@@ -1763,6 +1763,9 @@ bool RISCVInstrInfo::verifyInstruction(const MachineInstr &MI,
         case RISCVOp::OPERAND_SIMM5_PLUS1:
           Ok = (isInt<5>(Imm) && Imm != -16) || Imm == 16;
           break;
+        case RISCVOp::OPERAND_UIMM5_NONZERO:
+          Ok = (isUInt<5>(Imm) && Imm != 0);
+          break;
         case RISCVOp::OPERAND_SIMM6:
           Ok = isInt<6>(Imm);
           break;

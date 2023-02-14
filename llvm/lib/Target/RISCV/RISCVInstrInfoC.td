@@ -90,6 +90,8 @@ def c_lui_imm : Operand<XLenVT>,
                 ImmLeaf<XLenVT, [{return (Imm != 0) &&
                                  (isUInt<5>(Imm) ||
                                   (Imm >= 0xfffe0 && Imm <= 0xfffff));}]> {
+  let OperandType = "OPERAND_UIMM5_NONZERO";
+  let OperandNamespace = "RISCVOp";
   let ParserMatchClass = CLUIImmAsmOperand;
   let EncoderMethod = "getImmOpValue";
   let DecoderMethod = "decodeCLUIImmOperand";
