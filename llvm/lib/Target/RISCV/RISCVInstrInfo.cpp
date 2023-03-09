@@ -1084,6 +1084,7 @@ RISCVCC::CondCode RISCVInstrInfo::getCondFromBranchOpc(unsigned Opc) {
   default:
     return RISCVCC::COND_INVALID;
   case RISCV::BEQ:
+  case RISCV::C_BEQZ:
   case RISCV::BEQI:
   case RISCV::CV_BEQIMM:
   case RISCV::QC_BEQI:
@@ -1092,6 +1093,7 @@ RISCVCC::CondCode RISCVInstrInfo::getCondFromBranchOpc(unsigned Opc) {
   case RISCV::NDS_BEQC:
     return RISCVCC::COND_EQ;
   case RISCV::BNE:
+  case RISCV::C_BNEZ:
   case RISCV::BNEI:
   case RISCV::QC_BNEI:
   case RISCV::QC_E_BNEI:
@@ -1138,18 +1140,25 @@ bool RISCVInstrInfo::evaluateCondBranch(RISCVCC::CondCode CC, int64_t C0,
   }
 }
 
+static bool isCompressedBranch(unsigned Opcode) {
+  return Opcode == RISCV::C_BEQZ || Opcode == RISCV::C_BNEZ;
+}
+
 // The contents of values added to Cond are not examined outside of
 // RISCVInstrInfo, giving us flexibility in what to push to it. For RISCV, we
-// push BranchOpcode, Reg1, Reg2.
+// push BranchOpcode, Reg1 and Reg2 if branch is not compressed.
 static void parseCondBranch(MachineInstr &LastInst, MachineBasicBlock *&Target,
                             SmallVectorImpl<MachineOperand> &Cond) {
   // Block ends with fall-through condbranch.
   assert(LastInst.getDesc().isConditionalBranch() &&
          "Unknown conditional branch");
-  Target = LastInst.getOperand(2).getMBB();
-  Cond.push_back(MachineOperand::CreateImm(LastInst.getOpcode()));
+  unsigned Opcode = LastInst.getOpcode();
+  unsigned TargetOpNum = LastInst.getNumExplicitOperands() - 1;
+  Target = LastInst.getOperand(TargetOpNum).getMBB();
+  Cond.push_back(MachineOperand::CreateImm(Opcode));
   Cond.push_back(LastInst.getOperand(0));
-  Cond.push_back(LastInst.getOperand(1));
+  if (!isCompressedBranch(Opcode))
+    Cond.push_back(LastInst.getOperand(1));
 }
 
 static unsigned getInverseXqcicmOpcode(unsigned Opcode) {
