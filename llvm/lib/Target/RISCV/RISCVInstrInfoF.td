@@ -126,6 +126,8 @@ def frmarg : Operand<XLenVT> {
   let ParserMatchClass = FRMArg;
   let PrintMethod = "printFRMArg";
   let DecoderMethod = "decodeFRMArg";
+  let OperandType = "OPERAND_FRMARG";
+  let OperandNamespace = "RISCVOp";
 }
 
 //===----------------------------------------------------------------------===//

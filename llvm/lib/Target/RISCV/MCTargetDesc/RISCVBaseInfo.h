@@ -271,6 +271,9 @@ enum OperandType : unsigned {
   // instructions to represent a value that be passed as AVL to either vsetvli
   // or vsetivli.
   OPERAND_AVL,
+  // Operand is a 3-bit rounding mode, '111' indicates FRM register.
+  // Represents 'frm' argument passing to floating-point operations.
+  OPERAND_FRMARG,
 };
 } // namespace RISCVOp
 
