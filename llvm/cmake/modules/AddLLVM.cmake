@@ -1594,6 +1594,7 @@ if(NOT LLVM_TOOLCHAIN_TOOLS)
     llvm-profdata
     llvm-profgen
     llvm-symbolizer
+    llvm-snippy
     # symlink version of some of above tools that are enabled by
     # LLVM_INSTALL_BINUTILS_SYMLINKS.
     addr2line
