@@ -1,0 +1,12 @@
+add_llvm_library(LLVMSnippySupport
+  DISABLE_LLVM_LINK_LLVM_DYLIB
+  STATIC
+  DiagnosticInfo.cpp
+  DynLibLoader.cpp
+  OpcodeCache.cpp
+  Options.cpp
+  OpcodeGenerator.cpp
+  RandUtil.cpp
+  Utils.cpp
+  YAMLUtils.cpp
+)
