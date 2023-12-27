@@ -20,7 +20,6 @@ set(CMAKE_CXX_COMPILER clang++ CACHE STRING "")
 set(LLVM_ENABLE_LLD ON CACHE BOOL "")
 set(LLVM_ENABLE_PROJECTS
   lld
-  clang
   CACHE STRING "")
 set(CLANG_BUILD_EXAMPLES OFF CACHE BOOL "")
 set(LLVM_BUILD_TESTS OFF CACHE BOOL "")
@@ -28,7 +27,6 @@ set(LLVM_ENABLE_ASSERTIONS ON CACHE BOOL "")
 set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL "")
 set(LLVM_CCACHE_BUILD ON CACHE BOOL "")
 set(LLVM_TARGETS_TO_BUILD
-  X86
   RISCV CACHE STRING "")
 set(CLANG_ENABLE_STATIC_ANALYZER OFF CACHE BOOL "")
 set(CLANG_ENABLE_ARCMT OFF CACHE BOOL "")
@@ -115,9 +113,9 @@ This section allows you to set various command-line options. They can also be se
 
 - march: Target architecture (e.g., "riscv64-linux-gnu").
 - model-plugin: Model plugin to use (e.g., "None").
-- num-instrs: Number of instructions.
+- num-instrs: Number of instructions to generate.
 - o: Base name for the output file.
-- init-regs-in-elf: Initialize non-fixed registers in the ELF.
+- init-regs-in-elf: Initialize non-reserved registers in the ELF.
 
 ```
 march: "riscv64-linux-gnu"
@@ -129,20 +127,20 @@ The llvm-snippy generator potentially supports a variety of architectures. Curre
 model-plugin: "None"
 ```
 
-The llvm-snippy generator also supports various models through a unified interface. We plan to open-source SAIL-based and spike-based models that are already operational within Syntacore. Currently, the primary mode is without a model unless you write and integrate your own.
+The llvm-snippy generator also supports various models through a unified interface. Currently, the primary mode is without a model unless you write and integrate your own.
 
 ```
 num-instrs: 10000
 o: "snippet.elf"
 ```
 
-These options specify the number of instructions and the base name of the output file. You can set num-instrs to "all" and the entire section will be filled.
+These options specify the number of instructions and the base name of the output file. You can set num-instrs to "all" and the entire code section will be filled.
 
 ```
 init-regs-in-elf: true
 ```
 
-It initializes all unfixed registers with random values at the beginning of the snippet. This option helps avoid non-determinism due to different register settings before a function call.
+It initializes all non-reserved registers with random values at the beginning of the snippet. This option helps avoid non-determinism due to different register settings before a function call.
 
 ### sections
 
@@ -152,7 +150,7 @@ The section names are arbitrary and conditional—they will be mangled in the fi
 
 In the current open-source implementation, there is no distinction between VMA and LMA. The latter is ignored for practical purposes, but it is recommended to specify them as identical for now, just in case.
 
-### Раздел histogram
+### histogram
 
 The histogram sets weights for so-called primary instructions. The generator produces two types of instructions—primary ones according to the histogram and auxiliary ones necessary, for example, for memory access or initial register setup. Auxiliary instructions do not participate in probability distribution, and from the histogram perspective, they do not exist.
 
@@ -164,7 +162,7 @@ To see possible instruction names for the histogram, you can use the following c
 ./llvm-snippy -march=riscv64-linux-gnu -list-opcode-names
 ```
 
-At the time of open-sourcing, llvm-snippy works with all RISCV instructions.
+At the time of open-sourcing, llvm-snippy works with all RISCV instructions available in the LLVM backend.
 
 ### access-ranges
 
@@ -243,7 +241,7 @@ You can reproduce the same generation by repeating the call with the same seed.
 > ${SNIPPY_INSTALL}/llvm-snippy --seed=1703685916769088352 layout.yaml
 ```
 
-Of course, not everything is covered in this quick start. We will open-source detailed documentation soon. For now, the help command is available.
+Of course, not everything is covered in this quick start. We hope to publish detailed documentation soon. For now, the help command is available.
 
 # Contacts
 
