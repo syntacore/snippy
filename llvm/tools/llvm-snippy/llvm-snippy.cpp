@@ -198,11 +198,6 @@ static snippy::opt<bool> DumpMI(
 namespace snippy {
 
 static snippy::opt<std::string>
-    MemorySeed("memory-seed",
-               cl::desc("Seed for runtime memory initialization"),
-               cl::cat(Options), cl::init(""));
-
-static snippy::opt<std::string>
     Seed("seed",
          cl::desc("seed for instruction generation. If the option is not used "
                   "or its value is not set, seed will be generated randomly."),
