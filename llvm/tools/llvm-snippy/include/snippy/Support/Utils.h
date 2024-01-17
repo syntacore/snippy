@@ -153,6 +153,36 @@ template <class Target, class Source> Target narrowCast(Source Value) {
   return Narrow;
 }
 
+inline long long int alignSignedTo(long long int Value,
+                                   long long unsigned Align) {
+  if (Value < 0) {
+    assert(Value != std::numeric_limits<long long int>::min());
+    return -1ll * alignDown(std::abs(Value), Align);
+  }
+  return alignTo(Value, Align);
+}
+
+inline long long int alignSignedDown(long long int Value,
+                                     long long unsigned Align) {
+  if (Value < 0) {
+    assert(Value != std::numeric_limits<long long int>::min());
+    return -1ll * alignTo(std::abs(Value), Align);
+  }
+  return alignDown(Value, Align);
+}
+
+template <typename T,
+          std::enable_if_t<std::is_integral_v<T> && std::is_signed<T>::value,
+                           bool> = true>
+bool IsSAddOverflow(T A, T B) {
+  auto NumBits = sizeof(T) * CHAR_BIT;
+  APInt Op1(NumBits, A, true);
+  APInt Op2(NumBits, B, true);
+  bool Overflow = false;
+  (void)Op1.sadd_ov(Op2, Overflow);
+  return Overflow;
+}
+
 } // namespace snippy
 } // namespace llvm
 
