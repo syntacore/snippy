@@ -177,7 +177,16 @@ unsigned CFPermutation::calculateMaxDistance(unsigned BBNum, unsigned Size) {
   assert(Branch != BB->end());
   const auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
   const auto &SnippyTgt = GC.getLLVMState().getSnippyTarget();
-  auto MaxBranchDstMod = SnippyTgt.getMaxBranchDstMod(Branch->getOpcode());
+  auto PCDist = BranchSettings->getPCDistance();
+  auto MaxBranchDstMod =
+      PCDist.Max.value_or(SnippyTgt.getMaxBranchDstMod(Branch->getOpcode()));
+  auto MaxInstrSize = SnippyTgt.getMaxInstrSize();
+  if (MaxBranchDstMod < MaxInstrSize)
+    snippy::fatal(GC.getLLVMState().getCtx(),
+                  "Max PC distance (" + Twine(MaxBranchDstMod) +
+                      ") is less than max instruction size",
+                  Twine(MaxInstrSize));
+
   double AverageBBNInstrs =
       GC.getRequestedInstrsNum(*CurrMF) / static_cast<double>(Size);
   // NOTE: we can have other overhead, for example, load/store. May be it worth
@@ -191,10 +200,9 @@ unsigned CFPermutation::calculateMaxDistance(unsigned BBNum, unsigned Size) {
   assert(std::isfinite(AverageBBNInstrs) &&
          "Average number of instructions per BB must be finite");
 
-  auto MaxInstsSize = SnippyTgt.getMaxInstrSize();
   // NOTE: may be it is better to calculate weighted sum in future
   double MaxDistanceForThisBranch =
-      MaxBranchDstMod / (AverageBBNInstrs * MaxInstsSize) - 1;
+      MaxBranchDstMod / (AverageBBNInstrs * MaxInstrSize) - 1;
   assert(MaxDistanceForThisBranch <= std::numeric_limits<unsigned>::max() &&
          "Max distance doesn't fit in unsigned");
   return MaxDistanceForThisBranch;
@@ -250,7 +258,8 @@ void CFPermutation::initBlocksInfo(unsigned Size) {
                             ? calculateMaxDistance(BB, Size)
                             : *BranchSettings->getBlockDistance().Max;
     if (MaxBBDst > static_cast<unsigned>(std::numeric_limits<int>::max()))
-      report_fatal_error("Max block distance doesn't fit int");
+      report_fatal_error(
+          "Max block distance doesn't fit int: " + Twine(MaxBBDst), false);
     // Loop branch has two more blocks with instructions between source and
     // destination PC comparing with if branch (it is first and last blocks).
     // Thus we need to decrease max distance of backward branch.
