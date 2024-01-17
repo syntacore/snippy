@@ -104,7 +104,10 @@ class StridedImmediate {
 
 public:
   StridedImmediate(int64_t MinIn, int64_t MaxIn, uint64_t StrideIn)
-      : Min(MinIn), Max(MaxIn), Stride(StrideIn), Init(true) {}
+      : Min(MinIn), Max(MaxIn), Stride(StrideIn), Init(true) {
+    assert(Min <= Max);
+    assert(Stride == 0 || isPowerOf2_64(Stride));
+  }
   StridedImmediate() = default;
 
   bool isInitialized() const { return Init; }
@@ -119,6 +122,15 @@ public:
   auto getStride() const {
     assert(isInitialized());
     return Stride;
+  }
+
+  bool operator==(const StridedImmediate &Imm) const {
+    if (isInitialized() != Imm.isInitialized())
+      return false;
+    if (!isInitialized())
+      return true;
+    return getMin() == Imm.getMin() && getMax() == Imm.getMax() &&
+           getStride() == Imm.getStride();
   }
 };
 
@@ -169,7 +181,6 @@ int genImmInInterval(const StridedImmediate &StridedImm) {
   auto SkewMax = std::abs(StridedImm.getMax());
   Min = (Min < 0 ? -1ll : 1ll) * alignTo(std::abs(Min), Stride, SkewMin);
   Max = (Max < 0 ? -1ll : 1ll) * alignDown(std::abs(Max), Stride, SkewMax);
-
   assert(Max >= Min);
   assert((StridedImm.getMin() - Min) % Stride == 0);
   assert((StridedImm.getMax() - Max) % Stride == 0);
