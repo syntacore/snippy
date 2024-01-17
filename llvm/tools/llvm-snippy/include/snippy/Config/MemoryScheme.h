@@ -188,6 +188,12 @@ struct AddressRestriction {
   size_t AccessAlignment;
   StridedImmediate ImmOffsetRange;
   std::unordered_set<unsigned> Opcodes;
+
+  bool operator==(const AddressRestriction &AR) const {
+    return AccessSize == AR.AccessSize &&
+           AccessAlignment == AR.AccessAlignment &&
+           ImmOffsetRange == AR.ImmOffsetRange && Opcodes == AR.Opcodes;
+  }
 };
 
 // Parameters that define requirements for the randomly generated address.
