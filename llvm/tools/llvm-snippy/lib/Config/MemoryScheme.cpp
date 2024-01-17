@@ -32,14 +32,6 @@ namespace {
 constexpr const size_t MaxAccessSize = 8;
 }
 namespace llvm {
-namespace snippy {
-
-// Context for MemoryAccess yaml parsing
-struct MemAccessContext {
-  MemoryAccessMode Mode;
-  const SnippyTarget *SnpTgt;
-};
-} // namespace snippy
 
 template <> struct yaml::MappingTraits<snippy::AccessAddress> {
   static void mapping(yaml::IO &IO, snippy::AccessAddress &AA) {
@@ -60,12 +52,11 @@ template <> struct yaml::MappingTraits<snippy::AddressInfo> {
 
 template <>
 struct yaml::MappingContextTraits<std::unique_ptr<snippy::MemoryAccess>,
-                                  snippy::MemAccessContext> {
+                                  snippy::MemoryAccessMode> {
   static void mapping(yaml::IO &IO,
                       std::unique_ptr<snippy::MemoryAccess> &MemAccess,
-                      snippy::MemAccessContext &MemAccCont) {
+                      snippy::MemoryAccessMode &Mode) {
     assert(IO.outputting() == false);
-    auto [Mode, SnpTgtPtr] = MemAccCont;
     switch (Mode) {
     default:
       llvm_unreachable("Unhandled memory access mode");
@@ -137,7 +128,7 @@ struct yaml::MappingContextTraits<std::unique_ptr<snippy::MemoryAccess>,
     return std::make_unique<snippy::MemoryAccessAddresses>(
         std::move(AddressesScheme));
   }
-};
+}; // namespace llvm
 
 template <> struct yaml::SequenceTraits<snippy::MemoryAccessSeq> {
   static size_t size(yaml::IO &IO, snippy::MemoryAccessSeq &Seq) {
@@ -166,25 +157,22 @@ template <> struct yaml::MappingTraits<snippy::MemoryBank> {
   }
 };
 
-void fillBaseAccesses(yaml::IO &IO, snippy::MemoryAccessSeq &BaseAccesses,
-                      snippy::MemAccessContext &MemAccCont) {
-  MemAccCont.Mode = snippy::MemoryAccessMode::Range;
-  IO.mapOptionalWithContext("access-ranges", BaseAccesses, MemAccCont);
-  MemAccCont.Mode = snippy::MemoryAccessMode::Eviction;
-  IO.mapOptionalWithContext("access-evictions", BaseAccesses, MemAccCont);
-  MemAccCont.Mode = snippy::MemoryAccessMode::Addresses;
-  IO.mapOptionalWithContext("access-addresses", BaseAccesses, MemAccCont);
+void fillBaseAccesses(yaml::IO &IO, snippy::MemoryAccessSeq &BaseAccesses) {
+  snippy::MemoryAccessMode Mode{};
+  Mode = snippy::MemoryAccessMode::Range;
+  IO.mapOptionalWithContext("access-ranges", BaseAccesses, Mode);
+  Mode = snippy::MemoryAccessMode::Eviction;
+  IO.mapOptionalWithContext("access-evictions", BaseAccesses, Mode);
+  Mode = snippy::MemoryAccessMode::Addresses;
+  IO.mapOptionalWithContext("access-addresses", BaseAccesses, Mode);
 }
 
-template <>
-struct yaml::MappingContextTraits<snippy::MemoryAccessesGroup,
-                                  snippy::MemAccessContext> {
-  static void mapping(yaml::IO &IO, snippy::MemoryAccessesGroup &MG,
-                      snippy::MemAccessContext &MemAccCont) {
+template <> struct yaml::MappingTraits<snippy::MemoryAccessesGroup> {
+  static void mapping(yaml::IO &IO, snippy::MemoryAccessesGroup &MG) {
     IO.mapOptional("weight", MG.Weight);
     if (MG.Weight < 0)
       report_fatal_error("Access-group weight can not be less than 0", false);
-    fillBaseAccesses(IO, MG.BaseGroupAccesses, MemAccCont);
+    fillBaseAccesses(IO, MG.BaseGroupAccesses);
   }
 };
 
@@ -201,16 +189,11 @@ template <> struct yaml::SequenceTraits<snippy::MemoryAccessesGroupSeq> {
 
 template <> struct yaml::MappingTraits<snippy::MemoryAccesses> {
   static void mapping(yaml::IO &IO, snippy::MemoryAccesses &MA) {
-    auto *Ctx = reinterpret_cast<snippy::MemAccessContext *>(IO.getContext());
-    assert(Ctx != nullptr);
-    const auto *SnpTgtPtr = Ctx->SnpTgt;
     // It doesn't matter in which order these fields are in the file. However,
     // yaml expects to have only one entry point for ranges and one for
     // evictions.
-    auto Context =
-        snippy::MemAccessContext{snippy::MemoryAccessMode::Range, SnpTgtPtr};
-    fillBaseAccesses(IO, MA.BaseAccesses, Context);
-    IO.mapOptionalWithContext("access-groups", MA.AccessGroups, Context);
+    fillBaseAccesses(IO, MA.BaseAccesses);
+    IO.mapOptional("access-groups", MA.AccessGroups);
     MA.extractMemSchemesFromAccessGroups();
     std::vector<snippy::MemoryBank> MBs;
     IO.mapOptional("restricted-addresses", MBs);
@@ -1041,26 +1024,17 @@ void MemoryScheme::print(raw_ostream &OS) const {
   MA.print(OS);
 }
 
-void MemoryAccesses::mapYaml(yaml::IO &IO, const SnippyTarget *SnpTgt) {
-  auto Ctx = MemAccessContext{};
-  Ctx.SnpTgt = SnpTgt;
-  auto *YamlContext = IO.getContext();
-  IO.setContext(&Ctx);
+void MemoryAccesses::mapYaml(yaml::IO &IO) {
   yaml::MappingTraits<MemoryAccesses>::mapping(IO, *this);
-  IO.setContext(YamlContext);
 }
 
-void MemoryAccesses::loadFromYaml(LLVMContext &Ctx, StringRef Filename,
-                                  const SnippyTarget *SnpTgtPtr) {
+void MemoryAccesses::loadFromYaml(LLVMContext &Ctx, StringRef Filename) {
   auto File = llvm::MemoryBuffer::getFile(Filename.data());
   if (!File)
     snippy::fatal(Ctx, "Memory scheme file not found", Filename);
   auto Document = std::move(*File);
-  auto IOCtx = MemAccessContext{};
-  IOCtx.SnpTgt = SnpTgtPtr;
-  yaml::Input Yin(Document->getBuffer(), &IOCtx);
+  yaml::Input Yin(Document->getBuffer());
   Yin >> *this;
-  Yin.setContext(nullptr);
 
   if (auto Err = Yin.error())
     snippy::fatal(Ctx,
@@ -1139,34 +1113,23 @@ std::optional<::AddressGlobalId> MemoryScheme::getPreselectedAddressId() {
 }
 
 AddressInfo MemoryScheme::randomAddress(size_t AccessSize, size_t Alignment,
-                                        const MCInstrDesc *InstrDescPtr,
-                                        bool InLoop, bool BurstMode) {
-  auto InstrDescOrEmpty = std::vector<const MCInstrDesc *>{};
-  if (InstrDescPtr)
-    InstrDescOrEmpty.push_back(InstrDescPtr);
-
+                                        bool BurstMode) {
   auto ChooseGenInfo = [&](auto &&Scheme) {
     return AddressGenInfo::singleAccess(AccessSize, Alignment, BurstMode);
   };
 
   return std::get<AddressInfo>(randomAddressForInstructions(
-      AccessSize, Alignment, InstrDescOrEmpty.begin(), InstrDescOrEmpty.end(),
-      InLoop, ChooseGenInfo, BurstMode));
+      AccessSize, Alignment, ChooseGenInfo, BurstMode));
 }
 
 std::vector<AddressInfo>
 MemoryScheme::randomBurstGroupAddresses(ArrayRef<AddressRestriction> ARRange,
-                                        const OpcodeCache &OpcC) {
+                                        const OpcodeCache &OpcC,
+                                        const SnippyTarget &SnpTgt) {
   assert(!ARRange.empty());
 
   std::vector<AddressInfo> Addresses;
   for (auto &AR : ARRange) {
-    auto InstrDescPtrs = std::vector<const MCInstrDesc *>{};
-    std::transform(AR.Opcodes.begin(), AR.Opcodes.end(),
-                   std::back_inserter(InstrDescPtrs), [&OpcC](unsigned Opcode) {
-                     assert(OpcC.desc(Opcode));
-                     return OpcC.desc(Opcode);
-                   });
 
     auto ChooseGenInfo = [&](auto &&Scheme) {
       return AddressGenInfo::singleAccess(AR.AccessSize, AR.AccessAlignment,
@@ -1174,8 +1137,7 @@ MemoryScheme::randomBurstGroupAddresses(ArrayRef<AddressRestriction> ARRange,
     };
 
     auto AI = std::get<AddressInfo>(randomAddressForInstructions(
-        AR.AccessSize, AR.AccessAlignment, InstrDescPtrs.begin(),
-        InstrDescPtrs.end(), /*InLoop*/ false, ChooseGenInfo,
+        AR.AccessSize, AR.AccessAlignment, ChooseGenInfo,
         /*BurstMode*/ true));
 
     Addresses.push_back(std::move(AI));
