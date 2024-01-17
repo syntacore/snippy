@@ -578,7 +578,8 @@ unsigned RegPoolWrapper::getNumAvailableInSet(ArrayRef<Register> Registers,
                                               IsReservedTys &&...Args) const {
   return std::count_if(
       Registers.begin(), Registers.end(), [&Args..., this](auto Reg) {
-        return !isReserved(Reg, std::forward<IsReservedTys>(Args)...);
+        const auto *Pool = this; // silence erroneous warning
+        return !Pool->isReserved(Reg, std::forward<IsReservedTys>(Args)...);
       });
 }
 

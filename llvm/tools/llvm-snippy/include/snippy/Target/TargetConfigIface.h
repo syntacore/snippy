@@ -16,8 +16,9 @@ class IO;
 
 namespace snippy {
 
-struct TargetConfigInterface {
-  virtual ~TargetConfigInterface() = 0;
+class TargetConfigInterface {
+public:
+  virtual ~TargetConfigInterface(){};
 
   template <typename ImplT> ImplT &getImpl() {
     return static_cast<ImplT &>(*this);
@@ -30,8 +31,6 @@ struct TargetConfigInterface {
   virtual bool hasConfig() const = 0;
   virtual void mapConfig(yaml::IO &IO) = 0;
 };
-
-inline TargetConfigInterface::~TargetConfigInterface() {}
 
 } // namespace snippy
 } // namespace llvm
