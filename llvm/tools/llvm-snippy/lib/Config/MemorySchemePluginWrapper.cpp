@@ -65,7 +65,7 @@ MemorySchemePluginWrapper::getAddress(size_t AccessSize, size_t Alignment,
     report_fatal_error("Invalid memory scheme plugin functions table:"
                        " missing generateAddressId()",
                        false);
-  auto AddrId = ::AddressGlobalId{0u, 0u, 0u};
+  auto AddrId = ::AddressGlobalId{0, {0, 0}};
   DLTable->generateAddressId(&AddrId);
   return AddrId;
 }

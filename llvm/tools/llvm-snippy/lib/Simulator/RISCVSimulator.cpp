@@ -42,11 +42,10 @@ ContainerType applyMask(const ContainerType &Vect, IntegerType Mask) {
 static bool hasPCInRH(const RegistersWithHistograms &RH) {
   constexpr auto PCRegClassPrefix = "P";
   const auto &ClassValues = RH.Registers.ClassValues;
-  auto PCRegClassIt =
-      std::find_if(ClassValues.begin(), ClassValues.end(),
-                   [&PCRegClassPrefix](const RegisterClassValues &CV) {
-                     return CV.RegType == PCRegClassPrefix;
-                   });
+  auto PCRegClassIt = std::find_if(ClassValues.begin(), ClassValues.end(),
+                                   [](const RegisterClassValues &CV) {
+                                     return CV.RegType == PCRegClassPrefix;
+                                   });
   if (PCRegClassIt == ClassValues.end())
     return false;
 

@@ -50,7 +50,6 @@ void yaml::yamlize(IO &IO, Interval &Options, bool, EmptyContext &Ctx) {
 }
 
 template <> struct yaml::SequenceTraits<HexInterval> {
-  static const bool flow = true;
   static size_t size(yaml::IO &IO, HexInterval &List) {
     return List.Values.size();
   }
@@ -141,11 +140,11 @@ Error IntervalsToVerifyFinder::fillStartAddressesOfFunctions() {
     if (!TheObjContents.TextSection.containsSymbol(F))
       continue;
 
-    if (Expected Type = F.getType();
+    if (auto Type = F.getType();
         !Type || *Type != object::SymbolRef::ST_Function)
       continue;
 
-    Expected Addr = F.getAddress();
+    auto Addr = F.getAddress();
     if (!Addr)
       return Addr.takeError();
     FunctionAddresses.push_back(*Addr);
@@ -206,7 +205,7 @@ extractObjectContents(StringRef ObjectBytes, StringRef EntryPointName) {
   auto MemBuf = MemoryBuffer::getMemBuffer(ObjectBytes, "", false);
   std::unique_ptr<object::ObjectFile> Obj;
 
-  Expected Bin = object::createBinary(*MemBuf);
+  auto Bin = object::createBinary(*MemBuf);
   if (!Bin)
     return Bin.takeError();
 
@@ -224,15 +223,15 @@ extractObjectContents(StringRef ObjectBytes, StringRef EntryPointName) {
         inconvertibleErrorCode(),
         "Object file does not contain specified entry function");
 
-  Expected TextSection = EntryIt->getSection();
+  auto TextSection = EntryIt->getSection();
   if (!TextSection)
     return TextSection.takeError();
 
-  Expected EntryAddress = EntryIt->getAddress();
+  auto EntryAddress = EntryIt->getAddress();
   if (!EntryAddress)
     return EntryAddress.takeError();
 
-  Expected SectionContents = TextSection.get()->getContents();
+  auto SectionContents = TextSection.get()->getContents();
   if (!SectionContents)
     return SectionContents.takeError();
 
@@ -243,7 +242,7 @@ extractObjectContents(StringRef ObjectBytes, StringRef EntryPointName) {
 
 Error IntervalsToVerifyFinder::fillIntervals(StringRef ObjectBytes,
                                              StringRef EntryPointName) {
-  Expected ObjectContents = extractObjectContents(ObjectBytes, EntryPointName);
+  auto ObjectContents = extractObjectContents(ObjectBytes, EntryPointName);
   if (!ObjectContents)
     return ObjectContents.takeError();
   TheObjContents = std::move(*ObjectContents);
@@ -259,7 +258,7 @@ Error IntervalsToVerifyFinder::fillIntervals(StringRef ObjectBytes,
     if (auto DisasErr = writeInstructionAddresses(FuncAddr))
       return DisasErr;
 
-    Expected Interval = getEnclosedInterval(FirstInstrNum, LastInstrNum);
+    auto Interval = getEnclosedInterval(FirstInstrNum, LastInstrNum);
     if (!Interval)
       return Interval.takeError();
 
@@ -290,8 +289,8 @@ IntervalsToVerifyFinder::getLastNthInstrAddress(size_t Num) const {
 Expected<Interval>
 IntervalsToVerifyFinder::getEnclosedInterval(size_t FirstInstrNum,
                                              size_t LastInstrNum) const {
-  Expected First = getNthInstrAddress(FirstInstrNum);
-  Expected Last = getLastNthInstrAddress(LastInstrNum);
+  auto First = getNthInstrAddress(FirstInstrNum);
+  auto Last = getLastNthInstrAddress(LastInstrNum);
 
   if (First && Last)
     return Interval{*First, *Last};

@@ -232,6 +232,8 @@ struct EnumMapper {
 
   virtual void enumCase(int Value, const char *Name,
                         const char *Description) const = 0;
+
+  virtual ~EnumMapper() {}
 };
 
 class ClEnumValues : private SmallVector<cl::OptionEnumValue> {

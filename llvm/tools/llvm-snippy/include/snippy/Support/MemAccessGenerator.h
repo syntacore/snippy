@@ -1,4 +1,4 @@
-//===-- MemAccessGenerator.h -------------------------------------*- C++-*-===//
+//===-- MemAccessGenerator.h ------------------------------------*- C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -165,6 +165,9 @@ public:
 
   size_t getId() const { return MAGId; }
 };
+
+// deduction guide for ContT
+template <typename ContT> OwningMAG(ContT, size_t) -> OwningMAG<ContT>;
 
 } // namespace snippy
 } // namespace llvm
