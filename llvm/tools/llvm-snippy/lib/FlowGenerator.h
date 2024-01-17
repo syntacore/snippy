@@ -29,7 +29,7 @@ class LLVMState;
 class RegPool;
 struct RegisterState;
 struct GeneratorSettings;
-struct ImmediateHistogram;
+class ImmediateHistogram;
 
 class FlowGenerator {
   const OpcodeCache &OpCC;
