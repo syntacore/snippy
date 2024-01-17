@@ -1354,10 +1354,11 @@ selectAddressForSingleInstrFromBurstGroup(AddressInfo OrigAI,
   assert(OpcodeAR.Opcodes.size() == 1 &&
          "Expected AddressRestriction only for one opcode");
   auto Opcode = *OpcodeAR.Opcodes.begin();
+  auto &SnpTgt = GC.getLLVMState().getSnippyTarget();
+  auto &MIDesc = InstrInfo.get(Opcode);
   for (unsigned i = 0; i < BurstAddressRandomizationThreshold; ++i) {
     auto CandidateAI =
-        MS.randomAddress(OpcodeAR.AccessSize, OpcodeAR.AccessAlignment,
-                         &InstrInfo.get(Opcode), false, true);
+        MS.randomAddress(OpcodeAR.AccessSize, OpcodeAR.AccessAlignment, false);
 
     auto Stride = std::max<int64_t>(OpcodeAR.ImmOffsetRange.getStride(),
                                     CandidateAI.MinStride);
@@ -1420,10 +1421,11 @@ static auto collectPrimaryAddresses(
     const std::map<unsigned, AddressRestriction> &BaseRegToStrongestAR,
     GeneratorContext &GC) {
   auto &MS = GC.getMemoryScheme();
+  auto &SnpTgt = GC.getLLVMState().getSnippyTarget();
   auto ARRange = make_second_range(BaseRegToStrongestAR);
   std::vector<AddressRestriction> ARs(ARRange.begin(), ARRange.end());
   std::vector<AddressInfo> PrimaryAddresses =
-      MS.randomBurstGroupAddresses(ARs, GC.getOpcodeCache());
+      MS.randomBurstGroupAddresses(ARs, GC.getOpcodeCache(), SnpTgt);
   assert(PrimaryAddresses.size() == BaseRegToStrongestAR.size());
   std::map<unsigned, AddressInfo> BaseRegToPrimaryAddress;
   transform(
@@ -1821,7 +1823,6 @@ chooseAddrInfoForInstr(MachineInstr &MI, GeneratorContext &SGCtx,
   auto [AccessSize, Alignment] =
       SnippyTgt.getAccessSizeAndAlignment(Opcode, SGCtx, *MI.getParent());
 
-  auto InstrDescs = SmallVector{&MI.getDesc()};
   auto CurLoopGenInfo =
       ML ? SGCtx.getLoopsGenerationInfoForMBB(ML->getHeader()) : std::nullopt;
 
@@ -1837,8 +1838,7 @@ chooseAddrInfoForInstr(MachineInstr &MI, GeneratorContext &SGCtx,
   };
 
   auto Result =
-      MS.randomAddressForInstructions(AccessSize, Alignment, InstrDescs.begin(),
-                                      InstrDescs.end(), ML, ChooseAddrGenInfo);
+      MS.randomAddressForInstructions(AccessSize, Alignment, ChooseAddrGenInfo);
   const auto &AddrInfo = std::get<AddressInfo>(Result);
 
   assert(AddrInfo.MaxOffset >= 0);

@@ -348,7 +348,7 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
   // FIXME: Currently MemoryScheme can't be serialized
   if (!IO.outputting()) {
     IO.mapOptional("sections", Info.Sections);
-    Info.MS.MA.mapYaml(IO, Info.SnpTgt);
+    Info.MS.MA.mapYaml(IO);
   }
   IO.mapOptional("branches", Info.Branches);
   IO.mapOptional("burst", Info.Burst.Data);
@@ -391,8 +391,8 @@ static void diagnoseHistogram(LLVMContext &Ctx, const OpcodeCache &OpCC,
 Config::Config(const SnippyTarget &Tgt, StringRef PluginFilename,
                StringRef PluginInfoFilename, OpcodeCache OpCC,
                bool ParseWithPlugin, LLVMContext &Ctx)
-    : SnpTgt(&Tgt), PluginManagerImpl(std::make_unique<PluginManager>()),
-      TargetConfig(SnpTgt->createTargetConfig()) {
+    : PluginManagerImpl(std::make_unique<PluginManager>()),
+      TargetConfig(Tgt.createTargetConfig()) {
   PluginManagerImpl->loadPluginLib(PluginFilename.str());
   if (ParseWithPlugin) {
     PluginManagerImpl->parseOpcodes(
