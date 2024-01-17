@@ -512,14 +512,18 @@ BlockGenPlanningImpl::processFunctionWithSize(const MachineFunction &MF) {
   return GenPlan;
 }
 
+static auto accumulateMISize(unsigned long long Acc, const MachineInstr &MI) {
+  auto InstrSize = MI.getDesc().getSize();
+  assert(InstrSize != 0 && "Instruction with unknown size is unsupported");
+  return Acc + InstrSize;
+}
+
+template <typename T> static auto getSize(T First, T Last) {
+  return std::accumulate(First, Last, 0ull, &accumulateMISize);
+}
+
 static auto getMBBSize(const MachineBasicBlock &MBB) {
-  return std::accumulate(
-      MBB.begin(), MBB.end(), 0ull, [](unsigned long long Acc, const auto &MI) {
-        size_t InstrSize = MI.getDesc().getSize();
-        assert(InstrSize != 0 &&
-               "Instruction with unknown size is unsupported");
-        return Acc + InstrSize;
-      });
+  return getSize(MBB.begin(), MBB.end());
 }
 
 static size_t calcFilledSize(const BlocksGenPlanTy &GenPlan,
@@ -538,7 +542,7 @@ static void setSizeForLoopBlock(BlocksGenPlanTy &GenPlan,
                                 const MachineBasicBlock &SelectedMBB,
                                 ArrayRef<const MachineBasicBlock *> LoopBlocks,
                                 NumericRange<ProgramCounterType> PCDist,
-                                GeneratorContext &SGCtx) {
+                                bool IsLatch, GeneratorContext &SGCtx) {
   assert(!GenPlan.count(&SelectedMBB));
   auto &SnpTgt = SGCtx.getLLVMState().getSnippyTarget();
   auto BrOpc = SelectedMBB.getFirstTerminator()->getOpcode();
@@ -558,6 +562,8 @@ static void setSizeForLoopBlock(BlocksGenPlanTy &GenPlan,
     PCDist.Max = MaxBranchDstMod;
 
   size_t FilledSize = calcFilledSize(GenPlan, LoopBlocks);
+  if (IsLatch) // Branches size isn't included in backward distance
+    FilledSize -= getSize(SelectedMBB.getFirstTerminator(), SelectedMBB.end());
 
   if (PCDist.Max.value() < FilledSize)
     snippy::fatal(SelectedMBB.getParent()->getFunction().getContext(),
@@ -602,7 +608,8 @@ void BlockGenPlanningImpl::fillPlanForTopLoopBySize(
 
   auto LoopBlocks = ML.getBlocks();
   for (auto *MBB : LoopBlocks)
-    setSizeForLoopBlock(GenPlan, *MBB, LoopBlocks, PCDist, *GenCtx);
+    setSizeForLoopBlock(GenPlan, *MBB, LoopBlocks, PCDist, ML.isLoopLatch(MBB),
+                        *GenCtx);
 }
 
 BlocksGenPlanTy
