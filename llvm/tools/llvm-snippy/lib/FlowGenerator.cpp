@@ -148,6 +148,13 @@ static snippy::opt<CallGraphDumpMode>
                  CallGraphDumpEnumOption::getClValues(),
                  cl::init(CallGraphDumpMode::Dot), cl::cat(Options));
 
+static snippy::opt<unsigned> BurstAddressRandomizationThreshold(
+    "burst-addr-rand-threshold",
+    cl::desc(
+        "Number of attempts to randomize address of each instruction in the "
+        "burst group"),
+    cl::Hidden, cl::init(100));
+
 } // namespace snippy
 
 LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(snippy::CallGraphDumpMode,
@@ -252,17 +259,32 @@ static void dumpBurstAccesses(std::stringstream &SS,
   for (const auto &BurstDesc : Accesses) {
     assert(!BurstDesc.empty() && "At least one range is expected");
     for (auto &RangeDesc : BurstDesc) {
-      assert(RangeDesc.MinOffset <= 0);
-      assert(RangeDesc.MaxOffset >= 0);
-      assert(RangeDesc.Address >= static_cast<MemAddr>(-RangeDesc.MinOffset));
-      assert(std::numeric_limits<MemAddr>::max() -
-                 static_cast<MemAddr>(RangeDesc.MaxOffset) >=
-             static_cast<MemAddr>(-RangeDesc.MinOffset));
-      auto BaseAddr =
-          RangeDesc.Address - static_cast<MemAddr>(-RangeDesc.MinOffset);
-      auto Size = static_cast<MemAddr>(RangeDesc.MaxOffset) +
-                  static_cast<MemAddr>(-RangeDesc.MinOffset) +
-                  RangeDesc.AccessSize;
+      assert(RangeDesc.MinOffset <= RangeDesc.MaxOffset);
+      bool IsMinNegative = RangeDesc.MinOffset < 0;
+      MemAddr MinOffsetAbs = std::abs(RangeDesc.MinOffset);
+      bool IsMaxNegative = RangeDesc.MaxOffset < 0;
+      MemAddr MaxOffsetAbs = std::abs(RangeDesc.MaxOffset);
+      assert(!IsMinNegative || RangeDesc.Address >= MinOffsetAbs);
+      assert(IsMinNegative ||
+             std::numeric_limits<MemAddr>::max() - RangeDesc.Address >=
+                 MinOffsetAbs);
+      auto BaseAddr = IsMinNegative ? RangeDesc.Address - MinOffsetAbs
+                                    : RangeDesc.Address + MinOffsetAbs;
+      MemAddr Size = 0;
+      if (IsMaxNegative) {
+        assert(MinOffsetAbs >= MaxOffsetAbs);
+        Size = MinOffsetAbs - MaxOffsetAbs;
+      } else if (IsMinNegative) {
+        assert(std::numeric_limits<MemAddr>::max() - MaxOffsetAbs >=
+               MinOffsetAbs);
+        Size = MaxOffsetAbs + MinOffsetAbs;
+      } else {
+        assert(MaxOffsetAbs >= MinOffsetAbs);
+        Size = MaxOffsetAbs - MinOffsetAbs;
+      }
+      assert(std::numeric_limits<MemAddr>::max() - Size >=
+             RangeDesc.AccessSize);
+      Size += RangeDesc.AccessSize;
       SS << "        - addr: 0x" << Twine::utohexstr(BaseAddr).str() << "\n";
       SS << "          size: " << Size << "\n";
       SS << "          stride: " << RangeDesc.MinStride << "\n";
@@ -1047,15 +1069,13 @@ static auto selectOperands(const MCInstrDesc &InstrDesc, unsigned BaseReg,
 }
 
 static auto collectAddressRestrictions(ArrayRef<unsigned> Opcodes,
-                                       ArrayRef<unsigned> OpcodeIdxToBaseReg,
                                        GeneratorContext &GC,
                                        const MachineBasicBlock &MBB) {
-  std::map<unsigned, AddressRestriction> BaseRegToAR;
+  std::map<unsigned, AddressRestriction> OpcodeToAR;
   const auto &State = GC.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   const auto &InstrInfo = State.getInstrInfo();
-  for (auto [Idx, Opcode] : enumerate(Opcodes)) {
-    auto BaseReg = OpcodeIdxToBaseReg[Idx];
+  for (auto Opcode : Opcodes) {
     const auto &InstrDesc = InstrInfo.get(Opcode);
     if (!SnippyTgt.canUseInMemoryBurstMode(Opcode))
       continue;
@@ -1067,26 +1087,64 @@ static auto collectAddressRestrictions(ArrayRef<unsigned> Opcodes,
         SnippyTgt.getAccessSizeAndAlignment(Opcode, GC, MBB);
     AR.ImmOffsetRange = SnippyTgt.getImmOffsetRangeForMemAccessInst(InstrDesc);
 
-    auto &&[FoundEntry, IsNew] = BaseRegToAR.try_emplace(BaseReg, AR);
-    if (IsNew)
-      continue;
-    // Choose the strongest restrictions between already existed ones and
-    // restrictions for the current opcode.
-    auto &FoundAR = FoundEntry->second;
-    FoundAR.Opcodes.insert(Opcode);
-    FoundAR.AccessSize = std::max(FoundAR.AccessSize, AR.AccessSize);
-    auto MinOff =
-        std::max(FoundAR.ImmOffsetRange.getMin(), AR.ImmOffsetRange.getMin());
-    auto MaxOff =
-        std::min(FoundAR.ImmOffsetRange.getMax(), AR.ImmOffsetRange.getMax());
-    assert(MinOff <= MaxOff && "Illegal range for offsets");
-    auto Stride = std::max(FoundAR.ImmOffsetRange.getStride(),
-                           AR.ImmOffsetRange.getStride());
-    assert(Stride == 0 || isPowerOf2_64(Stride));
-    FoundAR.ImmOffsetRange = StridedImmediate(MinOff, MaxOff, Stride);
-    FoundAR.AccessAlignment =
-        std::max(FoundAR.AccessAlignment, AR.AccessAlignment);
+    assert(!OpcodeToAR.count(Opcode) ||
+           OpcodeToAR[Opcode].ImmOffsetRange == AR.ImmOffsetRange);
+    OpcodeToAR.try_emplace(Opcode, AR);
   }
+  return OpcodeToAR;
+}
+
+static auto deduceStrongestRestrictions(
+    ArrayRef<unsigned> Opcodes, ArrayRef<unsigned> OpcodeIdxToBaseReg,
+    const std::map<unsigned, AddressRestriction> &OpcodeToAR) {
+  assert(Opcodes.size() == OpcodeIdxToBaseReg.size());
+  assert(all_of(Opcodes, [&OpcodeToAR](auto Opcode) {
+    return OpcodeToAR.count(Opcode);
+  }));
+  std::map<unsigned, std::set<unsigned>> BaseRegToOpcodes;
+  for (auto [OpcodeIdx, BaseReg] : enumerate(OpcodeIdxToBaseReg))
+    BaseRegToOpcodes[BaseReg].insert(Opcodes[OpcodeIdx]);
+
+  std::map<unsigned, AddressRestriction> BaseRegToAR;
+  for (const auto &[BaseReg, Opcodes] : BaseRegToOpcodes) {
+    auto StrongestAccessSize = std::max_element(
+        Opcodes.begin(), Opcodes.end(), [&OpcodeToAR](auto LHS, auto RHS) {
+          return OpcodeToAR.at(LHS).AccessSize < OpcodeToAR.at(RHS).AccessSize;
+        });
+    auto StrongestImmMin = std::max_element(
+        Opcodes.begin(), Opcodes.end(), [&OpcodeToAR](auto LHS, auto RHS) {
+          return OpcodeToAR.at(LHS).ImmOffsetRange.getMin() <
+                 OpcodeToAR.at(RHS).ImmOffsetRange.getMin();
+        });
+    auto StrongestImmMax = std::min_element(
+        Opcodes.begin(), Opcodes.end(), [&OpcodeToAR](auto LHS, auto RHS) {
+          return OpcodeToAR.at(LHS).ImmOffsetRange.getMax() <
+                 OpcodeToAR.at(RHS).ImmOffsetRange.getMax();
+        });
+    auto StrongestImmStride = std::max_element(
+        Opcodes.begin(), Opcodes.end(), [&OpcodeToAR](auto LHS, auto RHS) {
+          return OpcodeToAR.at(LHS).ImmOffsetRange.getStride() <
+                 OpcodeToAR.at(RHS).ImmOffsetRange.getStride();
+        });
+
+    AddressRestriction StrongestAR;
+
+    StrongestAR.AccessSize = OpcodeToAR.at(*StrongestAccessSize).AccessSize;
+    StrongestAR.AccessAlignment =
+        OpcodeToAR.at(*StrongestAccessSize).AccessAlignment;
+
+    StrongestAR.ImmOffsetRange = StridedImmediate(
+        OpcodeToAR.at(*StrongestImmMin).ImmOffsetRange.getMin(),
+        OpcodeToAR.at(*StrongestImmMax).ImmOffsetRange.getMax(),
+        OpcodeToAR.at(*StrongestImmStride).ImmOffsetRange.getStride());
+
+    // We insert all opcodes because the address chosen for this restriction
+    // will be used as a fallback if we fail to find another one.
+    StrongestAR.Opcodes.insert(Opcodes.begin(), Opcodes.end());
+
+    BaseRegToAR[BaseReg] = std::move(StrongestAR);
+  }
+
   return BaseRegToAR;
 }
 
@@ -1252,48 +1310,214 @@ static std::vector<unsigned> generateBaseRegs(MachineBasicBlock &MBB,
   return OpcodeIdxToBaseReg;
 }
 
-static std::map<unsigned, AddressInfo>
-mapRegToAI(MachineBasicBlock &MBB, ArrayRef<unsigned> OpcodeIdxToBaseReg,
-           ArrayRef<unsigned> Opcodes, MachineBasicBlock::iterator Ins,
-           RegPoolWrapper &RP, GeneratorContext &SGCtx) {
+// For the given AddressInfo and AddressRestriction try to find another
+// AddressInfo such that:
+// 1. New AddressInfo will cover different set of addresses (for better
+// addresses and offsets randomization) in burst groups
+// 2. Base address from the given AddressInfo may be reused for the new one. It
+// means that the provided AddressRestriction allows immediate offsets that are
+// necessary for the base address change.
+//
+// Example:
+// Given AddressInfo is: base address = 10, min offset = 0, max offset = 0 -->
+// effective address is 10 Given AddressRestriction on immediate offsets are:
+// min = -5, max = 5
+//
+// We are limited in the number of registers we can use for base addresses in
+// burst groups, but the given AddressInfo isn't really interesting: it doesn't
+// allow immediate offsets other than zero. So, we'd like to choose another
+// address info that provides wider range of immediate offsets and can use the
+// original base address under the given AddressRestrictions.
+//
+// Let's say we've choosen a new AddressInfo: base address = 15, min offset =
+// -10, max offset = 10 --> effective addresses are [5, 25] Replacement of the
+// base address gives: base address = 10, min offset = -5 , max offset = 15 -->
+// effective addresses are still the same [5, 25] Then we need to apply
+// AddressRestrictions: base address = 10, min offset = -5 , max offset = 5 -->
+// effective addresses were shrinked to [5, 15]
+static AddressInfo
+selectAddressForSingleInstrFromBurstGroup(AddressInfo OrigAI,
+                                          const AddressRestriction &OpcodeAR,
+                                          GeneratorContext &GC) {
+  if (OrigAI.MinOffset != 0 || OrigAI.MaxOffset != 0 ||
+      (OpcodeAR.ImmOffsetRange.getMin() == 0 &&
+       OpcodeAR.ImmOffsetRange.getMax() == 0)) {
+    // Either OrigAI allows non-zero offets, or address restrictions for the
+    // given opcode doesn't allow non-zero offsets. In both cases there is
+    // nothing to change.
+    return OrigAI;
+  }
+
+  auto &MS = GC.getMemoryScheme();
+  auto &InstrInfo = GC.getLLVMState().getInstrInfo();
+  auto OrigAddr = OrigAI.Address;
+  assert(OpcodeAR.Opcodes.size() == 1 &&
+         "Expected AddressRestriction only for one opcode");
+  auto Opcode = *OpcodeAR.Opcodes.begin();
+  for (unsigned i = 0; i < BurstAddressRandomizationThreshold; ++i) {
+    auto CandidateAI =
+        MS.randomAddress(OpcodeAR.AccessSize, OpcodeAR.AccessAlignment,
+                         &InstrInfo.get(Opcode), false, true);
+
+    auto Stride = std::max<int64_t>(OpcodeAR.ImmOffsetRange.getStride(),
+                                    CandidateAI.MinStride);
+    CandidateAI.MinStride = std::max<int64_t>(Stride, 1);
+
+    if (CandidateAI.Address == OrigAddr && CandidateAI.MinOffset == 0 &&
+        CandidateAI.MaxOffset == 0)
+      continue;
+
+    bool IsDiffNeg = OrigAddr >= CandidateAI.Address;
+    auto AbsDiff = IsDiffNeg ? OrigAddr - CandidateAI.Address
+                             : CandidateAI.Address - OrigAddr;
+    auto SMax = std::numeric_limits<decltype(CandidateAI.MinOffset)>::max();
+    auto SMin = std::numeric_limits<decltype(CandidateAI.MinOffset)>::min();
+    assert(SMax > 0);
+    // We are going to apply Diff to the signed type. Check that it fits.
+    if (!IsDiffNeg && AbsDiff > static_cast<decltype(AbsDiff)>(SMax))
+      continue;
+    else if (IsDiffNeg &&
+             AbsDiff > static_cast<decltype(AbsDiff)>(std::abs(SMin + 1)))
+      continue;
+
+    auto SDiff = static_cast<decltype(CandidateAI.MinOffset)>(AbsDiff);
+    if (IsDiffNeg)
+      SDiff = -SDiff;
+
+    if (IsSAddOverflow(SDiff, CandidateAI.MinOffset) ||
+        IsSAddOverflow(SDiff, CandidateAI.MaxOffset))
+      continue;
+
+    auto AlignedMinOffset =
+        alignSignedTo(CandidateAI.MinOffset + SDiff, CandidateAI.MinStride);
+    auto AlignedMaxOffset =
+        alignSignedDown(CandidateAI.MaxOffset + SDiff, CandidateAI.MinStride);
+    if (AlignedMaxOffset < AlignedMinOffset ||
+        (AlignedMinOffset == 0 && AlignedMaxOffset == 0))
+      continue;
+
+    if (OpcodeAR.ImmOffsetRange.getMin() <= AlignedMinOffset &&
+        AlignedMinOffset <= OpcodeAR.ImmOffsetRange.getMax() &&
+        AlignedMinOffset <= AlignedMaxOffset &&
+        (CandidateAI.Address + CandidateAI.MinOffset) % CandidateAI.MinStride ==
+            (OrigAddr + AlignedMinOffset) % CandidateAI.MinStride) {
+      CandidateAI.Address = OrigAddr;
+      CandidateAI.MinOffset = AlignedMinOffset;
+      CandidateAI.MaxOffset = AlignedMaxOffset;
+      return CandidateAI;
+    }
+  }
+  return OrigAI;
+}
+
+// Collect addresses that will meet the specified restrictions. We call such
+// addresses "primary" because they'll be used as a defaults for the given base
+// registers (set of opcodes mapped to the base register). Snippy will try to
+// randomize addresses in a way that not only primary addresses are accessed
+// (see selectAddressForSingleInstrFromBurstGroup), but base register is always
+// taken suitable for the primary address.
+static auto collectPrimaryAddresses(
+    const std::map<unsigned, AddressRestriction> &BaseRegToStrongestAR,
+    GeneratorContext &GC) {
+  auto &MS = GC.getMemoryScheme();
+  auto ARRange = make_second_range(BaseRegToStrongestAR);
+  std::vector<AddressRestriction> ARs(ARRange.begin(), ARRange.end());
+  std::vector<AddressInfo> PrimaryAddresses =
+      MS.randomBurstGroupAddresses(ARs, GC.getOpcodeCache());
+  assert(PrimaryAddresses.size() == BaseRegToStrongestAR.size());
+  std::map<unsigned, AddressInfo> BaseRegToPrimaryAddress;
+  transform(
+      zip(make_first_range(BaseRegToStrongestAR), std::move(PrimaryAddresses)),
+      std::inserter(BaseRegToPrimaryAddress, BaseRegToPrimaryAddress.begin()),
+      [](auto BaseRegToAI) {
+        auto &&[BaseReg, AI] = BaseRegToAI;
+        return std::make_pair(BaseReg, std::move(AI));
+      });
+
+  // Do additional randomization of immediate offsets for each address info to
+  // have a uniform distribution imm offsets (otherwise, for the majority of
+  // real memory schemes they'll be around zero).
+  assert(BaseRegToStrongestAR.size() == BaseRegToPrimaryAddress.size());
+  for (auto &&[RegToAR, RegToAI] :
+       zip(BaseRegToStrongestAR, BaseRegToPrimaryAddress)) {
+    auto &[Reg, AR] = RegToAR;
+    auto &[BaseReg, AI] = RegToAI;
+    assert(BaseReg == Reg);
+    (void)BaseReg, (void)Reg;
+    AI = randomlyShiftAddressOffsetsInImmRange(AI, AR.ImmOffsetRange);
+  }
+  return BaseRegToPrimaryAddress;
+}
+
+// Insert initialization of base addresses before the burst group.
+static void
+initializeBaseRegs(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
+                   std::map<unsigned, AddressInfo> &BaseRegToPrimaryAddress,
+                   RegPoolWrapper &RP, GeneratorContext &GC) {
+  auto &State = GC.getLLVMState();
+  const auto &SnippyTgt = State.getSnippyTarget();
+  for (auto &[BaseReg, AI] : BaseRegToPrimaryAddress) {
+    auto NewValue =
+        APInt(SnippyTgt.getAddrRegLen(State.getTargetMachine()), AI.Address);
+    assert(RP.isReserved(BaseReg, AccessMaskBit::W));
+    if (GC.getGenSettings().TrackingConfig.AddressVH) {
+      auto &I = GC.getOrCreateInterpreter();
+      auto OldValue = I.readReg(BaseReg);
+      SnippyTgt.transformValueInReg(MBB, Ins, OldValue, NewValue, BaseReg, RP,
+                                    GC);
+    } else
+      SnippyTgt.writeValueToReg(MBB, Ins, NewValue, BaseReg, RP, GC);
+  }
+}
+
+// This function returns address info to use for each opcode.
+static std::vector<AddressInfo>
+mapOpcodeIdxToAI(MachineBasicBlock &MBB, ArrayRef<unsigned> OpcodeIdxToBaseReg,
+                 ArrayRef<unsigned> Opcodes, MachineBasicBlock::iterator Ins,
+                 RegPoolWrapper &RP, GeneratorContext &SGCtx) {
   assert(OpcodeIdxToBaseReg.size() == Opcodes.size());
   if (Opcodes.empty())
     return {};
-  auto &State = SGCtx.getLLVMState();
-  const auto &SnippyTgt = State.getSnippyTarget();
+
   // FIXME: This code does not account non-trivial cases when an opcode has
   // additional restrictions on the address register (e.g.
   // `excludeRegsForOpcode`).
 
-  // We know restrictions on memory address for each base register. Let's choose
-  // legal addresses from the memory schemes and initialize base registers.
-  std::map<unsigned, AddressInfo> BaseRegToAI;
-  auto &MS = SGCtx.getMemoryScheme();
-  auto BaseRegToAddrRestrictions =
-      collectAddressRestrictions(Opcodes, OpcodeIdxToBaseReg, SGCtx, MBB);
-  auto ARRange = make_second_range(BaseRegToAddrRestrictions);
-  std::vector<AddressRestriction> ARs(ARRange.begin(), ARRange.end());
-  std::vector<AddressInfo> ChosenRanges =
-      MS.randomBurstGroupAddresses(ARs, SGCtx.getOpcodeCache());
-  for (auto &&[RegToAR, AI] : zip(BaseRegToAddrRestrictions, ChosenRanges)) {
-    auto &[Reg, AR] = RegToAR;
-    auto NewAI = randomlyShiftAddressOffsetsInImmRange(AI, AR.ImmOffsetRange);
+  std::vector<AddressInfo> OpcodeIdxToAI;
+  // Collect address restrictions for each opcode
+  auto OpcodeToAR = collectAddressRestrictions(Opcodes, SGCtx, MBB);
+  // For each base register we have a set of opcodes. Join address restrictions
+  // for these set of opcodes by choosing the strongest ones and map the
+  // resulting address restriction to the base register.
+  auto BaseRegToStrongestAR =
+      deduceStrongestRestrictions(Opcodes, OpcodeIdxToBaseReg, OpcodeToAR);
+  // For the selected strongest restrictions get addresses. Thus, we'll have a
+  // mapping from base register to a legal address in memory to use.
+  auto BaseRegToPrimaryAddress =
+      collectPrimaryAddresses(BaseRegToStrongestAR, SGCtx);
+  // We've chosen addresses for each base register. Initialize base registers
+  // with these addresses.
+  initializeBaseRegs(MBB, Ins, BaseRegToPrimaryAddress, RP, SGCtx);
 
-    auto NewValue =
-        APInt(SnippyTgt.getAddrRegLen(State.getTargetMachine()), NewAI.Address);
-    assert(RP.isReserved(Reg, AccessMaskBit::W));
-    if (SGCtx.getGenSettings().TrackingConfig.AddressVH) {
-      auto &I = SGCtx.getOrCreateInterpreter();
-      auto OldValue = I.readReg(Reg);
-      SnippyTgt.transformValueInReg(MBB, Ins, OldValue, NewValue, Reg, RP,
-                                    SGCtx);
-    } else
-      SnippyTgt.writeValueToReg(MBB, Ins, NewValue, Reg, RP, SGCtx);
-    BaseRegToAI[Reg] = std::move(NewAI);
+  // Try to find addresses for each opcode that allow better randomization of
+  // offsets and effective addresses. If no address is found, we can always use
+  // the primary one for the given base reg.
+  for (auto [OpcodeIdx, Opcode] : enumerate(Opcodes)) {
+    assert(OpcodeToAR.count(Opcode));
+    assert(OpcodeIdxToBaseReg.size() > OpcodeIdx);
+    const auto &OpcodeAR = OpcodeToAR[Opcode];
+    auto BaseReg = OpcodeIdxToBaseReg[OpcodeIdx];
+    assert(BaseRegToPrimaryAddress.count(BaseReg));
+    const auto &OrigAI = BaseRegToPrimaryAddress[BaseReg];
+    auto AI =
+        selectAddressForSingleInstrFromBurstGroup(OrigAI, OpcodeAR, SGCtx);
+    OpcodeIdxToAI.push_back(AI);
   }
+
   if (DumpMemAccesses.isSpecified())
-    SGCtx.addBurstRangeMemAccess(std::move(ChosenRanges));
-  return BaseRegToAI;
+    SGCtx.addBurstRangeMemAccess(OpcodeIdxToAI);
+
+  return OpcodeIdxToAI;
 }
 
 static std::vector<unsigned>
@@ -1327,14 +1551,14 @@ void InstructionGenerator::generateBurst(
           });
   auto RP = SGCtx->getRegisterPool();
   auto OpcodeIdxToBaseReg = generateBaseRegs(MBB, MemUsers, RP, *SGCtx);
-  auto BaseRegToAI =
-      mapRegToAI(MBB, OpcodeIdxToBaseReg, MemUsers, Ins, RP, *SGCtx);
+  auto OpcodeIdxToAI =
+      mapOpcodeIdxToAI(MBB, OpcodeIdxToBaseReg, MemUsers, Ins, RP, *SGCtx);
   unsigned MemUsersIdx = 0;
   for (auto Opcode : Opcodes) {
     const auto &InstrDesc = InstrInfo.get(Opcode);
     if (SnippyTgt.countAddrsToGenerate(Opcode)) {
       auto BaseReg = OpcodeIdxToBaseReg[MemUsersIdx];
-      auto AI = BaseRegToAI[BaseReg];
+      auto AI = OpcodeIdxToAI[MemUsersIdx];
       auto Preselected = selectOperands(InstrDesc, BaseReg, AI);
       const auto *MI =
           randomInstruction(InstrDesc, MBB, Ins, std::move(Preselected));
