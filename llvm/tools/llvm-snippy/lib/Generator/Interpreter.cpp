@@ -107,8 +107,6 @@ static auto getSectionLA(object::ObjectFile &Obj, StringRef SectionName) {
 namespace llvm {
 namespace snippy {
 
-static constexpr auto BitsInByte = 8u;
-
 namespace {
 void applyMemCfgToSimCfg(const MemoryConfig &MemCfg, SimulationConfig &SimCfg) {
   SimCfg.ProgStart = MemCfg.ProgSectionStart;
@@ -355,20 +353,19 @@ void Interpreter::setReg(llvm::Register Reg, const APInt &NewValue) {
   auto &Transactions =
       Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
   switch (Env.SnippyTGT->regToStorage(Reg)) {
-  default:
-    llvm_unreachable("unknown storage");
   case RegStorageType::XReg:
     Transactions.xregUpdateNotification(RegIdx, NewValue.getZExtValue());
-    break;
+    return;
   case RegStorageType::FReg:
     Transactions.fregUpdateNotification(RegIdx, NewValue.getZExtValue());
-    break;
+    return;
   case RegStorageType::VReg:
     Transactions.vregUpdateNotification(
         RegIdx, {reinterpret_cast<const char *>(NewValue.getRawData()),
                  NewValue.getBitWidth() / CHAR_BIT});
-    break;
+    return;
   }
+  llvm_unreachable("unknown storage");
 }
 
 void Interpreter::initTransactionMechanism() {

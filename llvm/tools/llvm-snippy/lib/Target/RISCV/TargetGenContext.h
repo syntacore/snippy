@@ -122,7 +122,6 @@ public:
     CurrentRVVMode.VLVM = std::move(VLVM);
     CurrentRVVMode.Config = &RVVCfg;
     CurrentRVVMode.MBBGuard = &MBB;
-    auto VLen = getVUConfigInfo().getVLEN();
   }
 
 private:

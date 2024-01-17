@@ -203,7 +203,7 @@ struct AddressGenInfo {
 
   // Whether burst mode is enabled. In this case some magic needs to happen.
   bool BurstMode;
-  std::optional<::AddressId> PreselectedAddr;
+  std::optional<::AddressId> PreselectedAddr = std::nullopt;
 
   // In order to generate addresses for multiple sequential/strided accesses
   // MinStride needs to be set. NumElements in the necessary amount of elements
@@ -618,7 +618,7 @@ struct SectionsDescriptions : private std::vector<SectionDesc> {
   // Range of all RW sections excluding
   // specialized ones(e.g. stack and selfcheck).
   auto generalRWSections() const {
-    return make_filter_range(*this, [this](auto &Sec) {
+    return make_filter_range(*this, [](auto &Sec) {
       auto Access = Sec.M;
       return Access.R() && Access.W() &&
              (!Sec.isNamed() || !isSpecializedSectionName(Sec.getName()));
@@ -647,7 +647,7 @@ struct SectionsDescriptions : private std::vector<SectionDesc> {
     return *Found;
   }
 
-  const auto getSectionsSize(Acc AccType) const {
+  auto getSectionsSize(Acc AccType) const {
     // FIXME: this basically find LAST size of section
     return std::accumulate(
         begin(), end(), 0ull,

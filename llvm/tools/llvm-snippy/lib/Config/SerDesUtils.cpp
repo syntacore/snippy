@@ -37,9 +37,8 @@ static StringRef histogramPatternToString(RegisterClassHistogram::Pattern P) {
     return "uniform";
   case RegisterClassHistogram::Pattern::BitPattern:
     return "bitpattern";
-  default:
-    llvm_unreachable("Broken enum");
   }
+  llvm_unreachable("Broken enum");
 }
 
 struct RegisterClassHistogramEntry {

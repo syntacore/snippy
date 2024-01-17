@@ -199,7 +199,6 @@ void GeneratorContext::checkMemStateAfterSelfcheck() const {
   auto ResultOffset = 0;
   auto ReferenceOffset = SCStride;
   auto ChunksNum = 2;
-  auto DefMaskOffset = ChunksNum * SCStride;
 
   size_t BlockSize = ChunksNum * SCStride;
 
@@ -208,7 +207,6 @@ void GeneratorContext::checkMemStateAfterSelfcheck() const {
     auto It = Data.begin() + Offset;
     auto ResultIt = It + ResultOffset;
     auto ReferenceIt = It + ReferenceOffset;
-    auto DefMaskIt = It + DefMaskOffset;
     for (size_t ByteIdx = 0; ByteIdx < SCStride; ++ByteIdx) {
       auto Result = ResultIt[ByteIdx];
       auto Reference = ReferenceIt[ByteIdx];
