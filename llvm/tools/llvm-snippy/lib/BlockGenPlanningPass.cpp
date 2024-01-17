@@ -191,8 +191,8 @@ static double getBurstProb(const Config &Cfg, GeneratorContext &GenCtx) {
   auto BurstWeight = Cfg.getBurstOpcodesWeight();
   assert(TotalWeight >= CFWeight);
   assert(BurstWeight <= (TotalWeight - CFWeight));
-  double BurstProb = std::abs((TotalWeight - CFWeight) <=
-                              std::numeric_limits<double>::epsilon())
+  double BurstProb = (std::abs(TotalWeight - CFWeight) <=
+                      std::numeric_limits<double>::epsilon())
                          ? 0.0
                          : BurstWeight / (TotalWeight - CFWeight);
   return BurstProb;
@@ -693,9 +693,8 @@ BlockGenPlanningImpl::processFunction(const MachineFunction &MF) {
     return processFunctionWithSize(MF);
   case GenerationMode::Mixed:
     return processFunctionMixed(MF);
-  default:
-    llvm_unreachable("unknown generation mode");
   }
+  llvm_unreachable("unknown generation mode");
 }
 
 const SingleBlockGenPlanTy &

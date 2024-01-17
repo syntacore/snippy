@@ -26,7 +26,7 @@ namespace llvm {
 namespace snippy {
 
 class SnippyTarget;
-class ConfigIOContext;
+struct ConfigIOContext;
 
 struct OpcodeHistogramEntry {
   // If Weight set to this value (in fact any negative one) this

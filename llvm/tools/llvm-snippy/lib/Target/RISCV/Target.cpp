@@ -321,8 +321,6 @@ static bool isSupportedLoadStore(unsigned Opcode) {
 static MCRegister regIndexToMCReg(unsigned RegIdx, RegStorageType Storage,
                                   bool hasDExt) {
   switch (Storage) {
-  default:
-    llvm_unreachable("Unknown storage type");
   case RegStorageType::XReg:
     return RISCV::X0 + RegIdx;
   case RegStorageType::FReg:
@@ -330,6 +328,7 @@ static MCRegister regIndexToMCReg(unsigned RegIdx, RegStorageType Storage,
   case RegStorageType::VReg:
     return RISCV::V0 + RegIdx;
   }
+  llvm_unreachable("Unknown storage type");
 }
 
 static RegStorageType regToStorage(Register Reg) {
@@ -1534,8 +1533,6 @@ public:
                       const TargetSubtargetInfo &SubTgt) const override {
     const auto &ST = static_cast<const RISCVSubtarget &>(SubTgt);
     switch (Storage) {
-    default:
-      llvm_unreachable("Unknown storage type");
     case RegStorageType::XReg:
       return 32u;
     case RegStorageType::FReg:
@@ -1543,6 +1540,7 @@ public:
     case RegStorageType::VReg:
       return ST.hasStdExtV() ? 32u : 0u;
     }
+    llvm_unreachable("Unknown storage type");
   }
 
   unsigned getSpillSizeInBytes(MCRegister Reg,
@@ -2570,54 +2568,6 @@ void SnippyRISCVTarget::writeValueToFPReg(MachineBasicBlock &MBB,
       .addReg(ScratchReg);
 }
 
-static void zeroRd(MachineInstr &Instr) {
-  // Avoid storing undefined values to memory
-  auto &MBB = *Instr.getParent();
-  const auto &MF = *MBB.getParent();
-  const auto &F = MF.getFunction();
-  const auto &ST = static_cast<const RISCVSubtarget &>(MF.getSubtarget());
-  auto &Ctx = F.getContext();
-  auto InsertPos = std::next(MachineBasicBlock::iterator(Instr));
-  const auto &InstrInfo = *ST.getInstrInfo();
-  auto Rd = Instr.getOperand(0).getReg();
-  if (RISCV::GPRRegClass.contains(Rd)) {
-    getSupportInstBuilder(MBB, InsertPos, Ctx, InstrInfo.get(RISCV::ADD), Rd)
-        .addReg(RISCV::X0)
-        .addReg(RISCV::X0);
-  } else {
-    auto Opcode = [&] {
-      if (RISCV::FPR16RegClass.contains(Rd)) {
-        return RISCV::FCVT_S_W;
-      }
-      if (RISCV::FPR32RegClass.contains(Rd)) {
-        return RISCV::FCVT_S_W;
-      }
-      assert(RISCV::FPR64RegClass.contains(Rd));
-      return RISCV::FCVT_D_W;
-    }();
-    getSupportInstBuilder(MBB, InsertPos, Ctx, InstrInfo.get(Opcode), Rd)
-        .addReg(RISCV::X0);
-  }
-}
-
-static std::optional<int> getVSlideSrcOffset(const MachineInstr &Instr) {
-  auto Opcode = Instr.getOpcode();
-  switch (Opcode) {
-  default:
-    return std::nullopt;
-  case RISCV::VSLIDEUP_VI:
-    return -Instr.getOperand(2).getImm();
-  case RISCV::VSLIDEDOWN_VI:
-    return Instr.getOperand(2).getImm();
-  case RISCV::VSLIDE1UP_VX:
-  case RISCV::VFSLIDE1UP_VF:
-    return -1;
-  case RISCV::VSLIDE1DOWN_VX:
-  case RISCV::VFSLIDE1DOWN_VF:
-    return 1;
-  }
-}
-
 void SnippyRISCVTarget::rvvWriteValueUsingXReg(MachineBasicBlock &MBB,
                                                MachineBasicBlock::iterator Ins,
                                                GeneratorContext &GC,
@@ -2678,8 +2628,6 @@ void SnippyRISCVTarget::rvvWriteValue(MachineBasicBlock &MBB,
                                       GeneratorContext &GC, APInt Value,
                                       unsigned DstReg,
                                       RegPoolWrapper &RP) const {
-  auto &RGC = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
-  auto VLen = RGC.getVLEN();
   // FIXME for V0 we can only use global variables for initialization
   if (!InitVRegsFromMemory.getValue() && DstReg != RISCV::V0) {
     rvvWriteValueUsingXReg(MBB, Ins, GC, Value, DstReg, RP);
@@ -2735,7 +2683,6 @@ void SnippyRISCVTarget::updateRVVConfig(const MachineInstr &MI,
 void SnippyRISCVTarget::instructionPostProcess(
     MachineInstr &MI, GeneratorContext &GC,
     MachineBasicBlock::iterator Ins) const {
-  const auto &GenSettings = GC.getGenSettings();
   updateRVVConfig(MI, GC, Ins);
 }
 

@@ -77,7 +77,7 @@ MemorySectionConfig getRamInfo(const Linker &L) {
                                               S.OutputSection.Desc.Size);
   }
   assert(MaxRamVMAEnd >= RamVMABegin);
-  return {RamVMABegin, MaxRamVMAEnd - RamVMABegin};
+  return {RamVMABegin, MaxRamVMAEnd - RamVMABegin, ""};
 }
 
 MemorySectionConfig getRomInfo(const Linker &L, MemAddr ProgSectionStart) {

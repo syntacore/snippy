@@ -53,9 +53,9 @@ auto accessMaskToStr(AccessMaskBit Mask) {
   switch (Mask) {
     LLVM_SNIPPY_ACCESS_MASKS
 #undef LLVM_SNIPPY_ACCESS_MASK_DESC
-  default:
-    return "Invalid";
   }
+
+  return "Invalid";
 }
 
 } // namespace

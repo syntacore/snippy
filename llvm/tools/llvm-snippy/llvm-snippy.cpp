@@ -321,9 +321,6 @@ static ExitOnError ExitOnErr("llvm-snippy error: ");
 // Used to construct search paths for dynamically-loaded plugins
 static std::string ARGV0;
 
-// Number of branches for stable control flow permutation
-constexpr int ExpectedBranchesNumToBeStable = 500;
-
 static std::string getOutputFileBasename() {
   SmallVector<char> OutputFile;
   if (OutputFileBasename.getValue().empty()) {
@@ -838,7 +835,6 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
   auto SelfCheckPeriod = getSelfcheckPeriod();
   auto NumPrimaryInstrs = getExpectedNumInstrs(NumInstrs.getValue());
   bool FillCodeSectionMode = !NumPrimaryInstrs;
-  auto SeedValue = initializeRandomEngine();
   auto Models = parseModelPluginList();
   bool RunOnModel = !Models.empty();
   parseReservedRegistersOption(RP, State.getSnippyTarget(), State.getRegInfo());
