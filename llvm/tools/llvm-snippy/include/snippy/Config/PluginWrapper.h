@@ -118,7 +118,7 @@ public:
     assert(pluginHasBeenLoaded());
     setParsingContext(OpcCache);
     constexpr double OpcDefaultWeight = 1;
-    Opcodes PluginOpcodes = {0};
+    Opcodes PluginOpcodes = {0, nullptr};
     auto CanParse = DLTable->parseOpcodes(&PluginOpcodes, FileName.c_str());
     if (CanParse == PARSING_NOT_SUPPORTED)
       report_fatal_error("Plugin doesn't support parsing", false);

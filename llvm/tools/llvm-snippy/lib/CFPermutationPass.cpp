@@ -123,7 +123,7 @@ public:
 
   void releaseMemory() override { BlocksInfo.clear(); }
 
-  void print(raw_ostream &OS) const;
+  void print(raw_ostream &OS, const Module *M) const override;
   void dump() const;
 
 private:
@@ -597,7 +597,7 @@ bool CFPermutation::updateBranches(MachineFunction &MF) {
 
   return Changed;
 }
-void CFPermutation::print(raw_ostream &OS) const {
+void CFPermutation::print(raw_ostream &OS, const Module *M) const {
   for (auto BB : seq<unsigned>(0, BlocksInfo.size())) {
     OS << BB << " : " << BlocksInfo[BB].Successor << " : "
        << BlocksInfo[BB].IfDepth << " : " << BlocksInfo[BB].LoopDepth << " : {";
@@ -608,7 +608,7 @@ void CFPermutation::print(raw_ostream &OS) const {
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-LLVM_DUMP_METHOD void CFPermutation::dump() const { print(dbgs()); }
+LLVM_DUMP_METHOD void CFPermutation::dump() const { print(dbgs(), nullptr); }
 #endif
 
 } // namespace snippy

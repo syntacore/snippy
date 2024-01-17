@@ -28,8 +28,6 @@ raw_ostream &operator<<(raw_ostream &OS, GenerationMode GM) {
   case GenerationMode::Mixed:
     OS << "Mixed";
     break;
-  default:
-    OS << "Unknown";
   }
   return OS;
 }

@@ -58,8 +58,6 @@ struct yaml::MappingContextTraits<std::unique_ptr<snippy::MemoryAccess>,
                       snippy::MemoryAccessMode &Mode) {
     assert(IO.outputting() == false);
     switch (Mode) {
-    default:
-      llvm_unreachable("Unhandled memory access mode");
     case snippy::MemoryAccessMode::Range:
       MemAccess = getRange(IO);
       return;
@@ -70,6 +68,7 @@ struct yaml::MappingContextTraits<std::unique_ptr<snippy::MemoryAccess>,
       MemAccess = getMemoryAddresses(IO);
       return;
     }
+    llvm_unreachable("Unhandled memory access mode");
   }
 
   static std::unique_ptr<snippy::MemoryAccess> getRange(yaml::IO &IO) {
@@ -1082,7 +1081,7 @@ void MemoryScheme::updateMAG() {
   MemoryAccessSeq Schemes;
   for (auto &Scheme :
        make_range(MA.SplitAccesses.begin(), MA.SplitAccesses.end()))
-    Schemes.emplace_back(std::move(Scheme->copy()));
+    Schemes.emplace_back(Scheme->copy());
   MAG = OwningMAG{std::move(Schemes), MagCount};
 }
 

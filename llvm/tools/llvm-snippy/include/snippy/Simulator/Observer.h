@@ -20,8 +20,7 @@
 namespace llvm {
 namespace snippy {
 
-class Observer {
-public:
+struct Observer {
   virtual void memUpdateNotification(MemoryAddressType Addr, const char *Data,
                                      size_t Size) {}
   virtual void xregUpdateNotification(unsigned RegID, RegisterType Value) {}
@@ -35,7 +34,7 @@ public:
 } // namespace snippy
 } // namespace llvm
 
-class RVMCallbackHandler {
+struct RVMCallbackHandler {
 private:
   using HandleCounterType = uint64_t;
   llvm::DenseMap<HandleCounterType, std::unique_ptr<llvm::snippy::Observer>>

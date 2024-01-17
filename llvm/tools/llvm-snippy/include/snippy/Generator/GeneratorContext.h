@@ -34,14 +34,14 @@ class TargetSubtargetInfo;
 namespace llvm {
 namespace snippy {
 
-struct ImmediateHistogram;
+class ImmediateHistogram;
 class InitialReg;
 class Interpreter;
 class LLVMState;
 class MemoryScheme;
 class OpcodeCache;
 class RootRegPoolWrapper;
-class TargetGenContextInterface;
+struct TargetGenContextInterface;
 class Linker;
 class GlobalsPool;
 struct IRegisterState;

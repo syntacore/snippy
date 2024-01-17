@@ -104,7 +104,7 @@ namespace yaml {
 class Output;
 class Input;
 class IO;
-class EmptyContext;
+struct EmptyContext;
 enum class QuotingType;
 
 template <typename> struct MappingTraits;

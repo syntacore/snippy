@@ -306,7 +306,7 @@ createModeChangeInfoForHistogramMode(double WeightOfAllRVVInstructions,
   Result.ProbVSETVLI = ProbVSETVLI;
   Result.ProbVSETIVLI = ProbVSETIVLI;
 
-  std::discrete_distribution D = {ProbVSETVL, ProbVSETVLI, ProbVSETIVLI};
+  std::discrete_distribution<int> D = {ProbVSETVL, ProbVSETVLI, ProbVSETIVLI};
   auto Prob = D.probabilities();
   // We scale weights proportionally to the relative weight of each
   // mode-changing instruction
@@ -907,8 +907,6 @@ void RVVConfiguration::print(raw_ostream &OS) const {
   case VXRMMode::RON:
     OS << "ron";
     break;
-  default:
-    llvm_unreachable("VXRM has unexpected mode value");
   }
 
   OS << " }";
@@ -992,7 +990,7 @@ getLegalConfigurationPoints(unsigned VLEN, const RVVUnitInfo &VUInfo) {
 
   // Now, at this moment ConfigPoints can contain illegal configurations
   auto RemoveIt = std::remove_if(
-      ConfigPoints.begin(), ConfigPoints.end(), [VLEN](const auto &Point) {
+      ConfigPoints.begin(), ConfigPoints.end(), [](const auto &Point) {
         if (!Point.Config.IsLegal)
           LLVM_DEBUG(dbgs() << "  !!!RVV-CFG: discarding illegal config ";
                      Point.Config.print(dbgs()); dbgs() << "\n");
@@ -1025,8 +1023,7 @@ getIllegalConfigurationPoints(unsigned VLEN) {
       [VLEN](const auto &Point) { return convertRepresentation(VLEN, Point); });
   // Now, at this moment AllConfigPoints contain legal configurations
   auto RemoveLegalIt = std::remove_if(
-      AllConfigPoints.begin(), AllConfigPoints.end(),
-      [VLEN](const auto &Point) {
+      AllConfigPoints.begin(), AllConfigPoints.end(), [](const auto &Point) {
         if (NoReservedCfgRVV &&
             isReservedValues(static_cast<unsigned>(Point.Config.SEW),
                              Point.Config.LMUL))

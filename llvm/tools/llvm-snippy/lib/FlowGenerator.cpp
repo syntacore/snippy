@@ -1349,13 +1349,9 @@ selectAddressForSingleInstrFromBurstGroup(AddressInfo OrigAI,
   }
 
   auto &MS = GC.getMemoryScheme();
-  auto &InstrInfo = GC.getLLVMState().getInstrInfo();
   auto OrigAddr = OrigAI.Address;
   assert(OpcodeAR.Opcodes.size() == 1 &&
          "Expected AddressRestriction only for one opcode");
-  auto Opcode = *OpcodeAR.Opcodes.begin();
-  auto &SnpTgt = GC.getLLVMState().getSnippyTarget();
-  auto &MIDesc = InstrInfo.get(Opcode);
   for (unsigned i = 0; i < BurstAddressRandomizationThreshold; ++i) {
     auto CandidateAI =
         MS.randomAddress(OpcodeAR.AccessSize, OpcodeAR.AccessAlignment, false);
@@ -1612,7 +1608,8 @@ InstructionGenerator::storeRefAndActualValueForSelfcheck(
 
   ST.storeRegToAddr(MBB, InsertPos, SCAddress, DestReg, RP, *SGCtx,
                     /* store the whole register */ 0);
-  SelfcheckFirstStoreInfo FirstStoreInfo{std::prev(InsertPos), SCAddress};
+  SelfcheckFirstStoreInfo<InstrIt> FirstStoreInfo{std::prev(InsertPos),
+                                                  SCAddress};
   SCAddress += SGCtx->getSCStride();
   selfcheckOverflowGuard();
   ST.storeValueToAddr(MBB, InsertPos, SCAddress, RegValue, RP, *SGCtx);
@@ -1808,6 +1805,7 @@ static AddressGenInfo chooseAddrGenInfoForInstrCallback(
     LLVMContext &Ctx,
     std::optional<GeneratorContext::LoopGenerationInfo> CurLoopGenInfo,
     size_t AccessSize, size_t Alignment, const MemoryAccess &MemoryScheme) {
+  (void)CurLoopGenInfo; // for future extensibility
   // AddressGenInfo for one element access.
   return AddressGenInfo::singleAccess(AccessSize, Alignment, false /* Burst */);
 }
@@ -1861,9 +1859,6 @@ void InstructionGenerator::postprocessMemoryOperands(MachineInstr &MI,
     auto [AddrInfo, AddrGenInfo] = chooseAddrInfoForInstr(MI, *SGCtx, ML);
     bool GenerateStridedLoad = !AddrGenInfo.isSingleElement();
     auto AccessSize = AddrInfo.AccessSize;
-    auto CurLoopGenInfo =
-        ML ? SGCtx->getLoopsGenerationInfoForMBB(ML->getHeader())
-           : std::nullopt;
 
     if (GenerateStridedLoad && SGCtx->hasTrackingMode())
       snippy::fatal(State.getCtx(), "Incompatible features",
@@ -1936,10 +1931,10 @@ InstructionGenerator::tryToPregenerateOperands(
     const std::vector<PreselectedOpInfo> &Preselected) const {
   SmallVector<MachineOperand, 8> PregeneratedOperands;
   assert(InstrDesc.getNumOperands() == Preselected.size());
+  iota_range<unsigned long> PreIota(0, Preselected.size(),
+                                    /* Inclusive */ false);
   for (const auto &[MCOpInfo, PreselOpInfo, Index] :
-       zip(InstrDesc.operands(), Preselected,
-           iota_range(0ul, static_cast<unsigned long>(Preselected.size()),
-                      /* Inclusive */ false))) {
+       zip(InstrDesc.operands(), Preselected, PreIota)) {
     auto OpOpt = pregenerateOneOperand(MIB, RP, MCOpInfo, PreselOpInfo, Index,
                                        PregeneratedOperands);
     if (!OpOpt)
@@ -2121,9 +2116,8 @@ InstructionGenerator::createMFGenerationRequest(
   case GenerationMode::Mixed:
     return std::make_unique<FunctionGenReq<GenerationMode::Mixed>>(
         MF, GenPlan, FinalInstDesc, *SGCtx);
-  default:
-    llvm_unreachable("Unknown generation mode!");
   }
+  llvm_unreachable("Unknown generation mode!");
 }
 
 template <typename ValTy> APInt toAPInt(ValTy Val, unsigned Width) {
@@ -2451,8 +2445,7 @@ bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
     addModelMemoryPropertiesAsGV();
 
   if (GenSettings.TrackingConfig.SelfCheckPeriod) {
-    SelfcheckPeriodTracker = decltype(SelfcheckPeriodTracker)(
-        {GenSettings.TrackingConfig.SelfCheckPeriod});
+    SelfcheckPeriodTracker = {GenSettings.TrackingConfig.SelfCheckPeriod};
     const auto &SCSection = SGCtx->getSelfcheckSection();
     SCAddress = SCSection.VMA;
     // FIXME: make SelfCheckGV a deprecated option

@@ -397,7 +397,7 @@ Config::Config(const SnippyTarget &Tgt, StringRef PluginFilename,
   if (ParseWithPlugin) {
     PluginManagerImpl->parseOpcodes(
         OpCC, PluginInfoFilename.str(),
-        std::insert_iterator(Histogram, Histogram.begin()));
+        std::inserter(Histogram, Histogram.begin()));
     diagnoseHistogram(Ctx, OpCC, Histogram);
   }
 }
