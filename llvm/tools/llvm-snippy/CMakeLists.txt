@@ -69,4 +69,3 @@ endforeach()
 
 add_dependencies(llvm-snippy lld)
 
-
