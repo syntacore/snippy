@@ -435,10 +435,9 @@ struct MemoryAccesses {
     return (*Pos)->getLowerBound();
   }
 
-  void loadFromYaml(LLVMContext &Ctx, StringRef Filename,
-                    const SnippyTarget *SnpTgt = nullptr);
+  void loadFromYaml(LLVMContext &Ctx, StringRef Filename);
 
-  void mapYaml(yaml::IO &IO, const SnippyTarget *SnpTgt = nullptr);
+  void mapYaml(yaml::IO &IO);
 
   void validateSchemes(LLVMContext &Ctx, const SectionsDescriptions &Sections,
                        bool StrictCheck) const;
@@ -755,12 +754,12 @@ public:
   }
 
   AddressInfo randomAddress(size_t AccessSize, size_t Alignment,
-                            const MCInstrDesc *InstrDescPtr = nullptr,
-                            bool InLoop = false, bool BurstMode = false);
+                            bool BurstMode = false);
 
   std::vector<AddressInfo>
   randomBurstGroupAddresses(ArrayRef<AddressRestriction> ARRange,
-                            const OpcodeCache &OpcC);
+                            const OpcodeCache &OpcC,
+                            const SnippyTarget &SnpTgt);
 
   std::optional<MemAddr>
   getFirstNeededMemoryAccessBound(MemoryAccessMode Mode) const {
@@ -772,10 +771,9 @@ public:
 
   std::string getFilename() const { return OriginalFile; }
   void setFilename(StringRef Name) { OriginalFile = Name.str(); }
-  template <typename It>
+
   std::pair<AddressInfo, AddressGenInfo> randomAddressForInstructions(
-      size_t AccessSize, size_t Alignment, It InstrDescPtrsBeg,
-      It InstrDescPtrsEnd, bool InLoop,
+      size_t AccessSize, size_t Alignment,
       std::function<AddressGenInfo(MemoryAccess &)> ChooseAddrGenInfo,
       bool BurstMode = false) {
     auto &MAGWithSchemes = getMAG();

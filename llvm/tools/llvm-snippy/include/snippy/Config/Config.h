@@ -26,8 +26,6 @@ class SnippyTarget;
 
 class Config final {
 public:
-  const SnippyTarget *SnpTgt = nullptr;
-
   std::vector<std::string> Includes;
   MemoryScheme MS;
   SectionsDescriptions Sections;
@@ -44,8 +42,6 @@ public:
   Config(const SnippyTarget &Tgt, StringRef PluginFilename,
          StringRef PluginInfoFilename, OpcodeCache OpCC, bool ParseWithPlugin,
          LLVMContext &Ctx);
-
-  const SnippyTarget *getTarget() const { return SnpTgt; }
 
   // FIXME: this should return OpcGenHolder
   std::unique_ptr<DefaultOpcodeGenerator> createDefaultOpcodeGenerator() const {
