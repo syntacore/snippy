@@ -1,0 +1,42 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu --dump-layout -o %t 2>&1 | FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x1000
+      SIZE:      0x1000
+      LMA:       0x1000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [SRA, 1.0]
+    - [SRAI, 1.0]
+    - [SRL, 1.0]
+    - [SRLI, 1.0]
+    - [SLL, 1.0]
+    - [SLLI, 1.0]
+    - [AND, 1.0]
+    - [ANDI, 1.0]
+    - [OR, 1.0]
+    - [ORI, 1.0]
+    - [XOR, 1.0]
+    - [XORI, 1.0]
+    - [LW, 10.0]
+    - [SW, 10.0]
+
+# CHECK: Memory access scheme:
+# CHECK-NEXT: Memory access 0:
+# CHECK-NEXT: Memory range:
+# CHECK-NEXT: Weight: 1
+# CHECK-NEXT: Start: 2147483648
+# CHECK-NEXT: Size: 4194304
+# CHECK-NEXT: Stride: 8
+# CHECK-NEXT: FirstOffset: 0
+# CHECK-NEXT: LastOffset: 0

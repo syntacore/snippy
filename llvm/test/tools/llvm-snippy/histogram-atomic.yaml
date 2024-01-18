@@ -1,0 +1,35 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=5000 \
+# RUN:  -histogram-max-deviation=2.1 -verify-gen-histogram \
+# RUN:  -model-plugin None -mattr=+a \
+# RUN:  -dump-mf |& FileCheck %s --dump-input always
+
+# FIXME: Basically, we do not know what opcodes were generated to fill value in reg.
+# CHECK: Start Verification for function:
+# CHECK-NEXT: Start generated instructions statistics:
+# CHECK-NEXT: Opcode Count Primary_Count Freq,% Primary_Freq,% Expected_Prob,% Status
+# CHECK: {{ADDI [0-9]+ 0 [0-9]+\.[0-9] 0\.0 0\.0 OK}}
+# CHECK: {{AMOADD_D_AQ [0-9]+ [0-9]+ [0-9]+\.[0-9] [0-9]+\.[0-9] [0-9]+\.[0-9] OK}}
+# CHECK: {{AMOADD_W_AQ [0-9]+ [0-9]+ [0-9]+\.[0-9] [0-9]+\.[0-9] [0-9]+\.[0-9] OK}}
+# CHECK: {{AMOAND_D_AQ [0-9]+ [0-9]+ [0-9]+\.[0-9] [0-9]+\.[0-9] [0-9]+\.[0-9] OK}}
+# CHECK: {{EBREAK [0-9]+ [0-9]+ [0-9]+\.[0-9] [0-9]+\.[0-9] 0.0 OK}}
+# CHECK: {{LUI [0-9]+ 0 [0-9]+\.[0-9] 0\.0 0\.0 OK}}
+# CHECK: {{SLLI [0-9]+ 0 [0-9]+\.[0-9] 0\.0 0\.0 OK}}
+# CHECK-NOT: ERROR: some opcodes from histogram not generated:
+# CHECK-NOT: End information for non-generated opcodes
+# CHECK: End Verification for function: SnippyFunction
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [AMOADD_D_AQ, 1.0]
+    - [AMOADD_W_AQ, 1.0]
+    - [AMOAND_D_AQ, 1.0]

@@ -1,0 +1,26 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=-v \
+# RUN:  --num-instrs=100 -o %t \
+# RUN:  |& FileCheck %s
+
+include:
+- Inputs/rvv-unit-all.yaml
+
+sections:
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [ADDI, 1.0]
+
+# COM: we don't have VSETVL in histogram here - this is not an error
+# COM: since configuraition/ext checks should happen before
+
+# CHECK: LLVM ERROR: RVV configuration file should not be specified for targets without RVV

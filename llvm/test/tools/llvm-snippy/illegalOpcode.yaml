@@ -1,0 +1,22 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu >& %t.notwork || true
+# RUN: FileCheck %s --input-file=%t.notwork --check-prefix=NOTWORK --dump-input always
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+f,+d |& FileCheck %s --check-prefix=WORK
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [FCVT_W_D, 20.0]
+
+# WORK-NOT: Illegal opcode for specified cpu: FCVT_W_D
+# NOTWORK: Illegal opcode for specified cpu: FCVT_W_D

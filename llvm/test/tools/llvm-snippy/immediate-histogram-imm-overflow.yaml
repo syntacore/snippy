@@ -1,0 +1,23 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:    -dump-mi \
+# RUN:    |& FileCheck %s
+
+include:
+- Inputs/immediate-histogram-imm-overflow.yaml
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram: 
+    - [ADDI, 1.0]
+      
+# CHECK: LLVM ERROR: Immediate histogram does not contain any values in [-2048; 2047]

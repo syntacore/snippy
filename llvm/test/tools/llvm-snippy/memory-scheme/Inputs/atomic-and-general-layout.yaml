@@ -1,0 +1,12 @@
+include:
+    - sections.yaml
+histogram:
+    - [AMOADD_D, 1.0]
+    - [AMOADD_W, 1.0]
+    - [AMOAND_D, 1.0]
+    - [AMOAND_W, 1.0]
+    - [LW, 1.0]
+    - [LD, 1.0]
+    - [SW, 1.0]
+    - [SD, 1.0]
+    

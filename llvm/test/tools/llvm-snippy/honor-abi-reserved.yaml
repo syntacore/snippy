@@ -1,0 +1,53 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
+# RUN: -num-instrs=1000 -stack-size=1024 -dump-mf \
+# RUN: -honor-target-abi --reserved-regs-list=ra,s4 -init-regs-in-elf -verify-mi |& FileCheck %s
+sections:
+    - no:        1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+    - [ADD, 1.0]
+
+# CHECK: $x2 = ADDI $x2, -16
+
+# CHECK: SD $x1, $x2, 0
+# CHECK: SD $x3, $x2, 0
+# CHECK: SD $x4, $x2, 0
+# CHECK: SD $x8, $x2, 0
+# CHECK: SD $x18, $x2, 0
+# CHECK: SD $x19, $x2, 0
+# CHECK: SD $x20, $x2, 0
+# CHECK: SD $x21, $x2, 0
+# CHECK: SD $x22, $x2, 0
+# CHECK: SD $x23, $x2, 0
+# CHECK: SD $x24, $x2, 0
+# CHECK: SD $x25, $x2, 0
+# CHECK: SD $x26, $x2, 0
+# CHECK: SD $x27, $x2, 0
+
+# CHECK: DIV
+
+# CHECK: $x27 = LD $x2, 0
+# CHECK: $x26 = LD $x2, 0
+# CHECK: $x25 = LD $x2, 0
+# CHECK: $x24 = LD $x2, 0
+# CHECK: $x23 = LD $x2, 0
+# CHECK: $x22 = LD $x2, 0
+# CHECK: $x21 = LD $x2, 0
+# CHECK: $x20 = LD $x2, 0
+# CHECK: $x19 = LD $x2, 0
+# CHECK: $x8 = LD $x2, 0
+# CHECK: $x4 = LD $x2, 0
+# CHECK: $x3 = LD $x2, 0
+# CHECK: $x1 = LD $x2, 0
+
+# CHECK: $x2 = LD

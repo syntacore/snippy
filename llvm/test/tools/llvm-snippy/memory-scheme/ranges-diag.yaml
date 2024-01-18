@@ -1,0 +1,21 @@
+# RUN: not llvm-snippy %S/Inputs/loadstore-layout.yaml %s -march=riscv64-linux-gnu \
+# RUN:   -model-plugin=None \
+# RUN:   -num-instrs=1000 \
+# RUN: |& FileCheck %s
+
+
+access-ranges:
+    - start: 0x80002001
+      size: 0x14
+      stride: 5
+      first-offset: 3
+      last-offset: 1
+    - start: 0x80002001
+      size: 0x14
+      stride: 5
+      first-offset: 5
+      last-offset: 5
+
+# CHECK: Warning: first offset 3 > last offset 1
+# CHECK: Warning: last offset 5 >= stride 5
+# CHECK: LLVM ERROR: Memory schemes are too restrictive to generate the requested instructions

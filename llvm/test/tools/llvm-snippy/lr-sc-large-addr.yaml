@@ -1,0 +1,38 @@
+# RUN: llvm-snippy %s -march=riscv64-unknown-elf  \
+# RUN:   -mattr=+a -num-instrs=500 \
+# RUN:   -init-regs-in-elf
+
+include:
+- Inputs/large-addrs-scheme.yaml
+
+sections:
+- name: 1
+  VMA: 0x400000000
+  SIZE: 0x100000
+  LMA: 0x400000000
+  ACCESS: rx
+- name: 2
+  VMA: 0x400300000
+  SIZE: 0x4000
+  LMA: 0x400300000
+  ACCESS: rw
+histogram:
+- [ADD, 6.666666666666667]
+- [ADDI, 6.666666666666667]
+- [SUB, 6.666666666666667]
+- [SRA, 6.666666666666667]
+- [SRAI, 6.666666666666667]
+- [SRL, 6.666666666666667]
+- [SRLI, 6.666666666666667]
+- [SLL, 6.666666666666667]
+- [SLLI, 6.666666666666667]
+- [AND, 6.666666666666667]
+- [ANDI, 6.666666666666667]
+- [OR, 6.666666666666667]
+- [ORI, 6.666666666666667]
+- [XOR, 6.666666666666667]
+- [XORI, 6.666666666666667]
+- [LR_W, 125.0]
+- [LR_D, 125.0]
+- [SC_W, 125.0]
+- [SC_D, 125.0]

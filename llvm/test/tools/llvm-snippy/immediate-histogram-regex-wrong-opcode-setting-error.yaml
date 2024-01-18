@@ -1,0 +1,20 @@
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+include:
+  - Inputs/sections.yaml
+
+options:
+  march: riscv64-unknown-elf
+  num-instrs: 100
+
+histogram:
+  - [ADDI, 1.0]
+
+imm-hist:
+  opcodes:
+    - "ADDI":
+        nonexistent: mapping
+
+# CHECK: error: Immediate histogram opcode setting should be either sequence or scalar.
+# CHECK-SAME: But map was encountered
+# CHECK: nonexistent: mapping

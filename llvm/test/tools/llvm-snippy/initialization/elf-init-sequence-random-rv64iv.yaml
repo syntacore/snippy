@@ -1,0 +1,73 @@
+# RUN: llvm-snippy %s -model-plugin=None -march=riscv64-linux-gnu -mattr=+v \
+# RUN:    -num-instrs=10 -dump-mf -init-regs-in-elf --verify-mi \
+# RUN:    |& FileCheck %s --dump-input always
+
+sections:
+    - no:        0
+      VMA:       0x8000
+      SIZE:      0x4000
+      LMA:       0x8000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [SRA, 1.0]
+    - [SRAI, 1.0]
+    - [SRL, 1.0]
+    - [SRLI, 1.0]
+    - [SLL, 1.0]
+    - [SLLI, 1.0]
+    - [AND, 1.0]
+    - [ANDI, 1.0]
+    - [OR, 1.0]
+    - [ORI, 1.0]
+    - [XOR, 1.0]
+    - [XORI, 1.0]
+    - [LW, 10.0]
+    - [SW, 10.0]
+
+# CHECK: bb.0:
+# CHECK: {{(\$v1 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v2 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v3 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v4 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v5 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v6 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v7 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v8 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v9 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v10 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v11 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v12 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v13 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v14 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v15 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v16 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v17 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v18 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v19 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v20 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v21 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v22 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v23 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v24 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v25 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v26 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v27 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v28 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v29 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v30 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$v31 = .*$[[:space:]]+)+}}
+# CHECK: $v0 = VMXNOR_MM undef $v0, undef $v0

@@ -1,0 +1,26 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -o %t_1
+# RUN: ls %t_1.elf
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -o %t_2.elf
+# RUN: ls %t_2.elf
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -o %t_3.yaml
+# RUN: ls %t_3.yaml.elf
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -o %t_4.yaml.elf
+# RUN: ls %t_4.yaml.elf
+
+sections:
+    - no:        1
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]

@@ -1,0 +1,32 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+include:
+  - Inputs/sections.yaml
+
+options:
+  march: riscv64-unknown-elf
+  num-instrs: 100
+  dump-mf: on
+
+histogram: 
+  - [ADDI, 1.0]
+  - [XORI, 1.0]
+  - [ORI, 1.0]
+
+imm-hist:
+  opcodes:
+    - 'ADD?':
+      - [1, 1.0]
+      - [2, 1.0]
+      - [3, 1.0]
+    - '.*ORI':
+      - [5, 1.0]
+
+# There ADDI should be matched by 'ADD?'
+# We check that ADDI appears only with immediates: 1, 2 or 3
+# CHECK-NOT: ADDI $x{{[[:digit:]]+}}, {{[0,4-9]}}
+
+# Both XORI and ORI should be matched by '.*ORI'
+# We check that they appear only with immidiate 5
+# CHECK-NOT: XORI $x{{[[:digit:]]+}}, {{[0-4,6-9]}}
+# CHECK-NOT: ORI $x{{[[:digit:]]+}}, {{[0-4,6-9]}}

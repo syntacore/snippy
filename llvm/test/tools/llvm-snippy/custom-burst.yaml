@@ -1,0 +1,65 @@
+# RUN: llvm-snippy %s %S/Inputs/custom-burst-mixed-memory-fence.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
+# RUN: -num-instrs=200 -dump-layout \
+# RUN: |& FileCheck %s --check-prefix=DUMP
+
+# RUN: llvm-snippy %s %S/Inputs/custom-burst-mixed-memory-fence.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
+# RUN: -num-instrs=200 --dump-mf \
+# RUN: |& FileCheck %s --check-prefix=MEMFENCE
+
+# RUN: llvm-snippy %s %S/Inputs/fence-only-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
+# RUN: -num-instrs=200 --dump-mf \
+# RUN: |& FileCheck %s --check-prefix=FENCE
+
+# RUN: llvm-snippy %s %S/Inputs/custom-burst-amoadd.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
+# RUN: -num-instrs=200 --dump-mf \
+# RUN: |& FileCheck %s --check-prefix=WARN
+
+
+# RUN: llvm-snippy %s %S/Inputs/custom-burst-fence-in-both-groups.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
+# RUN: -num-instrs=500 --dump-mf \
+# RUN: |& FileCheck %s --check-prefix=FENCEINBOTH
+
+# RUN: llvm-snippy %S/Inputs/options-in-layout-burst.yaml \
+# RUN: |& FileCheck %s --check-prefix=FENCEINBOTH
+
+include:
+  - Inputs/sections.yaml
+
+histogram:
+    - [LW, 1.0]
+    - [SW, 1.0]
+    - [AMOSWAP_W, 1.0]
+    - [FENCE, 1.0]
+    
+# DUMP: burst:
+# DUMP:min-size:        3
+# DUMP:  max-size:        3
+# DUMP:  mode:            custom
+# DUMP:  groupings:
+# DUMP:    - [ AMOSWAP_W, FENCE, LW ]
+# DUMP:    - [ SW ]
+
+
+
+# We expect to see burst groups of both types
+# MEMFENCE: {{(((.+)(LW|AMOSWAP_W|FENCE)(.+)([[:space:]]+)){3})}}
+# MEMFENCE: {{(((.+)(SW)(.+)([[:space:]]+)){3})}}
+
+# Check that there's no group of SWs of size 4 and more
+# MEMFENCE-NOT: {{((SW[[:space:]]\$x([[:digit:]]+), \$x([[:digit:]]+), (-?)([[:digit:]]+)([[:space:]]+)){4})}}
+
+# We expect to see at least 2 burst groups of size 3:
+# FENCE: FENCE
+# FENCE-NEXT: FENCE
+# FENCE-NEXT: FENCE
+# FENCE: FENCE
+# FENCE-NEXT: FENCE
+# FENCE-NEXT: FENCE
+
+# WARN: warning: Instruction "AMOADD_W" was specified in burst grouping but not in histogram: Instruction won't be generated
+
+# There we want to see burst group full of loads and fences and after some unrelated instruction - group of stores and fences.
+# Regex to match 3 line with either LW or FENCE inside. Cannot use 3 different checks here. It may start matching wrong group.
+# FENCEINBOTH: {{(.+)(LW|FENCE)(.+)([[:space:]]+)(.+)(LW|FENCE)(.+)([[:space:]]+)(.+)(LW|FENCE)(.+)([[:space:]]+)}}
+# Regex to match 3 line with either SW or FENCE inside. Cannot use 3 different checks here. It may start matching wrong group.
+# FENCEINBOTH: {{(SW|FENCE)(.+)([[:space:]]+)(SW|FENCE)(.+)([[:space:]]+)(SW|FENCE)(.+)([[:space:]]+)}}

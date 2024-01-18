@@ -1,0 +1,69 @@
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-min-gt-max.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: -num-instrs=100 |& FileCheck %s \
+# RUN: -check-prefix=MINGTMAX
+
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-min-max-zero.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: -num-instrs=100 |& FileCheck %s \
+# RUN: -check-prefix=MINMAXZERO
+
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-err-mode.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: -num-instrs=100 |& FileCheck %s \
+# RUN: -check-prefix=ERRMODE
+
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-groupings-with-mixed.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
+# RUN: -num-instrs=20 \
+# RUN: |& FileCheck %s --check-prefix=MIXEDGROUPINGS
+
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-custom-without-groupings.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
+# RUN: -num-instrs=20 \
+# RUN: |& FileCheck %s --check-prefix=NOGROUPINGS
+
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-custom-with-empty-groupings.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
+# RUN: -num-instrs=20 \
+# RUN: |& FileCheck %s --check-prefix=EMPTYGROUPINGS
+
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-custom-unknown-opcode.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
+# RUN: -num-instrs=20 \
+# RUN: |& FileCheck %s --check-prefix=UNKNOWNOPC
+
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-custom-empty-grouping.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
+# RUN: -num-instrs=20 \
+# RUN: |& FileCheck %s --check-prefix=EMPTYGROUP
+
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-basic-burst-with-non-zero-group.yaml -march=riscv64-linux-gnu \
+# RUN: -num-instrs=20 \
+# RUN: |& FileCheck %s --check-prefix=NONZEROBASIC
+
+
+include:
+  - Inputs/sections.yaml
+
+histogram:
+    - [LW, 1.0]
+    - [AND, 1.0]
+
+# MINGTMAX: error: Max size of burst group should be greater than min size
+# MINGTMAX: LLVM ERROR: Failed to parse file
+
+# MINMAXZERO: error-burst-min-max-zero.yaml:2:3: error: Burst max size should be greater than 0
+# MINMAXZERO: LLVM ERROR: Failed to parse file
+
+# ERRMODE: error: unknown enumerated scalar
+# ERRMODE: LLVM ERROR: Failed to parse file
+
+# MIXEDGROUPINGS: error: Groupings can be specified only with custom burst mode
+# MIXEDGROUPINGS: LLVM ERROR: Failed to parse file
+
+# NOGROUPINGS: error: Custom burst mode was specified but groupings are not provided
+# NOGROUPINGS: LLVM ERROR: Failed to parse file
+
+# EMPTYGROUPINGS: error: Custom burst mode was specified but groupings are not provided 
+# EMPTYGROUPINGS: LLVM ERROR: Failed to parse file
+
+# UNKNOWNOPC: {{LLVM ERROR:  Unknown instruction \"(.+)\" in burst configuration}}
+
+# EMPTYGROUP: error: Burst grouping can't be empty
+# EMPTYGROUP: LLVM ERROR: Failed to parse file
+
+# NONZEROBASIC: error-burst-basic-burst-with-non-zero-group.yaml:2:3: error: Min and max burst group sizes should be 0 with "basic" mode
+# NONZEROBASIC: LLVM ERROR: Failed to parse file

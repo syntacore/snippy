@@ -1,0 +1,7 @@
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+options:
+  dump-mf: true
+  unknown-option: "srf"
+
+# CHECK: LLVM ERROR: Unknown option "unknown-option" was specified in YAML

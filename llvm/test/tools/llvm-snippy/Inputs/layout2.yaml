@@ -1,0 +1,30 @@
+sections:
+    - no:        1
+      VMA:       0x80010000
+      SIZE:      0x10000
+      LMA:       0x80010000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80040000
+      SIZE:      0x10000
+      LMA:       0x80040000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x80050000
+      SIZE:      0x10000
+      LMA:       0x80050000
+      ACCESS:    rw
+
+histogram:
+    - [LBU, 1.0]
+    - [LH, 1.0]
+    - [LHU, 1.0]
+    - [LW, 1.0]
+    - [LWU, 1.0]
+    - [LD, 1.0]
+    - [SB, 1.0]
+    - [SH, 1.0]
+    - [SW, 1.0]
+    - [SD, 1.0]
+    - [AND, 1.0]
+

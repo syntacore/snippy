@@ -1,0 +1,26 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -model-plugin=None -mattr=-a -num-instrs=10 >& %t
+# RUN: FileCheck --input-file=%t --dump-input always %s
+
+sections:
+    - no:        1
+      VMA:       0x10000
+      SIZE:      0x300
+      LMA:       0x10000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x10200
+      SIZE:      0x200
+      LMA:       0x10200
+      ACCESS:    rw
+    - no:        3
+      VMA:       0x10400
+      SIZE:      0x200
+      LMA:       0x10400
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SW, 5.0]
+
+# CHECK: LLVM ERROR: Incorrect list of sections: section 1 and section 2 are interfering

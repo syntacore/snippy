@@ -1,0 +1,9 @@
+# RUN: llvm-snippy %S/Inputs/single-precision-fp.yaml \
+# RUN:    -march=riscv64-linux-gnu -mattr=+f \
+# RUN:    -num-instrs=5000 \
+# RUN:    -init-regs-in-elf -verify-mi \
+# RUN:    -verify-gen-histogram -histogram-must-succeed=true \
+# RUN:    |& FileCheck %s
+
+# make sure that machine verifier does not report errors
+# CHECK-NOT: Machine Verifier Pass report

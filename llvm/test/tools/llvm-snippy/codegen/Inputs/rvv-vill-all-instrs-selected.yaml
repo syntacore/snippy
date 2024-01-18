@@ -1,0 +1,37 @@
+include:
+- "../../rvv-config-biased/Inputs/rvv-unit-pvill-1.yaml"
+
+sections:
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VL1RE16_V, 1.0]
+    - [VL1RE32_V, 1.0]
+    - [VL1RE64_V, 1.0]
+    - [VL1RE8_V, 1.0]
+    - [VL2RE16_V, 1.0]
+    - [VL2RE32_V, 1.0]
+    - [VL2RE64_V, 1.0]
+    - [VL2RE8_V, 1.0]
+    - [VL4RE16_V, 1.0]
+    - [VL4RE32_V, 1.0]
+    - [VL4RE64_V, 1.0]
+    - [VL4RE8_V, 1.0]
+    - [VL8RE16_V, 1.0]
+    - [VL8RE32_V, 1.0]
+    - [VL8RE64_V, 1.0]
+    - [VL8RE8_V, 1.0]
+    - [VS1R_V, 1.0]
+    - [VS2R_V, 1.0]
+    - [VS4R_V, 1.0]
+    - [VS8R_V, 1.0]
+

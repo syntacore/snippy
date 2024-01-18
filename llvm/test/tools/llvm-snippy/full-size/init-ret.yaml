@@ -1,0 +1,37 @@
+# There register initialization always is of size 0x7C. We add some space to generate necessary adds.
+# RUN: sed -e s/SIZE_RX/0x80/ %s > %t.1.yaml
+# RUN: llvm-snippy %t.1.yaml -march=riscv64-linux-gnu  \
+# RUN: --init-regs-in-elf \
+# RUN: -num-instrs=all \
+# RUN: --mattr=-c --initial-regs=%S/../initialization/Inputs/initial_state_zero.yaml
+
+
+# There register initialization always is of size 0x7C. We specify 0x7C + 1 = 0x7D as section size to
+# successfully generate register initialization but fail to generate anything else.
+
+# RUN: sed -e s/SIZE_RX/0x7D/ %s > %t.2.yaml
+# RUN: llvm-snippy %t.2.yaml -march=riscv64-linux-gnu  \
+# RUN: --init-regs-in-elf \
+# RUN: -num-instrs=all -model-plugin=None \
+# RUN: --mattr=-c --initial-regs=%S/../initialization/Inputs/initial_state_zero.yaml \
+# RUN:    |& FileCheck %s --check-prefix=SIZE_FAIL
+
+
+sections:
+    - no:        1
+      VMA:       0x80000
+      SIZE:      SIZE_RX
+      LMA:       0x80000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+
+# SIZE_FAIL: warning: It seems that the last instruction can not be inserted because of size restrictions:
+# SIZE_FAIL-SAME: Likely, you need to increase RX section.

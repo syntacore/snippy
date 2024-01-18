@@ -1,0 +1,30 @@
+# RUN: sed -e s/DO_PERM/off/ %s > %t.1.yaml
+# RUN: timeout 300 llvm-snippy %t.1.yaml -march=riscv64-linux-gnu -num-instrs=1000 \
+# RUN:     -verify-mi -dump-mf -o %t.1 2>&1 | \
+# RUN:     FileCheck %s
+# RUN: sed -e s/DO_PERM/on/ %s > %t.2.yaml
+# RUN: timeout 300 llvm-snippy %t.2.yaml -march=riscv64-linux-gnu -num-instrs=1000 \
+# RUN:     -verify-mi -dump-mf -o %t.2 2>&1 | \
+# RUN:     FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x1000
+      SIZE:      0x10000
+      LMA:       0x1000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+
+branches:
+  permutation: DO_PERM
+
+# CHECK-COUNT-1998: {{(BEQ \$x[0-9]+, \$x[0-9]+, %bb\.[0-9]+)|(PseudoBR %bb\.[0-9]+)}}
+# CHECK: EBREAK
+# CHECK-NOT: {{(EBREAK)|(BEQ \$x[0-9]+, \$x[0-9]+, %bb\.[0-9]+)|(PseudoBR %bb\.[0-9]+)}}

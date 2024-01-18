@@ -1,0 +1,22 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:    --num-instrs=10 --model-plugin=None \
+# RUN:    -o /wobble/wobble/wobble/wobble/wobble/wobble/out.docx \
+# RUN:    |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+
+# CHECK: LLVM ERROR: No such file or directory: /wobble/wobble/wobble/wobble/wobble/wobble/out.docx.elf

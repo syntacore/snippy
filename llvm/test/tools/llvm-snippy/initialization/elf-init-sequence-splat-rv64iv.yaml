@@ -1,0 +1,69 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:    -num-instrs=10 -dump-mf -init-regs-in-elf \
+# RUN:    --snippy-riscv-use-splats-for-rvv-init --verify-mi \
+# RUN:    |& FileCheck %s --dump-input always
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [SRA, 1.0]
+    - [SRAI, 1.0]
+    - [SRL, 1.0]
+    - [SRLI, 1.0]
+    - [SLL, 1.0]
+    - [SLLI, 1.0]
+    - [AND, 1.0]
+    - [ANDI, 1.0]
+    - [OR, 1.0]
+    - [ORI, 1.0]
+    - [XOR, 1.0]
+    - [XORI, 1.0]
+    - [LW, 10.0]
+    - [SW, 10.0]
+
+# CHECK: bb.0:
+# CHECK: $v0 = VMXNOR_MM undef $v0, undef $v0
+# CHECK: $v1 = VMV_V_X $x1
+# CHECK: $v2 = VMV_V_X $x2
+# CHECK: $v3 = VMV_V_X $x3
+# CHECK: $v4 = VMV_V_X $x4
+# CHECK: $v5 = VMV_V_X $x5
+# CHECK: $v6 = VMV_V_X $x6
+# CHECK: $v7 = VMV_V_X $x7
+# CHECK: $v8 = VMV_V_X $x8
+# CHECK: $v9 = VMV_V_X $x9
+# CHECK: $v10 = VMV_V_X $x10
+# CHECK: $v11 = VMV_V_X $x11
+# CHECK: $v12 = VMV_V_X $x12
+# CHECK: $v13 = VMV_V_X $x13
+# CHECK: $v14 = VMV_V_X $x14
+# CHECK: $v15 = VMV_V_X $x15
+# CHECK: $v16 = VMV_V_X $x16
+# CHECK: $v17 = VMV_V_X $x17
+# CHECK: $v18 = VMV_V_X $x18
+# CHECK: $v19 = VMV_V_X $x19
+# CHECK: $v20 = VMV_V_X $x20
+# CHECK: $v21 = VMV_V_X $x21
+# CHECK: $v22 = VMV_V_X $x22
+# CHECK: $v23 = VMV_V_X $x23
+# CHECK: $v24 = VMV_V_X $x24
+# CHECK: $v25 = VMV_V_X $x25
+# CHECK: $v26 = VMV_V_X $x26
+# CHECK: $v27 = VMV_V_X $x27
+# CHECK: $v28 = VMV_V_X $x28
+# CHECK: $v29 = VMV_V_X $x29
+# CHECK: $v30 = VMV_V_X $x30
+# CHECK: $v31 = VMV_V_X $x31

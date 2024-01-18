@@ -1,0 +1,20 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   -enable-address-value-hazards -model-plugin=None -num-instrs=10 \
+# RUN: |& FileCheck %s --dump-input fail
+
+sections:
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x800000
+      SIZE:      0x400000
+      LMA:       0x800000
+      ACCESS:    rw
+
+histogram:
+    - [LD, 1.0]
+
+# CHECK: LLVM ERROR: Cannot generate snippet: requested selfcheck / backtrack / address-value-hazards, but no model plugin provided.

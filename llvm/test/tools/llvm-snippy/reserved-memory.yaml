@@ -1,0 +1,20 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN: -model-plugin=None |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0xFFF1001000
+      SIZE:      0x400000
+      LMA:       0xFFF1001000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+
+# CHECK: LLVM ERROR: One of layout memory regions interferes with reserved region:

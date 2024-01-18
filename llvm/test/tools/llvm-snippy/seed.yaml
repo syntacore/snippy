@@ -1,0 +1,64 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:    -dump-mi -seed=0 -num-instrs=150  \
+# RUN:    -last-instr= \
+# RUN:    | FileCheck %s --dump-input always
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu  \
+# RUN:    -dump-mi -seed=1 -num-instrs=150  \
+# RUN:    -last-instr= \
+# RUN:    | FileCheck %s --dump-input always
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu  \
+# RUN:    -dump-mi -seed=1673611405 -num-instrs=150  \
+# RUN:    -last-instr= \
+# RUN:    | FileCheck %s --dump-input always
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   -model-plugin=None -verbose -seed=0 |& FileCheck %s --dump-input \
+# RUN:   always --check-prefix=SEED-0
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   -model-plugin=None -verbose -seed=300 |& FileCheck %s --dump-input \
+# RUN:   always --check-prefix=SEED-300
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   -model-plugin=None -seed=14u >& %t || true
+# RUN: FileCheck %s --input-file=%t --dump-input always --check-prefix=WRONG-SEED1
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   -model-plugin=None -seed=1.4 >& %t || true
+# RUN: FileCheck %s --input-file=%t --dump-input always --check-prefix=WRONG-SEED2
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   -model-plugin=None -seed=-1 >& %t || true
+# RUN: FileCheck %s --input-file=%t --dump-input always --check-prefix=WRONG-SEED3
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   -model-plugin=None -seed= |& FileCheck %s --dump-input always \
+# RUN:   --check-prefix=RAND-SEED
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram: 
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+      
+# CHECK-COUNT-150: {{(\$x[0-9]+ = \ADD \$x[0-9]+\, \$x[0-9]+)|(\$x[0-9]+ = \ADDI \$x[0-9]+\, (-)?[0-9]+)}} 
+
+# CHECK-NOT: {{(\$x[0-9]+ = \ADD \$x[0-9]+\, \$x[0-9]+)|(\$x[0-9]+ = \ADDI \$x[0-9]+\, (-)?[0-9]+)}} 
+
+# SEED-0: Used seed: 0
+# SEED-300: Used seed: 300
+# WRONG-SEED1: LLVM ERROR: Provided instructions seed is not convertible to numeric value.
+# WRONG-SEED2: LLVM ERROR: Provided instructions seed is not convertible to numeric value.
+# WRONG-SEED3: LLVM ERROR: Provided instructions seed is not convertible to numeric value.
+# RAND-SEED: warning: no instructions seed specified, using auto-generated one: {{[0-9]+$}}

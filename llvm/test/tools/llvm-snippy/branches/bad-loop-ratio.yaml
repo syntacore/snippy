@@ -1,0 +1,35 @@
+# RUN: sed -e s/LOOP_RATIO/-0.1/ %s > %t.1.yaml
+# RUN: not llvm-snippy %t.1.yaml -march=riscv64-linux-gnu -num-instrs=50 \
+# RUN:     -verify-mi -dump-mf -o %t |& FileCheck %s
+#
+# RUN: sed -e s/LOOP_RATIO/1.1/ %s > %t.2.yaml
+# RUN: not llvm-snippy %t.2.yaml -march=riscv64-linux-gnu -num-instrs=50 \
+# RUN:     -verify-mi -dump-mf -o %t |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x1000
+      SIZE:      0x10000
+      LMA:       0x1000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+    - [BLT, 1.0]
+    - [BLTU, 1.0]
+    - [BGE, 1.0]
+    - [BGEU, 1.0]
+    - [BNE, 1.0]
+    - [C_BEQZ, 1.0]
+    - [C_BNEZ, 1.0]
+    - [AND, 8.0]
+
+branches:
+    loop-ratio: LOOP_RATIO
+
+# CHECK: {{.+}}.yaml:33:5: error: Loop ratio expected to be >= 0 and <= 1

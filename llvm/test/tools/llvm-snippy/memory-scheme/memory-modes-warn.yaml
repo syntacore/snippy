@@ -1,0 +1,91 @@
+# RUN: llvm-snippy %S/Inputs/default-layout-2.yaml %s -march=riscv64-linux-gnu \
+# RUN: -num-instrs=100 \
+# RUN: -model-plugin None -riscv-disable-misaligned-access \
+# RUN: |& FileCheck %s --dump-input fail
+# RUN: not llvm-snippy %S/Inputs/default-layout-2.yaml %s -march=riscv64-linux-gnu \
+# RUN: -num-instrs=100 \
+# RUN: -model-plugin None -strict-memory-schemes -riscv-disable-misaligned-access \
+# RUN: |& FileCheck %s --dump-input fail --check-prefix=ERROR
+
+access-evictions:
+    - mask:  0x003c0000
+      fixed: 0x80000000
+    - mask:  0x00b0e000
+      fixed: 0x80001000
+access-ranges:
+    - start: 0x80002000
+      size: 0x1000
+      stride: 16
+      first-offset: 1
+      last-offset: 2
+    - start: 0x80004000
+      size: 0x200
+      stride: 8
+      first-offset: 4
+      last-offset: 6
+    - start: 0x803FFF00
+      size: 0x200
+      stride: 8
+      first-offset: 4
+      last-offset: 6
+    - start: 0x7FFFFFFF
+      size: 0x400
+      stride: 4
+      first-offset: 1
+      last-offset: 1
+access-addresses:
+    - ordered: true
+      plain:
+          - addr: 0x80200000
+          - addr: 0x80201234
+          - addr: 0x802020BC
+    - ordered: false
+      plain:
+          - addr: 0x80200050
+            access-size: 12
+          - addr: 0x807FFFF8
+            access-size: 8
+    - plain:
+          - addr: 0x80200F00
+          - addr: 0x80800000
+    - ordered: false
+      burst:
+          - addr: 0x807FFF00
+            size: 256
+            stride: 16
+            access-size: 8
+
+# CHECK: Test Generation resulted in the following warnings:
+# CHECK:     * Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:
+# CHECK-NEXT: Memory range:
+# CHECK-NEXT:   Weight: 1
+# CHECK-NEXT:   Start: 2147483647
+# CHECK-NEXT:   Size: 1024
+# CHECK-NEXT:   Stride: 4
+# CHECK-NEXT:   FirstOffset: 1
+# CHECK-NEXT:   LastOffset: 1
+# CHECK:     * Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:
+# CHECK-NEXT: Memory eviction:
+# CHECK-NEXT:   Weight: 1
+# CHECK-NEXT:   Mask:  0xb0e000
+# CHECK-NEXT:   Fixed: 0x80001000
+# CHECK:     * Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:
+# CHECK-NEXT: Memory addresses:
+# CHECK-NEXT:   Weight: 1
+# CHECK-NEXT:   Ordered: 1
+# CHECK-NEXT:   Plain:
+# CHECK-NEXT:    - Addr: 0x80200f00
+# CHECK-NEXT:      Access-size: 16
+# CHECK-NEXT:    - Addr: 0x80800000
+# CHECK-NEXT:      Access-size: 16
+# CHECK:     * Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:
+# CHECK-NEXT: Memory addresses:
+# CHECK-NEXT:   Weight: 1
+# CHECK-NEXT:   Ordered: 0
+# CHECK-NEXT:   Burst:
+# CHECK-NEXT:     - Addr: 0x807fff00
+# CHECK-NEXT:       Size: 256
+# CHECK-NEXT:       Stride: 16
+# CHECK-NEXT:       Access-size: 8
+# CHECK-NOT: * Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:
+# ERROR: LLVM ERROR: Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:

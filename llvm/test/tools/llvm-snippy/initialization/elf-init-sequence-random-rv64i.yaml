@@ -1,0 +1,65 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=-a -num-instrs=10 -dump-mf -init-regs-in-elf |& FileCheck %s --dump-input always
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [SRA, 1.0]
+    - [SRAI, 1.0]
+    - [SRL, 1.0]
+    - [SRLI, 1.0]
+    - [SLL, 1.0]
+    - [SLLI, 1.0]
+    - [AND, 1.0]
+    - [ANDI, 1.0]
+    - [OR, 1.0]
+    - [ORI, 1.0]
+    - [XOR, 1.0]
+    - [XORI, 1.0]
+    - [LW, 10.0]
+    - [SW, 10.0]
+
+# CHECK: bb.0:
+# CHECK-NEXT: {{(\$x1 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x2 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x3 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x4 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x5 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x6 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x7 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x8 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x9 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x10 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x11 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x12 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x13 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x14 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x15 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x16 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x17 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x18 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x19 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x20 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x21 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x22 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x23 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x24 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x25 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x26 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x27 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x28 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x29 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x30 = .*$[[:space:]]+)+}}
+# CHECK-SAME: {{(\$x31 = .*$[[:space:]]+)+}}

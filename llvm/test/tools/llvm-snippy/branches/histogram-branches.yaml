@@ -1,0 +1,43 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=800 \
+# RUN:   -verify-mi -mattr=+c -model-plugin None -histogram-max-deviation=2.1 \
+# RUN:   -verify-gen-histogram -o %t 2>&1 | FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x1000
+      SIZE:      0x10000
+      LMA:       0x1000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+    - [BLT, 1.0]
+    - [BLTU, 1.0]
+    - [BGE, 1.0]
+    - [BGEU, 1.0]
+    - [BNE, 1.0]
+    - [C_BEQZ, 1.0]
+    - [C_BNEZ, 1.0]
+    - [AND, 8.0]
+
+# CHECK: Start Verification for function: SnippyFunction:
+# CHECK-NEXT: Start generated instructions statistics:
+# CHECK-NEXT: Opcode Count Primary_Count Freq,% Primary_Freq,% Expected_Prob,% Status
+# CHECK-NEXT: {{ADDI [0-9]+ [0-9]+ [0-9]+\.[0-9] [0-9]+\.[0-9] [0-9]+\.[0-9] OK}}
+# CHECK-NEXT: {{AND [0-9]+ [0-9]+ [0-9]+\.[0-9] [0-9]+\.[0-9] [0-9]+\.[0-9] OK}}
+# CHECK-NEXT: {{BEQ [0-9]+ [0-9]+ [0-9]+\.[0-9] [0-9]+\.[0-9] [0-9]+\.[0-9] OK}}
+# CHECK-NEXT: {{BGE [0-9]+ [0-9]+ [0-9]+\.[0-9] [0-9]+\.[0-9] [0-9]+\.[0-9] OK}}
+# CHECK-NEXT: {{BGEU [0-9]+ [0-9]+ [0-9]+\.[0-9] [0-9]+\.[0-9] [0-9]+\.[0-9] OK}}
+# CHECK-NEXT: {{BLT [0-9]+ [0-9]+ [0-9]+\.[0-9] [0-9]+\.[0-9] [0-9]+\.[0-9] OK}}
+# CHECK-NEXT: {{BLTU [0-9]+ [0-9]+ [0-9]+\.[0-9] [0-9]+\.[0-9] [0-9]+\.[0-9] OK}}
+# CHECK-NEXT: {{BNE [0-9]+ [0-9]+ [0-9]+\.[0-9] [0-9]+\.[0-9] [0-9]+\.[0-9] OK}}
+# CHECK-NEXT: {{C_BEQZ [0-9]+ [0-9]+ [0-9]+\.[0-9] [0-9]+\.[0-9] [0-9]+\.[0-9] OK}}
+# CHECK-NEXT: {{C_BNEZ [0-9]+ [0-9]+ [0-9]+\.[0-9] [0-9]+\.[0-9] [0-9]+\.[0-9] OK}}
+# CHECK-NEXT: {{EBREAK [0-9]+ [0-9]+ [0-9]+\.[0-9] [0-9]+\.[0-9] [0-9]+\.[0-9] OK}}
+# CHECK-NEXT: {{SRLI [0-9]+ [0-9]+ [0-9]+\.[0-9] [0-9]+\.[0-9] [0-9]+\.[0-9] OK}}
+# CHECK: End Verification for function: SnippyFunction

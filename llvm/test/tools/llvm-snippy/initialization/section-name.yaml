@@ -1,0 +1,31 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu  \
+# RUN:    -num-instrs=10 \
+# RUN:    -dump-layout \
+# RUN: |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x800000
+      SIZE:      0x4000
+      LMA:       0x800000
+      ACCESS:    rx
+    - name:      ram
+      VMA:       0x806000
+      SIZE:      0x4000
+      LMA:       0x806000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+
+# CHECK: Sections:
+# CHECK-NEXT: Section #1
+# CHECK-NEXT: VMA: 0x800000
+# CHECK-NEXT: LMA: 0x800000
+# CHECK-NEXT: Size: 16384
+# CHECK-NEXT: rx
+# CHECK-NEXT: Section #ram
+# CHECK-NEXT: VMA: 0x806000
+# CHECK-NEXT: LMA: 0x806000
+# CHECK-NEXT: Size: 16384
+# CHECK-NEXT: rw
