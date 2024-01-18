@@ -816,8 +816,7 @@ static SelectedTargetInfo getSelectedTargetInfo() {
   return TargetInfo;
 }
 
-unsigned long long initializeRandomEngine() {
-  auto SeedValue = seedOptToValue(Seed.getValue());
+unsigned long long initializeRandomEngine(unsigned long long SeedValue) {
   if (Verbose)
     outs() << "Used seed: " << SeedValue << "\n";
   RandEngine::init(SeedValue);
@@ -830,6 +829,8 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
   auto SelfCheckPeriod = getSelfcheckPeriod();
   auto NumPrimaryInstrs = getExpectedNumInstrs(NumInstrs.getValue());
   bool FillCodeSectionMode = !NumPrimaryInstrs;
+  auto SeedValue = seedOptToValue(Seed.getValue());
+  initializeRandomEngine(SeedValue);
   auto Models = parseModelPluginList();
   bool RunOnModel = !Models.empty();
   parseReservedRegistersOption(RP, State.getSnippyTarget(), State.getRegInfo());
