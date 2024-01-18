@@ -1,0 +1,44 @@
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [FMADD_S, 1.0]
+    - [FMSUB_S, 1.0]
+    - [FNMSUB_S, 1.0]
+    - [FNMADD_S, 1.0]
+    - [FADD_S, 1.0]
+    - [FSUB_S, 1.0]
+    - [FMUL_S, 1.0]
+    - [FDIV_S, 1.0]
+    - [FSQRT_S, 1.0]
+    - [FSGNJ_S, 1.0]
+    - [FSGNJN_S, 1.0]
+    - [FSGNJX_S, 1.0]
+    - [FMIN_S, 1.0]
+    - [FMAX_S, 1.0]
+    - [FCVT_W_S, 1.0]
+    - [FCVT_WU_S, 1.0]
+    - [FMV_X_W, 1.0]
+    - [FEQ_S, 1.0]
+    - [FLT_S, 1.0]
+    - [FLE_S, 1.0]
+    - [FCLASS_S, 1.0]
+    - [FCVT_S_W, 1.0]
+    - [FCVT_S_WU, 1.0]
+    - [FMV_W_X, 1.0]
+    - [FCVT_L_S, 1.0]
+    - [FCVT_LU_S, 1.0]
+    - [FCVT_S_L, 1.0]
+    - [FCVT_S_LU, 1.0]
+    - [FLW, 1.0]
+    - [FSW, 1.0]
+

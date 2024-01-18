@@ -1,0 +1,35 @@
+# RUN: llvm-snippy %S/../Inputs/jal-layout.yaml %s -march=riscv64-linux-gnu -num-instrs=100 \
+# RUN: -num-instr-ancil=10 --dump-mf -verify-mi -stack-size=1024 \
+# RUN: -call-graph-dump-filename=%t -call-graph-dump-format=yaml
+# RUN: FileCheck %s --input-file=%t
+
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - fun1
+        - fun2
+    - name: fun1
+      callees:
+        - fun2
+    - name: fun2
+      callees:
+        - fun3
+    - name: fun3
+      external: true
+
+#CHECK: entry-point: SnippyFunction
+#CHECK-NEXT: function-list:
+#CHECK-NEXT:   - name: SnippyFunction
+#CHECK-NEXT:     callees:
+#CHECK-NEXT:       - fun1
+#CHECK-NEXT:       - fun2
+#CHECK-NEXT:   - name: fun1
+#CHECK-NEXT:     callees:
+#CHECK-NEXT:       - fun2
+#CHECK-NEXT:   - name: fun2
+#CHECK-NEXT:     callees:
+#CHECK-NEXT:       - fun3
+#CHECK-NEXT:   - name: fun3
+#CHECK-NEXT:     external: true

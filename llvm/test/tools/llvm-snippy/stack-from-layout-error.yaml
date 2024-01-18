@@ -1,0 +1,25 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
+# RUN:  -num-instrs=10000  \
+# RUN:  -spilled-regs-list=X1 -init-regs-in-elf -verify-mi |& FileCheck %s
+sections:
+    - no:        1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0xF00000
+      SIZE:      0x100000
+      LMA:       0xF00000
+      ACCESS:    rx
+
+histogram:
+    - [DIV, 1.0]
+    - [ADD, 1.0]
+
+# CHECK: LLVM ERROR: Wrong layout file: "stack" section must be RW

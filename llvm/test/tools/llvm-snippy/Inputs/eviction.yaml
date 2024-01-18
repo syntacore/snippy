@@ -1,0 +1,5 @@
+access-evictions:
+    - mask:  0x003c0000
+      fixed: 0x80000c81
+    - mask:  0x003c0000
+      fixed: 0x60000c73

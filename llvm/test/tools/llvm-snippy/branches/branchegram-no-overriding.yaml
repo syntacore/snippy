@@ -1,0 +1,12 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:     -num-instrs=10 |& FileCheck %s
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+
+include:
+  - ../Inputs/branchegram.yaml
+  - ../Inputs/sections.yaml
+
+# CHECK-NOT: branchegram values were overriden after including

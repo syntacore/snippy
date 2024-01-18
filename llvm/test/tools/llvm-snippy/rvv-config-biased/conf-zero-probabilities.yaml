@@ -1,0 +1,42 @@
+# COM: This test checks that if the probabilities of mode changing and setting vill
+# COM: are zero then there are no instructions vset*
+
+# RUN:  llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:   -model-plugin=None -dump-mf --num-instrs=1000 -o %t \
+# RUN:  |& FileCheck %s
+
+
+include:
+- Inputs/rvv-unit-p-0.yaml
+
+sections:
+  - no:        0
+    VMA:       0x8000
+    SIZE:      0x1000
+    LMA:       0x8000
+    ACCESS:    r
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VAADDU_VV, 1.0]
+    - [VAADD_VX, 1.0]
+    - [VADC_VIM, 1.0]
+    - [VADD_VI, 1.0]
+    - [VAND_VX, 1.0]
+    - [VASUBU_VX, 1.0]
+    - [VASUB_VX, 1.0]
+    - [VIOTA_M, 1.0]
+    - [VXOR_VX, 1.0]
+    - [VZEXT_VF4, 1.0]
+
+# CHECK: VSET
+# CHECK-NOT: VSET

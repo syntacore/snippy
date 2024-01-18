@@ -1,0 +1,77 @@
+# COM: this is the test for default value of snippy-riscv-rvv-wa-exclude-vlmax1
+# RUN: llvm-snippy %s %S/Inputs/rvv-unit-all.yaml -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None --num-instrs=10 -o %t \
+# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-FULL-VLMAX1-DISABLED
+
+# RUN: llvm-snippy %s %S/Inputs/rvv-unit-all.yaml -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None --num-instrs=10 -o %t \
+# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  --snippy-riscv-rvv-wa-exclude-vlmax1=true \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-FULL-VLMAX1-DISABLED
+
+# RUN: llvm-snippy %s %S/Inputs/rvv-unit-all.yaml -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  --model-plugin None \
+# RUN:  --num-instrs=10 -o %t \
+# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  --snippy-riscv-rvv-wa-exclude-vlmax1=false \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-FULL-VLMAX1-ENABLED
+
+# RUN: llvm-snippy %S/Inputs/layout-cl-options-rvv.yaml \
+# RUN:  -model-plugin=None |& FileCheck %s --check-prefix=CHECK-FULL-VLMAX1-DISABLED
+
+
+sections:
+  - no:        3
+    VMA:       0x7ffff000
+    SIZE:      0x1000
+    LMA:       0x7ffff000
+    ACCESS:    r
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VADD_VV, 1.0]
+
+# CHECK-FULL-VLMAX1-DISABLED:       --- RVV Configuration Info ---
+# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - Derived VLEN: 128 (VLENB = 16)
+# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - Mode Change Decision Policy: Configuration Bias
+# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - Mode Change Probability: 0.167
+# CHECK-FULL-VLMAX1-DISABLED-NEXT:    Set Vill Bit Probability: 0
+# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - VL Selection Rules:
+# CHECK-FULL-VLMAX1-DISABLED-NEXT:    P: 0.66667 <vlmax>
+# CHECK-FULL-VLMAX1-DISABLED-NEXT:    P: 0.33333 <any_legal>
+# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - VM Selection Rules:
+# CHECK-FULL-VLMAX1-DISABLED-NEXT:    P: 0.66667 <all_ones>
+# CHECK-FULL-VLMAX1-DISABLED-NEXT:    P: 0.33333 <any_legal>
+# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - Configuration Bag Listing:
+# CHECK-FULL-VLMAX1-DISABLED-COUNT-704:   /MaxVL
+# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - Configuration Bag Size: 704
+# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - State Cardinality: 15104 ~ {MASKS}
+# CHECK-FULL-VLMAX1-DISABLED-NEXT: --- RVV Configuration End  ---
+
+# CHECK-FULL-VLMAX1-ENABLED:       --- RVV Configuration Info ---
+# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - Derived VLEN: 128 (VLENB = 16)
+# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - Mode Change Decision Policy: Configuration Bias
+# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - Mode Change Probability: 0.167
+# CHECK-FULL-VLMAX1-ENABLED-NEXT:    Set Vill Bit Probability: 0
+# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - VL Selection Rules:
+# CHECK-FULL-VLMAX1-ENABLED-NEXT:    P: 0.66667 <vlmax>
+# CHECK-FULL-VLMAX1-ENABLED-NEXT:    P: 0.33333 <any_legal>
+# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - VM Selection Rules:
+# CHECK-FULL-VLMAX1-ENABLED-NEXT:    P: 0.66667 <all_ones>
+# CHECK-FULL-VLMAX1-ENABLED-NEXT:    P: 0.33333 <any_legal>
+# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - Configuration Bag Listing:
+# CHECK-FULL-VLMAX1-ENABLED-COUNT-800:   /MaxVL
+# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - Configuration Bag Size: 800
+# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - State Cardinality: 15200 ~ {MASKS}
+# CHECK-FULL-VLMAX1-ENABLED-NEXT: --- RVV Configuration End  ---
+# CHECK-FULL-VLMAX1-ENABLED: Skipping snippet execution on the model: model was set no 'None'

@@ -1,0 +1,18 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=100 \
+# RUN:     -verify-mi -dump-mf -mattr=+c -o %t
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=100 \
+# RUN:     -verify-mi -dump-mf -mattr=+c -init-regs-in-elf -o %t
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+
+histogram:
+    - [C_J, 1.0]

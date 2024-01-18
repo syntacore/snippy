@@ -1,0 +1,27 @@
+# RUN: llvm-snippy %S/../Inputs/jal-layout.yaml %s -march=riscv64-linux-gnu -num-instrs=100 \
+# RUN: -o %t -num-instr-ancil=10 --dump-mf -verify-mi -stack-size=1024 |& FileCheck %s
+# RUN: llvm-objdump -t %t.elf | FileCheck %s --check-prefix=SYMBOL-TABLE
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - fun1
+        - fun2
+    - name: fun1
+      callees:
+        - fun2
+    - name: fun2
+      callees:
+        - fun3
+    - name: fun3
+      external: true
+
+# CHECK: PseudoCALL target-flags(riscv-call)
+# CHECK-SAME: @[[FUN:[a-zA-Z0-9]+]]
+# CHECK: Machine code for function [[FUN]]:
+
+# SYMBOL-TABLE-DAG: {{[0-9a-f]+}} g     F .snippy.1.rx   {{[0-9a-f]+}} SnippyFunction
+# SYMBOL-TABLE-DAG: {{[0-9a-f]+}} l     F .snippy.1.rx   {{[0-9a-f]+}} fun1
+# SYMBOL-TABLE-DAG: {{[0-9a-f]+}} l     F .snippy.1.rx   {{[0-9a-f]+}} fun2
+# SYMBOL-TABLE-DAG: {{[0-9a-f]+}}  w    F .snippy.1.rx   {{[0-9a-f]+}} fun3

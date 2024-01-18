@@ -1,0 +1,22 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu  \
+# RUN: --init-regs-in-elf \
+# RUN:    -num-instrs=20 -model-plugin=None \
+# RUN:    |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x80000
+      SIZE:      0x4
+      LMA:       0x80000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+
+# CHECK: LLVM ERROR: RX section is filled completely. Current size is {{[0-9]+}}, but section size is {{[0-9]+}}

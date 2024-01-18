@@ -1,0 +1,8 @@
+access-addresses:
+  - ordered: true
+    plain:
+      - addr: 0x80002001
+      - addr: 0x80000000
+      - addr: 0x80001234
+      - addr: 0x80000000
+      - addr: 0x80000300

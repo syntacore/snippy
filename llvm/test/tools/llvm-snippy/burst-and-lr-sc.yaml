@@ -1,0 +1,29 @@
+# RUN: llvm-snippy %s -march=riscv64-unknown-elf  \
+# RUN:   -mattr=+a -num-instrs=2000 \
+# RUN:   -init-regs-in-elf
+
+include:
+- Inputs/large-addrs-scheme.yaml
+- Inputs/custom-burst-load-store.yaml
+
+sections:
+- name: 1
+  VMA: 0x400000000
+  SIZE: 0x100000
+  LMA: 0x400000000
+  ACCESS: rx
+- name: 2
+  VMA: 0x400300000
+  SIZE: 0x4000
+  LMA: 0x400300000
+  ACCESS: rw
+histogram:
+- [ADD, 1.0]
+- [LD, 1.0]
+- [SD, 1.0]
+- [LW, 1.0]
+- [SW, 1.0]
+- [LR_W, 1.0]
+- [LR_D, 1.0]
+- [SC_W, 1.0]
+- [SC_D, 1.0]

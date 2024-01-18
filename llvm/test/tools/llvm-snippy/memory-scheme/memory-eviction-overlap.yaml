@@ -1,0 +1,8 @@
+# RUN: llvm-snippy %S/Inputs/default-layout.yaml %s -march=riscv64-linux-gnu -num-instrs=100 -dump-layout=true >& %t || true
+# RUN: FileCheck --input-file=%t --dump-input always %s
+
+access-evictions:
+    - mask:  0x003f0000
+      fixed: 0x80010000
+
+# CHECK: LLVM ERROR: Bits in mask and fixed fields for eviction overlap

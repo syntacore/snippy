@@ -1,0 +1,36 @@
+# COM: This test checks that install a pvil not from [0.0;1.0] - error.
+
+# RUN: not llvm-snippy %s %S/Inputs/rvv-unit-wrong-pvill-1.yaml -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None --num-instrs=1000 -o %t \
+# RUN:  |& FileCheck %s
+
+# RUN: not llvm-snippy %s %S/Inputs/rvv-unit-wrong-pvill-2.yaml -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None --num-instrs=1000 -o %t \
+# RUN:  |& FileCheck %s
+
+
+sections:
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VAADDU_VV, 1.0]
+    - [VAADD_VX, 1.0]
+    - [VADC_VIM, 1.0]
+    - [VADD_VI, 1.0]
+    - [VAND_VX, 1.0]
+    - [VASUBU_VX, 1.0]
+    - [VASUB_VX, 1.0]
+    - [VIOTA_M, 1.0]
+    - [VXOR_VX, 1.0]
+    - [VZEXT_VF4, 1.0]
+
+# CHECK: LLVM ERROR: riscv-vector-vlvm::Pvill should be from [0.0;1.0]

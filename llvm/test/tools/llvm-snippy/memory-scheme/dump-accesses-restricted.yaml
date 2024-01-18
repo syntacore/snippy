@@ -1,0 +1,19 @@
+# RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s -march=riscv64-linux-gnu \
+# RUN:  -num-instrs=5000 \
+# RUN:  -dump-memory-accesses-restricted=%t
+# RUN: FileCheck --input-file=%t %s
+# RUN: cat %s >>%t
+# RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %t -march=riscv64-linux-gnu \
+# RUN:  -num-instrs=5000
+
+access-ranges:
+    - start: 0x80002000
+      size: 0x20000
+      stride: 8
+      first-offset: 0
+      last-offset: 0
+
+# CHECK: restricted-addresses:
+# CHECK-NEXT: - plain:
+# CHECK-COUNT-5000: {{0x800(0|1|2)}}
+# CHECK-NOT: {{0x800(0|1|2)}}

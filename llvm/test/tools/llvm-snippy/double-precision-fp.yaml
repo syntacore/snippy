@@ -1,0 +1,54 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+d \
+# RUN:    -num-instrs=5000 \
+# RUN:    -init-regs-in-elf -verify-mi \
+# RUN:    -verify-gen-histogram -histogram-must-succeed=true \
+# RUN:    |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [FMADD_D, 1.0]
+    - [FMSUB_D, 1.0]
+    - [FNMSUB_D, 1.0]
+    - [FNMADD_D, 1.0]
+    - [FADD_D, 1.0]
+    - [FSUB_D, 1.0]
+    - [FMUL_D, 1.0]
+    - [FDIV_D, 1.0]
+    - [FSQRT_D, 1.0]
+    - [FSGNJ_D, 1.0]
+    - [FSGNJN_D, 1.0]
+    - [FSGNJX_D, 1.0]
+    - [FMIN_D, 1.0]
+    - [FMAX_D, 1.0]
+    - [FCVT_W_D, 1.0]
+    - [FCVT_WU_D, 1.0]
+    - [FCVT_D_W, 1.0]
+    - [FCVT_D_WU, 1.0]
+    - [FMV_X_D, 1.0]
+    - [FEQ_D, 1.0]
+    - [FLT_D, 1.0]
+    - [FLE_D, 1.0]
+    - [FCLASS_D, 1.0]
+    - [FMV_D_X, 1.0]
+    - [FCVT_L_D, 1.0]
+    - [FCVT_LU_D, 1.0]
+    - [FCVT_D_L, 1.0]
+    - [FCVT_D_LU, 1.0]
+    - [FCVT_S_D, 1.0]
+    - [FCVT_D_S, 1.0]
+    - [FLD, 1.0]
+    - [FSD, 1.0]
+
+# make sure that machine verifier does not report errors
+# CHECK-NOT: Machine Verifier Pass report

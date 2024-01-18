@@ -1,0 +1,12 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   --layout-include-dir=%S/Inputs \
+# RUN:   --dump-mf --num-instrs=150 |& FileCheck %s
+
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   --layout-include-dir=%S/Inputs \
+# RUN:   --dump-mf --num-instrs=150 |& FileCheck %s
+
+include:
+  - include-inside-include.yaml
+
+# CHECK: In file "include-inside-include.yaml": included file cannot contain "include" section.

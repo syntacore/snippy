@@ -1,0 +1,10 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   -model-plugin=None --dump-mf --num-instrs=150 |& FileCheck %s
+
+include:
+  - Inputs/full.yaml
+  - Inputs/empty.yaml
+
+# CHECK-COUNT-149: {{(\$x[0-9]+ = ADD \$x[0-9]+, \$x[0-9]+)|(\$x[0-9]+ = ADDI \$x[0-9]+, (-)?[0-9]+)}}
+# CHECK: EBREAK
+# CHECK-NOT: {{(\$x[0-9]+ = ADD \$x[0-9]+, \$x[0-9]+)|(\$x[0-9]+ = ADDI \$x[0-9]+, (-)?[0-9]+)}}

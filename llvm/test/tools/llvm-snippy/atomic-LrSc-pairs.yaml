@@ -1,0 +1,35 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=500 \
+# RUN:    -mattr=+a \
+# RUN:    -init-regs-in-elf --verify-mi
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [AMOADD_D_AQ, 1.0]
+    - [AMOADD_W_AQ, 1.0]
+    - [AMOAND_D_AQ, 1.0]
+    - [AMOAND_W_AQ, 1.0]
+    - [AMOMAXU_D_AQ, 1.0]
+    - [AMOMAXU_W_AQ, 1.0]
+    - [SRL, 1.0]
+    - [SRLI, 1.0]
+    - [SLL, 1.0]
+    - [SLLI, 1.0]
+    - [AND, 1.0]
+    - [ANDI, 1.0]
+    - [OR, 1.0]
+    - [ORI, 1.0]
+    - [XOR, 1.0]
+    - [XORI, 1.0]
+    - [LR_W, 3.0]
+    - [SC_W, 3.0]
