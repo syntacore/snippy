@@ -1,0 +1,27 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+f \
+# RUN: -num-instrs=1000 -memory-access-mode=mixed-burst \
+# RUN: -memory-access-burst-group-size=100
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x805FFFEF
+      SIZE:      0x11
+      LMA:       0x805FFFEF
+      ACCESS:    rw
+
+histogram:
+    - [LW, 1.0]
+    - [SW, 1.0]
+    - [LBU, 1.0]
+    - [SD, 1.0]
+    - [FLW, 1.0]
+    - [FSW, 1.0]
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [XOR, 1.0]
+    - [AND, 1.0]

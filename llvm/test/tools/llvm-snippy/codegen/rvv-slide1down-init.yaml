@@ -1,0 +1,32 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None --num-instrs=10000 -o %t \
+# RUN:  -verify-gen-histogram  -histogram-must-succeed=true \
+# RUN:  -dump-mf \
+# RUN:  |& FileCheck %s
+
+include:
+- Inputs/rvv-unit-all.yaml
+
+sections:
+  - no:        0
+    VMA:       0x100000
+    SIZE:      0x400000
+    LMA:       0x100000
+    ACCESS:    r
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+    - [VADD_VV, 1.0]
+
+# CHECK: VADD
+# CHECK: $v0 = VL1RE8_V
+# CHECK: EBREAK
+# CHECK: Start Verification for function:

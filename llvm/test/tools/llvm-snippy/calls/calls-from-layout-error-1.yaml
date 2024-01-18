@@ -1,0 +1,19 @@
+# RUN: not llvm-snippy %S/../Inputs/jal-layout.yaml %s -march=riscv64-linux-gnu -num-instrs=100 \
+# RUN: -num-instr-ancil=10 --dump-mf -verify-mi -stack-size=1024 |& FileCheck %s
+
+call-graph:
+  entry-point: SnippyFunction1
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - fun1
+        - fun2
+    - name: fun1
+      callees:
+        - fun2
+    - name: fun2
+      callees:
+        - fun3
+    - name: fun3
+
+# CHECK: calls-from-layout-error-1.yaml:5:3: error: No description found for specified entry point 'SnippyFunction1' in call graph file

@@ -1,0 +1,19 @@
+# NOTE: This test relies on default initialized memory scheme
+# from layout of loadstore-layout-1b.yaml. In case of change
+# of that layout, you may need adjust this test too.
+# RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s -march=riscv64-linux-gnu \
+# RUN:  -num-instrs=1000 \
+# RUN:  -dump-memory-accesses=%t
+# RUN: FileCheck --input-file=%t %s
+
+restricted-addresses:
+    - plain:
+          - addr: 0x80002000
+            access-size: 128
+          - addr: 0x80004000
+            access-size: 400
+          - addr: 0x80201000
+            access-size: 600
+
+# CHECK-COUNT-1000: {{0x80(0|1|2|3)}}
+# CHECK-NOT: {{0x80(0|1|2|3)}}

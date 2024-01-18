@@ -1,0 +1,40 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:     -num-instrs=10 -dump-layout |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+
+include:
+  - ../Inputs/branchegram.yaml
+
+# CHECK: branches:
+# CHECK-NEXT:   permutation: true
+# CHECK-NEXT:   alignment: 32
+# CHECK-NEXT:   loop-ratio: 0.5
+# CHECK-NEXT:   number-of-loop-iterations:
+# CHECK-NEXT:       min: 2
+# CHECK-NEXT:       max: 32
+# CHECK-NEXT:   max-depth:
+# CHECK-NEXT:     if: 500
+# CHECK-NEXT:     loop: 4
+# CHECK-NEXT:   distance:
+# CHECK-NEXT:     blocks:
+# CHECK-NEXT:       min: 1
+# CHECK-NEXT:       max: 20
+# CHECK-NEXT:     pc:
+# CHECK-NEXT:       min: 0
+# CHECK-NEXT:       max: 120
+# CHECK-NOT: branchegram values were overriden after including

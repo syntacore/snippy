@@ -1,0 +1,26 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
+# RUN: --model-plugin=None -num-instrs=10000 -external-stack  \
+# RUN:  -spilled-regs-list=X1 -init-regs-in-elf -dump-mi -verify-mi |& FileCheck %s
+sections:
+    - no:        1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+    - [ADD, 1.0]
+
+# CHECK-NOT: $x2
+# CHECK: $x2 = ADDI $x2, -16
+# CHECK-NEXT: SD $x1, $x2, 0
+
+# CHECK: $x1 = LD $x2, 0
+# CHECK-NEXT: $x2 = ADDI $x2, 16
+# CHECK-NEXT: EBREAK

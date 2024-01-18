@@ -1,0 +1,13 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   --layout-include-dir=%S/Inputs \
+# RUN:   --dump-mf --num-instrs=150 |& FileCheck %s
+
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   --layout-include-dir=%S/Inputs \
+# RUN:   --dump-mf --num-instrs=150 |& FileCheck %s
+
+include:
+  - not-a-yaml.yaml
+
+# CHECK: not-a-yaml.yaml:1:1: error: not a mapping
+# CHECK: 'Twas brillig, and the slithy toves

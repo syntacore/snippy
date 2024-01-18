@@ -1,0 +1,35 @@
+# RUN: llvm-snippy %S/../Inputs/jal-layout.yaml %s -march=riscv64-linux-gnu -num-instrs=100 \
+# RUN: -num-instr-ancil=10 --dump-mf -verify-mi -stack-size=1024 \
+# RUN: -call-graph-dump-filename=%t -call-graph-dump-format=dot
+# RUN: FileCheck %s --input-file=%t
+
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - fun1
+        - fun2
+    - name: fun1
+      callees:
+        - fun2
+    - name: fun2
+      callees:
+        - fun3
+    - name: fun3
+      external: true
+
+#CHECK: digraph "Call graph" {
+#CHECK-NEXT: 	label="Call graph";
+#CHECK: 	Node0x[[SF:[0-9a-f]+]] [shape=record,style=filled fillcolor=lightskyblue shape=record,label="{SnippyFunction}"];
+#CHECK-NEXT: 	Node0x[[SF]] -> Node0x[[F1:[0-9a-f]+]]
+#CHECK-NEXT: 	Node0x[[SF]] -> Node0x[[F2:[0-9a-f]+]]
+#CHECK-NEXT: 	Node0x[[F1]] [shape=record,style=filled 
+#CHECK-SAME:  shape=record,label="{fun1}"];
+#CHECK-NEXT: 	Node0x[[F1]] -> Node0x[[F2]]
+#CHECK-NEXT: 	Node0x[[F2]] [shape=record,style=filled
+#CHECK-SAME:  shape=record,label="{fun2}"];
+#CHECK-NEXT: 	Node0x[[F2]] -> Node0x[[F3:[0-9a-f]+]]
+#CHECK-NEXT: 	Node0x[[F3]] [shape=record,style=filled
+#CHECK-SAME:  shape=diamond,label="{fun3}"];
+#CHECK-NEXT: }

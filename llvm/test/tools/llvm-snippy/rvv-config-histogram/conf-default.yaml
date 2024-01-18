@@ -1,0 +1,43 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None --num-instrs=10 -o %t \
+# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  |& FileCheck %s
+
+# COM: this just ensures that we still have proper execution
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None --num-instrs=10 -o %t \
+# RUN:  --snippy-riscv-dump-rvv-config
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None --num-instrs=10 -o %t \
+# RUN:  --snippy-riscv-dump-rvv-config=%t.rvv.config.info
+# RUN: FileCheck --input-file=%t.rvv.config.info %s
+
+# COM: this just ensures that we still have proper execution
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None --num-instrs=10 -o %t \
+# RUN:  --snippy-riscv-dump-rvv-config=%t.rvv.config.info
+
+sections:
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VSETIVLI, 1.0]
+    - [VSETVLI, 1.0]
+    - [VSETVL, 1.0]
+    - [VADD_VV, 1.0]
+
+# CHECK: --- RVV Configuration Info ---
+# CHECK:  - Configuration Bag Listing:
+# CHECK:    P: 1 Conf: { e64, m1, tu, mu, vxsat: 0, vxrm: rnu }
+# CHECK:  - Configuration Bag Size: 1
+# CHECK: --- RVV Configuration End  ---

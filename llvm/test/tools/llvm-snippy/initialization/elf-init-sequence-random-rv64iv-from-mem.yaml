@@ -1,0 +1,29 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v,+c,+f,+d \
+# RUN:    -num-instrs=100 -dump-mf -init-regs-in-elf --riscv-init-vregs-from-memory --verify-mi \
+# RUN:    -model-plugin=None -verify-gen-histogram  -histogram-must-succeed=true --histogram-max-deviation=2.5 \
+# RUN:    |& FileCheck %s --dump-input always
+
+sections:
+    - no:        0
+      VMA:       0x200000
+      SIZE:      0x100000
+      LMA:       0x200000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x400000
+      SIZE:      0x100000
+      LMA:       0x400000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x600000
+      SIZE:      0x100000
+      LMA:       0x600000
+      ACCESS:    rw
+
+histogram:
+    - [C_ADDI_NOP, 1.0]
+
+# CHECK-NOT: Machine Verifier Pass report
+# CHECK: Start Verification for function
+# CHECK-NOT: FAILED
+# CHECK: End Verification for function

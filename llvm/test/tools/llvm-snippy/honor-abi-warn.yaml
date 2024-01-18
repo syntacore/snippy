@@ -1,0 +1,20 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
+# RUN: --model-plugin=None -num-instrs=100 -stack-size=1024  \
+# RUN:  -honor-target-abi -spilled-regs-list=X5 -init-regs-in-elf -verify-mi |& FileCheck %s
+sections:
+    - no:        1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+    - [ADD, 1.0]
+
+# CHECK: warning: --spilled-regs-list is ignored: --honor-target-abi is enabled.

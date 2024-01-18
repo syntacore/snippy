@@ -1,0 +1,13 @@
+include:
+  - sections.yaml
+  - custom-burst-fence-in-both-groups.yaml
+options:
+  march: "riscv64-linux-gnu"
+  mattr: "+a,+f"
+  num-instrs: 200
+  dump-mf: "true"
+histogram:
+    - [LW, 1.0]
+    - [SW, 1.0]
+    - [AMOSWAP_W, 1.0]
+    - [FENCE, 1.0]

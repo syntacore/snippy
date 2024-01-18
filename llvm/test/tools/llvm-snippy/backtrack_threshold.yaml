@@ -1,0 +1,22 @@
+# RUN: llvm-snippy %s \
+# RUN:    -march=riscv64-linux-gnu \
+# RUN:    -num-instrs=10 -dump-mf -backtrack \
+# RUN:    -initial-regs-yaml=%S/initialization/Inputs/initial_state_zero.yaml >& %t || true \
+# RUN: FileCheck --input-file=%t --dump-input always %s 
+
+sections:
+    - no:        1
+      VMA:       0x800000
+      SIZE:      0x4000
+      LMA:       0x800000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x806000
+      SIZE:      0x4000
+      LMA:       0x806000
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+
+# CHECK: LLVM ERROR: Back-tracking events threshold is exceeded

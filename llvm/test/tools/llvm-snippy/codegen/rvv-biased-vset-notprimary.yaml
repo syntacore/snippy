@@ -1,0 +1,24 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None --num-instrs=100 -o %t \
+# RUN:  --histogram-must-succeed=false --verify-gen-histogram \
+# RUN:    |& FileCheck %s
+
+include:
+- Inputs/rvv-lmul1-sew32-vlany.yaml
+
+sections:
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VADD_VV, 1.0]
+
+# CHECK: Number of primary instructions: 100

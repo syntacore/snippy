@@ -1,0 +1,11 @@
+include:
+    - sections.yaml
+histogram:
+    - [C_LW, 1.0]
+#   - [C_LWSP, 1.0]
+    - [C_LD, 1.0]
+#   - [C_LDSP, 1.0]
+    - [C_SW, 1.0]
+#   - [C_SWSP, 1.0]
+    - [C_SD, 1.0]
+#   - [C_SDSP, 1.0]

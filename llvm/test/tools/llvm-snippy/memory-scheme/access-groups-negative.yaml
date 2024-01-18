@@ -1,0 +1,18 @@
+# COM: This test verifies that field "weight" can not be less than zero
+
+# RUN: not llvm-snippy %S/Inputs/default-layout.yaml %s -march=riscv64-linux-gnu \
+# RUN:   -num-instrs=100 \
+# RUN: |& FileCheck %s --dump-input always
+
+access-groups:
+  - weight: -2
+    access-ranges:
+      - start: 0x80002000
+        size: 0x1000
+        stride: 16
+        first-offset: 1
+        last-offset: 2
+        weight: 1.5
+
+
+# CHECK: LLVM ERROR: Access-group weight can not be less than 0

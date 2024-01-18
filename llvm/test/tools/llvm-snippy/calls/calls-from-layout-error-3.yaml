@@ -1,0 +1,20 @@
+# RUN: not llvm-snippy %S/../Inputs/jal-layout.yaml %s -march=riscv64-linux-gnu -num-instrs=100 \
+# RUN: -num-instr-ancil=10 --dump-mf -verify-mi -stack-size=1024 |& FileCheck %s
+
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - fun1
+        - fun2
+        - fun4
+    - name: fun1
+      callees:
+        - fun2
+    - name: fun2
+      callees:
+        - fun3
+    - name: fun3
+
+# CHECK: calls-from-layout-error-3.yaml:5:3: error: Function 'SnippyFunction' has 'fun4' in the callee list, that has no description in yaml

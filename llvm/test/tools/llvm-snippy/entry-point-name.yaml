@@ -1,0 +1,27 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=-a,+m -num-instrs=10 -entry-point=start -o %t
+# RUN: llvm-objdump -d %t.elf | FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x200
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80000200
+      SIZE:      0x200
+      LMA:       0x80000200
+      ACCESS:    rw
+    - no:        3
+      VMA:       0x80000400
+      SIZE:      0x200
+      LMA:       0x80000400
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SW, 5.0]
+
+# CHECK: 0000000000000000 <start>:

@@ -1,0 +1,20 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -generate-insertion-point-hints \
+# RUN: -dump-mi -num-instrs=1000 -last-instr= -model-plugin=None \
+# RUN: | FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+
+# CHECK-COUNT-1000: {{.*\$x0 = ADDI \$x0, 0.*[[:space:]].*\$x[0-9]+ = \ADD \$x[0-9]+\, \$x[0-9]+}}

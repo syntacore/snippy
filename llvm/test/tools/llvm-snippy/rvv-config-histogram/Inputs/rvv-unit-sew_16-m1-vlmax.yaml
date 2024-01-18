@@ -1,0 +1,25 @@
+riscv-vector-unit:
+  mode-distribution:
+    VM:
+      - [all_ones, 2.0]
+    VL:
+      - [vlmax, 2.0]
+    VXRM:
+      rnu: 1.0
+      rne: 1.0
+      rdn: 1.0
+      ron: 1.0
+    VXSAT:
+      on: 1.0
+      off: 1.0
+    VTYPE:
+      VMA:
+        mu: 1.0
+        ma: 1.0
+      VTA:
+        tu: 1.0
+        ta: 1.0
+      SEW:
+        sew_16: 1.0
+      LMUL:
+        m1: 1.0

@@ -1,0 +1,21 @@
+# RUN: llvm-snippy %s \
+# RUN:    -march=riscv64-linux-gnu \
+# RUN:    -mattr=+f -num-instrs=2 \
+# RUN:    -init-regs-in-elf -initial-regs-yaml=%S/Inputs/histogram_32_bit.yaml \
+# RUN: |& FileCheck %s
+sections:
+    - no:        1
+      VMA:       0x2000
+      SIZE:      0x400000
+      LMA:       0x2000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80200000
+      SIZE:      0x200000
+      LMA:       0x80200000
+      ACCESS:    rw
+
+histogram: 
+    - [FADD_S, 1.0]
+
+# CHECK-NOT: LLVM ERROR: Histogram entry 0 for register type F is wider than requested bit width 32 

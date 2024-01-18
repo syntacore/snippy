@@ -1,0 +1,26 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu  \
+# RUN: -num-instrs=1000 -memory-access-mode=load-store-burst \
+# RUN: --dump-mi \
+# RUN: --histogram-must-succeed=false --verify-gen-histogram \
+# RUN: --memory-access-burst-group-size=1000 \
+# RUN:  |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [SD, 0.3]
+    - [LD, 1.0]
+
+
+# CHECK: Number of primary instructions: 1000
+# CHECK-COUNT-1000: LD

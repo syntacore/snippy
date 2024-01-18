@@ -1,0 +1,28 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=-a -num-instrs=10 >& %t || true
+# RUN: FileCheck --input-file=%t --dump-input always %s
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    x
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rwx
+
+histogram:
+    - [LW, 1.0]
+    - [SW, 1.0]
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+histogram:
+    - [LW, 1.0]
+    - [SW, 1.0]
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+
+# CHECK: error: duplicated mapping key 'histogram
+# CHECK: Failed to parse file {{(.+)}}.yaml 

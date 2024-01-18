@@ -1,0 +1,23 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:     -num-instrs=20000 -model-plugin=None >& %t
+# RUN: FileCheck %s --input-file=%t --dump-input fail
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram: 
+# Invalid opcode
+    - [FOO, 1.0]
+# Invalid opcode regexp
+    - ["FOO(+", 1.0]
+
+# CHECK: Illegal opcode for specified cpu: FOO

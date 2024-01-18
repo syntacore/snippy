@@ -1,0 +1,3 @@
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]

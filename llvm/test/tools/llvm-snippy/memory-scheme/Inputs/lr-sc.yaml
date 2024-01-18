@@ -1,0 +1,7 @@
+include:
+    - sections.yaml
+histogram:
+    - [LR_W, 1.0]
+    - [SC_W, 1.0]
+    - [LR_D, 1.0]
+    - [SC_D, 1.0]

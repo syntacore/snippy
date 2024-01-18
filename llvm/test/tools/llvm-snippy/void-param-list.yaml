@@ -1,0 +1,5 @@
+# REQUIRES: x86-registered-target
+# RUN: not llvm-snippy  |& FileCheck %s
+
+# CHECK: LLVM ERROR: sorry,{{[ X86]*}} target is not implemented
+# CHECK-NOT: Aborted (core dumped)

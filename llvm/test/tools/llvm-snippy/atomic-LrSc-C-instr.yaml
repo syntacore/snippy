@@ -1,0 +1,23 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=500 \
+# RUN:    -mattr=+c,+a \
+# RUN:    -init-regs-in-elf --verify-mi
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [C_LD, 10.0]
+    - [C_LW, 10.0]
+    - [C_SD, 10.0]
+    - [C_SW, 10.0]
+    - [LR_W, 3.0]
+    - [SC_W, 3.0]

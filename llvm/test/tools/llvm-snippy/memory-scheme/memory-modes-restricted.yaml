@@ -1,0 +1,413 @@
+# RUN: llvm-snippy %S/Inputs/default-layout.yaml %S/Inputs/memory-restricted.yaml \
+# RUN:   %s -march=riscv64-linux-gnu \
+# RUN:   -num-instrs=100 \
+# RUN:   -dump-layout=true \
+# RUN: |& FileCheck %s --dump-input fail
+
+#CHECK: Memory access scheme:
+#CHECK: Memory access 0:
+#CHECK-NEXT: Memory range:
+#CHECK-NEXT:   Weight: 0.968
+#CHECK-NEXT:   Start: 2147491968
+#CHECK-NEXT:   Size: 3968
+#CHECK-NEXT:   Stride: 16
+#CHECK-NEXT:   FirstOffset: 1
+#CHECK-NEXT:   LastOffset: 2
+#CHECK: Memory access 1:
+#CHECK-NEXT: Memory range:
+#CHECK-NEXT:   Weight: 0.219
+#CHECK-NEXT:   Start: 2147500432
+#CHECK-NEXT:   Size: 112
+#CHECK-NEXT:   Stride: 8
+#CHECK-NEXT:   FirstOffset: 4
+#CHECK-NEXT:   LastOffset: 6
+#CHECK: Memory access 2:
+#CHECK-NEXT: Memory range:
+#CHECK-NEXT:   Weight: 1
+#CHECK-NEXT:   Start: 2147483648
+#CHECK-NEXT:   Size: 1024
+#CHECK-NEXT:   Stride: 4
+#CHECK-NEXT:   FirstOffset: 1
+#CHECK-NEXT:   LastOffset: 1
+#CHECK: Memory access 3:
+#CHECK-NEXT: Memory range:
+#CHECK-NEXT:   Weight: 0.25
+#CHECK-NEXT:   Start: 2147483648
+#CHECK-NEXT:   Size: 8192
+#CHECK-NEXT:   Stride: 16
+#CHECK-NEXT:   FirstOffset: 1
+#CHECK-NEXT:   LastOffset: 4
+#CHECK: Memory access 4:
+#CHECK-NEXT: Memory range:
+#CHECK-NEXT:   Weight: 0.238
+#CHECK-NEXT:   Start: 2147491968
+#CHECK-NEXT:   Size: 7808
+#CHECK-NEXT:   Stride: 16
+#CHECK-NEXT:   FirstOffset: 1
+#CHECK-NEXT:   LastOffset: 4
+#CHECK: Memory access 5:
+#CHECK-NEXT: Memory range:
+#CHECK-NEXT:   Weight: 0.00146
+#CHECK-NEXT:   Start: 2147499984
+#CHECK-NEXT:   Size: 48
+#CHECK-NEXT:   Stride: 16
+#CHECK-NEXT:   FirstOffset: 1
+#CHECK-NEXT:   LastOffset: 4
+#CHECK: Memory access 6:
+#CHECK-NEXT: Memory range:
+#CHECK-NEXT:   Weight: 0.488
+#CHECK-NEXT:   Start: 2147500432
+#CHECK-NEXT:   Size: 15984
+#CHECK-NEXT:   Stride: 16
+#CHECK-NEXT:   FirstOffset: 1
+#CHECK-NEXT:   LastOffset: 4
+#CHECK: Memory access 7:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.167
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80000000
+#CHECK: Memory access 8:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.667
+#CHECK-NEXT:   Mask:  0x180000
+#CHECK-NEXT:   Fixed: 0x80040000
+#CHECK: Memory access 9:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.167
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80080000
+#CHECK: Memory access 10:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.167
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80100000
+#CHECK: Memory access 11:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.167
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80180000
+#CHECK: Memory access 12:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.167
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80200000
+#CHECK: Memory access 13:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.167
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x803c0000
+#CHECK: Memory access 14:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.167
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80240000
+#CHECK: Memory access 15:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.167
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80280000
+#CHECK: Memory access 16:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.167
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x802c0000
+#CHECK: Memory access 17:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.167
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80300000
+#CHECK: Memory access 18:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.167
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80340000
+#CHECK: Memory access 19:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.167
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80380000
+#CHECK: Memory access 20:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80001000
+#CHECK: Memory access 21:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80003000
+#CHECK: Memory access 22:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.888
+#CHECK-NEXT:   Mask:  0xb8000
+#CHECK-NEXT:   Fixed: 0x80007000
+#CHECK: Memory access 23:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80005000
+#CHECK: Memory access 24:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80009000
+#CHECK: Memory access 25:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x8000b000
+#CHECK: Memory access 26:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x8000d000
+#CHECK: Memory access 27:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80011000
+#CHECK: Memory access 28:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80013000
+#CHECK: Memory access 29:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80015000
+#CHECK: Memory access 30:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80019000
+#CHECK: Memory access 31:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x8001b000
+#CHECK: Memory access 32:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x8001d000
+#CHECK: Memory access 33:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80021000
+#CHECK: Memory access 34:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80023000
+#CHECK: Memory access 35:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80025000
+#CHECK: Memory access 36:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80029000
+#CHECK: Memory access 37:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x8002b000
+#CHECK: Memory access 38:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x8002d000
+#CHECK: Memory access 39:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80031000
+#CHECK: Memory access 40:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80033000
+#CHECK: Memory access 41:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80035000
+#CHECK: Memory access 42:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80039000
+#CHECK: Memory access 43:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x8003b000
+#CHECK: Memory access 44:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x8003d000
+#CHECK: Memory access 45:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80081000
+#CHECK: Memory access 46:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80083000
+#CHECK: Memory access 47:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80085000
+#CHECK: Memory access 48:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80089000
+#CHECK: Memory access 49:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x8008b000
+#CHECK: Memory access 50:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x8008d000
+#CHECK: Memory access 51:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80091000
+#CHECK: Memory access 52:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80093000
+#CHECK: Memory access 53:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80095000
+#CHECK: Memory access 54:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x80099000
+#CHECK: Memory access 55:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x8009b000
+#CHECK: Memory access 56:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x8009d000
+#CHECK: Memory access 57:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x800a1000
+#CHECK: Memory access 58:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x800a3000
+#CHECK: Memory access 59:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x800a5000
+#CHECK: Memory access 60:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x800a9000
+#CHECK: Memory access 61:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x800ab000
+#CHECK: Memory access 62:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x800ad000
+#CHECK: Memory access 63:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x800b1000
+#CHECK: Memory access 64:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x800b3000
+#CHECK: Memory access 65:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x800b5000
+#CHECK: Memory access 66:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x800b9000
+#CHECK: Memory access 67:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x800bb000
+#CHECK: Memory access 68:
+#CHECK-NEXT: Memory eviction:
+#CHECK-NEXT:   Weight: 0.0556
+#CHECK-NEXT:   Mask:  0x0
+#CHECK-NEXT:   Fixed: 0x800bd000
+#CHECK: Memory access 69:
+#CHECK-NEXT: Memory addresses:
+#CHECK-NEXT:   Weight: 0.667
+#CHECK-NEXT:   Ordered: 1
+#CHECK-NEXT:   Plain:
+#CHECK-NEXT:    - Addr: 0x80200000
+#CHECK-NEXT:      Access-size: 16
+#CHECK-NEXT:    - Addr: 0x802020bc
+#CHECK-NEXT:      Access-size: 16
+#CHECK: Memory access 70:
+#CHECK-NEXT: Memory addresses:
+#CHECK-NEXT:   Weight: 1
+#CHECK-NEXT:   Ordered: 0
+#CHECK-NEXT:   Plain:
+#CHECK-NEXT:    - Addr: 0x80200050
+#CHECK-NEXT:      Access-size: 12
+#CHECK: Memory access 71:
+#CHECK-NEXT: Memory addresses:
+#CHECK-NEXT:   Weight: 1
+#CHECK-NEXT:   Ordered: 1
+#CHECK-NEXT:   Plain:
+#CHECK-NEXT:    - Addr: 0x80200f00
+#CHECK-NEXT:      Access-size: 16
+#CHECK: Memory access 72:
+#CHECK-NEXT: Memory addresses:
+#CHECK-NEXT:   Weight: 0.648
+#CHECK-NEXT:   Ordered: 0
+#CHECK-NEXT:   Burst:
+#CHECK-NEXT:     - Addr: 0x80002080
+#CHECK-NEXT:       Size: 32
+#CHECK-NEXT:       Stride: 1
+#CHECK-NEXT:       Access-size: 4
+#CHECK-NEXT:     - Addr: 0x80001f01
+#CHECK-NEXT:       Size: 255
+#CHECK-NEXT:       Stride: 8
+#CHECK-NEXT:       Access-size: 8
+#CHECK-NEXT:     - Addr: 0x80002081
+#CHECK-NEXT:       Size: 128
+#CHECK-NEXT:       Stride: 8
+#CHECK-NEXT:       Access-size: 8

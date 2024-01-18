@@ -1,0 +1,12 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   --layout-include-dir=%S/Inputs \
+# RUN:   --dump-mf --num-instrs=150
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   --layout-include-dir=/tmp/i-don-t-exist/Klaatu-barada-nikto \
+# RUN:   --layout-include-dir=%S/Inputs \
+# RUN:   --dump-mf --num-instrs=150
+#
+include:
+  - full.yaml
+

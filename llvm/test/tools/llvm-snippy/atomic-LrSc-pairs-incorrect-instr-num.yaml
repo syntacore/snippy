@@ -1,0 +1,30 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+a \
+# RUN:   --init-regs-in-elf --verify-mi \
+# RUN:   --num-instrs=4 \
+# RUN:   --histogram-must-succeed=false --verify-gen-histogram \
+# RUN:    |& FileCheck %s --check-prefixes=EVEN
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+a \
+# RUN:   --init-regs-in-elf --verify-mi \
+# RUN:   --num-instrs=5 \
+# RUN:   --histogram-must-succeed=false --verify-gen-histogram \
+# RUN:    |& FileCheck %s --check-prefixes=ODD
+
+# EVEN: Number of primary instructions: 4
+# ODD: Number of primary instructions: 5
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [LR_D, 3.0]
+    - [SC_D, 3.0]

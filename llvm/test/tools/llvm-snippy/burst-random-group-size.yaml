@@ -1,0 +1,36 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: -num-instrs=1000 \
+# RUN: >& %t
+# RUN: FileCheck --input-file=%t %s --dump-input=always --check-prefixes=THREE,CHECK
+# RUN: FileCheck --input-file=%t %s --dump-input=always --check-prefixes=FOUR,CHECK
+# RUN: not FileCheck --input-file=%t %s --dump-input=always --check-prefixes=ONE
+# RUN: not FileCheck --input-file=%t %s --dump-input=always --check-prefixes=TWO
+
+include:
+- Inputs/mixed-burst-random-group-size.yaml
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x8
+      SIZE:      0x8
+      LMA:       0x8
+      ACCESS:    rw
+
+histogram:
+    - [AMOADD_W, 1.0]
+
+# There can be no more than 250 groups of size four. Groups of size four and
+# three have the same weight => 250 / 2 +- random => we expect to see each group
+# at least 100 times.
+# THREE-COUNT-100: {{((\$x([0-9]+) = ADDI(.+))([[:space:]]+)((\$x([0-9]+) = AMOADD_W \$x([0-9]+), \$x([0-9]+)([[:space:]]+)){3})(\$x([0-9]+) = ADDI(.+)))}}
+# FOUR-COUNT-100: {{((\$x([0-9]+) = ADDI(.+))([[:space:]]+)((\$x([0-9]+) = AMOADD_W \$x([0-9]+), \$x([0-9]+)([[:space:]]+)){4})(\$x([0-9]+) = ADDI(.+)))}}
+# CHECK-NOT: {{((\$x([0-9]+) = AMOADD_W \$x([0-9]+), \$x([0-9]+)([[:space:]]+)){5})}}
+
+# There might be exactly one burst group of a smaller size.
+# ONE-COUNT-2: {{((\$x([0-9]+) = ADDI(.+))([[:space:]]+)((\$x([0-9]+) = AMOADD_W \$x([0-9]+), \$x([0-9]+)([[:space:]]+)){2})(\$x([0-9]+) = ADDI(.+)))}}
+# TWO-COUNT-2: {{((\$x([0-9]+) = ADDI(.+))([[:space:]]+)((\$x([0-9]+) = AMOADD_W \$x([0-9]+), \$x([0-9]+)([[:space:]]+)){1})(\$x([0-9]+) = ADDI(.+)))}}

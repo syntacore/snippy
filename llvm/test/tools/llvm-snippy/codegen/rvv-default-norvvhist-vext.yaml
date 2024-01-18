@@ -1,0 +1,26 @@
+# COM: by default, we allow for generation even if no config and histogram
+# COM: are provided (probably, this needs to be changed)
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None --num-instrs=100 -o %t \
+# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  |& FileCheck %s
+
+sections:
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [ADDI, 1.0]
+
+# CHECK: --- RVV Configuration Info ---
+# CHECK-NEXT:   - Derived VLEN: 128 (VLENB = 16)
+# CHECK-NEXT:   - Mode Change Decision Policy: None
+# CHECK-NEXT: --- RVV Configuration End  ---

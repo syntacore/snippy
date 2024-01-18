@@ -1,0 +1,14 @@
+# RUN: not llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s -march=riscv64-linux-gnu \
+# RUN:   -num-instrs=10 \
+# RUN:   -riscv-disable-misaligned-access \
+# RUN: |& FileCheck %s --dump-input fail
+
+access-evictions:
+    - mask:  0x00000000
+      fixed: 0x80000100
+      weight: 0
+    - mask:  0x00000000
+      fixed: 0x80000010
+      weight: 0
+
+# CHECK: LLVM ERROR: Memory schemes are too restrictive to generate the requested instructions. Size: 1 Alignment: 1

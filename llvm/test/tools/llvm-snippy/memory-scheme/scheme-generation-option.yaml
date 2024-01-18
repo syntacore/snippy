@@ -1,0 +1,20 @@
+# RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %S/Inputs/access-addresses.yaml -march=riscv64-linux-gnu \
+# RUN:  -num-instrs=5 \
+# RUN:  -dump-memory-accesses= \
+# RUN: |& FileCheck %s --check-prefix TO-STDOUT
+
+# RUN: llvm-snippy %S/Inputs/no-mem.yaml %S/Inputs/access-addresses.yaml -march=riscv64-linux-gnu \
+# RUN:  -num-instrs=5 \
+# RUN:  -dump-memory-accesses=%t \
+# RUN: |& FileCheck %s --check-prefix NO-MEM
+
+# TO-STDOUT: access-addresses:
+# TO-STDOUT-NEXT:  - ordered: true
+# TO-STDOUT-NEXT:    plain:
+# TO-STDOUT-NEXT:      - addr: 0x80002001
+# TO-STDOUT-NEXT:      - addr: 0x80000000
+# TO-STDOUT-NEXT:      - addr: 0x80001234
+# TO-STDOUT-NEXT:      - addr: 0x80000000
+# TO-STDOUT-NEXT:      - addr: 0x80000300
+
+# NO-MEM: warning: cannot dump memory accesses as no accesses were generated. File won't be created.

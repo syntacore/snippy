@@ -1,0 +1,58 @@
+options:
+  march: riscv64-unknown-elf
+  mattr: "+zifencei,+c,+m"
+  init-regs-in-elf: true
+  num-instrs: 12000
+  riscv-disable-misaligned-access: 'true'
+
+sections:
+- name: 1
+  VMA: 0x40000f000
+  SIZE: 0x1fe000
+  LMA: 0x40000f000
+  ACCESS: rx
+- name: 2
+  VMA: 0x401000000
+  SIZE: 0x500000
+  LMA: 0x401000000
+  ACCESS: rw
+- name: stack
+  VMA: 0x401800000
+  SIZE: 0x2000
+  LMA: 0x401800000
+  ACCESS: rw
+histogram:
+- [XOR, 2.0]
+- [REM, 2.0]
+- [LB, 250.0]
+- [LBU, 250.0]
+- [LH, 250.0]
+- [LHU, 250.0]
+- [SB, 500.0]
+- [SH, 500.0]
+- [FENCE_I, 25.0]
+- [BEQ, 0.1111111111111111]
+- [BGE, 0.1111111111111111]
+- [BGEU, 0.1111111111111111]
+- [BLT, 0.1111111111111111]
+- [BLTU, 0.1111111111111111]
+- [BNE, 0.1111111111111111]
+- [C_BEQZ, 0.1111111111111111]
+- [C_BNEZ, 0.1111111111111111]
+- [C_J, 0.1111111111111111]
+branches:
+  permutation: 'on'
+  loop-ratio: 0.0
+burst:
+  mode: custom
+  min-size: 4
+  max-size: 64
+  groupings:
+  - [LB, LBU, LH, LHU, SB, SH]
+access-groups:
+- access-ranges:
+  - start: 0x401004a54
+    size: 0x2
+    stride: 2
+    first-offset: 0
+    last-offset: 1

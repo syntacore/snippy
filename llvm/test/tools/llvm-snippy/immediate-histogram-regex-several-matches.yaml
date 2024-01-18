@@ -1,0 +1,23 @@
+# RUN: llvm-snippy %s %S/Inputs/immediate-histogram-concrete-first.yaml -model-plugin=None |& FileCheck %s
+# RUN: llvm-snippy %s %S/Inputs/immediate-histogram-generic-first.yaml -model-plugin=None |& FileCheck %s
+
+include:
+  - Inputs/sections.yaml
+
+options:
+  march: riscv64-unknown-elf
+  num-instrs: 100
+  dump-mf: on
+
+histogram: 
+  - [ADDI, 1.0]
+
+# Both immediate-histogram-concrete-first.yaml and immediate-histogram-generic-first.yaml
+# have 2 REGEXs that both match ADDI instruction. They are ordered differently. We check
+# that ADDI ends up having configuration of the first match met.
+
+# CHECK: warning: Unused regex in immediate histogram: 
+# CHECK-SAME: all opcodes were already matched so no opcodes remained to be matched by "ADD{{I|\.\*}}"
+# Check that all 100 ADDI instructions have immediate equal to 1
+# CHECK-COUNT-100: ADDI $x{{[[:digit:]]+}}, 1
+

@@ -1,0 +1,24 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu  \
+# RUN: --init-regs-in-elf \
+# RUN: -num-instrs=all \
+# RUN: -memory-access-mode=mixed-burst \
+# RUN: -mattr=-c \
+# RUN:    |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x80000
+      SIZE:      0x2000
+      LMA:       0x80000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+
+# CHECK: when -num-instr=all is specified, burst mode is not supported

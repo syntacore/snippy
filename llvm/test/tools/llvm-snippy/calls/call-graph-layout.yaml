@@ -1,0 +1,36 @@
+# RUN: split-file %s %t
+# RUN: llvm-snippy %t/layout.yaml %t/cg-layout.yaml -march=riscv64-linux-gnu -num-instrs=100 \
+# RUN: --dump-mf | FileCheck %s
+
+# CHECK-COUNT-9: Machine code for
+# CHECK-NOT: Machine code for
+
+#--- layout.yaml
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x1000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x100000
+    SIZE:      0x50000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      stack
+    VMA:       0x150000
+    SIZE:      0x50000
+    LMA:       0x150000
+    ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [JAL, 1.0]
+
+
+#--- cg-layout.yaml
+function-layers: 3
+function-number: 9
+num-instr-ancil: 10
