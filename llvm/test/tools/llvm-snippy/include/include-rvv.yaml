@@ -1,0 +1,47 @@
+# COM: this is the test for checking the possibility to include rvv-config
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  --num-instrs=10 --snippy-riscv-dump-rvv-config -o %t \
+# RUN:  -model-plugin=None \
+# RUN:  |& FileCheck %s
+
+include:
+  - Inputs/rvv-unit-all.yaml
+
+sections:
+  - no:        3
+    VMA:       0x7ffff000
+    SIZE:      0x1000
+    LMA:       0x7ffff000
+    ACCESS:    r
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+
+histogram:
+
+    - [VSETIVLI, 1.0]
+    - [VSETVLI, 1.0]
+    - [VSETVL, 1.0]
+    - [VADD_VV, 1.0]
+
+# CHECK:       --- RVV Configuration Info ---
+# CHECK-NEXT:    - Derived VLEN: 128 (VLENB = 16)
+# CHECK-NEXT:    - Mode Change Decision Policy: Histogram
+# CHECK-NEXT:    - Mode Change Probability: 0.75
+# CHECK-NEXT:      Set Vill Bit Probability: 0
+# CHECK-NEXT:    - VL Selection Rules:
+# CHECK-NEXT:      P: 0.66667 <vlmax>
+# CHECK-NEXT:      P: 0.33333 <any_legal>
+# CHECK-NEXT:    - VM Selection Rules:
+# CHECK-NEXT:      P: 0.66667 <all_ones>
+# CHECK-NEXT:      P: 0.33333 <any_legal>
+# CHECK:         - Configuration Bag Size: 704
+# CHECK-NEXT:    - State Cardinality: 15104 ~ {MASKS}
+# CHECK-NEXT:  --- RVV Configuration End  ---

@@ -1,0 +1,20 @@
+# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+include:
+  - Inputs/sections.yaml
+
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  num-instrs: 20
+  dump-mf: on
+
+histogram: 
+    - [ADDI, 1.0]
+    - [LUI, 1.0]
+
+imm-hist:
+  opcodes:
+    - 'ADDI': notuniform
+# CHECK: immediate-histogram-err-kind.yaml:18:15: error: unknown enumerated scalar
+# CHECK-NEXT:    - 'ADDI': notuniform

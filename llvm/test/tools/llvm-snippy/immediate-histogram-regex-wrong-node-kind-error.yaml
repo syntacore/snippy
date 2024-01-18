@@ -1,0 +1,15 @@
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+include:
+  - Inputs/sections.yaml
+
+options:
+  march: riscv64-unknown-elf
+  num-instrs: 100
+
+histogram:
+  - [ADDI, 1.0]
+
+imm-hist: scalar
+
+# CHECK: error: Immediate histogram should be either sequence or map. But scalar was encountered.

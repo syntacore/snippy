@@ -1,0 +1,9 @@
+sections:
+  - name:      m
+    VMA:       0x80040000
+    SIZE:      0x00010000
+    LMA:       0x80040000
+    ACCESS:    rw
+
+histogram:
+  - [XOR, 10.0]

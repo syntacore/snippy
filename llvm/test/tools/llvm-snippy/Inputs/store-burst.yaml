@@ -1,0 +1,4 @@
+burst:
+  mode: store
+  min-size: 3
+  max-size: 3

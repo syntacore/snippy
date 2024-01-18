@@ -1,0 +1,7 @@
+burst:
+  mode: custom
+  min-size: 3
+  max-size: 3
+  groupings:
+    - [ LD ]
+    - []

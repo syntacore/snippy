@@ -1,0 +1,8 @@
+---
+histograms:
+  - reg-type: X
+    values:
+      - [0, 1.0]
+      - [1, 1.0]
+      - [0xFF, 1.0]
+...

@@ -1,0 +1,28 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=-a,+m \
+# RUN:    -last-instr=DIV -dump-mi \
+# RUN:    -num-instrs=10 |& FileCheck %s --dump-input always
+
+sections:
+    - no:        1
+      VMA:       0x800000
+      SIZE:      0x200
+      LMA:       0x800000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x800200
+      SIZE:      0x200
+      LMA:       0x800200
+      ACCESS:    rw
+    - no:        3
+      VMA:       0x800400
+      SIZE:      0x200
+      LMA:       0x800400
+      ACCESS:    rw
+
+histogram: 
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SW, 5.0]
+      
+# CHECK: Generated MI_{{[0-9]*}}: $x{{[0-9]+}} = DIV
+# CHECK-NOT: Generated

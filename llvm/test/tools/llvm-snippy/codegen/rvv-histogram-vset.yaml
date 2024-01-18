@@ -1,0 +1,36 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -o %t --num-instrs=1000 \
+# RUN:  --init-regs-in-elf --verify-mi \
+# RUN:  -model-plugin=None --entry-point=start \
+# RUN:  -verify-gen-histogram  -histogram-must-succeed=true \
+# RUN:  --riscv-init-vregs-from-memory \
+# RUN:  -histogram-must-succeed=false \
+# RUN:  |& FileCheck %s
+
+include:
+- Inputs/rvv-lmul1-sewX-nobias.yaml
+
+sections:
+  - no:        0
+    VMA:       0x2000000
+    SIZE:      0x1000000
+    LMA:       0x2000000
+    ACCESS:    r
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VSETIVLI, 1.0]
+    - [VSETVL, 1.0]
+    - [VSETVLI, 1.0]
+# CHECK-NOT: Machine Verifier Pass report
+# CHECK: Start Verification for function: start:
+# CHECK: End Verification for function: start

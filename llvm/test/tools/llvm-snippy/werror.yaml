@@ -1,0 +1,22 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu  -werror --model-plugin=None \
+# RUN: -num-instrs=10 |& FileCheck %s --dump-input always
+
+sections:
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x800000
+      SIZE:      0x400000
+      LMA:       0x800000
+      ACCESS:    rw
+
+histogram:
+    - [LD, 1.0]
+
+# COM: FIXME: It looks like we must categorize our warnings as ones that can
+# COM: evolve to error eventually and ones that cannot. Maybe warnings from the
+# COM: second groups mustn't be warnings at all but something like remarks?
+# CHECK: LLVM ERROR: Skipping snippet execution on the model: model was set no 'None'.

@@ -1,0 +1,6 @@
+include:
+    - sections.yaml
+histogram:
+    - [VLE64_V, 1.0]
+    - [VLSE64_V, 1.0]
+    - [VLOXEI64_V, 1.0]

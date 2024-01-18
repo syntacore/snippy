@@ -1,0 +1,52 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+c,+f,+d \
+# RUN:    -dump-mi -num-instrs=10 -last-instr= -model-plugin=None \
+# RUN:    -init-regs-in-elf --verify-mi \
+# RUN:    | FileCheck %s --dump-input always
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [C_ADDI_NOP, 1.0]
+
+# CHECK: {{(\$f0_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f1_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f2_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f3_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f4_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f5_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f6_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f7_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f8_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f9_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f10_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f11_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f12_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f13_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f14_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f15_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f16_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f17_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f18_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f19_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f20_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f21_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f22_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f23_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f24_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f25_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f26_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f27_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f28_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f29_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f30_d = \FMV_D_X \$x[0-9]+)}}
+# CHECK: {{(\$f31_d = \FMV_D_X \$x[0-9]+)}}

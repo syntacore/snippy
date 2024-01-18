@@ -1,0 +1,20 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu  \
+# RUN:    -num-instrs=10 \
+# RUN: |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x800000
+      SIZE:      0x4000
+      LMA:       0x800000
+      ACCESS:    rx
+    - name:      1
+      VMA:       0x806000
+      SIZE:      0x4000
+      LMA:       0x806000
+      ACCESS:    rw
+
+histogram:
+    - [ADDI, 1.0]
+
+# CHECK: LLVM ERROR: Incorrect list of sections: List contains both numbered section #1 and named section with same name.

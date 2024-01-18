@@ -1,0 +1,54 @@
+# RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/DIST/-1/ > %t.0.yaml
+# RUN: not llvm-snippy %t.0.yaml -march=riscv64-linux-gnu -num-instrs=50 \
+# RUN:     -verify-mi -o %t.0 |& FileCheck %t.0.yaml \
+# RUN:     --check-prefix=PARSE-FAIL
+
+# RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/DIST/3.4/ > %t.1.yaml
+# RUN: not llvm-snippy %t.1.yaml -march=riscv64-linux-gnu -num-instrs=50 \
+# RUN:     -verify-mi -o %t.1 |& FileCheck %t.1.yaml \
+# RUN:     --check-prefix=PARSE-FAIL
+
+# RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/DIST/blblbl/ > %t.2.yaml
+# RUN: not llvm-snippy %t.2.yaml -march=riscv64-linux-gnu -num-instrs=50 \
+# RUN:     -verify-mi -o %t.2 |& FileCheck %t.2.yaml \
+# RUN:     --check-prefix=PARSE-FAIL
+
+# RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/DIST/9876543210/ > %t.3.yaml
+# RUN: llvm-snippy %t.3.yaml -march=riscv64-linux-gnu -num-instrs=50 \
+# RUN:     -verify-mi -o %t.3 |& FileCheck %t.3.yaml \
+# RUN:     --check-prefix=SIZE-WARN
+
+# PARSE-FAIL: error: LLVM ERROR: Failed to parse file
+
+# SIZE-WARN: remark: Specified max PC Distance is more than max distance for generated branch: Specified: 9876543210, max distance for BEQ: 4095
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80002000
+    SIZE:      0x100000
+    LMA:       0x80002000
+    ACCESS:    rw
+
+access-ranges:
+    - start: 0x80002000
+      size: 0x1000
+      stride: 16
+      first-offset: 0
+      last-offset: 0
+
+histogram:
+    - [ADDI, 10.0]
+    - [BEQ, 1.0]
+
+branches:
+  loop-ratio: 1.0
+  max-depth:
+    loop: 1
+  distance:
+    pc:
+      max: DIST

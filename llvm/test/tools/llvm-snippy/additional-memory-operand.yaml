@@ -1,0 +1,32 @@
+#  This test checks that llvm-snippy will not corrupt reserved registers
+#  during postprocessMemoryOperands() of additional memory operands.
+#
+#  Additional memory operands are not marked as OPERAND_MEMORY by target
+#  description, that's why target-independent part of snippy treats them
+#  as regular register operands.
+#
+#  In this particular case stack pointer is main concern - if it gets
+#  corrupted, trap access fault will be generated upon reload in epilogue
+#  and last instruction(ebreak) will not be reached.
+#
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -stack-size=1024  -honor-target-abi \
+# RUN:  -model-plugin=None --num-instrs=3000 -o %t
+
+include:
+- codegen/Inputs/rvv-lmul1-sew32-vlany.yaml
+
+sections:
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VSSSEG2E16_V, 1.0]
