@@ -2560,6 +2560,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
 
   // Post backtrack
   PM.add(createPrologueEpilogueInsertionPass());
+  PM.add(createFillExternalFunctionsStubsPass({}));
   if (GenSettings.DebugConfig.PrintMachineFunctions)
     PM.add(createMachineFunctionPrinterPass(outs()));
 
