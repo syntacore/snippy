@@ -1,0 +1,43 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+f -init-regs-in-elf \
+# RUN:    -dump-mf -num-instrs=1 -model-plugin=None \
+# RUN:    -reserved-regs-list=X0,X1,X2,X3,X4,X5,X6,X7,X8,X9,X11,X12,X13,X14,X15,X16,X17,X18,X19,X20,X21,X22,X23,X24,X25,X26,X27,X28,X29,X30,X31 \
+# RUN:    | FileCheck %s
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+d -init-regs-in-elf \
+# RUN:    -dump-mf -num-instrs=1 -model-plugin=None \
+# RUN:    -reserved-regs-list=X0,X1,X2,X3,X4,X5,X6,X7,X8,X9,X11,X12,X13,X14,X15,X16,X17,X18,X19,X20,X21,X22,X23,X24,X25,X26,X27,X28,X29,X30,X31 \
+# RUN:    | FileCheck %s
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v -init-regs-in-elf \
+# RUN:    -dump-mf -num-instrs=1 -model-plugin=None \
+# RUN:    -reserved-regs-list=X0,X1,X2,X3,X4,X5,X6,X7,X8,X9,X11,X12,X13,X14,X15,X16,X17,X18,X19,X20,X21,X22,X23,X24,X25,X26,X27,X28,X29,X30,X31 \
+# RUN:    | FileCheck %s
+
+sections:
+  - name:      ro
+    VMA:       0x000000
+    SIZE:      0x100000
+    LMA:       0x000000
+    ACCESS:    r
+  - no:        1
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x200000
+    SIZE:      0x100000
+    LMA:       0x200000
+    ACCESS:    rw
+  - name:      selfcheck
+    VMA:       0x300000
+    SIZE:      0x100000
+    LMA:       0x300000
+    ACCESS:    rw
+
+histogram:
+    - [XOR, 1.0]
+
+# CHECK: Machine code for function
+# COM: check that there are not only x10 register
+# CHECK-COUNT-100: $x{{(([0-9])|(1[1-9])|(2[0-9])|(31))}}

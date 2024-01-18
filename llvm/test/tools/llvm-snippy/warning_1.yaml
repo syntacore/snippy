@@ -1,0 +1,21 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=-a -list-opcode-names -dump-mi -num-instrs=10 |& FileCheck %s --dump-input always
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    x
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram: 
+    - [LW, 1.0]
+    - [SW, 1.0]
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+      
+# CHECK: warning: Incorrect section: The executable section 1 has not R access mode. Implicitly consider it like RX...

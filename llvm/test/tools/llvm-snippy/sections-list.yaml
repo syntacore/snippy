@@ -1,0 +1,39 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -model-plugin=None -mattr=-a -num-instrs=10 -o %t
+# RUN: llvm-objdump -h %t.elf | cat - <(echo "EOF") | FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x200
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80000200
+      SIZE:      0x200
+      LMA:       0x80000200
+      ACCESS:    rw
+    - no:        3
+      VMA:       0x80000400
+      SIZE:      0x200
+      LMA:       0x80000400
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SW, 5.0]
+
+# CHECK: Sections:
+# CHECK-NEXT: Idx Name              Size     VMA              Type
+# CHECK-NEXT:  0
+# CHECK-NEXT:  1 .snippy.1.rx
+# CHECK-NEXT:  2 .snippy.2.rw
+# CHECK-NEXT:  3 .snippy.3.rw
+# CHECK-NEXT:  4 .riscv.attributes
+# CHECK-NEXT:  5 .eh_frame
+# CHECK-NEXT:  6 .rela.eh_frame
+# CHECK-NEXT:  7 .note.GNU-stack
+# CHECK-NEXT:  8 .symtab
+# CHECK-NEXT:  9 .shstrtab
+# CHECK-NEXT: 10 .strtab
+# CHECK-NEXT: EOF

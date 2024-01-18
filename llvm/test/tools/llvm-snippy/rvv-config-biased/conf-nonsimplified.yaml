@@ -1,0 +1,73 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  --model-plugin None \
+# RUN:  --num-instrs=10 -o %t \
+# RUN:  --snippy-riscv-disable-simplified-rvv-configuration \
+# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-DEFAULT
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  --model-plugin None \
+# RUN:  --num-instrs=10 -o %t \
+# RUN:  --riscv-v-vector-bits-max=512 \
+# RUN:  --snippy-riscv-disable-simplified-rvv-configuration \
+# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-VLEN512
+
+include:
+- Inputs/rvv-unit-sew8-lmul4.yaml
+
+sections:
+  - no:        3
+    VMA:       0x7fff0000
+    SIZE:      0x10000
+    LMA:       0x7fff0000
+    ACCESS:    r
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VADD_VV, 1.0]
+
+# CHECK-DEFAULT:      --- RVV Configuration Info ---
+# CHECK-DEFAULT-NEXT:  - Derived VLEN: 65536 (VLENB = 8192)
+# CHECK-DEFAULT-NEXT:   - Mode Change Decision Policy: Configuration Bias
+# CHECK-DEFAULT-NEXT:   - Mode Change Probability: 0.0909
+# CHECK-DEFAULT-NEXT:     Set Vill Bit Probability: 0
+# CHECK-DEFAULT-NEXT:   - VL Selection Rules:
+# CHECK-DEFAULT-NEXT:     P: 0.66667 <vlmax>
+# CHECK-DEFAULT-NEXT:     P: 0.33333 <any_legal>
+# CHECK-DEFAULT-NEXT:   - VM Selection Rules:
+# CHECK-DEFAULT-NEXT:     P: 0.66667 <all_ones>
+# CHECK-DEFAULT-NEXT:     P: 0.33333 <any_legal>
+# CHECK-DEFAULT-NEXT:  - Configuration Bag Listing:
+# CHECK-DEFAULT-NEXT:    P: 1 Conf: { e8, m4, tu, mu, vxsat: 0, vxrm: rnu }/MaxVL: 32768
+# CHECK-DEFAULT-NEXT:  - Configuration Bag Size: 1
+# CHECK-DEFAULT-NEXT:  - State Cardinality: 32768 ~ {MASKS}
+# CHECK-DEFAULT-NEXT: --- RVV Configuration End  ---
+# CHECK-DEFAULT: Skipping snippet execution on the model: model was set no 'None'
+
+# CHECK-VLEN512:      --- RVV Configuration Info ---
+# CHECK-VLEN512-NEXT:  - Derived VLEN: 512 (VLENB = 64)
+# CHECK-VLEN512-NEXT:  - Mode Change Decision Policy: Configuration Bias
+# CHECK-VLEN512-NEXT:  - Mode Change Probability: 0.0909
+# CHECK-VLEN512-NEXT:    Set Vill Bit Probability: 0
+# CHECK-VLEN512-NEXT:  - VL Selection Rules:
+# CHECK-VLEN512-NEXT:    P: 0.66667 <vlmax>
+# CHECK-VLEN512-NEXT:    P: 0.33333 <any_legal>
+# CHECK-VLEN512-NEXT:  - VM Selection Rules:
+# CHECK-VLEN512-NEXT:    P: 0.66667 <all_ones>
+# CHECK-VLEN512-NEXT:    P: 0.33333 <any_legal>
+# CHECK-VLEN512-NEXT:  - Configuration Bag Listing:
+# CHECK-VLEN512-NEXT:    P: 1 Conf: { e8, m4, tu, mu, vxsat: 0, vxrm: rnu }/MaxVL: 256
+# CHECK-VLEN512-NEXT:  - Configuration Bag Size: 1
+# CHECK-VLEN512-NEXT:  - State Cardinality: 256 ~ {MASKS}
+# CHECK-VLEN512-NEXT: --- RVV Configuration End  ---
+# CHECK-VLEN512: Skipping snippet execution on the model: model was set no 'None'

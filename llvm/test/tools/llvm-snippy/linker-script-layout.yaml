@@ -1,0 +1,36 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -model-plugin=None -mattr=-a -num-instrs=10 -o %t
+# RUN: FileCheck %s --input-file=%t.ld --check-prefix=UNMANGLED
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -model-plugin=None -mattr=-a -num-instrs=10 -o %t \
+# RUN: -entry-point=Test -mangle-exported-names
+# RUN: FileCheck %s --input-file=%t.ld --check-prefix=MANGLED
+
+sections:
+    - no:        1
+      VMA:       0x10000
+      SIZE:      0x200
+      LMA:       0x10000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x10200
+      SIZE:      0x200
+      LMA:       0x10200
+      ACCESS:    rw
+    - name:      named
+      VMA:       0x10400
+      SIZE:      0x200
+      LMA:       0x10400
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SW, 5.0]
+
+# UNMANGLED: SNIPPY (rwx) : ORIGIN = 65536, LENGTH = 67072
+# UNMANGLED: .snippy.1.rx 65536: {
+# UNMANGLED: .snippy.2.rw 66048 (NOLOAD) : {
+# UNMANGLED: .snippy.named.rw 66560 (NOLOAD) : {
+# MANGLED: SNIPPY_Test (rwx) : ORIGIN = 65536, LENGTH = 67072
+# MANGLED: .snippy.Test.1.rx 65536: {
+# MANGLED: .snippy.Test.2.rw 66048 (NOLOAD) : {
+# MANGLED: .snippy.Test.named.rw 66560 (NOLOAD) : {

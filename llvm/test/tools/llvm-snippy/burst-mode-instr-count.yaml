@@ -1,0 +1,26 @@
+# COM: basic checks to ensure that we track number of instructions for
+# COM: burst group
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -dump-mf \
+# RUN: -num-instrs=500 -memory-access-mode=mixed-burst \
+# RUN: -memory-access-burst-group-size=100 \
+# RUN: --histogram-must-succeed=false --verify-gen-histogram \
+# RUN:    |& FileCheck %s --check-prefix=CHECK-MIXED-HUGEGROUP
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [LD, 1.0]
+
+# CHECK-MIXED-HUGEGROUP-COUNT-500: LD
+# CHECK-MIXED-HUGEGROUP: Number of primary instructions: 500

@@ -1,0 +1,28 @@
+# COM: the test checks for bias-based RVV mode switches
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None -dump-mf --num-instrs=10000 -o %t \
+# RUN:  -verify-gen-histogram  -histogram-must-succeed=true \
+# RUN:  |& FileCheck %s
+
+include:
+- Inputs/rvv-lmul1-sewX-nobias.yaml
+
+sections:
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VADD_VV, 1.0]
+    - [VSETVLI, 1.0]
+
+# CHECK: VSETVLI 
+# CHECK-NOT: VSETVL $x
+# CHECK-NOT: VSETIVLI 

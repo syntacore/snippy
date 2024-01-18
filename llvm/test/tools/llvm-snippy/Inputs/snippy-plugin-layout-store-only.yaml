@@ -1,0 +1,21 @@
+sections:
+    - no:        1
+      VMA:       0x2000
+      SIZE:      0x1000
+      LMA:       0x2000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x10000000
+      SIZE:      0x100000
+      LMA:       0x10000000
+      ACCESS:    rw
+    - no:        3
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [SB, 1.0]
+    - [SH, 1.0]
+    - [SW, 1.0]

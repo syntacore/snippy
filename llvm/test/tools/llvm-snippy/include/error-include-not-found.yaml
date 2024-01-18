@@ -1,0 +1,14 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   --layout-include-dir=%S/Inputs \
+# RUN:   --dump-mf --num-instrs=150 |& FileCheck %s
+
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   --layout-include-dir=%S/Inputs \
+# RUN:   --dump-mf --num-instrs=150 |& FileCheck %s
+
+include:
+  - this-include-file-does-not-exist.yaml
+
+# CHECK: LLVM ERROR: 
+# CHECK-SAME: this-include-file-does-not-exist.yaml
+# CHECK-SAME: No such file or directory

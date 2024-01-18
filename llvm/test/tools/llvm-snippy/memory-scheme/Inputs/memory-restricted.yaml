@@ -1,0 +1,67 @@
+access-evictions:
+    - mask:  0x003c0000
+      fixed: 0x80000000
+    - mask:  0x000be000
+      fixed: 0x80001000
+access-ranges:
+    - start: 0x80002000
+      size: 0x1000
+      stride: 16
+      first-offset: 1
+      last-offset: 2
+    - start: 0x80004000
+      size: 0x200
+      stride: 8
+      first-offset: 4
+      last-offset: 6
+    - start: 0x80000000
+      size: 0x400
+      stride: 4
+      first-offset: 1
+      last-offset: 1
+    - start: 0x80000000
+      size: 0x8000
+      stride: 16
+      first-offset: 1
+      last-offset: 4
+access-addresses:
+    - ordered: true
+      plain:
+          - addr: 0x80200000
+          - addr: 0x80201234
+          - addr: 0x802020BC
+    - ordered: false
+      plain:
+          - addr: 0x80200050
+            access-size: 12
+    - plain:
+          - addr: 0x80200F00
+    - burst:
+          - addr: 0x80002020
+            size: 128
+            stride: 1
+            access-size: 4
+          - addr: 0x80001F01
+            size: 0x200
+            stride: 8
+            access-size: 8
+    - ordered: false
+      burst:
+          - addr: 0x80002000
+            size: 4
+            stride: 1
+            access-size: 4
+
+
+restricted-addresses:
+    - plain:
+          - addr: 0x80002000
+            access-size: 128
+          - addr: 0x80003F00
+            access-size: 200
+          - addr: 0x80004000
+            access-size: 400
+          - addr: 0x80201000
+            access-size: 600
+
+

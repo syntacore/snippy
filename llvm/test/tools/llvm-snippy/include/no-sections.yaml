@@ -1,0 +1,7 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:   -model-plugin=None --dump-mf --num-instrs=150 |& FileCheck %s
+
+include:
+  - Inputs/only-histogram.yaml
+
+# CHECK: error: LLVM ERROR: Incorrect list of sections: list is empty

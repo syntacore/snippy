@@ -1,0 +1,28 @@
+# RUN: llvm-snippy %s -march=riscv64-unknown-elf -num-instrs=50 \
+# RUN:    -verify-mi -o %t.layout.elf \
+# RUN:    -dump-intervals-to-verify -init-regs-in-elf
+# RUN: FileCheck -input-file=%t.layout.elf.intervals-to-verify.yaml %s
+
+# CHECK: intervals-to-verify:
+# CHECK-NEXT: [ {{0x[[:xdigit:]]+}}, {{0x[[:xdigit:]]+}} ]
+
+sections:
+    - no:        1
+      VMA:       0x1000
+      SIZE:      0x10000
+      LMA:       0x1000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+    - [BLT, 1.0]
+    - [BLTU, 1.0]
+    - [BGE, 1.0]
+    - [BGEU, 1.0]
+    - [BNE, 1.0]
+    - [AND, 8.0]

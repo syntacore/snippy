@@ -1,0 +1,44 @@
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+
+histogram:
+    - [C_ADD, 1.0]
+    - [C_ADDI, 1.0]
+    - [C_ADDI16SP, 1.0]
+    - [C_ADDI4SPN, 1.0]
+    - [C_ADDIW, 1.0]
+    - [C_ADDW, 1.0]
+    - [C_AND, 1.0]
+    - [C_ANDI, 1.0]
+    - [C_FLD, 1.0]
+    - [C_FLDSP, 1.0]
+    - [C_FSD, 1.0]
+    - [C_FSDSP, 1.0]
+    - [C_LD, 1.0]
+    - [C_LDSP, 1.0]
+    - [C_LI, 1.0]
+    - [C_LUI, 1.0]
+    - [C_LW, 1.0]
+    - [C_LWSP, 1.0]
+    - [C_MV, 1.0]
+    - [C_OR, 1.0]
+    - [C_SD, 1.0]
+    - [C_SDSP, 1.0]
+    - [C_SLLI, 1.0]
+    - [C_SRAI, 1.0]
+    - [C_SRLI, 1.0]
+    - [C_SUB, 1.0]
+    - [C_SUBW, 1.0]
+    - [C_SW, 1.0]
+    - [C_SWSP, 1.0]
+    - [C_XOR, 1.0]
+

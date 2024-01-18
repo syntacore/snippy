@@ -1,0 +1,33 @@
+# RUN: timeout 300 llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=50 \
+# RUN:     -verify-mi -dump-mf -mattr=+c -o %t |& FileCheck %s
+# RUN: timeout 300 llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=50 \
+# RUN:     -verify-mi -dump-mf -mattr=+c -init-regs-in-elf \
+# RUN:     -o %t |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x1000
+      SIZE:      0x10000
+      LMA:       0x1000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+    - [BLT, 1.0]
+    - [BLTU, 1.0]
+    - [BGE, 1.0]
+    - [BGEU, 1.0]
+    - [BNE, 1.0]
+    - [C_BEQZ, 1.0]
+    - [C_BNEZ, 1.0]
+    - [AND, 8.0]
+
+# CHECK: {{((BEQ)|(BLT)|(BLTU)|(BGE)|(BGEU)|(BNE)|(C_BEQZ)|(C_BNEZ) \$x[0-9]+, \$x[0-9]+, %bb\.[[BB]]+)}}
+# CHECK-NOT: {{(PseudoBR %bb\.[[BB]])}}
+# CHECK: {{(PseudoBR %bb\.[0-9]+)}}
+# CHECK-EMPTY:

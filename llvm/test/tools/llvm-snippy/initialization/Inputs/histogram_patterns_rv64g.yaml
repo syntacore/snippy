@@ -1,0 +1,7 @@
+---
+histograms:
+  - reg-type: X
+    values:
+      - [uniform, 1.0]
+      - [bitpattern, 1.0]
+...

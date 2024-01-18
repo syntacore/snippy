@@ -1,0 +1,8 @@
+# RUN: not llvm-snippy %S/Inputs/default-layout.yaml %s -march=riscv64-linux-gnu \
+# RUN:  -num-instrs=10 \
+# RUN: |& FileCheck %s
+
+access-addresses:
+  - plain:
+
+# CHECK: LLVM ERROR: At least one address must be provided either in 'plain' or 'burst' format for access-addresses memory scheme

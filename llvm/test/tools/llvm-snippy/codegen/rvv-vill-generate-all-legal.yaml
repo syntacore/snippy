@@ -1,0 +1,46 @@
+# COM: This test verifies that after installing
+# COM: the illegal rvv configuration in vtype,
+# COM: only legal instructions are generated (from RISCV-V spec 1.0 :
+# COM: vset{i}vl{i} and whole-register loads, stores, and moves). 
+
+# RUN: llvm-snippy %S/Inputs/rvv-vill-generate-all-legal.yaml \
+# RUN:  -model-plugin=None -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -dump-mf --num-instrs=1000 -o %t \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-ILLEGAL
+
+# RUN: llvm-snippy %S/Inputs/rvv-vill-generate-all-legal.yaml \
+# RUN:  -model-plugin=None -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -dump-mf --num-instrs=10000 -o %t \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-LEGAL
+
+# CHECK-ILLEGAL-NOT: VAADDU_VV
+# CHECK-ILLEGAL-NOT: VAADD_VX
+# CHECK-ILLEGAL-NOT: VADC_VIM
+# CHECK-ILLEGAL-NOT: VADD_VI
+# CHECK-ILLEGAL-NOT: VAND_VX
+# CHECK-ILLEGAL-NOT: VASUBU_VX
+# CHECK-ILLEGAL-NOT: VASUB_VX
+# CHECK-ILLEGAL-NOT: VIOTA_M
+# CHECK-ILLEGAL-NOT: VXOR_VX
+# CHECK-ILLEGAL-NOT: VZEXT_VF4
+
+# CHECK-LEGAL: VL1RE16_V
+# CHECK-LEGAL: VL1RE32_V
+# CHECK-LEGAL: VL1RE64_V
+# CHECK-LEGAL: VL1RE8_V
+# CHECK-LEGAL: VL2RE16_V
+# CHECK-LEGAL: VL2RE32_V
+# CHECK-LEGAL: VL2RE64_V
+# CHECK-LEGAL: VL2RE8_V
+# CHECK-LEGAL: VL4RE16_V
+# CHECK-LEGAL: VL4RE32_V
+# CHECK-LEGAL: VL4RE64_V
+# CHECK-LEGAL: VL4RE8_V
+# CHECK-LEGAL: VL8RE16_V
+# CHECK-LEGAL: VL8RE32_V
+# CHECK-LEGAL: VL8RE64_V
+# CHECK-LEGAL: VL8RE8_V
+# CHECK-LEGAL: VS1R_V
+# CHECK-LEGAL: VS2R_V
+# CHECK-LEGAL: VS4R_V
+# CHECK-LEGAL: VS8R_V
