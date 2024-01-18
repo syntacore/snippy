@@ -1,0 +1,9 @@
+# RUN: llvm-snippy %S/Inputs/rvv-histogram-vsetivli-only.yaml \
+# RUN:  -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None -dump-mf --num-instrs=10000 -o %t \
+# RUN:  -verify-gen-histogram  -histogram-must-succeed=true \
+# RUN:  |& FileCheck %s
+
+# CHECK:     VSETIVLI
+# CHECK-NOT: VSETVLI
+# CHECK-NOT: VSETVL

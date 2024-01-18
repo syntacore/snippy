@@ -1,0 +1,5 @@
+# RUN: not llvm-snippy %S/Inputs/default-sections.yaml -march=riscv64-linux-gnu -num-instrs=100 \
+# RUN:    -dump-mf   \
+# RUN:    -init-regs-in-elf --verify-mi |& FileCheck %s --dump-input fail
+
+# CHECK: LLVM ERROR: OpcodeGenerator initialization failure: empty histogram specified

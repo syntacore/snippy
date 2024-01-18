@@ -1,0 +1,30 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN: -external-stack=true --model-plugin=None \
+# RUN: -num-instrs=10 |& FileCheck %s --dump-input fail
+
+sections:
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x800000
+      SIZE:      0x400000
+      LMA:       0x800000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x1500000
+      SIZE:      0x100
+      LMA:       0x1500000
+      ACCESS:    rw
+
+histogram:
+    - [LD, 1.0]
+
+# CHECK: warning: Section 'stack' will not be used: external stack was enabled.
+# CHECK: warning: Skipping snippet execution on the model: model was set no 'None'.
+# CHECK: _______
+# CHECK-NEXT: Test Generation resulted in the following warnings:
+# CHECK-NEXT: * Section 'stack' will not be used: external stack was enabled. (x1)
+# CHECK-NEXT: * Skipping snippet execution on the model: model was set no 'None'. (x1)

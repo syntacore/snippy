@@ -1,0 +1,27 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -model-plugin=None -dump-mir=- \
+# RUN:   |& FileCheck %s
+
+# RUN: llvm-snippy <(echo -e "options:\n  dump-mir: '-'") %s \
+# RUN:   -march=riscv64-linux-gnu -model-plugin=None \
+# RUN:   |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+
+# CHECK-LABEL: define void @SnippyFunction
+# CHECK-SAME: () {
+# CHECK-NEXT: ret void
+# CHECK-NEXT: }

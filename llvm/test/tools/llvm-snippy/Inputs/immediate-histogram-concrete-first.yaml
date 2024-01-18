@@ -1,0 +1,6 @@
+imm-hist:
+  opcodes:
+    - "ADDI":
+      - [1, 1.0]
+    - "ADD.*":
+      - [2, 1.0]

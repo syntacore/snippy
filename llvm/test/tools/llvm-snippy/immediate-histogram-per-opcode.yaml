@@ -1,0 +1,29 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+include:
+  - Inputs/sections.yaml
+
+options:
+  march: riscv64-unknown-elf
+  num-instrs: 20
+  dump-mf: on
+
+histogram: 
+    - [ADDI, 1.0]
+    - [LUI, 1.0]
+
+imm-hist:
+  opcodes:
+    - 'ADDI':
+      - [1, 1.0]
+      - [2, 1.0]
+      - [3, 1.0]
+    - 'LUI':
+      - [5, 1.0]
+    - 'LD': uniform
+
+# We check that ADDI appears only with immediates: 1, 2 or 3
+# CHECK-NOT: ADDI $x{{[[:digit:]]+}}, {{[0,4-9]}}
+
+# We check that LUI appears only with immidiate 5
+# CHECK-NOT: LUI {{[0-4,6-9]}}

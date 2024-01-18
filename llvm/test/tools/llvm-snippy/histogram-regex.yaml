@@ -1,0 +1,25 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:    -dump-mi -num-instrs=20000 -last-instr= -model-plugin=None -mattr=+m \
+# RUN:    | FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram: 
+# Test overriding weight before regex
+    - ["ADD", 0.5]
+    - ["ADDI?", 1.0]
+    - ["(DIV)|(REM)|(IDONTEXIST)", 1.0]
+# Test overriding weight after regex
+    - ["ADDI", 2.0]
+      
+# CHECK-COUNT-20000: {{(\$x[0-9]+ = \ADD \$x[0-9]+\, \$x[0-9]+)|(\$x[0-9]+ = \ADDI \$x[0-9]+\, (-)?[0-9]+)|(\$x[0-9]+ = \DIV \$x[0-9]+\, \$x[0-9]+)|(\$x[0-9]+ = \REM \$x[0-9]+\, \$x[0-9]+)}}

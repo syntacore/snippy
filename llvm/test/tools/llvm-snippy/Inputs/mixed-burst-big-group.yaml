@@ -1,0 +1,4 @@
+burst:
+  mode: mixed
+  min-size: 30
+  max-size: 30

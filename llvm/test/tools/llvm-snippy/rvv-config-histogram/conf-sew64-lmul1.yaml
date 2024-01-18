@@ -1,0 +1,59 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None --num-instrs=10 -o %t \
+# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-SEW64
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None --num-instrs=10 -o %t \
+# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  --snippy-riscv-rvv-wa-exclude-vlmax1=true \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-SEW64
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None --num-instrs=10 -o %t \
+# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  --snippy-riscv-rvv-wa-exclude-vlmax1=false \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-SEW64
+
+include:
+- Inputs/rvv-unit-sew64-lmul1.yaml
+
+sections:
+  - no:        0
+    VMA:       0x10000
+    SIZE:      0x40000
+    LMA:       0x10000
+    ACCESS:    r
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VSETIVLI, 1.0]
+    - [VSETVLI, 1.0]
+    - [VSETVL, 1.0]
+    - [VADD_VV, 1.0]
+
+# CHECK-SEW64:      --- RVV Configuration Info ---
+# CHECK-SEW64-NEXT:  - Derived VLEN: 128 (VLENB = 16)
+# CHECK-SEW64-NEXT:  - Mode Change Decision Policy: Histogram
+# CHECK-SEW64-NEXT:  - Mode Change Probability: 0
+# CHECK-SEW64-NEXT:    Set Vill Bit Probability: 0
+# CHECK-SEW64-NEXT:  - VL Selection Rules:
+# CHECK-SEW64-NEXT:    P: 0.66667 <vlmax>
+# CHECK-SEW64-NEXT:    P: 0.33333 <any_legal>
+# CHECK-SEW64-NEXT:  - VM Selection Rules:
+# CHECK-SEW64-NEXT:    P: 0.66667 <all_ones>
+# CHECK-SEW64-NEXT:    P: 0.33333 <any_legal>
+# CHECK-SEW64-NEXT:  - Configuration Bag Listing:
+# CHECK-SEW64-NEXT:    P: 1 Conf: { e64, m1, tu, mu, vxsat: 0, vxrm: rnu }/MaxVL: 2
+# CHECK-SEW64-NEXT:  - Configuration Bag Size: 1
+# CHECK-SEW64-NEXT:  - State Cardinality: 2 ~ {MASKS}
+# CHECK-SEW64-NEXT: --- RVV Configuration End  ---

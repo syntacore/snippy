@@ -1,0 +1,6 @@
+access-ranges:
+    - start: 0x8000bf00
+      size: 0x110
+      stride: 16
+      first-offset: 0
+      last-offset: 0

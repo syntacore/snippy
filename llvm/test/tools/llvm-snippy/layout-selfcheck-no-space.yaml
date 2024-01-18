@@ -1,0 +1,26 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu --selfcheck -mattr=-a -num-instrs=10 -model-plugin=NONEXISTENT >& %t
+# RUN: FileCheck --input-file=%t --dump-input always %s
+
+sections:
+    - no:        1
+      VMA:       0x00000
+      SIZE:      0x10000
+      LMA:       0x00000
+      ACCESS:    rw
+    - no:        2
+      VMA:       0x10000
+      SIZE:      0x10000
+      LMA:       0x10000
+      ACCESS:    rw
+    - no:        3
+      VMA:       0x20000
+      SIZE:      0x10000
+      LMA:       0x20000
+      ACCESS:    rx
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SW, 5.0]
+
+# CHECK: LLVM ERROR: Failed to emplace selfcheck section: Could not find {{[0-9]+}} bytes of consecutive free space outside of sections specified in layout.

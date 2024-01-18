@@ -1,0 +1,26 @@
+# COM: this is the test for catching error,
+# COM: when specifying rvv configuration through option and include
+# RUN: not llvm-snippy %s %S/Inputs/rvv-unit-all.yaml -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None --num-instrs=10 -o %t \
+# RUN:  |& FileCheck %s
+
+include:
+  - Inputs/rvv-unit-all.yaml 
+
+sections:
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+
+histogram:
+    - [VADD_VV, 1.0]
+
+# CHECK: rvv-unit-all.yaml:6:1: error: duplicated mapping key 'riscv-vector-unit'
+# CHECK: riscv-vector-unit:

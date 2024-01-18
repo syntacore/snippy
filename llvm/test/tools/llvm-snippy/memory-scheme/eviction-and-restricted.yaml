@@ -1,0 +1,12 @@
+# RUN: llvm-snippy %S/Inputs/loadstore-layout.yaml %s -march=riscv64-linux-gnu \
+# RUN:  -num-instrs=1000
+
+restricted-addresses:
+    - plain:
+          - addr: 0x80002000
+            access-size: 1
+access-evictions:
+    - mask:  0x00000000
+      fixed: 0x80002000
+    - mask:  0x00000000
+      fixed: 0x80002010

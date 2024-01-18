@@ -1,0 +1,44 @@
+# RUN: llvm-snippy %S/Inputs/loadstore-layout.yaml %s -march=riscv64-linux-gnu \
+# RUN:  -num-instrs=1000 \
+# RUN:  -memory-access-mode=mixed-burst \
+# RUN:  -memory-access-burst-group-size=100 \
+# RUN:  -dump-memory-accesses-restricted=%t-1.yaml
+
+# RUN: FileCheck --input-file=%t-1.yaml %s --check-prefix=STRUCTURE
+
+# RUN: llvm-snippy %S/Inputs/loadstore-layout.yaml %s -march=riscv64-linux-gnu \
+# RUN:  -num-instrs=1000 \
+# RUN:  -memory-access-mode=store-burst \
+# RUN:  -memory-access-burst-group-size=100 \
+# RUN:  -dump-memory-accesses-restricted=%t-2.yaml
+
+# RUN: FileCheck --input-file=%t-2.yaml %s --check-prefix=STRUCTURE
+
+# RUN: llvm-snippy %S/Inputs/loadstore-layout.yaml %s -march=riscv64-linux-gnu \
+# RUN:  -num-instrs=1000 \
+# RUN:  -memory-access-mode=load-burst \
+# RUN:  -memory-access-burst-group-size=100 \
+# RUN:  -dump-memory-accesses-restricted=%t-3.yaml
+
+# RUN: FileCheck --input-file=%t-3.yaml %s --check-prefix=STRUCTURE
+
+access-ranges:
+    - start: 0x80002000
+      size: 4
+      stride: 1
+      first-offset: 0
+      last-offset: 0
+    - start: 0x80002010
+      size: 16
+      stride: 8
+      first-offset: 0
+      last-offset: 0
+    - start: 0x80002050
+      size: 10
+      stride: 4
+      first-offset: 0
+      last-offset: 0
+
+# STRUCTURE: restricted-addresses:
+# STRUCTURE:   - plain:
+# STRUCTURE-NOT: plain

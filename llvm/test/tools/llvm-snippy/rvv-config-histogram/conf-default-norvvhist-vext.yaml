@@ -1,0 +1,25 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None --num-instrs=10 -o %t \
+# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-NORVVHIST
+
+sections:
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [ADDI, 1.0]
+
+
+# CHECK-NORVVHIST:        --- RVV Configuration Info ---
+# CHECK-NORVVHIST-NEXT:     - Derived VLEN: 128 (VLENB = 16)
+# CHECK-NORVVHIST-NEXT:     - Mode Change Decision Policy: None
+# CHECK-NORVVHIST-NEXT:   --- RVV Configuration End  ---

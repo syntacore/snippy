@@ -1,0 +1,16 @@
+---
+histograms:
+  - reg-type: X
+    values:
+      - [-1, 1.0]
+      - [-15, 1.0]
+      - [0xFF, 1.0]
+  - reg-type: F
+    values:
+      - [-10, 1.0]
+      - [0xAA, 1.0]
+  - reg-type: V
+    values:
+      - [-123, 1.0]
+      - [0xA00000000200B00000000000010, 1.0]
+...

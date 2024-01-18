@@ -1,0 +1,37 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=500 -mattr=+a -dump-mf |& FileCheck %s --dump-input always
+
+# CHECK: bb.0:
+# CHECK-COUNT-500: AMO
+# CHECK-NEXT: EBREAK
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [AMOADD_D_AQ, 1.0]
+    - [AMOADD_W_AQ, 1.0]
+    - [AMOAND_D_AQ, 1.0]
+    - [AMOAND_W_AQ, 1.0]
+    - [AMOMAXU_D_AQ, 1.0]
+    - [AMOMAXU_W_AQ, 1.0]
+    - [AMOMAX_D_AQ, 1.0]
+    - [AMOMAX_W_AQ, 1.0]
+    - [AMOMINU_D_AQ, 1.0]
+    - [AMOMINU_W_AQ, 1.0]
+    - [AMOMIN_D_AQ, 1.0]
+    - [AMOMIN_W_AQ, 1.0]
+    - [AMOOR_D_AQ, 1.0]
+    - [AMOOR_W_AQ, 1.0]
+    - [AMOSWAP_D_AQ, 1.0]
+    - [AMOSWAP_W_AQ, 1.0]
+    - [AMOXOR_D_AQ, 1.0]
+    - [AMOXOR_W_AQ, 1.0]

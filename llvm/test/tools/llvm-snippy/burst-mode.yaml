@@ -1,0 +1,124 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: -num-instrs=200 -memory-access-mode=store-burst \
+# RUN: -memory-access-burst-group-size=3 >& %t
+# RUN: FileCheck --input-file=%t %s -check-prefix=STORE
+# RUN: FileCheck --input-file=%t %s -check-prefix=STORE-ERR
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: -num-instrs=200 -memory-access-mode=load-burst \
+# RUN: -memory-access-burst-group-size=3 >& %t
+# RUN: FileCheck --input-file=%t %s -check-prefix=LOAD
+# RUN: FileCheck --input-file=%t %s -check-prefix=LOAD-ERR
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: -num-instrs=200 -memory-access-mode=mixed-burst \
+# RUN: -memory-access-burst-group-size=3 |& FileCheck %s \
+# RUN: -check-prefix=MIXED
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: -num-instrs=200 -memory-access-mode=load-store-burst \
+# RUN: -memory-access-burst-group-size=3 |& FileCheck %s \
+# RUN: -check-prefix=LOADSTORE
+
+# Generate many instructions to have extremely high probability that desired
+# pattern wasn't met because it cannot be emitted. It's not the most robust test
+# case. Please, improve it if you have better ideas.
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: -num-instrs=1000 -memory-access-mode=load-store-burst \
+# RUN: -model-plugin=None \
+# RUN: -memory-access-burst-group-size=3 |& FileCheck %s \
+# RUN: -check-prefix=LOADSTORE-ERR
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: -num-instrs=500 -memory-access-mode=mixed-burst \
+# RUN: -memory-access-burst-group-size=100 >& %t
+# RUN  FileCheck --input-file=%t %s -check-prefix=MIXED-HUGEGROUP
+# RUN  FileCheck --input-file=%t %s -check-prefix=MIXED-HUGEGROUP-ERR
+
+# RUN: llvm-snippy %s %S/Inputs/store-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: -num-instrs=200 >& %t
+# RUN: FileCheck --input-file=%t %s -check-prefix=STORE
+# RUN: FileCheck --input-file=%t %s -check-prefix=STORE-ERR
+
+# RUN: llvm-snippy %s %S/Inputs/load-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: -num-instrs=200 >& %t
+# RUN: FileCheck --input-file=%t %s -check-prefix=LOAD
+# RUN: FileCheck --input-file=%t %s -check-prefix=LOAD-ERR
+
+# RUN: llvm-snippy %s %S/Inputs/mixed-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: -num-instrs=200 |& FileCheck %s \
+# RUN: -check-prefix=MIXED
+
+# RUN: llvm-snippy %s %S/Inputs/load-store-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: -num-instrs=200 |& FileCheck %s \
+# RUN: -check-prefix=LOADSTORE
+
+# Generate many instructions to have extremely high probability that desired
+# pattern wasn't met because it cannot be emitted. It's not the most robust test
+# case. Please, improve it if you have better ideas.
+# RUN: llvm-snippy %s %S/Inputs/load-store-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: -num-instrs=1000 \
+# RUN: -model-plugin=None |& FileCheck %s \
+# RUN: -check-prefix=LOADSTORE-ERR
+
+# RUN: llvm-snippy %s %S/Inputs/mixed-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: -num-instrs=500 >& t
+# RUN  FileCheck --input-file=%t %s -check-prefix=MIXED-HUGEGROUP
+# RUN  FileCheck --input-file=%t %s -check-prefix=MIXED-HUGEGROUP-ERR
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [LW, 1.0]
+    - [SW, 1.0]
+    - [LBU, 1.0]
+    - [SD, 1.0]
+    - [FLW, 1.0]
+    - [FSW, 1.0]
+    - [AMOADD_W, 1.0]
+    - [ADD, 1.0]
+    - [XOR, 1.0]
+    - [AND, 1.0]
+
+# STORE: {{(((.+)((SW)|(SD)|(FSD)|(AMOADD_W))(.+)([[:space:]]+)){3})}}
+# STORE: {{(((.+)((SW)|(SD)|(FSD)|(AMOADD_W))(.+)([[:space:]]+)){3})}}
+# STORE-NOT: {{((((SW)|(SD)|(FSD)|(AMOADD_W)).*[[:space:]].*){4})}}
+
+# STORE-ERR: {{((((LW)|(LBU)|(FLD)).*[[:space:]].*))}}
+# STORE-ERR-NOT: {{((((LW)|(LBU)|(FLD)).*[[:space:]].*){2})}}
+
+# LOAD: {{(((.+)((LW)|(LBU)|(FLD))(.+)([[:space:]]+)){3})}}
+# LOAD: {{(((.+)((LW)|(LBU)|(FLD))(.+)([[:space:]]+)){3})}}
+# LOAD-NOT: {{((((LW)|(LBU)|(FLD)).*[[:space:]].*){4})}}
+
+# LOAD-ERR: {{((((SW)|(SD)|(FSD)|(AMOADD_W)).*[[:space:]].*))}}
+# LOAD-ERR-NOT: {{((((SW)|(SD)|(FSD)|(AMOADD_W)).*[[:space:]].*){2})}}
+
+# MIXED: {{(((.+)((SW)|(SD)|(FSD)|(AMOADD_W)|(LW)|(LBU)|(FLD))(.+)([[:space:]]+)){3})}}
+# MIXED: {{(((.+)((SW)|(SD)|(FSD)|(AMOADD_W)|(LW)|(LBU)|(FLD))(.+)([[:space:]]+)){3})}}
+# MIXED-NOT: {{((((SW)|(SD)|(FSD)|(AMOADD_W)|(LW)|(LBU)|(FLD)).*[[:space:]].*){4})}}
+
+# LOADSTORE: {{(((.+)((SW)|(SD)|(FSD)|(AMOADD_W))(.+)([[:space:]]+)){3})}}
+# LOADSTORE: {{(((.+)((LW)|(LBU)|(FLD))(.+)([[:space:]]+)){3})}}
+# LOADSTORE: {{(((.+)((SW)|(SD)|(FSD)|(AMOADD_W))(.+)([[:space:]]+)){3})}}
+# LOADSTORE: {{(((.+)((LW)|(LBU)|(FLD))(.+)([[:space:]]+)){3})}}
+# LOADSTORE-NOT: {{((((SW)|(SD)|(FSD)|(AMOADD_W)).*[[:space:]].*){4})}}
+# LOADSTORE-NOT: {{((((LW)|(LBU)|(FLD)).*[[:space:]].*){4})}}
+
+# Check that we have burst groups of either loads and stores but they are not mixed.
+# LOADSTORE-ERR-NOT: {{(((LW)|(LBU)|(FLD)).*[[:space:]].*)(((SW)|(SD)|(FSD)|(AMOADD_W)).*[[:space:]].*)}}
+
+# MIXED-HUGEGROUP: {{(((.+)((SW)|(SD)|(FSD)|(AMOADD_W)|(LW)|(LBU)|(FLD))(.+)([[:space:]]+)){100})}}
+# MIXED-HUGEGROUP: {{(((.+)((SW)|(SD)|(FSD)|(AMOADD_W)|(LW)|(LBU)|(FLD))(.+)([[:space:]]+)){100})}}
+
+# MIXED-HUGEGROUP-ERR-NOT: {{(((.+)((SW)|(SD)|(FSD)|(AMOADD_W)|(LW)|(LBU)|(FLD))(.+)([[:space:]]+)){101})}}

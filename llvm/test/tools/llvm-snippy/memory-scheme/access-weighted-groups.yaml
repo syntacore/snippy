@@ -1,0 +1,202 @@
+# COM: This test verifies that:
+# COM:    1. Field "weight" is optional and defaults equal 1
+# COM:    2. FinalWeight == IndividualWeight * GroupWeight
+# COM:    3. Access-groups may exist with regular memory-schemes (access-ranges, ...)
+# COM:    4. Zero weight is handled correctly
+
+# RUN: llvm-snippy %S/Inputs/default-layout.yaml %s -march=riscv64-linux-gnu \
+# RUN:   -num-instrs=100 \
+# RUN:   -dump-layout=true \
+# RUN: |& FileCheck %s --dump-input always
+
+access-evictions:
+  - mask:  0x003c0000
+    fixed: 0x80000000
+  - mask:  0x000be000
+    fixed: 0x80001000
+    weight: 2
+  - mask:  0x003c0000
+    fixed: 0x80000000
+
+access-groups:
+  - weight: 3
+    access-ranges:
+      - start: 0x80002000
+        size: 0x1000
+        stride: 16
+        first-offset: 1
+        last-offset: 2
+        weight: 1.5
+      - start: 0x80004000
+        size: 0x200
+        stride: 8
+        first-offset: 4
+        last-offset: 6
+        weight: 4
+    access-addresses:
+      - ordered: true
+        plain:
+            - addr: 0x80200000
+            - addr: 0x80201234
+            - addr: 0x802020BC
+        weight: 2.5
+      - ordered: false
+        plain:
+            - addr: 0x80200050
+              access-size: 12
+      - plain:
+            - addr: 0x80200F00
+        weight: 3
+
+  - weight: 5
+    access-addresses:
+      - ordered: true
+        plain:
+            - addr: 0x80200000
+            - addr: 0x80201234
+            - addr: 0x802020BC
+        weight: 2
+      - ordered: false
+        plain:
+            - addr: 0x80200050
+              access-size: 12
+        weight: 3.5
+      - plain:
+            - addr: 0x80200F00
+    access-evictions:
+      - mask:  0x003c0000
+        fixed: 0x80000000
+      - mask:  0x000be000
+        fixed: 0x80001000
+        weight: 2
+      - mask:  0x003c0000
+        fixed: 0x80000000
+
+  - weight: 0
+    access-ranges:
+      - start: 0x80002000
+        size: 0x1000
+        stride: 16
+        first-offset: 1
+        last-offset: 2
+        weight: 4
+
+
+# CHECK: Memory access 0:
+# CHECK-NEXT: Memory eviction:
+# CHECK-NEXT:   Weight: 1
+# CHECK-NEXT:  Mask:  0x3c0000
+# CHECK-NEXT:  Fixed: 0x80000000
+
+# CHECK: Memory access 1:
+# CHECK-NEXT: Memory eviction:
+# CHECK-NEXT:   Weight: 2
+# CHECK-NEXT:   Mask:  0xbe000
+# CHECK-NEXT:   Fixed: 0x80001000
+
+# CHECK: Memory access 2:
+# CHECK-NEXT: Memory eviction:
+# CHECK-NEXT:   Weight: 1
+# CHECK-NEXT:   Mask:  0x3c0000
+# CHECK-NEXT:   Fixed: 0x80000000
+
+# CHECK: Memory access 3:
+# CHECK-NEXT: Memory range:
+# CHECK-NEXT:   Weight: 4.5
+# CHECK-NEXT:   Start: 2147491840
+# CHECK-NEXT:   Size: 4096
+# CHECK-NEXT:   Stride: 16
+# CHECK-NEXT:   FirstOffset: 1
+# CHECK-NEXT:   LastOffset: 2
+
+# CHECK: Memory access 4:
+# CHECK-NEXT: Memory range:
+# CHECK-NEXT:   Weight: 12
+# CHECK-NEXT:   Start: 2147500032
+# CHECK-NEXT:   Size: 512
+# CHECK-NEXT:   Stride: 8
+# CHECK-NEXT:   FirstOffset: 4
+# CHECK-NEXT:   LastOffset: 6
+
+# CHECK: Memory access 5:
+# CHECK-NEXT: Memory addresses:
+# CHECK-NEXT:   Weight: 7.5
+# CHECK-NEXT:   Ordered: 1
+# CHECK-NEXT:   Plain:
+# CHECK-NEXT:    - Addr: 0x80200000
+# CHECK-NEXT:      Access-size: 16
+# CHECK-NEXT:    - Addr: 0x80201234
+# CHECK-NEXT:      Access-size: 16
+# CHECK-NEXT:    - Addr: 0x802020bc
+# CHECK-NEXT:      Access-size: 16
+
+# CHECK: Memory access 6:
+# CHECK-NEXT: Memory addresses:
+# CHECK-NEXT:   Weight: 3
+# CHECK-NEXT:   Ordered: 0
+# CHECK-NEXT:   Plain:
+# CHECK-NEXT:    - Addr: 0x80200050
+# CHECK-NEXT:      Access-size: 12
+
+# CHECK: Memory access 7:
+# CHECK-NEXT: Memory addresses:
+# CHECK-NEXT:   Weight: 9
+# CHECK-NEXT:   Ordered: 1
+# CHECK-NEXT:   Plain:
+# CHECK-NEXT:    - Addr: 0x80200f00
+# CHECK-NEXT:      Access-size: 16
+
+# CHECK: Memory access 8:
+# CHECK-NEXT: Memory eviction:
+# CHECK-NEXT:   Weight: 5
+# CHECK-NEXT:   Mask:  0x3c0000
+# CHECK-NEXT:   Fixed: 0x80000000
+
+# CHECK: Memory access 9:
+# CHECK-NEXT: Memory eviction:
+# CHECK-NEXT:   Weight: 10
+# CHECK-NEXT:   Mask:  0xbe000
+# CHECK-NEXT:   Fixed: 0x80001000
+
+# CHECK: Memory access 10:
+# CHECK-NEXT: Memory eviction:
+# CHECK-NEXT:   Weight: 5
+# CHECK-NEXT:   Mask:  0x3c0000
+# CHECK-NEXT:   Fixed: 0x80000000
+
+# CHECK: Memory access 11:
+# CHECK-NEXT: Memory addresses:
+# CHECK-NEXT:   Weight: 10
+# CHECK-NEXT:   Ordered: 1
+# CHECK-NEXT:   Plain:
+# CHECK-NEXT:    - Addr: 0x80200000
+# CHECK-NEXT:      Access-size: 16
+# CHECK-NEXT:    - Addr: 0x80201234
+# CHECK-NEXT:      Access-size: 16
+# CHECK-NEXT:    - Addr: 0x802020bc
+# CHECK-NEXT:      Access-size: 16
+
+# CHECK: Memory access 12:
+# CHECK-NEXT: Memory addresses:
+# CHECK-NEXT:   Weight: 17.5
+# CHECK-NEXT:   Ordered: 0
+# CHECK-NEXT:   Plain:
+# CHECK-NEXT:    - Addr: 0x80200050
+# CHECK-NEXT:      Access-size: 12
+ 
+# CHECK: Memory access 13:
+# CHECK-NEXT: Memory addresses:
+# CHECK-NEXT:   Weight: 5
+# CHECK-NEXT:   Ordered: 1
+# CHECK-NEXT:   Plain:
+# CHECK-NEXT:    - Addr: 0x80200f00
+# CHECK-NEXT:      Access-size: 16
+
+# CHECK: Memory access 14:
+# CHECK-NEXT: Memory range:
+# CHECK-NEXT:   Weight: 0
+# CHECK-NEXT:   Start: 2147491840
+# CHECK-NEXT:   Size: 4096
+# CHECK-NEXT:   Stride: 16
+# CHECK-NEXT:   FirstOffset: 1
+# CHECK-NEXT:   LastOffset: 2

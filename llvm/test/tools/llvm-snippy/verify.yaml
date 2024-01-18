@@ -1,0 +1,107 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+a,+m,+zfh \
+# RUN:   -num-instrs=10000 -init-regs-in-elf -verify-mi \
+# RUN:   -histogram-must-succeed=true \
+# RUN:  |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [LUI, 1.0]
+    - [SRAI, 1.0]
+    - [SRLI, 1.0]
+    - [SLLI, 1.0]
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [SRA, 1.0]
+    - [SRL, 1.0]
+    - [SLL, 1.0]
+    - [AND, 1.0]
+    - [ANDI, 1.0]
+    - [OR, 1.0]
+    - [ORI, 1.0]
+    - [XOR, 1.0]
+    - [XORI, 1.0]
+    - [LB, 1.0]
+    - [LBU, 1.0]
+    - [LH, 1.0]
+    - [LHU, 1.0]
+    - [LW, 1.0]
+    - [LWU, 1.0]
+    - [LD, 1.0]
+    - [SB, 1.0]
+    - [SH, 1.0]
+    - [SW, 1.0]
+    - [SD, 1.0]
+    - [ADDIW, 1.0]
+    - [ADDW, 1.0]
+    - [SUBW, 1.0]
+    - [SLLW, 1.0]
+    - [SRLW, 1.0]
+    - [SRAW, 1.0]
+    - [AMOADD_D_AQ_RL, 1.0]
+    - [AMOADD_W_AQ_RL, 1.0]
+    - [AMOAND_D_AQ_RL, 1.0]
+    - [AMOAND_W_AQ_RL, 1.0]
+    - [AMOMAXU_D_AQ_RL, 1.0]
+    - [AMOMAXU_W_AQ_RL, 1.0]
+    - [AMOMAX_D_AQ_RL, 1.0]
+    - [AMOMAX_W_AQ_RL, 1.0]
+    - [AMOMINU_D_AQ_RL, 1.0]
+    - [AMOMINU_W_AQ_RL, 1.0]
+    - [AMOMIN_D_AQ_RL, 1.0]
+    - [AMOMIN_W_AQ_RL, 1.0]
+    - [AMOOR_D_AQ_RL, 1.0]
+    - [AMOOR_W_AQ_RL, 1.0]
+    - [AMOSWAP_D_AQ_RL, 1.0]
+    - [AMOSWAP_W_AQ_RL, 1.0]
+    - [AMOXOR_D_AQ_RL, 1.0]
+    - [AMOXOR_W_AQ_RL, 1.0]
+    - [AMOADD_D_AQ, 1.0]
+    - [AMOADD_W_AQ, 1.0]
+    - [AMOAND_D_AQ, 1.0]
+    - [AMOAND_W_AQ, 1.0]
+    - [AMOMAXU_D_AQ, 1.0]
+    - [AMOMAXU_W_AQ, 1.0]
+    - [AMOMAX_D_AQ, 1.0]
+    - [AMOMAX_W_AQ, 1.0]
+    - [AMOMINU_D_AQ, 1.0]
+    - [AMOMINU_W_AQ, 1.0]
+    - [AMOMIN_D_AQ, 1.0]
+    - [AMOMIN_W_AQ, 1.0]
+    - [AMOOR_D_AQ, 1.0]
+    - [AMOOR_W_AQ, 1.0]
+    - [AMOSWAP_D_AQ, 1.0]
+    - [AMOSWAP_W_AQ, 1.0]
+    - [AMOXOR_D_AQ, 1.0]
+    - [AMOXOR_W_AQ, 1.0]
+    - [AMOADD_D_RL, 1.0]
+    - [AMOADD_W_RL, 1.0]
+    - [AMOAND_D_RL, 1.0]
+    - [AMOAND_W_RL, 1.0]
+    - [AMOMAXU_D_RL, 1.0]
+    - [AMOMAXU_W_RL, 1.0]
+    - [AMOMAX_D_RL, 1.0]
+    - [AMOMAX_W_RL, 1.0]
+    - [AMOMINU_D_RL, 1.0]
+    - [AMOMINU_W_RL, 1.0]
+    - [AMOMIN_D_RL, 1.0]
+    - [AMOMIN_W_RL, 1.0]
+    - [AMOOR_D_RL, 1.0]
+    - [AMOOR_W_RL, 1.0]
+    - [AMOSWAP_D_RL, 1.0]
+    - [AMOSWAP_W_RL, 1.0]
+    - [AMOXOR_D_RL, 1.0]
+    - [AMOXOR_W_RL, 1.0]
+
+# CHECK-NOT: Machine Verifier Pass report
