@@ -97,6 +97,13 @@ public:
     reportUnimplementedError();
   }
 
+  const MCRegisterClass &
+  getRegClass(const GeneratorContext &Ctx, unsigned OperandRegClassID,
+              unsigned OpIndex, unsigned Opcode, const MachineBasicBlock &MBB,
+              const MCRegisterInfo &RegInfo) const override {
+    reportUnimplementedError();
+  }
+
   MCRegister getStackPointer() const override { reportUnimplementedError(); }
 
   void generateSpill(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
@@ -208,6 +215,26 @@ public:
   }
 
   unsigned getMaxInstrSize() const override { reportUnimplementedError(); }
+
+  bool isMultipleReg(Register Reg, const MCRegisterInfo &RI) const override {
+    reportUnimplementedError();
+  }
+
+  bool isPhysRegClass(unsigned RegClassID,
+                      const MCRegisterInfo &RI) const override {
+    reportUnimplementedError();
+  }
+
+  Register getFirstPhysReg(Register Reg,
+                           const MCRegisterInfo &RI) const override {
+    reportUnimplementedError();
+  }
+
+  std::vector<Register>
+  getPhysRegsFromUnit(Register RegUnit,
+                      const MCRegisterInfo &RI) const override {
+    reportUnimplementedError();
+  }
 
   unsigned getMaxBranchDstMod(unsigned Opcode) const override {
     reportUnimplementedError();
@@ -366,12 +393,6 @@ public:
   }
 
   std::vector<Register> includeRegs(const MCRegisterClass &RC) const override {
-    reportUnimplementedError();
-  }
-
-  void excludeRegsForOpcode(unsigned Opcode, RegPoolWrapper &RP,
-                            GeneratorContext &GC,
-                            const MachineBasicBlock &MBB) const override {
     reportUnimplementedError();
   }
 

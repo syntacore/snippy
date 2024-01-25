@@ -111,7 +111,8 @@ class AvailableRegisterImpl {
         });
 
     if (!RegIdxs)
-      report_fatal_error(make_error<NoAvailableRegister>(RegClass, RI, Desc));
+      report_fatal_error(make_error<NoAvailableRegister>(RegClass, RI, Desc),
+                         false);
 
     transform(*RegIdxs, OutputIt,
               [&RegClass](auto Idx) { return RegClass.getRegister(Idx); });
