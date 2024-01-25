@@ -1427,5 +1427,52 @@ inline size_t getRVVWholeRegisterCount(unsigned Opcode) {
   llvm_unreachable("Not a whole register instruction");
 }
 
+inline const MCRegisterClass &
+getRVVSegLoadStoreRegClassForVd(unsigned Opcode, std::pair<unsigned, bool> EMUL,
+                                const MCRegisterInfo &RegInfo) {
+  // The vector load/store segment instructions move subarrays with
+  // homogeneous elements. Count of registers in vd operand differ
+  // from the LMUL and therefore the register class
+  // of this operand are other.
+  // This function return register class for Vd operand.
+  //
+  // Format(Segment Indexed):  vluxseg<nf>ei<eew>.v vd, (rs1), vs2, vm
+  //
+  // E.G. :
+  //                           nf = 3                       ->  N3
+  //                           EMUL = (eew/SEW) * LMUL = 8  ->  M8
+  //
+  // Then the register class of the vd operand will be VRN3M8
+  assert((isRVVUnitStrideSegLoadStore(Opcode) ||
+          isRVVStridedSegLoadStore(Opcode) ||
+          isRVVIndexedSegLoadStore(Opcode)) &&
+         "This function requires only these opcodes");
+  auto [Multiplier, IsFractional] = EMUL;
+  auto NFields = getNumFields(Opcode);
+  auto RegNumMult = IsFractional ? 1u : Multiplier;
+  assert(RegNumMult * NFields <= 8 && "RVV spec 7.8: EMUL * NFIELDS <= 8");
+
+  // This hash table matches:
+  //         {NFields, RegNumMult} -> {RegClassID}
+
+  // Hash in this Map is a two-digit number, for example,
+  //         VModeHash()({3, 2}) == 32
+  struct VModeHash final {
+    auto operator()(const std::pair<unsigned, unsigned> &P) const {
+      return std::hash<unsigned>()(P.first * 10 + P.second);
+    }
+  };
+  std::unordered_map<std::pair<unsigned, unsigned>, unsigned, VModeHash> Map = {
+      {{1, 1}, RISCV::VRRegClassID},     {{1, 2}, RISCV::VRM2RegClassID},
+      {{1, 4}, RISCV::VRM4RegClassID},   {{1, 8}, RISCV::VRM8RegClassID},
+      {{2, 1}, RISCV::VRN2M1RegClassID}, {{2, 2}, RISCV::VRN2M2RegClassID},
+      {{2, 4}, RISCV::VRN2M4RegClassID}, {{3, 1}, RISCV::VRN3M1RegClassID},
+      {{3, 2}, RISCV::VRN3M2RegClassID}, {{4, 1}, RISCV::VRN4M1RegClassID},
+      {{4, 2}, RISCV::VRN4M2RegClassID}, {{5, 1}, RISCV::VRN5M1RegClassID},
+      {{6, 1}, RISCV::VRN6M1RegClassID}, {{7, 1}, RISCV::VRN7M1RegClassID},
+      {{8, 1}, RISCV::VRN8M1RegClassID}};
+  return RegInfo.getRegClass(Map.at({NFields, RegNumMult}));
+}
+
 } // namespace snippy
 } // namespace llvm
