@@ -133,6 +133,11 @@ public:
     return {};
   }
 
+  virtual const MCRegisterClass &
+  getRegClass(const GeneratorContext &Ctx, unsigned OperandRegClassID,
+              unsigned OpIndex, unsigned Opcode, const MachineBasicBlock &MBB,
+              const MCRegisterInfo &RegInfo) const = 0;
+
   virtual MCRegister getStackPointer() const = 0;
 
   // NOTE: this list do not include stack pointer.
@@ -279,6 +284,17 @@ public:
 
   virtual unsigned getMaxInstrSize() const = 0;
 
+  virtual bool isMultipleReg(Register Reg, const MCRegisterInfo &RI) const = 0;
+
+  virtual bool isPhysRegClass(unsigned RegClassID,
+                              const MCRegisterInfo &RI) const = 0;
+
+  virtual Register getFirstPhysReg(Register Reg,
+                                   const MCRegisterInfo &RI) const = 0;
+
+  virtual std::vector<Register>
+  getPhysRegsFromUnit(Register RegUnit, const MCRegisterInfo &RI) const = 0;
+
   virtual unsigned getMaxBranchDstMod(unsigned Opcode) const = 0;
 
   virtual bool branchNeedsVerification(const MachineInstr &Branch) const = 0;
@@ -379,10 +395,6 @@ public:
 
   virtual std::vector<Register>
   includeRegs(const MCRegisterClass &RC) const = 0;
-
-  virtual void excludeRegsForOpcode(unsigned Opcode, RegPoolWrapper &RP,
-                                    GeneratorContext &GC,
-                                    const MachineBasicBlock &MBB) const = 0;
 
   virtual void reserveRegsIfNeeded(unsigned Opcode, bool isDst, bool isMem,
                                    Register Reg, RegPoolWrapper &RP,

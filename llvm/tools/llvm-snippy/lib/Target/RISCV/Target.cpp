@@ -206,7 +206,7 @@ getElemWidthAndGapForVectorLoad(unsigned Opcode, unsigned EEW,
     return {EEW, EMUL};
   }
 
-  auto [LMUL, IsFractional] = RISCVVType::decodeVLMUL(RISCVCtx.getLMUL(MBB));
+  auto [LMUL, IsFractional] = RISCVCtx.decodeVLMUL(RISCVCtx.getLMUL(MBB));
   assert(RISCVVType::isValidLMUL(LMUL, IsFractional));
 
   if (isRVVIndexedSegLoadStore(Opcode))
@@ -774,6 +774,11 @@ public:
                   RVMCallbackHandler *CallbackHandler,
                   const TargetSubtargetInfo &Subtarget) const override;
 
+  const MCRegisterClass &
+  getRegClass(const GeneratorContext &Ctx, unsigned OperandRegClassID,
+              unsigned OpIndex, unsigned Opcode, const MachineBasicBlock &MBB,
+              const MCRegisterInfo &RegInfo) const override;
+
   bool matchesArch(Triple::ArchType Arch) const override {
     return Arch == Triple::riscv32 || Arch == Triple::riscv64;
   }
@@ -808,14 +813,6 @@ public:
 
   bool needsGenerationPolicySwitch(unsigned Opcode) const override {
     return isRVVModeSwitch(Opcode);
-  }
-
-  // This function differs from the RISCVVType::decodeVLMUL in that it also
-  // handles the reserved LMUL
-  static std::pair<unsigned, bool> decodeVLMUL(RISCVII::VLMUL LMUL) {
-    if (LMUL == RISCVII::VLMUL::LMUL_RESERVED)
-      return std::make_pair(1 << static_cast<unsigned>(LMUL), false);
-    return RISCVVType::decodeVLMUL(LMUL);
   }
 
   std::vector<Register>
@@ -972,6 +969,49 @@ public:
   bool is64Bit(const TargetMachine &TM) const override {
     assert(TM.getTargetTriple().isRISCV());
     return TM.getTargetTriple().isRISCV64();
+  }
+
+  bool isMultipleReg(Register Reg, const MCRegisterInfo &RI) const override {
+    assert(Reg != RISCV::NoRegister && "Expected to have register");
+    // If there is only one subreg in subregs,
+    // then this register does not consist of smaller ones, which means it is
+    // physical
+    auto Subregs = RI.subregs_inclusive(Reg);
+    return std::distance(Subregs.begin(), Subregs.end()) != 1;
+  }
+
+  bool isPhysRegClass(unsigned RegClassID,
+                      const MCRegisterInfo &RI) const override {
+    if (RegClassID == RISCV::VMV0RegClassID)
+      return false;
+    auto RC = RI.getRegClass(RegClassID);
+    return std::all_of(RC.begin(), RC.end(), [this, RI](unsigned Reg) {
+      return !isMultipleReg(Reg, RI);
+    });
+  }
+
+  Register getFirstPhysReg(Register Reg,
+                           const MCRegisterInfo &RI) const override {
+    assert(Reg != RISCV::NoRegister && "Expected to have register");
+    // Select the smallest of the subregisters, which is in fact a physical
+    // register in RVV
+    auto Subregs = RI.subregs_inclusive(Reg);
+    return *std::min_element(Subregs.begin(), Subregs.end());
+  }
+
+  std::vector<Register>
+  getPhysRegsFromUnit(Register RegUnit,
+                      const MCRegisterInfo &RI) const override {
+    if (RegUnit == RISCV::NoRegister)
+      return {};
+    if (!isMultipleReg(RegUnit, RI))
+      return {RegUnit};
+
+    std::vector<Register> PhysRegs;
+    auto Subregs = RI.subregs_inclusive(RegUnit);
+    copy_if(Subregs, std::back_inserter(PhysRegs),
+            [this, &RI](auto &SubReg) { return !isMultipleReg(SubReg, RI); });
+    return PhysRegs;
   }
 
   bool isSelfcheckAllowed(unsigned Opcode) const override {
@@ -2338,89 +2378,6 @@ public:
     return {RISCV::V0, RISCV::V0M8, RISCV::V0M4, RISCV::V0M2};
   }
 
-  void excludeRegsForOpcode(unsigned Opcode, RegPoolWrapper &RP,
-                            GeneratorContext &GC,
-                            const MachineBasicBlock &MBB) const override {
-    if (!isRVV(Opcode))
-      return;
-
-    auto &TgtCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
-    if (!TgtCtx.hasActiveRVVMode(MBB))
-      return;
-
-    auto [Multiplier, IsFractional] = decodeVLMUL(TgtCtx.getLMUL(MBB));
-    // Use EMUL instead of LMUL for the instructions listed below.
-    if (isRVVUnitStrideLoadStore(Opcode) || isRVVUnitStrideFFLoad(Opcode) ||
-        isRVVUnitStrideSegLoadStore(Opcode) || isRVVStridedLoadStore(Opcode) ||
-        isRVVStridedSegLoadStore(Opcode)) {
-      auto LMUL = TgtCtx.getLMUL(MBB);
-      auto SEW = TgtCtx.getSEW(MBB);
-      auto EEW = getDataElementWidth(Opcode) * CHAR_BIT;
-      auto EMUL = computeEMUL(static_cast<unsigned>(SEW), EEW, LMUL);
-
-      std::tie(Multiplier, IsFractional) = RISCVVType::decodeVLMUL(EMUL);
-    }
-
-    if (isRVVUnitStrideSegLoadStore(Opcode) ||
-        isRVVStridedSegLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode)) {
-      // For segment load/stores #fields = #regs groups to use. So, we should
-      // reserve (#fields - 1) last vregs groups.
-      auto NFields = getNumFields(Opcode);
-      auto RegNumMult = IsFractional ? 1u : Multiplier;
-      assert(RegNumMult * NFields <= 8 && "RVV spec 7.8: EMUL * NFIELDS <= 8");
-      for (auto i = 0u; i < (NFields - 1) * RegNumMult; ++i)
-        // TODO: disallow reading for stores, writing for loads.
-        RP.addReserved(RISCV::V31 - i);
-    }
-
-    if (isRVVIndexedLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode)) {
-      auto LMUL = TgtCtx.getLMUL(MBB);
-      auto SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
-      auto EIEW = getIndexElementWidth(Opcode);
-      if (SEW < EIEW) {
-        auto EMUL = computeEMUL(static_cast<unsigned>(SEW), EIEW, LMUL);
-        std::tie(Multiplier, IsFractional) = RISCVVType::decodeVLMUL(EMUL);
-      }
-    }
-
-    if ((isRVVIntegerWidening(Opcode) || isRVVFPWidening(Opcode) ||
-         isRVVIntegerNarrowing(Opcode) || isRVVFPNarrowing(Opcode)) &&
-        !IsFractional) {
-      auto LMUL = TgtCtx.getLMUL(MBB);
-      auto SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
-      auto EMUL = computeEMUL(SEW, SEW * 2u, LMUL);
-      std::tie(Multiplier, IsFractional) = RISCVVType::decodeVLMUL(EMUL);
-    }
-
-    if (isRVVGather16(Opcode)) {
-      auto LMUL = TgtCtx.getLMUL(MBB);
-      auto SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
-      auto EEW = 16u;
-      if (EEW > SEW) {
-        auto EMUL = computeEMUL(SEW, EEW, LMUL);
-        std::tie(Multiplier, IsFractional) = RISCVVType::decodeVLMUL(EMUL);
-      }
-    }
-
-    // If LMUL > 1, we need to form register groups. Each group will have LMUL
-    // consequent registers and starts at register number that is the multiple
-    // of LMUL.
-    if (IsFractional || Multiplier == 1)
-      return;
-
-    // FIXME: RVV instruction operands might have different restrictions. For
-    // example, VZEXT's dst and src registers have different EMULs which leads
-    // to different register group restrictions. Now we choose the strongest
-    // existed rule for the instruction with the given VType and use it for all
-    // operands. As a future improvement, we can choose rules for each operand
-    // separately.
-    for (auto i = 0u; i < RISCV::VRRegClass.getNumRegs(); ++i)
-      if (i % Multiplier != 0) {
-        auto VReg = regIndexToMCReg(i, RegStorageType::VReg, GC);
-        RP.addReserved(VReg);
-      }
-  }
-
   std::vector<Register> includeRegs(const MCRegisterClass &RC) const override {
     if (RC.getID() == RISCV::VMV0RegClass.getID())
       return {RISCV::NoRegister};
@@ -2444,7 +2401,7 @@ public:
              "Dst reg in rvv indexed load/store instruction must be vreg");
       auto &TgtCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
 
-      auto [Mult, Fractional] = decodeVLMUL(TgtCtx.getLMUL(MBB));
+      auto [Mult, Fractional] = TgtCtx.decodeVLMUL(TgtCtx.getLMUL(MBB));
       // Register group here means a register group formed by LMUL multiplied by
       // NFields for segment which is confusing.
       auto DstRegGroupSize = Fractional ? 1u : Mult;
@@ -3047,6 +3004,39 @@ SnippyRISCVTarget::createSimulator(llvm::snippy::DynamicLibrary &ModelLib,
 
   return createRISCVSimulator(ModelLib, Cfg, CallbackHandler, Subtarget, VLENB,
                               !RISCVDisableMisaligned);
+}
+
+const MCRegisterClass &
+SnippyRISCVTarget::getRegClass(const GeneratorContext &Ctx,
+                               unsigned OperandRegClassID, unsigned OpIndex,
+                               unsigned Opcode, const MachineBasicBlock &MBB,
+                               const MCRegisterInfo &RegInfo) const {
+  auto &TgtCtx = Ctx.getTargetContext().getImpl<RISCVGeneratorContext>();
+  if (!isRVV(Opcode) || !TgtCtx.hasActiveRVVMode(MBB) ||
+      (OperandRegClassID != RISCV::VRRegClassID))
+    return RegInfo.getRegClass(OperandRegClassID);
+
+  auto [Multiplier, IsFractional] = TgtCtx.getEMUL(Opcode, OpIndex, MBB);
+  // Special handling for Vector Load/Store Segment Instructions, because
+  // this instructions moves subarrays.
+  if ((isRVVUnitStrideSegLoadStore(Opcode) ||
+       isRVVStridedSegLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode)) &&
+      OpIndex == 0 /* vector destination register group */)
+    return getRVVSegLoadStoreRegClassForVd(
+        Opcode, std::pair(Multiplier, IsFractional), RegInfo);
+
+  if (IsFractional)
+    return RegInfo.getRegClass(OperandRegClassID);
+  switch (Multiplier) {
+  case 2:
+    return RegInfo.getRegClass(RISCV::VRM2RegClassID);
+  case 4:
+    return RegInfo.getRegClass(RISCV::VRM4RegClassID);
+  case 8:
+    return RegInfo.getRegClass(RISCV::VRM8RegClassID);
+  default:
+    return RegInfo.getRegClass(OperandRegClassID);
+  }
 }
 
 } // anonymous namespace
