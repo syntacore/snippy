@@ -15,6 +15,7 @@
 
 #include "snippy/Generator/RegisterPool.h"
 #include "snippy/Plugins/RegisterPluginCInterface.h"
+#include "snippy/Target/Target.h"
 
 #include "llvm/CodeGen/Register.h"
 
@@ -96,10 +97,10 @@ class RegisterGenerator final {
                      AccessMaskBit Mask);
 
   std::optional<Register>
-  generateRandom(const MCRegisterClass &RC, const MCRegisterInfo &RI,
-                 const RegPoolWrapper &RP, const MachineBasicBlock &MBB,
-                 ArrayRef<Register> Exclude, ArrayRef<Register> Include,
-                 AccessMaskBit Mask) const;
+  generateRandom(const SnippyTarget &SnippyTgt, const MCRegisterClass &RC,
+                 const MCRegisterInfo &RI, const RegPoolWrapper &RP,
+                 const MachineBasicBlock &MBB, ArrayRef<Register> Exclude,
+                 ArrayRef<Register> Include, AccessMaskBit Mask) const;
 
 public:
   RegisterGenerator(const std::string &PluginLibName,
@@ -117,14 +118,25 @@ public:
 
   // Returns register either from (future)plugin or from random generator.
   std::optional<Register>
-  generate(const MCRegisterClass &RC, const MCRegisterInfo &RI,
-           const RegPoolWrapper &RP, const MachineBasicBlock &MBB,
+  generate(const MCRegisterClass &RC, unsigned OperandRegClassID,
+           const MCRegisterInfo &RI, const RegPoolWrapper &RP,
+           const MachineBasicBlock &MBB, const SnippyTarget &SnippyTgt,
            ArrayRef<Register> Exclude = {}, ArrayRef<Register> Include = {},
            AccessMaskBit Mask = AccessMaskBit::RW) {
     assert(!RequiresRollBack && "Can't generate without failure recovery");
-    if (regGenIsWithPlugin())
-      return generateWithPlugin(RC, RI, RP, MBB, Exclude, Include, Mask);
-    return generateRandom(RC, RI, RP, MBB, Exclude, Include, Mask);
+    assert(none_of(Include,
+                   [&RP, &MBB, Mask](unsigned Reg) {
+                     return RP.isReserved(Reg, MBB, Mask);
+                   }) &&
+           "Registers that have been reserved can't be included");
+    auto Result =
+        regGenIsWithPlugin()
+            ? generateWithPlugin(RC, RI, RP, MBB, Exclude, Include, Mask)
+            : generateRandom(SnippyTgt, RC, RI, RP, MBB, Exclude, Include,
+                             Mask);
+    if (Result.has_value() && SnippyTgt.isPhysRegClass(OperandRegClassID, RI))
+      return SnippyTgt.getFirstPhysReg(Result.value(), RI);
+    return Result;
   }
 };
 

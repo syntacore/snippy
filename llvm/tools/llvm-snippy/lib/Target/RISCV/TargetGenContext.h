@@ -108,6 +108,144 @@ public:
     return getActiveRVVMode(MBB).Config->SEW;
   }
 
+  std::pair<unsigned, bool> getEMUL(unsigned Opcode, unsigned OpIndex,
+                                    const MachineBasicBlock &MBB) const {
+    // EMUL - effective LMUL of each vector operand.
+
+    // Vector unit-stride and constant-stride use the EEW/EMUL encoded
+    // in the instruction for the data values.
+    //
+    // E.G. (Unit-Stride):
+    //
+    //           vle16.v vd, (rs1), vm          # 16-bit unit-stride load
+    //           vsse32.v vs3, (rs1), rs2, vm   # 32-bit strided store
+    //
+    // E.G. (Strided):
+    //
+    //           vlseg8e8.v vd, (rs1), vm
+    //                                          # Load eight vector registers
+    //                                          with eight byte fields.
+    //
+    // Conclusion: EMUL of destination vector register vd, must be calculated.
+    // There are no more vector operands in this instruction (mask does not
+    // require EMUL calculation), so there is an assertion.
+    if (isRVVUnitStrideLoadStore(Opcode) || isRVVUnitStrideFFLoad(Opcode) ||
+        isRVVUnitStrideSegLoadStore(Opcode) || isRVVStridedLoadStore(Opcode) ||
+        isRVVStridedSegLoadStore(Opcode)) {
+      assert(OpIndex == 0 && "We can be here only for vd vector operand");
+      auto LMUL = getLMUL(MBB);
+      auto SEW = getSEW(MBB);
+      auto EEW = getDataElementWidth(Opcode) * CHAR_BIT;
+      auto EMUL = computeEMUL(static_cast<unsigned>(SEW), EEW, LMUL);
+      return decodeVLMUL(EMUL);
+    }
+
+    // For Vector Indexed Loads and Stores Instructions EMULs of the operands
+    // are different.
+    //
+    // E.G. (Indexed):
+    //
+    //          vluxei32.v vd, (rs1), vs2, vm
+    //                                         # unordered 32-bit
+    //                                         indexed load of SEW data
+    //
+    // The destination vector register group (vd) has EEW = SEW,
+    // EMUL = LMUL = 1, while the index vector register group (vs2) has
+    // EEW encoded in the instruction (32) with
+    // EMUL = (32 / SEW) * LMUL.
+    //
+    // E.G. (Segment Indexed):
+    //
+    // Format:  vluxseg<nf>ei<eew>.v vd, (rs1), vs2, vm
+    //
+    //          vsetvli a1, t0, e8, ta, ma
+    //          vluxseg3ei32.v v4, (x5), v3
+    //
+    //                                         # Load bytes at
+    //                                         addresses x5+v3[i] into v4[i],
+    //                                         addresses x5+v3[i]+1 into v5[i],
+    //                                         addresses x5+v3[i]+2 into v6[i].
+    //
+    // The destination vector register group (vd, i.e v4) has EEW = SEW = 8,
+    // EMUL = LMUL = 1, while the index vector register group (vs2, i.e. v3) has
+    // EEW encoded in the instruction (32) with
+    // EMUL = (EEW / SEW) * LMUL = (32 / 8) * 1 = 4.
+
+    // Conclusion: EMUL of index vector register, which are specified by the
+    // third operand (OpIndex == 2), must be calculated. While for another
+    // vector operand EMUL is simply equal to the LMUL.
+    auto [Multiplier, IsFractional] = decodeVLMUL(getLMUL(MBB));
+    if (isRVVIndexedLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode)) {
+      if (OpIndex == 0)
+        return std::make_pair(Multiplier, IsFractional);
+      assert(OpIndex == 2 && "We can be here only for index vector operand");
+      auto LMUL = getLMUL(MBB);
+      auto SEW = static_cast<unsigned>(getSEW(MBB));
+      auto EIEW = getIndexElementWidth(Opcode);
+      auto EMUL = computeEMUL(static_cast<unsigned>(SEW), EIEW, LMUL);
+      return decodeVLMUL(EMUL);
+    }
+
+    // FIXME: This function must take into account the index of the operand
+    // in this instructions too. Now it returns the maximum EMUL of all
+    // operands.
+    //
+    // For Widening Vector Arithmetic Instructions EMULs of the operands
+    // are also different.
+    //
+    // E.G.:
+    //        # Double-width result, two single-width sources:
+    //        2*SEW = SEW op SEW
+    //
+    //        vwop.vv vd, vs2, vs1, vm       # integer vector-vector
+    //                                       vd[i] = vs2[i] op vs1[i]
+    //
+    // E.G.:
+    //        # Double-width result, first source double, second - single-width:
+    //        2*SEW = SEW op SEW
+    //
+    //        vwop.vv vd, vs2, vs1, vm       # integer vector-vector
+    //                                       vd[i] = vs2[i] op vs1[i]
+
+    // For Narrowing Vector Arithmetic Instructions too
+    //
+    // E.G.:
+    //        # Single-width result vd, double-width source vs2,
+    //        # single-width source vs1/rs1: SEW = 2*SEW op SEW
+    //
+    //        vnop.wv vd, vs2, vs1, vm       # integer vector-vector
+    //                                       vd[i] = vs2[i] op vs1[i]
+    //
+    if ((isRVVIntegerWidening(Opcode) || isRVVFPWidening(Opcode) ||
+         isRVVIntegerNarrowing(Opcode) || isRVVFPNarrowing(Opcode)) &&
+        !IsFractional) {
+      auto LMUL = getLMUL(MBB);
+      auto SEW = static_cast<unsigned>(getSEW(MBB));
+      auto EMUL = computeEMUL(SEW, SEW * 2u, LMUL);
+      return decodeVLMUL(EMUL);
+    }
+
+    if (isRVVGather16(Opcode)) {
+      auto LMUL = getLMUL(MBB);
+      auto SEW = static_cast<unsigned>(getSEW(MBB));
+      auto EEW = 16u;
+      if (EEW > SEW) {
+        auto EMUL = computeEMUL(SEW, EEW, LMUL);
+        std::tie(Multiplier, IsFractional) = decodeVLMUL(EMUL);
+      }
+    }
+
+    return std::make_pair(Multiplier, IsFractional);
+  }
+
+  // This function differs from the RISCVVType::decodeVLMUL in that it also
+  // handles the reserved LMUL
+  static std::pair<unsigned, bool> decodeVLMUL(RISCVII::VLMUL LMUL) {
+    if (LMUL == RISCVII::VLMUL::LMUL_RESERVED)
+      return std::make_pair(1 << static_cast<unsigned>(LMUL), false);
+    return RISCVVType::decodeVLMUL(LMUL);
+  }
+
   const RVVConfiguration &getCurrentRVVCfg(const MachineBasicBlock &MBB) const {
     return *getActiveRVVMode(MBB).Config;
   }

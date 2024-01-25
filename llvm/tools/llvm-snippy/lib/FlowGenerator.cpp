@@ -1485,9 +1485,10 @@ mapOpcodeIdxToAI(MachineBasicBlock &MBB, ArrayRef<unsigned> OpcodeIdxToBaseReg,
   if (Opcodes.empty())
     return {};
 
-  // FIXME: This code does not account non-trivial cases when an opcode has
+  // FIXME: This code does not account non-trivial cases when an opcode
+  // (vluxseg<nf>ei<eew>.v, vssseg<nf>e<eew>.v, etc) has
   // additional restrictions on the address register (e.g.
-  // `excludeRegsForOpcode`).
+  // `RISCVGeneratorContext::getEMUL`).
 
   std::vector<AddressInfo> OpcodeIdxToAI;
   // Collect address restrictions for each opcode
@@ -1644,6 +1645,9 @@ std::optional<MachineOperand> InstructionGenerator::pregenerateOneOperand(
   auto &RegGen = SGCtx->getRegGen();
 
   const auto &MBB = *MIB->getParent();
+  auto Opcode = MIB->getOpcode();
+  auto Operand = MIB->getDesc().operands()[OpIndex];
+  auto OperandRegClassID = Operand.RegClass;
 
   if (OpType == MCOI::OperandType::OPERAND_REGISTER) {
     assert(MCOpInfo.RegClass != -1);
@@ -1654,7 +1658,8 @@ std::optional<MachineOperand> InstructionGenerator::pregenerateOneOperand(
     else if (Preselected.isReg())
       Reg = Preselected.getReg();
     else {
-      auto RegClass = RegInfo.getRegClass(MCOpInfo.RegClass);
+      auto RegClass = SnippyTgt.getRegClass(*SGCtx, OperandRegClassID, OpIndex,
+                                            Opcode, MBB, RegInfo);
       const auto &InstDesc = MIB->getDesc();
       auto Exclude =
           SnippyTgt.excludeRegsForOperand(RegClass, *SGCtx, InstDesc, OpIndex);
@@ -1667,8 +1672,8 @@ std::optional<MachineOperand> InstructionGenerator::pregenerateOneOperand(
       // not conflicting.
       if (CustomMask != AccessMaskBit::None)
         Mask = CustomMask;
-      auto RegOpt =
-          RegGen.generate(RegClass, RegInfo, RP, MBB, Exclude, Include, Mask);
+      auto RegOpt = RegGen.generate(RegClass, OperandRegClassID, RegInfo, RP,
+                                    MBB, SnippyTgt, Exclude, Include, Mask);
       if (!RegOpt)
         return std::nullopt;
       Reg = RegOpt.value();
@@ -1688,9 +1693,11 @@ std::optional<MachineOperand> InstructionGenerator::pregenerateOneOperand(
     else if (Preselected.isReg())
       Reg = Preselected.getReg();
     else {
-      auto RegClass = RegInfo.getRegClass(MCOpInfo.RegClass);
+      auto RegClass = SnippyTgt.getRegClass(*SGCtx, OperandRegClassID, OpIndex,
+                                            Opcode, MBB, RegInfo);
       auto Exclude = SnippyTgt.excludeFromMemRegsForOpcode(MIB->getOpcode());
-      auto RegOpt = RegGen.generate(RegClass, RegInfo, RP, MBB, Exclude);
+      auto RegOpt = RegGen.generate(RegClass, OperandRegClassID, RegInfo, RP,
+                                    MBB, SnippyTgt, Exclude);
       if (!RegOpt)
         return std::nullopt;
       Reg = RegOpt.value();
@@ -1978,7 +1985,6 @@ SmallVector<MachineOperand, 8> InstructionGenerator::pregenerateOperands(
 
   while (IterNum < FailsMaxNum) {
     RP.reset();
-    SnippyTgt.excludeRegsForOpcode(InstrDesc.getOpcode(), RP, *SGCtx, MBB);
     RegGenerator.setRegContextForPlugin();
     auto PregeneratedOperandsOpt =
         tryToPregenerateOperands(MIB, InstrDesc, RP, Preselected);
@@ -2624,7 +2630,6 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
 
   PM.add(createInstructionsPostProcessPass());
   PM.add(createFunctionDistributePass());
-
   std::string MIR;
   raw_string_ostream MIROS(MIR);
   if (DumpMIR.isSpecified())
