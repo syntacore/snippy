@@ -14,9 +14,9 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/YAMLTraits.h"
 
+#include <map>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 namespace llvm {
 namespace snippy {
@@ -73,8 +73,7 @@ template <typename DataType> struct CommandOption : public CommandOptionBase {
 /// \class OptionsStorage
 /// \brief Singleton class that stores CommandOptions by pointer to base class
 class OptionsStorage final {
-  using StorageType =
-      std::unordered_map<std::string, std::unique_ptr<CommandOptionBase>>;
+  using StorageType = std::map<std::string, std::unique_ptr<CommandOptionBase>>;
   StorageType Data;
   OptionsStorage() = default;
 

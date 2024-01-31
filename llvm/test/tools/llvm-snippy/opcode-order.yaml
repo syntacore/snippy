@@ -1,0 +1,49 @@
+# RUN: llvm-snippy %s %S/Inputs/opcodes-order-1.yaml -o %t1
+# RUN: llvm-snippy %s %S/Inputs/opcodes-order-2.yaml -o %t2
+
+# RUN: llvm-readelf --hex-dump=.snippy.1.rx %t1.elf > %t11 
+# RUN: llvm-readelf --hex-dump=.snippy.1.rx %t2.elf > %t22
+# RUN: diff %t11 %t22 |& FileCheck %s -allow-empty
+
+# COMM: Traces should be equal
+# CHECK-NOT: {{[[:xdigit:]]}} 
+
+sections:
+    - no:       1
+      VMA:      0x2004000
+      SIZE:     0x3E0000
+      LMA:      0x2004000
+      ACCESS:    rx
+
+    - no:       2
+      VMA:      0x2a20000
+      SIZE:     0x9000
+      LMA:      0x2a20000
+      ACCESS:   rw
+
+options:
+  march: "riscv64-linux-gnu" 
+  init-regs-in-elf: true
+  memory-access-burst-group-size: 31
+  num-instrs: 400
+  mattr: "+c"
+
+access-evictions:
+    - mask:  0x038C
+      fixed: 0x2a20000
+    - mask:  0x038C
+      fixed: 0x2a21000
+    - mask:  0x038C
+      fixed: 0x2a22000
+    - mask:  0x038C
+      fixed: 0x2a23000
+    - mask:  0x038C
+      fixed: 0x2a24000
+    - mask:  0x038C
+      fixed: 0x2a25000
+    - mask:  0x038C
+      fixed: 0x2a26000
+    - mask:  0x038C
+      fixed: 0x2a27000
+    - mask:  0x038C
+      fixed: 0x2a28000
