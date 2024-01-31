@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "snippy/Support/Utils.h"
+
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -258,7 +260,7 @@ void outputYAMLToFileOrFatal(ObjT &Obj, const Twine &Path,
 template <typename T> Expected<T> loadYAMLFromFile(const Twine &Filename) {
   T ToLoad;
   if (auto Err = loadYAMLFromFile(ToLoad, Filename))
-    return Err;
+    return std::move(Err);
   return ToLoad;
 }
 

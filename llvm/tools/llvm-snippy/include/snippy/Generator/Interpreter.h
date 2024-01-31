@@ -31,7 +31,7 @@ namespace snippy {
 
 class MemoryScheme;
 struct TargetGenContextInterface;
-class SectionData;
+struct SectionData;
 
 using SectionDescVect = std::vector<SectionDesc>;
 struct SimulationEnvironment {
