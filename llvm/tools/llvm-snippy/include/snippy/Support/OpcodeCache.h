@@ -62,6 +62,7 @@ public:
     for (const auto &[OpcodeStr, Opcode] : Opcodes)
       if (OpcodeRegexp.match(OpcodeStr))
         Matches.push_back(Opcode);
+    std::sort(Matches.begin(), Matches.end());
   }
 
   std::optional<unsigned> code(const std::string &Name) const {

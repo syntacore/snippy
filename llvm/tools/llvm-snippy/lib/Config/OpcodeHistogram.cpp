@@ -127,7 +127,7 @@ void YAMLHistogramTraits<OpcodeHistogramDecodedEntry>::normalizeMap(
 
 namespace snippy {
 void diagnoseHistogram(LLVMContext &Ctx, const OpcodeCache &OpCC,
-                       std::unordered_map<unsigned, double> &Histogram) {
+                       std::map<unsigned, double> &Histogram) {
   if (Histogram.size() == 0) {
     snippy::warn(WarningName::InstructionHistogram, Ctx,
                  "Plugin didn't fill histogram",
