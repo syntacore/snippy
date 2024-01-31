@@ -42,7 +42,7 @@ public:
 
   void mapStoredValue(yaml::IO &IO) {
     doMapping(IO);
-    if (!isSpecified())
+    if (!isSpecified() && !IO.outputting())
       markAsSpecified();
   }
 
