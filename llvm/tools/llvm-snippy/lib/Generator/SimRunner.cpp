@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Generator/SimRunner.h"
-#include <filesystem>
+#include "llvm/Support/Path.h"
 
 namespace llvm {
 namespace snippy {
@@ -23,10 +23,9 @@ SimRunner::SimRunner(LLVMContext &Ctx, const SnippyTarget &TGT,
     auto CfgCopy = Env->SimCfg;
     // Add model plugin name postfix to secondary plugins' trace log files.
     if (!CfgCopy.TraceLogPath.empty() && ModelLibName != ModelLibs.front())
-      CfgCopy.TraceLogPath =
-          (CfgCopy.TraceLogPath + Twine(".") +
-           std::filesystem::path(ModelLibName).filename().string())
-              .str();
+      CfgCopy.TraceLogPath = (CfgCopy.TraceLogPath + Twine(".") +
+                              sys::path::filename(ModelLibName))
+                                 .str();
     auto Sim = Interpreter::createSimulatorForTarget(
         TGT, Subtarget, CfgCopy, Env->TgtGenCtx, Env->CallbackHandler.get(),
         ModelLibName);
