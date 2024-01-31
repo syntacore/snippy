@@ -129,7 +129,7 @@ Expected<IntervalsToVerifyFinder> IntervalsToVerifyFinder::createFromObject(
   IntervalsToVerifyFinder Finder(D, PrologueInstrCnt, EpilogueInstrCnt,
                                  MappedSectionAddr);
   if (auto E = Finder.fillIntervals(ObjectBytes, EntryPointName))
-    return E;
+    return std::move(E);
   return Finder;
 }
 
