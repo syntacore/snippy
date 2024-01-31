@@ -67,7 +67,7 @@ public:
     // proportionally to the weight of deleted elements
     assert(Burst.Data.has_value());
     auto BurstOpcodes = Burst.Data.value().getAllBurstOpcodes();
-    std::unordered_map<unsigned, double> DFHistogram;
+    std::map<unsigned, double> DFHistogram;
     std::copy_if(Histogram.begin(), Histogram.end(),
                  std::inserter(DFHistogram, DFHistogram.end()),
                  [&OpCC, &OpcMask, &BurstOpcodes](const auto &Hist) {
@@ -97,7 +97,7 @@ public:
 
   // Create opcode generator for only control flow instructions
   OpcGenHolder createCFOpcodeGenerator(const OpcodeCache &OpCC) const {
-    std::unordered_map<unsigned, double> CFHistogram;
+    std::map<unsigned, double> CFHistogram;
     std::copy_if(Histogram.begin(), Histogram.end(),
                  std::inserter(CFHistogram, CFHistogram.end()),
                  [&OpCC](const auto &Hist) {

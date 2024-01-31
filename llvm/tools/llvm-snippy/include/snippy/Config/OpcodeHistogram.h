@@ -17,10 +17,10 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <numeric>
 #include <optional>
 #include <string>
-#include <unordered_map>
 
 namespace llvm {
 namespace snippy {
@@ -38,19 +38,19 @@ struct OpcodeHistogramEntry {
   double Weight;
 };
 
-class OpcodeHistogram : private std::unordered_map<unsigned, double> {
+class OpcodeHistogram : private std::map<unsigned, double> {
 public:
-  using typename unordered_map::const_iterator;
-  using typename unordered_map::iterator;
-  using typename unordered_map::value_type;
+  using typename map::const_iterator;
+  using typename map::iterator;
+  using typename map::value_type;
 
-  using unordered_map::begin;
-  using unordered_map::count;
-  using unordered_map::end;
-  using unordered_map::find;
-  using unordered_map::insert;
-  using unordered_map::insert_or_assign;
-  using unordered_map::size;
+  using map::begin;
+  using map::count;
+  using map::end;
+  using map::find;
+  using map::insert;
+  using map::insert_or_assign;
+  using map::size;
 
   double getOpcodesWeight(std::function<bool(unsigned)> Pred) const {
     return std::accumulate(begin(), end(), 0.0,
