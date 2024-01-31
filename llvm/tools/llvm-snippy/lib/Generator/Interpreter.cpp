@@ -48,7 +48,7 @@ static snippy::opt<std::string> TraceLogPath(
     cl::cat(Options), cl::init(""));
 
 static snippy::opt<bool>
-    DumpAsASCII("dump-memory-as-acii",
+    DumpAsASCII("dump-memory-as-ascii",
                 cl::desc("Memory dump will be in ASCII format"),
                 cl::init(false));
 

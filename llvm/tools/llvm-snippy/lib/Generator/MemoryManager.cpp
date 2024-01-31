@@ -16,6 +16,7 @@
 #include "snippy/Target/Target.h"
 
 #include "llvm/ADT/APInt.h"
+#include "llvm/Support/Regex.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 
 #include <cassert>
