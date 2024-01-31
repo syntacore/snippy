@@ -40,15 +40,8 @@ struct MemKey {
   bool BurstMode;
 };
 inline bool operator<(const MemKey &Lhs, const MemKey &Rhs) {
-  if (Lhs.AccessSize < Rhs.AccessSize)
-    return true;
-  if (Lhs.AccessSize > Rhs.AccessSize)
-    return false;
-  if (Lhs.Alignment < Rhs.Alignment)
-    return true;
-  if (Lhs.Alignment > Rhs.Alignment)
-    return false;
-  return Lhs.BurstMode != Rhs.BurstMode;
+  return std::tie(Lhs.AccessSize, Lhs.Alignment, Lhs.BurstMode) <
+         std::tie(Rhs.AccessSize, Rhs.Alignment, Rhs.BurstMode);
 }
 
 struct MemValue {
@@ -149,10 +142,16 @@ public:
         MAGId{Id} {}
 
   OwningMAG(OwningMAG<ContT> &&OldMAG)
-      : Accesses{std::move(OldMAG.Accesses)}, MAG{Accesses.begin(),
-                                                  Accesses.end()} {}
+      : Accesses{std::move(OldMAG.Accesses)},
+        MAG{Accesses.begin(), Accesses.end()}, MAGId{OldMAG.MAGId} {}
 
-  OwningMAG<ContT> &operator=(OwningMAG<ContT> &&Rhs) = default;
+  OwningMAG<ContT> &operator=(OwningMAG<ContT> &&Rhs) {
+    Accesses = std::move(Rhs.Accesses);
+    MAG = MemoryAccessGenerator<typename ContT::iterator>{Accesses.begin(),
+                                                          Accesses.end()};
+    MAGId = Rhs.MAGId;
+    return *this;
+  }
 
   const typename ContT::value_type &
   getValidAccesses(size_t AccessSize, size_t Alignment, bool BurstMode,
