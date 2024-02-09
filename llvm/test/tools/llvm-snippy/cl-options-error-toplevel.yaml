@@ -1,0 +1,12 @@
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+clueless-user-toplevel-option: check
+dump-mf: true
+unknown-option: [1, 2, 3]
+
+# CHECK: cl-options-error-toplevel.yaml:6:1: warning: unknown key 'clueless-user-toplevel-option'
+# CHECK: cl-options-error-toplevel.yaml:7:1: warning: unknown key 'dump-mf'
+# CHECK: cl-options-error-toplevel.yaml:8:1: warning: unknown key 'unknown-option'

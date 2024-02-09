@@ -592,7 +592,16 @@ static Config readSnippyConfig(LLVMContext &Ctx, const SnippyTarget &Tgt,
         Yin.setContext(&CfgParsingCtx);
       },
       [](const auto &Diag, void *Ctx) {
-        if (!Diag.getMessage().starts_with("unknown key")) {
+        auto IsDiagAllowed = [](StringRef DiagMsg) {
+          auto AllowedKeys = std::array{"options"};
+          return any_of(AllowedKeys, [&DiagMsg](auto &&Allowed) {
+            return DiagMsg.starts_with((detail::YAMLUnknownKeyStartString +
+                                        "'" + StringRef(Allowed) + "'")
+                                           .str());
+          });
+        };
+
+        if (!IsDiagAllowed(Diag.getMessage())) {
           assert(Ctx);
           auto &IPP = *static_cast<IncludePreprocessor *>(Ctx);
           SMDiagnostic NewDiag(
