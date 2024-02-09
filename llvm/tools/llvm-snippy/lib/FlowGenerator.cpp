@@ -556,8 +556,8 @@ class InstructionGenerator final : public MachineFunctionPass {
                         unsigned OperandIndex,
                         ArrayRef<MachineOperand> PregeneratedOperands) const;
 
-  void generateCall(MachineBasicBlock &MBB,
-                    MachineBasicBlock::iterator Ins) const;
+  void generateCall(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
+                    unsigned OpCode) const;
 
   void generateInsertionPointHint(MachineBasicBlock &MBB,
                                   MachineBasicBlock::iterator Ins) const;
@@ -637,7 +637,7 @@ void InstructionGenerator::generateInstruction(
   }
 
   if (SnippyTgt.isCall(Opc))
-    generateCall(MBB, Ins);
+    generateCall(MBB, Ins, Opc);
   else
     randomInstruction(InstrDesc, MBB, Ins);
 }
@@ -1901,7 +1901,8 @@ void InstructionGenerator::postprocessMemoryOperands(MachineInstr &MI,
 }
 
 void InstructionGenerator::generateCall(MachineBasicBlock &MBB,
-                                        MachineBasicBlock::iterator Ins) const {
+                                        MachineBasicBlock::iterator Ins,
+                                        unsigned OpCode) const {
   auto &State = SGCtx->getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   auto &CGS = SGCtx->getCallGraphState();
@@ -1913,7 +1914,8 @@ void InstructionGenerator::generateCall(MachineBasicBlock &MBB,
   auto *CalleeNode = std::next(Node->callees().begin(), CalleeIdx)->Dest;
   auto &CallTarget = *(CalleeNode->function());
 
-  SnippyTgt.generateCall(MBB, Ins, CallTarget, *SGCtx);
+  SnippyTgt.generateCall(MBB, Ins, CallTarget, *SGCtx, /* AsSupport */ false,
+                         OpCode);
   Node->markAsCommitted(CalleeNode);
 }
 
