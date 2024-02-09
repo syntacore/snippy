@@ -34,9 +34,15 @@ LLVMState::LLVMState(const SelectedTargetInfo &TargetInfo) {
   if (!TheTarget)
     report_fatal_error(Twine(Error));
   const TargetOptions Options;
+  auto TargetFeatures = TargetInfo.Features;
+  // Relax feature is enabled by default to enable desired
+  // type of relocations be produced by linker that AsmPrinter
+  // cannot do by itself on some targets.
+  // E.G.: RISCV AsmPrinter cannot emit JAL directly.
+  TargetFeatures += ",+relax";
   TheTargetMachine.reset(static_cast<LLVMTargetMachine *>(
       TheTarget->createTargetMachine(TargetInfo.Triple, TargetInfo.CPU,
-                                     TargetInfo.Features, Options,
+                                     TargetFeatures, Options,
                                      Reloc::Model::Static)));
   assert(TheTargetMachine && "unable to create target machine");
   auto TT = TheTargetMachine->getTargetTriple();
