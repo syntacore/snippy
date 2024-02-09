@@ -321,13 +321,7 @@ public:
   createGenerationPolicy(unsigned Limit, OpcodeFilter Filter,
                          bool MustHavePrimaryInstrs,
                          std::optional<unsigned> BurstGroupID,
-                         ArrayRef<OpcodeHistogramEntry> Overrides = {}) const {
-    if (BurstGroupID.has_value())
-      return std::make_unique<BurstGenPolicy>(*this, BurstGroupID.value());
-    return std::make_unique<DefaultGenPolicy>(*this, Filter,
-                                              MustHavePrimaryInstrs, Overrides);
-  }
-
+                         ArrayRef<OpcodeHistogramEntry> Overrides = {}) const;
   auto getCFInstrsNum(const MachineFunction &MF) const {
     return GenSettings->Cfg.Histogram.getCFInstrsNum(getRequestedInstrsNum(MF),
                                                      *OpCC);
