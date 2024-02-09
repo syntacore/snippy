@@ -572,6 +572,15 @@ void GeneratorContext::attachTargetContext(
     std::unique_ptr<TargetGenContextInterface> TgtContext) {
   TargetContext = std::move(TgtContext);
 }
+GenPolicy GeneratorContext::createGenerationPolicy(
+    unsigned Limit, OpcodeFilter Filter, bool MustHavePrimaryInstrs,
+    std::optional<unsigned> BurstGroupID,
+    ArrayRef<OpcodeHistogramEntry> Overrides) const {
+  if (BurstGroupID.has_value())
+    return std::make_unique<BurstGenPolicy>(*this, BurstGroupID.value());
+  return std::make_unique<DefaultGenPolicy>(*this, Filter,
+                                            MustHavePrimaryInstrs, Overrides);
+}
 
 void GeneratorContext::addIncomingValues(const MachineBasicBlock *MBB,
                                          RegToValueType RegToValue) {
