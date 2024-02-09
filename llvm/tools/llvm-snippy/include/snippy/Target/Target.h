@@ -308,7 +308,14 @@ public:
   virtual MachineInstr *generateCall(MachineBasicBlock &MBB,
                                      MachineBasicBlock::iterator Ins,
                                      const Function &Target,
-                                     const GeneratorContext &GC) const = 0;
+                                     GeneratorContext &GC,
+                                     bool AsSupport) const = 0;
+
+  virtual MachineInstr *generateCall(MachineBasicBlock &MBB,
+                                     MachineBasicBlock::iterator Ins,
+                                     const Function &Target,
+                                     GeneratorContext &GC, bool AsSupport,
+                                     unsigned PreferredCallOpCode) const = 0;
 
   virtual MachineInstr *generateReturn(MachineBasicBlock &MBB,
                                        const LLVMState &State) const = 0;

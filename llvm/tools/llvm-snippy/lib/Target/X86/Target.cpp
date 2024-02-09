@@ -149,8 +149,16 @@ public:
 
   MachineInstr *generateCall(MachineBasicBlock &MBB,
                              MachineBasicBlock::iterator Ins,
-                             const Function &Target,
-                             const GeneratorContext &GC) const override {
+                             const Function &Target, GeneratorContext &GC,
+                             bool AsSupport) const override {
+    reportUnimplementedError();
+  }
+
+  MachineInstr *generateCall(MachineBasicBlock &MBB,
+                             MachineBasicBlock::iterator Ins,
+                             const Function &Target, GeneratorContext &GC,
+                             bool AsSupport,
+                             unsigned PreferredCallOpCode) const override {
     reportUnimplementedError();
   }
 
