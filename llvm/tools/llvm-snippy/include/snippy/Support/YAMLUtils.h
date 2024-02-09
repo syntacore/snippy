@@ -146,10 +146,19 @@ Error loadYAMLFromBuffer(T &ToLoad, StringRef Buf, CallableT &&Tap,
   return Error::success();
 }
 
+namespace detail {
+inline constexpr StringRef YAMLUnknownKeyStartString = "unknown key";
+struct AllowDiagnosticsForAllUnknownKeys {
+  bool operator()(const SMDiagnostic &Diag) const {
+    return Diag.getMessage().starts_with(YAMLUnknownKeyStartString);
+  }
+};
+} // namespace detail
+
 template <typename T, typename InT = yaml::Input>
 Error loadYAMLFromBufferIgnoreUnknown(T &ToLoad, StringRef Buf) {
   InT Yin(Buf, nullptr, [](const auto &Diag, void *) {
-    if (!Diag.getMessage().starts_with("unknown key"))
+    if (!detail::AllowDiagnosticsForAllUnknownKeys{}(Diag))
       Diag.print(nullptr, errs());
   });
   Yin.setAllowUnknownKeys(true);
@@ -157,6 +166,15 @@ Error loadYAMLFromBufferIgnoreUnknown(T &ToLoad, StringRef Buf) {
   if (auto EC = Yin.error())
     return createStringError(EC, EC.message());
   return Error::success();
+}
+
+// This monstrocity is necessary to set the correct filename in the diagnostic
+inline SMDiagnostic getSMDiagWithFilename(StringRef Filename,
+                                          const SMDiagnostic &Diag) {
+  return SMDiagnostic(*Diag.getSourceMgr(), Diag.getLoc(), Filename,
+                      Diag.getLineNo(), Diag.getColumnNo(), Diag.getKind(),
+                      Diag.getMessage(), Diag.getLineContents(),
+                      Diag.getRanges());
 }
 
 // Note that this template trick is necessary to avoid including the YAMLTraits
@@ -169,18 +187,13 @@ Error loadYAMLFromFile(T &ToLoad, const Twine &Filename, CallableT &&Tap) {
                                      "\": " + EC.message());
 
   std::unique_ptr<MemoryBuffer> MemBuf = std::move(*MemBufOrErr);
-  // This monstrocity is necessary to set the correct filename in the diagnostic
   auto NameCtx = Filename.str();
   auto Err = loadYAMLFromBuffer(
       ToLoad, MemBuf->getBuffer(), std::forward<CallableT>(Tap),
       [](const auto &Diag, void *Ctx) {
         assert(Ctx);
         const auto &Filename = *static_cast<std::string *>(Ctx);
-        SMDiagnostic NewDiag(*Diag.getSourceMgr(), Diag.getLoc(), Filename,
-                             Diag.getLineNo(), Diag.getColumnNo(),
-                             Diag.getKind(), Diag.getMessage(),
-                             Diag.getLineContents(), Diag.getRanges());
-        NewDiag.print(nullptr, errs());
+        getSMDiagWithFilename(Filename, Diag).print(nullptr, errs());
       },
       NameCtx);
 
@@ -195,18 +208,31 @@ Error loadYAMLFromFile(T &ToLoad, const Twine &Filename, CallableT &&Tap) {
 
 // Note that this template trick is necessary to avoid including the YAMLTraits
 // header. The client should make sure that it's available where necessary.
-template <typename T, typename InT = yaml::Input>
-Error loadYAMLIgnoreUnknownKeys(T &ToLoad, const Twine &Filename) {
+template <typename T, typename InT = yaml::Input,
+          typename CallableT = detail::AllowDiagnosticsForAllUnknownKeys>
+Error loadYAMLIgnoreUnknownKeys(T &ToLoad, const Twine &Filename,
+                                CallableT IsDiagnosticAllowed = {}) {
   auto MemBufOrErr = MemoryBuffer::getFile(Filename);
   if (auto EC = MemBufOrErr.getError(); !MemBufOrErr)
     return createStringError(EC, "Failed to open file " + Filename + ": " +
                                      EC.message());
 
+  struct DiagContext {
+    decltype(IsDiagnosticAllowed) DiagAllowed;
+    std::string Filename;
+  };
+
+  DiagContext Ctx{IsDiagnosticAllowed, Filename.str()};
+
   std::unique_ptr<MemoryBuffer> MemBuf = std::move(*MemBufOrErr);
-  InT Yin(MemBuf->getBuffer(), nullptr, [](const auto &Diag, void *) {
-    if (!Diag.getMessage().starts_with("unknown key"))
-      Diag.print(nullptr, errs());
-  });
+  InT Yin(
+      MemBuf->getBuffer(), nullptr,
+      [](const auto &Diag, void *CtxPtr) {
+        const DiagContext &Ctx = *static_cast<DiagContext *>(CtxPtr);
+        if (!Ctx.DiagAllowed(Diag))
+          getSMDiagWithFilename(Ctx.Filename, Diag).print(nullptr, errs());
+      },
+      &Ctx);
 
   Yin.setAllowUnknownKeys(true);
 
