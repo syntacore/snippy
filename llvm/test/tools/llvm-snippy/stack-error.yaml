@@ -6,6 +6,9 @@
 # RUN: --spilled-regs-list=X2 |& FileCheck %s -check-prefix=SPSPILL
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
 # RUN: %S/Inputs/layout3.yaml -num-instrs=1000 -stack-size=1024  \
+# RUN: --spilled-regs-list=[X1] |& FileCheck %s -check-prefix=ILLSPILL
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
+# RUN: %S/Inputs/layout3.yaml -num-instrs=1000 -stack-size=1024  \
 # RUN: --spilled-regs-list=X1 --reserved-regs-list=X1 |& FileCheck %s -check-prefix=RESSPILL
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
 # RUN: %S/Inputs/layout3.yaml -num-instrs=1000 -stack-size=0  \
@@ -19,6 +22,7 @@
 
 # SPRES: LLVM ERROR: Failed to initialize stack: stack pointer register is explicitly reserved.
 # SPSPILL: LLVM ERROR: Stack pointer cannot be spilled. Remove it from spill register list.
+# ILLSPILL: LLVM ERROR: Illegal register name [X1] is specified in --spilled-regs-list
 # RESSPILL: LLVM ERROR: Register "X1" cannot be spilled, because it is explicitly reserved.
 # NOSTACK: LLVM ERROR: Cannot spill requested registers: no stack space allocated.
 # UNALIGNED: LLVM ERROR: Stack configure failed: Stack section size must be 16 bytes aligned.

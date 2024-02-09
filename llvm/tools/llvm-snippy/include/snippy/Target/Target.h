@@ -173,9 +173,10 @@ public:
   virtual unsigned getSpillAlignmentInBytes(MCRegister Reg,
                                             GeneratorContext &GC) const = 0;
 
-  // Find register by name, 0 if not found.
-  virtual unsigned findRegisterByName(const StringRef RegName) const {
-    return 0;
+  // Find register by name, std::nullopt if not found.
+  virtual std::optional<unsigned>
+  findRegisterByName(const StringRef RegName) const {
+    return std::nullopt;
   }
 
   // default behavior is enabled
