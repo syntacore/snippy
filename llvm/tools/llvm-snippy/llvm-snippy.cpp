@@ -465,8 +465,9 @@ deriveDefaultableOptionValue(bool ExtractValue,
   return OptValue;
 }
 
-unsigned findRegisterByName(const SnippyTarget &SnippyTgt,
-                            const MCRegisterInfo &RI, StringRef Name) {
+std::optional<unsigned> findRegisterByName(const SnippyTarget &SnippyTgt,
+                                           const MCRegisterInfo &RI,
+                                           StringRef Name) {
   for (auto &RC : RI.regclasses()) {
     auto RegIdx = std::find_if(RC.begin(), RC.end(), [&Name, &RI](auto &Reg) {
       return Name.equals(RI.getName(Reg));
@@ -495,7 +496,12 @@ static void parseReservedRegistersOption(RegPool &RP, const SnippyTarget &Tgt,
                                          const MCRegisterInfo &RI) {
   for (auto &&RegName : ReservedRegisterList) {
     auto Reg = findRegisterByName(Tgt, RI, RegName);
-    RP.addReserved(Reg, AccessMaskBit::GRW);
+    if (!Reg)
+      report_fatal_error("Illegal register name " + Twine(RegName) +
+                             " is specified in --" +
+                             ReservedRegisterList.ArgStr,
+                         false);
+    RP.addReserved(Reg.value(), AccessMaskBit::GRW);
     DEBUG_WITH_TYPE("snippy-regpool",
                     (dbgs() << "Reserved with option:\n", RP.print(dbgs())));
   }
@@ -508,12 +514,17 @@ parseSpilledRegistersOption(RegPool &RP, const SnippyTarget &Tgt,
 
   for (auto &&RegName : SpilledRegisterList) {
     auto Reg = findRegisterByName(Tgt, RI, RegName);
-    if (RP.isReserved(Reg))
+    if (!Reg)
+      report_fatal_error("Illegal register name " + Twine(RegName) +
+                             " is specified in --" + SpilledRegisterList.ArgStr,
+                         false);
+
+    if (RP.isReserved(Reg.value()))
       report_fatal_error(
           "Register \"" + Twine(RegName) +
               "\" cannot be spilled, because it is explicitly reserved.\n",
           false);
-    SpilledRegs.push_back(Reg);
+    SpilledRegs.push_back(Reg.value());
   }
 
   if (FollowTargetABI) {
