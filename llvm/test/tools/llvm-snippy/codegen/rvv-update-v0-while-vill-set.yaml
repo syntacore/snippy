@@ -1,0 +1,59 @@
+# COM: This test checks that while the vill bit is set it is possible to change the V0 mask
+#
+# COM: Pattern to be found in the option -dump-mf output:
+# COM:
+# COM:       VSETIVLI/VSETVLI <Illegal configuration>    // !Illegal configuration!
+# COM:       ... not VSET<> ...                          // !Because we want for this concrete Illegal configuration!
+# COM:       v0 = VL1RE8_V                               // !Check load in v0 (== change the v0 mask) while vill is set!
+# COM:
+# COM:               //     This is done using "grep -E 'regex'":
+# COM:               // 1. (VSETIVLI |VSETVLI )[^ ]+(, 128)              -- find vsetivli <Illegal configuration>
+# COM:               //                                                      If (SEW == 128) => Illegal SEW, because rvv64
+# COM:               //                                                      E.g.:
+# COM:               //                                                              $x4 = VSETIVLI 4, 128,
+# COM:               //                                                              $x13 = VSETVLI $x28, 128,
+# COM:               // 3. (([^V]|V[^S]|VS[^E]|VSE[^T])+)                -- check that ... not VSET<> ...
+# COM:               // 4. (v0 = VL1RE8_V)                               -- find load in v0
+
+# RUN:  llvm-snippy %s -model-plugin None\
+# RUN:  | tr -d '\n' \
+# RUN:  | grep -E '((VSETIVLI |VSETVLI )[^ ]+(, 128)(([^V]|V[^S]|VS[^E]|VSE[^T])+)(v0 = VL1RE8_V))'
+
+options:
+  march: riscv64-linux-gnu
+  mcpu: generic-rv64
+  mattr: +v
+  dump-mf: on
+  init-regs-in-elf: on
+  num-instrs: 10000
+
+include:
+  - "../rvv-config-biased/Inputs/rvv-unit-pvill-05.yaml"
+
+sections:
+  - no:        0
+    VMA:       0x70000000
+    SIZE:      0x6000000
+    LMA:       0x70000000
+    ACCESS:    r
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+
+histogram:
+# COM: Legal instruction
+    - [VADD_VV, 1.0]
+
+# COM: Legal when vill is set
+    - [VL1RE8_V, 1.0]
+    - [VL2RE16_V, 1.0]
+    - [VL4RE32_V, 1.0]
+    - [VL8RE64_V, 1.0]
+

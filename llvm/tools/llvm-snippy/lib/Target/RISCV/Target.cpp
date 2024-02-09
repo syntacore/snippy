@@ -2842,12 +2842,11 @@ void SnippyRISCVTarget::generateV0MaskUpdate(
   // We do not interested in any V0 mask update
   if (NoMaskModeForRVV)
     return;
-  // FIXME: Now if RVVConfigutation is illegal we can update V0 only via whole
-  // register load
-  if (!IsLegalConfiguration)
-    return;
 
-  if (VLVM.VM.isAllOnes()) {
+  // In case of an illegal configuration, we cannot use generateRVVMaskReset
+  // because it uses vmxnor.mm instruction that will throw an exception if vill
+  // bit is set, so we use load
+  if (VLVM.VM.isAllOnes() && IsLegalConfiguration) {
     LLVM_DEBUG(dbgs() << "Resetting mask instruction for mask:"
                       << toString(VLVM.VM, /* Radix */ 16, /* Signed */ false)
                       << "\n");
