@@ -17,8 +17,12 @@ histogram:
     - [ADD, 1.0]
     - [ADDI, 1.0]
     - [SUB, 1.0]
-    - [JAL, 0.2]
+    - [JAL, 0.1]
+    - [JALR, 0.1]
 
+# CHECK: AUIPC
+# CHECK-NEXT: ADDI
+# CHECK-NEXT: PseudoCALLIndirect
 # CHECK: PseudoCALL target-flags(riscv-call)
 # CHECK-SAME: @[[FUN:[a-zA-Z0-9]+]]
-# CHECK: Machine code for function [[FUN]]:
+# CHECK-DAG: Machine code for function [[FUN]]:

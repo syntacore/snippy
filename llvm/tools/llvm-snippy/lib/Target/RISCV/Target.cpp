@@ -1620,14 +1620,86 @@ public:
 
   MachineInstr *generateCall(MachineBasicBlock &MBB,
                              MachineBasicBlock::iterator Ins,
-                             const Function &Target,
-                             const GeneratorContext &GC) const override {
+                             const Function &Target, GeneratorContext &GC,
+                             bool AsSupport) const override {
+    return generateCall(MBB, Ins, Target, GC, AsSupport, RISCV::JAL);
+  }
+
+  MachineInstr *loadSymbolAddress(MachineBasicBlock &MBB,
+                                  MachineBasicBlock::iterator Ins,
+                                  GeneratorContext &GC, unsigned DestReg,
+                                  const GlobalValue *Target) const {
     const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
     auto &State = GC.getLLVMState();
     auto &Ctx = State.getCtx();
-    return getSupportInstBuilder(MBB, Ins, Ctx,
-                                 InstrInfo.get(RISCV::PseudoCALL))
+    MachineFunction *MF = MBB.getParent();
+
+    // Cannot emit PseudoLLA here, because this pseudo instruction is expanded
+    // by RISCVPreRAExpandPseudo pass, which runs before register allocation.
+    // That's why create auipc + addi pair manually.
+
+    MachineInstr *MIAUIPC =
+        getSupportInstBuilder(MBB, Ins, Ctx, InstrInfo.get(RISCV::AUIPC))
+            .addReg(DestReg)
+            .addGlobalAddress(Target, 0, RISCVII::MO_PCREL_HI);
+    MCSymbol *AUIPCSymbol = MF->getContext().createNamedTempSymbol("pcrel_hi");
+    MIAUIPC->setPreInstrSymbol(*MF, AUIPCSymbol);
+
+    return getSupportInstBuilder(MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
+        .addReg(DestReg)
+        .addReg(DestReg)
+        .addSym(AUIPCSymbol, RISCVII::MO_PCREL_LO);
+  }
+
+  MachineInstr *generateJAL(MachineBasicBlock &MBB,
+                            MachineBasicBlock::iterator Ins,
+                            const Function &Target, GeneratorContext &GC,
+                            bool AsSupport) const {
+    const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
+    auto &State = GC.getLLVMState();
+    auto &Ctx = State.getCtx();
+    // Despite PseudoCALL gets expanded by RISCVMCCodeEmitter to JALR
+    // instruction, it has chance to be relaxed back to JAL by linker.
+    return getInstBuilder(AsSupport, MBB, Ins, Ctx,
+                          InstrInfo.get(RISCV::PseudoCALL))
         .addGlobalAddress(&Target, 0, RISCVII::MO_CALL);
+  }
+
+  MachineInstr *generateJALR(MachineBasicBlock &MBB,
+                             MachineBasicBlock::iterator Ins,
+                             const Function &Target, GeneratorContext &GC,
+                             bool AsSupport) const {
+    const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
+    auto &State = GC.getLLVMState();
+    auto &Ctx = State.getCtx();
+    const auto &RI = State.getRegInfo();
+    const auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
+    auto RP = GC.getRegisterPool();
+    auto Reg = getNonZeroReg("scratch register for storing function address",
+                             RI, RegClass, RP, MBB);
+    loadSymbolAddress(MBB, Ins, GC, Reg, &Target);
+    return getInstBuilder(AsSupport, MBB, Ins, Ctx,
+                          InstrInfo.get(RISCV::PseudoCALLIndirect))
+        .addReg(Reg);
+  }
+
+  MachineInstr *generateCall(MachineBasicBlock &MBB,
+                             MachineBasicBlock::iterator Ins,
+                             const Function &Target, GeneratorContext &GC,
+                             bool AsSupport,
+                             unsigned PreferredCallOpcode) const override {
+    assert(isCall(PreferredCallOpcode) && "Expected call here");
+    const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
+    auto &State = GC.getLLVMState();
+    auto &Ctx = State.getCtx();
+    switch (PreferredCallOpcode) {
+    case RISCV::JAL:
+      return generateJAL(MBB, Ins, Target, GC, AsSupport);
+    case RISCV::JALR:
+      return generateJALR(MBB, Ins, Target, GC, AsSupport);
+    default:
+      report_fatal_error("Unsupported call instruction", false);
+    }
   }
 
   MachineInstr *generateReturn(MachineBasicBlock &MBB,
