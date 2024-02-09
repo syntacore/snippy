@@ -1494,12 +1494,16 @@ public:
     return MIB;
   }
 
-  unsigned findRegisterByName(const StringRef RegName) const override {
+  std::optional<unsigned>
+  findRegisterByName(const StringRef RegName) const override {
     Register Reg = 0;
     Reg = MatchRegisterAltName(RegName);
     if (Reg == RISCV::NoRegister)
       Reg = MatchRegisterName(RegName);
-    return Reg;
+    if (Reg == RISCV::NoRegister)
+      return std::nullopt;
+    else
+      return Reg;
   }
 
   unsigned getSpillAlignmentInBytes(MCRegister Reg,
