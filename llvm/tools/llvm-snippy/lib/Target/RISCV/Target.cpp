@@ -2570,20 +2570,20 @@ private:
 
   // NOTE: DesiredOpcode is expected to be any mode changing opcode
   // (RISCV::VSETVL, RISCV::VSETVLI, RISCV::VSETIVLI) or
-  // RISCV::INSTRUCTION_LIST_END to indicate the user does not really care
+  // If !DesiredOpcode.has_value() this means that the user does not really care
   // which instruction to use. In case of the latter the implementaion is free
   // to chose any suitable opcode
   void rvvGenerateModeSwitchAndUpdateContext(
       const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB,
       GeneratorContext &GC, MachineBasicBlock::iterator Ins,
-      unsigned DesiredOpcode = RISCV::INSTRUCTION_LIST_END) const;
+      std::optional<unsigned> DesiredOpcode = {}) const;
 
-  void generateRVVModeUpdate(
-      const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB,
-      GeneratorContext &GC, const RVVConfiguration &Config,
-      const RVVConfigurationInfo::VLVM &VLVM, MachineBasicBlock::iterator Ins,
-      const RVVModeInfo *PendingRVVMode = nullptr,
-      unsigned DesiredOpcode = RISCV::INSTRUCTION_LIST_END) const;
+  void generateRVVModeUpdate(const MCInstrInfo &InstrInfo,
+                             MachineBasicBlock &MBB, GeneratorContext &GC,
+                             const RVVConfiguration &Config,
+                             const RVVConfigurationInfo::VLVM &VLVM,
+                             MachineBasicBlock::iterator Ins,
+                             std::optional<unsigned> DesiredOpcode = {}) const;
 
   void generateV0MaskUpdate(const RVVConfigurationInfo::VLVM &VLVM,
                             MachineBasicBlock::iterator Ins,
@@ -2603,12 +2603,12 @@ private:
 
   void generateVSETVLI(const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB,
                        GeneratorContext &GC, unsigned VTYPE, unsigned VL,
-                       const RVVModeInfo *PendingMode, bool SupportMarker,
+                       bool SupportMarker,
                        MachineBasicBlock::iterator Ins) const;
 
   void generateVSETVL(const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB,
                       GeneratorContext &GC, unsigned VTYPE, unsigned VL,
-                      const RVVModeInfo *PendingMode, bool SupportMarker,
+                      bool SupportMarker,
                       MachineBasicBlock::iterator Ins) const;
 };
 
@@ -2772,23 +2772,29 @@ void SnippyRISCVTarget::instructionPostProcess(
 
 void SnippyRISCVTarget::rvvGenerateModeSwitchAndUpdateContext(
     const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB, GeneratorContext &GC,
-    MachineBasicBlock::iterator Ins, unsigned DesiredOpcode) const {
+    MachineBasicBlock::iterator Ins,
+    std::optional<unsigned> DesiredOpcode) const {
   auto &RGC = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
   const auto &VUInfo = RGC.getVUConfigInfo();
   // TODO: likely, we should return a pair
   const auto &NewRvvCFG = VUInfo.selectConfiguration();
-  const auto &NewVLVM =
-      VUInfo.selectVLVM(NewRvvCFG, DesiredOpcode == RISCV::VSETIVLI);
-
-  const RVVModeInfo *PendingRVVModePtr = nullptr;
-  RVVModeInfo PendingMode;
-  // NOTE: active RVV mode is optional, so we don't always provide one
-  if (RGC.hasActiveRVVMode(MBB)) {
-    PendingMode = RGC.getActiveRVVMode(MBB);
-    PendingRVVModePtr = &PendingMode;
-  }
+  auto NewVLVM = VUInfo.selectVLVM(NewRvvCFG, DesiredOpcode == RISCV::VSETIVLI);
+  const auto &ModeChangeInfo = RGC.getVUConfigInfo().getModeChangeInfo();
+  // In this case, the probability of choosing a mode change instruction VSETVL
+  // or VSETVLI is 0, then the only available instruction is VSETIVLI.
+  // Also in this case, the already selected NewVLVM.VL has a value exceeding
+  // the maximum possible for this instruction (due to its encoding), so we
+  // reselect the NewVLVM.VL, taking into account its possible values for
+  // VSEIVLI.
+  if (NewVLVM.VL > kMaxVLForVSETIVLI &&
+      (ModeChangeInfo.WeightVSETVL + ModeChangeInfo.WeightVSETVLI) <
+          std::numeric_limits<double>::epsilon())
+    NewVLVM.VL =
+        RGC.getVUConfigInfo()
+            .selectVLVM(NewRvvCFG, /* DesiredOpcode == RISCV::VSETIVLI */ true)
+            .VL;
   generateRVVModeUpdate(InstrInfo, MBB, GC, NewRvvCFG, NewVLVM, Ins,
-                        PendingRVVModePtr, DesiredOpcode);
+                        DesiredOpcode);
   RGC.updateActiveRVVMode(NewVLVM, NewRvvCFG, MBB);
 }
 
@@ -2888,11 +2894,11 @@ void SnippyRISCVTarget::generateVSETIVLI(
   MIB.addDef(DstReg).addImm(VL).addImm(VTYPE);
 }
 
-void SnippyRISCVTarget::generateVSETVLI(
-    const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB, GeneratorContext &GC,
-    unsigned VTYPE, unsigned VL,
-    [[maybe_unused]] const RVVModeInfo *PendingMode, bool SupportMarker,
-    MachineBasicBlock::iterator Ins) const {
+void SnippyRISCVTarget::generateVSETVLI(const MCInstrInfo &InstrInfo,
+                                        MachineBasicBlock &MBB,
+                                        GeneratorContext &GC, unsigned VTYPE,
+                                        unsigned VL, bool SupportMarker,
+                                        MachineBasicBlock::iterator Ins) const {
   // TODO 1: if VL is equal to VLMAX we can use X0 if DstReg is not zero
   // TODO 2: if VL is not changed, and DST is zero, scratch VL can be zero
   const auto &RI = GC.getLLVMState().getRegInfo();
@@ -2913,11 +2919,11 @@ void SnippyRISCVTarget::generateVSETVLI(
   MIB.addImm(VTYPE);
 }
 
-void SnippyRISCVTarget::generateVSETVL(
-    const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB, GeneratorContext &GC,
-    unsigned VTYPE, unsigned VL,
-    [[maybe_unused]] const RVVModeInfo *PendingMode, bool SupportMarker,
-    MachineBasicBlock::iterator Ins) const {
+void SnippyRISCVTarget::generateVSETVL(const MCInstrInfo &InstrInfo,
+                                       MachineBasicBlock &MBB,
+                                       GeneratorContext &GC, unsigned VTYPE,
+                                       unsigned VL, bool SupportMarker,
+                                       MachineBasicBlock::iterator Ins) const {
   // TODO 1: if VL is equal to VLMAX we can use X0 if DstReg is not zero
   // TODO 2: if VL is not changed, and DST is zero, scratch VL can be zero
   const auto &RI = GC.getLLVMState().getRegInfo();
@@ -2946,8 +2952,8 @@ void SnippyRISCVTarget::generateVSETVL(
 void SnippyRISCVTarget::generateRVVModeUpdate(
     const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB, GeneratorContext &GC,
     const RVVConfiguration &Config, const RVVConfigurationInfo::VLVM &VLVM,
-    MachineBasicBlock::iterator Ins, const RVVModeInfo *PendingRVVMode,
-    unsigned DesiredOpcode) const {
+    MachineBasicBlock::iterator Ins,
+    std::optional<unsigned> DesiredOpcode) const {
   unsigned SEW = static_cast<unsigned>(Config.SEW);
   LLVM_DEBUG(dbgs() << "Emit RVV Mode Change: VL = " << VLVM.VL
                     << ", SEW = " << SEW << ", TA = " << Config.TailAgnostic
@@ -2956,7 +2962,7 @@ void SnippyRISCVTarget::generateRVVModeUpdate(
                                        Config.MaskAgnostic);
   auto &RGC = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
   bool SupportMarker = false;
-  if (DesiredOpcode == RISCV::INSTRUCTION_LIST_END) {
+  if (!DesiredOpcode.has_value()) {
     DesiredOpcode = selectDesiredModeChangeInstruction(
         RVVModeChangePreferenceOpt, VLVM.VL, RGC);
     SupportMarker = true;
@@ -2965,17 +2971,15 @@ void SnippyRISCVTarget::generateRVVModeUpdate(
     SupportMarker = VUInfo.isModeChangeArtificial();
   }
 
-  switch (DesiredOpcode) {
+  switch (DesiredOpcode.value()) {
   case RISCV::VSETIVLI:
     generateVSETIVLI(InstrInfo, MBB, GC, VTYPE, VLVM.VL, SupportMarker, Ins);
     break;
   case RISCV::VSETVLI:
-    generateVSETVLI(InstrInfo, MBB, GC, VTYPE, VLVM.VL, PendingRVVMode,
-                    SupportMarker, Ins);
+    generateVSETVLI(InstrInfo, MBB, GC, VTYPE, VLVM.VL, SupportMarker, Ins);
     break;
   case RISCV::VSETVL:
-    generateVSETVL(InstrInfo, MBB, GC, VTYPE, VLVM.VL, PendingRVVMode,
-                   SupportMarker, Ins);
+    generateVSETVL(InstrInfo, MBB, GC, VTYPE, VLVM.VL, SupportMarker, Ins);
     break;
   default:
     llvm_unreachable("unexpected OpcodeRequested for generateRVVModeUpdate");
