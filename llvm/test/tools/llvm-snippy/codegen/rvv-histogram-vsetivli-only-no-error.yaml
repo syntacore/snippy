@@ -1,0 +1,65 @@
+# COM: This test verifies that the "The specified restrictions on VSET* instructions do not allow to produce VL"
+# COM: error does not occur when histogram contains only VSETIVLI.
+#
+# RUN: llvm-snippy %s
+
+options:
+  march: riscv64-linux-gnu
+  mcpu: generic-rv64
+  mattr: +v
+  num-instrs: 10000
+  init-regs-in-elf: on
+
+riscv-vector-unit:
+  mode-distribution:
+    VM:
+      - [all_ones, 1.0]
+      - [any_legal, 2.0]
+    VL:
+      - [vlmax, 0.0]
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+      rne: 1.0
+      rdn: 1.0
+      ron: 1.0
+    VXSAT:
+      on: 1.0
+      off: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+      LMUL:
+        m8: 1.0
+      VMA:
+        mu: 1.0
+        ma: 1.0
+      VTA:
+        tu: 1.0
+        ta: 1.0
+
+sections:
+  - no:        0
+    VMA:       0x70000000
+    SIZE:      0x6000000
+    LMA:       0x70000000
+    ACCESS:    r
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+  - name:      selfcheck
+    VMA:       0x90600000
+    SIZE:      0x400000
+    LMA:       0x90600000
+    ACCESS:    rw
+
+histogram:
+    - [VSETIVLI, 1.0]
+
