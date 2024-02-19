@@ -22,6 +22,7 @@
 #include "snippy/Generator/GeneratorSettings.h"
 #include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/RegisterPool.h"
+#include "snippy/Generator/SelfcheckMode.h"
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/OpcodeCache.h"
 #include "snippy/Support/Options.h"
@@ -196,6 +197,23 @@ static snippy::opt<std::string>
                        "number N (means each N instructions)"),
               cl::cat(Options), cl::ValueOptional, cl::init(""));
 
+struct SelfcheckRefValueStorageEnumOption
+    : public snippy::EnumOptionMixin<SelfcheckRefValueStorageEnumOption> {
+  static void doMapping(EnumMapper &Mapper) {
+    Mapper.enumCase(
+        SelfcheckRefValueStorageType::Code, "code",
+        "selfcheck reference values are materialized during runtime");
+  }
+};
+
+static snippy::opt<SelfcheckRefValueStorageType>
+    SelfcheckRefValueStorage("selfcheck-ref-value-storage",
+                             cl::desc("Option to define "
+                                      "how to get reference selfcheck values"),
+                             SelfcheckRefValueStorageEnumOption::getClValues(),
+                             cl::init(SelfcheckRefValueStorageType::Code),
+                             cl::cat(Options));
+
 static snippy::opt<bool> StrictMemoryScheme(
     "strict-memory-schemes",
     cl::desc("Raise error instead of warning when potentially invalid memory "
@@ -208,6 +226,10 @@ static snippy::opt<bool> DumpMI(
     cl::cat(Options));
 
 } // namespace snippy
+
+LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(
+    snippy::SelfcheckRefValueStorageType,
+    snippy::SelfcheckRefValueStorageEnumOption)
 
 namespace snippy {
 
