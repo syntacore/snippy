@@ -467,6 +467,10 @@ class InstructionGenerator final : public MachineFunctionPass {
 
   void selfcheckOverflowGuard() const;
 
+  template <typename InstrIt>
+  void storeRefValue(MachineBasicBlock &MBB, InstrIt InsertPos, MemAddr Addr,
+                     APInt Val, RegPoolWrapper &RP) const;
+
   // Returns iterator to the first inserted instruction. So [returned It;
   // InsertPos) contains inserted instructions.
   // Register pool is taken by value as we'll do some local reservations on top
@@ -1582,6 +1586,14 @@ void InstructionGenerator::selfcheckOverflowGuard() const {
 }
 
 template <typename InstrIt>
+void InstructionGenerator::storeRefValue(MachineBasicBlock &MBB,
+                                         InstrIt InsertPos, MemAddr Addr,
+                                         APInt Val, RegPoolWrapper &RP) const {
+  SGCtx->getLLVMState().getSnippyTarget().storeValueToAddr(
+      MBB, InsertPos, SCAddress, Val, RP, *SGCtx);
+}
+
+template <typename InstrIt>
 SelfcheckIntermediateInfo<InstrIt>
 InstructionGenerator::storeRefAndActualValueForSelfcheck(
     MachineBasicBlock &MBB, InstrIt InsertPos, Register DestReg,
@@ -1601,7 +1613,7 @@ InstructionGenerator::storeRefAndActualValueForSelfcheck(
                                                   SCAddress};
   SCAddress += SGCtx->getSCStride();
   selfcheckOverflowGuard();
-  ST.storeValueToAddr(MBB, InsertPos, SCAddress, RegValue, RP, *SGCtx);
+  storeRefValue(MBB, InsertPos, SCAddress, RegValue, RP);
   SCAddress += SGCtx->getSCStride();
   selfcheckOverflowGuard();
 
