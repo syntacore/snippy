@@ -48,10 +48,21 @@ struct Branchegram final {
     NumericRange<ProgramCounterType> PC;
   };
 
+  struct ConsecutiveLoops {
+    enum class Mode {
+      NoConsecutiveLoops,
+      SomeConsecutiveLoops,
+      OnlyConsecutiveLoops
+    };
+
+    Mode M = Mode::NoConsecutiveLoops;
+    unsigned N = NConsecutiveLoopsDefault;
+  };
+
   bool PermuteCF = true;
   unsigned Alignment = DefaultAlignment;
   double LoopRatio = DefaultLoopRatio;
-  unsigned NConsecutiveLoops = NConsecutiveLoopsDefault;
+  ConsecutiveLoops ConsLoops;
   NumericRange<unsigned> NLoopIter = {MinNLoopIterDefault, MaxNLoopIterDefault};
   Depth MaxDepth;
   Distance Dist;
@@ -70,6 +81,22 @@ struct Branchegram final {
   unsigned getMaxIfDepth() const {
     assert(hasMaxIfDepth());
     return *MaxDepth.If;
+  }
+
+  bool onlyConsecutiveLoops() const {
+    return ConsLoops.M == ConsecutiveLoops::Mode::OnlyConsecutiveLoops;
+  }
+
+  unsigned getNConsecutiveLoops() const {
+    assert(ConsLoops.M != ConsecutiveLoops::Mode::OnlyConsecutiveLoops &&
+           "Number of consecutive loops is only valid when count is enabled");
+    return ConsLoops.M == ConsecutiveLoops::Mode::NoConsecutiveLoops
+               ? 0
+               : ConsLoops.N;
+  }
+
+  bool anyConsecutiveLoops() const {
+    return ConsLoops.M != ConsecutiveLoops::Mode::NoConsecutiveLoops;
   }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
