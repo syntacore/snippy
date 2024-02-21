@@ -116,6 +116,7 @@ bool LoopCanonicalization::runOnMachineFunction(MachineFunction &MF) {
     dbgs() << CLEntry.first << ":";
     for (auto &&CL : CLEntry.second)
       dbgs() << " " << CL;
+    dbgs() << "\n";
   }));
 
   SmallVector<MachineLoop *> Loops;
@@ -197,7 +198,7 @@ bool LoopCanonicalization::insertPreheaderIfNeeded(MachineLoop &ML) {
   auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
   auto HeaderNum = Header->getNumber();
   if (GC.isNonFirstConsecutiveLoopHeader(HeaderNum)) {
-    LLVM_DEBUG(dbgs() << "It's consecutive loop, skip preheader insertion");
+    LLVM_DEBUG(dbgs() << "It's consecutive loop, skip preheader insertion\n");
     return false;
   }
   if (auto *Preheader = ML.getLoopPreheader()) {
