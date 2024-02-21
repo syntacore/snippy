@@ -440,6 +440,7 @@ void PCUpdateCallback(RVMCallbackHandler *H, uint64_t PC) {
 
 unsigned getCustomExtensionsBits(const RISCVSubtarget &ST) {
   unsigned Res = 0;
+
   return Res;
 }
 
