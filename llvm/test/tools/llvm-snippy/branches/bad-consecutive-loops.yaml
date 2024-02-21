@@ -11,10 +11,9 @@
 # RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/CONS/999999999999999/ > %t.2.yaml
 # RUN: not llvm-snippy %t.2.yaml -march=riscv64-linux-gnu -num-instrs=20 \
 # RUN:     -verify-mi -mattr=-c -dump-mf --verify-consecutive-loops -o %t \
-# RUN:     --model-plugin=None |& FileCheck %s --check-prefix=TOO_BIG
+# RUN:     --model-plugin=None |& FileCheck %s
 
 # CHECK: error: invalid number
-# TOO_BIG: error: out of range number
 
 sections:
     - no:        1
