@@ -490,13 +490,13 @@ class InstructionGenerator final : public MachineFunctionPass {
                                       IMBBGenReq &Request);
 
   MachineBasicBlock *
-  findNextBlock(const MachineBasicBlock *MBB,
+  findNextBlock(MachineBasicBlock *MBB,
                 const std::set<MachineBasicBlock *, MIRComp> &NotVisited,
                 const MachineLoop *ML = nullptr) const;
 
   GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB);
 
-  MachineBasicBlock *findNextBlockOnModel(const MachineBasicBlock &MBB) const;
+  MachineBasicBlock *findNextBlockOnModel(MachineBasicBlock &MBB) const;
 
   std::unique_ptr<IFunctionGenReq>
   createMFGenerationRequest(const MachineFunction &MF) const;
@@ -2059,7 +2059,7 @@ InstructionGenerator::generateForMBB(MachineBasicBlock &MBB,
 }
 
 MachineBasicBlock *InstructionGenerator::findNextBlock(
-    const MachineBasicBlock *MBB,
+    MachineBasicBlock *MBB,
     const std::set<MachineBasicBlock *, MIRComp> &NotVisited,
     const MachineLoop *ML) const {
   if (SGCtx->hasTrackingMode() && MBB) {
@@ -2077,7 +2077,7 @@ MachineBasicBlock *InstructionGenerator::findNextBlock(
 }
 
 MachineBasicBlock *
-InstructionGenerator::findNextBlockOnModel(const MachineBasicBlock &MBB) const {
+InstructionGenerator::findNextBlockOnModel(MachineBasicBlock &MBB) const {
   const auto &SnippyTgt = SGCtx->getLLVMState().getSnippyTarget();
   auto &I = SGCtx->getOrCreateInterpreter();
   auto PC = I.getPC();
@@ -2101,6 +2101,9 @@ InstructionGenerator::findNextBlockOnModel(const MachineBasicBlock &MBB) const {
       // with zero because the actual offset is still unknown).
       return SnippyTgt.getBranchDestination(Branch);
   }
+
+  return MBB.getNextNode();
+
   llvm_unreachable(
       "Given BB doesn't have unconditional branch. All conditional branches "
       "were not taken. Successor is unknown.");
