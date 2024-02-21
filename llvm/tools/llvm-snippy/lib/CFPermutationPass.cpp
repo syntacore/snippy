@@ -83,6 +83,8 @@ public:
     using SetT = std::set<unsigned>;
     SetT Available;
 
+    BlockInfo(unsigned Succ) : Successor(Succ), Available() {}
+
     BlockInfo(unsigned Succ, const SetT &Available)
         : Successor(Succ), Available(Available) {}
   };
@@ -169,7 +171,7 @@ CFPermutation::CFPermutation() : MachineFunctionPass(ID) {
 /// distance for a branch in the selected basic block.
 unsigned CFPermutation::calculateMaxDistance(unsigned BBNum, unsigned Size) {
   LLVM_DEBUG(dbgs() << "Calculating max distance for BB#" << BBNum << '\n');
-  if (BranchSettings->NConsecutiveLoops != 0)
+  if (BranchSettings->anyConsecutiveLoops())
     return 0;
   assert(CurrMF);
   auto *BB = CurrMF->getBlockNumbered(BBNum);
@@ -238,14 +240,26 @@ printAvailableSet(raw_ostream &OS, unsigned BB,
   OS << "}\n";
 }
 
+bool checkBranchSettings(const Branchegram &Branches) {
+  return !Branches.anyConsecutiveLoops() ||
+         (Branches.LoopRatio == 1.0 && Branches.getMaxLoopDepth() == 1 &&
+          Branches.getBlockDistance().Min.value_or(0) == 0 &&
+          Branches.getBlockDistance().Max.value_or(0) == 0);
+}
+
 void CFPermutation::initBlocksInfo(unsigned Size) {
   BlocksInfo.reserve(Size);
-  if (BranchSettings->NConsecutiveLoops > 0) {
-    assert(BranchSettings->LoopRatio == 1.0 &&
-           BranchSettings->getMaxLoopDepth() == 1 &&
-           BranchSettings->getBlockDistance().Min.value_or(0) == 0 &&
-           BranchSettings->getBlockDistance().Max.value_or(0) == 0 &&
-           "unsupported branch settings");
+  assert(checkBranchSettings(*BranchSettings) && "unsupported branch settings");
+  if (BranchSettings->onlyConsecutiveLoops()) {
+    transform(seq(0u, Size), std::back_inserter(BlocksInfo),
+              [](unsigned BB) { return BlockInfo(BB); });
+    auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
+    for (auto &&BB : seq(1u, Size))
+      GC.registerConsecutiveLoopsHeader(BB, 0u);
+    return;
+  }
+
+  if (BranchSettings->anyConsecutiveLoops()) {
     transform(seq(0u, Size), std::back_inserter(BlocksInfo), [](unsigned BB) {
       return BlockInfo(BB + 1, BlockInfo::SetT({BB, BB + 1}));
     });
@@ -451,7 +465,7 @@ void CFPermutation::permuteBlock(unsigned BB) {
     return;
   }
 
-  unsigned NConsecutiveLoops = BranchSettings->NConsecutiveLoops;
+  unsigned NConsecutiveLoops = BranchSettings->getNConsecutiveLoops();
   // We cannot always create N consecutive loops
   auto NextCantBeSingleBlockLoopPos =
       std::find_if(BI, BI + NConsecutiveLoops + 1, [this](const auto &NextBI) {
