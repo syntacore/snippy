@@ -38,11 +38,61 @@ LLVM_DUMP_METHOD void Branchegram::dump() const { print(dbgs()); }
 } // namespace snippy
 
 using namespace snippy;
+template <> struct yaml::ScalarTraits<Branchegram::ConsecutiveLoops> {
+  using ConsLoopsMode = Branchegram::ConsecutiveLoops::Mode;
+  static void output(const Branchegram::ConsecutiveLoops &ConsLoops, void *,
+                     llvm::raw_ostream &Out) {
+    switch (ConsLoops.M) {
+    case ConsLoopsMode::NoConsecutiveLoops:
+      Out << "none";
+      return;
+    case ConsLoopsMode::SomeConsecutiveLoops:
+      Out << ConsLoops.N;
+      return;
+    case ConsLoopsMode::OnlyConsecutiveLoops:
+      Out << "all";
+      return;
+    }
+    llvm_unreachable("Unknown consecutive loops mode");
+  }
+
+  static StringRef input(StringRef Input, void *,
+                         Branchegram::ConsecutiveLoops &ConsLoops) {
+    auto MatchStringVal = [Input, &ConsLoops](StringRef ValToMatch,
+                                              ConsLoopsMode M) {
+      if (Input != ValToMatch)
+        return false;
+
+      ConsLoops.M = M;
+      return true;
+    };
+
+    if (MatchStringVal("all", ConsLoopsMode::OnlyConsecutiveLoops))
+      return {};
+    if (MatchStringVal("none", ConsLoopsMode::NoConsecutiveLoops))
+      return {};
+    if (MatchStringVal("off", ConsLoopsMode::NoConsecutiveLoops))
+      return {};
+    if (MatchStringVal("false", ConsLoopsMode::NoConsecutiveLoops))
+      return {};
+
+    if (!to_integer(Input, ConsLoops.N))
+      return "invalid number";
+
+    ConsLoops.M = ConsLoops.N == 0 ? ConsLoopsMode::NoConsecutiveLoops
+                                   : ConsLoopsMode::SomeConsecutiveLoops;
+
+    return {};
+  }
+
+  static QuotingType mustQuote(StringRef) { return QuotingType::None; }
+};
+
 void yaml::MappingTraits<Branchegram>::mapping(yaml::IO &IO,
                                                Branchegram &Branches) {
   IO.mapOptional("permutation", Branches.PermuteCF);
   IO.mapOptional("alignment", Branches.Alignment);
-  IO.mapOptional("consecutive-loops", Branches.NConsecutiveLoops);
+  IO.mapOptional("consecutive-loops", Branches.ConsLoops);
   IO.mapOptional("loop-ratio", Branches.LoopRatio);
   IO.mapOptional("number-of-loop-iterations", Branches.NLoopIter);
   IO.mapOptional("max-depth", Branches.MaxDepth);
@@ -60,7 +110,7 @@ std::string yaml::MappingTraits<Branchegram>::validate(yaml::IO &IO,
   if (Branches.NLoopIter.Min == 0)
     return std::string("Number of loop iterations must be > 0");
 
-  if (Branches.NConsecutiveLoops != 0) {
+  if (Branches.anyConsecutiveLoops()) {
     if (Branches.LoopRatio != 1.0)
       return std::string(
           "Consecutive loop generation is only supported with loop ratio == 1");
