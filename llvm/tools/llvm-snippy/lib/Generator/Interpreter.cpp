@@ -109,14 +109,16 @@ namespace snippy {
 
 namespace {
 void applyMemCfgToSimCfg(const MemoryConfig &MemCfg, SimulationConfig &SimCfg) {
-  SimCfg.ProgStart = MemCfg.ProgSectionStart;
-  SimCfg.ProgSize = MemCfg.ProgSectionSize;
-  SimCfg.ProgSectionName = MemCfg.ProgSectionName;
-  SimCfg.RomStart = MemCfg.RomStart;
-  SimCfg.RomSize = MemCfg.RomSize;
-  SimCfg.RomSectionName = MemCfg.RomSectionName;
-  SimCfg.RamStart = MemCfg.RamStart;
-  SimCfg.RamSize = MemCfg.RamSize;
+  llvm::transform(MemCfg.ProgSections, std::back_inserter(SimCfg.ProgSections),
+                  [](auto &Section) {
+                    return SimulationConfig::Section{
+                        Section.Start, Section.Size, Section.Name};
+                  });
+  SimCfg.RomStart = MemCfg.Rom.Start;
+  SimCfg.RomSize = MemCfg.Rom.Size;
+  SimCfg.RomSectionName = MemCfg.Rom.Name;
+  SimCfg.RamStart = MemCfg.Ram.Start;
+  SimCfg.RamSize = MemCfg.Ram.Size;
 }
 } // namespace
 
@@ -238,18 +240,20 @@ bool Interpreter::step() {
 }
 
 bool Interpreter::endOfProg() const {
-  return Simulator->readPC() >= getProgEnd();
+  return Simulator->readPC() == getProgEnd();
 }
 
 void Interpreter::resetMem() {
   const auto &SimCfg = Env.SimCfg;
   std::vector<char> RAMZeroMem(SimCfg.RamSize, 0);
   std::vector<char> ROMZeroMem(SimCfg.RomSize, 0);
-  std::vector<char> ProgZeroMem(SimCfg.ProgSize, 0);
 
   Simulator->writeMem(SimCfg.RamStart, RAMZeroMem);
   Simulator->writeMem(SimCfg.RomStart, ROMZeroMem);
-  Simulator->writeMem(SimCfg.ProgStart, ProgZeroMem);
+  for (auto &Section : SimCfg.ProgSections) {
+    std::vector<char> ProgZeroMem(Section.Size, 0);
+    Simulator->writeMem(Section.Start, ProgZeroMem);
+  }
 }
 
 void Interpreter::disableTransactionsTracking() {
@@ -269,15 +273,31 @@ void Interpreter::loadElfImage(StringRef ElfImage) {
   auto MemBuff = MemoryBuffer::getMemBuffer(ElfImage, "", false);
   auto ObjectFile = makeObjectFile(*MemBuff);
 
-  assert(hasSection(*ObjectFile, Env.SimCfg.ProgSectionName));
-  ProgramText = getSectionData(*ObjectFile, Env.SimCfg.ProgSectionName);
+  auto EndOfProgSym = llvm::find_if(ObjectFile->symbols(), [](auto &Sym) {
+    auto EName = Sym.getName();
+    return EName && EName.get() == Linker::GetExitSymbolName();
+  });
 
-  if (Env.SimCfg.ProgSize < ProgramText.size())
-    report_fatal_error("Incorrect list of sections: suitable RX section "
-                       "is too small for this program",
-                       false);
-  Simulator->writeMem(getProgStart(), ProgramText);
+  assert(EndOfProgSym != ObjectFile->symbols().end() &&
+         "expected to have one of these");
+  auto EAddress = EndOfProgSym->getAddress();
+  assert(EAddress && "Expected the address of symbol to be known");
+  ProgEnd = EAddress.get();
 
+  for (auto &ProgSection : Env.SimCfg.ProgSections) {
+    assert(hasSection(*ObjectFile, ProgSection.Name));
+
+    ProgramText = getSectionData(*ObjectFile, ProgSection.Name);
+
+    if (ProgSection.Size < ProgramText.size())
+      report_fatal_error(
+          "RX section '" + Twine(ProgSection.Name) +
+              "' failed to fit code mapped to it: section size is " +
+              Twine(ProgSection.Size) + " and code size is " +
+              Twine(ProgramText.size()),
+          false);
+    Simulator->writeMem(ProgSection.Start, ProgramText);
+  }
   if (!Env.SimCfg.RomSectionName.empty()) {
     auto RODataName = Env.SimCfg.RomSectionName;
     // Elf image might not have this section if
@@ -373,10 +393,11 @@ void Interpreter::initTransactionMechanism() {
       Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
   assert(Transactions.empty());
 
-  std::array<std::pair<uint64_t, uint64_t>, 3> MemoryConfig = {
-      std::pair{getProgStart(), getProgSize()},
+  SmallVector<std::pair<uint64_t, uint64_t>, 3> MemoryConfig = {
       std::pair{getRomStart(), getRomSize()},
       std::pair{getRamStart(), getRamSize()}};
+  for (auto &Section : Env.SimCfg.ProgSections)
+    MemoryConfig.emplace_back(std::make_pair(Section.Start, Section.Size));
   for (auto [Start, Size] : MemoryConfig) {
     if (Size == 0)
       continue;

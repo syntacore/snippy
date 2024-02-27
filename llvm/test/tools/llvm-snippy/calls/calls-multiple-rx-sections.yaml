@@ -1,0 +1,66 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=100 \
+# RUN: --num-instr-ancil=5 -o %t
+# RUN: llvm-objdump %t.elf -d |& FileCheck %s --check-prefix=DISABLED
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=1000 \
+# RUN: --chained-rx-sections-fill --num-instr-ancil=50 -o %t
+# RUN: llvm-objdump %t.elf -d |& FileCheck %s --check-prefix=ENABLED
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=1000 \
+# RUN: --chained-rx-sections-fill --chained-rx-sorted --num-instr-ancil=50 -o %t
+# RUN: llvm-objdump %t.elf -d |& FileCheck %s --check-prefix=SORTED
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=2500 \
+# RUN: --chained-rx-sections-fill --num-instr-ancil=200 |& \
+# RUN: FileCheck %s --check-prefix=SECONDARY-ERROR
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=4000 \
+# RUN: --chained-rx-sections-fill --num-instr-ancil=200 |& \
+# RUN: FileCheck %s --check-prefix=ROOT-ERROR
+
+sections:
+  - no:        3
+    VMA:       0x210000
+    SIZE:      0x1000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      "stack"
+    VMA:       0x200000
+    SIZE:      0x10000
+    LMA:       0x200000
+    ACCESS:    rw
+  - no:        1
+    VMA:       0x410000
+    SIZE:      0x1000
+    LMA:       0x410000
+    ACCESS:    rx
+  - no:        4
+    VMA:       0x610000
+    SIZE:      0x1000
+    LMA:       0x610000
+    ACCESS:    rx
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [JAL, 0.1]
+function-layers: 3
+function-number: 9
+
+# DISABLED-NOT: jr
+# DISABLED: ebreak
+# DISABLED-NOT: jr
+#
+# ENABLED-DAG: jr
+# ENABLED-DAG: ebreak
+# ENABLED-DAG: jr
+#
+# SORTED-COUNT-2: jr
+# SORTED-NOT: jr
+# SORTED: ebreak
+# SECONDARY-ERROR: LLVM ERROR: Failed to fit secondary code in specified RX sections: not enough contiguos space found.
+# ROOT-ERROR: LLVM ERROR: RX section '{{[0-9]+}}' (size 4096) failed to fit code mapped to it. Total code size: {{[0-9]+}}
+# ROOT-ERROR-NEXT: List of functions mapped to this section:
+# ROOT-ERROR-NEXT: SnippyFunction: size {{[0-9]+}} 

@@ -112,7 +112,7 @@ void CallGraphState::dump(StringRef Filename, CallGraphDumpMode Format) const {
   if (Nodes.empty())
     report_fatal_error("Cannot dump empty call graph.", false);
 
-  auto NameOf = [](Node *N) { return N->function()->getName().str(); };
+  auto NameOf = [](Node *N) { return N->functions().front()->getName().str(); };
 
   std::stringstream SS;
   SS << "entry-point: " << NameOf(getRootNode()) << "\n";
@@ -122,7 +122,7 @@ void CallGraphState::dump(StringRef Filename, CallGraphDumpMode Format) const {
     SS << "  - name: " << NameOf(N) << "\n";
     // Snippy emits 'external' functions with weak linkage.
     // Generated functions have either external or internal one.
-    if (Function::isWeakLinkage(N->function()->getLinkage()))
+    if (Function::isWeakLinkage(N->functions().front()->getLinkage()))
       SS << "    external: true\n";
     if (N->callees().empty())
       continue;
@@ -139,7 +139,7 @@ void CallGraphState::dump(StringRef Filename, CallGraphDumpMode Format) const {
 
 std::string DOTGraphTraits<snippy::CallGraphState>::getNodeLabel(
     const snippy::CallGraphState::Node *N, const snippy::CallGraphState &) {
-  return std::string(N->function()->getName());
+  return std::string(N->functions().front()->getName());
 }
 
 std::string DOTGraphTraits<snippy::CallGraphState>::getNodeAttributes(
@@ -148,14 +148,14 @@ std::string DOTGraphTraits<snippy::CallGraphState>::getNodeAttributes(
   // Reachability is expressed as color.
   if (CGS.getRootNode() == N)
     Attrs += " fillcolor=lightskyblue";
-  else if (CGS.reachable(N->function()))
+  else if (CGS.reachable(N->functions().front()))
     Attrs += " fillcolor=green";
   else
     Attrs += " fillcolor=grey";
 
   // Snippy-generated functions are shown as boxes
   // and external are shown as  diamonds.
-  auto *F = N->function();
+  auto *F = N->functions().front();
   if (!Function::isWeakLinkage(F->getLinkage())) {
     Attrs += " shape=record";
   } else {
