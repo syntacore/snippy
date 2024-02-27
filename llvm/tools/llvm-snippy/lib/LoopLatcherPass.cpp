@@ -30,6 +30,7 @@
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineLoopInfo.h"
+#include "llvm/CodeGen/MachinePostDominators.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/Support/Debug.h"
@@ -53,6 +54,8 @@ class LoopLatcher final : public MachineFunctionPass {
   void processExitingBlock(MachineLoop &ML, MachineBasicBlock &ExitingBlock,
                            MachineBasicBlock &Preheader);
   bool createLoopLatchFor(MachineLoop &ML);
+  template <typename R>
+  bool createLoopLatchFor(MachineLoop &ML, R &&ConsecutiveLoops);
   auto selectRegsForBranch(const MachineLoop &ML,
                            const MachineBasicBlock &Preheader,
                            const MachineBasicBlock &ExitingBlock,
@@ -75,6 +78,8 @@ public:
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<GeneratorContextWrapper>();
     AU.addRequired<MachineLoopInfo>();
+    AU.addRequired<MachineDominatorTree>();
+    AU.addRequired<MachinePostDominatorTree>();
     AU.addRequired<RootRegPoolWrapper>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
@@ -94,6 +99,8 @@ using llvm::snippy::LoopLatcher;
 INITIALIZE_PASS_BEGIN(LoopLatcher, DEBUG_TYPE, PASS_DESC, false, false)
 INITIALIZE_PASS_DEPENDENCY(GeneratorContextWrapper)
 INITIALIZE_PASS_DEPENDENCY(MachineLoopInfo)
+INITIALIZE_PASS_DEPENDENCY(MachineDominatorTree)
+INITIALIZE_PASS_DEPENDENCY(MachinePostDominatorTree)
 INITIALIZE_PASS_DEPENDENCY(RootRegPoolWrapper)
 INITIALIZE_PASS_END(LoopLatcher, DEBUG_TYPE, PASS_DESC, false, false)
 
@@ -134,10 +141,14 @@ bool LoopLatcher::runOnMachineFunction(MachineFunction &MF) {
         State.getCtx(), "Wrong snippy configuration:",
         "loops generation in selfcheck and backtracking modes requires stack.");
 
-  for_each(MLI, [this](auto *ML) {
+  for (auto *ML : MLI) {
     assert(ML);
-    createLoopLatchFor(*ML);
-  });
+    auto HeaderNumber = ML->getHeader()->getNumber();
+    if (SGCtx.isFirstConsecutiveLoopHeader(HeaderNumber))
+      createLoopLatchFor(*ML, SGCtx.getConsecutiveLoops(HeaderNumber));
+    else if (!SGCtx.isNonFirstConsecutiveLoopHeader(HeaderNumber))
+      createLoopLatchFor(*ML);
+  }
 
   bool Changed = !MLI.empty();
   return Changed;
@@ -157,6 +168,30 @@ static const auto &getMCRegClassForBranch(const MCInstrDesc &InstrDesc,
   return RegInfo.getRegClass(RegOperand->RegClass);
 }
 
+template <bool IsPostDom>
+void processDomTree(
+    const MachineBasicBlock &MBBToProcess, const MachineBasicBlock &MBBToCheck,
+    const DominatorTreeBase<MachineBasicBlock, IsPostDom> &MainDomTree,
+    const DominatorTreeBase<MachineBasicBlock, !IsPostDom> &CheckDomTree,
+    std::insert_iterator<std::set<const MachineBasicBlock *, MIRComp>>
+        &&Reserv) {
+  SmallVector<const MachineBasicBlock *> DominatedBySelectedMBB = {
+      &MBBToProcess};
+
+  while (!DominatedBySelectedMBB.empty()) {
+    auto *Last = DominatedBySelectedMBB.back();
+    DominatedBySelectedMBB.pop_back();
+    if (CheckDomTree.dominates(&MBBToCheck, Last))
+      Reserv = Last;
+    transform(make_filter_range(MainDomTree[Last]->children(),
+                                [&MBBToCheck](auto &&DomNode) {
+                                  return DomNode->getBlock() != &MBBToCheck;
+                                }),
+              std::back_inserter(DominatedBySelectedMBB),
+              [](auto &&DomNode) { return DomNode->getBlock(); });
+  }
+}
+
 auto LoopLatcher::selectRegsForBranch(const MachineLoop &ML,
                                       const MachineBasicBlock &Preheader,
                                       const MachineBasicBlock &ExitingBlock,
@@ -173,8 +208,24 @@ auto LoopLatcher::selectRegsForBranch(const MachineLoop &ML,
     return Pos != ImmutableReg.end();
   };
 
+  auto &DomTree = getAnalysis<MachineDominatorTree>().getBase();
+  auto &PostDomTree = getAnalysis<MachinePostDominatorTree>().getBase();
+
+  assert(DomTree.dominates(&Preheader, &ExitingBlock));
+  assert(PostDomTree.dominates(&ExitingBlock, &Preheader));
+
+  std::set<const MachineBasicBlock *, MIRComp> MBBsForReserv;
+
+  // We need to make reservation for all blocks that are dominated by Preheader
+  // and postdominated by Exitinig block
+  processDomTree(Preheader, ExitingBlock, DomTree, PostDomTree,
+                 std::inserter(MBBsForReserv, MBBsForReserv.end()));
+  processDomTree(ExitingBlock, Preheader, PostDomTree, DomTree,
+                 std::inserter(MBBsForReserv, MBBsForReserv.end()));
+
   auto [Counter, Limit] = RootPool.getNAvailableRegisters<2>(
-      "for loop latch", RegInfo, RegClass, ML, Filter, AccessMaskBit::SRW);
+      "for loop latch", RegInfo, RegClass, MBBsForReserv, Filter,
+      AccessMaskBit::SRW);
 
   RootPool.addReserved(Preheader, Counter, AccessMaskBit::W);
   RootPool.addReserved(Preheader, Limit, AccessMaskBit::W);
@@ -188,8 +239,10 @@ auto LoopLatcher::selectRegsForBranch(const MachineLoop &ML,
     RootPool.addReserved(ExitingBlock, Counter, ReservationMode);
     RootPool.addReserved(ExitingBlock, Limit, ReservationMode);
   } else {
-    RootPool.addReserved(ML, Counter, AccessMaskBit::W);
-    RootPool.addReserved(ML, Limit, AccessMaskBit::W);
+    for (const auto *MBB : MBBsForReserv) {
+      RootPool.addReserved(*MBB, Counter, AccessMaskBit::W);
+      RootPool.addReserved(*MBB, Limit, AccessMaskBit::W);
+    }
   }
   return std::make_pair(Counter, Limit);
 }
@@ -343,6 +396,38 @@ bool LoopLatcher::createLoopLatchFor(MachineLoop &ML) {
     assert(SubLoop);
     createLoopLatchFor(*SubLoop);
   });
+
+  return true;
+}
+
+template <typename R>
+bool LoopLatcher::createLoopLatchFor(MachineLoop &ML, R &&ConsecutiveLoops) {
+  LLVM_DEBUG(dbgs() << "Creating latch for "; ML.dump());
+  LLVM_DEBUG(dbgs() << "  and it's sequential loops:");
+  LLVM_DEBUG(
+      for_each(ConsecutiveLoops, [](auto &&BB) { dbgs() << " " << BB; }));
+  auto *Exiting = ML.getExitingBlock();
+  assert(Exiting && "Expected to have only one exiting block.");
+  LLVM_DEBUG(dbgs() << "Loop exiting block found:\n"; Exiting->dump(););
+
+  auto *Preheader = ML.getLoopPreheader();
+  assert(Preheader && "Loop must already have preheader");
+  processExitingBlock(ML, *Exiting, *Preheader);
+
+  assert(ML.getSubLoops().empty() &&
+         "First consecutive loop must not have sub loop");
+
+  auto &MF = *Preheader->getParent();
+  auto &MLI = getAnalysis<MachineLoopInfo>();
+  for (auto &&BBNum : ConsecutiveLoops) {
+    auto *ConsLoop = MLI.getLoopFor(MF.getBlockNumbered(BBNum));
+    assert(ConsLoop);
+    LLVM_DEBUG(dbgs() << "Creating latch for consecutive loop: ";
+               ConsLoop->dump());
+    auto *ConsLoopExiting = ConsLoop->getExitingBlock();
+    assert(ConsLoopExiting);
+    processExitingBlock(*ConsLoop, *ConsLoopExiting, *Preheader);
+  }
 
   return true;
 }

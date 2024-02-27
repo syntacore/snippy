@@ -180,6 +180,42 @@ private:
 
   OpcodeToImmHistSequenceMap ImmHistMap;
 
+  //       +---v---+
+  //       |       |
+  //       +---+---+
+  //           | ______    ------------------------------
+  //           |/      \
+  //       +---v---+   |
+  //       |       |   |      First consecutive loop
+  //       +---+---+   |
+  //           |\______/
+  //           | ______    ------------------------------
+  //           |/      \
+  //       +---v---+   |
+  //       |       |   |
+  //       +---+---+   |
+  //           |\______/
+  //           | ______
+  //           |/      \
+  //       +---v---+   |
+  //       |       |   |      Other consecutive loops
+  //       +---+---+   |
+  //           |\______/
+  //           | ______
+  //           |/      \
+  //       +---v---+   |
+  //       |       |   |
+  //       +---+---+   |
+  //           |\______/
+  //           |           ------------------------------
+  //           |
+  //       +---v---+
+  //       |       |
+  //       +---+---+
+  //
+  // First loop header <-> Consecutive loops headers (basic blocks numbers)
+  std::unordered_map<unsigned, std::set<unsigned>> ConsecutiveLoopsHeaders;
+
 public:
   GeneratorContext(MachineModuleInfo &MMI, Module &M, LLVMState &State,
                    RegPool &Pool, RegisterGenerator &RegGen,
@@ -495,6 +531,27 @@ public:
   const PlainAccessesType &getBurstPlainAccesses() const {
     return BurstPlainAccesses;
   }
+
+  bool isFirstConsecutiveLoopHeader(unsigned BB) const {
+    return ConsecutiveLoopsHeaders.count(BB);
+  }
+
+  bool isNonFirstConsecutiveLoopHeader(unsigned BB) const {
+    return any_of(make_second_range(ConsecutiveLoopsHeaders),
+                  [BB](const auto &ConsLoops) { return ConsLoops.count(BB); });
+  }
+
+  void registerConsecutiveLoopsHeader(unsigned ConsecutiveLoopHeader,
+                                      unsigned FirstLoopHeader) {
+    ConsecutiveLoopsHeaders[FirstLoopHeader].insert(ConsecutiveLoopHeader);
+  }
+
+  const auto &getConsecutiveLoops(unsigned FirstConsecutiveLoop) const {
+    assert(isFirstConsecutiveLoopHeader(FirstConsecutiveLoop));
+    return ConsecutiveLoopsHeaders.at(FirstConsecutiveLoop);
+  }
+
+  const auto &getConsecutiveLoops() const { return ConsecutiveLoopsHeaders; }
 };
 
 } // namespace snippy

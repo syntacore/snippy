@@ -70,4 +70,6 @@ MachineFunctionPass *createPrintMachineInstrsPass(raw_ostream &OS);
 
 MachineFunctionPass *createBlockGenPlanningPass();
 
+MachineFunctionPass *createConsecutiveLoopsVerifierPass();
+
 } // namespace llvm
