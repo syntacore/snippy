@@ -155,6 +155,12 @@ static snippy::opt<unsigned> BurstAddressRandomizationThreshold(
         "burst group"),
     cl::Hidden, cl::init(100));
 
+snippy::opt<bool> VerifyConsecutiveLoops(
+    "verify-consecutive-loops",
+    cl::desc(
+        "Check that consecutive loops generated accordingly to branchegram."),
+    cl::cat(Options), cl::init(false), cl::Hidden);
+
 } // namespace snippy
 
 LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(snippy::CallGraphDumpMode,
@@ -2573,6 +2579,8 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
   SnippyTgt.addTargetLegalizationPasses(PM);
 
   PM.add(createBranchRelaxatorPass());
+  if (VerifyConsecutiveLoops)
+    PM.add(createConsecutiveLoopsVerifierPass());
 
   PM.add(createInstructionsPostProcessPass());
   PM.add(createFunctionDistributePass());

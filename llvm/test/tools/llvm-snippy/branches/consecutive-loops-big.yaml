@@ -1,0 +1,24 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=20 \
+# RUN:     -verify-mi -mattr=-c -dump-mf --verify-consecutive-loops -o %t \
+# RUN:     --model-plugin=None
+
+sections:
+    - no:        1
+      VMA:       0x1000
+      SIZE:      0x10000
+      LMA:       0x1000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+
+branches:
+  consecutive-loops: 100
+  loop-ratio: 1
+  max-depth:
+    loop: 1

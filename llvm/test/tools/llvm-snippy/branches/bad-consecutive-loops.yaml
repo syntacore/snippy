@@ -1,0 +1,38 @@
+# RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/CONS/-1/ > %t.0.yaml
+# RUN: not llvm-snippy %t.0.yaml -march=riscv64-linux-gnu -num-instrs=20 \
+# RUN:     -verify-mi -mattr=-c -dump-mf --verify-consecutive-loops -o %t \
+# RUN:     --model-plugin=None |& FileCheck %s
+
+# RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/CONS/dfa/ > %t.1.yaml
+# RUN: not llvm-snippy %t.1.yaml -march=riscv64-linux-gnu -num-instrs=20 \
+# RUN:     -verify-mi -mattr=-c -dump-mf --verify-consecutive-loops -o %t \
+# RUN:     --model-plugin=None |& FileCheck %s
+
+# RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/CONS/999999999999999/ > %t.2.yaml
+# RUN: not llvm-snippy %t.2.yaml -march=riscv64-linux-gnu -num-instrs=20 \
+# RUN:     -verify-mi -mattr=-c -dump-mf --verify-consecutive-loops -o %t \
+# RUN:     --model-plugin=None |& FileCheck %s --check-prefix=TOO_BIG
+
+# CHECK: error: invalid number
+# TOO_BIG: error: out of range number
+
+sections:
+    - no:        1
+      VMA:       0x1000
+      SIZE:      0x10000
+      LMA:       0x1000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+
+branches:
+  consecutive-loops: CONS
+  loop-ratio: 1
+  max-depth:
+    loop: 1

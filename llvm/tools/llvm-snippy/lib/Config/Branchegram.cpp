@@ -42,6 +42,7 @@ void yaml::MappingTraits<Branchegram>::mapping(yaml::IO &IO,
                                                Branchegram &Branches) {
   IO.mapOptional("permutation", Branches.PermuteCF);
   IO.mapOptional("alignment", Branches.Alignment);
+  IO.mapOptional("consecutive-loops", Branches.NConsecutiveLoops);
   IO.mapOptional("loop-ratio", Branches.LoopRatio);
   IO.mapOptional("number-of-loop-iterations", Branches.NLoopIter);
   IO.mapOptional("max-depth", Branches.MaxDepth);
@@ -58,6 +59,19 @@ std::string yaml::MappingTraits<Branchegram>::validate(yaml::IO &IO,
 
   if (Branches.NLoopIter.Min == 0)
     return std::string("Number of loop iterations must be > 0");
+
+  if (Branches.NConsecutiveLoops != 0) {
+    if (Branches.LoopRatio != 1.0)
+      return std::string(
+          "Consecutive loop generation is only supported with loop ratio == 1");
+    if (Branches.getMaxLoopDepth() > 1)
+      return std::string(
+          "Consecutive loop generation is not supported for nested loops");
+    if (Branches.getBlockDistance().Min.value_or(0) != 0 ||
+        Branches.getBlockDistance().Max.value_or(0) != 0)
+      return std::string(
+          "Consecutive loop generation is only supported for one-block loops");
+  }
 
   return std::string();
 }

@@ -33,6 +33,7 @@ template <typename T> struct NumericRange final {
 struct Branchegram final {
   static constexpr unsigned DefaultAlignment = 1;
   static constexpr double DefaultLoopRatio = 0.5;
+  static constexpr unsigned NConsecutiveLoopsDefault = 0;
   static constexpr unsigned MinNLoopIterDefault = 4;
   static constexpr unsigned MaxNLoopIterDefault = 4;
   static constexpr unsigned MaxLoopDepthDefault = 3;
@@ -50,6 +51,7 @@ struct Branchegram final {
   bool PermuteCF = true;
   unsigned Alignment = DefaultAlignment;
   double LoopRatio = DefaultLoopRatio;
+  unsigned NConsecutiveLoops = NConsecutiveLoopsDefault;
   NumericRange<unsigned> NLoopIter = {MinNLoopIterDefault, MaxNLoopIterDefault};
   Depth MaxDepth;
   Distance Dist;
