@@ -1,0 +1,58 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=1000 -o %t
+# RUN: llvm-objdump %t.elf -d |& FileCheck %s --check-prefix=DISABLED
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=1000 |& \
+# RUN: FileCheck %s --check-prefix=WARN
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=1000 \
+# RUN: --chained-rx-sections-fill -o %t
+# RUN: llvm-objdump %t.elf -d |& FileCheck %s --check-prefix=ENABLED
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=1000 \
+# RUN: --chained-rx-sections-fill --chained-rx-sorted -o %t 
+# RUN: llvm-objdump %t.elf -d |& FileCheck %s --check-prefix=SORTED
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=5000 \
+# RUN: --chained-rx-sections-fill --chained-rx-sorted |& \
+# RUN: FileCheck %s --check-prefix=SIZE_ERROR
+
+sections:
+  - no:        3
+    VMA:       0x210000
+    SIZE:      0x1000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+  - no:        1
+    VMA:       0x410000
+    SIZE:      0x1000
+    LMA:       0x410000
+    ACCESS:    rx
+  - no:        4
+    VMA:       0x610000
+    SIZE:      0x1000
+    LMA:       0x610000
+    ACCESS:    rx
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+
+# DISABLED-NOT: jr
+# DISABLED: ebreak
+# DISABLED-NOT: jr
+#
+# WARN: Following RX sections are unused during generation:
+# WARN-SAME: '1'
+# WARN-SAME: '4'
+#
+# ENABLED-DAG: jr
+# ENABLED-DAG: ebreak
+# ENABLED-DAG: jr
+#
+# SORTED-COUNT-2: jr
+# SORTED-NOT: jr
+# SORTED: ebreak
+#
+# SIZE_ERROR: LLVM ERROR: RX section '{{[0-9]+}}' (size 4096) failed to fit code mapped to it. Total code size: {{[0-9]+}}
