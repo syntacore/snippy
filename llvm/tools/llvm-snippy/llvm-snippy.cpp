@@ -591,10 +591,15 @@ static Config readSnippyConfig(LLVMContext &Ctx, const SnippyTarget &Tgt,
                                const OpcodeCache &OpCC) {
   ConfigIOContext CfgParsingCtx{OpCC, Ctx, Tgt};
   auto ParseWithPlugin = isParsingWithPluginEnabled();
-  Config Cfg(Tgt, GeneratorPluginFile.getValue(),
-             GeneratorPluginParserFile.getValue(), OpCC, ParseWithPlugin, Ctx);
   IncludePreprocessor IPP(LayoutFile.getValue(), getExtraIncludeDirsForLayout(),
                           Ctx);
+  auto IncludeFiles = [&IPP] {
+    auto IncludesRange = IPP.getIncludes();
+    return std::vector(IncludesRange.begin(), IncludesRange.end());
+  }();
+  Config Cfg(Tgt, GeneratorPluginFile.getValue(),
+             GeneratorPluginParserFile.getValue(), OpCC, ParseWithPlugin, Ctx,
+             IncludeFiles);
   mergeFiles(IPP, Ctx);
   if (DumpPreprocessedConfig)
     outs() << IPP.getPreprocessed() << "\n";
@@ -778,13 +783,13 @@ static void checkConfig(const Config &Cfg, const SnippyTarget &Tgt,
   Cfg.MS.validateSchemes(Ctx, Cfg.Sections, StrictMemoryScheme);
 }
 
-static const std::string getMemPlugin() {
+static std::string getMemPlugin() {
   if (MemAddrGeneratorFile == "None")
     return {""};
   return MemAddrGeneratorFile;
 }
 
-static const std::string getMemPluginInfo() {
+static std::string getMemPluginInfo() {
   auto FileName = std::string{MemAddrGeneratorInfoFile};
   if (MemAddrGeneratorInfoFile == "None")
     FileName = "";
@@ -796,23 +801,14 @@ static const std::string getMemPluginInfo() {
   return FileName;
 }
 
-// Function to do all the necessary operations on Config after reading it from
-// YAML.
+// Function to do all the necessary operations on Config after reading it
+// from YAML.
 static void completeConfig(Config &Cfg, LLVMState &State,
                            const OpcodeCache &OpCC) {
   auto TargetAlignment =
       State.getTargetMachine().createDataLayout().getPointerABIAlignment(
           0 /* address space */);
   Cfg.MS.fillBaseAccessesIfNeeded(Cfg.Sections, TargetAlignment);
-
-  // FIXME: At the moment raw memory mode accesses should be passed in the file
-  // specified by the first positional argument. This file gets passed to the
-  // model plugin. Ideally we would serialize the memory scheme and pass it
-  // directly as a string or via a temporary file. However, at the moment memory
-  // scheme cannot be serialized
-  if (LayoutFile.getNumOccurrences())
-    Cfg.MS.setFilename(LayoutFile.getValue());
-
   setBurstGramIfNeeded(Cfg.Burst, ConfigIOContext{OpCC, State.getCtx(),
                                                   State.getSnippyTarget()});
   Cfg.MS.updateMemoryBank();
@@ -928,6 +924,7 @@ void checkOptions(LLVMContext &Ctx) {
     fatal(Ctx, "-plugin-parser option was specified,",
           "but no generator plugin file was passed");
 }
+
 void generateMain() {
   initializeLLVMAll();
   readSnippyOptionsIfNeeded();
