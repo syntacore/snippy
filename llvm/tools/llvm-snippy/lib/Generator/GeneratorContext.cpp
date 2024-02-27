@@ -141,49 +141,96 @@ static void dumpSelfCheck(const std::vector<char> &Data, size_t ChunkSize,
   }
 }
 
-template <typename It, typename InsertIt>
-static void collectSectionsWithAccess(It SectBeg, It SectEnd, InsertIt Inserter,
+template <typename InsertIt>
+static void collectSectionsWithAccess(Interpreter &I, InsertIt Inserter,
                                       StringRef Selector) {
-  auto ErrorRet = Selector.consume_front("{") && Selector.consume_back("}");
-  assert(ErrorRet && "Wrong opt formating");
   auto AccessMask = AccMask{Selector};
+  auto &Sects = I.getSections();
   std::vector<SectionDesc> SuitableSectDesc;
-  std::copy_if(SectBeg, SectEnd, std::back_inserter(SuitableSectDesc),
+  std::copy_if(Sects.begin(), Sects.end(), std::back_inserter(SuitableSectDesc),
                [&AccessMask](const SectionDesc &SectDesc) {
                  return SectDesc.M == AccessMask;
                });
-  std::transform(
-      SuitableSectDesc.begin(), SuitableSectDesc.end(), Inserter,
-      [](const SectionDesc &SectDesc) { return SectDesc.getIDString(); });
+  std::transform(SuitableSectDesc.begin(), SuitableSectDesc.end(), Inserter,
+                 [](const SectionDesc &SectDesc) {
+                   return NamedMemoryRange{SectDesc.VMA,
+                                           SectDesc.VMA + SectDesc.Size,
+                                           SectDesc.getIDString()};
+                 });
 }
 
-template <typename It, typename InsertIt>
-static void getSectionsFromSelector(It SectBeg, It SectEnd, InsertIt Inserter,
-                                    StringRef Selector) {
-  if (Selector.front() == '{' && Selector.back() == '}') {
-    collectSectionsWithAccess(SectBeg, SectEnd, Inserter, Selector);
+static void reportParsingError(Twine Msg) {
+  report_fatal_error("Memory dump option parsing: " + Msg, false);
+}
+
+static size_t getAddressFromString(StringRef AddrString) {
+  APInt Addr;
+  constexpr auto Radix = 16u;
+
+  if (AddrString.consumeInteger(Radix, Addr))
+    reportParsingError("can't convert address to the integer: " +
+                       Twine(AddrString));
+
+  return Addr.getLimitedValue();
+}
+
+static std::optional<NamedMemoryRange>
+getRangeFromSelector(StringRef Selector) {
+  // example: 0x10-0x30
+  Regex MemRangeRegex{"0x([0-9a-fA-F]+)-0x([0-9a-fA-F]+)"};
+  SmallVector<StringRef> MatchedGroups;
+
+  std::string Error;
+  if (!MemRangeRegex.match(Selector, &MatchedGroups, &Error))
+    return std::nullopt;
+
+  assert(MatchedGroups.size() == 3);
+  NamedMemoryRange FinalRange(getAddressFromString(MatchedGroups[1]),
+                              getAddressFromString(MatchedGroups[2]));
+  if (!FinalRange.isValid())
+    reportParsingError("invalid range: " + Twine(Selector));
+
+  return FinalRange;
+}
+
+template <typename InsertIt>
+static void collectRangesByExpr(Interpreter &I, InsertIt Inserter,
+                                StringRef Selector) {
+  auto ErrorRet = Selector.consume_front("{") && Selector.consume_back("}");
+  assert(ErrorRet && "Wrong opt formating");
+  auto RangeOpt = getRangeFromSelector(Selector);
+  if (!RangeOpt) {
+    collectSectionsWithAccess(I, Inserter, Selector);
     return;
   }
-  auto SectIt =
-      std::find_if(SectBeg, SectEnd, [&Selector](const SectionDesc &SectDesc) {
-        return SectDesc.getIDString() == Selector;
-      });
-  if (SectIt == SectEnd)
-    report_fatal_error("failed to find a section {" + Twine(Selector) + "}",
-                       false);
-  Inserter = SectIt->getIDString();
+  Inserter = *RangeOpt;
 }
 
-template <typename It>
-static std::vector<std::string>
-getSectionNamesToDump(It SectBeg, It SectEnd,
-                      snippy::opt_list<std::string> &SectionsToDump) {
-  std::set<std::string> SectionsSet;
-  for (const auto &SectSelector : SectionsToDump)
-    getSectionsFromSelector(SectBeg, SectEnd,
-                            std::inserter(SectionsSet, SectionsSet.begin()),
-                            SectSelector);
-  return {SectionsSet.begin(), SectionsSet.end()};
+template <typename InsertIt>
+static void getRangesFromSelector(Interpreter &I, InsertIt Inserter,
+                                  StringRef Selector) {
+  if (Selector.front() == '{' && Selector.back() == '}') {
+    collectRangesByExpr(I, Inserter, Selector);
+    return;
+  }
+  auto RangeOpt = I.getSectionPosition(Selector);
+  if (!RangeOpt)
+    report_fatal_error("failed to find a section {" + Twine(Selector) + "}",
+                       false);
+  Inserter = *RangeOpt;
+}
+
+static std::vector<NamedMemoryRange>
+getMemoryRangesToDump(Interpreter &I,
+                      snippy::opt_list<std::string> &RangesSelectors) {
+  std::vector<NamedMemoryRange> RangesToDump;
+  for (const auto &RangeSelector : RangesSelectors)
+    getRangesFromSelector(I, std::back_inserter(RangesToDump), RangeSelector);
+
+  std::sort(RangesToDump.begin(), RangesToDump.end());
+  RangesToDump.erase(std::unique(RangesToDump.begin(), RangesToDump.end()),
+                     RangesToDump.end());
+  return RangesToDump;
 }
 
 std::string
@@ -255,11 +302,9 @@ void GeneratorContext::runSimulator(StringRef ImageToRun) {
 
     I.setPC(FinalPC);
     I.dumpCurrentRegState(GenSettings->RegistersConfig.FinalStateOutputYaml);
-    auto InterpSections = I.getSections();
-    auto SectNames = getSectionNamesToDump(
-        InterpSections.begin(), InterpSections.end(), DumpMemorySection);
-    if (!SectNames.empty())
-      I.dumpSections(SectNames, MemorySectionFile);
+    auto RangesToDump = getMemoryRangesToDump(I, DumpMemorySection);
+    if (!RangesToDump.empty())
+      I.dumpRanges(RangesToDump, MemorySectionFile);
 
     // Force flush stdout buffer written by Simulator.
     // It helps to avoid mixing it with stderr if redirected to same file.

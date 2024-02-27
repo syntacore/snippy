@@ -143,28 +143,31 @@ static void writeAsHex(It Beg, It End, raw_string_ostream &SS) {
 }
 
 static void writeSectionToFile(ArrayRef<char> Data,
-                               const std::string &SectionName, size_t Size,
+                               const NamedMemoryRange &Range,
                                raw_fd_ostream &File) {
   auto *SectData = Data.data();
   if (!DumpAsASCII) {
-    File.write(SectData, Size);
+    File.write(SectData, Data.size());
     return;
   }
 
-  std::string OutString;
-  auto SS = raw_string_ostream{OutString};
-  SS << "Section {" << SectionName << "}:\n";
+  auto SectionHeader = Range.hasName() ? "Section {" + Range.name() + "}:"
+                                       : "Range {" + Range.name() + "}:";
+  std::string StringForSection;
+  raw_string_ostream SS{StringForSection};
+  SS << SectionHeader << "\n";
   // Number of digits of max address value in section in hex
-  auto NumOfDigits = Size ? static_cast<size_t>(std::ceil(std::log10(Size - 1) /
-                                                          std::log10(16)))
-                          : 0ul;
+  auto NumOfDigits = (Data.size() > 1)
+                         ? static_cast<size_t>(std::ceil(
+                               std::log10(Data.size() - 1) / std::log10(16)))
+                         : 0ul;
   auto CurOffset = 0ul;
   auto LineSize = 0x10ul;
-  while (CurOffset < Size) {
+  while (CurOffset < Data.size()) {
     // This additional 2 is a ritual sacrifice for the developer of the
     // format_hex(), who have decided to consider 0x as a part of a NUMBER
     SS << format_hex(CurOffset, NumOfDigits + 2) << ": ";
-    auto CurLineSize = std::min(LineSize, Size - CurOffset);
+    auto CurLineSize = std::min(LineSize, Data.size() - CurOffset);
     auto CurLineBeg = SectData + CurOffset;
     writeAsHex(CurLineBeg, CurLineBeg + CurLineSize, SS);
     SS << "\n";
@@ -335,36 +338,41 @@ void Interpreter::dumpRegs(const IRegisterState &Regs, StringRef YamlPath) {
     dumpRegsAsYAML(Regs, YamlPath);
 }
 
-void Interpreter::dumpOneSection(const std::string &SectionName,
-                                 raw_fd_ostream &File) const {
+void Interpreter::dumpOneRange(NamedMemoryRange Range,
+                               raw_fd_ostream &File) const {
+  assert(Range.isValid());
+  auto [RangeBeg, RangeEnd] = Range.boundaries();
+  auto Size = RangeEnd - RangeBeg;
+  std::vector<char> Data(Size);
+  Simulator->readMem(RangeBeg, Data);
+
+  writeSectionToFile(Data, Range, File);
+  if (File.has_error())
+    report_fatal_error("Memory dump error: " + Twine(File.error().message()),
+                       false);
+}
+
+std::optional<NamedMemoryRange>
+Interpreter::getSectionPosition(StringRef SectionName) const {
   const auto &Sections = Env.Sections;
   auto S = std::find_if(Sections.begin(), Sections.end(),
                         [SectionName](const auto &CurSection) {
                           return CurSection.getIDString() == SectionName;
                         });
   if (S == Sections.end())
-    report_fatal_error("failed to find a section {" + Twine(SectionName) + "}",
-                       false);
-  auto Size = S->Size;
-  std::vector<char> Data(Size);
-  LLVM_DEBUG(dbgs() << "Dumping section with name: {" << S->getIDString()
-                    << "}\n");
-  Simulator->readMem(S->VMA, Data);
-  writeSectionToFile(Data, SectionName, Size, File);
-  if (File.has_error())
-    report_fatal_error("Memory dump error: " + Twine(File.error().message()),
-                       false);
+    return std::nullopt;
+  return {NamedMemoryRange{S->VMA, S->VMA + S->Size, S->getIDString()}};
 }
 
-void Interpreter::dumpSections(const std::vector<std::string> &SectionNames,
-                               const std::string &FileName) const {
+void Interpreter::dumpRanges(ArrayRef<NamedMemoryRange> Ranges,
+                             const std::string &FileName) const {
   std::error_code EC;
   raw_fd_ostream File(FileName, EC);
   if (EC)
     report_fatal_error("Memory dump error: " + Twine(EC.message()), false);
 
-  for (const auto &SectName : SectionNames)
-    dumpOneSection(SectName, File);
+  for (auto Range : Ranges)
+    dumpOneRange(Range, File);
 }
 
 void Interpreter::setReg(llvm::Register Reg, const APInt &NewValue) {
