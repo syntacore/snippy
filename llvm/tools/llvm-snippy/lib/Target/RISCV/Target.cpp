@@ -2727,7 +2727,7 @@ void SnippyRISCVTarget::rvvWriteValue(MachineBasicBlock &MBB,
 
   auto GVAddr = GP.getGVAddress(GV);
   loadRegFromAddr(MBB, Ins, GVAddr, DstReg, RP, GC);
-  GC.NotifyMemUpdate(GVAddr, Value);
+  GC.notifyMemUpdate(GVAddr, Value);
 }
 
 void SnippyRISCVTarget::updateRVVConfig(const MachineInstr &MI,
