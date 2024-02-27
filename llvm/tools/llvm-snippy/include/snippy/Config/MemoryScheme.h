@@ -648,12 +648,11 @@ struct SectionsDescriptions : private std::vector<SectionDesc> {
   }
 
   auto getSectionsSize(Acc AccType) const {
-    // FIXME: this basically find LAST size of section
     return std::accumulate(
         begin(), end(), 0ull,
         [AccType](const size_t CurrentSize, const auto &Section) {
           if (Section.hasAccess(AccType))
-            return Section.getSize();
+            return CurrentSize + Section.getSize();
           return CurrentSize;
         });
   }

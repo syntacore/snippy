@@ -32,6 +32,15 @@ public:
 
   bool runOnMachineFunction(MachineFunction &MF) override;
 
+  bool insertPrologue(MachineFunction &MF, std::vector<unsigned> &SpilledRegs);
+  bool insertEpilogue(MachineFunction &MF, std::vector<unsigned> &SpilledRegs);
+
+  auto getFunctionSizeInfo(const MachineFunction &MF) const {
+    auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+    return std::make_pair(SGCtx.getFunctionSize(MF),
+                          SGCtx.getOutputSectionFor(MF));
+  }
+
   auto getAllMutatedRegs(MachineFunction &MF) {
     DenseSet<unsigned> MutatedRegs;
     for (auto &MBB : MF)
@@ -51,11 +60,11 @@ public:
 
   auto getSpilledRegs(MachineFunction &MF) {
     auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-    bool IsEntry = SGCtx.isEntryFunction(MF);
+    bool IsRoot = SGCtx.getCallGraphState().isRoot(&MF.getFunction());
 
     std::vector<unsigned> Ret;
 
-    if (IsEntry)
+    if (IsRoot)
       std::copy(SGCtx.getSpilledRegs().begin(), SGCtx.getSpilledRegs().end(),
                 std::back_inserter(Ret));
     else {
@@ -168,23 +177,21 @@ void PrologueEpilogueInsertion::generateStackTermination(
   auto Addr = SGCtx.getStackTop() - SPSpillSize;
   SnippyTgt.loadRegFromAddr(MBB, Ins, Addr, StackPointer, RP, SGCtx);
 }
-
-bool PrologueEpilogueInsertion::runOnMachineFunction(MachineFunction &MF) {
+bool PrologueEpilogueInsertion::insertPrologue(
+    MachineFunction &MF, std::vector<unsigned> &SpilledRegs) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &State = SGCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
-  if (!SGCtx.stackEnabled())
-    return false;
-
   bool IsEntry = SGCtx.isEntryFunction(MF);
 
-  // 1. Insert Prologue.
+  // Only Entry function out of all root functions has prologue.
+  if (!IsEntry && SGCtx.getCallGraphState().isRoot(&MF.getFunction()))
+    return false;
+
   auto &&[MBB, Ins] = findPlaceForPrologue(MF);
 
-  auto SpilledRegs = getSpilledRegs(MF);
-
-  // Forbid spilled registers to be potentially be used as scratch registers
+  // Forbid spilled registers to be potentially used as scratch registers
   // for address forming.
   auto RP = SGCtx.getRegisterPool();
   for (auto SpillReg : SpilledRegs)
@@ -198,12 +205,48 @@ bool PrologueEpilogueInsertion::runOnMachineFunction(MachineFunction &MF) {
     MBB->addLiveIn(SpillReg);
     SnippyTgt.generateSpill(*MBB, Ins, SpillReg, SGCtx);
   }
-  if (IsEntry)
-    SGCtx.setEntryPrologueInstructionCount(std::distance(MBB->begin(), Ins));
+  if (!IsEntry)
+    return true;
+  SGCtx.setEntryPrologueInstructionCount(std::distance(MBB->begin(), Ins));
 
-  // 2. Insert epilogue
+  // For entry also check that function still fits assigned section
+  // after prologue insertion
+  auto &&[FSize, SectionInfo] = getFunctionSizeInfo(MF);
+  auto PrologueSize = SGCtx.getCodeBlockSize(MBB->begin(), Ins);
 
-  std::tie(MBB, Ins) = findPlaceForEpilogue(MF);
+  // Do not report error here if function doesn't fit even without prologue.
+  // That error would be displayed further in FunctionDistributePass.
+  if (FSize <= SectionInfo.Size || FSize - PrologueSize > SectionInfo.Size)
+    return true;
+
+  std::string Message;
+  llvm::raw_string_ostream OS{Message};
+  OS << "Function '" << MF.getName() << "' won't fit into assigned section '"
+     << SectionInfo.getIDString() << "' of size " << SectionInfo.Size
+     << " after prologue insertion\n";
+  OS << "Total function size: " << FSize << "; Prologue size: " << PrologueSize;
+  report_fatal_error(StringRef(Message), false);
+}
+
+bool PrologueEpilogueInsertion::insertEpilogue(
+    MachineFunction &MF, std::vector<unsigned> &SpilledRegs) {
+  auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &State = SGCtx.getLLVMState();
+  const auto &SnippyTgt = State.getSnippyTarget();
+
+  bool IsExit = SGCtx.isExitFunction(MF);
+
+  // Only Exit function out of all root functions has epilogue.
+  if (!IsExit && SGCtx.getCallGraphState().isRoot(&MF.getFunction()))
+    return false;
+
+  // Forbid spilled registers to be potentially used as scratch registers
+  // for address forming.
+  auto RP = SGCtx.getRegisterPool();
+  for (auto SpillReg : SpilledRegs)
+    RP.addReserved(SpillReg);
+
+  auto &&[MBB, Ins] = findPlaceForEpilogue(MF);
   bool BBWasEmptyBeforeEpilogueInsertion = MBB->empty();
   auto Prev = BBWasEmptyBeforeEpilogueInsertion ? MBB->end() : std::prev(Ins);
 
@@ -213,16 +256,46 @@ bool PrologueEpilogueInsertion::runOnMachineFunction(MachineFunction &MF) {
                   SnippyTgt.generateReload(*MBB, Ins, Reg, SGCtx);
                 });
 
-  if (IsEntry && !SGCtx.hasExternalStack())
+  if (IsExit && !SGCtx.hasExternalStack())
     generateStackTermination(*MBB, Ins, RP);
 
   auto FirstInserted =
       BBWasEmptyBeforeEpilogueInsertion ? MBB->begin() : std::next(Prev);
-  if (IsEntry)
-    SGCtx.setEntryEpilogueInstuctionCount(
-        std::distance(FirstInserted, MBB->end()));
+  if (!IsExit)
+    return true;
+  SGCtx.setEntryEpilogueInstuctionCount(
+      std::distance(FirstInserted, MBB->end()));
 
-  return true;
+  // For exit also check that function still fits assigned section
+  // after epilogue insertion
+  auto &&[FSize, SectionInfo] = getFunctionSizeInfo(MF);
+  auto EpilogueSize = SGCtx.getCodeBlockSize(FirstInserted, MBB->end());
+
+  // Do not report error here if function doesn't fit even without epilogue.
+  // That error would be displayed further in FunctionDistributePass.
+  if (FSize <= SectionInfo.Size || FSize - EpilogueSize > SectionInfo.Size)
+    return true;
+
+  std::string Message;
+  llvm::raw_string_ostream OS{Message};
+  OS << "Function '" << MF.getName() << "' won't fit into assigned section '"
+     << SectionInfo.getIDString() << "' of size " << SectionInfo.Size
+     << " after epilogue insertion\n";
+  OS << "Total function size: " << FSize << "; Epilogue size: " << EpilogueSize;
+  report_fatal_error(StringRef(Message), false);
+}
+
+bool PrologueEpilogueInsertion::runOnMachineFunction(MachineFunction &MF) {
+  auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+
+  if (!SGCtx.stackEnabled())
+    return false;
+
+  auto SpilledRegs = getSpilledRegs(MF);
+  auto PrologueInserted = insertPrologue(MF, SpilledRegs);
+  auto EpilogueInserted = insertEpilogue(MF, SpilledRegs);
+
+  return PrologueInserted || EpilogueInserted;
 }
 
 } // namespace snippy

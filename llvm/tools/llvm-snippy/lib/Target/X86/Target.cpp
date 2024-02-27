@@ -162,6 +162,11 @@ public:
     reportUnimplementedError();
   }
 
+  MachineInstr *generateTailCall(MachineBasicBlock &MBB, const Function &Target,
+                                 const GeneratorContext &GC) const override {
+    reportUnimplementedError();
+  }
+
   MachineInstr *generateReturn(MachineBasicBlock &MBB,
                                const LLVMState &State) const override {
     reportUnimplementedError();

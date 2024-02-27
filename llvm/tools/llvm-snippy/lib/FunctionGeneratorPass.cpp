@@ -58,6 +58,8 @@ public:
 
   bool generateDefault(Module &M);
 
+  std::vector<std::string> prepareRXSections();
+
   bool runOnModule(Module &M) override;
 };
 
@@ -162,12 +164,16 @@ FunctionGenerator::FunctionGenerator() : ModulePass(ID) {
 namespace {
 
 MachineFunction &createFunction(GeneratorContext const &SGCtx, Module &M,
-                                StringRef Name,
+                                StringRef Name, StringRef SectionName,
                                 Function::LinkageTypes Linkage) {
 
   auto &State = SGCtx.getLLVMState();
+  std::string FinalName =
+      SectionName.empty() || Linkage != Function::InternalLinkage
+          ? std::string(Name)
+          : (Twine(SectionName) + "." + Name).str();
   auto &MF = State.createMachineFunctionFor(
-      State.createFunction(M, Name, Linkage), SGCtx.getMMI());
+      State.createFunction(M, FinalName, SectionName, Linkage), SGCtx.getMMI());
   auto &Props = MF.getProperties();
   // FIXME: currently we don't keep liveness when creating and filling new BB
   if (SGCtx.hasCFInstrs() || SGCtx.hasCallInstrs())
@@ -179,6 +185,25 @@ MachineFunction &createFunction(GeneratorContext const &SGCtx, Module &M,
 }
 
 } // namespace
+
+// Get list of RX sections. Root functions must be placed to
+// that sections in order. That is, entry function is assigned
+// first section in list, exit function is assigned last section
+// in list and all intermediate root functions goes between them
+// in order.
+std::vector<std::string> FunctionGenerator::prepareRXSections() {
+  auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &Linker = SGCtx.getLinker();
+
+  if (!SGCtx.getGenSettings().InstrsGenerationConfig.ChainedRXSectionsFill)
+    return {""};
+
+  std::vector<std::string> Ret;
+  for (auto &&[_, InputSections] : Linker.executionPath())
+    Ret.emplace_back(InputSections.front());
+
+  return Ret;
+}
 
 bool FunctionGenerator::runOnModule(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
@@ -203,12 +228,14 @@ bool FunctionGenerator::readFromYaml(Module &M, const FunctionDescs &FDs) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &State = SGCtx.getLLVMState();
   auto &Descs = FDs.Descs;
+  auto &CGS = SGCtx.getCallGraphState();
 
   auto EPIt = FDs.getEntryPointDesc();
   assert(EPIt != FDs.Descs.end() && "that should be checked earlier");
   auto &EntryPoint = *EPIt;
 
-  auto &CGS = SGCtx.getCallGraphState();
+  auto Sections = prepareRXSections();
+
   std::map<std::string, CallGraphState::Node *> NameMap;
 
   // Create functions.
@@ -217,17 +244,34 @@ bool FunctionGenerator::readFromYaml(Module &M, const FunctionDescs &FDs) {
       // 'External' functions are emitted as weak symbols.
       // This allows to override them in final elf.
       // Fuction bodies are filled later in FillExternalFunctionsStubsPass.
-      auto &F = State.createFunction(M, Desc.Name, Function::WeakAnyLinkage);
+      auto &F = State.createFunction(M, Desc.Name, Sections.front(),
+                                     Function::WeakAnyLinkage);
       NameMap.emplace(Desc.Name, CGS.emplaceNode(&F));
     } else {
       auto IsEntryPoint = &Desc == &EntryPoint;
-      // From all of snippy-generated functions only entry point is exported.
-      auto &MF = createFunction(SGCtx, M, Desc.Name,
-                                IsEntryPoint ? Function::ExternalLinkage
-                                             : Function::InternalLinkage);
-      auto *N = CGS.emplaceNode(&(MF.getFunction()));
-      if (IsEntryPoint)
+      CallGraphState::Node *N = nullptr;
+      if (IsEntryPoint) {
+        // Entry point produces multiple root functions. Each one of
+        // them is assigned to respective RX section.
+        auto &MF = createFunction(SGCtx, M, Desc.Name, Sections.front(),
+                                  Function::ExternalLinkage);
+        N = CGS.emplaceNode(&(MF.getFunction()));
         CGS.setRoot(N);
+        for (auto &Section :
+             llvm::make_range(std::next(Sections.begin()), Sections.end())) {
+          CGS.appendNode(N, (&createFunction(SGCtx, M, Desc.Name, Section,
+                                             Function::InternalLinkage)
+                                  .getFunction()));
+        }
+      } else {
+        // All secondary functions are not assigned to specific RX section upon
+        // creation. They are distributed to section later by
+        // FunctionDistributePass.
+        auto *NullSection = "";
+        auto &MF = createFunction(SGCtx, M, Desc.Name, NullSection,
+                                  Function::InternalLinkage);
+        N = CGS.emplaceNode(&(MF.getFunction()));
+      }
       NameMap.emplace(Desc.Name, N);
     }
   }
@@ -247,19 +291,35 @@ bool FunctionGenerator::readFromYaml(Module &M, const FunctionDescs &FDs) {
 
 bool FunctionGenerator::generateDefault(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &CGS = SGCtx.getCallGraphState();
+  auto Sections = prepareRXSections();
 
   // Create functions.
   auto NumF = SGCtx.getCallGraphLayout().FunctionNumber;
 
   assert(NumF && "Expected NumF >= 1");
 
-  auto &EntryFunction = createFunction(SGCtx, M, SGCtx.getEntryPointName(),
-                                       Function::ExternalLinkage);
-  auto &CGS = SGCtx.getCallGraphState();
-  CGS.setRoot(CGS.emplaceNode(&(EntryFunction.getFunction())));
+  auto &EntryFunction =
+      createFunction(SGCtx, M, SGCtx.getEntryPointName(), Sections.front(),
+                     Function::ExternalLinkage);
+
+  auto *Root = CGS.emplaceNode(&(EntryFunction.getFunction()));
+  CGS.setRoot(Root);
+
+  // Create Root function for each section.
+  for (auto &Section :
+       llvm::make_range(std::next(Sections.begin()), Sections.end())) {
+    auto &MF = createFunction(SGCtx, M, SGCtx.getEntryPointName(), Section,
+                              Function::InternalLinkage);
+    CGS.appendNode(Root, &MF.getFunction());
+  }
 
   for (auto i = 0u; i < NumF - 1; ++i) {
-    auto &MF = createFunction(SGCtx, M, ("fun" + Twine(i)).str(),
+    // All secondary functions are not assigned to specific RX section upon
+    // creation. They are distributed to section later by
+    // FunctionDistributePass.
+    auto *NullSection = "";
+    auto &MF = createFunction(SGCtx, M, ("fun" + Twine(i)).str(), NullSection,
                               Function::InternalLinkage);
     CGS.emplaceNode(&MF.getFunction());
   }

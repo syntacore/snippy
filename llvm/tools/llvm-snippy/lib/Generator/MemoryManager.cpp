@@ -28,26 +28,21 @@ namespace llvm::snippy {
 
 namespace {
 
-struct MemorySectionConfig {
-  MemAddr Start = 0;
-  MemAddr Size = 0;
-  std::string Name;
-};
+void fillProgSectionInfo(const Linker &L, MemoryConfig &Config) {
+  for (auto &ExecSection : L.executionPath()) {
+    if (ExecSection.InputSections.empty())
+      continue;
+    Config.ProgSections.emplace_back(
+        ExecSection.OutputSection.Desc.VMA, ExecSection.OutputSection.Desc.Size,
+        L.getMangledName(ExecSection.OutputSection.Name));
+    LLVM_DEBUG(
+        dbgs() << "ProgramStart: " << Config.ProgSections.back().Start << "\n";
+        dbgs() << "ProgramSize: " << Config.ProgSections.back().Size << "\n");
+  }
 
-MemorySectionConfig getProgSectionInfo(const Linker &L) {
-  if (!L.hasOutputSectionFor(".text"))
-    report_fatal_error("Incorrect list of sections: there are no suitable "
-                       "RX section",
+  if (Config.ProgSections.empty())
+    report_fatal_error("Incorrect list of sections: no used RX sections found",
                        false);
-  auto CodeSection = L.getOutputSectionFor(".text");
-  auto ProgStart = CodeSection.Desc.VMA;
-  auto ProgSize = CodeSection.Desc.Size;
-  auto ProgSectionName = L.getMangledName(CodeSection.Name);
-
-  LLVM_DEBUG(dbgs() << "ProgramStart: " << ProgStart << "\n";
-             dbgs() << "ProgramSize: " << ProgSize << "\n");
-
-  return {ProgStart, ProgSize, ProgSectionName};
 }
 
 MemorySectionConfig getRamInfo(const Linker &L) {
@@ -106,22 +101,15 @@ MemorySectionConfig getRomInfo(const Linker &L, MemAddr ProgSectionStart) {
 } // namespace
 
 MemoryConfig MemoryConfig::getMemoryConfig(const Linker &L) {
+  MemoryConfig Config{};
   // get RX sections info...
-  auto &&[ProgSectionStart, ProgSectionSize, ProgSectionName] =
-      getProgSectionInfo(L);
+  fillProgSectionInfo(L, Config);
   // get R sections info...
-  auto &&[RomStart, RomSize, RomSectionName] = getRomInfo(L, ProgSectionStart);
+  Config.Rom = getRomInfo(L, Config.ProgSections.front().Start);
   // get RW sections info...
-  auto RamCfg = getRamInfo(L);
+  Config.Ram = getRamInfo(L);
 
-  return {/* ProgSectionStart */ ProgSectionStart,
-          /* ProgSectionSize */ ProgSectionSize,
-          /* ProgSectionName */ ProgSectionName,
-          /* RomStart */ RomStart,
-          /* RomSize */ RomSize,
-          /* RomSectionName */ RomSectionName,
-          /* RamStart */ RamCfg.Start,
-          /* RamSize */ RamCfg.Size};
+  return Config;
 }
 
 } // namespace llvm::snippy

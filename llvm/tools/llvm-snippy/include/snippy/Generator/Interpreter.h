@@ -48,23 +48,27 @@ class Interpreter final {
   const SimulationEnvironment &Env;
   std::unique_ptr<RVMCallbackHandler::ObserverHandle<TransactionStack>>
       TransactionsObserverHandle;
+  uint64_t ProgEnd;
 
   void initTransactionMechanism();
   void dumpOneSection(const std::string &SectionName,
                       raw_fd_ostream &File) const;
 
 public:
-  uint64_t getProgStart() const { return Env.SimCfg.ProgStart; }
+  uint64_t getProgStart() const {
+    return Env.SimCfg.ProgSections.front().Start;
+  }
+  uint64_t getProgEnd() const { return ProgEnd; }
   uint64_t getRomStart() const { return Env.SimCfg.RomStart; }
   uint64_t getRamStart() const { return Env.SimCfg.RamStart; }
 
-  uint64_t getProgSize() const { return Env.SimCfg.ProgSize; }
   uint64_t getRomSize() const { return Env.SimCfg.RomSize; }
   uint64_t getRamSize() const { return Env.SimCfg.RamSize; }
 
-  uint64_t getProgEnd() const { return getProgStart() + getProgSize(); }
   uint64_t getRomEnd() const { return getRomStart() + getRomSize(); }
   uint64_t getRamEnd() const { return getRamStart() + getRamSize(); }
+
+  bool endOfProg() const;
 
   static SimulationEnvironment createSimulationEnvironment(
       const SnippyTarget &TGT, const TargetSubtargetInfo &Subtarget,
@@ -87,8 +91,6 @@ public:
   bool compareStates(const Interpreter &Another,
                      bool CheckMemory = false) const;
   bool step();
-
-  bool endOfProg() const;
 
   void resetMem();
 
