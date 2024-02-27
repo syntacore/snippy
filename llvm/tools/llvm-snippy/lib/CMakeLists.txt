@@ -35,6 +35,7 @@ add_llvm_library(LLVMSnippy
   CFGeneratorPass.cpp
   CFGPrinterPass.cpp
   CFPermutationPass.cpp
+  ConsecutiveLoopsVerifierPass.cpp
   FillExternalFunctionsStubsPass.cpp
   FlowGenerator.cpp
   FillExternalFunctionsStubsPass.cpp

@@ -32,5 +32,6 @@ void initializePrintMachineInstrsPass(PassRegistry &);
 void initializeInstructionsPostProcessPass(PassRegistry &);
 void initializeBranchRelaxatorPass(PassRegistry &);
 void initializeBlockGenPlanningPass(PassRegistry &);
+void initializeConsecutiveLoopsVerifierPass(PassRegistry &);
 
 } // namespace llvm

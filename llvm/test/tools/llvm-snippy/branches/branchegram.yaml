@@ -23,6 +23,7 @@ include:
 # CHECK: branches:
 # CHECK-NEXT:   permutation: true
 # CHECK-NEXT:   alignment: 32
+# CHECK-NEXT:   consecutive-loops: 0
 # CHECK-NEXT:   loop-ratio: 0.5
 # CHECK-NEXT:   number-of-loop-iterations:
 # CHECK-NEXT:       min: 2
