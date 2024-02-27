@@ -41,7 +41,7 @@ public:
 
   Config(const SnippyTarget &Tgt, StringRef PluginFilename,
          StringRef PluginInfoFilename, OpcodeCache OpCC, bool ParseWithPlugin,
-         LLVMContext &Ctx);
+         LLVMContext &Ctx, ArrayRef<std::string> IncludedFiles);
 
   // FIXME: this should return OpcGenHolder
   std::unique_ptr<DefaultOpcodeGenerator> createDefaultOpcodeGenerator() const {
@@ -117,14 +117,18 @@ public:
 
 class IncludePreprocessor final {
 public:
+  // NOTE: Lifetime of FileName field is the same as the
+  // lifetime of the enclosing class.
+  // Care needs to be taken that this StringRef does not dangle.
   struct LineID final {
-    std::string FileName;
+    StringRef FileName;
     unsigned N;
   };
 
 private:
   std::string Text;
   std::vector<LineID> Lines;
+  SmallSet<std::string, 8> IncludedFiles;
 
 public:
   IncludePreprocessor(StringRef Filename,
@@ -132,13 +136,15 @@ public:
                       LLVMContext &Ctx);
 
   void mergeFile(StringRef FileName, StringRef Contents);
-
-  LineID getCorrespondingLineID(unsigned GlobalID) {
+  LineID getCorrespondingLineID(unsigned GlobalID) const & {
     assert(GlobalID > 0 && GlobalID <= Lines.size());
     return Lines[GlobalID - 1];
   }
 
   StringRef getPreprocessed() const & { return Text; }
+  auto getIncludes() const & {
+    return llvm::make_range(IncludedFiles.begin(), IncludedFiles.end());
+  }
 };
 
 } // namespace snippy

@@ -179,7 +179,7 @@ private:
   std::set<MemRange> Ranges;
 };
 
-struct MemoryAccess;
+class MemoryAccess;
 using MemoryAccessSeq = SmallVector<std::unique_ptr<MemoryAccess>>;
 using MemoryAccessIter = MemoryAccessSeq::iterator;
 
@@ -237,10 +237,11 @@ struct AddressGenInfo {
   }
 };
 
-struct MemoryAccess {
-  double Weight = 1.0;
+class MemoryAccess {
+public:
+  MemoryAccess(MemoryAccessMode MAM) : Mode(MAM) {}
 
-  MemoryAccess() = default;
+  MemoryAccessMode getMode() const { return Mode; }
 
   virtual void print(raw_ostream &OS) const = 0;
   virtual void dump() const = 0;
@@ -249,9 +250,14 @@ struct MemoryAccess {
   virtual MemoryBank getPossibleAddresses() const = 0;
   virtual MemoryAccessSeq split(const MemoryBank &MB) const = 0;
   virtual std::unique_ptr<MemoryAccess> copy() const = 0;
-  virtual MemoryAccessMode getMode() const = 0;
   virtual bool isLegal(const AddressGenInfo &Info) const = 0;
   virtual ~MemoryAccess() {}
+
+public:
+  double Weight = 1.0;
+
+private:
+  MemoryAccessMode Mode;
 };
 
 struct MemoryAccessRange final : MemoryAccess {
@@ -273,7 +279,11 @@ struct MemoryAccessRange final : MemoryAccess {
   // small.
   std::array<SmallVector<size_t>, 4> AlignmentAllowedLCBlockOffsets;
 
-  MemoryAccessRange() {}
+  MemoryAccessRange() : MemoryAccess(MemoryAccessMode::Range) {}
+
+  static bool classof(const MemoryAccess *Access) {
+    return Access->getMode() == MemoryAccessMode::Range;
+  }
 
   void print(raw_ostream &OS) const override;
   void dump() const override { print(dbgs()); }
@@ -290,7 +300,6 @@ struct MemoryAccessRange final : MemoryAccess {
     return std::make_unique<MemoryAccessRange>(*this);
   }
 
-  MemoryAccessMode getMode() const override { return MemoryAccessMode::Range; }
   MemAddr getLowerBound() const override { return Start; }
 
 private:
@@ -319,7 +328,11 @@ struct MemoryAccessEviction final : MemoryAccess {
   MemAddr Mask = 0;
   MemAddr Fixed = 0;
 
-  MemoryAccessEviction() {}
+  MemoryAccessEviction() : MemoryAccess(MemoryAccessMode::Eviction) {}
+
+  static bool classof(const MemoryAccess *Access) {
+    return Access->getMode() == MemoryAccessMode::Eviction;
+  }
 
   void print(raw_ostream &OS) const override;
   void dump() const override { print(dbgs()); }
@@ -350,9 +363,6 @@ struct MemoryAccessEviction final : MemoryAccess {
     return Info.AccessSize <= 8;
   }
 
-  MemoryAccessMode getMode() const override {
-    return MemoryAccessMode::Eviction;
-  }
   MemAddr getLowerBound() const override { return Fixed; }
 };
 
@@ -369,7 +379,11 @@ struct MemoryAccessAddresses final : MemoryAccess {
   std::optional<size_t> NextBurstIdx;
   std::vector<AddressInfo> Burst;
 
-  MemoryAccessAddresses() {}
+  MemoryAccessAddresses() : MemoryAccess(MemoryAccessMode::Addresses) {}
+
+  static bool classof(const MemoryAccess *Access) {
+    return Access->getMode() == MemoryAccessMode::Addresses;
+  }
 
   void print(raw_ostream &OS) const override;
   void dump() const override { print(dbgs()); }
@@ -394,10 +408,6 @@ struct MemoryAccessAddresses final : MemoryAccess {
 
   bool isLegal(const AddressGenInfo &Info) const override;
 
-  MemoryAccessMode getMode() const override {
-    return MemoryAccessMode::Addresses;
-  }
-
   // FIXME: any reason to keep `getlowerbound` as a virtual function?
   MemAddr getLowerBound() const override {
     report_fatal_error(
@@ -416,7 +426,6 @@ using MemoryAccessesGroupSeq = SmallVector<MemoryAccessesGroup>;
 struct SectionsDescriptions;
 
 struct MemoryAccesses {
-  MemoryAccessesGroupSeq AccessGroups;
   MemoryAccessSeq BaseAccesses;
   MemoryAccessSeq SplitAccesses;
   MemoryBank Restricted;
@@ -441,19 +450,6 @@ struct MemoryAccesses {
 
   void validateSchemes(LLVMContext &Ctx, const SectionsDescriptions &Sections,
                        bool StrictCheck) const;
-  void extractMemSchemesFromAccessGroups() {
-    for (auto &AG : AccessGroups) {
-      for (auto &MA : AG.BaseGroupAccesses) {
-        MA->Weight *= AG.Weight;
-        if (MA->Weight == std::numeric_limits<double>::infinity())
-          report_fatal_error("The weight of the memory scheme, after "
-                             "calculation, became infinity",
-                             false);
-        BaseAccesses.push_back(std::move(MA));
-      }
-    }
-    AccessGroups.clear();
-  }
 };
 
 enum class Acc {
@@ -810,6 +806,30 @@ public:
 };
 
 } // namespace snippy
+
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(
+    snippy::MemoryAccessRange);
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(
+    snippy::MemoryAccessEviction);
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(
+    snippy::MemoryAccessAddresses);
+
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::MemoryBank);
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(
+    snippy::MemoryAccessesGroup);
+
+LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::MemoryAccessRange,
+                                     /* not flow */ false);
+LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::MemoryAccessEviction,
+                                     /* not flow */ false);
+LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::MemoryAccessAddresses,
+                                     /* not flow */ false);
+LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::MemoryAccessesGroup,
+                                     /* not flow */ false);
+
 LLVM_SNIPPY_YAML_DECLARE_SEQUENCE_TRAITS(snippy::SectionsDescriptions,
                                          snippy::SectionDesc);
+
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::MemoryAccesses);
+
 } // namespace llvm
