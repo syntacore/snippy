@@ -43,6 +43,44 @@ struct SimulationEnvironment {
   SectionDescVect Sections;
 };
 
+class NamedMemoryRange {
+  MemAddr Beg = 0;
+  MemAddr End = 0;
+  std::optional<std::string> Name;
+
+public:
+  NamedMemoryRange(MemAddr Beg, MemAddr End,
+                   std::optional<std::string> Name = std::nullopt)
+      : Beg{Beg}, End{End}, Name{Name} {}
+
+  std::pair<MemAddr, MemAddr> boundaries() const { return {Beg, End}; }
+
+  bool isValid() const { return End > Beg; }
+
+  std::string name() const {
+    if (Name)
+      return *Name;
+
+    std::string HeaderString;
+    raw_string_ostream SS{HeaderString};
+    SS << "0x";
+    SS.write_hex(Beg);
+    SS << "-0x";
+    SS.write_hex(End);
+    return SS.str();
+  }
+
+  bool hasName() const { return Name.has_value(); }
+
+  bool operator<(const NamedMemoryRange &Rhs) const {
+    return std::tie(Beg, End) < std::tie(Rhs.Beg, Rhs.End);
+  }
+
+  auto operator==(const NamedMemoryRange &Rhs) const {
+    return !(*this < Rhs) && !(Rhs < *this);
+  }
+};
+
 class Interpreter final {
   std::unique_ptr<SimulatorInterface> Simulator;
   const SimulationEnvironment &Env;
@@ -51,8 +89,7 @@ class Interpreter final {
   uint64_t ProgEnd;
 
   void initTransactionMechanism();
-  void dumpOneSection(const std::string &SectionName,
-                      raw_fd_ostream &File) const;
+  void dumpOneRange(NamedMemoryRange Range, raw_fd_ostream &File) const;
 
 public:
   uint64_t getProgStart() const {
@@ -158,11 +195,13 @@ public:
 
   const auto &getSimCfg() const { return Env.SimCfg; }
 
+  std::optional<NamedMemoryRange> getSectionPosition(StringRef Name) const;
+
   static void dumpRegsAsBin(const IRegisterState &Regs, StringRef FileName);
   static void dumpRegsAsYAML(const IRegisterState &Regs, StringRef FileName);
   static void dumpRegs(const IRegisterState &Regs, StringRef YamlPath);
-  void dumpSections(const std::vector<std::string> &SectionNames,
-                    const std::string &FileName) const;
+  void dumpRanges(ArrayRef<NamedMemoryRange> SectionNames,
+                  const std::string &FileName) const;
 
   void logMessage(const Twine &Message) const {
     return Simulator->logMessage(Message);
