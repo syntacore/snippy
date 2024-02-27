@@ -290,6 +290,32 @@ static uint64_t deriveZextBits(const RISCVSubtarget &Subtarget) {
     ZextBits |= RVM_ZEXT_BS;
   if (Subtarget.hasStdExtZfh())
     ZextBits |= RVM_ZEXT_FH;
+  if (Subtarget.hasStdExtZbkb())
+    ZextBits |= RVM_ZEXT_BKB;
+  if (Subtarget.hasStdExtZbkc())
+    ZextBits |= RVM_ZEXT_BKC;
+  if (Subtarget.hasStdExtZbkx())
+    ZextBits |= RVM_ZEXT_BKX;
+  if (Subtarget.hasStdExtZknd())
+    ZextBits |= RVM_ZEXT_KND;
+  if (Subtarget.hasStdExtZkne())
+    ZextBits |= RVM_ZEXT_KNE;
+  if (Subtarget.hasStdExtZknh())
+    ZextBits |= RVM_ZEXT_KNH;
+  if (Subtarget.hasStdExtZksed())
+    ZextBits |= RVM_ZEXT_KSED;
+  if (Subtarget.hasStdExtZksh())
+    ZextBits |= RVM_ZEXT_KSH;
+  if (Subtarget.hasStdExtZkr())
+    ZextBits |= RVM_ZEXT_KR;
+  if (Subtarget.hasStdExtZkn())
+    ZextBits |= RVM_ZEXT_KN;
+  if (Subtarget.hasStdExtZks())
+    ZextBits |= RVM_ZEXT_KS;
+  if (Subtarget.hasStdExtZk())
+    ZextBits |= RVM_ZEXT_K;
+  if (Subtarget.hasStdExtZkt())
+    ZextBits |= RVM_ZEXT_KT;
   return ZextBits;
 }
 
