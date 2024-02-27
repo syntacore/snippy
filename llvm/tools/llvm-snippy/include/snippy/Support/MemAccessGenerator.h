@@ -31,7 +31,7 @@
 namespace llvm {
 namespace snippy {
 
-struct MemoryAccess;
+class MemoryAccess;
 struct AddressInfo;
 
 struct MemKey {
