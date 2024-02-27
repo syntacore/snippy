@@ -490,9 +490,12 @@ GeneratorContext::GeneratorContext(MachineModuleInfo &MMI, Module &M,
     : MMI(&MMI), State(&State), RegPoolsStorage({Pool}), RegGen(&RegGen),
       CGS(std::make_unique<CallGraphState>()), OpCC(&OpCc),
       PLinker(std::make_unique<Linker>(
-          Settings.Cfg.Sections, Settings.LinkerConfig.MangleExportedNames
-                                     ? Settings.LinkerConfig.EntryPointName
-                                     : "")),
+          State.getCtx(), Settings.Cfg.Sections,
+          Settings.InstrsGenerationConfig.ChainedRXSectionsFill,
+          Settings.InstrsGenerationConfig.ChainedRXSorted,
+          Settings.LinkerConfig.MangleExportedNames
+              ? Settings.LinkerConfig.EntryPointName
+              : "")),
       GenSettings(&Settings), ImmHistMap([&Settings, &OpCc] {
         const auto &ImmHist = Settings.Cfg.ImmHistogram;
         if (ImmHist.holdsAlternative<ImmediateHistogramRegEx>())
@@ -554,6 +557,14 @@ GeneratorContext::GeneratorContext(MachineModuleInfo &MMI, Module &M,
 
   initializeStackSection();
 
+  if (Settings.InstrsGenerationConfig.ChainedRXSectionsFill &&
+      std::count_if(
+          getLinker().sections().begin(), getLinker().sections().end(),
+          [](auto &Section) { return Section.OutputSection.Desc.M.X(); }) > 1 &&
+      hasTrackingMode())
+    snippy::fatal(State.getCtx(), "Cannot generate chained code routine",
+                  "backtrack, selfcheck and address hazard mode do not work "
+                  "with it yet.");
   if (hasCallInstrs()) {
     const auto &RI = State.getRegInfo();
     auto RA = RI.getRARegister();

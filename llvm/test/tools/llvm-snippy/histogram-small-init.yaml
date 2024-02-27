@@ -19,4 +19,4 @@ histogram:
     - [ADD, 1.0]
     - [ADDI, 1.0]
 
-# CHECK: LLVM ERROR: RX section is filled completely. Current size is {{[0-9]+}}, but section size is {{[0-9]+}}
+# CHECK: LLVM ERROR: RX section '1' (size {{[0-9]+}}) failed to fit code mapped to it. Total code size: {{[0-9]+}}

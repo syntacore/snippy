@@ -356,15 +356,6 @@ size_t countPrimaryInstructions(IteratorType Begin, IteratorType End) {
       Begin, End, [](const auto &MI) { return !checkSupportMetadata(MI); });
 }
 
-static size_t getFunctionSize(const MachineFunction &MF) {
-  return std::accumulate(MF.begin(), MF.end(), 0u,
-                         [](unsigned CurrentSize, const auto &MBB) {
-                           auto End = MBB.end();
-                           auto Begin = MBB.begin();
-                           return CurrentSize + getCodeSize(Begin, End);
-                         });
-}
-
 static auto getEffectiveMemoryAccessInfo(const MachineInstr *MI, AddressInfo AI,
                                          const SnippyTarget &SnippyTgt) {
   MemAddr EffectiveAddr = AI.Address;
@@ -469,8 +460,6 @@ class InstructionGenerator final : public MachineFunctionPass {
       const GenerationStatistics &CurrentInstructionGroupStats) const;
 
   void selfcheckOverflowGuard() const;
-
-  void reportRXSectionOverflow(size_t CurrentCodeSize, size_t MaxSize) const;
 
   // Returns iterator to the first inserted instruction. So [returned It;
   // InsertPos) contains inserted instructions.
@@ -704,19 +693,21 @@ void InstructionGenerator::addModelMemoryPropertiesAsGV() const {
   constexpr auto ConstantSizeInBits = 64u; // Constants size in bits
   constexpr auto Alignment = 1u;           // Without special alignment
 
-  auto DataSectionVMA = APInt{ConstantSizeInBits, MemCfg.RamStart};
+  auto DataSectionVMA = APInt{ConstantSizeInBits, MemCfg.Ram.Start};
   addGV(DataSectionVMA, Alignment, GlobalValue::ExternalLinkage,
         "data_section_address");
 
-  auto DataSectionSize = APInt{ConstantSizeInBits, MemCfg.RamSize};
+  auto DataSectionSize = APInt{ConstantSizeInBits, MemCfg.Ram.Size};
   addGV(DataSectionSize, Alignment, GlobalValue::ExternalLinkage,
         "data_section_size");
 
-  auto ExecSectionVMA = APInt{ConstantSizeInBits, MemCfg.ProgSectionStart};
+  auto ExecSectionVMA =
+      APInt{ConstantSizeInBits, MemCfg.ProgSections.front().Start};
   addGV(ExecSectionVMA, Alignment, GlobalValue::ExternalLinkage,
         "exec_section_address");
 
-  auto ExecSectionSize = APInt{ConstantSizeInBits, MemCfg.ProgSectionSize};
+  auto ExecSectionSize =
+      APInt{ConstantSizeInBits, MemCfg.ProgSections.front().Size};
   addGV(ExecSectionSize, Alignment, GlobalValue::ExternalLinkage,
         "exec_section_size");
 }
@@ -1582,16 +1573,6 @@ void InstructionGenerator::selfcheckOverflowGuard() const {
                        false);
 }
 
-void InstructionGenerator::reportRXSectionOverflow(size_t CurrentCodeSize,
-                                                   size_t MaxSize) const {
-  if (CurrentCodeSize >= MaxSize)
-    report_fatal_error(
-        Twine("RX section is filled completely. Current size is ") +
-            itostr(CurrentCodeSize) + ", but section size is " +
-            itostr(MaxSize),
-        false);
-}
-
 template <typename InstrIt>
 SelfcheckIntermediateInfo<InstrIt>
 InstructionGenerator::storeRefAndActualValueForSelfcheck(
@@ -1912,7 +1893,9 @@ void InstructionGenerator::generateCall(MachineBasicBlock &MBB,
     return;
   auto CalleeIdx = RandEngine::genInRange(CalleeCount);
   auto *CalleeNode = std::next(Node->callees().begin(), CalleeIdx)->Dest;
-  auto &CallTarget = *(CalleeNode->function());
+  auto FunctionIdx = RandEngine::genInRange(CalleeNode->functions().size());
+
+  auto &CallTarget = *(CalleeNode->functions()[FunctionIdx]);
 
   SnippyTgt.generateCall(MBB, Ins, CallTarget, *SGCtx, /* AsSupport */ false,
                          OpCode);
@@ -2409,20 +2392,35 @@ void InstructionGenerator::finalizeFunction(
   auto LastInstr = SGCtx->getLastInstr();
   bool EmptyLastInstr = LastInstr.empty();
 
-  // User may ask for last instruction to be return.
-  if (!SGCtx->isEntryFunction(MF) || SGCtx->useRetAsLastInstr()) {
+  // Secondary functions always return.
+  if (!SGCtx->isRootFunction(MF)) {
     State.getSnippyTarget().generateReturn(MBB, State);
     return;
   }
 
-  if (EmptyLastInstr)
+  // Root functions are connected via tail calls.
+  if (!SGCtx->isExitFunction(MF)) {
+    State.getSnippyTarget().generateTailCall(MBB, *SGCtx->nextRootFunction(MF),
+                                             *SGCtx);
     return;
+  }
 
-  auto MaxSize = SGCtx->getConfig().Sections.getSectionsSize(Acc::X);
-  auto CurrentCodeSize = getFunctionSize(MF);
+  auto *ExitSym =
+      MF.getContext().getOrCreateSymbol(Linker::GetExitSymbolName());
 
-  if (CurrentCodeSize > MaxSize)
-    reportRXSectionOverflow(CurrentCodeSize, MaxSize);
+  // User may ask for last instruction to be return.
+  if (SGCtx->useRetAsLastInstr()) {
+    State.getSnippyTarget()
+        .generateReturn(MBB, State)
+        ->setPreInstrSymbol(MF, ExitSym);
+    return;
+  }
+
+  // Or to generate no instruction at all.
+  if (EmptyLastInstr) {
+    MBB.back().setPostInstrSymbol(MF, ExitSym);
+    return;
+  }
 
   for (auto &&FinalReq : Request.getFinalGenReqs(MFStats)) {
     assert(FinalReq && "FinalReq is empty!");
@@ -2431,6 +2429,7 @@ void InstructionGenerator::finalizeFunction(
 
   // Mark last generated instruction as support one.
   setAsSupportInstr(*(--MBB.getFirstTerminator()), State.getCtx());
+  MBB.back().setPreInstrSymbol(MF, ExitSym);
 }
 
 bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
@@ -2576,6 +2575,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
   PM.add(createBranchRelaxatorPass());
 
   PM.add(createInstructionsPostProcessPass());
+  PM.add(createFunctionDistributePass());
 
   std::string MIR;
   raw_string_ostream MIROS(MIR);

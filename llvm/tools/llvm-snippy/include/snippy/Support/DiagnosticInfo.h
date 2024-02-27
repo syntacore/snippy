@@ -37,6 +37,8 @@ enum class WarningName {
   RegState,
   InstructionSizeUnknown,
   TooFarMaxPCDist,
+  ModelException,
+  UnusedSection
 };
 
 struct WarningCounters {

@@ -317,6 +317,10 @@ public:
                                      GeneratorContext &GC, bool AsSupport,
                                      unsigned PreferredCallOpCode) const = 0;
 
+  virtual MachineInstr *generateTailCall(MachineBasicBlock &MBB,
+                                         const Function &Target,
+                                         const GeneratorContext &GC) const = 0;
+
   virtual MachineInstr *generateReturn(MachineBasicBlock &MBB,
                                        const LLVMState &State) const = 0;
 
