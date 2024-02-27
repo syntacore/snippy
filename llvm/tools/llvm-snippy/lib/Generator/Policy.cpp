@@ -61,6 +61,5 @@ BurstGenPolicy::BurstGenPolicy(const GeneratorContext &SGCtx,
                  });
   Dist = std::discrete_distribution<size_t>(Weights.begin(), Weights.end());
 }
-
 } // namespace snippy
 } // namespace llvm
