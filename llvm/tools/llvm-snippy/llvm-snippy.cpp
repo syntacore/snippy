@@ -30,6 +30,7 @@
 #include "snippy/Target/Target.h"
 #include "snippy/Target/TargetSelect.h"
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Path.h"
@@ -715,7 +716,8 @@ static void checkBurstGram(LLVMContext &Ctx, const OpcodeHistogram &Histogram,
 }
 
 static void checkConfig(const Config &Cfg, const SnippyTarget &Tgt,
-                        LLVMContext &Ctx, const OpcodeCache &OpCC) {
+                        const TargetMachine &TM, LLVMContext &Ctx,
+                        const OpcodeCache &OpCC) {
   Cfg.CGLayout.validate(Ctx);
   if (Cfg.Sections.empty())
     fatal(Ctx, "Incorrect list of sections", "list is empty");
@@ -776,6 +778,7 @@ static void checkConfig(const Config &Cfg, const SnippyTarget &Tgt,
       snippy::fatal(Ctx, "Incorrect list of sections", SS.str());
     }
   }
+
   checkBurstGram(Ctx, Cfg.Histogram, OpCC, *Cfg.Burst.Data);
   checkCallRequirements(Tgt, Cfg.Histogram);
   checkMemoryRegions(Tgt, Cfg);
@@ -817,7 +820,8 @@ static void completeConfig(Config &Cfg, LLVMState &State,
   convertToCustomBurstMode(Cfg.Histogram, State.getInstrInfo(),
                            *Cfg.Burst.Data);
   Cfg.MS.setAddrPlugin({getMemPlugin(), getMemPluginInfo()});
-  checkConfig(Cfg, State.getSnippyTarget(), State.getCtx(), OpCC);
+  checkConfig(Cfg, State.getSnippyTarget(), State.getTargetMachine(),
+              State.getCtx(), OpCC);
 }
 
 static void initializeLLVMAll() {
@@ -921,8 +925,8 @@ void checkOptions(LLVMContext &Ctx) {
   auto GenerateWithPluginMode = generateWithPlugin();
   auto ParseWithPlugin = isParsingWithPluginEnabled();
   if (ParseWithPlugin && !GenerateWithPluginMode)
-    fatal(Ctx, "-plugin-parser option was specified,",
-          "but no generator plugin file was passed");
+    snippy::fatal(Ctx, "-plugin-parser option was specified,",
+                  "but no generator plugin file was passed");
 }
 
 void generateMain() {
