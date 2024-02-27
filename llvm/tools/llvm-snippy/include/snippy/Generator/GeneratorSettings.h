@@ -34,6 +34,8 @@ struct TrackingOptions {
 
 struct InstrsGenerationOptions {
   bool RunMachineInstrVerifier;
+  bool ChainedRXSectionsFill;
+  bool ChainedRXSorted;
   std::optional<unsigned> NumInstrs;
   std::string LastInstr;
 };

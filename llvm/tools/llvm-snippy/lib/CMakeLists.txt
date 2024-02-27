@@ -38,6 +38,7 @@ add_llvm_library(LLVMSnippy
   FillExternalFunctionsStubsPass.cpp
   FlowGenerator.cpp
   FillExternalFunctionsStubsPass.cpp
+  FunctionDistributePass.cpp
   FunctionGeneratorPass.cpp
   GeneratorContextPass.cpp
   InstructionsPostProcessPass.cpp

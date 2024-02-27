@@ -57,6 +57,7 @@ public:
 private:
   void checkStates(bool CheckMemory);
 
+  LLVMContext &Ctx;
   std::unique_ptr<SimulationEnvironment> Env;
   std::vector<std::unique_ptr<Interpreter>> CoInterp;
 };

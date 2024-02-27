@@ -1,0 +1,40 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=1000 \
+# RUN: --chained-rx-sections-fill --chained-rx-sorted  \
+# RUN: --honor-target-abi |& \
+# RUN: FileCheck %s --check-prefix=SIZE_ERROR
+
+sections:
+  - no:        3
+    VMA:       0x210000
+    SIZE:      0x1000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x100000
+    SIZE:      0x10000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      "stack"
+    VMA:       0x110000
+    SIZE:      0x10000
+    LMA:       0x110000
+    ACCESS:    rw
+  - no:        1
+    VMA:       0x410000
+    SIZE:      0x10
+    LMA:       0x410000
+    ACCESS:    rx
+  - no:        4
+    VMA:       0x610000
+    SIZE:      0x1000
+    LMA:       0x610000
+    ACCESS:    rx
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+
+#
+# SIZE_ERROR: LLVM ERROR: Function 'SnippyFunction' won't fit into assigned section '1' of size 16 after prologue insertion
+# SIZE_ERROR-NEXT: Total function size: {{[0-9]+}}; Prologue size: {{[0-9]+}}

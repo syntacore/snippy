@@ -1689,9 +1689,6 @@ public:
                              bool AsSupport,
                              unsigned PreferredCallOpcode) const override {
     assert(isCall(PreferredCallOpcode) && "Expected call here");
-    const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
-    auto &State = GC.getLLVMState();
-    auto &Ctx = State.getCtx();
     switch (PreferredCallOpcode) {
     case RISCV::JAL:
       return generateJAL(MBB, Ins, Target, GC, AsSupport);
@@ -1700,6 +1697,16 @@ public:
     default:
       report_fatal_error("Unsupported call instruction", false);
     }
+  }
+
+  MachineInstr *generateTailCall(MachineBasicBlock &MBB, const Function &Target,
+                                 const GeneratorContext &GC) const override {
+    const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
+    auto &State = GC.getLLVMState();
+    auto &Ctx = State.getCtx();
+    return getSupportInstBuilder(MBB, MBB.end(), Ctx,
+                                 InstrInfo.get(RISCV::PseudoTAIL))
+        .addGlobalAddress(&Target, 0, RISCVII::MO_CALL);
   }
 
   MachineInstr *generateReturn(MachineBasicBlock &MBB,

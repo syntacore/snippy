@@ -45,9 +45,12 @@ struct IRegisterState {
 struct TargetGenContextInterface;
 
 struct SimulationConfig {
-  ProgramCounterType ProgStart = 0;
-  ProgramCounterType ProgSize = 0;
-  std::string ProgSectionName;
+  struct Section {
+    ProgramCounterType Start = 0;
+    ProgramCounterType Size = 0;
+    std::string Name;
+  };
+  std::vector<Section> ProgSections;
 
   ProgramCounterType RomStart = 0;
   ProgramCounterType RomSize = 0;

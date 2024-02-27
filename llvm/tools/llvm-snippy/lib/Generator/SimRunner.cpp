@@ -15,7 +15,8 @@ namespace snippy {
 SimRunner::SimRunner(LLVMContext &Ctx, const SnippyTarget &TGT,
                      const TargetSubtargetInfo &Subtarget,
                      SimulationEnvironment SimEnv,
-                     ArrayRef<std::string> ModelLibs) {
+                     ArrayRef<std::string> ModelLibs)
+    : Ctx(Ctx) {
   Env = std::make_unique<SimulationEnvironment>(std::move(SimEnv));
   assert(!ModelLibs.empty() && "Model lib list must not be empty");
 
@@ -46,18 +47,25 @@ ProgramCounterType SimRunner::run(StringRef Programm,
   auto &PrimI = getPrimaryInterpreter();
   PrimI.logMessage("#===Simulation Start===\n");
 
-  ProgramCounterType CurPC = PrimI.getPC();
-  ProgramCounterType PrevPC = PrimI.getPC();
   while (!PrimI.endOfProg()) {
-    PrevPC = CurPC;
-    CurPC = PrimI.getPC();
     if (std::any_of(CoInterp.begin(), CoInterp.end(),
-                    [](auto &I) { return !I->step(); }))
-      break;
+                    [](auto &I) { return !I->step(); })) {
+      snippy::warn(WarningName::ModelException, Ctx,
+                   "Execution did not reached final instruction",
+                   "exception occurred in model");
+      return PrimI.getPC();
+    }
     checkStates(/* CheckMemory */ false);
-  }
+  };
+
+  ProgramCounterType LastInstrPC = PrimI.getPC();
+
+  // Execute last instruction
+  for (auto &I : CoInterp)
+    I->step();
+
   checkStates(/* CheckMemory */ true);
-  return PrevPC;
+  return LastInstrPC;
 }
 
 void SimRunner::checkStates(bool CheckMemory) {

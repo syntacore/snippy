@@ -59,9 +59,12 @@ public:
      * then Node #2 has caller edge to Node #1
      * This invariant is kept by this class.
      *
+     * One node unites a group of one or more functions
+     * sharing same callees and callers.
+     *
      */
 
-    explicit Node(Function *Func) : F(Func){};
+    explicit Node(const Function *Func) : Fs(1u, Func){};
 
     // Creates caller(this) <-> callee(N) relationship.
     void addCallee(Node *N);
@@ -87,13 +90,14 @@ public:
     bool hasCallee(const Node *Callee) const;
     bool hasCaller(const Node *Caller) const;
 
-    auto *function() const { return F; }
+    void append(const Function *F) { Fs.push_back(F); }
+    auto &functions() const { return Fs; }
 
     using ChildContainerT = std::vector<Edge>;
     using ChildIteratorT = ChildContainerT::const_iterator;
 
   private:
-    Function *F;
+    SmallVector<const Function *, 2> Fs;
     ChildContainerT Callees;
     ChildContainerT Callers;
   };
@@ -104,13 +108,14 @@ public:
 private:
   NodeContainerT Nodes;
   NodeRefContainerT NodeRefs;
-  DenseMap<Function *, Node *> FunToNodeMap;
+  DenseMap<const Function *, Node *> FunToNodeMap;
 
 public:
   CallGraphState() = default;
 
-  auto *emplaceNode(Function *F) {
-    assert(!FunToNodeMap.count(F) && "Node for MF has been already registered");
+  bool registered(const Function *F) const { return FunToNodeMap.count(F); }
+  auto *emplaceNode(const Function *F) {
+    assert(!registered(F) && "Node for MF has been already registered");
     auto *N = Nodes.emplace_back(std::make_unique<Node>(F)).get();
     NodeRefs.emplace_back(N);
     FunToNodeMap.insert({F, N});
@@ -118,8 +123,13 @@ public:
   }
 
   auto *getNode(const Function *F) const {
-    assert(FunToNodeMap.count(F) && "Machine Function is unregistered");
+    assert(registered(F) && "Machine Function is unregistered");
     return FunToNodeMap.lookup(F);
+  }
+
+  void appendNode(Node *N, const Function *F) {
+    FunToNodeMap.insert({F, N});
+    N->append(F);
   }
 
   // Checks if Node of F is reachable from root node via callee edges.
@@ -131,6 +141,10 @@ public:
   auto nodes_end() const { return NodeRefs.end(); }
 
   auto *getRootNode() const { return NodeRefs.front(); }
+
+  bool isRoot(const Function *F) const {
+    return registered(F) && getNode(F) == getRootNode();
+  }
 
   void setRoot(Node *Node) {
     if (Node == getRootNode())

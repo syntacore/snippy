@@ -24,17 +24,20 @@ class Linker;
 class GeneratorContext;
 class Interpreter;
 
+struct MemorySectionConfig {
+  MemAddr Start = 0;
+  MemAddr Size = 0;
+  std::string Name;
+  MemorySectionConfig() = default;
+  MemorySectionConfig(MemAddr Start, MemAddr Size, StringRef Name)
+      : Start{Start}, Size{Size}, Name{Name} {};
+};
+
 struct MemoryConfig {
-  MemAddr ProgSectionStart = 0;
-  MemAddr ProgSectionSize = 0;
-  std::string ProgSectionName;
+  std::vector<MemorySectionConfig> ProgSections;
+  MemorySectionConfig Rom;
+  MemorySectionConfig Ram;
 
-  MemAddr RomStart = 0;
-  MemAddr RomSize = 0;
-  std::string RomSectionName; // Empty if ROM section is not present
-
-  MemAddr RamStart = 0;
-  MemAddr RamSize = 0;
   static MemoryConfig getMemoryConfig(const Linker &L);
 };
 

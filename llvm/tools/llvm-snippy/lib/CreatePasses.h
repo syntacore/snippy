@@ -35,6 +35,8 @@ ImmutablePass *createGeneratorContextWrapperPass(snippy::GeneratorContext &Ctx);
 
 ImmutablePass *createRootRegPoolWrapperPass();
 
+ModulePass *createFunctionDistributePass();
+
 ModulePass *createFunctionGeneratorPass();
 
 ModulePass *createReserveRegsPass();
