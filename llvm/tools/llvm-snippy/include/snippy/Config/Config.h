@@ -35,7 +35,6 @@ public:
   ImmediateHistogram ImmHistogram;
   CallGraphLayout CGLayout;
   std::optional<FunctionDescs> FuncDescs;
-
   std::unique_ptr<PluginManager> PluginManagerImpl;
   std::unique_ptr<TargetConfigInterface> TargetConfig;
 
@@ -70,7 +69,7 @@ public:
     std::map<unsigned, double> DFHistogram;
     std::copy_if(Histogram.begin(), Histogram.end(),
                  std::inserter(DFHistogram, DFHistogram.end()),
-                 [&OpCC, &OpcMask, &BurstOpcodes](const auto &Hist) {
+                 [&](const auto &Hist) {
                    auto *Desc = OpCC.desc(Hist.first);
                    assert(Desc);
                    return Desc->isBranch() == false && OpcMask(Hist.first) &&
