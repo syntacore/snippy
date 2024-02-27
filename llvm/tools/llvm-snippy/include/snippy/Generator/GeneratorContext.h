@@ -287,7 +287,7 @@ public:
     return *GenSettings->Cfg.Burst.Data;
   }
 
-  void NotifyMemUpdate(uint64_t Addr, const APInt &Value) const;
+  void notifyMemUpdate(uint64_t Addr, const APInt &Value) const;
 
   auto &getMMI() const { return *MMI; }
   auto &getLLVMState() const { return *State; }

@@ -98,9 +98,9 @@ void GeneratorContext::initRunner() const {
       GenSettings->ModelPluginConfig.ModelLibraries);
 }
 
-void GeneratorContext::NotifyMemUpdate(uint64_t Addr,
+void GeneratorContext::notifyMemUpdate(uint64_t Addr,
                                        const APInt &Value) const {
-  // NotifyMemUpdate can be called when Interpreter has not been created, so
+  // notifyMemUpdate can be called when Interpreter has not been created, so
   // We call getOrCreateInterpreter() instead of using 'I' directly
   if (hasTrackingMode())
     getOrCreateInterpreter().writeMem(Addr, Value);
