@@ -14,5 +14,4 @@ access-groups:
         last-offset: 2
         weight: 1.5
 
-
-# CHECK: LLVM ERROR: Access-group weight can not be less than 0
+# CHECK: access-groups-negative.yaml:8:5: error: Access-group weight can not be less than 0

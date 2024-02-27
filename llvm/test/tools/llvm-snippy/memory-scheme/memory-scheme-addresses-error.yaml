@@ -5,4 +5,4 @@
 access-addresses:
   - plain:
 
-# CHECK: LLVM ERROR: At least one address must be provided either in 'plain' or 'burst' format for access-addresses memory scheme
+# CHECK: memory-scheme-addresses-error.yaml:6:5: error: At least one address must be provided either in 'plain' or 'burst' format for access-addresses memory scheme
