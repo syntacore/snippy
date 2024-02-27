@@ -261,11 +261,11 @@ private:
 };
 
 struct MemoryAccessRange final : MemoryAccess {
-  MemAddr Start;
-  size_t Size;
-  unsigned Stride;
-  unsigned FirstOffset;
-  unsigned LastOffset;
+  MemAddr Start = 0;
+  size_t Size = 0;
+  unsigned Stride = 1;
+  unsigned FirstOffset = 0;
+  unsigned LastOffset = 0;
 
   // When alignment must be accounted for, offsets that are aligned in one
   // Stride-wide block might not be aligned in the next one. However, they will
@@ -280,6 +280,11 @@ struct MemoryAccessRange final : MemoryAccess {
   std::array<SmallVector<size_t>, 4> AlignmentAllowedLCBlockOffsets;
 
   MemoryAccessRange() : MemoryAccess(MemoryAccessMode::Range) {}
+
+  MemoryAccessRange(MemAddr StartAddr, size_t Size, unsigned Stride,
+                    unsigned FirstOffset, unsigned LastOffset)
+      : MemoryAccess(MemoryAccessMode::Range), Start(StartAddr), Size(Size),
+        Stride(Stride), FirstOffset(FirstOffset), LastOffset(LastOffset) {}
 
   static bool classof(const MemoryAccess *Access) {
     return Access->getMode() == MemoryAccessMode::Range;

@@ -47,6 +47,7 @@ private:
 
   void fillPlanWithBurstGroups(BlocksGenPlanTy &GenPlan, size_t NumInstrBurst,
                                size_t NumInstrTotal, size_t AverageBlockInstrs);
+
   void fillPlanWithPlainInstsByNumber(BlocksGenPlanTy &GenPlan,
                                       size_t NumInstrPlain,
                                       size_t AverageBlockInstrs);
@@ -206,7 +207,6 @@ getBurstInstCounts(GeneratorContext &GenCtx, unsigned long long NumInstrBurst,
   assert(BGram.Groupings->size() > 0);
 
   auto OpcodeToNumOfGroups = BGram.getOpcodeToNumBurstGroups();
-
   const auto &Cfg = GenCtx.getConfig();
   NumInstrToGroupIdTy NumInstrToGroupId;
   auto InstrLeft = NumInstrBurst;
@@ -435,7 +435,8 @@ BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
   // as in some cases there are no instructions outside burst groups and then
   // the number must be exact.
   unsigned long long NumInstrBurst = getBurstProb(Cfg, *GenCtx) * NumInstrTotal;
-  auto NumInstrPlain = NumInstrTotal - NumInstrBurst;
+  auto NumInstrPlain = NumInstrTotal;
+  NumInstrPlain -= NumInstrBurst;
 
   auto AverageBlockInstrs = NumInstrTotal / BlocksToProcess.size();
   if (AverageBlockInstrs == 0)
@@ -645,7 +646,9 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
   // as in some cases there are no instructions outside burst groups and then
   // the number must be exact.
   unsigned long long NumInstrBurst = getBurstProb(Cfg, *GenCtx) * NumInstrTotal;
-  auto NumInstrPlain = NumInstrTotal - NumInstrBurst;
+
+  auto NumInstrPlain = NumInstrTotal;
+  NumInstrPlain -= NumInstrBurst;
 
   auto AverageBlockInstrs = NumInstrTotal / BlocksToProcess.size();
   if (AverageBlockInstrs == 0)
@@ -653,6 +656,7 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
 
   fillPlanWithBurstGroups(GenPlan, NumInstrBurst, NumInstrTotal,
                           AverageBlockInstrs);
+
   fillPlanWithPlainInstsByNumber(GenPlan, NumInstrPlain, AverageBlockInstrs);
 
   // Add default plans for remaining blocks.

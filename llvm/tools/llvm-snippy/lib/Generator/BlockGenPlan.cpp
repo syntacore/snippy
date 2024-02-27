@@ -86,17 +86,17 @@ void SingleBlockGenPlanTy::randomize() {
       [PlainPackSize] { return RandEngine::genInRange(0ull, PlainPackSize); });
   std::sort(Idxs.begin(), Idxs.end());
 
-  auto BurstPacksIt = Packs.begin();
+  auto NonPlainPacksIt = Packs.begin();
   std::vector<InstPackTy> NewPacks;
   for (auto [FirstIdx, SecondIdx] : zip(Idxs, drop_begin(Idxs))) {
     assert(FirstIdx <= SecondIdx);
     if (FirstIdx != SecondIdx)
       NewPacks.emplace_back(SecondIdx - FirstIdx);
 
-    assert(BurstPacksIt->isBurst());
-    NewPacks.push_back(*BurstPacksIt);
-    assert(BurstPacksIt != Packs.end());
-    ++BurstPacksIt;
+    assert(!NonPlainPacksIt->isPlain());
+    NewPacks.push_back(*NonPlainPacksIt);
+    assert(NonPlainPacksIt != Packs.end());
+    ++NonPlainPacksIt;
   }
 
   if (Idxs.back() != PlainPackSize)
