@@ -119,16 +119,9 @@ static size_t getFunctionSize(const MachineFunction &MF) {
 size_t
 BlockGenPlanningImpl::calculateMFSizeLimit(const MachineFunction &MF) const {
   assert(!GenCtx->isInstrsNumKnown());
-  // FIXME: bacically, we should use RX, but It seems that we implicitly
-  // set it R.
-  auto MaxSize = GenCtx->getConfig().Sections.getSectionsSize(Acc::X);
+  auto OutSectionDesc = GenCtx->getOutputSectionFor(MF);
+  auto MaxSize = OutSectionDesc.Size;
   auto CurrentCodeSize = getFunctionSize(MF);
-  if (CurrentCodeSize >= MaxSize)
-    report_fatal_error(
-        Twine("RX section is filled completely. Current size is ") +
-            itostr(CurrentCodeSize) + ", but section size is " +
-            itostr(MaxSize),
-        false);
 
   // last instruction in the trace might be target dependent: EBREAK or
   // int 3, etc.

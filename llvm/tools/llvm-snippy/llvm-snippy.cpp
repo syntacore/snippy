@@ -108,6 +108,19 @@ static snippy::opt<bool> FollowTargetABI(
              "by snippet execution to follow ABI calling conventions."),
     cl::cat(Options), cl::init(false));
 
+static snippy::opt<bool> ChainedRXSectionsFill(
+    "chained-rx-sections-fill",
+    cl::desc("Span the generated code across all provided RX sections. "
+             "When disabled only one of all provided RX section is used to "
+             "generate code to."),
+    cl::cat(Options), cl::init(false));
+
+static snippy::opt<bool>
+    ChainedRXSorted("chained-rx-sorted",
+                    cl::desc("Sort RX sections by their ID alphabetically when "
+                             "generating chain execution routine."),
+                    cl::cat(Options), cl::init(false));
+
 static snippy::opt<bool> ExternalStackOpt(
     "external-stack",
     cl::desc(
@@ -871,7 +884,8 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
       LinkerOptions{ExternalStackOpt, MangleExportedNames,
                     std::move(EntryPointName.getValue())},
       ModelPluginOptions{RunOnModel, std::move(Models)},
-      InstrsGenerationOptions{VerifyMachineInstrs, NumPrimaryInstrs,
+      InstrsGenerationOptions{VerifyMachineInstrs, ChainedRXSectionsFill,
+                              ChainedRXSorted, NumPrimaryInstrs,
                               std::move(LastInstr)},
       RegistersOptions{
           InitRegsInElf, InitialRegisterDataFile.getValue(),

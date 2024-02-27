@@ -83,16 +83,22 @@ public:
   }
 
   Function &createFunction(Module &M, StringRef FunctionName,
+                           StringRef SectionName,
                            Function::LinkageTypes Linkage,
                            LLVMContext &ExternalCtx) const {
     auto *FT = FunctionType::get(Type::getVoidTy(ExternalCtx), false);
     auto *F = Function::Create(FT, Linkage, FunctionName, M);
+    // Assign specific output section for this function
+    // if not empty. Default output section is ".text".
+    if (!SectionName.empty())
+      F->setSection(SectionName);
     return *F;
   }
 
   Function &createFunction(Module &M, StringRef FunctionName,
+                           StringRef SectionName,
                            Function::LinkageTypes Linkage) {
-    return createFunction(M, FunctionName, Linkage, Ctx);
+    return createFunction(M, FunctionName, SectionName, Linkage, Ctx);
   }
 
   MachineFunction &createMachineFunctionFor(Function &F, MachineModuleInfo &MMI,
@@ -115,9 +121,11 @@ public:
 
   MachineFunction &createMachineFunction(Module &M, MachineModuleInfo &MMI,
                                          StringRef FunctionName,
+                                         StringRef SectionName,
                                          Function::LinkageTypes Linkage,
                                          LLVMContext &ExternalCtx) const {
-    auto &F = createFunction(M, FunctionName, Linkage, ExternalCtx);
+    auto &F =
+        createFunction(M, FunctionName, SectionName, Linkage, ExternalCtx);
     return createMachineFunctionFor(F, MMI, ExternalCtx);
   }
 

@@ -214,16 +214,55 @@ public:
   StringRef getABIName() const { return GenSettings->ABIName; }
 
   auto isEntryFunction(const MachineFunction &MF) const {
-    return CGS->getRootNode() == CGS->getNode(&MF.getFunction());
+    auto *F = &MF.getFunction();
+    return CGS->getRootNode()->functions().front() == F;
+  }
+
+  auto isExitFunction(const MachineFunction &MF) const {
+    auto *F = &MF.getFunction();
+    return CGS->getRootNode()->functions().back() == F;
+  }
+  auto isRootFunction(const Function &F) const { return CGS->isRoot(&F); }
+  auto isRootFunction(const MachineFunction &MF) const {
+    return isRootFunction(MF.getFunction());
+  }
+
+  auto *nextRootFunction(const MachineFunction &MF) const {
+    assert(isRootFunction(MF) && "MF must be in root group.");
+    auto *F = &MF.getFunction();
+    auto *Root = CGS->getNode(&MF.getFunction());
+    auto Found =
+        llvm::find_if(Root->functions(), [F](auto *E) { return F == E; });
+    assert(Found != Root->functions().end() &&
+           std::next(Found) != Root->functions().end() &&
+           "Exit function does not have ancessor");
+    return *std::next(Found);
+  }
+
+  StringRef getOutputSectionName(const Function &F) const {
+    return F.hasSection() ? F.getSection() : ".text";
+  }
+
+  auto getOutputSectionFor(const Function &F) const {
+    auto SectionName = getOutputSectionName(F);
+    assert(PLinker->hasOutputSectionFor(SectionName));
+    return PLinker->getOutputSectionFor(SectionName).Desc;
+  }
+
+  auto getOutputSectionFor(const MachineFunction &MF) const {
+    auto &F = MF.getFunction();
+    return getOutputSectionFor(F);
   }
 
   auto getRequestedInstrsNumForMainFunction() const {
     return GenSettings->InstrsGenerationConfig.NumInstrs.value_or(0);
   }
 
-  auto getRequestedInstrsNum(const MachineFunction &MF) const {
-    if (isEntryFunction(MF))
-      return getRequestedInstrsNumForMainFunction();
+  size_t getRequestedInstrsNum(const MachineFunction &MF) const {
+    if (isRootFunction(MF))
+      return (double)getRequestedInstrsNumForMainFunction() *
+             ((double)getOutputSectionFor(MF).Size /
+              (double)GenSettings->Cfg.Sections.getSectionsSize(Acc::X));
     else
       return GenSettings->Cfg.CGLayout.InstrNumAncil;
   }
@@ -284,6 +323,36 @@ public:
     return *GenSettings;
   }
   const auto &getCallGraphLayout() const { return GenSettings->Cfg.CGLayout; }
+
+  template <typename It> size_t getCodeBlockSize(It Begin, It End) const {
+    return std::accumulate(
+        Begin, End, 0ul, [this](auto CurrentSize, const auto &MI) {
+          size_t InstrSize = MI.getDesc().getSize();
+          if (InstrSize == 0)
+            snippy::warn(
+                WarningName::InstructionSizeUnknown, getLLVMState().getCtx(),
+                [&MI]() {
+                  std::string Ret;
+                  llvm::raw_string_ostream OS{Ret};
+                  OS << "Instruction '";
+                  MI.print(OS, /* IsStandalone */ true, /* SkipOpers */ true,
+                           /* SkipDebugLoc */ true, /* AddNewLine */ false);
+                  OS << "' has unknown size";
+                  return Ret;
+                }(),
+                "function size estimation may be wrong");
+          return CurrentSize + InstrSize;
+        });
+  }
+  size_t getMBBSize(const MachineBasicBlock &MBB) const {
+    return getCodeBlockSize(MBB.begin(), MBB.end());
+  }
+
+  size_t getFunctionSize(const MachineFunction &MF) const {
+    return std::accumulate(
+        MF.begin(), MF.end(), 0ul,
+        [this](auto CurrentSize, const auto &MBB) { return getMBBSize(MBB); });
+  }
 
   void addLoopGenerationInfoForMBB(const MachineBasicBlock *Header,
                                    LoopGenerationInfo LGI) {

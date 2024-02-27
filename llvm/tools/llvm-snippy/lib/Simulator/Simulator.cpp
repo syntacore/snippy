@@ -14,13 +14,15 @@ namespace llvm {
 
 void yaml::MappingTraits<snippy::SimulationConfig>::mapping(
     yaml::IO &IO, snippy::SimulationConfig &Cfg) {
-  IO.mapRequired("prog_start", Cfg.ProgStart);
-  IO.mapRequired("prog_size", Cfg.ProgSize);
+  auto &ProgSection = Cfg.ProgSections.empty() ? Cfg.ProgSections.emplace_back()
+                                               : Cfg.ProgSections.front();
+  IO.mapRequired("prog_start", ProgSection.Start);
+  IO.mapRequired("prog_size", ProgSection.Size);
   IO.mapRequired("rom_start", Cfg.RomStart);
   IO.mapRequired("rom_size", Cfg.RomSize);
   IO.mapRequired("ram_start", Cfg.RamStart);
   IO.mapRequired("ram_size", Cfg.RamSize);
-  IO.mapOptional("prog_section", Cfg.ProgSectionName);
+  IO.mapOptional("prog_section", ProgSection.Name);
   IO.mapOptional("rom_section", Cfg.RomSectionName);
   IO.mapOptional("trace_log", Cfg.TraceLogPath);
 }

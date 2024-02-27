@@ -152,6 +152,19 @@ static void reportSectionInterfereError(const Linker::OutputSectionT &Added,
      << Existing.Desc;
   report_fatal_error(MessageBuf.c_str(), false);
 }
+
+template <typename R>
+void reportUnusedRXSectionWarning(LLVMContext &Ctx, R &&Names) {
+  std::string NameList;
+  llvm::raw_string_ostream OS{NameList};
+  for (auto &&Name : Names) {
+    OS << "'" << Name << "' ";
+  }
+
+  snippy::warn(WarningName::UnusedSection, Ctx,
+               "Following RX sections are unused during generation", NameList);
+}
+
 } // namespace
 
 Linker::OutputSectionT::OutputSectionT(const SectionDesc &Desc)
@@ -164,7 +177,9 @@ void Linker::calculateMemoryRegion() {
                         Sections.back().OutputSection.Desc.Size;
 }
 
-Linker::Linker(const SectionsDescriptions &Sects, StringRef MN)
+Linker::Linker(LLVMContext &Ctx, const SectionsDescriptions &Sects,
+               bool EnableChainedExecution, bool SortedExecutionPath,
+               StringRef MN)
     : MangleName(MN) {
   std::transform(Sects.begin(), Sects.end(), std::back_inserter(Sections),
                  [](auto &SectionDesc) {
@@ -175,33 +190,71 @@ Linker::Linker(const SectionsDescriptions &Sects, StringRef MN)
   });
   calculateMemoryRegion();
 
-  auto CodeSection =
+  auto DefaultCodeSection =
       findFirstSection(Sections, [](const SectionDesc &S) { return S.M.X(); });
-  if (CodeSection != Sections.end())
-    CodeSection->InputSection = ".text";
+  if (DefaultCodeSection != Sections.end())
+    DefaultCodeSection->InputSections.emplace_back(".text");
+
+  if (EnableChainedExecution) {
+    for (auto &RXSection : llvm::make_filter_range(
+             Sections, [](auto &S) { return S.OutputSection.Desc.M.X(); })) {
+      RXSection.InputSections.emplace_back(RXSection.OutputSection.Name);
+      ExecutionPath.push_back(RXSection);
+    }
+    if (SortedExecutionPath) {
+      std::sort(ExecutionPath.begin(), ExecutionPath.end(),
+                [](auto &LHS, auto &RHS) {
+                  return LHS.OutputSection.Desc.getIDString() <
+                         RHS.OutputSection.Desc.getIDString();
+                });
+    } else {
+      std::shuffle(ExecutionPath.begin(), ExecutionPath.end(),
+                   RandEngine::engine());
+    }
+  } else {
+
+    std::vector<std::string> UnusedRXSections;
+    for (auto &RXSection :
+         llvm::make_filter_range(Sections, [DefaultCodeSection](auto &S) {
+           return S.OutputSection.Desc.M.X() &&
+                  S.OutputSection.Desc.getIDString() !=
+                      DefaultCodeSection->OutputSection.Desc.getIDString();
+         }))
+      UnusedRXSections.emplace_back(RXSection.OutputSection.Desc.getIDString());
+
+    if (!UnusedRXSections.empty())
+      reportUnusedRXSectionWarning(Ctx, UnusedRXSections);
+
+    ExecutionPath.push_back(*DefaultCodeSection);
+  }
+
   auto ROMSection = findFirstSection(Sections, [](const SectionDesc &S) {
     return S.M.R() && !S.M.W() && !S.M.X();
   });
 
   if (ROMSection != Sections.end())
-    ROMSection->InputSection = ".rodata";
+    ROMSection->InputSections.emplace_back(".rodata");
 }
 
 bool Linker::hasOutputSectionFor(StringRef SectionName) const {
-  return std::any_of(Sections.begin(), Sections.end(),
-                     [&SectionName](auto &Section) {
-                       return Section.InputSection == SectionName;
-                     });
+  return std::any_of(
+      Sections.begin(), Sections.end(), [&SectionName](auto &Section) {
+        return llvm::any_of(Section.InputSections, [&SectionName](auto &&Name) {
+          return Name == SectionName;
+        });
+      });
 }
 
 Linker::OutputSectionT
 Linker::getOutputSectionFor(StringRef SectionName) const {
   assert(hasOutputSectionFor(SectionName));
 
-  auto Section = std::find_if(Sections.begin(), Sections.end(),
-                              [&SectionName](auto &Section) {
-                                return Section.InputSection == SectionName;
-                              });
+  auto Section = std::find_if(
+      Sections.begin(), Sections.end(), [&SectionName](auto &Section) {
+        return llvm::any_of(Section.InputSections, [&SectionName](auto &&Name) {
+          return Name == SectionName;
+        });
+      });
   return Section->OutputSection;
 }
 
@@ -215,7 +268,7 @@ std::string Linker::getOutputNameForDesc(const SectionDesc &Desc) const {
   return Section->OutputSection.Name;
 }
 
-void Linker::setInputSectionForDescr(SectionDesc OutputSectionDesc,
+void Linker::addInputSectionForDescr(SectionDesc OutputSectionDesc,
                                      StringRef InpSectName) {
   auto SectIt =
       std::find_if(Sections.begin(), Sections.end(),
@@ -224,9 +277,7 @@ void Linker::setInputSectionForDescr(SectionDesc OutputSectionDesc,
                    });
   assert(SectIt != Sections.end() &&
          "Can't find current section in the output sections");
-  assert(SectIt->InputSection.empty() &&
-         "Input section has already been set for current output section");
-  SectIt->InputSection = InpSectName;
+  SectIt->InputSections.emplace_back(InpSectName);
 }
 
 std::string Linker::getMangledName(StringRef SectionName) const {
@@ -267,7 +318,7 @@ void Linker::addSection(const SectionDesc &Section,
       });
 
   Sections.insert(FoundPlace,
-                  SectionEntry{NewSection, std::string{InputSectionName}});
+                  SectionEntry{NewSection, {std::string{InputSectionName}}});
   calculateMemoryRegion();
 }
 
@@ -293,19 +344,20 @@ std::string Linker::createLinkerScript(bool Export) const {
 
     STS << "  " << OutSectionName << " " << SE.OutputSection.Desc.VMA;
 
-    if (SE.InputSection.empty())
+    if (SE.InputSections.empty())
       STS << " (NOLOAD) ";
 
     STS << ": {\n";
     if (Export) {
       STS << "  KEEP(*(" << OutSectionName << "))\n";
     } else {
-      if (SE.InputSection.empty()) {
+      if (SE.InputSections.empty()) {
         STS << "  PROVIDE(" << OutSectionName << "_start_ = .);\n";
         STS << "  . +=" << SE.OutputSection.Desc.Size << ";\n";
         STS << "  PROVIDE(" << OutSectionName << "_end_ = .);\n";
       } else {
-        STS << "  KEEP(*(" << SE.InputSection << "))\n";
+        for (auto &&InputSectionName : SE.InputSections)
+          STS << "  KEEP(*(" << InputSectionName << "))\n";
       }
     }
 
@@ -341,6 +393,8 @@ std::string Linker::run(ObjectFilesList ObjectFilesToLink,
 
   return FinalImage;
 }
+
+StringRef Linker::GetExitSymbolName() { return "__snippy_exit"; }
 
 } // namespace snippy
 } // namespace llvm

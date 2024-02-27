@@ -39,11 +39,14 @@ public:
     // parameters of the section in the linked file
     // (before mangling)
     OutputSectionT OutputSection;
-    // name of the section before linking
-    std::string InputSection;
+    // Sections from initial object file(s) that are
+    // placed in OutputSection during linking.
+    std::vector<std::string> InputSections;
   };
 
-  explicit Linker(const SectionsDescriptions &Sects, StringRef MangleName = "");
+  explicit Linker(LLVMContext &Ctx, const SectionsDescriptions &Sects,
+                  bool EnableChainedExecution, bool SortedExecutionPath,
+                  StringRef MangleName = "");
 
   // Checks if Linker has mapped section from object file to its
   // destination in final elf image.
@@ -56,12 +59,15 @@ public:
 
   // Sets input section for specified SectionDesc
   //  in order to avoid (NOLOAD) specifier in the linker script
-  void setInputSectionForDescr(SectionDesc OutputSectionDesc,
+  void addInputSectionForDescr(SectionDesc OutputSectionDesc,
                                StringRef InpSectName);
 
   // Sections are sorted by their VMA value (not ID value!)
   auto &sections() const { return Sections; }
 
+  // Executable sections where generated code goes into.
+  // They are sorted in order of code execution.
+  auto &executionPath() const { return ExecutionPath; };
   auto getMaxSectionID() const {
     return std::accumulate(Sections.begin(), Sections.end(), 0,
                            [](auto Acc, auto &SE) {
@@ -93,6 +99,10 @@ public:
   // all sections provided in layout file.
   auto memoryRegion() const { return MemoryRegion; }
 
+  // Returns name of symbol that should be inserted before last generated
+  // instruction.
+  static StringRef GetExitSymbolName();
+
 private:
   std::string createLinkerScript(bool Export) const;
   void calculateMemoryRegion();
@@ -100,6 +110,7 @@ private:
   std::string MangleName;
   std::pair<size_t, size_t> MemoryRegion;
   SmallVector<SectionEntry, 4> Sections;
+  SmallVector<SectionEntry, 4> ExecutionPath;
 };
 
 } // namespace snippy
