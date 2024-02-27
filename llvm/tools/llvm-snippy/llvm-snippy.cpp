@@ -609,7 +609,7 @@ static Config readSnippyConfig(LLVMContext &Ctx, const SnippyTarget &Tgt,
           auto AllowedKeys = std::array{"options"};
           return any_of(AllowedKeys, [&DiagMsg](auto &&Allowed) {
             return DiagMsg.starts_with((detail::YAMLUnknownKeyStartString +
-                                        "'" + StringRef(Allowed) + "'")
+                                        " '" + StringRef(Allowed) + "'")
                                            .str());
           });
         };
