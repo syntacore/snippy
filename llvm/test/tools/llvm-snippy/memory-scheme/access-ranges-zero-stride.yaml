@@ -1,0 +1,16 @@
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+include:
+  - Inputs/default-layout.yaml
+options:
+  march: riscv64-unknown-elf
+  num-instrs: 10
+access-ranges:
+  - start: 0x100000
+    size: 0x16
+    stride: 0
+    first-offset: 0
+    last-offset: 0
+
+# CHECK-NOT: error: Aborted (core dumped)
+# CHECK: access-ranges-zero-stride.yaml:9:5: error: Stride cannot be equal to 0

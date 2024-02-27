@@ -9,4 +9,4 @@
 include:
   - include-inside-include.yaml
 
-# CHECK: In file "include-inside-include.yaml": included file cannot contain "include" section.
+# CHECK: In file "{{.*}}include-inside-include.yaml": included file cannot contain "include" section.

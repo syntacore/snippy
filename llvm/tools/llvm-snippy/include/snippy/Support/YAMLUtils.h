@@ -313,6 +313,15 @@ void loadYAMLFromFileOrFatal(T &Obj, const Twine &Filename,
         false);
 }
 
+// Normalization for Hex64, Hex32, Hex16 and Hex8
+template <typename T> struct NormalizedYAMLStrongTypedef {
+  using ValueType = decltype(T{}.value);
+  NormalizedYAMLStrongTypedef(yaml::IO &Io) {}
+  NormalizedYAMLStrongTypedef(yaml::IO &Io, ValueType &Val) : Value{Val} {}
+  auto denormalize(yaml::IO &Io) { return Value.value; }
+  T Value;
+};
+
 LLVM_SNIPPY_YAML_STRONG_TYPEDEF(std::string, SValue);
 using SList = std::vector<SValue>;
 

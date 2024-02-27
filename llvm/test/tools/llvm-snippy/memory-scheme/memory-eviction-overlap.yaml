@@ -5,4 +5,4 @@ access-evictions:
     - mask:  0x003f0000
       fixed: 0x80010000
 
-# CHECK: LLVM ERROR: Bits in mask and fixed fields for eviction overlap
+# CHECK: memory-eviction-overlap.yaml:5:7: error: Bits in mask and fixed fields for eviction overlap

@@ -345,11 +345,11 @@ template <> struct yaml::PolymorphicTraits<ImmediateHistogramNorm> {
 };
 
 void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
-  // FIXME: Currently MemoryScheme can't be serialized
+  // FIXME: Currently sections can't be serialized
   if (!IO.outputting()) {
     IO.mapOptional("sections", Info.Sections);
-    Info.MS.MA.mapYaml(IO);
   }
+  yaml::MappingTraits<MemoryAccesses>::mapping(IO, Info.MS.MA);
   IO.mapOptional("branches", Info.Branches);
   IO.mapOptional("burst", Info.Burst.Data);
   YAMLHistogramIO<OpcodeHistogramDecodedEntry> HistIO(Info.Histogram);
@@ -358,7 +358,7 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
                              ImmediateHistogram>
       ImmHistNorm(IO, Info.ImmHistogram);
   IO.mapOptional("imm-hist", ImmHistNorm->Data);
-  MappingTraits<CallGraphLayout>::mapping(IO, Info.CGLayout);
+  yaml::MappingTraits<CallGraphLayout>::mapping(IO, Info.CGLayout);
   Info.TargetConfig->mapConfig(IO);
   IO.mapOptional("call-graph", Info.FuncDescs);
 }
@@ -390,8 +390,10 @@ static void diagnoseHistogram(LLVMContext &Ctx, const OpcodeCache &OpCC,
 
 Config::Config(const SnippyTarget &Tgt, StringRef PluginFilename,
                StringRef PluginInfoFilename, OpcodeCache OpCC,
-               bool ParseWithPlugin, LLVMContext &Ctx)
-    : PluginManagerImpl(std::make_unique<PluginManager>()),
+               bool ParseWithPlugin, LLVMContext &Ctx,
+               ArrayRef<std::string> IncludedFiles)
+    : Includes(IncludedFiles),
+      PluginManagerImpl(std::make_unique<PluginManager>()),
       TargetConfig(Tgt.createTargetConfig()) {
   PluginManagerImpl->loadPluginLib(PluginFilename.str());
   if (ParseWithPlugin) {
@@ -418,26 +420,47 @@ static auto getContentsFromRelativePath(StringRef ParentDirectory,
   return Contents;
 }
 
-static ErrorOr<std::unique_ptr<MemoryBuffer>>
-getIncludeFileContents(StringRef ParentPath,
-                       const std::vector<std::string> &ExtraIncludeDirs,
-                       StringRef IncludeFilename) {
+using MemBufStrPair = std::pair<std::unique_ptr<MemoryBuffer>, std::string>;
+
+static ErrorOr<MemBufStrPair>
+makeBufPathPairOrErr(ErrorOr<std::unique_ptr<MemoryBuffer>> BufOrErr,
+                     StringRef Path) {
+  if (BufOrErr.getError())
+    return BufOrErr.getError();
+  return std::make_pair(std::move(BufOrErr.get()), Path.str());
+}
+
+static ErrorOr<MemBufStrPair>
+makeRelBufPathPairOrErr(ErrorOr<std::unique_ptr<MemoryBuffer>> Contents,
+                        StringRef Filename, StringRef ParentPath) {
+  SmallString<32> AbsolutePath;
+  sys::path::append(AbsolutePath, ParentPath, Filename);
+  return makeBufPathPairOrErr(std::move(Contents), AbsolutePath.str().str());
+}
+
+static ErrorOr<MemBufStrPair>
+getIncludeFileContentsAndPath(StringRef ParentPath,
+                              const std::vector<std::string> &ExtraIncludeDirs,
+                              StringRef IncludeFilename) {
   LLVM_DEBUG(dbgs() << "processing include: " << IncludeFilename << "\n");
   if (!sys::path::is_relative(IncludeFilename)) {
     LLVM_DEBUG(dbgs() << "include file has an absolute path\n");
-    return MemoryBuffer::getFile(IncludeFilename);
+    return makeBufPathPairOrErr(MemoryBuffer::getFile(IncludeFilename),
+                                IncludeFilename.str());
   }
 
   LLVM_DEBUG(dbgs() << "include file has a relative path\n");
   auto Contents = getContentsFromRelativePath(ParentPath, IncludeFilename);
   if (Contents)
-    return Contents;
+    return makeRelBufPathPairOrErr(std::move(Contents), IncludeFilename.str(),
+                                   ParentPath.str());
 
   for (const auto &IncludeDir : ExtraIncludeDirs) {
     LLVM_DEBUG(dbgs() << "trying extra include dir: " << IncludeDir << "\n");
     auto Contents = getContentsFromRelativePath(IncludeDir, IncludeFilename);
     if (Contents)
-      return Contents;
+      return makeRelBufPathPairOrErr(std::move(Contents), IncludeFilename.str(),
+                                     IncludeDir);
   }
 
   return make_error_code(errc::no_such_file_or_directory);
@@ -501,8 +524,11 @@ void IncludePreprocessor::mergeFile(StringRef FileName, StringRef Contents) {
   checkSubFileContents(FileName, Contents);
   std::istringstream IS(Contents.str());
   unsigned LocalIdx = 1; // Line count starts from 1
-  for (std::string Line; std::getline(IS, Line); ++LocalIdx)
-    Lines.emplace_back(LineID{FileName.str(), LocalIdx});
+  for (std::string Line; std::getline(IS, Line); ++LocalIdx) {
+    // FileName is passed as a non-owning StringRef. This is intended to
+    // avoid copying absolute filepaths for each line
+    Lines.emplace_back(LineID{FileName, LocalIdx});
+  }
   Text += Contents;
   Text += endLineIfNeeded(Contents);
 }
@@ -513,12 +539,14 @@ IncludePreprocessor::IncludePreprocessor(
   auto SubFiles = getConfigIncludeFiles(Filename);
   auto ParentDirectoryPath = sys::path::parent_path(Filename);
   for (StringRef IncludeFileName : SubFiles) {
-    auto IncludeFileContents = getIncludeFileContents(
+    auto IncludeFileContentsAndPath = getIncludeFileContentsAndPath(
         ParentDirectoryPath, IncludeDirs, IncludeFileName);
-    if (!IncludeFileContents)
+    if (!IncludeFileContentsAndPath)
       fatal(Ctx, "Failed to open file \"" + IncludeFileName + "\"",
-            IncludeFileContents.getError().message());
-    mergeFile(IncludeFileName, (*IncludeFileContents)->getBuffer());
+            IncludeFileContentsAndPath.getError().message());
+    auto &&[Contents, Path] = *IncludeFileContentsAndPath;
+    auto [InsIter, _] = IncludedFiles.insert(Path);
+    mergeFile(*InsIter, Contents->getBuffer());
   }
   auto MemBufOrErr = MemoryBuffer::getFile(Filename);
   if (auto EC = MemBufOrErr.getError(); !MemBufOrErr)
