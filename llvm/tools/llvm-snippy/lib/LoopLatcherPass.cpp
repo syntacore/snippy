@@ -50,6 +50,34 @@ snippy::opt<bool> UseStackOpt("use-stack-for-IV",
                               cl::desc("Place induction variables on stack."),
                               cl::cat(Options), cl::Hidden);
 
+//       Initialize consecutive loop in previous loop:
+//
+//       +------v------+
+//       | loop1 init  |
+//       +------+------+
+//              | _________
+//       loop1  |/         \
+//       +------v------+   |
+//       | loop2 init  |   |
+//       | loop1 latch |   |
+//       +------+------+   |
+//              |\_________/
+//              | _________
+//       loop2  |/         \
+//       +------v------+   |
+//       | loop2 latch |   |
+//       +------+------+   |
+//              |\_________/
+//              |
+//              |
+//       +------v------+
+//       |             |
+//       +------+------+
+snippy::opt<bool> InitConsLoopInPrevLoop(
+    "init-cons-loop-in-prev-loop",
+    cl::desc("Initialize consecutive loop in previous loop."),
+    cl::cat(Options));
+
 class LoopLatcher final : public MachineFunctionPass {
   void processExitingBlock(MachineLoop &ML, MachineBasicBlock &ExitingBlock,
                            MachineBasicBlock &Preheader);
@@ -426,7 +454,9 @@ bool LoopLatcher::createLoopLatchFor(MachineLoop &ML, R &&ConsecutiveLoops) {
                ConsLoop->dump());
     auto *ConsLoopExiting = ConsLoop->getExitingBlock();
     assert(ConsLoopExiting);
-    processExitingBlock(*ConsLoop, *ConsLoopExiting, *Preheader);
+    auto *ConsLoopPreheader =
+        InitConsLoopInPrevLoop ? ConsLoopExiting->getPrevNode() : Preheader;
+    processExitingBlock(*ConsLoop, *ConsLoopExiting, *ConsLoopPreheader);
   }
 
   return true;
