@@ -111,6 +111,12 @@ bool LoopCanonicalization::runOnMachineFunction(MachineFunction &MF) {
   auto &MLI = getAnalysis<MachineLoopInfo>();
   LLVM_DEBUG(dbgs() << "Machine Loop Info for this function:\n");
   LLVM_DEBUG(MLI.getBase().print(dbgs()));
+  LLVM_DEBUG(dbgs() << "Consecutive loops:\n");
+  LLVM_DEBUG(for_each(GC.getConsecutiveLoops(), [](auto &CLEntry) {
+    dbgs() << CLEntry.first << ":";
+    for (auto &&CL : CLEntry.second)
+      dbgs() << " " << CL;
+  }));
 
   SmallVector<MachineLoop *> Loops;
   copy(MLI, std::back_inserter(Loops));
@@ -188,6 +194,12 @@ bool LoopCanonicalization::insertPreheaderIfNeeded(MachineLoop &ML) {
   assert(Header && "Loop expected to have header");
   assert(Header->pred_size() > 0 &&
          "Loop header should have at least one predecessor");
+  auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto HeaderNum = Header->getNumber();
+  if (GC.isNonFirstConsecutiveLoopHeader(HeaderNum)) {
+    LLVM_DEBUG(dbgs() << "It's consecutive loop, skip preheader insertion");
+    return false;
+  }
   if (auto *Preheader = ML.getLoopPreheader()) {
     LLVM_DEBUG(dbgs() << "Loop has preheader, don't split:\n");
     LLVM_DEBUG(Preheader->dump());

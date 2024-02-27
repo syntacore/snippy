@@ -132,8 +132,7 @@ private:
   void makePermutation(ArrayRef<unsigned> PermutationOrder);
   void permuteBlock(unsigned BB);
   void updateBlocksInfo(unsigned From, unsigned To);
-  void reapplyRules();
-  void dumpPermutedBranch(unsigned BB);
+  void dumpPermutedBranch(unsigned BB, bool IsLoop, const BlockInfo &BI) const;
   bool updateBranches(MachineFunction &MF);
 
   BlocksInfoIter findMaxIfDepthReached(BlocksInfoIter Beg, BlocksInfoIter End);
@@ -170,6 +169,8 @@ CFPermutation::CFPermutation() : MachineFunctionPass(ID) {
 /// distance for a branch in the selected basic block.
 unsigned CFPermutation::calculateMaxDistance(unsigned BBNum, unsigned Size) {
   LLVM_DEBUG(dbgs() << "Calculating max distance for BB#" << BBNum << '\n');
+  if (BranchSettings->NConsecutiveLoops != 0)
+    return 0;
   assert(CurrMF);
   auto *BB = CurrMF->getBlockNumbered(BBNum);
   assert(BB);
@@ -238,11 +239,23 @@ printAvailableSet(raw_ostream &OS, unsigned BB,
 }
 
 void CFPermutation::initBlocksInfo(unsigned Size) {
+  BlocksInfo.reserve(Size);
+  if (BranchSettings->NConsecutiveLoops > 0) {
+    assert(BranchSettings->LoopRatio == 1.0 &&
+           BranchSettings->getMaxLoopDepth() == 1 &&
+           BranchSettings->getBlockDistance().Min.value_or(0) == 0 &&
+           BranchSettings->getBlockDistance().Max.value_or(0) == 0 &&
+           "unsupported branch settings");
+    transform(seq(0u, Size), std::back_inserter(BlocksInfo), [](unsigned BB) {
+      return BlockInfo(BB + 1, BlockInfo::SetT({BB, BB + 1}));
+    });
+    return;
+  }
+
   bool AutoMaxBBDistance = !BranchSettings->getBlockDistance().Max.has_value();
   LLVM_DEBUG(dbgs() << "Initializing BlocksInfo for " << Size << " blocks\n");
   LLVM_DEBUG(dbgs() << (AutoMaxBBDistance ? "" : "don't ")
                     << "calculate max distance adaptively\n");
-  BlocksInfo.reserve(Size);
   for (auto BB : seq(0u, Size)) {
     assert(BlocksInfo.size() == BB);
     // We don't want want to permute unconditional branches
@@ -371,12 +384,23 @@ bool CFPermutation::runOnMachineFunction(MachineFunction &MF) {
   return updateBranches(MF);
 }
 
-void CFPermutation::dumpPermutedBranch(unsigned BB) {
+void CFPermutation::dumpPermutedBranch(unsigned BB, bool IsLoop,
+                                       const BlockInfo &BI) const {
+  auto Selected = BI.Successor;
   if (PermutationStatus) {
+    if (PermutationProgress)
+      errs() << '\n';
+    errs() << "Making branch from " << BB << " to " << Selected << ", "
+           << (IsLoop ? "loop" : "if") << ", distance: "
+           << std::abs(static_cast<int>(BB) - static_cast<int>(Selected) +
+                       (IsLoop ? 1 : -1))
+           << ", depth: " << (IsLoop ? BI.LoopDepth : BI.IfDepth) + 1 << "\n";
 #if defined(LLVM_ENABLE_DUMP)
     CurrMF->getBlockNumbered(BB)->getFirstTerminator()->dump();
 #endif
   } else {
+    LLVM_DEBUG(dbgs() << "Making branch from " << BB << " to " << Selected
+                      << "\n");
     LLVM_DEBUG(CurrMF->getBlockNumbered(BB)->getFirstTerminator()->dump());
   }
 }
@@ -408,7 +432,6 @@ static auto calcCandidatesDistribution(unsigned BackwardCount,
 
 static unsigned selectBB(const CFPermutation::BlockInfo::SetT &Available,
                          unsigned CurrBB, double LoopRatio) {
-
   auto BackwardCount =
       count_if(Available, [CurrBB](auto Other) { return Other <= CurrBB; });
   auto ForwardCount = Available.size() - BackwardCount;
@@ -421,40 +444,56 @@ void CFPermutation::permuteBlock(unsigned BB) {
   assert(BB < BlocksInfo.size() && "BB out of range");
   LLVM_DEBUG(dbgs() << "Permuting BB#" << BB << '\n');
 
-  auto &BI = BlocksInfo[BB];
-  auto AvailableSize = BI.Available.size();
-  if (AvailableSize == 0) {
+  auto BI = std::next(BlocksInfo.begin(), BB);
+  if (BI->Available.empty()) {
     LLVM_DEBUG(dbgs() << "Don't permute BB#" << BB
                       << " because available set is empty\n");
     return;
   }
 
-  unsigned Selected = selectBB(BI.Available, BB, BranchSettings->LoopRatio);
-  BI.Successor = Selected;
+  unsigned NConsecutiveLoops = BranchSettings->NConsecutiveLoops;
+  // We cannot always create N consecutive loops
+  auto NextCantBeSingleBlockLoopPos =
+      std::find_if(BI, BI + NConsecutiveLoops + 1, [this](const auto &NextBI) {
+        if (NextBI.Available.empty())
+          return true;
+        return NextBI.Available.count(&NextBI - BlocksInfo.data()) == 0;
+      });
+  NConsecutiveLoops = (NextCantBeSingleBlockLoopPos > BI)
+                          ? (NextCantBeSingleBlockLoopPos - BI - 1)
+                          : 0;
+  unsigned Selected =
+      (NConsecutiveLoops == 0)
+          ? selectBB(BI->Available, BB, BranchSettings->LoopRatio)
+          : BB;
+  bool IsLoop = BB >= Selected;
+  BI->Successor = Selected;
   // Clear available set since we already choosed destination and don't need to
   // track requirements for this BB
-  BI.Available.clear();
-  if (PermutationStatus) {
-    bool IsLoop = BB >= Selected;
-    if (PermutationProgress)
-      errs() << '\n';
-    errs() << "Making branch from " << BB << " to " << Selected << ", "
-           << (IsLoop ? "loop" : "if") << ", distance: "
-           << std::abs(static_cast<int>(BB) - static_cast<int>(Selected) +
-                       (IsLoop ? 1 : -1))
-           << ", depth: " << (IsLoop ? BI.LoopDepth : BI.IfDepth) + 1 << "\n";
-  } else {
-    LLVM_DEBUG(dbgs() << "Making branch from " << BB << " to " << Selected
-                      << "\n");
-  }
+  BI->Available.clear();
 
-  dumpPermutedBranch(BB);
-
+  dumpPermutedBranch(BB, IsLoop, *BI);
   updateBlocksInfo(BB, Selected);
-  reapplyRules();
-
   LLVM_DEBUG(dbgs() << "Available sets after this permutation:\n");
   LLVM_DEBUG(dump());
+
+  if (IsLoop && NConsecutiveLoops > 0) {
+    auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
+    for (auto NextBB : seq_inclusive(BB + 1, BB + NConsecutiveLoops)) {
+      LLVM_DEBUG(dbgs() << "Permuting BB#" << NextBB
+                        << " (consecutive loop)\n");
+      GC.registerConsecutiveLoopsHeader(NextBB, BB);
+      auto &NextBI = BlocksInfo[NextBB];
+      assert(NextBI.Available.count(NextBB));
+      NextBI.Successor = NextBB;
+      NextBI.Available.clear();
+      dumpPermutedBranch(NextBB, /* IsLoop */ true, NextBI);
+      updateBlocksInfo(NextBB, NextBB);
+      LLVM_DEBUG(
+          dbgs() << "Available sets after consecutive loop permutation:\n");
+      LLVM_DEBUG(dump());
+    }
+  }
 }
 
 // Simple function for finding if max depth reached
@@ -511,6 +550,7 @@ static void preserveDepth(typename CFPermutation::BlocksInfoIter Pos,
 
 // In this function region is a created region by branch From->To
 void CFPermutation::updateBlocksInfo(unsigned From, unsigned To) {
+  LLVM_DEBUG(dbgs() << "Update blocks info for " << From << ":" << To << "\n");
   unsigned Size = BlocksInfo.size();
   assert(From < Size && "Branch source is out of range");
   assert(To <= Size && "Branch destination is out of range");
@@ -549,6 +589,7 @@ void CFPermutation::updateBlocksInfo(unsigned From, unsigned To) {
   std::for_each(Beg, RegionUpperBound, ProcessBlocksOutsideRegion);
   std::for_each(RegionUpperBound, RegionLowerBound, ProcessBlocksInsideRegion);
   std::for_each(RegionLowerBound, End, ProcessBlocksOutsideRegion);
+  LLVM_DEBUG(dump());
 
   // If depth control: disable branches with source before and destination after
   // BB that reached max depth
@@ -567,11 +608,6 @@ void CFPermutation::updateBlocksInfo(unsigned From, unsigned To) {
     auto PosNum = Pos - Beg;
     preserveDepth(Pos, Pos, End, 0, PosNum);
   }
-}
-
-// Process rules that not directly depend on the last permuted branch
-void CFPermutation::reapplyRules() {
-  // Will not be empty when more user controls will be added
 }
 
 // Apply calculated CF
