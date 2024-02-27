@@ -1,0 +1,63 @@
+# RUN: llvm-snippy %s -model-plugin=None \
+# RUN: | FileCheck %s
+
+include:
+  - ../Inputs/sections.yaml
+
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  mattr: "+zbkb,+zbkc,+zbkx,+zknd,+zkne,+zknh,+zksed,+zksh,+zkr,+zkn,+zks,+zkt"
+  num-instrs: 400
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+
+histogram:
+  - [ BREV8, 1.0 ]
+  - [ PACK, 1.0 ]
+  - [ PACKH, 1.0 ]
+  - [ PACKW, 1.0 ]
+  - [ XPERM4, 1.0 ]
+  - [ XPERM8, 1.0 ]
+  - [ AES64DS, 1.0 ]
+  - [ AES64DSM, 1.0 ]
+  - [ AES64ES, 1.0 ]
+  - [ AES64ESM, 1.0 ]
+  - [ AES64IM, 1.0 ]
+  - [ AES64KS1I, 1.0 ]
+  - [ AES64KS2, 1.0 ]
+  - [ ANDN, 1.0 ]
+  - [ CLMUL, 1.0 ]
+  - [ CLMULH, 1.0 ]
+  - [ ORN, 1.0 ]
+  - [ ROL, 1.0 ]
+  - [ ROLW, 1.0 ]
+  - [ ROR, 1.0 ]
+  - [ RORI, 1.0 ]
+  - [ RORIW, 1.0 ]
+  - [ RORW, 1.0 ]
+  - [ SHA256SIG0, 1.0 ]
+  - [ SHA256SIG1, 1.0 ]
+  - [ SHA256SUM0, 1.0 ]
+  - [ SHA256SUM1, 1.0 ]
+  - [ SHA512SIG0, 1.0 ]
+  - [ SHA512SIG1, 1.0 ]
+  - [ SHA512SUM0, 1.0 ]
+  - [ SHA512SUM1, 1.0 ]
+  - [ SM3P0, 1.0 ]
+  - [ SM3P1, 1.0 ]
+  - [ SM4ED, 1.0 ]
+  - [ SM4KS, 1.0 ]
+
+
+
+access-groups:
+  - access-ranges:
+    - start: 0x100000
+      size: 0x1
+      stride: 1
+      first-offset: 0
+      last-offset: 0
+
+# CHECK-NOT: FAILED
