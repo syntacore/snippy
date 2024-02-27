@@ -16,7 +16,7 @@ extern "C" {
 
 #define RVMAPI_ENTRY_POINT_SYMBOL RVMVTable
 #define RVMAPI_VERSION_SYMBOL RVMInterfaceVersion
-#define RVMAPI_CURRENT_INTERFACE_VERSION 8u
+#define RVMAPI_CURRENT_INTERFACE_VERSION 9u
 
 typedef uint64_t RVMRegT;
 
@@ -61,7 +61,20 @@ typedef enum {
   RVM_ZEXT_BB = 1ull << 2,
   RVM_ZEXT_BC = 1ull << 3,
   RVM_ZEXT_BS = 1ull << 4,
-  RVM_ZEXT_BITMANIP = RVM_ZEXT_BA | RVM_ZEXT_BB | RVM_ZEXT_BC | RVM_ZEXT_BS
+  RVM_ZEXT_BITMANIP = RVM_ZEXT_BA | RVM_ZEXT_BB | RVM_ZEXT_BC | RVM_ZEXT_BS,
+  RVM_ZEXT_BKB = 1ull << 5,
+  RVM_ZEXT_BKC = 1ull << 6,
+  RVM_ZEXT_BKX = 1ull << 7,
+  RVM_ZEXT_KND = 1ull << 8,
+  RVM_ZEXT_KNE = 1ull << 9,
+  RVM_ZEXT_KNH = 1ull << 10,
+  RVM_ZEXT_KSED = 1ull << 11,
+  RVM_ZEXT_KSH = 1ull << 12,
+  RVM_ZEXT_KR = 1ull << 13,
+  RVM_ZEXT_KN = 1ull << 14,
+  RVM_ZEXT_KS = 1ull << 15,
+  RVM_ZEXT_K = 1ull << 16,
+  RVM_ZEXT_KT = 1ull << 17,
 } RVMZExt;
 
 typedef enum {
