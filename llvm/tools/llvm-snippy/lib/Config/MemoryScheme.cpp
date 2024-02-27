@@ -11,6 +11,7 @@
 #include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Support/RandUtil.h"
 #include "snippy/Support/Utils.h"
+#include "snippy/Support/YAMLHistogram.h"
 #include "snippy/Support/YAMLUtils.h"
 #include "snippy/Target/Target.h"
 
@@ -24,14 +25,96 @@
 
 #define DEBUG_TYPE "snippy-memory-scheme"
 
-LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::snippy::MemoryBank)
-LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::snippy::AccessAddress)
-LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::snippy::AddressInfo)
+namespace llvm {
+
+LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::MemoryBank, false);
+LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::AccessAddress, false);
+LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::AddressInfo, false);
+
+namespace snippy {
+
 namespace {
 
 constexpr const size_t MaxAccessSize = 8;
-}
-namespace llvm {
+
+struct NormalizedMemoryAccesses {
+  NormalizedMemoryAccesses(yaml::IO &Io) {}
+
+  NormalizedMemoryAccesses(yaml::IO &Io, MemoryAccessSeq &BaseAccesses) {
+    for (auto &&Access : BaseAccesses) {
+      switch (Access->getMode()) {
+      case MemoryAccessMode::Range:
+        Ranges.push_back(cast<MemoryAccessRange>(*Access));
+        break;
+      case MemoryAccessMode::Eviction:
+        Evictions.push_back(cast<MemoryAccessEviction>(*Access));
+        break;
+      case MemoryAccessMode::Addresses:
+        Addresses.push_back(cast<MemoryAccessAddresses>(*Access));
+        break;
+      }
+    }
+  }
+
+  MemoryAccessSeq denormalize(yaml::IO &Io) {
+    MemoryAccessSeq Seq;
+
+    auto CopyToSeq = [Inserter = std::back_inserter(Seq)](auto Range) {
+      using value_type = typename decltype(Range)::value_type;
+      transform(Range, Inserter,
+                [](auto &&Val) { return std::make_unique<value_type>(Val); });
+    };
+
+    CopyToSeq(Ranges);
+    CopyToSeq(Evictions);
+    CopyToSeq(Addresses);
+
+    return Seq;
+  }
+
+  std::vector<MemoryAccessRange> Ranges;
+  std::vector<MemoryAccessEviction> Evictions;
+  std::vector<MemoryAccessAddresses> Addresses;
+};
+
+} // namespace
+
+class NormalizedMemoryBaseAccessesAndAccessGroups {
+  void extractMemSchemesFromAccessGroups(yaml::IO &Io,
+                                         MemoryAccessSeq &BaseAccesses) {
+    for (auto &AG : AccessGroups) {
+      for (auto &MA : AG.BaseGroupAccesses) {
+        MA->Weight *= AG.Weight;
+        if (MA->Weight != std::numeric_limits<double>::infinity()) {
+          BaseAccesses.push_back(std::move(MA));
+          continue;
+        }
+
+        Io.setError("The weight of the memory scheme, after "
+                    "calculation, became infinity");
+        break;
+      }
+    }
+  }
+
+public:
+  NormalizedMemoryBaseAccessesAndAccessGroups(yaml::IO &Io) : Accesses(Io) {}
+
+  NormalizedMemoryBaseAccessesAndAccessGroups(yaml::IO &Io,
+                                              MemoryAccessSeq &BaseAccesses)
+      : Accesses(Io, BaseAccesses) {}
+
+  MemoryAccessSeq denormalize(yaml::IO &Io) {
+    MemoryAccessSeq BaseAccesses = Accesses.denormalize(Io);
+    extractMemSchemesFromAccessGroups(Io, BaseAccesses);
+    return BaseAccesses;
+  }
+
+  NormalizedMemoryAccesses Accesses;
+  MemoryAccessesGroupSeq AccessGroups;
+};
+
+} // namespace snippy
 
 template <> struct yaml::MappingTraits<snippy::AccessAddress> {
   static void mapping(yaml::IO &IO, snippy::AccessAddress &AA) {
@@ -41,166 +124,153 @@ template <> struct yaml::MappingTraits<snippy::AccessAddress> {
 };
 
 template <> struct yaml::MappingTraits<snippy::AddressInfo> {
-  static void mapping(yaml::IO &IO, snippy::AddressInfo &AI) {
-    IO.mapRequired("addr", AI.Address);
-    IO.mapRequired("size", AI.MaxOffset);
-    AI.MinOffset = 0;
-    IO.mapRequired("stride", AI.MinStride);
-    IO.mapRequired("access-size", AI.AccessSize);
+  static void mapping(yaml::IO &Io, snippy::AddressInfo &AI) {
+    if (!Io.outputting())
+      AI.MinOffset = 0;
+
+    Io.mapRequired("addr", AI.Address);
+    Io.mapRequired("size", AI.MaxOffset);
+    Io.mapRequired("stride", AI.MinStride);
+    Io.mapRequired("access-size", AI.AccessSize);
   }
 };
 
-template <>
-struct yaml::MappingContextTraits<std::unique_ptr<snippy::MemoryAccess>,
-                                  snippy::MemoryAccessMode> {
-  static void mapping(yaml::IO &IO,
-                      std::unique_ptr<snippy::MemoryAccess> &MemAccess,
-                      snippy::MemoryAccessMode &Mode) {
-    assert(IO.outputting() == false);
-    switch (Mode) {
-    case snippy::MemoryAccessMode::Range:
-      MemAccess = getRange(IO);
-      return;
-    case snippy::MemoryAccessMode::Eviction:
-      MemAccess = getEviction(IO);
-      return;
-    case snippy::MemoryAccessMode::Addresses:
-      MemAccess = getMemoryAddresses(IO);
-      return;
-    }
-    llvm_unreachable("Unhandled memory access mode");
-  }
+void yaml::MappingTraits<snippy::MemoryAccessRange>::mapping(
+    yaml::IO &Io, snippy::MemoryAccessRange &Range) {
+  Io.mapOptional("weight", Range.Weight);
+  Io.mapRequired("start", Range.Start);
+  Io.mapRequired("size", Range.Size);
+  Io.mapRequired("stride", Range.Stride);
+  Io.mapRequired("first-offset", Range.FirstOffset);
+  Io.mapRequired("last-offset", Range.LastOffset);
 
-  static std::unique_ptr<snippy::MemoryAccess> getRange(yaml::IO &IO) {
-    snippy::MemoryAccessRange Range;
-    IO.mapRequired("start", Range.Start);
-    IO.mapRequired("size", Range.Size);
-    IO.mapRequired("stride", Range.Stride);
-    IO.mapRequired("first-offset", Range.FirstOffset);
-    IO.mapRequired("last-offset", Range.LastOffset);
-    IO.mapOptional("weight", Range.Weight);
-    if (Range.FirstOffset > Range.LastOffset)
-      errs() << "Warning: first offset " << Range.FirstOffset
-             << " > last offset " << Range.LastOffset << "\n";
-    if (Range.LastOffset >= Range.Stride)
-      errs() << "Warning: last offset " << Range.LastOffset << " >= stride "
-             << Range.Stride << "\n";
-    if (Range.Weight < 0)
-      report_fatal_error("Range access weight can not be less than 0", false);
+  if (!Io.outputting())
     Range.initAllowedAlignmentLCBlockOffsets();
-    return std::make_unique<snippy::MemoryAccessRange>(std::move(Range));
-  }
-
-  static std::unique_ptr<snippy::MemoryAccess> getEviction(yaml::IO &IO) {
-    snippy::MemoryAccessEviction Eviction;
-    IO.mapRequired("mask", Eviction.Mask);
-    IO.mapRequired("fixed", Eviction.Fixed);
-    IO.mapOptional("weight", Eviction.Weight);
-    if (Eviction.Mask & Eviction.Fixed)
-      report_fatal_error("Bits in mask and fixed fields for eviction overlap");
-    if (Eviction.Weight < 0)
-      report_fatal_error("Eviction access weight can not be less than 0",
-                         false);
-    return std::make_unique<snippy::MemoryAccessEviction>(std::move(Eviction));
-  }
-
-  static std::unique_ptr<snippy::MemoryAccess>
-  getMemoryAddresses(yaml::IO &IO) {
-    snippy::MemoryAccessAddresses AddressesScheme;
-    bool Ordered = true;
-    IO.mapOptional("ordered", Ordered);
-    if (Ordered) {
-      AddressesScheme.NextAddressIdx = 0;
-      AddressesScheme.NextBurstIdx = 0;
-    }
-    IO.mapOptional("plain", AddressesScheme.Addresses);
-    IO.mapOptional("burst", AddressesScheme.Burst);
-    IO.mapOptional("weight", AddressesScheme.Weight);
-    if (AddressesScheme.Addresses.empty() && AddressesScheme.Burst.empty())
-      report_fatal_error("At least one address must be provided either in "
-                         "'plain' or 'burst' format for "
-                         "access-addresses memory scheme",
-                         false);
-    if (AddressesScheme.Weight < 0)
-      report_fatal_error("Addresses access weight can not be less than 0",
-                         false);
-    return std::make_unique<snippy::MemoryAccessAddresses>(
-        std::move(AddressesScheme));
-  }
-}; // namespace llvm
-
-template <> struct yaml::SequenceTraits<snippy::MemoryAccessSeq> {
-  static size_t size(yaml::IO &IO, snippy::MemoryAccessSeq &Seq) {
-    return Seq.size();
-  }
-  static std::unique_ptr<snippy::MemoryAccess> &
-  element(yaml::IO &, snippy::MemoryAccessSeq &Seq, size_t Index) {
-    // We don't follow usual flow that is allocating more space if the index is
-    // not in bounds and returning the indexed element. The reason for such
-    // behavior is the way how mapOptional works. It starts iterating from zero
-    // index, so when we call mapOptional twice with the same container, the
-    // latter call will overwrite results of the former. Instead, we want to
-    // append values from the second call, so logic below is quite direct.
-    Seq.push_back(std::unique_ptr<snippy::MemoryAccess>{});
-    return Seq.back();
-  }
-};
-
-template <> struct yaml::MappingTraits<snippy::MemoryBank> {
-  static void mapping(yaml::IO &IO, snippy::MemoryBank &MB) {
-    std::vector<snippy::AccessAddress> AAs;
-    IO.mapRequired("plain", AAs);
-    for (auto &AA : AAs) {
-      MB.addRange(snippy::MemRange{AA.Addr, AA.Addr + AA.AccessSize});
-    }
-  }
-};
-
-void fillBaseAccesses(yaml::IO &IO, snippy::MemoryAccessSeq &BaseAccesses) {
-  snippy::MemoryAccessMode Mode{};
-  Mode = snippy::MemoryAccessMode::Range;
-  IO.mapOptionalWithContext("access-ranges", BaseAccesses, Mode);
-  Mode = snippy::MemoryAccessMode::Eviction;
-  IO.mapOptionalWithContext("access-evictions", BaseAccesses, Mode);
-  Mode = snippy::MemoryAccessMode::Addresses;
-  IO.mapOptionalWithContext("access-addresses", BaseAccesses, Mode);
 }
 
-template <> struct yaml::MappingTraits<snippy::MemoryAccessesGroup> {
-  static void mapping(yaml::IO &IO, snippy::MemoryAccessesGroup &MG) {
-    IO.mapOptional("weight", MG.Weight);
-    if (MG.Weight < 0)
-      report_fatal_error("Access-group weight can not be less than 0", false);
-    fillBaseAccesses(IO, MG.BaseGroupAccesses);
-  }
-};
+std::string yaml::MappingTraits<snippy::MemoryAccessRange>::validate(
+    yaml::IO &Io, snippy::MemoryAccessRange &Range) {
+  // TODO: Remove this garbage and replace with a proper diagnostic
+  if (Range.FirstOffset > Range.LastOffset)
+    errs() << "Warning: first offset " << Range.FirstOffset << " > last offset "
+           << Range.LastOffset << "\n";
+  if (Range.LastOffset >= Range.Stride)
+    errs() << "Warning: last offset " << Range.LastOffset << " >= stride "
+           << Range.Stride << "\n";
 
-template <> struct yaml::SequenceTraits<snippy::MemoryAccessesGroupSeq> {
-  static size_t size(yaml::IO &IO, snippy::MemoryAccessesGroupSeq &Seq) {
-    return Seq.size();
-  }
-  static snippy::MemoryAccessesGroup &
-  element(yaml::IO &, snippy::MemoryAccessesGroupSeq &Seq, size_t Index) {
-    Seq.push_back(snippy::MemoryAccessesGroup{});
-    return Seq.back();
-  }
-};
+  if (Range.Stride == 0)
+    return "Stride cannot be equal to 0";
+  if (Range.Weight < 0)
+    return "Range access weight can not be less than 0";
+  return "";
+}
 
-template <> struct yaml::MappingTraits<snippy::MemoryAccesses> {
-  static void mapping(yaml::IO &IO, snippy::MemoryAccesses &MA) {
-    // It doesn't matter in which order these fields are in the file. However,
-    // yaml expects to have only one entry point for ranges and one for
-    // evictions.
-    fillBaseAccesses(IO, MA.BaseAccesses);
-    IO.mapOptional("access-groups", MA.AccessGroups);
-    MA.extractMemSchemesFromAccessGroups();
+void yaml::MappingTraits<snippy::MemoryAccessEviction>::mapping(
+    yaml::IO &Io, snippy::MemoryAccessEviction &Eviction) {
+  yaml::MappingNormalization<snippy::NormalizedYAMLStrongTypedef<yaml::Hex64>,
+                             decltype(Eviction.Mask)>
+      MaskNorm(Io, Eviction.Mask);
+
+  yaml::MappingNormalization<snippy::NormalizedYAMLStrongTypedef<yaml::Hex64>,
+                             decltype(Eviction.Mask)>
+      FixedNorm(Io, Eviction.Fixed);
+
+  Io.mapOptional("weight", Eviction.Weight);
+  Io.mapRequired("mask", MaskNorm->Value);
+  Io.mapRequired("fixed", FixedNorm->Value);
+}
+
+std::string yaml::MappingTraits<snippy::MemoryAccessEviction>::validate(
+    yaml::IO &Io, snippy::MemoryAccessEviction &Eviction) {
+  if (Eviction.Mask & Eviction.Fixed)
+    return "Bits in mask and fixed fields for eviction overlap";
+  if (Eviction.Weight < 0)
+    return "Eviction access weight can not be less than 0";
+  return "";
+}
+
+void yaml::MappingTraits<snippy::MemoryAccessAddresses>::mapping(
+    yaml::IO &Io, snippy::MemoryAccessAddresses &Addresses) {
+  // FIXME: Unbrick this code
+  if (!Io.outputting()) {
+    bool Ordered = true;
+    Io.mapOptional("ordered", Ordered, true);
+    if (Ordered) {
+      Addresses.NextAddressIdx = 0;
+      Addresses.NextBurstIdx = 0;
+    }
+  }
+
+  Io.mapOptional("weight", Addresses.Weight);
+  Io.mapOptional("plain", Addresses.Addresses);
+  Io.mapOptional("burst", Addresses.Burst);
+}
+
+std::string yaml::MappingTraits<snippy::MemoryAccessAddresses>::validate(
+    yaml::IO &Io, snippy::MemoryAccessAddresses &Addresses) {
+  if (Addresses.Addresses.empty() && Addresses.Burst.empty())
+    return "At least one address must be provided either in "
+           "'plain' or 'burst' format for "
+           "access-addresses memory scheme";
+  if (Addresses.Weight < 0)
+    return "Addresses access weight can not be less than 0";
+  return "";
+}
+
+void yaml::MappingTraits<snippy::MemoryBank>::mapping(yaml::IO &Io,
+                                                      snippy::MemoryBank &MB) {
+  assert(!Io.outputting());
+  std::vector<snippy::AccessAddress> AAs;
+  Io.mapRequired("plain", AAs);
+  for (auto &AA : AAs) {
+    MB.addRange(snippy::MemRange{AA.Addr, AA.Addr + AA.AccessSize});
+  }
+}
+
+static void mapBaseAccesses(yaml::IO &Io,
+                            snippy::NormalizedMemoryAccesses &Norm) {
+  Io.mapOptional("access-ranges", Norm.Ranges);
+  Io.mapOptional("access-evictions", Norm.Evictions);
+  Io.mapOptional("access-addresses", Norm.Addresses);
+}
+
+void yaml::MappingTraits<snippy::MemoryAccessesGroup>::mapping(
+    yaml::IO &Io, snippy::MemoryAccessesGroup &MG) {
+  yaml::MappingNormalization<snippy::NormalizedMemoryAccesses,
+                             snippy::MemoryAccessSeq>
+      MappingNorm(Io, MG.BaseGroupAccesses);
+  // NOTE: Nothing to see here. It's really necessary to call .operator->()
+  // because there's no .get() method unfortunately
+  mapBaseAccesses(Io, *MappingNorm.operator->());
+  Io.mapOptional("weight", MG.Weight);
+}
+
+std::string yaml::MappingTraits<snippy::MemoryAccessesGroup>::validate(
+    yaml::IO &Io, snippy::MemoryAccessesGroup &MG) {
+  if (MG.Weight < 0)
+    return "Access-group weight can not be less than 0";
+  return "";
+}
+
+void yaml::MappingTraits<snippy::MemoryAccesses>::mapping(
+    yaml::IO &Io, snippy::MemoryAccesses &MA) {
+  MappingNormalization<snippy::NormalizedMemoryBaseAccessesAndAccessGroups,
+                       snippy::MemoryAccessSeq>
+      MappingNorm(Io, MA.BaseAccesses);
+
+  mapBaseAccesses(Io, MappingNorm->Accesses);
+  Io.mapOptional("access-groups", MappingNorm->AccessGroups);
+
+  // FIXME: Possibly serialize this field?
+  if (!Io.outputting()) {
     std::vector<snippy::MemoryBank> MBs;
-    IO.mapOptional("restricted-addresses", MBs);
+    Io.mapOptional("restricted-addresses", MBs);
     for (auto &MB : MBs) {
       MA.Restricted = MA.Restricted.unite(MB);
     }
   }
-};
+}
+
 namespace snippy {
 namespace {
 
@@ -1023,22 +1093,12 @@ void MemoryScheme::print(raw_ostream &OS) const {
   MA.print(OS);
 }
 
-void MemoryAccesses::mapYaml(yaml::IO &IO) {
-  yaml::MappingTraits<MemoryAccesses>::mapping(IO, *this);
-}
-
 void MemoryAccesses::loadFromYaml(LLVMContext &Ctx, StringRef Filename) {
-  auto File = llvm::MemoryBuffer::getFile(Filename.data());
-  if (!File)
-    snippy::fatal(Ctx, "Memory scheme file not found", Filename);
-  auto Document = std::move(*File);
-  yaml::Input Yin(Document->getBuffer());
-  Yin >> *this;
-
-  if (auto Err = Yin.error())
+  auto Err = loadYAMLFromFile(*this, Filename);
+  if (Err)
     snippy::fatal(Ctx,
                   "Cannot read memory scheme " + Twine(Filename) + ". YAML",
-                  Err.message());
+                  toString(std::move(Err)));
 }
 
 void MemoryAccesses::validateSchemes(LLVMContext &Ctx,
