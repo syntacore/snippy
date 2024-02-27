@@ -511,6 +511,11 @@ class InstructionGenerator final : public MachineFunctionPass {
 
   void postprocessMemoryOperands(MachineInstr &MI, RegPoolWrapper &RP) const;
 
+  enum class MemAccessKind { BURST, REGULAR };
+
+  void markMemAccessAsUsed(const MachineInstr &MI, const AddressInfo &AI,
+                           MemAccessKind Kind, GeneratorContext &GC) const;
+
   bool preInterpretBacktracking(const MachineInstr &MI) const;
 
   void prepareInterpreterEnv() const;
@@ -1516,14 +1521,14 @@ mapOpcodeIdxToAI(MachineBasicBlock &MBB, ArrayRef<unsigned> OpcodeIdxToBaseReg,
 }
 
 static std::vector<unsigned>
-generateBurstGroupOpcodes(IInstrGroupGenReq &BurstGroupRequest,
-                          GeneratorContext &SGCtx) {
-  auto Limit = BurstGroupRequest.getGenerationLimit(GenerationMode::NumInstrs);
+generateOpcodesForFixedSizedGroup(IInstrGroupGenReq &GroupRequest,
+                                  GeneratorContext &SGCtx) {
+  auto Limit = GroupRequest.getGenerationLimit(GenerationMode::NumInstrs);
   assert(Limit.has_value());
 
   std::vector<unsigned> ChosenOpcodes;
   std::generate_n(std::back_inserter(ChosenOpcodes), Limit.value(),
-                  [&] { return BurstGroupRequest.genOpc(); });
+                  [&] { return GroupRequest.genOpc(); });
   return ChosenOpcodes;
 }
 
@@ -1537,7 +1542,7 @@ void InstructionGenerator::generateBurst(
   if (GenerateInsertionPointHints)
     generateInsertionPointHint(MBB, MBB.end());
 
-  auto Opcodes = generateBurstGroupOpcodes(BurstGroupRequest, *SGCtx);
+  auto Opcodes = generateOpcodesForFixedSizedGroup(BurstGroupRequest, *SGCtx);
 
   SmallVector<unsigned, 32> MemUsers;
   copy_if(Opcodes, std::back_inserter(MemUsers),
@@ -1559,12 +1564,7 @@ void InstructionGenerator::generateBurst(
           randomInstruction(InstrDesc, MBB, Ins, std::move(Preselected));
 
       assert(MI);
-      auto [EffectiveAddr, AccessSize] =
-          getEffectiveMemoryAccessInfo(MI, AI, SnippyTgt);
-      if (DumpMemAccesses.isSpecified() ||
-          DumpMemAccessesRestricted.isSpecified())
-        SGCtx->addBurstPlainMemAccess(EffectiveAddr, AccessSize);
-
+      markMemAccessAsUsed(*MI, AI, MemAccessKind::BURST, *SGCtx);
       ++MemUsersIdx;
     } else
       randomInstruction(InstrDesc, MBB, Ins);
@@ -1884,6 +1884,21 @@ void InstructionGenerator::postprocessMemoryOperands(MachineInstr &MI,
       // preparation.
       RP.addReserved(Reg, AccessMaskBit::W);
     }
+  }
+}
+
+void InstructionGenerator::markMemAccessAsUsed(const MachineInstr &MI,
+                                               const AddressInfo &AI,
+                                               MemAccessKind Kind,
+                                               GeneratorContext &GC) const {
+  auto [EffectiveAddr, AccessSize] = getEffectiveMemoryAccessInfo(
+      &MI, AI, GC.getLLVMState().getSnippyTarget());
+  if (DumpMemAccesses.isSpecified() ||
+      DumpMemAccessesRestricted.isSpecified()) {
+    if (Kind == MemAccessKind::BURST)
+      GC.addBurstPlainMemAccess(EffectiveAddr, AccessSize);
+    else
+      GC.addMemAccess(EffectiveAddr, AccessSize);
   }
 }
 

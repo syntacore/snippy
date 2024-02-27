@@ -427,6 +427,7 @@ public:
                          bool MustHavePrimaryInstrs,
                          std::optional<unsigned> BurstGroupID,
                          ArrayRef<OpcodeHistogramEntry> Overrides = {}) const;
+
   auto getCFInstrsNum(const MachineFunction &MF) const {
     return GenSettings->Cfg.Histogram.getCFInstrsNum(getRequestedInstrsNum(MF),
                                                      *OpCC);
