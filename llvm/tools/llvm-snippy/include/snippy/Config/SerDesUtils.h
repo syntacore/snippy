@@ -25,7 +25,7 @@ struct RegisterSerialization {
   RegisterSerialization &addRegisterGroup(StringRef Prefix, unsigned BitsNum,
                                           ArrayRef<APInt> Values);
 
-  void saveAsYAML(StringRef Path);
+  void saveAsYAML(raw_ostream &OS);
 };
 
 RegistersWithHistograms loadRegistersFromYaml(StringRef Path);
