@@ -393,8 +393,8 @@ RegisterSerialization::addRegisterGroup(StringRef RegType, unsigned BitsNum,
   return *this;
 }
 
-void RegisterSerialization::saveAsYAML(StringRef Path) {
-  outputYAMLToFileOrFatal(*this, Path);
+void RegisterSerialization::saveAsYAML(raw_ostream &OS) {
+  outputYAMLToStream(*this, OS);
 }
 
 RegistersWithHistograms loadRegistersFromYaml(StringRef Path) {

@@ -328,14 +328,20 @@ void Interpreter::addInstr(const MachineInstr &MI, const LLVMState &State) {
   Simulator->writeMem(Simulator->readPC(), EncodedMI);
 }
 
-void Interpreter::dumpRegsAsYAML(const IRegisterState &Regs,
-                                 StringRef FileName) {
-  Regs.saveAsYAMLFile(FileName);
+void Interpreter::dumpRegsAsYAML(const IRegisterState &Regs, raw_ostream &OS) {
+  Regs.saveAsYAMLFile(OS);
 }
 
 void Interpreter::dumpRegs(const IRegisterState &Regs, StringRef YamlPath) {
-  if (!YamlPath.empty())
-    dumpRegsAsYAML(Regs, YamlPath);
+  if (YamlPath.empty())
+    return;
+
+  std::error_code EC;
+  raw_fd_ostream File(YamlPath, EC);
+  if (EC)
+    report_fatal_error("Register dump error: " + Twine(EC.message()), false);
+
+  dumpRegsAsYAML(Regs, File);
 }
 
 void Interpreter::dumpOneRange(NamedMemoryRange Range,

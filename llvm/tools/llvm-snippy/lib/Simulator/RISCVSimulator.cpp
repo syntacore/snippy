@@ -96,7 +96,7 @@ void RISCVRegisterState::loadFromYamlFile(StringRef YamlFile,
   }
 }
 
-void RISCVRegisterState::saveAsYAMLFile(StringRef Filename) const {
+void RISCVRegisterState::saveAsYAMLFile(raw_ostream &OS) const {
   // Under some circumstances rv32 models can behave little bit wierdly:
   // namely, they can unexpectedly update high part of 64-bit storage for
   // 32-bit register. So we have to manually truncate the state to avoid
@@ -114,7 +114,7 @@ void RISCVRegisterState::saveAsYAMLFile(StringRef Filename) const {
                        .addRegisterGroup("V", VLEN, VRegs);
   if (!DumpRegsWithoutPC)
     RegSerObj.addRegisterGroup("P", PC);
-  RegSerObj.saveAsYAML(Filename);
+  RegSerObj.saveAsYAML(OS);
 }
 
 bool RISCVRegisterState::operator==(const IRegisterState &Another) const {

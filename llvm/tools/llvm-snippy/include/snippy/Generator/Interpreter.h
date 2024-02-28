@@ -89,7 +89,7 @@ class Interpreter final {
   uint64_t ProgEnd;
 
   void initTransactionMechanism();
-  void dumpOneRange(NamedMemoryRange Range, raw_fd_ostream &File) const;
+  void dumpOneRange(NamedMemoryRange Range, raw_fd_ostream &OS) const;
 
 public:
   uint64_t getProgStart() const {
@@ -197,8 +197,7 @@ public:
 
   std::optional<NamedMemoryRange> getSectionPosition(StringRef Name) const;
 
-  static void dumpRegsAsBin(const IRegisterState &Regs, StringRef FileName);
-  static void dumpRegsAsYAML(const IRegisterState &Regs, StringRef FileName);
+  static void dumpRegsAsYAML(const IRegisterState &Regs, raw_ostream &OS);
   static void dumpRegs(const IRegisterState &Regs, StringRef YamlPath);
   void dumpRanges(ArrayRef<NamedMemoryRange> SectionNames,
                   const std::string &FileName) const;
