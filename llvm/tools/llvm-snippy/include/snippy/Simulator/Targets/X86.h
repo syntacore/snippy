@@ -18,7 +18,7 @@ namespace snippy {
 
 struct X86RegisterState : public IRegisterState {
   void loadFromYamlFile(StringRef, WarningsT &) override;
-  void saveAsYAMLFile(StringRef) const override;
+  void saveAsYAMLFile(raw_ostream &) const override;
 
   void randomize() override;
   bool operator==(const IRegisterState &) const override;
