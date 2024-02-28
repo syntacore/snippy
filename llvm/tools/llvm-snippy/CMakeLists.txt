@@ -15,12 +15,13 @@ set(LLVM_LINK_COMPONENTS
   AllTargetsInfos
   )
 
+set(LLVMSnippyDeps intrinsics_gen)
 add_llvm_tool(llvm-snippy
   DISABLE_LLVM_LINK_LLVM_DYLIB
   llvm-snippy.cpp
 
   DEPENDS
-  intrinsics_gen
+  ${LLVMSnippyDeps}
   )
 
 add_subdirectory(include)
@@ -67,5 +68,7 @@ foreach(proj ${LLVM_SNIPPY_TARGETS_LIST})
   target_link_libraries(llvm-snippy PRIVATE ${tgt})
 endforeach()
 
+
 add_dependencies(llvm-snippy lld)
+
 

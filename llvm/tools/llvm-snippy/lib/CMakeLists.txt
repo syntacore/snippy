@@ -26,10 +26,7 @@ set(LLVM_LINK_COMPONENTS
   SnippyTarget
   SnippyGenerator
   )
-
-add_llvm_library(LLVMSnippy
-  DISABLE_LLVM_LINK_LLVM_DYLIB
-  STATIC
+set(LLVMSnippySources
   BranchRelaxatorPass.cpp
   BlockGenPlanningPass.cpp
   CFGeneratorPass.cpp
@@ -52,6 +49,12 @@ add_llvm_library(LLVMSnippy
   RegsInitInsertionPass.cpp
   ReserveRegsPass.cpp
   RootRegPoolWrapperPass.cpp
+  )
+
+add_llvm_library(LLVMSnippy
+  DISABLE_LLVM_LINK_LLVM_DYLIB
+  STATIC
+  ${LLVMSnippySources}
   DEPENDS
   intrinsics_gen
   )
