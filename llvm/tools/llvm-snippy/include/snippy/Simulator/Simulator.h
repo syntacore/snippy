@@ -32,7 +32,7 @@ struct IRegisterState {
   virtual ~IRegisterState() {}
 
   virtual void loadFromYamlFile(StringRef, WarningsT &) = 0;
-  virtual void saveAsYAMLFile(StringRef) const = 0;
+  virtual void saveAsYAMLFile(raw_ostream &) const = 0;
 
   virtual bool operator==(const IRegisterState &) const = 0;
   bool operator!=(const IRegisterState &Another) const {
