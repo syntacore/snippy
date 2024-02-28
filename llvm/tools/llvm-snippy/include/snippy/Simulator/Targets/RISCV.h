@@ -88,7 +88,7 @@ struct RISCVRegisterState : public IRegisterState {
 
   void loadFromYamlFile(StringRef YamlFile, WarningsT &WarningsArr) override;
 
-  void saveAsYAMLFile(StringRef Filename) const override;
+  void saveAsYAMLFile(raw_ostream &OS) const override;
 
   bool operator==(const IRegisterState &) const override;
 

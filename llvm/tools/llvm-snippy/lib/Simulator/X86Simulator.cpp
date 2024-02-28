@@ -21,7 +21,7 @@ void X86RegisterState::loadFromYamlFile(StringRef Filename,
   report_fatal_error("sorry not implemented");
 }
 
-void X86RegisterState::saveAsYAMLFile(StringRef Filename) const {
+void X86RegisterState::saveAsYAMLFile(raw_ostream &OS) const {
   report_fatal_error("sorry not implemented");
 }
 
