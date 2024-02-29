@@ -69,13 +69,14 @@ struct SimulationConfig {
 
 enum class ExecutionResult {
   Success,
-  AttensionRequired,
+  AttentionRequired,
   SimulationExit,
   FatalError
 };
 
 class SimulatorInterface {
 public:
+  virtual void setStopModeByPC(ProgramCounterType PC) = 0;
   virtual ProgramCounterType readPC() const = 0;
   virtual void setPC(ProgramCounterType PC) = 0;
 
@@ -112,6 +113,8 @@ public:
   virtual void setState(const IRegisterState &Regs) = 0;
 
   virtual void logMessage(const Twine &Message) const = 0;
+
+  virtual void dumpSystemRegistersState(raw_ostream &OS) const = 0;
 
   virtual bool supportsCallbacks() const = 0;
 
