@@ -11,6 +11,33 @@
 
 namespace llvm {
 namespace snippy {
+namespace {
+Expected<uint64_t> getAddressOfSymbolInImage(StringRef Image,
+                                             StringRef SymbolName) {
+  auto MemBuf = MemoryBuffer::getMemBuffer(Image, "", false);
+
+  auto &&Bin = object::ObjectFile::createObjectFile(*MemBuf);
+  if (!Bin)
+    return Bin.takeError();
+  auto &&Obj = *Bin;
+
+  auto ExitSimIt = std::find_if(Obj->symbols().begin(), Obj->symbols().end(),
+                                [SymbolName](const auto &Sym) {
+                                  if (auto Name = Sym.getName())
+                                    return *Name == SymbolName;
+                                  return false;
+                                });
+  if (ExitSimIt == Obj->symbols().end())
+    return {make_error<Failure>(Twine("no symbol ") + Twine(SymbolName) +
+                                Twine(" in image"))};
+
+  auto ExpectedAddress = ExitSimIt->getAddress();
+  if (!ExpectedAddress)
+    return ExpectedAddress.takeError();
+
+  return *ExpectedAddress;
+}
+} // namespace
 
 SimRunner::SimRunner(LLVMContext &Ctx, const SnippyTarget &TGT,
                      const TargetSubtargetInfo &Subtarget,
@@ -35,11 +62,19 @@ SimRunner::SimRunner(LLVMContext &Ctx, const SnippyTarget &TGT,
   }
 }
 
-ProgramCounterType SimRunner::run(StringRef Programm,
+ProgramCounterType SimRunner::run(StringRef Program,
                                   const IRegisterState &InitialRegState) {
+  auto StopPC = getAddressOfSymbolInImage(Program, Linker::GetExitSymbolName());
+  if (auto E = StopPC.takeError()) {
+    auto Err = toString(std::move(E));
+    report_fatal_error("[Internal error]: unable to get last instruction PC: " +
+                           Twine(Err) + Twine("\nPlease, report a bug"),
+                       false);
+  }
   for (auto &I : CoInterp) {
     I->setInitialState(InitialRegState);
-    I->loadElfImage(Programm);
+    I->loadElfImage(Program);
+    I->setStopModeByPC(*StopPC);
   }
 
   checkStates(/* CheckMemory */ true);
@@ -47,25 +82,32 @@ ProgramCounterType SimRunner::run(StringRef Programm,
   auto &PrimI = getPrimaryInterpreter();
   PrimI.logMessage("#===Simulation Start===\n");
 
+  ProgramCounterType CurPC = PrimI.getPC();
+
   while (!PrimI.endOfProg()) {
-    if (std::any_of(CoInterp.begin(), CoInterp.end(),
-                    [](auto &I) { return !I->step(); })) {
-      snippy::warn(WarningName::ModelException, Ctx,
-                   "Execution did not reached final instruction",
-                   "exception occurred in model");
-      return PrimI.getPC();
+    CurPC = PrimI.getPC();
+    auto ExecRes = PrimI.step();
+    if (ExecRes == ExecutionResult::FatalError)
+      PrimI.reportSimulationFatalError("Primary interpreter step failed");
+
+    for (auto [Num, I] : enumerate(drop_begin(CoInterp))) {
+      assert(I.get() != &PrimI);
+      if (I->step() == ExecutionResult::FatalError)
+        I->reportSimulationFatalError(std::to_string(Num) +
+                                      " interpreter step failed");
     }
+
+    if (ExecRes == ExecutionResult::SimulationExit)
+      break;
+
+    if (ExecRes != ExecutionResult::Success)
+      PrimI.reportSimulationFatalError(
+          "Unexpected primary interpreter step result");
+    // TODO: add an option to compare memory state after each step
     checkStates(/* CheckMemory */ false);
-  };
-
-  ProgramCounterType LastInstrPC = PrimI.getPC();
-
-  // Execute last instruction
-  for (auto &I : CoInterp)
-    I->step();
-
+  }
   checkStates(/* CheckMemory */ true);
-  return LastInstrPC;
+  return CurPC;
 }
 
 void SimRunner::checkStates(bool CheckMemory) {
@@ -75,8 +117,14 @@ void SimRunner::checkStates(bool CheckMemory) {
   if (std::any_of(CoInterp.begin(), CoInterp.end(),
                   [&PI, CheckMemory](auto &I) {
                     return !PI.compareStates(*I, CheckMemory);
-                  }))
-    report_fatal_error("Interpreters states differ", false);
+                  })) {
+    std::string MismatchMessage;
+    llvm::raw_string_ostream Stream(MismatchMessage);
+    for (auto &I : CoInterp)
+      I->dumpCurrentRegStateToStream(Stream);
+    report_fatal_error(
+        "Interpreters states differ :\n" + Twine(MismatchMessage), false);
+  }
 }
 
 } // namespace snippy

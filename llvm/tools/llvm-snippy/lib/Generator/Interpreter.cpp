@@ -238,10 +238,6 @@ bool Interpreter::compareStates(const Interpreter &Another,
   return MI1 == MI2;
 }
 
-bool Interpreter::step() {
-  return (Simulator->executeInstr() == ExecutionResult::Success);
-}
-
 bool Interpreter::endOfProg() const {
   return Simulator->readPC() == getProgEnd();
 }
@@ -269,6 +265,28 @@ void Interpreter::dumpCurrentRegState(StringRef Filename) const {
   auto RegisterState = Env.SnippyTGT->createRegisterState(*Env.ST);
   Simulator->saveState(*RegisterState);
   dumpRegs(*RegisterState, Filename);
+}
+
+void Interpreter::dumpCurrentRegStateToStream(raw_ostream &OS) const {
+  auto RegisterState = Env.SnippyTGT->createRegisterState(*Env.ST);
+  Simulator->saveState(*RegisterState);
+  dumpRegsAsYAML(*RegisterState, OS);
+}
+
+void Interpreter::dumpSystemRegistersState(raw_ostream &OS) const {
+  Simulator->dumpSystemRegistersState(OS);
+}
+
+void Interpreter::reportSimulationFatalError(StringRef PrefixMessage) const {
+  std::string ErrorMessage;
+  llvm::raw_string_ostream Stream(ErrorMessage);
+
+  Stream << PrefixMessage << ":\n";
+  dumpSystemRegistersState(Stream);
+  dumpCurrentRegStateToStream(Stream);
+  Stream.flush();
+
+  report_fatal_error(ErrorMessage.c_str(), false);
 }
 
 void Interpreter::loadElfImage(StringRef ElfImage) {

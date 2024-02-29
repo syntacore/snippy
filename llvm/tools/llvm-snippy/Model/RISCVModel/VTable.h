@@ -25,6 +25,9 @@ struct RVM_FunctionPointers {
   rvm_readMem_t readMem;
   rvm_writeMem_t writeMem;
 
+  rvm_setStopMode_t setStopMode;
+  rvm_setStopPC_t setStopPC;
+
   rvm_readPC_t readPC;
   rvm_setPC_t setPC;
 
