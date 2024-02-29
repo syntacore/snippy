@@ -746,7 +746,7 @@ GenerationStatus InstructionGenerator::interpretInstrs(InstrIt Begin,
     if (BT && !preInterpretBacktracking(MI))
       return GenerationStatus::BacktrackingFailed;
     I.addInstr(MI, State);
-    if (!I.step())
+    if (I.step() != ExecutionResult::Success)
       return GenerationStatus::InterpretFailed;
   }
   return GenerationStatus::Ok;
@@ -886,7 +886,9 @@ GenerationResult InstructionGenerator::handleGeneratedInstructions(
         std::distance(Def.Inst, std::next(StoreInfo.FirstStoreInstrPos)));
   // Execute self-check instructions
   auto &I = SGCtx->getOrCreateInterpreter();
-  I.executeChainOfInstrs(SGCtx->getLLVMState(), InsPoint, ItEnd);
+  if (!I.executeChainOfInstrs(SGCtx->getLLVMState(), InsPoint, ItEnd))
+    I.reportSimulationFatalError(
+        "Failed to execute chain of instructions in tracking mode");
 
   // Check size requirements after selfcheck addition.
   GeneratedCodeSize = getCodeSize(ItBegin, ItEnd);
@@ -967,8 +969,8 @@ GenerationStatistics InstructionGenerator::processInstructionGeneration(
 
     switch (IntRes.Status) {
     case GenerationStatus::InterpretFailed: {
-      report_fatal_error(
-          "Fail to execute generated instruction in tracking mode", false);
+      SGCtx->getOrCreateInterpreter().reportSimulationFatalError(
+          "Fail to execute generated instruction in tracking mode\n");
     }
     case GenerationStatus::BacktrackingFailed: {
       ++BacktrackCount;
@@ -2089,8 +2091,11 @@ InstructionGenerator::findNextBlockOnModel(const MachineBasicBlock &MBB) const {
            "during code generation.");
     assert(Branch.isConditionalBranch());
     I.addInstr(Branch, SGCtx->getLLVMState());
-    auto Success = I.step();
-    assert(Success && "Branch execution must not fail");
+
+    if (I.step() != ExecutionResult::Success)
+      I.reportSimulationFatalError(
+          "Fail to execute generated instruction in tracking mode");
+
     if (I.getPC() == PC)
       // pc + 0. Conditional branch is taken (Asm printer replaces BB's label
       // with zero because the actual offset is still unknown).
