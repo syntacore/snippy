@@ -127,7 +127,8 @@ public:
 
   bool compareStates(const Interpreter &Another,
                      bool CheckMemory = false) const;
-  bool step();
+
+  [[nodiscard]] ExecutionResult step() { return Simulator->executeInstr(); }
 
   void resetMem();
 
@@ -137,17 +138,27 @@ public:
 
   void dumpCurrentRegState(StringRef Filename) const;
 
+  void dumpCurrentRegStateToStream(raw_ostream &OS) const;
+
+  void dumpSystemRegistersState(raw_ostream &OS) const;
+
+  void reportSimulationFatalError(StringRef PrefixMessage) const;
+
   void setInitialState(const IRegisterState &Regs) {
     Simulator->setState(Regs);
     Simulator->setPC(getProgStart());
   }
 
+  void setStopModeByPC(ProgramCounterType StopPC) {
+    Simulator->setStopModeByPC(StopPC);
+  }
+
   template <typename InstrIt>
-  bool executeChainOfInstrs(const LLVMState &State, InstrIt ItBegin,
-                            InstrIt ItEnd) {
+  [[nodiscard]] bool executeChainOfInstrs(const LLVMState &State,
+                                          InstrIt ItBegin, InstrIt ItEnd) {
     for (auto ItCur = ItBegin; ItCur != ItEnd; ++ItCur) {
       addInstr(*ItCur, State);
-      if (!step())
+      if (step() != ExecutionResult::Success)
         return false;
     }
     return true;

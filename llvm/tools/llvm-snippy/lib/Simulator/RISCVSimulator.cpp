@@ -151,9 +151,22 @@ public:
   SnippyRISCVSimulator(rvm::State &&MS) : CommonSimulatorImpl(std::move(MS)) {}
 
   ExecutionResult executeInstr() override {
-    if (ModelState.executeInstr() == 0)
+    auto ExecRes = ModelState.executeInstr();
+    switch (ExecRes) {
+    case MODEL_SUCCESS:
       return ExecutionResult::Success;
-    return ExecutionResult::FatalError;
+    case MODEL_EXCEPTION:
+      return ExecutionResult::FatalError;
+    case MODEL_FINISH:
+      return ExecutionResult::SimulationExit;
+    }
+
+    llvm_unreachable("unknown model result of instruction execution");
+  }
+
+  void setStopModeByPC(ProgramCounterType PC) override {
+    ModelState.setStopMode(STOP_BY_PC);
+    ModelState.setStopPC(PC);
   }
 
   llvm::APInt readReg(llvm::Register Reg) const override {
@@ -246,6 +259,11 @@ public:
     ModelState.setVReg(static_cast<RVMVReg>(RegID),
                        reinterpret_cast<const char *>(NewValue.getRawData()),
                        NewValue.getBitWidth() / RISCV_CHAR_BIT);
+  }
+
+  void dumpSystemRegistersState(raw_ostream &OS) const override {
+    OS << "MCAUSE: " << ModelState.readCSRReg(RVM_CSR_MCAUSE) << "\n";
+    // TODO: give more information (mepc and mtval)
   }
 
   bool supportsCallbacks() const override {
