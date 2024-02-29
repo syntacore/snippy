@@ -16,7 +16,7 @@ extern "C" {
 
 #define RVMAPI_ENTRY_POINT_SYMBOL RVMVTable
 #define RVMAPI_VERSION_SYMBOL RVMInterfaceVersion
-#define RVMAPI_CURRENT_INTERFACE_VERSION 9u
+#define RVMAPI_CURRENT_INTERFACE_VERSION 12u
 
 typedef uint64_t RVMRegT;
 
@@ -85,17 +85,32 @@ typedef enum {
 struct RVMConfig;
 typedef struct RVMConfig RVMConfig;
 
+typedef enum { NON_STOP = 0, STOP_BY_PC } RVMStopMode;
+
+typedef enum {
+  // Simulator stepped successully, no additional event happened.
+  MODEL_SUCCESS,
+  // Simulator got ebreak or instruction with "StopPC".
+  MODEL_FINISH,
+  // Simulator got some kind of exception.
+  MODEL_EXCEPTION,
+} RVMSimExecStatus;
+
 RVMState *rvm_modelCreate(const RVMConfig *config);
 void rvm_modelDestroy(RVMState *State);
 
 const RVMConfig *rvm_getModelConfig(const RVMState *State);
 
-int rvm_executeInstr(RVMState *State);
+RVMSimExecStatus rvm_executeInstr(RVMState *State);
 
 void rvm_readMem(const RVMState *State, uint64_t Addr, size_t Count,
                  char *Data);
 void rvm_writeMem(RVMState *State, uint64_t Addr, size_t Count,
                   const char *Data);
+
+void rvm_setStopMode(RVMState *State, RVMStopMode Mode);
+
+void rvm_setStopPC(RVMState *State, uint64_t Addr);
 
 uint64_t rvm_readPC(const RVMState *State);
 void rvm_setPC(RVMState *State, uint64_t NewPC);
@@ -247,7 +262,7 @@ int rvm_setVReg(RVMState *State, RVMVReg Reg, const char *Data,
 
 void rvm_logMessage(const char *Message);
 
-int rvm_queryCallbackSupportPresent();
+int rvm_queryCallbackSupportPresent(void);
 
 typedef void (*MemUpdateCallbackTy)(RVMCallbackHandler *, uint64_t Addr,
                                     const char *Data, size_t Size);
@@ -270,6 +285,8 @@ struct RVMConfig {
   uint64_t XExt;
   unsigned VLEN;
   int EnableMisalignedAccess;
+  RVMStopMode Mode;
+  uint64_t StopAddr;
   const char *LogFilePath;
   const char *PluginInfo;
   RVMCallbackHandler *CallbackHandler;
@@ -285,7 +302,7 @@ struct RVMConfig {
 typedef RVMState *(*rvm_modelCreate_t)(const RVMConfig *);
 typedef void (*rvm_modelDestroy_t)(RVMState *);
 typedef const RVMConfig *(*rvm_getModelConfig_t)(const RVMState *);
-typedef int (*rvm_executeInstr_t)(RVMState *);
+typedef RVMSimExecStatus (*rvm_executeInstr_t)(RVMState *);
 typedef void (*rvm_readMem_t)(const RVMState *, uint64_t, size_t, char *);
 typedef void (*rvm_writeMem_t)(RVMState *, uint64_t, size_t, const char *);
 typedef uint64_t (*rvm_readPC_t)(const RVMState *);
@@ -294,12 +311,14 @@ typedef RVMRegT (*rvm_readXReg_t)(const RVMState *, RVMXReg);
 typedef void (*rvm_setXReg_t)(RVMState *, RVMXReg, RVMRegT);
 typedef RVMRegT (*rvm_readFReg_t)(const RVMState *, RVMFReg);
 typedef void (*rvm_setFReg_t)(RVMState *, RVMFReg, RVMRegT);
+typedef void (*rvm_setStopMode_t)(RVMState *, RVMStopMode);
+typedef void (*rvm_setStopPC_t)(RVMState *, uint64_t);
 typedef RVMRegT (*rvm_readCSRReg_t)(const RVMState *, unsigned);
 typedef void (*rvm_setCSRReg_t)(RVMState *, unsigned, RVMRegT);
 typedef int (*rvm_readVReg_t)(const RVMState *, RVMVReg, char *, size_t);
 typedef int (*rvm_setVReg_t)(RVMState *, RVMVReg, const char *, size_t);
 typedef void (*rvm_logMessage_t)(const char *);
-typedef int (*rvm_queryCallbackSupportPresent_t)();
+typedef int (*rvm_queryCallbackSupportPresent_t)(void);
 
 #ifdef __cplusplus
 }

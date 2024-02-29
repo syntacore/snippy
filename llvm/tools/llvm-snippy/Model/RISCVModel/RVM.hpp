@@ -171,7 +171,7 @@ public:
     return *Config;
   }
 
-  int executeInstr() { return getVTable()->executeInstr(get()); }
+  RVMSimExecStatus executeInstr() { return getVTable()->executeInstr(get()); }
 
   template <typename T>
   void readMem(uint64_t Addr, size_t Count, T *Data) const {
@@ -184,6 +184,9 @@ public:
     getVTable()->writeMem(get(), Addr, Count * sizeof(T),
                           reinterpret_cast<const char *>(Data));
   }
+
+  void setStopMode(RVMStopMode Mode) { getVTable()->setStopMode(get(), Mode); }
+  void setStopPC(uint64_t StopPC) { getVTable()->setStopPC(get(), StopPC); }
 
   uint64_t readPC() const { return getVTable()->readPC(get()); }
   void setPC(uint64_t NewPC) { getVTable()->setPC(get(), NewPC); }
