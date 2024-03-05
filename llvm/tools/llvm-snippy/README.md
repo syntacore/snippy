@@ -43,7 +43,7 @@ From the ${SNIPPY_PATH} directory, run CMake:
 
 ## Testing
 
-You can test LLVM-snippy by running LIT tests located in `llvm/test/tools/llvm-snippy`. These tests are based on the common for LLVM infrastructure including llvm-lit and FileCheck. For the additional information about LLVM testing infrastructure, please, refer to [LLVM Testing Infrastructure Guide](https://llvm.org/docs/TestingGuide.html).
+You can test LLVM-snippy by running LIT tests located in `llvm/test/tools/llvm-snippy`. These tests are based on the common for LLVM infrastructure including llvm-lit and FileCheck. For the additional information about LLVM testing infrastructure, refer to [LLVM Testing Infrastructure Guide](https://llvm.org/docs/TestingGuide.html).
 
 ### Prerequisites
 
@@ -274,16 +274,16 @@ Thank you for showing interest in contributing to LLVM-snippy. These are several
 
 ## Bug Reports
 
-We want to know about all LLVM-snippy bugs: segmentation faults, poor or incorrect diagnostics, lack of randomization in the generated test, incorrectly working feature, etc. If you think that you have encountered a bug, please file an issue on GitHub. Make sure that you provide minimal description, reproduction and HEAD commit hash in the issue.
+We want to know about all LLVM-snippy bugs: segmentation faults, poor or incorrect diagnostics, lack of randomization in the generated test, incorrectly working feature, etc. If you think that you have encountered a bug, file an issue on GitHub. Make sure that you provide minimal description, reproduction and HEAD commit hash in the issue.
 
 ## Bug Fixes
 
-We appreciate your desire to improve LLVM-snippy. You can start working on any open unassigned issue. A comment in the issue is enough to show that you have started working on it. If you do not have bandwidth to work on the issue already assigned to you, please let others know by leaving a comment in the issue, so it can be reassigned.
-If the fix requires design discussion, please create an [RFC](#driving-a-major-feature). Anyway, we encourage everyone to provide a short summary in the issue comments before creating a PR.
+We appreciate your desire to improve LLVM-snippy. You can start working on any open unassigned issue. A comment in the issue is enough to show that you have started working on it. If you do not have bandwidth to work on the issue already assigned to you, let other contributes know by leaving a comment in the issue, so it can be reassigned.
+If the fix requires design discussion, create an [RFC](#driving-a-major-feature). Anyway, we encourage everyone to provide a short summary in the issue comments before creating a PR.
 
 ## Driving a Major Feature
 
-If you want to introduce a major change or implement a new feature in LLVM-snippy, please create an RFC first. We would like to keep LLVM-snippy community informed about major changes. We should also reach consensus on all technical and design decisions before any significant work is done.
+If you want to introduce a major change or implement a new feature in LLVM-snippy, create an RFC first. We would like to keep LLVM-snippy community informed about major changes. We should also reach consensus on all technical and design decisions before any significant work is done.
 There is no template for an RFC, so feel free to create it on your own. A good RFC contains: overview, proposal, pros and cons, implementation steps.
 
 ## Backward Compatibility
@@ -300,9 +300,9 @@ When your patch is ready for review, create a pull request. We ask you to follow
 5. Make a single commit.
 6. Create a PR from your fork or use a branch that starts from `users/<username>/`.
 
-You can request a review by mentioning people in the PR comments. Best candidates for review are developers who have contributed in the area your patch concerns. Keep in mind that the usual review period is one week, so please do not ping more often.
+You can request a review by mentioning people in the PR comments. Best candidates for review are developers who have contributed in the area your patch concerns. Keep in mind that the usual review period is one week, so do not ping more often.
 
-Once you patch is reviewed and approved, you can merge the change. If you do not have the rights, please let people know so they could merge the change on your behalf.
+Once you patch is reviewed and approved, you can merge the change. If you do not have the rights, let maintainers know so they could merge the change on your behalf.
 
 Feel free to participate in any review you are interested in.
 

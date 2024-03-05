@@ -1,7 +1,5 @@
 # LLVM-snippy
-
-This is LLVM project fork containing LLVM-snippy generator. Documentation of this
-tool is available [here](llvm/tools/llvm-snippy/README.md).
+This is an LLVM project fork containing the LLVM-snippy generator. Documentation for this tool is available [here](llvm/tools/llvm-snippy/README.md).
 
 # LLVM Compiler Infrastructure
 
