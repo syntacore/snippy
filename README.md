@@ -1,4 +1,7 @@
-# The LLVM Compiler Infrastructure
+# LLVM-snippy
+This is an LLVM project fork containing the LLVM-snippy generator. Documentation for this tool is available [here](llvm/tools/llvm-snippy/README.md).
+
+# LLVM Compiler Infrastructure
 
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/llvm/llvm-project/badge)](https://securityscorecards.dev/viewer/?uri=github.com/llvm/llvm-project)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/8273/badge)](https://www.bestpractices.dev/projects/8273)
