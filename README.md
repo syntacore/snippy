@@ -1,4 +1,7 @@
-# The LLVM Compiler Infrastructure
+# LLVM-snippy
+This is an LLVM project fork containing the LLVM-snippy generator. Documentation for this tool is available [here](llvm/tools/llvm-snippy/README.md).
+
+# LLVM Compiler Infrastructure
 
 Welcome to the LLVM project!
 
