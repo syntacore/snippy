@@ -41,11 +41,36 @@ From the ${SNIPPY_PATH} directory, run CMake:
 > cmake --install release/build
 ```
 
-We haven't open-sourced LIT tests yet. When we do that, there will also be instructions here on how to test the generator.
+## Testing
+
+You can test LLVM-snippy by running LIT tests located in `llvm/test/tools/llvm-snippy`. These tests are based on the common for LLVM infrastructure including llvm-lit and FileCheck. For the additional information about LLVM testing infrastructure, refer to [LLVM Testing Infrastructure Guide](https://llvm.org/docs/TestingGuide.html).
+
+### Prerequisites
+
+To run tests, verify you have:
+
+ * LLVM-snippy built
+ * Python 3.6 or later 
+ * POSIX mandatory utilities (for example, grep, cat, etc.)
+
+### Running LLVM-snippy Tests
+Use the following command:
+
+```
+> cmake --build release/build/ --target check-llvm-tools-llvm-snippy
+```
+
+Alternatively, you can run llvm-lit directly:
+
+```
+> python3 ${SNIPPY_BUILD}/bin/llvm-lit llvm/test/tools/llvm-snippy/
+```
+
+We expect that all tests pass with the `passed`, `unsupported`, or `xfail` statuses. If some of the tests fail for you, let us know by [creating an issue](#contributing-to-llvm-snippy).
 
 These steps should get llvm-snippy up and running on your system. If you encounter any issues or have questions, feel free to reach out.
 
-# Quick start guide
+# Quick Start Guide
 
 In this section, we will create a configuration file, run the generator, and examine the generated results.
 
@@ -243,8 +268,44 @@ You can reproduce the same generation by repeating the call with the same seed.
 
 Of course, not everything is covered in this quick start. We hope to publish detailed documentation soon. For now, the help command is available.
 
+# Contributing to LLVM-snippy
+
+Thank you for showing interest in contributing to LLVM-snippy. These are several ways you can help to make the generator better.
+
+## Bug Reports
+
+We want to know about all LLVM-snippy bugs: segmentation faults, poor or incorrect diagnostics, lack of randomization in the generated test, incorrectly working feature, etc. If you think that you have encountered a bug, file an issue on GitHub. Make sure that you provide minimal description, reproduction and HEAD commit hash in the issue.
+
+## Bug Fixes
+
+We appreciate your desire to improve LLVM-snippy. You can start working on any open unassigned issue. A comment in the issue is enough to show that you have started working on it. If you do not have bandwidth to work on the issue already assigned to you, let other contributes know by leaving a comment in the issue, so it can be reassigned.
+If the fix requires design discussion, create an [RFC](#driving-a-major-feature). Anyway, we encourage everyone to provide a short summary in the issue comments before creating a PR.
+
+## Driving a Major Feature
+
+If you want to introduce a major change or implement a new feature in LLVM-snippy, create an RFC first. We would like to keep LLVM-snippy community informed about major changes. We should also reach consensus on all technical and design decisions before any significant work is done.
+There is no template for an RFC, so feel free to create it on your own. A good RFC contains: overview, proposal, pros and cons, implementation steps.
+
+## Backward Compatibility
+
+We try to keep backward compatibility in snippy for our customers. Backward incompatible changes include, but are not limited to, removing an existing option, changing an input configuration format, amends in the signatures of entry functions or globals. These changes require a major release version change and must be disscussed in prior. Please, create an [RFC](#driving-a-major-feature) for such changes.
+
+## Submitting a Patch
+
+When your patch is ready for review, create a pull request. We ask you to follow these rules:
+1. Adhere to the [LLVM Coding Standards](https://llvm.org/docs/CodingStandards.html) where applicable.
+2. Run `git-clang-format` on your changes.
+3. Remove any unrelated changes from your patch.
+4. Add at least one lit-test if possible.
+5. Make a single commit.
+6. Create a PR from your fork or use a branch that starts from `users/<username>/`.
+
+You can request a review by mentioning people in the PR comments. Best candidates for review are developers who have contributed in the area your patch concerns. Keep in mind that the usual review period is one week, so do not ping more often.
+
+Once your patch is reviewed and approved, you can merge the change. If you do not have the rights, let the maintainers know so they could merge the change on your behalf.
+
+Feel free to participate in any review you are interested in.
+
 # Contacts
 
-For questions regarding llvm-snippy and its development, as well as your suggestions, please contact konstantin.vladimirov@syntacore.com
-
-Additionally, merge requests and open issues are welcome.
+The preferred way to interract with the LLVM-snippy community is to use [GitHub issues and pull-requests](#contributing-to-llvm-snippy). However, if you want your question or suggestion to be discussed in a limited group, feel free to contact konstantin.vladimirov@syntacore.com.
