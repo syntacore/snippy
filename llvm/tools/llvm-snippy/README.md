@@ -302,7 +302,7 @@ When your patch is ready for review, create a pull request. We ask you to follow
 
 You can request a review by mentioning people in the PR comments. Best candidates for review are developers who have contributed in the area your patch concerns. Keep in mind that the usual review period is one week, so do not ping more often.
 
-Once you patch is reviewed and approved, you can merge the change. If you do not have the rights, let maintainers know so they could merge the change on your behalf.
+Once your patch is reviewed and approved, you can merge the change. If you do not have the rights, let the maintainers know so they could merge the change on your behalf.
 
 Feel free to participate in any review you are interested in.
 
