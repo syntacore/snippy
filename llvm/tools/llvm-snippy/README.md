@@ -308,4 +308,4 @@ Feel free to participate in any review you are interested in.
 
 # Contacts
 
-The preferred way to interract with the LLVM-snippy community is to use [GitHub issues and pull-requests](#contributing-to-llvm-snippy). However, if you want your question or suggestion to be discussed in a limited group, feel free to contact konstantin.vladimirov@syntacore.com.
+Use [GitHub issues and pull-requests](#contributing-to-llvm-snippy) to interact with the LLVM-snippy community, make suggestions and  ask questions.
