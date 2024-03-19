@@ -53,8 +53,7 @@ histogram:
     - [ADDI, 1.0]
       
 # CHECK-COUNT-150: {{(\$x[0-9]+ = \ADD \$x[0-9]+\, \$x[0-9]+)|(\$x[0-9]+ = \ADDI \$x[0-9]+\, (-)?[0-9]+)}} 
-
-# CHECK-NOT: {{(\$x[0-9]+ = \ADD \$x[0-9]+\, \$x[0-9]+)|(\$x[0-9]+ = \ADDI \$x[0-9]+\, (-)?[0-9]+)}} 
+# CHECK-NEXT: $x0 = ADDI $x0, 0, post-instr-symbol <mcsymbol __snippy_exit>  
 
 # SEED-0: Used seed: 0
 # SEED-300: Used seed: 300
