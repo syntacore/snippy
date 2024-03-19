@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=200 \
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=20 \
 # RUN:     -verify-mi -mattr=-c -dump-mf --verify-consecutive-loops -o %t \
 # RUN:     --model-plugin=None
 
@@ -18,7 +18,7 @@ histogram:
     - [BEQ, 1.0]
 
 branches:
-  consecutive-loops: 10
+  consecutive-loops: 100
   loop-ratio: 1
   max-depth:
     loop: 1
