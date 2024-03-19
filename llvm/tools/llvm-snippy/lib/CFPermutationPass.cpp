@@ -467,8 +467,9 @@ void CFPermutation::permuteBlock(unsigned BB) {
 
   unsigned NConsecutiveLoops = BranchSettings->getNConsecutiveLoops();
   // We cannot always create N consecutive loops
+  auto BIEnd = std::min(BI + NConsecutiveLoops + 1, BlocksInfo.end());
   auto NextCantBeSingleBlockLoopPos =
-      std::find_if(BI, BI + NConsecutiveLoops + 1, [this](const auto &NextBI) {
+      std::find_if(BI, BIEnd, [this](const auto &NextBI) {
         if (NextBI.Available.empty())
           return true;
         return NextBI.Available.count(&NextBI - BlocksInfo.data()) == 0;
