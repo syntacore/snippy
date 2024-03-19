@@ -2115,10 +2115,14 @@ InstructionGenerator::createMFGenerationRequest(
   const auto &GenPlan = getAnalysis<BlockGenPlanning>().get();
   const MCInstrDesc *FinalInstDesc = nullptr;
   auto LastInstrStr = SGCtx->getLastInstr();
-  if (!LastInstrStr.empty()) {
+  if (!LastInstrStr.empty() && !SGCtx->useRetAsLastInstr()) {
     auto Opc = SGCtx->getOpcodeCache().code(LastInstrStr.str());
-    if (Opc.has_value())
-      FinalInstDesc = SGCtx->getOpcodeCache().desc(Opc.value());
+    if (!Opc.has_value())
+      report_fatal_error("unknown opcode \"" + Twine(LastInstrStr) +
+                             "\" for last instruction generation",
+                         false);
+
+    FinalInstDesc = SGCtx->getOpcodeCache().desc(Opc.value());
   }
   switch (SGCtx->getGenerationMode()) {
   case GenerationMode::NumInstrs:
@@ -2419,7 +2423,7 @@ void InstructionGenerator::finalizeFunction(
   auto &MBB = MF.back();
 
   auto LastInstr = SGCtx->getLastInstr();
-  bool EmptyLastInstr = LastInstr.empty();
+  bool NopLastInstr = LastInstr.empty();
 
   // Secondary functions always return.
   if (!SGCtx->isRootFunction(MF)) {
@@ -2445,8 +2449,9 @@ void InstructionGenerator::finalizeFunction(
     return;
   }
 
-  // Or to generate no instruction at all.
-  if (EmptyLastInstr) {
+  // Or to generate nop
+  if (NopLastInstr) {
+    State.getSnippyTarget().generateNop(MBB, MBB.end(), State);
     MBB.back().setPostInstrSymbol(MF, ExitSym);
     return;
   }
