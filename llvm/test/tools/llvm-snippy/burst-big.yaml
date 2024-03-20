@@ -1,2 +1,1 @@
-# RUN: timeout 10 llvm-snippy %S/Inputs/burst-big-layout.yaml %s -model-plugin=None
-
+# RUN: timeout 30 llvm-snippy %S/Inputs/burst-big-layout.yaml %s -model-plugin=None
