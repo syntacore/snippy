@@ -16,7 +16,7 @@ extern "C" {
 
 #define RVMAPI_ENTRY_POINT_SYMBOL RVMVTable
 #define RVMAPI_VERSION_SYMBOL RVMInterfaceVersion
-#define RVMAPI_CURRENT_INTERFACE_VERSION 12u
+#define RVMAPI_CURRENT_INTERFACE_VERSION 13u
 
 typedef uint64_t RVMRegT;
 
@@ -205,7 +205,9 @@ typedef enum {
   RVM_CSR_MSTATUS = 0x300,
   RVM_CSR_MISA = 0x301,
   RVM_CSR_MTVEC = 0x305,
+  RVM_CSR_MEPC = 0x341,
   RVM_CSR_MCAUSE = 0x342,
+  RVM_CSR_MTVAL = 0x343,
 
   // github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#vector-extension-programmers-model
   RVM_CSR_VSTART = 0x008,
