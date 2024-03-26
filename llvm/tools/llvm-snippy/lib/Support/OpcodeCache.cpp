@@ -18,7 +18,7 @@ OpcodeCache::OpcodeCache(const SnippyTarget &Tgt, const MCInstrInfo &II,
                          const MCSubtargetInfo &SI) {
   for (unsigned Opcode = 1, E = II.getNumOpcodes(); Opcode < E; ++Opcode) {
     const MCInstrDesc &InstrDesc = II.get(Opcode);
-    if (InstrDesc.isPseudo())
+    if (InstrDesc.isPseudo() && !Tgt.isPseudoAllowed(Opcode))
       continue;
     if (!Tgt.checkOpcodeSupported(Opcode, SI))
       continue;
