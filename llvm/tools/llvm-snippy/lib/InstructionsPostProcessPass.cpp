@@ -54,7 +54,7 @@ namespace {
 #define PASS_DESC "Snippy-inst-postprocess"
 
 class InstructionsPostProcess final : public MachineFunctionPass {
-  void collectFreq(const MachineFunction &MF);
+  void collectFreq(const MachineFunction &MF, const SnippyTarget &SnippyTgt);
   void printData(const MachineFunction &MF) const;
   void stripInstructions(MachineFunction &MF) const;
 
@@ -119,10 +119,11 @@ void InstructionsPostProcess::stripInstructions(MachineFunction &MF) const {
   }
 }
 
-void InstructionsPostProcess::collectFreq(const MachineFunction &MF) {
+void InstructionsPostProcess::collectFreq(const MachineFunction &MF,
+                                          const SnippyTarget &SnippyTgt) {
   for (const auto &MBB : MF) {
     for (const auto &Instr : MBB.instrs()) {
-      if (Instr.isPseudo()) {
+      if (Instr.isPseudo() && !SnippyTgt.isPseudoAllowed(Instr.getOpcode())) {
         continue;
       }
       if (!checkSupportMetadata(Instr)) {
@@ -236,8 +237,10 @@ void InstructionsPostProcess::printData(const MachineFunction &MF) const {
 }
 
 bool InstructionsPostProcess::runOnMachineFunction(MachineFunction &MF) {
+  auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  const auto &SnippyTgt = SGCtx.getLLVMState().getSnippyTarget();
   if (VerifyHistogramGen)
-    collectFreq(MF);
+    collectFreq(MF, SnippyTgt);
   stripInstructions(MF);
   if (VerifyHistogramGen)
     printData(MF);
