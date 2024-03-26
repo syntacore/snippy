@@ -185,6 +185,9 @@ public:
     return true;
   }
 
+  // pseudo instructions are disallowed by default
+  virtual bool isPseudoAllowed(unsigned Opcode) const { return false; }
+
   // Returns the SnippyTarget for the given triple or nullptr if the target
   // does not exist.
   static const SnippyTarget *lookup(Triple TT);
