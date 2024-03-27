@@ -441,6 +441,37 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVConfiguration &Cfg) {
   return true;
 }
 
+void takeVSETPrefIntoAccount(VSETWeightOverrides &Overrides) {
+  auto Preference = RVVModeChangePreferenceOpt.getValue();
+  if (Preference == RVVModeChangeMode::MC_ANY)
+    return;
+
+  const auto &Result = Overrides.getEntries();
+  auto WeightSum =
+      std::accumulate(Result.begin(), Result.end(), 0.0,
+                      [](auto Acc, auto Entry) { return Acc + Entry.Weight; });
+
+  switch (Preference) {
+  case RVVModeChangeMode::MC_VSETVL:
+    Overrides.setVSETVLWeight(WeightSum);
+    Overrides.setVSETVLIWeight(0.0);
+    Overrides.setVSETIVLIWeight(0.0);
+    return;
+  case RVVModeChangeMode::MC_VSETVLI:
+    Overrides.setVSETVLIWeight(WeightSum);
+    Overrides.setVSETVLWeight(0.0);
+    Overrides.setVSETIVLIWeight(0.0);
+    return;
+  case RVVModeChangeMode::MC_VSETIVLI:
+    Overrides.setVSETIVLIWeight(WeightSum);
+    Overrides.setVSETVLWeight(0.0);
+    Overrides.setVSETVLIWeight(0.0);
+    return;
+  default:
+    report_fatal_error("Unknown vset* preference for rvv mode change");
+  }
+}
+
 RISCVMatInt::InstSeq getIntMatInstrSeq(APInt Value, GeneratorContext &GC) {
   [[maybe_unused]] const auto &ST = GC.getSubtarget<RISCVSubtarget>();
   assert((ST.getXLen() == 64 && Value.getBitWidth() == 64) ||
@@ -843,6 +874,7 @@ public:
         GenCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
     auto Filter = getDefaultPolicyFilter(MBB, RISCVCtx);
     auto Overrides = RISCVCtx.getVSETOverrides(MBB);
+    takeVSETPrefIntoAccount(Overrides);
 
     bool MustHavePrimaryInstr = RISCVCtx.hasActiveRVVMode(MBB);
     // Note: Filter can remove all opcodes
