@@ -262,8 +262,12 @@ public:
   }
 
   void dumpSystemRegistersState(raw_ostream &OS) const override {
-    OS << "MCAUSE: " << ModelState.readCSRReg(RVM_CSR_MCAUSE) << "\n";
-    // TODO: give more information (mepc and mtval)
+    OS << "MEPC:   0x" << utohexstr(ModelState.readCSRReg(RVM_CSR_MEPC))
+       << "\n";
+    OS << "MCAUSE: 0x" << utohexstr(ModelState.readCSRReg(RVM_CSR_MCAUSE))
+       << "\n";
+    OS << "MTVAL:  0x" << utohexstr(ModelState.readCSRReg(RVM_CSR_MTVAL))
+       << "\n";
   }
 
   bool supportsCallbacks() const override {
