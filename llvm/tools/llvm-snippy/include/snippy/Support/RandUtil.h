@@ -34,6 +34,129 @@ template <typename... Ts> constexpr auto makeArray(Ts &&...ts) {
 
 } // namespace details
 
+// INFO: this snippy implementation of UniformIntDistribution is
+// required because std::uniform_int_distribution has different
+// implementation(therefore different results) on different OS.
+// It is stripped version of std::uniform_int_distribution.
+template <typename IntType = int> class UniformIntDistribution final {
+  static_assert(std::is_integral<IntType>::value,
+                "template argument must be an integral type");
+
+public:
+  using result_type = IntType;
+  struct ParamType final {
+    using DistributionType = UniformIntDistribution<IntType>;
+
+    ParamType() : ParamType(0) {}
+
+    explicit ParamType(IntType Start,
+                       IntType End = std::numeric_limits<IntType>::max())
+        : Start(Start), End(End) {
+      assert(Start <= End);
+    }
+
+    result_type a() const { return Start; }
+
+    result_type b() const { return End; }
+
+    friend bool operator==(const ParamType &Lhs, const ParamType &Rhs) {
+      return Lhs.Start == Rhs.Start && Lhs.End == Rhs.End;
+    }
+
+    friend bool operator!=(const ParamType &Lhs, const ParamType &Rhs) {
+      return !(Lhs == Rhs);
+    }
+
+  private:
+    IntType Start;
+    IntType End;
+  };
+
+public:
+  UniformIntDistribution() : UniformIntDistribution(0) {}
+
+  explicit UniformIntDistribution(
+      IntType Start, IntType End = std::numeric_limits<IntType>::max())
+      : Param(Start, End) {}
+
+  explicit UniformIntDistribution(const ParamType &Param) : Param(Param) {}
+
+  // Does nothing for the uniform integer distribution.
+  void reset() {}
+
+  result_type a() const { return Param.a(); }
+
+  result_type b() const { return Param.b(); }
+
+  ParamType param() const { return Param; }
+
+  void param(const ParamType &ParamIn) { Param = ParamIn; }
+
+  result_type min() const { return this->a(); }
+
+  result_type max() const { return this->b(); }
+
+  template <typename UniformRandomNumberGenerator>
+  result_type operator()(UniformRandomNumberGenerator &URNG) {
+    return this->operator()(URNG, Param);
+  }
+
+  template <typename UniformRandomNumberGenerator>
+  result_type operator()(UniformRandomNumberGenerator &URNG,
+                         const ParamType &ParamIn) {
+    using result_type = typename UniformRandomNumberGenerator::result_type;
+    using utype = typename std::make_unsigned<result_type>::type;
+    using uctype = typename std::common_type<result_type, utype>::type;
+
+    const uctype URNGMin = URNG.min();
+    const uctype URNGMax = URNG.max();
+    const uctype URNGRange = URNGMax - URNGMin;
+    const uctype URange = uctype(ParamIn.b()) - uctype(ParamIn.a());
+
+    uctype Ret;
+
+    if (URNGRange > URange) {
+      // downscaling
+      const uctype UERange = URange + 1; // URange can be zero
+      const uctype Scaling = URNGRange / UERange;
+      const uctype Past = UERange * Scaling;
+      do
+        Ret = uctype(URNG()) - URNGMin;
+      while (Ret >= Past);
+      Ret /= Scaling;
+    } else if (URNGRange < URange) {
+      // upscaling
+      /*
+        Note that every value in [0, urange]
+        can be written uniquely as
+        (urngrange + 1) * high + low
+        where
+        high in [0, urange / (urngrange + 1)]
+        and
+        low in [0, urngrange].
+      */
+      uctype Tmp; // wraparound control
+      do {
+        const uctype UERngRange = URNGRange + 1;
+        Tmp =
+            (UERngRange * operator()(URNG, ParamType(0, URange / UERngRange)));
+        Ret = Tmp + (uctype(URNG()) - URNGMin);
+      } while (Ret > URange || Ret < Tmp);
+    } else
+      Ret = uctype(URNG()) - URNGMin;
+
+    return Ret + ParamIn.a();
+  }
+
+  friend bool operator==(const UniformIntDistribution &Lhs,
+                         const UniformIntDistribution &Rhs) {
+    return Lhs.Param == Rhs.Param;
+  }
+
+private:
+  ParamType Param;
+};
+
 class RandEngine {
   using GeneratorEngineType = std::mt19937_64;
   GeneratorEngineType Engine;
@@ -61,7 +184,7 @@ public:
   template <typename T> static T genInInterval(T Min, T Max) {
     if (Max < Min)
       report_fatal_error("Invalid usage of genInInterval");
-    std::uniform_int_distribution<T> Dist(Min, Max);
+    UniformIntDistribution<T> Dist(Min, Max);
     return Dist(pimpl->Engine);
   }
 
@@ -229,7 +352,7 @@ private:
 
 template <typename T>
 void uniformlyFill(MutableArrayRef<T> Out, T Low, T High) {
-  std::uniform_int_distribution<T> Dist(Low, High);
+  UniformIntDistribution<T> Dist(Low, High);
   auto &Engine = RandEngine::engine();
   std::generate(Out.begin(), Out.end(), [&] { return Dist(Engine); });
 }
