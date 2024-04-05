@@ -42,8 +42,7 @@ Expected<uint64_t> getAddressOfSymbolInImage(StringRef Image,
 SimRunner::SimRunner(LLVMContext &Ctx, const SnippyTarget &TGT,
                      const TargetSubtargetInfo &Subtarget,
                      SimulationEnvironment SimEnv,
-                     ArrayRef<std::string> ModelLibs)
-    : Ctx(Ctx) {
+                     ArrayRef<std::string> ModelLibs) {
   Env = std::make_unique<SimulationEnvironment>(std::move(SimEnv));
   assert(!ModelLibs.empty() && "Model lib list must not be empty");
 
