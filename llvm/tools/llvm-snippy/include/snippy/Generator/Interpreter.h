@@ -142,7 +142,7 @@ public:
 
   void dumpSystemRegistersState(raw_ostream &OS) const;
 
-  void reportSimulationFatalError(StringRef PrefixMessage) const;
+  [[noreturn]] void reportSimulationFatalError(StringRef PrefixMessage) const;
 
   void setInitialState(const IRegisterState &Regs) {
     Simulator->setState(Regs);
