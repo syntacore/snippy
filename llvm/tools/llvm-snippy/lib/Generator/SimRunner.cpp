@@ -45,7 +45,7 @@ ProgramCounterType SimRunner::run(StringRef Programm,
   checkStates(/* CheckMemory */ true);
 
   auto &PrimI = getPrimaryInterpreter();
-  PrimI.logMessage("#===Simulation Start===\n");
+  PrimI.logMessage("==============================Simulation Start==============================\n");
 
   while (!PrimI.endOfProg()) {
     if (std::any_of(CoInterp.begin(), CoInterp.end(),
