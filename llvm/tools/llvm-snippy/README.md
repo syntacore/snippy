@@ -77,7 +77,7 @@ In this section, we will:
 
 ## Creating Configuration File
 
-Configuration that you run through LLVM-snippy can consist of one or more YAML files with configuration details provided in specific sections. For the presentation purposes, you will use one configuration file `layout.yaml`.
+Configuration that you run through LLVM-snippy can consist of one or more YAML files, with configuration details provided in specific sections. For the presentation purposes, you will use one configuration file `layout.yaml`.
 
 Create a YAML file `layout.yaml` with the following content:
 
@@ -173,12 +173,12 @@ In the current open-source implementation, there is no distinction between VMA a
 
 ### histogram
 
-`hustogram` covers a list of instructions you want snippy to use and their relative weight. A histogram only sets weights for so-called primary instructions.
+`histogram` covers a list of instructions you want snippy to use and their relative weight. A histogram only sets weights for so-called primary instructions.
 
 LLVM-snippy generates two types of instructions: 
 
 - Primary. They are generated according to the histogram. 
-- Auxiliary. They are required, for example, for memory access or initial register setup. Auxiliary instructions do not participate in probability distribution, and from the histogram perspective, they do not exist.
+- Auxiliary. They are required, for example, for memory access or initial register setup. Auxiliary instructions do not participate in the probability distribution, and from the histogram perspective, they do not exist.
 
 Weights are relative. A weight of `10.0` means that the primary instruction will occur approximately 10 times more often than an instruction marked with weight `1.0`. All weights are summed, and to determine the probability of an instruction, the weight must be divided by the sum of the weights.
 
@@ -328,7 +328,7 @@ When your patch is ready for review, create a pull request. We ask you to follow
 3. Remove any unrelated changes from your patch.
 4. Add at least one lit-test if possible.
 5. Make a single commit.
-6. Create a PR from your fork or use a branch that starts from `users/<username>/`.
+6. Create a PR from your fork, or use a branch that starts from `users/<username>/`.
 
 You can request a review by mentioning people in the PR comments. Best candidates for review are developers who have contributed in the area your patch concerns. Keep in mind that the usual review period is one week, so do not ping more often.
 
