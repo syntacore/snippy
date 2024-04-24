@@ -1,0 +1,42 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN: -mattr=+a -dump-memory-accesses=%t \
+# RUN: --riscv-disable-misaligned-access=atomics-only \
+# RUN: --num-instrs=300
+# RUN: FileCheck %s --input-file=%t
+
+sections:
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+
+access-ranges:
+    - start: 0x80600000
+      size: 0x10
+      stride: 8
+      first-offset: 0
+      last-offset: 1
+
+histogram:
+   - [AMOSWAP_W, 1.0]
+   - [AMOADD_W, 1.0]
+   - [AMOAND_W, 1.0]
+   - [AMOOR_W, 1.0]
+   - [AMOXOR_W, 1.0]
+   - [AMOMAX_W, 1.0]
+   - [AMOMAXU_W, 1.0]
+   - [AMOMIN_W, 1.0]
+   - [AMOMINU_W, 1.0]
+   - [LR_W, 1.0]
+   - [SC_W, 1.0]
+
+# CHECK: - addr: 0x80600000
+# CHECK: - addr: 0x80600008
+
+# CHECK-NOT: {{0x806000(01|09)}}
