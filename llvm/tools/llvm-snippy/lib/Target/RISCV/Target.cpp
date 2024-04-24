@@ -74,6 +74,8 @@ namespace llvm {
 #include "RISCVGenAsmMatcher.inc"
 namespace snippy {
 
+enum class DisableMisalignedAccessMode { None, All, AtomicsOnly };
+
 enum class RVVModeChangeMode {
   MC_ANY,
   MC_VSETIVLI,
@@ -96,10 +98,28 @@ static snippy::opt<std::string> DumpRVVConfigurationInfo(
     cl::desc("Print verbose information about selected RVV configurations"),
     cl::init(""), cl::ValueOptional, cl::cat(SnippyRISCVOptions));
 
-static snippy::opt<bool>
+struct DisableMisalignedAccessEnumOption
+    : public snippy::EnumOptionMixin<DisableMisalignedAccessEnumOption> {
+  static void doMapping(EnumMapper &Mapper) {
+    Mapper.enumCase(DisableMisalignedAccessMode::None, "false",
+                    "enable misalign access");
+    Mapper.enumCase(DisableMisalignedAccessMode::All, "",
+                    "disable misaligned access for all loads/stores");
+    Mapper.enumCase(DisableMisalignedAccessMode::All, "true",
+                    "disable misaligned access for all loads/stores");
+    Mapper.enumCase(DisableMisalignedAccessMode::All, "all",
+                    "disable misaligned access for all loads/stores");
+    Mapper.enumCase(DisableMisalignedAccessMode::AtomicsOnly, "atomics-only",
+                    "disable misaligned access for atomic loads/stores only");
+  }
+};
+
+static snippy::opt<DisableMisalignedAccessMode>
     RISCVDisableMisaligned("riscv-disable-misaligned-access",
+                           DisableMisalignedAccessEnumOption::getClValues(),
                            cl::desc("disable misaligned load/store generation"),
-                           cl::cat(SnippyRISCVOptions), cl::init(false));
+                           cl::cat(SnippyRISCVOptions), cl::ValueOptional,
+                           cl::init(DisableMisalignedAccessMode::All));
 
 cl::alias UseSplatsForRVVInitAlias(
     "snippy-riscv-use-splats-for-rvv-init",
@@ -158,6 +178,10 @@ static snippy::opt<RVVModeChangeMode> RVVModeChangePreferenceOpt(
     cl::init(RVVModeChangeMode::MC_ANY), cl::cat(SnippyRISCVOptions));
 
 } // namespace snippy
+
+LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(
+    snippy::DisableMisalignedAccessMode,
+    snippy::DisableMisalignedAccessEnumOption)
 
 LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(snippy::RVVModeChangeMode,
                                            snippy::RVVModeChangeEnumOption)
@@ -767,10 +791,20 @@ inline bool checkSupportedOrdering(const OpcodeHistogram &H) {
   return true;
 }
 
+static DisableMisalignedAccessMode getMisalignedAccessMode() {
+  if (!RISCVDisableMisaligned.isSpecified())
+    return DisableMisalignedAccessMode::None;
+
+  return RISCVDisableMisaligned.getValue();
+}
+
 /// Helper function to calculate load/store alignment based on whether
 /// misaligned access is enabled or not
 static size_t getLoadStoreAlignment(unsigned Opcode, unsigned SEW = 0) {
-  if (RISCVDisableMisaligned)
+  auto MisalignedAccessMode = getMisalignedAccessMode();
+  if (MisalignedAccessMode == DisableMisalignedAccessMode::All ||
+      (MisalignedAccessMode == DisableMisalignedAccessMode::AtomicsOnly &&
+       (isAtomicAMO(Opcode) || isScInstr(Opcode) || isLrInstr(Opcode))))
     return getLoadStoreNaturalAlignment(Opcode, SEW);
   return 1;
 }
@@ -3034,8 +3068,10 @@ SnippyRISCVTarget::createSimulator(llvm::snippy::DynamicLibrary &ModelLib,
     VLENB = TgtCtx->getVLEN();
   }
 
-  return createRISCVSimulator(ModelLib, Cfg, CallbackHandler, Subtarget, VLENB,
-                              !RISCVDisableMisaligned);
+  auto MisalignedAccessMode = getMisalignedAccessMode();
+  return createRISCVSimulator(
+      ModelLib, Cfg, CallbackHandler, Subtarget, VLENB,
+      !(MisalignedAccessMode == DisableMisalignedAccessMode::All));
 }
 
 const MCRegisterClass &

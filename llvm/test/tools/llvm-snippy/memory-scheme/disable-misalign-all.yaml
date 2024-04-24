@@ -1,0 +1,33 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN: -dump-memory-accesses=%t \
+# RUN: --riscv-disable-misaligned-access=all \
+# RUN: --num-instrs=300
+# RUN: FileCheck %s --input-file=%t
+
+sections:
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+
+access-ranges:
+    - start: 0x80600000
+      size: 0x10
+      stride: 8
+      first-offset: 0
+      last-offset: 1
+
+histogram:
+   - [LW, 1.0]
+   - [SW, 1.0]
+
+# CHECK: - addr: 0x80600000
+# CHECK: - addr: 0x80600008
+
+# CHECK-NOT: {{0x806000(01|09)}}
