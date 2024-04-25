@@ -89,9 +89,10 @@ static snippy::opt<std::string>
     InitialRegisterDataFile("initial-regs",
                             cl::desc("file for initial registers state"),
                             cl::cat(Options), cl::init(""));
-cl::alias InitialRegisterYamlFile("initial-regs-yaml",
-                                  cl::desc("Alias for -initial-regs"),
-                                  cl::aliasopt(InitialRegisterDataFile));
+snippy::alias
+    InitialRegisterYamlFile("initial-regs-yaml",
+                            cl::desc("Alias for -initial-regs"),
+                            snippy::aliasopt(InitialRegisterDataFile));
 
 static snippy::opt_list<std::string> ReservedRegisterList(
     "reserved-regs-list", cl::CommaSeparated,
