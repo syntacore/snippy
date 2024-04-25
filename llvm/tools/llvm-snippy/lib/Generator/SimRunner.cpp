@@ -61,8 +61,7 @@ SimRunner::SimRunner(LLVMContext &Ctx, const SnippyTarget &TGT,
   }
 }
 
-ProgramCounterType SimRunner::run(StringRef Program,
-                                  const IRegisterState &InitialRegState) {
+void SimRunner::run(StringRef Program, const IRegisterState &InitialRegState) {
   auto StopPC = getAddressOfSymbolInImage(Program, Linker::GetExitSymbolName());
   if (auto E = StopPC.takeError()) {
     auto Err = toString(std::move(E));
@@ -81,10 +80,7 @@ ProgramCounterType SimRunner::run(StringRef Program,
   auto &PrimI = getPrimaryInterpreter();
   PrimI.logMessage("#===Simulation Start===\n");
 
-  ProgramCounterType CurPC = PrimI.getPC();
-
   while (!PrimI.endOfProg()) {
-    CurPC = PrimI.getPC();
     auto ExecRes = PrimI.step();
     if (ExecRes == ExecutionResult::FatalError)
       PrimI.reportSimulationFatalError("Primary interpreter step failed");
@@ -106,7 +102,6 @@ ProgramCounterType SimRunner::run(StringRef Program,
     checkStates(/* CheckMemory */ false);
   }
   checkStates(/* CheckMemory */ true);
-  return CurPC;
 }
 
 void SimRunner::checkStates(bool CheckMemory) {
