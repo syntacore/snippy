@@ -8,15 +8,15 @@
 
 #pragma once
 
-#include "snippy/Support/Utils.h"
+#include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/YAMLUtils.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/YAMLTraits.h"
 
-#include <map>
 #include <memory>
 #include <string>
+#include <unordered_set>
 
 namespace llvm {
 namespace snippy {
@@ -40,16 +40,13 @@ public:
 
   const std::string &getName() const { return Name; }
 
-  void mapStoredValue(yaml::IO &IO) {
-    doMapping(IO);
-    if (!isSpecified() && !IO.outputting())
-      markAsSpecified();
-  }
+  void mapStoredValue(yaml::IO &IO,
+                      std::optional<StringRef> Key = std::nullopt);
 
   std::unique_ptr<CommandOptionBase> clone() const { return doClone(); }
 
 private:
-  virtual void doMapping(yaml::IO &IO) = 0;
+  virtual void doMappingWithKey(yaml::IO &IO, StringRef Key) = 0;
   virtual std::unique_ptr<CommandOptionBase> doClone() const = 0;
 };
 
@@ -61,8 +58,8 @@ template <typename DataType> struct CommandOption : public CommandOptionBase {
 
   CommandOption(StringRef Name) : CommandOptionBase(Name) {}
 
-  void doMapping(yaml::IO &IO) override {
-    IO.mapRequired(getName().c_str(), Val);
+  void doMappingWithKey(yaml::IO &IO, StringRef Key) override {
+    IO.mapRequired(Key.data(), Val);
   }
 
   std::unique_ptr<CommandOptionBase> doClone() const override {
@@ -73,9 +70,20 @@ template <typename DataType> struct CommandOption : public CommandOptionBase {
 /// \class OptionsStorage
 /// \brief Singleton class that stores CommandOptions by pointer to base class
 class OptionsStorage final {
-  using StorageType = std::map<std::string, std::unique_ptr<CommandOptionBase>>;
+  using StorageType = std::vector<std::pair<std::unique_ptr<CommandOptionBase>,
+                                            std::unordered_set<std::string>>>;
   StorageType Data;
   OptionsStorage() = default;
+
+  static bool keyFound(const std::string &Key,
+                       const StorageType::value_type &Val) {
+    auto &[Opt, MV] = Val;
+    return MV.count(Key);
+  }
+
+  auto find(StringRef Key) {
+    return find_if(Data, [&](auto &Val) { return keyFound(Key.data(), Val); });
+  }
 
 public:
   OptionsStorage(const OptionsStorage &) = delete;
@@ -94,16 +102,57 @@ public:
   auto end() const { return Data.end(); }
   auto cbegin() const { return Data.cbegin(); }
   auto cend() const { return Data.cend(); }
-  auto count(const std::string &Key) const { return Data.count(Key); }
+  auto count(const std::string &Key) const {
+    return any_of(Data, [&](auto &Val) { return keyFound(Key, Val); });
+  }
   bool empty() const { return Data.empty(); }
   auto size() const { return Data.size(); }
-  bool insert(StringRef Key, std::unique_ptr<CommandOptionBase> &&Val) {
-    return Data.emplace(Key.data(), std::move(Val)).second;
-  }
 
   CommandOptionBase &get(const std::string &Key) {
-    assert(Data.count(Key));
-    return *Data.at(Key);
+    auto Found = find(Key);
+    assert(Found != Data.end() && "Unknown key");
+    return *Found->first;
+  }
+
+private:
+  // These classes has to be able to use 'allocateLocation' and 'getLocation'
+  // member functions of OptionsStorage. But we don't want these functions to be
+  // accessible by everyone. So we made them private and added opt and opt_list
+  // as friends.
+  template <typename T> friend class opt;
+  template <typename T> friend class opt_list;
+  friend class aliasopt;
+
+  auto insertNewOption(StringRef Key,
+                       std::unique_ptr<CommandOptionBase> &&Val) {
+    auto Found = find(Key);
+    if (Found != end())
+      return std::make_pair(Found, false);
+    Data.push_back(
+        {std::move(Val), std::unordered_set<std::string>{Key.str()}});
+    return std::make_pair(std::prev(end()), true);
+  }
+
+  template <typename T> T &allocateLocation(StringRef Name) {
+    auto Tmp = std::make_unique<CommandOption<T>>(Name);
+    auto [It, WasInserted] = insertNewOption(Name, std::move(Tmp));
+    if (!WasInserted) {
+      LLVMContext Ctx;
+      snippy::fatal(Ctx, "Inconsistent options",
+                    "Duplicated option name \"" + Twine(Name) + "\"");
+    }
+    return static_cast<CommandOption<T> &>(*It->first).Val;
+  }
+
+  template <typename T> T &getLocation(StringRef Name) {
+    auto Found = find(Name);
+    if (Found == Data.end()) {
+      LLVMContext Ctx;
+      snippy::fatal(Ctx, "Inconsistent options",
+                    "Attempt to get the location of option \"" + Twine(Name) +
+                        "\" that does not exist.");
+    }
+    return static_cast<CommandOption<T> &>(*Found->first).Val;
   }
 };
 
@@ -114,15 +163,6 @@ public:
 template <typename DataType> class opt : public cl::opt<DataType, true> {
   using BaseTy = cl::opt<DataType, true>;
 
-  static DataType &allocateLocation(const char *Name) {
-    auto &Options = OptionsStorage::instance();
-    auto Tmp = std::make_unique<CommandOption<DataType>>(Name);
-    auto &Res = Tmp->Val;
-    bool WasInserted = Options.insert(Name, std::move(Tmp));
-    assert(WasInserted && "Duplicated option name");
-    return Res;
-  }
-
 public:
   using BaseTy::ArgStr;
   using BaseTy::getValue;
@@ -130,7 +170,9 @@ public:
 
   template <typename... Modes>
   opt(const char *Name, Modes &&...Ms)
-      : BaseTy(StringRef(Name), cl::location(allocateLocation(Name)),
+      : BaseTy(StringRef(Name),
+               cl::location(
+                   OptionsStorage::instance().allocateLocation<DataType>(Name)),
                std::forward<Modes>(Ms)...) {
     this->setCallback(
         [Name, CB = std::move(this->Callback)](const DataType &SetVal) {
@@ -166,21 +208,8 @@ class opt_list : public cl::list<DataType, std::vector<DataType>> {
   using ValueTy = std::vector<DataType>;
   using BaseTy = cl::list<DataType, ValueTy>;
 
-  static ValueTy &allocateLocation(const char *Name) {
-    auto &Options = OptionsStorage::instance();
-    auto Tmp = std::make_unique<CommandOption<ValueTy>>(Name);
-    auto &Res = Tmp->Val;
-    bool WasInserted = Options.insert(Name, std::move(Tmp));
-    assert(WasInserted && "Duplicated option name");
-    return Res;
-  }
-
-  static ValueTy &getLocation(const char *Name) {
-    auto &Options = OptionsStorage::instance();
-    assert(Options.count(Name) && "Unknown option");
-    auto &Opt = static_cast<CommandOption<ValueTy> &>(
-        OptionsStorage::instance().get(Name));
-    return Opt.Val;
+  static ValueTy &getLocation(StringRef Key) {
+    return OptionsStorage::instance().getLocation<ValueTy>(Key.data());
   }
 
 public:
@@ -188,7 +217,9 @@ public:
 
   template <typename... Modes>
   opt_list(const char *Name, Modes &&...Ms)
-      : BaseTy(StringRef(Name), cl::location(allocateLocation(Name)),
+      : BaseTy(StringRef(Name),
+               cl::location(
+                   OptionsStorage::instance().allocateLocation<ValueTy>(Name)),
                std::forward<Modes>(Ms)...) {
     this->setCallback(
         [Name, CB = std::move(this->Callback)](const DataType &SetVal) {
@@ -210,13 +241,37 @@ public:
   const auto &front() const { return getLocation(ArgStr.data()).front(); }
   auto &back() { return getLocation(ArgStr.data()).back(); }
   const auto &back() const { return getLocation(ArgStr.data()).back(); }
-  auto &operator[](unsigned Idx) { return getLocation(ArgStr.data())[Idx]; }
-  const auto &operator[](unsigned Idx) const {
+  auto &operator[](unsigned Idx) {
+    assert(Idx < size());
     return getLocation(ArgStr.data())[Idx];
+  }
+  const auto &operator[](unsigned Idx) const {
+    assert(Idx < size());
+    return OptionsStorage::instance().getLocation(ArgStr.data())[Idx];
   }
 
   bool isSpecified() const {
     return OptionsStorage::instance().get(ArgStr.data()).isSpecified();
+  }
+};
+
+using cl::alias;
+// struct to be used instead of cl::aliasopt to make your option visible in YAML
+class aliasopt final : private cl::aliasopt {
+public:
+  explicit aliasopt(cl::Option &O) : cl::aliasopt(O) {}
+
+  void apply(cl::alias &A) const {
+    auto &Key = Opt.ArgStr;
+    auto &Options = OptionsStorage::instance();
+    auto Found = Options.find(Key);
+    if (Found == Options.end()) {
+      LLVMContext Ctx;
+      snippy::fatal(Ctx, "Inconsistent options",
+                    "Alias to unknown option \"" + Twine(Key) + "\"");
+    }
+    Found->second.insert(A.ArgStr.str());
+    cl::aliasopt::apply(A);
   }
 };
 
