@@ -121,15 +121,15 @@ static snippy::opt<DisableMisalignedAccessMode>
                            cl::cat(SnippyRISCVOptions), cl::ValueOptional,
                            cl::init(DisableMisalignedAccessMode::All));
 
-cl::alias UseSplatsForRVVInitAlias(
+snippy::alias UseSplatsForRVVInitAlias(
     "snippy-riscv-use-splats-for-rvv-init",
     cl::desc("Alias for -riscv-use-splats-for-rvv-init"),
-    cl::aliasopt(UseSplatsForRVVInit));
+    snippy::aliasopt(UseSplatsForRVVInit));
 
-cl::alias
+snippy::alias
     DumpConfigurationInfoAlias("snippy-riscv-dump-rvv-config",
                                cl::desc("Alias for -riscv-dump-rvv-config"),
-                               cl::aliasopt(DumpRVVConfigurationInfo));
+                               snippy::aliasopt(DumpRVVConfigurationInfo));
 
 static snippy::opt<bool> InitVRegsFromMemory(
     "riscv-init-vregs-from-memory",

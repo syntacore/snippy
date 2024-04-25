@@ -24,16 +24,25 @@ void yaml::CustomMappingTraits<OptionsStorage>::inputOne(
         "Unknown option \"" + Twine(Key) + "\" was specified in YAML", false);
   auto &Base = Options.get(KeyStr);
   if (Base.isSpecified())
-    report_fatal_error("Attempt to specify option \"" + Twine(Key) + "\" twice",
+    report_fatal_error("Attempt to specify option (or its alias) \"" +
+                           Twine(Key) + "\" twice",
                        false);
-  Base.mapStoredValue(IO);
+  Base.mapStoredValue(IO, KeyStr);
   Base.markAsSpecified();
 }
 
 void yaml::CustomMappingTraits<OptionsStorage>::output(
     yaml::IO &IO, OptionsStorage &Options) {
   for (auto &&Base : Options)
-    Base.second->mapStoredValue(IO);
+    Base.first->mapStoredValue(IO);
 }
-
+void CommandOptionBase::mapStoredValue(yaml::IO &IO,
+                                       std::optional<StringRef> Key) {
+  if (!Key.has_value())
+    doMappingWithKey(IO, Name);
+  else
+    doMappingWithKey(IO, Key.value());
+  if (!isSpecified() && !IO.outputting())
+    markAsSpecified();
+}
 } // namespace llvm
