@@ -37,10 +37,9 @@ public:
     return *CoInterp.front();
   }
 
-  // Preform co-simulation run and returns PC before final instruction.
+  // Preform co-simulation run.
   // Each interpreter state will be reset before run.
-  ProgramCounterType run(StringRef Programm,
-                         const IRegisterState &InitialRegState);
+  void run(StringRef Programm, const IRegisterState &InitialRegState);
 
   // Adds output section name to the sim config
   //  in order to load it later to the model before execution.

@@ -298,9 +298,8 @@ void GeneratorContext::runSimulator(StringRef ImageToRun) {
 
     auto &SimRunner = getOrCreateSimRunner();
 
-    auto FinalPC = SimRunner.run(ImageToRun, InitRegState);
+    SimRunner.run(ImageToRun, InitRegState);
 
-    I.setPC(FinalPC);
     I.dumpCurrentRegState(GenSettings->RegistersConfig.FinalStateOutputYaml);
     auto RangesToDump = getMemoryRangesToDump(I, DumpMemorySection);
     if (!RangesToDump.empty())
