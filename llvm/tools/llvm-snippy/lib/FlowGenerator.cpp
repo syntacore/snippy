@@ -633,7 +633,7 @@ void InstructionGenerator::generateInstruction(
          "All branch instructions expected to be generated separately");
 
   if (GenerateInsertionPointHints)
-    generateInsertionPointHint(MBB, MBB.end());
+    generateInsertionPointHint(MBB, MBB.getFirstTerminator());
 
   if (SnippyTgt.requiresCustomGeneration(InstrDesc)) {
     SnippyTgt.generateCustomInst(InstrDesc, MBB, *SGCtx, Ins);
@@ -1547,7 +1547,7 @@ void InstructionGenerator::generateBurst(
   const auto &InstrInfo = State.getInstrInfo();
 
   if (GenerateInsertionPointHints)
-    generateInsertionPointHint(MBB, MBB.end());
+    generateInsertionPointHint(MBB, MBB.getFirstTerminator());
 
   auto Opcodes = generateOpcodesForFixedSizedGroup(BurstGroupRequest, *SGCtx);
 
