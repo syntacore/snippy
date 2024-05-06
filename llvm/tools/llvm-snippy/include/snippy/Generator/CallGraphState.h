@@ -122,6 +122,10 @@ public:
     return N;
   }
 
+  // This is done for back_inserter_iterator.
+  using value_type = const Function *;
+  void push_back(value_type F) { emplaceNode(F); }
+
   auto *getNode(const Function *F) const {
     assert(registered(F) && "Machine Function is unregistered");
     return FunToNodeMap.lookup(F);

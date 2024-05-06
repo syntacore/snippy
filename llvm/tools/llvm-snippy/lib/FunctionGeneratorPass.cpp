@@ -59,6 +59,15 @@ public:
   bool generateDefault(Module &M);
 
   std::vector<std::string> prepareRXSections();
+  struct RootFnPlacement {
+    std::string SectionName;
+    size_t InstrNum;
+    RootFnPlacement(StringRef Name, size_t IN)
+        : SectionName{Name}, InstrNum{IN} {};
+  };
+  std::vector<RootFnPlacement> distributeRootFunctions();
+
+  void initRootFunctions(Module &M, StringRef EntryPointName);
 
   bool runOnModule(Module &M) override;
 };
@@ -163,9 +172,10 @@ FunctionGenerator::FunctionGenerator() : ModulePass(ID) {
 
 namespace {
 
-MachineFunction &createFunction(GeneratorContext const &SGCtx, Module &M,
+MachineFunction &createFunction(GeneratorContext &SGCtx, Module &M,
                                 StringRef Name, StringRef SectionName,
-                                Function::LinkageTypes Linkage) {
+                                Function::LinkageTypes Linkage,
+                                size_t NumInstr) {
 
   auto &State = SGCtx.getLLVMState();
   std::string FinalName =
@@ -180,6 +190,7 @@ MachineFunction &createFunction(GeneratorContext const &SGCtx, Module &M,
     Props.reset(MachineFunctionProperties::Property::TracksLiveness);
   auto *MBB = MF.CreateMachineBasicBlock();
   MF.push_back(MBB);
+  SGCtx.setRequestedInstrNum(MF, NumInstr);
 
   return MF;
 }
@@ -203,6 +214,80 @@ std::vector<std::string> FunctionGenerator::prepareRXSections() {
     Ret.emplace_back(InputSections.front());
 
   return Ret;
+}
+
+void FunctionGenerator::initRootFunctions(Module &M, StringRef EntryPointName) {
+  auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &CGS = SGCtx.getCallGraphState();
+
+  auto RFs = distributeRootFunctions();
+  auto &&[EntryFnSection, EntryFnInstrNum] = RFs.front();
+  // Entry point produces multiple root functions. Each one of
+  // them is assigned to respective RX section.
+  auto &MF = createFunction(SGCtx, M, EntryPointName, EntryFnSection,
+                            Function::ExternalLinkage, EntryFnInstrNum);
+  auto *N = CGS.emplaceNode(&(MF.getFunction()));
+  CGS.setRoot(N);
+  std::vector<Function *> RestRootFs;
+
+  std::transform(std::next(RFs.begin()), RFs.end(),
+                 std::back_inserter(RestRootFs), [&](auto &S) {
+                   return &createFunction(SGCtx, M, EntryPointName,
+                                          S.SectionName,
+                                          Function::InternalLinkage, S.InstrNum)
+                               .getFunction();
+                 });
+  if (!SGCtx.getGenSettings().InstrsGenerationConfig.ChainedRXSorted)
+    std::shuffle(RestRootFs.begin(), RestRootFs.end(), RandEngine::engine());
+  for (auto *F : RestRootFs)
+    CGS.appendNode(N, F);
+}
+
+std::vector<FunctionGenerator::RootFnPlacement>
+FunctionGenerator::distributeRootFunctions() {
+  auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &Linker = SGCtx.getLinker();
+  if (!SGCtx.getGenSettings().InstrsGenerationConfig.ChainedRXSectionsFill)
+    return {RootFnPlacement(std::string{""},
+                            SGCtx.getRequestedInstrsNumForMainFunction())};
+
+  auto Sections = prepareRXSections();
+
+  std::vector<RootFnPlacement> Ret;
+  auto GetInstrNum = [&SGCtx](auto SectionSize) {
+    return static_cast<size_t>(std::llround(
+        (double)SGCtx.getRequestedInstrsNumForMainFunction() *
+        ((double)SectionSize /
+         (double)SGCtx.getGenSettings().Cfg.Sections.getSectionsSize(Acc::X))));
+  };
+
+  std::transform(Sections.begin(), Sections.end(), std::back_inserter(Ret),
+                 [&](auto &S) {
+                   assert(Linker.hasOutputSectionFor(S));
+                   auto SectionSize = Linker.getOutputSectionFor(S).Desc.Size;
+                   return RootFnPlacement{S, GetInstrNum(SectionSize)};
+                 });
+
+  if (!SGCtx.getGenSettings().InstrsGenerationConfig.ChainedRXChunkSize)
+    return Ret;
+
+  auto ChunkSize =
+      *SGCtx.getGenSettings().InstrsGenerationConfig.ChainedRXChunkSize;
+
+  decltype(Ret) RetSplit;
+
+  // Split part for each section into pieces of size ChunkSize.
+  for (auto &&[Name, NumInstr] : Ret) {
+    auto FunCount = NumInstr / ChunkSize + 1u;
+    auto LastFunIC = NumInstr % ChunkSize;
+    // All except last function have exactly ChunkSize instructions.
+    std::fill_n(std::back_inserter(RetSplit), FunCount - 1u,
+                RootFnPlacement(Name, ChunkSize));
+    // Last function has remaining number of instructions(not greater than
+    // ChunkSize).
+    RetSplit.emplace_back(Name, LastFunIC);
+  }
+  return RetSplit;
 }
 
 bool FunctionGenerator::runOnModule(Module &M) {
@@ -251,25 +336,16 @@ bool FunctionGenerator::readFromYaml(Module &M, const FunctionDescs &FDs) {
       auto IsEntryPoint = &Desc == &EntryPoint;
       CallGraphState::Node *N = nullptr;
       if (IsEntryPoint) {
-        // Entry point produces multiple root functions. Each one of
-        // them is assigned to respective RX section.
-        auto &MF = createFunction(SGCtx, M, Desc.Name, Sections.front(),
-                                  Function::ExternalLinkage);
-        N = CGS.emplaceNode(&(MF.getFunction()));
-        CGS.setRoot(N);
-        for (auto &Section :
-             llvm::make_range(std::next(Sections.begin()), Sections.end())) {
-          CGS.appendNode(N, (&createFunction(SGCtx, M, Desc.Name, Section,
-                                             Function::InternalLinkage)
-                                  .getFunction()));
-        }
+        initRootFunctions(M, Desc.Name);
+        N = CGS.getRootNode();
       } else {
         // All secondary functions are not assigned to specific RX section upon
         // creation. They are distributed to section later by
         // FunctionDistributePass.
         auto *NullSection = "";
-        auto &MF = createFunction(SGCtx, M, Desc.Name, NullSection,
-                                  Function::InternalLinkage);
+        auto &MF = createFunction(
+            SGCtx, M, Desc.Name, NullSection, Function::InternalLinkage,
+            SGCtx.getGenSettings().Cfg.CGLayout.InstrNumAncil);
         N = CGS.emplaceNode(&(MF.getFunction()));
       }
       NameMap.emplace(Desc.Name, N);
@@ -292,37 +368,27 @@ bool FunctionGenerator::readFromYaml(Module &M, const FunctionDescs &FDs) {
 bool FunctionGenerator::generateDefault(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &CGS = SGCtx.getCallGraphState();
-  auto Sections = prepareRXSections();
 
   // Create functions.
   auto NumF = SGCtx.getCallGraphLayout().FunctionNumber;
 
   assert(NumF && "Expected NumF >= 1");
 
-  auto &EntryFunction =
-      createFunction(SGCtx, M, SGCtx.getEntryPointName(), Sections.front(),
-                     Function::ExternalLinkage);
+  initRootFunctions(M, SGCtx.getEntryPointName());
 
-  auto *Root = CGS.emplaceNode(&(EntryFunction.getFunction()));
-  CGS.setRoot(Root);
-
-  // Create Root function for each section.
-  for (auto &Section :
-       llvm::make_range(std::next(Sections.begin()), Sections.end())) {
-    auto &MF = createFunction(SGCtx, M, SGCtx.getEntryPointName(), Section,
-                              Function::InternalLinkage);
-    CGS.appendNode(Root, &MF.getFunction());
-  }
-
-  for (auto i = 0u; i < NumF - 1; ++i) {
-    // All secondary functions are not assigned to specific RX section upon
-    // creation. They are distributed to section later by
-    // FunctionDistributePass.
-    auto *NullSection = "";
-    auto &MF = createFunction(SGCtx, M, ("fun" + Twine(i)).str(), NullSection,
-                              Function::InternalLinkage);
-    CGS.emplaceNode(&MF.getFunction());
-  }
+  iota_range<size_t> funIDs(0u, NumF - 1u, /*Inclusive*/ false);
+  std::transform(
+      funIDs.begin(), funIDs.end(), std::back_inserter(CGS), [&](auto ID) {
+        // All secondary functions are not assigned to specific RX section upon
+        // creation. They are distributed to section later by
+        // FunctionDistributePass.
+        auto *NullSection = "";
+        auto &MF =
+            createFunction(SGCtx, M, ("fun" + Twine(ID)).str(), NullSection,
+                           Function::InternalLinkage,
+                           SGCtx.getGenSettings().Cfg.CGLayout.InstrNumAncil);
+        return &MF.getFunction();
+      });
 
   // Fill in connections.
 
