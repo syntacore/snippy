@@ -216,6 +216,8 @@ private:
   // First loop header <-> Consecutive loops headers (basic blocks numbers)
   std::unordered_map<unsigned, std::set<unsigned>> ConsecutiveLoopsHeaders;
 
+  std::unordered_map<const MachineFunction *, size_t> RequestedInstrNum;
+
 public:
   GeneratorContext(MachineModuleInfo &MMI, Module &M, LLVMState &State,
                    RegPool &Pool, RegisterGenerator &RegGen,
@@ -295,12 +297,12 @@ public:
   }
 
   size_t getRequestedInstrsNum(const MachineFunction &MF) const {
-    if (isRootFunction(MF))
-      return (double)getRequestedInstrsNumForMainFunction() *
-             ((double)getOutputSectionFor(MF).Size /
-              (double)GenSettings->Cfg.Sections.getSectionsSize(Acc::X));
-    else
-      return GenSettings->Cfg.CGLayout.InstrNumAncil;
+    assert(RequestedInstrNum.count(&MF));
+    return RequestedInstrNum.at(&MF);
+  }
+
+  void setRequestedInstrNum(const MachineFunction &MF, size_t NumInstr) {
+    RequestedInstrNum.emplace(&MF, NumInstr);
   }
 
   bool isLoopGenerationPossible() const {
