@@ -117,6 +117,12 @@ static snippy::opt<bool> ChainedRXSectionsFill(
              "generate code to."),
     cl::cat(Options), cl::init(false));
 
+static snippy::opt<size_t> ChainedRXChunkSize(
+    "chained-rx-chunk-size",
+    cl::desc("Slice main function in blocks of specified size, distribute over "
+             "rx sections and randomly link them in list."),
+    cl::cat(Options), cl::init(0u));
+
 static snippy::opt<bool>
     ChainedRXSorted("chained-rx-sorted",
                     cl::desc("Sort RX sections by their ID alphabetically when "
@@ -880,10 +886,28 @@ unsigned long long initializeRandomEngine(unsigned long long SeedValue) {
 
 GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
                                         RegPool &RP) {
+  auto &Ctx = State.getCtx();
   auto OutputFilename = getOutputFileBasename();
   auto SelfCheckPeriod = getSelfcheckPeriod();
   auto NumPrimaryInstrs = getExpectedNumInstrs(NumInstrs.getValue());
   bool FillCodeSectionMode = !NumPrimaryInstrs;
+  std::optional<size_t> ChunkSize{};
+  if (ChainedRXChunkSize.getNumOccurrences())
+    ChunkSize = ChainedRXChunkSize.getValue();
+
+  auto ChunkOptName = ChainedRXChunkSize.ArgStr;
+
+  if (ChunkSize && !NumPrimaryInstrs)
+    snippy::fatal(Ctx, "Cannot use '" + Twine(ChunkOptName) + "' option",
+                  "num-instr is set to 'all'");
+  if (ChunkSize && *ChunkSize == 0u)
+    snippy::fatal(Ctx, "Cannot set '" + Twine(ChunkOptName) + "' to 0",
+                  "expected >=1");
+  if (ChunkSize && !ChainedRXSectionsFill)
+    snippy::warn(WarningName::InconsistentOptions, Ctx,
+                 "'" + Twine(ChunkOptName) + "' is ignored",
+                 "pass '" + Twine(ChainedRXSectionsFill.ArgStr) +
+                     "' to enable it");
   auto SeedValue = seedOptToValue(Seed.getValue());
   initializeRandomEngine(SeedValue);
   auto Models = parseModelPluginList();
@@ -907,7 +931,7 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
                     std::move(EntryPointName.getValue())},
       ModelPluginOptions{RunOnModel, std::move(Models)},
       InstrsGenerationOptions{VerifyMachineInstrs, ChainedRXSectionsFill,
-                              ChainedRXSorted, NumPrimaryInstrs,
+                              ChainedRXSorted, ChunkSize, NumPrimaryInstrs,
                               std::move(LastInstr)},
       RegistersOptions{
           InitRegsInElf, InitialRegisterDataFile.getValue(),
