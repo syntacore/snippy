@@ -1290,6 +1290,23 @@ static std::vector<unsigned> generateBaseRegs(MachineBasicBlock &MBB,
   // can be bigger than the number of available registers.
   auto NumDefs = countDefsHavingRC(Opcodes, RegInfo, AddrRegClass, InstrInfo);
   auto NumAddrs = countAddrs(Opcodes, SnippyTgt);
+  // Count the minimum number of available registers we need.
+  unsigned MinAvailRegs = 0;
+  // If there is one address or more then we need at least one register
+  // available for it.
+  if (NumAddrs > 0)
+    ++MinAvailRegs;
+  // Same for definitions. If there are some definitions then we need at least
+  // one register available for it.
+  if (NumDefs > 0)
+    ++MinAvailRegs;
+  if (MinAvailRegs > NumAvailRegs)
+    report_fatal_error(
+        "Cannot generate burst group: don't have enough registers available. "
+        "Please, try to reduce amount of registers reserved by decreasing "
+        "loops nestness or change instructions used in burst groups if these "
+        "instructions may be used with a very limited set of registers.",
+        false);
   NumAddrs = normalizeNumRegs(NumDefs, NumAddrs, NumAvailRegs);
 
   // Randomly pick and reserve addr registers so as not to use them
