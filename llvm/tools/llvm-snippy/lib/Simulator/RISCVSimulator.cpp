@@ -312,6 +312,8 @@ static uint64_t deriveZextBits(const RISCVSubtarget &Subtarget) {
     ZextBits |= RVM_ZEXT_BS;
   if (Subtarget.hasStdExtZfh())
     ZextBits |= RVM_ZEXT_FH;
+  if (Subtarget.hasStdExtZfhmin())
+    ZextBits |= RVM_ZEXT_FHMIN;
   if (Subtarget.hasStdExtZbkb())
     ZextBits |= RVM_ZEXT_BKB;
   if (Subtarget.hasStdExtZbkc())
