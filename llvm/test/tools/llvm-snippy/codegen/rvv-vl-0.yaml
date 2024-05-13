@@ -1,0 +1,54 @@
+# RUN: llvm-snippy %s --riscv-preference-for-rvv-mode-change=vsetvli --dump-mf \
+# RUN:    -model-plugin=None \
+# RUN: |& FileCheck %s
+
+options:
+  march: riscv64-linux-gnu
+  mcpu: generic-rv64
+  mattr: +v
+  num-instrs: 1000
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: 0.5
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VXSAT:
+      on: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+      LMUL:
+        m1: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+sections:
+    - no:        0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+
+histogram: 
+    - [VADD_VV, 1.0]
+
+# CHECK: [[REG:\$x[0-9]+]] = ADDI $x0, 0
+# CHECK-NEXT: [[TMP:\$x[0-9]+]] = VSETVLI [[REG]]

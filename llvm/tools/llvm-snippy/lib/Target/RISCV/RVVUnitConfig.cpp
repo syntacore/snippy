@@ -528,9 +528,23 @@ struct LegalVLGenerator final : VLGeneratorInterface {
     auto PointSEW = static_cast<unsigned>(Cfg.SEW);
     auto MaxVL = computeVLMax(VLEN, PointSEW, Cfg.LMUL);
     if (MaxVL > 0)
+      return RandEngine::genInInterval<unsigned>(0u, MaxVL);
+    // If MaxVL == 0 this means that RVVConfiguration is illegal
+    // and we just return VL from [0, Max Possible VL]
+    return RandEngine::genInInterval<unsigned>(0u, getMaxPossibleVL(VLEN));
+  }
+};
+
+struct LegalVLNonZeroGenerator final : VLGeneratorInterface {
+
+  static constexpr const char *kID = "any_legal_non_zero";
+  std::string identify() const override { return kID; }
+
+  unsigned generate(unsigned VLEN, const RVVConfiguration &Cfg) const override {
+    auto PointSEW = static_cast<unsigned>(Cfg.SEW);
+    auto MaxVL = computeVLMax(VLEN, PointSEW, Cfg.LMUL);
+    if (MaxVL > 0)
       return RandEngine::genInInterval<unsigned>(1u, MaxVL);
-    MaxVL =
-        VLEN * RVVConfiguration::getMaxLMUL() / RVVConfiguration::getMinSEW();
     // If MaxVL == 0 this means that RVVConfiguration is illegal
     // and we just return VL from [1, Max Possible VL]
     return RandEngine::genInInterval<unsigned>(1u, getMaxPossibleVL(VLEN));
@@ -626,7 +640,7 @@ template <> struct GeneratorFactory<RVVConfigurationInfo::VLGeneratorHolder> {
   using ObjectType = VLGeneratorInterface;
   static RVVConfigurationInfo::VLGeneratorHolder create(const std::string &ID) {
     return constructByID<VLGeneratorInterface, ImmVLGen, MaxVLGenerator,
-                         LegalVLGenerator>(ID);
+                         LegalVLGenerator, LegalVLNonZeroGenerator>(ID);
   }
 };
 template <> struct GeneratorFactory<RVVConfigurationInfo::VMGeneratorHolder> {
