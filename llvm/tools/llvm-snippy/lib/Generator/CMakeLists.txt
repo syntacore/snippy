@@ -2,10 +2,10 @@ add_llvm_library(LLVMSnippyGenerator
   DISABLE_LLVM_LINK_LLVM_DYLIB
   STATIC
   Backtrack.cpp
-  BlockGenPlan.cpp
   CallGraphState.cpp
-  GenerationRequest.cpp
   GeneratorContext.cpp
+  GenerationLimit.cpp
+  GenerationUtils.cpp
   Interpreter.cpp
   Linker.cpp
   LLVMState.cpp
