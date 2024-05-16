@@ -11,13 +11,15 @@
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/Pass.h"
 
-#include "snippy/Generator/BlockGenPlan.h"
+#include "snippy/Generator/GenerationRequest.h"
+
+#include <optional>
 
 namespace llvm {
 namespace snippy {
 
 class BlockGenPlanning final : public MachineFunctionPass {
-  BlocksGenPlanTy Plan;
+  std::optional<planning::FunctionRequest> Req;
 
 public:
   static char ID;
@@ -28,8 +30,11 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const override;
 
-  const BlocksGenPlanTy &get() const { return Plan; }
-  const SingleBlockGenPlanTy &get(const MachineBasicBlock &MBB) const;
+  planning::FunctionRequest &get() {
+    assert(Req.has_value());
+    return *Req;
+  }
+  const planning::BasicBlockRequest &get(const MachineBasicBlock &MBB) const;
 
   bool runOnMachineFunction(MachineFunction &MF) override;
   void releaseMemory() override;

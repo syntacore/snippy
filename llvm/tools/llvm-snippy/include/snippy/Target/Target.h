@@ -17,11 +17,9 @@
 
 #include "TargetConfigIface.h"
 
-#include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Generator/MemoryManager.h"
-#include "snippy/Generator/Policy.h"
 #include "snippy/Generator/RegisterPool.h"
 #include "snippy/PassManagerWrapper.h"
 #include "snippy/Simulator/Simulator.h"
@@ -57,12 +55,11 @@ class DynamicLibrary;
 } // namespace sys
 
 namespace snippy {
-
 struct SectionDesc;
 class LLVMState;
 class RegPoolWrapper;
 class GeneratorContext;
-
+class StridedImmediate;
 struct TargetGenContextInterface {
   virtual ~TargetGenContextInterface() = 0;
 
@@ -113,7 +110,9 @@ struct AddressPart {
 
 using RegToValueType = DenseMap<Register, APInt>;
 using AddressParts = SmallVector<AddressPart>;
-
+namespace planning {
+class GenPolicy;
+} // namespace planning
 class SnippyTarget {
 public:
   SnippyTarget() = default;
@@ -217,10 +216,6 @@ public:
   virtual std::vector<Register>
   getRegsForSelfcheck(const MachineInstr &MI, const MachineBasicBlock &MBB,
                       const GeneratorContext &GenCtx) const = 0;
-
-  virtual GenPolicy
-  getGenerationPolicy(const MachineBasicBlock &MBB, GeneratorContext &GenCtx,
-                      std::optional<unsigned> BurstGroupID) const = 0;
 
   virtual std::unique_ptr<IRegisterState>
   createRegisterState(const TargetSubtargetInfo &ST) const = 0;
@@ -450,6 +445,17 @@ public:
   virtual size_t getAccessSize(unsigned Opcode) const = 0;
 
   virtual bool isCall(unsigned Opcode) const = 0;
+
+  virtual std::vector<OpcodeHistogramEntry>
+  getPolicyOverrides(const MachineBasicBlock &MBB,
+                     const GeneratorContext &GC) const = 0;
+
+  // Currently the result is the same for all groups in BB
+  virtual bool groupMustHavePrimaryInstr(const MachineBasicBlock &MBB,
+                                         const GeneratorContext &GC) const = 0;
+  virtual std::function<bool(unsigned)>
+  getDefaultPolicyFilter(const MachineBasicBlock &MBB,
+                         const GeneratorContext &GC) const = 0;
 
 private:
   virtual bool matchesArch(Triple::ArchType Arch) const = 0;

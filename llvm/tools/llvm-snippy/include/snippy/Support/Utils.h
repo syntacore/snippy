@@ -24,7 +24,6 @@ class Input;
 } // namespace yaml
 
 namespace snippy {
-
 namespace detail {
 constexpr static const char *SupportMetadataValue = "llvm.snippy.support";
 bool checkMetadata(const MachineInstr &MI, StringRef MetaStr);
@@ -182,6 +181,16 @@ bool IsSAddOverflow(T A, T B) {
   (void)Op1.sadd_ov(Op2, Overflow);
   return Overflow;
 }
+
+template <typename... ArgsTy>
+struct OverloadedCallable final : public ArgsTy... {
+  OverloadedCallable(ArgsTy &&...Args)
+      : ArgsTy(std::forward<ArgsTy>(Args))... {}
+  using ArgsTy::operator()...;
+};
+
+template <typename... ArgsTy>
+OverloadedCallable(ArgsTy &&...Args) -> OverloadedCallable<ArgsTy...>;
 
 } // namespace snippy
 } // namespace llvm

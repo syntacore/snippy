@@ -1,0 +1,32 @@
+# RUN: llvm-snippy --model-plugin None %s %S/Inputs/load-burst.yaml | FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  dump-mf: on
+  num-instrs: 6
+  generate-insertion-point-hints: on
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+  - [LW, 1.0]
+  - [LD, 1.0]
+
+
+
+# Check that we have at least 1 NOP and 2 burst groups of size 3
+# CHECK-DAG: $x0 = ADDI $x0, 0
+# CHECK: {{(((.+)((LW)|(LD))(.+)([[:space:]]+)){3})}}
+# CHECK: {{(((.+)((LW)|(LD))(.+)([[:space:]]+)){3})}}
+
+
