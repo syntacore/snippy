@@ -18,11 +18,13 @@
 #include "snippy/Generator/Backtrack.h"
 #include "snippy/Generator/CallGraphState.h"
 #include "snippy/Generator/GenerationRequest.h"
+#include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GlobalsPool.h"
 #include "snippy/Generator/Interpreter.h"
 #include "snippy/Generator/IntervalsToVerify.h"
 #include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/Linker.h"
+#include "snippy/Generator/Policy.h"
 #include "snippy/Generator/RegisterPool.h"
 #include "snippy/PassManagerWrapper.h"
 #include "snippy/Support/DiagnosticInfo.h"
@@ -148,13 +150,6 @@ static snippy::opt<CallGraphDumpMode>
                  CallGraphDumpEnumOption::getClValues(),
                  cl::init(CallGraphDumpMode::Dot), cl::cat(Options));
 
-static snippy::opt<unsigned> BurstAddressRandomizationThreshold(
-    "burst-addr-rand-threshold",
-    cl::desc(
-        "Number of attempts to randomize address of each instruction in the "
-        "burst group"),
-    cl::Hidden, cl::init(100));
-
 snippy::opt<bool> VerifyConsecutiveLoops(
     "verify-consecutive-loops",
     cl::desc(
@@ -182,27 +177,6 @@ static snippy::opt<bool> ExportGV(
     cl::desc(
         "add sections properties such as VMA, size and stride as "
         "a global constants with an external linkage. Requires a model plugin"),
-    cl::cat(Options), cl::init(false));
-static snippy::opt<std::string> DumpMemAccesses(
-    "dump-memory-accesses",
-    cl::desc("Dump memory addresses that are accessed by instructions in the "
-             "snippet to a file creating `access-addresses` memory scheme. It "
-             "does not record auxiliary instructions (e.g. selfcheck). Pass "
-             "the options with an empty value to dump to stdout."),
-    cl::value_desc("filename"), cl::cat(Options));
-static snippy::opt<std::string> DumpMemAccessesRestricted(
-    "dump-memory-accesses-restricted",
-    cl::desc(
-        "Dump memory addresses that are accessed by instructions in the "
-        "snippet to a file creating `restricted-addresses` memory scheme. It "
-        "does not record auxiliary instructions (e.g. selfcheck). Pass "
-        "the options with an empty value to dump to stdout."),
-    cl::value_desc("filename"), cl::cat(Options));
-
-static snippy::opt<bool> DumpBurstPlainAccesses(
-    "dump-burst-accesses-as-plain-addrs",
-    cl::desc("Dump memory addresses accessed by burst groups as plain "
-             "addresses rather than ranges descriptions"),
     cl::cat(Options), cl::init(false));
 
 static snippy::opt<bool>
@@ -237,103 +211,6 @@ void writeMIRFile(StringRef Data) {
   writeFile(Path, Data);
 }
 
-static bool dumpPlainAccesses(std::stringstream &SS,
-                              const PlainAccessesType &Accesses,
-                              bool Restricted, StringRef Prefix, bool Append) {
-  if (Accesses.empty())
-    return false;
-
-  if (!Append)
-    SS << Prefix.data() << "plain:\n";
-
-  for (auto [Addr, AccessSize] : Accesses) {
-    SS << "      - addr: 0x" << Twine::utohexstr(Addr).str() << "\n";
-    if (Restricted)
-      SS << "        access-size: " << AccessSize << "\n";
-  }
-  return true;
-}
-
-static void dumpBurstAccesses(std::stringstream &SS,
-                              const BurstGroupAccessesType &Accesses,
-                              StringRef Prefix) {
-  if (Accesses.empty())
-    return;
-
-  SS << Prefix.data() << "burst:\n";
-
-  for (const auto &BurstDesc : Accesses) {
-    assert(!BurstDesc.empty() && "At least one range is expected");
-    for (auto &RangeDesc : BurstDesc) {
-      assert(RangeDesc.MinOffset <= RangeDesc.MaxOffset);
-      bool IsMinNegative = RangeDesc.MinOffset < 0;
-      MemAddr MinOffsetAbs = std::abs(RangeDesc.MinOffset);
-      bool IsMaxNegative = RangeDesc.MaxOffset < 0;
-      MemAddr MaxOffsetAbs = std::abs(RangeDesc.MaxOffset);
-      assert(!IsMinNegative || RangeDesc.Address >= MinOffsetAbs);
-      assert(IsMinNegative ||
-             std::numeric_limits<MemAddr>::max() - RangeDesc.Address >=
-                 MinOffsetAbs);
-      auto BaseAddr = IsMinNegative ? RangeDesc.Address - MinOffsetAbs
-                                    : RangeDesc.Address + MinOffsetAbs;
-      MemAddr Size = 0;
-      if (IsMaxNegative) {
-        assert(MinOffsetAbs >= MaxOffsetAbs);
-        Size = MinOffsetAbs - MaxOffsetAbs;
-      } else if (IsMinNegative) {
-        assert(std::numeric_limits<MemAddr>::max() - MaxOffsetAbs >=
-               MinOffsetAbs);
-        Size = MaxOffsetAbs + MinOffsetAbs;
-      } else {
-        assert(MaxOffsetAbs >= MinOffsetAbs);
-        Size = MaxOffsetAbs - MinOffsetAbs;
-      }
-      assert(std::numeric_limits<MemAddr>::max() - Size >=
-             RangeDesc.AccessSize);
-      Size += RangeDesc.AccessSize;
-      SS << "        - addr: 0x" << Twine::utohexstr(BaseAddr).str() << "\n";
-      SS << "          size: " << Size << "\n";
-      SS << "          stride: " << RangeDesc.MinStride << "\n";
-      SS << "          access-size: " << RangeDesc.AccessSize << "\n";
-    }
-  }
-}
-
-static void dumpMemAccesses(StringRef Filename, const PlainAccessesType &Plain,
-                            const BurstGroupAccessesType &BurstRanges,
-                            const PlainAccessesType &BurstPlain,
-                            bool Restricted) {
-  if (Plain.empty() && BurstRanges.empty() && BurstPlain.empty()) {
-    errs() << "warning: cannot dump memory accesses as no accesses were "
-              "generated. File won't be created.\n";
-    return;
-  }
-
-  std::stringstream SS;
-  SS << (Restricted ? "restricted-addresses:\n" : "access-addresses:\n");
-  if (!Restricted)
-    SS << "  - ordered: true\n";
-
-  constexpr auto NewEntry = "  - ";
-  constexpr auto SameEntry = "    ";
-  auto Prefix = Restricted ? NewEntry : SameEntry;
-
-  auto Added =
-      dumpPlainAccesses(SS, Plain, Restricted, Prefix, /* Append */ false);
-  if (Added)
-    Prefix = SameEntry;
-
-  if (!Restricted && !DumpBurstPlainAccesses)
-    dumpBurstAccesses(SS, BurstRanges, Prefix);
-  else
-    dumpPlainAccesses(SS, BurstPlain, Restricted, Prefix, /* Append */ Added);
-
-  if (Filename.empty())
-    outs() << SS.str();
-  else
-    writeFile(Filename, SS.str());
-}
-
 template <typename InstrIt>
 void reportGeneratorRollback(InstrIt ItBegin, InstrIt ItEnd) {
   LLVM_DEBUG(
@@ -362,18 +239,6 @@ size_t countPrimaryInstructions(IteratorType Begin, IteratorType End) {
       Begin, End, [](const auto &MI) { return !checkSupportMetadata(MI); });
 }
 
-static auto getEffectiveMemoryAccessInfo(const MachineInstr *MI, AddressInfo AI,
-                                         const SnippyTarget &SnippyTgt) {
-  MemAddr EffectiveAddr = AI.Address;
-  auto Offset =
-      find_if(MI->operands(), [](const auto &Op) { return Op.isImm(); });
-  // Some instructions don't have offset operand.
-  if (Offset != MI->operands().end())
-    EffectiveAddr += Offset->getImm();
-  return std::make_pair(EffectiveAddr,
-                        SnippyTgt.getAccessSize(MI->getOpcode()));
-}
-
 template <typename RetType, RetType AsOne, RetType AsZero>
 class AsOneGenerator {
   unsigned long long Period;
@@ -396,61 +261,16 @@ public:
   }
 };
 
-// Helper class to keep additional information about the operand: register
-// number that has been somehow selected before instruction generation,
-// immediate operand range and so on.
-class PreselectedOpInfo {
-  using EmptyTy = std::monostate;
-  using RegTy = llvm::Register;
-  using ImmTy = StridedImmediate;
-  using TiedTy = int;
-  std::variant<EmptyTy, RegTy, ImmTy, TiedTy> Value;
-
-  unsigned Flags = 0;
-
-public:
-  PreselectedOpInfo(llvm::Register R) : Value(R) {}
-  PreselectedOpInfo(StridedImmediate Imm) : Value(Imm) {}
-  PreselectedOpInfo() = default;
-  bool isReg() const { return std::holds_alternative<RegTy>(Value); }
-  bool isImm() const { return std::holds_alternative<ImmTy>(Value); }
-  bool isUnset() const { return std::holds_alternative<EmptyTy>(Value); }
-  bool isTiedTo() const { return std::holds_alternative<TiedTy>(Value); }
-
-  unsigned getFlags() const { return Flags; }
-  StridedImmediate getImm() const {
-    assert(isImm());
-    return std::get<ImmTy>(Value);
-  }
-  llvm::Register getReg() const {
-    assert(isReg());
-    return std::get<RegTy>(Value);
-  }
-  llvm::Register getTiedTo() const {
-    assert(isTiedTo());
-    return std::get<TiedTy>(Value);
-  }
-
-  void setFlags(unsigned F) { Flags = F; }
-  void setTiedTo(int OpIdx) {
-    assert(isUnset());
-    Value = OpIdx;
-  }
-};
-
 class InstructionGenerator final : public MachineFunctionPass {
-
-  GenerationStatistics processInstructionGeneration(
-      MachineBasicBlock &MBB, IInstrGroupGenReq &InstructionGroupRequest,
+  GenerationResult generateNopsToSizeLimit(
+      MachineBasicBlock &MBB,
+      const planning::InstructionGroupRequest &InstructionGroupRequest,
       GenerationStatistics &CurrentInstructionGroupStats);
 
-  GenerationResult
-  generateNopsToSizeLimit(MachineBasicBlock &MBB,
-                          const IInstrGroupGenReq &InstructionGroupRequest,
-                          GenerationStatistics &CurrentInstructionGroupStats);
-
-  void generateInstruction(MachineBasicBlock &MBB, unsigned Opc,
-                           MachineBasicBlock::iterator Ins);
+  void generateInstruction(
+      const MCInstrDesc &InstrDesc, MachineBasicBlock &MBB,
+      MachineBasicBlock::iterator Ins,
+      std::vector<planning::PreselectedOpInfo> Preselected = {});
 
   template <typename InstrIt>
   GenerationStatus interpretInstrs(InstrIt Begin, InstrIt End) const;
@@ -462,8 +282,21 @@ class InstructionGenerator final : public MachineFunctionPass {
   template <typename InstrIt>
   GenerationResult handleGeneratedInstructions(
       MachineBasicBlock &MBB, InstrIt ItBegin, InstrIt ItEnd,
-      const IInstrGroupGenReq &InstructionGroupRequest,
+      const planning::InstructionGroupRequest &InstructionGroupRequest,
       const GenerationStatistics &CurrentInstructionGroupStats) const;
+
+  template <typename InstrIt>
+  MachineBasicBlock::iterator processGeneratedInstructions(
+      MachineBasicBlock &MBB, InstrIt ItBegin,
+      const planning::InstructionGroupRequest &IG, unsigned &BacktrackCount,
+      unsigned &SizeErrorCount, GenerationStatistics &CurrentStats);
+
+  void processGenerationResult(MachineBasicBlock &MBB,
+                               const planning::InstructionGroupRequest &IG,
+                               const GenerationResult &IntRes,
+                               GenerationStatistics &CurrentStats,
+                               unsigned &BacktrackCount,
+                               unsigned &SizeErrorCount);
 
   void selfcheckOverflowGuard() const;
 
@@ -481,17 +314,16 @@ class InstructionGenerator final : public MachineFunctionPass {
   storeRefAndActualValueForSelfcheck(MachineBasicBlock &MBB, InstrIt InsertPos,
                                      Register DestReg, RegPoolWrapper RP) const;
 
-  MachineInstr *
-  randomInstruction(const MCInstrDesc &InstrDesc, MachineBasicBlock &MBB,
-                    MachineBasicBlock::iterator Ins,
-                    std::vector<PreselectedOpInfo> Preselected = {}) const;
+  MachineInstr *randomInstruction(
+      const MCInstrDesc &InstrDesc, MachineBasicBlock &MBB,
+      MachineBasicBlock::iterator Ins,
+      std::vector<planning::PreselectedOpInfo> Preselected = {}) const;
 
-  GenerationStatistics
-  generateInstrGroup(MachineBasicBlock &MBB,
-                     IInstrGroupGenReq &InstructionGroupRequest);
+  void generate(planning::InstructionGroupRequest &IG, MachineBasicBlock &MBB,
+                GenerationStatistics &CurrentStats);
 
-  GenerationStatistics generateForMBB(MachineBasicBlock &MBB,
-                                      IMBBGenReq &Request);
+  GenerationStatistics generate(planning::BasicBlockRequest &Request,
+                                MachineBasicBlock &MBB);
 
   MachineBasicBlock *
   findNextBlock(MachineBasicBlock *MBB,
@@ -502,23 +334,18 @@ class InstructionGenerator final : public MachineFunctionPass {
 
   MachineBasicBlock *findNextBlockOnModel(MachineBasicBlock &MBB) const;
 
-  std::unique_ptr<IFunctionGenReq>
+  planning::FunctionRequest
   createMFGenerationRequest(const MachineFunction &MF) const;
 
-  void generateForFunction(MachineFunction &MF, IFunctionGenReq &Request);
+  void generate(planning::FunctionRequest &Request, MachineFunction &MF);
 
-  void finalizeFunction(MachineFunction &MF, IFunctionGenReq &Request,
+  void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
                         const GenerationStatistics &MFStats);
 
   unsigned chooseAddressRegister(MachineInstr &MI, const AddressPart &AP,
                                  RegPoolWrapper &RP) const;
 
   void postprocessMemoryOperands(MachineInstr &MI, RegPoolWrapper &RP) const;
-
-  enum class MemAccessKind { BURST, REGULAR };
-
-  void markMemAccessAsUsed(const MachineInstr &MI, const AddressInfo &AI,
-                           MemAccessKind Kind, GeneratorContext &GC) const;
 
   bool preInterpretBacktracking(const MachineInstr &MI) const;
 
@@ -531,14 +358,11 @@ class InstructionGenerator final : public MachineFunctionPass {
 
   void addModelMemoryPropertiesAsGV() const;
 
-  void generateBurst(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                     IInstrGroupGenReq &BurstGroupRequest) const;
-
   // Attempt to generate valid operands
   std::optional<SmallVector<MachineOperand, 8>> tryToPregenerateOperands(
-      const MachineInstrBuilder &MIB, const MCInstrDesc &InstrDesc,
+      const MachineBasicBlock &MBB, const MCInstrDesc &InstrDesc,
       RegPoolWrapper &RP,
-      const std::vector<PreselectedOpInfo> &Preselected) const;
+      const std::vector<planning::PreselectedOpInfo> &Preselected) const;
 
   // In order to support register plugin InstructionGenerator pre-generates all
   //  instructio operands.
@@ -546,19 +370,17 @@ class InstructionGenerator final : public MachineFunctionPass {
   //  but plugin may abort this process on an intermediate operand.
   // In this case InstructionGenerator starts generation from the first operand
   //  of the current instruction.
-  SmallVector<MachineOperand, 8>
-  pregenerateOperands(const MachineInstrBuilder &MIB,
-                      const MachineBasicBlock &MBB,
-                      const MCInstrDesc &InstrDesc, RegPoolWrapper &RP,
-                      const std::vector<PreselectedOpInfo> &Preselected) const;
+  SmallVector<MachineOperand, 8> pregenerateOperands(
+      const MachineBasicBlock &MBB, const MCInstrDesc &InstrDesc,
+      RegPoolWrapper &RP,
+      const std::vector<planning::PreselectedOpInfo> &Preselected) const;
 
   // Generates operand and stores it into the queue.
-  std::optional<MachineOperand>
-  pregenerateOneOperand(const MachineInstrBuilder &MIB, RegPoolWrapper &RP,
-                        const MCOperandInfo &MCOpInfo,
-                        const PreselectedOpInfo &Preselected,
-                        unsigned OperandIndex,
-                        ArrayRef<MachineOperand> PregeneratedOperands) const;
+  std::optional<MachineOperand> pregenerateOneOperand(
+      const MachineBasicBlock &MBB, const MCInstrDesc &InstrDesc,
+      RegPoolWrapper &RP, const MCOperandInfo &MCOpInfo,
+      const planning::PreselectedOpInfo &Preselected, unsigned OperandIndex,
+      ArrayRef<MachineOperand> PregeneratedOperands) const;
 
   void generateCall(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
                     unsigned OpCode) const;
@@ -615,25 +437,20 @@ MachineFunctionPass *createInstructionGeneratorPass() {
 
 namespace snippy {
 
-void GenerationStatistics::merge(const GenerationResult &Res) {
-  merge(Res.Stats);
-}
-
 InstructionGenerator::InstructionGenerator() : MachineFunctionPass(ID) {
   initializeInstructionGeneratorPass(*PassRegistry::getPassRegistry());
 }
 
 void InstructionGenerator::generateInstruction(
-    MachineBasicBlock &MBB, unsigned Opc, MachineBasicBlock::iterator Ins) {
+    const MCInstrDesc &InstrDesc, MachineBasicBlock &MBB,
+    MachineBasicBlock::iterator Ins,
+    std::vector<planning::PreselectedOpInfo> Preselected) {
   auto &State = SGCtx->getLLVMState();
-  const auto &InstrDesc = State.getInstrInfo().get(Opc);
+  auto Opc = InstrDesc.getOpcode();
   const auto &SnippyTgt = State.getSnippyTarget();
 
   assert(!InstrDesc.isBranch() &&
          "All branch instructions expected to be generated separately");
-
-  if (GenerateInsertionPointHints)
-    generateInsertionPointHint(MBB, MBB.getFirstTerminator());
 
   if (SnippyTgt.requiresCustomGeneration(InstrDesc)) {
     SnippyTgt.generateCustomInst(InstrDesc, MBB, *SGCtx, Ins);
@@ -643,7 +460,7 @@ void InstructionGenerator::generateInstruction(
   if (SnippyTgt.isCall(Opc))
     generateCall(MBB, Ins, Opc);
   else
-    randomInstruction(InstrDesc, MBB, Ins);
+    randomInstruction(InstrDesc, MBB, Ins, std::move(Preselected));
 }
 
 std::unique_ptr<Backtrack> InstructionGenerator::createBacktrack() const {
@@ -782,10 +599,18 @@ InstructionGenerator::collectSelfcheckCandidates(InstrIt Begin,
   return Candidates;
 }
 
+static bool sizeLimitIsReached(const planning::RequestLimit &Lim,
+                               const GenerationStatistics &CommitedStats,
+                               size_t NewGeneratedCodeSize) {
+  if (!Lim.isSizeLimit())
+    return false;
+  return NewGeneratedCodeSize > Lim.getSizeLeft(CommitedStats);
+}
+
 template <typename InstrIt>
 GenerationResult InstructionGenerator::handleGeneratedInstructions(
     MachineBasicBlock &MBB, InstrIt ItBegin, InstrIt ItEnd,
-    const IInstrGroupGenReq &InstructionGroupRequest,
+    const planning::InstructionGroupRequest &InstructionGroupRequest,
     const GenerationStatistics &CurrentInstructionGroupStats) const {
   auto GeneratedCodeSize = getCodeSize(ItBegin, ItEnd);
   auto PrimaryInstrCount = countPrimaryInstructions(ItBegin, ItEnd);
@@ -803,10 +628,9 @@ GenerationResult InstructionGenerator::handleGeneratedInstructions(
   };
 
   // Check size requirements before any backtrack execution
-  if (!InstructionGroupRequest.canGenerateMore(CurrentInstructionGroupStats,
-                                               GeneratedCodeSize))
+  if (sizeLimitIsReached(InstructionGroupRequest.limit(),
+                         CurrentInstructionGroupStats, GeneratedCodeSize))
     return ReportGenerationResult(GenerationStatus::SizeFailed);
-
   if (!SGCtx->hasTrackingMode())
     return ReportGenerationResult(GenerationStatus::Ok);
 
@@ -896,21 +720,23 @@ GenerationResult InstructionGenerator::handleGeneratedInstructions(
 
   // Check size requirements after selfcheck addition.
   GeneratedCodeSize = getCodeSize(ItBegin, ItEnd);
-  if (!InstructionGroupRequest.canGenerateMore(CurrentInstructionGroupStats,
-                                               GeneratedCodeSize))
+  if (sizeLimitIsReached(InstructionGroupRequest.limit(),
+                         CurrentInstructionGroupStats, GeneratedCodeSize))
     return ReportGenerationResult(GenerationStatus::SizeFailed);
   return ReportGenerationResult(GenerationStatus::Ok);
 }
 
 GenerationResult InstructionGenerator::generateNopsToSizeLimit(
-    MachineBasicBlock &MBB, const IInstrGroupGenReq &InstructionGroupRequest,
+    MachineBasicBlock &MBB,
+    const planning::InstructionGroupRequest &InstructionGroupRequest,
     GenerationStatistics &CurrentInstructionGroupStats) {
-  assert(InstructionGroupRequest.getGenerationLimit(GenerationMode::Size));
+  assert(InstructionGroupRequest.limit().isSizeLimit());
   auto &State = SGCtx->getLLVMState();
   auto &SnpTgt = State.getSnippyTarget();
   auto ItEnd = MBB.getFirstTerminator();
   auto ItBegin = ItEnd == MBB.begin() ? ItEnd : std::prev(ItEnd);
-  while (!InstructionGroupRequest.isCompleted(CurrentInstructionGroupStats)) {
+  while (
+      !InstructionGroupRequest.isLimitReached(CurrentInstructionGroupStats)) {
     auto *MI = SnpTgt.generateNop(MBB, ItBegin, State);
     assert(MI && "Nop generation failed");
     CurrentInstructionGroupStats.merge(
@@ -943,298 +769,6 @@ static void printInterpretResult(raw_ostream &OS, const Twine &Prefix,
   OS << ", RequestStatus: " << stringifyRequestStatus(TheResult.Status) << " }";
 }
 
-GenerationStatistics InstructionGenerator::processInstructionGeneration(
-    MachineBasicBlock &MBB, IInstrGroupGenReq &InstructionGroupRequest,
-    GenerationStatistics &CurrentInstructionGroupStats) {
-  // ensure that there is no underflow
-  assert(!InstructionGroupRequest.isCompleted(CurrentInstructionGroupStats));
-
-  auto BacktrackCount = 0u;
-  auto SizeErrorCount = 0u;
-
-  for (;;) {
-    auto ItEnd = MBB.getFirstTerminator();
-    auto ItBegin = ItEnd == MBB.begin() ? ItEnd : std::prev(ItEnd);
-
-    std::optional<unsigned> Opc = std::nullopt;
-    if (InstructionGroupRequest.getBurstGroupID()) {
-      generateBurst(MBB, ItEnd, InstructionGroupRequest);
-    } else {
-      Opc = InstructionGroupRequest.genOpc();
-      generateInstruction(MBB, Opc.value(), ItEnd);
-    }
-
-    ItBegin = ItBegin == ItEnd ? MBB.begin() : std::next(ItBegin);
-    auto IntRes = handleGeneratedInstructions(MBB, ItBegin, ItEnd,
-                                              InstructionGroupRequest,
-                                              CurrentInstructionGroupStats);
-
-    LLVM_DEBUG(printInterpretResult(dbgs(), "      ", IntRes); dbgs() << "\n");
-
-    switch (IntRes.Status) {
-    case GenerationStatus::InterpretFailed: {
-      SGCtx->getOrCreateInterpreter().reportSimulationFatalError(
-          "Fail to execute generated instruction in tracking mode\n");
-    }
-    case GenerationStatus::BacktrackingFailed: {
-      ++BacktrackCount;
-      if (BacktrackCount < BTThreshold)
-        continue;
-      report_fatal_error("Back-tracking events threshold is exceeded", false);
-    }
-    case GenerationStatus::SizeFailed: {
-      ++SizeErrorCount;
-      if (SizeErrorCount < SizeErrorThreshold)
-        continue;
-
-      // We have size error too many times, let's generate nops up to size
-      // limit
-      auto GenRes = generateNopsToSizeLimit(MBB, InstructionGroupRequest,
-                                            CurrentInstructionGroupStats);
-      if (GenRes.Status != GenerationStatus::Ok)
-        report_fatal_error("Nop generation during block fill by size failed",
-                           false);
-      return GenerationStatistics(GenRes.Stats);
-    }
-    case GenerationStatus::Ok: {
-      auto &SnpTgt = SGCtx->getLLVMState().getSnippyTarget();
-      if (Opc.has_value() && SnpTgt.needsGenerationPolicySwitch(Opc.value()))
-        InstructionGroupRequest.changePolicy(
-            SnpTgt.getGenerationPolicy(MBB, *SGCtx, std::nullopt));
-      break;
-    }
-    }
-
-    return GenerationStatistics(IntRes.Stats);
-  }
-}
-
-// Count how many def regs of a register class RC the instruction has.
-static unsigned countDefsHavingRC(ArrayRef<unsigned> Opcodes,
-                                  const TargetRegisterInfo &RegInfo,
-                                  const TargetRegisterClass &RC,
-                                  const MCInstrInfo &InstrInfo) {
-  auto CountDefsForOpcode = [&](unsigned Init, unsigned Opcode) {
-    const auto &InstrDesc = InstrInfo.get(Opcode);
-    auto NumDefs = InstrDesc.getNumDefs();
-    auto DefBegin = InstrDesc.operands().begin();
-    auto DefEnd = std::next(DefBegin, NumDefs);
-    return Init +
-           std::count_if(DefBegin, DefEnd, [&](const MCOperandInfo &OpInfo) {
-             const auto *OpRC = RegInfo.getRegClass(OpInfo.RegClass);
-             return RC.hasSubClassEq(OpRC);
-           });
-  };
-  return std::accumulate(Opcodes.begin(), Opcodes.end(), 0u,
-                         CountDefsForOpcode);
-}
-
-static unsigned countAddrs(ArrayRef<unsigned> Opcodes,
-                           const SnippyTarget &SnippyTgt) {
-  auto CountAddrsForOpcode = [&SnippyTgt](unsigned Init, unsigned Opcode) {
-    return Init + SnippyTgt.countAddrsToGenerate(Opcode);
-  };
-  return std::accumulate(Opcodes.begin(), Opcodes.end(), 0u,
-                         CountAddrsForOpcode);
-}
-
-// NumDefs + NumAddrs might be more than a number of available regs. This
-// normalizes the number of regs to reserve for addrs.
-static unsigned normalizeNumRegs(unsigned NumDefs, unsigned NumAddrs,
-                                 unsigned NumRegs) {
-  if (NumRegs == 0)
-    report_fatal_error("No registers left to reserve for burst mode", false);
-  auto Ratio = 1.0 * NumRegs / (NumAddrs + NumDefs);
-  if (Ratio > 1.0)
-    return NumAddrs;
-  unsigned NumAddrRegsToGen = Ratio * NumAddrs;
-  assert(NumAddrRegsToGen + Ratio * NumDefs <= NumRegs &&
-         "Wrong number of registers to reserve");
-  return NumAddrRegsToGen;
-}
-
-// For the given InstrDesc fill the vector of selected operands to account them
-// in instruction generation procedure.
-static auto selectOperands(const MCInstrDesc &InstrDesc, unsigned BaseReg,
-                           const AddressInfo &AI) {
-  std::vector<PreselectedOpInfo> Preselected;
-  for (const auto &MCOpInfo : InstrDesc.operands()) {
-    if (MCOpInfo.OperandType == MCOI::OperandType::OPERAND_MEMORY)
-      Preselected.emplace_back(BaseReg);
-    else if (MCOpInfo.OperandType >= MCOI::OperandType::OPERAND_FIRST_TARGET) {
-      // FIXME: Here we just use the fact that RISC-V loads and stores from base
-      // subset have only one target specific operand that is offset.
-      auto MinStride = AI.MinStride;
-      if (MinStride == 0)
-        MinStride = 1;
-      assert(isPowerOf2_64(MinStride));
-      Preselected.emplace_back(
-          StridedImmediate(AI.MinOffset, AI.MaxOffset, MinStride));
-    } else
-      Preselected.emplace_back();
-  }
-  return Preselected;
-}
-
-static auto collectAddressRestrictions(ArrayRef<unsigned> Opcodes,
-                                       GeneratorContext &GC,
-                                       const MachineBasicBlock &MBB) {
-  std::map<unsigned, AddressRestriction> OpcodeToAR;
-  const auto &State = GC.getLLVMState();
-  const auto &SnippyTgt = State.getSnippyTarget();
-  const auto &InstrInfo = State.getInstrInfo();
-  for (auto Opcode : Opcodes) {
-    const auto &InstrDesc = InstrInfo.get(Opcode);
-    if (!SnippyTgt.canUseInMemoryBurstMode(Opcode))
-      continue;
-
-    // Get address restrictions for the current opcode.
-    AddressRestriction AR;
-    AR.Opcodes.insert(Opcode);
-    std::tie(AR.AccessSize, AR.AccessAlignment) =
-        SnippyTgt.getAccessSizeAndAlignment(Opcode, GC, MBB);
-    AR.ImmOffsetRange = SnippyTgt.getImmOffsetRangeForMemAccessInst(InstrDesc);
-
-    assert(!OpcodeToAR.count(Opcode) ||
-           OpcodeToAR[Opcode].ImmOffsetRange == AR.ImmOffsetRange);
-    OpcodeToAR.try_emplace(Opcode, AR);
-  }
-  return OpcodeToAR;
-}
-
-static auto deduceStrongestRestrictions(
-    ArrayRef<unsigned> Opcodes, ArrayRef<unsigned> OpcodeIdxToBaseReg,
-    const std::map<unsigned, AddressRestriction> &OpcodeToAR) {
-  assert(Opcodes.size() == OpcodeIdxToBaseReg.size());
-  assert(all_of(Opcodes, [&OpcodeToAR](auto Opcode) {
-    return OpcodeToAR.count(Opcode);
-  }));
-  std::map<unsigned, std::set<unsigned>> BaseRegToOpcodes;
-  for (auto [OpcodeIdx, BaseReg] : enumerate(OpcodeIdxToBaseReg))
-    BaseRegToOpcodes[BaseReg].insert(Opcodes[OpcodeIdx]);
-
-  std::map<unsigned, AddressRestriction> BaseRegToAR;
-  for (const auto &[BaseReg, Opcodes] : BaseRegToOpcodes) {
-    auto StrongestAccessSize = std::max_element(
-        Opcodes.begin(), Opcodes.end(), [&OpcodeToAR](auto LHS, auto RHS) {
-          return OpcodeToAR.at(LHS).AccessSize < OpcodeToAR.at(RHS).AccessSize;
-        });
-    auto StrongestImmMin = std::max_element(
-        Opcodes.begin(), Opcodes.end(), [&OpcodeToAR](auto LHS, auto RHS) {
-          return OpcodeToAR.at(LHS).ImmOffsetRange.getMin() <
-                 OpcodeToAR.at(RHS).ImmOffsetRange.getMin();
-        });
-    auto StrongestImmMax = std::min_element(
-        Opcodes.begin(), Opcodes.end(), [&OpcodeToAR](auto LHS, auto RHS) {
-          return OpcodeToAR.at(LHS).ImmOffsetRange.getMax() <
-                 OpcodeToAR.at(RHS).ImmOffsetRange.getMax();
-        });
-    auto StrongestImmStride = std::max_element(
-        Opcodes.begin(), Opcodes.end(), [&OpcodeToAR](auto LHS, auto RHS) {
-          return OpcodeToAR.at(LHS).ImmOffsetRange.getStride() <
-                 OpcodeToAR.at(RHS).ImmOffsetRange.getStride();
-        });
-
-    AddressRestriction StrongestAR;
-
-    StrongestAR.AccessSize = OpcodeToAR.at(*StrongestAccessSize).AccessSize;
-    StrongestAR.AccessAlignment =
-        OpcodeToAR.at(*StrongestAccessSize).AccessAlignment;
-
-    StrongestAR.ImmOffsetRange = StridedImmediate(
-        OpcodeToAR.at(*StrongestImmMin).ImmOffsetRange.getMin(),
-        OpcodeToAR.at(*StrongestImmMax).ImmOffsetRange.getMax(),
-        OpcodeToAR.at(*StrongestImmStride).ImmOffsetRange.getStride());
-
-    // We insert all opcodes because the address chosen for this restriction
-    // will be used as a fallback if we fail to find another one.
-    StrongestAR.Opcodes.insert(Opcodes.begin(), Opcodes.end());
-
-    BaseRegToAR[BaseReg] = std::move(StrongestAR);
-  }
-
-  return BaseRegToAR;
-}
-
-// Memory schemes return random address with such offsets that they include zero
-// offset. So, when memory scheme is restrictive, for example has small size, we
-// can generate only small immediate offsets. For example for the scheme below
-//
-//   access-ranges:
-//      - start: 0x800FFFF0
-//        size: 0x10
-//        stride: 1
-//        first-offset: 0
-//        last-offset: 0
-//
-// Memory scheme may return the following address infos:
-//
-//  Base Addr    MinOff  MaxOff
-// [0x800FFFF0,    0,     15]
-// [0x800FFFF1,   -1,     14]
-// [0x800FFFF2,   -2,     13]
-// ...
-// [0x800FFFFE,   -14,     1]
-// [0x800FFFFF,   -15,     0]
-//
-// Such offsets may not cover whole possible range of ImmOffset field in
-// instruction encoding (RISC-V in general allows 12-bit signed immediate).
-//
-// To make randomization better we generate a random shift for the offsets such
-// that they will cover a part of imm range but not necessary contain zero
-// offset. For example,
-//   AddressInfo holds [0x800FFFF2, -2, 13],
-//   immediate field allows immediates [-2048, 2047].
-// Then we calculate random shift in range
-//   [-2048 - (-2), 2047 - 13] => [-2046, 2034].
-// Let's say randomly chosen value is -1000, we apply it to original range from
-// address info:
-//   [0x800FFFF2, -2, 13] => [0x800FFFF2 - (-1000), -2 + (-1000), 13 + (-1000)]
-//     => [0x801003DA, -1002, -987].
-// As you can check, all possible addresses (base addr + offset) match for both
-// ranges.
-//
-// If the legal values for an immediate aren't an interval (which is the case
-// for RISC-V compressed loads and stores), the random shift must be generated
-// with some kind of stride.
-static AddressInfo
-randomlyShiftAddressOffsetsInImmRange(AddressInfo AI,
-                                      StridedImmediate ImmRange) {
-  auto MinImm = ImmRange.getMin();
-  auto MaxImm = ImmRange.getMax();
-  assert(MinImm <= 0 && 0 <= MaxImm);
-  assert(ImmRange.getStride() == 0 || MinImm % ImmRange.getStride() == 0);
-  assert(AI.MinOffset <= 0 && 0 <= AI.MaxOffset);
-
-  assert(ImmRange.getStride() <= std::numeric_limits<int64_t>::max() &&
-         "Unexpected stride for immediate");
-  assert(AI.MinStride <= std::numeric_limits<int64_t>::max() &&
-         "Unexpected stride for AI");
-  auto Stride = std::max<int64_t>(ImmRange.getStride(), AI.MinStride);
-  Stride = std::max<int64_t>(Stride, 1);
-
-  // Address info might be less restrictive than the immediate operand. For
-  // example, legal final address can be aligned to 4, but the immediate operand
-  // must be aligned to 8. So, when choosing legal immediate range, we must
-  // account such restrictions.
-  AI.MinOffset = alignTo(AI.MinOffset, Stride);
-  AI.MaxOffset = alignDown(AI.MaxOffset, Stride);
-  assert(AI.MinOffset <= 0 && 0 <= AI.MaxOffset);
-
-  if (!(AI.MinOffset < MinImm && MaxImm < AI.MaxOffset)) {
-    auto Shift =
-        Stride * RandEngine::genInInterval<int64_t>(
-                     std::min<int64_t>((MinImm - AI.MinOffset) / Stride, 0),
-                     std::max<int64_t>((MaxImm - AI.MaxOffset) / Stride, 0));
-    AI.MinOffset += Shift;
-    AI.MaxOffset += Shift;
-    AI.Address -= Shift;
-  }
-
-  AI.MinStride = Stride;
-  return AI;
-}
-
 template <typename T>
 static void printDebugBrief(raw_ostream &OS, const Twine &Brief,
                             const T &Entity, int Indent = 0) {
@@ -1248,352 +782,6 @@ static void printDebugBrief(raw_ostream &OS, const Twine &Brief,
 #endif
 
 #define SNIPPY_DEBUG_BRIEF(...) LLVM_DEBUG(printDebugBrief(dbgs(), __VA_ARGS__))
-
-static std::vector<unsigned> generateBaseRegs(MachineBasicBlock &MBB,
-                                              ArrayRef<unsigned> Opcodes,
-                                              RegPoolWrapper &RP,
-                                              GeneratorContext &SGCtx) {
-  if (Opcodes.empty())
-    return {};
-  auto &State = SGCtx.getLLVMState();
-  const auto &SnippyTgt = State.getSnippyTarget();
-  const auto &InstrInfo = State.getInstrInfo();
-  // Compute set of registers compatible with all opcodes
-  std::unordered_set<unsigned> Exclude;
-  for (auto Opcode : Opcodes) {
-    copy(SnippyTgt.excludeFromMemRegsForOpcode(Opcode),
-         std::inserter(Exclude, Exclude.begin()));
-  }
-  // Current implementation expects that each target has only one addr reg
-  // class.
-  const auto &AddrRegClass = SnippyTgt.getAddrRegClass();
-  SmallVector<Register, 32> Include;
-  copy_if(AddrRegClass, std::back_inserter(Include),
-          [&](Register Reg) { return !Exclude.count(Reg); });
-
-  // Normalize the number of addr registers to use. It's possible that we'll
-  // re-use addr regs with different offset values.
-  // FIXME: normalization does not account restrictions from memory schemes:
-  // choosen number of base registers might not be enough.
-  auto NumAvailRegs = RP.getNumAvailableInSet(Include, MBB);
-  if (NumAvailRegs > 0 && SGCtx.getGenSettings().TrackingConfig.AddressVH) {
-    // When hazard mode is enabled we'll likely need a register to transform
-    // existing addresses.
-    --NumAvailRegs;
-  }
-  if (NumAvailRegs == 0)
-    report_fatal_error(
-        "No available registers to generate addresses for the burst group.",
-        false);
-  const auto &RegInfo = *SGCtx.getSubtargetImpl().getRegisterInfo();
-  // Get number of def and addr regs to use in the burst group. These values
-  // can be bigger than the number of available registers.
-  auto NumDefs = countDefsHavingRC(Opcodes, RegInfo, AddrRegClass, InstrInfo);
-  auto NumAddrs = countAddrs(Opcodes, SnippyTgt);
-  // Count the minimum number of available registers we need.
-  unsigned MinAvailRegs = 0;
-  // If there is one address or more then we need at least one register
-  // available for it.
-  if (NumAddrs > 0)
-    ++MinAvailRegs;
-  // Same for definitions. If there are some definitions then we need at least
-  // one register available for it.
-  if (NumDefs > 0)
-    ++MinAvailRegs;
-  if (MinAvailRegs > NumAvailRegs)
-    report_fatal_error(
-        "Cannot generate burst group: don't have enough registers available. "
-        "Please, try to reduce amount of registers reserved by decreasing "
-        "loops nestness or change instructions used in burst groups if these "
-        "instructions may be used with a very limited set of registers.",
-        false);
-  NumAddrs = normalizeNumRegs(NumDefs, NumAddrs, NumAvailRegs);
-
-  // Randomly pick and reserve addr registers so as not to use them
-  // destinations.
-  auto AddrRegs = RP.getNAvailableRegisters(
-      "for memory access burst", RegInfo, *AddrRegClass.MC, MBB, NumAddrs,
-      [&](Register R) { return Exclude.count(R); });
-
-  for (auto Reg : AddrRegs)
-    RP.addReserved(Reg, AccessMaskBit::W);
-
-  // We must be sure that each memory access in the burst group won't contradict
-  // given memory schemes. To do that we 'attach' base address register from the
-  // chosen above to each opcode (`OpcodeIdxToBaseReg`). After that we will know
-  // a group of opcodes for each base register. Then for each group of opcodes
-  // we collect restrictions on memory addresses such as stride and access size
-  // (`BaseRegToAI` as we've already had a mapping from opcode index to the base
-  // register). Gathered information gives us restriction on the offset
-  // immediate for each base register for each opcode.
-  std::vector<unsigned> OpcodeIdxToBaseReg(Opcodes.size());
-  std::generate(OpcodeIdxToBaseReg.begin(), OpcodeIdxToBaseReg.end(),
-                [&AddrRegs]() {
-                  auto N = RandEngine::genInRange(AddrRegs.size());
-                  return AddrRegs[N];
-                });
-  return OpcodeIdxToBaseReg;
-}
-
-// For the given AddressInfo and AddressRestriction try to find another
-// AddressInfo such that:
-// 1. New AddressInfo will cover different set of addresses (for better
-// addresses and offsets randomization) in burst groups
-// 2. Base address from the given AddressInfo may be reused for the new one. It
-// means that the provided AddressRestriction allows immediate offsets that are
-// necessary for the base address change.
-//
-// Example:
-// Given AddressInfo is: base address = 10, min offset = 0, max offset = 0 -->
-// effective address is 10 Given AddressRestriction on immediate offsets are:
-// min = -5, max = 5
-//
-// We are limited in the number of registers we can use for base addresses in
-// burst groups, but the given AddressInfo isn't really interesting: it doesn't
-// allow immediate offsets other than zero. So, we'd like to choose another
-// address info that provides wider range of immediate offsets and can use the
-// original base address under the given AddressRestrictions.
-//
-// Let's say we've choosen a new AddressInfo: base address = 15, min offset =
-// -10, max offset = 10 --> effective addresses are [5, 25] Replacement of the
-// base address gives: base address = 10, min offset = -5 , max offset = 15 -->
-// effective addresses are still the same [5, 25] Then we need to apply
-// AddressRestrictions: base address = 10, min offset = -5 , max offset = 5 -->
-// effective addresses were shrinked to [5, 15]
-static AddressInfo
-selectAddressForSingleInstrFromBurstGroup(AddressInfo OrigAI,
-                                          const AddressRestriction &OpcodeAR,
-                                          GeneratorContext &GC) {
-  if (OrigAI.MinOffset != 0 || OrigAI.MaxOffset != 0 ||
-      (OpcodeAR.ImmOffsetRange.getMin() == 0 &&
-       OpcodeAR.ImmOffsetRange.getMax() == 0)) {
-    // Either OrigAI allows non-zero offets, or address restrictions for the
-    // given opcode doesn't allow non-zero offsets. In both cases there is
-    // nothing to change.
-    return OrigAI;
-  }
-
-  auto &MS = GC.getMemoryScheme();
-  auto OrigAddr = OrigAI.Address;
-  assert(OpcodeAR.Opcodes.size() == 1 &&
-         "Expected AddressRestriction only for one opcode");
-  for (unsigned i = 0; i < BurstAddressRandomizationThreshold; ++i) {
-    auto CandidateAI =
-        MS.randomAddress(OpcodeAR.AccessSize, OpcodeAR.AccessAlignment, false);
-
-    auto Stride = std::max<int64_t>(OpcodeAR.ImmOffsetRange.getStride(),
-                                    CandidateAI.MinStride);
-    CandidateAI.MinStride = std::max<int64_t>(Stride, 1);
-
-    if (CandidateAI.Address == OrigAddr && CandidateAI.MinOffset == 0 &&
-        CandidateAI.MaxOffset == 0)
-      continue;
-
-    bool IsDiffNeg = OrigAddr >= CandidateAI.Address;
-    auto AbsDiff = IsDiffNeg ? OrigAddr - CandidateAI.Address
-                             : CandidateAI.Address - OrigAddr;
-    auto SMax = std::numeric_limits<decltype(CandidateAI.MinOffset)>::max();
-    auto SMin = std::numeric_limits<decltype(CandidateAI.MinOffset)>::min();
-    assert(SMax > 0);
-    // We are going to apply Diff to the signed type. Check that it fits.
-    if (!IsDiffNeg && AbsDiff > static_cast<decltype(AbsDiff)>(SMax))
-      continue;
-    else if (IsDiffNeg &&
-             AbsDiff > static_cast<decltype(AbsDiff)>(std::abs(SMin + 1)))
-      continue;
-
-    auto SDiff = static_cast<decltype(CandidateAI.MinOffset)>(AbsDiff);
-    if (IsDiffNeg)
-      SDiff = -SDiff;
-
-    if (IsSAddOverflow(SDiff, CandidateAI.MinOffset) ||
-        IsSAddOverflow(SDiff, CandidateAI.MaxOffset))
-      continue;
-
-    auto AlignedMinOffset =
-        alignSignedTo(CandidateAI.MinOffset + SDiff, CandidateAI.MinStride);
-    auto AlignedMaxOffset =
-        alignSignedDown(CandidateAI.MaxOffset + SDiff, CandidateAI.MinStride);
-    if (AlignedMaxOffset < AlignedMinOffset ||
-        (AlignedMinOffset == 0 && AlignedMaxOffset == 0))
-      continue;
-
-    if (OpcodeAR.ImmOffsetRange.getMin() <= AlignedMinOffset &&
-        AlignedMinOffset <= OpcodeAR.ImmOffsetRange.getMax() &&
-        AlignedMinOffset <= AlignedMaxOffset &&
-        (CandidateAI.Address + CandidateAI.MinOffset) % CandidateAI.MinStride ==
-            (OrigAddr + AlignedMinOffset) % CandidateAI.MinStride) {
-      CandidateAI.Address = OrigAddr;
-      CandidateAI.MinOffset = AlignedMinOffset;
-      CandidateAI.MaxOffset = AlignedMaxOffset;
-      return CandidateAI;
-    }
-  }
-  return OrigAI;
-}
-
-// Collect addresses that will meet the specified restrictions. We call such
-// addresses "primary" because they'll be used as a defaults for the given base
-// registers (set of opcodes mapped to the base register). Snippy will try to
-// randomize addresses in a way that not only primary addresses are accessed
-// (see selectAddressForSingleInstrFromBurstGroup), but base register is always
-// taken suitable for the primary address.
-static auto collectPrimaryAddresses(
-    const std::map<unsigned, AddressRestriction> &BaseRegToStrongestAR,
-    GeneratorContext &GC) {
-  auto &MS = GC.getMemoryScheme();
-  auto &SnpTgt = GC.getLLVMState().getSnippyTarget();
-  auto ARRange = make_second_range(BaseRegToStrongestAR);
-  std::vector<AddressRestriction> ARs(ARRange.begin(), ARRange.end());
-  std::vector<AddressInfo> PrimaryAddresses =
-      MS.randomBurstGroupAddresses(ARs, GC.getOpcodeCache(), SnpTgt);
-  assert(PrimaryAddresses.size() == BaseRegToStrongestAR.size());
-  std::map<unsigned, AddressInfo> BaseRegToPrimaryAddress;
-  transform(
-      zip(make_first_range(BaseRegToStrongestAR), std::move(PrimaryAddresses)),
-      std::inserter(BaseRegToPrimaryAddress, BaseRegToPrimaryAddress.begin()),
-      [](auto BaseRegToAI) {
-        auto &&[BaseReg, AI] = BaseRegToAI;
-        return std::make_pair(BaseReg, std::move(AI));
-      });
-
-  // Do additional randomization of immediate offsets for each address info to
-  // have a uniform distribution imm offsets (otherwise, for the majority of
-  // real memory schemes they'll be around zero).
-  assert(BaseRegToStrongestAR.size() == BaseRegToPrimaryAddress.size());
-  for (auto &&[RegToAR, RegToAI] :
-       zip(BaseRegToStrongestAR, BaseRegToPrimaryAddress)) {
-    auto &[Reg, AR] = RegToAR;
-    auto &[BaseReg, AI] = RegToAI;
-    assert(BaseReg == Reg);
-    (void)BaseReg, (void)Reg;
-    AI = randomlyShiftAddressOffsetsInImmRange(AI, AR.ImmOffsetRange);
-  }
-  return BaseRegToPrimaryAddress;
-}
-
-// Insert initialization of base addresses before the burst group.
-static void
-initializeBaseRegs(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                   std::map<unsigned, AddressInfo> &BaseRegToPrimaryAddress,
-                   RegPoolWrapper &RP, GeneratorContext &GC) {
-  auto &State = GC.getLLVMState();
-  const auto &SnippyTgt = State.getSnippyTarget();
-  for (auto &[BaseReg, AI] : BaseRegToPrimaryAddress) {
-    auto NewValue =
-        APInt(SnippyTgt.getAddrRegLen(State.getTargetMachine()), AI.Address);
-    assert(RP.isReserved(BaseReg, AccessMaskBit::W));
-    if (GC.getGenSettings().TrackingConfig.AddressVH) {
-      auto &I = GC.getOrCreateInterpreter();
-      auto OldValue = I.readReg(BaseReg);
-      SnippyTgt.transformValueInReg(MBB, Ins, OldValue, NewValue, BaseReg, RP,
-                                    GC);
-    } else
-      SnippyTgt.writeValueToReg(MBB, Ins, NewValue, BaseReg, RP, GC);
-  }
-}
-
-// This function returns address info to use for each opcode.
-static std::vector<AddressInfo>
-mapOpcodeIdxToAI(MachineBasicBlock &MBB, ArrayRef<unsigned> OpcodeIdxToBaseReg,
-                 ArrayRef<unsigned> Opcodes, MachineBasicBlock::iterator Ins,
-                 RegPoolWrapper &RP, GeneratorContext &SGCtx) {
-  assert(OpcodeIdxToBaseReg.size() == Opcodes.size());
-  if (Opcodes.empty())
-    return {};
-
-  // FIXME: This code does not account non-trivial cases when an opcode
-  // (vluxseg<nf>ei<eew>.v, vssseg<nf>e<eew>.v, etc) has
-  // additional restrictions on the address register (e.g.
-  // `RISCVGeneratorContext::getEMUL`).
-
-  std::vector<AddressInfo> OpcodeIdxToAI;
-  // Collect address restrictions for each opcode
-  auto OpcodeToAR = collectAddressRestrictions(Opcodes, SGCtx, MBB);
-  // For each base register we have a set of opcodes. Join address restrictions
-  // for these set of opcodes by choosing the strongest ones and map the
-  // resulting address restriction to the base register.
-  auto BaseRegToStrongestAR =
-      deduceStrongestRestrictions(Opcodes, OpcodeIdxToBaseReg, OpcodeToAR);
-  // For the selected strongest restrictions get addresses. Thus, we'll have a
-  // mapping from base register to a legal address in memory to use.
-  auto BaseRegToPrimaryAddress =
-      collectPrimaryAddresses(BaseRegToStrongestAR, SGCtx);
-  // We've chosen addresses for each base register. Initialize base registers
-  // with these addresses.
-  initializeBaseRegs(MBB, Ins, BaseRegToPrimaryAddress, RP, SGCtx);
-
-  // Try to find addresses for each opcode that allow better randomization of
-  // offsets and effective addresses. If no address is found, we can always use
-  // the primary one for the given base reg.
-  for (auto [OpcodeIdx, Opcode] : enumerate(Opcodes)) {
-    assert(OpcodeToAR.count(Opcode));
-    assert(OpcodeIdxToBaseReg.size() > OpcodeIdx);
-    const auto &OpcodeAR = OpcodeToAR[Opcode];
-    auto BaseReg = OpcodeIdxToBaseReg[OpcodeIdx];
-    assert(BaseRegToPrimaryAddress.count(BaseReg));
-    const auto &OrigAI = BaseRegToPrimaryAddress[BaseReg];
-    auto AI =
-        selectAddressForSingleInstrFromBurstGroup(OrigAI, OpcodeAR, SGCtx);
-    OpcodeIdxToAI.push_back(AI);
-  }
-
-  if (DumpMemAccesses.isSpecified())
-    SGCtx.addBurstRangeMemAccess(OpcodeIdxToAI);
-
-  return OpcodeIdxToAI;
-}
-
-static std::vector<unsigned>
-generateOpcodesForFixedSizedGroup(IInstrGroupGenReq &GroupRequest,
-                                  GeneratorContext &SGCtx) {
-  auto Limit = GroupRequest.getGenerationLimit(GenerationMode::NumInstrs);
-  assert(Limit.has_value());
-
-  std::vector<unsigned> ChosenOpcodes;
-  std::generate_n(std::back_inserter(ChosenOpcodes), Limit.value(),
-                  [&] { return GroupRequest.genOpc(); });
-  return ChosenOpcodes;
-}
-
-void InstructionGenerator::generateBurst(
-    MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-    IInstrGroupGenReq &BurstGroupRequest) const {
-  auto &State = SGCtx->getLLVMState();
-  const auto &SnippyTgt = State.getSnippyTarget();
-  const auto &InstrInfo = State.getInstrInfo();
-
-  if (GenerateInsertionPointHints)
-    generateInsertionPointHint(MBB, MBB.getFirstTerminator());
-
-  auto Opcodes = generateOpcodesForFixedSizedGroup(BurstGroupRequest, *SGCtx);
-
-  SmallVector<unsigned, 32> MemUsers;
-  copy_if(Opcodes, std::back_inserter(MemUsers),
-          [&SnippyTgt](auto Opc) -> bool {
-            return SnippyTgt.countAddrsToGenerate(Opc);
-          });
-  auto RP = SGCtx->getRegisterPool();
-  auto OpcodeIdxToBaseReg = generateBaseRegs(MBB, MemUsers, RP, *SGCtx);
-  auto OpcodeIdxToAI =
-      mapOpcodeIdxToAI(MBB, OpcodeIdxToBaseReg, MemUsers, Ins, RP, *SGCtx);
-  unsigned MemUsersIdx = 0;
-  for (auto Opcode : Opcodes) {
-    const auto &InstrDesc = InstrInfo.get(Opcode);
-    if (SnippyTgt.countAddrsToGenerate(Opcode)) {
-      auto BaseReg = OpcodeIdxToBaseReg[MemUsersIdx];
-      auto AI = OpcodeIdxToAI[MemUsersIdx];
-      auto Preselected = selectOperands(InstrDesc, BaseReg, AI);
-      const auto *MI =
-          randomInstruction(InstrDesc, MBB, Ins, std::move(Preselected));
-
-      assert(MI);
-      markMemAccessAsUsed(*MI, AI, MemAccessKind::BURST, *SGCtx);
-      ++MemUsersIdx;
-    } else
-      randomInstruction(InstrDesc, MBB, Ins);
-  }
-}
 
 void InstructionGenerator::selfcheckOverflowGuard() const {
   const auto &SelfcheckSection = SGCtx->getSelfcheckSection();
@@ -1651,9 +839,10 @@ static MachineOperand createRegAsOperand(Register Reg, unsigned Flags,
 }
 
 std::optional<MachineOperand> InstructionGenerator::pregenerateOneOperand(
-    const MachineInstrBuilder &MIB, RegPoolWrapper &RP,
-    const MCOperandInfo &MCOpInfo, const PreselectedOpInfo &Preselected,
-    unsigned OpIndex, ArrayRef<MachineOperand> PregeneratedOperands) const {
+    const MachineBasicBlock &MBB, const MCInstrDesc &InstrDesc,
+    RegPoolWrapper &RP, const MCOperandInfo &MCOpInfo,
+    const planning::PreselectedOpInfo &Preselected, unsigned OpIndex,
+    ArrayRef<MachineOperand> PregeneratedOperands) const {
   auto OpType = MCOpInfo.OperandType;
 
   const auto &State = SGCtx->getLLVMState();
@@ -1661,9 +850,7 @@ std::optional<MachineOperand> InstructionGenerator::pregenerateOneOperand(
   const auto &SnippyTgt = State.getSnippyTarget();
   auto &RegGen = SGCtx->getRegGen();
 
-  const auto &MBB = *MIB->getParent();
-  auto Opcode = MIB->getOpcode();
-  auto Operand = MIB->getDesc().operands()[OpIndex];
+  auto Operand = InstrDesc.operands()[OpIndex];
   auto OperandRegClassID = Operand.RegClass;
 
   if (OpType == MCOI::OperandType::OPERAND_REGISTER) {
@@ -1675,16 +862,16 @@ std::optional<MachineOperand> InstructionGenerator::pregenerateOneOperand(
     else if (Preselected.isReg())
       Reg = Preselected.getReg();
     else {
-      auto RegClass = SnippyTgt.getRegClass(*SGCtx, OperandRegClassID, OpIndex,
-                                            Opcode, MBB, RegInfo);
-      const auto &InstDesc = MIB->getDesc();
+      auto RegClass =
+          SnippyTgt.getRegClass(*SGCtx, OperandRegClassID, OpIndex,
+                                InstrDesc.getOpcode(), MBB, RegInfo);
       auto Exclude =
-          SnippyTgt.excludeRegsForOperand(RegClass, *SGCtx, InstDesc, OpIndex);
+          SnippyTgt.excludeRegsForOperand(RegClass, *SGCtx, InstrDesc, OpIndex);
       auto Include = SnippyTgt.includeRegs(RegClass);
       AccessMaskBit Mask = IsDst ? AccessMaskBit::W : AccessMaskBit::R;
 
       auto CustomMask =
-          SnippyTgt.getCustomAccessMaskForOperand(*SGCtx, InstDesc, OpIndex);
+          SnippyTgt.getCustomAccessMaskForOperand(*SGCtx, InstrDesc, OpIndex);
       // TODO: add checks that target-specific and generic restrictions are
       // not conflicting.
       if (CustomMask != AccessMaskBit::None)
@@ -1695,10 +882,9 @@ std::optional<MachineOperand> InstructionGenerator::pregenerateOneOperand(
         return std::nullopt;
       Reg = RegOpt.value();
     }
-    SnippyTgt.reserveRegsIfNeeded(MIB->getOpcode(),
+    SnippyTgt.reserveRegsIfNeeded(InstrDesc.getOpcode(),
                                   /* isDst */ IsDst,
-                                  /* isMem */ false, Reg, RP, *SGCtx,
-                                  *MIB->getParent());
+                                  /* isMem */ false, Reg, RP, *SGCtx, MBB);
     return createRegAsOperand(Reg, Preselected.getFlags());
   }
   if (OpType == MCOI::OperandType::OPERAND_MEMORY) {
@@ -1710,9 +896,11 @@ std::optional<MachineOperand> InstructionGenerator::pregenerateOneOperand(
     else if (Preselected.isReg())
       Reg = Preselected.getReg();
     else {
-      auto RegClass = SnippyTgt.getRegClass(*SGCtx, OperandRegClassID, OpIndex,
-                                            Opcode, MBB, RegInfo);
-      auto Exclude = SnippyTgt.excludeFromMemRegsForOpcode(MIB->getOpcode());
+      auto RegClass =
+          SnippyTgt.getRegClass(*SGCtx, OperandRegClassID, OpIndex,
+                                InstrDesc.getOpcode(), MBB, RegInfo);
+      auto Exclude =
+          SnippyTgt.excludeFromMemRegsForOpcode(InstrDesc.getOpcode());
       auto RegOpt = RegGen.generate(RegClass, OperandRegClassID, RegInfo, RP,
                                     MBB, SnippyTgt, Exclude);
       if (!RegOpt)
@@ -1720,10 +908,10 @@ std::optional<MachineOperand> InstructionGenerator::pregenerateOneOperand(
       Reg = RegOpt.value();
     }
     // FIXME: RW mask is too restrictive for the majority of instructions.
-    SnippyTgt.reserveRegsIfNeeded(
-        MIB->getOpcode(),
-        /* isDst */ Preselected.getFlags() & RegState::Define,
-        /* isMem */ true, Reg, RP, *SGCtx, *MIB->getParent());
+    SnippyTgt.reserveRegsIfNeeded(InstrDesc.getOpcode(),
+                                  /* isDst */ Preselected.getFlags() &
+                                      RegState::Define,
+                                  /* isMem */ true, Reg, RP, *SGCtx, MBB);
     return createRegAsOperand(Reg, Preselected.getFlags());
   }
 
@@ -1732,9 +920,8 @@ std::optional<MachineOperand> InstructionGenerator::pregenerateOneOperand(
     StridedImmediate StridedImm;
     if (Preselected.isImm())
       StridedImm = Preselected.getImm();
-    auto Op = SnippyTgt.generateTargetOperand(*SGCtx, MIB->getOpcode(), OpType,
-                                              StridedImm);
-    return Op;
+    return SnippyTgt.generateTargetOperand(*SGCtx, InstrDesc.getOpcode(),
+                                           OpType, StridedImm);
   }
   llvm_unreachable("this operand type unsupported");
 }
@@ -1826,15 +1013,6 @@ unsigned InstructionGenerator::chooseAddressRegister(MachineInstr &MI,
   return Reg;
 }
 
-static AddressGenInfo chooseAddrGenInfoForInstrCallback(
-    LLVMContext &Ctx,
-    std::optional<GeneratorContext::LoopGenerationInfo> CurLoopGenInfo,
-    size_t AccessSize, size_t Alignment, const MemoryAccess &MemoryScheme) {
-  (void)CurLoopGenInfo; // for future extensibility
-  // AddressGenInfo for one element access.
-  return AddressGenInfo::singleAccess(AccessSize, Alignment, false /* Burst */);
-}
-
 static std::pair<AddressInfo, AddressGenInfo>
 chooseAddrInfoForInstr(MachineInstr &MI, GeneratorContext &SGCtx,
                        const MachineLoop *ML) {
@@ -1894,12 +1072,7 @@ void InstructionGenerator::postprocessMemoryOperands(MachineInstr &MI,
         SnippyTgt.breakDownAddr(AddrInfo, MI, i, *SGCtx);
 
     for (unsigned j = 0; j < AddrGenInfo.NumElements; ++j) {
-
-      if (DumpMemAccesses.isSpecified() ||
-          DumpMemAccessesRestricted.isSpecified()) {
-        for (auto Addr : ChosenAddresses)
-          SGCtx->addMemAccess(Addr, AccessSize);
-      }
+      addMemAccessToDump(ChosenAddresses, *SGCtx, AccessSize);
 
       for_each(ChosenAddresses,
                [Stride = AddrInfo.MinStride](auto &Val) { Val += Stride; });
@@ -1922,21 +1095,6 @@ void InstructionGenerator::postprocessMemoryOperands(MachineInstr &MI,
       // preparation.
       RP.addReserved(Reg, AccessMaskBit::W);
     }
-  }
-}
-
-void InstructionGenerator::markMemAccessAsUsed(const MachineInstr &MI,
-                                               const AddressInfo &AI,
-                                               MemAccessKind Kind,
-                                               GeneratorContext &GC) const {
-  auto [EffectiveAddr, AccessSize] = getEffectiveMemoryAccessInfo(
-      &MI, AI, GC.getLLVMState().getSnippyTarget());
-  if (DumpMemAccesses.isSpecified() ||
-      DumpMemAccessesRestricted.isSpecified()) {
-    if (Kind == MemAccessKind::BURST)
-      GC.addBurstPlainMemAccess(EffectiveAddr, AccessSize);
-    else
-      GC.addMemAccess(EffectiveAddr, AccessSize);
   }
 }
 
@@ -1970,17 +1128,18 @@ void InstructionGenerator::generateInsertionPointHint(
 
 std::optional<SmallVector<MachineOperand, 8>>
 InstructionGenerator::tryToPregenerateOperands(
-    const MachineInstrBuilder &MIB, const MCInstrDesc &InstrDesc,
+    const MachineBasicBlock &MBB, const MCInstrDesc &InstrDesc,
     RegPoolWrapper &RP,
-    const std::vector<PreselectedOpInfo> &Preselected) const {
+    const std::vector<planning::PreselectedOpInfo> &Preselected) const {
   SmallVector<MachineOperand, 8> PregeneratedOperands;
   assert(InstrDesc.getNumOperands() == Preselected.size());
   iota_range<unsigned long> PreIota(0, Preselected.size(),
                                     /* Inclusive */ false);
   for (const auto &[MCOpInfo, PreselOpInfo, Index] :
        zip(InstrDesc.operands(), Preselected, PreIota)) {
-    auto OpOpt = pregenerateOneOperand(MIB, RP, MCOpInfo, PreselOpInfo, Index,
-                                       PregeneratedOperands);
+    auto OpOpt =
+        pregenerateOneOperand(MBB, InstrDesc, RP, MCOpInfo, PreselOpInfo, Index,
+                              PregeneratedOperands);
     if (!OpOpt)
       return std::nullopt;
     PregeneratedOperands.push_back(OpOpt.value());
@@ -1989,13 +1148,12 @@ InstructionGenerator::tryToPregenerateOperands(
 }
 
 SmallVector<MachineOperand, 8> InstructionGenerator::pregenerateOperands(
-    const MachineInstrBuilder &MIB, const MachineBasicBlock &MBB,
-    const MCInstrDesc &InstrDesc, RegPoolWrapper &RP,
-    const std::vector<PreselectedOpInfo> &Preselected) const {
+    const MachineBasicBlock &MBB, const MCInstrDesc &InstrDesc,
+    RegPoolWrapper &RP,
+    const std::vector<planning::PreselectedOpInfo> &Preselected) const {
   auto &RegGenerator = SGCtx->getRegGen();
   auto &State = SGCtx->getLLVMState();
   auto &InstrInfo = State.getInstrInfo();
-  const auto &SnippyTgt = State.getSnippyTarget();
 
   auto IterNum = 0u;
   constexpr auto FailsMaxNum = 10000u;
@@ -2004,7 +1162,7 @@ SmallVector<MachineOperand, 8> InstructionGenerator::pregenerateOperands(
     RP.reset();
     RegGenerator.setRegContextForPlugin();
     auto PregeneratedOperandsOpt =
-        tryToPregenerateOperands(MIB, InstrDesc, RP, Preselected);
+        tryToPregenerateOperands(MBB, InstrDesc, RP, Preselected);
     IterNum++;
 
     if (PregeneratedOperandsOpt)
@@ -2020,7 +1178,7 @@ SmallVector<MachineOperand, 8> InstructionGenerator::pregenerateOperands(
 MachineInstr *InstructionGenerator::randomInstruction(
     const MCInstrDesc &InstrDesc, MachineBasicBlock &MBB,
     MachineBasicBlock::iterator Ins,
-    std::vector<PreselectedOpInfo> Preselected) const {
+    std::vector<planning::PreselectedOpInfo> Preselected) const {
   auto &State = SGCtx->getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
@@ -2047,7 +1205,7 @@ MachineInstr *InstructionGenerator::randomInstruction(
 
   auto RP = SGCtx->getRegisterPool();
   auto PregeneratedOperands =
-      pregenerateOperands(MIB, MBB, InstrDesc, RP, Preselected);
+      pregenerateOperands(MBB, InstrDesc, RP, Preselected);
   for (auto &Op : PregeneratedOperands)
     MIB.add(Op);
 
@@ -2062,35 +1220,117 @@ MachineInstr *InstructionGenerator::randomInstruction(
   return MIB;
 }
 
-GenerationStatistics InstructionGenerator::generateInstrGroup(
-    MachineBasicBlock &MBB, IInstrGroupGenReq &InstructionGroupRequest) {
-  SNIPPY_DEBUG_BRIEF(__func__, InstructionGroupRequest, 4);
-  GenerationStatistics CurrentInstructionGroupStats;
-  while (!InstructionGroupRequest.isCompleted(CurrentInstructionGroupStats)) {
-    auto Stats = processInstructionGeneration(MBB, InstructionGroupRequest,
-                                              CurrentInstructionGroupStats);
-    CurrentInstructionGroupStats.merge(Stats);
+// FIXME: The only reason to change policy is if some instructions in the group
+// require some initialization first. We switch to default policy that has these
+// special instructions (overrides).
+static void switchPolicyIfNeeded(planning::InstructionGroupRequest &IG,
+                                 unsigned Opcode, MachineBasicBlock &MBB,
+                                 GeneratorContext &GC) {
+  auto &Tgt = GC.getLLVMState().getSnippyTarget();
+  if (Tgt.needsGenerationPolicySwitch(Opcode))
+    IG.changePolicy(
+        planning::DefaultGenPolicy(GC, Tgt.getDefaultPolicyFilter(MBB, GC),
+                                   Tgt.groupMustHavePrimaryInstr(MBB, GC),
+                                   Tgt.getPolicyOverrides(MBB, GC)));
+}
 
-    SNIPPY_DEBUG_BRIEF(__func__, InstructionGroupRequest, 4);
+void InstructionGenerator::processGenerationResult(
+    MachineBasicBlock &MBB, const planning::InstructionGroupRequest &IG,
+    const GenerationResult &IntRes, GenerationStatistics &CurrentStats,
+    unsigned &BacktrackCount, unsigned &SizeErrorCount) {
+  LLVM_DEBUG(printInterpretResult(dbgs(), "      ", IntRes); dbgs() << "\n");
+  switch (IntRes.Status) {
+  case GenerationStatus::InterpretFailed: {
+    SGCtx->getOrCreateInterpreter().reportSimulationFatalError(
+        "Fail to execute generated instruction in tracking mode\n");
   }
-  return CurrentInstructionGroupStats;
+  case GenerationStatus::BacktrackingFailed: {
+    ++BacktrackCount;
+    if (BacktrackCount < BTThreshold)
+      return;
+    report_fatal_error("Back-tracking events threshold is exceeded", false);
+  }
+  case GenerationStatus::SizeFailed: {
+    ++SizeErrorCount;
+    if (SizeErrorCount < SizeErrorThreshold)
+      return;
+
+    // We have size error too many times, let's generate nops up to size
+    // limit
+    auto GenRes = generateNopsToSizeLimit(MBB, IG, CurrentStats);
+    if (GenRes.Status != GenerationStatus::Ok)
+      report_fatal_error("Nop generation during block fill by size failed",
+                         false);
+    CurrentStats.merge(GenerationStatistics(GenRes.Stats));
+    return;
+  }
+  case GenerationStatus::Ok:
+    return;
+  }
+}
+
+template <typename InstrIt>
+MachineBasicBlock::iterator InstructionGenerator::processGeneratedInstructions(
+    MachineBasicBlock &MBB, InstrIt ItBegin,
+    const planning::InstructionGroupRequest &IG, unsigned &BacktrackCount,
+    unsigned &SizeErrorCount, GenerationStatistics &CurrentStats) {
+  auto ItEnd = MBB.getFirstTerminator();
+  ItBegin = ItBegin == ItEnd ? MBB.begin() : std::next(ItBegin);
+  auto IntRes =
+      handleGeneratedInstructions(MBB, ItBegin, ItEnd, IG, CurrentStats);
+  processGenerationResult(MBB, IG, IntRes, CurrentStats, BacktrackCount,
+                          SizeErrorCount);
+  CurrentStats.merge(IntRes.Stats);
+  return std::prev(ItEnd);
+}
+
+void InstructionGenerator::generate(planning::InstructionGroupRequest &IG,
+                                    MachineBasicBlock &MBB,
+                                    GenerationStatistics &CurrentStats) {
+  LLVM_DEBUG(dbgs() << "Generating IG:\n"; IG.print(dbgs(), 2););
+  auto BacktrackCount = 0u;
+  auto SizeErrorCount = 0u;
+  GenerationStatistics LocalStats{};
+  if (GenerateInsertionPointHints)
+    generateInsertionPointHint(MBB, MBB.getFirstTerminator());
+  auto ItEnd = MBB.getFirstTerminator();
+  auto ItBegin = ItEnd == MBB.begin() ? ItEnd : std::prev(ItEnd);
+  {
+    auto RP = SGCtx->getRegisterPool();
+    auto &InstrInfo = SGCtx->getLLVMState().getInstrInfo();
+    planning::InstructionGenerationContext InstrGenCtx{MBB, ItEnd, RP, *SGCtx};
+    planning::InstrGroupGenerationRAIIWrapper InitAndFinish(IG, InstrGenCtx);
+    planning::InstrRequestRange Range(IG, LocalStats);
+    for (auto &&IR : Range) {
+      if (!IG.isInseparableBundle() && GenerateInsertionPointHints)
+        generateInsertionPointHint(MBB, MBB.getFirstTerminator());
+      generateInstruction(InstrInfo.get(IR.Opcode), MBB, ItEnd, IR.Preselected);
+      switchPolicyIfNeeded(IG, IR.Opcode, MBB, *SGCtx);
+      if (!IG.isInseparableBundle())
+        ItBegin = processGeneratedInstructions(MBB, ItBegin, IG, BacktrackCount,
+                                               SizeErrorCount, LocalStats);
+    }
+  }
+  // Postprocess if instructions were not already postprocessed.
+  if (IG.isInseparableBundle())
+    processGeneratedInstructions(MBB, ItBegin, IG, BacktrackCount,
+                                 SizeErrorCount, LocalStats);
+  if (!IG.isLimitReached(LocalStats)) {
+    auto &Ctx = SGCtx->getLLVMState().getCtx();
+    snippy::fatal(Ctx, "Generation failure",
+                  "No more instructions to request but group limit still "
+                  "hasn't been reached.");
+  }
+  CurrentStats.merge(LocalStats);
 }
 
 GenerationStatistics
-InstructionGenerator::generateForMBB(MachineBasicBlock &MBB,
-                                     IMBBGenReq &BBGenRequest) {
-  GenerationStatistics CurrentBBGenerationStats;
-
-  for (auto &SubReq : BBGenRequest) {
-    SNIPPY_DEBUG_BRIEF(__func__, SubReq, 2);
-    auto InstructionGroupGenerationResult = generateInstrGroup(MBB, SubReq);
-    SNIPPY_DEBUG_BRIEF("InstructionGroupGenerationResult",
-                       InstructionGroupGenerationResult, 2);
-    CurrentBBGenerationStats.merge(InstructionGroupGenerationResult);
-    SNIPPY_DEBUG_BRIEF(__func__, SubReq, 2);
-  }
-
-  return CurrentBBGenerationStats;
+InstructionGenerator::generate(planning::BasicBlockRequest &BB,
+                               MachineBasicBlock &MBB) {
+  GenerationStatistics CurrentStats;
+  for (auto &&IG : BB)
+    generate(IG, MBB, CurrentStats);
+  return CurrentStats;
 }
 
 MachineBasicBlock *InstructionGenerator::findNextBlock(
@@ -2144,10 +1384,9 @@ InstructionGenerator::findNextBlockOnModel(MachineBasicBlock &MBB) const {
       "were not taken. Successor is unknown.");
 }
 
-std::unique_ptr<IFunctionGenReq>
-InstructionGenerator::createMFGenerationRequest(
+planning::FunctionRequest InstructionGenerator::createMFGenerationRequest(
     const MachineFunction &MF) const {
-  const auto &GenPlan = getAnalysis<BlockGenPlanning>().get();
+  auto &FunReq = getAnalysis<BlockGenPlanning>().get();
   const MCInstrDesc *FinalInstDesc = nullptr;
   auto LastInstrStr = SGCtx->getLastInstr();
   if (!LastInstrStr.empty() && !SGCtx->useRetAsLastInstr()) {
@@ -2156,21 +1395,10 @@ InstructionGenerator::createMFGenerationRequest(
       report_fatal_error("unknown opcode \"" + Twine(LastInstrStr) +
                              "\" for last instruction generation",
                          false);
-
     FinalInstDesc = SGCtx->getOpcodeCache().desc(Opc.value());
   }
-  switch (SGCtx->getGenerationMode()) {
-  case GenerationMode::NumInstrs:
-    return std::make_unique<FunctionGenReq<GenerationMode::NumInstrs>>(
-        MF, GenPlan, FinalInstDesc, *SGCtx);
-  case GenerationMode::Size:
-    return std::make_unique<FunctionGenReq<GenerationMode::Size>>(
-        MF, GenPlan, FinalInstDesc, *SGCtx);
-  case GenerationMode::Mixed:
-    return std::make_unique<FunctionGenReq<GenerationMode::Mixed>>(
-        MF, GenPlan, FinalInstDesc, *SGCtx);
-  }
-  llvm_unreachable("Unknown generation mode!");
+  FunReq.setFinalInstr(FinalInstDesc);
+  return std::move(FunReq);
 }
 
 template <typename ValTy> APInt toAPInt(ValTy Val, unsigned Width) {
@@ -2339,8 +1567,8 @@ InstructionGenerator::generateCompensationCode(MachineBasicBlock &MBB) {
       0, getCodeSize(MBB.begin(), MBB.getFirstTerminator()));
 }
 
-void InstructionGenerator::generateForFunction(
-    MachineFunction &MF, IFunctionGenReq &FunctionGenRequest) {
+void InstructionGenerator::generate(
+    planning::FunctionRequest &FunctionGenRequest, MachineFunction &MF) {
   GenerationStatistics CurrMFGenStats;
 
   auto &MLI = getAnalysis<MachineLoopInfo>();
@@ -2354,7 +1582,7 @@ void InstructionGenerator::generateForFunction(
     assert(MBB);
     NotVisited.erase(MBB);
 
-    auto &BBReq = FunctionGenRequest.getMBBGenerationRequest(*MBB);
+    auto &BBReq = FunctionGenRequest.at(MBB);
 
     MachineLoop *ML = nullptr;
     // We need to know loops structure in selfcheck mode.
@@ -2374,7 +1602,7 @@ void InstructionGenerator::generateForFunction(
       // special canonicalization when selfcheck is enabled). As we expect that
       // each loop iteration will do the same, insert compensation code in the
       // latch block.
-      assert(BBReq.isCompleted(GenerationStatistics{}) &&
+      assert(BBReq.isLimitReached(GenerationStatistics{}) &&
              "Latch block for compensation code cannot be requested to "
              "generate primary instructions");
       CurrMFGenStats.merge(generateCompensationCode(*MBB));
@@ -2390,7 +1618,7 @@ void InstructionGenerator::generateForFunction(
 
       SNIPPY_DEBUG_BRIEF("request for reachable BasicBlock", BBReq);
 
-      auto GeneratedStats = generateForMBB(*MBB, BBReq);
+      auto GeneratedStats = generate(BBReq, *MBB);
       CurrMFGenStats.merge(std::move(GeneratedStats));
     }
     SNIPPY_DEBUG_BRIEF("Function codegen", CurrMFGenStats);
@@ -2433,16 +1661,16 @@ void InstructionGenerator::generateForFunction(
   }
 
   MBB = findNextBlock(nullptr, NotVisited);
-  while (!FunctionGenRequest.isCompleted(CurrMFGenStats)) {
+  while (!FunctionGenRequest.isLimitReached(CurrMFGenStats)) {
     assert(MBB);
     assert(!NotVisited.empty() &&
            "There are no more block to insert instructions.");
     NotVisited.erase(MBB);
 
-    auto &BBReq = FunctionGenRequest.getMBBGenerationRequest(*MBB);
+    auto &BBReq = FunctionGenRequest.at(MBB);
     SNIPPY_DEBUG_BRIEF("request for dead BasicBlock", BBReq);
 
-    auto GeneratedStats = generateForMBB(*MBB, BBReq);
+    auto GeneratedStats = generate(BBReq, *MBB);
     CurrMFGenStats.merge(std::move(GeneratedStats));
     SNIPPY_DEBUG_BRIEF("Function codegen", CurrMFGenStats);
     MBB = findNextBlock(nullptr, NotVisited);
@@ -2452,7 +1680,7 @@ void InstructionGenerator::generateForFunction(
 }
 
 void InstructionGenerator::finalizeFunction(
-    MachineFunction &MF, IFunctionGenReq &Request,
+    MachineFunction &MF, planning::FunctionRequest &Request,
     const GenerationStatistics &MFStats) {
   auto &State = SGCtx->getLLVMState();
   auto &MBB = MF.back();
@@ -2490,10 +1718,12 @@ void InstructionGenerator::finalizeFunction(
     MBB.back().setPostInstrSymbol(MF, ExitSym);
     return;
   }
-
   for (auto &&FinalReq : Request.getFinalGenReqs(MFStats)) {
-    assert(FinalReq && "FinalReq is empty!");
-    generateInstrGroup(MF.back(), *FinalReq);
+    auto &Limit = FinalReq.limit();
+    assert(Limit.getLimit() && "FinalReq is empty!");
+    auto RP = SGCtx->getRegisterPool();
+    GenerationStatistics Stats;
+    generate(FinalReq, MF.back(), Stats);
   }
 
   // Mark last generated instruction as support one.
@@ -2527,10 +1757,9 @@ bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
   }
 
   auto FunctionGenRequest = createMFGenerationRequest(MF);
-  assert(FunctionGenRequest);
-  SNIPPY_DEBUG_BRIEF("request for function", *FunctionGenRequest);
+  SNIPPY_DEBUG_BRIEF("request for function", FunctionGenRequest);
 
-  generateForFunction(MF, *FunctionGenRequest);
+  generate(FunctionGenRequest, MF);
   return true;
 }
 
@@ -2667,16 +1896,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
 
   if (DumpMIR.isSpecified())
     writeMIRFile(MIR);
-  if (DumpMemAccesses.isSpecified())
-    dumpMemAccesses(DumpMemAccesses.getValue(), GenCtx.getMemAccesses(),
-                    GenCtx.getBurstRangeAccesses(),
-                    GenCtx.getBurstPlainAccesses(), /* Restricted */ false);
-
-  if (DumpMemAccessesRestricted.isSpecified())
-    dumpMemAccesses(DumpMemAccessesRestricted.getValue(),
-                    GenCtx.getMemAccesses(), GenCtx.getBurstRangeAccesses(),
-                    GenCtx.getBurstPlainAccesses(), /* Restricted */ true);
-
+  dumpMemAccessesIfNeeded(GenCtx);
   auto ImagesForFinalSnippet = ObjectFilesList{Output};
 
   auto Result = GenCtx.generateELF(ImagesForFinalSnippet);

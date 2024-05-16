@@ -83,6 +83,10 @@ class PluginManager final {
       return NewOpc;
     }
 
+    std::unique_ptr<OpcodeGeneratorInterface> copy() const override {
+      return std::make_unique<Plugin>(*this);
+    }
+
     void print(llvm::raw_ostream &OS) const override {
       OS << "PluginGenerator:\n";
       for (const auto Opc : AvailableOpcodes)

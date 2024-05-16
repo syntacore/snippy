@@ -97,13 +97,18 @@ public:
 };
 
 class StridedImmediate {
-  int64_t Min = 0;
-  int64_t Max = 0;
-  uint64_t Stride = 0;
+public:
+  using ValueType = int64_t;
+  using StrideType = uint64_t;
+
+private:
+  ValueType Min = 0;
+  ValueType Max = 0;
+  StrideType Stride = 0;
   bool Init = false;
 
 public:
-  StridedImmediate(int64_t MinIn, int64_t MaxIn, uint64_t StrideIn)
+  StridedImmediate(ValueType MinIn, ValueType MaxIn, StrideType StrideIn)
       : Min(MinIn), Max(MaxIn), Stride(StrideIn), Init(true) {
     assert(Min <= Max);
     assert(Stride == 0 || isPowerOf2_64(Stride));
@@ -166,8 +171,9 @@ enum class ImmediateZero {
 template <int MinValue, int MaxValue>
 int genImmInInterval(const StridedImmediate &StridedImm) {
   assert(StridedImm.isInitialized());
-  auto Min = std::max<int64_t>(MinValue, StridedImm.getMin());
-  auto Max = std::min<int64_t>(MaxValue, StridedImm.getMax());
+  using ValueType = StridedImmediate::ValueType;
+  auto Min = std::clamp<ValueType>(StridedImm.getMin(), MinValue, MaxValue);
+  auto Max = std::clamp<ValueType>(StridedImm.getMax(), MinValue, MaxValue);
   auto Stride = StridedImm.getStride();
   assert(Stride != 0);
   assert(Max >= Min);
