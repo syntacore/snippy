@@ -18,7 +18,6 @@
 #include "snippy/Generator/ImmediateHistogram.h"
 #include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/MemoryManager.h"
-#include "snippy/Generator/Policy.h"
 #include "snippy/Generator/RegisterGenerator.h"
 #include "snippy/Generator/RegisterPool.h"
 #include "snippy/Generator/SimRunner.h"
@@ -423,12 +422,6 @@ public:
     return GenSettings->Cfg.createDFOpcodeGenerator(*OpCC, OpcMask, Overrides,
                                                     MustHavePrimaryInstrs);
   }
-
-  GenPolicy
-  createGenerationPolicy(unsigned Limit, OpcodeFilter Filter,
-                         bool MustHavePrimaryInstrs,
-                         std::optional<unsigned> BurstGroupID,
-                         ArrayRef<OpcodeHistogramEntry> Overrides = {}) const;
 
   auto getCFInstrsNum(const MachineFunction &MF) const {
     return GenSettings->Cfg.Histogram.getCFInstrsNum(getRequestedInstrsNum(MF),

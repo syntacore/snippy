@@ -10,7 +10,9 @@
 #include "GeneratorContextPass.h"
 #include "InitializePasses.h"
 
+#include "snippy/Generator/GenerationRequest.h"
 #include "snippy/Generator/LLVMState.h"
+#include "snippy/Generator/Policy.h"
 #include "snippy/Target/Target.h"
 
 #include "llvm/CodeGen/MachineFunctionPass.h"
@@ -30,33 +32,35 @@ namespace {
 class BlockGenPlanningImpl {
   GeneratorContext *GenCtx;
   const MachineLoopInfo *MLI;
-  std::vector<std::reference_wrapper<const MachineBasicBlock>> BlocksToProcess;
+  std::vector<const MachineBasicBlock *> BlocksToProcess;
 
 public:
   BlockGenPlanningImpl(GeneratorContext *GenCtxIn, const MachineLoopInfo *MLIIn)
       : GenCtx(GenCtxIn), MLI(MLIIn) {}
 
-  BlocksGenPlanTy processFunction(const MachineFunction &MF);
+  planning::FunctionRequest processFunction(const MachineFunction &MF);
 
 private:
-  BlocksGenPlanTy processFunctionWithNumInstr(const MachineFunction &MF);
-  BlocksGenPlanTy processFunctionWithSize(const MachineFunction &MF);
-  BlocksGenPlanTy processFunctionMixed(const MachineFunction &MF);
+  planning::FunctionRequest
+  processFunctionWithNumInstr(const MachineFunction &MF);
+  planning::FunctionRequest processFunctionWithSize(const MachineFunction &MF);
+  planning::FunctionRequest processFunctionMixed(const MachineFunction &MF);
 
   size_t calculateMFSizeLimit(const MachineFunction &MF) const;
 
-  void fillPlanWithBurstGroups(BlocksGenPlanTy &GenPlan, size_t NumInstrBurst,
-                               size_t NumInstrTotal, size_t AverageBlockInstrs);
+  void fillReqWithBurstGroups(planning::FunctionRequest &FunReq,
+                              size_t NumInstrBurst, size_t NumInstrTotal,
+                              size_t AverageBlockInstrs);
 
-  void fillPlanWithPlainInstsByNumber(BlocksGenPlanTy &GenPlan,
-                                      size_t NumInstrPlain,
-                                      size_t AverageBlockInstrs);
-  void fillPlanWithPlainInstsBySize(BlocksGenPlanTy &GenPlan,
-                                    size_t MFSizeLimit);
-  void fillPlanForTopLoopBySize(BlocksGenPlanTy &GenPlan,
-                                const MachineLoop &ML) const;
-  void updateBlocksToProcess(const SingleBlockGenPlanTy &BlockPlan,
-                             size_t AverageBlockInstrs, size_t BlockId);
+  void fillReqWithPlainInstsByNumber(planning::FunctionRequest &FunReq,
+                                     size_t NumInstrPlain,
+                                     size_t AverageBlockInstrs);
+  void fillReqWithPlainInstsBySize(planning::FunctionRequest &FunReq,
+                                   size_t MFSizeLimit);
+  void fillReqForTopLoopBySize(planning::FunctionRequest &FunReq,
+                               const MachineLoop &ML) const;
+  void updateBlocksToProcess(const planning::BasicBlockRequest &BlockReq,
+                             size_t AverageBlockInstrs);
 };
 
 } // namespace
@@ -285,7 +289,7 @@ static size_t extractBurstGroup(NumInstrToGroupIdTy &NumInstrToGroupId,
 //
 // NumInstrBurst is 21, burst group size is 7, AverageBlockInstrs is 5, five BBs
 // to fill.
-//   NumInstrToGroupId    BlocksToProcess    GenPlan
+//   NumInstrToGroupId    BlocksToProcess    FunReq
 //     (num of instrs       (BB ->            (BB ->
 //      for the group        current size)     packs)
 //      -> group id)
@@ -302,7 +306,7 @@ static size_t extractBurstGroup(NumInstrToGroupIdTy &NumInstrToGroupId,
 // id1` as seven instructions were already added to plan.
 //
 // After the first iteration:
-//   NumInstrToGroupId    BlocksToProcess    GenPlan
+//   NumInstrToGroupId    BlocksToProcess    FunReq
 //     1: 1 -> id1          BB1 -> 0         BB1 -> empty
 //     2: 5 -> id2          BB2 -> 0         BB2 -> empty
 //     3: 4 -> id3          BB3 -> 7         BB3 -> Burst[7, id1]
@@ -317,7 +321,7 @@ static size_t extractBurstGroup(NumInstrToGroupIdTy &NumInstrToGroupId,
 // they are group 1 and group 3 (or 4, but let's use 3).
 //
 // After the iteration:
-//   NumInstrToGroupId    BlocksToProcess    GenPlan
+//   NumInstrToGroupId    BlocksToProcess    FunReq
 //    ~1: 0 -> id1~         BB1 -> 0         BB1 -> empty
 //    ~2: 0 -> id2~         BB2 -> 7         BB2 -> Burst[7, id2]
 //     3: 3 -> id3          BB3 -> 7         BB3 -> Burst[7, id1]
@@ -328,7 +332,7 @@ static size_t extractBurstGroup(NumInstrToGroupIdTy &NumInstrToGroupId,
 // instructions from group 3 to it:
 //
 // After the iteration:
-//   NumInstrToGroupId    BlocksToProcess    GenPlan
+//   NumInstrToGroupId    BlocksToProcess    FunReq
 //    ~1: 0 -> id1~         BB1 -> 0         BB1 -> empty
 //    ~2: 0 -> id2~        ~BB2 -> 14~       BB2 -> Burst[7, id2], Burst[7, id4]
 //    ~3: 0 -> id3~         BB3 -> 7         BB3 -> Burst[7, id1]
@@ -339,16 +343,15 @@ static size_t extractBurstGroup(NumInstrToGroupIdTy &NumInstrToGroupId,
 // became bigger than 2 * AverageBlockInstrs. So, no more packs would be added
 // to it if we continued. The rule that excludes blocks must be improved, but
 // currently it preserves the old behavior.
-void BlockGenPlanningImpl::fillPlanWithBurstGroups(BlocksGenPlanTy &GenPlan,
-                                                   size_t NumInstrBurst,
-                                                   size_t NumInstrTotal,
-                                                   size_t AverageBlockInstrs) {
+void BlockGenPlanningImpl::fillReqWithBurstGroups(
+    planning::FunctionRequest &FunReq, size_t NumInstrBurst,
+    size_t NumInstrTotal, size_t AverageBlockInstrs) {
   auto NumInstrToGroupId =
       getBurstInstCounts(*GenCtx, NumInstrBurst, NumInstrTotal);
   const auto &BurstSettings = GenCtx->getBurstGram();
   while (NumInstrBurst > 0) {
     auto BlockId = RandEngine::genInRange(BlocksToProcess.size());
-    const auto *MBB = &BlocksToProcess[BlockId].get();
+    const auto *MBB = BlocksToProcess[BlockId];
 
     auto BurstGroupInstCount =
         RandEngine::genInInterval(BurstSettings.MinSize, BurstSettings.MaxSize);
@@ -362,67 +365,159 @@ void BlockGenPlanningImpl::fillPlanWithBurstGroups(BlocksGenPlanTy &GenPlan,
 
     auto GroupId = extractBurstGroup(NumInstrToGroupId, BurstGroupInstCount);
 
-    auto [BlockPlanIt, _] = GenPlan.try_emplace(MBB, GenerationMode::NumInstrs);
-    auto &BlockPlan = BlockPlanIt->second;
-    BlockPlan.add({BurstGroupInstCount, GroupId});
+    FunReq.addToBlock(
+        MBB, planning::InstructionGroupRequest(
+                 planning::RequestLimit::NumInstrs{BurstGroupInstCount},
+                 planning::BurstGenPolicy(*GenCtx, GroupId)));
     NumInstrBurst -= BurstGroupInstCount;
 
-    updateBlocksToProcess(BlockPlan, AverageBlockInstrs, BlockId);
+    auto &BlockReq = FunReq.at(MBB);
+    updateBlocksToProcess(BlockReq, AverageBlockInstrs);
   }
 }
 
-void BlockGenPlanningImpl::fillPlanWithPlainInstsByNumber(
-    BlocksGenPlanTy &GenPlan, size_t NumInstrPlain, size_t AverageBlockInstrs) {
+void BlockGenPlanningImpl::fillReqWithPlainInstsByNumber(
+    planning::FunctionRequest &FunReq, size_t NumInstrPlain,
+    size_t AverageBlockInstrs) {
+  auto &Tgt = GenCtx->getLLVMState().getSnippyTarget();
   while (NumInstrPlain > 0) {
     auto MaxBlockInstrs = AverageBlockInstrs * 2ull;
     auto InstrsToAdd = RandEngine::genInInterval(
         1ull, std::min<unsigned long long>(NumInstrPlain, MaxBlockInstrs));
 
     auto BlockId = RandEngine::genInRange(BlocksToProcess.size());
-    const auto *MBB = &BlocksToProcess[BlockId].get();
+    const auto *MBB = BlocksToProcess[BlockId];
 
-    auto [BlockPlanIt, _] = GenPlan.try_emplace(MBB, GenerationMode::NumInstrs);
-    auto &BlockPlan = BlockPlanIt->second;
-    InstrsToAdd =
-        std::min(InstrsToAdd, MaxBlockInstrs - BlockPlan.instrCount());
+    auto BlockReqIt = FunReq.find(MBB);
+    unsigned Limit = 0;
+    if (BlockReqIt != FunReq.end()) {
+      auto &BlockReq = BlockReqIt->second;
+      assert(BlockReq.limit().isNumLimit());
+      Limit = BlockReq.limit().getLimit();
+    }
+    InstrsToAdd = std::min(InstrsToAdd, MaxBlockInstrs - Limit);
 
-    BlockPlan.add({InstrsToAdd});
+    auto Lim = planning::RequestLimit::NumInstrs{InstrsToAdd};
+    auto Policy = planning::DefaultGenPolicy(
+        *GenCtx, Tgt.getDefaultPolicyFilter(*MBB, *GenCtx),
+        Tgt.groupMustHavePrimaryInstr(*MBB, *GenCtx),
+        Tgt.getPolicyOverrides(*MBB, *GenCtx));
+    FunReq.addToBlock(
+        MBB, planning::InstructionGroupRequest(Lim, std::move(Policy)));
 
     NumInstrPlain -= InstrsToAdd;
-
-    updateBlocksToProcess(BlockPlan, AverageBlockInstrs, BlockId);
+    auto &BlockReq = FunReq.at(MBB);
+    updateBlocksToProcess(BlockReq, AverageBlockInstrs);
   }
 }
 
 void BlockGenPlanningImpl::updateBlocksToProcess(
-    const SingleBlockGenPlanTy &BlockPlan, size_t AverageBlockInstrs,
-    size_t BlockId) {
+    const planning::BasicBlockRequest &BlockReq, size_t AverageBlockInstrs) {
   // FIXME: We should make a smarter choice allowing big BBs with a low
   // propability instead of allowing BB sizes only in [0, 2 * Average block
   // size].
-  if (BlockPlan.instrCount() >= AverageBlockInstrs * 2) {
-    if (BlockId != BlocksToProcess.size() - 1)
-      std::swap(BlocksToProcess[BlockId], BlocksToProcess.back());
-    BlocksToProcess.pop_back();
+  assert(BlockReq.limit().isNumLimit());
+  if (BlockReq.limit().getLimit() >= AverageBlockInstrs * 2)
+    erase_value(BlocksToProcess, &BlockReq.getMBB());
+}
+
+template <typename T>
+void addEmptyReqForBlocks(planning::FunctionRequest &FunReq, const T &Blocks,
+                          const planning::RequestLimit &Limit) {
+  for (auto *MBB : Blocks)
+    FunReq.add(MBB, planning::BasicBlockRequest(*MBB));
+}
+
+static void randomize(planning::BasicBlockRequest &BB, GeneratorContext &GC) {
+  if (BB.empty())
+    return;
+
+  auto IsRegular = [](const auto &Req) {
+    return !Req.isInseparableBundle(); // FIXME: some kind of enum
+                                       // or llvm rtti
+  };
+  // We request all plain packs to be after burst packs.
+  auto InstPackIt = find_if(BB, IsRegular);
+  if (InstPackIt == BB.end())
+    return;
+
+  assert(std::all_of(InstPackIt, BB.end(), IsRegular) &&
+         "Before randomization all 'plain' packs must be at the end.");
+
+  // Calculate the number of instructions in all plain packs. Since plain packs
+  // may differ only by instruction count, we can think that only one plain pack
+  // exists with instcount of RegularPackSize.
+  auto RegularPackSize = std::accumulate(InstPackIt, BB.end(), 0ull,
+                                         [](auto Acc, const auto &Pack) {
+                                           auto &Limit = Pack.limit();
+                                           assert(Limit.isNumLimit());
+                                           return Limit.getLimit() + Acc;
+                                         });
+
+  // At this point let's say that we have `RegularPackSize` packs of plain
+  // instructions each of size one, e.g.:
+  //   P_0  P_1  P_2  P_3  P_4  P_5
+  // Let's also say that we have N burst packs:
+  //   B_0  B_1  B_2
+  // We generate N indices in [0, RegularPackSize - 1] for plain packs. By these
+  // indices plain packs will be mixed with burst packs:
+  //   Idxs: 0, 1, 1, 4 (generate 3 idxs as there are three burst packs).
+  //   Regular packs with idxs [0, 1) will be added before the first burst pack
+  //   Regular packs with idxs [1, 1) (<--- no packs) will be added before the
+  //   second burst pack and so on. If the last index is smaller than
+  //   RegularPackSize than all plain packs left will be added after the last
+  //   burst pack (in our case they are P_4 and P_5).
+  // If we add more than one plain pack, then they'll be joint into one.
+  // Resulting sequence of packs for our example is:
+  //   { Regular, 1 } -- P_0
+  //   { B_0 }
+  //   { B_1 }
+  //   { Regular, 3 } -- P_1  P_2  P_3
+  //   { B_2 }
+  //   { Regular, 2 } -- P_4  P_5
+  std::vector<size_t> Idxs;
+  Idxs.push_back(0);
+  std::generate_n(std::back_inserter(Idxs),
+                  std::distance(BB.begin(), InstPackIt), [RegularPackSize] {
+                    return RandEngine::genInRange(0ull, RegularPackSize);
+                  });
+  std::sort(Idxs.begin(), Idxs.end());
+
+  auto NonRegularPacksIt = BB.begin();
+  auto &MBB = BB.getMBB();
+  planning::BasicBlockRequest NewPacks(MBB);
+  auto &Tgt = GC.getLLVMState().getSnippyTarget();
+  for (auto [FirstIdx, SecondIdx] : zip(Idxs, drop_begin(Idxs))) {
+    assert(FirstIdx <= SecondIdx);
+    if (FirstIdx != SecondIdx)
+      NewPacks.add(planning::InstructionGroupRequest(
+          planning::RequestLimit::NumInstrs{SecondIdx - FirstIdx},
+          planning::DefaultGenPolicy(GC, Tgt.getDefaultPolicyFilter(MBB, GC),
+                                     Tgt.groupMustHavePrimaryInstr(MBB, GC),
+                                     Tgt.getPolicyOverrides(MBB, GC))));
+    // FIXME: should be enum or llvm rtti
+    assert(NonRegularPacksIt->isInseparableBundle());
+    NewPacks.add(std::move(*NonRegularPacksIt));
+    assert(NonRegularPacksIt != BB.end());
+    ++NonRegularPacksIt;
   }
+  if (Idxs.back() != RegularPackSize)
+    NewPacks.add(planning::InstructionGroupRequest(
+        planning::RequestLimit::NumInstrs{RegularPackSize - Idxs.back()},
+        planning::DefaultGenPolicy(GC, Tgt.getDefaultPolicyFilter(MBB, GC),
+                                   Tgt.groupMustHavePrimaryInstr(MBB, GC),
+                                   Tgt.getPolicyOverrides(MBB, GC))));
+  std::swap(NewPacks, BB);
 }
 
-template <GenerationMode GM, typename T>
-void addEmptyPlanForBlocks(BlocksGenPlanTy &GenPlan, const T &Blocks) {
-  transform(Blocks, std::inserter(GenPlan, GenPlan.begin()),
-            [](const MachineBasicBlock &MBB) {
-              return std::make_pair(&MBB, SingleBlockGenPlanTy(GM));
-            });
-}
-
-BlocksGenPlanTy
+planning::FunctionRequest
 BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
   assert(GenCtx->getGenerationMode() == GenerationMode::NumInstrs);
 
   auto LatchBlocks = collectLatchBlocks(*GenCtx, *MLI, MF);
-  std::copy_if(
-      MF.begin(), MF.end(), std::back_inserter(BlocksToProcess),
-      [&LatchBlocks](const auto &MBB) { return !LatchBlocks.count(&MBB); });
+  copy_if(map_range(MF, [](auto &MBB) { return &MBB; }),
+          std::back_inserter(BlocksToProcess),
+          [&LatchBlocks](const auto &MBB) { return !LatchBlocks.count(MBB); });
   assert(!BlocksToProcess.empty() &&
          "At least one basic block that is not a latch block must exist");
 
@@ -442,68 +537,71 @@ BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
   if (AverageBlockInstrs == 0)
     AverageBlockInstrs = 1;
 
-  BlocksGenPlanTy GenPlan;
-  fillPlanWithBurstGroups(GenPlan, NumInstrBurst, NumInstrTotal,
-                          AverageBlockInstrs);
-  fillPlanWithPlainInstsByNumber(GenPlan, NumInstrPlain, AverageBlockInstrs);
+  planning::FunctionRequest FunReq(MF, *GenCtx);
+  fillReqWithBurstGroups(FunReq, NumInstrBurst, NumInstrTotal,
+                         AverageBlockInstrs);
+  fillReqWithPlainInstsByNumber(FunReq, NumInstrPlain, AverageBlockInstrs);
 
+  for (auto &[MBB, BB] : FunReq)
+    erase_value(BlocksToProcess, MBB);
   // Add default plans for remaining blocks.
-  addEmptyPlanForBlocks<GenerationMode::NumInstrs>(GenPlan, BlocksToProcess);
-  addEmptyPlanForBlocks<GenerationMode::NumInstrs>(
-      GenPlan,
-      map_range(LatchBlocks,
-                [](const MachineBasicBlock *MBB) -> const MachineBasicBlock & {
-                  return *MBB;
-                }));
+  addEmptyReqForBlocks(FunReq, BlocksToProcess,
+                       planning::RequestLimit::NumInstrs{});
+  addEmptyReqForBlocks(FunReq, LatchBlocks,
+                       planning::RequestLimit::NumInstrs{});
 
   // Randomize generation plan: shuffle burst groups and plain instructions.
-  for (auto &BlockPlan : make_second_range(GenPlan))
-    BlockPlan.randomize();
+  for (auto &BlockReq : make_second_range(FunReq))
+    randomize(BlockReq, *GenCtx);
 
-  return GenPlan;
+  return FunReq;
 }
 
-void BlockGenPlanningImpl::fillPlanWithPlainInstsBySize(
-    BlocksGenPlanTy &GenPlan, size_t MFSizeLimit) {
+void BlockGenPlanningImpl::fillReqWithPlainInstsBySize(
+    planning::FunctionRequest &FunReq, size_t MFSizeLimit) {
   auto MaxInstrSize =
       GenCtx->getLLVMState().getSnippyTarget().getMaxInstrSize();
   // Multiset instead of vector because we generate accumulated size of first k
-  // blocks. For example, if PlannedAccumulatedSizes == {2, 4, 4, 25, 37} then
+  // blocks. For example, if RequestedAccumulatedSizes == {2, 4, 4, 25, 37} then
   // blocks will generated with {2, 2, 0, 21, 12} sizes.
-  std::multiset<size_t> PlannedAccumulatedSizes = {MFSizeLimit};
+  std::multiset<size_t> RequestedAccumulatedSizes = {MFSizeLimit};
   transform(
       seq(0ul, BlocksToProcess.size() - 1),
-      std::inserter(PlannedAccumulatedSizes, PlannedAccumulatedSizes.end()),
+      std::inserter(RequestedAccumulatedSizes, RequestedAccumulatedSizes.end()),
       [=](auto) {
         return RandEngine::genInInterval(MFSizeLimit) / MaxInstrSize *
                MaxInstrSize;
       });
-
+  auto &Tgt = GenCtx->getLLVMState().getSnippyTarget();
   size_t LastAccumulatedSize = 0;
   for (auto [MBB, AccumulatedSize] :
-       zip(BlocksToProcess, PlannedAccumulatedSizes)) {
-    auto [BlockPlanIt, _] =
-        GenPlan.try_emplace(&MBB.get(), GenerationMode::Size);
-    auto &BlockPlan = BlockPlanIt->second;
+       zip(BlocksToProcess, RequestedAccumulatedSizes)) {
     size_t BlockSize = AccumulatedSize - LastAccumulatedSize;
-    BlockPlan.add({BlockSize});
+    auto Limit = planning::RequestLimit::Size{BlockSize};
+    auto Policy = planning::DefaultGenPolicy(
+        *GenCtx, Tgt.getDefaultPolicyFilter(*MBB, *GenCtx),
+        Tgt.groupMustHavePrimaryInstr(*MBB, *GenCtx),
+        Tgt.getPolicyOverrides(*MBB, *GenCtx));
+    FunReq.addToBlock(
+        MBB, planning::InstructionGroupRequest(Limit, std::move(Policy)));
     LastAccumulatedSize = AccumulatedSize;
   }
 }
 
-BlocksGenPlanTy
+planning::FunctionRequest
 BlockGenPlanningImpl::processFunctionWithSize(const MachineFunction &MF) {
   assert(GenCtx->getGenerationMode() == GenerationMode::Size);
 
-  std::copy(MF.begin(), MF.end(), std::back_inserter(BlocksToProcess));
+  copy(map_range(MF, [](auto &MBB) { return &MBB; }),
+       std::back_inserter(BlocksToProcess));
   assert(!BlocksToProcess.empty() && "At least one basic block must exist");
 
   auto MFSizeLimit = calculateMFSizeLimit(MF);
 
-  BlocksGenPlanTy GenPlan;
-  fillPlanWithPlainInstsBySize(GenPlan, MFSizeLimit);
+  planning::FunctionRequest FunReq(MF, *GenCtx);
+  fillReqWithPlainInstsBySize(FunReq, MFSizeLimit);
 
-  return GenPlan;
+  return FunReq;
 }
 
 static auto accumulateMISize(unsigned long long Acc, const MachineInstr &MI) {
@@ -520,24 +618,26 @@ static auto getMBBSize(const MachineBasicBlock &MBB) {
   return getSize(MBB.begin(), MBB.end());
 }
 
-static size_t calcFilledSize(const BlocksGenPlanTy &GenPlan,
+static size_t calcFilledSize(const planning::FunctionRequest &FunReq,
                              ArrayRef<const MachineBasicBlock *> Blocks) {
   size_t FilledSize = 0;
   for (auto *Block : Blocks) {
-    if (GenPlan.count(Block))
-      FilledSize += GenPlan.at(Block).size() + getMBBSize(*Block);
-    else
-      FilledSize += getMBBSize(*Block);
+    FilledSize += getMBBSize(*Block);
+    if (FunReq.count(Block)) {
+      auto &Limit = FunReq.at(Block).limit();
+      assert(Limit.isSizeLimit());
+      FilledSize += Limit.getLimit();
+    }
   }
   return FilledSize;
 }
 
-static void setSizeForLoopBlock(BlocksGenPlanTy &GenPlan,
+static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
                                 const MachineBasicBlock &SelectedMBB,
                                 ArrayRef<const MachineBasicBlock *> LoopBlocks,
                                 NumericRange<ProgramCounterType> PCDist,
                                 bool IsLatch, GeneratorContext &SGCtx) {
-  assert(!GenPlan.count(&SelectedMBB));
+  assert(!FunReq.count(&SelectedMBB));
   auto &SnpTgt = SGCtx.getLLVMState().getSnippyTarget();
   auto BrOpc = SelectedMBB.getFirstTerminator()->getOpcode();
   auto MaxBranchDstMod = SnpTgt.getMaxBranchDstMod(BrOpc);
@@ -555,7 +655,7 @@ static void setSizeForLoopBlock(BlocksGenPlanTy &GenPlan,
   if (!PCDist.Max.has_value())
     PCDist.Max = MaxBranchDstMod;
 
-  size_t FilledSize = calcFilledSize(GenPlan, LoopBlocks);
+  size_t FilledSize = calcFilledSize(FunReq, LoopBlocks);
   if (IsLatch) // Branches size isn't included in backward distance
     FilledSize -= getSize(SelectedMBB.getFirstTerminator(), SelectedMBB.end());
 
@@ -583,16 +683,18 @@ static void setSizeForLoopBlock(BlocksGenPlanTy &GenPlan,
 
   auto BlockSize = RandEngine::genInInterval(Min, Max);
   BlockSize = alignDown(BlockSize, MaxInstrSize);
-
-  auto [BlockPlanIt, Emplaced] =
-      GenPlan.try_emplace(&SelectedMBB, GenerationMode::Size);
-  assert(Emplaced);
-  auto &BlockPlan = BlockPlanIt->second;
-  BlockPlan.add({BlockSize});
+  auto &Tgt = SGCtx.getLLVMState().getSnippyTarget();
+  auto Limit = planning::RequestLimit::Size{BlockSize};
+  auto Policy = planning::DefaultGenPolicy(
+      SGCtx, Tgt.getDefaultPolicyFilter(SelectedMBB, SGCtx),
+      Tgt.groupMustHavePrimaryInstr(SelectedMBB, SGCtx),
+      Tgt.getPolicyOverrides(SelectedMBB, SGCtx));
+  FunReq.addToBlock(&SelectedMBB, planning::InstructionGroupRequest(
+                                      Limit, std::move(Policy)));
 }
 
-void BlockGenPlanningImpl::fillPlanForTopLoopBySize(
-    BlocksGenPlanTy &GenPlan, const MachineLoop &ML) const {
+void BlockGenPlanningImpl::fillReqForTopLoopBySize(
+    planning::FunctionRequest &FunReq, const MachineLoop &ML) const {
   assert(ML.isOutermost() && "Only top level loop expected");
   if (!ML.getSubLoops().empty())
     fatal(GenCtx->getLLVMState().getCtx(), "Block generation planning failed",
@@ -602,23 +704,25 @@ void BlockGenPlanningImpl::fillPlanForTopLoopBySize(
 
   auto LoopBlocks = ML.getBlocks();
   for (auto *MBB : LoopBlocks)
-    setSizeForLoopBlock(GenPlan, *MBB, LoopBlocks, PCDist, ML.isLoopLatch(MBB),
+    setSizeForLoopBlock(FunReq, *MBB, LoopBlocks, PCDist, ML.isLoopLatch(MBB),
                         *GenCtx);
 }
 
-BlocksGenPlanTy
+planning::FunctionRequest
 BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
   assert(GenCtx->getGenerationMode() == GenerationMode::Mixed);
 
-  BlocksGenPlanTy GenPlan;
+  planning::FunctionRequest FunReq(MF, *GenCtx);
   unsigned SupposedNumInstr = 0;
   auto MaxInstrSize =
       GenCtx->getLLVMState().getSnippyTarget().getMaxInstrSize();
   for (auto *ML : *MLI) {
     assert(ML);
-    fillPlanForTopLoopBySize(GenPlan, *ML);
+    fillReqForTopLoopBySize(FunReq, *ML);
     for (auto *MBB : ML->blocks()) {
-      auto BBSize = GenPlan.at(MBB).size();
+      auto &Limit = FunReq.at(MBB).limit();
+      assert(Limit.isSizeLimit());
+      auto BBSize = Limit.getLimit();
       SupposedNumInstr += BBSize / MaxInstrSize;
       SupposedNumInstr += BBSize % MaxInstrSize ? 1 : 0;
     }
@@ -626,8 +730,9 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
 
   // Process blocks out of loops
 
-  std::copy_if(MF.begin(), MF.end(), std::back_inserter(BlocksToProcess),
-               [this](const auto &MBB) { return !MLI->getLoopFor(&MBB); });
+  copy_if(map_range(MF, [](auto &MBB) { return &MBB; }),
+          std::back_inserter(BlocksToProcess),
+          [this](const auto &MBB) { return !MLI->getLoopFor(MBB); });
 
   auto NumInstrTotal = GenCtx->getRequestedInstrsNum(MF);
   assert(NumInstrTotal >= GenCtx->getCFInstrsNum(MF));
@@ -635,8 +740,9 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
   // If number of instructions in size-requested blocks is already enough for
   // the whole function, skipping num instrs planning for other blocks
   if (NumInstrTotal <= SupposedNumInstr) {
-    addEmptyPlanForBlocks<GenerationMode::NumInstrs>(GenPlan, BlocksToProcess);
-    return GenPlan;
+    addEmptyReqForBlocks(FunReq, BlocksToProcess,
+                         planning::RequestLimit::NumInstrs{});
+    return FunReq;
   }
 
   NumInstrTotal -= SupposedNumInstr;
@@ -654,15 +760,17 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
   if (AverageBlockInstrs == 0)
     AverageBlockInstrs = 1;
 
-  fillPlanWithBurstGroups(GenPlan, NumInstrBurst, NumInstrTotal,
-                          AverageBlockInstrs);
+  fillReqWithBurstGroups(FunReq, NumInstrBurst, NumInstrTotal,
+                         AverageBlockInstrs);
 
-  fillPlanWithPlainInstsByNumber(GenPlan, NumInstrPlain, AverageBlockInstrs);
-
+  fillReqWithPlainInstsByNumber(FunReq, NumInstrPlain, AverageBlockInstrs);
+  for (auto &[MBB, BB] : FunReq)
+    erase_value(BlocksToProcess, MBB);
   // Add default plans for remaining blocks.
-  addEmptyPlanForBlocks<GenerationMode::NumInstrs>(GenPlan, BlocksToProcess);
+  addEmptyReqForBlocks(FunReq, BlocksToProcess,
+                       planning::RequestLimit::NumInstrs{});
 
-  return GenPlan;
+  return FunReq;
 }
 
 static void checkGenModeCompatibility(GeneratorContext &GenCtx,
@@ -679,7 +787,7 @@ static void checkGenModeCompatibility(GeneratorContext &GenCtx,
         false);
 }
 
-BlocksGenPlanTy
+planning::FunctionRequest
 BlockGenPlanningImpl::processFunction(const MachineFunction &MF) {
   assert(GenCtx && MLI);
   checkGenModeCompatibility(*GenCtx, *MLI);
@@ -694,24 +802,24 @@ BlockGenPlanningImpl::processFunction(const MachineFunction &MF) {
   llvm_unreachable("unknown generation mode");
 }
 
-const SingleBlockGenPlanTy &
+const planning::BasicBlockRequest &
 BlockGenPlanning::get(const MachineBasicBlock &MBB) const {
-  assert(Plan.count(&MBB));
-  return Plan.at(&MBB);
+  assert(Req);
+  assert(Req->count(&MBB));
+  return Req->at(&MBB);
 }
 
 bool BlockGenPlanning::runOnMachineFunction(MachineFunction &MF) {
-  assert(Plan.empty());
   auto *GenCtx = &getAnalysis<GeneratorContextWrapper>().getContext();
   auto *MLI = &getAnalysis<MachineLoopInfo>();
 
   BlockGenPlanningImpl Impl(GenCtx, MLI);
-  Plan = Impl.processFunction(MF);
+  Req = Impl.processFunction(MF);
 
   return true;
 }
 
-void BlockGenPlanning::releaseMemory() { Plan.clear(); }
+void BlockGenPlanning::releaseMemory() { Req->clear(); }
 
 } // namespace snippy
 } // namespace llvm

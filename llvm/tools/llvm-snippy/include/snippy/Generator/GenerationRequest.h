@@ -18,16 +18,15 @@
 /// inside it.
 ///
 /// Generation requests workflow:
-///   1. Only function generation requests should be created by hand.
-///   2. You can get generation requests for a block from corresponding function
+///   1. You can get generation requests for a block from corresponding function
 ///      request.
-///   3. Block generation request consists of instruction group requests. Only
-///      instruction groups expected to be generated in block (except final).
-///   4. When you generate instruction group you can get next generation opcode
-///      corresponding to the current generation policy and check whether
-///      request is completed. After successful opcode generation you should
-///      check if you need to change policy and update it in the request.
-///   5. After processing all blocks request for a function, final requests must
+///   2. Block generation request consists of instruction group requests. Only
+///      instruction groups expected to be generated in block.
+///   3. When you generate instruction group you can get next instruction
+///      request corresponding to the current generation policy and check
+///      whether request is completed. After successful opcode generation you
+///      should check if you need to change policy and update it in the request.
+///   4. After processing all blocks request for a function, final requests must
 ///      be processed. They consist of generation-mode specific requests and
 ///      request for generation final instruction.
 ///
@@ -42,497 +41,313 @@
 
 #pragma once
 
-#include "snippy/Generator/BlockGenPlan.h"
+#include "snippy/Generator/GenerationLimit.h"
+#include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Generator/Policy.h"
 #include "snippy/Target/Target.h"
 
 namespace llvm {
 namespace snippy {
 
-struct GenerationResult;
+namespace planning {
 
-raw_ostream &operator<<(raw_ostream &OS, GenerationMode GM);
+class InstructionGroupRequest final {
+  RequestLimit Limit;
+  GenPolicy Policy;
 
-// Return how many primary instrs were generated and size of all genrated instrs
-struct GenerationStatistics final {
-  size_t NumOfInstrs;
-  size_t GeneratedSize;
+public:
+  template <typename LimitTy>
+  InstructionGroupRequest(LimitTy ReqLimit, GenPolicy Pol)
+      : Limit(std::move(ReqLimit)), Policy(std::move(Pol)) {}
 
-  GenerationStatistics(size_t NumOfInstrs = 0, size_t GeneratedSize = 0)
-      : NumOfInstrs(NumOfInstrs), GeneratedSize(GeneratedSize) {}
-
-  void merge(const GenerationResult &Res);
-
-  void merge(const GenerationStatistics &Statistics) {
-    NumOfInstrs += Statistics.NumOfInstrs;
-    GeneratedSize += Statistics.GeneratedSize;
+  std::optional<InstructionRequest> next() const {
+    return planning::next(Policy);
   }
 
-  void print(raw_ostream &OS) const;
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-  LLVM_DUMP_METHOD void dump() const { print(dbgs()); }
-#endif
+  void changePolicy(GenPolicy NewPolicy) { Policy = std::move(NewPolicy); }
+
+  bool isLimitReached(const GenerationStatistics &Stats) const {
+    return Limit.isReached(Stats);
+  }
+
+  const RequestLimit &limit() const & { return Limit; }
+  auto &policy() const & { return Policy; }
+  auto &policy() & { return Policy; }
+  void initialize(InstructionGenerationContext &InstrGenCtx) const {
+    planning::initialize(Policy, InstrGenCtx, Limit);
+  }
+
+  void finalize(InstructionGenerationContext &InstrGenCtx) const {
+    planning::finalize(Policy, InstrGenCtx);
+  }
+
+  void print(raw_ostream &OS, size_t Indent = 0) const {
+    OS.indent(Indent) << "InstrGroupGenerationRequest<" << Limit.getAsString()
+                      << "> -- ";
+    planning::print(Policy, OS);
+    OS << "\n";
+  }
+
+  bool isInseparableBundle() const {
+    return planning::isInseparableBundle(Policy);
+  }
+};
+
+class InstrGroupGenerationRAIIWrapper final {
+  const InstructionGroupRequest &IG;
+  InstructionGenerationContext &InstrGenCtx;
+
+public:
+  InstrGroupGenerationRAIIWrapper(InstructionGroupRequest &Req,
+                                  InstructionGenerationContext &InstrGenCtx)
+      : IG(Req), InstrGenCtx(InstrGenCtx) {
+    IG.initialize(InstrGenCtx);
+  }
+
+  ~InstrGroupGenerationRAIIWrapper() { IG.finalize(InstrGenCtx); }
 };
 
 namespace detail {
-
-struct ICompletableGenReq {
-  [[nodiscard]] virtual bool
-  isCompleted(const GenerationStatistics &CurrentStats) const = 0;
-  [[nodiscard]] virtual std::optional<size_t>
-  getGenerationLimit(GenerationMode GM) const = 0;
-  virtual ~ICompletableGenReq() = default;
-};
-
-} // namespace detail
-
-struct IInstrGroupGenReq : virtual public detail::ICompletableGenReq {
-  [[nodiscard]] virtual bool
-  canGenerateMore(const GenerationStatistics &CommittedStats,
-                  size_t NewGeneratedCodeSize) const {
-    return true;
-  }
-
-  virtual void changePolicy(GenPolicy NewPolicy) = 0;
-
-  [[nodiscard]] virtual unsigned genOpc() = 0;
-
-  // Burst group id from BurstGram groupings. If nullopt, then plain instruction
-  // generation is required.
-  [[nodiscard]] virtual std::optional<size_t> getBurstGroupID() const {
-    return std::nullopt;
-  }
-
-  virtual void print(raw_ostream &OS, size_t Indent = 0) const = 0;
-
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-  LLVM_DUMP_METHOD void dump() const { print(dbgs()); }
-#endif
-};
-
-struct IMBBGenReq;
-
-class MBBGenReqIterator final {
-  IMBBGenReq &Req;
-  IInstrGroupGenReq *Elem;
+class InstrRequestIterator final {
+  const GenPolicy &Policy;
+  std::optional<InstructionRequest> CurrentReq;
 
 public:
-  using difference_type = void;
-  using value_type = IInstrGroupGenReq;
-  using pointer_type = IInstrGroupGenReq *;
-  using reference_type = IInstrGroupGenReq &;
+  InstrRequestIterator(const GenPolicy &Pol) : Policy(Pol) {
+    CurrentReq = planning::next(Policy);
+  }
+
+  using value_type = InstructionRequest;
+  using pointer = value_type *;
+  using reference = value_type &;
+  using difference_type = std::ptrdiff_t;
   using iterator_category = std::input_iterator_tag;
 
-  MBBGenReqIterator(IMBBGenReq &Req);
-  MBBGenReqIterator(IMBBGenReq &Req, std::nullptr_t);
+  operator bool() const { return CurrentReq.has_value(); }
 
-  MBBGenReqIterator &operator++();
-
-  IInstrGroupGenReq &operator*() {
-    assert(Elem);
-    return *Elem;
-  }
-  IInstrGroupGenReq *operator->() {
-    assert(Elem);
-    return Elem;
+  value_type operator*() {
+    assert(CurrentReq);
+    return *CurrentReq;
   }
 
-  bool operator!=(const MBBGenReqIterator &Other) const {
-    return !(*this == Other);
+  pointer operator->() & {
+    assert(CurrentReq);
+    return std::addressof(*CurrentReq);
   }
 
-  bool operator==(const MBBGenReqIterator &Other) const {
-    return &Req == &Other.Req && Elem == Other.Elem;
+  InstrRequestIterator &operator++() {
+    CurrentReq = next(Policy);
+    return *this;
+  }
+  InstrRequestIterator operator++(int) {
+    auto Tmp = *this;
+    ++*this;
+    return Tmp;
   }
 };
 
-struct IMBBGenReq : virtual public detail::ICompletableGenReq {
-  [[nodiscard]] virtual IInstrGroupGenReq *nextSubRequest() = 0;
-
-  [[nodiscard]] virtual MBBGenReqIterator begin() = 0;
-  [[nodiscard]] virtual MBBGenReqIterator end() = 0;
-
-  virtual void print(raw_ostream &OS, size_t Indent = 0) const = 0;
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-  LLVM_DUMP_METHOD void dump() const { print(dbgs()); }
-#endif
-};
-
-struct IFunctionGenReq : virtual public detail::ICompletableGenReq {
-  [[nodiscard]] virtual IMBBGenReq &
-  getMBBGenerationRequest(const MachineBasicBlock &MBB) = 0;
-
-  [[nodiscard]] virtual std::vector<std::unique_ptr<IInstrGroupGenReq>>
-  getFinalGenReqs(const GenerationStatistics &MFStats) const = 0;
-
-  virtual void print(raw_ostream &OS, size_t Indent = 0) const = 0;
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-  LLVM_DUMP_METHOD void dump() const { print(dbgs()); }
-#endif
-};
-
-namespace detail {
-
-class NumInstrsGenReq : virtual public detail::ICompletableGenReq {
-protected:
-  // How many primary instructions we need to generate as a result of this
-  // request
-  size_t PrimaryInstrNum;
-
-  static constexpr GenerationMode kGM = GenerationMode::NumInstrs;
+class InstrRequestSentinel final {
+  const GenerationStatistics &Stats;
+  const RequestLimit &Limit;
 
 public:
-  NumInstrsGenReq(size_t PrimaryInstrNum) : PrimaryInstrNum(PrimaryInstrNum) {}
-
-  bool isCompleted(const GenerationStatistics &CurrentStats) const override {
-    return CurrentStats.NumOfInstrs >= PrimaryInstrNum;
-  }
-
-  std::optional<size_t> getGenerationLimit(GenerationMode GM) const override {
-    return GM == kGM ? std::make_optional(PrimaryInstrNum) : std::nullopt;
-  }
+  InstrRequestSentinel(const GenerationStatistics &Stats,
+                       const RequestLimit &Lim)
+      : Stats(Stats), Limit(Lim) {}
+  auto &limit() const { return Limit; }
+  auto &getGenStats() const { return Stats; }
 };
 
-class SizeGenReq : virtual public detail::ICompletableGenReq {
-protected:
-  // Max size in bytes for this request
-  size_t SizeLimit;
+inline bool operator==(const InstrRequestIterator &It,
+                       const InstrRequestSentinel &Sentinel) {
+  return (Sentinel.limit().isReached(Sentinel.getGenStats()) || !It);
+}
 
-  static constexpr GenerationMode kGM = GenerationMode::Size;
+inline bool operator==(const InstrRequestSentinel &Sentinel,
+                       const InstrRequestIterator &It) {
+  return It == Sentinel;
+}
+
+inline bool operator!=(const InstrRequestIterator &It,
+                       const InstrRequestSentinel &Sentinel) {
+  return !(It == Sentinel);
+}
+
+inline bool operator!=(const InstrRequestSentinel &Sentinel,
+                       const InstrRequestIterator &It) {
+  return !(Sentinel == It);
+}
+} // namespace detail
+
+class InstrRequestRange final {
+  GenerationStatistics &Stats;
+  const InstructionGroupRequest &Request;
 
 public:
-  SizeGenReq(size_t SizeLimitIn) : SizeLimit(SizeLimitIn) {}
+  InstrRequestRange(InstructionGroupRequest &Req, GenerationStatistics &Stats)
+      : Stats(Stats), Request(Req) {}
 
-  bool isCompleted(const GenerationStatistics &CurrentStats) const override {
-    return CurrentStats.GeneratedSize >= SizeLimit;
+  auto begin() const { return detail::InstrRequestIterator(Request.policy()); }
+
+  auto end() const {
+    return detail::InstrRequestSentinel(Stats, Request.limit());
   }
-
-  std::optional<size_t> getGenerationLimit(GenerationMode GM) const override {
-    return GM == kGM ? std::make_optional(SizeLimit) : std::nullopt;
-  }
-};
-
-class MixedGenReq : public NumInstrsGenReq {
-protected:
-  static constexpr auto kGM = GenerationMode::Mixed;
-
-public:
-  MixedGenReq(size_t PrimaryInstrNum) : NumInstrsGenReq(PrimaryInstrNum) {}
-};
-
-template <GenerationMode> struct GenerationModeToRequestPolicy;
-
-template <> struct GenerationModeToRequestPolicy<GenerationMode::NumInstrs> {
-  using RequestPolicy = NumInstrsGenReq;
-};
-
-template <> struct GenerationModeToRequestPolicy<GenerationMode::Size> {
-  using RequestPolicy = SizeGenReq;
-};
-
-template <> struct GenerationModeToRequestPolicy<GenerationMode::Mixed> {
-  using RequestPolicy = MixedGenReq;
 };
 
 constexpr auto SubReqIndentSize = 2;
 
-template <GenerationMode> class InstrGroupGenReq;
-
-template <GenerationMode GM>
-class InstrGroupGenReqImpl
-    : public IInstrGroupGenReq,
-      public GenerationModeToRequestPolicy<GM>::RequestPolicy {
-protected:
-  GenPolicy Policy;
-
-  using RequestPolicy =
-      typename GenerationModeToRequestPolicy<GM>::RequestPolicy;
-  static_assert(RequestPolicy::kGM == GM);
+class BasicBlockRequest final : private std::vector<InstructionGroupRequest> {
+  const MachineBasicBlock *MBB = nullptr;
+  RequestLimit Limit;
 
 public:
-  InstrGroupGenReqImpl(size_t Limit, GenPolicy &&PolicyIn)
-      : IInstrGroupGenReq(), RequestPolicy(Limit), Policy(std::move(PolicyIn)) {
-    assert(Policy && "Empty policy!");
+  BasicBlockRequest(const MachineBasicBlock &MBB)
+      : MBB(&MBB), Limit(RequestLimit::NumInstrs{}) {}
+
+  const MachineBasicBlock &getMBB() const {
+    assert(MBB);
+    return *MBB;
   }
 
-  InstrGroupGenReqImpl(const InstrGroupGenReqImpl &) = delete;
-  InstrGroupGenReqImpl(InstrGroupGenReqImpl &&) = delete;
+  RequestLimit &limit() & { return Limit; }
 
-  void changePolicy(GenPolicy NewPolicy) override {
-    assert(NewPolicy && "Empty new policy!");
-    Policy.swap(NewPolicy);
-    assert(Policy);
+  const RequestLimit &limit() const & { return Limit; }
+
+  bool isLimitReached(const GenerationStatistics &Stats) const {
+    return Limit.isReached(Stats);
   }
 
-  unsigned genOpc() override { return Policy->genNextOpc(); }
+  using vector::begin;
+  using vector::cbegin;
+  using vector::cend;
+  using vector::end;
 
-  void print(raw_ostream &OS, size_t Indent) const override {
-    OS.indent(Indent) << "InstrGroupGenerationRequest<" << GM
-                      << ">: " << getGenerationLimit(GM) << "\n";
+  using vector::empty;
+  using vector::size;
+
+  void print(raw_ostream &OS, size_t Indent = 0) const {
+    OS.indent(Indent) << "BasicBlockRequest<" << Limit.getAsString() << ">("
+                      << MBB->getFullName() << ")\n";
+    for_each(*this,
+             [&](auto &Req) { Req.print(OS, Indent + SubReqIndentSize); });
+  }
+
+  void add(InstructionGroupRequest IG) {
+    vector::emplace_back(std::move(IG));
+    Limit += vector::back().limit();
   }
 };
 
-template <>
-class InstrGroupGenReq<GenerationMode::NumInstrs> final
-    : public InstrGroupGenReqImpl<GenerationMode::NumInstrs> {
-public:
-  InstrGroupGenReq(size_t NumInstr, GenPolicy &&PolicyIn)
-      : InstrGroupGenReqImpl(NumInstr, std::move(PolicyIn)) {}
-};
+class FunctionRequest final
+    : private std::map<const MachineBasicBlock *, BasicBlockRequest, MIRComp> {
+  const MachineFunction *MF = nullptr;
+  RequestLimit Limit;
+  const MCInstrDesc *FinalInstrDesc = nullptr;
+  GeneratorContext *GC = nullptr;
 
-template <>
-class InstrGroupGenReq<GenerationMode::Size> final
-    : public InstrGroupGenReqImpl<GenerationMode::Size> {
-public:
-  InstrGroupGenReq(size_t SizeLimit, GenPolicy &&PolicyIn)
-      : InstrGroupGenReqImpl(SizeLimit, std::move(PolicyIn)) {}
-
-  bool canGenerateMore(const GenerationStatistics &CommittedStats,
-                       size_t NewGeneratedCodeSize) const override {
-    return CommittedStats.GeneratedSize + NewGeneratedCodeSize <= SizeLimit;
-  }
-};
-
-class BurstGroupGenReq final
-    : public InstrGroupGenReqImpl<GenerationMode::NumInstrs> {
-  size_t BurstGroupId;
-
-public:
-  BurstGroupGenReq(size_t NumInstr, size_t GroupId, GenPolicy &&PolicyIn)
-      : InstrGroupGenReqImpl(NumInstr, std::move(PolicyIn)),
-        BurstGroupId(GroupId) {}
-
-  std::optional<size_t> getBurstGroupID() const override {
-    return BurstGroupId;
-  }
-
-  void print(raw_ostream &OS, size_t Indent) const override {
-    OS.indent(Indent) << "BurstGroupGenerationRequest: " << PrimaryInstrNum
-                      << "\n";
-  }
-};
-
-template <GenerationMode GM>
-class MBBGenReq final
-    : public IMBBGenReq,
-      public GenerationModeToRequestPolicy<GM>::RequestPolicy {
-protected:
-  using RequestPolicy =
-      typename GenerationModeToRequestPolicy<GM>::RequestPolicy;
-  static_assert(RequestPolicy::kGM == GM);
-
-  using SubReqStorage = std::vector<std::unique_ptr<IInstrGroupGenReq>>;
-  GeneratorContext &SGCtx;
-  const MachineBasicBlock &MBB;
-  SubReqStorage SubReqs;
-  size_t SubReqsGenerated = 0;
-
-  auto getPolicy(std::optional<unsigned> BurstGroupID = std::nullopt) const {
-    auto &SnpTgt = SGCtx.getLLVMState().getSnippyTarget();
-    return SnpTgt.getGenerationPolicy(MBB, SGCtx, BurstGroupID);
-  }
-
-  auto getFinalInstPolicy(unsigned Opc) const {
-    return std::make_unique<FinalInstPolicy>(Opc);
+  void checkLimitCompatibility(const RequestLimit &Limit) const {
+    assert(!(Limit.isNumLimit() && Limit.isSizeLimit()) &&
+           "Num instrs generation mode for block is incompatible with "
+           "function generation by size");
+    assert(
+        (Limit.isSizeLimit() || Limit.isNumLimit()) &&
+        "Instruction group generation mode can be either num instrs or size");
+    assert(!(Limit.isSizeLimit() && Limit.isNumLimit()) &&
+           "Size generation mode for block is incompatible with function "
+           "generation by num instrs");
   }
 
 public:
-  MBBGenReq(const SingleBlockGenPlanTy &Plan, const MachineBasicBlock &MBB,
-            GeneratorContext &SGCtx)
-      : IMBBGenReq(), RequestPolicy(Plan.limit(GM).value()), SGCtx(SGCtx),
-        MBB(MBB) {
-    assert(GM == Plan.genMode());
-    auto &Packs = Plan.packs();
-    auto CreateSubReq =
-        [this](const InstPackTy &Pack) -> SubReqStorage::value_type {
-      auto Limit = Pack.getLimit();
-      if (Pack.isBurst()) {
-        auto GroupId = Pack.getGroupId();
-        return std::make_unique<BurstGroupGenReq>(Limit, GroupId,
-                                                  getPolicy(GroupId));
-      }
-      return std::make_unique<InstrGroupGenReq<GM>>(Limit, getPolicy());
-    };
+  FunctionRequest(const MachineFunction &MFn, GeneratorContext &GC,
+                  const MCInstrDesc *FinalInstrDesc = nullptr)
+      // FIXME: Mixed limit there to accept both SizeLimit and NumInstrsLimit.
+      : MF(&MFn), Limit(RequestLimit::Mixed{}), FinalInstrDesc(FinalInstrDesc),
+        GC(&GC){};
 
-    std::transform(Packs.begin(), Packs.end(), std::back_inserter(SubReqs),
-                   CreateSubReq);
+  void setFinalInstr(const MCInstrDesc *Desc) { FinalInstrDesc = Desc; }
+
+  void addToBlock(const MachineBasicBlock *MBB, InstructionGroupRequest IG) {
+    assert(MBB);
+    checkLimitCompatibility(IG.limit());
+    auto Found = map::find(MBB);
+    if (Found == map::end()) {
+      BasicBlockRequest BB(*MBB);
+      BB.add(std::move(IG));
+      add(MBB, std::move(BB));
+    } else {
+      auto &BB = Found->second;
+      auto Lim = IG.limit();
+      BB.add(std::move(IG));
+      Limit += Lim;
+    }
   }
 
-  MBBGenReqIterator begin() override { return {*this}; }
-  MBBGenReqIterator end() override { return {*this, nullptr}; }
-
-  IInstrGroupGenReq *nextSubRequest() override {
-    if (SubReqsGenerated >= SubReqs.size())
-      return nullptr;
-
-    auto &SubReq = SubReqs[SubReqsGenerated];
-    assert(SubReq);
-    ++SubReqsGenerated;
-    return SubReq.get();
+  bool isLimitReached(const GenerationStatistics &Stats) const {
+    return Limit.isReached(Stats);
+  }
+  void add(const MachineBasicBlock *MBB, BasicBlockRequest &&BB) {
+    assert(MBB);
+    checkLimitCompatibility(BB.limit());
+    auto [It, WasInserted] = map::try_emplace(MBB, std::move(BB));
+    assert(WasInserted);
+    Limit += It->second.limit();
   }
 
-  void print(raw_ostream &OS, size_t Indent) const override {
-    OS.indent(Indent) << "MBBGenerationRequest<" << GM << ">("
-                      << MBB.getFullName() << "): " << getGenerationLimit(GM)
-                      << "\n";
-    for (auto &&Req : SubReqs)
-      Req->print(OS, Indent + SubReqIndentSize);
-  }
-};
+  const RequestLimit &limit() const & { return Limit; }
 
-template <GenerationMode GM>
-class FunctionGenReqImpl
-    : public IFunctionGenReq,
-      public GenerationModeToRequestPolicy<GM>::RequestPolicy {
-protected:
-  using RequestPolicy =
-      typename GenerationModeToRequestPolicy<GM>::RequestPolicy;
+  using map::begin;
+  using map::cbegin;
+  using map::cend;
+  using map::end;
 
-  // We store all generation requests as unique pointers because mixed
-  // generation request can contain both num instrs requests and size requests
-  using MBBGenReqT = std::unique_ptr<IMBBGenReq>;
-  // We need ordered map with special comparator to make print reproducible
-  using ReqsMap = std::map<const MachineBasicBlock *, MBBGenReqT, MIRComp>;
+  using map::at;
+  using map::clear;
+  using map::count;
+  using map::empty;
+  using map::find;
+  using map::size;
 
-  static_assert(RequestPolicy::kGM == GM);
-
-  const MCInstrDesc *FinalInstDesc;
-  const MachineFunction &MF;
-  ReqsMap BBReqs;
-  GeneratorContext &SGCtx;
-
-  virtual std::vector<std::unique_ptr<IInstrGroupGenReq>>
-  getSpecificFinalGenReqs(const GenerationStatistics &MFStats) const {
-    return {};
-  }
-
-public:
-  FunctionGenReqImpl(const MachineFunction &MF, const BlocksGenPlanTy &Plan,
-                     const MCInstrDesc *FinalInstDesc, GeneratorContext &SGCtx)
-      : IFunctionGenReq(), RequestPolicy([&Plan] {
-          return std::accumulate(
-              Plan.begin(), Plan.end(), size_t(0), [](size_t Acc, auto &Elem) {
-                auto GMToCount = GM == GenerationMode::Mixed
-                                     ? GenerationMode::NumInstrs
-                                     : GM;
-                return Acc + Elem.second.limit(GMToCount).value_or(0);
-              });
-        }()),
-        FinalInstDesc(FinalInstDesc), MF(MF), BBReqs(), SGCtx(SGCtx) {
-    std::transform(
-        MF.begin(), MF.end(), std::inserter(BBReqs, BBReqs.end()),
-        [&](const auto &MBB)
-            -> std::pair<const MachineBasicBlock *, MBBGenReqT> {
-          const SingleBlockGenPlanTy &BBPlan = Plan.at(&MBB);
-          if (BBPlan.genMode() == GenerationMode::NumInstrs) {
-            assert(GM != GenerationMode::Size &&
-                   "Num instrs generation mode for block is incompatible with "
-                   "function generation by size");
-            return std::make_pair(
-                &MBB,
-                std::make_unique<detail::MBBGenReq<GenerationMode::NumInstrs>>(
-                    BBPlan, MBB, SGCtx));
-          }
-          assert(BBPlan.genMode() == GenerationMode::Size &&
-                 "BBPlan generation mode can be either num instrs or size");
-          assert(GM != GenerationMode::NumInstrs &&
-                 "Size generation mode for block is incompatible with function "
-                 "generation by num instrs");
-          return std::make_pair(
-              &MBB, std::make_unique<detail::MBBGenReq<GenerationMode::Size>>(
-                        BBPlan, MBB, SGCtx));
-        });
-  }
-
-  IMBBGenReq &getMBBGenerationRequest(const MachineBasicBlock &MBB) override {
-    return *BBReqs.at(&MBB);
-  }
-
-  std::vector<std::unique_ptr<IInstrGroupGenReq>>
-  getFinalGenReqs(const GenerationStatistics &MFStats) const override {
+  std::vector<InstructionGroupRequest>
+  getFinalGenReqs(const GenerationStatistics &MFStats) const {
     auto Reqs = getSpecificFinalGenReqs(MFStats);
-    if (FinalInstDesc)
-      Reqs.emplace_back(
-          std::make_unique<detail::InstrGroupGenReq<GenerationMode::NumInstrs>>(
-              1,
-              std::make_unique<FinalInstPolicy>(FinalInstDesc->getOpcode())));
+    if (FinalInstrDesc)
+      Reqs.emplace_back(RequestLimit::NumInstrs{1},
+                        FinalInstPolicy(FinalInstrDesc->getOpcode()));
     return Reqs;
   }
 
-  void print(raw_ostream &OS, size_t Indent) const override {
-    OS.indent(Indent) << "FunctionGenerationRequest<" << GM << ">("
-                      << MF.getName() << "): " << getGenerationLimit(GM)
-                      << "\n";
-    for (auto &[MBB, Req] : BBReqs)
-      Req->print(OS, Indent + SubReqIndentSize);
-  }
-};
-
-} // namespace detail
-
-template <GenerationMode> class FunctionGenReq;
-
-template <>
-class FunctionGenReq<GenerationMode::NumInstrs> final
-    : public detail::FunctionGenReqImpl<GenerationMode::NumInstrs> {
-  using BaseT = FunctionGenReqImpl<GenerationMode::NumInstrs>;
-
-public:
-  FunctionGenReq(const MachineFunction &MF, const BlocksGenPlanTy &Plan,
-                 const MCInstrDesc *FinalInstDesc, GeneratorContext &SGCtx)
-      : FunctionGenReqImpl(MF, Plan, FinalInstDesc, SGCtx) {}
-};
-
-template <>
-class FunctionGenReq<GenerationMode::Size> final
-    : public detail::FunctionGenReqImpl<GenerationMode::Size> {
-  using BaseT = FunctionGenReqImpl<GenerationMode::Size>;
-
-public:
-  FunctionGenReq(const MachineFunction &MF, const BlocksGenPlanTy &Plan,
-                 const MCInstrDesc *FinalInstDesc, GeneratorContext &SGCtx)
-      : FunctionGenReqImpl(MF, Plan, FinalInstDesc, SGCtx) {}
-
-  std::vector<std::unique_ptr<IInstrGroupGenReq>>
-  getSpecificFinalGenReqs(const GenerationStatistics &MFStats) const override {
-    assert(MFStats.GeneratedSize <= SizeLimit);
-    std::vector<std::unique_ptr<IInstrGroupGenReq>> Reqs;
-    auto SizeLeft = SizeLimit - MFStats.GeneratedSize;
-    auto &SnpTgt = SGCtx.getLLVMState().getSnippyTarget();
-    auto &&GP = SnpTgt.getGenerationPolicy(MF.back(), SGCtx, std::nullopt);
-    Reqs.emplace_back(
-        std::make_unique<detail::InstrGroupGenReq<GenerationMode::Size>>(
-            SizeLeft, std::move(GP)));
-    return Reqs;
-  }
-};
-
-template <>
-class FunctionGenReq<GenerationMode::Mixed> final
-    : public detail::FunctionGenReqImpl<GenerationMode::Mixed> {
-  using BaseT = FunctionGenReqImpl<GenerationMode::Size>;
-
-public:
-  FunctionGenReq(const MachineFunction &MF, const BlocksGenPlanTy &Plan,
-                 const MCInstrDesc *FinalInstDesc, GeneratorContext &SGCtx)
-      : FunctionGenReqImpl(MF, Plan, FinalInstDesc, SGCtx) {}
-
-  std::vector<std::unique_ptr<IInstrGroupGenReq>>
-  getSpecificFinalGenReqs(const GenerationStatistics &MFStats) const override {
-    if (MFStats.NumOfInstrs >= PrimaryInstrNum)
+  std::vector<InstructionGroupRequest>
+  getSpecificFinalGenReqs(const GenerationStatistics &MFStats) const {
+    // No specific final requests if limit is already reached or we have
+    // NumInstr limit.
+    if (Limit.isNumLimit() || Limit.isReached(MFStats))
       return {};
-
-    std::vector<std::unique_ptr<IInstrGroupGenReq>> Reqs;
-    auto NumInstrsLeft = PrimaryInstrNum - MFStats.NumOfInstrs;
-    auto &SnpTgt = SGCtx.getLLVMState().getSnippyTarget();
-    auto GP = SnpTgt.getGenerationPolicy(MF.back(), SGCtx,
-                                         /* BurstGroupID */ std::nullopt);
-    Reqs.emplace_back(
-        std::make_unique<detail::InstrGroupGenReq<GenerationMode::NumInstrs>>(
-            NumInstrsLeft, std::move(GP)));
+    std::vector<InstructionGroupRequest> Reqs;
+    auto &MBB = MF->back();
+    auto &SnpTgt = GC->getLLVMState().getSnippyTarget();
+    auto &&GP = DefaultGenPolicy(*GC, SnpTgt.getDefaultPolicyFilter(MBB, *GC),
+                                 SnpTgt.groupMustHavePrimaryInstr(MBB, *GC),
+                                 SnpTgt.getPolicyOverrides(MBB, *GC));
+    if (Limit.isSizeLimit()) {
+      auto SizeLeft = Limit.getSizeLeft(MFStats);
+      Reqs.emplace_back(RequestLimit::Size{SizeLeft}, std::move(GP));
+    } else if (Limit.isMixedLimit()) {
+      auto NumInstrsLeft = Limit.getNumInstrsLeft(MFStats);
+      Reqs.emplace_back(RequestLimit::NumInstrs{NumInstrsLeft}, std::move(GP));
+    }
     return Reqs;
+  }
+
+  void print(raw_ostream &OS, size_t Indent = 0) const {
+    OS.indent(Indent) << "FunctionGenerationRequest<" << Limit.getAsString()
+                      << ">(" << MF->getName() << ")\n";
+    for_each(*this, [&](auto &Pair) {
+      auto &[MBB, Req] = Pair;
+      Req.print(OS, Indent + SubReqIndentSize);
+    });
   }
 };
 
+} // namespace planning
 } // namespace snippy
 } // namespace llvm

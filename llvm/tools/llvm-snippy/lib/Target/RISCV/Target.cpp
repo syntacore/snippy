@@ -9,6 +9,7 @@
 #include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Generator/GlobalsPool.h"
 #include "snippy/Generator/LLVMState.h"
+#include "snippy/Generator/Policy.h"
 #include "snippy/Generator/RegisterPool.h"
 
 #include "snippy/Config/ImmediateHistogram.h"
@@ -767,8 +768,8 @@ breakDownAddrForInstrWithImmOffset(AddressInfo AddrInfo, const MachineInstr &MI,
 using OpcodeFilter = GeneratorContext::OpcodeFilter;
 
 static OpcodeFilter
-getDefaultPolicyFilter(const MachineBasicBlock &MBB,
-                       const RISCVGeneratorContext &RISCVCtx) {
+getDefaultPolicyFilterImpl(const MachineBasicBlock &MBB,
+                           const RISCVGeneratorContext &RISCVCtx) {
   if (!RISCVCtx.hasActiveRVVMode(MBB))
     return [](unsigned Opcode) {
       if (isRVV(Opcode) && !isRVVModeSwitch(Opcode))
@@ -899,22 +900,27 @@ public:
     return Regs;
   }
 
-  constexpr static auto UnlimitedPolicy = std::numeric_limits<unsigned>::max();
-
-  GenPolicy
-  getGenerationPolicy(const MachineBasicBlock &MBB, GeneratorContext &GenCtx,
-                      std::optional<unsigned> BurstGroupID) const override {
-    const auto &RISCVCtx =
-        GenCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
-    auto Filter = getDefaultPolicyFilter(MBB, RISCVCtx);
+  std::vector<OpcodeHistogramEntry>
+  getPolicyOverrides(const MachineBasicBlock &MBB,
+                     const GeneratorContext &GC) const override {
+    auto &RISCVCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
     auto Overrides = RISCVCtx.getVSETOverrides(MBB);
     takeVSETPrefIntoAccount(Overrides);
+    auto Entries = Overrides.getEntries();
+    return {Entries.begin(), Entries.end()};
+  }
 
-    bool MustHavePrimaryInstr = RISCVCtx.hasActiveRVVMode(MBB);
-    // Note: Filter can remove all opcodes
-    return GenCtx.createGenerationPolicy(UnlimitedPolicy, std::move(Filter),
-                                         MustHavePrimaryInstr, BurstGroupID,
-                                         Overrides.getEntries());
+  bool groupMustHavePrimaryInstr(const MachineBasicBlock &MBB,
+                                 const GeneratorContext &GC) const override {
+    auto &RISCVCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
+    return RISCVCtx.hasActiveRVVMode(MBB);
+  }
+
+  GeneratorContext::OpcodeFilter
+  getDefaultPolicyFilter(const MachineBasicBlock &MBB,
+                         const GeneratorContext &GC) const override {
+    auto &RISCVCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
+    return getDefaultPolicyFilterImpl(MBB, RISCVCtx);
   }
 
   void checkInstrTargetDependency(const OpcodeHistogram &H) const override {

@@ -23,6 +23,7 @@ struct OpcodeGeneratorInterface {
   virtual void print(llvm::raw_ostream &OS) const = 0;
   virtual void dump() const = 0;
   virtual unsigned generate() = 0;
+  virtual std::unique_ptr<OpcodeGeneratorInterface> copy() const = 0;
   virtual ~OpcodeGeneratorInterface() {}
 };
 
@@ -65,6 +66,9 @@ public:
     auto Idx = OpcodeDist(RandEngine::engine());
     assert(Idx < Opcodes.size());
     return Opcodes[Idx];
+  }
+  std::unique_ptr<OpcodeGeneratorInterface> copy() const override {
+    return std::make_unique<DefaultOpcodeGenerator>(*this);
   }
 
   const Distribution &getDistribution() const { return OpcodeDist; }
