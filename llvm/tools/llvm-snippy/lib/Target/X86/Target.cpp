@@ -62,12 +62,6 @@ public:
     reportUnimplementedError();
   }
 
-  GenPolicy
-  getGenerationPolicy(const MachineBasicBlock &MBB, GeneratorContext &GenCtx,
-                      std::optional<unsigned> BurstGroupID) const override {
-    reportUnimplementedError();
-  }
-
   void generateRegsInit(MachineBasicBlock &MBB, const IRegisterState &R,
                         GeneratorContext &GC) const override {
     reportUnimplementedError();
@@ -425,6 +419,22 @@ public:
   }
 
   bool isCall(unsigned Opcode) const override { reportUnimplementedError(); }
+
+  std::vector<OpcodeHistogramEntry>
+  getPolicyOverrides(const MachineBasicBlock &MBB,
+                     const GeneratorContext &GC) const override {
+    reportUnimplementedError();
+  }
+
+  bool groupMustHavePrimaryInstr(const MachineBasicBlock &MBB,
+                                 const GeneratorContext &GC) const override {
+    reportUnimplementedError();
+  }
+  std::function<bool(unsigned)>
+  getDefaultPolicyFilter(const MachineBasicBlock &MBB,
+                         const GeneratorContext &GC) const override {
+    reportUnimplementedError();
+  }
 
 }; // namespace
 
