@@ -456,6 +456,8 @@ public:
   virtual std::function<bool(unsigned)>
   getDefaultPolicyFilter(const MachineBasicBlock &MBB,
                          const GeneratorContext &GC) const = 0;
+  // Registers that should be valid while calling an external function
+  virtual std::vector<MCRegister> getGlobalStateRegs() const = 0;
 
 private:
   virtual bool matchesArch(Triple::ArchType Arch) const = 0;

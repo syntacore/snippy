@@ -535,6 +535,34 @@ std::vector<std::string> parseModelPluginList() {
   return Ret;
 }
 
+// Reserve global state registers so they won't be corrupted when we call
+// external function.
+static void reserveGlobalStateRegisters(RegPool &RP, const Config &Cfg,
+                                        const SnippyTarget &Tgt,
+                                        const MCRegisterInfo &RI) {
+  if (!Cfg.FuncDescs)
+    return;
+  auto IsExternalFunc = [&Descs = Cfg.FuncDescs->Descs](StringRef Name) {
+    auto Found =
+        find_if(Descs, [&](auto &Desc) { return Name.equals(Desc.Name); });
+    assert(Found != Descs.end());
+    return Found->External;
+  };
+  auto HasExternalCallee = [&](const FunctionDesc &Desc) {
+    return any_of(Desc.Callees, IsExternalFunc);
+  };
+
+  if (any_of(Cfg.FuncDescs->Descs, HasExternalCallee)) {
+    auto Regs = Tgt.getGlobalStateRegs();
+    for (auto Reg : Regs) {
+      RP.addReserved(Reg, AccessMaskBit::RW);
+      DEBUG_WITH_TYPE("snippy-regpool",
+                      (dbgs() << "Reserved Because of external callee:\n",
+                       RP.print(dbgs())));
+    }
+  }
+}
+
 static void parseReservedRegistersOption(RegPool &RP, const SnippyTarget &Tgt,
                                          const MCRegisterInfo &RI) {
   for (auto &&RegName : ReservedRegisterList) {
@@ -914,6 +942,8 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
   auto Models = parseModelPluginList();
   bool RunOnModel = !Models.empty();
   parseReservedRegistersOption(RP, State.getSnippyTarget(), State.getRegInfo());
+  reserveGlobalStateRegisters(RP, Cfg, State.getSnippyTarget(),
+                              State.getRegInfo());
   auto SpilledRegs = parseSpilledRegistersOption(
       RP, State.getSnippyTarget(), State.getRegInfo(), State.getCtx());
   std::string DumpPathInitialState = deriveDefaultableOptionValue(
