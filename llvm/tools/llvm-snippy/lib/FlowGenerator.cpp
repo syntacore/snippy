@@ -443,8 +443,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
 
   SmallString<32> Output;
   raw_svector_ostream OS(Output);
-  PM.addAsmPrinter(LLVMTM, OS, nullptr, CodeGenFileType::CGFT_ObjectFile,
-                   Context);
+  PM.addAsmPrinter(LLVMTM, OS, nullptr, CodeGenFileType::ObjectFile, Context);
 
   PM.run(M);
 

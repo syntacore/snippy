@@ -19,6 +19,8 @@
 #include "snippy/Support/YAMLUtils.h"
 #include "snippy/Target/TargetConfigIface.h"
 
+#include "llvm/ADT/SmallSet.h"
+
 namespace llvm {
 namespace snippy {
 

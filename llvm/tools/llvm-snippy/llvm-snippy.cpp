@@ -530,7 +530,7 @@ std::vector<std::string> parseModelPluginList() {
 
   std::vector<std::string> Ret{ModelPluginFile.getValue()};
   copy(CoSimModelPluginFilesList, std::back_inserter(Ret));
-  erase_value(Ret, "None");
+  erase(Ret, "None");
 
   return Ret;
 }
