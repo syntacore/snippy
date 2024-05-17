@@ -1678,6 +1678,12 @@ public:
             RISCV::X27};
   }
 
+  // X3 is a thread pointer and X4 is a global pointer. We must preserve them so
+  // they have valid values when we call external functions.
+  std::vector<MCRegister> getGlobalStateRegs() const override {
+    return {RISCV::X3, RISCV::X4};
+  }
+
   MCRegister getStackPointer() const override { return RISCV::X2; }
 
   void generateSpill(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
