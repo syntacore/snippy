@@ -436,6 +436,9 @@ public:
     reportUnimplementedError();
   }
 
+  std::vector<MCRegister> getGlobalStateRegs() const override {
+    reportUnimplementedError();
+  }
 }; // namespace
 
 bool SnippyX86Target::matchesArch(Triple::ArchType Arch) const {
