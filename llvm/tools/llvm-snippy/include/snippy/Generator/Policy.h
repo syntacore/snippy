@@ -67,6 +67,7 @@
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Generator/GenerationLimit.h"
 #include "snippy/Generator/RegisterPool.h"
+#include "snippy/Generator/SelfCheckInfo.h"
 #include "snippy/Support/OpcodeGenerator.h"
 
 #include <functional>
@@ -123,8 +124,11 @@ public:
 struct InstructionGenerationContext final {
   MachineBasicBlock &MBB;
   MachineBasicBlock::iterator Ins;
-  RegPoolWrapper &RP;
+  RegPoolWrapper *RP;
   GeneratorContext &GC;
+  SelfCheckInfo *SelfCheck = nullptr;
+  unsigned SizeErrorCount = 0;
+  unsigned BacktrackCount = 0;
 };
 
 struct InstructionRequest final {
