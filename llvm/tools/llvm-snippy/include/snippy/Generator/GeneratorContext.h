@@ -79,6 +79,7 @@ private:
   constexpr static auto kPageSize = 0x1000u;
 
   MachineModuleInfo *MMI = nullptr;
+  MachineLoopInfo *MLI = nullptr;
   LLVMState *State = nullptr;
   std::vector<RegPool> RegPoolsStorage;
   RegisterGenerator *RegGen = nullptr;
@@ -327,6 +328,9 @@ public:
   void notifyMemUpdate(uint64_t Addr, const APInt &Value) const;
 
   auto &getMMI() const { return *MMI; }
+  auto *getMachineLoopInfo() { return MLI; }
+  auto *getMachineLoopInfo() const { return MLI; }
+  void setMachineLoopInfo(MachineLoopInfo &MLInfo) { MLI = &MLInfo; }
   auto &getLLVMState() const { return *State; }
 
   auto &getConfig() const {

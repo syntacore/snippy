@@ -10,22 +10,12 @@
 #define LLVM_TOOLS_SNIPPY_GENERATION_UTILS_H
 
 #include "snippy/Generator/GeneratorContext.h"
-#include "snippy/Generator/Policy.h"
 
 namespace llvm {
 namespace snippy {
-// NumDefs + NumAddrs might be more than a number of available regs. This
-// normalizes the number of regs to reserve for addrs.
-unsigned normalizeNumRegs(unsigned NumDefs, unsigned NumAddrs,
-                          unsigned NumRegs);
-
-// Count how many def regs of a register class RC the instruction has.
-unsigned countDefsHavingRC(ArrayRef<unsigned> Opcodes,
-                           const TargetRegisterInfo &RegInfo,
-                           const TargetRegisterClass &RC,
-                           const MCInstrInfo &InstrInfo);
-
-unsigned countAddrs(ArrayRef<unsigned> Opcodes, const SnippyTarget &SnippyTgt);
+namespace planning {
+class PreselectedOpInfo;
+} // namespace planning
 
 // For the given InstrDesc fill the vector of selected operands to account them
 // in instruction generation procedure.
@@ -59,9 +49,18 @@ selectAddressForSingleInstrFromBurstGroup(AddressInfo OrigAI,
                                           const AddressRestriction &OpcodeAR,
                                           GeneratorContext &GC);
 
-std::map<unsigned, AddressInfo> collectPrimaryAddresses(
-    const std::map<unsigned, AddressRestriction> &BaseRegToStrongestAR,
-    GeneratorContext &GC);
+AddressGenInfo chooseAddrGenInfoForInstrCallback(
+    LLVMContext &Ctx,
+    std::optional<GeneratorContext::LoopGenerationInfo> CurLoopGenInfo,
+    size_t AccessSize, size_t Alignment, const MemoryAccess &MemoryScheme);
+
+enum class MemAccessKind { BURST, REGULAR };
+void markMemAccessAsUsed(const MCInstrDesc &InstrDesc, const AddressInfo &AI,
+                         MemAccessKind Kind, GeneratorContext &GC);
+
+void addMemAccessToDump(const MemAddresses &ChosenAddresses,
+                        GeneratorContext &GC, size_t AccessSize);
+void dumpMemAccessesIfNeeded(GeneratorContext &GC);
 
 void initializeBaseRegs(
     MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
@@ -74,25 +73,6 @@ mapOpcodeIdxToAI(MachineBasicBlock &MBB, ArrayRef<unsigned> OpcodeIdxToBaseReg,
                  ArrayRef<unsigned> Opcodes, MachineBasicBlock::iterator Ins,
                  RegPoolWrapper &RP, GeneratorContext &SGCtx);
 
-AddressGenInfo chooseAddrGenInfoForInstrCallback(
-    LLVMContext &Ctx,
-    std::optional<GeneratorContext::LoopGenerationInfo> CurLoopGenInfo,
-    size_t AccessSize, size_t Alignment, const MemoryAccess &MemoryScheme);
-
-enum class MemAccessKind { BURST, REGULAR };
-
-
-void markMemAccessAsUsed(const MCInstrDesc &InstrDesc, const AddressInfo &AI,
-                         MemAccessKind Kind, GeneratorContext &GC);
-
-void addMemAccessToDump(const MemAddresses &ChosenAddresses,
-                        GeneratorContext &GC, size_t AccessSize);
-
-void dumpMemAccessesIfNeeded(GeneratorContext &GC);
-
-void dumpMemAccesses(StringRef Filename, const PlainAccessesType &Plain,
-                     const BurstGroupAccessesType &BurstRanges,
-                     const PlainAccessesType &BurstPlain, bool Restricted);
 } // namespace snippy
 } // namespace llvm
 #endif

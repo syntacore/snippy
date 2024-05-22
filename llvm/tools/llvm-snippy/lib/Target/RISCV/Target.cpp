@@ -1141,14 +1141,16 @@ public:
     MCCE.encodeInstruction(OutInst, OutBuf, Fixups, STI);
   }
 
-  void generateCustomInst(const MCInstrDesc &InstrDesc, MachineBasicBlock &MBB,
-                          GeneratorContext &GC,
-                          MachineBasicBlock::iterator Ins) const override {
+  void generateCustomInst(
+      const MCInstrDesc &InstrDesc,
+      planning::InstructionGenerationContext &InstrGenCtx) const override {
     assert(requiresCustomGeneration(InstrDesc));
     auto Opcode = InstrDesc.getOpcode();
     assert(isRVVModeSwitch(Opcode));
-    rvvGenerateModeSwitchAndUpdateContext(GC.getLLVMState().getInstrInfo(), MBB,
-                                          GC, Ins, Opcode);
+    auto &GC = InstrGenCtx.GC;
+    rvvGenerateModeSwitchAndUpdateContext(GC.getLLVMState().getInstrInfo(),
+                                          InstrGenCtx.MBB, GC, InstrGenCtx.Ins,
+                                          Opcode);
   }
 
   void instructionPostProcess(MachineInstr &MI, GeneratorContext &GC,
