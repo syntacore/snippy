@@ -16,7 +16,6 @@
 namespace llvm {
 namespace snippy {
 
-struct GenerationResult;
 // Return how many primary instrs were generated and size of all generated
 // instrs
 struct GenerationStatistics final {

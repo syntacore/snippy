@@ -7,7 +7,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Generator/GenerationUtils.h"
+#include "snippy/Generator/Policy.h"
 #include "snippy/Support/Options.h"
+#include "llvm/CodeGen/MachineLoopInfo.h"
+
+#include "llvm/Support/Debug.h"
 
 namespace llvm {
 namespace snippy {
@@ -181,6 +185,8 @@ unsigned countAddrs(ArrayRef<unsigned> Opcodes, const SnippyTarget &SnippyTgt) {
                          CountAddrsForOpcode);
 }
 
+// For the given InstrDesc fill the vector of selected operands to account them
+// in instruction generation procedure.
 std::vector<planning::PreselectedOpInfo>
 selectOperands(const MCInstrDesc &InstrDesc, unsigned BaseReg,
                const AddressInfo &AI) {
@@ -531,16 +537,6 @@ void initializeBaseRegs(
   }
 }
 
-
-AddressGenInfo chooseAddrGenInfoForInstrCallback(
-    LLVMContext &Ctx,
-    std::optional<GeneratorContext::LoopGenerationInfo> CurLoopGenInfo,
-    size_t AccessSize, size_t Alignment, const MemoryAccess &MemoryScheme) {
-  (void)CurLoopGenInfo; // for future extensibility
-  // AddressGenInfo for one element access.
-  return AddressGenInfo::singleAccess(AccessSize, Alignment, false /* Burst */);
-}
-
 // This function returns address info to use for each opcode.
 std::vector<AddressInfo>
 mapOpcodeIdxToAI(MachineBasicBlock &MBB, ArrayRef<unsigned> OpcodeIdxToBaseReg,
@@ -721,5 +717,6 @@ void dumpMemAccessesIfNeeded(GeneratorContext &GC) {
                     GC.getBurstRangeAccesses(), GC.getBurstPlainAccesses(),
                     /* Restricted */ true);
 }
+
 } // namespace snippy
 } // namespace llvm

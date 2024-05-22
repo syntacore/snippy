@@ -192,6 +192,37 @@ struct OverloadedCallable final : public ArgsTy... {
 template <typename... ArgsTy>
 OverloadedCallable(ArgsTy &&...Args) -> OverloadedCallable<ArgsTy...>;
 
+template <typename RetType, RetType AsOne, RetType AsZero>
+class AsOneGenerator final {
+  unsigned long long Period;
+  unsigned long long State;
+
+public:
+  AsOneGenerator(unsigned long long Period = 0)
+      : Period(Period), State(Period) {}
+
+  auto operator()() {
+    if (!State)
+      return AsZero;
+
+    --State;
+    if (State)
+      return AsZero;
+
+    State = Period;
+    return AsOne;
+  }
+};
+
+template <typename ValTy> APInt toAPInt(ValTy Val, unsigned Width) {
+  return APInt(Width, Val);
+}
+
+template <> inline APInt toAPInt<APInt>(APInt Val, unsigned Width) {
+  assert(Width >= Val.getBitWidth() && "Value is too long");
+  return Val;
+}
+
 } // namespace snippy
 } // namespace llvm
 

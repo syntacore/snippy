@@ -112,6 +112,7 @@ using RegToValueType = DenseMap<Register, APInt>;
 using AddressParts = SmallVector<AddressPart>;
 namespace planning {
 class GenPolicy;
+struct InstructionGenerationContext;
 } // namespace planning
 class SnippyTarget {
 public:
@@ -223,9 +224,9 @@ public:
   virtual void generateRegsInit(MachineBasicBlock &MBB, const IRegisterState &R,
                                 GeneratorContext &GC) const = 0;
 
-  virtual void generateCustomInst(const MCInstrDesc &InstrDesc,
-                                  MachineBasicBlock &MBB, GeneratorContext &GC,
-                                  MachineBasicBlock::iterator Ins) const = 0;
+  virtual void generateCustomInst(
+      const MCInstrDesc &InstrDesc,
+      planning::InstructionGenerationContext &InstrGenCtx) const = 0;
 
   virtual bool requiresCustomGeneration(const MCInstrDesc &InstrDesc) const = 0;
 
