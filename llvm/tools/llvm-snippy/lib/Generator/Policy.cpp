@@ -92,7 +92,7 @@ void BurstGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
   copy_if(map_range(Instructions, [](auto &&IR) { return IR.Opcode; }),
           std::back_inserter(MemUsers), IsMemUser);
   auto OpcodeIdxToBaseReg = generateBaseRegs(InstrGenCtx.MBB, MemUsers,
-                                             InstrGenCtx.RP, InstrGenCtx.GC);
+                                             *InstrGenCtx.RP, InstrGenCtx.GC);
 
   auto RP = InstrGenCtx.GC.getRegisterPool();
   auto OpcodeIdxToAI =
