@@ -71,9 +71,9 @@ public:
     reportUnimplementedError();
   }
 
-  void generateCustomInst(const MCInstrDesc &InstrDesc, MachineBasicBlock &MBB,
-                          GeneratorContext &GC,
-                          MachineBasicBlock::iterator Ins) const override {
+  void generateCustomInst(
+      const MCInstrDesc &InstrDesc,
+      planning::InstructionGenerationContext &InstrGenCtx) const override {
     reportUnimplementedError();
   }
   void instructionPostProcess(MachineInstr &MI, GeneratorContext &GC,
