@@ -6,6 +6,7 @@ add_llvm_library(LLVMSnippyGenerator
   GeneratorContext.cpp
   GenerationLimit.cpp
   GenerationUtils.cpp
+  Generation.cpp
   Interpreter.cpp
   Linker.cpp
   LLVMState.cpp
