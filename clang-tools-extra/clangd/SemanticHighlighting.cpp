@@ -265,7 +265,7 @@ bool isStatic(const Decl *D) {
 
 bool isAbstract(const Decl *D) {
   if (const auto *CMD = llvm::dyn_cast<CXXMethodDecl>(D))
-    return CMD->isPure();
+    return CMD->isPureVirtual();
   if (const auto *CRD = llvm::dyn_cast<CXXRecordDecl>(D))
     return CRD->hasDefinition() && CRD->isAbstract();
   return false;
@@ -418,7 +418,8 @@ class HighlightingsBuilder {
 public:
   HighlightingsBuilder(const ParsedAST &AST, const HighlightingFilter &Filter)
       : TB(AST.getTokens()), SourceMgr(AST.getSourceManager()),
-        LangOpts(AST.getLangOpts()), Filter(Filter) {}
+        LangOpts(AST.getLangOpts()), Filter(Filter),
+        Resolver(AST.getHeuristicResolver()) {}
 
   HighlightingToken &addToken(SourceLocation Loc, HighlightingKind Kind) {
     auto Range = getRangeForSourceLocation(Loc);
@@ -589,7 +590,7 @@ private:
   HighlightingFilter Filter;
   std::vector<HighlightingToken> Tokens;
   std::map<Range, llvm::SmallVector<HighlightingModifier, 1>> ExtraModifiers;
-  const HeuristicResolver *Resolver = nullptr;
+  const HeuristicResolver *Resolver;
   // returned from addToken(InvalidLoc)
   HighlightingToken InvalidHighlightingToken;
 };
@@ -617,7 +618,8 @@ std::optional<HighlightingModifier> scopeModifier(const NamedDecl *D) {
   if (DC->isTranslationUnit() && D->isTemplateParameter())
     return std::nullopt;
   // ExternalLinkage threshold could be tweaked, e.g. module-visible as global.
-  if (D->getLinkageInternal() < ExternalLinkage)
+  if (llvm::to_underlying(D->getLinkageInternal()) <
+      llvm::to_underlying(Linkage::External))
     return HighlightingModifier::FileScope;
   return HighlightingModifier::GlobalScope;
 }
@@ -715,13 +717,6 @@ public:
     return true;
   }
 
-  bool VisitClassScopeFunctionSpecializationDecl(
-      ClassScopeFunctionSpecializationDecl *D) {
-    if (auto *Args = D->getTemplateArgsAsWritten())
-      H.addAngleBracketTokens(Args->getLAngleLoc(), Args->getRAngleLoc());
-    return true;
-  }
-
   bool VisitDeclRefExpr(DeclRefExpr *E) {
     H.addAngleBracketTokens(E->getLAngleLoc(), E->getRAngleLoc());
     return true;
@@ -733,12 +728,6 @@ public:
 
   bool VisitTemplateSpecializationTypeLoc(TemplateSpecializationTypeLoc L) {
     H.addAngleBracketTokens(L.getLAngleLoc(), L.getRAngleLoc());
-    return true;
-  }
-
-  bool VisitAutoTypeLoc(AutoTypeLoc L) {
-    if (L.isConstrained())
-      H.addAngleBracketTokens(L.getLAngleLoc(), L.getRAngleLoc());
     return true;
   }
 
@@ -758,8 +747,6 @@ public:
     }
     if (auto *Args = D->getTemplateSpecializationArgsAsWritten())
       H.addAngleBracketTokens(Args->getLAngleLoc(), Args->getRAngleLoc());
-    if (auto *I = D->getDependentSpecializationInfo())
-      H.addAngleBracketTokens(I->getLAngleLoc(), I->getRAngleLoc());
     return true;
   }
 
@@ -953,13 +940,18 @@ public:
         kindForType(AT->getDeducedType().getTypePtrOrNull(), H.getResolver());
     if (!K)
       return true;
-    SourceLocation StartLoc = D->getTypeSpecStartLoc();
+    auto *TSI = D->getTypeSourceInfo();
+    if (!TSI)
+      return true;
+    SourceLocation StartLoc =
+        TSI->getTypeLoc().getContainedAutoTypeLoc().getNameLoc();
     // The AutoType may not have a corresponding token, e.g. in the case of
     // init-captures. In this case, StartLoc overlaps with the location
     // of the decl itself, and producing a token for the type here would result
     // in both it and the token for the decl being dropped due to conflict.
     if (StartLoc == D->getLocation())
       return true;
+
     auto &Tok =
         H.addToken(StartLoc, *K).addModifier(HighlightingModifier::Deduced);
     const Type *Deduced = AT->getDeducedType().getTypePtrOrNull();

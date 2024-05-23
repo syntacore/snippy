@@ -115,7 +115,7 @@ public:
 
   static void Terminate();
 
-  LLDB_DEPRECATED("Use one of the other Create variants", "Create(bool)")
+  LLDB_DEPRECATED_FIXME("Use one of the other Create variants", "Create(bool)")
   static lldb::SBDebugger Create();
 
   static lldb::SBDebugger Create(bool source_init_files);
@@ -208,14 +208,13 @@ public:
   lldb::SBListener GetListener();
 
 #ifndef SWIG
-  LLDB_DEPRECATED(
+  LLDB_DEPRECATED_FIXME(
       "Use HandleProcessEvent(const SBProcess &, const SBEvent &, SBFile, "
       "SBFile) or HandleProcessEvent(const SBProcess &, const SBEvent &, "
       "FileSP, FileSP)",
       "HandleProcessEvent(const SBProcess &, const SBEvent &, SBFile, SBFile)")
   void HandleProcessEvent(const lldb::SBProcess &process,
-                          const lldb::SBEvent &event, FILE *out,
-                          FILE *err);
+                          const lldb::SBEvent &event, FILE *out, FILE *err);
 #endif
 
   void HandleProcessEvent(const lldb::SBProcess &process,
@@ -332,8 +331,8 @@ public:
                           void *baton);
 
 #ifndef SWIG
-  LLDB_DEPRECATED("Use DispatchInput(const void *, size_t)",
-                  "DispatchInput(const void *, size_t)")
+  LLDB_DEPRECATED_FIXME("Use DispatchInput(const void *, size_t)",
+                        "DispatchInput(const void *, size_t)")
   void DispatchInput(void *baton, const void *data, size_t data_len);
 #endif
 
@@ -381,8 +380,10 @@ public:
 
   void SetREPLLanguage(lldb::LanguageType repl_lang);
 
+  LLDB_DEPRECATED("SBDebugger::GetCloseInputOnEOF() is deprecated.")
   bool GetCloseInputOnEOF() const;
 
+  LLDB_DEPRECATED("SBDebugger::SetCloseInputOnEOF() is deprecated.")
   void SetCloseInputOnEOF(bool b);
 
   SBTypeCategory GetCategory(const char *category_name);
@@ -485,6 +486,8 @@ private:
   friend class SBListener;
   friend class SBProcess;
   friend class SBSourceManager;
+  friend class SBStructuredData;
+  friend class SBPlatform;
   friend class SBTarget;
   friend class SBTrace;
 

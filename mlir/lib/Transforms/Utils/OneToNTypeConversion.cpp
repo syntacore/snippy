@@ -113,6 +113,11 @@ static const char *const castKindAttrName =
 /// result types. Returns the result values of the cast.
 static ValueRange buildUnrealizedCast(OpBuilder &builder, TypeRange resultTypes,
                                       ValueRange inputs, CastKind kind) {
+  // Special case: 1-to-N conversion with N = 0. No need to build an
+  // UnrealizedConversionCastOp because the op will always be dead.
+  if (resultTypes.empty())
+    return ValueRange();
+
   // Create cast.
   Location loc = builder.getUnknownLoc();
   if (!inputs.empty())
@@ -211,6 +216,8 @@ void OneToNPatternRewriter::replaceOp(Operation *op, ValueRange newValues,
   // original op with those.
   assert(newValues.size() == resultMapping.getConvertedTypes().size());
   assert(op->getResultTypes() == resultMapping.getOriginalTypes());
+  PatternRewriter::InsertionGuard g(*this);
+  setInsertionPointAfter(op);
   SmallVector<Value> castResults =
       buildUnrealizedBackwardsCasts(newValues, resultMapping, *this);
   replaceOp(op, castResults);
@@ -218,6 +225,8 @@ void OneToNPatternRewriter::replaceOp(Operation *op, ValueRange newValues,
 
 Block *OneToNPatternRewriter::applySignatureConversion(
     Block *block, OneToNTypeMapping &argumentConversion) {
+  PatternRewriter::InsertionGuard g(*this);
+
   // Split the block at the beginning to get a new block to use for the
   // updated signature.
   SmallVector<Location> locs;
@@ -285,9 +294,9 @@ OneToNConversionPattern::matchAndRewrite(Operation *op,
   //                    drive the pattern application ourselves, which is a lot
   //                    of additional boilerplate code. This seems to work fine,
   //                    so I leave it like this for the time being.
-  OneToNPatternRewriter oneToNPatternRewriter(rewriter.getContext());
+  OneToNPatternRewriter oneToNPatternRewriter(rewriter.getContext(),
+                                              rewriter.getListener());
   oneToNPatternRewriter.restoreInsertionPoint(rewriter.saveInsertionPoint());
-  oneToNPatternRewriter.setListener(rewriter.getListener());
 
   // Apply actual pattern.
   if (failed(matchAndRewrite(op, oneToNPatternRewriter, operandMapping,

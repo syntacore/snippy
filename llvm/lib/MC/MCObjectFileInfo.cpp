@@ -48,6 +48,14 @@ static bool useCompactUnwind(const Triple &T) {
   if (T.isiOS() && T.isX86())
     return true;
 
+  // The rest of the simulators always have it.
+  if (T.isSimulatorEnvironment())
+    return true;
+
+  // XROS always has it.
+  if (T.isXROS())
+    return true;
+
   return false;
 }
 
@@ -62,7 +70,8 @@ void MCObjectFileInfo::initMachOMCObjectFileInfo(const Triple &T) {
       SectionKind::getReadOnly());
 
   if (T.isOSDarwin() &&
-      (T.getArch() == Triple::aarch64 || T.getArch() == Triple::aarch64_32))
+      (T.getArch() == Triple::aarch64 || T.getArch() == Triple::aarch64_32 ||
+      T.isSimulatorEnvironment()))
     SupportsCompactUnwindWithoutEHFrame = true;
 
   switch (Ctx->emitDwarfUnwindInfo()) {
@@ -542,6 +551,13 @@ void MCObjectFileInfo::initGOFFMCObjectFileInfo(const Triple &T) {
   PPA1Section =
       Ctx->getGOFFSection(".ppa1", SectionKind::getMetadata(), TextSection,
                           MCConstantExpr::create(GOFF::SK_PPA1, *Ctx));
+  PPA2Section =
+      Ctx->getGOFFSection(".ppa2", SectionKind::getMetadata(), TextSection,
+                          MCConstantExpr::create(GOFF::SK_PPA2, *Ctx));
+  ADASection =
+      Ctx->getGOFFSection(".ada", SectionKind::getData(), nullptr, nullptr);
+  IDRLSection =
+      Ctx->getGOFFSection("B_IDRL", SectionKind::getData(), nullptr, nullptr);
 }
 
 void MCObjectFileInfo::initCOFFMCObjectFileInfo(const Triple &T) {
@@ -918,12 +934,18 @@ void MCObjectFileInfo::initWasmMCObjectFileInfo(const Triple &T) {
 void MCObjectFileInfo::initXCOFFMCObjectFileInfo(const Triple &T) {
   // The default csect for program code. Functions without a specified section
   // get placed into this csect. The choice of csect name is not a property of
-  // the ABI or object file format. For example, the XL compiler uses an unnamed
-  // csect for program code.
+  // the ABI or object file format, but various tools rely on the section
+  // name being empty (considering named symbols to be "user symbol names").
   TextSection = Ctx->getXCOFFSection(
-      ".text", SectionKind::getText(),
+      "..text..", // Use a non-null name to work around an AIX assembler bug...
+      SectionKind::getText(),
       XCOFF::CsectProperties(XCOFF::StorageMappingClass::XMC_PR, XCOFF::XTY_SD),
       /* MultiSymbolsAllowed*/ true);
+
+  // ... but use a null name when generating the symbol table.
+  MCSectionXCOFF *TS = static_cast<MCSectionXCOFF *>(TextSection);
+  TS->getQualNameSymbol()->setSymbolTableName("");
+  TS->setSymbolTableName("");
 
   DataSection = Ctx->getXCOFFSection(
       ".data", SectionKind::getData(),

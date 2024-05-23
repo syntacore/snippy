@@ -28,6 +28,15 @@ public:
 
   StringRef getPassName() const override { return "RISC-V Assembly Printer"; }
 
+  void LowerSTACKMAP(MCStreamer &OutStreamer, StackMaps &SM,
+                     const MachineInstr &MI);
+
+  void LowerPATCHPOINT(MCStreamer &OutStreamer, StackMaps &SM,
+                       const MachineInstr &MI);
+
+  void LowerSTATEPOINT(MCStreamer &OutStreamer, StackMaps &SM,
+                       const MachineInstr &MI);
+
   bool runOnMachineFunction(MachineFunction &MF) override;
 
   void emitInstruction(const MachineInstr *MI) override;
@@ -54,6 +63,7 @@ public:
   void emitEndOfAsmFile(Module &M) override;
 
   void emitFunctionEntryLabel() override;
+  bool emitDirectiveOptionArch();
 
   bool lowerToMCInst(const MachineInstr *MI, MCInst &OutMI);
 

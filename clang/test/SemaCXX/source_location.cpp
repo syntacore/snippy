@@ -1,7 +1,14 @@
 // RUN: %clang_cc1 -std=c++1z -fcxx-exceptions -fexceptions -verify %s
 // RUN: %clang_cc1 -std=c++2a -fcxx-exceptions -DUSE_CONSTEVAL -fexceptions -verify %s
+// RUN: %clang_cc1 -std=c++2b -fcxx-exceptions -DUSE_CONSTEVAL -DPAREN_INIT -fexceptions -verify %s
 // RUN: %clang_cc1 -std=c++1z -fcxx-exceptions -fms-extensions -DMS -fexceptions -verify %s
 // RUN: %clang_cc1 -std=c++2a -fcxx-exceptions -fms-extensions -DMS -DUSE_CONSTEVAL -fexceptions -verify %s
+//
+// RUN: %clang_cc1 -std=c++1z -fcxx-exceptions -fexceptions -fexperimental-new-constant-interpreter -DNEW_INTERP -verify %s
+// RUN: %clang_cc1 -std=c++2a -fcxx-exceptions -DUSE_CONSTEVAL -fexceptions -fexperimental-new-constant-interpreter -DNEW_INTERP -verify %s
+// RUN: %clang_cc1 -std=c++2b -fcxx-exceptions -DUSE_CONSTEVAL -DPAREN_INIT -fexceptions -fexperimental-new-constant-interpreter -DNEW_INTERP -verify %s
+// RUN: %clang_cc1 -std=c++1z -fcxx-exceptions -fms-extensions -DMS -fexceptions -fexperimental-new-constant-interpreter -DNEW_INTERP -verify %s
+// RUN: %clang_cc1 -std=c++2a -fcxx-exceptions -fms-extensions -DMS -DUSE_CONSTEVAL -fexceptions -fexperimental-new-constant-interpreter -DNEW_INTERP -verify %s
 // expected-no-diagnostics
 
 #define assert(...) ((__VA_ARGS__) ? ((void)0) : throw 42)
@@ -754,7 +761,7 @@ constexpr int test_init_capture(int a =
                 [b = SL::current().line()] { return b; }()) {
   return a;
 }
-#ifdef USE_CONSTEVAL
+#if defined(USE_CONSTEVAL) && !defined(NEW_INTERP)
 static_assert(test_init_capture() == __LINE__ - 4);
 #else
 static_assert(test_init_capture() == __LINE__ );
@@ -780,4 +787,48 @@ constexpr int f(int i = G<T>{}.line) {
 
 static_assert(f<int>() != // intentional new line
               f<int>());
+}
+
+#ifdef PAREN_INIT
+namespace GH63903 {
+struct S {
+    int _;
+    int i = SL::current().line();
+    int j = __builtin_LINE();
+};
+// Ensure parent aggregate initialization is consistent with brace
+// aggregate initialization.
+// Note: consteval functions are evaluated where they are used.
+static_assert(S(0).i == __builtin_LINE());
+static_assert(S(0).i == S{0}.i);
+static_assert(S(0).j == S{0}.j);
+static_assert(S(0).j == S{0}.i);
+}
+#endif
+
+namespace GH78128 {
+
+template<int N>
+constexpr int f() {
+  return N;
+}
+
+template<typename T>
+void foo() {
+  constexpr auto* F1 = std::source_location::current().function();
+  static_assert(__builtin_strlen(F1) == f<__builtin_strlen(F1)>());
+
+  constexpr auto* F2 = __builtin_FUNCTION();
+  static_assert(__builtin_strlen(F2) == f<__builtin_strlen(F2)>());
+
+#ifdef MS
+  constexpr auto* F3 = __builtin_FUNCSIG();
+  static_assert(__builtin_strlen(F3) == f<__builtin_strlen(F3)>());
+#endif
+}
+
+void test() {
+  foo<int>();
+}
+
 }

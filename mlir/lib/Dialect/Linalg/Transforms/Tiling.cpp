@@ -45,18 +45,6 @@ using namespace mlir::scf;
 
 #define DEBUG_TYPE "linalg-tiling"
 
-static bool isZero(OpFoldResult v) {
-  if (!v)
-    return false;
-  if (auto attr = llvm::dyn_cast_if_present<Attribute>(v)) {
-    IntegerAttr intAttr = dyn_cast<IntegerAttr>(attr);
-    return intAttr && intAttr.getValue().isZero();
-  }
-  if (auto cst = v.get<Value>().getDefiningOp<arith::ConstantIndexOp>())
-    return cst.value() == 0;
-  return false;
-}
-
 std::tuple<SmallVector<Range, 4>, LoopIndexToRangeIndexMap>
 mlir::linalg::makeTiledLoopRanges(RewriterBase &b, Location loc, AffineMap map,
                                   ArrayRef<OpFoldResult> allShapeSizes,
@@ -70,7 +58,8 @@ mlir::linalg::makeTiledLoopRanges(RewriterBase &b, Location loc, AffineMap map,
   // Traverse the tile sizes, which are in loop order, erase zeros everywhere.
   LoopIndexToRangeIndexMap loopIndexToRangeIndex;
   for (int idx = 0, e = tileSizes.size(), zerosCount = 0; idx < e; ++idx) {
-    if (isZero(tileSizes[idx - zerosCount])) {
+    if (getConstantIntValue(tileSizes[idx - zerosCount]) ==
+        static_cast<int64_t>(0)) {
       shapeSizes.erase(shapeSizes.begin() + idx - zerosCount);
       tileSizes.erase(tileSizes.begin() + idx - zerosCount);
       ++zerosCount;
@@ -379,14 +368,14 @@ static FailureOr<ForallTilingResult> tileToForallOpImpl(
     Operation *clonedOp = b.clone(*op.getOperation());
     auto destinationStyleOp = dyn_cast<DestinationStyleOpInterface>(clonedOp);
     if (destinationStyleOp) {
-      for (OpOperand *outOperand : destinationStyleOp.getDpsInitOperands()) {
+      for (OpOperand &outOperand : destinationStyleOp.getDpsInitsMutable()) {
         // Swap tensor inits with the corresponding block argument of the
         // scf.forall op. Memref inits remain as is.
-        if (outOperand->get().getType().isa<TensorType>()) {
-          auto *it = llvm::find(dest, outOperand->get());
+        if (outOperand.get().getType().isa<TensorType>()) {
+          auto *it = llvm::find(dest, outOperand.get());
           assert(it != dest.end() && "could not find destination tensor");
           unsigned destNum = std::distance(dest.begin(), it);
-          outOperand->set(destBbArgs[destNum]);
+          outOperand.set(destBbArgs[destNum]);
         }
       }
     }
@@ -473,7 +462,9 @@ tileLinalgOpImpl(RewriterBase &b, LinalgOp op, ArrayRef<OpFoldResult> tileSizes,
   // Initial tile sizes may be too big, only take the first nLoops.
   tileSizes = tileSizes.take_front(nLoops);
 
-  if (llvm::all_of(tileSizes, isZero)) {
+  if (llvm::all_of(tileSizes, [](OpFoldResult ofr) {
+        return getConstantIntValue(ofr) == static_cast<int64_t>(0);
+      })) {
     TiledLinalgOp tiledOp;
     tiledOp.op = cast<LinalgOp>(b.clone(*op.getOperation()));
     tiledOp.tensorResults.assign(tiledOp.op->result_begin(),
@@ -562,7 +553,7 @@ tileLinalgOpImpl(RewriterBase &b, LinalgOp op, ArrayRef<OpFoldResult> tileSizes,
     if (!options.interchangeVector.empty()) {
       for (AffineExpr result : invPermutationMap.getResults())
         interchangedIvs.push_back(
-            ivs[result.cast<AffineDimExpr>().getPosition()]);
+            ivs[cast<AffineDimExpr>(result).getPosition()]);
     } else {
       interchangedIvs.assign(ivs.begin(), ivs.end());
     }
@@ -711,8 +702,8 @@ FailureOr<linalg::ForallReductionTilingResult> linalg::tileReductionUsingForall(
     b.setInsertionPoint(forallOp.getTerminator());
 
     SmallVector<Value> tiledDpsInitOperands;
-    for (OpOperand *initOperand : destinationStyleOp.getDpsInitOperands()) {
-      auto *it = llvm::find(dest, initOperand->get());
+    for (Value initOperand : destinationStyleOp.getDpsInits()) {
+      auto *it = llvm::find(dest, initOperand);
       assert(it != dest.end() && "dest operand not found in dest");
       unsigned destNum = std::distance(dest.begin(), it);
       SmallVector<OpFoldResult> strides(numThreads.size(), b.getIndexAttr(1));
@@ -723,7 +714,7 @@ FailureOr<linalg::ForallReductionTilingResult> linalg::tileReductionUsingForall(
       outOffsets[reductionDim] = forallOp.getInductionVars().front();
       // TODO: use SubsetExtractOpInterface once it is available.
       tiledDpsInitOperands.push_back(b.create<tensor::ExtractSliceOp>(
-          loc, cast<RankedTensorType>(initOperand->get().getType()),
+          loc, cast<RankedTensorType>(initOperand.getType()),
           destBbArgs[destNum], outOffsets, sizes, strides));
     }
 
@@ -731,11 +722,11 @@ FailureOr<linalg::ForallReductionTilingResult> linalg::tileReductionUsingForall(
     // We cannot use a IRMapping here because it can replace
     // different OpOperands with the same value.
     Operation *clonedOp = b.clone(*op.getOperation());
-    b.updateRootInPlace(clonedOp, [&]() {
+    b.modifyOpInPlace(clonedOp, [&]() {
       for (auto [initOperandPtr, tiledInitValue] : llvm::zip_equal(
-               cast<DestinationStyleOpInterface>(clonedOp).getDpsInitOperands(),
+               cast<DestinationStyleOpInterface>(clonedOp).getDpsInitsMutable(),
                tiledDpsInitOperands)) {
-        initOperandPtr->set(tiledInitValue);
+        initOperandPtr.set(tiledInitValue);
       }
     });
 

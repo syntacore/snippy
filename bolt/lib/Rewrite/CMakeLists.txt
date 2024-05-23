@@ -5,6 +5,9 @@ set(LLVM_LINK_COMPONENTS
   MC
   Object
   Support
+  DWARFLinker
+  DWARFLinkerClassic
+  AsmPrinter
   TargetParser
   )
 
@@ -14,8 +17,12 @@ add_llvm_library(LLVMBOLTRewrite
   DWARFRewriter.cpp
   ExecutableFileMemoryManager.cpp
   JITLinkLinker.cpp
+  LinuxKernelRewriter.cpp
   MachORewriteInstance.cpp
+  MetadataManager.cpp
+  PseudoProbeRewriter.cpp
   RewriteInstance.cpp
+  SDTRewriter.cpp
 
   DISABLE_LLVM_LINK_LLVM_DYLIB
 
