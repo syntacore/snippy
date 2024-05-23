@@ -110,6 +110,18 @@ enum {
 
   HasRoundModeOpShift = IsSignExtendingOpWShift + 1,
   HasRoundModeOpMask = 1 << HasRoundModeOpShift,
+
+  UsesVXRMShift = HasRoundModeOpShift + 1,
+  UsesVXRMMask = 1 << UsesVXRMShift,
+
+  // Indicates whether these instructions can partially overlap between source
+  // registers and destination registers according to the vector spec.
+  // 0 -> not a vector pseudo
+  // 1 -> default value for vector pseudos. not widening or narrowing.
+  // 2 -> narrowing case
+  // 3 -> widening case
+  TargetOverlapConstraintTypeShift = UsesVXRMShift + 1,
+  TargetOverlapConstraintTypeMask = 3ULL << TargetOverlapConstraintTypeShift,
 };
 
 enum VLMUL : uint8_t {
@@ -172,6 +184,9 @@ static inline bool hasRoundModeOp(uint64_t TSFlags) {
   return TSFlags & HasRoundModeOpMask;
 }
 
+/// \returns true if this instruction uses vxrm
+static inline bool usesVXRM(uint64_t TSFlags) { return TSFlags & UsesVXRMMask; }
+
 static inline unsigned getVLOpNum(const MCInstrDesc &Desc) {
   const uint64_t TSFlags = Desc.TSFlags;
   // This method is only called if we expect to have a VL operand, and all
@@ -197,6 +212,35 @@ static inline unsigned getVecPolicyOpNum(const MCInstrDesc &Desc) {
   return Desc.getNumOperands() - 1;
 }
 
+/// \returns  the index to the rounding mode immediate value if any, otherwise
+/// returns -1.
+static inline int getFRMOpNum(const MCInstrDesc &Desc) {
+  const uint64_t TSFlags = Desc.TSFlags;
+  if (!hasRoundModeOp(TSFlags) || usesVXRM(TSFlags))
+    return -1;
+
+  // The operand order
+  // --------------------------------------
+  // | n-1 (if any)   | n-2  | n-3 | n-4 |
+  // | policy         | sew  | vl  | frm |
+  // --------------------------------------
+  return getVLOpNum(Desc) - 1;
+}
+
+/// \returns  the index to the rounding mode immediate value if any, otherwise
+/// returns -1.
+static inline int getVXRMOpNum(const MCInstrDesc &Desc) {
+  const uint64_t TSFlags = Desc.TSFlags;
+  if (!hasRoundModeOp(TSFlags) || !usesVXRM(TSFlags))
+    return -1;
+  // The operand order
+  // --------------------------------------
+  // | n-1 (if any)   | n-2  | n-3 | n-4  |
+  // | policy         | sew  | vl  | vxrm |
+  // --------------------------------------
+  return getVLOpNum(Desc) - 1;
+}
+
 // Is the first def operand tied to the first use operand. This is true for
 // vector pseudo instructions that have a merge operand for tail/mask
 // undisturbed. It's also true for vector FMA instructions where one of the
@@ -210,7 +254,6 @@ static inline bool isFirstDefTiedToFirstUse(const MCInstrDesc &Desc) {
 enum {
   MO_None = 0,
   MO_CALL = 1,
-  MO_PLT = 2,
   MO_LO = 3,
   MO_HI = 4,
   MO_PCREL_LO = 5,
@@ -221,11 +264,15 @@ enum {
   MO_TPREL_ADD = 10,
   MO_TLS_GOT_HI = 11,
   MO_TLS_GD_HI = 12,
+  MO_TLSDESC_HI = 13,
+  MO_TLSDESC_LOAD_LO = 14,
+  MO_TLSDESC_ADD_LO = 15,
+  MO_TLSDESC_CALL = 16,
 
   // Used to differentiate between target-specific "direct" flags and "bitmask"
   // flags. A machine operand can only have one "direct" flag, but can have
   // multiple "bitmask" flags.
-  MO_DIRECT_FLAG_MASK = 15
+  MO_DIRECT_FLAG_MASK = 31
 };
 } // namespace RISCVII
 
@@ -492,6 +539,8 @@ void printVType(unsigned VType, raw_ostream &OS);
 
 unsigned getSEWLMULRatio(unsigned SEW, RISCVII::VLMUL VLMul);
 
+std::optional<RISCVII::VLMUL>
+getSameRatioLMUL(unsigned SEW, RISCVII::VLMUL VLMUL, unsigned EEW);
 } // namespace RISCVVType
 
 namespace RISCVRVC {

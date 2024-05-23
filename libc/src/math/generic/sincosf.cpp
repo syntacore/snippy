@@ -18,7 +18,7 @@
 
 #include <errno.h>
 
-namespace __llvm_libc {
+namespace LIBC_NAMESPACE {
 
 // Exceptional values
 static constexpr int N_EXCEPTS = 6;
@@ -149,7 +149,8 @@ LLVM_LIBC_FUNCTION(void, sincosf, (float x, float *sinp, float *cosp)) {
       fputil::raise_except_if_required(FE_INVALID);
     }
     *sinp =
-        x + FPBits::build_nan(1 << (fputil::MantissaWidth<float>::VALUE - 1));
+        x +
+        FPBits::build_nan(fputil::Sign::POS, FPBits::FRACTION_MASK).get_val();
     *cosp = *sinp;
     return;
   }
@@ -200,4 +201,4 @@ LLVM_LIBC_FUNCTION(void, sincosf, (float x, float *sinp, float *cosp)) {
       sin_y, -sin_k, fputil::multiply_add(cosm1_y, cos_k, cos_k)));
 }
 
-} // namespace __llvm_libc
+} // namespace LIBC_NAMESPACE

@@ -502,9 +502,8 @@ RISCVMatInt::InstSeq getIntMatInstrSeq(APInt Value, GeneratorContext &GC) {
   assert((ST.getXLen() == 64 && Value.getBitWidth() == 64) ||
          (ST.getXLen() == 32 && isInt<32>(Value.getSExtValue())));
 
-  return RISCVMatInt::generateInstSeq(
-      Value.getSExtValue(),
-      GC.getLLVMState().getSubtargetInfo().getFeatureBits());
+  return RISCVMatInt::generateInstSeq(Value.getSExtValue(),
+                                      GC.getLLVMState().getSubtargetInfo());
 }
 
 void generateRVVMaskReset(const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB,
@@ -1014,7 +1013,7 @@ public:
 
     assert(ST.hasStdExtV());
 
-    unsigned SEW = ST.getELEN();
+    unsigned SEW = ST.getELen();
     auto VLen = Regs.VLEN / SEW;
     bool TA = false;
     bool MA = false;

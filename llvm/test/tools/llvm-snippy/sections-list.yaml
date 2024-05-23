@@ -30,10 +30,8 @@ histogram:
 # CHECK-NEXT:  2 .snippy.2.rw
 # CHECK-NEXT:  3 .snippy.3.rw
 # CHECK-NEXT:  4 .riscv.attributes
-# CHECK-NEXT:  5 .eh_frame
-# CHECK-NEXT:  6 .rela.eh_frame
-# CHECK-NEXT:  7 .note.GNU-stack
-# CHECK-NEXT:  8 .symtab
-# CHECK-NEXT:  9 .shstrtab
-# CHECK-NEXT: 10 .strtab
+# CHECK-NEXT:  5 .note.GNU-stack
+# CHECK-NEXT:  6 .symtab
+# CHECK-NEXT:  7 .shstrtab
+# CHECK-NEXT:  8 .strtab
 # CHECK-NEXT: EOF

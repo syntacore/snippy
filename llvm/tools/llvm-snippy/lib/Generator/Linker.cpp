@@ -363,6 +363,10 @@ std::string Linker::createLinkerScript(bool Export) const {
 
     STS << "} >" << MemoryRegionName << "\n";
   }
+  STS << "/DISCARD/ :\n"
+      << "{\n"
+      << "  *(.eh_frame)\n"
+      << "}\n";
 
   STS << "}";
   return ScriptText;

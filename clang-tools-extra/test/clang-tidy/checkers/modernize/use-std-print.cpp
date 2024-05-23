@@ -1,10 +1,10 @@
 // RUN: %check_clang_tidy -check-suffixes=,STRICT \
 // RUN:   -std=c++23 %s modernize-use-std-print %t -- \
-// RUN:   -config="{CheckOptions: [{key: StrictMode, value: true}]}" \
+// RUN:   -config="{CheckOptions: {StrictMode: true}}" \
 // RUN:   -- -isystem %clang_tidy_headers -fexceptions
 // RUN: %check_clang_tidy -check-suffixes=,NOTSTRICT \
 // RUN:   -std=c++23 %s modernize-use-std-print %t -- \
-// RUN:   -config="{CheckOptions: [{key: StrictMode, value: false}]}" \
+// RUN:   -config="{CheckOptions: {StrictMode: false}}" \
 // RUN:   -- -isystem %clang_tidy_headers -fexceptions
 #include <cstddef>
 #include <cstdint>
@@ -13,6 +13,12 @@
 #include <inttypes.h>
 #include <string.h>
 #include <string>
+
+template <typename T>
+struct iterator {
+  T *operator->();
+  T &operator*();
+};
 
 void printf_simple() {
   printf("Hello");
@@ -42,6 +48,16 @@ void printf_deceptive_newline() {
   printf("Hello\x0a");
   // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
   // CHECK-FIXES: std::println("Hello");
+}
+
+void printf_crlf_newline() {
+  printf("Hello\r\n");
+  // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::print' instead of 'printf' [modernize-use-std-print]
+  // CHECK-FIXES: std::print("Hello\r\n");
+
+  printf("Hello\r\\n");
+  // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::print' instead of 'printf' [modernize-use-std-print]
+  // CHECK-FIXES: std::print("Hello\r\\n");
 }
 
 // std::print returns nothing, so any callers that use the return
@@ -1024,7 +1040,7 @@ void printf_right_justified() {
 
   printf("Right-justified integer with field width argument %*d after\n", 5, 424242);
   // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
-  // CHECK-FIXES: std::println("Right-justified integer with field width argument {:{}} after", 5, 424242);
+  // CHECK-FIXES: std::println("Right-justified integer with field width argument {:{}} after", 424242, 5);
 
   printf("Right-justified integer with field width argument %2$*1$d after\n", 5, 424242);
   // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
@@ -1061,7 +1077,7 @@ void printf_left_justified() {
 
   printf("Left-justified integer with field width argument %-*d after\n", 5, 424242);
   // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
-  // CHECK-FIXES: std::println("Left-justified integer with field width argument {:<{}} after", 5, 424242);
+  // CHECK-FIXES: std::println("Left-justified integer with field width argument {:<{}} after", 424242, 5);
 
   printf("Left-justified integer with field width argument %2$-*1$d after\n", 5, 424242);
   // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
@@ -1087,15 +1103,15 @@ void printf_precision() {
 
   printf("Hello %.*f after\n", 10, 3.14159265358979323846);
   // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
-  // CHECK-FIXES: std::println("Hello {:.{}f} after", 10, 3.14159265358979323846);
+  // CHECK-FIXES: std::println("Hello {:.{}f} after", 3.14159265358979323846, 10);
 
   printf("Hello %10.*f after\n", 3, 3.14159265358979323846);
   // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
-  // CHECK-FIXES: std::println("Hello {:10.{}f} after", 3, 3.14159265358979323846);
+  // CHECK-FIXES: std::println("Hello {:10.{}f} after", 3.14159265358979323846, 3);
 
   printf("Hello %*.*f after\n", 10, 4, 3.14159265358979323846);
   // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
-  // CHECK-FIXES: std::println("Hello {:{}.{}f} after", 10, 4, 3.14159265358979323846);
+  // CHECK-FIXES: std::println("Hello {:{}.{}f} after", 3.14159265358979323846, 10, 4);
 
   printf("Hello %1$.*2$f after\n", 3.14159265358979323846, 4);
   // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
@@ -1111,10 +1127,77 @@ void printf_precision() {
   // CHECK-FIXES: std::println("Hello {:.5}", 'G');
 }
 
-void printf_field_width_and_precision() {
-  printf("Hello %1$*2$.*3$f after\n", 3.14159265358979323846, 4, 2);
+void printf_field_width_and_precision(const std::string &s1, const std::string &s2, const std::string &s3)
+{
+  printf("width only:%*d width and precision:%*.*f precision only:%.*f\n", 3, 42, 4, 2, 3.14159265358979323846, 5, 2.718);
   // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
-  // CHECK-FIXES: std::println("Hello {0:{1}.{2}f} after", 3.14159265358979323846, 4, 2);
+  // CHECK-FIXES: std::println("width only:{:{}} width and precision:{:{}.{}f} precision only:{:.{}f}", 42, 3, 3.14159265358979323846, 4, 2, 2.718, 5);
+
+  const unsigned int ui1 = 42, ui2 = 43, ui3 = 44;
+  printf("casts width only:%*d width and precision:%*.*d precision only:%.*d\n", 3, ui1, 4, 2, ui2, 5, ui3);
+  // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
+  // CHECK-FIXES-NOTSTRICT: std::println("casts width only:{:{}} width and precision:{:{}.{}} precision only:{:.{}}", ui1, 3, ui2, 4, 2, ui3, 5);
+  // CHECK-FIXES-STRICT: std::println("casts width only:{:{}} width and precision:{:{}.{}} precision only:{:.{}}", static_cast<int>(ui1), 3, static_cast<int>(ui2), 4, 2, static_cast<int>(ui3), 5);
+
+  printf("c_str removal width only:%*s width and precision:%*.*s precision only:%.*s\n", 3, s1.c_str(), 4, 2, s2.c_str(), 5, s3.c_str());
+  // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
+  // CHECK-FIXES: std::println("c_str removal width only:{:>{}} width and precision:{:>{}.{}} precision only:{:.{}}", s1, 3, s2, 4, 2, s3, 5);
+
+  const std::string *ps1 = &s1, *ps2 = &s2, *ps3 = &s3;
+  printf("c_str() removal pointer width only:%-*s width and precision:%-*.*s precision only:%-.*s\n", 3, ps1->c_str(), 4, 2, ps2->c_str(), 5, ps3->c_str());
+  // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
+  // CHECK-FIXES: std::println("c_str() removal pointer width only:{:{}} width and precision:{:{}.{}} precision only:{:.{}}", *ps1, 3, *ps2, 4, 2, *ps3, 5);
+
+  iterator<std::string> is1, is2, is3;
+  printf("c_str() removal iterator width only:%-*s width and precision:%-*.*s precision only:%-.*s\n", 3, is1->c_str(), 4, 2, is2->c_str(), 5, is3->c_str());
+  // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
+  // CHECK-FIXES: std::println("c_str() removal iterator width only:{:{}} width and precision:{:{}.{}} precision only:{:.{}}", *is1, 3, *is2, 4, 2, *is3, 5);
+
+  printf("width and precision positional:%1$*2$.*3$f after\n", 3.14159265358979323846, 4, 2);
+  // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
+  // CHECK-FIXES: std::println("width and precision positional:{0:{1}.{2}f} after", 3.14159265358979323846, 4, 2);
+
+  const int width = 10, precision = 3;
+  printf("width only:%3$*1$d width and precision:%4$*1$.*2$f precision only:%5$.*2$f\n", width, precision, 42, 3.1415926, 2.718);
+  // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
+  // CHECK-FIXES: std::println("width only:{2:{0}} width and precision:{3:{0}.{1}f} precision only:{4:.{1}f}", width, precision, 42, 3.1415926, 2.718);
+
+  printf("c_str removal width only:%3$*1$s width and precision:%4$*1$.*2$s precision only:%5$.*2$s\n", width, precision, s1.c_str(), s2.c_str(), s3.c_str());
+  // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'printf' [modernize-use-std-print]
+  // CHECK-FIXES: std::println("c_str removal width only:{2:>{0}} width and precision:{3:>{0}.{1}} precision only:{4:.{1}}", width, precision, s1, s2, s3);
+}
+
+void fprintf_field_width_and_precision(const std::string &s1, const std::string &s2, const std::string &s3) {
+  fprintf(stderr, "width only:%*d width and precision:%*.*f precision only:%.*f\n", 3, 42, 4, 2, 3.14159265358979323846, 5, 2.718);
+  // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'fprintf' [modernize-use-std-print]
+  // CHECK-FIXES: std::println(stderr, "width only:{:{}} width and precision:{:{}.{}f} precision only:{:.{}f}", 42, 3, 3.14159265358979323846, 4, 2, 2.718, 5);
+
+  fprintf(stderr, "width and precision positional:%1$*2$.*3$f after\n", 3.14159265358979323846, 4, 2);
+  // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'fprintf' [modernize-use-std-print]
+  // CHECK-FIXES: std::println(stderr, "width and precision positional:{0:{1}.{2}f} after", 3.14159265358979323846, 4, 2);
+
+  fprintf(stderr, "c_str removal width only:%*s width and precision:%*.*s precision only:%.*s\n", 3, s1.c_str(), 4, 2, s2.c_str(), 5, s3.c_str());
+  // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'fprintf' [modernize-use-std-print]
+  // CHECK-FIXES: std::println(stderr, "c_str removal width only:{:>{}} width and precision:{:>{}.{}} precision only:{:.{}}", s1, 3, s2, 4, 2, s3, 5);
+
+  const std::string *ps1 = &s1, *ps2 = &s2, *ps3 = &s3;
+  fprintf(stderr, "c_str() removal pointer width only:%-*s width and precision:%-*.*s precision only:%-.*s\n", 3, ps1->c_str(), 4, 2, ps2->c_str(), 5, ps3->c_str());
+  // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'fprintf' [modernize-use-std-print]
+  // CHECK-FIXES: std::println(stderr, "c_str() removal pointer width only:{:{}} width and precision:{:{}.{}} precision only:{:.{}}", *ps1, 3, *ps2, 4, 2, *ps3, 5);
+
+  iterator<std::string> is1, is2, is3;
+  fprintf(stderr, "c_str() removal iterator width only:%-*s width and precision:%-*.*s precision only:%-.*s\n", 3, is1->c_str(), 4, 2, is2->c_str(), 5, is3->c_str());
+  // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'fprintf' [modernize-use-std-print]
+  // CHECK-FIXES: std::println(stderr, "c_str() removal iterator width only:{:{}} width and precision:{:{}.{}} precision only:{:.{}}", *is1, 3, *is2, 4, 2, *is3, 5);
+
+  const int width = 10, precision = 3;
+  fprintf(stderr, "width only:%3$*1$d width and precision:%4$*1$.*2$f precision only:%5$.*2$f\n", width, precision, 42, 3.1415926, 2.718);
+  // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'fprintf' [modernize-use-std-print]
+  // CHECK-FIXES: std::println(stderr, "width only:{2:{0}} width and precision:{3:{0}.{1}f} precision only:{4:.{1}f}", width, precision, 42, 3.1415926, 2.718);
+
+  fprintf(stderr, "c_str removal width only:%3$*1$s width and precision:%4$*1$.*2$s precision only:%5$.*2$s\n", width, precision, s1.c_str(), s2.c_str(), s3.c_str());
+  // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::println' instead of 'fprintf' [modernize-use-std-print]
+  // CHECK-FIXES: std::println(stderr, "c_str removal width only:{2:>{0}} width and precision:{3:>{0}.{1}} precision only:{4:.{1}}", width, precision, s1, s2, s3);
 }
 
 void printf_alternative_form() {
@@ -1462,12 +1545,6 @@ void fprintf_string_pointer_cstr(const std::string *s1) {
   // CHECK-MESSAGES: [[@LINE-1]]:3: warning: use 'std::print' instead of 'fprintf' [modernize-use-std-print]
   // CHECK-FIXES: std::print(stderr, "fprintf string pointer c_str {}", *s1);
 }
-
-template <typename T>
-struct iterator {
-  T *operator->();
-  T &operator*();
-};
 
 void printf_iterator_cstr(iterator<std::string> i1, iterator<std::string> i2)
 {

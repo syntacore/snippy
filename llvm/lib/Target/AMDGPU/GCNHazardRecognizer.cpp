@@ -163,7 +163,10 @@ static bool isSendMsgTraceDataOrGDS(const SIInstrInfo &TII,
 static bool isPermlane(const MachineInstr &MI) {
   unsigned Opcode = MI.getOpcode();
   return Opcode == AMDGPU::V_PERMLANE16_B32_e64 ||
-         Opcode == AMDGPU::V_PERMLANEX16_B32_e64;
+         Opcode == AMDGPU::V_PERMLANE64_B32 ||
+         Opcode == AMDGPU::V_PERMLANEX16_B32_e64 ||
+         Opcode == AMDGPU::V_PERMLANE16_VAR_B32_e64 ||
+         Opcode == AMDGPU::V_PERMLANEX16_VAR_B32_e64;
 }
 
 static bool isLdsDma(const MachineInstr &MI) {
@@ -271,7 +274,7 @@ GCNHazardRecognizer::getMFMAPipelineWaitStates(const MachineInstr &MI) const {
   const MCSchedClassDesc *SC = TSchedModel.resolveSchedClass(&MI);
   assert(TSchedModel.getWriteProcResBegin(SC) !=
          TSchedModel.getWriteProcResEnd(SC));
-  return TSchedModel.getWriteProcResBegin(SC)->Cycles;
+  return TSchedModel.getWriteProcResBegin(SC)->ReleaseAtCycle;
 }
 
 void GCNHazardRecognizer::processBundle() {
@@ -1141,6 +1144,7 @@ bool GCNHazardRecognizer::fixVcmpxPermlaneHazards(MachineInstr *MI) {
 bool GCNHazardRecognizer::fixVMEMtoScalarWriteHazards(MachineInstr *MI) {
   if (!ST.hasVMEMtoScalarWriteHazard())
     return false;
+  assert(!ST.hasExtendedWaitCounts());
 
   if (!SIInstrInfo::isSALU(*MI) && !SIInstrInfo::isSMRD(*MI))
     return false;
@@ -1170,7 +1174,7 @@ bool GCNHazardRecognizer::fixVMEMtoScalarWriteHazards(MachineInstr *MI) {
            (MI.getOpcode() == AMDGPU::S_WAITCNT &&
             !MI.getOperand(0).getImm()) ||
            (MI.getOpcode() == AMDGPU::S_WAITCNT_DEPCTR &&
-            MI.getOperand(0).getImm() == 0xffe3);
+            AMDGPU::DepCtr::decodeFieldVmVsrc(MI.getOperand(0).getImm()) == 0);
   };
 
   if (::getWaitStatesSince(IsHazardFn, MI, IsExpiredFn) ==
@@ -1180,13 +1184,14 @@ bool GCNHazardRecognizer::fixVMEMtoScalarWriteHazards(MachineInstr *MI) {
   const SIInstrInfo *TII = ST.getInstrInfo();
   BuildMI(*MI->getParent(), MI, MI->getDebugLoc(),
           TII->get(AMDGPU::S_WAITCNT_DEPCTR))
-      .addImm(0xffe3);
+      .addImm(AMDGPU::DepCtr::encodeFieldVmVsrc(0));
   return true;
 }
 
 bool GCNHazardRecognizer::fixSMEMtoVectorWriteHazards(MachineInstr *MI) {
   if (!ST.hasSMEMtoVectorWriteHazard())
     return false;
+  assert(!ST.hasExtendedWaitCounts());
 
   if (!SIInstrInfo::isVALU(*MI))
     return false;
@@ -1240,7 +1245,8 @@ bool GCNHazardRecognizer::fixSMEMtoVectorWriteHazards(MachineInstr *MI) {
       case AMDGPU::S_WAITCNT: {
         const int64_t Imm = MI.getOperand(0).getImm();
         AMDGPU::Waitcnt Decoded = AMDGPU::decodeWaitcnt(IV, Imm);
-        return (Decoded.LgkmCnt == 0);
+        // DsCnt corresponds to LGKMCnt here.
+        return (Decoded.DsCnt == 0);
       }
       default:
         // SOPP instructions cannot mitigate the hazard.
@@ -1270,7 +1276,11 @@ bool GCNHazardRecognizer::fixSMEMtoVectorWriteHazards(MachineInstr *MI) {
 }
 
 bool GCNHazardRecognizer::fixVcmpxExecWARHazard(MachineInstr *MI) {
-  if (!ST.hasVcmpxExecWARHazard() || !SIInstrInfo::isVALU(*MI))
+  if (!ST.hasVcmpxExecWARHazard())
+    return false;
+  assert(!ST.hasExtendedWaitCounts());
+
+  if (!SIInstrInfo::isVALU(*MI))
     return false;
 
   const SIRegisterInfo *TRI = ST.getRegisterInfo();
@@ -1293,7 +1303,7 @@ bool GCNHazardRecognizer::fixVcmpxExecWARHazard(MachineInstr *MI) {
           return true;
     }
     if (MI.getOpcode() == AMDGPU::S_WAITCNT_DEPCTR &&
-        (MI.getOperand(0).getImm() & 0xfffe) == 0xfffe)
+        AMDGPU::DepCtr::decodeFieldSaSdst(MI.getOperand(0).getImm()) == 0)
       return true;
     return false;
   };
@@ -1304,7 +1314,7 @@ bool GCNHazardRecognizer::fixVcmpxExecWARHazard(MachineInstr *MI) {
 
   BuildMI(*MI->getParent(), MI, MI->getDebugLoc(),
           TII->get(AMDGPU::S_WAITCNT_DEPCTR))
-    .addImm(0xfffe);
+      .addImm(AMDGPU::DepCtr::encodeFieldSaSdst(0));
   return true;
 }
 
@@ -1340,6 +1350,7 @@ bool GCNHazardRecognizer::fixLdsBranchVmemWARHazard(MachineInstr *MI) {
     return false;
 
   assert(ST.hasLdsBranchVmemWARHazard());
+  assert(!ST.hasExtendedWaitCounts());
 
   auto IsHazardInst = [](const MachineInstr &MI) {
     if (SIInstrInfo::isDS(MI))
@@ -1448,30 +1459,39 @@ bool GCNHazardRecognizer::fixLdsDirectVMEMHazard(MachineInstr *MI) {
       return false;
     return I.readsRegister(VDSTReg, &TRI) || I.modifiesRegister(VDSTReg, &TRI);
   };
-  auto IsExpiredFn = [](const MachineInstr &I, int) {
+  bool LdsdirCanWait = ST.hasLdsWaitVMSRC();
+  // TODO: On GFX12 the hazard should expire on S_WAIT_LOADCNT/SAMPLECNT/BVHCNT
+  // according to the type of VMEM instruction.
+  auto IsExpiredFn = [this, LdsdirCanWait](const MachineInstr &I, int) {
     return SIInstrInfo::isVALU(I) || SIInstrInfo::isEXP(I) ||
            (I.getOpcode() == AMDGPU::S_WAITCNT && !I.getOperand(0).getImm()) ||
            (I.getOpcode() == AMDGPU::S_WAITCNT_DEPCTR &&
-            I.getOperand(0).getImm() == 0xffe3);
+            AMDGPU::DepCtr::decodeFieldVmVsrc(I.getOperand(0).getImm()) == 0) ||
+           (LdsdirCanWait && SIInstrInfo::isLDSDIR(I) &&
+            !TII.getNamedOperand(I, AMDGPU::OpName::waitvsrc)->getImm());
   };
 
   if (::getWaitStatesSince(IsHazardFn, MI, IsExpiredFn) ==
       std::numeric_limits<int>::max())
     return false;
 
-  BuildMI(*MI->getParent(), MI, MI->getDebugLoc(),
-          TII.get(AMDGPU::S_WAITCNT_DEPCTR))
-      .addImm(0xffe3);
+  if (LdsdirCanWait) {
+    TII.getNamedOperand(*MI, AMDGPU::OpName::waitvsrc)->setImm(0);
+  } else {
+    BuildMI(*MI->getParent(), MI, MI->getDebugLoc(),
+            TII.get(AMDGPU::S_WAITCNT_DEPCTR))
+        .addImm(AMDGPU::DepCtr::encodeFieldVmVsrc(0));
+  }
 
   return true;
 }
 
 bool GCNHazardRecognizer::fixVALUPartialForwardingHazard(MachineInstr *MI) {
-  if (!ST.isWave64())
-    return false;
   if (!ST.hasVALUPartialForwardingHazard())
     return false;
-  if (!SIInstrInfo::isVALU(*MI))
+  assert(!ST.hasExtendedWaitCounts());
+
+  if (!ST.isWave64() || !SIInstrInfo::isVALU(*MI))
     return false;
 
   SmallSetVector<Register, 4> SrcVGPRs;
@@ -1523,7 +1543,7 @@ bool GCNHazardRecognizer::fixVALUPartialForwardingHazard(MachineInstr *MI) {
     if (SIInstrInfo::isVMEM(I) || SIInstrInfo::isFLAT(I) ||
         SIInstrInfo::isDS(I) || SIInstrInfo::isEXP(I) ||
         (I.getOpcode() == AMDGPU::S_WAITCNT_DEPCTR &&
-         I.getOperand(0).getImm() == 0x0fff))
+         AMDGPU::DepCtr::decodeFieldVaVdst(I.getOperand(0).getImm()) == 0))
       return HazardExpired;
 
     // Track registers writes
@@ -1618,6 +1638,8 @@ bool GCNHazardRecognizer::fixVALUPartialForwardingHazard(MachineInstr *MI) {
 bool GCNHazardRecognizer::fixVALUTransUseHazard(MachineInstr *MI) {
   if (!ST.hasVALUTransUseHazard())
     return false;
+  assert(!ST.hasExtendedWaitCounts());
+
   if (!SIInstrInfo::isVALU(*MI))
     return false;
 
@@ -1685,23 +1707,23 @@ bool GCNHazardRecognizer::fixVALUTransUseHazard(MachineInstr *MI) {
     return false;
 
   // Hazard is observed - insert a wait on va_dst counter to ensure hazard is
-  // avoided (mask 0x0fff achieves this).
+  // avoided.
   BuildMI(*MI->getParent(), MI, MI->getDebugLoc(),
           TII.get(AMDGPU::S_WAITCNT_DEPCTR))
-      .addImm(0x0fff);
+      .addImm(AMDGPU::DepCtr::encodeFieldVaVdst(0));
 
   return true;
 }
 
 bool GCNHazardRecognizer::fixWMMAHazards(MachineInstr *MI) {
-  if (!SIInstrInfo::isWMMA(*MI))
+  if (!SIInstrInfo::isWMMA(*MI) && !SIInstrInfo::isSWMMAC(*MI))
     return false;
 
   const SIInstrInfo *TII = ST.getInstrInfo();
   const SIRegisterInfo *TRI = ST.getRegisterInfo();
 
-  auto IsHazardFn = [MI, TII, TRI](const MachineInstr &I) {
-    if (!SIInstrInfo::isWMMA(I))
+  auto IsHazardFn = [MI, TII, TRI, this](const MachineInstr &I) {
+    if (!SIInstrInfo::isWMMA(I) && !SIInstrInfo::isSWMMAC(I))
       return false;
 
     // Src0 or Src1 of the current wmma instruction overlaps with the dest of
@@ -1731,11 +1753,24 @@ bool GCNHazardRecognizer::fixWMMAHazards(MachineInstr *MI) {
       const MachineOperand *Src2Mods =
           TII->getNamedOperand(*MI, AMDGPU::OpName::src2_modifiers);
       const bool NoSrc2Mods =
+          !Src2Mods ||
           (Src2Mods->getImm() & (SISrcMods::NEG | SISrcMods::NEG_HI)) == 0;
       // Exception: there is no hazard if the wmma instructions are of the same
       // type and there is no input modifier on src2 of the current instruction.
       return !(NoSrc2Mods && (TII->pseudoToMCOpcode(I.getOpcode()) ==
                               TII->pseudoToMCOpcode(MI->getOpcode())));
+    }
+
+    // GFX12+ allows overlap of matrix C with PrevDstReg (hardware will stall)
+    // but Index can't overlap with PrevDstReg.
+    if (AMDGPU::isGFX12Plus(ST)) {
+      if (SIInstrInfo::isSWMMAC(*MI)) {
+        const Register CurIndex =
+            TII->getNamedOperand(*MI, AMDGPU::OpName::src2)->getReg();
+        if (TRI->regsOverlap(PrevDstReg, CurIndex))
+          return true;
+      }
+      return false;
     }
 
     return false;
@@ -1757,6 +1792,7 @@ bool GCNHazardRecognizer::fixWMMAHazards(MachineInstr *MI) {
 bool GCNHazardRecognizer::fixShift64HighRegBug(MachineInstr *MI) {
   if (!ST.hasShift64HighRegBug())
     return false;
+  assert(!ST.hasExtendedWaitCounts());
 
   switch (MI->getOpcode()) {
   default:
@@ -1886,6 +1922,7 @@ int GCNHazardRecognizer::checkFPAtomicToDenormModeHazard(MachineInstr *MI) {
 
   if (!ST.hasFPAtomicToDenormModeHazard())
     return 0;
+  assert(!ST.hasExtendedWaitCounts());
 
   if (MI->getOpcode() != AMDGPU::S_DENORM_MODE)
     return 0;
@@ -2711,11 +2748,11 @@ bool GCNHazardRecognizer::ShouldPreferAnother(SUnit *SU) {
 }
 
 bool GCNHazardRecognizer::fixVALUMaskWriteHazard(MachineInstr *MI) {
-  if (!ST.isWave64())
-    return false;
   if (!ST.hasVALUMaskWriteHazard())
     return false;
-  if (!SIInstrInfo::isSALU(*MI))
+  assert(!ST.hasExtendedWaitCounts());
+
+  if (!ST.isWave64() || !SIInstrInfo::isSALU(*MI))
     return false;
 
   // The hazard sequence is three instructions:
@@ -2779,7 +2816,7 @@ bool GCNHazardRecognizer::fixVALUMaskWriteHazard(MachineInstr *MI) {
   auto IsExpiredFn = [&MRI, this](const MachineInstr &I, int) {
     // s_waitcnt_depctr sa_sdst(0) mitigates hazard.
     if (I.getOpcode() == AMDGPU::S_WAITCNT_DEPCTR &&
-        !(I.getOperand(0).getImm() & 0x1))
+        AMDGPU::DepCtr::decodeFieldSaSdst(I.getOperand(0).getImm()) == 0)
       return true;
 
     // VALU access to any SGPR or literal constant other than HazardReg
@@ -2829,7 +2866,7 @@ bool GCNHazardRecognizer::fixVALUMaskWriteHazard(MachineInstr *MI) {
   // Add s_waitcnt_depctr sa_sdst(0) after SALU write.
   BuildMI(*MI->getParent(), NextMI, MI->getDebugLoc(),
           TII.get(AMDGPU::S_WAITCNT_DEPCTR))
-    .addImm(0xfffe);
+      .addImm(AMDGPU::DepCtr::encodeFieldSaSdst(0));
 
   // SALU write may be s_getpc in a bundle.
   if (MI->getOpcode() == AMDGPU::S_GETPC_B64) {

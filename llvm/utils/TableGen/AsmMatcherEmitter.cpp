@@ -910,7 +910,7 @@ extractSingletonRegisterForAsmOperand(MatchableInfo::AsmOperand &Op,
     return;
   }
 
-  if (!Tok.startswith(RegisterPrefix))
+  if (!Tok.starts_with(RegisterPrefix))
     return;
 
   StringRef RegName = Tok.substr(RegisterPrefix.size());
@@ -985,7 +985,7 @@ void MatchableInfo::tokenizeAsmString(const AsmMatcherInfo &Info,
   bool IsIsolatedToken = true;
   for (size_t i = 0, e = String.size(); i != e; ++i) {
     char Char = String[i];
-    if (Variant.BreakCharacters.find(Char) != std::string::npos) {
+    if (Variant.BreakCharacters.contains(Char)) {
       if (InTok) {
         addAsmOperand(String.slice(Prev, i), false);
         Prev = i;
@@ -994,7 +994,7 @@ void MatchableInfo::tokenizeAsmString(const AsmMatcherInfo &Info,
       InTok = true;
       continue;
     }
-    if (Variant.TokenizingCharacters.find(Char) != std::string::npos) {
+    if (Variant.TokenizingCharacters.contains(Char)) {
       if (InTok) {
         addAsmOperand(String.slice(Prev, i), IsIsolatedToken);
         InTok = false;
@@ -1005,7 +1005,7 @@ void MatchableInfo::tokenizeAsmString(const AsmMatcherInfo &Info,
       IsIsolatedToken = true;
       continue;
     }
-    if (Variant.SeparatorCharacters.find(Char) != std::string::npos) {
+    if (Variant.SeparatorCharacters.contains(Char)) {
       if (InTok) {
         addAsmOperand(String.slice(Prev, i), IsIsolatedToken);
         InTok = false;
@@ -1520,7 +1520,7 @@ void AsmMatcherInfo::buildInfo() {
 
       // If the tblgen -match-prefix option is specified (for tblgen hackers),
       // filter the set of instructions we consider.
-      if (!StringRef(CGI->TheDef->getName()).startswith(MatchPrefix))
+      if (!StringRef(CGI->TheDef->getName()).starts_with(MatchPrefix))
         continue;
 
       // Ignore "codegen only" instructions.
@@ -1555,7 +1555,7 @@ void AsmMatcherInfo::buildInfo() {
       // filter the set of instruction aliases we consider, based on the target
       // instruction.
       if (!StringRef(Alias->ResultInst->TheDef->getName())
-            .startswith( MatchPrefix))
+               .starts_with(MatchPrefix))
         continue;
 
       StringRef V = Alias->TheDef->getValueAsString("AsmVariantName");
@@ -2927,7 +2927,7 @@ emitCustomOperandParsing(raw_ostream &OS, CodeGenTarget &Target,
 
   // Emit the operand class switch to call the correct custom parser for
   // the found operand class.
-  OS << "OperandMatchResultTy " << Target.getName() << ClassName << "::\n"
+  OS << "ParseStatus " << Target.getName() << ClassName << "::\n"
      << "tryCustomParseOperand(OperandVector"
      << " &Operands,\n                      unsigned MCK) {\n\n"
      << "  switch(MCK) {\n";
@@ -2940,15 +2940,15 @@ emitCustomOperandParsing(raw_ostream &OS, CodeGenTarget &Target,
   }
 
   OS << "  default:\n";
-  OS << "    return MatchOperand_NoMatch;\n";
+  OS << "    return ParseStatus::NoMatch;\n";
   OS << "  }\n";
-  OS << "  return MatchOperand_NoMatch;\n";
+  OS << "  return ParseStatus::NoMatch;\n";
   OS << "}\n\n";
 
   // Emit the static custom operand parser. This code is very similar with
   // the other matcher. Also use MatchResultTy here just in case we go for
   // a better error handling.
-  OS << "OperandMatchResultTy " << Target.getName() << ClassName << "::\n"
+  OS << "ParseStatus " << Target.getName() << ClassName << "::\n"
      << "MatchOperandParserImpl(OperandVector"
      << " &Operands,\n                       StringRef Mnemonic,\n"
      << "                       bool ParseForAllFeatures) {\n";
@@ -2979,7 +2979,7 @@ emitCustomOperandParsing(raw_ostream &OS, CodeGenTarget &Target,
   }
 
   OS << "  if (MnemonicRange.first == MnemonicRange.second)\n";
-  OS << "    return MatchOperand_NoMatch;\n\n";
+  OS << "    return ParseStatus::NoMatch;\n\n";
 
   OS << "  for (const OperandMatchEntry *it = MnemonicRange.first,\n"
      << "       *ie = MnemonicRange.second; it != ie; ++it) {\n";
@@ -3005,14 +3005,13 @@ emitCustomOperandParsing(raw_ostream &OS, CodeGenTarget &Target,
   if (ParserName.empty())
     ParserName = "tryCustomParseOperand";
   OS << "    // call custom parse method to handle the operand\n";
-  OS << "    OperandMatchResultTy Result = " << ParserName
-     << "(Operands, it->Class);\n";
-  OS << "    if (Result != MatchOperand_NoMatch)\n";
+  OS << "    ParseStatus Result = " << ParserName << "(Operands, it->Class);\n";
+  OS << "    if (!Result.isNoMatch())\n";
   OS << "      return Result;\n";
   OS << "  }\n\n";
 
   OS << "  // Okay, we had no match.\n";
-  OS << "  return MatchOperand_NoMatch;\n";
+  OS << "  return ParseStatus::NoMatch;\n";
   OS << "}\n\n";
 }
 
@@ -3205,7 +3204,7 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
   Record *AsmParser = Target.getAsmParser();
   StringRef ClassName = AsmParser->getValueAsString("AsmParserClassName");
 
-  emitSourceFileHeader("Assembly Matcher Source Fragment", OS);
+  emitSourceFileHeader("Assembly Matcher Source Fragment", OS, Records);
 
   // Compute the information on the instructions to match.
   AsmMatcherInfo Info(AsmParser, Target, Records);
@@ -3308,17 +3307,17 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
 
 
   if (!Info.OperandMatchInfo.empty()) {
-    OS << "  OperandMatchResultTy MatchOperandParserImpl(\n";
+    OS << "  ParseStatus MatchOperandParserImpl(\n";
     OS << "    OperandVector &Operands,\n";
     OS << "    StringRef Mnemonic,\n";
     OS << "    bool ParseForAllFeatures = false);\n";
 
-    OS << "  OperandMatchResultTy tryCustomParseOperand(\n";
+    OS << "  ParseStatus tryCustomParseOperand(\n";
     OS << "    OperandVector &Operands,\n";
     OS << "    unsigned MCK);\n\n";
   }
 
-  OS << "#endif // GET_ASSEMBLER_HEADER_INFO\n\n";
+  OS << "#endif // GET_ASSEMBLER_HEADER\n\n";
 
   // Emit the operand match diagnostic enum names.
   OS << "\n#ifdef GET_OPERAND_DIAGNOSTIC_TYPES\n";

@@ -24,6 +24,7 @@
 #include "mlir/IR/IntegerSet.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/Types.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -211,6 +212,13 @@ public:
   DenseMap<TypeID, AbstractType *> registeredTypes;
   StorageUniquer typeUniquer;
 
+  /// This is a mapping from type name to the abstract type describing it.
+  /// It is used by `AbstractType::lookup` to get an `AbstractType` from a name.
+  /// As this map needs to be populated before `StringAttr` is loaded, we
+  /// cannot use `StringAttr` as the key. The context does not take ownership
+  /// of the key, so the `StringRef` must outlive the context.
+  llvm::DenseMap<StringRef, AbstractType *> nameToType;
+
   /// Cached Type Instances.
   Float8E5M2Type f8E5M2Ty;
   Float8E4M3FNType f8E4M3FNTy;
@@ -219,6 +227,7 @@ public:
   Float8E4M3B11FNUZType f8E4M3B11FNUZTy;
   BFloat16Type bf16Ty;
   Float16Type f16Ty;
+  FloatTF32Type tf32Ty;
   Float32Type f32Ty;
   Float64Type f64Ty;
   Float80Type f80Ty;
@@ -234,6 +243,14 @@ public:
   DenseMap<TypeID, AbstractAttribute *> registeredAttributes;
   StorageUniquer attributeUniquer;
 
+  /// This is a mapping from attribute name to the abstract attribute describing
+  /// it. It is used by `AbstractType::lookup` to get an `AbstractType` from a
+  /// name.
+  /// As this map needs to be populated before `StringAttr` is loaded, we
+  /// cannot use `StringAttr` as the key. The context does not take ownership
+  /// of the key, so the `StringRef` must outlive the context.
+  llvm::DenseMap<StringRef, AbstractAttribute *> nameToAttribute;
+
   /// Cached Attribute Instances.
   BoolAttr falseAttr, trueAttr;
   UnitAttr unitAttr;
@@ -246,6 +263,12 @@ public:
   llvm::sys::SmartMutex<true> dialectRefStrAttrMutex;
   DenseMap<StringRef, SmallVector<StringAttrStorage *>>
       dialectReferencingStrAttrs;
+
+  /// A distinct attribute allocator that allocates every time since the
+  /// address of the distinct attribute storage serves as unique identifier. The
+  /// allocator is thread safe and frees the allocated storage after its
+  /// destruction.
+  DistinctAttributeAllocator distinctAttributeAllocator;
 
 public:
   MLIRContextImpl(bool threadingIsEnabled)
@@ -294,6 +317,7 @@ MLIRContext::MLIRContext(const DialectRegistry &registry, Threading setting)
   impl->f8E4M3B11FNUZTy = TypeUniquer::get<Float8E4M3B11FNUZType>(this);
   impl->bf16Ty = TypeUniquer::get<BFloat16Type>(this);
   impl->f16Ty = TypeUniquer::get<Float16Type>(this);
+  impl->tf32Ty = TypeUniquer::get<FloatTF32Type>(this);
   impl->f32Ty = TypeUniquer::get<Float32Type>(this);
   impl->f64Ty = TypeUniquer::get<Float64Type>(this);
   impl->f80Ty = TypeUniquer::get<Float80Type>(this);
@@ -688,6 +712,9 @@ void Dialect::addType(TypeID typeID, AbstractType &&typeInfo) {
           AbstractType(std::move(typeInfo));
   if (!impl.registeredTypes.insert({typeID, newInfo}).second)
     llvm::report_fatal_error("Dialect Type already registered.");
+  if (!impl.nameToType.insert({newInfo->getName(), newInfo}).second)
+    llvm::report_fatal_error("Dialect Type with name " + newInfo->getName() +
+                             " is already registered.");
 }
 
 void Dialect::addAttribute(TypeID typeID, AbstractAttribute &&attrInfo) {
@@ -700,6 +727,9 @@ void Dialect::addAttribute(TypeID typeID, AbstractAttribute &&attrInfo) {
           AbstractAttribute(std::move(attrInfo));
   if (!impl.registeredAttributes.insert({typeID, newInfo}).second)
     llvm::report_fatal_error("Dialect Attribute already registered.");
+  if (!impl.nameToAttribute.insert({newInfo->getName(), newInfo}).second)
+    llvm::report_fatal_error("Dialect Attribute with name " +
+                             newInfo->getName() + " is already registered.");
 }
 
 //===----------------------------------------------------------------------===//
@@ -720,6 +750,16 @@ AbstractAttribute *AbstractAttribute::lookupMutable(TypeID typeID,
                                                     MLIRContext *context) {
   auto &impl = context->getImpl();
   return impl.registeredAttributes.lookup(typeID);
+}
+
+std::optional<std::reference_wrapper<const AbstractAttribute>>
+AbstractAttribute::lookup(StringRef name, MLIRContext *context) {
+  MLIRContextImpl &impl = context->getImpl();
+  const AbstractAttribute *type = impl.nameToAttribute.lookup(name);
+
+  if (!type)
+    return std::nullopt;
+  return {*type};
 }
 
 //===----------------------------------------------------------------------===//
@@ -825,7 +865,7 @@ void OperationName::UnregisteredOpModel::populateInherentAttrs(
     Operation *op, NamedAttrList &attrs) {}
 LogicalResult OperationName::UnregisteredOpModel::verifyInherentAttrs(
     OperationName opName, NamedAttrList &attributes,
-    function_ref<InFlightDiagnostic()> getDiag) {
+    function_ref<InFlightDiagnostic()> emitError) {
   return success();
 }
 int OperationName::UnregisteredOpModel::getOpPropertyByteSize() {
@@ -842,8 +882,9 @@ void OperationName::UnregisteredOpModel::deleteProperties(
 void OperationName::UnregisteredOpModel::populateDefaultProperties(
     OperationName opName, OpaqueProperties properties) {}
 LogicalResult OperationName::UnregisteredOpModel::setPropertiesFromAttr(
-    Operation *op, Attribute attr, InFlightDiagnostic *diag) {
-  *op->getPropertiesStorage().as<Attribute *>() = attr;
+    OperationName opName, OpaqueProperties properties, Attribute attr,
+    function_ref<InFlightDiagnostic()> emitError) {
+  *properties.as<Attribute *>() = attr;
   return success();
 }
 Attribute
@@ -853,6 +894,10 @@ OperationName::UnregisteredOpModel::getPropertiesAsAttr(Operation *op) {
 void OperationName::UnregisteredOpModel::copyProperties(OpaqueProperties lhs,
                                                         OpaqueProperties rhs) {
   *lhs.as<Attribute *>() = *rhs.as<Attribute *>();
+}
+bool OperationName::UnregisteredOpModel::compareProperties(
+    OpaqueProperties lhs, OpaqueProperties rhs) {
+  return *lhs.as<Attribute *>() == *rhs.as<Attribute *>();
 }
 llvm::hash_code
 OperationName::UnregisteredOpModel::hashProperties(OpaqueProperties prop) {
@@ -931,6 +976,16 @@ AbstractType *AbstractType::lookupMutable(TypeID typeID, MLIRContext *context) {
   return impl.registeredTypes.lookup(typeID);
 }
 
+std::optional<std::reference_wrapper<const AbstractType>>
+AbstractType::lookup(StringRef name, MLIRContext *context) {
+  MLIRContextImpl &impl = context->getImpl();
+  const AbstractType *type = impl.nameToType.lookup(name);
+
+  if (!type)
+    return std::nullopt;
+  return {*type};
+}
+
 //===----------------------------------------------------------------------===//
 // Type uniquing
 //===----------------------------------------------------------------------===//
@@ -959,6 +1014,9 @@ BFloat16Type BFloat16Type::get(MLIRContext *context) {
 }
 Float16Type Float16Type::get(MLIRContext *context) {
   return context->getImpl().f16Ty;
+}
+FloatTF32Type FloatTF32Type::get(MLIRContext *context) {
+  return context->getImpl().tf32Ty;
 }
 Float32Type Float32Type::get(MLIRContext *context) {
   return context->getImpl().f32Ty;
@@ -1057,6 +1115,12 @@ UnitAttr UnitAttr::get(MLIRContext *context) {
 
 UnknownLoc UnknownLoc::get(MLIRContext *context) {
   return context->getImpl().unknownLocAttr;
+}
+
+DistinctAttrStorage *
+detail::DistinctAttributeUniquer::allocateStorage(MLIRContext *context,
+                                                  Attribute referencedAttr) {
+  return context->getImpl().distinctAttributeAllocator.allocate(referencedAttr);
 }
 
 /// Return empty dictionary.

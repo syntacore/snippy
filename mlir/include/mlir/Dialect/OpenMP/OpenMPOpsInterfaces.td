@@ -130,11 +130,11 @@ def OffloadModuleInterface : OpInterface<"OffloadModuleInterface"> {
       argument.
       }],
       /*retTy=*/"void",
-      /*methodName=*/"setIsDevice",
-      (ins "bool":$isDevice), [{}], [{
+      /*methodName=*/"setIsTargetDevice",
+      (ins "bool":$isTargetDevice), [{}], [{
         $_op->setAttr(
-          mlir::StringAttr::get($_op->getContext(), llvm::Twine{"omp.is_device"}),
-            mlir::BoolAttr::get($_op->getContext(), isDevice));
+          mlir::StringAttr::get($_op->getContext(), llvm::Twine{"omp.is_target_device"}),
+            mlir::BoolAttr::get($_op->getContext(), isTargetDevice));
       }]>,
     InterfaceMethod<
       /*description=*/[{
@@ -142,11 +142,36 @@ def OffloadModuleInterface : OpInterface<"OffloadModuleInterface"> {
         return its value, if it doesn't exist it returns false by default.
       }],
       /*retTy=*/"bool",
-      /*methodName=*/"getIsDevice",
+      /*methodName=*/"getIsTargetDevice",
       (ins), [{}], [{
-        if (Attribute isDevice = $_op->getAttr("omp.is_device"))
-          if (isDevice.isa<mlir::BoolAttr>())
-           return isDevice.dyn_cast<BoolAttr>().getValue();
+        if (Attribute isTargetDevice = $_op->getAttr("omp.is_target_device"))
+          if (isTargetDevice.isa<mlir::BoolAttr>())
+           return isTargetDevice.dyn_cast<BoolAttr>().getValue();
+        return false;
+      }]>,
+    InterfaceMethod<
+      /*description=*/[{
+      Set the attribute on the current module with the specified boolean
+      argument.
+      }],
+      /*retTy=*/"void",
+      /*methodName=*/"setIsGPU",
+      (ins "bool":$isGPU), [{}], [{
+        $_op->setAttr(
+          mlir::StringAttr::get($_op->getContext(), "omp.is_gpu"),
+            mlir::BoolAttr::get($_op->getContext(), isGPU));
+      }]>,
+    InterfaceMethod<
+      /*description=*/[{
+        Get the attribute on the current module if it exists and
+        return its value, if it doesn't exist it returns false by default.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"getIsGPU",
+      (ins), [{}], [{
+        if (Attribute isTargetCGAttr = $_op->getAttr("omp.is_gpu"))
+          if (auto isTargetCGVal = isTargetCGAttr.dyn_cast<BoolAttr>())
+           return isTargetCGVal.getValue();
         return false;
       }]>,
     InterfaceMethod<
@@ -173,11 +198,12 @@ def OffloadModuleInterface : OpInterface<"OffloadModuleInterface"> {
             "bool":$assumeThreadsOversubscription,
             "bool":$assumeNoThreadState,
             "bool":$assumeNoNestedParallelism,
-            "uint32_t":$openmpDeviceVersion), [{}], [{
+            "uint32_t":$openmpDeviceVersion,
+            "bool":$noGPULib), [{}], [{
         $_op->setAttr(("omp." + mlir::omp::FlagsAttr::getMnemonic()).str(),
                   mlir::omp::FlagsAttr::get($_op->getContext(), debugKind,
                       assumeTeamsOversubscription, assumeThreadsOversubscription,
-                      assumeNoThreadState, assumeNoNestedParallelism, openmpDeviceVersion));
+                      assumeNoThreadState, assumeNoNestedParallelism, noGPULib, openmpDeviceVersion));
       }]>,
     InterfaceMethod<
       /*description=*/[{

@@ -8,6 +8,8 @@
 
 #include "snippy/Support/RandUtil.h"
 
+#include "llvm/ADT/APInt.h"
+
 using namespace llvm;
 
 std::unique_ptr<snippy::RandEngine> snippy::RandEngine::pimpl = nullptr;

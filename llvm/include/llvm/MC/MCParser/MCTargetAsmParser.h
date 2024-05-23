@@ -122,6 +122,12 @@ struct ParseInstructionInfo {
     : AsmRewrites(rewrites) {}
 };
 
+enum OperandMatchResultTy {
+  MatchOperand_Success,  // operand matched successfully
+  MatchOperand_NoMatch,  // operand did not match
+  MatchOperand_ParseFail // operand matched but had errors
+};
+
 /// Ternary parse status returned by various parse* methods.
 class ParseStatus {
   enum class StatusTy { Success, Failure, NoMatch } Status;
@@ -146,12 +152,19 @@ public:
   constexpr bool isSuccess() const { return Status == StatusTy::Success; }
   constexpr bool isFailure() const { return Status == StatusTy::Failure; }
   constexpr bool isNoMatch() const { return Status == StatusTy::NoMatch; }
-};
 
-enum OperandMatchResultTy {
-  MatchOperand_Success,  // operand matched successfully
-  MatchOperand_NoMatch,  // operand did not match
-  MatchOperand_ParseFail // operand matched but had errors
+  // Allow implicit conversions to / from OperandMatchResultTy.
+  LLVM_DEPRECATED("Migrate to ParseStatus", "")
+  constexpr ParseStatus(OperandMatchResultTy R)
+      : Status(R == MatchOperand_Success     ? Success
+               : R == MatchOperand_ParseFail ? Failure
+                                             : NoMatch) {}
+  LLVM_DEPRECATED("Migrate to ParseStatus", "")
+  constexpr operator OperandMatchResultTy() const {
+    return isSuccess()   ? MatchOperand_Success
+           : isFailure() ? MatchOperand_ParseFail
+                         : MatchOperand_NoMatch;
+  }
 };
 
 enum class DiagnosticPredicateTy {
@@ -410,8 +423,8 @@ public:
   /// Check whether a register specification can be parsed at the current
   /// location, without failing the entire parse if it can't. Must not consume
   /// tokens if the parse fails.
-  virtual OperandMatchResultTy
-  tryParseRegister(MCRegister &Reg, SMLoc &StartLoc, SMLoc &EndLoc) = 0;
+  virtual ParseStatus tryParseRegister(MCRegister &Reg, SMLoc &StartLoc,
+                                       SMLoc &EndLoc) = 0;
 
   /// ParseInstruction - Parse one assembly instruction.
   ///

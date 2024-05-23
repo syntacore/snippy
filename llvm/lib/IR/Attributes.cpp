@@ -523,7 +523,7 @@ std::string Attribute::getAsString(bool InAttrGrp) const {
 
     // Print access kind for "other" as the default access kind. This way it
     // will apply to any new location kinds that get split out of "other".
-    ModRefInfo OtherMR = ME.getModRef(MemoryEffects::Other);
+    ModRefInfo OtherMR = ME.getModRef(IRMemLocation::Other);
     if (OtherMR != ModRefInfo::NoModRef || ME.getModRef() == OtherMR) {
       First = false;
       OS << getModRefStr(OtherMR);
@@ -539,13 +539,13 @@ std::string Attribute::getAsString(bool InAttrGrp) const {
       First = false;
 
       switch (Loc) {
-      case MemoryEffects::ArgMem:
+      case IRMemLocation::ArgMem:
         OS << "argmem: ";
         break;
-      case MemoryEffects::InaccessibleMem:
+      case IRMemLocation::InaccessibleMem:
         OS << "inaccessiblemem: ";
         break;
-      case MemoryEffects::Other:
+      case IRMemLocation::Other:
         llvm_unreachable("This is represented as the default access kind");
       }
       OS << getModRefStr(MR);
@@ -1961,7 +1961,9 @@ AttributeMask AttributeFuncs::typeIncompatible(Type *Ty,
           .addAttribute(Attribute::ReadNone)
           .addAttribute(Attribute::ReadOnly)
           .addAttribute(Attribute::Dereferenceable)
-          .addAttribute(Attribute::DereferenceableOrNull);
+          .addAttribute(Attribute::DereferenceableOrNull)
+          .addAttribute(Attribute::Writable)
+          .addAttribute(Attribute::DeadOnUnwind);
     if (ASK & ASK_UNSAFE_TO_DROP)
       Incompatible.addAttribute(Attribute::Nest)
           .addAttribute(Attribute::SwiftError)
@@ -2041,6 +2043,11 @@ template<typename AttrClass>
 static bool isEqual(const Function &Caller, const Function &Callee) {
   return Caller.getFnAttribute(AttrClass::getKind()) ==
          Callee.getFnAttribute(AttrClass::getKind());
+}
+
+static bool isEqual(const Function &Caller, const Function &Callee,
+                    const StringRef &AttrName) {
+  return Caller.getFnAttribute(AttrName) == Callee.getFnAttribute(AttrName);
 }
 
 /// Compute the logical AND of the attributes of the caller and the

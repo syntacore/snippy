@@ -163,6 +163,16 @@ MLIR_CAPI_EXPORTED bool mlirTypeIsAF64(MlirType type);
 /// context.
 MLIR_CAPI_EXPORTED MlirType mlirF64TypeGet(MlirContext ctx);
 
+/// Returns the typeID of a TF32 type.
+MLIR_CAPI_EXPORTED MlirTypeID mlirFloatTF32TypeGetTypeID(void);
+
+/// Checks whether the given type is an TF32 type.
+MLIR_CAPI_EXPORTED bool mlirTypeIsATF32(MlirType type);
+
+/// Creates a TF32 type in the given context. The type is owned by the
+/// context.
+MLIR_CAPI_EXPORTED MlirType mlirTF32TypeGet(MlirContext ctx);
+
 //===----------------------------------------------------------------------===//
 // None type.
 //===----------------------------------------------------------------------===//
@@ -260,6 +270,32 @@ MLIR_CAPI_EXPORTED MlirType mlirVectorTypeGetChecked(MlirLocation loc,
                                                      intptr_t rank,
                                                      const int64_t *shape,
                                                      MlirType elementType);
+
+/// Creates a scalable vector type with the shape identified by its rank and
+/// dimensions. A subset of dimensions may be marked as scalable via the
+/// corresponding flag list, which is expected to have as many entries as the
+/// rank of the vector. The vector is created in the same context as the element
+/// type.
+MLIR_CAPI_EXPORTED MlirType mlirVectorTypeGetScalable(intptr_t rank,
+                                                      const int64_t *shape,
+                                                      const bool *scalable,
+                                                      MlirType elementType);
+
+/// Same as "mlirVectorTypeGetScalable" but returns a nullptr wrapping MlirType
+/// on illegal arguments, emitting appropriate diagnostics.
+MLIR_CAPI_EXPORTED
+MlirType mlirVectorTypeGetScalableChecked(MlirLocation loc, intptr_t rank,
+                                          const int64_t *shape,
+                                          const bool *scalable,
+                                          MlirType elementType);
+
+/// Checks whether the given vector type is scalable, i.e., has at least one
+/// scalable dimension.
+MLIR_CAPI_EXPORTED bool mlirVectorTypeIsScalable(MlirType type);
+
+/// Checks whether the "dim"-th dimension of the given vector is scalable.
+MLIR_CAPI_EXPORTED bool mlirVectorTypeIsDimScalable(MlirType type,
+                                                    intptr_t dim);
 
 //===----------------------------------------------------------------------===//
 // Ranked / Unranked Tensor type.
