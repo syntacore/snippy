@@ -43,5 +43,5 @@ histogram:
      - [JAL, 1.0]
      - [ADDIW, 1.0]
 
-# CHECK-NOT: {{x3[[:space:],]}}
-# CHECK-NOT: x4
+# CHECK-NOT: {{\$x3[[:space:],]}}
+# CHECK-NOT: {{\$x4[[:space:],]}}
