@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=20 \
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=10 \
 # RUN:     -verify-mi -mattr=-c -dump-mf --verify-consecutive-loops -o %t \
 # RUN:     --model-plugin=None
 

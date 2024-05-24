@@ -1,5 +1,5 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
-# RUN: -num-instrs=1000 -stack-size=1024 -dump-mf \
+# RUN: -num-instrs=1000 -stack-size=1024 -dump-mf -redefine-sp=SP \
 # RUN: -honor-target-abi --reserved-regs-list=ra,s4 -init-regs-in-elf -verify-mi |& FileCheck %s
 sections:
     - no:        1
