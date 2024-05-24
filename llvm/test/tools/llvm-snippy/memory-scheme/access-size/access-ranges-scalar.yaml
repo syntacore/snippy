@@ -1,0 +1,51 @@
+# RUN: llvm-snippy %s  -dump-memory-accesses=%t
+# RUN: cat %t |& FileCheck %s --check-prefix=POSITIVE-CHECK
+# RUN: cat %t |& FileCheck %s --check-prefix=NEGATIVE-CHECK
+
+# NEGATIVE-CHECK-NOT: 0x80004
+# POSITIVE-CHECK:     0x80005
+# POSITIVE-CHECK:     0x80003
+
+access-ranges:
+    - start: 0x80003000
+      size: 0x200
+      stride: 8
+      first-offset: 4
+      last-offset: 6
+      access-size: 4
+# Too small access size
+    - start: 0x80004000
+      size: 0x200
+      stride: 8
+      first-offset: 4
+      last-offset: 6
+      access-size: 3
+# No access restrictions 
+    - start: 0x80005000
+      size: 0x200
+      stride: 8
+      first-offset: 4
+      last-offset: 6
+
+sections:
+    - no:        1
+      VMA:       0x2000
+      SIZE:      0x10000000
+      LMA:       0x2000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [XORI, 1.0]
+    - [LW, 10.0]
+    - [SW, 10.0]
+
+options:
+  march: riscv64-linux-gnu
+  num-instrs: 100
+  riscv-disable-misaligned-access: true
+
