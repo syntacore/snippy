@@ -44,6 +44,7 @@ target_link_libraries(llvm-snippy PRIVATE
   LLVMSnippySupport
   LLVMSnippyTarget
   LLVMSnippyGenerator
+  LLVMSnippyOptionCategory
   )
 
 
