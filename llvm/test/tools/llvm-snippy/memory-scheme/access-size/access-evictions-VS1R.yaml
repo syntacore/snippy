@@ -1,0 +1,77 @@
+# REQUIRES: riscv-rvv
+# RUN: llvm-snippy %s  -dump-memory-accesses=%t
+# RUN: cat %t |& FileCheck %s --check-prefix=POSITIVE-CHECK
+# RUN: cat %t |& FileCheck %s --check-prefix=NEGATIVE-CHECK
+
+# NEGATIVE-CHECK-NOT:  0x80004
+# NEGATIVE-CHECK-NOT:  0x80006
+
+# POSITIVE-CHECK:      0x80005
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: 0.2
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+      rne: 1.0
+      rdn: 1.0
+      ron: 1.0
+    VXSAT:
+      on: 1.0
+      off: 1.0
+    VTYPE:
+      VMA:
+        mu: 1.0
+        ma: 1.0
+      VTA:
+        tu: 1.0
+        ta: 1.0
+      SEW:
+        sew_64: 1.0
+      LMUL:
+        m1: 1.0
+        m8: 1.0
+
+access-evictions:
+# This scheme has too small size
+    - mask:  0x000000ff
+      fixed: 0x80004000
+      access-size: 15
+# This scheme has propper access size
+    - mask:  0x000000ff
+      fixed: 0x80005000
+      access-size: 16
+# This scheme has default access size 8 
+    - mask:  0x000000ff
+      fixed: 0x80006000
+
+sections:
+    - no:        0
+      VMA:       0x2000000
+      SIZE:      0x1000000
+      LMA:       0x2000000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x0002000
+      SIZE:      0x1000000
+      LMA:       0x0002000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80000000
+      SIZE:      0x00400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [VS1R_V, 1.0]
+    - [XORI, 1.0]
+
+options:
+  march: riscv64-linux-gnu
+  mattr: +v
+  num-instrs: 100

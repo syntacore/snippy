@@ -1,0 +1,53 @@
+# RUN: llvm-snippy %s  -dump-memory-accesses=%t
+# RUN: cat %t |& FileCheck %s --check-prefix=POSITIVE-CHECK
+
+# POSITIVE-CHECK-DAG:     0x80003
+# POSITIVE-CHECK-DAG:     0x80005
+# POSITIVE-CHECK-DAG:     0x80002
+# POSITIVE-CHECK-DAG:     0x80006
+# POSITIVE-CHECK-DAG:     0x80007
+# POSITIVE-CHECK-DAG:     0x80008
+
+# Access-size in ordered addresses is ignored
+
+access-addresses:
+# This address has too small size
+  - ordered: true
+    plain:
+    - addr: 0x80002000
+      access-size: 8
+    - addr: 0x80003000
+      access-size: 1
+    - addr: 0x80005000
+      access-size: 8
+  - ordered: true
+    plain:
+    - addr: 0x80006000
+      access-size: 8
+    - addr: 0x80007000
+      access-size: 8
+    - addr: 0x80008000
+      access-size: 8
+
+
+sections:
+    - no:        1
+      VMA:       0x2000
+      SIZE:      0x10000000
+      LMA:       0x2000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [XORI, 1.0]
+    - [LD, 10.0]
+    - [SD, 10.0]
+
+options:
+  march: riscv64-linux-gnu
+  num-instrs: 300
+  riscv-disable-misaligned-access: true
