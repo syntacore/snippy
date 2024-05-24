@@ -203,7 +203,7 @@ static size_t calcMainFuncInitialSpillSize(GeneratorContext &GC) {
   auto &State = GC.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
-  auto StackPointer = SnippyTgt.getStackPointer();
+  auto StackPointer = GC.getStackPointer();
   size_t SpillSize = SnippyTgt.getSpillAlignmentInBytes(StackPointer, GC);
 
   auto SpilledRegs = GC.getSpilledRegs();
@@ -221,10 +221,11 @@ void InstructionGenerator::prepareInterpreterEnv() const {
   I.setInitialState(SGCtx->getInitialRegisterState(I.getSubTarget()));
   if (!SGCtx->hasStackSection())
     return;
+
   // Prologue insertion happens after instructions generation, so we do not
   // have SP initialization instructions at this point. However, we know the
   // actual value of SP, so let's initialize it in model artificially.
-  auto SP = SnippyTgt.getStackPointer();
+  auto SP = SGCtx->getStackPointer();
   APInt StackTop(SnippyTgt.getRegBitWidth(SP, *SGCtx),
                  SGCtx->getStackTop() - calcMainFuncInitialSpillSize(*SGCtx));
   I.setReg(SP, StackTop);
@@ -414,9 +415,6 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
   PM.add(createBlockGenPlanningPass());
   PM.add(createInstructionGeneratorPass()); // Can be backtracked
 
-  if (GenSettings.InstrsGenerationConfig.RunMachineInstrVerifier)
-    PM.add(createMachineVerifierPass("Machine Verifier Pass report"));
-
   // Post backtrack
   PM.add(createPrologueEpilogueInsertionPass());
   PM.add(createFillExternalFunctionsStubsPass({}));
@@ -436,6 +434,10 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
 
   PM.add(createInstructionsPostProcessPass());
   PM.add(createFunctionDistributePass());
+
+  if (GenSettings.InstrsGenerationConfig.RunMachineInstrVerifier)
+    PM.add(createMachineVerifierPass("Machine Verifier Pass report"));
+
   std::string MIR;
   raw_string_ostream MIROS(MIR);
   if (DumpMIR.isSpecified())

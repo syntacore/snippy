@@ -1,5 +1,5 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
-# RUN: --model-plugin=None -num-instrs=10000 -external-stack  \
+# RUN: --model-plugin=None -num-instrs=10000 -external-stack -redefine-sp=SP \
 # RUN:  -spilled-regs-list=X1 -init-regs-in-elf -dump-mi -verify-mi |& FileCheck %s
 sections:
     - no:        1

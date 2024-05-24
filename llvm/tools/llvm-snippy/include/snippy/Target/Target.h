@@ -138,6 +138,12 @@ public:
               unsigned OpIndex, unsigned Opcode, const MachineBasicBlock &MBB,
               const MCRegisterInfo &RegInfo) const = 0;
 
+  virtual const MCRegisterClass &
+  getRegClassSuitableForSP(const MCRegisterInfo &RI) const = 0;
+
+  virtual std::function<bool(MCRegister)>
+  filterSuitableRegsForStackPointer() const = 0;
+
   virtual MCRegister getStackPointer() const = 0;
 
   // NOTE: this list do not include stack pointer.

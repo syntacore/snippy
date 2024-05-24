@@ -495,6 +495,10 @@ public:
     return GenSettings->RegistersConfig.SpilledRegs;
   }
 
+  MCRegister getStackPointer() const {
+    return GenSettings->RegistersConfig.StackPointer;
+  }
+
   GeneratorResult generateELF(ObjectFilesList InputImages) const;
 
   std::string generateLinkedImage(ObjectFilesList InputImages) const;
