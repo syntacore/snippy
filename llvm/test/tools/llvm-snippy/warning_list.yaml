@@ -1,5 +1,5 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu \
-# RUN: -external-stack=true --model-plugin=None \
+# RUN: -external-stack=true -redefine-sp=SP --model-plugin=None \
 # RUN: -num-instrs=10 |& FileCheck %s --dump-input fail
 
 sections:
