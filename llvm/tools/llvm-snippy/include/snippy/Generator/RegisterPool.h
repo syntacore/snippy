@@ -183,6 +183,14 @@ public:
   }
 
   // Pick random non-reserved register in specified register class with required
+  // access mask and filter.
+  template <typename Pred>
+  unsigned
+  getAvailableRegister(const Twine &Desc, Pred Filter, const MCRegisterInfo &RI,
+                       const MCRegisterClass &RegClass,
+                       AccessMaskBit AccessMask = AccessMaskBit::RW) const;
+
+  // Pick random non-reserved register in specified register class with required
   // access mask.
   template <typename R>
   unsigned
@@ -540,6 +548,15 @@ std::vector<unsigned> LocalRegPool::getNAvailableRegisters(
     AccessMaskBit AccessMask) const {
   return AvailableRegisterImpl::get(Desc, RI, *this, Filter, NumRegs, RegClass,
                                     AccessMask);
+}
+
+template <typename Pred>
+unsigned RegPool::getAvailableRegister(const Twine &Desc, Pred Filter,
+                                       const MCRegisterInfo &RI,
+                                       const MCRegisterClass &RegClass,
+                                       AccessMaskBit AccessMask) const {
+  return AvailableRegisterImpl::getOne(Desc, RI, *this, Filter, RegClass,
+                                       AccessMask);
 }
 
 template <typename R>

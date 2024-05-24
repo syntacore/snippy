@@ -98,6 +98,16 @@ public:
     reportUnimplementedError();
   }
 
+  const MCRegisterClass &
+  getRegClassSuitableForSP(const MCRegisterInfo &RI) const override {
+    reportUnimplementedError();
+  }
+
+  std::function<bool(MCRegister)>
+  filterSuitableRegsForStackPointer() const override {
+    reportUnimplementedError();
+  }
+
   MCRegister getStackPointer() const override { reportUnimplementedError(); }
 
   void generateSpill(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,

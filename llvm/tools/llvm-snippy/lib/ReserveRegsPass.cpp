@@ -66,13 +66,11 @@ ReserveRegs::ReserveRegs() : ModulePass(ID) {
 
 bool ReserveRegs::runOnModule(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &State = SGCtx.getLLVMState();
-  const auto &SnippyTgt = State.getSnippyTarget();
 
   if (!SGCtx.stackEnabled())
     return false;
 
-  auto StackPointer = SnippyTgt.getStackPointer();
+  auto StackPointer = SGCtx.getStackPointer();
   auto &RootPool = getAnalysis<RootRegPoolWrapper>().getPool();
 
   // When stack enabled, it is not allow to modify stack pointer in any way.

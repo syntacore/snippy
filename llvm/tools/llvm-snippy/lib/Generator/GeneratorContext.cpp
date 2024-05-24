@@ -413,7 +413,7 @@ bool GeneratorContext::hasCallInstrs() const {
 void GeneratorContext::initializeStackSection() {
   auto &Ctx = State->getCtx();
   auto &SnippyTgt = State->getSnippyTarget();
-  auto SP = SnippyTgt.getStackPointer();
+  auto SP = getStackPointer();
   auto Align = SnippyTgt.getSpillAlignmentInBytes(SP, *this);
 
   if (GenSettings->LinkerConfig.ExternalStack) {
