@@ -143,6 +143,7 @@ void yaml::MappingTraits<snippy::MemoryAccessRange>::mapping(
   Io.mapRequired("stride", Range.Stride);
   Io.mapRequired("first-offset", Range.FirstOffset);
   Io.mapRequired("last-offset", Range.LastOffset);
+  Io.mapOptional("access-size", Range.AccessSize);
 
   if (!Io.outputting())
     Range.initAllowedAlignmentLCBlockOffsets();
@@ -178,6 +179,7 @@ void yaml::MappingTraits<snippy::MemoryAccessEviction>::mapping(
   Io.mapOptional("weight", Eviction.Weight);
   Io.mapRequired("mask", MaskNorm->Value);
   Io.mapRequired("fixed", FixedNorm->Value);
+  Io.mapOptional("access-size", Eviction.AccessSize);
 }
 
 std::string yaml::MappingTraits<snippy::MemoryAccessEviction>::validate(
@@ -463,6 +465,7 @@ MemoryAccessSeq MemoryAccessRange::split(const MemoryBank &MB) const {
     NewMemAccess->FirstOffset = FirstOffset;
     NewMemAccess->LastOffset = LastOffset;
     NewMemAccess->Size = Intersected.End - NewMemAccess->Start;
+    NewMemAccess->AccessSize = AccessSize;
 
     NewMemAccess->Weight = Size != 0 ? Weight * NewMemAccess->Size / Size : 0;
     NewMemAccess->initAllowedAlignmentLCBlockOffsets();
@@ -473,16 +476,17 @@ MemoryAccessSeq MemoryAccessRange::split(const MemoryBank &MB) const {
 
 bool MemoryAccessRange::isLegal(const AddressGenInfo &AddrGenInfo) const {
   auto Alignment = AddrGenInfo.Alignment;
-  auto AccessSize = AddrGenInfo.AccessSize;
+  auto AddrInfoAccessSize = AddrGenInfo.AccessSize;
   auto MinStride = AddrGenInfo.MinStride;
   auto LCStride = getLCStride(Alignment);
 
   assert(isPowerOf2_64(Alignment) && Alignment <= 8);
 
-  if (AccessSize > Size)
+  if (AddrInfoAccessSize > Size ||
+      (AccessSize && AddrInfoAccessSize > AccessSize))
     return false;
 
-  auto MaxOffset = Size - AccessSize;
+  auto MaxOffset = Size - AddrInfoAccessSize;
   const auto &AllowedLCBlockOffsets =
       AlignmentAllowedLCBlockOffsets[Log2_64(Alignment)];
 
@@ -506,7 +510,7 @@ bool MemoryAccessRange::isLegal(const AddressGenInfo &AddrGenInfo) const {
   // MaxLCBlock is the last LCStride-wide block that element can fit in. Then
   // the total number of elements that can be addressed with LCStride is
   // MaxLCBlock + 1
-  auto MaxLCBlock = getMaxLCBlock(Alignment, AccessSize);
+  auto MaxLCBlock = getMaxLCBlock(Alignment, AddrInfoAccessSize);
   return NumElements <= MaxLCBlock + 1;
 }
 
@@ -700,6 +704,7 @@ MemoryAccessSeq MemoryAccessEviction::split(const MemoryBank &MB) const {
     auto NewMemAccess = std::make_unique<MemoryAccessEviction>();
     NewMemAccess->Fixed = Fixed;
     NewMemAccess->Mask = 0u;
+    NewMemAccess->AccessSize = AccessSize;
     auto CurrentBit = countr_zero(Mask);
     int MaxBit = sizeof(Mask) * CHAR_BIT - countr_zero(Mask);
     for (; CurrentBit < MaxBit; ++CurrentBit) {
@@ -768,6 +773,13 @@ static bool isLegalAddress(MemAddr Address, size_t Alignment) {
   return MinAlign(Address, Alignment) == Alignment;
 }
 
+static bool isLegalAddress(AccessAddress Address, size_t AccessSize,
+                           size_t Alignment) {
+  return isLegalAddress(Address.Addr, Alignment) &&
+         // Address is an address from a memory scheme
+         Address.AccessSize >= AccessSize;
+}
+
 static bool isLegalAddress(const AddressInfo &AI, size_t AccessSize,
                            size_t Alignment) {
   assert(isPowerOf2_64(Alignment));
@@ -794,8 +806,8 @@ AddressInfo MemoryAccessAddresses::randomAddressForPlainAccess(
   } else {
     SmallVector<AccessAddress, 32> LegalAddresses;
     copy_if(Addresses, std::back_inserter(LegalAddresses),
-            [Alignment](auto Addr) {
-              return isLegalAddress(Addr.Addr, Alignment);
+            [Alignment, AccessSize](auto Addr) {
+              return isLegalAddress(Addr, AccessSize, Alignment);
             });
     assert(!LegalAddresses.empty() && "At least one address must be legal. "
                                       "We should've already checked it.");
@@ -881,8 +893,9 @@ bool MemoryAccessAddresses::isLegal(const AddressGenInfo &AddrGenInfo) const {
   // layout. It means that any AccessSize is legal.
   if (NextAddressIdx)
     return isLegalAddress(Addresses[*NextAddressIdx].Addr, Alignment);
-  return any_of(Addresses, [Alignment](auto Addr) {
-    return isLegalAddress(Addr.Addr, Alignment);
+
+  return any_of(Addresses, [Alignment, AccessSize](auto AI) {
+    return isLegalAddress(AI, AccessSize, Alignment);
   });
 }
 
@@ -1049,6 +1062,8 @@ void MemoryAccessRange::print(raw_ostream &OS) const {
      << "  Stride: " << Stride << "\n"
      << "  FirstOffset: " << FirstOffset << "\n"
      << "  LastOffset: " << LastOffset << "\n";
+  if (AccessSize)
+    OS << "  AccessSize: " << *AccessSize << "\n";
   OS << "\n";
 }
 
@@ -1056,6 +1071,8 @@ void MemoryAccessEviction::print(raw_ostream &OS) const {
   OS << "Memory eviction:\n  Weight: " << floatToString(Weight, 3)
      << "\n  Mask:  0x" << Twine::utohexstr(Mask) << "\n  Fixed: 0x"
      << Twine::utohexstr(Fixed) << "\n";
+  if (AccessSize)
+    OS << "  AccessSize: " << *AccessSize << "\n";
   OS << "\n";
 }
 
