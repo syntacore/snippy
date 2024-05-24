@@ -46,7 +46,7 @@
 namespace llvm {
 namespace snippy {
 
-cl::OptionCategory Options("llvm-snippy options");
+extern cl::OptionCategory Options;
 
 // Unlike clang, march here is not something like rv64gc (provided by attrs and
 // CPU). Instead it is something like target (try riscv64-linux-gnu).
