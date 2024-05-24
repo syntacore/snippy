@@ -266,6 +266,7 @@ struct MemoryAccessRange final : MemoryAccess {
   unsigned Stride = 1;
   unsigned FirstOffset = 0;
   unsigned LastOffset = 0;
+  std::optional<size_t> AccessSize = std::nullopt;
 
   // When alignment must be accounted for, offsets that are aligned in one
   // Stride-wide block might not be aligned in the next one. However, they will
@@ -332,6 +333,7 @@ private:
 struct MemoryAccessEviction final : MemoryAccess {
   MemAddr Mask = 0;
   MemAddr Fixed = 0;
+  std::optional<size_t> AccessSize = std::nullopt;
 
   MemoryAccessEviction() : MemoryAccess(MemoryAccessMode::Eviction) {}
 
@@ -364,8 +366,9 @@ struct MemoryAccessEviction final : MemoryAccess {
     if (!Info.isSingleElement())
       return false;
 
-    // FIXME: we should try to find size for eviction.
-    return Info.AccessSize <= 8;
+    if (!AccessSize)
+      return Info.AccessSize <= 8;
+    return Info.AccessSize <= *AccessSize;
   }
 
   MemAddr getLowerBound() const override { return Fixed; }

@@ -2385,7 +2385,7 @@ public:
 
     auto &TgtCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
     auto VL = TgtCtx.getVL(MBB);
-    if (VL == 0)
+    if (VL == 0 && !isRVVWholeRegLoadStore(Opcode))
       return 0;
 
     if (isRVVUnitStrideMaskLoadStore(Opcode))
