@@ -1,4 +1,5 @@
 add_subdirectory(Config)
+add_subdirectory(OptionCategory)
 add_subdirectory(Simulator)
 add_subdirectory(Support)
 add_subdirectory(Target)
