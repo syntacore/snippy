@@ -105,6 +105,27 @@ static snippy::opt_list<std::string>
                                  "before snippet execution and restored after"),
                         cl::cat(Options));
 
+enum class RedefineSPMode { Any, SP, AnyNotSP };
+
+struct RedefineSPEnumOption
+    : public snippy::EnumOptionMixin<RedefineSPEnumOption> {
+  static void doMapping(EnumMapper &Mapper) {
+    Mapper.enumCase(RedefineSPMode::Any, "any",
+                    "use any suitable register as a stack pointer");
+    Mapper.enumCase(RedefineSPMode::SP, "SP",
+                    "use target default stack pointer register");
+    Mapper.enumCase(
+        RedefineSPMode::AnyNotSP, "any-not-SP",
+        "use any suitable register as a stack pointer, except target default");
+  }
+};
+
+static snippy::opt<RedefineSPMode>
+    RedefineSP("redefine-sp",
+               cl::desc("Specify the reg to use as a stack pointer"),
+               RedefineSPEnumOption::getClValues(), cl::cat(Options),
+               cl::init(RedefineSPMode::Any));
+
 static snippy::opt<bool> FollowTargetABI(
     "honor-target-abi",
     cl::desc("Automatically spill registers that are required to be preserved "
@@ -237,6 +258,9 @@ static snippy::opt<bool> DumpMI(
 LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(
     snippy::SelfcheckRefValueStorageType,
     snippy::SelfcheckRefValueStorageEnumOption)
+
+LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(snippy::RedefineSPMode,
+                                           snippy::RedefineSPEnumOption)
 
 namespace snippy {
 
@@ -613,6 +637,46 @@ parseSpilledRegistersOption(RegPool &RP, const SnippyTarget &Tgt,
   return SpilledRegs;
 }
 
+static MCRegister getRealStackPointer(const RegPool &RP,
+                                      const SnippyTarget &Tgt,
+                                      const MCRegisterInfo &RI,
+                                      std::vector<unsigned> &SpilledRegs,
+                                      LLVMContext &Ctx) {
+  auto SP = Tgt.getStackPointer();
+
+  if (RedefineSP == RedefineSPMode::SP)
+    return SP;
+
+  if (ExternalStackOpt) {
+    snippy::warn(WarningName::InconsistentOptions, Ctx,
+                 "'" + Twine(ExternalStackOpt.ArgStr) + "' is specified",
+                 "'" + Twine(RedefineSP.ArgStr) + "' is assumed to be SP");
+    return Tgt.getStackPointer();
+  }
+
+  bool CanUseSP = !(RedefineSP == RedefineSPMode::AnyNotSP);
+
+  const auto &SPRegClass = Tgt.getRegClassSuitableForSP(RI);
+
+  auto BasicFilter = Tgt.filterSuitableRegsForStackPointer();
+
+  auto FullFilter = [&](auto Reg) {
+    return std::any_of(SpilledRegs.begin(), SpilledRegs.end(),
+                       [Reg](auto SpReg) { return SpReg == Reg; }) ||
+           std::invoke(BasicFilter, Reg) || (!CanUseSP && Reg == SP);
+  };
+
+  auto RealSP =
+      RP.getAvailableRegister("stack pointer", FullFilter, RI, SPRegClass);
+
+  // We need to spill SP if it is not used as intended
+  // and honor-target-abi is specified
+  if (FollowTargetABI && (RealSP != SP))
+    SpilledRegs.push_back(SP);
+
+  return RealSP;
+}
+
 static void reportWarningsSummary() {
   const auto &Warnings = snippy::SnippyDiagnosticInfo::fetchReportedWarnings();
   if (Warnings.empty())
@@ -946,6 +1010,9 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
                               State.getRegInfo());
   auto SpilledRegs = parseSpilledRegistersOption(
       RP, State.getSnippyTarget(), State.getRegInfo(), State.getCtx());
+  auto StackPointer =
+      getRealStackPointer(RP, State.getSnippyTarget(), State.getRegInfo(),
+                          SpilledRegs, State.getCtx());
   std::string DumpPathInitialState = deriveDefaultableOptionValue(
       RequestForInitialStateDump || Verbose, DumpInitialRegisters);
   std::string DumpPathFinalState = deriveDefaultableOptionValue(
@@ -967,7 +1034,8 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
       RegistersOptions{
           InitRegsInElf, InitialRegisterDataFile.getValue(),
           std::move(DumpPathInitialState), std::move(DumpPathFinalState),
-          SmallVector<unsigned>(SpilledRegs.begin(), SpilledRegs.end())},
+          SmallVector<unsigned>(SpilledRegs.begin(), SpilledRegs.end()),
+          StackPointer},
       std::move(Cfg));
 }
 

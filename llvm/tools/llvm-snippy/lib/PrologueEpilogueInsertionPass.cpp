@@ -144,7 +144,7 @@ void PrologueEpilogueInsertion::generateStackInitialization(
   auto &State = SGCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
-  auto StackPointer = SnippyTgt.getStackPointer();
+  auto StackPointer = SGCtx.getStackPointer();
   // Stack ponter is considered live on entry.
   MBB.addLiveIn(StackPointer);
 
@@ -172,7 +172,7 @@ void PrologueEpilogueInsertion::generateStackTermination(
   const auto &SnippyTgt = State.getSnippyTarget();
 
   // Restore stack pointer state.
-  auto StackPointer = SnippyTgt.getStackPointer();
+  auto StackPointer = SGCtx.getStackPointer();
   auto SPSpillSize = SnippyTgt.getSpillSizeInBytes(StackPointer, SGCtx);
   auto Addr = SGCtx.getStackTop() - SPSpillSize;
   SnippyTgt.loadRegFromAddr(MBB, Ins, Addr, StackPointer, RP, SGCtx);

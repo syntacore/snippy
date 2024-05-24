@@ -59,6 +59,7 @@ struct RegistersOptions {
   std::string InitialStateOutputYaml;
   std::string FinalStateOutputYaml;
   SmallVector<unsigned> SpilledRegs;
+  MCRegister StackPointer;
 };
 
 struct GeneratorSettings {

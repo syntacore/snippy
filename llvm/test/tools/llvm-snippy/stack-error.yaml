@@ -1,9 +1,9 @@
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
 # RUN: %S/Inputs/layout3.yaml -num-instrs=1000 -stack-size=1024  \
-# RUN: --reserved-regs-list=X2 |& FileCheck %s -check-prefix=SPRES
+# RUN: --reserved-regs-list=X2 -redefine-sp=SP |& FileCheck %s -check-prefix=SPRES
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
 # RUN: %S/Inputs/layout3.yaml -num-instrs=1000 -stack-size=1024  \
-# RUN: --spilled-regs-list=X2 |& FileCheck %s -check-prefix=SPSPILL
+# RUN: --spilled-regs-list=X2 -redefine-sp=SP |& FileCheck %s -check-prefix=SPSPILL
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
 # RUN: %S/Inputs/layout3.yaml -num-instrs=1000 -stack-size=1024  \
 # RUN: --spilled-regs-list=[X1] |& FileCheck %s -check-prefix=ILLSPILL
@@ -17,7 +17,7 @@
 # RUN: %S/Inputs/layout3.yaml -num-instrs=1000 -stack-size=1000 \
 # RUN: --spilled-regs-list=X1 |& FileCheck %s -check-prefix=UNALIGNED
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
-# RUN: %S/Inputs/layout3.yaml --model-plugin=None -num-instrs=1000 -external-stack \
+# RUN: %S/Inputs/layout3.yaml --model-plugin=None -num-instrs=1000 -external-stack -redefine-sp=SP \
 # RUN: --spilled-regs-list=X1 -reserved-regs-list=X2 |& FileCheck %s -check-prefix=EXTSTACKSPRES
 
 # SPRES: LLVM ERROR: Failed to initialize stack: stack pointer register is explicitly reserved.

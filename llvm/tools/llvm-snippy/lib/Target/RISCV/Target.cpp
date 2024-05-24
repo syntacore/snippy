@@ -1686,15 +1686,30 @@ public:
     return {RISCV::X3, RISCV::X4};
   }
 
+  const MCRegisterClass &
+  getRegClassSuitableForSP(const MCRegisterInfo &RI) const override {
+    return RI.getRegClass(RISCV::GPRRegClassID);
+  }
+
+  std::function<bool(MCRegister)>
+  filterSuitableRegsForStackPointer() const override {
+
+    /* X6 is excluded, because it is the default destination for AUIPC in
+     * tailcalls */
+    return [](auto Reg) {
+      return Reg == RISCV::X0 || Reg == RISCV::X1 || Reg == RISCV::X6;
+    };
+  }
+
   MCRegister getStackPointer() const override { return RISCV::X2; }
 
   void generateSpill(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
                      MCRegister Reg, GeneratorContext &GC) const override {
     assert(GC.stackEnabled() &&
            "An attempt to generate spill but stack was not enabled.");
-    auto SP = getStackPointer();
 
     auto &State = GC.getLLVMState();
+    auto SP = GC.getStackPointer();
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
     getSupportInstBuilder(MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
@@ -1709,9 +1724,8 @@ public:
                       MCRegister Reg, GeneratorContext &GC) const override {
     assert(GC.stackEnabled() &&
            "An attempt to generate reload but stack was not enabled.");
-    auto SP = getStackPointer();
-
     auto &State = GC.getLLVMState();
+    auto SP = GC.getStackPointer();
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
 
@@ -1727,9 +1741,8 @@ public:
                            GeneratorContext &GC) const override {
     assert(GC.stackEnabled() &&
            "An attempt to generate stack pop but stack was not enabled.");
-    auto SP = getStackPointer();
-
     auto &State = GC.getLLVMState();
+    auto SP = GC.getStackPointer();
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
 
