@@ -35,6 +35,7 @@
 #include "snippy/Generator/RegisterPoolImpl.h"
 #include "snippy/Support/Error.h"
 #include "snippy/Support/Utils.h"
+#include "snippy/Target/Target.h"
 
 #include <array>
 #include <map>
@@ -54,34 +55,6 @@ namespace snippy {
 
 class GeneratorContext;
 class RootRegPoolWrapper;
-
-#ifdef LLVM_SNIPPY_ACCESS_MASKS
-#error LLVM_SNIPPY_ACCESS_MASKS is already defined
-#endif
-#define LLVM_SNIPPY_ACCESS_MASKS                                               \
-  LLVM_SNIPPY_ACCESS_MASK_DESC(None, 0b0000)                                   \
-  LLVM_SNIPPY_ACCESS_MASK_DESC(SR, 0b0001)                                     \
-  LLVM_SNIPPY_ACCESS_MASK_DESC(GR, 0b0010)                                     \
-  LLVM_SNIPPY_ACCESS_MASK_DESC(R, 0b0011)                                      \
-  LLVM_SNIPPY_ACCESS_MASK_DESC(SW, 0b0100)                                     \
-  LLVM_SNIPPY_ACCESS_MASK_DESC(GW, 0b1000)                                     \
-  LLVM_SNIPPY_ACCESS_MASK_DESC(W, 0b1100)                                      \
-  LLVM_SNIPPY_ACCESS_MASK_DESC(SRW, 0b0101)                                    \
-  LLVM_SNIPPY_ACCESS_MASK_DESC(GRW, 0b1010)                                    \
-  LLVM_SNIPPY_ACCESS_MASK_DESC(RW, 0b1111)
-
-// R - read.
-// W - write.
-// S - support instruction only.
-// G - general instruction only.
-enum class AccessMaskBit {
-#ifdef LLVM_SNIPPY_ACCESS_MASK_DESC
-#error LLVM_SNIPPY_ACCESS_MASK_DESC is already defined
-#endif
-#define LLVM_SNIPPY_ACCESS_MASK_DESC(KEY, VALUE) KEY = VALUE,
-  LLVM_SNIPPY_ACCESS_MASKS
-#undef LLVM_SNIPPY_ACCESS_MASK_DESC
-};
 
 namespace detail {
 template <typename T>
@@ -353,13 +326,13 @@ public:
   // Append reserved set application-wide.
   void addReserved(unsigned Reg, AccessMaskBit AccessMask = AccessMaskBit::RW);
   // Append reserved set for a function.
-  void addReserved(const MachineFunction &MF, unsigned Reg,
+  void addReserved(unsigned Reg, const MachineFunction &MF,
                    AccessMaskBit AccessMask = AccessMaskBit::RW);
   // Append reserved set for a loop.
-  void addReserved(const MachineLoop &ML, unsigned Reg,
+  void addReserved(unsigned Reg, const MachineLoop &ML,
                    AccessMaskBit AccessMask = AccessMaskBit::RW);
   // Append reserved set for a block.
-  void addReserved(const MachineBasicBlock &MBB, unsigned Reg,
+  void addReserved(unsigned Reg, const MachineBasicBlock &MBB,
                    AccessMaskBit AccessMask = AccessMaskBit::RW);
 
   void print(raw_ostream &OS) const {
@@ -384,10 +357,14 @@ public:
 };
 
 class RegPoolWrapper final {
+  const SnippyTarget &SnippyTgt;
+  const MCRegisterInfo &RegInfo;
   std::vector<RegPool> &Pools;
 
 public:
-  RegPoolWrapper(std::vector<RegPool> &Pools) : Pools(Pools) {
+  RegPoolWrapper(const SnippyTarget &SnippyTgt, const MCRegisterInfo &RegInfo,
+                 std::vector<RegPool> &Pools)
+      : SnippyTgt(SnippyTgt), RegInfo(RegInfo), Pools(Pools) {
     Pools.emplace_back();
   }
 
@@ -398,16 +375,21 @@ public:
   RegPoolWrapper &operator=(RegPoolWrapper &&Other) = delete;
 
   // Create and push new wrapper
-  RegPoolWrapper push() { return {Pools}; }
+  RegPoolWrapper push() { return {SnippyTgt, RegInfo, Pools}; }
 
   // Pop wrapper on delete
   ~RegPoolWrapper() noexcept { Pools.pop_back(); }
 
   void reset() { Pools.back() = RegPool{}; }
 
-  template <typename... ArgsTys> bool isReserved(ArgsTys &&...Args) const {
+  template <typename... ArgsTys>
+  bool isReserved(unsigned Reg, ArgsTys &&...Args) const {
+    // Only physical registers can be reserved.
+    // Therefore, we must identify the physical register
+    // of this alias and check it.
+    Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
     return any_of(Pools, [&](auto &Pool) {
-      return Pool.isReserved(std::forward<ArgsTys>(Args)...);
+      return Pool.isReserved(Reg, std::forward<ArgsTys>(Args)...);
     });
   }
 
@@ -513,10 +495,15 @@ public:
                            const MachineBasicBlock &MBB,
                            AccessMaskBit AccessMask = AccessMaskBit::RW) const;
 
-  template <typename... ArgsTys> void addReserved(ArgsTys &&...Args) {
+  template <typename... ArgsTys>
+  void addReserved(unsigned Reg, ArgsTys &&...Args) {
+    assert(!SnippyTgt.isMultipleReg(Reg, RegInfo) &&
+           "Only physical registers can be reserved. If you want to reserve a "
+           "multiple register, then you must first divide it into physical "
+           "registers and then reserve each of them.");
     DEBUG_WITH_TYPE("snippy-regpool",
                     (dbgs() << "Before reservation: ", dump()));
-    Pools.back().addReserved(std::forward<ArgsTys>(Args)...);
+    Pools.back().addReserved(Reg, std::forward<ArgsTys>(Args)...);
     DEBUG_WITH_TYPE("snippy-regpool",
                     (dbgs() << "After reservation: ", dump()));
   }

@@ -1,0 +1,92 @@
+# COM: This test checks that if registers Fx_F are reserved, 
+# COM: which are sub-registers of Fx_D, then both of them 
+# COM: are not found in the machine function dump.
+
+# RUN: llvm-snippy %s -model-plugin=None \
+# RUN:  |& FileCheck %s
+
+options:
+  march: riscv64-linux-gnu
+  mcpu: generic-rv64
+  mattr: +f,+d
+  dump-mf: on
+  num-instrs: 10000
+  reserved-regs-list: [F0_F,F1_F,F2_F,F3_F,F4_F,F5_F,F6_F,F7_F,F8_F,F9_F,F10_F,F11_F,F12_F,F13_F,F14_F,F15_F,F16_F,F17_F,F18_F,F19_F,F20_F,F21_F,F22_F,F23_F,F24_F,F25_F,F26_F,F27_F,F28_F,F29_F,F30_F]
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [FADD_D, 1.0]
+
+# CHECK-NOT: f1_f 
+# CHECK-NOT: f2_f 
+# CHECK-NOT: f3_f 
+# CHECK-NOT: f4_f 
+# CHECK-NOT: f5_f 
+# CHECK-NOT: f6_f 
+# CHECK-NOT: f7_f 
+# CHECK-NOT: f8_f 
+# CHECK-NOT: f9_f 
+# CHECK-NOT: f10_f 
+# CHECK-NOT: f11_f 
+# CHECK-NOT: f12_f 
+# CHECK-NOT: f13_f 
+# CHECK-NOT: f14_f 
+# CHECK-NOT: f15_f 
+# CHECK-NOT: f16_f 
+# CHECK-NOT: f17_f 
+# CHECK-NOT: f18_f 
+# CHECK-NOT: f19_f 
+# CHECK-NOT: f20_f 
+# CHECK-NOT: f21_f 
+# CHECK-NOT: f22_f 
+# CHECK-NOT: f23_f 
+# CHECK-NOT: f24_f 
+# CHECK-NOT: f25_f 
+# CHECK-NOT: f26_f 
+# CHECK-NOT: f27_f 
+# CHECK-NOT: f28_f 
+# CHECK-NOT: f29_f 
+# CHECK-NOT: f30_f 
+
+# CHECK-NOT: f1_d 
+# CHECK-NOT: f2_d 
+# CHECK-NOT: f3_d 
+# CHECK-NOT: f4_d 
+# CHECK-NOT: f5_d 
+# CHECK-NOT: f6_d 
+# CHECK-NOT: f7_d 
+# CHECK-NOT: f8_d 
+# CHECK-NOT: f9_d 
+# CHECK-NOT: f10_d 
+# CHECK-NOT: f11_d 
+# CHECK-NOT: f12_d 
+# CHECK-NOT: f13_d 
+# CHECK-NOT: f14_d 
+# CHECK-NOT: f15_d 
+# CHECK-NOT: f16_d 
+# CHECK-NOT: f17_d 
+# CHECK-NOT: f18_d 
+# CHECK-NOT: f19_d 
+# CHECK-NOT: f20_d 
+# CHECK-NOT: f21_d 
+# CHECK-NOT: f22_d 
+# CHECK-NOT: f23_d 
+# CHECK-NOT: f24_d 
+# CHECK-NOT: f25_d 
+# CHECK-NOT: f26_d 
+# CHECK-NOT: f27_d 
+# CHECK-NOT: f28_d 
+# CHECK-NOT: f29_d 
+# CHECK-NOT: f30_d 
+
