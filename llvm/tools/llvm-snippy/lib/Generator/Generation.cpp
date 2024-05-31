@@ -302,7 +302,8 @@ GenerationResult handleGeneratedInstructions(
   // Collect def registers from the candidates.
   // Use SetVector as we want to preserve order of insertion.
   SetVector<SelfcheckAnnotationInfo<InstrIt>> Defs;
-  const auto &ST = GC.getLLVMState().getSnippyTarget();
+  auto &State = GC.getLLVMState();
+  const auto &ST = State.getSnippyTarget();
   // Reverse traversal as we need to sort definitions by their last use.
   for (auto Inst : reverse(SelfcheckCandidates)) {
     // TODO: Add self-check for instructions without definitions
@@ -342,7 +343,8 @@ GenerationResult handleGeneratedInstructions(
   auto RP = GC.getRegisterPool();
   std::vector<SelfcheckFirstStoreInfo<InstrIt>> StoresInfo;
   for (const auto &Def : Defs) {
-    RP.addReserved(Def.DestReg);
+    llvm::for_each(ST.getPhysRegsFromUnit(Def.DestReg, State.getRegInfo()),
+                   [&RP](auto SimpleReg) { RP.addReserved(SimpleReg); });
     auto SelfcheckInterInfo = storeRefAndActualValueForSelfcheck(
         InsPoint, Def.DestReg, RP.push(), InstrGenCtx);
     InsPoint = SelfcheckInterInfo.NextInsertPos;
@@ -360,7 +362,7 @@ GenerationResult handleGeneratedInstructions(
         std::distance(Def.Inst, std::next(StoreInfo.FirstStoreInstrPos)));
   // Execute self-check instructions
   auto &I = GC.getOrCreateInterpreter();
-  if (!I.executeChainOfInstrs(GC.getLLVMState(), InsPoint, ItEnd))
+  if (!I.executeChainOfInstrs(State, InsPoint, ItEnd))
     I.reportSimulationFatalError(
         "Failed to execute chain of instructions in tracking mode");
 

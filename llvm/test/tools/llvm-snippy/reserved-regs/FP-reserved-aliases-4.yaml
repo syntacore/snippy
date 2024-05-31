@@ -1,0 +1,181 @@
+# COM: This test checks that if registers Fx_H, Fy_F, Fz_D are reserved, 
+# COM: then Fx_H, Fx_F, Fx_D, Fy_H, Fy_F, Fy_D, Fz_H, Fz_F and Fz_D
+# COM: are not found in the machine function dump.
+
+# RUN: llvm-snippy %s -model-plugin=None \
+# RUN:  |& FileCheck %s
+
+options:
+  march: riscv64-linux-gnu
+  mcpu: generic-rv64
+  mattr: +d,+zfh
+  dump-mf: on
+  num-instrs: 10000
+  reserved-regs-list: [F0_H,F1_F,F2_D,F3_H,F4_F,F5_D,F6_H,F7_F,F8_D,F9_H,F10_F,F11_D,F12_H,F13_F,F14_D,F15_H,F16_F,F17_D,F18_H,F19_F,F20_D]
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [FADD_S, 1.0]
+    - [FMSUB_S, 1.0]
+    - [FNMSUB_S, 1.0]
+    - [FNMADD_S, 1.0]
+    - [FADD_S, 1.0]
+    - [FSUB_S, 1.0]
+    - [FMUL_S, 1.0]
+    - [FDIV_S, 1.0]
+    - [FSQRT_S, 1.0]
+    - [FSGNJ_S, 1.0]
+    - [FSGNJN_S, 1.0]
+    - [FSGNJX_S, 1.0]
+    - [FMIN_S, 1.0]
+    - [FMAX_S, 1.0]
+    - [FCVT_W_S, 1.0]
+    - [FCVT_WU_S, 1.0]
+    - [FMV_X_W, 1.0]
+    - [FEQ_S, 1.0]
+    - [FLT_S, 1.0]
+    - [FLE_S, 1.0]
+    - [FCLASS_S, 1.0]
+    - [FCVT_S_W, 1.0]
+    - [FCVT_S_WU, 1.0]
+    - [FMV_W_X, 1.0]
+    - [FCVT_L_S, 1.0]
+    - [FCVT_LU_S, 1.0]
+    - [FCVT_S_L, 1.0]
+    - [FCVT_S_LU, 1.0]
+    - [FLW, 1.0]
+    - [FSW, 1.0]
+
+    - [FMADD_D, 1.0]
+    - [FMSUB_D, 1.0]
+    - [FNMSUB_D, 1.0]
+    - [FNMADD_D, 1.0]
+    - [FADD_D, 1.0]
+    - [FSUB_D, 1.0]
+    - [FMUL_D, 1.0]
+    - [FDIV_D, 1.0]
+    - [FSQRT_D, 1.0]
+    - [FSGNJ_D, 1.0]
+    - [FSGNJN_D, 1.0]
+    - [FSGNJX_D, 1.0]
+    - [FMIN_D, 1.0]
+    - [FMAX_D, 1.0]
+    - [FCVT_W_D, 1.0]
+    - [FCVT_WU_D, 1.0]
+    - [FCVT_D_W, 1.0]
+    - [FCVT_D_WU, 1.0]
+    - [FMV_X_D, 1.0]
+    - [FEQ_D, 1.0]
+    - [FLT_D, 1.0]
+    - [FLE_D, 1.0]
+    - [FCLASS_D, 1.0]
+    - [FMV_D_X, 1.0]
+    - [FCVT_L_D, 1.0]
+    - [FCVT_LU_D, 1.0]
+    - [FCVT_D_L, 1.0]
+    - [FCVT_D_LU, 1.0]
+    - [FCVT_S_D, 1.0]
+    - [FCVT_D_S, 1.0]
+    - [FLD, 1.0]
+    - [FSD, 1.0]
+
+    - [FMADD_H, 1.0]
+    - [FMSUB_H, 1.0]
+    - [FNMSUB_H, 1.0]
+    - [FNMADD_H, 1.0]
+    - [FADD_H, 1.0]
+    - [FSUB_H, 1.0]
+    - [FMUL_H, 1.0]
+    - [FDIV_H, 1.0]
+    - [FSQRT_H, 1.0]
+    - [FSGNJ_H, 1.0]
+    - [FSGNJN_H, 1.0]
+    - [FSGNJX_H, 1.0]
+    - [FMIN_H, 1.0]
+    - [FMAX_H, 1.0]
+    - [FCVT_W_H, 1.0]
+    - [FCVT_WU_H, 1.0]
+    - [FMV_X_H, 1.0]
+    - [FEQ_H, 1.0]
+    - [FLT_H, 1.0]
+    - [FLE_H, 1.0]
+    - [FCLASS_H, 1.0]
+    - [FCVT_H_W, 1.0]
+    - [FCVT_H_WU, 1.0]
+    - [FMV_H_X, 1.0]
+    - [FCVT_L_H, 1.0]
+    - [FCVT_LU_H, 1.0]
+    - [FCVT_H_L, 1.0]
+    - [FCVT_H_LU, 1.0]
+    - [FCVT_S_H, 1.0]
+    - [FCVT_H_S, 1.0]
+    - [FLH, 1.0]
+    - [FSH, 1.0]
+
+# CHECK-NOT: f1_h 
+# CHECK-NOT: f2_h 
+# CHECK-NOT: f3_h 
+# CHECK-NOT: f4_h 
+# CHECK-NOT: f5_h 
+# CHECK-NOT: f6_h 
+# CHECK-NOT: f7_h 
+# CHECK-NOT: f8_h 
+# CHECK-NOT: f9_h 
+# CHECK-NOT: f10_h 
+# CHECK-NOT: f11_h 
+# CHECK-NOT: f12_h 
+# CHECK-NOT: f15_h 
+# CHECK-NOT: f16_h 
+# CHECK-NOT: f17_h 
+# CHECK-NOT: f18_h 
+# CHECK-NOT: f19_h 
+# CHECK-NOT: f20_h 
+
+# CHECK-NOT: f1_f 
+# CHECK-NOT: f2_f 
+# CHECK-NOT: f3_f 
+# CHECK-NOT: f4_f 
+# CHECK-NOT: f5_f 
+# CHECK-NOT: f6_f 
+# CHECK-NOT: f7_f 
+# CHECK-NOT: f8_f 
+# CHECK-NOT: f9_f 
+# CHECK-NOT: f10_f 
+# CHECK-NOT: f11_f 
+# CHECK-NOT: f12_f 
+# CHECK-NOT: f15_f 
+# CHECK-NOT: f16_f 
+# CHECK-NOT: f17_f 
+# CHECK-NOT: f18_f 
+# CHECK-NOT: f19_f 
+# CHECK-NOT: f20_f 
+
+# CHECK-NOT: f1_d 
+# CHECK-NOT: f2_d 
+# CHECK-NOT: f3_d 
+# CHECK-NOT: f4_d 
+# CHECK-NOT: f5_d 
+# CHECK-NOT: f6_d 
+# CHECK-NOT: f7_d 
+# CHECK-NOT: f8_d 
+# CHECK-NOT: f9_d 
+# CHECK-NOT: f10_d 
+# CHECK-NOT: f11_d 
+# CHECK-NOT: f12_d 
+# CHECK-NOT: f15_d 
+# CHECK-NOT: f16_d 
+# CHECK-NOT: f17_d 
+# CHECK-NOT: f18_d 
+# CHECK-NOT: f19_d 
+# CHECK-NOT: f20_d 

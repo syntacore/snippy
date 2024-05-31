@@ -1,0 +1,26 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -init-regs-in-elf \
+# RUN:    -dump-mi -num-instrs=2000 -reserved-regs-list=x4,s0,ra \
+# RUN:    | FileCheck %s
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x40000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [LW, 1.0]
+    - [SW, 1.0]
+
+# CHECK: Generated
+# CHECK-NOT: $x4
+# CHECK-NOT: $x8
+# CHECK-NOT: $x1{{[^0-9]}}

@@ -19,8 +19,9 @@
 
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
+#include "snippy/Generator/AccessMaskBit.h"
 #include "snippy/Generator/MemoryManager.h"
-#include "snippy/Generator/RegisterPool.h"
+#include "snippy/Generator/Policy.h"
 #include "snippy/PassManagerWrapper.h"
 #include "snippy/Simulator/Simulator.h"
 #include "snippy/Support/DynLibLoader.h"
