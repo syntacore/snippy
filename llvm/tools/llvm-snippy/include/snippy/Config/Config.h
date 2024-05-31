@@ -66,8 +66,12 @@ public:
                                        bool MustHavePrimaryInstrs) const {
     // TODO: we should have an option to re-scale Override set
     // proportionally to the weight of deleted elements
-    assert(Burst.Data.has_value());
-    auto BurstOpcodes = Burst.Data.value().getAllBurstOpcodes();
+    auto UsedInBurst = [&](auto Opc) -> bool {
+      if (!Burst.Data.has_value())
+        return false;
+      auto BurstOpcodes = Burst.Data.value().getAllBurstOpcodes();
+      return BurstOpcodes.count(Opc);
+    };
     std::map<unsigned, double> DFHistogram;
     std::copy_if(Histogram.begin(), Histogram.end(),
                  std::inserter(DFHistogram, DFHistogram.end()),
@@ -75,7 +79,7 @@ public:
                    auto *Desc = OpCC.desc(Hist.first);
                    assert(Desc);
                    return Desc->isBranch() == false && OpcMask(Hist.first) &&
-                          !BurstOpcodes.count(Hist.first);
+                          !UsedInBurst(Hist.first);
                  });
     if (MustHavePrimaryInstrs && DFHistogram.size() == 0)
       report_fatal_error(
