@@ -1,0 +1,61 @@
+# COM: This test checks that if register aliases are reserved, 
+# COM: then all their sub-register are not found in the machine function dump.
+
+# RUN: llvm-snippy %s -model-plugin=None \
+# RUN:  |& FileCheck %s
+
+options:
+  march: riscv64-linux-gnu
+  mcpu: generic-rv64
+  mattr: +v
+  dump-mf: on
+  riscv-init-vregs-from-memory: on
+  reserved-regs-list: [V0M8,V8M8,V16_V17_V18_V19_V20_V21_V22_V23]
+  num-instrs: 10000
+
+include:
+    - Inputs/rvv-unit-all.yaml
+
+sections:
+    - no:        0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+
+histogram:
+    - [VADD_VV, 1.0]
+
+# CHECK-NOT: {{v1 }}
+# CHECK-NOT: {{v2 }}
+# CHECK-NOT: {{v3 }}
+# CHECK-NOT: v4
+# CHECK-NOT: v5
+# CHECK-NOT: v6
+# CHECK-NOT: v7
+# CHECK-NOT: v8
+# CHECK-NOT: v9
+# CHECK-NOT: v10
+# CHECK-NOT: v11
+# CHECK-NOT: v12
+# CHECK-NOT: v13
+# CHECK-NOT: v14
+# CHECK-NOT: v15
+# CHECK-NOT: v16
+# CHECK-NOT: v17
+# CHECK-NOT: v18
+# CHECK-NOT: v19
+# CHECK-NOT: v20
+# CHECK-NOT: v21
+# CHECK-NOT: v22
+# CHECK-NOT: v23

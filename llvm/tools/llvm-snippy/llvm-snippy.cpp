@@ -596,7 +596,10 @@ static void parseReservedRegistersOption(RegPool &RP, const SnippyTarget &Tgt,
                              " is specified in --" +
                              ReservedRegisterList.ArgStr,
                          false);
-    RP.addReserved(Reg.value(), AccessMaskBit::GRW);
+    llvm::for_each(Tgt.getPhysRegsFromUnit(Reg.value(), RI),
+                   [&RP](auto SimpleReg) {
+                     RP.addReserved(SimpleReg, AccessMaskBit::GRW);
+                   });
     DEBUG_WITH_TYPE("snippy-regpool",
                     (dbgs() << "Reserved with option:\n", RP.print(dbgs())));
   }

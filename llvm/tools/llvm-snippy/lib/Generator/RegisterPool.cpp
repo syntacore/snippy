@@ -175,7 +175,7 @@ void RegPool::addReserved(unsigned Reg, AccessMaskBit AccessMask) {
              << "\n");
 }
 
-void RegPool::addReserved(const MachineFunction &MF, unsigned Reg,
+void RegPool::addReserved(unsigned Reg, const MachineFunction &MF,
                           AccessMaskBit AccessMask) {
   ReservedForFunction[&MF].addReserved(Reg, AccessMask);
   LLVM_DEBUG(
@@ -186,10 +186,10 @@ void RegPool::addReserved(const MachineFunction &MF, unsigned Reg,
              << "\n");
 }
 
-void RegPool::addReserved(const MachineLoop &ML, unsigned Reg,
+void RegPool::addReserved(unsigned Reg, const MachineLoop &ML,
                           AccessMaskBit AccessMask) {
   for_each(ML.blocks(), [this, Reg, AccessMask](auto *MBB) {
-    addReserved(*MBB, Reg, AccessMask);
+    addReserved(Reg, *MBB, AccessMask);
   });
   LLVM_DEBUG(
       dbgs() << "Reserved reg [" << Reg << "] for ML with access mask "
@@ -198,7 +198,7 @@ void RegPool::addReserved(const MachineLoop &ML, unsigned Reg,
              << "\n");
 }
 
-void RegPool::addReserved(const MachineBasicBlock &MBB, unsigned Reg,
+void RegPool::addReserved(unsigned Reg, const MachineBasicBlock &MBB,
                           AccessMaskBit AccessMask) {
   ReservedForBlock[&MBB].addReserved(Reg, AccessMask);
   LLVM_DEBUG(

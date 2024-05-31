@@ -255,8 +255,8 @@ auto LoopLatcher::selectRegsForBranch(const MachineLoop &ML,
       "for loop latch", RegInfo, RegClass, MBBsForReserv, Filter,
       AccessMaskBit::SRW);
 
-  RootPool.addReserved(Preheader, Counter, AccessMaskBit::W);
-  RootPool.addReserved(Preheader, Limit, AccessMaskBit::W);
+  RootPool.addReserved(Counter, Preheader, AccessMaskBit::W);
+  RootPool.addReserved(Limit, Preheader, AccessMaskBit::W);
   auto TrackingMode = SGCtx.hasTrackingMode();
   if (UseStackOpt || TrackingMode) {
     // We still have to reserve counter register even when using the stack.
@@ -264,12 +264,12 @@ auto LoopLatcher::selectRegsForBranch(const MachineLoop &ML,
     // flow generator (or any other part of snippy) and we'll corrupt the data
     // stored in it. Reservation can be smaller though - only one block.
     auto ReservationMode = TrackingMode ? AccessMaskBit::RW : AccessMaskBit::W;
-    RootPool.addReserved(ExitingBlock, Counter, ReservationMode);
-    RootPool.addReserved(ExitingBlock, Limit, ReservationMode);
+    RootPool.addReserved(Counter, ExitingBlock, ReservationMode);
+    RootPool.addReserved(Limit, ExitingBlock, ReservationMode);
   } else {
     for (const auto *MBB : MBBsForReserv) {
-      RootPool.addReserved(*MBB, Counter, AccessMaskBit::W);
-      RootPool.addReserved(*MBB, Limit, AccessMaskBit::W);
+      RootPool.addReserved(Counter, *MBB, AccessMaskBit::W);
+      RootPool.addReserved(Limit, *MBB, AccessMaskBit::W);
     }
   }
   return std::make_pair(Counter, Limit);
