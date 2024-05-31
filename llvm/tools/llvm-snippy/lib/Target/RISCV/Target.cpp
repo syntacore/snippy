@@ -1043,7 +1043,8 @@ public:
   }
 
   bool isMultipleReg(Register Reg, const MCRegisterInfo &RI) const override {
-    assert(Reg != RISCV::NoRegister && "Expected to have register");
+    if (Reg == RISCV::NoRegister)
+      return false;
     // If there is only one subreg in subregs,
     // then this register does not consist of smaller ones, which means it is
     // physical
@@ -1063,10 +1064,28 @@ public:
 
   Register getFirstPhysReg(Register Reg,
                            const MCRegisterInfo &RI) const override {
-    assert(Reg != RISCV::NoRegister && "Expected to have register");
-    // Select the smallest of the subregisters, which is in fact a physical
-    // register in RVV
+    if (Reg == RISCV::NoRegister)
+      return Reg;
     auto Subregs = RI.subregs_inclusive(Reg);
+    // The following comparisons rely on the location of the registers in the
+    // file RISCVGenRegisterInfo.inc. All registers except FP are written in
+    // order of increasing size.
+    static_assert(
+        RISCV::F0_D < RISCV::F0_F && RISCV::F0_F < RISCV::F0_H &&
+        "The value of enum is expected to decrease with increasing size of "
+        "the FP register");
+    if (Reg >= RISCV::F0_D && Reg <= RISCV::F31_H)
+      return *std::max_element(Subregs.begin(), Subregs.end());
+    // Select the smallest of the subregisters, which is in fact a physical
+    // register.
+    static_assert(
+        RISCV::V0 < RISCV::V0M2 &&
+        "The value of enum is expected to increase with increasing size of "
+        "the rvv register");
+    static_assert(
+        RISCV::X0 < RISCV::X31 &&
+        "The value of enum is expected to increase with increasing size of "
+        "the GPR register");
     return *std::min_element(Subregs.begin(), Subregs.end());
   }
 
@@ -2351,7 +2370,7 @@ public:
     auto &State = GC.getLLVMState();
     auto &RI = State.getRegInfo();
     auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
-    RP.addReserved(MBB, Reg);
+    RP.addReserved(getFirstPhysReg(Reg, RI), MBB);
     auto ScratchReg = getNonZeroReg("scratch register for addr", RI, RegClass,
                                     RP, MBB, AccessMaskBit::SRW);
     auto XRegBitSize = getRegBitWidth(ScratchReg, GC);

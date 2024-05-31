@@ -66,7 +66,6 @@
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Generator/GenerationLimit.h"
-#include "snippy/Generator/RegisterPool.h"
 #include "snippy/Generator/SelfCheckInfo.h"
 #include "snippy/Support/OpcodeGenerator.h"
 
@@ -77,6 +76,7 @@ namespace llvm {
 namespace snippy {
 
 class GeneratorContext;
+class RegPoolWrapper;
 namespace planning {
 
 // Helper class to keep additional information about the operand: register
