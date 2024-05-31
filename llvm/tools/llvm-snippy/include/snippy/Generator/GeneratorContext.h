@@ -351,7 +351,10 @@ public:
   auto &getSelfcheckSection() const { return SelfcheckSection; }
 
   // We return by value here to enforce copy
-  RegPoolWrapper getRegisterPool() { return {RegPoolsStorage}; }
+  RegPoolWrapper getRegisterPool() {
+    assert(State);
+    return {State->getSnippyTarget(), State->getRegInfo(), RegPoolsStorage};
+  }
 
   Linker &getLinker() const { return *PLinker; }
   RegisterGenerator &getRegGen() const { return *RegGen; }
