@@ -559,13 +559,9 @@ std::vector<std::string> parseModelPluginList() {
   return Ret;
 }
 
-// Reserve global state registers so they won't be corrupted when we call
-// external function.
-static void reserveGlobalStateRegisters(RegPool &RP, const Config &Cfg,
-                                        const SnippyTarget &Tgt,
-                                        const MCRegisterInfo &RI) {
+static bool hasExternalFuncs(const Config &Cfg) {
   if (!Cfg.FuncDescs)
-    return;
+    return false;
   auto IsExternalFunc = [&Descs = Cfg.FuncDescs->Descs](StringRef Name) {
     auto Found =
         find_if(Descs, [&](auto &Desc) { return Name.equals(Desc.Name); });
@@ -576,7 +572,14 @@ static void reserveGlobalStateRegisters(RegPool &RP, const Config &Cfg,
     return any_of(Desc.Callees, IsExternalFunc);
   };
 
-  if (any_of(Cfg.FuncDescs->Descs, HasExternalCallee)) {
+  return llvm::any_of(Cfg.FuncDescs->Descs, HasExternalCallee);
+}
+
+// Reserve global state registers so they won't be corrupted when we call
+// external function.
+static void reserveGlobalStateRegisters(RegPool &RP, const Config &Cfg,
+                                        const SnippyTarget &Tgt) {
+  if (hasExternalFuncs(Cfg)) {
     auto Regs = Tgt.getGlobalStateRegs();
     for (auto Reg : Regs) {
       RP.addReserved(Reg, AccessMaskBit::RW);
@@ -640,7 +643,7 @@ parseSpilledRegistersOption(RegPool &RP, const SnippyTarget &Tgt,
   return SpilledRegs;
 }
 
-static MCRegister getRealStackPointer(const RegPool &RP,
+static MCRegister getRealStackPointer(const RegPool &RP, const Config &Cfg,
                                       const SnippyTarget &Tgt,
                                       const MCRegisterInfo &RI,
                                       std::vector<unsigned> &SpilledRegs,
@@ -653,6 +656,13 @@ static MCRegister getRealStackPointer(const RegPool &RP,
   if (ExternalStackOpt) {
     snippy::warn(WarningName::InconsistentOptions, Ctx,
                  "'" + Twine(ExternalStackOpt.ArgStr) + "' is specified",
+                 "'" + Twine(RedefineSP.ArgStr) + "' is assumed to be SP");
+    return Tgt.getStackPointer();
+  }
+
+  if (hasExternalFuncs(Cfg)) {
+    snippy::warn(WarningName::InconsistentOptions, Ctx,
+                 "call-graph contains external functions",
                  "'" + Twine(RedefineSP.ArgStr) + "' is assumed to be SP");
     return Tgt.getStackPointer();
   }
@@ -1009,12 +1019,11 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
   auto Models = parseModelPluginList();
   bool RunOnModel = !Models.empty();
   parseReservedRegistersOption(RP, State.getSnippyTarget(), State.getRegInfo());
-  reserveGlobalStateRegisters(RP, Cfg, State.getSnippyTarget(),
-                              State.getRegInfo());
+  reserveGlobalStateRegisters(RP, Cfg, State.getSnippyTarget());
   auto SpilledRegs = parseSpilledRegistersOption(
       RP, State.getSnippyTarget(), State.getRegInfo(), State.getCtx());
   auto StackPointer =
-      getRealStackPointer(RP, State.getSnippyTarget(), State.getRegInfo(),
+      getRealStackPointer(RP, Cfg, State.getSnippyTarget(), State.getRegInfo(),
                           SpilledRegs, State.getCtx());
   std::string DumpPathInitialState = deriveDefaultableOptionValue(
       RequestForInitialStateDump || Verbose, DumpInitialRegisters);
