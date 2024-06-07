@@ -61,6 +61,10 @@ static std::string link(StringRef LLD, StringRef LinkerScript, bool Relocatable,
   checkError(sys::fs::file_size(OutPath, OutSize),
              "Could not read temporary file size");
 
+  constexpr auto MAX_SUPPORTED_SIZE = 1ull << 32;
+  if (OutSize > MAX_SUPPORTED_SIZE)
+    report_fatal_error("file size > 4Gb not supported");
+
   checkError(sys::fs::openFileForRead(OutPath, FD),
              "Could not open temporary file");
 
