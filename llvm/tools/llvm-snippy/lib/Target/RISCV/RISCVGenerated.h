@@ -1028,6 +1028,18 @@ inline bool isRVVExt(unsigned Opcode) {
   }
 }
 
+inline bool isZvbc(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RISCV::VCLMUL_VV:
+  case RISCV::VCLMUL_VX:
+  case RISCV::VCLMULH_VV:
+  case RISCV::VCLMULH_VX:
+    return true;
+  }
+}
+
 inline unsigned getRVVExtFactor(unsigned Opcode) {
   assert(isRVVExt(Opcode));
   switch (Opcode) {
@@ -1131,6 +1143,9 @@ inline bool isRVVIntegerWidening(unsigned Opcode) {
   case RISCV::VWMACCUS_VX:
   case RISCV::VWREDSUM_VS:
   case RISCV::VWREDSUMU_VS:
+  case RISCV::VWSLL_VV:
+  case RISCV::VWSLL_VX:
+  case RISCV::VWSLL_VI:
     return true;
   }
 }
