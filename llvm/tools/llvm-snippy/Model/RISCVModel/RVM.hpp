@@ -43,6 +43,12 @@ public:
       assert(VTable);
     }
 
+    Builder(const Builder &) = delete;
+    Builder(Builder &&OldBuild) = default;
+    Builder &operator=(const Builder &) = delete;
+    Builder &operator=(Builder &&OldBuild) = default;
+    ~Builder() = default;
+
     Builder &setRomStart(uint64_t Start) {
       Config.RomStart = Start;
       return *this;
