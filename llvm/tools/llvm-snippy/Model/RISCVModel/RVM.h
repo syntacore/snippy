@@ -16,7 +16,7 @@ extern "C" {
 
 #define RVMAPI_ENTRY_POINT_SYMBOL RVMVTable
 #define RVMAPI_VERSION_SYMBOL RVMInterfaceVersion
-#define RVMAPI_CURRENT_INTERFACE_VERSION 15u
+#define RVMAPI_CURRENT_INTERFACE_VERSION 16u
 
 typedef uint64_t RVMRegT;
 
@@ -76,6 +76,10 @@ typedef enum {
   RVM_ZEXT_K = 1ull << 16,
   RVM_ZEXT_KT = 1ull << 17,
   RVM_ZEXT_FHMIN = 1ull << 21,
+  // Vector crypto
+  RVM_ZEXT_VKB = 1ull << 22,
+  RVM_ZEXT_VBB = 1ull << 23,
+  RVM_ZEXT_VBC = 1ull << 24,
 } RVMZExt;
 
 typedef enum {
