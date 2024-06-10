@@ -463,6 +463,11 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVConfiguration &Cfg) {
     return isValidEMUL(static_cast<unsigned>(SEW), EEW, LMUL);
   }
 
+  // Instructions from zvbc (carryless multiplication) extension
+  // are defined only for SEW = 64.
+  if (isZvbc(Opcode) && static_cast<unsigned>(SEW) != 64u)
+    return false;
+
   return true;
 }
 
