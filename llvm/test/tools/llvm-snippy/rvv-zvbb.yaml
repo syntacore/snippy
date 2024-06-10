@@ -1,0 +1,47 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v,+zvbb \
+# RUN:  -o %t --num-instrs=1000 -model-plugin=None \
+# RUN:  --init-regs-in-elf --verify-mi -verify-gen-histogram
+
+include:
+- Inputs/memory-unaligned.yaml
+- rvv-config-histogram/Inputs/rvv-unit-sew_32-m1-vlmax.yaml
+sections:
+  - no:        0
+    VMA:       0x8000
+    SIZE:      0x4000
+    LMA:       0x8000
+    ACCESS:    r
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+  - [VMV1R_V, 1.0]
+  - [VMV2R_V, 1.0]
+  - [VMV4R_V, 1.0]
+  - [VMV8R_V, 1.0]
+  - [VMV_V_V, 1.0]
+  - [VCLZ_V, 1.0]
+  - [VCPOP_V, 1.0]
+  - [VCTZ_V, 1.0]
+  - [VBREV_V, 1.0]
+  - [VWSLL_VV, 1.0]
+  - [VWSLL_VX, 1.0]
+  - [VWSLL_VI, 1.0]
+  - [VANDN_VV, 1.0]
+  - [VANDN_VX, 1.0]
+  - [VBREV8_V, 1.0]
+  - [VREV8_V, 1.0]
+  - [VROL_VV, 1.0]
+  - [VROL_VX, 1.0]
+  - [VROR_VV, 1.0]
+  - [VROR_VX, 1.0]
+  - [VROR_VI, 1.0]
+  - [VSETVL, 0.1]

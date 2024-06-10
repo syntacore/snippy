@@ -340,6 +340,14 @@ static uint64_t deriveZextBits(const RISCVSubtarget &Subtarget) {
     ZextBits |= RVM_ZEXT_K;
   if (Subtarget.hasStdExtZkt())
     ZextBits |= RVM_ZEXT_KT;
+  if (Subtarget.hasStdExtZvbb())
+    ZextBits |= RVM_ZEXT_VBB;
+  if (Subtarget.hasStdExtZvbc())
+    ZextBits |= RVM_ZEXT_VBC;
+  // zvkb is subset of zvbb. Do not set this flag
+  // when zvbb is already set.
+  if (Subtarget.hasStdExtZvkb() && !Subtarget.hasStdExtZvbb())
+    ZextBits |= RVM_ZEXT_VKB;
   return ZextBits;
 }
 
