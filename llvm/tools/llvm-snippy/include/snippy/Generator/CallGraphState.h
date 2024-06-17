@@ -90,6 +90,9 @@ public:
     bool hasCallee(const Node *Callee) const;
     bool hasCaller(const Node *Caller) const;
 
+    bool isExternal() const { return External; }
+    void setExternal() { External = true; }
+
     void append(const Function *F) { Fs.push_back(F); }
     auto &functions() const { return Fs; }
 
@@ -100,6 +103,7 @@ public:
     SmallVector<const Function *, 2> Fs;
     ChildContainerT Callees;
     ChildContainerT Callers;
+    bool External = false;
   };
 
   using NodeContainerT = SmallVector<std::unique_ptr<Node>, 5>;
