@@ -341,9 +341,12 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   auto PreheaderInsertPt = Preheader.getFirstTerminator();
   SnippyTgt.insertLoopInit(Preheader, PreheaderInsertPt, NewBranch, CounterReg,
                            LimitReg, NIter, SGCtx);
+
+  auto SP = SGCtx.getStackPointer();
   if (UseStackOpt || TrackingMode) {
-    SnippyTgt.generateSpill(Preheader, PreheaderInsertPt, CounterReg, SGCtx);
-    SnippyTgt.generateSpill(Preheader, PreheaderInsertPt, LimitReg, SGCtx);
+    SnippyTgt.generateSpill(Preheader, PreheaderInsertPt, CounterReg, SGCtx,
+                            SP);
+    SnippyTgt.generateSpill(Preheader, PreheaderInsertPt, LimitReg, SGCtx, SP);
   }
 
   LLVM_DEBUG(dbgs() << "Loop counter init inserted: "; Preheader.dump());
@@ -362,8 +365,8 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
 
   auto *InsMBB = InsPos->getParent();
   if (UseStackOpt || TrackingMode) {
-    SnippyTgt.generateReload(*InsMBB, InsPos, LimitReg, SGCtx);
-    SnippyTgt.generateReload(*InsMBB, InsPos, CounterReg, SGCtx);
+    SnippyTgt.generateReload(*InsMBB, InsPos, LimitReg, SGCtx, SP);
+    SnippyTgt.generateReload(*InsMBB, InsPos, CounterReg, SGCtx, SP);
   }
 
   // FIXME: Currently selfcheck mode really does not behave well when loop
@@ -391,8 +394,8 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
     auto *Exit = ML.getExitBlock();
     assert(Exit);
     SGCtx.addIncomingValues(Exit, std::move(ExitingValues));
-    SnippyTgt.generateSpill(*InsMBB, InsPos, CounterReg, SGCtx);
-    SnippyTgt.generateSpill(*InsMBB, InsPos, LimitReg, SGCtx);
+    SnippyTgt.generateSpill(*InsMBB, InsPos, CounterReg, SGCtx, SP);
+    SnippyTgt.generateSpill(*InsMBB, InsPos, LimitReg, SGCtx, SP);
     SnippyTgt.generatePopNoReload(*Exit, Exit->getFirstNonPHI(), LimitReg,
                                   SGCtx);
     SnippyTgt.generatePopNoReload(*Exit, Exit->getFirstNonPHI(), CounterReg,

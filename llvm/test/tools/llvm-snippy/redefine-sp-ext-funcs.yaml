@@ -1,0 +1,48 @@
+# RUN: llvm-snippy %s --model-plugin None -redefine-sp=reg::X5 |& \
+# RUN: FileCheck %s --ignore-case
+
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  mattr: "+f,+d"
+  num-instrs: 100
+  init-regs-in-elf: on
+  dump-mf: on
+
+sections:
+  - no:        0
+    VMA:       0x200000
+    SIZE:      0x10000
+    LMA:       0x200000
+    ACCESS:    r
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x400000
+    SIZE:      0x100000
+    LMA:       0x400000
+    ACCESS:    rw
+
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - myfunc
+    - name: myfunc
+      external: true
+
+histogram:
+     - [FADD_D, 3.0]
+     - [FDIV_D, 3.0]
+     - [FMUL_D, 3.0]
+     - [FSUB_D, 3.0]
+     - [JAL, 1.0]
+     - [ADDIW, 1.0]
+
+# CHECK: $x2 = ADD $x5, $x0
+# CHECK-NEXT:  PseudoCALL target-flags(riscv-call) @myfunc
+# CHECK-NEXT:  $x5 = ADD $x2, $x0

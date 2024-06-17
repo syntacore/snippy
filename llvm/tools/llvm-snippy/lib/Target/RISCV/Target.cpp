@@ -1711,7 +1711,7 @@ public:
 
   const MCRegisterClass &
   getRegClassSuitableForSP(const MCRegisterInfo &RI) const override {
-    return RI.getRegClass(RISCV::GPRRegClassID);
+    return RI.getRegClass(RISCV::GPRNoX0RegClassID);
   }
 
   std::function<bool(MCRegister)>
@@ -1727,12 +1727,12 @@ public:
   MCRegister getStackPointer() const override { return RISCV::X2; }
 
   void generateSpill(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                     MCRegister Reg, GeneratorContext &GC) const override {
+                     MCRegister Reg, GeneratorContext &GC,
+                     MCRegister SP) const override {
     assert(GC.stackEnabled() &&
            "An attempt to generate spill but stack was not enabled.");
 
     auto &State = GC.getLLVMState();
-    auto SP = GC.getStackPointer();
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
     getSupportInstBuilder(MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
@@ -1744,11 +1744,11 @@ public:
   }
 
   void generateReload(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                      MCRegister Reg, GeneratorContext &GC) const override {
+                      MCRegister Reg, GeneratorContext &GC,
+                      MCRegister SP) const override {
     assert(GC.stackEnabled() &&
            "An attempt to generate reload but stack was not enabled.");
     auto &State = GC.getLLVMState();
-    auto SP = GC.getStackPointer();
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
 
@@ -2267,6 +2267,19 @@ public:
       }
       SrcReg = DstReg;
     }
+  }
+
+  void copyRegToReg(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
+                    MCRegister Rs, MCRegister Rd,
+                    GeneratorContext &GC) const override {
+    assert(RISCV::GPRRegClass.contains(Rs) && RISCV::GPRRegClass.contains(Rd) &&
+           "Both src and dst registers must be GPR");
+    auto &State = GC.getLLVMState();
+    const auto &InstrInfo = State.getInstrInfo();
+    getSupportInstBuilder(MBB, Ins, MBB.getParent()->getFunction().getContext(),
+                          InstrInfo.get(RISCV::ADD), Rd)
+        .addReg(Rs)
+        .addReg(RISCV::X0);
   }
 
   void loadRegFromAddrInReg(MachineBasicBlock &MBB,

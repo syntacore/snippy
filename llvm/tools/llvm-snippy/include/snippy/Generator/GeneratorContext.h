@@ -502,6 +502,10 @@ public:
     return GenSettings->RegistersConfig.StackPointer;
   }
 
+  bool followTargetABI() const {
+    return GenSettings->RegistersConfig.FollowTargetABI;
+  }
+
   GeneratorResult generateELF(ObjectFilesList InputImages) const;
 
   std::string generateLinkedImage(ObjectFilesList InputImages) const;

@@ -111,12 +111,14 @@ public:
   MCRegister getStackPointer() const override { reportUnimplementedError(); }
 
   void generateSpill(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                     MCRegister Reg, GeneratorContext &GC) const override {
+                     MCRegister Reg, GeneratorContext &GC,
+                     MCRegister SP) const override {
     reportUnimplementedError();
   }
 
   void generateReload(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                      MCRegister Reg, GeneratorContext &GC) const override {
+                      MCRegister Reg, GeneratorContext &GC,
+                      MCRegister SP) const override {
     reportUnimplementedError();
   }
 
@@ -356,6 +358,12 @@ public:
   void writeValueToReg(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
                        APInt Value, unsigned DstReg, RegPoolWrapper &RP,
                        GeneratorContext &GC) const override {
+    reportUnimplementedError();
+  }
+
+  void copyRegToReg(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
+                    MCRegister Rs, MCRegister Rd,
+                    GeneratorContext &GC) const override {
     reportUnimplementedError();
   }
 
