@@ -331,7 +331,9 @@ bool FunctionGenerator::readFromYaml(Module &M, const FunctionDescs &FDs) {
       // Fuction bodies are filled later in FillExternalFunctionsStubsPass.
       auto &F = State.createFunction(M, Desc.Name, Sections.front(),
                                      Function::WeakAnyLinkage);
-      NameMap.emplace(Desc.Name, CGS.emplaceNode(&F));
+      auto *Node = CGS.emplaceNode(&F);
+      Node->setExternal();
+      NameMap.emplace(Desc.Name, Node);
     } else {
       auto IsEntryPoint = &Desc == &EntryPoint;
       CallGraphState::Node *N = nullptr;

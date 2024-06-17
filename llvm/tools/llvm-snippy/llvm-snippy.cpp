@@ -105,26 +105,10 @@ static snippy::opt_list<std::string>
                                  "before snippet execution and restored after"),
                         cl::cat(Options));
 
-enum class RedefineSPMode { Any, SP, AnyNotSP };
-
-struct RedefineSPEnumOption
-    : public snippy::EnumOptionMixin<RedefineSPEnumOption> {
-  static void doMapping(EnumMapper &Mapper) {
-    Mapper.enumCase(RedefineSPMode::Any, "any",
-                    "use any suitable register as a stack pointer");
-    Mapper.enumCase(RedefineSPMode::SP, "SP",
-                    "use target default stack pointer register");
-    Mapper.enumCase(
-        RedefineSPMode::AnyNotSP, "any-not-SP",
-        "use any suitable register as a stack pointer, except target default");
-  }
-};
-
-static snippy::opt<RedefineSPMode>
+static snippy::opt<std::string>
     RedefineSP("redefine-sp",
                cl::desc("Specify the reg to use as a stack pointer"),
-               RedefineSPEnumOption::getClValues(), cl::cat(Options),
-               cl::init(RedefineSPMode::Any));
+               cl::cat(Options), cl::init("any"));
 
 static snippy::opt<bool> FollowTargetABI(
     "honor-target-abi",
@@ -258,9 +242,6 @@ static snippy::opt<bool> DumpMI(
 LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(
     snippy::SelfcheckRefValueStorageType,
     snippy::SelfcheckRefValueStorageEnumOption)
-
-LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(snippy::RedefineSPMode,
-                                           snippy::RedefineSPEnumOption)
 
 namespace snippy {
 
@@ -650,42 +631,61 @@ static MCRegister getRealStackPointer(const RegPool &RP, const Config &Cfg,
                                       LLVMContext &Ctx) {
   auto SP = Tgt.getStackPointer();
 
-  if (RedefineSP == RedefineSPMode::SP)
+  if (RedefineSP == "SP")
     return SP;
 
-  if (ExternalStackOpt) {
-    snippy::warn(WarningName::InconsistentOptions, Ctx,
-                 "'" + Twine(ExternalStackOpt.ArgStr) + "' is specified",
-                 "'" + Twine(RedefineSP.ArgStr) + "' is assumed to be SP");
-    return Tgt.getStackPointer();
-  }
-
-  if (hasExternalFuncs(Cfg)) {
-    snippy::warn(WarningName::InconsistentOptions, Ctx,
-                 "call-graph contains external functions",
-                 "'" + Twine(RedefineSP.ArgStr) + "' is assumed to be SP");
-    return Tgt.getStackPointer();
-  }
-
-  bool CanUseSP = !(RedefineSP == RedefineSPMode::AnyNotSP);
-
+  MCRegister RealSP = MCRegister::NoRegister;
+  bool CanUseSP = !(RedefineSP == "any-not-SP");
   const auto &SPRegClass = Tgt.getRegClassSuitableForSP(RI);
-
   auto BasicFilter = Tgt.filterSuitableRegsForStackPointer();
 
   auto FullFilter = [&](auto Reg) {
-    return std::any_of(SpilledRegs.begin(), SpilledRegs.end(),
-                       [Reg](auto SpReg) { return SpReg == Reg; }) ||
-           std::invoke(BasicFilter, Reg) || (!CanUseSP && Reg == SP);
+    return std::invoke(BasicFilter, Reg) || (!CanUseSP && Reg == SP) ||
+           (!FollowTargetABI &&
+            std::any_of(SpilledRegs.begin(), SpilledRegs.end(),
+                        [Reg](auto SpReg) { return SpReg == Reg; }));
   };
 
-  auto RealSP =
-      RP.getAvailableRegister("stack pointer", FullFilter, RI, SPRegClass);
+  std::string RegPrefix = "reg::";
+  if (RedefineSP.getValue().rfind(RegPrefix, 0) != std::string::npos) {
+    auto RegStr = RedefineSP.getValue().substr(RegPrefix.size());
+    auto Reg = findRegisterByName(Tgt, RI, RegStr);
+    if (!Reg)
+      report_fatal_error("Illegal register name " + Twine(RegStr) +
+                             " is specified in --" + RedefineSP.ArgStr,
+                         false);
+
+    if (RP.isReserved(Reg.value()))
+      report_fatal_error("Register " + Twine(RegStr) +
+                             " cannot redefine stack pointer, because it is "
+                             "explicitly reserved.\n",
+                         false);
+
+    if (FullFilter(Reg.value()))
+      report_fatal_error("Register " + Twine(RegStr) + " specified in --" +
+                             RedefineSP.ArgStr +
+                             " is not suitable for stack pointer redefinition",
+                         false);
+
+    RealSP = Reg.value();
+  } else if (RedefineSP == "any" || RedefineSP == "any-not-SP") {
+    RealSP =
+        RP.getAvailableRegister("stack pointer", FullFilter, RI, SPRegClass);
+  } else {
+    report_fatal_error("\"" + Twine(RedefineSP) + "\"" + ", passed to --" +
+                           RedefineSP.ArgStr + " is not valid option value",
+                       false);
+  }
 
   // We need to spill SP if it is not used as intended
-  // and honor-target-abi is specified
-  if (FollowTargetABI && (RealSP != SP))
+  // and honor-target-abi is specified and also remove RealSP from SpilledRegs
+  // list if it is in it
+  if (FollowTargetABI && (RealSP != SP)) {
+    SpilledRegs.erase(
+        std::remove(SpilledRegs.begin(), SpilledRegs.end(), RealSP),
+        SpilledRegs.end());
     SpilledRegs.push_back(SP);
+  }
 
   return RealSP;
 }
@@ -1044,7 +1044,7 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
                               ChainedRXSorted, ChunkSize, NumPrimaryInstrs,
                               std::move(LastInstr)},
       RegistersOptions{
-          InitRegsInElf, InitialRegisterDataFile.getValue(),
+          InitRegsInElf, FollowTargetABI, InitialRegisterDataFile.getValue(),
           std::move(DumpPathInitialState), std::move(DumpPathFinalState),
           SmallVector<unsigned>(SpilledRegs.begin(), SpilledRegs.end()),
           StackPointer},

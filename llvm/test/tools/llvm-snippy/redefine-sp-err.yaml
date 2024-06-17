@@ -1,0 +1,32 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m \
+# RUN: -redefine-sp=reg::X0 --model-plugin=None -num-instrs=10 -stack-size=1024 \
+# RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=X0-CHECK
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m -reserved-regs-list=X7 \
+# RUN: -redefine-sp=reg::X7 --model-plugin=None -num-instrs=10 -stack-size=1024 \
+# RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=RES-CHECK
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m \
+# RUN: -redefine-sp=reg::X32 --model-plugin=None -num-instrs=10 -stack-size=1024 \
+# RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=ILL-CHECK
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m \
+# RUN: -redefine-sp=any-no-SP --model-plugin=None -num-instrs=10 -stack-size=1024 \
+# RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=NO-OPT-CHECK
+sections:
+    - no:        1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+    - [ADD, 1.0]
+
+# X0-CHECK: LLVM ERROR: Register X0 specified in --redefine-sp is not suitable for stack pointer redefinition
+# RES-CHECK: LLVM ERROR: Register X7 cannot redefine stack pointer, because it is explicitly reserved
+# ILL-CHECK: LLVM ERROR: Illegal register name X32 is specified in --redefine-sp
+# NO-OPT-CHECK: LLVM ERROR: "any-no-SP", passed to --redefine-sp is not valid option value
