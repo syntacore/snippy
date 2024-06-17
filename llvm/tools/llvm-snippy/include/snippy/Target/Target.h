@@ -152,11 +152,11 @@ public:
 
   virtual void generateSpill(MachineBasicBlock &MBB,
                              MachineBasicBlock::iterator Ins, MCRegister Reg,
-                             GeneratorContext &GC) const = 0;
+                             GeneratorContext &GC, MCRegister SP) const = 0;
 
   virtual void generateReload(MachineBasicBlock &MBB,
                               MachineBasicBlock::iterator Ins, MCRegister Reg,
-                              GeneratorContext &GC) const = 0;
+                              GeneratorContext &GC, MCRegister SP) const = 0;
 
   virtual void generatePopNoReload(MachineBasicBlock &MBB,
                                    MachineBasicBlock::iterator Ins,
@@ -376,6 +376,10 @@ public:
                                MachineBasicBlock::iterator Ins, APInt Value,
                                unsigned DstReg, RegPoolWrapper &RP,
                                GeneratorContext &GC) const = 0;
+
+  virtual void copyRegToReg(MachineBasicBlock &MBB,
+                            MachineBasicBlock::iterator Ins, MCRegister Rs,
+                            MCRegister Rd, GeneratorContext &GC) const = 0;
 
   virtual void loadRegFromAddr(MachineBasicBlock &MBB,
                                MachineBasicBlock::iterator Ins, uint64_t Addr,

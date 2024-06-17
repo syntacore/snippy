@@ -54,6 +54,7 @@ struct ModelPluginOptions {
 
 struct RegistersOptions {
   bool InitializeRegs;
+  bool FollowTargetABI;
   std::string InitialRegYamlFile;
   // TODO: discuss these to be Interpreter-only options
   std::string InitialStateOutputYaml;

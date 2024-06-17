@@ -1,0 +1,87 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m -honor-target-abi \
+# RUN: -redefine-sp=reg::X4 -num-instrs=10 -stack-size=1024 -external-stack \
+# RUN: -init-regs-in-elf -verify-mi -dump-mi --model-plugin=None |& FileCheck %s
+sections:
+    - no:        1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+    - [ADD, 1.0]
+
+# CHECK:      $x2 = ADDI $x2, -16
+# CHECK-NEXT: SD $x4, $x2, 0
+# CHECK-NEXT: $x4 = ADD $x2, $x0
+# CHECK-NEXT: $x4 = ADDI $x4, -16
+# CHECK-NEXT: SD $x1, $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, -16
+# CHECK-NEXT: SD $x3, $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, -16
+# CHECK-NEXT: SD $x8, $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, -16
+# CHECK-NEXT: SD $x9, $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, -16
+# CHECK-NEXT: SD $x18, $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, -16
+# CHECK-NEXT: SD $x19, $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, -16
+# CHECK-NEXT: SD $x20, $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, -16
+# CHECK-NEXT: SD $x21, $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, -16
+# CHECK-NEXT: SD $x22, $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, -16
+# CHECK-NEXT: SD $x23, $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, -16
+# CHECK-NEXT: SD $x24, $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, -16
+# CHECK-NEXT: SD $x25, $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, -16
+# CHECK-NEXT: SD $x26, $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, -16
+# CHECK-NEXT: SD $x27, $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, -16
+# CHECK-NEXT: SD $x2, $x4, 0
+
+# CHECK: $x2 = LD $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, 16
+# CHECK-NEXT: $x27 = LD $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, 16
+# CHECK-NEXT: $x26 = LD $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, 16
+# CHECK-NEXT: $x25 = LD $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, 16
+# CHECK-NEXT: $x24 = LD $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, 16
+# CHECK-NEXT: $x23 = LD $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, 16
+# CHECK-NEXT: $x22 = LD $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, 16
+# CHECK-NEXT: $x21 = LD $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, 16
+# CHECK-NEXT: $x20 = LD $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, 16
+# CHECK-NEXT: $x19 = LD $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, 16
+# CHECK-NEXT: $x18 = LD $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, 16
+# CHECK-NEXT: $x9 = LD $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, 16
+# CHECK-NEXT: $x8 = LD $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, 16
+# CHECK-NEXT: $x3 = LD $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, 16
+# CHECK-NEXT: $x1 = LD $x4, 0
+# CHECK-NEXT: $x4 = ADDI $x4, 16 
+# CHECK-NEXT: $x2 = ADD $x4, $x0 
+# CHECK-NEXT: $x4 = LD $x2, 0 
+# CHECK-NEXT: $x2 = ADDI $x2, 16 
+# CHECK-NEXT: EBREAK
