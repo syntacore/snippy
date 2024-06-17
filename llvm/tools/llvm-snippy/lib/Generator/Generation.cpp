@@ -784,8 +784,23 @@ void generateCall(unsigned OpCode,
 
   auto &CallTarget = *(CalleeNode->functions()[FunctionIdx]);
 
+  auto TargetStackPointer = SnippyTgt.getStackPointer();
+  auto RealStackPointer = GC.getStackPointer();
+
+  // If we redefined stack pointer register, before generating external function
+  // call we need to copy stack pointer value to target default stack pointer
+  // and do reverse after returning from external call
+  if (CalleeNode->isExternal() && (RealStackPointer != TargetStackPointer))
+    SnippyTgt.copyRegToReg(MBB, InstrGenCtx.Ins, RealStackPointer,
+                           TargetStackPointer, GC);
+
   SnippyTgt.generateCall(MBB, InstrGenCtx.Ins, CallTarget, GC,
                          /* AsSupport */ false, OpCode);
+
+  if (CalleeNode->isExternal() && (RealStackPointer != TargetStackPointer))
+    SnippyTgt.copyRegToReg(MBB, InstrGenCtx.Ins, TargetStackPointer,
+                           RealStackPointer, GC);
+
   Node->markAsCommitted(CalleeNode);
 }
 
