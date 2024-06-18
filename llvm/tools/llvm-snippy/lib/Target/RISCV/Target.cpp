@@ -367,10 +367,12 @@ static RegStorageType regToStorage(Register Reg) {
   return RegStorageType::VReg;
 }
 
-static bool isLegalRVVInstr(unsigned Opcode, const RVVConfiguration &Cfg) {
+static bool isLegalRVVInstr(unsigned Opcode, const MachineBasicBlock &MBB,
+                            const GeneratorContext &GC) {
+  auto &RISCVCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
   if (!isRVV(Opcode))
     return false;
-
+  auto &Cfg = RISCVCtx.getCurrentRVVCfg(MBB);
   auto SEW = Cfg.SEW;
   auto LMUL = Cfg.LMUL;
 
@@ -467,7 +469,6 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVConfiguration &Cfg) {
   // are defined only for SEW = 64.
   if (isZvbc(Opcode) && static_cast<unsigned>(SEW) != 64u)
     return false;
-
   return true;
 }
 
@@ -772,9 +773,9 @@ breakDownAddrForInstrWithImmOffset(AddressInfo AddrInfo, const MachineInstr &MI,
 
 using OpcodeFilter = GeneratorContext::OpcodeFilter;
 
-static OpcodeFilter
-getDefaultPolicyFilterImpl(const MachineBasicBlock &MBB,
-                           const RISCVGeneratorContext &RISCVCtx) {
+static OpcodeFilter getDefaultPolicyFilterImpl(const MachineBasicBlock &MBB,
+                                               const GeneratorContext &GC) {
+  auto &RISCVCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
   if (!RISCVCtx.hasActiveRVVMode(MBB))
     return [](unsigned Opcode) {
       if (isRVV(Opcode) && !isRVVModeSwitch(Opcode))
@@ -782,9 +783,8 @@ getDefaultPolicyFilterImpl(const MachineBasicBlock &MBB,
       return true;
     };
 
-  return [&RISCVCtx, &MBB](unsigned Opcode) {
-    if (isRVV(Opcode) &&
-        !isLegalRVVInstr(Opcode, RISCVCtx.getCurrentRVVCfg(MBB)))
+  return [&GC, &MBB](unsigned Opcode) {
+    if (isRVV(Opcode) && !isLegalRVVInstr(Opcode, MBB, GC))
       return false;
     return true;
   };
@@ -924,8 +924,7 @@ public:
   GeneratorContext::OpcodeFilter
   getDefaultPolicyFilter(const MachineBasicBlock &MBB,
                          const GeneratorContext &GC) const override {
-    auto &RISCVCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
-    return getDefaultPolicyFilterImpl(MBB, RISCVCtx);
+    return getDefaultPolicyFilterImpl(MBB, GC);
   }
 
   void checkInstrTargetDependency(const OpcodeHistogram &H) const override {
