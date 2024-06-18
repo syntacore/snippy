@@ -767,8 +767,9 @@ void postprocessMemoryOperands(MachineInstr &MI, RegPoolWrapper &RP,
   }
 }
 
-void generateCall(unsigned OpCode,
-                  planning::InstructionGenerationContext &InstrGenCtx) {
+MachineInstr *
+generateCall(unsigned OpCode,
+             planning::InstructionGenerationContext &InstrGenCtx) {
   auto &GC = InstrGenCtx.GC;
   auto &MBB = InstrGenCtx.MBB;
   auto &State = GC.getLLVMState();
@@ -777,7 +778,7 @@ void generateCall(unsigned OpCode,
   auto *Node = CGS.getNode(&(MBB.getParent()->getFunction()));
   auto CalleeCount = Node->callees().size();
   if (!CalleeCount)
-    return;
+    return nullptr;
   auto CalleeIdx = RandEngine::genInRange(CalleeCount);
   auto *CalleeNode = std::next(Node->callees().begin(), CalleeIdx)->Dest;
   auto FunctionIdx = RandEngine::genInRange(CalleeNode->functions().size());
@@ -794,14 +795,15 @@ void generateCall(unsigned OpCode,
     SnippyTgt.copyRegToReg(MBB, InstrGenCtx.Ins, RealStackPointer,
                            TargetStackPointer, GC);
 
-  SnippyTgt.generateCall(MBB, InstrGenCtx.Ins, CallTarget, GC,
-                         /* AsSupport */ false, OpCode);
+  auto *Call = SnippyTgt.generateCall(MBB, InstrGenCtx.Ins, CallTarget, GC,
+                                      /* AsSupport */ false, OpCode);
 
   if (CalleeNode->isExternal() && (RealStackPointer != TargetStackPointer))
     SnippyTgt.copyRegToReg(MBB, InstrGenCtx.Ins, TargetStackPointer,
                            RealStackPointer, GC);
 
   Node->markAsCommitted(CalleeNode);
+  return Call;
 }
 
 MachineInstr *
@@ -851,6 +853,36 @@ randomInstruction(const MCInstrDesc &InstrDesc,
   return MIB;
 }
 
+void spillPseudoInstImplicitReg(MachineInstr &MI, Register Reg,
+                                GeneratorContext &GC) {
+  auto &SnpTgt = GC.getLLVMState().getSnippyTarget();
+  auto *MBBPtr = MI.getParent();
+  assert(MBBPtr);
+  auto &MBB = *MBBPtr;
+  auto RealStackPointer = GC.getStackPointer();
+
+  auto PointBeforeSpill = std::find_if(
+      std::next(MachineBasicBlock::reverse_iterator(MI)), MBB.rend(),
+      [](auto &&Inst) { return checkSupportMetadata(Inst); });
+  auto SpillPoint = std::next(PointBeforeSpill.getReverse());
+  SnpTgt.generateSpill(MBB, SpillPoint, Reg, GC, RealStackPointer);
+
+  auto ReloadPoint = std::next(MachineBasicBlock::iterator(MI));
+  SnpTgt.generateReload(MBB, ReloadPoint, Reg, GC, RealStackPointer);
+}
+
+void spillPseudoInstImplicitRegs(
+    MachineInstr &MI, planning::InstructionGenerationContext &InstrGenCtx) {
+  auto &&ImplicitRegsOps = make_filter_range(
+      MI.operands(), [](auto &&Op) { return Op.isReg() && Op.isImplicit(); });
+
+  for (auto &Op : ImplicitRegsOps) {
+    auto Reg = Op.getReg();
+    if (InstrGenCtx.RP->isReserved(Reg, *MI.getParent()))
+      spillPseudoInstImplicitReg(MI, Reg, InstrGenCtx.GC);
+  }
+}
+
 void generateInstruction(const MCInstrDesc &InstrDesc,
                          planning::InstructionGenerationContext &InstrGenCtx,
                          std::vector<planning::PreselectedOpInfo> Preselected) {
@@ -866,10 +898,15 @@ void generateInstruction(const MCInstrDesc &InstrDesc,
     return;
   }
 
-  if (SnippyTgt.isCall(Opc))
-    generateCall(Opc, InstrGenCtx);
-  else
-    randomInstruction(InstrDesc, std::move(Preselected), InstrGenCtx);
+  auto *MI =
+      (SnippyTgt.isCall(Opc))
+          ? generateCall(Opc, InstrGenCtx)
+          : randomInstruction(InstrDesc, std::move(Preselected), InstrGenCtx);
+
+  if (!MI || !MI->isPseudo())
+    return;
+
+  spillPseudoInstImplicitRegs(*MI, InstrGenCtx);
 }
 
 MachineBasicBlock *findNextBlockOnModel(MachineBasicBlock &MBB,
