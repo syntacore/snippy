@@ -253,7 +253,7 @@ auto LoopLatcher::selectRegsForBranch(const MachineLoop &ML,
 
   auto [Counter, Limit] = RootPool.getNAvailableRegisters<2>(
       "for loop latch", RegInfo, RegClass, MBBsForReserv, Filter,
-      AccessMaskBit::SRW);
+      AccessMaskBit::RW);
 
   RootPool.addReserved(Counter, Preheader, AccessMaskBit::W);
   RootPool.addReserved(Limit, Preheader, AccessMaskBit::W);

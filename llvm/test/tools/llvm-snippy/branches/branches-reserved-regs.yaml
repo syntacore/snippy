@@ -1,0 +1,90 @@
+# RUN: llvm-snippy %s --dump-mf --model-plugin=None -o %t | FileCheck %s
+# RUN: llvm-snippy %s --dump-mf --model-plugin=None -init-regs-in-elf -o %t | \
+# RUN: FileCheck %s
+
+options:
+  march: riscv64-linux-gnu
+  num-instrs: 100
+  redefine-sp: SP
+  reserved-regs-list:
+    - X3
+    - X4
+    - X5
+    - X6
+    - X7
+    - X8
+    - X9
+    - X10
+    - X11
+    - X12
+    - X13
+    - X14
+    - X15
+    - X16
+    - X17
+    - X18
+    - X19
+    - X20
+    - X21
+    - X22
+    - X23
+    - X24
+    - X25
+    - X26
+    - X27
+    - X28
+    - X29
+    - X30
+    - X31
+
+sections:
+  - name:      text
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      data
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+
+branches:
+  permutation: on
+  loop-ratio: 1.0
+  max-depth:
+    loop: 1
+  number-of-loop-iterations:
+    min: 1
+    max: 1
+
+# CHECK-NOT: BEQ $x5
+# CHECK-NOT: BEQ $x6
+# CHECK-NOT: BEQ $x7
+# CHECK-NOT: BEQ $x8
+# CHECK-NOT: BEQ $x9
+# CHECK-NOT: BEQ $x10
+# CHECK-NOT: BEQ $x11
+# CHECK-NOT: BEQ $x12
+# CHECK-NOT: BEQ $x13
+# CHECK-NOT: BEQ $x14
+# CHECK-NOT: BEQ $x15
+# CHECK-NOT: BEQ $x16
+# CHECK-NOT: BEQ $x17
+# CHECK-NOT: BEQ $x18
+# CHECK-NOT: BEQ $x19
+# CHECK-NOT: BEQ $x20
+# CHECK-NOT: BEQ $x21
+# CHECK-NOT: BEQ $x22
+# CHECK-NOT: BEQ $x23
+# CHECK-NOT: BEQ $x24
+# CHECK-NOT: BEQ $x25
+# CHECK-NOT: BEQ $x26
+# CHECK-NOT: BEQ $x27
+# CHECK-NOT: BEQ $x28
+# CHECK-NOT: BEQ $x29
+# CHECK-NOT: BEQ $x30
+# CHECK-NOT: BEQ $x31
