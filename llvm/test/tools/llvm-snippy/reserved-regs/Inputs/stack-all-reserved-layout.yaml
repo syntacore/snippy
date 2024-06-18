@@ -14,3 +14,7 @@ histogram:
     - [BEQ, 0.1]
     - [DIV, 1.0]
     - [ADD, 1.0]
+
+branches:
+  max-depth:
+    loop: 0
