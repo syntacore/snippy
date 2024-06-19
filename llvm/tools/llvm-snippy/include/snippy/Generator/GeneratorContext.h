@@ -369,25 +369,27 @@ public:
   const auto &getCallGraphLayout() const { return GenSettings->Cfg.CGLayout; }
 
   template <typename It> size_t getCodeBlockSize(It Begin, It End) const {
-    return std::accumulate(
-        Begin, End, 0ul, [this](auto CurrentSize, const auto &MI) {
-          size_t InstrSize = MI.getDesc().getSize();
-          if (InstrSize == 0)
-            snippy::warn(
-                WarningName::InstructionSizeUnknown, getLLVMState().getCtx(),
-                [&MI]() {
-                  std::string Ret;
-                  llvm::raw_string_ostream OS{Ret};
-                  OS << "Instruction '";
-                  MI.print(OS, /* IsStandalone */ true, /* SkipOpers */ true,
-                           /* SkipDebugLoc */ true, /* AddNewLine */ false);
-                  OS << "' has unknown size";
-                  return Ret;
-                }(),
-                "function size estimation may be wrong");
-          return CurrentSize + InstrSize;
-        });
+    auto SizeAccumulator = [this](auto CurrSize, auto &MI) {
+      size_t InstrSize =
+          getLLVMState().getSnippyTarget().getInstrSize(MI, *this);
+      if (InstrSize == 0)
+        snippy::warn(
+            WarningName::InstructionSizeUnknown, getLLVMState().getCtx(),
+            [&MI]() {
+              std::string Ret;
+              llvm::raw_string_ostream OS{Ret};
+              OS << "Instruction '";
+              MI.print(OS, /* IsStandalone */ true, /* SkipOpers */ true,
+                       /* SkipDebugLoc */ true, /* AddNewLine */ false);
+              OS << "' has unknown size";
+              return Ret;
+            }(),
+            "function size estimation may be wrong");
+      return CurrSize + InstrSize;
+    };
+    return std::accumulate(Begin, End, 0u, SizeAccumulator);
   }
+
   size_t getMBBSize(const MachineBasicBlock &MBB) const {
     return getCodeBlockSize(MBB.begin(), MBB.end());
   }
