@@ -287,6 +287,9 @@ public:
 
   virtual unsigned getMaxInstrSize() const = 0;
 
+  virtual std::set<unsigned>
+  getPossibleInstrsSize(const GeneratorContext &GC) const = 0;
+
   virtual bool isMultipleReg(Register Reg, const MCRegisterInfo &RI) const = 0;
 
   virtual bool isPhysRegClass(unsigned RegClassID,
@@ -419,6 +422,9 @@ public:
                                          const MCInstrDesc &InstrDesc,
                                          Register CounterReg,
                                          Register LimitReg) const = 0;
+
+  virtual unsigned getInstrSize(const MachineInstr &Inst,
+                                const GeneratorContext &GC) const = 0;
 
   virtual void insertLoopInit(MachineBasicBlock &MBB,
                               MachineBasicBlock::iterator Pos,

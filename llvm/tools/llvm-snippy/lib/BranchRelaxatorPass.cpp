@@ -106,46 +106,48 @@ bool BranchRelaxator::tryRelaxBranch(MachineInstr &Branch,
     return false;
   }
 
-  unsigned Distance = 0; // in instructions
+  unsigned DistanceInBytes = 0;
 
   if (BackwardBranch) {
     // From first instruction to branch inclusively
-    Distance += std::distance(BranchMBB->begin(),
-                              MachineBasicBlock::const_iterator(Branch)) +
-                1;
+    DistanceInBytes += GC.getCodeBlockSize(
+        BranchMBB->begin(),
+        std::next(MachineBasicBlock::const_iterator(Branch)));
     // if loop consists of only one block then we don't want to count it twice
     if (BranchMBB != DstMBB)
-      Distance += DstMBB->size();
+      DistanceInBytes += GC.getCodeBlockSize(DstMBB->begin(), DstMBB->end());
   } else {
-    Distance += std::distance(MachineBasicBlock::const_iterator(Branch),
-                              BranchMBB->end());
+    DistanceInBytes += GC.getCodeBlockSize(
+        MachineBasicBlock::const_iterator(Branch), BranchMBB->end());
   }
 
   // we already counted corner cases, now just count everything between
-  Distance = std::accumulate(R.block_begin(), R.block_end(), Distance,
-                             [Entry, Exit, BranchMBB](unsigned Dst, auto *BB) {
-                               assert(BB);
-                               bool DontTakeBB = (BB == Entry) ||
-                                                 (BB == Exit) ||
-                                                 (BB == BranchMBB);
-                               unsigned BBSize = DontTakeBB ? 0 : BB->size();
-                               return Dst + BBSize;
-                             });
+  DistanceInBytes = std::accumulate(
+      R.block_begin(), R.block_end(), DistanceInBytes,
+      [&](unsigned Dist, auto *BB) {
+        assert(BB);
+        bool DontTakeBB = (BB == Entry) || (BB == Exit) || (BB == BranchMBB);
+        unsigned BBSize =
+            DontTakeBB ? 0 : GC.getCodeBlockSize(BB->begin(), BB->end());
+        return Dist + BBSize;
+      });
 
   auto MaxInstrSize = SnippyTgt.getMaxInstrSize();
-  auto DistanceInBytes = Distance * MaxInstrSize;
   auto MaxBranchDstMod = SnippyTgt.getMaxBranchDstMod(Branch.getOpcode());
   if (DistanceInBytes < MaxBranchDstMod)
     return false;
 
-  LLVM_DEBUG(dbgs() << "Trying to relax (dist == " << format_hex(Distance, 6)
-                    << ") in " << BranchMBB->getFullName() << ": ";
+  // Print '0x' + 4 significant digits
+  [[maybe_unused]] constexpr auto HexPrintWidth = 6;
+  LLVM_DEBUG(dbgs() << "Trying to relax (dist == "
+                    << format_hex(DistanceInBytes, HexPrintWidth) << ") in "
+                    << BranchMBB->getFullName() << ": ";
              Branch.dump());
 
   if (NoRelax || !SnippyTgt.relaxBranch(Branch, DistanceInBytes, GC)) {
     LLVM_DEBUG(Branch.dump());
     LLVM_DEBUG(R.dump());
-    LLVM_DEBUG(dbgs() << "Distance = " << Distance << '\n');
+    LLVM_DEBUG(dbgs() << "Distance = " << DistanceInBytes << '\n');
     LLVM_DEBUG(dbgs() << "MaxInstrSize = " << MaxInstrSize << '\n');
     LLVM_DEBUG(dbgs() << "MaxBranchDstMod = " << MaxBranchDstMod << '\n');
     fatal(State.getCtx(), "Generation error", "Too far branch was generated");
