@@ -1194,8 +1194,20 @@ public:
   static constexpr unsigned kMaxJumpDstMod = (kMaxJumpDst - 2) / 2;
 
   static constexpr unsigned kMaxInstrSize = 4;
+  static constexpr unsigned kCompressedInstrSize = 2;
 
   unsigned getMaxInstrSize() const override { return kMaxInstrSize; }
+
+  std::set<unsigned>
+  getPossibleInstrsSize(const GeneratorContext &GC) const override {
+    const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+    bool STSupportsCompressed = ST.hasStdExtC() || ST.hasStdExtZca() ||
+                                ST.hasStdExtZcb() || ST.hasStdExtZcd() ||
+                                ST.hasStdExtZce() || ST.hasStdExtZcf();
+    if (STSupportsCompressed)
+      return {kCompressedInstrSize, kMaxInstrSize};
+    return {kMaxInstrSize};
+  }
 
   unsigned getMaxBranchDstMod(unsigned Opcode) const override {
     return isCompressedBranch(Opcode) ? kMaxCompBranchDstMod : kMaxBranchDstMod;
@@ -1338,6 +1350,7 @@ public:
 
   bool relaxBranch(MachineInstr &Branch, unsigned Distance,
                    GeneratorContext &GC) const override {
+    assert(Branch.isBranch());
     if (fitsCompressedBranch(Distance))
       return true;
     if (fitsBranch(Distance) && isCompressedBranch(Branch.getOpcode()))
@@ -1476,6 +1489,14 @@ public:
     NewBranch.addMBB(DestBB);
 
     return *NewBranch.getInstr();
+  }
+
+  unsigned getInstrSize(const MachineInstr &Inst,
+                        const GeneratorContext &GC) const override {
+    auto &RISCVSTI = GC.getSubtarget<RISCVSubtarget>();
+    auto *RISCVII = RISCVSTI.getInstrInfo();
+    assert(RISCVII);
+    return RISCVII->getInstSizeInBytes(Inst);
   }
 
   void insertLoopInit(MachineBasicBlock &MBB, MachineBasicBlock::iterator Pos,
