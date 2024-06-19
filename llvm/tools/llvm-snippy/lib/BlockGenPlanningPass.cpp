@@ -100,41 +100,19 @@ void BlockGenPlanning::getAnalysisUsage(AnalysisUsage &AU) const {
   MachineFunctionPass::getAnalysisUsage(AU);
 }
 
-template <typename IteratorType>
-static size_t getCodeSize(IteratorType Begin, IteratorType End) {
-  return std::accumulate(Begin, End, 0llu,
-                         [](size_t CurrentSize, const auto &MC) {
-                           size_t InstrSize = MC.getDesc().getSize();
-                           if (InstrSize == 0)
-                             errs() << "warning: Instruction has unknown size, "
-                                       "the size calculation will be wrong.\n";
-                           return CurrentSize + InstrSize;
-                         });
-}
-
-static size_t getFunctionSize(const MachineFunction &MF) {
-  return std::accumulate(MF.begin(), MF.end(), 0llu,
-                         [](size_t CurrentSize, const auto &MBB) {
-                           auto End = MBB.end();
-                           auto Begin = MBB.begin();
-                           return CurrentSize + getCodeSize(Begin, End);
-                         });
-}
-
 size_t
 BlockGenPlanningImpl::calculateMFSizeLimit(const MachineFunction &MF) const {
   assert(!GenCtx->isInstrsNumKnown());
   auto OutSectionDesc = GenCtx->getOutputSectionFor(MF);
   auto MaxSize = OutSectionDesc.Size;
-  auto CurrentCodeSize = getFunctionSize(MF);
+  const auto &SnpTgt = GenCtx->getLLVMState().getSnippyTarget();
+  auto CurrentCodeSize = GenCtx->getFunctionSize(MF);
 
   // last instruction in the trace might be target dependent: EBREAK or
   // int 3, etc.
   auto LastInstr = GenCtx->getLastInstr();
   // If not entry function, we generare ret anyway.
   bool EmptyLastInstr = GenCtx->isEntryFunction(MF) && LastInstr.empty();
-
-  const auto &SnpTgt = GenCtx->getLLVMState().getSnippyTarget();
   auto SizeOfOpc = SnpTgt.getMaxInstrSize();
 
   // FIXME: lastInstructions == we reserve space to put final instruction
@@ -604,25 +582,12 @@ BlockGenPlanningImpl::processFunctionWithSize(const MachineFunction &MF) {
   return FunReq;
 }
 
-static auto accumulateMISize(unsigned long long Acc, const MachineInstr &MI) {
-  auto InstrSize = MI.getDesc().getSize();
-  assert(InstrSize != 0 && "Instruction with unknown size is unsupported");
-  return Acc + InstrSize;
-}
-
-template <typename T> static auto getSize(T First, T Last) {
-  return std::accumulate(First, Last, 0ull, &accumulateMISize);
-}
-
-static auto getMBBSize(const MachineBasicBlock &MBB) {
-  return getSize(MBB.begin(), MBB.end());
-}
-
 static size_t calcFilledSize(const planning::FunctionRequest &FunReq,
-                             ArrayRef<const MachineBasicBlock *> Blocks) {
+                             ArrayRef<const MachineBasicBlock *> Blocks,
+                             const SnippyTarget &SnpTgt, GeneratorContext &GC) {
   size_t FilledSize = 0;
   for (auto *Block : Blocks) {
-    FilledSize += getMBBSize(*Block);
+    FilledSize += GC.getMBBSize(*Block);
     if (FunReq.count(Block)) {
       auto &Limit = FunReq.at(Block).limit();
       assert(Limit.isSizeLimit());
@@ -655,9 +620,13 @@ static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
   if (!PCDist.Max.has_value())
     PCDist.Max = MaxBranchDstMod;
 
-  size_t FilledSize = calcFilledSize(FunReq, LoopBlocks);
-  if (IsLatch) // Branches size isn't included in backward distance
-    FilledSize -= getSize(SelectedMBB.getFirstTerminator(), SelectedMBB.end());
+  size_t FilledSize = calcFilledSize(FunReq, LoopBlocks, SnpTgt, SGCtx);
+  if (IsLatch) { // Branches size isn't included in backward distance
+    auto BranchesSize = SGCtx.getCodeBlockSize(SelectedMBB.getFirstTerminator(),
+                                               SelectedMBB.end());
+    assert(BranchesSize <= FilledSize);
+    FilledSize -= BranchesSize;
+  }
 
   if (PCDist.Max.value() < FilledSize)
     snippy::fatal(SelectedMBB.getParent()->getFunction().getContext(),
@@ -672,18 +641,27 @@ static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
     BlockRange.Min =
         (PCDist.Min.value() > FilledSize) ? PCDist.Min.value() - FilledSize : 0;
 
-  auto MaxInstrSize = SnpTgt.getMaxInstrSize();
-  auto Min = alignTo(BlockRange.Min.value_or(0), MaxInstrSize);
-  auto Max = alignDown(BlockRange.Max.value(), MaxInstrSize);
+  auto InstrsSizes = SnpTgt.getPossibleInstrsSize(SGCtx);
+  assert(InstrsSizes.size() > 0 &&
+         "Target must have at least one variant of instruction size");
+  auto MinInstrSize = *InstrsSizes.begin();
+  auto Min = alignTo(BlockRange.Min.value_or(0), MinInstrSize);
+  auto Max = alignDown(BlockRange.Max.value(), MinInstrSize);
+  LLVM_DEBUG(dbgs() << "Selected MBB: "; SelectedMBB.dump());
+  LLVM_DEBUG(dbgs() << "BlockRagne.Min == " << BlockRange.Min << "\n");
+  LLVM_DEBUG(dbgs() << "BlockRange.Max == " << BlockRange.Max << "\n");
+  LLVM_DEBUG(dbgs() << "MinInstrSize == " << MinInstrSize << "\n");
+  LLVM_DEBUG(dbgs() << "Min == " << Min << "\n");
+  LLVM_DEBUG(dbgs() << "Max == " << Max << "\n");
   if (Min > Max)
     snippy::fatal(SelectedMBB.getParent()->getFunction().getContext(),
                   "Max PC distance requirement can't be met",
                   "Min distance is " + Twine(Min) + " , but max distance is " +
                       Twine(Max));
 
-  auto BlockSize = RandEngine::genInInterval(Min, Max);
-  BlockSize = alignDown(BlockSize, MaxInstrSize);
   auto &Tgt = SGCtx.getLLVMState().getSnippyTarget();
+  auto BlockSize = RandEngine::genInInterval(Min, Max);
+  BlockSize = alignDown(BlockSize, MinInstrSize);
   auto Limit = planning::RequestLimit::Size{BlockSize};
   auto Policy = planning::DefaultGenPolicy(
       SGCtx, Tgt.getDefaultPolicyFilter(SelectedMBB, SGCtx),
