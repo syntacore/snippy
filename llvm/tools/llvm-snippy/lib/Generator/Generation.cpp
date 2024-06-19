@@ -99,17 +99,6 @@ static void generateInsertionPointHint(
 }
 
 template <typename IteratorType>
-size_t getCodeSize(IteratorType Begin, IteratorType End) {
-  return std::accumulate(Begin, End, 0, [](size_t CurrentSize, const auto &MC) {
-    size_t InstrSize = MC.getDesc().getSize();
-    if (InstrSize == 0)
-      errs() << "warning: Instruction has unknown size, "
-                "the size calculation will be wrong.\n";
-    return CurrentSize + InstrSize;
-  });
-}
-
-template <typename IteratorType>
 size_t countPrimaryInstructions(IteratorType Begin, IteratorType End) {
   return std::count_if(
       Begin, End, [](const auto &MI) { return !checkSupportMetadata(MI); });
@@ -256,7 +245,7 @@ GenerationResult handleGeneratedInstructions(
   auto &MBB = InstrGenCtx.MBB;
   auto &GC = InstrGenCtx.GC;
   auto ItEnd = InstrGenCtx.Ins;
-  auto GeneratedCodeSize = getCodeSize(ItBegin, ItEnd);
+  auto GeneratedCodeSize = GC.getCodeBlockSize(ItBegin, ItEnd);
   auto PrimaryInstrCount = countPrimaryInstructions(ItBegin, ItEnd);
   auto ReportGenerationResult =
       [ItBegin, ItEnd, &GeneratedCodeSize, PrimaryInstrCount,
@@ -367,7 +356,7 @@ GenerationResult handleGeneratedInstructions(
         "Failed to execute chain of instructions in tracking mode");
 
   // Check size requirements after selfcheck addition.
-  GeneratedCodeSize = getCodeSize(ItBegin, ItEnd);
+  GeneratedCodeSize = GC.getCodeBlockSize(ItBegin, ItEnd);
   if (sizeLimitIsReached(IG.limit(), CurrentInstructionGroupStats,
                          GeneratedCodeSize))
     return ReportGenerationResult(GenerationStatus::SizeFailed);
@@ -1108,7 +1097,7 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
   writeRegsSnapshot(WholeXRegsSnapshot, MBB, RegStorageType::XReg, GC);
 
   return GenerationStatistics(
-      0, getCodeSize(MBB.begin(), MBB.getFirstTerminator()));
+      0, GC.getCodeBlockSize(MBB.begin(), MBB.getFirstTerminator()));
 }
 
 void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,

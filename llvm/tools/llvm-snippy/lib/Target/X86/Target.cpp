@@ -222,6 +222,11 @@ public:
 
   unsigned getMaxInstrSize() const override { reportUnimplementedError(); }
 
+  std::set<unsigned>
+  getPossibleInstrsSize(const GeneratorContext &GC) const override {
+    reportUnimplementedError();
+  }
+
   bool isMultipleReg(Register Reg, const MCRegisterInfo &RI) const override {
     reportUnimplementedError();
   }
@@ -321,6 +326,11 @@ public:
   }
 
   unsigned getLoopOverhead() const override { reportUnimplementedError(); }
+
+  unsigned getInstrSize(const MachineInstr &Inst,
+                        const GeneratorContext &GC) const override {
+    reportUnimplementedError();
+  }
 
   void insertLoopInit(MachineBasicBlock &MBB, MachineBasicBlock::iterator Pos,
                       MachineInstr &Branch, Register LatchRegNum,
