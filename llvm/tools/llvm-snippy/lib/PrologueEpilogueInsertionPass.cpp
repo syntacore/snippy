@@ -10,9 +10,9 @@
 #include "GeneratorContextPass.h"
 #include "InitializePasses.h"
 
-#include "snippy/Generator/LLVMState.h"
 #include "snippy/Target/Target.h"
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 
 #define DEBUG_TYPE "snippy-prologue-epilogue-insertion"
@@ -32,8 +32,10 @@ public:
 
   bool runOnMachineFunction(MachineFunction &MF) override;
 
-  bool insertPrologue(MachineFunction &MF, std::vector<unsigned> &SpilledRegs);
-  bool insertEpilogue(MachineFunction &MF, std::vector<unsigned> &SpilledRegs);
+  bool insertPrologue(MachineFunction &MF, ArrayRef<MCRegister> SpilledToStack,
+                      ArrayRef<MCRegister> SpilledToMem);
+  bool insertEpilogue(MachineFunction &MF, ArrayRef<MCRegister> SpilledToStack,
+                      ArrayRef<MCRegister> SpilledToMem);
 
   auto getFunctionSizeInfo(const MachineFunction &MF) const {
     auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
@@ -62,14 +64,13 @@ public:
     auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
     bool IsRoot = SGCtx.getCallGraphState().isRoot(&MF.getFunction());
 
-    std::vector<unsigned> Ret;
+    std::vector<MCRegister> Ret;
 
     if (IsRoot)
-      std::copy(SGCtx.getSpilledRegs().begin(), SGCtx.getSpilledRegs().end(),
-                std::back_inserter(Ret));
+      llvm::copy(SGCtx.getRegsSpilledToStack(), std::back_inserter(Ret));
     else {
       auto RegSet = getAllMutatedRegs(MF);
-      std::copy(RegSet.begin(), RegSet.end(), std::back_inserter(Ret));
+      llvm::copy(RegSet, std::back_inserter(Ret));
     }
 
     return Ret;
@@ -181,8 +182,9 @@ static void setupStackPointer(MCRegister AuxReg, GeneratorContext &SGCtx,
   auto SPSpillSize = SnippyTgt.getSpillSizeInBytes(AuxReg, SGCtx);
   auto Addr = SGCtx.getStackTop() - SPSpillSize;
   assert(Addr % SPSpillSize == 0u && "Stack section must be properly aligned");
-  SnippyTgt.storeRegToAddr(MBB, Ins, Addr, AuxReg, RP, SGCtx,
-                           /* store the whole register */ 0);
+  if (!SGCtx.isRegSpilledToMem(AuxReg))
+    SnippyTgt.storeRegToAddr(MBB, Ins, Addr, AuxReg, RP, SGCtx,
+                             /* store the whole register */ 0);
   auto SPInitValue = Addr;
   SnippyTgt.writeValueToReg(
       MBB, Ins,
@@ -247,7 +249,7 @@ void PrologueEpilogueInsertion::generateStackInitialization(
   // Spilling of preserved register, chosen for stack pointer role
   if (SGCtx.followTargetABI() && IsRealSPPreserved) {
     MBB.addLiveIn(RealStackPointer);
-    SnippyTgt.generateSpill(MBB, Ins, RealStackPointer, SGCtx, AuxReg);
+    SnippyTgt.generateSpillToStack(MBB, Ins, RealStackPointer, SGCtx, AuxReg);
   }
 
   if (RealStackPointer != AuxReg)
@@ -280,14 +282,32 @@ void PrologueEpilogueInsertion::generateStackTermination(
   if (SGCtx.followTargetABI() && IsRealSPPreserved) {
     AuxReg = getRegisterForPreservedSPSpill(SGCtx, MBB);
     SnippyTgt.copyRegToReg(MBB, Ins, RealStackPointer, AuxReg, SGCtx);
-    SnippyTgt.generateReload(MBB, Ins, RealStackPointer, SGCtx, AuxReg);
+    SnippyTgt.generateReloadFromStack(MBB, Ins, RealStackPointer, SGCtx,
+                                      AuxReg);
   }
 
   restoreStackPointer(AuxReg, SGCtx, MBB, Ins, RP);
 }
 
+static void generateSpillToMem(ArrayRef<MCRegister> SpilledToMem,
+                               GeneratorContext &SGCtx, MachineBasicBlock &MBB,
+                               MachineBasicBlock::iterator Ins) {
+  auto RP = SGCtx.getRegisterPool();
+  llvm::for_each(SpilledToMem, [&](auto Reg) { RP.addReserved(Reg); });
+  auto &State = SGCtx.getLLVMState();
+  const auto &SnippyTgt = State.getSnippyTarget();
+  llvm::for_each(SpilledToMem, [&](auto Reg) {
+    if (!SGCtx.hasSpillAddrsForReg(Reg))
+      SGCtx.reserveSpillAddrsForReg(Reg);
+    MBB.addLiveIn(Reg);
+    auto Addr = SGCtx.getSpilledRegAddrGlobal(Reg);
+    SnippyTgt.generateSpillToAddr(MBB, Ins, Reg, Addr, SGCtx);
+  });
+}
+
 bool PrologueEpilogueInsertion::insertPrologue(
-    MachineFunction &MF, std::vector<unsigned> &SpilledRegs) {
+    MachineFunction &MF, ArrayRef<MCRegister> SpilledToStack,
+    ArrayRef<MCRegister> SpilledToMem) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &State = SGCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
@@ -303,18 +323,22 @@ bool PrologueEpilogueInsertion::insertPrologue(
   // Forbid spilled registers to be potentially used as scratch registers
   // for address forming.
   auto RP = SGCtx.getRegisterPool();
-  for (auto SpillReg : SpilledRegs)
+  for (auto SpillReg : SpilledToStack)
     RP.addReserved(SpillReg);
+
+  if (IsEntry)
+    generateSpillToMem(SpilledToMem, SGCtx, *MBB, Ins);
 
   if (IsEntry)
     generateStackInitialization(*MBB, Ins, RP);
 
   auto SP = SGCtx.getStackPointer();
   // Spill requested registers. Also mark them as live-in.
-  for (auto SpillReg : SpilledRegs) {
+  for (auto SpillReg : SpilledToStack) {
     MBB->addLiveIn(SpillReg);
-    SnippyTgt.generateSpill(*MBB, Ins, SpillReg, SGCtx, SP);
+    SnippyTgt.generateSpillToStack(*MBB, Ins, SpillReg, SGCtx, SP);
   }
+
   if (!IsEntry)
     return true;
   SGCtx.setEntryPrologueInstructionCount(std::distance(MBB->begin(), Ins));
@@ -339,7 +363,8 @@ bool PrologueEpilogueInsertion::insertPrologue(
 }
 
 bool PrologueEpilogueInsertion::insertEpilogue(
-    MachineFunction &MF, std::vector<unsigned> &SpilledRegs) {
+    MachineFunction &MF, ArrayRef<MCRegister> SpilledToStack,
+    ArrayRef<MCRegister> SpilledToMem) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &State = SGCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
@@ -353,7 +378,7 @@ bool PrologueEpilogueInsertion::insertEpilogue(
   // Forbid spilled registers to be potentially used as scratch registers
   // for address forming.
   auto RP = SGCtx.getRegisterPool();
-  for (auto SpillReg : SpilledRegs)
+  for (auto SpillReg : SpilledToStack)
     RP.addReserved(SpillReg);
 
   auto &&[MBB, Ins] = findPlaceForEpilogue(MF);
@@ -361,14 +386,22 @@ bool PrologueEpilogueInsertion::insertEpilogue(
   auto Prev = BBWasEmptyBeforeEpilogueInsertion ? MBB->end() : std::prev(Ins);
 
   auto SP = SGCtx.getStackPointer();
-  // Reload spilled registers.
-  std::for_each(SpilledRegs.rbegin(), SpilledRegs.rend(),
-                [&, MBB = MBB, Ins = Ins](auto Reg) {
-                  SnippyTgt.generateReload(*MBB, Ins, Reg, SGCtx, SP);
-                });
+  // Reload spilled registers. Reverse order because of a stack.
+  llvm::for_each(llvm::reverse(SpilledToStack),
+                 [&, MBB = MBB, Ins = Ins](auto Reg) {
+                   SnippyTgt.generateReloadFromStack(*MBB, Ins, Reg, SGCtx, SP);
+                 });
 
   if (IsExit)
     generateStackTermination(*MBB, Ins, RP);
+
+  if (IsExit) {
+    // Reload order is indifferent when loading from memory.
+    llvm::for_each(SpilledToMem, [&, MBB = MBB, Ins = Ins](auto Reg) {
+      auto Addr = SGCtx.getSpilledRegAddrGlobal(Reg);
+      SnippyTgt.generateReloadFromAddr(*MBB, Ins, Reg, Addr, SGCtx);
+    });
+  }
 
   auto FirstInserted =
       BBWasEmptyBeforeEpilogueInsertion ? MBB->begin() : std::next(Prev);
@@ -402,9 +435,10 @@ bool PrologueEpilogueInsertion::runOnMachineFunction(MachineFunction &MF) {
   if (!SGCtx.stackEnabled())
     return false;
 
-  auto SpilledRegs = getSpilledRegs(MF);
-  auto PrologueInserted = insertPrologue(MF, SpilledRegs);
-  auto EpilogueInserted = insertEpilogue(MF, SpilledRegs);
+  auto SpilledToStack = getSpilledRegs(MF);
+  auto SpilledToMem = SGCtx.getRegsSpilledToMem();
+  auto PrologueInserted = insertPrologue(MF, SpilledToStack, SpilledToMem);
+  auto EpilogueInserted = insertEpilogue(MF, SpilledToStack, SpilledToMem);
 
   return PrologueInserted || EpilogueInserted;
 }

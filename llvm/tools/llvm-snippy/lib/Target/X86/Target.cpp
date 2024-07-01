@@ -110,15 +110,17 @@ public:
 
   MCRegister getStackPointer() const override { reportUnimplementedError(); }
 
-  void generateSpill(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                     MCRegister Reg, GeneratorContext &GC,
-                     MCRegister SP) const override {
+  void generateSpillToStack(MachineBasicBlock &MBB,
+                            MachineBasicBlock::iterator Ins, MCRegister Reg,
+                            GeneratorContext &GC,
+                            MCRegister SP) const override {
     reportUnimplementedError();
   }
 
-  void generateReload(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                      MCRegister Reg, GeneratorContext &GC,
-                      MCRegister SP) const override {
+  void generateReloadFromStack(MachineBasicBlock &MBB,
+                               MachineBasicBlock::iterator Ins, MCRegister Reg,
+                               GeneratorContext &GC,
+                               MCRegister SP) const override {
     reportUnimplementedError();
   }
 

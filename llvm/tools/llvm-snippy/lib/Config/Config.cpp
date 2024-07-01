@@ -131,6 +131,24 @@ LLVM_SNIPPY_YAML_INSTANTIATE_HISTOGRAM_IO(snippy::OpcodeHistogramDecodedEntry);
 LLVM_SNIPPY_YAML_IS_HISTOGRAM_DENORM_ENTRY(snippy::OpcodeHistogramDecodedEntry)
 
 namespace snippy {
+
+bool isExternal(const FunctionDescs &Funcs, StringRef Name) {
+  auto &Descs = Funcs.Descs;
+  auto Found =
+      llvm::find_if(Descs, [&](auto &Desc) { return Desc.Name == Name; });
+  assert(Found != Descs.end());
+  return Found->External;
+}
+
+bool hasExternalCallee(const FunctionDescs &FuncDescs,
+                       const FunctionDesc &Func) {
+  assert(llvm::count_if(FuncDescs.Descs,
+                        [&](auto &Desc) { return Desc.Name == Func.Name; }));
+  return llvm::any_of(Func.Callees, [&](StringRef Name) {
+    return isExternal(FuncDescs, Name);
+  });
+}
+
 struct SectionAttrs {
   std::variant<int, std::string> ID{0};
   size_t VMA;

@@ -150,13 +150,23 @@ public:
   // NOTE: this list do not include stack pointer.
   virtual std::vector<MCRegister> getRegsPreservedByABI() const = 0;
 
-  virtual void generateSpill(MachineBasicBlock &MBB,
-                             MachineBasicBlock::iterator Ins, MCRegister Reg,
-                             GeneratorContext &GC, MCRegister SP) const = 0;
+  void generateSpillToAddr(MachineBasicBlock &MBB,
+                           MachineBasicBlock::iterator Ins, MCRegister Reg,
+                           MemAddr Addr, GeneratorContext &GC) const;
 
-  virtual void generateReload(MachineBasicBlock &MBB,
+  virtual void generateSpillToStack(MachineBasicBlock &MBB,
+                                    MachineBasicBlock::iterator Ins,
+                                    MCRegister Reg, GeneratorContext &GC,
+                                    MCRegister SP) const = 0;
+
+  virtual void generateReloadFromStack(MachineBasicBlock &MBB,
+                                       MachineBasicBlock::iterator Ins,
+                                       MCRegister Reg, GeneratorContext &GC,
+                                       MCRegister SP) const = 0;
+
+  void generateReloadFromAddr(MachineBasicBlock &MBB,
                               MachineBasicBlock::iterator Ins, MCRegister Reg,
-                              GeneratorContext &GC, MCRegister SP) const = 0;
+                              MemAddr Addr, GeneratorContext &GC) const;
 
   virtual void generatePopNoReload(MachineBasicBlock &MBB,
                                    MachineBasicBlock::iterator Ins,

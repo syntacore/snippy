@@ -5,16 +5,17 @@ options:
   march: riscv64-unknown-elf
   mcpu: generic-rv64
   mattr: "+f,+d"
-  num-instrs: 1000
+  num-instrs: 100
   init-regs-in-elf: on
+  honor-target-abi: on
   dump-mf: on
 
 sections:
-  - no:        0
+  - name:      stack
     VMA:       0x200000
     SIZE:      0x10000
     LMA:       0x200000
-    ACCESS:    r
+    ACCESS:    rw
   - no:        1
     VMA:       0x210000
     SIZE:      0x100000
@@ -38,13 +39,21 @@ call-graph:
 histogram:
      - [FADD_D, 3.0]
      - [FDIV_D, 3.0]
-     - [FMUL_D, 3.0]
-     - [FSUB_D, 3.0]
+     - [FLD, 3.0]
+     - [FSW, 3.0]
      - [JAL, 1.0]
      - [ADDIW, 1.0]
+     - [SUB, 4.0]
 
-# CHECK: warning: External callees were found in call-graph but neither "utility" nor "stack" sections were found: Implicitly reserving registers: [X3, X4] 
+# CHECK: remark: No "utility" section was provided: Using part of "stack" section for internal purposes instead
 
-# CHECK-NOT: {{\$x3[[:space:],]}}
-# CHECK-NOT: {{\$x4[[:space:],]}}
+# Spill
+# CHECK: SD $x3
+# CHECK: SD $x4
 
+# Reload right before call
+# CHECK: $x3 = LD
+# CHECK: $x4 = LD
+# CHECK: $x2 =
+# CHECK-NEXT: PseudoCALL
+# CHECK-SAME: myfunc

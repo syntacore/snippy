@@ -59,7 +59,8 @@ struct RegistersOptions {
   // TODO: discuss these to be Interpreter-only options
   std::string InitialStateOutputYaml;
   std::string FinalStateOutputYaml;
-  SmallVector<unsigned> SpilledRegs;
+  SmallVector<MCRegister> SpilledToStack;
+  SmallVector<MCRegister> SpilledToMem;
   MCRegister StackPointer;
 };
 
