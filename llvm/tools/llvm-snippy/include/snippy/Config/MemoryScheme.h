@@ -629,6 +629,7 @@ struct SectionsDescriptions : private std::vector<SectionDesc> {
     });
   };
   static constexpr const char *StackSectionName = "stack";
+  static constexpr const StringRef UtilitySectionName = "utility";
   static constexpr const char *SelfcheckSectionName = "selfcheck";
 
   // Default size for implicitly generated sections
@@ -644,6 +645,14 @@ struct SectionsDescriptions : private std::vector<SectionDesc> {
   }
 
   auto &getSection(StringRef Name) const {
+    assert(hasSection(Name) && "No section with given name");
+    auto Found = std::find_if(begin(), end(), [Name](auto &S) {
+      return S.isNamed() && Name.equals(S.getName());
+    });
+    return *Found;
+  }
+
+  auto &getSection(StringRef Name) {
     assert(hasSection(Name) && "No section with given name");
     auto Found = std::find_if(begin(), end(), [Name](auto &S) {
       return S.isNamed() && Name.equals(S.getName());

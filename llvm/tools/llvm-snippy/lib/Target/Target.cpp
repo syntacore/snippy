@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "snippy/Target/Target.h"
+#include "snippy/Generator/GeneratorContext.h"
 
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Error.h"
@@ -36,5 +37,20 @@ void SnippyTarget::registerTarget(SnippyTarget *Target) {
   FirstTarget = Target;
 }
 
+void SnippyTarget::generateSpillToAddr(MachineBasicBlock &MBB,
+                                       MachineBasicBlock::iterator Ins,
+                                       MCRegister Reg, MemAddr Addr,
+                                       GeneratorContext &GC) const {
+  auto RP = GC.getRegisterPool();
+  storeRegToAddr(MBB, Ins, Addr, Reg, RP, GC,
+                 /* store the whole register */ 0);
+}
+void SnippyTarget::generateReloadFromAddr(MachineBasicBlock &MBB,
+                                          MachineBasicBlock::iterator Ins,
+                                          MCRegister Reg, MemAddr Addr,
+                                          GeneratorContext &GC) const {
+  auto RP = GC.getRegisterPool();
+  loadRegFromAddr(MBB, Ins, Addr, Reg, RP, GC);
+}
 } // namespace snippy
 } // namespace llvm

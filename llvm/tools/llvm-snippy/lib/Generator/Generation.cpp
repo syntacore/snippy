@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Generator/Generation.h"
+#include "snippy/Config/FunctionDescriptions.h"
 #include "snippy/Generator/Backtrack.h"
 #include "snippy/Generator/GenerationRequest.h"
 #include "snippy/Generator/GenerationUtils.h"
@@ -756,6 +757,32 @@ void postprocessMemoryOperands(MachineInstr &MI, RegPoolWrapper &RP,
   }
 }
 
+static void reloadGlobalRegsFromMemory(MachineBasicBlock &MBB,
+                                       MachineBasicBlock::iterator Ins,
+                                       GeneratorContext &GC) {
+  auto &Tgt = GC.getLLVMState().getSnippyTarget();
+  auto &SpilledToMem = GC.getGenSettings().RegistersConfig.SpilledToMem;
+  for (auto &Reg : SpilledToMem) {
+    auto Addr = GC.getSpilledRegAddrLocal(Reg);
+    Tgt.generateSpillToAddr(MBB, Ins, Reg, Addr, GC);
+  }
+  for (auto &Reg : SpilledToMem) {
+    auto Addr = GC.getSpilledRegAddrGlobal(Reg);
+    Tgt.generateReloadFromAddr(MBB, Ins, Reg, Addr, GC);
+  }
+}
+
+static void reloadLocallySpilledRegs(MachineBasicBlock &MBB,
+                                     MachineBasicBlock::iterator Ins,
+                                     GeneratorContext &GC) {
+  auto &Tgt = GC.getLLVMState().getSnippyTarget();
+  auto &SpilledToMem = GC.getGenSettings().RegistersConfig.SpilledToMem;
+  for (auto &Reg : SpilledToMem) {
+    auto Addr = GC.getSpilledRegAddrLocal(Reg);
+    Tgt.generateReloadFromAddr(MBB, Ins, Reg, Addr, GC);
+  }
+}
+
 MachineInstr *
 generateCall(unsigned OpCode,
              planning::InstructionGenerationContext &InstrGenCtx) {
@@ -773,6 +800,9 @@ generateCall(unsigned OpCode,
   auto FunctionIdx = RandEngine::genInRange(CalleeNode->functions().size());
 
   auto &CallTarget = *(CalleeNode->functions()[FunctionIdx]);
+  assert(CallTarget.hasName());
+  if (CalleeNode->isExternal() && GC.getConfig().hasSectionToSpillGlobalRegs())
+    reloadGlobalRegsFromMemory(MBB, InstrGenCtx.Ins, GC);
 
   auto TargetStackPointer = SnippyTgt.getStackPointer();
   auto RealStackPointer = GC.getStackPointer();
@@ -787,9 +817,13 @@ generateCall(unsigned OpCode,
   auto *Call = SnippyTgt.generateCall(MBB, InstrGenCtx.Ins, CallTarget, GC,
                                       /* AsSupport */ false, OpCode);
 
-  if (CalleeNode->isExternal() && (RealStackPointer != TargetStackPointer))
+  if (!GC.isRegSpilledToMem(RealStackPointer) && CalleeNode->isExternal() &&
+      (RealStackPointer != TargetStackPointer))
     SnippyTgt.copyRegToReg(MBB, InstrGenCtx.Ins, TargetStackPointer,
                            RealStackPointer, GC);
+
+  if (CalleeNode->isExternal() && GC.getConfig().hasSectionToSpillGlobalRegs())
+    reloadLocallySpilledRegs(MBB, InstrGenCtx.Ins, GC);
 
   Node->markAsCommitted(CalleeNode);
   return Call;
@@ -854,10 +888,10 @@ void spillPseudoInstImplicitReg(MachineInstr &MI, Register Reg,
       std::next(MachineBasicBlock::reverse_iterator(MI)), MBB.rend(),
       [](auto &&Inst) { return checkSupportMetadata(Inst); });
   auto SpillPoint = std::next(PointBeforeSpill.getReverse());
-  SnpTgt.generateSpill(MBB, SpillPoint, Reg, GC, RealStackPointer);
+  SnpTgt.generateSpillToStack(MBB, SpillPoint, Reg, GC, RealStackPointer);
 
   auto ReloadPoint = std::next(MachineBasicBlock::iterator(MI));
-  SnpTgt.generateReload(MBB, ReloadPoint, Reg, GC, RealStackPointer);
+  SnpTgt.generateReloadFromStack(MBB, ReloadPoint, Reg, GC, RealStackPointer);
 }
 
 void spillPseudoInstImplicitRegs(
