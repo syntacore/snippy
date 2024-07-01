@@ -118,7 +118,22 @@ public:
   }
 
   void dump(raw_ostream &OS, const ConfigIOContext &Ctx) const;
+
+  bool hasSectionToSpillGlobalRegs() const {
+    return Sections.hasSection(SectionsDescriptions::UtilitySectionName) ||
+           Sections.hasSection(SectionsDescriptions::StackSectionName);
+  }
+
+  bool hasExternalCallees() const {
+    if (!FuncDescs)
+      return false;
+    return llvm::any_of(FuncDescs->Descs, [&](auto &Func) {
+      return hasExternalCallee(*FuncDescs, Func);
+    });
+  }
 };
+
+bool shouldSpillGlobalRegs(const Config &Cfg);
 
 class IncludePreprocessor final {
 public:
