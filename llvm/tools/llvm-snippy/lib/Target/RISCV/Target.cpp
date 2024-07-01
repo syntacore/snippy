@@ -996,11 +996,22 @@ public:
     }
     rvvGenerateModeSwitchAndUpdateContext(InstrInfo, MBB, GC, InsertPos);
 
+    generateNonMaskVRegsInit(MBB, InsertPos, Regs, RP, GC,
+                             [](Register Reg) { return false; });
+  }
+
+  // If Filter(Reg) is true, than Reg won't be inited
+  template <typename T>
+  void generateNonMaskVRegsInit(MachineBasicBlock &MBB,
+                                MachineBasicBlock::iterator InsertPos,
+                                const RISCVRegisterState &Regs,
+                                RegPoolWrapper &RP, GeneratorContext &GC,
+                                const T &Filter) const {
     // V0 is the mask register, skip it
     for (auto [RegIdx, Value] : drop_begin(enumerate(Regs.VRegs))) {
       auto Reg = regIndexToMCReg(RegIdx, RegStorageType::VReg, GC);
       // Skip reserved registers
-      if (RP.isReserved(Reg, MBB))
+      if (RP.isReserved(Reg, MBB) || Filter(Reg))
         continue;
       writeValueToReg(MBB, InsertPos, Value, Reg, RP, GC);
     }
