@@ -1,20 +1,17 @@
-# RUN: llvm-snippy %s --model-plugin None |& \
+# RUN: not llvm-snippy %s --model-plugin None |& \
 # RUN: FileCheck %s --ignore-case
 
 options:
   march: riscv64-unknown-elf
   mcpu: generic-rv64
   mattr: "+f,+d"
-  num-instrs: 1000
+  num-instrs: 100
   init-regs-in-elf: on
+  honor-target-abi: on
+  external-stack: on
   dump-mf: on
 
 sections:
-  - no:        0
-    VMA:       0x200000
-    SIZE:      0x10000
-    LMA:       0x200000
-    ACCESS:    r
   - no:        1
     VMA:       0x210000
     SIZE:      0x100000
@@ -24,6 +21,11 @@ sections:
     VMA:       0x400000
     SIZE:      0x100000
     LMA:       0x400000
+    ACCESS:    rw
+  - name:      utility
+    VMA:       0x500000
+    SIZE:      0x8
+    LMA:       0x500000
     ACCESS:    rw
 
 call-graph:
@@ -38,13 +40,11 @@ call-graph:
 histogram:
      - [FADD_D, 3.0]
      - [FDIV_D, 3.0]
-     - [FMUL_D, 3.0]
-     - [FSUB_D, 3.0]
+     - [FLD, 3.0]
+     - [FSW, 3.0]
      - [JAL, 1.0]
      - [ADDIW, 1.0]
+     - [SUB, 4.0]
 
-# CHECK: warning: External callees were found in call-graph but neither "utility" nor "stack" sections were found: Implicitly reserving registers: [X3, X4] 
-
-# CHECK-NOT: {{\$x3[[:space:],]}}
-# CHECK-NOT: {{\$x4[[:space:],]}}
-
+# CHECK: error
+# CHECK-SAME: Section "utility" is full (Size: 8, Filled Size: 16): Try larger "utility" section.

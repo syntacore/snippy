@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Generator/GeneratorContext.h"
+#include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Generator/Interpreter.h"
 #include "snippy/Generator/MemoryManager.h"
@@ -486,14 +487,14 @@ void GeneratorContext::initializeStackSection() {
                     "stack pointer register is "
                     "explicitly reserved.");
 
-    if (std::any_of(GenSettings->RegistersConfig.SpilledRegs.begin(),
-                    GenSettings->RegistersConfig.SpilledRegs.end(),
+    if (std::any_of(GenSettings->RegistersConfig.SpilledToStack.begin(),
+                    GenSettings->RegistersConfig.SpilledToStack.end(),
                     [SP](auto Reg) { return Reg == SP; }))
       report_fatal_error("Stack pointer cannot be spilled. Remove it from "
                          "spill register list.",
                          false);
   } else {
-    if (!GenSettings->RegistersConfig.SpilledRegs.empty())
+    if (!GenSettings->RegistersConfig.SpilledToStack.empty())
       snippy::fatal(Ctx, "Cannot spill requested registers",
                     "no stack space allocated.");
 
@@ -548,6 +549,52 @@ GeneratorContext::GeneratorContext(MachineModuleInfo &MMI, Module &M,
               OpCc);
         return OpcodeToImmHistSequenceMap();
       }()) {
+  auto &Ctx = State.getCtx();
+  if (GenSettings->Cfg.Sections.hasSection(
+          SectionsDescriptions::UtilitySectionName)) {
+    UtilitySection = GenSettings->Cfg.Sections.getSection(
+        SectionsDescriptions::UtilitySectionName);
+    auto AccMask = UtilitySection->M;
+    if (!(AccMask.R() && AccMask.W() && !AccMask.X()))
+      snippy::fatal(Ctx, "Wrong layout file",
+                    "\"" + Twine(SectionsDescriptions::UtilitySectionName) +
+                        "\" section must be RW");
+  } else if (GenSettings->Cfg.Sections.hasSection(
+                 SectionsDescriptions::StackSectionName) &&
+             !GenSettings->RegistersConfig.SpilledToMem.empty()) {
+    auto &Sections = GenSettings->Cfg.Sections;
+    auto Size =
+        2 * GenSettings->RegistersConfig.SpilledToMem.size() *
+        State.getSnippyTarget().getAddrRegLen(State.getTargetMachine()) /
+        CHAR_BIT;
+    auto &Stack = GenSettings->Cfg.Sections.getSection(
+        SectionsDescriptions::StackSectionName);
+    UtilitySection = SectionDesc(SectionsDescriptions::UtilitySectionName);
+    UtilitySection->VMA = std::exchange(Stack.VMA, Stack.VMA + Size);
+    UtilitySection->LMA = std::exchange(Stack.LMA, Stack.LMA + Size);
+    UtilitySection->Size = Size;
+    if (Stack.Size <= Size) {
+      auto &Ctx = State.getCtx();
+      snippy::fatal(
+          Ctx, "Stack section is too small",
+          "stack cannot be used for internal purposes. Either provide \"" +
+              Twine(SectionsDescriptions::UtilitySectionName) +
+              "\" section or increase \"" +
+              Twine(SectionsDescriptions::StackSectionName) +
+              "\" section size. (stack size: " + Twine(Stack.Size) +
+              ", required size: " + Twine(Size) + ")");
+    }
+    Stack.Size -= Size;
+    UtilitySection->M = Stack.M;
+    Sections.push_back(*UtilitySection);
+    snippy::notice(WarningName::NotAWarning, Ctx,
+                   "No \"" + Twine(SectionsDescriptions::UtilitySectionName) +
+                       "\" section was provided",
+                   "Using part of \"" +
+                       Twine(SectionsDescriptions::StackSectionName) +
+                       "\" section for internal purposes instead");
+  }
+
   auto SnippyDataVMA = 0ull;
   auto SnippyDataSize = 0ull;
 

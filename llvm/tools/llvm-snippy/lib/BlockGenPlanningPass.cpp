@@ -118,8 +118,9 @@ BlockGenPlanningImpl::calculateMFSizeLimit(const MachineFunction &MF) const {
   // FIXME: lastInstructions == we reserve space to put final instruction
   // and any additional instructions that will be placed after random
   // instructions generation. This should be replaced as we have BlockInfo
-  auto SpilledRegs = GenCtx->getSpilledRegs();
-  auto NumOfSpilledRegs = SpilledRegs.size();
+  auto RegsSpilledToStack = GenCtx->getRegsSpilledToStack();
+  auto RegsSpilledToMem = GenCtx->getRegsSpilledToMem();
+  auto NumOfSpilledRegs = RegsSpilledToStack.size() + RegsSpilledToMem.size();
   // FIXME: may need to generic algorithm.
   size_t SizeForSpilledRegs = NumOfSpilledRegs * 5u * SizeOfOpc;
   // Prologue + Epilogue.
