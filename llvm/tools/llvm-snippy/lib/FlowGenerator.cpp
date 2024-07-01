@@ -206,7 +206,9 @@ static size_t calcMainFuncInitialSpillSize(GeneratorContext &GC) {
   auto StackPointer = GC.getStackPointer();
   size_t SpillSize = SnippyTgt.getSpillAlignmentInBytes(StackPointer, GC);
 
-  auto SpilledRegs = GC.getSpilledRegs();
+  auto SpilledRef = GC.getRegsSpilledToStack();
+  std::vector SpilledRegs(SpilledRef.begin(), SpilledRef.end());
+  llvm::copy(GC.getRegsSpilledToMem(), std::back_inserter(SpilledRegs));
   return std::accumulate(SpilledRegs.begin(), SpilledRegs.end(), SpillSize,
                          [&GC, &SnippyTgt](auto Init, auto Reg) {
                            return Init + SnippyTgt.getSpillSizeInBytes(Reg, GC);
@@ -296,10 +298,19 @@ planning::FunctionRequest InstructionGenerator::createMFGenerationRequest(
   return FunReq;
 }
 
+static void reserveAddressesForRegSpills(ArrayRef<MCRegister> Regs,
+                                         GeneratorContext &GC) {
+  llvm::for_each(Regs, [&](auto Reg) { GC.reserveSpillAddrsForReg(Reg); });
+}
+
 bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
   SGCtx = &getAnalysis<GeneratorContextWrapper>().getContext();
   const auto &GenSettings = SGCtx->getGenSettings();
-
+  if (SGCtx->getConfig().hasSectionToSpillGlobalRegs() &&
+      (SGCtx->getSpilledRegAddressesGlobal().empty() ||
+       SGCtx->getSpilledRegAddressesLocal().empty()))
+    reserveAddressesForRegSpills(GenSettings.RegistersConfig.SpilledToMem,
+                                 *SGCtx);
   if (SGCtx->hasTrackingMode())
     prepareInterpreterEnv();
 

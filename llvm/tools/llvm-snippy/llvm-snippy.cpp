@@ -15,6 +15,7 @@
 
 #include "snippy/Config/BurstGram.h"
 #include "snippy/Config/Config.h"
+#include "snippy/Config/FunctionDescriptions.h"
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
@@ -30,6 +31,9 @@
 #include "snippy/Support/YAMLUtils.h"
 #include "snippy/Target/Target.h"
 #include "snippy/Target/TargetSelect.h"
+#include "llvm/MC/MCRegister.h"
+#include "llvm/MC/MCRegisterInfo.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Twine.h"
@@ -540,27 +544,11 @@ std::vector<std::string> parseModelPluginList() {
   return Ret;
 }
 
-static bool hasExternalFuncs(const Config &Cfg) {
-  if (!Cfg.FuncDescs)
-    return false;
-  auto IsExternalFunc = [&Descs = Cfg.FuncDescs->Descs](StringRef Name) {
-    auto Found =
-        find_if(Descs, [&](auto &Desc) { return Name.equals(Desc.Name); });
-    assert(Found != Descs.end());
-    return Found->External;
-  };
-  auto HasExternalCallee = [&](const FunctionDesc &Desc) {
-    return any_of(Desc.Callees, IsExternalFunc);
-  };
-
-  return llvm::any_of(Cfg.FuncDescs->Descs, HasExternalCallee);
-}
-
 // Reserve global state registers so they won't be corrupted when we call
 // external function.
 static void reserveGlobalStateRegisters(RegPool &RP, const Config &Cfg,
                                         const SnippyTarget &Tgt) {
-  if (hasExternalFuncs(Cfg)) {
+  if (Cfg.hasExternalCallees()) {
     auto Regs = Tgt.getGlobalStateRegs();
     for (auto Reg : Regs) {
       RP.addReserved(Reg, AccessMaskBit::RW);
@@ -589,10 +577,24 @@ static void parseReservedRegistersOption(RegPool &RP, const SnippyTarget &Tgt,
   }
 }
 
-static std::vector<unsigned>
+// We want to spill certain global register (e.g. Thread Pointer and Global
+// Pointer) to memory instead of stack as we want to spill and reload them
+// several times throughout the program and we won't be able to do that if we
+// spill them to stack.
+static std::vector<MCRegister> getRegsToSpillToMem(const SnippyTarget &Tgt,
+                                                   const Config &Cfg,
+                                                   LLVMContext &Ctx,
+                                                   const MCRegisterInfo &RI) {
+  if (!Cfg.hasExternalCallees() || !Cfg.hasSectionToSpillGlobalRegs())
+    return {};
+  return Tgt.getGlobalStateRegs();
+}
+
+static std::vector<MCRegister>
 parseSpilledRegistersOption(RegPool &RP, const SnippyTarget &Tgt,
-                            const MCRegisterInfo &RI, LLVMContext &Ctx) {
-  std::vector<unsigned> SpilledRegs;
+                            const MCRegisterInfo &RI, LLVMContext &Ctx,
+                            const Config &Cfg) {
+  std::vector<MCRegister> SpilledRegs;
 
   for (auto &&RegName : SpilledRegisterList) {
     auto Reg = findRegisterByName(Tgt, RI, RegName);
@@ -616,10 +618,12 @@ parseSpilledRegistersOption(RegPool &RP, const SnippyTarget &Tgt,
                    "--" + Twine(FollowTargetABI.ArgStr) + " is enabled.");
     SpilledRegs.clear();
     auto ABIPreserved = Tgt.getRegsPreservedByABI();
-
-    std::transform(ABIPreserved.begin(), ABIPreserved.end(),
-                   std::back_inserter(SpilledRegs),
-                   [](auto Reg) { return Reg; });
+    auto GlobalRegs = getRegsToSpillToMem(Tgt, Cfg, Ctx, RI);
+    // Global Regs will be spilled separately as we need to spill them to
+    // Memory, not stack.
+    llvm::copy_if(ABIPreserved, std::back_inserter(SpilledRegs), [&](auto Reg) {
+      return !llvm::is_contained(GlobalRegs, Reg);
+    });
   }
   return SpilledRegs;
 }
@@ -627,7 +631,8 @@ parseSpilledRegistersOption(RegPool &RP, const SnippyTarget &Tgt,
 static MCRegister getRealStackPointer(const RegPool &RP, const Config &Cfg,
                                       const SnippyTarget &Tgt,
                                       const MCRegisterInfo &RI,
-                                      std::vector<unsigned> &SpilledRegs,
+                                      std::vector<MCRegister> &SpilledToStack,
+                                      std::vector<MCRegister> &SpilledToMem,
                                       LLVMContext &Ctx) {
   auto SP = Tgt.getStackPointer();
 
@@ -641,9 +646,9 @@ static MCRegister getRealStackPointer(const RegPool &RP, const Config &Cfg,
 
   auto FullFilter = [&](auto Reg) {
     return std::invoke(BasicFilter, Reg) || (!CanUseSP && Reg == SP) ||
-           (!FollowTargetABI &&
-            std::any_of(SpilledRegs.begin(), SpilledRegs.end(),
-                        [Reg](auto SpReg) { return SpReg == Reg; }));
+           (!FollowTargetABI && llvm::any_of(SpilledToStack, [Reg](auto SpReg) {
+             return SpReg == Reg;
+           }));
   };
 
   std::string RegPrefix = "reg::";
@@ -681,10 +686,8 @@ static MCRegister getRealStackPointer(const RegPool &RP, const Config &Cfg,
   // and honor-target-abi is specified and also remove RealSP from SpilledRegs
   // list if it is in it
   if (FollowTargetABI && (RealSP != SP)) {
-    SpilledRegs.erase(
-        std::remove(SpilledRegs.begin(), SpilledRegs.end(), RealSP),
-        SpilledRegs.end());
-    SpilledRegs.push_back(SP);
+    llvm::erase(SpilledToStack, RealSP);
+    SpilledToStack.push_back(SP);
   }
 
   return RealSP;
@@ -753,7 +756,6 @@ static Config readSnippyConfig(LLVMContext &Ctx, const SnippyTarget &Tgt,
                                            .str());
           });
         };
-
         if (!IsDiagAllowed(Diag.getMessage())) {
           assert(Ctx);
           auto &IPP = *static_cast<IncludePreprocessor *>(Ctx);
@@ -990,6 +992,28 @@ unsigned long long initializeRandomEngine(unsigned long long SeedValue) {
   return SeedValue;
 }
 
+static void checkGlobalRegsSpillSettings(const SnippyTarget &Tgt,
+                                         const MCRegisterInfo &RI,
+                                         const Config &Cfg, LLVMContext &Ctx) {
+  if (!Cfg.hasExternalCallees() || Cfg.hasSectionToSpillGlobalRegs())
+    return;
+  auto Globals = Tgt.getGlobalStateRegs();
+  auto RegNames =
+      llvm::map_range(Globals, [&](auto Reg) { return RI.getName(Reg); });
+  std::string RegNamesStr;
+  raw_string_ostream SS(RegNamesStr);
+  SS << "[";
+  llvm::interleaveComma(RegNames, SS);
+  SS << "]";
+  snippy::warn(WarningName::InconsistentOptions, Ctx,
+               "External callees were found in call-graph but neither \"" +
+                   Twine(SectionsDescriptions::UtilitySectionName) +
+                   "\" nor \"" + Twine(SectionsDescriptions::StackSectionName) +
+                   "\" sections were found",
+               "Implicitly reserving registers: " + Twine(RegNamesStr));
+  return;
+}
+
 GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
                                         RegPool &RP) {
   auto &Ctx = State.getCtx();
@@ -1018,13 +1042,18 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
   initializeRandomEngine(SeedValue);
   auto Models = parseModelPluginList();
   bool RunOnModel = !Models.empty();
+  checkGlobalRegsSpillSettings(State.getSnippyTarget(), State.getRegInfo(), Cfg,
+                               Ctx);
+  if (!Cfg.hasSectionToSpillGlobalRegs())
+    reserveGlobalStateRegisters(RP, Cfg, State.getSnippyTarget());
   parseReservedRegistersOption(RP, State.getSnippyTarget(), State.getRegInfo());
-  reserveGlobalStateRegisters(RP, Cfg, State.getSnippyTarget());
-  auto SpilledRegs = parseSpilledRegistersOption(
-      RP, State.getSnippyTarget(), State.getRegInfo(), State.getCtx());
+  auto RegsSpilledToStack = parseSpilledRegistersOption(
+      RP, State.getSnippyTarget(), State.getRegInfo(), State.getCtx(), Cfg);
+  auto RegsSpilledToMem = getRegsToSpillToMem(State.getSnippyTarget(), Cfg, Ctx,
+                                              State.getRegInfo());
   auto StackPointer =
       getRealStackPointer(RP, Cfg, State.getSnippyTarget(), State.getRegInfo(),
-                          SpilledRegs, State.getCtx());
+                          RegsSpilledToStack, RegsSpilledToMem, State.getCtx());
   std::string DumpPathInitialState = deriveDefaultableOptionValue(
       RequestForInitialStateDump || Verbose, DumpInitialRegisters);
   std::string DumpPathFinalState = deriveDefaultableOptionValue(
@@ -1046,7 +1075,10 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
       RegistersOptions{
           InitRegsInElf, FollowTargetABI, InitialRegisterDataFile.getValue(),
           std::move(DumpPathInitialState), std::move(DumpPathFinalState),
-          SmallVector<unsigned>(SpilledRegs.begin(), SpilledRegs.end()),
+          SmallVector<MCRegister>(RegsSpilledToStack.begin(),
+                                  RegsSpilledToStack.end()),
+          SmallVector<MCRegister>(RegsSpilledToMem.begin(),
+                                  RegsSpilledToMem.end()),
           StackPointer},
       std::move(Cfg));
 }

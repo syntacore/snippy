@@ -31,6 +31,10 @@ struct FunctionDescs {
   }
 };
 
+bool hasExternalCallee(const FunctionDescs &FuncDescs,
+                       const FunctionDesc &Func);
+bool isExternal(const FunctionDescs &Funcs, StringRef Name);
+
 } // namespace snippy
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(snippy::FunctionDesc);
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(snippy::FunctionDescs);
