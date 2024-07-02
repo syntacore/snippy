@@ -3,6 +3,7 @@ add_llvm_library(LLVMSnippyGenerator
   STATIC
   Backtrack.cpp
   CallGraphState.cpp
+  CFPermutation.cpp
   GeneratorContext.cpp
   GenerationLimit.cpp
   GenerationUtils.cpp
