@@ -182,20 +182,6 @@ bool LoopLatcher::runOnMachineFunction(MachineFunction &MF) {
   return Changed;
 }
 
-static const auto &getMCRegClassForBranch(const MCInstrDesc &InstrDesc,
-                                          const MCRegisterInfo &RegInfo) {
-  assert(InstrDesc.isBranch() && "Branch expected");
-  auto *RegOperand = std::find_if(
-      InstrDesc.operands().begin(), InstrDesc.operands().end(),
-      [](const auto &OpInfo) {
-        return OpInfo.OperandType == MCOI::OperandType::OPERAND_REGISTER;
-      });
-  assert(
-      RegOperand != InstrDesc.operands().end() &&
-      "All supported branches expected to have at least one register operand");
-  return RegInfo.getRegClass(RegOperand->RegClass);
-}
-
 template <bool IsPostDom>
 void processDomTree(
     const MachineBasicBlock &MBBToProcess, const MachineBasicBlock &MBBToCheck,
@@ -311,14 +297,12 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
       "ExitingBlock expected to have conditional branch as first terminator");
   auto &Branch = *FirstTerm;
   const auto &SnippyTgt = State.getSnippyTarget();
-  const auto &InstrInfo = State.getInstrInfo();
-  const auto &RegInfo = State.getRegInfo();
-  const auto &BranchDesc = InstrInfo.get(Branch.getOpcode());
-  const auto &MCRegClass = getMCRegClassForBranch(BranchDesc, RegInfo);
+  const auto &MCRegClass = SnippyTgt.getMCRegClassForBranch(Branch, SGCtx);
 
   auto [CounterReg, LimitReg] =
       selectRegsForBranch(ML, Preheader, ExitingBlock, MCRegClass);
-  LLVM_DEBUG(dbgs() << "Selected regs: " << RegInfo.getRegClassName(&MCRegClass)
+  LLVM_DEBUG(const auto &RegInfo = State.getRegInfo();
+             dbgs() << "Selected regs: " << RegInfo.getRegClassName(&MCRegClass)
                     << ": " << RegInfo.getName(CounterReg) << "[CounterReg] & "
                     << RegInfo.getName(LimitReg) << "[LimitReg]\n");
 

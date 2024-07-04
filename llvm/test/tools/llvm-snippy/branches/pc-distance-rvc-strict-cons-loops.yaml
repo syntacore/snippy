@@ -1,0 +1,47 @@
+# RUN: llvm-snippy %s --march=riscv64-unknown-elf \
+# RUN:   --num-instrs=10000 --trace-log %t.log \
+# RUN:   --init-regs-in-elf --last-instr=EBREAK --mattr=+c \
+# RUN:   --init-cons-loop-in-prev-loop
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80002000
+    SIZE:      0x100000
+    LMA:       0x80002000
+    ACCESS:    rw
+
+histogram:
+    - [BLT, 2.0]
+    - [BGE, 2.0]
+    - [BGEU, 2.0]
+    - [BLTU, 2.0]
+    - [BNE, 2.0]
+    - [C_ADD, 1.0]
+    - [C_ADDI, 1.0]
+    - [C_SLLI, 1.0]
+    - [C_SRLI, 1.0]
+    - [C_AND, 1.0]
+    - [C_OR, 1.0]
+
+branches:
+  permutation: on
+  consecutive-loops: all
+  alignment: 2
+  loop-ratio: 1
+  number-of-loop-iterations:
+      min: 4
+      max: 15
+  max-depth:
+    loop: 1
+  distance:
+    blocks:
+      min: 0
+      max: 0
+    pc:
+      min: 12
+      max: 12
