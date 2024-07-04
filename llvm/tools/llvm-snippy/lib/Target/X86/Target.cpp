@@ -320,6 +320,12 @@ public:
     reportUnimplementedError();
   }
 
+  const MCRegisterClass &
+  getMCRegClassForBranch(const MachineInstr &Instr,
+                         GeneratorContext &GC) const override {
+    reportUnimplementedError();
+  }
+
   MachineInstr &updateLoopBranch(MachineInstr &Branch,
                                  const MCInstrDesc &InstrDesc,
                                  Register CounterReg,
