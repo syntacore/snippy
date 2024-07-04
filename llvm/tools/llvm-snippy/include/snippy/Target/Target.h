@@ -428,6 +428,10 @@ public:
   // NOTE: may be in future in should return overhead size in bytes
   virtual unsigned getLoopOverhead() const = 0;
 
+  virtual const MCRegisterClass &
+  getMCRegClassForBranch(const MachineInstr &Instr,
+                         GeneratorContext &GC) const = 0;
+
   virtual MachineInstr &updateLoopBranch(MachineInstr &Branch,
                                          const MCInstrDesc &InstrDesc,
                                          Register CounterReg,
