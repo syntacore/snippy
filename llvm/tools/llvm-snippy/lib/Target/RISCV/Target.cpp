@@ -1439,6 +1439,36 @@ public:
     return {};
   }
 
+  /// If target supports compressed instructions return GPRC, use GPR either
+  const MCRegisterClass &
+  getMCRegClassForBranch(const MachineInstr &Instr,
+                         GeneratorContext &GC) const override {
+    assert(Instr.isBranch() && "Branch expected");
+    auto OpsInfo = Instr.getDesc().operands();
+    auto *RegOperand =
+        std::find_if(OpsInfo.begin(), OpsInfo.end(), [](const auto &OpInfo) {
+          return OpInfo.OperandType == MCOI::OperandType::OPERAND_REGISTER;
+        });
+    assert(RegOperand != OpsInfo.end() &&
+           "All supported branches expected to have at least one register "
+           "operand");
+    auto &RI = GC.getLLVMState().getRegInfo();
+    auto RCID = RegOperand->RegClass;
+    if (RCID == RISCV::GPRCRegClassID ||
+        !GC.getSubtarget<RISCVSubtarget>().hasStdExtC())
+      return RI.getRegClass(RCID);
+
+    auto *MBB = Instr.getParent();
+    assert(MBB);
+    auto NAvailableRegs = GC.getRegisterPool().getNumAvailable(
+        RI.getRegClass(RCID == RISCV::GPRCRegClassID), *MBB);
+    constexpr auto MinNumOfBranchRegs = 2;
+    if (NAvailableRegs >= MinNumOfBranchRegs)
+      RCID = RISCV::GPRCRegClassID;
+
+    return RI.getRegClass(RCID);
+  }
+
   /// RISCV Loops:
   ///
   /// * BEQ, C_BEQZ:
@@ -1576,6 +1606,8 @@ public:
     auto &MBB = *Pos->getParent();
     const auto &InstrInfo = State.getInstrInfo();
     APInt MinCounterVal;
+    auto ADDIOp = GC.getSubtarget<RISCVSubtarget>().hasStdExtC() ? RISCV::C_ADDI
+                                                                 : RISCV::ADDI;
 
     switch (Branch.getOpcode()) {
     case RISCV::BEQ:
@@ -1584,10 +1616,11 @@ public:
       NIter = bit_floor(NIter);
       getSupportInstBuilder(MBB, Pos,
                             MBB.getParent()->getFunction().getContext(),
-                            InstrInfo.get(RISCV::ADDI))
+                            InstrInfo.get(ADDIOp))
           .addReg(CounterReg, RegState::Define)
           .addReg(CounterReg)
           .addImm(1);
+      // SRLI can't be compressed because rd and rs1 are different regs
       getSupportInstBuilder(MBB, Pos,
                             MBB.getParent()->getFunction().getContext(),
                             InstrInfo.get(RISCV::SRLI))
@@ -1611,7 +1644,7 @@ public:
     case RISCV::C_BNEZ:
       getSupportInstBuilder(MBB, Pos,
                             MBB.getParent()->getFunction().getContext(),
-                            InstrInfo.get(RISCV::ADDI))
+                            InstrInfo.get(ADDIOp))
           .addReg(CounterReg, RegState::Define)
           .addReg(CounterReg)
           .addImm(-1);
@@ -1622,7 +1655,7 @@ public:
     case RISCV::BLTU:
       getSupportInstBuilder(MBB, Pos,
                             MBB.getParent()->getFunction().getContext(),
-                            InstrInfo.get(RISCV::ADDI))
+                            InstrInfo.get(ADDIOp))
           .addReg(CounterReg, RegState::Define)
           .addReg(CounterReg)
           .addImm(1);
@@ -1633,7 +1666,7 @@ public:
     case RISCV::BGEU:
       getSupportInstBuilder(MBB, Pos,
                             MBB.getParent()->getFunction().getContext(),
-                            InstrInfo.get(RISCV::ADDI))
+                            InstrInfo.get(ADDIOp))
           .addReg(CounterReg, RegState::Define)
           .addReg(CounterReg)
           .addImm(-1);
