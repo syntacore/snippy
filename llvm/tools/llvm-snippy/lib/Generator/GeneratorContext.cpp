@@ -89,9 +89,10 @@ void GeneratorContext::initRunner() const {
       *Module.getFunction(GenSettings->LinkerConfig.EntryPointName);
   const auto &SubTgt = MMI->getMachineFunction(EntryFun)->getSubtarget();
 
+  bool IsNeedCallbackHandler = hasExecutionTraceTrackingMode();
   auto Env = Interpreter::createSimulationEnvironment(
       SnippyTgt, SubTgt, *PLinker, GenSettings->Cfg.MS, getTargetContext(),
-      hasTrackingMode());
+      IsNeedCallbackHandler);
 
   assert(hasModel() && "Model list must not be empty here");
   Runner = std::make_unique<SimRunner>(
