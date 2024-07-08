@@ -1,11 +1,16 @@
+set(LLVMSnippySimulatorSources
+    SelfcheckObserver.cpp
+    Simulator.cpp
+    RISCVSimulator.cpp
+    X86Simulator.cpp
+    Transactions.cpp
+    )
+
+
 add_llvm_library(LLVMSnippySimulator
   DISABLE_LLVM_LINK_LLVM_DYLIB
   STATIC
-  SelfcheckObserver.cpp
-  Simulator.cpp
-  RISCVSimulator.cpp
-  X86Simulator.cpp
-  Transactions.cpp
+  ${LLVMSnippySimulatorSources}
   )
 
 target_link_libraries(LLVMSnippySimulator PRIVATE LLVMSnippyConfig LLVMSnippySupport)
