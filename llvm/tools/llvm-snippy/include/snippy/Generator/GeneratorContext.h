@@ -611,6 +611,7 @@ public:
   void runSimulator(StringRef ImageToRun);
 
   bool hasTrackingMode() const { return HasTrackingMode; }
+  bool hasExecutionTraceTrackingMode() const { return HasTrackingMode; }
   void disableTrackingMode() { HasTrackingMode = false; }
 
   bool hasModel() const {
