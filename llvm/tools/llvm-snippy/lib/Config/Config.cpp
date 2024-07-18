@@ -155,17 +155,19 @@ struct SectionAttrs {
   size_t Size;
   size_t LMA;
   std::string Access;
+  std::optional<std::string> Phdr;
 
   SectionAttrs(yaml::IO &) {}
 
   SectionAttrs(yaml::IO &IO, const SectionDesc &Desc)
-      : ID(Desc.ID), VMA(Desc.VMA), Size(Desc.Size), LMA(Desc.LMA) {
+      : ID(Desc.ID), VMA(Desc.VMA), Size(Desc.Size), LMA(Desc.LMA),
+        Phdr(Desc.Phdr) {
     auto SS = raw_string_ostream(Access);
     Desc.M.dump(SS);
   }
 
   SectionDesc denormalize(yaml::IO &IO) {
-    return SectionDesc(ID, VMA, Size, LMA, Access.c_str());
+    return SectionDesc(ID, VMA, Size, LMA, Access.c_str(), Phdr);
   }
 };
 
@@ -202,6 +204,7 @@ template <> struct yaml::MappingTraits<snippy::SectionAttrs> {
     IO.mapRequired("SIZE", Info.Size);
     IO.mapRequired("LMA", Info.LMA);
     IO.mapRequired("ACCESS", Info.Access);
+    IO.mapOptional("PHDR", Info.Phdr);
   }
 };
 
