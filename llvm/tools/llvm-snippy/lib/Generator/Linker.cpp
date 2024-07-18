@@ -27,6 +27,15 @@ static snippy::opt<std::string>
                        "Defaulting to directory of llvm-snippy installation."),
               cl::cat(Options), cl::init(""));
 
+static snippy::opt<bool> DumpPHDRSDef(
+    "enable-phdrs-definition",
+    cl::desc("If enabled, snippy will define all programm headers in linker "
+             "script that are used by sections in layout."
+             "Note: when disabled section are still placed to specified "
+             "segments, however user must provide definitions of"
+             "that segments themself."),
+    cl::cat(Options), cl::init(false));
+
 namespace {
 
 using FilePathT = SmallString<20>;
@@ -326,6 +335,18 @@ void Linker::addSection(const SectionDesc &Section,
   calculateMemoryRegion();
 }
 
+std::vector<std::string> Linker::collectPhdrInfo() const {
+  std::unordered_set<std::string> Phdrs;
+  for (auto &&SE : Sections) {
+    if (!SE.OutputSection.Desc.hasPhdr())
+      continue;
+    Phdrs.emplace(SE.OutputSection.Desc.getPhdr());
+  }
+  std::vector<std::string> Ret;
+  std::copy(Phdrs.begin(), Phdrs.end(), std::back_inserter(Ret));
+  return Ret;
+}
+
 std::string Linker::createLinkerScript(bool Export) const {
   std::string ScriptText;
   llvm::raw_string_ostream STS{ScriptText};
@@ -341,6 +362,15 @@ std::string Linker::createLinkerScript(bool Export) const {
       << (MemoryRegion.second - MemoryRegion.first + ExtraMemorySpace) << "\n";
 
   STS << "}\n";
+  auto Phdrs = collectPhdrInfo();
+  if (!Phdrs.empty() && (!Export || DumpPHDRSDef)) {
+    STS << "PHDRS\n";
+    STS << "{\n";
+    for (auto &&Header : Phdrs) {
+      STS << Header << " PT_LOAD ;\n";
+    }
+    STS << "}\n";
+  }
   STS << "SECTIONS {\n";
 
   for (auto &SE : Sections) {
@@ -365,7 +395,11 @@ std::string Linker::createLinkerScript(bool Export) const {
       }
     }
 
-    STS << "} >" << MemoryRegionName << "\n";
+    STS << "} >" << MemoryRegionName;
+    if (SE.OutputSection.Desc.hasPhdr()) {
+      STS << " :" << SE.OutputSection.Desc.getPhdr();
+    }
+    STS << "\n";
   }
   STS << "/DISCARD/ :\n"
       << "{\n"

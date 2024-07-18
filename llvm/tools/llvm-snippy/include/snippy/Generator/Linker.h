@@ -104,6 +104,7 @@ public:
   static StringRef GetExitSymbolName();
 
 private:
+  std::vector<std::string> collectPhdrInfo() const;
   std::string createLinkerScript(bool Export) const;
   void calculateMemoryRegion();
 
