@@ -535,18 +535,25 @@ struct SectionDesc {
   size_t Size;
   size_t LMA;
   AccMask M;
+  std::optional<std::string> Phdr;
 
   SectionDesc(int Num = 0, size_t VMAIn = 0, size_t SizeIn = 0,
-              size_t LMAIn = 0, AccMask Mask = "rwx")
-      : ID(Num), VMA(VMAIn), Size(SizeIn), LMA(LMAIn), M(Mask) {}
+              size_t LMAIn = 0, AccMask Mask = "rwx",
+              std::optional<std::string> Phdr = std::nullopt)
+      : ID(Num), VMA(VMAIn), Size(SizeIn), LMA(LMAIn), M(Mask),
+        Phdr{std::move(Phdr)} {}
 
   SectionDesc(StringRef Name, size_t VMAIn = 0, size_t SizeIn = 0,
-              size_t LMAIn = 0, AccMask Mask = "rwx")
-      : ID(std::string(Name)), VMA(VMAIn), Size(SizeIn), LMA(LMAIn), M(Mask) {}
+              size_t LMAIn = 0, AccMask Mask = "rwx",
+              std::optional<std::string> Phdr = std::nullopt)
+      : ID(std::string(Name)), VMA(VMAIn), Size(SizeIn), LMA(LMAIn), M(Mask),
+        Phdr{std::move(Phdr)} {}
 
   SectionDesc(std::variant<int, std::string> ID, size_t VMAIn = 0,
-              size_t SizeIn = 0, size_t LMAIn = 0, AccMask Mask = "rwx")
-      : ID(ID), VMA(VMAIn), Size(SizeIn), LMA(LMAIn), M(Mask) {}
+              size_t SizeIn = 0, size_t LMAIn = 0, AccMask Mask = "rwx",
+              std::optional<std::string> Phdr = std::nullopt)
+      : ID(ID), VMA(VMAIn), Size(SizeIn), LMA(LMAIn), M(Mask),
+        Phdr{std::move(Phdr)} {}
 
   bool interfere(SectionDesc const &another) const {
     if (VMA >= another.VMA + another.Size || VMA + Size <= another.VMA)
@@ -555,6 +562,7 @@ struct SectionDesc {
       return true;
   }
 
+  bool hasPhdr() const { return Phdr.has_value(); }
   bool isNamed() const { return std::holds_alternative<std::string>(ID); }
 
   StringRef getName() const {
@@ -574,6 +582,11 @@ struct SectionDesc {
       return std::to_string(getNumber());
   }
 
+  StringRef getPhdr() const {
+    assert(hasPhdr() && "Section does not have a phdr.");
+    return Phdr.value();
+  }
+
   void dump(llvm::raw_ostream &Stream) const {
     std::visit([&Stream](auto &&V) { Stream << "Section #" << V << "\n"; }, ID);
     Stream << "VMA: 0x";
@@ -584,6 +597,8 @@ struct SectionDesc {
     Stream << "\n";
     Stream << "Size: " << Size << "\n";
     M.dump(Stream);
+    if (hasPhdr())
+      Stream << "PHDR: " << getPhdr() << "\n";
   }
   bool hasAccess(Acc Type) const { return (M & Type) != 0; }
   size_t getSize() const { return Size; }
