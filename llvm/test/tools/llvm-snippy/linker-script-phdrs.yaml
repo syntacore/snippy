@@ -1,0 +1,50 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -model-plugin=None -mattr=-a -num-instrs=10 -o %t
+# RUN: FileCheck %s --input-file=%t.ld --check-prefix=NODEF
+# RUN: FileCheck %s --input-file=%t.ld --check-prefix=BOTH
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -model-plugin=None -mattr=-a -num-instrs=10 -o %t \
+# RUN: -enable-phdrs-definition
+# RUN: FileCheck %s --input-file=%t.ld --check-prefix=WITHDEF
+# RUN: FileCheck %s --input-file=%t.ld --check-prefix=BOTH
+
+sections:
+    - no:        1
+      VMA:       0x10000
+      SIZE:      0x200
+      LMA:       0x10000
+      ACCESS:    rx
+      PHDR: 'header0'
+    - no:        2
+      VMA:       0x10200
+      SIZE:      0x200
+      LMA:       0x10200
+      ACCESS:    rw
+      PHDR: 'header1'
+    - name:      named
+      VMA:       0x10400
+      SIZE:      0x200
+      LMA:       0x10400
+      ACCESS:    rw
+      PHDR: 'header2'
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SW, 5.0]
+
+# NODEF: SNIPPY (rwx) : ORIGIN = 65536, LENGTH = 67072
+# NODEF-NOT: PHDRS
+# NODEF: SECTIONS
+# WITHDEF: SNIPPY (rwx) : ORIGIN = 65536, LENGTH = 67072
+# WITHDEF: PHDRS
+# WITHDEF: SECTIONS
+
+# BOTH: SECTIONS
+# BOTH: .snippy.1.rx
+# BOTH-NEXT: KEEP(*(.snippy.1.rx))
+# BOTH-NEXT: >SNIPPY :header0 
+# BOTH: .snippy.2.rw
+# BOTH-NEXT: KEEP(*(.snippy.2.rw))
+# BOTH-NEXT: >SNIPPY :header1 
+# BOTH: .snippy.named.rw
+# BOTH-NEXT: KEEP(*(.snippy.named.rw))
+# BOTH-NEXT: >SNIPPY :header2
