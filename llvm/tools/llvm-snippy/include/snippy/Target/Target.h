@@ -432,18 +432,20 @@ public:
   getMCRegClassForBranch(const MachineInstr &Instr,
                          GeneratorContext &GC) const = 0;
 
-  virtual MachineInstr &updateLoopBranch(MachineInstr &Branch,
-                                         const MCInstrDesc &InstrDesc,
-                                         Register CounterReg,
-                                         Register LimitReg) const = 0;
+  virtual MachineInstr &
+  updateLoopBranch(MachineInstr &Branch, const MCInstrDesc &InstrDesc,
+                   ArrayRef<Register> ReservedRegs) const = 0;
+
+  virtual unsigned
+  getNumRegsForLoopBranch(const MCInstrDesc &BranchDesc) const = 0;
 
   virtual unsigned getInstrSize(const MachineInstr &Inst,
                                 const GeneratorContext &GC) const = 0;
 
   virtual void insertLoopInit(MachineBasicBlock &MBB,
                               MachineBasicBlock::iterator Pos,
-                              MachineInstr &Branch, Register LatchRegNum,
-                              Register LimitRegNum, unsigned NIter,
+                              MachineInstr &Branch,
+                              ArrayRef<Register> ReservedRegs, unsigned NIter,
                               GeneratorContext &GC) const = 0;
 
   struct LoopCounterInsertionResult {
@@ -454,7 +456,7 @@ public:
 
   virtual LoopCounterInsertionResult
   insertLoopCounter(MachineBasicBlock::iterator Pos, MachineInstr &MI,
-                    Register LatchRegNum, Register LimitRegNum, unsigned NIter,
+                    ArrayRef<Register> ReservedRegs, unsigned NIter,
                     GeneratorContext &GC,
                     RegToValueType &ExitingValues) const = 0;
 

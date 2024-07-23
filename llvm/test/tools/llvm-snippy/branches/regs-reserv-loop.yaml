@@ -1,0 +1,36 @@
+#COM: test checks that register reservations for loops depend on the branch instruction
+#COM: in case C_BNEZ only one register is expected to be reserved
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+c -num-instrs=1 \ 
+# RUN:     -verify-mi -dump-mf --model-plugin=None -o %t |& \
+# RUN: FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x1000
+      SIZE:      0x10000
+      LMA:       0x1000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+branches:
+  permutation: on
+  loop-ratio: 1.0
+  number-of-loop-iterations:
+    min: 1
+    max: 10
+
+histogram: 
+    - [C_BNEZ, 1.0]
+
+#CHECK: bb.2:
+#CHECK: [[CounterReg:\$x[0-9]+]] = ADDI {{\$x0, [0-9]+}}
+#CHECK-NOT: {{\$x[0-9]+ = ADDI \$x[0-9]+, [0-9]+}}
+#CHECK: bb.0: 
+#CHECK: [[CounterReg]] = C_ADDI [[CounterReg]](tied-def 0), -1
+#CHECK: C_BNEZ [[CounterReg]], %bb.0
+#CHECK: bb.1:

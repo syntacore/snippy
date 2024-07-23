@@ -20,6 +20,7 @@
 #include "RootRegPoolWrapperPass.h"
 
 #include "snippy/Generator/LLVMState.h"
+#include "snippy/Generator/RegReservForLoop.h"
 #include "snippy/Generator/RegisterPool.h"
 #include "snippy/Support/Error.h"
 #include "snippy/Support/Options.h"
@@ -84,13 +85,13 @@ class LoopLatcher final : public MachineFunctionPass {
   bool createLoopLatchFor(MachineLoop &ML);
   template <typename R>
   bool createLoopLatchFor(MachineLoop &ML, R &&ConsecutiveLoops);
-  auto selectRegsForBranch(const MachineLoop &ML,
+  auto selectRegsForBranch(const MCInstrDesc &BranchDesc,
                            const MachineBasicBlock &Preheader,
                            const MachineBasicBlock &ExitingBlock,
                            const MCRegisterClass &RegClass);
   MachineInstr &updateLatchBranch(MachineLoop &ML, MachineInstr &Branch,
                                   MachineBasicBlock &Preheader,
-                                  unsigned CounterReg, unsigned LimitReg);
+                                  ArrayRef<Register> ReservedRegs);
 
   bool NIterWarned = false;
 
@@ -206,7 +207,7 @@ void processDomTree(
   }
 }
 
-auto LoopLatcher::selectRegsForBranch(const MachineLoop &ML,
+auto LoopLatcher::selectRegsForBranch(const MCInstrDesc &BranchDesc,
                                       const MachineBasicBlock &Preheader,
                                       const MachineBasicBlock &ExitingBlock,
                                       const MCRegisterClass &RegClass) {
@@ -231,18 +232,21 @@ auto LoopLatcher::selectRegsForBranch(const MachineLoop &ML,
   std::set<const MachineBasicBlock *, MIRComp> MBBsForReserv;
 
   // We need to make reservation for all blocks that are dominated by Preheader
-  // and postdominated by Exitinig block
+  // and postdominated by Exiting block
   processDomTree(Preheader, ExitingBlock, DomTree, PostDomTree,
                  std::inserter(MBBsForReserv, MBBsForReserv.end()));
   processDomTree(ExitingBlock, Preheader, PostDomTree, DomTree,
                  std::inserter(MBBsForReserv, MBBsForReserv.end()));
 
-  auto [Counter, Limit] = RootPool.getNAvailableRegisters<2>(
-      "for loop latch", RegInfo, RegClass, MBBsForReserv, Filter,
-      AccessMaskBit::RW);
+  auto NumRegsToReserv = SnippyTgt.getNumRegsForLoopBranch(BranchDesc);
 
-  RootPool.addReserved(Counter, Preheader, AccessMaskBit::W);
-  RootPool.addReserved(Limit, Preheader, AccessMaskBit::W);
+  auto RegsToReserv = RootPool.getNAvailableRegisters(
+      "for loop latch", RegInfo, RegClass, MBBsForReserv, NumRegsToReserv,
+      Filter, AccessMaskBit::RW);
+
+  for (auto &&Reg : RegsToReserv)
+    RootPool.addReserved(Reg, Preheader, AccessMaskBit::W);
+
   auto TrackingMode = SGCtx.hasTrackingMode();
   if (UseStackOpt || TrackingMode) {
     // We still have to reserve counter register even when using the stack.
@@ -250,22 +254,49 @@ auto LoopLatcher::selectRegsForBranch(const MachineLoop &ML,
     // flow generator (or any other part of snippy) and we'll corrupt the data
     // stored in it. Reservation can be smaller though - only one block.
     auto ReservationMode = TrackingMode ? AccessMaskBit::RW : AccessMaskBit::W;
-    RootPool.addReserved(Counter, ExitingBlock, ReservationMode);
-    RootPool.addReserved(Limit, ExitingBlock, ReservationMode);
+
+    for (auto &&Reg : RegsToReserv)
+      RootPool.addReserved(Reg, ExitingBlock, ReservationMode);
+
   } else {
-    for (const auto *MBB : MBBsForReserv) {
-      RootPool.addReserved(Counter, *MBB, AccessMaskBit::W);
-      RootPool.addReserved(Limit, *MBB, AccessMaskBit::W);
+    for (const auto *MBB : MBBsForReserv)
+      for (auto &&Reg : RegsToReserv)
+        RootPool.addReserved(Reg, *MBB, AccessMaskBit::W);
+  }
+
+  SmallVector<Register> ReservedRegs;
+  std::copy(RegsToReserv.begin(), RegsToReserv.end(),
+            std::back_inserter(ReservedRegs));
+  return ReservedRegs;
+}
+
+static void printSelectedRegs(
+    raw_ostream &OS, ArrayRef<Register> ReservedRegs,
+    const MCRegisterInfo &RegInfo,
+    std::optional<const MCRegisterClass *> MCRegClass = std::nullopt) {
+  auto CounterReg = ReservedRegs[CounterRegIdx];
+  if (MCRegClass.has_value()) {
+    OS << "Selected regs: " << RegInfo.getRegClassName(MCRegClass.value())
+       << ": " << RegInfo.getName(CounterReg) << "[CounterReg]";
+    if (ReservedRegs.size() == MaxNumOfReservRegsForLoop) {
+      auto LimitReg = ReservedRegs[LimitRegIdx];
+      OS << " & " << RegInfo.getName(LimitReg) << "[LimitReg]";
+    }
+  } else {
+    OS << RegInfo.getName(CounterReg) << "(" << CounterReg << ")[CounterReg]";
+    if (ReservedRegs.size() == MaxNumOfReservRegsForLoop) {
+      auto LimitReg = ReservedRegs[LimitRegIdx];
+      OS << ", " << RegInfo.getName(LimitReg) << "(" << LimitReg
+         << ")[LimitReg]";
     }
   }
-  return std::make_pair(Counter, Limit);
+  OS << "\n";
 }
 
 MachineInstr &LoopLatcher::updateLatchBranch(MachineLoop &ML,
                                              MachineInstr &Branch,
                                              MachineBasicBlock &Preheader,
-                                             unsigned CounterReg,
-                                             unsigned LimitReg) {
+                                             ArrayRef<Register> ReservedRegs) {
   assert(Branch.isConditionalBranch() && "Conditional branch expected");
   assert(ML.contains(&Branch) && "Expected this loop branch");
 
@@ -277,7 +308,7 @@ MachineInstr &LoopLatcher::updateLatchBranch(MachineLoop &ML,
 
   LLVM_DEBUG(dbgs() << "Old branch: "; Branch.dump());
   auto &NewBranch =
-      SnippyTgt.updateLoopBranch(Branch, BranchDesc, CounterReg, LimitReg);
+      SnippyTgt.updateLoopBranch(Branch, BranchDesc, ReservedRegs);
   LLVM_DEBUG(dbgs() << "New branch: "; NewBranch.dump());
   return NewBranch;
 }
@@ -292,22 +323,26 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   auto FirstTerm = ExitingBlock.getFirstTerminator();
   assert(FirstTerm != ExitingBlock.end() &&
          "ExitingBlock expected to have terminator");
-  assert(
-      FirstTerm->isConditionalBranch() &&
-      "ExitingBlock expected to have conditional branch as first terminator");
+  assert(FirstTerm->isConditionalBranch() &&
+         "ExitingBlock expected to have conditional "
+         "branch as first terminator");
   auto &Branch = *FirstTerm;
+  const auto &InstrInfo = State.getInstrInfo();
+  const auto &BranchDesc = InstrInfo.get(Branch.getOpcode());
   const auto &SnippyTgt = State.getSnippyTarget();
   const auto &MCRegClass = SnippyTgt.getMCRegClassForBranch(Branch, SGCtx);
 
-  auto [CounterReg, LimitReg] =
-      selectRegsForBranch(ML, Preheader, ExitingBlock, MCRegClass);
-  LLVM_DEBUG(const auto &RegInfo = State.getRegInfo();
-             dbgs() << "Selected regs: " << RegInfo.getRegClassName(&MCRegClass)
-                    << ": " << RegInfo.getName(CounterReg) << "[CounterReg] & "
-                    << RegInfo.getName(LimitReg) << "[LimitReg]\n");
+  auto ReservedRegs =
+      selectRegsForBranch(BranchDesc, Preheader, ExitingBlock, MCRegClass);
 
-  auto &NewBranch =
-      updateLatchBranch(ML, Branch, Preheader, CounterReg, LimitReg);
+  assert((ReservedRegs.size() >= MinNumOfReservRegsForLoop) &&
+         (ReservedRegs.size() <= MaxNumOfReservRegsForLoop) &&
+         "One or Two Registers expected to be reserved for branch");
+
+  LLVM_DEBUG(
+      printSelectedRegs(dbgs(), ReservedRegs, State.getRegInfo(), &MCRegClass));
+
+  auto &NewBranch = updateLatchBranch(ML, Branch, Preheader, ReservedRegs);
   Branch.removeFromParent();
 
   assert(SGCtx.getConfig().Branches.NLoopIter.Min);
@@ -317,21 +352,17 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   auto NIter = RandEngine::genInInterval(NIterMin, NIterMax);
   LLVM_DEBUG(dbgs() << "Loop counter init inserting: " << NIter
                     << " iterations, ");
-  LLVM_DEBUG(dbgs() << State.getRegInfo().getName(CounterReg) << "("
-                    << CounterReg << ")[CounterReg], ");
-  LLVM_DEBUG(dbgs() << State.getRegInfo().getName(LimitReg) << "(" << LimitReg
-                    << ")[LimitReg]\n");
+  LLVM_DEBUG(printSelectedRegs(dbgs(), ReservedRegs, State.getRegInfo()));
 
   auto PreheaderInsertPt = Preheader.getFirstTerminator();
-  SnippyTgt.insertLoopInit(Preheader, PreheaderInsertPt, NewBranch, CounterReg,
-                           LimitReg, NIter, SGCtx);
+  SnippyTgt.insertLoopInit(Preheader, PreheaderInsertPt, NewBranch,
+                           ReservedRegs, NIter, SGCtx);
 
   auto SP = SGCtx.getStackPointer();
   if (UseStackOpt || TrackingMode) {
-    SnippyTgt.generateSpillToStack(Preheader, PreheaderInsertPt, CounterReg,
-                                   SGCtx, SP);
-    SnippyTgt.generateSpillToStack(Preheader, PreheaderInsertPt, LimitReg,
-                                   SGCtx, SP);
+    for (auto &&Reg : ReservedRegs)
+      SnippyTgt.generateSpillToStack(Preheader, PreheaderInsertPt, Reg, SGCtx,
+                                     SP);
   }
 
   LLVM_DEBUG(dbgs() << "Loop counter init inserted: "; Preheader.dump());
@@ -350,8 +381,8 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
 
   auto *InsMBB = InsPos->getParent();
   if (UseStackOpt || TrackingMode) {
-    SnippyTgt.generateReloadFromStack(*InsMBB, InsPos, LimitReg, SGCtx, SP);
-    SnippyTgt.generateReloadFromStack(*InsMBB, InsPos, CounterReg, SGCtx, SP);
+    for (auto &&Reg : reverse(ReservedRegs))
+      SnippyTgt.generateReloadFromStack(*InsMBB, InsPos, Reg, SGCtx, SP);
   }
 
   // FIXME: Currently selfcheck mode really does not behave well when loop
@@ -367,10 +398,11 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
 
   RegToValueType ExitingValues;
   auto CounterInsRes = SnippyTgt.insertLoopCounter(
-      InsPos, NewBranch, CounterReg, LimitReg, NIter, SGCtx, ExitingValues);
+      InsPos, NewBranch, ReservedRegs, NIter, SGCtx, ExitingValues);
   auto &Diag = CounterInsRes.Diag;
   auto ActualNumIter = CounterInsRes.NIter;
   unsigned MinCounterVal = CounterInsRes.MinCounterVal.getZExtValue();
+  auto CounterReg = ReservedRegs[CounterRegIdx];
   GeneratorContext::LoopGenerationInfo TheLoopGenInfo{CounterReg, ActualNumIter,
                                                       MinCounterVal};
   SGCtx.addLoopGenerationInfoForMBB(ML.getHeader(), TheLoopGenInfo);
@@ -379,12 +411,10 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
     auto *Exit = ML.getExitBlock();
     assert(Exit);
     SGCtx.addIncomingValues(Exit, std::move(ExitingValues));
-    SnippyTgt.generateSpillToStack(*InsMBB, InsPos, CounterReg, SGCtx, SP);
-    SnippyTgt.generateSpillToStack(*InsMBB, InsPos, LimitReg, SGCtx, SP);
-    SnippyTgt.generatePopNoReload(*Exit, Exit->getFirstNonPHI(), LimitReg,
-                                  SGCtx);
-    SnippyTgt.generatePopNoReload(*Exit, Exit->getFirstNonPHI(), CounterReg,
-                                  SGCtx);
+    for (auto &&Reg : ReservedRegs)
+      SnippyTgt.generateSpillToStack(*InsMBB, InsPos, Reg, SGCtx, SP);
+    for (auto &&Reg : reverse(ReservedRegs))
+      SnippyTgt.generatePopNoReload(*Exit, Exit->getFirstNonPHI(), Reg, SGCtx);
   }
 
   if (Diag.has_value() &&
