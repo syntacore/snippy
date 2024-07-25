@@ -326,10 +326,14 @@ public:
     reportUnimplementedError();
   }
 
-  MachineInstr &updateLoopBranch(MachineInstr &Branch,
-                                 const MCInstrDesc &InstrDesc,
-                                 Register CounterReg,
-                                 Register LimitReg) const override {
+  MachineInstr &
+  updateLoopBranch(MachineInstr &Branch, const MCInstrDesc &InstrDesc,
+                   ArrayRef<Register> ReservedRegs) const override {
+    reportUnimplementedError();
+  }
+
+  unsigned
+  getNumRegsForLoopBranch(const MCInstrDesc &BranchDesc) const override {
     reportUnimplementedError();
   }
 
@@ -341,15 +345,14 @@ public:
   }
 
   void insertLoopInit(MachineBasicBlock &MBB, MachineBasicBlock::iterator Pos,
-                      MachineInstr &Branch, Register LatchRegNum,
-                      Register LimitRegNum, unsigned NIter,
-                      GeneratorContext &GC) const override {
+                      MachineInstr &Branch, ArrayRef<Register> ReservedRegs,
+                      unsigned NIter, GeneratorContext &GC) const override {
     reportUnimplementedError();
   }
 
   LoopCounterInsertionResult
   insertLoopCounter(MachineBasicBlock::iterator Pos, MachineInstr &Branch,
-                    Register LatchRegNum, Register LimitRegNum, unsigned NIter,
+                    ArrayRef<Register> ReservedRegs, unsigned NIter,
                     GeneratorContext &GC,
                     RegToValueType &ExitingValues) const override {
     reportUnimplementedError();
