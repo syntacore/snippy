@@ -10,6 +10,7 @@
 #include "snippy/Generator/GlobalsPool.h"
 #include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/Policy.h"
+#include "snippy/Generator/RegReservForLoop.h"
 #include "snippy/Generator/RegisterPool.h"
 
 #include "snippy/Config/ImmediateHistogram.h"
@@ -1511,25 +1512,50 @@ public:
   ///     BGE CounterReg, LimitReg
   ///     BGEU CounterReg, LimitReg
 
-  MachineInstr &updateLoopBranch(MachineInstr &Branch,
-                                 const MCInstrDesc &InstrDesc,
-                                 Register CounterReg,
-                                 Register LimitReg) const override {
+  MachineInstr &
+  updateLoopBranch(MachineInstr &Branch, const MCInstrDesc &InstrDesc,
+                   ArrayRef<Register> ReservedRegs) const override {
     assert(Branch.isBranch() && "Branch expected");
     auto *BranchMBB = Branch.getParent();
+    auto *DestBB = getBranchDestination(Branch);
     auto Opcode = Branch.getOpcode();
     bool EqBranch = isEqBranch(Opcode);
-    auto FirstReg = EqBranch ? LimitReg : CounterReg;
-    auto *DestBB = getBranchDestination(Branch);
+    assert(!EqBranch ||
+           ReservedRegs.size() == MaxNumOfReservRegsForLoop &&
+               "Equal branches expected to have two reserved registers");
+
+    auto FirstReg =
+        EqBranch ? ReservedRegs[LimitRegIdx] : ReservedRegs[CounterRegIdx];
     auto NewBranch =
         BuildMI(*BranchMBB, Branch, MIMetadata(), InstrDesc).addReg(FirstReg);
     if (!isCompressedBranch(Opcode)) {
-      auto SecondReg = EqBranch ? RISCV::X0 : LimitReg;
+      auto SecondReg = EqBranch ? RISCV::X0 : ReservedRegs[LimitRegIdx];
       NewBranch.addReg(SecondReg);
     }
     NewBranch.addMBB(DestBB);
 
     return *NewBranch.getInstr();
+  }
+
+  unsigned
+  getNumRegsForLoopBranch(const MCInstrDesc &BranchDesc) const override {
+    assert(BranchDesc.isBranch() && "Branch expected");
+    auto Opcode = BranchDesc.getOpcode();
+    bool EqBranch = isEqBranch(Opcode);
+
+    auto FilterOpReg = [](const auto &OpInfo) {
+      return OpInfo.OperandType == MCOI::OperandType::OPERAND_REGISTER;
+    };
+    unsigned NumRegsToReserv =
+        EqBranch ? MaxNumOfReservRegsForLoop
+                 : count_if(BranchDesc.operands(), FilterOpReg);
+
+    assert((NumRegsToReserv >= MinNumOfReservRegsForLoop) &&
+           (NumRegsToReserv <= MaxNumOfReservRegsForLoop) &&
+           "Only branches with one or two register operands are expected for "
+           "RISC-V");
+
+    return NumRegsToReserv;
   }
 
   unsigned getInstrSize(const MachineInstr &Inst,
@@ -1541,52 +1567,61 @@ public:
   }
 
   void insertLoopInit(MachineBasicBlock &MBB, MachineBasicBlock::iterator Pos,
-                      MachineInstr &Branch, Register CounterReg,
-                      Register LimitReg, unsigned NIter,
-                      GeneratorContext &GC) const override {
+                      MachineInstr &Branch, ArrayRef<Register> ReservedRegs,
+                      unsigned NIter, GeneratorContext &GC) const override {
     assert(Branch.isBranch() && "Branch expected");
-    assert(CounterReg != LimitReg &&
-           "Counter and limit registers expected to be different");
+    assert((ReservedRegs.size() != MaxNumOfReservRegsForLoop) ||
+           (ReservedRegs[CounterRegIdx] != ReservedRegs[LimitRegIdx]) &&
+               "Counter and Limit registers expected to be different");
     auto RP = GC.getRegisterPool();
+
+    auto CounterReg = ReservedRegs[CounterRegIdx];
 
     switch (Branch.getOpcode()) {
     case RISCV::BEQ:
-    case RISCV::C_BEQZ:
+    case RISCV::C_BEQZ: {
       writeValueToReg(MBB, Pos, APInt::getZero(getRegBitWidth(CounterReg, GC)),
                       CounterReg, RP, GC);
-      // FIXME: LimitReg won't be used by the loop. We write value to it just to
-      // make sure it is initialized.
+      auto LimitReg = ReservedRegs[LimitRegIdx];
       writeValueToReg(MBB, Pos, APInt::getZero(getRegBitWidth(LimitReg, GC)),
                       LimitReg, RP, GC);
       break;
-    case RISCV::BNE:
+    }
+    case RISCV::BNE: {
       writeValueToReg(MBB, Pos, APInt(getRegBitWidth(CounterReg, GC), NIter),
                       CounterReg, RP, GC);
+      auto LimitReg = ReservedRegs[LimitRegIdx];
       writeValueToReg(MBB, Pos, APInt::getZero(getRegBitWidth(LimitReg, GC)),
                       LimitReg, RP, GC);
       break;
-    case RISCV::C_BNEZ:
+    }
+    case RISCV::C_BNEZ: {
       writeValueToReg(MBB, Pos, APInt(getRegBitWidth(CounterReg, GC), NIter),
                       CounterReg, RP, GC);
-      // FIXME: LimitReg won't be used by the loop. We write value to it just to
-      // make sure it is initialized.
-      writeValueToReg(MBB, Pos, APInt::getZero(getRegBitWidth(LimitReg, GC)),
-                      LimitReg, RP, GC);
+      assert(
+          (ReservedRegs.size() == MinNumOfReservRegsForLoop) &&
+          "In RISC-V for compressed branch C_BNEZ only one register CounterReg "
+          "expected to be reserved for loop");
       break;
+    }
     case RISCV::BLT:
-    case RISCV::BLTU:
+    case RISCV::BLTU: {
       writeValueToReg(MBB, Pos, APInt::getZero(getRegBitWidth(CounterReg, GC)),
                       CounterReg, RP, GC);
+      auto LimitReg = ReservedRegs[LimitRegIdx];
       writeValueToReg(MBB, Pos, APInt(getRegBitWidth(LimitReg, GC), NIter),
                       LimitReg, RP, GC);
       break;
+    }
     case RISCV::BGE:
-    case RISCV::BGEU:
+    case RISCV::BGEU: {
       writeValueToReg(MBB, Pos, APInt(getRegBitWidth(CounterReg, GC), NIter),
                       CounterReg, RP, GC);
+      auto LimitReg = ReservedRegs[LimitRegIdx];
       writeValueToReg(MBB, Pos, APInt(getRegBitWidth(LimitReg, GC), 1),
                       LimitReg, RP, GC);
       break;
+    }
     default:
       llvm_unreachable("Unsupported branch type");
     }
@@ -1594,12 +1629,13 @@ public:
 
   LoopCounterInsertionResult
   insertLoopCounter(MachineBasicBlock::iterator Pos, MachineInstr &Branch,
-                    Register CounterReg, Register LimitReg, unsigned NIter,
+                    ArrayRef<Register> ReservedRegs, unsigned NIter,
                     GeneratorContext &GC,
                     RegToValueType &ExitingValues) const override {
     assert(Branch.isBranch() && "Branch expected");
-    assert(CounterReg != LimitReg &&
-           "Counter and limit registers expected to be different");
+    assert(ReservedRegs.size() != MaxNumOfReservRegsForLoop ||
+           ReservedRegs[CounterRegIdx] != ReservedRegs[LimitRegIdx] &&
+               "Counter and limit registers expected to be different");
     assert(NIter);
 
     auto &State = GC.getLLVMState();
@@ -1609,9 +1645,12 @@ public:
     auto ADDIOp = GC.getSubtarget<RISCVSubtarget>().hasStdExtC() ? RISCV::C_ADDI
                                                                  : RISCV::ADDI;
 
+    auto CounterReg = ReservedRegs[CounterRegIdx];
+
     switch (Branch.getOpcode()) {
     case RISCV::BEQ:
-    case RISCV::C_BEQZ:
+    case RISCV::C_BEQZ: {
+      auto LimitReg = ReservedRegs[LimitRegIdx];
       // Closest power of two (floor)
       NIter = bit_floor(NIter);
       getSupportInstBuilder(MBB, Pos,
@@ -1640,6 +1679,7 @@ public:
                     llvm::DS_Warning, WarningName::LoopIterationNumber),
                 NIter, MinCounterVal};
       break;
+    }
     case RISCV::BNE:
     case RISCV::C_BNEZ:
       getSupportInstBuilder(MBB, Pos,
