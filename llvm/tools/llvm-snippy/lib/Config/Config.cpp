@@ -382,6 +382,7 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
   yaml::MappingTraits<CallGraphLayout>::mapping(IO, Info.CGLayout);
   Info.TargetConfig->mapConfig(IO);
   IO.mapOptional("call-graph", Info.FuncDescs);
+  IO.mapOptional("fpu-config", Info.FPUConfig);
 }
 
 namespace snippy {
