@@ -2802,6 +2802,18 @@ private:
                       GeneratorContext &GC, unsigned VTYPE, unsigned VL,
                       bool SupportMarker,
                       MachineBasicBlock::iterator Ins) const;
+
+  bool isFloatingPoint(MCRegister Reg) const override {
+    return snippy::isFloatingPointReg(Reg);
+  }
+
+  bool isFloatingPoint(const MCInstrDesc &InstrDesc) const override {
+    return snippy::isFloatingPoint(InstrDesc.getOpcode());
+  }
+
+  bool canProduceNaN(const MCInstrDesc &InstrDesc) const override {
+    return snippy::canProduceNaN(InstrDesc);
+  }
 };
 
 void SnippyRISCVTarget::writeValueToFPReg(MachineBasicBlock &MBB,

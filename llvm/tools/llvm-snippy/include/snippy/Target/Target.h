@@ -263,10 +263,16 @@ public:
                                 APInt Value, RegPoolWrapper &RP,
                                 GeneratorContext &GC) const = 0;
 
+  virtual bool isFloatingPoint(MCRegister Reg) const = 0;
+
+  virtual bool isFloatingPoint(const MCInstrDesc &InstrDesc) const = 0;
+
   virtual MachineOperand
   generateTargetOperand(GeneratorContext &SGCtx, unsigned OpCode,
                         unsigned OpType,
                         const StridedImmediate &StridedImm) const = 0;
+
+  virtual bool canProduceNaN(const MCInstrDesc &InstrDesc) const = 0;
 
   // Get target-specific access mask requirements for operand in instruction.
   // Returns AccessMaskBit::None if no such.
