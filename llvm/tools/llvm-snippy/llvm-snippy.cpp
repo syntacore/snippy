@@ -15,6 +15,7 @@
 
 #include "snippy/Config/BurstGram.h"
 #include "snippy/Config/Config.h"
+#include "snippy/Config/FPUSettings.h"
 #include "snippy/Config/FunctionDescriptions.h"
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/MemoryScheme.h"
@@ -940,24 +941,47 @@ static std::string getMemPluginInfo() {
   return FileName;
 }
 
+static void checkFPUSettings(Config &Cfg, LLVMContext &Ctx,
+                             const SnippyTarget &Tgt, const MCInstrInfo &II) {
+  const auto &Histogram = Cfg.Histogram;
+  if (llvm::none_of(llvm::make_first_range(Histogram), [&](auto Opcode) {
+        auto &InstrDesc = II.get(Opcode);
+        return Tgt.isFloatingPoint(InstrDesc);
+      }))
+    return;
+  if (!Cfg.FPUConfig)
+    Cfg.FPUConfig.emplace();
+  auto &FPUConfig = *Cfg.FPUConfig;
+  if (FPUConfig.Overwrite)
+    return;
+  static constexpr int Min = -1000;
+  static constexpr int Max = 1000;
+  snippy::notice(WarningName::NotAWarning, Ctx,
+                 "Float override range was not specified",
+                 "Using range: [" + Twine(Min) + ", " + Twine(Max) + "]");
+  FPUConfig.Overwrite = FloatOverwriteSettings{FloatOverwriteRange{-Min, Max}};
+}
+
 // Function to do all the necessary operations on Config after reading it
 // from YAML.
 static void completeConfig(Config &Cfg, LLVMState &State,
                            const OpcodeCache &OpCC) {
+  auto &TM = State.getTargetMachine();
+  auto &Tgt = State.getSnippyTarget();
   auto TargetAlignment =
-      State.getTargetMachine().createDataLayout().getPointerABIAlignment(
-          0 /* address space */);
+      TM.createDataLayout().getPointerABIAlignment(0 /* address space */);
   Cfg.MS.fillBaseAccessesIfNeeded(Cfg.Sections, TargetAlignment);
-  setBurstGramIfNeeded(Cfg.Burst, ConfigIOContext{OpCC, State.getCtx(),
-                                                  State.getSnippyTarget()});
+  setBurstGramIfNeeded(Cfg.Burst, ConfigIOContext{OpCC, State.getCtx(), Tgt});
   Cfg.MS.updateMemoryBank();
   std::sort(Cfg.Sections.begin(), Cfg.Sections.end(),
             [](auto &S1, auto &S2) { return S1.VMA < S2.VMA; });
   convertToCustomBurstMode(Cfg.Histogram, State.getInstrInfo(),
                            *Cfg.Burst.Data);
   Cfg.MS.setAddrPlugin({getMemPlugin(), getMemPluginInfo()});
-  checkConfig(Cfg, State.getSnippyTarget(), State.getTargetMachine(),
-              State.getCtx(), OpCC);
+  checkConfig(Cfg, Tgt, TM, State.getCtx(), OpCC);
+  auto *II = TM.getMCInstrInfo();
+  assert(II);
+  checkFPUSettings(Cfg, State.getCtx(), Tgt, *II);
 }
 
 static void initializeLLVMAll() {
