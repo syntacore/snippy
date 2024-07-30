@@ -71,6 +71,13 @@
 
 #include <functional>
 #include <memory>
+#include <unordered_set>
+
+template <> struct std::hash<llvm::MCRegister> {
+  std::size_t operator()(const llvm::MCRegister &Reg) const {
+    return std::hash<unsigned>{}(Reg);
+  }
+};
 
 namespace llvm {
 namespace snippy {
@@ -127,6 +134,7 @@ struct InstructionGenerationContext final {
   RegPoolWrapper *RP;
   GeneratorContext &GC;
   SelfCheckInfo *SelfCheck = nullptr;
+  std::unordered_set<MCRegister> PotentialNaNs{};
   unsigned SizeErrorCount = 0;
   unsigned BacktrackCount = 0;
 };

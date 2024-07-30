@@ -6,6 +6,7 @@ set(LLVMSnippyConfigSources
     RegisterHistogram.cpp
     SerDesUtils.cpp
     PluginWrapper.cpp
+    FPUSettings.cpp
     CallGraphLayout.cpp
     MemorySchemePluginWrapper.cpp
     )

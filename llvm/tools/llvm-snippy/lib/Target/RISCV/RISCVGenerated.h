@@ -18,6 +18,8 @@
 #include "RISCVInstrInfo.h"
 #include "RISCVRegisterInfo.h"
 
+#include <unordered_set>
+
 namespace llvm {
 namespace snippy {
 
@@ -389,6 +391,11 @@ inline bool isFloatingPoint(unsigned Opcode) {
   case RISCV::FSH:
     return true;
   }
+}
+inline bool isFloatingPointReg(MCRegister Reg) {
+  return RISCV::FPR64RegClass.contains(Reg) ||
+         RISCV::FPR32RegClass.contains(Reg) ||
+         RISCV::FPR16RegClass.contains(Reg);
 }
 
 inline bool isRVVModeSwitch(unsigned Opcode) {
@@ -1487,6 +1494,17 @@ getRVVSegLoadStoreRegClassForVd(unsigned Opcode, std::pair<unsigned, bool> EMUL,
       {{6, 1}, RISCV::VRN6M1RegClassID}, {{7, 1}, RISCV::VRN7M1RegClassID},
       {{8, 1}, RISCV::VRN8M1RegClassID}};
   return RegInfo.getRegClass(Map.at({NFields, RegNumMult}));
+}
+
+inline bool canProduceNaN(const MCInstrDesc &InstrDesc) {
+  static std::unordered_set<unsigned> GeneratingNaNs{
+      RISCV::FMUL_D,   RISCV::FMUL_S,   RISCV::FMUL_H,   RISCV::FDIV_D,
+      RISCV::FDIV_S,   RISCV::FDIV_H,   RISCV::FMADD_D,  RISCV::FMADD_S,
+      RISCV::FMADD_H,  RISCV::FMSUB_D,  RISCV::FMSUB_S,  RISCV::FMSUB_H,
+      RISCV::FNMADD_D, RISCV::FNMADD_S, RISCV::FNMADD_H, RISCV::FNMSUB_D,
+      RISCV::FNMSUB_S, RISCV::FNMSUB_H,
+  };
+  return GeneratingNaNs.count(InstrDesc.getOpcode());
 }
 
 } // namespace snippy
