@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Generator/Generation.h"
+#include "snippy/Config/FPUSettings.h"
 #include "snippy/Config/FunctionDescriptions.h"
 #include "snippy/Generator/Backtrack.h"
 #include "snippy/Generator/GenerationRequest.h"
@@ -238,6 +239,120 @@ struct GenerationResult {
   GenerationStatistics Stats;
 };
 
+static void unNaNRegister(planning::InstructionGenerationContext &InstrGenCtx,
+                          MCRegister Reg) {
+  // TODO: More interesting number generation
+  auto &GC = InstrGenCtx.GC;
+  auto &Cfg = GC.getConfig();
+  assert(Cfg.FPUConfig);
+  auto &OverwriteCfg = Cfg.FPUConfig->Overwrite;
+  assert(OverwriteCfg);
+  double NewValue = RandEngine::genInInterval(OverwriteCfg->Range.Min,
+                                              OverwriteCfg->Range.Max);
+  const auto &Tgt = GC.getLLVMState().getSnippyTarget();
+  auto ValueToWrite = APFloat(NewValue).bitcastToAPInt();
+  auto RP = GC.getRegisterPool();
+  Tgt.writeValueToReg(InstrGenCtx.MBB, InstrGenCtx.Ins, ValueToWrite, Reg, RP,
+                      GC);
+  InstrGenCtx.PotentialNaNs.erase(Reg);
+}
+
+static bool isDestinationRegister(const MachineOperand &Op) {
+  return Op.isReg() && Op.isDef();
+}
+
+static bool hasDestinationRegister(const MachineInstr &MI) {
+  if (!MI.getNumDefs())
+    return false;
+  auto Operands = MI.operands();
+  return llvm::find_if(Operands, isDestinationRegister) != Operands.end();
+}
+
+static MCRegister getFirstDestinationRegister(const MachineInstr &MI) {
+  assert(MI.getNumDefs());
+  auto Found = llvm::find_if(MI.operands(), isDestinationRegister);
+  assert(Found != MI.operands().end() && "MI has no destination registers");
+  return Found->getReg().asMCReg();
+}
+
+static MCRegister getDestinationRegister(const MachineInstr &MI) {
+  assert(MI.getNumDefs() == 1);
+  return getFirstDestinationRegister(MI);
+}
+
+static void markRegisterAsPotentialNaN(
+    MCRegister Reg, planning::InstructionGenerationContext &InstrGenCtx) {
+  InstrGenCtx.PotentialNaNs.insert(Reg);
+}
+
+static auto getInputRegisters(const MachineInstr &MI) {
+  return llvm::make_filter_range(
+      MI.operands(), [](auto &Op) { return Op.isReg() && Op.isUse(); });
+}
+
+static bool anyOfInputOperandsIsPotentiallyNaN(
+    const MachineInstr &MI,
+    const planning::InstructionGenerationContext &InstrGenCtx) {
+  auto InputRegisters = getInputRegisters(MI);
+  return llvm::any_of(InputRegisters, [&](auto &Op) {
+    return InstrGenCtx.PotentialNaNs.count(Op.getReg().asMCReg());
+  });
+}
+
+static bool allInputOperandsArePotentialNaNs(
+    const MachineInstr &MI,
+    const planning::InstructionGenerationContext &InstrGenCtx) {
+  auto InputRegisters = getInputRegisters(MI);
+  return llvm::all_of(InputRegisters, [&](auto &Op) {
+    return InstrGenCtx.PotentialNaNs.count(Op.getReg().asMCReg());
+  });
+}
+
+static bool shouldRewriteRegValue(
+    const MachineInstr &MI,
+    const planning::InstructionGenerationContext &InstrGenCtx) {
+  auto &Cfg = InstrGenCtx.GC.getConfig();
+  if (!Cfg.FPUConfig)
+    return false;
+  auto &OverwriteCfg = Cfg.FPUConfig->Overwrite;
+  assert(OverwriteCfg);
+  switch (OverwriteCfg->Mode) {
+  case FloatOverwriteMode::IF_ALL_OPERANDS:
+    return allInputOperandsArePotentialNaNs(MI, InstrGenCtx);
+  case FloatOverwriteMode::IF_ANY_OPERAND:
+    return anyOfInputOperandsIsPotentiallyNaN(MI, InstrGenCtx);
+  default:
+    llvm_unreachable("Unknown float overwrite heuristic");
+  }
+}
+
+static bool hasFRegDestination(const MachineInstr &MI,
+                               const SnippyTarget &Tgt) {
+  if (!MI.getNumOperands())
+    return false;
+  return hasDestinationRegister(MI) &&
+         Tgt.isFloatingPoint(getDestinationRegister(MI));
+}
+
+template <typename InstrIt>
+void controllNaNPropagation(
+    InstrIt Begin, InstrIt End,
+    planning::InstructionGenerationContext &InstrGenCtx) {
+  auto &GC = InstrGenCtx.GC;
+  auto &Tgt = GC.getLLVMState().getSnippyTarget();
+  auto Filtered =
+      llvm::make_filter_range(llvm::make_range(Begin, End), [&](auto &MI) {
+        return (MI.getNumDefs() == 1) && hasFRegDestination(MI, Tgt);
+      });
+  llvm::for_each(Filtered, [&](auto &MI) {
+    if (Tgt.canProduceNaN(MI.getDesc()) ||
+        anyOfInputOperandsIsPotentiallyNaN(MI, InstrGenCtx))
+      markRegisterAsPotentialNaN(getDestinationRegister(MI), InstrGenCtx);
+    if (shouldRewriteRegValue(MI, InstrGenCtx))
+      unNaNRegister(InstrGenCtx, getDestinationRegister(MI));
+  });
+}
+
 template <typename InstrIt>
 GenerationResult handleGeneratedInstructions(
     InstrIt ItBegin, planning::InstructionGenerationContext &InstrGenCtx,
@@ -265,6 +380,9 @@ GenerationResult handleGeneratedInstructions(
   if (sizeLimitIsReached(IG.limit(), CurrentInstructionGroupStats,
                          GeneratedCodeSize))
     return ReportGenerationResult(GenerationStatus::SizeFailed);
+
+  controllNaNPropagation(ItBegin, ItEnd, InstrGenCtx);
+
   if (!GC.hasTrackingMode())
     return ReportGenerationResult(GenerationStatus::Ok);
 
