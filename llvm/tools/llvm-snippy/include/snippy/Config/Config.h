@@ -12,6 +12,7 @@
 #include "snippy/Config/BurstGram.h"
 #include "snippy/Config/CallGraphLayout.h"
 #include "snippy/Config/ConfigIOContext.h"
+#include "snippy/Config/FPUSettings.h"
 #include "snippy/Config/FunctionDescriptions.h"
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
@@ -39,6 +40,7 @@ public:
   std::optional<FunctionDescs> FuncDescs;
   std::unique_ptr<PluginManager> PluginManagerImpl;
   std::unique_ptr<TargetConfigInterface> TargetConfig;
+  std::optional<FPUSettings> FPUConfig;
 
   Config(const SnippyTarget &Tgt, StringRef PluginFilename,
          StringRef PluginInfoFilename, OpcodeCache OpCC, bool ParseWithPlugin,
