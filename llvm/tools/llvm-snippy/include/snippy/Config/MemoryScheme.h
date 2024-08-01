@@ -740,6 +740,16 @@ private:
 
   std::optional<::AddressGlobalId> getPreselectedAddressId();
 
+  void
+  updateSplitImpl(ArrayRef<std::unique_ptr<MemoryAccess>> AccessesToSplit) {
+    for (auto &MS : AccessesToSplit) {
+      auto Accesses = MS->split(MB);
+      for (auto &A : Accesses)
+        MA.SplitAccesses.emplace_back(std::move(A));
+    }
+    updateMAG();
+  }
+
 public:
   MemoryScheme();
 
@@ -751,12 +761,7 @@ public:
 
   void updateSplit() {
     MA.SplitAccesses.clear();
-    for (auto &MS : MA.BaseAccesses) {
-      auto Accesses = MS->split(MB);
-      for (auto &A : Accesses)
-        MA.SplitAccesses.emplace_back(std::move(A));
-    }
-    updateMAG();
+    updateSplitImpl(MA.BaseAccesses);
   }
 
   void updateMemoryBank() {

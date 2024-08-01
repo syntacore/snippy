@@ -9,6 +9,7 @@
 #ifndef LLVM_TOOLS_SNIPPY_GENERATION_UTILS_H
 #define LLVM_TOOLS_SNIPPY_GENERATION_UTILS_H
 
+#include "snippy/Generator/GenerationLimit.h"
 #include "snippy/Generator/GeneratorContext.h"
 
 namespace llvm {
@@ -72,6 +73,11 @@ std::vector<AddressInfo>
 mapOpcodeIdxToAI(MachineBasicBlock &MBB, ArrayRef<unsigned> OpcodeIdxToBaseReg,
                  ArrayRef<unsigned> Opcodes, MachineBasicBlock::iterator Ins,
                  RegPoolWrapper &RP, GeneratorContext &SGCtx);
+
+MachineBasicBlock::iterator processGeneratedInstructions(
+    MachineBasicBlock::iterator ItBegin,
+    planning::InstructionGenerationContext &InstrGenCtx,
+    const planning::RequestLimit &Limit);
 
 } // namespace snippy
 } // namespace llvm
