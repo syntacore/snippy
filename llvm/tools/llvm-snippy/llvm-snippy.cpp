@@ -739,6 +739,7 @@ static Config readSnippyConfig(LLVMContext &Ctx, const SnippyTarget &Tgt,
   Config Cfg(Tgt, GeneratorPluginFile.getValue(),
              GeneratorPluginParserFile.getValue(), OpCC, ParseWithPlugin, Ctx,
              IncludeFiles);
+
   mergeFiles(IPP, Ctx);
   if (DumpPreprocessedConfig)
     outs() << IPP.getPreprocessed() << "\n";

@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CreatePasses.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
+
+#include "snippy/CreatePasses.h"
 
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/PassRegistry.h"

@@ -6,12 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CreatePasses.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
 
-#include "snippy/Generator/LLVMState.h"
-#include "snippy/Target/Target.h"
+#include "snippy/CreatePasses.h"
+#include "snippy/Generator/GeneratorContextPass.h"
 
 #define DEBUG_TYPE "snippy-fill-external-functions-stubs"
 #define PASS_DESC "Snippy Fill External Functions Stubs"
@@ -28,7 +26,8 @@ public:
 
   FillExternalFunctionsStubs() : ModulePass(ID) {}
 
-  FillExternalFunctionsStubs(const std::vector<std::string> &FunctionsToAvoid);
+  FillExternalFunctionsStubs(const std::vector<std::string> &FunctionsToAvoid)
+      : ModulePass(ID), FunctionsToAvoid{FunctionsToAvoid} {}
 
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
@@ -65,12 +64,6 @@ ModulePass *createFillExternalFunctionsStubsPass(
 }
 
 namespace snippy {
-
-FillExternalFunctionsStubs::FillExternalFunctionsStubs(
-    const std::vector<std::string> &FunctionsToAvoid)
-    : ModulePass(ID), FunctionsToAvoid{FunctionsToAvoid} {
-  initializeFillExternalFunctionsStubsPass(*PassRegistry::getPassRegistry());
-}
 
 bool FillExternalFunctionsStubs::runOnModule(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();

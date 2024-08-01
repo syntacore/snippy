@@ -14,17 +14,13 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "CreatePasses.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
-#include "RootRegPoolWrapperPass.h"
 
-#include "snippy/Generator/LLVMState.h"
+#include "snippy/CreatePasses.h"
+#include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/RegReservForLoop.h"
-#include "snippy/Generator/RegisterPool.h"
-#include "snippy/Support/Error.h"
+#include "snippy/Generator/RootRegPoolWrapperPass.h"
 #include "snippy/Support/Options.h"
-#include "snippy/Target/Target.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -98,7 +94,7 @@ class LoopLatcher final : public MachineFunctionPass {
 public:
   static char ID;
 
-  LoopLatcher();
+  LoopLatcher() : MachineFunctionPass(ID) {}
 
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
@@ -141,11 +137,6 @@ MachineFunctionPass *createLoopLatcherPass() { return new LoopLatcher(); }
 
 namespace llvm {
 namespace snippy {
-
-LoopLatcher::LoopLatcher() : MachineFunctionPass(ID) {
-  initializeLoopLatcherPass(*PassRegistry::getPassRegistry());
-}
-
 bool LoopLatcher::runOnMachineFunction(MachineFunction &MF) {
   LLVM_DEBUG(
       dbgs() << "MachineFunction at the start of llvm::snippy::LoopLatcher:\n";

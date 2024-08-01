@@ -7,10 +7,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "BlockGenPlanningPass.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
 
 #include "snippy/Generator/GenerationRequest.h"
+#include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/Policy.h"
 #include "snippy/Target/Target.h"
@@ -86,10 +86,6 @@ MachineFunctionPass *createBlockGenPlanningPass() {
 }
 
 namespace snippy {
-
-BlockGenPlanning::BlockGenPlanning() : MachineFunctionPass(ID) {
-  initializeBlockGenPlanningPass(*PassRegistry::getPassRegistry());
-}
 
 StringRef BlockGenPlanning::getPassName() const { return PASS_DESC " Pass"; }
 

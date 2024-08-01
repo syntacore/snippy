@@ -8,6 +8,7 @@
 
 #include "snippy/PassManagerWrapper.h"
 
+#include "llvm/Pass.h"
 #include "llvm/Target/TargetMachine.h"
 
 namespace llvm {

@@ -13,9 +13,10 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "CreatePasses.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
+
+#include "snippy/CreatePasses.h"
+#include "snippy/Generator/GeneratorContextPass.h"
 
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineLoopInfo.h"
@@ -31,7 +32,7 @@ namespace {
 struct LoopAlignment final : public MachineFunctionPass {
   static char ID;
 
-  LoopAlignment();
+  LoopAlignment() : MachineFunctionPass(ID) {}
 
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
@@ -62,10 +63,6 @@ namespace llvm {
 MachineFunctionPass *createLoopAlignmentPass() { return new LoopAlignment(); }
 
 namespace snippy {
-
-LoopAlignment::LoopAlignment() : MachineFunctionPass(ID) {
-  initializeLoopAlignmentPass(*PassRegistry::getPassRegistry());
-}
 
 bool LoopAlignment::runOnMachineFunction(MachineFunction &MF) {
   Align Alignment(getAnalysis<GeneratorContextWrapper>()

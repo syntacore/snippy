@@ -6,12 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CreatePasses.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
 
+#include "snippy/CreatePasses.h"
+#include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Support/Options.h"
-#include "snippy/Target/Target.h"
 
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
@@ -36,7 +35,7 @@ class BranchRelaxator final : public MachineFunctionPass {
 public:
   static char ID;
 
-  BranchRelaxator();
+  BranchRelaxator() : MachineFunctionPass(ID) {}
 
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
@@ -47,7 +46,7 @@ public:
   bool tryRelaxBranch(MachineInstr &Branch, const MachineRegion &R) const;
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.setPreservesAll();
+    AU.setPreservesCFG();
     AU.addRequired<GeneratorContextWrapper>();
     AU.addRequired<MachineRegionInfoPass>();
     MachineFunctionPass::getAnalysisUsage(AU);
@@ -77,11 +76,6 @@ MachineFunctionPass *createBranchRelaxatorPass() {
 }
 
 namespace snippy {
-
-BranchRelaxator::BranchRelaxator() : MachineFunctionPass(ID) {
-  initializeBranchRelaxatorPass(*PassRegistry::getPassRegistry());
-}
-
 bool BranchRelaxator::tryRelaxBranch(MachineInstr &Branch,
                                      const MachineRegion &R) const {
   assert(Branch.isBranch() && "Only branches expected");
