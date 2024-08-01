@@ -11,13 +11,11 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "CreatePasses.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
 
-#include "snippy/Generator/LLVMState.h"
+#include "snippy/CreatePasses.h"
+#include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Support/Options.h"
-#include "snippy/Target/Target.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -59,7 +57,7 @@ class LoopCanonicalization final : public MachineFunctionPass {
 public:
   static char ID;
 
-  LoopCanonicalization();
+  LoopCanonicalization() : MachineFunctionPass(ID) {}
 
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
@@ -98,10 +96,6 @@ MachineFunctionPass *createLoopCanonicalizationPass() {
 
 namespace llvm {
 namespace snippy {
-
-LoopCanonicalization::LoopCanonicalization() : MachineFunctionPass(ID) {
-  initializeLoopCanonicalizationPass(*PassRegistry::getPassRegistry());
-}
 
 bool LoopCanonicalization::runOnMachineFunction(MachineFunction &MF) {
   LLVM_DEBUG(dbgs() << "MachineFunction at the start of "

@@ -17,9 +17,6 @@
 // TODO: remove this dependency
 #include "snippy/Generator/GeneratorContext.h"
 
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringRef.h"
-
 namespace llvm {
 namespace snippy {
 

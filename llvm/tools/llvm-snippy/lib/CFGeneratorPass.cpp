@@ -6,13 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CreatePasses.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
 
-#include "snippy/Generator/LLVMState.h"
-#include "snippy/Target/Target.h"
-
+#include "snippy/CreatePasses.h"
+#include "snippy/Generator/GeneratorContextPass.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/PassRegistry.h"
 
@@ -22,11 +19,10 @@
 namespace llvm {
 namespace snippy {
 namespace {
-
 struct CFGenerator final : public MachineFunctionPass {
   static char ID;
 
-  CFGenerator();
+  CFGenerator() : MachineFunctionPass(ID) {}
 
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
@@ -39,7 +35,6 @@ struct CFGenerator final : public MachineFunctionPass {
 };
 
 char CFGenerator::ID = 0;
-
 } // namespace
 } // namespace snippy
 } // namespace llvm
@@ -56,11 +51,6 @@ namespace llvm {
 MachineFunctionPass *createCFGeneratorPass() { return new CFGenerator(); }
 
 namespace snippy {
-
-CFGenerator::CFGenerator() : MachineFunctionPass(ID) {
-  initializeCFGeneratorPass(*PassRegistry::getPassRegistry());
-}
-
 bool CFGenerator::runOnMachineFunction(MachineFunction &MF) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto CFInstrsNum = SGCtx.getCFInstrsNum(MF);
@@ -80,6 +70,5 @@ bool CFGenerator::runOnMachineFunction(MachineFunction &MF) {
 
   return true;
 }
-
 } // namespace snippy
 } // namespace llvm

@@ -6,13 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CreatePasses.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
-#include "RootRegPoolWrapperPass.h"
 
-#include "snippy/Generator/LLVMState.h"
-#include "snippy/Target/Target.h"
+#include "snippy/CreatePasses.h"
+#include "snippy/Generator/RootRegPoolWrapperPass.h"
 
 #define DEBUG_TYPE "snippy-register-reserve"
 #define PASS_DESC "Snippy Register Reserve"
@@ -24,7 +21,7 @@ namespace {
 struct ReserveRegs final : public ModulePass {
   static char ID;
 
-  ReserveRegs();
+  ReserveRegs() : ModulePass(ID) {}
 
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
@@ -59,10 +56,6 @@ namespace llvm {
 ModulePass *createReserveRegsPass() { return new ReserveRegs(); }
 
 namespace snippy {
-
-ReserveRegs::ReserveRegs() : ModulePass(ID) {
-  initializeReserveRegsPass(*PassRegistry::getPassRegistry());
-}
 
 bool ReserveRegs::runOnModule(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();

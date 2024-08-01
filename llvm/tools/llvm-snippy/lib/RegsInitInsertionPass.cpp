@@ -6,12 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CreatePasses.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
 
-#include "snippy/Generator/LLVMState.h"
-#include "snippy/Target/Target.h"
+#include "snippy/CreatePasses.h"
+#include "snippy/Generator/GeneratorContextPass.h"
 
 #include "llvm/CodeGen/MachineFunctionPass.h"
 
@@ -28,7 +26,8 @@ struct RegsInitInsertion final : public MachineFunctionPass {
 public:
   static char ID;
 
-  RegsInitInsertion(bool InitRegs = true);
+  RegsInitInsertion(bool InitRegs = true)
+      : MachineFunctionPass(ID), InitRegs(InitRegs) {}
 
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
@@ -61,11 +60,6 @@ MachineFunctionPass *createRegsInitInsertionPass(bool InitRegs) {
 }
 
 namespace snippy {
-
-RegsInitInsertion::RegsInitInsertion(bool InitRegs)
-    : MachineFunctionPass(ID), InitRegs(InitRegs) {
-  initializeRegsInitInsertionPass(*PassRegistry::getPassRegistry());
-}
 
 bool RegsInitInsertion::runOnMachineFunction(MachineFunction &MF) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();

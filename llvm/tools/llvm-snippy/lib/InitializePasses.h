@@ -12,11 +12,8 @@ namespace llvm {
 
 class PassRegistry;
 
-void initializeGeneratorContextWrapperPass(PassRegistry &);
-void initializeRootRegPoolWrapperPass(PassRegistry &);
 void initializeReserveRegsPass(PassRegistry &);
 void initializeFillExternalFunctionsStubsPass(PassRegistry &);
-void initializeRegisterStateWrapperPass(PassRegistry &);
 void initializeFunctionGeneratorPass(PassRegistry &);
 void initializeFunctionDistributePass(PassRegistry &);
 void initializeCFGeneratorPass(PassRegistry &);

@@ -6,12 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CreatePasses.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
 
-#include "snippy/Generator/LLVMState.h"
-#include "snippy/Support/Utils.h"
+#include "snippy/CreatePasses.h"
+#include "snippy/Generator/GeneratorContextPass.h"
 
 #include "llvm/CodeGen/MachineFunction.h"
 
@@ -26,7 +24,7 @@ struct FunctionDistribute final : public ModulePass {
 public:
   static char ID;
 
-  FunctionDistribute();
+  FunctionDistribute() : ModulePass(ID) {}
 
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
@@ -77,10 +75,6 @@ ModulePass *createFunctionDistributePass() { return new FunctionDistribute(); }
 namespace llvm {
 
 namespace snippy {
-
-FunctionDistribute::FunctionDistribute() : ModulePass(ID) {
-  initializeFunctionDistributePass(*PassRegistry::getPassRegistry());
-}
 
 void FunctionDistribute::verifyFunctionSizes(Module &M,
                                              bool OnlyRootOnes) const {

@@ -39,7 +39,7 @@ set(LLVMSnippySources
   FillExternalFunctionsStubsPass.cpp
   FunctionDistributePass.cpp
   FunctionGeneratorPass.cpp
-  GeneratorContextPass.cpp
+  InitializePasses.cpp
   InstructionsPostProcessPass.cpp
   LoopAlignmentPass.cpp
   LoopCanonicalizationPass.cpp
@@ -49,7 +49,6 @@ set(LLVMSnippySources
   PrologueEpilogueInsertionPass.cpp
   RegsInitInsertionPass.cpp
   ReserveRegsPass.cpp
-  RootRegPoolWrapperPass.cpp
   )
 
 add_llvm_library(LLVMSnippy

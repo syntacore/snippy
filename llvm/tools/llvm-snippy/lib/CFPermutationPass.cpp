@@ -23,27 +23,18 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "CreatePasses.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
 
 #include "snippy/Generator/CFPermutation.h"
-#include "snippy/Support/Options.h"
-#include "snippy/Support/RandUtil.h"
+#include "snippy/Generator/GeneratorContextPass.h"
 
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/Sequence.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/InitializePasses.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
-#include <cmath>
-#include <limits>
 
 #define DEBUG_TYPE "snippy-cf-permutation"
 #define PASS_DESC "Snippy Control Flow Permutation"
