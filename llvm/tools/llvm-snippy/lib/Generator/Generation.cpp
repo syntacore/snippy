@@ -354,10 +354,10 @@ void controllNaNPropagation(
 }
 
 template <typename InstrIt>
-GenerationResult handleGeneratedInstructions(
-    InstrIt ItBegin, planning::InstructionGenerationContext &InstrGenCtx,
-    const planning::InstructionGroupRequest &IG,
-    const GenerationStatistics &CurrentInstructionGroupStats) {
+GenerationResult
+handleGeneratedInstructions(InstrIt ItBegin,
+                            planning::InstructionGenerationContext &InstrGenCtx,
+                            const planning::RequestLimit &Limit) {
   auto &MBB = InstrGenCtx.MBB;
   auto &GC = InstrGenCtx.GC;
   auto ItEnd = InstrGenCtx.Ins;
@@ -377,8 +377,7 @@ GenerationResult handleGeneratedInstructions(
   };
 
   // Check size requirements before any backtrack execution
-  if (sizeLimitIsReached(IG.limit(), CurrentInstructionGroupStats,
-                         GeneratedCodeSize))
+  if (sizeLimitIsReached(Limit, InstrGenCtx.Stats, GeneratedCodeSize))
     return ReportGenerationResult(GenerationStatus::SizeFailed);
 
   controllNaNPropagation(ItBegin, ItEnd, InstrGenCtx);
@@ -476,25 +475,9 @@ GenerationResult handleGeneratedInstructions(
 
   // Check size requirements after selfcheck addition.
   GeneratedCodeSize = GC.getCodeBlockSize(ItBegin, ItEnd);
-  if (sizeLimitIsReached(IG.limit(), CurrentInstructionGroupStats,
-                         GeneratedCodeSize))
+  if (sizeLimitIsReached(Limit, InstrGenCtx.Stats, GeneratedCodeSize))
     return ReportGenerationResult(GenerationStatus::SizeFailed);
   return ReportGenerationResult(GenerationStatus::Ok);
-}
-
-template <typename InstrIt>
-MachineBasicBlock::iterator processGeneratedInstructions(
-    InstrIt ItBegin, planning::InstructionGenerationContext &InstrGenCtx,
-    const planning::InstructionGroupRequest &IG,
-    GenerationStatistics &CurrentStats) {
-  auto &MBB = InstrGenCtx.MBB;
-  auto ItEnd = MBB.getFirstTerminator();
-  ItBegin = ItBegin == ItEnd ? MBB.begin() : std::next(ItBegin);
-  auto IntRes =
-      handleGeneratedInstructions(ItBegin, InstrGenCtx, IG, CurrentStats);
-  processGenerationResult(IG, InstrGenCtx, IntRes, CurrentStats);
-  CurrentStats.merge(IntRes.Stats);
-  return std::prev(ItEnd);
 }
 
 static MachineOperand createRegAsOperand(Register Reg, unsigned Flags,
@@ -663,28 +646,23 @@ static void printInterpretResult(raw_ostream &OS, const Twine &Prefix,
   OS << ", RequestStatus: " << stringifyRequestStatus(TheResult.Status) << " }";
 }
 
-static GenerationResult generateNopsToSizeLimit(
-    const planning::InstructionGroupRequest &InstructionGroupRequest,
-    planning::InstructionGenerationContext &InstrGenCtx,
-    GenerationStatistics &CurrentInstructionGroupStats) {
-  assert(InstructionGroupRequest.limit().isSizeLimit());
+static GenerationResult
+generateNopsToSizeLimit(const planning::RequestLimit &Limit,
+                        planning::InstructionGenerationContext &InstrGenCtx) {
+  assert(Limit.isSizeLimit());
   auto &GC = InstrGenCtx.GC;
   auto &MBB = InstrGenCtx.MBB;
   auto &State = GC.getLLVMState();
   auto &SnpTgt = State.getSnippyTarget();
   auto ItEnd = MBB.getFirstTerminator();
   auto ItBegin = ItEnd == MBB.begin() ? ItEnd : std::prev(ItEnd);
-  while (!InstructionGroupRequest.limit().isReached(
-      CurrentInstructionGroupStats)) {
+  while (!Limit.isReached(InstrGenCtx.Stats)) {
     auto *MI = SnpTgt.generateNop(MBB, ItBegin, State);
     assert(MI && "Nop generation failed");
-    CurrentInstructionGroupStats.merge(
-        GenerationStatistics(0, MI->getDesc().getSize()));
+    InstrGenCtx.Stats.merge(GenerationStatistics(0, MI->getDesc().getSize()));
   }
   ItBegin = ItBegin == ItEnd ? MBB.begin() : std::next(ItBegin);
-  return handleGeneratedInstructions(ItBegin, InstrGenCtx,
-                                     InstructionGroupRequest,
-                                     CurrentInstructionGroupStats);
+  return handleGeneratedInstructions(ItBegin, InstrGenCtx, Limit);
 }
 
 bool sizeLimitIsReached(const planning::RequestLimit &Lim,
@@ -1294,10 +1272,10 @@ void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
     assert((!FinalReq.limit().isNumLimit() || FinalReq.limit().getLimit()) &&
            "FinalReq is empty!");
     auto RP = GC.getRegisterPool();
-    GenerationStatistics Stats;
     planning::InstructionGenerationContext InstrGenCtx{
-        MF.back(), MF.back().end(), &RP, GC, SelfCheckInfo};
-    snippy::generate(FinalReq, Stats, InstrGenCtx);
+        MF.back(), MF.back().end(),        &RP,
+        GC,        GenerationStatistics(), SelfCheckInfo};
+    snippy::generate(FinalReq, InstrGenCtx);
   }
 
   // Mark last generated instruction as support one.
@@ -1306,9 +1284,9 @@ void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
 }
 
 void processGenerationResult(
-    const planning::InstructionGroupRequest &IG,
+    const planning::RequestLimit &Limit,
     planning::InstructionGenerationContext &InstrGenCtx,
-    const GenerationResult &IntRes, GenerationStatistics &CurrentStats) {
+    const GenerationResult &IntRes) {
   LLVM_DEBUG(printInterpretResult(dbgs(), "      ", IntRes); dbgs() << "\n");
   auto &GC = InstrGenCtx.GC;
   auto &BacktrackCount = InstrGenCtx.BacktrackCount;
@@ -1331,16 +1309,29 @@ void processGenerationResult(
 
     // We have size error too many times, let's generate nops up to size
     // limit
-    auto GenRes = generateNopsToSizeLimit(IG, InstrGenCtx, CurrentStats);
+    auto GenRes = generateNopsToSizeLimit(Limit, InstrGenCtx);
     if (GenRes.Status != GenerationStatus::Ok)
       report_fatal_error("Nop generation during block fill by size failed",
                          false);
-    CurrentStats.merge(GenerationStatistics(GenRes.Stats));
+    InstrGenCtx.Stats.merge(GenRes.Stats);
     return;
   }
   case GenerationStatus::Ok:
     return;
   }
+}
+
+MachineBasicBlock::iterator processGeneratedInstructions(
+    MachineBasicBlock::iterator ItBegin,
+    planning::InstructionGenerationContext &InstrGenCtx,
+    const planning::RequestLimit &Limit) {
+  auto &MBB = InstrGenCtx.MBB;
+  auto ItEnd = InstrGenCtx.Ins;
+  ItBegin = ItBegin == ItEnd ? MBB.begin() : std::next(ItBegin);
+  auto IntRes = handleGeneratedInstructions(ItBegin, InstrGenCtx, Limit);
+  processGenerationResult(Limit, InstrGenCtx, IntRes);
+  InstrGenCtx.Stats.merge(IntRes.Stats);
+  return std::prev(ItEnd);
 }
 
 template <typename T>
@@ -1405,13 +1396,12 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
 
       SNIPPY_DEBUG_BRIEF("request for reachable BasicBlock", BBReq);
 
-      auto GeneratedStats = [&] {
         auto RP = GC.getRegisterPool();
         planning::InstructionGenerationContext InstrGenCtx{
-            *MBB, MBB->getFirstTerminator(), &RP, GC, SelfCheckInfo};
-        return snippy::generate(BBReq, InstrGenCtx);
-      }();
-      CurrMFGenStats.merge(std::move(GeneratedStats));
+            *MBB, MBB->getFirstTerminator(), &RP,
+            GC,   GenerationStatistics(),    SelfCheckInfo};
+        snippy::generate(BBReq, InstrGenCtx);
+        CurrMFGenStats.merge(InstrGenCtx.Stats);
     }
     SNIPPY_DEBUG_BRIEF("Function codegen", CurrMFGenStats);
 
@@ -1462,27 +1452,27 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
     auto &BBReq = FunctionGenRequest.at(MBB);
     SNIPPY_DEBUG_BRIEF("request for dead BasicBlock", BBReq);
 
-    auto GeneratedStats = [&] {
       auto RP = GC.getRegisterPool();
       planning::InstructionGenerationContext InstrGenCtx{
-          *MBB, MBB->getFirstTerminator(), &RP, GC, SelfCheckInfo};
-      return snippy::generate(BBReq, InstrGenCtx);
-    }();
-    CurrMFGenStats.merge(std::move(GeneratedStats));
-    SNIPPY_DEBUG_BRIEF("Function codegen", CurrMFGenStats);
-    MBB = findNextBlock(nullptr, NotVisited, nullptr, GC);
+          *MBB, MBB->getFirstTerminator(), &RP,
+          GC,   GenerationStatistics(),    SelfCheckInfo};
+      snippy::generate(BBReq, InstrGenCtx);
+
+      CurrMFGenStats.merge(InstrGenCtx.Stats);
+      SNIPPY_DEBUG_BRIEF("Function codegen", CurrMFGenStats);
+      MBB = findNextBlock(nullptr, NotVisited, nullptr, GC);
   }
 
   finalizeFunction(MF, FunctionGenRequest, CurrMFGenStats, GC, SelfCheckInfo);
 }
 
 void generate(planning::InstructionGroupRequest &IG,
-              GenerationStatistics &CurrentStats,
               planning::InstructionGenerationContext &InstrGenCtx) {
   LLVM_DEBUG(dbgs() << "Generating IG:\n"; IG.print(dbgs(), 2););
   auto &GC = InstrGenCtx.GC;
   auto &MBB = InstrGenCtx.MBB;
-  GenerationStatistics LocalStats{};
+  auto OldStats = InstrGenCtx.Stats;
+  InstrGenCtx.Stats = GenerationStatistics();
   if (GenerateInsertionPointHints)
     generateInsertionPointHint(InstrGenCtx);
   auto ItEnd = MBB.getFirstTerminator();
@@ -1493,7 +1483,8 @@ void generate(planning::InstructionGroupRequest &IG,
     InstrGenCtx.RP = &RP;
     auto &InstrInfo = GC.getLLVMState().getInstrInfo();
     planning::InstrGroupGenerationRAIIWrapper InitAndFinish(IG, InstrGenCtx);
-    planning::InstrRequestRange Range(IG, LocalStats);
+    auto ItBegin = ItEnd == MBB.begin() ? ItEnd : std::prev(ItEnd);
+    planning::InstrRequestRange Range(IG, InstrGenCtx.Stats);
     for (auto &&IR : Range) {
       if (GenerateInsertionPointHints && !IG.isInseparableBundle())
         generateInsertionPointHint(InstrGenCtx);
@@ -1502,29 +1493,28 @@ void generate(planning::InstructionGroupRequest &IG,
       switchPolicyIfNeeded(IG, IR.Opcode, MBB, GC);
       if (!IG.isInseparableBundle())
         ItBegin =
-            processGeneratedInstructions(ItBegin, InstrGenCtx, IG, LocalStats);
+            processGeneratedInstructions(ItBegin, InstrGenCtx, IG.limit());
     }
     InstrGenCtx.RP = OldRegPool;
   }
   // If instructions were not already postprocessed.
   if (IG.isInseparableBundle())
-    processGeneratedInstructions(ItBegin, InstrGenCtx, IG, LocalStats);
-  if (!IG.isLimitReached(LocalStats)) {
+    processGeneratedInstructions(ItBegin, InstrGenCtx, IG.limit());
+  if (!IG.isLimitReached(InstrGenCtx.Stats)) {
     auto &Ctx = GC.getLLVMState().getCtx();
     snippy::fatal(Ctx, "Generation failure",
                   "No more instructions to request but group limit still "
                   "hasn't been reached.");
   }
-  CurrentStats.merge(LocalStats);
+  InstrGenCtx.Stats.merge(OldStats);
 }
 
 GenerationStatistics
 generate(planning::BasicBlockRequest &BB,
          planning::InstructionGenerationContext &InstrGenCtx) {
-  GenerationStatistics CurrentStats;
   for (auto &&IG : BB)
-    generate(IG, CurrentStats, InstrGenCtx);
-  return CurrentStats;
+    generate(IG, InstrGenCtx);
+  return InstrGenCtx.Stats;
 }
 } // namespace snippy
 } // namespace llvm
