@@ -131,6 +131,47 @@ void transformBytesToNumbersArray(It Beg, It End, InsertIt Insert) {
     Insert = convertBytesToNumber<NumberT>(Beg, Beg + sizeof(NumberT));
 }
 
+template <
+    typename NumberT, typename InsertIt,
+    /*Insert iterator check*/
+    typename = decltype(std::declval<InsertIt &>() = std::declval<
+                            typename InsertIt::container_type::value_type>())>
+void convertNumberToBytesArrayWithEndianness(NumberT Num, size_t AddrLenInBytes,
+                                             bool TargetIsLittleEndian,
+                                             InsertIt Insert) {
+  SmallVector<unsigned char, 8> AddrBytes;
+  convertNumberToBytesArray(Num, std::back_inserter(AddrBytes));
+  if (!sys::IsLittleEndianHost)
+    std::reverse(AddrBytes.begin(), AddrBytes.end());
+  // AddressInfo::Address is of type uint64_t to AddrBytes is of length 8.
+  // In order to account for target's address size we need to chop off 8 -
+  // AddrRegLen bytes. convertNumberToBytesArray puts bytes in big endian
+  // order in the AddrBytes vector (for a little endian host). This rotate and
+  // resize chops off the required number of leading zeros in the address.
+  std::rotate(AddrBytes.begin(), AddrBytes.begin() + AddrLenInBytes,
+              AddrBytes.end());
+
+  assert(std::all_of(AddrBytes.begin() + AddrLenInBytes, AddrBytes.end(),
+                     [](auto &&Value) { return Value == 0; }));
+  AddrBytes.resize(AddrLenInBytes);
+  if (TargetIsLittleEndian)
+    std::reverse(AddrBytes.begin(), AddrBytes.end());
+  std::copy(AddrBytes.begin(), AddrBytes.end(), Insert);
+}
+
+template <typename NumberT>
+APInt convertNumberToCorrectEndianness(NumberT Num, size_t AddrLenInBytes,
+                                       bool TargetIsLittleEndian) {
+  SmallVector<unsigned char, 8> AddrBytes;
+  convertNumberToBytesArrayWithEndianness(
+      Num, AddrLenInBytes, TargetIsLittleEndian, std::back_inserter(AddrBytes));
+  APInt Res(AddrLenInBytes * CHAR_BIT, 0);
+  for (unsigned I = 0; I < AddrBytes.size(); ++I) {
+    Res |= (AddrBytes[I] << (I * CHAR_BIT));
+  }
+  return Res;
+}
+
 struct MIRComp {
   bool operator()(const MachineFunction *A, const MachineFunction *B) const {
     assert(A && B && "MachineFunction comparator can't compare nullptrs");
