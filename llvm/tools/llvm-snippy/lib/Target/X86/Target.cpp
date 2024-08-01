@@ -478,6 +478,19 @@ public:
   std::vector<MCRegister> getGlobalStateRegs() const override {
     reportUnimplementedError();
   }
+
+  bool canProduceNaN(const MCInstrDesc &InstrDesc) const override {
+    reportUnimplementedError();
+  }
+
+  bool isFloatingPoint(MCRegister Reg) const override {
+    reportUnimplementedError();
+  }
+
+  bool isFloatingPoint(const MCInstrDesc &InstrDesc) const override {
+    reportUnimplementedError();
+  }
+
 }; // namespace
 
 bool SnippyX86Target::matchesArch(Triple::ArchType Arch) const {
