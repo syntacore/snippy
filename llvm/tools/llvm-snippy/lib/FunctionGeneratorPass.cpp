@@ -6,14 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CreatePasses.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
 
 #include "snippy/Config/FunctionDescriptions.h"
-#include "snippy/Generator/LLVMState.h"
+#include "snippy/CreatePasses.h"
+#include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Support/Options.h"
-#include "snippy/Support/Utils.h"
 #include "snippy/Support/YAMLUtils.h"
 
 #include "llvm/CodeGen/MachineFunction.h"
@@ -45,7 +43,7 @@ struct FunctionGenerator final : public ModulePass {
 public:
   static char ID;
 
-  FunctionGenerator();
+  FunctionGenerator() : ModulePass(ID) {}
 
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
@@ -165,11 +163,6 @@ std::string yaml::MappingTraits<snippy::FunctionDescs>::validate(
 }
 
 namespace snippy {
-
-FunctionGenerator::FunctionGenerator() : ModulePass(ID) {
-  initializeFunctionGeneratorPass(*PassRegistry::getPassRegistry());
-}
-
 namespace {
 
 MachineFunction &createFunction(GeneratorContext &SGCtx, Module &M,

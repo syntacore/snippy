@@ -8,16 +8,16 @@
 
 #include "FlowGenerator.h"
 #include "BlockGenPlanningPass.h"
-#include "CreatePasses.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
 
 #include "snippy/Config/Branchegram.h"
 #include "snippy/Config/MemoryScheme.h"
+#include "snippy/CreatePasses.h"
 #include "snippy/Generator/CallGraphState.h"
 #include "snippy/Generator/Generation.h"
 #include "snippy/Generator/GenerationRequest.h"
 #include "snippy/Generator/GenerationUtils.h"
+#include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/GlobalsPool.h"
 #include "snippy/Generator/Interpreter.h"
 #include "snippy/Generator/IntervalsToVerify.h"
@@ -25,6 +25,7 @@
 #include "snippy/Generator/Linker.h"
 #include "snippy/Generator/Policy.h"
 #include "snippy/Generator/RegisterPool.h"
+#include "snippy/InitializePasses.h"
 #include "snippy/PassManagerWrapper.h"
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/Options.h"
@@ -96,6 +97,9 @@ snippy::opt<bool> VerifyConsecutiveLoops(
         "Check that consecutive loops generated accordingly to branchegram."),
     cl::cat(Options), cl::init(false), cl::Hidden);
 
+snippy::opt<bool> DumpFinalCFG("dump-final-cfg",
+                               cl::desc("Dump CFG after all passes."),
+                               cl::cat(Options), cl::init(false), cl::Hidden);
 } // namespace snippy
 
 LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(snippy::CallGraphDumpMode,
@@ -155,7 +159,7 @@ class InstructionGenerator final : public MachineFunctionPass {
 public:
   static char ID;
 
-  InstructionGenerator();
+  InstructionGenerator() : MachineFunctionPass(ID) {}
 
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
@@ -193,11 +197,6 @@ MachineFunctionPass *createInstructionGeneratorPass() {
 }
 
 namespace snippy {
-
-InstructionGenerator::InstructionGenerator() : MachineFunctionPass(ID) {
-  initializeInstructionGeneratorPass(*PassRegistry::getPassRegistry());
-}
-
 // This must always be in sync with prologue epilogue insertion.
 static size_t calcMainFuncInitialSpillSize(GeneratorContext &GC) {
   auto &State = GC.getLLVMState();
@@ -398,24 +397,27 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
 
   PassManagerWrapper PM;
   initializeCodeGen(*PassRegistry::getPassRegistry());
+  initializeSnippyPasses(*PassRegistry::getPassRegistry());
   SnippyTgt.initializeTargetPasses();
 
   // Pre backtrack start
   PM.add(MMIWP.release());
   PM.add(createGeneratorContextWrapperPass(GenCtx));
+  PM.add(createRootRegPoolWrapperPass());
   PM.add(createFunctionGeneratorPass());
+
   PM.add(createReserveRegsPass());
   PM.add(createCFGeneratorPass());
-  if (GenSettings.Cfg.Branches.PermuteCF) {
+  if (GenSettings.Cfg.Branches.PermuteCF)
     PM.add(createCFPermutationPass());
-    if (GenSettings.DebugConfig.PrintControlFlowGraph)
-      PM.add(createCFGPrinterPass());
-    PM.add(createLoopAlignmentPass());
-    PM.add(createLoopCanonicalizationPass());
-    PM.add(createLoopLatcherPass());
-    if (GenSettings.DebugConfig.PrintControlFlowGraph)
-      PM.add(createCFGPrinterPass());
-  }
+
+  if (GenSettings.DebugConfig.PrintControlFlowGraph)
+    PM.add(createCFGPrinterPass());
+  PM.add(createLoopAlignmentPass());
+  PM.add(createLoopCanonicalizationPass());
+  PM.add(createLoopLatcherPass());
+  if (GenSettings.DebugConfig.PrintControlFlowGraph)
+    PM.add(createCFGPrinterPass());
 
   PM.add(
       createRegsInitInsertionPass(GenSettings.RegistersConfig.InitializeRegs));
@@ -453,6 +455,8 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
   raw_string_ostream MIROS(MIR);
   if (DumpMIR.isSpecified())
     PM.add(createPrintMIRPass(MIROS));
+  if (DumpFinalCFG)
+    PM.add(createCFGPrinterPass());
 
   SmallString<32> Output;
   raw_svector_ostream OS(Output);
