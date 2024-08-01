@@ -133,6 +133,7 @@ struct InstructionGenerationContext final {
   MachineBasicBlock::iterator Ins;
   RegPoolWrapper *RP;
   GeneratorContext &GC;
+  GenerationStatistics Stats;
   SelfCheckInfo *SelfCheck = nullptr;
   std::unordered_set<MCRegister> PotentialNaNs{};
   unsigned SizeErrorCount = 0;
