@@ -6,10 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CreatePasses.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
 
+#include "snippy/CreatePasses.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/PassRegistry.h"
 
@@ -19,15 +18,17 @@
 namespace llvm {
 namespace snippy {
 namespace {
-
 struct CFGPrinter final : public MachineFunctionPass {
   static char ID;
 
-  CFGPrinter();
+  CFGPrinter() : MachineFunctionPass(ID) {}
 
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
-  bool runOnMachineFunction(MachineFunction &MF) override;
+  bool runOnMachineFunction(MachineFunction &MF) override {
+    MF.viewCFG();
+    return false;
+  }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.setPreservesAll();
@@ -36,7 +37,6 @@ struct CFGPrinter final : public MachineFunctionPass {
 };
 
 char CFGPrinter::ID = 0;
-
 } // namespace
 } // namespace snippy
 } // namespace llvm
@@ -49,19 +49,5 @@ using llvm::snippy::CFGPrinter;
 INITIALIZE_PASS(CFGPrinter, DEBUG_TYPE, PASS_DESC, false, false)
 
 namespace llvm {
-
 MachineFunctionPass *createCFGPrinterPass() { return new CFGPrinter(); }
-
-namespace snippy {
-
-CFGPrinter::CFGPrinter() : MachineFunctionPass(ID) {
-  initializeCFGPrinterPass(*PassRegistry::getPassRegistry());
-}
-
-bool CFGPrinter::runOnMachineFunction(MachineFunction &MF) {
-  MF.viewCFG();
-  return false;
-}
-
-} // namespace snippy
 } // namespace llvm

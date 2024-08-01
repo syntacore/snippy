@@ -6,11 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CreatePasses.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
 
-#include "snippy/Target/Target.h"
+#include "snippy/CreatePasses.h"
+#include "snippy/Generator/GeneratorContextPass.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
@@ -26,7 +25,7 @@ struct PrologueEpilogueInsertion final : public MachineFunctionPass {
 public:
   static char ID;
 
-  PrologueEpilogueInsertion();
+  PrologueEpilogueInsertion() : MachineFunctionPass(ID) {}
 
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
@@ -115,11 +114,6 @@ MachineFunctionPass *createPrologueEpilogueInsertionPass() {
 }
 
 namespace snippy {
-
-PrologueEpilogueInsertion::PrologueEpilogueInsertion()
-    : MachineFunctionPass(ID) {
-  initializePrologueEpilogueInsertionPass(*PassRegistry::getPassRegistry());
-}
 
 std::pair<MachineBasicBlock *, MachineBasicBlock::iterator>
 PrologueEpilogueInsertion::findPlaceForPrologue(MachineFunction &MF) {

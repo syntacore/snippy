@@ -24,7 +24,7 @@ class BlockGenPlanning final : public MachineFunctionPass {
 public:
   static char ID;
 
-  BlockGenPlanning();
+  BlockGenPlanning() : MachineFunctionPass(ID) {}
 
   StringRef getPassName() const override;
 

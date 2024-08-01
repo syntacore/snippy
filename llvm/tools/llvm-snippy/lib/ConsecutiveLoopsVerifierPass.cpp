@@ -6,11 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CreatePasses.h"
-#include "GeneratorContextPass.h"
 #include "InitializePasses.h"
 
-#include "snippy/Support/Options.h"
+#include "snippy/CreatePasses.h"
+#include "snippy/Generator/GeneratorContextPass.h"
 
 #include "llvm/InitializePasses.h"
 
@@ -25,7 +24,7 @@ class ConsecutiveLoopsVerifier final : public MachineFunctionPass {
 public:
   static char ID;
 
-  ConsecutiveLoopsVerifier();
+  ConsecutiveLoopsVerifier() : MachineFunctionPass(ID) {}
 
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
@@ -63,10 +62,6 @@ MachineFunctionPass *createConsecutiveLoopsVerifierPass() {
 }
 
 namespace snippy {
-
-ConsecutiveLoopsVerifier::ConsecutiveLoopsVerifier() : MachineFunctionPass(ID) {
-  initializeConsecutiveLoopsVerifierPass(*PassRegistry::getPassRegistry());
-}
 
 bool ConsecutiveLoopsVerifier::runOnMachineFunction(MachineFunction &MF) {
   auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
