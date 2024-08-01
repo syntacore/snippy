@@ -24,7 +24,6 @@ struct GenerationStatistics;
 struct SelfCheckInfo;
 
 void generate(planning::InstructionGroupRequest &IG,
-              GenerationStatistics &CurrentStats,
               planning::InstructionGenerationContext &InstrGenCtx);
 
 GenerationStatistics
