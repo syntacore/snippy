@@ -1,0 +1,92 @@
+# RUN: llvm-snippy %s -march=riscv32-linux-gnu -mattr=+d \
+# RUN: -num-instrs=10 -init-regs-in-elf -riscv-init-fregs-from-memory \
+# RUN: -model-plugin=None --dump-mf |& FileCheck %s --check-prefix DINIT
+
+# RUN: llvm-snippy %s -march=riscv32-linux-gnu -mattr=+f \
+# RUN: -num-instrs=10 -init-regs-in-elf -riscv-init-fregs-from-memory \
+# RUN: -model-plugin=None --dump-mf |& FileCheck %s --check-prefix FINIT
+sections:
+    - no:        0
+      VMA:       0x70000000
+      SIZE:      0x1000
+      LMA:       0x70000000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x805FFFEF
+      SIZE:      0x11
+      LMA:       0x805FFFEF
+      ACCESS:    rw
+
+histogram:
+    - [AND, 1.0]
+
+# DINIT: {{(\$f0_d = \FLD)}}
+# DINIT: {{(\$f1_d = \FLD)}}
+# DINIT: {{(\$f2_d = \FLD)}}
+# DINIT: {{(\$f3_d = \FLD)}}
+# DINIT: {{(\$f4_d = \FLD)}}
+# DINIT: {{(\$f5_d = \FLD)}}
+# DINIT: {{(\$f6_d = \FLD)}}
+# DINIT: {{(\$f7_d = \FLD)}}
+# DINIT: {{(\$f8_d = \FLD)}}
+# DINIT: {{(\$f9_d = \FLD)}}
+# DINIT: {{(\$f10_d = \FLD)}}
+# DINIT: {{(\$f11_d = \FLD)}}
+# DINIT: {{(\$f12_d = \FLD)}}
+# DINIT: {{(\$f13_d = \FLD)}}
+# DINIT: {{(\$f14_d = \FLD)}}
+# DINIT: {{(\$f15_d = \FLD)}}
+# DINIT: {{(\$f16_d = \FLD)}}
+# DINIT: {{(\$f17_d = \FLD)}}
+# DINIT: {{(\$f18_d = \FLD)}}
+# DINIT: {{(\$f19_d = \FLD)}}
+# DINIT: {{(\$f20_d = \FLD)}}
+# DINIT: {{(\$f21_d = \FLD)}}
+# DINIT: {{(\$f22_d = \FLD)}}
+# DINIT: {{(\$f23_d = \FLD)}}
+# DINIT: {{(\$f24_d = \FLD)}}
+# DINIT: {{(\$f25_d = \FLD)}}
+# DINIT: {{(\$f26_d = \FLD)}}
+# DINIT: {{(\$f27_d = \FLD)}}
+# DINIT: {{(\$f28_d = \FLD)}}
+# DINIT: {{(\$f29_d = \FLD)}}
+# DINIT: {{(\$f30_d = \FLD)}}
+# DINIT: {{(\$f31_d = \FLD)}}
+
+# FINIT: {{(\$f0_f = \FLW)}}
+# FINIT: {{(\$f1_f = \FLW)}}
+# FINIT: {{(\$f2_f = \FLW)}}
+# FINIT: {{(\$f3_f = \FLW)}}
+# FINIT: {{(\$f4_f = \FLW)}}
+# FINIT: {{(\$f5_f = \FLW)}}
+# FINIT: {{(\$f6_f = \FLW)}}
+# FINIT: {{(\$f7_f = \FLW)}}
+# FINIT: {{(\$f8_f = \FLW)}}
+# FINIT: {{(\$f9_f = \FLW)}}
+# FINIT: {{(\$f10_f = \FLW)}}
+# FINIT: {{(\$f11_f = \FLW)}}
+# FINIT: {{(\$f12_f = \FLW)}}
+# FINIT: {{(\$f13_f = \FLW)}}
+# FINIT: {{(\$f14_f = \FLW)}}
+# FINIT: {{(\$f15_f = \FLW)}}
+# FINIT: {{(\$f16_f = \FLW)}}
+# FINIT: {{(\$f17_f = \FLW)}}
+# FINIT: {{(\$f18_f = \FLW)}}
+# FINIT: {{(\$f19_f = \FLW)}}
+# FINIT: {{(\$f20_f = \FLW)}}
+# FINIT: {{(\$f21_f = \FLW)}}
+# FINIT: {{(\$f22_f = \FLW)}}
+# FINIT: {{(\$f23_f = \FLW)}}
+# FINIT: {{(\$f24_f = \FLW)}}
+# FINIT: {{(\$f25_f = \FLW)}}
+# FINIT: {{(\$f26_f = \FLW)}}
+# FINIT: {{(\$f27_f = \FLW)}}
+# FINIT: {{(\$f28_f = \FLW)}}
+# FINIT: {{(\$f29_f = \FLW)}}
+# FINIT: {{(\$f30_f = \FLW)}}
+# FINIT: {{(\$f31_f = \FLW)}}

@@ -1,0 +1,61 @@
+# RUN: not llvm-snippy %s -march=riscv32-linux-gnu -mattr=+d,+f \
+# RUN: -num-instrs=10 -init-regs-in-elf \
+# RUN: -model-plugin=None --dump-mf |& FileCheck %s --check-prefix=DPREC 
+
+# RUN: llvm-snippy %s -march=riscv32-linux-gnu -mattr=+f \
+# RUN: -num-instrs=10 -init-regs-in-elf \
+# RUN: -model-plugin=None --dump-mf |& FileCheck %s --check-prefix=FPREC
+
+sections:
+    - no:        0
+      VMA:       0x70000000
+      SIZE:      0x1000
+      LMA:       0x70000000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x805FFFEF
+      SIZE:      0x11
+      LMA:       0x805FFFEF
+      ACCESS:    rw
+
+histogram:
+    - [AND, 1.0]
+
+# DPREC: LLVM ERROR: Cannot write value to a FP register: it doesn't fit in GRP. Please, provide 'riscv-init-fregs-from-memory' option to make initialization possible
+# FPREC: {{(\$f0_f = \FMV_W_X)}}
+# FPREC: {{(\$f1_f = \FMV_W_X)}}
+# FPREC: {{(\$f2_f = \FMV_W_X)}}
+# FPREC: {{(\$f3_f = \FMV_W_X)}}
+# FPREC: {{(\$f4_f = \FMV_W_X)}}
+# FPREC: {{(\$f5_f = \FMV_W_X)}}
+# FPREC: {{(\$f6_f = \FMV_W_X)}}
+# FPREC: {{(\$f7_f = \FMV_W_X)}}
+# FPREC: {{(\$f8_f = \FMV_W_X)}}
+# FPREC: {{(\$f9_f = \FMV_W_X)}}
+# FPREC: {{(\$f10_f = \FMV_W_X)}}
+# FPREC: {{(\$f11_f = \FMV_W_X)}}
+# FPREC: {{(\$f12_f = \FMV_W_X)}}
+# FPREC: {{(\$f13_f = \FMV_W_X)}}
+# FPREC: {{(\$f14_f = \FMV_W_X)}}
+# FPREC: {{(\$f15_f = \FMV_W_X)}}
+# FPREC: {{(\$f16_f = \FMV_W_X)}}
+# FPREC: {{(\$f17_f = \FMV_W_X)}}
+# FPREC: {{(\$f18_f = \FMV_W_X)}}
+# FPREC: {{(\$f19_f = \FMV_W_X)}}
+# FPREC: {{(\$f20_f = \FMV_W_X)}}
+# FPREC: {{(\$f21_f = \FMV_W_X)}}
+# FPREC: {{(\$f22_f = \FMV_W_X)}}
+# FPREC: {{(\$f23_f = \FMV_W_X)}}
+# FPREC: {{(\$f24_f = \FMV_W_X)}}
+# FPREC: {{(\$f25_f = \FMV_W_X)}}
+# FPREC: {{(\$f26_f = \FMV_W_X)}}
+# FPREC: {{(\$f27_f = \FMV_W_X)}}
+# FPREC: {{(\$f28_f = \FMV_W_X)}}
+# FPREC: {{(\$f29_f = \FMV_W_X)}}
+# FPREC: {{(\$f30_f = \FMV_W_X)}}
+# FPREC: {{(\$f31_f = \FMV_W_X)}}
