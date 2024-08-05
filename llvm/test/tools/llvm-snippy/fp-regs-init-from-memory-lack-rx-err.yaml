@@ -1,0 +1,20 @@
+# RUN: not llvm-snippy %s -march=riscv32-linux-gnu -mattr=+d,+f \
+# RUN: -num-instrs=10 -init-regs-in-elf -riscv-init-fregs-from-memory \
+# RUN: -model-plugin=None --dump-mf |& FileCheck %s 
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x805FFFEF
+      SIZE:      0x11
+      LMA:       0x805FFFEF
+      ACCESS:    rw
+
+histogram:
+    - [AND, 1.0]
+
+# CHECK: LLVM ERROR: Failed to create global constant: No read-only ('r') section provided in layout. This is needed for updating of float register.

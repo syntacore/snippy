@@ -133,9 +133,15 @@ snippy::alias
                                cl::desc("Alias for -riscv-dump-rvv-config"),
                                snippy::aliasopt(DumpRVVConfigurationInfo));
 
+// FIXME: Make Init*RegsFromMemory options target independent
 static snippy::opt<bool> InitVRegsFromMemory(
     "riscv-init-vregs-from-memory",
     cl::desc("use preinitialized memory for initializing vector registers"),
+    cl::cat(SnippyRISCVOptions));
+
+static snippy::opt<bool> InitFRegsFromMemory(
+    "riscv-init-fregs-from-memory",
+    cl::desc("use preinitialized memory for initializing floating registers"),
     cl::cat(SnippyRISCVOptions));
 
 static snippy::opt<bool>
@@ -2816,6 +2822,29 @@ private:
   }
 };
 
+static unsigned getOpcodeForGPRToFPRInstr(unsigned DstReg, unsigned XLen,
+                                          unsigned NumBits, LLVMContext &Ctx) {
+  if (NumBits > XLen)
+    snippy::fatal(Ctx, "Cannot write value to a FP register",
+                  "it doesn't fit in GRP. Please, provide '" +
+                      InitFRegsFromMemory.ArgStr +
+                      "' option to make "
+                      "initialization possible");
+
+  unsigned FMVOpc;
+  if (RISCV::FPR32RegClass.contains(DstReg))
+    FMVOpc = RISCV::FMV_W_X;
+  else if (RISCV::FPR64RegClass.contains(DstReg))
+    FMVOpc = RISCV::FMV_D_X;
+  else if (RISCV::FPR16RegClass.contains(DstReg))
+    FMVOpc = RISCV::FMV_H_X;
+  else
+    report_fatal_error("unknown floating point register class for the register",
+                       false);
+
+  return FMVOpc;
+}
+
 void SnippyRISCVTarget::writeValueToFPReg(MachineBasicBlock &MBB,
                                           MachineBasicBlock::iterator Ins,
                                           APInt Value, unsigned DstReg,
@@ -2824,34 +2853,36 @@ void SnippyRISCVTarget::writeValueToFPReg(MachineBasicBlock &MBB,
   assert(RISCV::FPR64RegClass.contains(DstReg) ||
          RISCV::FPR32RegClass.contains(DstReg) ||
          RISCV::FPR16RegClass.contains(DstReg));
-
-  const auto &ST = GC.getSubtarget<RISCVSubtarget>();
   auto &State = GC.getLLVMState();
-  const auto &InstrInfo = State.getInstrInfo();
-
-  unsigned FMVOpc = RISCV::FMV_W_X;
-  if (RISCV::FPR64RegClass.contains(DstReg))
-    FMVOpc = RISCV::FMV_D_X;
-  else if (RISCV::FPR16RegClass.contains(DstReg))
-    FMVOpc = RISCV::FMV_H_X;
-
   auto NumBits = Value.getBitWidth();
-  if (ST.getXLen() > NumBits) {
-    Value = Value.zext(ST.getXLen());
-    Value.setBitsFrom(NumBits);
-  } else if (ST.getXLen() < NumBits) {
-    // FIXME: This may occur when D extension is enabled on rv32. It's a legal
-    // combination, though we do not have real scenarios for it. So, leaving
-    // this part unimplemented.
-    report_fatal_error(
-        "Cannot write value to a FP register as it doesn't fit in GRP.", false);
+
+  if (InitFRegsFromMemory) {
+    auto &GP = GC.getGlobalsPool();
+    const auto *GV = GP.createGV(
+        Value, /* Alignment */ NumBits,
+        /* Linkage */ GlobalValue::InternalLinkage,
+        /* Name */ "global",
+        /* Reason */ "This is needed for updating of float register.");
+
+    auto GVAddr = GP.getGVAddress(GV);
+    loadRegFromAddr(MBB, Ins, GVAddr, DstReg, RP, GC);
+    GC.notifyMemUpdate(GVAddr, Value);
+    return;
   }
+  const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+  auto FMVOpc =
+      getOpcodeForGPRToFPRInstr(DstReg, ST.getXLen(), NumBits, State.getCtx());
+
+  Value = Value.zext(ST.getXLen());
+  Value.setBitsFrom(NumBits);
 
   auto &RI = State.getRegInfo();
   auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
   auto ScratchReg = getNonZeroReg("scratch register for writing FP register",
                                   RI, RegClass, RP, MBB, AccessMaskBit::SRW);
   writeValueToReg(MBB, Ins, Value, ScratchReg, RP, GC);
+
+  const auto &InstrInfo = State.getInstrInfo();
   getSupportInstBuilder(MBB, Ins, State.getCtx(), InstrInfo.get(FMVOpc), DstReg)
       .addReg(ScratchReg);
 }
