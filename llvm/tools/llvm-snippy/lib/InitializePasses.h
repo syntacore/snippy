@@ -27,8 +27,10 @@ void initializeRegsInitInsertionPass(PassRegistry &);
 void initializePrologueEpilogueInsertionPass(PassRegistry &);
 void initializePrintMachineInstrsPass(PassRegistry &);
 void initializeInstructionsPostProcessPass(PassRegistry &);
+void initializePostGenVerifierPass(PassRegistry &);
 void initializeBranchRelaxatorPass(PassRegistry &);
 void initializeBlockGenPlanningPass(PassRegistry &);
+void initializeBlockGenPlanWrapperPass(PassRegistry &);
 void initializeConsecutiveLoopsVerifierPass(PassRegistry &);
 
 } // namespace llvm

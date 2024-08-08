@@ -36,6 +36,14 @@ std::string RequestLimit::getAsString() const {
                     Limit);
 }
 
+bool RequestLimit::isEmpty() const {
+  return std::visit(
+      OverloadedCallable(
+          [](const auto &Lim) { return Lim.Limit == 0; },
+          [](const Mixed &Lim) { return Lim.Size == 0 && Lim.NumInstrs == 0; }),
+      Limit);
+}
+
 bool RequestLimit::isReached(GenerationStatistics Stats) const {
   return std::visit(OverloadedCallable(
                         [&Stats](const NumInstrs &Lim) {
@@ -89,36 +97,49 @@ size_t RequestLimit::getNumInstrsLeft(GenerationStatistics Stats) const {
 }
 
 RequestLimit &RequestLimit::operator+=(const RequestLimit &Other) {
-  if (!isMixedLimit() && !isSameKindAs(Other)) {
-    if (getLimit() == 0) { // empty
-      Limit = Other.Limit; // overwrite
-      return *this;
-    }
-    LLVMContext Ctx;
-    snippy::fatal(
-        Ctx,
-        "Attempt to add limit <" + Twine(Other.getAsString()) + "> to limit <" +
-            Twine(getAsString()) + ">",
-        "You can only sum limits in one of the following ways: Limits of "
-        "the same kind, \"Mixed\" with any or empty \"non-Mixed\" with any");
-  }
-  std::visit(OverloadedCallable(
-                 [&Other](NumInstrs &Lim) { Lim.Limit += Other.getLimit(); },
-                 [&Other](Size &Lim) { Lim.Limit += Other.getLimit(); },
-                 [&Other](Mixed &Lim) {
-                   if (Other.isSizeLimit()) {
-                     Lim.Size += Other.getLimit();
-                   } else if (Other.isNumLimit()) {
-                     Lim.NumInstrs += Other.getLimit();
-                   } else if (Other.isMixedLimit()) {
+  if (isSameKindAs(Other)) {
+    std::visit(OverloadedCallable(
+                   [&Other](NumInstrs &Lim) { Lim.Limit += Other.getLimit(); },
+                   [&Other](Size &Lim) { Lim.Limit += Other.getLimit(); },
+                   [&Other](Mixed &Lim) {
                      auto &MixedOther = std::get<Mixed>(Other.Limit);
                      Lim.NumInstrs += MixedOther.NumInstrs;
                      Lim.Size += MixedOther.Size;
-                   } else {
-                     llvm_unreachable("Unknown limit kind");
-                   }
-                 }),
-             Limit);
+                   }),
+               Limit);
+    return *this;
+  }
+
+  if (isEmpty()) {
+    Limit = Other.Limit; // overwrite
+    return *this;
+  }
+
+  auto AddPlainToMixed = [](auto &MixedLimit, auto &PlainLimit) {
+    if (PlainLimit.isNumLimit())
+      MixedLimit.NumInstrs += PlainLimit.getLimit();
+    else if (PlainLimit.isSizeLimit())
+      MixedLimit.Size += PlainLimit.getLimit();
+    else
+      llvm_unreachable("Plain limit has undefined kind");
+    return MixedLimit;
+  };
+
+  if (Other.isMixedLimit()) {
+    RequestLimit::Mixed ResLimit(std::get<Mixed>(Other.Limit));
+    Limit = AddPlainToMixed(ResLimit, *this);
+    return *this;
+  }
+
+  if (isMixedLimit()) {
+    RequestLimit::Mixed &CurLimit = std::get<Mixed>(Limit);
+    AddPlainToMixed(CurLimit, Other);
+    return *this;
+  }
+
+  auto NumLimit = Other.isNumLimit() ? Other.getLimit() : getLimit();
+  auto SizeLimit = Other.isSizeLimit() ? Other.getLimit() : getLimit();
+  Limit = RequestLimit::Mixed{NumLimit, SizeLimit};
   return *this;
 }
 
