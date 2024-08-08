@@ -33,6 +33,7 @@
 #include "snippy/Support/Utils.h"
 #include "snippy/Target/Target.h"
 
+#include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
@@ -41,6 +42,7 @@
 #include "llvm/CodeGen/MachineOperand.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/InitializePasses.h"
+#include "llvm/MC/MCStreamer.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
@@ -376,6 +378,7 @@ static RegisterGenerator createRegGen(std::string PluginFileName,
 
 GeneratorResult FlowGenerator::generate(LLVMState &State) {
   auto &LLVMTM = State.getTargetMachine();
+  auto &Tgt = State.getSnippyTarget();
   auto &Ctx = State.getCtx();
   Module M("SnippyModule", Ctx);
 
@@ -462,7 +465,9 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
 
   SmallString<32> Output;
   raw_svector_ostream OS(Output);
-  PM.addAsmPrinter(LLVMTM, OS, nullptr, CodeGenFileType::ObjectFile, Context);
+  auto ObjStreamer = State.createObjStreamer(OS, Context);
+  auto AsmPrinter = Tgt.createAsmPrinter(LLVMTM, std::move(ObjStreamer));
+  PM.add(AsmPrinter.release());
 
   PM.run(M);
 

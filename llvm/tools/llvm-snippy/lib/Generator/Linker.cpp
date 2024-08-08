@@ -350,16 +350,12 @@ std::vector<std::string> Linker::collectPhdrInfo() const {
 std::string Linker::createLinkerScript(bool Export) const {
   std::string ScriptText;
   llvm::raw_string_ostream STS{ScriptText};
-  // It is needed to fit other object file sections like
-  // .eh_frame
-  constexpr size_t ExtraMemorySpace = 0x10000;
 
   std::string MemoryRegionName =
       MangleName.empty() ? "SNIPPY" : "SNIPPY_" + MangleName;
   STS << "MEMORY {\n"
       << "  " << MemoryRegionName << " (rwx) : ORIGIN = " << MemoryRegion.first
-      << ", LENGTH = "
-      << (MemoryRegion.second - MemoryRegion.first + ExtraMemorySpace) << "\n";
+      << ", LENGTH = " << (MemoryRegion.second - MemoryRegion.first) << "\n";
 
   STS << "}\n";
   auto Phdrs = collectPhdrInfo();
@@ -401,10 +397,6 @@ std::string Linker::createLinkerScript(bool Export) const {
     }
     STS << "\n";
   }
-  STS << "/DISCARD/ :\n"
-      << "{\n"
-      << "  *(.eh_frame)\n"
-      << "}\n";
 
   STS << "}";
   return ScriptText;
