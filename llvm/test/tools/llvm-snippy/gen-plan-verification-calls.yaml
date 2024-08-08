@@ -1,0 +1,24 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -function-number=20 -function-layers=5 -num-instrs=100 \
+# RUN: -stack-size=10240 -num-instr-ancil=50 -verify-gen-plan |& FileCheck %s
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [JAL, 0.1]
+    - [JALR, 0.1]
+    - [BLT, 0.1]
+
+# CHECK-NOT: warning: request for {{[a-zA-Z0-9]+}} contains limits not only on the number of generated instructions: number of instructions in some blocks can differ from plan
