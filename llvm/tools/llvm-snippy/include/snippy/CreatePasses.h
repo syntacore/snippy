@@ -61,6 +61,8 @@ MachineFunctionPass *createLoopAlignmentPass();
 
 MachineFunctionPass *createInstructionsPostProcessPass();
 
+MachineFunctionPass *createPostGenVerifierPass();
+
 MachineFunctionPass *createBranchRelaxatorPass();
 
 MachineFunctionPass *createRegsInitInsertionPass(bool InitRegs);
@@ -71,6 +73,7 @@ MachineFunctionPass *createPrintMachineInstrsPass(raw_ostream &OS);
 
 
 MachineFunctionPass *createBlockGenPlanningPass();
+ImmutablePass *createBlockGenPlanWrapperPass();
 
 MachineFunctionPass *createConsecutiveLoopsVerifierPass();
 

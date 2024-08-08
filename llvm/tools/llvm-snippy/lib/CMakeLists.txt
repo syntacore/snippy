@@ -30,6 +30,7 @@ set(LLVM_LINK_COMPONENTS
 set(LLVMSnippySources
   BranchRelaxatorPass.cpp
   BlockGenPlanningPass.cpp
+  BlockGenPlanWrapperPass.cpp
   CFGeneratorPass.cpp
   CFGPrinterPass.cpp
   CFPermutationPass.cpp
@@ -41,6 +42,7 @@ set(LLVMSnippySources
   FunctionGeneratorPass.cpp
   InitializePasses.cpp
   InstructionsPostProcessPass.cpp
+  PostGenVerifierPass.cpp
   LoopAlignmentPass.cpp
   LoopCanonicalizationPass.cpp
   LoopLatcherPass.cpp
