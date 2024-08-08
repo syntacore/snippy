@@ -7,7 +7,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "BlockGenPlanningPass.h"
+#include "BlockGenPlanWrapperPass.h"
 #include "InitializePasses.h"
+#include "snippy/Generator/GeneratorContextPass.h"
 
 #include "snippy/Generator/GenerationRequest.h"
 #include "snippy/Generator/GeneratorContextPass.h"
@@ -77,6 +79,7 @@ char BlockGenPlanning::ID = 0;
 INITIALIZE_PASS_BEGIN(BlockGenPlanning, DEBUG_TYPE, PASS_DESC, false, true)
 INITIALIZE_PASS_DEPENDENCY(GeneratorContextWrapper)
 INITIALIZE_PASS_DEPENDENCY(MachineLoopInfo)
+INITIALIZE_PASS_DEPENDENCY(BlockGenPlanWrapper)
 INITIALIZE_PASS_END(BlockGenPlanning, DEBUG_TYPE, PASS_DESC, false, true)
 
 namespace llvm {
@@ -93,6 +96,7 @@ void BlockGenPlanning::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesAll();
   AU.addRequired<GeneratorContextWrapper>();
   AU.addRequired<MachineLoopInfo>();
+  AU.addRequired<BlockGenPlanWrapper>();
   MachineFunctionPass::getAnalysisUsage(AU);
 }
 
@@ -787,9 +791,12 @@ BlockGenPlanning::get(const MachineBasicBlock &MBB) const {
 bool BlockGenPlanning::runOnMachineFunction(MachineFunction &MF) {
   auto *GenCtx = &getAnalysis<GeneratorContextWrapper>().getContext();
   auto *MLI = &getAnalysis<MachineLoopInfo>();
+  auto *GenPlanWrapper = &getAnalysis<BlockGenPlanWrapper>();
 
   BlockGenPlanningImpl Impl(GenCtx, MLI);
   Req = Impl.processFunction(MF);
+  assert(Req.has_value());
+  GenPlanWrapper->setFunctionRequest(&MF, Req.value());
 
   return true;
 }

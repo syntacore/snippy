@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "FlowGenerator.h"
+#include "BlockGenPlanWrapperPass.h"
 #include "BlockGenPlanningPass.h"
 #include "InitializePasses.h"
 
@@ -167,7 +168,7 @@ public:
     AU.setPreservesCFG();
     AU.addRequired<GeneratorContextWrapper>();
     AU.addRequired<MachineLoopInfo>();
-    AU.addRequired<BlockGenPlanning>();
+    AU.addRequired<BlockGenPlanWrapper>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 
@@ -187,7 +188,7 @@ using llvm::snippy::InstructionGenerator;
 
 INITIALIZE_PASS_BEGIN(InstructionGenerator, DEBUG_TYPE, PASS_DESC, false, false)
 INITIALIZE_PASS_DEPENDENCY(MachineLoopInfo)
-INITIALIZE_PASS_DEPENDENCY(BlockGenPlanning)
+INITIALIZE_PASS_DEPENDENCY(BlockGenPlanWrapper)
 INITIALIZE_PASS_END(InstructionGenerator, DEBUG_TYPE, PASS_DESC, false, false)
 
 namespace llvm {
@@ -282,7 +283,7 @@ void InstructionGenerator::addSelfcheckSectionPropertiesAsGV() const {
 
 planning::FunctionRequest InstructionGenerator::createMFGenerationRequest(
     const MachineFunction &MF) const {
-  auto &FunReq = getAnalysis<BlockGenPlanning>().get();
+  auto &FunReq = getAnalysis<BlockGenPlanWrapper>().getFunctionRequest(&MF);
   const MCInstrDesc *FinalInstDesc = nullptr;
   auto LastInstrStr = SGCtx->getLastInstr();
   if (!LastInstrStr.empty() && !SGCtx->useRetAsLastInstr()) {
@@ -424,7 +425,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
   SnippyTgt.addTargetSpecificPasses(PM);
 
   // Pre backtrack end
-
+  PM.add(createBlockGenPlanWrapperPass());
   PM.add(createBlockGenPlanningPass());
   PM.add(createInstructionGeneratorPass()); // Can be backtracked
 
@@ -445,6 +446,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
   if (VerifyConsecutiveLoops)
     PM.add(createConsecutiveLoopsVerifierPass());
 
+  PM.add(createPostGenVerifierPass());
   PM.add(createInstructionsPostProcessPass());
   PM.add(createFunctionDistributePass());
 

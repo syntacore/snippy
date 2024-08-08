@@ -38,7 +38,8 @@ enum class WarningName {
   InstructionSizeUnknown,
   TooFarMaxPCDist,
   ModelException,
-  UnusedSection
+  UnusedSection,
+  GenPlanVerification
 };
 
 struct WarningCounters {

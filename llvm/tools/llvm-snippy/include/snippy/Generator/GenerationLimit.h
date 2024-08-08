@@ -71,6 +71,8 @@ public:
     return Limit.index() == Other.Limit.index();
   }
 
+  bool isEmpty() const;
+
   std::string getAsString() const;
 
   RequestLimit &operator+=(const RequestLimit &Other);

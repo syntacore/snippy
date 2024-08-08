@@ -1,0 +1,39 @@
+# RUN: llvm-snippy %s --march=riscv64-unknown-elf --verify-gen-plan \
+# RUN: --num-instrs=10 --init-regs-in-elf --last-instr=RET --mattr=-c \
+# RUN: |& FileCheck %s
+
+include:
+  - Inputs/memory-aligned.yaml
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80002000
+    SIZE:      0x100000
+    LMA:       0x80002000
+    ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+    - [BNE, 1.0]
+    - [BLT, 1.0]
+    - [BLTU, 1.0]
+    - [BGE, 1.0]
+    - [BGEU, 1.0]
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+
+branches:
+  max-depth:
+    loop: 1
+  distance:
+    pc:
+      min: 0
+      max: 120
+
+# CHECK: warning: request for {{[a-zA-Z0-9]+}} contains limits not only on the number of generated instructions: number of instructions in some blocks can differ from plan
+
