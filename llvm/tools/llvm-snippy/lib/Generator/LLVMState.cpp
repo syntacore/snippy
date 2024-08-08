@@ -17,6 +17,7 @@
 #include "llvm/MC/MCDisassembler/MCDisassembler.h"
 #include "llvm/MC/MCFixup.h"
 #include "llvm/MC/MCObjectFileInfo.h"
+#include "llvm/MC/MCObjectStreamer.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
@@ -105,6 +106,24 @@ bool LLVMState::canAssemble(const MCInst &Inst) const {
   CodeEmitter->encodeInstruction(Inst, Tmp, Fixups,
                                  *TheTargetMachine->getMCSubtargetInfo());
   return Tmp.size() > 0;
+}
+
+std::unique_ptr<MCStreamer> LLVMState::createObjStreamer(raw_pwrite_stream &OS,
+                                                         MCContext &MCCtx) {
+  assert(TheTargetMachine);
+  auto MCStreamerOrErr = TheTargetMachine->createMCStreamer(
+      OS, nullptr, CodeGenFileType::ObjectFile, MCCtx);
+  if (auto Err = MCStreamerOrErr.takeError())
+    snippy::fatal(Ctx, "Internal Error creating MCStreamer",
+                  toString(std::move(Err)));
+
+  // We explicitly specified ObjectFile type 3 lines above so we can down-cast
+  // it safely
+  auto *ObjStreamer =
+      static_cast<MCObjectStreamer *>(MCStreamerOrErr->release());
+  ObjStreamer->setEmitEHFrame(false);
+  ObjStreamer->setEmitDebugFrame(false);
+  return std::unique_ptr<MCStreamer>(ObjStreamer);
 }
 
 } // namespace snippy
