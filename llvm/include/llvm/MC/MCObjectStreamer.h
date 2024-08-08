@@ -89,6 +89,12 @@ public:
   void emitFrames(MCAsmBackend *MAB);
   void emitCFISections(bool EH, bool Debug) override;
 
+  bool setEmitEHFrame(bool Val) { return std::exchange(EmitEHFrame, Val); }
+
+  bool setEmitDebugFrame(bool Val) {
+    return std::exchange(EmitDebugFrame, Val);
+  }
+
   MCFragment *getCurrentFragment() const;
 
   void insert(MCFragment *F) {

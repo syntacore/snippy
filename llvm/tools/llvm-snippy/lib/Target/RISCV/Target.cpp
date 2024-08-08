@@ -2814,6 +2814,12 @@ private:
   bool canProduceNaN(const MCInstrDesc &InstrDesc) const override {
     return snippy::canProduceNaN(InstrDesc);
   }
+
+  std::unique_ptr<AsmPrinter>
+  createAsmPrinter(LLVMTargetMachine &TM,
+                   std::unique_ptr<MCStreamer> Streamer) const override {
+    return std::make_unique<RISCVAsmPrinter>(TM, std::move(Streamer));
+  }
 };
 
 void SnippyRISCVTarget::writeValueToFPReg(MachineBasicBlock &MBB,
