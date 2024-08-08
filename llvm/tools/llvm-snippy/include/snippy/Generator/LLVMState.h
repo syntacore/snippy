@@ -142,6 +142,9 @@ public:
     return GV;
   }
 
+  std::unique_ptr<MCStreamer> createObjStreamer(raw_pwrite_stream &OS,
+                                                MCContext &Ctx);
+
   AsmPrinter &getOrCreateAsmPrinter() const;
   MCCodeEmitter &getCodeEmitter() const;
   MCDisassembler &getDisassembler() const;
