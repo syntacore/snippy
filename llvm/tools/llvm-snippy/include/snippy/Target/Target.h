@@ -499,6 +499,10 @@ public:
   // Registers that should be valid while calling an external function
   virtual std::vector<MCRegister> getGlobalStateRegs() const = 0;
 
+  virtual std::unique_ptr<AsmPrinter>
+  createAsmPrinter(LLVMTargetMachine &TM,
+                   std::unique_ptr<MCStreamer> Streamer) const = 0;
+
 private:
   virtual bool matchesArch(Triple::ArchType Arch) const = 0;
 

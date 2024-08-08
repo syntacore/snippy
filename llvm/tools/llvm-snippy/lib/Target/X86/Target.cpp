@@ -491,6 +491,12 @@ public:
     reportUnimplementedError();
   }
 
+  std::unique_ptr<AsmPrinter>
+  createAsmPrinter(LLVMTargetMachine &TM,
+                   std::unique_ptr<MCStreamer> Streamer) const override {
+    reportUnimplementedError();
+  }
+
 }; // namespace
 
 bool SnippyX86Target::matchesArch(Triple::ArchType Arch) const {

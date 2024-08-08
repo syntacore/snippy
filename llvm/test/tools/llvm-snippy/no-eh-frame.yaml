@@ -1,0 +1,23 @@
+# RUN: llvm-snippy %s -o %t -model-plugin=None
+# RUN: readelf -S %t.elf | not grep eh_frame
+
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  num-instrs: 100
+
+sections:
+    - no:        1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x600000
+      SIZE:      0x100000
+      LMA:       0x600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+

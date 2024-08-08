@@ -26,11 +26,11 @@ histogram:
     - [ADDI, 1.0]
     - [SW, 5.0]
 
-# UNMANGLED: SNIPPY (rwx) : ORIGIN = 65536, LENGTH = 67072
+# UNMANGLED: SNIPPY (rwx) : ORIGIN = 65536, LENGTH = 1536
 # UNMANGLED: .snippy.1.rx 65536: {
 # UNMANGLED: .snippy.2.rw 66048 (NOLOAD) : {
 # UNMANGLED: .snippy.named.rw 66560 (NOLOAD) : {
-# MANGLED: SNIPPY_Test (rwx) : ORIGIN = 65536, LENGTH = 67072
+# MANGLED: SNIPPY_Test (rwx) : ORIGIN = 65536, LENGTH = 1536
 # MANGLED: .snippy.Test.1.rx 65536: {
 # MANGLED: .snippy.Test.2.rw 66048 (NOLOAD) : {
 # MANGLED: .snippy.Test.named.rw 66560 (NOLOAD) : {
