@@ -393,7 +393,7 @@ void BlockGenPlanningImpl::updateBlocksToProcess(
   // size].
   assert(BlockReq.limit().isNumLimit());
   if (BlockReq.limit().getLimit() >= AverageBlockInstrs * 2)
-    erase_value(BlocksToProcess, &BlockReq.getMBB());
+    erase(BlocksToProcess, &BlockReq.getMBB());
 }
 
 template <typename T>
@@ -518,7 +518,7 @@ BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
   fillReqWithPlainInstsByNumber(FunReq, NumInstrPlain, AverageBlockInstrs);
 
   for (auto &[MBB, BB] : FunReq)
-    erase_value(BlocksToProcess, MBB);
+    erase(BlocksToProcess, MBB);
   // Add default plans for remaining blocks.
   addEmptyReqForBlocks(FunReq, BlocksToProcess,
                        planning::RequestLimit::NumInstrs{});
@@ -740,7 +740,7 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
 
   fillReqWithPlainInstsByNumber(FunReq, NumInstrPlain, AverageBlockInstrs);
   for (auto &[MBB, BB] : FunReq)
-    erase_value(BlocksToProcess, MBB);
+    erase(BlocksToProcess, MBB);
   // Add default plans for remaining blocks.
   addEmptyReqForBlocks(FunReq, BlocksToProcess,
                        planning::RequestLimit::NumInstrs{});
