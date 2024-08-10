@@ -78,7 +78,7 @@ void SimRunner::run(StringRef Program, const IRegisterState &InitialRegState) {
   checkStates(/* CheckMemory */ true);
 
   auto &PrimI = getPrimaryInterpreter();
-  PrimI.logMessage("#===Simulation Start===\n");
+  PrimI.logMessage("==============================Simulation Start==============================\n");
 
   while (!PrimI.endOfProg()) {
     auto ExecRes = PrimI.step();
