@@ -63,6 +63,9 @@ private:
                                const MachineLoop &ML) const;
   void updateBlocksToProcess(const planning::BasicBlockRequest &BlockReq,
                              size_t AverageBlockInstrs);
+  template <typename Predicate>
+  void fillBlocksToProcess(const MachineFunction &MF,
+                           planning::FunctionRequest &FunReq, Predicate &&Pred);
 };
 
 } // namespace
@@ -489,14 +492,33 @@ static void randomize(planning::BasicBlockRequest &BB, GeneratorContext &GC) {
   std::swap(NewPacks, BB);
 }
 
+template <typename Predicate>
+void BlockGenPlanningImpl::fillBlocksToProcess(
+    const MachineFunction &MF, planning::FunctionRequest &FunReq,
+    Predicate &&Pred) {
+  auto MapRange = map_range(MF, [](auto &MBB) { return &MBB; });
+  auto DropBlock = [&MapRange, &FunReq] {
+    FunReq.add(*MapRange.begin(),
+               planning::BasicBlockRequest(**MapRange.begin()));
+    MapRange = drop_begin(MapRange);
+  };
+
+  auto IsRegsInit = GenCtx->getGenSettings().RegistersConfig.InitializeRegs;
+  if (IsRegsInit)
+    DropBlock();
+  copy_if(std::move(MapRange), std::back_inserter(BlocksToProcess),
+          std::forward<Predicate>(Pred));
+}
+
 planning::FunctionRequest
 BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
   assert(GenCtx->getGenerationMode() == GenerationMode::NumInstrs);
 
   auto LatchBlocks = collectLatchBlocks(*GenCtx, *MLI, MF);
-  copy_if(map_range(MF, [](auto &MBB) { return &MBB; }),
-          std::back_inserter(BlocksToProcess),
-          [&LatchBlocks](const auto &MBB) { return !LatchBlocks.count(MBB); });
+  planning::FunctionRequest FunReq(MF, *GenCtx);
+  fillBlocksToProcess(MF, FunReq, [&LatchBlocks](const auto *MBB) {
+    return !LatchBlocks.count(MBB);
+  });
   assert(!BlocksToProcess.empty() &&
          "At least one basic block that is not a latch block must exist");
 
@@ -516,7 +538,6 @@ BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
   if (AverageBlockInstrs == 0)
     AverageBlockInstrs = 1;
 
-  planning::FunctionRequest FunReq(MF, *GenCtx);
   fillReqWithBurstGroups(FunReq, NumInstrBurst, NumInstrTotal,
                          AverageBlockInstrs);
   fillReqWithPlainInstsByNumber(FunReq, NumInstrPlain, AverageBlockInstrs);
@@ -528,7 +549,6 @@ BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
                        planning::RequestLimit::NumInstrs{});
   addEmptyReqForBlocks(FunReq, LatchBlocks,
                        planning::RequestLimit::NumInstrs{});
-
   // Randomize generation plan: shuffle burst groups and plain instructions.
   for (auto &BlockReq : make_second_range(FunReq))
     randomize(BlockReq, *GenCtx);
@@ -571,13 +591,12 @@ planning::FunctionRequest
 BlockGenPlanningImpl::processFunctionWithSize(const MachineFunction &MF) {
   assert(GenCtx->getGenerationMode() == GenerationMode::Size);
 
-  copy(map_range(MF, [](auto &MBB) { return &MBB; }),
-       std::back_inserter(BlocksToProcess));
+  planning::FunctionRequest FunReq(MF, *GenCtx);
+  fillBlocksToProcess(MF, FunReq, [](auto *MBB) { return true; });
   assert(!BlocksToProcess.empty() && "At least one basic block must exist");
 
   auto MFSizeLimit = calculateMFSizeLimit(MF);
 
-  planning::FunctionRequest FunReq(MF, *GenCtx);
   fillReqWithPlainInstsBySize(FunReq, MFSizeLimit);
 
   return FunReq;
@@ -692,6 +711,9 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
   assert(GenCtx->getGenerationMode() == GenerationMode::Mixed);
 
   planning::FunctionRequest FunReq(MF, *GenCtx);
+  // Process blocks out of loops
+  fillBlocksToProcess(
+      MF, FunReq, [this](const auto *MBB) { return !MLI->getLoopFor(MBB); });
   unsigned SupposedNumInstr = 0;
   auto MaxInstrSize =
       GenCtx->getLLVMState().getSnippyTarget().getMaxInstrSize();
@@ -706,12 +728,6 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
       SupposedNumInstr += BBSize % MaxInstrSize ? 1 : 0;
     }
   }
-
-  // Process blocks out of loops
-
-  copy_if(map_range(MF, [](auto &MBB) { return &MBB; }),
-          std::back_inserter(BlocksToProcess),
-          [this](const auto &MBB) { return !MLI->getLoopFor(MBB); });
 
   auto NumInstrTotal = GenCtx->getRequestedInstrsNum(MF);
   assert(NumInstrTotal >= GenCtx->getCFInstrsNum(MF));
