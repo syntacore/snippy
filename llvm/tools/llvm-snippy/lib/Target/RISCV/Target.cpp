@@ -1572,6 +1572,23 @@ public:
     return RISCVII->getInstSizeInBytes(Inst);
   }
 
+  LoopType getLoopType(MachineInstr &Branch) const override {
+    switch (Branch.getOpcode()) {
+    case RISCV::BEQ:
+    case RISCV::C_BEQZ:
+    case RISCV::BLT:
+    case RISCV::BLTU:
+      return LoopType::UpCount;
+    case RISCV::BNE:
+    case RISCV::C_BNEZ:
+    case RISCV::BGE:
+    case RISCV::BGEU:
+      return LoopType::DownCount;
+    default:
+      llvm_unreachable("Unsupported branch type");
+    }
+  }
+
   void insertLoopInit(MachineBasicBlock &MBB, MachineBasicBlock::iterator Pos,
                       MachineInstr &Branch, ArrayRef<Register> ReservedRegs,
                       unsigned NIter, GeneratorContext &GC) const override {
