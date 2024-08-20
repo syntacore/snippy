@@ -394,8 +394,9 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   auto ActualNumIter = CounterInsRes.NIter;
   unsigned MinCounterVal = CounterInsRes.MinCounterVal.getZExtValue();
   auto CounterReg = ReservedRegs[CounterRegIdx];
-  GeneratorContext::LoopGenerationInfo TheLoopGenInfo{CounterReg, ActualNumIter,
-                                                      MinCounterVal};
+  GeneratorContext::LoopGenerationInfo TheLoopGenInfo{
+      CounterReg, ActualNumIter, MinCounterVal,
+      SnippyTgt.getLoopType(NewBranch)};
   SGCtx.addLoopGenerationInfoForMBB(ML.getHeader(), TheLoopGenInfo);
 
   if (UseStackOpt || TrackingMode) {

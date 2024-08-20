@@ -59,6 +59,8 @@ enum class GenerationMode {
   Mixed
 };
 
+enum class LoopType { UpCount, DownCount };
+
 using BurstGroupAccessDesc = std::vector<AddressInfo>;
 using PlainAccessesType = std::vector<AccessAddress>;
 using BurstGroupAccessesType = std::vector<BurstGroupAccessDesc>;
@@ -69,6 +71,7 @@ public:
     Register CounterReg;
     unsigned NumIter;
     unsigned SmallestCounterVal;
+    LoopType Type;
   };
 
 private:
@@ -120,6 +123,8 @@ private:
 
   size_t EntryPrologueInstrCnt = 0;
   size_t EntryEpilogueInstrCnt = 0;
+
+  const MachineBasicBlock *RegsInitBlock = nullptr;
 
   DenseMap<const MachineBasicBlock *, LoopGenerationInfo> LoopInfoMap;
 
@@ -453,9 +458,10 @@ public:
   }
 
   size_t getFunctionSize(const MachineFunction &MF) const {
-    return std::accumulate(
-        MF.begin(), MF.end(), 0ul,
-        [this](auto CurrentSize, const auto &MBB) { return getMBBSize(MBB); });
+    return std::accumulate(MF.begin(), MF.end(), 0ul,
+                           [this](auto CurrentSize, const auto &MBB) {
+                             return CurrentSize + getMBBSize(MBB);
+                           });
   }
 
   void addLoopGenerationInfoForMBB(const MachineBasicBlock *Header,
@@ -671,6 +677,12 @@ public:
     auto Addr = getNextFreeUtilityAddr();
     addFilledUtilitySize(RegSize);
     return Addr;
+  }
+
+  void setRegsInitBlock(const MachineBasicBlock *MBB) { RegsInitBlock = MBB; }
+
+  bool isRegsInitBlock(const MachineBasicBlock *MBB) const {
+    return RegsInitBlock == MBB;
   }
 };
 

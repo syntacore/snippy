@@ -61,6 +61,7 @@ class LLVMState;
 class RegPoolWrapper;
 class GeneratorContext;
 class StridedImmediate;
+enum class LoopType;
 struct TargetGenContextInterface {
   virtual ~TargetGenContextInterface() = 0;
 
@@ -453,6 +454,8 @@ public:
                               MachineInstr &Branch,
                               ArrayRef<Register> ReservedRegs, unsigned NIter,
                               GeneratorContext &GC) const = 0;
+
+  virtual LoopType getLoopType(MachineInstr &Branch) const = 0;
 
   struct LoopCounterInsertionResult {
     std::optional<SnippyDiagnosticInfo> Diag;
