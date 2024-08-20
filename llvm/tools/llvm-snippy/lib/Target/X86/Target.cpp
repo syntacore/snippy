@@ -344,6 +344,10 @@ public:
     reportUnimplementedError();
   }
 
+  LoopType getLoopType(MachineInstr &Branch) const override {
+    reportUnimplementedError();
+  }
+
   void insertLoopInit(MachineBasicBlock &MBB, MachineBasicBlock::iterator Pos,
                       MachineInstr &Branch, ArrayRef<Register> ReservedRegs,
                       unsigned NIter, GeneratorContext &GC) const override {

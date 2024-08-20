@@ -31,7 +31,9 @@ histogram:
     - [LW, 10.0]
     - [SW, 10.0]
 
-# CHECK: bb.0:
+# CHECK: bb.1:
+# CHECK-NEXT: successors:
+# CHECK-EMPTY:
 # CHECK-NEXT: {{(\$x1 = .*$[[:space:]]+)+}}
 # CHECK-SAME: {{(\$x2 = .*$[[:space:]]+)+}}
 # CHECK-SAME: {{(\$x3 = .*$[[:space:]]+)+}}
