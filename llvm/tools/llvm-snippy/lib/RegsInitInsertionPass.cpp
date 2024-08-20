@@ -34,7 +34,6 @@ public:
   bool runOnMachineFunction(MachineFunction &MF) override;
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.setPreservesCFG();
     AU.addRequired<GeneratorContextWrapper>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
@@ -72,8 +71,17 @@ bool RegsInitInsertion::runOnMachineFunction(MachineFunction &MF) {
   auto &State = SGCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   const auto &SubTgt = MF.getSubtarget();
-  SnippyTgt.generateRegsInit(MF.front(), SGCtx.getInitialRegisterState(SubTgt),
-                             SGCtx);
+
+  // new block for registers initialization
+  auto *BlockRegsInit = MF.CreateMachineBasicBlock();
+  auto *SuccessorBlockPtr = &MF.front();
+  auto InsertIterPos = MF.begin();
+  BlockRegsInit->addSuccessor(SuccessorBlockPtr);
+  MF.insert(InsertIterPos, BlockRegsInit);
+  SGCtx.setRegsInitBlock(BlockRegsInit);
+
+  SnippyTgt.generateRegsInit(*BlockRegsInit,
+                             SGCtx.getInitialRegisterState(SubTgt), SGCtx);
   return true;
 }
 

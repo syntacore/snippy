@@ -179,7 +179,8 @@ MachineFunction &createFunction(GeneratorContext &SGCtx, Module &M,
       State.createFunction(M, FinalName, SectionName, Linkage), SGCtx.getMMI());
   auto &Props = MF.getProperties();
   // FIXME: currently we don't keep liveness when creating and filling new BB
-  if (SGCtx.hasCFInstrs() || SGCtx.hasCallInstrs())
+  auto IsRegsInit = SGCtx.getGenSettings().RegistersConfig.InitializeRegs;
+  if (SGCtx.hasCFInstrs() || SGCtx.hasCallInstrs() || IsRegsInit)
     Props.reset(MachineFunctionProperties::Property::TracksLiveness);
   auto *MBB = MF.CreateMachineBasicBlock();
   MF.push_back(MBB);

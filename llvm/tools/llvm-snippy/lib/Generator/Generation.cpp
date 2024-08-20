@@ -654,7 +654,7 @@ generateNopsToSizeLimit(const planning::RequestLimit &Limit,
   auto &MBB = InstrGenCtx.MBB;
   auto &State = GC.getLLVMState();
   auto &SnpTgt = State.getSnippyTarget();
-  auto ItEnd = MBB.getFirstTerminator();
+  auto ItEnd = InstrGenCtx.Ins;
   auto ItBegin = ItEnd == MBB.begin() ? ItEnd : std::prev(ItEnd);
   while (!Limit.isReached(InstrGenCtx.Stats)) {
     auto *MI = SnpTgt.generateNop(MBB, ItBegin, State);
@@ -1385,23 +1385,13 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
              "generate primary instructions");
       CurrMFGenStats.merge(generateCompensationCode(*MBB, GC));
     } else {
-      if (GC.hasTrackingMode()) {
-        if (snippy::interpretInstrs(MBB->begin(), MBB->getFirstTerminator(),
-                                    GC) != GenerationStatus::Ok)
-          report_fatal_error(
-              "Interpretation failed on instructions inserted before "
-              "main instructions generation routine.",
-              false);
-      }
-
       SNIPPY_DEBUG_BRIEF("request for reachable BasicBlock", BBReq);
 
-        auto RP = GC.getRegisterPool();
-        planning::InstructionGenerationContext InstrGenCtx{
-            *MBB, MBB->getFirstTerminator(), &RP,
-            GC,   GenerationStatistics(),    SelfCheckInfo};
-        snippy::generate(BBReq, InstrGenCtx);
-        CurrMFGenStats.merge(InstrGenCtx.Stats);
+      auto RP = GC.getRegisterPool();
+      planning::InstructionGenerationContext InstrGenCtx{
+          *MBB, MBB->begin(), &RP, GC, GenerationStatistics(), SelfCheckInfo};
+      snippy::generate(BBReq, InstrGenCtx);
+      CurrMFGenStats.merge(InstrGenCtx.Stats);
     }
     SNIPPY_DEBUG_BRIEF("Function codegen", CurrMFGenStats);
 
@@ -1452,15 +1442,14 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
     auto &BBReq = FunctionGenRequest.at(MBB);
     SNIPPY_DEBUG_BRIEF("request for dead BasicBlock", BBReq);
 
-      auto RP = GC.getRegisterPool();
-      planning::InstructionGenerationContext InstrGenCtx{
-          *MBB, MBB->getFirstTerminator(), &RP,
-          GC,   GenerationStatistics(),    SelfCheckInfo};
-      snippy::generate(BBReq, InstrGenCtx);
+    auto RP = GC.getRegisterPool();
+    planning::InstructionGenerationContext InstrGenCtx{
+        *MBB, MBB->begin(), &RP, GC, GenerationStatistics(), SelfCheckInfo};
+    snippy::generate(BBReq, InstrGenCtx);
 
-      CurrMFGenStats.merge(InstrGenCtx.Stats);
-      SNIPPY_DEBUG_BRIEF("Function codegen", CurrMFGenStats);
-      MBB = findNextBlock(nullptr, NotVisited, nullptr, GC);
+    CurrMFGenStats.merge(InstrGenCtx.Stats);
+    SNIPPY_DEBUG_BRIEF("Function codegen", CurrMFGenStats);
+    MBB = findNextBlock(nullptr, NotVisited, nullptr, GC);
   }
 
   finalizeFunction(MF, FunctionGenRequest, CurrMFGenStats, GC, SelfCheckInfo);
@@ -1475,7 +1464,7 @@ void generate(planning::InstructionGroupRequest &IG,
   InstrGenCtx.Stats = GenerationStatistics();
   if (GenerateInsertionPointHints)
     generateInsertionPointHint(InstrGenCtx);
-  auto ItEnd = MBB.getFirstTerminator();
+  auto ItEnd = InstrGenCtx.Ins;
   auto ItBegin = ItEnd == MBB.begin() ? ItEnd : std::prev(ItEnd);
   {
     auto RP = GC.getRegisterPool();
@@ -1509,11 +1498,35 @@ void generate(planning::InstructionGroupRequest &IG,
   InstrGenCtx.Stats.merge(OldStats);
 }
 
+namespace {
+
+void interpretMBBInstrs(GeneratorContext &GC,
+                        MachineBasicBlock::const_iterator BeginInterpretIter,
+                        MachineBasicBlock::const_iterator EndInterpretIter) {
+  auto Res = snippy::interpretInstrs(BeginInterpretIter, EndInterpretIter, GC);
+  if (Res != GenerationStatus::Ok)
+    snippy::fatal(GC.getLLVMState().getCtx(),
+                  "instruction interpretation error",
+                  "Interpretation failed on instructions inserted before "
+                  "main instructions generation routine.");
+}
+
+} // namespace
+
 GenerationStatistics
 generate(planning::BasicBlockRequest &BB,
          planning::InstructionGenerationContext &InstrGenCtx) {
   for (auto &&IG : BB)
     generate(IG, InstrGenCtx);
+
+  auto &GC = InstrGenCtx.GC;
+  const auto &MBB = BB.getMBB();
+  // In the register block we start interpretation from the beginning
+  // In other blocks we begin from a pre-established iterator (Ins)
+  if (GC.hasTrackingMode()) {
+    if (GC.isRegsInitBlock(&MBB))
+      interpretMBBInstrs(GC, MBB.begin(), MBB.getFirstTerminator());
+  }
   return InstrGenCtx.Stats;
 }
 } // namespace snippy
