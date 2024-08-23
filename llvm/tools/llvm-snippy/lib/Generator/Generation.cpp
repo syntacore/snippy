@@ -773,35 +773,29 @@ unsigned chooseAddressRegister(MachineInstr &MI, const AddressPart &AP,
 
   // Find Register among PickedRegisters with minimal value transform
   // cost.
-  std::pair<unsigned, int> MinimalMatCost = {0, -1};
-
   auto &I = GC.getOrCreateInterpreter();
   auto AddrValue = AP.Value;
 
-  MinimalMatCost = std::accumulate(
-      PickedRegisters.begin(), PickedRegisters.end(), MinimalMatCost,
-      [&I, &SnippyTgt, &AddrValue, &GC](auto CurCost, auto &&Reg) {
-        auto NewCost = CurCost;
-        auto MatCost = SnippyTgt.getTransformSequenceLength(I.readReg(Reg),
-                                                            AddrValue, Reg, GC);
-        if (NewCost.second == -1 ||
-            static_cast<unsigned>(NewCost.second) > MatCost) {
-          NewCost.first = Reg;
-          NewCost.second = MatCost;
-        }
-
-        return NewCost;
-      });
+  auto GetMatCost = [&](auto Reg) {
+    return SnippyTgt.getTransformSequenceLength(I.readReg(Reg), AddrValue, Reg,
+                                                GC);
+  };
+  auto ChosenRegIt =
+      std::min_element(PickedRegisters.begin(), PickedRegisters.end(),
+                       [&GetMatCost](auto &Lhs, auto &Rhs) {
+                         return GetMatCost(Lhs) < GetMatCost(Rhs);
+                       });
+  assert(ChosenRegIt != PickedRegisters.end());
+  auto ChosenReg = *ChosenRegIt;
 
   // Update corresponding MI operands with picked register.
-  auto Reg = MinimalMatCost.first;
   for (auto &OpIdx : AP.operands) {
     auto &Op = MI.getOperand(OpIdx);
     assert(Op.isReg() && "Operand is not register");
-    Op.setReg(Reg);
+    Op.setReg(ChosenReg);
   }
 
-  return Reg;
+  return ChosenReg;
 }
 void postprocessMemoryOperands(MachineInstr &MI, RegPoolWrapper &RP,
                                GeneratorContext &GC) {

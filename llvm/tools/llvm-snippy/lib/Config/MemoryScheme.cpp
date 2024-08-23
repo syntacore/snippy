@@ -935,11 +935,12 @@ MemoryAccessAddresses::splitPlainAccesses(const MemoryBank &MB) const {
             [](auto &Addr1, auto &Addr2) {
               return Addr1.Value.Addr < Addr2.Value.Addr;
             });
-  auto EndRange = std::accumulate(
-      SortedAddresses.begin(), SortedAddresses.end(), MemAddr{0u},
-      [](auto End, auto &Addr) {
-        return std::max(End, Addr.Value.Addr + Addr.Value.AccessSize);
-      });
+  auto GetEnd = [](auto &R) -> MemAddr {
+    return R.Value.Addr + R.Value.AccessSize;
+  };
+  auto Ends = llvm::map_range(SortedAddresses, GetEnd);
+  auto EndRangeIt = std::max_element(Ends.begin(), Ends.end());
+  auto EndRange = EndRangeIt == Ends.end() ? MemRange(0u) : *EndRangeIt;
   auto WholeRange = MemRange{SortedAddresses.front().Value.Addr, EndRange};
   decltype(SortedAddresses) LegalAddresses;
   for (auto &R : MB) {
