@@ -383,24 +383,18 @@ static std::string getOutputFileBasename() {
 
 static void checkMemoryRegions(const SnippyTarget &SnippyTgt,
                                const Config &Cfg) {
-  SectionDesc const *Reserved = nullptr;
-  auto &Sections = Cfg.Sections;
-  Reserved = std::accumulate(Sections.begin(), Sections.end(), Reserved,
-                             [&SnippyTgt](auto *Res, auto &Section) {
-                               auto *Touches =
-                                   SnippyTgt.touchesReservedRegion(Section);
-                               if (Touches)
-                                 return Touches;
-                               else
-                                 return Res;
-                             });
-  if (Reserved) {
-    std::string ErrBuf;
-    llvm::raw_string_ostream SS{ErrBuf};
-    SS << "One of layout memory regions interferes with reserved region:\n";
-    Reserved->dump(SS);
-    report_fatal_error(ErrBuf.c_str(), false);
-  }
+  auto Sections = llvm::reverse(Cfg.Sections);
+  auto ReservedIt = llvm::find_if(Sections, [&SnippyTgt](auto &S) {
+    return SnippyTgt.touchesReservedRegion(S);
+  });
+  if (ReservedIt == Sections.end())
+    return;
+  auto *Reserved = SnippyTgt.touchesReservedRegion(*ReservedIt);
+  std::string ErrBuf;
+  llvm::raw_string_ostream SS{ErrBuf};
+  SS << "One of layout memory regions interferes with reserved region:\n";
+  Reserved->dump(SS);
+  report_fatal_error(ErrBuf.c_str(), false);
 }
 
 static void checkCallRequirements(const SnippyTarget &Tgt,
