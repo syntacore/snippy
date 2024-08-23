@@ -69,14 +69,13 @@ public:
   // They are sorted in order of code execution.
   auto &executionPath() const { return ExecutionPath; };
   auto getMaxSectionID() const {
-    return std::accumulate(Sections.begin(), Sections.end(), 0,
-                           [](auto Acc, auto &SE) {
-                             auto &Desc = SE.OutputSection.Desc;
-                             if (Desc.isNamed())
-                               return Acc;
-                             else
-                               return std::max(Acc, Desc.getNumber());
-                           });
+    auto Unnamed = llvm::make_filter_range(
+        Sections,
+        +[](const SectionEntry &S) { return !S.OutputSection.Desc.isNamed(); });
+    auto IDs = llvm::map_range(
+        Unnamed, [](auto &S) { return S.OutputSection.Desc.getNumber(); });
+    auto MaxId = std::max_element(IDs.begin(), IDs.end());
+    return MaxId == IDs.end() ? 0 : *MaxId;
   }
 
   // Returns mangled name for supposed section with name SectionName.
