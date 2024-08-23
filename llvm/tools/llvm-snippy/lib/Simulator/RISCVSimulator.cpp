@@ -464,19 +464,19 @@ std::unique_ptr<SimulatorInterface> createRISCVSimulator(
     unsigned VLENB, bool EnableMisalignedAccess) {
   const auto &VTable = getSimulatorEntryPoint(ModelLib);
 
-  auto RomStart =
-      std::min(std::accumulate(Cfg.ProgSections.begin(), Cfg.ProgSections.end(),
-                               std::numeric_limits<size_t>::max(),
-                               [](auto Start, auto &Section) {
-                                 return std::min(Start, Section.Start);
-                               }),
-               Cfg.RomStart);
-  auto RomEnd = std::max(
-      std::accumulate(Cfg.ProgSections.begin(), Cfg.ProgSections.end(), 0ul,
-                      [](auto End, auto &Section) {
-                        return std::max(End, Section.Start + Section.Size);
-                      }),
-      Cfg.RomStart + Cfg.RomSize);
+  assert(!Cfg.ProgSections.empty());
+  auto Starts =
+      llvm::map_range(Cfg.ProgSections, [](auto &S) { return S.Start; });
+  auto Ends = llvm::map_range(Cfg.ProgSections,
+                              [](auto &S) { return S.Start + S.Size; });
+  auto FirstSection = std::min_element(Starts.begin(), Starts.end());
+  auto LastSection = std::max_element(Ends.begin(), Ends.end());
+  auto RomStart = FirstSection == Starts.end()
+                      ? Cfg.RomStart
+                      : std::min(Cfg.RomStart, *FirstSection);
+  auto CfgRomEnd = Cfg.RomStart + Cfg.RomSize;
+  auto RomEnd =
+      LastSection == Ends.end() ? CfgRomEnd : std::max(CfgRomEnd, *LastSection);
   auto SimInfo = deriveSimulatorIsaInfo(Subtarget);
   LLVM_DEBUG(dbgs() << "Model::RV64 = " << SimInfo.Is64Bit << "\n");
   LLVM_DEBUG(dbgs() << "Model::MISA = 0x" << utohexstr(SimInfo.MisaBits)
