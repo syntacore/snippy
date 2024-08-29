@@ -65,15 +65,15 @@ GeneratorContext::getInitialRegisterState(const TargetSubtargetInfo &ST) const {
   if (InitialMachineState)
     return *InitialMachineState;
 
-  assert(State);
-  InitialMachineState = State->getSnippyTarget().createRegisterState(ST);
+  auto &State = getProgramContext().getLLVMState();
+  InitialMachineState = State.getSnippyTarget().createRegisterState(ST);
 
   if (!getInitialRegYamlFile().empty()) {
     WarningsT YamlWarnings;
     InitialMachineState->loadFromYamlFile(getInitialRegYamlFile(),
                                           YamlWarnings);
     std::for_each(YamlWarnings.begin(), YamlWarnings.end(), [&](StringRef Msg) {
-      warn(WarningName::RegState, State->getCtx(), "register state yaml", Msg);
+      warn(WarningName::RegState, State.getCtx(), "register state yaml", Msg);
     });
     return *InitialMachineState;
   }
@@ -83,20 +83,21 @@ GeneratorContext::getInitialRegisterState(const TargetSubtargetInfo &ST) const {
 }
 
 void GeneratorContext::initRunner() const {
-  const auto &SnippyTgt = State->getSnippyTarget();
-  const auto &Module = *MMI->getModule();
+  auto &State = getProgramContext().getLLVMState();
+  const auto &SnippyTgt = State.getSnippyTarget();
+  const auto &Module = MainModule.getModule();
   const auto &EntryFun =
       *Module.getFunction(GenSettings->LinkerConfig.EntryPointName);
-  const auto &SubTgt = MMI->getMachineFunction(EntryFun)->getSubtarget();
+  const auto &SubTgt =
+      MainModule.getMMI().getMachineFunction(EntryFun)->getSubtarget();
 
   bool IsNeedCallbackHandler = hasExecutionTraceTrackingMode();
-  auto Env = Interpreter::createSimulationEnvironment(
-      SnippyTgt, SubTgt, *PLinker, GenSettings->Cfg.MS, getTargetContext(),
-      IsNeedCallbackHandler);
+
+  auto Env = Interpreter::createSimulationEnvironment(*this);
 
   assert(hasModel() && "Model list must not be empty here");
   Runner = std::make_unique<SimRunner>(
-      State->getCtx(), SnippyTgt, SubTgt, std::move(Env),
+      State.getCtx(), SnippyTgt, SubTgt, std::move(Env),
       GenSettings->ModelPluginConfig.ModelLibraries);
 }
 
@@ -117,16 +118,6 @@ SimRunner &GeneratorContext::getOrCreateSimRunner() const {
 
 Interpreter &GeneratorContext::getOrCreateInterpreter() const {
   return getOrCreateSimRunner().getPrimaryInterpreter();
-}
-
-GeneratorResult
-GeneratorContext::generateELF(ObjectFilesList InputImages) const {
-  GeneratorResult Result;
-
-  Result.SnippetImage = PLinker->run(InputImages, /*Relocatable*/ true);
-  Result.LinkerScript = PLinker->generateLinkerScript();
-
-  return Result;
 }
 
 static void dumpSelfCheck(const std::vector<char> &Data, size_t ChunkSize,
@@ -235,28 +226,25 @@ getMemoryRangesToDump(Interpreter &I,
   return RangesToDump;
 }
 
-std::string
-GeneratorContext::generateLinkedImage(ObjectFilesList InputImages) const {
-  return PLinker->run(InputImages, /*Relocatable*/ false);
-}
-
 void GeneratorContext::checkMemStateAfterSelfcheck() const {
+  auto &SelfcheckSection = getProgramContext().getSelfcheckSection();
   std::vector<char> Data(SelfcheckSection.Size);
   auto &I = getOrCreateInterpreter();
   I.readMem(SelfcheckSection.VMA, Data);
 
   auto ResultOffset = 0;
-  auto ReferenceOffset = SCStride;
+  auto ReferenceOffset = getProgramContext().getSCStride();
   auto ChunksNum = 2;
 
-  size_t BlockSize = ChunksNum * SCStride;
+  size_t BlockSize = ChunksNum * getProgramContext().getSCStride();
 
   auto DataSize = Data.size() - Data.size() % BlockSize;
   for (size_t Offset = 0; Offset < DataSize; Offset += BlockSize) {
     auto It = Data.begin() + Offset;
     auto ResultIt = It + ResultOffset;
     auto ReferenceIt = It + ReferenceOffset;
-    for (size_t ByteIdx = 0; ByteIdx < SCStride; ++ByteIdx) {
+    for (size_t ByteIdx = 0; ByteIdx < getProgramContext().getSCStride();
+         ++ByteIdx) {
       auto Result = ResultIt[ByteIdx];
       auto Reference = ReferenceIt[ByteIdx];
       auto DefMaskByte = 0xFF;
@@ -277,6 +265,7 @@ void GeneratorContext::checkMemStateAfterSelfcheck() const {
 }
 
 void GeneratorContext::runSimulator(StringRef ImageToRun) {
+  auto &State = getProgramContext().getLLVMState();
   // FIXME: unfortunately, it is not possible to implement interpretation as an
   // llvm pass (without creating a separate pass manager) due to peculiarities
   // of LLVM pipeline. The problem is that AsmPrinter does not actually
@@ -320,7 +309,7 @@ void GeneratorContext::runSimulator(StringRef ImageToRun) {
           .dumpAsYaml(AnnotationFilename);
     }
   } else {
-    snippy::warn(WarningName::NoModelExec, State->getCtx(),
+    snippy::warn(WarningName::NoModelExec, State.getCtx(),
                  "Skipping snippet execution on the model",
                  "model was set no 'None'.");
   }
@@ -329,10 +318,10 @@ void GeneratorContext::runSimulator(StringRef ImageToRun) {
 namespace {
 
 template <typename AccessPred>
-std::optional<MemAddr>
-findPlaceForNewSection(const Linker &L, AccessPred CustomModePred,
-                       size_t SectionSize, size_t SectionAlignment = 1) {
-  const auto &Sections = L.sections();
+std::optional<MemAddr> findPlaceForNewSection(SectionsDescriptions &Sections,
+                                              AccessPred CustomModePred,
+                                              size_t SectionSize,
+                                              size_t SectionAlignment = 1) {
   assert(!Sections.empty());
   auto SectionBegin =
       std::find_if(Sections.begin(), Sections.end(), CustomModePred);
@@ -343,7 +332,7 @@ findPlaceForNewSection(const Linker &L, AccessPred CustomModePred,
 
   // Try to emplace before all sections.
   if (SectionBegin == Sections.begin()) {
-    const auto &Desc = SectionBegin->OutputSection.Desc;
+    const auto &Desc = *SectionBegin;
     if (Desc.VMA >= SectionSize) {
       auto Unaligned = Desc.VMA - SectionSize;
       return alignDown(Unaligned, SectionAlignment);
@@ -352,7 +341,7 @@ findPlaceForNewSection(const Linker &L, AccessPred CustomModePred,
 
   // Try to emplace after all sections.
   if (SectionEnd == Sections.end()) {
-    const auto &Desc = std::prev(SectionEnd)->OutputSection.Desc;
+    const auto &Desc = *std::prev(SectionEnd);
     auto Unaligned = Desc.VMA + Desc.Size;
     auto Aligned = alignTo(Unaligned, SectionAlignment);
     if (std::numeric_limits<size_t>::max() - Aligned >= SectionSize) {
@@ -369,8 +358,8 @@ findPlaceForNewSection(const Linker &L, AccessPred CustomModePred,
   auto FoundPlace = std::adjacent_find(
       InsertPosBegin, InsertPosEnd,
       [SectionSize, SectionAlignment](const auto &Sec1, const auto &Sec2) {
-        const auto &Sec1Desc = Sec1.OutputSection.Desc;
-        const auto &Sec2Desc = Sec2.OutputSection.Desc;
+        const auto &Sec1Desc = Sec1;
+        const auto &Sec2Desc = Sec2;
         auto Sec1End = Sec1Desc.VMA + Sec1Desc.Size;
         assert(Sec2Desc.VMA >= Sec1End);
         auto EndAligned = alignTo(Sec1End, SectionAlignment);
@@ -380,19 +369,20 @@ findPlaceForNewSection(const Linker &L, AccessPred CustomModePred,
       });
 
   if (FoundPlace != InsertPosEnd) {
-    const auto &Desc = FoundPlace->OutputSection.Desc;
+    const auto &Desc = *FoundPlace;
     return alignTo(Desc.VMA + Desc.Size, SectionAlignment);
   } else
     return {};
 }
 
-SectionDesc allocateRWSection(Linker &L, size_t SectionSize, StringRef Name,
+SectionDesc allocateRWSection(SectionsDescriptions &Sections,
+                              size_t SectionSize, StringRef Name,
                               size_t Alignment = 1) {
-  auto IsRW = [](const Linker::SectionEntry &SE) {
-    auto M = SE.OutputSection.Desc.M;
+  auto IsRW = [](const SectionDesc &SE) {
+    auto M = SE.M;
     return M.R() && M.W() && !M.X();
   };
-  auto SecVMA = findPlaceForNewSection(L, IsRW, SectionSize, Alignment);
+  auto SecVMA = findPlaceForNewSection(Sections, IsRW, SectionSize, Alignment);
   if (!SecVMA)
     report_fatal_error("Failed to emplace selfcheck section: Could not find " +
                            Twine(SectionSize) +
@@ -408,196 +398,238 @@ SectionDesc allocateRWSection(Linker &L, size_t SectionSize, StringRef Name,
 } // namespace
 
 bool GeneratorContext::hasCallInstrs() const {
-  auto &SnippyTgt = State->getSnippyTarget();
-  return GenSettings->Cfg.Histogram.hasCallInstrs(*OpCC, SnippyTgt);
-}
-
-void GeneratorContext::initializeStackSection() {
-  auto &Ctx = State->getCtx();
-  auto &SnippyTgt = State->getSnippyTarget();
-  auto SP = getStackPointer();
-  auto Align = SnippyTgt.getSpillAlignmentInBytes(SP, *this);
-
-  if (GenSettings->LinkerConfig.ExternalStack) {
-    if (GenSettings->ModelPluginConfig.RunOnModel)
-      snippy::fatal(Ctx, "Cannot run snippet on model",
-                    "external stack was enabled.");
-    if (RegPoolsStorage.front().isReserved(SP))
-      snippy::fatal(Ctx, "Cannot configure external stack",
-                    "stack pointer register is "
-                    "explicitly reserved.");
-
-    if (GenSettings->Cfg.Sections.hasSection(
-            SectionsDescriptions::StackSectionName)) {
-      snippy::warn(WarningName::InconsistentOptions, Ctx,
-                   "Section 'stack' will not be used",
-                   "external stack was enabled.");
-    }
-
-    if (StackSize.getValue())
-      snippy::warn(WarningName::InconsistentOptions, Ctx,
-                   "--" + Twine(StackSize.ArgStr) + " option ignored",
-                   "external stack was enabled.");
-    return;
-  }
-
-  if (GenSettings->Cfg.Sections.hasSection(
-          SectionsDescriptions::StackSectionName)) {
-    // Configure stack from layout.
-    StackSection = GenSettings->Cfg.Sections.getSection(
-        SectionsDescriptions::StackSectionName);
-    auto M = StackSection.value().M;
-    if (!(M.R() && M.W() && !M.X()))
-      snippy::fatal(Ctx, "Wrong layout file",
-                    "\"" + Twine(SectionsDescriptions::StackSectionName) +
-                        "\" section must be RW");
-    if (StackSize.getValue())
-      snippy::warn(WarningName::InconsistentOptions, Ctx,
-                   "--" + Twine(StackSize.ArgStr) + " option ignored",
-                   "found stack section in layout");
-
-  } else if (StackSize.getValue()) {
-    // Manually place stack section when only stack size is provided.
-    StackSection =
-        allocateRWSection(*PLinker, StackSize.getValue(),
-                          SectionsDescriptions::StackSectionName, Align);
-    PLinker->addSection(StackSection.value());
-  } else if (GenSettings->LinkerConfig.ExternalStack) {
-    // Implicitly allocate section when external stack is enabled but no
-    // specific stack section info provided.
-    assert(SectionsDescriptions::ImplicitSectionSize % Align == 0 &&
-           "Wrong estimated stack size alignment.");
-    StackSection =
-        allocateRWSection(*PLinker, SectionsDescriptions::ImplicitSectionSize,
-                          SectionsDescriptions::StackSectionName, Align);
-    PLinker->addSection(StackSection.value());
-  }
-
-  if (StackSection.has_value()) {
-    if (StackSection.value().VMA % Align != 0)
-      snippy::fatal(Ctx, "Stack configure failed",
-                    "Stack section VMA must be " + Twine(Align) +
-                        " bytes aligned.");
-    if (StackSection.value().Size % Align != 0)
-      snippy::fatal(Ctx, "Stack configure failed",
-                    "Stack section size must be " + Twine(Align) +
-                        " bytes aligned.");
-
-    if (RegPoolsStorage.front().isReserved(SP))
-      snippy::fatal(Ctx, "Failed to initialize stack",
-                    "stack pointer register is "
-                    "explicitly reserved.");
-
-    if (std::any_of(GenSettings->RegistersConfig.SpilledToStack.begin(),
-                    GenSettings->RegistersConfig.SpilledToStack.end(),
-                    [SP](auto Reg) { return Reg == SP; }))
-      report_fatal_error("Stack pointer cannot be spilled. Remove it from "
-                         "spill register list.",
-                         false);
-  } else {
-    if (!GenSettings->RegistersConfig.SpilledToStack.empty())
-      snippy::fatal(Ctx, "Cannot spill requested registers",
-                    "no stack space allocated.");
-
-    if (hasCallInstrs() && GenSettings->Cfg.CGLayout.MaxLayers > 1u)
-      snippy::fatal(
-          State->getCtx(), "Cannot generate requested call instructions",
-          "layout allows calls with depth>=1 but stack space is not provided.");
-  }
+  auto &State = getProgramContext().getLLVMState();
+  auto &SnippyTgt = State.getSnippyTarget();
+  return GenSettings->Cfg.Histogram.hasCallInstrs(
+      getProgramContext().getOpcodeCache(), SnippyTgt);
 }
 
 void GeneratorContext::diagnoseSelfcheckSection(size_t MinSize) const {
+  auto &State = getProgramContext().getLLVMState();
+  auto &SelfcheckSection = getProgramContext().getSelfcheckSection();
   auto M = SelfcheckSection.M;
   if (!(M.R() && M.W() && !M.X()))
-    snippy::fatal(State->getCtx(), "Wrong layout file",
+    snippy::fatal(State.getCtx(), "Wrong layout file",
                   "\"" + Twine(SectionsDescriptions::SelfcheckSectionName) +
                       "\" section must be RW");
   auto &SelfcheckSectionSize = SelfcheckSection.Size;
   if (SelfcheckSectionSize < MinSize)
     snippy::fatal(
-        State->getCtx(),
+        State.getCtx(),
         "Cannot use \"" + Twine(SectionsDescriptions::SelfcheckSectionName) +
             "\" section from layout",
         "it does not fit selfcheck data (" + Twine(MinSize) + " bytes)");
-  if ((SelfcheckSectionSize != alignTo(SelfcheckSectionSize, kPageSize)) ||
-      SelfcheckSection.VMA != alignTo(SelfcheckSection.VMA, kPageSize))
-    snippy::fatal(State->getCtx(),
+  if ((SelfcheckSectionSize !=
+       alignTo(SelfcheckSectionSize, SnippyProgramContext::getPageSize())) ||
+      SelfcheckSection.VMA !=
+          alignTo(SelfcheckSection.VMA, SnippyProgramContext::getPageSize()))
+    snippy::fatal(State.getCtx(),
                   "Cannot use \"" +
                       Twine(SectionsDescriptions::SelfcheckSectionName) +
                       "\" section from layout",
                   "it has unaligned memory settings");
 }
 
-GeneratorContext::GeneratorContext(MachineModuleInfo &MMI, Module &M,
-                                   LLVMState &State, RegPool &Pool,
-                                   RegisterGenerator &RegGen,
-                                   GeneratorSettings &Settings,
-                                   const OpcodeCache &OpCc)
-    : MMI(&MMI), State(&State), RegPoolsStorage({Pool}), RegGen(&RegGen),
-      CGS(std::make_unique<CallGraphState>()), OpCC(&OpCc),
-      PLinker(std::make_unique<Linker>(
-          State.getCtx(), Settings.Cfg.Sections,
-          Settings.InstrsGenerationConfig.ChainedRXSectionsFill,
-          Settings.InstrsGenerationConfig.ChainedRXSorted,
-          Settings.LinkerConfig.MangleExportedNames
-              ? Settings.LinkerConfig.EntryPointName
-              : "")),
-      GenSettings(&Settings), ImmHistMap([&Settings, &OpCc] {
+template <typename R>
+void reportUnusedRXSectionWarning(LLVMContext &Ctx, R &&Names) {
+  std::string NameList;
+  llvm::raw_string_ostream OS{NameList};
+  for (auto &&Name : Names) {
+    OS << "'" << Name << "' ";
+  }
+
+  snippy::warn(WarningName::UnusedSection, Ctx,
+               "Following RX sections are unused during generation", NameList);
+}
+
+static std::vector<Linker::SectionEntry>
+configureLinkerSections(LLVMContext &Ctx, Linker &L,
+                        const GeneratorSettings &Settings) {
+  assert(L.hasOutputSectionFor(Linker::kDefaultTextSectionName));
+  auto DefaultCodeSection =
+      L.getOutputSectionFor(Linker::kDefaultTextSectionName);
+  std::vector<Linker::SectionEntry> ExecutionPath;
+
+  if (Settings.InstrsGenerationConfig.ChainedRXSectionsFill) {
+    for (auto &RXSection : llvm::make_filter_range(L.sections(), [](auto &S) {
+           return S.OutputSection.Desc.M.X();
+         })) {
+      L.addInputSectionForDescr(RXSection.OutputSection.Desc,
+                                RXSection.OutputSection.Name);
+      ExecutionPath.push_back(RXSection);
+    }
+    if (Settings.InstrsGenerationConfig.ChainedRXSorted) {
+      std::sort(ExecutionPath.begin(), ExecutionPath.end(),
+                [](auto &LHS, auto &RHS) {
+                  return LHS.OutputSection.Desc.getIDString() <
+                         RHS.OutputSection.Desc.getIDString();
+                });
+    } else
+      std::shuffle(ExecutionPath.begin(), ExecutionPath.end(),
+                   RandEngine::engine());
+
+  } else {
+    std::vector<std::string> UnusedRXSections;
+    for (auto &RXSection :
+         llvm::make_filter_range(L.sections(), [&DefaultCodeSection](auto &S) {
+           return S.OutputSection.Desc.M.X() &&
+                  S.OutputSection.Desc.getIDString() !=
+                      DefaultCodeSection.Desc.getIDString();
+         }))
+      UnusedRXSections.emplace_back(RXSection.OutputSection.Desc.getIDString());
+
+    if (!UnusedRXSections.empty())
+      reportUnusedRXSectionWarning(Ctx, UnusedRXSections);
+
+    ExecutionPath.push_back(Linker::SectionEntry{
+        DefaultCodeSection, {std::string(Linker::kDefaultTextSectionName)}});
+  }
+  return ExecutionPath;
+}
+
+namespace {
+
+size_t getMinimumSelfcheckSize(const GeneratorSettings &Settings) {
+  assert(Settings.TrackingConfig.SelfCheckPeriod);
+
+  size_t BlockSize = 2 * SnippyProgramContext::getSCStride();
+  // Note: There are cases when we have some problems for accurate calculating
+  // of selcheck section size.
+  //       Consequently it can potentially cause overflow of selfcheck
+  //       section, So it's better to provide selfcheck section in Layout
+  //       explicitly
+  return alignTo(Settings.InstrsGenerationConfig.NumInstrs.value_or(0) *
+                     BlockSize / Settings.TrackingConfig.SelfCheckPeriod,
+                 SnippyProgramContext::getPageSize());
+}
+
+void amendSelfcheckSection(LLVMState &State, const GeneratorSettings &Settings,
+                           SectionsDescriptions &Amended) {
+  if (!Settings.TrackingConfig.SelfCheckPeriod)
+    return;
+
+  auto AlignSize = getMinimumSelfcheckSize(Settings);
+  if (Amended.hasSection(SectionsDescriptions::SelfcheckSectionName))
+    return;
+  snippy::warn(
+      WarningName::InconsistentOptions, State.getCtx(),
+      "Implicit selfcheck section use is discouraged",
+      "please, provide \"selfcheck\" section description in layout file");
+  Amended.push_back(allocateRWSection(
+      Amended, AlignSize, SectionsDescriptions::SelfcheckSectionName));
+  return;
+}
+
+void amendStackSection(LLVMState &State, const GeneratorSettings &Settings,
+                       SectionsDescriptions &Amended) {
+
+  auto &SnippyTgt = State.getSnippyTarget();
+  auto SP = Settings.RegistersConfig.StackPointer;
+  auto Align = SnippyTgt.getSpillAlignmentInBytes(SP, State);
+
+  if (Amended.hasSection(SectionsDescriptions::StackSectionName))
+    return;
+
+  if (StackSize.getValue()) {
+    // Manually place stack section when only stack size is provided.
+    Amended.push_back(allocateRWSection(Amended, StackSize.getValue(),
+                                        SectionsDescriptions::StackSectionName,
+                                        Align));
+  } else if (Settings.LinkerConfig.ExternalStack) {
+    // Implicitly allocate section when external stack is enabled but no
+    // specific stack section info provided.
+    assert(SectionsDescriptions::ImplicitSectionSize % Align == 0 &&
+           "Wrong estimated stack size alignment.");
+    Amended.push_back(
+        allocateRWSection(Amended, SectionsDescriptions::ImplicitSectionSize,
+                          SectionsDescriptions::StackSectionName, Align));
+  }
+}
+
+void amendUtilitySection(LLVMState &State, const GeneratorSettings &Settings,
+                         SectionsDescriptions &Amended) {
+  // Don't do anything if section is not needed.
+  if (Settings.RegistersConfig.SpilledToMem.empty())
+    return;
+
+  if (Amended.hasSection(SectionsDescriptions::UtilitySectionName))
+    return;
+
+  if (!Amended.hasSection(SectionsDescriptions::StackSectionName))
+    return;
+  // Try to use up some of a stack space.
+
+  auto &Ctx = State.getCtx();
+  auto Size = 2 * Settings.RegistersConfig.SpilledToMem.size() *
+              State.getSnippyTarget().getAddrRegLen(State.getTargetMachine()) /
+              CHAR_BIT;
+  auto &Stack = Amended.getSection(SectionsDescriptions::StackSectionName);
+  auto UtilitySection = SectionDesc(SectionsDescriptions::UtilitySectionName);
+  UtilitySection.VMA = std::exchange(Stack.VMA, Stack.VMA + Size);
+  UtilitySection.LMA = std::exchange(Stack.LMA, Stack.LMA + Size);
+  UtilitySection.Size = Size;
+  if (Stack.Size <= Size) {
+    auto &Ctx = State.getCtx();
+    snippy::fatal(
+        Ctx, "Stack section is too small",
+        "stack cannot be used for internal purposes. Either provide \"" +
+            Twine(SectionsDescriptions::UtilitySectionName) +
+            "\" section or increase \"" +
+            Twine(SectionsDescriptions::StackSectionName) +
+            "\" section size. (stack size: " + Twine(Stack.Size) +
+            ", required size: " + Twine(Size) + ")");
+  }
+  Stack.Size -= Size;
+  UtilitySection.M = Stack.M;
+  Amended.push_back(UtilitySection);
+  snippy::notice(WarningName::NotAWarning, Ctx,
+                 "No \"" + Twine(SectionsDescriptions::UtilitySectionName) +
+                     "\" section was provided",
+                 "Using part of \"" +
+                     Twine(SectionsDescriptions::StackSectionName) +
+                     "\" section for internal purposes instead");
+}
+
+} // namespace
+
+SectionsDescriptions
+GeneratorSettings::getCompleteSectionList(LLVMState &State) const {
+  auto CompleteList = Cfg.Sections;
+  amendSelfcheckSection(State, *this, CompleteList);
+  amendStackSection(State, *this, CompleteList);
+  amendUtilitySection(State, *this, CompleteList);
+  return CompleteList;
+}
+
+GeneratorContext::GeneratorContext(SnippyProgramContext &ProgContext,
+                                   GeneratorSettings &Settings)
+    : ProgContext(ProgContext), MainModule(ProgContext.getLLVMState(), "main"),
+      CGS(std::make_unique<CallGraphState>()),
+      ExecutionPath(configureLinkerSections(ProgContext.getLLVMState().getCtx(),
+                                            ProgContext.getLinker(), Settings)),
+      GenSettings(&Settings), ImmHistMap([&Settings, &ProgContext] {
         const auto &ImmHist = Settings.Cfg.ImmHistogram;
         if (ImmHist.holdsAlternative<ImmediateHistogramRegEx>())
           return OpcodeToImmHistSequenceMap(
               ImmHist.get<ImmediateHistogramRegEx>(), Settings.Cfg.Histogram,
-              OpCc);
+              ProgContext.getOpcodeCache());
         return OpcodeToImmHistSequenceMap();
       }()) {
+  auto &State = ProgContext.getLLVMState();
   auto &Ctx = State.getCtx();
-  if (GenSettings->Cfg.Sections.hasSection(
-          SectionsDescriptions::UtilitySectionName)) {
-    UtilitySection = GenSettings->Cfg.Sections.getSection(
-        SectionsDescriptions::UtilitySectionName);
-    auto AccMask = UtilitySection->M;
-    if (!(AccMask.R() && AccMask.W() && !AccMask.X()))
-      snippy::fatal(Ctx, "Wrong layout file",
-                    "\"" + Twine(SectionsDescriptions::UtilitySectionName) +
-                        "\" section must be RW");
-  } else if (GenSettings->Cfg.Sections.hasSection(
-                 SectionsDescriptions::StackSectionName) &&
-             !GenSettings->RegistersConfig.SpilledToMem.empty()) {
-    auto &Sections = GenSettings->Cfg.Sections;
-    auto Size =
-        2 * GenSettings->RegistersConfig.SpilledToMem.size() *
-        State.getSnippyTarget().getAddrRegLen(State.getTargetMachine()) /
-        CHAR_BIT;
-    auto &Stack = GenSettings->Cfg.Sections.getSection(
-        SectionsDescriptions::StackSectionName);
-    UtilitySection = SectionDesc(SectionsDescriptions::UtilitySectionName);
-    UtilitySection->VMA = std::exchange(Stack.VMA, Stack.VMA + Size);
-    UtilitySection->LMA = std::exchange(Stack.LMA, Stack.LMA + Size);
-    UtilitySection->Size = Size;
-    if (Stack.Size <= Size) {
-      auto &Ctx = State.getCtx();
-      snippy::fatal(
-          Ctx, "Stack section is too small",
-          "stack cannot be used for internal purposes. Either provide \"" +
-              Twine(SectionsDescriptions::UtilitySectionName) +
-              "\" section or increase \"" +
-              Twine(SectionsDescriptions::StackSectionName) +
-              "\" section size. (stack size: " + Twine(Stack.Size) +
-              ", required size: " + Twine(Size) + ")");
-    }
-    Stack.Size -= Size;
-    UtilitySection->M = Stack.M;
-    Sections.push_back(*UtilitySection);
-    snippy::notice(WarningName::NotAWarning, Ctx,
-                   "No \"" + Twine(SectionsDescriptions::UtilitySectionName) +
-                       "\" section was provided",
-                   "Using part of \"" +
-                       Twine(SectionsDescriptions::StackSectionName) +
-                       "\" section for internal purposes instead");
-  }
 
-  auto SnippyDataVMA = 0ull;
-  auto SnippyDataSize = 0ull;
+  auto GlobalSectionVMA = 0ull;
+  auto GlobalSectionSize = 0ull;
+  if (ProgContext.hasROMSection()) {
+    auto &ROMSection = ProgContext.getROMSection();
+    GlobalSectionVMA = ROMSection.VMA;
+    GlobalSectionSize = ROMSection.Size;
+  }
+  GP = std::make_unique<GlobalsPool>(
+      State, MainModule.getModule(), GlobalSectionVMA, GlobalSectionSize,
+      ProgContext.exportedNamesMangled()
+          ? ("__snippy_" + Twine(ProgContext.getEntryPointName()) + "_").str()
+          : "__snippy_");
 
   HasTrackingMode = Settings.TrackingConfig.BTMode ||
                     Settings.TrackingConfig.SelfCheckPeriod ||
@@ -607,47 +639,6 @@ GeneratorContext::GeneratorContext(MachineModuleInfo &MMI, Module &M,
     snippy::fatal(State.getCtx(), "Cannot generate snippet",
                   "requested selfcheck / backtrack / address-value-hazards, "
                   "but no model plugin provided.");
-  if (PLinker->hasOutputSectionFor(".rodata")) {
-    auto ROMSection = PLinker->getOutputSectionFor(".rodata");
-    SnippyDataVMA = ROMSection.Desc.VMA;
-    SnippyDataSize = ROMSection.Desc.Size;
-  }
-  GP = std::make_unique<GlobalsPool>(
-      State, M, SnippyDataVMA, SnippyDataSize,
-      Settings.LinkerConfig.MangleExportedNames
-          ? ("__snippy_" + Twine(Settings.LinkerConfig.EntryPointName) + "_")
-                .str()
-          : "__snippy_");
-
-  if (Settings.TrackingConfig.SelfCheckPeriod) {
-    size_t BlockSize = 2 * SCStride;
-    // Note: There are cases when we have some problems for accurate calculating
-    // of selcheck section size.
-    //       Consequently it can potentially cause overflow of selfcheck
-    //       section, So it's better to provide selfcheck section in Layout
-    //       explicitly
-    auto AlignSize =
-        alignTo(getRequestedInstrsNumForMainFunction() * BlockSize /
-                    Settings.TrackingConfig.SelfCheckPeriod,
-                kPageSize);
-    if (GenSettings->Cfg.Sections.hasSection(
-            SectionsDescriptions::SelfcheckSectionName)) {
-      // Configure selfcheck from layout.
-      SelfcheckSection = GenSettings->Cfg.Sections.getSection(
-          SectionsDescriptions::SelfcheckSectionName);
-      diagnoseSelfcheckSection(AlignSize);
-    } else {
-      snippy::warn(
-          WarningName::InconsistentOptions, State.getCtx(),
-          "Implicit selfcheck section use is discouraged",
-          "please, provide \"selfcheck\" section description in layout file");
-      SelfcheckSection = allocateRWSection(
-          *PLinker, AlignSize, SectionsDescriptions::SelfcheckSectionName);
-      PLinker->addSection(SelfcheckSection);
-    }
-  }
-
-  initializeStackSection();
 
   if (Settings.InstrsGenerationConfig.ChainedRXSectionsFill &&
       std::count_if(
@@ -664,11 +655,51 @@ GeneratorContext::GeneratorContext(MachineModuleInfo &MMI, Module &M,
       snippy::fatal(State.getCtx(),
                     "Cannot generate requested call instructions",
                     "backtrack and selfcheck do not work with calls yet.");
-    if (RegPoolsStorage.front().isReserved(RA))
+    if (getRegisterPool().isReserved(RA))
       snippy::fatal(State.getCtx(),
                     "Cannot generate requested call instructions",
                     "return address register is explicitly reserved.");
   }
+  auto SP = getProgramContext().getStackPointer();
+  if (std::any_of(GenSettings->RegistersConfig.SpilledToStack.begin(),
+                  GenSettings->RegistersConfig.SpilledToStack.end(),
+                  [SP](auto Reg) { return Reg == SP; }))
+    report_fatal_error("Stack pointer cannot be spilled. Remove it from "
+                       "spill register list.",
+                       false);
+
+  if (!getProgramContext().hasStackSection()) {
+    if (!GenSettings->RegistersConfig.SpilledToStack.empty())
+      snippy::fatal(Ctx, "Cannot spill requested registers",
+                    "no stack space allocated.");
+
+    if (hasCallInstrs() && GenSettings->Cfg.CGLayout.MaxLayers > 1u)
+      snippy::fatal(
+          State.getCtx(), "Cannot generate requested call instructions",
+          "layout allows calls with depth>=1 but stack space is not provided.");
+  }
+
+  if (getProgramContext().hasExternalStack()) {
+    if (GenSettings->ModelPluginConfig.RunOnModel)
+      snippy::fatal(Ctx, "Cannot run snippet on model",
+                    "external stack was enabled.");
+    if (GenSettings->Cfg.Sections.hasSection(
+            SectionsDescriptions::StackSectionName)) {
+      snippy::warn(WarningName::InconsistentOptions, Ctx,
+                   "Section 'stack' will not be used",
+                   "external stack was enabled.");
+    }
+
+    if (StackSize.getValue())
+      snippy::warn(WarningName::InconsistentOptions, Ctx,
+                   "--" + Twine(StackSize.ArgStr) + " option ignored",
+                   "external stack was enabled.");
+  }
+
+  if (GenSettings->Cfg.Sections.hasSection(
+          SectionsDescriptions::SelfcheckSectionName) &&
+      Settings.TrackingConfig.SelfCheckPeriod)
+    diagnoseSelfcheckSection(getMinimumSelfcheckSize(*GenSettings));
 }
 
 void GeneratorContext::attachTargetContext(

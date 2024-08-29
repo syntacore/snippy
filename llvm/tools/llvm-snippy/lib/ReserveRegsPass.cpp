@@ -59,11 +59,12 @@ namespace snippy {
 
 bool ReserveRegs::runOnModule(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  const auto &ProgCtx = SGCtx.getProgramContext();
 
-  if (!SGCtx.stackEnabled())
+  if (!ProgCtx.stackEnabled())
     return false;
 
-  auto StackPointer = SGCtx.getStackPointer();
+  auto StackPointer = ProgCtx.getStackPointer();
   auto &RootPool = getAnalysis<RootRegPoolWrapper>().getPool();
 
   // When stack enabled, it is not allow to modify stack pointer in any way.

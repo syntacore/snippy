@@ -16,6 +16,7 @@ set(LLVMSnippyGeneratorSources
   RegisterPool.cpp
   RootRegPoolWrapperPass.cpp
   SimRunner.cpp
+  SnippyModule.cpp
   MemoryManager.cpp
   ImmediateHistogram.cpp
 )

@@ -151,12 +151,13 @@ bool LoopLatcher::runOnMachineFunction(MachineFunction &MF) {
   LLVM_DEBUG(MLI.getBase().print(dbgs()));
 
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  const auto &ProgCtx = SGCtx.getProgramContext();
   auto &State = SGCtx.getLLVMState();
-  if (UseStackOpt && !SGCtx.stackEnabled())
+  if (UseStackOpt && !ProgCtx.stackEnabled())
     snippy::fatal(State.getCtx(),
                   "Cannot place IVs on the stack:", " stack was not enabled.");
 
-  if (SGCtx.hasTrackingMode() && !SGCtx.stackEnabled())
+  if (SGCtx.hasTrackingMode() && !ProgCtx.stackEnabled())
     snippy::fatal(
         State.getCtx(), "Wrong snippy configuration:",
         "loops generation in selfcheck and backtracking modes requires stack.");
@@ -308,6 +309,7 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
                                       MachineBasicBlock &ExitingBlock,
                                       MachineBasicBlock &Preheader) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  const auto &ProgCtx = SGCtx.getProgramContext();
   auto &State = SGCtx.getLLVMState();
   auto TrackingMode = SGCtx.hasTrackingMode();
 
@@ -349,7 +351,7 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   SnippyTgt.insertLoopInit(Preheader, PreheaderInsertPt, NewBranch,
                            ReservedRegs, NIter, SGCtx);
 
-  auto SP = SGCtx.getStackPointer();
+  auto SP = ProgCtx.getStackPointer();
   if (UseStackOpt || TrackingMode) {
     for (auto &&Reg : ReservedRegs)
       SnippyTgt.generateSpillToStack(Preheader, PreheaderInsertPt, Reg, SGCtx,

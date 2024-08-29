@@ -13,8 +13,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Generator/Interpreter.h"
+#include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Generator/GlobalsPool.h"
-#include "snippy/Generator/Linker.h"
 
 #include "snippy/Generator/MemoryManager.h"
 #include "snippy/Support/DynLibLoader.h"
@@ -176,16 +176,27 @@ static void writeSectionToFile(ArrayRef<char> Data,
   File << SS.str();
 }
 
-SimulationEnvironment Interpreter::createSimulationEnvironment(
-    const SnippyTarget &SnippyTGT, const TargetSubtargetInfo &ST,
-    const Linker &L, const MemoryScheme &MS,
-    const TargetGenContextInterface &TgtCtx, bool NeedCallbackHandler) {
+SimulationEnvironment
+Interpreter::createSimulationEnvironment(const GeneratorContext &GC) {
+  auto &State = GC.getProgramContext().getLLVMState();
+  auto &Settings = GC.getGenSettings();
+  const auto &SnippyTGT = State.getSnippyTarget();
+  const auto &Module = GC.getMainModule().getModule();
+  const auto &EntryFun =
+      *Module.getFunction(Settings.LinkerConfig.EntryPointName);
+  const auto &ST =
+      GC.getMainModule().getMMI().getMachineFunction(EntryFun)->getSubtarget();
+
+  bool NeedCallbackHandler = GC.hasExecutionTraceTrackingMode();
+  auto &TgtCtx = GC.getTargetContext();
+  auto &L = GC.getProgramContext().getLinker();
+  auto &MS = Settings.Cfg.MS;
 
   SimulationEnvironment Env;
   Env.SnippyTGT = &SnippyTGT;
   Env.ST = &ST;
 
-  auto MemCfg = MemoryConfig::getMemoryConfig(L);
+  auto MemCfg = MemoryConfig::getMemoryConfig(GC);
   applyMemCfgToSimCfg(MemCfg, Env.SimCfg);
 
   std::transform(L.sections().begin(), L.sections().end(),
