@@ -19,15 +19,18 @@
 #include "snippy/Config/MemoryScheme.h"
 
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringRef.h"
 
 namespace llvm {
 namespace snippy {
 
+class SnippyModule;
 using ObjectFilesList = std::vector<SmallString<32>>;
 
 class Linker final {
 public:
+  constexpr static const char *kDefaultTextSectionName = ".text";
+  constexpr static const char *kDefaultRODataSectionName = ".rodata";
+
   struct OutputSectionT {
     explicit OutputSectionT(const SectionDesc &Desc);
     SectionDesc Desc;
@@ -45,7 +48,6 @@ public:
   };
 
   explicit Linker(LLVMContext &Ctx, const SectionsDescriptions &Sects,
-                  bool EnableChainedExecution, bool SortedExecutionPath,
                   StringRef MangleName = "");
 
   // Checks if Linker has mapped section from object file to its
@@ -65,9 +67,6 @@ public:
   // Sections are sorted by their VMA value (not ID value!)
   auto &sections() const { return Sections; }
 
-  // Executable sections where generated code goes into.
-  // They are sorted in order of code execution.
-  auto &executionPath() const { return ExecutionPath; };
   auto getMaxSectionID() const {
     auto Unnamed = llvm::make_filter_range(
         Sections,
@@ -110,7 +109,6 @@ private:
   std::string MangleName;
   std::pair<size_t, size_t> MemoryRegion;
   SmallVector<SectionEntry, 4> Sections;
-  SmallVector<SectionEntry, 4> ExecutionPath;
 };
 
 } // namespace snippy

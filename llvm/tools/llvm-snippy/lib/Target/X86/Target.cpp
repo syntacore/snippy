@@ -158,7 +158,7 @@ public:
   }
 
   unsigned getSpillAlignmentInBytes(MCRegister Reg,
-                                    GeneratorContext &GC) const override {
+                                    LLVMState &State) const override {
     reportUnimplementedError();
   }
 

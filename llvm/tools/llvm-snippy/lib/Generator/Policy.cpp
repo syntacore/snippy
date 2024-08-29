@@ -41,7 +41,8 @@ BurstGenPolicy::BurstGenPolicy(const GeneratorContext &SGCtx,
 
   std::copy_if(Group.begin(), Group.end(), std::back_inserter(Opcodes),
                [&SnippyTgt, &State,
-                &OpcCache = SGCtx.getOpcodeCache()](unsigned Opcode) {
+                &OpcCache = SGCtx.getProgramContext().getOpcodeCache()](
+                   unsigned Opcode) {
                  if (!SnippyTgt.canUseInMemoryBurstMode(Opcode)) {
                    snippy::warn(
                        WarningName::BurstMode, State.getCtx(),

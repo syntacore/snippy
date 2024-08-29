@@ -106,7 +106,7 @@ void BlockGenPlanning::getAnalysisUsage(AnalysisUsage &AU) const {
 size_t
 BlockGenPlanningImpl::calculateMFSizeLimit(const MachineFunction &MF) const {
   assert(!GenCtx->isInstrsNumKnown());
-  auto OutSectionDesc = GenCtx->getOutputSectionFor(MF);
+  auto OutSectionDesc = GenCtx->getProgramContext().getOutputSectionFor(MF);
   auto MaxSize = OutSectionDesc.Size;
   const auto &SnpTgt = GenCtx->getLLVMState().getSnippyTarget();
   auto CurrentCodeSize = GenCtx->getFunctionSize(MF);
@@ -167,7 +167,8 @@ collectLatchBlocks(const GeneratorContext &GenCtx, const MachineLoopInfo &MLI,
 
 static double getBurstProb(const Config &Cfg, GeneratorContext &GenCtx) {
   auto TotalWeight = Cfg.Histogram.getTotalWeight();
-  auto CFWeight = Cfg.Histogram.getCFWeight(GenCtx.getOpcodeCache());
+  auto CFWeight =
+      Cfg.Histogram.getCFWeight(GenCtx.getProgramContext().getOpcodeCache());
   auto BurstWeight = Cfg.getBurstOpcodesWeight();
   assert(TotalWeight >= CFWeight);
   assert(BurstWeight <= (TotalWeight - CFWeight));
@@ -627,7 +628,7 @@ static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
   auto BrOpc = SelectedMBB.getFirstTerminator()->getOpcode();
   auto MaxBranchDstMod = SnpTgt.getMaxBranchDstMod(BrOpc);
   if (PCDist.Max.has_value() && PCDist.Max.value() > MaxBranchDstMod) {
-    auto OpName = SGCtx.getOpcodeCache().name(BrOpc);
+    auto OpName = SGCtx.getProgramContext().getOpcodeCache().name(BrOpc);
     snippy::notice(WarningName::TooFarMaxPCDist,
                    SelectedMBB.getParent()->getFunction().getContext(),
                    "Specified max PC Distance is more than max distance for "

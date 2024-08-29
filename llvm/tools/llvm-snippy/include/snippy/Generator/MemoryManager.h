@@ -38,7 +38,7 @@ struct MemoryConfig {
   MemorySectionConfig Rom;
   MemorySectionConfig Ram;
 
-  static MemoryConfig getMemoryConfig(const Linker &L);
+  static MemoryConfig getMemoryConfig(const GeneratorContext &GC);
 };
 
 } // namespace snippy

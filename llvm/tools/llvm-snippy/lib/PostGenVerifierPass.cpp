@@ -127,7 +127,7 @@ static inline ValueTy getValueOrZero(const std::map<unsigned, ValueTy> Map,
 void PostGenVerifier::printData(const MachineFunction &MF) const {
   GeneratorContextWrapper &CtxWrapper = getAnalysis<GeneratorContextWrapper>();
   const GeneratorContext &SGCtx = CtxWrapper.getContext();
-  const OpcodeCache &OpCache = SGCtx.getOpcodeCache();
+  const OpcodeCache &OpCache = SGCtx.getProgramContext().getOpcodeCache();
 
   auto ExpectedDist = SGCtx.createDefaultOpcodeGenerator()->getProbabilities();
 

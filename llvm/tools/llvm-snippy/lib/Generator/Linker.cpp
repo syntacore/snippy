@@ -147,13 +147,6 @@ static std::string getUniqueSectionName(const SectionDesc &Desc) {
 
   return Buf;
 }
-template <typename SecT, typename PredT>
-static auto findFirstSection(SecT &&Sections, PredT &&Pred) {
-  return std::find_if(Sections.begin(), Sections.end(),
-                      [&Pred](auto &&Section) {
-                        return std::invoke(Pred, Section.OutputSection.Desc);
-                      });
-}
 
 static void reportSectionInterfereError(const Linker::OutputSectionT &Added,
                                         const Linker::OutputSectionT &Existing,
@@ -166,16 +159,12 @@ static void reportSectionInterfereError(const Linker::OutputSectionT &Added,
   report_fatal_error(MessageBuf.c_str(), false);
 }
 
-template <typename R>
-void reportUnusedRXSectionWarning(LLVMContext &Ctx, R &&Names) {
-  std::string NameList;
-  llvm::raw_string_ostream OS{NameList};
-  for (auto &&Name : Names) {
-    OS << "'" << Name << "' ";
-  }
-
-  snippy::warn(WarningName::UnusedSection, Ctx,
-               "Following RX sections are unused during generation", NameList);
+template <typename SecT, typename PredT>
+static auto findFirstSection(SecT &&Sections, PredT &&Pred) {
+  return std::find_if(Sections.begin(), Sections.end(),
+                      [&Pred](auto &&Section) {
+                        return std::invoke(Pred, Section.OutputSection.Desc);
+                      });
 }
 
 } // namespace
@@ -191,7 +180,6 @@ void Linker::calculateMemoryRegion() {
 }
 
 Linker::Linker(LLVMContext &Ctx, const SectionsDescriptions &Sects,
-               bool EnableChainedExecution, bool SortedExecutionPath,
                StringRef MN)
     : MangleName(MN) {
   std::transform(Sects.begin(), Sects.end(), std::back_inserter(Sections),
@@ -202,51 +190,18 @@ Linker::Linker(LLVMContext &Ctx, const SectionsDescriptions &Sects,
     return LSE.OutputSection.Desc.VMA < RSE.OutputSection.Desc.VMA;
   });
   calculateMemoryRegion();
+  auto DefaultCodeSection = findFirstSection(
+      Sections, [](const SectionDesc &Desc) { return Desc.M.X(); });
 
-  auto DefaultCodeSection =
-      findFirstSection(Sections, [](const SectionDesc &S) { return S.M.X(); });
   if (DefaultCodeSection != Sections.end())
-    DefaultCodeSection->InputSections.emplace_back(".text");
-
-  if (EnableChainedExecution) {
-    for (auto &RXSection : llvm::make_filter_range(
-             Sections, [](auto &S) { return S.OutputSection.Desc.M.X(); })) {
-      RXSection.InputSections.emplace_back(RXSection.OutputSection.Name);
-      ExecutionPath.push_back(RXSection);
-    }
-    if (SortedExecutionPath) {
-      std::sort(ExecutionPath.begin(), ExecutionPath.end(),
-                [](auto &LHS, auto &RHS) {
-                  return LHS.OutputSection.Desc.getIDString() <
-                         RHS.OutputSection.Desc.getIDString();
-                });
-    } else {
-      std::shuffle(ExecutionPath.begin(), ExecutionPath.end(),
-                   RandEngine::engine());
-    }
-  } else {
-
-    std::vector<std::string> UnusedRXSections;
-    for (auto &RXSection :
-         llvm::make_filter_range(Sections, [DefaultCodeSection](auto &S) {
-           return S.OutputSection.Desc.M.X() &&
-                  S.OutputSection.Desc.getIDString() !=
-                      DefaultCodeSection->OutputSection.Desc.getIDString();
-         }))
-      UnusedRXSections.emplace_back(RXSection.OutputSection.Desc.getIDString());
-
-    if (!UnusedRXSections.empty())
-      reportUnusedRXSectionWarning(Ctx, UnusedRXSections);
-
-    ExecutionPath.push_back(*DefaultCodeSection);
-  }
+    DefaultCodeSection->InputSections.emplace_back(kDefaultTextSectionName);
 
   auto ROMSection = findFirstSection(Sections, [](const SectionDesc &S) {
     return S.M.R() && !S.M.W() && !S.M.X();
   });
 
   if (ROMSection != Sections.end())
-    ROMSection->InputSections.emplace_back(".rodata");
+    ROMSection->InputSections.emplace_back(kDefaultRODataSectionName);
 }
 
 bool Linker::hasOutputSectionFor(StringRef SectionName) const {
