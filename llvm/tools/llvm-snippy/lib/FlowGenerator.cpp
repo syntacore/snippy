@@ -33,7 +33,6 @@
 #include "snippy/Support/Utils.h"
 #include "snippy/Target/Target.h"
 
-#include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
@@ -42,7 +41,6 @@
 #include "llvm/CodeGen/MachineOperand.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/InitializePasses.h"
-#include "llvm/MC/MCStreamer.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
@@ -205,8 +203,8 @@ static size_t calcMainFuncInitialSpillSize(GeneratorContext &GC) {
   auto &State = GC.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
-  auto StackPointer = GC.getStackPointer();
-  size_t SpillSize = SnippyTgt.getSpillAlignmentInBytes(StackPointer, GC);
+  auto StackPointer = GC.getProgramContext().getStackPointer();
+  size_t SpillSize = SnippyTgt.getSpillAlignmentInBytes(StackPointer, State);
 
   auto SpilledRef = GC.getRegsSpilledToStack();
   std::vector SpilledRegs(SpilledRef.begin(), SpilledRef.end());
@@ -220,18 +218,19 @@ static size_t calcMainFuncInitialSpillSize(GeneratorContext &GC) {
 void InstructionGenerator::prepareInterpreterEnv() const {
   auto &State = SGCtx->getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
+  const auto &ProgCtx = SGCtx->getProgramContext();
   auto &I = SGCtx->getOrCreateInterpreter();
 
   I.setInitialState(SGCtx->getInitialRegisterState(I.getSubTarget()));
-  if (!SGCtx->hasStackSection())
+  if (!ProgCtx.hasStackSection())
     return;
 
   // Prologue insertion happens after instructions generation, so we do not
   // have SP initialization instructions at this point. However, we know the
   // actual value of SP, so let's initialize it in model artificially.
-  auto SP = SGCtx->getStackPointer();
+  auto SP = ProgCtx.getStackPointer();
   APInt StackTop(SnippyTgt.getRegBitWidth(SP, *SGCtx),
-                 SGCtx->getStackTop() - calcMainFuncInitialSpillSize(*SGCtx));
+                 ProgCtx.getStackTop() - calcMainFuncInitialSpillSize(*SGCtx));
   I.setReg(SP, StackTop);
 }
 
@@ -247,7 +246,7 @@ void InstructionGenerator::addGV(
 }
 
 void InstructionGenerator::addModelMemoryPropertiesAsGV() const {
-  auto MemCfg = MemoryConfig::getMemoryConfig(SGCtx->getLinker());
+  auto MemCfg = MemoryConfig::getMemoryConfig(*SGCtx);
   // Below we add all the model memory properties as global constants
   constexpr auto ConstantSizeInBits = 64u; // Constants size in bits
   constexpr auto Alignment = 1u;           // Without special alignment
@@ -276,7 +275,7 @@ void InstructionGenerator::addSelfcheckSectionPropertiesAsGV() const {
 
   auto VMA = APInt{64, SelfcheckSection.VMA};
   auto Size = APInt{64, SelfcheckSection.Size};
-  auto Stride = APInt{64, SGCtx->getSCStride()};
+  auto Stride = APInt{64, SGCtx->getProgramContext().getSCStride()};
 
   addGV(VMA, 1, GlobalValue::ExternalLinkage, "selfcheck_section_address");
   addGV(Size, 1, GlobalValue::ExternalLinkage, "selfcheck_section_size");
@@ -286,15 +285,16 @@ void InstructionGenerator::addSelfcheckSectionPropertiesAsGV() const {
 planning::FunctionRequest InstructionGenerator::createMFGenerationRequest(
     const MachineFunction &MF) const {
   auto &FunReq = getAnalysis<BlockGenPlanWrapper>().getFunctionRequest(&MF);
+  const auto &ProgCtx = SGCtx->getProgramContext();
   const MCInstrDesc *FinalInstDesc = nullptr;
   auto LastInstrStr = SGCtx->getLastInstr();
   if (!LastInstrStr.empty() && !SGCtx->useRetAsLastInstr()) {
-    auto Opc = SGCtx->getOpcodeCache().code(LastInstrStr.str());
+    auto Opc = ProgCtx.getOpcodeCache().code(LastInstrStr.str());
     if (!Opc.has_value())
       report_fatal_error("unknown opcode \"" + Twine(LastInstrStr) +
                              "\" for last instruction generation",
                          false);
-    FinalInstDesc = SGCtx->getOpcodeCache().desc(Opc.value());
+    FinalInstDesc = ProgCtx.getOpcodeCache().desc(Opc.value());
   }
   FunReq.setFinalInstr(FinalInstDesc);
   return FunReq;
@@ -332,8 +332,8 @@ bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
   }
 
   auto FunctionGenRequest = createMFGenerationRequest(MF);
-  SGCtx->setMachineLoopInfo(getAnalysis<MachineLoopInfo>());
-  generate(FunctionGenRequest, MF, *SGCtx, &SelfCheckInfo);
+  generate(FunctionGenRequest, MF, *SGCtx, &SelfCheckInfo,
+           &getAnalysis<MachineLoopInfo>());
   return true;
 }
 
@@ -346,7 +346,8 @@ static void dumpVerificationIntervalsIfNeeeded(StringRef Output,
   auto &Ctx = State.getCtx();
 
   auto VerificationIntervals = IntervalsToVerify::createFromObject(
-      State.getDisassembler(), Output, GenCtx.getEntryPointName(),
+      State.getDisassembler(), Output,
+      GenCtx.getProgramContext().getEntryPointName(),
       GenCtx.getLinker().getOutputSectionFor(".text").Desc.VMA,
       GenCtx.getEntryPrologueInstructionCount(),
       GenCtx.getEntryEpilogueInstructionCount());
@@ -377,102 +378,82 @@ static RegisterGenerator createRegGen(std::string PluginFileName,
 }
 
 GeneratorResult FlowGenerator::generate(LLVMState &State) {
-  auto &LLVMTM = State.getTargetMachine();
-  auto &Tgt = State.getSnippyTarget();
-  auto &Ctx = State.getCtx();
-  Module M("SnippyModule", Ctx);
 
-  // Previously, AsmPrinter was created using Context from MMI
-  // MMI is captured by PM, so in order to avoid potential invalid ref,
-  //  now MMIWP uses external context
-  MCContext Context(LLVMTM.getTargetTriple(), LLVMTM.getMCAsmInfo(),
-                    LLVMTM.getMCRegisterInfo(), LLVMTM.getMCSubtargetInfo(),
-                    nullptr, &LLVMTM.Options.MCOptions, false);
-  Context.setObjectFileInfo(LLVMTM.getObjFileLowering());
-  auto MMIWP =
-      std::make_unique<MachineModuleInfoWrapperPass>(&LLVMTM, &Context);
-  auto &MMI = MMIWP->getMMI();
-  const auto &SnippyTgt = State.getSnippyTarget();
   auto RegGen =
       createRegGen(RegGeneratorFile.getValue(), RegInfoFile.getValue());
 
-  GeneratorContext GenCtx(MMI, M, State, RP, RegGen, GenSettings, OpCC);
+  SnippyProgramContext ProgContext(State, RegGen, RP, OpCC,
+                                   GenSettings.getSnippyProgramSettings(State));
+
+  const auto &SnippyTgt = State.getSnippyTarget();
+
+  GeneratorContext GenCtx(ProgContext, GenSettings);
   GenCtx.attachTargetContext(SnippyTgt.createTargetContext(GenCtx));
-
-  PassManagerWrapper PM;
-  initializeCodeGen(*PassRegistry::getPassRegistry());
-  initializeSnippyPasses(*PassRegistry::getPassRegistry());
-  SnippyTgt.initializeTargetPasses();
-
-  // Pre backtrack start
-  PM.add(MMIWP.release());
-  PM.add(createGeneratorContextWrapperPass(GenCtx));
-  PM.add(createRootRegPoolWrapperPass());
-  PM.add(createFunctionGeneratorPass());
-
-  PM.add(createReserveRegsPass());
-  PM.add(createCFGeneratorPass());
-  if (GenSettings.Cfg.Branches.PermuteCF)
-    PM.add(createCFPermutationPass());
-
-  if (GenSettings.DebugConfig.PrintControlFlowGraph)
-    PM.add(createCFGPrinterPass());
-  PM.add(createLoopAlignmentPass());
-  PM.add(createLoopCanonicalizationPass());
-  PM.add(createLoopLatcherPass());
-  if (GenSettings.DebugConfig.PrintControlFlowGraph)
-    PM.add(createCFGPrinterPass());
-
-  PM.add(
-      createRegsInitInsertionPass(GenSettings.RegistersConfig.InitializeRegs));
-  SnippyTgt.addTargetSpecificPasses(PM);
-
-  // Pre backtrack end
-  PM.add(createBlockGenPlanWrapperPass());
-  PM.add(createBlockGenPlanningPass());
-  PM.add(createInstructionGeneratorPass()); // Can be backtracked
-
-  // Post backtrack
-  PM.add(createPrologueEpilogueInsertionPass());
-  PM.add(createFillExternalFunctionsStubsPass({}));
-  if (GenSettings.DebugConfig.PrintMachineFunctions)
-    PM.add(createMachineFunctionPrinterPass(outs()));
-
-  if (GenSettings.DebugConfig.PrintControlFlowGraph)
-    PM.add(createCFGPrinterPass());
-  if (GenSettings.DebugConfig.PrintInstrs)
-    PM.add(createPrintMachineInstrsPass(outs()));
-
-  SnippyTgt.addTargetLegalizationPasses(PM);
-
-  PM.add(createBranchRelaxatorPass());
-  if (VerifyConsecutiveLoops)
-    PM.add(createConsecutiveLoopsVerifierPass());
-
-  PM.add(createPostGenVerifierPass());
-  PM.add(createInstructionsPostProcessPass());
-  PM.add(createFunctionDistributePass());
-
-  if (GenSettings.InstrsGenerationConfig.RunMachineInstrVerifier)
-    PM.add(createMachineVerifierPass("Machine Verifier Pass report"));
 
   std::string MIR;
   raw_string_ostream MIROS(MIR);
-  if (DumpMIR.isSpecified())
-    PM.add(createPrintMIRPass(MIROS));
-  if (DumpFinalCFG)
-    PM.add(createCFGPrinterPass());
 
-  SmallString<32> Output;
-  raw_svector_ostream OS(Output);
-  auto ObjStreamer = State.createObjStreamer(OS, Context);
-  auto AsmPrinter = Tgt.createAsmPrinter(LLVMTM, std::move(ObjStreamer));
-  PM.add(AsmPrinter.release());
+  auto &MainModule = GenCtx.getMainModule();
 
-  PM.run(M);
+  MainModule.generateObject([&](PassManagerWrapper &PM) {
+    // Pre backtrack start
+    PM.add(createGeneratorContextWrapperPass(GenCtx));
+    PM.add(createRootRegPoolWrapperPass());
+    PM.add(createFunctionGeneratorPass());
 
-  outs().flush(); // FIXME: this is currently needed because
-                  //        MachineFunctionPrinter don't flush
+    PM.add(createReserveRegsPass());
+    PM.add(createCFGeneratorPass());
+    if (GenSettings.Cfg.Branches.PermuteCF)
+      PM.add(createCFPermutationPass());
+
+    if (GenSettings.DebugConfig.PrintControlFlowGraph)
+      PM.add(createCFGPrinterPass());
+    PM.add(createLoopAlignmentPass());
+    PM.add(createLoopCanonicalizationPass());
+    PM.add(createLoopLatcherPass());
+    if (GenSettings.DebugConfig.PrintControlFlowGraph)
+      PM.add(createCFGPrinterPass());
+
+    PM.add(createRegsInitInsertionPass(
+        GenSettings.RegistersConfig.InitializeRegs));
+    SnippyTgt.addTargetSpecificPasses(PM);
+
+    // Pre backtrack end
+
+    PM.add(createBlockGenPlanWrapperPass());
+    PM.add(createBlockGenPlanningPass());
+    PM.add(createInstructionGeneratorPass()); // Can be backtracked
+
+    // Post backtrack
+    PM.add(createPrologueEpilogueInsertionPass());
+    PM.add(createFillExternalFunctionsStubsPass({}));
+    if (GenSettings.DebugConfig.PrintMachineFunctions)
+      PM.add(createMachineFunctionPrinterPass(outs()));
+
+    if (GenSettings.DebugConfig.PrintControlFlowGraph)
+      PM.add(createCFGPrinterPass());
+    if (GenSettings.DebugConfig.PrintInstrs)
+      PM.add(createPrintMachineInstrsPass(outs()));
+
+    SnippyTgt.addTargetLegalizationPasses(PM);
+
+    PM.add(createBranchRelaxatorPass());
+    if (VerifyConsecutiveLoops)
+      PM.add(createConsecutiveLoopsVerifierPass());
+
+    PM.add(createPostGenVerifierPass());
+    PM.add(createInstructionsPostProcessPass());
+    PM.add(createFunctionDistributePass());
+
+    if (GenSettings.InstrsGenerationConfig.RunMachineInstrVerifier)
+      PM.add(createMachineVerifierPass("Machine Verifier Pass report"));
+
+    if (DumpMIR.isSpecified())
+      PM.add(createPrintMIRPass(MIROS));
+    if (DumpFinalCFG)
+      PM.add(createCFGPrinterPass());
+  });
+
   auto CGFilename = DumpCGFilename.getValue();
   if (!CGFilename.empty())
     GenCtx.getCallGraphState().dump(CGFilename, CGDumpFormat);
@@ -480,16 +461,13 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
   if (DumpMIR.isSpecified())
     writeMIRFile(MIR);
   dumpMemAccessesIfNeeded(GenCtx);
-  auto ImagesForFinalSnippet = ObjectFilesList{Output};
+  std::vector<const SnippyModule *> Modules{&GenCtx.getMainModule()};
+  auto Result = ProgContext.generateELF(Modules);
 
-  auto Result = GenCtx.generateELF(ImagesForFinalSnippet);
+  auto SnippetImageForModelExecution = ProgContext.generateLinkedImage(Modules);
 
-  auto ImagesForModelExecution = ImagesForFinalSnippet;
-
-  auto SnippetImageForModelExecution =
-      GenCtx.generateLinkedImage(ImagesForModelExecution);
-
-  dumpVerificationIntervalsIfNeeeded(Output, GenCtx);
+  dumpVerificationIntervalsIfNeeeded(
+      GenCtx.getMainModule().getGeneratedObject(), GenCtx);
 
   GenCtx.runSimulator(SnippetImageForModelExecution);
 

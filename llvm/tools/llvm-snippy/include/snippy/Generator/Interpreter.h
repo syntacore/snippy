@@ -30,6 +30,7 @@ namespace llvm {
 namespace snippy {
 
 class MemoryScheme;
+class GeneratorContext;
 struct TargetGenContextInterface;
 struct SectionData;
 
@@ -107,10 +108,8 @@ public:
 
   bool endOfProg() const;
 
-  static SimulationEnvironment createSimulationEnvironment(
-      const SnippyTarget &TGT, const TargetSubtargetInfo &Subtarget,
-      const Linker &L, const MemoryScheme &MS,
-      const TargetGenContextInterface &TgtCtx, bool NeedCallbackHandler);
+  static SimulationEnvironment
+  createSimulationEnvironment(const GeneratorContext &GC);
 
   static std::unique_ptr<SimulatorInterface> createSimulatorForTarget(
       const SnippyTarget &TGT, const TargetSubtargetInfo &Subtarget,

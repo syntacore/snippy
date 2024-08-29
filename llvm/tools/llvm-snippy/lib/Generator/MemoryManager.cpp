@@ -28,10 +28,9 @@ namespace llvm::snippy {
 
 namespace {
 
-void fillProgSectionInfo(const Linker &L, MemoryConfig &Config) {
-  for (auto &ExecSection : L.executionPath()) {
-    if (ExecSection.InputSections.empty())
-      continue;
+void fillProgSectionInfo(const GeneratorContext &GC, MemoryConfig &Config) {
+  auto &L = GC.getProgramContext().getLinker();
+  for (auto &ExecSection : GC.executionPath()) {
     Config.ProgSections.emplace_back(
         ExecSection.OutputSection.Desc.VMA, ExecSection.OutputSection.Desc.Size,
         L.getMangledName(ExecSection.OutputSection.Name));
@@ -100,10 +99,11 @@ MemorySectionConfig getRomInfo(const Linker &L, MemAddr ProgSectionStart) {
 
 } // namespace
 
-MemoryConfig MemoryConfig::getMemoryConfig(const Linker &L) {
+MemoryConfig MemoryConfig::getMemoryConfig(const GeneratorContext &GC) {
   MemoryConfig Config{};
+  auto &L = GC.getProgramContext().getLinker();
   // get RX sections info...
-  fillProgSectionInfo(L, Config);
+  fillProgSectionInfo(GC, Config);
   // get R sections info...
   Config.Rom = getRomInfo(L, Config.ProgSections.front().Start);
   // get RW sections info...
