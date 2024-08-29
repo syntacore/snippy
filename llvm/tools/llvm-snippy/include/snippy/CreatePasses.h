@@ -25,7 +25,7 @@ class LLVMState;
 class MemoryScheme;
 class OpcodeCache;
 class GeneratorContext;
-struct GeneratorSettings;
+class GeneratorSettings;
 class MemoryManager;
 
 } // namespace snippy

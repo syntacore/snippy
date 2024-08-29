@@ -489,8 +489,8 @@ std::map<unsigned, AddressInfo> collectPrimaryAddresses(
   auto &SnpTgt = GC.getLLVMState().getSnippyTarget();
   auto ARRange = make_second_range(BaseRegToStrongestAR);
   std::vector<AddressRestriction> ARs(ARRange.begin(), ARRange.end());
-  std::vector<AddressInfo> PrimaryAddresses =
-      MS.randomBurstGroupAddresses(ARs, GC.getOpcodeCache(), SnpTgt);
+  std::vector<AddressInfo> PrimaryAddresses = MS.randomBurstGroupAddresses(
+      ARs, GC.getProgramContext().getOpcodeCache(), SnpTgt);
   assert(PrimaryAddresses.size() == BaseRegToStrongestAR.size());
   std::map<unsigned, AddressInfo> BaseRegToPrimaryAddress;
   transform(
