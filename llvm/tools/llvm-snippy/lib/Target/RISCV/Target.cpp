@@ -1772,7 +1772,7 @@ public:
   }
 
   unsigned getSpillAlignmentInBytes(MCRegister Reg,
-                                    GeneratorContext &GC) const override {
+                                    LLVMState &State) const override {
     // TODO: return actual minimum alignment of Reg.
     return 16u;
   }
@@ -1815,7 +1815,7 @@ public:
   unsigned getSpillSizeInBytes(MCRegister Reg,
                                GeneratorContext &GC) const override {
     unsigned RegSize = getRegBitWidth(Reg, GC) / RISCV_CHAR_BIT;
-    auto Alignment = getSpillAlignmentInBytes(Reg, GC);
+    auto Alignment = getSpillAlignmentInBytes(Reg, GC.getLLVMState());
     assert(Alignment && "Alignment size can't be zero");
     // Get the least number of alignment sizes that fully fits register.
     return Alignment * divideCeil(RegSize, Alignment);
@@ -1857,7 +1857,7 @@ public:
                             MachineBasicBlock::iterator Ins, MCRegister Reg,
                             GeneratorContext &GC,
                             MCRegister SP) const override {
-    assert(GC.stackEnabled() &&
+    assert(GC.getProgramContext().stackEnabled() &&
            "An attempt to generate spill but stack was not enabled.");
 
     auto &State = GC.getLLVMState();
@@ -1875,7 +1875,7 @@ public:
                                MachineBasicBlock::iterator Ins, MCRegister Reg,
                                GeneratorContext &GC,
                                MCRegister SP) const override {
-    assert(GC.stackEnabled() &&
+    assert(GC.getProgramContext().stackEnabled() &&
            "An attempt to generate reload but stack was not enabled.");
     auto &State = GC.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
@@ -1891,10 +1891,10 @@ public:
   void generatePopNoReload(MachineBasicBlock &MBB,
                            MachineBasicBlock::iterator Ins, MCRegister Reg,
                            GeneratorContext &GC) const override {
-    assert(GC.stackEnabled() &&
+    assert(GC.getProgramContext().stackEnabled() &&
            "An attempt to generate stack pop but stack was not enabled.");
     auto &State = GC.getLLVMState();
-    auto SP = GC.getStackPointer();
+    auto SP = GC.getProgramContext().getStackPointer();
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
 
@@ -2233,7 +2233,7 @@ public:
                                       GeneratorContext &GC) const {
     const auto &TM = GC.getLLVMState().getTargetMachine();
     const auto &OpcSetting = GC.getOpcodeToImmHistMap().getConfigForOpcode(
-        Opcode, GC.getOpcodeCache());
+        Opcode, GC.getProgramContext().getOpcodeCache());
     if (OpcSetting.isUniform())
       return createOperandForOpType(nullptr, OperandType, StridedImm, TM);
     const auto &Seq = OpcSetting.getSequence();

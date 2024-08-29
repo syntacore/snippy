@@ -618,6 +618,8 @@ inline bool operator==(const SectionDesc &Lhs, const SectionDesc &Rhs) {
 struct SectionsDescriptions : private std::vector<SectionDesc> {
   using vector::begin;
   using vector::end;
+  using vector::rbegin;
+  using vector::rend;
   using vector::operator[];
   using vector::back;
   using vector::empty;

@@ -25,7 +25,7 @@ class OpcodeCache;
 class LLVMState;
 class RegPool;
 struct RegisterState;
-struct GeneratorSettings;
+class GeneratorSettings;
 class ImmediateHistogram;
 
 class FlowGenerator {

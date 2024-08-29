@@ -11,6 +11,7 @@
 
 namespace llvm {
 class MachineFunction;
+class MachineLoopInfo;
 namespace snippy {
 
 namespace planning {
@@ -32,7 +33,7 @@ generate(planning::BasicBlockRequest &BB,
 
 void generate(planning::FunctionRequest &FunctionGenRequest,
               MachineFunction &MF, GeneratorContext &GC,
-              SelfCheckInfo *SelfCheckInfo);
+              SelfCheckInfo *SelfCheckInfo, MachineLoopInfo *MLI);
 
 } // namespace snippy
 } // namespace llvm

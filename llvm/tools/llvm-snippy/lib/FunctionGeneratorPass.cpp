@@ -176,7 +176,8 @@ MachineFunction &createFunction(GeneratorContext &SGCtx, Module &M,
           ? std::string(Name)
           : (Twine(SectionName) + "." + Name).str();
   auto &MF = State.createMachineFunctionFor(
-      State.createFunction(M, FinalName, SectionName, Linkage), SGCtx.getMMI());
+      State.createFunction(M, FinalName, SectionName, Linkage),
+      SGCtx.getMainModule().getMMI());
   auto &Props = MF.getProperties();
   // FIXME: currently we don't keep liveness when creating and filling new BB
   auto IsRegsInit = SGCtx.getGenSettings().RegistersConfig.InitializeRegs;
@@ -198,13 +199,12 @@ MachineFunction &createFunction(GeneratorContext &SGCtx, Module &M,
 // in order.
 std::vector<std::string> FunctionGenerator::prepareRXSections() {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &Linker = SGCtx.getLinker();
 
   if (!SGCtx.getGenSettings().InstrsGenerationConfig.ChainedRXSectionsFill)
     return {""};
 
   std::vector<std::string> Ret;
-  for (auto &&[_, InputSections] : Linker.executionPath())
+  for (auto &&[_, InputSections] : SGCtx.executionPath())
     Ret.emplace_back(InputSections.front());
 
   return Ret;
@@ -370,7 +370,7 @@ bool FunctionGenerator::generateDefault(Module &M) {
 
   assert(NumF && "Expected NumF >= 1");
 
-  initRootFunctions(M, SGCtx.getEntryPointName());
+  initRootFunctions(M, SGCtx.getProgramContext().getEntryPointName());
 
   iota_range<size_t> funIDs(0u, NumF - 1u, /*Inclusive*/ false);
   std::transform(
