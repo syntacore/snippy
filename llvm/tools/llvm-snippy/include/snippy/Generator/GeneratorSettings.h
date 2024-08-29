@@ -64,7 +64,24 @@ struct RegistersOptions {
   MCRegister StackPointer;
 };
 
-struct GeneratorSettings {
+struct SnippyProgramSettings {
+  SectionsDescriptions Sections;
+  MCRegister StackPointer;
+  bool MangleExportedNames;
+  bool FollowTargetABI;
+  bool ExternalStack;
+  std::string EntryPointName;
+  SnippyProgramSettings(SectionsDescriptions Sections, MCRegister StackPointer,
+                        bool MangleExportedNames, bool FollowTargetABI,
+                        bool ExternalStack, StringRef EntryPointName)
+      : Sections(std::move(Sections)), StackPointer(StackPointer),
+        MangleExportedNames(MangleExportedNames),
+        FollowTargetABI(FollowTargetABI), ExternalStack(ExternalStack),
+        EntryPointName(EntryPointName){};
+};
+
+class GeneratorSettings {
+public:
   std::string ABIName;
   std::string BaseFileName;
 
@@ -76,6 +93,13 @@ struct GeneratorSettings {
   RegistersOptions RegistersConfig;
 
   Config Cfg;
+
+  SnippyProgramSettings getSnippyProgramSettings(LLVMState &State) const {
+    return SnippyProgramSettings(
+        getCompleteSectionList(State), RegistersConfig.StackPointer,
+        LinkerConfig.MangleExportedNames, RegistersConfig.FollowTargetABI,
+        LinkerConfig.ExternalStack, LinkerConfig.EntryPointName);
+  }
 
   GeneratorSettings(std::string ABIName, std::string BaseFileName,
                     TrackingOptions &&TrackingConfig,
@@ -90,6 +114,9 @@ struct GeneratorSettings {
         ModelPluginConfig(std::move(ModelPluginConfig)),
         InstrsGenerationConfig(std::move(InstrsGenerationConfig)),
         RegistersConfig(std::move(RegistersConfig)), Cfg(std::move(Cfg)) {}
+
+private:
+  SectionsDescriptions getCompleteSectionList(LLVMState &State) const;
 };
 
 } // namespace snippy

@@ -194,7 +194,7 @@ public:
   // Returns minimum address alignment that can be used to generate register
   // spill.
   virtual unsigned getSpillAlignmentInBytes(MCRegister Reg,
-                                            GeneratorContext &GC) const = 0;
+                                            LLVMState &State) const = 0;
 
   // Find register by name, std::nullopt if not found.
   virtual std::optional<unsigned>

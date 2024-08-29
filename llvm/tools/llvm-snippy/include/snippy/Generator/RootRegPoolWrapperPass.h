@@ -10,6 +10,7 @@
 
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/RegisterPool.h"
+#include "snippy/Generator/SnippyModule.h"
 
 namespace llvm {
 
@@ -36,12 +37,14 @@ public:
   RegPool &getPool() {
     return getAnalysis<GeneratorContextWrapper>()
         .getContext()
+        .getProgramContext()
         .RegPoolsStorage.front();
   }
 
   const RegPool &getPool() const {
     return getAnalysis<GeneratorContextWrapper>()
         .getContext()
+        .getProgramContext()
         .RegPoolsStorage.front();
   }
 };

@@ -80,6 +80,8 @@ template <> struct std::hash<llvm::MCRegister> {
 };
 
 namespace llvm {
+class MachineLoopInfo;
+
 namespace snippy {
 
 class GeneratorContext;
@@ -135,6 +137,7 @@ struct InstructionGenerationContext final {
   GeneratorContext &GC;
   GenerationStatistics Stats;
   SelfCheckInfo *SelfCheck = nullptr;
+  MachineLoopInfo *MLI = nullptr;
   std::unordered_set<MCRegister> PotentialNaNs{};
   unsigned SizeErrorCount = 0;
   unsigned BacktrackCount = 0;

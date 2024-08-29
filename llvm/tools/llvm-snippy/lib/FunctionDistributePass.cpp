@@ -79,17 +79,17 @@ namespace snippy {
 void FunctionDistribute::verifyFunctionSizes(Module &M,
                                              bool OnlyRootOnes) const {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-
-  auto UsedSections = SGCtx.getLinker().executionPath();
+  const auto &ProgCtx = SGCtx.getProgramContext();
+  const auto &UsedSections = SGCtx.executionPath();
 
   for (auto &Section : UsedSections) {
     std::vector<Function *> Functions;
-    for (auto &F :
-         llvm::make_filter_range(M, [&SGCtx, &Section, OnlyRootOnes](auto &F) {
-           return (!OnlyRootOnes || SGCtx.isRootFunction(F)) &&
-                  SGCtx.getOutputSectionFor(F).getIDString() ==
-                      Section.OutputSection.Desc.getIDString();
-         }))
+    for (auto &F : llvm::make_filter_range(
+             M, [&SGCtx, &ProgCtx, &Section, OnlyRootOnes](auto &F) {
+               return (!OnlyRootOnes || SGCtx.isRootFunction(F)) &&
+                      ProgCtx.getOutputSectionFor(F).getIDString() ==
+                          Section.OutputSection.Desc.getIDString();
+             }))
       Functions.emplace_back(&F);
 
     auto totalSize = std::accumulate(
@@ -120,19 +120,20 @@ void FunctionDistribute::calculateFunctionSizes(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   for (auto &F : M)
     FunctionSizes.emplace(
-        &F,
-        SGCtx.getFunctionSize(SGCtx.getMMI().getOrCreateMachineFunction(F)));
+        &F, SGCtx.getFunctionSize(
+                SGCtx.getMainModule().getMMI().getOrCreateMachineFunction(F)));
 }
 
 std::vector<FunctionDistribute::SectionSpaceInfo>
 FunctionDistribute::calculateAvailableSpace() const {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  const auto &ProgCtx = SGCtx.getProgramContext();
   auto &RootFs = SGCtx.getCallGraphState().getRootNode()->functions();
   std::vector<SectionSpaceInfo> Ret;
 
   for (auto *F : RootFs)
-    Ret.emplace_back(SGCtx.getOutputSectionName(*F),
-                     SGCtx.getOutputSectionFor(*F).Size, FunctionSizes.at(F));
+    Ret.emplace_back(ProgCtx.getOutputSectionName(*F),
+                     ProgCtx.getOutputSectionFor(*F).Size, FunctionSizes.at(F));
 
   return Ret;
 }
@@ -156,13 +157,14 @@ bool FunctionDistribute::runOnModule(Module &M) {
 
   // Second, arrange all secondary functions sorted from largest to smallest.
   std::vector<Function *> SortedBySize;
-  llvm::transform(llvm::make_filter_range(
-                      M,
-                      [&SGCtx](auto &F) {
-                        return !SGCtx.isRootFunction(
-                            SGCtx.getMMI().getOrCreateMachineFunction(F));
-                      }),
-                  std::back_inserter(SortedBySize), [](auto &F) { return &F; });
+  llvm::transform(
+      llvm::make_filter_range(
+          M,
+          [&SGCtx](auto &F) {
+            return !SGCtx.isRootFunction(
+                SGCtx.getMainModule().getMMI().getOrCreateMachineFunction(F));
+          }),
+      std::back_inserter(SortedBySize), [](auto &F) { return &F; });
   std::sort(SortedBySize.begin(), SortedBySize.end(),
             [this](auto *F1, auto *F2) {
               return FunctionSizes.at(F1) > FunctionSizes.at(F2);

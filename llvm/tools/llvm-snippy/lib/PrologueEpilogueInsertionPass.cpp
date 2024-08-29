@@ -39,7 +39,7 @@ public:
   auto getFunctionSizeInfo(const MachineFunction &MF) const {
     auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
     return std::make_pair(SGCtx.getFunctionSize(MF),
-                          SGCtx.getOutputSectionFor(MF));
+                          SGCtx.getProgramContext().getOutputSectionFor(MF));
   }
 
   auto getAllMutatedRegs(MachineFunction &MF) {
@@ -61,7 +61,7 @@ public:
 
   auto getSpilledRegs(MachineFunction &MF) {
     auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-    bool IsRoot = SGCtx.getCallGraphState().isRoot(&MF.getFunction());
+    bool IsRoot = SGCtx.isRootFunction(MF);
 
     std::vector<MCRegister> Ret;
 
@@ -139,7 +139,7 @@ static MCRegister getRegisterForPreservedSPSpill(GeneratorContext &SGCtx,
 
   // If external stack is specified, we can use target-default stack pointer as
   // auxillary, because it is already initialized
-  if (SGCtx.hasExternalStack())
+  if (SGCtx.getProgramContext().hasExternalStack())
     return SnippyTgt.getStackPointer();
 
   auto RP = SGCtx.getRegisterPool();
@@ -157,7 +157,7 @@ static void setupStackPointer(MCRegister AuxReg, GeneratorContext &SGCtx,
   const auto &SnippyTgt = State.getSnippyTarget();
   auto TargetStackPointer = SnippyTgt.getStackPointer();
 
-  if (SGCtx.hasExternalStack()) {
+  if (SGCtx.getProgramContext().hasExternalStack()) {
     if (AuxReg != TargetStackPointer) // If we use external stack and redefine
                                       // stack pointer register in snippet, we
                                       // need to initialize redefined stack
@@ -174,7 +174,7 @@ static void setupStackPointer(MCRegister AuxReg, GeneratorContext &SGCtx,
   // 1 - save current stack pointer state to top of stack.
   // 2 - set stack pointer to point to next stack slot.
   auto SPSpillSize = SnippyTgt.getSpillSizeInBytes(AuxReg, SGCtx);
-  auto Addr = SGCtx.getStackTop() - SPSpillSize;
+  auto Addr = SGCtx.getProgramContext().getStackTop() - SPSpillSize;
   assert(Addr % SPSpillSize == 0u && "Stack section must be properly aligned");
   if (!SGCtx.isRegSpilledToMem(AuxReg))
     SnippyTgt.storeRegToAddr(MBB, Ins, Addr, AuxReg, RP, SGCtx,
@@ -193,7 +193,7 @@ static void restoreStackPointer(MCRegister AuxReg, GeneratorContext &SGCtx,
   const auto &SnippyTgt = SGCtx.getLLVMState().getSnippyTarget();
   auto TargetStackPointer = SnippyTgt.getStackPointer();
 
-  if (SGCtx.hasExternalStack()) {
+  if (SGCtx.getProgramContext().hasExternalStack()) {
     if (AuxReg != TargetStackPointer) // Like during stack initialization,
                                       // both `external-stack` and
                                       // `redefine-sp` are specified, copying
@@ -205,7 +205,7 @@ static void restoreStackPointer(MCRegister AuxReg, GeneratorContext &SGCtx,
 
   // Restore stack pointer state.
   auto SPSpillSize = SnippyTgt.getSpillSizeInBytes(AuxReg, SGCtx);
-  auto Addr = SGCtx.getStackTop() - SPSpillSize;
+  auto Addr = SGCtx.getProgramContext().getStackTop() - SPSpillSize;
   SnippyTgt.loadRegFromAddr(MBB, Ins, Addr, AuxReg, RP, SGCtx);
 }
 
@@ -216,8 +216,7 @@ void PrologueEpilogueInsertion::generateStackInitialization(
   auto &State = SGCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
-  auto RealStackPointer = SGCtx.getStackPointer();
-  auto TargetStackPointer = SnippyTgt.getStackPointer();
+  auto RealStackPointer = SGCtx.getProgramContext().getStackPointer();
 
   auto AuxReg = RealStackPointer;
   auto ABIPreserved = SnippyTgt.getRegsPreservedByABI();
@@ -235,13 +234,13 @@ void PrologueEpilogueInsertion::generateStackInitialization(
   // 3. spill "preserved stack pointer" relatively to auxillary register
   // 4. copy contents of auxillary register to "preserved stack pointer"
 
-  if (SGCtx.followTargetABI() && IsRealSPPreserved)
+  if (SGCtx.getProgramContext().followTargetABI() && IsRealSPPreserved)
     AuxReg = getRegisterForPreservedSPSpill(SGCtx, MBB);
 
   setupStackPointer(AuxReg, SGCtx, MBB, Ins, RP);
 
   // Spilling of preserved register, chosen for stack pointer role
-  if (SGCtx.followTargetABI() && IsRealSPPreserved) {
+  if (SGCtx.getProgramContext().followTargetABI() && IsRealSPPreserved) {
     MBB.addLiveIn(RealStackPointer);
     SnippyTgt.generateSpillToStack(MBB, Ins, RealStackPointer, SGCtx, AuxReg);
   }
@@ -256,8 +255,7 @@ void PrologueEpilogueInsertion::generateStackTermination(
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &State = SGCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
-  auto RealStackPointer = SGCtx.getStackPointer();
-  auto TargetStackPointer = SnippyTgt.getStackPointer();
+  auto RealStackPointer = SGCtx.getProgramContext().getStackPointer();
   auto AuxReg = RealStackPointer;
 
   auto ABIPreserved = SnippyTgt.getRegsPreservedByABI();
@@ -273,7 +271,7 @@ void PrologueEpilogueInsertion::generateStackTermination(
   // pointer relative to it
   // 3. copy stack pointer value to this auxillary register
   // 4. reload preserved stack pointer relatively to auxillary register
-  if (SGCtx.followTargetABI() && IsRealSPPreserved) {
+  if (SGCtx.getProgramContext().followTargetABI() && IsRealSPPreserved) {
     AuxReg = getRegisterForPreservedSPSpill(SGCtx, MBB);
     SnippyTgt.copyRegToReg(MBB, Ins, RealStackPointer, AuxReg, SGCtx);
     SnippyTgt.generateReloadFromStack(MBB, Ins, RealStackPointer, SGCtx,
@@ -309,7 +307,7 @@ bool PrologueEpilogueInsertion::insertPrologue(
   bool IsEntry = SGCtx.isEntryFunction(MF);
 
   // Only Entry function out of all root functions has prologue.
-  if (!IsEntry && SGCtx.getCallGraphState().isRoot(&MF.getFunction()))
+  if (!IsEntry && SGCtx.isRootFunction(MF))
     return false;
 
   auto &&[MBB, Ins] = findPlaceForPrologue(MF);
@@ -326,7 +324,7 @@ bool PrologueEpilogueInsertion::insertPrologue(
   if (IsEntry)
     generateStackInitialization(*MBB, Ins, RP);
 
-  auto SP = SGCtx.getStackPointer();
+  auto SP = SGCtx.getProgramContext().getStackPointer();
   // Spill requested registers. Also mark them as live-in.
   for (auto SpillReg : SpilledToStack) {
     MBB->addLiveIn(SpillReg);
@@ -366,7 +364,7 @@ bool PrologueEpilogueInsertion::insertEpilogue(
   bool IsExit = SGCtx.isExitFunction(MF);
 
   // Only Exit function out of all root functions has epilogue.
-  if (!IsExit && SGCtx.getCallGraphState().isRoot(&MF.getFunction()))
+  if (!IsExit && SGCtx.isRootFunction(MF))
     return false;
 
   // Forbid spilled registers to be potentially used as scratch registers
@@ -379,7 +377,7 @@ bool PrologueEpilogueInsertion::insertEpilogue(
   bool BBWasEmptyBeforeEpilogueInsertion = MBB->empty();
   auto Prev = BBWasEmptyBeforeEpilogueInsertion ? MBB->end() : std::prev(Ins);
 
-  auto SP = SGCtx.getStackPointer();
+  auto SP = SGCtx.getProgramContext().getStackPointer();
   // Reload spilled registers. Reverse order because of a stack.
   llvm::for_each(llvm::reverse(SpilledToStack),
                  [&, MBB = MBB, Ins = Ins](auto Reg) {
@@ -426,7 +424,7 @@ bool PrologueEpilogueInsertion::insertEpilogue(
 bool PrologueEpilogueInsertion::runOnMachineFunction(MachineFunction &MF) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
 
-  if (!SGCtx.stackEnabled())
+  if (!SGCtx.getProgramContext().stackEnabled())
     return false;
 
   auto SpilledToStack = getSpilledRegs(MF);

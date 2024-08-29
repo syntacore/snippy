@@ -221,11 +221,11 @@ SelfcheckIntermediateInfo<InstrIt> storeRefAndActualValueForSelfcheck(
                     /* store the whole register */ 0);
   SelfcheckFirstStoreInfo<InstrIt> FirstStoreInfo{std::prev(InsertPos),
                                                   SCAddress};
-  SCAddress += GC.getSCStride();
+  SCAddress += GC.getProgramContext().getSCStride();
   auto &SelfcheckSection = GC.getSelfcheckSection();
   selfcheckOverflowGuard(SelfcheckSection, SCAddress);
   storeRefValue(MBB, InsertPos, SCAddress, RegValue, RP, GC);
-  SCAddress += GC.getSCStride();
+  SCAddress += GC.getProgramContext().getSCStride();
   selfcheckOverflowGuard(SelfcheckSection, SCAddress);
 
 
@@ -500,7 +500,7 @@ std::optional<MachineOperand> pregenerateOneOperand(
   const auto &State = GC.getLLVMState();
   const auto &RegInfo = State.getRegInfo();
   const auto &SnippyTgt = State.getSnippyTarget();
-  auto &RegGen = GC.getRegGen();
+  auto &RegGen = GC.getProgramContext().getRegGen();
   auto Operand = InstrDesc.operands()[OpIndex];
   auto OperandRegClassID = Operand.RegClass;
   if (OpType == MCOI::OperandType::OPERAND_REGISTER) {
@@ -601,7 +601,7 @@ pregenerateOperands(const MachineBasicBlock &MBB, const MCInstrDesc &InstrDesc,
                     RegPoolWrapper &RP,
                     const std::vector<planning::PreselectedOpInfo> &Preselected,
                     GeneratorContext &GC) {
-  auto &RegGenerator = GC.getRegGen();
+  auto &RegGenerator = GC.getProgramContext().getRegGen();
   auto &State = GC.getLLVMState();
   auto &InstrInfo = State.getInstrInfo();
 
@@ -798,12 +798,11 @@ unsigned chooseAddressRegister(MachineInstr &MI, const AddressPart &AP,
   return ChosenReg;
 }
 void postprocessMemoryOperands(MachineInstr &MI, RegPoolWrapper &RP,
-                               GeneratorContext &GC) {
+                               GeneratorContext &GC, MachineLoopInfo *MLI) {
   auto &State = GC.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   auto Opcode = MI.getDesc().getOpcode();
   auto NumAddrsToGen = SnippyTgt.countAddrsToGenerate(Opcode);
-  auto *MLI = GC.getMachineLoopInfo();
   auto *MBB = MI.getParent();
   auto *ML = MLI ? MLI->getLoopFor(MBB) : nullptr;
 
@@ -895,7 +894,7 @@ generateCall(unsigned OpCode,
     reloadGlobalRegsFromMemory(MBB, InstrGenCtx.Ins, GC);
 
   auto TargetStackPointer = SnippyTgt.getStackPointer();
-  auto RealStackPointer = GC.getStackPointer();
+  auto RealStackPointer = GC.getProgramContext().getStackPointer();
 
   // If we redefined stack pointer register, before generating external function
   // call we need to copy stack pointer value to target default stack pointer
@@ -956,7 +955,7 @@ randomInstruction(const MCInstrDesc &InstrDesc,
     MIB.add(Op);
 
   if (DoPostprocess)
-    postprocessMemoryOperands(*MIB, RP, GC);
+    postprocessMemoryOperands(*MIB, RP, GC, InstrGenCtx.MLI);
   // FIXME:
   // We have a lot of problems with rollback and configurations
   // After this, we can have additional instruction after main one!
@@ -972,7 +971,7 @@ void spillPseudoInstImplicitReg(MachineInstr &MI, Register Reg,
   auto *MBBPtr = MI.getParent();
   assert(MBBPtr);
   auto &MBB = *MBBPtr;
-  auto RealStackPointer = GC.getStackPointer();
+  auto RealStackPointer = GC.getProgramContext().getStackPointer();
 
   auto PointBeforeSpill = std::find_if(
       std::next(MachineBasicBlock::reverse_iterator(MI)), MBB.rend(),
@@ -1101,7 +1100,7 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
   // So, open a new one.
   I.openTransaction();
   if (!MemSnapshot.empty()) {
-    auto StackSec = GC.getStackSection();
+    auto StackSec = GC.getProgramContext().getStackSection();
     auto SelfcheckSec = GC.getSelfcheckSection();
     for (auto [Addr, Data] : MemSnapshot) {
       assert(StackSec.Size > 0 && "Stack section cannot have zero size");
@@ -1340,10 +1339,9 @@ static void printDebugBrief(raw_ostream &OS, const Twine &Brief,
 
 void generate(planning::FunctionRequest &FunctionGenRequest,
               MachineFunction &MF, GeneratorContext &GC,
-              SelfCheckInfo *SelfCheckInfo) {
+              SelfCheckInfo *SelfCheckInfo, MachineLoopInfo *MLI) {
   GenerationStatistics CurrMFGenStats;
   SNIPPY_DEBUG_BRIEF("request for function", FunctionGenRequest);
-  auto &MLI = *GC.getMachineLoopInfo();
   std::set<MachineBasicBlock *, MIRComp> NotVisited;
   std::transform(MF.begin(), MF.end(),
                  std::inserter(NotVisited, NotVisited.begin()),
@@ -1358,8 +1356,10 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
 
     MachineLoop *ML = nullptr;
     // We need to know loops structure in selfcheck mode.
-    if (GC.hasTrackingMode())
-      ML = MLI.getLoopFor(MBB);
+    if (GC.hasTrackingMode()) {
+      assert(MLI && "Machine Loop Info must be available here");
+      ML = MLI->getLoopFor(MBB);
+    }
 
     if (ML && ML->getHeader() == MBB) {
       // Remember the current state (open transaction) before loop body
@@ -1383,7 +1383,8 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
 
       auto RP = GC.getRegisterPool();
       planning::InstructionGenerationContext InstrGenCtx{
-          *MBB, MBB->begin(), &RP, GC, GenerationStatistics(), SelfCheckInfo};
+          *MBB,          MBB->begin(), &RP, GC, GenerationStatistics(),
+          SelfCheckInfo, MLI};
       snippy::generate(BBReq, InstrGenCtx);
       CurrMFGenStats.merge(InstrGenCtx.Stats);
     }
