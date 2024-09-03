@@ -1285,8 +1285,8 @@ public:
                                             MCRegClass, MBB);
     MIB.addReg(FirstReg);
     if (!isCompressedBranch(Opcode)) {
-      auto SecondReg = RP.getAvailableRegister("for branch condition", RegInfo,
-                                               MCRegClass, MBB);
+      unsigned SecondReg = RP.getAvailableRegister("for branch condition",
+                                                   RegInfo, MCRegClass, MBB);
       MIB.addReg(SecondReg);
     }
     MIB.addMBB(NextMBB);
