@@ -143,6 +143,11 @@ public:
 
   bool followTargetABI() const { return FollowTargetABI; }
 
+  // When an arbitrary register is used as a stack pointer and this register
+  // must be preserved across snippy function call (callee-saved), we have to
+  // save it to the stack before start using it.
+  bool shouldSpillStackPointer() const;
+
 private:
   friend RootRegPoolWrapper;
   void initializeStackSection(const SnippyProgramSettings &Settings);
