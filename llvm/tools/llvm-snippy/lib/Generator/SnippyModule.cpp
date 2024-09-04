@@ -134,6 +134,18 @@ std::string SnippyProgramContext::generateLinkedImage(
   return PLinker->run(Objects, /*Relocatable*/ false);
 }
 
+bool SnippyProgramContext::shouldSpillStackPointer() const {
+  if (!followTargetABI())
+    return false;
+  auto RealStackPointer = getStackPointer();
+  const auto &SnippyTgt = getLLVMState().getSnippyTarget();
+  auto ABIPreservedRegs = SnippyTgt.getRegsPreservedByABI();
+  return std::any_of(ABIPreservedRegs.begin(), ABIPreservedRegs.end(),
+                     [RealStackPointer](auto PreservedReg) {
+                       return PreservedReg == RealStackPointer;
+                     });
+}
+
 void SnippyProgramContext::initializeStackSection(
     const SnippyProgramSettings &Settings) {
   if (!Settings.Sections.hasSection(SectionsDescriptions::StackSectionName))
