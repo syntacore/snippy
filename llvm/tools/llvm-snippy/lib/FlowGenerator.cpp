@@ -205,6 +205,9 @@ static size_t calcMainFuncInitialSpillSize(GeneratorContext &GC) {
 
   auto StackPointer = GC.getProgramContext().getStackPointer();
   size_t SpillSize = SnippyTgt.getSpillAlignmentInBytes(StackPointer, State);
+  // We'll spill a register we use as a stack pointer.
+  if (GC.getProgramContext().shouldSpillStackPointer())
+    SpillSize += SnippyTgt.getSpillSizeInBytes(StackPointer, GC);
 
   auto SpilledRef = GC.getRegsSpilledToStack();
   std::vector SpilledRegs(SpilledRef.begin(), SpilledRef.end());
