@@ -218,14 +218,6 @@ void PrologueEpilogueInsertion::generateStackInitialization(
 
   auto RealStackPointer = SGCtx.getProgramContext().getStackPointer();
 
-  auto AuxReg = RealStackPointer;
-  auto ABIPreserved = SnippyTgt.getRegsPreservedByABI();
-  bool IsRealSPPreserved =
-      std::any_of(ABIPreserved.begin(), ABIPreserved.end(),
-                  [RealStackPointer](auto PreservedReg) {
-                    return PreservedReg == RealStackPointer;
-                  });
-
   // If honor-target-abi is specified and register, chosen for stack pointer
   // redefinition, is preserved, we:
   // 1. choose auxillary register, relatively to which we spill this redefined
@@ -233,14 +225,14 @@ void PrologueEpilogueInsertion::generateStackInitialization(
   // 2. initialize stack with auxillary register as stack pointer
   // 3. spill "preserved stack pointer" relatively to auxillary register
   // 4. copy contents of auxillary register to "preserved stack pointer"
-
-  if (SGCtx.getProgramContext().followTargetABI() && IsRealSPPreserved)
+  auto AuxReg = RealStackPointer;
+  if (SGCtx.getProgramContext().shouldSpillStackPointer())
     AuxReg = getRegisterForPreservedSPSpill(SGCtx, MBB);
 
   setupStackPointer(AuxReg, SGCtx, MBB, Ins, RP);
 
   // Spilling of preserved register, chosen for stack pointer role
-  if (SGCtx.getProgramContext().followTargetABI() && IsRealSPPreserved) {
+  if (SGCtx.getProgramContext().shouldSpillStackPointer()) {
     MBB.addLiveIn(RealStackPointer);
     SnippyTgt.generateSpillToStack(MBB, Ins, RealStackPointer, SGCtx, AuxReg);
   }
@@ -256,14 +248,6 @@ void PrologueEpilogueInsertion::generateStackTermination(
   auto &State = SGCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   auto RealStackPointer = SGCtx.getProgramContext().getStackPointer();
-  auto AuxReg = RealStackPointer;
-
-  auto ABIPreserved = SnippyTgt.getRegsPreservedByABI();
-  bool IsRealSPPreserved =
-      std::any_of(ABIPreserved.begin(), ABIPreserved.end(),
-                  [RealStackPointer](auto PreservedReg) {
-                    return PreservedReg == RealStackPointer;
-                  });
 
   // If honor-target-abi is specified and chosen stack pointer is preserved
   // we:
@@ -271,7 +255,8 @@ void PrologueEpilogueInsertion::generateStackTermination(
   // pointer relative to it
   // 3. copy stack pointer value to this auxillary register
   // 4. reload preserved stack pointer relatively to auxillary register
-  if (SGCtx.getProgramContext().followTargetABI() && IsRealSPPreserved) {
+  auto AuxReg = RealStackPointer;
+  if (SGCtx.getProgramContext().shouldSpillStackPointer()) {
     AuxReg = getRegisterForPreservedSPSpill(SGCtx, MBB);
     SnippyTgt.copyRegToReg(MBB, Ins, RealStackPointer, AuxReg, SGCtx);
     SnippyTgt.generateReloadFromStack(MBB, Ins, RealStackPointer, SGCtx,
