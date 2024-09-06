@@ -41,7 +41,6 @@ public:
   std::unique_ptr<PluginManager> PluginManagerImpl;
   std::unique_ptr<TargetConfigInterface> TargetConfig;
   std::optional<FPUSettings> FPUConfig;
-
   Config(const SnippyTarget &Tgt, StringRef PluginFilename,
          StringRef PluginInfoFilename, OpcodeCache OpCC, bool ParseWithPlugin,
          LLVMContext &Ctx, ArrayRef<std::string> IncludedFiles);

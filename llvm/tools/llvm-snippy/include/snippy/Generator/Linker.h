@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "snippy/Config/Config.h"
 #include "snippy/Config/MemoryScheme.h"
 
 #include "llvm/ADT/SmallVector.h"
@@ -31,41 +32,99 @@ public:
   constexpr static const char *kDefaultTextSectionName = ".text";
   constexpr static const char *kDefaultRODataSectionName = ".rodata";
 
-  struct OutputSectionT {
-    explicit OutputSectionT(const SectionDesc &Desc);
+  struct OutputSection final {
+    explicit OutputSection(const SectionDesc &Desc);
     SectionDesc Desc;
     // almost final section name (before mangling)
+    std::string Name;
+  };
+
+  struct InputSection final {
     std::string Name;
   };
 
   struct SectionEntry {
     // parameters of the section in the linked file
     // (before mangling)
-    OutputSectionT OutputSection;
+    OutputSection OutputSection;
     // Sections from initial object file(s) that are
     // placed in OutputSection during linking.
-    std::vector<std::string> InputSections;
+    std::vector<InputSection> InputSections;
+  };
+
+  class LinkedSections final : private std::vector<SectionEntry> {
+    auto getSectionImpl(StringRef Name) const {
+      return std::find_if(begin(), end(), [Name](const auto &E) {
+        return E.OutputSection.Name == Name;
+      });
+    }
+
+    auto getSectionImpl(StringRef Name) {
+      return std::find_if(begin(), end(), [Name](const auto &E) {
+        return E.OutputSection.Name == Name;
+      });
+    }
+
+    auto getOutputSectionImpl(const SectionDesc &Desc) const {
+      return std::find_if(begin(), end(), [&Desc](const auto &E) {
+        return E.OutputSection.Desc == Desc;
+      });
+    }
+
+    auto getOutputSectionImpl(const SectionDesc &Desc) {
+      return std::find_if(begin(), end(), [&Desc](const auto &E) {
+        return E.OutputSection.Desc == Desc;
+      });
+    }
+
+  public:
+    using typename vector::value_type;
+
+    using vector::back;
+    using vector::begin;
+    using vector::empty;
+    using vector::end;
+    using vector::front;
+    using vector::rbegin;
+    using vector::rend;
+    using vector::size;
+
+    using vector::push_back;
+
+    bool contains(const std::string &Name) const {
+      return getSectionImpl(Name) != end();
+    }
+
+    std::string getOutputNameForDesc(const SectionDesc &Desc) const;
+
+    bool hasOutputSectionFor(StringRef InSectName) const;
+    const OutputSection &getOutputSectionFor(StringRef InSectName) const;
+
+    auto &getSection(StringRef Name) {
+      auto Section = getSectionImpl(Name);
+      assert(Section != end());
+      return *Section;
+    }
+
+    auto &getSection(StringRef Name) const {
+      auto Section = getSectionImpl(Name);
+      assert(Section != end());
+      return *Section;
+    }
+
+    void addInputSectionFor(const SectionDesc &OutDesc, StringRef InSectName);
   };
 
   explicit Linker(LLVMContext &Ctx, const SectionsDescriptions &Sects,
                   StringRef MangleName = "");
 
-  // Checks if Linker has mapped section from object file to its
-  // destination in final elf image.
-  bool hasOutputSectionFor(StringRef sectionName) const;
-
-  // Gets mapped section info.
-  OutputSectionT getOutputSectionFor(StringRef sectionName) const;
-
-  std::string getOutputNameForDesc(const SectionDesc &Desc) const;
-
-  // Sets input section for specified SectionDesc
-  //  in order to avoid (NOLOAD) specifier in the linker script
-  void addInputSectionForDescr(SectionDesc OutputSectionDesc,
-                               StringRef InpSectName);
-
   // Sections are sorted by their VMA value (not ID value!)
+  auto &sections() { return Sections; }
+
   auto &sections() const { return Sections; }
+
+  void setStartPC(uint64_t Addr) { StartPC = Addr; }
+  auto getStartPC() const { return StartPC; }
 
   auto getMaxSectionID() const {
     auto Unnamed = llvm::make_filter_range(
@@ -83,10 +142,6 @@ public:
 
   std::string getMangledFunctionName(StringRef FuncName) const;
 
-  // Add section mapping. If InputSectionName is empty, final section in elf
-  // will be marked as NOLOAD.
-  void addSection(const SectionDesc &Section, StringRef InputSectionName = "");
-
   // Generates linker script for external usage.
   std::string generateLinkerScript() const;
 
@@ -99,7 +154,7 @@ public:
 
   // Returns name of symbol that should be inserted before last generated
   // instruction.
-  static StringRef GetExitSymbolName();
+  static StringRef getExitSymbolName();
 
 private:
   std::vector<std::string> collectPhdrInfo() const;
@@ -108,7 +163,8 @@ private:
 
   std::string MangleName;
   std::pair<size_t, size_t> MemoryRegion;
-  SmallVector<SectionEntry, 4> Sections;
+  LinkedSections Sections;
+  std::optional<uint64_t> StartPC;
 };
 
 } // namespace snippy

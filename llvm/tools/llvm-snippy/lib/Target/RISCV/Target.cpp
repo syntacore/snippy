@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Generator/GlobalsPool.h"
 #include "snippy/Generator/LLVMState.h"
@@ -1304,7 +1305,7 @@ public:
     auto &State = GC.getLLVMState();
     auto RP = GC.getRegisterPool();
     auto *MF = MBB.getParent();
-    auto *NextMBB = MF->CreateMachineBasicBlock();
+    auto *NextMBB = createMachineBasicBlock(*MF, GC);
     MF->insert(++MachineFunction::iterator(&MBB), NextMBB);
     NextMBB->transferSuccessorsAndUpdatePHIs(&MBB);
     MBB.addSuccessor(NextMBB);
@@ -2888,6 +2889,24 @@ private:
   createAsmPrinter(LLVMTargetMachine &TM,
                    std::unique_ptr<MCStreamer> Streamer) const override {
     return std::make_unique<RISCVAsmPrinter>(TM, std::move(Streamer));
+  }
+
+  uint8_t getCodeAlignment(const GeneratorContext &GC) const override {
+    const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+    if (ST.hasStdExtC())
+      return 2;
+    return 4;
+  }
+
+  MachineBasicBlock::iterator generateJump(MachineBasicBlock &MBB,
+                                           MachineBasicBlock::iterator Ins,
+                                           MachineBasicBlock &TBB,
+                                           LLVMState &State) const override {
+    auto &InstrInfo = State.getInstrInfo();
+    return *getSupportInstBuilder(MBB, Ins, State.getCtx(),
+                                  InstrInfo.get(RISCV::PseudoBR))
+                .addMBB(&TBB)
+                .getInstr();
   }
 };
 

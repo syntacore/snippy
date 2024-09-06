@@ -77,10 +77,13 @@ void SnippyModule::generateObject(const PassInserter &Inserter) {
 
 void SnippyProgramContext::initializeROMSection(
     const SnippyProgramSettings &Settings) {
-  if (!getLinker().hasOutputSectionFor(Linker::kDefaultRODataSectionName))
+  if (!getLinker().sections().hasOutputSectionFor(
+          Linker::kDefaultRODataSectionName))
     return;
-  ROMSection =
-      getLinker().getOutputSectionFor(Linker::kDefaultRODataSectionName).Desc;
+  ROMSection = getLinker()
+                   .sections()
+                   .getOutputSectionFor(Linker::kDefaultRODataSectionName)
+                   .Desc;
 }
 
 void SnippyProgramContext::initializeUtilitySection(

@@ -718,5 +718,12 @@ void dumpMemAccessesIfNeeded(GeneratorContext &GC) {
                     /* Restricted */ true);
 }
 
+MachineBasicBlock *createMachineBasicBlock(MachineFunction &MF,
+                                           GeneratorContext &GC) {
+  auto *MBB = MF.CreateMachineBasicBlock();
+  assert(MBB);
+  return MBB;
+}
+
 } // namespace snippy
 } // namespace llvm
