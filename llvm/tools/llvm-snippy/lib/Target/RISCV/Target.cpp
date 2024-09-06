@@ -87,6 +87,8 @@ enum class RVVModeChangeMode {
 
 enum class LRSCGenMode { MaySucceed, MustFail };
 
+enum class LoopControlLogicCompressionMode { On, Random, Off };
+
 llvm::cl::OptionCategory
     SnippyRISCVOptions("llvm-snippy RISCV-specific options");
 
@@ -132,6 +134,27 @@ snippy::alias
     DumpConfigurationInfoAlias("snippy-riscv-dump-rvv-config",
                                cl::desc("Alias for -riscv-dump-rvv-config"),
                                snippy::aliasopt(DumpRVVConfigurationInfo));
+
+struct LoopControlLogicCompressionEnumOption
+    : public snippy::EnumOptionMixin<LoopControlLogicCompressionEnumOption> {
+  static void doMapping(EnumMapper &Mapper) {
+    Mapper.enumCase(LoopControlLogicCompressionMode::On, "on",
+                    "use compressed instruction as much as it possible");
+    Mapper.enumCase(LoopControlLogicCompressionMode::Random, "random",
+                    "compressed instructions may be used for loop counters");
+    Mapper.enumCase(
+        LoopControlLogicCompressionMode::Off, "off",
+        "avoid using compressed instruction as much as it possible ");
+  }
+};
+
+static snippy::opt<LoopControlLogicCompressionMode> LoopControlLogicCompression(
+    "riscv-loop-control-logic-compression",
+    LoopControlLogicCompressionEnumOption::getClValues(),
+    cl::desc(
+        "choose a policy for using compressed instruction for loop counters"),
+    cl::cat(SnippyRISCVOptions), cl::ValueOptional,
+    cl::init(LoopControlLogicCompressionMode::On));
 
 // FIXME: Make Init*RegsFromMemory options target independent
 static snippy::opt<bool> InitVRegsFromMemory(
@@ -190,6 +213,10 @@ static snippy::opt<RVVModeChangeMode> RVVModeChangePreferenceOpt(
 LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(
     snippy::DisableMisalignedAccessMode,
     snippy::DisableMisalignedAccessEnumOption)
+
+LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(
+    snippy::LoopControlLogicCompressionMode,
+    snippy::LoopControlLogicCompressionEnumOption)
 
 LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(snippy::RVVModeChangeMode,
                                            snippy::RVVModeChangeEnumOption)
@@ -361,6 +388,21 @@ static MCRegister regIndexToMCReg(unsigned RegIdx, RegStorageType Storage,
     return RISCV::V0 + RegIdx;
   }
   llvm_unreachable("Unknown storage type");
+}
+
+static inline unsigned getIncOpcodeForLoopCounter(const GeneratorContext &GC) {
+  if (!GC.getSubtarget<RISCVSubtarget>().hasStdExtC())
+    return RISCV::ADDI;
+
+  if (LoopControlLogicCompression.getValue() ==
+      LoopControlLogicCompressionMode::Random) {
+    auto OpcodeChoice = RandEngine::genInInterval(false, true);
+    return OpcodeChoice ? RISCV::C_ADDI : RISCV::ADDI;
+  }
+  return LoopControlLogicCompression.getValue() ==
+                 LoopControlLogicCompressionMode::On
+             ? RISCV::C_ADDI
+             : RISCV::ADDI;
 }
 
 static RegStorageType regToStorage(Register Reg) {
@@ -1465,15 +1507,20 @@ public:
         !GC.getSubtarget<RISCVSubtarget>().hasStdExtC())
       return RI.getRegClass(RCID);
 
+    auto CompressionMode = LoopControlLogicCompression.getValue();
+    if (CompressionMode == LoopControlLogicCompressionMode::Off)
+      return RI.getRegClass(RISCV::GPRNoGPRCRegClassID);
+
+    constexpr auto MinNumOfBranchGPRC = 2;
     auto *MBB = Instr.getParent();
     assert(MBB);
     auto NAvailableRegs = GC.getRegisterPool().getNumAvailable(
         RI.getRegClass(RCID == RISCV::GPRCRegClassID), *MBB);
-    constexpr auto MinNumOfBranchRegs = 2;
-    if (NAvailableRegs >= MinNumOfBranchRegs)
-      RCID = RISCV::GPRCRegClassID;
+    if (CompressionMode == LoopControlLogicCompressionMode::On &&
+        NAvailableRegs >= MinNumOfBranchGPRC)
+      return RI.getRegClass(RISCV::GPRCRegClassID);
 
-    return RI.getRegClass(RCID);
+    return RI.getRegClass(RISCV::GPRRegClassID);
   }
 
   /// RISCV Loops:
@@ -1665,8 +1712,7 @@ public:
     auto &MBB = *Pos->getParent();
     const auto &InstrInfo = State.getInstrInfo();
     APInt MinCounterVal;
-    auto ADDIOp = GC.getSubtarget<RISCVSubtarget>().hasStdExtC() ? RISCV::C_ADDI
-                                                                 : RISCV::ADDI;
+    auto ADDIOp = getIncOpcodeForLoopCounter(GC);
 
     auto CounterReg = ReservedRegs[CounterRegIdx];
 
