@@ -94,7 +94,8 @@ class Interpreter final {
 
 public:
   uint64_t getProgStart() const {
-    return Env.SimCfg.ProgSections.front().Start;
+    assert(Env.SimCfg.StartPC);
+    return Env.SimCfg.StartPC.value();
   }
   uint64_t getProgEnd() const { return ProgEnd; }
   uint64_t getRomStart() const { return Env.SimCfg.RomStart; }

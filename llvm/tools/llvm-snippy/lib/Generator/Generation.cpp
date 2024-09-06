@@ -1245,7 +1245,7 @@ void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
   }
 
   auto *ExitSym =
-      MF.getContext().getOrCreateSymbol(Linker::GetExitSymbolName());
+      MF.getContext().getOrCreateSymbol(Linker::getExitSymbolName());
 
   // User may ask for last instruction to be return.
   if (GC.useRetAsLastInstr()) {

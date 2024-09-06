@@ -79,8 +79,8 @@ MemorySectionConfig getRomInfo(const Linker &L, MemAddr ProgSectionStart) {
   MemAddr RomStart;
   MemAddr RomSize;
   std::string RomSectionName;
-  if (L.hasOutputSectionFor(".rodata")) {
-    const auto &ROMSection = L.getOutputSectionFor(".rodata");
+  if (L.sections().hasOutputSectionFor(".rodata")) {
+    const auto &ROMSection = L.sections().getOutputSectionFor(".rodata");
     const auto &ROMSectionDesc = ROMSection.Desc;
     RomStart = ROMSectionDesc.VMA;
     RomSize = ROMSectionDesc.Size;

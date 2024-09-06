@@ -36,6 +36,12 @@ static snippy::opt<bool> DumpPHDRSDef(
              "that segments themself."),
     cl::cat(Options), cl::init(false));
 
+static snippy::opt<bool>
+    LinkerUseHex("linker-use-hex",
+                 cl::desc("Make linker script use hexadecimal numbers in "
+                          "linker script for better readability"),
+                 cl::cat(Options), cl::init(false));
+
 namespace {
 
 using FilePathT = SmallString<20>;
@@ -148,17 +154,6 @@ static std::string getUniqueSectionName(const SectionDesc &Desc) {
   return Buf;
 }
 
-static void reportSectionInterfereError(const Linker::OutputSectionT &Added,
-                                        const Linker::OutputSectionT &Existing,
-                                        StringRef What) {
-  std::string MessageBuf;
-  raw_string_ostream SS{MessageBuf};
-  SS << "Extra added section " << Added.Name << ":\n" << Added.Desc;
-  SS << What << " with existing section " << Existing.Name << ":\n"
-     << Existing.Desc;
-  report_fatal_error(MessageBuf.c_str(), false);
-}
-
 template <typename SecT, typename PredT>
 static auto findFirstSection(SecT &&Sections, PredT &&Pred) {
   return std::find_if(Sections.begin(), Sections.end(),
@@ -169,7 +164,7 @@ static auto findFirstSection(SecT &&Sections, PredT &&Pred) {
 
 } // namespace
 
-Linker::OutputSectionT::OutputSectionT(const SectionDesc &Desc)
+Linker::OutputSection::OutputSection(const SectionDesc &Desc)
     : Desc(Desc), Name(getUniqueSectionName(Desc)) {}
 
 void Linker::calculateMemoryRegion() {
@@ -184,7 +179,7 @@ Linker::Linker(LLVMContext &Ctx, const SectionsDescriptions &Sects,
     : MangleName(MN) {
   std::transform(Sects.begin(), Sects.end(), std::back_inserter(Sections),
                  [](auto &SectionDesc) {
-                   return SectionEntry{OutputSectionT{SectionDesc}, {}};
+                   return SectionEntry{OutputSection{SectionDesc}, {}};
                  });
   std::sort(Sections.begin(), Sections.end(), [](auto &LSE, auto &RSE) {
     return LSE.OutputSection.Desc.VMA < RSE.OutputSection.Desc.VMA;
@@ -194,58 +189,48 @@ Linker::Linker(LLVMContext &Ctx, const SectionsDescriptions &Sects,
       Sections, [](const SectionDesc &Desc) { return Desc.M.X(); });
 
   if (DefaultCodeSection != Sections.end())
-    DefaultCodeSection->InputSections.emplace_back(kDefaultTextSectionName);
-
+    DefaultCodeSection->InputSections.push_back({kDefaultTextSectionName});
   auto ROMSection = findFirstSection(Sections, [](const SectionDesc &S) {
     return S.M.R() && !S.M.W() && !S.M.X();
   });
 
   if (ROMSection != Sections.end())
-    ROMSection->InputSections.emplace_back(kDefaultRODataSectionName);
+    ROMSection->InputSections.push_back({kDefaultRODataSectionName});
 }
 
-bool Linker::hasOutputSectionFor(StringRef SectionName) const {
-  return std::any_of(
-      Sections.begin(), Sections.end(), [&SectionName](auto &Section) {
-        return llvm::any_of(Section.InputSections, [&SectionName](auto &&Name) {
-          return Name == SectionName;
-        });
-      });
+bool Linker::LinkedSections::hasOutputSectionFor(StringRef SectionName) const {
+  return std::any_of(begin(), end(), [&SectionName](auto &Section) {
+    return llvm::any_of(Section.InputSections, [&SectionName](auto &&S) {
+      return S.Name == SectionName;
+    });
+  });
 }
 
-Linker::OutputSectionT
-Linker::getOutputSectionFor(StringRef SectionName) const {
-  assert(hasOutputSectionFor(SectionName));
-
-  auto Section = std::find_if(
-      Sections.begin(), Sections.end(), [&SectionName](auto &Section) {
-        return llvm::any_of(Section.InputSections, [&SectionName](auto &&Name) {
-          return Name == SectionName;
-        });
-      });
-  return Section->OutputSection;
+const Linker::OutputSection &
+Linker::LinkedSections::getOutputSectionFor(StringRef SectionName) const {
+  auto S = std::find_if(begin(), end(), [SectionName](auto &Section) {
+    return llvm::any_of(Section.InputSections, [SectionName](auto &S) {
+      return S.Name == SectionName;
+    });
+  });
+  assert(S != end());
+  return S->OutputSection;
 }
 
-std::string Linker::getOutputNameForDesc(const SectionDesc &Desc) const {
-  auto Section = std::find_if(Sections.begin(), Sections.end(),
-                              [&Desc](const SectionEntry &Section) {
-                                return Section.OutputSection.Desc == Desc;
-                              });
-  assert(Section != Sections.end() && "Got unknown section");
-  assert(!Section->OutputSection.Name.empty());
-  return Section->OutputSection.Name;
+std::string
+Linker::LinkedSections::getOutputNameForDesc(const SectionDesc &Desc) const {
+  auto Entry = getOutputSectionImpl(Desc);
+  assert(Entry != end() && "Got unknown section");
+  assert(!Entry->OutputSection.Name.empty());
+  return Entry->OutputSection.Name;
 }
 
-void Linker::addInputSectionForDescr(SectionDesc OutputSectionDesc,
-                                     StringRef InpSectName) {
-  auto SectIt =
-      std::find_if(Sections.begin(), Sections.end(),
-                   [&OutputSectionDesc](const SectionEntry &Sect) {
-                     return Sect.OutputSection.Desc == OutputSectionDesc;
-                   });
-  assert(SectIt != Sections.end() &&
+void Linker::LinkedSections::addInputSectionFor(const SectionDesc &Desc,
+                                                StringRef InSectName) {
+  auto SectIt = getOutputSectionImpl(Desc);
+  assert(SectIt != end() &&
          "Can't find current section in the output sections");
-  SectIt->InputSections.emplace_back(InpSectName);
+  SectIt->InputSections.push_back({InSectName.str()});
 }
 
 std::string Linker::getMangledName(StringRef SectionName) const {
@@ -257,37 +242,6 @@ std::string Linker::getMangledName(StringRef SectionName) const {
 std::string Linker::getMangledFunctionName(StringRef FuncName) const {
   return ("__" + MangleName + Twine(MangleName.empty() ? "" : "_") + FuncName)
       .str();
-}
-
-void Linker::addSection(const SectionDesc &Section,
-                        StringRef InputSectionName) {
-  OutputSectionT NewSection{Section};
-
-  auto FoundInterfere =
-      std::find_if(Sections.begin(), Sections.end(), [&Section](auto &SE) {
-        return SE.OutputSection.Desc.interfere(Section);
-      });
-  if (FoundInterfere != Sections.end())
-    reportSectionInterfereError(NewSection, FoundInterfere->OutputSection,
-                                "Interferes");
-
-  auto FoundIndexInterfere =
-      std::find_if(Sections.begin(), Sections.end(), [&Section](auto &SE) {
-        return SE.OutputSection.Desc.ID == Section.ID;
-      });
-
-  if (FoundIndexInterfere != Sections.end())
-    reportSectionInterfereError(NewSection, FoundInterfere->OutputSection,
-                                "Shares same id");
-
-  auto FoundPlace =
-      std::find_if(Sections.begin(), Sections.end(), [&Section](auto &SE) {
-        return SE.OutputSection.Desc.VMA > Section.VMA;
-      });
-
-  Sections.insert(FoundPlace,
-                  SectionEntry{NewSection, {std::string{InputSectionName}}});
-  calculateMemoryRegion();
 }
 
 std::vector<std::string> Linker::collectPhdrInfo() const {
@@ -302,15 +256,22 @@ std::vector<std::string> Linker::collectPhdrInfo() const {
   return Ret;
 }
 
+static std::string utostr(uint64_t Val) {
+  if (LinkerUseHex)
+    return "0x" + llvm::utohexstr(Val);
+  return std::to_string(Val);
+}
+
 std::string Linker::createLinkerScript(bool Export) const {
   std::string ScriptText;
   llvm::raw_string_ostream STS{ScriptText};
-
   std::string MemoryRegionName =
       MangleName.empty() ? "SNIPPY" : "SNIPPY_" + MangleName;
   STS << "MEMORY {\n"
-      << "  " << MemoryRegionName << " (rwx) : ORIGIN = " << MemoryRegion.first
-      << ", LENGTH = " << (MemoryRegion.second - MemoryRegion.first) << "\n";
+      << "  " << MemoryRegionName
+      << " (rwx) : ORIGIN = " << utostr(MemoryRegion.first)
+      << ", LENGTH = " << utostr(MemoryRegion.second - MemoryRegion.first)
+      << "\n";
 
   STS << "}\n";
   auto Phdrs = collectPhdrInfo();
@@ -323,11 +284,10 @@ std::string Linker::createLinkerScript(bool Export) const {
     STS << "}\n";
   }
   STS << "SECTIONS {\n";
-
   for (auto &SE : Sections) {
     auto OutSectionName = getMangledName(SE.OutputSection.Name);
 
-    STS << "  " << OutSectionName << " " << SE.OutputSection.Desc.VMA;
+    STS << "  " << OutSectionName << " " << utostr(SE.OutputSection.Desc.VMA);
 
     if (SE.InputSections.empty())
       STS << " (NOLOAD) ";
@@ -338,11 +298,12 @@ std::string Linker::createLinkerScript(bool Export) const {
     } else {
       if (SE.InputSections.empty()) {
         STS << "  PROVIDE(" << OutSectionName << "_start_ = .);\n";
-        STS << "  . +=" << SE.OutputSection.Desc.Size << ";\n";
+        STS << "  . +=" << utostr(SE.OutputSection.Desc.Size) << ";\n";
         STS << "  PROVIDE(" << OutSectionName << "_end_ = .);\n";
       } else {
-        for (auto &&InputSectionName : SE.InputSections)
-          STS << "  KEEP(*(" << InputSectionName << "))\n";
+        for (auto &&InputSection : SE.InputSections) {
+          STS << "  KEEP(*(" << InputSection.Name << "))\n";
+        }
       }
     }
 
@@ -364,11 +325,9 @@ std::string Linker::generateLinkerScript() const {
 std::string Linker::run(ObjectFilesList ObjectFilesToLink,
                         bool Relocatable) const {
   assert(ObjectFilesToLink.size() > 0 && "Linker needs at least one image");
-
   auto ObjectFilesPaths = std::vector<FilePathT>{};
   for (auto &Objectfile : ObjectFilesToLink)
     ObjectFilesPaths.push_back(writeDataToDisk(Objectfile));
-
   auto InternalLinkerScript = createLinkerScript(/*Export*/ false);
   auto LinkerScriptPath = writeDataToDisk(InternalLinkerScript);
 
@@ -383,7 +342,7 @@ std::string Linker::run(ObjectFilesList ObjectFilesToLink,
   return FinalImage;
 }
 
-StringRef Linker::GetExitSymbolName() { return "__snippy_exit"; }
+StringRef Linker::getExitSymbolName() { return "__snippy_exit"; }
 
 } // namespace snippy
 } // namespace llvm

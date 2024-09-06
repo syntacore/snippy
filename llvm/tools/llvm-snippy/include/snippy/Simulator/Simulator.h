@@ -51,6 +51,7 @@ struct SimulationConfig {
     std::string Name;
   };
   std::vector<Section> ProgSections;
+  std::optional<ProgramCounterType> StartPC;
 
   ProgramCounterType RomStart = 0;
   ProgramCounterType RomSize = 0;
