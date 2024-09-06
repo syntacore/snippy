@@ -53,6 +53,11 @@ public:
     AdditionalSectionsNames.push_back(NewSectOutputName);
   }
 
+  auto &getSimConfig() & {
+    assert(Env);
+    return Env->SimCfg;
+  }
+
 private:
   void checkStates(bool CheckMemory);
 

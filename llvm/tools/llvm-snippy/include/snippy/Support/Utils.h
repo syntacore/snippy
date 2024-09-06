@@ -13,6 +13,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 
 #include <array>
+#include <type_traits>
 
 namespace llvm {
 
@@ -262,6 +263,15 @@ template <typename ValTy> APInt toAPInt(ValTy Val, unsigned Width) {
 template <> inline APInt toAPInt<APInt>(APInt Val, unsigned Width) {
   assert(Width >= Val.getBitWidth() && "Value is too long");
   return Val;
+}
+
+// C++23 std::optional<T>::transform like
+template <typename T, typename Func>
+auto transformOpt(const std::optional<T> &O, Func &&F)
+    -> std::optional<remove_cvref_t<std::invoke_result_t<Func, T>>> {
+  if (O)
+    return std::invoke(std::forward<Func>(F), *O);
+  return std::nullopt;
 }
 
 } // namespace snippy

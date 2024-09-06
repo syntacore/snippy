@@ -62,7 +62,7 @@ SimRunner::SimRunner(LLVMContext &Ctx, const SnippyTarget &TGT,
 }
 
 void SimRunner::run(StringRef Program, const IRegisterState &InitialRegState) {
-  auto StopPC = getAddressOfSymbolInImage(Program, Linker::GetExitSymbolName());
+  auto StopPC = getAddressOfSymbolInImage(Program, Linker::getExitSymbolName());
   if (auto E = StopPC.takeError()) {
     auto Err = toString(std::move(E));
     report_fatal_error("[Internal error]: unable to get last instruction PC: " +
