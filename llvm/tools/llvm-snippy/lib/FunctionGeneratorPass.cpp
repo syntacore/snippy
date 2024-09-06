@@ -10,6 +10,7 @@
 
 #include "snippy/Config/FunctionDescriptions.h"
 #include "snippy/CreatePasses.h"
+#include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Support/Options.h"
 #include "snippy/Support/YAMLUtils.h"
@@ -183,7 +184,8 @@ MachineFunction &createFunction(GeneratorContext &SGCtx, Module &M,
   auto IsRegsInit = SGCtx.getGenSettings().RegistersConfig.InitializeRegs;
   if (SGCtx.hasCFInstrs() || SGCtx.hasCallInstrs() || IsRegsInit)
     Props.reset(MachineFunctionProperties::Property::TracksLiveness);
-  auto *MBB = MF.CreateMachineBasicBlock();
+  auto *MBB = createMachineBasicBlock(MF, SGCtx);
+  assert(MBB);
   MF.push_back(MBB);
   SGCtx.setRequestedInstrNum(MF, NumInstr);
 
@@ -205,7 +207,7 @@ std::vector<std::string> FunctionGenerator::prepareRXSections() {
 
   std::vector<std::string> Ret;
   for (auto &&[_, InputSections] : SGCtx.executionPath())
-    Ret.emplace_back(InputSections.front());
+    Ret.emplace_back(InputSections.front().Name);
 
   return Ret;
 }
@@ -255,12 +257,12 @@ FunctionGenerator::distributeRootFunctions() {
          (double)SGCtx.getGenSettings().Cfg.Sections.getSectionsSize(Acc::X))));
   };
 
-  std::transform(Sections.begin(), Sections.end(), std::back_inserter(Ret),
-                 [&](auto &S) {
-                   assert(Linker.hasOutputSectionFor(S));
-                   auto SectionSize = Linker.getOutputSectionFor(S).Desc.Size;
-                   return RootFnPlacement{S, GetInstrNum(SectionSize)};
-                 });
+  std::transform(
+      Sections.begin(), Sections.end(), std::back_inserter(Ret), [&](auto &S) {
+        assert(Linker.sections().hasOutputSectionFor(S));
+        auto SectionSize = Linker.sections().getOutputSectionFor(S).Desc.Size;
+        return RootFnPlacement{S, GetInstrNum(SectionSize)};
+      });
 
   if (!SGCtx.getGenSettings().InstrsGenerationConfig.ChainedRXChunkSize)
     return Ret;

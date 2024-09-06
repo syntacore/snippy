@@ -198,10 +198,10 @@ Interpreter::createSimulationEnvironment(const GeneratorContext &GC) {
 
   auto MemCfg = MemoryConfig::getMemoryConfig(GC);
   applyMemCfgToSimCfg(MemCfg, Env.SimCfg);
-
   std::transform(L.sections().begin(), L.sections().end(),
                  std::back_inserter(Env.Sections),
                  [](auto &SE) { return SE.OutputSection.Desc; });
+  Env.SimCfg.StartPC = L.getStartPC();
 
   Env.SimCfg.TraceLogPath = TraceLogPath.getValue();
   Env.TgtGenCtx = &TgtCtx;
@@ -307,7 +307,7 @@ void Interpreter::loadElfImage(StringRef ElfImage) {
 
   auto EndOfProgSym = llvm::find_if(ObjectFile->symbols(), [](auto &Sym) {
     auto EName = Sym.getName();
-    return EName && EName.get() == Linker::GetExitSymbolName();
+    return EName && EName.get() == Linker::getExitSymbolName();
   });
 
   assert(EndOfProgSym != ObjectFile->symbols().end() &&

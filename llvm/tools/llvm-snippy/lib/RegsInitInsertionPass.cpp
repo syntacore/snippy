@@ -9,6 +9,7 @@
 #include "InitializePasses.h"
 
 #include "snippy/CreatePasses.h"
+#include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 
 #include "llvm/CodeGen/MachineFunctionPass.h"
@@ -73,7 +74,7 @@ bool RegsInitInsertion::runOnMachineFunction(MachineFunction &MF) {
   const auto &SubTgt = MF.getSubtarget();
 
   // new block for registers initialization
-  auto *BlockRegsInit = MF.CreateMachineBasicBlock();
+  auto *BlockRegsInit = createMachineBasicBlock(MF, SGCtx);
   auto *SuccessorBlockPtr = &MF.front();
   auto InsertIterPos = MF.begin();
   BlockRegsInit->addSuccessor(SuccessorBlockPtr);

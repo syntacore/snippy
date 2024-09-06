@@ -14,6 +14,7 @@
 #include "InitializePasses.h"
 
 #include "snippy/CreatePasses.h"
+#include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Support/Options.h"
 
@@ -157,15 +158,15 @@ static void transferPredecessorsExceptLatches(MachineBasicBlock &Preheader,
 /// If loop header is also a function entry, we need special preheader insertion
 void LoopCanonicalization::createPreheader(MachineBasicBlock &Header,
                                            bool TransferPreds) {
-  const auto &State =
-      getAnalysis<GeneratorContextWrapper>().getContext().getLLVMState();
+  auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
+  const auto &State = GC.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   const auto &MLI = getAnalysis<MachineLoopInfo>();
   const auto *ML = MLI[&Header];
   assert(ML);
   assert(ML->getHeader() == &Header && "Loop header expected");
   auto &MF = *Header.getParent();
-  auto *Preheader = MF.CreateMachineBasicBlock();
+  auto *Preheader = createMachineBasicBlock(MF, GC);
   assert(Preheader);
   MF.insert(MachineFunction::iterator(&Header), Preheader);
   if (TransferPreds)
@@ -294,14 +295,14 @@ bool LoopCanonicalization::splitExitEdge(MachineLoop &ML) {
 
 MachineBasicBlock *LoopCanonicalization::splitEdge(MachineBasicBlock &From,
                                                    MachineBasicBlock &To) {
-  const auto &State =
-      getAnalysis<GeneratorContextWrapper>().getContext().getLLVMState();
+  auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
+  const auto &State = GC.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
   assert(From.isSuccessor(&To) && "From -> To is not an edge");
 
   auto &MF = *From.getParent();
-  auto *NewBB = MF.CreateMachineBasicBlock();
+  auto *NewBB = createMachineBasicBlock(MF, GC);
   assert(NewBB);
   MF.insert(std::next(MachineFunction::iterator(&From)), NewBB);
 

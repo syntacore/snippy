@@ -85,8 +85,8 @@ public:
 
   auto getOutputSectionFor(const Function &F) const {
     auto SectionName = getOutputSectionName(F);
-    assert(PLinker->hasOutputSectionFor(SectionName));
-    return PLinker->getOutputSectionFor(SectionName).Desc;
+    assert(PLinker->sections().hasOutputSectionFor(SectionName));
+    return PLinker->sections().getOutputSectionFor(SectionName).Desc;
   }
 
   auto getOutputSectionFor(const MachineFunction &MF) const {

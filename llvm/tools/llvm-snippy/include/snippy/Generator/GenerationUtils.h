@@ -79,6 +79,9 @@ MachineBasicBlock::iterator processGeneratedInstructions(
     planning::InstructionGenerationContext &InstrGenCtx,
     const planning::RequestLimit &Limit);
 
+MachineBasicBlock *createMachineBasicBlock(MachineFunction &MF,
+                                           GeneratorContext &GC);
+
 } // namespace snippy
 } // namespace llvm
 #endif

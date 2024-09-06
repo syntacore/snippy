@@ -101,6 +101,7 @@ snippy::opt<bool> VerifyConsecutiveLoops(
 snippy::opt<bool> DumpFinalCFG("dump-final-cfg",
                                cl::desc("Dump CFG after all passes."),
                                cl::cat(Options), cl::init(false), cl::Hidden);
+
 } // namespace snippy
 
 LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(snippy::CallGraphDumpMode,
@@ -351,7 +352,7 @@ static void dumpVerificationIntervalsIfNeeeded(StringRef Output,
   auto VerificationIntervals = IntervalsToVerify::createFromObject(
       State.getDisassembler(), Output,
       GenCtx.getProgramContext().getEntryPointName(),
-      GenCtx.getLinker().getOutputSectionFor(".text").Desc.VMA,
+      GenCtx.getLinker().sections().getOutputSectionFor(".text").Desc.VMA,
       GenCtx.getEntryPrologueInstructionCount(),
       GenCtx.getEntryEpilogueInstructionCount());
 
