@@ -113,6 +113,7 @@ SimRunner &GeneratorContext::getOrCreateSimRunner() const {
   assert(hasModel() && "Cannot create SimRunner. Model wasn't provided");
   if (!Runner)
     initRunner();
+  Runner->getSimConfig().StartPC = getLinker().getStartPC();
   return *Runner;
 }
 
@@ -442,22 +443,42 @@ void reportUnusedRXSectionWarning(LLVMContext &Ctx, R &&Names) {
                "Following RX sections are unused during generation", NameList);
 }
 
+static void
+checkForUnusedRXSections(const Linker::LinkedSections &Sections,
+                         const Linker::OutputSection &DefaultCodeSection,
+                         LLVMContext &Ctx) {
+  auto UnusedRXSections =
+      llvm::make_filter_range(Sections, [&DefaultCodeSection](auto &S) {
+        return S.OutputSection.Desc.M.X() &&
+               S.OutputSection.Desc.getIDString() !=
+                   DefaultCodeSection.Desc.getIDString();
+      });
+  auto UnusedRXSectionNames = llvm::map_range(UnusedRXSections, [](auto &S) {
+    return S.OutputSection.Desc.getIDString();
+  });
+  if (!UnusedRXSectionNames.empty())
+    reportUnusedRXSectionWarning(Ctx, UnusedRXSectionNames);
+}
+
 static std::vector<Linker::SectionEntry>
 configureLinkerSections(LLVMContext &Ctx, Linker &L,
                         const GeneratorSettings &Settings) {
-  assert(L.hasOutputSectionFor(Linker::kDefaultTextSectionName));
+  assert(L.sections().hasOutputSectionFor(Linker::kDefaultTextSectionName));
   auto DefaultCodeSection =
-      L.getOutputSectionFor(Linker::kDefaultTextSectionName);
+      L.sections().getOutputSectionFor(Linker::kDefaultTextSectionName);
   std::vector<Linker::SectionEntry> ExecutionPath;
+  if (Settings.InstrsGenerationConfig.ChainedRXSectionsFill)
 
-  if (Settings.InstrsGenerationConfig.ChainedRXSectionsFill) {
     for (auto &RXSection : llvm::make_filter_range(L.sections(), [](auto &S) {
            return S.OutputSection.Desc.M.X();
          })) {
-      L.addInputSectionForDescr(RXSection.OutputSection.Desc,
-                                RXSection.OutputSection.Name);
+      if (!L.sections().hasOutputSectionFor(RXSection.OutputSection.Name))
+        L.sections().addInputSectionFor(RXSection.OutputSection.Desc,
+                                        RXSection.OutputSection.Name);
       ExecutionPath.push_back(RXSection);
     }
+
+  if (Settings.InstrsGenerationConfig.ChainedRXSectionsFill) {
     if (Settings.InstrsGenerationConfig.ChainedRXSorted) {
       std::sort(ExecutionPath.begin(), ExecutionPath.end(),
                 [](auto &LHS, auto &RHS) {
@@ -467,22 +488,10 @@ configureLinkerSections(LLVMContext &Ctx, Linker &L,
     } else
       std::shuffle(ExecutionPath.begin(), ExecutionPath.end(),
                    RandEngine::engine());
-
   } else {
-    std::vector<std::string> UnusedRXSections;
-    for (auto &RXSection :
-         llvm::make_filter_range(L.sections(), [&DefaultCodeSection](auto &S) {
-           return S.OutputSection.Desc.M.X() &&
-                  S.OutputSection.Desc.getIDString() !=
-                      DefaultCodeSection.Desc.getIDString();
-         }))
-      UnusedRXSections.emplace_back(RXSection.OutputSection.Desc.getIDString());
-
-    if (!UnusedRXSections.empty())
-      reportUnusedRXSectionWarning(Ctx, UnusedRXSections);
-
+    checkForUnusedRXSections(L.sections(), DefaultCodeSection, Ctx);
     ExecutionPath.push_back(Linker::SectionEntry{
-        DefaultCodeSection, {std::string(Linker::kDefaultTextSectionName)}});
+        DefaultCodeSection, {{std::string(Linker::kDefaultTextSectionName)}}});
   }
   return ExecutionPath;
 }
@@ -605,8 +614,9 @@ GeneratorContext::GeneratorContext(SnippyProgramContext &ProgContext,
                                    GeneratorSettings &Settings)
     : ProgContext(ProgContext), MainModule(ProgContext.getLLVMState(), "main"),
       CGS(std::make_unique<CallGraphState>()),
-      ExecutionPath(configureLinkerSections(ProgContext.getLLVMState().getCtx(),
-                                            ProgContext.getLinker(), Settings)),
+      ExecutionPath(
+          snippy::configureLinkerSections(ProgContext.getLLVMState().getCtx(),
+                                          ProgContext.getLinker(), Settings)),
       GenSettings(&Settings), ImmHistMap([&Settings, &ProgContext] {
         const auto &ImmHist = Settings.Cfg.ImmHistogram;
         if (ImmHist.holdsAlternative<ImmediateHistogramRegEx>())

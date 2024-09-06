@@ -501,6 +501,17 @@ public:
     reportUnimplementedError();
   }
 
+  uint8_t getCodeAlignment(const GeneratorContext &GC) const override {
+    reportUnimplementedError();
+  }
+
+  MachineBasicBlock::iterator generateJump(MachineBasicBlock &MBB,
+                                           MachineBasicBlock::iterator Ins,
+                                           MachineBasicBlock &TBB,
+                                           LLVMState &State) const override {
+    reportUnimplementedError();
+  }
+
 }; // namespace
 
 bool SnippyX86Target::matchesArch(Triple::ArchType Arch) const {

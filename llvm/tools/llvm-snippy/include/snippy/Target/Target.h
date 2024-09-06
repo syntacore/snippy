@@ -196,6 +196,8 @@ public:
   virtual unsigned getSpillAlignmentInBytes(MCRegister Reg,
                                             LLVMState &State) const = 0;
 
+  virtual uint8_t getCodeAlignment(const GeneratorContext &GC) const = 0;
+
   // Find register by name, std::nullopt if not found.
   virtual std::optional<unsigned>
   findRegisterByName(const StringRef RegName) const {
@@ -505,6 +507,10 @@ public:
   virtual std::unique_ptr<AsmPrinter>
   createAsmPrinter(LLVMTargetMachine &TM,
                    std::unique_ptr<MCStreamer> Streamer) const = 0;
+
+  virtual MachineBasicBlock::iterator
+  generateJump(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
+               MachineBasicBlock &TBB, LLVMState &State) const = 0;
 
 private:
   virtual bool matchesArch(Triple::ArchType Arch) const = 0;
