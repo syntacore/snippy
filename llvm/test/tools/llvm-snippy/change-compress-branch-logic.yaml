@@ -1,0 +1,42 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:    -mcpu=generic-rv64 -mattr=+c  -num-instrs=100 \
+# RUN:    -dump-mf -riscv-loop-control-logic-compression=on \
+# RUN: |& FileCheck %s --check-prefix=ON
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:    -mcpu=generic-rv64 -mattr=+c  -num-instrs=10000 \
+# RUN:    -dump-mf -riscv-loop-control-logic-compression=random \
+# RUN: |& FileCheck %s --check-prefix=RANDOM-DAG
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:    -mcpu=generic-rv64 -mattr=+c  -num-instrs=100 \
+# RUN:    -dump-mf -riscv-loop-control-logic-compression=off \
+# RUN: |& FileCheck %s --check-prefix=OFF
+
+sections:
+    - no:        1
+      VMA:       0x2004000
+      SIZE:      0x3E0000
+      LMA:       0x2004000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x2800000
+      SIZE:      0x4000
+      LMA:       0x2800000
+      ACCESS:    rw
+
+histogram:
+    - [BNE, 1.0]
+
+branches:
+    permutation: on
+    max-depth:
+      if: 4
+      loop: 4
+
+# ON: C_ADDI
+# ON-NOT: {{\sADDI \$x[1-9]+}}
+# OFF: ADDI
+# OFF-NOT: C_ADDI
+# RANDOM-DAG: {{\$x[1-9]+ = ADDI}}
+# RANDOM-DAG: C_ADDI
