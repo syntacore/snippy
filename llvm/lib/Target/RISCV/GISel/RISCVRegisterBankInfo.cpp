@@ -93,6 +93,11 @@ RISCVRegisterBankInfo::getRegBankFromRegClass(const TargetRegisterClass &RC,
   case RISCV::SR07RegClassID:
   case RISCV::SPRegClassID:
   case RISCV::GPRX0RegClassID:
+  case RISCV::GPRNoGPRCRegClassID:
+  case RISCV::GPRNoGPRC_and_SR07RegClassID:
+  case RISCV::GPRNoGPRC_and_GPRNoX0RegClassID:
+  case RISCV::GPRNoGPRC_and_GPRNoX0X2RegClassID:
+  case RISCV::GPRNoGPRC_and_GPRTCRegClassID:
     return getRegBank(RISCV::GPRBRegBankID);
   case RISCV::FPR64RegClassID:
   case RISCV::FPR16RegClassID:
