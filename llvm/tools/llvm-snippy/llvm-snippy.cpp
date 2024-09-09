@@ -897,7 +897,8 @@ static void checkConfig(const Config &Cfg, const SnippyTarget &Tgt,
       }))
     snippy::fatal(Ctx, "Incorrect list of sections",
                   "List contains duplicate section IDs");
-  diagnoseXSections(Ctx, Cfg.Sections.begin(), Cfg.Sections.end());
+  diagnoseXSections(Ctx, Cfg.Sections.begin(), Cfg.Sections.end(),
+                    Cfg.Branches.Alignment);
 
   if (Cfg.Sections.size() < 2)
     return;

@@ -1,0 +1,28 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN:     -num-instrs=50 |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x1008
+      SIZE:      0x10000
+      LMA:       0x1008
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+    - [BLT, 1.0]
+    - [BLTU, 1.0]
+    - [BGE, 1.0]
+    - [BGEU, 1.0]
+    - [BNE, 1.0]
+    - [AND, 8.0]
+
+branches:
+  alignment: 16
+
+# CHECK: error: LLVM ERROR: Incorrect section: The executable section '1' must be aligned to 16 according to specified config
