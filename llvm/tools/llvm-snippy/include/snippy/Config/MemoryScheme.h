@@ -689,8 +689,8 @@ struct SectionsDescriptions : private std::vector<SectionDesc> {
 };
 
 template <typename SecIt>
-void diagnoseXSections(LLVMContext &Ctx, SecIt SectionsStart,
-                       SecIt SectionsFin) {
+void diagnoseXSections(LLVMContext &Ctx, SecIt SectionsStart, SecIt SectionsFin,
+                       size_t Alignment) {
   // TODO: assert for 1 rx section?
   std::vector<SectionDesc> ExecSections;
   std::copy_if(SectionsStart, SectionsFin, std::back_inserter(ExecSections),
@@ -716,6 +716,13 @@ void diagnoseXSections(LLVMContext &Ctx, SecIt SectionsStart,
           "The executable section " + Twine(ExecSection.getIDString()) +
               " has also W access mode. Snippy does not support SMC for now");
     }
+
+    if (ExecSection.VMA % Alignment)
+      snippy::fatal(Ctx, "Incorrect section",
+                    "The executable section '" +
+                        Twine(ExecSection.getIDString()) +
+                        "' must be aligned to " + Twine(Alignment) +
+                        " according to specified config");
   }
 }
 
