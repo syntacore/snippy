@@ -631,6 +631,19 @@ static MCRegister getRealStackPointer(const RegPool &RP, const Config &Cfg,
                                       LLVMContext &Ctx) {
   auto SP = Tgt.getStackPointer();
 
+  if (FollowTargetABI) {
+    if (RedefineSP.isSpecified() && RedefineSP != "SP")
+      snippy::warn(
+          WarningName::InconsistentOptions, Ctx,
+          "When using --" + Twine(FollowTargetABI.ArgStr) + " and --" +
+              RedefineSP.ArgStr + "=" + Twine(RedefineSP) +
+              " options together, target ABI may not be preserved in case of "
+              "traps",
+          "use these options in combination only for valid code generation");
+    else
+      RedefineSP.setValue("SP");
+  }
+
   if (RedefineSP == "SP")
     return SP;
 
