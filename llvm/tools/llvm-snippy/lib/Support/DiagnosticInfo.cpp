@@ -86,5 +86,12 @@ void fatal(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix, Error E) {
   Ctx.diagnose(Diag);
 }
 
+void fatal(const llvm::Twine &Prefix, const llvm::Twine &Desc) {
+  llvm::LLVMContext Ctx;
+  SnippyDiagnosticInfo Diag(Prefix, Desc, llvm::DS_Error,
+                            WarningName::NotAWarning);
+  Ctx.diagnose(Diag);
+}
+
 } // namespace snippy
 } // namespace llvm
