@@ -31,6 +31,7 @@
 #include "snippy/Support/YAMLUtils.h"
 
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #include <unordered_set>
 
@@ -484,6 +485,10 @@ struct AccMask {
       case 'x':
         M |= static_cast<int>(Acc::X);
         break;
+      default:
+        snippy::fatal(
+            "Invalid access attribute in config",
+            formatv("{0} is not allowed. Acceptable ones: r, w, x.", c));
       }
   }
 
