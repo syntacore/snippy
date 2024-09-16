@@ -8,6 +8,8 @@
 
 #include "InitializePasses.h"
 
+#include "snippy/Generator/GenerationUtils.h"
+
 #include "snippy/CreatePasses.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 
@@ -80,7 +82,7 @@ bool FillExternalFunctionsStubs::runOnModule(Module &M) {
 
     auto &MF =
         State.createMachineFunctionFor(F, SGCtx.getMainModule().getMMI());
-    auto *MBB = MF.CreateMachineBasicBlock();
+    auto *MBB = createMachineBasicBlock(MF, SGCtx);
     MF.push_back(MBB);
     SnippyTgt.generateReturn(*MBB, State);
   }

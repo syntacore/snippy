@@ -40,7 +40,8 @@ SnippyModule::SnippyModule(LLVMState &State, StringRef Name)
   M.setDataLayout(State.getTargetMachine().createDataLayout());
 }
 
-void SnippyModule::generateObject(const PassInserter &Inserter) {
+void SnippyModule::generateObject(const PassInserter &BeforePrinter,
+                                  const PassInserter &AfterPrinter) {
   struct InitPasses {
     InitPasses(LLVMState &State) {
       const auto &SnippyTgt = State.getSnippyTarget();
@@ -59,7 +60,7 @@ void SnippyModule::generateObject(const PassInserter &Inserter) {
 
   PPM->add(MMIWP.release());
 
-  std::invoke(Inserter, *PPM);
+  std::invoke(BeforePrinter, *PPM);
 
   GeneratedObject.clear();
   raw_svector_ostream OS(GeneratedObject);
@@ -68,7 +69,7 @@ void SnippyModule::generateObject(const PassInserter &Inserter) {
   auto AsmPrinter = State.getSnippyTarget().createAsmPrinter(
       State.getTargetMachine(), std::move(ObjStreamer));
   PPM->add(AsmPrinter.release());
-
+  std::invoke(AfterPrinter, *PPM);
   PPM->run(M);
 
   outs().flush(); // FIXME: this is currently needed because

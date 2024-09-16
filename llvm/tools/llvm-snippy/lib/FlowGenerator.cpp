@@ -399,64 +399,66 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
 
   auto &MainModule = GenCtx.getMainModule();
 
-  MainModule.generateObject([&](PassManagerWrapper &PM) {
-    // Pre backtrack start
-    PM.add(createGeneratorContextWrapperPass(GenCtx));
-    PM.add(createRootRegPoolWrapperPass());
-    PM.add(createFunctionGeneratorPass());
+  MainModule.generateObject(
+      [&](PassManagerWrapper &PM) {
+        // Pre backtrack start
+        PM.add(createGeneratorContextWrapperPass(GenCtx));
+        PM.add(createRootRegPoolWrapperPass());
+        PM.add(createFunctionGeneratorPass());
 
-    PM.add(createReserveRegsPass());
-    PM.add(createCFGeneratorPass());
-    if (GenSettings.Cfg.Branches.PermuteCF)
-      PM.add(createCFPermutationPass());
+        PM.add(createReserveRegsPass());
+        PM.add(createCFGeneratorPass());
+        if (GenSettings.Cfg.Branches.PermuteCF)
+          PM.add(createCFPermutationPass());
 
-    if (GenSettings.DebugConfig.PrintControlFlowGraph)
-      PM.add(createCFGPrinterPass());
-    PM.add(createLoopAlignmentPass());
-    PM.add(createLoopCanonicalizationPass());
-    PM.add(createLoopLatcherPass());
-    if (GenSettings.DebugConfig.PrintControlFlowGraph)
-      PM.add(createCFGPrinterPass());
+        if (GenSettings.DebugConfig.PrintControlFlowGraph)
+          PM.add(createCFGPrinterPass());
+        PM.add(createLoopAlignmentPass());
+        PM.add(createLoopCanonicalizationPass());
+        PM.add(createLoopLatcherPass());
+        if (GenSettings.DebugConfig.PrintControlFlowGraph)
+          PM.add(createCFGPrinterPass());
 
-    PM.add(createRegsInitInsertionPass(
-        GenSettings.RegistersConfig.InitializeRegs));
-    SnippyTgt.addTargetSpecificPasses(PM);
+        PM.add(createRegsInitInsertionPass(
+            GenSettings.RegistersConfig.InitializeRegs));
+        SnippyTgt.addTargetSpecificPasses(PM);
 
-    // Pre backtrack end
+        // Pre backtrack end
 
-    PM.add(createBlockGenPlanWrapperPass());
-    PM.add(createBlockGenPlanningPass());
-    PM.add(createInstructionGeneratorPass()); // Can be backtracked
+        PM.add(createBlockGenPlanWrapperPass());
+        PM.add(createBlockGenPlanningPass());
+        PM.add(createInstructionGeneratorPass()); // Can be backtracked
 
-    // Post backtrack
-    PM.add(createPrologueEpilogueInsertionPass());
-    PM.add(createFillExternalFunctionsStubsPass({}));
-    if (GenSettings.DebugConfig.PrintMachineFunctions)
-      PM.add(createMachineFunctionPrinterPass(outs()));
+        // Post backtrack
+        PM.add(createPrologueEpilogueInsertionPass());
+        PM.add(createFillExternalFunctionsStubsPass({}));
+        if (GenSettings.DebugConfig.PrintMachineFunctions)
+          PM.add(createMachineFunctionPrinterPass(outs()));
 
-    if (GenSettings.DebugConfig.PrintControlFlowGraph)
-      PM.add(createCFGPrinterPass());
-    if (GenSettings.DebugConfig.PrintInstrs)
-      PM.add(createPrintMachineInstrsPass(outs()));
+        if (GenSettings.DebugConfig.PrintControlFlowGraph)
+          PM.add(createCFGPrinterPass());
+        if (GenSettings.DebugConfig.PrintInstrs)
+          PM.add(createPrintMachineInstrsPass(outs()));
 
-    SnippyTgt.addTargetLegalizationPasses(PM);
+        SnippyTgt.addTargetLegalizationPasses(PM);
 
-    PM.add(createBranchRelaxatorPass());
-    if (VerifyConsecutiveLoops)
-      PM.add(createConsecutiveLoopsVerifierPass());
+        PM.add(createBranchRelaxatorPass());
+        if (VerifyConsecutiveLoops)
+          PM.add(createConsecutiveLoopsVerifierPass());
 
-    PM.add(createPostGenVerifierPass());
-    PM.add(createInstructionsPostProcessPass());
-    PM.add(createFunctionDistributePass());
+        PM.add(createPostGenVerifierPass());
+        PM.add(createInstructionsPostProcessPass());
+        PM.add(createFunctionDistributePass());
 
-    if (GenSettings.InstrsGenerationConfig.RunMachineInstrVerifier)
-      PM.add(createMachineVerifierPass("Machine Verifier Pass report"));
+        if (GenSettings.InstrsGenerationConfig.RunMachineInstrVerifier)
+          PM.add(createMachineVerifierPass("Machine Verifier Pass report"));
 
-    if (DumpMIR.isSpecified())
-      PM.add(createPrintMIRPass(MIROS));
-    if (DumpFinalCFG)
-      PM.add(createCFGPrinterPass());
-  });
+        if (DumpMIR.isSpecified())
+          PM.add(createPrintMIRPass(MIROS));
+        if (DumpFinalCFG)
+          PM.add(createCFGPrinterPass());
+      },
+      [&](PassManagerWrapper &PM) {});
 
   auto CGFilename = DumpCGFilename.getValue();
   if (!CGFilename.empty())
