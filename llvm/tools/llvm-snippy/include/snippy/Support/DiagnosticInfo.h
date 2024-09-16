@@ -91,6 +91,8 @@ void fatal(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
 
 void fatal(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix, Error E);
 
+void fatal(const llvm::Twine &Prefix, const llvm::Twine &Desc);
+
 } // namespace snippy
 
 } // namespace llvm
