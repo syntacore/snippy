@@ -50,7 +50,8 @@ public:
 
   using PassInserter = std::function<void(PassManagerWrapper &)>;
 
-  void generateObject(const PassInserter &Inserter);
+  void generateObject(const PassInserter &BeforePrinter,
+                      const PassInserter &AfterPrinter);
 
   bool haveGeneratedObject() const { return !GeneratedObject.empty(); }
 
