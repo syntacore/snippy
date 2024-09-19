@@ -42,6 +42,15 @@
     static QuotingType mustQuote(StringRef);                                   \
   }
 
+#define LLVM_SNIPPY_YAML_DECLARE_POLYMORPHIC_TRAITS(_type, _scalar_type,       \
+                                                    _map_type, _seq_type)      \
+  template <> struct llvm::yaml::PolymorphicTraits<_type> {                    \
+    static NodeKind getKind(const _type &);                                    \
+    static _scalar_type &getAsScalar(_type &);                                 \
+    static _seq_type &getAsSequence(_type &);                                  \
+    static _map_type &getAsMap(_type &);                                       \
+  }
+
 #define LLVM_SNIPPY_YAML_DECLARE_CUSTOM_MAPPING_TRAITS(_type)                  \
   template <> struct llvm::yaml::CustomMappingTraits<_type> {                  \
     static void inputOne(yaml::IO &, StringRef, _type &);                      \
@@ -75,11 +84,12 @@
       yaml::IO &Io, snippy::YAMLHistogramIO<_type> &, bool, EmptyContext &Ctx)
 
 #define LLVM_SNIPPY_YAML_DECLARE_IS_HISTOGRAM_DENORM_ENTRY(_type)              \
-  template <>                                                                  \
-  void llvm::yaml::yamlize(yaml::IO &Io, _type &E, bool, EmptyContext &Ctx)
+  namespace yaml {                                                             \
+  void yamlize(yaml::IO &Io, _type &E, bool, EmptyContext &Ctx);               \
+  } // namespace yaml
 
 #define LLVM_SNIPPY_YAML_DECLARE_HISTOGRAM_TRAITS(_type, _map_type)            \
-  template <> struct YAMLHistogramTraits<_type> {                              \
+  template <> struct YAMLHistogramTraits<_type, void> {                        \
     using MapType = _map_type;                                                 \
     static _type denormalizeEntry(yaml::IO &Io, StringRef Key, double Weight); \
     static void normalizeEntry(yaml::IO &Io, const _type &,                    \
@@ -123,6 +133,7 @@ template <typename> struct PolymorphicTraits;
 } // namespace yaml
 
 namespace snippy {
+template <typename T, typename> struct YAMLHistogramTraits;
 template <typename T, typename> struct YAMLHistogramIO;
 } // namespace snippy
 
@@ -168,7 +179,7 @@ Error loadYAMLFromBufferIgnoreUnknown(T &ToLoad, StringRef Buf) {
   return Error::success();
 }
 
-// This monstrocity is necessary to set the correct filename in the diagnostic
+// This monstrosity is necessary to set the correct filename in the diagnostic
 inline SMDiagnostic getSMDiagWithFilename(StringRef Filename,
                                           const SMDiagnostic &Diag) {
   return SMDiagnostic(*Diag.getSourceMgr(), Diag.getLoc(), Filename,
