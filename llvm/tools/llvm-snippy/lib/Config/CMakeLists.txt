@@ -9,6 +9,7 @@ set(LLVMSnippyConfigSources
     FPUSettings.cpp
     CallGraphLayout.cpp
     MemorySchemePluginWrapper.cpp
+    Valuegram.cpp
     )
 
 

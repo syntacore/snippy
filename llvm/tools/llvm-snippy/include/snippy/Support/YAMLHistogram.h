@@ -239,8 +239,10 @@ void yamlize(yaml::IO &Io, snippy::YAMLHistogramIO<T> &Hist, bool,
 } // namespace llvm
 
 #define LLVM_SNIPPY_YAML_IS_HISTOGRAM_DENORM_ENTRY(_type)                      \
-  LLVM_SNIPPY_YAML_DECLARE_IS_HISTOGRAM_DENORM_ENTRY(_type) {                  \
+  namespace yaml {                                                             \
+  void yamlize(yaml::IO &Io, _type &E, bool, EmptyContext &Ctx) {              \
     MappingNormalization<llvm::snippy::YAMLHistogramNormEntry<_type>, _type>   \
         Norm(Io, E);                                                           \
     yamlize(Io, Norm->Elements, true /* not used */, Ctx);                     \
-  }
+  }                                                                            \
+  } // namespace yaml
