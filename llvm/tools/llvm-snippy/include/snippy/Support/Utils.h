@@ -274,6 +274,8 @@ auto transformOpt(const std::optional<T> &O, Func &&F)
   return std::nullopt;
 }
 
+unsigned getAutoSenseRadix(StringRef Str);
+
 } // namespace snippy
 } // namespace llvm
 
