@@ -1,0 +1,23 @@
+# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+
+
+options:
+  mcpu: generic-rv64
+  march: riscv64-unknown-elf
+  num-instrs: 100
+  dump-registers-yaml: true
+
+# CHECK: LLVM ERROR: Dump resulting registers can't be done: dump-registers-yaml
+# CHECK-SAME: option is passed but model-plugin is not provided.
