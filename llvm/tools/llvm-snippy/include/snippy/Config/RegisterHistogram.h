@@ -8,6 +8,9 @@
 
 #pragma once
 
+#include "snippy/Config/Valuegram.h"
+#include "snippy/Support/YAMLUtils.h"
+
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -16,7 +19,8 @@
 #include <variant>
 #include <vector>
 
-namespace llvm::snippy {
+namespace llvm {
+namespace snippy {
 
 struct RegisterClassValues {
   std::string RegType;
@@ -28,16 +32,8 @@ struct RegisterValues {
 };
 
 struct RegisterClassHistogram {
-  enum class Pattern {
-    Uniform,
-    BitPattern,
-  };
-
-  using ValueEntry = std::variant<APInt, Pattern>;
-
   std::string RegType;
-  std::vector<ValueEntry> Values;
-  std::vector<double> Weights;
+  Valuegram TheValuegram;
 };
 
 struct RegisterHistograms {
@@ -63,4 +59,9 @@ void getRegisterGroup(const RegistersWithHistograms &RH, size_t ExpectedNumber,
                       StringRef Prefix, unsigned NumBits,
                       std::vector<APInt> &Registers);
 
-} // namespace llvm::snippy
+} // namespace snippy
+
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(
+    snippy::RegisterClassHistogram);
+
+} // namespace llvm

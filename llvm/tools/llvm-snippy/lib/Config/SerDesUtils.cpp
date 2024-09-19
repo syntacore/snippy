@@ -22,131 +22,6 @@
 namespace llvm {
 namespace snippy {
 
-static std::optional<RegisterClassHistogram::Pattern>
-parseHistogramPattern(StringRef ParseStr) {
-  if (ParseStr == "uniform")
-    return RegisterClassHistogram::Pattern::Uniform;
-  if (ParseStr == "bitpattern")
-    return RegisterClassHistogram::Pattern::BitPattern;
-  return std::nullopt;
-}
-
-static StringRef histogramPatternToString(RegisterClassHistogram::Pattern P) {
-  switch (P) {
-  case RegisterClassHistogram::Pattern::Uniform:
-    return "uniform";
-  case RegisterClassHistogram::Pattern::BitPattern:
-    return "bitpattern";
-  }
-  llvm_unreachable("Broken enum");
-}
-
-struct RegisterClassHistogramEntry {
-  RegisterClassHistogram::ValueEntry Value;
-  double Weight;
-};
-
-template <> struct YAMLHistogramTraits<RegisterClassHistogramEntry> {
-  using DenormEntry = RegisterClassHistogramEntry;
-  using MapType = RegisterClassHistogram;
-
-  static unsigned getAutoSenseRadix(StringRef &Str) {
-    if (Str.empty())
-      return 10;
-    if (Str.starts_with("0x") || Str.starts_with("0X")) {
-      return 16;
-    }
-    if (Str.starts_with("0b") || Str.starts_with("0B")) {
-      return 2;
-    }
-    if (Str.starts_with("0o")) {
-      return 8;
-    }
-    if (Str[0] == '0' && Str.size() > 1 && isDigit(Str[1])) {
-      return 8;
-    }
-    return 10;
-  }
-
-  static auto reportError(yaml::IO &Io, const Twine &Msg) {
-    Io.setError(Msg);
-    return RegisterClassHistogram::ValueEntry{};
-  }
-
-  static RegisterClassHistogram::ValueEntry parseValue(yaml::IO &Io,
-                                                       StringRef ParseStr) {
-    StringRef OriginalStr = ParseStr;
-    auto Pattern = parseHistogramPattern(ParseStr);
-    if (Pattern)
-      return *Pattern;
-    APInt Value;
-    if (ParseStr.empty())
-      return reportError(Io, "Histogram entry value empty");
-    bool IsNegative = false;
-    // We remove minus because StringRef::getAsInteger method overload for APInt
-    // doesn't handle the minus.
-    if (ParseStr.front() == '-') {
-      IsNegative = true;
-      ParseStr = ParseStr.substr(1);
-    }
-    if (IsNegative && getAutoSenseRadix(ParseStr) != 10)
-      return reportError(Io, "Histogram entry value " + OriginalStr +
-                                 " is negative, but "
-                                 "the radix is not equal to 10");
-    auto ParseFailed = ParseStr.getAsInteger(0, Value);
-    if (ParseFailed)
-      return reportError(Io, "Histogram entry value " + OriginalStr +
-                                 " is not an integer or a valid pattern");
-    // If there was a minus, we negate the number, if not - add one zero at the
-    // beginning to interpreted as positive.
-    if (!IsNegative)
-      return Value.zext(Value.getBitWidth() + 1);
-    Value.negate();
-    return Value;
-  }
-
-  static DenormEntry denormalizeEntry(yaml::IO &Io, StringRef ValueStr,
-                                      double Weight) {
-    return {parseValue(Io, ValueStr), Weight};
-  }
-
-  static void normalizeEntry(yaml::IO &Io, const DenormEntry &E,
-                             SmallVectorImpl<SValue> &RawStrings) {
-    struct NameVisitor {
-      std::string operator()(RegisterClassHistogram::Pattern P) {
-        return histogramPatternToString(P).str();
-      }
-      std::string operator()(APInt Val) {
-        SmallString<16> Str;
-        Val.toStringUnsigned(Str);
-        return Str.str().str();
-      }
-    };
-    RawStrings.push_back(std::visit(NameVisitor{}, E.Value));
-    RawStrings.push_back(std::to_string(E.Weight));
-  }
-
-  static MapType denormalizeMap(yaml::IO &Io, ArrayRef<DenormEntry> Entries) {
-    RegisterClassHistogram Hist;
-    transform(Entries, std::back_inserter(Hist.Values),
-              [](auto &&E) { return E.Value; });
-    transform(Entries, std::back_inserter(Hist.Weights),
-              [](auto &&E) { return E.Weight; });
-    return Hist;
-  }
-
-  static void normalizeMap(yaml::IO &Io, const RegisterClassHistogram &Hist,
-                           std::vector<DenormEntry> &Entries) {
-    transform(zip(Hist.Values, Hist.Weights), std::back_inserter(Entries),
-              [](auto &&Pair) {
-                auto &&[Value, Weight] = Pair;
-                return DenormEntry{Value, Weight};
-              });
-  }
-
-  static std::string validate(ArrayRef<DenormEntry> Entries) { return ""; }
-};
-
 struct RegisterValuesEntry {
   std::string RegName;
   APInt Value;
@@ -403,7 +278,6 @@ RegistersWithHistograms loadRegistersFromYaml(StringRef Path) {
 
 } // namespace snippy
 
-LLVM_SNIPPY_YAML_IS_HISTOGRAM_DENORM_ENTRY(snippy::RegisterClassHistogramEntry)
 LLVM_SNIPPY_YAML_IS_HISTOGRAM_DENORM_ENTRY(snippy::RegisterValuesEntry)
 LLVM_SNIPPY_YAML_IS_HISTOGRAM_DENORM_ENTRY(snippy::ImmediateHistogramEntry)
 
@@ -412,17 +286,6 @@ template <> struct yaml::SequenceElementTraits<snippy::RegisterClassHistogram> {
 };
 
 using snippy::YAMLHistogramIO;
-
-template <> struct yaml::MappingTraits<snippy::RegisterClassHistogram> {
-  static void mapping(IO &Io, snippy::RegisterClassHistogram &Hist) {
-    YAMLHistogramIO<snippy::RegisterClassHistogramEntry> RegHistogramIO(Hist);
-
-    // Very important! Do not change the order of these two lines. Otherwise you
-    // will summon the kraken.
-    Io.mapRequired("values", RegHistogramIO);
-    Io.mapRequired("reg-type", RegHistogramIO.UnderlyingMap.RegType);
-  }
-};
 
 template <> struct yaml::MappingTraits<snippy::RegistersWithHistograms> {
   static void mapping(IO &Io, snippy::RegistersWithHistograms &Info) {
