@@ -7,15 +7,19 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Config/RegisterHistogram.h"
+#include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/RandUtil.h"
+#include "snippy/Support/Utils.h"
+#include "snippy/Support/YAMLHistogram.h"
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/YAMLTraits.h"
 
 #include <algorithm>
 
-using namespace llvm;
-using namespace llvm::snippy;
+namespace llvm {
+namespace snippy {
 
 static void getFixedRegisterValues(const RegistersWithHistograms &RH,
                                    size_t ExpectedNumber, StringRef Prefix,
@@ -64,18 +68,17 @@ static APInt generateBitPattern(unsigned NumBits) {
   return Result;
 }
 
-static APInt
-getValueFromHistogramPattern(RegisterClassHistogram::Pattern Pattern,
-                             unsigned NumBits) {
-  switch (Pattern) {
-  case RegisterClassHistogram::Pattern::Uniform: {
+static APInt getValueFromHistogramPattern(ValuegramEntry::EntryKind Kind,
+                                          unsigned NumBits) {
+  using EntryKind = ValuegramEntry::EntryKind;
+  switch (Kind) {
+  case EntryKind::Uniform:
     return RandEngine::genAPInt(NumBits);
-  }
-  case RegisterClassHistogram::Pattern::BitPattern: {
+  case EntryKind::BitPattern:
     return generateBitPattern(NumBits);
+  default:
+    llvm_unreachable("Invalid EntryKind for a valuegram pattern");
   }
-  }
-  llvm_unreachable("Unhandled histogram pattern");
 }
 
 static void sampleHistogramForRegType(const RegistersWithHistograms &RH,
@@ -89,32 +92,51 @@ static void sampleHistogramForRegType(const RegistersWithHistograms &RH,
     Registers.clear();
     return;
   }
+
   const auto &Hist = *It;
-  std::discrete_distribution<size_t> Dist(Hist.Weights.begin(),
-                                          Hist.Weights.end());
+  const auto &Valuegram = Hist.TheValuegram;
+
+  std::discrete_distribution<size_t> Dist(Valuegram.weights_begin(),
+                                          Valuegram.weights_end());
+
   auto &Engine = RandEngine::engine();
   std::generate(Registers.begin(), Registers.end(), [&] {
-    const auto &Entry = Hist.Values[Dist(Engine)];
-    if (const auto *Value = std::get_if<APInt>(&Entry)) {
-      auto LeadingZeroBits = Value->countLeadingZeros();
-      if (Value->getBitWidth() - LeadingZeroBits > NumBits) {
+    const auto &Entry = Valuegram.at(Dist(Engine));
+
+    using EntryKind = ValuegramEntry::EntryKind;
+    auto Kind = Entry.getKind();
+    switch (Kind) {
+    case EntryKind::BitValue: {
+      auto &ValueWithSign =
+          cast<ValuegramBitValueEntry>(Entry.get()).ValWithSign;
+      auto &Value = ValueWithSign.Value;
+
+      if (Value.getActiveBits() > NumBits) {
         SmallVector<char> Str;
-        Value->toStringUnsigned(Str, 16);
-        report_fatal_error("Histogram entry " + Str + " for register type " +
-                               Prefix + " is wider than requested bit width " +
-                               Twine(NumBits),
-                           false);
+        Value.toString(Str, /*Radix=*/16, /*Signed=*/ValueWithSign.IsSigned,
+                       /*formatAsCLiteral=*/true, /*UpperCase=*/false);
+        LLVMContext Ctx;
+        snippy::fatal(Ctx, "Failed to sample register histogram",
+                      Twine("Histogram entry ")
+                          .concat(Str)
+                          .concat(" for register type ")
+                          .concat(Prefix)
+                          .concat(" is wider than requested bit width ")
+                          .concat(Twine(NumBits)));
       }
-      return Value->sextOrTrunc(NumBits);
+
+      if (ValueWithSign.IsSigned)
+        return Value.sextOrTrunc(NumBits);
+      return Value.zextOrTrunc(NumBits);
     }
-    if (const auto *Value =
-            std::get_if<RegisterClassHistogram::Pattern>(&Entry))
-      return getValueFromHistogramPattern(*Value, NumBits);
-    llvm_unreachable("Unhandled register value histogram entry variant");
+    case EntryKind::BitPattern:
+    case EntryKind::Uniform:
+      return getValueFromHistogramPattern(Kind, NumBits);
+    default:
+      llvm_unreachable("Unhandled register value histogram entry variant");
+    }
   });
 }
-
-namespace llvm::snippy {
 
 void getRegisterGroup(const RegistersWithHistograms &RH, size_t ExpectedNumber,
                       StringRef Prefix, unsigned NumBits,
@@ -123,18 +145,6 @@ void getRegisterGroup(const RegistersWithHistograms &RH, size_t ExpectedNumber,
   sampleHistogramForRegType(RH, Prefix, NumBits, APInts);
   if (APInts.empty()) {
     getFixedRegisterValues(RH, ExpectedNumber, Prefix, 64, APInts);
-    // TODO: decide whether values that don't fit in registers should be
-    // truncated or raise an error
-#if 0
-    for (auto Value : Registers)
-      if (Value > MaxValue) {
-        report_fatal_error(
-            "Register value " + Twine(Value) + " for register of type " +
-                Prefix +
-                " is outside the valid range of values for this register type",
-            false);
-      }
-#endif
   }
   Registers.resize(APInts.size());
   std::transform(APInts.begin(), APInts.end(), Registers.begin(),
@@ -167,12 +177,12 @@ void checkRegisterClasses(const RegisterValues &Values,
     auto It = std::find(AllowedClasses.begin(), AllowedClasses.end(),
                         ClassValues.RegType);
     if (It == AllowedClasses.end())
-      report_fatal_error(
-          "Illegal register class " + ClassValues.RegType +
-              " specified for initial register values. The following register "
-              "classes are legal for the current target: " +
-              formatAllowedRegisterClasses(AllowedClasses) + ".",
-          false);
+      report_fatal_error("Illegal register class " + ClassValues.RegType +
+                             " specified for initial register values. The "
+                             "following register "
+                             "classes are legal for the current target: " +
+                             formatAllowedRegisterClasses(AllowedClasses) + ".",
+                         false);
   }
 }
 
@@ -192,4 +202,29 @@ void checkRegisterClasses(const RegisterHistograms &Histograms,
   }
 }
 
-} // namespace llvm::snippy
+} // namespace snippy
+
+void yaml::MappingTraits<snippy::RegisterClassHistogram>::mapping(
+    IO &Io, snippy::RegisterClassHistogram &Hist) {
+  Io.mapRequired("values", Hist.TheValuegram);
+  Io.mapRequired("reg-type", Hist.RegType);
+}
+
+std::string yaml::MappingTraits<snippy::RegisterClassHistogram>::validate(
+    IO &Io, snippy::RegisterClassHistogram &Hist) {
+  auto MapEntries = map_range(Hist.TheValuegram, [](auto &&Entry) {
+    return dyn_cast_or_null<snippy::IValuegramMapEntry>(Entry.getOrNull());
+  });
+
+  for (auto *MapEntry : MapEntries) {
+    if (!MapEntry)
+      continue;
+
+    if (auto Msg = MapEntry->validate(Io); Msg.size())
+      return Msg;
+  }
+
+  return "";
+}
+
+} // namespace llvm
