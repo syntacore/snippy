@@ -39,6 +39,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/VCSRevision.h"
@@ -531,6 +532,13 @@ std::vector<std::string> parseModelPluginList() {
     report_fatal_error("--" + CoSimModelPluginFilesList.ArgStr +
                        " can only be used when --" + ModelPluginFile.ArgStr +
                        " is provided and is not None");
+  if (ModelPluginFile.getValue() == "None" &&
+      DumpResultingRegisters.isSpecified())
+    snippy::fatal("Dump resulting registers can't be done",
+                  formatv("{0} option is passed but {1} "
+                          "is not provided.",
+                          DumpResultingRegisters.ArgStr,
+                          ModelPluginFile.ArgStr));
 
   std::vector<std::string> Ret{ModelPluginFile.getValue()};
   copy(CoSimModelPluginFilesList, std::back_inserter(Ret));
