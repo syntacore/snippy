@@ -8,6 +8,7 @@
 
 #include "snippy/Support/Utils.h"
 
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
 
@@ -89,6 +90,24 @@ std::string floatToString(APFloat F, unsigned Precision) {
   llvm::SmallString<10> S;
   F.toString(S, Precision);
   return S.str().str();
+}
+
+unsigned getAutoSenseRadix(StringRef Str) {
+  if (Str.empty())
+    return 10;
+  if (Str.starts_with("0x") || Str.starts_with("0X")) {
+    return 16;
+  }
+  if (Str.starts_with("0b") || Str.starts_with("0B")) {
+    return 2;
+  }
+  if (Str.starts_with("0o")) {
+    return 8;
+  }
+  if (Str[0] == '0' && Str.size() > 1 && isDigit(Str[1])) {
+    return 8;
+  }
+  return 10;
 }
 
 } // namespace snippy
