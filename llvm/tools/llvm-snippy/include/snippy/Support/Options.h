@@ -11,12 +11,13 @@
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/YAMLUtils.h"
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/YAMLTraits.h"
 
 #include <memory>
-#include <string>
-#include <unordered_set>
+#include <string_view>
+#include <unordered_map>
 
 namespace llvm {
 namespace snippy {
@@ -26,11 +27,14 @@ namespace snippy {
 /// Manages option's name and tracks whether option was specified in either
 /// command line or YAML file. Provides interface for yaml mapping.
 class CommandOptionBase {
-  std::string Name;
+  // Name is always a static lifetime string literal because snippy::opt only
+  // accepts `const char *`. This makes lookup work without dynamic
+  // allocations.
+  StringRef Name;
   bool Specified = false;
 
 public:
-  CommandOptionBase(StringRef Key) : Name(Key.str()) {}
+  CommandOptionBase(StringRef Key) : Name(Key) {}
 
   virtual ~CommandOptionBase() {}
 
@@ -38,7 +42,7 @@ public:
 
   bool isSpecified() const { return Specified; }
 
-  const std::string &getName() const { return Name; }
+  StringRef getName() const { return Name; }
 
   void mapStoredValue(yaml::IO &IO,
                       std::optional<StringRef> Key = std::nullopt);
@@ -70,20 +74,20 @@ template <typename DataType> struct CommandOption : public CommandOptionBase {
 /// \class OptionsStorage
 /// \brief Singleton class that stores CommandOptions by pointer to base class
 class OptionsStorage final {
-  using StorageType = std::vector<std::pair<std::unique_ptr<CommandOptionBase>,
-                                            std::unordered_set<std::string>>>;
+  struct StringRefHasher {
+    std::hash<std::string_view> Hasher = {};
+    std::size_t operator()(StringRef Key) const {
+      return Hasher(std::string_view(Key.data(), Key.size()));
+    }
+  };
+
+  using StorageType =
+      std::unordered_map<StringRef, std::shared_ptr<CommandOptionBase>,
+                         StringRefHasher>;
   StorageType Data;
   OptionsStorage() = default;
 
-  static bool keyFound(const std::string &Key,
-                       const StorageType::value_type &Val) {
-    auto &[Opt, MV] = Val;
-    return MV.count(Key);
-  }
-
-  auto find(StringRef Key) {
-    return find_if(Data, [&](auto &Val) { return keyFound(Key.data(), Val); });
-  }
+  auto find(StringRef Key) { return Data.find(Key); }
 
 public:
   OptionsStorage(const OptionsStorage &) = delete;
@@ -102,16 +106,14 @@ public:
   auto end() const { return Data.end(); }
   auto cbegin() const { return Data.cbegin(); }
   auto cend() const { return Data.cend(); }
-  auto count(const std::string &Key) const {
-    return any_of(Data, [&](auto &Val) { return keyFound(Key, Val); });
-  }
+  auto count(StringRef Key) const { return Data.count(Key); }
   bool empty() const { return Data.empty(); }
   auto size() const { return Data.size(); }
 
-  CommandOptionBase &get(const std::string &Key) {
+  CommandOptionBase &get(StringRef Key) {
     auto Found = find(Key);
     assert(Found != Data.end() && "Unknown key");
-    return *Found->first;
+    return *Found->second;
   }
 
 private:
@@ -123,14 +125,11 @@ private:
   template <typename T> friend class opt_list;
   friend class aliasopt;
 
-  auto insertNewOption(StringRef Key,
-                       std::unique_ptr<CommandOptionBase> &&Val) {
+  auto insertNewOption(StringRef Key, std::shared_ptr<CommandOptionBase> Val) {
     auto Found = find(Key);
     if (Found != end())
       return std::make_pair(Found, false);
-    Data.push_back(
-        {std::move(Val), std::unordered_set<std::string>{Key.str()}});
-    return std::make_pair(std::prev(end()), true);
+    return Data.emplace(std::pair{Key, std::move(Val)});
   }
 
   template <typename T> T &allocateLocation(StringRef Name) {
@@ -141,7 +140,7 @@ private:
       snippy::fatal(Ctx, "Inconsistent options",
                     "Duplicated option name \"" + Twine(Name) + "\"");
     }
-    return static_cast<CommandOption<T> &>(*It->first).Val;
+    return static_cast<CommandOption<T> &>(*It->second).Val;
   }
 
   template <typename T> T &getLocation(StringRef Name) {
@@ -152,7 +151,7 @@ private:
                     "Attempt to get the location of option \"" + Twine(Name) +
                         "\" that does not exist.");
     }
-    return static_cast<CommandOption<T> &>(*Found->first).Val;
+    return static_cast<CommandOption<T> &>(*Found->second).Val;
   }
 };
 
@@ -270,7 +269,7 @@ public:
       snippy::fatal(Ctx, "Inconsistent options",
                     "Alias to unknown option \"" + Twine(Key) + "\"");
     }
-    Found->second.insert(A.ArgStr.str());
+    Options.insertNewOption(A.ArgStr, Found->second);
     cl::aliasopt::apply(A);
   }
 };
