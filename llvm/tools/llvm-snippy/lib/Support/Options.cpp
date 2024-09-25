@@ -34,7 +34,7 @@ void yaml::CustomMappingTraits<OptionsStorage>::inputOne(
 void yaml::CustomMappingTraits<OptionsStorage>::output(
     yaml::IO &IO, OptionsStorage &Options) {
   for (auto &&Base : Options)
-    Base.first->mapStoredValue(IO);
+    Base.second->mapStoredValue(IO);
 }
 void CommandOptionBase::mapStoredValue(yaml::IO &IO,
                                        std::optional<StringRef> Key) {
