@@ -75,17 +75,19 @@ template <typename DataType> struct CommandOption : public CommandOptionBase {
 /// \brief Singleton class that stores CommandOptions by pointer to base class
 class OptionsStorage final {
   struct StringRefHasher {
-    std::hash<std::string_view> Hasher = {};
+    std::hash<std::string_view> Hasher;
     std::size_t operator()(StringRef Key) const {
       return Hasher(std::string_view(Key.data(), Key.size()));
     }
   };
 
+  static_assert(std::is_default_constructible_v<StringRefHasher>);
+
   using StorageType =
       std::unordered_map<StringRef, std::shared_ptr<CommandOptionBase>,
                          StringRefHasher>;
   StorageType Data;
-  OptionsStorage() = default;
+  OptionsStorage(){};
 
   auto find(StringRef Key) { return Data.find(Key); }
 
