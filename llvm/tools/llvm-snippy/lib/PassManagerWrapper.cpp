@@ -6,15 +6,43 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "CFGPrinter.h"
+#include "snippy/CreatePasses.h"
+
 #include "snippy/PassManagerWrapper.h"
 
-#include "llvm/Pass.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/Target/TargetMachine.h"
 
 namespace llvm {
 namespace snippy {
 
-void PassManagerWrapper::add(Pass *P) { PM.add(P); }
+namespace {
+auto lookupPassInfoAndPassArgument(AnalysisID ID) {
+  auto *PI = Pass::lookupPassInfo(ID);
+  std::string PA;
+  if (PI && !PI->isAnalysis())
+    PA = PI->getPassArgument();
+  return std::make_pair(PI, std::move(PA));
+}
+} // namespace
+
+void PassManagerWrapper::add(ImmutablePass *P) { PM.add(P); }
+
+void PassManagerWrapper::add(Pass *P) {
+  assert(P && "Non-null pointer to a pass expected");
+
+  auto [PI, PA] = lookupPassInfoAndPassArgument(P->getPassID());
+
+  if (PI && shouldDumpCFGBeforePass(PA))
+    PM.add(createCFGPrinterPassBefore(*PI, shouldViewCFGBeforePass(PA)));
+
+  PM.add(P);
+
+  if (PI && shouldDumpCFGAfterPass(PA))
+    PM.add(createCFGPrinterPassAfter(*PI, shouldViewCFGAfterPass(PA)));
+}
 
 bool PassManagerWrapper::addAsmPrinter(LLVMTargetMachine &LLVMTM,
                                        raw_pwrite_stream &Out,

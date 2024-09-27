@@ -1,0 +1,34 @@
+# RUN: llvm-snippy %s -num-instrs=100 -march=riscv64-linux-gnu \
+# RUN:   --model-plugin=None --dump-cfg-before-all --cfg-basename=%t -o %t
+# RUN: rm %t_SnippyFunction-cfg-dump-before-snippy-register-reserve.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-cf-generator.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-loop-alignment.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-loop-canonicalization.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-loop-latcher.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-regs-init-insertion.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-block-gen-plan.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-flow-generator.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-prologue-epilogue-insertion.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-fill-external-functions-stubs.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-riscv-expand-pseudo.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-riscv-expand-atomic-pseudo.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-branch-relaxator.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-post-verification.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-inst-postprocess.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-function-distribute.dot
+
+sections:
+  - name:      0
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      1
+    VMA:       0x80002000
+    SIZE:      0x100000
+    LMA:       0x80002000
+    ACCESS:    rw
+
+histogram:
+  - [SUB, 2.0]
+  - [BEQ, 1.0]
