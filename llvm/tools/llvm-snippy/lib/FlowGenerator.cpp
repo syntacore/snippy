@@ -98,10 +98,6 @@ snippy::opt<bool> VerifyConsecutiveLoops(
         "Check that consecutive loops generated accordingly to branchegram."),
     cl::cat(Options), cl::init(false), cl::Hidden);
 
-snippy::opt<bool> DumpFinalCFG("dump-final-cfg",
-                               cl::desc("Dump CFG after all passes."),
-                               cl::cat(Options), cl::init(false), cl::Hidden);
-
 } // namespace snippy
 
 LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(snippy::CallGraphDumpMode,
@@ -411,13 +407,9 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
         if (GenSettings.Cfg.Branches.PermuteCF)
           PM.add(createCFPermutationPass());
 
-        if (GenSettings.DebugConfig.PrintControlFlowGraph)
-          PM.add(createCFGPrinterPass());
         PM.add(createLoopAlignmentPass());
         PM.add(createLoopCanonicalizationPass());
         PM.add(createLoopLatcherPass());
-        if (GenSettings.DebugConfig.PrintControlFlowGraph)
-          PM.add(createCFGPrinterPass());
 
         PM.add(createRegsInitInsertionPass(
             GenSettings.RegistersConfig.InitializeRegs));
@@ -435,8 +427,6 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
         if (GenSettings.DebugConfig.PrintMachineFunctions)
           PM.add(createMachineFunctionPrinterPass(outs()));
 
-        if (GenSettings.DebugConfig.PrintControlFlowGraph)
-          PM.add(createCFGPrinterPass());
         if (GenSettings.DebugConfig.PrintInstrs)
           PM.add(createPrintMachineInstrsPass(outs()));
 
@@ -453,10 +443,12 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
         if (GenSettings.InstrsGenerationConfig.RunMachineInstrVerifier)
           PM.add(createMachineVerifierPass("Machine Verifier Pass report"));
 
+        if (GenSettings.DebugConfig.PrintControlFlowGraph)
+          PM.add(createCFGPrinterPass(
+              GenSettings.DebugConfig.ViewControlFlowGraph));
+
         if (DumpMIR.isSpecified())
           PM.add(createPrintMIRPass(MIROS));
-        if (DumpFinalCFG)
-          PM.add(createCFGPrinterPass());
       },
       [&](PassManagerWrapper &PM) {});
 
