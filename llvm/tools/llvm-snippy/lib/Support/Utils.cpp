@@ -110,5 +110,11 @@ unsigned getAutoSenseRadix(StringRef Str) {
   return 10;
 }
 
+void replaceAllSubstrs(std::string &Str, StringRef What, StringRef With) {
+  for (auto Pos = Str.find(What); std::string::npos != Pos;
+       Pos = Str.find(What, Pos + With.size()))
+    Str.replace(Pos, What.size(), With);
+}
+
 } // namespace snippy
 } // namespace llvm
