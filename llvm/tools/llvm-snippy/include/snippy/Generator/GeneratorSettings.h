@@ -24,6 +24,7 @@ struct DebugOptions {
   bool PrintInstrs;
   bool PrintMachineFunctions;
   bool PrintControlFlowGraph;
+  bool ViewControlFlowGraph;
 };
 
 struct TrackingOptions {

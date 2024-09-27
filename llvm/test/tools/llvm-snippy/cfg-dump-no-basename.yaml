@@ -1,0 +1,19 @@
+# RUN: llvm-snippy %s --num-instrs=100 --march=riscv64-linux-gnu \
+# RUN:   --model-plugin=None --dump-cfg
+# RUN: rm SnippyFunction-cfg-dump.dot
+
+sections:
+  - name:      0
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      1
+    VMA:       0x80002000
+    SIZE:      0x100000
+    LMA:       0x80002000
+    ACCESS:    rw
+
+histogram:
+  - [SUB, 2.0]
+  - [BEQ, 1.0]
