@@ -194,9 +194,15 @@ std::optional<unsigned> getExpectedNumInstrs(StringRef NumAsString) {
   return Value;
 }
 
-static snippy::opt<bool> DumpCFG("dump-cfg",
-                                 cl::desc("[Debug] dump generated CFG"),
+static snippy::opt<bool> DumpCFG("dump-cfg", cl::desc("Dump generated CFG"),
                                  cl::cat(Options));
+
+static snippy::opt<bool> ViewCFG("view-cfg", cl::desc("View generated CFG"),
+                                 cl::cat(Options),
+                                 cl::callback([](const bool &V) {
+                                   if (V)
+                                     DumpCFG = true;
+                                 }));
 
 static snippy::opt<bool> DumpMF(
     "dump-mf",
@@ -1106,7 +1112,7 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
   return GeneratorSettings(
       ABI, OutputFilename,
       TrackingOptions{Backtrack, SelfCheckPeriod, AddressVHOpt},
-      DebugOptions{DumpMI, DumpMF, DumpCFG},
+      DebugOptions{DumpMI, DumpMF, DumpCFG, ViewCFG},
       LinkerOptions{ExternalStackOpt, MangleExportedNames,
                     std::move(EntryPointName.getValue())},
       ModelPluginOptions{RunOnModel, std::move(Models)},

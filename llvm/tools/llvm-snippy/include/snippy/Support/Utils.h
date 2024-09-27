@@ -276,6 +276,8 @@ auto transformOpt(const std::optional<T> &O, Func &&F)
 
 unsigned getAutoSenseRadix(StringRef Str);
 
+void replaceAllSubstrs(std::string &Str, StringRef What, StringRef With);
+
 } // namespace snippy
 } // namespace llvm
 

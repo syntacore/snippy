@@ -32,7 +32,7 @@ set(LLVMSnippySources
   BlockGenPlanningPass.cpp
   BlockGenPlanWrapperPass.cpp
   CFGeneratorPass.cpp
-  CFGPrinterPass.cpp
+  CFGPrinter.cpp
   CFPermutationPass.cpp
   ConsecutiveLoopsVerifierPass.cpp
   FillExternalFunctionsStubsPass.cpp
