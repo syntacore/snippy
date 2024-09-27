@@ -14,9 +14,10 @@
 
 namespace llvm {
 
+class ImmutablePass;
 class LLVMTargetMachine;
-class raw_pwrite_stream;
 class MCContext;
+class raw_pwrite_stream;
 
 namespace snippy {
 
@@ -25,6 +26,7 @@ class PassManagerWrapper final {
 
 public:
   void add(Pass *P);
+  void add(ImmutablePass *P);
   bool addAsmPrinter(LLVMTargetMachine &LLVMTM, raw_pwrite_stream &Out,
                      raw_pwrite_stream *DwoOut, CodeGenFileType FileType,
                      MCContext &Context);

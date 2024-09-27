@@ -17,7 +17,9 @@ class ImmutablePass;
 class ModulePass;
 class MachineFunctionPass;
 class MachineModuleInfo;
+class PassInfo;
 class raw_ostream;
+class Twine;
 
 namespace snippy {
 
@@ -52,7 +54,11 @@ MachineFunctionPass *createLoopCanonicalizationPass();
 
 MachineFunctionPass *createLoopLatcherPass();
 
-MachineFunctionPass *createCFGPrinterPass();
+MachineFunctionPass *createCFGPrinterPass(bool EnableView);
+MachineFunctionPass *createCFGPrinterPassBefore(const PassInfo &PI,
+                                                bool EnableView);
+MachineFunctionPass *createCFGPrinterPassAfter(const PassInfo &PI,
+                                               bool EnableView);
 
 MachineFunctionPass *createInstructionGeneratorPass();
 
