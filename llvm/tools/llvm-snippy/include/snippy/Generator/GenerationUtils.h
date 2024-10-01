@@ -82,6 +82,8 @@ MachineBasicBlock::iterator processGeneratedInstructions(
 MachineBasicBlock *createMachineBasicBlock(MachineFunction &MF,
                                            GeneratorContext &GC);
 
+std::string getMBBSectionName(const MachineBasicBlock &MBB);
+
 } // namespace snippy
 } // namespace llvm
 #endif

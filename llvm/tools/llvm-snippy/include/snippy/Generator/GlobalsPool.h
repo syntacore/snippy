@@ -30,9 +30,11 @@ public:
       : SectionAddr(SectionAddr), SectionName(SectionName), MaxSize(MaxSize),
         State(State), M(M), Prepend(Prepend){};
 
-  const GlobalVariable *getGV(StringRef Name) { return M.getNamedGlobal(Name); }
+  GlobalVariable *getGV(StringRef Name) {
+    return M.getNamedGlobal(Prepend + Name.str());
+  }
 
-  const GlobalVariable *
+  GlobalVariable *
   createGV(const APInt &Init, unsigned Alignment = 1u,
            GlobalValue::LinkageTypes Linkage = GlobalValue::InternalLinkage,
            StringRef Name = "global", StringRef Reason = "",
@@ -52,7 +54,7 @@ public:
                         Reason);
     std::string FinalName = (Prepend + Name).str();
     auto GVAlign = MaybeAlign(Alignment);
-    auto NewGV =
+    auto *NewGV =
         State.createGlobalConstant(M, Init, Linkage, FinalName, IsConstant);
     NewGV->setAlignment(GVAlign);
     if (!SectionName.empty())
@@ -60,7 +62,7 @@ public:
     return GVs.emplace(NewGV, Offset).first->first;
   }
 
-  uint64_t getGVAddress(const GlobalVariable *GV) const {
+  uint64_t getGVAddress(GlobalVariable *GV) const {
     assert(GVs.count(GV) && "GV is unregistered");
     return GVs.at(GV) + SectionAddr;
   }
@@ -71,7 +73,7 @@ public:
 
 private:
   // Map GV to their address offset
-  std::unordered_map<const GlobalVariable *, unsigned> GVs;
+  std::unordered_map<GlobalVariable *, unsigned> GVs;
   const uint64_t SectionAddr;
   std::string SectionName;
   uint64_t TotalSize = 0ull;

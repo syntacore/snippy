@@ -1437,7 +1437,7 @@ public:
     auto *OldDestBB = getBranchDestination(Branch);
     if (OldDestBB == &NewDestMBB)
       return false;
-
+    assert(Branch.getNumExplicitOperands() >= 1);
     auto DestBBOpNum = Branch.getNumExplicitOperands() - 1;
     Branch.removeOperand(DestBBOpNum);
 
@@ -1445,7 +1445,7 @@ public:
     Branch.addOperand(NewDestOperand);
 
     auto *BranchBB = Branch.getParent();
-
+    assert(BranchBB);
     if (Branch.isConditionalBranch()) {
       auto &FallbackBranch = *Branch.getNextNode();
       assert(FallbackBranch.isBranch());
@@ -2947,7 +2947,7 @@ void SnippyRISCVTarget::writeValueToFPReg(MachineBasicBlock &MBB,
 
   if (InitFRegsFromMemory) {
     auto &GP = GC.getGlobalsPool();
-    const auto *GV = GP.createGV(
+    auto *GV = GP.createGV(
         Value, /* Alignment */ NumBits,
         /* Linkage */ GlobalValue::InternalLinkage,
         /* Name */ "global",
@@ -3044,7 +3044,7 @@ void SnippyRISCVTarget::rvvWriteValue(MachineBasicBlock &MBB,
 
   assert(GC.getSubtarget<RISCVSubtarget>().hasStdExtV());
   auto &GP = GC.getGlobalsPool();
-  const auto *GV =
+  auto *GV =
       GP.createGV(Value, /* Alignment */ Reg16Bytes,
                   /* Linkage */ GlobalValue::InternalLinkage,
                   /* Name */ "global",
