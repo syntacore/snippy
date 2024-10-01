@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Config/RegisterHistogram.h"
+#include "snippy/Support/APIntSampler.h"
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/RandUtil.h"
 #include "snippy/Support/Utils.h"
@@ -20,6 +21,20 @@
 
 namespace llvm {
 namespace snippy {
+
+static Expected<APInt>
+getValueFromHistogramPattern(ValuegramEntry::EntryKind Pattern,
+                             unsigned NumBits) {
+  switch (Pattern) {
+  case ValuegramEntry::EntryKind::Uniform:
+    return UniformAPIntSamler::generate(NumBits);
+  case ValuegramEntry::EntryKind::BitPattern:
+    return BitPatternAPIntSamler::generate(NumBits);
+  default:
+    return createStringError(std::make_error_code(std::errc::invalid_argument),
+                             "Not a histogram pattern");
+  }
+}
 
 static void getFixedRegisterValues(const RegistersWithHistograms &RH,
                                    size_t ExpectedNumber, StringRef Prefix,
@@ -45,6 +60,7 @@ static void getFixedRegisterValues(const RegistersWithHistograms &RH,
   // NOTE: for now we require that either all registers are present or none of
   // them are. This may be changed in future
   if (ExpectedNumber != NumFound)
+    // FIXME: Get rid of report_fatal_error and propagate errors cleanly.
     report_fatal_error("Unexpected number of registers found in for \"" +
                            Prefix + "\" group expecting " +
                            Twine(ExpectedNumber) + ", got " + Twine(NumFound),
@@ -53,32 +69,6 @@ static void getFixedRegisterValues(const RegistersWithHistograms &RH,
   Result.resize(NumFound);
   std::transform(First, Last, Result.begin(),
                  [&](const APInt &Value) { return Value.zext(NumBits); });
-}
-
-static APInt generateBitPattern(unsigned NumBits) {
-  auto Result = APInt::getZero(NumBits);
-  auto Stride = RandEngine::genInRange<unsigned>(1, NumBits);
-  auto Idx = RandEngine::genInInterval<unsigned>(0, Stride);
-  while (Idx < NumBits) {
-    Result.insertBits(1, Idx, 1);
-    Idx += Stride;
-  }
-  if (RandEngine::genInRange(0, 1))
-    return ~Result;
-  return Result;
-}
-
-static APInt getValueFromHistogramPattern(ValuegramEntry::EntryKind Kind,
-                                          unsigned NumBits) {
-  using EntryKind = ValuegramEntry::EntryKind;
-  switch (Kind) {
-  case EntryKind::Uniform:
-    return RandEngine::genAPInt(NumBits);
-  case EntryKind::BitPattern:
-    return generateBitPattern(NumBits);
-  default:
-    llvm_unreachable("Invalid EntryKind for a valuegram pattern");
-  }
 }
 
 static void sampleHistogramForRegType(const RegistersWithHistograms &RH,
@@ -130,8 +120,14 @@ static void sampleHistogramForRegType(const RegistersWithHistograms &RH,
       return Value.zextOrTrunc(NumBits);
     }
     case EntryKind::BitPattern:
-    case EntryKind::Uniform:
-      return getValueFromHistogramPattern(Kind, NumBits);
+    case EntryKind::Uniform: {
+      APInt Val;
+      if (Error E = getValueFromHistogramPattern(Kind, NumBits).moveInto(Val)) {
+        LLVMContext Ctx;
+        snippy::fatal(Ctx, "Failed to sample register histogram", std::move(E));
+      }
+      return Val;
+    }
     default:
       llvm_unreachable("Unhandled register value histogram entry variant");
     }

@@ -1,4 +1,5 @@
-add_llvm_library(LLVMSnippySupport
+add_llvm_library(
+  LLVMSnippySupport
   DISABLE_LLVM_LINK_LLVM_DYLIB
   STATIC
   DiagnosticInfo.cpp
@@ -9,4 +10,4 @@ add_llvm_library(LLVMSnippySupport
   RandUtil.cpp
   Utils.cpp
   YAMLUtils.cpp
-)
+  APIntSampler.cpp)

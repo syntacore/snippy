@@ -460,7 +460,6 @@ configureLinkerSections(LLVMContext &Ctx, Linker &L,
       L.sections().getOutputSectionFor(Linker::kDefaultTextSectionName);
   std::vector<Linker::SectionEntry> ExecutionPath;
   if (Settings.InstrsGenerationConfig.ChainedRXSectionsFill)
-
     for (auto &RXSection : llvm::make_filter_range(L.sections(), [](auto &S) {
            return S.OutputSection.Desc.M.X();
          })) {
@@ -609,7 +608,15 @@ GeneratorContext::GeneratorContext(SnippyProgramContext &ProgContext,
       ExecutionPath(
           snippy::configureLinkerSections(ProgContext.getLLVMState().getCtx(),
                                           ProgContext.getLinker(), Settings)),
-      GenSettings(&Settings), ImmHistMap([&Settings, &ProgContext] {
+      GenSettings(&Settings),
+      FloatOverwriteSamplers(
+          [&]() -> std::optional<FloatSemanticsSamplerHolder> {
+            if (const auto &FPUConfig = GenSettings->Cfg.FPUConfig;
+                FPUConfig.has_value() && FPUConfig->Overwrite.has_value())
+              return FloatSemanticsSamplerHolder(*FPUConfig->Overwrite);
+            return std::nullopt;
+          }()),
+      ImmHistMap([&] {
         const auto &ImmHist = Settings.Cfg.ImmHistogram;
         if (ImmHist.holdsAlternative<ImmediateHistogramRegEx>())
           return OpcodeToImmHistSequenceMap(
