@@ -17,10 +17,6 @@
 
 namespace llvm {
 
-static void burrowError(Error E) {
-  handleAllErrors(std::move(E), [](const ErrorInfoBase &EI) {});
-}
-
 using EntryKind = snippy::IValuegramEntry::EntryKind;
 
 void yaml::ScalarEnumerationTraits<snippy::IValuegramEntry::EntryKind>::
@@ -29,6 +25,7 @@ void yaml::ScalarEnumerationTraits<snippy::IValuegramEntry::EntryKind>::
   Io.enumCase(Kind, "bitpattern", EntryKind::BitPattern);
   Io.enumCase(Kind, "uniform", EntryKind::Uniform);
   Io.enumCase(Kind, "bitvalue", EntryKind::BitValue);
+  Io.enumCase(Kind, "bitrange", EntryKind::BitRange);
 }
 
 void yaml::MappingTraits<const snippy::detail::ValuegramEntryMapMapper>::
@@ -48,7 +45,7 @@ void yaml::MappingTraits<const snippy::detail::ValuegramEntryMapMapper>::
     if (Error E = snippy::ValuegramEntry::create(Kind).moveInto(EntryRef)) {
       // NOTE: Need to consume Error to make error handling happy. We don't
       // actually need this message to give a nice diagnostic.
-      burrowError(std::move(E));
+      snippy::burrowError(std::move(E));
       return;
     }
 
@@ -66,9 +63,7 @@ yaml::MappingTraits<const snippy::detail::ValuegramEntryMapMapper>::validate(
 
 yaml::NodeKind yaml::PolymorphicTraits<snippy::ValuegramEntry>::getKind(
     const snippy::ValuegramEntry &Entry) {
-  if (isa<snippy::IValuegramMapEntry>(Entry.get()))
-    return NodeKind::Map;
-  llvm_unreachable("Unknown value kind in ValuegramEntry");
+  return NodeKind::Map;
 }
 
 const snippy::detail::ValuegramEntryScalarMapper
@@ -124,7 +119,7 @@ yaml::ScalarTraits<snippy::APIntWithSign>::input(StringRef Input, void *,
     // NOTE: Unfortunately here we can't diagnose the exact error message,
     // without reimplementing fromString logic completely. ::input method
     // return a non-owning StringRef, which can't take the error message.
-    burrowError(std::move(E));
+    snippy::burrowError(std::move(E));
     return "Invalid number";
   }
   return {};
@@ -158,7 +153,7 @@ Expected<APIntWithSign> APIntWithSign::fromString(StringRef StrView) {
   };
 
   if (StrView.empty())
-    return ReportError("Histogram entry value empty");
+    return ReportError("Empty string is not a valid number");
 
   // We remove minus because StringRef::getAsInteger method overload for APInt
   // doesn't handle the minus.
@@ -167,15 +162,15 @@ Expected<APIntWithSign> APIntWithSign::fromString(StringRef StrView) {
 
   if (IsSigned && getAutoSenseRadix(StrView) != 10)
     return ReportError(
-        Twine("Histogram entry value ")
+        Twine("Value '")
             .concat(OriginalStr)
-            .concat(" is negative, but the radix is not equal to 10"));
+            .concat("' is negative, but the radix is not equal to 10"));
 
   auto ParseFailed = StrView.getAsInteger(0, Value);
   if (ParseFailed)
-    return ReportError(Twine("Histogram entry value ")
+    return ReportError(Twine("Value '")
                            .concat(OriginalStr)
-                           .concat(" is not an integer or a valid pattern"));
+                           .concat("' is not a valid integer"));
 
   if (!IsSigned)
     return ValueWithSign;
@@ -191,23 +186,47 @@ void ValuegramBitValueEntry::mapYamlImpl(yaml::IO &Io) {
   Io.mapRequired("value", ValWithSign);
 }
 
+void ValuegramBitRangeEntry::mapYamlImpl(yaml::IO &Io) {
+  auto MapUnsignedAPInt = [&](const char *Key, APInt &Val) {
+    struct APIntBitsMapperHelper {
+      APIntBitsMapperHelper(yaml::IO &Io) {}
+      APIntBitsMapperHelper(yaml::IO &Io, APInt Val)
+          : ValWithSign{std::move(Val), /*IsSigned=*/false} {}
+      APInt denormalize(yaml::IO &Io) {
+        if (ValWithSign.IsSigned)
+          Io.setError("Value can't be negative");
+        return ValWithSign.Value;
+      }
+      APIntWithSign ValWithSign;
+    };
+
+    yaml::MappingNormalization<APIntBitsMapperHelper, APInt> NormAPInt(Io, Val);
+    Io.mapRequired(Key, NormAPInt->ValWithSign);
+  };
+
+  MapUnsignedAPInt("min", Min);
+  MapUnsignedAPInt("max", Max);
+}
+
 static std::optional<EntryKind>
 getValuegramSequenceEntryKind(StringRef ParseStr) {
   if (ParseStr == "uniform")
-    return EntryKind::Uniform;
+    return ValuegramPattern::Uniform;
   if (ParseStr == "bitpattern")
-    return EntryKind::BitPattern;
+    return ValuegramPattern::BitPattern;
   return std::nullopt;
 }
 
-static StringRef toString(EntryKind Kind) {
+StringRef toString(EntryKind Kind) {
   switch (Kind) {
-  case EntryKind::Uniform:
+  case ValuegramPattern::Uniform:
     return "uniform";
-  case EntryKind::BitPattern:
+  case ValuegramPattern::BitPattern:
     return "bitpattern";
   case EntryKind::BitValue:
     return "bitvalue";
+  case EntryKind::BitRange:
+    return "bitrange";
   case EntryKind::MapEntry:
   case EntryKind::HelperSentinel:
     return "<internal>";
@@ -218,9 +237,9 @@ static StringRef toString(EntryKind Kind) {
 Expected<std::unique_ptr<IValuegramEntry>>
 createValuegramSequenceEntry(IValuegramEntry::EntryKind Kind) {
   switch (Kind) {
-  case EntryKind::BitPattern:
+  case ValuegramPattern::BitPattern:
     return std::make_unique<ValuegramBitpatternEntry>();
-  case EntryKind::Uniform:
+  case ValuegramPattern::Uniform:
     return std::make_unique<ValuegramUniformEntry>();
   case EntryKind::BitValue:
     return std::make_unique<ValuegramBitValueEntry>();
@@ -278,8 +297,8 @@ void YAMLHistogramTraits<std::unique_ptr<IValuegramEntry>>::normalizeEntry(
                                       /*UpperCase=*/false);
       return SmallStr.str().str();
     }
-    case EntryKind::BitPattern:
-    case EntryKind::Uniform:
+    case ValuegramPattern::BitPattern:
+    case ValuegramPattern::Uniform:
       return toString(Kind).str();
     default:
       llvm_unreachable("IValuegramSeqEntry is of unexpected type");
@@ -303,6 +322,8 @@ Expected<ValuegramEntry> ValuegramEntry::create(EntryKind Kind) {
     return ValuegramEntry{std::make_unique<ValuegramUniformEntry>()};
   case EntryKind::BitValue:
     return ValuegramEntry{std::make_unique<ValuegramBitValueEntry>()};
+  case EntryKind::BitRange:
+    return ValuegramEntry{std::make_unique<ValuegramBitRangeEntry>()};
   default:
     return createStringError(
         std::make_error_code(std::errc::invalid_argument),
@@ -319,9 +340,10 @@ ValuegramEntry::create(std::unique_ptr<IValuegramEntry> Owning) {
 
   auto Kind = Owning->getKind();
   switch (Kind) {
-  case EntryKind::BitPattern:
-  case EntryKind::Uniform:
+  case ValuegramPattern::BitPattern:
+  case ValuegramPattern::Uniform:
   case EntryKind::BitValue:
+  case EntryKind::BitRange:
     return ValuegramEntry{std::move(Owning)};
   default:
     return createStringError(

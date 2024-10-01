@@ -9,8 +9,9 @@
 #ifndef LLVM_TOOLS_SNIPPY_LIB_SERDES_UTILS_H
 #define LLVM_TOOLS_SNIPPY_LIB_SERDES_UTILS_H
 
-#include "ImmediateHistogram.h"
-#include "RegisterHistogram.h"
+#include "snippy/Config/ImmediateHistogram.h"
+#include "snippy/Config/RegisterHistogram.h"
+#include "snippy/Support/YAMLUtils.h"
 
 #include "llvm/ADT/APFloat.h"
 

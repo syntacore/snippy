@@ -977,12 +977,7 @@ static void checkFPUSettings(Config &Cfg, LLVMContext &Ctx,
   auto &FPUConfig = *Cfg.FPUConfig;
   if (FPUConfig.Overwrite)
     return;
-  static constexpr int Min = -1000;
-  static constexpr int Max = 1000;
-  snippy::notice(WarningName::NotAWarning, Ctx,
-                 "Float override range was not specified",
-                 "Using range: [" + Twine(Min) + ", " + Twine(Max) + "]");
-  FPUConfig.Overwrite = FloatOverwriteSettings{FloatOverwriteRange{-Min, Max}};
+  FPUConfig.Overwrite = FloatOverwriteSettings{};
 }
 
 // Function to do all the necessary operations on Config after reading it

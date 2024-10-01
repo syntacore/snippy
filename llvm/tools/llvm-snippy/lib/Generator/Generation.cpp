@@ -241,19 +241,57 @@ struct GenerationResult {
 
 static void unNaNRegister(planning::InstructionGenerationContext &InstrGenCtx,
                           MCRegister Reg) {
-  // TODO: More interesting number generation
   auto &GC = InstrGenCtx.GC;
+  const auto &Tgt = GC.getLLVMState().getSnippyTarget();
+
   auto &Cfg = GC.getConfig();
   assert(Cfg.FPUConfig);
   auto &OverwriteCfg = Cfg.FPUConfig->Overwrite;
   assert(OverwriteCfg);
-  double NewValue = RandEngine::genInInterval(OverwriteCfg->Range.Min,
-                                              OverwriteCfg->Range.Max);
-  const auto &Tgt = GC.getLLVMState().getSnippyTarget();
-  auto ValueToWrite = APFloat(NewValue).bitcastToAPInt();
+
+  auto &SelectedSemantics = [&]() -> const fltSemantics & {
+    const auto &MCRegInfo = GC.getLLVMState().getRegInfo();
+    const auto *MCRegClass =
+        find_if(MCRegInfo.regclasses(),
+                [Reg](const auto &RegClass) { return RegClass.contains(Reg); });
+    assert(MCRegClass != MCRegInfo.regclass_end());
+    auto RegBitWidth = MCRegClass->getSizeInBits();
+    assert(RegBitWidth);
+
+    // (TODO): Some further work should be done to select the correct semantics
+    // from MCRegister. For now snippy supports only IEEE formats.
+    const auto AvailableSemantics = std::array<const fltSemantics *, 3>{
+        &APFloat::IEEEhalf(), &APFloat::IEEEsingle(), &APFloat::IEEEdouble()};
+
+    if (auto FoundIt = find_if(AvailableSemantics,
+                               [&](const fltSemantics *Semantics) {
+                                 return RegBitWidth ==
+                                        APFloat::getSizeInBits(*Semantics);
+                               });
+        FoundIt != AvailableSemantics.end())
+      return **FoundIt;
+
+    snippy::fatal(
+        GC.getLLVMState().getCtx(), "Internal error",
+        Twine(
+            "Failed to select floating-point semantics for register of width ")
+            .concat(Twine(RegBitWidth)));
+
+    // snippy::fatal is not marked [[noreturn]], since in theory it might not
+    // call exit, so we return a value in all paths.
+    return APFloat::Bogus();
+  }();
+
+  Expected<APInt> ValueToWriteOrErr =
+      GC.getOrCreateFloatOverwriteValueSampler(SelectedSemantics).sample();
+
+  if (auto Err = ValueToWriteOrErr.takeError())
+    snippy::fatal(GC.getLLVMState().getCtx(), "Internal error", std::move(Err));
+
   auto RP = GC.getRegisterPool();
-  Tgt.writeValueToReg(InstrGenCtx.MBB, InstrGenCtx.Ins, ValueToWrite, Reg, RP,
-                      GC);
+  Tgt.writeValueToReg(InstrGenCtx.MBB, InstrGenCtx.Ins, *ValueToWriteOrErr, Reg,
+                      RP, GC);
+
   InstrGenCtx.PotentialNaNs.erase(Reg);
 }
 
@@ -321,9 +359,10 @@ static bool shouldRewriteRegValue(
     return allInputOperandsArePotentialNaNs(MI, InstrGenCtx);
   case FloatOverwriteMode::IF_ANY_OPERAND:
     return anyOfInputOperandsIsPotentiallyNaN(MI, InstrGenCtx);
-  default:
-    llvm_unreachable("Unknown float overwrite heuristic");
+  case FloatOverwriteMode::DISABLED:
+    return false;
   }
+  llvm_unreachable("Unknown float overwrite heuristic");
 }
 
 static bool hasFRegDestination(const MachineInstr &MI,
@@ -335,7 +374,7 @@ static bool hasFRegDestination(const MachineInstr &MI,
 }
 
 template <typename InstrIt>
-void controllNaNPropagation(
+void controlNaNPropagation(
     InstrIt Begin, InstrIt End,
     planning::InstructionGenerationContext &InstrGenCtx) {
   auto &GC = InstrGenCtx.GC;
@@ -380,7 +419,7 @@ handleGeneratedInstructions(InstrIt ItBegin,
   if (sizeLimitIsReached(Limit, InstrGenCtx.Stats, GeneratedCodeSize))
     return ReportGenerationResult(GenerationStatus::SizeFailed);
 
-  controllNaNPropagation(ItBegin, ItEnd, InstrGenCtx);
+  controlNaNPropagation(ItBegin, ItEnd, InstrGenCtx);
 
   if (!GC.hasTrackingMode())
     return ReportGenerationResult(GenerationStatus::Ok);
