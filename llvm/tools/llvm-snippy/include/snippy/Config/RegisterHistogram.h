@@ -14,7 +14,6 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
 
-#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -32,6 +31,7 @@ struct RegisterValues {
 };
 
 struct RegisterClassHistogram {
+  bool isEmpty() const { return TheValuegram.empty(); }
   std::string RegType;
   Valuegram TheValuegram;
 };

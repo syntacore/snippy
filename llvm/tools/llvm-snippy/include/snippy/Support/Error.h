@@ -34,5 +34,9 @@ public:
                 RegInfo.getRegClassName(&RegClass) + ": " + Msg) {}
 };
 
+inline void burrowError(Error E) {
+  handleAllErrors(std::move(E), [](const ErrorInfoBase &EI) {});
+}
+
 } // namespace snippy
 } // namespace llvm

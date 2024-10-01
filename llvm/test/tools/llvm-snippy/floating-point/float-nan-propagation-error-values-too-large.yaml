@@ -1,0 +1,18 @@
+# RUN: not llvm-snippy %s --model-plugin None |& FileCheck %s
+
+include:
+  - ../Inputs/sections.yaml
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  mattr: "+f,-d"
+  num-instrs: 10
+fpu-config:
+  overwrite:
+    ieee-single:
+      valuegram:
+        - [0xffffffffffffffff, 1.0]
+histogram:
+  - [FMUL_S, 1.0]
+
+# CHECK: float-nan-propagation-error-values-too-large.yaml:12:5: error: '0xffffffffffffffff' is too wide to fit in 32 bits

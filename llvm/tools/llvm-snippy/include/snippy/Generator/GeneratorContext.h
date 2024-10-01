@@ -9,6 +9,7 @@
 #pragma once
 
 #include "snippy/Config/CallGraphLayout.h"
+#include "snippy/Config/FPUSettings.h"
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Generator/BurstMode.h"
@@ -112,6 +113,8 @@ private:
   const MachineBasicBlock *RegsInitBlock = nullptr;
 
   DenseMap<const MachineBasicBlock *, LoopGenerationInfo> LoopInfoMap;
+
+  std::optional<FloatSemanticsSamplerHolder> FloatOverwriteSamplers;
 
   void diagnoseSelfcheckSection(size_t MinSize) const;
 
@@ -619,6 +622,19 @@ public:
 
   bool isRegsInitBlock(const MachineBasicBlock *MBB) const {
     return RegsInitBlock == MBB;
+  }
+
+  // (FIXME): This should be moved to a less global context, when
+  // GeneratorContext is finally split into more manageable pieces.
+  IAPIntSampler &
+  getOrCreateFloatOverwriteValueSampler(const fltSemantics &Semantics) {
+    auto &FPUCfg = GenSettings->Cfg.FPUConfig;
+    assert(FPUCfg && FPUCfg->Overwrite);
+    assert(FloatOverwriteSamplers.has_value());
+    auto SamplerRefOrErr = FloatOverwriteSamplers->getSamplerFor(Semantics);
+    if (auto Err = SamplerRefOrErr.takeError())
+      snippy::fatal(getLLVMState().getCtx(), "Internal error", std::move(Err));
+    return *SamplerRefOrErr;
   }
 };
 
