@@ -1,0 +1,135 @@
+# RUN: llvm-snippy %s --model-plugin None |& FileCheck %s
+
+include:
+  - ../Inputs/sections.yaml
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  mattr: "+d"
+  num-instrs: 10000
+fpu-config:
+  overwrite:
+    range:
+      min: -9223372036854775808
+      max: 9223372036854775807
+      weight: 1.0
+      rounding-mode: rup
+    ieee-single:
+      valuegram:
+        - [0x7f800000, 1.0]
+        - [0xff800000, 1.0]
+        - [0x00000000, 1.0]
+        - [0x80000000, 1.0]
+        - [0x7fc00000, 1.0]
+        - [0x007fffff, 1.0]
+        - [0x00000001, 1.0]
+        - [0x807fffff, 1.0]
+        - [0x80000001, 1.0]
+        - [0x7f7fffff, 1.0]
+        - [0x00800000, 1.0]
+        - [0xff7fffff, 1.0]
+        - [0x80800000, 1.0]
+        - type: bitrange
+          min: 0x00800000
+          max: 0x7f7fffff
+        - type: bitrange
+          min: 0x80800000
+          max: 0xff7fffff
+        - type: bitrange
+          min: 0x00000001
+          max: 0x007fffff
+        - type: bitrange
+          min: 0x80000001
+          max: 0x807fffff
+    ieee-double:
+      valuegram:
+        - [0x7ff0000000000000, 1.0]
+        - [0xfff0000000000000, 1.0]
+        - [0x0000000000000000, 1.0]
+        - [0x8000000000000000, 1.0]
+        - [0x7ff8000000000000, 1.0]
+        - [0x000fffffffffffff, 1.0]
+        - [0x0000000000000001, 1.0]
+        - [0x800fffffffffffff, 1.0]
+        - [0x8000000000000001, 1.0]
+        - [0x7fefffffffffffff, 1.0]
+        - [0x0010000000000000, 1.0]
+        - [0xffefffffffffffff, 1.0]
+        - [0x8010000000000000, 1.0]
+        - type: bitrange
+          min: 0x8000000000000001
+          max: 0x800fffffffffffff
+        - type: bitrange
+          min: 0x0000000000000001
+          max: 0x000fffffffffffff
+        - type: bitrange
+          min: 0x8010000000000000
+          max: 0xffefffffffffffff
+        - type: bitrange
+          min: 0x0010000000000000
+          max: 0x7fefffffffffffff
+histogram:
+  - [FMADD_S, 1.0]
+  - [FMSUB_S, 1.0]
+  - [FNMSUB_S, 1.0]
+  - [FNMADD_S, 1.0]
+  - [FADD_S, 1.0]
+  - [FSUB_S, 1.0]
+  - [FMUL_S, 1.0]
+  - [FDIV_S, 1.0]
+  - [FSQRT_S, 1.0]
+  - [FSGNJ_S, 1.0]
+  - [FSGNJN_S, 1.0]
+  - [FSGNJX_S, 1.0]
+  - [FMIN_S, 1.0]
+  - [FMAX_S, 1.0]
+  - [FCVT_W_S, 1.0]
+  - [FCVT_WU_S, 1.0]
+  - [FMV_X_W, 1.0]
+  - [FEQ_S, 1.0]
+  - [FLT_S, 1.0]
+  - [FLE_S, 1.0]
+  - [FCLASS_S, 1.0]
+  - [FCVT_S_W, 1.0]
+  - [FCVT_S_WU, 1.0]
+  - [FMV_W_X, 1.0]
+  - [FCVT_L_S, 1.0]
+  - [FCVT_LU_S, 1.0]
+  - [FCVT_S_L, 1.0]
+  - [FCVT_S_LU, 1.0]
+  - [FLW, 1.0]
+  - [FSW, 1.0]
+  - [FMADD_D, 1.0]
+  - [FMSUB_D, 1.0]
+  - [FNMSUB_D, 1.0]
+  - [FNMADD_D, 1.0]
+  - [FADD_D, 1.0]
+  - [FSUB_D, 1.0]
+  - [FMUL_D, 1.0]
+  - [FDIV_D, 1.0]
+  - [FSQRT_D, 1.0]
+  - [FSGNJ_D, 1.0]
+  - [FSGNJN_D, 1.0]
+  - [FSGNJX_D, 1.0]
+  - [FMIN_D, 1.0]
+  - [FMAX_D, 1.0]
+  - [FCVT_W_D, 1.0]
+  - [FCVT_WU_D, 1.0]
+  - [FCVT_D_W, 1.0]
+  - [FCVT_D_WU, 1.0]
+  - [FMV_X_D, 1.0]
+  - [FEQ_D, 1.0]
+  - [FLT_D, 1.0]
+  - [FLE_D, 1.0]
+  - [FCLASS_D, 1.0]
+  - [FMV_D_X, 1.0]
+  - [FCVT_L_D, 1.0]
+  - [FCVT_LU_D, 1.0]
+  - [FCVT_D_L, 1.0]
+  - [FCVT_D_LU, 1.0]
+  - [FCVT_S_D, 1.0]
+  - [FCVT_D_S, 1.0]
+  - [FLD, 1.0]
+  - [FSD, 1.0]
+
+# CHECK-NOT: error

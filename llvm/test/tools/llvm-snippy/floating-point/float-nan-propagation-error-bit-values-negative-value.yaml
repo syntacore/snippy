@@ -1,0 +1,19 @@
+# RUN: not llvm-snippy %s --model-plugin None |& FileCheck %s
+
+include:
+  - ../Inputs/sections.yaml
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  mattr: "+d"
+  num-instrs: 10
+fpu-config:
+  overwrite:
+    ieee-double:
+      valuegram:
+        - type: bitvalue
+          value: -1
+histogram:
+  - [FADD_D, 1.0]
+
+# CHECK: float-nan-propagation-error-bit-values-negative-value.yaml:13:7: error: Negative values are not allowed in a valuegram

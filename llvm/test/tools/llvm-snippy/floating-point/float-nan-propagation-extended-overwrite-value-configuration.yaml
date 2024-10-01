@@ -1,0 +1,36 @@
+# RUN: llvm-snippy %s --model-plugin None | FileCheck %s
+
+include:
+  - ../Inputs/sections.yaml
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  mattr: "+d"
+  num-instrs: 100
+  dump-mf: true
+fpu-config:
+  overwrite:
+    ieee-double:
+      valuegram:
+        - [0x000fffffffffffff, 1.0]
+        - [0x8010000000000000, 1.0]
+        - [0x7ff0000000000000, 1.0]
+        - [uniform, 1.0]
+        - [bitpattern, 1.0]
+        - type: bitrange
+          min: 0x8000000000000001
+          max: 0x800fffffffffffff
+          weight: 1.0
+    range:
+      min: 0x00000000
+      max: 0x0fffffff
+      weight: 2.0
+histogram:
+  - [FMUL_D, 1.0]
+
+# regex to match the following code:
+# REG = FMUL_D ...
+# ... ADDI ...
+# ... SLLI ...
+# REG = FMV_D_X
+# CHECK: [[REG:\$f[[:digit:]]+_d]] = FMUL_D {{.*([[:space:]]+).*ADDI.*([[:space:]]+).*SLLI.*([[:space:]]+)}} [[REG]] = FMV_D_X

@@ -1,0 +1,19 @@
+# RUN: not llvm-snippy %s --model-plugin None |& FileCheck %s
+
+include:
+  - ../Inputs/sections.yaml
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  mattr: "+d"
+  num-instrs: 10
+fpu-config:
+  overwrite:
+    range:
+      min: 0
+      max: 0
+      rounding-mode: really-not-a-rounding-mode
+histogram:
+  - [ADDI, 1.0]
+
+# CHECK: float-nan-propagation-error-integral-range-rounding-mode.yaml:15:22: error: unknown enumerated scalar
