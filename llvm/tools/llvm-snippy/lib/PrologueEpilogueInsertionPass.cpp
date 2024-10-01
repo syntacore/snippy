@@ -319,7 +319,6 @@ bool PrologueEpilogueInsertion::insertPrologue(
   if (!IsEntry)
     return true;
   SGCtx.setEntryPrologueInstructionCount(std::distance(MBB->begin(), Ins));
-
   // For entry also check that function still fits assigned section
   // after prologue insertion
   auto &&[FSize, SectionInfo] = getFunctionSizeInfo(MF);
@@ -386,7 +385,6 @@ bool PrologueEpilogueInsertion::insertEpilogue(
     return true;
   SGCtx.setEntryEpilogueInstuctionCount(
       std::distance(FirstInserted, MBB->end()));
-
   // For exit also check that function still fits assigned section
   // after epilogue insertion
   auto &&[FSize, SectionInfo] = getFunctionSizeInfo(MF);
