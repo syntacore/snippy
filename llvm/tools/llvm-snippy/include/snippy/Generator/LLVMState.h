@@ -102,10 +102,13 @@ public:
   }
 
   MachineFunction &createMachineFunctionFor(Function &F, MachineModuleInfo &MMI,
-                                            LLVMContext &ExternalCtx) const {
+                                            LLVMContext &ExternalCtx,
+                                            bool SetSection = false) const {
     auto *BB = BasicBlock::Create(ExternalCtx, "", &F);
     ReturnInst::Create(ExternalCtx, BB);
     F.setIsMaterializable(true);
+    if (SetSection)
+      F.setSection(Twine(".text.").concat(F.getName()).str());
     auto &MF = MMI.getOrCreateMachineFunction(F);
     auto &Props = MF.getProperties();
     Props.set(MachineFunctionProperties::Property::NoVRegs);
@@ -114,9 +117,9 @@ public:
     return MF;
   }
 
-  MachineFunction &createMachineFunctionFor(Function &F,
-                                            MachineModuleInfo &MMI) {
-    return createMachineFunctionFor(F, MMI, Ctx);
+  MachineFunction &createMachineFunctionFor(Function &F, MachineModuleInfo &MMI,
+                                            bool SetSection = false) {
+    return createMachineFunctionFor(F, MMI, Ctx, SetSection);
   }
 
   MachineFunction &createMachineFunction(Module &M, MachineModuleInfo &MMI,

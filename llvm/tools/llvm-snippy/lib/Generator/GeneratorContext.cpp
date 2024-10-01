@@ -91,8 +91,6 @@ void GeneratorContext::initRunner() const {
   const auto &SubTgt =
       MainModule.getMMI().getMachineFunction(EntryFun)->getSubtarget();
 
-  bool IsNeedCallbackHandler = hasExecutionTraceTrackingMode();
-
   auto Env = Interpreter::createSimulationEnvironment(*this);
 
   assert(hasModel() && "Model list must not be empty here");
@@ -266,7 +264,6 @@ void GeneratorContext::checkMemStateAfterSelfcheck() const {
 }
 
 void GeneratorContext::runSimulator(StringRef ImageToRun) {
-  auto &State = getProgramContext().getLLVMState();
   // FIXME: unfortunately, it is not possible to implement interpretation as an
   // llvm pass (without creating a separate pass manager) due to peculiarities
   // of LLVM pipeline. The problem is that AsmPrinter does not actually
@@ -275,44 +272,39 @@ void GeneratorContext::runSimulator(StringRef ImageToRun) {
   // function in Module. The actual object file generation happens during the
   // respected doFinalization call.  The problem with doFinalization is that it
   // runs after all passes have been run and the order of execution is not
-  if (GenSettings->ModelPluginConfig.RunOnModel) {
-    // Interpreters memory is set to the zero state after generation.
-    auto &I = getOrCreateInterpreter();
-    auto &InitRegState = getInitialRegisterState(I.getSubTarget());
-    I.setInitialState(InitRegState);
-    I.dumpCurrentRegState(GenSettings->RegistersConfig.InitialStateOutputYaml);
+  // Interpreters memory is set to the zero state after generation.
+  assert(GenSettings->ModelPluginConfig.RunOnModel);
+  auto &I = getOrCreateInterpreter();
+  auto &InitRegState = getInitialRegisterState(I.getSubTarget());
+  I.setInitialState(InitRegState);
+  I.dumpCurrentRegState(GenSettings->RegistersConfig.InitialStateOutputYaml);
 
-    std::unique_ptr<RVMCallbackHandler::ObserverHandle<SelfcheckObserver>>
-        SelfcheckObserverHandle;
-    if (GenSettings->TrackingConfig.SelfCheckPeriod)
-      SelfcheckObserverHandle = I.setObserver<SelfcheckObserver>(
-          SelfcheckMap.begin(), SelfcheckMap.end(), I.getPC());
+  std::unique_ptr<RVMCallbackHandler::ObserverHandle<SelfcheckObserver>>
+      SelfcheckObserverHandle;
+  if (GenSettings->TrackingConfig.SelfCheckPeriod)
+    SelfcheckObserverHandle = I.setObserver<SelfcheckObserver>(
+        SelfcheckMap.begin(), SelfcheckMap.end(), I.getPC());
 
-    auto &SimRunner = getOrCreateSimRunner();
+  auto &SimRunner = getOrCreateSimRunner();
 
-    SimRunner.run(ImageToRun, InitRegState);
+  SimRunner.run(ImageToRun, InitRegState);
 
-    I.dumpCurrentRegState(GenSettings->RegistersConfig.FinalStateOutputYaml);
-    auto RangesToDump = getMemoryRangesToDump(I, DumpMemorySection);
-    if (!RangesToDump.empty())
-      I.dumpRanges(RangesToDump, MemorySectionFile);
+  I.dumpCurrentRegState(GenSettings->RegistersConfig.FinalStateOutputYaml);
+  auto RangesToDump = getMemoryRangesToDump(I, DumpMemorySection);
+  if (!RangesToDump.empty())
+    I.dumpRanges(RangesToDump, MemorySectionFile);
 
-    // Force flush stdout buffer written by Simulator.
-    // It helps to avoid mixing it with stderr if redirected to same file.
-    fflush(stdout);
-    if (GenSettings->TrackingConfig.SelfCheckPeriod) {
-      if (SelfCheckMem)
-        checkMemStateAfterSelfcheck();
+  // Force flush stdout buffer written by Simulator.
+  // It helps to avoid mixing it with stderr if redirected to same file.
+  fflush(stdout);
+  if (GenSettings->TrackingConfig.SelfCheckPeriod) {
+    if (SelfCheckMem)
+      checkMemStateAfterSelfcheck();
 
-      auto AnnotationFilename =
-          addExtensionIfRequired(GenSettings->BaseFileName, ".selfcheck.yaml");
-      I.getObserverByHandle(*SelfcheckObserverHandle)
-          .dumpAsYaml(AnnotationFilename);
-    }
-  } else {
-    snippy::warn(WarningName::NoModelExec, State.getCtx(),
-                 "Skipping snippet execution on the model",
-                 "model was set no 'None'.");
+    auto AnnotationFilename =
+        addExtensionIfRequired(GenSettings->BaseFileName, ".selfcheck.yaml");
+    I.getObserverByHandle(*SelfcheckObserverHandle)
+        .dumpAsYaml(AnnotationFilename);
   }
 }
 

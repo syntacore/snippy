@@ -725,5 +725,14 @@ MachineBasicBlock *createMachineBasicBlock(MachineFunction &MF,
   return MBB;
 }
 
+std::string getMBBSectionName(const MachineBasicBlock &MBB) {
+  auto *MF = MBB.getParent();
+  assert(MF);
+  auto FunctionSectionName = MF->getFunction().getSection();
+  auto *Symb = MBB.getSymbol();
+  assert(Symb);
+  return llvm::formatv("{0}.{1}", FunctionSectionName, Symb->getName()).str();
+}
+
 } // namespace snippy
 } // namespace llvm
