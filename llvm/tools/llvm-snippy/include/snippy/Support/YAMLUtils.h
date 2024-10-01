@@ -61,7 +61,7 @@
   struct _type {                                                               \
     _type() : value() {}                                                       \
     _type(const _mapped &w) : value(w) {}                                      \
-    operator const _mapped &() const { return value; }                         \
+    operator const _mapped &() const & { return value; }                       \
     _mapped value;                                                             \
   }
 

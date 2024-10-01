@@ -1,0 +1,22 @@
+# RUN: not llvm-snippy %s --model-plugin None |& FileCheck %s
+
+include:
+  - ../Inputs/sections.yaml
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  mattr: "+zfh"
+  num-instrs: 100
+fpu-config:
+  overwrite:
+    ieee-half:
+      valuegram:
+        - [0xfefe, 1.0]
+    range:
+      min: 0xffffffffffff
+      max: 0xffffffffffff
+      rounding-mode: rmm
+histogram:
+  - [FMUL_H, 1.0]
+
+# CHECK: float-nan-propagation-error-too-large.yaml:12:5: error: Conversion from integer value '0xffffffffffff' would result in a floating-point overflow exception
