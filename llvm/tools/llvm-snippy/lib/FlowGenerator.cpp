@@ -33,6 +33,8 @@
 #include "snippy/Support/Utils.h"
 #include "snippy/Target/Target.h"
 
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
@@ -244,7 +246,7 @@ void InstructionGenerator::addGV(
     StringRef Name = "global") const {
   auto &GP = SGCtx->getGlobalsPool();
 
-  const auto *GV = GP.createGV(Value, Stride, LType, Name);
+  auto *GV = GP.createGV(Value, Stride, LType, Name);
   if (SGCtx->hasTrackingMode())
     SGCtx->getOrCreateInterpreter().writeMem(GP.getGVAddress(GV), Value);
 }
@@ -441,7 +443,6 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
           PM.add(createPrintMachineInstrsPass(outs()));
 
         SnippyTgt.addTargetLegalizationPasses(PM);
-
         PM.add(createBranchRelaxatorPass());
         if (VerifyConsecutiveLoops)
           PM.add(createConsecutiveLoopsVerifierPass());
@@ -458,7 +459,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
         if (DumpFinalCFG)
           PM.add(createCFGPrinterPass());
       },
-      [&](PassManagerWrapper &PM) {});
+      [](PassManagerWrapper &PM) {});
 
   auto CGFilename = DumpCGFilename.getValue();
   if (!CGFilename.empty())
@@ -470,13 +471,20 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
   std::vector<const SnippyModule *> Modules{&GenCtx.getMainModule()};
   auto Result = ProgContext.generateELF(Modules);
 
-  auto SnippetImageForModelExecution = ProgContext.generateLinkedImage(Modules);
-
   dumpVerificationIntervalsIfNeeeded(
       GenCtx.getMainModule().getGeneratedObject(), GenCtx);
 
-  GenCtx.runSimulator(SnippetImageForModelExecution);
+  if (GenSettings.ModelPluginConfig.RunOnModel) {
+    auto SnippetImageForModelExecution =
+        ProgContext.generateLinkedImage(Modules);
 
+    GenCtx.runSimulator(SnippetImageForModelExecution);
+  } else {
+
+    snippy::warn(WarningName::NoModelExec, State.getCtx(),
+                 "Skipping snippet execution on the model",
+                 "model was set no 'None'.");
+  }
   if (!Result.LinkerScript.empty())
     snippy::notice(
         WarningName::RelocatableGenerated, State.getCtx(),
