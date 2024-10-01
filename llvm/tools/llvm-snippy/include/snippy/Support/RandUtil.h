@@ -198,6 +198,8 @@ public:
     return genInInterval<T>(First, Last - 1);
   }
 
+  static bool genBool() { return genInRange(0, 1); }
+
   template <typename T> static T genInRange(T Last) {
     return genInRange<T>(0, Last);
   }

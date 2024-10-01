@@ -57,6 +57,7 @@ public:
     BitPattern,
     Uniform,
     BitValue,
+    BitRange,
     HelperSentinel, //< Should not be used directly. Used to indicate
                     // past-the-end enum value. Must always be the last.
   };
@@ -68,6 +69,64 @@ public:
 
   double Weight = 1.0;
 };
+
+StringRef toString(IValuegramEntry::EntryKind Kind);
+
+class ValuegramPattern {
+public:
+  enum class PatternKind {
+    BitPattern,
+    Uniform,
+  };
+
+private:
+  static std::optional<PatternKind>
+  getPatternKindOrNone(IValuegramEntry::EntryKind EntryKind) {
+    switch (EntryKind) {
+    case IValuegramEntry::EntryKind::BitPattern:
+      return PatternKind::BitPattern;
+    case IValuegramEntry::EntryKind::Uniform:
+      return PatternKind::Uniform;
+    default:
+      return std::nullopt;
+    }
+  }
+
+public:
+  static bool isPattern(IValuegramEntry::EntryKind EntryKind) {
+    return getPatternKindOrNone(EntryKind).has_value();
+  }
+
+  static Expected<ValuegramPattern>
+  create(IValuegramEntry::EntryKind EntryKind) {
+    if (auto Pattern = getPatternKindOrNone(EntryKind))
+      return ValuegramPattern(*Pattern);
+    return createStringError(
+        std::make_error_code(std::errc::invalid_argument),
+        Twine(toString(EntryKind)).concat(" is not a pattern kind"));
+  }
+
+  constexpr explicit ValuegramPattern(PatternKind Kind) : TheKind(Kind) {}
+  constexpr operator PatternKind() const noexcept { return TheKind; }
+  constexpr operator IValuegramEntry::EntryKind() const noexcept {
+    switch (TheKind) {
+    case PatternKind::BitPattern:
+      return IValuegramEntry::EntryKind::BitPattern;
+    case PatternKind::Uniform:
+      return IValuegramEntry::EntryKind::Uniform;
+    }
+  }
+
+  static const ValuegramPattern BitPattern;
+  static const ValuegramPattern Uniform;
+
+  PatternKind TheKind;
+};
+
+constexpr inline ValuegramPattern ValuegramPattern::BitPattern =
+    ValuegramPattern(ValuegramPattern::PatternKind::BitPattern);
+constexpr inline ValuegramPattern ValuegramPattern::Uniform =
+    ValuegramPattern(ValuegramPattern::PatternKind::Uniform);
 
 // NOTE: Ideally we would have diamond inheritance of interfaces for Valuegram
 // entries. All pattern entries are a sequence and a mapping at the same time.
@@ -139,6 +198,33 @@ protected:
   void mapYamlImpl(yaml::IO &Io) override;
 };
 
+struct ValuegramBitRangeEntry final : public IValuegramMapEntry {
+  // Values are always treated as raw bits, range is unsigned regardless
+  // and it's illegal to deserialize signed values.
+
+  APInt Min;
+  APInt Max;
+
+  ValuegramBitRangeEntry() = default;
+  ValuegramBitRangeEntry(APInt MinParam, APInt MaxParam)
+      : Min(std::move(MinParam)), Max(std::move(MaxParam)) {}
+
+  EntryKind getKind() const override { return EntryKind::BitRange; }
+
+  static bool classof(const IValuegramEntry *Entry) {
+    assert(Entry);
+    auto Kind = Entry->getKind();
+    return Kind == EntryKind::BitRange;
+  }
+
+  std::unique_ptr<IValuegramEntry> clone() override {
+    return std::make_unique<ValuegramBitRangeEntry>(*this);
+  }
+
+protected:
+  void mapYamlImpl(yaml::IO &Io) override;
+};
+
 Expected<std::unique_ptr<IValuegramEntry>>
 createValuegramSequenceEntry(IValuegramEntry::EntryKind Kind);
 
@@ -169,13 +255,13 @@ private:
   // parser. Valid YAML will result only in non-default constructed
   // ValuegramEntry with values.
 
+public:
   IValuegramEntry *getOrNull() { return UnderlyingEntry.get(); }
   const IValuegramEntry *getOrNull() const { return UnderlyingEntry.get(); }
 
   bool hasValue() const { return UnderlyingEntry.get(); }
   operator bool() const { return hasValue(); }
 
-public:
   using EntryKind = IValuegramEntry::EntryKind;
 
   ValuegramEntry(const ValuegramEntry &Other)
