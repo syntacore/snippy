@@ -25,6 +25,12 @@ class Input;
 } // namespace yaml
 
 namespace snippy {
+
+template <typename T> struct NumericRange final {
+  std::optional<T> Min;
+  std::optional<T> Max;
+};
+
 namespace detail {
 constexpr static const char *SupportMetadataValue = "llvm.snippy.support";
 bool checkMetadata(const MachineInstr &MI, StringRef MetaStr);
