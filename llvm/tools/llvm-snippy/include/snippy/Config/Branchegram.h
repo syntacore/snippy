@@ -25,11 +25,6 @@ const auto &getField(const T &Obj, MemberPtrT &&MemberPtr, ArgsTys &&...Args) {
                   std::forward<ArgsTys>(Args)...);
 }
 
-template <typename T> struct NumericRange final {
-  std::optional<T> Min;
-  std::optional<T> Max;
-};
-
 struct Branchegram final {
   static constexpr unsigned DefaultAlignment = 1;
   static constexpr double DefaultLoopRatio = 0.5;
