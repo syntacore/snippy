@@ -36,4 +36,4 @@ branches:
         min: 2
         max: 1
 
-# CHECK: error: Min expected to be less or equal max
+# CHECK: error: 'min' expected to be less or equal 'max'

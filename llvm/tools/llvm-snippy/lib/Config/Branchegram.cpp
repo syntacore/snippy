@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Config/Branchegram.h"
+#include "snippy/Support/YAMLNumericRange.h"
 
 #include "llvm/Support/YAMLTraits.h"
 namespace llvm {
@@ -125,19 +126,6 @@ std::string yaml::MappingTraits<Branchegram>::validate(yaml::IO &IO,
 
   return std::string();
 }
-
-template <typename T> struct yaml::MappingTraits<NumericRange<T>> {
-  static void mapping(yaml::IO &IO, NumericRange<T> &Range) {
-    IO.mapOptional("min", Range.Min);
-    IO.mapOptional("max", Range.Max);
-  }
-
-  static std::string validate(yaml::IO &IO, NumericRange<T> &Range) {
-    return (!Range.Min || !Range.Max || *Range.Min <= *Range.Max)
-               ? std::string()
-               : std::string("Min expected to be less or equal max");
-  }
-};
 
 template <> struct yaml::MappingTraits<Branchegram::Depth> {
   static void mapping(yaml::IO &IO, Branchegram::Depth &Depth) {
