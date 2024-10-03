@@ -9,6 +9,7 @@
 #pragma once
 
 #include "Error.h"
+#include "Utils.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
@@ -188,6 +189,11 @@ public:
     return Dist(pimpl->Engine);
   }
 
+  template <typename T> static T genInInterval(NumericRange<T> Interval) {
+    auto Min = Interval.Min.value_or(0);
+    return genInInterval<T>(Min, Interval.Max.value_or(Min));
+  }
+
   template <typename T> static T genInInterval(T Max) {
     return genInInterval<T>(0, Max);
   }
@@ -199,6 +205,13 @@ public:
   }
 
   static bool genBool() { return genInRange(0, 1); }
+
+  template <typename T> static T genInRange(NumericRange<T> Range) {
+    if (!Range.Min.has_value())
+      Range.Min = 0;
+    return genInRange<T>(Range.Min.value(),
+                         Range.Max.value_or(Range.Min.value()));
+  }
 
   template <typename T> static T genInRange(T Last) {
     return genInRange<T>(0, Last);
