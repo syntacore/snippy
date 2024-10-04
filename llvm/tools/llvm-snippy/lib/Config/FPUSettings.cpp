@@ -187,7 +187,7 @@ public:
 
     if (auto Err = checkOverflowIntegralConversionError(SampledAPInt, Status,
                                                         IsSigned))
-      return Err;
+      return Expected<APInt>(std::move(Err));
 
     return FPValue.bitcastToAPInt();
   }
@@ -316,7 +316,7 @@ createSamplerForEntry(const ValuegramEntry &Entry, uint32_t BitWidth) {
             APIntRangeSampler::create(BitRangeEntry->Min, BitRangeEntry->Max,
                                       /*IsSigned=*/false);
         if (Error E = SamplerOrErr.takeError())
-          return E;
+          return Expected<std::unique_ptr<IAPIntSampler>>(std::move(E));
         return std::make_unique<APIntRangeSampler>(std::move(*SamplerOrErr));
       })
       .Default([](auto &&) {
@@ -452,7 +452,7 @@ createFloatOverwriteValueSampler(const FloatOverwriteSettings &Settings,
       getSettingsForSemantics(Settings, Semantics);
 
   if (auto Err = CfgOrErr.takeError())
-    return Err;
+    return Expected<std::unique_ptr<IAPIntSampler>>(std::move(Err));
 
   // (NOTE): Fallback case. The most reasonable choice for default
   // distribution is uniform.
@@ -469,7 +469,7 @@ createFloatOverwriteValueSampler(const FloatOverwriteSettings &Settings,
             Semantics);
 
     if (auto E = SamplerOrErr.takeError())
-      return E;
+      return Expected<std::unique_ptr<IAPIntSampler>>(std::move(E));
 
     Builder.addOwned(std::move(*SamplerOrErr), IntegralRange->Weight);
   }
@@ -481,7 +481,7 @@ createFloatOverwriteValueSampler(const FloatOverwriteSettings &Settings,
   for (const auto &Entry : Cfg->TheValuegram) {
     auto SamplerOrErr = createSamplerForEntry(Entry, BitWidth);
     if (Error E = SamplerOrErr.takeError())
-      return E;
+      return Expected<std::unique_ptr<IAPIntSampler>>(std::move(E));
     Builder.addOwned(std::move(*SamplerOrErr), Entry.getWeight());
   }
 
@@ -500,7 +500,7 @@ FloatSemanticsSamplerHolder::getSamplerFor(const fltSemantics &Semantics) {
   auto [InsertedIt, _] =
       FloatValueSamplerForSemantics.emplace(&Semantics, nullptr);
   if (auto Err = std::move(SamplerOrErr).moveInto(InsertedIt->second))
-    return Err;
+    return Expected<IAPIntSampler &>(std::move(Err));
   return *InsertedIt->second;
 }
 
