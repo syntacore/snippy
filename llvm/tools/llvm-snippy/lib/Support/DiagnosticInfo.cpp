@@ -73,20 +73,21 @@ void warn(WarningName WN, llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
   Ctx.diagnose(Diag);
 }
 
-void fatal(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
-           const llvm::Twine &Desc) {
+[[noreturn]] void fatal(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
+                        const llvm::Twine &Desc) {
   SnippyDiagnosticInfo Diag(Prefix, Desc, llvm::DS_Error,
                             WarningName::NotAWarning);
   Ctx.diagnose(Diag);
 }
 
-void fatal(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix, Error E) {
+[[noreturn]] void fatal(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
+                        Error E) {
   SnippyDiagnosticInfo Diag(Prefix, toString(std::move(E)), llvm::DS_Error,
                             WarningName::NotAWarning);
   Ctx.diagnose(Diag);
 }
 
-void fatal(const llvm::Twine &Prefix, const llvm::Twine &Desc) {
+[[noreturn]] void fatal(const llvm::Twine &Prefix, const llvm::Twine &Desc) {
   llvm::LLVMContext Ctx;
   SnippyDiagnosticInfo Diag(Prefix, Desc, llvm::DS_Error,
                             WarningName::NotAWarning);

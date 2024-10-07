@@ -86,12 +86,13 @@ void notice(WarningName WN, llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
 void warn(WarningName WN, llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
           const llvm::Twine &Desc);
 
-void fatal(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
-           const llvm::Twine &Desc);
+[[noreturn]] void fatal(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
+                        const llvm::Twine &Desc);
 
-void fatal(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix, Error E);
+[[noreturn]] void fatal(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
+                        Error E);
 
-void fatal(const llvm::Twine &Prefix, const llvm::Twine &Desc);
+[[noreturn]] void fatal(const llvm::Twine &Prefix, const llvm::Twine &Desc);
 
 } // namespace snippy
 
