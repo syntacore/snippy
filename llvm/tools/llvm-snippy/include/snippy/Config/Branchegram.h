@@ -26,7 +26,8 @@ const auto &getField(const T &Obj, MemberPtrT &&MemberPtr, ArgsTys &&...Args) {
 }
 
 struct Branchegram final {
-  static constexpr unsigned DefaultAlignment = 1;
+  static constexpr unsigned Unaligned = 1;
+  static constexpr unsigned DefaultAlignment = Unaligned;
   static constexpr double DefaultLoopRatio = 0.5;
   static constexpr unsigned NConsecutiveLoopsDefault = 0;
   static constexpr unsigned MinNLoopIterDefault = 4;
@@ -68,6 +69,8 @@ struct Branchegram final {
   NumericRange<ProgramCounterType> getPCDistance() const { return Dist.PC; }
 
   bool isPCDistanceRequested() const { return Dist.PC.Min || Dist.PC.Max; }
+
+  bool unaligned() const { return Alignment == Unaligned; }
 
   unsigned getMaxLoopDepth() const { return MaxDepth.Loop; }
 

@@ -167,5 +167,5 @@ public:
 };
 
 } // namespace snippy
-LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::Config);
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(snippy::Config);
 } // namespace llvm
