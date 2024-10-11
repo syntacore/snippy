@@ -385,6 +385,10 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
   IO.mapOptional("fpu-config", Info.FPUConfig);
 }
 
+std::string yaml::MappingTraits<Config>::validate(yaml::IO &Io, Config &Info) {
+  return "";
+}
+
 namespace snippy {
 
 static void diagnoseHistogram(LLVMContext &Ctx, const OpcodeCache &OpCC,
