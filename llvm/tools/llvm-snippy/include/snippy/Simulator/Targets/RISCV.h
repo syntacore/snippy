@@ -86,7 +86,8 @@ struct RISCVRegisterState : public IRegisterState {
     uniformlyFillVRegs();
   }
 
-  void loadFromYamlFile(StringRef YamlFile, WarningsT &WarningsArr) override;
+  void loadFromYamlFile(StringRef YamlFile, WarningsT &WarningsArr,
+                        const SnippyTarget *Tgt = nullptr) override;
 
   void saveAsYAMLFile(raw_ostream &OS) const override;
 

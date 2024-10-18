@@ -4,7 +4,6 @@ set(LLVMSnippyConfigSources
     Branchegram.cpp
     MemoryScheme.cpp
     RegisterHistogram.cpp
-    SerDesUtils.cpp
     PluginWrapper.cpp
     FPUSettings.cpp
     CallGraphLayout.cpp

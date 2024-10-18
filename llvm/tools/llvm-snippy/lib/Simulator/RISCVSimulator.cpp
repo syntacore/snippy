@@ -10,18 +10,26 @@
 
 #include <RISCVModel/RVM.hpp>
 
-#include "snippy/Config/SerDesUtils.h"
+#include "snippy/Config/RegisterHistogram.h"
 #include "snippy/Simulator/Targets/RISCV.h"
 #include "snippy/Simulator/Transactions.h"
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/DynLibLoader.h"
 #include "snippy/Support/Options.h"
+#include "snippy/Support/RandUtil.h"
 
 #include "Common.h"
+
+#include "llvm/ADT/StringRef.h"
 
 #define DEBUG_TYPE "snippy-riscv-sim"
 
 namespace llvm {
+
+#define GET_REGISTER_MATCHER
+#include "RISCVGenAsmMatcher.inc"
+#undef GET_REGISTER_MATCHER
+
 namespace snippy {
 
 cl::OptionCategory RISCVSimOptions("RISCV simulator options");
@@ -61,7 +69,8 @@ static bool hasPCInRH(const RegistersWithHistograms &RH) {
 }
 
 void RISCVRegisterState::loadFromYamlFile(StringRef YamlFile,
-                                          WarningsT &WarningsArr) {
+                                          WarningsT &WarningsArr,
+                                          const SnippyTarget *Tgt) {
   auto RH = loadRegistersFromYaml(YamlFile);
 
   constexpr auto DefaultPC = 0ul;
@@ -70,7 +79,7 @@ void RISCVRegisterState::loadFromYamlFile(StringRef YamlFile,
     WarningsArr.emplace_back("PC value from YAML has been ignored");
 
   std::array<StringRef, 4> AllowedRegClasses = {"X", "F", "V", "P"};
-  checkRegisterClasses(RH.Registers, AllowedRegClasses);
+  checkRegisterClasses(RH.Registers, AllowedRegClasses, Tgt);
   checkRegisterClasses(RH.Histograms, AllowedRegClasses);
 
   auto NumXRegs = XRegs.size();
@@ -107,8 +116,7 @@ void RISCVRegisterState::saveAsYAMLFile(raw_ostream &OS) const {
   auto FRegsMasked = FRegs;
   if (FRegSize == Reg4Bytes)
     FRegsMasked = applyMask(FRegsMasked, std::numeric_limits<uint32_t>::max());
-
-  auto RegSerObj = RegisterSerialization()
+  auto RegSerObj = AllRegisters()
                        .addRegisterGroup("X", XRegsMasked)
                        .addRegisterGroup("F", FRegsMasked)
                        .addRegisterGroup("V", VLEN, VRegs);
@@ -219,7 +227,6 @@ public:
       Regs.XRegs[XRegNo] = readGPR(XRegNo);
     for (size_t FRegNo = 0; FRegNo < Regs.FRegs.size(); ++FRegNo)
       Regs.FRegs[FRegNo] = readFPR(FRegNo);
-
     if (Regs.VRegs.empty())
       return;
 
