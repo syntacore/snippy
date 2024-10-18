@@ -16,7 +16,6 @@
 
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/OpcodeHistogram.h"
-#include "snippy/Config/SerDesUtils.h"
 #include "snippy/Support/DynLibLoader.h"
 #include "snippy/Support/Options.h"
 #include "snippy/Support/RandUtil.h"
