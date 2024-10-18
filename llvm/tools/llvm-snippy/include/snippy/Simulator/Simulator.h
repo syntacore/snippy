@@ -26,12 +26,15 @@
 namespace llvm {
 namespace snippy {
 
+class SnippyTarget;
+
 using WarningsT = std::vector<std::string>;
 
 struct IRegisterState {
   virtual ~IRegisterState() {}
 
-  virtual void loadFromYamlFile(StringRef, WarningsT &) = 0;
+  virtual void loadFromYamlFile(StringRef, WarningsT &,
+                                const SnippyTarget *Tgt = nullptr) = 0;
   virtual void saveAsYAMLFile(raw_ostream &) const = 0;
 
   virtual bool operator==(const IRegisterState &) const = 0;

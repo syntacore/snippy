@@ -17,7 +17,8 @@ namespace llvm {
 namespace snippy {
 
 struct X86RegisterState : public IRegisterState {
-  void loadFromYamlFile(StringRef, WarningsT &) override;
+  void loadFromYamlFile(StringRef, WarningsT &,
+                        const SnippyTarget *Tgt = nullptr) override;
   void saveAsYAMLFile(raw_ostream &) const override;
 
   void randomize() override;
