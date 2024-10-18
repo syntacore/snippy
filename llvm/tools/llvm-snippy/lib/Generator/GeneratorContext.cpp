@@ -70,8 +70,8 @@ GeneratorContext::getInitialRegisterState(const TargetSubtargetInfo &ST) const {
 
   if (!getInitialRegYamlFile().empty()) {
     WarningsT YamlWarnings;
-    InitialMachineState->loadFromYamlFile(getInitialRegYamlFile(),
-                                          YamlWarnings);
+    InitialMachineState->loadFromYamlFile(getInitialRegYamlFile(), YamlWarnings,
+                                          &State.getSnippyTarget());
     std::for_each(YamlWarnings.begin(), YamlWarnings.end(), [&](StringRef Msg) {
       warn(WarningName::RegState, State.getCtx(), "register state yaml", Msg);
     });

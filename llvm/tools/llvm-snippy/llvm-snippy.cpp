@@ -20,7 +20,6 @@
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
-#include "snippy/Config/SerDesUtils.h"
 #include "snippy/Generator/GeneratorSettings.h"
 #include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/RegisterPool.h"
