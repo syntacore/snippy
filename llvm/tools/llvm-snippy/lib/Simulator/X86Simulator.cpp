@@ -6,7 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "snippy/Config/SerDesUtils.h"
 #include "snippy/Simulator/Targets/X86.h"
 
 #include "Common.h"
@@ -17,7 +16,8 @@ namespace llvm {
 namespace snippy {
 
 void X86RegisterState::loadFromYamlFile(StringRef Filename,
-                                        WarningsT &WarningsArr) {
+                                        WarningsT &WarningsArr,
+                                        const SnippyTarget *Tgt) {
   report_fatal_error("sorry not implemented");
 }
 

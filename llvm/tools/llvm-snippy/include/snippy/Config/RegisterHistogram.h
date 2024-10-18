@@ -21,6 +21,8 @@
 namespace llvm {
 namespace snippy {
 
+class SnippyTarget;
+
 struct RegisterClassValues {
   std::string RegType;
   std::vector<APInt> Values;
@@ -40,13 +42,33 @@ struct RegisterHistograms {
   SmallVector<RegisterClassHistogram, 3> ClassHistograms;
 };
 
+struct AllRegisters final {
+  SmallVector<RegisterClassValues, 3> ClassValues;
+  std::map<std::string, APInt> SpecialRegs;
+  AllRegisters &addRegisterGroup(StringRef Prefix, ArrayRef<uint64_t> Values);
+
+  AllRegisters &addRegisterGroup(StringRef Prefix, unsigned BitsNum,
+                                 ArrayRef<APInt> Values);
+  AllRegisters &addRegister(StringRef Name, APInt Value) {
+    [[maybe_unused]] auto [It, Inserted] =
+        SpecialRegs.try_emplace(Name.str(), Value);
+    assert(Inserted);
+    return *this;
+  }
+
+  void saveAsYAML(raw_ostream &OS);
+};
+
 struct RegistersWithHistograms {
-  RegisterValues Registers;
+  AllRegisters Registers;
   RegisterHistograms Histograms;
 };
 
-void checkRegisterClasses(const RegisterValues &Values,
-                          ArrayRef<StringRef> AllowedClasses);
+RegistersWithHistograms loadRegistersFromYaml(StringRef Path);
+
+void checkRegisterClasses(const AllRegisters &Values,
+                          ArrayRef<StringRef> AllowedClasses,
+                          const SnippyTarget *Tgt = nullptr);
 
 void checkRegisterClasses(const RegisterHistograms &Histograms,
                           ArrayRef<StringRef> AllowedClasses);
