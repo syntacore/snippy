@@ -43,9 +43,10 @@ SnippyDiagnosticInfo::fetchReportedWarnings() {
 }
 
 void SnippyDiagnosticInfo::print(llvm::DiagnosticPrinter &DP) const {
-  if (Severity == llvm::DS_Error)
-    llvm::report_fatal_error(StringRef(Description), false);
   DP << Description;
+
+  if (Severity == llvm::DS_Error)
+    return;
 
   if (Severity >= llvm::DS_Remark)
     return;
@@ -87,10 +88,23 @@ void warn(WarningName WN, llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
   Ctx.diagnose(Diag);
 }
 
+[[noreturn]] void fatal(Error E) {
+  llvm::LLVMContext Ctx;
+  SnippyDiagnosticInfo Diag(toString(std::move(E)), llvm::DS_Error,
+                            WarningName::NotAWarning);
+  Ctx.diagnose(Diag);
+}
+
 [[noreturn]] void fatal(const llvm::Twine &Prefix, const llvm::Twine &Desc) {
   llvm::LLVMContext Ctx;
   SnippyDiagnosticInfo Diag(Prefix, Desc, llvm::DS_Error,
                             WarningName::NotAWarning);
+  Ctx.diagnose(Diag);
+}
+
+[[noreturn]] void fatal(const llvm::Twine &Desc) {
+  llvm::LLVMContext Ctx;
+  SnippyDiagnosticInfo Diag(Desc, llvm::DS_Error, WarningName::NotAWarning);
   Ctx.diagnose(Diag);
 }
 

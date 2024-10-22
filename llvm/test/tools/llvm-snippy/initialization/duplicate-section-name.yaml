@@ -17,4 +17,4 @@ sections:
 histogram:
     - [ADD, 1.0]
 
-# CHECK: error: LLVM ERROR: Incorrect list of sections: List contains duplicate section IDs
+# CHECK: error: Incorrect list of sections: List contains duplicate section IDs

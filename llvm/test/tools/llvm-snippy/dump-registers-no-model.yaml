@@ -19,5 +19,5 @@ options:
   num-instrs: 100
   dump-registers-yaml: true
 
-# CHECK: LLVM ERROR: Dump resulting registers can't be done: dump-registers-yaml
+# CHECK: error: Dump resulting registers can't be done: dump-registers-yaml
 # CHECK-SAME: option is passed but model-plugin is not provided.

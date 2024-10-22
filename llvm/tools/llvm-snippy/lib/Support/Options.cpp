@@ -7,6 +7,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Support/Options.h"
+#include "snippy/Support/DiagnosticInfo.h"
+
+#include "llvm/Support/FormatVariadic.h"
 
 namespace llvm {
 using namespace snippy;
@@ -20,13 +23,11 @@ void yaml::CustomMappingTraits<OptionsStorage>::inputOne(
     yaml::IO &IO, StringRef Key, OptionsStorage &Options) {
   auto KeyStr = Key.str();
   if (!Options.count(KeyStr))
-    report_fatal_error(
-        "Unknown option \"" + Twine(Key) + "\" was specified in YAML", false);
+    snippy::fatal(formatv("Unknown option \"{0}\" was specified in YAML", Key));
   auto &Base = Options.get(KeyStr);
   if (Base.isSpecified())
-    report_fatal_error("Attempt to specify option (or its alias) \"" +
-                           Twine(Key) + "\" twice",
-                       false);
+    snippy::fatal(
+        formatv("Attempt to specify option (or its alias) \"{0}\" twice", Key));
   Base.mapStoredValue(IO, KeyStr);
   Base.markAsSpecified();
 }

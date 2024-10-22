@@ -30,4 +30,4 @@ histogram:
     - [ADD, 1.0]
     - [ADDI, 1.0]
 
-# CHECK: LLVM ERROR: Incorrect list of sections: all RW sections must go either before all other sections or after them all
+# CHECK: error: Incorrect list of sections: all RW sections must go either before all other sections or after them all

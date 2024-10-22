@@ -25,4 +25,4 @@ histogram:
 branches:
   alignment: 16
 
-# CHECK: error: LLVM ERROR: Incorrect section: The executable section '1' must be aligned to 16 according to specified config
+# CHECK: error: Incorrect section: The executable section '1' must be aligned to 16 according to specified config

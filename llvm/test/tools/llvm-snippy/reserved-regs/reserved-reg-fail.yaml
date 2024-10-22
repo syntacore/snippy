@@ -22,5 +22,5 @@ sections:
 histogram:
     - [ADD, 1.0]
     - [ADDI, 1.0]
-# CHECK: LLVM ERROR: No available register GPR: instruction generation
-# ILLEGAL: LLVM ERROR: Illegal register name XA is specified in --reserved-regs-list
+# CHECK: error: No available register GPR: instruction generation
+# ILLEGAL: error: Illegal register name XA is specified in --reserved-regs-list

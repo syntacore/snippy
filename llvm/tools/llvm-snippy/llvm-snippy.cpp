@@ -187,9 +187,9 @@ std::optional<unsigned> getExpectedNumInstrs(StringRef NumAsString) {
     return {};
   int Value;
   if (!to_integer(NumAsString, Value, /*base*/ 10))
-    report_fatal_error("num-instrs get not a number or all", false);
+    snippy::fatal("num-instrs get not a number or all");
   if (Value < 0)
-    report_fatal_error("num-instrs get negative number", false);
+    snippy::fatal("num-instrs get negative number");
   return Value;
 }
 
@@ -370,8 +370,6 @@ static snippy::opt<bool> DumpPreprocessedConfig(
     "E", cl::desc("Dump snippy config after preprocessing it"), cl::init(false),
     cl::cat(Options));
 
-static ExitOnError ExitOnErr("llvm-snippy error: ");
-
 // Used to construct search paths for dynamically-loaded plugins
 static std::string ARGV0;
 
@@ -400,7 +398,7 @@ static void checkMemoryRegions(const SnippyTarget &SnippyTgt,
   llvm::raw_string_ostream SS{ErrBuf};
   SS << "One of layout memory regions interferes with reserved region:\n";
   Reserved->dump(SS);
-  report_fatal_error(ErrBuf.c_str(), false);
+  snippy::fatal(ErrBuf.c_str());
 }
 
 static void checkCallRequirements(const SnippyTarget &Tgt,
@@ -412,9 +410,8 @@ static void checkCallRequirements(const SnippyTarget &Tgt,
     return !Tgt.isCall(Opcode);
   }) > 0.0;
   if (hasCalls && !hasNonCalls)
-    report_fatal_error(
-        "for using calls you need to add to histogram non-call instructions",
-        false);
+    snippy::fatal(
+        "for using calls you need to add to histogram non-call instructions");
 }
 
 static void checkFullSizeGenerationRequirements(const MCInstrInfo &II,
@@ -427,20 +424,19 @@ static void checkFullSizeGenerationRequirements(const MCInstrInfo &II,
         auto &Desc = II.get(Opcode);
         return Desc.isBranch();
       }) > 0.0)
-    report_fatal_error(
-        "when -num-instr=all is specified, branches are not supported", false);
+    snippy::fatal(
+        "when -num-instr=all is specified, branches are not supported");
   if (FillCodeSectionMode &&
       Cfg.Histogram.getOpcodesWeight(
           [&Tgt](unsigned Opcode) { return Tgt.isCall(Opcode); }) > 0.0)
-    report_fatal_error(
-        "when -num-instr=all is specified, calls are not supported", false);
+    snippy::fatal("when -num-instr=all is specified, calls are not supported");
 
   if (FillCodeSectionMode && SelfCheckPeriod)
-    report_fatal_error(
-        "when -num-instr=all is specified, selfcheck is not supported", false);
+    snippy::fatal(
+        "when -num-instr=all is specified, selfcheck is not supported");
   if (FillCodeSectionMode && Cfg.Burst.Data->Mode != BurstMode::Basic)
-    report_fatal_error(
-        "when -num-instr=all is specified, burst mode is not supported", false);
+    snippy::fatal(
+        "when -num-instr=all is specified, burst mode is not supported");
 }
 
 static void setBurstGramIfNeeded(BurstGram &BGram,
@@ -485,9 +481,8 @@ seedOptToValue(StringRef SeedStr, StringRef SeedType = "instructions seed",
 
   unsigned long long SeedValue;
   if (getAsUnsignedInteger(SeedStr, /* Radix */ 10, SeedValue))
-    report_fatal_error("Provided " + SeedType +
-                           " is not convertible to numeric value.",
-                       false);
+    snippy::fatal(
+        formatv("Provided {0} is not convertible to numeric value.", SeedType));
   return SeedValue;
 }
 
@@ -501,8 +496,8 @@ static unsigned getSelfcheckPeriod() {
   unsigned long long SelfCheckPeriod = 0;
   if (getAsUnsignedInteger(SelfCheck.getValue(), /* Radix */ 10,
                            SelfCheckPeriod))
-    report_fatal_error(
-        "Value of selfcheck option is not convertible to numeric one.", false);
+    snippy::fatal(
+        "Value of selfcheck option is not convertible to numeric one.");
   assert(isUInt<sizeof(unsigned) * CHAR_BIT>(SelfCheckPeriod));
   return SelfCheckPeriod;
 }
@@ -534,9 +529,11 @@ std::vector<std::string> parseModelPluginList() {
   if ((!ModelPluginFile.isSpecified() ||
        ModelPluginFile.getValue() == "None") &&
       CoSimModelPluginFilesList.size())
-    report_fatal_error("--" + CoSimModelPluginFilesList.ArgStr +
-                       " can only be used when --" + ModelPluginFile.ArgStr +
-                       " is provided and is not None");
+    snippy::fatal(formatv("--{0}"
+                          " can only be used when --{1}"
+                          " is provided and is not None",
+                          CoSimModelPluginFilesList.ArgStr,
+                          ModelPluginFile.ArgStr));
   if (ModelPluginFile.getValue() == "None" &&
       DumpResultingRegisters.isSpecified())
     snippy::fatal("Dump resulting registers can't be done",
@@ -572,10 +569,9 @@ static void parseReservedRegistersOption(RegPool &RP, const SnippyTarget &Tgt,
   for (auto &&RegName : ReservedRegisterList) {
     auto Reg = findRegisterByName(Tgt, RI, RegName);
     if (!Reg)
-      report_fatal_error("Illegal register name " + Twine(RegName) +
-                             " is specified in --" +
-                             ReservedRegisterList.ArgStr,
-                         false);
+      snippy::fatal(formatv("Illegal register name {0}"
+                            " is specified in --{1}",
+                            RegName, ReservedRegisterList.ArgStr));
     llvm::for_each(Tgt.getPhysRegsFromUnit(Reg.value(), RI),
                    [&RP](auto SimpleReg) {
                      RP.addReserved(SimpleReg, AccessMaskBit::GRW);
@@ -607,15 +603,14 @@ parseSpilledRegistersOption(RegPool &RP, const SnippyTarget &Tgt,
   for (auto &&RegName : SpilledRegisterList) {
     auto Reg = findRegisterByName(Tgt, RI, RegName);
     if (!Reg)
-      report_fatal_error("Illegal register name " + Twine(RegName) +
-                             " is specified in --" + SpilledRegisterList.ArgStr,
-                         false);
+      snippy::fatal(formatv("Illegal register name {0}"
+                            " is specified in --{1}",
+                            RegName, SpilledRegisterList.ArgStr));
 
     if (RP.isReserved(Reg.value()))
-      report_fatal_error(
-          "Register \"" + Twine(RegName) +
-              "\" cannot be spilled, because it is explicitly reserved.\n",
-          false);
+      snippy::fatal(formatv("Register \"{0}\" cannot be spilled, because it is "
+                            "explicitly reserved.\n",
+                            RegName));
     SpilledRegs.push_back(Reg.value());
   }
 
@@ -677,30 +672,28 @@ static MCRegister getRealStackPointer(const RegPool &RP, const Config &Cfg,
     auto RegStr = RedefineSP.getValue().substr(RegPrefix.size());
     auto Reg = findRegisterByName(Tgt, RI, RegStr);
     if (!Reg)
-      report_fatal_error("Illegal register name " + Twine(RegStr) +
-                             " is specified in --" + RedefineSP.ArgStr,
-                         false);
+      snippy::fatal(formatv("Illegal register name {0}"
+                            " is specified in --{1}",
+                            RegStr, RedefineSP.ArgStr));
 
     if (RP.isReserved(Reg.value()))
-      report_fatal_error("Register " + Twine(RegStr) +
-                             " cannot redefine stack pointer, because it is "
-                             "explicitly reserved.\n",
-                         false);
+      snippy::fatal(
+          formatv("Register {0} cannot redefine stack pointer, because it is "
+                  "explicitly reserved.\n",
+                  RegStr));
 
     if (FullFilter(Reg.value()))
-      report_fatal_error("Register " + Twine(RegStr) + " specified in --" +
-                             RedefineSP.ArgStr +
-                             " is not suitable for stack pointer redefinition",
-                         false);
+      snippy::fatal(formatv("Register {0} specified in --{1} is not suitable "
+                            "for stack pointer redefinition",
+                            RegStr, RedefineSP.ArgStr));
 
     RealSP = Reg.value();
   } else if (RedefineSP == "any" || RedefineSP == "any-not-SP") {
     RealSP =
         RP.getAvailableRegister("stack pointer", FullFilter, RI, SPRegClass);
   } else {
-    report_fatal_error("\"" + Twine(RedefineSP) + "\"" + ", passed to --" +
-                           RedefineSP.ArgStr + " is not valid option value",
-                       false);
+    snippy::fatal(formatv("\"{0}\", passed to --{1} is not valid option value",
+                          RedefineSP, RedefineSP.ArgStr));
   }
 
   // We need to spill SP if it is not used as intended
@@ -729,7 +722,7 @@ static void readSnippyOptionsIfNeeded() {
     OptionsMappingWrapper OMWP;
     auto Err = loadYAMLIgnoreUnknownKeys(OMWP, LayoutFile.getValue());
     if (Err)
-      report_fatal_error(toString(std::move(Err)).c_str(), false);
+      snippy::fatal(toString(std::move(Err)).c_str());
   }
 }
 
@@ -956,10 +949,9 @@ static std::string getMemPluginInfo() {
   if (MemAddrGeneratorInfoFile == "None")
     FileName = "";
   if (!FileName.empty() && getMemPlugin().empty())
-    report_fatal_error("Addresses generator plugin info file "
-                       "may be used only with " +
-                           Twine(MemAddrGeneratorFile.ArgStr) + "Option",
-                       false);
+    snippy::fatal(formatv("Addresses generator plugin info file "
+                          "may be used only with {0}Option",
+                          MemAddrGeneratorFile.ArgStr));
   return FileName;
 }
 
@@ -1193,9 +1185,6 @@ int main(int Argc, char **Argv) {
       [](raw_ostream &OS) { OS << "Revision: " LLVM_REVISION "\n\n"; });
 #endif
   cl::ParseCommandLineOptions(Argc, Argv, "");
-
-  snippy::ExitOnErr.setExitCodeMapper(
-      [](const Error &Err) { return EXIT_FAILURE; });
 
   snippy::generateMain();
   snippy::reportWarningsSummary();

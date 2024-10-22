@@ -147,7 +147,7 @@ selectAddressForSingleInstrFromBurstGroup(AddressInfo OrigAI,
 unsigned normalizeNumRegs(unsigned NumDefs, unsigned NumAddrs,
                           unsigned NumRegs) {
   if (NumRegs == 0)
-    report_fatal_error("No registers left to reserve for burst mode", false);
+    snippy::fatal("No registers left to reserve for burst mode");
   auto Ratio = 1.0 * NumRegs / (NumAddrs + NumDefs);
   if (Ratio > 1.0)
     return NumAddrs;
@@ -422,9 +422,8 @@ std::vector<unsigned> generateBaseRegs(MachineBasicBlock &MBB,
     --NumAvailRegs;
   }
   if (NumAvailRegs == 0)
-    report_fatal_error(
-        "No available registers to generate addresses for the burst group.",
-        false);
+    snippy::fatal(
+        "No available registers to generate addresses for the burst group.");
   const auto &RegInfo = *SGCtx.getSubtargetImpl().getRegisterInfo();
   // Get number of def and addr regs to use in the burst group. These values
   // can be bigger than the number of available registers.
@@ -441,12 +440,11 @@ std::vector<unsigned> generateBaseRegs(MachineBasicBlock &MBB,
   if (NumDefs > 0)
     ++MinAvailRegs;
   if (MinAvailRegs > NumAvailRegs)
-    report_fatal_error(
+    snippy::fatal(
         "Cannot generate burst group: don't have enough registers available. "
         "Please, try to reduce amount of registers reserved by decreasing "
         "loops nestness or change instructions used in burst groups if these "
-        "instructions may be used with a very limited set of registers.",
-        false);
+        "instructions may be used with a very limited set of registers.");
 
   NumAddrs = normalizeNumRegs(NumDefs, NumAddrs, NumAvailRegs);
 
