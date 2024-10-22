@@ -15,4 +15,4 @@ sections:
 histogram:
     - [ADD, 1.0]
 
-# CHECK: LLVM ERROR: Invalid access attribute in config: Z is not allowed. Acceptable ones: r, w, x.
+# CHECK: error: Invalid access attribute in config: Z is not allowed. Acceptable ones: r, w, x.

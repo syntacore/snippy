@@ -778,9 +778,8 @@ static void checkGenModeCompatibility(GeneratorContext &GenCtx,
   bool LoopGenerated = !MLI.empty();
   bool TrackingEnabled = GenCtx.hasTrackingMode();
   if (LoopGenerated && TrackingEnabled)
-    report_fatal_error(
-        "Generation by size with loops in tracking mode is not supported",
-        false);
+    snippy::fatal(
+        "Generation by size with loops in tracking mode is not supported");
 }
 
 planning::FunctionRequest

@@ -8,6 +8,7 @@
 #pragma once
 
 #include "snippy/Plugins/PluginCInterface.h"
+#include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/OpcodeGenerator.h"
 
 #include <algorithm>
@@ -58,13 +59,13 @@ class PluginManager final {
     Plugin(const PluginFunctionsTable *DLTable, Iter First, Iter Last)
         : Communicator{DLTable} {
       if (std::distance(First, Last) == 0)
-        report_fatal_error(
-            "Plugin initialization failure: opcodes are not defined.\n"
+        snippy::fatal(
+            "Plugin initialization failure",
+            "opcodes are not defined."
             "This may happen when you can not generate any instruction in "
             "specific context.\n"
             "Try to increase requested number of instructions or add more "
-            "available instructions.\n",
-            false);
+            "available instructions.");
       std::vector<unsigned> OpcodesToSend;
       std::transform(First, Last, std::back_inserter(OpcodesToSend),
                      [](auto It) { return It.first; });
@@ -78,8 +79,8 @@ class PluginManager final {
     unsigned generate() override {
       auto NewOpc = Communicator.generate(GeneratorID);
       if (AvailableOpcodes.count(NewOpc) == 0)
-        report_fatal_error(
-            "Plugin generated opcode doesn't fit in the current policy", false);
+        snippy::fatal("Plugin opcode",
+                      "generated opcode doesn't fit in the current policy");
       return NewOpc;
     }
 
@@ -125,10 +126,10 @@ public:
     Opcodes PluginOpcodes = {0, nullptr};
     auto CanParse = DLTable->parseOpcodes(&PluginOpcodes, FileName.c_str());
     if (CanParse == PARSING_NOT_SUPPORTED)
-      report_fatal_error("Plugin doesn't support parsing", false);
+      snippy::fatal("Plugin doesn't support parsing.");
 
     if (PluginOpcodes.Num == 0 || !PluginOpcodes.Data)
-      report_fatal_error("Invalid opcodes from plugin", false);
+      snippy::fatal("Invalid opcodes from plugin.");
 
     for (unsigned i = 0; i < PluginOpcodes.Num; i++)
       HistogramIt = std::pair{PluginOpcodes.Data[i], OpcDefaultWeight};

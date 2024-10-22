@@ -23,4 +23,4 @@ histogram:
 # COM: we don't have VSETVL in histogram here - this is not an error
 # COM: since configuraition/ext checks should happen before
 
-# CHECK: LLVM ERROR: RVV configuration file should not be specified for targets without RVV
+# CHECK: error: RVV configuration file should not be specified for targets without RVV

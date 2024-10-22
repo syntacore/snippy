@@ -11,4 +11,4 @@ access-evictions:
       fixed: 0x80000010
       weight: 0
 
-# CHECK: LLVM ERROR: Memory schemes are too restrictive to generate the requested instructions. Size: 1 Alignment: 1
+# CHECK: error: Memory schemes are too restrictive to generate the requested instructions. Size: 1 Alignment: 1

@@ -10,4 +10,4 @@ sections:
 
 histogram:
 
-# CHECK: LLVM ERROR: OpcodeGenerator initialization failure: empty histogram specified
+# CHECK: error: OpcodeGenerator initialization failure: empty histogram specified

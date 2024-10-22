@@ -48,7 +48,7 @@ using FilePathT = SmallString<20>;
 
 static void checkError(const std::error_code &ECode, StringRef What = "") {
   if (Error E = errorCodeToError(ECode))
-    report_fatal_error(Twine(What) + ": " + ECode.message(), false);
+    snippy::fatal(Twine(What) + ": " + ECode.message());
 }
 
 static std::string link(StringRef LLD, StringRef LinkerScript, bool Relocatable,
@@ -70,7 +70,7 @@ static std::string link(StringRef LLD, StringRef LinkerScript, bool Relocatable,
 
   auto RetCode = sys::ExecuteAndWait(LLD, LLDCommands);
   if (RetCode)
-    report_fatal_error("lld returned non-zero status", false);
+    snippy::fatal("lld returned non-zero status");
 
   uint64_t OutSize;
   checkError(sys::fs::file_size(OutPath, OutSize),
@@ -78,7 +78,7 @@ static std::string link(StringRef LLD, StringRef LinkerScript, bool Relocatable,
 
   constexpr auto MAX_SUPPORTED_SIZE = 1ull << 32;
   if (OutSize > MAX_SUPPORTED_SIZE)
-    report_fatal_error("file size > 4Gb not supported");
+    snippy::fatal("file size > 4Gb not supported");
 
   checkError(sys::fs::openFileForRead(OutPath, FD),
              "Could not open temporary file");
@@ -88,7 +88,7 @@ static std::string link(StringRef LLD, StringRef LinkerScript, bool Relocatable,
   Ret.resize(OutSize + 1);
   auto ExpRead = sys::fs::readNativeFile(NH, {Ret.data(), Ret.size()});
   if (!ExpRead || ExpRead.get() != OutSize)
-    report_fatal_error("Failed on temporary file read", false);
+    snippy::fatal("Failed on temporary file read");
 
   sys::fs::remove(OutPath);
   return Ret;
@@ -130,14 +130,13 @@ static StringRef findLLD() {
 
     auto LLDExeE = sys::findProgramByName("ld.lld", {LLDDir});
     if (!LLDExeE) {
-      report_fatal_error(
+      snippy::fatal(
           Twine("Could not find ld.lld: ") +
-              (PathSpecified
-                   ? StringRef("Please, specify it's path via "
-                               "--lld-path=<path to ld.lld> or copy it to "
-                               "llvm-snippy installation directory.")
-                   : StringRef("Could not find it in the specified path.")),
-          false);
+          (PathSpecified
+               ? StringRef("Please, specify it's path via "
+                           "--lld-path=<path to ld.lld> or copy it to "
+                           "llvm-snippy installation directory.")
+               : StringRef("Could not find it in the specified path.")));
     }
     Found = LLDExeE.get();
   }

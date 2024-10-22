@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Simulator/SelfcheckObserver.h"
+#include "snippy/Support/DiagnosticInfo.h"
 
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
@@ -52,9 +53,8 @@ void SelfcheckObserver::dumpAsYaml(StringRef Path) {
   std::error_code EC;
   raw_fd_ostream File(Path, EC);
   if (EC)
-    report_fatal_error("Selfcheck annotation dump error: " + EC.message() +
-                           ": " + Path,
-                       false);
+    snippy::fatal("Selfcheck annotation dump error: " + EC.message() + ": " +
+                  Path);
 
   yaml::Output Yout(File);
   Yout << *this;

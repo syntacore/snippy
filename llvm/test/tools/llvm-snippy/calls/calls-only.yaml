@@ -16,4 +16,4 @@ sections:
 histogram:
     - [JAL, 0.2]
 
-# CHECK: LLVM ERROR: for using calls you need to add to histogram non-call instructions
+# CHECK: error: for using calls you need to add to histogram non-call instructions

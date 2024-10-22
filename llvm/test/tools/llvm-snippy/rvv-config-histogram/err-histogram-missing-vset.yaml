@@ -27,4 +27,4 @@ histogram:
 
     - [VADD_VV, 1.0]
 
-# CHECK: LLVM ERROR: No VSET instruction detected in histogram
+# CHECK: error: No VSET instruction detected in histogram

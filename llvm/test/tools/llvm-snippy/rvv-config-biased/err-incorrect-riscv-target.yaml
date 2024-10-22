@@ -20,4 +20,4 @@ histogram:
 
     - [ADD, 1.0]
 
-# CHECK: LLVM ERROR: RVV configuration file should not be specified for targets without RVV
+# CHECK: error: RVV configuration file should not be specified for targets without RVV

@@ -36,5 +36,5 @@ histogram:
     - [SUB, 1.0]
 
 #
-# SIZE_ERROR: LLVM ERROR: Function 'SnippyFunction' won't fit into assigned section '1' of size 16 after prologue insertion
+# SIZE_ERROR: error: Function 'SnippyFunction' won't fit into assigned section '1' of size 16 after prologue insertion
 # SIZE_ERROR-NEXT: Total function size: {{[0-9]+}}; Prologue size: {{[0-9]+}}

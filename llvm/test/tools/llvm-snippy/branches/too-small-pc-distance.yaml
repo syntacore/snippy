@@ -14,7 +14,7 @@
 # RUN: not llvm-snippy %t.3.yaml -march=riscv64-linux-gnu -num-instrs=50 \
 # RUN:     -verify-mi -o %t.3 |& FileCheck %t.3.yaml
 
-# CHECK: error: LLVM ERROR: Max PC distance (DIST) is less than max instruction size: 4
+# CHECK: error: Max PC distance (DIST) is less than max instruction size: 4
 
 sections:
   - no:        1

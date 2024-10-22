@@ -29,7 +29,7 @@ public:
   SnippyX86Target() = default;
 
   [[noreturn]] void reportUnimplementedError() const {
-    report_fatal_error("sorry, X86 target is not implemented", false);
+    snippy::fatal("sorry, X86 target is not implemented");
   }
 
   bool matchesArch(Triple::ArchType Arch) const override;

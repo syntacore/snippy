@@ -140,13 +140,12 @@ void diagnoseHistogram(LLVMContext &Ctx, const OpcodeCache &OpCC,
   };
   if (std::find_if(Histogram.begin(), Histogram.end(), InvalidOpcChecker) !=
       Histogram.end())
-    report_fatal_error("Plugin filled histogram with invalid opcodes", false);
+    snippy::fatal("Plugin filled histogram with invalid opcodes");
 
   auto InvalidWeightsChecker = [](auto It) { return It.second < 0; };
   if (std::find_if(Histogram.begin(), Histogram.end(), InvalidWeightsChecker) !=
       Histogram.end())
-    report_fatal_error("Plugin filled histogram with negative opcodes weights",
-                       false);
+    snippy::fatal("Plugin filled histogram with negative opcodes weights");
 }
 
 bool OpcodeHistogram::hasCallInstrs(const OpcodeCache &OpCC,

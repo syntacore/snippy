@@ -31,9 +31,9 @@ histogram:
     - [SUB, 1.0]
     - [JAL, 0.2]
 
-# NOSTACK: error: LLVM ERROR: Cannot generate requested call instructions: layout allows calls with depth>=1 but stack space is not provided.
-# ZERO-LAYER: error: LLVM ERROR: Invalid number of function layers: expected >=1
-# ZERO-FUN: error: LLVM ERROR: Invalid number of functions: expected >=1
-# RA-RES: error: LLVM ERROR: Cannot generate requested call instructions: return address register is explicitly reserved.
-# TRACK: error: LLVM ERROR: Cannot generate requested call instructions: backtrack and selfcheck do not work with calls yet.
-# ALL: LLVM ERROR: when -num-instr=all is specified, calls are not supported
+# NOSTACK: error: Cannot generate requested call instructions: layout allows calls with depth>=1 but stack space is not provided.
+# ZERO-LAYER: error: Invalid number of function layers: expected >=1
+# ZERO-FUN: error: Invalid number of functions: expected >=1
+# RA-RES: error: Cannot generate requested call instructions: return address register is explicitly reserved.
+# TRACK: error: Cannot generate requested call instructions: backtrack and selfcheck do not work with calls yet.
+# ALL: error: when -num-instr=all is specified, calls are not supported

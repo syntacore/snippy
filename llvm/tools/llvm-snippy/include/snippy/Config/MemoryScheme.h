@@ -419,9 +419,8 @@ struct MemoryAccessAddresses final : MemoryAccess {
 
   // FIXME: any reason to keep `getlowerbound` as a virtual function?
   MemAddr getLowerBound() const override {
-    report_fatal_error(
-        "getLowerBound for 'Addresses' memory scheme is not implemented",
-        false);
+    snippy::fatal(
+        "getLowerBound for 'Addresses' memory scheme is not implemented");
   }
 };
 

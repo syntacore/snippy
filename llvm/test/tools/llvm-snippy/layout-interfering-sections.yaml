@@ -23,4 +23,4 @@ histogram:
     - [ADDI, 1.0]
     - [SW, 5.0]
 
-# CHECK: LLVM ERROR: Incorrect list of sections: section 1 and section 2 are interfering
+# CHECK: error: Incorrect list of sections: section 1 and section 2 are interfering
