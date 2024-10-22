@@ -4,4 +4,4 @@
 include:
   - Inputs/only-sections.yaml
 
-# CHECK: LLVM ERROR: OpcodeGenerator initialization failure: empty histogram specified
+# CHECK: error: OpcodeGenerator initialization failure: empty histogram specified

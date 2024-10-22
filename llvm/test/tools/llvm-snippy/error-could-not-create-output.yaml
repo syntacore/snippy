@@ -19,4 +19,4 @@ histogram:
     - [ADD, 1.0]
     - [ADDI, 1.0]
 
-# CHECK: LLVM ERROR: No such file or directory: /wobble/wobble/wobble/wobble/wobble/wobble/out.docx.elf
+# CHECK: error: No such file or directory: /wobble/wobble/wobble/wobble/wobble/wobble/out.docx.elf

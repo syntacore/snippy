@@ -16,4 +16,4 @@ sections:
 histogram:
     - [ADD, 1.0]
 
-# CHECK: LLVM ERROR: No available register GPRNoX0: stack pointer
+# CHECK: error: No available register GPRNoX0: stack pointer

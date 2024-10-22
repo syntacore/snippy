@@ -43,27 +43,27 @@ histogram:
     - [AND, 1.0]
 
 # MINGTMAX: error: Max size of burst group should be greater than min size
-# MINGTMAX: LLVM ERROR: Failed to parse file
+# MINGTMAX: error: Failed to parse file
 
 # MINMAXZERO: error-burst-min-max-zero.yaml:2:3: error: Burst max size should be greater than 0
-# MINMAXZERO: LLVM ERROR: Failed to parse file
+# MINMAXZERO: error: Failed to parse file
 
 # ERRMODE: error: unknown enumerated scalar
-# ERRMODE: LLVM ERROR: Failed to parse file
+# ERRMODE: error: Failed to parse file
 
 # MIXEDGROUPINGS: error: Groupings can be specified only with custom burst mode
-# MIXEDGROUPINGS: LLVM ERROR: Failed to parse file
+# MIXEDGROUPINGS: error: Failed to parse file
 
 # NOGROUPINGS: error: Custom burst mode was specified but groupings are not provided
-# NOGROUPINGS: LLVM ERROR: Failed to parse file
+# NOGROUPINGS: error: Failed to parse file
 
 # EMPTYGROUPINGS: error: Custom burst mode was specified but groupings are not provided 
-# EMPTYGROUPINGS: LLVM ERROR: Failed to parse file
+# EMPTYGROUPINGS: error: Failed to parse file
 
-# UNKNOWNOPC: {{LLVM ERROR:  Unknown instruction \"(.+)\" in burst configuration}}
+# UNKNOWNOPC: {{error:  Unknown instruction \"(.+)\" in burst configuration}}
 
 # EMPTYGROUP: error: Burst grouping can't be empty
-# EMPTYGROUP: LLVM ERROR: Failed to parse file
+# EMPTYGROUP: error: Failed to parse file
 
 # NONZEROBASIC: error-burst-basic-burst-with-non-zero-group.yaml:2:3: error: Min and max burst group sizes should be 0 with "basic" mode
-# NONZEROBASIC: LLVM ERROR: Failed to parse file
+# NONZEROBASIC: error: Failed to parse file

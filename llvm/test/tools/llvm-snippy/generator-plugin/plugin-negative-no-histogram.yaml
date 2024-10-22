@@ -2,4 +2,4 @@
 # RUN:    -dump-mf   \
 # RUN:    -init-regs-in-elf --verify-mi |& FileCheck %s --dump-input fail
 
-# CHECK: LLVM ERROR: OpcodeGenerator initialization failure: empty histogram specified
+# CHECK: error: OpcodeGenerator initialization failure: empty histogram specified

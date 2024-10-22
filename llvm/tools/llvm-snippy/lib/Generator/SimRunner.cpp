@@ -65,9 +65,8 @@ void SimRunner::run(StringRef Program, const IRegisterState &InitialRegState) {
   auto StopPC = getAddressOfSymbolInImage(Program, Linker::getExitSymbolName());
   if (auto E = StopPC.takeError()) {
     auto Err = toString(std::move(E));
-    report_fatal_error("[Internal error]: unable to get last instruction PC: " +
-                           Twine(Err) + Twine("\nPlease, report a bug"),
-                       false);
+    snippy::fatal("[Internal error]: unable to get last instruction PC: " +
+                  Twine(Err) + Twine("\nPlease, report a bug"));
   }
   for (auto &I : CoInterp) {
     I->setInitialState(InitialRegState);
@@ -116,8 +115,7 @@ void SimRunner::checkStates(bool CheckMemory) {
     llvm::raw_string_ostream Stream(MismatchMessage);
     for (auto &I : CoInterp)
       I->dumpCurrentRegStateToStream(Stream);
-    report_fatal_error(
-        "Interpreters states differ :\n" + Twine(MismatchMessage), false);
+    snippy::fatal("Interpreters states differ :\n" + Twine(MismatchMessage));
   }
 }
 

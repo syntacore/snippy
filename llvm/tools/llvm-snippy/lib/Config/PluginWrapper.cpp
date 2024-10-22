@@ -26,19 +26,18 @@ void PluginManager::loadPluginDL(const std::string &PluginLibName) {
   const auto *VTable = reinterpret_cast<const PluginFunctionsTable *>(
       Lib.getAddressOfSymbol(PLUGIN_ENTRY_NAME));
   if (!VTable)
-    report_fatal_error("Can't find entry point of plugin generator", false);
+    snippy::fatal("Can't find entry point of plugin generator");
   DLTable = VTable;
 }
 
 unsigned getOpcodeFromStr(const char *Str,
                           const OpcodeCacheHandle *OpcCacheHandle) {
   if (!OpcCacheHandle)
-    report_fatal_error("Null opcode cache handle", false);
+    snippy::fatal("Null opcode cache handle");
   auto OpcCache = reinterpret_cast<const OpcodeCache *>(OpcCacheHandle);
   auto Opcode = OpcCache->code(Str);
   if (!Opcode)
-    report_fatal_error("Incorrect opcode in plugin: [" + Twine(Str) + "]",
-                       false);
+    snippy::fatal("Incorrect opcode in plugin: [" + Twine(Str) + "]");
   return Opcode.value();
 }
 

@@ -7,8 +7,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Support/DynLibLoader.h"
+#include "snippy/Support/DiagnosticInfo.h"
 
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #include <dlfcn.h>
 
@@ -72,8 +74,7 @@ std::string getDynLibPath(StringRef DynLib,
                                       << FindModifiedName.value() << "\n");
     return FindModifiedName.value();
   }
-  report_fatal_error(Twine("could not find library for plugin: ") + DynLib,
-                     false);
+  snippy::fatal(formatv("could not find library for plugin: {0}", DynLib));
 }
 
 DynamicLibrary::DynamicLibrary(StringRef LibraryPath,
@@ -86,15 +87,14 @@ DynamicLibrary::DynamicLibrary(StringRef LibraryPath,
   if (Handle)
     return;
 
-  llvm::report_fatal_error("could not load library: " + Twine(ErrMsg), false);
+  llvm::snippy::fatal(formatv("could not load library: {0}", ErrMsg));
 }
 
 void *DynamicLibrary::getAddressOfSymbol(const char *symbolName) const {
   auto *Sym = ::dlsym(Handle, symbolName);
   if (!Sym) {
-    report_fatal_error("Failed to fetch symbol " + Twine(symbolName) + ": " +
-                           Twine(::dlerror()),
-                       false);
+    snippy::fatal(
+        formatv("Failed to fetch symbol {0}: {1}", symbolName, ::dlerror));
   }
   return Sym;
 }

@@ -111,8 +111,7 @@ class AvailableRegisterImpl {
         });
 
     if (!RegIdxs)
-      report_fatal_error(make_error<NoAvailableRegister>(RegClass, RI, Desc),
-                         false);
+      snippy::fatal(make_error<NoAvailableRegister>(RegClass, RI, Desc));
 
     transform(*RegIdxs, OutputIt,
               [&RegClass](auto Idx) { return RegClass.getRegister(Idx); });

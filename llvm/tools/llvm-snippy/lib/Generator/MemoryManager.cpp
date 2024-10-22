@@ -16,6 +16,7 @@
 #include "snippy/Target/Target.h"
 
 #include "llvm/ADT/APInt.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 
@@ -40,8 +41,7 @@ void fillProgSectionInfo(const GeneratorContext &GC, MemoryConfig &Config) {
   }
 
   if (Config.ProgSections.empty())
-    report_fatal_error("Incorrect list of sections: no used RX sections found",
-                       false);
+    snippy::fatal("Incorrect list of sections: no used RX sections found");
 }
 
 MemorySectionConfig getRamInfo(const Linker &L) {
@@ -58,9 +58,8 @@ MemorySectionConfig getRamInfo(const Linker &L) {
 
   if (std::any_of(RWSectionIt, RWSectionLast, std::not_fn(IsRW)) ||
       (RWSectionIt != Sections.begin() && RWSectionLast != Sections.end()))
-    report_fatal_error("Incorrect list of sections: all RW sections must go "
-                       "either before all other sections or after them all",
-                       false);
+    snippy::fatal("Incorrect list of sections: all RW sections must go "
+                  "either before all other sections or after them all");
 
   const auto &OutputSectionDesc = RWSectionIt->OutputSection.Desc;
   auto RamVMABegin = OutputSectionDesc.VMA;

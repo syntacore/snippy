@@ -21,6 +21,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #include <variant>
 #include <vector>
@@ -147,9 +148,10 @@ int genImmInInterval(const ImmediateHistogramSequence &IH) {
   auto First = std::lower_bound(IH.Values.begin(), IH.Values.end(), MinValue);
   auto Last = std::upper_bound(IH.Values.begin(), IH.Values.end(), MaxValue);
   if (First == Last)
-    report_fatal_error("Immediate histogram does not contain any values in [" +
-                           Twine(MinValue) + "; " + Twine(MaxValue) + "]",
-                       false);
+    snippy::fatal("Immediate histogram",
+                  formatv("it does not contain any values in [{0}; {1}]",
+                          MinValue, MaxValue));
+
   auto FirstIdx = std::distance(IH.Values.begin(), First);
   auto LastIdx = std::distance(IH.Values.begin(), Last);
   std::discrete_distribution<unsigned> Dist(IH.Weights.begin() + FirstIdx,
@@ -242,8 +244,8 @@ auto genImmInInterval(const ImmediateHistogramSequence &IH) {
   }
 
   if (Values.empty())
-    report_fatal_error(
-        "Immediate histogram does not contain any suitable values", false);
+    snippy::fatal("Immediate histogram",
+                  "it does not contain any suitable values.");
 
   std::discrete_distribution<unsigned> Dist(Weights.begin(), Weights.end());
 

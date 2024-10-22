@@ -18,6 +18,7 @@
 #include "snippy/Target/Target.h"
 
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #include <set>
 #include <vector>
@@ -152,7 +153,7 @@ static void collectSectionsWithAccess(Interpreter &I, InsertIt Inserter,
 }
 
 static void reportParsingError(Twine Msg) {
-  report_fatal_error("Memory dump option parsing: " + Msg, false);
+  snippy::fatal(formatv("Memory dump option parsing: {0}", Msg));
 }
 
 static size_t getAddressFromString(StringRef AddrString) {
@@ -207,8 +208,7 @@ static void getRangesFromSelector(Interpreter &I, InsertIt Inserter,
   }
   auto RangeOpt = I.getSectionPosition(Selector);
   if (!RangeOpt)
-    report_fatal_error("failed to find a section {" + Twine(Selector) + "}",
-                       false);
+    snippy::fatal(formatv("failed to find a section {{0}}", Selector));
   Inserter = *RangeOpt;
 }
 
@@ -251,13 +251,11 @@ void GeneratorContext::checkMemStateAfterSelfcheck() const {
         auto FaultAddr = SelfcheckSection.VMA + Offset + ByteIdx;
         LLVM_DEBUG(
             dumpSelfCheck(Data, BlockSize / ChunksNum, ChunksNum, dbgs()));
-        report_fatal_error("Incorrect memory state after interpretation in "
-                           "self-check mode. Error is in block @ 0x" +
-                               Twine::utohexstr(FaultAddr) + "{" +
-                               Twine::utohexstr(SelfcheckSection.VMA) + " + " +
-                               Twine::utohexstr(Offset) + " + " +
-                               Twine::utohexstr(ByteIdx) + "}\n",
-                           false);
+        snippy::fatal(formatv(
+            "Incorrect memory state after interpretation in "
+            "self-check mode. Error is in block @ 0x{0}{{1} + {2} + {3}}\n",
+            Twine::utohexstr(FaultAddr), Twine::utohexstr(SelfcheckSection.VMA),
+            Twine::utohexstr(Offset), Twine::utohexstr(ByteIdx)));
       }
     }
   }
@@ -377,11 +375,11 @@ SectionDesc allocateRWSection(SectionsDescriptions &Sections,
   };
   auto SecVMA = findPlaceForNewSection(Sections, IsRW, SectionSize, Alignment);
   if (!SecVMA)
-    report_fatal_error("Failed to emplace selfcheck section: Could not find " +
-                           Twine(SectionSize) +
-                           " bytes of consecutive free space outside of "
-                           "sections specified in layout.",
-                       false);
+    snippy::fatal(
+        formatv("Failed to emplace selfcheck section: Could not find {0}"
+                " bytes of consecutive free space outside of "
+                "sections specified in layout.",
+                SectionSize));
 
   auto SecVMAValue = SecVMA.value();
   auto SCSection =
@@ -673,9 +671,8 @@ GeneratorContext::GeneratorContext(SnippyProgramContext &ProgContext,
   if (std::any_of(GenSettings->RegistersConfig.SpilledToStack.begin(),
                   GenSettings->RegistersConfig.SpilledToStack.end(),
                   [SP](auto Reg) { return Reg == SP; }))
-    report_fatal_error("Stack pointer cannot be spilled. Remove it from "
-                       "spill register list.",
-                       false);
+    snippy::fatal("Stack pointer cannot be spilled. Remove it from "
+                  "spill register list.");
 
   if (!getProgramContext().hasStackSection()) {
     if (!GenSettings->RegistersConfig.SpilledToStack.empty())

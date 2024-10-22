@@ -18,7 +18,7 @@
 # RUN:     -verify-mi -o %t.3 |& FileCheck %t.3.yaml \
 # RUN:     --check-prefix=SIZE-WARN
 
-# PARSE-FAIL: error: LLVM ERROR: Failed to parse file
+# PARSE-FAIL: error: Failed to parse file
 
 # SIZE-WARN: remark: Specified max PC Distance is more than max distance for generated branch: Specified: 9876543210, max distance for BEQ: 4095
 

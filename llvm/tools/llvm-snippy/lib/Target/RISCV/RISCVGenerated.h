@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include "snippy/Support/DiagnosticInfo.h"
+
 #include "RISCV.h"
 #include "RISCVInstrInfo.h"
 #include "RISCVRegisterInfo.h"

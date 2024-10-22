@@ -113,7 +113,7 @@ void FunctionDistribute::verifyFunctionSizes(Module &M,
     OS << "Please, provide more space in RX sections or reduce instruction "
           "count.";
 
-    report_fatal_error(StringRef(Message), false);
+    snippy::fatal(StringRef(Message));
   }
 }
 void FunctionDistribute::calculateFunctionSizes(Module &M) {
@@ -182,11 +182,10 @@ bool FunctionDistribute::runOnModule(Module &M) {
     auto PlaceE = RandEngine::genNUniqInInterval(
         0ul, AvailableSpace.size() - 1ul, 1ul, HasNoSpaceFor);
     if (!PlaceE || PlaceE.get().empty())
-      report_fatal_error(
+      snippy::fatal(
           "Failed to fit secondary code in specified RX "
           "sections: not enough contiguos space found. Please, provide more "
-          "space in RX sections or reduce instruction count.",
-          false);
+          "space in RX sections or reduce instruction count.");
 
     auto &Section = AvailableSpace.at(PlaceE.get().front());
     F->setSection(Section.Name);

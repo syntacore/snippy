@@ -17,4 +17,4 @@ histogram:
     - [ADD, 1.0]
     - [ADDI, 1.0]
 
-# CHECK: LLVM ERROR: One of layout memory regions interferes with reserved region:
+# CHECK: error: One of layout memory regions interferes with reserved region:

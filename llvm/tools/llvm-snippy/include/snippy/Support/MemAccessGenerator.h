@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include "snippy/Support/DiagnosticInfo.h"
+
 #include "llvm/Support/raw_ostream.h"
 
 #include "RandUtil.h"
@@ -88,7 +90,7 @@ template <typename Iter> class MemoryAccessGenerator final {
             "instructions."
          << " Size: " << Key.AccessSize << " Alignment: " << Key.Alignment
          << '\n';
-      report_fatal_error(ErrMsg.c_str(), false);
+      snippy::fatal(ErrMsg.c_str());
     }
 
     MemVal.MemDist = std::discrete_distribution<size_t>(MemWeights.begin(),

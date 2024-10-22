@@ -20,7 +20,7 @@ void MemorySchemePluginWrapper::loadPluginDL(StringRef PluginLibName) {
       reinterpret_cast<const ::MemorySchemePluginFunctionsTable *>(
           Lib.getAddressOfSymbol(MEMORY_SCHEME_PLUGIN_ENTRY_NAME));
   if (!VTable)
-    report_fatal_error("Can't find entry point of memory scheme plugin", false);
+    snippy::fatal("Can't find entry point of memory scheme plugin");
   DLTable = VTable;
 }
 
@@ -28,9 +28,8 @@ void MemorySchemePluginWrapper::setMemSchemePluginInfo(
     StringRef MemSchemePluginInfoFile) const {
   assert(DLTable && "Plugin hasn't been loaded yet");
   if (DLTable->setAddressInfoFile == nullptr)
-    report_fatal_error("Invalid memory scheme plugin functions table:"
-                       " missing setAddressInfoFile()",
-                       false);
+    snippy::fatal("Invalid memory scheme plugin functions table:"
+                  " missing setAddressInfoFile()");
   DLTable->setAddressInfoFile(MemSchemePluginInfoFile.str().c_str());
 }
 
@@ -40,16 +39,14 @@ MemorySchemePluginWrapper::getAddress(size_t AccessSize, size_t Alignment,
                                       size_t InstrClassId) const {
   assert(DLTable && "Plugin hasn't been loaded yet");
   if (DLTable->generateAddress == nullptr)
-    report_fatal_error("Invalid memory scheme plugin functions table:"
-                       " missing generateAddress()",
-                       false);
+    snippy::fatal("Invalid memory scheme plugin functions table:"
+                  " missing generateAddress()");
   auto GenMode = ::GenModeT{};
   auto Address = DLTable->generateAddress(AccessSize, Alignment, BurstMode,
                                           InstrClassId, &GenMode);
   if (GenMode != CANNOT_GENERATE_ADDRESS && GenMode != CAN_GENERATE_ADDRESS)
-    report_fatal_error("Bad response from memory scheme plugin: "
-                       "invalid generation mode",
-                       false);
+    snippy::fatal("Bad response from memory scheme plugin: "
+                  "invalid generation mode");
   if (GenMode == CANNOT_GENERATE_ADDRESS)
     return std::nullopt;
 
@@ -62,9 +59,8 @@ MemorySchemePluginWrapper::getAddress(size_t AccessSize, size_t Alignment,
 ::AddressGlobalId MemorySchemePluginWrapper::getAddressId() const {
   assert(DLTable && "Plugin hasn't been loaded yet");
   if (DLTable->generateAddressId == nullptr)
-    report_fatal_error("Invalid memory scheme plugin functions table:"
-                       " missing generateAddressId()",
-                       false);
+    snippy::fatal("Invalid memory scheme plugin functions table:"
+                  " missing generateAddressId()");
   auto AddrId = ::AddressGlobalId{0, {0, 0}};
   DLTable->generateAddressId(&AddrId);
   return AddrId;

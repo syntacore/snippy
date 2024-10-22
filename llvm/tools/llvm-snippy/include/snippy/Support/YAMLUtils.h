@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/Utils.h"
 
 #include "llvm/Support/Error.h"
@@ -288,10 +289,8 @@ void outputYAMLToFileOrFatal(ObjT &Obj, const Twine &Path,
         outputYAMLToStream(Obj, OS, [](auto &&) {});
         return Error::success();
       }))
-    report_fatal_error(
-        (Description.isTriviallyEmpty() ? "" : Description + ": ") +
-            toString(std::move(Err)),
-        false);
+    snippy::fatal((Description.isTriviallyEmpty() ? "" : Description + ": ") +
+                  toString(std::move(Err)));
 }
 
 template <typename T> Expected<T> loadYAMLFromFile(const Twine &Filename) {
@@ -306,10 +305,8 @@ T loadYAMLFromFileOrFatal(const Twine &Filename,
                           const Twine &Description = "") {
   auto Loaded = loadYAMLFromFile<T>(Filename);
   if (!Loaded)
-    report_fatal_error(
-        (Description.isTriviallyEmpty() ? "" : Description + ": ") +
-            toString(Loaded.takeError()),
-        false);
+    snippy::fatal((Description.isTriviallyEmpty() ? "" : Description + ": ") +
+                  toString(Loaded.takeError()));
   return *Loaded;
 }
 
@@ -318,10 +315,8 @@ void loadYAMLFromFileOrFatal(T &Obj, const Twine &Filename,
                              const Twine &Description = "") {
   auto Err = loadYAMLFromFile(Obj, Filename);
   if (Err)
-    report_fatal_error(
-        (Description.isTriviallyEmpty() ? "" : Description + ": ") +
-            toString(std::move(Err)),
-        false);
+    snippy::fatal((Description.isTriviallyEmpty() ? "" : Description + ": ") +
+                  toString(std::move(Err)));
 }
 
 // Normalization for Hex64, Hex32, Hex16 and Hex8
