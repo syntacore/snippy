@@ -150,7 +150,7 @@ llvm::snippy::CFPermutationContext::CFPermutationContext(MachineFunction &MF,
            .modelSupportCallbacks())
     fatal(GC.getLLVMState().getCtx(),
           "Loops cannot be generated in selfcheck/backtrack/hazard modes",
-          "Selected model does not support it");
+          "Selected model does not support it.");
 
   LLVM_DEBUG(dbgs() << "CFPermutationContext created for branchegram:\n");
   LLVM_DEBUG(BranchSettings.get().dump());

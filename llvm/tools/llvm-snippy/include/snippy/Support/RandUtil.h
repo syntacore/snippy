@@ -11,6 +11,8 @@
 #include "Error.h"
 #include "Utils.h"
 
+#include "snippy/Support/DiagnosticInfo.h"
+
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Error.h"
@@ -184,7 +186,7 @@ public:
 
   template <typename T> static T genInInterval(T Min, T Max) {
     if (Max < Min)
-      report_fatal_error("Invalid usage of genInInterval");
+      snippy::fatal("Invalid usage of genInInterval");
     UniformIntDistribution<T> Dist(Min, Max);
     return Dist(pimpl->Engine);
   }

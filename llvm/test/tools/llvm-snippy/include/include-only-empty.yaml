@@ -4,4 +4,4 @@
 include:
   - Inputs/empty.yaml
 
-# CHECK: error: LLVM ERROR: Incorrect list of sections: list is empty
+# CHECK: error: Incorrect list of sections: list is empty

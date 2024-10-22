@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "snippy/Support/DiagnosticInfo.h"
+
 #include "llvm/Support/raw_ostream.h"
 
 #include "RandUtil.h"
@@ -40,14 +42,13 @@ public:
   template <typename Iter> DefaultOpcodeGenerator(Iter First, Iter Last) {
     auto Count = std::distance(First, Last);
     if (Count == 0)
-      report_fatal_error(
+      snippy::fatal(
           "OpcodeGenerator initialization failure: empty histogram specified.\n"
           "Usually this may happen when in some context snippy can not find "
           "any instruction that could be created in current context.\n"
           "Try to increase instruction number by one or add more instructions "
           "to "
-          "histogram.",
-          false);
+          "histogram.");
     std::vector<double> OpcodeWeights(Count);
     std::transform(First, Last, std::back_inserter(Opcodes),
                    [](const auto &HEntry) { return HEntry.first; });
@@ -55,9 +56,8 @@ public:
                    [](const auto &HEntry) { return HEntry.second; });
     if (std::all_of(OpcodeWeights.begin(), OpcodeWeights.end(),
                     [](auto W) { return W == 0; }))
-      report_fatal_error("OpcodeGenerator initialization failure: all given to "
-                         "histogram opcodes have zero weight",
-                         false);
+      snippy::fatal("OpcodeGenerator initialization failure: all given to "
+                    "histogram opcodes have zero weight");
     OpcodeDist = std::discrete_distribution<size_t>(OpcodeWeights.begin(),
                                                     OpcodeWeights.end());
   }

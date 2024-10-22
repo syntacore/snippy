@@ -21,4 +21,4 @@ histogram:
     - [VADD_VV, 1.0]
     - [VSETVL, 1.0]
 
-# CHECK: LLVM ERROR: It is forbidden to specify RVV mode-changing bias and VSET* instructions in histogram simultaneously
+# CHECK: error: It is forbidden to specify RVV mode-changing bias and VSET* instructions in histogram simultaneously

@@ -20,4 +20,4 @@ sections:
 histogram: 
     - [ADDI, 1.0]
       
-# CHECK: LLVM ERROR: Immediate histogram does not contain any values in [-2048; 2047]
+# CHECK: error: Immediate histogram: it does not contain any values in [-2048; 2047]

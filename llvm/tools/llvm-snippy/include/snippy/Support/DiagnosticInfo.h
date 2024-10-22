@@ -92,7 +92,11 @@ void warn(WarningName WN, llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
 [[noreturn]] void fatal(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
                         Error E);
 
+[[noreturn]] void fatal(Error E);
+
 [[noreturn]] void fatal(const llvm::Twine &Prefix, const llvm::Twine &Desc);
+
+[[noreturn]] void fatal(const llvm::Twine &Desc);
 
 } // namespace snippy
 

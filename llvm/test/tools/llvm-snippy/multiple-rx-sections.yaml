@@ -55,4 +55,4 @@ histogram:
 # SORTED-NOT: jr
 # SORTED: ebreak
 #
-# SIZE_ERROR: LLVM ERROR: RX section '{{[0-9]+}}' (size 4096) failed to fit code mapped to it. Total code size: {{[0-9]+}}
+# SIZE_ERROR: error: RX section '{{[0-9]+}}' (size 4096) failed to fit code mapped to it. Total code size: {{[0-9]+}}

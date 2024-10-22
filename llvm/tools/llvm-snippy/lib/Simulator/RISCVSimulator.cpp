@@ -21,6 +21,7 @@
 #include "Common.h"
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #define DEBUG_TYPE "snippy-riscv-sim"
 
@@ -62,9 +63,8 @@ static bool hasPCInRH(const RegistersWithHistograms &RH) {
   assert(NumFound > 0);
 
   if (NumFound > 1)
-    report_fatal_error("Too many programm registers are specified "
-                       "in the reg state YAML",
-                       false);
+    snippy::fatal("Too many programm registers are specified "
+                  "in the reg state YAML");
   return true;
 }
 
@@ -194,9 +194,8 @@ public:
                           reinterpret_cast<char *>(Val.data()), RegSize);
       return llvm::APInt(RegSize, Val);
     }
-    llvm::report_fatal_error("Impossible to read the register from the "
-                             "Simulator. Invalid RegID for the RISCV target",
-                             false);
+    snippy::fatal("Impossible to read the register from the "
+                  "Simulator. Invalid RegID for the RISCV target");
   }
 
   void setReg(llvm::Register Reg, const APInt &NewValue) override {
@@ -215,9 +214,8 @@ public:
       setVPR(RegIdx, NewValue);
       return;
     }
-    llvm::report_fatal_error("Impossible to set the register from the "
-                             "Simulator. Invalid RegID for the RISCV target",
-                             false);
+    snippy::fatal("Impossible to set the register from the "
+                  "Simulator. Invalid RegID for the RISCV target");
   }
 
   void saveState(IRegisterState &Output) const override {
@@ -402,15 +400,14 @@ static void checkModelInterfaceVersion(llvm::snippy::DynamicLibrary &ModelLib,
   const auto *InterfaceVersionAddress = reinterpret_cast<const unsigned char *>(
       ModelLib.getAddressOfSymbol(InterfaceVersionSymbol));
   if (!InterfaceVersionAddress)
-    report_fatal_error("could figure out interface version of the model (" +
-                           Twine(InterfaceVersionSymbol) + " symbol",
-                       false);
+    snippy::fatal(
+        formatv("could figure out interface version of the model ({0}) symbol",
+                InterfaceVersionSymbol));
   unsigned CurrentVersion = *InterfaceVersionAddress;
   if (CurrentVersion != ExpectedVersion)
-    report_fatal_error("unexpected model interface version detected! Got " +
-                           Twine(CurrentVersion) + ", expecting " +
-                           Twine(ExpectedVersion),
-                       false);
+    snippy::fatal(formatv(
+        "unexpected model interface version detected! Got {0}, expecting {1}",
+        CurrentVersion, ExpectedVersion));
   return;
 }
 
@@ -420,10 +417,9 @@ getSimulatorEntryPoint(llvm::snippy::DynamicLibrary &ModelLib) {
   const auto *VTable = reinterpret_cast<const rvm::RVM_FunctionPointers *>(
       ModelLib.getAddressOfSymbol(SimulatorEntryPointSymbol));
   if (!VTable)
-    report_fatal_error("could not find entry point <" +
-                           Twine(SimulatorEntryPointSymbol) +
-                           "> to create simulator",
-                       false);
+    snippy::fatal(
+        formatv("could not find entry point <{0}> to create simulator",
+                SimulatorEntryPointSymbol));
   return *VTable;
 }
 

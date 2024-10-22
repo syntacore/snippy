@@ -293,9 +293,8 @@ planning::FunctionRequest InstructionGenerator::createMFGenerationRequest(
   if (!LastInstrStr.empty() && !SGCtx->useRetAsLastInstr()) {
     auto Opc = ProgCtx.getOpcodeCache().code(LastInstrStr.str());
     if (!Opc.has_value())
-      report_fatal_error("unknown opcode \"" + Twine(LastInstrStr) +
-                             "\" for last instruction generation",
-                         false);
+      snippy::fatal("unknown opcode \"" + Twine(LastInstrStr) +
+                    "\" for last instruction generation");
     FinalInstDesc = ProgCtx.getOpcodeCache().desc(Opc.value());
   }
   FunReq.setFinalInstr(FinalInstDesc);

@@ -34,4 +34,4 @@ histogram:
   - [VCLMULH_VX, 1.0]
   - [VSETVL, 0.1]
 
-# CHECK: LLVM ERROR: RVV Config: no legal configuration detected and Pvill != 1, aborting 
+# CHECK: error: RVV Config: no legal configuration detected and Pvill != 1, aborting 

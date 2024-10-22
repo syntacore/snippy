@@ -142,10 +142,10 @@ static bool checkNonZeroWeightPresent(ItType Begin, ItType End) {
 template <typename ItType>
 void checkWeights(ItType Begin, ItType End, const llvm::Twine &What) {
   if (!checkWeightsNonNegative(Begin, End))
-    report_fatal_error(What + ": weights must be non-negative!", false);
+    snippy::fatal(What + ": weights must be non-negative!");
 
   if (!checkNonZeroWeightPresent(Begin, End))
-    report_fatal_error(What + ": at least one weight must be positive!", false);
+    snippy::fatal(What + ": at least one weight must be positive!");
 }
 
 template <typename ItType>
@@ -575,7 +575,7 @@ struct LegalVMGenerator final : VMGeneratorInterface {
 struct ImmVLGen : public VLGeneratorInterface {
 
   ImmVLGen(std::string ID) : Context(std::move(ID)) {
-    report_fatal_error("IMM-based VL generators are not implemented", false);
+    snippy::fatal("IMM-based VL generators are not implemented");
   }
 
   std::string identify() const override { return "imm_" + Context; }
@@ -591,7 +591,7 @@ private:
 struct ImmVMGen : public VMGeneratorInterface {
 
   ImmVMGen(std::string ID) : Context(std::move(ID)) {
-    report_fatal_error("IMM-based VM generators are not implemented", false);
+    snippy::fatal("IMM-based VM generators are not implemented");
   }
   std::string identify() const override { return "imm_" + Context; }
 
@@ -770,14 +770,12 @@ template <> struct yaml::MappingTraits<BiasGuides> {
     // TODO: implemenent alternative mode changing schemes and
     // replace probability with weight
     if (!(Guides.ModeChangeP >= 0.0 && Guides.ModeChangeP <= 1.0))
-      report_fatal_error("riscv-vector-vlvm::P should be from [0.0;1.0]",
-                         false);
+      snippy::fatal("riscv-vector-vlvm::P should be from [0.0;1.0]");
 
     IO.mapOptional("Pvill", Guides.SetVillP);
 
     if (!(Guides.SetVillP >= 0.0 && Guides.SetVillP <= 1.0))
-      report_fatal_error("riscv-vector-vlvm::Pvill should be from [0.0;1.0]",
-                         false);
+      snippy::fatal("riscv-vector-vlvm::Pvill should be from [0.0;1.0]");
   }
 };
 
@@ -944,13 +942,12 @@ extractWeightedGeneratorIDs(const std::vector<SList> &GenInfo) {
   std::transform(GenInfo.begin(), GenInfo.end(), std::back_inserter(Result),
                  [](const auto &Item) {
                    if (Item.size() != 2)
-                     report_fatal_error(
-                         "incorrect format for genetor descriptions", false);
+                     snippy::fatal("incorrect format for genetor descriptions");
                    std::string GeneratorID = Item[0];
                    double Weight;
                    if (StringRef(Item[1]).getAsDouble(Weight))
-                     report_fatal_error(
-                         Twine("could not parse weight ") + GeneratorID, false);
+                     snippy::fatal(Twine("could not parse weight ") +
+                                   GeneratorID);
                    // TODO: more error handling
                    return WeightedGeneratorID{Weight, std::move(GeneratorID)};
                  });
@@ -1073,9 +1070,8 @@ getInternalConfigurationPoints(unsigned VLEN, const RVVUnitInfo &VUInfo,
         return Weight + (Point.Config.IsLegal ? 0 : Point.Probability);
       });
   if (WeightLegal == 0 && ProbSetVill != 1)
-    report_fatal_error(
-        "RVV Config: no legal configuration detected and Pvill != 1, aborting",
-        false);
+    snippy::fatal(
+        "RVV Config: no legal configuration detected and Pvill != 1, aborting");
   // If LegalWeight is zero that means that there are no legal configurations
   // and LegalWeightCoeff not needed because LegalPoints empty
   double LegalWeightCoeff = WeightLegal ? (1.0 - ProbSetVill) / WeightLegal : 0;
@@ -1122,7 +1118,7 @@ auto constructGeneratorsFromWeightedIds(
   for (const auto &GenID : IDs) {
     auto Gen = GeneratorFactory<T>::create(GenID.GeneratorName);
     if (!Gen)
-      report_fatal_error("unsupported generator ID specified", false);
+      snippy::fatal("unsupported generator ID specified");
     Result.addWeightedElement(GenID.Weight, std::move(Gen));
   }
   return Result;
@@ -1144,7 +1140,7 @@ RVVConfigurationInfo::createDefault(const GeneratorContext &GenCtx,
       /* set vill bit bias*/ 0.0);
   if (ModeSwitchInfo.RVVPresentInHistogram &&
       !ModeSwitchInfo.VSETPresentInHistogram) {
-    report_fatal_error("No VSET instruction detected in histogram", false);
+    snippy::fatal("No VSET instruction detected in histogram");
   }
 
   return RVVConfigurationInfo(
@@ -1167,9 +1163,8 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
                   .value();
 
   if (VLEN == 0)
-    report_fatal_error("RVV configuration file should not be "
-                       "specified for targets without RVV",
-                       false);
+    snippy::fatal("RVV configuration file should not be "
+                  "specified for targets without RVV");
   auto VLVMRules = extractVLVMRules(CS.VUInfo);
   auto &&[ConfigPoints, ConfigWeights] =
       getInternalConfigurationPoints(VLEN, CS.VUInfo, CS.Guides.SetVillP);
@@ -1182,11 +1177,10 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
       GenCtx.getConfig(), CS.Guides.ModeChangeP, CS.Guides.SetVillP);
 
   if (!CS.Guides.Enabled && !ModeSwitchInfo.VSETPresentInHistogram)
-    report_fatal_error("No VSET instruction detected in histogram", false);
+    snippy::fatal("No VSET instruction detected in histogram");
   if (CS.Guides.Enabled && ModeSwitchInfo.VSETPresentInHistogram)
-    report_fatal_error("It is forbidden to specify RVV mode-changing bias and "
-                       "VSET* instructions in histogram simultaneously",
-                       false);
+    snippy::fatal("It is forbidden to specify RVV mode-changing bias and "
+                  "VSET* instructions in histogram simultaneously");
 
   return RVVConfigurationInfo(
       VLEN, ConfigGenerator(std::move(ConfigPoints), ConfigWeights),
