@@ -51,6 +51,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MathExtras.h"
 
 #include <cstdint>
@@ -548,7 +549,7 @@ void takeVSETPrefIntoAccount(VSETWeightOverrides &Overrides) {
     Overrides.setVSETVLIWeight(0.0);
     return;
   default:
-    report_fatal_error("Unknown vset* preference for rvv mode change");
+    snippy::fatal("Unknown vset* preference for rvv mode change");
   }
 }
 
@@ -977,7 +978,7 @@ public:
 
   void checkInstrTargetDependency(const OpcodeHistogram &H) const override {
     if (!checkSupportedOrdering(H))
-      report_fatal_error("Lr.rl and Sc.aq are prohibited by RISCV ISA", false);
+      snippy::fatal("Lr.rl and Sc.aq are prohibited by RISCV ISA");
   }
 
   void generateRegsInit(MachineBasicBlock &MBB, const IRegisterState &R,
@@ -1199,16 +1200,15 @@ public:
       return false;
     // FIXME: all checks with fatal error should be moved to histogram verifier
     if (InstrDesc.mayLoad() || InstrDesc.mayStore())
-      report_fatal_error("This memory instruction unsupported");
+      snippy::fatal("This memory instruction unsupported");
 
     // FIXME: here explicitly placed all vector istructions that use V0 mask
     // explicitly and this can not be changed
     if (NoMaskModeForRVV &&
         (isRVVuseV0RegExplicitly(Opcode) || isRVVuseV0RegImplicitly(Opcode))) {
-      report_fatal_error("In histogram given a vector opcode with explicit V0 "
-                         "mask usage, but snippy was given option that forbids "
-                         "any masks for vector instructions",
-                         false);
+      snippy::fatal("In histogram given a vector opcode with explicit V0 "
+                    "mask usage, but snippy was given option that forbids "
+                    "any masks for vector instructions");
     }
     return false;
   }
@@ -2027,7 +2027,7 @@ public:
     case RISCV::JALR:
       return generateJALR(MBB, Ins, Target, GC, AsSupport);
     default:
-      report_fatal_error("Unsupported call instruction", false);
+      snippy::fatal("Unsupported call instruction");
     }
   }
 
@@ -2066,8 +2066,7 @@ public:
                                       MCRegister Register,
                                       GeneratorContext &GC) const override {
     if (!RISCV::GPRRegClass.contains(Register))
-      report_fatal_error(
-          "transform of value in register is supported only for GPR", false);
+      snippy::fatal("transform of value in register is supported only for GPR");
 
     if (NewValue.eq(OldValue))
       return 0u;
@@ -2091,8 +2090,7 @@ public:
                            RegPoolWrapper &RP,
                            GeneratorContext &GC) const override {
     if (!RISCV::GPRRegClass.contains(Register))
-      report_fatal_error(
-          "transform of value in register is supported only for GPR", false);
+      snippy::fatal("transform of value in register is supported only for GPR");
 
     auto &State = GC.getLLVMState();
     const auto &RI = State.getRegInfo();
@@ -2157,7 +2155,7 @@ public:
 
     RP.addReserved(Register);
     if (!hasNonZeroRegAvailable(RegClass, RP))
-      report_fatal_error("Can't find suitable scratch register");
+      snippy::fatal("Can't find suitable scratch register");
 
     auto AddrReg =
         getNonZeroReg("Scratch register for BaseAddr", RI, RegClass, RP, MBB);
@@ -2179,8 +2177,7 @@ public:
     // (RISCVInstrInfo::verifyInstruction)
     switch (OperandType) {
     default:
-      report_fatal_error(
-          "Requested generation for an unexpected operand type.");
+      snippy::fatal("Requested generation for an unexpected operand type.");
     case RISCVOp::OPERAND_UIMM1:
       return MachineOperand::CreateImm(genImmUINT<1>(IH, StridedImm));
     case RISCVOp::OPERAND_UIMM2:
@@ -2266,9 +2263,9 @@ public:
     case RISCVOp::OPERAND_RVKRNUM_2_14:
       return MachineOperand::CreateImm(genImmInInterval<2, 14>(IH, StridedImm));
     case RISCVOp::OPERAND_AVL:
-      report_fatal_error("AVL operand generation is not supported. Probably "
-                         "snippy still does "
-                         "not support vector instructions generation.");
+      snippy::fatal("AVL operand generation is not supported. Probably "
+                    "snippy still does "
+                    "not support vector instructions generation.");
     case RISCVOp::OPERAND_FRMARG:
       return MachineOperand::CreateImm(0);
     }
@@ -2398,7 +2395,7 @@ public:
   unsigned getWriteValueSequenceLength(APInt Value, MCRegister Register,
                                        GeneratorContext &GC) const override {
     if (RISCV::VRRegClass.contains(Register))
-      report_fatal_error("Not implemented for RVV regs yet");
+      snippy::fatal("Not implemented for RVV regs yet");
 
     return getIntMatInstrSeq(Value, GC).size();
   }
@@ -2490,10 +2487,8 @@ public:
       getSupportInstBuilder(MBB, Ins, Ctx, InstrInfo.get(RISCV::VL1RE8_V), Reg)
           .addReg(AddrReg);
     } else {
-      report_fatal_error(
-          Twine("Cannot generate load from memory for register ") +
-              std::to_string(Reg),
-          false);
+      snippy::fatal(
+          formatv("Cannot generate load from memory for register {0}", Reg));
     }
   }
 
@@ -2550,9 +2545,8 @@ public:
           .addReg(Reg)
           .addReg(AddrReg);
     } else {
-      report_fatal_error(
-          Twine("Cannot generate store to memory for register ") + Twine(Reg),
-          false);
+      snippy::fatal(
+          formatv("Cannot generate store to memory for register {0}", Reg));
     }
   }
 
@@ -2926,8 +2920,7 @@ static unsigned getOpcodeForGPRToFPRInstr(unsigned DstReg, unsigned XLen,
   else if (RISCV::FPR16RegClass.contains(DstReg))
     FMVOpc = RISCV::FMV_H_X;
   else
-    report_fatal_error("unknown floating point register class for the register",
-                       false);
+    snippy::fatal("unknown floating point register class for the register");
 
   return FMVOpc;
 }
@@ -3138,13 +3131,11 @@ selectDesiredModeChangeInstruction(RVVModeChangeMode Preference, unsigned VL,
     // checks at the configuration phase
     if (std::all_of(VsetvlProb.begin(), VsetvlProb.end(),
                     [](const auto &P) { return P <= 0.0; }))
-      report_fatal_error(
-          "The specified restrictions on VSET* instructions "
-          "do not allow to produce VL of " +
-              Twine(VL) +
-              ". Please, adjust the histogram or change the set of "
-              "reachable RVV configurations",
-          false);
+      snippy::fatal(formatv("The specified restrictions on VSET* instructions "
+                            "do not allow to produce VL of {0}. Please, adjust "
+                            "the histogram or change the set of "
+                            "reachable RVV configurations",
+                            VL));
 
     DiscreteGeneratorInfo<unsigned, std::array<unsigned, 3>> Gen(
         {RISCV::VSETVL, RISCV::VSETVLI, RISCV::VSETIVLI}, VsetvlProb);
@@ -3152,9 +3143,8 @@ selectDesiredModeChangeInstruction(RVVModeChangeMode Preference, unsigned VL,
   }
   case RVVModeChangeMode::MC_VSETIVLI:
     if (VL > kMaxVLForVSETIVLI)
-      report_fatal_error("cannot select VSETIVLI as mode changing instruction "
-                         " for VL greater than 31",
-                         false);
+      snippy::fatal("cannot select VSETIVLI as mode changing instruction "
+                    " for VL greater than 31");
     return RISCV::VSETIVLI;
   case RVVModeChangeMode::MC_VSETVLI:
     return RISCV::VSETVLI;
@@ -3208,9 +3198,9 @@ void SnippyRISCVTarget::generateVSETIVLI(
                                                       : AccessMaskBit::GRW);
   // TODO: eventually this should be an assert
   if (VL > kMaxVLForVSETIVLI)
-    report_fatal_error("cannot set the desired VL " + Twine(VL) +
-                           " since selected VSETIVLI does not support it",
-                       false);
+    snippy::fatal(formatv("cannot set the desired VL {0} since selected "
+                          "VSETIVLI does not support it",
+                          VL));
   auto MIB = getInstBuilder(SupportMarker, MBB, Ins, GC.getLLVMState().getCtx(),
                             InstrInfo.get(RISCV::VSETIVLI));
   MIB.addDef(DstReg).addImm(VL).addImm(VTYPE);
@@ -3319,9 +3309,8 @@ static void dumpRvvConfigurationInfo(StringRef FilePath,
   }
 
   auto ReportFileError = [FilePath](const std::error_code &EC) {
-    report_fatal_error("could not create " + FilePath +
-                           " for RVV config dump: " + EC.message(),
-                       false);
+    snippy::fatal(formatv("could not create {0} for RVV config dump: {1}",
+                          FilePath, EC.message()));
   };
   // TODO: this code is a rather common pattern. Probably, it should be
   // factored-out to a separate function

@@ -83,13 +83,12 @@ public:
                           !UsedInBurst(Hist.first);
                  });
     if (MustHavePrimaryInstrs && DFHistogram.size() == 0)
-      report_fatal_error(
+      snippy::fatal(
           "We can not create any primary instruction in this context.\nUsually "
           "this may happen when in some context snippy can not find any "
           "instruction that could be created in current context.\nTry to "
           "increase instruction number by one or add more instructions to "
-          "histogram.",
-          false);
+          "histogram.");
 
     for (const auto &Entry : Overrides)
       if (!Entry.deactivated())

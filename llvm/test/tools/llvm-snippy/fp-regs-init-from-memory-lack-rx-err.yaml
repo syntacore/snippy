@@ -17,4 +17,4 @@ sections:
 histogram:
     - [AND, 1.0]
 
-# CHECK: LLVM ERROR: Failed to create global constant: No read-only ('r') section provided in layout. This is needed for updating of float register.
+# CHECK: error: Failed to create global constant: No read-only ('r') section provided in layout. This is needed for updating of float register.

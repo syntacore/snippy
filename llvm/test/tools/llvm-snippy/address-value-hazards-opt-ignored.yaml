@@ -17,4 +17,4 @@ sections:
 histogram:
     - [LD, 1.0]
 
-# CHECK: LLVM ERROR: Cannot generate snippet: requested selfcheck / backtrack / address-value-hazards, but no model plugin provided.
+# CHECK: error: Cannot generate snippet: requested selfcheck / backtrack / address-value-hazards, but no model plugin provided.

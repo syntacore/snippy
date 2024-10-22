@@ -335,7 +335,7 @@ bool PrologueEpilogueInsertion::insertPrologue(
      << SectionInfo.getIDString() << "' of size " << SectionInfo.Size
      << " after prologue insertion\n";
   OS << "Total function size: " << FSize << "; Prologue size: " << PrologueSize;
-  report_fatal_error(StringRef(Message), false);
+  snippy::fatal(StringRef(Message));
 }
 
 bool PrologueEpilogueInsertion::insertEpilogue(
@@ -401,7 +401,7 @@ bool PrologueEpilogueInsertion::insertEpilogue(
      << SectionInfo.getIDString() << "' of size " << SectionInfo.Size
      << " after epilogue insertion\n";
   OS << "Total function size: " << FSize << "; Epilogue size: " << EpilogueSize;
-  report_fatal_error(StringRef(Message), false);
+  snippy::fatal(StringRef(Message));
 }
 
 bool PrologueEpilogueInsertion::runOnMachineFunction(MachineFunction &MF) {

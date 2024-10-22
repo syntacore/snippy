@@ -16,6 +16,7 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/YAMLTraits.h"
 
 #include <algorithm>
@@ -61,11 +62,10 @@ static void getFixedRegisterValues(const RegistersWithHistograms &RH,
   // NOTE: for now we require that either all registers are present or none of
   // them are. This may be changed in future
   if (ExpectedNumber != NumFound)
-    // FIXME: Get rid of report_fatal_error and propagate errors cleanly.
-    report_fatal_error("Unexpected number of registers found in for \"" +
-                           Prefix + "\" group expecting " +
-                           Twine(ExpectedNumber) + ", got " + Twine(NumFound),
-                       false);
+    // FIXME: Get rid of snippy::fatal and propagate errors cleanly.
+    snippy::fatal(formatv("Unexpected number of registers found in for \"{0}\" "
+                          "group expecting {1}, got {2}",
+                          Prefix, ExpectedNumber, NumFound));
 
   Result.resize(NumFound);
   std::transform(First, Last, Result.begin(),
@@ -175,12 +175,12 @@ void checkRegisterClasses(const AllRegisters &Values,
     auto It = std::find(AllowedClasses.begin(), AllowedClasses.end(),
                         ClassValues.RegType);
     if (It == AllowedClasses.end())
-      report_fatal_error("Illegal register class " + ClassValues.RegType +
-                             " specified for initial register values. The "
-                             "following register "
-                             "classes are legal for the current target: " +
-                             formatAllowedRegisterClasses(AllowedClasses) + ".",
-                         false);
+      snippy::fatal(formatv("Illegal register class {0} specified for initial "
+                            "register values. The "
+                            "following register "
+                            "classes are legal for the current target: {1}.",
+                            ClassValues.RegType,
+                            formatAllowedRegisterClasses(AllowedClasses)));
   }
   if (Values.SpecialRegs.empty())
     return;
@@ -203,12 +203,12 @@ void checkRegisterClasses(const RegisterHistograms &Histograms,
     auto It = std::find(AllowedClasses.begin(), AllowedClasses.end(),
                         ClassHistogram.RegType);
     if (It == AllowedClasses.end())
-      report_fatal_error("Illegal register class " + ClassHistogram.RegType +
-                             " specified in "
-                             "register value histogram. The following register "
-                             "classes are legal for the current target: " +
-                             formatAllowedRegisterClasses(AllowedClasses) + ".",
-                         false);
+      snippy::fatal(formatv("Illegal register class {0} specified in register "
+                            "value histogram. The "
+                            "following register "
+                            "classes are legal for the current target: {1}.",
+                            ClassHistogram.RegType,
+                            formatAllowedRegisterClasses(AllowedClasses)));
   }
 }
 

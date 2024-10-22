@@ -9,6 +9,6 @@
 include:
   - this-include-file-does-not-exist.yaml
 
-# CHECK: LLVM ERROR: 
+# CHECK: error: 
 # CHECK-SAME: this-include-file-does-not-exist.yaml
 # CHECK-SAME: No such file or directory
