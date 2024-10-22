@@ -33,7 +33,7 @@ LLVMState::LLVMState(const SelectedTargetInfo &TargetInfo) {
   const Target *const TheTarget =
       TargetRegistry::lookupTarget(TargetInfo.Triple, Error);
   if (!TheTarget)
-    report_fatal_error(Twine(Error));
+    snippy::fatal(Twine(Error));
   const TargetOptions Options;
   auto TargetFeatures = TargetInfo.Features;
   // Relax feature is enabled by default to enable desired
@@ -49,8 +49,8 @@ LLVMState::LLVMState(const SelectedTargetInfo &TargetInfo) {
   auto TT = TheTargetMachine->getTargetTriple();
   TheSnippyTarget = SnippyTarget::lookup(TT);
   if (!TheSnippyTarget) {
-    errs() << "no snippy target for " << TargetInfo.Triple << "\n";
-    report_fatal_error("sorry, target is not implemented", false);
+    errs() << "error: no snippy target for " << TargetInfo.Triple << "\n";
+    snippy::fatal("sorry, target is not implemented");
   }
   const Target &T = TheTargetMachine->getTarget();
   const auto *STI = TheTargetMachine->getMCSubtargetInfo();

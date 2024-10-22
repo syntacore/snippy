@@ -24,4 +24,4 @@ histogram:
     - [ADDI, 1.0]
     - [SW, 5.0]
       
-# CHECK: LLVM ERROR: unknown opcode "abrakadabra" for last instruction generation  
+# CHECK: error: unknown opcode "abrakadabra" for last instruction generation  

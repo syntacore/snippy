@@ -216,8 +216,7 @@ void PostGenVerifier::printData(const MachineFunction &MF) const {
          << "\n";
   Output << "End Verification for function: " << MF.getName() << "\n";
   if (MustSucceed && (HaveMissedOpcodes || !GenerationGood))
-    report_fatal_error("Snippy's output does not correspond to histogram",
-                       false);
+    snippy::fatal("Snippy's output does not correspond to histogram");
 }
 
 enum class VerificationStatus {

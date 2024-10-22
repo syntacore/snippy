@@ -53,6 +53,6 @@ histogram:
 # SORTED-NOT: jr
 # SORTED: ebreak
 #
-# ERR1: LLVM ERROR: Cannot use 'chained-rx-chunk-size' option: num-instr is set to 'all'
-# ERR2: LLVM ERROR: Cannot set 'chained-rx-chunk-size' to 0: expected >=1
+# ERR1: error: Cannot use 'chained-rx-chunk-size' option: num-instr is set to 'all'
+# ERR2: error: Cannot set 'chained-rx-chunk-size' to 0: expected >=1
 # WARN: warning: 'chained-rx-chunk-size' is ignored: pass 'chained-rx-sections-fill' to enable it

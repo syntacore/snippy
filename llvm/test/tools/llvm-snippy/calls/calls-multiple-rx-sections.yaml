@@ -60,7 +60,7 @@ function-number: 9
 # SORTED-COUNT-2: jr
 # SORTED-NOT: jr
 # SORTED: ebreak
-# SECONDARY-ERROR: LLVM ERROR: Failed to fit secondary code in specified RX sections: not enough contiguos space found.
-# ROOT-ERROR: LLVM ERROR: RX section '{{[0-9]+}}' (size 4096) failed to fit code mapped to it. Total code size: {{[0-9]+}}
+# SECONDARY-ERROR: error: Failed to fit secondary code in specified RX sections: not enough contiguos space found.
+# ROOT-ERROR: error: RX section '{{[0-9]+}}' (size 4096) failed to fit code mapped to it. Total code size: {{[0-9]+}}
 # ROOT-ERROR-NEXT: List of functions mapped to this section:
 # ROOT-ERROR-NEXT: SnippyFunction: size {{[0-9]+}} 

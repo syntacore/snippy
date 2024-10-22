@@ -18,25 +18,23 @@ namespace snippy {
 void X86RegisterState::loadFromYamlFile(StringRef Filename,
                                         WarningsT &WarningsArr,
                                         const SnippyTarget *Tgt) {
-  report_fatal_error("sorry not implemented");
+  snippy::fatal("sorry not implemented");
 }
 
 void X86RegisterState::saveAsYAMLFile(raw_ostream &OS) const {
-  report_fatal_error("sorry not implemented");
+  snippy::fatal("sorry not implemented");
 }
 
-void X86RegisterState::randomize() {
-  report_fatal_error("sorry not implemented");
-}
+void X86RegisterState::randomize() { snippy::fatal("sorry not implemented"); }
 
 bool X86RegisterState::operator==(const IRegisterState &) const {
-  report_fatal_error("sorry not implemented");
+  snippy::fatal("sorry not implemented");
 }
 
 std::unique_ptr<SimulatorInterface> createX86Simulator(
     llvm::snippy::DynamicLibrary &ModelLib, const SimulationConfig &Cfg,
     RVMCallbackHandler *CallbackHandler, const TargetSubtargetInfo &Subtarget) {
-  report_fatal_error("sorry not implemented");
+  snippy::fatal("sorry not implemented");
 }
 
 } // namespace snippy

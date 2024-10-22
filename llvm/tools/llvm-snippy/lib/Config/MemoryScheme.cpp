@@ -796,9 +796,8 @@ AddressInfo MemoryAccessAddresses::randomAddressForPlainAccess(
     std::optional<::AddressId> PreselectedAddr) {
   AddressInfo AI;
   if (NextAddressIdx && PreselectedAddr)
-    report_fatal_error("Can't generate preselected address "
-                       "for ordered memory scheme",
-                       false);
+    snippy::fatal("Can't generate preselected address "
+                  "for ordered memory scheme");
 
   if (NextAddressIdx) {
     AI.Address = Addresses[*NextAddressIdx].Addr;
@@ -827,9 +826,8 @@ AddressInfo MemoryAccessAddresses::randomAddressForBurstAccess(
     size_t AccessSize, size_t Alignment,
     std::optional<::AddressId> PreselectedAddr) {
   if (NextBurstIdx && PreselectedAddr)
-    report_fatal_error("Can't generate preselected address "
-                       "for ordered memory scheme",
-                       false);
+    snippy::fatal("Can't generate preselected address "
+                  "for ordered memory scheme");
 
   if (NextBurstIdx) {
     for (size_t i = 0; i < Burst.size(); ++i) {

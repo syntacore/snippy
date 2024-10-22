@@ -26,7 +26,7 @@ histogram:
     - [DIV, 1.0]
     - [ADD, 1.0]
 
-# X0-CHECK: LLVM ERROR: Register X0 specified in --redefine-sp is not suitable for stack pointer redefinition
-# RES-CHECK: LLVM ERROR: Register X7 cannot redefine stack pointer, because it is explicitly reserved
-# ILL-CHECK: LLVM ERROR: Illegal register name X32 is specified in --redefine-sp
-# NO-OPT-CHECK: LLVM ERROR: "any-no-SP", passed to --redefine-sp is not valid option value
+# X0-CHECK: error: Register X0 specified in --redefine-sp is not suitable for stack pointer redefinition
+# RES-CHECK: error: Register X7 cannot redefine stack pointer, because it is explicitly reserved
+# ILL-CHECK: error: Illegal register name X32 is specified in --redefine-sp
+# NO-OPT-CHECK: error: "any-no-SP", passed to --redefine-sp is not valid option value

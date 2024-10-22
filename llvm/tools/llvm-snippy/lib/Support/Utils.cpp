@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Support/Utils.h"
+#include "snippy/Support/DiagnosticInfo.h"
 
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Error.h"
@@ -36,12 +37,12 @@ void writeFile(StringRef Path, StringRef Data) {
   std::error_code EC;
   raw_fd_ostream File(Path, EC);
   if (EC)
-    report_fatal_error(EC.message() + ": " + Path, false);
+    snippy::fatal(EC.message() + ": " + Path);
   File.write(Data.data(), Data.size());
   File.flush();
   if (File.has_error()) {
     EC = File.error();
-    report_fatal_error(EC.message() + ": " + Path, false);
+    snippy::fatal(EC.message() + ": " + Path);
   }
 }
 

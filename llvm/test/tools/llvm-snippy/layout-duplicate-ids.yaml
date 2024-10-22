@@ -24,4 +24,4 @@ histogram:
     - [ADDI, 1.0]
     - [SW, 5.0]
 
-# CHECK: LLVM ERROR: Incorrect list of sections: List contains duplicate section IDs
+# CHECK: error: Incorrect list of sections: List contains duplicate section IDs

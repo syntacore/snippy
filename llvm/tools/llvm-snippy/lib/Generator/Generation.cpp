@@ -15,6 +15,8 @@
 #include "snippy/Generator/Policy.h"
 #include "snippy/Support/Options.h"
 
+#include "llvm/Support/FormatVariadic.h"
+
 namespace llvm {
 namespace snippy {
 template <typename InstrItType> struct SelfcheckAnnotationInfo {
@@ -191,9 +193,8 @@ void storeRefValue(MachineBasicBlock &MBB, InstrIt InsertPos, MemAddr Addr,
 void selfcheckOverflowGuard(const SectionDesc &SelfcheckSection,
                             unsigned long long SCAddress) {
   if (SCAddress >= SelfcheckSection.VMA + SelfcheckSection.Size)
-    report_fatal_error("Selfcheck section overflow. Try to provide "
-                       "\"selfcheck\" section description in layout file",
-                       false);
+    snippy::fatal("Selfcheck section overflow. Try to provide "
+                  "\"selfcheck\" section description in layout file");
 }
 // Returns iterator to the first inserted instruction. So [returned It;
 // InsertPos) contains inserted instructions.
@@ -658,10 +659,9 @@ pregenerateOperands(const MachineBasicBlock &MBB, const MCInstrDesc &InstrDesc,
       return std::move(PregeneratedOperandsOpt.value());
   }
 
-  report_fatal_error("Limit on failed generation attempts exceeded "
-                     "on instruction " +
-                         InstrInfo.getName(InstrDesc.getOpcode()),
-                     false);
+  snippy::fatal(formatv("Limit on failed generation attempts exceeded "
+                        "on instruction {0}",
+                        InstrInfo.getName(InstrDesc.getOpcode())));
 }
 
 static auto stringifyRequestStatus(GenerationStatus Status) {
@@ -1162,7 +1162,7 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
   // transaction.
   if (snippy::interpretInstrs(MBB.begin(), MBB.getFirstTerminator(), GC) !=
       GenerationStatus::Ok)
-    report_fatal_error("Inserted compensation code is incorrect", false);
+    snippy::fatal("Inserted compensation code is incorrect");
 
   // We have two active transactions for which compensation code for GPRs must
   // be inserted at this point. The most inner one is a transaction opened in
@@ -1332,7 +1332,7 @@ void processGenerationResult(
     ++BacktrackCount;
     if (BacktrackCount < BTThreshold)
       return;
-    report_fatal_error("Back-tracking events threshold is exceeded", false);
+    snippy::fatal("Back-tracking events threshold is exceeded");
   }
   case GenerationStatus::SizeFailed: {
     ++SizeErrorCount;
@@ -1343,8 +1343,7 @@ void processGenerationResult(
     // limit
     auto GenRes = generateNopsToSizeLimit(Limit, InstrGenCtx);
     if (GenRes.Status != GenerationStatus::Ok)
-      report_fatal_error("Nop generation during block fill by size failed",
-                         false);
+      snippy::fatal("Nop generation during block fill by size failed");
     InstrGenCtx.Stats.merge(GenRes.Stats);
     return;
   }

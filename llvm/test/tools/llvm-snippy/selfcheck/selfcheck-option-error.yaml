@@ -18,4 +18,4 @@ sections:
 histogram: 
     - [ADD, 1.0]
 
-# CHECK: LLVM ERROR: Value of selfcheck option is not convertible to numeric one.
+# CHECK: error: Value of selfcheck option is not convertible to numeric one.

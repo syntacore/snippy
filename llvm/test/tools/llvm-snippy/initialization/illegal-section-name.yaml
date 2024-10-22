@@ -18,4 +18,4 @@ sections:
 histogram:
     - [C_ADDI_NOP, 1.0]
 
-# CHECK: LLVM ERROR: There is a section in the layout file that has both 'no' and 'name' keys.
+# CHECK: error: There is a section in the layout file that has both 'no' and 'name' keys.

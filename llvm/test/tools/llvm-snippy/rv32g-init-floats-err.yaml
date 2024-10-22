@@ -26,7 +26,7 @@ sections:
 histogram:
     - [AND, 1.0]
 
-# DPREC: LLVM ERROR: Cannot write value to a FP register: it doesn't fit in GRP. Please, provide 'riscv-init-fregs-from-memory' option to make initialization possible
+# DPREC: error: Cannot write value to a FP register: it doesn't fit in GRP. Please, provide 'riscv-init-fregs-from-memory' option to make initialization possible
 # FPREC: {{(\$f0_f = \FMV_W_X)}}
 # FPREC: {{(\$f1_f = \FMV_W_X)}}
 # FPREC: {{(\$f2_f = \FMV_W_X)}}

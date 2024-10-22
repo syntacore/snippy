@@ -103,14 +103,13 @@ void CallGraphState::dump(StringRef Filename, CallGraphDumpMode Format) const {
     auto WriteResult = WriteGraph(*this, "", /* ShortNames */ false,
                                   "Call graph", std::string(Filename));
     if (WriteResult.empty())
-      report_fatal_error("Failed to write call graph to " + Twine(Filename),
-                         false);
+      snippy::fatal("Failed to write call graph to " + Twine(Filename));
 
     return;
   }
 
   if (Nodes.empty())
-    report_fatal_error("Cannot dump empty call graph.", false);
+    snippy::fatal("Cannot dump empty call graph.");
 
   auto NameOf = [](Node *N) { return N->functions().front()->getName().str(); };
 

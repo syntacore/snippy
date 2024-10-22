@@ -66,7 +66,7 @@ static std::string makeModelNameFromPartialName(StringRef PartialName) {
 static std::unique_ptr<object::ObjectFile> makeObjectFile(MemoryBufferRef Buf) {
   auto Exp = object::ObjectFile::createObjectFile(Buf);
   if (!Exp)
-    report_fatal_error("Failed to constuct object file from memory buffer");
+    snippy::fatal("Failed to constuct object file from memory buffer");
   return std::move(Exp.get());
 }
 
@@ -92,7 +92,7 @@ static StringRef getSectionData(object::ObjectFile &Obj,
 
   auto Exp = SectionIt->getContents();
   if (!Exp)
-    report_fatal_error(SectionName + " section is empty");
+    snippy::fatal(SectionName + " section is empty");
   return Exp.get();
 }
 
@@ -131,7 +131,7 @@ std::unique_ptr<SimulatorInterface> Interpreter::createSimulatorForTarget(
   auto Sim =
       TGT.createSimulator(Lib, SimCfg, TgtGenCtx, CallbackHandler, Subtarget);
   if (!Sim)
-    llvm::report_fatal_error("could not initialize simulator", false);
+    snippy::fatal("could not initialize simulator");
   return Sim;
 }
 
@@ -297,7 +297,7 @@ void Interpreter::reportSimulationFatalError(StringRef PrefixMessage) const {
   dumpCurrentRegStateToStream(Stream);
   Stream.flush();
 
-  report_fatal_error(ErrorMessage.c_str(), false);
+  snippy::fatal(ErrorMessage.c_str());
 }
 
 void Interpreter::loadElfImage(StringRef ElfImage) {
@@ -322,12 +322,10 @@ void Interpreter::loadElfImage(StringRef ElfImage) {
     ProgramText = getSectionData(*ObjectFile, ProgSection.Name);
 
     if (ProgSection.Size < ProgramText.size())
-      report_fatal_error(
-          "RX section '" + Twine(ProgSection.Name) +
-              "' failed to fit code mapped to it: section size is " +
-              Twine(ProgSection.Size) + " and code size is " +
-              Twine(ProgramText.size()),
-          false);
+      snippy::fatal(formatv("RX section '{0}' failed to fit code mapped to it: "
+                            "section size is {1} and code size is {2}",
+                            ProgSection.Name, ProgSection.Size,
+                            ProgramText.size()));
     Simulator->writeMem(ProgSection.Start, ProgramText);
   }
   if (!Env.SimCfg.RomSectionName.empty()) {
@@ -368,7 +366,7 @@ void Interpreter::dumpRegs(const IRegisterState &Regs, StringRef YamlPath) {
   std::error_code EC;
   raw_fd_ostream File(YamlPath, EC);
   if (EC)
-    report_fatal_error("Register dump error: " + Twine(EC.message()), false);
+    snippy::fatal(formatv("Register dump error: {0}", EC.message()));
 
   dumpRegsAsYAML(Regs, File);
 }
@@ -383,8 +381,7 @@ void Interpreter::dumpOneRange(NamedMemoryRange Range,
 
   writeSectionToFile(Data, Range, File);
   if (File.has_error())
-    report_fatal_error("Memory dump error: " + Twine(File.error().message()),
-                       false);
+    snippy::fatal(formatv("Memory dump error: {0}", File.error().message()));
 }
 
 std::optional<NamedMemoryRange>
@@ -404,7 +401,7 @@ void Interpreter::dumpRanges(ArrayRef<NamedMemoryRange> Ranges,
   std::error_code EC;
   raw_fd_ostream File(FileName, EC);
   if (EC)
-    report_fatal_error("Memory dump error: " + Twine(EC.message()), false);
+    snippy::fatal(formatv("Memory dump error: {0}", EC.message()));
 
   for (auto Range : Ranges)
     dumpOneRange(Range, File);

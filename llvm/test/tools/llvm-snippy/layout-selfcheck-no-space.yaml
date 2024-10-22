@@ -23,4 +23,4 @@ histogram:
     - [ADDI, 1.0]
     - [SW, 5.0]
 
-# CHECK: LLVM ERROR: Failed to emplace selfcheck section: Could not find {{[0-9]+}} bytes of consecutive free space outside of sections specified in layout.
+# CHECK: error: Failed to emplace selfcheck section: Could not find {{[0-9]+}} bytes of consecutive free space outside of sections specified in layout.

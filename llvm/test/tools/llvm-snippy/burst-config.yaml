@@ -52,5 +52,5 @@ histogram:
 # CHECK:  mode: custom
 
 # DOUBLESPEC: error: duplicated mapping key 'burst
-# CLCONFCLBURST: LLVM ERROR: Attempt to specify burst config through the command line options: burst configuration was already found in config file
-# CLCONFCLSIZE: LLVM ERROR: Attempt to specify burst config through the command line options: burst configuration was already found in config file
+# CLCONFCLBURST: error: Attempt to specify burst config through the command line options: burst configuration was already found in config file
+# CLCONFCLSIZE: error: Attempt to specify burst config through the command line options: burst configuration was already found in config file

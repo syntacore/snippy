@@ -88,4 +88,4 @@ access-addresses:
 # CHECK-NEXT:       Stride: 16
 # CHECK-NEXT:       Access-size: 8
 # CHECK-NOT: * Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:
-# ERROR: LLVM ERROR: Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:
+# ERROR: error: Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:

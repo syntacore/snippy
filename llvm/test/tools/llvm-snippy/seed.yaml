@@ -57,7 +57,7 @@ histogram:
 
 # SEED-0: Used seed: 0
 # SEED-300: Used seed: 300
-# WRONG-SEED1: LLVM ERROR: Provided instructions seed is not convertible to numeric value.
-# WRONG-SEED2: LLVM ERROR: Provided instructions seed is not convertible to numeric value.
-# WRONG-SEED3: LLVM ERROR: Provided instructions seed is not convertible to numeric value.
+# WRONG-SEED1: error: Provided instructions seed is not convertible to numeric value.
+# WRONG-SEED2: error: Provided instructions seed is not convertible to numeric value.
+# WRONG-SEED3: error: Provided instructions seed is not convertible to numeric value.
 # RAND-SEED: warning: no instructions seed specified, using auto-generated one: {{[0-9]+$}}

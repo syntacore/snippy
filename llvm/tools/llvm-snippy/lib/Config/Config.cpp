@@ -78,7 +78,7 @@ template <> struct yaml::MappingTraits<BurstGramData> {
                         if (!Opt.has_value()) {
                           std::string Msg = "Unknown instruction \"" + Name +
                                             "\" in burst configuration";
-                          report_fatal_error(StringRef(Msg), false);
+                          snippy::fatal(StringRef(Msg));
                         }
                         return *Opt;
                       });
@@ -189,13 +189,11 @@ template <> struct yaml::MappingTraits<snippy::SectionAttrs> {
     IO.mapOptional("no", NumberFromNo);
     IO.mapOptional("name", NumberFromName);
     if (!NumberFromNo && !NumberFromName)
-      report_fatal_error("There is a section in the layout file that does not "
-                         "have 'no' key, nor 'name'.",
-                         false);
+      snippy::fatal("There is a section in the layout file that does not "
+                    "have 'no' key, nor 'name'.");
     if (NumberFromNo && NumberFromName)
-      report_fatal_error("There is a section in the layout file that has both "
-                         "'no' and 'name' keys.",
-                         false);
+      snippy::fatal("There is a section in the layout file that has both "
+                    "'no' and 'name' keys.");
     if (NumberFromNo)
       Info.ID = *NumberFromNo;
     else
@@ -272,7 +270,7 @@ template <> struct yaml::PolymorphicTraits<ImmHistOpcodeSettingsNorm> {
   static ImmediateHistogramSequence &getAsMap(ImmHistOpcodeSettingsNorm &Info) {
     Info.IO.setError("Immediate histogram opcode setting should be either "
                      "sequence or scalar. But map was encountered.");
-    report_fatal_error("Failed to parse configuration file.", false);
+    snippy::fatal("Failed to parse configuration file.");
   }
 };
 
@@ -361,7 +359,7 @@ template <> struct yaml::PolymorphicTraits<ImmediateHistogramNorm> {
   static int &getAsScalar(ImmediateHistogramNorm &Info) {
     Info.IO.setError("Immediate histogram should be either sequence or map. "
                      "But scalar was encountered.");
-    report_fatal_error("Failed to parse configuration file.", false);
+    snippy::fatal("Failed to parse configuration file.");
   }
 };
 
@@ -405,13 +403,12 @@ static void diagnoseHistogram(LLVMContext &Ctx, const OpcodeCache &OpCC,
   };
   if (std::find_if(Histogram.begin(), Histogram.end(), InvalidOpcChecker) !=
       Histogram.end())
-    report_fatal_error("Plugin filled histogram with invalid opcodes", false);
+    snippy::fatal("Plugin filled histogram with invalid opcodes");
 
   auto InvalidWeightsChecker = [](auto It) { return It.second < 0; };
   if (std::find_if(Histogram.begin(), Histogram.end(), InvalidWeightsChecker) !=
       Histogram.end())
-    report_fatal_error("Plugin filled histogram with negative opcodes weights",
-                       false);
+    snippy::fatal("Plugin filled histogram with negative opcodes weights");
 }
 
 Config::Config(const SnippyTarget &Tgt, StringRef PluginFilename,
@@ -496,7 +493,7 @@ static std::vector<std::string> getConfigIncludeFiles(StringRef Filename) {
   snippy::IncludeParsingWrapper IPW;
   auto Err = loadYAMLIgnoreUnknownKeys(IPW, Filename);
   if (Err)
-    report_fatal_error(toString(std::move(Err)).c_str(), false);
+    snippy::fatal(toString(std::move(Err)).c_str());
   return IPW.Includes;
 }
 
@@ -542,7 +539,7 @@ static void checkSubFileContents(StringRef SubFileName, StringRef Contents) {
     SS << "In file \"" << SubFileName << "\""
        << ": included file cannot contain \"include\" section."
        << "\n";
-    report_fatal_error(StringRef(Msg), false);
+    snippy::fatal(StringRef(Msg));
   }
 }
 

@@ -32,4 +32,4 @@ histogram:
 # CHECK: Generated MI_{{[0-9]*}}: $x0 = ADDI $x0, 0, post-instr-symbol <mcsymbol __snippy_exit>  
 # CHECK-NOT: Generated
 
-# TRICKY-EMPTY: LLVM ERROR: unknown opcode " " for last instruction generation
+# TRICKY-EMPTY: error: unknown opcode " " for last instruction generation

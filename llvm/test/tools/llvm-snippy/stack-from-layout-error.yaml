@@ -22,4 +22,4 @@ histogram:
     - [DIV, 1.0]
     - [ADD, 1.0]
 
-# CHECK: LLVM ERROR: Wrong layout file: "stack" section must be RW
+# CHECK: error: Wrong layout file: "stack" section must be RW
