@@ -505,7 +505,7 @@ void BlockGenPlanningImpl::fillBlocksToProcess(
   };
 
   auto IsRegsInit = GenCtx->getGenSettings().RegistersConfig.InitializeRegs;
-  if (IsRegsInit)
+  if (IsRegsInit && GenCtx->isEntryFunction(MF))
     DropBlock();
   copy_if(std::move(MapRange), std::back_inserter(BlocksToProcess),
           std::forward<Predicate>(Pred));
