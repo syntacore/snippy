@@ -6,10 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "InitializePasses.h"
+#include "../InitializePasses.h"
 
 #include "snippy/Config/FunctionDescriptions.h"
 #include "snippy/CreatePasses.h"
+#include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Support/Options.h"
@@ -38,40 +39,36 @@ snippy::opt<bool>
                           "to make all nodes reachable from root"),
                  cl::cat(Options), cl::init(false), cl::Hidden);
 
-namespace {
+static snippy::opt<std::string>
+    DumpCGFilename("call-graph-dump-filename",
+                   cl::desc("Specify file to dump call graph in dot format"),
+                   cl::value_desc("filename"), cl::init(""), cl::cat(Options));
 
-struct FunctionGenerator final : public ModulePass {
-public:
-  static char ID;
-
-  FunctionGenerator() : ModulePass(ID) {}
-
-  StringRef getPassName() const override { return PASS_DESC " Pass"; }
-
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<GeneratorContextWrapper>();
-    ModulePass::getAnalysisUsage(AU);
+struct CallGraphDumpEnumOption
+    : public snippy::EnumOptionMixin<CallGraphDumpEnumOption> {
+  static void doMapping(EnumMapper &Mapper) {
+    Mapper.enumCase(CallGraphDumpMode::Dot, "dot",
+                    "is used to render visual graph representation");
+    Mapper.enumCase(CallGraphDumpMode::Yaml, "yaml",
+                    "can be read back by snippy");
   }
-
-  bool readFromYaml(Module &M, const FunctionDescs &FDs);
-
-  bool generateDefault(Module &M);
-
-  std::vector<std::string> prepareRXSections();
-  struct RootFnPlacement {
-    std::string SectionName;
-    size_t InstrNum;
-    RootFnPlacement(StringRef Name, size_t IN)
-        : SectionName{Name}, InstrNum{IN} {};
-  };
-  std::vector<RootFnPlacement> distributeRootFunctions();
-
-  void initRootFunctions(Module &M, StringRef EntryPointName);
-
-  bool runOnModule(Module &M) override;
 };
 
+static snippy::opt<CallGraphDumpMode>
+    CGDumpFormat("call-graph-dump-format",
+                 cl::desc("Choose format for call graph dump option:"),
+                 CallGraphDumpEnumOption::getClValues(),
+                 cl::init(CallGraphDumpMode::Dot), cl::cat(Options));
+
+void FunctionGenerator::getAnalysisUsage(AnalysisUsage &AU) const {
+  AU.addRequired<GeneratorContextWrapper>();
+  ModulePass::getAnalysisUsage(AU);
+}
+StringRef FunctionGenerator::getPassName() const { return PASS_DESC " Pass"; }
+
 char FunctionGenerator::ID = 0;
+
+namespace {
 
 struct LayerMapEntry {
   CallGraphState::Node *Node;
@@ -104,11 +101,13 @@ using llvm::PassInfo;
 using llvm::PassRegistry;
 using llvm::snippy::FunctionGenerator;
 
-INITIALIZE_PASS(FunctionGenerator, DEBUG_TYPE, PASS_DESC, false, false)
+SNIPPY_INITIALIZE_PASS(FunctionGenerator, DEBUG_TYPE, PASS_DESC, false)
 
 namespace llvm {
 
-ModulePass *createFunctionGeneratorPass() { return new FunctionGenerator(); }
+snippy::ActiveImmutablePassInterface *createFunctionGeneratorPass() {
+  return new FunctionGenerator();
+}
 
 } // namespace llvm
 
@@ -164,12 +163,9 @@ std::string yaml::MappingTraits<snippy::FunctionDescs>::validate(
 }
 
 namespace snippy {
-namespace {
-
-MachineFunction &createFunction(GeneratorContext &SGCtx, Module &M,
-                                StringRef Name, StringRef SectionName,
-                                Function::LinkageTypes Linkage,
-                                size_t NumInstr) {
+MachineFunction &FunctionGenerator::createFunction(
+    GeneratorContext &SGCtx, Module &M, StringRef Name, StringRef SectionName,
+    Function::LinkageTypes Linkage, size_t NumInstr) {
 
   auto &State = SGCtx.getLLVMState();
   std::string FinalName =
@@ -178,7 +174,8 @@ MachineFunction &createFunction(GeneratorContext &SGCtx, Module &M,
           : (Twine(SectionName) + "." + Name).str();
   auto &MF = State.createMachineFunctionFor(
       State.createFunction(M, FinalName, SectionName, Linkage),
-      SGCtx.getMainModule().getMMI());
+      SGCtx.getMainModule().getMMI()
+  );
   auto &Props = MF.getProperties();
   // FIXME: currently we don't keep liveness when creating and filling new BB
   auto IsRegsInit = SGCtx.getGenSettings().RegistersConfig.InitializeRegs;
@@ -187,12 +184,10 @@ MachineFunction &createFunction(GeneratorContext &SGCtx, Module &M,
   auto *MBB = createMachineBasicBlock(MF, SGCtx);
   assert(MBB);
   MF.push_back(MBB);
-  SGCtx.setRequestedInstrNum(MF, NumInstr);
+  setRequestedInstrNum(MF, NumInstr);
 
   return MF;
 }
-
-} // namespace
 
 // Get list of RX sections. Root functions must be placed to
 // that sections in order. That is, entry function is assigned
@@ -214,8 +209,7 @@ std::vector<std::string> FunctionGenerator::prepareRXSections() {
 
 void FunctionGenerator::initRootFunctions(Module &M, StringRef EntryPointName) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &CGS = SGCtx.getCallGraphState();
-
+  auto &CGS = get<CallGraphState>();
   auto RFs = distributeRootFunctions();
   auto &&[EntryFnSection, EntryFnInstrNum] = RFs.front();
   // Entry point produces multiple root functions. Each one of
@@ -300,16 +294,25 @@ bool FunctionGenerator::runOnModule(Module &M) {
 
   M.setDataLayout(LLVMTM.createDataLayout());
 
-  return !SGCtx.getConfig().FuncDescs.has_value()
-             ? generateDefault(M)
-             : readFromYaml(M, *SGCtx.getConfig().FuncDescs);
+  auto Ret = !SGCtx.getConfig().FuncDescs.has_value()
+                 ? generateDefault(M)
+                 : readFromYaml(M, *SGCtx.getConfig().FuncDescs);
+  auto CGFilename = DumpCGFilename.getValue();
+  if (!CGFilename.empty())
+    getCallGraphState().dump(CGFilename, CGDumpFormat);
+  // FIXME: currently we initialize it here, because
+  // it is obviously a safe place to take a TargetSubtargetInfo
+  if (SGCtx.getGenSettings().ModelPluginConfig.RunOnModel)
+    SGCtx.getOrCreateInterpreter();
+
+  return Ret;
 }
 
 bool FunctionGenerator::readFromYaml(Module &M, const FunctionDescs &FDs) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &State = SGCtx.getLLVMState();
+  auto &CGS = get<CallGraphState>();
   auto &Descs = FDs.Descs;
-  auto &CGS = SGCtx.getCallGraphState();
 
   auto EPIt = FDs.getEntryPointDesc();
   assert(EPIt != FDs.Descs.end() && "that should be checked earlier");
@@ -365,8 +368,7 @@ bool FunctionGenerator::readFromYaml(Module &M, const FunctionDescs &FDs) {
 
 bool FunctionGenerator::generateDefault(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &CGS = SGCtx.getCallGraphState();
-
+  auto &CGS = get<CallGraphState>();
   // Create functions.
   auto NumF = SGCtx.getCallGraphLayout().FunctionNumber;
 
@@ -471,4 +473,8 @@ bool FunctionGenerator::generateDefault(Module &M) {
 }
 
 } // namespace snippy
+
+LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(snippy::CallGraphDumpMode,
+                                           snippy::CallGraphDumpEnumOption)
+
 } // namespace llvm
