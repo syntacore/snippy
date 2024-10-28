@@ -7,10 +7,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "BlockGenPlanningPass.h"
-#include "BlockGenPlanWrapperPass.h"
 #include "InitializePasses.h"
+
+#include "snippy/Generator/BlockGenPlanWrapperPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 
+#include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GenerationRequest.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/LLVMState.h"
@@ -35,11 +37,13 @@ namespace {
 class BlockGenPlanningImpl {
   GeneratorContext *GenCtx;
   const MachineLoopInfo *MLI;
+  const FunctionGenerator *FG;
   std::vector<const MachineBasicBlock *> BlocksToProcess;
 
 public:
-  BlockGenPlanningImpl(GeneratorContext *GenCtxIn, const MachineLoopInfo *MLIIn)
-      : GenCtx(GenCtxIn), MLI(MLIIn) {}
+  BlockGenPlanningImpl(GeneratorContext *GenCtxIn, const MachineLoopInfo *MLIIn,
+                       const FunctionGenerator *FGIn)
+      : GenCtx(GenCtxIn), MLI(MLIIn), FG(FGIn) {}
 
   planning::FunctionRequest processFunction(const MachineFunction &MF);
 
@@ -84,6 +88,7 @@ INITIALIZE_PASS_BEGIN(BlockGenPlanning, DEBUG_TYPE, PASS_DESC, false, true)
 INITIALIZE_PASS_DEPENDENCY(GeneratorContextWrapper)
 INITIALIZE_PASS_DEPENDENCY(MachineLoopInfo)
 INITIALIZE_PASS_DEPENDENCY(BlockGenPlanWrapper)
+INITIALIZE_PASS_DEPENDENCY(FunctionGenerator)
 INITIALIZE_PASS_END(BlockGenPlanning, DEBUG_TYPE, PASS_DESC, false, true)
 
 namespace llvm {
@@ -101,6 +106,7 @@ void BlockGenPlanning::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<GeneratorContextWrapper>();
   AU.addRequired<MachineLoopInfo>();
   AU.addRequired<BlockGenPlanWrapper>();
+  AU.addRequired<FunctionGenerator>();
   MachineFunctionPass::getAnalysisUsage(AU);
 }
 
@@ -116,7 +122,7 @@ BlockGenPlanningImpl::calculateMFSizeLimit(const MachineFunction &MF) const {
   // int 3, etc.
   auto LastInstr = GenCtx->getLastInstr();
   // If not entry function, we generare ret anyway.
-  bool EmptyLastInstr = GenCtx->isEntryFunction(MF) && LastInstr.empty();
+  bool EmptyLastInstr = FG->isEntryFunction(MF) && LastInstr.empty();
   auto SizeOfOpc = SnpTgt.getMaxInstrSize();
 
   // FIXME: lastInstructions == we reserve space to put final instruction
@@ -506,7 +512,7 @@ void BlockGenPlanningImpl::fillBlocksToProcess(
   };
 
   auto IsRegsInit = GenCtx->getGenSettings().RegistersConfig.InitializeRegs;
-  if (IsRegsInit && GenCtx->isEntryFunction(MF))
+  if (IsRegsInit && FG->isEntryFunction(MF))
     DropBlock();
   copy_if(std::move(MapRange), std::back_inserter(BlocksToProcess),
           std::forward<Predicate>(Pred));
@@ -524,9 +530,9 @@ BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
   assert(!BlocksToProcess.empty() &&
          "At least one basic block that is not a latch block must exist");
 
-  auto NumInstrTotal = GenCtx->getRequestedInstrsNum(MF);
-  assert(NumInstrTotal >= GenCtx->getCFInstrsNum(MF));
-  NumInstrTotal -= GenCtx->getCFInstrsNum(MF);
+  auto NumInstrTotal = FG->getRequestedInstrsNum(MF);
+  assert(NumInstrTotal >= GenCtx->getCFInstrsNum(NumInstrTotal));
+  NumInstrTotal -= GenCtx->getCFInstrsNum(NumInstrTotal);
 
   const auto &Cfg = GenCtx->getConfig();
   // FIXME: NumInstrBurst should be somehow randomized. But we must be careful
@@ -739,9 +745,9 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
     }
   }
 
-  auto NumInstrTotal = GenCtx->getRequestedInstrsNum(MF);
-  assert(NumInstrTotal >= GenCtx->getCFInstrsNum(MF));
-  NumInstrTotal -= GenCtx->getCFInstrsNum(MF);
+  auto NumInstrTotal = FG->getRequestedInstrsNum(MF);
+  assert(NumInstrTotal >= GenCtx->getCFInstrsNum(NumInstrTotal));
+  NumInstrTotal -= GenCtx->getCFInstrsNum(NumInstrTotal);
   // If number of instructions in size-requested blocks is already enough for
   // the whole function, skipping num instrs planning for other blocks
   if (NumInstrTotal <= SupposedNumInstr) {
@@ -793,7 +799,7 @@ static void checkGenModeCompatibility(GeneratorContext &GenCtx,
 
 planning::FunctionRequest
 BlockGenPlanningImpl::processFunction(const MachineFunction &MF) {
-  assert(GenCtx && MLI);
+  assert(GenCtx && MLI && FG);
   checkGenModeCompatibility(*GenCtx, *MLI);
   switch (GenCtx->getGenerationMode()) {
   case GenerationMode::NumInstrs:
@@ -817,8 +823,9 @@ bool BlockGenPlanning::runOnMachineFunction(MachineFunction &MF) {
   auto *GenCtx = &getAnalysis<GeneratorContextWrapper>().getContext();
   auto *MLI = &getAnalysis<MachineLoopInfo>();
   auto *GenPlanWrapper = &getAnalysis<BlockGenPlanWrapper>();
+  auto *FG = &getAnalysis<FunctionGenerator>();
 
-  BlockGenPlanningImpl Impl(GenCtx, MLI);
+  BlockGenPlanningImpl Impl(GenCtx, MLI, FG);
   Req = Impl.processFunction(MF);
   assert(Req.has_value());
   GenPlanWrapper->setFunctionRequest(&MF, Req.value());

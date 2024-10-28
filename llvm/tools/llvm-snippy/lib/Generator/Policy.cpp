@@ -98,7 +98,7 @@ void BurstGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
   auto RP = InstrGenCtx.GC.getRegisterPool();
   auto OpcodeIdxToAI =
       mapOpcodeIdxToAI(InstrGenCtx.MBB, OpcodeIdxToBaseReg, MemUsers,
-                       InstrGenCtx.Ins, RP, InstrGenCtx.GC);
+                       InstrGenCtx.Ins, RP, InstrGenCtx.GC, InstrGenCtx.MAI);
   unsigned MemUsersIdx = 0;
   for (auto &&Instr : Instructions) {
     const auto &InstrDesc = InstrInfo.get(Instr.Opcode);
@@ -112,7 +112,7 @@ void BurstGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
       auto Offset = getOffsetImmediate(Instr.Preselected);
       ActualAI.Address += Offset.value_or(0);
       markMemAccessAsUsed(InstrDesc, ActualAI, MemAccessKind::BURST,
-                          InstrGenCtx.GC);
+                          InstrGenCtx.GC, InstrGenCtx.MAI);
       ++MemUsersIdx;
     }
   }

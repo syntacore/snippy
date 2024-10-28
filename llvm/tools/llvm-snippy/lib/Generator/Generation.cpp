@@ -10,6 +10,7 @@
 #include "snippy/Config/FPUSettings.h"
 #include "snippy/Config/FunctionDescriptions.h"
 #include "snippy/Generator/Backtrack.h"
+#include "snippy/Generator/CallGraphState.h"
 #include "snippy/Generator/GenerationRequest.h"
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/Policy.h"
@@ -837,7 +838,8 @@ unsigned chooseAddressRegister(MachineInstr &MI, const AddressPart &AP,
   return ChosenReg;
 }
 void postprocessMemoryOperands(MachineInstr &MI, RegPoolWrapper &RP,
-                               GeneratorContext &GC, MachineLoopInfo *MLI) {
+                               GeneratorContext &GC, MachineLoopInfo *MLI,
+                               MemAccessInfo *MAI) {
   auto &State = GC.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   auto Opcode = MI.getDesc().getOpcode();
@@ -859,7 +861,8 @@ void postprocessMemoryOperands(MachineInstr &MI, RegPoolWrapper &RP,
         SnippyTgt.breakDownAddr(AddrInfo, MI, i, GC);
 
     for (unsigned j = 0; j < AddrGenInfo.NumElements; ++j) {
-      addMemAccessToDump(ChosenAddresses, GC, AccessSize);
+      if (MAI)
+        addMemAccessToDump(ChosenAddresses, *MAI, AccessSize);
 
       for_each(ChosenAddresses,
                [Stride = AddrInfo.MinStride](auto &Val) { Val += Stride; });
@@ -918,7 +921,8 @@ generateCall(unsigned OpCode,
   auto &MBB = InstrGenCtx.MBB;
   auto &State = GC.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
-  auto &CGS = GC.getCallGraphState();
+  assert(InstrGenCtx.CGS);
+  auto &CGS = *InstrGenCtx.CGS;
   auto *Node = CGS.getNode(&(MBB.getParent()->getFunction()));
   auto CalleeCount = Node->callees().size();
   if (!CalleeCount)
@@ -994,7 +998,7 @@ randomInstruction(const MCInstrDesc &InstrDesc,
     MIB.add(Op);
 
   if (DoPostprocess)
-    postprocessMemoryOperands(*MIB, RP, GC, InstrGenCtx.MLI);
+    postprocessMemoryOperands(*MIB, RP, GC, InstrGenCtx.MLI, InstrGenCtx.MAI);
   // FIXME:
   // We have a lot of problems with rollback and configurations
   // After this, we can have additional instruction after main one!
@@ -1264,7 +1268,8 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
 
 void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
                       const GenerationStatistics &MFStats, GeneratorContext &GC,
-                      SelfCheckInfo *SelfCheckInfo) {
+                      SelfCheckInfo *SelfCheckInfo, const CallGraphState &CGS,
+                      MemAccessInfo *MAI) {
   auto &State = GC.getLLVMState();
   auto &MBB = MF.back();
 
@@ -1272,14 +1277,15 @@ void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
   bool NopLastInstr = LastInstr.empty();
 
   // Secondary functions always return.
-  if (!GC.isRootFunction(MF)) {
+  if (!CGS.isRootFunction(MF)) {
     State.getSnippyTarget().generateReturn(MBB, State);
     return;
   }
 
   // Root functions are connected via tail calls.
-  if (!GC.isExitFunction(MF)) {
-    State.getSnippyTarget().generateTailCall(MBB, *GC.nextRootFunction(MF), GC);
+  if (!CGS.isExitFunction(MF)) {
+    State.getSnippyTarget().generateTailCall(MBB, *CGS.nextRootFunction(MF),
+                                             GC);
     return;
   }
 
@@ -1305,8 +1311,15 @@ void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
            "FinalReq is empty!");
     auto RP = GC.getRegisterPool();
     planning::InstructionGenerationContext InstrGenCtx{
-        MF.back(), MF.back().end(),        &RP,
-        GC,        GenerationStatistics(), SelfCheckInfo};
+        MF.back(),
+        MF.back().end(),
+        &RP,
+        GC,
+        GenerationStatistics(),
+        SelfCheckInfo,
+        /* MachineLoopInfo */ nullptr,
+        /* CallGraphState */ nullptr,
+        MAI};
     snippy::generate(FinalReq, InstrGenCtx);
   }
 
@@ -1377,7 +1390,8 @@ static void printDebugBrief(raw_ostream &OS, const Twine &Brief,
 
 void generate(planning::FunctionRequest &FunctionGenRequest,
               MachineFunction &MF, GeneratorContext &GC,
-              SelfCheckInfo *SelfCheckInfo, MachineLoopInfo *MLI) {
+              SelfCheckInfo *SelfCheckInfo, MachineLoopInfo *MLI,
+              const CallGraphState &CGS, MemAccessInfo *MAI) {
   GenerationStatistics CurrMFGenStats;
   SNIPPY_DEBUG_BRIEF("request for function", FunctionGenRequest);
   std::set<MachineBasicBlock *, MIRComp> NotVisited;
@@ -1421,8 +1435,8 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
 
       auto RP = GC.getRegisterPool();
       planning::InstructionGenerationContext InstrGenCtx{
-          *MBB,          MBB->begin(), &RP, GC, GenerationStatistics(),
-          SelfCheckInfo, MLI};
+          *MBB,          MBB->begin(), &RP,  GC, GenerationStatistics(),
+          SelfCheckInfo, MLI,          &CGS, MAI};
       snippy::generate(BBReq, InstrGenCtx);
       CurrMFGenStats.merge(InstrGenCtx.Stats);
     }
@@ -1477,7 +1491,15 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
 
     auto RP = GC.getRegisterPool();
     planning::InstructionGenerationContext InstrGenCtx{
-        *MBB, MBB->begin(), &RP, GC, GenerationStatistics(), SelfCheckInfo};
+        *MBB,
+        MBB->begin(),
+        &RP,
+        GC,
+        GenerationStatistics(),
+        SelfCheckInfo,
+        /* MachineLoopInfo */ nullptr,
+        &CGS,
+        MAI};
     snippy::generate(BBReq, InstrGenCtx);
 
     CurrMFGenStats.merge(InstrGenCtx.Stats);
@@ -1485,7 +1507,8 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
     MBB = findNextBlock(nullptr, NotVisited, nullptr, GC);
   }
 
-  finalizeFunction(MF, FunctionGenRequest, CurrMFGenStats, GC, SelfCheckInfo);
+  finalizeFunction(MF, FunctionGenRequest, CurrMFGenStats, GC, SelfCheckInfo,
+                   CGS, MAI);
 }
 
 void generate(planning::InstructionGroupRequest &IG,

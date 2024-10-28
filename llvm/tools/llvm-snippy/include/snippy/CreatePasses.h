@@ -23,6 +23,7 @@ class Twine;
 
 namespace snippy {
 
+class ActiveImmutablePassInterface;
 class LLVMState;
 class MemoryScheme;
 class OpcodeCache;
@@ -38,7 +39,7 @@ ImmutablePass *createRootRegPoolWrapperPass();
 
 ModulePass *createFunctionDistributePass();
 
-ModulePass *createFunctionGeneratorPass();
+snippy::ActiveImmutablePassInterface *createFunctionGeneratorPass();
 
 ModulePass *createReserveRegsPass();
 
@@ -60,7 +61,7 @@ MachineFunctionPass *createCFGPrinterPassBefore(const PassInfo &PI,
 MachineFunctionPass *createCFGPrinterPassAfter(const PassInfo &PI,
                                                bool EnableView);
 
-MachineFunctionPass *createInstructionGeneratorPass();
+snippy::ActiveImmutablePassInterface *createInstructionGeneratorPass();
 
 MachineFunctionPass *createLoopAlignmentPass();
 
@@ -80,6 +81,8 @@ MachineFunctionPass *createPrintMachineInstrsPass(raw_ostream &OS);
 
 MachineFunctionPass *createBlockGenPlanningPass();
 ImmutablePass *createBlockGenPlanWrapperPass();
+
+MachineFunctionPass *createMemAccessDumperPass();
 
 MachineFunctionPass *createConsecutiveLoopsVerifierPass();
 

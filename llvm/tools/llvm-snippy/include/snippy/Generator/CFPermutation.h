@@ -18,6 +18,7 @@ class raw_ostream;
 namespace snippy {
 struct Branchegram;
 class GeneratorContext;
+class FunctionGenerator;
 class CFPermutationContext {
 public:
   struct BlockInfo final {
@@ -51,11 +52,13 @@ protected:
   BlocksInfoT BlocksInfo;
   std::reference_wrapper<MachineFunction> CurrMF;
   std::reference_wrapper<GeneratorContext> GC;
+  std::reference_wrapper<FunctionGenerator> FG;
   std::reference_wrapper<const Branchegram> BranchSettings;
   unsigned PermutationCounter = 0;
 
 public:
-  CFPermutationContext(MachineFunction &MF, GeneratorContext &GC);
+  CFPermutationContext(MachineFunction &MF, GeneratorContext &GC,
+                       FunctionGenerator &FG);
   virtual ~CFPermutationContext() = default;
 
   virtual void print(raw_ostream &OS) const;
@@ -87,6 +90,7 @@ protected:
   BlocksInfoIter findMaxIfDepthReached(BlocksInfoIter Beg, BlocksInfoIter End);
   BlocksInfoIter findMaxLoopDepthReached(BlocksInfoIter Beg,
                                          BlocksInfoIter End);
+  size_t getCFInstrNumFor(const MachineFunction &MF) const;
 
 private:
   void initOneBlockInfo(unsigned BB, unsigned NBlocks,

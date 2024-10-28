@@ -9,6 +9,7 @@
 #include "InitializePasses.h"
 
 #include "snippy/CreatePasses.h"
+#include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 
@@ -36,6 +37,7 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<GeneratorContextWrapper>();
+    AU.addRequired<FunctionGenerator>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 };
@@ -63,7 +65,8 @@ namespace snippy {
 
 bool RegsInitInsertion::runOnMachineFunction(MachineFunction &MF) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  if (!SGCtx.isEntryFunction(MF))
+  auto &FG = getAnalysis<FunctionGenerator>();
+  if (!FG.isEntryFunction(MF))
     return false;
   if (!InitRegs) {
     MF.getRegInfo().invalidateLiveness();

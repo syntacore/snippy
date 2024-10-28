@@ -26,6 +26,7 @@
 #include "InitializePasses.h"
 
 #include "snippy/Generator/CFPermutation.h"
+#include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 
 #include "llvm/CodeGen/MachineBasicBlock.h"
@@ -54,6 +55,7 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<GeneratorContextWrapper>();
+    AU.addRequired<FunctionGenerator>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 };
@@ -83,7 +85,8 @@ bool CFPermutation::runOnMachineFunction(MachineFunction &MF) {
       dbgs() << "CFPermutation::runOnMachineFunction runs on function:\n");
   LLVM_DEBUG(MF.dump());
   auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
-  return CFPermutationContext(MF, GC).makePermutationAndUpdateBranches();
+  auto &FG = getAnalysis<FunctionGenerator>();
+  return CFPermutationContext(MF, GC, FG).makePermutationAndUpdateBranches();
 }
 } // namespace snippy
 } // namespace llvm

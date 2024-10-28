@@ -21,10 +21,13 @@ class raw_pwrite_stream;
 
 namespace snippy {
 
+class ActiveImmutablePassInterface;
+
 class PassManagerWrapper final {
   legacy::PassManager PM;
 
 public:
+  void add(ActiveImmutablePassInterface *P);
   void add(Pass *P);
   void add(ImmutablePass *P);
   bool addAsmPrinter(LLVMTargetMachine &LLVMTM, raw_pwrite_stream &Out,

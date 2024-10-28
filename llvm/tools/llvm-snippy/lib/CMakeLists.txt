@@ -39,13 +39,13 @@ set(LLVMSnippySources
   FlowGenerator.cpp
   FillExternalFunctionsStubsPass.cpp
   FunctionDistributePass.cpp
-  FunctionGeneratorPass.cpp
   InitializePasses.cpp
   InstructionsPostProcessPass.cpp
   PostGenVerifierPass.cpp
   LoopAlignmentPass.cpp
   LoopCanonicalizationPass.cpp
   LoopLatcherPass.cpp
+  MemAccessDumperPass.cpp
   PassManagerWrapper.cpp
   PrintMachineInstrsPass.cpp
   PrologueEpilogueInsertionPass.cpp
