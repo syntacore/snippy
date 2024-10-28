@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "BlockGenPlanWrapperPass.h"
+#include "snippy/Generator/BlockGenPlanWrapperPass.h"
 #include "InitializePasses.h"
 #include "snippy/CreatePasses.h"
 

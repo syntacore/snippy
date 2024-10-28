@@ -86,6 +86,9 @@ namespace snippy {
 
 class GeneratorContext;
 class RegPoolWrapper;
+class CallGraphState;
+class MemAccessInfo;
+
 namespace planning {
 
 // Helper class to keep additional information about the operand: register
@@ -138,6 +141,8 @@ struct InstructionGenerationContext final {
   GenerationStatistics Stats;
   SelfCheckInfo *SelfCheck = nullptr;
   MachineLoopInfo *MLI = nullptr;
+  const CallGraphState *CGS = nullptr;
+  MemAccessInfo *MAI = nullptr;
   std::unordered_set<MCRegister> PotentialNaNs{};
   unsigned SizeErrorCount = 0;
   unsigned BacktrackCount = 0;

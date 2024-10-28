@@ -31,5 +31,6 @@ void llvm::snippy::initializeSnippyPasses(PassRegistry &Registry) {
   initializeInstructionsPostProcessPass(Registry);
   initializeBranchRelaxatorPass(Registry);
   initializeBlockGenPlanningPass(Registry);
+  initializeMemoryAccessDumperPass(Registry);
   initializeConsecutiveLoopsVerifierPass(Registry);
 }
