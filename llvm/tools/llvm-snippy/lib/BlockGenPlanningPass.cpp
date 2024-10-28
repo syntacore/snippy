@@ -21,6 +21,7 @@
 #include "llvm/CodeGen/MachineLoopInfo.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/PassRegistry.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #include <functional>
 
@@ -649,12 +650,20 @@ static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
     FilledSize -= BranchesSize;
   }
 
-  if (PCDist.Max.value() < FilledSize)
+  if (PCDist.Max.value() < FilledSize) {
+    std::string Desc = formatv("Loop is already filled with {0}"
+                               " bytes, but max pc distance is {1}.",
+                               FilledSize, PCDist.Max.value());
+    const auto &Branches = SGCtx.getGenSettings().Cfg.Branches;
+    if (Branches.isRandomCountersInitRequested() &&
+        Branches.isPCDistanceRequested())
+      Desc +=
+          " This can be caused by small PC distance with random loop counter "
+          "initialization, you can try either relax PC distance requirements "
+          "or reduce loop counter initialization to values close to 0.";
     snippy::fatal(SelectedMBB.getParent()->getFunction().getContext(),
-                  "Max PC distance requirement can't be met",
-                  "Loop is already filled with " + Twine(FilledSize) +
-                      " bytes, but max pc distance is " +
-                      Twine(PCDist.Max.value()));
+                  "Max PC distance requirement can't be met", Desc);
+  }
 
   NumericRange<unsigned> BlockRange;
   BlockRange.Max = PCDist.Max.value() - FilledSize;

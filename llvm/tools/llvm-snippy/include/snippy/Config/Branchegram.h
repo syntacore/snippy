@@ -60,6 +60,7 @@ struct Branchegram final {
   double LoopRatio = DefaultLoopRatio;
   ConsecutiveLoops ConsLoops;
   NumericRange<unsigned> NLoopIter = {MinNLoopIterDefault, MaxNLoopIterDefault};
+  std::optional<NumericRange<unsigned>> LoopCounterOffset;
   Depth MaxDepth;
   Distance Dist;
 
@@ -71,6 +72,10 @@ struct Branchegram final {
   bool isPCDistanceRequested() const { return Dist.PC.Min || Dist.PC.Max; }
 
   bool unaligned() const { return Alignment == Unaligned; }
+
+  bool isRandomCountersInitRequested() const {
+    return LoopCounterOffset.has_value();
+  }
 
   unsigned getMaxLoopDepth() const { return MaxDepth.Loop; }
 
