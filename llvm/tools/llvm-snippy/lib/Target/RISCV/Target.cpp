@@ -1526,6 +1526,8 @@ public:
 
   /// RISCV Loops:
   ///
+  /// If loop-counters-random-init is setted, we have an Offset for register
+  /// values. Only zero Offset is supported for BEQ, C_BEQZ and C_BNEZ.
   /// * BEQ, C_BEQZ:
   ///   -- Init --
   ///     CounterReg = 0
@@ -1538,8 +1540,8 @@ public:
   ///
   /// * BNE, C_BNEZ:
   ///   -- Init --
-  ///     LimitReg = 0
-  ///     CounterReg = NIter
+  ///     LimitReg = 0 (= Offset)
+  ///     CounterReg = NIter (= NIter + Offset)
   ///   -- Latch --
   ///     CounterReg -= 1
   ///   -- Branch --
@@ -1548,8 +1550,8 @@ public:
   ///
   /// * BLT, BLTU:
   ///   -- Init --
-  ///     LimitReg = NIter
-  ///     CounterReg = 0
+  ///     LimitReg = NIter (= NIter + Offset)
+  ///     CounterReg = 0 (= Offset)
   ///   -- Latch --
   ///     CounterReg += 1
   ///   -- Branch --
@@ -1558,8 +1560,8 @@ public:
   ///
   /// * BGE, BGEU:
   ///   -- Init --
-  ///     LimitReg = 0
-  ///     CounterReg = NIter
+  ///     LimitReg = 0 (= Offset)
+  ///     CounterReg = NIter (= NIter + Offset)
   ///   -- Latch --
   ///     CounterReg -= 1
   ///   -- Branch --
@@ -1637,9 +1639,34 @@ public:
     }
   }
 
-  void insertLoopInit(MachineBasicBlock &MBB, MachineBasicBlock::iterator Pos,
-                      MachineInstr &Branch, ArrayRef<Register> ReservedRegs,
-                      unsigned NIter, GeneratorContext &GC) const override {
+  unsigned getRandLoopCounterInitValue(GeneratorContext &GC,
+                                       Register CounterReg,
+                                       const Branchegram &Branches,
+                                       ArrayRef<Register> ReservedRegs) const {
+    if (!Branches.isRandomCountersInitRequested())
+      return 0u;
+
+    auto LimitReg = ReservedRegs[LimitRegIdx];
+    const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+    auto VLEN =
+        GC.getTargetContext().getImpl<RISCVGeneratorContext>().getVLEN();
+    unsigned MaxCounterRegVal = RISCVRegisterState::getMaxRegValueForSize(
+        CounterReg, ST.getXLen(), VLEN);
+    unsigned MaxLimitRegVal =
+        RISCVRegisterState::getMaxRegValueForSize(LimitReg, ST.getXLen(), VLEN);
+    auto MaxGenVal = std::min(MaxCounterRegVal, MaxLimitRegVal);
+
+    auto [MinRegOpt, MaxRegOpt] = Branches.LoopCounterOffset.value();
+    auto Min = MinRegOpt.value_or(0);
+    auto Max = MaxRegOpt.value_or(MaxGenVal);
+
+    return RandEngine::genInInterval(Min, Max);
+  }
+
+  unsigned insertLoopInit(MachineBasicBlock &MBB,
+                          MachineBasicBlock::iterator Pos, MachineInstr &Branch,
+                          ArrayRef<Register> ReservedRegs, unsigned NIter,
+                          GeneratorContext &GC) const override {
     assert(Branch.isBranch() && "Branch expected");
     assert((ReservedRegs.size() != MaxNumOfReservRegsForLoop) ||
            (ReservedRegs[CounterRegIdx] != ReservedRegs[LimitRegIdx]) &&
@@ -1647,6 +1674,9 @@ public:
     auto RP = GC.getRegisterPool();
 
     auto CounterReg = ReservedRegs[CounterRegIdx];
+    const auto &Branches = GC.getGenSettings().Cfg.Branches;
+    auto RegRandOffset =
+        getRandLoopCounterInitValue(GC, CounterReg, Branches, ReservedRegs);
 
     switch (Branch.getOpcode()) {
     case RISCV::BEQ:
@@ -1656,13 +1686,17 @@ public:
       auto LimitReg = ReservedRegs[LimitRegIdx];
       writeValueToReg(MBB, Pos, APInt::getZero(getRegBitWidth(LimitReg, GC)),
                       LimitReg, RP, GC);
+      RegRandOffset = 0;
       break;
     }
     case RISCV::BNE: {
-      writeValueToReg(MBB, Pos, APInt(getRegBitWidth(CounterReg, GC), NIter),
-                      CounterReg, RP, GC);
+      writeValueToReg(
+          MBB, Pos,
+          APInt(getRegBitWidth(CounterReg, GC), NIter + RegRandOffset),
+          CounterReg, RP, GC);
       auto LimitReg = ReservedRegs[LimitRegIdx];
-      writeValueToReg(MBB, Pos, APInt::getZero(getRegBitWidth(LimitReg, GC)),
+      writeValueToReg(MBB, Pos,
+                      APInt(getRegBitWidth(LimitReg, GC), RegRandOffset),
                       LimitReg, RP, GC);
       break;
     }
@@ -1673,36 +1707,43 @@ public:
           (ReservedRegs.size() == MinNumOfReservRegsForLoop) &&
           "In RISC-V for compressed branch C_BNEZ only one register CounterReg "
           "expected to be reserved for loop");
+      RegRandOffset = 0;
       break;
     }
     case RISCV::BLT:
     case RISCV::BLTU: {
-      writeValueToReg(MBB, Pos, APInt::getZero(getRegBitWidth(CounterReg, GC)),
+      writeValueToReg(MBB, Pos,
+                      APInt(getRegBitWidth(CounterReg, GC), RegRandOffset),
                       CounterReg, RP, GC);
       auto LimitReg = ReservedRegs[LimitRegIdx];
-      writeValueToReg(MBB, Pos, APInt(getRegBitWidth(LimitReg, GC), NIter),
-                      LimitReg, RP, GC);
+      writeValueToReg(
+          MBB, Pos, APInt(getRegBitWidth(LimitReg, GC), NIter + RegRandOffset),
+          LimitReg, RP, GC);
       break;
     }
     case RISCV::BGE:
     case RISCV::BGEU: {
-      writeValueToReg(MBB, Pos, APInt(getRegBitWidth(CounterReg, GC), NIter),
-                      CounterReg, RP, GC);
+      writeValueToReg(
+          MBB, Pos,
+          APInt(getRegBitWidth(CounterReg, GC), NIter + RegRandOffset),
+          CounterReg, RP, GC);
       auto LimitReg = ReservedRegs[LimitRegIdx];
-      writeValueToReg(MBB, Pos, APInt(getRegBitWidth(LimitReg, GC), 1),
+      writeValueToReg(MBB, Pos,
+                      APInt(getRegBitWidth(LimitReg, GC), 1 + RegRandOffset),
                       LimitReg, RP, GC);
       break;
     }
     default:
       llvm_unreachable("Unsupported branch type");
     }
+    return RegRandOffset;
   }
 
   LoopCounterInsertionResult
   insertLoopCounter(MachineBasicBlock::iterator Pos, MachineInstr &Branch,
                     ArrayRef<Register> ReservedRegs, unsigned NIter,
-                    GeneratorContext &GC,
-                    RegToValueType &ExitingValues) const override {
+                    GeneratorContext &GC, RegToValueType &ExitingValues,
+                    unsigned RegCounterOffset) const override {
     assert(Branch.isBranch() && "Branch expected");
     assert(ReservedRegs.size() != MaxNumOfReservRegsForLoop ||
            ReservedRegs[CounterRegIdx] != ReservedRegs[LimitRegIdx] &&
@@ -1750,16 +1791,20 @@ public:
                 NIter, MinCounterVal};
       break;
     }
-    case RISCV::BNE:
     case RISCV::C_BNEZ:
+      assert(RegCounterOffset == 0 &&
+             "C_BNEZ is not supported with non zero value of the loop counter");
+      [[fallthrough]];
+    case RISCV::BNE:
       getSupportInstBuilder(MBB, Pos,
                             MBB.getParent()->getFunction().getContext(),
                             InstrInfo.get(ADDIOp))
           .addReg(CounterReg, RegState::Define)
           .addReg(CounterReg)
           .addImm(-1);
-      ExitingValues[CounterReg] = APInt(getRegBitWidth(CounterReg, GC), 0);
-      MinCounterVal = APInt(getRegBitWidth(CounterReg, GC), 0);
+      ExitingValues[CounterReg] =
+          APInt(getRegBitWidth(CounterReg, GC), RegCounterOffset);
+      MinCounterVal = APInt(getRegBitWidth(CounterReg, GC), RegCounterOffset);
       break;
     case RISCV::BLT:
     case RISCV::BLTU:
@@ -1769,8 +1814,10 @@ public:
           .addReg(CounterReg, RegState::Define)
           .addReg(CounterReg)
           .addImm(1);
-      ExitingValues[CounterReg] = APInt(getRegBitWidth(CounterReg, GC), NIter);
-      MinCounterVal = APInt(getRegBitWidth(CounterReg, GC), 1);
+      ExitingValues[CounterReg] =
+          APInt(getRegBitWidth(CounterReg, GC), RegCounterOffset + NIter);
+      MinCounterVal =
+          APInt(getRegBitWidth(CounterReg, GC), RegCounterOffset + 1);
       break;
     case RISCV::BGE:
     case RISCV::BGEU:
@@ -1780,8 +1827,9 @@ public:
           .addReg(CounterReg, RegState::Define)
           .addReg(CounterReg)
           .addImm(-1);
-      ExitingValues[CounterReg] = APInt(getRegBitWidth(CounterReg, GC), 0);
-      MinCounterVal = APInt(getRegBitWidth(CounterReg, GC), 0);
+      ExitingValues[CounterReg] =
+          APInt(getRegBitWidth(CounterReg, GC), RegCounterOffset);
+      MinCounterVal = APInt(getRegBitWidth(CounterReg, GC), RegCounterOffset);
       break;
     default:
       llvm_unreachable("Unsupported branch type");

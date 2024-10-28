@@ -7,6 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Config/Branchegram.h"
+
+#include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/YAMLNumericRange.h"
 
 #include "llvm/Support/YAMLTraits.h"
@@ -89,6 +91,36 @@ template <> struct yaml::ScalarTraits<Branchegram::ConsecutiveLoops> {
   static QuotingType mustQuote(StringRef) { return QuotingType::None; }
 };
 
+struct LoopCounterInitMap final {
+  NumericRange<unsigned> LoopCounterOffset;
+  // optional for checking that at least one of the params should be setted
+  std::optional<bool> IsEnabled;
+
+  bool isOffsetRequested() const {
+    bool MinOrMaxSetted = LoopCounterOffset.Min || LoopCounterOffset.Max;
+    bool CheckEnabled = IsEnabled.has_value() && IsEnabled.value();
+    return CheckEnabled || (!IsEnabled.has_value() && MinOrMaxSetted);
+  }
+};
+
+template <> struct yaml::MappingTraits<LoopCounterInitMap> {
+  static void mapping(yaml::IO &IO, LoopCounterInitMap &LoopMap) {
+    IO.mapOptional("enabled", LoopMap.IsEnabled);
+    IO.mapOptional("min", LoopMap.LoopCounterOffset.Min);
+    IO.mapOptional("max", LoopMap.LoopCounterOffset.Max);
+  }
+
+  static std::string validate(yaml::IO &IO, LoopCounterInitMap &LoopMap) {
+    if (!IO.outputting() && !LoopMap.IsEnabled &&
+        !LoopMap.LoopCounterOffset.Min && !LoopMap.LoopCounterOffset.Max)
+      return std::string("loop-counter-random-init option requires at least "
+                         "one of the following attributes: enabled, min, max. "
+                         "But none of them was provided.");
+
+    return std::string("");
+  }
+};
+
 void yaml::MappingTraits<Branchegram>::mapping(yaml::IO &IO,
                                                Branchegram &Branches) {
   IO.mapOptional("permutation", Branches.PermuteCF);
@@ -98,6 +130,12 @@ void yaml::MappingTraits<Branchegram>::mapping(yaml::IO &IO,
   IO.mapOptional("number-of-loop-iterations", Branches.NLoopIter);
   IO.mapOptional("max-depth", Branches.MaxDepth);
   IO.mapOptional("distance", Branches.Dist);
+
+  LoopCounterInitMap LoopCounterMap;
+  IO.mapOptional("loop-counters-random-init", LoopCounterMap);
+  if (LoopCounterMap.isOffsetRequested())
+    Branches.LoopCounterOffset.emplace(
+        std::move(LoopCounterMap.LoopCounterOffset));
 }
 
 std::string yaml::MappingTraits<Branchegram>::validate(yaml::IO &IO,
