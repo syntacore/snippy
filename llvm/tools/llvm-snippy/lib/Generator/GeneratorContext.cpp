@@ -602,7 +602,6 @@ GeneratorSettings::getCompleteSectionList(LLVMState &State) const {
 GeneratorContext::GeneratorContext(SnippyProgramContext &ProgContext,
                                    GeneratorSettings &Settings)
     : ProgContext(ProgContext), MainModule(ProgContext.getLLVMState(), "main"),
-      CGS(std::make_unique<CallGraphState>()),
       ExecutionPath(
           snippy::configureLinkerSections(ProgContext.getLLVMState().getCtx(),
                                           ProgContext.getLinker(), Settings)),

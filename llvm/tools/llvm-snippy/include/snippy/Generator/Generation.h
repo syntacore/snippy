@@ -23,6 +23,8 @@ struct InstructionGenerationContext;
 class GeneratorContext;
 struct GenerationStatistics;
 struct SelfCheckInfo;
+class CallGraphState;
+class MemAccessInfo;
 
 void generate(planning::InstructionGroupRequest &IG,
               planning::InstructionGenerationContext &InstrGenCtx);
@@ -33,7 +35,8 @@ generate(planning::BasicBlockRequest &BB,
 
 void generate(planning::FunctionRequest &FunctionGenRequest,
               MachineFunction &MF, GeneratorContext &GC,
-              SelfCheckInfo *SelfCheckInfo, MachineLoopInfo *MLI);
+              SelfCheckInfo *SelfCheckInfo, MachineLoopInfo *MLI,
+              const CallGraphState &CGS, MemAccessInfo *MAI);
 
 } // namespace snippy
 } // namespace llvm

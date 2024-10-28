@@ -57,11 +57,12 @@ AddressGenInfo chooseAddrGenInfoForInstrCallback(
 
 enum class MemAccessKind { BURST, REGULAR };
 void markMemAccessAsUsed(const MCInstrDesc &InstrDesc, const AddressInfo &AI,
-                         MemAccessKind Kind, GeneratorContext &GC);
+                         MemAccessKind Kind, GeneratorContext &GC,
+                         MemAccessInfo *MAI);
 
-void addMemAccessToDump(const MemAddresses &ChosenAddresses,
-                        GeneratorContext &GC, size_t AccessSize);
-void dumpMemAccessesIfNeeded(GeneratorContext &GC);
+void addMemAccessToDump(const MemAddresses &ChosenAddresses, MemAccessInfo &MAI,
+                        size_t AccessSize);
+void dumpMemAccessesIfNeeded(const MemAccessInfo &MAI);
 
 void initializeBaseRegs(
     MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
@@ -72,7 +73,8 @@ void initializeBaseRegs(
 std::vector<AddressInfo>
 mapOpcodeIdxToAI(MachineBasicBlock &MBB, ArrayRef<unsigned> OpcodeIdxToBaseReg,
                  ArrayRef<unsigned> Opcodes, MachineBasicBlock::iterator Ins,
-                 RegPoolWrapper &RP, GeneratorContext &SGCtx);
+                 RegPoolWrapper &RP, GeneratorContext &SGCtx,
+                 MemAccessInfo *MAI);
 
 MachineBasicBlock::iterator processGeneratedInstructions(
     MachineBasicBlock::iterator ItBegin,
