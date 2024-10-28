@@ -14,6 +14,7 @@
 # RUN:  %t_SnippyFunction-cfg-dump-after-riscv-expand-pseudo.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-after-riscv-expand-atomic-pseudo.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-after-snippy-branch-relaxator.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-after-snippy-mem-access-dump.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-after-snippy-post-verification.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-after-snippy-inst-postprocess.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-after-snippy-function-distribute.dot

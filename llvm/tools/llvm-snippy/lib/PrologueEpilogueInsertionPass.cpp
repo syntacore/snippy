@@ -9,6 +9,7 @@
 #include "InitializePasses.h"
 
 #include "snippy/CreatePasses.h"
+#include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 
 #include "llvm/ADT/STLExtras.h"
@@ -61,7 +62,8 @@ public:
 
   auto getSpilledRegs(MachineFunction &MF) {
     auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-    bool IsRoot = SGCtx.isRootFunction(MF);
+    auto &FG = getAnalysis<FunctionGenerator>();
+    bool IsRoot = FG.isRootFunction(MF);
 
     std::vector<MCRegister> Ret;
 
@@ -90,6 +92,7 @@ public:
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.setPreservesCFG();
     AU.addRequired<GeneratorContextWrapper>();
+    AU.addRequired<FunctionGenerator>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 };
@@ -286,13 +289,14 @@ bool PrologueEpilogueInsertion::insertPrologue(
     MachineFunction &MF, ArrayRef<MCRegister> SpilledToStack,
     ArrayRef<MCRegister> SpilledToMem) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &FG = getAnalysis<FunctionGenerator>();
   auto &State = SGCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
-  bool IsEntry = SGCtx.isEntryFunction(MF);
+  bool IsEntry = FG.isEntryFunction(MF);
 
   // Only Entry function out of all root functions has prologue.
-  if (!IsEntry && SGCtx.isRootFunction(MF))
+  if (!IsEntry && FG.isRootFunction(MF))
     return false;
 
   auto &&[MBB, Ins] = findPlaceForPrologue(MF);
@@ -342,13 +346,14 @@ bool PrologueEpilogueInsertion::insertEpilogue(
     MachineFunction &MF, ArrayRef<MCRegister> SpilledToStack,
     ArrayRef<MCRegister> SpilledToMem) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &FG = getAnalysis<FunctionGenerator>();
   auto &State = SGCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
-  bool IsExit = SGCtx.isExitFunction(MF);
+  bool IsExit = FG.isExitFunction(MF);
 
   // Only Exit function out of all root functions has epilogue.
-  if (!IsExit && SGCtx.isRootFunction(MF))
+  if (!IsExit && FG.isRootFunction(MF))
     return false;
 
   // Forbid spilled registers to be potentially used as scratch registers

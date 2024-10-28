@@ -6,8 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "BlockGenPlanWrapperPass.h"
 #include "InitializePasses.h"
+
+#include "snippy/Generator/BlockGenPlanWrapperPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 
 #include "snippy/Support/Options.h"

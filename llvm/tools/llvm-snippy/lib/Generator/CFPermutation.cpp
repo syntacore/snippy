@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 #include "snippy/Generator/CFPermutation.h"
 #include "snippy/Config/Branchegram.h"
+#include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Support/Options.h"
 
@@ -141,8 +142,9 @@ findMaxDepthReachedImpl(CFPermBIIter Beg, CFPermBIIter End,
 } // namespace
 
 llvm::snippy::CFPermutationContext::CFPermutationContext(MachineFunction &MF,
-                                                         GeneratorContext &GC)
-    : BlocksInfo(), CurrMF(MF), GC(GC),
+                                                         GeneratorContext &GC,
+                                                         FunctionGenerator &FG)
+    : BlocksInfo(), CurrMF(MF), GC(GC), FG(FG),
       BranchSettings(GC.getConfig().Branches) {
   if (GC.hasTrackingMode() && GC.isLoopGenerationPossible() &&
       !GC.getOrCreateSimRunner()
@@ -156,8 +158,14 @@ llvm::snippy::CFPermutationContext::CFPermutationContext(MachineFunction &MF,
   LLVM_DEBUG(BranchSettings.get().dump());
 }
 
+size_t llvm::snippy::CFPermutationContext::getCFInstrNumFor(
+    const MachineFunction &MF) const {
+  auto TotalInstrNum = FG.get().getRequestedInstrsNum(MF);
+  return GC.get().getCFInstrsNum(TotalInstrNum);
+}
+
 bool llvm::snippy::CFPermutationContext::makePermutationAndUpdateBranches() {
-  auto CFInstrsNum = GC.get().getCFInstrsNum(CurrMF);
+  auto CFInstrsNum = getCFInstrNumFor(CurrMF);
   if (CFInstrsNum == 0) {
     LLVM_DEBUG(dbgs() << "No CF instructions for " << CurrMF.get().getName()
                       << "\n");
@@ -296,7 +304,7 @@ void llvm::snippy::CFPermutationContext::initBlocksInfo(unsigned Size) {
     return;
   }
 
-  auto RequestedInstrsNum = GC.get().getRequestedInstrsNum(CurrMF);
+  auto RequestedInstrsNum = FG.get().getRequestedInstrsNum(CurrMF);
 
   for (auto BB : seq(0u, Size))
     initOneBlockInfo(BB, Size, RequestedInstrsNum);

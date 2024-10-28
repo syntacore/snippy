@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Generator/GenerationUtils.h"
+#include "snippy/Generator/MemAccessInfo.h"
 #include "snippy/Generator/Policy.h"
 #include "snippy/Support/Options.h"
 #include "llvm/CodeGen/MachineLoopInfo.h"
@@ -23,26 +24,6 @@ static snippy::opt<unsigned> BurstAddressRandomizationThreshold(
         "Number of attempts to randomize address of each instruction in the "
         "burst group"),
     cl::Hidden, cl::init(100));
-static snippy::opt<std::string> DumpMemAccesses(
-    "dump-memory-accesses",
-    cl::desc("Dump memory addresses that are accessed by instructions in the "
-             "snippet to a file creating `access-addresses` memory scheme. It "
-             "does not record auxiliary instructions (e.g. selfcheck). Pass "
-             "the options with an empty value to dump to stdout."),
-    cl::value_desc("filename"), cl::cat(Options));
-static snippy::opt<std::string> DumpMemAccessesRestricted(
-    "dump-memory-accesses-restricted",
-    cl::desc(
-        "Dump memory addresses that are accessed by instructions in the "
-        "snippet to a file creating `restricted-addresses` memory scheme. It "
-        "does not record auxiliary instructions (e.g. selfcheck). Pass "
-        "the options with an empty value to dump to stdout."),
-    cl::value_desc("filename"), cl::cat(Options));
-static snippy::opt<bool> DumpBurstPlainAccesses(
-    "dump-burst-accesses-as-plain-addrs",
-    cl::desc("Dump memory addresses accessed by burst groups as plain "
-             "addresses rather than ranges descriptions"),
-    cl::cat(Options), cl::init(false));
 
 // For the given AddressInfo and AddressRestriction try to find another
 // AddressInfo such that:
@@ -539,7 +520,8 @@ void initializeBaseRegs(
 std::vector<AddressInfo>
 mapOpcodeIdxToAI(MachineBasicBlock &MBB, ArrayRef<unsigned> OpcodeIdxToBaseReg,
                  ArrayRef<unsigned> Opcodes, MachineBasicBlock::iterator Ins,
-                 RegPoolWrapper &RP, GeneratorContext &SGCtx) {
+                 RegPoolWrapper &RP, GeneratorContext &SGCtx,
+                 MemAccessInfo *MAI) {
   assert(OpcodeIdxToBaseReg.size() == Opcodes.size());
   if (Opcodes.empty())
     return {};
@@ -580,140 +562,29 @@ mapOpcodeIdxToAI(MachineBasicBlock &MBB, ArrayRef<unsigned> OpcodeIdxToBaseReg,
     OpcodeIdxToAI.push_back(AI);
   }
 
-  if (DumpMemAccesses.isSpecified())
-    SGCtx.addBurstRangeMemAccess(OpcodeIdxToAI);
+  if (MAI)
+    MAI->addBurstRangeMemAccess(OpcodeIdxToAI);
 
   return OpcodeIdxToAI;
 }
 
 void markMemAccessAsUsed(const MCInstrDesc &InstrDesc, const AddressInfo &AI,
-                         MemAccessKind Kind, GeneratorContext &GC) {
+                         MemAccessKind Kind, GeneratorContext &GC,
+                         MemAccessInfo *MAI) {
   auto EffectiveAddr = AI.Address;
   auto AccessSize = AI.AccessSize;
-  if (DumpMemAccesses.isSpecified() ||
-      DumpMemAccessesRestricted.isSpecified()) {
+  if (MAI) {
     if (Kind == MemAccessKind::BURST)
-      GC.addBurstPlainMemAccess(EffectiveAddr, AccessSize);
+      MAI->addBurstPlainMemAccess(EffectiveAddr, AccessSize);
     else
-      GC.addMemAccess(EffectiveAddr, AccessSize);
+      MAI->addMemAccess(EffectiveAddr, AccessSize);
   }
 }
 
-void addMemAccessToDump(const MemAddresses &ChosenAddresses,
-                        GeneratorContext &GC, size_t AccessSize) {
-  if (DumpMemAccesses.isSpecified() ||
-      DumpMemAccessesRestricted.isSpecified()) {
-    for (auto Addr : ChosenAddresses)
-      GC.addMemAccess(Addr, AccessSize);
-  }
-}
-
-static bool dumpPlainAccesses(raw_ostream &OS,
-                              const PlainAccessesType &Accesses,
-                              bool Restricted, StringRef Prefix, bool Append) {
-  if (Accesses.empty())
-    return false;
-
-  if (!Append)
-    OS << Prefix.data() << "plain:\n";
-
-  for (auto [Addr, AccessSize] : Accesses) {
-    OS << "      - addr: 0x" << Twine::utohexstr(Addr).str() << "\n";
-    if (Restricted)
-      OS << "        access-size: " << AccessSize << "\n";
-  }
-  return true;
-}
-
-static void dumpBurstAccesses(raw_ostream &OS,
-                              const BurstGroupAccessesType &Accesses,
-                              StringRef Prefix) {
-  if (Accesses.empty())
-    return;
-
-  OS << Prefix.data() << "burst:\n";
-
-  for (const auto &BurstDesc : Accesses) {
-    assert(!BurstDesc.empty() && "At least one range is expected");
-    for (auto &RangeDesc : BurstDesc) {
-      assert(RangeDesc.MinOffset <= RangeDesc.MaxOffset);
-      bool IsMinNegative = RangeDesc.MinOffset < 0;
-      MemAddr MinOffsetAbs = std::abs(RangeDesc.MinOffset);
-      bool IsMaxNegative = RangeDesc.MaxOffset < 0;
-      MemAddr MaxOffsetAbs = std::abs(RangeDesc.MaxOffset);
-      assert(!IsMinNegative || RangeDesc.Address >= MinOffsetAbs);
-      assert(IsMinNegative ||
-             std::numeric_limits<MemAddr>::max() - RangeDesc.Address >=
-                 MinOffsetAbs);
-      auto BaseAddr = IsMinNegative ? RangeDesc.Address - MinOffsetAbs
-                                    : RangeDesc.Address + MinOffsetAbs;
-      MemAddr Size = 0;
-      if (IsMaxNegative) {
-        assert(MinOffsetAbs >= MaxOffsetAbs);
-        Size = MinOffsetAbs - MaxOffsetAbs;
-      } else if (IsMinNegative) {
-        assert(std::numeric_limits<MemAddr>::max() - MaxOffsetAbs >=
-               MinOffsetAbs);
-        Size = MaxOffsetAbs + MinOffsetAbs;
-      } else {
-        assert(MaxOffsetAbs >= MinOffsetAbs);
-        Size = MaxOffsetAbs - MinOffsetAbs;
-      }
-      assert(std::numeric_limits<MemAddr>::max() - Size >=
-             RangeDesc.AccessSize);
-      Size += RangeDesc.AccessSize;
-      OS << "        - addr: 0x" << Twine::utohexstr(BaseAddr).str() << "\n";
-      OS << "          size: " << Size << "\n";
-      OS << "          stride: " << RangeDesc.MinStride << "\n";
-      OS << "          access-size: " << RangeDesc.AccessSize << "\n";
-    }
-  }
-}
-void dumpMemAccesses(StringRef Filename, const PlainAccessesType &Plain,
-                     const BurstGroupAccessesType &BurstRanges,
-                     const PlainAccessesType &BurstPlain, bool Restricted) {
-  if (Plain.empty() && BurstRanges.empty() && BurstPlain.empty()) {
-    errs() << "warning: cannot dump memory accesses as no accesses were "
-              "generated. File won't be created.\n";
-    return;
-  }
-
-  std::string DumpStr;
-  raw_string_ostream SS(DumpStr);
-  SS << (Restricted ? "restricted-addresses:\n" : "access-addresses:\n");
-  if (!Restricted)
-    SS << "  - ordered: true\n";
-
-  constexpr auto NewEntry = "  - ";
-  constexpr auto SameEntry = "    ";
-  auto Prefix = Restricted ? NewEntry : SameEntry;
-
-  auto Added =
-      dumpPlainAccesses(SS, Plain, Restricted, Prefix, /* Append */ false);
-  if (Added)
-    Prefix = SameEntry;
-
-  if (!Restricted && !DumpBurstPlainAccesses)
-    dumpBurstAccesses(SS, BurstRanges, Prefix);
-  else
-    dumpPlainAccesses(SS, BurstPlain, Restricted, Prefix, /* Append */ Added);
-
-  if (Filename.empty())
-    outs() << SS.str();
-  else
-    writeFile(Filename, DumpStr);
-}
-
-void dumpMemAccessesIfNeeded(GeneratorContext &GC) {
-  if (DumpMemAccesses.isSpecified())
-    dumpMemAccesses(DumpMemAccesses.getValue(), GC.getMemAccesses(),
-                    GC.getBurstRangeAccesses(), GC.getBurstPlainAccesses(),
-                    /* Restricted */ false);
-
-  if (DumpMemAccessesRestricted.isSpecified())
-    dumpMemAccesses(DumpMemAccessesRestricted.getValue(), GC.getMemAccesses(),
-                    GC.getBurstRangeAccesses(), GC.getBurstPlainAccesses(),
-                    /* Restricted */ true);
+void addMemAccessToDump(const MemAddresses &ChosenAddresses, MemAccessInfo &MAI,
+                        size_t AccessSize) {
+  for (auto Addr : ChosenAddresses)
+    MAI.addMemAccess(Addr, AccessSize);
 }
 
 MachineBasicBlock *createMachineBasicBlock(MachineFunction &MF,

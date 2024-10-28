@@ -9,6 +9,7 @@
 #include "InitializePasses.h"
 
 #include "snippy/CreatePasses.h"
+#include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/PassRegistry.h"
@@ -30,6 +31,7 @@ struct CFGenerator final : public MachineFunctionPass {
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<GeneratorContextWrapper>();
+    AU.addRequired<FunctionGenerator>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 };
@@ -53,7 +55,8 @@ MachineFunctionPass *createCFGeneratorPass() { return new CFGenerator(); }
 namespace snippy {
 bool CFGenerator::runOnMachineFunction(MachineFunction &MF) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto CFInstrsNum = SGCtx.getCFInstrsNum(MF);
+  auto &FG = getAnalysis<FunctionGenerator>();
+  auto CFInstrsNum = SGCtx.getCFInstrsNum(FG.getRequestedInstrsNum(MF));
   if (CFInstrsNum == 0)
     return false;
 

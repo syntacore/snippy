@@ -9,6 +9,7 @@
 #include "CFGPrinter.h"
 #include "snippy/CreatePasses.h"
 
+#include "snippy/ActiveImmutablePass.h"
 #include "snippy/PassManagerWrapper.h"
 
 #include "llvm/ADT/StringRef.h"
@@ -17,6 +18,9 @@
 
 namespace llvm {
 namespace snippy {
+std::unordered_map<char *, std::unique_ptr<char>>
+    ActiveImmutablePassInterface::IDStash;
+std::vector<std::string> ActiveImmutablePassInterface::StringStorage;
 
 namespace {
 auto lookupPassInfoAndPassArgument(AnalysisID ID) {
@@ -29,6 +33,13 @@ auto lookupPassInfoAndPassArgument(AnalysisID ID) {
 } // namespace
 
 void PassManagerWrapper::add(ImmutablePass *P) { PM.add(P); }
+
+void PassManagerWrapper::add(ActiveImmutablePassInterface *P) {
+  auto *AsP = P->getAsPass();
+  auto *Decoy = P->createStoragePass();
+  add(Decoy);
+  add(AsP);
+}
 
 void PassManagerWrapper::add(Pass *P) {
   assert(P && "Non-null pointer to a pass expected");
