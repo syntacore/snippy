@@ -9,6 +9,7 @@
 #include "InitializePasses.h"
 
 #include "snippy/CreatePasses.h"
+#include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 
 #include "llvm/CodeGen/MachineFunction.h"
@@ -30,6 +31,7 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<GeneratorContextWrapper>();
+    AU.addRequired<FunctionGenerator>();
     ModulePass::getAnalysisUsage(AU);
   }
 
@@ -80,16 +82,17 @@ void FunctionDistribute::verifyFunctionSizes(Module &M,
                                              bool OnlyRootOnes) const {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   const auto &ProgCtx = SGCtx.getProgramContext();
+  auto &FG = getAnalysis<FunctionGenerator>();
   const auto &UsedSections = SGCtx.executionPath();
 
   for (auto &Section : UsedSections) {
     std::vector<Function *> Functions;
-    for (auto &F : llvm::make_filter_range(
-             M, [&SGCtx, &ProgCtx, &Section, OnlyRootOnes](auto &F) {
-               return (!OnlyRootOnes || SGCtx.isRootFunction(F)) &&
-                      ProgCtx.getOutputSectionFor(F).getIDString() ==
-                          Section.OutputSection.Desc.getIDString();
-             }))
+    auto Examined = [&](auto &F) {
+      return (!OnlyRootOnes || FG.isRootFunction(F)) &&
+             ProgCtx.getOutputSectionFor(F).getIDString() ==
+                 Section.OutputSection.Desc.getIDString();
+    };
+    for (auto &F : llvm::make_filter_range(M, Examined))
       Functions.emplace_back(&F);
 
     auto totalSize = std::accumulate(
@@ -128,7 +131,10 @@ std::vector<FunctionDistribute::SectionSpaceInfo>
 FunctionDistribute::calculateAvailableSpace() const {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   const auto &ProgCtx = SGCtx.getProgramContext();
-  auto &RootFs = SGCtx.getCallGraphState().getRootNode()->functions();
+  auto &RootFs = getAnalysis<FunctionGenerator>()
+                     .getCallGraphState()
+                     .getRootNode()
+                     ->functions();
   std::vector<SectionSpaceInfo> Ret;
 
   for (auto *F : RootFs)
@@ -140,6 +146,7 @@ FunctionDistribute::calculateAvailableSpace() const {
 
 bool FunctionDistribute::runOnModule(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &FG = getAnalysis<FunctionGenerator>();
   calculateFunctionSizes(M);
 
   // Don't do anything if singular section is used anyway.
@@ -160,8 +167,8 @@ bool FunctionDistribute::runOnModule(Module &M) {
   llvm::transform(
       llvm::make_filter_range(
           M,
-          [&SGCtx](auto &F) {
-            return !SGCtx.isRootFunction(
+          [&SGCtx, &FG](auto &F) {
+            return !FG.isRootFunction(
                 SGCtx.getMainModule().getMMI().getOrCreateMachineFunction(F));
           }),
       std::back_inserter(SortedBySize), [](auto &F) { return &F; });

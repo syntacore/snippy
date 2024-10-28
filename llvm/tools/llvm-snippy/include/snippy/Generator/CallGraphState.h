@@ -154,6 +154,33 @@ public:
     return registered(F) && getNode(F) == getRootNode();
   }
 
+  bool isRootFunction(const MachineFunction &MF) const {
+    auto *F = &MF.getFunction();
+    return isRoot(F);
+  }
+
+  auto isEntryFunction(const MachineFunction &MF) const {
+    auto *F = &MF.getFunction();
+    return getRootNode()->functions().front() == F;
+  }
+
+  auto isExitFunction(const MachineFunction &MF) const {
+    auto *F = &MF.getFunction();
+    return getRootNode()->functions().back() == F;
+  }
+
+  auto *nextRootFunction(const MachineFunction &MF) const {
+    assert(isRootFunction(MF) && "MF must be in root group.");
+    auto *F = &MF.getFunction();
+    auto *Root = getNode(&MF.getFunction());
+    auto Found =
+        llvm::find_if(Root->functions(), [F](auto *E) { return F == E; });
+    assert(Found != Root->functions().end() &&
+           std::next(Found) != Root->functions().end() &&
+           "Exit function does not have ancessor");
+    return *std::next(Found);
+  }
+
   void setRoot(Node *Node) {
     if (Node == getRootNode())
       return;
