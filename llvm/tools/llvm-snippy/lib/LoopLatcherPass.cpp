@@ -348,8 +348,8 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   LLVM_DEBUG(printSelectedRegs(dbgs(), ReservedRegs, State.getRegInfo()));
 
   auto PreheaderInsertPt = Preheader.getFirstTerminator();
-  SnippyTgt.insertLoopInit(Preheader, PreheaderInsertPt, NewBranch,
-                           ReservedRegs, NIter, SGCtx);
+  auto MinLoopCountVal = SnippyTgt.insertLoopInit(
+      Preheader, PreheaderInsertPt, NewBranch, ReservedRegs, NIter, SGCtx);
 
   auto SP = ProgCtx.getStackPointer();
   if (UseStackOpt || TrackingMode) {
@@ -390,8 +390,9 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   // fixed to work with non-trivial loops.
 
   RegToValueType ExitingValues;
-  auto CounterInsRes = SnippyTgt.insertLoopCounter(
-      InsPos, NewBranch, ReservedRegs, NIter, SGCtx, ExitingValues);
+  auto CounterInsRes =
+      SnippyTgt.insertLoopCounter(InsPos, NewBranch, ReservedRegs, NIter, SGCtx,
+                                  ExitingValues, MinLoopCountVal);
   auto &Diag = CounterInsRes.Diag;
   auto ActualNumIter = CounterInsRes.NIter;
   unsigned MinCounterVal = CounterInsRes.MinCounterVal.getZExtValue();
