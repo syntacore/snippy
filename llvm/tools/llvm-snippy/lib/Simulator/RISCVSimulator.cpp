@@ -132,6 +132,25 @@ bool RISCVRegisterState::operator==(const IRegisterState &Another) const {
          VRegs == Casted.VRegs;
 }
 
+RegSizeInBytes RISCVRegisterState::getRegSizeInBytes(Register Reg,
+                                                     unsigned XLen,
+                                                     unsigned VLEN) {
+  return static_cast<RegSizeInBytes>(
+      getRegBitWidth(Reg, XLen * RISCV_CHAR_BIT, VLEN) / RISCV_CHAR_BIT);
+}
+
+uint64_t RISCVRegisterState::getMaxRegValueForSize(RegSizeInBytes Size) {
+  if (Size == RegSizeInBytes::Reg4Bytes)
+    return std::numeric_limits<uint32_t>::max();
+  return std::numeric_limits<uint64_t>::max();
+}
+
+uint64_t RISCVRegisterState::getMaxRegValueForSize(Register Reg, unsigned XLen,
+                                                   unsigned VLEN) {
+  auto SizeInBytes = getRegSizeInBytes(Reg, XLen, VLEN);
+  return getMaxRegValueForSize(SizeInBytes);
+}
+
 void RISCVRegisterState::uniformlyFillXRegs() {
   assert(!XRegs.empty());
   uniformlyFill<uint64_t>(MutableArrayRef<uint64_t>(XRegs).slice(1), 0,

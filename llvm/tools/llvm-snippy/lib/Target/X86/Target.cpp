@@ -348,17 +348,18 @@ public:
     reportUnimplementedError();
   }
 
-  void insertLoopInit(MachineBasicBlock &MBB, MachineBasicBlock::iterator Pos,
-                      MachineInstr &Branch, ArrayRef<Register> ReservedRegs,
-                      unsigned NIter, GeneratorContext &GC) const override {
+  unsigned insertLoopInit(MachineBasicBlock &MBB,
+                          MachineBasicBlock::iterator Pos, MachineInstr &Branch,
+                          ArrayRef<Register> ReservedRegs, unsigned NIter,
+                          GeneratorContext &GC) const override {
     reportUnimplementedError();
   }
 
   LoopCounterInsertionResult
   insertLoopCounter(MachineBasicBlock::iterator Pos, MachineInstr &Branch,
                     ArrayRef<Register> ReservedRegs, unsigned NIter,
-                    GeneratorContext &GC,
-                    RegToValueType &ExitingValues) const override {
+                    GeneratorContext &GC, RegToValueType &ExitingValues,
+                    unsigned RegCounterOffset) const override {
     reportUnimplementedError();
   }
 

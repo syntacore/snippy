@@ -451,11 +451,11 @@ public:
   virtual unsigned getInstrSize(const MachineInstr &Inst,
                                 const GeneratorContext &GC) const = 0;
 
-  virtual void insertLoopInit(MachineBasicBlock &MBB,
-                              MachineBasicBlock::iterator Pos,
-                              MachineInstr &Branch,
-                              ArrayRef<Register> ReservedRegs, unsigned NIter,
-                              GeneratorContext &GC) const = 0;
+  // returns min loop counter value
+  virtual unsigned
+  insertLoopInit(MachineBasicBlock &MBB, MachineBasicBlock::iterator Pos,
+                 MachineInstr &Branch, ArrayRef<Register> ReservedRegs,
+                 unsigned NIter, GeneratorContext &GC) const = 0;
 
   virtual LoopType getLoopType(MachineInstr &Branch) const = 0;
 
@@ -468,8 +468,8 @@ public:
   virtual LoopCounterInsertionResult
   insertLoopCounter(MachineBasicBlock::iterator Pos, MachineInstr &MI,
                     ArrayRef<Register> ReservedRegs, unsigned NIter,
-                    GeneratorContext &GC,
-                    RegToValueType &ExitingValues) const = 0;
+                    GeneratorContext &GC, RegToValueType &ExitingValues,
+                    unsigned RegCounterOffset) const = 0;
 
   virtual ~SnippyTarget();
 
