@@ -93,16 +93,18 @@ struct RISCVRegisterState : public IRegisterState {
 
   bool operator==(const IRegisterState &) const override;
 
+  static uint64_t getMaxRegValueForSize(RegSizeInBytes Size);
+
+  static uint64_t getMaxRegValueForSize(Register Reg, unsigned XLen,
+                                        unsigned VLen);
+
+  static RegSizeInBytes getRegSizeInBytes(Register Reg, unsigned XLen,
+                                          unsigned VLen);
+
 private:
   void uniformlyFillXRegs();
   void uniformlyFillFRegs();
   void uniformlyFillVRegs();
-
-  static uint64_t getMaxRegValueForSize(RegSizeInBytes Size) {
-    if (Size == RegSizeInBytes::Reg4Bytes)
-      return std::numeric_limits<uint32_t>::max();
-    return std::numeric_limits<uint64_t>::max();
-  }
 };
 
 std::unique_ptr<SimulatorInterface> createRISCVSimulator(
