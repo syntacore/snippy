@@ -1,0 +1,22 @@
+histogram:
+# Three operands
+    - [ADD, 1.0]
+    - [AND, 1.0]
+    - [OR, 1.0]
+    - [SLL, 1.0]
+    - [SLT, 1.0]
+    - [SLTU, 1.0]
+    - [SRA, 1.0]
+    - [SRL, 1.0]
+    - [SUB, 1.0]
+    - [XOR, 1.0]
+# Two operands  
+    - [ANDI, 1.0]
+    - [ORI, 1.0]
+    - [SLLI, 1.0]
+    - [SLTI, 1.0]
+    - [SLTIU, 1.0]
+    - [SRAI, 1.0]
+    - [SRLI, 1.0]
+    - [XORI, 1.0]
+

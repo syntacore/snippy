@@ -166,6 +166,72 @@ unsigned countAddrs(ArrayRef<unsigned> Opcodes, const SnippyTarget &SnippyTgt) {
                          CountAddrsForOpcode);
 }
 
+static Register pregenerateRegister(const MachineBasicBlock &MBB,
+                                    const MCInstrDesc &InstrDesc,
+                                    RegPoolWrapper &RP,
+                                    const MCOperandInfo &MCOpInfo,
+                                    unsigned OpIndex, GeneratorContext &GC) {
+  const auto &State = GC.getLLVMState();
+  const auto &RegInfo = State.getRegInfo();
+  const auto &Tgt = State.getSnippyTarget();
+  auto OperandRegClassID = InstrDesc.operands()[OpIndex].RegClass;
+  auto RegClass = Tgt.getRegClass(GC, OperandRegClassID, OpIndex,
+                                  InstrDesc.getOpcode(), MBB, RegInfo);
+  auto Exclude = Tgt.excludeRegsForOperand(RegClass, GC, InstrDesc, OpIndex);
+  auto Include = Tgt.includeRegs(RegClass);
+  AccessMaskBit Mask = AccessMaskBit::RW;
+  auto CustomMask = Tgt.getCustomAccessMaskForOperand(GC, InstrDesc, OpIndex);
+  if (CustomMask != AccessMaskBit::None)
+    Mask = CustomMask;
+  auto RegOpt = GC.getProgramContext().getRegGen().generate(
+      RegClass, OperandRegClassID, RegInfo, RP, MBB, Tgt, Exclude, Include,
+      Mask);
+  assert(RegOpt.has_value());
+  return RegOpt.value();
+}
+
+std::vector<planning::PreselectedOpInfo>
+selectInitializableOperandsRegisters(const MCInstrDesc &InstrDesc,
+                                     GeneratorContext &GC,
+                                     MachineBasicBlock &MBB) {
+  std::vector<planning::PreselectedOpInfo> Preselected;
+  Preselected.reserve(InstrDesc.getNumOperands());
+  auto RP = GC.getRegisterPool();
+  llvm::transform(
+      llvm::enumerate(InstrDesc.operands()), std::back_inserter(Preselected),
+      [&, &Tgt = GC.getLLVMState().getSnippyTarget()](
+          const auto &&Args) -> planning::PreselectedOpInfo {
+        const auto &[OpIndex, MCOpInfo] = Args;
+        // If it is TIED_TO, this register is already selected.
+        if (Tgt.canInitializeOperand(InstrDesc, OpIndex) &&
+            InstrDesc.getOperandConstraint(OpIndex, MCOI::TIED_TO) == -1)
+          return pregenerateRegister(MBB, InstrDesc, RP, MCOpInfo, OpIndex, GC);
+        return {};
+      });
+  return Preselected;
+}
+
+static planning::PreselectedOpInfo
+convertToPreselectedOpInfo(const MCOperand &Op) {
+  if (Op.isReg())
+    return Register(Op.getReg());
+  if (Op.isImm())
+    return StridedImmediate(/* MinIn */ Op.getImm(), /* MaxIn */ Op.getImm(),
+                            /* StrideIn */ 0);
+  llvm_unreachable("Unknown MCOperand");
+}
+
+std::vector<planning::PreselectedOpInfo>
+getPreselectedForInstr(const MCInst &Inst) {
+  std::vector<planning::PreselectedOpInfo> Preselected;
+  Preselected.reserve(Inst.getNumOperands());
+
+  transform(Inst, std::back_inserter(Preselected), [](const auto &Operand) {
+    return convertToPreselectedOpInfo(Operand);
+  });
+  return Preselected;
+}
+
 // For the given InstrDesc fill the vector of selected operands to account them
 // in instruction generation procedure.
 std::vector<planning::PreselectedOpInfo>

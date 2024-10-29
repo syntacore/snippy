@@ -99,6 +99,13 @@ snippy::alias
                             cl::desc("Alias for -initial-regs"),
                             snippy::aliasopt(InitialRegisterDataFile));
 
+static snippy::opt<std::string> ValuegramRegsDataFile(
+    "valuegram-operands-regs",
+    cl::desc("Set values in operands registers before each instruction "
+             "according to the file. It supported only if a number of "
+             "instructions are generated."),
+    cl::cat(Options), cl::init(""));
+
 static snippy::opt_list<std::string> ReservedRegisterList(
     "reserved-regs-list", cl::CommaSeparated,
     cl::desc("list of registers that shall not be used in snippet code"),
@@ -866,6 +873,22 @@ static void checkBurstGram(LLVMContext &Ctx, const OpcodeHistogram &Histogram,
   }
 }
 
+static void checkCompatibilityWithValuegramPolicy(const Config &Cfg,
+                                                  LLVMContext &Ctx) {
+  if (!ValuegramRegsDataFile.isSpecified())
+    return;
+  bool FillCodeSectionMode = !getExpectedNumInstrs(NumInstrs.getValue());
+  if (FillCodeSectionMode)
+    snippy::fatal(Ctx, "Incompatible options",
+                  "When -num-instr=all is specified, initializing "
+                  "registers after each instruction is not supported.");
+  if (Cfg.Burst.Data->Mode != BurstMode::Basic)
+    snippy::fatal(
+        Ctx, "Incompatible options",
+        "Generating bursts and initializing "
+        "registers after each instruction is not supported together.");
+}
+
 static void checkConfig(const Config &Cfg, const SnippyTarget &Tgt,
                         const TargetMachine &TM, LLVMContext &Ctx,
                         const OpcodeCache &OpCC) {
@@ -936,6 +959,7 @@ static void checkConfig(const Config &Cfg, const SnippyTarget &Tgt,
   checkMemoryRegions(Tgt, Cfg);
   Tgt.checkInstrTargetDependency(Cfg.Histogram);
   Cfg.MS.validateSchemes(Ctx, Cfg.Sections, StrictMemoryScheme);
+  checkCompatibilityWithValuegramPolicy(Cfg, Ctx);
 }
 
 static std::string getMemPlugin() {
@@ -988,6 +1012,10 @@ static void completeConfig(Config &Cfg, LLVMState &State,
                            *Cfg.Burst.Data);
   Cfg.MS.setAddrPlugin({getMemPlugin(), getMemPluginInfo()});
   checkConfig(Cfg, Tgt, TM, State.getCtx(), OpCC);
+  if (ValuegramRegsDataFile.isSpecified())
+    Cfg.RegsHistograms =
+        loadRegistersFromYaml(ValuegramRegsDataFile.getValue());
+
   auto *II = TM.getMCInstrInfo();
   assert(II);
   checkFPUSettings(Cfg, State.getCtx(), Tgt, *II);

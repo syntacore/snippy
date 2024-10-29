@@ -1,0 +1,71 @@
+# COM: This test checks that before loads and stores there is a partial initialization.
+# COM: Only those registers that are not memory addresses are initialized from histogram.
+
+# RUN: llvm-snippy %s %S/Inputs/loads.yaml \
+# RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN: |& FileCheck %s --check-prefix=LOADS
+ 
+# RUN: llvm-snippy %s %S/Inputs/stores.yaml \
+# RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN: |& FileCheck %s --check-prefix=STORES
+
+options:
+  march: riscv64
+  mcpu: generic-rv64
+  mattr: +zfh,+d,+c
+  dump-mf: on
+  num-instrs: 1000
+
+sections:
+    - no:        0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+
+#          Valuegram values:
+#
+#                     X: 0, 1, 255.
+#                     F: 83, 170.
+#                     We want to see them in initialization 
+#         
+#          An example of what we're matching:
+#          
+#          Loads:     $x15 = ADDI $x0, 255, pcsections <0x55fcab0978b8>
+#                     $x14 = LUI 597, pcsections <0x55fcab0978b8>
+#                     $x14 = ADDIW $x14, 304, pcsections <0x55fcab0978b8>
+#                     $x15 = C_LD $x14, 120
+#                   
+#          Stores:    $x7 = ADDI $x0, 83, pcsections <0x564fec963d78>
+#                     $f23_f = FMV_W_X $x7, pcsections <0x564fec963d78>
+#                     $x21 = LUI 679, pcsections <0x564fec963d78>
+#                     $x21 = ADDIW $x21, -601, pcsections <0x564fec963d78>
+#                     FSW $f23_f, $x21, 1377
+
+# Floats
+# 
+# LOADS-COUNT-20: [[REG0:\$x[0-9]+]] = ADDI{{.*}}, {{(83|170).*[[:space:]].*}}[[FREG0:\$f[0-9]+_f]] = FMV_W_X [[REG0]]{{.*[[:space:]].*}}[[REG1:\$x[0-9]+]] = LUI{{.*[[:space:]].*}}[[REG1]] = ADDIW [[REG1]]{{.*[[:space:]].*}}[[FREG0]] = FLW [[REG1]]
+#
+# Basic and compressed
+#
+# LOADS-COUNT-20: [[REG0:\$x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}[[REG1:\$x[0-9]+]] = LUI {{.*[[:space:]].*}}[[REG1]] = ADDIW [[REG1]]{{.*[[:space:]].*}}[[REG0]] = {{C_L|L}}{{W|D|H}} [[REG1]]
+
+
+# Floats
+# 
+# STORES-COUNT-20: [[REG0:\$x[0-9]+]] = ADDI {{.*}}, {{(83|170).*[[:space:]].*}}[[FREG0:\$f[0-9]+_f]] = FMV_W_X [[REG0]]{{.*[[:space:]].*}}[[REG1:\$x[0-9]+]] = LUI {{.*[[:space:]].*}}[[REG1]] = ADDIW [[REG1]]{{.*[[:space:]].*}}FSW [[FREG0]], [[REG1]]
+#
+# Basic and compressed
+#
+# STORES-COUNT-20: [[REG0:\$x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}[[REG1:\$x[0-9]+]] = LUI{{.*[[:space:]].*}}[[REG1]] = ADDIW [[REG1]]{{.*[[:space:]].*}}{{C_S|S}}{{W|D|H}} [[REG0]], [[REG1]]
+ 
