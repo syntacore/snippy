@@ -1,0 +1,89 @@
+# COM: This test checks that before atomic instructions there is a partial initialization.
+# COM: Only those registers that are not memory addresses are initialized from histogram.
+
+
+# RUN: llvm-snippy %s \
+# RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN: |& FileCheck %s --check-prefix AMO_SC
+
+# RUN: llvm-snippy %s \
+# RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN: |& FileCheck %s --check-prefix LR
+
+options:
+  march: riscv64-linux-gnu
+  mcpu: generic-rv64
+  mattr: +a
+  dump-mf: true
+  num-instrs: 1000
+
+sections:
+    - no:        0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x1000000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x2100000
+      SIZE:      0x100000
+      LMA:       0x2100000
+      ACCESS:    rw
+
+histogram:
+    - [AMOADD_D, 1.0]
+    - [AMOADD_W, 1.0]
+    - [AMOADD_D_AQ, 1.0]
+    - [AMOADD_W_AQ, 1.0]
+    - [AMOADD_D_RL, 1.0]
+    - [AMOADD_W_RL, 1.0]
+    - [AMOADD_D_AQ_RL, 1.0]
+    - [AMOADD_W_AQ_RL, 1.0]
+    - [AMOAND_D, 1.0]
+    - [AMOMAXU_W, 1.0]
+    - [AMOMAXU_D_RL, 1.0]
+    - [AMOMIN_D, 1.0]
+    - [AMOMINU_D_AQ_RL, 1.0]
+    - [AMOSWAP_D, 1.0]
+    - [AMOSWAP_W, 1.0]
+    - [AMOSWAP_D_AQ, 1.0]
+    - [AMOSWAP_W_AQ, 1.0]
+    - [AMOXOR_W_AQ, 1.0]
+    - [AMOOR_D_RL, 1.0]
+    - [AMOSWAP_D_RL, 1.0]
+    - [AMOSWAP_W_AQ_RL, 1.0]
+    - [SC_D, 1.0]
+    - [SC_D_RL, 1.0]
+    - [SC_W, 1.0]
+    - [SC_W_RL, 1.0]
+  
+    - [LR_D, 5.0]
+    - [LR_D_AQ, 5.0]
+    - [LR_W, 5.0]
+    - [LR_W_AQ, 5.0]
+
+#          Valuegram values:
+#
+#                      X: 0, 1, 255.
+#                      We want to see them in initialization 
+#         
+#          An example of what we're matching:
+# 
+#          AMO and SC: $x7 = ADDI $x0, 255, pcsections <0x56275c6c3b28>
+#                      $x6 = ADDI $x0, 0, pcsections <0x56275c6c3b28>
+#                      $x29 = LUI 8574, pcsections <0x56275c6c3b28>
+#                      $x29 = ADDIW $x29, -136, pcsections <0x56275c6c3b28>
+#                      $x7 = AMOMAXU_W $x29, $x6
+
+#                  Lr: $x24 = ADDI $x0, 1, pcsections <0x55bafc168578>
+#                      $x1 = LUI 8617, pcsections <0x55bafc168578>
+#                      $x1 = ADDIW $x1, -2032, pcsections <0x55bafc168578>
+#                      $x24 = LR_D $x1
+
+# AMO_SC-COUNT-100: [[REG0:\$x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}[[REG1:\$x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}[[REG2:\$x[0-9]+]] = LUI {{.*[[:space:]].*}}[[REG2]] = ADDIW [[REG2]]{{.*[[:space:]].*}}[[REG0]] = {{AMO|SC}}{{.*}} [[REG2]], [[REG1]]
+ 
+# LR-COUNT-100: [[REG3:\$x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}[[REG4:\$x[0-9]+]] = LUI {{.*[[:space:]].*}}[[REG4]] = ADDIW [[REG4]]{{.*[[:space:]].*}}[[REG3]] = LR_{{D|W}}{{.*}}[[REG4]]

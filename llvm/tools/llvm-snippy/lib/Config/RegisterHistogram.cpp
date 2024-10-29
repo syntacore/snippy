@@ -38,10 +38,9 @@ getValueFromHistogramPattern(ValuegramEntry::EntryKind Pattern,
   }
 }
 
-static void getFixedRegisterValues(const RegistersWithHistograms &RH,
-                                   size_t ExpectedNumber, StringRef Prefix,
-                                   unsigned NumBits,
-                                   std::vector<APInt> &Result) {
+void getFixedRegisterValues(const RegistersWithHistograms &RH,
+                            size_t ExpectedNumber, StringRef Prefix,
+                            unsigned NumBits, std::vector<APInt> &Result) {
   assert((NumBits % CHAR_BIT) == 0);
 
   const auto &ClassValues = RH.Registers.ClassValues;
@@ -62,14 +61,68 @@ static void getFixedRegisterValues(const RegistersWithHistograms &RH,
   // NOTE: for now we require that either all registers are present or none of
   // them are. This may be changed in future
   if (ExpectedNumber != NumFound)
-    // FIXME: Get rid of snippy::fatal and propagate errors cleanly.
-    snippy::fatal(formatv("Unexpected number of registers found in for \"{0}\" "
-                          "group expecting {1}, got {2}",
-                          Prefix, ExpectedNumber, NumFound));
+    snippy::fatal("Registers file error",
+                  "Unexpected number of registers found in for \"" + Prefix +
+                      "\" group expecting " + Twine(ExpectedNumber) + ", got " +
+                      Twine(NumFound));
 
   Result.resize(NumFound);
-  std::transform(First, Last, Result.begin(),
-                 [&](const APInt &Value) { return Value.zext(NumBits); });
+  std::transform(First, Last, Result.begin(), [&](const APInt &Value) {
+    auto LeadingZeroBits = Value.countLeadingZeros();
+    if (Value.getBitWidth() - LeadingZeroBits > NumBits) {
+      SmallVector<char> Str;
+      Value.toStringUnsigned(Str, 16);
+      snippy::fatal("Registers file error",
+                    "Entry " + Str + " for register type " + Prefix +
+                        " is wider than requested bit width " + Twine(NumBits));
+    }
+    return Value.zextOrTrunc(NumBits);
+  });
+}
+
+APInt sampleValuegramForOneReg(const Valuegram &Valuegram, StringRef Prefix,
+                               unsigned NumBits,
+                               std::discrete_distribution<size_t> &Dist) {
+  auto &Engine = RandEngine::engine();
+  const auto &Entry = Valuegram.at(Dist(Engine));
+
+  using EntryKind = ValuegramEntry::EntryKind;
+  auto Kind = Entry.getKind();
+  switch (Kind) {
+  case EntryKind::BitValue: {
+    auto &ValueWithSign = cast<ValuegramBitValueEntry>(Entry.get()).ValWithSign;
+    auto &Value = ValueWithSign.Value;
+
+    if (Value.getActiveBits() > NumBits) {
+      SmallVector<char> Str;
+      Value.toString(Str, /*Radix=*/16, /*Signed=*/ValueWithSign.IsSigned,
+                     /*formatAsCLiteral=*/true, /*UpperCase=*/false);
+      LLVMContext Ctx;
+      snippy::fatal(Ctx, "Failed to sample register histogram",
+                    Twine("Histogram entry ")
+                        .concat(Str)
+                        .concat(" for register type ")
+                        .concat(Prefix)
+                        .concat(" is wider than requested bit width ")
+                        .concat(Twine(NumBits)));
+    }
+
+    if (ValueWithSign.IsSigned)
+      return Value.sextOrTrunc(NumBits);
+    return Value.zextOrTrunc(NumBits);
+  }
+  case EntryKind::BitPattern:
+  case EntryKind::Uniform: {
+    APInt Val;
+    if (Error E = getValueFromHistogramPattern(Kind, NumBits).moveInto(Val)) {
+      LLVMContext Ctx;
+      snippy::fatal(Ctx, "Failed to sample register histogram", std::move(E));
+    }
+    return Val;
+  }
+  default:
+    llvm_unreachable("Unhandled register value histogram entry variant");
+  }
 }
 
 static void sampleHistogramForRegType(const RegistersWithHistograms &RH,
@@ -90,48 +143,8 @@ static void sampleHistogramForRegType(const RegistersWithHistograms &RH,
   std::discrete_distribution<size_t> Dist(Valuegram.weights_begin(),
                                           Valuegram.weights_end());
 
-  auto &Engine = RandEngine::engine();
   std::generate(Registers.begin(), Registers.end(), [&] {
-    const auto &Entry = Valuegram.at(Dist(Engine));
-
-    using EntryKind = ValuegramEntry::EntryKind;
-    auto Kind = Entry.getKind();
-    switch (Kind) {
-    case EntryKind::BitValue: {
-      auto &ValueWithSign =
-          cast<ValuegramBitValueEntry>(Entry.get()).ValWithSign;
-      auto &Value = ValueWithSign.Value;
-
-      if (Value.getActiveBits() > NumBits) {
-        SmallVector<char> Str;
-        Value.toString(Str, /*Radix=*/16, /*Signed=*/ValueWithSign.IsSigned,
-                       /*formatAsCLiteral=*/true, /*UpperCase=*/false);
-        LLVMContext Ctx;
-        snippy::fatal(Ctx, "Failed to sample register histogram",
-                      Twine("Histogram entry ")
-                          .concat(Str)
-                          .concat(" for register type ")
-                          .concat(Prefix)
-                          .concat(" is wider than requested bit width ")
-                          .concat(Twine(NumBits)));
-      }
-
-      if (ValueWithSign.IsSigned)
-        return Value.sextOrTrunc(NumBits);
-      return Value.zextOrTrunc(NumBits);
-    }
-    case EntryKind::BitPattern:
-    case EntryKind::Uniform: {
-      APInt Val;
-      if (Error E = getValueFromHistogramPattern(Kind, NumBits).moveInto(Val)) {
-        LLVMContext Ctx;
-        snippy::fatal(Ctx, "Failed to sample register histogram", std::move(E));
-      }
-      return Val;
-    }
-    default:
-      llvm_unreachable("Unhandled register value histogram entry variant");
-    }
+    return sampleValuegramForOneReg(Valuegram, Prefix, NumBits, Dist);
   });
 }
 

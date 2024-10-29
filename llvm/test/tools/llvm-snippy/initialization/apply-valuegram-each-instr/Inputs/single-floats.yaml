@@ -1,0 +1,57 @@
+histogram:
+# Three operands, one X
+    - [FEQ_S, 1.0]
+    - [FLT_S, 1.0]
+    - [FLE_S, 1.0]
+
+    - [FEQ_H, 1.0]
+    - [FLT_H, 1.0]
+    - [FLE_H, 1.0]
+
+# Three operands
+    - [FADD_S, 1.0]
+    - [FMSUB_S, 1.0]
+    - [FSUB_S, 1.0]
+    - [FMUL_S, 1.0]
+    - [FDIV_S, 1.0]
+    - [FSGNJ_S, 1.0]
+    - [FSGNJN_S, 1.0]
+    - [FSGNJX_S, 1.0]
+    - [FMIN_S, 1.0]
+    - [FMAX_S, 1.0]
+
+    - [FADD_H, 1.0]
+    - [FMSUB_H, 1.0]
+    - [FSUB_H, 1.0]
+    - [FMUL_H, 1.0]
+    - [FDIV_H, 1.0]
+    - [FSGNJ_H, 1.0]
+    - [FSGNJN_H, 1.0]
+    - [FSGNJX_H, 1.0]
+    - [FMIN_H, 1.0]
+    - [FMAX_H, 1.0]
+
+# Two operands, one X
+    - [FCVT_S_W, 1.0]
+    - [FCVT_S_WU, 1.0]
+    - [FCVT_W_S, 1.0]
+    - [FCVT_WU_S, 1.0]
+    - [FCLASS_S, 1.0]
+
+    - [FCVT_H_W, 1.0]
+    - [FCVT_H_WU, 1.0]
+    - [FCVT_W_H, 1.0]
+    - [FCVT_WU_H, 1.0]
+    - [FCLASS_H, 1.0]
+
+# Two operands
+    - [FSQRT_S, 1.0]
+       
+    - [FSQRT_H, 1.0]
+
+# Four operands
+    - [FNMSUB_S, 1.0]
+    - [FNMADD_S, 1.0]
+
+    - [FNMSUB_H, 1.0]
+    - [FNMADD_H, 1.0]
