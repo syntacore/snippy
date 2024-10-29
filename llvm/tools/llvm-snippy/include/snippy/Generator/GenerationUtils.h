@@ -24,6 +24,12 @@ std::vector<planning::PreselectedOpInfo>
 selectOperands(const MCInstrDesc &InstrDesc, unsigned BaseReg,
                const AddressInfo &AI);
 
+std::vector<planning::PreselectedOpInfo> selectInitializableOperandsRegisters(
+    const MCInstrDesc &InstrDesc, GeneratorContext &GC, MachineBasicBlock &MBB);
+
+std::vector<planning::PreselectedOpInfo>
+getPreselectedForInstr(const MCInst &Inst);
+
 std::vector<planning::PreselectedOpInfo> selectConcreteOffsets(
     const MCInstrDesc &InstrDesc,
     const std::vector<planning::PreselectedOpInfo> &Preselected,

@@ -1,0 +1,32 @@
+histogram:
+# Three operands, one X
+    - [FEQ_D, 1.0]
+    - [FLT_D, 1.0]
+    - [FLE_D, 1.0]
+
+# Three operands
+    - [FADD_D, 1.0]
+    - [FMSUB_D, 1.0]
+    - [FSUB_D, 1.0]
+    - [FMUL_D, 1.0]
+    - [FDIV_D, 1.0]
+    - [FSGNJ_D, 1.0]
+    - [FSGNJN_D, 1.0]
+    - [FSGNJX_D, 1.0]
+    - [FMIN_D, 1.0]
+    - [FMAX_D, 1.0]
+
+# Two operands, one X
+    - [FCVT_D_W, 1.0]
+    - [FCVT_D_WU, 1.0]
+    - [FCVT_W_D, 1.0]
+    - [FCVT_WU_D, 1.0]
+    - [FCLASS_D, 1.0]
+
+# Two operands
+    - [FSQRT_D, 1.0]
+
+# Four operands
+    - [FNMSUB_D, 1.0]
+    - [FNMADD_D, 1.0]
+

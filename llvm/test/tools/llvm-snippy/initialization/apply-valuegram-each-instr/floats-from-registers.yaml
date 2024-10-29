@@ -1,0 +1,52 @@
+# COM: This test checks that initialization takes place only according to the "registers" file.
+
+# RUN: llvm-snippy %s %S/Inputs/double-floats.yaml --march=riscv64 \
+# RUN:    -valuegram-operands-regs=%S/Inputs/registers.yaml \
+# RUN: |& FileCheck %s --check-prefix=DOUBLE
+
+
+options:
+  num-instrs: 1000
+  mattr: +zfh,+d
+  dump-mf: on
+
+sections:
+    - no:        1
+      VMA:       0x70000000
+      SIZE:      0x10000000
+      LMA:       0x70000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x9000000
+      SIZE:      0x40000
+      LMA:       0x9000000
+      ACCESS:    rw
+
+#          Registers values:
+#
+#                     F0-F10:  9
+#                     F11-F20: 0xb
+#                     F21-F31: 0xd
+#                     We want to see them in initialization 
+#         
+#          An example of what we're matching:
+#
+#                     $x30 = ADDI $x0, 13, pcsections <0x55f68d5bc318>
+#                     $f29_d = FMV_D_X $x30, pcsections <0x55f68d5bc318>
+#                     $x5 = ADDI $x0, 9, pcsections <0x55f68d5bc318>
+#                     $f3_d = FMV_D_X $x5, pcsections <0x55f68d5bc318>
+#                     $x14 = ADDI $x0, 11, pcsections <0x55f68d5bc318>
+#                     $f16_d = FMV_D_X $x14, pcsections <0x55f68d5bc318>
+
+
+# Here we check that the initialization from the registers.yaml is encountered
+
+# DOUBLE-COUNT-100: [[REG:\$x[0-9]+]] = ADDI $x0, 9{{.*[[:space:]].*}}$f{{0|1|2|3|4|5|6|7|8|9|10}}_d = FMV_D_X [[REG]]
+# DOUBLE-COUNT-100: [[REG:\$x[0-9]+]] = ADDI $x0, 11{{.*[[:space:]].*}}$f{{11|12|13|14|15|16|17|18|19|20}}_d = FMV_D_X [[REG]]
+# DOUBLE-COUNT-100: [[REG:\$x[0-9]+]] = ADDI $x0, 13{{.*[[:space:]].*}}$f{{21|22|23|24|25|26|27|28|29|30|31}}_d = FMV_D_X [[REG]]
+
+# Here we check that there is no initialization that contradicts the registers.yaml
+
+# DOUBLE-NOT: [[REG:\$x[0-9]+]] = ADDI $x0, {{(11|13).*[[:space:]].*}}$f{{0|1|2|3|4|5|6|7|8|9|10}}_d = FMV_D_X [[REG]]
+# DOUBLE-NOT: [[REG:\$x[0-9]+]] = ADDI $x0, {{(9|13).*[[:space:]].*}}$f{{11|12|13|14|15|16|17|18|19|20}}_d = FMV_D_X [[REG]]
+# DOUBLE-NOT: [[REG:\$x[0-9]+]] = ADDI $x0, {{(9|11).*[[:space:]].*}}$f{{21|22|23|24|25|26|27|28|29|30|31}}_d = FMV_D_X [[REG]]
