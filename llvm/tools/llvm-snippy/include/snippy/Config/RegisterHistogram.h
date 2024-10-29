@@ -14,6 +14,7 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
 
+#include <random>
 #include <string>
 #include <variant>
 #include <vector>
@@ -72,6 +73,14 @@ void checkRegisterClasses(const AllRegisters &Values,
 
 void checkRegisterClasses(const RegisterHistograms &Histograms,
                           ArrayRef<StringRef> AllowedClasses);
+
+void getFixedRegisterValues(const RegistersWithHistograms &RH,
+                            size_t ExpectedNumber, StringRef Prefix,
+                            unsigned NumBits, std::vector<APInt> &Result);
+
+APInt sampleValuegramForOneReg(const Valuegram &Valuegram, StringRef Prefix,
+                               unsigned NumBits,
+                               std::discrete_distribution<size_t> &Dist);
 
 void getRegisterGroup(const RegistersWithHistograms &RH, size_t ExpectedNumber,
                       StringRef Prefix, unsigned NumBits,

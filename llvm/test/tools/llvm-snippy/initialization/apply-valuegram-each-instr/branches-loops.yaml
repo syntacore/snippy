@@ -1,0 +1,46 @@
+# COM: This test checks that before branches and loops instructions there is no initialization. 
+# COM: That is, the run on the model completes successfully, without traps.
+
+# RUN: llvm-snippy %s --march=riscv32-linux-gnu \ 
+# RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml
+
+# RUN: llvm-snippy %s --march=riscv64 \ 
+# RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml
+
+options:
+  dump-mf: on
+  num-instrs: 100
+
+branches:
+  number-of-loop-iterations:
+    min: 1
+    max: 2
+  max-depth:
+    if: 3
+    loop: 3
+
+sections:
+    - no:        0
+      VMA:       0x200000
+      SIZE:      0x1000
+      LMA:       0x200000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x70000000
+      SIZE:      0x10000000
+      LMA:       0x70000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x90000000
+      SIZE:      0x400000
+      LMA:       0x90000000
+      ACCESS:    rw
+
+histogram:
+    - [AUIPC, 1.0]
+    - [BEQ, 1.0]
+    - [BGE, 1.0]
+    - [BGEU, 1.0]
+    - [BLT, 1.0]
+    - [BLTU, 1.0]
+    - [BNE, 1.0]

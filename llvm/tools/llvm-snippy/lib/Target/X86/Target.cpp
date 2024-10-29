@@ -28,6 +28,13 @@ class SnippyX86Target : public SnippyTarget {
 public:
   SnippyX86Target() = default;
 
+  void generateWriteValueSeq(APInt Value, MCRegister DestReg,
+                             GeneratorContext &GC, RegPoolWrapper &RP,
+                             const MachineBasicBlock &MBB,
+                             SmallVectorImpl<MCInst> &Insts) const override {
+    reportUnimplementedError();
+  }
+
   [[noreturn]] void reportUnimplementedError() const {
     snippy::fatal("sorry, X86 target is not implemented");
   }
@@ -249,6 +256,12 @@ public:
     reportUnimplementedError();
   }
 
+  std::vector<Register>
+  getPhysRegsWithoutOverlaps(Register RegUnit,
+                             const MCRegisterInfo &RI) const override {
+    reportUnimplementedError();
+  }
+
   unsigned getMaxBranchDstMod(unsigned Opcode) const override {
     reportUnimplementedError();
   }
@@ -450,6 +463,11 @@ public:
   }
 
   bool canUseInMemoryBurstMode(unsigned Opcode) const override {
+    reportUnimplementedError();
+  }
+
+  bool canInitializeOperand(const MCInstrDesc &InstrDesc,
+                            unsigned OpIndex) const override {
     reportUnimplementedError();
   }
 
