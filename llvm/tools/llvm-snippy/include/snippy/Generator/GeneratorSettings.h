@@ -11,6 +11,7 @@
 
 #include "snippy/Config/Config.h"
 #include "snippy/Generator/BurstMode.h"
+#include "snippy/Generator/Policy.h"
 
 #include "llvm/ADT/ArrayRef.h"
 
@@ -107,14 +108,14 @@ public:
                     DebugOptions &&DebugConfig, LinkerOptions &&LinkerConfig,
                     ModelPluginOptions &&ModelPluginConfig,
                     InstrsGenerationOptions &&InstrsGenerationConfig,
-                    RegistersOptions &&RegistersConfig, Config &&Cfg)
+                    RegistersOptions &&RegsConfig, Config &&Cfg)
       : ABIName(std::move(ABIName)), BaseFileName(std::move(BaseFileName)),
         TrackingConfig(std::move(TrackingConfig)),
         DebugConfig(std::move(DebugConfig)),
         LinkerConfig(std::move(LinkerConfig)),
         ModelPluginConfig(std::move(ModelPluginConfig)),
         InstrsGenerationConfig(std::move(InstrsGenerationConfig)),
-        RegistersConfig(std::move(RegistersConfig)), Cfg(std::move(Cfg)) {}
+        RegistersConfig(std::move(RegsConfig)), Cfg(std::move(Cfg)) {}
 
 private:
   SectionsDescriptions getCompleteSectionList(LLVMState &State) const;

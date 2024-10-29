@@ -120,6 +120,11 @@ class SnippyTarget {
 public:
   SnippyTarget() = default;
 
+  virtual void generateWriteValueSeq(APInt Value, MCRegister DestReg,
+                                     GeneratorContext &GC, RegPoolWrapper &RP,
+                                     const MachineBasicBlock &MBB,
+                                     SmallVectorImpl<MCInst> &Insts) const = 0;
+
   virtual std::unique_ptr<TargetGenContextInterface>
   createTargetContext(const GeneratorContext &Ctx) const = 0;
 
@@ -320,6 +325,16 @@ public:
   virtual std::vector<Register>
   getPhysRegsFromUnit(Register RegUnit, const MCRegisterInfo &RI) const = 0;
 
+  // This function is different from getPhysRegsFromUnit in that
+  // it returns physical registers without overlaps.
+  // 1. If RegUnit is already a physical register, we will return it.
+  // 2. If RegUnit is part of a physical register, we will return that part.
+  // 3. Otherwise, we will return the physical register referenced by this
+  // alias.
+  virtual std::vector<Register>
+  getPhysRegsWithoutOverlaps(Register RegUnit,
+                             const MCRegisterInfo &RI) const = 0;
+
   virtual unsigned getMaxBranchDstMod(unsigned Opcode) const = 0;
 
   virtual bool branchNeedsVerification(const MachineInstr &Branch) const = 0;
@@ -483,6 +498,9 @@ public:
   virtual unsigned getAddrRegLen(const TargetMachine &TM) const = 0;
 
   virtual bool canUseInMemoryBurstMode(unsigned Opcode) const = 0;
+
+  virtual bool canInitializeOperand(const MCInstrDesc &InstrDesc,
+                                    unsigned OpIndex) const = 0;
 
   virtual StridedImmediate
   getImmOffsetRangeForMemAccessInst(const MCInstrDesc &InstrDesc) const = 0;

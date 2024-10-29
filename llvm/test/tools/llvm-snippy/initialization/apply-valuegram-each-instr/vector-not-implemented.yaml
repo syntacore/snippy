@@ -1,0 +1,59 @@
+# COM: This test checks that we print error, because initialization
+# COM: has not yet been implemented for rvv
+
+
+# RUN: not llvm-snippy %s \
+# RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN: |& FileCheck %s 
+
+options:
+  march: riscv64
+  mcpu: generic-rv64
+  mattr: +v
+  dump-mf: true
+  num-instrs: 1000
+
+sections:
+    - no:        0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x1000000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x2100000
+      SIZE:      0x100000
+      LMA:       0x2100000
+      ACCESS:    rw
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: 0.1
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VXSAT:
+      on: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+      LMUL:
+          mf2: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+ 
+histogram:
+       - [VADD_VV, 1.0]
+ 
+# CHECK: Not implemented: vector registers can't be initialized
+

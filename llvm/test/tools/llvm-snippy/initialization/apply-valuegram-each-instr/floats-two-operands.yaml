@@ -1,0 +1,71 @@
+# COM: This test checks that before each instruction (rv64 floats with two operands), 
+# COM: the registers it uses are initialized. They are initialized only according to the histogram.
+
+# RUN: llvm-snippy %s %S/Inputs/double-floats.yaml -march=riscv64 \
+# RUN:    -mattr=+zfh,+d -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN: |& FileCheck %s --check-prefix DOUBLE_XF_TWO_OPERANDS_ONE_X
+
+# RUN: llvm-snippy %s %S/Inputs/single-floats.yaml -march=riscv64 \
+# RUN:    -mattr=+zfh -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN: |& FileCheck %s --check-prefix FX_TWO_OPERANDS_ONE_X
+
+# RUN: llvm-snippy %s %S/Inputs/double-floats.yaml -march=riscv64 \
+# RUN:    -mattr=+zfh,+d -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN: |& FileCheck %s --check-prefix DOUBLE_FX_TWO_OPERANDS_ONE_X
+
+
+options:
+  num-instrs: 10000
+  dump-mf: on
+
+sections:
+    - no:        1
+      VMA:       0x70000000
+      SIZE:      0x10000000
+      LMA:       0x70000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x9000000
+      SIZE:      0x40000
+      LMA:       0x9000000
+      ACCESS:    rw
+
+#          Valuegram values:
+#
+#                     X: 0, 1, 255.
+#                     F: 83, 170.
+#                     We want to see them in initialization 
+#         
+#          An example of what we're matching:
+#
+#          XF_two_operands_one_X:     
+#
+#                     $x10 = ADDI $x0, 0, pcsections <0x55e0036ce768>
+#                     $x9 = LUI 1048560, pcsections <0x55e0036ce768>
+#                     $x9 = ADDI $x9, 83, pcsections <0x55e0036ce768>
+#                     $f24_h = FMV_H_X $x9, pcsections <0x55e0036ce768>
+#                     $x10 = FCVT_W_H $f24_h, 0
+#
+#          FX_two_operands_one_X:  
+#
+#                     $x2 = ADDI $x0, 170, pcsections <0x55e0036ce768>
+#                     $f2_f = FMV_W_X $x2, pcsections <0x55e0036ce768>
+#                     $x23 = ADDI $x0, 0, pcsections <0x55e0036ce768>
+#                     $f2_f = FCVT_S_WU $x23, 0
+#
+#          Two_operands:    
+#
+#                     $x25 = ADDI $x0, 170, pcsections <0x55e0036ce768>
+#                     $f0_f = FMV_W_X $x25, pcsections <0x55e0036ce768>
+#                     $x25 = ADDI $x0, 83, pcsections <0x55e0036ce768>
+#                     $f21_f = FMV_W_X $x25, pcsections <0x55e0036ce768>
+#                     $f0_f = FSQRT_S $f21_f, 0
+
+
+# DOUBLE_XF_TWO_OPERANDS_ONE_X-COUNT-10: [[REG0:\$x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}[[REG1:\$x[0-9]+]] = ADDI {{.*}}, {{(83|170).*[[:space:]].*}}[[FREG1:\$f[0-9]+_d]] = FMV_D_X [[REG1]]{{.*[[:space:]].*}}[[REG0]] = {{.*}}[[FREG1]]
+
+
+# FX_TWO_OPERANDS_ONE_X-COUNT-10: [[REG0:\$x[0-9]+]] = ADDI {{.*}}, {{(83|170).*[[:space:]].*}}[[FREG0:\$f[0-9]+_f]] = FMV_W_X [[REG0]]{{.*[[:space:]].*}}[[REG1:\$x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}[[FREG0]] = {{.*}}[[REG1]]
+
+# DOUBLE_FX_TWO_OPERANDS_ONE_X-COUNT-10: [[REG0:\$x[0-9]+]] = ADDI {{.*}}, {{(83|170).*[[:space:]].*}}[[FREG0:\$f[0-9]+_d]] = FMV_D_X [[REG0]]{{.*[[:space:]].*}}[[REG1:\$x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}[[FREG0]] = {{.*}}[[REG1]]
+

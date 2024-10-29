@@ -134,8 +134,6 @@ public:
             ? generateWithPlugin(RC, RI, RP, MBB, Exclude, Include, Mask)
             : generateRandom(SnippyTgt, RC, RI, RP, MBB, Exclude, Include,
                              Mask);
-    if (Result.has_value() && SnippyTgt.isPhysRegClass(OperandRegClassID, RI))
-      return SnippyTgt.getFirstPhysReg(Result.value(), RI);
     return Result;
   }
 };

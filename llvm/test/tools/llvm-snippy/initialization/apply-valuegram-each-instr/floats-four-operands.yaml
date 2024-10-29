@@ -1,0 +1,44 @@
+# COM: This test checks that before each instruction (rv64 floats with four operands), 
+# COM: the registers it uses are initialized. They are initialized only according to the histogram.
+
+# RUN: llvm-snippy %s %S/Inputs/double-floats.yaml -march=riscv64 \
+# RUN:    -mattr=+zfh,+d -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN: |& FileCheck %s --check-prefix=DOUBLE 
+
+
+options:
+  num-instrs: 10000
+  dump-mf: on
+
+sections:
+    - no:        1
+      VMA:       0x70000000
+      SIZE:      0x10000000
+      LMA:       0x70000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x9000000
+      SIZE:      0x40000
+      LMA:       0x9000000
+      ACCESS:    rw
+
+#          Valuegram values:
+#
+#                     X: 0, 1, 255.
+#                     F: 83, 170.
+#                     We want to see them in initialization 
+#         
+#          An example of what we're matching:
+#          
+#                     $x9 = ADDI $x0, 170, pcsections <0x55f5a715cd08>
+#                     $f28_f = FMV_W_X $x9, pcsections <0x55f5a715cd08>
+#                     $x21 = ADDI $x0, 170, pcsections <0x55f5a715cd08>
+#                     $f30_f = FMV_W_X $x21, pcsections <0x55f5a715cd08>
+#                     $x17 = ADDI $x0, 170, pcsections <0x55f5a715cd08>
+#                     $f3_f = FMV_W_X $x17, pcsections <0x55f5a715cd08>
+#                     $x28 = ADDI $x0, 170, pcsections <0x55f5a715cd08>
+#                     $f6_f = FMV_W_X $x28, pcsections <0x55f5a715cd08>
+#                     $f28_f = FNMSUB_S $f30_f, $f3_f, $f6_f, 0
+
+# DOUBLE-COUNT-100: = ADDI {{.*}}, {{(83|170).*[[:space:]].*}}[[FREG0:\$f[0-9]+_d]] = FMV_D_X {{.*[[:space:]].*}} = ADDI {{.*}}, {{(83|170).*[[:space:]].*}}[[FREG1:\$f[0-9]+_d]] = FMV_D_X {{.*[[:space:]].*}} = ADDI {{.*}}, {{(83|170).*[[:space:]].*}} = FMV_D_X {{.*[[:space:]].*}} = ADDI {{.*}}, {{(83|170).*[[:space:]].*}} = FMV_D_X {{.*[[:space:]].*}}[[FREG0]] = {{.*}}[[FREG1]], 
+

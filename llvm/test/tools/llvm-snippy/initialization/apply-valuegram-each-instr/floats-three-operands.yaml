@@ -1,0 +1,59 @@
+# COM: This test checks that before each instruction (rv64 floats with three operands), 
+# COM: the registers it uses are initialized. They are initialized only according to the histogram.
+ 
+# RUN: llvm-snippy %s %S/Inputs/double-floats.yaml -march=riscv64 \
+# RUN:    -mattr=+zfh,+d -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN: |& FileCheck %s --check-prefix THREE_OPERANDS_ONE_X_DOUBLE
+
+# RUN: llvm-snippy %s %S/Inputs/double-floats.yaml -march=riscv64 \
+# RUN:    -mattr=+zfh,+d -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN: |& FileCheck %s --check-prefix THREE_OPERANDS_DOUBLE
+
+
+options:
+  num-instrs: 1000
+  dump-mf: on
+
+sections:
+    - no:        1
+      VMA:       0x70000000
+      SIZE:      0x10000000
+      LMA:       0x70000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x9000000
+      SIZE:      0x40000
+      LMA:       0x9000000
+      ACCESS:    rw
+
+#          Valuegram values:
+#
+#                     X: 0, 1, 255.
+#                     F: 83, 170.
+#                     We want to see them in initialization 
+#         
+#          An example of what we're matching:
+#
+#          Three_operands_one_X:     
+#
+#                     $x6 = ADDI $x0, 1, pcsections <0x557f3eb1b5f8>
+#                     $x8 = ADDI $x0, 83, pcsections <0x557f3eb1b5f8>
+#                     $f9_f = FMV_W_X $x8, pcsections <0x557f3eb1b5f8>
+#                     $x7 = ADDI $x0, 83, pcsections <0x557f3eb1b5f8>
+#                     $f26_f = FMV_W_X $x7, pcsections <0x557f3eb1b5f8>
+#                     $x6 = FEQ_S $f9_f, $f26_f
+#
+#          Three_operands:     
+#
+#                     $x6 = ADDI $x0, 83, pcsections <0x55e0036ce768>
+#                     $f28_f = FMV_W_X $x6, pcsections <0x55e0036ce768>
+#                     $x29 = ADDI $x0, 170, pcsections <0x55e0036ce768>
+#                     $f16_f = FMV_W_X $x29, pcsections <0x55e0036ce768>
+#                     $x23 = ADDI $x0, 170, pcsections <0x55e0036ce768>
+#                     $f12_f = FMV_W_X $x23, pcsections <0x55e0036ce768>
+#                     $f28_f = FSGNJ_S $f16_f, $f12_f
+
+
+# THREE_OPERANDS_ONE_X_DOUBLE-COUNT-10: = ADDI $x0, {{(0|1|255).*[[:space:]].*}} = ADDI {{.*}}, {{(83|170).*[[:space:]].*}}[[FREG1:\$f[0-9]+_d]] = FMV_D_X {{.*[[:space:]].*}} = ADDI {{.*(83|170).*[[:space:]].*}} = FMV_D_X {{.*[[:space:]].*}} = {{.*}}[[FREG1]], 
+
+# THREE_OPERANDS_DOUBLE-COUNT-10: = ADDI {{.*}}, {{(83|170).*[[:space:]].*}}[[FREG0:\$f[0-9]+_d]] = FMV_D_X {{.*[[:space:]].*}} = ADDI {{.*}}, {{(83|170).*[[:space:]].*}} = FMV_D_X {{.*[[:space:]].*}} = ADDI {{.*}}, {{(83|170).*[[:space:]].*}} = FMV_D_X {{.*[[:space:]].*}}[[FREG0]] = {{.*}}, 

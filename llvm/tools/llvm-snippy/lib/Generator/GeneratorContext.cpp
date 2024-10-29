@@ -726,5 +726,18 @@ GeneratorContext::getIncomingValues(const MachineBasicBlock *MBB) {
   return IncomingValues[MBB];
 }
 
+planning::GenPolicy
+GeneratorContext::createGenPolicy(const MachineBasicBlock &MBB) const {
+  auto &Tgt = getLLVMState().getSnippyTarget();
+  auto Filter = Tgt.getDefaultPolicyFilter(MBB, *this);
+  auto MustHavePrimaryInstrs = Tgt.groupMustHavePrimaryInstr(MBB, *this);
+  auto Overrides = Tgt.getPolicyOverrides(MBB, *this);
+  if (isApplyValuegramEachInstr())
+    return planning::ValuegramGenPolicy(
+        *this, std::move(Filter), MustHavePrimaryInstrs, std::move(Overrides));
+  return planning::DefaultGenPolicy(
+      *this, std::move(Filter), MustHavePrimaryInstrs, std::move(Overrides));
+}
+
 } // namespace snippy
 } // namespace llvm

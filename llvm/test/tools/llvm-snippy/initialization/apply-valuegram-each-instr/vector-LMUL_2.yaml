@@ -1,0 +1,94 @@
+# REQUIRES: riscv-rvv
+# COM: This test checks that in the case of LMUL == 2, we initialize all registers 
+# COM: from the register group according to the histograms.yaml.
+
+# COM: Because this functionality has not yet been implemented for rvv
+# XFAIL: *
+
+# RUN: llvm-snippy %s \
+# RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN: |& FileCheck %s --enable-var-scope
+
+options:
+  march: riscv64
+  mcpu: generic-rv64
+  mattr: +v
+  dump-mf: true
+  num-instrs: 1
+  reserved-regs-list: [V2,V4,V6,V8,V10,V12,V14,V16,V18,V20,V22,V24,V26,V28]
+
+sections:
+    - no:        0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x1000000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x2100000
+      SIZE:      0x100000
+      LMA:       0x2100000
+      ACCESS:    rw
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: 0.001
+  mode-distribution:
+    VM:
+      - [all_ones, 2.0]
+      - [any_legal, 1.0]
+    VL:
+      - [vlmax, 2.0]
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+      rne: 1.0
+      rdn: 1.0
+      ron: 1.0
+    VXSAT:
+      on: 1.0
+      off: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+        sew_16: 1.0
+        sew_32: 1.0
+        sew_64: 1.0
+      LMUL:
+          m2: 1.0
+      VMA:
+        mu: 1.0
+        ma: 1.0
+      VTA:
+        tu: 1.0
+        ta: 1.0
+ 
+histogram:
+       - [VADD_VV, 1.0]
+
+#          Valuegram values:
+#
+#                     V: 3, 4.
+#                     We want to see them in initialization 
+#         
+#          An example of what we're matching:
+#
+#          v30:       $x14 = ADDI $x0, 4, pcsections <0x5617782a9708>
+#                     $v30 = VSLIDE1DOWN_VX undef $v30, $x14, 
+#                     $x14 = ADDI $x0, 0, pcsections <0x5617782a9708>
+#                     $v30 = VSLIDE1DOWN_VX $v30, $x14, 
+#                       ... vsetvl ...
+#          v31:       $x2 = ADDI $x0, 3, pcsections <0x5617782a9708>
+#                     $v31 = VSLIDE1DOWN_VX undef $v31, $x2, 
+#                     $x2 = ADDI $x0, 0, pcsections <0x5617782a9708>
+#                     $v31 = VSLIDE1DOWN_VX $v31, $x2, 
+
+
+# Initialization a vector register takes about 50 instructions. We just check that initialization from the histograms.yaml is encountered
+# 
+# CHECK: [[REG:\$x[0-9]+]] = ADDI $x0, {{(3|4), pcsections.*[[:space:]].*}}$v30 = VSLIDE1DOWN_VX undef $v30, [[REG]]{{.*[[:space:]].*}}[[REG]] = ADDI $x0, 0, pcsections{{.*[[:space:]].*}}$v30 = VSLIDE1DOWN_VX $v30, [[REG]]
+# CHECK-DAG: [[REG:\$x[0-9]+]] = ADDI $x0, {{(3|4), pcsections.*[[:space:]].*}}$v31 = VSLIDE1DOWN_VX undef $v31, [[REG]]{{.*[[:space:]].*}}[[REG]] = ADDI $x0, 0, pcsections{{.*[[:space:]].*}}$v31 = VSLIDE1DOWN_VX $v31, [[REG]]

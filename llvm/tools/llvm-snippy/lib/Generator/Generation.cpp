@@ -90,10 +90,7 @@ static void switchPolicyIfNeeded(planning::InstructionGroupRequest &IG,
                                  GeneratorContext &GC) {
   auto &Tgt = GC.getLLVMState().getSnippyTarget();
   if (Tgt.needsGenerationPolicySwitch(Opcode))
-    IG.changePolicy(
-        planning::DefaultGenPolicy(GC, Tgt.getDefaultPolicyFilter(MBB, GC),
-                                   Tgt.groupMustHavePrimaryInstr(MBB, GC),
-                                   Tgt.getPolicyOverrides(MBB, GC)));
+    IG.changePolicy(GC.createGenPolicy(MBB));
 }
 
 static void generateInsertionPointHint(
@@ -571,6 +568,8 @@ std::optional<MachineOperand> pregenerateOneOperand(
       if (!RegOpt)
         return std::nullopt;
       Reg = RegOpt.value();
+      if (SnippyTgt.isPhysRegClass(OperandRegClassID, RegInfo))
+        Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
     }
     SnippyTgt.reserveRegsIfNeeded(InstrDesc.getOpcode(),
                                   /* isDst */ IsDst,
@@ -594,6 +593,8 @@ std::optional<MachineOperand> pregenerateOneOperand(
       if (!RegOpt)
         return std::nullopt;
       Reg = RegOpt.value();
+      if (SnippyTgt.isPhysRegClass(OperandRegClassID, RegInfo))
+        Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
     }
     // FIXME: RW mask is too restrictive for the majority of instructions.
     SnippyTgt.reserveRegsIfNeeded(InstrDesc.getOpcode(),
@@ -645,12 +646,24 @@ pregenerateOperands(const MachineBasicBlock &MBB, const MCInstrDesc &InstrDesc,
   auto &RegGenerator = GC.getProgramContext().getRegGen();
   auto &State = GC.getLLVMState();
   auto &InstrInfo = State.getInstrInfo();
+  const auto &Tgt = State.getSnippyTarget();
+  const auto &RI = State.getRegInfo();
 
   auto IterNum = 0u;
   constexpr auto FailsMaxNum = 10000u;
 
   while (IterNum < FailsMaxNum) {
     RP.reset();
+    // Initialized registers must not be overwritten during other instruction
+    // preparation.
+    llvm::for_each(Preselected, [&](const auto &Op) {
+      if (!Op.isReg())
+        return;
+      llvm::for_each(Tgt.getPhysRegsFromUnit(Op.getReg(), RI),
+                     [&RP](auto SimpleReg) {
+                       RP.addReserved(SimpleReg, AccessMaskBit::W);
+                     });
+    });
     RegGenerator.setRegContextForPlugin();
     auto PregeneratedOperandsOpt =
         tryToPregenerateOperands(MBB, InstrDesc, RP, Preselected, GC);
@@ -961,6 +974,23 @@ generateCall(unsigned OpCode,
   return Call;
 }
 
+static bool
+isPostprocessNeeded(const MCInstrDesc &InstrDesc,
+                    const std::vector<planning::PreselectedOpInfo> &Preselected,
+                    const GeneratorContext &GC) {
+  // 1. If any information about operands is provided from the caller, we won't
+  //    do any postprocessing.
+  if (!GC.isApplyValuegramEachInstr())
+    return Preselected.empty();
+  // 2. In the case of the option -valuegram-operands-regs, we do partial
+  //    initialization in the case of memory instructions. We initialize only
+  //    those registers that are not memory addresses and still need a
+  //    postprocess to specify addresses.
+  // 3. In case -riscv-init-fregs-from-memory we initialize all memory
+  //    operands and do not need a postprocess.
+  return llvm::any_of(Preselected, [](const auto &Op) { return Op.isUnset(); });
+}
+
 MachineInstr *
 randomInstruction(const MCInstrDesc &InstrDesc,
                   std::vector<planning::PreselectedOpInfo> Preselected,
@@ -972,10 +1002,7 @@ randomInstruction(const MCInstrDesc &InstrDesc,
 
   auto MIB = BuildMI(MBB, InstrGenCtx.Ins, MIMetadata(), InstrDesc);
 
-  // If any information about operands is provided from the caller, we won't do
-  // any postprocessing. In this case the caller should be responsible for any
-  // additional processing of the instruction.
-  bool DoPostprocess = Preselected.empty();
+  bool DoPostprocess = isPostprocessNeeded(InstrDesc, Preselected, GC);
 
   auto NumDefs = InstrDesc.getNumDefs();
   auto TotalNum = InstrDesc.getNumOperands();
