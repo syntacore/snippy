@@ -1,0 +1,58 @@
+# COM: This test checks that initialization takes place only according to the "registers" file.
+
+# RUN: llvm-snippy %s %S/Inputs/rv32-basic.yaml --march=riscv32-linux-gnu \
+# RUN:    -valuegram-operands-regs=%S/Inputs/registers.yaml \
+# RUN: |& FileCheck %s
+ 
+# RUN: llvm-snippy %s %S/Inputs/rv64-basic.yaml --march=riscv64 \
+# RUN:    -valuegram-operands-regs=%S/Inputs/registers.yaml \
+# RUN: |& FileCheck %s
+
+
+options:
+  dump-mf: on
+  num-instrs: 1000
+
+sections:
+    - no:        0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+
+ 
+#          Registers values:
+#
+#                     X0-X10:  3
+#                     X11-X20: 5
+#                     X21-X31: 7
+#                     We want to see them in initialization 
+#         
+#          An example of what we're matching:
+#
+#                     $x30 = ADDI $x0, 7, pcsections <0x562f5eb97f78>
+#                     $x13 = ADDI $x0, 5, pcsections <0x562f5eb97f78>
+#                     $x1 = ADDI $x0, 3, pcsections <0x562f5eb97f78>
+
+# Here we check that the initialization from the registers.yaml is encountered
+#
+# CHECK-COUNT-100: $x{{0|1|2|3|4|5|6|7|8|9|10}} = ADDI $x0, 3
+# CHECK-COUNT-100: $x{{11|12|13|14|15|16|17|18|19|20}} = ADDI $x0, 5
+# CHECK-COUNT-100: $x{{21|22|23|24|25|26|27|28|29|30|31}} = ADDI $x0, 7
+
+# Here we check that there is no initialization that contradicts the registers.yaml
+#
+# CHECK-NOT: $x{{0|1|2|3|4|5|6|7|8|9|10}} = ADDI $x0, {{5|7}}
+# CHECK-NOT: $x{{11|12|13|14|15|16|17|18|19|20}} = ADDI $x0, {{3|7}}
+# CHECK-NOT: $x{{21|22|23|24|25|26|27|28|29|30|31}} = ADDI $x0, {{3|5}}
+

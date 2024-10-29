@@ -65,6 +65,7 @@
 
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/OpcodeHistogram.h"
+#include "snippy/Config/RegisterHistogram.h"
 #include "snippy/Generator/GenerationLimit.h"
 #include "snippy/Generator/SelfCheckInfo.h"
 #include "snippy/Support/OpcodeGenerator.h"
@@ -131,6 +132,11 @@ public:
     assert(isUnset());
     Value = OpIdx;
   }
+
+  friend constexpr bool operator==(const PreselectedOpInfo &Lhs,
+                                   const PreselectedOpInfo &Rhs) {
+    return Lhs.Value == Rhs.Value && Lhs.Flags == Rhs.Flags;
+  }
 };
 
 struct InstructionGenerationContext final {
@@ -190,6 +196,64 @@ public:
   bool isInseparableBundle() const { return false; }
 
   void print(raw_ostream &OS) const { OS << "Default Generation Policy\n"; }
+};
+
+// This generation policy initializes the registers according to the
+// valuegram-operands-regs option. That is, it inserts additional initializing
+// instructions before each instruction for registers used in it that are not
+// memory addresses. These initializing instructions are not taken into account
+// in the planning instructions.
+class ValuegramGenPolicy final : public detail::EmptyFinalizeMixin {
+  OpcGenHolder OpcGen;
+
+  std::vector<InstructionRequest> Instructions;
+  unsigned Idx = 0;
+
+public:
+  ValuegramGenPolicy(const ValuegramGenPolicy &Other)
+      : OpcGen(Other.OpcGen->copy()) {}
+
+  ValuegramGenPolicy(ValuegramGenPolicy &&) = default;
+
+  ValuegramGenPolicy &operator=(const ValuegramGenPolicy &Other) {
+    ValuegramGenPolicy Tmp = Other;
+    std::swap(*this, Tmp);
+    return *this;
+  }
+
+  ValuegramGenPolicy &operator=(ValuegramGenPolicy &&) = default;
+
+  ValuegramGenPolicy(const GeneratorContext &SGCtx,
+                     std::function<bool(unsigned)> Filter,
+                     bool MustHavePrimaryInstrs,
+                     ArrayRef<OpcodeHistogramEntry> Overrides);
+
+  std::optional<InstructionRequest> next() {
+    assert(Idx <= Instructions.size());
+    if (Idx < Instructions.size())
+      return Instructions[Idx++];
+    return std::nullopt;
+  }
+
+  void initialize(InstructionGenerationContext &InstrGenCtx,
+                  const RequestLimit &Limit);
+
+  bool isInseparableBundle() const { return true; }
+
+  void print(raw_ostream &OS) const { OS << "Valuegram Generation Policy\n"; }
+
+  std::vector<InstructionRequest> generateRegInit(Register Reg,
+                                                  GeneratorContext &GC,
+                                                  const MachineBasicBlock &MBB,
+                                                  const MCInstrDesc &InstrDesc,
+                                                  RegPoolWrapper &RP);
+
+  std::vector<InstructionRequest>
+  generateOneInstrWithInitRegs(unsigned Opcode, GeneratorContext &GC,
+                               MachineBasicBlock &MBB);
+
+  APInt getValueFromValuegram(Register Reg, StringRef Prefix,
+                              GeneratorContext &GC) const;
 };
 
 class BurstGenPolicy final : public detail::EmptyFinalizeMixin {

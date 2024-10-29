@@ -369,7 +369,6 @@ void BlockGenPlanningImpl::fillReqWithBurstGroups(
 void BlockGenPlanningImpl::fillReqWithPlainInstsByNumber(
     planning::FunctionRequest &FunReq, size_t NumInstrPlain,
     size_t AverageBlockInstrs) {
-  auto &Tgt = GenCtx->getLLVMState().getSnippyTarget();
   while (NumInstrPlain > 0) {
     auto MaxBlockInstrs = AverageBlockInstrs * 2ull;
     auto InstrsToAdd = RandEngine::genInInterval(
@@ -388,13 +387,8 @@ void BlockGenPlanningImpl::fillReqWithPlainInstsByNumber(
     InstrsToAdd = std::min(InstrsToAdd, MaxBlockInstrs - Limit);
 
     auto Lim = planning::RequestLimit::NumInstrs{InstrsToAdd};
-    auto Policy = planning::DefaultGenPolicy(
-        *GenCtx, Tgt.getDefaultPolicyFilter(*MBB, *GenCtx),
-        Tgt.groupMustHavePrimaryInstr(*MBB, *GenCtx),
-        Tgt.getPolicyOverrides(*MBB, *GenCtx));
-    FunReq.addToBlock(
-        MBB, planning::InstructionGroupRequest(Lim, std::move(Policy)));
-
+    FunReq.addToBlock(MBB, planning::InstructionGroupRequest(
+                               Lim, GenCtx->createGenPolicy(*MBB)));
     NumInstrPlain -= InstrsToAdd;
     auto &BlockReq = FunReq.at(MBB);
     updateBlocksToProcess(BlockReq, AverageBlockInstrs);
@@ -476,15 +470,12 @@ static void randomize(planning::BasicBlockRequest &BB, GeneratorContext &GC) {
   auto NonRegularPacksIt = BB.begin();
   auto &MBB = BB.getMBB();
   planning::BasicBlockRequest NewPacks(MBB);
-  auto &Tgt = GC.getLLVMState().getSnippyTarget();
   for (auto [FirstIdx, SecondIdx] : zip(Idxs, drop_begin(Idxs))) {
     assert(FirstIdx <= SecondIdx);
     if (FirstIdx != SecondIdx)
       NewPacks.add(planning::InstructionGroupRequest(
           planning::RequestLimit::NumInstrs{SecondIdx - FirstIdx},
-          planning::DefaultGenPolicy(GC, Tgt.getDefaultPolicyFilter(MBB, GC),
-                                     Tgt.groupMustHavePrimaryInstr(MBB, GC),
-                                     Tgt.getPolicyOverrides(MBB, GC))));
+          GC.createGenPolicy(MBB)));
     // FIXME: should be enum or llvm rtti
     assert(NonRegularPacksIt->isInseparableBundle());
     NewPacks.add(std::move(*NonRegularPacksIt));
@@ -494,9 +485,7 @@ static void randomize(planning::BasicBlockRequest &BB, GeneratorContext &GC) {
   if (Idxs.back() != RegularPackSize)
     NewPacks.add(planning::InstructionGroupRequest(
         planning::RequestLimit::NumInstrs{RegularPackSize - Idxs.back()},
-        planning::DefaultGenPolicy(GC, Tgt.getDefaultPolicyFilter(MBB, GC),
-                                   Tgt.groupMustHavePrimaryInstr(MBB, GC),
-                                   Tgt.getPolicyOverrides(MBB, GC))));
+        GC.createGenPolicy(MBB)));
   std::swap(NewPacks, BB);
 }
 
@@ -579,18 +568,13 @@ void BlockGenPlanningImpl::fillReqWithPlainInstsBySize(
         return RandEngine::genInInterval(MFSizeLimit) / MaxInstrSize *
                MaxInstrSize;
       });
-  auto &Tgt = GenCtx->getLLVMState().getSnippyTarget();
   size_t LastAccumulatedSize = 0;
   for (auto [MBB, AccumulatedSize] :
        zip(BlocksToProcess, RequestedAccumulatedSizes)) {
     size_t BlockSize = AccumulatedSize - LastAccumulatedSize;
     auto Limit = planning::RequestLimit::Size{BlockSize};
-    auto Policy = planning::DefaultGenPolicy(
-        *GenCtx, Tgt.getDefaultPolicyFilter(*MBB, *GenCtx),
-        Tgt.groupMustHavePrimaryInstr(*MBB, *GenCtx),
-        Tgt.getPolicyOverrides(*MBB, *GenCtx));
-    FunReq.addToBlock(
-        MBB, planning::InstructionGroupRequest(Limit, std::move(Policy)));
+    FunReq.addToBlock(MBB, planning::InstructionGroupRequest(
+                               Limit, GenCtx->createGenPolicy(*MBB)));
     LastAccumulatedSize = AccumulatedSize;
   }
 }
@@ -695,16 +679,12 @@ static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
                   "Min distance is " + Twine(Min) + " , but max distance is " +
                       Twine(Max));
 
-  auto &Tgt = SGCtx.getLLVMState().getSnippyTarget();
   auto BlockSize = RandEngine::genInInterval(Min, Max);
   BlockSize = alignDown(BlockSize, MinInstrSize);
   auto Limit = planning::RequestLimit::Size{BlockSize};
-  auto Policy = planning::DefaultGenPolicy(
-      SGCtx, Tgt.getDefaultPolicyFilter(SelectedMBB, SGCtx),
-      Tgt.groupMustHavePrimaryInstr(SelectedMBB, SGCtx),
-      Tgt.getPolicyOverrides(SelectedMBB, SGCtx));
-  FunReq.addToBlock(&SelectedMBB, planning::InstructionGroupRequest(
-                                      Limit, std::move(Policy)));
+  FunReq.addToBlock(&SelectedMBB,
+                    planning::InstructionGroupRequest(
+                        Limit, SGCtx.createGenPolicy(SelectedMBB)));
 }
 
 void BlockGenPlanningImpl::fillReqForTopLoopBySize(

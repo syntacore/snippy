@@ -351,6 +351,11 @@ public:
   }
 
   GenerationMode getGenerationMode() const {
+    assert((!isApplyValuegramEachInstr() || isInstrsNumKnown()) &&
+           "Initialization of registers before each instruction is supported "
+           "only if a number of instructions are generated.");
+    if (isApplyValuegramEachInstr())
+      return GenerationMode::NumInstrs;
     if (!isInstrsNumKnown())
       return GenerationMode::Size;
     bool PCDistanceRequested = getConfig().Branches.isPCDistanceRequested();
@@ -448,6 +453,10 @@ public:
 
   bool hasCFInstrs() const {
     return GenSettings->Cfg.Histogram.hasCFInstrs(ProgContext.getOpcodeCache());
+  }
+
+  bool isApplyValuegramEachInstr() const {
+    return GenSettings->Cfg.RegsHistograms.has_value();
   }
 
   StringRef getInitialRegYamlFile() const {
@@ -567,6 +576,8 @@ public:
       snippy::fatal(getLLVMState().getCtx(), "Internal error", std::move(Err));
     return *SamplerRefOrErr;
   }
+
+  planning::GenPolicy createGenPolicy(const MachineBasicBlock &MBB) const;
 };
 
 } // namespace snippy
