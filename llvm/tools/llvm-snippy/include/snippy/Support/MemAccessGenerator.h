@@ -15,11 +15,11 @@
 #pragma once
 
 #include "snippy/Support/DiagnosticInfo.h"
+#include "snippy/Support/RandUtil.h"
+#include "snippy/Support/Utils.h"
 
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
-
-#include "RandUtil.h"
-#include "Utils.h"
 
 #include <algorithm>
 #include <functional>
@@ -67,7 +67,7 @@ template <typename Iter> class MemoryAccessGenerator final {
   Iter Last;
   std::map<MemKey, MemValue> MemTable;
 
-  MemTableIter updateTable(MemKey Key) {
+  Expected<MemTableIter> updateTable(MemKey Key) {
     MemValue MemVal;
     std::vector<double> MemWeights;
 
@@ -84,13 +84,10 @@ template <typename Iter> class MemoryAccessGenerator final {
     }
 
     if (MemWeights.size() == 0) {
-      std::string ErrMsg;
-      raw_string_ostream OS(ErrMsg);
-      OS << "Memory schemes are too restrictive to generate the requested "
-            "instructions."
-         << " Size: " << Key.AccessSize << " Alignment: " << Key.Alignment
-         << '\n';
-      snippy::fatal(ErrMsg.c_str());
+      return make_error<MemoryAccessSampleError>(
+          formatv("Memory schemes are to restrictive to generate access (size: "
+                  "{0}, alignment: {1})",
+                  Key.AccessSize, Key.Alignment));
     }
 
     MemVal.MemDist = std::discrete_distribution<size_t>(MemWeights.begin(),
@@ -108,12 +105,17 @@ public:
     MemTable.clear();
   }
 
-  size_t generate(size_t AccessSize, size_t Alignment, bool BurstMode,
-                  std::optional<size_t> PreselectedSchemeId = std::nullopt) {
+  Expected<size_t>
+  generate(size_t AccessSize, size_t Alignment, bool BurstMode,
+           std::optional<size_t> PreselectedSchemeId = std::nullopt) {
     MemKey Key{AccessSize, Alignment, BurstMode};
     auto FindIter = MemTable.find(Key);
-    if (FindIter == MemTable.end())
-      FindIter = updateTable(Key);
+    if (FindIter == MemTable.end()) {
+      auto FindIterExp = updateTable(Key);
+      if (auto Err = FindIterExp.takeError())
+        return std::move(Err);
+      FindIter = *FindIterExp;
+    }
     if (PreselectedSchemeId)
       return FindIter->second.getSchemeIdx(*PreselectedSchemeId);
     return FindIter->second.generate();
@@ -155,13 +157,15 @@ public:
     return *this;
   }
 
-  const typename ContT::value_type &
+  Expected<const typename ContT::value_type &>
   getValidAccesses(size_t AccessSize, size_t Alignment, bool BurstMode,
                    std::optional<size_t> InstrClassId) {
     auto PickedScheme =
         MAG.generate(AccessSize, Alignment, BurstMode, InstrClassId);
-    assert(PickedScheme < Accesses.size());
-    return Accesses[PickedScheme];
+    if (auto Err = PickedScheme.takeError())
+      return std::move(Err);
+    assert(*PickedScheme < Accesses.size());
+    return Accesses[*PickedScheme];
   }
 
   size_t getId() const { return MAGId; }

@@ -23,6 +23,7 @@
 #include "snippy/Generator/RegisterPool.h"
 #include "snippy/Generator/SimRunner.h"
 #include "snippy/Generator/SnippyModule.h"
+#include "snippy/Generator/TopMemAccSampler.h"
 #include "snippy/Target/Target.h"
 
 #include "llvm/CodeGen/MachineModuleInfo.h"
@@ -95,6 +96,8 @@ private:
   // Local - values local to snippy code (tp's and gp's values might be
   // corrupted)
   std::map<MCRegister, MemAddr> SpilledRegsAddressesLocal;
+
+  TopLevelMemoryAccessSampler MemAccSampler;
 
   size_t EntryPrologueInstrCnt = 0;
   size_t EntryEpilogueInstrCnt = 0;
@@ -220,6 +223,8 @@ public:
 
   auto &getLinker() { return getProgramContext().getLinker(); }
   const auto &getLinker() const { return getProgramContext().getLinker(); }
+
+  auto &getMemoryAccessSampler() { return MemAccSampler; }
 
   void addToSelfcheckMap(MemAddr Address, MemAddr Distance) {
     [[maybe_unused]] auto EmplaceResult =
