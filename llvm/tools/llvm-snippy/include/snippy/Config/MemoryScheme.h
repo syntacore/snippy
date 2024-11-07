@@ -266,6 +266,7 @@ struct MemoryAccessRange final : MemoryAccess {
   size_t LastOffset = 0;
   std::optional<size_t> AccessSize = std::nullopt;
 
+private:
   // When alignment must be accounted for, offsets that are aligned in one
   // Stride-wide block might not be aligned in the next one. However, they will
   // be aligned again if we add the least common multiple of Stride and
@@ -276,8 +277,12 @@ struct MemoryAccessRange final : MemoryAccess {
   // LCStride-wide block, and then select one of these offsets instead.
   // This assumes that Stride might not be a power of 2, but is still rather
   // small.
-  std::array<SmallVector<size_t>, 4> AlignmentAllowedLCBlockOffsets;
+  // NOTE: mutable here because we are caching calculated offsets. Won't work
+  // well if we'll want to parallel it.
+  mutable std::array<std::optional<SmallVector<size_t>>, 4>
+      AlignmentAllowedLCBlockOffsets;
 
+public:
   MemoryAccessRange() : MemoryAccess(MemoryAccessMode::Range) {}
 
   MemoryAccessRange(MemAddr StartAddr, size_t Size, unsigned Stride,
@@ -290,8 +295,6 @@ struct MemoryAccessRange final : MemoryAccess {
   static bool classof(const MemoryAccess *Access) {
     return Access->getMode() == MemoryAccessMode::Range;
   }
-
-  void initAllowedAlignmentLCBlockOffsets();
 
   MemoryBank getPossibleAddresses() const override;
   MemoryAccessSeq split(const MemoryBank &MB) const override;
@@ -312,12 +315,16 @@ private:
     return std::lcm(Stride, Alignment);
   }
 
+  void getAllowedOffsetsImpl(size_t Alignment,
+                             SmallVectorImpl<size_t> &Out) const;
+
+  ArrayRef<size_t> getAllowedOffsets(size_t Alignment) const;
+
   // Find the last LCStride-wide block that can fit AccessSize-wide element with
   // the specified alignment.
-  size_t getMaxLCBlock(size_t Alignment, size_t AccessSize) const {
+  size_t getMaxLCBlock(size_t Alignment, size_t AccessSize,
+                       ArrayRef<size_t> AllowedLCBlockOffsets) const {
     auto LCStride = getLCStride(Alignment);
-    auto &AllowedLCBlockOffsets =
-        AlignmentAllowedLCBlockOffsets[Log2_64(Alignment)];
     assert(!AllowedLCBlockOffsets.empty());
     auto MaxOffset = Size - AccessSize;
     // Can select block if LCBlock * LCStride + AllowedLCBlockOffsets.front() <=
@@ -699,8 +706,6 @@ public:
   MemoryBank Restricted;
 
 public:
-  MemoryScheme();
-
   std::optional<std::string>
   validateSchemes(LLVMContext &Ctx, const SectionsDescriptions &Sections) const;
 };
