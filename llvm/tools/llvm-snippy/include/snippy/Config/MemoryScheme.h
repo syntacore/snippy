@@ -23,11 +23,8 @@
 
 #include "ImmediateHistogram.h"
 
-#include "snippy/Config/MemorySchemePluginWrapper.h"
-#include "snippy/Config/PluginWrapper.h"
 #include "snippy/Plugins/MemorySchemePluginCInterface.h"
 #include "snippy/Support/DiagnosticInfo.h"
-#include "snippy/Support/MemAccessGenerator.h"
 #include "snippy/Support/YAMLUtils.h"
 
 #include "llvm/Support/Debug.h"
@@ -244,8 +241,6 @@ public:
 
   MemoryAccessMode getMode() const { return Mode; }
 
-  virtual void print(raw_ostream &OS) const = 0;
-  virtual void dump() const = 0;
   virtual AddressInfo randomAddress(const AddressGenInfo &Info) = 0;
   virtual MemAddr getLowerBound() const = 0;
   virtual MemoryBank getPossibleAddresses() const = 0;
@@ -261,12 +256,14 @@ private:
   MemoryAccessMode Mode;
 };
 
+struct SectionDesc;
+
 struct MemoryAccessRange final : MemoryAccess {
   MemAddr Start = 0;
   size_t Size = 0;
-  unsigned Stride = 1;
-  unsigned FirstOffset = 0;
-  unsigned LastOffset = 0;
+  size_t Stride = 1;
+  size_t FirstOffset = 0;
+  size_t LastOffset = 0;
   std::optional<size_t> AccessSize = std::nullopt;
 
   // When alignment must be accounted for, offsets that are aligned in one
@@ -288,12 +285,11 @@ struct MemoryAccessRange final : MemoryAccess {
       : MemoryAccess(MemoryAccessMode::Range), Start(StartAddr), Size(Size),
         Stride(Stride), FirstOffset(FirstOffset), LastOffset(LastOffset) {}
 
+  MemoryAccessRange(const SectionDesc &S, unsigned Alignment);
+
   static bool classof(const MemoryAccess *Access) {
     return Access->getMode() == MemoryAccessMode::Range;
   }
-
-  void print(raw_ostream &OS) const override;
-  void dump() const override { print(dbgs()); }
 
   void initAllowedAlignmentLCBlockOffsets();
 
@@ -341,9 +337,6 @@ struct MemoryAccessEviction final : MemoryAccess {
   static bool classof(const MemoryAccess *Access) {
     return Access->getMode() == MemoryAccessMode::Eviction;
   }
-
-  void print(raw_ostream &OS) const override;
-  void dump() const override { print(dbgs()); }
 
   AddressInfo randomAddress(const AddressGenInfo &Info) override;
   MemoryBank getPossibleAddresses() const override;
@@ -394,9 +387,6 @@ struct MemoryAccessAddresses final : MemoryAccess {
     return Access->getMode() == MemoryAccessMode::Addresses;
   }
 
-  void print(raw_ostream &OS) const override;
-  void dump() const override { print(dbgs()); }
-
   AddressInfo randomAddress(const AddressGenInfo &Info) override;
   MemoryBank getPossibleAddresses() const override;
   MemoryAccessSeq split(const MemoryBank &MB) const override;
@@ -432,33 +422,6 @@ struct MemoryAccessesGroup {
 using MemoryAccessesGroupSeq = SmallVector<MemoryAccessesGroup>;
 
 struct SectionsDescriptions;
-
-struct MemoryAccesses {
-  MemoryAccessSeq BaseAccesses;
-  MemoryAccessSeq SplitAccesses;
-  MemoryBank Restricted;
-
-  void print(raw_ostream &OS) const;
-  void dump() const { print(dbgs()); }
-
-  std::optional<MemAddr>
-  getFirstNeededMemoryAccessBound(MemoryAccessMode Mode) const {
-    auto *Pos =
-        find_if(BaseAccesses, [Mode](const std::unique_ptr<MemoryAccess> &MA) {
-          return MA->getMode() == Mode;
-        });
-    if (Pos == BaseAccesses.end())
-      return {};
-    return (*Pos)->getLowerBound();
-  }
-
-  void loadFromYaml(LLVMContext &Ctx, StringRef Filename);
-
-  void mapYaml(yaml::IO &IO);
-
-  void validateSchemes(LLVMContext &Ctx, const SectionsDescriptions &Sections,
-                       bool StrictCheck) const;
-};
 
 enum class Acc {
   R = 1,
@@ -730,131 +693,29 @@ void diagnoseXSections(LLVMContext &Ctx, SecIt SectionsStart, SecIt SectionsFin,
   }
 }
 
-using MemoryAccessesGenerator = OwningMAG<MemoryAccessSeq>;
-
 class MemoryScheme {
 public:
-  MemoryAccesses MA;
-
-private:
-  MemoryAccessesGenerator MAG;
-  MemoryBank MB;
-  MemorySchemePluginWrapper AddrPlugin;
-  std::string OriginalFile;
-
-  void updateMAG();
-
-  MemoryAccessesGenerator &getMAG();
-
-  std::optional<AddressInfo> getAddressfromPlugin(size_t AccessSize,
-                                                  size_t Alignment,
-                                                  bool BurstMode,
-                                                  size_t InstrClassId);
-
-  std::optional<::AddressGlobalId> getPreselectedAddressId();
-
-  void
-  updateSplitImpl(ArrayRef<std::unique_ptr<MemoryAccess>> AccessesToSplit) {
-    for (auto &MS : AccessesToSplit) {
-      auto Accesses = MS->split(MB);
-      for (auto &A : Accesses)
-        MA.SplitAccesses.emplace_back(std::move(A));
-    }
-    updateMAG();
-  }
+  MemoryAccessSeq BaseAccesses;
+  MemoryBank Restricted;
 
 public:
   MemoryScheme();
 
-  MemoryScheme(MemoryAccesses MAc, StringRef Filename = "");
-
-  void setAddrPlugin(MemorySchemePluginWrapper Plug) {
-    AddrPlugin = std::move(Plug);
-  }
-
-  void updateSplit() {
-    MA.SplitAccesses.clear();
-    updateSplitImpl(MA.BaseAccesses);
-  }
-
-  void updateMemoryBank() {
-    MemoryBank MB;
-    MB.addRange(MemRange{0, std::numeric_limits<MemAddr>::max()});
-    updateMemoryBank(std::move(MB));
-  }
-  void updateMemoryBank(MemoryBank NewMB) {
-    MB = NewMB.diff(MA.Restricted);
-    updateSplit();
-  }
-
-  void updateRestricted(MemoryBank Restricted) {
-    MA.Restricted = MA.Restricted.unite(Restricted);
-    MB = MB.diff(MA.Restricted);
-    updateSplit();
-  }
-
-  void validateSchemes(LLVMContext &Ctx, const SectionsDescriptions &Sections,
-                       bool StrictCheck) const {
-    MA.validateSchemes(Ctx, Sections, StrictCheck);
-  }
-
-  AddressInfo randomAddress(size_t AccessSize, size_t Alignment,
-                            bool BurstMode = false);
-
-  std::vector<AddressInfo>
-  randomBurstGroupAddresses(ArrayRef<AddressRestriction> ARRange,
-                            const OpcodeCache &OpcC,
-                            const SnippyTarget &SnpTgt);
-
-  std::optional<MemAddr>
-  getFirstNeededMemoryAccessBound(MemoryAccessMode Mode) const {
-    return MA.getFirstNeededMemoryAccessBound(Mode);
-  }
-
-  void print(raw_ostream &OS) const;
-  void dump() const { print(dbgs()); }
-
-  std::string getFilename() const { return OriginalFile; }
-  void setFilename(StringRef Name) { OriginalFile = Name.str(); }
-
-  std::pair<AddressInfo, AddressGenInfo> randomAddressForInstructions(
-      size_t AccessSize, size_t Alignment,
-      std::function<AddressGenInfo(MemoryAccess &)> ChooseAddrGenInfo,
-      bool BurstMode = false) {
-    auto &MAGWithSchemes = getMAG();
-    auto InstrClassId = MAGWithSchemes.getId();
-
-    auto AddrFromPlugin =
-        getAddressfromPlugin(AccessSize, Alignment, BurstMode, InstrClassId);
-    if (AddrFromPlugin)
-      return {*AddrFromPlugin,
-              AddressGenInfo::singleAccess(AccessSize, Alignment, BurstMode)};
-
-    auto PreselectedGlobalAddrId = getPreselectedAddressId();
-    auto PreselectedSchemeId = std::optional<size_t>{};
-    auto PreselectedAddrId = std::optional<::AddressId>{};
-    if (PreselectedGlobalAddrId) {
-      PreselectedSchemeId = PreselectedGlobalAddrId->MemSchemeId;
-      PreselectedAddrId = PreselectedGlobalAddrId->AddrId;
-    }
-
-    auto &Scheme = MAGWithSchemes.getValidAccesses(
-        AccessSize, Alignment, BurstMode, PreselectedSchemeId);
-    auto AddrGenInfo = ChooseAddrGenInfo(*Scheme);
-    AddrGenInfo.PreselectedAddr = PreselectedAddrId;
-    auto AI = Scheme->randomAddress(AddrGenInfo);
-    assert(MB.contained(AI) && "Address Info potentially out of memory bank");
-
-    return {AI, AddrGenInfo};
-  }
-
-  // Unfortunately this cannot be done as Normalization in Yaml parsing due to
-  // lack of knowledge about TargetAlignment.
-  // TODO: Fix this
-  void fillBaseAccessesIfNeeded(const SectionsDescriptions &Sections,
-                                const Align &TargetAlignment);
+  std::optional<std::string>
+  validateSchemes(LLVMContext &Ctx, const SectionsDescriptions &Sections) const;
 };
 
+template <typename AccessesRange>
+std::optional<MemAddr> getFirstNeededMemoryAccessBound(AccessesRange &&Accesses,
+                                                       MemoryAccessMode Mode) {
+  auto *Pos =
+      llvm::find_if(Accesses, [Mode](const std::unique_ptr<MemoryAccess> &MA) {
+        return MA->getMode() == Mode;
+      });
+  if (Pos == Accesses.end())
+    return {};
+  return (*Pos)->getLowerBound();
+}
 } // namespace snippy
 
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(
@@ -880,6 +741,6 @@ LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::MemoryAccessesGroup,
 LLVM_SNIPPY_YAML_DECLARE_SEQUENCE_TRAITS(snippy::SectionsDescriptions,
                                          snippy::SectionDesc);
 
-LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::MemoryAccesses);
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::MemoryScheme);
 
 } // namespace llvm

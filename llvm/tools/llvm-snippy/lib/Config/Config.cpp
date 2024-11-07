@@ -368,7 +368,9 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
   if (!IO.outputting()) {
     IO.mapOptional("sections", Info.Sections);
   }
-  yaml::MappingTraits<MemoryAccesses>::mapping(IO, Info.MS.MA);
+  // Here we call yamlize directly since memory scheme has no top-level key.
+  // This could be changed in the future but it'd be a breaking change.
+  yaml::MappingTraits<MemoryScheme>::mapping(IO, Info.MS);
   IO.mapOptional("branches", Info.Branches);
   IO.mapOptional("burst", Info.Burst.Data);
   YAMLHistogramIO<OpcodeHistogramDecodedEntry> HistIO(Info.Histogram);
@@ -384,7 +386,11 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
 }
 
 std::string yaml::MappingTraits<Config>::validate(yaml::IO &Io, Config &Info) {
-  return "";
+  void *Ctx = Io.getContext();
+  assert(Ctx && "To parse or output Config provide ConfigIOContext as "
+                "context for yaml::IO");
+  auto &ConfigIOCtx = *static_cast<ConfigIOContext *>(Ctx);
+  return Info.MS.validateSchemes(ConfigIOCtx.Ctx, Info.Sections).value_or("");
 }
 
 namespace snippy {
