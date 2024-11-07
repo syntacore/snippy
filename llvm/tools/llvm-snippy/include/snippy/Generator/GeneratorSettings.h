@@ -86,7 +86,8 @@ class GeneratorSettings {
 public:
   std::string ABIName;
   std::string BaseFileName;
-
+  std::string LayoutFile;
+  std::vector<std::string> AdditionalLayoutFiles;
   TrackingOptions TrackingConfig;
   DebugOptions DebugConfig;
   LinkerOptions LinkerConfig;
@@ -104,12 +105,16 @@ public:
   }
 
   GeneratorSettings(std::string ABIName, std::string BaseFileName,
+                    std::string LayoutFile,
+                    const std::vector<std::string> &AdditionalLayoutFiles,
                     TrackingOptions &&TrackingConfig,
                     DebugOptions &&DebugConfig, LinkerOptions &&LinkerConfig,
                     ModelPluginOptions &&ModelPluginConfig,
                     InstrsGenerationOptions &&InstrsGenerationConfig,
                     RegistersOptions &&RegsConfig, Config &&Cfg)
       : ABIName(std::move(ABIName)), BaseFileName(std::move(BaseFileName)),
+        LayoutFile(std::move(LayoutFile)),
+        AdditionalLayoutFiles(AdditionalLayoutFiles),
         TrackingConfig(std::move(TrackingConfig)),
         DebugConfig(std::move(DebugConfig)),
         LinkerConfig(std::move(LinkerConfig)),

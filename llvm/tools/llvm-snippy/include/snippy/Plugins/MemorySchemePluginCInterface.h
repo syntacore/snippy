@@ -19,7 +19,7 @@ extern "C" {
 
 // Process of random address generation:
 //            Snippy pipeline            Plugin pipeline
-//  MemoryScheme::randomAddress(...) {
+//  sample (...) {
 //    if plugin enabled           --->  generateAddress(...)
 //      if CAN_GENERATE_ADDRESS           returns address if it can,
 //        returns AddressInfo with        otherwise sets GenMode
@@ -52,12 +52,6 @@ typedef enum GenerationMode {
   CANNOT_GENERATE_ADDRESS = 0,
   CAN_GENERATE_ADDRESS = 1
 } GenModeT;
-
-size_t snippyPluginGenerateAddress(size_t AccessSize, size_t Alignment,
-                                   bool BurstMode, size_t InstrClassId,
-                                   GenModeT *GenMode);
-void snippyPluginGenerateAddressId(struct AddressGlobalId *AddrId);
-void snippyPluginSetAddressInfoFile(const char *AddressInfoFileName);
 
 // table for linking with snippy
 struct MemorySchemePluginFunctionsTable {

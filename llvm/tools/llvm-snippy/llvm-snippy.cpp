@@ -244,12 +244,6 @@ static snippy::opt<SelfcheckRefValueStorageType>
                              cl::init(SelfcheckRefValueStorageType::Code),
                              cl::cat(Options));
 
-static snippy::opt<bool> StrictMemoryScheme(
-    "strict-memory-schemes",
-    cl::desc("Raise error instead of warning when potentially invalid memory "
-             "scheme is encountered."),
-    cl::cat(Options), cl::init(false));
-
 static snippy::opt<bool> DumpMI(
     "dump-mi",
     cl::desc("[Debug] dump generated machine instructions in Machine IR"),
@@ -304,22 +298,6 @@ static snippy::opt<std::string> GeneratorPluginParserFile(
     cl::desc("File with info to parse with plugin generator. "
              "Use =None to parse histogram with build-in "
              "Snippy pareser."),
-    cl::value_desc("filename"), cl::cat(Options), cl::init("None"));
-
-static snippy::opt<std::string>
-    MemAddrGeneratorFile("address-generator-plugin",
-                         cl::desc("Plugin for custom addreses generation."
-                                  "Use =None to generate addresses "
-                                  "with build-in randomizer."
-                                  "(=None - default value)"),
-                         cl::value_desc("filename"), cl::cat(Options),
-                         cl::init("None"));
-
-static snippy::opt<std::string> MemAddrGeneratorInfoFile(
-    "address-plugin-info-file",
-    cl::desc("File with info for addresses generator. "
-             "Use =None if plugin doesn't need additional info."
-             "(=None - default value)"),
     cl::value_desc("filename"), cl::cat(Options), cl::init("None"));
 
 static snippy::opt<BurstMode> BurstModeOpt(
@@ -808,7 +786,6 @@ static void dumpConfigIfNeeded(const Config &Cfg,
       S.dump(OS);
       OS << "\n";
     }
-    Cfg.MS.dump();
   }
 }
 
@@ -958,25 +935,7 @@ static void checkConfig(const Config &Cfg, const SnippyTarget &Tgt,
   checkCallRequirements(Tgt, Cfg.Histogram);
   checkMemoryRegions(Tgt, Cfg);
   Tgt.checkInstrTargetDependency(Cfg.Histogram);
-  Cfg.MS.validateSchemes(Ctx, Cfg.Sections, StrictMemoryScheme);
   checkCompatibilityWithValuegramPolicy(Cfg, Ctx);
-}
-
-static std::string getMemPlugin() {
-  if (MemAddrGeneratorFile == "None")
-    return {""};
-  return MemAddrGeneratorFile;
-}
-
-static std::string getMemPluginInfo() {
-  auto FileName = std::string{MemAddrGeneratorInfoFile};
-  if (MemAddrGeneratorInfoFile == "None")
-    FileName = "";
-  if (!FileName.empty() && getMemPlugin().empty())
-    snippy::fatal(formatv("Addresses generator plugin info file "
-                          "may be used only with {0}Option",
-                          MemAddrGeneratorFile.ArgStr));
-  return FileName;
 }
 
 static void checkFPUSettings(Config &Cfg, LLVMContext &Ctx,
@@ -1001,16 +960,11 @@ static void completeConfig(Config &Cfg, LLVMState &State,
                            const OpcodeCache &OpCC) {
   auto &TM = State.getTargetMachine();
   auto &Tgt = State.getSnippyTarget();
-  auto TargetAlignment =
-      TM.createDataLayout().getPointerABIAlignment(0 /* address space */);
-  Cfg.MS.fillBaseAccessesIfNeeded(Cfg.Sections, TargetAlignment);
   setBurstGramIfNeeded(Cfg.Burst, ConfigIOContext{OpCC, State.getCtx(), Tgt});
-  Cfg.MS.updateMemoryBank();
   std::sort(Cfg.Sections.begin(), Cfg.Sections.end(),
             [](auto &S1, auto &S2) { return S1.VMA < S2.VMA; });
   convertToCustomBurstMode(Cfg.Histogram, State.getInstrInfo(),
                            *Cfg.Burst.Data);
-  Cfg.MS.setAddrPlugin({getMemPlugin(), getMemPluginInfo()});
   checkConfig(Cfg, Tgt, TM, State.getCtx(), OpCC);
   if (ValuegramRegsDataFile.isSpecified())
     Cfg.RegsHistograms =
@@ -1124,7 +1078,7 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
                                       FillCodeSectionMode, SelfCheckPeriod);
 
   return GeneratorSettings(
-      ABI, OutputFilename,
+      ABI, OutputFilename, LayoutFile.getValue(), AdditionalLayoutFiles,
       TrackingOptions{Backtrack, SelfCheckPeriod, AddressVHOpt},
       DebugOptions{DumpMI, DumpMF, DumpCFG, ViewCFG},
       LinkerOptions{ExternalStackOpt, MangleExportedNames,

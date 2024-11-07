@@ -57,35 +57,33 @@ access-addresses:
 
 # CHECK: Test Generation resulted in the following warnings:
 # CHECK:     * Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:
-# CHECK-NEXT: Memory range:
-# CHECK-NEXT:   Weight: 1
-# CHECK-NEXT:   Start: 2147483647
-# CHECK-NEXT:   Size: 1024
-# CHECK-NEXT:   Stride: 4
-# CHECK-NEXT:   FirstOffset: 1
-# CHECK-NEXT:   LastOffset: 1
+# CHECK: access-ranges:
+# CHECK-NEXT:  - weight:          1
+# CHECK-NEXT:    start:           0x7FFFFFFF
+# CHECK-NEXT:    size:            0x400
+# CHECK-NEXT:    stride:          0x4
+# CHECK-NEXT:    first-offset:    0x1
+# CHECK-NEXT:    last-offset:     0x1
 # CHECK:     * Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:
-# CHECK-NEXT: Memory eviction:
-# CHECK-NEXT:   Weight: 1
-# CHECK-NEXT:   Mask:  0xb0e000
-# CHECK-NEXT:   Fixed: 0x80001000
+# CHECK: access-evictions:
+# CHECK-NEXT: - weight:          1
+# CHECK-NEXT:     mask:            0xB0E000
+# CHECK-NEXT:     fixed:           0x80001000
 # CHECK:     * Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:
-# CHECK-NEXT: Memory addresses:
-# CHECK-NEXT:   Weight: 1
-# CHECK-NEXT:   Ordered: 1
-# CHECK-NEXT:   Plain:
-# CHECK-NEXT:    - Addr: 0x80200f00
-# CHECK-NEXT:      Access-size: 16
-# CHECK-NEXT:    - Addr: 0x80800000
-# CHECK-NEXT:      Access-size: 16
+# CHECK: access-addresses:
+# CHECK-NEXT: - weight:          1
+# CHECK-NEXT:     ordered:         false
+# CHECK-NEXT:     plain:
+# CHECK-NEXT:       - addr:            0x80200F00
+# CHECK-NEXT:       - addr:            0x80800000
 # CHECK:     * Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:
-# CHECK-NEXT: Memory addresses:
-# CHECK-NEXT:   Weight: 1
-# CHECK-NEXT:   Ordered: 0
-# CHECK-NEXT:   Burst:
-# CHECK-NEXT:     - Addr: 0x807fff00
-# CHECK-NEXT:       Size: 256
-# CHECK-NEXT:       Stride: 16
-# CHECK-NEXT:       Access-size: 8
+# CHECK: access-addresses:
+# CHECK-NEXT:   - weight:          1
+# CHECK-NEXT:     ordered:         false
+# CHECK-NEXT:     burst:
+# CHECK-NEXT:       - addr:            0x807FFF00
+# CHECK-NEXT:         size:            256
+# CHECK-NEXT:         stride:          16
+# CHECK-NEXT:         access-size:     8
 # CHECK-NOT: * Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:
-# ERROR: error: Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:
+# ERROR: Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:

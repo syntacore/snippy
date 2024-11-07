@@ -33,6 +33,7 @@ class MemoryScheme;
 class GeneratorContext;
 struct TargetGenContextInterface;
 struct SectionData;
+class MemoryAccessSampler;
 
 using SectionDescVect = std::vector<SectionDesc>;
 struct SimulationEnvironment {

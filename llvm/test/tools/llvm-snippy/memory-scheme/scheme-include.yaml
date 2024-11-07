@@ -8,69 +8,45 @@ include:
   - Inputs/default-opcodes.yaml
   - memory-modes.yaml
 
-# CHECK: Memory access 0:
-# CHECK-NEXT: Memory range:
-# CHECK-NEXT:   Weight: 1
-# CHECK-NEXT:   Start: 2147491840
-# CHECK-NEXT:   Size: 4096
-# CHECK-NEXT:   Stride: 16
-# CHECK-NEXT:   FirstOffset: 1
-# CHECK-NEXT:   LastOffset: 2
-
-# CHECK: Memory access 1:
-# CHECK-NEXT: Memory range:
-# CHECK-NEXT:   Weight: 1
-# CHECK-NEXT:   Start: 2147500032
-# CHECK-NEXT:   Size: 512
-# CHECK-NEXT:   Stride: 8
-# CHECK-NEXT:   FirstOffset: 4
-# CHECK-NEXT:   LastOffset: 6
-
-# CHECK: Memory access 2:
-# CHECK-NEXT: Memory range:
-# CHECK-NEXT:   Weight: 1
-# CHECK-NEXT:   Start: 2147483648
-# CHECK-NEXT:   Size: 1024
-# CHECK-NEXT:   Stride: 4
-# CHECK-NEXT:   FirstOffset: 1
-# CHECK-NEXT:   LastOffset: 1
-
-# CHECK: Memory access 3:
-# CHECK-NEXT: Memory eviction:
-# CHECK-NEXT:   Weight: 1
-# CHECK-NEXT:   Mask:  0x3c0000
-# CHECK-NEXT:   Fixed: 0x80000000
-
-# CHECK: Memory access 4:
-# CHECK-NEXT: Memory eviction:
-# CHECK-NEXT:   Weight: 1
-# CHECK-NEXT:   Mask:  0xbe000
-# CHECK-NEXT:   Fixed: 0x80001000
-
-# CHECK: Memory access 5:
-# CHECK-NEXT: Memory addresses:
-# CHECK-NEXT:  Weight: 1
-# CHECK-NEXT:  Ordered: 1
-# CHECK-NEXT:  Plain:
-# CHECK-NEXT:   - Addr: 0x80200000
-# CHECK-NEXT:     Access-size: 16
-# CHECK-NEXT:   - Addr: 0x80201234
-# CHECK-NEXT:     Access-size: 16
-# CHECK-NEXT:   - Addr: 0x802020bc
-# CHECK-NEXT:     Access-size: 16
-
-# CHECK: Memory access 6:
-# CHECK-NEXT: Memory addresses:
-# CHECK-NEXT:  Weight: 1
-# CHECK-NEXT:  Ordered: 0
-# CHECK-NEXT:  Plain:
-# CHECK-NEXT:   - Addr: 0x80200050
-# CHECK-NEXT:     Access-size: 12
-
-# CHECK: Memory access 7:
-# CHECK-NEXT: Memory addresses:
-# CHECK-NEXT:  Weight: 1
-# CHECK-NEXT:  Ordered: 1
-# CHECK-NEXT:  Plain:
-# CHECK-NEXT:   - Addr: 0x80200f00
-# CHECK-NEXT:     Access-size: 16
+# CHECK: access-ranges:
+# CHECK-NEXT:  - weight:          1
+# CHECK-NEXT:    start:           0x80002000
+# CHECK-NEXT:    size:            0x1000
+# CHECK-NEXT:    stride:          0x10
+# CHECK-NEXT:    first-offset:    0x1
+# CHECK-NEXT:    last-offset:     0x2
+# CHECK-NEXT:  - weight:          1
+# CHECK-NEXT:    start:           0x80004000
+# CHECK-NEXT:    size:            0x200
+# CHECK-NEXT:    stride:          0x8
+# CHECK-NEXT:    first-offset:    0x4
+# CHECK-NEXT:    last-offset:     0x6
+# CHECK-NEXT:  - weight:          1
+# CHECK-NEXT:    start:           0x80000000
+# CHECK-NEXT:    size:            0x400
+# CHECK-NEXT:    stride:          0x4
+# CHECK-NEXT:    first-offset:    0x1
+# CHECK-NEXT:    last-offset:     0x1
+# CHECK-NEXT: access-evictions:
+# CHECK-NEXT:  - weight:          1
+# CHECK-NEXT:    mask:            0x3C0000
+# CHECK-NEXT:    fixed:           0x80000000
+# CHECK-NEXT:  - weight:          1
+# CHECK-NEXT:    mask:            0xBE000
+# CHECK-NEXT:    fixed:           0x80001000
+# CHECK-NEXT: access-addresses:
+# CHECK-NEXT:  - weight:          1
+# CHECK-NEXT:    ordered:         true
+# CHECK-NEXT:    plain:
+# CHECK-NEXT:      - addr:            0x80200000
+# CHECK-NEXT:      - addr:            0x80201234
+# CHECK-NEXT:      - addr:            0x802020BC
+# CHECK-NEXT:  - weight:          1
+# CHECK-NEXT:    ordered:         false
+# CHECK-NEXT:    plain:
+# CHECK-NEXT:      - addr:            0x80200050
+# CHECK-NEXT:        access-size:     12
+# CHECK-NEXT:  - weight:          1
+# CHECK-NEXT:    ordered:         false
+# CHECK-NEXT:    plain:
+# CHECK-NEXT:      - addr:            0x80200F00
