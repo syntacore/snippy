@@ -165,9 +165,6 @@ void yaml::MappingTraits<snippy::MemoryAccessRange>::mapping(
   Io.mapRequired("first-offset", NormFirstOffset->Value);
   Io.mapRequired("last-offset", NormLastOffset->Value);
   Io.mapOptional("access-size", Range.AccessSize);
-
-  if (!Io.outputting())
-    Range.initAllowedAlignmentLCBlockOffsets();
 }
 
 bool shouldSkipValidation(yaml::IO &Io) {
@@ -450,28 +447,7 @@ void MemoryBank::mergeRanges() {
 }
 
 MemoryAccessRange::MemoryAccessRange(const SectionDesc &S, unsigned Alignment)
-    : MemoryAccessRange(S.VMA, S.Size, Alignment, 0, 0) {
-  initAllowedAlignmentLCBlockOffsets();
-}
-
-void MemoryAccessRange::initAllowedAlignmentLCBlockOffsets() {
-  for (auto &&[Idx, AllowedLCBlockOffsets] :
-       enumerate(AlignmentAllowedLCBlockOffsets)) {
-    // An offset into this memory section is valid if
-    // it's properly aligned and its offset in a Stride-wide block
-    // is within [FirstOffset; LastOffset]
-    assert(Idx < std::numeric_limits<size_t>::digits);
-    auto Alignment = size_t(1) << Idx;
-    auto LCStride = std::lcm(Stride, Alignment);
-    auto FirstAlignedOffset = alignTo(Start, Alignment) - Start;
-    for (size_t Offset = FirstAlignedOffset; Offset < LCStride;
-         Offset += Alignment) {
-      auto BlockOffset = Offset % Stride;
-      if (FirstOffset <= BlockOffset && BlockOffset <= LastOffset)
-        AllowedLCBlockOffsets.push_back(Offset);
-    }
-  }
-}
+    : MemoryAccessRange(S.VMA, S.Size, Alignment, 0, 0) {}
 
 MemoryBank MemoryAccessRange::getPossibleAddresses() const {
   MemoryBank MB;
@@ -499,7 +475,6 @@ MemoryAccessSeq MemoryAccessRange::split(const MemoryBank &MB) const {
     NewMemAccess->AccessSize = AccessSize;
 
     NewMemAccess->Weight = Size != 0 ? Weight * NewMemAccess->Size / Size : 0;
-    NewMemAccess->initAllowedAlignmentLCBlockOffsets();
     Ret.emplace_back(std::move(NewMemAccess));
   }
   return Ret;
@@ -518,8 +493,7 @@ bool MemoryAccessRange::isLegal(const AddressGenInfo &AddrGenInfo) const {
     return false;
 
   auto MaxOffset = Size - AddrInfoAccessSize;
-  const auto &AllowedLCBlockOffsets =
-      AlignmentAllowedLCBlockOffsets[Log2_64(Alignment)];
+  auto AllowedLCBlockOffsets = getAllowedOffsets(Alignment);
 
   if (AllowedLCBlockOffsets.empty() ||
       // FIXME: Is it actually possible? Seems like this
@@ -541,8 +515,34 @@ bool MemoryAccessRange::isLegal(const AddressGenInfo &AddrGenInfo) const {
   // MaxLCBlock is the last LCStride-wide block that element can fit in. Then
   // the total number of elements that can be addressed with LCStride is
   // MaxLCBlock + 1
-  auto MaxLCBlock = getMaxLCBlock(Alignment, AddrInfoAccessSize);
+  auto MaxLCBlock =
+      getMaxLCBlock(Alignment, AddrInfoAccessSize, AllowedLCBlockOffsets);
   return NumElements <= MaxLCBlock + 1;
+}
+
+void MemoryAccessRange::getAllowedOffsetsImpl(
+    size_t Alignment, SmallVectorImpl<size_t> &Out) const {
+  // An offset into this memory section is valid if
+  // it's properly aligned and its offset in a Stride-wide block
+  // is within [FirstOffset; LastOffset]
+  auto LCStride = getLCStride(Alignment);
+  auto FirstAlignedOffset = alignTo(Start, Alignment) - Start;
+  assert(LCStride > FirstAlignedOffset);
+  for (size_t Offset = FirstAlignedOffset; Offset < LCStride;
+       Offset += Alignment) {
+    auto BlockOffset = Offset % Stride;
+    if (FirstOffset <= BlockOffset && BlockOffset <= LastOffset)
+      Out.push_back(Offset);
+  }
+}
+
+ArrayRef<size_t> MemoryAccessRange::getAllowedOffsets(size_t Alignment) const {
+  auto &Offsets = AlignmentAllowedLCBlockOffsets[Log2_64(Alignment)];
+  if (Offsets)
+    return *Offsets;
+  auto &OffsetsVec = Offsets.emplace();
+  getAllowedOffsetsImpl(Alignment, OffsetsVec);
+  return OffsetsVec;
 }
 
 AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
@@ -554,8 +554,7 @@ AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
   auto NumElements = Params.NumElements;
   auto PreselectedAddr = Params.PreselectedAddr;
 
-  auto &AllowedLCBlockOffsets =
-      AlignmentAllowedLCBlockOffsets[Log2_64(Alignment)];
+  auto AllowedLCBlockOffsets = getAllowedOffsets(Alignment);
   assert(!AllowedLCBlockOffsets.empty());
 
   auto MaxOffset = Size - AccessSize;
@@ -563,7 +562,9 @@ AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
   // Special care needs to be taken to select an address in the appropriate
   // block so that all NumElements values can fit. Note: beware off-by-one
   // errors. If NumElements == 1, then maxLCBlock = getMaxLCBlock();
-  auto MaxLCBlock = getMaxLCBlock(Alignment, AccessSize) - (NumElements - 1);
+  auto MaxLCBlock =
+      getMaxLCBlock(Alignment, AccessSize, AllowedLCBlockOffsets) -
+      (NumElements - 1);
   LLVM_DEBUG(dbgs() << "Numelements: " << NumElements
                     << ", MaxLCBlock: " << MaxLCBlock << "\n");
   // NOTE: The way that addresses are sampled is two-step. First select any
@@ -1120,8 +1121,6 @@ MemoryScheme::validateSchemes(LLVMContext &Ctx,
   }
   return std::nullopt;
 }
-
-MemoryScheme::MemoryScheme() {}
 
 } // namespace snippy
 
