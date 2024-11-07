@@ -21,19 +21,24 @@ namespace snippy {
 struct GenerationStatistics final {
   size_t NumOfPrimaryInstrs;
   size_t GeneratedSize;
+  bool UnableToFitAnymore;
 
-  GenerationStatistics(size_t NumOfPrimaryInstrs = 0, size_t GeneratedSize = 0)
-      : NumOfPrimaryInstrs(NumOfPrimaryInstrs), GeneratedSize(GeneratedSize) {}
+  GenerationStatistics(size_t NumOfPrimaryInstrs = 0, size_t GeneratedSize = 0,
+                       bool UnableToFitAnymore = false)
+      : NumOfPrimaryInstrs(NumOfPrimaryInstrs), GeneratedSize(GeneratedSize),
+        UnableToFitAnymore(UnableToFitAnymore) {}
 
   void merge(const GenerationStatistics &Statistics) {
     NumOfPrimaryInstrs += Statistics.NumOfPrimaryInstrs;
     GeneratedSize += Statistics.GeneratedSize;
+    UnableToFitAnymore |= Statistics.UnableToFitAnymore;
   }
 
   void print(raw_ostream &OS) const {
     OS << "GenStats={ "
        << "NumOfPrimaryInstrs: " << NumOfPrimaryInstrs
-       << ", GeneratedSize: " << GeneratedSize << " }";
+       << ", GeneratedSize: " << GeneratedSize
+       << ", UnableToFitAnymore: " << UnableToFitAnymore << " }";
   }
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   LLVM_DUMP_METHOD void dump() const { print(dbgs()); }
@@ -78,6 +83,8 @@ public:
   RequestLimit &operator+=(const RequestLimit &Other);
 
   size_t getLimit() const;
+
+  RequestLimit::Mixed getMixedLimit() const;
 
   size_t getNumInstrsLeft(GenerationStatistics Stats) const;
 
