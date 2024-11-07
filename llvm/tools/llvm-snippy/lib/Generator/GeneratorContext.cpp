@@ -11,6 +11,8 @@
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Generator/Interpreter.h"
 #include "snippy/Generator/MemoryManager.h"
+#include "snippy/Generator/PluginMemAccSampler.h"
+#include "snippy/Generator/RandomMemAccSampler.h"
 #include "snippy/Simulator/SelfcheckObserver.h"
 #include "snippy/Support/Options.h"
 #include "snippy/Support/RandUtil.h"
@@ -58,6 +60,45 @@ static snippy::opt<std::string>
     MemorySectionFile("memory-section-file",
                       cl::desc("file to dump specified section"),
                       cl::cat(Options), cl::init("mem_state.bin"));
+
+static snippy::opt<std::string>
+    MemAddrGeneratorFile("address-generator-plugin",
+                         cl::desc("Plugin for custom addreses generation."
+                                  "Use =None to generate addresses "
+                                  "with build-in randomizer."
+                                  "(=None - default value)"),
+                         cl::value_desc("filename"), cl::cat(Options),
+                         cl::init("None"));
+
+static snippy::opt<bool>
+    DumpRandMemAccesses("dump-rand-mem-accesses",
+                        cl::desc("Dump random memory accesses"),
+                        cl::cat(Options), cl::Hidden);
+
+static snippy::opt<std::string> MemAddrGeneratorInfoFile(
+    "address-plugin-info-file",
+    cl::desc("File with info for addresses generator. "
+             "Use =None if plugin doesn't need additional info."
+             "(=None - default value)"),
+    cl::value_desc("filename"), cl::cat(Options), cl::init("None"));
+
+static std::string getMemPlugin() {
+  if (MemAddrGeneratorFile == "None")
+    return {""};
+  return MemAddrGeneratorFile;
+}
+
+static std::string getMemPluginInfo() {
+  auto FileName = std::string{MemAddrGeneratorInfoFile};
+  if (MemAddrGeneratorInfoFile == "None")
+    FileName = "";
+  if (!FileName.empty() && getMemPlugin().empty())
+    report_fatal_error("Addresses generator plugin info file "
+                       "may be used only with " +
+                           Twine(MemAddrGeneratorFile.ArgStr) + "Option",
+                       false);
+  return FileName;
+}
 
 GeneratorContext::~GeneratorContext() {}
 
@@ -605,7 +646,29 @@ GeneratorContext::GeneratorContext(SnippyProgramContext &ProgContext,
       ExecutionPath(
           snippy::configureLinkerSections(ProgContext.getLLVMState().getCtx(),
                                           ProgContext.getLinker(), Settings)),
-      GenSettings(&Settings),
+      GenSettings(&Settings), MemAccSampler([&] {
+        std::vector<SectionDesc> RWSections;
+        llvm::copy_if(Settings.Cfg.Sections, std::back_inserter(RWSections),
+                      [](auto &Desc) { return Desc.M.W() && Desc.M.R(); });
+        auto &MS = Settings.Cfg.MS;
+        auto &TM = ProgContext.getLLVMState().getTargetMachine();
+        auto Alignment =
+            TM.createDataLayout().getPointerABIAlignment(/* Address Space */ 0);
+        auto BaseAccesses = llvm::map_range(
+            MS.BaseAccesses,
+            [](const auto &A) -> const MemoryAccess & { return *A; });
+        auto RandSampler = std::make_unique<RandomMemoryAccessSampler>(
+            RWSections.begin(), RWSections.end(), BaseAccesses.begin(),
+            BaseAccesses.end(), Alignment.value(), MS.Restricted);
+        if (DumpRandMemAccesses)
+          RandSampler->dump();
+        auto PluginSampler = std::make_unique<PluginMemoryAccessSampler>(
+            MemorySchemePluginWrapper{getMemPlugin(), getMemPluginInfo()});
+        std::vector<std::unique_ptr<IMemoryAccessSampler>> Samplers;
+        Samplers.emplace_back(std::move(PluginSampler));
+        Samplers.emplace_back(std::move(RandSampler));
+        return TopLevelMemoryAccessSampler(Samplers.begin(), Samplers.end());
+      }()),
       FloatOverwriteSamplers(
           [&]() -> std::optional<FloatSemanticsSamplerHolder> {
             if (const auto &FPUConfig = GenSettings->Cfg.FPUConfig;

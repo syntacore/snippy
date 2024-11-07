@@ -108,5 +108,12 @@ void warn(WarningName WN, llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
   Ctx.diagnose(Diag);
 }
 
+[[noreturn]] void fatal(const llvm::Twine &Prefix, Error E) {
+  llvm::LLVMContext Ctx;
+  SnippyDiagnosticInfo Diag(Prefix, toString(std::move(E)), llvm::DS_Error,
+                            WarningName::NotAWarning);
+  Ctx.diagnose(Diag);
+}
+
 } // namespace snippy
 } // namespace llvm

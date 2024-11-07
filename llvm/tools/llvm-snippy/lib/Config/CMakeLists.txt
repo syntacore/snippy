@@ -18,4 +18,4 @@ add_llvm_library(LLVMSnippyConfig
   ${LLVMSnippyConfigSources}
     )
 
-target_link_libraries(LLVMSnippyConfig PRIVATE LLVMSnippySupport)
+  target_link_libraries(LLVMSnippyConfig PRIVATE LLVMSnippySupport LLVMSnippyOptionCategory)

@@ -38,5 +38,10 @@ inline void burrowError(Error E) {
   handleAllErrors(std::move(E), [](const ErrorInfoBase &EI) {});
 }
 
+class MemoryAccessSampleError : public StringError {
+public:
+  MemoryAccessSampleError(const Twine &S)
+      : StringError(S, inconvertibleErrorCode()) {}
+};
 } // namespace snippy
 } // namespace llvm

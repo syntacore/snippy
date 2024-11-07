@@ -63,14 +63,21 @@ selectAddressForSingleInstrFromBurstGroup(AddressInfo OrigAI,
     return OrigAI;
   }
 
-  auto &MS = GC.getMemoryScheme();
+  auto &MS = GC.getMemoryAccessSampler();
   auto OrigAddr = OrigAI.Address;
   assert(OpcodeAR.Opcodes.size() == 1 &&
          "Expected AddressRestriction only for one opcode");
   for (unsigned i = 0; i < BurstAddressRandomizationThreshold; ++i) {
-    auto CandidateAI =
-        MS.randomAddress(OpcodeAR.AccessSize, OpcodeAR.AccessAlignment,
-                         false);
+    auto CandidateAccess =
+        MS.sample(OpcodeAR.AccessSize, OpcodeAR.AccessAlignment, false);
+    if (auto Err = CandidateAccess.takeError()) {
+      std::string PrefixErr;
+      raw_string_ostream OS(PrefixErr);
+      OS << "Cannot sample memory access for single instruction from burst "
+            "group";
+      snippy::fatal(PrefixErr, toString(std::move(Err)));
+    }
+    auto &CandidateAI = CandidateAccess->AddrInfo;
 
     auto Stride = std::max<int64_t>(OpcodeAR.ImmOffsetRange.getStride(),
                                     CandidateAI.MinStride);
@@ -530,7 +537,7 @@ std::vector<unsigned> generateBaseRegs(MachineBasicBlock &MBB,
 std::map<unsigned, AddressInfo> collectPrimaryAddresses(
     const std::map<unsigned, AddressRestriction> &BaseRegToStrongestAR,
     GeneratorContext &GC) {
-  auto &MS = GC.getMemoryScheme();
+  auto &MS = GC.getMemoryAccessSampler();
   auto &SnpTgt = GC.getLLVMState().getSnippyTarget();
   auto ARRange = make_second_range(BaseRegToStrongestAR);
   std::vector<AddressRestriction> ARs(ARRange.begin(), ARRange.end());

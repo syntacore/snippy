@@ -1,4 +1,8 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu --dump-layout -o %t 2>&1 | FileCheck %s
+# RUN: llvm-snippy %s -o %t 2>&1 | FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  dump-rand-mem-accesses: true
 
 sections:
     - no:        1
@@ -31,12 +35,10 @@ histogram:
     - [LW, 10.0]
     - [SW, 10.0]
 
-# CHECK: Memory access scheme:
-# CHECK-NEXT: Memory access 0:
-# CHECK-NEXT: Memory range:
-# CHECK-NEXT: Weight: 1
-# CHECK-NEXT: Start: 2147483648
-# CHECK-NEXT: Size: 4194304
-# CHECK-NEXT: Stride: 8
-# CHECK-NEXT: FirstOffset: 0
-# CHECK-NEXT: LastOffset: 0
+# CHECK: access-ranges:
+# CHECK-NEXT:  - weight:          1
+# CHECK-NEXT:    start:           0x80000000
+# CHECK-NEXT:    size:            0x400000
+# CHECK-NEXT:    stride:          0x8
+# CHECK-NEXT:    first-offset:    0x0
+# CHECK-NEXT:    last-offset:     0x0

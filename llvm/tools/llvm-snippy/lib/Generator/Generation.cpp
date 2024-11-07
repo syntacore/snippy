@@ -735,11 +735,11 @@ AddressGenInfo chooseAddrGenInfoForInstrCallback(
   return AddressGenInfo::singleAccess(AccessSize, Alignment, false /* Burst */);
 }
 
-std::pair<AddressInfo, AddressGenInfo>
-chooseAddrInfoForInstr(MachineInstr &MI, GeneratorContext &SGCtx,
-                       const MachineLoop *ML) {
+AccessSampleResult chooseAddrInfoForInstr(MachineInstr &MI,
+                                          GeneratorContext &SGCtx,
+                                          const MachineLoop *ML) {
   auto &State = SGCtx.getLLVMState();
-  auto &MS = SGCtx.getMemoryScheme();
+  auto &MS = SGCtx.getMemoryAccessSampler();
   const auto &SnippyTgt = State.getSnippyTarget();
   auto Opcode = MI.getDesc().getOpcode();
 
@@ -760,15 +760,21 @@ chooseAddrInfoForInstr(MachineInstr &MI, GeneratorContext &SGCtx,
                                              Alignment, MemoryScheme);
   };
 
-
-  auto Result = MS.randomAddressForInstructions(AccessSize, Alignment,
-                                                ChooseAddrGenInfo);
-  const auto &AddrInfo = std::get<AddressInfo>(Result);
+  auto Result = MS.sample(AccessSize, Alignment, ChooseAddrGenInfo);
+  if (auto Err = Result.takeError()) {
+    std::string InstrStr;
+    raw_string_ostream OS(InstrStr);
+    MI.print(OS);
+    snippy::fatal(formatv("Cannot sample memory access for instruction \"{0}\"",
+                          StringRef(InstrStr).rtrim()),
+                  Twine("\n").concat(toString(std::move(Err))));
+  }
+  const auto &AddrInfo = Result->AddrInfo;
 
   assert(AddrInfo.MaxOffset >= 0);
   assert(AddrInfo.MinOffset <= 0);
 
-  return Result;
+  return *Result;
 }
 
 SmallVector<unsigned, 4> pickRecentDefs(MachineInstr &MI,
