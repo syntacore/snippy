@@ -86,8 +86,6 @@ enum class RVVModeChangeMode {
   MC_VSETVL,
 };
 
-enum class LRSCGenMode { MaySucceed, MustFail };
-
 enum class LoopControlLogicCompressionMode { On, Random, Off };
 
 llvm::cl::OptionCategory
@@ -178,20 +176,6 @@ static snippy::opt<bool>
                  cl::desc("turning on selfcheck for rvv instructions"),
                  cl::Hidden, cl::init(false));
 
-struct LRSCGenModeEnumOption
-    : public snippy::EnumOptionMixin<LRSCGenModeEnumOption> {
-  static void doMapping(EnumMapper &Mapper) {
-    Mapper.enumCase(
-        LRSCGenMode::MaySucceed, "may-succeed",
-        "Generate constained LR and SC pairs in a way that they may "
-        "eventually succeed on all spec-compliant implementations");
-    Mapper.enumCase(LRSCGenMode::MustFail, "must-fail",
-                    "Generated SC will always fail on each spec-compliant "
-                    "implementation with the same or smaller reservation set "
-                    "size (see riscv-reservation-set-size)");
-  }
-};
-
 struct RVVModeChangeEnumOption
     : public snippy::EnumOptionMixin<RVVModeChangeEnumOption> {
   static void doMapping(EnumMapper &Mapper) {
@@ -221,9 +205,6 @@ LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(
 
 LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(snippy::RVVModeChangeMode,
                                            snippy::RVVModeChangeEnumOption)
-
-LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(snippy::LRSCGenMode,
-                                           snippy::LRSCGenModeEnumOption)
 
 namespace snippy {
 
