@@ -47,14 +47,17 @@ bool RequestLimit::isEmpty() const {
 bool RequestLimit::isReached(GenerationStatistics Stats) const {
   return std::visit(OverloadedCallable(
                         [&Stats](const NumInstrs &Lim) {
-                          return Stats.NumOfPrimaryInstrs >= Lim.Limit;
+                          return Stats.NumOfPrimaryInstrs >= Lim.Limit ||
+                                 Stats.UnableToFitAnymore;
                         },
                         [&Stats](const Size &Lim) {
-                          return Stats.GeneratedSize >= Lim.Limit;
+                          return Stats.GeneratedSize >= Lim.Limit ||
+                                 Stats.UnableToFitAnymore;
                         },
                         [&Stats](const Mixed &Lim) {
                           return Stats.GeneratedSize >= Lim.Size ||
-                                 Stats.NumOfPrimaryInstrs >= Lim.NumInstrs;
+                                 Stats.NumOfPrimaryInstrs >= Lim.NumInstrs ||
+                                 Stats.UnableToFitAnymore;
                         }),
                     Limit);
 }
@@ -154,6 +157,22 @@ size_t RequestLimit::getLimit() const {
           }),
       Limit);
 }
+
+RequestLimit::Mixed RequestLimit::getMixedLimit() const {
+  return std::visit(
+      OverloadedCallable(
+          [](const NumInstrs &) -> Mixed {
+            llvm_unreachable("Calling getMixedLimit on NumInstrs limit does "
+                             "not make sense.");
+          },
+          [](const Size &) -> Mixed {
+            llvm_unreachable(
+                "Calling getMixedLimit on size limit does not make sense.");
+          },
+          [](const Mixed &Limit) -> Mixed { return Limit; }),
+      Limit);
+}
+
 } // namespace planning
 } // namespace snippy
 } // namespace llvm

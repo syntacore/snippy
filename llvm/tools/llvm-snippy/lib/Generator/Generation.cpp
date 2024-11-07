@@ -100,12 +100,6 @@ static void generateInsertionPointHint(
   SnippyTgt.generateNop(InstrGenCtx.MBB, InstrGenCtx.Ins, State);
 }
 
-template <typename IteratorType>
-size_t countPrimaryInstructions(IteratorType Begin, IteratorType End) {
-  return std::count_if(
-      Begin, End, [](const auto &MI) { return !checkSupportMetadata(MI); });
-}
-
 enum class GenerationStatus {
   Ok,
   BacktrackingFailed,
@@ -415,7 +409,7 @@ handleGeneratedInstructions(InstrIt ItBegin,
   };
 
   // Check size requirements before any backtrack execution
-  if (sizeLimitIsReached(Limit, InstrGenCtx.Stats, GeneratedCodeSize))
+  if (sizeLimitIsExceeded(Limit, InstrGenCtx.Stats, GeneratedCodeSize))
     return ReportGenerationResult(GenerationStatus::SizeFailed);
 
   controlNaNPropagation(ItBegin, ItEnd, InstrGenCtx);
@@ -436,10 +430,11 @@ handleGeneratedInstructions(InstrIt ItBegin,
         dbgs() << "Ignoring selfcheck for the supportive instruction\n";);
     return ReportGenerationResult(GenerationStatus::Ok);
   }
-
   assert(PrimaryInstrCount >= 1);
-
+  assert(!InstrGenCtx.Stats.UnableToFitAnymore &&
+         "There is no room left for selfcheck");
   assert(InstrGenCtx.SelfCheck);
+
   // Collect instructions that can and should be selfchecked.
   auto SelfcheckCandidates = collectSelfcheckCandidates(
       ItBegin, ItEnd, GC, InstrGenCtx.SelfCheck->PeriodTracker);
@@ -513,7 +508,7 @@ handleGeneratedInstructions(InstrIt ItBegin,
 
   // Check size requirements after selfcheck addition.
   GeneratedCodeSize = GC.getCodeBlockSize(ItBegin, ItEnd);
-  if (sizeLimitIsReached(Limit, InstrGenCtx.Stats, GeneratedCodeSize))
+  if (sizeLimitIsExceeded(Limit, InstrGenCtx.Stats, GeneratedCodeSize))
     return ReportGenerationResult(GenerationStatus::SizeFailed);
   return ReportGenerationResult(GenerationStatus::Ok);
 }
@@ -703,24 +698,38 @@ static GenerationResult
 generateNopsToSizeLimit(const planning::RequestLimit &Limit,
                         planning::InstructionGenerationContext &InstrGenCtx) {
   assert(Limit.isSizeLimit());
+
   auto &GC = InstrGenCtx.GC;
   auto &MBB = InstrGenCtx.MBB;
   auto &State = GC.getLLVMState();
   auto &SnpTgt = State.getSnippyTarget();
-  auto ItEnd = InstrGenCtx.Ins;
-  auto ItBegin = ItEnd == MBB.begin() ? ItEnd : std::prev(ItEnd);
-  while (!Limit.isReached(InstrGenCtx.Stats)) {
-    auto *MI = SnpTgt.generateNop(MBB, ItBegin, State);
+  auto ItBegin = InstrGenCtx.Ins == MBB.begin() ? InstrGenCtx.Ins
+                                                : std::prev(InstrGenCtx.Ins);
+
+  // assume nop size is the lowest possible instruction size
+  size_t NopSize = *SnpTgt.getPossibleInstrsSize(GC).begin();
+  size_t GeneratedNopsSize = 0;
+
+  while (Limit.getSizeLeft(InstrGenCtx.Stats) >=
+         (GeneratedNopsSize + NopSize)) {
+    auto *MI = SnpTgt.generateNop(MBB, InstrGenCtx.Ins, State);
     assert(MI && "Nop generation failed");
-    InstrGenCtx.Stats.merge(GenerationStatistics(0, MI->getDesc().getSize()));
+
+    assert(NopSize == SnpTgt.getInstrSize(*MI, GC));
+    GeneratedNopsSize += NopSize;
   }
-  ItBegin = ItBegin == ItEnd ? MBB.begin() : std::next(ItBegin);
+
+  InstrGenCtx.Stats.UnableToFitAnymore = true;
+
+  if (ItBegin != std::prev(InstrGenCtx.Ins)) {
+    ItBegin++;
+  }
   return handleGeneratedInstructions(ItBegin, InstrGenCtx, Limit);
 }
 
-bool sizeLimitIsReached(const planning::RequestLimit &Lim,
-                        const GenerationStatistics &CommitedStats,
-                        size_t NewGeneratedCodeSize) {
+bool sizeLimitIsExceeded(const planning::RequestLimit &Lim,
+                         const GenerationStatistics &CommitedStats,
+                         size_t NewGeneratedCodeSize) {
   if (!Lim.isSizeLimit())
     return false;
   return NewGeneratedCodeSize > Lim.getSizeLeft(CommitedStats);
