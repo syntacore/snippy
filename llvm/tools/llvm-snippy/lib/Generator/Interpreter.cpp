@@ -190,7 +190,6 @@ Interpreter::createSimulationEnvironment(const GeneratorContext &GC) {
   bool NeedCallbackHandler = GC.hasExecutionTraceTrackingMode();
   auto &TgtCtx = GC.getTargetContext();
   auto &L = GC.getProgramContext().getLinker();
-  auto &MS = Settings.Cfg.MS;
 
   SimulationEnvironment Env;
   Env.SnippyTGT = &SnippyTGT;

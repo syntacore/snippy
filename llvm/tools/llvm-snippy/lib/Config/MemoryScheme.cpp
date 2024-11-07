@@ -9,6 +9,7 @@
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Generator/GeneratorContext.h"
+#include "snippy/Support/Options.h"
 #include "snippy/Support/RandUtil.h"
 #include "snippy/Support/Utils.h"
 #include "snippy/Support/YAMLHistogram.h"
@@ -32,6 +33,13 @@ LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::AccessAddress, false);
 LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::AddressInfo, false);
 
 namespace snippy {
+
+extern cl::OptionCategory Options;
+static snippy::opt<bool> StrictMemoryScheme(
+    "strict-memory-schemes",
+    cl::desc("Raise error instead of warning when potentially invalid memory "
+             "scheme is encountered."),
+    cl::cat(Options), cl::init(false));
 
 namespace {
 
@@ -116,19 +124,26 @@ public:
 
 } // namespace snippy
 
+using snippy::NormalizedYAMLStrongTypedef;
+#define CREATE_HEX_NORMALIZATION(var, field)                                   \
+  yaml::MappingNormalization<NormalizedYAMLStrongTypedef<yaml::Hex64>,         \
+                             decltype(var.field)>                              \
+      Norm##field(Io, var.field);
+
 template <> struct yaml::MappingTraits<snippy::AccessAddress> {
-  static void mapping(yaml::IO &IO, snippy::AccessAddress &AA) {
-    IO.mapRequired("addr", AA.Addr);
-    IO.mapOptional("access-size", AA.AccessSize, 16);
+  static void mapping(yaml::IO &Io, snippy::AccessAddress &AA) {
+    CREATE_HEX_NORMALIZATION(AA, Addr);
+    Io.mapRequired("addr", NormAddr->Value);
+    Io.mapOptional("access-size", AA.AccessSize, 16);
   }
 };
 
 template <> struct yaml::MappingTraits<snippy::AddressInfo> {
   static void mapping(yaml::IO &Io, snippy::AddressInfo &AI) {
-    if (!Io.outputting())
-      AI.MinOffset = 0;
-
-    Io.mapRequired("addr", AI.Address);
+    yaml::MappingNormalization<snippy::NormalizedYAMLStrongTypedef<yaml::Hex64>,
+                               decltype(AI.Address)>
+        NormAddress(Io, AI.Address);
+    Io.mapRequired("addr", NormAddress->Value);
     Io.mapRequired("size", AI.MaxOffset);
     Io.mapRequired("stride", AI.MinStride);
     Io.mapRequired("access-size", AI.AccessSize);
@@ -137,20 +152,35 @@ template <> struct yaml::MappingTraits<snippy::AddressInfo> {
 
 void yaml::MappingTraits<snippy::MemoryAccessRange>::mapping(
     yaml::IO &Io, snippy::MemoryAccessRange &Range) {
+
+  CREATE_HEX_NORMALIZATION(Range, Start);
+  CREATE_HEX_NORMALIZATION(Range, Size);
+  CREATE_HEX_NORMALIZATION(Range, Stride);
+  CREATE_HEX_NORMALIZATION(Range, FirstOffset);
+  CREATE_HEX_NORMALIZATION(Range, LastOffset);
   Io.mapOptional("weight", Range.Weight);
-  Io.mapRequired("start", Range.Start);
-  Io.mapRequired("size", Range.Size);
-  Io.mapRequired("stride", Range.Stride);
-  Io.mapRequired("first-offset", Range.FirstOffset);
-  Io.mapRequired("last-offset", Range.LastOffset);
+  Io.mapRequired("start", NormStart->Value);
+  Io.mapRequired("size", NormSize->Value);
+  Io.mapRequired("stride", NormStride->Value);
+  Io.mapRequired("first-offset", NormFirstOffset->Value);
+  Io.mapRequired("last-offset", NormLastOffset->Value);
   Io.mapOptional("access-size", Range.AccessSize);
 
   if (!Io.outputting())
     Range.initAllowedAlignmentLCBlockOffsets();
 }
 
+bool shouldSkipValidation(yaml::IO &Io) {
+  // This is necessary because we sometimes want to output this range before
+  // yaml parsing is finished. To avoid being crashed with assertion failure we
+  // ignore errors on outputting. The errors will still be reported.
+  return Io.outputting();
+}
+
 std::string yaml::MappingTraits<snippy::MemoryAccessRange>::validate(
     yaml::IO &Io, snippy::MemoryAccessRange &Range) {
+  if (shouldSkipValidation(Io))
+    return "";
   // TODO: Remove this garbage and replace with a proper diagnostic
   if (Range.FirstOffset > Range.LastOffset)
     errs() << "Warning: first offset " << Range.FirstOffset << " > last offset "
@@ -168,22 +198,18 @@ std::string yaml::MappingTraits<snippy::MemoryAccessRange>::validate(
 
 void yaml::MappingTraits<snippy::MemoryAccessEviction>::mapping(
     yaml::IO &Io, snippy::MemoryAccessEviction &Eviction) {
-  yaml::MappingNormalization<snippy::NormalizedYAMLStrongTypedef<yaml::Hex64>,
-                             decltype(Eviction.Mask)>
-      MaskNorm(Io, Eviction.Mask);
-
-  yaml::MappingNormalization<snippy::NormalizedYAMLStrongTypedef<yaml::Hex64>,
-                             decltype(Eviction.Mask)>
-      FixedNorm(Io, Eviction.Fixed);
-
+  CREATE_HEX_NORMALIZATION(Eviction, Mask);
+  CREATE_HEX_NORMALIZATION(Eviction, Fixed);
   Io.mapOptional("weight", Eviction.Weight);
-  Io.mapRequired("mask", MaskNorm->Value);
-  Io.mapRequired("fixed", FixedNorm->Value);
+  Io.mapRequired("mask", NormMask->Value);
+  Io.mapRequired("fixed", NormFixed->Value);
   Io.mapOptional("access-size", Eviction.AccessSize);
 }
 
 std::string yaml::MappingTraits<snippy::MemoryAccessEviction>::validate(
     yaml::IO &Io, snippy::MemoryAccessEviction &Eviction) {
+  if (shouldSkipValidation(Io))
+    return "";
   if (Eviction.Mask & Eviction.Fixed)
     return "Bits in mask and fixed fields for eviction overlap";
   if (Eviction.Weight < 0)
@@ -193,23 +219,23 @@ std::string yaml::MappingTraits<snippy::MemoryAccessEviction>::validate(
 
 void yaml::MappingTraits<snippy::MemoryAccessAddresses>::mapping(
     yaml::IO &Io, snippy::MemoryAccessAddresses &Addresses) {
-  // FIXME: Unbrick this code
-  if (!Io.outputting()) {
-    bool Ordered = true;
-    Io.mapOptional("ordered", Ordered, true);
-    if (Ordered) {
-      Addresses.NextAddressIdx = 0;
-      Addresses.NextBurstIdx = 0;
-    }
+  Io.mapOptional("weight", Addresses.Weight);
+  // FIXME: possibly normalization
+  bool Ordered = Addresses.NextAddressIdx.has_value();
+  Io.mapOptional("ordered", Ordered);
+  if (!Io.outputting() && Ordered) {
+    Addresses.NextAddressIdx = 0;
+    Addresses.NextBurstIdx = 0;
   }
 
-  Io.mapOptional("weight", Addresses.Weight);
   Io.mapOptional("plain", Addresses.Addresses);
   Io.mapOptional("burst", Addresses.Burst);
 }
 
 std::string yaml::MappingTraits<snippy::MemoryAccessAddresses>::validate(
     yaml::IO &Io, snippy::MemoryAccessAddresses &Addresses) {
+  if (shouldSkipValidation(Io))
+    return "";
   if (Addresses.Addresses.empty() && Addresses.Burst.empty())
     return "At least one address must be provided either in "
            "'plain' or 'burst' format for "
@@ -254,11 +280,11 @@ std::string yaml::MappingTraits<snippy::MemoryAccessesGroup>::validate(
   return "";
 }
 
-void yaml::MappingTraits<snippy::MemoryAccesses>::mapping(
-    yaml::IO &Io, snippy::MemoryAccesses &MA) {
+void yaml::MappingTraits<snippy::MemoryScheme>::mapping(
+    yaml::IO &Io, snippy::MemoryScheme &MS) {
   MappingNormalization<snippy::NormalizedMemoryBaseAccessesAndAccessGroups,
                        snippy::MemoryAccessSeq>
-      MappingNorm(Io, MA.BaseAccesses);
+      MappingNorm(Io, MS.BaseAccesses);
 
   mapBaseAccesses(Io, MappingNorm->Accesses);
   Io.mapOptional("access-groups", MappingNorm->AccessGroups);
@@ -268,7 +294,7 @@ void yaml::MappingTraits<snippy::MemoryAccesses>::mapping(
     std::vector<snippy::MemoryBank> MBs;
     Io.mapOptional("restricted-addresses", MBs);
     for (auto &MB : MBs) {
-      MA.Restricted = MA.Restricted.unite(MB);
+      MS.Restricted = MS.Restricted.unite(MB);
     }
   }
 }
@@ -421,6 +447,11 @@ void MemoryBank::mergeRanges() {
     // Next scan start from newly inserted range.
     R = Ranges.emplace(MergedRange).first;
   }
+}
+
+MemoryAccessRange::MemoryAccessRange(const SectionDesc &S, unsigned Alignment)
+    : MemoryAccessRange(S.VMA, S.Size, Alignment, 0, 0) {
+  initAllowedAlignmentLCBlockOffsets();
 }
 
 void MemoryAccessRange::initAllowedAlignmentLCBlockOffsets() {
@@ -1053,198 +1084,44 @@ MemoryAccessSeq MemoryAccessAddresses::split(const MemoryBank &MB) const {
   return Ret;
 }
 
-void MemoryAccessRange::print(raw_ostream &OS) const {
-  OS << "Memory range:\n"
-     << "  Weight: " << floatToString(Weight, 3) << "\n"
-     << "  Start: " << Start << "\n"
-     << "  Size: " << Size << "\n"
-     << "  Stride: " << Stride << "\n"
-     << "  FirstOffset: " << FirstOffset << "\n"
-     << "  LastOffset: " << LastOffset << "\n";
-  if (AccessSize)
-    OS << "  AccessSize: " << *AccessSize << "\n";
-  OS << "\n";
-}
-
-void MemoryAccessEviction::print(raw_ostream &OS) const {
-  OS << "Memory eviction:\n  Weight: " << floatToString(Weight, 3)
-     << "\n  Mask:  0x" << Twine::utohexstr(Mask) << "\n  Fixed: 0x"
-     << Twine::utohexstr(Fixed) << "\n";
-  if (AccessSize)
-    OS << "  AccessSize: " << *AccessSize << "\n";
-  OS << "\n";
-}
-
-void MemoryAccessAddresses::print(raw_ostream &OS) const {
-  OS << "Memory addresses:\n"
-     << "  Weight: " << floatToString(Weight, 3)
-     << "\n  Ordered: " << NextAddressIdx.has_value() << "\n";
-  if (!Addresses.empty())
-    OS << "  Plain:\n";
-  for (auto Addr : Addresses) {
-    OS << "   - Addr: 0x" << Twine::utohexstr(Addr.Addr) << "\n";
-    OS << "     Access-size: " << Addr.AccessSize << "\n";
-  }
-  if (!Burst.empty())
-    OS << "  Burst:\n";
-  for (const auto &AI : Burst) {
-    OS << "    - Addr: 0x" << Twine::utohexstr(AI.Address) << "\n";
-    OS << "      Size: " << AI.MaxOffset << "\n";
-    OS << "      Stride: " << AI.MinStride << "\n";
-    OS << "      Access-size: " << AI.AccessSize << "\n";
-  }
-  OS << "\n\n";
-}
-
-void MemoryAccesses::print(raw_ostream &OS) const {
-  for (auto &&[Idx, Access] : enumerate(SplitAccesses)) {
-    OS << "Memory access " << Idx << ":\n";
-    Access->print(OS);
-    OS << "\n";
-  }
-}
-
-void MemoryScheme::print(raw_ostream &OS) const {
-  OS << "Memory access scheme:\n";
-  MA.print(OS);
-}
-
-void MemoryAccesses::loadFromYaml(LLVMContext &Ctx, StringRef Filename) {
-  auto Err = loadYAMLFromFile(*this, Filename);
-  if (Err)
-    snippy::fatal(Ctx,
-                  "Cannot read memory scheme " + Twine(Filename) + ". YAML",
-                  toString(std::move(Err)));
-}
-
-void MemoryAccesses::validateSchemes(LLVMContext &Ctx,
-                                     const SectionsDescriptions &Sections,
-                                     bool StrictCheck) const {
-
+std::optional<std::string>
+MemoryScheme::validateSchemes(LLVMContext &Ctx,
+                              const SectionsDescriptions &Sections) const {
   MemoryBank SecMB;
   for (auto &S : Sections.generalRWSections()) {
     SecMB.addRange(getRangeFromSection(S));
   }
 
-  for (auto &MA : SplitAccesses) {
-
+  for (auto &MA : BaseAccesses) {
     auto MB = MA->getPossibleAddresses();
     if (MB.containedIn(SecMB))
       continue;
 
+    MemoryScheme MAcc;
+    MAcc.BaseAccesses.emplace_back(MA->copy());
     std::string SchemeDump;
     raw_string_ostream SS{SchemeDump};
-    MA->print(SS);
+    outputYAMLToStream(MAcc, SS);
 
     constexpr const char *DiagPrefix = "Possibly wrong memory scheme";
     constexpr const char *CommonDiagMsg =
         "Following scheme may generate accesses outside of all "
         "provided RW sections in layout:\n";
 
-    if (StrictCheck)
-      snippy::fatal(Ctx, DiagPrefix, CommonDiagMsg + Twine(SchemeDump));
+    if (StrictMemoryScheme)
+      return Twine(DiagPrefix)
+          .concat(": ")
+          .concat(CommonDiagMsg)
+          .concat(SchemeDump)
+          .str();
 
     snippy::warn(WarningName::MemoryAccess, Ctx, DiagPrefix,
                  CommonDiagMsg + Twine(SchemeDump));
   }
-}
-
-MemoryAccessesGenerator &MemoryScheme::getMAG() { return MAG; }
-
-void MemoryScheme::updateMAG() {
-  static auto MagCount = 0ull;
-  MagCount++;
-  MemoryAccessSeq Schemes;
-  for (auto &Scheme :
-       make_range(MA.SplitAccesses.begin(), MA.SplitAccesses.end()))
-    Schemes.emplace_back(Scheme->copy());
-  MAG = OwningMAG{std::move(Schemes), MagCount};
-}
-
-MemoryScheme::MemoryScheme() : MemoryScheme(MemoryAccesses()) {}
-
-MemoryScheme::MemoryScheme(MemoryAccesses MAc, StringRef Filename)
-    : MA(std::move(MAc)), MAG(MemoryAccessSeq{}, 0ull), OriginalFile(Filename) {
-  updateMAG();
-  updateMemoryBank();
-}
-
-std::optional<AddressInfo>
-MemoryScheme::getAddressfromPlugin(size_t AccessSize, size_t Alignment,
-                                   bool BurstMode, size_t InstrClassId) {
-  if (!AddrPlugin.isEnabled())
-    return std::nullopt;
-  auto AddrOpt =
-      AddrPlugin.getAddress(AccessSize, Alignment, BurstMode, InstrClassId);
-  if (AddrOpt)
-    return *AddrOpt;
   return std::nullopt;
 }
 
-std::optional<::AddressGlobalId> MemoryScheme::getPreselectedAddressId() {
-  if (!AddrPlugin.isEnabled())
-    return std::nullopt;
-  return AddrPlugin.getAddressId();
-}
-
-AddressInfo MemoryScheme::randomAddress(size_t AccessSize, size_t Alignment,
-                                        bool BurstMode) {
-  auto ChooseGenInfo = [&](auto &&Scheme) {
-    return AddressGenInfo::singleAccess(AccessSize, Alignment, BurstMode);
-  };
-
-  return std::get<AddressInfo>(randomAddressForInstructions(
-      AccessSize, Alignment, ChooseGenInfo, BurstMode));
-}
-
-std::vector<AddressInfo>
-MemoryScheme::randomBurstGroupAddresses(ArrayRef<AddressRestriction> ARRange,
-                                        const OpcodeCache &OpcC,
-                                        const SnippyTarget &SnpTgt) {
-  assert(!ARRange.empty());
-
-  std::vector<AddressInfo> Addresses;
-  for (auto &AR : ARRange) {
-
-    auto ChooseGenInfo = [&](auto &&Scheme) {
-      return AddressGenInfo::singleAccess(AR.AccessSize, AR.AccessAlignment,
-                                          true);
-    };
-
-    auto AI = std::get<AddressInfo>(randomAddressForInstructions(
-        AR.AccessSize, AR.AccessAlignment, ChooseGenInfo,
-        /*BurstMode*/ true));
-
-    Addresses.push_back(std::move(AI));
-  }
-
-  return Addresses;
-}
-
-void MemoryScheme::fillBaseAccessesIfNeeded(
-    const SectionsDescriptions &Sections, const Align &TargetAlignment) {
-  if (!MA.BaseAccesses.empty())
-    return;
-  auto DefaultStride = TargetAlignment.value();
-  std::vector<SectionDesc> V;
-  std::copy_if(
-      Sections.begin(), Sections.end(), std::back_inserter(V), [](auto S) {
-        return S.M.W() &&
-               (!S.isNamed() ||
-                !SectionsDescriptions::isSpecializedSectionName(S.getName()));
-      });
-  std::transform(V.begin(), V.end(), std::back_inserter(MA.BaseAccesses),
-                 [DefaultStride](const SectionDesc &S) {
-                   MemoryAccessRange R{};
-                   R.Start = S.VMA;
-                   R.Size = S.Size;
-                   R.Stride = DefaultStride;
-                   R.FirstOffset = 0;
-                   R.LastOffset = 0;
-                   R.initAllowedAlignmentLCBlockOffsets();
-                   return std::make_unique<MemoryAccessRange>(std::move(R));
-                 });
-}
+MemoryScheme::MemoryScheme() {}
 
 } // namespace snippy
 

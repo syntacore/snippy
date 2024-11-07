@@ -18,4 +18,4 @@ access-ranges:
 
 # CHECK: Warning: first offset 3 > last offset 1
 # CHECK: Warning: last offset 5 >= stride 5
-# CHECK: error: Memory schemes are too restrictive to generate the requested instructions
+# CHECK: Cannot sample memory access for instruction
