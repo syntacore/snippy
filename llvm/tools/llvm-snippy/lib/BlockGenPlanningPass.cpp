@@ -121,7 +121,7 @@ BlockGenPlanningImpl::calculateMFSizeLimit(const MachineFunction &MF) const {
   // last instruction in the trace might be target dependent: EBREAK or
   // int 3, etc.
   auto LastInstr = GenCtx->getLastInstr();
-  // If not entry function, we generare ret anyway.
+  // If not entry function, we generate ret anyway.
   bool EmptyLastInstr = FG->isEntryFunction(MF) && LastInstr.empty();
   auto SizeOfOpc = SnpTgt.getMaxInstrSize();
 
@@ -398,7 +398,7 @@ void BlockGenPlanningImpl::fillReqWithPlainInstsByNumber(
 void BlockGenPlanningImpl::updateBlocksToProcess(
     const planning::BasicBlockRequest &BlockReq, size_t AverageBlockInstrs) {
   // FIXME: We should make a smarter choice allowing big BBs with a low
-  // propability instead of allowing BB sizes only in [0, 2 * Average block
+  // probability instead of allowing BB sizes only in [0, 2 * Average block
   // size].
   assert(BlockReq.limit().isNumLimit());
   if (BlockReq.limit().getLimit() >= AverageBlockInstrs * 2)
@@ -640,6 +640,10 @@ static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
     FilledSize -= BranchesSize;
   }
 
+  size_t MBBSize = SGCtx.getMBBSize(SelectedMBB);
+  size_t NumOfPrimaryInstrs =
+      countPrimaryInstructions(SelectedMBB.begin(), SelectedMBB.end());
+
   if (PCDist.Max.value() < FilledSize) {
     std::string Desc = formatv("Loop is already filled with {0}"
                                " bytes, but max pc distance is {1}.",
@@ -668,7 +672,7 @@ static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
   auto Min = alignTo(BlockRange.Min.value_or(0), MinInstrSize);
   auto Max = alignDown(BlockRange.Max.value(), MinInstrSize);
   LLVM_DEBUG(dbgs() << "Selected MBB: "; SelectedMBB.dump());
-  LLVM_DEBUG(dbgs() << "BlockRagne.Min == " << BlockRange.Min << "\n");
+  LLVM_DEBUG(dbgs() << "BlockRange.Min == " << BlockRange.Min << "\n");
   LLVM_DEBUG(dbgs() << "BlockRange.Max == " << BlockRange.Max << "\n");
   LLVM_DEBUG(dbgs() << "MinInstrSize == " << MinInstrSize << "\n");
   LLVM_DEBUG(dbgs() << "Min == " << Min << "\n");
@@ -682,9 +686,12 @@ static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
   auto BlockSize = RandEngine::genInInterval(Min, Max);
   BlockSize = alignDown(BlockSize, MinInstrSize);
   auto Limit = planning::RequestLimit::Size{BlockSize};
-  FunReq.addToBlock(&SelectedMBB,
-                    planning::InstructionGroupRequest(
-                        Limit, SGCtx.createGenPolicy(SelectedMBB)));
+  // InitialAmount allows to account for any already generated instructions
+  auto InitialAmount =
+      GenerationStatistics{NumOfPrimaryInstrs, /*GeneratedSize*/ MBBSize};
+  FunReq.addToBlock(&SelectedMBB, planning::InstructionGroupRequest(
+                                      Limit, SGCtx.createGenPolicy(SelectedMBB),
+                                      InitialAmount));
 }
 
 void BlockGenPlanningImpl::fillReqForTopLoopBySize(
