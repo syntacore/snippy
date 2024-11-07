@@ -48,7 +48,8 @@ namespace {
 
 class PostGenVerifier final : public MachineFunctionPass {
   void collectFreq(const MachineFunction &MF, const SnippyTarget &SnippyTgt);
-  void verifyGenPlan(const MachineFunction &MF, LLVMContext &LLVMCtx) const;
+  void verifyGenPlan(const MachineFunction &MF, LLVMContext &LLVMCtx,
+                     const GeneratorContext &SGCtx) const;
   void printData(const MachineFunction &MF) const;
 
 public:
@@ -184,7 +185,7 @@ void PostGenVerifier::printData(const MachineFunction &MF) const {
            << right_justify(IsWithingThreshold ? "OK" : "FAILED", StatusWidth)
            << "\n";
   }
-  Output << "End generatated instructions statistics\n";
+  Output << "End generated instructions statistics\n";
   // check that all opcodes from histogram appear in TotalInstrs.
   std::map<unsigned, double> MissedOpcodes;
   std::set_difference(ExpectedDist.begin(), ExpectedDist.end(),
@@ -223,58 +224,101 @@ void PostGenVerifier::printData(const MachineFunction &MF) const {
 enum class VerificationStatus {
   EverythingGood,
   DoNotCorrespondPlan,
-  NotNumLimitFound
+  UnalignedSizeLimitFound
 };
 
 static VerificationStatus
-verifyBasicBlock(const MachineBasicBlock &MBB,
-                 const planning::FunctionRequest &FunReq) {
-  auto &BBReq = FunReq.at(&MBB);
-  // TODO: support verification for size limits
-  if (!BBReq.limit().isNumLimit()) {
-    return VerificationStatus::NotNumLimitFound;
-  }
-
+verifyBBWithNumLimit(const MachineBasicBlock &MBB,
+                     const planning::BasicBlockRequest &BBReq) {
   // We don't count branches, because they are terminated instructions, which
   // are not mentioned in gen plan
   size_t Count =
       std::count_if(MBB.instr_begin(), MBB.instr_end(), [](const auto &Instr) {
         return !checkSupportMetadata(Instr) && !Instr.isBranch();
       });
-
   size_t Planned = BBReq.limit().getLimit();
-
   if (Planned != Count) {
     outs() << printMBBReference(MBB) << " : count -- " << Count
            << ", planned -- " << Planned << "\n";
     return VerificationStatus::DoNotCorrespondPlan;
   }
-
   return VerificationStatus::EverythingGood;
 }
 
+static VerificationStatus verifyBBWithSizeLimit(
+    const MachineBasicBlock &MBB, const planning::BasicBlockRequest &BBReq,
+    const planning::FunctionRequest &FunReq, const GeneratorContext &SGCtx) {
+  // in the last block, not counting __snippy_exit
+  assert(!MBB.empty());
+  auto InstrEnd =
+      (MBB.getNextNode() == nullptr) ? --MBB.instr_end() : MBB.instr_end();
+
+  size_t Count = SGCtx.getCodeBlockSize(MBB.instr_begin(), InstrEnd);
+  size_t Planned = BBReq.limit().getLimit();
+
+  // There are some instructions (like branches) which are not included in
+  // BBReq.limit() because they were created before the generation pass.
+  // Information about these instructions is stored in
+  // InstructionGroupRequests inside BBReq
+  Planned += std::accumulate(FunReq.at(&MBB).begin(), FunReq.at(&MBB).end(), 0,
+                             [&](size_t Lhs, const auto &Rhs) {
+                               return Lhs + Rhs.initialStats().GeneratedSize;
+                             });
+
+  const auto &SnippyTgt = SGCtx.getLLVMState().getSnippyTarget();
+  unsigned MinInstrSize = *SnippyTgt.getPossibleInstrsSize(SGCtx).begin();
+  if (Planned > Count && Planned - Count < MinInstrSize) {
+    outs() << printMBBReference(MBB) << " :  size -- " << Count
+           << ", planned -- " << Planned << "\n";
+    return VerificationStatus::UnalignedSizeLimitFound;
+  } else if (Planned != Count) {
+    outs() << printMBBReference(MBB) << " :  size -- " << Count
+           << ", planned -- " << Planned << "\n";
+    return VerificationStatus::DoNotCorrespondPlan;
+  }
+  return VerificationStatus::EverythingGood;
+}
+
+static VerificationStatus
+verifyBasicBlock(const MachineBasicBlock &MBB,
+                 const planning::FunctionRequest &FunReq,
+                 const GeneratorContext &SGCtx) {
+  auto &BBReq = FunReq.at(&MBB);
+
+  if (BBReq.limit().isNumLimit()) {
+    return verifyBBWithNumLimit(MBB, BBReq);
+  } else if (BBReq.limit().isSizeLimit()) {
+    return verifyBBWithSizeLimit(MBB, BBReq, FunReq, SGCtx);
+  }
+  // For now, there can't be a mixed limit in a BBReq
+  else {
+    llvm_unreachable("unknown verification limit");
+  }
+}
+
 void PostGenVerifier::verifyGenPlan(const MachineFunction &MF,
-                                    LLVMContext &LLVMCtx) const {
+                                    LLVMContext &LLVMCtx,
+                                    const GeneratorContext &SGCtx) const {
   const auto &FunReq =
       getAnalysis<BlockGenPlanWrapper>().getFunctionRequest(&MF);
-  bool NotNumLimitFound = false;
-  bool GenPlanCorrespondance = true;
+  bool UnalignedSizeLimitFound = false;
+  bool GenPlanCorrespondence = true;
+
   for (const auto &MBB : MF) {
-    auto VerifStatus = verifyBasicBlock(MBB, FunReq);
+    auto VerifStatus = verifyBasicBlock(MBB, FunReq, SGCtx);
     if (VerifStatus == VerificationStatus::DoNotCorrespondPlan)
-      GenPlanCorrespondance = false;
-    else if (VerifStatus == VerificationStatus::NotNumLimitFound)
-      NotNumLimitFound = true;
+      GenPlanCorrespondence = false;
+    else if (VerifStatus == VerificationStatus::UnalignedSizeLimitFound)
+      UnalignedSizeLimitFound = true;
   }
 
-  if (NotNumLimitFound)
-    snippy::warn(
-        WarningName::GenPlanVerification, LLVMCtx,
-        "request for " + MF.getName() +
-            " contains limits not only on the number of generated instructions",
-        "number of instructions in some blocks can differ from plan");
+  if (UnalignedSizeLimitFound)
+    snippy::warn(WarningName::GenPlanVerification, LLVMCtx,
+                 "request for " + MF.getName() +
+                     " contains size limits which are impossible to satisfy",
+                 "size of some blocks can differ from plan");
 
-  if (!GenPlanCorrespondance)
+  if (!GenPlanCorrespondence)
     snippy::fatal(LLVMCtx, "gen plan verification failed",
                   "snippy's output does not correspond to generation plan");
 }
@@ -286,7 +330,7 @@ bool PostGenVerifier::runOnMachineFunction(MachineFunction &MF) {
   if (VerifyHistogramGen)
     collectFreq(MF, SnippyTgt);
   if (VerifyGenPlan)
-    verifyGenPlan(MF, LLVMCtx);
+    verifyGenPlan(MF, LLVMCtx, SGCtx);
   if (VerifyHistogramGen)
     printData(MF);
   return false;
