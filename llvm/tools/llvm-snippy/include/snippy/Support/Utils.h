@@ -40,6 +40,12 @@ inline bool checkSupportMetadata(const MachineInstr &MI) {
   return detail::checkMetadata(MI, detail::SupportMetadataValue);
 }
 
+template <typename IteratorType>
+size_t countPrimaryInstructions(IteratorType Begin, IteratorType End) {
+  return std::count_if(
+      Begin, End, [](const auto &MI) { return !checkSupportMetadata(MI); });
+}
+
 inline MDNode *getSupportMark(LLVMContext &Context) {
   return MDNode::get(Context,
                      MDString::get(Context, detail::SupportMetadataValue));
@@ -80,7 +86,7 @@ inline std::string floatToString(double D, unsigned Precision) {
   return floatToString(APFloat(D), Precision);
 }
 
-// This is an anolog of C++20 bitCast() function
+// This is an analog of C++20 bitCast() function
 template <class To, class From>
 std::enable_if_t<sizeof(To) == sizeof(From) &&
                      std::is_trivially_copyable_v<From> &&

@@ -1,6 +1,5 @@
 # RUN: llvm-snippy %s --march=riscv64-unknown-elf --verify-gen-plan \
-# RUN: --num-instrs=10 --init-regs-in-elf --last-instr=RET --mattr=-c \
-# RUN: |& FileCheck %s
+# RUN: --num-instrs=10 --init-regs-in-elf --last-instr=RET --mattr=-c
 
 include:
   - Inputs/memory-aligned.yaml
@@ -34,6 +33,3 @@ branches:
     pc:
       min: 0
       max: 120
-
-# CHECK: warning: request for {{[a-zA-Z0-9]+}} contains limits not only on the number of generated instructions: number of instructions in some blocks can differ from plan
-

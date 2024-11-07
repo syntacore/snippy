@@ -54,11 +54,18 @@ namespace planning {
 class InstructionGroupRequest final {
   RequestLimit Limit;
   GenPolicy Policy;
+  // This field is used for post-gen verification. There are some
+  // instructions (like branches), size of which is not included in generation
+  // request
+  GenerationStatistics InitialStats;
 
 public:
   template <typename LimitTy>
-  InstructionGroupRequest(LimitTy ReqLimit, GenPolicy Pol)
-      : Limit(std::move(ReqLimit)), Policy(std::move(Pol)) {}
+  InstructionGroupRequest(
+      LimitTy ReqLimit, GenPolicy Pol,
+      GenerationStatistics InitStats = GenerationStatistics{})
+      : Limit(std::move(ReqLimit)), Policy(std::move(Pol)),
+        InitialStats(std::move(InitStats)) {}
 
   std::optional<InstructionRequest> next() const {
     return planning::next(Policy);
@@ -73,6 +80,8 @@ public:
   const RequestLimit &limit() const & { return Limit; }
   auto &policy() const & { return Policy; }
   auto &policy() & { return Policy; }
+  const GenerationStatistics &initialStats() const & { return InitialStats; }
+
   void initialize(InstructionGenerationContext &InstrGenCtx) const {
     planning::initialize(Policy, InstrGenCtx, Limit);
   }

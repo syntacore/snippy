@@ -161,7 +161,7 @@ private:
   //
   // As you can see, we won't execute the second iteration of the loop. When
   // moving interpreter execution to exit block, we have the correct state of
-  // registers/memory in interprepator except for r1 and r2 (as we execute only
+  // registers/memory in interpreter except for r1 and r2 (as we execute only
   // one iteration). However, expected values of r1 and r2 are known statically
   // at loop latcher stage. So, we'll save these values in the map below and
   // write them in interpreter before executing the exit block.
@@ -230,7 +230,7 @@ public:
     [[maybe_unused]] auto EmplaceResult =
         SelfcheckMap.try_emplace(Address, Distance);
     assert(EmplaceResult.second &&
-           "This address has been already inserterd to map.");
+           "This address has been already inserted to map.");
   }
 
   bool hasSpillAddrsForReg(MCRegister Reg) const {
