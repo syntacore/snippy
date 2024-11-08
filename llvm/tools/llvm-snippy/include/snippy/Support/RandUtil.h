@@ -230,7 +230,7 @@ public:
           "Invalid usage of genNUniqInInterval: Max cannot be less than Min.");
     std::vector<T> Vals(Max - Min + 1);
     std::iota(Vals.begin(), Vals.end(), Min);
-    std::shuffle(Vals.begin(), Vals.end(), pimpl->Engine);
+    shuffle(Vals.begin(), Vals.end());
     Vals.resize(N);
     return Vals;
   }
@@ -277,7 +277,7 @@ public:
       return make_error<Failure>(
           "Invalid usage of genNUniqInInterval: The interval has less unique "
           "values than was requested.");
-    std::shuffle(Vals.begin(), Vals.end(), pimpl->Engine);
+    shuffle(Vals.begin(), Vals.end());
     Vals.resize(N);
     return Vals;
   }
@@ -309,6 +309,70 @@ public:
   }
 
   static auto &engine() { return pimpl->Engine; }
+
+  // INFO: this snippy implementation of shuffle is required because
+  // std::shuffle uses std::uniform_int_distribution that has different
+  // implementation(therefore different results) on different OS.
+  // It is stripped version of std::shuffle.
+  template <typename IterT> static void shuffle(IterT First, IterT Last) {
+    if (First == Last)
+      return;
+
+    using DistanceT = typename std::iterator_traits<IterT>::difference_type;
+
+    using UniformDistT = typename std::make_unsigned<DistanceT>::type;
+    using DistrT = UniformIntDistribution<UniformDistT>;
+    using ParamT = typename DistrT::ParamType;
+
+    using CommonUniformT =
+        typename std::common_type<typename GeneratorEngineType::result_type,
+                                  UniformDistT>::type;
+
+    const CommonUniformT URngRange = engine().max() - engine().min();
+    const CommonUniformT URange = CommonUniformT(Last - First);
+
+    if (URngRange / URange >= URange)
+    // I.e. (__urngrange >= __urange * __urange) but without wrap issues.
+    {
+      IterT It = First + 1;
+
+      // Since we know the range isn't empty, an even number of elements
+      // means an uneven number of elements /to swap/, in which case we
+      // do the first one up front:
+
+      if ((URange % 2) == 0) {
+        DistrT D{0, 1};
+        std::iter_swap(It++, First + D(engine()));
+      }
+
+      // Now we know that __last - __i is even, so we do the rest in pairs,
+      // using a single distribution invocation to produce swap positions
+      // for two successive elements at a time:
+
+      auto GenTwoUniformInts = [](CommonUniformT B0, CommonUniformT B1) {
+        CommonUniformT X =
+            UniformIntDistribution<CommonUniformT>{0, (B0 * B1) - 1}(engine());
+        return std::make_pair(X / B1, X % B1);
+      };
+
+      while (It != Last) {
+        const CommonUniformT SwapRange = CommonUniformT(It - First) + 1;
+
+        const std::pair<CommonUniformT, CommonUniformT> PosPos =
+            GenTwoUniformInts(SwapRange, SwapRange + 1);
+
+        std::iter_swap(It++, First + PosPos.first);
+        std::iter_swap(It++, First + PosPos.second);
+      }
+
+      return;
+    }
+
+    DistrT D;
+
+    for (IterT It = First + 1; It != Last; ++It)
+      std::iter_swap(It, First + D(engine(), ParamT(0, It - First)));
+  }
 };
 
 template <typename T> class RandomEliminationGenerator {
