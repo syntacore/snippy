@@ -10,6 +10,7 @@
 #include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Support/Options.h"
+#include "snippy/Support/RandUtil.h"
 
 #define DEBUG_TYPE "snippy-cf-permutation"
 
@@ -351,7 +352,7 @@ SmallVector<unsigned>
 llvm::snippy::CFPermutationContext::generatePermutationOrder(unsigned Size) {
   auto Seq = seq(0u, Size);
   SmallVector<unsigned> Order(Seq.begin(), Seq.end());
-  std::shuffle(Order.begin(), Order.end(), RandEngine::engine());
+  RandEngine::shuffle(Order.begin(), Order.end());
 
   LLVM_DEBUG(dbgs() << "Permutation order:\n");
   LLVM_DEBUG(dbgs() << Order.front());
