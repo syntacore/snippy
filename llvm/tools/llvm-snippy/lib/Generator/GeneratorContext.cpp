@@ -515,9 +515,9 @@ configureLinkerSections(LLVMContext &Ctx, Linker &L,
                   return LHS.OutputSection.Desc.getIDString() <
                          RHS.OutputSection.Desc.getIDString();
                 });
-    } else
-      std::shuffle(ExecutionPath.begin(), ExecutionPath.end(),
-                   RandEngine::engine());
+    } else {
+      RandEngine::shuffle(ExecutionPath.begin(), ExecutionPath.end());
+    }
   } else {
     checkForUnusedRXSections(L.sections(), DefaultCodeSection, Ctx);
     ExecutionPath.push_back(Linker::SectionEntry{
