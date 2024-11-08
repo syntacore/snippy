@@ -228,7 +228,7 @@ void FunctionGenerator::initRootFunctions(Module &M, StringRef EntryPointName) {
                                .getFunction();
                  });
   if (!SGCtx.getGenSettings().InstrsGenerationConfig.ChainedRXSorted)
-    std::shuffle(RestRootFs.begin(), RestRootFs.end(), RandEngine::engine());
+    RandEngine::shuffle(RestRootFs.begin(), RestRootFs.end());
   for (auto *F : RestRootFs)
     CGS.appendNode(N, F);
 }
@@ -432,7 +432,7 @@ bool FunctionGenerator::generateDefault(Module &M) {
   // Steps 2. and 3.
 
   for (auto I = 0u; I < GraphDensity.getValue(); ++I) {
-    std::shuffle(LayerMap.begin(), LayerMap.end(), RandEngine::engine());
+    RandEngine::shuffle(LayerMap.begin(), LayerMap.end());
     for (auto &&[Entry, NextEntry] :
          llvm::zip(ArrayRef(LayerMap.begin(), std::prev(LayerMap.end())),
                    ArrayRef(std::next(LayerMap.begin()), LayerMap.end()))) {
