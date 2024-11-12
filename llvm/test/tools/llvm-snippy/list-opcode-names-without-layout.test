@@ -1,0 +1,12 @@
+# RUN: llvm-snippy -mcpu=generic-rv64 -march=riscv64-unknown-elf \
+# RUN:     -list-opcode-names \
+# RUN:     2> %t.stderr \
+# RUN:     | FileCheck %s
+# COM: Check that the stderr is not cluttered.
+# RUN: [ ! -s %t.stderr ]
+
+# CHECK-DAG: {{[0-9]+}} ADD
+# CHECK-DAG: {{[0-9]+}} SUB
+# CHECK-DAG: {{[0-9]+}} BLT
+# CHECK-DAG: {{[0-9]+}} JAL
+# CHECK-DAG: {{[0-9]+}} OR
