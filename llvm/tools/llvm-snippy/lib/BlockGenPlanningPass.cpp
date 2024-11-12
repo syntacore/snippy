@@ -17,6 +17,7 @@
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/Policy.h"
+#include "snippy/Support/Utils.h"
 #include "snippy/Target/Target.h"
 
 #include "llvm/CodeGen/MachineFunctionPass.h"
@@ -25,6 +26,7 @@
 #include "llvm/PassRegistry.h"
 #include "llvm/Support/FormatVariadic.h"
 
+#include <algorithm>
 #include <functional>
 
 #define DEBUG_TYPE "snippy-block-gen-plan"
