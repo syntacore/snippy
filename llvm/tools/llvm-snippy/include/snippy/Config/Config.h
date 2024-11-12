@@ -20,6 +20,7 @@
 #include "snippy/Support/YAMLUtils.h"
 #include "snippy/Target/TargetConfigIface.h"
 
+#include <unordered_map>
 namespace llvm {
 namespace snippy {
 
@@ -60,10 +61,10 @@ public:
 
   // Create opcode generator for only data flow instructions excluding ones
   // which are in burst groups
-  OpcGenHolder createDFOpcodeGenerator(const OpcodeCache &OpCC,
-                                       std::function<bool(unsigned)> OpcMask,
-                                       ArrayRef<OpcodeHistogramEntry> Overrides,
-                                       bool MustHavePrimaryInstrs) const {
+  OpcGenHolder createDFOpcodeGenerator(
+      const OpcodeCache &OpCC, std::function<bool(unsigned)> OpcMask,
+      ArrayRef<OpcodeHistogramEntry> Overrides, bool MustHavePrimaryInstrs,
+      std::unordered_map<unsigned, double> OpcWeightOverrides = {}) const {
     // TODO: we should have an option to re-scale Override set
     // proportionally to the weight of deleted elements
     auto UsedInBurst = [&](auto Opc) -> bool {
@@ -81,6 +82,13 @@ public:
                    return Desc->isBranch() == false && OpcMask(Hist.first) &&
                           !UsedInBurst(Hist.first);
                  });
+    // overriding previous weights
+    if (!OpcWeightOverrides.empty()) {
+      for (auto &&[Opcode, Weight] : OpcWeightOverrides) {
+        if (DFHistogram.count(Opcode))
+          DFHistogram[Opcode] = Weight;
+      }
+    }
     if (MustHavePrimaryInstrs && DFHistogram.size() == 0)
       snippy::fatal(
           "We can not create any primary instruction in this context.\nUsually "
