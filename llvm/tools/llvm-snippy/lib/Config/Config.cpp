@@ -375,6 +375,7 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
   IO.mapOptional("burst", Info.Burst.Data);
   YAMLHistogramIO<OpcodeHistogramDecodedEntry> HistIO(Info.Histogram);
   IO.mapOptional("histogram", HistIO);
+
   yaml::MappingNormalization<ImmediateHistogramNormalization,
                              ImmediateHistogram>
       ImmHistNorm(IO, Info.ImmHistogram);

@@ -10,6 +10,8 @@
 
 namespace llvm {
 class LLVMContext;
+class MCInstrInfo;
+class LLVMTargetMachine;
 namespace snippy {
 
 class SnippyTarget;
@@ -19,6 +21,8 @@ struct ConfigIOContext {
   const OpcodeCache &OpCC;
   LLVMContext &Ctx;
   const SnippyTarget &SnpTgt;
+  const MCInstrInfo &InstrInfo;
+  const LLVMTargetMachine &TargetMachine;
 };
 
 } // namespace snippy
