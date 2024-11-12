@@ -9,6 +9,7 @@
 #define LLVM_TOOLS_SNIPPY_LIB_UTILS
 
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/MC/MCInstrInfo.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -52,6 +53,10 @@ inline MDNode *getSupportMark(LLVMContext &Context) {
 }
 
 void setAsSupportInstr(MachineInstr &MI, LLVMContext &Ctx);
+
+inline bool isLoadStoreInstr(unsigned Opcode, const MCInstrInfo &InstrInfo) {
+  return InstrInfo.get(Opcode).mayLoad() || InstrInfo.get(Opcode).mayStore();
+}
 
 template <typename... DstArgs>
 MachineInstrBuilder
