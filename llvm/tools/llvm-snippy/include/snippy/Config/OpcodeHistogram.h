@@ -46,6 +46,7 @@ public:
 
   using map::begin;
   using map::count;
+  using map::empty;
   using map::end;
   using map::find;
   using map::insert;

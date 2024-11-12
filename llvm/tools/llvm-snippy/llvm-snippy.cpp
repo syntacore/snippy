@@ -725,8 +725,10 @@ static void mergeFiles(IncludePreprocessor &IPP, LLVMContext &Ctx) {
 }
 
 static Config readSnippyConfig(LLVMContext &Ctx, const SnippyTarget &Tgt,
-                               const OpcodeCache &OpCC) {
-  ConfigIOContext CfgParsingCtx{OpCC, Ctx, Tgt};
+                               const OpcodeCache &OpCC,
+                               const MCInstrInfo &InstrInfo,
+                               LLVMTargetMachine &TargetMachine) {
+  ConfigIOContext CfgParsingCtx{OpCC, Ctx, Tgt, InstrInfo, TargetMachine};
   auto ParseWithPlugin = isParsingWithPluginEnabled();
   IncludePreprocessor IPP(LayoutFile.getValue(), getExtraIncludeDirsForLayout(),
                           Ctx);
@@ -960,7 +962,9 @@ static void completeConfig(Config &Cfg, LLVMState &State,
                            const OpcodeCache &OpCC) {
   auto &TM = State.getTargetMachine();
   auto &Tgt = State.getSnippyTarget();
-  setBurstGramIfNeeded(Cfg.Burst, ConfigIOContext{OpCC, State.getCtx(), Tgt});
+  setBurstGramIfNeeded(Cfg.Burst, ConfigIOContext{OpCC, State.getCtx(), Tgt,
+                                                  State.getInstrInfo(),
+                                                  State.getTargetMachine()});
   std::sort(Cfg.Sections.begin(), Cfg.Sections.end(),
             [](auto &S1, auto &S2) { return S1.VMA < S2.VMA; });
   convertToCustomBurstMode(Cfg.Histogram, State.getInstrInfo(),
@@ -1165,11 +1169,13 @@ void generateMain() {
     printNoLayoutHint(State.getCtx());
     return;
   }
-
-  auto Cfg = readSnippyConfig(State.getCtx(), State.getSnippyTarget(), OpCC);
+  auto Cfg = readSnippyConfig(State.getCtx(), State.getSnippyTarget(), OpCC,
+                              State.getInstrInfo(), State.getTargetMachine());
   completeConfig(Cfg, State, OpCC);
   dumpConfigIfNeeded(
-      Cfg, ConfigIOContext{OpCC, State.getCtx(), State.getSnippyTarget()},
+      Cfg,
+      ConfigIOContext{OpCC, State.getCtx(), State.getSnippyTarget(),
+                      State.getInstrInfo(), State.getTargetMachine()},
       outs());
   auto Flow = createFlowGenerator(std::move(Cfg), State, OpCC);
   auto Result = Flow.generate(State);
