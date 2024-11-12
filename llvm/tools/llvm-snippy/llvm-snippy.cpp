@@ -1133,6 +1133,25 @@ void checkOptions(LLVMContext &Ctx) {
                   "but no generator plugin file was passed");
 }
 
+static void printNoLayoutHint(LLVMContext &Ctx) {
+  // NOTE: Some options like list-opcode-names are useful on their own
+  // and unnecessary notices just clutter the output. It's reasonable to just
+  // skip the notice hint altogether for those.
+  //
+  // Dumping options is really helpful to see the YAML format for them, so
+  // we skip printing the hint as well.
+  auto ShouldSkipHint =
+      ListOpcodeNames.getNumOccurrences() || DumpOptions.getNumOccurrences();
+
+  if (ShouldSkipHint)
+    return;
+
+  snippy::notice(
+      WarningName::NotAWarning, Ctx, "Nothing to do",
+      "Please specify path to <layout> file as a positional argument for "
+      "instruction generation");
+}
+
 void generateMain() {
   initializeLLVMAll();
   readSnippyOptionsIfNeeded();
@@ -1141,10 +1160,12 @@ void generateMain() {
   OpcodeCache OpCC(State.getSnippyTarget(), State.getInstrInfo(),
                    State.getSubtargetInfo());
   dumpIfNecessary(OpCC);
-  if (LayoutFile.getValue().empty()) {
-    errs() << "Please specify --layout=<file> for instruction generation\n";
+
+  if (!LayoutFile.getNumOccurrences()) {
+    printNoLayoutHint(State.getCtx());
     return;
   }
+
   auto Cfg = readSnippyConfig(State.getCtx(), State.getSnippyTarget(), OpCC);
   completeConfig(Cfg, State, OpCC);
   dumpConfigIfNeeded(
