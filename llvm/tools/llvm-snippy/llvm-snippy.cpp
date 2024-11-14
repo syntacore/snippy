@@ -382,7 +382,7 @@ static void checkMemoryRegions(const SnippyTarget &SnippyTgt,
   std::string ErrBuf;
   llvm::raw_string_ostream SS{ErrBuf};
   SS << "One of layout memory regions interferes with reserved region:\n";
-  Reserved->dump(SS);
+  outputYAMLToStream(*Reserved, SS);
   snippy::fatal(ErrBuf.c_str());
 }
 
@@ -780,15 +780,8 @@ static Config readSnippyConfig(LLVMContext &Ctx, const SnippyTarget &Tgt,
 static void dumpConfigIfNeeded(const Config &Cfg,
                                const ConfigIOContext &CfgParsingCtx,
                                raw_ostream &OS) {
-  if (DumpLayout) {
+  if (DumpLayout)
     Cfg.dump(OS, CfgParsingCtx);
-    // FIXME: Currently sections can't be serialized through YAML
-    OS << "Sections:\n";
-    for (auto &&S : Cfg.Sections) {
-      S.dump(OS);
-      OS << "\n";
-    }
-  }
 }
 
 static void convertToCustomBurstMode(const OpcodeHistogram &Histogram,

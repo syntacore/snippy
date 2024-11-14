@@ -149,28 +149,6 @@ bool hasExternalCallee(const FunctionDescs &FuncDescs,
   });
 }
 
-struct SectionAttrs {
-  std::variant<int, std::string> ID{0};
-  size_t VMA;
-  size_t Size;
-  size_t LMA;
-  std::string Access;
-  std::optional<std::string> Phdr;
-
-  SectionAttrs(yaml::IO &) {}
-
-  SectionAttrs(yaml::IO &IO, const SectionDesc &Desc)
-      : ID(Desc.ID), VMA(Desc.VMA), Size(Desc.Size), LMA(Desc.LMA),
-        Phdr(Desc.Phdr) {
-    auto SS = raw_string_ostream(Access);
-    Desc.M.dump(SS);
-  }
-
-  SectionDesc denormalize(yaml::IO &IO) {
-    return SectionDesc(ID, VMA, Size, LMA, Access.c_str(), Phdr);
-  }
-};
-
 struct IncludeParsingWrapper final {
   std::vector<std::string> Includes;
 };
@@ -181,37 +159,6 @@ template <> struct yaml::MappingTraits<IncludeParsingWrapper> {
     IO.mapOptional("include", IPW.Includes);
   }
 };
-
-template <> struct yaml::MappingTraits<snippy::SectionAttrs> {
-  static void mapping(yaml::IO &IO, snippy::SectionAttrs &Info) {
-    std::optional<int> NumberFromNo;
-    std::optional<std::string> NumberFromName;
-    IO.mapOptional("no", NumberFromNo);
-    IO.mapOptional("name", NumberFromName);
-    if (!NumberFromNo && !NumberFromName)
-      snippy::fatal("There is a section in the layout file that does not "
-                    "have 'no' key, nor 'name'.");
-    if (NumberFromNo && NumberFromName)
-      snippy::fatal("There is a section in the layout file that has both "
-                    "'no' and 'name' keys.");
-    if (NumberFromNo)
-      Info.ID = *NumberFromNo;
-    else
-      Info.ID = *NumberFromName;
-    IO.mapRequired("VMA", Info.VMA);
-    IO.mapRequired("SIZE", Info.Size);
-    IO.mapRequired("LMA", Info.LMA);
-    IO.mapRequired("ACCESS", Info.Access);
-    IO.mapOptional("PHDR", Info.Phdr);
-  }
-};
-
-template <>
-void yaml::yamlize(IO &IO, snippy::SectionDesc &Desc, bool, EmptyContext &Ctx) {
-  MappingNormalization<snippy::SectionAttrs, snippy::SectionDesc> MappingNorm(
-      IO, Desc);
-  yamlize(IO, *(MappingNorm.operator->()), true, Ctx);
-}
 
 template <> struct yaml::ScalarEnumerationTraits<ImmHistOpcodeSettings::Kind> {
   static void enumeration(IO &IO, ImmHistOpcodeSettings::Kind &K) {
@@ -364,10 +311,7 @@ template <> struct yaml::PolymorphicTraits<ImmediateHistogramNorm> {
 };
 
 void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
-  // FIXME: Currently sections can't be serialized
-  if (!IO.outputting()) {
-    IO.mapOptional("sections", Info.Sections);
-  }
+  IO.mapOptional("sections", Info.Sections);
   // Here we call yamlize directly since memory scheme has no top-level key.
   // This could be changed in the future but it'd be a breaking change.
   yaml::MappingTraits<MemoryScheme>::mapping(IO, Info.MS);
