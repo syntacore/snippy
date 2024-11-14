@@ -32,8 +32,28 @@ struct FloatOverwriteRange final {
 enum class FloatOverwriteMode {
   IF_ANY_OPERAND,
   IF_ALL_OPERANDS,
+  IF_MODEL_DETECTED_NAN,
   DISABLED,
 };
+
+template <FloatOverwriteMode M>
+constexpr StringLiteral FloatOverwriteModeName = "";
+
+template <>
+inline constexpr StringLiteral
+    FloatOverwriteModeName<FloatOverwriteMode::IF_ANY_OPERAND> =
+        "if-any-operand";
+template <>
+inline constexpr StringLiteral
+    FloatOverwriteModeName<FloatOverwriteMode::IF_ALL_OPERANDS> =
+        "if-all-operands";
+template <>
+inline constexpr StringLiteral
+    FloatOverwriteModeName<FloatOverwriteMode::DISABLED> = "disabled";
+template <>
+inline constexpr StringLiteral
+    FloatOverwriteModeName<FloatOverwriteMode::IF_MODEL_DETECTED_NAN> =
+        "if-model-detected-nan";
 
 struct FloatOverwriteValues final {
   Valuegram TheValuegram;
@@ -45,10 +65,15 @@ struct FloatOverwriteSettings final {
   std::optional<FloatOverwriteValues> SingleValues;
   std::optional<FloatOverwriteValues> DoubleValues;
   FloatOverwriteMode Mode = FloatOverwriteMode::IF_ALL_OPERANDS;
+
+  bool needsModel() const {
+    return Mode == FloatOverwriteMode::IF_MODEL_DETECTED_NAN;
+  }
 };
 
 struct FPUSettings final {
   std::optional<FloatOverwriteSettings> Overwrite;
+  bool needsModel() const { return Overwrite && Overwrite->needsModel(); }
 };
 
 LLVM_SNIPPY_YAML_STRONG_TYPEDEF(RoundingMode, FPURoundingMode);

@@ -934,7 +934,8 @@ static void checkConfig(const Config &Cfg, const SnippyTarget &Tgt,
 }
 
 static void checkFPUSettings(Config &Cfg, LLVMContext &Ctx,
-                             const SnippyTarget &Tgt, const MCInstrInfo &II) {
+                             const SnippyTarget &Tgt, const MCInstrInfo &II,
+                             bool RunOnModel) {
   const auto &Histogram = Cfg.Histogram;
   if (llvm::none_of(llvm::make_first_range(Histogram), [&](auto Opcode) {
         auto &InstrDesc = II.get(Opcode);
@@ -944,15 +945,23 @@ static void checkFPUSettings(Config &Cfg, LLVMContext &Ctx,
   if (!Cfg.FPUConfig)
     Cfg.FPUConfig.emplace();
   auto &FPUConfig = *Cfg.FPUConfig;
-  if (FPUConfig.Overwrite)
+  if (!FPUConfig.Overwrite) {
+    FPUConfig.Overwrite.emplace();
     return;
-  FPUConfig.Overwrite = FloatOverwriteSettings{};
+  }
+  if (!RunOnModel && FPUConfig.needsModel())
+    snippy::fatal(
+        "Invalid FPU config",
+        Twine("\"")
+            .concat(FloatOverwriteModeName<
+                    FloatOverwriteMode::IF_MODEL_DETECTED_NAN>)
+            .concat("\" overwrite heuristic requires model to be specified"));
 }
 
 // Function to do all the necessary operations on Config after reading it
 // from YAML.
 static void completeConfig(Config &Cfg, LLVMState &State,
-                           const OpcodeCache &OpCC) {
+                           const OpcodeCache &OpCC, bool RunOnModel) {
   auto &TM = State.getTargetMachine();
   auto &Tgt = State.getSnippyTarget();
   setBurstGramIfNeeded(Cfg.Burst, ConfigIOContext{OpCC, State.getCtx(), Tgt,
@@ -969,7 +978,7 @@ static void completeConfig(Config &Cfg, LLVMState &State,
 
   auto *II = TM.getMCInstrInfo();
   assert(II);
-  checkFPUSettings(Cfg, State.getCtx(), Tgt, *II);
+  checkFPUSettings(Cfg, State.getCtx(), Tgt, *II, RunOnModel);
 }
 
 static void initializeLLVMAll() {
@@ -1027,7 +1036,8 @@ static void checkGlobalRegsSpillSettings(const SnippyTarget &Tgt,
 }
 
 GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
-                                        RegPool &RP) {
+                                        RegPool &RP,
+                                        ArrayRef<std::string> Models) {
   auto &Ctx = State.getCtx();
   auto OutputFilename = getOutputFileBasename();
   auto SelfCheckPeriod = getSelfcheckPeriod();
@@ -1052,8 +1062,6 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
                      "' to enable it");
   auto SeedValue = seedOptToValue(Seed.getValue());
   initializeRandomEngine(SeedValue);
-  auto Models = parseModelPluginList();
-  bool RunOnModel = !Models.empty();
   checkGlobalRegsSpillSettings(State.getSnippyTarget(), State.getRegInfo(), Cfg,
                                Ctx);
   if (!Cfg.hasSectionToSpillGlobalRegs())
@@ -1073,6 +1081,7 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
   checkFullSizeGenerationRequirements(State.getInstrInfo(),
                                       State.getSnippyTarget(), Cfg,
                                       FillCodeSectionMode, SelfCheckPeriod);
+  bool RunOnModel = !Models.empty();
 
   return GeneratorSettings(
       ABI, OutputFilename, LayoutFile.getValue(), AdditionalLayoutFiles,
@@ -1096,9 +1105,10 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
 }
 
 static FlowGenerator createFlowGenerator(Config &&Cfg, LLVMState &State,
-                                         const OpcodeCache &OpCC) {
+                                         const OpcodeCache &OpCC,
+                                         ArrayRef<std::string> Models) {
   RegPool RP;
-  auto GenSettings = createGeneratorConfig(State, std::move(Cfg), RP);
+  auto GenSettings = createGeneratorConfig(State, std::move(Cfg), RP, Models);
   return FlowGenerator(std::move(GenSettings), OpCC, std::move(RP));
 }
 
@@ -1164,13 +1174,14 @@ void generateMain() {
   }
   auto Cfg = readSnippyConfig(State.getCtx(), State.getSnippyTarget(), OpCC,
                               State.getInstrInfo(), State.getTargetMachine());
-  completeConfig(Cfg, State, OpCC);
+  auto Models = parseModelPluginList();
+  completeConfig(Cfg, State, OpCC, !Models.empty());
   dumpConfigIfNeeded(
       Cfg,
       ConfigIOContext{OpCC, State.getCtx(), State.getSnippyTarget(),
                       State.getInstrInfo(), State.getTargetMachine()},
       outs());
-  auto Flow = createFlowGenerator(std::move(Cfg), State, OpCC);
+  auto Flow = createFlowGenerator(std::move(Cfg), State, OpCC, Models);
   auto Result = Flow.generate(State);
   saveToFile(Result);
 }
