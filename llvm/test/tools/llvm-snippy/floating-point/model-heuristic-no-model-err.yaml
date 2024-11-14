@@ -1,0 +1,23 @@
+# RUN: not llvm-snippy %s -model-plugin None \
+# RUN: |& FileCheck %s
+
+include:
+  - ../Inputs/sections.yaml
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  mattr: "+f,-d"
+  num-instrs: 50
+  init-regs-in-elf: true
+fpu-config:
+  overwrite:
+    ieee-single:
+      valuegram:
+        - [uniform, 1.0]
+    mode: if-model-detected-nan
+
+histogram:
+  - [FDIV_S, 1.0]
+
+# CHECK: error: Invalid FPU config: "if-model-detected-nan" overwrite heuristic requires model
+# CHECK-SAME: to be specified 
