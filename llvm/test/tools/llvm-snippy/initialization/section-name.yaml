@@ -1,31 +1,43 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu  \
-# RUN:    -num-instrs=10 \
-# RUN:    -dump-layout \
-# RUN: |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
 
+options:
+  march: riscv64-unknown-elf
+  num-instrs: 10
+  dump-layout: true
 sections:
-    - no:        1
-      VMA:       0x800000
-      SIZE:      0x4000
-      LMA:       0x800000
-      ACCESS:    rx
-    - name:      ram
-      VMA:       0x806000
-      SIZE:      0x4000
-      LMA:       0x806000
-      ACCESS:    rw
-
+  - no: 1
+    VMA: 0x800000
+    SIZE: 0x4000
+    LMA: 0x800000
+    ACCESS: rx
+  - name: ram
+    VMA: 0x806000
+    SIZE: 0x4000
+    LMA: 0x806000
+    ACCESS: rw
+  - name: test
+    VMA: 0x80a000
+    SIZE: 0x4000
+    LMA: 0x80a000
+    ACCESS: rw
+    PHDR: header
 histogram:
-    - [ADD, 1.0]
+  - [ADD, 1.0]
 
-# CHECK: Sections:
-# CHECK-NEXT: Section #1
-# CHECK-NEXT: VMA: 0x800000
-# CHECK-NEXT: LMA: 0x800000
-# CHECK-NEXT: Size: 16384
-# CHECK-NEXT: rx
-# CHECK-NEXT: Section #ram
-# CHECK-NEXT: VMA: 0x806000
-# CHECK-NEXT: LMA: 0x806000
-# CHECK-NEXT: Size: 16384
-# CHECK-NEXT: rw
+# CHECK: sections:
+# CHECK-NEXT:   - no:              1
+# CHECK-NEXT:     VMA:             0x800000
+# CHECK-NEXT:     SIZE:            0x4000
+# CHECK-NEXT:     LMA:             0x800000
+# CHECK-NEXT:     ACCESS:          rx
+# CHECK-NEXT:   - name:            ram
+# CHECK-NEXT:     VMA:             0x806000
+# CHECK-NEXT:     SIZE:            0x4000
+# CHECK-NEXT:     LMA:             0x806000
+# CHECK-NEXT:     ACCESS:          rw
+# CHECK-NEXT:   - name:            test
+# CHECK-NEXT:     VMA:             0x80A000
+# CHECK-NEXT:     SIZE:            0x4000
+# CHECK-NEXT:     LMA:             0x80A000
+# CHECK-NEXT:     ACCESS:          rw
+# CHECK-NEXT:     PHDR:            header
