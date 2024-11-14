@@ -442,9 +442,11 @@ struct AccMask {
   AccMask(int M) : M(M) {}
   AccMask(Acc T) : M(static_cast<int>(T)) {}
 
-  AccMask(StringRef Mode) {
-    for (auto c : Mode)
-      switch (tolower(c)) {
+  static Expected<AccMask> fromString(StringRef Mode) {
+    int M = 0;
+
+    for (auto C : Mode)
+      switch (tolower(C)) {
       case 'r':
         M |= static_cast<int>(Acc::R);
         break;
@@ -455,10 +457,19 @@ struct AccMask {
         M |= static_cast<int>(Acc::X);
         break;
       default:
-        snippy::fatal(
-            "Invalid access attribute in config",
-            formatv("{0} is not allowed. Acceptable ones: r, w, x.", c));
+        return createStringError(
+            std::make_error_code(std::errc::invalid_argument),
+            formatv("Invalid access attribute in config: {0} is not allowed. "
+                    "Acceptable ones: r, w, x.",
+                    C));
       }
+
+    return M;
+  }
+
+  AccMask(StringRef Mode) {
+    if (auto E = fromString(Mode).moveInto(*this))
+      snippy::fatal(std::move(E));
   }
 
   AccMask(const char *Mode) : AccMask(StringRef(Mode)) {}
@@ -561,28 +572,9 @@ struct SectionDesc {
     return Phdr.value();
   }
 
-  void dump(llvm::raw_ostream &Stream) const {
-    std::visit([&Stream](auto &&V) { Stream << "Section #" << V << "\n"; }, ID);
-    Stream << "VMA: 0x";
-    Stream.write_hex(VMA);
-    Stream << "\n";
-    Stream << "LMA: 0x";
-    Stream.write_hex(LMA);
-    Stream << "\n";
-    Stream << "Size: " << Size << "\n";
-    M.dump(Stream);
-    if (hasPhdr())
-      Stream << "PHDR: " << getPhdr() << "\n";
-  }
   bool hasAccess(Acc Type) const { return (M & Type) != 0; }
   size_t getSize() const { return Size; }
 };
-
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &Stream,
-                                     const SectionDesc &Desc) {
-  Desc.dump(Stream);
-  return Stream;
-}
 
 inline bool operator==(const SectionDesc &Lhs, const SectionDesc &Rhs) {
   return Lhs.VMA == Rhs.VMA && Lhs.LMA == Rhs.LMA && Lhs.M.M == Rhs.M.M &&
@@ -590,16 +582,18 @@ inline bool operator==(const SectionDesc &Lhs, const SectionDesc &Rhs) {
 }
 
 struct SectionsDescriptions : private std::vector<SectionDesc> {
-  using vector::begin;
-  using vector::end;
-  using vector::rbegin;
-  using vector::rend;
-  using vector::operator[];
+  using vector::at;
   using vector::back;
+  using vector::begin;
   using vector::empty;
+  using vector::end;
   using vector::front;
+  using vector::operator[];
   using vector::pop_back;
   using vector::push_back;
+  using vector::rbegin;
+  using vector::rend;
+  using vector::resize;
   using vector::size;
 
   auto &lastRWSection() const {
@@ -743,6 +737,8 @@ LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::MemoryAccessAddresses,
 LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::MemoryAccessesGroup,
                                      /* not flow */ false);
 
+LLVM_SNIPPY_YAML_DECLARE_SCALAR_TRAITS_NG(snippy::AccMask);
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::SectionDesc);
 LLVM_SNIPPY_YAML_DECLARE_SEQUENCE_TRAITS(snippy::SectionsDescriptions,
                                          snippy::SectionDesc);
 
