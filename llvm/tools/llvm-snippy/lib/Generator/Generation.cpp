@@ -232,6 +232,37 @@ struct GenerationResult {
   GenerationStatistics Stats;
 };
 
+static const auto &getAvailableFloatSemantics() {
+  // (TODO): Some further work should be done to select the correct semantics
+  // from MCRegister. For now snippy supports only IEEE formats.
+  static const auto AvailableSemantics = std::array<const fltSemantics *, 3>{
+      &APFloat::IEEEhalf(), &APFloat::IEEEsingle(), &APFloat::IEEEdouble()};
+  return AvailableSemantics;
+}
+
+static Expected<const fltSemantics &>
+getFloatSemanticsForReg(const MCRegisterInfo &RegInfo, MCRegister Reg) {
+  auto RegClass = llvm::find_if(RegInfo.regclasses(),
+                                [Reg](auto &C) { return C.contains(Reg); });
+  if (RegClass == RegInfo.regclass_end())
+    return createStringError(inconvertibleErrorCode(),
+                             "Could not find register register class that "
+                             "contains the requested register");
+  auto RegWidth = RegClass->getSizeInBits();
+  assert(RegWidth);
+  auto &AvailableSemantics = getAvailableFloatSemantics();
+  auto Found =
+      llvm::find_if(AvailableSemantics, [&](const fltSemantics *Semantics) {
+        return RegWidth == APFloat::getSizeInBits(*Semantics);
+      });
+  if (Found == AvailableSemantics.end())
+    return createStringError(inconvertibleErrorCode(),
+                             "No float semantics available for register class");
+  auto *Sem = *Found;
+  assert(Sem);
+  return *Sem;
+}
+
 static void unNaNRegister(planning::InstructionGenerationContext &InstrGenCtx,
                           MCRegister Reg) {
   auto &GC = InstrGenCtx.GC;
@@ -242,41 +273,14 @@ static void unNaNRegister(planning::InstructionGenerationContext &InstrGenCtx,
   auto &OverwriteCfg = Cfg.FPUConfig->Overwrite;
   assert(OverwriteCfg);
 
-  auto &SelectedSemantics = [&]() -> const fltSemantics & {
-    const auto &MCRegInfo = GC.getLLVMState().getRegInfo();
-    const auto *MCRegClass =
-        find_if(MCRegInfo.regclasses(),
-                [Reg](const auto &RegClass) { return RegClass.contains(Reg); });
-    assert(MCRegClass != MCRegInfo.regclass_end());
-    auto RegBitWidth = MCRegClass->getSizeInBits();
-    assert(RegBitWidth);
-
-    // (TODO): Some further work should be done to select the correct semantics
-    // from MCRegister. For now snippy supports only IEEE formats.
-    const auto AvailableSemantics = std::array<const fltSemantics *, 3>{
-        &APFloat::IEEEhalf(), &APFloat::IEEEsingle(), &APFloat::IEEEdouble()};
-
-    if (auto FoundIt = find_if(AvailableSemantics,
-                               [&](const fltSemantics *Semantics) {
-                                 return RegBitWidth ==
-                                        APFloat::getSizeInBits(*Semantics);
-                               });
-        FoundIt != AvailableSemantics.end())
-      return **FoundIt;
-
+  auto SelectedSemantics =
+      getFloatSemanticsForReg(GC.getLLVMState().getRegInfo(), Reg);
+  if (auto Err = SelectedSemantics.takeError())
     snippy::fatal(
-        GC.getLLVMState().getCtx(), "Internal error",
-        Twine(
-            "Failed to select floating-point semantics for register of width ")
-            .concat(Twine(RegBitWidth)));
-
-    // snippy::fatal is not marked [[noreturn]], since in theory it might not
-    // call exit, so we return a value in all paths.
-    return APFloat::Bogus();
-  }();
-
+        "Internal error",
+        Twine("Cannot unNaNRegister: ").concat(toString(std::move(Err))));
   Expected<APInt> ValueToWriteOrErr =
-      GC.getOrCreateFloatOverwriteValueSampler(SelectedSemantics).sample();
+      GC.getOrCreateFloatOverwriteValueSampler(*SelectedSemantics).sample();
 
   if (auto Err = ValueToWriteOrErr.takeError())
     snippy::fatal(GC.getLLVMState().getCtx(), "Internal error", std::move(Err));
@@ -339,6 +343,14 @@ static bool allInputOperandsArePotentialNaNs(
   });
 }
 
+static bool hasFRegDestination(const MachineInstr &MI,
+                               const SnippyTarget &Tgt) {
+  if (!MI.getNumOperands())
+    return false;
+  return hasDestinationRegister(MI) &&
+         Tgt.isFloatingPoint(getDestinationRegister(MI));
+}
+
 static bool shouldRewriteRegValue(
     const MachineInstr &MI,
     const planning::InstructionGenerationContext &InstrGenCtx) {
@@ -352,37 +364,56 @@ static bool shouldRewriteRegValue(
     return allInputOperandsArePotentialNaNs(MI, InstrGenCtx);
   case FloatOverwriteMode::IF_ANY_OPERAND:
     return anyOfInputOperandsIsPotentiallyNaN(MI, InstrGenCtx);
+  case FloatOverwriteMode::IF_MODEL_DETECTED_NAN: {
+    auto &GC = InstrGenCtx.GC;
+    auto Reg = getDestinationRegister(MI);
+    auto SelectedSemantics =
+        getFloatSemanticsForReg(GC.getLLVMState().getRegInfo(), Reg);
+    if (auto Err = SelectedSemantics.takeError())
+      snippy::fatal("Internal error", Twine("Cannot check if register is NaN: ")
+                                          .concat(toString(std::move(Err))));
+    auto &I = GC.getOrCreateInterpreter();
+    APFloat Val(*SelectedSemantics, I.readReg(Reg));
+    return Val.isNaN();
+  }
   case FloatOverwriteMode::DISABLED:
     return false;
   }
   llvm_unreachable("Unknown float overwrite heuristic");
 }
 
-static bool hasFRegDestination(const MachineInstr &MI,
-                               const SnippyTarget &Tgt) {
-  if (!MI.getNumOperands())
-    return false;
-  return hasDestinationRegister(MI) &&
-         Tgt.isFloatingPoint(getDestinationRegister(MI));
-}
-
 template <typename InstrIt>
 void controlNaNPropagation(
     InstrIt Begin, InstrIt End,
     planning::InstructionGenerationContext &InstrGenCtx) {
+  if (Begin == End)
+    return;
   auto &GC = InstrGenCtx.GC;
+  auto &FPUConfig = GC.getConfig().FPUConfig;
+  if (!FPUConfig || !FPUConfig->Overwrite)
+    return;
   auto &Tgt = GC.getLLVMState().getSnippyTarget();
   auto Filtered =
       llvm::make_filter_range(llvm::make_range(Begin, End), [&](auto &MI) {
         return (MI.getNumDefs() == 1) && hasFRegDestination(MI, Tgt);
       });
+
+  SmallVector<MCRegister, 8> RegsToUnNaN;
   llvm::for_each(Filtered, [&](auto &MI) {
     if (Tgt.canProduceNaN(MI.getDesc()) ||
         anyOfInputOperandsIsPotentiallyNaN(MI, InstrGenCtx))
       markRegisterAsPotentialNaN(getDestinationRegister(MI), InstrGenCtx);
     if (shouldRewriteRegValue(MI, InstrGenCtx))
-      unNaNRegister(InstrGenCtx, getDestinationRegister(MI));
+      RegsToUnNaN.push_back(getDestinationRegister(MI));
   });
+  auto Beg = std::prev(End);
+  for (auto Reg : RegsToUnNaN)
+    unNaNRegister(InstrGenCtx, Reg);
+  if (!GC.hasTrackingMode())
+    return;
+  if (interpretInstrs(++Beg, End, GC) != GenerationStatus::Ok)
+    snippy::fatal("Internal error",
+                  "Failed to execute float overwrite on model");
 }
 
 template <typename InstrIt>
@@ -412,14 +443,15 @@ handleGeneratedInstructions(InstrIt ItBegin,
   if (sizeLimitIsExceeded(Limit, InstrGenCtx.Stats, GeneratedCodeSize))
     return ReportGenerationResult(GenerationStatus::SizeFailed);
 
-  controlNaNPropagation(ItBegin, ItEnd, InstrGenCtx);
-
-  if (!GC.hasTrackingMode())
+  if (!GC.hasTrackingMode()) {
+    controlNaNPropagation(ItBegin, ItEnd, InstrGenCtx);
     return ReportGenerationResult(GenerationStatus::Ok);
-
+  }
   auto InterpretInstrsResult = interpretInstrs(ItBegin, ItEnd, GC);
   if (InterpretInstrsResult != GenerationStatus::Ok)
     return ReportGenerationResult(InterpretInstrsResult);
+
+  controlNaNPropagation(ItBegin, ItEnd, InstrGenCtx);
 
   const auto &GenSettings = GC.getGenSettings();
   if (!GenSettings.TrackingConfig.SelfCheckPeriod)
