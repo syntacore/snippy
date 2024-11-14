@@ -43,6 +43,17 @@
     static QuotingType mustQuote(StringRef);                                   \
   }
 
+// NOTE: ScalarTraits, but with error messages returned by-value.
+#define LLVM_SNIPPY_YAML_DECLARE_SCALAR_TRAITS_NG(_type)                       \
+  template <>                                                                  \
+  struct llvm::yaml::missingTraits<_type, llvm::yaml::EmptyContext>            \
+      : std::false_type {};                                                    \
+  template <> struct llvm::yaml::ScalarTraits<_type, void> {                   \
+    static void output(const _type &, void *, raw_ostream &);                  \
+    static std::string input(StringRef scalar, void *, _type &value);          \
+    static QuotingType mustQuote(StringRef);                                   \
+  }
+
 #define LLVM_SNIPPY_YAML_DECLARE_POLYMORPHIC_TRAITS(_type, _scalar_type,       \
                                                     _map_type, _seq_type)      \
   template <> struct llvm::yaml::PolymorphicTraits<_type> {                    \
@@ -105,7 +116,6 @@
   template <> struct llvm::yaml::SequenceTraits<_type, void> {                 \
     static size_t size(IO &io, _type &list);                                   \
     static _elem &element(IO &io, _type &list, size_t index);                  \
-    static const bool flow = false;                                            \
   }
 
 namespace llvm {
@@ -130,6 +140,8 @@ template <typename, typename> struct SequenceElementTraits;
 template <typename> struct DocumentListTraits;
 template <typename> struct CustomMappingTraits;
 template <typename> struct PolymorphicTraits;
+template <typename> struct has_ScalarTraits;
+template <typename, typename> struct missingTraits;
 
 } // namespace yaml
 
@@ -330,6 +342,27 @@ template <typename T> struct NormalizedYAMLStrongTypedef {
 
 LLVM_SNIPPY_YAML_STRONG_TYPEDEF(std::string, SValue);
 using SList = std::vector<SValue>;
+
+// Test if ScalarTraits<T> is defined on type T. This is a better variant of
+// ScalarTraits, since it allows to return error messages by-value.
+template <class T>
+struct has_ScalarTraitsWithStringError // NOLINT
+{
+  using Signature_input = std::string (*)(StringRef, void *, T &);
+  using Signature_output = void (*)(const T &, void *, raw_ostream &);
+  using Signature_mustQuote = yaml::QuotingType (*)(StringRef);
+
+  template <typename U>
+  static char test(SameType<Signature_input, &U::input> *,
+                   SameType<Signature_output, &U::output> *,
+                   SameType<Signature_mustQuote, &U::mustQuote> *);
+
+  template <typename U> static double test(...);
+
+  static bool const value = // NOLINT
+      (sizeof(test<yaml::ScalarTraits<T, void>>(nullptr, nullptr, nullptr)) ==
+       1);
+};
 
 } // namespace snippy
 
