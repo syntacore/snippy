@@ -433,12 +433,22 @@ yaml::MappingTraits<FloatOverwriteRange>::validate(yaml::IO &IO,
 }
 
 using snippy::FloatOverwriteMode;
+using snippy::FloatOverwriteModeName;
+#ifdef ENUM_CASE
+#error ENUM_CASE already defined
+#endif
+#define ENUM_CASE(name)                                                        \
+  IO.enumCase(M, FloatOverwriteModeName<FloatOverwriteMode::name>.data(),      \
+              FloatOverwriteMode::name)
+
 void yaml::ScalarEnumerationTraits<FloatOverwriteMode>::enumeration(
     yaml::IO &IO, FloatOverwriteMode &M) {
-  IO.enumCase(M, "if-all-operands", FloatOverwriteMode::IF_ALL_OPERANDS);
-  IO.enumCase(M, "if-any-operand", FloatOverwriteMode::IF_ANY_OPERAND);
-  IO.enumCase(M, "disabled", FloatOverwriteMode::DISABLED);
+  ENUM_CASE(IF_ALL_OPERANDS);
+  ENUM_CASE(IF_ANY_OPERAND);
+  ENUM_CASE(DISABLED);
+  ENUM_CASE(IF_MODEL_DETECTED_NAN);
 }
+#undef ENUM_CASE
 
 namespace snippy {
 
