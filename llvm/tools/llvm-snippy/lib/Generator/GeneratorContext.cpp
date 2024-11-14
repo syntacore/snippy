@@ -643,6 +643,12 @@ GeneratorSettings::getCompleteSectionList(LLVMState &State) const {
 GeneratorContext::GeneratorContext(SnippyProgramContext &ProgContext,
                                    GeneratorSettings &Settings)
     : ProgContext(ProgContext), MainModule(ProgContext.getLLVMState(), "main"),
+      HasTrackingMode(
+          [&Cfg = Settings.Cfg, &Tracking = Settings.TrackingConfig] {
+            return Tracking.BTMode || Tracking.SelfCheckPeriod ||
+                   Tracking.AddressVH ||
+                   (Cfg.FPUConfig && Cfg.FPUConfig->needsModel());
+          }()),
       ExecutionPath(
           snippy::configureLinkerSections(ProgContext.getLLVMState().getCtx(),
                                           ProgContext.getLinker(), Settings)),
@@ -699,10 +705,6 @@ GeneratorContext::GeneratorContext(SnippyProgramContext &ProgContext,
       ProgContext.exportedNamesMangled()
           ? ("__snippy_" + Twine(ProgContext.getEntryPointName()) + "_").str()
           : "__snippy_");
-
-  HasTrackingMode = Settings.TrackingConfig.BTMode ||
-                    Settings.TrackingConfig.SelfCheckPeriod ||
-                    Settings.TrackingConfig.AddressVH;
 
   if (hasTrackingMode() && Settings.ModelPluginConfig.ModelLibraries.empty())
     snippy::fatal(State.getCtx(), "Cannot generate snippet",
