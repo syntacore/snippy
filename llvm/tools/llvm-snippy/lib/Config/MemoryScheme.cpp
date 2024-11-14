@@ -12,6 +12,7 @@
 #include "snippy/Support/Options.h"
 #include "snippy/Support/RandUtil.h"
 #include "snippy/Support/Utils.h"
+#include "snippy/Support/YAMLExtras.h"
 #include "snippy/Support/YAMLHistogram.h"
 #include "snippy/Support/YAMLUtils.h"
 #include "snippy/Target/Target.h"
@@ -140,9 +141,7 @@ template <> struct yaml::MappingTraits<snippy::AccessAddress> {
 
 template <> struct yaml::MappingTraits<snippy::AddressInfo> {
   static void mapping(yaml::IO &Io, snippy::AddressInfo &AI) {
-    yaml::MappingNormalization<snippy::NormalizedYAMLStrongTypedef<yaml::Hex64>,
-                               decltype(AI.Address)>
-        NormAddress(Io, AI.Address);
+    CREATE_HEX_NORMALIZATION(AI, Address);
     Io.mapRequired("addr", NormAddress->Value);
     Io.mapRequired("size", AI.MaxOffset);
     Io.mapRequired("stride", AI.MinStride);
@@ -1132,11 +1131,66 @@ size_t yaml::SequenceTraits<snippy::SectionsDescriptions>::size(
 snippy::SectionDesc &
 yaml::SequenceTraits<snippy::SectionsDescriptions>::element(
     yaml::IO &IO, snippy::SectionsDescriptions &Sections, size_t Index) {
-  if (Index >= Sections.size()) {
-    Sections.push_back(snippy::SectionDesc());
-    return Sections.back();
-  }
-  return Sections[Index];
+  if (Index >= Sections.size())
+    Sections.resize(Index + 1);
+  return Sections.at(Index);
 }
+
+using snippy::AccMask;
+void yaml::ScalarTraits<AccMask>::output(const AccMask &Val, void *,
+                                         raw_ostream &Out) {
+  Val.dump(Out);
+}
+
+std::string yaml::ScalarTraits<AccMask>::input(StringRef Scalar, void *Ctx,
+                                               AccMask &Val) {
+  if (auto E = AccMask::fromString(Scalar).moveInto(Val))
+    return toString(std::move(E));
+  return "";
+}
+
+yaml::QuotingType yaml::ScalarTraits<AccMask>::mustQuote(StringRef) {
+  return QuotingType::None;
+}
+
+void yaml::MappingTraits<snippy::SectionDesc>::mapping(
+    yaml::IO &Io, snippy::SectionDesc &Info) {
+  if (!Io.outputting()) {
+    std::optional<int> NumberFromNo;
+    std::optional<std::string> NumberFromName;
+
+    Io.mapOptional("no", NumberFromNo);
+    Io.mapOptional("name", NumberFromName);
+
+    if (!NumberFromNo && !NumberFromName) {
+      Io.setError("There is a section in the layout file that does not have "
+                  "'no' key, nor 'name'.");
+    } else if (NumberFromNo && NumberFromName) {
+      Io.setError("There is a section in the layout file that has both "
+                  "'no' and 'name' keys.");
+    } else {
+      using IDType = decltype(Info.ID);
+      Info.ID = NumberFromName.has_value() ? IDType(NumberFromName.value())
+                                           : IDType(NumberFromNo.value());
+    }
+  } else {
+    std::visit(snippy::OverloadedCallable{
+                   [&](StringRef Name) { Io.mapRequired("name", Name); },
+                   [&](int Index) { Io.mapRequired("no", Index); }},
+               Info.ID);
+  }
+
+  CREATE_HEX_NORMALIZATION(Info, VMA);
+  CREATE_HEX_NORMALIZATION(Info, Size);
+  CREATE_HEX_NORMALIZATION(Info, LMA);
+
+  Io.mapRequired("VMA", NormVMA->Value);
+  Io.mapRequired("SIZE", NormSize->Value);
+  Io.mapRequired("LMA", NormLMA->Value);
+  Io.mapRequired("ACCESS", Info.M);
+  Io.mapOptional("PHDR", Info.Phdr);
+}
+
+#undef CREATE_HEX_NORMALIZATION
 
 } // namespace llvm
