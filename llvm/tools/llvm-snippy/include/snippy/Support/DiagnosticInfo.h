@@ -39,7 +39,8 @@ enum class WarningName {
   TooFarMaxPCDist,
   ModelException,
   UnusedSection,
-  GenPlanVerification
+  GenPlanVerification,
+  SeedNotSpecified,
 };
 
 struct WarningCounters {
@@ -83,8 +84,16 @@ public:
 void notice(WarningName WN, llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
             const llvm::Twine &Desc);
 
+void notice(const llvm::Twine &Prefix, const llvm::Twine &Desc,
+            WarningName WN = WarningName::NotAWarning);
+
+void notice(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
+            const llvm::Twine &Desc, WarningName WN = WarningName::NotAWarning);
+
 void warn(WarningName WN, llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
           const llvm::Twine &Desc);
+
+void warn(WarningName WN, const llvm::Twine &Prefix, const llvm::Twine &Desc);
 
 [[noreturn]] void fatal(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
                         const llvm::Twine &Desc);
