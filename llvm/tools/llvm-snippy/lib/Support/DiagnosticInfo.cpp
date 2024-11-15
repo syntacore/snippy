@@ -6,11 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/IR/DiagnosticPrinter.h"
-#include "llvm/Support/CommandLine.h"
-
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/Options.h"
+
+#include "llvm/IR/DiagnosticPrinter.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/WithColor.h"
 
 namespace llvm {
 
@@ -61,58 +62,118 @@ void SnippyDiagnosticInfo::print(llvm::DiagnosticPrinter &DP) const {
     ++WarningIt->second.EncounteredTotal;
 }
 
+void handleDiagnostic(LLVMContext &Ctx, const SnippyDiagnosticInfo &Diag) {
+  auto OldHandlerCallback = Ctx.getDiagnosticHandlerCallBack();
+
+  Ctx.setDiagnosticHandlerCallBack([](const DiagnosticInfo &Info, void *) {
+    HighlightColor Color = [&]() {
+      switch (Info.getSeverity()) {
+      case DS_Error:
+        return HighlightColor::Error;
+      case DS_Remark:
+        return HighlightColor::Remark;
+      case DS_Warning:
+        return HighlightColor::Warning;
+      case DS_Note:
+        return HighlightColor::Note;
+      }
+    }();
+
+    WithColor(errs(), Color)
+        << LLVMContext::getDiagnosticMessagePrefix(Info.getSeverity());
+
+    errs() << ": ";
+
+    DiagnosticPrinterRawOStream DP(errs());
+    Info.print(DP);
+    errs() << "\n";
+    if (Info.getSeverity() == DS_Error)
+      exit(1);
+  });
+
+  Ctx.diagnose(Diag);
+  Ctx.setDiagnosticHandlerCallBack(OldHandlerCallback);
+}
+
+void handleDiagnostic(const SnippyDiagnosticInfo &Diag) {
+  LLVMContext Ctx;
+  handleDiagnostic(Ctx, Diag);
+}
+
+void notice(const llvm::Twine &Prefix, const llvm::Twine &Desc,
+            WarningName WN) {
+  SnippyDiagnosticInfo Diag(Prefix, Desc, llvm::DS_Remark,
+                            WarningName::NotAWarning);
+  handleDiagnostic(Diag);
+}
+
+void notice(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
+            const llvm::Twine &Desc, WarningName WN) {
+  SnippyDiagnosticInfo Diag(Prefix, Desc, llvm::DS_Remark,
+                            WarningName::NotAWarning);
+  handleDiagnostic(Ctx, Diag);
+}
+
 void notice(WarningName WN, llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
             const llvm::Twine &Desc) {
   SnippyDiagnosticInfo Diag(Prefix, Desc, llvm::DS_Remark, WN);
-  Ctx.diagnose(Diag);
+  handleDiagnostic(Ctx, Diag);
 }
 
 void warn(WarningName WN, llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
           const llvm::Twine &Desc) {
   auto MsgCategory = WError ? llvm::DS_Error : llvm::DS_Warning;
   SnippyDiagnosticInfo Diag(Prefix, Desc, MsgCategory, WN);
-  Ctx.diagnose(Diag);
+  handleDiagnostic(Ctx, Diag);
+}
+
+void warn(WarningName WN, const llvm::Twine &Prefix, const llvm::Twine &Desc) {
+  auto MsgCategory = WError ? llvm::DS_Error : llvm::DS_Warning;
+  SnippyDiagnosticInfo Diag(Prefix, Desc, MsgCategory, WN);
+  handleDiagnostic(Diag);
 }
 
 [[noreturn]] void fatal(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
                         const llvm::Twine &Desc) {
   SnippyDiagnosticInfo Diag(Prefix, Desc, llvm::DS_Error,
                             WarningName::NotAWarning);
-  Ctx.diagnose(Diag);
+  handleDiagnostic(Ctx, Diag);
+  llvm_unreachable("snippy::fatal should never return");
 }
 
 [[noreturn]] void fatal(llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
                         Error E) {
   SnippyDiagnosticInfo Diag(Prefix, toString(std::move(E)), llvm::DS_Error,
                             WarningName::NotAWarning);
-  Ctx.diagnose(Diag);
+  handleDiagnostic(Ctx, Diag);
+  llvm_unreachable("snippy::fatal should never return");
 }
 
 [[noreturn]] void fatal(Error E) {
-  llvm::LLVMContext Ctx;
   SnippyDiagnosticInfo Diag(toString(std::move(E)), llvm::DS_Error,
                             WarningName::NotAWarning);
-  Ctx.diagnose(Diag);
+  handleDiagnostic(Diag);
+  llvm_unreachable("snippy::fatal should never return");
 }
 
 [[noreturn]] void fatal(const llvm::Twine &Prefix, const llvm::Twine &Desc) {
-  llvm::LLVMContext Ctx;
   SnippyDiagnosticInfo Diag(Prefix, Desc, llvm::DS_Error,
                             WarningName::NotAWarning);
-  Ctx.diagnose(Diag);
+  handleDiagnostic(Diag);
+  llvm_unreachable("snippy::fatal should never return");
 }
 
 [[noreturn]] void fatal(const llvm::Twine &Desc) {
-  llvm::LLVMContext Ctx;
   SnippyDiagnosticInfo Diag(Desc, llvm::DS_Error, WarningName::NotAWarning);
-  Ctx.diagnose(Diag);
+  handleDiagnostic(Diag);
+  llvm_unreachable("snippy::fatal should never return");
 }
 
 [[noreturn]] void fatal(const llvm::Twine &Prefix, Error E) {
-  llvm::LLVMContext Ctx;
   SnippyDiagnosticInfo Diag(Prefix, toString(std::move(E)), llvm::DS_Error,
                             WarningName::NotAWarning);
-  Ctx.diagnose(Diag);
+  handleDiagnostic(Diag);
+  llvm_unreachable("snippy::fatal should never return");
 }
 
 } // namespace snippy
