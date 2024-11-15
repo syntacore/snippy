@@ -455,12 +455,12 @@ static bool isParsingWithPluginEnabled() {
 
 static unsigned long long
 seedOptToValue(StringRef SeedStr, StringRef SeedType = "instructions seed",
-               StringRef Warning = "no instructions seed specified,"
-                                   " using auto-generated one: ") {
+               StringRef Warning =
+                   "no instructions seed specified, using auto-generated one") {
   if (SeedStr.empty()) {
     auto SeedValue =
         std::chrono::system_clock::now().time_since_epoch().count();
-    llvm::errs() << "warning: " << Warning << SeedValue << "\n";
+    snippy::warn(WarningName::SeedNotSpecified, Warning, Twine(SeedValue));
     return SeedValue;
   }
 
