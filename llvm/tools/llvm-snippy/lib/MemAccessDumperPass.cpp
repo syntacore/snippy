@@ -108,8 +108,8 @@ void dumpMemAccesses(StringRef Filename, const PlainAccessesType &Plain,
                      const BurstGroupAccessesType &BurstRanges,
                      const PlainAccessesType &BurstPlain, bool Restricted) {
   if (Plain.empty() && BurstRanges.empty() && BurstPlain.empty()) {
-    errs() << "warning: cannot dump memory accesses as no accesses were "
-              "generated. File won't be created.\n";
+    snippy::warn(WarningName::MemoryAccess, "Cannot dump memory accesses",
+                 "No accesses were generated, file won't be created.");
     return;
   }
 

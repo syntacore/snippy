@@ -177,13 +177,28 @@ std::string yaml::MappingTraits<snippy::MemoryAccessRange>::validate(
     yaml::IO &Io, snippy::MemoryAccessRange &Range) {
   if (shouldSkipValidation(Io))
     return "";
-  // TODO: Remove this garbage and replace with a proper diagnostic
-  if (Range.FirstOffset > Range.LastOffset)
-    errs() << "Warning: first offset " << Range.FirstOffset << " > last offset "
-           << Range.LastOffset << "\n";
-  if (Range.LastOffset >= Range.Stride)
-    errs() << "Warning: last offset " << Range.LastOffset << " >= stride "
-           << Range.Stride << "\n";
+
+  if (Range.FirstOffset > Range.LastOffset) {
+    // TODO: Maybe this should become a hard error with the next breaking
+    // release?
+    snippy::warn(snippy::WarningName::MemoryAccess,
+                 "Invalid memory access range",
+                 Twine("'first-offset' (")
+                     .concat(Twine(Range.FirstOffset))
+                     .concat(") > 'last-offset' (")
+                     .concat(Twine(Range.LastOffset).concat(")")));
+  }
+
+  if (Range.LastOffset >= Range.Stride) {
+    // TODO: Maybe this should become a hard error with the next breaking
+    // release?
+    snippy::warn(snippy::WarningName::MemoryAccess,
+                 "Invalid memory access range",
+                 Twine("'last-offset' (")
+                     .concat(Twine(Range.LastOffset))
+                     .concat(") >= 'stride' (")
+                     .concat(Twine(Range.Stride).concat(")")));
+  }
 
   if (Range.Stride == 0)
     return "Stride cannot be equal to 0";
