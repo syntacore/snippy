@@ -35,10 +35,10 @@ void RandomMemoryAccessSampler::print(raw_ostream &OS) const {
 void RandomMemoryAccessSampler::updateMAG() {
   static auto MagCount = 0ull;
   MagCount++;
-  MemoryAccessSeq Schemes;
+  std::vector<MemoryAccess *> Schemes;
   for (auto &Scheme : make_range(SplitAccesses.begin(), SplitAccesses.end()))
-    Schemes.emplace_back(Scheme->copy());
-  MAG = OwningMAG{std::move(Schemes), MagCount};
+    Schemes.emplace_back(std::addressof(*Scheme));
+  MAG = MemAccGenerator{std::move(Schemes), MagCount};
 }
 
 MemoryAccessesGenerator &RandomMemoryAccessSampler::getMAG() {
