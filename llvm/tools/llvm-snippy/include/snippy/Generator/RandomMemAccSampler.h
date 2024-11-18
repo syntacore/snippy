@@ -15,7 +15,7 @@
 
 namespace llvm {
 namespace snippy {
-using MemoryAccessesGenerator = OwningMAG<MemoryAccessSeq>;
+using MemoryAccessesGenerator = MemAccGenerator<std::vector<MemoryAccess *>>;
 
 class RandomMemoryAccessSampler : public IMemoryAccessSampler {
   MemoryAccessSeq BaseAccesses;
@@ -24,7 +24,7 @@ class RandomMemoryAccessSampler : public IMemoryAccessSampler {
   MemoryBank RestrictedMB;
   MemoryBank MB;
 
-  MemoryAccessesGenerator MAG{MemoryAccessSeq{}};
+  MemoryAccessesGenerator MAG{std::vector<MemoryAccess *>{}};
 
 private:
   void updateMAG();
