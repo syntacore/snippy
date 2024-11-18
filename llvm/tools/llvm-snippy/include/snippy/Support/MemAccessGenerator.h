@@ -134,22 +134,22 @@ public:
   void dump() const { print(dbgs()); }
 };
 
-template <typename ContT> class OwningMAG final {
+template <typename ContT> class MemAccGenerator final {
   ContT Accesses;
   MemoryAccessGenerator<typename ContT::iterator> MAG;
   size_t MAGId;
 
 public:
   // Id field should be unique only if this MAG is used in plugin interface
-  OwningMAG(ContT Container, size_t Id = 0)
+  MemAccGenerator(ContT Container, size_t Id = 0)
       : Accesses{std::move(Container)}, MAG{Accesses.begin(), Accesses.end()},
         MAGId{Id} {}
 
-  OwningMAG(OwningMAG<ContT> &&OldMAG)
+  MemAccGenerator(MemAccGenerator<ContT> &&OldMAG)
       : Accesses{std::move(OldMAG.Accesses)},
         MAG{Accesses.begin(), Accesses.end()}, MAGId{OldMAG.MAGId} {}
 
-  OwningMAG<ContT> &operator=(OwningMAG<ContT> &&Rhs) {
+  MemAccGenerator<ContT> &operator=(MemAccGenerator<ContT> &&Rhs) {
     Accesses = std::move(Rhs.Accesses);
     MAG = MemoryAccessGenerator<typename ContT::iterator>{Accesses.begin(),
                                                           Accesses.end()};
@@ -172,7 +172,8 @@ public:
 };
 
 // deduction guide for ContT
-template <typename ContT> OwningMAG(ContT, size_t) -> OwningMAG<ContT>;
+template <typename ContT>
+MemAccGenerator(ContT, size_t) -> MemAccGenerator<ContT>;
 
 } // namespace snippy
 } // namespace llvm
