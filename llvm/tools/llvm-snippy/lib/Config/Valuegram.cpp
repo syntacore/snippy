@@ -141,44 +141,57 @@ yaml::ScalarTraits<snippy::APIntWithSign>::mustQuote(StringRef) {
 
 namespace snippy {
 
-Expected<APIntWithSign> APIntWithSign::fromString(StringRef StrView) {
-  StringRef OriginalStr = StrView;
-  APIntWithSign ValueWithSign;
-  APInt &Value = ValueWithSign.Value;
-  bool &IsSigned = ValueWithSign.IsSigned;
+Error APIntWithSign::reportError(Twine Msg) {
+  return createStringError(std::make_error_code(std::errc::invalid_argument),
+                           Msg);
+}
 
-  auto ReportError = [&](Twine Msg) -> Error {
-    return createStringError(std::make_error_code(std::errc::invalid_argument),
-                             Msg);
-  };
-
-  if (StrView.empty())
-    return ReportError("Empty string is not a valid number");
-
-  // We remove minus because StringRef::getAsInteger method overload for APInt
-  // doesn't handle the minus.
-  if ((IsSigned = StrView.starts_with("-")))
-    StrView = StrView.drop_front(1);
-
-  if (IsSigned && getAutoSenseRadix(StrView) != 10)
-    return ReportError(
+Expected<APInt> APIntWithSign::parseAPInt(StringRef StrView,
+                                          bool HasNegativeSign, unsigned Radix,
+                                          StringRef OriginalStr) {
+  if (HasNegativeSign && Radix != 10)
+    return reportError(
         Twine("Value '")
             .concat(OriginalStr)
             .concat("' is negative, but the radix is not equal to 10"));
 
-  auto ParseFailed = StrView.getAsInteger(0, Value);
+  APInt Value(64 /* numBits */, 0 /* val */);
+  auto ParseFailed = StrView.getAsInteger(Radix, Value);
   if (ParseFailed)
-    return ReportError(Twine("Value '")
+    return reportError(Twine("Value '")
                            .concat(OriginalStr)
                            .concat("' is not a valid integer"));
 
-  if (!IsSigned)
-    return ValueWithSign;
+  if (HasNegativeSign) {
+    Value = Value.zextOrTrunc(Value.getSignificantBits());
+    Value.negate();
+    assert(Value.isNegative());
+  }
 
-  Value = Value.zextOrTrunc(Value.getSignificantBits());
-  Value.negate();
-  assert(Value.isNegative());
+  return Value;
+}
 
+Expected<APIntWithSign> APIntWithSign::fromString(StringRef StrView) {
+  StringRef OriginalStr = StrView;
+  APIntWithSign ValueWithSign;
+  APInt &Value = ValueWithSign.Value;
+  bool &HasNegativeSign = ValueWithSign.IsSigned;
+
+  if (StrView.empty())
+    return reportError("Empty string is not a valid number");
+
+  // We remove minus because StringRef::getAsInteger method overload for APInt
+  // doesn't handle the minus.
+  HasNegativeSign = StrView.consume_front("-");
+
+  auto Radix = getAutoSenseRadix(StrView);
+
+  Expected<APInt> ExpectedValue =
+      parseAPInt(StrView, HasNegativeSign, Radix, OriginalStr);
+  if (auto E = ExpectedValue.takeError())
+    return reportError(toString(std::move(E)));
+
+  Value = *ExpectedValue;
   return ValueWithSign;
 }
 
