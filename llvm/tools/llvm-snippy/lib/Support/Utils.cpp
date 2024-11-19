@@ -94,21 +94,24 @@ std::string floatToString(APFloat F, unsigned Precision) {
   return S.str().str();
 }
 
-unsigned getAutoSenseRadix(StringRef Str) {
+unsigned getAutoSenseRadix(StringRef &Str) {
   if (Str.empty())
     return 10;
-  if (Str.starts_with("0x") || Str.starts_with("0X")) {
+
+  if (Str.consume_front_insensitive("0x"))
     return 16;
-  }
-  if (Str.starts_with("0b") || Str.starts_with("0B")) {
+
+  if (Str.consume_front_insensitive("0b"))
     return 2;
-  }
-  if (Str.starts_with("0o")) {
+
+  if (Str.consume_front("0o"))
     return 8;
-  }
+
   if (Str[0] == '0' && Str.size() > 1 && isDigit(Str[1])) {
+    Str = Str.substr(1);
     return 8;
   }
+
   return 10;
 }
 
