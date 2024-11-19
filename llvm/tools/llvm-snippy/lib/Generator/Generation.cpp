@@ -1080,9 +1080,10 @@ void spillPseudoInstImplicitRegs(
   }
 }
 
-void generateInstruction(const MCInstrDesc &InstrDesc,
-                         planning::InstructionGenerationContext &InstrGenCtx,
-                         std::vector<planning::PreselectedOpInfo> Preselected) {
+void generateRealInstruction(
+    const MCInstrDesc &InstrDesc,
+    planning::InstructionGenerationContext &InstrGenCtx,
+    std::vector<planning::PreselectedOpInfo> Preselected) {
   auto &State = InstrGenCtx.GC.getLLVMState();
   auto Opc = InstrDesc.getOpcode();
   const auto &SnippyTgt = State.getSnippyTarget();
@@ -1104,6 +1105,13 @@ void generateInstruction(const MCInstrDesc &InstrDesc,
     return;
 
   spillPseudoInstImplicitRegs(*MI, InstrGenCtx);
+}
+
+void generateInstruction(const MCInstrDesc &InstrDesc,
+                         planning::InstructionGenerationContext &InstrGenCtx,
+                         std::vector<planning::PreselectedOpInfo> Preselected) {
+
+  generateRealInstruction(InstrDesc, InstrGenCtx, std::move(Preselected));
 }
 
 MachineBasicBlock *findNextBlockOnModel(MachineBasicBlock &MBB,

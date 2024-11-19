@@ -291,7 +291,7 @@ auto transformOpt(const std::optional<T> &O, Func &&F)
   return std::nullopt;
 }
 
-unsigned getAutoSenseRadix(StringRef Str);
+unsigned getAutoSenseRadix(StringRef &Str);
 
 void replaceAllSubstrs(std::string &Str, StringRef What, StringRef With);
 
