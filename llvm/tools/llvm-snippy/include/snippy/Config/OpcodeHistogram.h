@@ -126,6 +126,11 @@ struct OpcodeHistogramDecodedEntry {
   std::string RegexPattern;
 };
 
+struct OpcodeHistogramCodedEntry {
+  std::string InstrMnemonic;
+  std::string Weight;
+};
+
 } // namespace snippy
 
 template <>
@@ -133,21 +138,6 @@ struct snippy::YAMLHistogramTraits<snippy::OpcodeHistogramDecodedEntry> {
   static ConfigIOContext &getContext(yaml::IO &IO) {
     return *static_cast<ConfigIOContext *>(IO.getContext());
   }
-
-  static OpcodeHistogramDecodedEntry
-  reportError(yaml::IO &IO, const Twine &Prefix, const Twine &Msg) {
-    IO.setError(Prefix + ": " + Msg);
-    return {};
-  }
-
-  static OpcodeHistogramDecodedEntry reportNoMatchesError(yaml::IO &IO,
-                                                          StringRef OpcodeStr) {
-    reportError(IO, "Illegal opcode for specified cpu",
-                Twine(OpcodeStr) + "\nUse -list-opcode-names option "
-                                   "to check for available instructions!");
-    return {};
-  }
-
   using DenormEntry = OpcodeHistogramDecodedEntry;
   using MapType = OpcodeHistogram;
 
@@ -161,5 +151,11 @@ struct snippy::YAMLHistogramTraits<snippy::OpcodeHistogramDecodedEntry> {
                            std::vector<DenormEntry> &Entries);
   static std::string validate(ArrayRef<DenormEntry> Entries) { return ""; }
 };
+
+snippy::OpcodeHistogramCodedEntry
+codeInstrFromOpcode(yaml::IO &IO, const snippy::OpcodeHistogramDecodedEntry &E);
+
+Expected<snippy::OpcodeHistogramDecodedEntry>
+decodeInstrRegex(yaml::IO &IO, StringRef OpcodeStr, double Weight);
 
 } // namespace llvm
