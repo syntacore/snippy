@@ -32,16 +32,28 @@ namespace llvm {
 // all mapping shall live in llvm, not in llvm::snippy
 using namespace snippy;
 
-OpcodeHistogramDecodedEntry
-YAMLHistogramTraits<OpcodeHistogramDecodedEntry>::denormalizeEntry(
-    yaml::IO &IO, StringRef OpcodeStr, double Weight) {
-  auto &ParserCtx = getContext(IO);
+Expected<OpcodeHistogramDecodedEntry>
+decodeInstrRegex(yaml::IO &IO, StringRef OpcodeStr, double Weight) {
+  auto &ParserCtx = snippy::YAMLHistogramTraits<
+      snippy::OpcodeHistogramDecodedEntry>::getContext(IO);
   const auto &OpCC = ParserCtx.OpCC;
+
+  auto ReportError = [&](Twine Msg) -> Error {
+    return createStringError(std::make_error_code(std::errc::invalid_argument),
+                             Msg);
+  };
+
+  auto ReportNoMatchesError = [&](Twine OpcodeStr) -> Error {
+    return ReportError("Illegal opcode for specified cpu: " + Twine(OpcodeStr) +
+                       "\nUse -list-opcode-names option "
+                       "to check for available instructions!");
+  };
 
   if (Regex::isLiteralERE(OpcodeStr)) {
     auto Opcode = OpCC.code(OpcodeStr.str());
     if (!Opcode)
-      return reportNoMatchesError(IO, OpcodeStr);
+      return ReportNoMatchesError(OpcodeStr);
+
     return OpcodeHistogramDecodedEntry{{*Opcode, Weight}};
   }
 
@@ -51,8 +63,8 @@ YAMLHistogramTraits<OpcodeHistogramDecodedEntry>::denormalizeEntry(
   Regex OpcodeRegexp(NameStorage);
   std::string Error;
   if (!OpcodeRegexp.isValid(Error))
-    return reportError(
-        IO, "Illegal opcode regular expression \"" + OpcodeStr + "\"", Error);
+    return ReportError("Illegal opcode regular expression \"" + OpcodeStr +
+                       "\": " + Twine(Error));
 
   SmallVector<unsigned, 16> MatchedOpcodes;
   OpCC.code(OpcodeRegexp, MatchedOpcodes);
@@ -63,20 +75,41 @@ YAMLHistogramTraits<OpcodeHistogramDecodedEntry>::denormalizeEntry(
       });
 
   if (MatchedOpcodes.empty())
-    return reportNoMatchesError(IO, OpcodeStr);
-
+    return ReportNoMatchesError(OpcodeStr);
   return Result;
 }
 
-void YAMLHistogramTraits<OpcodeHistogramDecodedEntry>::normalizeEntry(
-    yaml::IO &IO, const DenormEntry &E, SmallVectorImpl<SValue> &RawStrings) {
+OpcodeHistogramDecodedEntry
+YAMLHistogramTraits<OpcodeHistogramDecodedEntry>::denormalizeEntry(
+    yaml::IO &IO, StringRef OpcodeStr, double Weight) {
+  Expected<OpcodeHistogramDecodedEntry> Decoded =
+      decodeInstrRegex(IO, OpcodeStr, Weight);
+  if (auto E = Decoded.takeError()) {
+    IO.setError(toString(std::move(E)));
+    return OpcodeHistogramDecodedEntry{};
+  }
+
+  return *Decoded;
+}
+
+OpcodeHistogramCodedEntry
+codeInstrFromOpcode(yaml::IO &IO, const OpcodeHistogramDecodedEntry &E) {
   auto &Decoded = E.Decoded;
   assert(Decoded.size() == 1 && "Expected entry to contain only a "
                                 "single opcode, can't serialize");
   auto &First = Decoded.front();
-  const auto &OpCC = getContext(IO).OpCC;
-  RawStrings.push_back(std::string(OpCC.name(First.Opcode)));
-  RawStrings.push_back(std::to_string(First.Weight));
+  const auto &OpCC = snippy::YAMLHistogramTraits<
+                         snippy::OpcodeHistogramDecodedEntry>::getContext(IO)
+                         .OpCC;
+  return OpcodeHistogramCodedEntry{std::string(OpCC.name(First.Opcode)),
+                                   std::to_string(First.Weight)};
+}
+
+void YAMLHistogramTraits<OpcodeHistogramDecodedEntry>::normalizeEntry(
+    yaml::IO &IO, const DenormEntry &E, SmallVectorImpl<SValue> &RawStrings) {
+  auto Result = codeInstrFromOpcode(IO, E);
+  RawStrings.push_back(Result.InstrMnemonic);
+  RawStrings.push_back(Result.Weight);
 }
 
 OpcodeHistogram

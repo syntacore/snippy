@@ -36,6 +36,9 @@ struct APIntWithSign {
   APInt Value;
   bool IsSigned;
   static Expected<APIntWithSign> fromString(StringRef StrView);
+  static Expected<APInt> parseAPInt(StringRef StrView, bool HasNegativeSign,
+                                    unsigned Radix, StringRef OriginalStr);
+  static Error reportError(Twine Msg);
 };
 
 // Valuegram is an ordered collection of arbitrary weighted types.
