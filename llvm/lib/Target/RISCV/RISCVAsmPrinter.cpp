@@ -127,6 +127,8 @@ void RISCVAsmPrinter::LowerSTATEPOINT(MCStreamer &OutStreamer, StackMaps &SM,
 void RISCVAsmPrinter::EmitToStreamer(MCStreamer &S, const MCInst &Inst) {
   MCInst CInst;
   bool Res = RISCVRVC::compress(CInst, Inst, *STI);
+  if (Inst.getFlags() & RISCV::DoNotCompress)
+    Res = false;
   if (Res)
     ++RISCVNumInstrsCompressed;
   AsmPrinter::EmitToStreamer(*OutStreamer, Res ? CInst : Inst);
@@ -907,6 +909,9 @@ static bool lowerRISCVVMachineInstrToMCInst(const MachineInstr *MI,
 }
 
 bool RISCVAsmPrinter::lowerToMCInst(const MachineInstr *MI, MCInst &OutMI) {
+  if (MI->getAsmPrinterFlags() & RISCV::DoNotCompress)
+    OutMI.setFlags(OutMI.getFlags() | RISCV::DoNotCompress);
+
   if (lowerRISCVVMachineInstrToMCInst(MI, OutMI))
     return false;
 

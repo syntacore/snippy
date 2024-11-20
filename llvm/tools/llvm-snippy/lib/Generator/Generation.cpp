@@ -1015,7 +1015,9 @@ randomInstruction(const MCInstrDesc &InstrDesc,
   auto &State = GC.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
-  auto MIB = BuildMI(MBB, InstrGenCtx.Ins, MIMetadata(), InstrDesc);
+  auto MIB = getMainInstBuilder(SnippyTgt, MBB, InstrGenCtx.Ins,
+                                MBB.getParent()->getFunction().getContext(),
+                                InstrDesc);
 
   bool DoPostprocess = isPostprocessNeeded(InstrDesc, Preselected, GC);
 
