@@ -530,6 +530,8 @@ public:
                                            LLVMState &State) const override {
     reportUnimplementedError();
   }
+
+  void addAsmPrinterFlags(MachineInstr &MI) const override {}
 }; // namespace
 
 bool SnippyX86Target::matchesArch(Triple::ArchType Arch) const {

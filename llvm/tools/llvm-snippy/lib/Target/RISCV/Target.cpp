@@ -544,10 +544,12 @@ RISCVMatInt::InstSeq getIntMatInstrSeq(APInt Value, GeneratorContext &GC) {
 }
 
 void generateRVVMaskReset(const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB,
-                          MachineBasicBlock::iterator Ins) {
+                          MachineBasicBlock::iterator Ins,
+                          const SnippyTarget &Tgt) {
   if (NoMaskModeForRVV)
     return;
-  getSupportInstBuilder(MBB, Ins, MBB.getParent()->getFunction().getContext(),
+  getSupportInstBuilder(Tgt, MBB, Ins,
+                        MBB.getParent()->getFunction().getContext(),
                         InstrInfo.get(RISCV::VMXNOR_MM))
       .addReg(RISCV::V0, RegState::Define)
       .addReg(RISCV::V0, RegState::Undef)
@@ -853,13 +855,13 @@ template <typename It> static void storeWordToMem(It MemIt, uint32_t Value) {
 
 static void addGeneratedInstrsToBB(MachineBasicBlock &MBB,
                                    MachineBasicBlock::iterator Ins,
-                                   GeneratorContext &GC,
-                                   ArrayRef<MCInst> Insts) {
+                                   GeneratorContext &GC, ArrayRef<MCInst> Insts,
+                                   const SnippyTarget &Tgt) {
   auto &State = GC.getLLVMState();
   const auto &InstrInfo = State.getInstrInfo();
 
   for (const auto &Inst : Insts) {
-    auto MIB = getSupportInstBuilder(MBB, Ins, State.getCtx(),
+    auto MIB = getSupportInstBuilder(Tgt, MBB, Ins, State.getCtx(),
                                      InstrInfo.get(Inst.getOpcode()));
     assert(Inst.begin()->isReg() && "In write instructions, the first operand "
                                     "is always the destination register");
@@ -1142,7 +1144,7 @@ public:
       auto XReg = regIndexToMCReg(RegNo, RegStorageType::XReg, GC);
       auto VReg = regIndexToMCReg(RegNo, RegStorageType::VReg, GC);
       if (!RP.isReserved(VReg, MBB))
-        getSupportInstBuilder(MBB, InsertPos,
+        getSupportInstBuilder(*this, MBB, InsertPos,
                               MBB.getParent()->getFunction().getContext(),
                               InstrInfo.get(RISCV::VMV_V_X), VReg)
             .addReg(XReg);
@@ -1388,7 +1390,9 @@ public:
     }
 
     const auto &RegInfo = State.getRegInfo();
-    auto MIB = BuildMI(MBB, MBB.end(), MIMetadata(), BranchDesc);
+    auto MIB = getMainInstBuilder(*this, MBB, MBB.end(),
+                                  MBB.getParent()->getFunction().getContext(),
+                                  BranchDesc);
     const auto &MCRegClass =
         RegInfo.getRegClass(BranchDesc.operands()[0].RegClass);
     auto FirstReg = RP.getAvailableRegister("for branch condition", RegInfo,
@@ -1428,7 +1432,9 @@ public:
     auto CondReg = CondOp.getReg();
     auto *DstMBB = getBranchDestination(Branch);
     assert(DstMBB);
-    auto &MI = *BuildMI(*MBB, Branch, MIMetadata(), InstrInfo.get(UncompOpcode))
+    auto &MI = *getMainInstBuilder(*this, *MBB, Branch,
+                                   MBB->getParent()->getFunction().getContext(),
+                                   InstrInfo.get(UncompOpcode))
                     .addReg(CondReg)
                     .addReg(RISCV::X0)
                     .addMBB(DstMBB);
@@ -1492,7 +1498,7 @@ public:
   void insertFallbackBranch(MachineBasicBlock &From, MachineBasicBlock &To,
                             const LLVMState &State) const override {
     const auto &InstrInfo = State.getInstrInfo();
-    getSupportInstBuilder(From, From.end(),
+    getSupportInstBuilder(*this, From, From.end(),
                           From.getParent()->getFunction().getContext(),
                           InstrInfo.get(RISCV::PseudoBR))
         .addMBB(&To);
@@ -1650,7 +1656,10 @@ public:
     auto FirstReg =
         EqBranch ? ReservedRegs[LimitRegIdx] : ReservedRegs[CounterRegIdx];
     auto NewBranch =
-        BuildMI(*BranchMBB, Branch, MIMetadata(), InstrDesc).addReg(FirstReg);
+        getMainInstBuilder(*this, *BranchMBB, Branch,
+                           BranchMBB->getParent()->getFunction().getContext(),
+                           InstrDesc)
+            .addReg(FirstReg);
     if (!isCompressedBranch(Opcode)) {
       auto SecondReg = EqBranch ? RISCV::X0 : ReservedRegs[LimitRegIdx];
       NewBranch.addReg(SecondReg);
@@ -1831,14 +1840,14 @@ public:
       auto LimitReg = ReservedRegs[LimitRegIdx];
       // Closest power of two (floor)
       NIter = bit_floor(NIter);
-      getSupportInstBuilder(MBB, Pos,
+      getSupportInstBuilder(*this, MBB, Pos,
                             MBB.getParent()->getFunction().getContext(),
                             InstrInfo.get(ADDIOp))
           .addReg(CounterReg, RegState::Define)
           .addReg(CounterReg)
           .addImm(1);
       // SRLI can't be compressed because rd and rs1 are different regs
-      getSupportInstBuilder(MBB, Pos,
+      getSupportInstBuilder(*this, MBB, Pos,
                             MBB.getParent()->getFunction().getContext(),
                             InstrInfo.get(RISCV::SRLI))
           .addReg(LimitReg, RegState::Define)
@@ -1863,7 +1872,7 @@ public:
              "C_BNEZ is not supported with non zero value of the loop counter");
       [[fallthrough]];
     case RISCV::BNE:
-      getSupportInstBuilder(MBB, Pos,
+      getSupportInstBuilder(*this, MBB, Pos,
                             MBB.getParent()->getFunction().getContext(),
                             InstrInfo.get(ADDIOp))
           .addReg(CounterReg, RegState::Define)
@@ -1875,7 +1884,7 @@ public:
       break;
     case RISCV::BLT:
     case RISCV::BLTU:
-      getSupportInstBuilder(MBB, Pos,
+      getSupportInstBuilder(*this, MBB, Pos,
                             MBB.getParent()->getFunction().getContext(),
                             InstrInfo.get(ADDIOp))
           .addReg(CounterReg, RegState::Define)
@@ -1888,7 +1897,7 @@ public:
       break;
     case RISCV::BGE:
     case RISCV::BGEU:
-      getSupportInstBuilder(MBB, Pos,
+      getSupportInstBuilder(*this, MBB, Pos,
                             MBB.getParent()->getFunction().getContext(),
                             InstrInfo.get(ADDIOp))
           .addReg(CounterReg, RegState::Define)
@@ -1916,7 +1925,7 @@ public:
                                   unsigned LastInstrOpc) const override {
     const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
     auto MIB = getSupportInstBuilder(
-        MBB, MBB.end(), MBB.getParent()->getFunction().getContext(),
+        *this, MBB, MBB.end(), MBB.getParent()->getFunction().getContext(),
         InstrInfo.get(LastInstrOpc));
     return MIB;
   }
@@ -2025,7 +2034,7 @@ public:
     auto &State = GC.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
-    getSupportInstBuilder(MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
+    getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
         .addDef(SP)
         .addReg(SP)
         .addImm(-static_cast<int64_t>(getSpillSizeInBytes(Reg, GC)));
@@ -2044,7 +2053,7 @@ public:
     auto &Ctx = State.getCtx();
 
     loadRegFromAddrInReg(MBB, Ins, SP, Reg, GC);
-    getSupportInstBuilder(MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
+    getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
         .addDef(SP)
         .addReg(SP)
         .addImm(getSpillSizeInBytes(Reg, GC));
@@ -2060,7 +2069,7 @@ public:
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
 
-    getSupportInstBuilder(MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
+    getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
         .addDef(SP)
         .addReg(SP)
         .addImm(getSpillSizeInBytes(Reg, GC));
@@ -2087,13 +2096,14 @@ public:
     // That's why create auipc + addi pair manually.
 
     MachineInstr *MIAUIPC =
-        getSupportInstBuilder(MBB, Ins, Ctx, InstrInfo.get(RISCV::AUIPC))
+        getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::AUIPC))
             .addReg(DestReg)
             .addGlobalAddress(Target, 0, RISCVII::MO_PCREL_HI);
     MCSymbol *AUIPCSymbol = MF->getContext().createNamedTempSymbol("pcrel_hi");
     MIAUIPC->setPreInstrSymbol(*MF, AUIPCSymbol);
 
-    return getSupportInstBuilder(MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
+    return getSupportInstBuilder(*this, MBB, Ins, Ctx,
+                                 InstrInfo.get(RISCV::ADDI))
         .addReg(DestReg)
         .addReg(DestReg)
         .addSym(AUIPCSymbol, RISCVII::MO_PCREL_LO);
@@ -2108,7 +2118,7 @@ public:
     auto &Ctx = State.getCtx();
     // Despite PseudoCALL gets expanded by RISCVMCCodeEmitter to JALR
     // instruction, it has chance to be relaxed back to JAL by linker.
-    return getInstBuilder(AsSupport, MBB, Ins, Ctx,
+    return getInstBuilder(AsSupport, *this, MBB, Ins, Ctx,
                           InstrInfo.get(RISCV::PseudoCALL))
         .addGlobalAddress(&Target, 0, RISCVII::MO_CALL);
   }
@@ -2126,7 +2136,7 @@ public:
     auto Reg = getNonZeroReg("scratch register for storing function address",
                              RI, RegClass, RP, MBB);
     loadSymbolAddress(MBB, Ins, GC, Reg, &Target);
-    return getInstBuilder(AsSupport, MBB, Ins, Ctx,
+    return getInstBuilder(AsSupport, *this, MBB, Ins, Ctx,
                           InstrInfo.get(RISCV::PseudoCALLIndirect))
         .addReg(Reg);
   }
@@ -2152,7 +2162,7 @@ public:
     const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
     auto &State = GC.getLLVMState();
     auto &Ctx = State.getCtx();
-    return getSupportInstBuilder(MBB, MBB.end(), Ctx,
+    return getSupportInstBuilder(*this, MBB, MBB.end(), Ctx,
                                  InstrInfo.get(RISCV::PseudoTAIL))
         .addGlobalAddress(&Target, 0, RISCVII::MO_CALL);
   }
@@ -2161,7 +2171,7 @@ public:
                                const LLVMState &State) const override {
     const auto &InstrInfo = State.getInstrInfo();
     auto MIB = getSupportInstBuilder(
-        MBB, MBB.end(), MBB.getParent()->getFunction().getContext(),
+        *this, MBB, MBB.end(), MBB.getParent()->getFunction().getContext(),
         InstrInfo.get(RISCV::PseudoRET));
     return MIB;
   }
@@ -2171,7 +2181,7 @@ public:
                             const LLVMState &State) const override {
     const auto &InstrInfo = State.getInstrInfo();
     auto MIB = getSupportInstBuilder(
-                   MBB, Ins, MBB.getParent()->getFunction().getContext(),
+                   *this, MBB, Ins, MBB.getParent()->getFunction().getContext(),
                    InstrInfo.get(RISCV::ADDI), RISCV::X0)
                    .addReg(RISCV::X0)
                    .addImm(0);
@@ -2241,7 +2251,7 @@ public:
         getTransformSequenceLength(OldValue, NewValue, Register, GC) ==
             (getWriteValueSequenceLength(ValueToWrite, ScratchReg, GC) + 1) &&
         "Generated sequence length does not match expected one");
-    getSupportInstBuilder(MBB, Ins, State.getCtx(),
+    getSupportInstBuilder(*this, MBB, Ins, State.getCtx(),
                           InstrInfo.get(WillUseAdd ? RISCV::ADD : RISCV::SUB),
                           Register)
         .addReg(Register)
@@ -2264,8 +2274,8 @@ public:
 
     auto XRegBitSize = getRegBitWidth(Register, GC);
     writeValueToReg(MBB, Ins, APInt(XRegBitSize, Stride), Register, RP, GC);
-    getSupportInstBuilder(MBB, Ins, State.getCtx(), InstrInfo.get(RISCV::MUL),
-                          Register)
+    getSupportInstBuilder(*this, MBB, Ins, State.getCtx(),
+                          InstrInfo.get(RISCV::MUL), Register)
         .addReg(Register)
         .addReg(IndexReg);
 
@@ -2277,8 +2287,8 @@ public:
         getNonZeroReg("Scratch register for BaseAddr", RI, RegClass, RP, MBB);
 
     writeValueToReg(MBB, Ins, APInt(XRegBitSize, BaseAddr), AddrReg, RP, GC);
-    getSupportInstBuilder(MBB, Ins, State.getCtx(), InstrInfo.get(RISCV::ADD),
-                          Register)
+    getSupportInstBuilder(*this, MBB, Ins, State.getCtx(),
+                          InstrInfo.get(RISCV::ADD), Register)
         .addReg(Register)
         .addReg(AddrReg);
   }
@@ -2528,7 +2538,7 @@ public:
 
     SmallVector<MCInst> InstrsForWrite;
     generateWriteValueSeq(Value, DstReg, GC, RP, MBB, InstrsForWrite);
-    addGeneratedInstrsToBB(MBB, Ins, GC, InstrsForWrite);
+    addGeneratedInstrsToBB(MBB, Ins, GC, InstrsForWrite, *this);
   }
 
   void copyRegToReg(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
@@ -2538,7 +2548,8 @@ public:
            "Both src and dst registers must be GPR");
     auto &State = GC.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
-    getSupportInstBuilder(MBB, Ins, MBB.getParent()->getFunction().getContext(),
+    getSupportInstBuilder(*this, MBB, Ins,
+                          MBB.getParent()->getFunction().getContext(),
                           InstrInfo.get(RISCV::ADD), Rd)
         .addReg(Rs)
         .addReg(RISCV::X0);
@@ -2548,7 +2559,7 @@ public:
                             MachineBasicBlock::iterator Ins, MCRegister AddrReg,
                             MCRegister Reg, GeneratorContext &GC) const {
     const auto LoadInstr = generateLoadRegFromAddrInReg(AddrReg, Reg, GC);
-    addGeneratedInstrsToBB(MBB, Ins, GC, {LoadInstr});
+    addGeneratedInstrsToBB(MBB, Ins, GC, {LoadInstr}, *this);
   }
 
   MCInst generateLoadRegFromAddrInReg(MCRegister AddrReg, MCRegister Reg,
@@ -2579,7 +2590,7 @@ public:
                        GeneratorContext &GC) const override {
     SmallVector<MCInst> InstrsForWrite;
     generateLoadRegFromAddr(MBB, Addr, Reg, RP, GC, InstrsForWrite);
-    addGeneratedInstrsToBB(MBB, Ins, GC, InstrsForWrite);
+    addGeneratedInstrsToBB(MBB, Ins, GC, InstrsForWrite, *this);
   }
 
   void generateLoadRegFromAddr(const MachineBasicBlock &MBB, uint64_t Addr,
@@ -2610,7 +2621,7 @@ public:
     if (RISCV::GPRRegClass.contains(Reg)) {
       auto StoreOp = getStoreOpcode(BytesToWrite ? BytesToWrite * RISCV_CHAR_BIT
                                                  : getRegBitWidth(Reg, GC));
-      getSupportInstBuilder(MBB, Ins, Ctx, InstrInfo.get(StoreOp))
+      getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(StoreOp))
           .addReg(Reg)
           .addReg(AddrReg)
           .addImm(0);
@@ -2618,21 +2629,21 @@ public:
                RISCV::FPR16RegClass.contains(Reg)) {
       assert(BytesToWrite == 0 ||
              BytesToWrite * RISCV_CHAR_BIT == getRegBitWidth(Reg, GC));
-      getSupportInstBuilder(MBB, Ins, Ctx, InstrInfo.get(RISCV::FSW))
+      getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::FSW))
           .addReg(Reg)
           .addReg(AddrReg)
           .addImm(0);
     } else if (RISCV::FPR64RegClass.contains(Reg)) {
       assert(BytesToWrite == 0 ||
              BytesToWrite * RISCV_CHAR_BIT == getRegBitWidth(Reg, GC));
-      getSupportInstBuilder(MBB, Ins, Ctx, InstrInfo.get(RISCV::FSD))
+      getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::FSD))
           .addReg(Reg)
           .addReg(AddrReg)
           .addImm(0);
     } else if (RISCV::VRRegClass.contains(Reg)) {
       assert(BytesToWrite == 0 ||
              BytesToWrite * RISCV_CHAR_BIT == getRegBitWidth(Reg, GC));
-      getSupportInstBuilder(MBB, Ins, Ctx, InstrInfo.get(RISCV::VS1R_V))
+      getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::VS1R_V))
           .addReg(Reg)
           .addReg(AddrReg);
     } else {
@@ -3011,10 +3022,18 @@ private:
                                            MachineBasicBlock &TBB,
                                            LLVMState &State) const override {
     auto &InstrInfo = State.getInstrInfo();
-    return *getSupportInstBuilder(MBB, Ins, State.getCtx(),
+    return *getSupportInstBuilder(*this, MBB, Ins, State.getCtx(),
                                   InstrInfo.get(RISCV::PseudoBR))
                 .addMBB(&TBB)
                 .getInstr();
+  }
+
+  void addAsmPrinterFlags(MachineInstr &MI) const override {
+    // Add DoNotCompress flags only to main instructions as they must correspond
+    // to the given histogram. On the other hand, we'd like to compress support
+    // instructions as much as possible to reduce total overhead.
+    if (!checkSupportMetadata(MI))
+      MI.setAsmPrinterFlag(RISCV::DoNotCompress);
   }
 };
 
@@ -3120,7 +3139,7 @@ void SnippyRISCVTarget::rvvWriteValueUsingXReg(MachineBasicBlock &MBB,
   for (unsigned Idx = 0; Idx < VL; ++Idx) {
     auto EltValue = Value.extractBitsAsZExtValue(SEW, Idx * SEW);
     writeValueToReg(MBB, Ins, APInt(SEW, EltValue), XScratchReg, RP, GC);
-    getSupportInstBuilder(MBB, Ins, State.getCtx(),
+    getSupportInstBuilder(*this, MBB, Ins, State.getCtx(),
                           InstrInfo.get(RISCV::VSLIDE1DOWN_VX), DstReg)
         .addReg(DstReg, RegFlags)
         .addReg(XScratchReg)
@@ -3282,7 +3301,7 @@ void SnippyRISCVTarget::generateV0MaskUpdate(
     LLVM_DEBUG(dbgs() << "Resetting mask instruction for mask:"
                       << toString(VLVM.VM, /* Radix */ 16, /* Signed */ false)
                       << "\n");
-    generateRVVMaskReset(InstrInfo, MBB, Ins);
+    generateRVVMaskReset(InstrInfo, MBB, Ins, *this);
     return;
   }
 
@@ -3314,8 +3333,9 @@ void SnippyRISCVTarget::generateVSETIVLI(
     snippy::fatal(formatv("cannot set the desired VL {0} since selected "
                           "VSETIVLI does not support it",
                           VL));
-  auto MIB = getInstBuilder(SupportMarker, MBB, Ins, GC.getLLVMState().getCtx(),
-                            InstrInfo.get(RISCV::VSETIVLI));
+  auto MIB =
+      getInstBuilder(SupportMarker, *this, MBB, Ins, GC.getLLVMState().getCtx(),
+                     InstrInfo.get(RISCV::VSETIVLI));
   MIB.addDef(DstReg).addImm(VL).addImm(VTYPE);
 }
 
@@ -3337,8 +3357,9 @@ void SnippyRISCVTarget::generateVSETVLI(const MCInstrInfo &InstrInfo,
   writeValueToReg(MBB, Ins,
                   APInt(GC.getSubtarget<RISCVSubtarget>().getXLen(), VL),
                   ScratchRegVL, RP, GC);
-  auto MIB = getInstBuilder(SupportMarker, MBB, Ins, GC.getLLVMState().getCtx(),
-                            InstrInfo.get(RISCV::VSETVLI));
+  auto MIB =
+      getInstBuilder(SupportMarker, *this, MBB, Ins, GC.getLLVMState().getCtx(),
+                     InstrInfo.get(RISCV::VSETVLI));
   MIB.addDef(DstReg);
   MIB.addReg(ScratchRegVL);
   MIB.addImm(VTYPE);
@@ -3367,8 +3388,9 @@ void SnippyRISCVTarget::generateVSETVL(const MCInstrInfo &InstrInfo,
   RP.addReserved(ScratchRegVL);
   writeValueToReg(MBB, Ins, APInt(ST.getXLen(), VTYPE), ScratchRegVType, RP,
                   GC);
-  auto MIB = getInstBuilder(SupportMarker, MBB, Ins, GC.getLLVMState().getCtx(),
-                            InstrInfo.get(RISCV::VSETVL));
+  auto MIB =
+      getInstBuilder(SupportMarker, *this, MBB, Ins, GC.getLLVMState().getCtx(),
+                     InstrInfo.get(RISCV::VSETVL));
   MIB.addDef(DstReg);
   MIB.addReg(ScratchRegVL);
   MIB.addReg(ScratchRegVType);

@@ -271,6 +271,15 @@ private:
 
 namespace RISCV {
 
+enum AsmComments {
+  // This flag disables the compression even if C-ext is given and the
+  // instruction can be compressed.
+  // This contradicts the purpose of the 'AsmComment' mechanism as it doesn't
+  // add any asm comment and modifies asm printer behavior. However, currently
+  // it should not introduce any real problems.
+  DoNotCompress = MachineInstr::TAsmComments
+};
+
 // Returns true if this is the sext.w pattern, addiw rd, rs1, 0.
 bool isSEXT_W(const MachineInstr &MI);
 bool isZEXT_W(const MachineInstr &MI);

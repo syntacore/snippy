@@ -1,0 +1,34 @@
+# COM: run snippy and print MF that contains opcodes as we generated them in snippy
+# RUN: llvm-snippy %s -o %t -dump-mf >& %t.dump.mf
+
+# COM: objdump resulting elf, compressed instructions will be parsed with "c.*"
+# RUN: llvm-objdump %t.elf -M no-aliases -d >& %t.dump.obj
+
+# COM: count entries of compressed add instructions from both dumps
+# RUN: grep "C_ADD" %t.dump.mf | wc -l >& %t.count.mf
+# RUN: grep "c.add" %t.dump.obj | wc -l >& %t.count.obj
+
+# COM: check that the number of compressed instructions in MF dump and resulting elf
+# COM: is the same.
+# RUN: diff -q %t.count.mf %t.count.obj
+
+options:
+  march: riscv64-unknown-elf
+  mattr: +c
+  num-instrs: 100000
+
+sections:
+  - no:        1
+    VMA:       0
+    SIZE:      0x1000000
+    LMA:       0
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x1000000
+    SIZE:      0x1000000
+    LMA:       0
+    ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [C_ADD, 1.0]
