@@ -2010,9 +2010,11 @@ unsigned RISCVInstrInfo::getInstSizeInBytes(const MachineInstr &MI) const {
                               MF.getTarget().getMCAsmInfo());
   }
 
+  bool CompressionEnabled = !(MI.getAsmPrinterFlags() & RISCV::DoNotCompress);
+
   if (requiresNTLHint(MI)) {
     if (STI.hasStdExtZca()) {
-      if (isCompressibleInst(MI, STI))
+      if (isCompressibleInst(MI, STI) && CompressionEnabled)
         return 4; // c.ntl.all + c.load/c.store
       return 6;   // c.ntl.all + load/store
     }
@@ -2023,7 +2025,7 @@ unsigned RISCVInstrInfo::getInstSizeInBytes(const MachineInstr &MI) const {
     return getInstBundleSize(MI);
 
   if (MI.getParent() && MI.getParent()->getParent()) {
-    if (isCompressibleInst(MI, STI))
+    if (isCompressibleInst(MI, STI) && CompressionEnabled)
       return 2;
   }
 

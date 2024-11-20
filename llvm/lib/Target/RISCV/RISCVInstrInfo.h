@@ -379,6 +379,15 @@ private:
 
 namespace RISCV {
 
+enum AsmComments {
+  // This flag disables the compression even if C-ext is given and the
+  // instruction can be compressed.
+  // This contradicts the purpose of the 'AsmComment' mechanism as it doesn't
+  // add any asm comment and modifies asm printer behavior. However, currently
+  // it should not introduce any real problems.
+  DoNotCompress = MachineInstr::TAsmComments
+};
+
 // Returns true if the given MI is an RVV instruction opcode for which we may
 // expect to see a FrameIndex operand.
 bool isRVVSpill(const MachineInstr &MI);
