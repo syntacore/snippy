@@ -2122,9 +2122,11 @@ unsigned RISCVInstrInfo::getInstSizeInBytes(const MachineInstr &MI) const {
                               MF.getTarget().getMCAsmInfo());
   }
 
+  bool CompressionEnabled = !(MI.getAsmPrinterFlags() & RISCV::DoNotCompress);
+
   if (requiresNTLHint(MI)) {
     if (STI.hasStdExtZca()) {
-      if (unsigned Size = getCompressedSize(MI, STI))
+      if (unsigned Size = CompressionEnabled ? getCompressedSize(MI, STI) : 0)
         return 2 + Size; // c.ntl.all + c.load/c.store
       return 6;   // c.ntl.all + load/store
     }
@@ -2135,7 +2137,7 @@ unsigned RISCVInstrInfo::getInstSizeInBytes(const MachineInstr &MI) const {
     return getInstBundleSize(MI);
 
   if (MI.getParent() && MI.getParent()->getParent()) {
-    if (unsigned Size = getCompressedSize(MI, STI))
+    if (unsigned Size = CompressionEnabled ? getCompressedSize(MI, STI) : 0)
       return Size;
   }
 

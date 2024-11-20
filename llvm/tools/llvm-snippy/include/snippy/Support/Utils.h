@@ -58,26 +58,6 @@ inline bool isLoadStoreInstr(unsigned Opcode, const MCInstrInfo &InstrInfo) {
   return InstrInfo.get(Opcode).mayLoad() || InstrInfo.get(Opcode).mayStore();
 }
 
-template <typename... DstArgs>
-MachineInstrBuilder
-getSupportInstBuilder(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                      LLVMContext &Context, const MCInstrDesc &Desc,
-                      DstArgs... DstReg) {
-  static_assert(sizeof...(DstReg) <= 1, "Only 0 or 1 dst regs supported");
-  return BuildMI(MBB, Ins, MIMetadata({}, getSupportMark(Context)), Desc,
-                 DstReg...);
-}
-
-template <typename... DstArgs>
-MachineInstrBuilder getInstBuilder(bool IsSupport, MachineBasicBlock &MBB,
-                                   MachineBasicBlock::iterator Ins,
-                                   LLVMContext &Context,
-                                   const MCInstrDesc &Desc, DstArgs... DstReg) {
-  if (IsSupport)
-    return getSupportInstBuilder(MBB, Ins, Context, Desc, DstReg...);
-  return BuildMI(MBB, Ins, MIMetadata(), Desc, DstReg...);
-}
-
 std::string addExtensionIfRequired(StringRef StrRef, std::string Ext);
 
 void writeFile(StringRef Path, StringRef Data);
