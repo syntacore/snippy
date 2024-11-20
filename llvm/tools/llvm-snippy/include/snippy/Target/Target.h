@@ -530,6 +530,10 @@ public:
   generateJump(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
                MachineBasicBlock &TBB, LLVMState &State) const = 0;
 
+  // Add any additional target-dependent flags to provide additional information
+  // to asm printer.
+  virtual void addAsmPrinterFlags(MachineInstr &MI) const = 0;
+
 private:
   virtual bool matchesArch(Triple::ArchType Arch) const = 0;
 

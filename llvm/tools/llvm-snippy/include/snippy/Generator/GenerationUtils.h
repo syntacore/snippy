@@ -92,6 +92,36 @@ MachineBasicBlock *createMachineBasicBlock(MachineFunction &MF,
 
 std::string getMBBSectionName(const MachineBasicBlock &MBB);
 
+template <typename... DstArgs>
+MachineInstrBuilder
+getInstBuilder(bool IsSupport, const SnippyTarget &Tgt, MachineBasicBlock &MBB,
+               MachineBasicBlock::iterator Ins, LLVMContext &Context,
+               const MCInstrDesc &Desc, DstArgs... DstReg) {
+  static_assert(sizeof...(DstReg) <= 1, "Only 0 or 1 dst regs supported");
+  MIMetadata MD({}, IsSupport ? getSupportMark(Context) : nullptr);
+  auto MIB = BuildMI(MBB, Ins, MD, Desc, DstReg...);
+  Tgt.addAsmPrinterFlags(*MIB.getInstr());
+  return MIB;
+}
+
+template <typename... DstArgs>
+MachineInstrBuilder
+getSupportInstBuilder(const SnippyTarget &Tgt, MachineBasicBlock &MBB,
+                      MachineBasicBlock::iterator Ins, LLVMContext &Context,
+                      const MCInstrDesc &Desc, DstArgs... DstReg) {
+  return getInstBuilder(/* IsSupport */ true, Tgt, MBB, Ins, Context, Desc,
+                        DstReg...);
+}
+
+template <typename... DstArgs>
+MachineInstrBuilder
+getMainInstBuilder(const SnippyTarget &Tgt, MachineBasicBlock &MBB,
+                   MachineBasicBlock::iterator Ins, LLVMContext &Context,
+                   const MCInstrDesc &Desc, DstArgs... DstReg) {
+  return getInstBuilder(/* IsSupport */ false, Tgt, MBB, Ins, Context, Desc,
+                        DstReg...);
+}
+
 } // namespace snippy
 } // namespace llvm
 #endif
