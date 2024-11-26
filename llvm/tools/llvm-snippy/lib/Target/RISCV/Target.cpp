@@ -2097,14 +2097,14 @@ public:
 
     MachineInstr *MIAUIPC =
         getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::AUIPC))
-            .addReg(DestReg)
+            .addDef(DestReg)
             .addGlobalAddress(Target, 0, RISCVII::MO_PCREL_HI);
     MCSymbol *AUIPCSymbol = MF->getContext().createNamedTempSymbol("pcrel_hi");
     MIAUIPC->setPreInstrSymbol(*MF, AUIPCSymbol);
 
     return getSupportInstBuilder(*this, MBB, Ins, Ctx,
                                  InstrInfo.get(RISCV::ADDI))
-        .addReg(DestReg)
+        .addDef(DestReg)
         .addReg(DestReg)
         .addSym(AUIPCSymbol, RISCVII::MO_PCREL_LO);
   }
@@ -2131,7 +2131,7 @@ public:
     auto &State = GC.getLLVMState();
     auto &Ctx = State.getCtx();
     const auto &RI = State.getRegInfo();
-    const auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
+    const auto &RegClass = RI.getRegClass(RISCV::GPRJALRRegClassID);
     auto RP = GC.getRegisterPool();
     auto Reg = getNonZeroReg("scratch register for storing function address",
                              RI, RegClass, RP, MBB);

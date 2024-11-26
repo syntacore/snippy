@@ -1,0 +1,57 @@
+# XFAIL: *
+
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -function-number=20 -function-layers=5 -num-instrs=100 \
+# RUN: --dump-mf -stack-size=10240 -num-instr-ancil=50 -verify-mi |& Filcheck %s
+
+options:
+  redefine-sp: SP
+  reserved-regs-list:
+    - X5
+    - X6
+    - X7
+    - X8
+    - X9
+    - X10
+    - X11
+    - X12
+    - X13
+    - X14
+    - X15
+    - X16
+    - X17
+    - X18
+    - X19
+    - X20
+    - X21
+    - X22
+    - X23
+    - X24
+    - X25
+    - X26
+    - X27
+    - X28
+    - X29
+    - X30
+    - X31
+
+
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [JALR, 10]
+
+#CHECK: error: No available register GPRJALR: scratch register for storing function address
