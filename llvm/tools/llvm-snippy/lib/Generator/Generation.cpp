@@ -16,6 +16,7 @@
 #include "snippy/Generator/Policy.h"
 #include "snippy/Support/Options.h"
 
+#include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/Support/FormatVariadic.h"
 
 namespace llvm {
@@ -1092,10 +1093,8 @@ void spillPseudoInstImplicitReg(MachineInstr &MI, Register Reg,
   auto &MBB = *MBBPtr;
   auto RealStackPointer = GC.getProgramContext().getStackPointer();
 
-  auto PointBeforeSpill = std::find_if(
-      std::next(MachineBasicBlock::reverse_iterator(MI)), MBB.rend(),
-      [](auto &&Inst) { return checkSupportMetadata(Inst); });
-  auto SpillPoint = std::next(PointBeforeSpill.getReverse());
+  // FIXME: This code can be unsuitable for some platforms
+  auto SpillPoint = MachineBasicBlock::iterator(MI);
   SnpTgt.generateSpillToStack(MBB, SpillPoint, Reg, GC, RealStackPointer);
 
   auto ReloadPoint = std::next(MachineBasicBlock::iterator(MI));

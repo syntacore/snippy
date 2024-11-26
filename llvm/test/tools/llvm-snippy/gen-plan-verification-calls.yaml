@@ -1,5 +1,5 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -function-number=20 -function-layers=5 -num-instrs=100 \
-# RUN: -stack-size=10240 -num-instr-ancil=50 -verify-gen-plan |& FileCheck %s
+# RUN: -stack-size=10240 -num-instr-ancil=50 -verify-gen-plan -verify-mi |& FileCheck %s
 
 sections:
   - no:        1
