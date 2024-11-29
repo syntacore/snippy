@@ -83,7 +83,7 @@ void FunctionDistribute::verifyFunctionSizes(Module &M,
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   const auto &ProgCtx = SGCtx.getProgramContext();
   auto &FG = getAnalysis<FunctionGenerator>();
-  const auto &UsedSections = SGCtx.executionPath();
+  const auto &UsedSections = FG.get<GlobalCodeFlowInfo>().ExecutionPath;
 
   for (auto &Section : UsedSections) {
     std::vector<Function *> Functions;

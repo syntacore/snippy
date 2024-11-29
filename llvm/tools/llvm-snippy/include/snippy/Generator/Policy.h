@@ -68,6 +68,7 @@
 #include "snippy/Config/RegisterHistogram.h"
 #include "snippy/Generator/GenerationLimit.h"
 #include "snippy/Generator/SelfCheckInfo.h"
+#include "snippy/Generator/SnippyModule.h"
 #include "snippy/Support/OpcodeGenerator.h"
 
 #include <functional>
@@ -89,6 +90,9 @@ class GeneratorContext;
 class RegPoolWrapper;
 class CallGraphState;
 class MemAccessInfo;
+class SnippyLoopInfo;
+struct SimulatorContext;
+struct SnippyFunctionMetadata;
 
 namespace planning {
 
@@ -139,19 +143,98 @@ public:
   }
 };
 
-struct InstructionGenerationContext final {
+class RegPoolStack {
+private:
+  struct PopDeleter {
+    RegPoolStack *Parent;
+    RegPoolWrapper *Prev;
+    void operator()(RegPoolWrapper *Current) const {
+      delete Current;
+      Parent->Current = Prev;
+    }
+  };
+
+public:
+  RegPoolStack(SnippyProgramContext &ProgCtx) : ProgCtx(ProgCtx) {}
+
+  auto append() {
+    auto Ret = std::unique_ptr<RegPoolWrapper, PopDeleter>(
+        new RegPoolWrapper(ProgCtx.getRegisterPool()),
+        PopDeleter{this, Current});
+    Current = Ret.get();
+    return Ret;
+  }
+
+  auto &getCurrent() {
+    assert(Current);
+    return *Current;
+  }
+
+private:
+  SnippyProgramContext &ProgCtx;
+  RegPoolWrapper *Current = nullptr;
+};
+
+class InstructionGenerationContext final {
+private:
+  std::unique_ptr<SimulatorContext> NullSimCtx;
+
+public:
   MachineBasicBlock &MBB;
   MachineBasicBlock::iterator Ins;
-  RegPoolWrapper *RP;
   GeneratorContext &GC;
+  const SimulatorContext &SimCtx;
   GenerationStatistics Stats;
-  SelfCheckInfo *SelfCheck = nullptr;
+  SnippyFunctionMetadata *SFM = nullptr;
   MachineLoopInfo *MLI = nullptr;
   const CallGraphState *CGS = nullptr;
   MemAccessInfo *MAI = nullptr;
+  const SnippyLoopInfo *SLI = nullptr;
   std::unordered_set<MCRegister> PotentialNaNs{};
   unsigned SizeErrorCount = 0;
   unsigned BacktrackCount = 0;
+
+  InstructionGenerationContext(MachineBasicBlock &MBB,
+                               MachineBasicBlock::iterator Ins,
+                               GeneratorContext &GC,
+                               const SimulatorContext &SimCtx);
+  InstructionGenerationContext(MachineBasicBlock &MBB,
+                               MachineBasicBlock::iterator Ins,
+                               GeneratorContext &GC);
+  ~InstructionGenerationContext();
+
+  InstructionGenerationContext &append(SnippyFunctionMetadata *NewSFM) {
+    SFM = NewSFM;
+    return *this;
+  }
+
+  InstructionGenerationContext &append(MachineLoopInfo *NewMLI) {
+    MLI = NewMLI;
+    return *this;
+  }
+
+  InstructionGenerationContext &append(const CallGraphState *NewCGS) {
+    CGS = NewCGS;
+    return *this;
+  }
+
+  InstructionGenerationContext &append(MemAccessInfo *NewMAI) {
+    MAI = NewMAI;
+    return *this;
+  }
+
+  InstructionGenerationContext &append(const SnippyLoopInfo *NewSLI) {
+    SLI = NewSLI;
+    return *this;
+  }
+
+  auto pushRegPool() { return RPS.append(); }
+
+  auto &getRegPool() { return RPS.getCurrent(); }
+
+private:
+  std::unique_ptr<RegPoolWrapper> TopRP;
+  RegPoolStack RPS;
 };
 
 struct InstructionRequest final {
@@ -185,7 +268,8 @@ public:
   DefaultGenPolicy(const GeneratorContext &SGCtx,
                    std::function<bool(unsigned)> Filter,
                    bool MustHavePrimaryInstrs,
-                   ArrayRef<OpcodeHistogramEntry> Overrides);
+                   ArrayRef<OpcodeHistogramEntry> Overrides,
+                   const std::unordered_map<unsigned, double> &WeightOverrides);
 
   std::optional<InstructionRequest> next() const {
     return InstructionRequest{OpcGen->generate(), {}};
@@ -223,10 +307,10 @@ public:
 
   ValuegramGenPolicy &operator=(ValuegramGenPolicy &&) = default;
 
-  ValuegramGenPolicy(const GeneratorContext &SGCtx,
-                     std::function<bool(unsigned)> Filter,
-                     bool MustHavePrimaryInstrs,
-                     ArrayRef<OpcodeHistogramEntry> Overrides);
+  ValuegramGenPolicy(
+      const GeneratorContext &SGCtx, std::function<bool(unsigned)> Filter,
+      bool MustHavePrimaryInstrs, ArrayRef<OpcodeHistogramEntry> Overrides,
+      const std::unordered_map<unsigned, double> &WeightOverrides);
 
   std::optional<InstructionRequest> next() {
     assert(Idx <= Instructions.size());
@@ -242,15 +326,13 @@ public:
 
   void print(raw_ostream &OS) const { OS << "Valuegram Generation Policy\n"; }
 
-  std::vector<InstructionRequest> generateRegInit(Register Reg,
-                                                  GeneratorContext &GC,
-                                                  const MachineBasicBlock &MBB,
-                                                  const MCInstrDesc &InstrDesc,
-                                                  RegPoolWrapper &RP);
+  std::vector<InstructionRequest>
+  generateRegInit(InstructionGenerationContext &IGC, Register Reg,
+                  const MCInstrDesc &InstrDesc);
 
   std::vector<InstructionRequest>
-  generateOneInstrWithInitRegs(unsigned Opcode, GeneratorContext &GC,
-                               MachineBasicBlock &MBB);
+  generateOneInstrWithInitRegs(InstructionGenerationContext &IGC,
+                               unsigned Opcode);
 
   APInt getValueFromValuegram(Register Reg, StringRef Prefix,
                               GeneratorContext &GC) const;

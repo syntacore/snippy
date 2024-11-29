@@ -37,8 +37,17 @@ void PassManagerWrapper::add(ImmutablePass *P) { PM.add(P); }
 void PassManagerWrapper::add(ActiveImmutablePassInterface *P) {
   auto *AsP = P->getAsPass();
   auto *Decoy = P->createStoragePass();
-  add(Decoy);
-  add(AsP);
+
+  auto [PI, PA] = lookupPassInfoAndPassArgument(AsP->getPassID());
+  PM.add(Decoy);
+
+  if (PI && shouldDumpCFGBeforePass(PA))
+    PM.add(createCFGPrinterPassBefore(*PI, shouldViewCFGBeforePass(PA)));
+
+  PM.add(AsP);
+
+  if (PI && shouldDumpCFGAfterPass(PA))
+    PM.add(createCFGPrinterPassAfter(*PI, shouldViewCFGAfterPass(PA)));
 }
 
 void PassManagerWrapper::add(Pass *P) {

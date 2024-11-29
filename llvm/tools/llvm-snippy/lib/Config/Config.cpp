@@ -324,6 +324,7 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
                              ImmediateHistogram>
       ImmHistNorm(IO, Info.ImmHistogram);
   IO.mapOptional("imm-hist", ImmHistNorm->Data);
+
   yaml::MappingTraits<CallGraphLayout>::mapping(IO, Info.CGLayout);
   Info.TargetConfig->mapConfig(IO);
   IO.mapOptional("call-graph", Info.FuncDescs);

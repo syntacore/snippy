@@ -9,6 +9,7 @@
 #include "snippy/Generator/Policy.h"
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContext.h"
+#include "snippy/Generator/SimulatorContext.h"
 #include "snippy/Target/Target.h"
 
 #include <random>
@@ -17,32 +18,43 @@ namespace llvm {
 namespace snippy {
 
 namespace planning {
+InstructionGenerationContext::InstructionGenerationContext(
+    MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
+    GeneratorContext &GC, const SimulatorContext &SimCtx)
+    : MBB(MBB), Ins(Ins), GC(GC), SimCtx(SimCtx), RPS(GC.getProgramContext()) {}
 
-DefaultGenPolicy::DefaultGenPolicy(const GeneratorContext &SGCtx,
-                                   std::function<bool(unsigned)> Filter,
-                                   bool MustHavePrimaryInstrs,
-                                   ArrayRef<OpcodeHistogramEntry> Overrides)
+InstructionGenerationContext::InstructionGenerationContext(
+    MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
+    GeneratorContext &GC)
+    : NullSimCtx(std::make_unique<SimulatorContext>()), MBB(MBB), Ins(Ins),
+      GC(GC), SimCtx(*NullSimCtx), RPS(GC.getProgramContext()) {}
+InstructionGenerationContext::~InstructionGenerationContext() = default;
+
+DefaultGenPolicy::DefaultGenPolicy(
+    const GeneratorContext &SGCtx, std::function<bool(unsigned)> Filter,
+    bool MustHavePrimaryInstrs, ArrayRef<OpcodeHistogramEntry> Overrides,
+    const std::unordered_map<unsigned, double> &WeightOverrides = {})
     : OpcGen(SGCtx.createFlowOpcodeGenerator(Filter, MustHavePrimaryInstrs,
-                                             Overrides)) {
+                                             Overrides, WeightOverrides)) {
   assert(!SGCtx.isApplyValuegramEachInstr() &&
          "In this case you must use ValuegramGenPolicy");
 }
 
-ValuegramGenPolicy::ValuegramGenPolicy(const GeneratorContext &SGCtx,
-                                       std::function<bool(unsigned)> Filter,
-                                       bool MustHavePrimaryInstrs,
-                                       ArrayRef<OpcodeHistogramEntry> Overrides)
+ValuegramGenPolicy::ValuegramGenPolicy(
+    const GeneratorContext &SGCtx, std::function<bool(unsigned)> Filter,
+    bool MustHavePrimaryInstrs, ArrayRef<OpcodeHistogramEntry> Overrides,
+    const std::unordered_map<unsigned, double> &WeightOverrides = {})
     : OpcGen(SGCtx.createFlowOpcodeGenerator(Filter, MustHavePrimaryInstrs,
-                                             Overrides)) {
+                                             Overrides, WeightOverrides)) {
   assert(SGCtx.isApplyValuegramEachInstr() &&
          "This policy can only be used when the "
          "-valuegram-operands-regs file provided");
 }
 
 std::vector<InstructionRequest>
-ValuegramGenPolicy::generateOneInstrWithInitRegs(unsigned Opcode,
-                                                 GeneratorContext &GC,
-                                                 MachineBasicBlock &MBB) {
+ValuegramGenPolicy::generateOneInstrWithInitRegs(
+    InstructionGenerationContext &InstrGenCtx, unsigned Opcode) {
+  auto &GC = InstrGenCtx.GC;
   auto &State = GC.getLLVMState();
   const auto &Tgt = State.getSnippyTarget();
   const auto &RI = State.getRegInfo();
@@ -53,7 +65,7 @@ ValuegramGenPolicy::generateOneInstrWithInitRegs(unsigned Opcode,
   // We need to select all operands-registers to insert their
   // initialization according to the valuegram before the main instruction.
   MainInstr.Preselected =
-      selectInitializableOperandsRegisters(InstrDesc, GC, MBB);
+      selectInitializableOperandsRegisters(InstrGenCtx, InstrDesc);
 
   auto OpsRegs =
       llvm::make_filter_range(MainInstr.Preselected, [](const auto &Operand) {
@@ -67,7 +79,7 @@ ValuegramGenPolicy::generateOneInstrWithInitRegs(unsigned Opcode,
                     return false;
                   return true;
                 });
-  auto RP = GC.getRegisterPool();
+  auto RP = InstrGenCtx.pushRegPool();
   llvm::for_each(Registers, [&](const auto &OpReg) {
     auto Reg = OpReg.getReg();
     if (Reg == MCRegister::NoRegister)
@@ -75,11 +87,11 @@ ValuegramGenPolicy::generateOneInstrWithInitRegs(unsigned Opcode,
     // To avoid using registers that have already been initialized during
     // initialization.
     llvm::for_each(Tgt.getPhysRegsFromUnit(Reg, RI), [&RP](auto SimpleReg) {
-      RP.addReserved(SimpleReg, AccessMaskBit::W);
+      RP->addReserved(SimpleReg, AccessMaskBit::W);
     });
     // Added initialization instructions
     llvm::append_range(InstrWithInitRegs,
-                       generateRegInit(Reg, GC, MBB, InstrDesc, RP));
+                       generateRegInit(InstrGenCtx, Reg, InstrDesc));
   });
 
   InstrWithInitRegs.emplace_back(std::move(MainInstr));
@@ -89,14 +101,12 @@ ValuegramGenPolicy::generateOneInstrWithInitRegs(unsigned Opcode,
 void ValuegramGenPolicy::initialize(InstructionGenerationContext &InstGenCtx,
                                     const RequestLimit &Limit) {
   assert(Limit.isNumLimit());
-  auto &GC = InstGenCtx.GC;
-  auto &MBB = InstGenCtx.MBB;
   assert(Instructions.empty() && Idx == 0 && "Is expected to be called once");
 
   int PrimaryInstrsLeft = Limit.getLimit() + 1;
   while (--PrimaryInstrsLeft > 0)
     llvm::append_range(Instructions, generateOneInstrWithInitRegs(
-                                         OpcGen->generate(), GC, MBB));
+                                         InstGenCtx, OpcGen->generate()));
 }
 
 APInt ValuegramGenPolicy::getValueFromValuegram(Register Reg, StringRef Prefix,
@@ -145,11 +155,13 @@ static std::string getRegistersPrefix(RegStorageType Storage) {
   llvm_unreachable("Unknown storage type");
 }
 
-std::vector<InstructionRequest> ValuegramGenPolicy::generateRegInit(
-    Register Reg, GeneratorContext &GC, const MachineBasicBlock &MBB,
-    const MCInstrDesc &InstrDesc, RegPoolWrapper &RP) {
+std::vector<InstructionRequest>
+ValuegramGenPolicy::generateRegInit(InstructionGenerationContext &InstrGenCtx,
+                                    Register Reg,
+                                    const MCInstrDesc &InstrDesc) {
   if (Reg == MCRegister::NoRegister)
     return {};
+  auto &GC = InstrGenCtx.GC;
   auto &State = GC.getLLVMState();
   const auto &Tgt = State.getSnippyTarget();
   const auto &RI = State.getRegInfo();
@@ -160,7 +172,7 @@ std::vector<InstructionRequest> ValuegramGenPolicy::generateRegInit(
     auto ValueToWrite = getValueFromValuegram(
         SimpleReg, getRegistersPrefix(Tgt.regToStorage(SimpleReg)), GC);
     SmallVector<MCInst> InstrsForWrite;
-    Tgt.generateWriteValueSeq(ValueToWrite, SimpleReg.asMCReg(), GC, RP, MBB,
+    Tgt.generateWriteValueSeq(InstrGenCtx, ValueToWrite, SimpleReg.asMCReg(),
                               InstrsForWrite);
     llvm::transform(
         InstrsForWrite, std::back_inserter(InitInstrs), [&](const auto &I) {
@@ -240,13 +252,11 @@ void BurstGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
   std::vector<unsigned> MemUsers;
   copy_if(map_range(Instructions, [](auto &&IR) { return IR.Opcode; }),
           std::back_inserter(MemUsers), IsMemUser);
-  auto OpcodeIdxToBaseReg = generateBaseRegs(InstrGenCtx.MBB, MemUsers,
-                                             *InstrGenCtx.RP, InstrGenCtx.GC);
+  auto OpcodeIdxToBaseReg = generateBaseRegs(InstrGenCtx, MemUsers);
 
-  auto RP = InstrGenCtx.GC.getRegisterPool();
+  auto RP = InstrGenCtx.pushRegPool();
   auto OpcodeIdxToAI =
-      mapOpcodeIdxToAI(InstrGenCtx.MBB, OpcodeIdxToBaseReg, MemUsers,
-                       InstrGenCtx.Ins, RP, InstrGenCtx.GC, InstrGenCtx.MAI);
+      mapOpcodeIdxToAI(InstrGenCtx, OpcodeIdxToBaseReg, MemUsers);
   unsigned MemUsersIdx = 0;
   for (auto &&Instr : Instructions) {
     const auto &InstrDesc = InstrInfo.get(Instr.Opcode);

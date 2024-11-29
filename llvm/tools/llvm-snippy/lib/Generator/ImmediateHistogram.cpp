@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "snippy/Generator/ImmediateHistogram.h"
+#include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Support/YAMLHistogram.h"
 
 #include "llvm/Support/Debug.h"
