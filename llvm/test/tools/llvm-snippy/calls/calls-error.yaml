@@ -6,10 +6,6 @@
 # RUN: --dump-mf -stack-size=1024 -num-instr-ancil=50 -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=ZERO-FUN
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -function-number=20 -function-layers=5 -num-instrs=100 \
 # RUN: --dump-mf -stack-size=1024 -num-instr-ancil=50 -reserved-regs-list=X1 -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=RA-RES
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -function-number=20 -function-layers=5 -num-instrs=100 \
-# RUN: --dump-mf -stack-size=1024 -num-instr-ancil=50 -backtrack -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=TRACK
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -function-number=20 -function-layers=5 -num-instrs=100 \
-# RUN: --dump-mf -stack-size=1024 -num-instr-ancil=50 -selfcheck -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=TRACK
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -function-number=20 -function-layers=5 -num-instrs=all \
 # RUN: --dump-mf -stack-size=1024 -num-instr-ancil=50 -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=ALL
 
@@ -35,5 +31,4 @@ histogram:
 # ZERO-LAYER: error: Invalid number of function layers: expected >=1
 # ZERO-FUN: error: Invalid number of functions: expected >=1
 # RA-RES: error: Cannot generate requested call instructions: return address register is explicitly reserved.
-# TRACK: error: Cannot generate requested call instructions: backtrack and selfcheck do not work with calls yet.
 # ALL: error: when -num-instr=all is specified, calls are not supported

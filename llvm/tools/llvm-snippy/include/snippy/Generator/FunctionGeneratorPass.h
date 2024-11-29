@@ -10,6 +10,7 @@
 
 #include "snippy/Config/FunctionDescriptions.h"
 #include "snippy/Generator/CallGraphState.h"
+#include "snippy/Generator/Linker.h"
 
 #include "snippy/ActiveImmutablePass.h"
 
@@ -18,12 +19,18 @@ namespace snippy {
 
 class GeneratorContext;
 
+struct GlobalCodeFlowInfo {
+  CallGraphState CGS;
+  std::vector<Linker::SectionEntry> ExecutionPath;
+};
+
 class FunctionGenerator final
-    : public ActiveImmutablePass<ModulePass, CallGraphState> {
+    : public ActiveImmutablePass<ModulePass, GlobalCodeFlowInfo> {
 public:
   static char ID;
 
-  FunctionGenerator() : ActiveImmutablePass<ModulePass, CallGraphState>(ID){};
+  FunctionGenerator()
+      : ActiveImmutablePass<ModulePass, GlobalCodeFlowInfo>(ID){};
 
   StringRef getPassName() const override;
 
@@ -31,7 +38,9 @@ public:
 
   bool runOnModule(Module &M) override;
 
-  const auto &getCallGraphState() const { return get<CallGraphState>(); }
+  const auto &getCallGraphState() const {
+    return get<GlobalCodeFlowInfo>().CGS;
+  }
 
   auto isEntryFunction(const MachineFunction &MF) const {
     return getCallGraphState().isEntryFunction(MF);
@@ -81,6 +90,8 @@ private:
   std::vector<RootFnPlacement> distributeRootFunctions();
 
   void initRootFunctions(Module &M, StringRef EntryPointName);
+
+  void initExecutionPath();
 
   std::unordered_map<const MachineFunction *, size_t> RequestedInstrNum;
 };

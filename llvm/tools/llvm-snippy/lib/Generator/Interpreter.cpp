@@ -176,31 +176,26 @@ static void writeSectionToFile(ArrayRef<char> Data,
   File << SS.str();
 }
 
-SimulationEnvironment
-Interpreter::createSimulationEnvironment(const GeneratorContext &GC) {
-  auto &State = GC.getProgramContext().getLLVMState();
-  auto &Settings = GC.getGenSettings();
+SimulationEnvironment Interpreter::createSimulationEnvironment(
+    SnippyProgramContext &SPC, const TargetSubtargetInfo &ST,
+    const GeneratorSettings &Settings, const MemoryConfig &MemCfg,
+    TargetGenContextInterface &TgtCtx) {
+  auto &State = SPC.getLLVMState();
   const auto &SnippyTGT = State.getSnippyTarget();
-  const auto &Module = GC.getMainModule().getModule();
-  const auto &EntryFun =
-      *Module.getFunction(Settings.LinkerConfig.EntryPointName);
-  const auto &ST =
-      GC.getMainModule().getMMI().getMachineFunction(EntryFun)->getSubtarget();
 
-  bool NeedCallbackHandler = GC.hasExecutionTraceTrackingMode();
-  auto &TgtCtx = GC.getTargetContext();
-  auto &L = GC.getProgramContext().getLinker();
+  bool NeedCallbackHandler = Settings.TrackingConfig.BTMode ||
+                             Settings.TrackingConfig.SelfCheckPeriod ||
+                             Settings.TrackingConfig.AddressVH;
+  auto &L = SPC.getLinker();
 
   SimulationEnvironment Env;
   Env.SnippyTGT = &SnippyTGT;
   Env.ST = &ST;
 
-  auto MemCfg = MemoryConfig::getMemoryConfig(GC);
   applyMemCfgToSimCfg(MemCfg, Env.SimCfg);
   std::transform(L.sections().begin(), L.sections().end(),
                  std::back_inserter(Env.Sections),
                  [](auto &SE) { return SE.OutputSection.Desc; });
-  Env.SimCfg.StartPC = L.getStartPC();
 
   Env.SimCfg.TraceLogPath = TraceLogPath.getValue();
   Env.TgtGenCtx = &TgtCtx;
@@ -214,7 +209,6 @@ Interpreter::createSimulationEnvironment(const GeneratorContext &GC) {
 Interpreter::Interpreter(LLVMContext &Ctx, const SimulationEnvironment &SimEnv,
                          std::unique_ptr<SimulatorInterface> Sim)
     : Simulator(std::move(Sim)), Env(SimEnv) {
-  Simulator->setPC(getProgStart());
   if (auto *Handler = Env.CallbackHandler.get())
     TransactionsObserverHandle =
         Handler->createAndSetObserver<TransactionStack>();

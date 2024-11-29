@@ -11,6 +11,7 @@
 
 #include "snippy/Generator/GenerationLimit.h"
 #include "snippy/Generator/GeneratorContext.h"
+#include "snippy/Generator/LoopLatcherPass.h"
 
 namespace llvm {
 namespace snippy {
@@ -24,8 +25,9 @@ std::vector<planning::PreselectedOpInfo>
 selectOperands(const MCInstrDesc &InstrDesc, unsigned BaseReg,
                const AddressInfo &AI);
 
-std::vector<planning::PreselectedOpInfo> selectInitializableOperandsRegisters(
-    const MCInstrDesc &InstrDesc, GeneratorContext &GC, MachineBasicBlock &MBB);
+std::vector<planning::PreselectedOpInfo>
+selectInitializableOperandsRegisters(InstructionGenerationContext &IGC,
+                                     const MCInstrDesc &InstrDesc);
 
 std::vector<planning::PreselectedOpInfo>
 getPreselectedForInstr(const MCInst &Inst);
@@ -46,10 +48,8 @@ std::map<unsigned, AddressRestriction> deduceStrongestRestrictions(
 AddressInfo randomlyShiftAddressOffsetsInImmRange(AddressInfo AI,
                                                   StridedImmediate ImmRange);
 
-std::vector<unsigned> generateBaseRegs(MachineBasicBlock &MBB,
-                                       ArrayRef<unsigned> Opcodes,
-                                       RegPoolWrapper &RP,
-                                       GeneratorContext &SGCtx);
+std::vector<unsigned> generateBaseRegs(InstructionGenerationContext &IGC,
+                                       ArrayRef<unsigned> Opcodes);
 
 AddressInfo
 selectAddressForSingleInstrFromBurstGroup(AddressInfo OrigAI,
@@ -58,7 +58,7 @@ selectAddressForSingleInstrFromBurstGroup(AddressInfo OrigAI,
 
 AddressGenInfo chooseAddrGenInfoForInstrCallback(
     LLVMContext &Ctx,
-    std::optional<GeneratorContext::LoopGenerationInfo> CurLoopGenInfo,
+    std::optional<SnippyLoopInfo::LoopGenerationInfo> CurLoopGenInfo,
     size_t AccessSize, size_t Alignment, const MemoryAccess &MemoryScheme);
 
 enum class MemAccessKind { BURST, REGULAR };
@@ -71,16 +71,14 @@ void addMemAccessToDump(const MemAddresses &ChosenAddresses, MemAccessInfo &MAI,
 void dumpMemAccessesIfNeeded(const MemAccessInfo &MAI);
 
 void initializeBaseRegs(
-    MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-    std::map<unsigned, AddressInfo> &BaseRegToPrimaryAddress,
-    RegPoolWrapper &RP, GeneratorContext &GC);
+    InstructionGenerationContext &InstrGenCtx,
+    std::map<unsigned, AddressInfo> &BaseRegToPrimaryAddress);
 
 // This function returns address info to use for each opcode.
 std::vector<AddressInfo>
-mapOpcodeIdxToAI(MachineBasicBlock &MBB, ArrayRef<unsigned> OpcodeIdxToBaseReg,
-                 ArrayRef<unsigned> Opcodes, MachineBasicBlock::iterator Ins,
-                 RegPoolWrapper &RP, GeneratorContext &SGCtx,
-                 MemAccessInfo *MAI);
+mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
+                 ArrayRef<unsigned> OpcodeIdxToBaseReg,
+                 ArrayRef<unsigned> Opcodes);
 
 MachineBasicBlock::iterator processGeneratedInstructions(
     MachineBasicBlock::iterator ItBegin,

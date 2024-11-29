@@ -9,6 +9,7 @@
 #include "InitializePasses.h"
 
 #include "snippy/CreatePasses.h"
+#include "snippy/Generator/CFPermutationPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 
 #include "llvm/InitializePasses.h"
@@ -33,6 +34,7 @@ public:
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<GeneratorContextWrapper>();
     AU.addRequired<MachineLoopInfo>();
+    AU.addRequired<CFPermutation>();
     AU.setPreservesAll();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
@@ -66,7 +68,8 @@ namespace snippy {
 bool ConsecutiveLoopsVerifier::runOnMachineFunction(MachineFunction &MF) {
   auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &Ctx = GC.getLLVMState().getCtx();
-  auto &ConsLoops = GC.getConsecutiveLoops();
+  auto &CLI = getAnalysis<CFPermutation>().get<ConsecutiveLoopInfo>(MF);
+  auto &ConsLoops = CLI.getConsecutiveLoops();
   auto &BranchSettings = GC.getGenSettings().Cfg.Branches;
   auto AnyConsLoops = BranchSettings.anyConsecutiveLoops();
   if (!AnyConsLoops) {

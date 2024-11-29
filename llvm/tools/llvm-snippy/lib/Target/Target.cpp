@@ -37,20 +37,14 @@ void SnippyTarget::registerTarget(SnippyTarget *Target) {
   FirstTarget = Target;
 }
 
-void SnippyTarget::generateSpillToAddr(MachineBasicBlock &MBB,
-                                       MachineBasicBlock::iterator Ins,
-                                       MCRegister Reg, MemAddr Addr,
-                                       GeneratorContext &GC) const {
-  auto RP = GC.getRegisterPool();
-  storeRegToAddr(MBB, Ins, Addr, Reg, RP, GC,
+void SnippyTarget::generateSpillToAddr(InstructionGenerationContext &IGC,
+                                       MCRegister Reg, MemAddr Addr) const {
+  storeRegToAddr(IGC, Addr, Reg,
                  /* store the whole register */ 0);
 }
-void SnippyTarget::generateReloadFromAddr(MachineBasicBlock &MBB,
-                                          MachineBasicBlock::iterator Ins,
-                                          MCRegister Reg, MemAddr Addr,
-                                          GeneratorContext &GC) const {
-  auto RP = GC.getRegisterPool();
-  loadRegFromAddr(MBB, Ins, Addr, Reg, RP, GC);
+void SnippyTarget::generateReloadFromAddr(InstructionGenerationContext &IGC,
+                                          MCRegister Reg, MemAddr Addr) const {
+  loadRegFromAddr(IGC, Addr, Reg);
 }
 } // namespace snippy
 } // namespace llvm

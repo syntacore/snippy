@@ -14,6 +14,7 @@
 #include "snippy/Generator/Interpreter.h"
 #include "snippy/Generator/IntervalsToVerify.h"
 #include "snippy/Generator/RegisterPool.h"
+#include "snippy/Generator/SimulatorContextWrapperPass.h"
 #include "snippy/InitializePasses.h"
 #include "snippy/PassManagerWrapper.h"
 #include "snippy/Support/DiagnosticInfo.h"
@@ -49,6 +50,26 @@ static snippy::opt<std::string>
                               "(=None - default value)"),
                      cl::value_desc("filename"), cl::cat(Options),
                      cl::init("None"));
+
+static snippy::opt<bool> SelfCheckMem(
+    "selfcheck-mem",
+    cl::desc("check a memory state after execution in selfcheck mode"),
+    cl::Hidden, cl::init(true));
+
+static snippy::opt_list<std::string>
+    DumpMemorySection("dump-memory-section", cl::CommaSeparated,
+                      cl::desc("Dump listed memory sections"
+                               "after interpretation. "
+                               "If {rw} specified, "
+                               "then all read and write sections "
+                               "will be dumped. "
+                               "(similarly for other accesses)"),
+                      cl::cat(Options));
+
+static snippy::opt<std::string>
+    MemorySectionFile("memory-section-file",
+                      cl::desc("file to dump specified section"),
+                      cl::cat(Options), cl::init("mem_state.bin"));
 
 static snippy::opt<std::string>
     RegInfoFile("reg-plugin-info-file",
@@ -96,13 +117,16 @@ static void dumpVerificationIntervalsIfNeeeded(StringRef Output,
 
   auto &State = GenCtx.getLLVMState();
   auto &Ctx = State.getCtx();
-
+  auto &SM = GenCtx.getMainModule();
+  ObjectMetadata NullObjMeta{};
+  auto &Meta = SM.hasGenResult<ObjectMetadata>()
+                   ? SM.getGenResult<ObjectMetadata>()
+                   : NullObjMeta;
   auto VerificationIntervals = IntervalsToVerify::createFromObject(
       State.getDisassembler(), Output,
       GenCtx.getProgramContext().getEntryPointName(),
       GenCtx.getLinker().sections().getOutputSectionFor(".text").Desc.VMA,
-      GenCtx.getEntryPrologueInstructionCount(),
-      GenCtx.getEntryEpilogueInstructionCount());
+      Meta.EntryPrologueInstrCnt, Meta.EntryEpilogueInstrCnt);
 
   if (!VerificationIntervals)
     snippy::fatal(Ctx, "Failed to extract pc intervals to verify",
@@ -153,11 +177,11 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
         PM.add(createGeneratorContextWrapperPass(GenCtx));
         PM.add(createRootRegPoolWrapperPass());
         PM.add(createFunctionGeneratorPass());
+        PM.add(createSimulatorContextWrapperPass(/* DoInit */ true));
 
         PM.add(createReserveRegsPass());
         PM.add(createCFGeneratorPass());
-        if (GenSettings.Cfg.Branches.PermuteCF)
-          PM.add(createCFPermutationPass());
+        PM.add(createCFPermutationPass());
 
         PM.add(createLoopAlignmentPass());
         PM.add(createLoopCanonicalizationPass());
@@ -202,7 +226,9 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
           PM.add(createPrintMIRPass(MIROS));
         PM.add(createMemAccessDumperPass());
       },
-      [](PassManagerWrapper &PM) {});
+      [](PassManagerWrapper &PM) {
+        PM.add(createSimulatorContextPreserverPass());
+      });
 
   if (DumpMIR.isSpecified())
     writeMIRFile(MIR);
@@ -216,7 +242,21 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
     auto SnippetImageForModelExecution =
         ProgContext.generateLinkedImage(Modules);
 
-    GenCtx.runSimulator(SnippetImageForModelExecution);
+    auto RI = SimulatorContext::RunInfo{
+        SnippetImageForModelExecution,
+        ProgContext,
+        GenCtx.getMainModule(),
+        GenSettings.RegistersConfig.InitialStateOutputYaml,
+        GenSettings.RegistersConfig.FinalStateOutputYaml,
+        SelfCheckMem,
+        DumpMemorySection,
+        MemorySectionFile.getValue(),
+        GenSettings.BaseFileName};
+
+    auto &SimCtx =
+        GenCtx.getMainModule().getGenResult<OwningSimulatorContext>();
+    SimCtx.runSimulator(RI);
+
   } else {
 
     snippy::warn(WarningName::NoModelExec, State.getCtx(),

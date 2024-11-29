@@ -1,6 +1,8 @@
 # RUN: llvm-snippy %s -num-instrs=100 -march=riscv64-linux-gnu \
 # RUN:   --model-plugin=None --dump-cfg-before-all --cfg-basename=%t -o %t
 # RUN: rm %t_SnippyFunction-cfg-dump-before-snippy-register-reserve.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-simulator-context-wrapper.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-simulator-context-preserver.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-before-snippy-cf-generator.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-before-snippy-loop-alignment.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-before-snippy-loop-canonicalization.dot \

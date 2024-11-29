@@ -25,6 +25,6 @@ sections:
 histogram:
     - [VADD_VV, 1.0]
 
-# CHECK: Failed to create global constant: read-only ('r') section overflow;
-# CHECK-SAME: Please provide more space in ('r') section in your layout configuration.
-# CHECK-SAME: This is needed for updating of RVV register.
+# CHECK: error: Failed to create global constant (This is needed for updating of RVV register): 
+# CHECK-SAME: Out of space when allocating 16 bytes (align 16) in section '0' of size 64. 16 bytes overflow
+# CHECK-NEXT: Please, provide more space in specified section or select another section to emit global constants to. 

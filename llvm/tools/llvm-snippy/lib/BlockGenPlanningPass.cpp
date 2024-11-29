@@ -11,6 +11,7 @@
 
 #include "snippy/Generator/BlockGenPlanWrapperPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
+#include "snippy/Generator/SimulatorContextWrapperPass.h"
 
 #include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GenerationRequest.h"
@@ -40,12 +41,13 @@ class BlockGenPlanningImpl {
   GeneratorContext *GenCtx;
   const MachineLoopInfo *MLI;
   const FunctionGenerator *FG;
+  SimulatorContext SimCtx;
   std::vector<const MachineBasicBlock *> BlocksToProcess;
 
 public:
   BlockGenPlanningImpl(GeneratorContext *GenCtxIn, const MachineLoopInfo *MLIIn,
-                       const FunctionGenerator *FGIn)
-      : GenCtx(GenCtxIn), MLI(MLIIn), FG(FGIn) {}
+                       const FunctionGenerator *FGIn, SimulatorContext SimCtx)
+      : GenCtx(GenCtxIn), MLI(MLIIn), FG(FGIn), SimCtx(std::move(SimCtx)) {}
 
   planning::FunctionRequest processFunction(const MachineFunction &MF);
 
@@ -106,6 +108,7 @@ StringRef BlockGenPlanning::getPassName() const { return PASS_DESC " Pass"; }
 void BlockGenPlanning::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesAll();
   AU.addRequired<GeneratorContextWrapper>();
+  AU.addRequired<SimulatorContextWrapper>();
   AU.addRequired<MachineLoopInfo>();
   AU.addRequired<BlockGenPlanWrapper>();
   AU.addRequired<FunctionGenerator>();
@@ -159,8 +162,8 @@ BlockGenPlanningImpl::calculateMFSizeLimit(const MachineFunction &MF) const {
 // mode is disabled, latch blocks can be treated as ordinary blocks.
 static std::unordered_set<const MachineBasicBlock *>
 collectLatchBlocks(const GeneratorContext &GenCtx, const MachineLoopInfo &MLI,
-                   const MachineFunction &MF) {
-  if (!GenCtx.hasTrackingMode())
+                   const MachineFunction &MF, SimulatorContext &SimCtx) {
+  if (!SimCtx.hasTrackingMode())
     return {};
 
   auto LatchBlocksRange = make_filter_range(MF, [&MLI](const auto &MBB) {
@@ -389,8 +392,10 @@ void BlockGenPlanningImpl::fillReqWithPlainInstsByNumber(
     InstrsToAdd = std::min(InstrsToAdd, MaxBlockInstrs - Limit);
 
     auto Lim = planning::RequestLimit::NumInstrs{InstrsToAdd};
-    FunReq.addToBlock(MBB, planning::InstructionGroupRequest(
-                               Lim, GenCtx->createGenPolicy(*MBB)));
+    FunReq.addToBlock(MBB,
+                      planning::InstructionGroupRequest(
+                          Lim, GenCtx->createGenPolicy(
+                                   *MBB, FunReq.getOpcodeWeightOverrides())));
     NumInstrPlain -= InstrsToAdd;
     auto &BlockReq = FunReq.at(MBB);
     updateBlocksToProcess(BlockReq, AverageBlockInstrs);
@@ -414,7 +419,8 @@ void addEmptyReqForBlocks(planning::FunctionRequest &FunReq, const T &Blocks,
     FunReq.add(MBB, planning::BasicBlockRequest(*MBB));
 }
 
-static void randomize(planning::BasicBlockRequest &BB, GeneratorContext &GC) {
+static void randomize(const planning::FunctionRequest &FunReq,
+                      planning::BasicBlockRequest &BB, GeneratorContext &GC) {
   if (BB.empty())
     return;
 
@@ -477,7 +483,7 @@ static void randomize(planning::BasicBlockRequest &BB, GeneratorContext &GC) {
     if (FirstIdx != SecondIdx)
       NewPacks.add(planning::InstructionGroupRequest(
           planning::RequestLimit::NumInstrs{SecondIdx - FirstIdx},
-          GC.createGenPolicy(MBB)));
+          GC.createGenPolicy(MBB, FunReq.getOpcodeWeightOverrides())));
     // FIXME: should be enum or llvm rtti
     assert(NonRegularPacksIt->isInseparableBundle());
     NewPacks.add(std::move(*NonRegularPacksIt));
@@ -487,7 +493,7 @@ static void randomize(planning::BasicBlockRequest &BB, GeneratorContext &GC) {
   if (Idxs.back() != RegularPackSize)
     NewPacks.add(planning::InstructionGroupRequest(
         planning::RequestLimit::NumInstrs{RegularPackSize - Idxs.back()},
-        GC.createGenPolicy(MBB)));
+        GC.createGenPolicy(MBB, FunReq.getOpcodeWeightOverrides())));
   std::swap(NewPacks, BB);
 }
 
@@ -513,7 +519,7 @@ planning::FunctionRequest
 BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
   assert(GenCtx->getGenerationMode() == GenerationMode::NumInstrs);
 
-  auto LatchBlocks = collectLatchBlocks(*GenCtx, *MLI, MF);
+  auto LatchBlocks = collectLatchBlocks(*GenCtx, *MLI, MF, SimCtx);
   planning::FunctionRequest FunReq(MF, *GenCtx);
   fillBlocksToProcess(MF, FunReq, [&LatchBlocks](const auto *MBB) {
     return !LatchBlocks.count(MBB);
@@ -550,7 +556,7 @@ BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
                        planning::RequestLimit::NumInstrs{});
   // Randomize generation plan: shuffle burst groups and plain instructions.
   for (auto &BlockReq : make_second_range(FunReq))
-    randomize(BlockReq, *GenCtx);
+    randomize(FunReq, BlockReq, *GenCtx);
 
   return FunReq;
 }
@@ -575,8 +581,10 @@ void BlockGenPlanningImpl::fillReqWithPlainInstsBySize(
        zip(BlocksToProcess, RequestedAccumulatedSizes)) {
     size_t BlockSize = AccumulatedSize - LastAccumulatedSize;
     auto Limit = planning::RequestLimit::Size{BlockSize};
-    FunReq.addToBlock(MBB, planning::InstructionGroupRequest(
-                               Limit, GenCtx->createGenPolicy(*MBB)));
+    FunReq.addToBlock(MBB,
+                      planning::InstructionGroupRequest(
+                          Limit, GenCtx->createGenPolicy(
+                                     *MBB, FunReq.getOpcodeWeightOverrides())));
     LastAccumulatedSize = AccumulatedSize;
   }
 }
@@ -691,9 +699,12 @@ static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
   // InitialAmount allows to account for any already generated instructions
   auto InitialAmount =
       GenerationStatistics{NumOfPrimaryInstrs, /*GeneratedSize*/ MBBSize};
-  FunReq.addToBlock(&SelectedMBB, planning::InstructionGroupRequest(
-                                      Limit, SGCtx.createGenPolicy(SelectedMBB),
-                                      InitialAmount));
+  FunReq.addToBlock(
+      &SelectedMBB,
+      planning::InstructionGroupRequest(
+          Limit,
+          SGCtx.createGenPolicy(SelectedMBB, FunReq.getOpcodeWeightOverrides()),
+          InitialAmount));
 }
 
 void BlockGenPlanningImpl::fillReqForTopLoopBySize(
@@ -774,13 +785,14 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
 }
 
 static void checkGenModeCompatibility(GeneratorContext &GenCtx,
-                                      const MachineLoopInfo &MLI) {
+                                      const MachineLoopInfo &MLI,
+                                      SimulatorContext &SimCtx) {
   auto GM = GenCtx.getGenerationMode();
   if (GM == GenerationMode::NumInstrs)
     return;
 
   bool LoopGenerated = !MLI.empty();
-  bool TrackingEnabled = GenCtx.hasTrackingMode();
+  bool TrackingEnabled = SimCtx.hasTrackingMode();
   if (LoopGenerated && TrackingEnabled)
     snippy::fatal(
         "Generation by size with loops in tracking mode is not supported");
@@ -789,7 +801,7 @@ static void checkGenModeCompatibility(GeneratorContext &GenCtx,
 planning::FunctionRequest
 BlockGenPlanningImpl::processFunction(const MachineFunction &MF) {
   assert(GenCtx && MLI && FG);
-  checkGenModeCompatibility(*GenCtx, *MLI);
+  checkGenModeCompatibility(*GenCtx, *MLI, SimCtx);
   switch (GenCtx->getGenerationMode()) {
   case GenerationMode::NumInstrs:
     return processFunctionWithNumInstr(MF);
@@ -813,8 +825,11 @@ bool BlockGenPlanning::runOnMachineFunction(MachineFunction &MF) {
   auto *MLI = &getAnalysis<MachineLoopInfo>();
   auto *GenPlanWrapper = &getAnalysis<BlockGenPlanWrapper>();
   auto *FG = &getAnalysis<FunctionGenerator>();
+  auto SimCtx = getAnalysis<SimulatorContextWrapper>()
+                    .get<OwningSimulatorContext>()
+                    .get();
 
-  BlockGenPlanningImpl Impl(GenCtx, MLI, FG);
+  BlockGenPlanningImpl Impl(GenCtx, MLI, FG, SimCtx);
   Req = Impl.processFunction(MF);
   assert(Req.has_value());
   GenPlanWrapper->setFunctionRequest(&MF, Req.value());

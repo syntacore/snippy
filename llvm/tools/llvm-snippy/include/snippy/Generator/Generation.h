@@ -18,13 +18,16 @@ namespace planning {
 class InstructionGroupRequest;
 class BasicBlockRequest;
 class FunctionRequest;
-struct InstructionGenerationContext;
+class InstructionGenerationContext;
 } // namespace planning
 class GeneratorContext;
 struct GenerationStatistics;
 struct SelfCheckInfo;
+struct SimulatorContext;
 class CallGraphState;
 class MemAccessInfo;
+class SnippyLoopInfo;
+struct SnippyFunctionMetadata;
 
 void generate(planning::InstructionGroupRequest &IG,
               planning::InstructionGenerationContext &InstrGenCtx);
@@ -35,8 +38,9 @@ generate(planning::BasicBlockRequest &BB,
 
 void generate(planning::FunctionRequest &FunctionGenRequest,
               MachineFunction &MF, GeneratorContext &GC,
-              SelfCheckInfo *SelfCheckInfo, MachineLoopInfo *MLI,
-              const CallGraphState &CGS, MemAccessInfo *MAI);
+              const SimulatorContext &SimCtx, MachineLoopInfo *MLI,
+              const CallGraphState &CGS, MemAccessInfo *MAI,
+              const SnippyLoopInfo *SLI, SnippyFunctionMetadata *SFM);
 
 } // namespace snippy
 } // namespace llvm

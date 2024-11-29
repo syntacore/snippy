@@ -2,6 +2,7 @@ set(LLVMSnippyGeneratorSources
   Backtrack.cpp
   CallGraphState.cpp
   CFPermutation.cpp
+  CFPermutationPass.cpp
   FunctionGeneratorPass.cpp
   GeneratorContext.cpp
   GeneratorContextPass.cpp
@@ -18,6 +19,8 @@ set(LLVMSnippyGeneratorSources
   RegisterPool.cpp
   RootRegPoolWrapperPass.cpp
   SimRunner.cpp
+  SimulatorContextWrapperPass.cpp
+  SnippyFunctionMetadata.cpp
   SnippyModule.cpp
   MemoryManager.cpp
   ImmediateHistogram.cpp
