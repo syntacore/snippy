@@ -19,7 +19,11 @@
 
 namespace llvm {
 namespace snippy {
+namespace planning {
 
+class InstructionGenerationContext;
+
+}
 class Linker;
 class GeneratorContext;
 class Interpreter;
@@ -33,12 +37,14 @@ struct MemorySectionConfig {
       : Start{Start}, Size{Size}, Name{Name} {};
 };
 
+struct GlobalCodeFlowInfo;
+
 struct MemoryConfig {
   std::vector<MemorySectionConfig> ProgSections;
   MemorySectionConfig Rom;
   MemorySectionConfig Ram;
 
-  static MemoryConfig getMemoryConfig(const GeneratorContext &GC);
+  static MemoryConfig getMemoryConfig(Linker &L, GlobalCodeFlowInfo &GCFI);
 };
 
 } // namespace snippy

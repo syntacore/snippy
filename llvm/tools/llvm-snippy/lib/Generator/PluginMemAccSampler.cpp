@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Generator/PluginMemAccSampler.h"
-
 namespace llvm {
 namespace snippy {
 Expected<AccessSampleResult> PluginMemoryAccessSampler::sample(

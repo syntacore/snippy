@@ -265,6 +265,9 @@ class FunctionRequest final
            "Size generation mode for block is incompatible with function "
            "generation by num instrs");
   }
+  // It is used in DFGenerator because sometimes we may need to change the
+  // weights of opcodes.
+  std::unordered_map<unsigned, double> OpcWeightOverrides;
 
 public:
   FunctionRequest(const MachineFunction &MFn, GeneratorContext &GC,
@@ -272,6 +275,9 @@ public:
       // FIXME: Mixed limit there to accept both SizeLimit and NumInstrsLimit.
       : MF(&MFn), Limit(RequestLimit::Mixed{}), FinalInstrDesc(FinalInstrDesc),
         GC(&GC){};
+
+  auto &getOpcodeWeightOverrides() { return OpcWeightOverrides; }
+  const auto &getOpcodeWeightOverrides() const { return OpcWeightOverrides; }
 
   void setFinalInstr(const MCInstrDesc *Desc) { FinalInstrDesc = Desc; }
 
@@ -336,7 +342,7 @@ public:
     auto &SnpTgt = GC->getLLVMState().getSnippyTarget();
     auto &&GP = DefaultGenPolicy(*GC, SnpTgt.getDefaultPolicyFilter(MBB, *GC),
                                  SnpTgt.groupMustHavePrimaryInstr(MBB, *GC),
-                                 SnpTgt.getPolicyOverrides(MBB, *GC));
+                                 SnpTgt.getPolicyOverrides(MBB, *GC), {});
     if (Limit.isSizeLimit()) {
       auto SizeLeft = Limit.getSizeLeft(MFStats);
       Reqs.emplace_back(RequestLimit::Size{SizeLeft}, std::move(GP));

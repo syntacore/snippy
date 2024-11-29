@@ -61,7 +61,8 @@ SimRunner::SimRunner(LLVMContext &Ctx, const SnippyTarget &TGT,
   }
 }
 
-void SimRunner::run(StringRef Program, const IRegisterState &InitialRegState) {
+void SimRunner::run(StringRef Program, const IRegisterState &InitialRegState,
+                    ProgramCounterType StartPC) {
   auto StopPC = getAddressOfSymbolInImage(Program, Linker::getExitSymbolName());
   if (auto E = StopPC.takeError()) {
     auto Err = toString(std::move(E));
@@ -72,6 +73,7 @@ void SimRunner::run(StringRef Program, const IRegisterState &InitialRegState) {
     I->setInitialState(InitialRegState);
     I->loadElfImage(Program);
     I->setStopModeByPC(*StopPC);
+    I->setPC(StartPC);
   }
 
   checkStates(/* CheckMemory */ true);

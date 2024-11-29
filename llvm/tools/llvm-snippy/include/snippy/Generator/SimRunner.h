@@ -42,7 +42,8 @@ public:
 
   // Preform co-simulation run.
   // Each interpreter state will be reset before run.
-  void run(StringRef Programm, const IRegisterState &InitialRegState);
+  void run(StringRef Programm, const IRegisterState &InitialRegState,
+           ProgramCounterType StartPC);
 
   // Adds output section name to the sim config
   //  in order to load it later to the model before execution.

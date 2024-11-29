@@ -33,6 +33,7 @@ class MemoryManager;
 
 } // namespace snippy
 
+ImmutablePass *createSnippyFunctionMetadataWrapperPassWrapperPass();
 ImmutablePass *createGeneratorContextWrapperPass(snippy::GeneratorContext &Ctx);
 
 ImmutablePass *createRootRegPoolWrapperPass();
@@ -40,6 +41,9 @@ ImmutablePass *createRootRegPoolWrapperPass();
 ModulePass *createFunctionDistributePass();
 
 snippy::ActiveImmutablePassInterface *createFunctionGeneratorPass();
+snippy::ActiveImmutablePassInterface *
+createSimulatorContextWrapperPass(bool DoInit);
+ModulePass *createSimulatorContextPreserverPass();
 
 ModulePass *createReserveRegsPass();
 
@@ -49,11 +53,11 @@ ModulePass *createFillExternalFunctionsStubsPass(
 
 MachineFunctionPass *createCFGeneratorPass();
 
-MachineFunctionPass *createCFPermutationPass();
+snippy::ActiveImmutablePassInterface *createCFPermutationPass();
 
 MachineFunctionPass *createLoopCanonicalizationPass();
 
-MachineFunctionPass *createLoopLatcherPass();
+snippy::ActiveImmutablePassInterface *createLoopLatcherPass();
 
 MachineFunctionPass *createCFGPrinterPass(bool EnableView);
 MachineFunctionPass *createCFGPrinterPassBefore(const PassInfo &PI,

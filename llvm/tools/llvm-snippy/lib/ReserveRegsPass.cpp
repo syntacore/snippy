@@ -10,6 +10,7 @@
 
 #include "snippy/CreatePasses.h"
 #include "snippy/Generator/RootRegPoolWrapperPass.h"
+#include "snippy/Generator/SimulatorContextWrapperPass.h"
 
 #define DEBUG_TYPE "snippy-register-reserve"
 #define PASS_DESC "Snippy Register Reserve"
@@ -30,6 +31,7 @@ struct ReserveRegs final : public ModulePass {
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.setPreservesAll();
     AU.addRequired<GeneratorContextWrapper>();
+    AU.addRequired<SimulatorContextWrapper>();
     AU.addRequired<RootRegPoolWrapper>();
     ModulePass::getAnalysisUsage(AU);
   }
@@ -59,6 +61,9 @@ namespace snippy {
 
 bool ReserveRegs::runOnModule(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto SimCtx = getAnalysis<SimulatorContextWrapper>()
+                    .get<OwningSimulatorContext>()
+                    .get();
   const auto &ProgCtx = SGCtx.getProgramContext();
 
   if (!ProgCtx.stackEnabled())
@@ -71,7 +76,7 @@ bool ReserveRegs::runOnModule(Module &M) {
   // Additionally, if we use model during instructions generation, we must
   // disallow reading of SP since its value is not known at this stage.
   auto ReservationMode =
-      SGCtx.hasTrackingMode() ? AccessMaskBit::RW : AccessMaskBit::W;
+      SimCtx.hasTrackingMode() ? AccessMaskBit::RW : AccessMaskBit::W;
   RootPool.addReserved(StackPointer, ReservationMode);
 
   return true;
