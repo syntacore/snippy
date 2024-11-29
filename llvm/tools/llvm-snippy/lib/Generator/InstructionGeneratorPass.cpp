@@ -11,7 +11,10 @@
 #include "snippy/Generator/BlockGenPlanWrapperPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/InstructionGeneratorPass.h"
+#include "snippy/Generator/LoopLatcherPass.h"
 #include "snippy/Generator/Policy.h"
+#include "snippy/Generator/SimulatorContextWrapperPass.h"
+#include "snippy/Generator/SnippyFunctionMetadata.h"
 #include "snippy/Support/Options.h"
 
 #include "llvm/CodeGen/MachineLoopInfo.h"
@@ -61,9 +64,12 @@ namespace snippy {
 void InstructionGenerator::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesCFG();
   AU.addRequired<GeneratorContextWrapper>();
+  AU.addRequired<SnippyFunctionMetadataWrapper>();
+  AU.addRequired<SimulatorContextWrapper>();
   AU.addRequired<MachineLoopInfo>();
   AU.addRequired<FunctionGenerator>();
   AU.addRequired<BlockGenPlanWrapper>();
+  AU.addRequired<LoopLatcher>();
   MachineFunctionPass::getAnalysisUsage(AU);
 }
 
@@ -89,11 +95,14 @@ static size_t calcMainFuncInitialSpillSize(GeneratorContext &GC) {
 
 void InstructionGenerator::prepareInterpreterEnv() const {
   auto &State = SGCtx->getLLVMState();
+  auto SimCtx = getAnalysis<SimulatorContextWrapper>()
+                    .get<OwningSimulatorContext>()
+                    .get();
   const auto &SnippyTgt = State.getSnippyTarget();
   const auto &ProgCtx = SGCtx->getProgramContext();
-  auto &I = SGCtx->getOrCreateInterpreter();
+  auto &I = SimCtx.getInterpreter();
 
-  I.setInitialState(SGCtx->getInitialRegisterState(I.getSubTarget()));
+  I.setInitialState(ProgCtx.getInitialRegisterState(I.getSubTarget()));
   if (!ProgCtx.hasStackSection())
     return;
 
@@ -110,15 +119,23 @@ void InstructionGenerator::addGV(
     const APInt &Value, unsigned long long Stride = 1,
     GlobalValue::LinkageTypes LType = GlobalValue::ExternalLinkage,
     StringRef Name = "global") const {
-  auto &GP = SGCtx->getGlobalsPool();
+  auto &ProgCtx = SGCtx->getProgramContext();
+  auto &GP = ProgCtx.getOrAddGlobalsPoolFor(
+      SGCtx->getMainModule(),
+      "Failed to allocate space for selfcheck global data");
 
+  auto SimCtx = getAnalysis<SimulatorContextWrapper>()
+                    .get<OwningSimulatorContext>()
+                    .get();
   auto *GV = GP.createGV(Value, Stride, LType, Name);
-  if (SGCtx->hasTrackingMode())
-    SGCtx->getOrCreateInterpreter().writeMem(GP.getGVAddress(GV), Value);
+  if (SimCtx.hasTrackingMode())
+    SimCtx.getInterpreter().writeMem(GP.getGVAddress(GV), Value);
 }
 
 void InstructionGenerator::addModelMemoryPropertiesAsGV() const {
-  auto MemCfg = MemoryConfig::getMemoryConfig(*SGCtx);
+  auto &GCFI = getAnalysis<FunctionGenerator>().get<GlobalCodeFlowInfo>();
+  auto MemCfg = MemoryConfig::getMemoryConfig(
+      SGCtx->getProgramContext().getLinker(), GCFI);
   // Below we add all the model memory properties as global constants
   constexpr auto ConstantSizeInBits = 64u; // Constants size in bits
   constexpr auto Alignment = 1u;           // Without special alignment
@@ -173,28 +190,41 @@ planning::FunctionRequest InstructionGenerator::createMFGenerationRequest(
 
 static void reserveAddressesForRegSpills(ArrayRef<MCRegister> Regs,
                                          GeneratorContext &GC) {
-  llvm::for_each(Regs, [&](auto Reg) { GC.reserveSpillAddrsForReg(Reg); });
+  if (Regs.empty())
+    return;
+  auto &ProgCtx = GC.getProgramContext();
+  assert(ProgCtx.hasProgramStateSaveSpace());
+  auto &SaveLocs = ProgCtx.getProgramStateSaveSpace();
+  auto &SnippyTgt = GC.getLLVMState().getSnippyTarget();
+  llvm::for_each(Regs, [&](auto Reg) {
+    if (SaveLocs.hasSaveLocation(Reg))
+      return;
+    SaveLocs.allocateSaveLocation(Reg,
+                                  SnippyTgt.getRegBitWidth(Reg, GC) / CHAR_BIT);
+  });
 }
 
 bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
   SGCtx = &getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &SimCtx = getAnalysis<SimulatorContextWrapper>()
+                     .get<OwningSimulatorContext>()
+                     .get();
   const auto &GenSettings = SGCtx->getGenSettings();
-  if (SGCtx->getConfig().hasSectionToSpillGlobalRegs() &&
-      (SGCtx->getSpilledRegAddressesGlobal().empty() ||
-       SGCtx->getSpilledRegAddressesLocal().empty()))
+  if (SGCtx->getConfig().hasSectionToSpillGlobalRegs())
     reserveAddressesForRegSpills(GenSettings.RegistersConfig.SpilledToMem,
                                  *SGCtx);
-  if (SGCtx->hasTrackingMode())
+  if (SimCtx.hasTrackingMode())
     prepareInterpreterEnv();
 
   if (ExportGV)
     addModelMemoryPropertiesAsGV();
 
-  auto &SCI = get<SelfCheckInfo>(MF);
-  if (GenSettings.TrackingConfig.SelfCheckPeriod) {
-    SCI.PeriodTracker = {GenSettings.TrackingConfig.SelfCheckPeriod};
+  auto *SCI = SimCtx.SCI;
+  if (SCI) {
+    // TODO: move it to initializer:
+    SCI->PeriodTracker = {GenSettings.TrackingConfig.SelfCheckPeriod};
     const auto &SCSection = SGCtx->getSelfcheckSection();
-    SCI.CurrentAddress = SCSection.VMA;
+    SCI->CurrentAddress = SCSection.VMA;
     // FIXME: make SelfCheckGV a deprecated option
     if (SelfCheckGV || ExportGV) {
       if (!ExportGV)
@@ -204,10 +234,12 @@ bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
   }
 
   auto FunctionGenRequest = createMFGenerationRequest(MF);
-  generate(FunctionGenRequest, MF, *SGCtx, &SCI,
+  generate(FunctionGenRequest, MF, *SGCtx, SimCtx,
            &getAnalysis<MachineLoopInfo>(),
            getAnalysis<FunctionGenerator>().getCallGraphState(),
-           &get<MemAccessInfo>(MF));
+           &get<MemAccessInfo>(MF),
+           &getAnalysis<LoopLatcher>().get<SnippyLoopInfo>(MF),
+           &getAnalysis<SnippyFunctionMetadataWrapper>().get(MF));
   return true;
 }
 

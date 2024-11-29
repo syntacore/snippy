@@ -20,6 +20,5 @@ sections:
 histogram:
     - [VADD_VV, 1.0]
 
-# CHECK: error: Failed to create global constant:
-# CHECK-SAME: No read-only ('r') section provided in layout.
-# CHECK-SAME: This is needed for updating of RVV register.
+# CHECK: error: Failed to allocate global constant for RVV register value load: 
+# CHECK-SAME: ROM section is not configured

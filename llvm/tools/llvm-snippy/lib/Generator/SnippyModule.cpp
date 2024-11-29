@@ -17,9 +17,11 @@
 #include "llvm/InitializePasses.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
-
 namespace llvm {
 namespace snippy {
+
+template class GenResultT<ObjectFile>;
+template class GenResultT<ObjectMetadata>;
 
 SnippyModule::SnippyModule(LLVMState &State, StringRef Name)
     : State(State), M(Name, State.getCtx()), Context([&]() {
@@ -62,7 +64,7 @@ void SnippyModule::generateObject(const PassInserter &BeforePrinter,
 
   std::invoke(BeforePrinter, *PPM);
 
-  GeneratedObject.clear();
+  SmallString<32> GeneratedObject;
   raw_svector_ostream OS(GeneratedObject);
 
   auto ObjStreamer = State.createObjStreamer(OS, *Context);
@@ -71,6 +73,7 @@ void SnippyModule::generateObject(const PassInserter &BeforePrinter,
   PPM->add(AsmPrinter.release());
   std::invoke(AfterPrinter, *PPM);
   PPM->run(M);
+  addGenResult<ObjectFile>(std::move(GeneratedObject));
 
   outs().flush(); // FIXME: this is currently needed because
                   //        MachineFunctionPrinter don't flush
@@ -99,6 +102,42 @@ void SnippyProgramContext::initializeUtilitySection(
     snippy::fatal(Ctx, "Wrong layout file",
                   "\"" + Twine(SectionsDescriptions::UtilitySectionName) +
                       "\" section must be RW");
+  PGSK = std::make_unique<ProgramGlobalStateKeeper>(*State, *UtilitySection);
+}
+
+Expected<GlobalsPool &>
+SnippyProgramContext::getOrAddGlobalsPoolFor(SnippyModule &M) {
+  auto *Key = &M.getModule();
+  if (PerModuleGPs.count(Key))
+    return *PerModuleGPs.at(Key);
+  if (!PerModuleGPs.empty())
+    snippy::fatal("multiple global pools are not supported for now");
+  if (!ROMSection)
+    return make_error<Failure>("ROM section is not configured");
+
+  return *PerModuleGPs
+              .emplace(Key, std::make_unique<GlobalsPool>(
+                                *State, M.getModule(), *ROMSection,
+                                exportedNamesMangled()
+                                    ? ("__snippy_" +
+                                       Twine(getEntryPointName()) + "_")
+                                          .str()
+                                    : "__snippy_"))
+              .first->second;
+}
+
+GlobalsPool &SnippyProgramContext::getOrAddGlobalsPoolFor(SnippyModule &M,
+                                                          StringRef OnError) {
+  auto EPool = getOrAddGlobalsPoolFor(M);
+  if (EPool)
+    return EPool.get();
+  auto E = EPool.takeError();
+  snippy::fatal(OnError, [&]() {
+    std::string Msg;
+    raw_string_ostream OS{Msg};
+    OS << E;
+    return Msg;
+  }());
 }
 
 void SnippyProgramContext::initializeSelfcheckSection(
@@ -190,6 +229,25 @@ void SnippyProgramContext::initializeStackSection(
                     "explicitly reserved.");
   }
 }
+const IRegisterState &SnippyProgramContext::getInitialRegisterState(
+    const TargetSubtargetInfo &ST) const {
+  if (InitialMachineState)
+    return *InitialMachineState;
+  InitialMachineState = State->getSnippyTarget().createRegisterState(ST);
+
+  if (!InitialRegYamlFile.empty()) {
+    WarningsT YamlWarnings;
+    InitialMachineState->loadFromYamlFile(InitialRegYamlFile, YamlWarnings,
+                                          &State->getSnippyTarget());
+    std::for_each(YamlWarnings.begin(), YamlWarnings.end(), [&](StringRef Msg) {
+      warn(WarningName::RegState, State->getCtx(), "register state yaml", Msg);
+    });
+  } else {
+    InitialMachineState->randomize();
+  }
+
+  return *InitialMachineState;
+}
 
 SnippyProgramContext::SnippyProgramContext(
     LLVMState &State, RegisterGenerator &RegGen, RegPool &Pool,
@@ -202,7 +260,8 @@ SnippyProgramContext::SnippyProgramContext(
       MangleExportedNames(Settings.MangleExportedNames),
       EntryPointName(Settings.EntryPointName),
       ExternalStack(Settings.ExternalStack),
-      FollowTargetABI(Settings.FollowTargetABI) {
+      FollowTargetABI(Settings.FollowTargetABI),
+      InitialRegYamlFile(Settings.InitialRegYamlFile) {
 
   initializeStackSection(Settings);
   initializeSelfcheckSection(Settings);

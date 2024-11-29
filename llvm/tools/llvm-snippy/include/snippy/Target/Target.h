@@ -21,7 +21,6 @@
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Generator/AccessMaskBit.h"
 #include "snippy/Generator/MemoryManager.h"
-#include "snippy/Generator/Policy.h"
 #include "snippy/PassManagerWrapper.h"
 #include "snippy/Simulator/Simulator.h"
 #include "snippy/Support/DynLibLoader.h"
@@ -114,15 +113,16 @@ using RegToValueType = DenseMap<Register, APInt>;
 using AddressParts = SmallVector<AddressPart>;
 namespace planning {
 class GenPolicy;
-struct InstructionGenerationContext;
+class InstructionGenerationContext;
 } // namespace planning
+using planning::InstructionGenerationContext;
+
 class SnippyTarget {
 public:
   SnippyTarget() = default;
 
-  virtual void generateWriteValueSeq(APInt Value, MCRegister DestReg,
-                                     GeneratorContext &GC, RegPoolWrapper &RP,
-                                     const MachineBasicBlock &MBB,
+  virtual void generateWriteValueSeq(InstructionGenerationContext &IGC,
+                                     APInt Value, MCRegister DestReg,
                                      SmallVectorImpl<MCInst> &Insts) const = 0;
 
   virtual std::unique_ptr<TargetGenContextInterface>
@@ -141,8 +141,8 @@ public:
   }
 
   virtual const MCRegisterClass &
-  getRegClass(const GeneratorContext &Ctx, unsigned OperandRegClassID,
-              unsigned OpIndex, unsigned Opcode, const MachineBasicBlock &MBB,
+  getRegClass(InstructionGenerationContext &IGC, unsigned OperandRegClassID,
+              unsigned OpIndex, unsigned Opcode,
               const MCRegisterInfo &RegInfo) const = 0;
 
   virtual const MCRegisterClass &
@@ -156,28 +156,20 @@ public:
   // NOTE: this list do not include stack pointer.
   virtual std::vector<MCRegister> getRegsPreservedByABI() const = 0;
 
-  void generateSpillToAddr(MachineBasicBlock &MBB,
-                           MachineBasicBlock::iterator Ins, MCRegister Reg,
-                           MemAddr Addr, GeneratorContext &GC) const;
+  void generateSpillToAddr(InstructionGenerationContext &IGC, MCRegister Reg,
+                           MemAddr Addr) const;
 
-  virtual void generateSpillToStack(MachineBasicBlock &MBB,
-                                    MachineBasicBlock::iterator Ins,
-                                    MCRegister Reg, GeneratorContext &GC,
-                                    MCRegister SP) const = 0;
+  virtual void generateSpillToStack(InstructionGenerationContext &IGC,
+                                    MCRegister Reg, MCRegister SP) const = 0;
 
-  virtual void generateReloadFromStack(MachineBasicBlock &MBB,
-                                       MachineBasicBlock::iterator Ins,
-                                       MCRegister Reg, GeneratorContext &GC,
-                                       MCRegister SP) const = 0;
+  virtual void generateReloadFromStack(InstructionGenerationContext &IGC,
+                                       MCRegister Reg, MCRegister SP) const = 0;
 
-  void generateReloadFromAddr(MachineBasicBlock &MBB,
-                              MachineBasicBlock::iterator Ins, MCRegister Reg,
-                              MemAddr Addr, GeneratorContext &GC) const;
+  void generateReloadFromAddr(InstructionGenerationContext &IGC, MCRegister Reg,
+                              MemAddr Addr) const;
 
-  virtual void generatePopNoReload(MachineBasicBlock &MBB,
-                                   MachineBasicBlock::iterator Ins,
-                                   MCRegister Reg,
-                                   GeneratorContext &GC) const = 0;
+  virtual void generatePopNoReload(InstructionGenerationContext &IGC,
+                                   MCRegister Reg) const = 0;
 
   virtual unsigned getRegBitWidth(MCRegister Reg,
                                   GeneratorContext &GC) const = 0;
@@ -246,8 +238,8 @@ public:
   virtual std::unique_ptr<IRegisterState>
   createRegisterState(const TargetSubtargetInfo &ST) const = 0;
 
-  virtual void generateRegsInit(MachineBasicBlock &MBB, const IRegisterState &R,
-                                GeneratorContext &GC) const = 0;
+  virtual void generateRegsInit(InstructionGenerationContext &IGC,
+                                const IRegisterState &R) const = 0;
 
   virtual void generateCustomInst(
       const MCInstrDesc &InstrDesc,
@@ -255,21 +247,15 @@ public:
 
   virtual bool requiresCustomGeneration(const MCInstrDesc &InstrDesc) const = 0;
 
-  virtual void
-  instructionPostProcess(MachineInstr &MI, GeneratorContext &GC,
-                         MachineBasicBlock::iterator Ins) const = 0;
+  virtual void instructionPostProcess(InstructionGenerationContext &IGC,
+                                      MachineInstr &MI) const = 0;
 
   // If BytesToWrite is zero, the whole register will be stored.
-  virtual void storeRegToAddr(MachineBasicBlock &MBB,
-                              MachineBasicBlock::iterator Ins, uint64_t Addr,
-                              MCRegister Reg, RegPoolWrapper &RP,
-                              GeneratorContext &GC,
-                              unsigned BytesToWrite) const = 0;
+  virtual void storeRegToAddr(InstructionGenerationContext &IGC, uint64_t Addr,
+                              MCRegister Reg, unsigned BytesToWrite) const = 0;
 
-  virtual void storeValueToAddr(MachineBasicBlock &MBB,
-                                MachineBasicBlock::iterator Ins, uint64_t Addr,
-                                APInt Value, RegPoolWrapper &RP,
-                                GeneratorContext &GC) const = 0;
+  virtual void storeValueToAddr(InstructionGenerationContext &IGC,
+                                uint64_t Addr, APInt Value) const = 0;
 
   virtual bool isFloatingPoint(MCRegister Reg) const = 0;
 
@@ -295,19 +281,15 @@ public:
                                               MCRegister Register,
                                               GeneratorContext &GC) const = 0;
 
-  virtual void transformValueInReg(MachineBasicBlock &MBB,
-                                   const MachineBasicBlock::iterator &,
+  virtual void transformValueInReg(InstructionGenerationContext &IGC,
                                    APInt OldValue, APInt NewValue,
-                                   MCRegister Register, RegPoolWrapper &RP,
-                                   GeneratorContext &GC) const = 0;
+                                   MCRegister Register) const = 0;
 
   // Places value [ BaseAddr + Stride * IndexReg ] in Register
-  virtual void loadEffectiveAddressInReg(MachineBasicBlock &MBB,
-                                         const MachineBasicBlock::iterator &,
+  virtual void loadEffectiveAddressInReg(InstructionGenerationContext &IGC,
                                          MCRegister Register, uint64_t BaseAddr,
-                                         uint64_t Stride, MCRegister IndexReg,
-                                         RegPoolWrapper &RP,
-                                         GeneratorContext &GC) const = 0;
+                                         uint64_t Stride,
+                                         MCRegister IndexReg) const = 0;
 
   virtual unsigned getMaxInstrSize() const = 0;
 
@@ -360,32 +342,25 @@ public:
                                  MachineBasicBlock &OldDestMBB,
                                  MachineBasicBlock &NewDestMBB) const = 0;
 
-  virtual MachineInstr *generateFinalInst(MachineBasicBlock &MBB,
-                                          GeneratorContext &GC,
+  virtual MachineInstr *generateFinalInst(InstructionGenerationContext &IGC,
                                           unsigned LastInstrOpc) const = 0;
 
-  virtual MachineInstr *generateCall(MachineBasicBlock &MBB,
-                                     MachineBasicBlock::iterator Ins,
+  virtual MachineInstr *generateCall(InstructionGenerationContext &IGC,
                                      const Function &Target,
-                                     GeneratorContext &GC,
                                      bool AsSupport) const = 0;
 
-  virtual MachineInstr *generateCall(MachineBasicBlock &MBB,
-                                     MachineBasicBlock::iterator Ins,
-                                     const Function &Target,
-                                     GeneratorContext &GC, bool AsSupport,
+  virtual MachineInstr *generateCall(InstructionGenerationContext &IGC,
+                                     const Function &Target, bool AsSupport,
                                      unsigned PreferredCallOpCode) const = 0;
 
-  virtual MachineInstr *generateTailCall(MachineBasicBlock &MBB,
-                                         const Function &Target,
-                                         const GeneratorContext &GC) const = 0;
+  virtual MachineInstr *generateTailCall(InstructionGenerationContext &IGC,
+                                         const Function &Target) const = 0;
 
-  virtual MachineInstr *generateReturn(MachineBasicBlock &MBB,
-                                       const LLVMState &State) const = 0;
+  virtual MachineInstr *
+  generateReturn(InstructionGenerationContext &IGC) const = 0;
 
-  virtual MachineInstr *generateNop(MachineBasicBlock &MBB,
-                                    MachineBasicBlock::iterator Ins,
-                                    const LLVMState &State) const = 0;
+  virtual MachineInstr *
+  generateNop(InstructionGenerationContext &IGC) const = 0;
 
   virtual void addTargetSpecificPasses(PassManagerWrapper &PM) const = 0;
   virtual void addTargetLegalizationPasses(PassManagerWrapper &PM) const = 0;
@@ -409,19 +384,14 @@ public:
   virtual unsigned getWriteValueSequenceLength(APInt Value, MCRegister Register,
                                                GeneratorContext &GC) const = 0;
 
-  virtual void writeValueToReg(MachineBasicBlock &MBB,
-                               MachineBasicBlock::iterator Ins, APInt Value,
-                               unsigned DstReg, RegPoolWrapper &RP,
-                               GeneratorContext &GC) const = 0;
+  virtual void writeValueToReg(InstructionGenerationContext &IGC, APInt Value,
+                               unsigned DstReg) const = 0;
 
-  virtual void copyRegToReg(MachineBasicBlock &MBB,
-                            MachineBasicBlock::iterator Ins, MCRegister Rs,
-                            MCRegister Rd, GeneratorContext &GC) const = 0;
+  virtual void copyRegToReg(InstructionGenerationContext &IGC, MCRegister Rs,
+                            MCRegister Rd) const = 0;
 
-  virtual void loadRegFromAddr(MachineBasicBlock &MBB,
-                               MachineBasicBlock::iterator Ins, uint64_t Addr,
-                               MCRegister Reg, RegPoolWrapper &RP,
-                               GeneratorContext &GC) const = 0;
+  virtual void loadRegFromAddr(InstructionGenerationContext &IGC, uint64_t Addr,
+                               MCRegister Reg) const = 0;
 
   virtual std::tuple<size_t, size_t>
   getAccessSizeAndAlignment(unsigned Opcode, GeneratorContext &GC,
@@ -467,10 +437,10 @@ public:
                                 const GeneratorContext &GC) const = 0;
 
   // returns min loop counter value
-  virtual unsigned
-  insertLoopInit(MachineBasicBlock &MBB, MachineBasicBlock::iterator Pos,
-                 MachineInstr &Branch, ArrayRef<Register> ReservedRegs,
-                 unsigned NIter, GeneratorContext &GC) const = 0;
+  virtual unsigned insertLoopInit(InstructionGenerationContext &IGC,
+                                  MachineInstr &Branch,
+                                  ArrayRef<Register> ReservedRegs,
+                                  unsigned NIter) const = 0;
 
   virtual LoopType getLoopType(MachineInstr &Branch) const = 0;
 

@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "snippy/Generator/GenResult.h"
 #include "snippy/Generator/GlobalsPool.h"
 #include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/Linker.h"
@@ -30,17 +31,62 @@ struct GeneratorResult {
   std::string LinkerScript;
 };
 
+struct ObjectMetadata {
+  size_t EntryPrologueInstrCnt = 0;
+  size_t EntryEpilogueInstrCnt = 0;
+};
+
 class RegisterGenerator;
 class GlobalsPool;
 class OpcodeCache;
 class MemoryManager;
 struct SnippyProgramSettings;
 class RootRegPoolWrapper;
+
+struct ObjectFile final {
+  SmallString<32> Object;
+};
+
+extern template class GenResultT<ObjectFile>;
+extern template class GenResultT<ObjectMetadata>;
+
 class SnippyModule final {
 public:
   SnippyModule(LLVMState &State, StringRef Name);
 
   const auto &getModule() const { return M; }
+
+  template <typename T> bool hasGenResult() const {
+    return llvm::any_of(Results,
+                        [](auto &&Res) { return Res->template isA<T>(); });
+  }
+
+  template <typename T> T &getGenResult() {
+    auto Found = llvm::find_if(
+        Results, [](auto &&Res) { return Res->template isA<T>(); });
+    assert(Found != Results.end());
+    return static_cast<GenResultT<T> &>(**Found).Value;
+  }
+
+  template <typename T> const T &getGenResult() const {
+    auto Found = llvm::find_if(
+        Results, [](auto &&Res) { return Res->template isA<T>(); });
+    assert(Found != Results.end());
+    return static_cast<GenResultT<T> &>(**Found).Value;
+  }
+
+  template <typename T, typename... Types> T &addGenResult(Types &&...Args) {
+    assert(!hasGenResult<T>());
+    auto &NewResult = *Results.emplace_back(
+        std::make_unique<GenResultT<T>>(std::forward<Types>(Args)...));
+    return static_cast<GenResultT<T> &>(NewResult).Value;
+  }
+
+  template <typename T, typename... Types> T &getOrAddResult(Types &&...Args) {
+    if (hasGenResult<T>())
+      return getGenResult<T>();
+    return addGenResult<T>(std::forward<Types>(Args)...);
+  }
 
   auto &getModule() { return M; }
 
@@ -53,9 +99,11 @@ public:
   void generateObject(const PassInserter &BeforePrinter,
                       const PassInserter &AfterPrinter);
 
-  bool haveGeneratedObject() const { return !GeneratedObject.empty(); }
+  bool haveGeneratedObject() const { return hasGenResult<ObjectFile>(); }
 
-  const auto &getGeneratedObject() const { return GeneratedObject; }
+  const auto &getGeneratedObject() const {
+    return getGenResult<ObjectFile>().Object;
+  }
 
 private:
   LLVMState &State;
@@ -64,7 +112,7 @@ private:
   std::unique_ptr<MachineModuleInfoWrapperPass> MMIWP;
   MachineModuleInfo &MMI;
   std::unique_ptr<PassManagerWrapper> PPM;
-  SmallString<32> GeneratedObject;
+  std::vector<std::unique_ptr<GenResult>> Results;
 };
 
 class SnippyProgramContext final {
@@ -105,6 +153,14 @@ public:
     assert(State);
     return {State->getSnippyTarget(), State->getRegInfo(), RegPoolsStorage};
   }
+
+  // May fail if no appropriate section found or if all suitable section
+  // are already taken. In such case Failure is returned.
+  Expected<GlobalsPool &> getOrAddGlobalsPoolFor(SnippyModule &M);
+
+  // Wrapper helper for method above. Terminates on error printing 'OnError'
+  // message.
+  GlobalsPool &getOrAddGlobalsPoolFor(SnippyModule &M, StringRef OnError);
 
   GeneratorResult generateELF(ArrayRef<const SnippyModule *> Modules) const;
   std::string generateLinkedImage(ArrayRef<const SnippyModule *> Modules) const;
@@ -149,6 +205,13 @@ public:
   // save it to the stack before start using it.
   bool shouldSpillStackPointer() const;
 
+  const IRegisterState &
+  getInitialRegisterState(const TargetSubtargetInfo &ST) const;
+
+  bool hasProgramStateSaveSpace() const { return PGSK.get(); }
+  const auto &getProgramStateSaveSpace() const { return *PGSK; }
+  auto &getProgramStateSaveSpace() { return *PGSK; }
+
 private:
   friend RootRegPoolWrapper;
   void initializeStackSection(const SnippyProgramSettings &Settings);
@@ -171,12 +234,19 @@ private:
   std::optional<SectionDesc> SelfcheckSection;
   std::optional<SectionDesc> StackSection;
   std::optional<SectionDesc> UtilitySection;
-
+  std::unique_ptr<ProgramGlobalStateKeeper> PGSK;
+  std::map<Module *, std::unique_ptr<GlobalsPool>> PerModuleGPs;
   MCRegister StackPointer;
   bool MangleExportedNames;
   std::string EntryPointName;
   bool ExternalStack;
   bool FollowTargetABI;
+
+  // TODO: it would be nice to be able to initialize it right away, but
+  // currently it depends on TargetSubtargetInfo which is diffucult to get
+  // before Module and first MachineFunction creation.
+  std::string InitialRegYamlFile;
+  mutable std::unique_ptr<IRegisterState> InitialMachineState = nullptr;
 };
 
 } // namespace snippy

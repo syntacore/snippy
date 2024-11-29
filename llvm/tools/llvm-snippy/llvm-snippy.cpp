@@ -979,6 +979,7 @@ static void completeConfig(Config &Cfg, LLVMState &State,
   auto *II = TM.getMCInstrInfo();
   assert(II);
   checkFPUSettings(Cfg, State.getCtx(), Tgt, *II, RunOnModel);
+  Cfg.setupImmHistMap(OpCC);
 }
 
 static void initializeLLVMAll() {

@@ -12,11 +12,14 @@
 #include "snippy/InitializePasses.h"
 
 void llvm::snippy::initializeSnippyPasses(PassRegistry &Registry) {
+  initializeSnippyFunctionMetadataWrapperPass(Registry);
   initializeGeneratorContextWrapperPass(Registry);
   initializeRootRegPoolWrapperPass(Registry);
   initializeReserveRegsPass(Registry);
   initializeFillExternalFunctionsStubsPass(Registry);
   initializeFunctionGeneratorPass(Registry);
+  initializeSimulatorContextWrapperPass(Registry);
+  initializeSimulatorContextPreserverPass(Registry);
   initializeFunctionDistributePass(Registry);
   initializeCFGeneratorPass(Registry);
   initializeCFPermutationPass(Registry);

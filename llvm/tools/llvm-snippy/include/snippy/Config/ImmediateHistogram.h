@@ -19,10 +19,12 @@
 #include "snippy/Support/RandUtil.h"
 #include "snippy/Support/YAMLUtils.h"
 
+#include "snippy/Config/OpcodeHistogram.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FormatVariadic.h"
 
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -362,6 +364,24 @@ int genImmSINTWithOffset(const ImmediateHistogramSequence *IH,
   return genImmInInterval<Offset - (1 << (BitWidth - 1)),
                           (1 << (BitWidth - 1)) - 1 + Offset>(IH, StridedImm);
 }
+
+class OpcodeToImmHistSequenceMap final {
+  std::unordered_map<unsigned, ImmHistOpcodeSettings> Data;
+
+public:
+  OpcodeToImmHistSequenceMap(const ImmediateHistogramRegEx &ImmHist,
+                             const OpcodeHistogram &OpcHist,
+                             const OpcodeCache &OpCC);
+
+  OpcodeToImmHistSequenceMap() = default;
+
+  const ImmHistOpcodeSettings &
+  getConfigForOpcode(unsigned Opc, const OpcodeCache &OpCC) const {
+    assert(Data.count(Opc) && "Opcode was not found in immediate histogram");
+    return Data.at(Opc);
+  }
+};
+
 } // namespace snippy
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::ImmediateHistogramSequence);
 } // namespace llvm

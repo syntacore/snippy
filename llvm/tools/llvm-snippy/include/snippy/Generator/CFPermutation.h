@@ -7,9 +7,11 @@
 //===----------------------------------------------------------------------===//
 #pragma once
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 
 #include <set>
+#include <unordered_map>
 
 namespace llvm {
 class MachineBasicBlock;
@@ -19,6 +21,70 @@ namespace snippy {
 struct Branchegram;
 class GeneratorContext;
 class FunctionGenerator;
+struct SimulatorContext;
+
+class ConsecutiveLoopInfo {
+public:
+  ConsecutiveLoopInfo() = default;
+  bool isFirstConsecutiveLoopHeader(unsigned BB) const {
+    return ConsecutiveLoopsHeaders.count(BB);
+  }
+
+  bool isNonFirstConsecutiveLoopHeader(unsigned BB) const {
+    return any_of(make_second_range(ConsecutiveLoopsHeaders),
+                  [BB](const auto &ConsLoops) { return ConsLoops.count(BB); });
+  }
+
+  void registerConsecutiveLoopsHeader(unsigned ConsecutiveLoopHeader,
+                                      unsigned FirstLoopHeader) {
+    ConsecutiveLoopsHeaders[FirstLoopHeader].insert(ConsecutiveLoopHeader);
+  }
+
+  const auto &getConsecutiveLoops(unsigned FirstConsecutiveLoop) const {
+    assert(isFirstConsecutiveLoopHeader(FirstConsecutiveLoop));
+    return ConsecutiveLoopsHeaders.at(FirstConsecutiveLoop);
+  }
+
+  const auto &getConsecutiveLoops() const { return ConsecutiveLoopsHeaders; }
+
+private:
+  //       +---v---+
+  //       |       |
+  //       +---+---+
+  //           | ______    ------------------------------
+  //           |/      \
+  //       +---v---+   |
+  //       |       |   |      First consecutive loop
+  //       +---+---+   |
+  //           |\______/
+  //           | ______    ------------------------------
+  //           |/      \
+  //       +---v---+   |
+  //       |       |   |
+  //       +---+---+   |
+  //           |\______/
+  //           | ______
+  //           |/      \
+  //       +---v---+   |
+  //       |       |   |      Other consecutive loops
+  //       +---+---+   |
+  //           |\______/
+  //           | ______
+  //           |/      \
+  //       +---v---+   |
+  //       |       |   |
+  //       +---+---+   |
+  //           |\______/
+  //           |           ------------------------------
+  //           |
+  //       +---v---+
+  //       |       |
+  //       +---+---+
+  //
+  // First loop header <-> Consecutive loops headers (basic blocks numbers)
+  std::unordered_map<unsigned, std::set<unsigned>> ConsecutiveLoopsHeaders;
+};
+
 class CFPermutationContext {
 public:
   struct BlockInfo final {
@@ -53,12 +119,15 @@ protected:
   std::reference_wrapper<MachineFunction> CurrMF;
   std::reference_wrapper<GeneratorContext> GC;
   std::reference_wrapper<FunctionGenerator> FG;
+  std::reference_wrapper<ConsecutiveLoopInfo> CLI;
   std::reference_wrapper<const Branchegram> BranchSettings;
+  std::reference_wrapper<const SimulatorContext> SimCtx;
   unsigned PermutationCounter = 0;
 
 public:
   CFPermutationContext(MachineFunction &MF, GeneratorContext &GC,
-                       FunctionGenerator &FG);
+                       FunctionGenerator &FG, ConsecutiveLoopInfo &CLI,
+                       const SimulatorContext &SimCtx);
   virtual ~CFPermutationContext() = default;
 
   virtual void print(raw_ostream &OS) const;

@@ -12,6 +12,9 @@
 #include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContextPass.h"
+#include "snippy/Generator/Policy.h"
+#include "snippy/Generator/SimulatorContextWrapperPass.h"
+#include "snippy/Generator/SnippyFunctionMetadata.h"
 
 #include "llvm/CodeGen/MachineFunctionPass.h"
 
@@ -37,7 +40,9 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<GeneratorContextWrapper>();
+    AU.addRequired<SnippyFunctionMetadataWrapper>();
     AU.addRequired<FunctionGenerator>();
+    AU.addRequired<SimulatorContextWrapper>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 };
@@ -66,6 +71,9 @@ namespace snippy {
 bool RegsInitInsertion::runOnMachineFunction(MachineFunction &MF) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &FG = getAnalysis<FunctionGenerator>();
+  auto &SFM = getAnalysis<SnippyFunctionMetadataWrapper>().get(MF);
+  auto &SimCtx =
+      getAnalysis<SimulatorContextWrapper>().get<OwningSimulatorContext>();
   if (!FG.isEntryFunction(MF))
     return false;
   if (!InitRegs) {
@@ -82,10 +90,13 @@ bool RegsInitInsertion::runOnMachineFunction(MachineFunction &MF) {
   auto InsertIterPos = MF.begin();
   BlockRegsInit->addSuccessor(SuccessorBlockPtr);
   MF.insert(InsertIterPos, BlockRegsInit);
-  SGCtx.setRegsInitBlock(BlockRegsInit);
+  SFM.RegsInitBlock = BlockRegsInit;
 
-  SnippyTgt.generateRegsInit(*BlockRegsInit,
-                             SGCtx.getInitialRegisterState(SubTgt), SGCtx);
+  planning::InstructionGenerationContext IGC{
+      *BlockRegsInit, BlockRegsInit->getFirstTerminator(), SGCtx, SimCtx};
+
+  SnippyTgt.generateRegsInit(
+      IGC, SGCtx.getProgramContext().getInitialRegisterState(SubTgt));
   return true;
 }
 

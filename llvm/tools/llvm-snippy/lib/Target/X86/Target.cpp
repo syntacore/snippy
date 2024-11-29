@@ -28,9 +28,8 @@ class SnippyX86Target : public SnippyTarget {
 public:
   SnippyX86Target() = default;
 
-  void generateWriteValueSeq(APInt Value, MCRegister DestReg,
-                             GeneratorContext &GC, RegPoolWrapper &RP,
-                             const MachineBasicBlock &MBB,
+  void generateWriteValueSeq(InstructionGenerationContext &IGC, APInt Value,
+                             MCRegister DestReg,
                              SmallVectorImpl<MCInst> &Insts) const override {
     reportUnimplementedError();
   }
@@ -69,8 +68,8 @@ public:
     reportUnimplementedError();
   }
 
-  void generateRegsInit(MachineBasicBlock &MBB, const IRegisterState &R,
-                        GeneratorContext &GC) const override {
+  void generateRegsInit(InstructionGenerationContext &IGC,
+                        const IRegisterState &R) const override {
     reportUnimplementedError();
   }
 
@@ -83,13 +82,12 @@ public:
       planning::InstructionGenerationContext &InstrGenCtx) const override {
     reportUnimplementedError();
   }
-  void instructionPostProcess(MachineInstr &MI, GeneratorContext &GC,
-                              MachineBasicBlock::iterator Ins) const override {
+  void instructionPostProcess(InstructionGenerationContext &IGC,
+                              MachineInstr &MI) const override {
     reportUnimplementedError();
   }
 
-  virtual MachineInstr *generateFinalInst(MachineBasicBlock &MBB,
-                                          GeneratorContext &GC,
+  virtual MachineInstr *generateFinalInst(InstructionGenerationContext &IGC,
                                           unsigned LastInstr) const override {
     reportUnimplementedError();
   }
@@ -99,8 +97,8 @@ public:
   }
 
   const MCRegisterClass &
-  getRegClass(const GeneratorContext &Ctx, unsigned OperandRegClassID,
-              unsigned OpIndex, unsigned Opcode, const MachineBasicBlock &MBB,
+  getRegClass(InstructionGenerationContext &IGC, unsigned OperandRegClassID,
+              unsigned OpIndex, unsigned Opcode,
               const MCRegisterInfo &RegInfo) const override {
     reportUnimplementedError();
   }
@@ -117,23 +115,18 @@ public:
 
   MCRegister getStackPointer() const override { reportUnimplementedError(); }
 
-  void generateSpillToStack(MachineBasicBlock &MBB,
-                            MachineBasicBlock::iterator Ins, MCRegister Reg,
-                            GeneratorContext &GC,
+  void generateSpillToStack(InstructionGenerationContext &IGC, MCRegister Reg,
                             MCRegister SP) const override {
     reportUnimplementedError();
   }
 
-  void generateReloadFromStack(MachineBasicBlock &MBB,
-                               MachineBasicBlock::iterator Ins, MCRegister Reg,
-                               GeneratorContext &GC,
-                               MCRegister SP) const override {
+  void generateReloadFromStack(InstructionGenerationContext &IGC,
+                               MCRegister Reg, MCRegister SP) const override {
     reportUnimplementedError();
   }
 
-  void generatePopNoReload(MachineBasicBlock &MBB,
-                           MachineBasicBlock::iterator Ins, MCRegister Reg,
-                           GeneratorContext &GC) const override {
+  void generatePopNoReload(InstructionGenerationContext &IGC,
+                           MCRegister Reg) const override {
     reportUnimplementedError();
   }
 
@@ -169,34 +162,29 @@ public:
     reportUnimplementedError();
   }
 
-  MachineInstr *generateCall(MachineBasicBlock &MBB,
-                             MachineBasicBlock::iterator Ins,
-                             const Function &Target, GeneratorContext &GC,
+  MachineInstr *generateCall(InstructionGenerationContext &IGC,
+                             const Function &Target,
                              bool AsSupport) const override {
     reportUnimplementedError();
   }
 
-  MachineInstr *generateCall(MachineBasicBlock &MBB,
-                             MachineBasicBlock::iterator Ins,
-                             const Function &Target, GeneratorContext &GC,
-                             bool AsSupport,
+  MachineInstr *generateCall(InstructionGenerationContext &IGC,
+                             const Function &Target, bool AsSupport,
                              unsigned PreferredCallOpCode) const override {
     reportUnimplementedError();
   }
 
-  MachineInstr *generateTailCall(MachineBasicBlock &MBB, const Function &Target,
-                                 const GeneratorContext &GC) const override {
+  MachineInstr *generateTailCall(InstructionGenerationContext &IGC,
+                                 const Function &Target) const override {
     reportUnimplementedError();
   }
 
-  MachineInstr *generateReturn(MachineBasicBlock &MBB,
-                               const LLVMState &State) const override {
+  MachineInstr *
+  generateReturn(InstructionGenerationContext &IGC) const override {
     reportUnimplementedError();
   }
 
-  MachineInstr *generateNop(MachineBasicBlock &MBB,
-                            MachineBasicBlock::iterator Ins,
-                            const LLVMState &State) const override {
+  MachineInstr *generateNop(InstructionGenerationContext &IGC) const override {
     reportUnimplementedError();
   }
 
@@ -205,20 +193,15 @@ public:
                                       GeneratorContext &GC) const override {
     reportUnimplementedError();
   }
-  void transformValueInReg(MachineBasicBlock &MBB,
-                           const MachineBasicBlock::iterator &, APInt OldValue,
-                           APInt NewValue, MCRegister Register,
-                           RegPoolWrapper &RP,
-                           GeneratorContext &GC) const override {
+  void transformValueInReg(InstructionGenerationContext &IGC, APInt OldValue,
+                           APInt NewValue, MCRegister Register) const override {
     reportUnimplementedError();
   }
 
-  void loadEffectiveAddressInReg(MachineBasicBlock &MBB,
-                                 const MachineBasicBlock::iterator &,
+  void loadEffectiveAddressInReg(InstructionGenerationContext &IGC,
                                  MCRegister Register, uint64_t BaseAddr,
-                                 uint64_t Stride, MCRegister IndexReg,
-                                 RegPoolWrapper &RP,
-                                 GeneratorContext &GC) const override {
+                                 uint64_t Stride,
+                                 MCRegister IndexReg) const override {
     reportUnimplementedError();
   }
 
@@ -361,10 +344,9 @@ public:
     reportUnimplementedError();
   }
 
-  unsigned insertLoopInit(MachineBasicBlock &MBB,
-                          MachineBasicBlock::iterator Pos, MachineInstr &Branch,
-                          ArrayRef<Register> ReservedRegs, unsigned NIter,
-                          GeneratorContext &GC) const override {
+  unsigned insertLoopInit(InstructionGenerationContext &IGC,
+                          MachineInstr &Branch, ArrayRef<Register> ReservedRegs,
+                          unsigned NIter) const override {
     reportUnimplementedError();
   }
 
@@ -394,34 +376,28 @@ public:
                                        GeneratorContext &GC) const override {
     reportUnimplementedError();
   }
-  void writeValueToReg(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                       APInt Value, unsigned DstReg, RegPoolWrapper &RP,
-                       GeneratorContext &GC) const override {
+  void writeValueToReg(InstructionGenerationContext &IGC, APInt Value,
+                       unsigned DstReg) const override {
     reportUnimplementedError();
   }
 
-  void copyRegToReg(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                    MCRegister Rs, MCRegister Rd,
-                    GeneratorContext &GC) const override {
+  void copyRegToReg(InstructionGenerationContext &IGC, MCRegister Rs,
+                    MCRegister Rd) const override {
     reportUnimplementedError();
   }
 
-  void loadRegFromAddr(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                       uint64_t Addr, MCRegister Reg, RegPoolWrapper &RP,
-                       GeneratorContext &GC) const override {
+  void loadRegFromAddr(InstructionGenerationContext &IGC, uint64_t Addr,
+                       MCRegister Reg) const override {
     reportUnimplementedError();
   }
 
-  void storeRegToAddr(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                      uint64_t Addr, MCRegister Reg, RegPoolWrapper &RP,
-                      GeneratorContext &GC,
-                      unsigned BytesToWrite) const override {
+  void storeRegToAddr(InstructionGenerationContext &IGC, uint64_t Addr,
+                      MCRegister Reg, unsigned BytesToWrite) const override {
     reportUnimplementedError();
   }
 
-  void storeValueToAddr(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                        uint64_t Addr, APInt Value, RegPoolWrapper &RP,
-                        GeneratorContext &GC) const override {
+  void storeValueToAddr(InstructionGenerationContext &IGC, uint64_t Addr,
+                        APInt Value) const override {
     reportUnimplementedError();
   }
 

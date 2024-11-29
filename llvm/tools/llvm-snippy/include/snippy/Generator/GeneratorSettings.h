@@ -73,13 +73,17 @@ struct SnippyProgramSettings {
   bool FollowTargetABI;
   bool ExternalStack;
   std::string EntryPointName;
+  std::string InitialRegYamlFile;
+
   SnippyProgramSettings(SectionsDescriptions Sections, MCRegister StackPointer,
                         bool MangleExportedNames, bool FollowTargetABI,
-                        bool ExternalStack, StringRef EntryPointName)
+                        bool ExternalStack, StringRef EntryPointName,
+                        StringRef InitialRegYamlFile)
       : Sections(std::move(Sections)), StackPointer(StackPointer),
         MangleExportedNames(MangleExportedNames),
         FollowTargetABI(FollowTargetABI), ExternalStack(ExternalStack),
-        EntryPointName(EntryPointName){};
+        EntryPointName(EntryPointName),
+        InitialRegYamlFile(InitialRegYamlFile){};
 };
 
 class GeneratorSettings {
@@ -101,7 +105,8 @@ public:
     return SnippyProgramSettings(
         getCompleteSectionList(State), RegistersConfig.StackPointer,
         LinkerConfig.MangleExportedNames, RegistersConfig.FollowTargetABI,
-        LinkerConfig.ExternalStack, LinkerConfig.EntryPointName);
+        LinkerConfig.ExternalStack, LinkerConfig.EntryPointName,
+        RegistersConfig.InitialRegYamlFile);
   }
 
   GeneratorSettings(std::string ABIName, std::string BaseFileName,
