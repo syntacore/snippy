@@ -23,11 +23,12 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "InitializePasses.h"
+#include "../InitializePasses.h"
 
-#include "snippy/Generator/CFPermutation.h"
+#include "snippy/Generator/CFPermutationPass.h"
 #include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
+#include "snippy/Generator/SimulatorContextWrapperPass.h"
 
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -42,27 +43,15 @@
 
 namespace llvm {
 namespace snippy {
-namespace {
-class CFPermutation final : public MachineFunctionPass {
-public:
-  static char ID;
-
-  CFPermutation() : MachineFunctionPass(ID) {}
-
-  StringRef getPassName() const override { return PASS_DESC " Pass"; }
-
-  bool runOnMachineFunction(MachineFunction &MF) override;
-
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<GeneratorContextWrapper>();
-    AU.addRequired<FunctionGenerator>();
-    MachineFunctionPass::getAnalysisUsage(AU);
-  }
-};
+StringRef CFPermutation::getPassName() const { return PASS_DESC " Pass"; }
+void CFPermutation::getAnalysisUsage(AnalysisUsage &AU) const {
+  AU.addRequired<GeneratorContextWrapper>();
+  AU.addRequired<SimulatorContextWrapper>();
+  AU.addRequired<FunctionGenerator>();
+  MachineFunctionPass::getAnalysisUsage(AU);
+}
 
 char CFPermutation::ID = 0;
-
-} // namespace
 } // namespace snippy
 } // namespace llvm
 
@@ -71,22 +60,32 @@ using llvm::PassInfo;
 using llvm::PassRegistry;
 using llvm::snippy::CFPermutation;
 
-INITIALIZE_PASS_BEGIN(CFPermutation, DEBUG_TYPE, PASS_DESC, false, false)
-INITIALIZE_PASS_DEPENDENCY(GeneratorContextWrapper)
-INITIALIZE_PASS_END(CFPermutation, DEBUG_TYPE, PASS_DESC, false, false)
+SNIPPY_INITIALIZE_PASS(CFPermutation, DEBUG_TYPE, PASS_DESC, false)
 
 namespace llvm {
 
-MachineFunctionPass *createCFPermutationPass() { return new CFPermutation(); }
+snippy::ActiveImmutablePassInterface *createCFPermutationPass() {
+  return new CFPermutation();
+}
 
 namespace snippy {
+
 bool CFPermutation::runOnMachineFunction(MachineFunction &MF) {
+  auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &GenSettings = GC.getGenSettings();
+  auto SimCtx = getAnalysis<SimulatorContextWrapper>()
+                    .get<OwningSimulatorContext>()
+                    .get();
+  if (!GenSettings.Cfg.Branches.PermuteCF)
+    return false;
   LLVM_DEBUG(
       dbgs() << "CFPermutation::runOnMachineFunction runs on function:\n");
   LLVM_DEBUG(MF.dump());
-  auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &FG = getAnalysis<FunctionGenerator>();
-  return CFPermutationContext(MF, GC, FG).makePermutationAndUpdateBranches();
+  auto &CLI = get<ConsecutiveLoopInfo>(MF);
+  return CFPermutationContext(MF, GC, FG, CLI, SimCtx)
+      .makePermutationAndUpdateBranches();
 }
+
 } // namespace snippy
 } // namespace llvm

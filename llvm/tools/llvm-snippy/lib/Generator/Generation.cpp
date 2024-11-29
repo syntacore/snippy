@@ -14,6 +14,8 @@
 #include "snippy/Generator/GenerationRequest.h"
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/Policy.h"
+#include "snippy/Generator/SimulatorContext.h"
+#include "snippy/Generator/SnippyFunctionMetadata.h"
 #include "snippy/Support/Options.h"
 
 #include "llvm/CodeGen/MachineBasicBlock.h"
@@ -98,7 +100,7 @@ static void generateInsertionPointHint(
     planning::InstructionGenerationContext &InstrGenCtx) {
   auto &State = InstrGenCtx.GC.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
-  SnippyTgt.generateNop(InstrGenCtx.MBB, InstrGenCtx.Ins, State);
+  SnippyTgt.generateNop(InstrGenCtx);
 }
 
 enum class GenerationStatus {
@@ -108,29 +110,22 @@ enum class GenerationStatus {
   SizeFailed,
 };
 
-std::unique_ptr<Backtrack> createBacktrack(GeneratorContext &GC) {
-  return std::make_unique<Backtrack>(GC.getOrCreateInterpreter());
-}
-
-bool preInterpretBacktracking(const MachineInstr &MI, GeneratorContext &GC) {
-  auto BT = createBacktrack(GC);
-  assert(BT);
-  if (!BT->isInstrValid(MI, GC.getLLVMState().getSnippyTarget()))
+bool preInterpretBacktracking(const MachineInstr &MI, LLVMState &State,
+                              Backtrack &BT) {
+  if (!BT.isInstrValid(MI, State.getSnippyTarget()))
     return false;
   // TODO: maybe there will be another one way for back-tracking?
   return true;
 }
 
 template <typename InstrIt>
-GenerationStatus interpretInstrs(InstrIt Begin, InstrIt End,
-                                 GeneratorContext &GC) {
-  auto &I = GC.getOrCreateInterpreter();
-  const auto &State = GC.getLLVMState();
-  assert(GC.hasTrackingMode());
+GenerationStatus interpretInstrs(InstrIt Begin, InstrIt End, LLVMState &State,
+                                 const SimulatorContext &SimCtx) {
+  auto &I = SimCtx.getInterpreter();
+  assert(SimCtx.hasTrackingMode());
 
   for (auto &MI : iterator_range(Begin, End)) {
-    if (GC.getGenSettings().TrackingConfig.BTMode &&
-        !preInterpretBacktracking(MI, GC))
+    if (SimCtx.BT && !preInterpretBacktracking(MI, State, *SimCtx.BT))
       return GenerationStatus::BacktrackingFailed;
     I.addInstr(MI, State);
     if (I.step() != ExecutionResult::Success)
@@ -176,11 +171,10 @@ void reportGeneratorRollback(InstrIt ItBegin, InstrIt ItEnd) {
       } dbgs() << "are not valid. Regeneration...\n";);
 }
 
-template <typename InstrIt>
-void storeRefValue(MachineBasicBlock &MBB, InstrIt InsertPos, MemAddr Addr,
-                   APInt Val, RegPoolWrapper &RP, GeneratorContext &GC) {
-  GC.getLLVMState().getSnippyTarget().storeValueToAddr(MBB, InsertPos, Addr,
-                                                       Val, RP, GC);
+void storeRefValue(InstructionGenerationContext &InstrGenCtx, MemAddr Addr,
+                   APInt Val) {
+  auto &GC = InstrGenCtx.GC;
+  GC.getLLVMState().getSnippyTarget().storeValueToAddr(InstrGenCtx, Addr, Val);
 }
 
 void selfcheckOverflowGuard(const SectionDesc &SelfcheckSection,
@@ -194,16 +188,17 @@ void selfcheckOverflowGuard(const SectionDesc &SelfcheckSection,
 // Register pool is taken by value as we'll do some local reservations on top
 // of the existing register pool. All changes made must be canceled at the
 // function exit.
-template <typename InstrIt>
-SelfcheckIntermediateInfo<InstrIt> storeRefAndActualValueForSelfcheck(
-    InstrIt InsertPos, Register DestReg, RegPoolWrapper RP,
-    planning::InstructionGenerationContext &InstrGenCtx) {
+SelfcheckIntermediateInfo<MachineBasicBlock::iterator>
+storeRefAndActualValueForSelfcheck(
+    Register DestReg, planning::InstructionGenerationContext &InstrGenCtx) {
+  auto InsertPos = InstrGenCtx.Ins;
   auto &GC = InstrGenCtx.GC;
   auto &MBB = InstrGenCtx.MBB;
-  assert(InstrGenCtx.SelfCheck);
-  auto &SCAddress = InstrGenCtx.SelfCheck->CurrentAddress;
+  auto &SimCtx = InstrGenCtx.SimCtx;
+  assert(SimCtx.SCI);
+  auto &SCAddress = SimCtx.SCI->CurrentAddress;
   const auto &ST = GC.getLLVMState().getSnippyTarget();
-  auto &I = GC.getOrCreateInterpreter();
+  auto &I = SimCtx.getInterpreter();
   auto RegValue = I.readReg(DestReg);
 
   bool IsBegin = MBB.begin() == InsertPos;
@@ -211,14 +206,14 @@ SelfcheckIntermediateInfo<InstrIt> storeRefAndActualValueForSelfcheck(
   if (!IsBegin)
     FirstInserted = std::prev(InsertPos);
 
-  ST.storeRegToAddr(MBB, InsertPos, SCAddress, DestReg, RP, GC,
+  ST.storeRegToAddr(InstrGenCtx, SCAddress, DestReg,
                     /* store the whole register */ 0);
-  SelfcheckFirstStoreInfo<InstrIt> FirstStoreInfo{std::prev(InsertPos),
-                                                  SCAddress};
+  SelfcheckFirstStoreInfo<MachineBasicBlock::iterator> FirstStoreInfo{
+      std::prev(InsertPos), SCAddress};
   SCAddress += GC.getProgramContext().getSCStride();
   auto &SelfcheckSection = GC.getSelfcheckSection();
   selfcheckOverflowGuard(SelfcheckSection, SCAddress);
-  storeRefValue(MBB, InsertPos, SCAddress, RegValue, RP, GC);
+  storeRefValue(InstrGenCtx, SCAddress, RegValue);
   SCAddress += GC.getProgramContext().getSCStride();
   selfcheckOverflowGuard(SelfcheckSection, SCAddress);
 
@@ -286,9 +281,8 @@ static void unNaNRegister(planning::InstructionGenerationContext &InstrGenCtx,
   if (auto Err = ValueToWriteOrErr.takeError())
     snippy::fatal(GC.getLLVMState().getCtx(), "Internal error", std::move(Err));
 
-  auto RP = GC.getRegisterPool();
-  Tgt.writeValueToReg(InstrGenCtx.MBB, InstrGenCtx.Ins, *ValueToWriteOrErr, Reg,
-                      RP, GC);
+  auto RP = InstrGenCtx.pushRegPool();
+  Tgt.writeValueToReg(InstrGenCtx, *ValueToWriteOrErr, Reg);
 
   InstrGenCtx.PotentialNaNs.erase(Reg);
 }
@@ -367,13 +361,15 @@ static bool shouldRewriteRegValue(
     return anyOfInputOperandsIsPotentiallyNaN(MI, InstrGenCtx);
   case FloatOverwriteMode::IF_MODEL_DETECTED_NAN: {
     auto &GC = InstrGenCtx.GC;
+    auto &SimCtx = InstrGenCtx.SimCtx;
+    assert(SimCtx.hasTrackingMode());
     auto Reg = getDestinationRegister(MI);
     auto SelectedSemantics =
         getFloatSemanticsForReg(GC.getLLVMState().getRegInfo(), Reg);
     if (auto Err = SelectedSemantics.takeError())
       snippy::fatal("Internal error", Twine("Cannot check if register is NaN: ")
                                           .concat(toString(std::move(Err))));
-    auto &I = GC.getOrCreateInterpreter();
+    auto &I = SimCtx.getInterpreter();
     APFloat Val(*SelectedSemantics, I.readReg(Reg));
     return Val.isNaN();
   }
@@ -390,10 +386,12 @@ void controlNaNPropagation(
   if (Begin == End)
     return;
   auto &GC = InstrGenCtx.GC;
+  auto &SimCtx = InstrGenCtx.SimCtx;
+  auto &State = GC.getLLVMState();
   auto &FPUConfig = GC.getConfig().FPUConfig;
   if (!FPUConfig || !FPUConfig->Overwrite)
     return;
-  auto &Tgt = GC.getLLVMState().getSnippyTarget();
+  auto &Tgt = State.getSnippyTarget();
   auto Filtered =
       llvm::make_filter_range(llvm::make_range(Begin, End), [&](auto &MI) {
         return (MI.getNumDefs() == 1) && hasFRegDestination(MI, Tgt);
@@ -410,9 +408,9 @@ void controlNaNPropagation(
   auto Beg = std::prev(End);
   for (auto Reg : RegsToUnNaN)
     unNaNRegister(InstrGenCtx, Reg);
-  if (!GC.hasTrackingMode())
+  if (!SimCtx.hasTrackingMode())
     return;
-  if (interpretInstrs(++Beg, End, GC) != GenerationStatus::Ok)
+  if (interpretInstrs(++Beg, End, State, SimCtx) != GenerationStatus::Ok)
     snippy::fatal("Internal error",
                   "Failed to execute float overwrite on model");
 }
@@ -425,6 +423,7 @@ handleGeneratedInstructions(InstrIt ItBegin,
   auto &MBB = InstrGenCtx.MBB;
   auto &GC = InstrGenCtx.GC;
   auto ItEnd = InstrGenCtx.Ins;
+  auto &SimCtx = InstrGenCtx.SimCtx;
   auto GeneratedCodeSize = GC.getCodeBlockSize(ItBegin, ItEnd);
   auto PrimaryInstrCount = countPrimaryInstructions(ItBegin, ItEnd);
   auto ReportGenerationResult =
@@ -444,18 +443,19 @@ handleGeneratedInstructions(InstrIt ItBegin,
   if (sizeLimitIsExceeded(Limit, InstrGenCtx.Stats, GeneratedCodeSize))
     return ReportGenerationResult(GenerationStatus::SizeFailed);
 
-  if (!GC.hasTrackingMode()) {
+  if (!SimCtx.hasTrackingMode()) {
     controlNaNPropagation(ItBegin, ItEnd, InstrGenCtx);
     return ReportGenerationResult(GenerationStatus::Ok);
   }
-  auto InterpretInstrsResult = interpretInstrs(ItBegin, ItEnd, GC);
+
+  auto InterpretInstrsResult =
+      interpretInstrs(ItBegin, ItEnd, GC.getLLVMState(), SimCtx);
   if (InterpretInstrsResult != GenerationStatus::Ok)
     return ReportGenerationResult(InterpretInstrsResult);
 
   controlNaNPropagation(ItBegin, ItEnd, InstrGenCtx);
 
-  const auto &GenSettings = GC.getGenSettings();
-  if (!GenSettings.TrackingConfig.SelfCheckPeriod)
+  if (!SimCtx.SCI)
     return ReportGenerationResult(GenerationStatus::Ok);
 
   if (PrimaryInstrCount == 0) {
@@ -466,11 +466,11 @@ handleGeneratedInstructions(InstrIt ItBegin,
   assert(PrimaryInstrCount >= 1);
   assert(!InstrGenCtx.Stats.UnableToFitAnymore &&
          "There is no room left for selfcheck");
-  assert(InstrGenCtx.SelfCheck);
+  assert(SimCtx.SCI);
 
   // Collect instructions that can and should be selfchecked.
-  auto SelfcheckCandidates = collectSelfcheckCandidates(
-      ItBegin, ItEnd, GC, InstrGenCtx.SelfCheck->PeriodTracker);
+  auto SelfcheckCandidates =
+      collectSelfcheckCandidates(ItBegin, ItEnd, GC, SimCtx.SCI->PeriodTracker);
 
   // Collect def registers from the candidates.
   // Use SetVector as we want to preserve order of insertion.
@@ -513,28 +513,31 @@ handleGeneratedInstructions(InstrIt ItBegin,
   //                         r3, but can use r1.
   //     r3 selfcheck  <---- inserted first, support instruction can use r1, r2.
   auto InsPoint = ItEnd;
-  auto RP = GC.getRegisterPool();
+  auto RP = InstrGenCtx.pushRegPool();
   std::vector<SelfcheckFirstStoreInfo<InstrIt>> StoresInfo;
   for (const auto &Def : Defs) {
     llvm::for_each(ST.getPhysRegsFromUnit(Def.DestReg, State.getRegInfo()),
-                   [&RP](auto SimpleReg) { RP.addReserved(SimpleReg); });
-    auto SelfcheckInterInfo = storeRefAndActualValueForSelfcheck(
-        InsPoint, Def.DestReg, RP.push(), InstrGenCtx);
-    InsPoint = SelfcheckInterInfo.NextInsertPos;
+                   [&RP](auto SimpleReg) { RP->addReserved(SimpleReg); });
+    // This is done for backward compatibility.
+    auto TmpRP = InstrGenCtx.pushRegPool();
+    auto SelfcheckInterInfo =
+        storeRefAndActualValueForSelfcheck(Def.DestReg, InstrGenCtx);
+    InsPoint = InstrGenCtx.Ins = SelfcheckInterInfo.NextInsertPos;
     // Collect information about first generated selfcehck store for a primary
     // instr
     StoresInfo.push_back(SelfcheckInterInfo.FirstStoreInfo);
   }
+  InstrGenCtx.Ins = ItEnd;
 
   assert(Defs.size() == StoresInfo.size());
   // Add collected information about generated selfcheck stores for selfcheck
   // annotation
   for (const auto &[Def, StoreInfo] : zip(Defs, StoresInfo))
-    GC.addToSelfcheckMap(
+    GC.getMainModule().getOrAddResult<SelfCheckMap>().addToSelfcheckMap(
         StoreInfo.Address,
         std::distance(Def.Inst, std::next(StoreInfo.FirstStoreInstrPos)));
   // Execute self-check instructions
-  auto &I = GC.getOrCreateInterpreter();
+  auto &I = SimCtx.getInterpreter();
   if (!I.executeChainOfInstrs(State, InsPoint, ItEnd))
     I.reportSimulationFatalError(
         "Failed to execute chain of instructions in tracking mode");
@@ -557,12 +560,15 @@ static MachineOperand createRegAsOperand(Register Reg, unsigned Flags,
 }
 
 std::optional<MachineOperand> pregenerateOneOperand(
-    const MachineBasicBlock &MBB, const MCInstrDesc &InstrDesc,
-    RegPoolWrapper &RP, const MCOperandInfo &MCOpInfo,
+    InstructionGenerationContext &InstrGenCtx, const MCInstrDesc &InstrDesc,
+    const MCOperandInfo &MCOpInfo,
     const planning::PreselectedOpInfo &Preselected, unsigned OpIndex,
-    ArrayRef<MachineOperand> PregeneratedOperands, GeneratorContext &GC) {
+    ArrayRef<MachineOperand> PregeneratedOperands) {
   auto OpType = MCOpInfo.OperandType;
 
+  auto &RP = InstrGenCtx.getRegPool();
+  auto &MBB = InstrGenCtx.MBB;
+  auto &GC = InstrGenCtx.GC;
   const auto &State = GC.getLLVMState();
   const auto &RegInfo = State.getRegInfo();
   const auto &SnippyTgt = State.getSnippyTarget();
@@ -578,8 +584,9 @@ std::optional<MachineOperand> pregenerateOneOperand(
     else if (Preselected.isReg())
       Reg = Preselected.getReg();
     else {
-      auto RegClass = SnippyTgt.getRegClass(
-          GC, OperandRegClassID, OpIndex, InstrDesc.getOpcode(), MBB, RegInfo);
+      auto RegClass =
+          SnippyTgt.getRegClass(InstrGenCtx, OperandRegClassID, OpIndex,
+                                InstrDesc.getOpcode(), RegInfo);
       auto Exclude =
           SnippyTgt.excludeRegsForOperand(RegClass, GC, InstrDesc, OpIndex);
       auto Include = SnippyTgt.includeRegs(RegClass);
@@ -646,10 +653,8 @@ std::optional<MachineOperand> pregenerateOneOperand(
   llvm_unreachable("this operand type unsupported");
 }
 std::optional<SmallVector<MachineOperand, 8>> tryToPregenerateOperands(
-    const MachineBasicBlock &MBB, const MCInstrDesc &InstrDesc,
-    RegPoolWrapper &RP,
-    const std::vector<planning::PreselectedOpInfo> &Preselected,
-    GeneratorContext &GC) {
+    InstructionGenerationContext &InstrGenCtx, const MCInstrDesc &InstrDesc,
+    const std::vector<planning::PreselectedOpInfo> &Preselected) {
   SmallVector<MachineOperand, 8> PregeneratedOperands;
   assert(InstrDesc.getNumOperands() == Preselected.size());
   iota_range<unsigned long> PreIota(0, Preselected.size(),
@@ -657,8 +662,8 @@ std::optional<SmallVector<MachineOperand, 8>> tryToPregenerateOperands(
   for (const auto &[MCOpInfo, PreselOpInfo, Index] :
        zip(InstrDesc.operands(), Preselected, PreIota)) {
     auto OpOpt =
-        pregenerateOneOperand(MBB, InstrDesc, RP, MCOpInfo, PreselOpInfo, Index,
-                              PregeneratedOperands, GC);
+        pregenerateOneOperand(InstrGenCtx, InstrDesc, MCOpInfo, PreselOpInfo,
+                              Index, PregeneratedOperands);
     if (!OpOpt)
       return std::nullopt;
     PregeneratedOperands.push_back(OpOpt.value());
@@ -666,11 +671,11 @@ std::optional<SmallVector<MachineOperand, 8>> tryToPregenerateOperands(
   return PregeneratedOperands;
 }
 
-SmallVector<MachineOperand, 8>
-pregenerateOperands(const MachineBasicBlock &MBB, const MCInstrDesc &InstrDesc,
-                    RegPoolWrapper &RP,
-                    const std::vector<planning::PreselectedOpInfo> &Preselected,
-                    GeneratorContext &GC) {
+SmallVector<MachineOperand, 8> pregenerateOperands(
+    InstructionGenerationContext &InstrGenCtx, const MCInstrDesc &InstrDesc,
+    const std::vector<planning::PreselectedOpInfo> &Preselected) {
+  auto &RP = InstrGenCtx.getRegPool();
+  auto &GC = InstrGenCtx.GC;
   auto &RegGenerator = GC.getProgramContext().getRegGen();
   auto &State = GC.getLLVMState();
   auto &InstrInfo = State.getInstrInfo();
@@ -694,7 +699,7 @@ pregenerateOperands(const MachineBasicBlock &MBB, const MCInstrDesc &InstrDesc,
     });
     RegGenerator.setRegContextForPlugin();
     auto PregeneratedOperandsOpt =
-        tryToPregenerateOperands(MBB, InstrDesc, RP, Preselected, GC);
+        tryToPregenerateOperands(InstrGenCtx, InstrDesc, Preselected);
     IterNum++;
 
     if (PregeneratedOperandsOpt)
@@ -745,7 +750,7 @@ generateNopsToSizeLimit(const planning::RequestLimit &Limit,
 
   while (Limit.getSizeLeft(InstrGenCtx.Stats) >=
          (GeneratedNopsSize + NopSize)) {
-    auto *MI = SnpTgt.generateNop(MBB, InstrGenCtx.Ins, State);
+    auto *MI = SnpTgt.generateNop(InstrGenCtx);
     assert(MI && "Nop generation failed");
 
     assert(NopSize == SnpTgt.getInstrSize(*MI, GC));
@@ -770,7 +775,7 @@ bool sizeLimitIsExceeded(const planning::RequestLimit &Lim,
 
 AddressGenInfo chooseAddrGenInfoForInstrCallback(
     LLVMContext &Ctx,
-    std::optional<GeneratorContext::LoopGenerationInfo> CurLoopGenInfo,
+    std::optional<SnippyLoopInfo::LoopGenerationInfo> CurLoopGenInfo,
     size_t AccessSize, size_t Alignment, const MemoryAccess &MemoryScheme) {
   (void)CurLoopGenInfo; // for future extensibility
   // AddressGenInfo for one element access.
@@ -779,7 +784,9 @@ AddressGenInfo chooseAddrGenInfoForInstrCallback(
 
 AccessSampleResult chooseAddrInfoForInstr(MachineInstr &MI,
                                           GeneratorContext &SGCtx,
-                                          const MachineLoop *ML) {
+                                          const MachineLoop *ML,
+                                          const SnippyLoopInfo *SLI) {
+  assert(!ML || SLI);
   auto &State = SGCtx.getLLVMState();
   auto &MS = SGCtx.getMemoryAccessSampler();
   const auto &SnippyTgt = State.getSnippyTarget();
@@ -789,7 +796,7 @@ AccessSampleResult chooseAddrInfoForInstr(MachineInstr &MI,
       SnippyTgt.getAccessSizeAndAlignment(Opcode, SGCtx, *MI.getParent());
 
   auto CurLoopGenInfo =
-      ML ? SGCtx.getLoopsGenerationInfoForMBB(ML->getHeader()) : std::nullopt;
+      ML ? SLI->getLoopsGenerationInfoForMBB(ML->getHeader()) : std::nullopt;
 
   // Depending on which memory scheme is chosen we either try to generate a
   // strided access if the scheme has [ind-var] attribute or fallback to
@@ -845,7 +852,8 @@ SmallVector<unsigned, 4> pickRecentDefs(MachineInstr &MI,
 }
 
 unsigned chooseAddressRegister(MachineInstr &MI, const AddressPart &AP,
-                               RegPoolWrapper &RP, GeneratorContext &GC) {
+                               RegPoolWrapper &RP, GeneratorContext &GC,
+                               const SimulatorContext &SimCtx) {
   auto &State = GC.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
@@ -874,7 +882,7 @@ unsigned chooseAddressRegister(MachineInstr &MI, const AddressPart &AP,
 
   // Find Register among PickedRegisters with minimal value transform
   // cost.
-  auto &I = GC.getOrCreateInterpreter();
+  auto &I = SimCtx.getInterpreter();
   auto AddrValue = AP.Value;
 
   auto GetMatCost = [&](auto Reg) {
@@ -898,22 +906,28 @@ unsigned chooseAddressRegister(MachineInstr &MI, const AddressPart &AP,
 
   return ChosenReg;
 }
-void postprocessMemoryOperands(MachineInstr &MI, RegPoolWrapper &RP,
-                               GeneratorContext &GC, MachineLoopInfo *MLI,
-                               MemAccessInfo *MAI) {
+void postprocessMemoryOperands(MachineInstr &MI,
+                               planning::InstructionGenerationContext &IGC) {
+  auto *MAI = IGC.MAI;
+  auto *MLI = IGC.MLI;
+  auto &RP = IGC.getRegPool();
+  const auto *SLI = IGC.SLI;
+  auto &SimCtx = IGC.SimCtx;
+  auto &GC = IGC.GC;
   auto &State = GC.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   auto Opcode = MI.getDesc().getOpcode();
   auto NumAddrsToGen = SnippyTgt.countAddrsToGenerate(Opcode);
   auto *MBB = MI.getParent();
   auto *ML = MLI ? MLI->getLoopFor(MBB) : nullptr;
+  assert(!ML || SLI);
 
   for (size_t i = 0; i < NumAddrsToGen; ++i) {
-    auto [AddrInfo, AddrGenInfo] = chooseAddrInfoForInstr(MI, GC, ML);
+    auto [AddrInfo, AddrGenInfo] = chooseAddrInfoForInstr(MI, GC, ML, SLI);
     bool GenerateStridedLoad = !AddrGenInfo.isSingleElement();
     auto AccessSize = AddrInfo.AccessSize;
 
-    if (GenerateStridedLoad && GC.hasTrackingMode())
+    if (GenerateStridedLoad && SimCtx.hasTrackingMode())
       snippy::fatal(State.getCtx(), "Incompatible features",
                     "Can't use generate strided accesses in loops with "
                     "tracking mode enabled");
@@ -929,49 +943,57 @@ void postprocessMemoryOperands(MachineInstr &MI, RegPoolWrapper &RP,
                [Stride = AddrInfo.MinStride](auto &Val) { Val += Stride; });
     }
 
-    auto InsPoint = MI.getIterator();
+    auto OldIns = IGC.Ins;
+    IGC.Ins = MI.getIterator();
     for (auto &AP : RegToValue) {
       MCRegister Reg = AP.FixedReg;
-      if (GC.hasTrackingMode() &&
+      if (SimCtx.hasTrackingMode() &&
           GC.getGenSettings().TrackingConfig.AddressVH) {
-        auto &I = GC.getOrCreateInterpreter();
-        Reg = chooseAddressRegister(MI, AP, RP, GC);
-        SnippyTgt.transformValueInReg(*MI.getParent(), InsPoint, I.readReg(Reg),
-                                      AP.Value, Reg, RP, GC);
+        auto &I = SimCtx.getInterpreter();
+        Reg = chooseAddressRegister(MI, AP, RP, GC, SimCtx);
+        SnippyTgt.transformValueInReg(IGC, I.readReg(Reg), AP.Value, Reg);
       } else {
-        SnippyTgt.writeValueToReg(*MI.getParent(), InsPoint, AP.Value, Reg, RP,
-                                  GC);
+        SnippyTgt.writeValueToReg(IGC, AP.Value, Reg);
       }
       // Address registers must not be overwritten during other memory operands
       // preparation.
       RP.addReserved(Reg, AccessMaskBit::W);
     }
+    IGC.Ins = OldIns;
   }
 }
 
-static void reloadGlobalRegsFromMemory(MachineBasicBlock &MBB,
-                                       MachineBasicBlock::iterator Ins,
-                                       GeneratorContext &GC) {
+static void reloadGlobalRegsFromMemory(InstructionGenerationContext &IGC) {
+  auto &GC = IGC.GC;
   auto &Tgt = GC.getLLVMState().getSnippyTarget();
   auto &SpilledToMem = GC.getGenSettings().RegistersConfig.SpilledToMem;
+  if (SpilledToMem.empty())
+    return;
+  auto &ProgCtx = GC.getProgramContext();
+  assert(ProgCtx.hasProgramStateSaveSpace());
+  auto &SaveLocs = ProgCtx.getProgramStateSaveSpace();
   for (auto &Reg : SpilledToMem) {
-    auto Addr = GC.getSpilledRegAddrLocal(Reg);
-    Tgt.generateSpillToAddr(MBB, Ins, Reg, Addr, GC);
+    auto &Addr = SaveLocs.getSaveLocation(Reg);
+    Tgt.generateSpillToAddr(IGC, Reg, Addr.Local);
   }
   for (auto &Reg : SpilledToMem) {
-    auto Addr = GC.getSpilledRegAddrGlobal(Reg);
-    Tgt.generateReloadFromAddr(MBB, Ins, Reg, Addr, GC);
+    auto &Addr = SaveLocs.getSaveLocation(Reg);
+    Tgt.generateReloadFromAddr(IGC, Reg, Addr.Global);
   }
 }
 
-static void reloadLocallySpilledRegs(MachineBasicBlock &MBB,
-                                     MachineBasicBlock::iterator Ins,
-                                     GeneratorContext &GC) {
+static void reloadLocallySpilledRegs(InstructionGenerationContext &IGC) {
+  auto &GC = IGC.GC;
   auto &Tgt = GC.getLLVMState().getSnippyTarget();
   auto &SpilledToMem = GC.getGenSettings().RegistersConfig.SpilledToMem;
+  if (SpilledToMem.empty())
+    return;
+  auto &ProgCtx = GC.getProgramContext();
+  assert(ProgCtx.hasProgramStateSaveSpace());
+  auto &SaveLocs = ProgCtx.getProgramStateSaveSpace();
   for (auto &Reg : SpilledToMem) {
-    auto Addr = GC.getSpilledRegAddrLocal(Reg);
-    Tgt.generateReloadFromAddr(MBB, Ins, Reg, Addr, GC);
+    auto &Addr = SaveLocs.getSaveLocation(Reg);
+    Tgt.generateReloadFromAddr(IGC, Reg, Addr.Local);
   }
 }
 
@@ -995,7 +1017,7 @@ generateCall(unsigned OpCode,
   auto &CallTarget = *(CalleeNode->functions()[FunctionIdx]);
   assert(CallTarget.hasName());
   if (CalleeNode->isExternal() && GC.getConfig().hasSectionToSpillGlobalRegs())
-    reloadGlobalRegsFromMemory(MBB, InstrGenCtx.Ins, GC);
+    reloadGlobalRegsFromMemory(InstrGenCtx);
 
   auto TargetStackPointer = SnippyTgt.getStackPointer();
   auto RealStackPointer = GC.getProgramContext().getStackPointer();
@@ -1004,19 +1026,17 @@ generateCall(unsigned OpCode,
   // call we need to copy stack pointer value to target default stack pointer
   // and do reverse after returning from external call
   if (CalleeNode->isExternal() && (RealStackPointer != TargetStackPointer))
-    SnippyTgt.copyRegToReg(MBB, InstrGenCtx.Ins, RealStackPointer,
-                           TargetStackPointer, GC);
+    SnippyTgt.copyRegToReg(InstrGenCtx, RealStackPointer, TargetStackPointer);
 
-  auto *Call = SnippyTgt.generateCall(MBB, InstrGenCtx.Ins, CallTarget, GC,
+  auto *Call = SnippyTgt.generateCall(InstrGenCtx, CallTarget,
                                       /* AsSupport */ false, OpCode);
 
   if (!GC.isRegSpilledToMem(RealStackPointer) && CalleeNode->isExternal() &&
       (RealStackPointer != TargetStackPointer))
-    SnippyTgt.copyRegToReg(MBB, InstrGenCtx.Ins, TargetStackPointer,
-                           RealStackPointer, GC);
+    SnippyTgt.copyRegToReg(InstrGenCtx, TargetStackPointer, RealStackPointer);
 
   if (CalleeNode->isExternal() && GC.getConfig().hasSectionToSpillGlobalRegs())
-    reloadLocallySpilledRegs(MBB, InstrGenCtx.Ins, GC);
+    reloadLocallySpilledRegs(InstrGenCtx);
 
   Node->markAsCommitted(CalleeNode);
   return Call;
@@ -1068,37 +1088,43 @@ randomInstruction(const MCInstrDesc &InstrDesc,
       OpInfo.setTiedTo(TiedTo);
   }
 
-  auto RP = GC.getRegisterPool();
+  auto RP = InstrGenCtx.pushRegPool();
   auto PregeneratedOperands =
-      pregenerateOperands(MBB, InstrDesc, RP, Preselected, GC);
+      pregenerateOperands(InstrGenCtx, InstrDesc, Preselected);
   for (auto &Op : PregeneratedOperands)
     MIB.add(Op);
 
   if (DoPostprocess)
-    postprocessMemoryOperands(*MIB, RP, GC, InstrGenCtx.MLI, InstrGenCtx.MAI);
+    postprocessMemoryOperands(*MIB, InstrGenCtx);
   // FIXME:
   // We have a lot of problems with rollback and configurations
   // After this, we can have additional instruction after main one!
-  auto PostProcessInstPos = std::next(MIB->getIterator());
+  [[maybe_unused]] auto PostProcessInstPos = std::next(MIB->getIterator());
   assert(PostProcessInstPos == InstrGenCtx.Ins);
-  SnippyTgt.instructionPostProcess(*MIB, GC, PostProcessInstPos);
+  SnippyTgt.instructionPostProcess(InstrGenCtx, *MIB);
   return MIB;
 }
 
 void spillPseudoInstImplicitReg(MachineInstr &MI, Register Reg,
-                                GeneratorContext &GC) {
+                                InstructionGenerationContext &IGC) {
+  auto &GC = IGC.GC;
   auto &SnpTgt = GC.getLLVMState().getSnippyTarget();
   auto *MBBPtr = MI.getParent();
   assert(MBBPtr);
   auto &MBB = *MBBPtr;
   auto RealStackPointer = GC.getProgramContext().getStackPointer();
 
+  auto OldIns = IGC.Ins;
+
   // FIXME: This code can be unsuitable for some platforms
   auto SpillPoint = MachineBasicBlock::iterator(MI);
-  SnpTgt.generateSpillToStack(MBB, SpillPoint, Reg, GC, RealStackPointer);
+  IGC.Ins = SpillPoint;
+  SnpTgt.generateSpillToStack(IGC, Reg, RealStackPointer);
 
   auto ReloadPoint = std::next(MachineBasicBlock::iterator(MI));
-  SnpTgt.generateReloadFromStack(MBB, ReloadPoint, Reg, GC, RealStackPointer);
+  IGC.Ins = ReloadPoint;
+  SnpTgt.generateReloadFromStack(IGC, Reg, RealStackPointer);
+  IGC.Ins = OldIns;
 }
 
 void spillPseudoInstImplicitRegs(
@@ -1108,8 +1134,8 @@ void spillPseudoInstImplicitRegs(
 
   for (auto &Op : ImplicitRegsOps) {
     auto Reg = Op.getReg();
-    if (InstrGenCtx.RP->isReserved(Reg, *MI.getParent()))
-      spillPseudoInstImplicitReg(MI, Reg, InstrGenCtx.GC);
+    if (InstrGenCtx.getRegPool().isReserved(Reg, *MI.getParent()))
+      spillPseudoInstImplicitReg(MI, Reg, InstrGenCtx);
   }
 }
 
@@ -1148,9 +1174,10 @@ void generateInstruction(const MCInstrDesc &InstrDesc,
 }
 
 MachineBasicBlock *findNextBlockOnModel(MachineBasicBlock &MBB,
-                                        GeneratorContext &GC) {
-  const auto &SnippyTgt = GC.getLLVMState().getSnippyTarget();
-  auto &I = GC.getOrCreateInterpreter();
+                                        LLVMState &State,
+                                        const SimulatorContext &SimCtx) {
+  const auto &SnippyTgt = State.getSnippyTarget();
+  auto &I = SimCtx.getInterpreter();
   auto PC = I.getPC();
   for (auto &Branch : MBB.terminators()) {
     assert(Branch.isBranch());
@@ -1161,7 +1188,7 @@ MachineBasicBlock *findNextBlockOnModel(MachineBasicBlock &MBB,
            "Indirect branches are not supported for execution on the model "
            "during code generation.");
     assert(Branch.isConditionalBranch());
-    I.addInstr(Branch, GC.getLLVMState());
+    I.addInstr(Branch, State);
 
     if (I.step() != ExecutionResult::Success)
       I.reportSimulationFatalError(
@@ -1179,13 +1206,14 @@ MachineBasicBlock *findNextBlockOnModel(MachineBasicBlock &MBB,
 MachineBasicBlock *
 findNextBlock(MachineBasicBlock *MBB,
               const std::set<MachineBasicBlock *, MIRComp> &NotVisited,
-              const MachineLoop *ML, GeneratorContext &GC) {
-  if (GC.hasTrackingMode() && MBB) {
+              const MachineLoop *ML, LLVMState &State,
+              const SimulatorContext &SimCtx) {
+  if (SimCtx.hasTrackingMode() && MBB) {
     // In selfcheck/backtracking mode we go to exit block of the loop right
     // after the latch block.
     if (ML && ML->getLoopLatch() == MBB)
       return ML->getExitBlock();
-    return findNextBlockOnModel(*MBB, GC);
+    return findNextBlockOnModel(*MBB, State, SimCtx);
   }
   // When we're not tracking execution on the model or worrying about BBs order,
   // we can pick up any BB that we haven't processed yet.
@@ -1198,25 +1226,28 @@ template <typename RegsSnapshotTy>
 void writeRegsSnapshot(RegsSnapshotTy RegsSnapshot, MachineBasicBlock &MBB,
                        RegStorageType Storage, GeneratorContext &GC) {
   const auto &SnippyTgt = GC.getLLVMState().getSnippyTarget();
-  auto RP = GC.getRegisterPool();
+  InstructionGenerationContext IGC{MBB, MBB.getFirstTerminator(), GC};
+  auto RP = IGC.pushRegPool();
   for (auto &&[RegIdx, Value] : RegsSnapshot) {
     auto Reg = SnippyTgt.regIndexToMCReg(RegIdx, Storage, GC);
     // FIXME: we expect that writeValueToReg won't corrupt other registers of
     // the same class even if they were not reserved. Also we expect that
     // writing to FP/V register may use only non-reserved GPR registers.
-    SnippyTgt.writeValueToReg(MBB, MBB.getFirstTerminator(),
-                              toAPInt(Value, SnippyTgt.getRegBitWidth(Reg, GC)),
-                              Reg, RP, GC);
+    SnippyTgt.writeValueToReg(
+        IGC, toAPInt(Value, SnippyTgt.getRegBitWidth(Reg, GC)), Reg);
   }
 }
 
 GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
-                                              GeneratorContext &GC) {
-  assert(GC.hasTrackingMode());
+                                              GeneratorContext &GC,
+                                              const SimulatorContext &SimCtx) {
+  assert(SimCtx.hasTrackingMode());
 
-  const auto &SnippyTgt = GC.getLLVMState().getSnippyTarget();
+  InstructionGenerationContext IGC{MBB, MBB.getFirstTerminator(), GC};
+  auto &State = GC.getLLVMState();
+  const auto &SnippyTgt = State.getSnippyTarget();
 
-  auto &I = GC.getOrCreateInterpreter();
+  auto &I = SimCtx.getInterpreter();
   auto MemSnapshot = I.getMemBeforeTransaction();
   auto FRegsSnapshot = I.getFRegsBeforeTransaction();
   auto VRegsSnapshot = I.getVRegsBeforeTransaction();
@@ -1236,10 +1267,10 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
           std::clamp<size_t>(Addr, SelfcheckSec.VMA,
                              SelfcheckSec.VMA + SelfcheckSec.Size) == Addr)
         continue;
-      auto RP = GC.getRegisterPool();
+      auto RP = IGC.pushRegPool();
       SnippyTgt.storeValueToAddr(
-          MBB, MBB.getFirstTerminator(), Addr,
-          {sizeof(Data) * CHAR_BIT, static_cast<unsigned char>(Data)}, RP, GC);
+          IGC, Addr,
+          {sizeof(Data) * CHAR_BIT, static_cast<unsigned char>(Data)});
     }
   }
 
@@ -1247,8 +1278,8 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
   writeRegsSnapshot(VRegsSnapshot, MBB, RegStorageType::VReg, GC);
   // Execute inserted instructions to get a change made by the opened
   // transaction.
-  if (snippy::interpretInstrs(MBB.begin(), MBB.getFirstTerminator(), GC) !=
-      GenerationStatus::Ok)
+  if (snippy::interpretInstrs(MBB.begin(), MBB.getFirstTerminator(), State,
+                              SimCtx) != GenerationStatus::Ok)
     snippy::fatal("Inserted compensation code is incorrect");
 
   // We have two active transactions for which compensation code for GPRs must
@@ -1351,24 +1382,27 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
 
 void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
                       const GenerationStatistics &MFStats, GeneratorContext &GC,
-                      SelfCheckInfo *SelfCheckInfo, const CallGraphState &CGS,
+                      const SimulatorContext &SimCtx, const CallGraphState &CGS,
                       MemAccessInfo *MAI) {
   auto &State = GC.getLLVMState();
   auto &MBB = MF.back();
 
   auto LastInstr = GC.getLastInstr();
   bool NopLastInstr = LastInstr.empty();
+  planning::InstructionGenerationContext InstrGenCtx{MBB, MF.back().end(), GC,
+                                                     SimCtx};
+  auto RP = InstrGenCtx.pushRegPool();
 
   // Secondary functions always return.
   if (!CGS.isRootFunction(MF)) {
-    State.getSnippyTarget().generateReturn(MBB, State);
+    State.getSnippyTarget().generateReturn(InstrGenCtx);
     return;
   }
 
   // Root functions are connected via tail calls.
   if (!CGS.isExitFunction(MF)) {
-    State.getSnippyTarget().generateTailCall(MBB, *CGS.nextRootFunction(MF),
-                                             GC);
+    State.getSnippyTarget().generateTailCall(InstrGenCtx,
+                                             *CGS.nextRootFunction(MF));
     return;
   }
 
@@ -1378,31 +1412,21 @@ void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
   // User may ask for last instruction to be return.
   if (GC.useRetAsLastInstr()) {
     State.getSnippyTarget()
-        .generateReturn(MBB, State)
+        .generateReturn(InstrGenCtx)
         ->setPreInstrSymbol(MF, ExitSym);
     return;
   }
 
   // Or to generate nop
   if (NopLastInstr) {
-    State.getSnippyTarget().generateNop(MBB, MBB.end(), State);
+    State.getSnippyTarget().generateNop(InstrGenCtx);
     MBB.back().setPostInstrSymbol(MF, ExitSym);
     return;
   }
   for (auto &&FinalReq : Request.getFinalGenReqs(MFStats)) {
     assert((!FinalReq.limit().isNumLimit() || FinalReq.limit().getLimit()) &&
            "FinalReq is empty!");
-    auto RP = GC.getRegisterPool();
-    planning::InstructionGenerationContext InstrGenCtx{
-        MF.back(),
-        MF.back().end(),
-        &RP,
-        GC,
-        GenerationStatistics(),
-        SelfCheckInfo,
-        /* MachineLoopInfo */ nullptr,
-        /* CallGraphState */ nullptr,
-        MAI};
+    InstrGenCtx.append(MAI);
     snippy::generate(FinalReq, InstrGenCtx);
   }
 
@@ -1416,12 +1440,12 @@ void processGenerationResult(
     planning::InstructionGenerationContext &InstrGenCtx,
     const GenerationResult &IntRes) {
   LLVM_DEBUG(printInterpretResult(dbgs(), "      ", IntRes); dbgs() << "\n");
-  auto &GC = InstrGenCtx.GC;
+  auto &SimCtx = InstrGenCtx.SimCtx;
   auto &BacktrackCount = InstrGenCtx.BacktrackCount;
   auto &SizeErrorCount = InstrGenCtx.SizeErrorCount;
   switch (IntRes.Status) {
   case GenerationStatus::InterpretFailed: {
-    GC.getOrCreateInterpreter().reportSimulationFatalError(
+    SimCtx.getInterpreter().reportSimulationFatalError(
         "Fail to execute generated instruction in tracking mode\n");
   }
   case GenerationStatus::BacktrackingFailed: {
@@ -1473,8 +1497,9 @@ static void printDebugBrief(raw_ostream &OS, const Twine &Brief,
 
 void generate(planning::FunctionRequest &FunctionGenRequest,
               MachineFunction &MF, GeneratorContext &GC,
-              SelfCheckInfo *SelfCheckInfo, MachineLoopInfo *MLI,
-              const CallGraphState &CGS, MemAccessInfo *MAI) {
+              const SimulatorContext &SimCtx, MachineLoopInfo *MLI,
+              const CallGraphState &CGS, MemAccessInfo *MAI,
+              const SnippyLoopInfo *SLI, SnippyFunctionMetadata *SFM) {
   GenerationStatistics CurrMFGenStats;
   SNIPPY_DEBUG_BRIEF("request for function", FunctionGenRequest);
   std::set<MachineBasicBlock *, MIRComp> NotVisited;
@@ -1482,7 +1507,15 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
                  std::inserter(NotVisited, NotVisited.begin()),
                  [](auto &MBB) { return &MBB; });
   auto *MBB = &MF.front();
-
+  auto &State = GC.getLLVMState();
+  if (SimCtx.hasTrackingMode()) {
+    // Explicitly prepare interpreter PC.
+    assert(SimCtx.Runner);
+    auto &I = SimCtx.Runner->getPrimaryInterpreter();
+    auto StartPC = GC.getProgramContext().getLinker().getStartPC();
+    assert(StartPC);
+    I.setPC(*StartPC);
+  }
   while (!NotVisited.empty()) {
     assert(MBB);
     NotVisited.erase(MBB);
@@ -1491,7 +1524,7 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
 
     MachineLoop *ML = nullptr;
     // We need to know loops structure in selfcheck mode.
-    if (GC.hasTrackingMode()) {
+    if (SimCtx.hasTrackingMode()) {
       assert(MLI && "Machine Loop Info must be available here");
       ML = MLI->getLoopFor(MBB);
     }
@@ -1499,8 +1532,8 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
     if (ML && ML->getHeader() == MBB) {
       // Remember the current state (open transaction) before loop body
       // execution.
-      assert(GC.hasTrackingMode());
-      auto &I = GC.getOrCreateInterpreter();
+      assert(SimCtx.hasTrackingMode());
+      auto &I = SimCtx.getInterpreter();
       I.openTransaction();
     }
 
@@ -1512,37 +1545,38 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
       assert(BBReq.isLimitReached(GenerationStatistics{}) &&
              "Latch block for compensation code cannot be requested to "
              "generate primary instructions");
-      CurrMFGenStats.merge(generateCompensationCode(*MBB, GC));
+      CurrMFGenStats.merge(generateCompensationCode(*MBB, GC, SimCtx));
     } else {
       SNIPPY_DEBUG_BRIEF("request for reachable BasicBlock", BBReq);
 
-      auto RP = GC.getRegisterPool();
-      planning::InstructionGenerationContext InstrGenCtx{
-          *MBB,          MBB->begin(), &RP,  GC, GenerationStatistics(),
-          SelfCheckInfo, MLI,          &CGS, MAI};
+      planning::InstructionGenerationContext InstrGenCtx{*MBB, MBB->begin(), GC,
+                                                         SimCtx};
+      auto RP = InstrGenCtx.pushRegPool();
+      InstrGenCtx.append(MLI).append(&CGS).append(MAI).append(SLI).append(SFM);
       snippy::generate(BBReq, InstrGenCtx);
       CurrMFGenStats.merge(InstrGenCtx.Stats);
     }
     SNIPPY_DEBUG_BRIEF("Function codegen", CurrMFGenStats);
 
-    if (GC.hasTrackingMode() && MBB == &MF.back()) {
+    if (SimCtx.hasTrackingMode() && MBB == &MF.back()) {
       // The model has executed blocks from entry till exit. All other blocks
       // are dead and we'll handle then in the next loop below.
       break;
     }
 
-    MBB = findNextBlock(MBB, NotVisited, ML, GC);
+    MBB = findNextBlock(MBB, NotVisited, ML, State, SimCtx);
     if (!ML || ML->getExitBlock() != MBB)
       continue;
 
-    auto &I = GC.getOrCreateInterpreter();
+    auto &I = SimCtx.getInterpreter();
     // We are in exit block, it means that the loop was generated and we can
     // commit the transaction.
     I.commitTransaction();
     // Set expected values for registers that participate in the loop exit
     // condition (we execute only the first iteration of the loop). See
     // addIncomingValues/getIncomingValues description for additional details.
-    for (const auto &[Reg, Value] : GC.getIncomingValues(MBB))
+    assert(SLI);
+    for (const auto &[Reg, Value] : SLI->getIncomingValues(MBB))
       I.setReg(Reg, Value);
   }
 
@@ -1550,19 +1584,19 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
       dbgs() << "Instructions generation with enabled tracking on model: "
              << NotVisited.size() << " basic block are dead.\n");
 
-  assert((NotVisited.empty() || GC.hasTrackingMode()) &&
+  assert((NotVisited.empty() || SimCtx.hasTrackingMode()) &&
          "At this point some basic block might not be visited only when model "
          "controls generation routine.");
 
-  if (GC.hasTrackingMode()) {
+  if (SimCtx.hasTrackingMode()) {
     // Model must not be used further as it finished execution.
-    GC.disableTrackingMode();
-    auto &I = GC.getOrCreateInterpreter();
+    SimCtx.disableTrackingMode();
+    auto &I = SimCtx.getInterpreter();
     I.disableTransactionsTracking();
     I.resetMem();
   }
 
-  MBB = findNextBlock(nullptr, NotVisited, nullptr, GC);
+  MBB = findNextBlock(nullptr, NotVisited, nullptr, State, SimCtx);
   while (!FunctionGenRequest.isLimitReached(CurrMFGenStats)) {
     assert(MBB);
     assert(!NotVisited.empty() &&
@@ -1572,26 +1606,19 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
     auto &BBReq = FunctionGenRequest.at(MBB);
     SNIPPY_DEBUG_BRIEF("request for dead BasicBlock", BBReq);
 
-    auto RP = GC.getRegisterPool();
-    planning::InstructionGenerationContext InstrGenCtx{
-        *MBB,
-        MBB->begin(),
-        &RP,
-        GC,
-        GenerationStatistics(),
-        SelfCheckInfo,
-        /* MachineLoopInfo */ nullptr,
-        &CGS,
-        MAI};
+    planning::InstructionGenerationContext InstrGenCtx{*MBB, MBB->begin(), GC,
+                                                       SimCtx};
+    InstrGenCtx.append(&CGS).append(MAI).append(SFM);
+    auto RP = InstrGenCtx.pushRegPool();
     snippy::generate(BBReq, InstrGenCtx);
 
     CurrMFGenStats.merge(InstrGenCtx.Stats);
     SNIPPY_DEBUG_BRIEF("Function codegen", CurrMFGenStats);
-    MBB = findNextBlock(nullptr, NotVisited, nullptr, GC);
+    MBB = findNextBlock(nullptr, NotVisited, nullptr, State, SimCtx);
   }
 
-  finalizeFunction(MF, FunctionGenRequest, CurrMFGenStats, GC, SelfCheckInfo,
-                   CGS, MAI);
+  finalizeFunction(MF, FunctionGenRequest, CurrMFGenStats, GC, SimCtx, CGS,
+                   MAI);
 }
 
 void generate(planning::InstructionGroupRequest &IG,
@@ -1606,9 +1633,7 @@ void generate(planning::InstructionGroupRequest &IG,
   auto ItEnd = InstrGenCtx.Ins;
   auto ItBegin = ItEnd == MBB.begin() ? ItEnd : std::prev(ItEnd);
   {
-    auto RP = GC.getRegisterPool();
-    auto *OldRegPool = InstrGenCtx.RP;
-    InstrGenCtx.RP = &RP;
+    auto RP = InstrGenCtx.pushRegPool();
     auto &InstrInfo = GC.getLLVMState().getInstrInfo();
     planning::InstrGroupGenerationRAIIWrapper InitAndFinish(IG, InstrGenCtx);
     auto ItBegin = ItEnd == MBB.begin() ? ItEnd : std::prev(ItEnd);
@@ -1623,7 +1648,6 @@ void generate(planning::InstructionGroupRequest &IG,
         ItBegin =
             processGeneratedInstructions(ItBegin, InstrGenCtx, IG.limit());
     }
-    InstrGenCtx.RP = OldRegPool;
   }
   // If instructions were not already postprocessed.
   if (IG.isInseparableBundle())
@@ -1639,13 +1663,13 @@ void generate(planning::InstructionGroupRequest &IG,
 
 namespace {
 
-void interpretMBBInstrs(GeneratorContext &GC,
+void interpretMBBInstrs(LLVMState &State, const SimulatorContext &SimCtx,
                         MachineBasicBlock::const_iterator BeginInterpretIter,
                         MachineBasicBlock::const_iterator EndInterpretIter) {
-  auto Res = snippy::interpretInstrs(BeginInterpretIter, EndInterpretIter, GC);
+  auto Res = snippy::interpretInstrs(BeginInterpretIter, EndInterpretIter,
+                                     State, SimCtx);
   if (Res != GenerationStatus::Ok)
-    snippy::fatal(GC.getLLVMState().getCtx(),
-                  "instruction interpretation error",
+    snippy::fatal(State.getCtx(), "instruction interpretation error",
                   "Interpretation failed on instructions inserted before "
                   "main instructions generation routine.");
 }
@@ -1659,12 +1683,15 @@ generate(planning::BasicBlockRequest &BB,
     generate(IG, InstrGenCtx);
 
   auto &GC = InstrGenCtx.GC;
+  auto &State = GC.getLLVMState();
+  auto &SimCtx = InstrGenCtx.SimCtx;
   const auto &MBB = BB.getMBB();
   // In the register block we start interpretation from the beginning
   // In other blocks we begin from a pre-established iterator (Ins)
-  if (GC.hasTrackingMode()) {
-    if (GC.isRegsInitBlock(&MBB))
-      interpretMBBInstrs(GC, MBB.begin(), MBB.getFirstTerminator());
+  if (SimCtx.hasTrackingMode()) {
+    auto *SFM = InstrGenCtx.SFM;
+    if (!SFM || (SFM->RegsInitBlock == &MBB))
+      interpretMBBInstrs(State, SimCtx, MBB.begin(), MBB.getFirstTerminator());
   }
   return InstrGenCtx.Stats;
 }

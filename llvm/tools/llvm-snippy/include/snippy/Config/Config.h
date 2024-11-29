@@ -14,6 +14,7 @@
 #include "snippy/Config/ConfigIOContext.h"
 #include "snippy/Config/FPUSettings.h"
 #include "snippy/Config/FunctionDescriptions.h"
+#include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/PluginWrapper.h"
@@ -44,6 +45,8 @@ public:
   std::unique_ptr<TargetConfigInterface> TargetConfig;
   std::optional<FPUSettings> FPUConfig;
   std::optional<RegistersWithHistograms> RegsHistograms;
+  OpcodeToImmHistSequenceMap ImmHistMap;
+
   Config(const SnippyTarget &Tgt, StringRef PluginFilename,
          StringRef PluginInfoFilename, OpcodeCache OpCC, bool ParseWithPlugin,
          LLVMContext &Ctx, ArrayRef<std::string> IncludedFiles);
@@ -54,6 +57,12 @@ public:
                                                     Histogram.end());
   }
 
+  void setupImmHistMap(const OpcodeCache &OpCC) {
+    if (!ImmHistogram.holdsAlternative<ImmediateHistogramRegEx>())
+      return;
+    ImmHistMap = OpcodeToImmHistSequenceMap(
+        ImmHistogram.get<ImmediateHistogramRegEx>(), Histogram, OpCC);
+  }
   double getBurstOpcodesWeight() const {
     assert(Burst.Data.has_value());
     auto BurstOpcodes = Burst.Data.value().getAllBurstOpcodes();

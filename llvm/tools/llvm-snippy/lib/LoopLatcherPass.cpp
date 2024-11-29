@@ -17,9 +17,12 @@
 #include "InitializePasses.h"
 
 #include "snippy/CreatePasses.h"
+#include "snippy/Generator/CFPermutationPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
+#include "snippy/Generator/LoopLatcherPass.h"
 #include "snippy/Generator/RegReservForLoop.h"
 #include "snippy/Generator/RootRegPoolWrapperPass.h"
+#include "snippy/Generator/SimulatorContextWrapperPass.h"
 #include "snippy/Support/Options.h"
 
 #include "llvm/ADT/STLExtras.h"
@@ -38,14 +41,27 @@ namespace snippy {
 
 extern cl::OptionCategory Options;
 
-namespace {
-
 #define DEBUG_TYPE "snippy-loop-latcher"
 #define PASS_DESC "Snippy Loop Latcher"
 
-snippy::opt<bool> UseStackOpt("use-stack-for-IV",
-                              cl::desc("Place induction variables on stack."),
-                              cl::cat(Options), cl::Hidden);
+static snippy::opt<bool>
+    UseStackOpt("use-stack-for-IV",
+                cl::desc("Place induction variables on stack."),
+                cl::cat(Options), cl::Hidden);
+
+void SnippyLoopInfo::addIncomingValues(const MachineBasicBlock *MBB,
+                                       RegToValueType RegToValue) {
+  assert(MBB);
+  assert(IncomingValues.count(MBB) == 0);
+  IncomingValues[MBB] = std::move(RegToValue);
+}
+
+const SnippyLoopInfo::RegToValueType &
+SnippyLoopInfo::getIncomingValues(const MachineBasicBlock *MBB) const {
+  assert(MBB);
+  assert(IncomingValues.count(MBB));
+  return IncomingValues.at(MBB);
+}
 
 //       Initialize consecutive loop in previous loop:
 //
@@ -70,49 +86,29 @@ snippy::opt<bool> UseStackOpt("use-stack-for-IV",
 //       +------v------+
 //       |             |
 //       +------+------+
-snippy::opt<bool> InitConsLoopInPrevLoop(
+static snippy::opt<bool> InitConsLoopInPrevLoop(
     "init-cons-loop-in-prev-loop",
     cl::desc("Initialize consecutive loop in previous loop."),
     cl::cat(Options));
 
-class LoopLatcher final : public MachineFunctionPass {
-  void processExitingBlock(MachineLoop &ML, MachineBasicBlock &ExitingBlock,
-                           MachineBasicBlock &Preheader);
-  bool createLoopLatchFor(MachineLoop &ML);
-  template <typename R>
-  bool createLoopLatchFor(MachineLoop &ML, R &&ConsecutiveLoops);
-  auto selectRegsForBranch(const MCInstrDesc &BranchDesc,
-                           const MachineBasicBlock &Preheader,
-                           const MachineBasicBlock &ExitingBlock,
-                           const MCRegisterClass &RegClass);
-  MachineInstr &updateLatchBranch(MachineLoop &ML, MachineInstr &Branch,
-                                  MachineBasicBlock &Preheader,
-                                  ArrayRef<Register> ReservedRegs);
+LoopLatcher::LoopLatcher()
+    : ActiveImmutablePass<MachineFunctionPass, SnippyLoopInfo>(ID) {}
 
-  bool NIterWarned = false;
+StringRef LoopLatcher::getPassName() const { return PASS_DESC " Pass"; }
 
-public:
-  static char ID;
-
-  LoopLatcher() : MachineFunctionPass(ID) {}
-
-  StringRef getPassName() const override { return PASS_DESC " Pass"; }
-
-  bool runOnMachineFunction(MachineFunction &MF) override;
-
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<GeneratorContextWrapper>();
-    AU.addRequired<MachineLoopInfo>();
-    AU.addRequired<MachineDominatorTree>();
-    AU.addRequired<MachinePostDominatorTree>();
-    AU.addRequired<RootRegPoolWrapper>();
-    MachineFunctionPass::getAnalysisUsage(AU);
-  }
-};
+void LoopLatcher::getAnalysisUsage(AnalysisUsage &AU) const {
+  AU.addRequired<GeneratorContextWrapper>();
+  AU.addRequired<MachineLoopInfo>();
+  AU.addRequired<CFPermutation>();
+  AU.addRequired<MachineDominatorTree>();
+  AU.addRequired<MachinePostDominatorTree>();
+  AU.addRequired<SimulatorContextWrapper>();
+  AU.addRequired<RootRegPoolWrapper>();
+  MachineFunctionPass::getAnalysisUsage(AU);
+}
 
 char LoopLatcher::ID = 0;
 
-} // namespace
 } // namespace snippy
 } // namespace llvm
 
@@ -121,17 +117,13 @@ using llvm::PassInfo;
 using llvm::PassRegistry;
 using llvm::snippy::LoopLatcher;
 
-INITIALIZE_PASS_BEGIN(LoopLatcher, DEBUG_TYPE, PASS_DESC, false, false)
-INITIALIZE_PASS_DEPENDENCY(GeneratorContextWrapper)
-INITIALIZE_PASS_DEPENDENCY(MachineLoopInfo)
-INITIALIZE_PASS_DEPENDENCY(MachineDominatorTree)
-INITIALIZE_PASS_DEPENDENCY(MachinePostDominatorTree)
-INITIALIZE_PASS_DEPENDENCY(RootRegPoolWrapper)
-INITIALIZE_PASS_END(LoopLatcher, DEBUG_TYPE, PASS_DESC, false, false)
+SNIPPY_INITIALIZE_PASS(LoopLatcher, DEBUG_TYPE, PASS_DESC, false)
 
 namespace llvm {
 
-MachineFunctionPass *createLoopLatcherPass() { return new LoopLatcher(); }
+snippy::ActiveImmutablePassInterface *createLoopLatcherPass() {
+  return new LoopLatcher();
+}
 
 } // namespace llvm
 
@@ -151,13 +143,17 @@ bool LoopLatcher::runOnMachineFunction(MachineFunction &MF) {
   LLVM_DEBUG(MLI.getBase().print(dbgs()));
 
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto SimCtx = getAnalysis<SimulatorContextWrapper>()
+                    .get<OwningSimulatorContext>()
+                    .get();
   const auto &ProgCtx = SGCtx.getProgramContext();
   auto &State = SGCtx.getLLVMState();
+  auto &CLI = getAnalysis<CFPermutation>().get<ConsecutiveLoopInfo>(MF);
   if (UseStackOpt && !ProgCtx.stackEnabled())
     snippy::fatal(State.getCtx(),
                   "Cannot place IVs on the stack:", " stack was not enabled.");
 
-  if (SGCtx.hasTrackingMode() && !ProgCtx.stackEnabled())
+  if (SimCtx.hasTrackingMode() && !ProgCtx.stackEnabled())
     snippy::fatal(
         State.getCtx(), "Wrong snippy configuration:",
         "loops generation in selfcheck and backtracking modes requires stack.");
@@ -165,9 +161,9 @@ bool LoopLatcher::runOnMachineFunction(MachineFunction &MF) {
   for (auto *ML : MLI) {
     assert(ML);
     auto HeaderNumber = ML->getHeader()->getNumber();
-    if (SGCtx.isFirstConsecutiveLoopHeader(HeaderNumber))
-      createLoopLatchFor(*ML, SGCtx.getConsecutiveLoops(HeaderNumber));
-    else if (!SGCtx.isNonFirstConsecutiveLoopHeader(HeaderNumber))
+    if (CLI.isFirstConsecutiveLoopHeader(HeaderNumber))
+      createLoopLatchFor(*ML, CLI.getConsecutiveLoops(HeaderNumber));
+    else if (!CLI.isNonFirstConsecutiveLoopHeader(HeaderNumber))
       createLoopLatchFor(*ML);
   }
 
@@ -204,6 +200,9 @@ auto LoopLatcher::selectRegsForBranch(const MCInstrDesc &BranchDesc,
                                       const MachineBasicBlock &ExitingBlock,
                                       const MCRegisterClass &RegClass) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto SimCtx = getAnalysis<SimulatorContextWrapper>()
+                    .get<OwningSimulatorContext>()
+                    .get();
   auto &State = SGCtx.getLLVMState();
   auto &RegInfo = State.getRegInfo();
   const auto &SnippyTgt = State.getSnippyTarget();
@@ -239,7 +238,7 @@ auto LoopLatcher::selectRegsForBranch(const MCInstrDesc &BranchDesc,
   for (auto &&Reg : RegsToReserv)
     RootPool.addReserved(Reg, Preheader, AccessMaskBit::W);
 
-  auto TrackingMode = SGCtx.hasTrackingMode();
+  auto TrackingMode = SimCtx.hasTrackingMode();
   if (UseStackOpt || TrackingMode) {
     // We still have to reserve counter register even when using the stack.
     // Otherwise, this register might be later reserved for other purposes in
@@ -309,9 +308,12 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
                                       MachineBasicBlock &ExitingBlock,
                                       MachineBasicBlock &Preheader) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto SimCtx = getAnalysis<SimulatorContextWrapper>()
+                    .get<OwningSimulatorContext>()
+                    .get();
   const auto &ProgCtx = SGCtx.getProgramContext();
   auto &State = SGCtx.getLLVMState();
-  auto TrackingMode = SGCtx.hasTrackingMode();
+  auto TrackingMode = SimCtx.hasTrackingMode();
 
   auto FirstTerm = ExitingBlock.getFirstTerminator();
   assert(FirstTerm != ExitingBlock.end() &&
@@ -348,14 +350,15 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   LLVM_DEBUG(printSelectedRegs(dbgs(), ReservedRegs, State.getRegInfo()));
 
   auto PreheaderInsertPt = Preheader.getFirstTerminator();
-  auto MinLoopCountVal = SnippyTgt.insertLoopInit(
-      Preheader, PreheaderInsertPt, NewBranch, ReservedRegs, NIter, SGCtx);
+  InstructionGenerationContext PHCtx{Preheader, PreheaderInsertPt, SGCtx,
+                                     SimCtx};
+  auto MinLoopCountVal =
+      SnippyTgt.insertLoopInit(PHCtx, NewBranch, ReservedRegs, NIter);
 
   auto SP = ProgCtx.getStackPointer();
   if (UseStackOpt || TrackingMode) {
     for (auto &&Reg : ReservedRegs)
-      SnippyTgt.generateSpillToStack(Preheader, PreheaderInsertPt, Reg, SGCtx,
-                                     SP);
+      SnippyTgt.generateSpillToStack(PHCtx, Reg, SP);
   }
 
   LLVM_DEBUG(dbgs() << "Loop counter init inserted: "; Preheader.dump());
@@ -373,9 +376,12 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
       UseStackOpt || TrackingMode ? NewBranch : Header->getFirstNonPHI();
 
   auto *InsMBB = InsPos->getParent();
+  assert(InsMBB);
+  InstructionGenerationContext HeadCtx{*InsMBB, InsPos, SGCtx, SimCtx};
+
   if (UseStackOpt || TrackingMode) {
     for (auto &&Reg : reverse(ReservedRegs))
-      SnippyTgt.generateReloadFromStack(*InsMBB, InsPos, Reg, SGCtx, SP);
+      SnippyTgt.generateReloadFromStack(HeadCtx, Reg, SP);
   }
 
   // FIXME: Currently selfcheck mode really does not behave well when loop
@@ -397,19 +403,22 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   auto ActualNumIter = CounterInsRes.NIter;
   unsigned MinCounterVal = CounterInsRes.MinCounterVal.getZExtValue();
   auto CounterReg = ReservedRegs[CounterRegIdx];
-  GeneratorContext::LoopGenerationInfo TheLoopGenInfo{
+  auto &SLI = get<SnippyLoopInfo>(*ML.getHeader()->getParent());
+  SnippyLoopInfo::LoopGenerationInfo TheLoopGenInfo{
       CounterReg, ActualNumIter, MinCounterVal,
       SnippyTgt.getLoopType(NewBranch)};
-  SGCtx.addLoopGenerationInfoForMBB(ML.getHeader(), TheLoopGenInfo);
+  SLI.addLoopGenerationInfoForMBB(ML.getHeader(), TheLoopGenInfo);
 
   if (UseStackOpt || TrackingMode) {
     auto *Exit = ML.getExitBlock();
     assert(Exit);
-    SGCtx.addIncomingValues(Exit, std::move(ExitingValues));
+    SLI.addIncomingValues(Exit, std::move(ExitingValues));
     for (auto &&Reg : ReservedRegs)
-      SnippyTgt.generateSpillToStack(*InsMBB, InsPos, Reg, SGCtx, SP);
+      SnippyTgt.generateSpillToStack(HeadCtx, Reg, SP);
+    InstructionGenerationContext ExitCtx{*Exit, Exit->getFirstNonPHI(), SGCtx,
+                                         SimCtx};
     for (auto &&Reg : reverse(ReservedRegs))
-      SnippyTgt.generatePopNoReload(*Exit, Exit->getFirstNonPHI(), Reg, SGCtx);
+      SnippyTgt.generatePopNoReload(ExitCtx, Reg);
   }
 
   if (Diag.has_value() &&

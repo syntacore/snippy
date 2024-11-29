@@ -278,7 +278,6 @@ void replaceAllSubstrs(std::string &Str, StringRef What, StringRef With);
 inline unsigned requiredNumOfHexDigits(size_t Val) {
   return llvm::alignTo(Val, 4);
 }
-
 } // namespace snippy
 } // namespace llvm
 

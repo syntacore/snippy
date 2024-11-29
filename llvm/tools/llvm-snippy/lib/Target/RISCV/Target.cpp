@@ -13,6 +13,7 @@
 #include "snippy/Generator/Policy.h"
 #include "snippy/Generator/RegReservForLoop.h"
 #include "snippy/Generator/RegisterPool.h"
+#include "snippy/Generator/SimulatorContext.h"
 
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/OpcodeHistogram.h"
@@ -853,10 +854,12 @@ template <typename It> static void storeWordToMem(It MemIt, uint32_t Value) {
   std::copy(RegAsBytes.rbegin(), RegAsBytes.rend(), MemIt);
 }
 
-static void addGeneratedInstrsToBB(MachineBasicBlock &MBB,
-                                   MachineBasicBlock::iterator Ins,
-                                   GeneratorContext &GC, ArrayRef<MCInst> Insts,
+static void addGeneratedInstrsToBB(InstructionGenerationContext &IGC,
+                                   ArrayRef<MCInst> Insts,
                                    const SnippyTarget &Tgt) {
+  auto &MBB = IGC.MBB;
+  auto &Ins = IGC.Ins;
+  auto &GC = IGC.GC;
   auto &State = GC.getLLVMState();
   const auto &InstrInfo = State.getInstrInfo();
 
@@ -879,10 +882,10 @@ static void addGeneratedInstrsToBB(MachineBasicBlock &MBB,
 
 class SnippyRISCVTarget final : public SnippyTarget {
 
-  void generateWriteValueSeq(APInt Value, MCRegister DestReg,
-                             GeneratorContext &GC, RegPoolWrapper &RP,
-                             const MachineBasicBlock &MBB,
+  void generateWriteValueSeq(InstructionGenerationContext &IGC, APInt Value,
+                             MCRegister DestReg,
                              SmallVectorImpl<MCInst> &Insts) const override {
+    auto &GC = IGC.GC;
     if (RISCV::VRRegClass.contains(DestReg))
       snippy::fatal(GC.getLLVMState().getCtx(),
                     "Generation register write sequence error",
@@ -891,7 +894,7 @@ class SnippyRISCVTarget final : public SnippyTarget {
     if (RISCV::FPR64RegClass.contains(DestReg) ||
         RISCV::FPR32RegClass.contains(DestReg) ||
         RISCV::FPR16RegClass.contains(DestReg)) {
-      generateWriteValueFP(Value, DestReg, GC, RP, MBB, Insts);
+      generateWriteValueFP(IGC, Value, DestReg, Insts);
       return;
     }
     const auto &ST = GC.getSubtarget<RISCVSubtarget>();
@@ -944,8 +947,8 @@ public:
                   const TargetSubtargetInfo &Subtarget) const override;
 
   const MCRegisterClass &
-  getRegClass(const GeneratorContext &Ctx, unsigned OperandRegClassID,
-              unsigned OpIndex, unsigned Opcode, const MachineBasicBlock &MBB,
+  getRegClass(InstructionGenerationContext &IGC, unsigned OperandRegClassID,
+              unsigned OpIndex, unsigned Opcode,
               const MCRegisterInfo &RegInfo) const override;
 
   bool matchesArch(Triple::ArchType Arch) const override {
@@ -1030,97 +1033,96 @@ public:
       snippy::fatal("Lr.rl and Sc.aq are prohibited by RISCV ISA");
   }
 
-  void generateRegsInit(MachineBasicBlock &MBB, const IRegisterState &R,
-                        GeneratorContext &GC) const override {
+  void generateRegsInit(InstructionGenerationContext &IGC,
+                        const IRegisterState &R) const override {
     const auto &Regs = static_cast<const RISCVRegisterState &>(R);
 
     // Done before GPR initialization since scratch registers are used
     if (!Regs.FRegs.empty())
-      generateFPRInit(MBB, Regs, GC);
+      generateFPRInit(IGC, Regs);
 
     // Done before GPR initialization since scratch registers are used
     if (!Regs.VRegs.empty() && !UseSplatsForRVVInit.getValue())
-      generateVRegsInit(MBB, Regs, GC);
+      generateVRegsInit(IGC, Regs);
 
-    generateGPRInit(MBB, Regs, GC);
+    generateGPRInit(IGC, Regs);
 
     if (!Regs.VRegs.empty() && UseSplatsForRVVInit.getValue())
-      generateVRegsInitWithSplats(MBB, Regs, GC);
+      generateVRegsInitWithSplats(IGC, Regs);
   }
 
-  void generateGPRInit(MachineBasicBlock &MBB, const RISCVRegisterState &Regs,
-                       GeneratorContext &GC) const {
-    auto RP = GC.getRegisterPool();
+  void generateGPRInit(InstructionGenerationContext &IGC,
+                       const RISCVRegisterState &Regs) const {
+    auto &MBB = IGC.MBB;
+    auto RP = IGC.pushRegPool();
+    auto &GC = IGC.GC;
     // Initialize registers (except X0) before taking a branch
     assert(Regs.XRegs[0] == 0);
-    auto InsertPos = MBB.getFirstTerminator();
     for (auto [RegIdx, Value] : drop_begin(enumerate(Regs.XRegs))) {
       auto Reg = regIndexToMCReg(RegIdx, RegStorageType::XReg, GC);
-      if (!RP.isReserved(Reg, MBB))
-        writeValueToReg(MBB, InsertPos, APInt(getRegBitWidth(Reg, GC), Value),
-                        Reg, RP, GC);
+      if (!RP->isReserved(Reg, MBB))
+        writeValueToReg(IGC, APInt(getRegBitWidth(Reg, GC), Value), Reg);
     }
   }
 
-  void generateFPRInit(MachineBasicBlock &MBB, const RISCVRegisterState &Regs,
-                       GeneratorContext &GC) const {
-    auto RP = GC.getRegisterPool();
+  void generateFPRInit(InstructionGenerationContext &IGC,
+                       const RISCVRegisterState &Regs) const {
+    auto &MBB = IGC.MBB;
+    auto RP = IGC.pushRegPool();
+    auto &GC = IGC.GC;
     // Initialize registers before taking a branch
-    auto InsertPos = MBB.getFirstTerminator();
     for (auto [RegIdx, Value] : enumerate(Regs.FRegs)) {
       auto FPReg = regIndexToMCReg(RegIdx, RegStorageType::FReg, GC);
-      if (!RP.isReserved(FPReg, MBB))
-        writeValueToReg(MBB, InsertPos, APInt(getRegBitWidth(FPReg, GC), Value),
-                        FPReg, RP, GC);
+      if (!RP->isReserved(FPReg, MBB))
+        writeValueToReg(IGC, APInt(getRegBitWidth(FPReg, GC), Value), FPReg);
     }
   }
 
-  void generateVRegsInit(MachineBasicBlock &MBB, const RISCVRegisterState &Regs,
-                         GeneratorContext &GC) const {
+  void generateVRegsInit(InstructionGenerationContext &IGC,
+                         const RISCVRegisterState &Regs) const {
+    auto &GC = IGC.GC;
     const auto &State = GC.getLLVMState();
-    auto RP = GC.getRegisterPool();
+    auto RP = IGC.pushRegPool();
 
     const auto &ST = GC.getSubtarget<RISCVSubtarget>();
     const auto &InstrInfo = State.getInstrInfo();
 
     assert(ST.hasStdExtV());
 
-    // Initialize registers before taking a branch
-    auto InsertPos = MBB.getFirstTerminator();
-
     // V0 to init before anything vector-related
     if (!NoMaskModeForRVV) {
       auto InitV0 = Regs.VRegs[0];
-      writeValueToReg(MBB, InsertPos, InitV0, RISCV::V0, RP, GC);
+      writeValueToReg(IGC, InitV0, RISCV::V0);
     }
-    rvvGenerateModeSwitchAndUpdateContext(InstrInfo, MBB, GC, InsertPos);
+    rvvGenerateModeSwitchAndUpdateContext(InstrInfo, IGC);
 
-    generateNonMaskVRegsInit(MBB, InsertPos, Regs, RP, GC,
-                             [](Register Reg) { return false; });
+    generateNonMaskVRegsInit(IGC, Regs, [](Register Reg) { return false; });
   }
 
   // If Filter(Reg) is true, than Reg won't be inited
   template <typename T>
-  void generateNonMaskVRegsInit(MachineBasicBlock &MBB,
-                                MachineBasicBlock::iterator InsertPos,
+  void generateNonMaskVRegsInit(InstructionGenerationContext &IGC,
                                 const RISCVRegisterState &Regs,
-                                RegPoolWrapper &RP, GeneratorContext &GC,
                                 const T &Filter) const {
+    auto &GC = IGC.GC;
+    auto &MBB = IGC.MBB;
+    auto &RP = IGC.getRegPool();
     // V0 is the mask register, skip it
     for (auto [RegIdx, Value] : drop_begin(enumerate(Regs.VRegs))) {
       auto Reg = regIndexToMCReg(RegIdx, RegStorageType::VReg, GC);
       // Skip reserved registers
       if (RP.isReserved(Reg, MBB) || Filter(Reg))
         continue;
-      writeValueToReg(MBB, InsertPos, Value, Reg, RP, GC);
+      writeValueToReg(IGC, Value, Reg);
     }
   }
 
-  void generateVRegsInitWithSplats(MachineBasicBlock &MBB,
-                                   const RISCVRegisterState &Regs,
-                                   GeneratorContext &GC) const {
+  void generateVRegsInitWithSplats(InstructionGenerationContext &IGC,
+                                   const RISCVRegisterState &Regs) const {
+    auto &MBB = IGC.MBB;
+    auto &GC = IGC.GC;
     const auto &State = GC.getLLVMState();
-    auto RP = GC.getRegisterPool();
+    auto RP = IGC.pushRegPool();
 
     const auto &ST = GC.getSubtarget<RISCVSubtarget>();
     const auto &InstrInfo = State.getInstrInfo();
@@ -1136,14 +1138,14 @@ public:
 
     auto [RVVConfig, VLVM] =
         constructRVVModeWithVMReset(RISCVII::VLMUL::LMUL_1, VLen, SEW, TA, MA);
-    generateRVVModeUpdate(InstrInfo, MBB, GC, RVVConfig, VLVM, InsertPos);
+    generateRVVModeUpdate(IGC, InstrInfo, RVVConfig, VLVM);
 
     // Initialize registers before taking a branch
     // V0 is the mask register, skip it.
     for (unsigned RegNo = 1; RegNo < Regs.XRegs.size(); ++RegNo) {
       auto XReg = regIndexToMCReg(RegNo, RegStorageType::XReg, GC);
       auto VReg = regIndexToMCReg(RegNo, RegStorageType::VReg, GC);
-      if (!RP.isReserved(VReg, MBB))
+      if (!RP->isReserved(VReg, MBB))
         getSupportInstBuilder(*this, MBB, InsertPos,
                               MBB.getParent()->getFunction().getContext(),
                               InstrInfo.get(RISCV::VMV_V_X), VReg)
@@ -1301,12 +1303,11 @@ public:
     assert(isRVVModeSwitch(Opcode));
     auto &GC = InstrGenCtx.GC;
     rvvGenerateModeSwitchAndUpdateContext(GC.getLLVMState().getInstrInfo(),
-                                          InstrGenCtx.MBB, GC, InstrGenCtx.Ins,
-                                          Opcode);
+                                          InstrGenCtx, Opcode);
   }
 
-  void instructionPostProcess(MachineInstr &MI, GeneratorContext &GC,
-                              MachineBasicBlock::iterator Ins) const override;
+  void instructionPostProcess(InstructionGenerationContext &IGC,
+                              MachineInstr &MI) const override;
   // From RISC-V spec v2.2:
   //     All branch instructions use the B-type instruction format. The 12-bit
   //     B-immediate encodes signed offsets in multiples of 2, and is added to
@@ -1372,7 +1373,7 @@ public:
                                     MachineBasicBlock &MBB,
                                     GeneratorContext &GC) const override {
     auto &State = GC.getLLVMState();
-    auto RP = GC.getRegisterPool();
+    auto RP = GC.getProgramContext().getRegisterPool();
     auto *MF = MBB.getParent();
     auto *NextMBB = createMachineBasicBlock(*MF, GC);
     MF->insert(++MachineFunction::iterator(&MBB), NextMBB);
@@ -1588,8 +1589,9 @@ public:
     constexpr auto MinNumOfBranchGPRC = 2;
     auto *MBB = Instr.getParent();
     assert(MBB);
-    auto NAvailableRegs = GC.getRegisterPool().getNumAvailable(
-        RI.getRegClass(RCID == RISCV::GPRCRegClassID), *MBB);
+    auto RP = GC.getProgramContext().getRegisterPool();
+    auto NAvailableRegs =
+        RP.getNumAvailable(RI.getRegClass(RCID == RISCV::GPRCRegClassID), *MBB);
     if (CompressionMode == LoopControlLogicCompressionMode::On &&
         NAvailableRegs >= MinNumOfBranchGPRC)
       return RI.getRegClass(RISCV::GPRCRegClassID);
@@ -1739,15 +1741,14 @@ public:
     return RandEngine::genInInterval(Min, Max);
   }
 
-  unsigned insertLoopInit(MachineBasicBlock &MBB,
-                          MachineBasicBlock::iterator Pos, MachineInstr &Branch,
-                          ArrayRef<Register> ReservedRegs, unsigned NIter,
-                          GeneratorContext &GC) const override {
+  unsigned insertLoopInit(InstructionGenerationContext &IGC,
+                          MachineInstr &Branch, ArrayRef<Register> ReservedRegs,
+                          unsigned NIter) const override {
+    auto &GC = IGC.GC;
     assert(Branch.isBranch() && "Branch expected");
     assert((ReservedRegs.size() != MaxNumOfReservRegsForLoop) ||
            (ReservedRegs[CounterRegIdx] != ReservedRegs[LimitRegIdx]) &&
                "Counter and Limit registers expected to be different");
-    auto RP = GC.getRegisterPool();
 
     auto CounterReg = ReservedRegs[CounterRegIdx];
     const auto &Branches = GC.getGenSettings().Cfg.Branches;
@@ -1757,28 +1758,26 @@ public:
     switch (Branch.getOpcode()) {
     case RISCV::BEQ:
     case RISCV::C_BEQZ: {
-      writeValueToReg(MBB, Pos, APInt::getZero(getRegBitWidth(CounterReg, GC)),
-                      CounterReg, RP, GC);
+      writeValueToReg(IGC, APInt::getZero(getRegBitWidth(CounterReg, GC)),
+                      CounterReg);
       auto LimitReg = ReservedRegs[LimitRegIdx];
-      writeValueToReg(MBB, Pos, APInt::getZero(getRegBitWidth(LimitReg, GC)),
-                      LimitReg, RP, GC);
+      writeValueToReg(IGC, APInt::getZero(getRegBitWidth(LimitReg, GC)),
+                      LimitReg);
       RegRandOffset = 0;
       break;
     }
     case RISCV::BNE: {
       writeValueToReg(
-          MBB, Pos,
-          APInt(getRegBitWidth(CounterReg, GC), NIter + RegRandOffset),
-          CounterReg, RP, GC);
+          IGC, APInt(getRegBitWidth(CounterReg, GC), NIter + RegRandOffset),
+          CounterReg);
       auto LimitReg = ReservedRegs[LimitRegIdx];
-      writeValueToReg(MBB, Pos,
-                      APInt(getRegBitWidth(LimitReg, GC), RegRandOffset),
-                      LimitReg, RP, GC);
+      writeValueToReg(IGC, APInt(getRegBitWidth(LimitReg, GC), RegRandOffset),
+                      LimitReg);
       break;
     }
     case RISCV::C_BNEZ: {
-      writeValueToReg(MBB, Pos, APInt(getRegBitWidth(CounterReg, GC), NIter),
-                      CounterReg, RP, GC);
+      writeValueToReg(IGC, APInt(getRegBitWidth(CounterReg, GC), NIter),
+                      CounterReg);
       assert(
           (ReservedRegs.size() == MinNumOfReservRegsForLoop) &&
           "In RISC-V for compressed branch C_BNEZ only one register CounterReg "
@@ -1788,25 +1787,23 @@ public:
     }
     case RISCV::BLT:
     case RISCV::BLTU: {
-      writeValueToReg(MBB, Pos,
-                      APInt(getRegBitWidth(CounterReg, GC), RegRandOffset),
-                      CounterReg, RP, GC);
+      writeValueToReg(IGC, APInt(getRegBitWidth(CounterReg, GC), RegRandOffset),
+                      CounterReg);
       auto LimitReg = ReservedRegs[LimitRegIdx];
       writeValueToReg(
-          MBB, Pos, APInt(getRegBitWidth(LimitReg, GC), NIter + RegRandOffset),
-          LimitReg, RP, GC);
+          IGC, APInt(getRegBitWidth(LimitReg, GC), NIter + RegRandOffset),
+          LimitReg);
       break;
     }
     case RISCV::BGE:
     case RISCV::BGEU: {
       writeValueToReg(
-          MBB, Pos,
-          APInt(getRegBitWidth(CounterReg, GC), NIter + RegRandOffset),
-          CounterReg, RP, GC);
+          IGC, APInt(getRegBitWidth(CounterReg, GC), NIter + RegRandOffset),
+          CounterReg);
       auto LimitReg = ReservedRegs[LimitRegIdx];
-      writeValueToReg(MBB, Pos,
+      writeValueToReg(IGC,
                       APInt(getRegBitWidth(LimitReg, GC), 1 + RegRandOffset),
-                      LimitReg, RP, GC);
+                      LimitReg);
       break;
     }
     default:
@@ -1921,12 +1918,14 @@ public:
 
   unsigned getLoopOverhead() const override { return kOverheadPerLoop; }
 
-  MachineInstr *generateFinalInst(MachineBasicBlock &MBB, GeneratorContext &GC,
+  MachineInstr *generateFinalInst(InstructionGenerationContext &IGC,
                                   unsigned LastInstrOpc) const override {
+    auto &GC = IGC.GC;
     const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
-    auto MIB = getSupportInstBuilder(
-        *this, MBB, MBB.end(), MBB.getParent()->getFunction().getContext(),
-        InstrInfo.get(LastInstrOpc));
+    auto MIB =
+        getSupportInstBuilder(*this, IGC.MBB, IGC.Ins,
+                              IGC.MBB.getParent()->getFunction().getContext(),
+                              InstrInfo.get(LastInstrOpc));
     return MIB;
   }
 
@@ -2024,13 +2023,13 @@ public:
 
   MCRegister getStackPointer() const override { return RISCV::X2; }
 
-  void generateSpillToStack(MachineBasicBlock &MBB,
-                            MachineBasicBlock::iterator Ins, MCRegister Reg,
-                            GeneratorContext &GC,
+  void generateSpillToStack(InstructionGenerationContext &IGC, MCRegister Reg,
                             MCRegister SP) const override {
+    auto &GC = IGC.GC;
+    auto &MBB = IGC.MBB;
+    auto &Ins = IGC.Ins;
     assert(GC.getProgramContext().stackEnabled() &&
            "An attempt to generate spill but stack was not enabled.");
-
     auto &State = GC.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
@@ -2039,29 +2038,32 @@ public:
         .addReg(SP)
         .addImm(-static_cast<int64_t>(getSpillSizeInBytes(Reg, GC)));
 
-    storeRegToAddrInReg(MBB, Ins, SP, Reg, GC);
+    storeRegToAddrInReg(IGC, SP, Reg);
   }
 
-  void generateReloadFromStack(MachineBasicBlock &MBB,
-                               MachineBasicBlock::iterator Ins, MCRegister Reg,
-                               GeneratorContext &GC,
-                               MCRegister SP) const override {
+  void generateReloadFromStack(InstructionGenerationContext &IGC,
+                               MCRegister Reg, MCRegister SP) const override {
+    auto &GC = IGC.GC;
+    auto &MBB = IGC.MBB;
+    auto &Ins = IGC.Ins;
     assert(GC.getProgramContext().stackEnabled() &&
            "An attempt to generate reload but stack was not enabled.");
     auto &State = GC.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
 
-    loadRegFromAddrInReg(MBB, Ins, SP, Reg, GC);
+    loadRegFromAddrInReg(IGC, SP, Reg);
     getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
         .addDef(SP)
         .addReg(SP)
         .addImm(getSpillSizeInBytes(Reg, GC));
   }
 
-  void generatePopNoReload(MachineBasicBlock &MBB,
-                           MachineBasicBlock::iterator Ins, MCRegister Reg,
-                           GeneratorContext &GC) const override {
+  void generatePopNoReload(InstructionGenerationContext &IGC,
+                           MCRegister Reg) const override {
+    auto &GC = IGC.GC;
+    auto &MBB = IGC.MBB;
+    auto &Ins = IGC.Ins;
     assert(GC.getProgramContext().stackEnabled() &&
            "An attempt to generate stack pop but stack was not enabled.");
     auto &State = GC.getLLVMState();
@@ -2075,11 +2077,10 @@ public:
         .addImm(getSpillSizeInBytes(Reg, GC));
   }
 
-  MachineInstr *generateCall(MachineBasicBlock &MBB,
-                             MachineBasicBlock::iterator Ins,
-                             const Function &Target, GeneratorContext &GC,
+  MachineInstr *generateCall(InstructionGenerationContext &IGC,
+                             const Function &Target,
                              bool AsSupport) const override {
-    return generateCall(MBB, Ins, Target, GC, AsSupport, RISCV::JAL);
+    return generateCall(IGC, Target, AsSupport, RISCV::JAL);
   }
 
   MachineInstr *loadSymbolAddress(MachineBasicBlock &MBB,
@@ -2109,82 +2110,81 @@ public:
         .addSym(AUIPCSymbol, RISCVII::MO_PCREL_LO);
   }
 
-  MachineInstr *generateJAL(MachineBasicBlock &MBB,
-                            MachineBasicBlock::iterator Ins,
-                            const Function &Target, GeneratorContext &GC,
-                            bool AsSupport) const {
+  MachineInstr *generateJAL(InstructionGenerationContext &IGC,
+                            const Function &Target, bool AsSupport) const {
+    auto &GC = IGC.GC;
     const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
     auto &State = GC.getLLVMState();
     auto &Ctx = State.getCtx();
     // Despite PseudoCALL gets expanded by RISCVMCCodeEmitter to JALR
     // instruction, it has chance to be relaxed back to JAL by linker.
-    return getInstBuilder(AsSupport, *this, MBB, Ins, Ctx,
+    return getInstBuilder(AsSupport, *this, IGC.MBB, IGC.Ins, Ctx,
                           InstrInfo.get(RISCV::PseudoCALL))
         .addGlobalAddress(&Target, 0, RISCVII::MO_CALL);
   }
 
-  MachineInstr *generateJALR(MachineBasicBlock &MBB,
-                             MachineBasicBlock::iterator Ins,
-                             const Function &Target, GeneratorContext &GC,
-                             bool AsSupport) const {
+  MachineInstr *generateJALR(InstructionGenerationContext &IGC,
+                             const Function &Target, bool AsSupport) const {
+    auto &GC = IGC.GC;
     const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
     auto &State = GC.getLLVMState();
     auto &Ctx = State.getCtx();
     const auto &RI = State.getRegInfo();
     const auto &RegClass = RI.getRegClass(RISCV::GPRJALRRegClassID);
-    auto RP = GC.getRegisterPool();
+    auto RP = IGC.pushRegPool();
     auto Reg = getNonZeroReg("scratch register for storing function address",
-                             RI, RegClass, RP, MBB);
-    loadSymbolAddress(MBB, Ins, GC, Reg, &Target);
-    return getInstBuilder(AsSupport, *this, MBB, Ins, Ctx,
+                             RI, RegClass, *RP, IGC.MBB);
+    loadSymbolAddress(IGC.MBB, IGC.Ins, GC, Reg, &Target);
+    return getInstBuilder(AsSupport, *this, IGC.MBB, IGC.Ins, Ctx,
                           InstrInfo.get(RISCV::PseudoCALLIndirect))
         .addReg(Reg);
   }
 
-  MachineInstr *generateCall(MachineBasicBlock &MBB,
-                             MachineBasicBlock::iterator Ins,
-                             const Function &Target, GeneratorContext &GC,
-                             bool AsSupport,
+  MachineInstr *generateCall(InstructionGenerationContext &IGC,
+                             const Function &Target, bool AsSupport,
                              unsigned PreferredCallOpcode) const override {
     assert(isCall(PreferredCallOpcode) && "Expected call here");
     switch (PreferredCallOpcode) {
     case RISCV::JAL:
-      return generateJAL(MBB, Ins, Target, GC, AsSupport);
+      return generateJAL(IGC, Target, AsSupport);
     case RISCV::JALR:
-      return generateJALR(MBB, Ins, Target, GC, AsSupport);
+      return generateJALR(IGC, Target, AsSupport);
     default:
       snippy::fatal("Unsupported call instruction");
     }
   }
 
-  MachineInstr *generateTailCall(MachineBasicBlock &MBB, const Function &Target,
-                                 const GeneratorContext &GC) const override {
+  MachineInstr *generateTailCall(InstructionGenerationContext &IGC,
+                                 const Function &Target) const override {
+    auto &GC = IGC.GC;
     const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
     auto &State = GC.getLLVMState();
     auto &Ctx = State.getCtx();
-    return getSupportInstBuilder(*this, MBB, MBB.end(), Ctx,
+    return getSupportInstBuilder(*this, IGC.MBB, IGC.Ins, Ctx,
                                  InstrInfo.get(RISCV::PseudoTAIL))
         .addGlobalAddress(&Target, 0, RISCVII::MO_CALL);
   }
 
-  MachineInstr *generateReturn(MachineBasicBlock &MBB,
-                               const LLVMState &State) const override {
+  MachineInstr *
+  generateReturn(InstructionGenerationContext &IGC) const override {
+    auto &State = IGC.GC.getProgramContext().getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
-    auto MIB = getSupportInstBuilder(
-        *this, MBB, MBB.end(), MBB.getParent()->getFunction().getContext(),
-        InstrInfo.get(RISCV::PseudoRET));
+    auto MIB =
+        getSupportInstBuilder(*this, IGC.MBB, IGC.Ins,
+                              IGC.MBB.getParent()->getFunction().getContext(),
+                              InstrInfo.get(RISCV::PseudoRET));
     return MIB;
   }
 
-  MachineInstr *generateNop(MachineBasicBlock &MBB,
-                            MachineBasicBlock::iterator Ins,
-                            const LLVMState &State) const override {
+  MachineInstr *generateNop(InstructionGenerationContext &IGC) const override {
+    auto &State = IGC.GC.getProgramContext().getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
-    auto MIB = getSupportInstBuilder(
-                   *this, MBB, Ins, MBB.getParent()->getFunction().getContext(),
-                   InstrInfo.get(RISCV::ADDI), RISCV::X0)
-                   .addReg(RISCV::X0)
-                   .addImm(0);
+    auto MIB =
+        getSupportInstBuilder(*this, IGC.MBB, IGC.Ins,
+                              IGC.MBB.getParent()->getFunction().getContext(),
+                              InstrInfo.get(RISCV::ADDI), RISCV::X0)
+            .addReg(RISCV::X0)
+            .addImm(0);
     return MIB;
   }
 
@@ -2210,13 +2210,15 @@ public:
     return getWriteValueSequenceLength(ValueToWrite, Register, GC) + 1;
   }
 
-  void transformValueInReg(MachineBasicBlock &MBB,
-                           const MachineBasicBlock::iterator &Ins,
-                           APInt OldValue, APInt NewValue, MCRegister Register,
-                           RegPoolWrapper &RP,
-                           GeneratorContext &GC) const override {
+  void transformValueInReg(InstructionGenerationContext &IGC, APInt OldValue,
+                           APInt NewValue, MCRegister Register) const override {
     if (!RISCV::GPRRegClass.contains(Register))
       snippy::fatal("transform of value in register is supported only for GPR");
+
+    auto &GC = IGC.GC;
+    auto RP = IGC.pushRegPool();
+    auto &MBB = IGC.MBB;
+    auto &Ins = IGC.Ins;
 
     auto &State = GC.getLLVMState();
     const auto &RI = State.getRegInfo();
@@ -2227,17 +2229,17 @@ public:
       return;
 
     // Materialization sequence should not touch Register.
-    RP.addReserved(Register, AccessMaskBit::W);
+    RP->addReserved(Register, AccessMaskBit::W);
 
-    if (!hasNonZeroRegAvailable(RegClass, RP, AccessMaskBit::W)) {
-      writeValueToReg(MBB, Ins, NewValue, Register, RP, GC);
+    if (!hasNonZeroRegAvailable(RegClass, *RP, AccessMaskBit::W)) {
+      writeValueToReg(IGC, NewValue, Register);
       return;
     }
 
     // First need to choose another not X0 reg to materialize
     // differnce value in.
     auto ScratchReg = getNonZeroReg("scratch register for transforming value",
-                                    RI, RegClass, RP, MBB);
+                                    RI, RegClass, *RP, MBB);
 
     // Choose final operation based on value relation.
     bool WillUseAdd = NewValue.ugt(OldValue);
@@ -2245,7 +2247,7 @@ public:
     auto ValueToWrite =
         APInt(WillUseAdd ? NewValue.usub_ov(OldValue, Overflowed)
                          : OldValue.usub_ov(NewValue, Overflowed));
-    writeValueToReg(MBB, Ins, ValueToWrite, ScratchReg, RP, GC);
+    writeValueToReg(IGC, ValueToWrite, ScratchReg);
     assert(!Overflowed && "Expression expect to not overflow");
     assert(
         getTransformSequenceLength(OldValue, NewValue, Register, GC) ==
@@ -2258,12 +2260,14 @@ public:
         .addReg(ScratchReg);
   }
 
-  void loadEffectiveAddressInReg(MachineBasicBlock &MBB,
-                                 const MachineBasicBlock::iterator &Ins,
+  void loadEffectiveAddressInReg(InstructionGenerationContext &IGC,
                                  MCRegister Register, uint64_t BaseAddr,
-                                 uint64_t Stride, MCRegister IndexReg,
-                                 RegPoolWrapper &RP,
-                                 GeneratorContext &GC) const override {
+                                 uint64_t Stride,
+                                 MCRegister IndexReg) const override {
+    auto &GC = IGC.GC;
+    auto RP = IGC.pushRegPool();
+    auto &MBB = IGC.MBB;
+    auto &Ins = IGC.Ins;
     assert(RISCV::GPRRegClass.contains(Register, IndexReg) &&
            "Only GPR registers are supported");
 
@@ -2273,20 +2277,20 @@ public:
     const auto &InstrInfo = State.getInstrInfo();
 
     auto XRegBitSize = getRegBitWidth(Register, GC);
-    writeValueToReg(MBB, Ins, APInt(XRegBitSize, Stride), Register, RP, GC);
+    writeValueToReg(IGC, APInt(XRegBitSize, Stride), Register);
     getSupportInstBuilder(*this, MBB, Ins, State.getCtx(),
                           InstrInfo.get(RISCV::MUL), Register)
         .addReg(Register)
         .addReg(IndexReg);
 
-    RP.addReserved(Register);
-    if (!hasNonZeroRegAvailable(RegClass, RP))
+    RP->addReserved(Register);
+    if (!hasNonZeroRegAvailable(RegClass, *RP))
       snippy::fatal("Can't find suitable scratch register");
 
     auto AddrReg =
-        getNonZeroReg("Scratch register for BaseAddr", RI, RegClass, RP, MBB);
+        getNonZeroReg("Scratch register for BaseAddr", RI, RegClass, *RP, MBB);
 
-    writeValueToReg(MBB, Ins, APInt(XRegBitSize, BaseAddr), AddrReg, RP, GC);
+    writeValueToReg(IGC, APInt(XRegBitSize, BaseAddr), AddrReg);
     getSupportInstBuilder(*this, MBB, Ins, State.getCtx(),
                           InstrInfo.get(RISCV::ADD), Register)
         .addReg(Register)
@@ -2401,8 +2405,9 @@ public:
                                       const StridedImmediate &StridedImm,
                                       GeneratorContext &GC) const {
     const auto &TM = GC.getLLVMState().getTargetMachine();
-    const auto &OpcSetting = GC.getOpcodeToImmHistMap().getConfigForOpcode(
-        Opcode, GC.getProgramContext().getOpcodeCache());
+    const auto &OpcSetting =
+        GC.getGenSettings().Cfg.ImmHistMap.getConfigForOpcode(
+            Opcode, GC.getProgramContext().getOpcodeCache());
     if (OpcSetting.isUniform())
       return createOperandForOpType(nullptr, OperandType, StridedImm, TM);
     const auto &Seq = OpcSetting.getSequence();
@@ -2526,26 +2531,27 @@ public:
     return getIntMatInstrSeq(Value, GC).size();
   }
 
-  void writeValueToReg(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                       APInt Value, unsigned DstReg, RegPoolWrapper &RP,
-                       GeneratorContext &GC) const override {
+  void writeValueToReg(InstructionGenerationContext &IGC, APInt Value,
+                       unsigned DstReg) const override {
     // TODO: Instruction sequence generation for RVV has not been implemented
     // yet, so we write directly.
     if (RISCV::VRRegClass.contains(DstReg)) {
-      rvvWriteValue(MBB, Ins, GC, Value, DstReg, RP);
+      rvvWriteValue(IGC, Value, DstReg);
       return;
     }
 
     SmallVector<MCInst> InstrsForWrite;
-    generateWriteValueSeq(Value, DstReg, GC, RP, MBB, InstrsForWrite);
-    addGeneratedInstrsToBB(MBB, Ins, GC, InstrsForWrite, *this);
+    generateWriteValueSeq(IGC, Value, DstReg, InstrsForWrite);
+    addGeneratedInstrsToBB(IGC, InstrsForWrite, *this);
   }
 
-  void copyRegToReg(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                    MCRegister Rs, MCRegister Rd,
-                    GeneratorContext &GC) const override {
+  void copyRegToReg(InstructionGenerationContext &IGC, MCRegister Rs,
+                    MCRegister Rd) const override {
     assert(RISCV::GPRRegClass.contains(Rs) && RISCV::GPRRegClass.contains(Rd) &&
            "Both src and dst registers must be GPR");
+    auto &GC = IGC.GC;
+    auto &MBB = IGC.MBB;
+    auto &Ins = IGC.Ins;
     auto &State = GC.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
     getSupportInstBuilder(*this, MBB, Ins,
@@ -2555,18 +2561,19 @@ public:
         .addReg(RISCV::X0);
   }
 
-  void loadRegFromAddrInReg(MachineBasicBlock &MBB,
-                            MachineBasicBlock::iterator Ins, MCRegister AddrReg,
-                            MCRegister Reg, GeneratorContext &GC) const {
-    const auto LoadInstr = generateLoadRegFromAddrInReg(AddrReg, Reg, GC);
-    addGeneratedInstrsToBB(MBB, Ins, GC, {LoadInstr}, *this);
+  void loadRegFromAddrInReg(InstructionGenerationContext &IGC,
+                            MCRegister AddrReg, MCRegister Reg) const {
+    const auto LoadInstr = generateLoadRegFromAddrInReg(IGC, AddrReg, Reg);
+    addGeneratedInstrsToBB(IGC, {LoadInstr}, *this);
   }
 
-  MCInst generateLoadRegFromAddrInReg(MCRegister AddrReg, MCRegister Reg,
-                                      GeneratorContext &GC) const {
+  MCInst generateLoadRegFromAddrInReg(InstructionGenerationContext &IGC,
+                                      MCRegister AddrReg,
+                                      MCRegister Reg) const {
     assert(RISCV::GPRRegClass.contains(AddrReg) &&
            "Expected address register be GPR");
 
+    auto &GC = IGC.GC;
     if (RISCV::GPRRegClass.contains(Reg)) {
       const auto &ST = GC.getSubtarget<RISCVSubtarget>();
       auto LoadOp = ST.getXLen() == 32 ? RISCV::LW : RISCV::LD;
@@ -2585,35 +2592,38 @@ public:
     return {};
   }
 
-  void loadRegFromAddr(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                       uint64_t Addr, MCRegister Reg, RegPoolWrapper &RP,
-                       GeneratorContext &GC) const override {
+  void loadRegFromAddr(InstructionGenerationContext &IGC, uint64_t Addr,
+                       MCRegister Reg) const override {
     SmallVector<MCInst> InstrsForWrite;
-    generateLoadRegFromAddr(MBB, Addr, Reg, RP, GC, InstrsForWrite);
-    addGeneratedInstrsToBB(MBB, Ins, GC, InstrsForWrite, *this);
+    generateLoadRegFromAddr(IGC, Addr, Reg, InstrsForWrite);
+    addGeneratedInstrsToBB(IGC, InstrsForWrite, *this);
   }
 
-  void generateLoadRegFromAddr(const MachineBasicBlock &MBB, uint64_t Addr,
-                               MCRegister Reg, RegPoolWrapper &RP,
-                               GeneratorContext &GC,
+  void generateLoadRegFromAddr(InstructionGenerationContext &IGC, uint64_t Addr,
+                               MCRegister Reg,
                                SmallVectorImpl<MCInst> &Insts) const {
-    // Form address in scratch register.
+    auto &GC = IGC.GC;
+    auto &MBB = IGC.MBB;
+    auto &RP = IGC.getRegPool();
     auto &State = GC.getLLVMState();
     auto &RI = State.getRegInfo();
     auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
     auto XScratchReg = getNonZeroReg("scratch register for addr", RI, RegClass,
                                      RP, MBB, AccessMaskBit::SRW);
-    generateWriteValueSeq(APInt(getRegBitWidth(XScratchReg, GC), Addr),
-                          XScratchReg, GC, RP, MBB, Insts);
-    Insts.push_back(generateLoadRegFromAddrInReg(XScratchReg, Reg, GC));
+    // Form address in scratch register.
+    generateWriteValueSeq(IGC, APInt(getRegBitWidth(XScratchReg, GC), Addr),
+                          XScratchReg, Insts);
+    Insts.push_back(generateLoadRegFromAddrInReg(IGC, XScratchReg, Reg));
   }
 
-  void storeRegToAddrInReg(MachineBasicBlock &MBB,
-                           MachineBasicBlock::iterator Ins, MCRegister AddrReg,
-                           MCRegister Reg, GeneratorContext &GC,
+  void storeRegToAddrInReg(InstructionGenerationContext &IGC,
+                           MCRegister AddrReg, MCRegister Reg,
                            unsigned BytesToWrite = 0) const {
     assert(RISCV::GPRRegClass.contains(AddrReg) &&
            "Expected address register be GPR");
+    auto &GC = IGC.GC;
+    auto &MBB = IGC.MBB;
+    auto &Ins = IGC.Ins;
     auto &State = GC.getLLVMState();
     auto &Ctx = State.getCtx();
     const auto &InstrInfo = State.getInstrInfo();
@@ -2652,26 +2662,29 @@ public:
     }
   }
 
-  void storeRegToAddr(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                      uint64_t Addr, MCRegister Reg, RegPoolWrapper &RP,
-                      GeneratorContext &GC,
-                      unsigned BytesToWrite) const override {
+  void storeRegToAddr(InstructionGenerationContext &IGC, uint64_t Addr,
+                      MCRegister Reg, unsigned BytesToWrite) const override {
+    auto &GC = IGC.GC;
+    auto &MBB = IGC.MBB;
+    auto RP = IGC.pushRegPool();
     auto &State = GC.getLLVMState();
     auto &RI = State.getRegInfo();
     auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
-    RP.addReserved(getFirstPhysReg(Reg, RI), MBB);
+    RP->addReserved(getFirstPhysReg(Reg, RI), MBB);
     auto ScratchReg = getNonZeroReg("scratch register for addr", RI, RegClass,
-                                    RP, MBB, AccessMaskBit::SRW);
+                                    *RP, MBB, AccessMaskBit::SRW);
     auto XRegBitSize = getRegBitWidth(ScratchReg, GC);
 
-    writeValueToReg(MBB, Ins, APInt(XRegBitSize, Addr), ScratchReg, RP, GC);
-    storeRegToAddrInReg(MBB, Ins, ScratchReg, Reg, GC, BytesToWrite);
+    writeValueToReg(IGC, APInt(XRegBitSize, Addr), ScratchReg);
+    storeRegToAddrInReg(IGC, ScratchReg, Reg, BytesToWrite);
   }
 
-  void storeValueToAddr(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                        uint64_t Addr, APInt Value, RegPoolWrapper &RP,
-                        GeneratorContext &GC) const override {
+  void storeValueToAddr(InstructionGenerationContext &IGC, uint64_t Addr,
+                        APInt Value) const override {
+    auto &GC = IGC.GC;
     auto &State = GC.getLLVMState();
+    auto &MBB = IGC.MBB;
+    auto &RP = IGC.getRegPool();
     auto &RI = State.getRegInfo();
 
     Register RegForValue;
@@ -2688,11 +2701,10 @@ public:
         snippy::fatal(State.getCtx(), "Selfcheck error ",
                       "selfcheck is not implemented for rv32 with D ext");
     }
-    writeValueToReg(MBB, Ins, Value.zext(getRegBitWidth(RegForValue, GC)),
-                    RegForValue, RP, GC);
+    writeValueToReg(IGC, Value.zext(getRegBitWidth(RegForValue, GC)),
+                    RegForValue);
     assert(ValueRegBitSize % RISCV_CHAR_BIT == 0);
-    storeRegToAddr(MBB, Ins, Addr, RegForValue, RP, GC,
-                   ValueRegBitSize / RISCV_CHAR_BIT);
+    storeRegToAddr(IGC, Addr, RegForValue, ValueRegBitSize / RISCV_CHAR_BIT);
   }
 
   size_t getAccessSize(unsigned Opcode, GeneratorContext &GC,
@@ -2936,17 +2948,14 @@ public:
 private:
   SmallVector<SectionDesc, 3> ReservedRanges;
 
-  void rvvWriteValue(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-                     GeneratorContext &GC, APInt Value, unsigned DstReg,
-                     RegPoolWrapper &RP) const;
+  void rvvWriteValue(InstructionGenerationContext &IGC, APInt Value,
+                     unsigned DstReg) const;
 
-  void rvvWriteValueUsingXReg(MachineBasicBlock &MBB,
-                              MachineBasicBlock::iterator Ins,
-                              GeneratorContext &GC, APInt Value,
-                              unsigned DstReg, RegPoolWrapper &RP) const;
+  void rvvWriteValueUsingXReg(InstructionGenerationContext &IGC, APInt Value,
+                              unsigned DstReg) const;
 
-  void generateWriteValueFP(APInt Value, unsigned DstReg, GeneratorContext &GC,
-                            RegPoolWrapper &RP, const MachineBasicBlock &MBB,
+  void generateWriteValueFP(InstructionGenerationContext &IGC, APInt Value,
+                            unsigned DstReg,
                             SmallVectorImpl<MCInst> &Insts) const;
 
   // NOTE: DesiredOpcode is expected to be any mode changing opcode
@@ -2955,42 +2964,36 @@ private:
   // which instruction to use. In case of the latter the implementaion is free
   // to chose any suitable opcode
   void rvvGenerateModeSwitchAndUpdateContext(
-      const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB,
-      GeneratorContext &GC, MachineBasicBlock::iterator Ins,
+      const MCInstrInfo &InstrInfo, InstructionGenerationContext &IGC,
       std::optional<unsigned> DesiredOpcode = {}) const;
 
-  void generateRVVModeUpdate(const MCInstrInfo &InstrInfo,
-                             MachineBasicBlock &MBB, GeneratorContext &GC,
+  void generateRVVModeUpdate(InstructionGenerationContext &IGC,
+                             const MCInstrInfo &InstrInfo,
                              const RVVConfiguration &Config,
                              const RVVConfigurationInfo::VLVM &VLVM,
-                             MachineBasicBlock::iterator Ins,
                              std::optional<unsigned> DesiredOpcode = {}) const;
 
-  void generateV0MaskUpdate(const RVVConfigurationInfo::VLVM &VLVM,
-                            MachineBasicBlock::iterator Ins,
-                            MachineBasicBlock &MBB, GeneratorContext &GC,
+  void generateV0MaskUpdate(InstructionGenerationContext &IGC,
+                            const RVVConfigurationInfo::VLVM &VLVM,
                             const MCInstrInfo &InstrInfo,
                             bool IsLegalConfiguration) const;
 
-  void updateRVVConfig(const MachineInstr &MI, GeneratorContext &GC,
-                       MachineBasicBlock::iterator Ins) const;
+  void updateRVVConfig(InstructionGenerationContext &IGC,
+                       const MachineInstr &MI) const;
 
   // NOTE: generateVSET* functions are expected to be called by
   // generateRVVModeUpdate only
-  void generateVSETIVLI(const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB,
-                        GeneratorContext &GC, unsigned VTYPE, unsigned VL,
-                        bool SupportMarker,
-                        MachineBasicBlock::iterator Ins) const;
+  void generateVSETIVLI(InstructionGenerationContext &IGC,
+                        const MCInstrInfo &InstrInfo, unsigned VTYPE,
+                        unsigned VL, bool SupportMarker) const;
 
-  void generateVSETVLI(const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB,
-                       GeneratorContext &GC, unsigned VTYPE, unsigned VL,
-                       bool SupportMarker,
-                       MachineBasicBlock::iterator Ins) const;
+  void generateVSETVLI(InstructionGenerationContext &IGC,
+                       const MCInstrInfo &InstrInfo, unsigned VTYPE,
+                       unsigned VL, bool SupportMarker) const;
 
-  void generateVSETVL(const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB,
-                      GeneratorContext &GC, unsigned VTYPE, unsigned VL,
-                      bool SupportMarker,
-                      MachineBasicBlock::iterator Ins) const;
+  void generateVSETVL(InstructionGenerationContext &IGC,
+                      const MCInstrInfo &InstrInfo, unsigned VTYPE, unsigned VL,
+                      bool SupportMarker) const;
 
   bool isFloatingPoint(MCRegister Reg) const override {
     return snippy::isFloatingPointReg(Reg);
@@ -3060,24 +3063,30 @@ static unsigned getOpcodeForGPRToFPRInstr(unsigned DstReg, unsigned XLen,
 }
 
 void SnippyRISCVTarget::generateWriteValueFP(
-    APInt Value, unsigned DstReg, GeneratorContext &GC, RegPoolWrapper &RP,
-    const MachineBasicBlock &MBB, SmallVectorImpl<MCInst> &Insts) const {
+    InstructionGenerationContext &IGC, APInt Value, unsigned DstReg,
+    SmallVectorImpl<MCInst> &Insts) const {
+  auto &GC = IGC.GC;
+  const auto &SimCtx = IGC.SimCtx;
   assert(RISCV::FPR64RegClass.contains(DstReg) ||
          RISCV::FPR32RegClass.contains(DstReg) ||
          RISCV::FPR16RegClass.contains(DstReg));
   auto NumBits = Value.getBitWidth();
 
   if (InitFRegsFromMemory) {
-    auto &GP = GC.getGlobalsPool();
+    auto &ProgCtx = GC.getProgramContext();
+    auto &GP = ProgCtx.getOrAddGlobalsPoolFor(
+        GC.getMainModule(),
+        "Failed to allocate global constant for float register value load");
     auto *GV = GP.createGV(
         Value, /* Alignment */ NumBits,
         /* Linkage */ GlobalValue::InternalLinkage,
         /* Name */ "global",
-        /* Reason */ "This is needed for updating of float register.");
+        /* Reason */ "This is needed for updating of float register");
 
     auto GVAddr = GP.getGVAddress(GV);
-    generateLoadRegFromAddr(MBB, GVAddr, DstReg, RP, GC, Insts);
-    GC.notifyMemUpdate(GVAddr, Value);
+    generateLoadRegFromAddr(IGC, GVAddr, DstReg, Insts);
+    if (SimCtx.hasModel())
+      SimCtx.notifyMemUpdate(GVAddr, Value);
     return;
   }
 
@@ -3091,19 +3100,22 @@ void SnippyRISCVTarget::generateWriteValueFP(
 
   auto &RI = State.getRegInfo();
   auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
-  auto ScratchReg = getNonZeroReg("scratch register for writing FP register",
-                                  RI, RegClass, RP, MBB, AccessMaskBit::SRW);
+  auto &RP = IGC.getRegPool();
+  auto ScratchReg =
+      getNonZeroReg("scratch register for writing FP register", RI, RegClass,
+                    RP, IGC.MBB, AccessMaskBit::SRW);
 
-  generateWriteValueSeq(Value, ScratchReg, GC, RP, MBB, Insts);
+  generateWriteValueSeq(IGC, Value, ScratchReg, Insts);
 
   Insts.emplace_back(MCInstBuilder(FMVOpc).addReg(DstReg).addReg(ScratchReg));
 }
 
-void SnippyRISCVTarget::rvvWriteValueUsingXReg(MachineBasicBlock &MBB,
-                                               MachineBasicBlock::iterator Ins,
-                                               GeneratorContext &GC,
-                                               APInt Value, unsigned DstReg,
-                                               RegPoolWrapper &RP) const {
+void SnippyRISCVTarget::rvvWriteValueUsingXReg(
+    InstructionGenerationContext &IGC, APInt Value, unsigned DstReg) const {
+  auto &GC = IGC.GC;
+  auto &Ins = IGC.Ins;
+  auto &MBB = IGC.MBB;
+  auto &RP = IGC.getRegPool();
   auto &State = GC.getLLVMState();
   const auto &ST = GC.getSubtarget<RISCVSubtarget>();
   const auto &InstrInfo = State.getInstrInfo();
@@ -3122,7 +3134,7 @@ void SnippyRISCVTarget::rvvWriteValueUsingXReg(MachineBasicBlock &MBB,
   auto [RVVConfig, VLVM] =
       constructRVVModeWithVMReset(RISCVII::VLMUL::LMUL_1, VL, SEW, TA, MA);
 
-  generateRVVModeUpdate(InstrInfo, MBB, GC, RVVConfig, VLVM, Ins);
+  generateRVVModeUpdate(IGC, InstrInfo, RVVConfig, VLVM);
 
   // Use non-reserved reg as scratch.
   auto &RI = State.getRegInfo();
@@ -3138,7 +3150,7 @@ void SnippyRISCVTarget::rvvWriteValueUsingXReg(MachineBasicBlock &MBB,
   unsigned RegFlags = RegState::Undef;
   for (unsigned Idx = 0; Idx < VL; ++Idx) {
     auto EltValue = Value.extractBitsAsZExtValue(SEW, Idx * SEW);
-    writeValueToReg(MBB, Ins, APInt(SEW, EltValue), XScratchReg, RP, GC);
+    writeValueToReg(IGC, APInt(SEW, EltValue), XScratchReg);
     getSupportInstBuilder(*this, MBB, Ins, State.getCtx(),
                           InstrInfo.get(RISCV::VSLIDE1DOWN_VX), DstReg)
         .addReg(DstReg, RegFlags)
@@ -3150,37 +3162,41 @@ void SnippyRISCVTarget::rvvWriteValueUsingXReg(MachineBasicBlock &MBB,
   const auto &RGC = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
   if (RGC.hasActiveRVVMode(MBB)) {
     const auto &CurRVVMode = RGC.getActiveRVVMode(MBB);
-    generateRVVModeUpdate(InstrInfo, MBB, GC, *CurRVVMode.Config,
-                          CurRVVMode.VLVM, Ins);
+    generateRVVModeUpdate(IGC, InstrInfo, *CurRVVMode.Config, CurRVVMode.VLVM);
   }
 }
-void SnippyRISCVTarget::rvvWriteValue(MachineBasicBlock &MBB,
-                                      MachineBasicBlock::iterator Ins,
-                                      GeneratorContext &GC, APInt Value,
-                                      unsigned DstReg,
-                                      RegPoolWrapper &RP) const {
+void SnippyRISCVTarget::rvvWriteValue(InstructionGenerationContext &IGC,
+                                      APInt Value, unsigned DstReg) const {
+  auto &GC = IGC.GC;
+  const auto &SimCtx = IGC.SimCtx;
   // FIXME for V0 we can only use global variables for initialization
   if (!InitVRegsFromMemory.getValue() && DstReg != RISCV::V0) {
-    rvvWriteValueUsingXReg(MBB, Ins, GC, Value, DstReg, RP);
+    rvvWriteValueUsingXReg(IGC, Value, DstReg);
     return;
   }
 
   assert(GC.getSubtarget<RISCVSubtarget>().hasStdExtV());
-  auto &GP = GC.getGlobalsPool();
+  auto &ProgCtx = GC.getProgramContext();
+  auto &GP = ProgCtx.getOrAddGlobalsPoolFor(
+      GC.getMainModule(),
+      "Failed to allocate global constant for RVV register value load");
+
   auto *GV =
       GP.createGV(Value, /* Alignment */ Reg16Bytes,
                   /* Linkage */ GlobalValue::InternalLinkage,
                   /* Name */ "global",
-                  /* Reason */ "This is needed for updating of RVV register.");
+                  /* Reason */ "This is needed for updating of RVV register");
 
   auto GVAddr = GP.getGVAddress(GV);
-  loadRegFromAddr(MBB, Ins, GVAddr, DstReg, RP, GC);
-  GC.notifyMemUpdate(GVAddr, Value);
+  loadRegFromAddr(IGC, GVAddr, DstReg);
+  if (SimCtx.hasModel())
+    SimCtx.notifyMemUpdate(GVAddr, Value);
 }
 
-void SnippyRISCVTarget::updateRVVConfig(const MachineInstr &MI,
-                                        GeneratorContext &GC,
-                                        MachineBasicBlock::iterator Ins) const {
+void SnippyRISCVTarget::updateRVVConfig(InstructionGenerationContext &IGC,
+                                        const MachineInstr &MI) const {
+  auto &Ins = IGC.Ins;
+  auto &GC = IGC.GC;
   if (MI.getNumDefs() == 0)
     return;
   if (!isRVV(MI.getDesc().getOpcode()))
@@ -3204,23 +3220,22 @@ void SnippyRISCVTarget::updateRVVConfig(const MachineInstr &MI,
     // We have write to V0. Update V0 Mask with the value from config.
     // FIXME: basically, we can be better, and check value from Interpreter...
     auto NewVLVM = VUInfo.updateVM(*RVVMode.Config, RVVMode.VLVM);
-    generateV0MaskUpdate(NewVLVM, Ins, MBB, GC, InstrInfo,
-                         RVVMode.Config->IsLegal);
+    generateV0MaskUpdate(IGC, NewVLVM, InstrInfo, RVVMode.Config->IsLegal);
     // We change only V0 here...
     RGC.updateActiveRVVMode(NewVLVM, *RVVMode.Config, MBB);
   }
 }
 
 void SnippyRISCVTarget::instructionPostProcess(
-    MachineInstr &MI, GeneratorContext &GC,
-    MachineBasicBlock::iterator Ins) const {
-  updateRVVConfig(MI, GC, Ins);
+    InstructionGenerationContext &IGC, MachineInstr &MI) const {
+  updateRVVConfig(IGC, MI);
 }
 
 void SnippyRISCVTarget::rvvGenerateModeSwitchAndUpdateContext(
-    const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB, GeneratorContext &GC,
-    MachineBasicBlock::iterator Ins,
+    const MCInstrInfo &InstrInfo, InstructionGenerationContext &IGC,
     std::optional<unsigned> DesiredOpcode) const {
+  auto &GC = IGC.GC;
+  auto &MBB = IGC.MBB;
   auto &RGC = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
   const auto &VUInfo = RGC.getVUConfigInfo();
   // TODO: likely, we should return a pair
@@ -3240,8 +3255,7 @@ void SnippyRISCVTarget::rvvGenerateModeSwitchAndUpdateContext(
         RGC.getVUConfigInfo()
             .selectVLVM(NewRvvCFG, /* DesiredOpcode == RISCV::VSETIVLI */ true)
             .VL;
-  generateRVVModeUpdate(InstrInfo, MBB, GC, NewRvvCFG, NewVLVM, Ins,
-                        DesiredOpcode);
+  generateRVVModeUpdate(IGC, InstrInfo, NewRvvCFG, NewVLVM, DesiredOpcode);
   RGC.updateActiveRVVMode(NewVLVM, NewRvvCFG, MBB);
 }
 
@@ -3287,9 +3301,12 @@ selectDesiredModeChangeInstruction(RVVModeChangeMode Preference, unsigned VL,
 }
 
 void SnippyRISCVTarget::generateV0MaskUpdate(
-    const RVVConfigurationInfo::VLVM &VLVM, MachineBasicBlock::iterator Ins,
-    MachineBasicBlock &MBB, GeneratorContext &GC, const MCInstrInfo &InstrInfo,
-    bool IsLegalConfiguration) const {
+    InstructionGenerationContext &IGC, const RVVConfigurationInfo::VLVM &VLVM,
+    const MCInstrInfo &InstrInfo, bool IsLegalConfiguration) const {
+  auto &GC = IGC.GC;
+  auto &MBB = IGC.MBB;
+  auto &Ins = IGC.Ins;
+  auto RP = IGC.pushRegPool();
   // We do not interested in any V0 mask update
   if (NoMaskModeForRVV)
     return;
@@ -3305,7 +3322,6 @@ void SnippyRISCVTarget::generateV0MaskUpdate(
     return;
   }
 
-  auto RP = GC.getRegisterPool();
   // Note: currently used load from memory instruction,
   // So real mask value width should be VLEN.
   auto &TgtCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
@@ -3314,16 +3330,19 @@ void SnippyRISCVTarget::generateV0MaskUpdate(
   LLVM_DEBUG(dbgs() << "Mask update with memory instruction for mask:"
                     << toString(WidenVM, /* Radix */ 16, /* Signed */ false)
                     << "\n");
-  rvvWriteValue(MBB, Ins, GC, WidenVM, RISCV::V0, RP);
+  rvvWriteValue(IGC, WidenVM, RISCV::V0);
 }
 
-void SnippyRISCVTarget::generateVSETIVLI(
-    const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB, GeneratorContext &GC,
-    unsigned VTYPE, unsigned VL, bool SupportMarker,
-    MachineBasicBlock::iterator Ins) const {
+void SnippyRISCVTarget::generateVSETIVLI(InstructionGenerationContext &IGC,
+                                         const MCInstrInfo &InstrInfo,
+                                         unsigned VTYPE, unsigned VL,
+                                         bool SupportMarker) const {
+  auto &GC = IGC.GC;
+  auto &MBB = IGC.MBB;
+  auto &Ins = IGC.Ins;
   auto &State = GC.getLLVMState();
   const auto &RI = State.getRegInfo();
-  auto RP = GC.getRegisterPool();
+  auto &RP = IGC.getRegPool();
   auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
   auto DstReg = RP.getAvailableRegister("VSETIVLI dst", RI, RegClass, MBB,
                                         SupportMarker ? AccessMaskBit::SRW
@@ -3339,24 +3358,25 @@ void SnippyRISCVTarget::generateVSETIVLI(
   MIB.addDef(DstReg).addImm(VL).addImm(VTYPE);
 }
 
-void SnippyRISCVTarget::generateVSETVLI(const MCInstrInfo &InstrInfo,
-                                        MachineBasicBlock &MBB,
-                                        GeneratorContext &GC, unsigned VTYPE,
-                                        unsigned VL, bool SupportMarker,
-                                        MachineBasicBlock::iterator Ins) const {
+void SnippyRISCVTarget::generateVSETVLI(InstructionGenerationContext &IGC,
+                                        const MCInstrInfo &InstrInfo,
+                                        unsigned VTYPE, unsigned VL,
+                                        bool SupportMarker) const {
+  auto &GC = IGC.GC;
+  auto &RP = IGC.getRegPool();
+  auto &MBB = IGC.MBB;
+  auto &Ins = IGC.Ins;
   // TODO 1: if VL is equal to VLMAX we can use X0 if DstReg is not zero
   // TODO 2: if VL is not changed, and DST is zero, scratch VL can be zero
   const auto &RI = GC.getLLVMState().getRegInfo();
   auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
-  auto RP = GC.getRegisterPool();
   auto DstReg = RP.getAvailableRegister("for VSETVLI dst", RI, RegClass, MBB,
                                         SupportMarker ? AccessMaskBit::SRW
                                                       : AccessMaskBit::GRW);
   auto ScratchRegVL = getNonZeroReg("for VSETVLI VL", RI, RegClass, RP, MBB,
                                     AccessMaskBit::SRW);
-  writeValueToReg(MBB, Ins,
-                  APInt(GC.getSubtarget<RISCVSubtarget>().getXLen(), VL),
-                  ScratchRegVL, RP, GC);
+  writeValueToReg(IGC, APInt(GC.getSubtarget<RISCVSubtarget>().getXLen(), VL),
+                  ScratchRegVL);
   auto MIB =
       getInstBuilder(SupportMarker, *this, MBB, Ins, GC.getLLVMState().getCtx(),
                      InstrInfo.get(RISCV::VSETVLI));
@@ -3365,29 +3385,30 @@ void SnippyRISCVTarget::generateVSETVLI(const MCInstrInfo &InstrInfo,
   MIB.addImm(VTYPE);
 }
 
-void SnippyRISCVTarget::generateVSETVL(const MCInstrInfo &InstrInfo,
-                                       MachineBasicBlock &MBB,
-                                       GeneratorContext &GC, unsigned VTYPE,
-                                       unsigned VL, bool SupportMarker,
-                                       MachineBasicBlock::iterator Ins) const {
+void SnippyRISCVTarget::generateVSETVL(InstructionGenerationContext &IGC,
+                                       const MCInstrInfo &InstrInfo,
+                                       unsigned VTYPE, unsigned VL,
+                                       bool SupportMarker) const {
   // TODO 1: if VL is equal to VLMAX we can use X0 if DstReg is not zero
   // TODO 2: if VL is not changed, and DST is zero, scratch VL can be zero
+  auto &GC = IGC.GC;
+  auto &MBB = IGC.MBB;
+  auto &Ins = IGC.Ins;
   const auto &RI = GC.getLLVMState().getRegInfo();
   auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
-  auto RP = GC.getRegisterPool();
-  auto DstReg = RP.getAvailableRegister("for VSETVL dst", RI, RegClass, MBB,
-                                        SupportMarker ? AccessMaskBit::SRW
-                                                      : AccessMaskBit::GRW);
+  auto RP = IGC.pushRegPool();
+  auto DstReg = RP->getAvailableRegister("for VSETVL dst", RI, RegClass, MBB,
+                                         SupportMarker ? AccessMaskBit::SRW
+                                                       : AccessMaskBit::GRW);
   const auto &ST = GC.getSubtarget<RISCVSubtarget>();
   // TODO: maybe just use GPRNoX0RegClassID class?
-  auto [ScratchRegVL, ScratchRegVType] = RP.getNAvailableRegisters<2>(
+  auto [ScratchRegVL, ScratchRegVType] = RP->getNAvailableRegisters<2>(
       "registers for VSETVL VL and VType", RI, RegClass, MBB,
       /* Filter */ [](unsigned Reg) { return Reg == RISCV::X0; },
       AccessMaskBit::SRW);
-  writeValueToReg(MBB, Ins, APInt(ST.getXLen(), VL), ScratchRegVL, RP, GC);
-  RP.addReserved(ScratchRegVL);
-  writeValueToReg(MBB, Ins, APInt(ST.getXLen(), VTYPE), ScratchRegVType, RP,
-                  GC);
+  writeValueToReg(IGC, APInt(ST.getXLen(), VL), ScratchRegVL);
+  RP->addReserved(ScratchRegVL);
+  writeValueToReg(IGC, APInt(ST.getXLen(), VTYPE), ScratchRegVType);
   auto MIB =
       getInstBuilder(SupportMarker, *this, MBB, Ins, GC.getLLVMState().getCtx(),
                      InstrInfo.get(RISCV::VSETVL));
@@ -3397,10 +3418,10 @@ void SnippyRISCVTarget::generateVSETVL(const MCInstrInfo &InstrInfo,
 }
 
 void SnippyRISCVTarget::generateRVVModeUpdate(
-    const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB, GeneratorContext &GC,
+    InstructionGenerationContext &IGC, const MCInstrInfo &InstrInfo,
     const RVVConfiguration &Config, const RVVConfigurationInfo::VLVM &VLVM,
-    MachineBasicBlock::iterator Ins,
     std::optional<unsigned> DesiredOpcode) const {
+  auto &GC = IGC.GC;
   unsigned SEW = static_cast<unsigned>(Config.SEW);
   LLVM_DEBUG(dbgs() << "Emit RVV Mode Change: VL = " << VLVM.VL
                     << ", SEW = " << SEW << ", TA = " << Config.TailAgnostic
@@ -3420,18 +3441,18 @@ void SnippyRISCVTarget::generateRVVModeUpdate(
 
   switch (DesiredOpcode.value()) {
   case RISCV::VSETIVLI:
-    generateVSETIVLI(InstrInfo, MBB, GC, VTYPE, VLVM.VL, SupportMarker, Ins);
+    generateVSETIVLI(IGC, InstrInfo, VTYPE, VLVM.VL, SupportMarker);
     break;
   case RISCV::VSETVLI:
-    generateVSETVLI(InstrInfo, MBB, GC, VTYPE, VLVM.VL, SupportMarker, Ins);
+    generateVSETVLI(IGC, InstrInfo, VTYPE, VLVM.VL, SupportMarker);
     break;
   case RISCV::VSETVL:
-    generateVSETVL(InstrInfo, MBB, GC, VTYPE, VLVM.VL, SupportMarker, Ins);
+    generateVSETVL(IGC, InstrInfo, VTYPE, VLVM.VL, SupportMarker);
     break;
   default:
     llvm_unreachable("unexpected OpcodeRequested for generateRVVModeUpdate");
   }
-  generateV0MaskUpdate(VLVM, Ins, MBB, GC, InstrInfo, Config.IsLegal);
+  generateV0MaskUpdate(IGC, VLVM, InstrInfo, Config.IsLegal);
 
   // TODO: update VXRM/VXSAT
 }
@@ -3502,11 +3523,11 @@ SnippyRISCVTarget::createSimulator(llvm::snippy::DynamicLibrary &ModelLib,
       !(MisalignedAccessMode == DisableMisalignedAccessMode::All));
 }
 
-const MCRegisterClass &
-SnippyRISCVTarget::getRegClass(const GeneratorContext &Ctx,
-                               unsigned OperandRegClassID, unsigned OpIndex,
-                               unsigned Opcode, const MachineBasicBlock &MBB,
-                               const MCRegisterInfo &RegInfo) const {
+const MCRegisterClass &SnippyRISCVTarget::getRegClass(
+    InstructionGenerationContext &IGC, unsigned OperandRegClassID,
+    unsigned OpIndex, unsigned Opcode, const MCRegisterInfo &RegInfo) const {
+  auto &Ctx = IGC.GC;
+  auto &MBB = IGC.MBB;
   auto &TgtCtx = Ctx.getTargetContext().getImpl<RISCVGeneratorContext>();
   if (!isRVV(Opcode) || !TgtCtx.hasActiveRVVMode(MBB) ||
       (OperandRegClassID != RISCV::VRRegClassID))

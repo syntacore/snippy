@@ -12,9 +12,12 @@ namespace llvm {
 
 class PassRegistry;
 
+void initializeSnippyFunctionMetadataWrapperPass(PassRegistry &);
 void initializeReserveRegsPass(PassRegistry &);
 void initializeFillExternalFunctionsStubsPass(PassRegistry &);
 void initializeFunctionGeneratorPass(PassRegistry &);
+void initializeSimulatorContextWrapperPass(PassRegistry &);
+void initializeSimulatorContextPreserverPass(PassRegistry &);
 void initializeFunctionDistributePass(PassRegistry &);
 void initializeCFGeneratorPass(PassRegistry &);
 void initializeCFPermutationPass(llvm::PassRegistry &);

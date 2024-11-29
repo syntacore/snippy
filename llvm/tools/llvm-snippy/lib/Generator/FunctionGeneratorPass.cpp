@@ -196,12 +196,12 @@ MachineFunction &FunctionGenerator::createFunction(
 // in order.
 std::vector<std::string> FunctionGenerator::prepareRXSections() {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-
+  auto &GCFI = get<GlobalCodeFlowInfo>();
   if (!SGCtx.getGenSettings().InstrsGenerationConfig.ChainedRXSectionsFill)
     return {""};
 
   std::vector<std::string> Ret;
-  for (auto &&[_, InputSections] : SGCtx.executionPath())
+  for (auto &&[_, InputSections] : GCFI.ExecutionPath)
     Ret.emplace_back(InputSections.front().Name);
 
   return Ret;
@@ -209,7 +209,7 @@ std::vector<std::string> FunctionGenerator::prepareRXSections() {
 
 void FunctionGenerator::initRootFunctions(Module &M, StringRef EntryPointName) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &CGS = get<CallGraphState>();
+  auto &CGS = get<GlobalCodeFlowInfo>().CGS;
   auto RFs = distributeRootFunctions();
   auto &&[EntryFnSection, EntryFnInstrNum] = RFs.front();
   // Entry point produces multiple root functions. Each one of
@@ -279,6 +279,73 @@ FunctionGenerator::distributeRootFunctions() {
   }
   return RetSplit;
 }
+template <typename R>
+static void reportUnusedRXSectionWarning(LLVMContext &Ctx, R &&Names) {
+  std::string NameList;
+  llvm::raw_string_ostream OS{NameList};
+  for (auto &&Name : Names) {
+    OS << "'" << Name << "' ";
+  }
+
+  snippy::warn(WarningName::UnusedSection, Ctx,
+               "Following RX sections are unused during generation", NameList);
+}
+
+static void
+checkForUnusedRXSections(const Linker::LinkedSections &Sections,
+                         const Linker::OutputSection &DefaultCodeSection,
+                         LLVMContext &Ctx) {
+  auto UnusedRXSections =
+      llvm::make_filter_range(Sections, [&DefaultCodeSection](auto &S) {
+        return S.OutputSection.Desc.M.X() &&
+               S.OutputSection.Desc.getIDString() !=
+                   DefaultCodeSection.Desc.getIDString();
+      });
+  auto UnusedRXSectionNames = llvm::map_range(UnusedRXSections, [](auto &S) {
+    return S.OutputSection.Desc.getIDString();
+  });
+  if (!UnusedRXSectionNames.empty())
+    reportUnusedRXSectionWarning(Ctx, UnusedRXSectionNames);
+}
+
+void FunctionGenerator::initExecutionPath() {
+  auto &ExecutionPath = get<GlobalCodeFlowInfo>().ExecutionPath;
+  auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &Settings = SGCtx.getGenSettings();
+  auto &State = SGCtx.getLLVMState();
+  auto &L = SGCtx.getProgramContext().getLinker();
+  assert(L.sections().hasOutputSectionFor(Linker::kDefaultTextSectionName));
+  auto DefaultCodeSection =
+      L.sections().getOutputSectionFor(Linker::kDefaultTextSectionName);
+  if (Settings.InstrsGenerationConfig.ChainedRXSectionsFill)
+    for (auto &RXSection : llvm::make_filter_range(L.sections(), [](auto &S) {
+           return S.OutputSection.Desc.M.X();
+         })) {
+      if (!L.sections().hasOutputSectionFor(RXSection.OutputSection.Name))
+        L.sections().addInputSectionFor(RXSection.OutputSection.Desc,
+                                        RXSection.OutputSection.Name);
+      ExecutionPath.push_back(RXSection);
+    }
+
+  if (Settings.InstrsGenerationConfig.ChainedRXSectionsFill) {
+    if (Settings.InstrsGenerationConfig.ChainedRXSorted) {
+      std::sort(ExecutionPath.begin(), ExecutionPath.end(),
+                [](auto &LHS, auto &RHS) {
+                  return LHS.OutputSection.Desc.getIDString() <
+                         RHS.OutputSection.Desc.getIDString();
+                });
+    } else
+      RandEngine::shuffle(ExecutionPath.begin(), ExecutionPath.end());
+  } else {
+    checkForUnusedRXSections(L.sections(), DefaultCodeSection, State.getCtx());
+    ExecutionPath.push_back(Linker::SectionEntry{
+        DefaultCodeSection, {{std::string(Linker::kDefaultTextSectionName)}}});
+  }
+  // Setup StartPC for later initialize model with.
+  auto &FirstSection = ExecutionPath.front();
+  auto StartPC = FirstSection.OutputSection.Desc.VMA;
+  L.setStartPC(StartPC);
+}
 
 bool FunctionGenerator::runOnModule(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
@@ -286,7 +353,7 @@ bool FunctionGenerator::runOnModule(Module &M) {
   auto &Ctx = State.getCtx();
   auto &LLVMTM = State.getTargetMachine();
   StringRef ABIName = SGCtx.getABIName();
-
+  initExecutionPath();
   if (ABIName.size()) {
     auto *ABINameMD = MDString::get(Ctx, ABIName);
     M.setModuleFlag(Module::ModFlagBehavior::Error, "target-abi", ABINameMD);
@@ -300,10 +367,6 @@ bool FunctionGenerator::runOnModule(Module &M) {
   auto CGFilename = DumpCGFilename.getValue();
   if (!CGFilename.empty())
     getCallGraphState().dump(CGFilename, CGDumpFormat);
-  // FIXME: currently we initialize it here, because
-  // it is obviously a safe place to take a TargetSubtargetInfo
-  if (SGCtx.getGenSettings().ModelPluginConfig.RunOnModel)
-    SGCtx.getOrCreateInterpreter();
 
   return Ret;
 }
@@ -311,7 +374,7 @@ bool FunctionGenerator::runOnModule(Module &M) {
 bool FunctionGenerator::readFromYaml(Module &M, const FunctionDescs &FDs) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &State = SGCtx.getLLVMState();
-  auto &CGS = get<CallGraphState>();
+  auto &CGS = get<GlobalCodeFlowInfo>().CGS;
   auto &Descs = FDs.Descs;
 
   auto EPIt = FDs.getEntryPointDesc();
@@ -368,7 +431,7 @@ bool FunctionGenerator::readFromYaml(Module &M, const FunctionDescs &FDs) {
 
 bool FunctionGenerator::generateDefault(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &CGS = get<CallGraphState>();
+  auto &CGS = get<GlobalCodeFlowInfo>().CGS;
   // Create functions.
   auto NumF = SGCtx.getCallGraphLayout().FunctionNumber;
 

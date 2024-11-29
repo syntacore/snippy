@@ -17,4 +17,5 @@ sections:
 histogram:
     - [AND, 1.0]
 
-# CHECK: error: Failed to create global constant: No read-only ('r') section provided in layout. This is needed for updating of float register.
+# CHECK: error: Failed to allocate global constant for float register value load: 
+# CHECK-SAME: ROM section is not configured

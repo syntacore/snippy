@@ -34,6 +34,9 @@ class GeneratorContext;
 struct TargetGenContextInterface;
 struct SectionData;
 class MemoryAccessSampler;
+class SnippyProgramContext;
+class GeneratorSettings;
+struct MemoryConfig;
 
 using SectionDescVect = std::vector<SectionDesc>;
 struct SimulationEnvironment {
@@ -94,10 +97,6 @@ class Interpreter final {
   void dumpOneRange(NamedMemoryRange Range, raw_fd_ostream &OS) const;
 
 public:
-  uint64_t getProgStart() const {
-    assert(Env.SimCfg.StartPC);
-    return Env.SimCfg.StartPC.value();
-  }
   uint64_t getProgEnd() const { return ProgEnd; }
   uint64_t getRomStart() const { return Env.SimCfg.RomStart; }
   uint64_t getRamStart() const { return Env.SimCfg.RamStart; }
@@ -110,8 +109,10 @@ public:
 
   bool endOfProg() const;
 
-  static SimulationEnvironment
-  createSimulationEnvironment(const GeneratorContext &GC);
+  static SimulationEnvironment createSimulationEnvironment(
+      SnippyProgramContext &SPC, const TargetSubtargetInfo &ST,
+      const GeneratorSettings &Settings, const MemoryConfig &MemCfg,
+      TargetGenContextInterface &TgtCtx);
 
   static std::unique_ptr<SimulatorInterface> createSimulatorForTarget(
       const SnippyTarget &TGT, const TargetSubtargetInfo &Subtarget,
@@ -147,7 +148,6 @@ public:
 
   void setInitialState(const IRegisterState &Regs) {
     Simulator->setState(Regs);
-    Simulator->setPC(getProgStart());
   }
 
   void setStopModeByPC(ProgramCounterType StopPC) {

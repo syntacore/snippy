@@ -8,6 +8,7 @@
 
 #include "snippy/Generator/MemoryManager.h"
 #include "snippy/Config/MemoryScheme.h"
+#include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Generator/GlobalsPool.h"
 #include "snippy/Generator/Interpreter.h"
@@ -29,9 +30,9 @@ namespace llvm::snippy {
 
 namespace {
 
-void fillProgSectionInfo(const GeneratorContext &GC, MemoryConfig &Config) {
-  auto &L = GC.getProgramContext().getLinker();
-  for (auto &ExecSection : GC.executionPath()) {
+void fillProgSectionInfo(Linker &L, const GlobalCodeFlowInfo &GCFI,
+                         MemoryConfig &Config) {
+  for (auto &ExecSection : GCFI.ExecutionPath) {
     Config.ProgSections.emplace_back(
         ExecSection.OutputSection.Desc.VMA, ExecSection.OutputSection.Desc.Size,
         L.getMangledName(ExecSection.OutputSection.Name));
@@ -98,11 +99,11 @@ MemorySectionConfig getRomInfo(const Linker &L, MemAddr ProgSectionStart) {
 
 } // namespace
 
-MemoryConfig MemoryConfig::getMemoryConfig(const GeneratorContext &GC) {
+MemoryConfig MemoryConfig::getMemoryConfig(Linker &L,
+                                           GlobalCodeFlowInfo &GCFI) {
   MemoryConfig Config{};
-  auto &L = GC.getProgramContext().getLinker();
   // get RX sections info...
-  fillProgSectionInfo(GC, Config);
+  fillProgSectionInfo(L, GCFI, Config);
   // get R sections info...
   Config.Rom = getRomInfo(L, Config.ProgSections.front().Start);
   // get RW sections info...

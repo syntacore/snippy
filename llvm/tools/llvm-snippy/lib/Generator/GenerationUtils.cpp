@@ -9,6 +9,7 @@
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/MemAccessInfo.h"
 #include "snippy/Generator/Policy.h"
+#include "snippy/Generator/SimulatorContext.h"
 #include "snippy/Support/Options.h"
 #include "llvm/CodeGen/MachineLoopInfo.h"
 
@@ -173,17 +174,19 @@ unsigned countAddrs(ArrayRef<unsigned> Opcodes, const SnippyTarget &SnippyTgt) {
                          CountAddrsForOpcode);
 }
 
-static Register pregenerateRegister(const MachineBasicBlock &MBB,
+static Register pregenerateRegister(InstructionGenerationContext &InstrGenCtx,
                                     const MCInstrDesc &InstrDesc,
-                                    RegPoolWrapper &RP,
                                     const MCOperandInfo &MCOpInfo,
-                                    unsigned OpIndex, GeneratorContext &GC) {
+                                    unsigned OpIndex) {
+  auto &GC = InstrGenCtx.GC;
+  auto &MBB = InstrGenCtx.MBB;
+  auto &RP = InstrGenCtx.getRegPool();
   const auto &State = GC.getLLVMState();
   const auto &RegInfo = State.getRegInfo();
   const auto &Tgt = State.getSnippyTarget();
   auto OperandRegClassID = InstrDesc.operands()[OpIndex].RegClass;
-  auto RegClass = Tgt.getRegClass(GC, OperandRegClassID, OpIndex,
-                                  InstrDesc.getOpcode(), MBB, RegInfo);
+  auto RegClass = Tgt.getRegClass(InstrGenCtx, OperandRegClassID, OpIndex,
+                                  InstrDesc.getOpcode(), RegInfo);
   auto Exclude = Tgt.excludeRegsForOperand(RegClass, GC, InstrDesc, OpIndex);
   auto Include = Tgt.includeRegs(RegClass);
   AccessMaskBit Mask = AccessMaskBit::RW;
@@ -198,12 +201,11 @@ static Register pregenerateRegister(const MachineBasicBlock &MBB,
 }
 
 std::vector<planning::PreselectedOpInfo>
-selectInitializableOperandsRegisters(const MCInstrDesc &InstrDesc,
-                                     GeneratorContext &GC,
-                                     MachineBasicBlock &MBB) {
+selectInitializableOperandsRegisters(InstructionGenerationContext &InstrGenCtx,
+                                     const MCInstrDesc &InstrDesc) {
   std::vector<planning::PreselectedOpInfo> Preselected;
   Preselected.reserve(InstrDesc.getNumOperands());
-  auto RP = GC.getRegisterPool();
+  auto &GC = InstrGenCtx.GC;
   llvm::transform(
       llvm::enumerate(InstrDesc.operands()), std::back_inserter(Preselected),
       [&, &Tgt = GC.getLLVMState().getSnippyTarget()](
@@ -212,7 +214,7 @@ selectInitializableOperandsRegisters(const MCInstrDesc &InstrDesc,
         // If it is TIED_TO, this register is already selected.
         if (Tgt.canInitializeOperand(InstrDesc, OpIndex) &&
             InstrDesc.getOperandConstraint(OpIndex, MCOI::TIED_TO) == -1)
-          return pregenerateRegister(MBB, InstrDesc, RP, MCOpInfo, OpIndex, GC);
+          return pregenerateRegister(InstrGenCtx, InstrDesc, MCOpInfo, OpIndex);
         return {};
       });
   return Preselected;
@@ -443,12 +445,14 @@ collectAddressRestrictions(ArrayRef<unsigned> Opcodes, GeneratorContext &GC,
   return OpcodeToAR;
 }
 
-std::vector<unsigned> generateBaseRegs(MachineBasicBlock &MBB,
-                                       ArrayRef<unsigned> Opcodes,
-                                       RegPoolWrapper &RP,
-                                       GeneratorContext &SGCtx) {
+std::vector<unsigned>
+generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
+                 ArrayRef<unsigned> Opcodes) {
   if (Opcodes.empty())
     return {};
+  auto &MBB = InstrGenCtx.MBB;
+  auto &RP = InstrGenCtx.getRegPool();
+  auto &SGCtx = InstrGenCtx.GC;
   auto &State = SGCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   const auto &InstrInfo = State.getInstrInfo();
@@ -570,32 +574,35 @@ std::map<unsigned, AddressInfo> collectPrimaryAddresses(
 
 // Insert initialization of base addresses before the burst group.
 void initializeBaseRegs(
-    MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-    std::map<unsigned, AddressInfo> &BaseRegToPrimaryAddress,
-    RegPoolWrapper &RP, GeneratorContext &GC) {
+    InstructionGenerationContext &InstrGenCtx,
+    std::map<unsigned, AddressInfo> &BaseRegToPrimaryAddress) {
+  auto &GC = InstrGenCtx.GC;
+  auto &SimCtx = InstrGenCtx.SimCtx;
+  auto &RP = InstrGenCtx.getRegPool();
   auto &State = GC.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   for (auto &[BaseReg, AI] : BaseRegToPrimaryAddress) {
     auto NewValue =
         APInt(SnippyTgt.getAddrRegLen(State.getTargetMachine()), AI.Address);
     assert(RP.isReserved(BaseReg, AccessMaskBit::W));
-    if (GC.getGenSettings().TrackingConfig.AddressVH) {
-      auto &I = GC.getOrCreateInterpreter();
+    if (SimCtx.TrackOpts.AddressVH) {
+      auto &I = SimCtx.getInterpreter();
       auto OldValue = I.readReg(BaseReg);
-      SnippyTgt.transformValueInReg(MBB, Ins, OldValue, NewValue, BaseReg, RP,
-                                    GC);
+      SnippyTgt.transformValueInReg(InstrGenCtx, OldValue, NewValue, BaseReg);
     } else
-      SnippyTgt.writeValueToReg(MBB, Ins, NewValue, BaseReg, RP, GC);
+      SnippyTgt.writeValueToReg(InstrGenCtx, NewValue, BaseReg);
   }
 }
 
 // This function returns address info to use for each opcode.
 std::vector<AddressInfo>
-mapOpcodeIdxToAI(MachineBasicBlock &MBB, ArrayRef<unsigned> OpcodeIdxToBaseReg,
-                 ArrayRef<unsigned> Opcodes, MachineBasicBlock::iterator Ins,
-                 RegPoolWrapper &RP, GeneratorContext &SGCtx,
-                 MemAccessInfo *MAI) {
+mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
+                 ArrayRef<unsigned> OpcodeIdxToBaseReg,
+                 ArrayRef<unsigned> Opcodes) {
   assert(OpcodeIdxToBaseReg.size() == Opcodes.size());
+  auto &MBB = InstrGenCtx.MBB;
+  auto &SGCtx = InstrGenCtx.GC;
+  auto *MAI = InstrGenCtx.MAI;
   if (Opcodes.empty())
     return {};
 
@@ -618,7 +625,7 @@ mapOpcodeIdxToAI(MachineBasicBlock &MBB, ArrayRef<unsigned> OpcodeIdxToBaseReg,
       collectPrimaryAddresses(BaseRegToStrongestAR, SGCtx);
   // We've chosen addresses for each base register. Initialize base registers
   // with these addresses.
-  initializeBaseRegs(MBB, Ins, BaseRegToPrimaryAddress, RP, SGCtx);
+  initializeBaseRegs(InstrGenCtx, BaseRegToPrimaryAddress);
 
   // Try to find addresses for each opcode that allow better randomization of
   // offsets and effective addresses. If no address is found, we can always use
