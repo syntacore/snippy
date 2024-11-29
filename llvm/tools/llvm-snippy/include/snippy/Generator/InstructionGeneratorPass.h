@@ -22,8 +22,7 @@ namespace llvm {
 namespace snippy {
 
 class InstructionGenerator final
-    : public ActiveImmutablePass<MachineFunctionPass, SelfCheckInfo,
-                                 MemAccessInfo> {
+    : public ActiveImmutablePass<MachineFunctionPass, MemAccessInfo> {
   planning::FunctionRequest
   createMFGenerationRequest(const MachineFunction &MF) const;
 
@@ -45,8 +44,7 @@ public:
   static char ID;
 
   InstructionGenerator()
-      : ActiveImmutablePass<MachineFunctionPass, SelfCheckInfo, MemAccessInfo>(
-            ID) {}
+      : ActiveImmutablePass<MachineFunctionPass, MemAccessInfo>(ID) {}
 
   StringRef getPassName() const override;
 

@@ -9,6 +9,7 @@
 #include "snippy/Config/Branchegram.h"
 #include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GeneratorContext.h"
+#include "snippy/Generator/SimulatorContextWrapperPass.h"
 #include "snippy/Support/Options.h"
 #include "snippy/Support/RandUtil.h"
 
@@ -142,15 +143,14 @@ findMaxDepthReachedImpl(CFPermBIIter Beg, CFPermBIIter End,
 }
 } // namespace
 
-llvm::snippy::CFPermutationContext::CFPermutationContext(MachineFunction &MF,
-                                                         GeneratorContext &GC,
-                                                         FunctionGenerator &FG)
-    : BlocksInfo(), CurrMF(MF), GC(GC), FG(FG),
+llvm::snippy::CFPermutationContext::CFPermutationContext(
+    MachineFunction &MF, GeneratorContext &GC, FunctionGenerator &FG,
+    ConsecutiveLoopInfo &CLI, const SimulatorContext &SimCtx)
+    : BlocksInfo(), CurrMF(MF), GC(GC), FG(FG), CLI(CLI), SimCtx(SimCtx),
       BranchSettings(GC.getConfig().Branches) {
-  if (GC.hasTrackingMode() && GC.isLoopGenerationPossible() &&
-      !GC.getOrCreateSimRunner()
-           .getPrimaryInterpreter()
-           .modelSupportCallbacks())
+
+  if (SimCtx.hasTrackingMode() && GC.isLoopGenerationPossible() &&
+      !SimCtx.getSimRunner().getPrimaryInterpreter().modelSupportCallbacks())
     fatal(GC.getLLVMState().getCtx(),
           "Loops cannot be generated in selfcheck/backtrack/hazard modes",
           "Selected model does not support it.");
@@ -294,7 +294,7 @@ void llvm::snippy::CFPermutationContext::initBlocksInfo(unsigned Size) {
     transform(seq(0u, Size), std::back_inserter(BlocksInfo),
               [](unsigned BB) { return BlockInfo(BB); });
     for (auto &&BB : seq(1u, Size))
-      GC.get().registerConsecutiveLoopsHeader(BB, 0u);
+      CLI.get().registerConsecutiveLoopsHeader(BB, 0u);
     return;
   }
 
@@ -446,7 +446,7 @@ void llvm::snippy::CFPermutationContext::permuteBlock(unsigned BB) {
     for (auto NextBB : seq_inclusive(BB + 1, BB + NConsecutiveLoops)) {
       LLVM_DEBUG(dbgs() << "Permuting BB#" << NextBB
                         << " (consecutive loop)\n");
-      GC.get().registerConsecutiveLoopsHeader(NextBB, BB);
+      CLI.get().registerConsecutiveLoopsHeader(NextBB, BB);
       auto &NextBI = BlocksInfo[NextBB];
       assert(NextBI.Available.count(NextBB));
       NextBI.Successor = NextBB;

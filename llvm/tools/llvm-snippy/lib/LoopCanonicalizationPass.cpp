@@ -14,8 +14,10 @@
 #include "InitializePasses.h"
 
 #include "snippy/CreatePasses.h"
+#include "snippy/Generator/CFPermutationPass.h"
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContextPass.h"
+#include "snippy/Generator/SimulatorContextWrapperPass.h"
 #include "snippy/Support/Options.h"
 
 #include "llvm/ADT/STLExtras.h"
@@ -66,7 +68,9 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<GeneratorContextWrapper>();
+    AU.addRequired<SimulatorContextWrapper>();
     AU.addRequired<MachineLoopInfo>();
+    AU.addRequired<CFPermutation>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 };
@@ -102,12 +106,16 @@ bool LoopCanonicalization::runOnMachineFunction(MachineFunction &MF) {
   LLVM_DEBUG(dbgs() << "MachineFunction at the start of "
                        "llvm::snippy::LoopCanonicalization:\n";
              MF.dump());
-  auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto SimCtx = getAnalysis<SimulatorContextWrapper>()
+                    .get<OwningSimulatorContext>()
+                    .get();
   auto &MLI = getAnalysis<MachineLoopInfo>();
+  [[maybe_unused]] auto &CLI =
+      getAnalysis<CFPermutation>().get<ConsecutiveLoopInfo>(MF);
   LLVM_DEBUG(dbgs() << "Machine Loop Info for this function:\n");
   LLVM_DEBUG(MLI.getBase().print(dbgs()));
   LLVM_DEBUG(dbgs() << "Consecutive loops:\n");
-  LLVM_DEBUG(for_each(GC.getConsecutiveLoops(), [](auto &CLEntry) {
+  LLVM_DEBUG(for_each(CLI.getConsecutiveLoops(), [](auto &CLEntry) {
     dbgs() << CLEntry.first << ":";
     for (auto &&CL : CLEntry.second)
       dbgs() << " " << CL;
@@ -120,7 +128,7 @@ bool LoopCanonicalization::runOnMachineFunction(MachineFunction &MF) {
   while (!Loops.empty()) {
     auto &ML = *Loops.back();
     Changed |= insertPreheaderIfNeeded(ML);
-    if (ForceLatchTransform || GC.hasTrackingMode()) {
+    if (ForceLatchTransform || SimCtx.hasTrackingMode()) {
       Changed |= splitExitEdge(ML);
       Changed |= makeLatchUnconditional(ML, MLI);
     }
@@ -190,9 +198,10 @@ bool LoopCanonicalization::insertPreheaderIfNeeded(MachineLoop &ML) {
   assert(Header && "Loop expected to have header");
   assert(Header->pred_size() > 0 &&
          "Loop header should have at least one predecessor");
-  auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &CLI = getAnalysis<CFPermutation>().get<ConsecutiveLoopInfo>(
+      *Header->getParent());
   auto HeaderNum = Header->getNumber();
-  if (GC.isNonFirstConsecutiveLoopHeader(HeaderNum)) {
+  if (CLI.isNonFirstConsecutiveLoopHeader(HeaderNum)) {
     LLVM_DEBUG(dbgs() << "It's consecutive loop, skip preheader insertion\n");
     return false;
   }

@@ -46,5 +46,5 @@ histogram:
      - [ADDIW, 1.0]
      - [SUB, 4.0]
 
-# CHECK: error
-# CHECK-SAME: Section "utility" is full (Size: 8, Filled Size: 16): Try larger "utility" section.
+# CHECK: error: Failed to create a savepoint for global state: 
+# CHECK-SAME: Out of space when allocating 8 bytes (align 1) in section 'utility' of size 8. 8 bytes overflow
