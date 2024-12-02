@@ -35,9 +35,9 @@ public:
   const SimulatorContext &get() const { return *this; }
 
 private:
-  std::unique_ptr<SimRunner> OwnRunner = nullptr;
-  std::unique_ptr<SelfCheckInfo> OwnSCI = nullptr;
-  std::unique_ptr<Backtrack> OwnBT = nullptr;
+  std::unique_ptr<SimRunner> OwnRunner;
+  std::unique_ptr<SelfCheckInfo> OwnSCI;
+  std::unique_ptr<Backtrack> OwnBT;
 };
 
 extern template class GenResultT<OwningSimulatorContext>;
