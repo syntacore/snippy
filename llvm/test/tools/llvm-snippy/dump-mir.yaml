@@ -22,6 +22,6 @@ histogram:
     - [ADDI, 1.0]
 
 # CHECK-LABEL: define void @SnippyFunction
-# CHECK-SAME: () {
+# CHECK-SAME: () #[[ATTR:[0-9]+]] {
 # CHECK-NEXT: ret void
 # CHECK-NEXT: }
