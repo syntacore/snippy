@@ -220,6 +220,7 @@ struct RVVConfigurationSpace {
   BiasGuides Guides;
   RVVUnitInfo VUInfo;
 
+  static constexpr auto kUnitName = "riscv-vector-unit";
   static void mapYaml(llvm::yaml::IO &IO,
                       std::optional<RVVConfigurationSpace> &CS);
 };
@@ -656,7 +657,7 @@ template <> struct GeneratorFactory<RVVConfigurationInfo::VMGeneratorHolder> {
 void RVVConfigurationSpace::mapYaml(llvm::yaml::IO &IO,
                                     std::optional<RVVConfigurationSpace> &CS) {
   yaml::EmptyContext Ctx;
-  IO.mapOptionalWithContext("riscv-vector-unit", CS, Ctx);
+  IO.mapOptionalWithContext(RVVConfigurationSpace::kUnitName, CS, Ctx);
 }
 
 class RVVConfig : public RVVConfigInterface {
@@ -762,20 +763,30 @@ template <> struct yaml::MappingTraits<RVVUnitInfo> {
   }
 };
 
+static bool isCorrectProbability(double Prob) {
+  return Prob >= 0.0 && Prob <= 1.0;
+}
+
 template <> struct yaml::MappingTraits<BiasGuides> {
+  static constexpr auto kProbBounds = "probability should be from [0.0;1.0]";
+
   static void mapping(yaml::IO &IO, BiasGuides &Guides) {
     Guides.Enabled = true;
     IO.mapRequired("P", Guides.ModeChangeP);
+    IO.mapOptional("Pvill", Guides.SetVillP);
+  }
 
+  static std::string validate(yaml::IO &IO, BiasGuides &Guides) {
     // TODO: implemenent alternative mode changing schemes and
     // replace probability with weight
-    if (!(Guides.ModeChangeP >= 0.0 && Guides.ModeChangeP <= 1.0))
-      snippy::fatal("riscv-vector-vlvm::P should be from [0.0;1.0]");
+    if (!isCorrectProbability(Guides.ModeChangeP))
+      return std::string(RVVConfigurationSpace::kUnitName) + ": P " +
+             kProbBounds;
 
-    IO.mapOptional("Pvill", Guides.SetVillP);
-
-    if (!(Guides.SetVillP >= 0.0 && Guides.SetVillP <= 1.0))
-      snippy::fatal("riscv-vector-vlvm::Pvill should be from [0.0;1.0]");
+    if (!isCorrectProbability(Guides.SetVillP))
+      return std::string(RVVConfigurationSpace::kUnitName) + ": Pvill " +
+             kProbBounds;
+    return {};
   }
 };
 
@@ -788,7 +799,7 @@ template <> struct yaml::MappingTraits<RVVConfigurationSpace> {
 
 template <> struct yaml::MappingTraits<VectorUnitRules> {
   static void mapping(yaml::IO &IO, VectorUnitRules &VU) {
-    IO.mapRequired("riscv-vector-unit", VU.Config);
+    IO.mapRequired(RVVConfigurationSpace::kUnitName, VU.Config);
   }
 };
 
@@ -818,12 +829,11 @@ unsigned computeVLMax(unsigned VLEN, unsigned SEW, RISCVII::VLMUL LMUL) {
 
 std::pair<unsigned, bool> computeDecodedEMUL(unsigned SEW, unsigned EEW,
                                              RISCVII::VLMUL LMUL) {
-  if (isReservedValues(SEW, LMUL) || !isLegalSEW(SEW)) {
+  if (isReservedValues(SEW, LMUL) || !isLegalSEW(SEW) || !isLegalSEW(EEW)) {
     // Calculating EMUL doesn't make sense for illegal values of SEW or LMUL, so
     // just return {1, 0}
     return {1, 0};
   }
-  assert(isLegalSEW(EEW));
 
   auto [Multiplier, IsFractional] = RISCVVType::decodeVLMUL(LMUL);
   unsigned long long Dividend = EEW * (IsFractional ? 1u : Multiplier);
@@ -1264,6 +1274,7 @@ void RVVConfigurationInfo::print(raw_ostream &OS) const {
     OS << "P: " << floatToString(Prob, 5) << " ";
     OS << "<" << Gen->identify() << ">\n";
   }
+
   OS << "  - Configuration Bag Listing:\n";
   unsigned IllegalPointsSize = 0;
   for (const auto &[Point, Prob] :

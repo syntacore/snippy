@@ -36,4 +36,4 @@ histogram:
     - [VXOR_VX, 1.0]
     - [VZEXT_VF4, 1.0]
 
-# CHECK: We can not create any primary instruction in this context.
+# CHECK: error: We can not create any primary instruction in this context.

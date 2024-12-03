@@ -85,7 +85,7 @@ histogram:
 # CHECK-BOTH-CONFIGS-NEXT:  - VM Selection Rules:
 # CHECK-BOTH-CONFIGS-NEXT:    P: 0.5 <all_ones>
 # CHECK-BOTH-CONFIGS-NEXT:    P: 0.5 <any_legal>
-# CHECK-BOTH-CONFIGS-NEXT:  - Configuration Bag Listing:
+# CHECK-BOTH-CONFIGS:  - Configuration Bag Listing:
 # CHECK-BOTH-CONFIGS-COUNT-704:   /MaxVL
 # CHECK-BOTH-CONFIGS-NEXT:    P: 0.5 Conf: {  Illegal Configurations:  1344 points }/MaxVL: 0
 # CHECK-BOTH-CONFIGS-NEXT:  - Configuration Bag Size: 2048
@@ -103,7 +103,7 @@ histogram:
 # CHECK-ILLEGAL-ONLY-NEXT:  - VM Selection Rules:
 # CHECK-ILLEGAL-ONLY-NEXT:    P: 0.5 <all_ones>
 # CHECK-ILLEGAL-ONLY-NEXT:    P: 0.5 <any_legal>
-# CHECK-ILLEGAL-ONLY-NEXT:  - Configuration Bag Listing:
+# CHECK-ILLEGAL-ONLY:  - Configuration Bag Listing:
 # CHECK-ILLEGAL-ONLY-NEXT:    P: 1 Conf: {  Illegal Configurations:  1344 points }/MaxVL: 0
 # CHECK-ILLEGAL-ONLY-NEXT:  - Configuration Bag Size: 1344
 # CHECK-ILLEGAL-ONLY-NEXT:  - State Cardinality: 0 ~ {MASKS}
@@ -120,7 +120,7 @@ histogram:
 # CHECK-LEGAL-ONLY-NEXT:  - VM Selection Rules:
 # CHECK-LEGAL-ONLY-NEXT:    P: 0.5 <all_ones>
 # CHECK-LEGAL-ONLY-NEXT:    P: 0.5 <any_legal>
-# CHECK-LEGAL-ONLY-NEXT:  - Configuration Bag Listing:
+# CHECK-LEGAL-ONLY:  - Configuration Bag Listing:
 # CHECK-LEGAL-ONLY-COUNT-704:   /MaxVL
 # CHECK-LEGAL-ONLY-NEXT:  - Configuration Bag Size: 704
 # CHECK-LEGAL-ONLY-NEXT:  - State Cardinality: 15104 ~ {MASKS}
