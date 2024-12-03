@@ -399,12 +399,11 @@ static RegStorageType regToStorage(Register Reg) {
   return RegStorageType::VReg;
 }
 
-static bool isLegalRVVInstr(unsigned Opcode, const MachineBasicBlock &MBB,
+static bool isLegalRVVInstr(unsigned Opcode, const RVVConfiguration &Cfg,
+                            unsigned VL, unsigned VLEN,
                             const GeneratorContext &GC) {
-  auto &RISCVCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
   if (!isRVV(Opcode))
     return false;
-  auto &Cfg = RISCVCtx.getCurrentRVVCfg(MBB);
   auto SEW = Cfg.SEW;
   auto LMUL = Cfg.LMUL;
 
@@ -806,6 +805,16 @@ breakDownAddrForInstrWithImmOffset(AddressInfo AddrInfo, const MachineInstr &MI,
 
 using OpcodeFilter = GeneratorContext::OpcodeFilter;
 
+static OpcodeFilter getRVVDefaultPolicyFilterImpl(const RVVConfiguration &Cfg,
+                                                  unsigned VL, unsigned VLEN,
+                                                  const GeneratorContext &GC) {
+  return [&Cfg, VL, VLEN, &GC](unsigned Opcode) {
+    if (!isRVV(Opcode))
+      return true;
+    return isLegalRVVInstr(Opcode, Cfg, VL, VLEN, GC);
+  };
+}
+
 static OpcodeFilter getDefaultPolicyFilterImpl(const MachineBasicBlock &MBB,
                                                const GeneratorContext &GC) {
   auto &RISCVCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
@@ -816,11 +825,11 @@ static OpcodeFilter getDefaultPolicyFilterImpl(const MachineBasicBlock &MBB,
       return true;
     };
 
-  return [&GC, &MBB](unsigned Opcode) {
-    if (isRVV(Opcode) && !isLegalRVVInstr(Opcode, MBB, GC))
-      return false;
-    return true;
-  };
+  const auto &Cfg = RISCVCtx.getCurrentRVVCfg(MBB);
+  auto VL = RISCVCtx.getVL(MBB);
+  auto VLEN = RISCVCtx.getVLEN();
+
+  return getRVVDefaultPolicyFilterImpl(Cfg, VL, VLEN, GC);
 }
 
 inline bool checkSupportedOrdering(const OpcodeHistogram &H) {
@@ -3247,7 +3256,7 @@ void SnippyRISCVTarget::rvvGenerateModeSwitchAndUpdateContext(
   // Also in this case, the already selected NewVLVM.VL has a value exceeding
   // the maximum possible for this instruction (due to its encoding), so we
   // reselect the NewVLVM.VL, taking into account its possible values for
-  // VSEIVLI.
+  // VSETIVLI.
   if (NewVLVM.VL > kMaxVLForVSETIVLI &&
       (ModeChangeInfo.WeightVSETVL + ModeChangeInfo.WeightVSETVLI) <
           std::numeric_limits<double>::epsilon())
@@ -3484,17 +3493,20 @@ static void dumpRvvConfigurationInfo(StringRef FilePath,
 std::unique_ptr<TargetGenContextInterface>
 SnippyRISCVTarget::createTargetContext(const GeneratorContext &Ctx) const {
   auto RISCVCfg = RISCVConfigurationInfo::constructConfiguration(Ctx);
-  bool IsRVVPresent = RISCVCfg.getVUConfig().getModeChangeInfo().RVVPresent;
-  bool IsApplyValuegramEachInst =
-      Ctx.getGenSettings().Cfg.RegsHistograms.has_value();
-  if (IsRVVPresent && IsApplyValuegramEachInst)
-    snippy::fatal("Not implemented", "vector registers can't be initialized");
+  auto RGC = std::make_unique<RISCVGeneratorContext>(std::move(RISCVCfg));
+  const auto &VUInfo = RGC->getVUConfigInfo();
+  bool IsRVVPresent = VUInfo.getModeChangeInfo().RVVPresent;
+  if (IsRVVPresent) {
+    bool IsApplyValuegramEachInst =
+        Ctx.getGenSettings().Cfg.RegsHistograms.has_value();
+    if (IsApplyValuegramEachInst)
+      snippy::fatal("Not implemented", "vector registers can't be initialized");
+  }
 
   if (DumpRVVConfigurationInfo.isSpecified())
-    dumpRvvConfigurationInfo(DumpRVVConfigurationInfo.getValue(),
-                             RISCVCfg.getVUConfig());
+    dumpRvvConfigurationInfo(DumpRVVConfigurationInfo.getValue(), VUInfo);
 
-  return std::make_unique<RISCVGeneratorContext>(std::move(RISCVCfg));
+  return std::move(RGC);
 }
 
 std::unique_ptr<TargetConfigInterface>
