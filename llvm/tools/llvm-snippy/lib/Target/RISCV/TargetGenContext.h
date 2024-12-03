@@ -136,8 +136,7 @@ public:
       auto LMUL = getLMUL(MBB);
       auto SEW = getSEW(MBB);
       auto EEW = getDataElementWidth(Opcode) * CHAR_BIT;
-      auto EMUL = computeEMUL(static_cast<unsigned>(SEW), EEW, LMUL);
-      return decodeVLMUL(EMUL);
+      return computeDecodedEMUL(static_cast<unsigned>(SEW), EEW, LMUL);
     }
 
     // For Vector Indexed Loads and Stores Instructions EMULs of the operands
@@ -182,8 +181,7 @@ public:
       auto LMUL = getLMUL(MBB);
       auto SEW = static_cast<unsigned>(getSEW(MBB));
       auto EIEW = getIndexElementWidth(Opcode);
-      auto EMUL = computeEMUL(static_cast<unsigned>(SEW), EIEW, LMUL);
-      return decodeVLMUL(EMUL);
+      return computeDecodedEMUL(static_cast<unsigned>(SEW), EIEW, LMUL);
     }
 
     // FIXME: This function must take into account the index of the operand
@@ -221,18 +219,15 @@ public:
         !IsFractional) {
       auto LMUL = getLMUL(MBB);
       auto SEW = static_cast<unsigned>(getSEW(MBB));
-      auto EMUL = computeEMUL(SEW, SEW * 2u, LMUL);
-      return decodeVLMUL(EMUL);
+      return computeDecodedEMUL(SEW, SEW * 2u, LMUL);
     }
 
     if (isRVVGather16(Opcode)) {
       auto LMUL = getLMUL(MBB);
       auto SEW = static_cast<unsigned>(getSEW(MBB));
       auto EEW = 16u;
-      if (EEW > SEW) {
-        auto EMUL = computeEMUL(SEW, EEW, LMUL);
-        std::tie(Multiplier, IsFractional) = decodeVLMUL(EMUL);
-      }
+      if (EEW > SEW)
+        std::tie(Multiplier, IsFractional) = computeDecodedEMUL(SEW, EEW, LMUL);
     }
 
     return std::make_pair(Multiplier, IsFractional);

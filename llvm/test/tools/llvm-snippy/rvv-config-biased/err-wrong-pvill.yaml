@@ -33,4 +33,4 @@ histogram:
     - [VXOR_VX, 1.0]
     - [VZEXT_VF4, 1.0]
 
-# CHECK: error: riscv-vector-vlvm::Pvill should be from [0.0;1.0]
+# CHECK: error: riscv-vector-unit: Pvill probability should be from [0.0;1.0]
