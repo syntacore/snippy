@@ -52,6 +52,8 @@ std::unique_ptr<RVVConfigInterface> createRVVConfig();
 
 // Compute EMUL = EEW / SEW * LMUL
 RISCVII::VLMUL computeEMUL(unsigned SEW, unsigned EEW, RISCVII::VLMUL LMUL);
+std::pair<unsigned, bool> computeDecodedEMUL(unsigned SEW, unsigned EEW,
+                                             RISCVII::VLMUL LMUL);
 bool isValidEMUL(unsigned SEW, unsigned EEW, RISCVII::VLMUL LMUL);
 
 inline static bool canBeEncoded(unsigned SEW) {
@@ -228,6 +230,10 @@ struct RVVConfigurationInfo final {
   bool isModeChangeArtificial() const { return ArtificialModeChange; }
   const ModeChangeInfo &getModeChangeInfo() const { return SwitchInfo; }
 
+  const std::vector<RVVConfiguration> &getConfigs() const {
+    return CfgGen.elements();
+  }
+
   void print(raw_ostream &OS) const;
   void dump() const;
 
@@ -238,7 +244,6 @@ private:
   using ConfigGenerator = DiscreteGeneratorInfo<RVVConfiguration>;
   using VLGenerator = DiscreteGeneratorInfo<VLGeneratorHolder>;
   using VMGenerator = DiscreteGeneratorInfo<VMGeneratorHolder>;
-  using ModeGenerator = DiscreteGeneratorInfo<int>;
 
   RVVConfigurationInfo(unsigned VLEN, ConfigGenerator &&CfgGen,
                        VLGenerator &&VLGen, VMGenerator &&VMGen,

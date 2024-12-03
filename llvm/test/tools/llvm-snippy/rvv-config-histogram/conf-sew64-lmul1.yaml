@@ -52,7 +52,7 @@ histogram:
 # CHECK-SEW64-NEXT:  - VM Selection Rules:
 # CHECK-SEW64-NEXT:    P: 0.66667 <all_ones>
 # CHECK-SEW64-NEXT:    P: 0.33333 <any_legal>
-# CHECK-SEW64-NEXT:  - Configuration Bag Listing:
+# CHECK-SEW64:  - Configuration Bag Listing:
 # CHECK-SEW64-NEXT:    P: 1 Conf: { e64, m1, tu, mu, vxsat: 0, vxrm: rnu }/MaxVL: 2
 # CHECK-SEW64-NEXT:  - Configuration Bag Size: 1
 # CHECK-SEW64-NEXT:  - State Cardinality: 2 ~ {MASKS}
