@@ -28,7 +28,7 @@ bool checkMetadata(const MachineInstr &MI, StringRef MetaStr) {
   MDString *S = dyn_cast<MDString>(Node->getOperand(0));
   if (!S)
     return false;
-  return MetaStr.equals(S->getString());
+  return MetaStr == S->getString();
 }
 
 } // namespace detail

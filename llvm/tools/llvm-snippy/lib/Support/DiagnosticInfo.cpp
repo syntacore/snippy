@@ -65,9 +65,9 @@ void SnippyDiagnosticInfo::print(llvm::DiagnosticPrinter &DP) const {
 void handleDiagnostic(LLVMContext &Ctx, const SnippyDiagnosticInfo &Diag) {
   auto OldHandlerCallback = Ctx.getDiagnosticHandlerCallBack();
 
-  Ctx.setDiagnosticHandlerCallBack([](const DiagnosticInfo &Info, void *) {
+  Ctx.setDiagnosticHandlerCallBack([](const DiagnosticInfo *Info, void *) {
     HighlightColor Color = [&]() {
-      switch (Info.getSeverity()) {
+      switch (Info->getSeverity()) {
       case DS_Error:
         return HighlightColor::Error;
       case DS_Remark:
@@ -80,14 +80,14 @@ void handleDiagnostic(LLVMContext &Ctx, const SnippyDiagnosticInfo &Diag) {
     }();
 
     WithColor(errs(), Color)
-        << LLVMContext::getDiagnosticMessagePrefix(Info.getSeverity());
+        << LLVMContext::getDiagnosticMessagePrefix(Info->getSeverity());
 
     errs() << ": ";
 
     DiagnosticPrinterRawOStream DP(errs());
-    Info.print(DP);
+    Info->print(DP);
     errs() << "\n";
-    if (Info.getSeverity() == DS_Error)
+    if (Info->getSeverity() == DS_Error)
       exit(1);
   });
 
