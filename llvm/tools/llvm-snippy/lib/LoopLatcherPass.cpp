@@ -98,10 +98,10 @@ StringRef LoopLatcher::getPassName() const { return PASS_DESC " Pass"; }
 
 void LoopLatcher::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<GeneratorContextWrapper>();
-  AU.addRequired<MachineLoopInfo>();
+  AU.addRequired<MachineLoopInfoWrapperPass>();
   AU.addRequired<CFPermutation>();
-  AU.addRequired<MachineDominatorTree>();
-  AU.addRequired<MachinePostDominatorTree>();
+  AU.addRequired<MachineDominatorTreeWrapperPass>();
+  AU.addRequired<MachinePostDominatorTreeWrapperPass>();
   AU.addRequired<SimulatorContextWrapper>();
   AU.addRequired<RootRegPoolWrapper>();
   MachineFunctionPass::getAnalysisUsage(AU);
@@ -133,14 +133,14 @@ bool LoopLatcher::runOnMachineFunction(MachineFunction &MF) {
   LLVM_DEBUG(
       dbgs() << "MachineFunction at the start of llvm::snippy::LoopLatcher:\n";
       MF.dump());
-  auto &MLI = getAnalysis<MachineLoopInfo>();
+  auto &MLI = getAnalysis<MachineLoopInfoWrapperPass>().getLI();
   if (MLI.empty()) {
     LLVM_DEBUG(dbgs() << "No loops in function, exiting.\n");
     return false;
   }
 
   LLVM_DEBUG(dbgs() << "Machine Loop Info for this function:\n");
-  LLVM_DEBUG(MLI.getBase().print(dbgs()));
+  LLVM_DEBUG(MLI.print(dbgs()));
 
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto SimCtx = getAnalysis<SimulatorContextWrapper>()
@@ -214,8 +214,9 @@ auto LoopLatcher::selectRegsForBranch(const MCInstrDesc &BranchDesc,
     return Pos != ImmutableReg.end();
   };
 
-  auto &DomTree = getAnalysis<MachineDominatorTree>().getBase();
-  auto &PostDomTree = getAnalysis<MachinePostDominatorTree>().getBase();
+  auto &DomTree = getAnalysis<MachineDominatorTreeWrapperPass>().getDomTree();
+  auto &PostDomTree =
+      getAnalysis<MachinePostDominatorTreeWrapperPass>().getPostDomTree();
 
   assert(DomTree.dominates(&Preheader, &ExitingBlock));
   assert(PostDomTree.dominates(&ExitingBlock, &Preheader));
@@ -468,7 +469,7 @@ bool LoopLatcher::createLoopLatchFor(MachineLoop &ML, R &&ConsecutiveLoops) {
          "First consecutive loop must not have sub loop");
 
   auto &MF = *Preheader->getParent();
-  auto &MLI = getAnalysis<MachineLoopInfo>();
+  auto &MLI = getAnalysis<MachineLoopInfoWrapperPass>().getLI();
   for (auto &&BBNum : ConsecutiveLoops) {
     auto *ConsLoop = MLI.getLoopFor(MF.getBlockNumbered(BBNum));
     assert(ConsLoop);

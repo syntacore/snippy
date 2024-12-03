@@ -20,6 +20,7 @@
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCInst.h"
@@ -92,6 +93,7 @@ public:
     // if not empty. Default output section is ".text".
     if (!SectionName.empty())
       F->setSection(SectionName);
+    F->setDoesNotThrow();
     return *F;
   }
 

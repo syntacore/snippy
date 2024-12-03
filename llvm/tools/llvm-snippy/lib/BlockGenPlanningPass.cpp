@@ -90,7 +90,7 @@ char BlockGenPlanning::ID = 0;
 
 INITIALIZE_PASS_BEGIN(BlockGenPlanning, DEBUG_TYPE, PASS_DESC, false, true)
 INITIALIZE_PASS_DEPENDENCY(GeneratorContextWrapper)
-INITIALIZE_PASS_DEPENDENCY(MachineLoopInfo)
+INITIALIZE_PASS_DEPENDENCY(MachineLoopInfoWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(BlockGenPlanWrapper)
 INITIALIZE_PASS_DEPENDENCY(FunctionGenerator)
 INITIALIZE_PASS_END(BlockGenPlanning, DEBUG_TYPE, PASS_DESC, false, true)
@@ -109,7 +109,7 @@ void BlockGenPlanning::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesAll();
   AU.addRequired<GeneratorContextWrapper>();
   AU.addRequired<SimulatorContextWrapper>();
-  AU.addRequired<MachineLoopInfo>();
+  AU.addRequired<MachineLoopInfoWrapperPass>();
   AU.addRequired<BlockGenPlanWrapper>();
   AU.addRequired<FunctionGenerator>();
   MachineFunctionPass::getAnalysisUsage(AU);
@@ -822,7 +822,7 @@ BlockGenPlanning::get(const MachineBasicBlock &MBB) const {
 
 bool BlockGenPlanning::runOnMachineFunction(MachineFunction &MF) {
   auto *GenCtx = &getAnalysis<GeneratorContextWrapper>().getContext();
-  auto *MLI = &getAnalysis<MachineLoopInfo>();
+  auto *MLI = &getAnalysis<MachineLoopInfoWrapperPass>().getLI();
   auto *GenPlanWrapper = &getAnalysis<BlockGenPlanWrapper>();
   auto *FG = &getAnalysis<FunctionGenerator>();
   auto SimCtx = getAnalysis<SimulatorContextWrapper>()
