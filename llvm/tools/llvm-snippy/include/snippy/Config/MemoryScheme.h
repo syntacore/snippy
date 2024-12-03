@@ -625,14 +625,14 @@ struct SectionsDescriptions : private std::vector<SectionDesc> {
   }
   bool hasSection(StringRef Name) const {
     return std::any_of(begin(), end(), [Name](auto &S) {
-      return S.isNamed() && Name.equals(S.getName());
+      return S.isNamed() && Name == S.getName();
     });
   }
 
   auto &getSection(StringRef Name) const {
     assert(hasSection(Name) && "No section with given name");
     auto Found = std::find_if(begin(), end(), [Name](auto &S) {
-      return S.isNamed() && Name.equals(S.getName());
+      return S.isNamed() && Name == S.getName();
     });
     return *Found;
   }
@@ -640,7 +640,7 @@ struct SectionsDescriptions : private std::vector<SectionDesc> {
   auto &getSection(StringRef Name) {
     assert(hasSection(Name) && "No section with given name");
     auto Found = std::find_if(begin(), end(), [Name](auto &S) {
-      return S.isNamed() && Name.equals(S.getName());
+      return S.isNamed() && Name == S.getName();
     });
     return *Found;
   }

@@ -18,6 +18,7 @@
 
 #include "LLVMState.h"
 #include "snippy/Config/MemoryScheme.h"
+#include "llvm/IR/Module.h"
 
 namespace llvm {
 
