@@ -47,7 +47,7 @@ histogram:
 # CHECK-DEFAULT-NEXT:   - VM Selection Rules:
 # CHECK-DEFAULT-NEXT:     P: 0.66667 <all_ones>
 # CHECK-DEFAULT-NEXT:     P: 0.33333 <any_legal>
-# CHECK-DEFAULT-NEXT:  - Configuration Bag Listing:
+# CHECK-DEFAULT:  - Configuration Bag Listing:
 # CHECK-DEFAULT-NEXT:    P: 1 Conf: { e8, m4, tu, mu, vxsat: 0, vxrm: rnu }/MaxVL: 32768
 # CHECK-DEFAULT-NEXT:  - Configuration Bag Size: 1
 # CHECK-DEFAULT-NEXT:  - State Cardinality: 32768 ~ {MASKS}
@@ -65,7 +65,7 @@ histogram:
 # CHECK-VLEN512-NEXT:  - VM Selection Rules:
 # CHECK-VLEN512-NEXT:    P: 0.66667 <all_ones>
 # CHECK-VLEN512-NEXT:    P: 0.33333 <any_legal>
-# CHECK-VLEN512-NEXT:  - Configuration Bag Listing:
+# CHECK-VLEN512:  - Configuration Bag Listing:
 # CHECK-VLEN512-NEXT:    P: 1 Conf: { e8, m4, tu, mu, vxsat: 0, vxrm: rnu }/MaxVL: 256
 # CHECK-VLEN512-NEXT:  - Configuration Bag Size: 1
 # CHECK-VLEN512-NEXT:  - State Cardinality: 256 ~ {MASKS}
