@@ -66,7 +66,7 @@ void InstructionGenerator::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<GeneratorContextWrapper>();
   AU.addRequired<SnippyFunctionMetadataWrapper>();
   AU.addRequired<SimulatorContextWrapper>();
-  AU.addRequired<MachineLoopInfo>();
+  AU.addRequired<MachineLoopInfoWrapperPass>();
   AU.addRequired<FunctionGenerator>();
   AU.addRequired<BlockGenPlanWrapper>();
   AU.addRequired<LoopLatcher>();
@@ -235,7 +235,7 @@ bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
 
   auto FunctionGenRequest = createMFGenerationRequest(MF);
   generate(FunctionGenRequest, MF, *SGCtx, SimCtx,
-           &getAnalysis<MachineLoopInfo>(),
+           &getAnalysis<MachineLoopInfoWrapperPass>().getLI(),
            getAnalysis<FunctionGenerator>().getCallGraphState(),
            &get<MemAccessInfo>(MF),
            &getAnalysis<LoopLatcher>().get<SnippyLoopInfo>(MF),

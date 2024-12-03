@@ -503,7 +503,7 @@ std::optional<unsigned> findRegisterByName(const SnippyTarget &SnippyTgt,
                                            StringRef Name) {
   for (auto &RC : RI.regclasses()) {
     auto RegIdx = std::find_if(RC.begin(), RC.end(), [&Name, &RI](auto &Reg) {
-      return Name.equals(RI.getName(Reg));
+      return Name == RI.getName(Reg);
     });
     if (RegIdx != RC.end())
       return *RegIdx;

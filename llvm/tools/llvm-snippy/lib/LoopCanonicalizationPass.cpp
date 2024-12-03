@@ -69,7 +69,7 @@ public:
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<GeneratorContextWrapper>();
     AU.addRequired<SimulatorContextWrapper>();
-    AU.addRequired<MachineLoopInfo>();
+    AU.addRequired<MachineLoopInfoWrapperPass>();
     AU.addRequired<CFPermutation>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
@@ -88,7 +88,7 @@ using llvm::snippy::LoopCanonicalization;
 
 INITIALIZE_PASS_BEGIN(LoopCanonicalization, DEBUG_TYPE, PASS_DESC, false, false)
 INITIALIZE_PASS_DEPENDENCY(GeneratorContextWrapper)
-INITIALIZE_PASS_DEPENDENCY(MachineLoopInfo)
+INITIALIZE_PASS_DEPENDENCY(MachineLoopInfoWrapperPass)
 INITIALIZE_PASS_END(LoopCanonicalization, DEBUG_TYPE, PASS_DESC, false, false)
 
 namespace llvm {
@@ -109,11 +109,11 @@ bool LoopCanonicalization::runOnMachineFunction(MachineFunction &MF) {
   auto SimCtx = getAnalysis<SimulatorContextWrapper>()
                     .get<OwningSimulatorContext>()
                     .get();
-  auto &MLI = getAnalysis<MachineLoopInfo>();
+  auto &MLI = getAnalysis<MachineLoopInfoWrapperPass>().getLI();
   [[maybe_unused]] auto &CLI =
       getAnalysis<CFPermutation>().get<ConsecutiveLoopInfo>(MF);
   LLVM_DEBUG(dbgs() << "Machine Loop Info for this function:\n");
-  LLVM_DEBUG(MLI.getBase().print(dbgs()));
+  LLVM_DEBUG(MLI.print(dbgs()));
   LLVM_DEBUG(dbgs() << "Consecutive loops:\n");
   LLVM_DEBUG(for_each(CLI.getConsecutiveLoops(), [](auto &CLEntry) {
     dbgs() << CLEntry.first << ":";
@@ -169,7 +169,7 @@ void LoopCanonicalization::createPreheader(MachineBasicBlock &Header,
   auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
   const auto &State = GC.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
-  const auto &MLI = getAnalysis<MachineLoopInfo>();
+  const auto &MLI = getAnalysis<MachineLoopInfoWrapperPass>().getLI();
   const auto *ML = MLI[&Header];
   assert(ML);
   assert(ML->getHeader() == &Header && "Loop header expected");
@@ -286,7 +286,7 @@ bool LoopCanonicalization::makeLatchUnconditional(MachineLoop &ML,
   assert(Header && "Loop is expected to have header");
 
   auto *NewLatch = splitEdge(*Latch, *Header);
-  ML.addBasicBlockToLoop(NewLatch, MLI.getBase());
+  ML.addBasicBlockToLoop(NewLatch, MLI);
   return true;
 }
 
