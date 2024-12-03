@@ -40,7 +40,7 @@ struct LoopAlignment final : public MachineFunctionPass {
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<GeneratorContextWrapper>();
-    AU.addRequired<MachineLoopInfo>();
+    AU.addRequired<MachineLoopInfoWrapperPass>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 };
@@ -70,7 +70,7 @@ bool LoopAlignment::runOnMachineFunction(MachineFunction &MF) {
                       .getGenSettings()
                       .Cfg.Branches.Alignment);
 
-  auto &MLI = getAnalysis<MachineLoopInfo>();
+  auto &MLI = getAnalysis<MachineLoopInfoWrapperPass>().getLI();
   for (auto *ML : MLI) {
     auto *Header = ML->getHeader();
     assert(Header && "Loop must have header");

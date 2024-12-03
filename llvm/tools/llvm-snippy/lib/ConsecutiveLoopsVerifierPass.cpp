@@ -33,7 +33,7 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<GeneratorContextWrapper>();
-    AU.addRequired<MachineLoopInfo>();
+    AU.addRequired<MachineLoopInfoWrapperPass>();
     AU.addRequired<CFPermutation>();
     AU.setPreservesAll();
     MachineFunctionPass::getAnalysisUsage(AU);
@@ -54,7 +54,7 @@ using llvm::snippy::ConsecutiveLoopsVerifier;
 INITIALIZE_PASS_BEGIN(ConsecutiveLoopsVerifier, DEBUG_TYPE, PASS_DESC, true,
                       true)
 INITIALIZE_PASS_DEPENDENCY(GeneratorContextWrapper)
-INITIALIZE_PASS_DEPENDENCY(MachineLoopInfo)
+INITIALIZE_PASS_DEPENDENCY(MachineLoopInfoWrapperPass)
 INITIALIZE_PASS_END(ConsecutiveLoopsVerifier, DEBUG_TYPE, PASS_DESC, true, true)
 
 namespace llvm {
@@ -81,7 +81,7 @@ bool ConsecutiveLoopsVerifier::runOnMachineFunction(MachineFunction &MF) {
     return false;
   }
 
-  auto &MLI = getAnalysis<MachineLoopInfo>();
+  auto &MLI = getAnalysis<MachineLoopInfoWrapperPass>().getLI();
   // Check max depth == 1
   if (any_of(MF, [&MLI](auto &MBB) { return MLI.getLoopDepth(&MBB) > 1; }))
     fatal(Ctx, PASS_DESC,
