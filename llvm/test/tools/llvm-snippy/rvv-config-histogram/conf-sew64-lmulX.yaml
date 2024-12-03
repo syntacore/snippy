@@ -53,7 +53,7 @@ histogram:
 # CHECK-SEW64-LMULX-VLMAX1-DISABLED-NEXT:  - VM Selection Rules:
 # CHECK-SEW64-LMULX-VLMAX1-DISABLED-NEXT:    P: 0.66667 <all_ones>
 # CHECK-SEW64-LMULX-VLMAX1-DISABLED-NEXT:    P: 0.33333 <any_legal>
-# CHECK-SEW64-LMULX-VLMAX1-DISABLED-NEXT:  - Configuration Bag Listing:
+# CHECK-SEW64-LMULX-VLMAX1-DISABLED:  - Configuration Bag Listing:
 # CHECK-SEW64-LMULX-VLMAX1-DISABLED-NEXT:    P: 0.25 Conf: { e64, m1, tu, mu, vxsat: 0, vxrm: rnu }/MaxVL: 2
 # CHECK-SEW64-LMULX-VLMAX1-DISABLED-NEXT:    P: 0.25 Conf: { e64, m2, tu, mu, vxsat: 0, vxrm: rnu }/MaxVL: 4
 # CHECK-SEW64-LMULX-VLMAX1-DISABLED-NEXT:    P: 0.25 Conf: { e64, m4, tu, mu, vxsat: 0, vxrm: rnu }/MaxVL: 8
@@ -73,7 +73,7 @@ histogram:
 # CHECK-SEW64-LMULX-VLMAX1-ENABLED-NEXT:  - VM Selection Rules:
 # CHECK-SEW64-LMULX-VLMAX1-ENABLED-NEXT:    P: 0.66667 <all_ones>
 # CHECK-SEW64-LMULX-VLMAX1-ENABLED-NEXT:    P: 0.33333 <any_legal>
-# CHECK-SEW64-LMULX-VLMAX1-ENABLED-NEXT:  - Configuration Bag Listing:
+# CHECK-SEW64-LMULX-VLMAX1-ENABLED:  - Configuration Bag Listing:
 # CHECK-SEW64-LMULX-VLMAX1-ENABLED-NEXT:    P: 0.22222 Conf: { e64, m1, tu, mu, vxsat: 0, vxrm: rnu }/MaxVL: 2
 # CHECK-SEW64-LMULX-VLMAX1-ENABLED-NEXT:    P: 0.22222 Conf: { e64, m2, tu, mu, vxsat: 0, vxrm: rnu }/MaxVL: 4
 # CHECK-SEW64-LMULX-VLMAX1-ENABLED-NEXT:    P: 0.22222 Conf: { e64, m4, tu, mu, vxsat: 0, vxrm: rnu }/MaxVL: 8
