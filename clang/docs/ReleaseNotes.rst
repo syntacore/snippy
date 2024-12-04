@@ -147,7 +147,7 @@ Clang Frontend Potentially Breaking Changes
   that ``none`` means that there is no operating system. As opposed to an unknown
   type of operating system.
 
-  This change my cause clang to not find libraries, or libraries to be built at
+  This change can cause clang to not find libraries, or libraries to be built at
   different file system locations. This can be fixed by changing your builds to
   use the new normalized triple. However, we recommend instead getting the
   normalized triple from clang itself, as this will make your builds more
@@ -447,6 +447,10 @@ Non-comprehensive list of changes in this release
   type of the pointer was taken into account. This improves
   compatibility with GCC's libstdc++.
 
+- The type traits builtin ``__is_nullptr`` is deprecated in CLang 19 and will be
+  removed in Clang 20. ``__is_same(__remove_cv(T), decltype(nullptr))`` can be
+  used instead to check whether a type ``T`` is a ``nullptr``.
+
 New Compiler Flags
 ------------------
 - ``-fsanitize=implicit-bitfield-conversion`` checks implicit truncation and
@@ -629,6 +633,9 @@ Attribute Changes in Clang
   The attributes declare constraints about a function's behavior pertaining to blocking and
   heap memory allocation.
 
+- The ``hybrid_patchable`` attribute is now supported on ARM64EC targets. It can be used to specify
+  that a function requires an additional x86-64 thunk, which may be patched at runtime.
+
 Improvements to Clang's diagnostics
 -----------------------------------
 - Clang now emits an error instead of a warning for ``-Wundefined-internal``
@@ -751,7 +758,7 @@ Improvements to Clang's diagnostics
 
 - Clang now diagnoses dangling assignments for pointer-like objects (annotated with `[[gsl::Pointer]]`) under `-Wdangling-assignment-gsl` (off by default)
   Fixes #GH63310.
-  
+
 - Clang now diagnoses uses of alias templates with a deprecated attribute. (Fixes #GH18236).
 
   .. code-block:: c++
@@ -764,6 +771,11 @@ Improvements to Clang's diagnostics
      using UsingWithAttr __attribute__((deprecated)) = NoAttr<T>;
 
      UsingWithAttr<int> objUsingWA; // warning: 'UsingWithAttr' is deprecated
+
+- Clang now diagnoses undefined behavior in constant expressions more consistently. This includes invalid shifts, and signed overflow in arithmetic.
+
+- Clang now diagnoses dangling references to fields of temporary objects. Fixes #GH81589.
+
 
 Improvements to Clang's time-trace
 ----------------------------------
@@ -890,6 +902,9 @@ Bug Fixes in This Version
 
 - Fixed an assertion failure when a template non-type parameter contains
   an invalid expression.
+
+- Fixed the definition of ``ATOMIC_FLAG_INIT`` in ``<stdatomic.h>`` so it can
+  be used in C++.
 
 Bug Fixes to Compiler Builtins
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1106,6 +1121,9 @@ Bug Fixes to C++ Support
   Fixes (#GH85992).
 - Fixed a crash-on-invalid bug involving extraneous template parameter with concept substitution. (#GH73885)
 - Fixed assertion failure by skipping the analysis of an invalid field declaration. (#GH99868)
+- Fix an issue with dependent source location expressions (#GH106428), (#GH81155), (#GH80210), (#GH85373)
+- Fix handling of ``_`` as the name of a lambda's init capture variable. (#GH107024)
+
 
 Bug Fixes to AST Handling
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1176,11 +1194,13 @@ Arm and AArch64 Support
   improvements for most targets. We have not changed the default behavior for
   ARMv6, but may revisit that decision in the future. Users can restore the old
   behavior with -m[no-]unaligned-access.
+
 - An alias identifier (rdma) has been added for targeting the AArch64
   Architecture Extension which uses Rounding Doubling Multiply Accumulate
   instructions (rdm). The identifier is available on the command line as
   a feature modifier for -march and -mcpu as well as via target attributes
   like ``target_version`` or ``target_clones``.
+
 - Support has been added for the following processors (-mcpu identifiers in parenthesis):
     * Arm Cortex-R52+ (cortex-r52plus).
     * Arm Cortex-R82AE (cortex-r82ae).
@@ -1192,6 +1212,20 @@ Arm and AArch64 Support
     * Arm Neoverse-N3 (neoverse-n3).
     * Arm Neoverse-V3 (neoverse-v3).
     * Arm Neoverse-V3AE (neoverse-v3ae).
+- ``-mbranch-protection=gcs`` has been added which enables support for the
+  Guarded Control Stack extension, and ``-mbranch-protection=standard`` also
+  enables this. Enabling GCS causes the GCS GNU property bit to be set on output
+  objects. It doesn't cause any code generation changes, as the code generated
+  by clang is already compatible with GCS.
+
+ - Experimental support has been added for pointer authentication ABI for С/C++.
+
+ - Pointer authentication ABI could be enabled for AArch64 Linux via
+   ``-mabi=pauthtest`` option or via specifying ``pauthtest`` environment part of
+   target triple.
+
+ - The C23 ``_BitInt`` implementation has been brought into compliance
+   with AAPCS32 and AAPCS64.
 
 Android Support
 ^^^^^^^^^^^^^^^
@@ -1248,6 +1282,14 @@ RISC-V Support
   accesses may be created. ``-m[no-]strict-align`` applies to both scalar and
   vector.
 
+PowerPC Support
+^^^^^^^^^^^^^^^
+
+- Clang now emits errors for impossible ``__attribute__((musttail))``.
+- Added support for ``-mcpu=[pwr11 | power11]`` and ``-mtune=[pwr11 | power11]``.
+- Added support for ``builtin_cpu_supports`` on AIX, along with a subset of
+  features that can be queried.
+
 CUDA/HIP Language Changes
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -1266,6 +1308,14 @@ AIX Support
   base is encoded as an immediate operand.
   This access sequence is not used for TLS variables larger than 32KB, and is
   currently only supported on 64-bit mode.
+- Introduced the options ``-mtocdata/-mno-tocdata`` to enable/disable TOC data
+  transformations for the listed suitable variables.
+- Introduced the ``-maix-shared-lib-tls-model-opt`` option to enable the tuning
+  of changing local-dynamic mode access(es) to initial-exec access(es) at the
+  function level on 64-bit mode.
+- Clang now emits errors for ``-gdwarf-5``.
+- Added the support of the OpenMP runtime libomp on AIX. OpenMP applications can be
+  compiled with ``-fopenmp`` and execute on AIX.
 
 NetBSD Support
 ^^^^^^^^^^^^^^
@@ -1357,8 +1407,16 @@ Crash and bug fixes
 - Fixed a crash when storing through an address that refers to the address of
   a label. (#GH89185)
 
+- Fixed a crash when using ``__builtin_bitcast(type, array)`` as an array
+  subscript. (#GH94496)
+
 - Z3 crosschecking (aka. Z3 refutation) is now bounded, and can't consume
   more total time than the eymbolic execution itself. (#GH97298)
+
+- In clang-18, we regressed in terms of analysis time for projects having many
+  nested loops with buffer indexing or shifting or other binary operations.
+  For example, functions computing different hash values. Some of this slowdown
+  was attributed to taint analysis, which is fixed now. (#GH105493)
 
 - ``std::addressof``, ``std::as_const``, ``std::forward``,
   ``std::forward_like``, ``std::move``, ``std::move_if_noexcept``, are now
@@ -1420,6 +1478,7 @@ OpenMP Support
 --------------
 
 - Added support for the `[[omp::assume]]` attribute.
+- AIX added an include directory for ``omp.h`` at ``/opt/IBM/openxlCSDK/include/openmp``.
 
 Additional Information
 ======================

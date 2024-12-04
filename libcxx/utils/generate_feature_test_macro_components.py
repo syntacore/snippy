@@ -991,7 +991,8 @@ feature_test_macros = [
         {
             "name": "__cpp_lib_ranges",
             "values": {
-                "c++20": 202207,
+                "c++20": 202110, # P2415R2 What is a view?
+                "c++23": 202211,  # P2602R2 Poison Pills are Too Toxic
                 # "c++23": 202302,  # Relaxing Ranges Just A Smidge
                 # "c++26": 202406,  # P2997R1 Removing the common reference requirement from the indirectly invocable concepts (already implemented as a DR)
             },
@@ -1302,8 +1303,7 @@ feature_test_macros = [
         },
         {
             "name": "__cpp_lib_three_way_comparison",
-            "values": {"c++20": 201711},
-            # {"c++20": 201907} # P1614R2 The Mothership has Landed (see P1902R1 Missing feature-test macros 2017-2019)
+            "values": {"c++20": 201907},
             "headers": ["compare"],
         },
         {

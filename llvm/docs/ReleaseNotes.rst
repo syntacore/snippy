@@ -42,6 +42,10 @@ Non-comprehensive list of changes in this release
    functionality, or simply have a lot to talk about), see the `NOTE` below
    for adding a new subsection.
 
+* Starting with LLVM 19, the Windows installers only include support for the
+  X86, ARM, and AArch64 targets in order to keep the build size within the
+  limits of the NSIS installer framework.
+
 * ...
 
 Update on required toolchains to build LLVM
@@ -80,6 +84,11 @@ Changes to the LLVM IR
     removed. The next argument has been changed from byte index to bit
     index.
 * Added ``llvm.experimental.vector.compress`` intrinsic.
+* Added special kind of `constant expressions
+  <https://llvm.org/docs/LangRef.html#pointer-authentication-constants>`_ to
+  represent pointers with signature embedded into it.
+* Added `pointer authentication operand bundles
+  <https://llvm.org/docs/LangRef.html#pointer-authentication-operand-bundles>`_. 
 
 Changes to LLVM infrastructure
 ------------------------------
@@ -108,6 +117,8 @@ Changes to TableGen
 Changes to Interprocedural Optimizations
 ----------------------------------------
 
+* Hot cold region splitting analysis improvements for overlapping cold regions.
+
 Changes to the AArch64 Backend
 ------------------------------
 
@@ -125,6 +136,15 @@ Changes to the AArch64 Backend
   when specified via ``-march=`` or an ``-mcpu=`` that supports them.  The
   attribute ``"target-features"="+v9a"`` no longer implies ``"+sve"`` and
   ``"+sve2"`` respectively.
+* Added support for ELF pointer authentication relocations as specified in
+  `PAuth ABI Extension to ELF
+  <https://github.com/ARM-software/abi-aa/blob/main/pauthabielf64/pauthabielf64.rst>`_.
+* Added codegeneration, ELF object file and linker support for authenticated
+  call lowering, signed constants and emission of signing scheme details in
+  ``GNU_PROPERTY_AARCH64_FEATURE_PAUTH`` property of ``.note.gnu.property``
+  section.
+* Added codegeneration support for ``llvm.ptrauth.auth`` and
+  ``llvm.ptrauth.resign`` intrinsics.
 
 Changes to the AMDGPU Backend
 -----------------------------
@@ -179,6 +199,16 @@ Changes to the MIPS Backend
 
 Changes to the PowerPC Backend
 ------------------------------
+
+* PPC big-endian Linux now supports ``-fpatchable-function-entry``.
+* PPC AIX now supports local-dynamic TLS mode.
+* PPC AIX saves the Git revision in binaries when built with LLVM_APPEND_VC_REV=ON.
+* PPC AIX now supports toc-data attribute for large code model.
+* PPC AIX now supports passing arguments by value having greater alignment than
+  the pointer size. Currently only compatible with the IBM XL C compiler.
+* Add support for the per global code model attribute on AIX.
+* Support spilling non-volatile registers for traceback table accuracy on AIX.
+* Codegen improvements and bug fixes.
 
 Changes to the RISC-V Backend
 -----------------------------
@@ -421,6 +451,8 @@ Changes to the LLVM tools
 * llvm-objcopy now verifies format of ``.note`` sections for ELF input. This can
   be disabled by ``--no-verify-note-sections``. (`#90458
   <https://github.com/llvm/llvm-project/pull/90458>`).
+
+* llvm-objdump now supports the ``--file-headers`` option for XCOFF object files.
 
 Changes to LLDB
 ---------------------------------

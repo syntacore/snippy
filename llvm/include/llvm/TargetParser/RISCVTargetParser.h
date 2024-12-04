@@ -70,7 +70,10 @@ enum {
 namespace RISCVVType {
 // Is this a SEW value that can be encoded into the VTYPE format.
 inline static bool isValidSEW(unsigned SEW) {
-  return isPowerOf2_32(SEW) && SEW >= 8 && SEW <= 64;
+  // We set the max SEW to 1024 for the sake of llvm-snippy (instead of 64 that
+  // is chosen in upstream LLVM and is in general allowed in allording to the
+  // SPEC).
+  return isPowerOf2_32(SEW) && SEW >= 8 && SEW <= 1024;
 }
 
 // Is this a LMUL value that can be encoded into the VTYPE format.

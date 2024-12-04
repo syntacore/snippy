@@ -341,6 +341,9 @@ bool PEI::runOnMachineFunction(MachineFunction &MF) {
            << ore::NV("Function", MF.getFunction().getName()) << "'";
   });
 
+  // Emit any remarks implemented for the target, based on final frame layout.
+  TFI->emitRemarks(MF, ORE);
+
   delete RS;
   SaveBlocks.clear();
   RestoreBlocks.clear();
@@ -366,8 +369,8 @@ void PEI::calculateCallFrameInfo(MachineFunction &MF) {
     return;
 
   // (Re-)Compute the MaxCallFrameSize.
-  [[maybe_unused]] uint32_t MaxCFSIn =
-      MFI.isMaxCallFrameSizeComputed() ? MFI.getMaxCallFrameSize() : UINT32_MAX;
+  [[maybe_unused]] uint64_t MaxCFSIn =
+      MFI.isMaxCallFrameSizeComputed() ? MFI.getMaxCallFrameSize() : UINT64_MAX;
   std::vector<MachineBasicBlock::iterator> FrameSDOps;
   MFI.computeMaxCallFrameSize(MF, &FrameSDOps);
   assert(MFI.getMaxCallFrameSize() <= MaxCFSIn &&
