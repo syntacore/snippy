@@ -139,7 +139,7 @@ bool SourceCoverageView::shouldRenderRegionMarkers(
 
 bool SourceCoverageView::hasSubViews() const {
   return !ExpansionSubViews.empty() || !InstantiationSubViews.empty() ||
-         !BranchSubViews.empty() || !MCDCSubViews.empty();
+         !BranchSubViews.empty();
 }
 
 std::unique_ptr<SourceCoverageView>

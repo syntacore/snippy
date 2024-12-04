@@ -657,12 +657,11 @@ Value *Lint::findValueImpl(Value *V, bool OffsetOk,
     BasicBlock::iterator BBI = L->getIterator();
     BasicBlock *BB = L->getParent();
     SmallPtrSet<BasicBlock *, 4> VisitedBlocks;
-    BatchAAResults BatchAA(*AA);
     for (;;) {
       if (!VisitedBlocks.insert(BB).second)
         break;
       if (Value *U =
-              FindAvailableLoadedValue(L, BB, BBI, DefMaxInstsToScan, &BatchAA))
+              FindAvailableLoadedValue(L, BB, BBI, DefMaxInstsToScan, AA))
         return findValueImpl(U, OffsetOk, Visited);
       if (BBI != BB->begin())
         break;

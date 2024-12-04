@@ -26,16 +26,7 @@
 namespace llvm {
 namespace object {
 
-constexpr std::string_view ImportDescriptorPrefix = "__IMPORT_DESCRIPTOR_";
-constexpr std::string_view NullImportDescriptorSymbolName =
-    "__NULL_IMPORT_DESCRIPTOR";
-constexpr std::string_view NullThunkDataPrefix = "\x7f";
-constexpr std::string_view NullThunkDataSuffix = "_NULL_THUNK_DATA";
-
 class COFFImportFile : public SymbolicFile {
-private:
-  enum SymbolIndex { ImpSymbol, ThunkSymbol, ECAuxSymbol, ECThunkSymbol };
-
 public:
   COFFImportFile(MemoryBufferRef Source)
       : SymbolicFile(ID_COFFImportFile, Source) {}
@@ -45,23 +36,9 @@ public:
   void moveSymbolNext(DataRefImpl &Symb) const override { ++Symb.p; }
 
   Error printSymbolName(raw_ostream &OS, DataRefImpl Symb) const override {
-    switch (Symb.p) {
-    case ImpSymbol:
+    if (Symb.p == 0)
       OS << "__imp_";
-      break;
-    case ECAuxSymbol:
-      OS << "__imp_aux_";
-      break;
-    }
-    const char *Name = Data.getBufferStart() + sizeof(coff_import_header);
-    if (Symb.p != ECThunkSymbol && COFF::isArm64EC(getMachine())) {
-      if (std::optional<std::string> DemangledName =
-              getArm64ECDemangledFunctionName(Name)) {
-        OS << StringRef(*DemangledName);
-        return Error::success();
-      }
-    }
-    OS << StringRef(Name);
+    OS << StringRef(Data.getBufferStart() + sizeof(coff_import_header));
     return Error::success();
   }
 
@@ -75,12 +52,7 @@ public:
 
   basic_symbol_iterator symbol_end() const override {
     DataRefImpl Symb;
-    if (isData())
-      Symb.p = ImpSymbol + 1;
-    else if (COFF::isArm64EC(getMachine()))
-      Symb.p = ECThunkSymbol + 1;
-    else
-      Symb.p = ThunkSymbol + 1;
+    Symb.p = isData() ? 1 : 2;
     return BasicSymbolRef(Symb, this);
   }
 
@@ -94,7 +66,6 @@ public:
   uint16_t getMachine() const { return getCOFFImportHeader()->Machine; }
 
   StringRef getFileFormatName() const;
-  StringRef getExportName() const;
 
 private:
   bool isData() const {

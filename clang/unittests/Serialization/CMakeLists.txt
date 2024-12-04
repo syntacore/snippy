@@ -10,7 +10,6 @@ add_clang_unittest(SerializationTests
   InMemoryModuleCacheTest.cpp
   ModuleCacheTest.cpp
   NoCommentsTest.cpp
-  PreambleInNamedModulesTest.cpp
   SourceLocationEncodingTest.cpp
   VarDeclConstantInitTest.cpp
   )

@@ -3192,8 +3192,7 @@ static std::optional<uint64_t> getExactInteger(const APFloat &APF,
 // Note that this method will also match potentially unappealing index
 // sequences, like <i32 0, i32 50939494>, however it is left to the caller to
 // determine whether this is worth generating code for.
-static std::optional<VIDSequence> isSimpleVIDSequence(SDValue Op,
-                                                      unsigned EltSizeInBits) {
+static std::optional<VIDSequence> isSimpleVIDSequence(SDValue Op) {
   unsigned NumElts = Op.getNumOperands();
   assert(Op.getOpcode() == ISD::BUILD_VECTOR && "Unexpected BUILD_VECTOR");
   bool IsInteger = Op.getValueType().isInteger();
@@ -3201,7 +3200,7 @@ static std::optional<VIDSequence> isSimpleVIDSequence(SDValue Op,
   std::optional<unsigned> SeqStepDenom;
   std::optional<int64_t> SeqStepNum, SeqAddend;
   std::optional<std::pair<uint64_t, unsigned>> PrevElt;
-  assert(EltSizeInBits >= Op.getValueType().getScalarSizeInBits());
+  unsigned EltSizeInBits = Op.getValueType().getScalarSizeInBits();
   for (unsigned Idx = 0; Idx < NumElts; Idx++) {
     // Assume undef elements match the sequence; we just have to be careful
     // when interpolating across them.
@@ -3214,14 +3213,14 @@ static std::optional<VIDSequence> isSimpleVIDSequence(SDValue Op,
       if (!isa<ConstantSDNode>(Op.getOperand(Idx)))
         return std::nullopt;
       Val = Op.getConstantOperandVal(Idx) &
-            maskTrailingOnes<uint64_t>(Op.getScalarValueSizeInBits());
+            maskTrailingOnes<uint64_t>(EltSizeInBits);
     } else {
       // The BUILD_VECTOR must be all constants.
       if (!isa<ConstantFPSDNode>(Op.getOperand(Idx)))
         return std::nullopt;
       if (auto ExactInteger = getExactInteger(
               cast<ConstantFPSDNode>(Op.getOperand(Idx))->getValueAPF(),
-              Op.getScalarValueSizeInBits()))
+              EltSizeInBits))
         Val = *ExactInteger;
       else
         return std::nullopt;
@@ -3277,11 +3276,11 @@ static std::optional<VIDSequence> isSimpleVIDSequence(SDValue Op,
     uint64_t Val;
     if (IsInteger) {
       Val = Op.getConstantOperandVal(Idx) &
-            maskTrailingOnes<uint64_t>(Op.getScalarValueSizeInBits());
+            maskTrailingOnes<uint64_t>(EltSizeInBits);
     } else {
       Val = *getExactInteger(
           cast<ConstantFPSDNode>(Op.getOperand(Idx))->getValueAPF(),
-          Op.getScalarValueSizeInBits());
+          EltSizeInBits);
     }
     uint64_t ExpectedVal =
         (int64_t)(Idx * (uint64_t)*SeqStepNum) / *SeqStepDenom;
@@ -3551,7 +3550,7 @@ static SDValue lowerBuildVectorOfConstants(SDValue Op, SelectionDAG &DAG,
   // Try and match index sequences, which we can lower to the vid instruction
   // with optional modifications. An all-undef vector is matched by
   // getSplatValue, above.
-  if (auto SimpleVID = isSimpleVIDSequence(Op, Op.getScalarValueSizeInBits())) {
+  if (auto SimpleVID = isSimpleVIDSequence(Op)) {
     int64_t StepNumerator = SimpleVID->StepNumerator;
     unsigned StepDenominator = SimpleVID->StepDenominator;
     int64_t Addend = SimpleVID->Addend;
@@ -4719,7 +4718,7 @@ static SDValue lowerShuffleViaVRegSplitting(ShuffleVectorSDNode *SVN,
     if (SrcVecIdx == -1)
       continue;
     unsigned ExtractIdx = (SrcVecIdx % VRegsPerSrc) * NumOpElts;
-    SDValue SrcVec = (unsigned)SrcVecIdx >= VRegsPerSrc ? V2 : V1;
+    SDValue SrcVec = (unsigned)SrcVecIdx > VRegsPerSrc ? V2 : V1;
     SDValue SubVec = DAG.getNode(ISD::EXTRACT_SUBVECTOR, DL, M1VT, SrcVec,
                                  DAG.getVectorIdxConstant(ExtractIdx, DL));
     SubVec = convertFromScalableVector(OneRegVT, SubVec, DAG, Subtarget);
@@ -5034,56 +5033,60 @@ static SDValue lowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG,
   MVT IndexContainerVT =
       ContainerVT.changeVectorElementType(IndexVT.getScalarType());
 
-  SDValue Gather;
-  // TODO: This doesn't trigger for i64 vectors on RV32, since there we
-  // encounter a bitcasted BUILD_VECTOR with low/high i32 values.
-  if (SDValue SplatValue = DAG.getSplatValue(V1, /*LegalTypes*/ true)) {
-    Gather = lowerScalarSplat(SDValue(), SplatValue, VL, ContainerVT, DL, DAG,
-                              Subtarget);
-  } else {
+  // Base case for the recursion just below - handle the worst case
+  // single source permutation.  Note that all the splat variants
+  // are handled above.
+  if (V2.isUndef()) {
     V1 = convertToScalableVector(ContainerVT, V1, DAG, Subtarget);
-    // If only one index is used, we can use a "splat" vrgather.
-    // TODO: We can splat the most-common index and fix-up any stragglers, if
-    // that's beneficial.
-    if (LHSIndexCounts.size() == 1) {
-      int SplatIndex = LHSIndexCounts.begin()->getFirst();
-      Gather = DAG.getNode(GatherVXOpc, DL, ContainerVT, V1,
-                           DAG.getConstant(SplatIndex, DL, XLenVT),
-                           DAG.getUNDEF(ContainerVT), TrueMask, VL);
-    } else {
-      SDValue LHSIndices = DAG.getBuildVector(IndexVT, DL, GatherIndicesLHS);
-      LHSIndices =
-          convertToScalableVector(IndexContainerVT, LHSIndices, DAG, Subtarget);
-
-      Gather = DAG.getNode(GatherVVOpc, DL, ContainerVT, V1, LHSIndices,
-                           DAG.getUNDEF(ContainerVT), TrueMask, VL);
-    }
+    SDValue LHSIndices = DAG.getBuildVector(IndexVT, DL, GatherIndicesLHS);
+    LHSIndices = convertToScalableVector(IndexContainerVT, LHSIndices, DAG,
+                                         Subtarget);
+    SDValue Gather = DAG.getNode(GatherVVOpc, DL, ContainerVT, V1, LHSIndices,
+                                 DAG.getUNDEF(ContainerVT), TrueMask, VL);
+    return convertFromScalableVector(VT, Gather, DAG, Subtarget);
   }
 
-  // If a second vector operand is used by this shuffle, blend it in with an
-  // additional vrgather.
-  if (!V2.isUndef()) {
-    V2 = convertToScalableVector(ContainerVT, V2, DAG, Subtarget);
-
-    MVT MaskContainerVT = ContainerVT.changeVectorElementType(MVT::i1);
-    SelectMask =
-        convertToScalableVector(MaskContainerVT, SelectMask, DAG, Subtarget);
-
-    // If only one index is used, we can use a "splat" vrgather.
-    // TODO: We can splat the most-common index and fix-up any stragglers, if
-    // that's beneficial.
-    if (RHSIndexCounts.size() == 1) {
-      int SplatIndex = RHSIndexCounts.begin()->getFirst();
-      Gather = DAG.getNode(GatherVXOpc, DL, ContainerVT, V2,
-                           DAG.getConstant(SplatIndex, DL, XLenVT), Gather,
-                           SelectMask, VL);
-    } else {
-      SDValue RHSIndices = DAG.getBuildVector(IndexVT, DL, GatherIndicesRHS);
-      RHSIndices =
-          convertToScalableVector(IndexContainerVT, RHSIndices, DAG, Subtarget);
-      Gather = DAG.getNode(GatherVVOpc, DL, ContainerVT, V2, RHSIndices, Gather,
-                           SelectMask, VL);
+  // Translate the gather index we computed above (and possibly swapped)
+  // back to a shuffle mask.  This step should disappear once we complete
+  // the migration to recursive design.
+  SmallVector<int> ShuffleMaskLHS;
+  ShuffleMaskLHS.reserve(GatherIndicesLHS.size());
+  for (SDValue GatherIndex : GatherIndicesLHS) {
+    if (GatherIndex.isUndef()) {
+      ShuffleMaskLHS.push_back(-1);
+      continue;
     }
+    auto *IdxC = cast<ConstantSDNode>(GatherIndex);
+    ShuffleMaskLHS.push_back(IdxC->getZExtValue());
+  }
+
+  // Recursively invoke lowering for the LHS as if there were no RHS.
+  // This allows us to leverage all of our single source permute tricks.
+  SDValue Gather =
+    DAG.getVectorShuffle(VT, DL, V1, DAG.getUNDEF(VT), ShuffleMaskLHS);
+  Gather = convertToScalableVector(ContainerVT, Gather, DAG, Subtarget);
+
+  // Blend in second vector source with an additional vrgather.
+  V2 = convertToScalableVector(ContainerVT, V2, DAG, Subtarget);
+
+  MVT MaskContainerVT = ContainerVT.changeVectorElementType(MVT::i1);
+  SelectMask =
+    convertToScalableVector(MaskContainerVT, SelectMask, DAG, Subtarget);
+
+  // If only one index is used, we can use a "splat" vrgather.
+  // TODO: We can splat the most-common index and fix-up any stragglers, if
+  // that's beneficial.
+  if (RHSIndexCounts.size() == 1) {
+    int SplatIndex = RHSIndexCounts.begin()->getFirst();
+    Gather = DAG.getNode(GatherVXOpc, DL, ContainerVT, V2,
+                         DAG.getConstant(SplatIndex, DL, XLenVT), Gather,
+                         SelectMask, VL);
+  } else {
+    SDValue RHSIndices = DAG.getBuildVector(IndexVT, DL, GatherIndicesRHS);
+    RHSIndices =
+      convertToScalableVector(IndexContainerVT, RHSIndices, DAG, Subtarget);
+    Gather = DAG.getNode(GatherVVOpc, DL, ContainerVT, V2, RHSIndices, Gather,
+                         SelectMask, VL);
   }
 
   return convertFromScalableVector(VT, Gather, DAG, Subtarget);
@@ -14655,8 +14658,8 @@ static SDValue useInversedSetcc(SDNode *N, SelectionDAG &DAG,
     ISD::CondCode CC = cast<CondCodeSDNode>(Cond.getOperand(2))->get();
     if (CC == ISD::SETEQ && LHS.getOpcode() == ISD::AND &&
         isa<ConstantSDNode>(LHS.getOperand(1)) && isNullConstant(RHS)) {
-      const APInt &MaskVal = LHS.getConstantOperandAPInt(1);
-      if (MaskVal.isPowerOf2() && !MaskVal.isSignedIntN(12))
+      uint64_t MaskVal = LHS.getConstantOperandVal(1);
+      if (isPowerOf2_64(MaskVal) && !isInt<12>(MaskVal))
         return DAG.getSelect(DL, VT,
                              DAG.getSetCC(DL, CondVT, LHS, RHS, ISD::SETNE),
                              False, True);
@@ -15562,11 +15565,8 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
           MGN->getMemOperand(), IndexType, MGN->getExtensionType());
 
     if (Index.getOpcode() == ISD::BUILD_VECTOR &&
-        MGN->getExtensionType() == ISD::NON_EXTLOAD && isTypeLegal(VT)) {
-      // The sequence will be XLenVT, not the type of Index. Tell
-      // isSimpleVIDSequence this so we avoid overflow.
-      if (std::optional<VIDSequence> SimpleVID =
-              isSimpleVIDSequence(Index, Subtarget.getXLen());
+        MGN->getExtensionType() == ISD::NON_EXTLOAD) {
+      if (std::optional<VIDSequence> SimpleVID = isSimpleVIDSequence(Index);
           SimpleVID && SimpleVID->StepDenominator == 1) {
         const int64_t StepNumerator = SimpleVID->StepNumerator;
         const int64_t Addend = SimpleVID->Addend;

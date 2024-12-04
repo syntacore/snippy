@@ -382,8 +382,7 @@ void SourceCoverageViewText::renderMCDCView(raw_ostream &OS, MCDCView &MRV,
     colored_ostream(OS, raw_ostream::RED,
                     getOptions().Colors && Record.getPercentCovered() < 100.0,
                     /*Bold=*/false, /*BG=*/true)
-        << format("%0.2f", Record.getPercentCovered()) << "%";
-    OS << "\n";
+        << format("%0.2f", Record.getPercentCovered()) << "%\n";
     renderLinePrefix(OS, ViewDepth);
     OS << "\n";
   }

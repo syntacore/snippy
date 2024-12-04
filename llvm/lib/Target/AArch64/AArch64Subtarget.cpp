@@ -296,7 +296,6 @@ void AArch64Subtarget::initializeProperties(bool HasMinSize) {
     break;
   case Ampere1:
   case Ampere1A:
-  case Ampere1B:
     CacheLineSize = 64;
     PrefFunctionAlignment = Align(64);
     PrefLoopAlignment = Align(64);

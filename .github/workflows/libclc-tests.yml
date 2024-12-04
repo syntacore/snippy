@@ -36,4 +36,5 @@ jobs:
     name: Test libclc
     uses: ./.github/workflows/llvm-project-tests.yml
     with:
+      build_target: ''
       projects: clang;libclc

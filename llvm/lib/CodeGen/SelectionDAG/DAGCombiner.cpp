@@ -3575,11 +3575,6 @@ static SDValue combineCarryDiamond(SelectionDAG &DAG, const TargetLowering &TLI,
     return SDValue();
   if (Opcode != ISD::UADDO && Opcode != ISD::USUBO)
     return SDValue();
-  // Guarantee identical type of CarryOut
-  EVT CarryOutType = N->getValueType(0);
-  if (CarryOutType != Carry0.getValue(1).getValueType() ||
-      CarryOutType != Carry1.getValue(1).getValueType())
-    return SDValue();
 
   // Canonicalize the add/sub of A and B (the top node in the above ASCII art)
   // as Carry0 and the add/sub of the carry in as Carry1 (the middle node).
@@ -3627,7 +3622,7 @@ static SDValue combineCarryDiamond(SelectionDAG &DAG, const TargetLowering &TLI,
   // TODO: match other operations that can merge flags (ADD, etc)
   DAG.ReplaceAllUsesOfValueWith(Carry1.getValue(0), Merged.getValue(0));
   if (N->getOpcode() == ISD::AND)
-    return DAG.getConstant(0, DL, CarryOutType);
+    return DAG.getConstant(0, DL, MVT::i1);
   return Merged.getValue(1);
 }
 
@@ -9258,7 +9253,7 @@ SDValue DAGCombiner::MatchLoadCombine(SDNode *N) {
 
   // Transfer chain users from old loads to the new load.
   for (LoadSDNode *L : Loads)
-    DAG.makeEquivalentMemoryOrdering(L, NewLoad);
+    DAG.ReplaceAllUsesOfValueWith(SDValue(L, 1), SDValue(NewLoad.getNode(), 1));
 
   if (!NeedsBswap)
     return NewLoad;

@@ -11347,24 +11347,14 @@ TEST_F(FormatTest, UnderstandsNewAndDelete) {
 
   FormatStyle AfterPlacementOperator = getLLVMStyle();
   AfterPlacementOperator.SpaceBeforeParens = FormatStyle::SBPO_Custom;
-  EXPECT_TRUE(
-      AfterPlacementOperator.SpaceBeforeParensOptions.AfterPlacementOperator);
+  EXPECT_EQ(
+      AfterPlacementOperator.SpaceBeforeParensOptions.AfterPlacementOperator,
+      FormatStyle::SpaceBeforeParensCustom::APO_Leave);
   verifyFormat("new (buf) int;", AfterPlacementOperator);
-  verifyFormat("struct A {\n"
-               "  int *a;\n"
-               "  A(int *p) : a(new (p) int) {\n"
-               "    new (p) int;\n"
-               "    int *b = new (p) int;\n"
-               "    int *c = new (p) int(3);\n"
-               "    delete (b);\n"
-               "  }\n"
-               "};",
-               AfterPlacementOperator);
-  verifyFormat("void operator new(void *foo) ATTRIB;", AfterPlacementOperator);
+  verifyFormat("new(buf) int;", AfterPlacementOperator);
 
   AfterPlacementOperator.SpaceBeforeParensOptions.AfterPlacementOperator =
-      false;
-  verifyFormat("new(buf) int;", AfterPlacementOperator);
+      FormatStyle::SpaceBeforeParensCustom::APO_Never;
   verifyFormat("struct A {\n"
                "  int *a;\n"
                "  A(int *p) : a(new(p) int) {\n"
@@ -11372,6 +11362,20 @@ TEST_F(FormatTest, UnderstandsNewAndDelete) {
                "    int *b = new(p) int;\n"
                "    int *c = new(p) int(3);\n"
                "    delete(b);\n"
+               "  }\n"
+               "};",
+               AfterPlacementOperator);
+  verifyFormat("void operator new(void *foo) ATTRIB;", AfterPlacementOperator);
+
+  AfterPlacementOperator.SpaceBeforeParensOptions.AfterPlacementOperator =
+      FormatStyle::SpaceBeforeParensCustom::APO_Always;
+  verifyFormat("struct A {\n"
+               "  int *a;\n"
+               "  A(int *p) : a(new (p) int) {\n"
+               "    new (p) int;\n"
+               "    int *b = new (p) int;\n"
+               "    int *c = new (p) int(3);\n"
+               "    delete (b);\n"
                "  }\n"
                "};",
                AfterPlacementOperator);
@@ -26856,7 +26860,6 @@ TEST_F(FormatTest, RemoveParentheses) {
   EXPECT_EQ(Style.RemoveParentheses, FormatStyle::RPS_Leave);
 
   Style.RemoveParentheses = FormatStyle::RPS_MultipleParentheses;
-  verifyFormat("#define Foo(...) foo((__VA_ARGS__))", Style);
   verifyFormat("int x __attribute__((aligned(16))) = 0;", Style);
   verifyFormat("decltype((foo->bar)) baz;", Style);
   verifyFormat("class __declspec(dllimport) X {};",
@@ -26891,7 +26894,6 @@ TEST_F(FormatTest, RemoveParentheses) {
   verifyFormat("return (({ 0; }));", "return ((({ 0; })));", Style);
 
   Style.RemoveParentheses = FormatStyle::RPS_ReturnStatement;
-  verifyFormat("#define Return0 return (0);", Style);
   verifyFormat("return 0;", "return (0);", Style);
   verifyFormat("co_return 0;", "co_return ((0));", Style);
   verifyFormat("return 0;", "return (((0)));", Style);

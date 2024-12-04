@@ -1,4 +1,4 @@
-; REQUIRES: x86, non-root-user
+; REQUIRES: x86
 ;; Not supported on windows since we use permissions to deny the creation
 ; UNSUPPORTED: system-windows
 

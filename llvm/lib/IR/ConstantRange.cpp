@@ -746,7 +746,7 @@ ConstantRange ConstantRange::castOp(Instruction::CastOps CastOp,
       Min = Min.zext(ResultBitWidth);
       Max = Max.zext(ResultBitWidth);
     }
-    return getNonEmpty(std::move(Min), std::move(Max) + 1);
+    return ConstantRange(std::move(Min), std::move(Max));
   }
   case Instruction::SIToFP: {
     // TODO: use input range if available
@@ -757,7 +757,7 @@ ConstantRange ConstantRange::castOp(Instruction::CastOps CastOp,
       SMin = SMin.sext(ResultBitWidth);
       SMax = SMax.sext(ResultBitWidth);
     }
-    return getNonEmpty(std::move(SMin), std::move(SMax) + 1);
+    return ConstantRange(std::move(SMin), std::move(SMax));
   }
   case Instruction::FPTrunc:
   case Instruction::FPExt:

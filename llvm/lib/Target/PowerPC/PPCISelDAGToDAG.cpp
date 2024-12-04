@@ -1635,8 +1635,7 @@ class BitPermutationSelector {
     default: break;
     case ISD::ROTL:
       if (isa<ConstantSDNode>(V.getOperand(1))) {
-        assert(isPowerOf2_32(NumBits) && "rotl bits should be power of 2!");
-        unsigned RotAmt = V.getConstantOperandVal(1) & (NumBits - 1);
+        unsigned RotAmt = V.getConstantOperandVal(1);
 
         const auto &LHSBits = *getValueBits(V.getOperand(0), NumBits).second;
 
@@ -1649,20 +1648,15 @@ class BitPermutationSelector {
     case ISD::SHL:
     case PPCISD::SHL:
       if (isa<ConstantSDNode>(V.getOperand(1))) {
-        // sld takes 7 bits, slw takes 6.
-        unsigned ShiftAmt = V.getConstantOperandVal(1) & ((NumBits << 1) - 1);
+        unsigned ShiftAmt = V.getConstantOperandVal(1);
 
         const auto &LHSBits = *getValueBits(V.getOperand(0), NumBits).second;
 
-        if (ShiftAmt >= NumBits) {
-          for (unsigned i = 0; i < NumBits; ++i)
-            Bits[i] = ValueBit(ValueBit::ConstZero);
-        } else {
-          for (unsigned i = ShiftAmt; i < NumBits; ++i)
-            Bits[i] = LHSBits[i - ShiftAmt];
-          for (unsigned i = 0; i < ShiftAmt; ++i)
-            Bits[i] = ValueBit(ValueBit::ConstZero);
-        }
+        for (unsigned i = ShiftAmt; i < NumBits; ++i)
+          Bits[i] = LHSBits[i - ShiftAmt];
+
+        for (unsigned i = 0; i < ShiftAmt; ++i)
+          Bits[i] = ValueBit(ValueBit::ConstZero);
 
         return std::make_pair(Interesting = true, &Bits);
       }
@@ -1670,20 +1664,15 @@ class BitPermutationSelector {
     case ISD::SRL:
     case PPCISD::SRL:
       if (isa<ConstantSDNode>(V.getOperand(1))) {
-        // srd takes lowest 7 bits, srw takes 6.
-        unsigned ShiftAmt = V.getConstantOperandVal(1) & ((NumBits << 1) - 1);
+        unsigned ShiftAmt = V.getConstantOperandVal(1);
 
         const auto &LHSBits = *getValueBits(V.getOperand(0), NumBits).second;
 
-        if (ShiftAmt >= NumBits) {
-          for (unsigned i = 0; i < NumBits; ++i)
-            Bits[i] = ValueBit(ValueBit::ConstZero);
-        } else {
-          for (unsigned i = 0; i < NumBits - ShiftAmt; ++i)
-            Bits[i] = LHSBits[i + ShiftAmt];
-          for (unsigned i = NumBits - ShiftAmt; i < NumBits; ++i)
-            Bits[i] = ValueBit(ValueBit::ConstZero);
-        }
+        for (unsigned i = 0; i < NumBits - ShiftAmt; ++i)
+          Bits[i] = LHSBits[i + ShiftAmt];
+
+        for (unsigned i = NumBits - ShiftAmt; i < NumBits; ++i)
+          Bits[i] = ValueBit(ValueBit::ConstZero);
 
         return std::make_pair(Interesting = true, &Bits);
       }

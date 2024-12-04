@@ -69,7 +69,6 @@ define void @cmpxchg_i16_acquire_acquire(ptr %ptr, i16 %cmp, i16 %val) nounwind 
 define void @cmpxchg_i32_acquire_acquire(ptr %ptr, i32 %cmp, i32 %val) nounwind {
 ; LA64-LABEL: cmpxchg_i32_acquire_acquire:
 ; LA64:       # %bb.0:
-; LA64-NEXT:    addi.w $a1, $a1, 0
 ; LA64-NEXT:  .LBB2_1: # =>This Inner Loop Header: Depth=1
 ; LA64-NEXT:    ll.w $a3, $a0, 0
 ; LA64-NEXT:    bne $a3, $a1, .LBB2_3
@@ -173,7 +172,6 @@ define void @cmpxchg_i16_acquire_monotonic(ptr %ptr, i16 %cmp, i16 %val) nounwin
 define void @cmpxchg_i32_acquire_monotonic(ptr %ptr, i32 %cmp, i32 %val) nounwind {
 ; LA64-LABEL: cmpxchg_i32_acquire_monotonic:
 ; LA64:       # %bb.0:
-; LA64-NEXT:    addi.w $a1, $a1, 0
 ; LA64-NEXT:  .LBB6_1: # =>This Inner Loop Header: Depth=1
 ; LA64-NEXT:    ll.w $a3, $a0, 0
 ; LA64-NEXT:    bne $a3, $a1, .LBB6_3
@@ -281,10 +279,9 @@ define i16 @cmpxchg_i16_acquire_acquire_reti16(ptr %ptr, i16 %cmp, i16 %val) nou
 define i32 @cmpxchg_i32_acquire_acquire_reti32(ptr %ptr, i32 %cmp, i32 %val) nounwind {
 ; LA64-LABEL: cmpxchg_i32_acquire_acquire_reti32:
 ; LA64:       # %bb.0:
-; LA64-NEXT:    addi.w $a3, $a1, 0
 ; LA64-NEXT:  .LBB10_1: # =>This Inner Loop Header: Depth=1
-; LA64-NEXT:    ll.w $a1, $a0, 0
-; LA64-NEXT:    bne $a1, $a3, .LBB10_3
+; LA64-NEXT:    ll.w $a3, $a0, 0
+; LA64-NEXT:    bne $a3, $a1, .LBB10_3
 ; LA64-NEXT:  # %bb.2: # in Loop: Header=BB10_1 Depth=1
 ; LA64-NEXT:    move $a4, $a2
 ; LA64-NEXT:    sc.w $a4, $a0, 0
@@ -293,7 +290,7 @@ define i32 @cmpxchg_i32_acquire_acquire_reti32(ptr %ptr, i32 %cmp, i32 %val) nou
 ; LA64-NEXT:  .LBB10_3:
 ; LA64-NEXT:    dbar 20
 ; LA64-NEXT:  .LBB10_4:
-; LA64-NEXT:    move $a0, $a1
+; LA64-NEXT:    move $a0, $a3
 ; LA64-NEXT:    ret
   %tmp = cmpxchg ptr %ptr, i32 %cmp, i32 %val acquire acquire
   %res = extractvalue { i32, i1 } %tmp, 0
@@ -399,7 +396,6 @@ define i1 @cmpxchg_i16_acquire_acquire_reti1(ptr %ptr, i16 %cmp, i16 %val) nounw
 define i1 @cmpxchg_i32_acquire_acquire_reti1(ptr %ptr, i32 %cmp, i32 %val) nounwind {
 ; LA64-LABEL: cmpxchg_i32_acquire_acquire_reti1:
 ; LA64:       # %bb.0:
-; LA64-NEXT:    addi.w $a1, $a1, 0
 ; LA64-NEXT:  .LBB14_1: # =>This Inner Loop Header: Depth=1
 ; LA64-NEXT:    ll.w $a3, $a0, 0
 ; LA64-NEXT:    bne $a3, $a1, .LBB14_3
@@ -411,7 +407,8 @@ define i1 @cmpxchg_i32_acquire_acquire_reti1(ptr %ptr, i32 %cmp, i32 %val) nounw
 ; LA64-NEXT:  .LBB14_3:
 ; LA64-NEXT:    dbar 20
 ; LA64-NEXT:  .LBB14_4:
-; LA64-NEXT:    xor $a0, $a3, $a1
+; LA64-NEXT:    addi.w $a0, $a1, 0
+; LA64-NEXT:    xor $a0, $a3, $a0
 ; LA64-NEXT:    sltui $a0, $a0, 1
 ; LA64-NEXT:    ret
   %tmp = cmpxchg ptr %ptr, i32 %cmp, i32 %val acquire acquire
@@ -509,7 +506,6 @@ define void @cmpxchg_i16_monotonic_monotonic(ptr %ptr, i16 %cmp, i16 %val) nounw
 define void @cmpxchg_i32_monotonic_monotonic(ptr %ptr, i32 %cmp, i32 %val) nounwind {
 ; LA64-LABEL: cmpxchg_i32_monotonic_monotonic:
 ; LA64:       # %bb.0:
-; LA64-NEXT:    addi.w $a1, $a1, 0
 ; LA64-NEXT:  .LBB18_1: # =>This Inner Loop Header: Depth=1
 ; LA64-NEXT:    ll.w $a3, $a0, 0
 ; LA64-NEXT:    bne $a3, $a1, .LBB18_3
@@ -617,10 +613,9 @@ define i16 @cmpxchg_i16_monotonic_monotonic_reti16(ptr %ptr, i16 %cmp, i16 %val)
 define i32 @cmpxchg_i32_monotonic_monotonic_reti32(ptr %ptr, i32 %cmp, i32 %val) nounwind {
 ; LA64-LABEL: cmpxchg_i32_monotonic_monotonic_reti32:
 ; LA64:       # %bb.0:
-; LA64-NEXT:    addi.w $a3, $a1, 0
 ; LA64-NEXT:  .LBB22_1: # =>This Inner Loop Header: Depth=1
-; LA64-NEXT:    ll.w $a1, $a0, 0
-; LA64-NEXT:    bne $a1, $a3, .LBB22_3
+; LA64-NEXT:    ll.w $a3, $a0, 0
+; LA64-NEXT:    bne $a3, $a1, .LBB22_3
 ; LA64-NEXT:  # %bb.2: # in Loop: Header=BB22_1 Depth=1
 ; LA64-NEXT:    move $a4, $a2
 ; LA64-NEXT:    sc.w $a4, $a0, 0
@@ -629,7 +624,7 @@ define i32 @cmpxchg_i32_monotonic_monotonic_reti32(ptr %ptr, i32 %cmp, i32 %val)
 ; LA64-NEXT:  .LBB22_3:
 ; LA64-NEXT:    dbar 1792
 ; LA64-NEXT:  .LBB22_4:
-; LA64-NEXT:    move $a0, $a1
+; LA64-NEXT:    move $a0, $a3
 ; LA64-NEXT:    ret
   %tmp = cmpxchg ptr %ptr, i32 %cmp, i32 %val monotonic monotonic
   %res = extractvalue { i32, i1 } %tmp, 0
@@ -735,7 +730,6 @@ define i1 @cmpxchg_i16_monotonic_monotonic_reti1(ptr %ptr, i16 %cmp, i16 %val) n
 define i1 @cmpxchg_i32_monotonic_monotonic_reti1(ptr %ptr, i32 %cmp, i32 %val) nounwind {
 ; LA64-LABEL: cmpxchg_i32_monotonic_monotonic_reti1:
 ; LA64:       # %bb.0:
-; LA64-NEXT:    addi.w $a1, $a1, 0
 ; LA64-NEXT:  .LBB26_1: # =>This Inner Loop Header: Depth=1
 ; LA64-NEXT:    ll.w $a3, $a0, 0
 ; LA64-NEXT:    bne $a3, $a1, .LBB26_3
@@ -747,7 +741,8 @@ define i1 @cmpxchg_i32_monotonic_monotonic_reti1(ptr %ptr, i32 %cmp, i32 %val) n
 ; LA64-NEXT:  .LBB26_3:
 ; LA64-NEXT:    dbar 1792
 ; LA64-NEXT:  .LBB26_4:
-; LA64-NEXT:    xor $a0, $a3, $a1
+; LA64-NEXT:    addi.w $a0, $a1, 0
+; LA64-NEXT:    xor $a0, $a3, $a0
 ; LA64-NEXT:    sltui $a0, $a0, 1
 ; LA64-NEXT:    ret
   %tmp = cmpxchg ptr %ptr, i32 %cmp, i32 %val monotonic monotonic

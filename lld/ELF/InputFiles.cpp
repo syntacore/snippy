@@ -1614,8 +1614,6 @@ static uint16_t getBitcodeMachineKind(StringRef path, const Triple &t) {
     return EM_RISCV;
   case Triple::sparcv9:
     return EM_SPARCV9;
-  case Triple::systemz:
-    return EM_S390;
   case Triple::x86:
     return t.isOSIAMCU() ? EM_IAMCU : EM_386;
   case Triple::x86_64:
@@ -1790,12 +1788,7 @@ void BinaryFile::parse() {
 }
 
 InputFile *elf::createInternalFile(StringRef name) {
-  auto *file =
-      make<InputFile>(InputFile::InternalKind, MemoryBufferRef("", name));
-  // References from an internal file do not lead to --warn-backrefs
-  // diagnostics.
-  file->groupId = 0;
-  return file;
+  return make<InputFile>(InputFile::InternalKind, MemoryBufferRef("", name));
 }
 
 ELFFileBase *elf::createObjFile(MemoryBufferRef mb, StringRef archiveName,

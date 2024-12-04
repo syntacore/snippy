@@ -1191,6 +1191,12 @@ void PPCFrameLowering::emitPrologue(MachineFunction &MF,
       if ((Reg == PPC::X2 || Reg == PPC::R2) && MustSaveTOC)
         continue;
 
+      // For SVR4, don't emit a move for the CR spill slot if we haven't
+      // spilled CRs.
+      if (isSVR4ABI && (PPC::CR2 <= Reg && Reg <= PPC::CR4)
+          && !MustSaveCR)
+        continue;
+
       // For 64-bit SVR4 when we have spilled CRs, the spill location
       // is SP+8, not a frame-relative slot.
       if (isSVR4ABI && isPPC64 && (PPC::CR2 <= Reg && Reg <= PPC::CR4)) {
@@ -1435,11 +1441,8 @@ void PPCFrameLowering::inlineStackProbe(MachineFunction &MF,
       ProbeLoopBodyMBB->addSuccessor(ProbeLoopBodyMBB);
     }
     // Update liveins.
-    bool anyChange = false;
-    do {
-      anyChange = recomputeLiveIns(*ProbeExitMBB) ||
-                  recomputeLiveIns(*ProbeLoopBodyMBB);
-    } while (anyChange);
+    recomputeLiveIns(*ProbeLoopBodyMBB);
+    recomputeLiveIns(*ProbeExitMBB);
     return ProbeExitMBB;
   };
   // For case HasBP && MaxAlign > 1, we have to realign the SP by performing
@@ -1531,10 +1534,8 @@ void PPCFrameLowering::inlineStackProbe(MachineFunction &MF,
         buildDefCFAReg(*ExitMBB, ExitMBB->begin(), SPReg);
       }
       // Update liveins.
-      bool anyChange = false;
-      do {
-        anyChange = recomputeLiveIns(*ExitMBB) || recomputeLiveIns(*LoopMBB);
-      } while (anyChange);
+      recomputeLiveIns(*LoopMBB);
+      recomputeLiveIns(*ExitMBB);
     }
   }
   ++NumPrologProbed;

@@ -7,7 +7,7 @@
  *===-----------------------------------------------------------------------===
  */
 
-#if !defined(NULL) || !__building_module(_Builtin_stddef)
+#if !defined(NULL) || !__has_feature(modules)
 
 /* linux/stddef.h will define NULL to 0. glibc (and other) headers then define
  * __need_NULL and rely on stddef.h to redefine NULL to the correct value again.

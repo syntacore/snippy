@@ -30,28 +30,26 @@ def findFilesWithExtension(path, extension):
 
 
 def clean(args):
-    if len(args) < 2:
+    if len(args) != 2:
         print(
-            "Usage: %s clean <paths> <extension>\n" % __file__
+            "Usage: %s clean <path> <extension>\n" % __file__
             + "\tRemoves all files with extension from <path>."
         )
         return 1
-    for path in args[1:-1]:
-        for filename in findFilesWithExtension(path, args[-1]):
-            os.remove(filename)
+    for filename in findFilesWithExtension(args[0], args[1]):
+        os.remove(filename)
     return 0
 
 
 def merge(args):
-    if len(args) < 3:
+    if len(args) != 3:
         print(
-            "Usage: %s merge <llvm-profdata> <output> <paths>\n" % __file__
+            "Usage: %s merge <llvm-profdata> <output> <path>\n" % __file__
             + "\tMerges all profraw files from path into output."
         )
         return 1
     cmd = [args[0], "merge", "-o", args[1]]
-    for path in args[2:]:
-        cmd.extend(findFilesWithExtension(path, "profraw"))
+    cmd.extend(findFilesWithExtension(args[2], "profraw"))
     subprocess.check_call(cmd)
     return 0
 

@@ -2985,14 +2985,6 @@ def fmodule_output : Flag<["-"], "fmodule-output">, Flags<[NoXarchOption]>,
   Visibility<[ClangOption, CC1Option]>,
   HelpText<"Save intermediate module file results when compiling a standard C++ module unit.">;
 
-defm skip_odr_check_in_gmf : BoolOption<"f", "skip-odr-check-in-gmf",
-  LangOpts<"SkipODRCheckInGMF">, DefaultFalse,
-  PosFlag<SetTrue, [], [CC1Option],
-          "Skip ODR checks for decls in the global module fragment.">,
-  NegFlag<SetFalse, [], [CC1Option],
-          "Perform ODR checks for decls in the global module fragment.">>,
-  Group<f_Group>;
-
 def fmodules_prune_interval : Joined<["-"], "fmodules-prune-interval=">, Group<i_Group>,
   Visibility<[ClangOption, CC1Option]>, MetaVarName<"<seconds>">,
   HelpText<"Specify the interval (in seconds) between attempts to prune the module cache">,
@@ -4427,8 +4419,6 @@ def mtls_size_EQ : Joined<["-"], "mtls-size=">, Group<m_Group>,
   HelpText<"Specify bit size of immediate TLS offsets (AArch64 ELF only): "
            "12 (for 4KB) | 24 (for 16MB, default) | 32 (for 4GB) | 48 (for 256TB, needs -mcmodel=large)">,
   MarshallingInfoInt<CodeGenOpts<"TLSSize">>;
-def mtls_dialect_EQ : Joined<["-"], "mtls-dialect=">, Group<m_Group>,
-  Flags<[TargetSpecific]>, HelpText<"Which thread-local storage dialect to use for dynamic accesses of TLS variables">;
 def mimplicit_it_EQ : Joined<["-"], "mimplicit-it=">, Group<m_Group>;
 def mdefault_build_attributes : Joined<["-"], "mdefault-build-attributes">, Group<m_Group>;
 def mno_default_build_attributes : Joined<["-"], "mno-default-build-attributes">, Group<m_Group>;
@@ -5815,18 +5805,6 @@ def mvis3 : Flag<["-"], "mvis3">, Group<m_sparc_Features_Group>;
 def mno_vis3 : Flag<["-"], "mno-vis3">, Group<m_sparc_Features_Group>;
 def mhard_quad_float : Flag<["-"], "mhard-quad-float">, Group<m_sparc_Features_Group>;
 def msoft_quad_float : Flag<["-"], "msoft-quad-float">, Group<m_sparc_Features_Group>;
-foreach i = 1 ... 7 in
-  def ffixed_g#i : Flag<["-"], "ffixed-g"#i>, Group<m_sparc_Features_Group>,
-    HelpText<"Reserve the G"#i#" register (SPARC only)">;
-foreach i = 0 ... 5 in
-  def ffixed_o#i : Flag<["-"], "ffixed-o"#i>, Group<m_sparc_Features_Group>,
-    HelpText<"Reserve the O"#i#" register (SPARC only)">;
-foreach i = 0 ... 7 in
-  def ffixed_l#i : Flag<["-"], "ffixed-l"#i>, Group<m_sparc_Features_Group>,
-    HelpText<"Reserve the L"#i#" register (SPARC only)">;
-foreach i = 0 ... 5 in
-  def ffixed_i#i : Flag<["-"], "ffixed-i"#i>, Group<m_sparc_Features_Group>,
-    HelpText<"Reserve the I"#i#" register (SPARC only)">;
 } // let Flags = [TargetSpecific]
 
 // M68k features flags
@@ -7087,9 +7065,6 @@ def fexperimental_assignment_tracking_EQ : Joined<["-"], "fexperimental-assignme
   NormalizedValuesScope<"CodeGenOptions::AssignmentTrackingOpts">,
   Values<"disabled,enabled,forced">, NormalizedValues<["Disabled","Enabled","Forced"]>,
   MarshallingInfoEnum<CodeGenOpts<"AssignmentTrackingMode">, "Enabled">;
-
-def enable_tlsdesc : Flag<["-"], "enable-tlsdesc">,
-  MarshallingInfoFlag<CodeGenOpts<"EnableTLSDESC">>;
 
 } // let Visibility = [CC1Option]
 

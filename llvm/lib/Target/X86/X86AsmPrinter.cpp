@@ -877,6 +877,7 @@ void X86AsmPrinter::emitStartOfAsmFile(Module &M) {
       OutStreamer->emitInt32(FeatureFlagsAnd);            // data
       emitAlignment(WordSize == 4 ? Align(4) : Align(8)); // padding
 
+      OutStreamer->endSection(Nt);
       OutStreamer->switchSection(Cur);
     }
   }

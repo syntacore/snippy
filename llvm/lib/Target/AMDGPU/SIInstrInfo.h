@@ -802,14 +802,6 @@ public:
     return isMFMA(MI) || isWMMA(MI);
   }
 
-  static bool isSWMMAC(const MachineInstr &MI) {
-    return MI.getDesc().TSFlags & SIInstrFlags::IsSWMMAC;
-  }
-
-  bool isSWMMAC(uint16_t Opcode) const {
-    return get(Opcode).TSFlags & SIInstrFlags::IsSWMMAC;
-  }
-
   bool isDOT(uint16_t Opcode) const {
     return get(Opcode).TSFlags & SIInstrFlags::IsDOT;
   }

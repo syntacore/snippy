@@ -596,8 +596,6 @@ llvm::createLibcall(MachineIRBuilder &MIRBuilder, RTLIB::Libcall Libcall,
                     LostDebugLocObserver &LocObserver, MachineInstr *MI) {
   auto &TLI = *MIRBuilder.getMF().getSubtarget().getTargetLowering();
   const char *Name = TLI.getLibcallName(Libcall);
-  if (!Name)
-    return LegalizerHelper::UnableToLegalize;
   const CallingConv::ID CC = TLI.getLibcallCallingConv(Libcall);
   return createLibcall(MIRBuilder, Name, Result, Args, CC, LocObserver, MI);
 }

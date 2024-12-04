@@ -2156,14 +2156,14 @@ static bool collectInsertionElements(Value *V, unsigned Shift,
     Type *ElementIntTy = IntegerType::get(C->getContext(), ElementSize);
 
     for (unsigned i = 0; i != NumElts; ++i) {
-      unsigned ShiftI = i * ElementSize;
+      unsigned ShiftI = Shift + i * ElementSize;
       Constant *Piece = ConstantFoldBinaryInstruction(
           Instruction::LShr, C, ConstantInt::get(C->getType(), ShiftI));
       if (!Piece)
         return false;
 
       Piece = ConstantExpr::getTrunc(Piece, ElementIntTy);
-      if (!collectInsertionElements(Piece, ShiftI + Shift, Elements, VecEltTy,
+      if (!collectInsertionElements(Piece, ShiftI, Elements, VecEltTy,
                                     isBigEndian))
         return false;
     }

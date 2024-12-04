@@ -1260,11 +1260,8 @@ bool JumpThreadingPass::simplifyPartiallyRedundantLoad(LoadInst *LoadI) {
   // the entry to its block.
   BasicBlock::iterator BBIt(LoadI);
   bool IsLoadCSE;
-  BatchAAResults BatchAA(*AA);
-  // The dominator tree is updated lazily and may not be valid at this point.
-  BatchAA.disableDominatorTree();
   if (Value *AvailableVal = FindAvailableLoadedValue(
-          LoadI, LoadBB, BBIt, DefMaxInstsToScan, &BatchAA, &IsLoadCSE)) {
+          LoadI, LoadBB, BBIt, DefMaxInstsToScan, AA, &IsLoadCSE)) {
     // If the value of the load is locally available within the block, just use
     // it.  This frequently occurs for reg2mem'd allocas.
 
@@ -1325,9 +1322,9 @@ bool JumpThreadingPass::simplifyPartiallyRedundantLoad(LoadInst *LoadI) {
     MemoryLocation Loc(LoadedPtr->DoPHITranslation(LoadBB, PredBB),
                        LocationSize::precise(DL.getTypeStoreSize(AccessTy)),
                        AATags);
-    PredAvailable = findAvailablePtrLoadStore(
-        Loc, AccessTy, LoadI->isAtomic(), PredBB, BBIt, DefMaxInstsToScan,
-        &BatchAA, &IsLoadCSE, &NumScanedInst);
+    PredAvailable = findAvailablePtrLoadStore(Loc, AccessTy, LoadI->isAtomic(),
+                                              PredBB, BBIt, DefMaxInstsToScan,
+                                              AA, &IsLoadCSE, &NumScanedInst);
 
     // If PredBB has a single predecessor, continue scanning through the
     // single predecessor.
@@ -1339,7 +1336,7 @@ bool JumpThreadingPass::simplifyPartiallyRedundantLoad(LoadInst *LoadI) {
         BBIt = SinglePredBB->end();
         PredAvailable = findAvailablePtrLoadStore(
             Loc, AccessTy, LoadI->isAtomic(), SinglePredBB, BBIt,
-            (DefMaxInstsToScan - NumScanedInst), &BatchAA, &IsLoadCSE,
+            (DefMaxInstsToScan - NumScanedInst), AA, &IsLoadCSE,
             &NumScanedInst);
       }
     }

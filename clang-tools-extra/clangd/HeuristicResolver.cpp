@@ -16,80 +16,6 @@
 namespace clang {
 namespace clangd {
 
-namespace {
-
-// Helper class for implementing HeuristicResolver.
-// Unlike HeuristicResolver which is a long-lived class,
-// a new instance of this class is created for every external
-// call into a HeuristicResolver operation. That allows this
-// class to store state that's local to such a top-level call,
-// particularly "recursion protection sets" that keep track of
-// nodes that have already been seen to avoid infinite recursion.
-class HeuristicResolverImpl {
-public:
-  HeuristicResolverImpl(ASTContext &Ctx) : Ctx(Ctx) {}
-
-  // These functions match the public interface of HeuristicResolver
-  // (but aren't const since they may modify the recursion protection sets).
-  std::vector<const NamedDecl *>
-  resolveMemberExpr(const CXXDependentScopeMemberExpr *ME);
-  std::vector<const NamedDecl *>
-  resolveDeclRefExpr(const DependentScopeDeclRefExpr *RE);
-  std::vector<const NamedDecl *> resolveTypeOfCallExpr(const CallExpr *CE);
-  std::vector<const NamedDecl *> resolveCalleeOfCallExpr(const CallExpr *CE);
-  std::vector<const NamedDecl *>
-  resolveUsingValueDecl(const UnresolvedUsingValueDecl *UUVD);
-  std::vector<const NamedDecl *>
-  resolveDependentNameType(const DependentNameType *DNT);
-  std::vector<const NamedDecl *> resolveTemplateSpecializationType(
-      const DependentTemplateSpecializationType *DTST);
-  const Type *resolveNestedNameSpecifierToType(const NestedNameSpecifier *NNS);
-  const Type *getPointeeType(const Type *T);
-
-private:
-  ASTContext &Ctx;
-
-  // Recursion protection sets
-  llvm::SmallSet<const DependentNameType *, 4> SeenDependentNameTypes;
-
-  // Given a tag-decl type and a member name, heuristically resolve the
-  // name to one or more declarations.
-  // The current heuristic is simply to look up the name in the primary
-  // template. This is a heuristic because the template could potentially
-  // have specializations that declare different members.
-  // Multiple declarations could be returned if the name is overloaded
-  // (e.g. an overloaded method in the primary template).
-  // This heuristic will give the desired answer in many cases, e.g.
-  // for a call to vector<T>::size().
-  std::vector<const NamedDecl *>
-  resolveDependentMember(const Type *T, DeclarationName Name,
-                         llvm::function_ref<bool(const NamedDecl *ND)> Filter);
-
-  // Try to heuristically resolve the type of a possibly-dependent expression
-  // `E`.
-  const Type *resolveExprToType(const Expr *E);
-  std::vector<const NamedDecl *> resolveExprToDecls(const Expr *E);
-
-  // Helper function for HeuristicResolver::resolveDependentMember()
-  // which takes a possibly-dependent type `T` and heuristically
-  // resolves it to a CXXRecordDecl in which we can try name lookup.
-  CXXRecordDecl *resolveTypeToRecordDecl(const Type *T);
-
-  // This is a reimplementation of CXXRecordDecl::lookupDependentName()
-  // so that the implementation can call into other HeuristicResolver helpers.
-  // FIXME: Once HeuristicResolver is upstreamed to the clang libraries
-  // (https://github.com/clangd/clangd/discussions/1662),
-  // CXXRecordDecl::lookupDepenedentName() can be removed, and its call sites
-  // can be modified to benefit from the more comprehensive heuristics offered
-  // by HeuristicResolver instead.
-  std::vector<const NamedDecl *>
-  lookupDependentName(CXXRecordDecl *RD, DeclarationName Name,
-                      llvm::function_ref<bool(const NamedDecl *ND)> Filter);
-  bool findOrdinaryMemberInDependentClasses(const CXXBaseSpecifier *Specifier,
-                                            CXXBasePath &Path,
-                                            DeclarationName Name);
-};
-
 // Convenience lambdas for use as the 'Filter' parameter of
 // HeuristicResolver::resolveDependentMember().
 const auto NoFilter = [](const NamedDecl *D) { return true; };
@@ -105,6 +31,8 @@ const auto TemplateFilter = [](const NamedDecl *D) {
   return isa<TemplateDecl>(D);
 };
 
+namespace {
+
 const Type *resolveDeclsToType(const std::vector<const NamedDecl *> &Decls,
                                ASTContext &Ctx) {
   if (Decls.size() != 1) // Names an overload set -- just bail.
@@ -118,10 +46,12 @@ const Type *resolveDeclsToType(const std::vector<const NamedDecl *> &Decls,
   return nullptr;
 }
 
+} // namespace
+
 // Helper function for HeuristicResolver::resolveDependentMember()
 // which takes a possibly-dependent type `T` and heuristically
 // resolves it to a CXXRecordDecl in which we can try name lookup.
-CXXRecordDecl *HeuristicResolverImpl::resolveTypeToRecordDecl(const Type *T) {
+CXXRecordDecl *HeuristicResolver::resolveTypeToRecordDecl(const Type *T) const {
   assert(T);
 
   // Unwrap type sugar such as type aliases.
@@ -154,7 +84,7 @@ CXXRecordDecl *HeuristicResolverImpl::resolveTypeToRecordDecl(const Type *T) {
   return TD->getTemplatedDecl();
 }
 
-const Type *HeuristicResolverImpl::getPointeeType(const Type *T) {
+const Type *HeuristicResolver::getPointeeType(const Type *T) const {
   if (!T)
     return nullptr;
 
@@ -187,8 +117,8 @@ const Type *HeuristicResolverImpl::getPointeeType(const Type *T) {
   return FirstArg.getAsType().getTypePtrOrNull();
 }
 
-std::vector<const NamedDecl *> HeuristicResolverImpl::resolveMemberExpr(
-    const CXXDependentScopeMemberExpr *ME) {
+std::vector<const NamedDecl *> HeuristicResolver::resolveMemberExpr(
+    const CXXDependentScopeMemberExpr *ME) const {
   // If the expression has a qualifier, try resolving the member inside the
   // qualifier's type.
   // Note that we cannot use a NonStaticFilter in either case, for a couple
@@ -234,14 +164,14 @@ std::vector<const NamedDecl *> HeuristicResolverImpl::resolveMemberExpr(
   return resolveDependentMember(BaseType, ME->getMember(), NoFilter);
 }
 
-std::vector<const NamedDecl *>
-HeuristicResolverImpl::resolveDeclRefExpr(const DependentScopeDeclRefExpr *RE) {
+std::vector<const NamedDecl *> HeuristicResolver::resolveDeclRefExpr(
+    const DependentScopeDeclRefExpr *RE) const {
   return resolveDependentMember(RE->getQualifier()->getAsType(),
                                 RE->getDeclName(), StaticFilter);
 }
 
 std::vector<const NamedDecl *>
-HeuristicResolverImpl::resolveTypeOfCallExpr(const CallExpr *CE) {
+HeuristicResolver::resolveTypeOfCallExpr(const CallExpr *CE) const {
   const auto *CalleeType = resolveExprToType(CE->getCallee());
   if (!CalleeType)
     return {};
@@ -257,7 +187,7 @@ HeuristicResolverImpl::resolveTypeOfCallExpr(const CallExpr *CE) {
 }
 
 std::vector<const NamedDecl *>
-HeuristicResolverImpl::resolveCalleeOfCallExpr(const CallExpr *CE) {
+HeuristicResolver::resolveCalleeOfCallExpr(const CallExpr *CE) const {
   if (const auto *ND = dyn_cast_or_null<NamedDecl>(CE->getCalleeDecl())) {
     return {ND};
   }
@@ -265,31 +195,29 @@ HeuristicResolverImpl::resolveCalleeOfCallExpr(const CallExpr *CE) {
   return resolveExprToDecls(CE->getCallee());
 }
 
-std::vector<const NamedDecl *> HeuristicResolverImpl::resolveUsingValueDecl(
-    const UnresolvedUsingValueDecl *UUVD) {
+std::vector<const NamedDecl *> HeuristicResolver::resolveUsingValueDecl(
+    const UnresolvedUsingValueDecl *UUVD) const {
   return resolveDependentMember(UUVD->getQualifier()->getAsType(),
                                 UUVD->getNameInfo().getName(), ValueFilter);
 }
 
-std::vector<const NamedDecl *>
-HeuristicResolverImpl::resolveDependentNameType(const DependentNameType *DNT) {
-  if (auto [_, inserted] = SeenDependentNameTypes.insert(DNT); !inserted)
-    return {};
+std::vector<const NamedDecl *> HeuristicResolver::resolveDependentNameType(
+    const DependentNameType *DNT) const {
   return resolveDependentMember(
       resolveNestedNameSpecifierToType(DNT->getQualifier()),
       DNT->getIdentifier(), TypeFilter);
 }
 
 std::vector<const NamedDecl *>
-HeuristicResolverImpl::resolveTemplateSpecializationType(
-    const DependentTemplateSpecializationType *DTST) {
+HeuristicResolver::resolveTemplateSpecializationType(
+    const DependentTemplateSpecializationType *DTST) const {
   return resolveDependentMember(
       resolveNestedNameSpecifierToType(DTST->getQualifier()),
       DTST->getIdentifier(), TemplateFilter);
 }
 
 std::vector<const NamedDecl *>
-HeuristicResolverImpl::resolveExprToDecls(const Expr *E) {
+HeuristicResolver::resolveExprToDecls(const Expr *E) const {
   if (const auto *ME = dyn_cast<CXXDependentScopeMemberExpr>(E)) {
     return resolveMemberExpr(ME);
   }
@@ -308,7 +236,7 @@ HeuristicResolverImpl::resolveExprToDecls(const Expr *E) {
   return {};
 }
 
-const Type *HeuristicResolverImpl::resolveExprToType(const Expr *E) {
+const Type *HeuristicResolver::resolveExprToType(const Expr *E) const {
   std::vector<const NamedDecl *> Decls = resolveExprToDecls(E);
   if (!Decls.empty())
     return resolveDeclsToType(Decls, Ctx);
@@ -316,8 +244,8 @@ const Type *HeuristicResolverImpl::resolveExprToType(const Expr *E) {
   return E->getType().getTypePtr();
 }
 
-const Type *HeuristicResolverImpl::resolveNestedNameSpecifierToType(
-    const NestedNameSpecifier *NNS) {
+const Type *HeuristicResolver::resolveNestedNameSpecifierToType(
+    const NestedNameSpecifier *NNS) const {
   if (!NNS)
     return nullptr;
 
@@ -342,6 +270,8 @@ const Type *HeuristicResolverImpl::resolveNestedNameSpecifierToType(
   return nullptr;
 }
 
+namespace {
+
 bool isOrdinaryMember(const NamedDecl *ND) {
   return ND->isInIdentifierNamespace(Decl::IDNS_Ordinary | Decl::IDNS_Tag |
                                      Decl::IDNS_Member);
@@ -357,9 +287,11 @@ bool findOrdinaryMember(const CXXRecordDecl *RD, CXXBasePath &Path,
   return false;
 }
 
-bool HeuristicResolverImpl::findOrdinaryMemberInDependentClasses(
+} // namespace
+
+bool HeuristicResolver::findOrdinaryMemberInDependentClasses(
     const CXXBaseSpecifier *Specifier, CXXBasePath &Path,
-    DeclarationName Name) {
+    DeclarationName Name) const {
   CXXRecordDecl *RD =
       resolveTypeToRecordDecl(Specifier->getType().getTypePtr());
   if (!RD)
@@ -367,9 +299,9 @@ bool HeuristicResolverImpl::findOrdinaryMemberInDependentClasses(
   return findOrdinaryMember(RD, Path, Name);
 }
 
-std::vector<const NamedDecl *> HeuristicResolverImpl::lookupDependentName(
+std::vector<const NamedDecl *> HeuristicResolver::lookupDependentName(
     CXXRecordDecl *RD, DeclarationName Name,
-    llvm::function_ref<bool(const NamedDecl *ND)> Filter) {
+    llvm::function_ref<bool(const NamedDecl *ND)> Filter) const {
   std::vector<const NamedDecl *> Results;
 
   // Lookup in the class.
@@ -400,9 +332,9 @@ std::vector<const NamedDecl *> HeuristicResolverImpl::lookupDependentName(
   return Results;
 }
 
-std::vector<const NamedDecl *> HeuristicResolverImpl::resolveDependentMember(
+std::vector<const NamedDecl *> HeuristicResolver::resolveDependentMember(
     const Type *T, DeclarationName Name,
-    llvm::function_ref<bool(const NamedDecl *ND)> Filter) {
+    llvm::function_ref<bool(const NamedDecl *ND)> Filter) const {
   if (!T)
     return {};
   if (auto *ET = T->getAs<EnumType>()) {
@@ -416,44 +348,6 @@ std::vector<const NamedDecl *> HeuristicResolverImpl::resolveDependentMember(
     return lookupDependentName(RD, Name, Filter);
   }
   return {};
-}
-} // namespace
-
-std::vector<const NamedDecl *> HeuristicResolver::resolveMemberExpr(
-    const CXXDependentScopeMemberExpr *ME) const {
-  return HeuristicResolverImpl(Ctx).resolveMemberExpr(ME);
-}
-std::vector<const NamedDecl *> HeuristicResolver::resolveDeclRefExpr(
-    const DependentScopeDeclRefExpr *RE) const {
-  return HeuristicResolverImpl(Ctx).resolveDeclRefExpr(RE);
-}
-std::vector<const NamedDecl *>
-HeuristicResolver::resolveTypeOfCallExpr(const CallExpr *CE) const {
-  return HeuristicResolverImpl(Ctx).resolveTypeOfCallExpr(CE);
-}
-std::vector<const NamedDecl *>
-HeuristicResolver::resolveCalleeOfCallExpr(const CallExpr *CE) const {
-  return HeuristicResolverImpl(Ctx).resolveCalleeOfCallExpr(CE);
-}
-std::vector<const NamedDecl *> HeuristicResolver::resolveUsingValueDecl(
-    const UnresolvedUsingValueDecl *UUVD) const {
-  return HeuristicResolverImpl(Ctx).resolveUsingValueDecl(UUVD);
-}
-std::vector<const NamedDecl *> HeuristicResolver::resolveDependentNameType(
-    const DependentNameType *DNT) const {
-  return HeuristicResolverImpl(Ctx).resolveDependentNameType(DNT);
-}
-std::vector<const NamedDecl *>
-HeuristicResolver::resolveTemplateSpecializationType(
-    const DependentTemplateSpecializationType *DTST) const {
-  return HeuristicResolverImpl(Ctx).resolveTemplateSpecializationType(DTST);
-}
-const Type *HeuristicResolver::resolveNestedNameSpecifierToType(
-    const NestedNameSpecifier *NNS) const {
-  return HeuristicResolverImpl(Ctx).resolveNestedNameSpecifierToType(NNS);
-}
-const Type *HeuristicResolver::getPointeeType(const Type *T) const {
-  return HeuristicResolverImpl(Ctx).getPointeeType(T);
 }
 
 } // namespace clangd
