@@ -2515,7 +2515,7 @@ bool UnwrappedLineParser::parseParens(TokenType AmpAmpTokenType) {
         parseChildBlock();
       break;
     case tok::r_paren:
-      if (!MightBeStmtExpr && !Line->InMacroBody &&
+      if (!MightBeStmtExpr &&
           Style.RemoveParentheses > FormatStyle::RPS_Leave) {
         const auto *Prev = LeftParen->Previous;
         const auto *Next = Tokens->peekNextToken();

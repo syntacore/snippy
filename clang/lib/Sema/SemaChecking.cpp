@@ -7545,43 +7545,47 @@ void Sema::checkCall(NamedDecl *FDecl, const FunctionProtoType *Proto,
       }
     }
 
-    FunctionType::ArmStateValue CalleeArmZAState =
+    // If the callee uses AArch64 SME ZA state but the caller doesn't define
+    // any, then this is an error.
+    FunctionType::ArmStateValue ArmZAState =
         FunctionType::getArmZAState(ExtInfo.AArch64SMEAttributes);
-    FunctionType::ArmStateValue CalleeArmZT0State =
-        FunctionType::getArmZT0State(ExtInfo.AArch64SMEAttributes);
-    if (CalleeArmZAState != FunctionType::ARM_None ||
-        CalleeArmZT0State != FunctionType::ARM_None) {
+    if (ArmZAState != FunctionType::ARM_None) {
       bool CallerHasZAState = false;
-      bool CallerHasZT0State = false;
       if (const auto *CallerFD = dyn_cast<FunctionDecl>(CurContext)) {
         auto *Attr = CallerFD->getAttr<ArmNewAttr>();
         if (Attr && Attr->isNewZA())
           CallerHasZAState = true;
+        else if (const auto *FPT =
+                     CallerFD->getType()->getAs<FunctionProtoType>())
+          CallerHasZAState = FunctionType::getArmZAState(
+                                 FPT->getExtProtoInfo().AArch64SMEAttributes) !=
+                             FunctionType::ARM_None;
+      }
+
+      if (!CallerHasZAState)
+        Diag(Loc, diag::err_sme_za_call_no_za_state);
+    }
+
+    // If the callee uses AArch64 SME ZT0 state but the caller doesn't define
+    // any, then this is an error.
+    FunctionType::ArmStateValue ArmZT0State =
+        FunctionType::getArmZT0State(ExtInfo.AArch64SMEAttributes);
+    if (ArmZT0State != FunctionType::ARM_None) {
+      bool CallerHasZT0State = false;
+      if (const auto *CallerFD = dyn_cast<FunctionDecl>(CurContext)) {
+        auto *Attr = CallerFD->getAttr<ArmNewAttr>();
         if (Attr && Attr->isNewZT0())
           CallerHasZT0State = true;
-        if (const auto *FPT = CallerFD->getType()->getAs<FunctionProtoType>()) {
-          CallerHasZAState |=
-              FunctionType::getArmZAState(
-                  FPT->getExtProtoInfo().AArch64SMEAttributes) !=
-              FunctionType::ARM_None;
-          CallerHasZT0State |=
+        else if (const auto *FPT =
+                     CallerFD->getType()->getAs<FunctionProtoType>())
+          CallerHasZT0State =
               FunctionType::getArmZT0State(
                   FPT->getExtProtoInfo().AArch64SMEAttributes) !=
               FunctionType::ARM_None;
-        }
       }
 
-      if (CalleeArmZAState != FunctionType::ARM_None && !CallerHasZAState)
-        Diag(Loc, diag::err_sme_za_call_no_za_state);
-
-      if (CalleeArmZT0State != FunctionType::ARM_None && !CallerHasZT0State)
+      if (!CallerHasZT0State)
         Diag(Loc, diag::err_sme_zt0_call_no_zt0_state);
-
-      if (CallerHasZAState && CalleeArmZAState == FunctionType::ARM_None &&
-          CalleeArmZT0State != FunctionType::ARM_None) {
-        Diag(Loc, diag::err_sme_unimplemented_za_save_restore);
-        Diag(Loc, diag::note_sme_use_preserves_za);
-      }
     }
   }
 
@@ -7639,8 +7643,9 @@ bool Sema::CheckFunctionCall(FunctionDecl *FDecl, CallExpr *TheCall,
   unsigned NumArgs = TheCall->getNumArgs();
 
   Expr *ImplicitThis = nullptr;
-  if (IsMemberOperatorCall && !FDecl->hasCXXExplicitFunctionObjectParameter()) {
-    // If this is a call to a member operator, hide the first
+  if (IsMemberOperatorCall && !FDecl->isStatic() &&
+      !FDecl->hasCXXExplicitFunctionObjectParameter()) {
+    // If this is a call to a non-static member operator, hide the first
     // argument from checkCall.
     // FIXME: Our choice of AST representation here is less than ideal.
     ImplicitThis = Args[0];

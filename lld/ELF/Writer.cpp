@@ -261,9 +261,6 @@ static void demoteDefined(Defined &sym, DenseMap<SectionBase *, size_t> &map) {
   Undefined(sym.file, sym.getName(), binding, sym.stOther, sym.type,
             /*discardedSecIdx=*/map.lookup(sym.section))
       .overwrite(sym);
-  // Eliminate from the symbol table, otherwise we would leave an undefined
-  // symbol if the symbol is unreferenced in the absence of GC.
-  sym.isUsedInRegularObj = false;
 }
 
 // If all references to a DSO happen to be weak, the DSO is not added to
@@ -1521,12 +1518,12 @@ template <class ELFT> void Writer<ELFT>::sortSections() {
     if (auto *osd = dyn_cast<OutputDesc>(cmd))
       osd->osec.sortRank = getSectionRank(osd->osec);
   if (!script->hasSectionsCommand) {
-    // OutputDescs are mostly contiguous, but may be interleaved with
-    // SymbolAssignments in the presence of INSERT commands.
-    auto mid = std::stable_partition(
-        script->sectionCommands.begin(), script->sectionCommands.end(),
-        [](SectionCommand *cmd) { return isa<OutputDesc>(cmd); });
-    std::stable_sort(script->sectionCommands.begin(), mid, compareSections);
+    // We know that all the OutputSections are contiguous in this case.
+    auto isSection = [](SectionCommand *cmd) { return isa<OutputDesc>(cmd); };
+    std::stable_sort(
+        llvm::find_if(script->sectionCommands, isSection),
+        llvm::find_if(llvm::reverse(script->sectionCommands), isSection).base(),
+        compareSections);
   }
 
   // Process INSERT commands and update output section attributes. From this
@@ -1755,8 +1752,8 @@ template <class ELFT> void Writer<ELFT>::finalizeAddressDependentContent() {
       }
     }
   }
-  if (!config->relocatable)
-    target->finalizeRelax(pass);
+  if (!config->relocatable && config->emachine == EM_RISCV)
+    riscvFinalizeRelax(pass);
 
   if (config->relocatable)
     for (OutputSection *sec : outputSections)

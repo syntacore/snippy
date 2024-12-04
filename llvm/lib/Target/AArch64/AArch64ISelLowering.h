@@ -58,8 +58,6 @@ enum NodeType : unsigned {
 
   CALL_BTI, // Function call followed by a BTI instruction.
 
-  COALESCER_BARRIER,
-
   SMSTART,
   SMSTOP,
   RESTORE_ZA,
@@ -1001,9 +999,6 @@ private:
   /// make the right decision when generating code for different targets.
   const AArch64Subtarget *Subtarget;
 
-  llvm::BumpPtrAllocator BumpAlloc;
-  llvm::StringSaver Saver{BumpAlloc};
-
   bool isExtFreeImpl(const Instruction *Ext) const override;
 
   void addTypeForNEON(MVT VT);
@@ -1031,7 +1026,7 @@ private:
                           const SmallVectorImpl<CCValAssign> &RVLocs,
                           const SDLoc &DL, SelectionDAG &DAG,
                           SmallVectorImpl<SDValue> &InVals, bool isThisReturn,
-                          SDValue ThisVal, bool RequiresSMChange) const;
+                          SDValue ThisVal) const;
 
   SDValue LowerLOAD(SDValue Op, SelectionDAG &DAG) const;
   SDValue LowerSTORE(SDValue Op, SelectionDAG &DAG) const;

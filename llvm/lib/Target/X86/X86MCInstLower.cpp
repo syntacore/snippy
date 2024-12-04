@@ -959,10 +959,8 @@ void X86AsmPrinter::LowerPATCHABLE_OP(const MachineInstr &MI,
   SmallString<256> Code;
   unsigned MinSize = MI.getOperand(0).getImm();
 
-  if (NextMI != MI.getParent()->end() && !NextMI->isInlineAsm()) {
+  if (NextMI != MI.getParent()->end()) {
     // Lower the next MachineInstr to find its byte size.
-    // If the next instruction is inline assembly, we skip lowering it for now,
-    // and assume we should always generate NOPs.
     MCInst MCI;
     MCIL.Lower(&*NextMI, MCI);
 

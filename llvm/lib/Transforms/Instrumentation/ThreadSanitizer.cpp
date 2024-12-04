@@ -752,12 +752,11 @@ bool ThreadSanitizer::instrumentAtomic(Instruction *I, const DataLayout &DL) {
     const unsigned ByteSize = 1U << Idx;
     const unsigned BitSize = ByteSize * 8;
     Type *Ty = Type::getIntNTy(IRB.getContext(), BitSize);
-    Value *Val = RMWI->getValOperand();
-    Value *Args[] = {Addr, IRB.CreateBitOrPointerCast(Val, Ty),
+    Value *Args[] = {Addr,
+                     IRB.CreateIntCast(RMWI->getValOperand(), Ty, false),
                      createOrdering(&IRB, RMWI->getOrdering())};
-    Value *C = IRB.CreateCall(F, Args);
-    I->replaceAllUsesWith(IRB.CreateBitOrPointerCast(C, Val->getType()));
-    I->eraseFromParent();
+    CallInst *C = CallInst::Create(F, Args);
+    ReplaceInstWithInst(I, C);
   } else if (AtomicCmpXchgInst *CASI = dyn_cast<AtomicCmpXchgInst>(I)) {
     Value *Addr = CASI->getPointerOperand();
     Type *OrigOldValTy = CASI->getNewValOperand()->getType();

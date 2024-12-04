@@ -2451,6 +2451,7 @@ private:
   uint32_t Value;
   uint32_t CurrentBitsIndex = ~0;
 };
+
 } // namespace clang
 
 #endif // LLVM_CLANG_SERIALIZATION_ASTREADER_H

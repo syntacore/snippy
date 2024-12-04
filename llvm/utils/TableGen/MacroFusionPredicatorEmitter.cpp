@@ -152,7 +152,8 @@ void MacroFusionPredicatorEmitter::emitFirstPredicate(Record *Predicate,
         << "if (FirstDest.isVirtual() && !MRI.hasOneNonDBGUse(FirstDest))\n";
     OS.indent(4) << "  return false;\n";
     OS.indent(2) << "}\n";
-  } else if (Predicate->isSubClassOf("FusionPredicateWithMCInstPredicate")) {
+  } else if (Predicate->isSubClassOf(
+                 "FirstFusionPredicateWithMCInstPredicate")) {
     OS.indent(2) << "{\n";
     OS.indent(4) << "const MachineInstr *MI = FirstMI;\n";
     OS.indent(4) << "if (";
@@ -172,7 +173,7 @@ void MacroFusionPredicatorEmitter::emitFirstPredicate(Record *Predicate,
 void MacroFusionPredicatorEmitter::emitSecondPredicate(Record *Predicate,
                                                        PredicateExpander &PE,
                                                        raw_ostream &OS) {
-  if (Predicate->isSubClassOf("FusionPredicateWithMCInstPredicate")) {
+  if (Predicate->isSubClassOf("SecondFusionPredicateWithMCInstPredicate")) {
     OS.indent(2) << "{\n";
     OS.indent(4) << "const MachineInstr *MI = &SecondMI;\n";
     OS.indent(4) << "if (";
@@ -184,7 +185,7 @@ void MacroFusionPredicatorEmitter::emitSecondPredicate(Record *Predicate,
     OS.indent(2) << "}\n";
   } else {
     PrintFatalError(Predicate->getLoc(),
-                    "Unsupported predicate for second instruction: " +
+                    "Unsupported predicate for first instruction: " +
                         Predicate->getType()->getAsString());
   }
 }
@@ -195,8 +196,9 @@ void MacroFusionPredicatorEmitter::emitBothPredicate(Record *Predicate,
   if (Predicate->isSubClassOf("FusionPredicateWithCode"))
     OS << Predicate->getValueAsString("Predicate");
   else if (Predicate->isSubClassOf("BothFusionPredicateWithMCInstPredicate")) {
-    emitFirstPredicate(Predicate, PE, OS);
-    emitSecondPredicate(Predicate, PE, OS);
+    Record *MCPred = Predicate->getValueAsDef("Predicate");
+    emitFirstPredicate(MCPred, PE, OS);
+    emitSecondPredicate(MCPred, PE, OS);
   } else if (Predicate->isSubClassOf("TieReg")) {
     int FirstOpIdx = Predicate->getValueAsInt("FirstOpIdx");
     int SecondOpIdx = Predicate->getValueAsInt("SecondOpIdx");

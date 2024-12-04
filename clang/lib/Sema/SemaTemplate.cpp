@@ -1830,27 +1830,7 @@ static TemplateParameterList *GetTemplateParameterList(TemplateDecl *TD) {
   // Make sure we get the template parameter list from the most
   // recent declaration, since that is the only one that is guaranteed to
   // have all the default template argument information.
-  Decl *D = TD->getMostRecentDecl();
-  // C++11 [temp.param]p12:
-  // A default template argument shall not be specified in a friend class
-  // template declaration.
-  //
-  // Skip past friend *declarations* because they are not supposed to contain
-  // default template arguments. Moreover, these declarations may introduce
-  // template parameters living in different template depths than the
-  // corresponding template parameters in TD, causing unmatched constraint
-  // substitution.
-  //
-  // FIXME: Diagnose such cases within a class template:
-  //  template <class T>
-  //  struct S {
-  //    template <class = void> friend struct C;
-  //  };
-  //  template struct S<int>;
-  while (D->getFriendObjectKind() != Decl::FriendObjectKind::FOK_None &&
-         D->getPreviousDecl())
-    D = D->getPreviousDecl();
-  return cast<TemplateDecl>(D)->getTemplateParameters();
+  return cast<TemplateDecl>(TD->getMostRecentDecl())->getTemplateParameters();
 }
 
 DeclResult Sema::CheckClassTemplate(
@@ -7432,9 +7412,9 @@ ExprResult Sema::CheckTemplateArgument(NonTypeTemplateParmDecl *Param,
     if (ArgResult.isInvalid())
       return ExprError();
 
-    if (Value.isLValue()) {
-      APValue::LValueBase Base = Value.getLValueBase();
-      auto *VD = const_cast<ValueDecl *>(Base.dyn_cast<const ValueDecl *>());
+    // Prior to C++20, enforce restrictions on possible template argument
+    // values.
+    if (!getLangOpts().CPlusPlus20 && Value.isLValue()) {
       //   For a non-type template-parameter of pointer or reference type,
       //   the value of the constant expression shall not refer to
       assert(ParamType->isPointerType() || ParamType->isReferenceType() ||
@@ -7443,6 +7423,8 @@ ExprResult Sema::CheckTemplateArgument(NonTypeTemplateParmDecl *Param,
       // -- a string literal
       // -- the result of a typeid expression, or
       // -- a predefined __func__ variable
+      APValue::LValueBase Base = Value.getLValueBase();
+      auto *VD = const_cast<ValueDecl *>(Base.dyn_cast<const ValueDecl *>());
       if (Base &&
           (!VD ||
            isa<LifetimeExtendedTemporaryDecl, UnnamedGlobalConstantDecl>(VD))) {
@@ -7450,30 +7432,24 @@ ExprResult Sema::CheckTemplateArgument(NonTypeTemplateParmDecl *Param,
             << Arg->getSourceRange();
         return ExprError();
       }
-
-      if (Value.hasLValuePath() && Value.getLValuePath().size() == 1 && VD &&
-          VD->getType()->isArrayType() &&
+      // -- a subobject [until C++20]
+      if (Value.hasLValuePath() && Value.getLValuePath().size() == 1 &&
+          VD && VD->getType()->isArrayType() &&
           Value.getLValuePath()[0].getAsArrayIndex() == 0 &&
           !Value.isLValueOnePastTheEnd() && ParamType->isPointerType()) {
-        SugaredConverted = TemplateArgument(VD, ParamType);
-        CanonicalConverted = TemplateArgument(
-            cast<ValueDecl>(VD->getCanonicalDecl()), CanonParamType);
-        return ArgResult.get();
+        // Per defect report (no number yet):
+        //   ... other than a pointer to the first element of a complete array
+        //       object.
+      } else if (!Value.hasLValuePath() || Value.getLValuePath().size() ||
+                 Value.isLValueOnePastTheEnd()) {
+        Diag(StartLoc, diag::err_non_type_template_arg_subobject)
+          << Value.getAsString(Context, ParamType);
+        return ExprError();
       }
-
-      // -- a subobject [until C++20]
-      if (!getLangOpts().CPlusPlus20) {
-        if (!Value.hasLValuePath() || Value.getLValuePath().size() ||
-            Value.isLValueOnePastTheEnd()) {
-          Diag(StartLoc, diag::err_non_type_template_arg_subobject)
-              << Value.getAsString(Context, ParamType);
-          return ExprError();
-        }
-        assert((VD || !ParamType->isReferenceType()) &&
-               "null reference should not be a constant expression");
-        assert((!VD || !ParamType->isNullPtrType()) &&
-               "non-null value of type nullptr_t?");
-      }
+      assert((VD || !ParamType->isReferenceType()) &&
+             "null reference should not be a constant expression");
+      assert((!VD || !ParamType->isNullPtrType()) &&
+             "non-null value of type nullptr_t?");
     }
 
     if (Value.isAddrLabelDiff())

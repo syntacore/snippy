@@ -1398,7 +1398,7 @@ let mayLoad = 1, hasSideEffects = 0,
 
 // Load indirect with displacement operations.
 let canFoldAsLoad = 1, isReMaterializable = 1 in {
-  def LDDRdPtrQ
+  let Constraints = "@earlyclobber $reg" in def LDDRdPtrQ
       : FSTDLDD<0,
                 (outs GPR8
                  : $reg),

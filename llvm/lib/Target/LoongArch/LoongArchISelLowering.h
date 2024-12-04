@@ -206,8 +206,6 @@ public:
     return ISD::SIGN_EXTEND;
   }
 
-  ISD::NodeType getExtendForAtomicCmpSwapArg() const override;
-
   Register getRegisterByName(const char *RegName, LLT VT,
                              const MachineFunction &MF) const override;
   bool mayBeEmittedAsTailCall(const CallInst *CI) const override;

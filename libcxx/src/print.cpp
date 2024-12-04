@@ -8,25 +8,21 @@
 
 #include <__config>
 
-#include <cstdlib>
-#include <print>
-
-#include <__system_error/system_error.h>
-
-#include "filesystem/error.h"
-
 #if defined(_LIBCPP_WIN32API)
+
+#  include <cstdlib>
+#  include <print>
+
 #  define WIN32_LEAN_AND_MEAN
 #  define NOMINMAX
 #  include <io.h>
 #  include <windows.h>
-#elif __has_include(<unistd.h>)
-#  include <unistd.h>
-#endif
+
+#  include <__system_error/system_error.h>
+
+#  include "filesystem/error.h"
 
 _LIBCPP_BEGIN_NAMESPACE_STD
-
-#if defined(_LIBCPP_WIN32API)
 
 _LIBCPP_EXPORTED_FROM_ABI bool __is_windows_terminal(FILE* __stream) {
   // Note the Standard does this in one call, but it's unclear whether
@@ -56,9 +52,6 @@ __write_to_windows_console([[maybe_unused]] FILE* __stream, [[maybe_unused]] wst
 }
 #  endif // _LIBCPP_HAS_NO_WIDE_CHARACTERS
 
-#elif __has_include(<unistd.h>) // !_LIBCPP_WIN32API
-
-_LIBCPP_EXPORTED_FROM_ABI bool __is_posix_terminal(FILE* __stream) { return isatty(fileno(__stream)); }
-#endif
-
 _LIBCPP_END_NAMESPACE_STD
+
+#endif // !_LIBCPP_WIN32API

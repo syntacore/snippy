@@ -38,62 +38,38 @@
 
 #elif TEST_STD_VER == 17
 
-# if !defined(_LIBCPP_HAS_NO_THREADS)
-#   ifndef __cpp_lib_scoped_lock
-#     error "__cpp_lib_scoped_lock should be defined in c++17"
-#   endif
-#   if __cpp_lib_scoped_lock != 201703L
-#     error "__cpp_lib_scoped_lock should have the value 201703L in c++17"
-#   endif
-# else
-#   ifdef __cpp_lib_scoped_lock
-#     error "__cpp_lib_scoped_lock should not be defined when the requirement '!defined(_LIBCPP_HAS_NO_THREADS)' is not met!"
-#   endif
+# ifndef __cpp_lib_scoped_lock
+#   error "__cpp_lib_scoped_lock should be defined in c++17"
+# endif
+# if __cpp_lib_scoped_lock != 201703L
+#   error "__cpp_lib_scoped_lock should have the value 201703L in c++17"
 # endif
 
 #elif TEST_STD_VER == 20
 
-# if !defined(_LIBCPP_HAS_NO_THREADS)
-#   ifndef __cpp_lib_scoped_lock
-#     error "__cpp_lib_scoped_lock should be defined in c++20"
-#   endif
-#   if __cpp_lib_scoped_lock != 201703L
-#     error "__cpp_lib_scoped_lock should have the value 201703L in c++20"
-#   endif
-# else
-#   ifdef __cpp_lib_scoped_lock
-#     error "__cpp_lib_scoped_lock should not be defined when the requirement '!defined(_LIBCPP_HAS_NO_THREADS)' is not met!"
-#   endif
+# ifndef __cpp_lib_scoped_lock
+#   error "__cpp_lib_scoped_lock should be defined in c++20"
+# endif
+# if __cpp_lib_scoped_lock != 201703L
+#   error "__cpp_lib_scoped_lock should have the value 201703L in c++20"
 # endif
 
 #elif TEST_STD_VER == 23
 
-# if !defined(_LIBCPP_HAS_NO_THREADS)
-#   ifndef __cpp_lib_scoped_lock
-#     error "__cpp_lib_scoped_lock should be defined in c++23"
-#   endif
-#   if __cpp_lib_scoped_lock != 201703L
-#     error "__cpp_lib_scoped_lock should have the value 201703L in c++23"
-#   endif
-# else
-#   ifdef __cpp_lib_scoped_lock
-#     error "__cpp_lib_scoped_lock should not be defined when the requirement '!defined(_LIBCPP_HAS_NO_THREADS)' is not met!"
-#   endif
+# ifndef __cpp_lib_scoped_lock
+#   error "__cpp_lib_scoped_lock should be defined in c++23"
+# endif
+# if __cpp_lib_scoped_lock != 201703L
+#   error "__cpp_lib_scoped_lock should have the value 201703L in c++23"
 # endif
 
 #elif TEST_STD_VER > 23
 
-# if !defined(_LIBCPP_HAS_NO_THREADS)
-#   ifndef __cpp_lib_scoped_lock
-#     error "__cpp_lib_scoped_lock should be defined in c++26"
-#   endif
-#   if __cpp_lib_scoped_lock != 201703L
-#     error "__cpp_lib_scoped_lock should have the value 201703L in c++26"
-#   endif
-# else
-#   ifdef __cpp_lib_scoped_lock
-#     error "__cpp_lib_scoped_lock should not be defined when the requirement '!defined(_LIBCPP_HAS_NO_THREADS)' is not met!"
-#   endif
+# ifndef __cpp_lib_scoped_lock
+#   error "__cpp_lib_scoped_lock should be defined in c++26"
+# endif
+# if __cpp_lib_scoped_lock != 201703L
+#   error "__cpp_lib_scoped_lock should have the value 201703L in c++26"
 # endif
 
 #endif // TEST_STD_VER > 23

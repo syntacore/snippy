@@ -611,11 +611,6 @@ TEST_F(TokenAnnotatorTest, UnderstandsCasts) {
   EXPECT_TOKEN(Tokens[13], tok::r_paren, TT_Unknown);
   EXPECT_TOKEN(Tokens[14], tok::star, TT_BinaryOperator);
 
-  Tokens = annotate("#define foo(i) ((i) - bar)");
-  ASSERT_EQ(Tokens.size(), 14u) << Tokens;
-  EXPECT_TOKEN(Tokens[9], tok::r_paren, TT_Unknown);
-  EXPECT_TOKEN(Tokens[10], tok::minus, TT_BinaryOperator);
-
   Tokens = annotate("return (Foo) & 10;");
   ASSERT_EQ(Tokens.size(), 8u) << Tokens;
   EXPECT_TOKEN(Tokens[3], tok::r_paren, TT_Unknown);
@@ -2595,20 +2590,6 @@ TEST_F(TokenAnnotatorTest, BraceKind) {
   EXPECT_TOKEN(Tokens[4], tok::l_brace, TT_FunctionLBrace);
   EXPECT_BRACE_KIND(Tokens[4], BK_Block);
   EXPECT_BRACE_KIND(Tokens[6], BK_Block);
-
-  Tokens = annotate("struct Foo {\n"
-                    "  Foo() {};\n"
-                    "  ~Foo() {};\n"
-                    "};");
-  ASSERT_EQ(Tokens.size(), 19u) << Tokens;
-  EXPECT_TOKEN(Tokens[3], tok::identifier, TT_CtorDtorDeclName);
-  EXPECT_TOKEN(Tokens[6], tok::l_brace, TT_FunctionLBrace);
-  EXPECT_BRACE_KIND(Tokens[6], BK_Block);
-  EXPECT_BRACE_KIND(Tokens[7], BK_Block);
-  EXPECT_TOKEN(Tokens[10], tok::identifier, TT_CtorDtorDeclName);
-  EXPECT_TOKEN(Tokens[13], tok::l_brace, TT_FunctionLBrace);
-  EXPECT_BRACE_KIND(Tokens[13], BK_Block);
-  EXPECT_BRACE_KIND(Tokens[14], BK_Block);
 }
 
 TEST_F(TokenAnnotatorTest, StreamOperator) {

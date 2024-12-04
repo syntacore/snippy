@@ -1658,14 +1658,40 @@ AArch64TargetLowering::AArch64TargetLowering(const TargetMachine &TM,
   setMaxAtomicSizeInBitsSupported(128);
 
   if (Subtarget->isWindowsArm64EC()) {
-    // FIXME: are there intrinsics we need to exclude from this?
-    for (int i = 0; i < RTLIB::UNKNOWN_LIBCALL; ++i) {
-      auto code = static_cast<RTLIB::Libcall>(i);
-      auto libcallName = getLibcallName(code);
-      if ((libcallName != nullptr) && (libcallName[0] != '#')) {
-        setLibcallName(code, Saver.save(Twine("#") + libcallName).data());
-      }
-    }
+    // FIXME: are there other intrinsics we need to add here?
+    setLibcallName(RTLIB::MEMCPY, "#memcpy");
+    setLibcallName(RTLIB::MEMSET, "#memset");
+    setLibcallName(RTLIB::MEMMOVE, "#memmove");
+    setLibcallName(RTLIB::REM_F32, "#fmodf");
+    setLibcallName(RTLIB::REM_F64, "#fmod");
+    setLibcallName(RTLIB::FMA_F32, "#fmaf");
+    setLibcallName(RTLIB::FMA_F64, "#fma");
+    setLibcallName(RTLIB::SQRT_F32, "#sqrtf");
+    setLibcallName(RTLIB::SQRT_F64, "#sqrt");
+    setLibcallName(RTLIB::CBRT_F32, "#cbrtf");
+    setLibcallName(RTLIB::CBRT_F64, "#cbrt");
+    setLibcallName(RTLIB::LOG_F32, "#logf");
+    setLibcallName(RTLIB::LOG_F64, "#log");
+    setLibcallName(RTLIB::LOG2_F32, "#log2f");
+    setLibcallName(RTLIB::LOG2_F64, "#log2");
+    setLibcallName(RTLIB::LOG10_F32, "#log10f");
+    setLibcallName(RTLIB::LOG10_F64, "#log10");
+    setLibcallName(RTLIB::EXP_F32, "#expf");
+    setLibcallName(RTLIB::EXP_F64, "#exp");
+    setLibcallName(RTLIB::EXP2_F32, "#exp2f");
+    setLibcallName(RTLIB::EXP2_F64, "#exp2");
+    setLibcallName(RTLIB::EXP10_F32, "#exp10f");
+    setLibcallName(RTLIB::EXP10_F64, "#exp10");
+    setLibcallName(RTLIB::SIN_F32, "#sinf");
+    setLibcallName(RTLIB::SIN_F64, "#sin");
+    setLibcallName(RTLIB::COS_F32, "#cosf");
+    setLibcallName(RTLIB::COS_F64, "#cos");
+    setLibcallName(RTLIB::POW_F32, "#powf");
+    setLibcallName(RTLIB::POW_F64, "#pow");
+    setLibcallName(RTLIB::LDEXP_F32, "#ldexpf");
+    setLibcallName(RTLIB::LDEXP_F64, "#ldexp");
+    setLibcallName(RTLIB::FREXP_F32, "#frexpf");
+    setLibcallName(RTLIB::FREXP_F64, "#frexp");
   }
 }
 
@@ -2349,7 +2375,6 @@ const char *AArch64TargetLowering::getTargetNodeName(unsigned Opcode) const {
   switch ((AArch64ISD::NodeType)Opcode) {
   case AArch64ISD::FIRST_NUMBER:
     break;
-    MAKE_CASE(AArch64ISD::COALESCER_BARRIER)
     MAKE_CASE(AArch64ISD::SMSTART)
     MAKE_CASE(AArch64ISD::SMSTOP)
     MAKE_CASE(AArch64ISD::RESTORE_ZA)
@@ -7129,18 +7154,13 @@ void AArch64TargetLowering::saveVarArgRegisters(CCState &CCInfo,
   }
 }
 
-static bool isPassedInFPR(EVT VT) {
-  return VT.isFixedLengthVector() ||
-         (VT.isFloatingPoint() && !VT.isScalableVector());
-}
-
 /// LowerCallResult - Lower the result values of a call into the
 /// appropriate copies out of appropriate physical registers.
 SDValue AArch64TargetLowering::LowerCallResult(
     SDValue Chain, SDValue InGlue, CallingConv::ID CallConv, bool isVarArg,
     const SmallVectorImpl<CCValAssign> &RVLocs, const SDLoc &DL,
     SelectionDAG &DAG, SmallVectorImpl<SDValue> &InVals, bool isThisReturn,
-    SDValue ThisVal, bool RequiresSMChange) const {
+    SDValue ThisVal) const {
   DenseMap<unsigned, SDValue> CopiedRegs;
   // Copy all of the result registers out of their specified physreg.
   for (unsigned i = 0; i != RVLocs.size(); ++i) {
@@ -7184,10 +7204,6 @@ SDValue AArch64TargetLowering::LowerCallResult(
       Val = DAG.getZExtOrTrunc(Val, DL, VA.getValVT());
       break;
     }
-
-    if (RequiresSMChange && isPassedInFPR(VA.getValVT()))
-      Val = DAG.getNode(AArch64ISD::COALESCER_BARRIER, DL, Val.getValueType(),
-                        Val);
 
     InVals.push_back(Val);
   }
@@ -7899,12 +7915,6 @@ AArch64TargetLowering::LowerCall(CallLoweringInfo &CLI,
           return ArgReg.Reg == VA.getLocReg();
         });
       } else {
-        // Add an extra level of indirection for streaming mode changes by
-        // using a pseudo copy node that cannot be rematerialised between a
-        // smstart/smstop and the call by the simple register coalescer.
-        if (RequiresSMChange && isPassedInFPR(Arg.getValueType()))
-          Arg = DAG.getNode(AArch64ISD::COALESCER_BARRIER, DL,
-                            Arg.getValueType(), Arg);
         RegsToPass.emplace_back(VA.getLocReg(), Arg);
         RegsUsed.insert(VA.getLocReg());
         const TargetOptions &Options = DAG.getTarget().Options;
@@ -7981,19 +7991,11 @@ AArch64TargetLowering::LowerCall(CallLoweringInfo &CLI,
   }
 
   if (IsVarArg && Subtarget->isWindowsArm64EC()) {
-    SDValue ParamPtr = StackPtr;
-    if (IsTailCall) {
-      // Create a dummy object at the top of the stack that can be used to get
-      // the SP after the epilogue
-      int FI = MF.getFrameInfo().CreateFixedObject(1, FPDiff, true);
-      ParamPtr = DAG.getFrameIndex(FI, PtrVT);
-    }
-
     // For vararg calls, the Arm64EC ABI requires values in x4 and x5
     // describing the argument list.  x4 contains the address of the
     // first stack parameter. x5 contains the size in bytes of all parameters
     // passed on the stack.
-    RegsToPass.emplace_back(AArch64::X4, ParamPtr);
+    RegsToPass.emplace_back(AArch64::X4, StackPtr);
     RegsToPass.emplace_back(AArch64::X5,
                             DAG.getConstant(NumBytes, DL, MVT::i64));
   }
@@ -8149,9 +8151,9 @@ AArch64TargetLowering::LowerCall(CallLoweringInfo &CLI,
 
   // Handle result values, copying them out of physregs into vregs that we
   // return.
-  SDValue Result = LowerCallResult(
-      Chain, InGlue, CallConv, IsVarArg, RVLocs, DL, DAG, InVals, IsThisReturn,
-      IsThisReturn ? OutVals[0] : SDValue(), RequiresSMChange);
+  SDValue Result = LowerCallResult(Chain, InGlue, CallConv, IsVarArg, RVLocs,
+                                   DL, DAG, InVals, IsThisReturn,
+                                   IsThisReturn ? OutVals[0] : SDValue());
 
   if (!Ins.empty())
     InGlue = Result.getValue(Result->getNumValues() - 1);
@@ -10699,14 +10701,6 @@ AArch64TargetLowering::getRegForInlineAsmConstraint(
   if (StringRef("{cc}").equals_insensitive(Constraint) ||
       parseConstraintCode(Constraint) != AArch64CC::Invalid)
     return std::make_pair(unsigned(AArch64::NZCV), &AArch64::CCRRegClass);
-
-  if (Constraint == "{za}") {
-    return std::make_pair(unsigned(AArch64::ZA), &AArch64::MPRRegClass);
-  }
-
-  if (Constraint == "{zt0}") {
-    return std::make_pair(unsigned(AArch64::ZT0), &AArch64::ZTRRegClass);
-  }
 
   // Use the default implementation in TargetLowering to convert the register
   // constraint into a member of a register class.
@@ -24409,8 +24403,7 @@ void AArch64TargetLowering::ReplaceBITCASTResults(
     return;
   }
 
-  if (SrcVT.isVector() && SrcVT.getVectorElementType() == MVT::i1 &&
-      !VT.isVector())
+  if (SrcVT.isVector() && SrcVT.getVectorElementType() == MVT::i1)
     return replaceBoolVectorBitcast(N, Results, DAG);
 
   if (VT != MVT::i16 || (SrcVT != MVT::f16 && SrcVT != MVT::bf16))
@@ -26906,7 +26899,7 @@ bool AArch64TargetLowering::isComplexDeinterleavingOperationSupported(
     return false;
 
   // If the vector is scalable, SVE is enabled, implying support for complex
-  // numbers. Otherwise, we need to ensure complex number support is available
+  // numbers. Otherwirse, we need to ensure complex number support is avaialble
   if (!VTy->isScalableTy() && !Subtarget->hasComplxNum())
     return false;
 
@@ -26922,7 +26915,7 @@ bool AArch64TargetLowering::isComplexDeinterleavingOperationSupported(
       !llvm::isPowerOf2_32(VTyWidth))
     return false;
 
-  if (ScalarTy->isIntegerTy() && Subtarget->hasSVE2() && VTy->isScalableTy()) {
+  if (ScalarTy->isIntegerTy() && Subtarget->hasSVE2()) {
     unsigned ScalarWidth = ScalarTy->getScalarSizeInBits();
     return 8 <= ScalarWidth && ScalarWidth <= 64;
   }

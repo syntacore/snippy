@@ -577,7 +577,6 @@ AMDGPUTargetLowering::AMDGPUTargetLowering(const TargetMachine &TM,
                        ISD::AssertSext, ISD::INTRINSIC_WO_CHAIN});
 
   setMaxAtomicSizeInBitsSupported(64);
-  setMaxDivRemBitWidthSupported(64);
 }
 
 bool AMDGPUTargetLowering::mayIgnoreSignedZero(SDValue Op) const {

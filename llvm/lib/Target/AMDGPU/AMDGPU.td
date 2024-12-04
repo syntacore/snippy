@@ -1506,7 +1506,6 @@ def FeatureISAVersion12 : FeatureSet<
    FeatureFlatAtomicFaddF32Inst,
    FeatureImageInsts,
    FeatureExtendedImageInsts,
-   FeatureFP8ConversionInsts,
    FeaturePackedTID,
    FeatureVcmpxPermlaneHazard,
    FeatureSALUFloatInsts,

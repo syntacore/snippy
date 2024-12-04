@@ -2343,9 +2343,7 @@ Retry:
     return DAG.getNode(
         LoongArchISD::BSTRINS, DL, ValTy, N0.getOperand(0),
         DAG.getConstant(CN1->getSExtValue() >> MaskIdx0, DL, ValTy),
-        DAG.getConstant(ValBits == 32 ? (MaskIdx0 + (MaskLen0 & 31) - 1)
-                                      : (MaskIdx0 + MaskLen0 - 1),
-                        DL, GRLenVT),
+        DAG.getConstant((MaskIdx0 + MaskLen0 - 1), DL, GRLenVT),
         DAG.getConstant(MaskIdx0, DL, GRLenVT));
   }
 
@@ -4941,9 +4939,4 @@ bool LoongArchTargetLowering::hasAndNotCompare(SDValue Y) const {
     return false;
 
   return !isa<ConstantSDNode>(Y);
-}
-
-ISD::NodeType LoongArchTargetLowering::getExtendForAtomicCmpSwapArg() const {
-  // TODO: LAMCAS will use amcas{_DB,}.[bhwd] which does not require extension.
-  return ISD::SIGN_EXTEND;
 }

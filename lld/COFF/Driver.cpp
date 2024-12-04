@@ -1825,15 +1825,7 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
     }
   } else {
     config->repro = false;
-    if (std::optional<std::string> epoch =
-            Process::GetEnv("SOURCE_DATE_EPOCH")) {
-      StringRef value(*epoch);
-      if (value.getAsInteger(0, config->timestamp))
-        fatal(Twine("invalid SOURCE_DATE_EPOCH timestamp: ") + value +
-              ".  Expected 32-bit integer");
-    } else {
-      config->timestamp = time(nullptr);
-    }
+    config->timestamp = time(nullptr);
   }
 
   // Handle /alternatename

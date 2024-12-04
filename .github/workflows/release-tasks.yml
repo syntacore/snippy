@@ -28,7 +28,6 @@ jobs:
     name: Create a New Release
     runs-on: ubuntu-latest
     needs: validate-tag
-
     steps:
       - name: Install Dependencies
         run: |
@@ -41,9 +40,8 @@ jobs:
       - name: Create Release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          USER_TOKEN: ${{ secrets.RELEASE_TASKS_USER_TOKEN }}
         run: |
-          ./llvm/utils/release/./github-upload-release.py --token "$GITHUB_TOKEN" --release ${{ needs.validate-tag.outputs.release-version }} --user ${{ github.actor }} --user-token "$USER_TOKEN" create
+          ./llvm/utils/release/./github-upload-release.py --token "$GITHUB_TOKEN" --release ${{ needs.validate-tag.outputs.release-version }} --user ${{ github.actor }} create
   release-documentation:
     name: Build and Upload Release Documentation
     needs:

@@ -412,14 +412,11 @@ Instruction *InstCombinerImpl::simplifyMaskedScatter(IntrinsicInst &II) {
   if (auto *SplatPtr = getSplatValue(II.getArgOperand(1))) {
     // scatter(splat(value), splat(ptr), non-zero-mask) -> store value, ptr
     if (auto *SplatValue = getSplatValue(II.getArgOperand(0))) {
-      if (maskContainsAllOneOrUndef(ConstMask)) {
-        Align Alignment =
-            cast<ConstantInt>(II.getArgOperand(2))->getAlignValue();
-        StoreInst *S = new StoreInst(SplatValue, SplatPtr, /*IsVolatile=*/false,
-                                     Alignment);
-        S->copyMetadata(II);
-        return S;
-      }
+      Align Alignment = cast<ConstantInt>(II.getArgOperand(2))->getAlignValue();
+      StoreInst *S =
+          new StoreInst(SplatValue, SplatPtr, /*IsVolatile=*/false, Alignment);
+      S->copyMetadata(II);
+      return S;
     }
     // scatter(vector, splat(ptr), splat(true)) -> store extract(vector,
     // lastlane), ptr

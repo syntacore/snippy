@@ -28,8 +28,7 @@ def NeoverseV1Model : SchedMachineModel {
 
   list<Predicate> UnsupportedFeatures = !listconcat(SVE2Unsupported.F,
                                                     SMEUnsupported.F,
-                                                    [HasMTE, HasCPA,
-                                                    HasCSSC]);
+                                                    [HasMTE, HasCPA]);
 }
 
 //===----------------------------------------------------------------------===//

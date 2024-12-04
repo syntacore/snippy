@@ -102,23 +102,7 @@ protected:
         link(link), info(info) {}
 };
 
-struct SymbolAnchor {
-  uint64_t offset;
-  Defined *d;
-  bool end; // true for the anchor of st_value+st_size
-};
-
-struct RelaxAux {
-  // This records symbol start and end offsets which will be adjusted according
-  // to the nearest relocDeltas element.
-  SmallVector<SymbolAnchor, 0> anchors;
-  // For relocations[i], the actual offset is
-  //   r_offset - (i ? relocDeltas[i-1] : 0).
-  std::unique_ptr<uint32_t[]> relocDeltas;
-  // For relocations[i], the actual type is relocTypes[i].
-  std::unique_ptr<RelType[]> relocTypes;
-  SmallVector<uint32_t, 0> writes;
-};
+struct RISCVRelaxAux;
 
 // This corresponds to a section of an input file.
 class InputSectionBase : public SectionBase {
@@ -242,9 +226,9 @@ public:
     // basic blocks.
     JumpInstrMod *jumpInstrMod = nullptr;
 
-    // Auxiliary information for RISC-V and LoongArch linker relaxation.
-    // They do not use jumpInstrMod.
-    RelaxAux *relaxAux;
+    // Auxiliary information for RISC-V linker relaxation. RISC-V does not use
+    // jumpInstrMod.
+    RISCVRelaxAux *relaxAux;
 
     // The compressed content size when `compressed` is true.
     size_t compressedSize;

@@ -532,15 +532,10 @@ function build_llvmCore() {
       BuildTarget="clang"
       InstallTarget="install-clang install-clang-resource-headers"
       # compiler-rt builtins is needed on AIX to have a functional Phase 1 clang.
-      if [ "$System" = "AIX" ]; then
+      if [ "$System" = "AIX" -o "$Phase" != "1" ]; then
         BuildTarget="$BuildTarget runtimes"
-        InstallTarget="$InstallTarget install-builtins"
+        InstallTarget="$InstallTarget install-runtimes"
       fi
-    fi
-    if [ "$Phase" -eq "3" ]; then
-      # Build everything at once, with the proper parallelism and verbosity,
-      # in Phase 3.
-      BuildTarget=
     fi
 
     cd $ObjDir

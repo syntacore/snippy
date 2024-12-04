@@ -818,7 +818,6 @@ private:
 typedef KMPAffinity::Mask kmp_affin_mask_t;
 extern KMPAffinity *__kmp_affinity_dispatch;
 
-#ifndef KMP_OS_AIX
 class kmp_affinity_raii_t {
   kmp_affin_mask_t *mask;
   bool restored;
@@ -843,7 +842,6 @@ public:
   }
   ~kmp_affinity_raii_t() { restore(); }
 };
-#endif // !KMP_OS_AIX
 
 // Declare local char buffers with this size for printing debug and info
 // messages, using __kmp_affinity_print_mask().
@@ -1183,11 +1181,7 @@ extern void __kmp_init_target_task();
 #define KMP_MIN_STKSIZE ((size_t)(32 * 1024))
 #endif
 
-#if KMP_OS_AIX && KMP_ARCH_PPC
-#define KMP_MAX_STKSIZE 0x10000000 /* 256Mb max size on 32-bit AIX */
-#else
 #define KMP_MAX_STKSIZE (~((size_t)1 << ((sizeof(size_t) * (1 << 3)) - 1)))
-#endif
 
 #if KMP_ARCH_X86
 #define KMP_DEFAULT_STKSIZE ((size_t)(2 * 1024 * 1024))
@@ -2500,15 +2494,14 @@ typedef struct kmp_dephash_entry kmp_dephash_entry_t;
 #define KMP_DEP_MTX 0x4
 #define KMP_DEP_SET 0x8
 #define KMP_DEP_ALL 0x80
-// Compiler sends us this info. Note: some test cases contain an explicit copy
-// of this struct and should be in sync with any changes here.
+// Compiler sends us this info:
 typedef struct kmp_depend_info {
   kmp_intptr_t base_addr;
   size_t len;
   union {
     kmp_uint8 flag; // flag as an unsigned char
     struct { // flag as a set of 8 bits
-#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
       /* Same fields as in the #else branch, but in reverse order */
       unsigned all : 1;
       unsigned unused : 3;
@@ -2673,7 +2666,7 @@ typedef struct kmp_task_stack {
 #endif // BUILD_TIED_TASK_STACK
 
 typedef struct kmp_tasking_flags { /* Total struct must be exactly 32 bits */
-#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
   /* Same fields as in the #else branch, but in reverse order */
 #if OMPX_TASKGRAPH
   unsigned reserved31 : 6;
@@ -3913,7 +3906,7 @@ extern void __kmp_balanced_affinity(kmp_info_t *th, int team_size);
 #if KMP_WEIGHTED_ITERATIONS_SUPPORTED
 extern int __kmp_get_first_osid_with_ecore(void);
 #endif
-#if KMP_OS_LINUX || KMP_OS_FREEBSD || KMP_OS_AIX
+#if KMP_OS_LINUX || KMP_OS_FREEBSD
 extern int kmp_set_thread_affinity_mask_initial(void);
 #endif
 static inline void __kmp_assign_root_init_mask() {
