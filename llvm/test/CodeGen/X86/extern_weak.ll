@@ -6,8 +6,7 @@ declare extern_weak void @foo(...)
 
 define void @bar() {
 entry:
-  %cmp = icmp ne ptr @foo, null
-  br i1 %cmp, label %if.then, label %if.end
+  br i1 icmp ne (ptr @foo, ptr null), label %if.then, label %if.end
 
 if.then:
   tail call void (...) @foo( )

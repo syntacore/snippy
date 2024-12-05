@@ -90,11 +90,7 @@ private:
     auto &dir{std::get<parser::OmpLoopDirective>(beginDir.t)};
 
     nextIt = it;
-    while (++nextIt != block.end()) {
-      // Ignore compiler directives.
-      if (GetConstructIf<parser::CompilerDirective>(*nextIt))
-        continue;
-
+    if (++nextIt != block.end()) {
       if (auto *doCons{GetConstructIf<parser::DoConstruct>(*nextIt)}) {
         if (doCons->GetLoopControl()) {
           // move DoConstruct
@@ -115,14 +111,12 @@ private:
               "DO loop after the %s directive must have loop control"_err_en_US,
               parser::ToUpperCaseLetters(dir.source.ToString()));
         }
-      } else {
-        messages_.Say(dir.source,
-            "A DO loop must follow the %s directive"_err_en_US,
-            parser::ToUpperCaseLetters(dir.source.ToString()));
+        return; // found do-loop
       }
-      // If we get here, we either found a loop, or issued an error message.
-      return;
     }
+    messages_.Say(dir.source,
+        "A DO loop must follow the %s directive"_err_en_US,
+        parser::ToUpperCaseLetters(dir.source.ToString()));
   }
 
   void RewriteOmpAllocations(parser::ExecutionPart &body) {

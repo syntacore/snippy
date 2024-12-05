@@ -5,6 +5,7 @@
 // Check sparc-sun-solaris2.11, 32bit
 // RUN: %clang -ansi -### %s 2>&1 \
 // RUN:     --target=sparc-sun-solaris2.11 \
+// RUN:     --gcc-toolchain="" \
 // RUN:     --sysroot=%S/Inputs/solaris_sparc_tree \
 // RUN:   | FileCheck --check-prefix=CHECK-LD-SPARC32-ANSI %s
 // CHECK-LD-SPARC32-ANSI: values-Xc.o
@@ -12,6 +13,7 @@
 
 // RUN: %clang -std=c++98 -### %s 2>&1 \
 // RUN:     --target=sparc-sun-solaris2.11 \
+// RUN:     --gcc-toolchain="" \
 // RUN:     --sysroot=%S/Inputs/solaris_sparc_tree \
 // RUN:   | FileCheck --check-prefix=CHECK-LD-SPARC32-CPP98 %s
 // CHECK-LD-SPARC32-CPP98: values-Xc.o
@@ -19,6 +21,7 @@
 
 // RUN: %clang -std=c++11 -### %s 2>&1 \
 // RUN:     --target=sparc-sun-solaris2.11 \
+// RUN:     --gcc-toolchain="" \
 // RUN:     --sysroot=%S/Inputs/solaris_sparc_tree \
 // RUN:   | FileCheck --check-prefix=CHECK-LD-SPARC32-CPP11 %s
 // CHECK-LD-SPARC32-CPP11: values-Xc.o
@@ -26,6 +29,7 @@
 
 // RUN: %clang -std=gnu++98 -### %s 2>&1 \
 // RUN:     --target=sparc-sun-solaris2.11 \
+// RUN:     --gcc-toolchain="" \
 // RUN:     --sysroot=%S/Inputs/solaris_sparc_tree \
 // RUN:   | FileCheck --check-prefix=CHECK-LD-SPARC32-GNUPP98 %s
 // CHECK-LD-SPARC32-GNUPP98: values-Xa.o
@@ -34,6 +38,7 @@
 // Check i386-pc-solaris2.11, 32bit
 // RUN: %clang -ANSI -### %s 2>&1 \
 // RUN:     --target=i386-pc-solaris2.11 \
+// RUN:     --gcc-toolchain="" \
 // RUN:     --sysroot=%S/Inputs/solaris_x86_tree \
 // RUN:   | FileCheck --check-prefix=CHECK-LD-X32-ANSI %s
 // CHECK-LD-X32-ANSI: values-Xa.o

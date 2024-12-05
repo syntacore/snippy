@@ -229,8 +229,19 @@ public:
         m_remote_file(
             LLDB_OPT_SET_1, false, "remote-file", 'r', 0, eArgTypeFilename,
             "Fullpath to the file on the remote host if debugging remotely.") {
+    CommandArgumentEntry arg;
+    CommandArgumentData file_arg;
 
-    AddSimpleArgumentList(eArgTypeFilename);
+    // Define the first (and only) variant of this arg.
+    file_arg.arg_type = eArgTypeFilename;
+    file_arg.arg_repetition = eArgRepeatPlain;
+
+    // There is only one variant this argument could be; put it into the
+    // argument entry.
+    arg.push_back(file_arg);
+
+    // Push the data for the first argument into the m_arguments vector.
+    m_arguments.push_back(arg);
 
     m_option_group.Append(&m_arch_option, LLDB_OPT_SET_ALL, LLDB_OPT_SET_1);
     m_option_group.Append(&m_platform_options, LLDB_OPT_SET_ALL, 1);
@@ -245,6 +256,13 @@ public:
   ~CommandObjectTargetCreate() override = default;
 
   Options *GetOptions() override { return &m_option_group; }
+
+  void
+  HandleArgumentCompletion(CompletionRequest &request,
+                           OptionElementVector &opt_element_vector) override {
+    lldb_private::CommandCompletions::InvokeCommonCompletionCallbacks(
+        GetCommandInterpreter(), lldb::eDiskFileCompletion, request, nullptr);
+  }
 
 protected:
   void DoExecute(Args &command, CommandReturnObject &result) override {
@@ -492,7 +510,8 @@ public:
       : CommandObjectParsed(
             interpreter, "target select",
             "Select a target as the current target by target index.", nullptr) {
-    AddSimpleArgumentList(eArgTypeTargetID);
+    CommandArgumentData target_arg{eArgTypeTargetID, eArgRepeatPlain};
+    m_arguments.push_back({target_arg});
   }
 
   ~CommandObjectTargetSelect() override = default;
@@ -574,7 +593,8 @@ public:
     m_option_group.Append(&m_all_option, LLDB_OPT_SET_ALL, LLDB_OPT_SET_1);
     m_option_group.Append(&m_cleanup_option, LLDB_OPT_SET_ALL, LLDB_OPT_SET_1);
     m_option_group.Finalize();
-    AddSimpleArgumentList(eArgTypeTargetID, eArgRepeatStar);
+    CommandArgumentData target_arg{eArgTypeTargetID, eArgRepeatStar};
+    m_arguments.push_back({target_arg});
   }
 
   ~CommandObjectTargetDelete() override = default;
@@ -716,7 +736,19 @@ public:
             "A basename or fullpath to a shared library to use in the search "
             "for global "
             "variables. This option can be specified multiple times.") {
-    AddSimpleArgumentList(eArgTypeVarName, eArgRepeatPlus);
+    CommandArgumentEntry arg;
+    CommandArgumentData var_name_arg;
+
+    // Define the first (and only) variant of this arg.
+    var_name_arg.arg_type = eArgTypeVarName;
+    var_name_arg.arg_repetition = eArgRepeatPlus;
+
+    // There is only one variant this argument could be; put it into the
+    // argument entry.
+    arg.push_back(var_name_arg);
+
+    // Push the data for the first argument into the m_arguments vector.
+    m_arguments.push_back(arg);
 
     m_option_group.Append(&m_varobj_options, LLDB_OPT_SET_ALL, LLDB_OPT_SET_1);
     m_option_group.Append(&m_option_variable, LLDB_OPT_SET_ALL, LLDB_OPT_SET_1);
@@ -784,8 +816,7 @@ public:
 
     options.SetRootValueObjectName(root_name);
 
-    if (llvm::Error error = valobj_sp->Dump(s, options))
-      s << "error: " << toString(std::move(error));
+    valobj_sp->Dump(s, options);
   }
 
   static size_t GetVariableCallback(void *baton, const char *name,
@@ -1219,7 +1250,19 @@ public:
             interpreter, "target modules search-paths query",
             "Transform a path using the first applicable image search path.",
             nullptr, eCommandRequiresTarget) {
-    AddSimpleArgumentList(eArgTypeDirectoryName);
+    CommandArgumentEntry arg;
+    CommandArgumentData path_arg;
+
+    // Define the first (and only) variant of this arg.
+    path_arg.arg_type = eArgTypeDirectoryName;
+    path_arg.arg_repetition = eArgRepeatPlain;
+
+    // There is only one variant this argument could be; put it into the
+    // argument entry.
+    arg.push_back(path_arg);
+
+    // Push the data for the first argument into the m_arguments vector.
+    m_arguments.push_back(arg);
   }
 
   ~CommandObjectTargetModulesSearchPathsQuery() override = default;
@@ -1845,7 +1888,19 @@ public:
                                                const char *syntax,
                                                uint32_t flags = 0)
       : CommandObjectParsed(interpreter, name, help, syntax, flags) {
-    AddSimpleArgumentList(eArgTypeFilename, eArgRepeatStar);
+    CommandArgumentEntry arg;
+    CommandArgumentData file_arg;
+
+    // Define the first (and only) variant of this arg.
+    file_arg.arg_type = eArgTypeFilename;
+    file_arg.arg_repetition = eArgRepeatStar;
+
+    // There is only one variant this argument could be; put it into the
+    // argument entry.
+    arg.push_back(file_arg);
+
+    // Push the data for the first argument into the m_arguments vector.
+    m_arguments.push_back(arg);
   }
 
   ~CommandObjectTargetModulesModuleAutoComplete() override = default;
@@ -1870,7 +1925,19 @@ public:
       CommandInterpreter &interpreter, const char *name, const char *help,
       const char *syntax, uint32_t flags)
       : CommandObjectParsed(interpreter, name, help, syntax, flags) {
-    AddSimpleArgumentList(eArgTypeSourceFile, eArgRepeatPlus);
+    CommandArgumentEntry arg;
+    CommandArgumentData source_file_arg;
+
+    // Define the first (and only) variant of this arg.
+    source_file_arg.arg_type = eArgTypeSourceFile;
+    source_file_arg.arg_repetition = eArgRepeatPlus;
+
+    // There is only one variant this argument could be; put it into the
+    // argument entry.
+    arg.push_back(source_file_arg);
+
+    // Push the data for the first argument into the m_arguments vector.
+    m_arguments.push_back(arg);
   }
 
   ~CommandObjectTargetModulesSourceFileAutoComplete() override = default;
@@ -2174,7 +2241,8 @@ public:
             interpreter, "target modules dump pcm-info",
             "Dump information about the given clang module (pcm).") {
     // Take a single file argument.
-    AddSimpleArgumentList(eArgTypeFilename);
+    CommandArgumentData arg{eArgTypeFilename, eArgRepeatPlain};
+    m_arguments.push_back({arg});
   }
 
   ~CommandObjectTargetModulesDumpClangPCMInfo() override = default;
@@ -2713,12 +2781,20 @@ public:
                           LLDB_OPT_SET_1);
     m_option_group.Append(&m_symbol_file, LLDB_OPT_SET_ALL, LLDB_OPT_SET_1);
     m_option_group.Finalize();
-    AddSimpleArgumentList(eArgTypePath, eArgRepeatStar);
+    CommandArgumentData module_arg{eArgTypePath, eArgRepeatStar};
+    m_arguments.push_back({module_arg});
   }
 
   ~CommandObjectTargetModulesAdd() override = default;
 
   Options *GetOptions() override { return &m_option_group; }
+
+  void
+  HandleArgumentCompletion(CompletionRequest &request,
+                           OptionElementVector &opt_element_vector) override {
+    lldb_private::CommandCompletions::InvokeCommonCompletionCallbacks(
+        GetCommandInterpreter(), lldb::eDiskFileCompletion, request, nullptr);
+  }
 
 protected:
   OptionGroupOptions m_option_group;
@@ -3157,7 +3233,8 @@ public:
       : CommandObjectParsed(
             interpreter, "target modules list",
             "List current executable and dependent shared library images.") {
-    AddSimpleArgumentList(eArgTypeModule, eArgRepeatStar);
+    CommandArgumentData module_arg{eArgTypeShlibName, eArgRepeatStar};
+    m_arguments.push_back({module_arg});
   }
 
   ~CommandObjectTargetModulesList() override = default;
@@ -3377,19 +3454,15 @@ protected:
 
       case 'r': {
         size_t ref_count = 0;
-        char in_shared_cache = 'Y';
-
         ModuleSP module_sp(module->shared_from_this());
-        if (!ModuleList::ModuleIsInCache(module))
-          in_shared_cache = 'N';
         if (module_sp) {
           // Take one away to make sure we don't count our local "module_sp"
           ref_count = module_sp.use_count() - 1;
         }
         if (width)
-          strm.Printf("{%c %*" PRIu64 "}", in_shared_cache, width, (uint64_t)ref_count);
+          strm.Printf("{%*" PRIu64 "}", width, (uint64_t)ref_count);
         else
-          strm.Printf("{%c %" PRIu64 "}", in_shared_cache, (uint64_t)ref_count);
+          strm.Printf("{%" PRIu64 "}", (uint64_t)ref_count);
       } break;
 
       case 's':
@@ -3933,7 +4006,19 @@ public:
                             "Look up information within executable and "
                             "dependent shared library images.",
                             nullptr, eCommandRequiresTarget) {
-    AddSimpleArgumentList(eArgTypeFilename, eArgRepeatStar);
+    CommandArgumentEntry arg;
+    CommandArgumentData file_arg;
+
+    // Define the first (and only) variant of this arg.
+    file_arg.arg_type = eArgTypeFilename;
+    file_arg.arg_repetition = eArgRepeatStar;
+
+    // There is only one variant this argument could be; put it into the
+    // argument entry.
+    arg.push_back(file_arg);
+
+    // Push the data for the first argument into the m_arguments vector.
+    m_arguments.push_back(arg);
   }
 
   ~CommandObjectTargetModulesLookup() override = default;
@@ -4252,10 +4337,18 @@ public:
     m_option_group.Append(&m_current_stack_option, LLDB_OPT_SET_2,
                           LLDB_OPT_SET_2);
     m_option_group.Finalize();
-    AddSimpleArgumentList(eArgTypeFilename);
+    CommandArgumentData module_arg{eArgTypeShlibName, eArgRepeatPlain};
+    m_arguments.push_back({module_arg});
   }
 
   ~CommandObjectTargetSymbolsAdd() override = default;
+
+  void
+  HandleArgumentCompletion(CompletionRequest &request,
+                           OptionElementVector &opt_element_vector) override {
+    lldb_private::CommandCompletions::InvokeCommonCompletionCallbacks(
+        GetCommandInterpreter(), lldb::eDiskFileCompletion, request, nullptr);
+  }
 
   Options *GetOptions() override { return &m_option_group; }
 
@@ -4509,8 +4602,11 @@ protected:
 
     ModuleSpec module_spec;
     module_spec.GetUUID() = frame_module_sp->GetUUID();
-    module_spec.GetArchitecture() = frame_module_sp->GetArchitecture();
-    module_spec.GetFileSpec() = frame_module_sp->GetPlatformFileSpec();
+
+    if (FileSystem::Instance().Exists(frame_module_sp->GetPlatformFileSpec())) {
+      module_spec.GetArchitecture() = frame_module_sp->GetArchitecture();
+      module_spec.GetFileSpec() = frame_module_sp->GetPlatformFileSpec();
+    }
 
     if (!DownloadObjectAndSymbolFile(module_spec, result, flush)) {
       result.AppendError("unable to find debug symbols for the current frame");
@@ -4555,8 +4651,12 @@ protected:
 
       ModuleSpec module_spec;
       module_spec.GetUUID() = frame_module_sp->GetUUID();
-      module_spec.GetFileSpec() = frame_module_sp->GetPlatformFileSpec();
-      module_spec.GetArchitecture() = frame_module_sp->GetArchitecture();
+
+      if (FileSystem::Instance().Exists(
+              frame_module_sp->GetPlatformFileSpec())) {
+        module_spec.GetArchitecture() = frame_module_sp->GetArchitecture();
+        module_spec.GetFileSpec() = frame_module_sp->GetPlatformFileSpec();
+      }
 
       bool current_frame_flush = false;
       if (DownloadObjectAndSymbolFile(module_spec, result, current_frame_flush))
@@ -5084,7 +5184,8 @@ public:
       : CommandObjectParsed(interpreter, "target stop-hook delete",
                             "Delete a stop-hook.",
                             "target stop-hook delete [<idx>]") {
-    AddSimpleArgumentList(eArgTypeStopHookID, eArgRepeatStar);
+    CommandArgumentData hook_arg{eArgTypeStopHookID, eArgRepeatStar};
+    m_arguments.push_back({hook_arg});
   }
 
   ~CommandObjectTargetStopHookDelete() override = default;
@@ -5094,7 +5195,8 @@ public:
                            OptionElementVector &opt_element_vector) override {
     if (request.GetCursorIndex())
       return;
-    CommandObject::HandleArgumentCompletion(request, opt_element_vector);
+    lldb_private::CommandCompletions::InvokeCommonCompletionCallbacks(
+        GetCommandInterpreter(), lldb::eStopHookIDCompletion, request, nullptr);
   }
 
 protected:
@@ -5138,7 +5240,8 @@ public:
                                            bool enable, const char *name,
                                            const char *help, const char *syntax)
       : CommandObjectParsed(interpreter, name, help, syntax), m_enable(enable) {
-    AddSimpleArgumentList(eArgTypeStopHookID, eArgRepeatStar);
+    CommandArgumentData hook_arg{eArgTypeStopHookID, eArgRepeatStar};
+    m_arguments.push_back({hook_arg});
   }
 
   ~CommandObjectTargetStopHookEnableDisable() override = default;
@@ -5148,7 +5251,8 @@ public:
                            OptionElementVector &opt_element_vector) override {
     if (request.GetCursorIndex())
       return;
-    CommandObject::HandleArgumentCompletion(request, opt_element_vector);
+    lldb_private::CommandCompletions::InvokeCommonCompletionCallbacks(
+        GetCommandInterpreter(), lldb::eStopHookIDCompletion, request, nullptr);
   }
 
 protected:

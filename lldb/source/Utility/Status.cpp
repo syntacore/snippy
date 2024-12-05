@@ -92,7 +92,8 @@ llvm::Error Status::ToError() const {
   if (m_type == ErrorType::eErrorTypePOSIX)
     return llvm::errorCodeToError(
         std::error_code(m_code, std::generic_category()));
-  return llvm::createStringError(AsCString());
+  return llvm::make_error<llvm::StringError>(AsCString(),
+                                             llvm::inconvertibleErrorCode());
 }
 
 Status::~Status() = default;

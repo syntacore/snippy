@@ -13,6 +13,7 @@ import os
 
 class TestDAP_disassemble(lldbdap_testcase.DAPTestCaseBase):
     @skipIfWindows
+    @skipIfRemote
     def test_disassemble(self):
         """
         Tests the 'disassemble' request.
@@ -30,11 +31,11 @@ class TestDAP_disassemble(lldbdap_testcase.DAPTestCaseBase):
         self.continue_to_next_stop()
 
         pc_assembly = self.disassemble(frameIndex=0)
-        self.assertIn("location", pc_assembly, "Source location missing.")
-        self.assertIn("instruction", pc_assembly, "Assembly instruction missing.")
+        self.assertTrue("location" in pc_assembly, "Source location missing.")
+        self.assertTrue("instruction" in pc_assembly, "Assembly instruction missing.")
 
         # The calling frame (qsort) is coming from a system library, as a result
         # we should not have a source location.
         qsort_assembly = self.disassemble(frameIndex=1)
-        self.assertNotIn("location", qsort_assembly, "Source location not expected.")
-        self.assertIn("instruction", pc_assembly, "Assembly instruction missing.")
+        self.assertFalse("location" in qsort_assembly, "Source location not expected.")
+        self.assertTrue("instruction" in pc_assembly, "Assembly instruction missing.")

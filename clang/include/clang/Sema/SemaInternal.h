@@ -21,6 +21,10 @@
 
 namespace clang {
 
+inline PartialDiagnostic Sema::PDiag(unsigned DiagID) {
+  return PartialDiagnostic(DiagID, Context.getDiagAllocator());
+}
+
 inline bool
 FTIHasSingleVoidParameter(const DeclaratorChunk::FunctionTypeInfo &FTI) {
   return FTI.NumParams == 1 && !FTI.isVariadic &&

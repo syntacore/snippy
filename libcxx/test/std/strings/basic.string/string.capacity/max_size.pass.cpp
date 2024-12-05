@@ -8,11 +8,10 @@
 
 // UNSUPPORTED: no-exceptions
 
-// After changing the alignment of the allocated pointer from 16 to 8, the exception
-// thrown is no longer `bad_alloc` but instead length_error on systems using new
-// headers but a dylib that doesn't contain 04ce0ba.
+// After changing the alignment of the allocated pointer from 16 to 8, the exception thrown is no longer `bad_alloc`
+// but instead length_error on systems using new headers but older dylibs.
 //
-// XFAIL: using-built-library-before-llvm-19
+// XFAIL: stdlib=apple-libc++ && target={{.+}}-apple-macosx{{10.13|10.15|11.0}}
 
 // <string>
 

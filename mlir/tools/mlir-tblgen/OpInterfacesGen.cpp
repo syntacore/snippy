@@ -480,7 +480,7 @@ void InterfaceGenerator::emitTraitDecl(const Interface &interface,
     tblgen::FmtContext verifyCtx;
     verifyCtx.addSubst("_op", "op");
     os << llvm::formatv(
-              "    static ::llvm::LogicalResult {0}(::mlir::Operation *op) ",
+              "    static ::mlir::LogicalResult {0}(::mlir::Operation *op) ",
               (interface.verifyWithRegions() ? "verifyRegionTrait"
                                              : "verifyTrait"))
        << "{\n      " << tblgen::tgfmt(verify->trim(), &verifyCtx)
@@ -533,7 +533,7 @@ void InterfaceGenerator::emitInterfaceDecl(const Interface &interface) {
      << "struct " << interfaceTraitsName << " {\n";
   emitConceptDecl(interface);
   emitModelDecl(interface);
-  os << "};\n";
+  os << "};";
 
   // Emit the derived trait for the interface.
   os << "template <typename " << valueTemplate << ">\n";

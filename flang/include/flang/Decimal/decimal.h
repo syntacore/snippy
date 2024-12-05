@@ -12,7 +12,6 @@
 #ifndef FORTRAN_DECIMAL_DECIMAL_H_
 #define FORTRAN_DECIMAL_DECIMAL_H_
 
-#include "flang/Common/api-attrs.h"
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -66,27 +65,27 @@ enum DecimalConversionFlags {
 
 #ifdef __cplusplus
 template <int PREC>
-RT_API_ATTRS ConversionToDecimalResult ConvertToDecimal(char *, size_t,
+ConversionToDecimalResult ConvertToDecimal(char *, size_t,
     DecimalConversionFlags, int digits, enum FortranRounding rounding,
     BinaryFloatingPointNumber<PREC> x);
 
-extern template RT_API_ATTRS ConversionToDecimalResult ConvertToDecimal<8>(
-    char *, size_t, enum DecimalConversionFlags, int, enum FortranRounding,
+extern template ConversionToDecimalResult ConvertToDecimal<8>(char *, size_t,
+    enum DecimalConversionFlags, int, enum FortranRounding,
     BinaryFloatingPointNumber<8>);
-extern template RT_API_ATTRS ConversionToDecimalResult ConvertToDecimal<11>(
-    char *, size_t, enum DecimalConversionFlags, int, enum FortranRounding,
+extern template ConversionToDecimalResult ConvertToDecimal<11>(char *, size_t,
+    enum DecimalConversionFlags, int, enum FortranRounding,
     BinaryFloatingPointNumber<11>);
-extern template RT_API_ATTRS ConversionToDecimalResult ConvertToDecimal<24>(
-    char *, size_t, enum DecimalConversionFlags, int, enum FortranRounding,
+extern template ConversionToDecimalResult ConvertToDecimal<24>(char *, size_t,
+    enum DecimalConversionFlags, int, enum FortranRounding,
     BinaryFloatingPointNumber<24>);
-extern template RT_API_ATTRS ConversionToDecimalResult ConvertToDecimal<53>(
-    char *, size_t, enum DecimalConversionFlags, int, enum FortranRounding,
+extern template ConversionToDecimalResult ConvertToDecimal<53>(char *, size_t,
+    enum DecimalConversionFlags, int, enum FortranRounding,
     BinaryFloatingPointNumber<53>);
-extern template RT_API_ATTRS ConversionToDecimalResult ConvertToDecimal<64>(
-    char *, size_t, enum DecimalConversionFlags, int, enum FortranRounding,
+extern template ConversionToDecimalResult ConvertToDecimal<64>(char *, size_t,
+    enum DecimalConversionFlags, int, enum FortranRounding,
     BinaryFloatingPointNumber<64>);
-extern template RT_API_ATTRS ConversionToDecimalResult ConvertToDecimal<113>(
-    char *, size_t, enum DecimalConversionFlags, int, enum FortranRounding,
+extern template ConversionToDecimalResult ConvertToDecimal<113>(char *, size_t,
+    enum DecimalConversionFlags, int, enum FortranRounding,
     BinaryFloatingPointNumber<113>);
 
 template <int PREC> struct ConversionToBinaryResult {
@@ -95,20 +94,20 @@ template <int PREC> struct ConversionToBinaryResult {
 };
 
 template <int PREC>
-RT_API_ATTRS ConversionToBinaryResult<PREC> ConvertToBinary(const char *&,
+ConversionToBinaryResult<PREC> ConvertToBinary(const char *&,
     enum FortranRounding = RoundNearest, const char *end = nullptr);
 
-extern template RT_API_ATTRS ConversionToBinaryResult<8> ConvertToBinary<8>(
+extern template ConversionToBinaryResult<8> ConvertToBinary<8>(
     const char *&, enum FortranRounding, const char *end);
-extern template RT_API_ATTRS ConversionToBinaryResult<11> ConvertToBinary<11>(
+extern template ConversionToBinaryResult<11> ConvertToBinary<11>(
     const char *&, enum FortranRounding, const char *end);
-extern template RT_API_ATTRS ConversionToBinaryResult<24> ConvertToBinary<24>(
+extern template ConversionToBinaryResult<24> ConvertToBinary<24>(
     const char *&, enum FortranRounding, const char *end);
-extern template RT_API_ATTRS ConversionToBinaryResult<53> ConvertToBinary<53>(
+extern template ConversionToBinaryResult<53> ConvertToBinary<53>(
     const char *&, enum FortranRounding, const char *end);
-extern template RT_API_ATTRS ConversionToBinaryResult<64> ConvertToBinary<64>(
+extern template ConversionToBinaryResult<64> ConvertToBinary<64>(
     const char *&, enum FortranRounding, const char *end);
-extern template RT_API_ATTRS ConversionToBinaryResult<113> ConvertToBinary<113>(
+extern template ConversionToBinaryResult<113> ConvertToBinary<113>(
     const char *&, enum FortranRounding, const char *end);
 } // namespace Fortran::decimal
 extern "C" {
@@ -117,21 +116,21 @@ extern "C" {
 #define NS(x) x
 #endif /* C++ */
 
-RT_API_ATTRS struct NS(ConversionToDecimalResult)
+struct NS(ConversionToDecimalResult)
     ConvertFloatToDecimal(char *, size_t, enum NS(DecimalConversionFlags),
         int digits, enum NS(FortranRounding), float);
-RT_API_ATTRS struct NS(ConversionToDecimalResult)
+struct NS(ConversionToDecimalResult)
     ConvertDoubleToDecimal(char *, size_t, enum NS(DecimalConversionFlags),
         int digits, enum NS(FortranRounding), double);
-RT_API_ATTRS struct NS(ConversionToDecimalResult)
+struct NS(ConversionToDecimalResult)
     ConvertLongDoubleToDecimal(char *, size_t, enum NS(DecimalConversionFlags),
         int digits, enum NS(FortranRounding), long double);
 
-RT_API_ATTRS enum NS(ConversionResultFlags)
+enum NS(ConversionResultFlags)
     ConvertDecimalToFloat(const char **, float *, enum NS(FortranRounding));
-RT_API_ATTRS enum NS(ConversionResultFlags)
+enum NS(ConversionResultFlags)
     ConvertDecimalToDouble(const char **, double *, enum NS(FortranRounding));
-RT_API_ATTRS enum NS(ConversionResultFlags) ConvertDecimalToLongDouble(
+enum NS(ConversionResultFlags) ConvertDecimalToLongDouble(
     const char **, long double *, enum NS(FortranRounding));
 #undef NS
 #ifdef __cplusplus

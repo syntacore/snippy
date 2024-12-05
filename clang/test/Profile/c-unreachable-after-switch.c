@@ -5,11 +5,11 @@
 // CHECK-LABEL: @foo()
 // CHECK: store {{.*}} @[[C]]
 void foo(void) {
-  // CHECK: store {{.*}} @[[C]], i64 16)
+  // CHECK: store {{.*}} @[[C]], i64 0, i64 2
   switch (0) {
   default:
     return;
   }
   // We shouldn't emit the unreachable counter. This used to crash in GlobalDCE.
-  // CHECK-NOT: store {{.*}} @[[C]], i64 8)
+  // CHECK-NOT: store {{.*}} @[[C]], i64 0, i64 1}
 }

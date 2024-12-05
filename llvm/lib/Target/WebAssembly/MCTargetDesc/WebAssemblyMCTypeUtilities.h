@@ -32,7 +32,6 @@ enum class BlockType : unsigned {
   V128 = unsigned(wasm::ValType::V128),
   Externref = unsigned(wasm::ValType::EXTERNREF),
   Funcref = unsigned(wasm::ValType::FUNCREF),
-  Exnref = unsigned(wasm::ValType::EXNREF),
   // Multivalue blocks (and other non-void blocks) are only emitted when the
   // blocks will never be exited and are at the ends of functions (see
   // WebAssemblyCFGStackify::fixEndsAtEndOfFunction). They also are never made
@@ -42,13 +41,12 @@ enum class BlockType : unsigned {
 };
 
 inline bool isRefType(wasm::ValType Type) {
-  return Type == wasm::ValType::EXTERNREF || Type == wasm::ValType::FUNCREF ||
-         Type == wasm::ValType::EXNREF;
+  return Type == wasm::ValType::EXTERNREF || Type == wasm::ValType::FUNCREF;
 }
 
 // Convert ValType or a list/signature of ValTypes to a string.
 
-// Convert an unsigned integer, which can be among wasm::ValType enum, to its
+// Convert an unsinged integer, which can be among wasm::ValType enum, to its
 // type name string. If the input is not within wasm::ValType, returns
 // "invalid_type".
 const char *anyTypeToString(unsigned Type);

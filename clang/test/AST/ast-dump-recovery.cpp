@@ -413,19 +413,6 @@ void RecoveryExprForInvalidDecls(Unknown InvalidDecl) {
   // CHECK-NEXT: `-RecoveryExpr {{.*}} '<dependent type>'
 }
 
-void InitializerOfInvalidDecl() {
-  int ValidDecl;
-  Unkown InvalidDecl = ValidDecl;
-  // CHECK:      VarDecl {{.*}} invalid InvalidDecl
-  // CHECK-NEXT: `-RecoveryExpr {{.*}} '<dependent type>' contains-errors
-  // CHECK-NEXT:   `-DeclRefExpr {{.*}} 'int' lvalue Var {{.*}} 'ValidDecl'
-
-  Unknown InvalidDeclWithInvalidInit = Invalid;
-  // CHECK:      VarDecl {{.*}} invalid InvalidDeclWithInvalidInit
-  // CHECK-NEXT: `-RecoveryExpr {{.*}} '<dependent type>' contains-errors
-  // CHECK-NOT:    `-TypoExpr
-}
-
 void RecoverToAnInvalidDecl() {
   Unknown* foo; // invalid decl
   goo; // the typo was correct to the invalid foo.

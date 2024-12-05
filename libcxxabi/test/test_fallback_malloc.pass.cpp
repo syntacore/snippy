@@ -11,7 +11,7 @@
 #include <cassert>
 #include <inttypes.h>
 
-#include <__thread/support.h>
+#include <__threading_support>
 
 // UNSUPPORTED: c++03
 // UNSUPPORTED: modules-build && no-threads

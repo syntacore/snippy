@@ -15,8 +15,6 @@
 #include <algorithm>
 #include <cmath>
 
-#define DEBUG_TYPE "exegesis-latency-benchmarkrunner"
-
 namespace llvm {
 namespace exegesis {
 
@@ -35,7 +33,7 @@ LatencyBenchmarkRunner::LatencyBenchmarkRunner(
 
 LatencyBenchmarkRunner::~LatencyBenchmarkRunner() = default;
 
-static double computeVariance(const SmallVector<int64_t, 4> &Values) {
+static double computeVariance(const llvm::SmallVector<int64_t, 4> &Values) {
   if (Values.empty())
     return 0.0;
   double Sum = std::accumulate(Values.begin(), Values.end(), 0.0);
@@ -49,19 +47,19 @@ static double computeVariance(const SmallVector<int64_t, 4> &Values) {
   return Ret / Values.size();
 }
 
-static int64_t findMin(const SmallVector<int64_t, 4> &Values) {
+static int64_t findMin(const llvm::SmallVector<int64_t, 4> &Values) {
   if (Values.empty())
     return 0;
-  return *llvm::min_element(Values);
+  return *std::min_element(Values.begin(), Values.end());
 }
 
-static int64_t findMax(const SmallVector<int64_t, 4> &Values) {
+static int64_t findMax(const llvm::SmallVector<int64_t, 4> &Values) {
   if (Values.empty())
     return 0;
-  return *llvm::max_element(Values);
+  return *std::max_element(Values.begin(), Values.end());
 }
 
-static int64_t findMean(const SmallVector<int64_t, 4> &Values) {
+static int64_t findMean(const llvm::SmallVector<int64_t, 4> &Values) {
   if (Values.empty())
     return 0;
   return std::accumulate(Values.begin(), Values.end(), 0.0) /
@@ -73,7 +71,7 @@ Expected<std::vector<BenchmarkMeasure>> LatencyBenchmarkRunner::runMeasurements(
   // Cycle measurements include some overhead from the kernel. Repeat the
   // measure several times and return the aggregated value, as specified by
   // ResultAggMode.
-  SmallVector<int64_t, 4> AccumulatedValues;
+  llvm::SmallVector<int64_t, 4> AccumulatedValues;
   double MinVariance = std::numeric_limits<double>::infinity();
   const PfmCountersInfo &PCI = State.getPfmCounters();
   const char *CounterName = PCI.CycleCounter;
@@ -93,11 +91,9 @@ Expected<std::vector<BenchmarkMeasure>> LatencyBenchmarkRunner::runMeasurements(
     if (!ExpectedCounterValues)
       return ExpectedCounterValues.takeError();
     ValuesCount = ExpectedCounterValues.get().size();
-    if (ValuesCount == 1) {
-      LLVM_DEBUG(dbgs() << "Latency value: " << ExpectedCounterValues.get()[0]
-                        << "\n");
+    if (ValuesCount == 1)
       AccumulatedValues.push_back(ExpectedCounterValues.get()[0]);
-    } else {
+    else {
       // We'll keep the reading with lowest variance (ie., most stable)
       double Variance = computeVariance(*ExpectedCounterValues);
       if (MinVariance > Variance) {
@@ -106,11 +102,8 @@ Expected<std::vector<BenchmarkMeasure>> LatencyBenchmarkRunner::runMeasurements(
       }
     }
 
-    for (size_t I = 0; I < ValCounterValues.size(); ++I) {
-      LLVM_DEBUG(dbgs() << getValidationEventName(ValidationCounters[I]) << ": "
-                        << IterationValCounterValues[I] << "\n");
+    for (size_t I = 0; I < ValCounterValues.size(); ++I)
       ValCounterValues[I] += IterationValCounterValues[I];
-    }
   }
 
   std::map<ValidationEvent, int64_t> ValidationInfo;
@@ -132,8 +125,8 @@ Expected<std::vector<BenchmarkMeasure>> LatencyBenchmarkRunner::runMeasurements(
   switch (ResultAggMode) {
   case Benchmark::MinVariance: {
     if (ValuesCount == 1)
-      errs() << "Each sample only has one value. result-aggregation-mode "
-                "of min-variance is probably non-sensical\n";
+      llvm::errs() << "Each sample only has one value. result-aggregation-mode "
+                      "of min-variance is probably non-sensical\n";
     std::vector<BenchmarkMeasure> Result;
     Result.reserve(AccumulatedValues.size());
     for (const int64_t Value : AccumulatedValues)
@@ -160,10 +153,10 @@ Expected<std::vector<BenchmarkMeasure>> LatencyBenchmarkRunner::runMeasurements(
     return std::move(Result);
   }
   }
-  return make_error<Failure>(Twine("Unexpected benchmark mode(")
-                                 .concat(std::to_string(Mode))
-                                 .concat(" and unexpected ResultAggMode ")
-                                 .concat(std::to_string(ResultAggMode)));
+  return llvm::make_error<Failure>(llvm::Twine("Unexpected benchmark mode(")
+                                       .concat(std::to_string(Mode))
+                                       .concat(" and unexpected ResultAggMode ")
+                                       .concat(std::to_string(ResultAggMode)));
 }
 
 } // namespace exegesis

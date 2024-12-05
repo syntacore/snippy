@@ -26,6 +26,7 @@ function(clang_tablegen)
 
   if(CTG_TARGET)
     add_public_tablegen_target(${CTG_TARGET})
+    set_target_properties( ${CTG_TARGET} PROPERTIES FOLDER "Clang tablegenning")
     set_property(GLOBAL APPEND PROPERTY CLANG_TABLEGEN_TARGETS ${CTG_TARGET})
   endif()
 endfunction(clang_tablegen)
@@ -96,12 +97,8 @@ macro(add_clang_library name)
     else()
       set(LIBTYPE STATIC)
     endif()
-    if(NOT XCODE AND NOT MSVC_IDE)
+    if(NOT XCODE)
       # The Xcode generator doesn't handle object libraries correctly.
-      # The Visual Studio CMake generator does handle object libraries
-      # correctly, but it is preferable to list the libraries with their
-      # source files (instead of the object files and the source files in
-      # a separate target in the "Object Libraries" folder)
       list(APPEND LIBTYPE OBJECT)
     endif()
     set_property(GLOBAL APPEND PROPERTY CLANG_STATIC_LIBS ${name})
@@ -141,11 +138,13 @@ macro(add_clang_library name)
     endif()
   endforeach()
 
+  set_target_properties(${name} PROPERTIES FOLDER "Clang libraries")
   set_clang_windows_version_resource_properties(${name})
 endmacro(add_clang_library)
 
 macro(add_clang_executable name)
   add_llvm_executable( ${name} ${ARGN} )
+  set_target_properties(${name} PROPERTIES FOLDER "Clang executables")
   set_clang_windows_version_resource_properties(${name})
 endmacro(add_clang_executable)
 

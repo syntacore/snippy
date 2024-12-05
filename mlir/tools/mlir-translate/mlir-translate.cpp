@@ -12,7 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/InitAllTranslations.h"
-#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Tools/mlir-translate/MlirTranslateMain.h"
 
 using namespace mlir;
@@ -23,7 +23,6 @@ void registerTestRoundtripSPIRV();
 void registerTestRoundtripDebugSPIRV();
 #ifdef MLIR_INCLUDE_TESTS
 void registerTestToLLVMIR();
-void registerTestFromLLVMIR();
 #endif
 } // namespace mlir
 
@@ -32,7 +31,6 @@ static void registerTestTranslations() {
   registerTestRoundtripDebugSPIRV();
 #ifdef MLIR_INCLUDE_TESTS
   registerTestToLLVMIR();
-  registerTestFromLLVMIR();
 #endif
 }
 

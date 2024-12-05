@@ -55,7 +55,6 @@ if(CLANG_VENDOR)
 endif()
 
 add_clang_library(clangBasic
-  ASTSourceDescriptor.cpp
   Attributes.cpp
   Builtins.cpp
   CLWarnings.cpp
@@ -131,9 +130,6 @@ add_clang_library(clangBasic
   DEPENDS
   omp_gen
   ClangDriverOptions
-  # These generated headers are included transitively.
-  ARMTargetParserTableGen
-  AArch64TargetParserTableGen
   )
 
 target_link_libraries(clangBasic

@@ -25,11 +25,9 @@ public:
   }
 
   bool MightHaveChildren() override { return true; }
-  lldb::ChildCacheState Update() override;
-  llvm::Expected<uint32_t> CalculateNumChildren() override {
-    return m_elements.size();
-  }
-  ValueObjectSP GetChildAtIndex(uint32_t idx) override;
+  bool Update() override;
+  size_t CalculateNumChildren() override { return m_elements.size(); }
+  ValueObjectSP GetChildAtIndex(size_t idx) override;
 
 private:
   // The lifetime of a ValueObject and all its derivative ValueObjects
@@ -42,7 +40,7 @@ private:
 };
 }
 
-lldb::ChildCacheState TupleFrontEnd::Update() {
+bool TupleFrontEnd::Update() {
   m_elements.clear();
   m_base = nullptr;
 
@@ -53,14 +51,14 @@ lldb::ChildCacheState TupleFrontEnd::Update() {
     base_sp = m_backend.GetChildMemberWithName("base_");
   }
   if (!base_sp)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
   m_base = base_sp.get();
   m_elements.assign(base_sp->GetCompilerType().GetNumDirectBaseClasses(),
                     nullptr);
-  return lldb::ChildCacheState::eRefetch;
+  return false;
 }
 
-ValueObjectSP TupleFrontEnd::GetChildAtIndex(uint32_t idx) {
+ValueObjectSP TupleFrontEnd::GetChildAtIndex(size_t idx) {
   if (idx >= m_elements.size())
     return ValueObjectSP();
   if (!m_base)

@@ -27,7 +27,7 @@ class GCNILPScheduler {
   };
 
   SpecificBumpPtrAllocator<Candidate> Alloc;
-  using Queue = simple_ilist<Candidate>;
+  typedef simple_ilist<Candidate> Queue;
   Queue PendingQueue;
   Queue AvailQueue;
   unsigned CurQueueId = 0;
@@ -224,11 +224,13 @@ const SUnit *GCNILPScheduler::pickBest(const SUnit *left, const SUnit *right)
       return result > 0 ? right : left;
     return left;
   }
-  if (left->getHeight() != right->getHeight())
-    return (left->getHeight() > right->getHeight()) ? right : left;
+  else {
+    if (left->getHeight() != right->getHeight())
+      return (left->getHeight() > right->getHeight()) ? right : left;
 
-  if (left->getDepth() != right->getDepth())
-    return (left->getDepth() < right->getDepth()) ? right : left;
+    if (left->getDepth() != right->getDepth())
+      return (left->getDepth() < right->getDepth()) ? right : left;
+  }
 
   assert(left->NodeQueueId && right->NodeQueueId &&
         "NodeQueueId cannot be zero");
@@ -311,11 +313,11 @@ GCNILPScheduler::schedule(ArrayRef<const SUnit*> BotRoots,
   Schedule.reserve(SUnits.size());
   while (true) {
     if (AvailQueue.empty() && !PendingQueue.empty()) {
-      auto EarliestSU =
-          llvm::min_element(PendingQueue, [=](const Candidate &C1,
-                                              const Candidate &C2) {
-            return C1.SU->getHeight() < C2.SU->getHeight();
-          })->SU;
+      auto EarliestSU = std::min_element(
+        PendingQueue.begin(), PendingQueue.end(),
+        [=](const Candidate& C1, const Candidate& C2) {
+        return C1.SU->getHeight() < C2.SU->getHeight();
+      })->SU;
       advanceToCycle(std::max(CurCycle + 1, EarliestSU->getHeight()));
     }
     if (AvailQueue.empty())
@@ -357,4 +359,4 @@ std::vector<const SUnit*> makeGCNILPScheduler(ArrayRef<const SUnit*> BotRoots,
   GCNILPScheduler S;
   return S.schedule(BotRoots, DAG);
 }
-} // namespace llvm
+}

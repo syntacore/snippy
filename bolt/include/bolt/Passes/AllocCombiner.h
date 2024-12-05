@@ -33,7 +33,7 @@ public:
   }
 
   /// Pass entry point
-  Error runOnFunctions(BinaryContext &BC) override;
+  void runOnFunctions(BinaryContext &BC) override;
 };
 
 } // namespace bolt

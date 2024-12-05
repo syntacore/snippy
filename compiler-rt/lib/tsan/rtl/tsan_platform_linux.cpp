@@ -215,7 +215,7 @@ void InitializeShadowMemoryPlatform() {
 #endif  // #if !SANITIZER_GO
 
 #  if !SANITIZER_GO
-static void ReExecIfNeeded(bool ignore_heap) {
+static void ReExecIfNeeded() {
   // Go maps shadow memory lazily and works fine with limited address space.
   // Unlimited stack is not a problem as well, because the executable
   // is not compiled with -pie.
@@ -244,12 +244,12 @@ static void ReExecIfNeeded(bool ignore_heap) {
   }
 
 #    if SANITIZER_LINUX
-#      if SANITIZER_ANDROID && (defined(__aarch64__) || defined(__x86_64__))
   // ASLR personality check.
   int old_personality = personality(0xffffffff);
   bool aslr_on =
       (old_personality != -1) && ((old_personality & ADDR_NO_RANDOMIZE) == 0);
 
+#      if SANITIZER_ANDROID && (defined(__aarch64__) || defined(__x86_64__))
   // After patch "arm64: mm: support ARCH_MMAP_RND_BITS." is introduced in
   // linux kernel, the random gap between stack and mapped area is increased
   // from 128M to 36G on 39-bit aarch64. As it is almost impossible to cover
@@ -266,15 +266,7 @@ static void ReExecIfNeeded(bool ignore_heap) {
 
   if (reexec) {
     // Don't check the address space since we're going to re-exec anyway.
-  } else if (!CheckAndProtect(false, ignore_heap, false)) {
-    // ASLR personality check.
-    // N.B. 'personality' is sometimes forbidden by sandboxes, so we only call
-    // this as a last resort (when the memory mapping is incompatible and TSan
-    // would fail anyway).
-    int old_personality = personality(0xffffffff);
-    bool aslr_on =
-        (old_personality != -1) && ((old_personality & ADDR_NO_RANDOMIZE) == 0);
-
+  } else if (!CheckAndProtect(false, false, false)) {
     if (aslr_on) {
       // Disable ASLR if the memory layout was incompatible.
       // Alternatively, we could just keep re-execing until we get lucky
@@ -290,11 +282,10 @@ static void ReExecIfNeeded(bool ignore_heap) {
       CHECK_NE(personality(old_personality | ADDR_NO_RANDOMIZE), -1);
       reexec = true;
     } else {
-      Printf(
-          "FATAL: ThreadSanitizer: memory layout is incompatible, "
-          "even though ASLR is disabled.\n"
-          "Please file a bug.\n");
-      DumpProcessMap();
+      VReport(1,
+              "FATAL: ThreadSanitizer: memory layout is incompatible, "
+              "even though ASLR is disabled.\n"
+              "Please file a bug.\n");
       Die();
     }
   }
@@ -377,8 +368,7 @@ void InitializePlatformEarly() {
 #  endif
 
 #  if !SANITIZER_GO
-  // Heap has not been allocated yet
-  ReExecIfNeeded(false);
+  ReExecIfNeeded();
 #  endif
 }
 
@@ -396,17 +386,6 @@ void InitializePlatform() {
 #    endif
   }
 
-  // We called ReExecIfNeeded() in InitializePlatformEarly(), but there are
-  // intervening allocations that result in an edge case:
-  // 1) InitializePlatformEarly(): memory layout is compatible
-  // 2) Intervening allocations happen
-  // 3) InitializePlatform(): memory layout is incompatible and fails
-  //    CheckAndProtect()
-#    if !SANITIZER_GO
-  // Heap has already been allocated
-  ReExecIfNeeded(true);
-#    endif
-
   // Earlier initialization steps already re-exec'ed until we got a compatible
   // memory layout, so we don't expect any more issues here.
   if (!CheckAndProtect(true, true, true)) {
@@ -414,7 +393,6 @@ void InitializePlatform() {
         "FATAL: ThreadSanitizer: unexpectedly found incompatible memory "
         "layout.\n");
     Printf("FATAL: Please file a bug.\n");
-    DumpProcessMap();
     Die();
   }
 

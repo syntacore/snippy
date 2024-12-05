@@ -12,13 +12,12 @@ add_mlir_conversion_library(MLIRAffineToStandard
 
   LINK_LIBS PUBLIC
   MLIRAffineDialect
-  MLIRAffineTransforms
   MLIRAffineUtils
   MLIRArithDialect
   MLIRIR
   MLIRMemRefDialect
-  MLIRPass
   MLIRSCFDialect
+  MLIRPass
   MLIRTransforms
   MLIRVectorDialect
   )

@@ -26,6 +26,9 @@ template <typename FnTy> void ForeachKnownBits(unsigned Bits, FnTy Fn) {
     for (unsigned One = 0; One < Max; ++One) {
       Known.Zero = Zero;
       Known.One = One;
+      if (Known.hasConflict())
+        continue;
+
       Fn(Known);
     }
   }
@@ -34,19 +37,13 @@ template <typename FnTy> void ForeachKnownBits(unsigned Bits, FnTy Fn) {
 template <typename FnTy>
 void ForeachNumInKnownBits(const KnownBits &Known, FnTy Fn) {
   unsigned Bits = Known.getBitWidth();
-  assert(Bits < 32);
-  unsigned Max = 1u << Bits;
-  unsigned Zero = Known.Zero.getZExtValue();
-  unsigned One = Known.One.getZExtValue();
-
-  if (Zero & One) {
-    // Known has a conflict. No values will satisfy it.
-    return;
-  }
-
+  unsigned Max = 1 << Bits;
   for (unsigned N = 0; N < Max; ++N) {
-    if ((N & Zero) == 0 && (~N & One) == 0)
-      Fn(APInt(Bits, N));
+    APInt Num(Bits, N);
+    if ((Num & Known.Zero) != 0 || (~Num & Known.One) != 0)
+      continue;
+
+    Fn(Num);
   }
 }
 

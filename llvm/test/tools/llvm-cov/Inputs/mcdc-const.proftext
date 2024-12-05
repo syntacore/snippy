@@ -1,3 +1,11 @@
+main
+# Func Hash:
+24
+# Num Counters:
+1
+# Counter Values:
+1
+
 _Z4testbbbb
 # Func Hash:
 703556281489
@@ -13,18 +21,10 @@ _Z4testbbbb
 4
 0
 0
-# Num Bitmap Bytes:
-$2
-# Bitmap Byte Values:
-0x1
-0x4
-
-
-main
-# Func Hash:
-24
-# Num Counters:
+# Num Bitmask Bytes:
+$4
+# Bitmask Byte Values:
 1
-# Counter Values:
-1
-
+2
+0
+0

@@ -20,15 +20,13 @@ class Module;
 namespace mlir {
 class Operation;
 
-/// Translates a given LLVM dialect `module` into an LLVM IR module living in
-/// the given context. Operates on any operation from dialects that provide a
-/// registered implementation of the LLVMTranslationDialectInterface. Returns
-/// nullptr when the translation fails.
-/// Verifies the produced LLVM module, except when `disableVerification` is set.
+/// Translate operation that satisfies LLVM dialect module requirements into an
+/// LLVM IR module living in the given context. This translates operations from
+/// any dilalect that has a registered implementation of
+/// LLVMTranslationDialectInterface.
 std::unique_ptr<llvm::Module>
 translateModuleToLLVMIR(Operation *module, llvm::LLVMContext &llvmContext,
-                        llvm::StringRef name = "LLVMDialectModule",
-                        bool disableVerification = false);
+                        llvm::StringRef name = "LLVMDialectModule");
 } // namespace mlir
 
 #endif // MLIR_TARGET_LLVMIR_EXPORT_H

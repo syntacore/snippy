@@ -17,9 +17,8 @@
 #include <type_traits>
 #include <utility>
 
-#include "test_iterators.h"
 #include "test_macros.h"
-#include "test_range.h"
+#include "test_iterators.h"
 
 int globalBuff[8];
 
@@ -82,6 +81,11 @@ struct RandomAccessRange {
 };
 template<>
 inline constexpr bool std::ranges::enable_borrowed_range<RandomAccessRange> = true;
+
+template <class View, class T>
+concept CanBePiped = requires (View&& view, T&& t) {
+  { std::forward<View>(view) | std::forward<T>(t) };
+};
 
 constexpr bool test() {
   {

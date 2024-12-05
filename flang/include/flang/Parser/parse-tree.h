@@ -455,8 +455,7 @@ struct SpecificationPart {
 struct InternalSubprogram {
   UNION_CLASS_BOILERPLATE(InternalSubprogram);
   std::variant<common::Indirection<FunctionSubprogram>,
-      common::Indirection<SubroutineSubprogram>,
-      common::Indirection<CompilerDirective>>
+      common::Indirection<SubroutineSubprogram>>
       u;
 };
 
@@ -552,9 +551,7 @@ struct ExecutionPartConstruct {
 };
 
 // R509 execution-part -> executable-construct [execution-part-construct]...
-// R1101 block -> [execution-part-construct]...
-using Block = std::list<ExecutionPartConstruct>;
-WRAPPER_CLASS(ExecutionPart, Block);
+WRAPPER_CLASS(ExecutionPart, std::list<ExecutionPartConstruct>);
 
 // R502 program-unit ->
 //        main-program | external-subprogram | module | submodule | block-data
@@ -992,7 +989,7 @@ struct ComponentArraySpec {
 //        access-spec | ALLOCATABLE |
 //        CODIMENSION lbracket coarray-spec rbracket |
 //        CONTIGUOUS | DIMENSION ( component-array-spec ) | POINTER |
-// (CUDA) CONSTANT | DEVICE | MANAGED | PINNED | SHARED | TEXTURE | UNIFIED
+// (CUDA) CONSTANT | DEVICE | MANAGED | PINNED | SHARED | TEXTURE
 EMPTY_CLASS(Allocatable);
 EMPTY_CLASS(Pointer);
 EMPTY_CLASS(Contiguous);
@@ -1098,8 +1095,7 @@ struct ProcComponentDefStmt {
 // R736 component-def-stmt -> data-component-def-stmt | proc-component-def-stmt
 struct ComponentDefStmt {
   UNION_CLASS_BOILERPLATE(ComponentDefStmt);
-  std::variant<DataComponentDefStmt, ProcComponentDefStmt,
-      common::Indirection<CompilerDirective>, ErrorRecovery
+  std::variant<DataComponentDefStmt, ProcComponentDefStmt, ErrorRecovery
       // , TypeParamDefStmt -- PGI accidental extension, not enabled
       >
       u;
@@ -1296,13 +1292,10 @@ struct AcImpliedDo {
 };
 
 // R808 language-binding-spec ->
-//        BIND ( C [, NAME = scalar-default-char-constant-expr ]
-//                 [, CDEFINED ] )
+//        BIND ( C [, NAME = scalar-default-char-constant-expr] )
 // R1528 proc-language-binding-spec -> language-binding-spec
-struct LanguageBindingSpec {
-  TUPLE_CLASS_BOILERPLATE(LanguageBindingSpec);
-  std::tuple<std::optional<ScalarDefaultCharConstantExpr>, bool> t;
-};
+WRAPPER_CLASS(
+    LanguageBindingSpec, std::optional<ScalarDefaultCharConstantExpr>);
 
 // R852 named-constant-def -> named-constant = constant-expr
 struct NamedConstantDef {
@@ -2122,6 +2115,9 @@ struct ForallConstruct {
       t;
 };
 
+// R1101 block -> [execution-part-construct]...
+using Block = std::list<ExecutionPartConstruct>;
+
 // R1105 selector -> expr | variable
 struct Selector {
   UNION_CLASS_BOILERPLATE(Selector);
@@ -2239,34 +2235,16 @@ struct ConcurrentHeader {
       t;
 };
 
-// F'2023 R1131 reduce-operation -> reduction-operator
-// CUF reduction-op -> reduction-operator
-// OpenACC 3.3 2.5.15 reduction-operator ->
-//                      + | * | .AND. | .OR. | .EQV. | .NEQV. |
-//                      MAX | MIN | IAND | IOR | IEOR
-struct ReductionOperator {
-  ENUM_CLASS(
-      Operator, Plus, Multiply, Max, Min, Iand, Ior, Ieor, And, Or, Eqv, Neqv)
-  WRAPPER_CLASS_BOILERPLATE(ReductionOperator, Operator);
-  CharBlock source;
-};
-
 // R1130 locality-spec ->
 //         LOCAL ( variable-name-list ) | LOCAL_INIT ( variable-name-list ) |
-//         REDUCE ( reduce-operation : variable-name-list ) |
 //         SHARED ( variable-name-list ) | DEFAULT ( NONE )
 struct LocalitySpec {
   UNION_CLASS_BOILERPLATE(LocalitySpec);
   WRAPPER_CLASS(Local, std::list<Name>);
   WRAPPER_CLASS(LocalInit, std::list<Name>);
-  struct Reduce {
-    TUPLE_CLASS_BOILERPLATE(Reduce);
-    using Operator = ReductionOperator;
-    std::tuple<Operator, std::list<Name>> t;
-  };
   WRAPPER_CLASS(Shared, std::list<Name>);
   EMPTY_CLASS(DefaultNone);
-  std::variant<Local, LocalInit, Reduce, Shared, DefaultNone> u;
+  std::variant<Local, LocalInit, Shared, DefaultNone> u;
 };
 
 // R1123 loop-control ->
@@ -2926,8 +2904,7 @@ struct ModuleSubprogram {
   UNION_CLASS_BOILERPLATE(ModuleSubprogram);
   std::variant<common::Indirection<FunctionSubprogram>,
       common::Indirection<SubroutineSubprogram>,
-      common::Indirection<SeparateModuleSubprogram>,
-      common::Indirection<CompilerDirective>>
+      common::Indirection<SeparateModuleSubprogram>>
       u;
 };
 
@@ -3215,7 +3192,7 @@ WRAPPER_CLASS(AltReturnSpec, Label);
 //         expr | variable | procedure-name | proc-component-ref |
 //         alt-return-spec
 struct ActualArg {
-  WRAPPER_CLASS(PercentRef, Expr); // %REF(x) extension
+  WRAPPER_CLASS(PercentRef, Variable); // %REF(v) extension
   WRAPPER_CLASS(PercentVal, Expr); // %VAL(x) extension
   UNION_CLASS_BOILERPLATE(ActualArg);
   ActualArg(Expr &&x) : u{common::Indirection<Expr>(std::move(x))} {}
@@ -3322,8 +3299,7 @@ struct StmtFunctionStmt {
 // Compiler directives
 // !DIR$ IGNORE_TKR [ [(tkrdmac...)] name ]...
 // !DIR$ LOOP COUNT (n1[, n2]...)
-// !DIR$ name[=value] [, name[=value]]...    = can be :
-// !DIR$ <anything else>
+// !DIR$ name...
 struct CompilerDirective {
   UNION_CLASS_BOILERPLATE(CompilerDirective);
   struct IgnoreTKR {
@@ -3333,20 +3309,12 @@ struct CompilerDirective {
   struct LoopCount {
     WRAPPER_CLASS_BOILERPLATE(LoopCount, std::list<std::uint64_t>);
   };
-  struct AssumeAligned {
-    TUPLE_CLASS_BOILERPLATE(AssumeAligned);
-    std::tuple<common::Indirection<Designator>, uint64_t> t;
-  };
-  EMPTY_CLASS(VectorAlways);
   struct NameValue {
     TUPLE_CLASS_BOILERPLATE(NameValue);
     std::tuple<Name, std::optional<std::uint64_t>> t;
   };
-  EMPTY_CLASS(Unrecognized);
   CharBlock source;
-  std::variant<std::list<IgnoreTKR>, LoopCount, std::list<AssumeAligned>,
-      VectorAlways, std::list<NameValue>, Unrecognized>
-      u;
+  std::variant<std::list<IgnoreTKR>, LoopCount, std::list<NameValue>> u;
 };
 
 // (CUDA) ATTRIBUTE(attribute) [::] name-list
@@ -3576,10 +3544,7 @@ struct OmpReductionOperator {
 //                                         variable-name-list)
 struct OmpReductionClause {
   TUPLE_CLASS_BOILERPLATE(OmpReductionClause);
-  ENUM_CLASS(ReductionModifier, Inscan, Task, Default)
-  std::tuple<std::optional<ReductionModifier>, OmpReductionOperator,
-      OmpObjectList>
-      t;
+  std::tuple<OmpReductionOperator, OmpObjectList> t;
 };
 
 // OMP 5.0 2.19.5.6 in_reduction-clause -> IN_REDUCTION (reduction-identifier:
@@ -4088,9 +4053,17 @@ struct AccObjectListWithModifier {
   std::tuple<std::optional<AccDataModifier>, AccObjectList> t;
 };
 
+// 2.5.15: + | * | max | min | iand | ior | ieor | .and. | .or. | .eqv. | .neqv.
+struct AccReductionOperator {
+  ENUM_CLASS(
+      Operator, Plus, Multiply, Max, Min, Iand, Ior, Ieor, And, Or, Eqv, Neqv)
+  WRAPPER_CLASS_BOILERPLATE(AccReductionOperator, Operator);
+  CharBlock source;
+};
+
 struct AccObjectListWithReduction {
   TUPLE_CLASS_BOILERPLATE(AccObjectListWithReduction);
-  std::tuple<ReductionOperator, AccObjectList> t;
+  std::tuple<AccReductionOperator, AccObjectList> t;
 };
 
 struct AccWaitArgument {
@@ -4317,32 +4290,18 @@ struct OpenACCConstruct {
 };
 
 // CUF-kernel-do-construct ->
-//   !$CUF KERNEL DO [ (scalar-int-constant-expr) ]
-//      <<< grid, block [, stream] >>>
-//      [ cuf-reduction... ]
-//      do-construct
-// star-or-expr -> * | scalar-int-expr
-// grid -> * | scalar-int-expr | ( star-or-expr-list )
-// block -> * | scalar-int-expr | ( star-or-expr-list )
+//     !$CUF KERNEL DO [ (scalar-int-constant-expr) ] <<< grid, block [, stream]
+//     >>> do-construct
+// grid -> * | scalar-int-expr | ( scalar-int-expr-list )
+// block -> * | scalar-int-expr | ( scalar-int-expr-list )
 // stream -> 0, scalar-int-expr | STREAM = scalar-int-expr
-// cuf-reduction -> [ REDUCE | REDUCTION ] (
-//                  reduction-op : scalar-variable-list )
-
-struct CUFReduction {
-  TUPLE_CLASS_BOILERPLATE(CUFReduction);
-  using Operator = ReductionOperator;
-  std::tuple<Operator, std::list<Scalar<Variable>>> t;
-};
-
 struct CUFKernelDoConstruct {
   TUPLE_CLASS_BOILERPLATE(CUFKernelDoConstruct);
-  WRAPPER_CLASS(StarOrExpr, std::optional<ScalarIntExpr>);
   struct Directive {
     TUPLE_CLASS_BOILERPLATE(Directive);
     CharBlock source;
-    std::tuple<std::optional<ScalarIntConstantExpr>, std::list<StarOrExpr>,
-        std::list<StarOrExpr>, std::optional<ScalarIntExpr>,
-        std::list<CUFReduction>>
+    std::tuple<std::optional<ScalarIntConstantExpr>, std::list<ScalarIntExpr>,
+        std::list<ScalarIntExpr>, std::optional<ScalarIntExpr>>
         t;
   };
   std::tuple<Directive, std::optional<DoConstruct>> t;

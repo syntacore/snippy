@@ -34,9 +34,6 @@
     .thumb
 main:
     bx lr
-    .global _pei386_runtime_relocator
-_pei386_runtime_relocator:
-    bx lr
     .data
 ptr:
     .long variable

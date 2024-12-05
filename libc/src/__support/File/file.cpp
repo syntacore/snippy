@@ -8,14 +8,14 @@
 
 #include "file.h"
 
-#include "hdr/stdio_macros.h"
-#include "hdr/types/off_t.h"
 #include "src/__support/CPP/new.h"
 #include "src/__support/CPP/span.h"
-#include "src/__support/macros/config.h"
 #include "src/errno/libc_errno.h" // For error macros
 
-namespace LIBC_NAMESPACE_DECL {
+#include <stdio.h>
+#include <stdlib.h>
+
+namespace LIBC_NAMESPACE {
 
 FileIOResult File::write_unlocked(const void *data, size_t len) {
   if (!write_allowed()) {
@@ -282,7 +282,7 @@ int File::ungetc_unlocked(int c) {
   return c;
 }
 
-ErrorOr<int> File::seek(off_t offset, int whence) {
+ErrorOr<int> File::seek(long offset, int whence) {
   FileLock lock(this);
   if (prev_op == FileOp::WRITE && pos > 0) {
 
@@ -305,21 +305,23 @@ ErrorOr<int> File::seek(off_t offset, int whence) {
   auto result = platform_seek(this, offset, whence);
   if (!result.has_value())
     return Error(result.error());
-  return 0;
+  else
+    return 0;
 }
 
-ErrorOr<off_t> File::tell() {
+ErrorOr<long> File::tell() {
   FileLock lock(this);
   auto seek_target = eof ? SEEK_END : SEEK_CUR;
   auto result = platform_seek(this, 0, seek_target);
   if (!result.has_value() || result.value() < 0)
     return Error(result.error());
-  off_t platform_offset = result.value();
+  long platform_offset = result.value();
   if (prev_op == FileOp::READ)
     return platform_offset - (read_limit - pos);
-  if (prev_op == FileOp::WRITE)
+  else if (prev_op == FileOp::WRITE)
     return platform_offset + pos;
-  return platform_offset;
+  else
+    return platform_offset;
 }
 
 int File::flush_unlocked() {
@@ -431,4 +433,4 @@ File::ModeFlags File::mode_flags(const char *mode) {
   return flags;
 }
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE

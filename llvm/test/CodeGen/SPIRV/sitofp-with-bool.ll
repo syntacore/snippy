@@ -8,12 +8,13 @@
 ; CHECK-DAG: %[[#ptr:]] = OpTypePointer CrossWorkgroup %[[#float]]
 
 ; CHECK: OpFunction
-; CHECK: %[[#A:]] = OpFunctionParameter %[[#ptr]]
+; CHECK: %[[#A:]] = OpFunctionParameter %[[#]]
 ; CHECK: %[[#B:]] = OpFunctionParameter %[[#]]
 ; CHECK: %[[#cmp_res:]] = OpSGreaterThan %[[#bool]] %[[#B]] %[[#zero]]
 ; CHECK: %[[#select_res:]] = OpSelect %[[#int_32]] %[[#cmp_res]] %[[#one]] %[[#zero]]
 ; CHECK: %[[#stof_res:]] = OpConvertSToF %[[#]] %[[#select_res]]
-; CHECK: OpStore %[[#A]] %[[#stof_res]]
+; CHECK: %[[#bitcast:]] = OpBitcast %[[#ptr]] %[[#A]]
+; CHECK: OpStore %[[#bitcast]] %[[#stof_res]]
 
 define dso_local spir_kernel void @K(ptr addrspace(1) nocapture %A, i32 %B) local_unnamed_addr {
 entry:

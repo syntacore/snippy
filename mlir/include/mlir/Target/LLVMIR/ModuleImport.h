@@ -47,7 +47,7 @@ class LoopAnnotationImporter;
 class ModuleImport {
 public:
   ModuleImport(ModuleOp mlirModule, std::unique_ptr<llvm::Module> llvmModule,
-               bool emitExpensiveWarnings, bool importEmptyDICompositeTypes);
+               bool emitExpensiveWarnings);
 
   /// Calls the LLVMImportInterface initialization that queries the registered
   /// dialect interfaces for the supported LLVM IR intrinsics and metadata kinds
@@ -152,14 +152,6 @@ public:
   /// Converts `value` to a label attribute. Asserts if the matching fails.
   DILabelAttr matchLabelAttr(llvm::Value *value);
 
-  /// Converts `value` to a FP exception behavior attribute. Asserts if the
-  /// matching fails.
-  FPExceptionBehaviorAttr matchFPExceptionBehaviorAttr(llvm::Value *value);
-
-  /// Converts `value` to a rounding mode attribute. Asserts if the matching
-  /// fails.
-  RoundingModeAttr matchRoundingModeAttr(llvm::Value *value);
-
   /// Converts `value` to an array of alias scopes or returns failure if the
   /// conversion fails.
   FailureOr<SmallVector<AliasScopeAttr>>
@@ -183,7 +175,8 @@ public:
   /// Sets the integer overflow flags (nsw/nuw) attribute for the imported
   /// operation `op` given the original instruction `inst`. Asserts if the
   /// operation does not implement the integer overflow flag interface.
-  void setIntegerOverflowFlags(llvm::Instruction *inst, Operation *op) const;
+  void setIntegerOverflowFlagsAttr(llvm::Instruction *inst,
+                                   Operation *op) const;
 
   /// Sets the fastmath flags attribute for the imported operation `op` given
   /// the original instruction `inst`. Asserts if the operation does not

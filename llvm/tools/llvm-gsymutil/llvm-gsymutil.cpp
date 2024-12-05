@@ -18,7 +18,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Format.h"
-#include "llvm/Support/JSON.h"
 #include "llvm/Support/LLVMDriver.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -44,7 +43,6 @@
 #include "llvm/DebugInfo/GSYM/InlineInfo.h"
 #include "llvm/DebugInfo/GSYM/LookupResult.h"
 #include "llvm/DebugInfo/GSYM/ObjectFileTransformer.h"
-#include "llvm/DebugInfo/GSYM/OutputAggregator.h"
 #include <optional>
 
 using namespace llvm;
@@ -88,7 +86,6 @@ static std::vector<std::string> InputFilenames;
 static std::string ConvertFilename;
 static std::vector<std::string> ArchFilters;
 static std::string OutputFilename;
-static std::string JsonSummaryFile;
 static bool Verify;
 static unsigned NumThreads;
 static uint64_t SegmentSize;
@@ -139,9 +136,6 @@ static void parseArgs(int argc, char **argv) {
 
   if (const llvm::opt::Arg *A = Args.getLastArg(OPT_out_file_EQ))
     OutputFilename = A->getValue();
-
-  if (const llvm::opt::Arg *A = Args.getLastArg(OPT_json_summary_file_EQ))
-    JsonSummaryFile = A->getValue();
 
   Verify = Args.hasArg(OPT_verify);
 
@@ -306,10 +300,16 @@ static std::optional<uint64_t> getImageBaseAddress(object::ObjectFile &Obj) {
   return std::nullopt;
 }
 
-static llvm::Error handleObjectFile(ObjectFile &Obj, const std::string &OutFile,
-                                    OutputAggregator &Out) {
+static llvm::Error handleObjectFile(ObjectFile &Obj,
+                                    const std::string &OutFile) {
   auto ThreadCount =
       NumThreads > 0 ? NumThreads : std::thread::hardware_concurrency();
+  auto &OS = outs();
+  // Make a stream refernce that will become a /dev/null log stream if
+  // Quiet is true, or normal output if Quiet is false. This can stop the
+  // errors and warnings from being displayed and producing too much output
+  // when they aren't desired.
+  raw_ostream *LogOS = Quiet ? nullptr : &outs();
 
   GsymCreator Gsym(Quiet);
 
@@ -354,17 +354,17 @@ static llvm::Error handleObjectFile(ObjectFile &Obj, const std::string &OutFile,
     Gsym.SetValidTextRanges(TextRanges);
 
   // Convert all DWARF to GSYM.
-  if (auto Err = DT.convert(ThreadCount, Out))
+  if (auto Err = DT.convert(ThreadCount, LogOS))
     return Err;
 
   // Get the UUID and convert symbol table to GSYM.
-  if (auto Err = ObjectFileTransformer::convert(Obj, Out, Gsym))
+  if (auto Err = ObjectFileTransformer::convert(Obj, LogOS, Gsym))
     return Err;
 
   // Finalize the GSYM to make it ready to save to disk. This will remove
   // duplicate FunctionInfo entries where we might have found an entry from
   // debug info and also a symbol table entry from the object file.
-  if (auto Err = Gsym.finalize(Out))
+  if (auto Err = Gsym.finalize(OS))
     return Err;
 
   // Save the GSYM file to disk.
@@ -381,7 +381,7 @@ static llvm::Error handleObjectFile(ObjectFile &Obj, const std::string &OutFile,
   // Verify the DWARF if requested. This will ensure all the info in the DWARF
   // can be looked up in the GSYM and that all lookups get matching data.
   if (Verify) {
-    if (auto Err = DT.verify(OutFile, Out))
+    if (auto Err = DT.verify(OutFile, OS))
       return Err;
   }
 
@@ -389,8 +389,7 @@ static llvm::Error handleObjectFile(ObjectFile &Obj, const std::string &OutFile,
 }
 
 static llvm::Error handleBuffer(StringRef Filename, MemoryBufferRef Buffer,
-                                const std::string &OutFile,
-                                OutputAggregator &Out) {
+                                const std::string &OutFile) {
   Expected<std::unique_ptr<Binary>> BinOrErr = object::createBinary(Buffer);
   error(Filename, errorToErrorCode(BinOrErr.takeError()));
 
@@ -398,7 +397,7 @@ static llvm::Error handleBuffer(StringRef Filename, MemoryBufferRef Buffer,
     Triple ObjTriple(Obj->makeTriple());
     auto ArchName = ObjTriple.getArchName();
     outs() << "Output file (" << ArchName << "): " << OutFile << "\n";
-    if (auto Err = handleObjectFile(*Obj, OutFile, Out))
+    if (auto Err = handleObjectFile(*Obj, OutFile))
       return Err;
   } else if (auto *Fat = dyn_cast<MachOUniversalBinary>(BinOrErr->get())) {
     // Iterate over all contained architectures and filter out any that were
@@ -432,7 +431,7 @@ static llvm::Error handleBuffer(StringRef Filename, MemoryBufferRef Buffer,
         ArchOutFile.append(ArchName.str());
       }
       outs() << "Output file (" << ArchName << "): " << ArchOutFile << "\n";
-      if (auto Err = handleObjectFile(*Obj, ArchOutFile, Out))
+      if (auto Err = handleObjectFile(*Obj, ArchOutFile))
         return Err;
     }
   }
@@ -440,16 +439,15 @@ static llvm::Error handleBuffer(StringRef Filename, MemoryBufferRef Buffer,
 }
 
 static llvm::Error handleFileConversionToGSYM(StringRef Filename,
-                                              const std::string &OutFile,
-                                              OutputAggregator &Out) {
+                                              const std::string &OutFile) {
   ErrorOr<std::unique_ptr<MemoryBuffer>> BuffOrErr =
       MemoryBuffer::getFileOrSTDIN(Filename);
   error(Filename, BuffOrErr.getError());
   std::unique_ptr<MemoryBuffer> Buffer = std::move(BuffOrErr.get());
-  return handleBuffer(Filename, *Buffer, OutFile, Out);
+  return handleBuffer(Filename, *Buffer, OutFile);
 }
 
-static llvm::Error convertFileToGSYM(OutputAggregator &Out) {
+static llvm::Error convertFileToGSYM(raw_ostream &OS) {
   // Expand any .dSYM bundles to the individual object files contained therein.
   std::vector<std::string> Objects;
   std::string OutFile = OutputFilename;
@@ -458,7 +456,7 @@ static llvm::Error convertFileToGSYM(OutputAggregator &Out) {
     OutFile += ".gsym";
   }
 
-  Out << "Input file: " << ConvertFilename << "\n";
+  OS << "Input file: " << ConvertFilename << "\n";
 
   if (auto DsymObjectsOrErr =
           MachOObjectFile::findDsymObjectMembers(ConvertFilename)) {
@@ -471,7 +469,7 @@ static llvm::Error convertFileToGSYM(OutputAggregator &Out) {
   }
 
   for (StringRef Object : Objects)
-    if (Error Err = handleFileConversionToGSYM(Object, OutFile, Out))
+    if (Error Err = handleFileConversionToGSYM(Object, OutFile))
       return Err;
   return Error::success();
 }
@@ -509,7 +507,6 @@ int llvm_gsymutil_main(int argc, char **argv, const llvm::ToolContext &) {
 
   raw_ostream &OS = outs();
 
-  OutputAggregator Aggregation(&OS);
   if (!ConvertFilename.empty()) {
     // Convert DWARF to GSYM
     if (!InputFilenames.empty()) {
@@ -518,36 +515,8 @@ int llvm_gsymutil_main(int argc, char **argv, const llvm::ToolContext &) {
       return 1;
     }
     // Call error() if we have an error and it will exit with a status of 1
-    if (auto Err = convertFileToGSYM(Aggregation))
+    if (auto Err = convertFileToGSYM(OS))
       error("DWARF conversion failed: ", std::move(Err));
-
-    // Report the errors from aggregator:
-    Aggregation.EnumerateResults([&](StringRef category, unsigned count) {
-      OS << category << " occurred " << count << " time(s)\n";
-    });
-    if (!JsonSummaryFile.empty()) {
-      std::error_code EC;
-      raw_fd_ostream JsonStream(JsonSummaryFile, EC, sys::fs::OF_Text);
-      if (EC) {
-        OS << "error opening aggregate error json file '" << JsonSummaryFile
-           << "' for writing: " << EC.message() << '\n';
-        return 1;
-      }
-
-      llvm::json::Object Categories;
-      uint64_t ErrorCount = 0;
-      Aggregation.EnumerateResults([&](StringRef Category, unsigned Count) {
-        llvm::json::Object Val;
-        Val.try_emplace("count", Count);
-        Categories.try_emplace(Category, std::move(Val));
-        ErrorCount += Count;
-      });
-      llvm::json::Object RootNode;
-      RootNode.try_emplace("error-categories", std::move(Categories));
-      RootNode.try_emplace("error-count", ErrorCount);
-
-      JsonStream << llvm::json::Value(std::move(RootNode));
-    }
     return 0;
   }
 

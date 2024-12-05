@@ -129,29 +129,6 @@ static void test_new_line() {
   }
 }
 
-static void test_println_blank_line() {
-  // Text does newline translation.
-  {
-    FILE* file = fopen(filename.c_str(), "w");
-    assert(file);
-
-    std::println(file);
-#ifndef _WIN32
-    assert(std::ftell(file) == 1);
-#else
-    assert(std::ftell(file) == 2);
-#endif
-  }
-  // Binary no newline translation.
-  {
-    FILE* file = fopen(filename.c_str(), "wb");
-    assert(file);
-
-    std::println(file);
-    assert(std::ftell(file) == 1);
-  }
-}
-
 int main(int, char**) {
   print_tests(test_file, test_exception);
 
@@ -160,7 +137,6 @@ int main(int, char**) {
 #endif
   test_read_only();
   test_new_line();
-  test_println_blank_line();
 
   return 0;
 }

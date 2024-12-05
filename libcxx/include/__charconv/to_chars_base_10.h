@@ -11,7 +11,6 @@
 #define _LIBCPP___CHARCONV_TO_CHARS_BASE_10_H
 
 #include <__algorithm/copy_n.h>
-#include <__assert>
 #include <__charconv/tables.h>
 #include <__config>
 #include <cstdint>

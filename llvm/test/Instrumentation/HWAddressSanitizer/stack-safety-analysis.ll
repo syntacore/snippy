@@ -1,5 +1,4 @@
-; RUN: opt -pass-remarks-output=%t.pass-remarks -mtriple=aarch64-unknown-linux-gnu -passes=hwasan -hwasan-instrument-with-calls -hwasan-use-stack-safety=1 -hwasan-generate-tags-with-calls -S < %s | FileCheck %s --check-prefixes=SAFETY,CHECK
-; RUN: cat %t.pass-remarks | FileCheck %s --check-prefixes=SAFETY-REMARKS
+; RUN: opt -mtriple=aarch64-unknown-linux-gnu -passes=hwasan -hwasan-instrument-with-calls -hwasan-use-stack-safety=1 -hwasan-generate-tags-with-calls -S < %s | FileCheck %s --check-prefixes=SAFETY,CHECK
 ; RUN: opt -mtriple=aarch64-unknown-linux-gnu -passes=hwasan -hwasan-instrument-with-calls -hwasan-use-stack-safety=0 -hwasan-generate-tags-with-calls -S < %s | FileCheck %s --check-prefixes=NOSAFETY,CHECK
 ; RUN: opt -mtriple=aarch64-unknown-linux-gnu -passes=hwasan -hwasan-instrument-with-calls -hwasan-generate-tags-with-calls -S < %s | FileCheck %s --check-prefixes=SAFETY,CHECK
 ; RUN: opt -mtriple=aarch64-unknown-linux-gnu -passes=hwasan -hwasan-instrument-stack=0 -hwasan-instrument-with-calls -hwasan-generate-tags-with-calls -S < %s | FileCheck %s --check-prefixes=NOSTACK,CHECK
@@ -21,7 +20,6 @@ entry:
   ; SAFETY-NOT: call {{.*}}__hwasan_store
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_store
-  ; SAFETY-REMARKS: --- !Passed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_simple
   %buf.sroa.0 = alloca i8, align 4
   call void @llvm.lifetime.start.p0(i64 1, ptr nonnull %buf.sroa.0)
   store volatile i8 0, ptr %buf.sroa.0, align 4, !tbaa !8
@@ -39,7 +37,6 @@ entry:
   ; SAFETY-NOT: call {{.*}}__hwasan_store
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_store
-  ; SAFETY-REMARKS: --- !Passed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_cmpxchg
   %buf.sroa.0 = alloca i8, align 4
   call void @llvm.lifetime.start.p0(i64 1, ptr nonnull %buf.sroa.0)
   %0 = cmpxchg ptr %buf.sroa.0, i8 1, i8 2 monotonic monotonic, align 4
@@ -57,7 +54,6 @@ entry:
   ; SAFETY-NOT: call {{.*}}__hwasan_store
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_store
-  ; SAFETY-REMARKS: --- !Passed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_atomicrwm
   %buf.sroa.0 = alloca i8, align 4
   call void @llvm.lifetime.start.p0(i64 1, ptr nonnull %buf.sroa.0)
   %0 = atomicrmw add ptr %buf.sroa.0, i8 1 monotonic, align 4
@@ -75,7 +71,6 @@ entry:
   ; SAFETY-NOT: call {{.*}}__hwasan_store
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_store
-  ; SAFETY-REMARKS: --- !Passed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_use
   %buf.sroa.0 = alloca i8, align 4
   call void @use(ptr nonnull %buf.sroa.0)
   call void @llvm.lifetime.start.p0(i64 1, ptr nonnull %buf.sroa.0)
@@ -94,7 +89,6 @@ entry:
   ; SAFETY-NOT: call {{.*}}__hwasan_store
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_store
-  ; SAFETY-REMARKS: --- !Passed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_in_range
   %buf.sroa.0 = alloca [10 x i8], align 4
   call void @llvm.lifetime.start.p0(i64 10, ptr nonnull %buf.sroa.0)
   store volatile i8 0, ptr %buf.sroa.0, align 4, !tbaa !8
@@ -112,7 +106,6 @@ entry:
   ; SAFETY-NOT: call {{.*}}__hwasan_store
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_store
-  ; SAFETY-REMARKS: --- !Passed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_in_range2
   %buf.sroa.0 = alloca [10 x i8], align 4
   %ptr = getelementptr [10 x i8], ptr %buf.sroa.0, i32 0, i32 9
   call void @llvm.lifetime.start.p0(i64 10, ptr nonnull %buf.sroa.0)
@@ -130,7 +123,6 @@ entry:
   ; SAFETY-NOT: call {{.*}}__hwasan_memset
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_memset
-  ; SAFETY-REMARKS: --- !Passed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_in_range3
   %buf.sroa.0 = alloca [10 x i8], align 4
   %ptr = getelementptr [10 x i8], ptr %buf.sroa.0, i32 0, i32 9
   call void @llvm.memset.p0.i32(ptr %ptr, i8 0, i32 1, i1 true)
@@ -146,7 +138,6 @@ entry:
   ; SAFETY-NOT: call {{.*}}__hwasan_memmove
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_memmove
-  ; SAFETY-REMARKS: --- !Passed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_in_range4
   %buf.sroa.0 = alloca [10 x i8], align 4
   %ptr = getelementptr [10 x i8], ptr %buf.sroa.0, i32 0, i32 9
   call void @llvm.memmove.p0.p0.i32(ptr %ptr, ptr %ptr, i32 1, i1 true)
@@ -162,7 +153,6 @@ entry:
   ; SAFETY-NOT: call {{.*}}__hwasan_memmove
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_memmove
-  ; SAFETY-REMARKS: --- !Passed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_in_range5
   %buf.sroa.0 = alloca [10 x i8], align 4
   %ptr = getelementptr [10 x i8], ptr %buf.sroa.0, i32 0, i32 9
   %buf.sroa.1 = alloca [10 x i8], align 4
@@ -181,7 +171,6 @@ entry:
   ; SAFETY: call {{.*}}__hwasan_store
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_store
-  ; SAFETY-REMARKS: --- !Missed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_out_of_range
   %buf.sroa.0 = alloca [10 x i8], align 4
   %ptr = getelementptr [10 x i8], ptr %buf.sroa.0, i32 0, i32 10
   call void @llvm.lifetime.start.p0(i64 10, ptr nonnull %buf.sroa.0)
@@ -199,7 +188,6 @@ entry:
   ; SAFETY: call {{.*}}__hwasan_store
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_store
-  ; SAFETY-REMARKS: --- !Missed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_out_of_range2
   %buf.sroa.0 = alloca [10 x i8], align 4
   %ptr = getelementptr [10 x i8], ptr %buf.sroa.0, i32 0, i32 10
   call void @llvm.lifetime.start.p0(i64 10, ptr nonnull %buf.sroa.0)
@@ -217,7 +205,6 @@ entry:
   ; SAFETY: call {{.*}}__hwasan_memset
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_memset
-  ; SAFETY-REMARKS: --- !Missed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_out_of_range3
   %buf.sroa.0 = alloca [10 x i8], align 4
   %ptr = getelementptr [10 x i8], ptr %buf.sroa.0, i32 0, i32 9
   call void @llvm.memset.p0.i32(ptr %ptr, i8 0, i32 2, i1 true)
@@ -233,7 +220,6 @@ entry:
   ; SAFETY: call {{.*}}__hwasan_memmove
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_memmove
-  ; SAFETY-REMARKS: --- !Missed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_out_of_range4
   %buf.sroa.0 = alloca [10 x i8], align 4
   %ptr = getelementptr [10 x i8], ptr %buf.sroa.0, i32 0, i32 9
   call void @llvm.memmove.p0.p0.i32(ptr %ptr, ptr %ptr, i32 2, i1 true)
@@ -249,7 +235,6 @@ entry:
   ; SAFETY: call {{.*}}__hwasan_memmove
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_memmove
-  ; SAFETY-REMARKS: --- !Missed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_out_of_range5
   %buf.sroa.0 = alloca [10 x i8], align 4
   %ptr = getelementptr [10 x i8], ptr %buf.sroa.0, i32 0, i32 9
   %buf.sroa.1 = alloca [10 x i8], align 4
@@ -271,7 +256,6 @@ entry:
   ; SAFETY: call {{.*}}__hwasan_store
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_store
-  ; SAFETY-REMARKS: --- !Missed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_out_of_range6
   %buf.sroa.0 = alloca [10 x i8], align 4
   %ptr = getelementptr [10 x i8], ptr %buf.sroa.0, i32 0, i32 10
   call void @llvm.lifetime.start.p0(i64 10, ptr nonnull %buf.sroa.0)
@@ -291,7 +275,6 @@ entry:
   ; SAFETY: call {{.*}}__hwasan_store
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_store
-  ; SAFETY-REMARKS: --- !Missed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_potentially_out_of_range
   %buf.sroa.0 = alloca [10 x i8], align 4
   %off = call i32 @getoffset()
   %ptr = getelementptr [10 x i8], ptr %buf.sroa.0, i32 0, i32 %off
@@ -310,7 +293,6 @@ entry:
   ; SAFETY: call {{.*}}__hwasan_memmove
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK: call {{.*}}__hwasan_memmove
-  ; SAFETY-REMARKS: --- !Missed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_potentially_out_of_range2
   %buf.sroa.0 = alloca [10 x i8], align 4
   %ptr = getelementptr [10 x i8], ptr %buf.sroa.0, i32 0, i32 9
   call void @llvm.memmove.p0.p0.i32(ptr %ptr, ptr %a, i32 1, i1 true)
@@ -327,7 +309,6 @@ entry:
   ; SAFETY: call {{.*}}__hwasan_store
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK: call {{.*}}__hwasan_store
-  ; SAFETY-REMARKS: --- !Missed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_unclear
   %buf.sroa.0 = alloca i8, align 4
   %ptr = call ptr @getptr(ptr %buf.sroa.0)
   call void @llvm.lifetime.start.p0(i64 10, ptr nonnull %ptr)
@@ -345,7 +326,6 @@ entry:
   ; SAFETY: call {{.*}}__hwasan_store
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK: call {{.*}}__hwasan_store
-  ; SAFETY-REMARKS: --- !Missed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_select
   %x = call ptr @getptr(ptr %a)
   %buf.sroa.0 = alloca i8, align 4
   call void @llvm.lifetime.start.p0(i64 1, ptr nonnull %buf.sroa.0)
@@ -366,7 +346,6 @@ entry:
   ; SAFETY-NOT: call {{.*}}__hwasan_store
   ; NOSTACK-NOT: call {{.*}}__hwasan_generate_tag
   ; NOSTACK-NOT: call {{.*}}__hwasan_store
-  ; SAFETY-REMARKS: --- !Passed{{[[:space:]]}}Pass: hwasan{{[[:space:]]}}Name: ignoreAccess{{[[:space:]]}}Function: test_retptr
   %buf.sroa.0 = alloca i8, align 4
   call void @llvm.lifetime.start.p0(i64 1, ptr nonnull %buf.sroa.0)
   %ptr = call ptr @retptr(ptr %buf.sroa.0)

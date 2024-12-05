@@ -98,10 +98,12 @@ ControlFlowToSCFTransformation::createStructuredDoWhileLoopOp(
       loc, builder.create<arith::TruncIOp>(loc, builder.getI1Type(), condition),
       loopVariablesNextIter);
 
-  Block *afterBlock = builder.createBlock(&whileOp.getAfter());
+  auto *afterBlock = new Block;
+  whileOp.getAfter().push_back(afterBlock);
   afterBlock->addArguments(
       loopVariablesInit.getTypes(),
       SmallVector<Location>(loopVariablesInit.size(), loc));
+  builder.setInsertionPointToEnd(afterBlock);
   builder.create<scf::YieldOp>(loc, afterBlock->getArguments());
 
   return whileOp.getOperation();

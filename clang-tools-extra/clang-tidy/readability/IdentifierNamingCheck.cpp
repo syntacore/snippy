@@ -658,7 +658,7 @@ std::string IdentifierNamingCheck::HungarianNotation::getEnumPrefix(
   const auto *ED = cast<EnumDecl>(ECD->getDeclContext());
 
   std::string Name = ED->getName().str();
-  if (StringRef(Name).contains("enum")) {
+  if (std::string::npos != Name.find("enum")) {
     Name = Name.substr(strlen("enum"), Name.length() - strlen("enum"));
     Name = Name.erase(0, Name.find_first_not_of(' '));
   }
@@ -888,14 +888,8 @@ bool IdentifierNamingCheck::matchesStyle(
     return false;
   if (IdentifierNamingCheck::HungarianPrefixType::HPT_Off != Style.HPType) {
     std::string HNPrefix = HungarianNotation.getPrefix(Decl, HNOption);
-    if (!HNPrefix.empty()) {
-      if (!Name.consume_front(HNPrefix))
-        return false;
-      if (Style.HPType ==
-              IdentifierNamingCheck::HungarianPrefixType::HPT_LowerCase &&
-          !Name.consume_front("_"))
-        return false;
-    }
+    if (!Name.consume_front(HNPrefix))
+      return false;
   }
 
   // Ensure the name doesn't have any extra underscores beyond those specified
@@ -1358,7 +1352,7 @@ IdentifierNamingCheck::getFailureInfo(
   std::replace(KindName.begin(), KindName.end(), '_', ' ');
 
   std::string Fixup = fixupWithStyle(Type, Name, Style, HNOption, ND);
-  if (StringRef(Fixup) == Name) {
+  if (StringRef(Fixup).equals(Name)) {
     if (!IgnoreFailedSplit) {
       LLVM_DEBUG(Location.print(llvm::dbgs(), SM);
                  llvm::dbgs()
@@ -1374,10 +1368,6 @@ IdentifierNamingCheck::getFailureInfo(
 std::optional<RenamerClangTidyCheck::FailureInfo>
 IdentifierNamingCheck::getDeclFailureInfo(const NamedDecl *Decl,
                                           const SourceManager &SM) const {
-  // Implicit identifiers cannot be renamed.
-  if (Decl->isImplicit())
-    return std::nullopt;
-
   SourceLocation Loc = Decl->getLocation();
   const FileStyle &FileStyle = getStyleForFile(SM.getFilename(Loc));
   if (!FileStyle.isActive())
@@ -1414,28 +1404,17 @@ IdentifierNamingCheck::getDiagInfo(const NamingCheckId &ID,
                   }};
 }
 
-StringRef IdentifierNamingCheck::getRealFileName(StringRef FileName) const {
-  auto Iter = RealFileNameCache.try_emplace(FileName);
-  SmallString<256U> &RealFileName = Iter.first->getValue();
-  if (!Iter.second)
-    return RealFileName;
-  llvm::sys::fs::real_path(FileName, RealFileName);
-  return RealFileName;
-}
-
 const IdentifierNamingCheck::FileStyle &
 IdentifierNamingCheck::getStyleForFile(StringRef FileName) const {
   if (!GetConfigPerFile)
     return *MainFileStyle;
-
-  StringRef RealFileName = getRealFileName(FileName);
-  StringRef Parent = llvm::sys::path::parent_path(RealFileName);
+  StringRef Parent = llvm::sys::path::parent_path(FileName);
   auto Iter = NamingStylesCache.find(Parent);
   if (Iter != NamingStylesCache.end())
     return Iter->getValue();
 
   llvm::StringRef CheckName = getID();
-  ClangTidyOptions Options = Context->getOptionsForFile(RealFileName);
+  ClangTidyOptions Options = Context->getOptionsForFile(FileName);
   if (Options.Checks && GlobList(*Options.Checks).contains(CheckName)) {
     auto It = NamingStylesCache.try_emplace(
         Parent,

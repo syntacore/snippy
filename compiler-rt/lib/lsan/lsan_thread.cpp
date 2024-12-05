@@ -35,12 +35,12 @@ static ThreadContextBase *CreateThreadContext(u32 tid) {
 }
 
 void InitializeThreads() {
-  alignas(alignof(ThreadRegistry)) static char
-      thread_registry_placeholder[sizeof(ThreadRegistry)];
+  static ALIGNED(alignof(
+      ThreadRegistry)) char thread_registry_placeholder[sizeof(ThreadRegistry)];
   thread_registry =
       new (thread_registry_placeholder) ThreadRegistry(CreateThreadContext);
 
-  alignas(alignof(ThreadArgRetval)) static char
+  static ALIGNED(alignof(ThreadArgRetval)) char
       thread_arg_retval_placeholder[sizeof(ThreadArgRetval)];
   thread_arg_retval = new (thread_arg_retval_placeholder) ThreadArgRetval();
 }

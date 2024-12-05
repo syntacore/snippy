@@ -2,6 +2,7 @@
 Test how lldb reacts to wrong commands
 """
 
+
 import lldb
 from lldbsuite.test.decorators import *
 from lldbsuite.test.lldbtest import *
@@ -17,10 +18,12 @@ class UnknownCommandTestCase(TestBase):
 
         command_interpreter.HandleCommand("g", result)
         self.assertFalse(result.Succeeded())
-        self.assertRegex(result.GetError(), "Ambiguous command 'g'. Possible matches:")
-        self.assertRegex(result.GetError(), "gui")
-        self.assertRegex(result.GetError(), "gdb-remote")
-        self.assertEqual(1, result.GetError().count("gdb-remote"))
+        self.assertRegexpMatches(
+            result.GetError(), "Ambiguous command 'g'. Possible matches:"
+        )
+        self.assertRegexpMatches(result.GetError(), "gui")
+        self.assertRegexpMatches(result.GetError(), "gdb-remote")
+        self.assertEquals(1, result.GetError().count("gdb-remote"))
 
     @no_debug_info_test
     def test_unknown_command(self):
@@ -30,4 +33,4 @@ class UnknownCommandTestCase(TestBase):
 
         command_interpreter.HandleCommand("qbert", result)
         self.assertFalse(result.Succeeded())
-        self.assertEqual(result.GetError(), "error: 'qbert' is not a valid command.\n")
+        self.assertEquals(result.GetError(), "error: 'qbert' is not a valid command.\n")

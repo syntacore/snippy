@@ -15,7 +15,7 @@
 
 ; No model specified
 
-define ptr @f1() nounwind {
+define i32* @f1() nounwind {
 ; CSKY-PIC-LABEL: f1:
 ; CSKY-PIC:       # %bb.0: # %entry
 ; CSKY-PIC-NEXT:    subi16 sp, sp, 8
@@ -59,13 +59,13 @@ define ptr @f1() nounwind {
 ; CSKY-NOPIC-NEXT:  .Ltmp0:
 ; CSKY-NOPIC-NEXT:    .long unspecified-(.LPC0_1-.Ltmp0)@GOTTPOFF
 entry:
-  ret ptr @unspecified
+  ret i32* @unspecified
 }
 
 
 ; localdynamic specified
 
-define ptr @f2() nounwind {
+define i32* @f2() nounwind {
 ; CSKY-PIC-LABEL: f2:
 ; CSKY-PIC:       # %bb.0: # %entry
 ; CSKY-PIC-NEXT:    subi16 sp, sp, 8
@@ -109,13 +109,13 @@ define ptr @f2() nounwind {
 ; CSKY-NOPIC-NEXT:  .Ltmp1:
 ; CSKY-NOPIC-NEXT:    .long ld-(.LPC1_1-.Ltmp1)@GOTTPOFF
 entry:
-  ret ptr @ld
+  ret i32* @ld
 }
 
 
 ; initialexec specified
 
-define ptr @f3() nounwind {
+define i32* @f3() nounwind {
 ; CSKY-PIC-LABEL: f3:
 ; CSKY-PIC:       # %bb.0: # %entry
 ; CSKY-PIC-NEXT:  .LPC2_1:
@@ -146,13 +146,13 @@ define ptr @f3() nounwind {
 ; CSKY-NOPIC-NEXT:  .Ltmp2:
 ; CSKY-NOPIC-NEXT:    .long ie-(.LPC2_1-.Ltmp2)@GOTTPOFF
 entry:
-  ret ptr @ie
+  ret i32* @ie
 }
 
 
 ; localexec specified
 
-define ptr @f4() nounwind {
+define i32* @f4() nounwind {
 ; CSKY-PIC-LABEL: f4:
 ; CSKY-PIC:       # %bb.0: # %entry
 ; CSKY-PIC-NEXT:    lrw32 a0, [.LCPI3_0]
@@ -175,5 +175,5 @@ define ptr @f4() nounwind {
 ; CSKY-NOPIC-NEXT:  .LCPI3_0:
 ; CSKY-NOPIC-NEXT:    .long le@TPOFF
 entry:
-  ret ptr @le
+  ret i32* @le
 }

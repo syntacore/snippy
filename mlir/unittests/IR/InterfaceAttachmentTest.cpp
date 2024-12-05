@@ -19,7 +19,6 @@
 
 #include "../../test/lib/Dialect/Test/TestAttributes.h"
 #include "../../test/lib/Dialect/Test/TestDialect.h"
-#include "../../test/lib/Dialect/Test/TestOps.h"
 #include "../../test/lib/Dialect/Test/TestTypes.h"
 #include "mlir/IR/OwningOpRef.h"
 
@@ -422,7 +421,7 @@ TEST(InterfaceAttachmentTest, PromisedInterfaces) {
   // Attribute interfaces use the exact same mechanism as types, so just check
   // that the promise mechanism works for attributes.
   MLIRContext context;
-  auto *testDialect = context.getOrLoadDialect<test::TestDialect>();
+  auto testDialect = context.getOrLoadDialect<test::TestDialect>();
   auto attr = test::SimpleAAttr::get(&context);
 
   // `SimpleAAttr` doesn't implement nor promises the
@@ -432,8 +431,8 @@ TEST(InterfaceAttachmentTest, PromisedInterfaces) {
       attr.hasPromiseOrImplementsInterface<TestExternalAttrInterface>());
 
   // Add a promise `TestExternalAttrInterface`.
-  testDialect->declarePromisedInterface<TestExternalAttrInterface,
-                                        test::SimpleAAttr>();
+  testDialect->declarePromisedInterface<test::SimpleAAttr,
+                                        TestExternalAttrInterface>();
   EXPECT_TRUE(
       attr.hasPromiseOrImplementsInterface<TestExternalAttrInterface>());
 

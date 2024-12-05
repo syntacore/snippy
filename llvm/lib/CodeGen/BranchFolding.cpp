@@ -80,6 +80,7 @@ TailMergeThreshold("tail-merge-threshold",
           cl::init(150), cl::Hidden);
 
 // Heuristic for tail merging (and, inversely, tail duplication).
+// TODO: This should be replaced with a target query.
 static cl::opt<unsigned>
 TailMergeSize("tail-merge-size",
               cl::desc("Min number of instructions to consider tail merging"),
@@ -97,8 +98,8 @@ namespace {
     bool runOnMachineFunction(MachineFunction &MF) override;
 
     void getAnalysisUsage(AnalysisUsage &AU) const override {
-      AU.addRequired<MachineBlockFrequencyInfoWrapperPass>();
-      AU.addRequired<MachineBranchProbabilityInfoWrapperPass>();
+      AU.addRequired<MachineBlockFrequencyInfo>();
+      AU.addRequired<MachineBranchProbabilityInfo>();
       AU.addRequired<ProfileSummaryInfoWrapperPass>();
       AU.addRequired<TargetPassConfig>();
       MachineFunctionPass::getAnalysisUsage(AU);
@@ -129,11 +130,10 @@ bool BranchFolderPass::runOnMachineFunction(MachineFunction &MF) {
   bool EnableTailMerge = !MF.getTarget().requiresStructuredCFG() &&
                          PassConfig->getEnableTailMerge();
   MBFIWrapper MBBFreqInfo(
-      getAnalysis<MachineBlockFrequencyInfoWrapperPass>().getMBFI());
-  BranchFolder Folder(
-      EnableTailMerge, /*CommonHoist=*/true, MBBFreqInfo,
-      getAnalysis<MachineBranchProbabilityInfoWrapperPass>().getMBPI(),
-      &getAnalysis<ProfileSummaryInfoWrapperPass>().getPSI());
+      getAnalysis<MachineBlockFrequencyInfo>());
+  BranchFolder Folder(EnableTailMerge, /*CommonHoist=*/true, MBBFreqInfo,
+                      getAnalysis<MachineBranchProbabilityInfo>(),
+                      &getAnalysis<ProfileSummaryInfoWrapperPass>().getPSI());
   return Folder.OptimizeFunction(MF, MF.getSubtarget().getInstrInfo(),
                                  MF.getSubtarget().getRegisterInfo());
 }
@@ -144,6 +144,8 @@ BranchFolder::BranchFolder(bool DefaultEnableTailMerge, bool CommonHoist,
                            ProfileSummaryInfo *PSI, unsigned MinTailLength)
     : EnableHoistCommonCode(CommonHoist), MinCommonTailLength(MinTailLength),
       MBBFreqInfo(FreqInfo), MBPI(ProbInfo), PSI(PSI) {
+  if (MinCommonTailLength == 0)
+    MinCommonTailLength = TailMergeSize;
   switch (FlagEnableTailMerge) {
   case cl::BOU_UNSET:
     EnableTailMerge = DefaultEnableTailMerge;
@@ -191,12 +193,6 @@ bool BranchFolder::OptimizeFunction(MachineFunction &MF,
   TRI = tri;
   MLI = mli;
   this->MRI = &MRI;
-
-  if (MinCommonTailLength == 0) {
-    MinCommonTailLength = TailMergeSize.getNumOccurrences() > 0
-                              ? TailMergeSize
-                              : TII->getTailMergeSize(MF);
-  }
 
   UpdateLiveIns = MRI.tracksLiveness() && TRI->trackLivenessAfterRegAlloc(MF);
   if (!UpdateLiveIns)
@@ -418,7 +414,7 @@ MachineBasicBlock *BranchFolder::SplitMBBAt(MachineBasicBlock &CurMBB,
   // NewMBB belongs to the same loop as CurMBB.
   if (MLI)
     if (MachineLoop *ML = MLI->getLoopFor(&CurMBB))
-      ML->addBasicBlockToLoop(NewMBB, *MLI);
+      ML->addBasicBlockToLoop(NewMBB, MLI->getBase());
 
   // NewMBB inherits CurMBB's block frequency.
   MBBFreqInfo.setBlockFreq(NewMBB, MBBFreqInfo.getBlockFreq(&CurMBB));
@@ -459,14 +455,12 @@ static unsigned EstimateRuntime(MachineBasicBlock::iterator I,
 // with a conditional branch to the next block, optimize by reversing the
 // test and conditionally branching to SuccMBB instead.
 static void FixTail(MachineBasicBlock *CurMBB, MachineBasicBlock *SuccBB,
-                    const TargetInstrInfo *TII, const DebugLoc &BranchDL) {
+                    const TargetInstrInfo *TII) {
   MachineFunction *MF = CurMBB->getParent();
   MachineFunction::iterator I = std::next(MachineFunction::iterator(CurMBB));
   MachineBasicBlock *TBB = nullptr, *FBB = nullptr;
   SmallVector<MachineOperand, 4> Cond;
   DebugLoc dl = CurMBB->findBranchDebugLoc();
-  if (!dl)
-    dl = BranchDL;
   if (I != MF->end() && !TII->analyzeBranch(*CurMBB, TBB, FBB, Cond, true)) {
     MachineBasicBlock *NextBB = &*I;
     if (TBB == NextBB && !Cond.empty() && !FBB) {
@@ -692,8 +686,7 @@ unsigned BranchFolder::ComputeSameTails(unsigned CurHash,
 
 void BranchFolder::RemoveBlocksWithHash(unsigned CurHash,
                                         MachineBasicBlock *SuccBB,
-                                        MachineBasicBlock *PredBB,
-                                        const DebugLoc &BranchDL) {
+                                        MachineBasicBlock *PredBB) {
   MPIterator CurMPIter, B;
   for (CurMPIter = std::prev(MergePotentials.end()),
       B = MergePotentials.begin();
@@ -701,7 +694,7 @@ void BranchFolder::RemoveBlocksWithHash(unsigned CurHash,
     // Put the unconditional branch back, if we need one.
     MachineBasicBlock *CurMBB = CurMPIter->getBlock();
     if (SuccBB && CurMBB != PredBB)
-      FixTail(CurMBB, SuccBB, TII, BranchDL);
+      FixTail(CurMBB, SuccBB, TII);
     if (CurMPIter == B)
       break;
   }
@@ -915,7 +908,6 @@ bool BranchFolder::TryTailMergeBlocks(MachineBasicBlock *SuccBB,
   // Walk through equivalence sets looking for actual exact matches.
   while (MergePotentials.size() > 1) {
     unsigned CurHash = MergePotentials.back().getHash();
-    const DebugLoc &BranchDL = MergePotentials.back().getBranchDebugLoc();
 
     // Build SameTails, identifying the set of blocks with this hash code
     // and with the maximum number of instructions in common.
@@ -926,7 +918,7 @@ bool BranchFolder::TryTailMergeBlocks(MachineBasicBlock *SuccBB,
     // If we didn't find any pair that has at least MinCommonTailLength
     // instructions in common, remove all blocks with this hash code and retry.
     if (SameTails.empty()) {
-      RemoveBlocksWithHash(CurHash, SuccBB, PredBB, BranchDL);
+      RemoveBlocksWithHash(CurHash, SuccBB, PredBB);
       continue;
     }
 
@@ -973,7 +965,7 @@ bool BranchFolder::TryTailMergeBlocks(MachineBasicBlock *SuccBB,
       // Split a block so that one does.
       if (!CreateCommonTailOnlyBlock(PredBB, SuccBB,
                                      maxCommonTailLength, commonTailIndex)) {
-        RemoveBlocksWithHash(CurHash, SuccBB, PredBB, BranchDL);
+        RemoveBlocksWithHash(CurHash, SuccBB, PredBB);
         continue;
       }
     }
@@ -1021,8 +1013,7 @@ bool BranchFolder::TailMergeBlocks(MachineFunction &MF) {
     if (MergePotentials.size() == TailMergeThreshold)
       break;
     if (!TriedMerging.count(&MBB) && MBB.succ_empty())
-      MergePotentials.push_back(MergePotentialsElt(HashEndOfMBB(MBB), &MBB,
-                                                   MBB.findBranchDebugLoc()));
+      MergePotentials.push_back(MergePotentialsElt(HashEndOfMBB(MBB), &MBB));
   }
 
   // If this is a large problem, avoid visiting the same basic blocks
@@ -1124,8 +1115,8 @@ bool BranchFolder::TailMergeBlocks(MachineFunction &MF) {
         }
 
         // Remove the unconditional branch at the end, if any.
-        DebugLoc dl = PBB->findBranchDebugLoc();
         if (TBB && (Cond.empty() || FBB)) {
+          DebugLoc dl = PBB->findBranchDebugLoc();
           TII->removeBranch(*PBB);
           if (!Cond.empty())
             // reinsert conditional branch only, for now
@@ -1133,8 +1124,7 @@ bool BranchFolder::TailMergeBlocks(MachineFunction &MF) {
                               NewCond, dl);
         }
 
-        MergePotentials.push_back(
-            MergePotentialsElt(HashEndOfMBB(*PBB), PBB, dl));
+        MergePotentials.push_back(MergePotentialsElt(HashEndOfMBB(*PBB), PBB));
       }
     }
 
@@ -1152,8 +1142,7 @@ bool BranchFolder::TailMergeBlocks(MachineFunction &MF) {
     PredBB = &*std::prev(I); // this may have been changed in TryTailMergeBlocks
     if (MergePotentials.size() == 1 &&
         MergePotentials.begin()->getBlock() != PredBB)
-      FixTail(MergePotentials.begin()->getBlock(), IBB, TII,
-              MergePotentials.begin()->getBranchDebugLoc());
+      FixTail(MergePotentials.begin()->getBlock(), IBB, TII);
   }
 
   return MadeChange;
@@ -2058,8 +2047,12 @@ bool BranchFolder::HoistCommonCodeInSuccs(MachineBasicBlock *MBB) {
   MBB->splice(Loc, TBB, TBB->begin(), TIB);
   FBB->erase(FBB->begin(), FIB);
 
-  if (UpdateLiveIns)
-    fullyRecomputeLiveIns({TBB, FBB});
+  if (UpdateLiveIns) {
+    bool anyChange = false;
+    do {
+      anyChange = recomputeLiveIns(*TBB) || recomputeLiveIns(*FBB);
+    } while (anyChange);
+  }
 
   ++NumHoist;
   return true;

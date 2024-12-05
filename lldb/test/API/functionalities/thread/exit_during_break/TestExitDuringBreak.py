@@ -49,9 +49,8 @@ class ExitDuringBreakpointTestCase(TestBase):
         num_threads = process.GetNumThreads()
 
         # Make sure we see at least five threads
-        self.assertGreaterEqual(
-            num_threads,
-            5,
+        self.assertTrue(
+            num_threads >= 5,
             "Number of expected threads and actual threads do not match.",
         )
 

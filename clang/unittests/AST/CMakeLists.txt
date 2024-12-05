@@ -9,7 +9,6 @@ add_subdirectory(Interp)
 
 add_clang_unittest(ASTTests
   ASTContextParentMapTest.cpp
-  ASTDumperTest.cpp
   ASTExprTest.cpp
   ASTImporterFixtures.cpp
   ASTImporterTest.cpp
@@ -24,7 +23,6 @@ add_clang_unittest(ASTTests
   CommentLexer.cpp
   CommentParser.cpp
   CommentTextTest.cpp
-  ConceptPrinterTest.cpp
   DataCollectionTest.cpp
   DeclPrinterTest.cpp
   DeclTest.cpp

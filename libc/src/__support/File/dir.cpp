@@ -8,13 +8,11 @@
 
 #include "dir.h"
 
-#include "src/__support/CPP/mutex.h" // lock_guard
 #include "src/__support/CPP/new.h"
 #include "src/__support/error_or.h"
-#include "src/__support/macros/config.h"
 #include "src/errno/libc_errno.h" // For error macros
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 
 ErrorOr<Dir *> Dir::open(const char *path) {
   auto fd = platform_opendir(path);
@@ -29,7 +27,7 @@ ErrorOr<Dir *> Dir::open(const char *path) {
 }
 
 ErrorOr<struct ::dirent *> Dir::read() {
-  cpp::lock_guard lock(mutex);
+  MutexLock lock(&mutex);
   if (readptr >= fillsize) {
     auto readsize = platform_fetch_dirents(fd, buffer);
     if (!readsize)
@@ -53,7 +51,7 @@ ErrorOr<struct ::dirent *> Dir::read() {
 
 int Dir::close() {
   {
-    cpp::lock_guard lock(mutex);
+    MutexLock lock(&mutex);
     int retval = platform_closedir(fd);
     if (retval != 0)
       return retval;
@@ -62,4 +60,4 @@ int Dir::close() {
   return 0;
 }
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE

@@ -113,10 +113,6 @@ public:
     StringRef CPUName(Name);
     return isValidCPUName(CPUName);
   }
-
-  std::pair<unsigned, unsigned> hardwareInterferenceSizes() const override {
-    return std::make_pair(32, 32);
-  }
 };
 } // namespace targets
 } // namespace clang

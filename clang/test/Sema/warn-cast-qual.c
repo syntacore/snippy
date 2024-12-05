@@ -1,6 +1,5 @@
 // RUN: %clang_cc1 -triple x86_64-unknown-unknown -fsyntax-only -Wcast-qual -verify %s
-// RUN: %clang_cc1 -triple x86_64-unknown-unknown -fsyntax-only -Wcast-qual -verify %s -fexperimental-new-constant-interpreter
-// RUN: %clang_cc1 -triple x86_64-unknown-unknown -x c++ -fsyntax-only -Wcast-qual -verify %s -fexperimental-new-constant-interpreter
+// RUN: %clang_cc1 -triple x86_64-unknown-unknown -x c++ -fsyntax-only -Wcast-qual -verify %s
 
 #include <stdint.h>
 

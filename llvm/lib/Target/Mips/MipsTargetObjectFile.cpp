@@ -143,7 +143,7 @@ IsGlobalInSmallSectionImpl(const GlobalObject *GO,
     return false;
 
   return IsInSmallSection(
-      GVA->getDataLayout().getTypeAllocSize(Ty));
+      GVA->getParent()->getDataLayout().getTypeAllocSize(Ty));
 }
 
 MCSection *MipsTargetObjectFile::SelectSectionForGlobal(

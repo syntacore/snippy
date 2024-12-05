@@ -1449,7 +1449,7 @@ bool IRForTarget::ReplaceVariables(Function &llvm_function) {
 
   Argument *argument = &*iter;
 
-  if (argument->getName() == "this") {
+  if (argument->getName().equals("this")) {
     ++iter;
 
     if (iter == llvm_function.arg_end()) {
@@ -1461,7 +1461,7 @@ bool IRForTarget::ReplaceVariables(Function &llvm_function) {
     }
 
     argument = &*iter;
-  } else if (argument->getName() == "self") {
+  } else if (argument->getName().equals("self")) {
     ++iter;
 
     if (iter == llvm_function.arg_end()) {
@@ -1472,7 +1472,7 @@ bool IRForTarget::ReplaceVariables(Function &llvm_function) {
       return false;
     }
 
-    if (iter->getName() != "_cmd") {
+    if (!iter->getName().equals("_cmd")) {
       m_error_stream.Format("Internal error [IRForTarget]: Wrapper takes '{0}' "
                             "after 'self' argument (should take '_cmd')",
                             iter->getName());
@@ -1493,7 +1493,7 @@ bool IRForTarget::ReplaceVariables(Function &llvm_function) {
     argument = &*iter;
   }
 
-  if (argument->getName() != "$__lldb_arg") {
+  if (!argument->getName().equals("$__lldb_arg")) {
     m_error_stream.Format("Internal error [IRForTarget]: Wrapper takes an "
                           "argument named '{0}' instead of the struct pointer",
                           argument->getName());

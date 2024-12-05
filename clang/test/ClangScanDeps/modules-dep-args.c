@@ -61,7 +61,6 @@ module Direct { header "direct.h" }
 // CHECK-NEXT:         "[[PREFIX]]/direct.h",
 // CHECK-NEXT:         "[[PREFIX]]/module.modulemap"
 // CHECK-NEXT:       ],
-// CHECK-NEXT:       "link-libraries": [],
 // CHECK-NEXT:       "name": "Direct"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
@@ -74,7 +73,6 @@ module Direct { header "direct.h" }
 // CHECK-NEXT:         "[[PREFIX]]/module.modulemap",
 // CHECK-NEXT:         "[[PREFIX]]/transitive.h"
 // CHECK-NEXT:       ],
-// CHECK-NEXT:       "link-libraries": [],
 // CHECK-NEXT:       "name": "Transitive"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],

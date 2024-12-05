@@ -97,14 +97,12 @@ add_clang_library(clangDaemon
   IncludeFixer.cpp
   InlayHints.cpp
   JSONTransport.cpp
-  ModulesBuilder.cpp
   PathMapping.cpp
   Protocol.cpp
   Quality.cpp
   ParsedAST.cpp
   Preamble.cpp
   RIFF.cpp
-  ScanningProjectModules.cpp
   Selection.cpp
   SemanticHighlighting.cpp
   SemanticSelection.cpp
@@ -163,7 +161,6 @@ clang_target_link_libraries(clangDaemon
   clangAST
   clangASTMatchers
   clangBasic
-  clangDependencyScanning
   clangDriver
   clangFormat
   clangFrontend
@@ -185,7 +182,6 @@ target_link_libraries(clangDaemon
   clangIncludeCleaner
   clangPseudo
   clangTidy
-  clangTidyUtils
 
   clangdSupport
   )

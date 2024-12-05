@@ -120,7 +120,9 @@ mlir::affine::fullyComposeAndComputeConstantDelta(Value value1, Value value2) {
   mapOperands.push_back(value1);
   mapOperands.push_back(value2);
   affine::fullyComposeAffineMapAndOperands(&map, &mapOperands);
+  ValueDimList valueDims;
+  for (Value v : mapOperands)
+    valueDims.push_back({v, std::nullopt});
   return ValueBoundsConstraintSet::computeConstantBound(
-      presburger::BoundType::EQ,
-      ValueBoundsConstraintSet::Variable(map, mapOperands));
+      presburger::BoundType::EQ, map, valueDims);
 }

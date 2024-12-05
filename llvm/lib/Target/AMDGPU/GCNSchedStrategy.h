@@ -45,12 +45,12 @@ protected:
 
   void pickNodeFromQueue(SchedBoundary &Zone, const CandPolicy &ZonePolicy,
                          const RegPressureTracker &RPTracker,
-                         SchedCandidate &Cand, bool IsBottomUp);
+                         SchedCandidate &Cand);
 
-  void initCandidate(SchedCandidate &Cand, SUnit *SU, bool AtTop,
-                     const RegPressureTracker &RPTracker,
-                     const SIRegisterInfo *SRI, unsigned SGPRPressure,
-                     unsigned VGPRPressure, bool IsBottomUp);
+  void initCandidate(SchedCandidate &Cand, SUnit *SU,
+                     bool AtTop, const RegPressureTracker &RPTracker,
+                     const SIRegisterInfo *SRI,
+                     unsigned SGPRPressure, unsigned VGPRPressure);
 
   std::vector<unsigned> Pressure;
 
@@ -372,7 +372,7 @@ private:
   MapVector<unsigned, MapVector<MachineInstr *, MachineInstr *>>
       RematerializableInsts;
 
-  // Map a trivially rematerializable def to a list of regions at MinOccupancy
+  // Map a trivially remateriazable def to a list of regions at MinOccupancy
   // that has the defined reg as a live-in.
   DenseMap<MachineInstr *, SmallVector<unsigned, 4>> RematDefToLiveInRegions;
 

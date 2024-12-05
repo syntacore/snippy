@@ -69,7 +69,7 @@ private:
                           bool IsAngled, CharSourceRange FilenameRange,
                           OptionalFileEntryRef IncludedFile,
                           StringRef SearchPath, StringRef RelativePath,
-                          const Module *SuggestedModule, bool ModuleImported,
+                          const Module *Imported,
                           SrcMgr::CharacteristicKind FileType) override;
 
   void EndOfMainFile() override;

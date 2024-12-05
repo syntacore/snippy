@@ -220,13 +220,16 @@ static bool findDependencies(DependenceKind Flavor, const Value *Arg,
     BasicBlock::iterator StartBBBegin = LocalStartBB->begin();
     for (;;) {
       if (LocalStartPos == StartBBBegin) {
-        if (pred_empty(LocalStartBB))
+        pred_iterator PI(LocalStartBB), PE(LocalStartBB, false);
+        if (PI == PE)
           // Return if we've reached the function entry.
           return false;
         // Add the predecessors to the worklist.
-        for (BasicBlock *PredBB : predecessors(LocalStartBB))
+        do {
+          BasicBlock *PredBB = *PI;
           if (Visited.insert(PredBB).second)
             Worklist.push_back(std::make_pair(PredBB, PredBB->end()));
+        } while (++PI != PE);
         break;
       }
 

@@ -73,13 +73,14 @@ WebAssemblyMCInstLower::GetGlobalAddressSymbol(const MachineOperand &MO) const {
   SmallVector<MVT, 4> ParamMVTs;
   const auto *const F = dyn_cast<Function>(Global);
   computeSignatureVTs(FuncTy, F, CurrentFunc, TM, ParamMVTs, ResultMVTs);
-  auto Signature = signatureFromMVTs(Ctx, ResultMVTs, ParamMVTs);
+  auto Signature = signatureFromMVTs(ResultMVTs, ParamMVTs);
 
   bool InvokeDetected = false;
   auto *WasmSym = Printer.getMCSymbolForFunction(
       F, WebAssembly::WasmEnableEmEH || WebAssembly::WasmEnableEmSjLj,
-      Signature, InvokeDetected);
-  WasmSym->setSignature(Signature);
+      Signature.get(), InvokeDetected);
+  WasmSym->setSignature(Signature.get());
+  Printer.addSignature(std::move(Signature));
   WasmSym->setType(wasm::WASM_SYMBOL_TYPE_FUNCTION);
   return WasmSym;
 }
@@ -141,12 +142,12 @@ MCOperand WebAssemblyMCInstLower::lowerSymbolOperand(const MachineOperand &MO,
 MCOperand WebAssemblyMCInstLower::lowerTypeIndexOperand(
     SmallVectorImpl<wasm::ValType> &&Returns,
     SmallVectorImpl<wasm::ValType> &&Params) const {
-  auto Signature = Ctx.createWasmSignature();
-  Signature->Returns = std::move(Returns);
-  Signature->Params = std::move(Params);
+  auto Signature = std::make_unique<wasm::WasmSignature>(std::move(Returns),
+                                                         std::move(Params));
   MCSymbol *Sym = Printer.createTempSymbol("typeindex");
   auto *WasmSym = cast<MCSymbolWasm>(Sym);
-  WasmSym->setSignature(Signature);
+  WasmSym->setSignature(Signature.get());
+  Printer.addSignature(std::move(Signature));
   WasmSym->setType(wasm::WASM_SYMBOL_TYPE_FUNCTION);
   const MCExpr *Expr =
       MCSymbolRefExpr::create(WasmSym, MCSymbolRefExpr::VK_WASM_TYPEINDEX, Ctx);

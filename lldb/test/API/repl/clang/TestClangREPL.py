@@ -1,6 +1,7 @@
+import lldb
 from lldbsuite.test.decorators import *
-from lldbsuite.test.lldbpexpect import PExpectTest
 from lldbsuite.test.lldbtest import *
+from lldbsuite.test.lldbpexpect import PExpectTest
 
 
 class TestCase(PExpectTest):
@@ -16,7 +17,13 @@ class TestCase(PExpectTest):
         self.current_repl_line_number += 1
         self.child.expect_exact(str(self.current_repl_line_number) + ">")
 
-    def start_repl(self):
+    # PExpect uses many timeouts internally and doesn't play well
+    # under ASAN on a loaded machine..
+    @skipIfAsan
+    @skipIf(oslist=["linux"], archs=["arm", "aarch64"])  # Randomly fails on buildbot
+    @skipIfEditlineSupportMissing
+    def test_basic_completion(self):
+        """Test that we can complete a simple multiline expression"""
         self.build()
         self.current_repl_line_number = 1
 
@@ -34,14 +41,6 @@ class TestCase(PExpectTest):
         self.child.send("expression --repl -l c --\n")
         self.child.expect_exact("1>")
 
-    # PExpect uses many timeouts internally and doesn't play well
-    # under ASAN on a loaded machine..
-    @skipIfAsan
-    @skipIf(oslist=["linux"], archs=["arm", "aarch64"])  # Randomly fails on buildbot
-    @skipIfEditlineSupportMissing
-    def test_basic_completion(self):
-        """Test that we can complete a simple multiline expression"""
-        self.start_repl()
         # Try evaluating a simple expression.
         self.expect_repl("3 + 3", substrs=["(int) $0 = 6"])
 
@@ -55,16 +54,3 @@ class TestCase(PExpectTest):
         self.expect_repl("$persistent + 10", substrs=["(long) $2 = 17"])
 
         self.quit()
-
-    # PExpect uses many timeouts internally and doesn't play well
-    # under ASAN on a loaded machine..
-    @skipIfAsan
-    @skipIf(oslist=["linux"], archs=["arm", "aarch64"])  # Randomly fails on buildbot
-    @skipIfEditlineSupportMissing
-    def test_completion_with_space_only_line(self):
-        """Test that we don't crash when completing lines with spaces only"""
-        self.start_repl()
-
-        self.child.send("   ")
-        self.child.send("\t")
-        self.expect_repl("3 + 3", substrs=["(int) $0 = 6"])

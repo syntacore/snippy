@@ -50,6 +50,7 @@ AutoExporter::AutoExporter(
       "libclang_rt.profile-x86_64",
       "libc++",
       "libc++abi",
+      "libFortran_main",
       "libFortranRuntime",
       "libFortranDecimal",
       "libunwind",

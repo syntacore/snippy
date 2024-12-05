@@ -120,8 +120,9 @@ public:
 
   llvm::Expected<lldb::TypeSystemSP>
   GetTypeSystemForLanguage(lldb::LanguageType language) override {
-    return llvm::createStringError(
-        "SymbolFileBreakpad does not support GetTypeSystemForLanguage");
+    return llvm::make_error<llvm::StringError>(
+        "SymbolFileBreakpad does not support GetTypeSystemForLanguage",
+        llvm::inconvertibleErrorCode());
   }
 
   CompilerDeclContext FindNamespace(ConstString name,
@@ -140,7 +141,7 @@ public:
 
   llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
 
-  uint64_t GetDebugInfoSize(bool load_all_debug_info = false) override;
+  uint64_t GetDebugInfoSize() override;
 
 private:
   // A class representing a position in the breakpad file. Useful for

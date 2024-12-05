@@ -51,7 +51,7 @@ void CalleeNamespaceCheck::check(const MatchFinder::MatchResult &Result) {
   // __llvm_libc, we're good.
   const auto *NS = dyn_cast<NamespaceDecl>(getOutermostNamespace(FuncDecl));
   if (NS && Result.SourceManager->isMacroBodyExpansion(NS->getLocation()) &&
-      NS->getName().starts_with(RequiredNamespaceRefStart))
+      NS->getName().starts_with(RequiredNamespaceStart))
     return;
 
   const DeclarationName &Name = FuncDecl->getDeclName();
@@ -62,7 +62,7 @@ void CalleeNamespaceCheck::check(const MatchFinder::MatchResult &Result) {
   diag(UsageSiteExpr->getBeginLoc(),
        "%0 must resolve to a function declared "
        "within the namespace defined by the '%1' macro")
-      << FuncDecl << RequiredNamespaceRefMacroName;
+      << FuncDecl << RequiredNamespaceMacroName;
 
   diag(FuncDecl->getLocation(), "resolves to this declaration",
        clang::DiagnosticIDs::Note);

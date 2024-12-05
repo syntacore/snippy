@@ -8,7 +8,6 @@
 // with PCH
 // RUN: %clang_cc1 -fopenmp -emit-llvm -chain-include %s -chain-include %s %s -o - | FileCheck %s -check-prefix=CHECK-TLS-1
 // RUN: %clang_cc1 -fopenmp -emit-llvm -chain-include %s -chain-include %s %s -o - | FileCheck %s -check-prefix=CHECK-TLS-2
-// // UNSUPPORTED: target={{.*}}-zos{{.*}}
 
 #if !defined(PASS1)
 #define PASS1

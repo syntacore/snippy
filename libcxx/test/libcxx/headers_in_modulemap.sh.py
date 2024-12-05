@@ -1,4 +1,4 @@
-# RUN: %{python} %s %{libcxx-dir}/utils %{include-dir}
+# RUN: %{python} %s %{libcxx}/utils %{include}
 
 import sys
 

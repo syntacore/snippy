@@ -26,7 +26,7 @@
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringRef.h"
@@ -120,7 +120,7 @@ namespace {
 /// Maintains the set of instructions of the loop for a partition before
 /// cloning.  After cloning, it hosts the new loop.
 class InstPartition {
-  using InstructionSet = SmallSetVector<Instruction *, 8>;
+  using InstructionSet = SmallPtrSet<Instruction *, 8>;
 
 public:
   InstPartition(Instruction *I, Loop *L, bool DepCycle = false)
@@ -166,7 +166,7 @@ public:
       // Insert instructions from the loop that we depend on.
       for (Value *V : I->operand_values()) {
         auto *I = dyn_cast<Instruction>(V);
-        if (I && OrigLoop->contains(I->getParent()) && Set.insert(I))
+        if (I && OrigLoop->contains(I->getParent()) && Set.insert(I).second)
           Worklist.push_back(I);
       }
     }
@@ -231,16 +231,17 @@ public:
     }
   }
 
-  void print(raw_ostream &OS) const {
-    OS << (DepCycle ? " (cycle)\n" : "\n");
+  void print() const {
+    if (DepCycle)
+      dbgs() << "  (cycle)\n";
     for (auto *I : Set)
       // Prefix with the block name.
-      OS << "  " << I->getParent()->getName() << ":" << *I << "\n";
+      dbgs() << "  " << I->getParent()->getName() << ":" << *I << "\n";
   }
 
-  void printBlocks(raw_ostream &OS) const {
+  void printBlocks() const {
     for (auto *BB : getDistributedLoop()->getBlocks())
-      OS << *BB;
+      dbgs() << *BB;
   }
 
 private:
@@ -367,11 +368,11 @@ public:
           std::tie(LoadToPart, NewElt) =
               LoadToPartition.insert(std::make_pair(Inst, PartI));
           if (!NewElt) {
-            LLVM_DEBUG(
-                dbgs()
-                << "LDist: Merging partitions due to this load in multiple "
-                << "partitions: " << PartI << ", " << LoadToPart->second << "\n"
-                << *Inst << "\n");
+            LLVM_DEBUG(dbgs()
+                       << "Merging partitions due to this load in multiple "
+                       << "partitions: " << PartI << ", " << LoadToPart->second
+                       << "\n"
+                       << *Inst << "\n");
 
             auto PartJ = I;
             do {
@@ -529,8 +530,8 @@ public:
   void print(raw_ostream &OS) const {
     unsigned Index = 0;
     for (const auto &P : PartitionContainer) {
-      OS << "LDist: Partition " << Index++ << ":";
-      P.print(OS);
+      OS << "Partition " << Index++ << " (" << &P << "):\n";
+      P.print();
     }
   }
 
@@ -544,11 +545,11 @@ public:
   }
 #endif
 
-  void printBlocks(raw_ostream &OS) const {
+  void printBlocks() const {
     unsigned Index = 0;
     for (const auto &P : PartitionContainer) {
-      OS << "LDist: Partition " << Index++ << ":";
-      P.printBlocks(OS);
+      dbgs() << "\nPartition " << Index++ << " (" << &P << "):\n";
+      P.printBlocks();
     }
   }
 
@@ -627,7 +628,7 @@ public:
       const SmallVectorImpl<Dependence> &Dependences) {
     Accesses.append(Instructions.begin(), Instructions.end());
 
-    LLVM_DEBUG(dbgs() << "LDist: Backward dependences:\n");
+    LLVM_DEBUG(dbgs() << "Backward dependences:\n");
     for (const auto &Dep : Dependences)
       if (Dep.isPossiblyBackward()) {
         // Note that the designations source and destination follow the program
@@ -658,9 +659,9 @@ public:
   bool processLoop() {
     assert(L->isInnermost() && "Only process inner loops.");
 
-    LLVM_DEBUG(dbgs() << "\nLDist: Checking a loop in '"
-                      << L->getHeader()->getParent()->getName() << "' from "
-                      << L->getLocStr() << "\n");
+    LLVM_DEBUG(dbgs() << "\nLDist: In \""
+                      << L->getHeader()->getParent()->getName()
+                      << "\" checking " << *L << "\n");
 
     // Having a single exit block implies there's also one exiting block.
     if (!L->getExitBlock())
@@ -684,9 +685,6 @@ public:
     auto *Dependences = LAI->getDepChecker().getDependences();
     if (!Dependences || Dependences->empty())
       return fail("NoUnsafeDeps", "no unsafe dependences to isolate");
-
-    LLVM_DEBUG(dbgs() << "LDist: Found a candidate loop: "
-                      << L->getHeader()->getName() << "\n");
 
     InstPartitionContainer Partitions(L, LI, DT);
 
@@ -737,7 +735,7 @@ public:
     for (auto *Inst : DefsUsedOutside)
       Partitions.addToNewNonCyclicPartition(Inst);
 
-    LLVM_DEBUG(dbgs() << "LDist: Seeded partitions:\n" << Partitions);
+    LLVM_DEBUG(dbgs() << "Seeded partitions:\n" << Partitions);
     if (Partitions.getSize() < 2)
       return fail("CantIsolateUnsafeDeps",
                   "cannot isolate unsafe dependencies");
@@ -745,19 +743,19 @@ public:
     // Run the merge heuristics: Merge non-cyclic adjacent partitions since we
     // should be able to vectorize these together.
     Partitions.mergeBeforePopulating();
-    LLVM_DEBUG(dbgs() << "LDist: Merged partitions:\n" << Partitions);
+    LLVM_DEBUG(dbgs() << "\nMerged partitions:\n" << Partitions);
     if (Partitions.getSize() < 2)
       return fail("CantIsolateUnsafeDeps",
                   "cannot isolate unsafe dependencies");
 
     // Now, populate the partitions with non-memory operations.
     Partitions.populateUsedSet();
-    LLVM_DEBUG(dbgs() << "LDist: Populated partitions:\n" << Partitions);
+    LLVM_DEBUG(dbgs() << "\nPopulated partitions:\n" << Partitions);
 
     // In order to preserve original lexical order for loads, keep them in the
     // partition that we set up in the MemoryInstructionDependences loop.
     if (Partitions.mergeToAvoidDuplicatedLoads()) {
-      LLVM_DEBUG(dbgs() << "LDist: Partitions merged to ensure unique loads:\n"
+      LLVM_DEBUG(dbgs() << "\nPartitions merged to ensure unique loads:\n"
                         << Partitions);
       if (Partitions.getSize() < 2)
         return fail("CantIsolateUnsafeDeps",
@@ -781,8 +779,7 @@ public:
     if (!IsForced.value_or(false) && hasDisableAllTransformsHint(L))
       return fail("HeuristicDisabled", "distribution heuristic disabled");
 
-    LLVM_DEBUG(dbgs() << "LDist: Distributing loop: "
-                      << L->getHeader()->getName() << "\n");
+    LLVM_DEBUG(dbgs() << "\nDistributing loop: " << *L << "\n");
     // We're done forming the partitions set up the reverse mapping from
     // instructions to partitions.
     Partitions.setupPartitionIdOnInstructions();
@@ -810,7 +807,7 @@ public:
 
       MDNode *OrigLoopID = L->getLoopID();
 
-      LLVM_DEBUG(dbgs() << "LDist: Pointers:\n");
+      LLVM_DEBUG(dbgs() << "\nPointers:\n");
       LLVM_DEBUG(LAI->getRuntimePointerChecking()->printChecks(dbgs(), Checks));
       LoopVersioning LVer(*LAI, Checks, L, LI, DT, SE);
       LVer.versionLoop(DefsUsedOutside);
@@ -833,8 +830,8 @@ public:
     // Now, we remove the instruction from each loop that don't belong to that
     // partition.
     Partitions.removeUnusedInsts();
-    LLVM_DEBUG(dbgs() << "LDist: After removing unused Instrs:\n");
-    LLVM_DEBUG(Partitions.printBlocks(dbgs()));
+    LLVM_DEBUG(dbgs() << "\nAfter removing unused Instrs:\n");
+    LLVM_DEBUG(Partitions.printBlocks());
 
     if (LDistVerify) {
       LI->verify(*DT);
@@ -856,7 +853,7 @@ public:
     LLVMContext &Ctx = F->getContext();
     bool Forced = isForced().value_or(false);
 
-    LLVM_DEBUG(dbgs() << "LDist: Skipping; " << Message << "\n");
+    LLVM_DEBUG(dbgs() << "Skipping; " << Message << "\n");
 
     // With Rpass-missed report that distribution failed.
     ORE->emit([&]() {
@@ -965,10 +962,11 @@ private:
 
 } // end anonymous namespace
 
+/// Shared implementation between new and old PMs.
 static bool runImpl(Function &F, LoopInfo *LI, DominatorTree *DT,
                     ScalarEvolution *SE, OptimizationRemarkEmitter *ORE,
                     LoopAccessInfoManager &LAIs) {
-  // Build up a worklist of inner-loops to distribute. This is necessary as the
+  // Build up a worklist of inner-loops to vectorize. This is necessary as the
   // act of distributing a loop creates new loops and can invalidate iterators
   // across the loops.
   SmallVector<Loop *, 8> Worklist;

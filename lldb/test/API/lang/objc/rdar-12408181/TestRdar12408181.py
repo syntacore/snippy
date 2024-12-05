@@ -49,12 +49,11 @@ class Rdar12408181TestCase(TestBase):
         ):
             window = self.frame().FindVariable("window")
             window_dynamic = window.GetDynamicValue(lldb.eDynamicCanRunTarget)
-            self.assertGreater(
-                window.GetNumChildren(), 1, "NSWindow (static) only has 1 child!"
+            self.assertTrue(
+                window.GetNumChildren() > 1, "NSWindow (static) only has 1 child!"
             )
-            self.assertGreater(
-                window_dynamic.GetNumChildren(),
-                1,
+            self.assertTrue(
+                window_dynamic.GetNumChildren() > 1,
                 "NSWindow (dynamic) only has 1 child!",
             )
             self.assertTrue(

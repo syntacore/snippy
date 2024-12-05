@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TestOps.h"
+#include "TestDialect.h"
 #include "mlir/Analysis/DataLayoutAnalysis.h"
 #include "mlir/Dialect/DLTI/DLTI.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -36,38 +36,19 @@ struct TestDataLayoutQuery
         return;
 
       const DataLayout &layout = layouts.getAbove(op);
-      llvm::TypeSize size = layout.getTypeSize(op.getType());
-      llvm::TypeSize bitsize = layout.getTypeSizeInBits(op.getType());
-      uint64_t alignment = layout.getTypeABIAlignment(op.getType());
-      uint64_t preferred = layout.getTypePreferredAlignment(op.getType());
-      uint64_t index = layout.getTypeIndexBitwidth(op.getType()).value_or(0);
-      Attribute endianness = layout.getEndianness();
+      unsigned size = layout.getTypeSize(op.getType());
+      unsigned bitsize = layout.getTypeSizeInBits(op.getType());
+      unsigned alignment = layout.getTypeABIAlignment(op.getType());
+      unsigned preferred = layout.getTypePreferredAlignment(op.getType());
       Attribute allocaMemorySpace = layout.getAllocaMemorySpace();
       Attribute programMemorySpace = layout.getProgramMemorySpace();
       Attribute globalMemorySpace = layout.getGlobalMemorySpace();
-      uint64_t stackAlignment = layout.getStackAlignment();
-
-      auto convertTypeSizeToAttr = [&](llvm::TypeSize typeSize) -> Attribute {
-        if (!typeSize.isScalable())
-          return builder.getIndexAttr(typeSize);
-
-        return builder.getDictionaryAttr({
-            builder.getNamedAttr("scalable", builder.getUnitAttr()),
-            builder.getNamedAttr(
-                "minimal_size",
-                builder.getIndexAttr(typeSize.getKnownMinValue())),
-        });
-      };
-
+      unsigned stackAlignment = layout.getStackAlignment();
       op->setAttrs(
-          {builder.getNamedAttr("size", convertTypeSizeToAttr(size)),
-           builder.getNamedAttr("bitsize", convertTypeSizeToAttr(bitsize)),
+          {builder.getNamedAttr("size", builder.getIndexAttr(size)),
+           builder.getNamedAttr("bitsize", builder.getIndexAttr(bitsize)),
            builder.getNamedAttr("alignment", builder.getIndexAttr(alignment)),
            builder.getNamedAttr("preferred", builder.getIndexAttr(preferred)),
-           builder.getNamedAttr("index", builder.getIndexAttr(index)),
-           builder.getNamedAttr("endianness", endianness == Attribute()
-                                                  ? builder.getStringAttr("")
-                                                  : endianness),
            builder.getNamedAttr("alloca_memory_space",
                                 allocaMemorySpace == Attribute()
                                     ? builder.getUI32IntegerAttr(0)

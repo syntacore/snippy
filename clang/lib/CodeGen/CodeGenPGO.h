@@ -16,7 +16,6 @@
 #include "CGBuilder.h"
 #include "CodeGenModule.h"
 #include "CodeGenTypes.h"
-#include "MCDCState.h"
 #include "llvm/ProfileData/InstrProfReader.h"
 #include <array>
 #include <memory>
@@ -34,18 +33,21 @@ private:
 
   std::array <unsigned, llvm::IPVK_Last + 1> NumValueSites;
   unsigned NumRegionCounters;
+  unsigned MCDCBitmapBytes;
   uint64_t FunctionHash;
   std::unique_ptr<llvm::DenseMap<const Stmt *, unsigned>> RegionCounterMap;
+  std::unique_ptr<llvm::DenseMap<const Stmt *, unsigned>> RegionMCDCBitmapMap;
+  std::unique_ptr<llvm::DenseMap<const Stmt *, unsigned>> RegionCondIDMap;
   std::unique_ptr<llvm::DenseMap<const Stmt *, uint64_t>> StmtCountMap;
   std::unique_ptr<llvm::InstrProfRecord> ProfRecord;
-  std::unique_ptr<MCDC::State> RegionMCDCState;
   std::vector<uint64_t> RegionCounts;
   uint64_t CurrentRegionCount;
 
 public:
   CodeGenPGO(CodeGenModule &CGModule)
       : CGM(CGModule), FuncNameVar(nullptr), NumValueSites({{0}}),
-        NumRegionCounters(0), FunctionHash(0), CurrentRegionCount(0) {}
+        NumRegionCounters(0), MCDCBitmapBytes(0), FunctionHash(0),
+        CurrentRegionCount(0) {}
 
   /// Whether or not we have PGO region data for the current function. This is
   /// false both when we have no data at all and when our data has been
@@ -94,8 +96,6 @@ public:
   // Set a module flag indicating if value profiling is enabled.
   void setValueProfilingFlag(llvm::Module &M);
 
-  void setProfileVersion(llvm::Module &M);
-
 private:
   void setFuncName(llvm::Function *Fn);
   void setFuncName(StringRef Name, llvm::GlobalValue::LinkageTypes Linkage);
@@ -110,17 +110,15 @@ private:
   bool canEmitMCDCCoverage(const CGBuilderTy &Builder);
 
 public:
-  void emitCounterSetOrIncrement(CGBuilderTy &Builder, const Stmt *S,
-                                 llvm::Value *StepV);
+  void emitCounterIncrement(CGBuilderTy &Builder, const Stmt *S,
+                            llvm::Value *StepV);
   void emitMCDCTestVectorBitmapUpdate(CGBuilderTy &Builder, const Expr *S,
-                                      Address MCDCCondBitmapAddr,
-                                      CodeGenFunction &CGF);
+                                      Address MCDCCondBitmapAddr);
   void emitMCDCParameters(CGBuilderTy &Builder);
   void emitMCDCCondBitmapReset(CGBuilderTy &Builder, const Expr *S,
                                Address MCDCCondBitmapAddr);
   void emitMCDCCondBitmapUpdate(CGBuilderTy &Builder, const Expr *S,
-                                Address MCDCCondBitmapAddr, llvm::Value *Val,
-                                CodeGenFunction &CGF);
+                                Address MCDCCondBitmapAddr, llvm::Value *Val);
 
   /// Return the region count for the counter at the given index.
   uint64_t getRegionCount(const Stmt *S) {

@@ -44,12 +44,10 @@
 #include "llvm/CodeGen/DFAPacketizer.h"
 #include "llvm/CodeGen/MachineDominators.h"
 #include "llvm/CodeGen/MachineOptimizationRemarkEmitter.h"
-#include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/CodeGen/RegisterClassInfo.h"
 #include "llvm/CodeGen/ScheduleDAGInstrs.h"
 #include "llvm/CodeGen/ScheduleDAGMutation.h"
 #include "llvm/CodeGen/TargetInstrInfo.h"
-#include "llvm/CodeGen/WindowScheduler.h"
 #include "llvm/InitializePasses.h"
 
 #include <deque>
@@ -109,9 +107,6 @@ private:
   bool scheduleLoop(MachineLoop &L);
   bool swingModuloScheduler(MachineLoop &L);
   void setPragmaPipelineOptions(MachineLoop &L);
-  bool runWindowScheduler(MachineLoop &L);
-  bool useSwingModuloScheduler();
-  bool useWindowScheduler(bool Changed);
 };
 
 /// This class builds the dependence graph for the instructions in a loop,
@@ -454,7 +449,7 @@ private:
   const MCSchedModel &SM;
   const TargetSubtargetInfo *ST;
   const TargetInstrInfo *TII;
-  ScheduleDAGInstrs *DAG;
+  SwingSchedulerDAG *DAG;
   const bool UseDFA;
   /// DFA resources for each slot
   llvm::SmallVector<std::unique_ptr<DFAPacketizer>> DFAResources;
@@ -498,7 +493,7 @@ private:
 #endif
 
 public:
-  ResourceManager(const TargetSubtargetInfo *ST, ScheduleDAGInstrs *DAG)
+  ResourceManager(const TargetSubtargetInfo *ST, SwingSchedulerDAG *DAG)
       : STI(ST), SM(ST->getSchedModel()), ST(ST), TII(ST->getInstrInfo()),
         DAG(DAG), UseDFA(ST->useDFAforSMS()),
         ProcResourceMasks(SM.getNumProcResourceKinds(), 0),
@@ -599,8 +594,8 @@ public:
   /// chain.
   int latestCycleInChain(const SDep &Dep);
 
-  void computeStart(SUnit *SU, int *MaxEarlyStart, int *MinLateStart, int II,
-                    SwingSchedulerDAG *DAG);
+  void computeStart(SUnit *SU, int *MaxEarlyStart, int *MinLateStart,
+                    int *MinEnd, int *MaxStart, int II, SwingSchedulerDAG *DAG);
   bool insert(SUnit *SU, int StartCycle, int EndCycle, int II);
 
   /// Iterators for the cycle to instruction map.
@@ -658,9 +653,6 @@ public:
   bool isLoopCarried(const SwingSchedulerDAG *SSD, MachineInstr &Phi) const;
   bool isLoopCarriedDefOfUse(const SwingSchedulerDAG *SSD, MachineInstr *Def,
                              MachineOperand &MO) const;
-
-  bool onlyHasLoopCarriedOutputOrOrderPreds(SUnit *SU,
-                                            SwingSchedulerDAG *DAG) const;
   void print(raw_ostream &os) const;
   void dump() const;
 };

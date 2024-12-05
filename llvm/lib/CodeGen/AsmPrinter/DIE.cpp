@@ -53,8 +53,8 @@ void DIEAbbrev::Profile(FoldingSetNodeID &ID) const {
   ID.AddInteger(unsigned(Children));
 
   // For each attribute description.
-  for (const DIEAbbrevData &D : Data)
-    D.Profile(ID);
+  for (unsigned i = 0, N = Data.size(); i < N; ++i)
+    Data[i].Profile(ID);
 }
 
 /// Emit - Print the abbreviation using the specified asm printer.
@@ -67,7 +67,9 @@ void DIEAbbrev::Emit(const AsmPrinter *AP) const {
   AP->emitULEB128((unsigned)Children, dwarf::ChildrenString(Children).data());
 
   // For each attribute description.
-  for (const DIEAbbrevData &AttrData : Data) {
+  for (unsigned i = 0, N = Data.size(); i < N; ++i) {
+    const DIEAbbrevData &AttrData = Data[i];
+
     // Emit attribute type.
     AP->emitULEB128(AttrData.getAttribute(),
                     dwarf::AttributeString(AttrData.getAttribute()).data());
@@ -107,12 +109,14 @@ void DIEAbbrev::print(raw_ostream &O) const {
     << dwarf::ChildrenString(Children)
     << '\n';
 
-  for (const DIEAbbrevData &D : Data) {
-    O << "  " << dwarf::AttributeString(D.getAttribute()) << "  "
-      << dwarf::FormEncodingString(D.getForm());
+  for (unsigned i = 0, N = Data.size(); i < N; ++i) {
+    O << "  "
+      << dwarf::AttributeString(Data[i].getAttribute())
+      << "  "
+      << dwarf::FormEncodingString(Data[i].getForm());
 
-    if (D.getForm() == dwarf::DW_FORM_implicit_const)
-      O << " " << D.getValue();
+    if (Data[i].getForm() == dwarf::DW_FORM_implicit_const)
+      O << " " << Data[i].getValue();
 
     O << '\n';
   }

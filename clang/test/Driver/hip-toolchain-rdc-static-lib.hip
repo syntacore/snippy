@@ -1,6 +1,9 @@
+// REQUIRES: x86-registered-target
+// REQUIRES: amdgpu-registered-target
+
 // RUN: %clang -### --target=x86_64-linux-gnu \
 // RUN:   -x hip --cuda-gpu-arch=gfx803 --cuda-gpu-arch=gfx900 \
-// RUN:   --no-offload-new-driver --emit-static-lib -nogpulib \
+// RUN:   --emit-static-lib -nogpulib \
 // RUN:   -fuse-ld=lld -B%S/Inputs/lld -fgpu-rdc -nogpuinc \
 // RUN:   %S/Inputs/hip_multiple_inputs/a.cu \
 // RUN:   %S/Inputs/hip_multiple_inputs/b.hip \

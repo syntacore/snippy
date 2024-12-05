@@ -4,7 +4,7 @@
 
 ; GCN-LABEL: {{^}}is_local_vgpr:
 ; GCN-DAG: {{flat|global|buffer}}_load_dwordx2 v{{\[[0-9]+}}:[[PTR_HI:[0-9]+]]]
-; CI-DAG: s_load_dwordx2 s[0:1], s[6:7], 0x0
+; CI-DAG: s_load_dwordx2 s[0:1], s[4:5], 0x0
 
 ; GFX9: s_mov_b64 s[{{[0-9]+}}:[[HI:[0-9]+]]], src_shared_base
 ; GFX9: v_cmp_eq_u32_e32 vcc, s[[HI]], v[[PTR_HI]]
@@ -26,10 +26,10 @@ define amdgpu_kernel void @is_local_vgpr(ptr addrspace(1) %ptr.ptr) {
 ; select and vcc branch.
 
 ; GCN-LABEL: {{^}}is_local_sgpr:
-; CI-DAG: s_load_dword s0, s[6:7], 0x1
+; CI-DAG: s_load_dword s0, s[4:5], 0x1
 
-; CI-DAG: s_load_dword [[PTR_HI:s[0-9]+]], s[6:7], 0x33{{$}}
-; GFX9-DAG: s_load_dword [[PTR_HI:s[0-9]+]], s[6:7], 0x4{{$}}
+; CI-DAG: s_load_dword [[PTR_HI:s[0-9]+]], s[4:5], 0x33{{$}}
+; GFX9-DAG: s_load_dword [[PTR_HI:s[0-9]+]], s[4:5], 0x4{{$}}
 
 ; GFX9: s_mov_b64 s[{{[0-9]+}}:[[HI:[0-9]+]]], src_shared_base
 ; GFX9: s_cmp_eq_u32 [[PTR_HI]], s[[HI]]
@@ -54,4 +54,4 @@ declare i1 @llvm.amdgcn.is.shared(ptr nocapture) #0
 attributes #0 = { nounwind readnone speculatable }
 
 !llvm.module.flags = !{!0}
-!0 = !{i32 1, !"amdhsa_code_object_version", i32 500}
+!0 = !{i32 1, !"amdgpu_code_object_version", i32 500}

@@ -10,8 +10,6 @@
 #      CHECK:  "id": 1,
 # CHECK-NEXT:  "jsonrpc": "2.0",
 # CHECK-NEXT:  "result": {
-# CHECK-NEXT:    "placeholder": "foo",
-# CHECK-NEXT:    "range": {
 # CHECK-NEXT:      "end": {
 # CHECK-NEXT:        "character": 7,
 # CHECK-NEXT:        "line": 0
@@ -20,7 +18,6 @@
 # CHECK-NEXT:        "character": 4,
 # CHECK-NEXT:        "line": 0
 # CHECK-NEXT:      }
-# CHECK-NEXT:    }
 # CHECK-NEXT:  }
 ---
 {"jsonrpc":"2.0","id":2,"method":"textDocument/prepareRename","params":{"textDocument":{"uri":"test:///foo.cpp"},"position":{"line":0,"character":2}}}

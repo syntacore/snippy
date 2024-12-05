@@ -20,6 +20,11 @@
 // in various corner cases. We do not care much about efficiency because
 // the time spent in parsing linker scripts is usually negligible.
 //
+// Our grammar of the linker script is LL(2), meaning that it needs at
+// most two-token lookahead to parse. The only place we need two-token
+// lookahead is labels in version scripts, where we need to parse "local :"
+// as if "local:".
+//
 // Overall, this lexer works fine for most linker scripts. There might
 // be room for improving compatibility, but that's probably not at the
 // top of our todo list.
@@ -267,10 +272,20 @@ StringRef ScriptLexer::peek() {
   return tok;
 }
 
+StringRef ScriptLexer::peek2() {
+  skip();
+  StringRef tok = next();
+  if (errorCount())
+    return "";
+  pos = pos - 2;
+  return tok;
+}
+
 bool ScriptLexer::consume(StringRef tok) {
-  if (next() == tok)
+  if (peek() == tok) {
+    skip();
     return true;
-  --pos;
+  }
   return false;
 }
 

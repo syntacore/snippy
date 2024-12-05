@@ -15,10 +15,6 @@ ForwardIt unique(ForwardIt, ForwardIt);
 template <class InputIt, class T>
 InputIt find(InputIt, InputIt, const T&);
 
-struct unique_disposable {
-  void* release();
-};
-
 class error_code {
 };
 
@@ -67,6 +63,4 @@ void noWarning() {
   //   bugprone-unused-return-value's checked return types.
   errorFunc();
   (void) errorFunc();
-
-  std::unique_disposable{}.release();
 }

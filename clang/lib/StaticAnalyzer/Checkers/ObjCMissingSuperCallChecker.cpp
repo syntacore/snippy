@@ -107,7 +107,7 @@ void ObjCSuperCallChecker::fillSelectors(ASTContext &Ctx,
     assert(Descriptor.ArgumentCount <= 1); // No multi-argument selectors yet.
 
     // Get the selector.
-    const IdentifierInfo *II = &Ctx.Idents.get(Descriptor.SelectorName);
+    IdentifierInfo *II = &Ctx.Idents.get(Descriptor.SelectorName);
 
     Selector Sel = Ctx.Selectors.getSelector(Descriptor.ArgumentCount, &II);
     ClassSelectors.insert(Sel);

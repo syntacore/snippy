@@ -75,8 +75,7 @@ private:
                           StringRef FileName, bool IsAngled,
                           CharSourceRange FilenameRange,
                           OptionalFileEntryRef File, StringRef SearchPath,
-                          StringRef RelativePath, const Module *SuggestedModule,
-                          bool ModuleImported,
+                          StringRef RelativePath, const Module *Imported,
                           SrcMgr::CharacteristicKind FileType) override;
   void If(SourceLocation Loc, SourceRange ConditionRange,
           ConditionValueKind ConditionValue) override;
@@ -190,10 +189,9 @@ void InclusionRewriter::InclusionDirective(
     StringRef /*FileName*/, bool /*IsAngled*/,
     CharSourceRange /*FilenameRange*/, OptionalFileEntryRef /*File*/,
     StringRef /*SearchPath*/, StringRef /*RelativePath*/,
-    const Module *SuggestedModule, bool ModuleImported,
-    SrcMgr::CharacteristicKind FileType) {
-  if (ModuleImported) {
-    auto P = ModuleIncludes.insert(std::make_pair(HashLoc, SuggestedModule));
+    const Module *Imported, SrcMgr::CharacteristicKind FileType) {
+  if (Imported) {
+    auto P = ModuleIncludes.insert(std::make_pair(HashLoc, Imported));
     (void)P;
     assert(P.second && "Unexpected revisitation of the same include directive");
   } else

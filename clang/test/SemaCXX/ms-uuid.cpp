@@ -1,7 +1,5 @@
 // RUN: %clang_cc1 -fsyntax-only -verify -fms-extensions %s -Wno-deprecated-declarations
-// RUN: %clang_cc1 -fsyntax-only -verify -fms-extensions %s -Wno-deprecated-declarations -fexperimental-new-constant-interpreter
 // RUN: %clang_cc1 -fsyntax-only -std=c++17 -verify -fms-extensions %s -Wno-deprecated-declarations
-// RUN: %clang_cc1 -fsyntax-only -std=c++17 -verify -fms-extensions %s -Wno-deprecated-declarations -fexperimental-new-constant-interpreter
 
 typedef struct _GUID {
   __UINT32_TYPE__ Data1;

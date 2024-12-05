@@ -1,10 +1,12 @@
-; RUN: opt < %s -passes=loop-vectorize -enable-vplan-native-path -vplan-build-stress-test -debug-only=loop-vectorize -disable-output 2>&1 | FileCheck %s
+; RUN: opt < %s -passes=loop-vectorize -enable-vplan-native-path -vplan-build-stress-test -vplan-verify-hcfg -debug-only=loop-vectorize -disable-output 2>&1 | FileCheck %s -check-prefix=VERIFIER
+; RUN: opt < %s -passes=loop-vectorize -enable-vplan-native-path -vplan-build-stress-test -debug-only=loop-vectorize -disable-output 2>&1 | FileCheck %s -check-prefix=NO-VERIFIER -allow-empty
 ; REQUIRES: asserts
 
 ; Verify that the stress testing flag for the VPlan H-CFG builder works as
 ; expected with and without enabling the VPlan H-CFG Verifier.
 
-; CHECK: VPlan 'HCFGBuilder: Plain CFG
+; VERIFIER: Verifying VPlan H-CFG.
+; NO-VERIFIER-NOT: Verifying VPlan H-CFG.
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 

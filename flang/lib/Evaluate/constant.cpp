@@ -160,7 +160,7 @@ template <typename RESULT, typename ELEMENT>
 auto ConstantBase<RESULT, ELEMENT>::Reshape(
     const ConstantSubscripts &dims) const -> std::vector<Element> {
   std::optional<uint64_t> optN{TotalElementCount(dims)};
-  CHECK_MSG(optN, "Overflow in TotalElementCount");
+  CHECK(optN);
   uint64_t n{*optN};
   CHECK(!empty() || n == 0);
   std::vector<Element> elements;

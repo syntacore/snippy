@@ -11,7 +11,7 @@
 // template<class T>
 // constexpr T& as-lvalue(T&& t) { // exposition only
 
-#include <__utility/as_lvalue.h>
+#include <utility>
 
 void test() {
   // Check prvalue

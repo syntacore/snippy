@@ -5,7 +5,4 @@
 // XFAIL: gcc
 
 #define SCHEDULE auto
-// The runtime uses guided schedule for auto,
-// which is a reason choice
-#define SCHED_OUTPUT "guided"
 #include "base_split.h"

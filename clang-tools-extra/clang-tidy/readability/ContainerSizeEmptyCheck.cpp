@@ -96,14 +96,9 @@ AST_MATCHER(QualType, isIntegralType) {
 
 AST_MATCHER_P(UserDefinedLiteral, hasLiteral,
               clang::ast_matchers::internal::Matcher<Expr>, InnerMatcher) {
-  const UserDefinedLiteral::LiteralOperatorKind LOK =
-      Node.getLiteralOperatorKind();
-  if (LOK == UserDefinedLiteral::LOK_Template ||
-      LOK == UserDefinedLiteral::LOK_Raw)
-    return false;
-
-  if (const Expr *CookedLiteral = Node.getCookedLiteral())
+  if (const Expr *CookedLiteral = Node.getCookedLiteral()) {
     return InnerMatcher.matches(*CookedLiteral, Finder, Builder);
+  }
   return false;
 }
 
@@ -155,7 +150,6 @@ void ContainerSizeEmptyCheck::registerMatchers(MatchFinder *Finder) {
 
   Finder->addMatcher(
       cxxMemberCallExpr(
-          argumentCountIs(0),
           on(expr(anyOf(hasType(ValidContainer),
                         hasType(pointsTo(ValidContainer)),
                         hasType(references(ValidContainer))))
@@ -169,8 +163,7 @@ void ContainerSizeEmptyCheck::registerMatchers(MatchFinder *Finder) {
       this);
 
   Finder->addMatcher(
-      callExpr(argumentCountIs(0),
-               has(cxxDependentScopeMemberExpr(
+      callExpr(has(cxxDependentScopeMemberExpr(
                        hasObjectExpression(
                            expr(anyOf(hasType(ValidContainer),
                                       hasType(pointsTo(ValidContainer)),

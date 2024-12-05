@@ -32,7 +32,6 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
-#include "llvm/Support/CodeGen.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FileUtilities.h"
 #include "llvm/Support/Path.h"
@@ -146,7 +145,6 @@ static bool parseDebugArgs(Fortran::frontend::CodeGenOptions &opts,
     }
     opts.setDebugInfo(val.value());
     if (val != llvm::codegenoptions::DebugLineTablesOnly &&
-        val != llvm::codegenoptions::FullDebugInfo &&
         val != llvm::codegenoptions::NoDebugInfo) {
       const auto debugWarning = diags.getCustomDiagID(
           clang::DiagnosticsEngine::Warning, "Unsupported debug option: %0");
@@ -286,8 +284,6 @@ static void parseCodeGenArgs(Fortran::frontend::CodeGenOptions &opts,
   if (const llvm::opt::Arg *a = args.getLastArg(
           clang::driver::options::OPT_mcode_object_version_EQ)) {
     llvm::StringRef s = a->getValue();
-    if (s == "6")
-      opts.CodeObjectVersion = llvm::CodeObjectVersionKind::COV_6;
     if (s == "5")
       opts.CodeObjectVersion = llvm::CodeObjectVersionKind::COV_5;
     if (s == "4")
@@ -348,11 +344,6 @@ static void parseCodeGenArgs(Fortran::frontend::CodeGenOptions &opts,
   if (auto *a = args.getLastArg(clang::driver::options::OPT_save_temps_EQ))
     opts.SaveTempsDir = a->getValue();
 
-  // -mlink-builtin-bitcode
-  for (auto *a :
-       args.filtered(clang::driver::options::OPT_mlink_builtin_bitcode))
-    opts.BuiltinBCLibs.push_back(a->getValue());
-
   // -mrelocation-model option.
   if (const llvm::opt::Arg *a =
           args.getLastArg(clang::driver::options::OPT_mrelocation_model)) {
@@ -387,29 +378,6 @@ static void parseCodeGenArgs(Fortran::frontend::CodeGenOptions &opts,
       opts.IsPIE = 1;
   }
 
-  // -mcmodel option.
-  if (const llvm::opt::Arg *a =
-          args.getLastArg(clang::driver::options::OPT_mcmodel_EQ)) {
-    llvm::StringRef modelName = a->getValue();
-    std::optional<llvm::CodeModel::Model> codeModel = getCodeModel(modelName);
-
-    if (codeModel.has_value())
-      opts.CodeModel = modelName;
-    else
-      diags.Report(clang::diag::err_drv_invalid_value)
-          << a->getAsString(args) << modelName;
-  }
-
-  if (const llvm::opt::Arg *arg = args.getLastArg(
-          clang::driver::options::OPT_mlarge_data_threshold_EQ)) {
-    uint64_t LDT;
-    if (llvm::StringRef(arg->getValue()).getAsInteger(/*Radix=*/10, LDT)) {
-      diags.Report(clang::diag::err_drv_invalid_value)
-          << arg->getSpelling() << arg->getValue();
-    }
-    opts.LargeDataThreshold = LDT;
-  }
-
   // This option is compatible with -f[no-]underscoring in gfortran.
   if (args.hasFlag(clang::driver::options::OPT_fno_underscoring,
                    clang::driver::options::OPT_funderscoring, false)) {
@@ -430,10 +398,6 @@ static void parseTargetArgs(TargetOptions &opts, llvm::opt::ArgList &args) {
   if (const llvm::opt::Arg *a =
           args.getLastArg(clang::driver::options::OPT_target_cpu))
     opts.cpu = a->getValue();
-
-  if (const llvm::opt::Arg *a =
-          args.getLastArg(clang::driver::options::OPT_tune_cpu))
-    opts.cpuToTuneFor = a->getValue();
 
   for (const llvm::opt::Arg *currentArg :
        args.filtered(clang::driver::options::OPT_target_feature))
@@ -520,9 +484,6 @@ static bool parseFrontendArgs(FrontendOptions &opts, llvm::opt::ArgList &args,
       break;
     case clang::driver::options::OPT_fdebug_unparse_with_symbols:
       opts.programAction = DebugUnparseWithSymbols;
-      break;
-    case clang::driver::options::OPT_fdebug_unparse_with_modules:
-      opts.programAction = DebugUnparseWithModules;
       break;
     case clang::driver::options::OPT_fdebug_dump_symbols:
       opts.programAction = DebugDumpSymbols;
@@ -618,8 +579,6 @@ static bool parseFrontendArgs(FrontendOptions &opts, llvm::opt::ArgList &args,
                 // pre-processed inputs.
                 .Case("f95", Language::Fortran)
                 .Case("f95-cpp-input", Language::Fortran)
-                // CUDA Fortran
-                .Case("cuda", Language::Fortran)
                 .Default(Language::Unknown);
 
     // Flang's intermediate representations.
@@ -809,7 +768,6 @@ static void parsePreprocessorArgs(Fortran::frontend::PreprocessorOptions &opts,
 
   opts.noReformat = args.hasArg(clang::driver::options::OPT_fno_reformat);
   opts.noLineDirectives = args.hasArg(clang::driver::options::OPT_P);
-  opts.showMacros = args.hasArg(clang::driver::options::OPT_dM);
 }
 
 /// Parses all semantic related arguments and populates the variables
@@ -835,11 +793,6 @@ static bool parseSemaArgs(CompilerInvocation &res, llvm::opt::ArgList &args,
   // -fdebug-module-writer option
   if (args.hasArg(clang::driver::options::OPT_fdebug_module_writer)) {
     res.setDebugModuleDir(true);
-  }
-
-  // -fhermetic-module-files option
-  if (args.hasArg(clang::driver::options::OPT_fhermetic_module_files)) {
-    res.setHermeticModuleFileOutput(true);
   }
 
   // -module-suffix
@@ -922,13 +875,6 @@ static bool parseDialectArgs(CompilerInvocation &res, llvm::opt::ArgList &args,
   if (args.hasArg(clang::driver::options::OPT_flarge_sizes))
     res.getDefaultKinds().set_sizeIntegerKind(8);
 
-  // -x cuda
-  auto language = args.getLastArgValue(clang::driver::options::OPT_x);
-  if (language == "cuda") {
-    res.getFrontendOpts().features.Enable(
-        Fortran::common::LanguageFeature::CUDA);
-  }
-
   // -fopenmp and -fopenacc
   if (args.hasArg(clang::driver::options::OPT_fopenacc)) {
     res.getFrontendOpts().features.Enable(
@@ -943,9 +889,6 @@ static bool parseDialectArgs(CompilerInvocation &res, llvm::opt::ArgList &args,
             args, clang::driver::options::OPT_fopenmp_version_EQ,
             res.getLangOpts().OpenMPVersion, diags)) {
       res.getLangOpts().OpenMPVersion = Version;
-    }
-    if (args.hasArg(clang::driver::options::OPT_fopenmp_force_usm)) {
-      res.getLangOpts().OpenMPForceUSM = 1;
     }
     if (args.hasArg(clang::driver::options::OPT_fopenmp_is_target_device)) {
       res.getLangOpts().OpenMPIsTargetDevice = 1;
@@ -1019,18 +962,13 @@ static bool parseDialectArgs(CompilerInvocation &res, llvm::opt::ArgList &args,
     res.setEnableConformanceChecks();
     res.setEnableUsageChecks();
   }
-
-  // -w
-  if (args.hasArg(clang::driver::options::OPT_w))
-    res.setDisableWarnings();
-
   // -std=f2018
   // TODO: Set proper options when more fortran standards
   // are supported.
   if (args.hasArg(clang::driver::options::OPT_std_EQ)) {
     auto standard = args.getLastArgValue(clang::driver::options::OPT_std_EQ);
     // We only allow f2018 as the given standard
-    if (standard == "f2018") {
+    if (standard.equals("f2018")) {
       res.setEnableConformanceChecks();
     } else {
       const unsigned diagID =
@@ -1242,15 +1180,14 @@ bool CompilerInvocation::createFromArgs(
     invoc.loweringOpts.setLowerToHighLevelFIR(false);
   }
 
+  if (args.hasArg(
+          clang::driver::options::OPT_flang_experimental_polymorphism)) {
+    invoc.loweringOpts.setPolymorphicTypeImpl(true);
+  }
+
   // -fno-ppc-native-vector-element-order
   if (args.hasArg(clang::driver::options::OPT_fno_ppc_native_vec_elem_order)) {
     invoc.loweringOpts.setNoPPCNativeVecElemOrder(true);
-  }
-
-  // -flang-experimental-integer-overflow
-  if (args.hasArg(
-          clang::driver::options::OPT_flang_experimental_integer_overflow)) {
-    invoc.loweringOpts.setNSWOnLoopVarInc(true);
   }
 
   // Preserve all the remark options requested, i.e. -Rpass, -Rpass-missed or
@@ -1387,24 +1324,10 @@ void CompilerInvocation::setDefaultPredefinitions() {
     Fortran::common::setOpenMPMacro(getLangOpts().OpenMPVersion,
                                     fortranOptions.predefinitions);
   }
-
   llvm::Triple targetTriple{llvm::Triple(this->targetOpts.triple)};
-  if (targetTriple.isPPC()) {
-    // '__powerpc__' is a generic macro for any PowerPC cases. e.g. Max integer
-    // size.
-    fortranOptions.predefinitions.emplace_back("__powerpc__", "1");
-  }
-  if (targetTriple.isOSLinux()) {
-    fortranOptions.predefinitions.emplace_back("__linux__", "1");
-  }
-
-  switch (targetTriple.getArch()) {
-  default:
-    break;
-  case llvm::Triple::ArchType::x86_64:
+  if (targetTriple.getArch() == llvm::Triple::ArchType::x86_64) {
     fortranOptions.predefinitions.emplace_back("__x86_64__", "1");
     fortranOptions.predefinitions.emplace_back("__x86_64", "1");
-    break;
   }
 }
 
@@ -1458,11 +1381,6 @@ void CompilerInvocation::setFortranOpts() {
 
   if (getEnableUsageChecks())
     fortranOptions.features.WarnOnAllUsage();
-
-  if (getDisableWarnings()) {
-    fortranOptions.features.DisableAllNonstandardWarnings();
-    fortranOptions.features.DisableAllUsageWarnings();
-  }
 }
 
 std::unique_ptr<Fortran::semantics::SemanticsContext>

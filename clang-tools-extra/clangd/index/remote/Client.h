@@ -12,11 +12,8 @@
 #include "index/Index.h"
 #include "llvm/ADT/StringRef.h"
 
-#include <memory>
-
 namespace clang {
 namespace clangd {
-
 namespace remote {
 
 /// Returns an SymbolIndex client that passes requests to remote index located

@@ -1,13 +1,12 @@
-! RUN: %flang_fc1 -flang-experimental-hlfir -triple powerpc64le-unknown-unknown -emit-llvm %s -o - | FileCheck --check-prefixes="LLVMIR","LLVMIR-LE","LLVM" %s
-! RUN: %flang_fc1 -triple powerpc64le-unknown-unknown -target-cpu pwr9 -emit-llvm %s -o - | FileCheck --check-prefixes="LLVMIR","LLVMIR_P9","LLVM" %s
-! RUN: %flang_fc1 -flang-experimental-hlfir -triple powerpc64-unknown-unknown -emit-llvm %s -o - | FileCheck --check-prefixes="LLVMIR","LLVMIR-BE","LLVM" %s
+! RUN: %flang_fc1 -flang-experimental-hlfir -triple powerpc64le-unknown-unknown -emit-llvm %s -o - | FileCheck --check-prefixes="LLVMIR","LLVMIR-LE" %s
+! RUN: %flang_fc1 -flang-experimental-hlfir -triple powerpc64-unknown-unknown -emit-llvm %s -o - | FileCheck --check-prefixes="LLVMIR","LLVMIR-BE" %s
 ! REQUIRES: target=powerpc{{.*}}
 
 !----------------------
 ! vec_ld
 !----------------------
 
-! LLVM-LABEL: @vec_ld_testi8
+! CHECK-LABEL: @vec_ld_testi8
 subroutine vec_ld_testi8(arg1, arg2, res)
   integer(1) :: arg1
   vector(integer(1)) :: arg2, res
@@ -20,7 +19,7 @@ subroutine vec_ld_testi8(arg1, arg2, res)
 ! LLVMIR: store <16 x i8> %[[bc]], ptr %2, align 16
 end subroutine vec_ld_testi8
 
-! LLVM-LABEL: @vec_ld_testi16
+! CHECK-LABEL: @vec_ld_testi16
 subroutine vec_ld_testi16(arg1, arg2, res)
   integer(2) :: arg1
   vector(integer(2)) :: arg2, res
@@ -33,7 +32,7 @@ subroutine vec_ld_testi16(arg1, arg2, res)
 ! LLVMIR: store <8 x i16> %[[bc]], ptr %2, align 16
 end subroutine vec_ld_testi16
 
-! LLVM-LABEL: @vec_ld_testi32
+! CHECK-LABEL: @vec_ld_testi32
 subroutine vec_ld_testi32(arg1, arg2, res)
   integer(4) :: arg1
   vector(integer(4)) :: arg2, res
@@ -45,7 +44,7 @@ subroutine vec_ld_testi32(arg1, arg2, res)
 ! LLVMIR: store <4 x i32> %[[bc]], ptr %2, align 16
 end subroutine vec_ld_testi32
 
-! LLVM-LABEL: @vec_ld_testf32
+! CHECK-LABEL: @vec_ld_testf32
 subroutine vec_ld_testf32(arg1, arg2, res)
   integer(8) :: arg1
   vector(real(4)) :: arg2, res
@@ -59,7 +58,7 @@ subroutine vec_ld_testf32(arg1, arg2, res)
 ! LLVMIR: store <4 x float> %[[bc]], ptr %2, align 16
 end subroutine vec_ld_testf32
 
-! LLVM-LABEL: @vec_ld_testu32
+! CHECK-LABEL: @vec_ld_testu32
 subroutine vec_ld_testu32(arg1, arg2, res)
   integer(1) :: arg1
   vector(unsigned(4)) :: arg2, res
@@ -71,7 +70,7 @@ subroutine vec_ld_testu32(arg1, arg2, res)
 ! LLVMIR: store <4 x i32> %[[call]], ptr %2, align 16
 end subroutine vec_ld_testu32
 
-! LLVM-LABEL: @vec_ld_testi32a
+! CHECK-LABEL: @vec_ld_testi32a
 subroutine vec_ld_testi32a(arg1, arg2, res)
   integer(4) :: arg1
   integer(4) :: arg2(10)
@@ -84,7 +83,7 @@ subroutine vec_ld_testi32a(arg1, arg2, res)
 ! LLVMIR: store <4 x i32> %[[call]], ptr %2, align 16
 end subroutine vec_ld_testi32a
 
-! LLVM-LABEL: @vec_ld_testf32av
+! CHECK-LABEL: @vec_ld_testf32av
 subroutine vec_ld_testf32av(arg1, arg2, res)
   integer(8) :: arg1
   vector(real(4)) :: arg2(2, 4, 8)
@@ -99,7 +98,7 @@ subroutine vec_ld_testf32av(arg1, arg2, res)
 ! LLVMIR: store <4 x float> %[[bc]], ptr %2, align 16
 end subroutine vec_ld_testf32av
 
-! LLVM-LABEL: @vec_ld_testi32s
+! CHECK-LABEL: @vec_ld_testi32s
 subroutine vec_ld_testi32s(arg1, arg2, res)
   integer(4) :: arg1
   real(4) :: arg2
@@ -117,7 +116,7 @@ end subroutine vec_ld_testi32s
 ! vec_lde
 !----------------------
 
-! LLVM-LABEL: @vec_lde_testi8s
+! CHECK-LABEL: @vec_lde_testi8s
 subroutine vec_lde_testi8s(arg1, arg2, res)
   integer(1) :: arg1
   integer(1) :: arg2
@@ -130,7 +129,7 @@ subroutine vec_lde_testi8s(arg1, arg2, res)
 ! LLVMIR: store <16 x i8> %[[call]], ptr %2, align 16
 end subroutine vec_lde_testi8s
 
-! LLVM-LABEL: @vec_lde_testi16a
+! CHECK-LABEL: @vec_lde_testi16a
 subroutine vec_lde_testi16a(arg1, arg2, res)
   integer(2) :: arg1
   integer(2) :: arg2(2, 4, 8)
@@ -143,7 +142,7 @@ subroutine vec_lde_testi16a(arg1, arg2, res)
 ! LLVMIR: store <8 x i16> %[[call]], ptr %2, align 16
 end subroutine vec_lde_testi16a
 
-! LLVM-LABEL: @vec_lde_testi32a
+! CHECK-LABEL: @vec_lde_testi32a
 subroutine vec_lde_testi32a(arg1, arg2, res)
   integer(4) :: arg1
   integer(4) :: arg2(4)
@@ -156,7 +155,7 @@ subroutine vec_lde_testi32a(arg1, arg2, res)
 ! LLVMIR: store <4 x i32> %[[call]], ptr %2, align 16
 end subroutine vec_lde_testi32a
 
-! LLVM-LABEL: @vec_lde_testf32a
+! CHECK-LABEL: @vec_lde_testf32a
 subroutine vec_lde_testf32a(arg1, arg2, res)
   integer(8) :: arg1
   real(4) :: arg2(4)
@@ -174,7 +173,7 @@ end subroutine vec_lde_testf32a
 ! vec_ldl
 !----------------------
 
-! LLVM-LABEL: @vec_ldl_testi8
+! CHECK-LABEL: @vec_ldl_testi8
 subroutine vec_ldl_testi8(arg1, arg2, res)
   integer(1) :: arg1
   vector(integer(1)) :: arg2, res
@@ -187,7 +186,7 @@ subroutine vec_ldl_testi8(arg1, arg2, res)
 ! LLVMIR: store <16 x i8> %[[bc]], ptr %2, align 16
 end subroutine vec_ldl_testi8
 
-! LLVM-LABEL: @vec_ldl_testi16
+! CHECK-LABEL: @vec_ldl_testi16
 subroutine vec_ldl_testi16(arg1, arg2, res)
   integer(2) :: arg1
   vector(integer(2)) :: arg2, res
@@ -200,7 +199,7 @@ subroutine vec_ldl_testi16(arg1, arg2, res)
 ! LLVMIR: store <8 x i16> %[[bc]], ptr %2, align 16
 end subroutine vec_ldl_testi16
 
-! LLVM-LABEL: @vec_ldl_testi32
+! CHECK-LABEL: @vec_ldl_testi32
 subroutine vec_ldl_testi32(arg1, arg2, res)
   integer(4) :: arg1
   vector(integer(4)) :: arg2, res
@@ -212,7 +211,7 @@ subroutine vec_ldl_testi32(arg1, arg2, res)
 ! LLVMIR: store <4 x i32> %[[bc]], ptr %2, align 16
 end subroutine vec_ldl_testi32
 
-! LLVM-LABEL: @vec_ldl_testf32
+! CHECK-LABEL: @vec_ldl_testf32
 subroutine vec_ldl_testf32(arg1, arg2, res)
   integer(8) :: arg1
   vector(real(4)) :: arg2, res
@@ -226,7 +225,7 @@ subroutine vec_ldl_testf32(arg1, arg2, res)
 ! LLVMIR: store <4 x float> %[[bc]], ptr %2, align 16
 end subroutine vec_ldl_testf32
 
-! LLVM-LABEL: @vec_ldl_testu32
+! CHECK-LABEL: @vec_ldl_testu32
 subroutine vec_ldl_testu32(arg1, arg2, res)
   integer(1) :: arg1
   vector(unsigned(4)) :: arg2, res
@@ -238,7 +237,7 @@ subroutine vec_ldl_testu32(arg1, arg2, res)
 ! LLVMIR: store <4 x i32> %[[call]], ptr %2, align 16
 end subroutine vec_ldl_testu32
 
-! LLVM-LABEL: @vec_ldl_testi32a
+! CHECK-LABEL: @vec_ldl_testi32a
 subroutine vec_ldl_testi32a(arg1, arg2, res)
   integer(4) :: arg1
   integer(4) :: arg2(10)
@@ -251,7 +250,7 @@ subroutine vec_ldl_testi32a(arg1, arg2, res)
 ! LLVMIR: store <4 x i32> %[[call]], ptr %2, align 16
 end subroutine vec_ldl_testi32a
 
-! LLVM-LABEL: @vec_ldl_testf32av
+! CHECK-LABEL: @vec_ldl_testf32av
 subroutine vec_ldl_testf32av(arg1, arg2, res)
   integer(8) :: arg1
   vector(real(4)) :: arg2(2, 4, 8)
@@ -265,7 +264,7 @@ subroutine vec_ldl_testf32av(arg1, arg2, res)
 ! LLVMIR: store <4 x float> %[[bc]], ptr %2, align 16
 end subroutine vec_ldl_testf32av
 
-! LLVM-LABEL: @vec_ldl_testi32s
+! CHECK-LABEL: @vec_ldl_testi32s
 subroutine vec_ldl_testi32s(arg1, arg2, res)
   integer(4) :: arg1
   real(4) :: arg2
@@ -283,7 +282,7 @@ end subroutine vec_ldl_testi32s
 ! vec_lvsl
 !----------------------
 
-! LLVM-LABEL: @vec_lvsl_testi8s
+! CHECK-LABEL: @vec_lvsl_testi8s
 subroutine vec_lvsl_testi8s(arg1, arg2, res)
   integer(1) :: arg1
   integer(1) :: arg2
@@ -301,7 +300,7 @@ subroutine vec_lvsl_testi8s(arg1, arg2, res)
 ! LLVMIR-BE: store <16 x i8> %[[ld]], ptr %2, align 16
 end subroutine vec_lvsl_testi8s
 
-! LLVM-LABEL: @vec_lvsl_testi16a
+! CHECK-LABEL: @vec_lvsl_testi16a
 subroutine vec_lvsl_testi16a(arg1, arg2, res)
   integer(2) :: arg1
   integer(2) :: arg2(4)
@@ -319,7 +318,7 @@ subroutine vec_lvsl_testi16a(arg1, arg2, res)
 ! LLVMIR-BE:  store <16 x i8> %[[ld]], ptr %2, align 16
 end subroutine vec_lvsl_testi16a
 
-! LLVM-LABEL: @vec_lvsl_testi32a
+! CHECK-LABEL: @vec_lvsl_testi32a
 subroutine vec_lvsl_testi32a(arg1, arg2, res)
   integer(4) :: arg1
   integer(4) :: arg2(2, 3, 4)
@@ -337,7 +336,7 @@ subroutine vec_lvsl_testi32a(arg1, arg2, res)
 ! LLVMIR-BE:  store <16 x i8> %[[ld]], ptr %2, align 16
 end subroutine vec_lvsl_testi32a
 
-! LLVM-LABEL: @vec_lvsl_testf32a
+! CHECK-LABEL: @vec_lvsl_testf32a
 subroutine vec_lvsl_testf32a(arg1, arg2, res)
   integer(8) :: arg1
   real(4) :: arg2(4)
@@ -358,7 +357,7 @@ end subroutine vec_lvsl_testf32a
 ! vec_lvsr
 !----------------------
 
-! LLVM-LABEL: @vec_lvsr_testi8s
+! CHECK-LABEL: @vec_lvsr_testi8s
 subroutine vec_lvsr_testi8s(arg1, arg2, res)
   integer(1) :: arg1
   integer(1) :: arg2
@@ -376,7 +375,7 @@ subroutine vec_lvsr_testi8s(arg1, arg2, res)
 ! LLVMIR-BE: store <16 x i8> %[[addr]], ptr %2, align 16
 end subroutine vec_lvsr_testi8s
 
-! LLVM-LABEL: @vec_lvsr_testi16a
+! CHECK-LABEL: @vec_lvsr_testi16a
 subroutine vec_lvsr_testi16a(arg1, arg2, res)
   integer(2) :: arg1
   integer(2) :: arg2(4)
@@ -394,7 +393,7 @@ subroutine vec_lvsr_testi16a(arg1, arg2, res)
 ! LLVMIR-BE: store <16 x i8> %[[addr]], ptr %2, align 16
 end subroutine vec_lvsr_testi16a
 
-! LLVM-LABEL: @vec_lvsr_testi32a
+! CHECK-LABEL: @vec_lvsr_testi32a
 subroutine vec_lvsr_testi32a(arg1, arg2, res)
   integer(4) :: arg1
   integer(4) :: arg2(2, 3, 4)
@@ -412,7 +411,7 @@ subroutine vec_lvsr_testi32a(arg1, arg2, res)
 ! LLVMIR-BE: store <16 x i8> %[[addr]], ptr %2, align 16
 end subroutine vec_lvsr_testi32a
 
-! LLVM-LABEL: @vec_lvsr_testf32a
+! CHECK-LABEL: @vec_lvsr_testf32a
 subroutine vec_lvsr_testf32a(arg1, arg2, res)
   integer(8) :: arg1
   real(4) :: arg2(4)
@@ -433,7 +432,7 @@ end subroutine vec_lvsr_testf32a
 ! vec_lxv
 !----------------------
 
-! LLVM-LABEL: @vec_lxv_testi8a
+! CHECK-LABEL: @vec_lxv_testi8a
 subroutine vec_lxv_testi8a(arg1, arg2, res)
   integer(1) :: arg1
   integer(1) :: arg2(4)
@@ -446,7 +445,7 @@ subroutine vec_lxv_testi8a(arg1, arg2, res)
 ! LLVMIR_P9: store <16 x i8> %[[ld]], ptr %2, align 16
 end subroutine vec_lxv_testi8a
 
-! LLVM-LABEL: @vec_lxv_testi16a
+! CHECK-LABEL: @vec_lxv_testi16a
 subroutine vec_lxv_testi16a(arg1, arg2, res)
   integer(2) :: arg1
   integer(2) :: arg2(2, 4, 8)
@@ -459,7 +458,7 @@ subroutine vec_lxv_testi16a(arg1, arg2, res)
 ! LLVMIR_P9: store <8 x i16> %[[ld]], ptr %2, align 16
 end subroutine vec_lxv_testi16a
 
-! LLVM-LABEL: @vec_lxv_testi32a
+! CHECK-LABEL: @vec_lxv_testi32a
 subroutine vec_lxv_testi32a(arg1, arg2, res)
   integer(4) :: arg1
   integer(4) :: arg2(2, 4, 8)
@@ -472,7 +471,7 @@ subroutine vec_lxv_testi32a(arg1, arg2, res)
 ! LLVMIR_P9: store <4 x i32> %[[ld]], ptr %2, align 16
 end subroutine vec_lxv_testi32a
 
-! LLVM-LABEL: @vec_lxv_testf32a
+! CHECK-LABEL: @vec_lxv_testf32a
 subroutine vec_lxv_testf32a(arg1, arg2, res)
   integer(2) :: arg1
   real(4) :: arg2(4)
@@ -485,7 +484,7 @@ subroutine vec_lxv_testf32a(arg1, arg2, res)
 ! LLVMIR_P9: store <4 x float> %[[ld]], ptr %2, align 16
 end subroutine vec_lxv_testf32a
 
-! LLVM-LABEL: @vec_lxv_testf64a
+! CHECK-LABEL: @vec_lxv_testf64a
 subroutine vec_lxv_testf64a(arg1, arg2, res)
   integer(8) :: arg1
   real(8) :: arg2(4)
@@ -502,7 +501,7 @@ end subroutine vec_lxv_testf64a
 ! vec_xld2
 !----------------------
 
-! LLVM-LABEL: @vec_xld2_testi8a
+! CHECK-LABEL: @vec_xld2_testi8a
 subroutine vec_xld2_testi8a(arg1, arg2, res)
   integer(1) :: arg1
   vector(integer(1)) :: arg2(4)
@@ -516,7 +515,7 @@ subroutine vec_xld2_testi8a(arg1, arg2, res)
 ! LLVMIR: store <16 x i8> %[[bc]], ptr %2, align 16
 end subroutine vec_xld2_testi8a
 
-! LLVM-LABEL: @vec_xld2_testi16
+! CHECK-LABEL: @vec_xld2_testi16
 subroutine vec_xld2_testi16(arg1, arg2, res)
   integer :: arg1
   vector(integer(2)) :: arg2
@@ -530,7 +529,7 @@ subroutine vec_xld2_testi16(arg1, arg2, res)
 ! LLVMIR: store <8 x i16> %[[bc]], ptr %2, align 16
 end subroutine vec_xld2_testi16
 
-! LLVM-LABEL: @vec_xld2_testi32a
+! CHECK-LABEL: @vec_xld2_testi32a
 subroutine vec_xld2_testi32a(arg1, arg2, res)
   integer(4) :: arg1
   vector(integer(4)) :: arg2(41)
@@ -544,7 +543,7 @@ subroutine vec_xld2_testi32a(arg1, arg2, res)
 ! LLVMIR: store <4 x i32> %[[bc]], ptr %2, align 16
 end subroutine vec_xld2_testi32a
 
-! LLVM-LABEL: @vec_xld2_testi64a
+! CHECK-LABEL: @vec_xld2_testi64a
 subroutine vec_xld2_testi64a(arg1, arg2, res)
   integer(8) :: arg1
   vector(integer(8)) :: arg2(4)
@@ -558,7 +557,7 @@ subroutine vec_xld2_testi64a(arg1, arg2, res)
 ! LLVMIR: store <2 x i64> %[[bc]], ptr %2, align 16
 end subroutine vec_xld2_testi64a
 
-! LLVM-LABEL: @vec_xld2_testf32a
+! CHECK-LABEL: @vec_xld2_testf32a
 subroutine vec_xld2_testf32a(arg1, arg2, res)
   integer(2) :: arg1
   vector(real(4)) :: arg2(4)
@@ -572,7 +571,7 @@ subroutine vec_xld2_testf32a(arg1, arg2, res)
 ! LLVMIR: store <4 x float> %[[bc]], ptr %2, align 16
 end subroutine vec_xld2_testf32a
 
-! LLVM-LABEL: @vec_xld2_testf64a
+! CHECK-LABEL: @vec_xld2_testf64a
 subroutine vec_xld2_testf64a(arg1, arg2, res)
   integer(8) :: arg1
   vector(real(8)) :: arg2(4)
@@ -589,7 +588,7 @@ end subroutine vec_xld2_testf64a
 ! vec_xl
 !----------------------
 
-! LLVM-LABEL: @vec_xl_testi8a
+! CHECK-LABEL: @vec_xl_testi8a
 subroutine vec_xl_testi8a(arg1, arg2, res)
   integer(1) :: arg1
   integer(1) :: arg2(4)
@@ -602,7 +601,7 @@ subroutine vec_xl_testi8a(arg1, arg2, res)
 ! LLVMIR: store <16 x i8> %[[ld]], ptr %2, align 16
 end subroutine vec_xl_testi8a
 
-! LLVM-LABEL: @vec_xl_testi16a
+! CHECK-LABEL: @vec_xl_testi16a
 subroutine vec_xl_testi16a(arg1, arg2, res)
   integer(2) :: arg1
   integer(2) :: arg2(2, 4, 8)
@@ -615,7 +614,7 @@ subroutine vec_xl_testi16a(arg1, arg2, res)
 ! LLVMIR: store <8 x i16> %[[ld]], ptr %2, align 16
 end subroutine vec_xl_testi16a
 
-! LLVM-LABEL: @vec_xl_testi32a
+! CHECK-LABEL: @vec_xl_testi32a
 subroutine vec_xl_testi32a(arg1, arg2, res)
   integer(4) :: arg1
   integer(4) :: arg2(2, 4, 8)
@@ -628,7 +627,7 @@ subroutine vec_xl_testi32a(arg1, arg2, res)
 ! LLVMIR: store <4 x i32> %[[ld]], ptr %2, align 16
 end subroutine vec_xl_testi32a
 
-! LLVM-LABEL: @vec_xl_testi64a
+! CHECK-LABEL: @vec_xl_testi64a
 subroutine vec_xl_testi64a(arg1, arg2, res)
   integer(8) :: arg1
   integer(8) :: arg2(2, 4, 8)
@@ -642,7 +641,7 @@ subroutine vec_xl_testi64a(arg1, arg2, res)
 ! LLVMIR: store <2 x i64> %[[bc]], ptr %2, align 16
 end subroutine vec_xl_testi64a
 
-! LLVM-LABEL: @vec_xl_testf32a
+! CHECK-LABEL: @vec_xl_testf32a
 subroutine vec_xl_testf32a(arg1, arg2, res)
   integer(2) :: arg1
   real(4) :: arg2(4)
@@ -656,7 +655,7 @@ subroutine vec_xl_testf32a(arg1, arg2, res)
 ! LLVMIR: store <4 x float> %[[bc]], ptr %2, align 16
 end subroutine vec_xl_testf32a
 
-! LLVM-LABEL: @vec_xl_testf64a
+! CHECK-LABEL: @vec_xl_testf64a
 subroutine vec_xl_testf64a(arg1, arg2, res)
   integer(8) :: arg1
   real(8) :: arg2
@@ -673,7 +672,7 @@ end subroutine vec_xl_testf64a
 ! vec_xlds
 !----------------------
 
-! LLVM-LABEL: @vec_xlds_testi64a
+! CHECK-LABEL: @vec_xlds_testi64a
 subroutine vec_xlds_testi64a(arg1, arg2, res)
   integer(8) :: arg1
   vector(integer(8)) :: arg2(4)
@@ -688,7 +687,7 @@ subroutine vec_xlds_testi64a(arg1, arg2, res)
 ! LLVMIR: store <2 x i64> %[[shfl]], ptr %2, align 16
 end subroutine vec_xlds_testi64a
 
-! LLVM-LABEL: @vec_xlds_testf64a
+! CHECK-LABEL: @vec_xlds_testf64a
 subroutine vec_xlds_testf64a(arg1, arg2, res)
   integer(8) :: arg1
   vector(real(8)) :: arg2(4)
@@ -708,7 +707,7 @@ end subroutine vec_xlds_testf64a
 ! vec_xl_be
 !----------------------
 
-! LLVM-LABEL: @vec_xl_be_testi8a
+! CHECK-LABEL: @vec_xl_be_testi8a
 subroutine vec_xl_be_testi8a(arg1, arg2, res)
   integer(1) :: arg1
   integer(1) :: arg2(2, 4, 8)
@@ -723,7 +722,7 @@ subroutine vec_xl_be_testi8a(arg1, arg2, res)
 ! LLVMIR-BE: store <16 x i8> %[[ld]], ptr %2, align 16
 end subroutine vec_xl_be_testi8a
 
-! LLVM-LABEL: @vec_xl_be_testi16a
+! CHECK-LABEL: @vec_xl_be_testi16a
 subroutine vec_xl_be_testi16a(arg1, arg2, res)
   integer(2) :: arg1
   integer(2) :: arg2(2, 4, 8)
@@ -738,7 +737,7 @@ subroutine vec_xl_be_testi16a(arg1, arg2, res)
 ! LLVMIR-BE: store <8 x i16> %[[ld]], ptr %2, align 16
 end subroutine vec_xl_be_testi16a
 
-! LLVM-LABEL: @vec_xl_be_testi32a
+! CHECK-LABEL: @vec_xl_be_testi32a
 subroutine vec_xl_be_testi32a(arg1, arg2, res)
   integer(4) :: arg1
   integer(4) :: arg2(2, 4, 8)
@@ -753,7 +752,7 @@ subroutine vec_xl_be_testi32a(arg1, arg2, res)
 ! LLVMIR-BE:  store <4 x i32> %[[ld]], ptr %2, align 16
 end subroutine vec_xl_be_testi32a
 
-! LLVM-LABEL: @vec_xl_be_testi64a
+! CHECK-LABEL: @vec_xl_be_testi64a
 subroutine vec_xl_be_testi64a(arg1, arg2, res)
   integer(8) :: arg1
   integer(8) :: arg2(2, 4, 8)
@@ -768,7 +767,7 @@ subroutine vec_xl_be_testi64a(arg1, arg2, res)
 ! LLVMIR-BE:  store <2 x i64> %[[ld]], ptr %2, align 16
 end subroutine vec_xl_be_testi64a
 
-! LLVM-LABEL: @vec_xl_be_testf32a
+! CHECK-LABEL: @vec_xl_be_testf32a
 subroutine vec_xl_be_testf32a(arg1, arg2, res)
   integer(2) :: arg1
   real(4) :: arg2(4)
@@ -783,7 +782,7 @@ subroutine vec_xl_be_testf32a(arg1, arg2, res)
 ! LLVMIR-BE:  store <4 x float> %[[ld]], ptr %2, align 16
 end subroutine vec_xl_be_testf32a
 
-! LLVM-LABEL: @vec_xl_be_testf64a
+! CHECK-LABEL: @vec_xl_be_testf64a
 subroutine vec_xl_be_testf64a(arg1, arg2, res)
   integer(8) :: arg1
   real(8) :: arg2(7)
@@ -802,7 +801,7 @@ end subroutine vec_xl_be_testf64a
 ! vec_xlw4
 !----------------------
 
-! LLVM-LABEL: @vec_xlw4_testi8a
+! CHECK-LABEL: @vec_xlw4_testi8a
 subroutine vec_xlw4_testi8a(arg1, arg2, res)
   integer(1) :: arg1
   vector(integer(1)) :: arg2(2, 4, 8)
@@ -816,7 +815,7 @@ subroutine vec_xlw4_testi8a(arg1, arg2, res)
 ! LLVMIR: store <16 x i8> %[[res]], ptr %2, align 16
 end subroutine vec_xlw4_testi8a
 
-! LLVM-LABEL: @vec_xlw4_testi16a
+! CHECK-LABEL: @vec_xlw4_testi16a
 subroutine vec_xlw4_testi16a(arg1, arg2, res)
   integer(2) :: arg1
   vector(integer(2)) :: arg2(2, 4, 8)
@@ -830,7 +829,7 @@ subroutine vec_xlw4_testi16a(arg1, arg2, res)
 ! LLVMIR: store <8 x i16> %[[res]], ptr %2, align 16
 end subroutine vec_xlw4_testi16a
 
-! LLVM-LABEL: @vec_xlw4_testu32a
+! CHECK-LABEL: @vec_xlw4_testu32a
 subroutine vec_xlw4_testu32a(arg1, arg2, res)
   integer(4) :: arg1
   vector(unsigned(4)) :: arg2(2, 4, 8)
@@ -843,7 +842,7 @@ subroutine vec_xlw4_testu32a(arg1, arg2, res)
 ! LLVMIR: store <4 x i32> %[[ld]], ptr %2, align 16
 end subroutine vec_xlw4_testu32a
 
-! LLVM-LABEL: @vec_xlw4_testf32a
+! CHECK-LABEL: @vec_xlw4_testf32a
 subroutine vec_xlw4_testf32a(arg1, arg2, res)
   integer(2) :: arg1
   vector(real(4)) :: arg2(4)

@@ -6,9 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Target/Cpp/CppEmitter.h"
@@ -38,9 +41,12 @@ void registerToCppTranslation() {
       },
       [](DialectRegistry &registry) {
         // clang-format off
-        registry.insert<cf::ControlFlowDialect,
+        registry.insert<arith::ArithDialect,
+                        cf::ControlFlowDialect,
                         emitc::EmitCDialect,
-                        func::FuncDialect>();
+                        func::FuncDialect,
+                        math::MathDialect,
+                        scf::SCFDialect>();
         // clang-format on
       });
 }

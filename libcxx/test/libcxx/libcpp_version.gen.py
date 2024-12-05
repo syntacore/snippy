@@ -8,7 +8,7 @@
 
 # Test that all headers define the _LIBCPP_VERSION macro.
 
-# RUN: %{python} %s %{libcxx-dir}/utils
+# RUN: %{python} %s %{libcxx}/utils
 
 import sys
 sys.path.append(sys.argv[1])

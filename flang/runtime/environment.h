@@ -9,8 +9,8 @@
 #ifndef FORTRAN_RUNTIME_ENVIRONMENT_H_
 #define FORTRAN_RUNTIME_ENVIRONMENT_H_
 
-#include "flang/Common/optional.h"
 #include "flang/Decimal/decimal.h"
+#include <optional>
 
 struct EnvironmentDefaultList;
 
@@ -18,7 +18,6 @@ namespace Fortran::runtime {
 
 class Terminator;
 
-RT_OFFLOAD_VAR_GROUP_BEGIN
 #if FLANG_BIG_ENDIAN
 constexpr bool isHostLittleEndian{false};
 #elif FLANG_LITTLE_ENDIAN
@@ -26,20 +25,14 @@ constexpr bool isHostLittleEndian{true};
 #else
 #error host endianness is not known
 #endif
-RT_OFFLOAD_VAR_GROUP_END
 
 // External unformatted I/O data conversions
 enum class Convert { Unknown, Native, LittleEndian, BigEndian, Swap };
 
-RT_API_ATTRS Fortran::common::optional<Convert> GetConvertFromString(
-    const char *, std::size_t);
+std::optional<Convert> GetConvertFromString(const char *, std::size_t);
 
 struct ExecutionEnvironment {
-#if !defined(_OPENMP)
-  // FIXME: https://github.com/llvm/llvm-project/issues/84942
-  constexpr
-#endif
-      ExecutionEnvironment(){};
+  constexpr ExecutionEnvironment(){};
   void Configure(int argc, const char *argv[], const char *envp[],
       const EnvironmentDefaultList *envDefaults);
   const char *GetEnv(
@@ -55,13 +48,9 @@ struct ExecutionEnvironment {
   Convert conversion{Convert::Unknown}; // FORT_CONVERT
   bool noStopMessage{false}; // NO_STOP_MESSAGE=1 inhibits "Fortran STOP"
   bool defaultUTF8{false}; // DEFAULT_UTF8
-  bool checkPointerDeallocation{true}; // FORT_CHECK_POINTER_DEALLOCATION
 };
 
-RT_OFFLOAD_VAR_GROUP_BEGIN
-extern RT_VAR_ATTRS ExecutionEnvironment executionEnvironment;
-RT_OFFLOAD_VAR_GROUP_END
-
+extern ExecutionEnvironment executionEnvironment;
 } // namespace Fortran::runtime
 
 #endif // FORTRAN_RUNTIME_ENVIRONMENT_H_

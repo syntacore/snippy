@@ -426,8 +426,8 @@ public:
   }
   CRLogicalOpInfo createCRLogicalOpInfo(MachineInstr &MI);
   void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<MachineBranchProbabilityInfoWrapperPass>();
-    AU.addRequired<MachineDominatorTreeWrapperPass>();
+    AU.addRequired<MachineBranchProbabilityInfo>();
+    AU.addRequired<MachineDominatorTree>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 };
@@ -570,7 +570,7 @@ void PPCReduceCRLogicals::initialize(MachineFunction &MFParam) {
   MF = &MFParam;
   MRI = &MF->getRegInfo();
   TII = MF->getSubtarget<PPCSubtarget>().getInstrInfo();
-  MBPI = &getAnalysis<MachineBranchProbabilityInfoWrapperPass>().getMBPI();
+  MBPI = &getAnalysis<MachineBranchProbabilityInfo>();
 
   AllCRLogicalOps.clear();
 }
@@ -730,7 +730,7 @@ void PPCReduceCRLogicals::collectCRLogicals() {
 
 INITIALIZE_PASS_BEGIN(PPCReduceCRLogicals, DEBUG_TYPE,
                       "PowerPC Reduce CR logical Operation", false, false)
-INITIALIZE_PASS_DEPENDENCY(MachineDominatorTreeWrapperPass)
+INITIALIZE_PASS_DEPENDENCY(MachineDominatorTree)
 INITIALIZE_PASS_END(PPCReduceCRLogicals, DEBUG_TYPE,
                     "PowerPC Reduce CR logical Operation", false, false)
 

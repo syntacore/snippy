@@ -10,15 +10,14 @@
 # alphabetic macros. Also ensure that we don't swallow the definition of user
 # provided macros (in other words, ensure that we push/pop correctly everywhere).
 
-# RUN: %{python} %s %{libcxx-dir}/utils
+# RUN: %{python} %s %{libcxx}/utils
 
 import sys
 sys.path.append(sys.argv[1])
 from libcxx.header_information import lit_header_restrictions, public_headers
 
 for header in public_headers:
-    print(
-        f"""\
+  print(f"""\
 //--- {header}.compile.pass.cpp
 {lit_header_restrictions.get(header, '')}
 
@@ -163,18 +162,6 @@ for header in public_headers:
 #define erase SYSTEM_RESERVED_NAME
 #define refresh SYSTEM_RESERVED_NAME
 
-// Dinkumware libc ctype.h uses these definitions
-#define _XA SYSTEM_RESERVED_NAME
-#define _XS SYSTEM_RESERVED_NAME
-#define _BB SYSTEM_RESERVED_NAME
-#define _CN SYSTEM_RESERVED_NAME
-#define _DI SYSTEM_RESERVED_NAME
-#define _LO SYSTEM_RESERVED_NAME
-#define _PU SYSTEM_RESERVED_NAME
-#define _SP SYSTEM_RESERVED_NAME
-#define _UP SYSTEM_RESERVED_NAME
-#define _XD SYSTEM_RESERVED_NAME
-
 #include <{header}>
 
 // Make sure we don't swallow the definition of the macros we push/pop
@@ -185,5 +172,4 @@ static_assert(__builtin_strcmp(STRINGIFY(max), STRINGIFY(SYSTEM_RESERVED_NAME)) 
 static_assert(__builtin_strcmp(STRINGIFY(move), STRINGIFY(SYSTEM_RESERVED_NAME)) == 0, "");
 static_assert(__builtin_strcmp(STRINGIFY(erase), STRINGIFY(SYSTEM_RESERVED_NAME)) == 0, "");
 static_assert(__builtin_strcmp(STRINGIFY(refresh), STRINGIFY(SYSTEM_RESERVED_NAME)) == 0, "");
-"""
-    )
+""")

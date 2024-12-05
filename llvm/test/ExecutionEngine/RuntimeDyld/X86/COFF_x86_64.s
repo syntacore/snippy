@@ -5,6 +5,7 @@
 
 
 	.section section,"rx"
+section:
 	.long 0
 Lreloc:
 	.long 0

@@ -274,8 +274,8 @@ public:
   /// Create a remapper from the given remapping file. The remapper will
   /// be used for profile read in by Reader.
   static ErrorOr<std::unique_ptr<SampleProfileReaderItaniumRemapper>>
-  create(StringRef Filename, vfs::FileSystem &FS, SampleProfileReader &Reader,
-         LLVMContext &C);
+  create(const std::string Filename, vfs::FileSystem &FS,
+         SampleProfileReader &Reader, LLVMContext &C);
 
   /// Create a remapper from the given Buffer. The remapper will
   /// be used for profile read in by Reader.
@@ -436,9 +436,9 @@ public:
   /// Create a remapper underlying if RemapFilename is not empty.
   /// Parameter P specifies the FSDiscriminatorPass.
   static ErrorOr<std::unique_ptr<SampleProfileReader>>
-  create(StringRef Filename, LLVMContext &C, vfs::FileSystem &FS,
+  create(const std::string Filename, LLVMContext &C, vfs::FileSystem &FS,
          FSDiscriminatorPass P = FSDiscriminatorPass::Base,
-         StringRef RemapFilename = "");
+         const std::string RemapFilename = "");
 
   /// Create a sample profile reader from the supplied memory buffer.
   /// Create a remapper underlying if RemapFilename is not empty.
@@ -446,10 +446,10 @@ public:
   static ErrorOr<std::unique_ptr<SampleProfileReader>>
   create(std::unique_ptr<MemoryBuffer> &B, LLVMContext &C, vfs::FileSystem &FS,
          FSDiscriminatorPass P = FSDiscriminatorPass::Base,
-         StringRef RemapFilename = "");
+         const std::string RemapFilename = "");
 
   /// Return the profile summary.
-  ProfileSummary &getSummary() const { return *Summary; }
+  ProfileSummary &getSummary() const { return *(Summary.get()); }
 
   MemoryBuffer *getBuffer() const { return Buffer.get(); }
 

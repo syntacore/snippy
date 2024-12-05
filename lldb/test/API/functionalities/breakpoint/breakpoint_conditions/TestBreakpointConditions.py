@@ -143,8 +143,8 @@ class BreakpointConditionsTestCase(TestBase):
             "The thread index should be invalid",
         )
         # The thread name should be invalid, too.
-        self.assertIsNone(
-            breakpoint.GetThreadName(), "The thread name should be invalid"
+        self.assertTrue(
+            breakpoint.GetThreadName() is None, "The thread name should be invalid"
         )
 
         # Let's set the thread index for this breakpoint and verify that it is,

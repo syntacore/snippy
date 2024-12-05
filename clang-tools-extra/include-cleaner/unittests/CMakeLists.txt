@@ -4,7 +4,6 @@ set(LLVM_LINK_COMPONENTS
   )
 
 add_custom_target(ClangIncludeCleanerUnitTests)
-set_target_properties(ClangIncludeCleanerUnitTests PROPERTIES FOLDER "Clang Tools Extra/Tests")
 add_unittest(ClangIncludeCleanerUnitTests ClangIncludeCleanerTests
   AnalysisTest.cpp
   FindHeadersTest.cpp

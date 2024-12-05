@@ -10,8 +10,5 @@ A default SBCommandInterpreterRunOptions object has:
 * PrintResults:   true
 * PrintErrors:    true
 * AddToHistory:   true
-* AllowRepeats    false
 
-Interactive debug sessions always allow repeats, the AllowRepeats
-run option only affects non-interactive sessions.
 ") lldb::SBCommandInterpreterRunOptions;

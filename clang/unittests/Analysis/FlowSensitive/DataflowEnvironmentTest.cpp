@@ -9,8 +9,6 @@
 #include "clang/Analysis/FlowSensitive/DataflowEnvironment.h"
 #include "TestingSupport.h"
 #include "clang/AST/DeclCXX.h"
-#include "clang/AST/ExprCXX.h"
-#include "clang/AST/Stmt.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/Analysis/FlowSensitive/DataflowAnalysisContext.h"
@@ -21,13 +19,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include <memory>
-#include <string>
 
 namespace {
 
 using namespace clang;
 using namespace dataflow;
-using ::clang::dataflow::test::findValueDecl;
 using ::clang::dataflow::test::getFieldValue;
 using ::testing::Contains;
 using ::testing::IsNull;
@@ -153,18 +149,13 @@ TEST_F(EnvironmentTest, CreateValueRecursiveType) {
   EXPECT_THAT(PV, NotNull());
 }
 
-TEST_F(EnvironmentTest, DifferentReferenceLocInJoin) {
-  // This tests the case where the storage location for a reference-type
-  // variable is different for two states being joined. We used to believe this
-  // could not happen and therefore had an assertion disallowing this; this test
-  // exists to demonstrate that we can handle this condition without a failing
-  // assertion. See also the discussion here:
-  // https://discourse.llvm.org/t/70086/6
-
+TEST_F(EnvironmentTest, JoinRecords) {
   using namespace ast_matchers;
 
   std::string Code = R"cc(
-    void f(int &ref) {}
+    struct S {};
+    // Need to use the type somewhere so that the `QualType` gets created;
+    S s;
   )cc";
 
   auto Unit =
@@ -173,26 +164,38 @@ TEST_F(EnvironmentTest, DifferentReferenceLocInJoin) {
 
   ASSERT_EQ(Context.getDiagnostics().getClient()->getNumErrors(), 0U);
 
-  const ValueDecl *Ref = findValueDecl(Context, "ref");
+  auto Results =
+      match(qualType(hasDeclaration(recordDecl(hasName("S")))).bind("SType"),
+            Context);
+  const QualType *TyPtr = selectFirst<QualType>("SType", Results);
+  ASSERT_THAT(TyPtr, NotNull());
+  QualType Ty = *TyPtr;
+  ASSERT_FALSE(Ty.isNull());
 
-  Environment Env1(DAContext);
-  StorageLocation &Loc1 = Env1.createStorageLocation(Context.IntTy);
-  Env1.setStorageLocation(*Ref, Loc1);
+  auto *ConstructExpr = CXXConstructExpr::CreateEmpty(Context, 0);
+  ConstructExpr->setType(Ty);
+  ConstructExpr->setValueKind(VK_PRValue);
 
-  Environment Env2(DAContext);
-  StorageLocation &Loc2 = Env2.createStorageLocation(Context.IntTy);
-  Env2.setStorageLocation(*Ref, Loc2);
+  // Two different `RecordValue`s with the same location are joined into a
+  // third `RecordValue` with that same location.
+  {
+    Environment Env1(DAContext);
+    auto &Val1 = *cast<RecordValue>(Env1.createValue(Ty));
+    RecordStorageLocation &Loc = Val1.getLoc();
+    Env1.setValue(Loc, Val1);
 
-  EXPECT_NE(&Loc1, &Loc2);
+    Environment Env2(DAContext);
+    auto &Val2 = Env2.create<RecordValue>(Loc);
+    Env2.setValue(Loc, Val2);
+    Env2.setValue(Loc, Val2);
 
-  Environment::ValueModel Model;
-  Environment EnvJoined =
-      Environment::join(Env1, Env2, Model, Environment::DiscardExprState);
-
-  // Joining environments with different storage locations for the same
-  // declaration results in the declaration being removed from the joined
-  // environment.
-  EXPECT_EQ(EnvJoined.getStorageLocation(*Ref), nullptr);
+    Environment::ValueModel Model;
+    Environment EnvJoined = Environment::join(Env1, Env2, Model);
+    auto *JoinedVal = cast<RecordValue>(EnvJoined.getValue(Loc));
+    EXPECT_NE(JoinedVal, &Val1);
+    EXPECT_NE(JoinedVal, &Val2);
+    EXPECT_EQ(&JoinedVal->getLoc(), &Loc);
+  }
 }
 
 TEST_F(EnvironmentTest, InitGlobalVarsFun) {
@@ -406,18 +409,15 @@ TEST_F(EnvironmentTest,
               Contains(Member));
 }
 
-// This is a repro of a failure case seen in the wild.
-TEST_F(EnvironmentTest, CXXDefaultInitExprResultObjIsWrappedExprResultObj) {
+TEST_F(EnvironmentTest, RefreshRecordValue) {
   using namespace ast_matchers;
 
   std::string Code = R"cc(
-      struct Inner {};
-
-      struct S {
-        S() {}
-
-        Inner i = {};
-      };
+     struct S {};
+     void target () {
+       S s;
+       s;
+     }
   )cc";
 
   auto Unit =
@@ -426,79 +426,18 @@ TEST_F(EnvironmentTest, CXXDefaultInitExprResultObjIsWrappedExprResultObj) {
 
   ASSERT_EQ(Context.getDiagnostics().getClient()->getNumErrors(), 0U);
 
-  auto Results =
-      match(cxxConstructorDecl(
-                hasAnyConstructorInitializer(cxxCtorInitializer(
-                    withInitializer(expr().bind("default_init_expr")))))
-                .bind("ctor"),
-            Context);
-  const auto *Constructor = selectFirst<CXXConstructorDecl>("ctor", Results);
-  const auto *DefaultInit =
-      selectFirst<CXXDefaultInitExpr>("default_init_expr", Results);
+  auto Results = match(functionDecl(hasName("target")).bind("target"), Context);
+  const auto *Target = selectFirst<FunctionDecl>("target", Results);
+  ASSERT_THAT(Target, NotNull());
 
-  Environment Env(DAContext, *Constructor);
-  Env.initialize();
-  EXPECT_EQ(&Env.getResultObjectLocation(*DefaultInit),
-            &Env.getResultObjectLocation(*DefaultInit->getExpr()));
-}
+  Results = match(declRefExpr(to(varDecl(hasName("s")))).bind("s"), Context);
+  const auto *DRE = selectFirst<DeclRefExpr>("s", Results);
+  ASSERT_THAT(DRE, NotNull());
 
-TEST_F(EnvironmentTest, Stmt) {
-  using namespace ast_matchers;
-
-  std::string Code = R"cc(
-      struct S { int i; };
-      void foo() {
-        S AnS = S{1};
-      }
-    )cc";
-  auto Unit =
-      tooling::buildASTFromCodeWithArgs(Code, {"-fsyntax-only", "-std=c++11"});
-  auto &Context = Unit->getASTContext();
-
-  ASSERT_EQ(Context.getDiagnostics().getClient()->getNumErrors(), 0U);
-
-  auto *DeclStatement = const_cast<DeclStmt *>(selectFirst<DeclStmt>(
-      "d", match(declStmt(hasSingleDecl(varDecl(hasName("AnS")))).bind("d"),
-                 Context)));
-  ASSERT_THAT(DeclStatement, NotNull());
-  auto *Init = (cast<VarDecl>(*DeclStatement->decl_begin()))->getInit();
-  ASSERT_THAT(Init, NotNull());
-
-  // Verify that we can retrieve the result object location for the initializer
-  // expression when we analyze the DeclStmt for `AnS`.
-  Environment Env(DAContext, *DeclStatement);
-  // Don't crash when initializing.
-  Env.initialize();
-  // And don't crash when retrieving the result object location.
-  Env.getResultObjectLocation(*Init);
-}
-
-// This is a crash repro.
-TEST_F(EnvironmentTest, LambdaCapturingThisInFieldInitializer) {
-  using namespace ast_matchers;
-  std::string Code = R"cc(
-      struct S {
-        int f{[this]() { return 1; }()};
-      };
-    )cc";
-
-  auto Unit =
-      tooling::buildASTFromCodeWithArgs(Code, {"-fsyntax-only", "-std=c++11"});
-  auto &Context = Unit->getASTContext();
-
-  ASSERT_EQ(Context.getDiagnostics().getClient()->getNumErrors(), 0U);
-
-  auto *LambdaCallOperator = selectFirst<CXXMethodDecl>(
-      "method", match(cxxMethodDecl(hasName("operator()"),
-                                    ofClass(cxxRecordDecl(isLambda())))
-                          .bind("method"),
-                      Context));
-
-  Environment Env(DAContext, *LambdaCallOperator);
-  // Don't crash when initializing.
-  Env.initialize();
-  // And initialize the captured `this` pointee.
-  ASSERT_NE(nullptr, Env.getThisPointeeStorageLocation());
+  Environment Env(DAContext, *Target);
+  EXPECT_THAT(Env.getStorageLocation(*DRE), IsNull());
+  refreshRecordValue(*DRE, Env);
+  EXPECT_THAT(Env.getStorageLocation(*DRE), NotNull());
 }
 
 } // namespace

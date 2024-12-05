@@ -18,7 +18,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/CodeGen/LiveRegUnits.h"
+#include "llvm/CodeGen/LivePhysRegs.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
@@ -420,7 +420,9 @@ bool SystemZElimCompare::adjustCCMasksForInstr(
   if (!MIEquivalentToCmp) {
     // Now check whether these flags are enough for all users.
     SmallVector<MachineOperand *, 4> AlterMasks;
-    for (MachineInstr *CCUserMI : CCUsers) {
+    for (unsigned int I = 0, E = CCUsers.size(); I != E; ++I) {
+      MachineInstr *CCUserMI = CCUsers[I];
+
       // Fail if this isn't a use of CC that we understand.
       unsigned Flags = CCUserMI->getDesc().TSFlags;
       unsigned FirstOpNum;
@@ -631,7 +633,7 @@ bool SystemZElimCompare::fuseCompareOperations(
     RegMask = MBBI->getOperand(3).getRegMask();
 
   // Clear out all current operands.
-  int CCUse = MBBI->findRegisterUseOperandIdx(SystemZ::CC, TRI, false);
+  int CCUse = MBBI->findRegisterUseOperandIdx(SystemZ::CC, false, TRI);
   assert(CCUse >= 0 && "BRC/BCR must use CC");
   Branch->removeOperand(CCUse);
   // Remove regmask (sibcall).
@@ -688,9 +690,9 @@ bool SystemZElimCompare::processBlock(MachineBasicBlock &MBB) {
   // Walk backwards through the block looking for comparisons, recording
   // all CC users as we go.  The subroutines can delete Compare and
   // instructions before it.
-  LiveRegUnits LiveRegs(*TRI);
+  LivePhysRegs LiveRegs(*TRI);
   LiveRegs.addLiveOuts(MBB);
-  bool CompleteCCUsers = LiveRegs.available(SystemZ::CC);
+  bool CompleteCCUsers = !LiveRegs.contains(SystemZ::CC);
   SmallVector<MachineInstr *, 4> CCUsers;
   MachineBasicBlock::iterator MBBI = MBB.end();
   while (MBBI != MBB.begin()) {
@@ -705,11 +707,11 @@ bool SystemZElimCompare::processBlock(MachineBasicBlock &MBB) {
       continue;
     }
 
-    if (MI.definesRegister(SystemZ::CC, /*TRI=*/nullptr)) {
+    if (MI.definesRegister(SystemZ::CC)) {
       CCUsers.clear();
       CompleteCCUsers = true;
     }
-    if (MI.readsRegister(SystemZ::CC, /*TRI=*/nullptr) && CompleteCCUsers)
+    if (MI.readsRegister(SystemZ::CC) && CompleteCCUsers)
       CCUsers.push_back(&MI);
   }
   return Changed;

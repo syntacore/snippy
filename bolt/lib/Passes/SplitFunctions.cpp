@@ -17,6 +17,7 @@
 #include "bolt/Core/ParallelUtilities.h"
 #include "bolt/Utils/CommandLineOpts.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Sequence.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/CommandLine.h"
@@ -711,21 +712,15 @@ bool SplitFunctions::shouldOptimize(const BinaryFunction &BF) const {
   return BinaryFunctionPass::shouldOptimize(BF);
 }
 
-Error SplitFunctions::runOnFunctions(BinaryContext &BC) {
+void SplitFunctions::runOnFunctions(BinaryContext &BC) {
   if (!opts::SplitFunctions)
-    return Error::success();
-
-  if (BC.IsLinuxKernel && BC.BOLTReserved.empty()) {
-    BC.errs() << "BOLT-ERROR: split functions require reserved space in the "
-                 "Linux kernel binary\n";
-    exit(1);
-  }
+    return;
 
   // If split strategy is not CDSplit, then a second run of the pass is not
   // needed after function reordering.
   if (BC.HasFinalizedFunctionOrder &&
       opts::SplitStrategy != SplitFunctionsStrategy::CDSplit)
-    return Error::success();
+    return;
 
   std::unique_ptr<SplitStrategy> Strategy;
   bool ForceSequential = false;
@@ -771,12 +766,10 @@ Error SplitFunctions::runOnFunctions(BinaryContext &BC) {
       "SplitFunctions", ForceSequential);
 
   if (SplitBytesHot + SplitBytesCold > 0)
-    BC.outs() << "BOLT-INFO: splitting separates " << SplitBytesHot
-              << " hot bytes from " << SplitBytesCold << " cold bytes "
-              << format("(%.2lf%% of split functions is hot).\n",
-                        100.0 * SplitBytesHot /
-                            (SplitBytesHot + SplitBytesCold));
-  return Error::success();
+    outs() << "BOLT-INFO: splitting separates " << SplitBytesHot
+           << " hot bytes from " << SplitBytesCold << " cold bytes "
+           << format("(%.2lf%% of split functions is hot).\n",
+                     100.0 * SplitBytesHot / (SplitBytesHot + SplitBytesCold));
 }
 
 void SplitFunctions::splitFunction(BinaryFunction &BF, SplitStrategy &S) {
@@ -834,13 +827,6 @@ void SplitFunctions::splitFunction(BinaryFunction &BF, SplitStrategy &S) {
           break;
         }
       }
-    }
-
-    // Outlining blocks with dynamic branches is not supported yet.
-    if (BC.IsLinuxKernel) {
-      if (llvm::any_of(
-              *BB, [&](MCInst &Inst) { return BC.MIB->isDynamicBranch(Inst); }))
-        BB->setCanOutline(false);
     }
   }
 
@@ -913,9 +899,9 @@ void SplitFunctions::splitFunction(BinaryFunction &BF, SplitStrategy &S) {
     if (alignTo(OriginalHotSize, opts::SplitAlignThreshold) <=
         alignTo(HotSize, opts::SplitAlignThreshold) + opts::SplitThreshold) {
       if (opts::Verbosity >= 2) {
-        BC.outs() << "BOLT-INFO: Reversing splitting of function "
-                  << formatv("{0}:\n  {1:x}, {2:x} -> {3:x}\n", BF, HotSize,
-                             ColdSize, OriginalHotSize);
+        outs() << "BOLT-INFO: Reversing splitting of function "
+               << formatv("{0}:\n  {1:x}, {2:x} -> {3:x}\n", BF, HotSize,
+                          ColdSize, OriginalHotSize);
       }
 
       // Reverse the action of createEHTrampolines(). The trampolines will be

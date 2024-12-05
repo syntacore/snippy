@@ -630,8 +630,6 @@ Error UnwindTable::parseRows(const CFIProgram &CFIP, UnwindRow &Row,
           if (LRLoc->getLocation() == UnwindLocation::Constant) {
             // Toggle the constant value from 0 to 1 or 1 to 0.
             LRLoc->setConstant(LRLoc->getConstant() ^ 1);
-            Row.getRegisterLocations().setRegisterLocation(
-                AArch64DWARFPAuthRaState, *LRLoc);
           } else {
             return createStringError(
                 errc::invalid_argument,
@@ -860,8 +858,7 @@ CFIProgram::getOperandTypes() {
 /// Print \p Opcode's operand number \p OperandIdx which has value \p Operand.
 void CFIProgram::printOperand(raw_ostream &OS, DIDumpOptions DumpOpts,
                               const Instruction &Instr, unsigned OperandIdx,
-                              uint64_t Operand,
-                              std::optional<uint64_t> &Address) const {
+                              uint64_t Operand) const {
   assert(OperandIdx < MaxOperands);
   uint8_t Opcode = Instr.Opcode;
   OperandType Type = getOperandTypes()[Opcode][OperandIdx];
@@ -880,7 +877,6 @@ void CFIProgram::printOperand(raw_ostream &OS, DIDumpOptions DumpOpts,
     break;
   case OT_Address:
     OS << format(" %" PRIx64, Operand);
-    Address = Operand;
     break;
   case OT_Offset:
     // The offsets are all encoded in a unsigned form, but in practice
@@ -892,11 +888,7 @@ void CFIProgram::printOperand(raw_ostream &OS, DIDumpOptions DumpOpts,
     if (CodeAlignmentFactor)
       OS << format(" %" PRId64, Operand * CodeAlignmentFactor);
     else
-      OS << format(" %" PRId64 "*code_alignment_factor", Operand);
-    if (Address && CodeAlignmentFactor) {
-      *Address += Operand * CodeAlignmentFactor;
-      OS << format(" to 0x%" PRIx64, *Address);
-    }
+      OS << format(" %" PRId64 "*code_alignment_factor" , Operand);
     break;
   case OT_SignedFactDataOffset:
     if (DataAlignmentFactor)
@@ -926,14 +918,13 @@ void CFIProgram::printOperand(raw_ostream &OS, DIDumpOptions DumpOpts,
 }
 
 void CFIProgram::dump(raw_ostream &OS, DIDumpOptions DumpOpts,
-                      unsigned IndentLevel,
-                      std::optional<uint64_t> Address) const {
+                      unsigned IndentLevel) const {
   for (const auto &Instr : Instructions) {
     uint8_t Opcode = Instr.Opcode;
     OS.indent(2 * IndentLevel);
     OS << callFrameString(Opcode) << ":";
     for (unsigned i = 0; i < Instr.Ops.size(); ++i)
-      printOperand(OS, DumpOpts, Instr, i, Instr.Ops[i], Address);
+      printOperand(OS, DumpOpts, Instr, i, Instr.Ops[i]);
     OS << '\n';
   }
 }
@@ -984,7 +975,7 @@ void CIE::dump(raw_ostream &OS, DIDumpOptions DumpOpts) const {
     OS << "\n";
   }
   OS << "\n";
-  CFIs.dump(OS, DumpOpts, /*IndentLevel=*/1, /*InitialLocation=*/{});
+  CFIs.dump(OS, DumpOpts);
   OS << "\n";
 
   if (Expected<UnwindTable> RowsOrErr = UnwindTable::create(this))
@@ -1012,7 +1003,7 @@ void FDE::dump(raw_ostream &OS, DIDumpOptions DumpOpts) const {
   OS << "  Format:       " << FormatString(IsDWARF64) << "\n";
   if (LSDAAddress)
     OS << format("  LSDA Address: %016" PRIx64 "\n", *LSDAAddress);
-  CFIs.dump(OS, DumpOpts, /*IndentLevel=*/1, InitialLocation);
+  CFIs.dump(OS, DumpOpts);
   OS << "\n";
 
   if (Expected<UnwindTable> RowsOrErr = UnwindTable::create(this))

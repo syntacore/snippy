@@ -115,9 +115,6 @@ public:
       case 'S':
         flags |= wasm::WASM_SEG_FLAG_STRINGS;
         break;
-      case 'R':
-        flags |= wasm::WASM_SEG_FLAG_RETAIN;
-        break;
       default:
         return -1U;
       }
@@ -252,7 +249,7 @@ public:
     if (TypeName == "function") {
       WasmSym->setType(wasm::WASM_SYMBOL_TYPE_FUNCTION);
       auto *Current =
-          cast<MCSectionWasm>(getStreamer().getCurrentSectionOnly());
+          cast<MCSectionWasm>(getStreamer().getCurrentSection().first);
       if (Current->getGroup())
         WasmSym->setComdat(true);
     } else if (TypeName == "global")

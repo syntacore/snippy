@@ -15,12 +15,32 @@
 namespace clang::tidy::utils {
 
 /// Finds and fixes header guards.
+/// The check supports these options:
+///   - `HeaderFileExtensions`: a semicolon-separated list of filename
+///     extensions of header files (The filename extension should not contain
+///     "." prefix). ";h;hh;hpp;hxx" by default.
+///
+///     For extension-less header files, using an empty string or leaving an
+///     empty string between ";" if there are other filename extensions.
 class HeaderGuardCheck : public ClangTidyCheck {
 public:
   HeaderGuardCheck(StringRef Name, ClangTidyContext *Context)
-      : ClangTidyCheck(Name, Context),
-        HeaderFileExtensions(Context->getHeaderFileExtensions()) {}
-
+      : ClangTidyCheck(Name, Context) {
+    std::optional<StringRef> HeaderFileExtensionsOption =
+        Options.get("HeaderFileExtensions");
+    RawStringHeaderFileExtensions = HeaderFileExtensionsOption.value_or(
+        utils::defaultHeaderFileExtensions());
+    if (HeaderFileExtensionsOption) {
+      if (!utils::parseFileExtensions(
+              RawStringHeaderFileExtensions, HeaderFileExtensions,
+              utils::defaultFileExtensionDelimiters())) {
+        this->configurationDiag("Invalid header file extension: '%0'")
+            << RawStringHeaderFileExtensions;
+      }
+    } else
+      HeaderFileExtensions = Context->getHeaderFileExtensions();
+  }
+  void storeOptions(ClangTidyOptions::OptionMap &Opts) override;
   void registerPPCallbacks(const SourceManager &SM, Preprocessor *PP,
                            Preprocessor *ModuleExpanderPP) override;
 
@@ -45,6 +65,7 @@ public:
                                      StringRef OldGuard = StringRef()) = 0;
 
 private:
+  std::string RawStringHeaderFileExtensions;
   FileExtensionsSet HeaderFileExtensions;
 };
 

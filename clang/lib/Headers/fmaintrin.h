@@ -60,8 +60,7 @@ _mm_fmadd_pd(__m128d __A, __m128d __B, __m128d __C)
 
 /// Computes a scalar multiply-add of the single-precision values in the
 ///    low 32 bits of 128-bit vectors of [4 x float].
-///
-/// \code{.operation}
+/// \code
 /// result[31:0] = (__A[31:0] * __B[31:0]) + __C[31:0]
 /// result[127:32] = __A[127:32]
 /// \endcode
@@ -89,8 +88,7 @@ _mm_fmadd_ss(__m128 __A, __m128 __B, __m128 __C)
 
 /// Computes a scalar multiply-add of the double-precision values in the
 ///    low 64 bits of 128-bit vectors of [2 x double].
-///
-/// \code{.operation}
+/// \code
 /// result[63:0] = (__A[63:0] * __B[63:0]) + __C[63:0]
 /// result[127:64] = __A[127:64]
 /// \endcode
@@ -158,8 +156,7 @@ _mm_fmsub_pd(__m128d __A, __m128d __B, __m128d __C)
 
 /// Computes a scalar multiply-subtract of the single-precision values in
 ///    the low 32 bits of 128-bit vectors of [4 x float].
-///
-/// \code{.operation}
+/// \code
 /// result[31:0] = (__A[31:0] * __B[31:0]) - __C[31:0]
 /// result[127:32] = __A[127:32]
 /// \endcode
@@ -187,8 +184,7 @@ _mm_fmsub_ss(__m128 __A, __m128 __B, __m128 __C)
 
 /// Computes a scalar multiply-subtract of the double-precision values in
 ///    the low 64 bits of 128-bit vectors of [2 x double].
-///
-/// \code{.operation}
+/// \code
 /// result[63:0] = (__A[63:0] * __B[63:0]) - __C[63:0]
 /// result[127:64] = __A[127:64]
 /// \endcode
@@ -256,8 +252,7 @@ _mm_fnmadd_pd(__m128d __A, __m128d __B, __m128d __C)
 
 /// Computes a scalar negated multiply-add of the single-precision values in
 ///    the low 32 bits of 128-bit vectors of [4 x float].
-///
-/// \code{.operation}
+/// \code
 /// result[31:0] = -(__A[31:0] * __B[31:0]) + __C[31:0]
 /// result[127:32] = __A[127:32]
 /// \endcode
@@ -285,8 +280,7 @@ _mm_fnmadd_ss(__m128 __A, __m128 __B, __m128 __C)
 
 /// Computes a scalar negated multiply-add of the double-precision values
 ///    in the low 64 bits of 128-bit vectors of [2 x double].
-///
-/// \code{.operation}
+/// \code
 /// result[63:0] = -(__A[63:0] * __B[63:0]) + __C[63:0]
 /// result[127:64] = __A[127:64]
 /// \endcode
@@ -354,8 +348,7 @@ _mm_fnmsub_pd(__m128d __A, __m128d __B, __m128d __C)
 
 /// Computes a scalar negated multiply-subtract of the single-precision
 ///    values in the low 32 bits of 128-bit vectors of [4 x float].
-///
-/// \code{.operation}
+/// \code
 /// result[31:0] = -(__A[31:0] * __B[31:0]) - __C[31:0]
 /// result[127:32] = __A[127:32]
 /// \endcode
@@ -383,8 +376,7 @@ _mm_fnmsub_ss(__m128 __A, __m128 __B, __m128 __C)
 
 /// Computes a scalar negated multiply-subtract of the double-precision
 ///    values in the low 64 bits of 128-bit vectors of [2 x double].
-///
-/// \code{.operation}
+/// \code
 /// result[63:0] = -(__A[63:0] * __B[63:0]) - __C[63:0]
 /// result[127:64] = __A[127:64]
 /// \endcode
@@ -412,8 +404,7 @@ _mm_fnmsub_sd(__m128d __A, __m128d __B, __m128d __C)
 
 /// Computes a multiply with alternating add/subtract of 128-bit vectors of
 ///    [4 x float].
-///
-/// \code{.operation}
+/// \code
 /// result[31:0]  = (__A[31:0] * __B[31:0]) - __C[31:0]
 /// result[63:32] = (__A[63:32] * __B[63:32]) + __C[63:32]
 /// result[95:64] = (__A[95:64] * __B[95:64]) - __C[95:64]
@@ -439,8 +430,7 @@ _mm_fmaddsub_ps(__m128 __A, __m128 __B, __m128 __C)
 
 /// Computes a multiply with alternating add/subtract of 128-bit vectors of
 ///    [2 x double].
-///
-/// \code{.operation}
+/// \code
 /// result[63:0]  = (__A[63:0] * __B[63:0]) - __C[63:0]
 /// result[127:64] = (__A[127:64] * __B[127:64]) + __C[127:64]
 /// \endcode
@@ -464,8 +454,7 @@ _mm_fmaddsub_pd(__m128d __A, __m128d __B, __m128d __C)
 
 /// Computes a multiply with alternating add/subtract of 128-bit vectors of
 ///    [4 x float].
-///
-/// \code{.operation}
+/// \code
 /// result[31:0]  = (__A[31:0] * __B[31:0]) + __C[31:0]
 /// result[63:32] = (__A[63:32] * __B[63:32]) - __C[63:32]
 /// result[95:64] = (__A[95:64] * __B[95:64]) + __C[95:64]
@@ -491,8 +480,7 @@ _mm_fmsubadd_ps(__m128 __A, __m128 __B, __m128 __C)
 
 /// Computes a multiply with alternating add/subtract of 128-bit vectors of
 ///    [2 x double].
-///
-/// \code{.operation}
+/// \code
 /// result[63:0]  = (__A[63:0] * __B[63:0]) + __C[63:0]
 /// result[127:64] = (__A[127:64] * __B[127:64]) - __C[127:64]
 /// \endcode
@@ -676,8 +664,7 @@ _mm256_fnmsub_pd(__m256d __A, __m256d __B, __m256d __C)
 
 /// Computes a multiply with alternating add/subtract of 256-bit vectors of
 ///    [8 x float].
-///
-/// \code{.operation}
+/// \code
 /// result[31:0] = (__A[31:0] * __B[31:0]) - __C[31:0]
 /// result[63:32] = (__A[63:32] * __B[63:32]) + __C[63:32]
 /// result[95:64] = (__A[95:64] * __B[95:64]) - __C[95:64]
@@ -707,8 +694,7 @@ _mm256_fmaddsub_ps(__m256 __A, __m256 __B, __m256 __C)
 
 /// Computes a multiply with alternating add/subtract of 256-bit vectors of
 ///    [4 x double].
-///
-/// \code{.operation}
+/// \code
 /// result[63:0] = (__A[63:0] * __B[63:0]) - __C[63:0]
 /// result[127:64] = (__A[127:64] * __B[127:64]) + __C[127:64]
 /// result[191:128] = (__A[191:128] * __B[191:128]) - __C[191:128]
@@ -734,8 +720,7 @@ _mm256_fmaddsub_pd(__m256d __A, __m256d __B, __m256d __C)
 
 /// Computes a vector multiply with alternating add/subtract of 256-bit
 ///    vectors of [8 x float].
-///
-/// \code{.operation}
+/// \code
 /// result[31:0] = (__A[31:0] * __B[31:0]) + __C[31:0]
 /// result[63:32] = (__A[63:32] * __B[63:32]) - __C[63:32]
 /// result[95:64] = (__A[95:64] * __B[95:64]) + __C[95:64]
@@ -765,8 +750,7 @@ _mm256_fmsubadd_ps(__m256 __A, __m256 __B, __m256 __C)
 
 /// Computes a vector multiply with alternating add/subtract of 256-bit
 ///    vectors of [4 x double].
-///
-/// \code{.operation}
+/// \code
 /// result[63:0] = (__A[63:0] * __B[63:0]) + __C[63:0]
 /// result[127:64] = (__A[127:64] * __B[127:64]) - __C[127:64]
 /// result[191:128] = (__A[191:128] * __B[191:128]) + __C[191:128]

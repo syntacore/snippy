@@ -10,6 +10,9 @@ class ScriptedPlatform(metaclass=ABCMeta):
 
     Most of the base class methods are `@abstractmethod` that need to be
     overwritten by the inheriting class.
+
+    DISCLAIMER: THIS INTERFACE IS STILL UNDER DEVELOPMENT AND NOT STABLE.
+                THE METHODS EXPOSED MIGHT CHANGE IN THE FUTURE.
     """
 
     processes = None
@@ -29,18 +32,16 @@ class ScriptedPlatform(metaclass=ABCMeta):
     def list_processes(self):
         """Get a list of processes that are running or that can be attached to on the platform.
 
-        .. code-block:: python
-
-            processes = {
-                420: {
-                        name: a.out,
-                        arch: aarch64,
-                        pid: 420,
-                        parent_pid: 42 (optional),
-                        uid: 0 (optional),
-                        gid: 0 (optional),
-                },
-            }
+        processes = {
+            420: {
+                    name: a.out,
+                    arch: aarch64,
+                    pid: 420,
+                    parent_pid: 42 (optional),
+                    uid: 0 (optional),
+                    gid: 0 (optional),
+            },
+        }
 
         Returns:
             Dict: The processes represented as a dictionary, with at least the

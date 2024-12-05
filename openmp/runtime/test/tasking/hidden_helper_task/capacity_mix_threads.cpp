@@ -8,12 +8,6 @@
 #include <thread>
 #include <vector>
 
-// AIX runs out of resource in 32-bit if 4*omp_get_max_threads() is more
-// than 64 threads with the default stack size.
-#if defined(_AIX) && !__LP64__
-#define MAX_THREADS 64
-#endif
-
 void dummy_root() {
   // omp_get_max_threads() will do middle initialization
   int nthreads = omp_get_max_threads();
@@ -21,14 +15,9 @@ void dummy_root() {
 }
 
 int main(int argc, char *argv[]) {
-  int N = std::min(std::max(std::max(32, 4 * omp_get_max_threads()),
-                            4 * omp_get_num_procs()),
-                   std::numeric_limits<int>::max());
-
-#if defined(_AIX) && !__LP64__
-  if (N > MAX_THREADS)
-    N = MAX_THREADS;
-#endif
+  const int N = std::min(std::max(std::max(32, 4 * omp_get_max_threads()),
+                                  4 * omp_get_num_procs()),
+                         std::numeric_limits<int>::max());
 
   std::vector<int> data(N);
 

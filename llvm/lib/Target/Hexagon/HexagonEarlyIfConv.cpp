@@ -161,10 +161,10 @@ namespace {
     }
 
     void getAnalysisUsage(AnalysisUsage &AU) const override {
-      AU.addRequired<MachineBranchProbabilityInfoWrapperPass>();
-      AU.addRequired<MachineDominatorTreeWrapperPass>();
-      AU.addPreserved<MachineDominatorTreeWrapperPass>();
-      AU.addRequired<MachineLoopInfoWrapperPass>();
+      AU.addRequired<MachineBranchProbabilityInfo>();
+      AU.addRequired<MachineDominatorTree>();
+      AU.addPreserved<MachineDominatorTree>();
+      AU.addRequired<MachineLoopInfo>();
       MachineFunctionPass::getAnalysisUsage(AU);
     }
 
@@ -1054,11 +1054,10 @@ bool HexagonEarlyIfConversion::runOnMachineFunction(MachineFunction &MF) {
   TRI = ST.getRegisterInfo();
   MFN = &MF;
   MRI = &MF.getRegInfo();
-  MDT = &getAnalysis<MachineDominatorTreeWrapperPass>().getDomTree();
-  MLI = &getAnalysis<MachineLoopInfoWrapperPass>().getLI();
-  MBPI = EnableHexagonBP
-             ? &getAnalysis<MachineBranchProbabilityInfoWrapperPass>().getMBPI()
-             : nullptr;
+  MDT = &getAnalysis<MachineDominatorTree>();
+  MLI = &getAnalysis<MachineLoopInfo>();
+  MBPI = EnableHexagonBP ? &getAnalysis<MachineBranchProbabilityInfo>() :
+    nullptr;
 
   Deleted.clear();
   bool Changed = false;

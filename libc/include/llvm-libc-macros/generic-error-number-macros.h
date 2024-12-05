@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_MACROS_GENERIC_ERROR_NUMBER_MACROS_H
-#define LLVM_LIBC_MACROS_GENERIC_ERROR_NUMBER_MACROS_H
+#ifndef __LLVM_LIBC_MACROS_GENERIC_ERROR_NUMBER_MACROS_H
+#define __LLVM_LIBC_MACROS_GENERIC_ERROR_NUMBER_MACROS_H
 
 #define EPERM 1
 #define ENOENT 2
@@ -43,6 +43,6 @@
 #define EPIPE 32
 #define EDOM 33
 #define ERANGE 34
-#define EILSEQ 84
+#define EILSEQ 35
 
-#endif // LLVM_LIBC_MACROS_GENERIC_ERROR_NUMBER_MACROS_H
+#endif // __LLVM_LIBC_MACROS_GENERIC_ERROR_NUMBER_MACROS_H

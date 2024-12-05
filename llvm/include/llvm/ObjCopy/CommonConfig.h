@@ -16,16 +16,23 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Object/ELFTypes.h"
-#include "llvm/Support/Compression.h"
 #include "llvm/Support/GlobPattern.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Regex.h"
+// Necessary for llvm::DebugCompressionType::None
+#include "llvm/Target/TargetOptions.h"
 #include <optional>
+#include <vector>
 
 namespace llvm {
 namespace objcopy {
 
-enum class FileFormat { Unspecified, ELF, Binary, IHex, SREC };
+enum class FileFormat {
+  Unspecified,
+  ELF,
+  Binary,
+  IHex,
+};
 
 // This type keeps track of the machine info for various architectures. This
 // lets us map architecture names to ELF types and the e_machine value of the
@@ -124,8 +131,8 @@ public:
 // provided for that option.
 class NameMatcher {
   DenseSet<CachedHashStringRef> PosNames;
-  SmallVector<NameOrPattern, 0> PosPatterns;
-  SmallVector<NameOrPattern, 0> NegMatchers;
+  std::vector<NameOrPattern> PosPatterns;
+  std::vector<NameOrPattern> NegMatchers;
 
 public:
   Error addMatcher(Expected<NameOrPattern> Matcher) {
@@ -177,8 +184,8 @@ struct NewSymbolInfo {
   StringRef SymbolName;
   StringRef SectionName;
   uint64_t Value = 0;
-  SmallVector<SymbolFlag, 0> Flags;
-  SmallVector<StringRef, 0> BeforeSyms;
+  std::vector<SymbolFlag> Flags;
+  std::vector<StringRef> BeforeSyms;
 };
 
 // Specify section name and section body for newly added or updated section.
@@ -211,14 +218,13 @@ struct CommonConfig {
   uint64_t PadTo = 0;
   StringRef SplitDWO;
   StringRef SymbolsPrefix;
-  StringRef SymbolsPrefixRemove;
   StringRef AllocSectionsPrefix;
   DiscardType DiscardMode = DiscardType::None;
 
   // Repeated options
-  SmallVector<NewSectionInfo, 0> AddSection;
-  SmallVector<StringRef, 0> DumpSection;
-  SmallVector<NewSectionInfo, 0> UpdateSection;
+  std::vector<NewSectionInfo> AddSection;
+  std::vector<StringRef> DumpSection;
+  std::vector<NewSectionInfo> UpdateSection;
 
   // Section matchers
   NameMatcher KeepSection;
@@ -233,7 +239,6 @@ struct CommonConfig {
   NameMatcher UnneededSymbolsToRemove;
   NameMatcher SymbolsToWeaken;
   NameMatcher SymbolsToKeepGlobal;
-  NameMatcher SymbolsToSkip;
 
   // Map options
   StringMap<SectionRename> SectionsToRename;
@@ -243,10 +248,7 @@ struct CommonConfig {
   StringMap<StringRef> SymbolsToRename;
 
   // Symbol info specified by --add-symbol option.
-  SmallVector<NewSymbolInfo, 0> SymbolsToAdd;
-
-  // Integer options
-  int64_t ChangeSectionLMAValAll = 0;
+  std::vector<NewSymbolInfo> SymbolsToAdd;
 
   // Boolean options
   bool DeterministicArchives = true;
@@ -265,9 +267,6 @@ struct CommonConfig {
   bool DecompressDebugSections = false;
 
   DebugCompressionType CompressionType = DebugCompressionType::None;
-
-  SmallVector<std::pair<NameMatcher, llvm::DebugCompressionType>, 0>
-      compressSections;
 };
 
 } // namespace objcopy

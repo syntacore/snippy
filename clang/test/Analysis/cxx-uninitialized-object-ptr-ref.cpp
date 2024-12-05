@@ -1,9 +1,9 @@
-// RUN: %clang_analyze_cc1 -analyzer-checker=core,unix.Malloc,optin.cplusplus.UninitializedObject \
+// RUN: %clang_analyze_cc1 -analyzer-checker=core,optin.cplusplus.UninitializedObject \
 // RUN:   -analyzer-config optin.cplusplus.UninitializedObject:Pedantic=true -DPEDANTIC \
 // RUN:   -analyzer-config optin.cplusplus.UninitializedObject:CheckPointeeInitialization=true \
 // RUN:   -std=c++11 -verify  %s
 
-// RUN: %clang_analyze_cc1 -analyzer-checker=core,unix.Malloc,optin.cplusplus.UninitializedObject \
+// RUN: %clang_analyze_cc1 -analyzer-checker=core,optin.cplusplus.UninitializedObject \
 // RUN:   -analyzer-config optin.cplusplus.UninitializedObject:CheckPointeeInitialization=true \
 // RUN:   -std=c++11 -verify  %s
 
@@ -316,10 +316,7 @@ void fCyclicPointerTest2() {
 
 // Void pointer tests are mainly no-crash tests.
 
-typedef __typeof(sizeof(int)) size_t;
-
-void *calloc(size_t nmemb, size_t size);
-void free(void *p);
+void *malloc(int size);
 
 class VoidPointerTest1 {
   void *vptr;
@@ -331,9 +328,8 @@ public:
 };
 
 void fVoidPointerTest1() {
-  void *vptr = calloc(1, sizeof(int));
+  void *vptr = malloc(sizeof(int));
   VoidPointerTest1(vptr, char());
-  free(vptr);
 }
 
 class VoidPointerTest2 {
@@ -346,9 +342,8 @@ public:
 };
 
 void fVoidPointerTest2() {
-  void *vptr = calloc(1, sizeof(int));
+  void *vptr = malloc(sizeof(int));
   VoidPointerTest2(&vptr, char());
-  free(vptr);
 }
 
 class VoidPointerRRefTest1 {
@@ -364,9 +359,8 @@ upon returning to the caller.  This will be a dangling reference}}
 };
 
 void fVoidPointerRRefTest1() {
-  void *vptr = calloc(1, sizeof(int));
+  void *vptr = malloc(sizeof(int));
   VoidPointerRRefTest1(vptr, char());
-  free(vptr);
 }
 
 class VoidPointerRRefTest2 {
@@ -382,9 +376,8 @@ upon returning to the caller.  This will be a dangling reference}}
 };
 
 void fVoidPointerRRefTest2() {
-  void *vptr = calloc(1, sizeof(int));
+  void *vptr = malloc(sizeof(int));
   VoidPointerRRefTest2(&vptr, char());
-  free(vptr);
 }
 
 class VoidPointerLRefTest {
@@ -400,9 +393,8 @@ upon returning to the caller.  This will be a dangling reference}}
 };
 
 void fVoidPointerLRefTest() {
-  void *vptr = calloc(1, sizeof(int));
+  void *vptr = malloc(sizeof(int));
   VoidPointerLRefTest(vptr, char());
-  free(vptr);
 }
 
 struct CyclicVoidPointerTest {

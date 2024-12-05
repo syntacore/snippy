@@ -97,15 +97,13 @@ struct LTOCodeGenerator {
   void setFileType(CodeGenFileType FT) { Config.CGFileType = FT; }
 
   void setCpu(StringRef MCpu) { Config.CPU = std::string(MCpu); }
-  void setAttrs(std::vector<std::string> MAttrs) {
-    Config.MAttrs = std::move(MAttrs);
-  }
+  void setAttrs(std::vector<std::string> MAttrs) { Config.MAttrs = MAttrs; }
   void setOptLevel(unsigned OptLevel);
 
   void setShouldInternalize(bool Value) { ShouldInternalize = Value; }
   void setShouldEmbedUselists(bool Value) { ShouldEmbedUselists = Value; }
   void setSaveIRBeforeOptPath(std::string Value) {
-    SaveIRBeforeOptPath = std::move(Value);
+    SaveIRBeforeOptPath = Value;
   }
 
   /// Restore linkage of globals

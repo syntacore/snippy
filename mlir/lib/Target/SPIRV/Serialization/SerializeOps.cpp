@@ -15,6 +15,7 @@
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/IR/RegionGraphTraits.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Target/SPIRV/SPIRVBinaryUtils.h"
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/StringExtras.h"
@@ -246,8 +247,7 @@ LogicalResult Serializer::processFuncOp(spirv::FuncOp op) {
     return op.emitError(
         "'spirv.module' cannot contain external functions "
         "without 'Import' linkage_attributes (LinkageAttributes)");
-  }
-  if (op.isExternal() && hasImportLinkage) {
+  } else if (op.isExternal() && hasImportLinkage) {
     // Add an entry block to set up the block arguments
     // to match the signature of the function.
     // This is to generate OpFunctionParameter for functions with
@@ -708,37 +708,33 @@ Serializer::processOp<spirv::CopyMemoryOp>(spirv::CopyMemoryOp op) {
     operands.push_back(id);
   }
 
-  StringAttr memoryAccess = op.getMemoryAccessAttrName();
-  if (auto attr = op->getAttr(memoryAccess)) {
+  if (auto attr = op->getAttr("memory_access")) {
     operands.push_back(
         static_cast<uint32_t>(cast<spirv::MemoryAccessAttr>(attr).getValue()));
   }
 
-  elidedAttrs.push_back(memoryAccess.strref());
+  elidedAttrs.push_back("memory_access");
 
-  StringAttr alignment = op.getAlignmentAttrName();
-  if (auto attr = op->getAttr(alignment)) {
+  if (auto attr = op->getAttr("alignment")) {
     operands.push_back(static_cast<uint32_t>(
         cast<IntegerAttr>(attr).getValue().getZExtValue()));
   }
 
-  elidedAttrs.push_back(alignment.strref());
+  elidedAttrs.push_back("alignment");
 
-  StringAttr sourceMemoryAccess = op.getSourceMemoryAccessAttrName();
-  if (auto attr = op->getAttr(sourceMemoryAccess)) {
+  if (auto attr = op->getAttr("source_memory_access")) {
     operands.push_back(
         static_cast<uint32_t>(cast<spirv::MemoryAccessAttr>(attr).getValue()));
   }
 
-  elidedAttrs.push_back(sourceMemoryAccess.strref());
+  elidedAttrs.push_back("source_memory_access");
 
-  StringAttr sourceAlignment = op.getSourceAlignmentAttrName();
-  if (auto attr = op->getAttr(sourceAlignment)) {
+  if (auto attr = op->getAttr("source_alignment")) {
     operands.push_back(static_cast<uint32_t>(
         cast<IntegerAttr>(attr).getValue().getZExtValue()));
   }
 
-  elidedAttrs.push_back(sourceAlignment.strref());
+  elidedAttrs.push_back("source_alignment");
   if (failed(emitDebugLine(functionBody, op.getLoc())))
     return failure();
   encodeInstructionInto(functionBody, spirv::Opcode::OpCopyMemory, operands);

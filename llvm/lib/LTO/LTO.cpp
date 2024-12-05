@@ -30,7 +30,6 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Mangler.h"
 #include "llvm/IR/Metadata.h"
-#include "llvm/IR/RuntimeLibcalls.h"
 #include "llvm/LTO/LTOBackend.h"
 #include "llvm/LTO/SummaryBasedOptimizations.h"
 #include "llvm/Linker/IRMover.h"
@@ -65,8 +64,6 @@ using namespace lto;
 using namespace object;
 
 #define DEBUG_TYPE "lto"
-
-extern cl::opt<bool> UseNewDbgInfoFormat;
 
 static cl::opt<bool>
     DumpThinCGSCCs("dump-thin-cg-sccs", cl::init(false), cl::Hidden,
@@ -117,22 +114,19 @@ void llvm::computeLTOCacheKey(
   auto AddUnsigned = [&](unsigned I) {
     uint8_t Data[4];
     support::endian::write32le(Data, I);
-    Hasher.update(Data);
+    Hasher.update(ArrayRef<uint8_t>{Data, 4});
   };
   auto AddUint64 = [&](uint64_t I) {
     uint8_t Data[8];
     support::endian::write64le(Data, I);
-    Hasher.update(Data);
-  };
-  auto AddUint8 = [&](const uint8_t I) {
-    Hasher.update(ArrayRef<uint8_t>((const uint8_t *)&I, 1));
+    Hasher.update(ArrayRef<uint8_t>{Data, 8});
   };
   AddString(Conf.CPU);
   // FIXME: Hash more of Options. For now all clients initialize Options from
   // command-line flags (which is unsupported in production), but may set
-  // X86RelaxRelocations. The clang driver can also pass FunctionSections,
+  // RelaxELFRelocations. The clang driver can also pass FunctionSections,
   // DataSections and DebuggerTuning via command line flags.
-  AddUnsigned(Conf.Options.MCOptions.X86RelaxRelocations);
+  AddUnsigned(Conf.Options.RelaxELFRelocations);
   AddUnsigned(Conf.Options.FunctionSections);
   AddUnsigned(Conf.Options.DataSections);
   AddUnsigned((unsigned)Conf.Options.DebuggerTuning);
@@ -162,17 +156,19 @@ void llvm::computeLTOCacheKey(
   auto ModHash = Index.getModuleHash(ModuleID);
   Hasher.update(ArrayRef<uint8_t>((uint8_t *)&ModHash[0], sizeof(ModHash)));
 
-  // TODO: `ExportList` is determined by `ImportList`. Since `ImportList` is
-  // used to compute cache key, we could omit hashing `ExportList` here.
   std::vector<uint64_t> ExportsGUID;
   ExportsGUID.reserve(ExportList.size());
-  for (const auto &VI : ExportList)
-    ExportsGUID.push_back(VI.getGUID());
+  for (const auto &VI : ExportList) {
+    auto GUID = VI.getGUID();
+    ExportsGUID.push_back(GUID);
+  }
 
   // Sort the export list elements GUIDs.
   llvm::sort(ExportsGUID);
-  for (auto GUID : ExportsGUID)
+  for (uint64_t GUID : ExportsGUID) {
+    // The export list can impact the internalization, be conservative here
     Hasher.update(ArrayRef<uint8_t>((uint8_t *)&GUID, sizeof(GUID)));
+  }
 
   // Include the hash for every module we import functions from. The set of
   // imported symbols for each module may affect code generation and is
@@ -203,21 +199,13 @@ void llvm::computeLTOCacheKey(
              [](const ImportModule &Lhs, const ImportModule &Rhs) -> bool {
                return Lhs.getHash() < Rhs.getHash();
              });
-  std::vector<std::pair<uint64_t, uint8_t>> ImportedGUIDs;
   for (const ImportModule &Entry : ImportModulesVector) {
     auto ModHash = Entry.getHash();
     Hasher.update(ArrayRef<uint8_t>((uint8_t *)&ModHash[0], sizeof(ModHash)));
 
     AddUint64(Entry.getFunctions().size());
-
-    ImportedGUIDs.clear();
-    for (auto &[Fn, ImportType] : Entry.getFunctions())
-      ImportedGUIDs.push_back(std::make_pair(Fn, ImportType));
-    llvm::sort(ImportedGUIDs);
-    for (auto &[GUID, Type] : ImportedGUIDs) {
-      AddUint64(GUID);
-      AddUint8(Type);
-    }
+    for (auto &Fn : Entry.getFunctions())
+      AddUint64(Fn);
   }
 
   // Include the hash for the resolved ODR.
@@ -287,9 +275,9 @@ void llvm::computeLTOCacheKey(
   // Imported functions may introduce new uses of type identifier resolutions,
   // so we need to collect their used resolutions as well.
   for (const ImportModule &ImpM : ImportModulesVector)
-    for (auto &[GUID, UnusedImportType] : ImpM.getFunctions()) {
+    for (auto &ImpF : ImpM.getFunctions()) {
       GlobalValueSummary *S =
-          Index.findSummaryInModule(GUID, ImpM.getIdentifier());
+          Index.findSummaryInModule(ImpF, ImpM.getIdentifier());
       AddUsedThings(S);
       // If this is an alias, we also care about any types/etc. that the aliasee
       // may reference.
@@ -591,9 +579,7 @@ LTO::RegularLTOState::RegularLTOState(unsigned ParallelCodeGenParallelismLevel,
                                       const Config &Conf)
     : ParallelCodeGenParallelismLevel(ParallelCodeGenParallelismLevel),
       Ctx(Conf), CombinedModule(std::make_unique<Module>("ld-temp.o", Ctx)),
-      Mover(std::make_unique<IRMover>(*CombinedModule)) {
-  CombinedModule->IsNewDbgInfoFormat = UseNewDbgInfoFormat;
-}
+      Mover(std::make_unique<IRMover>(*CombinedModule)) {}
 
 LTO::ThinLTOState::ThinLTOState(ThinBackend Backend)
     : Backend(Backend), CombinedIndex(/*HaveGVs*/ false) {
@@ -1358,12 +1344,14 @@ Error LTO::runRegularLTO(AddStreamFn AddStream) {
   return finalizeOptimizationRemarks(std::move(DiagnosticOutputFile));
 }
 
-SmallVector<const char *> LTO::getRuntimeLibcallSymbols(const Triple &TT) {
-  RTLIB::RuntimeLibcallsInfo Libcalls(TT);
-  SmallVector<const char *> LibcallSymbols;
-  copy_if(Libcalls.getLibcallNames(), std::back_inserter(LibcallSymbols),
-          [](const char *Name) { return Name; });
-  return LibcallSymbols;
+static const char *libcallRoutineNames[] = {
+#define HANDLE_LIBCALL(code, name) name,
+#include "llvm/IR/RuntimeLibcalls.def"
+#undef HANDLE_LIBCALL
+};
+
+ArrayRef<const char*> LTO::getRuntimeLibcallSymbols() {
+  return ArrayRef(libcallRoutineNames);
 }
 
 /// This class defines the interface to the ThinLTO backend.
@@ -1399,20 +1387,15 @@ public:
                   llvm::StringRef ModulePath,
                   const std::string &NewModulePath) {
     std::map<std::string, GVSummaryMapTy> ModuleToSummariesForIndex;
-    GVSummaryPtrSet DeclarationSummaries;
-
     std::error_code EC;
     gatherImportedSummariesForModule(ModulePath, ModuleToDefinedGVSummaries,
-                                     ImportList, ModuleToSummariesForIndex,
-                                     DeclarationSummaries);
+                                     ImportList, ModuleToSummariesForIndex);
 
     raw_fd_ostream OS(NewModulePath + ".thinlto.bc", EC,
                       sys::fs::OpenFlags::OF_None);
     if (EC)
       return errorCodeToError(EC);
-
-    writeIndexToFile(CombinedIndex, OS, &ModuleToSummariesForIndex,
-                     &DeclarationSummaries);
+    writeIndexToFile(CombinedIndex, OS, &ModuleToSummariesForIndex);
 
     if (ShouldEmitImportsFiles) {
       EC = EmitImportsFiles(ModulePath, NewModulePath + ".imports",
@@ -1426,7 +1409,7 @@ public:
 
 namespace {
 class InProcessThinBackend : public ThinBackendProc {
-  DefaultThreadPool BackendThreadPool;
+  ThreadPool BackendThreadPool;
   AddStreamFn AddStream;
   FileCache Cache;
   std::set<GlobalValue::GUID> CfiFunctionDefs;
@@ -1554,7 +1537,7 @@ public:
   }
 
   unsigned getThreadCount() override {
-    return BackendThreadPool.getMaxConcurrency();
+    return BackendThreadPool.getThreadCount();
   }
 };
 } // end anonymous namespace
@@ -1572,21 +1555,6 @@ ThinBackend lto::createInProcessThinBackend(ThreadPoolStrategy Parallelism,
             AddStream, Cache, OnWrite, ShouldEmitIndexFiles,
             ShouldEmitImportsFiles);
       };
-}
-
-StringLiteral lto::getThinLTODefaultCPU(const Triple &TheTriple) {
-  if (!TheTriple.isOSDarwin())
-    return "";
-  if (TheTriple.getArch() == Triple::x86_64)
-    return "core2";
-  if (TheTriple.getArch() == Triple::x86)
-    return "yonah";
-  if (TheTriple.isArm64e())
-    return "apple-a12";
-  if (TheTriple.getArch() == Triple::aarch64 ||
-      TheTriple.getArch() == Triple::aarch64_32)
-    return "cyclone";
-  return "";
 }
 
 // Given the original \p Path to an output file, replace any path

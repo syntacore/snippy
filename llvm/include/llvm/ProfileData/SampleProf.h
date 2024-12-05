@@ -66,8 +66,8 @@ inline std::error_code make_error_code(sampleprof_error E) {
   return std::error_code(static_cast<int>(E), sampleprof_category());
 }
 
-inline sampleprof_error mergeSampleProfErrors(sampleprof_error &Accumulator,
-                                              sampleprof_error Result) {
+inline sampleprof_error MergeResult(sampleprof_error &Accumulator,
+                                    sampleprof_error Result) {
   // Prefer first error encountered as later errors may be secondary effects of
   // the initial problem.
   if (Accumulator == sampleprof_error::success &&
@@ -129,7 +129,7 @@ enum SecType {
 };
 
 static inline std::string getSecName(SecType Type) {
-  switch (static_cast<int>(Type)) { // Avoid -Wcovered-switch-default
+  switch ((int)Type) { // Avoid -Wcovered-switch-default
   case SecInValid:
     return "InvalidSection";
   case SecProfSummary:
@@ -392,7 +392,7 @@ public:
   uint64_t getSamples() const { return NumSamples; }
   const CallTargetMap &getCallTargets() const { return CallTargets; }
   const SortedCallTargetSet getSortedCallTargets() const {
-    return sortCallTargets(CallTargets);
+    return SortCallTargets(CallTargets);
   }
 
   uint64_t getCallTargetSum() const {
@@ -403,8 +403,7 @@ public:
   }
 
   /// Sort call targets in descending order of call frequency.
-  static const SortedCallTargetSet
-  sortCallTargets(const CallTargetMap &Targets) {
+  static const SortedCallTargetSet SortCallTargets(const CallTargetMap &Targets) {
     SortedCallTargetSet SortedTargets;
     for (const auto &[Target, Frequency] : Targets) {
       SortedTargets.emplace(Target, Frequency);
@@ -467,7 +466,7 @@ struct SampleContextFrame {
   LineLocation Location;
 
   SampleContextFrame() : Location(0, 0) {}
-
+  
   SampleContextFrame(FunctionId Func, LineLocation Location)
       : Func(Func), Location(Location) {}
 
@@ -528,7 +527,7 @@ public:
       : Func(Name), State(UnknownContext), Attributes(ContextNone) {
         assert(!Name.empty() && "Name is empty");
       }
-
+  
   SampleContext(FunctionId Func)
       : Func(Func), State(UnknownContext), Attributes(ContextNone) {}
 
@@ -643,8 +642,8 @@ public:
   }
 
   /// Set the name of the function and clear the current context.
-  void setFunction(FunctionId NewFunctionID) {
-    Func = NewFunctionID;
+  void setFunction(FunctionId newFunction) {
+    Func = newFunction;
     FullContext = SampleContextFrames();
     State = UnknownContext;
   }
@@ -693,7 +692,7 @@ public:
     }
   };
 
-  bool isPrefixOf(const SampleContext &That) const {
+  bool IsPrefixOf(const SampleContext &That) const {
     auto ThisContext = FullContext;
     auto ThatContext = That.FullContext;
     if (ThatContext.size() < ThisContext.size())
@@ -847,11 +846,11 @@ public:
   }
 
   // Set current context and all callee contexts to be synthetic.
-  void setContextSynthetic() {
+  void SetContextSynthetic() {
     Context.setState(SyntheticContext);
     for (auto &I : CallsiteSamples) {
       for (auto &CS : I.second) {
-        CS.second.setContextSynthetic();
+        CS.second.SetContextSynthetic();
       }
     }
   }
@@ -865,7 +864,8 @@ public:
     const auto &ProfileLoc = IRToProfileLocationMap->find(IRLoc);
     if (ProfileLoc != IRToProfileLocationMap->end())
       return ProfileLoc->second;
-    return IRLoc;
+    else
+      return IRLoc;
   }
 
   /// Return the number of samples collected at the given location.
@@ -873,11 +873,11 @@ public:
   /// If the location is not found in profile, return error.
   ErrorOr<uint64_t> findSamplesAt(uint32_t LineOffset,
                                   uint32_t Discriminator) const {
-    const auto &Ret = BodySamples.find(
+    const auto &ret = BodySamples.find(
         mapIRLocToProfileLoc(LineLocation(LineOffset, Discriminator)));
-    if (Ret == BodySamples.end())
+    if (ret == BodySamples.end())
       return std::error_code();
-    return Ret->second.getSamples();
+    return ret->second.getSamples();
   }
 
   /// Returns the call target map collected at a given location.
@@ -885,11 +885,11 @@ public:
   /// If the location is not found in profile, return error.
   ErrorOr<const SampleRecord::CallTargetMap &>
   findCallTargetMapAt(uint32_t LineOffset, uint32_t Discriminator) const {
-    const auto &Ret = BodySamples.find(
+    const auto &ret = BodySamples.find(
         mapIRLocToProfileLoc(LineLocation(LineOffset, Discriminator)));
-    if (Ret == BodySamples.end())
+    if (ret == BodySamples.end())
       return std::error_code();
-    return Ret->second.getCallTargets();
+    return ret->second.getCallTargets();
   }
 
   /// Returns the call target map collected at a given location specified by \p
@@ -910,23 +910,21 @@ public:
   /// Returns the FunctionSamplesMap at the given \p Loc.
   const FunctionSamplesMap *
   findFunctionSamplesMapAt(const LineLocation &Loc) const {
-    auto Iter = CallsiteSamples.find(mapIRLocToProfileLoc(Loc));
-    if (Iter == CallsiteSamples.end())
+    auto iter = CallsiteSamples.find(mapIRLocToProfileLoc(Loc));
+    if (iter == CallsiteSamples.end())
       return nullptr;
-    return &Iter->second;
+    return &iter->second;
   }
 
   /// Returns a pointer to FunctionSamples at the given callsite location
   /// \p Loc with callee \p CalleeName. If no callsite can be found, relax
   /// the restriction to return the FunctionSamples at callsite location
-  /// \p Loc with the maximum total sample count. If \p Remapper or \p
-  /// FuncNameToProfNameMap is not nullptr, use them to find FunctionSamples
-  /// with equivalent name as \p CalleeName.
-  const FunctionSamples *findFunctionSamplesAt(
-      const LineLocation &Loc, StringRef CalleeName,
-      SampleProfileReaderItaniumRemapper *Remapper,
-      const HashKeyMap<std::unordered_map, FunctionId, FunctionId>
-          *FuncNameToProfNameMap = nullptr) const;
+  /// \p Loc with the maximum total sample count. If \p Remapper is not
+  /// nullptr, use \p Remapper to find FunctionSamples with equivalent name
+  /// as \p CalleeName.
+  const FunctionSamples *
+  findFunctionSamplesAt(const LineLocation &Loc, StringRef CalleeName,
+                        SampleProfileReaderItaniumRemapper *Remapper) const;
 
   bool empty() const { return TotalSamples == 0; }
 
@@ -962,8 +960,8 @@ public:
     else if (!CallsiteSamples.empty()) {
       // An indirect callsite may be promoted to several inlined direct calls.
       // We need to get the sum of them.
-      for (const auto &FuncSamples : CallsiteSamples.begin()->second)
-        Count += FuncSamples.second.getHeadSamplesEstimate();
+      for (const auto &N_FS : CallsiteSamples.begin()->second)
+        Count += N_FS.second.getHeadSamplesEstimate();
     }
     // Return at least 1 if total sample is not 0.
     return Count ? Count : TotalSamples > 0;
@@ -1015,21 +1013,18 @@ public:
       return sampleprof_error::hash_mismatch;
     }
 
-    mergeSampleProfErrors(Result,
-                          addTotalSamples(Other.getTotalSamples(), Weight));
-    mergeSampleProfErrors(Result,
-                          addHeadSamples(Other.getHeadSamples(), Weight));
+    MergeResult(Result, addTotalSamples(Other.getTotalSamples(), Weight));
+    MergeResult(Result, addHeadSamples(Other.getHeadSamples(), Weight));
     for (const auto &I : Other.getBodySamples()) {
       const LineLocation &Loc = I.first;
       const SampleRecord &Rec = I.second;
-      mergeSampleProfErrors(Result, BodySamples[Loc].merge(Rec, Weight));
+      MergeResult(Result, BodySamples[Loc].merge(Rec, Weight));
     }
     for (const auto &I : Other.getCallsiteSamples()) {
       const LineLocation &Loc = I.first;
       FunctionSamplesMap &FSMap = functionSamplesAt(Loc);
       for (const auto &Rec : I.second)
-        mergeSampleProfErrors(Result,
-                              FSMap[Rec.first].merge(Rec.second, Weight));
+        MergeResult(Result, FSMap[Rec.first].merge(Rec.second, Weight));
     }
     return Result;
   }
@@ -1044,10 +1039,10 @@ public:
                             uint64_t Threshold) const {
     if (TotalSamples <= Threshold)
       return;
-    auto IsDeclaration = [](const Function *F) {
+    auto isDeclaration = [](const Function *F) {
       return !F || F->isDeclaration();
     };
-    if (IsDeclaration(SymbolMap.lookup(getFunction()))) {
+    if (isDeclaration(SymbolMap.lookup(getFunction()))) {
       // Add to the import list only when it's defined out of module.
       S.insert(getGUID());
     }
@@ -1057,7 +1052,7 @@ public:
       for (const auto &TS : BS.second.getCallTargets())
         if (TS.second > Threshold) {
           const Function *Callee = SymbolMap.lookup(TS.first);
-          if (IsDeclaration(Callee))
+          if (isDeclaration(Callee))
             S.insert(TS.first.getHashCode());
         }
     for (const auto &CS : CallsiteSamples)
@@ -1066,8 +1061,8 @@ public:
   }
 
   /// Set the name of the function.
-  void setFunction(FunctionId NewFunctionID) {
-    Context.setFunction(NewFunctionID);
+  void setFunction(FunctionId newFunction) {
+    Context.setFunction(newFunction);
   }
 
   /// Return the function name.
@@ -1088,7 +1083,7 @@ public:
   /// Return the canonical name for a function, taking into account
   /// suffix elision policy attributes.
   static StringRef getCanonicalFnName(const Function &F) {
-    const char *AttrName = "sample-profile-suffix-elision-policy";
+    auto AttrName = "sample-profile-suffix-elision-policy";
     auto Attr = F.getFnAttribute(AttrName).getValueAsString();
     return getCanonicalFnName(F.getName(), Attr);
   }
@@ -1104,12 +1099,12 @@ public:
     // Note the sequence of the suffixes in the knownSuffixes array matters.
     // If suffix "A" is appended after the suffix "B", "A" should be in front
     // of "B" in knownSuffixes.
-    const char *KnownSuffixes[] = {LLVMSuffix, PartSuffix, UniqSuffix};
-    if (Attr == "" || Attr == "all")
+    const char *knownSuffixes[] = {LLVMSuffix, PartSuffix, UniqSuffix};
+    if (Attr == "" || Attr == "all") {
       return FnName.split('.').first;
-    if (Attr == "selected") {
+    } else if (Attr == "selected") {
       StringRef Cand(FnName);
-      for (const auto &Suf : KnownSuffixes) {
+      for (const auto &Suf : knownSuffixes) {
         StringRef Suffix(Suf);
         // If the profile contains ".__uniq." suffix, don't strip the
         // suffix for names in the IR.
@@ -1123,10 +1118,11 @@ public:
           Cand = Cand.substr(0, It);
       }
       return Cand;
-    }
-    if (Attr == "none")
+    } else if (Attr == "none") {
       return FnName;
-    assert(false && "internal error: unknown suffix elision policy");
+    } else {
+      assert(false && "internal error: unknown suffix elision policy");
+    }
     return FnName;
   }
 
@@ -1174,14 +1170,11 @@ public:
   /// tree nodes in the profile.
   ///
   /// \returns the FunctionSamples pointer to the inlined instance.
-  /// If \p Remapper or \p FuncNameToProfNameMap is not nullptr, it will be used
-  /// to find matching FunctionSamples with not exactly the same but equivalent
-  /// name.
+  /// If \p Remapper is not nullptr, it will be used to find matching
+  /// FunctionSamples with not exactly the same but equivalent name.
   const FunctionSamples *findFunctionSamples(
       const DILocation *DIL,
-      SampleProfileReaderItaniumRemapper *Remapper = nullptr,
-      const HashKeyMap<std::unordered_map, FunctionId, FunctionId>
-          *FuncNameToProfNameMap = nullptr) const;
+      SampleProfileReaderItaniumRemapper *Remapper = nullptr) const;
 
   static bool ProfileIsProbeBased;
 
@@ -1314,7 +1307,7 @@ class SampleProfileMap
 public:
   // Convenience method because this is being used in many places. Set the
   // FunctionSamples' context if its newly inserted.
-  mapped_type &create(const SampleContext &Ctx) {
+  mapped_type &Create(const SampleContext &Ctx) {
     auto Ret = try_emplace(Ctx, FunctionSamples());
     if (Ret.second)
       Ret.first->second.setContext(Ctx);
@@ -1435,7 +1428,7 @@ public:
       for (const auto &I : InputProfiles) {
         // Retain the profile name and clear the full context for each function
         // profile.
-        FunctionSamples &FS = OutputProfiles.create(I.second.getFunction());
+        FunctionSamples &FS = OutputProfiles.Create(I.second.getFunction());
         FS.merge(I.second);
       }
     } else {
@@ -1514,8 +1507,8 @@ class ProfileSymbolList {
 public:
   /// copy indicates whether we need to copy the underlying memory
   /// for the input Name.
-  void add(StringRef Name, bool Copy = false) {
-    if (!Copy) {
+  void add(StringRef Name, bool copy = false) {
+    if (!copy) {
       Syms.insert(Name);
       return;
     }

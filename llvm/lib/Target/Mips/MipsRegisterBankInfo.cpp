@@ -104,6 +104,26 @@ MipsRegisterBankInfo::getRegBankFromRegClass(const TargetRegisterClass &RC,
   }
 }
 
+// Instructions where all register operands are floating point.
+static bool isFloatingPointOpcode(unsigned Opc) {
+  switch (Opc) {
+  case TargetOpcode::G_FCONSTANT:
+  case TargetOpcode::G_FADD:
+  case TargetOpcode::G_FSUB:
+  case TargetOpcode::G_FMUL:
+  case TargetOpcode::G_FDIV:
+  case TargetOpcode::G_FABS:
+  case TargetOpcode::G_FSQRT:
+  case TargetOpcode::G_FCEIL:
+  case TargetOpcode::G_FFLOOR:
+  case TargetOpcode::G_FPEXT:
+  case TargetOpcode::G_FPTRUNC:
+    return true;
+  default:
+    return false;
+  }
+}
+
 // Instructions where use operands are floating point registers.
 // Def operands are general purpose.
 static bool isFloatingPointOpcodeUse(unsigned Opc) {
@@ -113,7 +133,7 @@ static bool isFloatingPointOpcodeUse(unsigned Opc) {
   case TargetOpcode::G_FCMP:
     return true;
   default:
-    return isPreISelGenericFloatingPointOpcode(Opc);
+    return isFloatingPointOpcode(Opc);
   }
 }
 
@@ -125,7 +145,7 @@ static bool isFloatingPointOpcodeDef(unsigned Opc) {
   case TargetOpcode::G_UITOFP:
     return true;
   default:
-    return isPreISelGenericFloatingPointOpcode(Opc);
+    return isFloatingPointOpcode(Opc);
   }
 }
 
@@ -135,8 +155,7 @@ static bool isGprbTwoInstrUnalignedLoadOrStore(const MachineInstr *MI) {
     auto MMO = *MI->memoperands_begin();
     const MipsSubtarget &STI = MI->getMF()->getSubtarget<MipsSubtarget>();
     if (MMO->getSize() == 4 && (!STI.systemSupportsUnalignedAccess() &&
-                                (!MMO->getSize().hasValue() ||
-                                 MMO->getAlign() < MMO->getSize().getValue())))
+                                MMO->getAlign() < MMO->getSize()))
       return true;
   }
   return false;

@@ -31,11 +31,6 @@
 namespace lldb_private {
 std::string GetInputFilePath(const llvm::Twine &name);
 
-class TestUtilities {
-public:
-  static std::once_flag g_debugger_initialize_flag;
-};
-
 class TestFile {
 public:
   static llvm::Expected<TestFile> fromYaml(llvm::StringRef Yaml);
@@ -56,6 +51,6 @@ private:
 
   std::string Buffer;
 };
-} // namespace lldb_private
+}
 
 #endif

@@ -1,4 +1,3 @@
-
 //===-- StackFrame.h --------------------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -447,12 +446,13 @@ public:
   /// Query this frame to determine what the default language should be when
   /// parsing expressions given the execution context.
   ///
-  /// \return   The language of the frame if known.
-  SourceLanguage GetLanguage();
+  /// \return
+  ///   The language of the frame if known, else lldb::eLanguageTypeUnknown.
+  lldb::LanguageType GetLanguage();
 
-  /// Similar to GetLanguage(), but is allowed to take a potentially incorrect
-  /// guess if exact information is not available.
-  SourceLanguage GuessLanguage();
+  // similar to GetLanguage(), but is allowed to take a potentially incorrect
+  // guess if exact information is not available
+  lldb::LanguageType GuessLanguage();
 
   /// Attempt to econstruct the ValueObject for a given raw address touched by
   /// the current instruction.  The ExpressionPath should indicate how to get

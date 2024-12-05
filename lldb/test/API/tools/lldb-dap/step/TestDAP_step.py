@@ -12,6 +12,7 @@ import lldbdap_testcase
 
 class TestDAP_step(lldbdap_testcase.DAPTestCaseBase):
     @skipIfWindows
+    @skipIfRemote
     def test_step(self):
         """
         Tests the stepping in/out/over in threads.

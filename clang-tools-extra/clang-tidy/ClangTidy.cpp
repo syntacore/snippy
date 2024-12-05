@@ -233,7 +233,7 @@ public:
         if (!tooling::applyAllReplacements(Replacements.get(), Rewrite)) {
           llvm::errs() << "Can't apply replacements for file " << File << "\n";
         }
-        AnyNotWritten |= Rewrite.overwriteChangedFiles();
+        AnyNotWritten &= Rewrite.overwriteChangedFiles();
       }
 
       if (AnyNotWritten) {
@@ -373,11 +373,11 @@ static CheckersList getAnalyzerCheckersAndPackages(ClangTidyContext &Context,
 
   const auto &RegisteredCheckers =
       AnalyzerOptions::getRegisteredCheckers(IncludeExperimental);
-  const bool AnalyzerChecksEnabled =
-      llvm::any_of(RegisteredCheckers, [&](StringRef CheckName) -> bool {
-        return Context.isCheckEnabled(
-            (AnalyzerCheckNamePrefix + CheckName).str());
-      });
+  bool AnalyzerChecksEnabled = false;
+  for (StringRef CheckName : RegisteredCheckers) {
+    std::string ClangTidyCheckName((AnalyzerCheckNamePrefix + CheckName).str());
+    AnalyzerChecksEnabled |= Context.isCheckEnabled(ClangTidyCheckName);
+  }
 
   if (!AnalyzerChecksEnabled)
     return List;

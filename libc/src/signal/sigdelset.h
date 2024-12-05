@@ -9,13 +9,12 @@
 #ifndef LLVM_LIBC_SRC_SIGNAL_SIGDELSET_H
 #define LLVM_LIBC_SRC_SIGNAL_SIGDELSET_H
 
-#include "hdr/types/sigset_t.h"
-#include "src/__support/macros/config.h"
+#include <signal.h>
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 
 int sigdelset(sigset_t *set, int signum);
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE
 
 #endif // LLVM_LIBC_SRC_SIGNAL_SIGDELSET_H

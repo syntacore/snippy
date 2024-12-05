@@ -12,7 +12,6 @@
 
 #include "llvm/Object/WindowsResource.h"
 #include "llvm/Object/COFF.h"
-#include "llvm/Object/WindowsMachineFlag.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/ScopedPrinter.h"
@@ -80,7 +79,7 @@ Expected<ResourceEntryRef>
 ResourceEntryRef::create(BinaryStreamRef BSR, const WindowsResource *Owner) {
   auto Ref = ResourceEntryRef(BSR, Owner);
   if (auto E = Ref.loadNext())
-    return E;
+    return std::move(E);
   return Ref;
 }
 
@@ -979,17 +978,19 @@ void WindowsResourceCOFFWriter::writeFirstSectionRelocations() {
         reinterpret_cast<coff_relocation *>(BufferStart + CurrentOffset);
     Reloc->VirtualAddress = RelocationAddresses[i];
     Reloc->SymbolTableIndex = NextSymbolIndex++;
-    switch (getMachineArchType(MachineType)) {
-    case Triple::thumb:
+    switch (MachineType) {
+    case COFF::IMAGE_FILE_MACHINE_ARMNT:
       Reloc->Type = COFF::IMAGE_REL_ARM_ADDR32NB;
       break;
-    case Triple::x86_64:
+    case COFF::IMAGE_FILE_MACHINE_AMD64:
       Reloc->Type = COFF::IMAGE_REL_AMD64_ADDR32NB;
       break;
-    case Triple::x86:
+    case COFF::IMAGE_FILE_MACHINE_I386:
       Reloc->Type = COFF::IMAGE_REL_I386_DIR32NB;
       break;
-    case Triple::aarch64:
+    case COFF::IMAGE_FILE_MACHINE_ARM64:
+    case COFF::IMAGE_FILE_MACHINE_ARM64EC:
+    case COFF::IMAGE_FILE_MACHINE_ARM64X:
       Reloc->Type = COFF::IMAGE_REL_ARM64_ADDR32NB;
       break;
     default:
@@ -1006,7 +1007,7 @@ writeWindowsResourceCOFF(COFF::MachineTypes MachineType,
   Error E = Error::success();
   WindowsResourceCOFFWriter Writer(MachineType, Parser, E);
   if (E)
-    return E;
+    return std::move(E);
   return Writer.write(TimeDateStamp);
 }
 

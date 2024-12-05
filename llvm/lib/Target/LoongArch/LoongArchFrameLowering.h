@@ -52,7 +52,8 @@ public:
   bool hasFP(const MachineFunction &MF) const override;
   bool hasBP(const MachineFunction &MF) const;
 
-  uint64_t getFirstSPAdjustAmount(const MachineFunction &MF) const;
+  uint64_t getFirstSPAdjustAmount(const MachineFunction &MF,
+                                  bool IsPrologue = false) const;
 
   bool enableShrinkWrapping(const MachineFunction &MF) const override;
 

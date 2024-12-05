@@ -10,6 +10,5 @@
 #define PYTHON_BINDINGS_LLVM_OPS
 
 include "mlir/Dialect/LLVMIR/LLVMOps.td"
-include "mlir/Dialect/LLVMIR/LLVMIntrinsicOps.td"
 
 #endif

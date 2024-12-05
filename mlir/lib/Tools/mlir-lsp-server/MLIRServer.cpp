@@ -15,7 +15,6 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Parser/Parser.h"
-#include "mlir/Support/ToolUtilities.h"
 #include "mlir/Tools/lsp-server-support/Logging.h"
 #include "mlir/Tools/lsp-server-support/SourceMgrUtils.h"
 #include "llvm/ADT/StringExtras.h"
@@ -917,7 +916,7 @@ void MLIRDocument::getCodeActionForDiagnostic(
   edit.range = lsp::Range(lsp::Position(pos.line, 0));
 
   // Use the indent of the current line for the expected-* diagnostic.
-  size_t indent = line.find_first_not_of(' ');
+  size_t indent = line.find_first_not_of(" ");
   if (indent == StringRef::npos)
     indent = line.size();
 
@@ -1053,8 +1052,11 @@ MLIRTextFile::MLIRTextFile(const lsp::URIForFile &uri, StringRef fileContents,
   context.allowUnregisteredDialects();
 
   // Split the file into separate MLIR documents.
+  // TODO: Find a way to share the split file marker with other tools. We don't
+  // want to use `splitAndProcessBuffer` here, but we do want to make sure this
+  // marker doesn't go out of sync.
   SmallVector<StringRef, 8> subContents;
-  StringRef(contents).split(subContents, kDefaultSplitMarker);
+  StringRef(contents).split(subContents, "// -----");
   chunks.emplace_back(std::make_unique<MLIRTextFileChunk>(
       context, /*lineOffset=*/0, uri, subContents.front(), diagnostics));
 

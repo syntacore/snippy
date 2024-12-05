@@ -17,7 +17,6 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
@@ -215,9 +214,9 @@ Value *PHITransAddr::translateSubExpr(Value *V, BasicBlock *CurBB,
     // Simplify the GEP to handle 'gep x, 0' -> x etc.
     if (Value *V = simplifyGEPInst(GEP->getSourceElementType(), GEPOps[0],
                                    ArrayRef<Value *>(GEPOps).slice(1),
-                                   GEP->getNoWrapFlags(), {DL, TLI, DT, AC})) {
-      for (Value *Op : GEPOps)
-        RemoveInstInputs(Op, InstInputs);
+                                   GEP->isInBounds(), {DL, TLI, DT, AC})) {
+      for (unsigned i = 0, e = GEPOps.size(); i != e; ++i)
+        RemoveInstInputs(GEPOps[i], InstInputs);
 
       return addAsInput(V);
     }
@@ -370,7 +369,7 @@ Value *PHITransAddr::insertTranslatedSubExpr(
     // Otherwise insert a cast at the end of PredBB.
     CastInst *New = CastInst::Create(Cast->getOpcode(), OpVal, InVal->getType(),
                                      InVal->getName() + ".phi.trans.insert",
-                                     PredBB->getTerminator()->getIterator());
+                                     PredBB->getTerminator());
     New->setDebugLoc(Inst->getDebugLoc());
     NewInsts.push_back(New);
     return New;
@@ -388,10 +387,9 @@ Value *PHITransAddr::insertTranslatedSubExpr(
 
     GetElementPtrInst *Result = GetElementPtrInst::Create(
         GEP->getSourceElementType(), GEPOps[0], ArrayRef(GEPOps).slice(1),
-        InVal->getName() + ".phi.trans.insert",
-        PredBB->getTerminator()->getIterator());
+        InVal->getName() + ".phi.trans.insert", PredBB->getTerminator());
     Result->setDebugLoc(Inst->getDebugLoc());
-    Result->setNoWrapFlags(GEP->getNoWrapFlags());
+    Result->setIsInBounds(GEP->isInBounds());
     NewInsts.push_back(Result);
     return Result;
   }
@@ -410,9 +408,9 @@ Value *PHITransAddr::insertTranslatedSubExpr(
     if (OpVal == nullptr)
       return nullptr;
 
-    BinaryOperator *Res = BinaryOperator::CreateAdd(
-        OpVal, Inst->getOperand(1), InVal->getName() + ".phi.trans.insert",
-        PredBB->getTerminator()->getIterator());
+    BinaryOperator *Res = BinaryOperator::CreateAdd(OpVal, Inst->getOperand(1),
+                                           InVal->getName()+".phi.trans.insert",
+                                                    PredBB->getTerminator());
     Res->setHasNoSignedWrap(cast<BinaryOperator>(Inst)->hasNoSignedWrap());
     Res->setHasNoUnsignedWrap(cast<BinaryOperator>(Inst)->hasNoUnsignedWrap());
     NewInsts.push_back(Res);

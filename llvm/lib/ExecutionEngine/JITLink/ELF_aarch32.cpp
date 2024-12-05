@@ -200,9 +200,6 @@ private:
 
 protected:
   TargetFlagsType makeTargetFlags(const typename ELFT::Sym &Sym) override {
-    // Only emit target flag for callable symbols
-    if (Sym.getType() != ELF::STT_FUNC)
-      return TargetFlagsType{};
     if (Sym.getValue() & 0x01)
       return aarch32::ThumbSymbol;
     return TargetFlagsType{};
@@ -212,9 +209,7 @@ protected:
                                      TargetFlagsType Flags) override {
     assert((makeTargetFlags(Sym) & Flags) == Flags);
     static constexpr uint64_t ThumbBit = 0x01;
-    if (Sym.getType() == ELF::STT_FUNC)
-      return Sym.getValue() & ~ThumbBit;
-    return Sym.getValue();
+    return Sym.getValue() & ~ThumbBit;
   }
 
 public:

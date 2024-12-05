@@ -28,12 +28,5 @@ void ScalarEnumerationTraits<IncludeStyle::IncludeBlocksStyle>::enumeration(
   IO.enumCase(Value, "Regroup", IncludeStyle::IBS_Regroup);
 }
 
-void ScalarEnumerationTraits<IncludeStyle::MainIncludeCharDiscriminator>::
-    enumeration(IO &IO, IncludeStyle::MainIncludeCharDiscriminator &Value) {
-  IO.enumCase(Value, "Quote", IncludeStyle::MICD_Quote);
-  IO.enumCase(Value, "AngleBracket", IncludeStyle::MICD_AngleBracket);
-  IO.enumCase(Value, "Any", IncludeStyle::MICD_Any);
-}
-
 } // namespace yaml
 } // namespace llvm

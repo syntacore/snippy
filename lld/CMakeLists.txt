@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.20.0)
-set(LLVM_SUBPROJECT_TITLE "LLD")
 
 if(NOT DEFINED LLVM_COMMON_CMAKE_UTILS)
   set(LLVM_COMMON_CMAKE_UTILS ${CMAKE_CURRENT_SOURCE_DIR}/../cmake)
@@ -193,10 +192,7 @@ add_subdirectory(tools/lld)
 
 if (LLVM_INCLUDE_TESTS)
   add_custom_target(LLDUnitTests)
-  set_target_properties(LLDUnitTests PROPERTIES FOLDER "LLD/Tests")
-  if (TARGET llvm_gtest)
-    add_subdirectory(unittests)
-  endif()
+  llvm_add_unittests(LLD_UNITTESTS_ADDED)
   add_subdirectory(test)
 endif()
 

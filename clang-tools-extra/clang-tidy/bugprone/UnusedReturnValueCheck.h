@@ -29,14 +29,14 @@ public:
   }
 
 private:
-  const std::vector<StringRef> CheckedFunctions;
+  std::string CheckedFunctions;
   const std::vector<StringRef> CheckedReturnTypes;
 
 protected:
   UnusedReturnValueCheck(StringRef Name, ClangTidyContext *Context,
-                         std::vector<StringRef> CheckedFunctions);
+                         std::string CheckedFunctions);
   UnusedReturnValueCheck(StringRef Name, ClangTidyContext *Context,
-                         std::vector<StringRef> CheckedFunctions,
+                         std::string CheckedFunctions,
                          std::vector<StringRef> CheckedReturnTypes,
                          bool AllowCastToVoid);
   bool AllowCastToVoid;

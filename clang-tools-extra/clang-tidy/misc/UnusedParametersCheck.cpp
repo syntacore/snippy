@@ -192,7 +192,9 @@ void UnusedParametersCheck::check(const MatchFinder::MatchResult &Result) {
 
     // In non-strict mode ignore function definitions with empty bodies
     // (constructor initializer counts for non-empty body).
-    if (StrictMode || !Function->getBody()->children().empty() ||
+    if (StrictMode ||
+        (Function->getBody()->child_begin() !=
+         Function->getBody()->child_end()) ||
         (isa<CXXConstructorDecl>(Function) &&
          cast<CXXConstructorDecl>(Function)->getNumCtorInitializers() > 0))
       warnOnUnusedParameter(Result, Function, I);

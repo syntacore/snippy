@@ -39,9 +39,6 @@ LLT llvm::getLLTForType(Type &Ty, const DataLayout &DL) {
     return LLT::scalar(SizeInBits);
   }
 
-  if (Ty.isTokenTy())
-    return LLT::token();
-
   return LLT();
 }
 
@@ -51,7 +48,7 @@ MVT llvm::getMVTForLLT(LLT Ty) {
 
   return MVT::getVectorVT(
       MVT::getIntegerVT(Ty.getElementType().getSizeInBits()),
-      Ty.getElementCount());
+      Ty.getNumElements());
 }
 
 EVT llvm::getApproximateEVTForLLT(LLT Ty, const DataLayout &DL,

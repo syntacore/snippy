@@ -64,5 +64,7 @@ enum_targets_gen = rule(
                   " `@LLVM_ENUM_{macro_name}S@`",
         ),
     },
+    # output_to_genfiles is required for header files.
+    output_to_genfiles = True,
     implementation = enum_targets_gen_impl,
 )

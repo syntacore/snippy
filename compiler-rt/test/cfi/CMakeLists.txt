@@ -59,7 +59,9 @@ list(APPEND CFI_TEST_DEPS
   ubsan
   stats
 )
-list(APPEND CFI_TEST_DEPS cfi)
+if(COMPILER_RT_HAS_CFI)
+  list(APPEND CFI_TEST_DEPS cfi)
+endif()
 
 if(NOT COMPILER_RT_STANDALONE_BUILD)
   list(APPEND CFI_TEST_DEPS
@@ -93,3 +95,6 @@ add_lit_target(check-cfi-and-supported "Running the cfi regression tests"
   ${CFI_TESTSUITES}
   PARAMS check_supported=1
   DEPENDS ${CFI_TEST_DEPS})
+
+set_target_properties(check-cfi PROPERTIES FOLDER "Compiler-RT Misc")
+set_target_properties(check-cfi-and-supported PROPERTIES FOLDER "Compiler-RT Misc")

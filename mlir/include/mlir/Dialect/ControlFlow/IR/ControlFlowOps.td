@@ -37,8 +37,7 @@ class CF_Op<string mnemonic, list<Trait> traits = []> :
 // AssertOp
 //===----------------------------------------------------------------------===//
 
-def AssertOp : CF_Op<"assert",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
+def AssertOp : CF_Op<"assert"> {
   let summary = "Assert operation with message attribute";
   let description = [{
     Assert operation at runtime with single boolean operand and an error

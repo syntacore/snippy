@@ -27,7 +27,7 @@ TEST(PatternBenefitTest, BenefitOrder) {
     Pattern1(mlir::MLIRContext *context, bool *called)
         : OpRewritePattern<ModuleOp>(context, /*benefit*/ 1), called(called) {}
 
-    llvm::LogicalResult
+    mlir::LogicalResult
     matchAndRewrite(ModuleOp /*op*/,
                     mlir::PatternRewriter & /*rewriter*/) const override {
       *called = true;
@@ -43,7 +43,7 @@ TEST(PatternBenefitTest, BenefitOrder) {
         : RewritePattern(MatchAnyOpTypeTag(), /*benefit=*/2, context),
           called(called) {}
 
-    llvm::LogicalResult
+    mlir::LogicalResult
     matchAndRewrite(Operation * /*op*/,
                     mlir::PatternRewriter & /*rewriter*/) const override {
       *called = true;

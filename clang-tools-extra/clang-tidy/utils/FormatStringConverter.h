@@ -32,14 +32,8 @@ class FormatStringConverter
 public:
   using ConversionSpecifier = clang::analyze_format_string::ConversionSpecifier;
   using PrintfSpecifier = analyze_printf::PrintfSpecifier;
-
-  struct Configuration {
-    bool StrictMode = false;
-    bool AllowTrailingNewlineRemoval = false;
-  };
-
   FormatStringConverter(ASTContext *Context, const CallExpr *Call,
-                        unsigned FormatArgOffset, Configuration Config,
+                        unsigned FormatArgOffset, bool StrictMode,
                         const LangOptions &LO);
 
   bool canApply() const { return ConversionNotPossibleReason.empty(); }
@@ -51,7 +45,6 @@ public:
 
 private:
   ASTContext *Context;
-  const Configuration Config;
   const bool CastMismatchedIntegerTypes;
   const Expr *const *Args;
   const unsigned NumArgs;

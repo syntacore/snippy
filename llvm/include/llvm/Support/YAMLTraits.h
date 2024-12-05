@@ -567,10 +567,10 @@ inline bool isNumeric(StringRef S) {
 
   // Make S.front() and S.drop_front().front() (if S.front() is [+-]) calls
   // safe.
-  if (S.empty() || S == "+" || S == "-")
+  if (S.empty() || S.equals("+") || S.equals("-"))
     return false;
 
-  if (S == ".nan" || S == ".NaN" || S == ".NAN")
+  if (S.equals(".nan") || S.equals(".NaN") || S.equals(".NAN"))
     return true;
 
   // Infinity and decimal numbers can be prefixed with sign.
@@ -578,7 +578,7 @@ inline bool isNumeric(StringRef S) {
 
   // Check for infinity first, because checking for hex and oct numbers is more
   // expensive.
-  if (Tail == ".inf" || Tail == ".Inf" || Tail == ".INF")
+  if (Tail.equals(".inf") || Tail.equals(".Inf") || Tail.equals(".INF"))
     return true;
 
   // Section 10.3.2 Tag Resolution
@@ -599,7 +599,7 @@ inline bool isNumeric(StringRef S) {
   // digit after dot (as opposed by number which has digits before the dot), but
   // doesn't have one.
   if (S.starts_with(".") &&
-      (S == "." ||
+      (S.equals(".") ||
        (S.size() > 1 && std::strchr("0123456789", S[1]) == nullptr)))
     return false;
 
@@ -656,13 +656,14 @@ inline bool isNumeric(StringRef S) {
 }
 
 inline bool isNull(StringRef S) {
-  return S == "null" || S == "Null" || S == "NULL" || S == "~";
+  return S.equals("null") || S.equals("Null") || S.equals("NULL") ||
+         S.equals("~");
 }
 
 inline bool isBool(StringRef S) {
   // FIXME: using parseBool is causing multiple tests to fail.
-  return S == "true" || S == "True" || S == "TRUE" || S == "false" ||
-         S == "False" || S == "FALSE";
+  return S.equals("true") || S.equals("True") || S.equals("TRUE") ||
+         S.equals("false") || S.equals("False") || S.equals("FALSE");
 }
 
 // 5.1. Character Set
@@ -670,11 +671,7 @@ inline bool isBool(StringRef S) {
 // (except for TAB #x9, LF #xA, and CR #xD which are allowed), DEL #x7F, the C1
 // control block #x80-#x9F (except for NEL #x85 which is allowed), the surrogate
 // block #xD800-#xDFFF, #xFFFE, and #xFFFF.
-//
-// Some strings are valid YAML values even unquoted, but without quotes are
-// interpreted as non-string type, for instance null, boolean or numeric values.
-// If ForcePreserveAsString is set, such strings are quoted.
-inline QuotingType needsQuotes(StringRef S, bool ForcePreserveAsString = true) {
+inline QuotingType needsQuotes(StringRef S) {
   if (S.empty())
     return QuotingType::Single;
 
@@ -682,14 +679,12 @@ inline QuotingType needsQuotes(StringRef S, bool ForcePreserveAsString = true) {
   if (isSpace(static_cast<unsigned char>(S.front())) ||
       isSpace(static_cast<unsigned char>(S.back())))
     MaxQuotingNeeded = QuotingType::Single;
-  if (ForcePreserveAsString) {
-    if (isNull(S))
-      MaxQuotingNeeded = QuotingType::Single;
-    if (isBool(S))
-      MaxQuotingNeeded = QuotingType::Single;
-    if (isNumeric(S))
-      MaxQuotingNeeded = QuotingType::Single;
-  }
+  if (isNull(S))
+    MaxQuotingNeeded = QuotingType::Single;
+  if (isBool(S))
+    MaxQuotingNeeded = QuotingType::Single;
+  if (isNumeric(S))
+    MaxQuotingNeeded = QuotingType::Single;
 
   // 7.3.3 Plain Style
   // Plain scalars must not begin with most indicators, as this would cause
@@ -1026,7 +1021,7 @@ yamlize(IO &YamlIO, T &Val, bool, EmptyContext &Ctx) {
     std::string Storage;
     raw_string_ostream Buffer(Storage);
     BlockScalarTraits<T>::output(Val, YamlIO.getContext(), Buffer);
-    StringRef Str(Storage);
+    StringRef Str = Buffer.str();
     YamlIO.blockScalarString(Str);
   } else {
     StringRef Str;
@@ -1046,8 +1041,8 @@ yamlize(IO &io, T &Val, bool, EmptyContext &Ctx) {
     raw_string_ostream ScalarBuffer(ScalarStorage), TagBuffer(TagStorage);
     TaggedScalarTraits<T>::output(Val, io.getContext(), ScalarBuffer,
                                   TagBuffer);
-    io.scalarTag(TagStorage);
-    StringRef ScalarStr(ScalarStorage);
+    io.scalarTag(TagBuffer.str());
+    StringRef ScalarStr = ScalarBuffer.str();
     io.scalarString(ScalarStr,
                     TaggedScalarTraits<T>::mustQuote(Val, ScalarStr));
   } else {
@@ -1641,7 +1636,6 @@ public:
 
 private:
   void output(StringRef s);
-  void output(StringRef, QuotingType);
   void outputUpToEndOfLine(StringRef s);
   void newLineCheck(bool EmptySequence = false);
   void outputNewLine();

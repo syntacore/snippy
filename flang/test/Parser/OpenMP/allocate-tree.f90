@@ -1,7 +1,5 @@
-! REQUIRES: openmp_runtime
-
-! RUN: %flang_fc1 %openmp_flags -fdebug-dump-parse-tree %s | FileCheck %s
-! RUN: %flang_fc1 %openmp_flags -fdebug-unparse %s | FileCheck %s --check-prefix="UNPARSE"
+! RUN: %flang_fc1 -fopenmp -fdebug-dump-parse-tree %s | FileCheck %s
+! RUN: %flang_fc1 -fopenmp -fdebug-unparse %s | FileCheck %s --check-prefix="UNPARSE"
 ! Ensures associated declarative OMP allocations are nested in their
 ! corresponding executable allocate directive
 
@@ -38,8 +36,8 @@ end program allocate_tree
 !CHECK-NEXT: | | | | | Designator -> DataRef -> Name =
 !CHECK-NEXT: | | | AllocateStmt
 
-!UNPARSE: !$OMP ALLOCATE (w) ALLOCATOR(3_8)
-!UNPARSE-NEXT: !$OMP ALLOCATE (xarray) ALLOCATOR(2_8)
-!UNPARSE-NEXT: !$OMP ALLOCATE (zarray) ALLOCATOR(1_8)
+!UNPARSE: !$OMP ALLOCATE (w) ALLOCATOR(1_4)
+!UNPARSE-NEXT: !$OMP ALLOCATE (xarray) ALLOCATOR(1_4)
+!UNPARSE-NEXT: !$OMP ALLOCATE (zarray) ALLOCATOR(1_4)
 !UNPARSE-NEXT: !$OMP ALLOCATE
 !UNPARSE-NEXT: ALLOCATE(w, xarray(4_4), zarray(t,z))

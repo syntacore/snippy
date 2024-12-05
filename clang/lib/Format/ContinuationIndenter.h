@@ -17,6 +17,11 @@
 
 #include "Encoding.h"
 #include "FormatToken.h"
+#include "clang/Format/Format.h"
+#include "llvm/Support/Regex.h"
+#include <map>
+#include <optional>
+#include <tuple>
 
 namespace clang {
 class SourceManager;
@@ -99,7 +104,7 @@ private:
   /// Update 'State' according to the next token being one of ")>}]".
   void moveStatePastScopeCloser(LineState &State);
   /// Update 'State' with the next token opening a nested block.
-  void moveStateToNewBlock(LineState &State, bool NewLine);
+  void moveStateToNewBlock(LineState &State);
 
   /// Reformats a raw string literal.
   ///

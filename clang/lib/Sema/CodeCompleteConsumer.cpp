@@ -854,8 +854,7 @@ StringRef CodeCompletionResult::getOrderedName(std::string &Saved) const {
   if (IdentifierInfo *Id = Name.getAsIdentifierInfo())
     return Id->getName();
   if (Name.isObjCZeroArgSelector())
-    if (const IdentifierInfo *Id =
-            Name.getObjCSelector().getIdentifierInfoForSlot(0))
+    if (IdentifierInfo *Id = Name.getObjCSelector().getIdentifierInfoForSlot(0))
       return Id->getName();
 
   Saved = Name.getAsString();

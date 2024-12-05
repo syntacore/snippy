@@ -11,7 +11,6 @@
 #include "llvm/CodeGen/MachineDominanceFrontier.h"
 #include "llvm/CodeGen/MachineDominators.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
-#include "llvm/IR/Module.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
@@ -168,7 +167,7 @@ body: |
   WebAssemblyExceptionInfo WEI;
   MachineDominatorTree MDT;
   MachineDominanceFrontier MDF;
-  MDT.calculate(*MF);
+  MDT.runOnMachineFunction(*MF);
   MDF.getBase().analyze(MDT.getBase());
   WEI.recalculate(*MF, MDT, MDF);
 
@@ -343,7 +342,7 @@ body: |
   WebAssemblyExceptionInfo WEI;
   MachineDominatorTree MDT;
   MachineDominanceFrontier MDF;
-  MDT.calculate(*MF);
+  MDT.runOnMachineFunction(*MF);
   MDF.getBase().analyze(MDT.getBase());
   WEI.recalculate(*MF, MDT, MDF);
 

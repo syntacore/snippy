@@ -277,12 +277,6 @@ TEST_F(ConfigCompileTests, DiagnosticsIncludeCleaner) {
   };
   EXPECT_TRUE(HeaderFilter("foo.h"));
   EXPECT_FALSE(HeaderFilter("bar.h"));
-
-  Frag = {};
-  EXPECT_FALSE(Conf.Diagnostics.Includes.AnalyzeAngledIncludes);
-  Frag.Diagnostics.Includes.AnalyzeAngledIncludes = true;
-  EXPECT_TRUE(compileAndApply());
-  EXPECT_TRUE(Conf.Diagnostics.Includes.AnalyzeAngledIncludes);
 }
 
 TEST_F(ConfigCompileTests, DiagnosticSuppression) {

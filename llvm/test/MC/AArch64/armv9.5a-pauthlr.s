@@ -70,30 +70,30 @@ label1:
 // CHECK-ERROR: instruction requires: pauth-lr
 // CHECK-UNKNOWN: f3bfffff <unknown>
 
-  autiasppcr x0
-// CHECK-INST: autiasppcr x0
-// CHECK-DISASS: autiasppcr x0
+  autiasppc x0
+// CHECK-INST: autiasppc x0
+// CHECK-DISASS: autiasppc x0
 // CHECK-ENCODING: [0x1e,0x90,0xc1,0xda]
 // CHECK-ERROR: instruction requires: pauth-lr
 // CHECK-UNKNOWN: dac1901e <unknown>
 
-  autibsppcr x1
-// CHECK-INST: autibsppcr x1
-// CHECK-DISASS: autibsppcr x1
+  autibsppc x1
+// CHECK-INST: autibsppc x1
+// CHECK-DISASS: autibsppc x1
 // CHECK-ENCODING: [0x3e,0x94,0xc1,0xda]
 // CHECK-ERROR: instruction requires: pauth-lr
 // CHECK-UNKNOWN: dac1943e <unknown>
 
-  autiasppcr xzr
-// CHECK-INST: autiasppcr xzr
-// CHECK-DISASS: autiasppcr xzr
+  autiasppc xzr
+// CHECK-INST: autiasppc xzr
+// CHECK-DISASS: autiasppc xzr
 // CHECK-ENCODING: [0xfe,0x93,0xc1,0xda]
 // CHECK-ERROR: instruction requires: pauth-lr
 // CHECK-UNKNOWN: dac193fe <unknown>
 
-  autibsppcr xzr
-// CHECK-INST: autibsppcr xzr
-// CHECK-DISASS: autibsppcr xzr
+  autibsppc xzr
+// CHECK-INST: autibsppc xzr
+// CHECK-DISASS: autibsppc xzr
 // CHECK-ENCODING: [0xfe,0x97,0xc1,0xda]
 // CHECK-ERROR: instruction requires: pauth-lr
 // CHECK-UNKNOWN: dac197fe <unknown>
@@ -156,16 +156,16 @@ label1:
 // CHECK-ERROR: instruction requires: pauth-lr
 // CHECK-UNKNOWN: 551fffff <unknown>
 
-  retaasppcr x2
-// CHECK-INST: retaasppcr x2
-// CHECK-DISASS: retaasppcr x2
+  retaasppc x2
+// CHECK-INST: retaasppc x2
+// CHECK-DISASS: retaasppc x2
 // CHECK-ENCODING: [0xe2,0x0b,0x5f,0xd6]
 // CHECK-ERROR: instruction requires: pauth-lr
 // CHECK-UNKNOWN: d65f0be2 <unknown>
 
-  retabsppcr x3
-// CHECK-INST: retabsppcr x3
-// CHECK-DISASS: retabsppcr x3
+  retabsppc x3
+// CHECK-INST: retabsppc x3
+// CHECK-DISASS: retabsppc x3
 // CHECK-ENCODING: [0xe3,0x0f,0x5f,0xd6]
 // CHECK-ERROR: instruction requires: pauth-lr
 // CHECK-UNKNOWN: d65f0fe3 <unknown>

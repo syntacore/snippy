@@ -310,14 +310,16 @@ TEST(FunctionCallTrieTest, MergeInto) {
 
 TEST(FunctionCallTrieTest, PlacementNewOnAlignedStorage) {
   profilingFlags()->setDefaults();
-  alignas(FunctionCallTrie::Allocators)
-      std::byte AllocatorsStorage[sizeof(FunctionCallTrie::Allocators)];
+  typename std::aligned_storage<sizeof(FunctionCallTrie::Allocators),
+                                alignof(FunctionCallTrie::Allocators)>::type
+      AllocatorsStorage;
   new (&AllocatorsStorage)
       FunctionCallTrie::Allocators(FunctionCallTrie::InitAllocators());
   auto *A =
       reinterpret_cast<FunctionCallTrie::Allocators *>(&AllocatorsStorage);
 
-  alignas(FunctionCallTrie) std::byte FCTStorage[sizeof(FunctionCallTrie)];
+  typename std::aligned_storage<sizeof(FunctionCallTrie),
+                                alignof(FunctionCallTrie)>::type FCTStorage;
   new (&FCTStorage) FunctionCallTrie(*A);
   auto *T = reinterpret_cast<FunctionCallTrie *>(&FCTStorage);
 

@@ -10,11 +10,7 @@
 
 namespace clang::tidy::llvm_libc {
 
-const static llvm::StringRef RequiredNamespaceRefStart = "__llvm_libc";
-const static llvm::StringRef RequiredNamespaceRefMacroName = "LIBC_NAMESPACE";
-const static llvm::StringRef RequiredNamespaceDeclStart =
-    "[[gnu::visibility(\"hidden\")]] __llvm_libc";
-const static llvm::StringRef RequiredNamespaceDeclMacroName =
-    "LIBC_NAMESPACE_DECL";
+const static llvm::StringRef RequiredNamespaceStart = "__llvm_libc";
+const static llvm::StringRef RequiredNamespaceMacroName = "LIBC_NAMESPACE";
 
 } // namespace clang::tidy::llvm_libc

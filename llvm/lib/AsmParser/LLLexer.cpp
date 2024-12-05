@@ -438,12 +438,9 @@ lltok::Kind LLLexer::LexCaret() {
 
 /// Lex all tokens that start with a # character.
 ///    AttrGrpID ::= #[0-9]+
-///    Hash ::= #
 lltok::Kind LLLexer::LexHash() {
   // Handle AttrGrpID: #[0-9]+
-  if (isdigit(static_cast<unsigned char>(CurPtr[0])))
-    return LexUIntID(lltok::AttrGrpID);
-  return lltok::hash;
+  return LexUIntID(lltok::AttrGrpID);
 }
 
 /// Lex a label, integer type, keyword, or hexadecimal integer constant.
@@ -566,7 +563,6 @@ lltok::Kind LLLexer::LexIdentifier() {
   KEYWORD(fast);
   KEYWORD(nuw);
   KEYWORD(nsw);
-  KEYWORD(nusw);
   KEYWORD(exact);
   KEYWORD(disjoint);
   KEYWORD(inbounds);
@@ -604,7 +600,6 @@ lltok::Kind LLLexer::LexIdentifier() {
   KEYWORD(aarch64_vector_pcs);
   KEYWORD(aarch64_sve_vector_pcs);
   KEYWORD(aarch64_sme_preservemost_from_x0);
-  KEYWORD(aarch64_sme_preservemost_from_x1);
   KEYWORD(aarch64_sme_preservemost_from_x2);
   KEYWORD(msp430_intrcc);
   KEYWORD(avr_intrcc);
@@ -622,7 +617,6 @@ lltok::Kind LLLexer::LexIdentifier() {
   KEYWORD(anyregcc);
   KEYWORD(preserve_mostcc);
   KEYWORD(preserve_allcc);
-  KEYWORD(preserve_nonecc);
   KEYWORD(ghccc);
   KEYWORD(x86_intrcc);
   KEYWORD(hhvmcc);
@@ -642,7 +636,6 @@ lltok::Kind LLLexer::LexIdentifier() {
   KEYWORD(tailcc);
   KEYWORD(m68k_rtdcc);
   KEYWORD(graalcc);
-  KEYWORD(riscv_vector_cc);
 
   KEYWORD(cc);
   KEYWORD(c);
@@ -711,7 +704,6 @@ lltok::Kind LLLexer::LexIdentifier() {
   KEYWORD(blockaddress);
   KEYWORD(dso_local_equivalent);
   KEYWORD(no_cfi);
-  KEYWORD(ptrauth);
 
   // Metadata types.
   KEYWORD(distinct);
@@ -740,9 +732,6 @@ lltok::Kind LLLexer::LexIdentifier() {
   KEYWORD(live);
   KEYWORD(dsoLocal);
   KEYWORD(canAutoHide);
-  KEYWORD(importType);
-  KEYWORD(definition);
-  KEYWORD(declaration);
   KEYWORD(function);
   KEYWORD(insts);
   KEYWORD(funcFlags);
@@ -932,21 +921,6 @@ lltok::Kind LLLexer::LexIdentifier() {
   DWKEYWORD(MACINFO, DwarfMacinfo);
 
 #undef DWKEYWORD
-
-// Keywords for debug record types.
-#define DBGRECORDTYPEKEYWORD(STR)                                              \
-  do {                                                                         \
-    if (Keyword == "dbg_" #STR) {                                              \
-      StrVal = #STR;                                                           \
-      return lltok::DbgRecordType;                                             \
-    }                                                                          \
-  } while (false)
-
-  DBGRECORDTYPEKEYWORD(value);
-  DBGRECORDTYPEKEYWORD(declare);
-  DBGRECORDTYPEKEYWORD(assign);
-  DBGRECORDTYPEKEYWORD(label);
-#undef DBGRECORDTYPEKEYWORD
 
   if (Keyword.starts_with("DIFlag")) {
     StrVal.assign(Keyword.begin(), Keyword.end());

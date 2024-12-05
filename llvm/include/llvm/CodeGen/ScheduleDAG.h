@@ -243,10 +243,8 @@ class TargetRegisterInfo;
   private:
     enum : unsigned { BoundaryID = ~0u };
 
-    union {
-      SDNode *Node;        ///< Representative node.
-      MachineInstr *Instr; ///< Alternatively, a MachineInstr.
-    };
+    SDNode *Node = nullptr;        ///< Representative node.
+    MachineInstr *Instr = nullptr; ///< Alternatively, a MachineInstr.
 
   public:
     SUnit *OrigNode = nullptr; ///< If not this, the node from which this node
@@ -254,10 +252,6 @@ class TargetRegisterInfo;
 
     const MCSchedClassDesc *SchedClass =
         nullptr; ///< nullptr or resolved SchedClass.
-
-    const TargetRegisterClass *CopyDstRC =
-        nullptr; ///< Is a special copy node if != nullptr.
-    const TargetRegisterClass *CopySrcRC = nullptr;
 
     SmallVector<SDep, 4> Preds;  ///< All sunit predecessors.
     SmallVector<SDep, 4> Succs;  ///< All sunit successors.
@@ -275,14 +269,8 @@ class TargetRegisterInfo;
     unsigned NumSuccsLeft = 0;         ///< # of succs not scheduled.
     unsigned WeakPredsLeft = 0;        ///< # of weak preds not scheduled.
     unsigned WeakSuccsLeft = 0;        ///< # of weak succs not scheduled.
-    unsigned TopReadyCycle = 0; ///< Cycle relative to start when node is ready.
-    unsigned BotReadyCycle = 0; ///< Cycle relative to end when node is ready.
-
-  private:
-    unsigned Depth = 0;  ///< Node depth.
-    unsigned Height = 0; ///< Node height.
-
-  public:
+    unsigned short NumRegDefsLeft = 0; ///< # of reg defs with no scheduled use.
+    unsigned short Latency = 0;        ///< Node latency.
     bool isVRegCycle      : 1;         ///< May use and def the same vreg.
     bool isCall           : 1;         ///< Is a function call.
     bool isCallOp         : 1;         ///< Is a function call operand.
@@ -299,54 +287,52 @@ class TargetRegisterInfo;
     bool isCloned         : 1;         ///< True if this node has been cloned.
     bool isUnbuffered     : 1;         ///< Uses an unbuffered resource.
     bool hasReservedResource : 1;      ///< Uses a reserved resource.
-    unsigned short NumRegDefsLeft = 0; ///< # of reg defs with no scheduled use.
-    unsigned short Latency = 0;        ///< Node latency.
+    Sched::Preference SchedulingPref = Sched::None; ///< Scheduling preference.
 
   private:
     bool isDepthCurrent   : 1;         ///< True if Depth is current.
     bool isHeightCurrent  : 1;         ///< True if Height is current.
-    bool isNode : 1; ///< True if the representative is an SDNode
-    bool isInst : 1; ///< True if the representative is a MachineInstr
+    unsigned Depth = 0;                ///< Node depth.
+    unsigned Height = 0;               ///< Node height.
 
   public:
-    Sched::Preference SchedulingPref : 4; ///< Scheduling preference.
-    static_assert(Sched::Preference::Last <= (1 << 4),
-                  "not enough bits in bitfield");
+    unsigned TopReadyCycle = 0; ///< Cycle relative to start when node is ready.
+    unsigned BotReadyCycle = 0; ///< Cycle relative to end when node is ready.
+
+    const TargetRegisterClass *CopyDstRC =
+        nullptr; ///< Is a special copy node if != nullptr.
+    const TargetRegisterClass *CopySrcRC = nullptr;
 
     /// Constructs an SUnit for pre-regalloc scheduling to represent an
     /// SDNode and any nodes flagged to it.
     SUnit(SDNode *node, unsigned nodenum)
-        : Node(node), NodeNum(nodenum), isVRegCycle(false), isCall(false),
-          isCallOp(false), isTwoAddress(false), isCommutable(false),
-          hasPhysRegUses(false), hasPhysRegDefs(false),
-          hasPhysRegClobbers(false), isPending(false), isAvailable(false),
-          isScheduled(false), isScheduleHigh(false), isScheduleLow(false),
-          isCloned(false), isUnbuffered(false), hasReservedResource(false),
-          isDepthCurrent(false), isHeightCurrent(false), isNode(true),
-          isInst(false), SchedulingPref(Sched::None) {}
+      : Node(node), NodeNum(nodenum), isVRegCycle(false), isCall(false),
+        isCallOp(false), isTwoAddress(false), isCommutable(false),
+        hasPhysRegUses(false), hasPhysRegDefs(false), hasPhysRegClobbers(false),
+        isPending(false), isAvailable(false), isScheduled(false),
+        isScheduleHigh(false), isScheduleLow(false), isCloned(false),
+        isUnbuffered(false), hasReservedResource(false), isDepthCurrent(false),
+        isHeightCurrent(false) {}
 
     /// Constructs an SUnit for post-regalloc scheduling to represent a
     /// MachineInstr.
     SUnit(MachineInstr *instr, unsigned nodenum)
-        : Instr(instr), NodeNum(nodenum), isVRegCycle(false), isCall(false),
-          isCallOp(false), isTwoAddress(false), isCommutable(false),
-          hasPhysRegUses(false), hasPhysRegDefs(false),
-          hasPhysRegClobbers(false), isPending(false), isAvailable(false),
-          isScheduled(false), isScheduleHigh(false), isScheduleLow(false),
-          isCloned(false), isUnbuffered(false), hasReservedResource(false),
-          isDepthCurrent(false), isHeightCurrent(false), isNode(false),
-          isInst(true), SchedulingPref(Sched::None) {}
+      : Instr(instr), NodeNum(nodenum), isVRegCycle(false), isCall(false),
+        isCallOp(false), isTwoAddress(false), isCommutable(false),
+        hasPhysRegUses(false), hasPhysRegDefs(false), hasPhysRegClobbers(false),
+        isPending(false), isAvailable(false), isScheduled(false),
+        isScheduleHigh(false), isScheduleLow(false), isCloned(false),
+        isUnbuffered(false), hasReservedResource(false), isDepthCurrent(false),
+        isHeightCurrent(false) {}
 
     /// Constructs a placeholder SUnit.
     SUnit()
-        : Node(nullptr), isVRegCycle(false), isCall(false), isCallOp(false),
-          isTwoAddress(false), isCommutable(false), hasPhysRegUses(false),
-          hasPhysRegDefs(false), hasPhysRegClobbers(false), isPending(false),
-          isAvailable(false), isScheduled(false), isScheduleHigh(false),
-          isScheduleLow(false), isCloned(false), isUnbuffered(false),
-          hasReservedResource(false), isDepthCurrent(false),
-          isHeightCurrent(false), isNode(false), isInst(false),
-          SchedulingPref(Sched::None) {}
+      : isVRegCycle(false), isCall(false), isCallOp(false), isTwoAddress(false),
+        isCommutable(false), hasPhysRegUses(false), hasPhysRegDefs(false),
+        hasPhysRegClobbers(false), isPending(false), isAvailable(false),
+        isScheduled(false), isScheduleHigh(false), isScheduleLow(false),
+        isCloned(false), isUnbuffered(false), hasReservedResource(false),
+        isDepthCurrent(false), isHeightCurrent(false) {}
 
     /// Boundary nodes are placeholders for the boundary of the
     /// scheduling region.
@@ -360,36 +346,32 @@ class TargetRegisterInfo;
     /// Assigns the representative SDNode for this SUnit. This may be used
     /// during pre-regalloc scheduling.
     void setNode(SDNode *N) {
-      assert(!isInst && "Setting SDNode of SUnit with MachineInstr!");
+      assert(!Instr && "Setting SDNode of SUnit with MachineInstr!");
       Node = N;
-      isNode = true;
     }
 
     /// Returns the representative SDNode for this SUnit. This may be used
     /// during pre-regalloc scheduling.
     SDNode *getNode() const {
-      assert(!isInst && (isNode || !Instr) &&
-             "Reading SDNode of SUnit without SDNode!");
+      assert(!Instr && "Reading SDNode of SUnit with MachineInstr!");
       return Node;
     }
 
     /// Returns true if this SUnit refers to a machine instruction as
     /// opposed to an SDNode.
-    bool isInstr() const { return isInst && Instr; }
+    bool isInstr() const { return Instr; }
 
     /// Assigns the instruction for the SUnit. This may be used during
     /// post-regalloc scheduling.
     void setInstr(MachineInstr *MI) {
-      assert(!isNode && "Setting MachineInstr of SUnit with SDNode!");
+      assert(!Node && "Setting MachineInstr of SUnit with SDNode!");
       Instr = MI;
-      isInst = true;
     }
 
     /// Returns the representative MachineInstr for this SUnit. This may be used
     /// during post-regalloc scheduling.
     MachineInstr *getInstr() const {
-      assert(!isNode && (isInst || !Node) &&
-             "Reading MachineInstr of SUnit without MachineInstr!");
+      assert(!Node && "Reading MachineInstr of SUnit with SDNode!");
       return Instr;
     }
 

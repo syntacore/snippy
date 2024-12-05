@@ -18,8 +18,6 @@
 
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/Error.h"
-#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/raw_ostream.h"
 #ifdef _WIN32
 #include "llvm/Support/Windows/WindowsSupport.h"
@@ -83,14 +81,14 @@ std::error_code llvm::getRandomBytes(void *Buffer, size_t Size) {
     std::error_code Ret;
     ssize_t BytesRead = read(Fd, Buffer, Size);
     if (BytesRead == -1)
-      Ret = errnoAsErrorCode();
+      Ret = std::error_code(errno, std::system_category());
     else if (BytesRead != static_cast<ssize_t>(Size))
       Ret = std::error_code(EIO, std::system_category());
     if (close(Fd) == -1)
-      Ret = errnoAsErrorCode();
+      Ret = std::error_code(errno, std::system_category());
 
     return Ret;
   }
-  return errnoAsErrorCode();
+  return std::error_code(errno, std::system_category());
 #endif
 }

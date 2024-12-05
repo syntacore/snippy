@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
-#include "mlir/Dialect/IRDL/IRDLSymbols.h"
 #include "mlir/IR/ValueRange.h"
 #include <optional>
 
@@ -48,9 +47,8 @@ std::unique_ptr<Constraint> BaseOp::getVerifier(
   // Case where the input is a symbol reference.
   // This corresponds to the case where the base is an IRDL type or attribute.
   if (auto baseRef = getBaseRef()) {
-    // The verifier for BaseOp guarantees it is within a dialect.
     Operation *defOp =
-        irdl::lookupSymbolNearDialect(getOperation(), baseRef.value());
+        SymbolTable::lookupNearestSymbolFrom(getOperation(), baseRef.value());
 
     // Type case.
     if (auto typeOp = dyn_cast<TypeOp>(defOp)) {
@@ -101,10 +99,10 @@ std::unique_ptr<Constraint> ParametricOp::getVerifier(
   SmallVector<unsigned> constraints =
       getConstraintIndicesForArgs(getArgs(), valueToConstr);
 
-  // Symbol reference case for the base.
-  // The verifier for ParametricOp guarantees it is within a dialect.
+  // Symbol reference case for the base
   SymbolRefAttr symRef = getBaseType();
-  Operation *defOp = irdl::lookupSymbolNearDialect(getOperation(), symRef);
+  Operation *defOp =
+      SymbolTable::lookupNearestSymbolFrom(getOperation(), symRef);
   if (!defOp) {
     emitError() << symRef << " does not refer to any existing symbol";
     return nullptr;

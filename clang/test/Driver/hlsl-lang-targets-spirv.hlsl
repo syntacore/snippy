@@ -1,5 +1,4 @@
 // REQUIRES: spirv-registered-target
-// REQUIRES: directx-registered-target
 
 // Supported targets
 //

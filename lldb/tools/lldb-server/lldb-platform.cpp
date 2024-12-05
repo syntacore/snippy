@@ -282,12 +282,17 @@ int main_platform(int argc, char *argv[]) {
     }
   }
 
-  GDBRemoteCommunicationServerPlatform platform(
-      acceptor_up->GetSocketProtocol(), acceptor_up->GetSocketScheme());
-  if (port_offset > 0)
-    platform.SetPortOffset(port_offset);
-
   do {
+    GDBRemoteCommunicationServerPlatform platform(
+        acceptor_up->GetSocketProtocol(), acceptor_up->GetSocketScheme());
+
+    if (port_offset > 0)
+      platform.SetPortOffset(port_offset);
+
+    if (!gdbserver_portmap.empty()) {
+      platform.SetPortMap(std::move(gdbserver_portmap));
+    }
+
     const bool children_inherit_accept_socket = true;
     Connection *conn = nullptr;
     error = acceptor_up->Accept(children_inherit_accept_socket, conn);
@@ -296,39 +301,13 @@ int main_platform(int argc, char *argv[]) {
       exit(socket_error);
     }
     printf("Connection established.\n");
-
     if (g_server) {
       // Collect child zombie processes.
 #if !defined(_WIN32)
-      ::pid_t waitResult;
-      while ((waitResult = waitpid(-1, nullptr, WNOHANG)) > 0) {
-        // waitResult is the child pid
-        gdbserver_portmap.FreePortForProcess(waitResult);
-      }
+      while (waitpid(-1, nullptr, WNOHANG) > 0)
+        ;
 #endif
-      // TODO: Clean up portmap for Windows when children die
-      // See https://github.com/llvm/llvm-project/issues/90923
-
-      // After collecting zombie ports, get the next available
-      GDBRemoteCommunicationServerPlatform::PortMap portmap_for_child;
-      llvm::Expected<uint16_t> available_port =
-          gdbserver_portmap.GetNextAvailablePort();
-      if (available_port) {
-        // GetNextAvailablePort() may return 0 if gdbserver_portmap is empty.
-        if (*available_port)
-          portmap_for_child.AllowPort(*available_port);
-      } else {
-        llvm::consumeError(available_port.takeError());
-        fprintf(stderr,
-                "no available gdbserver port for connection - dropping...\n");
-        delete conn;
-        continue;
-      }
-      platform.SetPortMap(std::move(portmap_for_child));
-
-      auto childPid = fork();
-      if (childPid) {
-        gdbserver_portmap.AssociatePortWithProcess(*available_port, childPid);
+      if (fork()) {
         // Parent doesn't need a connection to the lldb client
         delete conn;
 
@@ -344,17 +323,13 @@ int main_platform(int argc, char *argv[]) {
       // If not running as a server, this process will not accept
       // connections while a connection is active.
       acceptor_up.reset();
-
-      // When not running in server mode, use all available ports
-      platform.SetPortMap(std::move(gdbserver_portmap));
     }
-
     platform.SetConnection(std::unique_ptr<Connection>(conn));
 
     if (platform.IsConnected()) {
       if (inferior_arguments.GetArgumentCount() > 0) {
         lldb::pid_t pid = LLDB_INVALID_PROCESS_ID;
-        std::optional<uint16_t> port;
+        std::optional<uint16_t> port = 0;
         std::string socket_name;
         Status error = platform.LaunchGDBServer(inferior_arguments,
                                                 "", // hostname

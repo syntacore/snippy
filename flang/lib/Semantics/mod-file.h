@@ -35,40 +35,31 @@ class ModFileWriter {
 public:
   explicit ModFileWriter(SemanticsContext &context) : context_{context} {}
   bool WriteAll();
-  void WriteClosure(llvm::raw_ostream &, const Symbol &,
-      UnorderedSymbolSet &nonIntrinsicModulesWritten);
-  ModFileWriter &set_hermeticModuleFileOutput(bool yes = true) {
-    hermeticModuleFileOutput_ = yes;
-    return *this;
-  }
 
 private:
   SemanticsContext &context_;
-  // Buffers to use with raw_string_ostream
-  std::string needsBuf_;
+  // Buffer to use with raw_string_ostream
   std::string usesBuf_;
   std::string useExtraAttrsBuf_;
   std::string declsBuf_;
   std::string containsBuf_;
   // Tracks nested DEC structures and fields of that type
   UnorderedSymbolSet emittedDECStructures_, emittedDECFields_;
-  UnorderedSymbolSet usedNonIntrinsicModules_;
 
-  llvm::raw_string_ostream needs_{needsBuf_};
   llvm::raw_string_ostream uses_{usesBuf_};
   llvm::raw_string_ostream useExtraAttrs_{
       useExtraAttrsBuf_}; // attrs added to used entity
   llvm::raw_string_ostream decls_{declsBuf_};
   llvm::raw_string_ostream contains_{containsBuf_};
   bool isSubmodule_{false};
-  bool hermeticModuleFileOutput_{false};
+  std::map<const Symbol *, SourceName> renamings_;
 
   void WriteAll(const Scope &);
   void WriteOne(const Scope &);
   void Write(const Symbol &);
   std::string GetAsString(const Symbol &);
   void PrepareRenamings(const Scope &);
-  void PutSymbols(const Scope &, UnorderedSymbolSet *hermetic);
+  void PutSymbols(const Scope &);
   // Returns true if a derived type with bindings and "contains" was emitted
   bool PutComponents(const Symbol &);
   void PutSymbol(llvm::raw_ostream &, const Symbol &);
@@ -92,17 +83,18 @@ private:
 
 class ModFileReader {
 public:
+  // directories specifies where to search for module files
   ModFileReader(SemanticsContext &context) : context_{context} {}
   // Find and read the module file for a module or submodule.
   // If ancestor is specified, look for a submodule of that module.
   // Return the Scope for that module/submodule or nullptr on error.
-  Scope *Read(SourceName, std::optional<bool> isIntrinsic, Scope *ancestor,
-      bool silent);
+  Scope *Read(const SourceName &, std::optional<bool> isIntrinsic,
+      Scope *ancestor, bool silent = false);
 
 private:
   SemanticsContext &context_;
 
-  parser::Message &Say(SourceName, const std::string &,
+  parser::Message &Say(const SourceName &, const std::string &,
       parser::MessageFixedText &&, const std::string &);
 };
 

@@ -48,14 +48,17 @@ static pthread_key_t ProfilingKey;
 
 // We use a global buffer queue, which gets initialized once at initialisation
 // time, and gets reset when profiling is "done".
-alignas(BufferQueue) static std::byte BufferQueueStorage[sizeof(BufferQueue)];
+static std::aligned_storage<sizeof(BufferQueue), alignof(BufferQueue)>::type
+    BufferQueueStorage;
 static BufferQueue *BQ = nullptr;
 
 thread_local FunctionCallTrie::Allocators::Buffers ThreadBuffers;
-alignas(FunctionCallTrie::Allocators) thread_local std::byte
-    AllocatorsStorage[sizeof(FunctionCallTrie::Allocators)];
-alignas(FunctionCallTrie) thread_local std::byte
-    FunctionCallTrieStorage[sizeof(FunctionCallTrie)];
+thread_local std::aligned_storage<sizeof(FunctionCallTrie::Allocators),
+                                  alignof(FunctionCallTrie::Allocators)>::type
+    AllocatorsStorage;
+thread_local std::aligned_storage<sizeof(FunctionCallTrie),
+                                  alignof(FunctionCallTrie)>::type
+    FunctionCallTrieStorage;
 thread_local ProfilingData TLD{{0}, {0}};
 thread_local atomic_uint8_t ReentranceGuard{0};
 

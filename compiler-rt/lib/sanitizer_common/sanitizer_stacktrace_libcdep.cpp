@@ -63,7 +63,7 @@ class StackTraceTextPrinter {
 
     if (dedup_frames_-- > 0) {
       if (dedup_token_->length())
-        dedup_token_->Append("--");
+        dedup_token_->AppendF("--");
       if (stack->info.function)
         dedup_token_->Append(stack->info.function);
     }
@@ -99,7 +99,7 @@ void StackTrace::PrintTo(InternalScopedString *output) const {
                                 output, &dedup_token);
 
   if (trace == nullptr || size == 0) {
-    output->Append("    <empty stack>\n\n");
+    output->AppendF("    <empty stack>\n\n");
     return;
   }
 
@@ -111,7 +111,7 @@ void StackTrace::PrintTo(InternalScopedString *output) const {
   }
 
   // Always add a trailing empty line after stack trace.
-  output->Append("\n");
+  output->AppendF("\n");
 
   // Append deduplication token, if non-empty.
   if (dedup_token.length())
@@ -198,7 +198,7 @@ void __sanitizer_symbolize_pc(uptr pc, const char *fmt, char *out_buf,
   StackTraceTextPrinter printer(fmt, '\0', &output, nullptr);
   if (!printer.ProcessAddressFrames(pc)) {
     output.clear();
-    output.Append("<can't symbolize>");
+    output.AppendF("<can't symbolize>");
   }
   CopyStringToBuffer(output, out_buf, out_buf_size);
 }

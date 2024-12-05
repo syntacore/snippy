@@ -99,11 +99,13 @@ PPCMCExpr::evaluateAsInt64(int64_t Value) const {
   llvm_unreachable("Invalid kind!");
 }
 
-bool PPCMCExpr::evaluateAsRelocatableImpl(MCValue &Res, const MCAssembler *Asm,
-                                          const MCFixup *Fixup) const {
+bool
+PPCMCExpr::evaluateAsRelocatableImpl(MCValue &Res,
+                                     const MCAsmLayout *Layout,
+                                     const MCFixup *Fixup) const {
   MCValue Value;
 
-  if (!getSubExpr()->evaluateAsRelocatable(Value, Asm, Fixup))
+  if (!getSubExpr()->evaluateAsRelocatable(Value, Layout, Fixup))
     return false;
 
   if (Value.isAbsolute()) {
@@ -122,10 +124,10 @@ bool PPCMCExpr::evaluateAsRelocatableImpl(MCValue &Res, const MCAssembler *Asm,
 
     Res = MCValue::get(Result);
   } else {
-    if (!Asm || !Asm->hasLayout())
+    if (!Layout)
       return false;
 
-    MCContext &Context = Asm->getContext();
+    MCContext &Context = Layout->getAssembler().getContext();
     const MCSymbolRefExpr *Sym = Value.getSymA();
     MCSymbolRefExpr::VariantKind Modifier = Sym->getKind();
     if (Modifier != MCSymbolRefExpr::VK_None)

@@ -8,14 +8,12 @@
 
 #include "src/stdio/fputs.h"
 #include "src/__support/CPP/string_view.h"
-#include "src/__support/macros/config.h"
 #include "src/errno/libc_errno.h"
 #include "src/stdio/gpu/file.h"
 
-#include "hdr/stdio_macros.h" // for EOF.
-#include "hdr/types/FILE.h"
+#include <stdio.h>
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 
 LLVM_LIBC_FUNCTION(int, fputs,
                    (const char *__restrict str, ::FILE *__restrict stream)) {
@@ -26,4 +24,4 @@ LLVM_LIBC_FUNCTION(int, fputs,
   return 0;
 }
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE

@@ -160,10 +160,15 @@ void ObjDumper::printSectionsAsString(const object::ObjectFile &Obj,
                                       ArrayRef<std::string> Sections,
                                       bool Decompress) {
   SmallString<0> Out;
+  bool First = true;
   for (object::SectionRef Section :
        getSectionRefsByNameOrIndex(Obj, Sections)) {
     StringRef SectionName = unwrapOrError(Obj.getFileName(), Section.getName());
-    W.startLine() << "\nString dump of section '" << SectionName << "':\n";
+
+    if (!First)
+      W.startLine() << '\n';
+    First = false;
+    W.startLine() << "String dump of section '" << SectionName << "':\n";
 
     StringRef SectionContent =
         unwrapOrError(Obj.getFileName(), Section.getContents());
@@ -177,10 +182,15 @@ void ObjDumper::printSectionsAsHex(const object::ObjectFile &Obj,
                                    ArrayRef<std::string> Sections,
                                    bool Decompress) {
   SmallString<0> Out;
+  bool First = true;
   for (object::SectionRef Section :
        getSectionRefsByNameOrIndex(Obj, Sections)) {
     StringRef SectionName = unwrapOrError(Obj.getFileName(), Section.getName());
-    W.startLine() << "\nHex dump of section '" << SectionName << "':\n";
+
+    if (!First)
+      W.startLine() << '\n';
+    First = false;
+    W.startLine() << "Hex dump of section '" << SectionName << "':\n";
 
     StringRef SectionContent =
         unwrapOrError(Obj.getFileName(), Section.getContents());

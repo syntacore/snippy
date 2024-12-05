@@ -6,13 +6,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_FD_SET_H
-#define LLVM_LIBC_TYPES_FD_SET_H
+#ifndef __LLVM_LIBC_TYPES_FD_SET_H__
+#define __LLVM_LIBC_TYPES_FD_SET_H__
 
-#include "llvm-libc-macros/sys-select-macros.h" // FD_SETSIZE
+#include <llvm-libc-macros/sys-select-macros.h> // FD_SETSIZE
 
 typedef struct {
   __FD_SET_WORD_TYPE __set[__FD_SET_ARRAYSIZE];
 } fd_set;
 
-#endif // LLVM_LIBC_TYPES_FD_SET_H
+#endif // __LLVM_LIBC_TYPES_FD_SET_H__

@@ -2,7 +2,7 @@
 // RUN: %clang_cc1 -triple %itanium_abi_triple -std=c++20 %s \
 // RUN:    -emit-module-interface -o %T/HasPMF.pcm
 // RUN: %clang_cc1 -triple %itanium_abi_triple -std=c++20 %T/HasPMF.pcm \
-// RUN:  -emit-llvm -o - | FileCheck %s
+// RUN:  -S -emit-llvm -o - | FileCheck %s
 
 module;
 

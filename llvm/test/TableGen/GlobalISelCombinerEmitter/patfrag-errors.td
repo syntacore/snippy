@@ -28,7 +28,7 @@ def too_many_perms : GICombineRule<
          (MatchFooPerms $cst, (i32 0)):$b,
          (MatchFooPerms $cst, (i32 0)):$c
   ),
-  (apply (COPY $dst, (i32 0)))>;
+  (apply (COPY $dst, (i32 0)), "APPLY ${src}")>;
 
 def DummyCXXPF: GICombinePatFrag<
     (outs),

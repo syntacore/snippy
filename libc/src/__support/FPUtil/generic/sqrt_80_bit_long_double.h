@@ -13,11 +13,10 @@
 #include "src/__support/FPUtil/FEnvImpl.h"
 #include "src/__support/FPUtil/FPBits.h"
 #include "src/__support/FPUtil/rounding_mode.h"
+#include "src/__support/UInt128.h"
 #include "src/__support/common.h"
-#include "src/__support/macros/config.h"
-#include "src/__support/uint128.h"
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 namespace fputil {
 namespace x86 {
 
@@ -35,25 +34,30 @@ LIBC_INLINE long double sqrt(long double x);
 
 // Correctly rounded SQRT for all rounding modes.
 // Shift-and-add algorithm.
-#if defined(LIBC_TYPES_LONG_DOUBLE_IS_X86_FLOAT80)
+#if defined(LIBC_LONG_DOUBLE_IS_X86_FLOAT80)
 LIBC_INLINE long double sqrt(long double x) {
   using LDBits = FPBits<long double>;
   using StorageType = typename LDBits::StorageType;
   constexpr StorageType ONE = StorageType(1) << int(LDBits::FRACTION_LEN);
-  constexpr auto LDNAN = LDBits::quiet_nan().get_val();
+  constexpr auto LDNAN = LDBits::build_quiet_nan().get_val();
 
   LDBits bits(x);
 
-  if (bits == LDBits::inf(Sign::POS) || bits.is_zero() || bits.is_nan()) {
-    // sqrt(+Inf) = +Inf
+  if (bits.is_inf_or_nan()) {
+    if (bits.is_neg() && (bits.get_mantissa() == 0)) {
+      // sqrt(-Inf) = NaN
+      return LDNAN;
+    } else {
+      // sqrt(NaN) = NaN
+      // sqrt(+Inf) = +Inf
+      return x;
+    }
+  } else if (bits.is_zero()) {
     // sqrt(+0) = +0
     // sqrt(-0) = -0
-    // sqrt(NaN) = NaN
-    // sqrt(-NaN) = -NaN
     return x;
   } else if (bits.is_neg()) {
-    // sqrt(-Inf) = NaN
-    // sqrt(-x) = NaN
+    // sqrt( negative numbers ) = NaN
     return LDNAN;
   } else {
     int x_exp = bits.get_explicit_exponent();
@@ -131,10 +135,10 @@ LIBC_INLINE long double sqrt(long double x) {
     return out.get_val();
   }
 }
-#endif // LIBC_TYPES_LONG_DOUBLE_IS_X86_FLOAT80
+#endif // LIBC_LONG_DOUBLE_IS_X86_FLOAT80
 
 } // namespace x86
 } // namespace fputil
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE
 
 #endif // LLVM_LIBC_SRC___SUPPORT_FPUTIL_GENERIC_SQRT_80_BIT_LONG_DOUBLE_H

@@ -4,11 +4,8 @@ module m
   type haslen(L)
     integer, len :: L
   end type
-  integer, target :: targ
  contains
-  subroutine subr
-  end
-  subroutine test(assumedType, poly, nclen, n)
+  subroutine test(assumedType, poly, nclen)
     type(*), target :: assumedType
     class(*), target ::  poly
     type(c_ptr) cp
@@ -19,12 +16,7 @@ module m
     real, target :: arr(3)
     type(hasLen(1)), target :: clen
     type(hasLen(*)), target :: nclen
-    integer, intent(in) :: n
     character(2), target :: ch
-    real :: arr1(purefun1(c_loc(targ))) ! ok
-    real :: arr2(purefun2(c_funloc(subr))) ! ok
-    character(:), allocatable, target :: deferred
-    character(n), pointer :: p2ch
     !ERROR: C_LOC() argument must be a data pointer or target
     cp = c_loc(notATarget)
     !ERROR: C_LOC() argument must be a data pointer or target
@@ -42,9 +34,7 @@ module m
     cp = c_loc(ch(2:1))
     !WARNING: C_LOC() argument has non-interoperable intrinsic type, kind, or length
     cp = c_loc(ch)
-    cp = c_loc(ch(1:1)) ! ok
-    cp = c_loc(deferred) ! ok
-    cp = c_loc(p2ch) ! ok
+    cp = c_loc(ch(1:1)) ! ok)
     !ERROR: PRIVATE name '__address' is only accessible within module '__fortran_builtins'
     cp = c_ptr(0)
     !ERROR: PRIVATE name '__address' is only accessible within module '__fortran_builtins'
@@ -53,13 +43,5 @@ module m
     cp = cfp
     !ERROR: No intrinsic or user-defined ASSIGNMENT(=) matches operand types TYPE(c_funptr) and TYPE(c_ptr)
     cfp = cp
-  end
-  pure integer function purefun1(p)
-    type(c_ptr), intent(in) :: p
-    purefun1 = 1
-  end
-  pure integer function purefun2(p)
-    type(c_funptr), intent(in) :: p
-    purefun2 = 1
   end
 end module

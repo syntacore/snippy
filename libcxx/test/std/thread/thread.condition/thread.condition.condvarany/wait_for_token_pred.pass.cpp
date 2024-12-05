@@ -119,7 +119,7 @@ void test() {
     bool flag   = false;
     auto thread = support::make_test_thread([&]() {
       std::this_thread::sleep_for(2ms);
-      std::unique_lock<Mutex> lock2{mutex};
+      Lock lock2{mutex};
       flag = true;
       cv.notify_all();
     });

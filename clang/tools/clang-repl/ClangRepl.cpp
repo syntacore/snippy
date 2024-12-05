@@ -152,7 +152,6 @@ int main(int argc, const char **argv) {
   llvm::InitializeAllTargets();
   llvm::InitializeAllTargetMCs();
   llvm::InitializeAllAsmPrinters();
-  llvm::InitializeAllAsmParsers();
 
   if (OptHostSupportsJit) {
     auto J = llvm::orc::LLJITBuilder().create();
@@ -215,14 +214,12 @@ int main(int argc, const char **argv) {
   } else
     Interp = ExitOnErr(clang::Interpreter::create(std::move(CI)));
 
-  bool HasError = false;
-
   for (const std::string &input : OptInputs) {
-    if (auto Err = Interp->ParseAndExecute(input)) {
+    if (auto Err = Interp->ParseAndExecute(input))
       llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(), "error: ");
-      HasError = true;
-    }
   }
+
+  bool HasError = false;
 
   if (OptInputs.empty()) {
     llvm::LineEditor LE("clang-repl");
@@ -243,13 +240,18 @@ int main(int argc, const char **argv) {
         break;
       }
       if (Input == R"(%undo)") {
-        if (auto Err = Interp->Undo())
+        if (auto Err = Interp->Undo()) {
           llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(), "error: ");
+          HasError = true;
+        }
       } else if (Input.rfind("%lib ", 0) == 0) {
-        if (auto Err = Interp->LoadDynamicLibrary(Input.data() + 5))
+        if (auto Err = Interp->LoadDynamicLibrary(Input.data() + 5)) {
           llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(), "error: ");
+          HasError = true;
+        }
       } else if (auto Err = Interp->ParseAndExecute(Input)) {
         llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(), "error: ");
+        HasError = true;
       }
 
       Input = "";

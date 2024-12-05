@@ -473,9 +473,9 @@ llvm::UnrollAndJamLoop(Loop *L, unsigned Count, unsigned TripCount,
   };
   // Move all the phis from Src into Dest
   auto movePHIs = [](BasicBlock *Src, BasicBlock *Dest) {
-    BasicBlock::iterator insertPoint = Dest->getFirstNonPHIIt();
+    Instruction *insertPoint = Dest->getFirstNonPHI();
     while (PHINode *Phi = dyn_cast<PHINode>(Src->begin()))
-      Phi->moveBefore(*Dest, insertPoint);
+      Phi->moveBefore(insertPoint);
   };
 
   // Update the PHI values outside the loop to point to the last block
@@ -522,7 +522,7 @@ llvm::UnrollAndJamLoop(Loop *L, unsigned Count, unsigned TripCount,
     // unconditional one to this one
     BranchInst *SubTerm =
         cast<BranchInst>(SubLoopBlocksLast[It - 1]->getTerminator());
-    BranchInst::Create(SubLoopBlocksFirst[It], SubTerm->getIterator());
+    BranchInst::Create(SubLoopBlocksFirst[It], SubTerm);
     SubTerm->eraseFromParent();
 
     SubLoopBlocksFirst[It]->replacePhiUsesWith(ForeBlocksLast[It],
@@ -535,7 +535,7 @@ llvm::UnrollAndJamLoop(Loop *L, unsigned Count, unsigned TripCount,
   // Aft blocks successors and phis
   BranchInst *AftTerm = cast<BranchInst>(AftBlocksLast.back()->getTerminator());
   if (CompletelyUnroll) {
-    BranchInst::Create(LoopExit, AftTerm->getIterator());
+    BranchInst::Create(LoopExit, AftTerm);
     AftTerm->eraseFromParent();
   } else {
     AftTerm->setSuccessor(!ContinueOnTrue, ForeBlocksFirst[0]);
@@ -550,7 +550,7 @@ llvm::UnrollAndJamLoop(Loop *L, unsigned Count, unsigned TripCount,
     // unconditional one to this one
     BranchInst *AftTerm =
         cast<BranchInst>(AftBlocksLast[It - 1]->getTerminator());
-    BranchInst::Create(AftBlocksFirst[It], AftTerm->getIterator());
+    BranchInst::Create(AftBlocksFirst[It], AftTerm);
     AftTerm->eraseFromParent();
 
     AftBlocksFirst[It]->replacePhiUsesWith(SubLoopBlocksLast[It],

@@ -16,7 +16,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/TypedPointerType.h"
-#include "llvm/IR/Value.h"
 
 namespace llvm {
 

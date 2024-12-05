@@ -13,7 +13,6 @@ class BreakpointOptionsTestCase(TestBase):
         """Test breakpoint command for different options."""
         self.build()
         self.breakpoint_options_test()
-        self.breakpoint_options_language_test()
 
     def setUp(self):
         # Call super's setUp().
@@ -82,25 +81,12 @@ class BreakpointOptionsTestCase(TestBase):
         self.runCmd("file " + exe, CURRENT_EXECUTABLE_SET)
 
         # This should create a breakpoint with 1 locations.
-        bp_id = lldbutil.run_break_set_by_symbol(
+        lldbutil.run_break_set_by_symbol(
             self,
             "ns::func",
             sym_exact=False,
             extra_options="-L c++",
             num_expected_locations=1,
-        )
-
-        location = self.target().FindBreakpointByID(bp_id).GetLocationAtIndex(0)
-        function = location.GetAddress().GetFunction()
-        self.expect(
-            "breakpoint list -v",
-            "Verbose breakpoint list contains mangled names",
-            # The demangled function name is system-dependent, e.g.
-            # 'int ns::func(void)' on Windows and 'ns::func()' on Linux.
-            substrs=[
-                f"function = {function.GetName()}",
-                f"mangled function = {function.GetMangledName()}",
-            ],
         )
 
         # This should create a breakpoint with 0 locations.

@@ -43,6 +43,9 @@ public:
                   const MCSubtargetInfo *STI) const override;
   bool mayNeedRelaxation(const MCInst &Inst,
                          const MCSubtargetInfo &STI) const override;
+  bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
+                            const MCRelaxableFragment *Fragment,
+                            const MCAsmLayout &Layout) const override;
   void relaxInstruction(MCInst &Inst,
                         const MCSubtargetInfo &STI) const override;
   bool writeNopData(raw_ostream &OS, uint64_t Count,
@@ -166,6 +169,12 @@ void XtensaMCAsmBackend::applyFixup(const MCAssembler &Asm,
 
 bool XtensaMCAsmBackend::mayNeedRelaxation(const MCInst &Inst,
                                            const MCSubtargetInfo &STI) const {
+  return false;
+}
+
+bool XtensaMCAsmBackend::fixupNeedsRelaxation(
+    const MCFixup &Fixup, uint64_t Value, const MCRelaxableFragment *Fragment,
+    const MCAsmLayout &Layout) const {
   return false;
 }
 

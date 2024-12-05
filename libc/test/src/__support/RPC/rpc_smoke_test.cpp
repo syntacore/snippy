@@ -13,8 +13,12 @@
 namespace {
 enum { lane_size = 8, port_count = 4 };
 
-using ProcAType = LIBC_NAMESPACE::rpc::Process<false>;
-using ProcBType = LIBC_NAMESPACE::rpc::Process<true>;
+struct Packet {
+  uint64_t unused;
+};
+
+using ProcAType = LIBC_NAMESPACE::rpc::Process<false, Packet>;
+using ProcBType = LIBC_NAMESPACE::rpc::Process<true, Packet>;
 
 static_assert(ProcAType::inbox_offset(port_count) ==
               ProcBType::outbox_offset(port_count));
@@ -22,7 +26,7 @@ static_assert(ProcAType::inbox_offset(port_count) ==
 static_assert(ProcAType::outbox_offset(port_count) ==
               ProcBType::inbox_offset(port_count));
 
-enum { alloc_size = ProcAType::allocation_size(port_count, 1) };
+enum { alloc_size = ProcAType::allocation_size(port_count) };
 
 alignas(64) char buffer[alloc_size] = {0};
 } // namespace

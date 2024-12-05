@@ -17,6 +17,9 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Support/TypeID.h"
 
+#include <map>
+#include <tuple>
+
 namespace mlir {
 class DialectAsmParser;
 class DialectAsmPrinter;
@@ -207,18 +210,10 @@ public:
   /// registration. The promised interface type can be an interface of any type
   /// not just a dialect interface, i.e. it may also be an
   /// AttributeInterface/OpInterface/TypeInterface/etc.
-  template <typename InterfaceT, typename ConcreteT>
+  template <typename ConcreteT, typename InterfaceT>
   void declarePromisedInterface() {
     unresolvedPromisedInterfaces.insert(
         {TypeID::get<ConcreteT>(), InterfaceT::getInterfaceID()});
-  }
-
-  // Declare the same interface for multiple types.
-  // Example:
-  // declarePromisedInterfaces<FunctionOpInterface, MyFuncType1, MyFuncType2>()
-  template <typename InterfaceT, typename... ConcreteT>
-  void declarePromisedInterfaces() {
-    (declarePromisedInterface<InterfaceT, ConcreteT>(), ...);
   }
 
   /// Checks if the given interface, which is attempting to be used, is a

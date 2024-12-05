@@ -73,9 +73,8 @@ class BreakpointAfterJoinTestCase(TestBase):
         num_threads = process.GetNumThreads()
 
         # Make sure we see at least six threads
-        self.assertGreaterEqual(
-            num_threads,
-            6,
+        self.assertTrue(
+            num_threads >= 6,
             "Number of expected threads and actual threads do not match.",
         )
 

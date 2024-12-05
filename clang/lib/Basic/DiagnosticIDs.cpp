@@ -49,7 +49,6 @@ struct StaticDiagInfoDescriptionStringTable {
 #include "clang/Basic/DiagnosticSemaKinds.inc"
 #include "clang/Basic/DiagnosticAnalysisKinds.inc"
 #include "clang/Basic/DiagnosticRefactoringKinds.inc"
-#include "clang/Basic/DiagnosticInstallAPIKinds.inc"
   // clang-format on
 #undef DIAG
 };
@@ -71,8 +70,7 @@ const StaticDiagInfoDescriptionStringTable StaticDiagInfoDescriptions = {
 #include "clang/Basic/DiagnosticSemaKinds.inc"
 #include "clang/Basic/DiagnosticAnalysisKinds.inc"
 #include "clang/Basic/DiagnosticRefactoringKinds.inc"
-#include "clang/Basic/DiagnosticInstallAPIKinds.inc"
-// clang-format on
+  // clang-format on
 #undef DIAG
 };
 
@@ -97,13 +95,12 @@ const uint32_t StaticDiagInfoDescriptionOffsets[] = {
 #include "clang/Basic/DiagnosticSemaKinds.inc"
 #include "clang/Basic/DiagnosticAnalysisKinds.inc"
 #include "clang/Basic/DiagnosticRefactoringKinds.inc"
-#include "clang/Basic/DiagnosticInstallAPIKinds.inc"
-// clang-format on
+  // clang-format on
 #undef DIAG
 };
 
 // Diagnostic classes.
-enum DiagnosticClass {
+enum {
   CLASS_NOTE       = 0x01,
   CLASS_REMARK     = 0x02,
   CLASS_WARNING    = 0x03,
@@ -113,22 +110,15 @@ enum DiagnosticClass {
 
 struct StaticDiagInfoRec {
   uint16_t DiagID;
-  LLVM_PREFERRED_TYPE(diag::Severity)
   uint8_t DefaultSeverity : 3;
-  LLVM_PREFERRED_TYPE(DiagnosticClass)
   uint8_t Class : 3;
-  LLVM_PREFERRED_TYPE(DiagnosticIDs::SFINAEResponse)
   uint8_t SFINAE : 2;
   uint8_t Category : 6;
-  LLVM_PREFERRED_TYPE(bool)
   uint8_t WarnNoWerror : 1;
-  LLVM_PREFERRED_TYPE(bool)
   uint8_t WarnShowInSystemHeader : 1;
-  LLVM_PREFERRED_TYPE(bool)
   uint8_t WarnShowInSystemMacro : 1;
 
   uint16_t OptionGroupIndex : 15;
-  LLVM_PREFERRED_TYPE(bool)
   uint16_t Deferrable : 1;
 
   uint16_t DescriptionLen;
@@ -176,7 +166,6 @@ VALIDATE_DIAG_SIZE(CROSSTU)
 VALIDATE_DIAG_SIZE(SEMA)
 VALIDATE_DIAG_SIZE(ANALYSIS)
 VALIDATE_DIAG_SIZE(REFACTORING)
-VALIDATE_DIAG_SIZE(INSTALLAPI)
 #undef VALIDATE_DIAG_SIZE
 #undef STRINGIFY_NAME
 
@@ -208,7 +197,6 @@ const StaticDiagInfoRec StaticDiagInfo[] = {
 #include "clang/Basic/DiagnosticSemaKinds.inc"
 #include "clang/Basic/DiagnosticAnalysisKinds.inc"
 #include "clang/Basic/DiagnosticRefactoringKinds.inc"
-#include "clang/Basic/DiagnosticInstallAPIKinds.inc"
 // clang-format on
 #undef DIAG
 };
@@ -251,7 +239,6 @@ CATEGORY(CROSSTU, COMMENT)
 CATEGORY(SEMA, CROSSTU)
 CATEGORY(ANALYSIS, SEMA)
 CATEGORY(REFACTORING, ANALYSIS)
-CATEGORY(INSTALLAPI, REFACTORING)
 #undef CATEGORY
 
   // Avoid out of bounds reads.
@@ -861,18 +848,10 @@ bool DiagnosticIDs::isUnrecoverable(unsigned DiagID) const {
   if (isARCDiagnostic(DiagID))
     return false;
 
-  if (isCodegenABICheckDiagnostic(DiagID))
-    return false;
-
   return true;
 }
 
 bool DiagnosticIDs::isARCDiagnostic(unsigned DiagID) {
   unsigned cat = getCategoryNumberForDiag(DiagID);
   return DiagnosticIDs::getCategoryNameFromID(cat).starts_with("ARC ");
-}
-
-bool DiagnosticIDs::isCodegenABICheckDiagnostic(unsigned DiagID) {
-  unsigned cat = getCategoryNumberForDiag(DiagID);
-  return DiagnosticIDs::getCategoryNameFromID(cat) == "Codegen ABI Check";
 }

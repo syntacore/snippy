@@ -120,8 +120,8 @@ public:
   /// Construct a PBQP register allocator.
   RegAllocPBQP(char *cPassID = nullptr)
       : MachineFunctionPass(ID), customPassID(cPassID) {
-    initializeSlotIndexesWrapperPassPass(*PassRegistry::getPassRegistry());
-    initializeLiveIntervalsWrapperPassPass(*PassRegistry::getPassRegistry());
+    initializeSlotIndexesPass(*PassRegistry::getPassRegistry());
+    initializeLiveIntervalsPass(*PassRegistry::getPassRegistry());
     initializeLiveStacksPass(*PassRegistry::getPassRegistry());
     initializeVirtRegMapPass(*PassRegistry::getPassRegistry());
   }
@@ -544,21 +544,21 @@ void RegAllocPBQP::getAnalysisUsage(AnalysisUsage &au) const {
   au.setPreservesCFG();
   au.addRequired<AAResultsWrapperPass>();
   au.addPreserved<AAResultsWrapperPass>();
-  au.addRequired<SlotIndexesWrapperPass>();
-  au.addPreserved<SlotIndexesWrapperPass>();
-  au.addRequired<LiveIntervalsWrapperPass>();
-  au.addPreserved<LiveIntervalsWrapperPass>();
+  au.addRequired<SlotIndexes>();
+  au.addPreserved<SlotIndexes>();
+  au.addRequired<LiveIntervals>();
+  au.addPreserved<LiveIntervals>();
   //au.addRequiredID(SplitCriticalEdgesID);
   if (customPassID)
     au.addRequiredID(*customPassID);
   au.addRequired<LiveStacks>();
   au.addPreserved<LiveStacks>();
-  au.addRequired<MachineBlockFrequencyInfoWrapperPass>();
-  au.addPreserved<MachineBlockFrequencyInfoWrapperPass>();
-  au.addRequired<MachineLoopInfoWrapperPass>();
-  au.addPreserved<MachineLoopInfoWrapperPass>();
-  au.addRequired<MachineDominatorTreeWrapperPass>();
-  au.addPreserved<MachineDominatorTreeWrapperPass>();
+  au.addRequired<MachineBlockFrequencyInfo>();
+  au.addPreserved<MachineBlockFrequencyInfo>();
+  au.addRequired<MachineLoopInfo>();
+  au.addPreserved<MachineLoopInfo>();
+  au.addRequired<MachineDominatorTree>();
+  au.addPreserved<MachineDominatorTree>();
   au.addRequired<VirtRegMap>();
   au.addPreserved<VirtRegMap>();
   MachineFunctionPass::getAnalysisUsage(au);
@@ -791,26 +791,25 @@ void RegAllocPBQP::postOptimization(Spiller &VRegSpiller, LiveIntervals &LIS) {
 }
 
 bool RegAllocPBQP::runOnMachineFunction(MachineFunction &MF) {
-  LiveIntervals &LIS = getAnalysis<LiveIntervalsWrapperPass>().getLIS();
+  LiveIntervals &LIS = getAnalysis<LiveIntervals>();
   MachineBlockFrequencyInfo &MBFI =
-      getAnalysis<MachineBlockFrequencyInfoWrapperPass>().getMBFI();
+    getAnalysis<MachineBlockFrequencyInfo>();
 
   VirtRegMap &VRM = getAnalysis<VirtRegMap>();
 
-  PBQPVirtRegAuxInfo VRAI(
-      MF, LIS, VRM, getAnalysis<MachineLoopInfoWrapperPass>().getLI(), MBFI);
+  PBQPVirtRegAuxInfo VRAI(MF, LIS, VRM, getAnalysis<MachineLoopInfo>(), MBFI);
   VRAI.calculateSpillWeightsAndHints();
 
   // FIXME: we create DefaultVRAI here to match existing behavior pre-passing
   // the VRAI through the spiller to the live range editor. However, it probably
   // makes more sense to pass the PBQP VRAI. The existing behavior had
   // LiveRangeEdit make its own VirtRegAuxInfo object.
-  VirtRegAuxInfo DefaultVRAI(
-      MF, LIS, VRM, getAnalysis<MachineLoopInfoWrapperPass>().getLI(), MBFI);
+  VirtRegAuxInfo DefaultVRAI(MF, LIS, VRM, getAnalysis<MachineLoopInfo>(),
+                             MBFI);
   std::unique_ptr<Spiller> VRegSpiller(
       createInlineSpiller(*this, MF, VRM, DefaultVRAI));
 
-  MF.getRegInfo().freezeReservedRegs();
+  MF.getRegInfo().freezeReservedRegs(MF);
 
   LLVM_DEBUG(dbgs() << "PBQP Register Allocating for " << MF.getName() << "\n");
 

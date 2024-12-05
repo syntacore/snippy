@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <__availability>
 #include <__config>
 #ifndef _LIBCPP_HAS_NO_FILESYSTEM
 #  include <fstream>

@@ -14,9 +14,8 @@
 #include "llvm/Support/DataExtractor.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "llvm/DebugInfo/GSYM/GsymCreator.h"
 #include "llvm/DebugInfo/GSYM/ObjectFileTransformer.h"
-#include "llvm/DebugInfo/GSYM/OutputAggregator.h"
+#include "llvm/DebugInfo/GSYM/GsymCreator.h"
 
 using namespace llvm;
 using namespace gsym;
@@ -69,7 +68,7 @@ static std::vector<uint8_t> getUUID(const object::ObjectFile &Obj) {
 }
 
 llvm::Error ObjectFileTransformer::convert(const object::ObjectFile &Obj,
-                                           OutputAggregator &Out,
+                                           raw_ostream *Log,
                                            GsymCreator &Gsym) {
   using namespace llvm::object;
 
@@ -100,8 +99,8 @@ llvm::Error ObjectFileTransformer::convert(const object::ObjectFile &Obj,
     const uint64_t size = IsELF ? ELFSymbolRef(Sym).getSize() : 0;
     Expected<StringRef> Name = Sym.getName();
     if (!Name) {
-      if (Out.GetOS())
-        logAllUnhandledErrors(Name.takeError(), *Out.GetOS(),
+      if (Log)
+        logAllUnhandledErrors(Name.takeError(), *Log,
                               "ObjectFileTransformer: ");
       else
         consumeError(Name.takeError());
@@ -115,8 +114,8 @@ llvm::Error ObjectFileTransformer::convert(const object::ObjectFile &Obj,
         FunctionInfo(*AddrOrErr, size, Gsym.insertString(*Name, NoCopy)));
   }
   size_t FunctionsAddedCount = Gsym.getNumFunctionInfos() - NumBefore;
-  if (Out.GetOS())
-    *Out.GetOS() << "Loaded " << FunctionsAddedCount
-                 << " functions from symbol table.\n";
+  if (Log)
+    *Log << "Loaded " << FunctionsAddedCount
+         << " functions from symbol table.\n";
   return Error::success();
 }

@@ -43,19 +43,14 @@ class CfgLoopConv : public mlir::OpRewritePattern<fir::DoLoopOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
 
-  CfgLoopConv(mlir::MLIRContext *ctx, bool forceLoopToExecuteOnce, bool setNSW)
+  CfgLoopConv(mlir::MLIRContext *ctx, bool forceLoopToExecuteOnce)
       : mlir::OpRewritePattern<fir::DoLoopOp>(ctx),
-        forceLoopToExecuteOnce(forceLoopToExecuteOnce), setNSW(setNSW) {}
+        forceLoopToExecuteOnce(forceLoopToExecuteOnce) {}
 
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(DoLoopOp loop,
                   mlir::PatternRewriter &rewriter) const override {
     auto loc = loop.getLoc();
-    mlir::arith::IntegerOverflowFlags flags{};
-    if (setNSW)
-      flags = bitEnumSet(flags, mlir::arith::IntegerOverflowFlags::nsw);
-    auto iofAttr = mlir::arith::IntegerOverflowFlagsAttr::get(
-        rewriter.getContext(), flags);
 
     // Create the start and end blocks that will wrap the DoLoopOp with an
     // initalizer and an end point
@@ -109,7 +104,7 @@ public:
     rewriter.setInsertionPointToEnd(lastBlock);
     auto iv = conditionalBlock->getArgument(0);
     mlir::Value steppedIndex =
-        rewriter.create<mlir::arith::AddIOp>(loc, iv, step, iofAttr);
+        rewriter.create<mlir::arith::AddIOp>(loc, iv, step);
     assert(steppedIndex && "must be a Value");
     auto lastArg = conditionalBlock->getNumArguments() - 1;
     auto itersLeft = conditionalBlock->getArgument(lastArg);
@@ -132,13 +127,9 @@ public:
     auto comparison = rewriter.create<mlir::arith::CmpIOp>(
         loc, arith::CmpIPredicate::sgt, itersLeft, zero);
 
-    auto cond = rewriter.create<mlir::cf::CondBranchOp>(
+    rewriter.create<mlir::cf::CondBranchOp>(
         loc, comparison, firstBlock, llvm::ArrayRef<mlir::Value>(), endBlock,
         llvm::ArrayRef<mlir::Value>());
-
-    // Copy loop annotations from the do loop to the loop entry condition.
-    if (auto ann = loop.getLoopAnnotation())
-      cond->setAttr("loop_annotation", *ann);
 
     // The result of the loop operation is the values of the condition block
     // arguments except the induction variable on the last iteration.
@@ -151,7 +142,6 @@ public:
 
 private:
   bool forceLoopToExecuteOnce;
-  bool setNSW;
 };
 
 /// Convert `fir.if` to control-flow
@@ -159,10 +149,10 @@ class CfgIfConv : public mlir::OpRewritePattern<fir::IfOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
 
-  CfgIfConv(mlir::MLIRContext *ctx, bool forceLoopToExecuteOnce, bool setNSW)
+  CfgIfConv(mlir::MLIRContext *ctx, bool forceLoopToExecuteOnce)
       : mlir::OpRewritePattern<fir::IfOp>(ctx) {}
 
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(IfOp ifOp, mlir::PatternRewriter &rewriter) const override {
     auto loc = ifOp.getLoc();
 
@@ -224,19 +214,13 @@ class CfgIterWhileConv : public mlir::OpRewritePattern<fir::IterWhileOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
 
-  CfgIterWhileConv(mlir::MLIRContext *ctx, bool forceLoopToExecuteOnce,
-                   bool setNSW)
-      : mlir::OpRewritePattern<fir::IterWhileOp>(ctx), setNSW(setNSW) {}
+  CfgIterWhileConv(mlir::MLIRContext *ctx, bool forceLoopToExecuteOnce)
+      : mlir::OpRewritePattern<fir::IterWhileOp>(ctx) {}
 
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(fir::IterWhileOp whileOp,
                   mlir::PatternRewriter &rewriter) const override {
     auto loc = whileOp.getLoc();
-    mlir::arith::IntegerOverflowFlags flags{};
-    if (setNSW)
-      flags = bitEnumSet(flags, mlir::arith::IntegerOverflowFlags::nsw);
-    auto iofAttr = mlir::arith::IntegerOverflowFlagsAttr::get(
-        rewriter.getContext(), flags);
 
     // Start by splitting the block containing the 'fir.do_loop' into two parts.
     // The part before will get the init code, the part after will be the end
@@ -264,8 +248,7 @@ public:
     auto *terminator = lastBodyBlock->getTerminator();
     rewriter.setInsertionPointToEnd(lastBodyBlock);
     auto step = whileOp.getStep();
-    mlir::Value stepped =
-        rewriter.create<mlir::arith::AddIOp>(loc, iv, step, iofAttr);
+    mlir::Value stepped = rewriter.create<mlir::arith::AddIOp>(loc, iv, step);
     assert(stepped && "must be a Value");
 
     llvm::SmallVector<mlir::Value> loopCarried;
@@ -322,23 +305,16 @@ public:
     rewriter.replaceOp(whileOp, args);
     return success();
   }
-
-private:
-  bool setNSW;
 };
 
 /// Convert FIR structured control flow ops to CFG ops.
 class CfgConversion : public fir::impl::CFGConversionBase<CfgConversion> {
 public:
-  using CFGConversionBase<CfgConversion>::CFGConversionBase;
-
-  CfgConversion(bool setNSW) { this->setNSW = setNSW; }
-
   void runOnOperation() override {
-    auto *context = &this->getContext();
+    auto *context = &getContext();
     mlir::RewritePatternSet patterns(context);
-    fir::populateCfgConversionRewrites(patterns, this->forceLoopToExecuteOnce,
-                                       this->setNSW);
+    patterns.insert<CfgLoopConv, CfgIfConv, CfgIterWhileConv>(
+        context, forceLoopToExecuteOnce);
     mlir::ConversionTarget target(*context);
     target.addLegalDialect<mlir::affine::AffineDialect,
                            mlir::cf::ControlFlowDialect, FIROpsDialect,
@@ -347,25 +323,19 @@ public:
     // apply the patterns
     target.addIllegalOp<ResultOp, DoLoopOp, IfOp, IterWhileOp>();
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-    if (mlir::failed(mlir::applyPartialConversion(this->getOperation(), target,
+    if (mlir::failed(mlir::applyPartialConversion(getOperation(), target,
                                                   std::move(patterns)))) {
       mlir::emitError(mlir::UnknownLoc::get(context),
                       "error in converting to CFG\n");
-      this->signalPassFailure();
+      signalPassFailure();
     }
   }
 };
-
 } // namespace
 
-/// Expose conversion rewriters to other passes
-void fir::populateCfgConversionRewrites(mlir::RewritePatternSet &patterns,
-                                        bool forceLoopToExecuteOnce,
-                                        bool setNSW) {
-  patterns.insert<CfgLoopConv, CfgIfConv, CfgIterWhileConv>(
-      patterns.getContext(), forceLoopToExecuteOnce, setNSW);
-}
-
-std::unique_ptr<mlir::Pass> fir::createCFGConversionPassWithNSW() {
-  return std::make_unique<CfgConversion>(true);
+/// Convert FIR's structured control flow ops to CFG ops.  This
+/// conversion enables the `createLowerToCFGPass` to transform these to CFG
+/// form.
+std::unique_ptr<mlir::Pass> fir::createFirToCfgPass() {
+  return std::make_unique<CfgConversion>();
 }

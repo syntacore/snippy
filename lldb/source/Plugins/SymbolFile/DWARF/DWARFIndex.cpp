@@ -24,11 +24,16 @@ using namespace lldb_private::plugin::dwarf;
 DWARFIndex::~DWARFIndex() = default;
 
 bool DWARFIndex::ProcessFunctionDIE(
-    const Module::LookupInfo &lookup_info, DWARFDIE die,
+    const Module::LookupInfo &lookup_info, DIERef ref, SymbolFileDWARF &dwarf,
     const CompilerDeclContext &parent_decl_ctx,
     llvm::function_ref<bool(DWARFDIE die)> callback) {
   llvm::StringRef name = lookup_info.GetLookupName().GetStringRef();
   FunctionNameType name_type_mask = lookup_info.GetNameTypeMask();
+  DWARFDIE die = dwarf.GetDIE(ref);
+  if (!die) {
+    ReportInvalidDIERef(ref, name);
+    return true;
+  }
 
   if (!(name_type_mask & eFunctionNameTypeFull)) {
     ConstString name_to_match_against;
@@ -121,7 +126,8 @@ void DWARFIndex::GetFullyQualifiedType(
 bool DWARFIndex::GetFullyQualifiedTypeImpl(
     const DWARFDeclContext &context, DWARFDIE die,
     llvm::function_ref<bool(DWARFDIE die)> callback) {
-  DWARFDeclContext dwarf_decl_ctx = die.GetDWARFDeclContext();
+  DWARFDeclContext dwarf_decl_ctx =
+      die.GetDIE()->GetDWARFDeclContext(die.GetCU());
   if (dwarf_decl_ctx == context)
     return callback(die);
   return true;

@@ -251,7 +251,7 @@ private:
   /// targets, this value is only used when generating debug info (via
   /// TargetRegisterInfo::getFrameIndexReference); when generating code, the
   /// corresponding adjustments are performed directly.
-  int64_t OffsetAdjustment = 0;
+  int OffsetAdjustment = 0;
 
   /// The prolog/epilog code inserter may process objects that require greater
   /// alignment than the default alignment the target provides.
@@ -280,7 +280,7 @@ private:
   /// setup/destroy pseudo instructions (as defined in the TargetFrameInfo
   /// class).  This information is important for frame pointer elimination.
   /// It is only valid during and after prolog/epilog code insertion.
-  uint64_t MaxCallFrameSize = ~UINT64_C(0);
+  unsigned MaxCallFrameSize = ~0u;
 
   /// The number of bytes of callee saved registers that the target wants to
   /// report for the current function in the CodeView S_FRAMEPROC record.
@@ -345,8 +345,6 @@ public:
         StackRealignable(StackRealignable), ForcedRealign(ForcedRealign) {}
 
   MachineFrameInfo(const MachineFrameInfo &) = delete;
-
-  bool isStackRealignable() const { return StackRealignable; }
 
   /// Return true if there are any stack objects in this function.
   bool hasStackObjects() const { return !Objects.empty(); }
@@ -593,10 +591,10 @@ public:
   uint64_t estimateStackSize(const MachineFunction &MF) const;
 
   /// Return the correction for frame offsets.
-  int64_t getOffsetAdjustment() const { return OffsetAdjustment; }
+  int getOffsetAdjustment() const { return OffsetAdjustment; }
 
   /// Set the correction for frame offsets.
-  void setOffsetAdjustment(int64_t Adj) { OffsetAdjustment = Adj; }
+  void setOffsetAdjustment(int Adj) { OffsetAdjustment = Adj; }
 
   /// Return the alignment in bytes that this function must be aligned to,
   /// which is greater than the default stack alignment provided by the target.
@@ -604,12 +602,6 @@ public:
 
   /// Make sure the function is at least Align bytes aligned.
   void ensureMaxAlignment(Align Alignment);
-
-  /// Return true if stack realignment is forced by function attributes or if
-  /// the stack alignment.
-  bool shouldRealignStack() const {
-    return ForcedRealign || MaxAlignment > StackAlignment;
-  }
 
   /// Return true if this function adjusts the stack -- e.g.,
   /// when calling another function. This is only valid during and after
@@ -646,24 +638,20 @@ public:
   bool hasTailCall() const { return HasTailCall; }
   void setHasTailCall(bool V = true) { HasTailCall = V; }
 
-  /// Computes the maximum size of a callframe.
+  /// Computes the maximum size of a callframe and the AdjustsStack property.
   /// This only works for targets defining
   /// TargetInstrInfo::getCallFrameSetupOpcode(), getCallFrameDestroyOpcode(),
   /// and getFrameSize().
   /// This is usually computed by the prologue epilogue inserter but some
   /// targets may call this to compute it earlier.
-  /// If FrameSDOps is passed, the frame instructions in the MF will be
-  /// inserted into it.
-  void computeMaxCallFrameSize(
-      MachineFunction &MF,
-      std::vector<MachineBasicBlock::iterator> *FrameSDOps = nullptr);
+  void computeMaxCallFrameSize(const MachineFunction &MF);
 
   /// Return the maximum size of a call frame that must be
   /// allocated for an outgoing function call.  This is only available if
   /// CallFrameSetup/Destroy pseudo instructions are used by the target, and
   /// then only during or after prolog/epilog code insertion.
   ///
-  uint64_t getMaxCallFrameSize() const {
+  unsigned getMaxCallFrameSize() const {
     // TODO: Enable this assert when targets are fixed.
     //assert(isMaxCallFrameSizeComputed() && "MaxCallFrameSize not computed yet");
     if (!isMaxCallFrameSizeComputed())
@@ -671,9 +659,9 @@ public:
     return MaxCallFrameSize;
   }
   bool isMaxCallFrameSizeComputed() const {
-    return MaxCallFrameSize != ~UINT64_C(0);
+    return MaxCallFrameSize != ~0u;
   }
-  void setMaxCallFrameSize(uint64_t S) { MaxCallFrameSize = S; }
+  void setMaxCallFrameSize(unsigned S) { MaxCallFrameSize = S; }
 
   /// Returns how many bytes of callee-saved registers the target pushed in the
   /// prologue. Only used for debug info.
@@ -707,13 +695,6 @@ public:
     assert(unsigned(ObjectIdx+NumFixedObjects) < Objects.size() &&
            "Invalid Object Idx!");
     return Objects[ObjectIdx+NumFixedObjects].isAliased;
-  }
-
-  /// Set "maybe pointed to by an LLVM IR value" for an object.
-  void setIsAliasedObjectIndex(int ObjectIdx, bool IsAliased) {
-    assert(unsigned(ObjectIdx+NumFixedObjects) < Objects.size() &&
-           "Invalid Object Idx!");
-    Objects[ObjectIdx+NumFixedObjects].isAliased = IsAliased;
   }
 
   /// Returns true if the specified index corresponds to an immutable object.

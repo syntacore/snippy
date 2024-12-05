@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// REQUIRES: target={{.+}}-aix{{.*}}
+// REQUIRES: target={{powerpc.*-ibm-aix.*}}
 // ADDITIONAL_COMPILE_FLAGS: -fvisibility-inlines-hidden
 
 // When there is a weak hidden symbol in user code and a strong definition

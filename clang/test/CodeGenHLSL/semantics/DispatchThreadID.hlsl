@@ -1,25 +1,28 @@
-// RUN: %clang_cc1 -triple dxil-pc-shadermodel6.3-library -x hlsl -emit-llvm -finclude-default-header -disable-llvm-passes -o - %s | FileCheck %s --check-prefixes=CHECK,CHECK-DXIL
-// RUN: %clang_cc1 -triple spirv-linux-vulkan-library -x hlsl -emit-llvm -finclude-default-header -disable-llvm-passes -o - %s | FileCheck %s --check-prefixes=CHECK,CHECK-SPIRV
+// RUN: %clang_cc1 -triple dxil-pc-shadermodel6.3-library -x hlsl -emit-llvm -finclude-default-header -disable-llvm-passes -o - %s
 
 // Make sure SV_DispatchThreadID translated into dx.thread.id.
 
-// CHECK:       define void @foo()
-// CHECK-DXIL:  %[[#ID:]] = call i32 @llvm.dx.thread.id(i32 0)
-// CHECK-SPIRV: %[[#ID:]] = call i32 @llvm.spv.thread.id(i32 0)
-// CHECK:       call void @{{.*}}foo{{.*}}(i32 %[[#ID]])
-[shader("compute")]
-[numthreads(8,8,1)]
-void foo(uint Idx : SV_DispatchThreadID) {}
+const RWBuffer<float> In;
+RWBuffer<float> Out;
 
-// CHECK:       define void @bar()
-// CHECK-DXIL:  %[[#ID_X:]] = call i32 @llvm.dx.thread.id(i32 0)
-// CHECK-SPIRV: %[[#ID_X:]] = call i32 @llvm.spv.thread.id(i32 0)
-// CHECK:       %[[#ID_X_:]] = insertelement <2 x i32> poison, i32 %[[#ID_X]], i64 0
-// CHECK-DXIL:  %[[#ID_Y:]] = call i32 @llvm.dx.thread.id(i32 1)
-// CHECK-SPIRV: %[[#ID_Y:]] = call i32 @llvm.spv.thread.id(i32 1)
-// CHECK:       %[[#ID_XY:]] = insertelement <2 x i32> %[[#ID_X_]], i32 %[[#ID_Y]], i64 1
-// CHECK-DXIL:  call void @{{.*}}bar{{.*}}(<2 x i32> %[[#ID_XY]])
+// CHECK: define void @foo()
+// CHECK: %[[ID:[0-9a-zA-Z]+]] = call i32 @llvm.dx.thread.id(i32 0)
+// CHECK: call void @"?foo@@YAXH@Z"(i32 %[[ID]])
 [shader("compute")]
 [numthreads(8,8,1)]
-void bar(uint2 Idx : SV_DispatchThreadID) {}
+void foo(uint Idx : SV_DispatchThreadID) {
+  Out[Idx] = In[Idx];
+}
+
+// CHECK: define void @bar()
+// CHECK: %[[ID_X:[0-9a-zA-Z]+]] = call i32 @llvm.dx.thread.id(i32 0)
+// CHECK: %[[ID_X_:[0-9a-zA-Z]+]] = insertelement <2 x i32> poison, i32 %[[ID_X]], i64 0
+// CHECK: %[[ID_Y:[0-9a-zA-Z]+]] = call i32 @llvm.dx.thread.id(i32 1)
+// CHECK: %[[ID_XY:[0-9a-zA-Z]+]] = insertelement <2 x i32> %[[ID_X_]], i32 %[[ID_Y]], i64 1
+// CHECK: call void @"?bar@@YAXT?$__vector@H$01@__clang@@@Z"(<2 x i32> %[[ID_XY]])
+[shader("compute")]
+[numthreads(8,8,1)]
+void bar(uint2 Idx : SV_DispatchThreadID) {
+  Out[Idx.y] = In[Idx.x];
+}
 

@@ -223,9 +223,11 @@ public:
 };
 } // end namespace
 
-static MCTargetStreamer *createAsmTargetStreamer(MCStreamer &S,
-                                                 formatted_raw_ostream &OS,
-                                                 MCInstPrinter *InstPrint) {
+static MCTargetStreamer *
+createAsmTargetStreamer(MCStreamer &S,
+                        formatted_raw_ostream &OS,
+                        MCInstPrinter *InstPrint,
+                        bool isVerboseAsm) {
   return new SystemZTargetAsmStreamer(S, OS);
 }
 

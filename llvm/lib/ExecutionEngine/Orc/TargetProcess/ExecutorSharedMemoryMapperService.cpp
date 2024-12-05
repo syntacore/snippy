@@ -18,10 +18,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-#if defined(__MVS__)
-#include "llvm/Support/BLAKE3.h"
-#include <sys/shm.h>
-#endif
 #include <unistd.h>
 #endif
 
@@ -63,36 +59,20 @@ ExecutorSharedMemoryMapperService::reserve(uint64_t Size) {
     SharedMemoryName = SharedMemoryNameStream.str();
   }
 
-#if defined(__MVS__)
-  ArrayRef<uint8_t> Data(
-      reinterpret_cast<const uint8_t *>(SharedMemoryName.c_str()),
-      SharedMemoryName.size());
-  auto HashedName = BLAKE3::hash<sizeof(key_t)>(Data);
-  key_t Key = *reinterpret_cast<key_t *>(HashedName.data());
-  int SharedMemoryId =
-      shmget(Key, Size, IPC_CREAT | IPC_EXCL | __IPC_SHAREAS | 0700);
-  if (SharedMemoryId < 0)
-    return errorCodeToError(errnoAsErrorCode());
-
-  void *Addr = shmat(SharedMemoryId, nullptr, 0);
-  if (Addr == reinterpret_cast<void *>(-1))
-    return errorCodeToError(errnoAsErrorCode());
-#else
   int SharedMemoryFile =
       shm_open(SharedMemoryName.c_str(), O_RDWR | O_CREAT | O_EXCL, 0700);
   if (SharedMemoryFile < 0)
-    return errorCodeToError(errnoAsErrorCode());
+    return errorCodeToError(std::error_code(errno, std::generic_category()));
 
   // by default size is 0
   if (ftruncate(SharedMemoryFile, Size) < 0)
-    return errorCodeToError(errnoAsErrorCode());
+    return errorCodeToError(std::error_code(errno, std::generic_category()));
 
   void *Addr = mmap(nullptr, Size, PROT_NONE, MAP_SHARED, SharedMemoryFile, 0);
   if (Addr == MAP_FAILED)
-    return errorCodeToError(errnoAsErrorCode());
+    return errorCodeToError(std::error_code(errno, std::generic_category()));
 
   close(SharedMemoryFile);
-#endif
 
 #elif defined(_WIN32)
 
@@ -151,9 +131,6 @@ Expected<ExecutorAddr> ExecutorSharedMemoryMapperService::initialize(
 
 #if defined(LLVM_ON_UNIX)
 
-#if defined(__MVS__)
-      // TODO Is it possible to change the protection level?
-#else
     int NativeProt = 0;
     if ((Segment.RAG.Prot & MemProt::Read) == MemProt::Read)
       NativeProt |= PROT_READ;
@@ -163,8 +140,7 @@ Expected<ExecutorAddr> ExecutorSharedMemoryMapperService::initialize(
       NativeProt |= PROT_EXEC;
 
     if (mprotect(Segment.Addr.toPtr<void *>(), Segment.Size, NativeProt))
-      return errorCodeToError(errnoAsErrorCode());
-#endif
+      return errorCodeToError(std::error_code(errno, std::generic_category()));
 
 #elif defined(_WIN32)
 
@@ -263,15 +239,9 @@ Error ExecutorSharedMemoryMapperService::release(
 
 #if defined(LLVM_ON_UNIX)
 
-#if defined(__MVS__)
-    (void)Size;
-
-    if (shmdt(Base.toPtr<void *>()) < 0)
-      Err = joinErrors(std::move(Err), errorCodeToError(errnoAsErrorCode()));
-#else
     if (munmap(Base.toPtr<void *>(), Size) != 0)
-      Err = joinErrors(std::move(Err), errorCodeToError(errnoAsErrorCode()));
-#endif
+      Err = joinErrors(std::move(Err), errorCodeToError(std::error_code(
+                                           errno, std::generic_category())));
 
 #elif defined(_WIN32)
     (void)Size;

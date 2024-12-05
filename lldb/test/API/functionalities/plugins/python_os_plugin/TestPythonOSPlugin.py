@@ -5,7 +5,6 @@ Test that the Python operating system plugin works correctly
 
 import os
 import lldb
-from lldbsuite.test.decorators import *
 from lldbsuite.test.lldbtest import *
 import lldbsuite.test.lldbutil as lldbutil
 
@@ -18,8 +17,7 @@ class PluginPythonOSPlugin(TestBase):
         self.build()
         self.run_python_os_funcionality()
 
-    @skipIfWindows  # This is flaky on Windows
-    def test_run_python_os_step(self):
+    def run_python_os_step(self):
         """Test that the Python operating system plugin works correctly when single stepping a virtual thread"""
         self.build()
         self.run_python_os_step()
@@ -214,7 +212,7 @@ class PluginPythonOSPlugin(TestBase):
             "main.c",
             "Make sure we stepped from line 5 to line 6 in main.c",
         )
-        self.assertEqual(
+        self.assertEquals(
             line_entry.GetLine(),
             6,
             "Make sure we stepped from line 5 to line 6 in main.c",

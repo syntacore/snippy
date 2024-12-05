@@ -403,7 +403,7 @@ static void splitCallSite(CallBase &CB,
       NewPN->insertBefore(*TailBB, TailBB->begin());
       CurrentI->replaceAllUsesWith(NewPN);
     }
-    CurrentI->dropDbgRecords();
+    CurrentI->dropDbgValues();
     CurrentI->eraseFromParent();
     // We are done once we handled the first original instruction in TailBB.
     if (CurrentI == OriginalBeginInst)

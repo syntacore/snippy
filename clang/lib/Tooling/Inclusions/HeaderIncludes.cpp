@@ -234,18 +234,8 @@ int IncludeCategoryManager::getSortIncludePriority(StringRef IncludeName,
   return Ret;
 }
 bool IncludeCategoryManager::isMainHeader(StringRef IncludeName) const {
-  switch (Style.MainIncludeChar) {
-  case IncludeStyle::MICD_Quote:
-    if (!IncludeName.starts_with("\""))
-      return false;
-    break;
-  case IncludeStyle::MICD_AngleBracket:
-    if (!IncludeName.starts_with("<"))
-      return false;
-    break;
-  case IncludeStyle::MICD_Any:
-    break;
-  }
+  if (!IncludeName.starts_with("\""))
+    return false;
 
   IncludeName =
       IncludeName.drop_front(1).drop_back(1); // remove the surrounding "" or <>

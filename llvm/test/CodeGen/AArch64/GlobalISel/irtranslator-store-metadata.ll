@@ -4,12 +4,11 @@
 define void @store_nontemporal(ptr dereferenceable(4) %ptr) {
   ; CHECK-LABEL: name: store_nontemporal
   ; CHECK: bb.1 (%ir-block.0):
-  ; CHECK-NEXT:   liveins: $x0
-  ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   [[COPY:%[0-9]+]]:_(p0) = COPY $x0
-  ; CHECK-NEXT:   [[C:%[0-9]+]]:_(s32) = G_CONSTANT i32 0
-  ; CHECK-NEXT:   G_STORE [[C]](s32), [[COPY]](p0) :: (non-temporal store (s32) into %ir.ptr)
-  ; CHECK-NEXT:   RET_ReallyLR
+  ; CHECK:   liveins: $x0
+  ; CHECK:   [[COPY:%[0-9]+]]:_(p0) = COPY $x0
+  ; CHECK:   [[C:%[0-9]+]]:_(s32) = G_CONSTANT i32 0
+  ; CHECK:   G_STORE [[C]](s32), [[COPY]](p0) :: (non-temporal store (s32) into %ir.ptr)
+  ; CHECK:   RET_ReallyLR
   store i32 0, ptr %ptr, align 4, !nontemporal !0
   ret void
 }
@@ -17,12 +16,11 @@ define void @store_nontemporal(ptr dereferenceable(4) %ptr) {
 define void @store_dereferenceable(ptr dereferenceable(4) %ptr) {
   ; CHECK-LABEL: name: store_dereferenceable
   ; CHECK: bb.1 (%ir-block.0):
-  ; CHECK-NEXT:   liveins: $x0
-  ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   [[COPY:%[0-9]+]]:_(p0) = COPY $x0
-  ; CHECK-NEXT:   [[C:%[0-9]+]]:_(s32) = G_CONSTANT i32 0
-  ; CHECK-NEXT:   G_STORE [[C]](s32), [[COPY]](p0) :: (store (s32) into %ir.ptr)
-  ; CHECK-NEXT:   RET_ReallyLR
+  ; CHECK:   liveins: $x0
+  ; CHECK:   [[COPY:%[0-9]+]]:_(p0) = COPY $x0
+  ; CHECK:   [[C:%[0-9]+]]:_(s32) = G_CONSTANT i32 0
+  ; CHECK:   G_STORE [[C]](s32), [[COPY]](p0) :: (store (s32) into %ir.ptr)
+  ; CHECK:   RET_ReallyLR
   store i32 0, ptr %ptr, align 4
   ret void
 }
@@ -30,12 +28,11 @@ define void @store_dereferenceable(ptr dereferenceable(4) %ptr) {
 define void @store_volatile_dereferenceable(ptr dereferenceable(4) %ptr) {
   ; CHECK-LABEL: name: store_volatile_dereferenceable
   ; CHECK: bb.1 (%ir-block.0):
-  ; CHECK-NEXT:   liveins: $x0
-  ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   [[COPY:%[0-9]+]]:_(p0) = COPY $x0
-  ; CHECK-NEXT:   [[C:%[0-9]+]]:_(s32) = G_CONSTANT i32 0
-  ; CHECK-NEXT:   G_STORE [[C]](s32), [[COPY]](p0) :: (volatile store (s32) into %ir.ptr)
-  ; CHECK-NEXT:   RET_ReallyLR
+  ; CHECK:   liveins: $x0
+  ; CHECK:   [[COPY:%[0-9]+]]:_(p0) = COPY $x0
+  ; CHECK:   [[C:%[0-9]+]]:_(s32) = G_CONSTANT i32 0
+  ; CHECK:   G_STORE [[C]](s32), [[COPY]](p0) :: (volatile store (s32) into %ir.ptr)
+  ; CHECK:   RET_ReallyLR
   store volatile i32 0, ptr %ptr, align 4
   ret void
 }
@@ -43,12 +40,11 @@ define void @store_volatile_dereferenceable(ptr dereferenceable(4) %ptr) {
 define void @store_falkor_strided_access(ptr %ptr) {
   ; CHECK-LABEL: name: store_falkor_strided_access
   ; CHECK: bb.1 (%ir-block.0):
-  ; CHECK-NEXT:   liveins: $x0
-  ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   [[COPY:%[0-9]+]]:_(p0) = COPY $x0
-  ; CHECK-NEXT:   [[C:%[0-9]+]]:_(s32) = G_CONSTANT i32 0
-  ; CHECK-NEXT:   G_STORE [[C]](s32), [[COPY]](p0) :: ("aarch64-strided-access" store (s32) into %ir.ptr)
-  ; CHECK-NEXT:   RET_ReallyLR
+  ; CHECK:   liveins: $x0
+  ; CHECK:   [[COPY:%[0-9]+]]:_(p0) = COPY $x0
+  ; CHECK:   [[C:%[0-9]+]]:_(s32) = G_CONSTANT i32 0
+  ; CHECK:   G_STORE [[C]](s32), [[COPY]](p0) :: ("aarch64-strided-access" store (s32) into %ir.ptr)
+  ; CHECK:   RET_ReallyLR
   store i32 0, ptr %ptr, align 4, !falkor.strided.access !0
   ret void
 }

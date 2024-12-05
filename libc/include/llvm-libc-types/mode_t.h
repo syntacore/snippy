@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_MODE_T_H
-#define LLVM_LIBC_TYPES_MODE_T_H
+#ifndef __LLVM_LIBC_TYPES_MODE_T_H
+#define __LLVM_LIBC_TYPES_MODE_T_H
 
 typedef unsigned mode_t;
 
-#endif // LLVM_LIBC_TYPES_MODE_T_H
+#endif // __LLVM_LIBC_TYPES_MODE_T_H

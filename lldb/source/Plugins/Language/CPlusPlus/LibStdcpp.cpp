@@ -43,11 +43,11 @@ class LibstdcppMapIteratorSyntheticFrontEnd : public SyntheticChildrenFrontEnd {
 public:
   explicit LibstdcppMapIteratorSyntheticFrontEnd(lldb::ValueObjectSP valobj_sp);
 
-  llvm::Expected<uint32_t> CalculateNumChildren() override;
+  size_t CalculateNumChildren() override;
 
-  lldb::ValueObjectSP GetChildAtIndex(uint32_t idx) override;
+  lldb::ValueObjectSP GetChildAtIndex(size_t idx) override;
 
-  lldb::ChildCacheState Update() override;
+  bool Update() override;
 
   bool MightHaveChildren() override;
 
@@ -64,11 +64,11 @@ class LibStdcppSharedPtrSyntheticFrontEnd : public SyntheticChildrenFrontEnd {
 public:
   explicit LibStdcppSharedPtrSyntheticFrontEnd(lldb::ValueObjectSP valobj_sp);
 
-  llvm::Expected<uint32_t> CalculateNumChildren() override;
+  size_t CalculateNumChildren() override;
 
-  lldb::ValueObjectSP GetChildAtIndex(uint32_t idx) override;
+  lldb::ValueObjectSP GetChildAtIndex(size_t idx) override;
 
-  lldb::ChildCacheState Update() override;
+  bool Update() override;
 
   bool MightHaveChildren() override;
 
@@ -94,29 +94,29 @@ LibstdcppMapIteratorSyntheticFrontEnd::LibstdcppMapIteratorSyntheticFrontEnd(
     Update();
 }
 
-lldb::ChildCacheState LibstdcppMapIteratorSyntheticFrontEnd::Update() {
+bool LibstdcppMapIteratorSyntheticFrontEnd::Update() {
   ValueObjectSP valobj_sp = m_backend.GetSP();
   if (!valobj_sp)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
   TargetSP target_sp(valobj_sp->GetTargetSP());
 
   if (!target_sp)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
   bool is_64bit = (target_sp->GetArchitecture().GetAddressByteSize() == 8);
 
   if (!valobj_sp)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
   m_exe_ctx_ref = valobj_sp->GetExecutionContextRef();
 
   ValueObjectSP _M_node_sp(valobj_sp->GetChildMemberWithName("_M_node"));
   if (!_M_node_sp)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
   m_pair_address = _M_node_sp->GetValueAsUnsigned(0);
   if (m_pair_address == 0)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
   m_pair_address += (is_64bit ? 32 : 16);
 
@@ -124,21 +124,20 @@ lldb::ChildCacheState LibstdcppMapIteratorSyntheticFrontEnd::Update() {
   if (my_type.GetNumTemplateArguments() >= 1) {
     CompilerType pair_type = my_type.GetTypeTemplateArgument(0);
     if (!pair_type)
-      return lldb::ChildCacheState::eRefetch;
+      return false;
     m_pair_type = pair_type;
   } else
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
-  return lldb::ChildCacheState::eReuse;
+  return true;
 }
 
-llvm::Expected<uint32_t>
-LibstdcppMapIteratorSyntheticFrontEnd::CalculateNumChildren() {
+size_t LibstdcppMapIteratorSyntheticFrontEnd::CalculateNumChildren() {
   return 2;
 }
 
 lldb::ValueObjectSP
-LibstdcppMapIteratorSyntheticFrontEnd::GetChildAtIndex(uint32_t idx) {
+LibstdcppMapIteratorSyntheticFrontEnd::GetChildAtIndex(size_t idx) {
   if (m_pair_address != 0 && m_pair_type) {
     if (!m_pair_sp)
       m_pair_sp = CreateValueObjectFromAddress("pair", m_pair_address,
@@ -194,22 +193,22 @@ lldb_private::formatters::VectorIteratorSyntheticFrontEnd::
     Update();
 }
 
-lldb::ChildCacheState VectorIteratorSyntheticFrontEnd::Update() {
+bool VectorIteratorSyntheticFrontEnd::Update() {
   m_item_sp.reset();
 
   ValueObjectSP valobj_sp = m_backend.GetSP();
   if (!valobj_sp)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
   if (!valobj_sp)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
   ValueObjectSP item_ptr =
       formatters::GetChildMemberWithName(*valobj_sp, m_item_names);
   if (!item_ptr)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
   if (item_ptr->GetValueAsUnsigned(0) == 0)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
   Status err;
   m_exe_ctx_ref = valobj_sp->GetExecutionContextRef();
   m_item_sp = CreateValueObjectFromAddress(
@@ -217,16 +216,13 @@ lldb::ChildCacheState VectorIteratorSyntheticFrontEnd::Update() {
       item_ptr->GetCompilerType().GetPointeeType());
   if (err.Fail())
     m_item_sp.reset();
-  return lldb::ChildCacheState::eRefetch;
+  return false;
 }
 
-llvm::Expected<uint32_t>
-VectorIteratorSyntheticFrontEnd::CalculateNumChildren() {
-  return 1;
-}
+size_t VectorIteratorSyntheticFrontEnd::CalculateNumChildren() { return 1; }
 
 lldb::ValueObjectSP
-VectorIteratorSyntheticFrontEnd::GetChildAtIndex(uint32_t idx) {
+VectorIteratorSyntheticFrontEnd::GetChildAtIndex(size_t idx) {
   if (idx == 0)
     return m_item_sp;
   return lldb::ValueObjectSP();
@@ -375,13 +371,10 @@ LibStdcppSharedPtrSyntheticFrontEnd::LibStdcppSharedPtrSyntheticFrontEnd(
     Update();
 }
 
-llvm::Expected<uint32_t>
-LibStdcppSharedPtrSyntheticFrontEnd::CalculateNumChildren() {
-  return 1;
-}
+size_t LibStdcppSharedPtrSyntheticFrontEnd::CalculateNumChildren() { return 1; }
 
 lldb::ValueObjectSP
-LibStdcppSharedPtrSyntheticFrontEnd::GetChildAtIndex(uint32_t idx) {
+LibStdcppSharedPtrSyntheticFrontEnd::GetChildAtIndex(size_t idx) {
   if (idx == 0)
     return m_ptr_obj->GetSP();
   if (idx == 1) {
@@ -397,23 +390,23 @@ LibStdcppSharedPtrSyntheticFrontEnd::GetChildAtIndex(uint32_t idx) {
   return lldb::ValueObjectSP();
 }
 
-lldb::ChildCacheState LibStdcppSharedPtrSyntheticFrontEnd::Update() {
+bool LibStdcppSharedPtrSyntheticFrontEnd::Update() {
   auto backend = m_backend.GetSP();
   if (!backend)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
   auto valobj_sp = backend->GetNonSyntheticValue();
   if (!valobj_sp)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
   auto ptr_obj_sp = valobj_sp->GetChildMemberWithName("_M_ptr");
   if (!ptr_obj_sp)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
   m_ptr_obj = ptr_obj_sp->Clone(ConstString("pointer")).get();
   m_obj_obj = nullptr;
 
-  return lldb::ChildCacheState::eRefetch;
+  return false;
 }
 
 bool LibStdcppSharedPtrSyntheticFrontEnd::MightHaveChildren() { return true; }

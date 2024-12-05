@@ -15,7 +15,6 @@
 #define LLVM_CODEGEN_SELECTIONDAGISEL_H
 
 #include "llvm/CodeGen/MachineFunctionPass.h"
-#include "llvm/CodeGen/MachinePassManager.h"
 #include "llvm/CodeGen/SelectionDAG.h"
 #include "llvm/IR/BasicBlock.h"
 #include <memory>
@@ -25,7 +24,6 @@ class AAResults;
 class AssumptionCache;
 class TargetInstrInfo;
 class TargetMachine;
-class SSPLayoutInfo;
 class SelectionDAGBuilder;
 class SDValue;
 class MachineRegisterInfo;
@@ -33,7 +31,6 @@ class MachineFunction;
 class OptimizationRemarkEmitter;
 class TargetLowering;
 class TargetLibraryInfo;
-class TargetTransformInfo;
 class FunctionLoweringInfo;
 class SwiftErrorValueTracking;
 class GCFunctionInfo;
@@ -41,7 +38,7 @@ class ScheduleDAGSDNodes;
 
 /// SelectionDAGISel - This is the common base class used for SelectionDAG-based
 /// pattern-matching instruction selectors.
-class SelectionDAGISel {
+class SelectionDAGISel : public MachineFunctionPass {
 public:
   TargetMachine &TM;
   const TargetLibraryInfo *LibInfo;
@@ -54,10 +51,6 @@ public:
   AAResults *AA = nullptr;
   AssumptionCache *AC = nullptr;
   GCFunctionInfo *GFI = nullptr;
-  SSPLayoutInfo *SP = nullptr;
-#if LLVM_ENABLE_ABI_BREAKING_CHECKS
-  TargetTransformInfo *TTI = nullptr;
-#endif
   CodeGenOptLevel OptLevel;
   const TargetInstrInfo *TII;
   const TargetLowering *TLI;
@@ -74,18 +67,16 @@ public:
   /// functions. Storing the filter result here so that we only need to do the
   /// filtering once.
   bool MatchFilterFuncName = false;
-  StringRef FuncName;
 
-  explicit SelectionDAGISel(TargetMachine &tm,
+  explicit SelectionDAGISel(char &ID, TargetMachine &tm,
                             CodeGenOptLevel OL = CodeGenOptLevel::Default);
-  virtual ~SelectionDAGISel();
+  ~SelectionDAGISel() override;
 
   const TargetLowering *getTargetLowering() const { return TLI; }
 
-  void initializeAnalysisResults(MachineFunctionAnalysisManager &MFAM);
-  void initializeAnalysisResults(MachineFunctionPass &MFP);
+  void getAnalysisUsage(AnalysisUsage &AU) const override;
 
-  virtual bool runOnMachineFunction(MachineFunction &mf);
+  bool runOnMachineFunction(MachineFunction &MF) override;
 
   virtual void emitFunctionEntryCode() {}
 
@@ -468,10 +459,6 @@ private:
   void Select_ARITH_FENCE(SDNode *N);
   void Select_MEMBARRIER(SDNode *N);
 
-  void Select_CONVERGENCECTRL_ANCHOR(SDNode *N);
-  void Select_CONVERGENCECTRL_ENTRY(SDNode *N);
-  void Select_CONVERGENCECTRL_LOOP(SDNode *N);
-
   void pushStackMapLiveVariable(SmallVectorImpl<SDValue> &Ops, SDValue Operand,
                                 SDLoc DL);
   void Select_STACKMAP(SDNode *N);
@@ -526,30 +513,6 @@ private:
                     bool isMorphNodeTo);
 };
 
-class SelectionDAGISelLegacy : public MachineFunctionPass {
-  std::unique_ptr<SelectionDAGISel> Selector;
-
-public:
-  SelectionDAGISelLegacy(char &ID, std::unique_ptr<SelectionDAGISel> S);
-
-  ~SelectionDAGISelLegacy() override = default;
-
-  void getAnalysisUsage(AnalysisUsage &AU) const override;
-
-  bool runOnMachineFunction(MachineFunction &MF) override;
-};
-
-class SelectionDAGISelPass : public PassInfoMixin<SelectionDAGISelPass> {
-  std::unique_ptr<SelectionDAGISel> Selector;
-
-protected:
-  SelectionDAGISelPass(std::unique_ptr<SelectionDAGISel> Selector)
-      : Selector(std::move(Selector)) {}
-
-public:
-  PreservedAnalyses run(MachineFunction &MF,
-                        MachineFunctionAnalysisManager &MFAM);
-};
 }
 
 #endif /* LLVM_CODEGEN_SELECTIONDAGISEL_H */

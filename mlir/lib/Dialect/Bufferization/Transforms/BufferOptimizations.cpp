@@ -59,12 +59,6 @@ static bool isLoop(Operation *op) {
   return regionInterface.hasLoop();
 }
 
-/// Return whether the given operation is a loop with sequential execution
-/// semantics.
-static bool isSequentialLoop(Operation *op) {
-  return !op->hasTrait<OpTrait::HasParallelRegion>() && isLoop(op);
-}
-
 /// Returns true if the given operation implements the AllocationOpInterface
 /// and it supports the dominate block hoisting.
 static bool allowAllocDominateBlockHoisting(Operation *op) {
@@ -344,13 +338,12 @@ struct BufferAllocationLoopHoistingState : BufferAllocationHoistingStateBase {
     return dependencyBlock ? dependencyBlock : nullptr;
   }
 
-  /// Returns true if the given operation represents a loop with sequential
-  /// execution semantics and one of the aliases caused the
-  /// `aliasDominatorBlock` to be "above" the block of the given loop operation.
-  /// If this is the case, it indicates that the allocation is passed via a back
-  /// edge.
+  /// Returns true if the given operation represents a loop and one of the
+  /// aliases caused the `aliasDominatorBlock` to be "above" the block of the
+  /// given loop operation. If this is the case, it indicates that the
+  /// allocation is passed via a back edge.
   bool isLegalPlacement(Operation *op) {
-    return isSequentialLoop(op) &&
+    return isLoop(op) &&
            !dominators->dominates(aliasDominatorBlock, op->getBlock());
   }
 
@@ -397,12 +390,12 @@ public:
       OpBuilder builder(startOperation);
       Operation *allocOp = alloc.getDefiningOp();
       if (auto allocInterface = dyn_cast<AllocationOpInterface>(allocOp)) {
-        std::optional<Operation *> alloca =
-            allocInterface.buildPromotedAlloc(builder, alloc);
+        Operation *alloca =
+            allocInterface.buildPromotedAlloc(builder, alloc).value();
         if (!alloca)
           continue;
         // Replace the original alloc by a newly created alloca.
-        allocOp->replaceAllUsesWith(alloca.value());
+        allocOp->replaceAllUsesWith(alloca);
         allocOp->erase();
       }
     }

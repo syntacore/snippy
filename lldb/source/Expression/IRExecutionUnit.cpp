@@ -201,7 +201,7 @@ Status IRExecutionUnit::DisassembleFunction(Stream &stream,
                                       UINT32_MAX, false, false);
 
   InstructionList &instruction_list = disassembler_sp->GetInstructionList();
-  instruction_list.Dump(&stream, true, true, /*show_control_flow_kind=*/false,
+  instruction_list.Dump(&stream, true, true, /*show_control_flow_kind=*/true,
                         &exe_ctx);
 
   return ret;
@@ -212,17 +212,18 @@ struct IRExecDiagnosticHandler : public llvm::DiagnosticHandler {
   Status *err;
   IRExecDiagnosticHandler(Status *err) : err(err) {}
   bool handleDiagnostics(const llvm::DiagnosticInfo &DI) override {
-    if (DI.getSeverity() == llvm::DS_Error) {
+    if (DI.getKind() == llvm::DK_SrcMgr) {
       const auto &DISM = llvm::cast<llvm::DiagnosticInfoSrcMgr>(DI);
       if (err && err->Success()) {
         err->SetErrorToGenericError();
         err->SetErrorStringWithFormat(
-            "IRExecution error: %s",
+            "Inline assembly error: %s",
             DISM.getSMDiag().getMessage().str().c_str());
       }
+      return true;
     }
 
-    return true;
+    return false;
   }
 };
 } // namespace
@@ -431,9 +432,7 @@ void IRExecutionUnit::GetRunnableInfo(Status &error, lldb::addr_t &func_addr,
     }
 
     m_failed_lookups.clear();
-    ss.PutCString(
-        "\nHint: The expression tried to call a function that is not present "
-        "in the target, perhaps because it was optimized out by the compiler.");
+
     error.SetErrorString(ss.GetString());
 
     return;
@@ -534,63 +533,63 @@ lldb::SectionType IRExecutionUnit::GetSectionTypeFromSectionName(
   }
 
   if (!name.empty()) {
-    if (name == "__text" || name == ".text")
+    if (name.equals("__text") || name.equals(".text"))
       sect_type = lldb::eSectionTypeCode;
-    else if (name == "__data" || name == ".data")
+    else if (name.equals("__data") || name.equals(".data"))
       sect_type = lldb::eSectionTypeCode;
     else if (name.starts_with("__debug_") || name.starts_with(".debug_")) {
       const uint32_t name_idx = name[0] == '_' ? 8 : 7;
       llvm::StringRef dwarf_name(name.substr(name_idx));
       switch (dwarf_name[0]) {
       case 'a':
-        if (dwarf_name == "abbrev")
+        if (dwarf_name.equals("abbrev"))
           sect_type = lldb::eSectionTypeDWARFDebugAbbrev;
-        else if (dwarf_name == "aranges")
+        else if (dwarf_name.equals("aranges"))
           sect_type = lldb::eSectionTypeDWARFDebugAranges;
-        else if (dwarf_name == "addr")
+        else if (dwarf_name.equals("addr"))
           sect_type = lldb::eSectionTypeDWARFDebugAddr;
         break;
 
       case 'f':
-        if (dwarf_name == "frame")
+        if (dwarf_name.equals("frame"))
           sect_type = lldb::eSectionTypeDWARFDebugFrame;
         break;
 
       case 'i':
-        if (dwarf_name == "info")
+        if (dwarf_name.equals("info"))
           sect_type = lldb::eSectionTypeDWARFDebugInfo;
         break;
 
       case 'l':
-        if (dwarf_name == "line")
+        if (dwarf_name.equals("line"))
           sect_type = lldb::eSectionTypeDWARFDebugLine;
-        else if (dwarf_name == "loc")
+        else if (dwarf_name.equals("loc"))
           sect_type = lldb::eSectionTypeDWARFDebugLoc;
-        else if (dwarf_name == "loclists")
+        else if (dwarf_name.equals("loclists"))
           sect_type = lldb::eSectionTypeDWARFDebugLocLists;
         break;
 
       case 'm':
-        if (dwarf_name == "macinfo")
+        if (dwarf_name.equals("macinfo"))
           sect_type = lldb::eSectionTypeDWARFDebugMacInfo;
         break;
 
       case 'p':
-        if (dwarf_name == "pubnames")
+        if (dwarf_name.equals("pubnames"))
           sect_type = lldb::eSectionTypeDWARFDebugPubNames;
-        else if (dwarf_name == "pubtypes")
+        else if (dwarf_name.equals("pubtypes"))
           sect_type = lldb::eSectionTypeDWARFDebugPubTypes;
         break;
 
       case 's':
-        if (dwarf_name == "str")
+        if (dwarf_name.equals("str"))
           sect_type = lldb::eSectionTypeDWARFDebugStr;
-        else if (dwarf_name == "str_offsets")
+        else if (dwarf_name.equals("str_offsets"))
           sect_type = lldb::eSectionTypeDWARFDebugStrOffsets;
         break;
 
       case 'r':
-        if (dwarf_name == "ranges")
+        if (dwarf_name.equals("ranges"))
           sect_type = lldb::eSectionTypeDWARFDebugRanges;
         break;
 
@@ -599,7 +598,7 @@ lldb::SectionType IRExecutionUnit::GetSectionTypeFromSectionName(
       }
     } else if (name.starts_with("__apple_") || name.starts_with(".apple_"))
       sect_type = lldb::eSectionTypeInvalid;
-    else if (name == "__objc_imageinfo")
+    else if (name.equals("__objc_imageinfo"))
       sect_type = lldb::eSectionTypeOther;
   }
   return sect_type;

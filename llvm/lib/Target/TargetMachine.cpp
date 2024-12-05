@@ -16,7 +16,6 @@
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Mangler.h"
-#include "llvm/IR/Module.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCInstrInfo.h"
@@ -44,12 +43,6 @@ bool TargetMachine::isLargeGlobalValue(const GlobalValue *GVal) const {
   if (getTargetTriple().getArch() != Triple::x86_64)
     return false;
 
-  // Remaining logic below is ELF-specific. For other object file formats where
-  // the large code model is mostly used for JIT compilation, just look at the
-  // code model.
-  if (!getTargetTriple().isOSBinFormatELF())
-    return getCodeModel() == CodeModel::Large;
-
   auto *GO = GVal->getAliaseeObject();
 
   // Be conservative if we can't find an underlying GlobalObject.
@@ -58,20 +51,9 @@ bool TargetMachine::isLargeGlobalValue(const GlobalValue *GVal) const {
 
   auto *GV = dyn_cast<GlobalVariable>(GO);
 
-  auto IsPrefix = [](StringRef Name, StringRef Prefix) {
-    return Name.consume_front(Prefix) && (Name.empty() || Name[0] == '.');
-  };
-
   // Functions/GlobalIFuncs are only large under the large code model.
-  if (!GV) {
-    // Handle explicit sections as we do for GlobalVariables with an explicit
-    // section, see comments below.
-    if (GO->hasSection()) {
-      StringRef Name = GO->getSection();
-      return IsPrefix(Name, ".ltext");
-    }
+  if (!GV)
     return getCodeModel() == CodeModel::Large;
-  }
 
   if (GV->isThreadLocal())
     return false;
@@ -91,8 +73,11 @@ bool TargetMachine::isLargeGlobalValue(const GlobalValue *GVal) const {
   // data sections. The code model attribute overrides this above.
   if (GV->hasSection()) {
     StringRef Name = GV->getSection();
-    return IsPrefix(Name, ".lbss") || IsPrefix(Name, ".ldata") ||
-           IsPrefix(Name, ".lrodata");
+    auto IsPrefix = [&](StringRef Prefix) {
+      StringRef S = Name;
+      return S.consume_front(Prefix) && (S.empty() || S[0] == '.');
+    };
+    return IsPrefix(".lbss") || IsPrefix(".ldata") || IsPrefix(".lrodata");
   }
 
   // Respect large data threshold for medium and large code models.
@@ -100,14 +85,8 @@ bool TargetMachine::isLargeGlobalValue(const GlobalValue *GVal) const {
       getCodeModel() == CodeModel::Large) {
     if (!GV->getValueType()->isSized())
       return true;
-    // Linker defined start/stop symbols can point to arbitrary points in the
-    // binary, so treat them as large.
-    if (GV->isDeclaration() && (GV->getName() == "__ehdr_start" ||
-                                GV->getName().starts_with("__start_") ||
-                                GV->getName().starts_with("__stop_")))
-      return true;
-    const DataLayout &DL = GV->getDataLayout();
-    uint64_t Size = DL.getTypeAllocSize(GV->getValueType());
+    const DataLayout &DL = GV->getParent()->getDataLayout();
+    uint64_t Size = DL.getTypeSizeInBits(GV->getValueType()) / 8;
     return Size == 0 || Size > LargeDataThreshold;
   }
 
@@ -175,7 +154,8 @@ static TLSModel::Model getSelectedTLSModel(const GlobalValue *GV) {
   llvm_unreachable("invalid TLS model");
 }
 
-bool TargetMachine::shouldAssumeDSOLocal(const GlobalValue *GV) const {
+bool TargetMachine::shouldAssumeDSOLocal(const Module &M,
+                                         const GlobalValue *GV) const {
   const Triple &TT = getTargetTriple();
   Reloc::Model RM = getRelocationModel();
 
@@ -239,7 +219,7 @@ TLSModel::Model TargetMachine::getTLSModel(const GlobalValue *GV) const {
   bool IsPIE = GV->getParent()->getPIELevel() != PIELevel::Default;
   Reloc::Model RM = getRelocationModel();
   bool IsSharedLibrary = RM == Reloc::PIC_ && !IsPIE;
-  bool IsLocal = shouldAssumeDSOLocal(GV);
+  bool IsLocal = shouldAssumeDSOLocal(*GV->getParent(), GV);
 
   TLSModel::Model Model;
   if (IsSharedLibrary) {
@@ -269,7 +249,7 @@ void TargetMachine::setOptLevel(CodeGenOptLevel Level) { OptLevel = Level; }
 
 TargetTransformInfo
 TargetMachine::getTargetTransformInfo(const Function &F) const {
-  return TargetTransformInfo(F.getDataLayout());
+  return TargetTransformInfo(F.getParent()->getDataLayout());
 }
 
 void TargetMachine::getNameWithPrefix(SmallVectorImpl<char> &Name,

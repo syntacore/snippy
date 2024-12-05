@@ -20,7 +20,6 @@
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
-#include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/Support/Debug.h"
 
 using namespace llvm;
@@ -165,9 +164,11 @@ bool BPFMIPreEmitChecking::processAtomicInsts() {
       if (hasLiveDefs(MI, TRI)) {
         DebugLoc Empty;
         const DebugLoc &DL = MI.getDebugLoc();
-        const Function &F = MF->getFunction();
-        F.getContext().diagnose(DiagnosticInfoUnsupported{
-            F, "Invalid usage of the XADD return value", DL});
+        if (DL != Empty)
+          report_fatal_error(Twine("line ") + std::to_string(DL.getLine()) +
+                             ": Invalid usage of the XADD return value", false);
+        else
+          report_fatal_error("Invalid usage of the XADD return value", false);
       }
     }
   }

@@ -6,10 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_STRUCT_RUSAGE_H
-#define LLVM_LIBC_TYPES_STRUCT_RUSAGE_H
+#ifndef __LLVM_LIBC_TYPES_STRUCT_RUSAGE_H__
+#define __LLVM_LIBC_TYPES_STRUCT_RUSAGE_H__
 
-#include "llvm-libc-types/struct_timeval.h"
+#include <llvm-libc-types/struct_timeval.h>
 
 struct rusage {
   struct timeval ru_utime;
@@ -34,4 +34,4 @@ struct rusage {
 #endif
 };
 
-#endif // LLVM_LIBC_TYPES_STRUCT_RUSAGE_H
+#endif // __LLVM_LIBC_TYPES_STRUCT_RUSAGE_H__

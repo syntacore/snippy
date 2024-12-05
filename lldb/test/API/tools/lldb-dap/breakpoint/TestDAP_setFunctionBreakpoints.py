@@ -12,6 +12,7 @@ import lldbdap_testcase
 
 class TestDAP_setFunctionBreakpoints(lldbdap_testcase.DAPTestCaseBase):
     @skipIfWindows
+    @skipIfRemote
     def test_set_and_clear(self):
         """Tests setting and clearing function breakpoints.
         This packet is a bit tricky on the debug adaptor side since there
@@ -36,7 +37,7 @@ class TestDAP_setFunctionBreakpoints(lldbdap_testcase.DAPTestCaseBase):
         response = self.dap_server.request_setFunctionBreakpoints(functions)
         if response:
             breakpoints = response["body"]["breakpoints"]
-            self.assertEqual(
+            self.assertEquals(
                 len(breakpoints),
                 len(functions),
                 "expect %u source breakpoints" % (len(functions)),
@@ -50,7 +51,7 @@ class TestDAP_setFunctionBreakpoints(lldbdap_testcase.DAPTestCaseBase):
         response = self.dap_server.request_setFunctionBreakpoints(functions)
         if response:
             breakpoints = response["body"]["breakpoints"]
-            self.assertEqual(
+            self.assertEquals(
                 len(breakpoints),
                 len(functions),
                 "expect %u source breakpoints" % (len(functions)),
@@ -64,14 +65,14 @@ class TestDAP_setFunctionBreakpoints(lldbdap_testcase.DAPTestCaseBase):
         response = self.dap_server.request_setFunctionBreakpoints(functions)
         if response:
             breakpoints = response["body"]["breakpoints"]
-            self.assertEqual(
+            self.assertEquals(
                 len(breakpoints),
                 len(functions),
                 "expect %u source breakpoints" % (len(functions)),
             )
             for breakpoint in breakpoints:
                 bp_id = breakpoint["id"]
-                self.assertEqual(
+                self.assertEquals(
                     bp_id, bp_id_12, 'verify "twelve" breakpoint ID is same'
                 )
                 self.assertTrue(
@@ -85,14 +86,14 @@ class TestDAP_setFunctionBreakpoints(lldbdap_testcase.DAPTestCaseBase):
         response = self.dap_server.request_testGetTargetBreakpoints()
         if response:
             breakpoints = response["body"]["breakpoints"]
-            self.assertEqual(
+            self.assertEquals(
                 len(breakpoints),
                 len(functions),
                 "expect %u source breakpoints" % (len(functions)),
             )
             for breakpoint in breakpoints:
                 bp_id = breakpoint["id"]
-                self.assertEqual(
+                self.assertEquals(
                     bp_id, bp_id_12, 'verify "twelve" breakpoint ID is same'
                 )
                 self.assertTrue(
@@ -105,7 +106,7 @@ class TestDAP_setFunctionBreakpoints(lldbdap_testcase.DAPTestCaseBase):
         response = self.dap_server.request_setFunctionBreakpoints(functions)
         if response:
             breakpoints = response["body"]["breakpoints"]
-            self.assertEqual(
+            self.assertEquals(
                 len(breakpoints),
                 len(functions),
                 "expect %u source breakpoints" % (len(functions)),
@@ -115,13 +116,14 @@ class TestDAP_setFunctionBreakpoints(lldbdap_testcase.DAPTestCaseBase):
         response = self.dap_server.request_testGetTargetBreakpoints()
         if response:
             breakpoints = response["body"]["breakpoints"]
-            self.assertEqual(
+            self.assertEquals(
                 len(breakpoints),
                 len(functions),
                 "expect %u source breakpoints" % (len(functions)),
             )
 
     @skipIfWindows
+    @skipIfRemote
     def test_functionality(self):
         """Tests hitting breakpoints and the functionality of a single
         breakpoint, like 'conditions' and 'hitCondition' settings."""
@@ -132,18 +134,18 @@ class TestDAP_setFunctionBreakpoints(lldbdap_testcase.DAPTestCaseBase):
         functions = ["twelve"]
         breakpoint_ids = self.set_function_breakpoints(functions)
 
-        self.assertEqual(len(breakpoint_ids), len(functions), "expect one breakpoint")
+        self.assertEquals(len(breakpoint_ids), len(functions), "expect one breakpoint")
 
         # Verify we hit the breakpoint we just set
         self.continue_to_breakpoints(breakpoint_ids)
 
         # Make sure i is zero at first breakpoint
         i = int(self.dap_server.get_local_variable_value("i"))
-        self.assertEqual(i, 0, "i != 0 after hitting breakpoint")
+        self.assertEquals(i, 0, "i != 0 after hitting breakpoint")
 
         # Update the condition on our breakpoint
         new_breakpoint_ids = self.set_function_breakpoints(functions, condition="i==4")
-        self.assertEqual(
+        self.assertEquals(
             breakpoint_ids,
             new_breakpoint_ids,
             "existing breakpoint should have its condition " "updated",
@@ -151,10 +153,10 @@ class TestDAP_setFunctionBreakpoints(lldbdap_testcase.DAPTestCaseBase):
 
         self.continue_to_breakpoints(breakpoint_ids)
         i = int(self.dap_server.get_local_variable_value("i"))
-        self.assertEqual(i, 4, "i != 4 showing conditional works")
+        self.assertEquals(i, 4, "i != 4 showing conditional works")
         new_breakpoint_ids = self.set_function_breakpoints(functions, hitCondition="2")
 
-        self.assertEqual(
+        self.assertEquals(
             breakpoint_ids,
             new_breakpoint_ids,
             "existing breakpoint should have its condition " "updated",
@@ -163,10 +165,10 @@ class TestDAP_setFunctionBreakpoints(lldbdap_testcase.DAPTestCaseBase):
         # Continue with a hitCondition of 2 and expect it to skip 1 value
         self.continue_to_breakpoints(breakpoint_ids)
         i = int(self.dap_server.get_local_variable_value("i"))
-        self.assertEqual(i, 6, "i != 6 showing hitCondition works")
+        self.assertEquals(i, 6, "i != 6 showing hitCondition works")
 
         # continue after hitting our hitCondition and make sure it only goes
         # up by 1
         self.continue_to_breakpoints(breakpoint_ids)
         i = int(self.dap_server.get_local_variable_value("i"))
-        self.assertEqual(i, 7, "i != 7 showing post hitCondition hits every time")
+        self.assertEquals(i, 7, "i != 7 showing post hitCondition hits every time")

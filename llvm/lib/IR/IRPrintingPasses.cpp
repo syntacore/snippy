@@ -23,12 +23,6 @@
 
 using namespace llvm;
 
-cl::opt<bool> WriteNewDbgInfoFormat(
-    "write-experimental-debuginfo",
-    cl::desc("Write debug info in the new non-intrinsic format. Has no effect "
-             "if --preserve-input-debuginfo-format=true."),
-    cl::init(true));
-
 namespace {
 
 class PrintModulePassWrapper : public ModulePass {
@@ -45,14 +39,11 @@ public:
         ShouldPreserveUseListOrder(ShouldPreserveUseListOrder) {}
 
   bool runOnModule(Module &M) override {
-    // RemoveDIs: Regardless of the format we've processed this module in, use
-    // `WriteNewDbgInfoFormat` to determine which format we use to write it.
-    ScopedDbgInfoFormatSetter FormatSetter(M, WriteNewDbgInfoFormat);
-    // Remove intrinsic declarations when printing in the new format.
-    // TODO: Move this into Module::setIsNewDbgInfoFormat when we're ready to
-    // update test output.
-    if (WriteNewDbgInfoFormat)
-      M.removeDebugIntrinsicDeclarations();
+    // RemoveDIs: there's no textual representation of the DPValue debug-info,
+    // convert to dbg.values before writing out.
+    bool IsNewDbgInfoFormat = M.IsNewDbgInfoFormat;
+    if (IsNewDbgInfoFormat)
+      M.convertFromNewDbgValues();
 
     if (llvm::isFunctionInPrintList("*")) {
       if (!Banner.empty())
@@ -70,6 +61,9 @@ public:
         }
       }
     }
+
+    if (IsNewDbgInfoFormat)
+      M.convertToNewDbgValues();
 
     return false;
   }
@@ -93,9 +87,11 @@ public:
 
   // This pass just prints a banner followed by the function as it's processed.
   bool runOnFunction(Function &F) override {
-    // RemoveDIs: Regardless of the format we've processed this function in, use
-    // `WriteNewDbgInfoFormat` to determine which format we use to write it.
-    ScopedDbgInfoFormatSetter FormatSetter(F, WriteNewDbgInfoFormat);
+    // RemoveDIs: there's no textual representation of the DPValue debug-info,
+    // convert to dbg.values before writing out.
+    bool IsNewDbgInfoFormat = F.IsNewDbgInfoFormat;
+    if (IsNewDbgInfoFormat)
+      F.convertFromNewDbgValues();
 
     if (isFunctionInPrintList(F.getName())) {
       if (forcePrintModuleIR())
@@ -104,6 +100,9 @@ public:
       else
         OS << Banner << '\n' << static_cast<Value &>(F);
     }
+
+    if (IsNewDbgInfoFormat)
+      F.convertToNewDbgValues();
 
     return false;
   }

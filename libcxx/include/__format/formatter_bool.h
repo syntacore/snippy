@@ -12,6 +12,7 @@
 
 #include <__algorithm/copy.h>
 #include <__assert>
+#include <__availability>
 #include <__config>
 #include <__format/concepts.h>
 #include <__format/format_parse_context.h>
@@ -21,7 +22,7 @@
 #include <__utility/unreachable.h>
 
 #ifndef _LIBCPP_HAS_NO_LOCALIZATION
-#  include <__locale>
+#  include <locale>
 #endif
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)

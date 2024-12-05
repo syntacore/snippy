@@ -99,7 +99,6 @@ class CompilerInvocation : public CompilerInvocationBase {
   std::string moduleFileSuffix = ".mod";
 
   bool debugModuleDir = false;
-  bool hermeticModuleFileOutput = false;
 
   bool warnAsErr = false;
 
@@ -115,10 +114,8 @@ class CompilerInvocation : public CompilerInvocationBase {
   // Fortran Dialect options
   Fortran::common::IntrinsicTypeDefaultKinds defaultKinds;
 
-  // Fortran Warning options
   bool enableConformanceChecks = false;
   bool enableUsageChecks = false;
-  bool disableWarnings = false;
 
   /// Used in e.g. unparsing to dump the analyzed rather than the original
   /// parse-tree objects.
@@ -180,11 +177,6 @@ public:
   bool &getDebugModuleDir() { return debugModuleDir; }
   const bool &getDebugModuleDir() const { return debugModuleDir; }
 
-  bool &getHermeticModuleFileOutput() { return hermeticModuleFileOutput; }
-  const bool &getHermeticModuleFileOutput() const {
-    return hermeticModuleFileOutput;
-  }
-
   bool &getWarnAsErr() { return warnAsErr; }
   const bool &getWarnAsErr() const { return warnAsErr; }
 
@@ -204,9 +196,6 @@ public:
 
   bool &getEnableUsageChecks() { return enableUsageChecks; }
   const bool &getEnableUsageChecks() const { return enableUsageChecks; }
-
-  bool &getDisableWarnings() { return disableWarnings; }
-  const bool &getDisableWarnings() const { return disableWarnings; }
 
   Fortran::parser::AnalyzedObjectsAsFortran &getAsFortran() {
     return asFortran;
@@ -237,9 +226,6 @@ public:
   // Enables the usage checks
   void setEnableUsageChecks() { enableUsageChecks = true; }
 
-  // Disables all Warnings
-  void setDisableWarnings() { disableWarnings = true; }
-
   /// Useful setters
   void setArgv0(const char *dir) { argv0 = dir; }
 
@@ -250,9 +236,6 @@ public:
   }
 
   void setDebugModuleDir(bool flag) { debugModuleDir = flag; }
-  void setHermeticModuleFileOutput(bool flag) {
-    hermeticModuleFileOutput = flag;
-  }
 
   void setWarnAsErr(bool flag) { warnAsErr = flag; }
 

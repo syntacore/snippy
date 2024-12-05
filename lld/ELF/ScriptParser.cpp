@@ -36,7 +36,6 @@
 #include "llvm/Support/TimeProfiler.h"
 #include <cassert>
 #include <limits>
-#include <optional>
 #include <vector>
 
 using namespace llvm;
@@ -87,12 +86,11 @@ private:
   void readTarget();
   void readVersion();
   void readVersionScriptCommand();
-  void readNoCrossRefs(bool to);
 
   SymbolAssignment *readSymbolAssignment(StringRef name);
   ByteCommand *readByteCommand(StringRef tok);
   std::array<uint8_t, 4> readFill();
-  bool readSectionDirective(OutputSection *cmd, StringRef tok);
+  bool readSectionDirective(OutputSection *cmd, StringRef tok1, StringRef tok2);
   void readSectionAddressType(OutputSection *cmd);
   OutputDesc *readOverlaySectionDescription();
   OutputDesc *readOutputSectionDescription(StringRef outSec);
@@ -140,10 +138,6 @@ private:
 
   // A set to detect an INCLUDE() cycle.
   StringSet<> seen;
-
-  // If we are currently parsing a PROVIDE|PROVIDE_HIDDEN command,
-  // then this member is set to the PROVIDE symbol name.
-  std::optional<llvm::StringRef> activeProvideSym;
 };
 } // namespace
 
@@ -159,8 +153,7 @@ static void moveAbsRight(ExprValue &a, ExprValue &b) {
   if (a.sec == nullptr || (a.forceAbsolute && !b.isAbsolute()))
     std::swap(a, b);
   if (!b.isAbsolute())
-    script->recordError(
-        a.loc + ": at least one side of the expression must be absolute");
+    error(a.loc + ": at least one side of the expression must be absolute");
 }
 
 static ExprValue add(ExprValue a, ExprValue b) {
@@ -281,10 +274,6 @@ void ScriptParser::readLinkerScript() {
       readTarget();
     } else if (tok == "VERSION") {
       readVersion();
-    } else if (tok == "NOCROSSREFS") {
-      readNoCrossRefs(/*to=*/false);
-    } else if (tok == "NOCROSSREFS_TO") {
-      readNoCrossRefs(/*to=*/true);
     } else if (SymbolAssignment *cmd = readAssignment(tok)) {
       script->sectionCommands.push_back(cmd);
     } else {
@@ -302,17 +291,6 @@ void ScriptParser::readDefsym(StringRef name) {
   auto *cmd = make<SymbolAssignment>(
       name, e, 0, getCurrentMB().getBufferIdentifier().str());
   script->sectionCommands.push_back(cmd);
-}
-
-void ScriptParser::readNoCrossRefs(bool to) {
-  expect("(");
-  NoCrossRefCommand cmd{{}, to};
-  while (!errorCount() && !consume(")"))
-    cmd.outputSections.push_back(unquote(next()));
-  if (cmd.outputSections.size() < 2)
-    warn(getCurrentLocation() + ": ignored with fewer than 2 output sections");
-  else
-    script->noCrossRefs.push_back(std::move(cmd));
 }
 
 void ScriptParser::addFile(StringRef s) {
@@ -468,7 +446,6 @@ static std::pair<ELFKind, uint16_t> parseBfdName(StringRef s) {
       .Case("elf32-loongarch", {ELF32LEKind, EM_LOONGARCH})
       .Case("elf64-loongarch", {ELF64LEKind, EM_LOONGARCH})
       .Case("elf64-s390", {ELF64BEKind, EM_S390})
-      .Cases("elf32-hexagon", "elf32-littlehexagon", {ELF32LEKind, EM_HEXAGON})
       .Default({ELFNoneKind, EM_NONE});
 }
 
@@ -478,28 +455,20 @@ static std::pair<ELFKind, uint16_t> parseBfdName(StringRef s) {
 void ScriptParser::readOutputFormat() {
   expect("(");
 
-  StringRef s = unquote(next());
+  StringRef s;
+  config->bfdname = unquote(next());
   if (!consume(")")) {
     expect(",");
-    StringRef tmp = unquote(next());
+    s = unquote(next());
     if (config->optEB)
-      s = tmp;
+      config->bfdname = s;
     expect(",");
-    tmp = unquote(next());
+    s = unquote(next());
     if (config->optEL)
-      s = tmp;
+      config->bfdname = s;
     consume(")");
   }
-  // If more than one OUTPUT_FORMAT is specified, only the first is checked.
-  if (!config->bfdname.empty())
-    return;
-  config->bfdname = s;
-
-  if (s == "binary") {
-    config->oFormatBinary = true;
-    return;
-  }
-
+  s = config->bfdname;
   if (s.consume_back("-freebsd"))
     config->osabi = ELFOSABI_FREEBSD;
 
@@ -748,19 +717,9 @@ SmallVector<SectionPattern, 0> ScriptParser::readInputSectionsList() {
 
     StringMatcher SectionMatcher;
     // Break if the next token is ), EXCLUDE_FILE, or SORT*.
-    while (!errorCount() && peekSortKind() == SortSectionPolicy::Default) {
-      StringRef s = peek();
-      if (s == ")" || s == "EXCLUDE_FILE")
-        break;
-      // Detect common mistakes when certain non-wildcard meta characters are
-      // used without a closing ')'.
-      if (!s.empty() && strchr("(){}", s[0])) {
-        skip();
-        setError("section pattern is expected");
-        break;
-      }
+    while (!errorCount() && peek() != ")" && peek() != "EXCLUDE_FILE" &&
+           peekSortKind() == SortSectionPolicy::Default)
       SectionMatcher.addPattern(unquote(next()));
-    }
 
     if (!SectionMatcher.empty())
       ret.push_back({std::move(excludeFilePat), std::move(SectionMatcher)});
@@ -873,11 +832,16 @@ constexpr std::pair<const char *, unsigned> typeMap[] = {
 // Tries to read the special directive for an output section definition which
 // can be one of following: "(NOLOAD)", "(COPY)", "(INFO)", "(OVERLAY)", and
 // "(TYPE=<value>)".
-bool ScriptParser::readSectionDirective(OutputSection *cmd, StringRef tok) {
-  if (tok != "NOLOAD" && tok != "COPY" && tok != "INFO" && tok != "OVERLAY" &&
-      tok != "TYPE")
+// Tok1 and Tok2 are next 2 tokens peeked. See comment for
+// readSectionAddressType below.
+bool ScriptParser::readSectionDirective(OutputSection *cmd, StringRef tok1, StringRef tok2) {
+  if (tok1 != "(")
+    return false;
+  if (tok2 != "NOLOAD" && tok2 != "COPY" && tok2 != "INFO" &&
+      tok2 != "OVERLAY" && tok2 != "TYPE")
     return false;
 
+  expect("(");
   if (consume("NOLOAD")) {
     cmd->type = SHT_NOBITS;
     cmd->typeIsSet = true;
@@ -916,23 +880,16 @@ bool ScriptParser::readSectionDirective(OutputSection *cmd, StringRef tok) {
 // https://sourceware.org/binutils/docs/ld/Output-Section-Address.html
 // https://sourceware.org/binutils/docs/ld/Output-Section-Type.html
 void ScriptParser::readSectionAddressType(OutputSection *cmd) {
-  if (consume("(")) {
-    // Temporarily set inExpr to support TYPE=<value> without spaces.
-    SaveAndRestore saved(inExpr, true);
-    if (readSectionDirective(cmd, peek()))
-      return;
-    cmd->addrExpr = readExpr();
-    expect(")");
-  } else {
-    cmd->addrExpr = readExpr();
-  }
+  // Temporarily set inExpr to support TYPE=<value> without spaces.
+  bool saved = std::exchange(inExpr, true);
+  bool isDirective = readSectionDirective(cmd, peek(), peek2());
+  inExpr = saved;
+  if (isDirective)
+    return;
 
-  if (consume("(")) {
-    SaveAndRestore saved(inExpr, true);
-    StringRef tok = peek();
-    if (!readSectionDirective(cmd, tok))
-      setError("unknown section directive: " + tok);
-  }
+  cmd->addrExpr = readExpr();
+  if (peek() == "(" && !readSectionDirective(cmd, "(", peek2()))
+    setError("unknown section directive: " + peek2());
 }
 
 static Expr checkAlignment(Expr e, std::string &loc) {
@@ -1088,9 +1045,6 @@ SymbolAssignment *ScriptParser::readProvideHidden(bool provide, bool hidden) {
       ;
     return nullptr;
   }
-  llvm::SaveAndRestore saveActiveProvideSym(activeProvideSym);
-  if (provide)
-    activeProvideSym = name;
   SymbolAssignment *cmd = readSymbolAssignment(name);
   cmd->provide = provide;
   cmd->hidden = hidden;
@@ -1182,8 +1136,10 @@ SymbolAssignment *ScriptParser::readSymbolAssignment(StringRef name) {
 Expr ScriptParser::readExpr() {
   // Our lexer is context-aware. Set the in-expression bit so that
   // they apply different tokenization rules.
-  SaveAndRestore saved(inExpr, true);
+  bool orig = inExpr;
+  inExpr = true;
   Expr e = readExpr1(readPrimary(), 0);
+  inExpr = orig;
   return e;
 }
 
@@ -1249,9 +1205,9 @@ Expr ScriptParser::readExpr1(Expr lhs, int minPrec) {
     StringRef op1 = peek();
     if (precedence(op1) < minPrec)
       break;
-    skip();
-    if (op1 == "?")
+    if (consume("?"))
       return readTernary(lhs);
+    skip();
     Expr rhs = readPrimary();
 
     // Evaluate the remaining part of the expression first if the
@@ -1410,7 +1366,7 @@ StringRef ScriptParser::readParenLiteral() {
 
 static void checkIfExists(const OutputSection &osec, StringRef location) {
   if (osec.location.empty() && script->errorOnMissingSection)
-    script->recordError(location + ": undefined section " + osec.name);
+    error(location + ": undefined section " + osec.name);
 }
 
 static bool isValidSymbolName(StringRef s) {
@@ -1604,10 +1560,7 @@ Expr ScriptParser::readPrimary() {
     tok = unquote(tok);
   else if (!isValidSymbolName(tok))
     setError("malformed number: " + tok);
-  if (activeProvideSym)
-    script->provideMap[*activeProvideSym].push_back(tok);
-  else
-    script->referencedSymbols.push_back(tok);
+  script->referencedSymbols.push_back(tok);
   return [=] { return script->getSymbolValue(tok, location); };
 }
 
@@ -1653,9 +1606,7 @@ unsigned ScriptParser::readPhdrType() {
                      .Case("PT_GNU_EH_FRAME", PT_GNU_EH_FRAME)
                      .Case("PT_GNU_STACK", PT_GNU_STACK)
                      .Case("PT_GNU_RELRO", PT_GNU_RELRO)
-                     .Case("PT_OPENBSD_MUTABLE", PT_OPENBSD_MUTABLE)
                      .Case("PT_OPENBSD_RANDOMIZE", PT_OPENBSD_RANDOMIZE)
-                     .Case("PT_OPENBSD_SYSCALLS", PT_OPENBSD_SYSCALLS)
                      .Case("PT_OPENBSD_WXNEEDED", PT_OPENBSD_WXNEEDED)
                      .Case("PT_OPENBSD_BOOTDATA", PT_OPENBSD_BOOTDATA)
                      .Default(-1);

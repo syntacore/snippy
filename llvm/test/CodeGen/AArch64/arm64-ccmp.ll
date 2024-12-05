@@ -635,7 +635,19 @@ define i64 @select_noccmp1(i64 %v1, i64 %v2, i64 %v3, i64 %r) {
 ;
 ; GISEL-LABEL: select_noccmp1:
 ; GISEL:       ; %bb.0:
-; GISEL-NEXT:    mov x0, x3
+; GISEL-NEXT:    cmp x0, #0
+; GISEL-NEXT:    cset w8, lt
+; GISEL-NEXT:    cmp x0, #13
+; GISEL-NEXT:    cset w9, gt
+; GISEL-NEXT:    cmp x2, #2
+; GISEL-NEXT:    cset w10, lt
+; GISEL-NEXT:    cmp x2, #4
+; GISEL-NEXT:    cset w11, gt
+; GISEL-NEXT:    and w8, w8, w9
+; GISEL-NEXT:    and w9, w10, w11
+; GISEL-NEXT:    orr w8, w8, w9
+; GISEL-NEXT:    tst w8, #0x1
+; GISEL-NEXT:    csel x0, xzr, x3, ne
 ; GISEL-NEXT:    ret
   %c0 = icmp slt i64 %v1, 0
   %c1 = icmp sgt i64 %v1, 13
@@ -665,8 +677,11 @@ define i64 @select_noccmp2(i64 %v1, i64 %v2, i64 %v3, i64 %r) {
 ;
 ; GISEL-LABEL: select_noccmp2:
 ; GISEL:       ; %bb.0:
-; GISEL-NEXT:    cmp x0, #14
-; GISEL-NEXT:    cset w8, hs
+; GISEL-NEXT:    cmp x0, #0
+; GISEL-NEXT:    cset w8, lt
+; GISEL-NEXT:    cmp x0, #13
+; GISEL-NEXT:    cset w9, gt
+; GISEL-NEXT:    orr w8, w8, w9
 ; GISEL-NEXT:    tst w8, #0x1
 ; GISEL-NEXT:    csel x0, xzr, x3, ne
 ; GISEL-NEXT:    sbfx w8, w8, #0, #1
@@ -704,13 +719,25 @@ define i32 @select_noccmp3(i32 %v0, i32 %v1, i32 %v2) {
 ;
 ; GISEL-LABEL: select_noccmp3:
 ; GISEL:       ; %bb.0:
-; GISEL-NEXT:    mov w8, #99 ; =0x63
-; GISEL-NEXT:    sub w9, w0, #45
+; GISEL-NEXT:    cmp w0, #0
+; GISEL-NEXT:    cset w8, lt
+; GISEL-NEXT:    cmp w0, #13
+; GISEL-NEXT:    cset w9, gt
+; GISEL-NEXT:    cmp w0, #22
+; GISEL-NEXT:    cset w10, lt
+; GISEL-NEXT:    cmp w0, #44
+; GISEL-NEXT:    cset w11, gt
+; GISEL-NEXT:    cmp w0, #99
+; GISEL-NEXT:    cset w12, eq
 ; GISEL-NEXT:    cmp w0, #77
-; GISEL-NEXT:    ccmp w0, w8, #4, ne
-; GISEL-NEXT:    ccmn w9, #23, #2, eq
-; GISEL-NEXT:    ccmp w0, #14, #0, lo
-; GISEL-NEXT:    csel w0, w1, w2, hs
+; GISEL-NEXT:    cset w13, eq
+; GISEL-NEXT:    orr w8, w8, w9
+; GISEL-NEXT:    orr w9, w10, w11
+; GISEL-NEXT:    and w8, w8, w9
+; GISEL-NEXT:    orr w9, w12, w13
+; GISEL-NEXT:    and w8, w8, w9
+; GISEL-NEXT:    tst w8, #0x1
+; GISEL-NEXT:    csel w0, w1, w2, ne
 ; GISEL-NEXT:    ret
   %c0 = icmp slt i32 %v0, 0
   %c1 = icmp sgt i32 %v0, 13

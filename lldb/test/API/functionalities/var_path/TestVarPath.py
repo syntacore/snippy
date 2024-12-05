@@ -22,7 +22,7 @@ class TestVarPath(TestBase):
     def verify_point(self, frame, var_name, var_typename, x_value, y_value):
         v = frame.GetValueForVariablePath(var_name)
         self.assertSuccess(v.GetError(), "Make sure we find '%s'" % (var_name))
-        self.assertEqual(
+        self.assertEquals(
             v.GetType().GetName(),
             var_typename,
             "Make sure '%s' has type '%s'" % (var_name, var_typename),
@@ -43,12 +43,12 @@ class TestVarPath(TestBase):
 
         v = frame.GetValueForVariablePath(valid_x_path)
         self.assertSuccess(v.GetError(), "Make sure we find '%s'" % (valid_x_path))
-        self.assertEqual(
+        self.assertEquals(
             v.GetValue(),
             str(x_value),
             "Make sure '%s' has a value of %i" % (valid_x_path, x_value),
         )
-        self.assertEqual(
+        self.assertEquals(
             v.GetType().GetName(),
             "int",
             "Make sure '%s' has type 'int'" % (valid_x_path),
@@ -60,12 +60,12 @@ class TestVarPath(TestBase):
 
         v = frame.GetValueForVariablePath(valid_y_path)
         self.assertSuccess(v.GetError(), "Make sure we find '%s'" % (valid_y_path))
-        self.assertEqual(
+        self.assertEquals(
             v.GetValue(),
             str(y_value),
             "Make sure '%s' has a value of %i" % (valid_y_path, y_value),
         )
-        self.assertEqual(
+        self.assertEquals(
             v.GetType().GetName(),
             "int",
             "Make sure '%s' has type 'int'" % (valid_y_path),

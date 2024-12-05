@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "include/overridable_function.h"
-#include <__assert>
 #include <__memory/aligned_alloc.h>
 #include <cstddef>
 #include <cstdlib>

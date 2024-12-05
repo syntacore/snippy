@@ -26,11 +26,11 @@ public:
 
   ~LibcxxInitializerListSyntheticFrontEnd() override;
 
-  llvm::Expected<uint32_t> CalculateNumChildren() override;
+  size_t CalculateNumChildren() override;
 
-  lldb::ValueObjectSP GetChildAtIndex(uint32_t idx) override;
+  lldb::ValueObjectSP GetChildAtIndex(size_t idx) override;
 
-  lldb::ChildCacheState Update() override;
+  bool Update() override;
 
   bool MightHaveChildren() override;
 
@@ -59,8 +59,8 @@ lldb_private::formatters::LibcxxInitializerListSyntheticFrontEnd::
   // delete m_start;
 }
 
-llvm::Expected<uint32_t> lldb_private::formatters::
-    LibcxxInitializerListSyntheticFrontEnd::CalculateNumChildren() {
+size_t lldb_private::formatters::LibcxxInitializerListSyntheticFrontEnd::
+    CalculateNumChildren() {
   m_num_elements = 0;
   ValueObjectSP size_sp(m_backend.GetChildMemberWithName("__size_"));
   if (size_sp)
@@ -69,7 +69,7 @@ llvm::Expected<uint32_t> lldb_private::formatters::
 }
 
 lldb::ValueObjectSP lldb_private::formatters::
-    LibcxxInitializerListSyntheticFrontEnd::GetChildAtIndex(uint32_t idx) {
+    LibcxxInitializerListSyntheticFrontEnd::GetChildAtIndex(size_t idx) {
   if (!m_start)
     return lldb::ValueObjectSP();
 
@@ -82,13 +82,13 @@ lldb::ValueObjectSP lldb_private::formatters::
                                       m_element_type);
 }
 
-lldb::ChildCacheState
-lldb_private::formatters::LibcxxInitializerListSyntheticFrontEnd::Update() {
+bool lldb_private::formatters::LibcxxInitializerListSyntheticFrontEnd::
+    Update() {
   m_start = nullptr;
   m_num_elements = 0;
   m_element_type = m_backend.GetCompilerType().GetTypeTemplateArgument(0);
   if (!m_element_type.IsValid())
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
   if (std::optional<uint64_t> size = m_element_type.GetByteSize(nullptr)) {
     m_element_size = *size;
@@ -96,7 +96,7 @@ lldb_private::formatters::LibcxxInitializerListSyntheticFrontEnd::Update() {
     m_start = m_backend.GetChildMemberWithName("__begin_").get();
   }
 
-  return lldb::ChildCacheState::eRefetch;
+  return false;
 }
 
 bool lldb_private::formatters::LibcxxInitializerListSyntheticFrontEnd::

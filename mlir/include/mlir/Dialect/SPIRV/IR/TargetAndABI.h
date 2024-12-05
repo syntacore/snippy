@@ -87,14 +87,9 @@ bool needsInterfaceVarABIAttrs(TargetEnvAttr targetAttr);
 StringRef getEntryPointABIAttrName();
 
 /// Gets the EntryPointABIAttr given its fields.
-/// targetWidth is used by several execution modes. It is the element width
-/// of floating-point operations.
-/// Refer to Execution Mode in SPIR-V specification.
-/// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_execution_mode
 EntryPointABIAttr getEntryPointABIAttr(MLIRContext *context,
                                        ArrayRef<int32_t> workgroupSize = {},
-                                       std::optional<int> subgroupSize = {},
-                                       std::optional<int> targetWidth = {});
+                                       std::optional<int> subgroupSize = {});
 
 /// Queries the entry point ABI on the nearest function-like op containing the
 /// given `op`. Returns null attribute if not found.

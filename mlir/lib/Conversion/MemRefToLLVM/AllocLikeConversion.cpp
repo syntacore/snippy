@@ -10,14 +10,18 @@
 #include "mlir/Analysis/DataLayoutAnalysis.h"
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/IR/SymbolTable.h"
 
 using namespace mlir;
 
 namespace {
+// TODO: Fix the LLVM utilities for looking up functions to take Operation*
+// with SymbolTable trait instead of ModuleOp and make similar change here. This
+// allows call sites to use getParentWithTrait<OpTrait::SymbolTable> instead
+// of getParentOfType<ModuleOp> to pass down the operation.
 LLVM::LLVMFuncOp getNotalignedAllocFn(const LLVMTypeConverter *typeConverter,
-                                      Operation *module, Type indexType) {
+                                      ModuleOp module, Type indexType) {
   bool useGenericFn = typeConverter->getOptions().useGenericFunctions;
+
   if (useGenericFn)
     return LLVM::lookupOrCreateGenericAllocFn(module, indexType);
 
@@ -25,7 +29,7 @@ LLVM::LLVMFuncOp getNotalignedAllocFn(const LLVMTypeConverter *typeConverter,
 }
 
 LLVM::LLVMFuncOp getAlignedAllocFn(const LLVMTypeConverter *typeConverter,
-                                   Operation *module, Type indexType) {
+                                   ModuleOp module, Type indexType) {
   bool useGenericFn = typeConverter->getOptions().useGenericFunctions;
 
   if (useGenericFn)
@@ -75,8 +79,7 @@ std::tuple<Value, Value> AllocationOpLLVMLowering::allocateBufferManuallyAlign(
   // Allocate the underlying buffer.
   Type elementPtrType = this->getElementPtrType(memRefType);
   LLVM::LLVMFuncOp allocFuncOp = getNotalignedAllocFn(
-      getTypeConverter(), op->getParentWithTrait<OpTrait::SymbolTable>(),
-      getIndexType());
+      getTypeConverter(), op->getParentOfType<ModuleOp>(), getIndexType());
   auto results = rewriter.create<LLVM::CallOp>(loc, allocFuncOp, sizeBytes);
 
   Value allocatedPtr =
@@ -141,8 +144,7 @@ Value AllocationOpLLVMLowering::allocateBufferAutoAlign(
 
   Type elementPtrType = this->getElementPtrType(memRefType);
   LLVM::LLVMFuncOp allocFuncOp = getAlignedAllocFn(
-      getTypeConverter(), op->getParentWithTrait<OpTrait::SymbolTable>(),
-      getIndexType());
+      getTypeConverter(), op->getParentOfType<ModuleOp>(), getIndexType());
   auto results = rewriter.create<LLVM::CallOp>(
       loc, allocFuncOp, ValueRange({allocAlignment, sizeBytes}));
 

@@ -138,9 +138,8 @@ ASM_SYMBOL(__xray_ArgLoggerEntry):
   ret
 ASM_SIZE(__xray_ArgLoggerEntry)
 
-// __xray_*Event have default visibility so that they can be referenced by user
-// DSOs that do not link against the runtime.
 .global ASM_SYMBOL(__xray_CustomEvent)
+ASM_HIDDEN(__xray_CustomEvent)
 ASM_TYPE_FUNCTION(__xray_CustomEvent)
 ASM_SYMBOL(__xray_CustomEvent):
   SAVE_REGISTERS
@@ -154,6 +153,7 @@ ASM_SYMBOL(__xray_CustomEvent):
 ASM_SIZE(__xray_CustomEvent)
 
 .global ASM_SYMBOL(__xray_TypedEvent)
+ASM_HIDDEN(__xray_TypedEvent)
 ASM_TYPE_FUNCTION(__xray_TypedEvent)
 ASM_SYMBOL(__xray_TypedEvent):
   SAVE_REGISTERS

@@ -1166,7 +1166,7 @@ void InvalidateRegionsWorker::VisitCluster(const MemRegion *baseR,
 
       // Compute lower and upper offsets for region within array.
       if (const ConstantArrayType *CAT = dyn_cast<ConstantArrayType>(AT))
-        NumElements = CAT->getZExtSize();
+        NumElements = CAT->getSize().getZExtValue();
       if (!NumElements) // We are not dealing with a constant size array
         goto conjure_default;
       QualType ElementTy = AT->getElementType();
@@ -1613,7 +1613,7 @@ getConstantArrayExtents(const ConstantArrayType *CAT) {
   CAT = cast<ConstantArrayType>(CAT->getCanonicalTypeInternal());
   SmallVector<uint64_t, 2> Extents;
   do {
-    Extents.push_back(CAT->getZExtSize());
+    Extents.push_back(CAT->getSize().getZExtValue());
   } while ((CAT = dyn_cast<ConstantArrayType>(CAT->getElementType())));
   return Extents;
 }
@@ -2358,12 +2358,11 @@ StoreRef RegionStoreManager::killBinding(Store ST, Loc L) {
 
 RegionBindingsRef
 RegionStoreManager::bind(RegionBindingsConstRef B, Loc L, SVal V) {
-  // We only care about region locations.
-  auto MemRegVal = L.getAs<loc::MemRegionVal>();
-  if (!MemRegVal)
+  if (L.getAs<loc::ConcreteInt>())
     return B;
 
-  const MemRegion *R = MemRegVal->getRegion();
+  // If we get here, the location should be a region.
+  const MemRegion *R = L.castAs<loc::MemRegionVal>().getRegion();
 
   // Check if the region is a struct region.
   if (const TypedValueRegion* TR = dyn_cast<TypedValueRegion>(R)) {
@@ -2437,7 +2436,7 @@ std::optional<RegionBindingsRef> RegionStoreManager::tryBindSmallArray(
     return std::nullopt;
 
   // If the array is too big, create a LCV instead.
-  uint64_t ArrSize = CAT->getLimitedSize();
+  uint64_t ArrSize = CAT->getSize().getLimitedValue();
   if (ArrSize > SmallArrayLimit)
     return std::nullopt;
 
@@ -2466,7 +2465,7 @@ RegionStoreManager::bindArray(RegionBindingsConstRef B,
   std::optional<uint64_t> Size;
 
   if (const ConstantArrayType* CAT = dyn_cast<ConstantArrayType>(AT))
-    Size = CAT->getZExtSize();
+    Size = CAT->getSize().getZExtValue();
 
   // Check if the init expr is a literal. If so, bind the rvalue instead.
   // FIXME: It's not responsibility of the Store to transform this lvalue
@@ -2571,7 +2570,7 @@ std::optional<RegionBindingsRef> RegionStoreManager::tryBindSmallStruct(
       return std::nullopt;
 
   for (const auto *FD : RD->fields()) {
-    if (FD->isUnnamedBitField())
+    if (FD->isUnnamedBitfield())
       continue;
 
     // If there are too many fields, or if any of the fields are aggregates,
@@ -2698,7 +2697,7 @@ RegionBindingsRef RegionStoreManager::bindStruct(RegionBindingsConstRef B,
       break;
 
     // Skip any unnamed bitfields to stay in sync with the initializers.
-    if (FI->isUnnamedBitField())
+    if (FI->isUnnamedBitfield())
       continue;
 
     QualType FTy = FI->getType();

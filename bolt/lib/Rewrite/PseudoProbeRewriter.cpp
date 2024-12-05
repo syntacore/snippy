@@ -19,7 +19,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/LEB128.h"
-#include <memory>
 
 #undef DEBUG_TYPE
 #define DEBUG_TYPE "pseudo-probe-rewriter"
@@ -73,35 +72,23 @@ class PseudoProbeRewriter final : public MetadataRewriter {
   void parsePseudoProbe();
 
   /// PseudoProbe decoder
-  std::shared_ptr<MCPseudoProbeDecoder> ProbeDecoderPtr;
+  MCPseudoProbeDecoder ProbeDecoder;
 
 public:
   PseudoProbeRewriter(BinaryContext &BC)
-      : MetadataRewriter("pseudo-probe-rewriter", BC),
-        ProbeDecoderPtr(std::make_shared<MCPseudoProbeDecoder>()) {
-    BC.setPseudoProbeDecoder(ProbeDecoderPtr);
-  }
+      : MetadataRewriter("pseudo-probe-rewriter", BC) {}
 
-  Error preCFGInitializer() override;
   Error postEmitFinalizer() override;
-
-  ~PseudoProbeRewriter() override { ProbeDecoderPtr.reset(); }
 };
 
-Error PseudoProbeRewriter::preCFGInitializer() {
-  parsePseudoProbe();
-
-  return Error::success();
-}
-
 Error PseudoProbeRewriter::postEmitFinalizer() {
+  parsePseudoProbe();
   updatePseudoProbes();
 
   return Error::success();
 }
 
 void PseudoProbeRewriter::parsePseudoProbe() {
-  MCPseudoProbeDecoder &ProbeDecoder(*ProbeDecoderPtr);
   PseudoProbeDescSection = BC.getUniqueSectionByName(".pseudo_probe_desc");
   PseudoProbeSection = BC.getUniqueSectionByName(".pseudo_probe");
 
@@ -151,18 +138,9 @@ void PseudoProbeRewriter::parsePseudoProbe() {
     ProbeDecoder.printGUID2FuncDescMap(outs());
     ProbeDecoder.printProbesForAllAddresses(outs());
   }
-
-  for (const auto &[GUID, FuncDesc] : ProbeDecoder.getGUID2FuncDescMap()) {
-    if (!FuncStartAddrs.contains(GUID))
-      continue;
-    BinaryFunction *BF = BC.getBinaryFunctionAtAddress(FuncStartAddrs[GUID]);
-    assert(BF);
-    BF->setGUID(GUID);
-  }
 }
 
 void PseudoProbeRewriter::updatePseudoProbes() {
-  MCPseudoProbeDecoder &ProbeDecoder(*ProbeDecoderPtr);
   // check if there is pseudo probe section decoded
   if (ProbeDecoder.getAddress2ProbesMap().empty())
     return;
@@ -263,7 +241,6 @@ void PseudoProbeRewriter::updatePseudoProbes() {
 }
 
 void PseudoProbeRewriter::encodePseudoProbes() {
-  MCPseudoProbeDecoder &ProbeDecoder(*ProbeDecoderPtr);
   // Buffer for new pseudo probes section
   SmallString<8> Contents;
   MCDecodedPseudoProbe *LastProbe = nullptr;

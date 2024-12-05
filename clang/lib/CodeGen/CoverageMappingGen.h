@@ -19,12 +19,7 @@
 #include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/GlobalValue.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
-
-namespace llvm::coverage {
-extern cl::opt<bool> SystemHeadersCoverage;
-}
 
 namespace clang {
 
@@ -96,10 +91,6 @@ namespace CodeGen {
 
 class CodeGenModule;
 
-namespace MCDC {
-struct State;
-}
-
 /// Organizes the cross-function state that is used while generating
 /// code coverage mapping data.
 class CoverageMappingModuleGen {
@@ -159,20 +150,22 @@ class CoverageMappingGen {
   SourceManager &SM;
   const LangOptions &LangOpts;
   llvm::DenseMap<const Stmt *, unsigned> *CounterMap;
-  MCDC::State *MCDCState;
+  llvm::DenseMap<const Stmt *, unsigned> *MCDCBitmapMap;
+  llvm::DenseMap<const Stmt *, unsigned> *CondIDMap;
 
 public:
   CoverageMappingGen(CoverageMappingModuleGen &CVM, SourceManager &SM,
                      const LangOptions &LangOpts)
       : CVM(CVM), SM(SM), LangOpts(LangOpts), CounterMap(nullptr),
-        MCDCState(nullptr) {}
+        MCDCBitmapMap(nullptr), CondIDMap(nullptr) {}
 
   CoverageMappingGen(CoverageMappingModuleGen &CVM, SourceManager &SM,
                      const LangOptions &LangOpts,
                      llvm::DenseMap<const Stmt *, unsigned> *CounterMap,
-                     MCDC::State *MCDCState)
+                     llvm::DenseMap<const Stmt *, unsigned> *MCDCBitmapMap,
+                     llvm::DenseMap<const Stmt *, unsigned> *CondIDMap)
       : CVM(CVM), SM(SM), LangOpts(LangOpts), CounterMap(CounterMap),
-        MCDCState(MCDCState) {}
+        MCDCBitmapMap(MCDCBitmapMap), CondIDMap(CondIDMap) {}
 
   /// Emit the coverage mapping data which maps the regions of
   /// code to counters that will be used to find the execution

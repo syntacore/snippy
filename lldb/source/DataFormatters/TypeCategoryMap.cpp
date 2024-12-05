@@ -25,31 +25,19 @@ TypeCategoryMap::TypeCategoryMap(IFormatChangeListener *lst)
 }
 
 void TypeCategoryMap::Add(KeyType name, const TypeCategoryImplSP &entry) {
-  {
-    std::lock_guard<std::recursive_mutex> guard(m_map_mutex);
-    m_map[name] = entry;
-  }
-  // Release the mutex to avoid a potential deadlock between
-  // TypeCategoryMap::m_map_mutex and
-  // FormatManager::m_language_categories_mutex which can be acquired in
-  // reverse order when calling FormatManager::Changed.
+  std::lock_guard<std::recursive_mutex> guard(m_map_mutex);
+  m_map[name] = entry;
   if (listener)
     listener->Changed();
 }
 
 bool TypeCategoryMap::Delete(KeyType name) {
-  {
-    std::lock_guard<std::recursive_mutex> guard(m_map_mutex);
-    MapIterator iter = m_map.find(name);
-    if (iter == m_map.end())
-      return false;
-    m_map.erase(name);
-    Disable(name);
-  }
-  // Release the mutex to avoid a potential deadlock between
-  // TypeCategoryMap::m_map_mutex and
-  // FormatManager::m_language_categories_mutex which can be acquired in
-  // reverse order when calling FormatManager::Changed.
+  std::lock_guard<std::recursive_mutex> guard(m_map_mutex);
+  MapIterator iter = m_map.find(name);
+  if (iter == m_map.end())
+    return false;
+  m_map.erase(name);
+  Disable(name);
   if (listener)
     listener->Changed();
   return true;
@@ -135,15 +123,9 @@ void TypeCategoryMap::DisableAllCategories() {
 }
 
 void TypeCategoryMap::Clear() {
-  {
-    std::lock_guard<std::recursive_mutex> guard(m_map_mutex);
-    m_map.clear();
-    m_active_categories.clear();
-  }
-  // Release the mutex to avoid a potential deadlock between
-  // TypeCategoryMap::m_map_mutex and
-  // FormatManager::m_language_categories_mutex which can be acquired in
-  // reverse order when calling FormatManager::Changed.
+  std::lock_guard<std::recursive_mutex> guard(m_map_mutex);
+  m_map.clear();
+  m_active_categories.clear();
   if (listener)
     listener->Changed();
 }

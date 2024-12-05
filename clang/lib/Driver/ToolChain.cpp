@@ -77,19 +77,10 @@ static ToolChain::RTTIMode CalculateRTTIMode(const ArgList &Args,
   return NoRTTI ? ToolChain::RM_Disabled : ToolChain::RM_Enabled;
 }
 
-static ToolChain::ExceptionsMode CalculateExceptionsMode(const ArgList &Args) {
-  if (Args.hasFlag(options::OPT_fexceptions, options::OPT_fno_exceptions,
-                   true)) {
-    return ToolChain::EM_Enabled;
-  }
-  return ToolChain::EM_Disabled;
-}
-
 ToolChain::ToolChain(const Driver &D, const llvm::Triple &T,
                      const ArgList &Args)
     : D(D), Triple(T), Args(Args), CachedRTTIArg(GetRTTIArgument(Args)),
-      CachedRTTIMode(CalculateRTTIMode(Args, Triple, CachedRTTIArg)),
-      CachedExceptionsMode(CalculateExceptionsMode(Args)) {
+      CachedRTTIMode(CalculateRTTIMode(Args, Triple, CachedRTTIArg)) {
   auto addIfExists = [this](path_list &List, const std::string &Path) {
     if (getVFS().exists(Path))
       List.push_back(Path);
@@ -104,8 +95,7 @@ ToolChain::ToolChain(const Driver &D, const llvm::Triple &T,
 }
 
 llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>>
-ToolChain::executeToolChainProgram(StringRef Executable,
-                                   unsigned SecondsToWait) const {
+ToolChain::executeToolChainProgram(StringRef Executable) const {
   llvm::SmallString<64> OutputFile;
   llvm::sys::fs::createTemporaryFile("toolchain-program", "txt", OutputFile);
   llvm::FileRemover OutputRemover(OutputFile.c_str());
@@ -116,8 +106,9 @@ ToolChain::executeToolChainProgram(StringRef Executable,
   };
 
   std::string ErrorMessage;
-  if (llvm::sys::ExecuteAndWait(Executable, {}, {}, Redirects, SecondsToWait,
-                                /*MemoryLimit=*/0, &ErrorMessage))
+  if (llvm::sys::ExecuteAndWait(Executable, {}, {}, Redirects,
+                                /* SecondsToWait */ 0,
+                                /*MemoryLimit*/ 0, &ErrorMessage))
     return llvm::createStringError(std::error_code(),
                                    Executable + ": " + ErrorMessage);
 
@@ -195,19 +186,12 @@ static void getAArch64MultilibFlags(const Driver &D,
                                        UnifiedFeatures.end());
   std::vector<std::string> MArch;
   for (const auto &Ext : AArch64::Extensions)
-    if (!Ext.UserVisibleName.empty())
-      if (FeatureSet.contains(Ext.PosTargetFeature))
-        MArch.push_back(Ext.UserVisibleName.str());
+    if (FeatureSet.contains(Ext.Feature))
+      MArch.push_back(Ext.Name.str());
   for (const auto &Ext : AArch64::Extensions)
-    if (!Ext.UserVisibleName.empty())
-      if (FeatureSet.contains(Ext.NegTargetFeature))
-        MArch.push_back(("no" + Ext.UserVisibleName).str());
-  StringRef ArchName;
-  for (const auto &ArchInfo : AArch64::ArchInfos)
-    if (FeatureSet.contains(ArchInfo->ArchFeature))
-      ArchName = ArchInfo->Name;
-  assert(!ArchName.empty() && "at least one architecture should be found");
-  MArch.insert(MArch.begin(), ("-march=" + ArchName).str());
+    if (FeatureSet.contains(Ext.NegFeature))
+      MArch.push_back(("no" + Ext.Name).str());
+  MArch.insert(MArch.begin(), ("-march=" + Triple.getArchName()).str());
   Result.push_back(llvm::join(MArch, "+"));
 }
 
@@ -223,13 +207,11 @@ static void getARMMultilibFlags(const Driver &D,
                                        UnifiedFeatures.end());
   std::vector<std::string> MArch;
   for (const auto &Ext : ARM::ARCHExtNames)
-    if (!Ext.Name.empty())
-      if (FeatureSet.contains(Ext.Feature))
-        MArch.push_back(Ext.Name.str());
+    if (FeatureSet.contains(Ext.Feature))
+      MArch.push_back(Ext.Name.str());
   for (const auto &Ext : ARM::ARCHExtNames)
-    if (!Ext.Name.empty())
-      if (FeatureSet.contains(Ext.NegFeature))
-        MArch.push_back(("no" + Ext.Name).str());
+    if (FeatureSet.contains(Ext.NegFeature))
+      MArch.push_back(("no" + Ext.Name).str());
   MArch.insert(MArch.begin(), ("-march=" + Triple.getArchName()).str());
   Result.push_back(llvm::join(MArch, "+"));
 
@@ -281,18 +263,6 @@ ToolChain::getMultilibFlags(const llvm::opt::ArgList &Args) const {
   default:
     break;
   }
-
-  // Include fno-exceptions and fno-rtti
-  // to improve multilib selection
-  if (getRTTIMode() == ToolChain::RTTIMode::RM_Disabled)
-    Result.push_back("-fno-rtti");
-  else
-    Result.push_back("-frtti");
-
-  if (getExceptionsMode() == ToolChain::ExceptionsMode::EM_Disabled)
-    Result.push_back("-fno-exceptions");
-  else
-    Result.push_back("-fexceptions");
 
   // Sort and remove duplicates.
   std::sort(Result.begin(), Result.end());
@@ -455,6 +425,12 @@ std::string ToolChain::getInputFilename(const InputInfo &Input) const {
 ToolChain::UnwindTableLevel
 ToolChain::getDefaultUnwindTableLevel(const ArgList &Args) const {
   return UnwindTableLevel::None;
+}
+
+unsigned ToolChain::GetDefaultDwarfVersion() const {
+  // TODO: Remove the RISC-V special case when R_RISCV_SET_ULEB128 linker
+  // support becomes more widely available.
+  return getTriple().isRISCV() ? 4 : 5;
 }
 
 Tool *ToolChain::getClang() const {
@@ -679,29 +655,19 @@ std::string ToolChain::getCompilerRT(const ArgList &Args, StringRef Component,
   // Check for runtime files in the new layout without the architecture first.
   std::string CRTBasename =
       buildCompilerRTBasename(Args, Component, Type, /*AddArch=*/false);
-  SmallString<128> Path;
   for (const auto &LibPath : getLibraryPaths()) {
     SmallString<128> P(LibPath);
     llvm::sys::path::append(P, CRTBasename);
     if (getVFS().exists(P))
       return std::string(P);
-    if (Path.empty())
-      Path = P;
   }
-  if (getTriple().isOSAIX())
-    Path.clear();
 
-  // Check the filename for the old layout if the new one does not exist.
+  // Fall back to the old expected compiler-rt name if the new one does not
+  // exist.
   CRTBasename =
       buildCompilerRTBasename(Args, Component, Type, /*AddArch=*/true);
-  SmallString<128> OldPath(getCompilerRTPath());
-  llvm::sys::path::append(OldPath, CRTBasename);
-  if (Path.empty() || getVFS().exists(OldPath))
-    return std::string(OldPath);
-
-  // If none is found, use a file name from the new layout, which may get
-  // printed in an error message, aiding users in knowing what Clang is
-  // looking for.
+  SmallString<128> Path(getCompilerRTPath());
+  llvm::sys::path::append(Path, CRTBasename);
   return std::string(Path);
 }
 
@@ -800,24 +766,12 @@ ToolChain::getTargetSubDirPath(StringRef BaseDir) const {
 std::optional<std::string> ToolChain::getRuntimePath() const {
   SmallString<128> P(D.ResourceDir);
   llvm::sys::path::append(P, "lib");
-  if (auto Ret = getTargetSubDirPath(P))
-    return Ret;
-  // Darwin does not use per-target runtime directory.
-  if (Triple.isOSDarwin())
-    return {};
-  llvm::sys::path::append(P, Triple.str());
-  return std::string(P);
+  return getTargetSubDirPath(P);
 }
 
 std::optional<std::string> ToolChain::getStdlibPath() const {
   SmallString<128> P(D.Dir);
   llvm::sys::path::append(P, "..", "lib");
-  return getTargetSubDirPath(P);
-}
-
-std::optional<std::string> ToolChain::getStdlibIncludePath() const {
-  SmallString<128> P(D.Dir);
-  llvm::sys::path::append(P, "..", "include");
   return getTargetSubDirPath(P);
 }
 
@@ -1031,12 +985,11 @@ std::string ToolChain::ComputeLLVMTriple(const ArgList &Args,
   }
   case llvm::Triple::aarch64: {
     llvm::Triple Triple = getTriple();
-    tools::aarch64::setPAuthABIInTriple(getDriver(), Args, Triple);
     if (!Triple.isOSBinFormatMachO())
-      return Triple.getTriple();
+      return getTripleString();
 
     if (Triple.isArm64e())
-      return Triple.getTriple();
+      return getTripleString();
 
     // FIXME: older versions of ld64 expect the "arm64" component in the actual
     // triple string and query it to determine whether an LTO file can be
@@ -1318,35 +1271,19 @@ void ToolChain::AddCCKextLibArgs(const ArgList &Args,
 
 bool ToolChain::isFastMathRuntimeAvailable(const ArgList &Args,
                                            std::string &Path) const {
-  // Don't implicitly link in mode-changing libraries in a shared library, since
-  // this can have very deleterious effects. See the various links from
-  // https://github.com/llvm/llvm-project/issues/57589 for more information.
-  bool Default = !Args.hasArgNoClaim(options::OPT_shared);
-
   // Do not check for -fno-fast-math or -fno-unsafe-math when -Ofast passed
   // (to keep the linker options consistent with gcc and clang itself).
-  if (Default && !isOptimizationLevelFast(Args)) {
+  if (!isOptimizationLevelFast(Args)) {
     // Check if -ffast-math or -funsafe-math.
-    Arg *A = Args.getLastArg(
-        options::OPT_ffast_math, options::OPT_fno_fast_math,
-        options::OPT_funsafe_math_optimizations,
-        options::OPT_fno_unsafe_math_optimizations, options::OPT_ffp_model_EQ);
+    Arg *A =
+      Args.getLastArg(options::OPT_ffast_math, options::OPT_fno_fast_math,
+                      options::OPT_funsafe_math_optimizations,
+                      options::OPT_fno_unsafe_math_optimizations);
 
     if (!A || A->getOption().getID() == options::OPT_fno_fast_math ||
         A->getOption().getID() == options::OPT_fno_unsafe_math_optimizations)
-      Default = false;
-    if (A && A->getOption().getID() == options::OPT_ffp_model_EQ) {
-      StringRef Model = A->getValue();
-      if (Model != "fast")
-        Default = false;
-    }
+      return false;
   }
-
-  // Whatever decision came as a result of the above implicit settings, either
-  // -mdaz-ftz or -mno-daz-ftz is capable of overriding it.
-  if (!Args.hasFlag(options::OPT_mdaz_ftz, options::OPT_mno_daz_ftz, Default))
-    return false;
-
   // If crtfastmath.o exists add it to the arguments.
   Path = GetFilePath("crtfastmath.o");
   return (Path != "crtfastmath.o"); // Not found.

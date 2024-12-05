@@ -14,6 +14,7 @@
 #define BOLT_UTILS_NAME_SHORTENER_H
 
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/Twine.h"
 
 namespace llvm {
 namespace bolt {

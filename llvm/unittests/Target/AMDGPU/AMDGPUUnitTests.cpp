@@ -92,23 +92,9 @@ static const std::pair<StringRef, StringRef>
   W32FS = {"+wavefrontsize32", "w32"},
   W64FS = {"+wavefrontsize64", "w64"};
 
-using TestFuncTy =
-    function_ref<bool(std::stringstream &, unsigned, const GCNSubtarget &)>;
-
-static bool testAndRecord(std::stringstream &Table, const GCNSubtarget &ST,
-                          TestFuncTy test) {
-  bool Success = true;
-  unsigned MaxOcc = ST.getMaxWavesPerEU();
-  for (unsigned Occ = MaxOcc; Occ > 0; --Occ) {
-    Table << std::right << std::setw(3) << Occ << "    ";
-    Success = test(Table, Occ, ST) && Success;
-    Table << '\n';
-  }
-  return Success;
-}
-
-static void testGPRLimits(const char *RegName, bool TestW32W64,
-                          TestFuncTy test) {
+static void testGPRLimits(
+    const char *RegName, bool TestW32W64,
+    std::function<bool(std::stringstream &, unsigned, GCNSubtarget &)> test) {
   SmallVector<StringRef> CPUs;
   AMDGPU::fillValidArchListAMDGCN(CPUs);
 
@@ -131,7 +117,13 @@ static void testGPRLimits(const char *RegName, bool TestW32W64,
         FS = &W32FS;
 
       std::stringstream Table;
-      bool Success = testAndRecord(Table, ST, test);
+      bool Success = true;
+      unsigned MaxOcc = ST.getMaxWavesPerEU();
+      for (unsigned Occ = MaxOcc; Occ > 0; --Occ) {
+        Table << std::right << std::setw(3) << Occ << "    ";
+        Success = test(Table, Occ, ST) && Success;
+        Table << '\n';
+      }
       if (!Success || PrintCpuRegLimits)
         TablePerCPUs[Table.str()].push_back((CanonCPUName + FS->second).str());
 
@@ -153,14 +145,13 @@ static void testGPRLimits(const char *RegName, bool TestW32W64,
 }
 
 TEST(AMDGPU, TestVGPRLimitsPerOccupancy) {
-  auto test = [](std::stringstream &OS, unsigned Occ, const GCNSubtarget &ST) {
+  testGPRLimits("VGPR", true, [](std::stringstream &OS, unsigned Occ,
+                                 GCNSubtarget &ST) {
     unsigned MaxVGPRNum = ST.getAddressableNumVGPRs();
     return checkMinMax(
         OS, Occ, ST.getOccupancyWithNumVGPRs(MaxVGPRNum), ST.getMaxWavesPerEU(),
         [&](unsigned NumGPRs) { return ST.getOccupancyWithNumVGPRs(NumGPRs); },
         [&](unsigned Occ) { return ST.getMinNumVGPRs(Occ); },
         [&](unsigned Occ) { return ST.getMaxNumVGPRs(Occ); });
-  };
-
-  testGPRLimits("VGPR", true, test);
+  });
 }

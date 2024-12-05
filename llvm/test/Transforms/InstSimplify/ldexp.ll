@@ -57,12 +57,11 @@ define void @ldexp_f32_exp0(float %x) {
 define void @ldexp_v2f32_exp0(<2 x float> %x) {
 ; CHECK-LABEL: @ldexp_v2f32_exp0(
 ; CHECK-NEXT:    store volatile <2 x float> [[X:%.*]], ptr addrspace(1) undef, align 8
-; CHECK-NEXT:    [[PART_UNDEF1:%.*]] = call <2 x float> @llvm.ldexp.v2f32.v2i32(<2 x float> [[X]], <2 x i32> <i32 undef, i32 0>)
-; CHECK-NEXT:    store volatile <2 x float> [[PART_UNDEF1]], ptr addrspace(1) undef, align 8
+; CHECK-NEXT:    store volatile <2 x float> [[X]], ptr addrspace(1) undef, align 8
 ; CHECK-NEXT:    store volatile <2 x float> [[X]], ptr addrspace(1) undef, align 8
 ; CHECK-NEXT:    ret void
 ;
-  %part.undef0 = call <2 x float> @llvm.ldexp.v2f32.v2i32(<2 x float> %x, <2 x i32> <i32 0, i32 poison>)
+  %part.undef0 = call <2 x float> @llvm.ldexp.v2f32.v2i32(<2 x float> %x, <2 x i32> <i32 0, i32 undef>)
   store volatile <2 x float> %part.undef0, ptr addrspace(1) undef
 
   %part.undef1 = call <2 x float> @llvm.ldexp.v2f32.v2i32(<2 x float> %x, <2 x i32> <i32 undef, i32 0>)

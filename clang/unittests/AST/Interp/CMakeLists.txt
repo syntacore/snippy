@@ -1,6 +1,5 @@
 add_clang_unittest(InterpTests
   Descriptor.cpp
-  toAPValue.cpp
   )
 
 clang_target_link_libraries(InterpTests

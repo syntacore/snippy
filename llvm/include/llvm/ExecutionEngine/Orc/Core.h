@@ -227,14 +227,14 @@ public:
   }
 
   /// Construct a SymbolLookupSet from DenseMap keys.
-  template <typename ValT>
+  template <typename KeyT>
   static SymbolLookupSet
-  fromMapKeys(const DenseMap<SymbolStringPtr, ValT> &M,
+  fromMapKeys(const DenseMap<SymbolStringPtr, KeyT> &M,
               SymbolLookupFlags Flags = SymbolLookupFlags::RequiredSymbol) {
     SymbolLookupSet Result;
     Result.Symbols.reserve(M.size());
-    for (const auto &[Name, Val] : M)
-      Result.add(Name, Flags);
+    for (const auto &KV : M)
+      Result.add(KV.first, Flags);
     return Result;
   }
 
@@ -361,7 +361,7 @@ public:
   /// by construction, this method can be used to turn it into a proper set.
   void removeDuplicates() {
     sortByAddress();
-    auto LastI = llvm::unique(Symbols);
+    auto LastI = std::unique(Symbols.begin(), Symbols.end());
     Symbols.erase(LastI, Symbols.end());
   }
 
@@ -434,27 +434,6 @@ public:
 private:
   std::shared_ptr<SymbolStringPool> SSP;
   std::shared_ptr<SymbolDependenceMap> Symbols;
-};
-
-/// Used to report failure due to unsatisfiable symbol dependencies.
-class UnsatisfiedSymbolDependencies
-    : public ErrorInfo<UnsatisfiedSymbolDependencies> {
-public:
-  static char ID;
-
-  UnsatisfiedSymbolDependencies(std::shared_ptr<SymbolStringPool> SSP,
-                                JITDylibSP JD, SymbolNameSet FailedSymbols,
-                                SymbolDependenceMap BadDeps,
-                                std::string Explanation);
-  std::error_code convertToErrorCode() const override;
-  void log(raw_ostream &OS) const override;
-
-private:
-  std::shared_ptr<SymbolStringPool> SSP;
-  JITDylibSP JD;
-  SymbolNameSet FailedSymbols;
-  SymbolDependenceMap BadDeps;
-  std::string Explanation;
 };
 
 /// Used to notify clients when symbols can not be found during a lookup.
@@ -538,13 +517,6 @@ private:
   SymbolNameVector Symbols;
 };
 
-/// A set of symbols and the their dependencies. Used to describe dependencies
-/// for the MaterializationResponsibility::notifyEmitted operation.
-struct SymbolDependenceGroup {
-  SymbolNameSet Symbols;
-  SymbolDependenceMap Dependencies;
-};
-
 /// Tracks responsibility for materialization, and mediates interactions between
 /// MaterializationUnits and JDs.
 ///
@@ -615,22 +587,13 @@ public:
   /// that all symbols covered by this MaterializationResponsibility instance
   /// have been emitted.
   ///
-  /// The DepGroups array describes the dependencies of symbols being emitted on
-  /// symbols that are outside this MaterializationResponsibility object. Each
-  /// group consists of a pair of a set of symbols and a SymbolDependenceMap
-  /// that describes the dependencies for the symbols in the first set. The
-  /// elements of DepGroups must be non-overlapping (no symbol should appear in
-  /// more than one of hte symbol sets), but do not have to be exhaustive. Any
-  /// symbol in this MaterializationResponsibility object that is not covered
-  /// by an entry will be treated as having no dependencies.
-  ///
   /// This method will return an error if any symbols being resolved have been
   /// moved to the error state due to the failure of a dependency. If this
   /// method returns an error then clients should log it and call
   /// failMaterialize. If no dependencies have been registered for the
   /// symbols covered by this MaterializationResponsibility then this method
   /// is guaranteed to return Error::success() and can be wrapped with cantFail.
-  Error notifyEmitted(ArrayRef<SymbolDependenceGroup> DepGroups);
+  Error notifyEmitted();
 
   /// Attempt to claim responsibility for new definitions. This method can be
   /// used to claim responsibility for symbols that are added to a
@@ -664,6 +627,12 @@ public:
   /// threads, or different kinds of materialization processes.
   Expected<std::unique_ptr<MaterializationResponsibility>>
   delegate(const SymbolNameSet &Symbols);
+
+  void addDependencies(const SymbolStringPtr &Name,
+                       const SymbolDependenceMap &Dependencies);
+
+  /// Add dependencies that apply to all symbols covered by this instance.
+  void addDependenciesForAll(const SymbolDependenceMap &Dependencies);
 
 private:
   /// Create a MaterializationResponsibility for the given JITDylib and
@@ -1216,31 +1185,9 @@ private:
   using UnmaterializedInfosList =
       std::vector<std::shared_ptr<UnmaterializedInfo>>;
 
-  struct EmissionDepUnit {
-    EmissionDepUnit(JITDylib &JD) : JD(&JD) {}
-
-    JITDylib *JD = nullptr;
-    DenseMap<NonOwningSymbolStringPtr, JITSymbolFlags> Symbols;
-    DenseMap<JITDylib *, DenseSet<NonOwningSymbolStringPtr>> Dependencies;
-  };
-
-  struct EmissionDepUnitInfo {
-    std::shared_ptr<EmissionDepUnit> EDU;
-    DenseSet<EmissionDepUnit *> IntraEmitUsers;
-    DenseMap<JITDylib *, DenseSet<NonOwningSymbolStringPtr>> NewDeps;
-  };
-
-  // Information about not-yet-ready symbol.
-  // * DefiningEDU will point to the EmissionDepUnit that defines the symbol.
-  // * DependantEDUs will hold pointers to any EmissionDepUnits currently
-  //   waiting on this symbol.
-  // * Pending queries holds any not-yet-completed queries that include this
-  //   symbol.
   struct MaterializingInfo {
-    friend class ExecutionSession;
-
-    std::shared_ptr<EmissionDepUnit> DefiningEDU;
-    DenseSet<EmissionDepUnit *> DependantEDUs;
+    SymbolDependenceMap Dependants;
+    SymbolDependenceMap UnemittedDependencies;
 
     void addQuery(std::shared_ptr<AsynchronousSymbolQuery> Q);
     void removeQuery(const AsynchronousSymbolQuery &Q);
@@ -1297,7 +1244,7 @@ private:
   JITDylib(ExecutionSession &ES, std::string Name);
 
   std::pair<AsynchronousSymbolQuerySet, std::shared_ptr<SymbolDependenceMap>>
-  IL_removeTracker(ResourceTracker &RT);
+  removeTracker(ResourceTracker &RT);
 
   void transferTracker(ResourceTracker &DstRT, ResourceTracker &SrcRT);
 
@@ -1331,11 +1278,16 @@ private:
 
   Error resolve(MaterializationResponsibility &MR, const SymbolMap &Resolved);
 
+  Error emit(MaterializationResponsibility &MR, const SymbolFlagsMap &Emitted);
+
   void unlinkMaterializationResponsibility(MaterializationResponsibility &MR);
 
-  /// Attempt to reduce memory usage from empty \c UnmaterializedInfos and
-  /// \c MaterializingInfos tables.
-  void shrinkMaterializationInfoMemory();
+  using FailedSymbolsWorklist =
+      std::vector<std::pair<JITDylib *, SymbolStringPtr>>;
+
+  static std::pair<AsynchronousSymbolQuerySet,
+                   std::shared_ptr<SymbolDependenceMap>>
+      failSymbols(FailedSymbolsWorklist);
 
   ExecutionSession &ES;
   enum { Open, Closing, Closed } State = Open;
@@ -1438,10 +1390,13 @@ class ExecutionSession {
 
 public:
   /// For reporting errors.
-  using ErrorReporter = unique_function<void(Error)>;
+  using ErrorReporter = std::function<void(Error)>;
 
   /// Send a result to the remote.
   using SendResultFunction = unique_function<void(shared::WrapperFunctionResult)>;
+
+  /// For dispatching ORC tasks (typically materialization tasks).
+  using DispatchTaskFunction = unique_function<void(std::unique_ptr<Task> T)>;
 
   /// An asynchronous wrapper-function callable from the executor via
   /// jit-dispatch.
@@ -1565,6 +1520,12 @@ public:
   /// Unhandled errors can be sent here to log them.
   void reportError(Error Err) { ReportError(std::move(Err)); }
 
+  /// Set the task dispatch function.
+  ExecutionSession &setDispatchTask(DispatchTaskFunction DispatchTask) {
+    this->DispatchTask = std::move(DispatchTask);
+    return *this;
+  }
+
   /// Search the given JITDylibs to find the flags associated with each of the
   /// given symbols.
   void lookupFlags(LookupKind K, JITDylibSearchOrder SearchOrder,
@@ -1639,7 +1600,7 @@ public:
   void dispatchTask(std::unique_ptr<Task> T) {
     assert(T && "T must be non-null");
     DEBUG_WITH_TYPE("orc", dumpDispatchInfo(*T));
-    EPC->getDispatcher().dispatch(std::move(T));
+    DispatchTask(std::move(T));
   }
 
   /// Run a wrapper function in the executor.
@@ -1743,15 +1704,12 @@ public:
   /// Dump the state of all the JITDylibs in this session.
   void dump(raw_ostream &OS);
 
-  /// Check the internal consistency of ExecutionSession data structures.
-#ifdef EXPENSIVE_CHECKS
-  bool verifySessionState(Twine Phase);
-#endif
-
 private:
   static void logErrorsToStdErr(Error Err) {
     logAllUnhandledErrors(std::move(Err), errs(), "JIT session error: ");
   }
+
+  static void runOnCurrentThread(std::unique_ptr<Task> T) { T->run(); }
 
   void dispatchOutstandingMUs();
 
@@ -1809,45 +1767,19 @@ private:
   SymbolNameSet OL_getRequestedSymbols(const MaterializationResponsibility &MR);
   Error OL_notifyResolved(MaterializationResponsibility &MR,
                           const SymbolMap &Symbols);
-
-  using EDUInfosMap =
-      DenseMap<JITDylib::EmissionDepUnit *, JITDylib::EmissionDepUnitInfo>;
-
-  template <typename HandleNewDepFn>
-  void propagateExtraEmitDeps(std::deque<JITDylib::EmissionDepUnit *> Worklist,
-                              EDUInfosMap &EDUInfos,
-                              HandleNewDepFn HandleNewDep);
-  EDUInfosMap simplifyDepGroups(MaterializationResponsibility &MR,
-                                ArrayRef<SymbolDependenceGroup> EmittedDeps);
-  void IL_makeEDUReady(std::shared_ptr<JITDylib::EmissionDepUnit> EDU,
-                       JITDylib::AsynchronousSymbolQuerySet &Queries);
-  void IL_makeEDUEmitted(std::shared_ptr<JITDylib::EmissionDepUnit> EDU,
-                         JITDylib::AsynchronousSymbolQuerySet &Queries);
-  bool IL_removeEDUDependence(JITDylib::EmissionDepUnit &EDU, JITDylib &DepJD,
-                              NonOwningSymbolStringPtr DepSym,
-                              EDUInfosMap &EDUInfos);
-
-  static Error makeJDClosedError(JITDylib::EmissionDepUnit &EDU,
-                                 JITDylib &ClosedJD);
-  static Error makeUnsatisfiedDepsError(JITDylib::EmissionDepUnit &EDU,
-                                        JITDylib &BadJD, SymbolNameSet BadDeps);
-
-  Expected<JITDylib::AsynchronousSymbolQuerySet>
-  IL_emit(MaterializationResponsibility &MR, EDUInfosMap EDUInfos);
-  Error OL_notifyEmitted(MaterializationResponsibility &MR,
-                         ArrayRef<SymbolDependenceGroup> EmittedDeps);
-
+  Error OL_notifyEmitted(MaterializationResponsibility &MR);
   Error OL_defineMaterializing(MaterializationResponsibility &MR,
                                SymbolFlagsMap SymbolFlags);
-
-  std::pair<JITDylib::AsynchronousSymbolQuerySet,
-            std::shared_ptr<SymbolDependenceMap>>
-  IL_failSymbols(JITDylib &JD, const SymbolNameVector &SymbolsToFail);
   void OL_notifyFailed(MaterializationResponsibility &MR);
   Error OL_replace(MaterializationResponsibility &MR,
                    std::unique_ptr<MaterializationUnit> MU);
   Expected<std::unique_ptr<MaterializationResponsibility>>
   OL_delegate(MaterializationResponsibility &MR, const SymbolNameSet &Symbols);
+  void OL_addDependencies(MaterializationResponsibility &MR,
+                          const SymbolStringPtr &Name,
+                          const SymbolDependenceMap &Dependencies);
+  void OL_addDependenciesForAll(MaterializationResponsibility &MR,
+                                const SymbolDependenceMap &Dependencies);
 
 #ifndef NDEBUG
   void dumpDispatchInfo(Task &T);
@@ -1858,6 +1790,7 @@ private:
   std::unique_ptr<ExecutorProcessControl> EPC;
   std::unique_ptr<Platform> P;
   ErrorReporter ReportError = logErrorsToStdErr;
+  DispatchTaskFunction DispatchTask = runOnCurrentThread;
 
   std::vector<ResourceManager *> ResourceManagers;
 
@@ -2032,9 +1965,8 @@ inline Error MaterializationResponsibility::notifyResolved(
   return getExecutionSession().OL_notifyResolved(*this, Symbols);
 }
 
-inline Error MaterializationResponsibility::notifyEmitted(
-    ArrayRef<SymbolDependenceGroup> EmittedDeps) {
-  return getExecutionSession().OL_notifyEmitted(*this, EmittedDeps);
+inline Error MaterializationResponsibility::notifyEmitted() {
+  return getExecutionSession().OL_notifyEmitted(*this);
 }
 
 inline Error MaterializationResponsibility::defineMaterializing(
@@ -2055,6 +1987,16 @@ inline Error MaterializationResponsibility::replace(
 inline Expected<std::unique_ptr<MaterializationResponsibility>>
 MaterializationResponsibility::delegate(const SymbolNameSet &Symbols) {
   return getExecutionSession().OL_delegate(*this, Symbols);
+}
+
+inline void MaterializationResponsibility::addDependencies(
+    const SymbolStringPtr &Name, const SymbolDependenceMap &Dependencies) {
+  getExecutionSession().OL_addDependencies(*this, Name, Dependencies);
+}
+
+inline void MaterializationResponsibility::addDependenciesForAll(
+    const SymbolDependenceMap &Dependencies) {
+  getExecutionSession().OL_addDependenciesForAll(*this, Dependencies);
 }
 
 } // End namespace orc

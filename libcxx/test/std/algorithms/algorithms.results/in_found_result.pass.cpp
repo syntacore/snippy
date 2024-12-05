@@ -64,7 +64,6 @@ struct ConvertibleFrom {
 };
 
 constexpr bool test() {
-  // Checks that conversion operations are correct.
   {
     std::ranges::in_found_result<double> res{10, true};
     assert(res.in == 10);
@@ -73,8 +72,6 @@ constexpr bool test() {
     assert(res2.in.content == 10);
     assert(res2.found == true);
   }
-
-  // Checks that conversions are possible when one of the types is move-only.
   {
     std::ranges::in_found_result<MoveOnly> res{MoveOnly{}, false};
     assert(res.in.get() == 1);
@@ -85,13 +82,10 @@ constexpr bool test() {
     assert(res.in.get() == 0);
     assert(!res.found);
   }
+  auto [in, found] = std::ranges::in_found_result<int>{2, false};
+  assert(in == 2);
+  assert(!found);
 
-  // Checks that structured bindings get the correct values.
-  {
-    auto [in, found] = std::ranges::in_found_result<int>{2, false};
-    assert(in == 2);
-    assert(!found);
-  }
   return true;
 }
 

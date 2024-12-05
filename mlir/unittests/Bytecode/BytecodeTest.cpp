@@ -23,7 +23,7 @@
 using namespace llvm;
 using namespace mlir;
 
-StringLiteral irWithResources = R"(
+StringLiteral IRWithResources = R"(
 module @TestDialectResources attributes {
   bytecode.test = dense_resource<resource> : tensor<4xi32>
 } {}
@@ -42,7 +42,7 @@ TEST(Bytecode, MultiModuleWithResource) {
   Builder builder(&context);
   ParserConfig parseConfig(&context);
   OwningOpRef<Operation *> module =
-      parseSourceString<Operation *>(irWithResources, parseConfig);
+      parseSourceString<Operation *>(IRWithResources, parseConfig);
   ASSERT_TRUE(module);
 
   // Write the module to bytecode
@@ -53,15 +53,15 @@ TEST(Bytecode, MultiModuleWithResource) {
 
   // Create copy of buffer which is aligned to requested resource alignment.
   constexpr size_t kAlignment = 0x20;
-  size_t bufferSize = buffer.size();
-  buffer.reserve(bufferSize + kAlignment - 1);
+  size_t buffer_size = buffer.size();
+  buffer.reserve(buffer_size + kAlignment - 1);
   size_t pad = ~(uintptr_t)buffer.data() + 1 & kAlignment - 1;
   buffer.insert(0, pad, ' ');
-  StringRef alignedBuffer(buffer.data() + pad, bufferSize);
+  StringRef aligned_buffer(buffer.data() + pad, buffer_size);
 
   // Parse it back
   OwningOpRef<Operation *> roundTripModule =
-      parseSourceString<Operation *>(alignedBuffer, parseConfig);
+      parseSourceString<Operation *>(aligned_buffer, parseConfig);
   ASSERT_TRUE(roundTripModule);
 
   // FIXME: Parsing external resources does not work on big-endian

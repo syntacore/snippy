@@ -27,7 +27,7 @@ class TestCPPBreakpointLocations(TestBase):
         name = bp_dict["name"]
         names = bp_dict["loc_names"]
         bp = target.BreakpointCreateByName(name)
-        self.assertEqual(
+        self.assertEquals(
             bp.GetNumLocations(),
             len(names),
             "Make sure we find the right number of breakpoint locations for {}".format(
@@ -157,7 +157,7 @@ class TestCPPBreakpointLocations(TestBase):
                 bp_loc_names = {
                     bp_loc.GetAddress().GetFunction().GetName() for bp_loc in bp
                 }
-                self.assertEqual(
+                self.assertEquals(
                     bp_loc_names, loc_names, "Breakpoint set on the correct symbol"
                 )
 
@@ -165,13 +165,13 @@ class TestCPPBreakpointLocations(TestBase):
                 symbol_addresses = set()
                 for symbol in symbols:
                     sc_list = target.FindSymbols(symbol, lldb.eSymbolTypeCode)
-                    self.assertEqual(sc_list.GetSize(), 1, "Found symbol " + symbol)
+                    self.assertEquals(sc_list.GetSize(), 1, "Found symbol " + symbol)
                     symbol = sc_list.GetContextAtIndex(0).GetSymbol()
                     symbol_addresses.add(
                         symbol.GetStartAddress().GetLoadAddress(target)
                     )
 
-                self.assertEqual(
+                self.assertEquals(
                     symbol_addresses, bp_addresses, "Breakpoint set on correct address"
                 )
         finally:

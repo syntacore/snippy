@@ -2,11 +2,11 @@
 # This test ensures that the MIR parser parses heap alloc markers correctly.
 
 --- |
-  declare ptr @f(i32) nounwind
+  declare i8* @f(i32) nounwind
 
   define i32 @test(i32 %x) nounwind {
   entry:
-    call ptr @f(i32 %x), !heapallocsite !2
+    call i8* @f(i32 %x), !heapallocsite !2
     ret i32 undef
   }
 

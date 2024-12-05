@@ -77,23 +77,9 @@ CodeGenVTables::EmitVTTDefinition(llvm::GlobalVariable *VTT,
        llvm::ConstantInt::get(CGM.Int32Ty, AddressPoint.AddressPointIndex),
      };
 
-     // Add inrange attribute to indicate that only the VTableIndex can be
-     // accessed.
-     unsigned ComponentSize =
-         CGM.getDataLayout().getTypeAllocSize(getVTableComponentType());
-     unsigned VTableSize = CGM.getDataLayout().getTypeAllocSize(
-         cast<llvm::StructType>(VTable->getValueType())
-             ->getElementType(AddressPoint.VTableIndex));
-     unsigned Offset = ComponentSize * AddressPoint.AddressPointIndex;
-     llvm::ConstantRange InRange(llvm::APInt(32, -Offset, true),
-                                 llvm::APInt(32, VTableSize - Offset, true));
      llvm::Constant *Init = llvm::ConstantExpr::getGetElementPtr(
-         VTable->getValueType(), VTable, Idxs, /*InBounds=*/true, InRange);
-
-     if (const auto &Schema =
-             CGM.getCodeGenOpts().PointerAuth.CXXVTTVTablePointers)
-       Init = CGM.getConstantSignedPointer(Init, Schema, nullptr, GlobalDecl(),
-                                           QualType());
+         VTable->getValueType(), VTable, Idxs, /*InBounds=*/true,
+         /*InRangeIndex=*/1);
 
      VTTComponents.push_back(Init);
   }
@@ -143,24 +129,23 @@ uint64_t CodeGenVTables::getSubVTTIndex(const CXXRecordDecl *RD,
                                         BaseSubobject Base) {
   BaseSubobjectPairTy ClassSubobjectPair(RD, Base);
 
-  SubVTTIndicesMapTy::iterator I = SubVTTIndices.find(ClassSubobjectPair);
-  if (I != SubVTTIndices.end())
+  SubVTTIndiciesMapTy::iterator I = SubVTTIndicies.find(ClassSubobjectPair);
+  if (I != SubVTTIndicies.end())
     return I->second;
 
   VTTBuilder Builder(CGM.getContext(), RD, /*GenerateDefinition=*/false);
 
-  for (llvm::DenseMap<BaseSubobject, uint64_t>::const_iterator
-           I = Builder.getSubVTTIndices().begin(),
-           E = Builder.getSubVTTIndices().end();
-       I != E; ++I) {
+  for (llvm::DenseMap<BaseSubobject, uint64_t>::const_iterator I =
+       Builder.getSubVTTIndicies().begin(),
+       E = Builder.getSubVTTIndicies().end(); I != E; ++I) {
     // Insert all indices.
     BaseSubobjectPairTy ClassSubobjectPair(RD, I->first);
 
-    SubVTTIndices.insert(std::make_pair(ClassSubobjectPair, I->second));
+    SubVTTIndicies.insert(std::make_pair(ClassSubobjectPair, I->second));
   }
 
-  I = SubVTTIndices.find(ClassSubobjectPair);
-  assert(I != SubVTTIndices.end() && "Did not find index!");
+  I = SubVTTIndicies.find(ClassSubobjectPair);
+  assert(I != SubVTTIndicies.end() && "Did not find index!");
 
   return I->second;
 }

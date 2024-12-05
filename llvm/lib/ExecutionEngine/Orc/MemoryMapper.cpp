@@ -16,10 +16,6 @@
 #if defined(LLVM_ON_UNIX) && !defined(__ANDROID__)
 #include <fcntl.h>
 #include <sys/mman.h>
-#if defined(__MVS__)
-#include "llvm/Support/BLAKE3.h"
-#include <sys/shm.h>
-#endif
 #include <unistd.h>
 #elif defined(_WIN32)
 #include <windows.h>
@@ -243,27 +239,10 @@ void SharedMemoryMapper::reserve(size_t NumBytes,
 
 #if defined(LLVM_ON_UNIX)
 
-#if defined(__MVS__)
-        ArrayRef<uint8_t> Data(
-            reinterpret_cast<const uint8_t *>(SharedMemoryName.c_str()),
-            SharedMemoryName.size());
-        auto HashedName = BLAKE3::hash<sizeof(key_t)>(Data);
-        key_t Key = *reinterpret_cast<key_t *>(HashedName.data());
-        int SharedMemoryId =
-            shmget(Key, NumBytes, IPC_CREAT | __IPC_SHAREAS | 0700);
-        if (SharedMemoryId < 0) {
-          return OnReserved(errorCodeToError(
-              std::error_code(errno, std::generic_category())));
-        }
-        LocalAddr = shmat(SharedMemoryId, nullptr, 0);
-        if (LocalAddr == reinterpret_cast<void *>(-1)) {
-          return OnReserved(errorCodeToError(
-              std::error_code(errno, std::generic_category())));
-        }
-#else
         int SharedMemoryFile = shm_open(SharedMemoryName.c_str(), O_RDWR, 0700);
         if (SharedMemoryFile < 0) {
-          return OnReserved(errorCodeToError(errnoAsErrorCode()));
+          return OnReserved(errorCodeToError(
+              std::error_code(errno, std::generic_category())));
         }
 
         // this prevents other processes from accessing it by name
@@ -272,11 +251,11 @@ void SharedMemoryMapper::reserve(size_t NumBytes,
         LocalAddr = mmap(nullptr, NumBytes, PROT_READ | PROT_WRITE, MAP_SHARED,
                          SharedMemoryFile, 0);
         if (LocalAddr == MAP_FAILED) {
-          return OnReserved(errorCodeToError(errnoAsErrorCode()));
+          return OnReserved(errorCodeToError(
+              std::error_code(errno, std::generic_category())));
         }
 
         close(SharedMemoryFile);
-#endif
 
 #elif defined(_WIN32)
 
@@ -396,13 +375,9 @@ void SharedMemoryMapper::release(ArrayRef<ExecutorAddr> Bases,
 
 #if defined(LLVM_ON_UNIX)
 
-#if defined(__MVS__)
-      if (shmdt(Reservations[Base].LocalAddr) < 0)
-        Err = joinErrors(std::move(Err), errorCodeToError(errnoAsErrorCode()));
-#else
       if (munmap(Reservations[Base].LocalAddr, Reservations[Base].Size) != 0)
-        Err = joinErrors(std::move(Err), errorCodeToError(errnoAsErrorCode()));
-#endif
+        Err = joinErrors(std::move(Err), errorCodeToError(std::error_code(
+                                             errno, std::generic_category())));
 
 #elif defined(_WIN32)
 
@@ -443,11 +418,7 @@ SharedMemoryMapper::~SharedMemoryMapper() {
 
 #if defined(LLVM_ON_UNIX) && !defined(__ANDROID__)
 
-#if defined(__MVS__)
-    shmdt(R.second.LocalAddr);
-#else
     munmap(R.second.LocalAddr, R.second.Size);
-#endif
 
 #elif defined(_WIN32)
 

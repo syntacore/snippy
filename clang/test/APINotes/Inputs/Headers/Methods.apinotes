@@ -1,8 +1,0 @@
----
-Name: Methods
-Tags:
-- Name: IntWrapper
-  Methods:
-  - Name: getIncremented
-    Availability: none
-    AvailabilityMsg: "oh no"

@@ -124,14 +124,6 @@ public:
 namespace {
 using namespace cl;
 
-enum ErrorDetailLevel {
-  OnlyDetailsNoSummary,
-  NoDetailsOnlySummary,
-  NoDetailsOrSummary,
-  BothDetailsAndSummary,
-  Unspecified
-};
-
 OptionCategory DwarfDumpCategory("Specific Options");
 static list<std::string>
     InputFilenames(Positional, desc("<input object files or .dSYM bundles>"),
@@ -284,24 +276,6 @@ static cl::opt<bool>
                 cat(DwarfDumpCategory));
 static opt<bool> Verify("verify", desc("Verify the DWARF debug info."),
                         cat(DwarfDumpCategory));
-static opt<ErrorDetailLevel> ErrorDetails(
-    "error-display", init(Unspecified),
-    desc("Set the level of detail and summary to display when verifying "
-         "(implies --verify)"),
-    values(clEnumValN(NoDetailsOrSummary, "quiet",
-                      "Only display whether errors occurred."),
-           clEnumValN(NoDetailsOnlySummary, "summary",
-                      "Display only a summary of the errors found."),
-           clEnumValN(OnlyDetailsNoSummary, "details",
-                      "Display each error in detail but no summary."),
-           clEnumValN(BothDetailsAndSummary, "full",
-                      "Display each error as well as a summary. [default]")),
-    cat(DwarfDumpCategory));
-static opt<std::string> JsonErrSummaryFile(
-    "verify-json", init(""),
-    desc("Output JSON-formatted error summary to the specified file. "
-         "(Implies --verify)"),
-    value_desc("filename.json"), cat(DwarfDumpCategory));
 static opt<bool> Quiet("quiet", desc("Use with -verify to not emit to STDOUT."),
                        cat(DwarfDumpCategory));
 static opt<bool> DumpUUID("uuid", desc("Show the UUID for each architecture."),
@@ -352,11 +326,7 @@ static DIDumpOptions getDumpOpts(DWARFContext &C) {
   DumpOpts.RecoverableErrorHandler = C.getRecoverableErrorHandler();
   // In -verify mode, print DIEs without children in error messages.
   if (Verify) {
-    DumpOpts.Verbose = ErrorDetails != NoDetailsOnlySummary &&
-                       ErrorDetails != NoDetailsOrSummary;
-    DumpOpts.ShowAggregateErrors = ErrorDetails != OnlyDetailsNoSummary &&
-                                   ErrorDetails != NoDetailsOnlySummary;
-    DumpOpts.JsonErrSummaryFile = JsonErrSummaryFile;
+    DumpOpts.Verbose = true;
     return DumpOpts.noImplicitRecursion();
   }
   return DumpOpts;
@@ -502,7 +472,7 @@ static void filterByAccelName(
     getDies(DICtx, DICtx.getDebugNames(), Name, Dies);
   }
   llvm::sort(Dies);
-  Dies.erase(llvm::unique(Dies), Dies.end());
+  Dies.erase(std::unique(Dies.begin(), Dies.end()), Dies.end());
 
   DIDumpOptions DumpOpts = getDumpOpts(DICtx);
   DumpOpts.GetNameForDWARFReg = GetNameForDWARFReg;
@@ -646,7 +616,7 @@ static bool collectObjectSources(ObjectFile &Obj, DWARFContext &DICtx,
 
   // Dedup and order the sources.
   llvm::sort(Sources);
-  Sources.erase(llvm::unique(Sources), Sources.end());
+  Sources.erase(std::unique(Sources.begin(), Sources.end()), Sources.end());
 
   for (StringRef Name : Sources)
     OS << Name << "\n";
@@ -842,10 +812,6 @@ int main(int argc, char **argv) {
                           "-verbose is currently not supported";
     return 1;
   }
-  // -error-detail and -json-summary-file both imply -verify
-  if (ErrorDetails != Unspecified || !JsonErrSummaryFile.empty()) {
-    Verify = true;
-  }
 
   std::error_code EC;
   ToolOutputFile OutputFile(OutputFilename, EC, sys::fs::OF_TextWithCRLF);
@@ -855,9 +821,8 @@ int main(int argc, char **argv) {
 
   bool OffsetRequested = false;
 
-  // Defaults to dumping only debug_info, unless: A) verbose mode is specified,
-  // in which case all sections are dumped, or B) a specific section is
-  // requested.
+  // Defaults to dumping all sections, unless brief mode is specified in which
+  // case only the .debug_info section in dumped.
 #define HANDLE_DWARF_SECTION(ENUM_NAME, ELF_NAME, CMDLINE_NAME, OPTION)        \
   if (Dump##ENUM_NAME.IsRequested) {                                           \
     DumpType |= DIDT_##ENUM_NAME;                                              \
@@ -873,7 +838,7 @@ int main(int argc, char **argv) {
   if (DumpAll)
     DumpType = DIDT_All;
   if (DumpType == DIDT_Null) {
-    if (Verbose || Verify)
+    if (Verbose)
       DumpType = DIDT_All;
     else
       DumpType = DIDT_DebugInfo;

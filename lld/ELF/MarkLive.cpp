@@ -85,19 +85,13 @@ static uint64_t getAddend(InputSectionBase &sec,
   return rel.r_addend;
 }
 
-// Currently, we assume all input CREL relocations have an explicit addend.
-template <class ELFT>
-static uint64_t getAddend(InputSectionBase &sec,
-                          const typename ELFT::Crel &rel) {
-  return rel.r_addend;
-}
-
 template <class ELFT>
 template <class RelTy>
 void MarkLive<ELFT>::resolveReloc(InputSectionBase &sec, RelTy &rel,
                                   bool fromFDE) {
+  Symbol &sym = sec.getFile<ELFT>()->getRelocTargetSym(rel);
+
   // If a symbol is referenced in a live section, it is used.
-  Symbol &sym = sec.file->getRelocTargetSym(rel);
   sym.used = true;
 
   if (auto *d = dyn_cast<Defined>(&sym)) {
@@ -246,8 +240,7 @@ template <class ELFT> void MarkLive<ELFT>::run() {
   // all of them. We also want to preserve personality routines and LSDA
   // referenced by .eh_frame sections, so we scan them for that here.
   for (EhInputSection *eh : ctx.ehInputSections) {
-    const RelsOrRelas<ELFT> rels =
-        eh->template relsOrRelas<ELFT>(/*supportsCrel=*/false);
+    const RelsOrRelas<ELFT> rels = eh->template relsOrRelas<ELFT>();
     if (rels.areRelocsRel())
       scanEhFrameSection(*eh, rels.rels);
     else if (rels.relas.size())
@@ -284,7 +277,8 @@ template <class ELFT> void MarkLive<ELFT>::run() {
     //   collection.
     // - Groups members are retained or discarded as a unit.
     if (!(sec->flags & SHF_ALLOC)) {
-      if (!isStaticRelSecType(sec->type) && !sec->nextInSectionGroup) {
+      bool isRel = sec->type == SHT_REL || sec->type == SHT_RELA;
+      if (!isRel && !sec->nextInSectionGroup) {
         sec->markLive();
         for (InputSection *isec : sec->dependentSections)
           isec->markLive();
@@ -317,8 +311,6 @@ template <class ELFT> void MarkLive<ELFT>::mark() {
     for (const typename ELFT::Rel &rel : rels.rels)
       resolveReloc(sec, rel, false);
     for (const typename ELFT::Rela &rel : rels.relas)
-      resolveReloc(sec, rel, false);
-    for (const typename ELFT::Crel &rel : rels.crels)
       resolveReloc(sec, rel, false);
 
     for (InputSectionBase *isec : sec.dependentSections)

@@ -72,13 +72,13 @@ Error DXContainer::parseDXILHeader(StringRef Part) {
   return Error::success();
 }
 
-Error DXContainer::parseShaderFeatureFlags(StringRef Part) {
-  if (ShaderFeatureFlags)
+Error DXContainer::parseShaderFlags(StringRef Part) {
+  if (ShaderFlags)
     return parseFailed("More than one SFI0 part is present in the file");
   uint64_t FlagValue = 0;
   if (Error Err = readInteger(Part, Part.begin(), FlagValue))
     return Err;
-  ShaderFeatureFlags = FlagValue;
+  ShaderFlags = FlagValue;
   return Error::success();
 }
 
@@ -168,7 +168,7 @@ Error DXContainer::parsePartOffsets() {
         return Err;
       break;
     case dxbc::PartType::SFI0:
-      if (Error Err = parseShaderFeatureFlags(PartData))
+      if (Error Err = parseShaderFlags(PartData))
         return Err;
       break;
     case dxbc::PartType::HASH:
@@ -247,14 +247,7 @@ Error DirectX::PSVRuntimeInfo::parse(uint16_t ShaderKind) {
   const uint32_t PSVVersion = getVersion();
 
   // Detect the PSVVersion by looking at the size field.
-  if (PSVVersion == 3) {
-    v3::RuntimeInfo Info;
-    if (Error Err = readStruct(PSVInfoData, Current, Info))
-      return Err;
-    if (sys::IsBigEndianHost)
-      Info.swapBytes(ShaderStage);
-    BasicInfo = Info;
-  } else if (PSVVersion == 2) {
+  if (PSVVersion == 2) {
     v2::RuntimeInfo Info;
     if (Error Err = readStruct(PSVInfoData, Current, Info))
       return Err;
@@ -348,8 +341,7 @@ Error DirectX::PSVRuntimeInfo::parse(uint16_t ShaderKind) {
     SigOutputElements.Stride = SigPatchOrPrimElements.Stride =
         SigInputElements.Stride;
 
-    if (Data.end() - Current <
-        (ptrdiff_t)(ElementCount * SigInputElements.Stride))
+    if (Data.end() - Current < ElementCount * SigInputElements.Stride)
       return parseFailed(
           "Signature elements extend beyond the size of the part");
 
@@ -432,8 +424,6 @@ Error DirectX::PSVRuntimeInfo::parse(uint16_t ShaderKind) {
 }
 
 uint8_t DirectX::PSVRuntimeInfo::getSigInputCount() const {
-  if (const auto *P = std::get_if<dxbc::PSV::v3::RuntimeInfo>(&BasicInfo))
-    return P->SigInputElements;
   if (const auto *P = std::get_if<dxbc::PSV::v2::RuntimeInfo>(&BasicInfo))
     return P->SigInputElements;
   if (const auto *P = std::get_if<dxbc::PSV::v1::RuntimeInfo>(&BasicInfo))
@@ -442,8 +432,6 @@ uint8_t DirectX::PSVRuntimeInfo::getSigInputCount() const {
 }
 
 uint8_t DirectX::PSVRuntimeInfo::getSigOutputCount() const {
-  if (const auto *P = std::get_if<dxbc::PSV::v3::RuntimeInfo>(&BasicInfo))
-    return P->SigOutputElements;
   if (const auto *P = std::get_if<dxbc::PSV::v2::RuntimeInfo>(&BasicInfo))
     return P->SigOutputElements;
   if (const auto *P = std::get_if<dxbc::PSV::v1::RuntimeInfo>(&BasicInfo))
@@ -452,8 +440,6 @@ uint8_t DirectX::PSVRuntimeInfo::getSigOutputCount() const {
 }
 
 uint8_t DirectX::PSVRuntimeInfo::getSigPatchOrPrimCount() const {
-  if (const auto *P = std::get_if<dxbc::PSV::v3::RuntimeInfo>(&BasicInfo))
-    return P->SigPatchOrPrimElements;
   if (const auto *P = std::get_if<dxbc::PSV::v2::RuntimeInfo>(&BasicInfo))
     return P->SigPatchOrPrimElements;
   if (const auto *P = std::get_if<dxbc::PSV::v1::RuntimeInfo>(&BasicInfo))

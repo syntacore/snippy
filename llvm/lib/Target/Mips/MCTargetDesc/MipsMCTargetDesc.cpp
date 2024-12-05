@@ -104,20 +104,22 @@ static MCInstPrinter *createMipsMCInstPrinter(const Triple &T,
 static MCStreamer *createMCStreamer(const Triple &T, MCContext &Context,
                                     std::unique_ptr<MCAsmBackend> &&MAB,
                                     std::unique_ptr<MCObjectWriter> &&OW,
-                                    std::unique_ptr<MCCodeEmitter> &&Emitter) {
+                                    std::unique_ptr<MCCodeEmitter> &&Emitter,
+                                    bool RelaxAll) {
   MCStreamer *S;
   if (!T.isOSNaCl())
     S = createMipsELFStreamer(Context, std::move(MAB), std::move(OW),
-                              std::move(Emitter));
+                              std::move(Emitter), RelaxAll);
   else
     S = createMipsNaClELFStreamer(Context, std::move(MAB), std::move(OW),
-                                  std::move(Emitter));
+                                  std::move(Emitter), RelaxAll);
   return S;
 }
 
 static MCTargetStreamer *createMipsAsmTargetStreamer(MCStreamer &S,
                                                      formatted_raw_ostream &OS,
-                                                     MCInstPrinter *InstPrint) {
+                                                     MCInstPrinter *InstPrint,
+                                                     bool isVerboseAsm) {
   return new MipsTargetAsmStreamer(S, OS);
 }
 

@@ -17,10 +17,13 @@
 
 #include <concepts>
 #include <string_view>
-
 #include "../types.h"
 
-#include "test_range.h"
+template <class Iter>
+concept CanCallEquals = requires(const Iter& i) {
+  i == i;
+  i != i;
+};
 
 constexpr bool test() {
   // Forward range supports both overloads of `operator==`.
@@ -66,7 +69,7 @@ constexpr bool test() {
     auto b = v.begin();
     std::same_as<std::default_sentinel_t> decltype(auto) e = v.end();
 
-    static_assert(!weakly_equality_comparable_with<decltype(b), decltype(b)>);
+    static_assert(!CanCallEquals<decltype(b)>);
 
     assert(!(b == std::default_sentinel));
     assert(b != std::default_sentinel);

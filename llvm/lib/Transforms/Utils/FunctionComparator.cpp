@@ -143,18 +143,6 @@ int FunctionComparator::cmpAttrs(const AttributeList L,
         if (int Res = cmpNumbers((uint64_t)TyL, (uint64_t)TyR))
           return Res;
         continue;
-      } else if (LA.isConstantRangeAttribute() &&
-                 RA.isConstantRangeAttribute()) {
-        if (LA.getKindAsEnum() != RA.getKindAsEnum())
-          return cmpNumbers(LA.getKindAsEnum(), RA.getKindAsEnum());
-
-        const ConstantRange &LCR = LA.getRange();
-        const ConstantRange &RCR = RA.getRange();
-        if (int Res = cmpAPInts(LCR.getLower(), RCR.getLower()))
-          return Res;
-        if (int Res = cmpAPInts(LCR.getUpper(), RCR.getUpper()))
-          return Res;
-        continue;
       }
       if (LA < RA)
         return -1;
@@ -428,27 +416,19 @@ int FunctionComparator::cmpConstants(const Constant *L,
                                  cast<Constant>(RE->getOperand(i))))
         return Res;
     }
+    if (LE->isCompare())
+      if (int Res = cmpNumbers(LE->getPredicate(), RE->getPredicate()))
+        return Res;
     if (auto *GEPL = dyn_cast<GEPOperator>(LE)) {
       auto *GEPR = cast<GEPOperator>(RE);
       if (int Res = cmpTypes(GEPL->getSourceElementType(),
                              GEPR->getSourceElementType()))
         return Res;
-      if (int Res = cmpNumbers(GEPL->getNoWrapFlags().getRaw(),
-                               GEPR->getNoWrapFlags().getRaw()))
+      if (int Res = cmpNumbers(GEPL->isInBounds(), GEPR->isInBounds()))
         return Res;
-
-      std::optional<ConstantRange> InRangeL = GEPL->getInRange();
-      std::optional<ConstantRange> InRangeR = GEPR->getInRange();
-      if (InRangeL) {
-        if (!InRangeR)
-          return 1;
-        if (int Res = cmpAPInts(InRangeL->getLower(), InRangeR->getLower()))
-          return Res;
-        if (int Res = cmpAPInts(InRangeL->getUpper(), InRangeR->getUpper()))
-          return Res;
-      } else if (InRangeR) {
-        return -1;
-      }
+      if (int Res = cmpNumbers(GEPL->getInRangeIndex().value_or(unsigned(-1)),
+                               GEPR->getInRangeIndex().value_or(unsigned(-1))))
+        return Res;
     }
     if (auto *OBOL = dyn_cast<OverflowingBinaryOperator>(LE)) {
       auto *OBOR = cast<OverflowingBinaryOperator>(RE);
@@ -524,7 +504,7 @@ int FunctionComparator::cmpTypes(Type *TyL, Type *TyR) const {
   PointerType *PTyL = dyn_cast<PointerType>(TyL);
   PointerType *PTyR = dyn_cast<PointerType>(TyR);
 
-  const DataLayout &DL = FnL->getDataLayout();
+  const DataLayout &DL = FnL->getParent()->getDataLayout();
   if (PTyL && PTyL->getAddressSpace() == 0)
     TyL = DL.getIntPtrType(TyL);
   if (PTyR && PTyR->getAddressSpace() == 0)
@@ -805,7 +785,7 @@ int FunctionComparator::cmpGEPs(const GEPOperator *GEPL,
 
   // When we have target data, we can reduce the GEP down to the value in bytes
   // added to the address.
-  const DataLayout &DL = FnL->getDataLayout();
+  const DataLayout &DL = FnL->getParent()->getDataLayout();
   unsigned OffsetBitWidth = DL.getIndexSizeInBits(ASL);
   APInt OffsetL(OffsetBitWidth, 0), OffsetR(OffsetBitWidth, 0);
   if (GEPL->accumulateConstantOffset(DL, OffsetL) &&

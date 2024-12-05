@@ -13,6 +13,7 @@
 #include "RISCVSubtarget.h"
 #include "GISel/RISCVCallLowering.h"
 #include "GISel/RISCVLegalizerInfo.h"
+#include "GISel/RISCVRegisterBankInfo.h"
 #include "RISCV.h"
 #include "RISCVFrameLowering.h"
 #include "RISCVTargetMachine.h"
@@ -37,6 +38,9 @@ namespace llvm::RISCVTuneInfoTable {
 #define GET_RISCVTuneInfoTable_IMPL
 #include "RISCVGenSearchableTables.inc"
 } // namespace llvm::RISCVTuneInfoTable
+
+static cl::opt<bool> EnableSubRegLiveness("riscv-enable-subreg-liveness",
+                                          cl::init(true), cl::Hidden);
 
 static cl::opt<unsigned> RVVVectorLMULMax(
     "riscv-v-fixed-length-vector-lmul-max",
@@ -96,32 +100,29 @@ RISCVSubtarget::RISCVSubtarget(const Triple &TT, StringRef CPU,
       RVVVectorBitsMin(RVVVectorBitsMin), RVVVectorBitsMax(RVVVectorBitsMax),
       FrameLowering(
           initializeSubtargetDependencies(TT, CPU, TuneCPU, FS, ABIName)),
-      InstrInfo(*this), RegInfo(getHwMode()), TLInfo(TM, *this) {}
+      InstrInfo(*this), RegInfo(getHwMode()), TLInfo(TM, *this) {
+  CallLoweringInfo.reset(new RISCVCallLowering(*getTargetLowering()));
+  Legalizer.reset(new RISCVLegalizerInfo(*this));
+
+  auto *RBI = new RISCVRegisterBankInfo(getHwMode());
+  RegBankInfo.reset(RBI);
+  InstSelector.reset(createRISCVInstructionSelector(
+      *static_cast<const RISCVTargetMachine *>(&TM), *this, *RBI));
+}
 
 const CallLowering *RISCVSubtarget::getCallLowering() const {
-  if (!CallLoweringInfo)
-    CallLoweringInfo.reset(new RISCVCallLowering(*getTargetLowering()));
   return CallLoweringInfo.get();
 }
 
 InstructionSelector *RISCVSubtarget::getInstructionSelector() const {
-  if (!InstSelector) {
-    InstSelector.reset(createRISCVInstructionSelector(
-        *static_cast<const RISCVTargetMachine *>(&TLInfo.getTargetMachine()),
-        *this, *getRegBankInfo()));
-  }
   return InstSelector.get();
 }
 
 const LegalizerInfo *RISCVSubtarget::getLegalizerInfo() const {
-  if (!Legalizer)
-    Legalizer.reset(new RISCVLegalizerInfo(*this));
   return Legalizer.get();
 }
 
-const RISCVRegisterBankInfo *RISCVSubtarget::getRegBankInfo() const {
-  if (!RegBankInfo)
-    RegBankInfo.reset(new RISCVRegisterBankInfo(getHwMode()));
+const RegisterBankInfo *RISCVSubtarget::getRegBankInfo() const {
   return RegBankInfo.get();
 }
 
@@ -182,7 +183,11 @@ bool RISCVSubtarget::useRVVForFixedLengthVectors() const {
   return hasVInstructions() && getMinRVVVectorSizeInBits() != 0;
 }
 
-bool RISCVSubtarget::enableSubRegLiveness() const { return true; }
+bool RISCVSubtarget::enableSubRegLiveness() const {
+  // FIXME: Enable subregister liveness by default for RVV to better handle
+  // LMUL>1 and segment load/store.
+  return EnableSubRegLiveness;
+}
 
 void RISCVSubtarget::getPostRAMutations(
     std::vector<std::unique_ptr<ScheduleDAGMutation>> &Mutations) const {

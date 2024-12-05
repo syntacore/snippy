@@ -5,6 +5,7 @@ add_entrypoint_object(
   HDRS
     fegetround.h
   DEPENDS
+    libc.include.fenv
     libc.src.__support.FPUtil.fenv_impl
   COMPILE_OPTIONS
     -O2
@@ -17,6 +18,7 @@ add_entrypoint_object(
   HDRS
     fesetround.h
   DEPENDS
+    libc.include.fenv
     libc.src.__support.FPUtil.fenv_impl
   COMPILE_OPTIONS
     -O2
@@ -29,6 +31,7 @@ add_entrypoint_object(
   HDRS
     feclearexcept.h
   DEPENDS
+    libc.include.fenv
     libc.src.__support.FPUtil.fenv_impl
   COMPILE_OPTIONS
     -O2
@@ -41,6 +44,7 @@ add_entrypoint_object(
   HDRS
     feraiseexcept.h
   DEPENDS
+    libc.include.fenv
     libc.src.__support.FPUtil.fenv_impl
   COMPILE_OPTIONS
     -O2
@@ -53,19 +57,7 @@ add_entrypoint_object(
   HDRS
     fetestexcept.h
   DEPENDS
-    libc.src.__support.FPUtil.fenv_impl
-  COMPILE_OPTIONS
-    -O2
-)
-
-add_entrypoint_object(
-  fetestexceptflag
-  SRCS
-    fetestexceptflag.cpp
-  HDRS
-    fetestexceptflag.h
-  DEPENDS
-    libc.hdr.types.fexcept_t
+    libc.include.fenv
     libc.src.__support.FPUtil.fenv_impl
   COMPILE_OPTIONS
     -O2
@@ -78,7 +70,7 @@ add_entrypoint_object(
   HDRS
     fegetenv.h
   DEPENDS
-    libc.hdr.types.fenv_t
+    libc.include.fenv
     libc.src.__support.FPUtil.fenv_impl
   COMPILE_OPTIONS
     -O2
@@ -91,7 +83,7 @@ add_entrypoint_object(
   HDRS
     fesetenv.h
   DEPENDS
-    libc.hdr.types.fenv_t
+    libc.include.fenv
     libc.src.__support.FPUtil.fenv_impl
   COMPILE_OPTIONS
     -O2
@@ -104,20 +96,7 @@ add_entrypoint_object(
   HDRS
     fegetexceptflag.h
   DEPENDS
-    libc.hdr.fenv_macros
-    libc.hdr.types.fexcept_t
-    libc.src.__support.FPUtil.fenv_impl
-  COMPILE_OPTIONS
-    -O2
-)
-
-add_entrypoint_object(
-  fesetexcept
-  SRCS
-    fesetexcept.cpp
-  HDRS
-    fesetexcept.h
-  DEPENDS
+    libc.include.fenv
     libc.src.__support.FPUtil.fenv_impl
   COMPILE_OPTIONS
     -O2
@@ -130,8 +109,7 @@ add_entrypoint_object(
   HDRS
     fesetexceptflag.h
   DEPENDS
-    libc.hdr.fenv_macros
-    libc.hdr.types.fexcept_t
+    libc.include.fenv
     libc.src.__support.FPUtil.fenv_impl
   COMPILE_OPTIONS
     -O2
@@ -144,8 +122,7 @@ add_entrypoint_object(
   HDRS
     feholdexcept.h
   DEPENDS
-    libc.hdr.fenv_macros
-    libc.hdr.types.fenv_t
+    libc.include.fenv
     libc.src.__support.FPUtil.fenv_impl
   COMPILE_OPTIONS
     -O2
@@ -158,8 +135,7 @@ add_entrypoint_object(
   HDRS
     feupdateenv.h
   DEPENDS
-    libc.hdr.fenv_macros
-    libc.hdr.types.fenv_t
+    libc.include.fenv
     libc.src.__support.FPUtil.fenv_impl
   COMPILE_OPTIONS
     -O2
@@ -172,6 +148,7 @@ add_entrypoint_object(
   HDRS
     feenableexcept.h
   DEPENDS
+    libc.include.fenv
     libc.src.__support.FPUtil.fenv_impl
   COMPILE_OPTIONS
     -O2
@@ -184,6 +161,7 @@ add_entrypoint_object(
   HDRS
     fedisableexcept.h
   DEPENDS
+    libc.include.fenv
     libc.src.__support.FPUtil.fenv_impl
   COMPILE_OPTIONS
     -O2
@@ -196,6 +174,7 @@ add_entrypoint_object(
   HDRS
     fegetexcept.h
   DEPENDS
+    libc.include.fenv
     libc.src.__support.FPUtil.fenv_impl
   COMPILE_OPTIONS
     -O2

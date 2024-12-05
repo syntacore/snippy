@@ -159,9 +159,8 @@ inline DynoStats getDynoStats(FuncsType &Funcs, bool IsAArch64) {
 
 /// Call a function with optional before and after dynostats printing.
 template <typename FnType, typename FuncsType>
-inline void callWithDynoStats(raw_ostream &OS, FnType &&Func, FuncsType &Funcs,
-                              StringRef Phase, const bool Flag,
-                              bool IsAArch64) {
+inline void callWithDynoStats(FnType &&Func, FuncsType &Funcs, StringRef Phase,
+                              const bool Flag, bool IsAArch64) {
   DynoStats DynoStatsBefore(IsAArch64);
   if (Flag)
     DynoStatsBefore = getDynoStats(Funcs, IsAArch64);
@@ -171,12 +170,12 @@ inline void callWithDynoStats(raw_ostream &OS, FnType &&Func, FuncsType &Funcs,
   if (Flag) {
     const DynoStats DynoStatsAfter = getDynoStats(Funcs, IsAArch64);
     const bool Changed = (DynoStatsAfter != DynoStatsBefore);
-    OS << "BOLT-INFO: program-wide dynostats after running " << Phase
-       << (Changed ? "" : " (no change)") << ":\n\n"
-       << DynoStatsBefore << '\n';
+    outs() << "BOLT-INFO: program-wide dynostats after running " << Phase
+           << (Changed ? "" : " (no change)") << ":\n\n"
+           << DynoStatsBefore << '\n';
     if (Changed)
-      DynoStatsAfter.print(OS, &DynoStatsBefore);
-    OS << '\n';
+      DynoStatsAfter.print(outs(), &DynoStatsBefore);
+    outs() << '\n';
   }
 }
 

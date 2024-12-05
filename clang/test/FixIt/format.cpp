@@ -1,7 +1,5 @@
-// RUN: %clang_cc1 -fsyntax-only -verify -Wformat-pedantic %s
-// RUN: %clang_cc1 -fsyntax-only -fdiagnostics-parseable-fixits -Wformat-pedantic %s 2>&1 | FileCheck %s
-// RUN: %clang_cc1 -fsyntax-only -fdiagnostics-parseable-fixits -Wformat %s -verify=okay
-// okay-no-diagnostics
+// RUN: %clang_cc1 -fsyntax-only -verify -Wformat %s
+// RUN: %clang_cc1 -fsyntax-only -fdiagnostics-parseable-fixits -Wformat %s 2>&1 | FileCheck %s
 
 extern "C" int printf(const char *, ...);
 #define LOG(...) printf(__VA_ARGS__)

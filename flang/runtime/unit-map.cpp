@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "unit-map.h"
-#include "flang/Common/optional.h"
 
 namespace Fortran::runtime::io {
 
@@ -30,7 +29,7 @@ void UnitMap::Initialize() {
 ExternalFileUnit &UnitMap::NewUnit(const Terminator &terminator) {
   CriticalSection critical{lock_};
   Initialize();
-  Fortran::common::optional<int> n{freeNewUnits_.PopValue()};
+  std::optional<int> n{freeNewUnits_.PopValue()};
   if (!n) {
     n = emergencyNewUnit_++;
   }

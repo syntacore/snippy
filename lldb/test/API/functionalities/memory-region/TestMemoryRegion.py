@@ -2,6 +2,7 @@
 Test the 'memory region' command.
 """
 
+
 import lldb
 from lldbsuite.test.decorators import *
 from lldbsuite.test.lldbtest import *
@@ -61,7 +62,7 @@ class MemoryCommandRegion(TestBase):
         # We allow --all or an address argument, not both
         interp.HandleCommand("memory region --all 0", result)
         self.assertFalse(result.Succeeded())
-        self.assertRegex(
+        self.assertRegexpMatches(
             result.GetError(),
             'The "--all" option cannot be used when an address argument is given',
         )
@@ -80,7 +81,7 @@ class MemoryCommandRegion(TestBase):
         # Now let's print the memory region starting at 0 which should always work.
         interp.HandleCommand("memory region 0x0", result)
         self.assertTrue(result.Succeeded())
-        self.assertRegex(result.GetOutput(), "\\[0x0+-")
+        self.assertRegexpMatches(result.GetOutput(), "\\[0x0+-")
         all_regions += result.GetOutput()
 
         # Keep printing memory regions until we printed all of them.
@@ -93,7 +94,7 @@ class MemoryCommandRegion(TestBase):
         # Now that we reached the end, 'memory region' should again print the usage.
         interp.HandleCommand("memory region", result)
         self.assertFalse(result.Succeeded())
-        self.assertRegex(
+        self.assertRegexpMatches(
             result.GetError(),
             "Usage: memory region <address\-expression> \(or \-\-all\)",
         )

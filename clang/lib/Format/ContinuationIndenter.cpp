@@ -328,17 +328,9 @@ bool ContinuationIndenter::canBreak(const LineState &State) {
 
   // Don't break after very short return types (e.g. "void") as that is often
   // unexpected.
-  if (Current.is(TT_FunctionDeclarationName)) {
-    if (Style.BreakAfterReturnType == FormatStyle::RTBS_None &&
-        State.Column < 6) {
+  if (Current.is(TT_FunctionDeclarationName) && State.Column < 6) {
+    if (Style.AlwaysBreakAfterReturnType == FormatStyle::RTBS_None)
       return false;
-    }
-
-    if (Style.BreakAfterReturnType == FormatStyle::RTBS_ExceptShortType) {
-      assert(State.Column >= State.FirstIndent);
-      if (State.Column - State.FirstIndent < 6)
-        return false;
-    }
   }
 
   // If binary operators are moved to the next line (including commas for some
@@ -569,9 +561,7 @@ bool ContinuationIndenter::mustBreak(const LineState &State) {
           return true;
         }
       }
-      return Style.BreakTemplateDeclarations != FormatStyle::BTDS_No &&
-             (Style.BreakTemplateDeclarations != FormatStyle::BTDS_Leave ||
-              Current.NewlinesBefore > 0);
+      return Style.AlwaysBreakTemplateDeclarations != FormatStyle::BTDS_No;
     }
     if (Previous.is(TT_FunctionAnnotationRParen) &&
         State.Line->Type != LT_PreprocessorDirective) {
@@ -597,7 +587,7 @@ bool ContinuationIndenter::mustBreak(const LineState &State) {
       !State.Line->ReturnTypeWrapped &&
       // Don't break before a C# function when no break after return type.
       (!Style.isCSharp() ||
-       Style.BreakAfterReturnType > FormatStyle::RTBS_ExceptShortType) &&
+       Style.AlwaysBreakAfterReturnType != FormatStyle::RTBS_None) &&
       // Don't always break between a JavaScript `function` and the function
       // name.
       !Style.isJavaScript() && Previous.isNot(tok::kw_template) &&
@@ -684,13 +674,7 @@ void ContinuationIndenter::addTokenOnCurrentLine(LineState &State, bool DryRun,
         // arguments to function calls. We do this by ensuring that either all
         // arguments (including any lambdas) go on the same line as the function
         // call, or we break before the first argument.
-        const auto *Prev = Current.Previous;
-        if (!Prev)
-          return false;
-        // For example, `/*Newline=*/false`.
-        if (Prev->is(TT_BlockComment) && Current.SpacesRequiredBefore == 0)
-          return false;
-        const auto *PrevNonComment = Current.getPreviousNonComment();
+        auto PrevNonComment = Current.getPreviousNonComment();
         if (!PrevNonComment || PrevNonComment->isNot(tok::l_paren))
           return false;
         if (Current.isOneOf(tok::comment, tok::l_paren, TT_LambdaLSquare))
@@ -827,8 +811,6 @@ void ContinuationIndenter::addTokenOnCurrentLine(LineState &State, bool DryRun,
   if (Style.AlignAfterOpenBracket != FormatStyle::BAS_DontAlign &&
       !CurrentState.IsCSharpGenericTypeConstraint && Previous.opensScope() &&
       Previous.isNot(TT_ObjCMethodExpr) && Previous.isNot(TT_RequiresClause) &&
-      Previous.isNot(TT_TableGenDAGArgOpener) &&
-      Previous.isNot(TT_TableGenDAGArgOpenerToBreak) &&
       !(Current.MacroParent && Previous.MacroParent) &&
       (Current.isNot(TT_LineComment) ||
        Previous.isOneOf(BK_BracedInit, TT_VerilogMultiLineListLParen))) {
@@ -842,8 +824,10 @@ void ContinuationIndenter::addTokenOnCurrentLine(LineState &State, bool DryRun,
     CurrentState.ContainsUnwrappedBuilder = true;
   }
 
-  if (Current.is(TT_LambdaArrow) && Style.Language == FormatStyle::LK_Java)
+  if (Current.is(TT_TrailingReturnArrow) &&
+      Style.Language == FormatStyle::LK_Java) {
     CurrentState.NoLineBreak = true;
+  }
   if (Current.isMemberAccess() && Previous.is(tok::r_paren) &&
       (Previous.MatchingParen &&
        (Previous.TotalLength - Previous.MatchingParen->TotalLength > 10))) {
@@ -998,7 +982,7 @@ unsigned ContinuationIndenter::addTokenOnNewLine(LineState &State,
   //
   // is common and should be formatted like a free-standing function. The same
   // goes for wrapping before the lambda return type arrow.
-  if (Current.isNot(TT_LambdaArrow) &&
+  if (Current.isNot(TT_TrailingReturnArrow) &&
       (!Style.isJavaScript() || Current.NestingLevel != 0 ||
        !PreviousNonComment || PreviousNonComment->isNot(tok::equal) ||
        !Current.isOneOf(Keywords.kw_async, Keywords.kw_function))) {
@@ -1255,13 +1239,8 @@ unsigned ContinuationIndenter::getNewLineColumn(const LineState &State) {
     }
     return CurrentState.Indent;
   }
-  if (Current.is(TT_LambdaArrow) &&
-      Previous.isOneOf(tok::kw_noexcept, tok::kw_mutable, tok::kw_constexpr,
-                       tok::kw_consteval, tok::kw_static, TT_AttributeSquare)) {
-    return ContinuationIndent;
-  }
   if ((Current.isOneOf(tok::r_brace, tok::r_square) ||
-       (Current.is(tok::greater) && (Style.isProto() || Style.isTableGen()))) &&
+       (Current.is(tok::greater) && Style.isProto())) &&
       State.Stack.size() > 1) {
     if (Current.closesBlockOrBlockTypeList(Style))
       return State.Stack[State.Stack.size() - 2].NestedBlockIndent;
@@ -1287,12 +1266,6 @@ unsigned ContinuationIndenter::getNewLineColumn(const LineState &State) {
   if (Current.is(tok::r_paren) && State.Stack.size() > 1 &&
       (!Current.Next ||
        Current.Next->isOneOf(tok::semi, tok::kw_const, tok::l_brace))) {
-    return State.Stack[State.Stack.size() - 2].LastSpace;
-  }
-  // When DAGArg closer exists top of line, it should be aligned in the similar
-  // way as function call above.
-  if (Style.isTableGen() && Current.is(TT_TableGenDAGArgCloser) &&
-      State.Stack.size() > 1) {
     return State.Stack[State.Stack.size() - 2].LastSpace;
   }
   if (Style.AlignAfterOpenBracket == FormatStyle::BAS_BlockIndent &&
@@ -1425,7 +1398,7 @@ unsigned ContinuationIndenter::getNewLineColumn(const LineState &State) {
   // the next line.
   if (State.Line->InPragmaDirective) {
     FormatToken *PragmaType = State.Line->First->Next->Next;
-    if (PragmaType && PragmaType->TokenText == "omp")
+    if (PragmaType && PragmaType->TokenText.equals("omp"))
       return CurrentState.Indent + Style.ContinuationIndentWidth;
   }
 
@@ -1454,9 +1427,7 @@ unsigned ContinuationIndenter::getNewLineColumn(const LineState &State) {
       Style.BreakInheritanceList == FormatStyle::BILS_AfterColon) {
     return CurrentState.Indent;
   }
-  if (Previous.is(tok::r_paren) &&
-      Previous.isNot(TT_TableGenDAGArgOperatorToBreak) &&
-      !Current.isBinaryOperator() &&
+  if (Previous.is(tok::r_paren) && !Current.isBinaryOperator() &&
       !Current.isOneOf(tok::colon, tok::comment)) {
     return ContinuationIndent;
   }
@@ -1588,7 +1559,7 @@ unsigned ContinuationIndenter::moveStateToNextToken(LineState &State,
   }
   if (Current.isOneOf(TT_BinaryOperator, TT_ConditionalExpr) && Newline)
     CurrentState.NestedBlockIndent = State.Column + Current.ColumnWidth + 1;
-  if (Current.isOneOf(TT_LambdaLSquare, TT_LambdaArrow))
+  if (Current.isOneOf(TT_LambdaLSquare, TT_TrailingReturnArrow))
     CurrentState.LastSpace = State.Column;
   if (Current.is(TT_RequiresExpression) &&
       Style.RequiresExpressionIndentation == FormatStyle::REI_Keyword) {
@@ -1715,10 +1686,7 @@ void ContinuationIndenter::moveStatePastFakeLParens(LineState &State,
         (!Previous || Previous->isNot(tok::kw_return) ||
          (Style.Language != FormatStyle::LK_Java && PrecedenceLevel > 0)) &&
         (Style.AlignAfterOpenBracket != FormatStyle::BAS_DontAlign ||
-         PrecedenceLevel > prec::Comma || Current.NestingLevel == 0) &&
-        (!Style.isTableGen() ||
-         (Previous && Previous->isOneOf(TT_TableGenDAGArgListComma,
-                                        TT_TableGenDAGArgListCommaToBreak)))) {
+         PrecedenceLevel != prec::Comma || Current.NestingLevel == 0)) {
       NewParenState.Indent = std::max(
           std::max(State.Column, NewParenState.Indent), CurrentState.LastSpace);
     }
@@ -1726,11 +1694,8 @@ void ContinuationIndenter::moveStatePastFakeLParens(LineState &State,
     // Special case for generic selection expressions, its comma-separated
     // expressions are not aligned to the opening paren like regular calls, but
     // rather continuation-indented relative to the _Generic keyword.
-    if (Previous && Previous->endsSequence(tok::l_paren, tok::kw__Generic) &&
-        State.Stack.size() > 1) {
-      NewParenState.Indent = State.Stack[State.Stack.size() - 2].Indent +
-                             Style.ContinuationIndentWidth;
-    }
+    if (Previous && Previous->endsSequence(tok::l_paren, tok::kw__Generic))
+      NewParenState.Indent = CurrentState.LastSpace;
 
     if ((shouldUnindentNextOperator(Current) ||
          (Previous &&
@@ -1816,7 +1781,7 @@ void ContinuationIndenter::moveStatePastScopeOpener(LineState &State,
   }
 
   if (Current.MatchingParen && Current.is(BK_Block)) {
-    moveStateToNewBlock(State, Newline);
+    moveStateToNewBlock(State);
     return;
   }
 
@@ -1854,17 +1819,6 @@ void ContinuationIndenter::moveStatePastScopeOpener(LineState &State,
     NewIndent =
         Style.ContinuationIndentWidth +
         std::max(CurrentState.LastSpace, CurrentState.StartOfFunctionCall);
-
-    if (Style.isTableGen() && Current.is(TT_TableGenDAGArgOpenerToBreak) &&
-        Style.TableGenBreakInsideDAGArg == FormatStyle::DAS_BreakElements) {
-      // For the case the next token is a TableGen DAGArg operator identifier
-      // that is not marked to have a line break after it.
-      // In this case the option DAS_BreakElements requires to align the
-      // DAGArg elements to the operator.
-      const FormatToken *Next = Current.Next;
-      if (Next && Next->is(TT_TableGenDAGArgOperatorID))
-        NewIndent = State.Column + Next->TokenText.size() + 2;
-    }
 
     // Ensure that different different brackets force relative alignment, e.g.:
     // void SomeFunction(vector<  // break
@@ -1975,7 +1929,6 @@ void ContinuationIndenter::moveStatePastScopeCloser(LineState &State) {
       (Current.isOneOf(tok::r_paren, tok::r_square, TT_TemplateString) ||
        (Current.is(tok::r_brace) && State.NextToken != State.Line->First) ||
        State.NextToken->is(TT_TemplateCloser) ||
-       State.NextToken->is(TT_TableGenListCloser) ||
        (Current.is(tok::greater) && Current.is(TT_DictLiteral)))) {
     State.Stack.pop_back();
   }
@@ -2015,7 +1968,7 @@ void ContinuationIndenter::moveStatePastScopeCloser(LineState &State) {
   }
 }
 
-void ContinuationIndenter::moveStateToNewBlock(LineState &State, bool NewLine) {
+void ContinuationIndenter::moveStateToNewBlock(LineState &State) {
   if (Style.LambdaBodyIndentation == FormatStyle::LBI_OuterScope &&
       State.NextToken->is(TT_LambdaLBrace) &&
       !State.Line->MightBeFunctionDecl) {
@@ -2027,18 +1980,10 @@ void ContinuationIndenter::moveStateToNewBlock(LineState &State, bool NewLine) {
       NestedBlockIndent + (State.NextToken->is(TT_ObjCBlockLBrace)
                                ? Style.ObjCBlockIndentWidth
                                : Style.IndentWidth);
-
-  // Even when wrapping before lambda body, the left brace can still be added to
-  // the same line. This occurs when checking whether the whole lambda body can
-  // go on a single line. In this case we have to make sure there are no line
-  // breaks in the body, otherwise we could just end up with a regular lambda
-  // body without the brace wrapped.
-  bool NoLineBreak = Style.BraceWrapping.BeforeLambdaBody && !NewLine &&
-                     State.NextToken->is(TT_LambdaLBrace);
-
   State.Stack.push_back(ParenState(State.NextToken, NewIndent,
                                    State.Stack.back().LastSpace,
-                                   /*AvoidBinPacking=*/true, NoLineBreak));
+                                   /*AvoidBinPacking=*/true,
+                                   /*NoLineBreak=*/false));
   State.Stack.back().NestedBlockIndent = NestedBlockIndent;
   State.Stack.back().BreakBeforeParameter = true;
 }

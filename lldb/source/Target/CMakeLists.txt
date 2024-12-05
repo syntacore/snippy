@@ -78,7 +78,6 @@ add_lldb_library(lldbTarget
   UnixSignals.cpp
   UnwindAssembly.cpp
   UnwindLLDB.cpp
-  VerboseTrapFrameRecognizer.cpp
 
   LINK_LIBS
     lldbBreakpoint

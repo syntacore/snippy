@@ -33,7 +33,7 @@ StringRef stringifyTypeName<FloatType>() {
 }
 
 // Verifies an atomic update op.
-template <typename AtomicOpTy, typename ExpectedElementType>
+template <typename ExpectedElementType>
 static LogicalResult verifyAtomicUpdateOp(Operation *op) {
   auto ptrType = llvm::cast<spirv::PointerType>(op->getOperand(0).getType());
   auto elementType = ptrType.getPointeeType();
@@ -42,10 +42,8 @@ static LogicalResult verifyAtomicUpdateOp(Operation *op) {
                              << stringifyTypeName<ExpectedElementType>()
                              << " value, found " << elementType;
 
-  StringAttr semanticsAttrName =
-      AtomicOpTy::getSemanticsAttrName(op->getName());
   auto memorySemantics =
-      op->getAttrOfType<spirv::MemorySemanticsAttr>(semanticsAttrName)
+      op->getAttrOfType<spirv::MemorySemanticsAttr>(kSemanticsAttrName)
           .getValue();
   if (failed(verifyMemorySemantics(op, memorySemantics))) {
     return failure();
@@ -58,7 +56,7 @@ static LogicalResult verifyAtomicUpdateOp(Operation *op) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult AtomicAndOp::verify() {
-  return verifyAtomicUpdateOp<AtomicAndOp, IntegerType>(getOperation());
+  return verifyAtomicUpdateOp<IntegerType>(getOperation());
 }
 
 //===----------------------------------------------------------------------===//
@@ -66,7 +64,7 @@ LogicalResult AtomicAndOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult AtomicIAddOp::verify() {
-  return verifyAtomicUpdateOp<AtomicIAddOp, IntegerType>(getOperation());
+  return verifyAtomicUpdateOp<IntegerType>(getOperation());
 }
 
 //===----------------------------------------------------------------------===//
@@ -74,7 +72,7 @@ LogicalResult AtomicIAddOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult EXTAtomicFAddOp::verify() {
-  return verifyAtomicUpdateOp<EXTAtomicFAddOp, FloatType>(getOperation());
+  return verifyAtomicUpdateOp<FloatType>(getOperation());
 }
 
 //===----------------------------------------------------------------------===//
@@ -82,7 +80,7 @@ LogicalResult EXTAtomicFAddOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult AtomicIDecrementOp::verify() {
-  return verifyAtomicUpdateOp<AtomicIDecrementOp, IntegerType>(getOperation());
+  return verifyAtomicUpdateOp<IntegerType>(getOperation());
 }
 
 //===----------------------------------------------------------------------===//
@@ -90,7 +88,7 @@ LogicalResult AtomicIDecrementOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult AtomicIIncrementOp::verify() {
-  return verifyAtomicUpdateOp<AtomicIIncrementOp, IntegerType>(getOperation());
+  return verifyAtomicUpdateOp<IntegerType>(getOperation());
 }
 
 //===----------------------------------------------------------------------===//
@@ -98,7 +96,7 @@ LogicalResult AtomicIIncrementOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult AtomicISubOp::verify() {
-  return verifyAtomicUpdateOp<AtomicISubOp, IntegerType>(getOperation());
+  return verifyAtomicUpdateOp<IntegerType>(getOperation());
 }
 
 //===----------------------------------------------------------------------===//
@@ -106,7 +104,7 @@ LogicalResult AtomicISubOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult AtomicOrOp::verify() {
-  return verifyAtomicUpdateOp<AtomicOrOp, IntegerType>(getOperation());
+  return verifyAtomicUpdateOp<IntegerType>(getOperation());
 }
 
 //===----------------------------------------------------------------------===//
@@ -114,7 +112,7 @@ LogicalResult AtomicOrOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult AtomicSMaxOp::verify() {
-  return verifyAtomicUpdateOp<AtomicSMaxOp, IntegerType>(getOperation());
+  return verifyAtomicUpdateOp<IntegerType>(getOperation());
 }
 
 //===----------------------------------------------------------------------===//
@@ -122,7 +120,7 @@ LogicalResult AtomicSMaxOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult AtomicSMinOp::verify() {
-  return verifyAtomicUpdateOp<AtomicSMinOp, IntegerType>(getOperation());
+  return verifyAtomicUpdateOp<IntegerType>(getOperation());
 }
 
 //===----------------------------------------------------------------------===//
@@ -130,7 +128,7 @@ LogicalResult AtomicSMinOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult AtomicUMaxOp::verify() {
-  return verifyAtomicUpdateOp<AtomicUMaxOp, IntegerType>(getOperation());
+  return verifyAtomicUpdateOp<IntegerType>(getOperation());
 }
 
 //===----------------------------------------------------------------------===//
@@ -138,7 +136,7 @@ LogicalResult AtomicUMaxOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult AtomicUMinOp::verify() {
-  return verifyAtomicUpdateOp<AtomicUMinOp, IntegerType>(getOperation());
+  return verifyAtomicUpdateOp<IntegerType>(getOperation());
 }
 
 //===----------------------------------------------------------------------===//
@@ -146,7 +144,7 @@ LogicalResult AtomicUMinOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult AtomicXorOp::verify() {
-  return verifyAtomicUpdateOp<AtomicXorOp, IntegerType>(getOperation());
+  return verifyAtomicUpdateOp<IntegerType>(getOperation());
 }
 
 } // namespace mlir::spirv

@@ -43,8 +43,7 @@ void DeallocateChecker::Leave(const parser::DeallocateStmt &deallocateStmt) {
                 context_
                     .Say(name.source,
                         "Name in DEALLOCATE statement is not definable"_err_en_US)
-                    .Attach(std::move(
-                        whyNot->set_severity(parser::Severity::Because)));
+                    .Attach(std::move(*whyNot));
               } else if (auto whyNot{WhyNotDefinable(name.source,
                              context_.FindScope(name.source),
                              DefinabilityFlags{}, *symbol)}) {
@@ -52,8 +51,7 @@ void DeallocateChecker::Leave(const parser::DeallocateStmt &deallocateStmt) {
                 context_
                     .Say(name.source,
                         "Object in DEALLOCATE statement is not deallocatable"_err_en_US)
-                    .Attach(std::move(
-                        whyNot->set_severity(parser::Severity::Because)));
+                    .Attach(std::move(*whyNot));
               } else {
                 context_.CheckIndexVarRedefine(name);
               }
@@ -79,16 +77,14 @@ void DeallocateChecker::Leave(const parser::DeallocateStmt &deallocateStmt) {
                   context_
                       .Say(source,
                           "Name in DEALLOCATE statement is not definable"_err_en_US)
-                      .Attach(std::move(
-                          whyNot->set_severity(parser::Severity::Because)));
+                      .Attach(std::move(*whyNot));
                 } else if (auto whyNot{WhyNotDefinable(source,
                                context_.FindScope(source), DefinabilityFlags{},
                                *expr)}) {
                   context_
                       .Say(source,
                           "Object in DEALLOCATE statement is not deallocatable"_err_en_US)
-                      .Attach(std::move(
-                          whyNot->set_severity(parser::Severity::Because)));
+                      .Attach(std::move(*whyNot));
                 }
               }
             },

@@ -396,12 +396,6 @@ public:
   }
 };
 
-static std::string DetailedErrorString(const DiagnosticsEngine &Diags) {
-  if (Diags.getDiagnosticOptions().VerifyPrefixes.empty())
-    return "expected";
-  return *Diags.getDiagnosticOptions().VerifyPrefixes.begin();
-}
-
 /// ParseDirective - Go through the comment and see if it indicates expected
 /// diagnostics. If so, then put them in the appropriate directive list.
 ///
@@ -451,9 +445,10 @@ static bool ParseDirective(StringRef S, ExpectedData *ED, SourceManager &SM,
     // others.
 
     // Regex in initial directive token: -re
-    if (DToken.consume_back("-re")) {
+    if (DToken.ends_with("-re")) {
       D.RegexKind = true;
       KindStr = "regex";
+      DToken = DToken.substr(0, DToken.size()-3);
     }
 
     // Type in initial directive token: -{error|warning|note|no-diagnostics}
@@ -484,14 +479,14 @@ static bool ParseDirective(StringRef S, ExpectedData *ED, SourceManager &SM,
     if (NoDiag) {
       if (Status == VerifyDiagnosticConsumer::HasOtherExpectedDirectives)
         Diags.Report(Pos, diag::err_verify_invalid_no_diags)
-            << DetailedErrorString(Diags) << /*IsExpectedNoDiagnostics=*/true;
+          << /*IsExpectedNoDiagnostics=*/true;
       else
         Status = VerifyDiagnosticConsumer::HasExpectedNoDiagnostics;
       continue;
     }
     if (Status == VerifyDiagnosticConsumer::HasExpectedNoDiagnostics) {
       Diags.Report(Pos, diag::err_verify_invalid_no_diags)
-          << DetailedErrorString(Diags) << /*IsExpectedNoDiagnostics=*/false;
+        << /*IsExpectedNoDiagnostics=*/false;
       continue;
     }
     Status = VerifyDiagnosticConsumer::HasOtherExpectedDirectives;
@@ -1110,8 +1105,7 @@ void VerifyDiagnosticConsumer::CheckDiagnostics() {
     // Produce an error if no expected-* directives could be found in the
     // source file(s) processed.
     if (Status == HasNoDirectives) {
-      Diags.Report(diag::err_verify_no_directives).setForceEmit()
-          << DetailedErrorString(Diags);
+      Diags.Report(diag::err_verify_no_directives).setForceEmit();
       ++NumErrors;
       Status = HasNoDirectivesReported;
     }

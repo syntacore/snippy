@@ -21,7 +21,6 @@
 #include "llvm/IR/Metadata.h"
 #include "llvm/Transforms/Utils/UnrollLoop.h"
 
-#include "polly/Support/PollyDebug.h"
 #define DEBUG_TYPE "polly-opt-isl"
 
 using namespace polly;
@@ -600,7 +599,7 @@ public:
     if (Nest.size() <= 1)
       return getBase().visitBand(Band);
 
-    POLLY_DEBUG({
+    LLVM_DEBUG({
       dbgs() << "Found loops to collapse between\n";
       dumpIslObj(RootBand, dbgs());
       dbgs() << "and\n";
@@ -645,7 +644,7 @@ public:
 };
 
 static isl::schedule collapseBands(isl::schedule Sched) {
-  POLLY_DEBUG(dbgs() << "Collapse bands in schedule\n");
+  LLVM_DEBUG(dbgs() << "Collapse bands in schedule\n");
   BandCollapseRewriter Rewriter;
   return Rewriter.visit(Sched);
 }
@@ -774,7 +773,7 @@ static isl::schedule tryGreedyFuse(isl::schedule_node_band LHS,
   if (!canFuseOutermost(LHS, RHS, Deps))
     return {};
 
-  POLLY_DEBUG({
+  LLVM_DEBUG({
     dbgs() << "Found loops for greedy fusion:\n";
     dumpIslObj(LHS, dbgs());
     dbgs() << "and\n";
@@ -1229,12 +1228,12 @@ isl::schedule polly::applyMaxFission(isl::schedule_node BandToFission) {
 
 isl::schedule polly::applyGreedyFusion(isl::schedule Sched,
                                        const isl::union_map &Deps) {
-  POLLY_DEBUG(dbgs() << "Greedy loop fusion\n");
+  LLVM_DEBUG(dbgs() << "Greedy loop fusion\n");
 
   GreedyFusionRewriter Rewriter;
   isl::schedule Result = Rewriter.visit(Sched, Deps);
   if (!Rewriter.AnyChange) {
-    POLLY_DEBUG(dbgs() << "Found nothing to fuse\n");
+    LLVM_DEBUG(dbgs() << "Found nothing to fuse\n");
     return Sched;
   }
 

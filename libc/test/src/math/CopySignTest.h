@@ -6,17 +6,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "test/UnitTest/FEnvSafeTest.h"
 #include "test/UnitTest/FPMatcher.h"
 #include "test/UnitTest/Test.h"
 #include "utils/MPFRWrapper/MPFRUtils.h"
 
-#include "hdr/math_macros.h"
+#include <math.h>
 
 namespace mpfr = LIBC_NAMESPACE::testing::mpfr;
 
 template <typename T>
-class CopySignTest : public LIBC_NAMESPACE::testing::FEnvSafeTest {
+class CopySignTest : public LIBC_NAMESPACE::testing::Test {
 
   DECLARE_SPECIAL_CONSTANTS(T)
 

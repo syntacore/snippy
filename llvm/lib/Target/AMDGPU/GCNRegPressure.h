@@ -74,20 +74,8 @@ struct GCNRegPressure {
     return getOccupancy(ST) > O.getOccupancy(ST);
   }
 
-  /// Compares \p this GCNRegpressure to \p O, returning true if \p this is
-  /// less. Since GCNRegpressure contains different types of pressures, and due
-  /// to target-specific pecularities (e.g. we care about occupancy rather than
-  /// raw register usage), we determine if \p this GCNRegPressure is less than
-  /// \p O based on the following tiered comparisons (in order order of
-  /// precedence):
-  /// 1. Better occupancy
-  /// 2. Less spilling (first preference to VGPR spills, then to SGPR spills)
-  /// 3. Less tuple register pressure (first preference to VGPR tuples if we
-  /// determine that SGPR pressure is not important)
-  /// 4. Less raw register pressure (first preference to VGPR tuples if we
-  /// determine that SGPR pressure is not important)
-  bool less(const MachineFunction &MF, const GCNRegPressure &O,
-            unsigned MaxOccupancy = std::numeric_limits<unsigned>::max()) const;
+  bool less(const GCNSubtarget &ST, const GCNRegPressure& O,
+    unsigned MaxOccupancy = std::numeric_limits<unsigned>::max()) const;
 
   bool operator==(const GCNRegPressure &O) const {
     return std::equal(&Value[0], &Value[TOTAL_KINDS], O.Value);
@@ -356,7 +344,7 @@ public:
   bool runOnMachineFunction(MachineFunction &MF) override;
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<LiveIntervalsWrapperPass>();
+    AU.addRequired<LiveIntervals>();
     AU.setPreservesAll();
     MachineFunctionPass::getAnalysisUsage(AU);
   }

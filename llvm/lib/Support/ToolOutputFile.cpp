@@ -17,14 +17,14 @@ using namespace llvm;
 
 static bool isStdout(StringRef Filename) { return Filename == "-"; }
 
-CleanupInstaller::CleanupInstaller(StringRef Filename)
+ToolOutputFile::CleanupInstaller::CleanupInstaller(StringRef Filename)
     : Filename(std::string(Filename)), Keep(false) {
   // Arrange for the file to be deleted if the process is killed.
   if (!isStdout(Filename))
     sys::RemoveFileOnSignal(Filename);
 }
 
-CleanupInstaller::~CleanupInstaller() {
+ToolOutputFile::CleanupInstaller::~CleanupInstaller() {
   if (isStdout(Filename))
     return;
 

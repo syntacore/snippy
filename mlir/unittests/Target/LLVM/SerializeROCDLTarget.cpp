@@ -31,15 +31,15 @@
 using namespace mlir;
 
 // Skip the test if the AMDGPU target was not built.
-#if MLIR_ENABLE_ROCM_CONVERSIONS
-#define SKIP_WITHOUT_AMDGPU(x) x
-#else
+#if MLIR_ROCM_CONVERSIONS_ENABLED == 0
 #define SKIP_WITHOUT_AMDGPU(x) DISABLED_##x
+#else
+#define SKIP_WITHOUT_AMDGPU(x) x
 #endif
 
 class MLIRTargetLLVMROCDL : public ::testing::Test {
 protected:
-  void SetUp() override {
+  virtual void SetUp() {
     registerBuiltinDialectTranslation(registry);
     registerLLVMDialectTranslation(registry);
     registerGPUDialectTranslation(registry);
@@ -89,7 +89,7 @@ TEST_F(MLIRTargetLLVMROCDL, SKIP_WITHOUT_AMDGPU(SerializeROCDLMToLLVM)) {
         serializer.serializeToObject(gpuModule, options);
     // Check that the serializer was successful.
     ASSERT_TRUE(object != std::nullopt);
-    ASSERT_TRUE(!object->empty());
+    ASSERT_TRUE(object->size() > 0);
 
     // Read the serialized module.
     llvm::MemoryBufferRef buffer(StringRef(object->data(), object->size()),
@@ -125,7 +125,7 @@ TEST_F(MLIRTargetLLVMROCDL, SKIP_WITHOUT_AMDGPU(SerializeROCDLToPTX)) {
         serializer.serializeToObject(gpuModule, options);
     // Check that the serializer was successful.
     ASSERT_TRUE(object != std::nullopt);
-    ASSERT_TRUE(!object->empty());
+    ASSERT_TRUE(object->size() > 0);
 
     ASSERT_TRUE(
         StringRef(object->data(), object->size()).contains("rocdl_kernel"));

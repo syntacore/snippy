@@ -18,7 +18,7 @@
 #include "llvm/Analysis/CFG.h"
 #include "llvm/Analysis/DomTreeUpdater.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
-#include "llvm/CodeGen/RuntimeLibcallUtil.h"
+#include "llvm/CodeGen/RuntimeLibcalls.h"
 #include "llvm/CodeGen/TargetLowering.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
@@ -111,8 +111,7 @@ Value *DwarfEHPrepare::GetExceptionObject(ResumeInst *RI) {
   }
 
   if (!ExnObj)
-    ExnObj = ExtractValueInst::Create(RI->getOperand(0), 0, "exn.obj",
-                                      RI->getIterator());
+    ExnObj = ExtractValueInst::Create(RI->getOperand(0), 0, "exn.obj", RI);
 
   RI->eraseFromParent();
 
@@ -159,7 +158,7 @@ size_t DwarfEHPrepare::pruneUnreachableResumes(
       Resumes[ResumesLeft++] = RI;
     } else {
       BasicBlock *BB = RI->getParent();
-      new UnreachableInst(Ctx, RI->getIterator());
+      new UnreachableInst(Ctx, RI);
       RI->eraseFromParent();
       simplifyCFG(BB, *TTI, DTU);
     }
@@ -293,13 +292,6 @@ bool DwarfEHPrepare::InsertUnwindResumeCalls() {
   // Call the function.
   CallInst *CI =
       CallInst::Create(RewindFunction, RewindFunctionArgs, "", UnwindBB);
-  // The verifier requires that all calls of debug-info-bearing functions
-  // from debug-info-bearing functions have a debug location (for inlining
-  // purposes). Assign a dummy location to satisfy the constraint.
-  Function *RewindFn = dyn_cast<Function>(RewindFunction.getCallee());
-  if (RewindFn && RewindFn->getSubprogram())
-    if (DISubprogram *SP = F.getSubprogram())
-      CI->setDebugLoc(DILocation::get(SP->getContext(), 0, 0, SP));
   CI->setCallingConv(RewindFunctionCallingConv);
 
   // We never expect _Unwind_Resume to return.

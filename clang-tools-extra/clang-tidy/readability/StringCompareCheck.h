@@ -10,7 +10,6 @@
 #define LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_READABILITY_STRINGCOMPARECHECK_H
 
 #include "../ClangTidyCheck.h"
-#include <vector>
 
 namespace clang::tidy::readability {
 
@@ -21,18 +20,13 @@ namespace clang::tidy::readability {
 /// http://clang.llvm.org/extra/clang-tidy/checks/readability/string-compare.html
 class StringCompareCheck : public ClangTidyCheck {
 public:
-  StringCompareCheck(StringRef Name, ClangTidyContext *Context);
-
+  StringCompareCheck(StringRef Name, ClangTidyContext *Context)
+      : ClangTidyCheck(Name, Context) {}
   bool isLanguageVersionSupported(const LangOptions &LangOpts) const override {
     return LangOpts.CPlusPlus;
   }
-
   void registerMatchers(ast_matchers::MatchFinder *Finder) override;
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
-  void storeOptions(ClangTidyOptions::OptionMap &Opts) override;
-
-private:
-  const std::vector<StringRef> StringLikeClasses;
 };
 
 } // namespace clang::tidy::readability

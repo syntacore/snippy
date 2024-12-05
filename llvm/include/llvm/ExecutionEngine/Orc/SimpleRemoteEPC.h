@@ -71,8 +71,8 @@ public:
 
   Expected<tpctypes::DylibHandle> loadDylib(const char *DylibPath) override;
 
-  void lookupSymbolsAsync(ArrayRef<LookupRequest> Request,
-                          SymbolLookupCompleteFn F) override;
+  Expected<std::vector<tpctypes::LookupResult>>
+  lookupSymbols(ArrayRef<LookupRequest> Request) override;
 
   Expected<int32_t> runAsMain(ExecutorAddr MainFnAddr,
                               ArrayRef<std::string> Args) override;

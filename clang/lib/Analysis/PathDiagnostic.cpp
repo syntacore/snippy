@@ -115,17 +115,14 @@ PathDiagnostic::PathDiagnostic(
     StringRef CheckerName, const Decl *declWithIssue, StringRef bugtype,
     StringRef verboseDesc, StringRef shortDesc, StringRef category,
     PathDiagnosticLocation LocationToUnique, const Decl *DeclToUnique,
-    const Decl *AnalysisEntryPoint,
     std::unique_ptr<FilesToLineNumsMap> ExecutedLines)
     : CheckerName(CheckerName), DeclWithIssue(declWithIssue),
       BugType(StripTrailingDots(bugtype)),
       VerboseDesc(StripTrailingDots(verboseDesc)),
       ShortDesc(StripTrailingDots(shortDesc)),
       Category(StripTrailingDots(category)), UniqueingLoc(LocationToUnique),
-      UniqueingDecl(DeclToUnique), AnalysisEntryPoint(AnalysisEntryPoint),
-      ExecutedLines(std::move(ExecutedLines)), path(pathImpl) {
-  assert(AnalysisEntryPoint);
-}
+      UniqueingDecl(DeclToUnique), ExecutedLines(std::move(ExecutedLines)),
+      path(pathImpl) {}
 
 void PathDiagnosticConsumer::anchor() {}
 

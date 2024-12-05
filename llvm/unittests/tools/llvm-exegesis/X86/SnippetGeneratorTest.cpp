@@ -182,9 +182,8 @@ TEST_F(X86SerialSnippetGeneratorTest,
     EXPECT_THAT(IT.getOpcode(), Opcode);
     ASSERT_THAT(IT.getVariableValues(), SizeIs(3));
     for (const auto &Var : IT.getVariableValues()) {
-      if (Var.isReg()) {
+      if (Var.isReg())
         EXPECT_FALSE(ForbiddenRegisters[Var.getReg()]);
-      }
     }
   }
 }

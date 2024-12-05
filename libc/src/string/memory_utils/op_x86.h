@@ -12,10 +12,9 @@
 #ifndef LLVM_LIBC_SRC_STRING_MEMORY_UTILS_OP_X86_H
 #define LLVM_LIBC_SRC_STRING_MEMORY_UTILS_OP_X86_H
 
-#include "src/__support/macros/config.h"
 #include "src/__support/macros/properties/architectures.h"
 
-#if defined(LIBC_TARGET_ARCH_IS_X86)
+#if defined(LIBC_TARGET_ARCH_IS_X86_64)
 
 #include "src/__support/common.h"
 #include "src/string/memory_utils/op_builtin.h"
@@ -38,16 +37,15 @@
 #define _mm_movemask_epi8(A) 0
 #endif
 
-namespace LIBC_NAMESPACE_DECL {
-namespace x86 {
+namespace LIBC_NAMESPACE::x86 {
 
 // A set of constants to check compile time features.
-LIBC_INLINE_VAR constexpr bool K_SSE2 = LLVM_LIBC_IS_DEFINED(__SSE2__);
-LIBC_INLINE_VAR constexpr bool K_SSE41 = LLVM_LIBC_IS_DEFINED(__SSE4_1__);
-LIBC_INLINE_VAR constexpr bool K_AVX = LLVM_LIBC_IS_DEFINED(__AVX__);
-LIBC_INLINE_VAR constexpr bool K_AVX2 = LLVM_LIBC_IS_DEFINED(__AVX2__);
-LIBC_INLINE_VAR constexpr bool K_AVX512_F = LLVM_LIBC_IS_DEFINED(__AVX512F__);
-LIBC_INLINE_VAR constexpr bool K_AVX512_BW = LLVM_LIBC_IS_DEFINED(__AVX512BW__);
+LIBC_INLINE_VAR constexpr bool kSse2 = LLVM_LIBC_IS_DEFINED(__SSE2__);
+LIBC_INLINE_VAR constexpr bool kSse41 = LLVM_LIBC_IS_DEFINED(__SSE4_1__);
+LIBC_INLINE_VAR constexpr bool kAvx = LLVM_LIBC_IS_DEFINED(__AVX__);
+LIBC_INLINE_VAR constexpr bool kAvx2 = LLVM_LIBC_IS_DEFINED(__AVX2__);
+LIBC_INLINE_VAR constexpr bool kAvx512F = LLVM_LIBC_IS_DEFINED(__AVX512F__);
+LIBC_INLINE_VAR constexpr bool kAvx512BW = LLVM_LIBC_IS_DEFINED(__AVX512BW__);
 
 ///////////////////////////////////////////////////////////////////////////////
 // Memcpy repmovsb implementation
@@ -57,11 +55,9 @@ struct Memcpy {
   }
 };
 
-} // namespace x86
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE::x86
 
-namespace LIBC_NAMESPACE_DECL {
-namespace generic {
+namespace LIBC_NAMESPACE::generic {
 
 ///////////////////////////////////////////////////////////////////////////////
 // Specializations for uint16_t
@@ -318,9 +314,8 @@ LIBC_INLINE MemcmpReturnType cmp_neq<__m512i>(CPtr p1, CPtr p2, size_t offset) {
 
 #pragma GCC diagnostic pop
 
-} // namespace generic
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE::generic
 
-#endif // LIBC_TARGET_ARCH_IS_X86
+#endif // LIBC_TARGET_ARCH_IS_X86_64
 
 #endif // LLVM_LIBC_SRC_STRING_MEMORY_UTILS_OP_X86_H

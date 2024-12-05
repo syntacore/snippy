@@ -1,4 +1,4 @@
-//===-- Resizable Monotonic HashTable ---------------------------*- C++ -*-===//
+//===-- Fix-sized Monotonic HashTable ---------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_SRC___SUPPORT_HASHTABLE_TABLE_H
-#define LLVM_LIBC_SRC___SUPPORT_HASHTABLE_TABLE_H
+#ifndef LLVM_LIBC_SRC___SUPPORT_HASHTABLE_table_H
+#define LLVM_LIBC_SRC___SUPPORT_HASHTABLE_table_H
 
 #include "include/llvm-libc-types/ENTRY.h"
 #include "src/__support/CPP/bit.h" // bit_ceil
@@ -15,7 +15,6 @@
 #include "src/__support/HashTable/bitmask.h"
 #include "src/__support/hash.h"
 #include "src/__support/macros/attributes.h"
-#include "src/__support/macros/config.h"
 #include "src/__support/macros/optimization.h"
 #include "src/__support/memory_size.h"
 #include "src/string/memset.h"
@@ -24,7 +23,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 namespace internal {
 
 LIBC_INLINE uint8_t secondary_hash(uint64_t hash) {
@@ -350,6 +349,6 @@ public:
   }
 };
 } // namespace internal
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE
 
-#endif // LLVM_LIBC_SRC___SUPPORT_HASHTABLE_TABLE_H
+#endif // LLVM_LIBC_SRC___SUPPORT_HASHTABLE_table_H

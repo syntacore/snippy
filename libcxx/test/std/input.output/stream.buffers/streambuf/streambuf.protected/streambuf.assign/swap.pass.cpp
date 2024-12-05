@@ -68,11 +68,10 @@ int main(int, char**)
         t2.swap(t);
     }
     {
-        char g[3];
-        char p[3];
+        char g1, g2, g3, p1, p3;
         test<char> t;
-        t.setg(&g[0], &g[1], &g[2]);
-        t.setp(&p[0], &p[2]);
+        t.setg(&g1, &g2, &g3);
+        t.setp(&p1, &p3);
         test<char> t2;
         t2.swap(t);
     }
@@ -83,11 +82,10 @@ int main(int, char**)
         t2.swap(t);
     }
     {
-        wchar_t g[3];
-        wchar_t p[3];
+        wchar_t g1, g2, g3, p1, p3;
         test<wchar_t> t;
-        t.setg(&g[0], &g[1], &g[2]);
-        t.setp(&p[0], &p[2]);
+        t.setg(&g1, &g2, &g3);
+        t.setp(&p1, &p3);
         test<wchar_t> t2;
         t2.swap(t);
     }

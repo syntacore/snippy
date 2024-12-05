@@ -14,7 +14,6 @@
 #include "polly/FlattenAlgo.h"
 #include "polly/Support/ISLOStream.h"
 #include "polly/Support/ISLTools.h"
-#include "polly/Support/PollyDebug.h"
 #include "llvm/Support/Debug.h"
 #define DEBUG_TYPE "polly-flatten-algo"
 
@@ -172,7 +171,7 @@ isl::union_map tryFlattenSequence(isl::union_map Schedule) {
 
   // Would cause an infinite loop.
   if (!isDimBoundedByConstant(ScatterSet, 0)) {
-    POLLY_DEBUG(dbgs() << "Abort; dimension is not of fixed size\n");
+    LLVM_DEBUG(dbgs() << "Abort; dimension is not of fixed size\n");
     return {};
   }
 
@@ -183,8 +182,8 @@ isl::union_map tryFlattenSequence(isl::union_map Schedule) {
   auto Counter = isl::pw_aff(isl::local_space(ParamSpace.set_from_params()));
 
   while (!ScatterSet.is_empty()) {
-    POLLY_DEBUG(dbgs() << "Next counter:\n  " << Counter << "\n");
-    POLLY_DEBUG(dbgs() << "Remaining scatter set:\n  " << ScatterSet << "\n");
+    LLVM_DEBUG(dbgs() << "Next counter:\n  " << Counter << "\n");
+    LLVM_DEBUG(dbgs() << "Remaining scatter set:\n  " << ScatterSet << "\n");
     auto ThisSet = ScatterSet.project_out(isl::dim::set, 1, Dims - 1);
     auto ThisFirst = ThisSet.lexmin();
     auto ScatterFirst = ThisFirst.add_dims(isl::dim::set, Dims - 1);
@@ -200,11 +199,11 @@ isl::union_map tryFlattenSequence(isl::union_map Schedule) {
     auto RemainingSubSchedule = scheduleProjectOut(SubSchedule, 0, 1);
 
     auto FirstSubScatter = isl::set(FirstSubSchedule.range());
-    POLLY_DEBUG(dbgs() << "Next step in sequence is:\n  " << FirstSubScatter
-                       << "\n");
+    LLVM_DEBUG(dbgs() << "Next step in sequence is:\n  " << FirstSubScatter
+                      << "\n");
 
     if (!isDimBoundedByParameter(FirstSubScatter, 0)) {
-      POLLY_DEBUG(dbgs() << "Abort; sequence step is not bounded\n");
+      LLVM_DEBUG(dbgs() << "Abort; sequence step is not bounded\n");
       return {};
     }
 
@@ -237,8 +236,8 @@ isl::union_map tryFlattenSequence(isl::union_map Schedule) {
     Counter = Counter.add(PartLen);
   }
 
-  POLLY_DEBUG(dbgs() << "Sequence-flatten result is:\n  " << NewSchedule
-                     << "\n");
+  LLVM_DEBUG(dbgs() << "Sequence-flatten result is:\n  " << NewSchedule
+                    << "\n");
   return NewSchedule;
 }
 
@@ -267,20 +266,20 @@ isl::union_map tryFlattenLoop(isl::union_map Schedule) {
   SubExtent = SubExtent.project_out(isl::dim::set, 1, SubDims - 1);
 
   if (!isDimBoundedByConstant(SubExtent, 0)) {
-    POLLY_DEBUG(dbgs() << "Abort; dimension not bounded by constant\n");
+    LLVM_DEBUG(dbgs() << "Abort; dimension not bounded by constant\n");
     return {};
   }
 
   auto Min = SubExtent.dim_min(0);
-  POLLY_DEBUG(dbgs() << "Min bound:\n  " << Min << "\n");
+  LLVM_DEBUG(dbgs() << "Min bound:\n  " << Min << "\n");
   auto MinVal = getConstant(Min, false, true);
   auto Max = SubExtent.dim_max(0);
-  POLLY_DEBUG(dbgs() << "Max bound:\n  " << Max << "\n");
+  LLVM_DEBUG(dbgs() << "Max bound:\n  " << Max << "\n");
   auto MaxVal = getConstant(Max, true, false);
 
   if (MinVal.is_null() || MaxVal.is_null() || MinVal.is_nan() ||
       MaxVal.is_nan()) {
-    POLLY_DEBUG(dbgs() << "Abort; dimension bounds could not be determined\n");
+    LLVM_DEBUG(dbgs() << "Abort; dimension bounds could not be determined\n");
     return {};
   }
 
@@ -298,15 +297,15 @@ isl::union_map tryFlattenLoop(isl::union_map Schedule) {
   auto IndexMap = isl::union_map::from(Index);
 
   auto Result = IndexMap.flat_range_product(RemainingSubSchedule);
-  POLLY_DEBUG(dbgs() << "Loop-flatten result is:\n  " << Result << "\n");
+  LLVM_DEBUG(dbgs() << "Loop-flatten result is:\n  " << Result << "\n");
   return Result;
 }
 } // anonymous namespace
 
 isl::union_map polly::flattenSchedule(isl::union_map Schedule) {
   unsigned Dims = getNumScatterDims(Schedule);
-  POLLY_DEBUG(dbgs() << "Recursive schedule to process:\n  " << Schedule
-                     << "\n");
+  LLVM_DEBUG(dbgs() << "Recursive schedule to process:\n  " << Schedule
+                    << "\n");
 
   // Base case; no dimensions left
   if (Dims == 0) {
@@ -320,20 +319,20 @@ isl::union_map polly::flattenSchedule(isl::union_map Schedule) {
 
   // Fixed dimension; no need to preserve variabledness.
   if (!isVariableDim(Schedule)) {
-    POLLY_DEBUG(dbgs() << "Fixed dimension; try sequence flattening\n");
+    LLVM_DEBUG(dbgs() << "Fixed dimension; try sequence flattening\n");
     auto NewScheduleSequence = tryFlattenSequence(Schedule);
     if (!NewScheduleSequence.is_null())
       return NewScheduleSequence;
   }
 
   // Constant stride
-  POLLY_DEBUG(dbgs() << "Try loop flattening\n");
+  LLVM_DEBUG(dbgs() << "Try loop flattening\n");
   auto NewScheduleLoop = tryFlattenLoop(Schedule);
   if (!NewScheduleLoop.is_null())
     return NewScheduleLoop;
 
   // Try again without loop condition (may blow up the number of pieces!!)
-  POLLY_DEBUG(dbgs() << "Try sequence flattening again\n");
+  LLVM_DEBUG(dbgs() << "Try sequence flattening again\n");
   auto NewScheduleSequence = tryFlattenSequence(Schedule);
   if (!NewScheduleSequence.is_null())
     return NewScheduleSequence;

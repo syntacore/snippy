@@ -19,7 +19,11 @@
 #include <utility>
 
 #include "test_iterators.h"
-#include "test_range.h"
+
+template <class View, class T>
+concept CanBePiped = requires (View&& view, T&& t) {
+  { std::forward<View>(view) | std::forward<T>(t) };
+};
 
 struct NonCopyablePredicate {
   NonCopyablePredicate(NonCopyablePredicate const&) = delete;

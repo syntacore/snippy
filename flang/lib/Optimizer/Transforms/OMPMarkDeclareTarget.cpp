@@ -88,3 +88,10 @@ class OMPMarkDeclareTargetPass
 };
 
 } // namespace
+
+namespace fir {
+std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+createOMPMarkDeclareTargetPass() {
+  return std::make_unique<OMPMarkDeclareTargetPass>();
+}
+} // namespace fir

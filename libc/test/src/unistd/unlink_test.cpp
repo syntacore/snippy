@@ -17,10 +17,9 @@
 
 TEST(LlvmLibcUnlinkTest, CreateAndUnlink) {
   using LIBC_NAMESPACE::testing::ErrnoSetterMatcher::Succeeds;
-  constexpr const char *FILENAME = "unlink.test";
-  auto TEST_FILE = libc_make_test_file_path(FILENAME);
+  constexpr const char *TEST_FILE = "testdata/unlink.test";
   int write_fd = LIBC_NAMESPACE::open(TEST_FILE, O_WRONLY | O_CREAT, S_IRWXU);
-  ASSERT_ERRNO_SUCCESS();
+  ASSERT_EQ(libc_errno, 0);
   ASSERT_GT(write_fd, 0);
   ASSERT_THAT(LIBC_NAMESPACE::close(write_fd), Succeeds(0));
   ASSERT_THAT(LIBC_NAMESPACE::unlink(TEST_FILE), Succeeds(0));
@@ -28,5 +27,6 @@ TEST(LlvmLibcUnlinkTest, CreateAndUnlink) {
 
 TEST(LlvmLibcUnlinkTest, UnlinkNonExistentFile) {
   using LIBC_NAMESPACE::testing::ErrnoSetterMatcher::Fails;
-  ASSERT_THAT(LIBC_NAMESPACE::unlink("non-existent-file"), Fails(ENOENT));
+  ASSERT_THAT(LIBC_NAMESPACE::unlink("testdata/non-existent-file"),
+              Fails(ENOENT));
 }

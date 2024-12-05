@@ -21,7 +21,6 @@
 namespace llvm {
 
 class Constant;
-class DIExpression;
 class LLVMContext;
 class MemoryBufferRef;
 class Module;
@@ -202,11 +201,6 @@ Type *parseType(StringRef Asm, SMDiagnostic &Err, const Module &M,
 /// \return null on error.
 Type *parseTypeAtBeginning(StringRef Asm, unsigned &Read, SMDiagnostic &Err,
                            const Module &M, const SlotMapping *Slots = nullptr);
-
-DIExpression *parseDIExpressionBodyAtBeginning(StringRef Asm, unsigned &Read,
-                                               SMDiagnostic &Err,
-                                               const Module &M,
-                                               const SlotMapping *Slots);
 
 } // End llvm namespace
 

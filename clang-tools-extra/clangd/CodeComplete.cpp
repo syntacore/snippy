@@ -89,11 +89,7 @@ const CodeCompleteOptions::CodeCompletionRankingModel
 
 namespace {
 
-// Note: changes to this function should also be reflected in the
-// CodeCompletionResult overload where appropriate.
-CompletionItemKind
-toCompletionItemKind(index::SymbolKind Kind,
-                     const llvm::StringRef *Signature = nullptr) {
+CompletionItemKind toCompletionItemKind(index::SymbolKind Kind) {
   using SK = index::SymbolKind;
   switch (Kind) {
   case SK::Unknown:
@@ -103,10 +99,7 @@ toCompletionItemKind(index::SymbolKind Kind,
   case SK::NamespaceAlias:
     return CompletionItemKind::Module;
   case SK::Macro:
-    // Use macro signature (if provided) to tell apart function-like and
-    // object-like macros.
-    return Signature && Signature->contains('(') ? CompletionItemKind::Function
-                                                 : CompletionItemKind::Constant;
+    return CompletionItemKind::Text;
   case SK::Enum:
     return CompletionItemKind::Enum;
   case SK::Struct:
@@ -157,8 +150,6 @@ toCompletionItemKind(index::SymbolKind Kind,
   llvm_unreachable("Unhandled clang::index::SymbolKind.");
 }
 
-// Note: changes to this function should also be reflected in the
-// index::SymbolKind overload where appropriate.
 CompletionItemKind toCompletionItemKind(const CodeCompletionResult &Res,
                                         CodeCompletionContext::Kind CtxKind) {
   if (Res.Declaration)
@@ -388,8 +379,7 @@ struct CodeCompletionBuilder {
       if (Completion.Scope.empty())
         Completion.Scope = std::string(C.IndexResult->Scope);
       if (Completion.Kind == CompletionItemKind::Missing)
-        Completion.Kind = toCompletionItemKind(C.IndexResult->SymInfo.Kind,
-                                               &C.IndexResult->Signature);
+        Completion.Kind = toCompletionItemKind(C.IndexResult->SymInfo.Kind);
       if (Completion.Name.empty())
         Completion.Name = std::string(C.IndexResult->Name);
       if (Completion.FilterText.empty())
@@ -629,8 +619,7 @@ private:
     }
     // 'CompletionItemKind::Interface' matches template type aliases.
     if (Completion.Kind == CompletionItemKind::Interface ||
-        Completion.Kind == CompletionItemKind::Class ||
-        Completion.Kind == CompletionItemKind::Variable) {
+        Completion.Kind == CompletionItemKind::Class) {
       if (Snippet->front() != '<')
         return *Snippet; // Not an arg snippet?
 
@@ -1639,7 +1628,7 @@ public:
       IsUsingDeclaration = Recorder->CCContext.isUsingDeclaration();
       auto Style = getFormatStyleForFile(SemaCCInput.FileName,
                                          SemaCCInput.ParseInput.Contents,
-                                         *SemaCCInput.ParseInput.TFS, false);
+                                         *SemaCCInput.ParseInput.TFS);
       const auto NextToken = findTokenAfterCompletionPoint(
           Recorder->CCSema->getPreprocessor().getCodeCompletionLoc(),
           Recorder->CCSema->getSourceManager(), Recorder->CCSema->LangOpts);
@@ -1730,7 +1719,7 @@ public:
     ProxSources[FileName].Cost = 0;
     FileProximity.emplace(ProxSources);
 
-    auto Style = getFormatStyleForFile(FileName, Content, TFS, false);
+    auto Style = getFormatStyleForFile(FileName, Content, TFS);
     // This will only insert verbatim headers.
     Inserter.emplace(FileName, Content, Style,
                      /*BuildDir=*/"", /*HeaderSearchInfo=*/nullptr);

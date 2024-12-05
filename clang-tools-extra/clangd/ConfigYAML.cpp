@@ -169,10 +169,6 @@ private:
       if (auto Values = scalarValues(N))
         F.IgnoreHeader = std::move(*Values);
     });
-    Dict.handle("AnalyzeAngledIncludes", [&](Node &N) {
-      if (auto Value = boolValue(N, "AnalyzeAngledIncludes"))
-        F.AnalyzeAngledIncludes = *Value;
-    });
     Dict.parse(N);
   }
 

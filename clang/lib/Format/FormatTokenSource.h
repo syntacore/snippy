@@ -15,7 +15,10 @@
 #ifndef LLVM_CLANG_LIB_FORMAT_FORMATTOKENSOURCE_H
 #define LLVM_CLANG_LIB_FORMAT_FORMATTOKENSOURCE_H
 
+#include "FormatToken.h"
 #include "UnwrappedLineParser.h"
+#include "llvm/ADT/DenseMap.h"
+#include <cstddef>
 
 #define DEBUG_TYPE "format-token-source"
 
@@ -72,15 +75,6 @@ public:
   // getNextToken() -> a1
   // getNextToken() -> a2
   virtual FormatToken *insertTokens(ArrayRef<FormatToken *> Tokens) = 0;
-
-  [[nodiscard]] FormatToken *getNextNonComment() {
-    FormatToken *Tok;
-    do {
-      Tok = getNextToken();
-      assert(Tok);
-    } while (Tok->is(tok::comment));
-    return Tok;
-  }
 };
 
 class IndexedTokenSource : public FormatTokenSource {
@@ -173,7 +167,7 @@ private:
     return Next;
   }
 
-  void dbgToken(int Position, StringRef Indent = "") {
+  void dbgToken(int Position, llvm::StringRef Indent = "") {
     FormatToken *Tok = Tokens[Position];
     llvm::dbgs() << Indent << "[" << Position
                  << "] Token: " << Tok->Tok.getName() << " / " << Tok->TokenText

@@ -81,7 +81,6 @@ public:
   void generateRelocationCode(raw_ostream &os) const;
 
   bool isTLS() const { return flags & llvm::wasm::WASM_SEG_FLAG_TLS; }
-  bool isRetained() const { return flags & llvm::wasm::WASM_SEG_FLAG_RETAIN; }
 
   ObjFile *file;
   OutputSection *outputSec = nullptr;
@@ -260,13 +259,10 @@ public:
         file->codeSection->Content.slice(inputSectionOffset, function->Size);
     debugName = function->DebugName;
     comdat = function->Comdat;
-    assert(s.Kind != WasmSignature::Placeholder);
   }
 
   InputFunction(StringRef name, const WasmSignature &s)
-      : InputChunk(nullptr, InputChunk::Function, name), signature(s) {
-    assert(s.Kind == WasmSignature::Function);
-  }
+      : InputChunk(nullptr, InputChunk::Function, name), signature(s) {}
 
   static bool classof(const InputChunk *c) {
     return c->kind() == InputChunk::Function ||
@@ -279,14 +275,7 @@ public:
   }
   void setExportName(std::string exportName) { this->exportName = exportName; }
   uint32_t getFunctionInputOffset() const { return getInputSectionOffset(); }
-  uint32_t getFunctionCodeOffset() const {
-    // For generated synthetic functions, such as unreachable stubs generated
-    // for signature mismatches, 'function' reference does not exist. This
-    // function is used to get function offsets for .debug_info section, and for
-    // those generated stubs function offsets are not meaningful anyway. So just
-    // return 0 in those cases.
-    return function ? function->CodeOffset : 0;
-  }
+  uint32_t getFunctionCodeOffset() const { return function->CodeOffset; }
   uint32_t getFunctionIndex() const { return *functionIndex; }
   bool hasFunctionIndex() const { return functionIndex.has_value(); }
   void setFunctionIndex(uint32_t index);
@@ -308,7 +297,7 @@ public:
     return compressedSize;
   }
 
-  const WasmFunction *function = nullptr;
+  const WasmFunction *function;
 
 protected:
   std::optional<std::string> exportName;

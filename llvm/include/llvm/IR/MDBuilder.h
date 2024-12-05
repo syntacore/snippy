@@ -59,25 +59,10 @@ public:
   //===------------------------------------------------------------------===//
 
   /// Return metadata containing two branch weights.
-  /// @param TrueWeight the weight of the true branch
-  /// @param FalseWeight the weight of the false branch
-  /// @param Do these weights come from __builtin_expect*
-  MDNode *createBranchWeights(uint32_t TrueWeight, uint32_t FalseWeight,
-                              bool IsExpected = false);
-
-  /// Return metadata containing two branch weights, with significant bias
-  /// towards `true` destination.
-  MDNode *createLikelyBranchWeights();
-
-  /// Return metadata containing two branch weights, with significant bias
-  /// towards `false` destination.
-  MDNode *createUnlikelyBranchWeights();
+  MDNode *createBranchWeights(uint32_t TrueWeight, uint32_t FalseWeight);
 
   /// Return metadata containing a number of branch weights.
-  /// @param Weights the weights of all the branches
-  /// @param Do these weights come from __builtin_expect*
-  MDNode *createBranchWeights(ArrayRef<uint32_t> Weights,
-                              bool IsExpected = false);
+  MDNode *createBranchWeights(ArrayRef<uint32_t> Weights);
 
   /// Return metadata specifying that a branch or switch is unpredictable.
   MDNode *createUnpredictable();

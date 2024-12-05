@@ -94,7 +94,6 @@ unittest("ClangdTests") {
     "ParsedASTTests.cpp",
     "PathMappingTests.cpp",
     "PreambleTests.cpp",
-    "PrerequisiteModulesTest.cpp",
     "PrintASTTests.cpp",
     "ProjectAwareIndexTests.cpp",
     "QualityTests.cpp",

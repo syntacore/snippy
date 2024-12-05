@@ -6,8 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_MACROS_FLOAT_MACROS_H
-#define LLVM_LIBC_MACROS_FLOAT_MACROS_H
+#ifndef __LLVM_LIBC_MACROS_FLOAT_MACROS_H
+#define __LLVM_LIBC_MACROS_FLOAT_MACROS_H
+
+#include_next <float.h>
 
 #ifndef FLT_RADIX
 #define FLT_RADIX __FLT_RADIX__
@@ -17,13 +19,9 @@
 #define FLT_EVAL_METHOD __FLT_EVAL_METHOD__
 #endif // FLT_EVAL_METHOD
 
-#ifndef FLT_ROUNDS
-#if __has_builtin(__builtin_flt_rounds)
-#define FLT_ROUNDS __builtin_flt_rounds()
-#else
-#define FLT_ROUNDS 1
-#endif
-#endif // FLT_ROUNDS
+#ifndef DECIMAL_DIG
+#define DECIMAL_DIG __DECIMAL_DIG__
+#endif // DECIMAL_DIG
 
 #ifndef FLT_DECIMAL_DIG
 #define FLT_DECIMAL_DIG __FLT_DECIMAL_DIG__
@@ -36,10 +34,6 @@
 #ifndef LDBL_DECIMAL_DIG
 #define LDBL_DECIMAL_DIG __LDBL_DECIMAL_DIG__
 #endif // LDBL_DECIMAL_DIG
-
-#ifndef DECIMAL_DIG
-#define DECIMAL_DIG __DECIMAL_DIG__
-#endif // DECIMAL_DIG
 
 #ifndef FLT_DIG
 #define FLT_DIG __FLT_DIG__
@@ -90,15 +84,15 @@
 #endif // LDBL_MAX
 
 #ifndef FLT_TRUE_MIN
-#define FLT_TRUE_MIN __FLT_DENORM_MIN__
+#define FLT_TRUE_MIN __FLT_TRUE_MIN__
 #endif // FLT_TRUE_MIN
 
 #ifndef DBL_TRUE_MIN
-#define DBL_TRUE_MIN __DBL_DENORM_MIN__
+#define DBL_TRUE_MIN __DBL_TRUE_MIN__
 #endif // DBL_TRUE_MIN
 
 #ifndef LDBL_TRUE_MIN
-#define LDBL_TRUE_MIN __LDBL_DENORM_MIN__
+#define LDBL_TRUE_MIN __LDBL_TRUE_MIN__
 #endif // LDBL_TRUE_MIN
 
 #ifndef FLT_EPSILON
@@ -163,4 +157,4 @@
 
 // TODO: Add FLT16 and FLT128 constants.
 
-#endif // LLVM_LIBC_MACROS_FLOAT_MACROS_H
+#endif // __LLVM_LIBC_MACROS_FLOAT_MACROS_H

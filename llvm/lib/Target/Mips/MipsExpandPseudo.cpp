@@ -342,7 +342,6 @@ bool MipsExpandPseudo::expandAtomicBinOpSubword(
   bool IsMin = false;
   bool IsMax = false;
   bool IsUnsigned = false;
-  bool DestOK = false;
 
   unsigned Opcode = 0;
   switch (I->getOpcode()) {
@@ -389,34 +388,18 @@ bool MipsExpandPseudo::expandAtomicBinOpSubword(
     Opcode = Mips::XOR;
     break;
   case Mips::ATOMIC_LOAD_UMIN_I8_POSTRA:
-    SEOp = Mips::SEB;
-    IsUnsigned = true;
-    IsMin = true;
-    break;
   case Mips::ATOMIC_LOAD_UMIN_I16_POSTRA:
     IsUnsigned = true;
-    IsMin = true;
-    break;
+    [[fallthrough]];
   case Mips::ATOMIC_LOAD_MIN_I8_POSTRA:
-    SEOp = Mips::SEB;
-    IsMin = true;
-    break;
   case Mips::ATOMIC_LOAD_MIN_I16_POSTRA:
     IsMin = true;
     break;
   case Mips::ATOMIC_LOAD_UMAX_I8_POSTRA:
-    SEOp = Mips::SEB;
-    IsUnsigned = true;
-    IsMax = true;
-    break;
   case Mips::ATOMIC_LOAD_UMAX_I16_POSTRA:
     IsUnsigned = true;
-    IsMax = true;
-    break;
+    [[fallthrough]];
   case Mips::ATOMIC_LOAD_MAX_I8_POSTRA:
-    SEOp = Mips::SEB;
-    IsMax = true;
-    break;
   case Mips::ATOMIC_LOAD_MAX_I16_POSTRA:
     IsMax = true;
     break;
@@ -476,38 +459,20 @@ bool MipsExpandPseudo::expandAtomicBinOpSubword(
     unsigned SELOldVal = IsMax ? SELEQZ : SELNEZ;
     unsigned MOVIncr = IsMax ? MOVN : MOVZ;
 
-    BuildMI(loopMBB, DL, TII->get(Mips::SRAV), StoreVal)
-        .addReg(OldVal)
-        .addReg(ShiftAmnt);
-    if (IsUnsigned) {
-      const unsigned OpMask = SEOp == Mips::SEH ? 0xffff : 0xff;
-      BuildMI(loopMBB, DL, TII->get(Mips::ANDi), StoreVal)
-          .addReg(StoreVal)
-          .addImm(OpMask);
-    } else if (STI->hasMips32r2()) {
-      BuildMI(loopMBB, DL, TII->get(SEOp), StoreVal).addReg(StoreVal);
-    } else {
-      const unsigned ShiftImm = SEOp == Mips::SEH ? 16 : 24;
-      const unsigned SROp = IsUnsigned ? Mips::SRL : Mips::SRA;
-      BuildMI(loopMBB, DL, TII->get(Mips::SLL), StoreVal)
-          .addReg(StoreVal, RegState::Kill)
-          .addImm(ShiftImm);
-      BuildMI(loopMBB, DL, TII->get(SROp), StoreVal)
-          .addReg(StoreVal, RegState::Kill)
-          .addImm(ShiftImm);
+    // For little endian we need to clear uninterested bits.
+    if (STI->isLittle()) {
+      // and OldVal, OldVal, Mask
+      // and Incr, Incr, Mask
+      BuildMI(loopMBB, DL, TII->get(Mips::AND), OldVal)
+          .addReg(OldVal)
+          .addReg(Mask);
+      BuildMI(loopMBB, DL, TII->get(Mips::AND), Incr).addReg(Incr).addReg(Mask);
     }
-    BuildMI(loopMBB, DL, TII->get(Mips::OR), Dest)
-        .addReg(Mips::ZERO)
-        .addReg(StoreVal);
-    DestOK = true;
-    BuildMI(loopMBB, DL, TII->get(Mips::SLLV), StoreVal)
-        .addReg(StoreVal)
-        .addReg(ShiftAmnt);
 
-    // unsigned: sltu Scratch4, StoreVal, Incr
-    // signed:   slt Scratch4, StoreVal, Incr
+    // unsigned: sltu Scratch4, oldVal, Incr
+    // signed:   slt Scratch4, oldVal, Incr
     BuildMI(loopMBB, DL, TII->get(SLTScratch4), Scratch4)
-        .addReg(StoreVal)
+        .addReg(OldVal)
         .addReg(Incr);
 
     if (STI->hasMips64r6() || STI->hasMips32r6()) {
@@ -518,7 +483,7 @@ bool MipsExpandPseudo::expandAtomicBinOpSubword(
       //      seleqz Scratch4, Incr, Scratch4
       //      or BinOpRes, BinOpRes, Scratch4
       BuildMI(loopMBB, DL, TII->get(SELOldVal), BinOpRes)
-          .addReg(StoreVal)
+          .addReg(OldVal)
           .addReg(Scratch4);
       BuildMI(loopMBB, DL, TII->get(SELIncr), Scratch4)
           .addReg(Incr)
@@ -527,12 +492,12 @@ bool MipsExpandPseudo::expandAtomicBinOpSubword(
           .addReg(BinOpRes)
           .addReg(Scratch4);
     } else {
-      // max: move BinOpRes, StoreVal
+      // max: move BinOpRes, OldVal
       //      movn BinOpRes, Incr, Scratch4, BinOpRes
-      // min: move BinOpRes, StoreVal
+      // min: move BinOpRes, OldVal
       //      movz BinOpRes, Incr, Scratch4, BinOpRes
       BuildMI(loopMBB, DL, TII->get(OR), BinOpRes)
-          .addReg(StoreVal)
+          .addReg(OldVal)
           .addReg(Mips::ZERO);
       BuildMI(loopMBB, DL, TII->get(MOVIncr), BinOpRes)
           .addReg(Incr)
@@ -579,24 +544,23 @@ bool MipsExpandPseudo::expandAtomicBinOpSubword(
   //    srl     srlres,maskedoldval1,shiftamt
   //    sign_extend dest,srlres
 
-  if (!DestOK) {
-    sinkMBB->addSuccessor(exitMBB, BranchProbability::getOne());
-    BuildMI(sinkMBB, DL, TII->get(Mips::AND), Dest).addReg(OldVal).addReg(Mask);
-    BuildMI(sinkMBB, DL, TII->get(Mips::SRLV), Dest)
-        .addReg(Dest)
-        .addReg(ShiftAmnt);
+  sinkMBB->addSuccessor(exitMBB, BranchProbability::getOne());
 
-    if (STI->hasMips32r2()) {
-      BuildMI(sinkMBB, DL, TII->get(SEOp), Dest).addReg(Dest);
-    } else {
-      const unsigned ShiftImm = SEOp == Mips::SEH ? 16 : 24;
-      BuildMI(sinkMBB, DL, TII->get(Mips::SLL), Dest)
-          .addReg(Dest, RegState::Kill)
-          .addImm(ShiftImm);
-      BuildMI(sinkMBB, DL, TII->get(Mips::SRA), Dest)
-          .addReg(Dest, RegState::Kill)
-          .addImm(ShiftImm);
-    }
+  BuildMI(sinkMBB, DL, TII->get(Mips::AND), Dest)
+    .addReg(OldVal).addReg(Mask);
+  BuildMI(sinkMBB, DL, TII->get(Mips::SRLV), Dest)
+      .addReg(Dest).addReg(ShiftAmnt);
+
+  if (STI->hasMips32r2()) {
+    BuildMI(sinkMBB, DL, TII->get(SEOp), Dest).addReg(Dest);
+  } else {
+    const unsigned ShiftImm = SEOp == Mips::SEH ? 16 : 24;
+    BuildMI(sinkMBB, DL, TII->get(Mips::SLL), Dest)
+        .addReg(Dest, RegState::Kill)
+        .addImm(ShiftImm);
+    BuildMI(sinkMBB, DL, TII->get(Mips::SRA), Dest)
+        .addReg(Dest, RegState::Kill)
+        .addImm(ShiftImm);
   }
 
   LivePhysRegs LiveRegs;

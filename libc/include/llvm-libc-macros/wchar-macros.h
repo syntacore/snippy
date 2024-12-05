@@ -6,11 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_MACROS_WCHAR_MACROS_H
-#define LLVM_LIBC_MACROS_WCHAR_MACROS_H
+#ifndef __LLVM_LIBC_MACROS_WCHAR_MACROS_H
+#define __LLVM_LIBC_MACROS_WCHAR_MACROS_H
 
 #ifndef WEOF
 #define WEOF 0xffffffffu
 #endif
 
-#endif // LLVM_LIBC_MACROS_WCHAR_MACROS_H
+#endif // __LLVM_LIBC_MACROS_WCHAR_MACROS_H

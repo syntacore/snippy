@@ -6,19 +6,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "hdr/time_macros.h"
-#include "src/__support/common.h"
-#include "src/__support/macros/config.h"
-#include "src/__support/time/linux/clock_gettime.h"
-#include "src/errno/libc_errno.h"
 #include "src/time/time_func.h"
 
-namespace LIBC_NAMESPACE_DECL {
+#include "src/__support/OSUtil/syscall.h" // For internal syscall function.
+#include "src/__support/common.h"
+#include "src/errno/libc_errno.h"
+#include "src/time/linux/clockGetTimeImpl.h"
+
+#include <sys/syscall.h> // For syscall numbers.
+#include <time.h>
+
+namespace LIBC_NAMESPACE {
 
 LLVM_LIBC_FUNCTION(time_t, time, (time_t * tp)) {
   // TODO: Use the Linux VDSO to fetch the time and avoid the syscall.
   struct timespec ts;
-  auto result = internal::clock_gettime(CLOCK_REALTIME, &ts);
+  auto result = internal::clock_gettimeimpl(CLOCK_REALTIME, &ts);
   if (!result.has_value()) {
     libc_errno = result.error();
     return -1;
@@ -29,4 +32,4 @@ LLVM_LIBC_FUNCTION(time_t, time, (time_t * tp)) {
   return time_t(ts.tv_sec);
 }
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE

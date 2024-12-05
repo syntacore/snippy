@@ -21,7 +21,8 @@ CommandObjectIterateOverThreads::CommandObjectIterateOverThreads(
     const char *syntax, uint32_t flags)
     : CommandObjectParsed(interpreter, name, help, syntax, flags) {
   // These commands all take thread ID's as arguments.
-  AddSimpleArgumentList(eArgTypeThreadIndex, eArgRepeatStar);
+  CommandArgumentData thread_arg{eArgTypeThreadIndex, eArgRepeatStar};
+  m_arguments.push_back({thread_arg});
 }
 
 CommandObjectMultipleThreads::CommandObjectMultipleThreads(
@@ -29,7 +30,8 @@ CommandObjectMultipleThreads::CommandObjectMultipleThreads(
     const char *syntax, uint32_t flags)
     : CommandObjectParsed(interpreter, name, help, syntax, flags) {
   // These commands all take thread ID's as arguments.
-  AddSimpleArgumentList(eArgTypeThreadIndex, eArgRepeatStar);
+  CommandArgumentData thread_arg{eArgTypeThreadIndex, eArgRepeatStar};
+  m_arguments.push_back({thread_arg});
 }
 
 void CommandObjectIterateOverThreads::DoExecute(Args &command,

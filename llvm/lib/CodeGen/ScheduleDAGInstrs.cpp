@@ -282,7 +282,7 @@ void ScheduleDAGInstrs::addPhysRegDataDeps(SUnit *SU, unsigned OperIdx) {
       } else {
         Dep.setLatency(0);
       }
-      ST.adjustSchedDependency(SU, OperIdx, UseSU, UseOpIdx, Dep, &SchedModel);
+      ST.adjustSchedDependency(SU, OperIdx, UseSU, UseOpIdx, Dep);
       UseSU->addPred(Dep);
     }
   }
@@ -323,8 +323,7 @@ void ScheduleDAGInstrs::addPhysRegDeps(SUnit *SU, unsigned OperIdx) {
           Dep.setLatency(
               SchedModel.computeOutputLatency(MI, OperIdx, DefInstr));
         }
-        ST.adjustSchedDependency(SU, OperIdx, DefSU, I->OpIdx, Dep,
-                                 &SchedModel);
+        ST.adjustSchedDependency(SU, OperIdx, DefSU, I->OpIdx, Dep);
         DefSU->addPred(Dep);
       }
     }
@@ -454,8 +453,7 @@ void ScheduleDAGInstrs::addVRegDefDeps(SUnit *SU, unsigned OperIdx) {
         SDep Dep(SU, SDep::Data, Reg);
         Dep.setLatency(SchedModel.computeOperandLatency(MI, OperIdx, Use,
                                                         I->OperandIndex));
-        ST.adjustSchedDependency(SU, OperIdx, UseSU, I->OperandIndex, Dep,
-                                 &SchedModel);
+        ST.adjustSchedDependency(SU, OperIdx, UseSU, I->OperandIndex, Dep);
         UseSU->addPred(Dep);
       }
 
@@ -1105,7 +1103,7 @@ void ScheduleDAGInstrs::reduceHugeMemNodeMaps(Value2SUsMap &stores,
              dbgs() << "Loading SUnits:\n"; loads.dump());
 }
 
-static void toggleKills(const MachineRegisterInfo &MRI, LiveRegUnits &LiveRegs,
+static void toggleKills(const MachineRegisterInfo &MRI, LivePhysRegs &LiveRegs,
                         MachineInstr &MI, bool addToLiveRegs) {
   for (MachineOperand &MO : MI.operands()) {
     if (!MO.isReg() || !MO.readsReg())
@@ -1115,10 +1113,8 @@ static void toggleKills(const MachineRegisterInfo &MRI, LiveRegUnits &LiveRegs,
       continue;
 
     // Things that are available after the instruction are killed by it.
-    bool IsKill = LiveRegs.available(Reg);
-
-    // Exception: Do not kill reserved registers
-    MO.setIsKill(IsKill && !MRI.isReserved(Reg));
+    bool IsKill = LiveRegs.available(MRI, Reg);
+    MO.setIsKill(IsKill);
     if (addToLiveRegs)
       LiveRegs.addReg(Reg);
   }
@@ -1148,7 +1144,7 @@ void ScheduleDAGInstrs::fixupKills(MachineBasicBlock &MBB) {
           continue;
         LiveRegs.removeReg(Reg);
       } else if (MO.isRegMask()) {
-        LiveRegs.removeRegsNotPreserved(MO.getRegMask());
+        LiveRegs.removeRegsInMask(MO);
       }
     }
 
@@ -1206,7 +1202,7 @@ std::string ScheduleDAGInstrs::getGraphNodeLabel(const SUnit *SU) const {
     oss << "<exit>";
   else
     SU->getInstr()->print(oss, /*IsStandalone=*/true);
-  return s;
+  return oss.str();
 }
 
 /// Return the basic block label. It is not necessarilly unique because a block

@@ -9,13 +9,12 @@
 #ifndef LLVM_LIBC_SRC_STDIO_CLEARERR_UNLOCKED_H
 #define LLVM_LIBC_SRC_STDIO_CLEARERR_UNLOCKED_H
 
-#include "hdr/types/FILE.h"
-#include "src/__support/macros/config.h"
+#include <stdio.h>
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 
 void clearerr_unlocked(::FILE *stream);
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE
 
 #endif // LLVM_LIBC_SRC_STDIO_CLEARERR_UNLOCKED_H

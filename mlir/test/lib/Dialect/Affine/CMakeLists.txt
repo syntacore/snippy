@@ -3,7 +3,6 @@ add_mlir_library(MLIRAffineTransformsTestPasses
   TestAffineDataCopy.cpp
   TestAffineLoopUnswitching.cpp
   TestAffineLoopParametricTiling.cpp
-  TestAccessAnalysis.cpp
   TestDecomposeAffineOps.cpp
   TestReifyValueBounds.cpp
   TestLoopFusion.cpp
@@ -22,7 +21,6 @@ add_mlir_library(MLIRAffineTransformsTestPasses
 
   LINK_LIBS PUBLIC
   MLIRArithTransforms
-  MLIRAffineAnalysis
   MLIRAffineTransforms
   MLIRAffineUtils
   MLIRIR
@@ -30,13 +28,5 @@ add_mlir_library(MLIRAffineTransformsTestPasses
   MLIRSupport
   MLIRMemRefDialect
   MLIRTensorDialect
-  MLIRTestDialect
   MLIRVectorUtils
   )
-
-target_include_directories(MLIRAffineTransformsTestPasses
-  PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/../Test
-  ${CMAKE_CURRENT_BINARY_DIR}/../Test
-  )
-

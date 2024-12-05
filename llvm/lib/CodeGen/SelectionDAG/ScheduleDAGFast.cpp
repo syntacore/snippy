@@ -622,11 +622,11 @@ void ScheduleDAGFast::ListScheduleBottomUp() {
     }
 
     // Add the nodes that aren't ready back onto the available list.
-    for (SUnit *SU : NotReady) {
-      SU->isPending = false;
+    for (unsigned i = 0, e = NotReady.size(); i != e; ++i) {
+      NotReady[i]->isPending = false;
       // May no longer be available due to backtracking.
-      if (SU->isAvailable)
-        AvailableQueue.push(SU);
+      if (NotReady[i]->isAvailable)
+        AvailableQueue.push(NotReady[i]);
     }
     NotReady.clear();
 
@@ -748,7 +748,8 @@ void ScheduleDAGLinearize::Schedule() {
       ++DAGSize;
   }
 
-  for (SDNode *Glue : Glues) {
+  for (unsigned i = 0, e = Glues.size(); i != e; ++i) {
+    SDNode *Glue = Glues[i];
     SDNode *GUser = GluedMap[Glue];
     unsigned Degree = Glue->getNodeId();
     unsigned UDegree = GUser->getNodeId();

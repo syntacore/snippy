@@ -18,7 +18,6 @@ package(default_visibility = ["//visibility:public"])
         ] + glob([
             "IRDL/*.irdl.mlir",
             "LLVM/*-symbol-def.mlir",
-            "Linalg/transpose-matmul-*.mlir",
             "Transform/include/**/*.mlir",
         ]),
     )
@@ -27,7 +26,6 @@ package(default_visibility = ["//visibility:public"])
         exclude = [
             "IRDL/*.irdl.mlir",
             "LLVM/*-symbol-def.mlir",
-            "Linalg/transpose-matmul-*.mlir",
             "Transform/*-symbol-decl-and-schedule.mlir",
             "Transform/include/**/*.mlir",
         ],

@@ -9,12 +9,10 @@
 #include "src/stdio/fread_unlocked.h"
 #include "src/__support/File/file.h"
 
-#include "hdr/types/FILE.h"
-#include "src/__support/macros/config.h"
 #include "src/errno/libc_errno.h"
-#include <stddef.h>
+#include <stdio.h>
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 
 LLVM_LIBC_FUNCTION(size_t, fread_unlocked,
                    (void *__restrict buffer, size_t size, size_t nmemb,
@@ -28,4 +26,4 @@ LLVM_LIBC_FUNCTION(size_t, fread_unlocked,
   return result.value / size;
 }
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE

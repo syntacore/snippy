@@ -27,11 +27,6 @@ struct PlainNode : ilist_node<PlainNode> {
   friend class dummy;
 };
 
-class Parent {};
-struct ParentNode
-    : ilist_node<ParentNode, ilist_iterator_bits<true>, ilist_parent<Parent>> {
-};
-
 TEST(IListIteratorBitsTest, DefaultConstructor) {
   simple_ilist<Node, ilist_iterator_bits<true>>::iterator I;
   simple_ilist<Node, ilist_iterator_bits<true>>::reverse_iterator RI;
@@ -60,8 +55,10 @@ TEST(IListIteratorBitsTest, ConsAndAssignment) {
 
   simple_ilist<Node, ilist_iterator_bits<true>>::iterator I, I2;
 
-  // Check that HeadInclusiveBit and TailInclusiveBit are preserved on
-  // assignment and copy construction, but not on other operations.
+// Two sets of tests: if we've compiled in the iterator bits, then check that
+// HeadInclusiveBit and TailInclusiveBit are preserved on assignment and copy
+// construction, but not on other operations.
+#ifdef EXPERIMENTAL_DEBUGINFO_ITERATORS
   I = L.begin();
   EXPECT_FALSE(I.getHeadBit());
   EXPECT_FALSE(I.getTailBit());
@@ -88,6 +85,18 @@ TEST(IListIteratorBitsTest, ConsAndAssignment) {
   simple_ilist<Node, ilist_iterator_bits<true>>::iterator I3(I);
   EXPECT_TRUE(I3.getHeadBit());
   EXPECT_TRUE(I3.getTailBit());
+#else
+  // The calls should be available, but shouldn't actually store information.
+  I = L.begin();
+  EXPECT_FALSE(I.getHeadBit());
+  EXPECT_FALSE(I.getTailBit());
+  I.setHeadBit(true);
+  I.setTailBit(true);
+  EXPECT_FALSE(I.getHeadBit());
+  EXPECT_FALSE(I.getTailBit());
+  // Suppress warnings as we don't test with this variable.
+  (void)I2;
+#endif
 }
 
 class dummy {
@@ -124,24 +133,6 @@ TEST(IListIteratorBitsTest, RangeIteration) {
 
   for (Node &N : make_range(RevIt, L.rend()))
     (void)N;
-}
-
-TEST(IListIteratorBitsTest, GetParent) {
-  simple_ilist<ParentNode, ilist_iterator_bits<true>, ilist_parent<Parent>> L;
-  Parent P;
-  ParentNode A;
-
-  // Parents are not set automatically.
-  A.setParent(&P);
-  L.insert(L.end(), A);
-  L.end().getNodePtr()->setParent(&P);
-
-  // Check we can get the node parent from all iterators, including for the
-  // sentinel.
-  EXPECT_EQ(&P, L.begin().getNodeParent());
-  EXPECT_EQ(&P, L.end().getNodeParent());
-  EXPECT_EQ(&P, L.rbegin().getNodeParent());
-  EXPECT_EQ(&P, L.rend().getNodeParent());
 }
 
 } // end namespace

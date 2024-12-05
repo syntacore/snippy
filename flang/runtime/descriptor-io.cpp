@@ -8,18 +8,15 @@
 
 #include "descriptor-io.h"
 #include "flang/Common/restorer.h"
-#include "flang/Runtime/freestanding-tools.h"
 
 namespace Fortran::runtime::io::descr {
-RT_OFFLOAD_API_GROUP_BEGIN
 
 // Defined formatted I/O (maybe)
-Fortran::common::optional<bool> DefinedFormattedIo(IoStatementState &io,
+std::optional<bool> DefinedFormattedIo(IoStatementState &io,
     const Descriptor &descriptor, const typeInfo::DerivedType &derived,
     const typeInfo::SpecialBinding &special,
     const SubscriptValue subscripts[]) {
-  Fortran::common::optional<DataEdit> peek{
-      io.GetNextDataEdit(0 /*to peek at it*/)};
+  std::optional<DataEdit> peek{io.GetNextDataEdit(0 /*to peek at it*/)};
   if (peek &&
       (peek->descriptor == DataEdit::DefinedDerivedType ||
           peek->descriptor == DataEdit::ListDirected)) {
@@ -34,9 +31,9 @@ Fortran::common::optional<bool> DefinedFormattedIo(IoStatementState &io,
       ioType[1] = 'T';
       std::memcpy(ioType + 2, edit.ioType, edit.ioTypeChars);
     } else {
-      runtime::strcpy(
+      std::strcpy(
           ioType, io.mutableModes().inNamelist ? "NAMELIST" : "LISTDIRECTED");
-      ioTypeLen = runtime::strlen(ioType);
+      ioTypeLen = std::strlen(ioType);
     }
     StaticDescriptor<1, true> vListStatDesc;
     Descriptor &vListDesc{vListStatDesc.descriptor()};
@@ -58,7 +55,7 @@ Fortran::common::optional<bool> DefinedFormattedIo(IoStatementState &io,
     int unit{external->unitNumber()};
     int ioStat{IostatOk};
     char ioMsg[100];
-    Fortran::common::optional<std::int64_t> startPos;
+    std::optional<std::int64_t> startPos;
     if (edit.descriptor == DataEdit::DefinedDerivedType &&
         special.which() == typeInfo::SpecialBinding::Which::ReadFormatted) {
       // DT is an edit descriptor so everything that the child
@@ -99,7 +96,7 @@ Fortran::common::optional<bool> DefinedFormattedIo(IoStatementState &io,
     // There's a defined I/O subroutine, but there's a FORMAT present and
     // it does not have a DT data edit descriptor, so apply default formatting
     // to the components of the derived type as usual.
-    return Fortran::common::nullopt;
+    return std::nullopt;
   }
 }
 
@@ -152,5 +149,4 @@ bool DefinedUnformattedIo(IoStatementState &io, const Descriptor &descriptor,
   return handler.GetIoStat() == IostatOk;
 }
 
-RT_OFFLOAD_API_GROUP_END
 } // namespace Fortran::runtime::io::descr

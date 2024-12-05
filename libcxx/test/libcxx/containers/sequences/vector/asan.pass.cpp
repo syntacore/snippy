@@ -29,7 +29,8 @@ void do_exit() {
 
 int main(int, char**)
 {
-#if TEST_STD_VER >= 11
+#if TEST_STD_VER >= 11 && TEST_CLANG_VER >= 1600
+  // TODO(LLVM-18): Remove the special-casing
   {
     typedef int T;
     typedef cpp17_input_iterator<T*> MyInputIter;
@@ -51,7 +52,7 @@ int main(int, char**)
     assert(v[1] == 'b');
     assert(is_contiguous_container_asan_correct(v));
   }
-#endif // TEST_STD_VER >= 11
+#endif
   {
     typedef cpp17_input_iterator<int*> MyInputIter;
     // Sould not trigger ASan.

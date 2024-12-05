@@ -79,8 +79,8 @@ N: Hal Finkel
 E: hfinkel@anl.gov
 D: The loop reroller and alias analysis
 
-N: Zheng Chen
-E: czhengsz@cn.ibm.com
+N: Nemanja Ivanovic
+E: nemanja.i.ibm@gmail.com
 D: PowerPC Backend
 
 N: Dan Gohman

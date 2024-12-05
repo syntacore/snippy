@@ -7,16 +7,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "time_utils.h"
-#include "src/__support/macros/config.h"
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 
 #if defined(LIBC_TARGET_ARCH_IS_AMDGPU)
 // This is expected to be initialized by the runtime if the default value is
 // insufficient.
 // TODO: Once we have another use-case for this we should put it in a common
 // device environment struct.
-gpu::Constant<uint64_t> __llvm_libc_clock_freq = clock_freq;
+extern "C" [[gnu::visibility("protected")]] uint64_t
+    [[clang::address_space(4)]] __llvm_libc_clock_freq = clock_freq;
 #endif
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE

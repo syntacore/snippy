@@ -27,10 +27,14 @@ func.func @simple_unpack_and_extract_slice(%input: tensor<1x1x8x2xf32>, %output:
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[DEST:[a-zA-Z0-9]+]]
 // CHECK:         %[[TILE:.+]] = tensor.extract_slice %[[SRC]][0, 0, 0, 0] [1, 1, 8, 2] [1, 1, 1, 1]
-// CHECK-NOT:     linalg.transpose
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<8x2xf32>
+// CHECK:         %[[TRANSP:.+]] =  linalg.transpose
+// CHECK-SAME:      ins(%[[TILE]] : tensor<8x2xf32>)
+// CHECK-SAME:      outs(%[[EMPTY]] : tensor<8x2xf32>)
+// CHECK-SAME:      permutation = [0, 1]
 //                They have the same type, so the insert_slice op is folded
 //                away.
-// CHECK:         %[[SLICE:.+]] = tensor.extract_slice %[[TILE]][0, 0] [5, 1] [1, 1]
+// CHECK:         %[[SLICE:.+]] = tensor.extract_slice %[[TRANSP]][0, 0] [5, 1] [1, 1]
 // CHECK:         return %[[SLICE]]
 
 // -----
@@ -43,10 +47,14 @@ func.func @simple_CNnc_to_NC(%arg0: tensor<1x1x32x8xf32>, %arg1: tensor<32x8xf32
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[DEST:[a-zA-Z0-9]+]]
 // CHECK:         %[[TILE:.+]] = tensor.extract_slice %[[SRC]][0, 0, 0, 0] [1, 1, 32, 8] [1, 1, 1, 1]
-// CHECK-NOT:     linalg.transpose
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<32x8xf32>
+// CHECK:         %[[TRANSP:.+]] =  linalg.transpose
+// CHECK-SAME:      ins(%[[TILE]] : tensor<32x8xf32>)
+// CHECK-SAME:      outs(%[[EMPTY]] : tensor<32x8xf32>)
+// CHECK-SAME:      permutation = [0, 1]
 //                They have the same type, so the insert_slice op is folded
 //                away.
-// CHECK:         return %[[TILE]]
+// CHECK:         return %[[TRANSP]]
 
 // -----
 
@@ -66,6 +74,7 @@ func.func @simple_NCHWc_to_NCHW(%arg0: tensor<2x1x16x8x32xf32>, %arg1: tensor<2x
 //                They have the same type, so the insert_slice op is folded
 //                away.
 // CHECK:         return %[[TRANSP]]
+
 
 // -----
 

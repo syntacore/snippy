@@ -1,10 +1,10 @@
-import unittest
+import unittest2
 import re
 
 from lldbgdbserverutils import *
 
 
-class TestLldbGdbServerUtils(unittest.TestCase):
+class TestLldbGdbServerUtils(unittest2.TestCase):
     def test_entry_exact_payload_match(self):
         entry = GdbRemoteEntry(is_send_to_remote=False, exact_payload="$OK#9a")
         entry.assert_match(self, "$OK#9a")

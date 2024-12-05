@@ -124,28 +124,29 @@ private:
     assert(
         (TII->isALUInstr(MI.getOpcode()) || MI.getOpcode() == R600::DOT_4) &&
         "Can't assign Const");
-    for (auto &[Op, Sel] : Consts) {
-      if (Op->getReg() != R600::ALU_CONST)
+    for (unsigned i = 0, n = Consts.size(); i < n; ++i) {
+      if (Consts[i].first->getReg() != R600::ALU_CONST)
         continue;
+      unsigned Sel = Consts[i].second;
       unsigned Chan = Sel & 3, Index = ((Sel >> 2) - 512) & 31;
       unsigned KCacheIndex = Index * 4 + Chan;
       const std::pair<unsigned, unsigned> &BankLine = getAccessedBankLine(Sel);
       if (CachedConsts.empty()) {
         CachedConsts.push_back(BankLine);
-        UsedKCache.emplace_back(0, KCacheIndex);
+        UsedKCache.push_back(std::pair<unsigned, unsigned>(0, KCacheIndex));
         continue;
       }
       if (CachedConsts[0] == BankLine) {
-        UsedKCache.emplace_back(0, KCacheIndex);
+        UsedKCache.push_back(std::pair<unsigned, unsigned>(0, KCacheIndex));
         continue;
       }
       if (CachedConsts.size() == 1) {
         CachedConsts.push_back(BankLine);
-        UsedKCache.emplace_back(1, KCacheIndex);
+        UsedKCache.push_back(std::pair<unsigned, unsigned>(1, KCacheIndex));
         continue;
       }
       if (CachedConsts[1] == BankLine) {
-        UsedKCache.emplace_back(1, KCacheIndex);
+        UsedKCache.push_back(std::pair<unsigned, unsigned>(1, KCacheIndex));
         continue;
       }
       return false;
@@ -154,16 +155,17 @@ private:
     if (!UpdateInstr)
       return true;
 
-    unsigned j = 0;
-    for (auto &[Op, Sel] : Consts) {
-      if (Op->getReg() != R600::ALU_CONST)
+    for (unsigned i = 0, j = 0, n = Consts.size(); i < n; ++i) {
+      if (Consts[i].first->getReg() != R600::ALU_CONST)
         continue;
-      switch (UsedKCache[j].first) {
+      switch(UsedKCache[j].first) {
       case 0:
-        Op->setReg(R600::R600_KC0RegClass.getRegister(UsedKCache[j].second));
+        Consts[i].first->setReg(
+            R600::R600_KC0RegClass.getRegister(UsedKCache[j].second));
         break;
       case 1:
-        Op->setReg(R600::R600_KC1RegClass.getRegister(UsedKCache[j].second));
+        Consts[i].first->setReg(
+            R600::R600_KC1RegClass.getRegister(UsedKCache[j].second));
         break;
       default:
         llvm_unreachable("Wrong Cache Line");

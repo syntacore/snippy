@@ -8,8 +8,10 @@
 
 %struct.Foo = type { ptr }
 
+; ARM-LABEL:   foo:
+; THUMB-LABEL: foo:
+; T2-LABEL:    foo:
 define ptr @foo(ptr %this, i32 %acc) nounwind readonly align 2 {
-; ARM-LABEL: foo:
 ; ARM:       @ %bb.0: @ %entry
 ; ARM-NEXT:    add r2, r0, #4
 ; ARM-NEXT:    mov r12, #1
@@ -42,7 +44,6 @@ define ptr @foo(ptr %this, i32 %acc) nounwind readonly align 2 {
 ; ARM-NEXT:    add r0, r0, r1, lsl #2
 ; ARM-NEXT:    mov pc, lr
 ;
-; THUMB-LABEL: foo:
 ; THUMB:       @ %bb.0: @ %entry
 ; THUMB-NEXT:    .save {r4, r5, r7, lr}
 ; THUMB-NEXT:    push {r4, r5, r7, lr}
@@ -90,7 +91,6 @@ define ptr @foo(ptr %this, i32 %acc) nounwind readonly align 2 {
 ; THUMB-NEXT:    pop {r0}
 ; THUMB-NEXT:    bx r0
 ;
-; T2-LABEL: foo:
 ; T2:       @ %bb.0: @ %entry
 ; T2-NEXT:    adds r2, r0, #4
 ; T2-NEXT:    mov.w r12, #1
@@ -125,7 +125,6 @@ define ptr @foo(ptr %this, i32 %acc) nounwind readonly align 2 {
 ; T2-NEXT:    add.w r0, r0, r1, lsl #2
 ; T2-NEXT:    bx lr
 ;
-; V8-LABEL: foo:
 ; V8:       @ %bb.0: @ %entry
 ; V8-NEXT:    adds r2, r0, #4
 ; V8-NEXT:    mov.w r12, #1
@@ -211,8 +210,11 @@ sw.epilog:                                        ; preds = %tailrecurse.switch
 
 %struct.S = type { ptr, [1 x i8] }
 
-define internal zeroext i8 @bar(ptr %x, ptr nocapture %y) nounwind readonly {
 ; ARM-LABEL: bar:
+; THUMB-LABEL: bar:
+; T2-LABEL: bar:
+; V8-LABEL: bar:
+define internal zeroext i8 @bar(ptr %x, ptr nocapture %y) nounwind readonly {
 ; ARM:       @ %bb.0: @ %entry
 ; ARM-NEXT:    ldrb r2, [r0, #4]
 ; ARM-NEXT:    ands r2, r2, #112
@@ -228,7 +230,6 @@ define internal zeroext i8 @bar(ptr %x, ptr nocapture %y) nounwind readonly {
 ; ARM-NEXT:    mov r0, #1
 ; ARM-NEXT:    mov pc, lr
 ;
-; THUMB-LABEL: bar:
 ; THUMB:       @ %bb.0: @ %entry
 ; THUMB-NEXT:    ldrb r2, [r0, #4]
 ; THUMB-NEXT:    movs r3, #112
@@ -252,7 +253,6 @@ define internal zeroext i8 @bar(ptr %x, ptr nocapture %y) nounwind readonly {
 ; THUMB-NEXT:    ands r0, r1
 ; THUMB-NEXT:    bx lr
 ;
-; T2-LABEL: bar:
 ; T2:       @ %bb.0: @ %entry
 ; T2-NEXT:    ldrb r2, [r0, #4]
 ; T2-NEXT:    ands r2, r2, #112
@@ -270,7 +270,6 @@ define internal zeroext i8 @bar(ptr %x, ptr nocapture %y) nounwind readonly {
 ; T2-NEXT:    movs r0, #1
 ; T2-NEXT:    bx lr
 ;
-; V8-LABEL: bar:
 ; V8:       @ %bb.0: @ %entry
 ; V8-NEXT:    ldrb r2, [r0, #4]
 ; V8-NEXT:    ands r2, r2, #112

@@ -7,7 +7,7 @@
 
 declare void @llvm.riscv.vse.nxv1i64(
   <vscale x 1 x i64>,
-  ptr,
+  <vscale x 1 x i64>*,
   i64);
 
 define i64 @test(<vscale x 1 x i64> %0) nounwind {
@@ -23,11 +23,11 @@ define i64 @test(<vscale x 1 x i64> %0) nounwind {
   ; CHECK-NEXT:   PseudoRET implicit $x10
 entry:
   %a = alloca i64
-  %b = bitcast ptr %a to ptr
+  %b = bitcast i64* %a to <vscale x 1 x i64>*
   call void @llvm.riscv.vse.nxv1i64(
     <vscale x 1 x i64> %0,
-    ptr %b,
+    <vscale x 1 x i64>* %b,
     i64 1)
-  %c = load i64, ptr %a
+  %c = load i64, i64* %a
   ret i64 %c
 }

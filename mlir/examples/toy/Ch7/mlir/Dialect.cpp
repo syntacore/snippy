@@ -27,6 +27,7 @@
 #include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/InliningUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
@@ -194,7 +195,7 @@ void ConstantOp::print(mlir::OpAsmPrinter &printer) {
 }
 
 /// Verify that the given attribute value is valid for the given type.
-static llvm::LogicalResult verifyConstantForType(mlir::Type type,
+static mlir::LogicalResult verifyConstantForType(mlir::Type type,
                                                  mlir::Attribute opaqueValue,
                                                  mlir::Operation *op) {
   if (llvm::isa<mlir::TensorType>(type)) {
@@ -251,11 +252,11 @@ static llvm::LogicalResult verifyConstantForType(mlir::Type type,
 
 /// Verifier for the constant operation. This corresponds to the `::verify(...)`
 /// in the op definition.
-llvm::LogicalResult ConstantOp::verify() {
+mlir::LogicalResult ConstantOp::verify() {
   return verifyConstantForType(getResult().getType(), getValue(), *this);
 }
 
-llvm::LogicalResult StructConstantOp::verify() {
+mlir::LogicalResult StructConstantOp::verify() {
   return verifyConstantForType(getResult().getType(), getValue(), *this);
 }
 
@@ -405,7 +406,7 @@ void MulOp::inferShapes() { getResult().setType(getLhs().getType()); }
 // ReturnOp
 //===----------------------------------------------------------------------===//
 
-llvm::LogicalResult ReturnOp::verify() {
+mlir::LogicalResult ReturnOp::verify() {
   // We know that the parent operation is a function, because of the 'HasParent'
   // trait attached to the operation definition.
   auto function = cast<FuncOp>((*this)->getParentOp());
@@ -453,7 +454,7 @@ void StructAccessOp::build(mlir::OpBuilder &b, mlir::OperationState &state,
   build(b, state, resultType, input, b.getI64IntegerAttr(index));
 }
 
-llvm::LogicalResult StructAccessOp::verify() {
+mlir::LogicalResult StructAccessOp::verify() {
   StructType structTy = llvm::cast<StructType>(getInput().getType());
   size_t indexValue = getIndex();
   if (indexValue >= structTy.getNumElementTypes())
@@ -482,7 +483,7 @@ void TransposeOp::inferShapes() {
   getResult().setType(RankedTensorType::get(dims, arrayTy.getElementType()));
 }
 
-llvm::LogicalResult TransposeOp::verify() {
+mlir::LogicalResult TransposeOp::verify() {
   auto inputType = llvm::dyn_cast<RankedTensorType>(getOperand().getType());
   auto resultType = llvm::dyn_cast<RankedTensorType>(getType());
   if (!inputType || !resultType)

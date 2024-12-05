@@ -30,7 +30,7 @@ class NativeProcessFreeBSD;
 class NativeRegisterContextFreeBSD_arm : public NativeRegisterContextFreeBSD {
 public:
   NativeRegisterContextFreeBSD_arm(const ArchSpec &target_arch,
-                                   NativeThreadFreeBSD &native_thread);
+                                   NativeThreadProtocol &native_thread);
 
   uint32_t GetRegisterSetCount() const override;
 

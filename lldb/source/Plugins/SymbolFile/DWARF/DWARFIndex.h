@@ -81,10 +81,11 @@ protected:
   StatsDuration m_index_time;
 
   /// Helper function implementing common logic for processing function dies. If
-  /// the function given by "die" matches search criteria given by
-  /// "parent_decl_ctx" and "name_type_mask", it calls the callback with the
-  /// given die.
-  bool ProcessFunctionDIE(const Module::LookupInfo &lookup_info, DWARFDIE die,
+  /// the function given by "ref" matches search criteria given by
+  /// "parent_decl_ctx" and "name_type_mask", it is inserted into the "dies"
+  /// vector.
+  bool ProcessFunctionDIE(const Module::LookupInfo &lookup_info, DIERef ref,
+                          SymbolFileDWARF &dwarf,
                           const CompilerDeclContext &parent_decl_ctx,
                           llvm::function_ref<bool(DWARFDIE die)> callback);
 

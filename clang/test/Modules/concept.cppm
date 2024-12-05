@@ -11,6 +11,7 @@
 // RUN: %clang_cc1 -std=c++20 -fskip-odr-check-in-gmf -fprebuilt-module-path=%t -I%t  \
 // RUN:    -DDIFFERENT -DSKIP_ODR_CHECK_IN_GMF %t/B.cppm -verify
 
+
 //--- foo.h
 #ifndef FOO_H
 #define FOO_H

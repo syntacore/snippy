@@ -16,14 +16,12 @@
 #define LLVM_TRANSFORMS_UTILS_UNROLLLOOP_H
 
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/Analysis/CodeMetrics.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Support/InstructionCost.h"
 
 namespace llvm {
 
 class AssumptionCache;
-class AAResults;
 class BasicBlock;
 class BlockFrequencyInfo;
 class DependenceInfo;
@@ -74,7 +72,6 @@ struct UnrollLoopOptions {
   bool AllowExpensiveTripCount;
   bool UnrollRemainder;
   bool ForgetAllSCEV;
-  const Instruction *Heart = nullptr;
 };
 
 LoopUnrollResult UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
@@ -82,8 +79,7 @@ LoopUnrollResult UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
                             AssumptionCache *AC,
                             const llvm::TargetTransformInfo *TTI,
                             OptimizationRemarkEmitter *ORE, bool PreserveLCSSA,
-                            Loop **RemainderLoop = nullptr,
-                            AAResults *AA = nullptr);
+                            Loop **RemainderLoop = nullptr);
 
 bool UnrollRuntimeLoopRemainder(
     Loop *L, unsigned Count, bool AllowExpensiveTripCount,
@@ -106,8 +102,7 @@ bool isSafeToUnrollAndJam(Loop *L, ScalarEvolution &SE, DominatorTree &DT,
 void simplifyLoopAfterUnroll(Loop *L, bool SimplifyIVs, LoopInfo *LI,
                              ScalarEvolution *SE, DominatorTree *DT,
                              AssumptionCache *AC,
-                             const TargetTransformInfo *TTI,
-                             AAResults *AA = nullptr);
+                             const TargetTransformInfo *TTI);
 
 MDNode *GetUnrollMetadata(MDNode *LoopID, StringRef Name);
 
@@ -130,15 +125,14 @@ class UnrollCostEstimator {
 
 public:
   unsigned NumInlineCandidates;
-  ConvergenceKind Convergence;
-  bool ConvergenceAllowsRuntime;
+  bool Convergent;
 
   UnrollCostEstimator(const Loop *L, const TargetTransformInfo &TTI,
                       const SmallPtrSetImpl<const Value *> &EphValues,
                       unsigned BEInsns);
 
   /// Whether it is legal to unroll this loop.
-  bool canUnroll() const;
+  bool canUnroll() const { return LoopSize.isValid() && !NotDuplicatable; }
 
   uint64_t getRolledLoopSize() const { return *LoopSize.getValue(); }
 

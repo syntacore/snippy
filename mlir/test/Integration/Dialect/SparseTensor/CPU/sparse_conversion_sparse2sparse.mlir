@@ -10,7 +10,7 @@
 // DEFINE: %{compile} = mlir-opt %s --sparsifier="%{sparsifier_opts}"
 // DEFINE: %{compile_sve} = mlir-opt %s --sparsifier="%{sparsifier_opts_sve}"
 // DEFINE: %{run_libs} = -shared-libs=%mlir_c_runner_utils,%mlir_runner_utils
-// DEFINE: %{run_opts} = -e main -entry-point-result=void
+// DEFINE: %{run_opts} = -e entry -entry-point-result=void
 // DEFINE: %{run} = mlir-cpu-runner %{run_opts} %{run_libs}
 // DEFINE: %{run_sve} = %mcr_aarch64_cmd --march=aarch64 --mattr="+sve" %{run_opts} %{run_libs}
 //
@@ -114,14 +114,12 @@ module {
     call @dump(%d31) : (tensor<2x3x4xf64>) -> ()
 
     //
-    // Release the resources.
+    // Release sparse tensors.
     //
     bufferization.dealloc_tensor %t13 : tensor<2x3x4xf64, #Tensor3>
     bufferization.dealloc_tensor %t31 : tensor<2x3x4xf64, #Tensor1>
     bufferization.dealloc_tensor %s1 : tensor<2x3x4xf64, #Tensor1>
     bufferization.dealloc_tensor %s3 : tensor<2x3x4xf64, #Tensor3>
-    bufferization.dealloc_tensor %d13 : tensor<2x3x4xf64>
-    bufferization.dealloc_tensor %d31 : tensor<2x3x4xf64>
 
     return
   }
@@ -169,14 +167,12 @@ module {
     call @dump(%d31) : (tensor<2x3x4xf64>) -> ()
 
     //
-    // Release the resources.
+    // Release sparse tensors.
     //
     bufferization.dealloc_tensor %t13 : tensor<2x3x4xf64, #SingletonTensor3>
     bufferization.dealloc_tensor %t31 : tensor<2x3x4xf64, #SingletonTensor1>
     bufferization.dealloc_tensor %s1 : tensor<2x3x4xf64, #SingletonTensor1>
     bufferization.dealloc_tensor %s3 : tensor<2x3x4xf64, #SingletonTensor3>
-    bufferization.dealloc_tensor %d13 : tensor<2x3x4xf64>
-    bufferization.dealloc_tensor %d31 : tensor<2x3x4xf64>
 
     return
   }
@@ -184,7 +180,7 @@ module {
   //
   // Main driver.
   //
-  func.func @main() {
+  func.func @entry() {
     call @testNonSingleton() : () -> ()
     call @testSingleton() : () -> ()
     return

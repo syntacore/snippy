@@ -70,12 +70,12 @@ public:
     return nullptr;
   }
 
-  Value *FoldCmp(CmpInst::Predicate P, Value *LHS, Value *RHS) const override {
+  Value *FoldICmp(CmpInst::Predicate P, Value *LHS, Value *RHS) const override {
     return nullptr;
   }
 
   Value *FoldGEP(Type *Ty, Value *Ptr, ArrayRef<Value *> IdxList,
-                 GEPNoWrapFlags NW) const override {
+                 bool IsInBounds = false) const override {
     return nullptr;
   }
 
@@ -112,11 +112,6 @@ public:
     return nullptr;
   }
 
-  Value *FoldBinaryIntrinsic(Intrinsic::ID ID, Value *LHS, Value *RHS, Type *Ty,
-                             Instruction *FMFSource) const override {
-    return nullptr;
-  }
-
   //===--------------------------------------------------------------------===//
   // Cast/Conversion Operators
   //===--------------------------------------------------------------------===//
@@ -128,6 +123,15 @@ public:
   Instruction *CreatePointerBitCastOrAddrSpaceCast(
       Constant *C, Type *DestTy) const override {
     return CastInst::CreatePointerBitCastOrAddrSpaceCast(C, DestTy);
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Compare Instructions
+  //===--------------------------------------------------------------------===//
+
+  Instruction *CreateFCmp(CmpInst::Predicate P,
+                          Constant *LHS, Constant *RHS) const override {
+    return new FCmpInst(P, LHS, RHS);
   }
 };
 

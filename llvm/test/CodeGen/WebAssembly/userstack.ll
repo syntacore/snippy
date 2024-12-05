@@ -554,10 +554,10 @@ define void @llvm_stack_builtins(i32 %alloc) noredzone {
 ; CHECK-LABEL: llvm_stacksave_noalloca:
 define void @llvm_stacksave_noalloca() noredzone {
  ; CHECK: global.get $push[[L11:.+]]=, __stack_pointer{{$}}
- %stack = call ptr @llvm.stacksave()
+ %stack = call i8* @llvm.stacksave()
 
  ; CHECK-NEXT: call use_i8_star, $pop[[L11:.+]]
- call void @use_i8_star(ptr %stack)
+ call void @use_i8_star(i8* %stack)
 
  ret void
 }

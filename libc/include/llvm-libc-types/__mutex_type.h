@@ -6,10 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES___MUTEX_TYPE_H
-#define LLVM_LIBC_TYPES___MUTEX_TYPE_H
+#ifndef __LLVM_LIBC_TYPES___MUTEX_T_H
+#define __LLVM_LIBC_TYPES___MUTEX_T_H
 
-#include "llvm-libc-types/__futex_word.h"
+#include <llvm-libc-types/__futex_word.h>
 
 typedef struct {
   unsigned char __timed;
@@ -26,4 +26,4 @@ typedef struct {
 #endif
 } __mutex_type;
 
-#endif // LLVM_LIBC_TYPES___MUTEX_TYPE_H
+#endif // __LLVM_LIBC_TYPES___MUTEX_T_H

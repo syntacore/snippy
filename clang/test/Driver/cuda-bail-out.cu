@@ -1,5 +1,8 @@
 // Test clang driver bails out after one error during CUDA compilation.
 
+// REQUIRES: powerpc-registered-target
+// REQUIRES: nvptx-registered-target
+
 #ifdef FORCE_ERROR
 #error compilation failed
 #endif

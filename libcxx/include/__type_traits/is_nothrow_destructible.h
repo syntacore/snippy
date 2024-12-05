@@ -12,6 +12,9 @@
 #include <__config>
 #include <__type_traits/integral_constant.h>
 #include <__type_traits/is_destructible.h>
+#include <__type_traits/is_reference.h>
+#include <__type_traits/is_scalar.h>
+#include <__type_traits/remove_all_extents.h>
 #include <__utility/declval.h>
 #include <cstddef>
 
@@ -21,12 +24,7 @@
 
 _LIBCPP_BEGIN_NAMESPACE_STD
 
-#if __has_builtin(__is_nothrow_destructible)
-
-template <class _Tp>
-struct _LIBCPP_TEMPLATE_VIS is_nothrow_destructible : integral_constant<bool, __is_nothrow_destructible(_Tp)> {};
-
-#else
+#if !defined(_LIBCPP_CXX03_LANG)
 
 template <bool, class _Tp>
 struct __libcpp_is_nothrow_destructible;
@@ -51,7 +49,20 @@ struct _LIBCPP_TEMPLATE_VIS is_nothrow_destructible<_Tp&> : public true_type {};
 template <class _Tp>
 struct _LIBCPP_TEMPLATE_VIS is_nothrow_destructible<_Tp&&> : public true_type {};
 
-#endif // __has_builtin(__is_nothrow_destructible)
+#else
+
+template <class _Tp>
+struct __libcpp_nothrow_destructor : public integral_constant<bool, is_scalar<_Tp>::value || is_reference<_Tp>::value> {
+};
+
+template <class _Tp>
+struct _LIBCPP_TEMPLATE_VIS is_nothrow_destructible : public __libcpp_nothrow_destructor<__remove_all_extents_t<_Tp> > {
+};
+
+template <class _Tp>
+struct _LIBCPP_TEMPLATE_VIS is_nothrow_destructible<_Tp[]> : public false_type {};
+
+#endif
 
 #if _LIBCPP_STD_VER >= 17
 template <class _Tp>

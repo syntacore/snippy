@@ -42,10 +42,7 @@ public:
     target.addLegalDialect<arith::ArithDialect>();
     target.addLegalDialect<tensor::TensorDialect>();
 
-    TypeConverter converter;
-    mlir::tosa::populateTosaTypeConversion(converter);
-
-    mlir::tosa::populateTosaToTensorConversionPatterns(converter, &patterns);
+    mlir::tosa::populateTosaToTensorConversionPatterns(&patterns);
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns))))

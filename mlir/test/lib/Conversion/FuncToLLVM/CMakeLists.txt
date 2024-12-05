@@ -1,7 +1,6 @@
 # Exclude tests from libMLIR.so
 add_mlir_library(MLIRTestFuncToLLVM
   TestConvertCallOp.cpp
-  TestConvertFuncOp.cpp
 
   EXCLUDE_FROM_LIBMLIR
 

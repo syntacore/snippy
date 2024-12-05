@@ -38,6 +38,7 @@
 
 using namespace mlir;
 
+#if MLIR_CUDA_CONVERSIONS_ENABLED
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -50,6 +51,7 @@ void buildCommonPassPipeline(
   pm.addPass(createConvertVectorToSCFPass());
   pm.addPass(createConvertSCFToCFPass());
   pm.addPass(createConvertNVVMToLLVMPass());
+  pm.addPass(createConvertMathToLLVMPass());
   pm.addPass(createConvertFuncToLLVMPass());
   pm.addPass(memref::createExpandStridedMetadataPass());
 
@@ -96,7 +98,6 @@ void buildHostPostPipeline(OpPassManager &pm,
   GpuModuleToBinaryPassOptions gpuModuleToBinaryPassOptions;
   gpuModuleToBinaryPassOptions.compilationTarget = options.cubinFormat;
   pm.addPass(createGpuModuleToBinaryPass(gpuModuleToBinaryPassOptions));
-  pm.addPass(createConvertMathToLLVMPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
   pm.addPass(createReconcileUnrealizedCastsPass());
@@ -125,3 +126,5 @@ void mlir::gpu::registerGPUToNVVMPipeline() {
       "code.",
       buildLowerToNVVMPassPipeline);
 }
+
+#endif // MLIR_CUDA_CONVERSIONS_ENABLED

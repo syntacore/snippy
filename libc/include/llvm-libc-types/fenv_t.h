@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_FENV_T_H
-#define LLVM_LIBC_TYPES_FENV_T_H
+#ifndef __LLVM_LIBC_TYPES_FENV_T_H__
+#define __LLVM_LIBC_TYPES_FENV_T_H__
 
 #ifdef __aarch64__
 typedef struct {
@@ -33,4 +33,4 @@ typedef struct {
 #error "fenv_t not defined for your platform"
 #endif
 
-#endif // LLVM_LIBC_TYPES_FENV_T_H
+#endif // __LLVM_LIBC_TYPES_FENV_T_H__

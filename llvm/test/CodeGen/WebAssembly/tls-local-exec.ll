@@ -20,9 +20,7 @@ define i32 @address_of_tls() {
 
   ; NO-TLS-NEXT: i32.const tls
   ; NO-TLS-NEXT: return
-  %p = call ptr @llvm.threadlocal.address.p0(ptr @tls)
-  %r = ptrtoint ptr %p to i32
-  ret i32 %r
+  ret i32 ptrtoint(ptr @tls to i32)
 }
 
 ; CHECK-LABEL: address_of_tls_external:
@@ -35,9 +33,7 @@ define i32 @address_of_tls_external() {
 
   ; NO-TLS-NEXT: i32.const tls_external
   ; NO-TLS-NEXT: return
-  %p = call ptr @llvm.threadlocal.address.p0(ptr @tls_external)
-  %r = ptrtoint ptr %p to i32
-  ret i32 %r
+  ret i32 ptrtoint(ptr @tls_external to i32)
 }
 
 ; CHECK-LABEL: ptr_to_tls:
@@ -50,8 +46,7 @@ define ptr @ptr_to_tls() {
 
   ; NO-TLS-NEXT: i32.const tls
   ; NO-TLS-NEXT: return
-  %p = call ptr @llvm.threadlocal.address.p0(ptr @tls)
-  ret ptr %p
+  ret ptr @tls
 }
 
 ; CHECK-LABEL: tls_load:
@@ -66,8 +61,7 @@ define i32 @tls_load() {
   ; NO-TLS-NEXT: i32.const 0
   ; NO-TLS-NEXT: i32.load tls
   ; NO-TLS-NEXT: return
-  %p = call ptr @llvm.threadlocal.address.p0(ptr @tls)
-  %tmp = load i32, ptr %p, align 4
+  %tmp = load i32, ptr @tls, align 4
   ret i32 %tmp
 }
 
@@ -83,8 +77,7 @@ define void @tls_store(i32 %x) {
   ; NO-TLS-NEXT: i32.const 0
   ; NO-TLS-NEXT: i32.store tls
   ; NO-TLS-NEXT: return
-  %p = call ptr @llvm.threadlocal.address.p0(ptr @tls)
-  store i32 %x, ptr %p, align 4
+  store i32 %x, ptr @tls, align 4
   ret void
 }
 

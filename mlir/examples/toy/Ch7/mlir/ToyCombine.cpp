@@ -16,6 +16,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Support/LogicalResult.h"
 #include "toy/Dialect.h"
 #include "llvm/Support/Casting.h"
 #include <cstddef>
@@ -56,7 +57,7 @@ struct SimplifyRedundantTranspose : public mlir::OpRewritePattern<TransposeOp> {
   /// This method attempts to match a pattern and rewrite it. The rewriter
   /// argument is the orchestrator of the sequence of rewrites. The pattern is
   /// expected to interact with it to perform any changes to the IR from here.
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(TransposeOp op,
                   mlir::PatternRewriter &rewriter) const override {
     // Look through the input of the current transpose.

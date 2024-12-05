@@ -30,14 +30,15 @@ public:
   // Appends the token stream obtained from expanding the macro Name given
   // the provided arguments, to be later retrieved with getTokens().
   // Returns the list of tokens making up the unexpanded macro call.
-  TokenList expand(StringRef Name,
-                   const SmallVector<SmallVector<FormatToken *, 8>, 1> &Args) {
+  TokenList
+  expand(llvm::StringRef Name,
+         const SmallVector<llvm::SmallVector<FormatToken *, 8>, 1> &Args) {
     return expandInternal(Name, Args);
   }
 
-  TokenList expand(StringRef Name) { return expandInternal(Name, {}); }
+  TokenList expand(llvm::StringRef Name) { return expandInternal(Name, {}); }
 
-  TokenList expand(StringRef Name, const std::vector<std::string> &Args) {
+  TokenList expand(llvm::StringRef Name, const std::vector<std::string> &Args) {
     return expandInternal(Name, lexArgs(Args));
   }
 
@@ -47,8 +48,8 @@ public:
 
 private:
   TokenList expandInternal(
-      StringRef Name,
-      const std::optional<SmallVector<SmallVector<FormatToken *, 8>, 1>>
+      llvm::StringRef Name,
+      const std::optional<SmallVector<llvm::SmallVector<FormatToken *, 8>, 1>>
           &Args) {
     auto *ID = Lex.id(Name);
     auto UnexpandedLine = std::make_unique<UnwrappedLine>();
@@ -74,25 +75,26 @@ private:
     return UnexpandedTokens;
   }
 
-  SmallVector<TokenList, 1> lexArgs(const std::vector<std::string> &Args) {
-    SmallVector<TokenList, 1> Result;
+  llvm::SmallVector<TokenList, 1>
+  lexArgs(const std::vector<std::string> &Args) {
+    llvm::SmallVector<TokenList, 1> Result;
     for (const auto &Arg : Args)
       Result.push_back(uneof(Lex.lex(Arg)));
     return Result;
   }
   llvm::DenseMap<FormatToken *, std::unique_ptr<UnwrappedLine>> Unexpanded;
-  SmallVector<FormatToken *, 8> Tokens;
+  llvm::SmallVector<FormatToken *, 8> Tokens;
   TestLexer &Lex;
   MacroExpander &Macros;
 };
 
 struct Chunk {
-  Chunk(ArrayRef<FormatToken *> Tokens)
+  Chunk(llvm::ArrayRef<FormatToken *> Tokens)
       : Tokens(Tokens.begin(), Tokens.end()) {}
-  Chunk(ArrayRef<UnwrappedLine> Children)
+  Chunk(llvm::ArrayRef<UnwrappedLine> Children)
       : Children(Children.begin(), Children.end()) {}
-  SmallVector<UnwrappedLineNode, 1> Tokens;
-  SmallVector<UnwrappedLine, 0> Children;
+  llvm::SmallVector<UnwrappedLineNode, 1> Tokens;
+  llvm::SmallVector<UnwrappedLine, 0> Children;
 };
 
 // Allows to produce chunks of a token list by typing the code of equal tokens.
@@ -138,7 +140,7 @@ UnexpandedMap mergeUnexpanded(const UnexpandedMap &M1,
   return Result;
 }
 
-class MacroCallReconstructorTest : public testing::Test {
+class MacroCallReconstructorTest : public ::testing::Test {
 public:
   MacroCallReconstructorTest() : Lex(Allocator, Buffers) {}
 
@@ -149,21 +151,17 @@ public:
                                            Lex.Allocator, Lex.IdentTable);
   }
 
-  UnwrappedLine line(ArrayRef<FormatToken *> Tokens, unsigned Level = 0) {
+  UnwrappedLine line(llvm::ArrayRef<FormatToken *> Tokens) {
     UnwrappedLine Result;
-    Result.Level = Level;
     for (FormatToken *Tok : Tokens)
       Result.Tokens.push_back(UnwrappedLineNode(Tok));
     return Result;
   }
 
-  UnwrappedLine line(StringRef Text, unsigned Level = 0) {
-    return line({lex(Text)}, Level);
-  }
+  UnwrappedLine line(llvm::StringRef Text) { return line({lex(Text)}); }
 
-  UnwrappedLine line(ArrayRef<Chunk> Chunks, unsigned Level = 0) {
+  UnwrappedLine line(llvm::ArrayRef<Chunk> Chunks) {
     UnwrappedLine Result;
-    Result.Level = Level;
     for (const Chunk &Chunk : Chunks) {
       Result.Tokens.insert(Result.Tokens.end(), Chunk.Tokens.begin(),
                            Chunk.Tokens.end());
@@ -174,11 +172,13 @@ public:
     return Result;
   }
 
-  TokenList lex(StringRef Text) { return uneof(Lex.lex(Text)); }
+  TokenList lex(llvm::StringRef Text) { return uneof(Lex.lex(Text)); }
 
-  Chunk tokens(StringRef Text) { return Chunk(lex(Text)); }
+  Chunk tokens(llvm::StringRef Text) { return Chunk(lex(Text)); }
 
-  Chunk children(ArrayRef<UnwrappedLine> Children) { return Chunk(Children); }
+  Chunk children(llvm::ArrayRef<UnwrappedLine> Children) {
+    return Chunk(Children);
+  }
 
   llvm::SpecificBumpPtrAllocator<FormatToken> Allocator;
   std::vector<std::unique_ptr<llvm::MemoryBuffer>> Buffers;
@@ -186,8 +186,6 @@ public:
 };
 
 bool matchesTokens(const UnwrappedLine &L1, const UnwrappedLine &L2) {
-  if (L1.Level != L2.Level)
-    return false;
   if (L1.Tokens.size() != L2.Tokens.size())
     return false;
   for (auto L1It = L1.Tokens.begin(), L2It = L2.Tokens.begin();
@@ -290,8 +288,7 @@ TEST_F(MacroCallReconstructorTest, StatementSequence) {
               matchesLine(line(
                   {U1.consume("SEMI"),
                    children({line({U2.consume("SEMI"),
-                                   children({line(U3.consume("SEMI"), 2)})},
-                                  1)})})));
+                                   children({line(U3.consume("SEMI"))})})})})));
 }
 
 TEST_F(MacroCallReconstructorTest, NestedBlock) {
@@ -340,9 +337,9 @@ TEST_F(MacroCallReconstructorTest, NestedBlock) {
 
   auto Expected = line({Chunk2Start,
                         children({
-                            line(Chunk2LBrace, 1),
-                            line({Chunk1, Chunk2Mid}, 1),
-                            line(Chunk2RBrace, 1),
+                            line(Chunk2LBrace),
+                            line({Chunk1, Chunk2Mid}),
+                            line(Chunk2RBrace),
                         }),
                         Chunk2End});
   EXPECT_THAT(std::move(Unexp).takeResult(), matchesLine(Expected));
@@ -382,11 +379,9 @@ TEST_F(MacroCallReconstructorTest, NestedChildBlocks) {
   Unexp.addLine(
       line({E.consume("f([] {"),
             children({line({E.consume("f([] {"),
-                            children({line(E.consume("return a * b;"), 3)}),
-                            E.consume("})")},
-                           2)}),
-            E.consume("})")},
-           1));
+                            children({line(E.consume("return a * b;"))}),
+                            E.consume("})")})}),
+            E.consume("})")}));
   Unexp.addLine(line(E.consume("}")));
   EXPECT_TRUE(Unexp.finished());
 
@@ -412,15 +407,13 @@ TEST_F(MacroCallReconstructorTest, NestedChildBlocks) {
   auto Expected = line({
       Chunk3Start,
       children({
-          line(Chunk3LBrace, 1),
-          line(
-              {
-                  Chunk2Start,
-                  Chunk1,
-                  Chunk2End,
-              },
-              2),
-          line(Chunk3RBrace, 1),
+          line(Chunk3LBrace),
+          line({
+              Chunk2Start,
+              Chunk1,
+              Chunk2End,
+          }),
+          line(Chunk3RBrace),
       }),
       Chunk3End,
   });
@@ -476,8 +469,8 @@ TEST_F(MacroCallReconstructorTest, MultipleToplevelUnwrappedLines) {
   auto Expected = line({
       U.consume("ID("),
       children({
-          line(U.consume("x;"), 1),
-          line(U.consume("x"), 1),
+          line(U.consume("x;")),
+          line(U.consume("x")),
       }),
       U.consume(", y)"),
   });
@@ -531,9 +524,9 @@ TEST_F(MacroCallReconstructorTest, NestedCallsMultipleLines) {
   auto Expected = line({
       Chunk2Start,
       children({
-          line({Chunk2LBrace}, 1),
-          line({Chunk1, Chunk2Semi}, 1),
-          line({Chunk2RBrace}, 1),
+          line({Chunk2LBrace}),
+          line({Chunk1, Chunk2Semi}),
+          line({Chunk2RBrace}),
       }),
       Chunk2End,
   });
@@ -563,17 +556,15 @@ TEST_F(MacroCallReconstructorTest, ParentOutsideMacroCall) {
   auto Expected = line({
       Prefix,
       children({
-          line(
-              {
-                  U.consume("ID("),
-                  children({
-                      line(U.consume("x;"), 2),
-                      line(U.consume("y;"), 2),
-                      line(U.consume("z;"), 2),
-                  }),
-                  U.consume(")"),
-              },
-              1),
+          line({
+              U.consume("ID("),
+              children({
+                  line(U.consume("x;")),
+                  line(U.consume("y;")),
+                  line(U.consume("z;")),
+              }),
+              U.consume(")"),
+          }),
       }),
       Postfix,
   });
@@ -599,7 +590,7 @@ TEST_F(MacroCallReconstructorTest, ChildrenSplitAcrossArguments) {
   Matcher U(Call, Lex);
   auto Expected = line({
       U.consume("CALL({"),
-      children(line(U.consume("a;"), 1)),
+      children(line(U.consume("a;"))),
       U.consume(", b; })"),
   });
   EXPECT_THAT(std::move(Unexp).takeResult(), matchesLine(Expected));
@@ -629,20 +620,16 @@ TEST_F(MacroCallReconstructorTest, ChildrenAfterMacroCall) {
   Matcher U(Call, Lex);
   auto Expected = line({
       U.consume("CALL({"),
-      children(line(U.consume("a"), 1)),
+      children(line(U.consume("a"))),
       U.consume(", b)"),
       Semi,
-      children(line(
-          {
-              SecondLine,
-              children(line(
-                  {
-                      ThirdLine,
-                      Postfix,
-                  },
-                  2)),
-          },
-          1)),
+      children(line({
+          SecondLine,
+          children(line({
+              ThirdLine,
+              Postfix,
+          })),
+      })),
   });
   EXPECT_THAT(std::move(Unexp).takeResult(), matchesLine(Expected));
 }
@@ -668,37 +655,7 @@ TEST_F(MacroCallReconstructorTest, InvalidCodeSplittingBracesAcrossArgs) {
   Matcher U(Call, Lex);
   auto Expected = line({
       Prefix,
-      children({line(U.consume("M({,x,)"), 1)}),
-  });
-  EXPECT_THAT(std::move(Unexp).takeResult(), matchesLine(Expected));
-}
-
-TEST_F(MacroCallReconstructorTest, IndentLevelInExpandedCode) {
-  auto Macros = createExpander({"ID(a)=a"});
-  Expansion Exp(Lex, *Macros);
-  TokenList Call = Exp.expand("ID", {std::string("[] { { x; } }")});
-
-  MacroCallReconstructor Unexp(0, Exp.getUnexpanded());
-  Matcher E(Exp.getTokens(), Lex);
-  Unexp.addLine(line({
-      E.consume("[] {"),
-      children({
-          line(E.consume("{"), 1),
-          line(E.consume("x;"), 2),
-          line(E.consume("}"), 1),
-      }),
-      E.consume("}"),
-  }));
-  EXPECT_TRUE(Unexp.finished());
-  Matcher U(Call, Lex);
-  auto Expected = line({
-      U.consume("ID([] {"),
-      children({
-          line(U.consume("{"), 1),
-          line(U.consume("x;"), 2),
-          line(U.consume("}"), 1),
-      }),
-      U.consume("})"),
+      children({line(U.consume("M({,x,)"))}),
   });
   EXPECT_THAT(std::move(Unexp).takeResult(), matchesLine(Expected));
 }

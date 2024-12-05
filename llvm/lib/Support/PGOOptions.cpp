@@ -15,12 +15,11 @@ PGOOptions::PGOOptions(std::string ProfileFile, std::string CSProfileGenFile,
                        std::string ProfileRemappingFile,
                        std::string MemoryProfile,
                        IntrusiveRefCntPtr<vfs::FileSystem> FS, PGOAction Action,
-                       CSPGOAction CSAction, ColdFuncOpt ColdType,
-                       bool DebugInfoForProfiling, bool PseudoProbeForProfiling,
-                       bool AtomicCounterUpdate)
+                       CSPGOAction CSAction, bool DebugInfoForProfiling,
+                       bool PseudoProbeForProfiling, bool AtomicCounterUpdate)
     : ProfileFile(ProfileFile), CSProfileGenFile(CSProfileGenFile),
       ProfileRemappingFile(ProfileRemappingFile), MemoryProfile(MemoryProfile),
-      Action(Action), CSAction(CSAction), ColdOptType(ColdType),
+      Action(Action), CSAction(CSAction),
       DebugInfoForProfiling(DebugInfoForProfiling ||
                             (Action == SampleUse && !PseudoProbeForProfiling)),
       PseudoProbeForProfiling(PseudoProbeForProfiling),

@@ -39,7 +39,6 @@ using namespace llvm;
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeDirectXTarget() {
   RegisterTargetMachine<DirectXTargetMachine> X(getTheDirectXTarget());
   auto *PR = PassRegistry::getPassRegistry();
-  initializeDXILIntrinsicExpansionLegacyPass(*PR);
   initializeDXILPrepareModulePass(*PR);
   initializeEmbedDXILPassPass(*PR);
   initializeWriteDXILPassPass(*PR);
@@ -77,10 +76,9 @@ public:
 
   FunctionPass *createTargetRegisterAllocator(bool) override { return nullptr; }
   void addCodeGenPrepare() override {
-    addPass(createDXILIntrinsicExpansionLegacyPass());
     addPass(createDXILOpLoweringLegacyPass());
-    addPass(createDXILTranslateMetadataPass());
     addPass(createDXILPrepareModulePass());
+    addPass(createDXILTranslateMetadataPass());
   }
 };
 
@@ -102,9 +100,26 @@ DirectXTargetMachine::DirectXTargetMachine(const Target &T, const Triple &TT,
 
 DirectXTargetMachine::~DirectXTargetMachine() {}
 
-void DirectXTargetMachine::registerPassBuilderCallbacks(PassBuilder &PB) {
-#define GET_PASS_REGISTRY "DirectXPassRegistry.def"
-#include "llvm/Passes/TargetPassRegistry.inc"
+void DirectXTargetMachine::registerPassBuilderCallbacks(
+    PassBuilder &PB, bool PopulateClassToPassNames) {
+  PB.registerPipelineParsingCallback(
+      [](StringRef PassName, ModulePassManager &PM,
+         ArrayRef<PassBuilder::PipelineElement>) {
+        if (PassName == "print-dxil-resource") {
+          PM.addPass(DXILResourcePrinterPass(dbgs()));
+          return true;
+        }
+        if (PassName == "print-dx-shader-flags") {
+          PM.addPass(dxil::ShaderFlagsAnalysisPrinter(dbgs()));
+          return true;
+        }
+        return false;
+      });
+
+  PB.registerAnalysisRegistrationCallback([](ModuleAnalysisManager &MAM) {
+    MAM.registerPass([&] { return DXILResourceAnalysis(); });
+    MAM.registerPass([&] { return dxil::ShaderFlagsAnalysis(); });
+  });
 }
 
 bool DirectXTargetMachine::addPassesToEmitFile(

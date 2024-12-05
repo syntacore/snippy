@@ -43,7 +43,6 @@
 #include "lldb/Target/ThreadList.h"
 #include "lldb/Target/ThreadPlanStack.h"
 #include "lldb/Target/Trace.h"
-#include "lldb/Utility/AddressableBits.h"
 #include "lldb/Utility/ArchSpec.h"
 #include "lldb/Utility/Broadcaster.h"
 #include "lldb/Utility/Event.h"
@@ -59,7 +58,6 @@
 
 #include "llvm/ADT/AddressRanges.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/Support/Error.h"
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/VersionTuple.h"
 
@@ -381,7 +379,7 @@ public:
 
   // These two functions fill out the Broadcaster interface:
 
-  static llvm::StringRef GetStaticBroadcasterClass();
+  static ConstString &GetStaticBroadcasterClass();
 
   static constexpr llvm::StringRef AttachSynchronousHijackListenerName =
       "lldb.internal.Process.AttachSynchronous.hijack";
@@ -390,7 +388,7 @@ public:
   static constexpr llvm::StringRef ResumeSynchronousHijackListenerName =
       "lldb.internal.Process.ResumeSynchronous.hijack";
 
-  llvm::StringRef GetBroadcasterClass() const override {
+  ConstString &GetBroadcasterClass() const override {
     return GetStaticBroadcasterClass();
   }
 
@@ -465,8 +463,6 @@ public:
     static bool SetUpdateStateOnRemoval(Event *event_ptr);
 
   private:
-    bool ForwardEventToPendingListeners(Event *event_ptr) override;
-
     void SetUpdateStateOnRemoval() { m_update_state++; }
 
     void SetRestarted(bool new_value) { m_restarted = new_value; }
@@ -917,8 +913,8 @@ public:
   /// \param[in] force_kill
   ///     Whether lldb should force a kill (instead of a detach) from
   ///     the inferior process.  Normally if lldb launched a binary and
-  ///     Destroy is called, lldb kills it.  If lldb attached to a
-  ///     running process and Destroy is called, lldb detaches.  If
+  ///     Destory is called, lldb kills it.  If lldb attached to a
+  ///     running process and Destory is called, lldb detaches.  If
   ///     this behavior needs to be over-ridden, this is the bool that
   ///     can be used.
   ///
@@ -1425,23 +1421,9 @@ public:
 
   virtual void DidExit() {}
 
-  /// Get the current address mask in the Process
-  ///
-  /// This mask can used to set/clear non-address bits in an addr_t.
-  ///
-  /// \return
-  ///   The current address mask.
-  ///   Bits which are set to 1 are not used for addressing.
-  ///   An address mask of 0 means all bits are used for addressing.
-  ///   An address mask of LLDB_INVALID_ADDRESS_MASK (all 1's) means
-  ///   that no mask has been set.
   lldb::addr_t GetCodeAddressMask();
   lldb::addr_t GetDataAddressMask();
 
-  /// The highmem masks are for targets where we may have different masks
-  /// for low memory versus high memory addresses, and they will be left
-  /// as LLDB_INVALID_ADDRESS_MASK normally, meaning the base masks
-  /// should be applied to all addresses.
   lldb::addr_t GetHighmemCodeAddressMask();
   lldb::addr_t GetHighmemDataAddressMask();
 
@@ -1519,13 +1501,6 @@ public:
   virtual bool IsAlive();
 
   virtual bool IsLiveDebugSession() const { return true; };
-
-  /// Provide a way to retrieve the core dump file that is loaded for debugging.
-  /// Only available if IsLiveDebugSession() returns true.
-  ///
-  /// \return
-  ///     File path to the core file.
-  virtual FileSpec GetCoreFile() const { return {}; }
 
   /// Before lldb detaches from a process, it warns the user that they are
   /// about to lose their debug session. In some cases, this warning doesn't
@@ -2665,37 +2640,6 @@ void PruneThreadPlans();
     return m_source_file_cache;
   }
 
-  /// Find a pattern within a memory region.
-  ///
-  /// This function searches for a pattern represented by the provided buffer
-  /// within the memory range specified by the low and high addresses. It uses
-  /// a bad character heuristic to optimize the search process.
-  ///
-  /// \param[in] low The starting address of the memory region to be searched.
-  /// (inclusive)
-  ///
-  /// \param[in] high The ending address of the memory region to be searched.
-  /// (exclusive)
-  ///
-  /// \param[in] buf A pointer to the buffer containing the pattern to be
-  /// searched.
-  ///
-  /// \param[in] buffer_size The size of the buffer in bytes.
-  ///
-  /// \return The address where the pattern was found or LLDB_INVALID_ADDRESS if
-  /// not found.
-  lldb::addr_t FindInMemory(lldb::addr_t low, lldb::addr_t high,
-                            const uint8_t *buf, size_t size);
-
-  AddressRanges FindRangesInMemory(const uint8_t *buf, uint64_t size,
-                                   const AddressRanges &ranges,
-                                   size_t alignment, size_t max_matches,
-                                   Status &error);
-
-  lldb::addr_t FindInMemory(const uint8_t *buf, uint64_t size,
-                            const AddressRange &range, size_t alignment,
-                            Status &error);
-
 protected:
   friend class Trace;
 
@@ -2810,11 +2754,6 @@ protected:
   ///     Zero is returned in the case of an error.
   virtual size_t DoReadMemory(lldb::addr_t vm_addr, void *buf, size_t size,
                               Status &error) = 0;
-
-  virtual void DoFindInMemory(lldb::addr_t start_addr, lldb::addr_t end_addr,
-                              const uint8_t *buf, size_t size,
-                              AddressRanges &matches, size_t alignment,
-                              size_t max_matches);
 
   /// DoGetMemoryRegionInfo is called by GetMemoryRegionInfo after it has
   /// removed non address bits from load_addr. Override this method in
@@ -3149,20 +3088,16 @@ protected:
   // if run while destructing.  We use this flag to determine that.
   std::atomic<bool> m_destructing;
 
-  /// Mask for code an data addresses.
-  /// The default value LLDB_INVALID_ADDRESS_MASK means no mask has been set,
-  /// and addresses values should not be modified.
-  /// In these masks, the bits are set to 1 indicate bits that are not
-  /// significant for addressing.
-  /// The highmem masks are for targets where we may have different masks
-  /// for low memory versus high memory addresses, and they will be left
-  /// as LLDB_INVALID_ADDRESS_MASK normally, meaning the base masks
-  /// should be applied to all addresses.
+  /// Mask for code an data addresses. The default value (0) means no mask is
+  /// set.  The bits set to 1 indicate bits that are NOT significant for
+  /// addressing.
+  /// The highmem versions are for targets where we may have different masks
+  /// for low memory versus high memory addresses.
   /// @{
-  lldb::addr_t m_code_address_mask = LLDB_INVALID_ADDRESS_MASK;
-  lldb::addr_t m_data_address_mask = LLDB_INVALID_ADDRESS_MASK;
-  lldb::addr_t m_highmem_code_address_mask = LLDB_INVALID_ADDRESS_MASK;
-  lldb::addr_t m_highmem_data_address_mask = LLDB_INVALID_ADDRESS_MASK;
+  lldb::addr_t m_code_address_mask = 0;
+  lldb::addr_t m_data_address_mask = 0;
+  lldb::addr_t m_highmem_code_address_mask = 0;
+  lldb::addr_t m_highmem_data_address_mask = 0;
   /// @}
 
   bool m_clear_thread_plans_on_stop;
@@ -3258,8 +3193,6 @@ protected:
 
   void LoadOperatingSystemPlugin(bool flush);
 
-  void SetAddressableBitMasks(AddressableBits bit_masks);
-
 private:
   Status DestroyImpl(bool force_kill);
 
@@ -3282,8 +3215,6 @@ private:
 
   Status LaunchPrivate(ProcessLaunchInfo &launch_info, lldb::StateType &state,
                        lldb::EventSP &event_sp);
-
-  lldb::EventSP CreateEventFromProcessState(uint32_t event_type);
 
   Process(const Process &) = delete;
   const Process &operator=(const Process &) = delete;

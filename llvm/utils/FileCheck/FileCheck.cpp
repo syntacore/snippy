@@ -641,7 +641,7 @@ static void DumpAnnotatedInput(raw_ostream &OS, const FileCheckRequest &Req,
       LineOS = &ElidedLinesOS;
     else {
       LineOS = &OS;
-      DumpEllipsisOrElidedLines(OS, ElidedLines, LabelWidth);
+      DumpEllipsisOrElidedLines(OS, ElidedLinesOS.str(), LabelWidth);
     }
 
     // Print right-aligned line number.
@@ -723,7 +723,7 @@ static void DumpAnnotatedInput(raw_ostream &OS, const FileCheckRequest &Req,
       ++AnnotationItr;
     }
   }
-  DumpEllipsisOrElidedLines(OS, ElidedLines, LabelWidth);
+  DumpEllipsisOrElidedLines(OS, ElidedLinesOS.str(), LabelWidth);
 
   OS << ">>>>>>\n";
 }
@@ -742,15 +742,20 @@ int main(int argc, char **argv) {
   // In the latter case, the general rule of thumb is to choose the value that
   // provides the most information.
   DumpInputValue DumpInput =
-      DumpInputs.empty() ? DumpInputFail : *llvm::max_element(DumpInputs);
+      DumpInputs.empty()
+          ? DumpInputFail
+          : *std::max_element(DumpInputs.begin(), DumpInputs.end());
   DumpInputFilterValue DumpInputFilter;
   if (DumpInputFilters.empty())
     DumpInputFilter = DumpInput == DumpInputAlways ? DumpInputFilterAll
                                                    : DumpInputFilterError;
   else
-    DumpInputFilter = *llvm::max_element(DumpInputFilters);
-  unsigned DumpInputContext =
-      DumpInputContexts.empty() ? 5 : *llvm::max_element(DumpInputContexts);
+    DumpInputFilter =
+        *std::max_element(DumpInputFilters.begin(), DumpInputFilters.end());
+  unsigned DumpInputContext = DumpInputContexts.empty()
+                                  ? 5
+                                  : *std::max_element(DumpInputContexts.begin(),
+                                                      DumpInputContexts.end());
 
   if (DumpInput == DumpInputHelp) {
     DumpInputAnnotationHelp(outs());

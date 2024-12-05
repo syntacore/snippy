@@ -39,7 +39,7 @@ class WebAssemblyExplicitLocals final : public MachineFunctionPass {
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.setPreservesCFG();
-    AU.addPreserved<MachineBlockFrequencyInfoWrapperPass>();
+    AU.addPreserved<MachineBlockFrequencyInfo>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 
@@ -100,8 +100,6 @@ static unsigned getDropOpcode(const TargetRegisterClass *RC) {
     return WebAssembly::DROP_FUNCREF;
   if (RC == &WebAssembly::EXTERNREFRegClass)
     return WebAssembly::DROP_EXTERNREF;
-  if (RC == &WebAssembly::EXNREFRegClass)
-    return WebAssembly::DROP_EXNREF;
   llvm_unreachable("Unexpected register class");
 }
 
@@ -121,8 +119,6 @@ static unsigned getLocalGetOpcode(const TargetRegisterClass *RC) {
     return WebAssembly::LOCAL_GET_FUNCREF;
   if (RC == &WebAssembly::EXTERNREFRegClass)
     return WebAssembly::LOCAL_GET_EXTERNREF;
-  if (RC == &WebAssembly::EXNREFRegClass)
-    return WebAssembly::LOCAL_GET_EXNREF;
   llvm_unreachable("Unexpected register class");
 }
 
@@ -142,8 +138,6 @@ static unsigned getLocalSetOpcode(const TargetRegisterClass *RC) {
     return WebAssembly::LOCAL_SET_FUNCREF;
   if (RC == &WebAssembly::EXTERNREFRegClass)
     return WebAssembly::LOCAL_SET_EXTERNREF;
-  if (RC == &WebAssembly::EXNREFRegClass)
-    return WebAssembly::LOCAL_SET_EXNREF;
   llvm_unreachable("Unexpected register class");
 }
 
@@ -163,8 +157,6 @@ static unsigned getLocalTeeOpcode(const TargetRegisterClass *RC) {
     return WebAssembly::LOCAL_TEE_FUNCREF;
   if (RC == &WebAssembly::EXTERNREFRegClass)
     return WebAssembly::LOCAL_TEE_EXTERNREF;
-  if (RC == &WebAssembly::EXNREFRegClass)
-    return WebAssembly::LOCAL_TEE_EXNREF;
   llvm_unreachable("Unexpected register class");
 }
 
@@ -184,8 +176,6 @@ static MVT typeForRegClass(const TargetRegisterClass *RC) {
     return MVT::funcref;
   if (RC == &WebAssembly::EXTERNREFRegClass)
     return MVT::externref;
-  if (RC == &WebAssembly::EXNREFRegClass)
-    return MVT::exnref;
   llvm_unreachable("unrecognized register class");
 }
 

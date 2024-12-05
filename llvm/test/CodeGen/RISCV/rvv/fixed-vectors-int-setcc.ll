@@ -523,7 +523,9 @@ define void @seteq_vi_v16i8(ptr %x, ptr %z) {
 ; CHECK-NEXT:    vsm.v v8, (a1)
 ; CHECK-NEXT:    ret
   %a = load <16 x i8>, ptr %x
-  %d = icmp eq <16 x i8> %a, splat (i8 0)
+  %b = insertelement <16 x i8> poison, i8 0, i32 0
+  %c = shufflevector <16 x i8> %b, <16 x i8> poison, <16 x i32> zeroinitializer
+  %d = icmp eq <16 x i8> %a, %c
   store <16 x i1> %d, ptr %z
   ret void
 }
@@ -538,7 +540,9 @@ define void @setne_vi_v32i8(ptr %x, ptr %z) {
 ; CHECK-NEXT:    vsm.v v10, (a1)
 ; CHECK-NEXT:    ret
   %a = load <32 x i8>, ptr %x
-  %d = icmp ne <32 x i8> %a, splat (i8 0)
+  %b = insertelement <32 x i8> poison, i8 0, i32 0
+  %c = shufflevector <32 x i8> %b, <32 x i8> poison, <32 x i32> zeroinitializer
+  %d = icmp ne <32 x i8> %a, %c
   store <32 x i1> %d, ptr %z
   ret void
 }
@@ -553,7 +557,9 @@ define void @setgt_vi_v64i8(ptr %x, ptr %z) {
 ; CHECK-NEXT:    vsm.v v12, (a1)
 ; CHECK-NEXT:    ret
   %a = load <64 x i8>, ptr %x
-  %d = icmp sgt <64 x i8> %a, splat (i8 0)
+  %b = insertelement <64 x i8> poison, i8 0, i32 0
+  %c = shufflevector <64 x i8> %b, <64 x i8> poison, <64 x i32> zeroinitializer
+  %d = icmp sgt <64 x i8> %a, %c
   store <64 x i1> %d, ptr %z
   ret void
 }
@@ -568,7 +574,9 @@ define void @setgt_vi_v64i8_nonzero(ptr %x, ptr %z) {
 ; CHECK-NEXT:    vsm.v v12, (a1)
 ; CHECK-NEXT:    ret
   %a = load <64 x i8>, ptr %x
-  %d = icmp sgt <64 x i8> %a, splat (i8 5)
+  %b = insertelement <64 x i8> poison, i8 5, i32 0
+  %c = shufflevector <64 x i8> %b, <64 x i8> poison, <64 x i32> zeroinitializer
+  %d = icmp sgt <64 x i8> %a, %c
   store <64 x i1> %d, ptr %z
   ret void
 }
@@ -583,7 +591,9 @@ define void @setlt_vi_v128i8(ptr %x, ptr %z) {
 ; CHECK-NEXT:    vsm.v v16, (a1)
 ; CHECK-NEXT:    ret
   %a = load <128 x i8>, ptr %x
-  %d = icmp slt <128 x i8> %a, splat (i8 0)
+  %b = insertelement <128 x i8> poison, i8 0, i32 0
+  %c = shufflevector <128 x i8> %b, <128 x i8> poison, <128 x i32> zeroinitializer
+  %d = icmp slt <128 x i8> %a, %c
   store <128 x i1> %d, ptr %z
   ret void
 }
@@ -597,7 +607,9 @@ define void @setge_vi_v8i8(ptr %x, ptr %z) {
 ; CHECK-NEXT:    vsm.v v8, (a1)
 ; CHECK-NEXT:    ret
   %a = load <8 x i8>, ptr %x
-  %d = icmp sge <8 x i8> %a, splat (i8 0)
+  %b = insertelement <8 x i8> poison, i8 0, i32 0
+  %c = shufflevector <8 x i8> %b, <8 x i8> poison, <8 x i32> zeroinitializer
+  %d = icmp sge <8 x i8> %a, %c
   store <8 x i1> %d, ptr %z
   ret void
 }
@@ -611,7 +623,9 @@ define void @setle_vi_v16i8(ptr %x, ptr %z) {
 ; CHECK-NEXT:    vsm.v v8, (a1)
 ; CHECK-NEXT:    ret
   %a = load <16 x i8>, ptr %x
-  %d = icmp sle <16 x i8> %a, splat (i8 0)
+  %b = insertelement <16 x i8> poison, i8 0, i32 0
+  %c = shufflevector <16 x i8> %b, <16 x i8> poison, <16 x i32> zeroinitializer
+  %d = icmp sle <16 x i8> %a, %c
   store <16 x i1> %d, ptr %z
   ret void
 }
@@ -626,7 +640,9 @@ define void @setugt_vi_v32i8(ptr %x, ptr %z) {
 ; CHECK-NEXT:    vsm.v v10, (a1)
 ; CHECK-NEXT:    ret
   %a = load <32 x i8>, ptr %x
-  %d = icmp ugt <32 x i8> %a, splat (i8 5)
+  %b = insertelement <32 x i8> poison, i8 5, i32 0
+  %c = shufflevector <32 x i8> %b, <32 x i8> poison, <32 x i32> zeroinitializer
+  %d = icmp ugt <32 x i8> %a, %c
   store <32 x i1> %d, ptr %z
   ret void
 }
@@ -641,7 +657,9 @@ define void @setult_vi_v64i8(ptr %x, ptr %z) {
 ; CHECK-NEXT:    vsm.v v12, (a1)
 ; CHECK-NEXT:    ret
   %a = load <64 x i8>, ptr %x
-  %d = icmp ult <64 x i8> %a, splat (i8 5)
+  %b = insertelement <64 x i8> poison, i8 5, i32 0
+  %c = shufflevector <64 x i8> %b, <64 x i8> poison, <64 x i32> zeroinitializer
+  %d = icmp ult <64 x i8> %a, %c
   store <64 x i1> %d, ptr %z
   ret void
 }
@@ -656,7 +674,9 @@ define void @setuge_vi_v128i8(ptr %x, ptr %z) {
 ; CHECK-NEXT:    vsm.v v16, (a1)
 ; CHECK-NEXT:    ret
   %a = load <128 x i8>, ptr %x
-  %d = icmp uge <128 x i8> %a, splat (i8 5)
+  %b = insertelement <128 x i8> poison, i8 5, i32 0
+  %c = shufflevector <128 x i8> %b, <128 x i8> poison, <128 x i32> zeroinitializer
+  %d = icmp uge <128 x i8> %a, %c
   store <128 x i1> %d, ptr %z
   ret void
 }
@@ -670,7 +690,9 @@ define void @setule_vi_v8i8(ptr %x, ptr %z) {
 ; CHECK-NEXT:    vsm.v v8, (a1)
 ; CHECK-NEXT:    ret
   %a = load <8 x i8>, ptr %x
-  %d = icmp ule <8 x i8> %a, splat (i8 5)
+  %b = insertelement <8 x i8> poison, i8 5, i32 0
+  %c = shufflevector <8 x i8> %b, <8 x i8> poison, <8 x i32> zeroinitializer
+  %d = icmp ule <8 x i8> %a, %c
   store <8 x i1> %d, ptr %z
   ret void
 }

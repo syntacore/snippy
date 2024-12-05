@@ -4,13 +4,13 @@
 
 --- |
 
-  @addr = global ptr null
+  @addr = global i8* null
 
   define void @test() {
   entry:
-    store volatile ptr blockaddress(@test, %block), ptr @addr
-    %val = load volatile ptr, ptr @addr
-    indirectbr ptr %val, [label %block]
+    store volatile i8* blockaddress(@test, %block), i8** @addr
+    %val = load volatile i8*, i8** @addr
+    indirectbr i8* %val, [label %block]
 
   block:
     ret void
@@ -18,34 +18,34 @@
 
   define void @test2() {
   entry:
-    store volatile ptr blockaddress(@test2, %"quoted block"), ptr @addr
-    %val = load volatile ptr, ptr @addr
-    indirectbr ptr %val, [label %"quoted block"]
+    store volatile i8* blockaddress(@test2, %"quoted block"), i8** @addr
+    %val = load volatile i8*, i8** @addr
+    indirectbr i8* %val, [label %"quoted block"]
 
   "quoted block":
     ret void
   }
 
-  define void @slot_in_other_function(ptr %addr) {
+  define void @slot_in_other_function(i8** %addr) {
   entry:
-    store volatile ptr blockaddress(@test3, %0), ptr %addr
+    store volatile i8* blockaddress(@test3, %0), i8** %addr
     ret void
   }
 
   define void @test3() {
   entry:
-    store volatile ptr blockaddress(@test3, %0), ptr @addr
-    %val = load volatile ptr, ptr @addr
-    indirectbr ptr %val, [label %0]
+    store volatile i8* blockaddress(@test3, %0), i8** @addr
+    %val = load volatile i8*, i8** @addr
+    indirectbr i8* %val, [label %0]
 
     ret void
   }
 
   define void @test4() {
   entry:
-    store volatile ptr blockaddress(@test4, %block), ptr @addr
-    %val = load volatile ptr, ptr @addr
-    indirectbr ptr %val, [label %block]
+    store volatile i8* blockaddress(@test4, %block), i8** @addr
+    %val = load volatile i8*, i8** @addr
+    indirectbr i8* %val, [label %block]
 
   block:
     ret void

@@ -25,7 +25,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/SetVector.h"
-#include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/ValueHandle.h"
 #include <deque>
@@ -62,19 +61,6 @@ struct Factor {
   unsigned Power;
 
   Factor(Value *Base, unsigned Power) : Base(Base), Power(Power) {}
-};
-
-struct OverflowTracking {
-  bool HasNUW;
-  bool HasNSW;
-  bool AllKnownNonNegative;
-  bool AllKnownNonZero;
-  // Note: AllKnownNonNegative can be true in a case where one of the operands
-  // is negative, but one the operators is not NSW. AllKnownNonNegative should
-  // not be used independently of HasNSW
-  OverflowTracking()
-      : HasNUW(true), HasNSW(true), AllKnownNonNegative(true),
-        AllKnownNonZero(true) {}
 };
 
 class XorOpnd;
@@ -117,16 +103,16 @@ private:
   void ReassociateExpression(BinaryOperator *I);
   void RewriteExprTree(BinaryOperator *I,
                        SmallVectorImpl<reassociate::ValueEntry> &Ops,
-                       reassociate::OverflowTracking Flags);
+                       bool HasNUW);
   Value *OptimizeExpression(BinaryOperator *I,
                             SmallVectorImpl<reassociate::ValueEntry> &Ops);
   Value *OptimizeAdd(Instruction *I,
                      SmallVectorImpl<reassociate::ValueEntry> &Ops);
   Value *OptimizeXor(Instruction *I,
                      SmallVectorImpl<reassociate::ValueEntry> &Ops);
-  bool CombineXorOpnd(BasicBlock::iterator It, reassociate::XorOpnd *Opnd1,
+  bool CombineXorOpnd(Instruction *I, reassociate::XorOpnd *Opnd1,
                       APInt &ConstOpnd, Value *&Res);
-  bool CombineXorOpnd(BasicBlock::iterator It, reassociate::XorOpnd *Opnd1,
+  bool CombineXorOpnd(Instruction *I, reassociate::XorOpnd *Opnd1,
                       reassociate::XorOpnd *Opnd2, APInt &ConstOpnd,
                       Value *&Res);
   Value *buildMinimalMultiplyDAG(IRBuilderBase &Builder,

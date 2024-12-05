@@ -1,4 +1,4 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1
+! RUN: %python %S/test_errors.py %s %flang_fc1 -pedantic -Werror
 ! Tests actual/dummy pointer argument shape mismatches
 module m
  contains
@@ -10,15 +10,6 @@ module m
   end
   subroutine sa(p)
     real, pointer, intent(in) :: p(..)
-  end
-  subroutine sao(p)
-    real, intent(in), optional, pointer :: p(..)
-  end
-  subroutine so(x)
-    real, intent(in), optional :: x(..)
-  end
-  subroutine soa(a)
-    real, intent(in), optional, allocatable :: a(..)
   end
   subroutine test
     real, pointer :: a0, a1(:)
@@ -32,15 +23,9 @@ module m
     call s1(null(a1)) ! ok
     call sa(null(a0)) ! ok
     call sa(null(a1)) ! ok
-    !ERROR: NULL() without MOLD= must not be associated with an assumed-rank dummy argument that is ALLOCATABLE, POINTER, or non-OPTIONAL
+    !ERROR: NULL() without MOLD= must not be associated with an assumed-rank dummy argument
     call sa(null())
-    call sao ! ok
-    !ERROR: NULL() without MOLD= must not be associated with an assumed-rank dummy argument that is ALLOCATABLE, POINTER, or non-OPTIONAL
-    call sao(null())
-    call so ! ok
-    call so(null()) ! ok
-    call soa ! ok
-    !ERROR: NULL() without MOLD= must not be associated with an assumed-rank dummy argument that is ALLOCATABLE, POINTER, or non-OPTIONAL
-    call soa(null())
+    !ERROR: NULL() without MOLD= must not be associated with an assumed-rank dummy argument
+    call sa(null())
   end
 end

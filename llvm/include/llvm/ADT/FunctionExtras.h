@@ -161,7 +161,8 @@ protected:
     // provide three pointers worth of storage here.
     // This is mutable as an inlined `const unique_function<void() const>` may
     // still modify its own mutable members.
-    alignas(void *) mutable std::byte InlineStorage[InlineStorageSize];
+    mutable std::aligned_storage_t<InlineStorageSize, alignof(void *)>
+        InlineStorage;
   } StorageUnion;
 
   // A compressed pointer to either our dispatching callback or our table of

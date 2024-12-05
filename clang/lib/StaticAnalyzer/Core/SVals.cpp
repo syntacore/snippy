@@ -271,7 +271,7 @@ void SVal::printJson(raw_ostream &Out, bool AddQuotes) const {
 
   dumpToStream(TempOut);
 
-  Out << JsonFormat(Buf, AddQuotes);
+  Out << JsonFormat(TempOut.str(), AddQuotes);
 }
 
 void SVal::dumpToStream(raw_ostream &os) const {

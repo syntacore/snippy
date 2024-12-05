@@ -27,9 +27,9 @@ public:
 
   ~LibcxxStdSpanSyntheticFrontEnd() override = default;
 
-  llvm::Expected<uint32_t> CalculateNumChildren() override;
+  size_t CalculateNumChildren() override;
 
-  lldb::ValueObjectSP GetChildAtIndex(uint32_t idx) override;
+  lldb::ValueObjectSP GetChildAtIndex(size_t idx) override;
 
   /// Determines properties of the std::span<> associated with this object
   //
@@ -53,7 +53,7 @@ public:
   // This function checks for a '__size' member to determine the number
   // of elements in the span. If no such member exists, we get the size
   // from the only other place it can be: the template argument.
-  lldb::ChildCacheState Update() override;
+  bool Update() override;
 
   bool MightHaveChildren() override;
 
@@ -73,14 +73,14 @@ lldb_private::formatters::LibcxxStdSpanSyntheticFrontEnd::
     Update();
 }
 
-llvm::Expected<uint32_t> lldb_private::formatters::
-    LibcxxStdSpanSyntheticFrontEnd::CalculateNumChildren() {
+size_t lldb_private::formatters::LibcxxStdSpanSyntheticFrontEnd::
+    CalculateNumChildren() {
   return m_num_elements;
 }
 
 lldb::ValueObjectSP
 lldb_private::formatters::LibcxxStdSpanSyntheticFrontEnd::GetChildAtIndex(
-    uint32_t idx) {
+    size_t idx) {
   if (!m_start)
     return {};
 
@@ -93,13 +93,12 @@ lldb_private::formatters::LibcxxStdSpanSyntheticFrontEnd::GetChildAtIndex(
                                       m_element_type);
 }
 
-lldb::ChildCacheState
-lldb_private::formatters::LibcxxStdSpanSyntheticFrontEnd::Update() {
+bool lldb_private::formatters::LibcxxStdSpanSyntheticFrontEnd::Update() {
   // Get element type.
   ValueObjectSP data_type_finder_sp = GetChildMemberWithName(
       m_backend, {ConstString("__data_"), ConstString("__data")});
   if (!data_type_finder_sp)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
   m_element_type = data_type_finder_sp->GetCompilerType().GetPointeeType();
 
@@ -123,7 +122,7 @@ lldb_private::formatters::LibcxxStdSpanSyntheticFrontEnd::Update() {
     }
   }
 
-  return lldb::ChildCacheState::eReuse;
+  return true;
 }
 
 bool lldb_private::formatters::LibcxxStdSpanSyntheticFrontEnd::

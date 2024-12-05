@@ -10,9 +10,6 @@
 #define LLDB_UTILITY_ADDRESSABLEBITS_H
 
 #include "lldb/lldb-forward.h"
-#include "lldb/lldb-public.h"
-
-#include <cstdint>
 
 namespace lldb_private {
 
@@ -34,13 +31,9 @@ public:
 
   void SetLowmemAddressableBits(uint32_t lowmem_addressing_bits);
 
-  uint32_t GetLowmemAddressableBits() const;
-
   void SetHighmemAddressableBits(uint32_t highmem_addressing_bits);
 
-  uint32_t GetHighmemAddressableBits() const;
-
-  static lldb::addr_t AddressableBitToMask(uint32_t addressable_bits);
+  void SetProcessMasks(lldb_private::Process &process);
 
 private:
   uint32_t m_low_memory_addr_bits;

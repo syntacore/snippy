@@ -86,10 +86,9 @@ void ADRRelaxationPass::runOnFunction(BinaryFunction &BF) {
         // invalidate this offset, so we have to rely on linker-inserted NOP to
         // replace it with ADRP, and abort if it is not present.
         auto L = BC.scopeLock();
-        BC.errs() << formatv(
-            "BOLT-ERROR: Cannot relax adr in non-simple function "
-            "{0}. Use --strict option to override\n",
-            BF.getOneName());
+        errs() << formatv("BOLT-ERROR: Cannot relax adr in non-simple function "
+                          "{0}. Use --strict option to override\n",
+                          BF.getOneName());
         PassFailed = true;
         return;
       }
@@ -98,9 +97,9 @@ void ADRRelaxationPass::runOnFunction(BinaryFunction &BF) {
   }
 }
 
-Error ADRRelaxationPass::runOnFunctions(BinaryContext &BC) {
+void ADRRelaxationPass::runOnFunctions(BinaryContext &BC) {
   if (!opts::AdrPassOpt || !BC.HasRelocations)
-    return Error::success();
+    return;
 
   ParallelUtilities::WorkFuncTy WorkFun = [&](BinaryFunction &BF) {
     runOnFunction(BF);
@@ -111,8 +110,7 @@ Error ADRRelaxationPass::runOnFunctions(BinaryContext &BC) {
       "ADRRelaxationPass");
 
   if (PassFailed)
-    return createFatalBOLTError("");
-  return Error::success();
+    exit(1);
 }
 
 } // end namespace bolt

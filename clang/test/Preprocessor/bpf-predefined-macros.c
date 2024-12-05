@@ -61,9 +61,6 @@ int r;
 #ifdef __BPF_FEATURE_ST
 int s;
 #endif
-#ifdef __BPF_FEATURE_ADDR_SPACE_CAST
-int t;
-#endif
 
 // CHECK: int b;
 // CHECK: int c;
@@ -92,11 +89,6 @@ int t;
 // CPU_V4: int q;
 // CPU_V4: int r;
 // CPU_V4: int s;
-
-// CPU_V1: int t;
-// CPU_V2: int t;
-// CPU_V3: int t;
-// CPU_V4: int t;
 
 // CPU_GENERIC: int g;
 

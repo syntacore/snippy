@@ -9,3 +9,5 @@ add_llvm_unittest(DebugInfoBTFTests
   )
 
 target_link_libraries(DebugInfoBTFTests PRIVATE LLVMTestingSupport)
+
+set_property(TARGET DebugInfoBTFTests PROPERTY FOLDER "Tests/UnitTests/DebugInfoTests")

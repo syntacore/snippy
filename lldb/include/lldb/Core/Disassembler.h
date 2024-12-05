@@ -538,7 +538,7 @@ protected:
   ElideMixedSourceAndDisassemblyLine(const ExecutionContext &exe_ctx,
                                      const SymbolContext &sc, LineEntry &line) {
     SourceLine sl;
-    sl.file = line.GetFile();
+    sl.file = line.file;
     sl.line = line.line;
     sl.column = line.column;
     return ElideMixedSourceAndDisassemblyLine(exe_ctx, sc, sl);
@@ -547,6 +547,7 @@ protected:
   // Classes that inherit from Disassembler can see and modify these
   ArchSpec m_arch;
   InstructionList m_instruction_list;
+  lldb::addr_t m_base_addr;
   std::string m_flavor;
 
 private:

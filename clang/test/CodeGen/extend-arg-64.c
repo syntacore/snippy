@@ -68,8 +68,7 @@ int test(void) {
   // CHECKEXT-NEXT: call void (i64, ...) @knr
 
   knr(ei23);
-  // CHECKEXT: load i32, ptr @ei23
-  // CHECKEXT: trunc i32
+  // CHECKEXT: load i23, ptr @ei23
   // CHECKEXT-NEXT: call void (i23, ...) @knr
 
   knr(ff);

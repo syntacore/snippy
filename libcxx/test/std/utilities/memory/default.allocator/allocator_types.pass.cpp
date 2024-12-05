@@ -61,5 +61,8 @@ void test() {
 
 int main(int, char**) {
     test<char>();
+#ifdef _LIBCPP_VERSION
+    test<char const>(); // extension
+#endif
     return 0;
 }

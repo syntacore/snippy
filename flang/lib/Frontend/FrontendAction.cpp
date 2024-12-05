@@ -86,14 +86,9 @@ bool FrontendAction::beginSourceFile(CompilerInstance &ci,
     invoc.collectMacroDefinitions();
   }
 
-  if (!invoc.getFortranOpts().features.IsEnabled(
-          Fortran::common::LanguageFeature::CUDA)) {
-    // Enable CUDA Fortran if source file is *.cuf/*.CUF and not already
-    // enabled.
-    invoc.getFortranOpts().features.Enable(
-        Fortran::common::LanguageFeature::CUDA,
-        getCurrentInput().getIsCUDAFortran());
-  }
+  // Enable CUDA Fortran if source file is *.cuf/*.CUF.
+  invoc.getFortranOpts().features.Enable(Fortran::common::LanguageFeature::CUDA,
+                                         getCurrentInput().getIsCUDAFortran());
 
   // Decide between fixed and free form (if the user didn't express any
   // preference, use the file extension to decide)
@@ -153,7 +148,7 @@ bool FrontendAction::runPrescan() {
   return !reportFatalScanningErrors();
 }
 
-bool FrontendAction::runParse(bool emitMessages) {
+bool FrontendAction::runParse() {
   CompilerInstance &ci = this->getInstance();
 
   // Parse. In case of failure, report and return.
@@ -163,11 +158,9 @@ bool FrontendAction::runParse(bool emitMessages) {
     return false;
   }
 
-  if (emitMessages) {
-    // Report any non-fatal diagnostics from getParsing now rather than
-    // combining them with messages from semantics.
-    ci.getParsing().messages().Emit(llvm::errs(), ci.getAllCookedSources());
-  }
+  // Report the diagnostics from getParsing
+  ci.getParsing().messages().Emit(llvm::errs(), ci.getAllCookedSources());
+
   return true;
 }
 
@@ -176,18 +169,11 @@ bool FrontendAction::runSemanticChecks() {
   std::optional<parser::Program> &parseTree{ci.getParsing().parseTree()};
   assert(parseTree && "Cannot run semantic checks without a parse tree!");
 
-  // Transfer any pending non-fatal messages from parsing to semantics
-  // so that they are merged and all printed in order.
-  auto &semanticsCtx{ci.getSemanticsContext()};
-  semanticsCtx.messages().Annex(std::move(ci.getParsing().messages()));
-  semanticsCtx.set_debugModuleWriter(ci.getInvocation().getDebugModuleDir());
-
   // Prepare semantics
-  ci.setSemantics(std::make_unique<Fortran::semantics::Semantics>(semanticsCtx,
-                                                                  *parseTree));
+  ci.setSemantics(std::make_unique<Fortran::semantics::Semantics>(
+      ci.getSemanticsContext(), *parseTree,
+      ci.getInvocation().getDebugModuleDir()));
   auto &semantics = ci.getSemantics();
-  semantics.set_hermeticModuleFileOutput(
-      ci.getInvocation().getHermeticModuleFileOutput());
 
   // Run semantic checks
   semantics.Perform();
@@ -196,7 +182,7 @@ bool FrontendAction::runSemanticChecks() {
     return false;
   }
 
-  // Report the diagnostics from parsing and the semantic checks
+  // Report the diagnostics from the semantic checks
   semantics.EmitMessages(ci.getSemaOutputStream());
 
   return true;

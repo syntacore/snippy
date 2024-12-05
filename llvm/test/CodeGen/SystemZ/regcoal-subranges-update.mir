@@ -49,8 +49,6 @@ body:             |
 ---
 name:            segfault
 tracksRegLiveness: true
-frameInfo:
-  adjustsStack:    true
 liveins:         []
 body:             |
   ; CHECK-LABEL: name: segfault

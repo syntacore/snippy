@@ -1,12 +1,5 @@
 ! RUN: %python %S/test_errors.py %s %flang_fc1 -pedantic
-module m1
- contains
-  real function rf2(x)
-    rf2 = x
-  end
-end
-module m2
-  use m1
+module m
   real, target :: x = 1.
  contains
   function rpf(x)
@@ -25,11 +18,7 @@ module m2
   end
   subroutine test2
     !PORTABILITY: Name 'rf' from host scope should have a type declaration before its local statement function definition
-    rf(x) = 1.
-  end
-  subroutine test2b
-    !PORTABILITY: Name 'rf2' from host scope should have a type declaration before its local statement function definition
-    rf2(x) = 1.
+    rf(x) = 3.
   end
   subroutine test3
     external sf

@@ -1,3 +1,5 @@
+// REQUIRES: x86-registered-target
+// REQUIRES: amdgpu-registered-target
 // REQUIRES: libgcc
 // UNSUPPORTED: system-windows
 

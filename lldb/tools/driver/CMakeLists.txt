@@ -28,6 +28,8 @@ add_dependencies(lldb
   ${tablegen_deps}
 )
 
+set_target_properties(LLDBOptionsTableGen PROPERTIES FOLDER "lldb misc")
+
 if(LLDB_BUILD_FRAMEWORK)
   # In the build-tree, we know the exact path to the framework directory.
   # The installed framework can be in different locations.

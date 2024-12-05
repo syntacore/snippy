@@ -39,12 +39,13 @@
 DEMANGLE_NAMESPACE_BEGIN
 
 template <class T, size_t N> class PODSmallVector {
-  static_assert(std::is_trivial<T>::value,
-                "T is required to be a trivial type");
+  static_assert(std::is_pod<T>::value,
+                "T is required to be a plain old data type");
+
   T *First = nullptr;
   T *Last = nullptr;
   T *Cap = nullptr;
-  T Inline[N] = {};
+  T Inline[N] = {0};
 
   bool isInline() const { return First == Inline; }
 
@@ -5541,7 +5542,7 @@ Node *AbstractManglingParser<Alloc, Derived>::parseFloatingLiteral() {
     return nullptr;
   std::string_view Data(First, N);
   for (char C : Data)
-    if (!(C >= '0' && C <= '9') && !(C >= 'a' && C <= 'f'))
+    if (!std::isxdigit(C))
       return nullptr;
   First += N;
   if (!consumeIf('E'))
@@ -5715,7 +5716,6 @@ Node *AbstractManglingParser<Derived, Alloc>::parseTemplateParam() {
 }
 
 // <template-param-decl> ::= Ty                          # type parameter
-//                       ::= Tk <concept name> [<template-args>] # constrained type parameter
 //                       ::= Tn <type>                   # non-type parameter
 //                       ::= Tt <template-param-decl>* E # template parameter
 //                       ::= Tp <template-param-decl>    # parameter pack
@@ -5847,7 +5847,7 @@ Node *AbstractManglingParser<Derived, Alloc>::parseTemplateArg() {
   }
 }
 
-// <template-args> ::= I <template-arg>* [Q <requires-clause expr>] E
+// <template-args> ::= I <template-arg>* E
 //     extension, the abi says <template-arg>+
 template <typename Derived, typename Alloc>
 Node *

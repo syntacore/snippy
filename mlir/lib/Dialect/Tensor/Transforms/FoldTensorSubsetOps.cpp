@@ -18,7 +18,6 @@
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/Dialect/Vector/Utils/VectorUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -49,14 +48,12 @@ static Value getTensorOperand(tensor::InsertSliceOp op) {
 namespace {
 /// Merge extract_slice operation with load/transferRead operation.
 class TransferReadOfExtractSliceOpFolder final
-    : public vector::MaskableOpRewritePattern<vector::TransferReadOp> {
+    : public OpRewritePattern<vector::TransferReadOp> {
 public:
-  using MaskableOpRewritePattern::MaskableOpRewritePattern;
+  using OpRewritePattern<vector::TransferReadOp>::OpRewritePattern;
 
-  FailureOr<mlir::Value>
-  matchAndRewriteMaskableOp(vector::TransferReadOp readOp,
-                            vector::MaskingOpInterface maskOp,
-                            PatternRewriter &rewriter) const override;
+  LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
+                                PatternRewriter &rewriter) const override;
 };
 
 /// Merge insert_slice operation with store/transferWriteOp operation.
@@ -87,10 +84,8 @@ static LogicalResult preconditionsFoldExtractOrInsertWithTransferOp(
   return success();
 }
 
-FailureOr<mlir::Value>
-TransferReadOfExtractSliceOpFolder::matchAndRewriteMaskableOp(
-    vector::TransferReadOp readOp, vector::MaskingOpInterface maskOp,
-    PatternRewriter &rewriter) const {
+LogicalResult TransferReadOfExtractSliceOpFolder::matchAndRewrite(
+    vector::TransferReadOp readOp, PatternRewriter &rewriter) const {
   auto extractSliceOp =
       getTensorOperand(readOp).getDefiningOp<tensor::ExtractSliceOp>();
   if (!extractSliceOp)
@@ -100,7 +95,7 @@ TransferReadOfExtractSliceOpFolder::matchAndRewriteMaskableOp(
       preconditionsFoldExtractOrInsertWithTransferOp(rewriter, readOp,
                                                      extractSliceOp);
   if (failed(preconditionResult))
-    return rewriter.notifyMatchFailure(readOp, "Failed preconditions");
+    return preconditionResult;
 
   SmallVector<Value> indices(readOp.getIndices().begin(),
                              readOp.getIndices().end());
@@ -110,17 +105,15 @@ TransferReadOfExtractSliceOpFolder::matchAndRewriteMaskableOp(
       extractSliceOp.getMixedStrides(), extractSliceOp.getDroppedDims(),
       indices, sourceIndices);
 
-  Operation *newOp = rewriter.create<vector::TransferReadOp>(
-      readOp.getLoc(), readOp.getVectorType(), extractSliceOp.getSource(),
-      sourceIndices,
+  rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
+      readOp, readOp.getVectorType(), extractSliceOp.getSource(), sourceIndices,
       AffineMapAttr::get(expandDimsToRank(
           readOp.getPermutationMap(), extractSliceOp.getSourceType().getRank(),
           extractSliceOp.getDroppedDims())),
       readOp.getPadding(),
       /*mask=*/Value(), readOp.getInBoundsAttr());
-  if (maskOp)
-    newOp = mlir::vector::maskOperation(rewriter, newOp, maskOp.getMask());
-  return newOp->getResults()[0];
+
+  return success();
 }
 
 LogicalResult InsertSliceOfTransferWriteOpFolder::matchAndRewrite(

@@ -13,8 +13,7 @@
 
 class ProcessFreeBSDKernel : public lldb_private::PostMortemProcess {
 public:
-  ProcessFreeBSDKernel(lldb::TargetSP target_sp, lldb::ListenerSP listener,
-                       const lldb_private::FileSpec &core_file);
+  ProcessFreeBSDKernel(lldb::TargetSP target_sp, lldb::ListenerSP listener);
 
   static lldb::ProcessSP
   CreateInstance(lldb::TargetSP target_sp, lldb::ListenerSP listener,

@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -verify %s -std=c++2a
-// RUN: %clang_cc1 -fsyntax-only -verify %s -std=c++2a -fexperimental-new-constant-interpreter
 
 int foo(int x) {
   return x == x; // expected-warning {{self-comparison always evaluates to true}}

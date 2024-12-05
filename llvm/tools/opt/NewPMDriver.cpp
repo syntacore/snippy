@@ -202,19 +202,6 @@ static cl::opt<std::string>
                          cl::desc("Path to the profile remapping file."),
                          cl::Hidden);
 
-static cl::opt<PGOOptions::ColdFuncOpt> PGOColdFuncAttr(
-    "pgo-cold-func-opt", cl::init(PGOOptions::ColdFuncOpt::Default), cl::Hidden,
-    cl::desc(
-        "Function attribute to apply to cold functions as determined by PGO"),
-    cl::values(clEnumValN(PGOOptions::ColdFuncOpt::Default, "default",
-                          "Default (no attribute)"),
-               clEnumValN(PGOOptions::ColdFuncOpt::OptSize, "optsize",
-                          "Mark cold functions with optsize."),
-               clEnumValN(PGOOptions::ColdFuncOpt::MinSize, "minsize",
-                          "Mark cold functions with minsize."),
-               clEnumValN(PGOOptions::ColdFuncOpt::OptNone, "optnone",
-                          "Mark cold functions with optnone.")));
-
 static cl::opt<bool> DebugInfoForProfiling(
     "debug-info-for-profiling", cl::init(false), cl::Hidden,
     cl::desc("Emit special debug info to enable PGO profile generation."));
@@ -341,9 +328,8 @@ bool llvm::runPassPipeline(
     StringRef Arg0, Module &M, TargetMachine *TM, TargetLibraryInfoImpl *TLII,
     ToolOutputFile *Out, ToolOutputFile *ThinLTOLinkOut,
     ToolOutputFile *OptRemarkFile, StringRef PassPipeline,
-    ArrayRef<PassPlugin> PassPlugins,
-    ArrayRef<std::function<void(llvm::PassBuilder &)>> PassBuilderCallbacks,
-    OutputKind OK, VerifierKind VK, bool ShouldPreserveAssemblyUseListOrder,
+    ArrayRef<PassPlugin> PassPlugins, OutputKind OK, VerifierKind VK,
+    bool ShouldPreserveAssemblyUseListOrder,
     bool ShouldPreserveBitcodeUseListOrder, bool EmitSummaryIndex,
     bool EmitModuleHash, bool EnableDebugify, bool VerifyDIPreserve,
     bool UnifiedLTO) {
@@ -354,24 +340,22 @@ bool llvm::runPassPipeline(
   switch (PGOKindFlag) {
   case InstrGen:
     P = PGOOptions(ProfileFile, "", "", MemoryProfileFile, FS,
-                   PGOOptions::IRInstr, PGOOptions::NoCSAction,
-                   PGOColdFuncAttr);
+                   PGOOptions::IRInstr);
     break;
   case InstrUse:
     P = PGOOptions(ProfileFile, "", ProfileRemappingFile, MemoryProfileFile, FS,
-                   PGOOptions::IRUse, PGOOptions::NoCSAction, PGOColdFuncAttr);
+                   PGOOptions::IRUse);
     break;
   case SampleUse:
     P = PGOOptions(ProfileFile, "", ProfileRemappingFile, MemoryProfileFile, FS,
-                   PGOOptions::SampleUse, PGOOptions::NoCSAction,
-                   PGOColdFuncAttr);
+                   PGOOptions::SampleUse);
     break;
   case NoPGO:
     if (DebugInfoForProfiling || PseudoProbeForProfiling ||
         !MemoryProfileFile.empty())
       P = PGOOptions("", "", "", MemoryProfileFile, FS, PGOOptions::NoAction,
-                     PGOOptions::NoCSAction, PGOColdFuncAttr,
-                     DebugInfoForProfiling, PseudoProbeForProfiling);
+                     PGOOptions::NoCSAction, DebugInfoForProfiling,
+                     PseudoProbeForProfiling);
     else
       P = std::nullopt;
   }
@@ -443,10 +427,6 @@ bool llvm::runPassPipeline(
   // For any loaded plugins, let them register pass builder callbacks.
   for (auto &PassPlugin : PassPlugins)
     PassPlugin.registerPassBuilderCallbacks(PB);
-
-  // Load any explicitly specified plugins.
-  for (auto &PassCallback : PassBuilderCallbacks)
-    PassCallback(PB);
 
 #define HANDLE_EXTENSION(Ext)                                                  \
   get##Ext##PluginInfo().RegisterPassBuilderCallbacks(PB);

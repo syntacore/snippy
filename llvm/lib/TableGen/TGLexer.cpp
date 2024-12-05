@@ -360,7 +360,6 @@ tgtok::TokKind TGLexer::LexIdentifier() {
                             .Case("foreach", tgtok::Foreach)
                             .Case("defm", tgtok::Defm)
                             .Case("defset", tgtok::Defset)
-                            .Case("deftype", tgtok::Deftype)
                             .Case("multiclass", tgtok::MultiClass)
                             .Case("field", tgtok::Field)
                             .Case("let", tgtok::Let)
@@ -849,8 +848,7 @@ bool TGLexer::prepSkipRegion(bool MustNeverBeFalse) {
 
   do {
     // Skip all symbols to the line end.
-    while (*CurPtr != '\n')
-      ++CurPtr;
+    prepSkipToLineEnd();
 
     // Find the first non-whitespace symbol in the next line(s).
     if (!prepSkipLineBegin())
@@ -1031,6 +1029,11 @@ bool TGLexer::prepSkipDirectiveEnd() {
   }
 
   return true;
+}
+
+void TGLexer::prepSkipToLineEnd() {
+  while (*CurPtr != '\n' && *CurPtr != '\r' && CurPtr != CurBuf.end())
+    ++CurPtr;
 }
 
 bool TGLexer::prepIsProcessingEnabled() {

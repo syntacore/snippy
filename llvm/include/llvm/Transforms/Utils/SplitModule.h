@@ -24,9 +24,6 @@ class Module;
 
 /// Splits the module M into N linkable partitions. The function ModuleCallback
 /// is called N times passing each individual partition as the MPart argument.
-/// PreserveLocals: Split without externalizing locals.
-/// RoundRobin: Use round-robin distribution of functions to modules instead
-/// of the default name-hash-based one.
 ///
 /// FIXME: This function does not deal with the somewhat subtle symbol
 /// visibility issues around module splitting, including (but not limited to):
@@ -38,7 +35,7 @@ class Module;
 void SplitModule(
     Module &M, unsigned N,
     function_ref<void(std::unique_ptr<Module> MPart)> ModuleCallback,
-    bool PreserveLocals = false, bool RoundRobin = false);
+    bool PreserveLocals = false);
 
 } // end namespace llvm
 

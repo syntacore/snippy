@@ -467,6 +467,7 @@ template <> void SymbolRecordImpl<LabelSym>::map(IO &IO) {
   IO.mapOptional("Offset", Symbol.CodeOffset, 0U);
   IO.mapOptional("Segment", Symbol.Segment, uint16_t(0));
   IO.mapRequired("Flags", Symbol.Flags);
+  IO.mapRequired("Flags", Symbol.Flags);
   IO.mapRequired("DisplayName", Symbol.Name);
 }
 

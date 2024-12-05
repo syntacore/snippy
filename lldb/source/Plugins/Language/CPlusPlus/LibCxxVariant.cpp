@@ -204,36 +204,36 @@ public:
   }
 
   bool MightHaveChildren() override { return true; }
-  lldb::ChildCacheState Update() override;
-  llvm::Expected<uint32_t> CalculateNumChildren() override { return m_size; }
-  ValueObjectSP GetChildAtIndex(uint32_t idx) override;
+  bool Update() override;
+  size_t CalculateNumChildren() override { return m_size; }
+  ValueObjectSP GetChildAtIndex(size_t idx) override;
 
 private:
   size_t m_size = 0;
 };
 } // namespace
 
-lldb::ChildCacheState VariantFrontEnd::Update() {
+bool VariantFrontEnd::Update() {
   m_size = 0;
   ValueObjectSP impl_sp = formatters::GetChildMemberWithName(
       m_backend, {ConstString("__impl_"), ConstString("__impl")});
   if (!impl_sp)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
   LibcxxVariantIndexValidity validity = LibcxxVariantGetIndexValidity(impl_sp);
 
   if (validity == LibcxxVariantIndexValidity::Invalid)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
   if (validity == LibcxxVariantIndexValidity::NPos)
-    return lldb::ChildCacheState::eReuse;
+    return true;
 
   m_size = 1;
 
-  return lldb::ChildCacheState::eRefetch;
+  return false;
 }
 
-ValueObjectSP VariantFrontEnd::GetChildAtIndex(uint32_t idx) {
+ValueObjectSP VariantFrontEnd::GetChildAtIndex(size_t idx) {
   if (idx >= m_size)
     return {};
 

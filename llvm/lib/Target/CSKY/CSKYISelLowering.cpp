@@ -556,7 +556,7 @@ SDValue CSKYTargetLowering::LowerCall(CallLoweringInfo &CLI,
 
     Chain = DAG.getMemcpy(Chain, DL, FIPtr, Arg, SizeNode, Alignment,
                           /*IsVolatile=*/false,
-                          /*AlwaysInline=*/false, /*CI=*/nullptr, IsTailCall,
+                          /*AlwaysInline=*/false, IsTailCall,
                           MachinePointerInfo(), MachinePointerInfo());
     ByValArgs.push_back(FIPtr);
   }
@@ -649,7 +649,8 @@ SDValue CSKYTargetLowering::LowerCall(CallLoweringInfo &CLI,
 
   if (GlobalAddressSDNode *S = dyn_cast<GlobalAddressSDNode>(Callee)) {
     const GlobalValue *GV = S->getGlobal();
-    bool IsLocal = getTargetMachine().shouldAssumeDSOLocal(GV);
+    bool IsLocal =
+        getTargetMachine().shouldAssumeDSOLocal(*GV->getParent(), GV);
 
     if (isPositionIndependent() || !Subtarget.has2E3()) {
       IsRegCall = true;
@@ -661,7 +662,8 @@ SDValue CSKYTargetLowering::LowerCall(CallLoweringInfo &CLI,
           cast<GlobalAddressSDNode>(Callee), Ty, DAG, CSKYII::MO_None));
     }
   } else if (ExternalSymbolSDNode *S = dyn_cast<ExternalSymbolSDNode>(Callee)) {
-    bool IsLocal = getTargetMachine().shouldAssumeDSOLocal(nullptr);
+    bool IsLocal = getTargetMachine().shouldAssumeDSOLocal(
+        *MF.getFunction().getParent(), nullptr);
 
     if (isPositionIndependent() || !Subtarget.has2E3()) {
       IsRegCall = true;
@@ -1151,7 +1153,7 @@ SDValue CSKYTargetLowering::LowerGlobalAddress(SDValue Op,
   int64_t Offset = N->getOffset();
 
   const GlobalValue *GV = N->getGlobal();
-  bool IsLocal = getTargetMachine().shouldAssumeDSOLocal(GV);
+  bool IsLocal = getTargetMachine().shouldAssumeDSOLocal(*GV->getParent(), GV);
   SDValue Addr = getAddr<GlobalAddressSDNode, false>(N, DAG, IsLocal);
 
   // In order to maximise the opportunity for common subexpression elimination,

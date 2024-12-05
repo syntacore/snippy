@@ -103,18 +103,17 @@ void AllocCombinerPass::combineAdjustments(BinaryFunction &BF) {
   }
 }
 
-Error AllocCombinerPass::runOnFunctions(BinaryContext &BC) {
+void AllocCombinerPass::runOnFunctions(BinaryContext &BC) {
   if (opts::FrameOptimization == FOP_NONE)
-    return Error::success();
+    return;
 
   runForAllWeCare(BC.getBinaryFunctions(), [&](BinaryFunction &Function) {
     combineAdjustments(Function);
   });
 
-  BC.outs() << "BOLT-INFO: Allocation combiner: " << NumCombined
-            << " empty spaces coalesced (dyn count: " << DynamicCountCombined
-            << ").\n";
-  return Error::success();
+  outs() << "BOLT-INFO: Allocation combiner: " << NumCombined
+         << " empty spaces coalesced (dyn count: " << DynamicCountCombined
+         << ").\n";
 }
 
 } // end namespace bolt

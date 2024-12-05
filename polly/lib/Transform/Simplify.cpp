@@ -22,7 +22,6 @@
 #include "llvm/Support/Debug.h"
 #include <optional>
 
-#include "polly/Support/PollyDebug.h"
 #define DEBUG_TYPE "polly-simplify"
 
 using namespace llvm;
@@ -238,8 +237,8 @@ void SimplifyImpl::removeEmptyDomainStmts() {
 
   assert(NumStmtsBefore >= S->getSize());
   EmptyDomainsRemoved = NumStmtsBefore - S->getSize();
-  POLLY_DEBUG(dbgs() << "Removed " << EmptyDomainsRemoved << " (of "
-                     << NumStmtsBefore << ") statements with empty domains \n");
+  LLVM_DEBUG(dbgs() << "Removed " << EmptyDomainsRemoved << " (of "
+                    << NumStmtsBefore << ") statements with empty domains \n");
   TotalEmptyDomainsRemoved[CallNo] += EmptyDomainsRemoved;
 }
 
@@ -281,8 +280,8 @@ void SimplifyImpl::removeOverwrites() {
       // If all of a write's elements are overwritten, remove it.
       isl::union_map AccRelUnion = AccRel;
       if (AccRelUnion.is_subset(WillBeOverwritten)) {
-        POLLY_DEBUG(dbgs() << "Removing " << MA
-                           << " which will be overwritten anyway\n");
+        LLVM_DEBUG(dbgs() << "Removing " << MA
+                          << " which will be overwritten anyway\n");
 
         Stmt.removeSingleMemoryAccess(MA);
         OverwritesRemoved++;
@@ -533,9 +532,9 @@ void SimplifyImpl::removeRedundantWrites() {
           isl::map AccRelStoredVal = isl::map::from_domain_and_range(
               AccRelWrapped, makeValueSet(StoredVal));
           if (isl::union_map(AccRelStoredVal).is_subset(Known)) {
-            POLLY_DEBUG(dbgs() << "Cleanup of " << MA << ":\n");
-            POLLY_DEBUG(dbgs() << "      Scalar: " << *StoredVal << "\n");
-            POLLY_DEBUG(dbgs() << "      AccRel: " << AccRel << "\n");
+            LLVM_DEBUG(dbgs() << "Cleanup of " << MA << ":\n");
+            LLVM_DEBUG(dbgs() << "      Scalar: " << *StoredVal << "\n");
+            LLVM_DEBUG(dbgs() << "      AccRel: " << AccRel << "\n");
 
             Stmt.removeSingleMemoryAccess(MA);
 
@@ -577,8 +576,8 @@ void SimplifyImpl::removeUnnecessaryStmts() {
   S->simplifySCoP(true);
   assert(NumStmtsBefore >= S->getSize());
   StmtsRemoved = NumStmtsBefore - S->getSize();
-  POLLY_DEBUG(dbgs() << "Removed " << StmtsRemoved << " (of " << NumStmtsBefore
-                     << ") statements\n");
+  LLVM_DEBUG(dbgs() << "Removed " << StmtsRemoved << " (of " << NumStmtsBefore
+                    << ") statements\n");
   TotalStmtsRemoved[CallNo] += StmtsRemoved;
 }
 
@@ -596,7 +595,7 @@ void SimplifyImpl::removeEmptyPartialAccesses() {
       if (!AccRel.is_empty().is_true())
         continue;
 
-      POLLY_DEBUG(
+      LLVM_DEBUG(
           dbgs() << "Removing " << MA
                  << " because it's a partial access that never occurs\n");
       DeferredRemove.push_back(MA);
@@ -629,8 +628,8 @@ void SimplifyImpl::markAndSweep(LoopInfo *LI) {
   for (MemoryAccess *MA : AllMAs) {
     if (UsedMA.count(MA))
       continue;
-    POLLY_DEBUG(dbgs() << "Removing " << MA
-                       << " because its value is not used\n");
+    LLVM_DEBUG(dbgs() << "Removing " << MA
+                      << " because its value is not used\n");
     ScopStmt *Stmt = MA->getStatement();
     Stmt->removeSingleMemoryAccess(MA);
 
@@ -651,8 +650,8 @@ void SimplifyImpl::markAndSweep(LoopInfo *LI) {
     for (Instruction *Inst : AllInsts) {
       auto It = UsedInsts.find({&Stmt, Inst});
       if (It == UsedInsts.end()) {
-        POLLY_DEBUG(dbgs() << "Removing "; Inst->print(dbgs());
-                    dbgs() << " because it is not used\n");
+        LLVM_DEBUG(dbgs() << "Removing "; Inst->print(dbgs());
+                   dbgs() << " because it is not used\n");
         DeadInstructionsRemoved++;
         TotalDeadInstructionsRemoved[CallNo]++;
         continue;
@@ -709,31 +708,31 @@ void SimplifyImpl::run(Scop &S, LoopInfo *LI) {
   this->S = &S;
   ScopsProcessed[CallNo]++;
 
-  POLLY_DEBUG(dbgs() << "Removing statements that are never executed...\n");
+  LLVM_DEBUG(dbgs() << "Removing statements that are never executed...\n");
   removeEmptyDomainStmts();
 
-  POLLY_DEBUG(dbgs() << "Removing partial writes that never happen...\n");
+  LLVM_DEBUG(dbgs() << "Removing partial writes that never happen...\n");
   removeEmptyPartialAccesses();
 
-  POLLY_DEBUG(dbgs() << "Removing overwrites...\n");
+  LLVM_DEBUG(dbgs() << "Removing overwrites...\n");
   removeOverwrites();
 
-  POLLY_DEBUG(dbgs() << "Coalesce partial writes...\n");
+  LLVM_DEBUG(dbgs() << "Coalesce partial writes...\n");
   coalesceWrites();
 
-  POLLY_DEBUG(dbgs() << "Removing redundant writes...\n");
+  LLVM_DEBUG(dbgs() << "Removing redundant writes...\n");
   removeRedundantWrites();
 
-  POLLY_DEBUG(dbgs() << "Cleanup unused accesses...\n");
+  LLVM_DEBUG(dbgs() << "Cleanup unused accesses...\n");
   markAndSweep(LI);
 
-  POLLY_DEBUG(dbgs() << "Removing statements without side effects...\n");
+  LLVM_DEBUG(dbgs() << "Removing statements without side effects...\n");
   removeUnnecessaryStmts();
 
   if (isModified())
     ScopsModified[CallNo]++;
-  POLLY_DEBUG(dbgs() << "\nFinal Scop:\n");
-  POLLY_DEBUG(dbgs() << S);
+  LLVM_DEBUG(dbgs() << "\nFinal Scop:\n");
+  LLVM_DEBUG(dbgs() << S);
 
   auto ScopStats = S.getStatistics();
   NumValueWrites[CallNo] += ScopStats.NumValueWrites;

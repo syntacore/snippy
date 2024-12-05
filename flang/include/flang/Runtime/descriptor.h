@@ -99,10 +99,10 @@ class DescriptorAddendum {
 public:
   explicit RT_API_ATTRS DescriptorAddendum(
       const typeInfo::DerivedType *dt = nullptr)
-      : derivedType_{dt}, len_{0} {}
+      : derivedType_{dt} {}
   RT_API_ATTRS DescriptorAddendum &operator=(const DescriptorAddendum &);
 
-  RT_API_ATTRS const typeInfo::DerivedType *derivedType() const {
+  const RT_API_ATTRS typeInfo::DerivedType *derivedType() const {
     return derivedType_;
   }
   RT_API_ATTRS DescriptorAddendum &set_derivedType(
@@ -204,7 +204,7 @@ public:
       ISO::CFI_attribute_t attribute = CFI_attribute_other);
 
   RT_API_ATTRS ISO::CFI_cdesc_t &raw() { return raw_; }
-  RT_API_ATTRS const ISO::CFI_cdesc_t &raw() const { return raw_; }
+  const RT_API_ATTRS ISO::CFI_cdesc_t &raw() const { return raw_; }
   RT_API_ATTRS std::size_t ElementBytes() const { return raw_.elem_len; }
   RT_API_ATTRS int rank() const { return raw_.rank; }
   RT_API_ATTRS TypeCode type() const { return TypeCode{raw_.type}; }
@@ -225,7 +225,7 @@ public:
   RT_API_ATTRS Dimension &GetDimension(int dim) {
     return *reinterpret_cast<Dimension *>(&raw_.dim[dim]);
   }
-  RT_API_ATTRS const Dimension &GetDimension(int dim) const {
+  const RT_API_ATTRS Dimension &GetDimension(int dim) const {
     return *reinterpret_cast<const Dimension *>(&raw_.dim[dim]);
   }
 
@@ -345,7 +345,7 @@ public:
       return nullptr;
     }
   }
-  RT_API_ATTRS const DescriptorAddendum *Addendum() const {
+  const RT_API_ATTRS DescriptorAddendum *Addendum() const {
     if (raw_.f18Addendum != 0) {
       return reinterpret_cast<const DescriptorAddendum *>(
           &GetDimension(rank()));
@@ -375,7 +375,6 @@ public:
   // allocation.  Does not allocate automatic components or
   // perform default component initialization.
   RT_API_ATTRS int Allocate();
-  RT_API_ATTRS void SetByteStrides();
 
   // Deallocates storage; does not call FINAL subroutines or
   // deallocate allocatable/automatic components.
@@ -448,7 +447,7 @@ public:
   RT_API_ATTRS Descriptor &descriptor() {
     return *reinterpret_cast<Descriptor *>(storage_);
   }
-  RT_API_ATTRS const Descriptor &descriptor() const {
+  const RT_API_ATTRS Descriptor &descriptor() const {
     return *reinterpret_cast<const Descriptor *>(storage_);
   }
 
@@ -456,7 +455,6 @@ public:
     assert(descriptor().rank() <= maxRank);
     assert(descriptor().SizeInBytes() <= byteSize);
     if (DescriptorAddendum * addendum{descriptor().Addendum()}) {
-      (void)addendum;
       assert(hasAddendum);
       assert(addendum->LenParameters() <= maxLengthTypeParameters);
     } else {

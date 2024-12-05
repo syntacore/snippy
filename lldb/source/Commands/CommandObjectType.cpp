@@ -589,7 +589,15 @@ public:
       : CommandObjectParsed(interpreter, "type format add",
                             "Add a new formatting style for a type.", nullptr),
         m_format_options(eFormatInvalid) {
-    AddSimpleArgumentList(eArgTypeName, eArgRepeatPlus);
+    CommandArgumentEntry type_arg;
+    CommandArgumentData type_style_arg;
+
+    type_style_arg.arg_type = eArgTypeName;
+    type_style_arg.arg_repetition = eArgRepeatPlus;
+
+    type_arg.push_back(type_style_arg);
+
+    m_arguments.push_back(type_arg);
 
     SetHelpLong(
         R"(
@@ -776,7 +784,15 @@ public:
       : CommandObjectParsed(interpreter,
                             FormatCategoryToString(formatter_kind, false)),
         m_formatter_kind(formatter_kind) {
-    AddSimpleArgumentList(eArgTypeName);
+    CommandArgumentEntry type_arg;
+    CommandArgumentData type_style_arg;
+
+    type_style_arg.arg_type = eArgTypeName;
+    type_style_arg.arg_repetition = eArgRepeatPlain;
+
+    type_arg.push_back(type_style_arg);
+
+    m_arguments.push_back(type_arg);
 
     const char *kind = FormatCategoryToString(formatter_kind, true);
     const char *short_kind = FormatCategoryToString(formatter_kind, false);
@@ -913,7 +929,8 @@ public:
                                   const char *name, const char *help)
       : CommandObjectParsed(interpreter, name, help, nullptr),
         m_formatter_kind(formatter_kind) {
-    AddSimpleArgumentList(eArgTypeName, eArgRepeatOptional);
+    CommandArgumentData category_arg{eArgTypeName, eArgRepeatOptional};
+    m_arguments.push_back({category_arg});
   }
 
   ~CommandObjectTypeFormatterClear() override = default;
@@ -1028,7 +1045,15 @@ public:
   CommandObjectTypeFormatterList(CommandInterpreter &interpreter,
                                  const char *name, const char *help)
       : CommandObjectParsed(interpreter, name, help, nullptr), m_options() {
-    AddSimpleArgumentList(eArgTypeName, eArgRepeatOptional);
+    CommandArgumentEntry type_arg;
+    CommandArgumentData type_style_arg;
+
+    type_style_arg.arg_type = eArgTypeName;
+    type_style_arg.arg_repetition = eArgRepeatOptional;
+
+    type_arg.push_back(type_style_arg);
+
+    m_arguments.push_back(type_arg);
   }
 
   ~CommandObjectTypeFormatterList() override = default;
@@ -1420,7 +1445,15 @@ CommandObjectTypeSummaryAdd::CommandObjectTypeSummaryAdd(
     : CommandObjectParsed(interpreter, "type summary add",
                           "Add a new summary style for a type.", nullptr),
       IOHandlerDelegateMultiline("DONE"), m_options(interpreter) {
-  AddSimpleArgumentList(eArgTypeName, eArgRepeatPlus);
+  CommandArgumentEntry type_arg;
+  CommandArgumentData type_style_arg;
+
+  type_style_arg.arg_type = eArgTypeName;
+  type_style_arg.arg_repetition = eArgRepeatPlus;
+
+  type_arg.push_back(type_style_arg);
+
+  m_arguments.push_back(type_arg);
 
   SetHelpLong(
       R"(
@@ -1712,10 +1745,26 @@ public:
       : CommandObjectParsed(interpreter, "type category define",
                             "Define a new category as a source of formatters.",
                             nullptr) {
-    AddSimpleArgumentList(eArgTypeName, eArgRepeatPlus);
+    CommandArgumentEntry type_arg;
+    CommandArgumentData type_style_arg;
+
+    type_style_arg.arg_type = eArgTypeName;
+    type_style_arg.arg_repetition = eArgRepeatPlus;
+
+    type_arg.push_back(type_style_arg);
+
+    m_arguments.push_back(type_arg);
   }
 
   ~CommandObjectTypeCategoryDefine() override = default;
+
+  void
+  HandleArgumentCompletion(CompletionRequest &request,
+                           OptionElementVector &opt_element_vector) override {
+    lldb_private::CommandCompletions::InvokeCommonCompletionCallbacks(
+        GetCommandInterpreter(), lldb::eTypeCategoryNameCompletion, request,
+        nullptr);
+  }
 
 protected:
   void DoExecute(Args &command, CommandReturnObject &result) override {
@@ -1797,10 +1846,26 @@ public:
       : CommandObjectParsed(interpreter, "type category enable",
                             "Enable a category as a source of formatters.",
                             nullptr) {
-    AddSimpleArgumentList(eArgTypeName, eArgRepeatPlus);
+    CommandArgumentEntry type_arg;
+    CommandArgumentData type_style_arg;
+
+    type_style_arg.arg_type = eArgTypeName;
+    type_style_arg.arg_repetition = eArgRepeatPlus;
+
+    type_arg.push_back(type_style_arg);
+
+    m_arguments.push_back(type_arg);
   }
 
   ~CommandObjectTypeCategoryEnable() override = default;
+
+  void
+  HandleArgumentCompletion(CompletionRequest &request,
+                           OptionElementVector &opt_element_vector) override {
+    lldb_private::CommandCompletions::InvokeCommonCompletionCallbacks(
+        GetCommandInterpreter(), lldb::eTypeCategoryNameCompletion, request,
+        nullptr);
+  }
 
 protected:
   void DoExecute(Args &command, CommandReturnObject &result) override {
@@ -1848,10 +1913,26 @@ public:
       : CommandObjectParsed(interpreter, "type category delete",
                             "Delete a category and all associated formatters.",
                             nullptr) {
-    AddSimpleArgumentList(eArgTypeName, eArgRepeatPlus);
+    CommandArgumentEntry type_arg;
+    CommandArgumentData type_style_arg;
+
+    type_style_arg.arg_type = eArgTypeName;
+    type_style_arg.arg_repetition = eArgRepeatPlus;
+
+    type_arg.push_back(type_style_arg);
+
+    m_arguments.push_back(type_arg);
   }
 
   ~CommandObjectTypeCategoryDelete() override = default;
+
+  void
+  HandleArgumentCompletion(CompletionRequest &request,
+                           OptionElementVector &opt_element_vector) override {
+    lldb_private::CommandCompletions::InvokeCommonCompletionCallbacks(
+        GetCommandInterpreter(), lldb::eTypeCategoryNameCompletion, request,
+        nullptr);
+  }
 
 protected:
   void DoExecute(Args &command, CommandReturnObject &result) override {
@@ -1939,10 +2020,26 @@ public:
       : CommandObjectParsed(interpreter, "type category disable",
                             "Disable a category as a source of formatters.",
                             nullptr) {
-    AddSimpleArgumentList(eArgTypeName, eArgRepeatPlus);
+    CommandArgumentEntry type_arg;
+    CommandArgumentData type_style_arg;
+
+    type_style_arg.arg_type = eArgTypeName;
+    type_style_arg.arg_repetition = eArgRepeatPlus;
+
+    type_arg.push_back(type_style_arg);
+
+    m_arguments.push_back(type_arg);
   }
 
   ~CommandObjectTypeCategoryDisable() override = default;
+
+  void
+  HandleArgumentCompletion(CompletionRequest &request,
+                           OptionElementVector &opt_element_vector) override {
+    lldb_private::CommandCompletions::InvokeCommonCompletionCallbacks(
+        GetCommandInterpreter(), lldb::eTypeCategoryNameCompletion, request,
+        nullptr);
+  }
 
 protected:
   void DoExecute(Args &command, CommandReturnObject &result) override {
@@ -1985,7 +2082,15 @@ public:
       : CommandObjectParsed(interpreter, "type category list",
                             "Provide a list of all existing categories.",
                             nullptr) {
-    AddSimpleArgumentList(eArgTypeName, eArgRepeatOptional);
+    CommandArgumentEntry type_arg;
+    CommandArgumentData type_style_arg;
+
+    type_style_arg.arg_type = eArgTypeName;
+    type_style_arg.arg_repetition = eArgRepeatOptional;
+
+    type_arg.push_back(type_style_arg);
+
+    m_arguments.push_back(type_arg);
   }
 
   ~CommandObjectTypeCategoryList() override = default;
@@ -2198,7 +2303,15 @@ CommandObjectTypeSynthAdd::CommandObjectTypeSynthAdd(
     : CommandObjectParsed(interpreter, "type synthetic add",
                           "Add a new synthetic provider for a type.", nullptr),
       IOHandlerDelegateMultiline("DONE"), m_options() {
-  AddSimpleArgumentList(eArgTypeName, eArgRepeatPlus);
+  CommandArgumentEntry type_arg;
+  CommandArgumentData type_style_arg;
+
+  type_style_arg.arg_type = eArgTypeName;
+  type_style_arg.arg_repetition = eArgRepeatPlus;
+
+  type_arg.push_back(type_style_arg);
+
+  m_arguments.push_back(type_arg);
 }
 
 bool CommandObjectTypeSynthAdd::AddSynth(ConstString type_name,
@@ -2395,7 +2508,15 @@ public:
   CommandObjectTypeFilterAdd(CommandInterpreter &interpreter)
       : CommandObjectParsed(interpreter, "type filter add",
                             "Add a new filter for a type.", nullptr) {
-    AddSimpleArgumentList(eArgTypeName, eArgRepeatPlus);
+    CommandArgumentEntry type_arg;
+    CommandArgumentData type_style_arg;
+
+    type_style_arg.arg_type = eArgTypeName;
+    type_style_arg.arg_repetition = eArgRepeatPlus;
+
+    type_arg.push_back(type_style_arg);
+
+    m_arguments.push_back(type_arg);
 
     SetHelpLong(
         R"(
@@ -2509,7 +2630,7 @@ protected:
     if (!frame)
       return lang_type;
 
-    lang_type = frame->GuessLanguage().AsLanguageType();
+    lang_type = frame->GuessLanguage();
     if (lang_type != lldb::eLanguageTypeUnknown)
       return lang_type;
 

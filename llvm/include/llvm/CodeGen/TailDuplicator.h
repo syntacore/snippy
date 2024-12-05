@@ -40,6 +40,7 @@ class TailDuplicator {
   const TargetInstrInfo *TII;
   const TargetRegisterInfo *TRI;
   const MachineBranchProbabilityInfo *MBPI;
+  const MachineModuleInfo *MMI;
   MachineRegisterInfo *MRI;
   MachineFunction *MF;
   MBFIWrapper *MBFI;

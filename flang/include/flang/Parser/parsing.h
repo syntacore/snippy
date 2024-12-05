@@ -15,7 +15,6 @@
 #include "parse-tree.h"
 #include "provenance.h"
 #include "flang/Common/Fortran-features.h"
-#include "flang/Parser/preprocessor.h"
 #include "llvm/Support/raw_ostream.h"
 #include <optional>
 #include <string>
@@ -60,7 +59,6 @@ public:
   const SourceFile *Prescan(const std::string &path, Options);
   void EmitPreprocessedSource(
       llvm::raw_ostream &, bool lineDirectives = true) const;
-  void EmitPreprocessorMacros(llvm::raw_ostream &) const;
   void DumpCookedChars(llvm::raw_ostream &) const;
   void DumpProvenance(llvm::raw_ostream &) const;
   void DumpParsingLog(llvm::raw_ostream &) const;
@@ -85,7 +83,6 @@ private:
   const char *finalRestingPlace_{nullptr};
   std::optional<Program> parseTree_;
   ParsingLog log_;
-  Preprocessor preprocessor_{allCooked_.allSources()};
 };
 } // namespace Fortran::parser
 #endif // FORTRAN_PARSER_PARSING_H_

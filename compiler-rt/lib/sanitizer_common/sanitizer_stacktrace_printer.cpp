@@ -152,12 +152,12 @@ static void MaybeBuildIdToBuffer(const AddressInfo &info, bool PrefixSpace,
                                  InternalScopedString *buffer) {
   if (info.uuid_size) {
     if (PrefixSpace)
-      buffer->Append(" ");
-    buffer->Append("(BuildId: ");
+      buffer->AppendF(" ");
+    buffer->AppendF("(BuildId: ");
     for (uptr i = 0; i < info.uuid_size; ++i) {
       buffer->AppendF("%02x", info.uuid[i]);
     }
-    buffer->Append(")");
+    buffer->AppendF(")");
   }
 }
 
@@ -192,7 +192,7 @@ void FormattedStackTracePrinter::RenderFrame(InternalScopedString *buffer,
       buffer->AppendF("%u", frame_no);
       break;
     case 'p':
-      buffer->AppendF("%p", (void *)address);
+      buffer->AppendF("0x%zx", address);
       break;
     case 'm':
       buffer->AppendF("%s", StripPathPrefix(info->module, strip_path_prefix));
@@ -249,7 +249,7 @@ void FormattedStackTracePrinter::RenderFrame(InternalScopedString *buffer,
         MaybeBuildIdToBuffer(*info, /*PrefixSpace=*/true, buffer);
 #endif
       } else {
-        buffer->Append("(<unknown module>)");
+        buffer->AppendF("(<unknown module>)");
       }
       break;
     case 'M':
@@ -269,7 +269,7 @@ void FormattedStackTracePrinter::RenderFrame(InternalScopedString *buffer,
       break;
     default:
       Report("Unsupported specifier in stack frame format: %c (%p)!\n", *p,
-             (const void *)p);
+             (void *)p);
       Die();
     }
   }
@@ -323,7 +323,7 @@ void FormattedStackTracePrinter::RenderData(InternalScopedString *buffer,
         break;
       default:
         Report("Unsupported specifier in stack frame format: %c (%p)!\n", *p,
-               (const void *)p);
+               (void *)p);
         Die();
     }
   }
@@ -339,7 +339,7 @@ void StackTracePrinter::RenderSourceLocation(InternalScopedString *buffer,
     buffer->AppendF("%s(%d", StripPathPrefix(file, strip_path_prefix), line);
     if (column > 0)
       buffer->AppendF(",%d", column);
-    buffer->Append(")");
+    buffer->AppendF(")");
     return;
   }
 

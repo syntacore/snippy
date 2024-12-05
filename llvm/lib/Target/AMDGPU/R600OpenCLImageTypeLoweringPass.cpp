@@ -31,7 +31,6 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Metadata.h"
-#include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
@@ -244,8 +243,9 @@ class R600OpenCLImageTypeLoweringPass : public ModulePass {
         Modified |= replaceSamplerUses(Arg, ResourceID);
       }
     }
-    for (auto *Inst : InstsToErase)
-      Inst->eraseFromParent();
+    for (unsigned i = 0; i < InstsToErase.size(); ++i) {
+      InstsToErase[i]->eraseFromParent();
+    }
 
     return Modified;
   }

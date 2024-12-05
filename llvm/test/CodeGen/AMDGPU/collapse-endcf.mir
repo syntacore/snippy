@@ -28,6 +28,7 @@ body:             |
   ; GCN-NEXT: bb.2:
   ; GCN-NEXT:   successors: %bb.4(0x80000000)
   ; GCN-NEXT: {{  $}}
+  ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: bb.4:
   ; GCN-NEXT:   $exec = S_OR_B64 $exec, [[COPY]], implicit-def $scc
   ; GCN-NEXT:   DBG_VALUE
@@ -82,8 +83,10 @@ body:             |
   ; GCN-NEXT: bb.2:
   ; GCN-NEXT:   successors: %bb.4(0x80000000)
   ; GCN-NEXT: {{  $}}
+  ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: bb.4:
   ; GCN-NEXT:   successors: %bb.5(0x80000000)
+  ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: bb.5:
   ; GCN-NEXT:   $exec = S_OR_B64 $exec, [[COPY]], implicit-def $scc
@@ -135,6 +138,7 @@ body:             |
   ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: bb.2:
   ; GCN-NEXT:   successors: %bb.4(0x80000000)
+  ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: bb.4:
   ; GCN-NEXT:   successors: %bb.5(0x80000000)
@@ -194,6 +198,7 @@ body:             |
   ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: bb.2:
   ; GCN-NEXT:   successors: %bb.3(0x80000000)
+  ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: bb.3:
   ; GCN-NEXT:   successors: %bb.4(0x80000000)
@@ -258,6 +263,7 @@ body:             |
   ; GCN-NEXT: bb.2:
   ; GCN-NEXT:   successors: %bb.3(0x80000000)
   ; GCN-NEXT: {{  $}}
+  ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: bb.3:
   ; GCN-NEXT:   successors: %bb.4(0x80000000)
   ; GCN-NEXT: {{  $}}
@@ -321,6 +327,7 @@ body:             |
   ; GCN-NEXT: bb.2:
   ; GCN-NEXT:   successors: %bb.3(0x80000000)
   ; GCN-NEXT: {{  $}}
+  ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: bb.3:
   ; GCN-NEXT:   successors: %bb.4(0x80000000)
   ; GCN-NEXT: {{  $}}
@@ -379,6 +386,7 @@ body:             |
   ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: bb.2:
   ; GCN-NEXT:   successors: %bb.3(0x80000000)
+  ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: bb.3:
   ; GCN-NEXT:   successors: %bb.4(0x80000000)
@@ -553,6 +561,7 @@ body:             |
   ; GCN-NEXT: bb.4:
   ; GCN-NEXT:   successors: %bb.5(0x80000000)
   ; GCN-NEXT: {{  $}}
+  ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: bb.5:
   ; GCN-NEXT:   successors: %bb.6(0x80000000)
   ; GCN-NEXT: {{  $}}
@@ -631,6 +640,7 @@ body:             |
   ; GCN-NEXT: bb.5:
   ; GCN-NEXT:   successors: %bb.6(0x80000000)
   ; GCN-NEXT: {{  $}}
+  ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: bb.6:
   ; GCN-NEXT:   successors: %bb.4(0x40000000), %bb.0(0x40000000)
   ; GCN-NEXT: {{  $}}
@@ -693,6 +703,7 @@ body:             |
   ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: bb.2:
   ; GCN-NEXT:   successors: %bb.4(0x80000000)
+  ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: {{  $}}
   ; GCN-NEXT: bb.4:
   ; GCN-NEXT:   successors: %bb.5(0x80000000)

@@ -10,7 +10,6 @@
 
 // ADDITIONAL_COMPILE_FLAGS: -fno-exceptions
 
-#include <__utility/exception_guard.h>
 #include <utility>
 
 int main(int, char**) {

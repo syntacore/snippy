@@ -36,9 +36,6 @@ private:
   /// insertIndirectBranch.
   int BranchRelaxationSpillFrameIndex = -1;
 
-  /// Registers that have been sign extended from i32.
-  SmallVector<Register, 8> SExt32Registers;
-
 public:
   LoongArchMachineFunctionInfo(const Function &F,
                                const TargetSubtargetInfo *STI) {}
@@ -64,12 +61,6 @@ public:
   }
   void setBranchRelaxationSpillFrameIndex(int Index) {
     BranchRelaxationSpillFrameIndex = Index;
-  }
-
-  void addSExt32Register(Register Reg) { SExt32Registers.push_back(Reg); }
-
-  bool isSExt32Register(Register Reg) const {
-    return is_contained(SExt32Registers, Reg);
   }
 };
 

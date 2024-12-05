@@ -297,12 +297,6 @@ Pattern::parseVariable(StringRef &Str, const SourceMgr &SM) {
   if (Str[0] == '$' || IsPseudo)
     ++I;
 
-  if (I == Str.size())
-    return ErrorDiagnostic::get(SM, Str.slice(I, StringRef::npos),
-                                StringRef("empty ") +
-                                    (IsPseudo ? "pseudo " : "global ") +
-                                    "variable name");
-
   if (!isValidVarNameStart(Str[I++]))
     return ErrorDiagnostic::get(SM, Str, "invalid variable name");
 
@@ -374,7 +368,7 @@ Expected<NumericVariable *> Pattern::parseNumericVariableDefinition(
 Expected<std::unique_ptr<NumericVariableUse>> Pattern::parseNumericVariableUse(
     StringRef Name, bool IsPseudo, std::optional<size_t> LineNumber,
     FileCheckPatternContext *Context, const SourceMgr &SM) {
-  if (IsPseudo && Name != "@LINE")
+  if (IsPseudo && !Name.equals("@LINE"))
     return ErrorDiagnostic::get(
         SM, Name, "invalid pseudo numeric variable '" + Name + "'");
 
@@ -624,7 +618,7 @@ Expected<std::unique_ptr<Expression>> Pattern::parseNumericSubstitutionBlock(
   ExpressionFormat ExplicitFormat = ExpressionFormat();
   unsigned Precision = 0;
 
-  // Parse format specifier (NOTE: ',' is also an argument separator).
+  // Parse format specifier (NOTE: ',' is also an argument seperator).
   size_t FormatSpecEnd = Expr.find(',');
   size_t FunctionStart = Expr.find('(');
   if (FormatSpecEnd != StringRef::npos && FormatSpecEnd < FunctionStart) {
@@ -696,7 +690,9 @@ Expected<std::unique_ptr<Expression>> Pattern::parseNumericSubstitutionBlock(
 
   // Parse matching constraint.
   Expr = Expr.ltrim(SpaceChars);
-  bool HasParsedValidConstraint = Expr.consume_front("==");
+  bool HasParsedValidConstraint = false;
+  if (Expr.consume_front("=="))
+    HasParsedValidConstraint = true;
 
   // Parse the expression itself.
   Expr = Expr.ltrim(SpaceChars);
@@ -770,7 +766,9 @@ bool Pattern::parsePattern(StringRef PatternStr, StringRef Prefix,
 
   if (!(Req.NoCanonicalizeWhiteSpace && Req.MatchFullLines))
     // Ignore trailing whitespace.
-    PatternStr = PatternStr.rtrim(" \t");
+    while (!PatternStr.empty() &&
+           (PatternStr.back() == ' ' || PatternStr.back() == '\t'))
+      PatternStr = PatternStr.substr(0, PatternStr.size() - 1);
 
   // Check that there is something on the line.
   if (PatternStr.empty() && CheckTy != Check::CheckEmpty) {
@@ -1488,7 +1486,7 @@ std::string Check::FileCheckType::getModifiersDescription() const {
   if (isLiteralMatch())
     OS << "LITERAL";
   OS << '}';
-  return Ret;
+  return OS.str();
 }
 
 std::string Check::FileCheckType::getDescription(StringRef Prefix) const {

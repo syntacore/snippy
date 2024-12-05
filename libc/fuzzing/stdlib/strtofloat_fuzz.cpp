@@ -16,7 +16,7 @@
 
 #include "src/__support/FPUtil/FPBits.h"
 
-#include "hdr/math_macros.h"
+#include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 

@@ -62,6 +62,7 @@ set(FLANG_TEST_DEPENDS
   llvm-readobj
   split-file
   FortranRuntime
+  Fortran_main
   FortranDecimal
 )
 if (LLVM_ENABLE_PLUGINS AND NOT WIN32)
@@ -83,14 +84,13 @@ if (LLVM_BUILD_EXAMPLES)
 endif ()
 
 add_custom_target(flang-test-depends DEPENDS ${FLANG_TEST_DEPENDS})
-set_target_properties(flang-test-depends PROPERTIES FOLDER "Flang/Meta")
 
 add_lit_testsuite(check-flang "Running the Flang regression tests"
   ${CMAKE_CURRENT_BINARY_DIR}
   PARAMS ${FLANG_TEST_PARAMS}
   DEPENDS ${FLANG_TEST_DEPENDS}
 )
-set_target_properties(check-flang PROPERTIES FOLDER "Flang/Meta")
+set_target_properties(check-flang PROPERTIES FOLDER "Tests")
 
 # In case of standalone builds.
 if (FLANG_STANDALONE_BUILD)

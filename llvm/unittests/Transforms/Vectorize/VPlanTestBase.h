@@ -68,8 +68,7 @@ protected:
     doAnalysis(F);
 
     auto Plan = VPlan::createInitialVPlan(
-        SE->getBackedgeTakenCount(LI->getLoopFor(LoopHeader)), *SE, true, false,
-        LI->getLoopFor(LoopHeader));
+        SE->getBackedgeTakenCount(LI->getLoopFor(LoopHeader)), *SE);
     VPlanHCFGBuilder HCFGBuilder(LI->getLoopFor(LoopHeader), LI.get(), *Plan);
     HCFGBuilder.buildHierarchicalCFG();
     return Plan;
@@ -82,8 +81,7 @@ protected:
     doAnalysis(F);
 
     auto Plan = VPlan::createInitialVPlan(
-        SE->getBackedgeTakenCount(LI->getLoopFor(LoopHeader)), *SE, true, false,
-        LI->getLoopFor(LoopHeader));
+        SE->getBackedgeTakenCount(LI->getLoopFor(LoopHeader)), *SE);
     VPlanHCFGBuilder HCFGBuilder(LI->getLoopFor(LoopHeader), LI.get(), *Plan);
     HCFGBuilder.buildPlainCFG();
     return Plan;

@@ -14,12 +14,12 @@
 using namespace mlir;
 
 llvm::Expected<PassPlugin> PassPlugin::load(const std::string &filename) {
-  std::string error;
+  std::string Error;
   auto library =
-      llvm::sys::DynamicLibrary::getPermanentLibrary(filename.c_str(), &error);
+      llvm::sys::DynamicLibrary::getPermanentLibrary(filename.c_str(), &Error);
   if (!library.isValid())
     return llvm::make_error<llvm::StringError>(
-        Twine("Could not load library '") + filename + "': " + error,
+        Twine("Could not load library '") + filename + "': " + Error,
         llvm::inconvertibleErrorCode());
 
   PassPlugin plugin{filename, library};

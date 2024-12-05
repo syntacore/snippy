@@ -63,10 +63,6 @@ enum ActionKind {
   /// Fortran source file
   DebugUnparseWithSymbols,
 
-  /// Parse, run semantics, and output a Fortran source file preceded
-  /// by all the necessary modules (transitively)
-  DebugUnparseWithModules,
-
   /// Parse, run semantics and then output symbols from semantics
   DebugDumpSymbols,
 

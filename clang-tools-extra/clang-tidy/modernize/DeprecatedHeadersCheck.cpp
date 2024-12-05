@@ -32,8 +32,7 @@ public:
                           StringRef FileName, bool IsAngled,
                           CharSourceRange FilenameRange,
                           OptionalFileEntryRef File, StringRef SearchPath,
-                          StringRef RelativePath, const Module *SuggestedModule,
-                          bool ModuleImported,
+                          StringRef RelativePath, const Module *Imported,
                           SrcMgr::CharacteristicKind FileType) override;
 
 private:
@@ -158,7 +157,7 @@ IncludeModernizePPCallbacks::IncludeModernizePPCallbacks(
             {"wctype.h", "cwctype"}})) {
     CStyledHeaderToCxx.insert(KeyValue);
   }
-  // Add C++11 headers.
+  // Add C++ 11 headers.
   if (LangOpts.CPlusPlus11) {
     for (const auto &KeyValue :
          std::vector<std::pair<llvm::StringRef, std::string>>(
@@ -179,8 +178,8 @@ IncludeModernizePPCallbacks::IncludeModernizePPCallbacks(
 void IncludeModernizePPCallbacks::InclusionDirective(
     SourceLocation HashLoc, const Token &IncludeTok, StringRef FileName,
     bool IsAngled, CharSourceRange FilenameRange, OptionalFileEntryRef File,
-    StringRef SearchPath, StringRef RelativePath, const Module *SuggestedModule,
-    bool ModuleImported, SrcMgr::CharacteristicKind FileType) {
+    StringRef SearchPath, StringRef RelativePath, const Module *Imported,
+    SrcMgr::CharacteristicKind FileType) {
 
   // If we don't want to warn for non-main file reports and this is one, skip
   // it.

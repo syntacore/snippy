@@ -20,7 +20,6 @@
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/HeatUtils.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Module.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DOTGraphTraits.h"
@@ -30,7 +29,7 @@ using namespace llvm;
 
 namespace llvm {
 template <class GraphType> struct GraphTraits;
-} // namespace llvm
+}
 
 // This option shows static (relative) call counts.
 // FIXME:
@@ -216,7 +215,7 @@ struct DOTGraphTraits<CallGraphDOTInfo *> : public DefaultDOTGraphTraits {
   }
 };
 
-} // namespace llvm
+} // end llvm namespace
 
 namespace {
 void doCallGraphDOTPrinting(

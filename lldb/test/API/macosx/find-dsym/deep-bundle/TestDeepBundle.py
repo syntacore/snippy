@@ -62,7 +62,7 @@ class DeepBundleTestCase(TestBase):
         )
 
         setup_complete = target.FindFirstGlobalVariable("setup_is_complete")
-        self.assertEqual(
+        self.assertEquals(
             setup_complete.GetValueAsUnsigned(),
             1,
             "Check that inferior process has completed setup",

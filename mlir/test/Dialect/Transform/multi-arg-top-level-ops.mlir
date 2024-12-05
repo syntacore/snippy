@@ -1,15 +1,10 @@
-// RUN: mlir-opt %s --pass-pipeline="builtin.module(transform-interpreter{\
-// RUN:       debug-bind-trailing-args=func.func,func.return})" \
-// RUN:   --split-input-file --verify-diagnostics
+// RUN: mlir-opt %s --pass-pipeline='builtin.module(test-transform-dialect-interpreter{bind-first-extra-to-ops=func.func bind-second-extra-to-ops=func.return})' \
+// RUN:             --split-input-file --verify-diagnostics
 
-module attributes {transform.with_named_sequence} {
-  transform.named_sequence @__transform_main(
-      %arg0: !transform.any_op, %arg1: !transform.any_op,
-      %arg2: !transform.any_op) {
-    transform.debug.emit_remark_at %arg1, "first extra" : !transform.any_op
-    transform.debug.emit_remark_at %arg2, "second extra" : !transform.any_op
-    transform.yield
-  }
+transform.sequence failures(propagate) {
+^bb0(%arg0: !transform.any_op, %arg1: !transform.any_op, %arg2: !transform.any_op):
+  transform.debug.emit_remark_at %arg1, "first extra" : !transform.any_op
+  transform.debug.emit_remark_at %arg2, "second extra" : !transform.any_op
 }
 
 // expected-remark @below {{first extra}}
@@ -31,13 +26,9 @@ func.func @bar(%arg0: i1) {
 
 // -----
 
-module attributes {transform.with_named_sequence} {
-  transform.named_sequence @__transform_main(
-      %arg0: !transform.any_op, %arg1: !transform.any_op,
-      %arg2: !transform.param<i64>) {
-    // expected-error @above {{wrong kind of value provided for top-level parameter}}
-    transform.yield
-  }
+transform.sequence failures(propagate) {
+^bb0(%arg0: !transform.any_op, %arg1: !transform.any_op, %arg2: !transform.param<i64>):
+  // expected-error @above {{wrong kind of value provided for top-level parameter}}
 }
 
 func.func @foo() {
@@ -46,13 +37,9 @@ func.func @foo() {
 
 // -----
 
-module attributes {transform.with_named_sequence} {
-  transform.named_sequence @__transform_main(
-      %arg0: !transform.any_op, %arg1: !transform.any_op,
-      %arg2: !transform.any_value) {
-    // expected-error @above {{wrong kind of value provided for the top-level value handle}}
-    transform.yield
-  }
+transform.sequence failures(propagate) {
+^bb0(%arg0: !transform.any_op, %arg1: !transform.any_op, %arg2: !transform.any_value):
+  // expected-error @above {{wrong kind of value provided for the top-level value handle}}
 }
 
 func.func @foo() {
@@ -61,27 +48,19 @@ func.func @foo() {
 
 // -----
 
-
-module attributes {transform.with_named_sequence} {
-  // expected-error @below {{operation expects 1 extra value bindings, but 2 were provided to the interpreter}}
-  transform.named_sequence @__transform_main(
-      %arg0: !transform.any_op, %arg1: !transform.any_op) {
-    transform.yield
-  }
+// expected-error @below {{operation expects 1 extra value bindings, but 2 were provided to the interpreter}}
+transform.sequence failures(propagate) {
+^bb0(%arg0: !transform.any_op, %arg1: !transform.any_op):
 }
 
 // -----
 
-module attributes {transform.with_named_sequence} {
-  transform.named_sequence @__transform_main(
-      %arg0: !transform.any_op, %arg1: !transform.any_op,
-      %arg2: !transform.any_op) {
-    transform.sequence %arg0, %arg1, %arg2 : !transform.any_op, !transform.any_op, !transform.any_op failures(propagate) {
-    ^bb0(%arg3: !transform.any_op, %arg4: !transform.any_op, %arg5: !transform.any_op):
-      transform.debug.emit_remark_at %arg4, "first extra" : !transform.any_op
-      transform.debug.emit_remark_at %arg5, "second extra" : !transform.any_op
-    }
-    transform.yield
+transform.sequence failures(propagate) {
+^bb0(%arg0: !transform.any_op, %arg1: !transform.any_op, %arg2: !transform.any_op):
+  transform.sequence %arg0, %arg1, %arg2 : !transform.any_op, !transform.any_op, !transform.any_op failures(propagate) {
+  ^bb0(%arg3: !transform.any_op, %arg4: !transform.any_op, %arg5: !transform.any_op):
+    transform.debug.emit_remark_at %arg4, "first extra" : !transform.any_op
+    transform.debug.emit_remark_at %arg5, "second extra" : !transform.any_op
   }
 }
 

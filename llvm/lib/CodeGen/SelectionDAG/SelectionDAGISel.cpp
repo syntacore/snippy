@@ -48,6 +48,7 @@
 #include "llvm/CodeGen/MachineOperand.h"
 #include "llvm/CodeGen/MachinePassRegistry.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
+#include "llvm/CodeGen/MachineValueType.h"
 #include "llvm/CodeGen/SchedulerRegistry.h"
 #include "llvm/CodeGen/SelectionDAG.h"
 #include "llvm/CodeGen/SelectionDAGNodes.h"
@@ -60,7 +61,6 @@
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/CodeGen/ValueTypes.h"
 #include "llvm/CodeGen/WinEHFuncInfo.h"
-#include "llvm/CodeGenTypes/MachineValueType.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -78,7 +78,6 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/IntrinsicsWebAssembly.h"
 #include "llvm/IR/Metadata.h"
-#include "llvm/IR/Module.h"
 #include "llvm/IR/PrintPasses.h"
 #include "llvm/IR/Statepoint.h"
 #include "llvm/IR/Type.h"
@@ -311,6 +310,15 @@ namespace llvm {
 
 } // end namespace llvm
 
+// EmitInstrWithCustomInserter - This method should be implemented by targets
+// that mark instructions with the 'usesCustomInserter' flag.  These
+// instructions are special in various ways, which require special support to
+// insert.  The specified MachineInstr is created but not inserted into any
+// basic blocks, and this method is called to expand it into a sequence of
+// instructions, potentially also creating new basic blocks and control flow.
+// When new basic blocks are inserted and the edges from MBB to its successors
+// are modified, the method should insert pairs of <OldSucc, NewSucc> into the
+// DenseMap.
 MachineBasicBlock *
 TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
                                             MachineBasicBlock *MBB) const {
@@ -333,49 +341,9 @@ void TargetLowering::AdjustInstrPostInstrSelection(MachineInstr &MI,
 // SelectionDAGISel code
 //===----------------------------------------------------------------------===//
 
-SelectionDAGISelLegacy::SelectionDAGISelLegacy(
-    char &ID, std::unique_ptr<SelectionDAGISel> S)
-    : MachineFunctionPass(ID), Selector(std::move(S)) {
-  initializeGCModuleInfoPass(*PassRegistry::getPassRegistry());
-  initializeBranchProbabilityInfoWrapperPassPass(
-      *PassRegistry::getPassRegistry());
-  initializeAAResultsWrapperPassPass(*PassRegistry::getPassRegistry());
-  initializeTargetLibraryInfoWrapperPassPass(*PassRegistry::getPassRegistry());
-}
-
-bool SelectionDAGISelLegacy::runOnMachineFunction(MachineFunction &MF) {
-  // If we already selected that function, we do not need to run SDISel.
-  if (MF.getProperties().hasProperty(
-          MachineFunctionProperties::Property::Selected))
-    return false;
-
-  // Do some sanity-checking on the command-line options.
-  if (EnableFastISelAbort && !Selector->TM.Options.EnableFastISel)
-    report_fatal_error("-fast-isel-abort > 0 requires -fast-isel");
-
-  // Decide what flavour of variable location debug-info will be used, before
-  // we change the optimisation level.
-  MF.setUseDebugInstrRef(MF.shouldUseDebugInstrRef());
-
-  // Reset the target options before resetting the optimization
-  // level below.
-  // FIXME: This is a horrible hack and should be processed via
-  // codegen looking at the optimization level explicitly when
-  // it wants to look at it.
-  Selector->TM.resetTargetOptions(MF.getFunction());
-  // Reset OptLevel to None for optnone functions.
-  CodeGenOptLevel NewOptLevel = skipFunction(MF.getFunction())
-                                    ? CodeGenOptLevel::None
-                                    : Selector->OptLevel;
-
-  Selector->MF = &MF;
-  OptLevelChanger OLC(*Selector, NewOptLevel);
-  Selector->initializeAnalysisResults(*this);
-  return Selector->runOnMachineFunction(MF);
-}
-
-SelectionDAGISel::SelectionDAGISel(TargetMachine &tm, CodeGenOptLevel OL)
-    : TM(tm), FuncInfo(new FunctionLoweringInfo()),
+SelectionDAGISel::SelectionDAGISel(char &ID, TargetMachine &tm,
+                                   CodeGenOptLevel OL)
+    : MachineFunctionPass(ID), TM(tm), FuncInfo(new FunctionLoweringInfo()),
       SwiftError(new SwiftErrorValueTracking()),
       CurDAG(new SelectionDAG(tm, OL)),
       SDB(std::make_unique<SelectionDAGBuilder>(*CurDAG, *FuncInfo, *SwiftError,
@@ -393,17 +361,14 @@ SelectionDAGISel::~SelectionDAGISel() {
   delete SwiftError;
 }
 
-void SelectionDAGISelLegacy::getAnalysisUsage(AnalysisUsage &AU) const {
-  CodeGenOptLevel OptLevel = Selector->OptLevel;
+void SelectionDAGISel::getAnalysisUsage(AnalysisUsage &AU) const {
   if (OptLevel != CodeGenOptLevel::None)
       AU.addRequired<AAResultsWrapperPass>();
   AU.addRequired<GCModuleInfo>();
   AU.addRequired<StackProtector>();
   AU.addPreserved<GCModuleInfo>();
   AU.addRequired<TargetLibraryInfoWrapperPass>();
-#ifndef NDEBUG
   AU.addRequired<TargetTransformInfoWrapperPass>();
-#endif
   AU.addRequired<AssumptionCacheTracker>();
   if (UseMBPI && OptLevel != CodeGenOptLevel::None)
       AU.addRequired<BranchProbabilityInfoWrapperPass>();
@@ -441,128 +406,66 @@ static void computeUsesMSVCFloatingPoint(const Triple &TT, const Function &F,
   }
 }
 
-PreservedAnalyses
-SelectionDAGISelPass::run(MachineFunction &MF,
-                          MachineFunctionAnalysisManager &MFAM) {
+bool SelectionDAGISel::runOnMachineFunction(MachineFunction &mf) {
   // If we already selected that function, we do not need to run SDISel.
-  if (MF.getProperties().hasProperty(
+  if (mf.getProperties().hasProperty(
           MachineFunctionProperties::Property::Selected))
-    return PreservedAnalyses::all();
-
+    return false;
   // Do some sanity-checking on the command-line options.
-  if (EnableFastISelAbort && !Selector->TM.Options.EnableFastISel)
-    report_fatal_error("-fast-isel-abort > 0 requires -fast-isel");
+  assert((!EnableFastISelAbort || TM.Options.EnableFastISel) &&
+         "-fast-isel-abort > 0 requires -fast-isel");
+
+  const Function &Fn = mf.getFunction();
+  MF = &mf;
+
+#ifndef NDEBUG
+  StringRef FuncName = Fn.getName();
+  MatchFilterFuncName = isFunctionInPrintList(FuncName);
+#else
+  (void)MatchFilterFuncName;
+#endif
 
   // Decide what flavour of variable location debug-info will be used, before
   // we change the optimisation level.
-  MF.setUseDebugInstrRef(MF.shouldUseDebugInstrRef());
+  bool InstrRef = mf.shouldUseDebugInstrRef();
+  mf.setUseDebugInstrRef(InstrRef);
 
   // Reset the target options before resetting the optimization
   // level below.
   // FIXME: This is a horrible hack and should be processed via
   // codegen looking at the optimization level explicitly when
   // it wants to look at it.
-  Selector->TM.resetTargetOptions(MF.getFunction());
+  TM.resetTargetOptions(Fn);
   // Reset OptLevel to None for optnone functions.
-  // TODO: Add a function analysis to handle this.
-  Selector->MF = &MF;
-  // Reset OptLevel to None for optnone functions.
-  CodeGenOptLevel NewOptLevel = MF.getFunction().hasOptNone()
-                                    ? CodeGenOptLevel::None
-                                    : Selector->OptLevel;
-
-  OptLevelChanger OLC(*Selector, NewOptLevel);
-  Selector->initializeAnalysisResults(MFAM);
-  Selector->runOnMachineFunction(MF);
-
-  return getMachineFunctionPassPreservedAnalyses();
-}
-
-void SelectionDAGISel::initializeAnalysisResults(
-    MachineFunctionAnalysisManager &MFAM) {
-  auto &FAM = MFAM.getResult<FunctionAnalysisManagerMachineFunctionProxy>(*MF)
-                  .getManager();
-  auto &MAMP = MFAM.getResult<ModuleAnalysisManagerMachineFunctionProxy>(*MF);
-  Function &Fn = MF->getFunction();
-#ifndef NDEBUG
-  FuncName = Fn.getName();
-  MatchFilterFuncName = isFunctionInPrintList(FuncName);
-#else
-  (void)MatchFilterFuncName;
-#endif
+  CodeGenOptLevel NewOptLevel = OptLevel;
+  if (OptLevel != CodeGenOptLevel::None && skipFunction(Fn))
+    NewOptLevel = CodeGenOptLevel::None;
+  OptLevelChanger OLC(*this, NewOptLevel);
 
   TII = MF->getSubtarget().getInstrInfo();
   TLI = MF->getSubtarget().getTargetLowering();
   RegInfo = &MF->getRegInfo();
-  LibInfo = &FAM.getResult<TargetLibraryAnalysis>(Fn);
-  GFI = Fn.hasGC() ? &FAM.getResult<GCFunctionAnalysis>(Fn) : nullptr;
+  LibInfo = &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(Fn);
+  GFI = Fn.hasGC() ? &getAnalysis<GCModuleInfo>().getFunctionInfo(Fn) : nullptr;
   ORE = std::make_unique<OptimizationRemarkEmitter>(&Fn);
-  AC = &FAM.getResult<AssumptionAnalysis>(Fn);
-  auto *PSI = MAMP.getCachedResult<ProfileSummaryAnalysis>(*Fn.getParent());
+  AC = &getAnalysis<AssumptionCacheTracker>().getAssumptionCache(mf.getFunction());
+  auto *PSI = &getAnalysis<ProfileSummaryInfoWrapperPass>().getPSI();
   BlockFrequencyInfo *BFI = nullptr;
-  FAM.getResult<BlockFrequencyAnalysis>(Fn);
   if (PSI && PSI->hasProfileSummary() && OptLevel != CodeGenOptLevel::None)
-    BFI = &FAM.getResult<BlockFrequencyAnalysis>(Fn);
+    BFI = &getAnalysis<LazyBlockFrequencyInfoPass>().getBFI();
 
   FunctionVarLocs const *FnVarLocs = nullptr;
   if (isAssignmentTrackingEnabled(*Fn.getParent()))
-    FnVarLocs = &FAM.getResult<DebugAssignmentTrackingAnalysis>(Fn);
+    FnVarLocs = getAnalysis<AssignmentTrackingAnalysis>().getResults();
 
-  auto *UA = FAM.getCachedResult<UniformityInfoAnalysis>(Fn);
-  CurDAG->init(*MF, *ORE, MFAM, LibInfo, UA, PSI, BFI, FnVarLocs);
-
-  // Now get the optional analyzes if we want to.
-  // This is based on the possibly changed OptLevel (after optnone is taken
-  // into account).  That's unfortunate but OK because it just means we won't
-  // ask for passes that have been required anyway.
-
-  if (UseMBPI && OptLevel != CodeGenOptLevel::None)
-    FuncInfo->BPI = &FAM.getResult<BranchProbabilityAnalysis>(Fn);
-  else
-    FuncInfo->BPI = nullptr;
-
-  if (OptLevel != CodeGenOptLevel::None)
-    AA = &FAM.getResult<AAManager>(Fn);
-  else
-    AA = nullptr;
-
-  SP = &FAM.getResult<SSPLayoutAnalysis>(Fn);
-
-#if !defined(NDEBUG) && LLVM_ENABLE_ABI_BREAKING_CHECKS
-  TTI = &FAM.getResult<TargetIRAnalysis>(Fn);
-#endif
-}
-
-void SelectionDAGISel::initializeAnalysisResults(MachineFunctionPass &MFP) {
-  Function &Fn = MF->getFunction();
-#ifndef NDEBUG
-  FuncName = Fn.getName();
-  MatchFilterFuncName = isFunctionInPrintList(FuncName);
-#else
-  (void)MatchFilterFuncName;
-#endif
-
-  TII = MF->getSubtarget().getInstrInfo();
-  TLI = MF->getSubtarget().getTargetLowering();
-  RegInfo = &MF->getRegInfo();
-  LibInfo = &MFP.getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(Fn);
-  GFI = Fn.hasGC() ? &MFP.getAnalysis<GCModuleInfo>().getFunctionInfo(Fn)
-                   : nullptr;
-  ORE = std::make_unique<OptimizationRemarkEmitter>(&Fn);
-  AC = &MFP.getAnalysis<AssumptionCacheTracker>().getAssumptionCache(Fn);
-  auto *PSI = &MFP.getAnalysis<ProfileSummaryInfoWrapperPass>().getPSI();
-  BlockFrequencyInfo *BFI = nullptr;
-  if (PSI && PSI->hasProfileSummary() && OptLevel != CodeGenOptLevel::None)
-    BFI = &MFP.getAnalysis<LazyBlockFrequencyInfoPass>().getBFI();
-
-  FunctionVarLocs const *FnVarLocs = nullptr;
-  if (isAssignmentTrackingEnabled(*Fn.getParent()))
-    FnVarLocs = MFP.getAnalysis<AssignmentTrackingAnalysis>().getResults();
+  ISEL_DUMP(dbgs() << "\n\n\n=== " << FuncName << "\n");
 
   UniformityInfo *UA = nullptr;
-  if (auto *UAPass = MFP.getAnalysisIfAvailable<UniformityInfoWrapperPass>())
+  if (auto *UAPass = getAnalysisIfAvailable<UniformityInfoWrapperPass>())
     UA = &UAPass->getUniformityInfo();
-  CurDAG->init(*MF, *ORE, &MFP, LibInfo, UA, PSI, BFI, FnVarLocs);
+  CurDAG->init(*MF, *ORE, this, LibInfo, UA, PSI, BFI, FnVarLocs);
+  FuncInfo->set(Fn, *MF, CurDAG);
+  SwiftError->setFunction(*MF);
 
   // Now get the optional analyzes if we want to.
   // This is based on the possibly changed OptLevel (after optnone is taken
@@ -570,32 +473,14 @@ void SelectionDAGISel::initializeAnalysisResults(MachineFunctionPass &MFP) {
   // ask for passes that have been required anyway.
 
   if (UseMBPI && OptLevel != CodeGenOptLevel::None)
-    FuncInfo->BPI =
-        &MFP.getAnalysis<BranchProbabilityInfoWrapperPass>().getBPI();
+    FuncInfo->BPI = &getAnalysis<BranchProbabilityInfoWrapperPass>().getBPI();
   else
     FuncInfo->BPI = nullptr;
 
   if (OptLevel != CodeGenOptLevel::None)
-    AA = &MFP.getAnalysis<AAResultsWrapperPass>().getAAResults();
+    AA = &getAnalysis<AAResultsWrapperPass>().getAAResults();
   else
     AA = nullptr;
-
-  SP = &MFP.getAnalysis<StackProtector>().getLayoutInfo();
-
-#if !defined(NDEBUG) && LLVM_ENABLE_ABI_BREAKING_CHECKS
-  TTI = &MFP.getAnalysis<TargetTransformInfoWrapperPass>().getTTI(Fn);
-#endif
-}
-
-bool SelectionDAGISel::runOnMachineFunction(MachineFunction &mf) {
-  SwiftError->setFunction(mf);
-  const Function &Fn = mf.getFunction();
-
-  bool InstrRef = mf.shouldUseDebugInstrRef();
-
-  FuncInfo->set(MF->getFunction(), *MF, CurDAG);
-
-  ISEL_DUMP(dbgs() << "\n\n\n=== " << FuncName << '\n');
 
   SDB->init(GFI, AA, AC, LibInfo);
 
@@ -747,16 +632,16 @@ bool SelectionDAGISel::runOnMachineFunction(MachineFunction &mf) {
       // that COPY instructions also need DBG_VALUE, if it is the only
       // user of LDI->second.
       MachineInstr *CopyUseMI = nullptr;
-      for (MachineInstr &UseMI : RegInfo->use_instructions(LDI->second)) {
-        if (UseMI.isDebugValue())
-          continue;
-        if (UseMI.isCopy() && !CopyUseMI && UseMI.getParent() == EntryMBB) {
-          CopyUseMI = &UseMI;
-          continue;
+      for (MachineRegisterInfo::use_instr_iterator
+           UI = RegInfo->use_instr_begin(LDI->second),
+           E = RegInfo->use_instr_end(); UI != E; ) {
+        MachineInstr *UseMI = &*(UI++);
+        if (UseMI->isDebugValue()) continue;
+        if (UseMI->isCopy() && !CopyUseMI && UseMI->getParent() == EntryMBB) {
+          CopyUseMI = UseMI; continue;
         }
         // Otherwise this is another use or second copy use.
-        CopyUseMI = nullptr;
-        break;
+        CopyUseMI = nullptr; break;
       }
       if (CopyUseMI &&
           TRI.getRegSizeInBits(LDI->second, MRI) ==
@@ -794,6 +679,9 @@ bool SelectionDAGISel::runOnMachineFunction(MachineFunction &mf) {
       }
     }
   }
+
+  // Determine if there is a call to setjmp in the machine function.
+  MF->setExposesReturnsTwice(Fn.callsFunctionThatReturnsTwice());
 
   // Determine if floating point is used for msvc
   computeUsesMSVCFloatingPoint(TM.getTargetTriple(), Fn, MF->getMMI());
@@ -891,8 +779,11 @@ void SelectionDAGISel::CodeGenAndEmitDAG() {
   StringRef GroupName = "sdag";
   StringRef GroupDescription = "Instruction Selection and Scheduling";
   std::string BlockName;
-  bool MatchFilterBB = false;
-  (void)MatchFilterBB;
+  bool MatchFilterBB = false; (void)MatchFilterBB;
+#ifndef NDEBUG
+  TargetTransformInfo &TTI =
+      getAnalysis<TargetTransformInfoWrapperPass>().getTTI(*FuncInfo->Fn);
+#endif
 
   // Pre-type legalization allow creation of any node types.
   CurDAG->NewNodesMustHaveLegalTypes = false;
@@ -916,8 +807,8 @@ void SelectionDAGISel::CodeGenAndEmitDAG() {
                    << "'\n";
             CurDAG->dump());
 
-#if LLVM_ENABLE_ABI_BREAKING_CHECKS
-  if (TTI->hasBranchDivergence())
+#ifndef NDEBUG
+  if (TTI.hasBranchDivergence())
     CurDAG->VerifyDAGDivergence();
 #endif
 
@@ -936,8 +827,8 @@ void SelectionDAGISel::CodeGenAndEmitDAG() {
                    << "'\n";
             CurDAG->dump());
 
-#if LLVM_ENABLE_ABI_BREAKING_CHECKS
-  if (TTI->hasBranchDivergence())
+#ifndef NDEBUG
+  if (TTI.hasBranchDivergence())
     CurDAG->VerifyDAGDivergence();
 #endif
 
@@ -958,8 +849,8 @@ void SelectionDAGISel::CodeGenAndEmitDAG() {
                    << "'\n";
             CurDAG->dump());
 
-#if LLVM_ENABLE_ABI_BREAKING_CHECKS
-  if (TTI->hasBranchDivergence())
+#ifndef NDEBUG
+  if (TTI.hasBranchDivergence())
     CurDAG->VerifyDAGDivergence();
 #endif
 
@@ -982,8 +873,8 @@ void SelectionDAGISel::CodeGenAndEmitDAG() {
                      << "'\n";
               CurDAG->dump());
 
-#if LLVM_ENABLE_ABI_BREAKING_CHECKS
-    if (TTI->hasBranchDivergence())
+#ifndef NDEBUG
+    if (TTI.hasBranchDivergence())
       CurDAG->VerifyDAGDivergence();
 #endif
   }
@@ -1000,8 +891,8 @@ void SelectionDAGISel::CodeGenAndEmitDAG() {
                      << "'\n";
               CurDAG->dump());
 
-#if LLVM_ENABLE_ABI_BREAKING_CHECKS
-    if (TTI->hasBranchDivergence())
+#ifndef NDEBUG
+    if (TTI.hasBranchDivergence())
       CurDAG->VerifyDAGDivergence();
 #endif
 
@@ -1016,8 +907,8 @@ void SelectionDAGISel::CodeGenAndEmitDAG() {
                      << "'\n";
               CurDAG->dump());
 
-#if LLVM_ENABLE_ABI_BREAKING_CHECKS
-    if (TTI->hasBranchDivergence())
+#ifndef NDEBUG
+    if (TTI.hasBranchDivergence())
       CurDAG->VerifyDAGDivergence();
 #endif
 
@@ -1036,8 +927,8 @@ void SelectionDAGISel::CodeGenAndEmitDAG() {
                      << "'\n";
               CurDAG->dump());
 
-#if LLVM_ENABLE_ABI_BREAKING_CHECKS
-    if (TTI->hasBranchDivergence())
+#ifndef NDEBUG
+    if (TTI.hasBranchDivergence())
       CurDAG->VerifyDAGDivergence();
 #endif
   }
@@ -1056,8 +947,8 @@ void SelectionDAGISel::CodeGenAndEmitDAG() {
                    << "'\n";
             CurDAG->dump());
 
-#if LLVM_ENABLE_ABI_BREAKING_CHECKS
-  if (TTI->hasBranchDivergence())
+#ifndef NDEBUG
+  if (TTI.hasBranchDivergence())
     CurDAG->VerifyDAGDivergence();
 #endif
 
@@ -1076,8 +967,8 @@ void SelectionDAGISel::CodeGenAndEmitDAG() {
                    << "'\n";
             CurDAG->dump());
 
-#if LLVM_ENABLE_ABI_BREAKING_CHECKS
-  if (TTI->hasBranchDivergence())
+#ifndef NDEBUG
+  if (TTI.hasBranchDivergence())
     CurDAG->VerifyDAGDivergence();
 #endif
 
@@ -1168,8 +1059,6 @@ public:
     SDNode *CurNode = &*ISelPosition;
     if (MDNode *MD = DAG.getPCSections(CurNode))
       DAG.addPCSections(N, MD);
-    if (MDNode *MMRA = DAG.getMMRAMetadata(CurNode))
-      DAG.addMMRAMetadata(N, MMRA);
   }
 };
 
@@ -1447,16 +1336,13 @@ void SelectionDAGISel::reportIPToStateForBlocks(MachineFunction *MF) {
   llvm::WinEHFuncInfo *EHInfo = MF->getWinEHFuncInfo();
   if (!EHInfo)
     return;
-  for (MachineBasicBlock &MBB : *MF) {
-    const BasicBlock *BB = MBB.getBasicBlock();
+  for (auto MBBI = MF->begin(), E = MF->end(); MBBI != E; ++MBBI) {
+    MachineBasicBlock *MBB = &*MBBI;
+    const BasicBlock *BB = MBB->getBasicBlock();
     int State = EHInfo->BlockToStateMap[BB];
     if (BB->getFirstMayFaultInst()) {
       // Report IP range only for blocks with Faulty inst
-      auto MBBb = MBB.getFirstNonPHI();
-
-      if (MBBb == MBB.end())
-        continue;
-
+      auto MBBb = MBB->getFirstNonPHI();
       MachineInstr *MIb = &*MBBb;
       if (MIb->isTerminator())
         continue;
@@ -1465,16 +1351,16 @@ void SelectionDAGISel::reportIPToStateForBlocks(MachineFunction *MF) {
       MCSymbol *BeginLabel = MMI.getContext().createTempSymbol();
       MCSymbol *EndLabel = MMI.getContext().createTempSymbol();
       EHInfo->addIPToStateRange(State, BeginLabel, EndLabel);
-      BuildMI(MBB, MBBb, SDB->getCurDebugLoc(),
+      BuildMI(*MBB, MBBb, SDB->getCurDebugLoc(),
               TII->get(TargetOpcode::EH_LABEL))
           .addSym(BeginLabel);
-      auto MBBe = MBB.instr_end();
+      auto MBBe = MBB->instr_end();
       MachineInstr *MIe = &*(--MBBe);
       // insert before (possible multiple) terminators
       while (MIe->isTerminator())
         MIe = &*(--MBBe);
       ++MBBe;
-      BuildMI(MBB, MBBe, SDB->getCurDebugLoc(),
+      BuildMI(*MBB, MBBe, SDB->getCurDebugLoc(),
               TII->get(TargetOpcode::EH_LABEL))
           .addSym(EndLabel);
     }
@@ -1575,12 +1461,13 @@ static void processDbgDeclares(FunctionLoweringInfo &FuncInfo) {
     if (DI && processDbgDeclare(FuncInfo, DI->getAddress(), DI->getExpression(),
                                 DI->getVariable(), DI->getDebugLoc()))
       FuncInfo.PreprocessedDbgDeclares.insert(DI);
-    for (const DbgVariableRecord &DVR : filterDbgVars(I.getDbgRecordRange())) {
-      if (DVR.Type == DbgVariableRecord::LocationType::Declare &&
-          processDbgDeclare(FuncInfo, DVR.getVariableLocationOp(0),
-                            DVR.getExpression(), DVR.getVariable(),
-                            DVR.getDebugLoc()))
-        FuncInfo.PreprocessedDVRDeclares.insert(&DVR);
+
+    for (const DPValue &DPV : I.getDbgValueRange()) {
+      if (DPV.getType() == DPValue::LocationType::Declare &&
+          processDbgDeclare(FuncInfo, DPV.getVariableLocationOp(0),
+                            DPV.getExpression(), DPV.getVariable(),
+                            DPV.getDebugLoc()))
+        FuncInfo.PreprocessedDPVDeclares.insert(&DPV);
     }
   }
 }
@@ -1668,6 +1555,7 @@ void SelectionDAGISel::SelectAllBasicBlocks(const Function &Fn) {
   }
 
   // Iterate over all basic blocks in the function.
+  StackProtector &SP = getAnalysis<StackProtector>();
   for (const BasicBlock *LLVMBB : RPOT) {
     if (OptLevel != CodeGenOptLevel::None) {
       bool AllPredsVisited = true;
@@ -1782,7 +1670,7 @@ void SelectionDAGISel::SelectAllBasicBlocks(const Function &Fn) {
             raw_string_ostream InstStr(InstStrStorage);
             InstStr << *Inst;
 
-            R << ": " << InstStrStorage;
+            R << ": " << InstStr.str();
           }
 
           reportFastISelFailure(*MF, *ORE, R, EnableFastISelAbort > 2);
@@ -1831,7 +1719,7 @@ void SelectionDAGISel::SelectAllBasicBlocks(const Function &Fn) {
           std::string InstStrStorage;
           raw_string_ostream InstStr(InstStrStorage);
           InstStr << *Inst;
-          R << ": " << InstStrStorage;
+          R << ": " << InstStr.str();
         }
 
         reportFastISelFailure(*MF, *ORE, R, ShouldAbort);
@@ -1843,7 +1731,7 @@ void SelectionDAGISel::SelectAllBasicBlocks(const Function &Fn) {
       FastIS->recomputeInsertPt();
     }
 
-    if (SP->shouldEmitSDCheck(*LLVMBB)) {
+    if (SP.shouldEmitSDCheck(*LLVMBB)) {
       bool FunctionBasedInstrumentation =
           TLI->getSSPStackGuardCheck(*Fn.getParent());
       SDB->SPDescriptor.initialize(LLVMBB, FuncInfo->MBBMap[LLVMBB],
@@ -1880,7 +1768,7 @@ void SelectionDAGISel::SelectAllBasicBlocks(const Function &Fn) {
   if (Fn.getParent()->getModuleFlag("eh-asynch"))
     reportIPToStateForBlocks(MF);
 
-  SP->copyToMachineFrameInfo(MF->getFrameInfo());
+  SP.copyToMachineFrameInfo(MF->getFrameInfo());
 
   SwiftError->propagateVRegs();
 
@@ -2120,8 +2008,8 @@ SelectionDAGISel::FinishBasicBlock() {
     // from the original BB before switch expansion.  Note that PHI nodes can
     // occur multiple times in PHINodesToUpdate.  We have to be very careful to
     // handle them the right number of times.
-    for (MachineBasicBlock *Succ : Succs) {
-      FuncInfo->MBB = Succ;
+    for (unsigned i = 0, e = Succs.size(); i != e; ++i) {
+      FuncInfo->MBB = Succs[i];
       FuncInfo->InsertPt = FuncInfo->MBB->end();
       // FuncInfo->MBB may have been removed from the CFG if a branch was
       // constant folded.
@@ -2224,27 +2112,24 @@ bool SelectionDAGISel::CheckOrMask(SDValue LHS, ConstantSDNode *RHS,
 /// by tblgen.  Others should not call it.
 void SelectionDAGISel::SelectInlineAsmMemoryOperands(std::vector<SDValue> &Ops,
                                                      const SDLoc &DL) {
-  // Change the vector of SDValue into a list of SDNodeHandle for x86 might call
-  // replaceAllUses when matching address.
+  std::vector<SDValue> InOps;
+  std::swap(InOps, Ops);
 
-  std::list<HandleSDNode> Handles;
+  Ops.push_back(InOps[InlineAsm::Op_InputChain]); // 0
+  Ops.push_back(InOps[InlineAsm::Op_AsmString]);  // 1
+  Ops.push_back(InOps[InlineAsm::Op_MDNode]);     // 2, !srcloc
+  Ops.push_back(InOps[InlineAsm::Op_ExtraInfo]);  // 3 (SideEffect, AlignStack)
 
-  Handles.emplace_back(Ops[InlineAsm::Op_InputChain]); // 0
-  Handles.emplace_back(Ops[InlineAsm::Op_AsmString]);  // 1
-  Handles.emplace_back(Ops[InlineAsm::Op_MDNode]);     // 2, !srcloc
-  Handles.emplace_back(
-      Ops[InlineAsm::Op_ExtraInfo]); // 3 (SideEffect, AlignStack)
-
-  unsigned i = InlineAsm::Op_FirstOperand, e = Ops.size();
-  if (Ops[e - 1].getValueType() == MVT::Glue)
+  unsigned i = InlineAsm::Op_FirstOperand, e = InOps.size();
+  if (InOps[e-1].getValueType() == MVT::Glue)
     --e;  // Don't process a glue operand if it is here.
 
   while (i != e) {
-    InlineAsm::Flag Flags(Ops[i]->getAsZExtVal());
+    InlineAsm::Flag Flags(InOps[i]->getAsZExtVal());
     if (!Flags.isMemKind() && !Flags.isFuncKind()) {
       // Just skip over this operand, copying the operands verbatim.
-      Handles.insert(Handles.end(), Ops.begin() + i,
-                     Ops.begin() + i + Flags.getNumOperandRegisters() + 1);
+      Ops.insert(Ops.end(), InOps.begin() + i,
+                 InOps.begin() + i + Flags.getNumOperandRegisters() + 1);
       i += Flags.getNumOperandRegisters() + 1;
     } else {
       assert(Flags.getNumOperandRegisters() == 1 &&
@@ -2254,10 +2139,10 @@ void SelectionDAGISel::SelectInlineAsmMemoryOperands(std::vector<SDValue> &Ops,
       if (Flags.isUseOperandTiedToDef(TiedToOperand)) {
         // We need the constraint ID from the operand this is tied to.
         unsigned CurOp = InlineAsm::Op_FirstOperand;
-        Flags = InlineAsm::Flag(Ops[CurOp]->getAsZExtVal());
+        Flags = InlineAsm::Flag(InOps[CurOp]->getAsZExtVal());
         for (; TiedToOperand; --TiedToOperand) {
           CurOp += Flags.getNumOperandRegisters() + 1;
-          Flags = InlineAsm::Flag(Ops[CurOp]->getAsZExtVal());
+          Flags = InlineAsm::Flag(InOps[CurOp]->getAsZExtVal());
         }
       }
 
@@ -2265,7 +2150,7 @@ void SelectionDAGISel::SelectInlineAsmMemoryOperands(std::vector<SDValue> &Ops,
       std::vector<SDValue> SelOps;
       const InlineAsm::ConstraintCode ConstraintID =
           Flags.getMemoryConstraintID();
-      if (SelectInlineAsmMemoryOperand(Ops[i + 1], ConstraintID, SelOps))
+      if (SelectInlineAsmMemoryOperand(InOps[i+1], ConstraintID, SelOps))
         report_fatal_error("Could not match memory address.  Inline asm"
                            " failure!");
 
@@ -2274,19 +2159,15 @@ void SelectionDAGISel::SelectInlineAsmMemoryOperands(std::vector<SDValue> &Ops,
                                                 : InlineAsm::Kind::Func,
                               SelOps.size());
       Flags.setMemConstraint(ConstraintID);
-      Handles.emplace_back(CurDAG->getTargetConstant(Flags, DL, MVT::i32));
-      Handles.insert(Handles.end(), SelOps.begin(), SelOps.end());
+      Ops.push_back(CurDAG->getTargetConstant(Flags, DL, MVT::i32));
+      llvm::append_range(Ops, SelOps);
       i += 2;
     }
   }
 
   // Add the glue input back if present.
-  if (e != Ops.size())
-    Handles.emplace_back(Ops.back());
-
-  Ops.clear();
-  for (auto &handle : Handles)
-    Ops.push_back(handle.getValue());
+  if (e != InOps.size())
+    Ops.push_back(InOps.back());
 }
 
 /// findGlueUse - Return use of MVT::Glue value produced by the specified
@@ -2488,21 +2369,6 @@ void SelectionDAGISel::Select_ARITH_FENCE(SDNode *N) {
 void SelectionDAGISel::Select_MEMBARRIER(SDNode *N) {
   CurDAG->SelectNodeTo(N, TargetOpcode::MEMBARRIER, N->getValueType(0),
                        N->getOperand(0));
-}
-
-void SelectionDAGISel::Select_CONVERGENCECTRL_ANCHOR(SDNode *N) {
-  CurDAG->SelectNodeTo(N, TargetOpcode::CONVERGENCECTRL_ANCHOR,
-                       N->getValueType(0));
-}
-
-void SelectionDAGISel::Select_CONVERGENCECTRL_ENTRY(SDNode *N) {
-  CurDAG->SelectNodeTo(N, TargetOpcode::CONVERGENCECTRL_ENTRY,
-                       N->getValueType(0));
-}
-
-void SelectionDAGISel::Select_CONVERGENCECTRL_LOOP(SDNode *N) {
-  CurDAG->SelectNodeTo(N, TargetOpcode::CONVERGENCECTRL_LOOP,
-                       N->getValueType(0), N->getOperand(0));
 }
 
 void SelectionDAGISel::pushStackMapLiveVariable(SmallVectorImpl<SDValue> &Ops,
@@ -3251,15 +3117,6 @@ void SelectionDAGISel::SelectCodeCommon(SDNode *NodeToMatch,
     return;
   case ISD::JUMP_TABLE_DEBUG_INFO:
     Select_JUMP_TABLE_DEBUG_INFO(NodeToMatch);
-    return;
-  case ISD::CONVERGENCECTRL_ANCHOR:
-    Select_CONVERGENCECTRL_ANCHOR(NodeToMatch);
-    return;
-  case ISD::CONVERGENCECTRL_ENTRY:
-    Select_CONVERGENCECTRL_ENTRY(NodeToMatch);
-    return;
-  case ISD::CONVERGENCECTRL_LOOP:
-    Select_CONVERGENCECTRL_LOOP(NodeToMatch);
     return;
   }
 
@@ -4381,5 +4238,5 @@ void SelectionDAGISel::CannotYetSelect(SDNode *N) {
     else
       Msg << "unknown intrinsic #" << iid;
   }
-  report_fatal_error(Twine(msg));
+  report_fatal_error(Twine(Msg.str()));
 }

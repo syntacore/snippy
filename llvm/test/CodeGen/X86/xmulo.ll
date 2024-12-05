@@ -76,7 +76,7 @@ define zeroext i1 @smuloi8(i8 %v1, i8 %v2, ptr %res) {
 ; FAST-NEXT:    seto %cl
 ; FAST-NEXT:    movb %al, (%rdx)
 ; FAST-NEXT:    andb $1, %cl
-; FAST-NEXT:    movl %ecx, %eax
+; FAST-NEXT:    movzbl %cl, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: smuloi8:
@@ -118,6 +118,7 @@ define zeroext i1 @smuloi16(i16 %v1, i16 %v2, ptr %res) {
 ; FAST-NEXT:    seto %al
 ; FAST-NEXT:    movw %di, (%rdx)
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: smuloi16:
@@ -156,6 +157,7 @@ define zeroext i1 @smuloi32(i32 %v1, i32 %v2, ptr %res) {
 ; FAST-NEXT:    seto %al
 ; FAST-NEXT:    movl %edi, (%rdx)
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: smuloi32:
@@ -194,6 +196,7 @@ define zeroext i1 @smuloi64(i64 %v1, i64 %v2, ptr %res) {
 ; FAST-NEXT:    seto %al
 ; FAST-NEXT:    movq %rdi, (%rdx)
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: smuloi64:
@@ -303,7 +306,7 @@ define zeroext i1 @umuloi8(i8 %v1, i8 %v2, ptr %res) {
 ; FAST-NEXT:    seto %cl
 ; FAST-NEXT:    movb %al, (%rdx)
 ; FAST-NEXT:    andb $1, %cl
-; FAST-NEXT:    movl %ecx, %eax
+; FAST-NEXT:    movzbl %cl, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: umuloi8:
@@ -352,7 +355,7 @@ define zeroext i1 @umuloi16(i16 %v1, i16 %v2, ptr %res) {
 ; FAST-NEXT:    seto %dl
 ; FAST-NEXT:    movw %ax, (%rcx)
 ; FAST-NEXT:    andb $1, %dl
-; FAST-NEXT:    movl %edx, %eax
+; FAST-NEXT:    movzbl %dl, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: umuloi16:
@@ -401,7 +404,7 @@ define zeroext i1 @umuloi32(i32 %v1, i32 %v2, ptr %res) {
 ; FAST-NEXT:    seto %dl
 ; FAST-NEXT:    movl %eax, (%rcx)
 ; FAST-NEXT:    andb $1, %dl
-; FAST-NEXT:    movl %edx, %eax
+; FAST-NEXT:    movzbl %dl, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: umuloi32:
@@ -450,7 +453,7 @@ define zeroext i1 @umuloi64(i64 %v1, i64 %v2, ptr %res) {
 ; FAST-NEXT:    seto %dl
 ; FAST-NEXT:    movq %rax, (%rcx)
 ; FAST-NEXT:    andb $1, %dl
-; FAST-NEXT:    movl %edx, %eax
+; FAST-NEXT:    movzbl %dl, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: umuloi64:
@@ -776,11 +779,12 @@ define zeroext i1 @smulobri8(i8 %v1, i8 %v2) {
 ; FAST-NEXT:  # %bb.2: # %continue
 ; FAST-NEXT:    movb $1, %al
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ; FAST-NEXT:  .LBB15_1: # %overflow
 ; FAST-NEXT:    xorl %eax, %eax
 ; FAST-NEXT:    andb $1, %al
-; FAST-NEXT:    # kill: def $al killed $al killed $eax
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: smulobri8:
@@ -839,11 +843,12 @@ define zeroext i1 @smulobri16(i16 %v1, i16 %v2) {
 ; FAST-NEXT:  # %bb.2: # %continue
 ; FAST-NEXT:    movb $1, %al
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ; FAST-NEXT:  .LBB16_1: # %overflow
 ; FAST-NEXT:    xorl %eax, %eax
 ; FAST-NEXT:    andb $1, %al
-; FAST-NEXT:    # kill: def $al killed $al killed $eax
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: smulobri16:
@@ -899,11 +904,12 @@ define zeroext i1 @smulobri32(i32 %v1, i32 %v2) {
 ; FAST-NEXT:  # %bb.2: # %continue
 ; FAST-NEXT:    movb $1, %al
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ; FAST-NEXT:  .LBB17_1: # %overflow
 ; FAST-NEXT:    xorl %eax, %eax
 ; FAST-NEXT:    andb $1, %al
-; FAST-NEXT:    # kill: def $al killed $al killed $eax
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: smulobri32:
@@ -959,11 +965,12 @@ define zeroext i1 @smulobri64(i64 %v1, i64 %v2) {
 ; FAST-NEXT:  # %bb.2: # %continue
 ; FAST-NEXT:    movb $1, %al
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ; FAST-NEXT:  .LBB18_1: # %overflow
 ; FAST-NEXT:    xorl %eax, %eax
 ; FAST-NEXT:    andb $1, %al
-; FAST-NEXT:    # kill: def $al killed $al killed $eax
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: smulobri64:
@@ -1087,11 +1094,12 @@ define zeroext i1 @umulobri8(i8 %v1, i8 %v2) {
 ; FAST-NEXT:  # %bb.2: # %continue
 ; FAST-NEXT:    movb $1, %al
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ; FAST-NEXT:  .LBB19_1: # %overflow
 ; FAST-NEXT:    xorl %eax, %eax
 ; FAST-NEXT:    andb $1, %al
-; FAST-NEXT:    # kill: def $al killed $al killed $eax
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: umulobri8:
@@ -1154,11 +1162,12 @@ define zeroext i1 @umulobri16(i16 %v1, i16 %v2) {
 ; FAST-NEXT:  # %bb.2: # %continue
 ; FAST-NEXT:    movb $1, %al
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ; FAST-NEXT:  .LBB20_1: # %overflow
 ; FAST-NEXT:    xorl %eax, %eax
 ; FAST-NEXT:    andb $1, %al
-; FAST-NEXT:    # kill: def $al killed $al killed $eax
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: umulobri16:
@@ -1217,11 +1226,12 @@ define zeroext i1 @umulobri32(i32 %v1, i32 %v2) {
 ; FAST-NEXT:  # %bb.2: # %continue
 ; FAST-NEXT:    movb $1, %al
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ; FAST-NEXT:  .LBB21_1: # %overflow
 ; FAST-NEXT:    xorl %eax, %eax
 ; FAST-NEXT:    andb $1, %al
-; FAST-NEXT:    # kill: def $al killed $al killed $eax
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: umulobri32:
@@ -1280,11 +1290,12 @@ define zeroext i1 @umulobri64(i64 %v1, i64 %v2) {
 ; FAST-NEXT:  # %bb.2: # %continue
 ; FAST-NEXT:    movb $1, %al
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ; FAST-NEXT:  .LBB22_1: # %overflow
 ; FAST-NEXT:    xorl %eax, %eax
 ; FAST-NEXT:    andb $1, %al
-; FAST-NEXT:    # kill: def $al killed $al killed $eax
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: umulobri64:
@@ -1411,7 +1422,7 @@ define zeroext i1 @smuloi8_load(ptr %ptr1, i8 %v2, ptr %res) {
 ; FAST-NEXT:    seto %cl
 ; FAST-NEXT:    movb %al, (%rdx)
 ; FAST-NEXT:    andb $1, %cl
-; FAST-NEXT:    movl %ecx, %eax
+; FAST-NEXT:    movzbl %cl, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: smuloi8_load:
@@ -1460,7 +1471,7 @@ define zeroext i1 @smuloi8_load2(i8 %v1, ptr %ptr2, ptr %res) {
 ; FAST-NEXT:    seto %cl
 ; FAST-NEXT:    movb %al, (%rdx)
 ; FAST-NEXT:    andb $1, %cl
-; FAST-NEXT:    movl %ecx, %eax
+; FAST-NEXT:    movzbl %cl, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: smuloi8_load2:
@@ -1504,6 +1515,7 @@ define zeroext i1 @smuloi16_load(ptr %ptr1, i16 %v2, ptr %res) {
 ; FAST-NEXT:    seto %al
 ; FAST-NEXT:    movw %si, (%rdx)
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: smuloi16_load:
@@ -1544,6 +1556,7 @@ define zeroext i1 @smuloi16_load2(i16 %v1, ptr %ptr2, ptr %res) {
 ; FAST-NEXT:    seto %al
 ; FAST-NEXT:    movw %di, (%rdx)
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: smuloi16_load2:
@@ -1584,6 +1597,7 @@ define zeroext i1 @smuloi32_load(ptr %ptr1, i32 %v2, ptr %res) {
 ; FAST-NEXT:    seto %al
 ; FAST-NEXT:    movl %esi, (%rdx)
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: smuloi32_load:
@@ -1624,6 +1638,7 @@ define zeroext i1 @smuloi32_load2(i32 %v1, ptr %ptr2, ptr %res) {
 ; FAST-NEXT:    seto %al
 ; FAST-NEXT:    movl %edi, (%rdx)
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: smuloi32_load2:
@@ -1664,6 +1679,7 @@ define zeroext i1 @smuloi64_load(ptr %ptr1, i64 %v2, ptr %res) {
 ; FAST-NEXT:    seto %al
 ; FAST-NEXT:    movq %rsi, (%rdx)
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: smuloi64_load:
@@ -1773,6 +1789,7 @@ define zeroext i1 @smuloi64_load2(i64 %v1, ptr %ptr2, ptr %res) {
 ; FAST-NEXT:    seto %al
 ; FAST-NEXT:    movq %rdi, (%rdx)
 ; FAST-NEXT:    andb $1, %al
+; FAST-NEXT:    movzbl %al, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: smuloi64_load2:
@@ -1881,7 +1898,7 @@ define zeroext i1 @umuloi8_load(ptr %ptr1, i8 %v2, ptr %res) {
 ; FAST-NEXT:    seto %cl
 ; FAST-NEXT:    movb %al, (%rdx)
 ; FAST-NEXT:    andb $1, %cl
-; FAST-NEXT:    movl %ecx, %eax
+; FAST-NEXT:    movzbl %cl, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: umuloi8_load:
@@ -1930,7 +1947,7 @@ define zeroext i1 @umuloi8_load2(i8 %v1, ptr %ptr2, ptr %res) {
 ; FAST-NEXT:    seto %cl
 ; FAST-NEXT:    movb %al, (%rdx)
 ; FAST-NEXT:    andb $1, %cl
-; FAST-NEXT:    movl %ecx, %eax
+; FAST-NEXT:    movzbl %cl, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: umuloi8_load2:
@@ -1980,7 +1997,7 @@ define zeroext i1 @umuloi16_load(ptr %ptr1, i16 %v2, ptr %res) {
 ; FAST-NEXT:    seto %dl
 ; FAST-NEXT:    movw %ax, (%rcx)
 ; FAST-NEXT:    andb $1, %dl
-; FAST-NEXT:    movl %edx, %eax
+; FAST-NEXT:    movzbl %dl, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: umuloi16_load:
@@ -2033,7 +2050,7 @@ define zeroext i1 @umuloi16_load2(i16 %v1, ptr %ptr2, ptr %res) {
 ; FAST-NEXT:    seto %dl
 ; FAST-NEXT:    movw %ax, (%rcx)
 ; FAST-NEXT:    andb $1, %dl
-; FAST-NEXT:    movl %edx, %eax
+; FAST-NEXT:    movzbl %dl, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: umuloi16_load2:
@@ -2084,7 +2101,7 @@ define zeroext i1 @umuloi32_load(ptr %ptr1, i32 %v2, ptr %res) {
 ; FAST-NEXT:    seto %dl
 ; FAST-NEXT:    movl %eax, (%rcx)
 ; FAST-NEXT:    andb $1, %dl
-; FAST-NEXT:    movl %edx, %eax
+; FAST-NEXT:    movzbl %dl, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: umuloi32_load:
@@ -2135,7 +2152,7 @@ define zeroext i1 @umuloi32_load2(i32 %v1, ptr %ptr2, ptr %res) {
 ; FAST-NEXT:    seto %dl
 ; FAST-NEXT:    movl %eax, (%rcx)
 ; FAST-NEXT:    andb $1, %dl
-; FAST-NEXT:    movl %edx, %eax
+; FAST-NEXT:    movzbl %dl, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: umuloi32_load2:
@@ -2186,7 +2203,7 @@ define zeroext i1 @umuloi64_load(ptr %ptr1, i64 %v2, ptr %res) {
 ; FAST-NEXT:    seto %dl
 ; FAST-NEXT:    movq %rax, (%rcx)
 ; FAST-NEXT:    andb $1, %dl
-; FAST-NEXT:    movl %edx, %eax
+; FAST-NEXT:    movzbl %dl, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: umuloi64_load:
@@ -2263,7 +2280,7 @@ define zeroext i1 @umuloi64_load2(i64 %v1, ptr %ptr2, ptr %res) {
 ; FAST-NEXT:    seto %dl
 ; FAST-NEXT:    movq %rax, (%rcx)
 ; FAST-NEXT:    andb $1, %dl
-; FAST-NEXT:    movl %edx, %eax
+; FAST-NEXT:    movzbl %dl, %eax
 ; FAST-NEXT:    retq
 ;
 ; WIN64-LABEL: umuloi64_load2:

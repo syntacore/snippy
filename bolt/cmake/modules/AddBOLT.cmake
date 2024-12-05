@@ -3,6 +3,7 @@ include(LLVMDistributionSupport)
 
 macro(add_bolt_executable name)
   add_llvm_executable(${name} ${ARGN})
+  set_target_properties(${name} PROPERTIES FOLDER "BOLT")
 endmacro()
 
 macro(add_bolt_tool name)

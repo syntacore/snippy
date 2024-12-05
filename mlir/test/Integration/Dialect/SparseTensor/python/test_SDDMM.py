@@ -139,15 +139,12 @@ def main():
         # search the full state space to reduce runtime of the test. It is
         # straightforward to adapt the code below to explore more combinations.
         # For these simple orderings, dim2lvl and lvl2dim are the same.
-        builder = st.EncodingAttr.build_level_type
-        fmt = st.LevelFormat
-        prop = st.LevelProperty
         levels = [
-            [builder(fmt.compressed, [prop.non_unique]), builder(fmt.singleton)],
-            [builder(fmt.dense), builder(fmt.dense)],
-            [builder(fmt.dense), builder(fmt.compressed)],
-            [builder(fmt.compressed), builder(fmt.dense)],
-            [builder(fmt.compressed), builder(fmt.compressed)],
+            [st.LevelType.compressed_nu, st.LevelType.singleton],
+            [st.LevelType.dense, st.LevelType.dense],
+            [st.LevelType.dense, st.LevelType.compressed],
+            [st.LevelType.compressed, st.LevelType.dense],
+            [st.LevelType.compressed, st.LevelType.compressed],
         ]
         orderings = [
             ir.AffineMap.get_permutation([0, 1]),

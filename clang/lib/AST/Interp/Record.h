@@ -28,7 +28,7 @@ public:
   struct Field {
     const FieldDecl *Decl;
     unsigned Offset;
-    const Descriptor *Desc;
+    Descriptor *Desc;
     bool isBitField() const { return Decl->isBitField(); }
   };
 
@@ -36,8 +36,8 @@ public:
   struct Base {
     const RecordDecl *Decl;
     unsigned Offset;
-    const Descriptor *Desc;
-    const Record *R;
+    Descriptor *Desc;
+    Record *R;
   };
 
   /// Mapping from identifiers to field descriptors.
@@ -51,9 +51,9 @@ public:
   /// Returns the underlying declaration.
   const RecordDecl *getDecl() const { return Decl; }
   /// Returns the name of the underlying declaration.
-  const std::string getName() const;
+  const std::string getName() const { return Decl->getNameAsString(); }
   /// Checks if the record is a union.
-  bool isUnion() const { return IsUnion; }
+  bool isUnion() const { return getDecl()->isUnion(); }
   /// Returns the size of the record.
   unsigned getSize() const { return BaseSize; }
   /// Returns the full size of the record, including records.
@@ -80,6 +80,7 @@ public:
 
   unsigned getNumFields() const { return Fields.size(); }
   const Field *getField(unsigned I) const { return &Fields[I]; }
+  Field *getField(unsigned I) { return &Fields[I]; }
 
   using const_base_iter = BaseList::const_iterator;
   llvm::iterator_range<const_base_iter> bases() const {
@@ -100,10 +101,6 @@ public:
   unsigned getNumVirtualBases() const { return VirtualBases.size(); }
   const Base *getVirtualBase(unsigned I) const { return &VirtualBases[I]; }
 
-  void dump(llvm::raw_ostream &OS, unsigned Indentation = 0,
-            unsigned Offset = 0) const;
-  void dump() const { dump(llvm::errs()); }
-
 private:
   /// Constructor used by Program to create record descriptors.
   Record(const RecordDecl *, BaseList &&Bases, FieldList &&Fields,
@@ -123,17 +120,15 @@ private:
   VirtualBaseList VirtualBases;
 
   /// Mapping from declarations to bases.
-  llvm::DenseMap<const RecordDecl *, const Base *> BaseMap;
+  llvm::DenseMap<const RecordDecl *, Base *> BaseMap;
   /// Mapping from field identifiers to descriptors.
-  llvm::DenseMap<const FieldDecl *, const Field *> FieldMap;
+  llvm::DenseMap<const FieldDecl *, Field *> FieldMap;
   /// Mapping from declarations to virtual bases.
   llvm::DenseMap<const RecordDecl *, Base *> VirtualBaseMap;
   /// Size of the structure.
   unsigned BaseSize;
   /// Size of all virtual bases.
   unsigned VirtualSize;
-  /// If this record is a union.
-  bool IsUnion;
 };
 
 } // namespace interp

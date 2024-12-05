@@ -39,7 +39,7 @@ static Value buildBoolValue(OpBuilder &builder, Location loc, bool value) {
   return builder.create<arith::ConstantOp>(loc, builder.getBoolAttr(value));
 }
 
-static bool isMemref(Value v) { return isa<BaseMemRefType>(v.getType()); }
+static bool isMemref(Value v) { return v.getType().isa<BaseMemRefType>(); }
 
 //===----------------------------------------------------------------------===//
 // Ownership
@@ -222,8 +222,8 @@ bool ValueComparator::operator()(const Value &lhs, const Value &rhs) const {
     return false;
 
   // Block arguments are less than results.
-  bool lhsIsBBArg = isa<BlockArgument>(lhs);
-  if (lhsIsBBArg != isa<BlockArgument>(rhs)) {
+  bool lhsIsBBArg = lhs.isa<BlockArgument>();
+  if (lhsIsBBArg != rhs.isa<BlockArgument>()) {
     return lhsIsBBArg;
   }
 

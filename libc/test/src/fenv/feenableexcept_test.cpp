@@ -11,16 +11,11 @@
 #include "src/fenv/feenableexcept.h"
 #include "src/fenv/fegetexcept.h"
 
-#include "test/UnitTest/FEnvSafeTest.h"
 #include "test/UnitTest/Test.h"
 
-#include "hdr/fenv_macros.h"
+#include <fenv.h>
 
-#include "excepts.h"
-
-using LlvmLibcFEnvTest = LIBC_NAMESPACE::testing::FEnvSafeTest;
-
-TEST_F(LlvmLibcFEnvTest, EnableTest) {
+TEST(LlvmLibcFEnvTest, EnableTest) {
 #if defined(LIBC_TARGET_ARCH_IS_ANY_ARM) ||                                    \
     defined(LIBC_TARGET_ARCH_IS_ANY_RISCV)
   // Few Arm HW implementations do not trap exceptions. We skip this test

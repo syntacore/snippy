@@ -44,6 +44,7 @@ class TestDAP_runInTerminal(lldbdap_testcase.DAPTestCaseBase):
             return False
 
     @skipIfWindows
+    @skipIfRemote
     @skipIf(archs=no_match(["x86_64"]))
     def test_runInTerminal(self):
         if not self.isTestSupported():
@@ -77,7 +78,7 @@ class TestDAP_runInTerminal(lldbdap_testcase.DAPTestCaseBase):
 
         # We verify we actually stopped inside the loop
         counter = int(self.dap_server.get_local_variable_value("counter"))
-        self.assertGreater(counter, 0)
+        self.assertTrue(counter > 0)
 
         # We verify we were able to set the launch arguments
         argc = int(self.dap_server.get_local_variable_value("argc"))
@@ -91,6 +92,7 @@ class TestDAP_runInTerminal(lldbdap_testcase.DAPTestCaseBase):
         self.assertIn("bar", env)
 
     @skipIfWindows
+    @skipIfRemote
     @skipIf(archs=no_match(["x86_64"]))
     def test_runInTerminalInvalidTarget(self):
         if not self.isTestSupported():
@@ -105,11 +107,12 @@ class TestDAP_runInTerminal(lldbdap_testcase.DAPTestCaseBase):
         )
         self.assertFalse(response["success"])
         self.assertIn(
-            "Could not create a target for a program 'INVALIDPROGRAM': 'INVALIDPROGRAM' does not exist",
+            "Could not create a target for a program 'INVALIDPROGRAM': unable to find executable",
             response["message"],
         )
 
     @skipIfWindows
+    @skipIfRemote
     @skipIf(archs=no_match(["x86_64"]))
     def test_missingArgInRunInTerminalLauncher(self):
         if not self.isTestSupported():
@@ -119,12 +122,13 @@ class TestDAP_runInTerminal(lldbdap_testcase.DAPTestCaseBase):
             capture_output=True,
             universal_newlines=True,
         )
-        self.assertNotEqual(proc.returncode, 0)
+        self.assertTrue(proc.returncode != 0)
         self.assertIn(
             '"--launch-target" requires "--comm-file" to be specified', proc.stderr
         )
 
     @skipIfWindows
+    @skipIfRemote
     @skipIf(archs=no_match(["x86_64"]))
     def test_FakeAttachedRunInTerminalLauncherWithInvalidProgram(self):
         if not self.isTestSupported():
@@ -152,6 +156,7 @@ class TestDAP_runInTerminal(lldbdap_testcase.DAPTestCaseBase):
         self.assertIn("No such file or directory", stderr)
 
     @skipIfWindows
+    @skipIfRemote
     @skipIf(archs=no_match(["x86_64"]))
     def test_FakeAttachedRunInTerminalLauncherWithValidProgram(self):
         if not self.isTestSupported():
@@ -179,6 +184,7 @@ class TestDAP_runInTerminal(lldbdap_testcase.DAPTestCaseBase):
         self.assertIn("foo", stdout)
 
     @skipIfWindows
+    @skipIfRemote
     @skipIf(archs=no_match(["x86_64"]))
     def test_FakeAttachedRunInTerminalLauncherAndCheckEnvironment(self):
         if not self.isTestSupported():
@@ -200,6 +206,7 @@ class TestDAP_runInTerminal(lldbdap_testcase.DAPTestCaseBase):
         self.assertIn("FOO=BAR", stdout)
 
     @skipIfWindows
+    @skipIfRemote
     @skipIf(archs=no_match(["x86_64"]))
     def test_NonAttachedRunInTerminalLauncher(self):
         if not self.isTestSupported():

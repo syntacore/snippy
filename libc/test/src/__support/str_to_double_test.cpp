@@ -1,7 +1,6 @@
-#include "src/__support/macros/config.h"
 #include "str_to_fp_test.h"
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 using LlvmLibcStrToDblTest = LlvmLibcStrToFloatTest<double>;
 
 TEST_F(LlvmLibcStrToDblTest, ClingerFastPathFloat64Simple) {
@@ -91,7 +90,7 @@ TEST(LlvmLibcStrToDblTest, SimpleDecimalConversionExtraTypes) {
   uint64_t double_output_mantissa = 0;
   uint32_t output_exp2 = 0;
 
-  LIBC_NAMESPACE::libc_errno = 0;
+  libc_errno = 0;
   auto double_result =
       internal::simple_decimal_conversion<double>("123456789012345678900");
 
@@ -103,4 +102,4 @@ TEST(LlvmLibcStrToDblTest, SimpleDecimalConversionExtraTypes) {
   EXPECT_EQ(double_result.error, 0);
 }
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE

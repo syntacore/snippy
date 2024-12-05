@@ -26,11 +26,11 @@ class LibStdcppTupleSyntheticFrontEnd : public SyntheticChildrenFrontEnd {
 public:
   explicit LibStdcppTupleSyntheticFrontEnd(lldb::ValueObjectSP valobj_sp);
 
-  llvm::Expected<uint32_t> CalculateNumChildren() override;
+  size_t CalculateNumChildren() override;
 
-  lldb::ValueObjectSP GetChildAtIndex(uint32_t idx) override;
+  lldb::ValueObjectSP GetChildAtIndex(size_t idx) override;
 
-  lldb::ChildCacheState Update() override;
+  bool Update() override;
 
   bool MightHaveChildren() override;
 
@@ -53,19 +53,19 @@ LibStdcppTupleSyntheticFrontEnd::LibStdcppTupleSyntheticFrontEnd(
   Update();
 }
 
-lldb::ChildCacheState LibStdcppTupleSyntheticFrontEnd::Update() {
+bool LibStdcppTupleSyntheticFrontEnd::Update() {
   m_members.clear();
 
   ValueObjectSP valobj_backend_sp = m_backend.GetSP();
   if (!valobj_backend_sp)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
   ValueObjectSP next_child_sp = valobj_backend_sp->GetNonSyntheticValue();
   while (next_child_sp != nullptr) {
     ValueObjectSP current_child = next_child_sp;
     next_child_sp = nullptr;
 
-    size_t child_count = current_child->GetNumChildrenIgnoringErrors();
+    size_t child_count = current_child->GetNumChildren();
     for (size_t i = 0; i < child_count; ++i) {
       ValueObjectSP child_sp = current_child->GetChildAtIndex(i);
       llvm::StringRef name_str = child_sp->GetName().GetStringRef();
@@ -83,20 +83,19 @@ lldb::ChildCacheState LibStdcppTupleSyntheticFrontEnd::Update() {
     }
   }
 
-  return lldb::ChildCacheState::eRefetch;
+  return false;
 }
 
 bool LibStdcppTupleSyntheticFrontEnd::MightHaveChildren() { return true; }
 
 lldb::ValueObjectSP
-LibStdcppTupleSyntheticFrontEnd::GetChildAtIndex(uint32_t idx) {
+LibStdcppTupleSyntheticFrontEnd::GetChildAtIndex(size_t idx) {
   if (idx < m_members.size() && m_members[idx])
     return m_members[idx]->GetSP();
   return lldb::ValueObjectSP();
 }
 
-llvm::Expected<uint32_t>
-LibStdcppTupleSyntheticFrontEnd::CalculateNumChildren() {
+size_t LibStdcppTupleSyntheticFrontEnd::CalculateNumChildren() {
   return m_members.size();
 }
 

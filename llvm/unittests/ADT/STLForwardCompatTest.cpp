@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/STLForwardCompat.h"
-#include "CountCopyAndMove.h"
+#include "MoveOnly.h"
 #include "gtest/gtest.h"
 
 namespace {
@@ -58,29 +58,27 @@ TEST(TransformTest, TransformStd) {
 }
 
 TEST(TransformTest, MoveTransformStd) {
-  using llvm::CountCopyAndMove;
+  using llvm::MoveOnly;
 
-  std::optional<CountCopyAndMove> A;
+  std::optional<MoveOnly> A;
 
-  CountCopyAndMove::ResetCounts();
+  MoveOnly::ResetCounts();
   std::optional<int> B = llvm::transformOptional(
-      std::move(A), [&](const CountCopyAndMove &M) { return M.val + 2; });
+      std::move(A), [&](const MoveOnly &M) { return M.val + 2; });
   EXPECT_FALSE(B.has_value());
-  EXPECT_EQ(0, CountCopyAndMove::TotalCopies());
-  EXPECT_EQ(0, CountCopyAndMove::MoveConstructions);
-  EXPECT_EQ(0, CountCopyAndMove::MoveAssignments);
-  EXPECT_EQ(0, CountCopyAndMove::Destructions);
+  EXPECT_EQ(0u, MoveOnly::MoveConstructions);
+  EXPECT_EQ(0u, MoveOnly::MoveAssignments);
+  EXPECT_EQ(0u, MoveOnly::Destructions);
 
-  A = CountCopyAndMove(5);
-  CountCopyAndMove::ResetCounts();
+  A = MoveOnly(5);
+  MoveOnly::ResetCounts();
   std::optional<int> C = llvm::transformOptional(
-      std::move(A), [&](const CountCopyAndMove &M) { return M.val + 2; });
+      std::move(A), [&](const MoveOnly &M) { return M.val + 2; });
   EXPECT_TRUE(C.has_value());
   EXPECT_EQ(7, *C);
-  EXPECT_EQ(0, CountCopyAndMove::TotalCopies());
-  EXPECT_EQ(0, CountCopyAndMove::MoveConstructions);
-  EXPECT_EQ(0, CountCopyAndMove::MoveAssignments);
-  EXPECT_EQ(0, CountCopyAndMove::Destructions);
+  EXPECT_EQ(0u, MoveOnly::MoveConstructions);
+  EXPECT_EQ(0u, MoveOnly::MoveAssignments);
+  EXPECT_EQ(0u, MoveOnly::Destructions);
 }
 
 TEST(TransformTest, TransformLlvm) {
@@ -98,29 +96,27 @@ TEST(TransformTest, TransformLlvm) {
 }
 
 TEST(TransformTest, MoveTransformLlvm) {
-  using llvm::CountCopyAndMove;
+  using llvm::MoveOnly;
 
-  std::optional<CountCopyAndMove> A;
+  std::optional<MoveOnly> A;
 
-  CountCopyAndMove::ResetCounts();
+  MoveOnly::ResetCounts();
   std::optional<int> B = llvm::transformOptional(
-      std::move(A), [&](const CountCopyAndMove &M) { return M.val + 2; });
+      std::move(A), [&](const MoveOnly &M) { return M.val + 2; });
   EXPECT_FALSE(B.has_value());
-  EXPECT_EQ(0, CountCopyAndMove::TotalCopies());
-  EXPECT_EQ(0, CountCopyAndMove::MoveConstructions);
-  EXPECT_EQ(0, CountCopyAndMove::MoveAssignments);
-  EXPECT_EQ(0, CountCopyAndMove::Destructions);
+  EXPECT_EQ(0u, MoveOnly::MoveConstructions);
+  EXPECT_EQ(0u, MoveOnly::MoveAssignments);
+  EXPECT_EQ(0u, MoveOnly::Destructions);
 
-  A = CountCopyAndMove(5);
-  CountCopyAndMove::ResetCounts();
+  A = MoveOnly(5);
+  MoveOnly::ResetCounts();
   std::optional<int> C = llvm::transformOptional(
-      std::move(A), [&](const CountCopyAndMove &M) { return M.val + 2; });
+      std::move(A), [&](const MoveOnly &M) { return M.val + 2; });
   EXPECT_TRUE(C.has_value());
   EXPECT_EQ(7, *C);
-  EXPECT_EQ(0, CountCopyAndMove::TotalCopies());
-  EXPECT_EQ(0, CountCopyAndMove::MoveConstructions);
-  EXPECT_EQ(0, CountCopyAndMove::MoveAssignments);
-  EXPECT_EQ(0, CountCopyAndMove::Destructions);
+  EXPECT_EQ(0u, MoveOnly::MoveConstructions);
+  EXPECT_EQ(0u, MoveOnly::MoveAssignments);
+  EXPECT_EQ(0u, MoveOnly::Destructions);
 }
 
 TEST(TransformTest, ToUnderlying) {

@@ -270,10 +270,8 @@ void CompileUnit::analyzeImportedModule(const DWARFDebugInfoEntry *DieEntry) {
     return;
   // Don't track interfaces that are part of the toolchain.
   // For example: Swift, _Concurrency, ...
-  StringRef DeveloperDir = guessDeveloperDir(SysRoot);
-  if (!DeveloperDir.empty() && Path.starts_with(DeveloperDir))
-    return;
-  if (isInToolchainDir(Path))
+  SmallString<128> Toolchain = guessToolchainBaseDir(SysRoot);
+  if (!Toolchain.empty() && Path.starts_with(Toolchain))
     return;
   if (std::optional<DWARFFormValue> Val = find(DieEntry, dwarf::DW_AT_name)) {
     Expected<const char *> Name = Val->getAsCString();
@@ -381,36 +379,38 @@ void CompileUnit::updateDieRefPatchesWithClonedOffsets() {
 std::optional<UnitEntryPairTy> CompileUnit::resolveDIEReference(
     const DWARFFormValue &RefValue,
     ResolveInterCUReferencesMode CanResolveInterCUReferences) {
-  CompileUnit *RefCU;
-  uint64_t RefDIEOffset;
-  if (std::optional<uint64_t> Offset = RefValue.getAsRelativeReference()) {
-    RefCU = this;
-    RefDIEOffset = RefValue.getUnit()->getOffset() + *Offset;
-  } else if (Offset = RefValue.getAsDebugInfoReference(); Offset) {
-    RefCU = getUnitFromOffset(*Offset);
-    RefDIEOffset = *Offset;
-  } else {
-    return std::nullopt;
+  if (std::optional<DWARFFormValue::UnitOffset> Ref =
+          *RefValue.getAsRelativeReference()) {
+    if (Ref->Unit == OrigUnit) {
+      // Referenced DIE is in current compile unit.
+      if (std::optional<uint32_t> RefDieIdx =
+              getDIEIndexForOffset(OrigUnit->getOffset() + Ref->Offset))
+        return UnitEntryPairTy{this, OrigUnit->getDebugInfoEntry(*RefDieIdx)};
+    }
+    uint64_t RefDIEOffset =
+        Ref->Unit ? Ref->Unit->getOffset() + Ref->Offset : Ref->Offset;
+    if (CompileUnit *RefCU = getUnitFromOffset(RefDIEOffset)) {
+      if (RefCU == this) {
+        // Referenced DIE is in current compile unit.
+        if (std::optional<uint32_t> RefDieIdx =
+                getDIEIndexForOffset(RefDIEOffset))
+          return UnitEntryPairTy{this, getDebugInfoEntry(*RefDieIdx)};
+      } else if (CanResolveInterCUReferences) {
+        // Referenced DIE is in other compile unit.
+
+        // Check whether DIEs are loaded for that compile unit.
+        enum Stage ReferredCUStage = RefCU->getStage();
+        if (ReferredCUStage < Stage::Loaded || ReferredCUStage > Stage::Cloned)
+          return UnitEntryPairTy{RefCU, nullptr};
+
+        if (std::optional<uint32_t> RefDieIdx =
+                RefCU->getDIEIndexForOffset(RefDIEOffset))
+          return UnitEntryPairTy{RefCU, RefCU->getDebugInfoEntry(*RefDieIdx)};
+      } else
+        return UnitEntryPairTy{RefCU, nullptr};
+    }
   }
 
-  if (RefCU == this) {
-    // Referenced DIE is in current compile unit.
-    if (std::optional<uint32_t> RefDieIdx = getDIEIndexForOffset(RefDIEOffset))
-      return UnitEntryPairTy{this, getDebugInfoEntry(*RefDieIdx)};
-  } else if (RefCU && CanResolveInterCUReferences) {
-    // Referenced DIE is in other compile unit.
-
-    // Check whether DIEs are loaded for that compile unit.
-    enum Stage ReferredCUStage = RefCU->getStage();
-    if (ReferredCUStage < Stage::Loaded || ReferredCUStage > Stage::Cloned)
-      return UnitEntryPairTy{RefCU, nullptr};
-
-    if (std::optional<uint32_t> RefDieIdx =
-            RefCU->getDIEIndexForOffset(RefDIEOffset))
-      return UnitEntryPairTy{RefCU, RefCU->getDebugInfoEntry(*RefDieIdx)};
-  } else {
-    return UnitEntryPairTy{RefCU, nullptr};
-  }
   return std::nullopt;
 }
 
@@ -1831,7 +1831,7 @@ TypeUnit *CompileUnit::OutputUnitVariantPtr::getAsTypeUnit() {
 
 bool CompileUnit::resolveDependenciesAndMarkLiveness(
     bool InterCUProcessingStarted, std::atomic<bool> &HasNewInterconnectedCUs) {
-  if (!Dependencies)
+  if (!Dependencies.get())
     Dependencies.reset(new DependencyTracker(*this));
 
   return Dependencies->resolveDependenciesAndMarkLiveness(
@@ -1841,13 +1841,13 @@ bool CompileUnit::resolveDependenciesAndMarkLiveness(
 bool CompileUnit::updateDependenciesCompleteness() {
   assert(Dependencies.get());
 
-  return Dependencies->updateDependenciesCompleteness();
+  return Dependencies.get()->updateDependenciesCompleteness();
 }
 
 void CompileUnit::verifyDependencies() {
   assert(Dependencies.get());
 
-  Dependencies->verifyKeepChain();
+  Dependencies.get()->verifyKeepChain();
 }
 
 ArrayRef<dwarf::Attribute> dwarf_linker::parallel::getODRAttributes() {

@@ -58,10 +58,6 @@ struct PassManagerOptions {
       llvm::cl::desc("When printing IR for print-ir-[before|after]{-all} "
                      "always print the top-level operation"),
       llvm::cl::init(false)};
-  llvm::cl::opt<std::string> printTreeDir{
-      "mlir-print-ir-tree-dir",
-      llvm::cl::desc("When printing the IR before/after a pass, print file "
-                     "tree rooted at this directory")};
 
   /// Add an IR printing instrumentation if enabled by any 'print-ir' flags.
   void addPrinterInstrumentation(PassManager &pm);
@@ -124,13 +120,6 @@ void PassManagerOptions::addPrinterInstrumentation(PassManager &pm) {
     return;
 
   // Otherwise, add the IR printing instrumentation.
-  if (!printTreeDir.empty()) {
-    pm.enableIRPrintingToFileTree(shouldPrintBeforePass, shouldPrintAfterPass,
-                                  printModuleScope, printAfterChange,
-                                  printAfterFailure, printTreeDir);
-    return;
-  }
-
   pm.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass,
                       printModuleScope, printAfterChange, printAfterFailure,
                       llvm::errs());

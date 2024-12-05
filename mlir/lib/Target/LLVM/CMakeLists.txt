@@ -32,8 +32,6 @@ endif()
 add_mlir_dialect_library(MLIRNVVMTarget
   NVVM/Target.cpp
 
-  OBJECT
-
   ADDITIONAL_HEADER_DIRS
   ${MLIR_MAIN_INCLUDE_DIR}/mlir/Dialect/LLVMIR
 
@@ -49,7 +47,7 @@ add_mlir_dialect_library(MLIRNVVMTarget
   MLIRNVVMToLLVMIRTranslation
   )
 
-if ("NVPTX" IN_LIST LLVM_TARGETS_TO_BUILD)
+if(MLIR_ENABLE_CUDA_CONVERSIONS)
   # Find the CUDA toolkit.
   find_package(CUDAToolkit)
 
@@ -95,6 +93,7 @@ if ("NVPTX" IN_LIST LLVM_TARGETS_TO_BUILD)
   # Define the `CUDAToolkit` path.
   target_compile_definitions(obj.MLIRNVVMTarget
     PRIVATE
+    MLIR_NVPTXCOMPILER_ENABLED=${MLIR_ENABLE_NVPTXCOMPILER}
     __DEFAULT_CUDATOOLKIT_PATH__="${MLIR_CUDAToolkit_ROOT}"
   )
 endif()
@@ -111,8 +110,6 @@ endif()
 add_mlir_dialect_library(MLIRROCDLTarget
   ROCDL/Target.cpp
 
-  OBJECT
-
   LINK_COMPONENTS
   MCParser
   ${AMDGPU_LIBS}
@@ -127,18 +124,17 @@ add_mlir_dialect_library(MLIRROCDLTarget
   )
 
 if(MLIR_ENABLE_ROCM_CONVERSIONS)
+  if (NOT ("AMDGPU" IN_LIST LLVM_TARGETS_TO_BUILD))
+    message(SEND_ERROR
+      "Building mlir with ROCm support requires the AMDGPU backend")
+  endif()
+
   if (DEFINED ROCM_PATH)
     set(DEFAULT_ROCM_PATH "${ROCM_PATH}" CACHE PATH "Fallback path to search for ROCm installs")
   elseif(DEFINED ENV{ROCM_PATH})
     set(DEFAULT_ROCM_PATH "$ENV{ROCM_PATH}" CACHE PATH "Fallback path to search for ROCm installs")
   else()
-    if (WIN32)
-      # Avoid setting an UNIX path for Windows.
-      # TODO: Eventually migrate to FindHIP once it becomes a part of CMake.
-      set(DEFAULT_ROCM_PATH "" CACHE PATH "Fallback path to search for ROCm installs")
-    else()
-      set(DEFAULT_ROCM_PATH "/opt/rocm" CACHE PATH "Fallback path to search for ROCm installs")
-    endif()
+    set(DEFAULT_ROCM_PATH "/opt/rocm" CACHE PATH "Fallback path to search for ROCm installs")
   endif()
   message(VERBOSE "MLIR Default ROCM toolkit path: ${DEFAULT_ROCM_PATH}")
 

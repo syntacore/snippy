@@ -159,8 +159,6 @@ void UnreachableCodeChecker::checkEndAnalysis(ExplodedGraph &G,
       SL = DL.asLocation();
       if (SR.isInvalid() || !SL.isValid())
         continue;
-      if (isa<CXXTryStmt>(S))
-        continue;
     }
     else
       continue;

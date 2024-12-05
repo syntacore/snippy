@@ -11,14 +11,9 @@ endif()
 
 if(LLDB_ENFORCE_STRICT_TEST_REQUIREMENTS)
   message(STATUS "Enforcing strict test requirements for LLDB")
-  # Lit uses psutil to do per-test timeouts.
-  set(useful_python_modules psutil)
-
-  if(NOT WIN32)
-    # We no longer vendor pexpect and it is not used on Windows.
-    list(APPEND pexpect)
-  endif()
-
+  set(useful_python_modules
+    psutil # Lit uses psutil to do per-test timeouts.
+  )
   foreach(module ${useful_python_modules})
     lldb_find_python_module(${module})
     if (NOT PY_${module}_FOUND)
@@ -91,11 +86,10 @@ string(REPLACE ${CMAKE_CFG_INTDIR} ${LLVM_BUILD_MODE} LLDB_TOOLS_DIR ${LLVM_RUNT
 
 # Create a custom target to track test dependencies.
 add_custom_target(lldb-test-depends)
-set_target_properties(lldb-test-depends PROPERTIES FOLDER "LLDB/Tests")
+set_target_properties(lldb-test-depends PROPERTIES FOLDER "lldb misc")
 
 # Create an alias for the legacy name of lldb-test-depends
 add_custom_target(lldb-test-deps)
-set_target_properties(lldb-test-deps PROPERTIES FOLDER "LLDB/Tests")
 add_dependencies(lldb-test-deps lldb-test-depends)
 
 function(add_lldb_test_dependency)
@@ -266,6 +260,7 @@ add_lit_testsuite(check-lldb "Running lldb lit test suite"
     lldb-api-test-deps
     lldb-shell-test-deps
     lldb-unit-test-deps)
+set_target_properties(check-lldb PROPERTIES FOLDER "lldb tests")
 
 if(LLDB_BUILT_STANDALONE)
   # This has to happen *AFTER* add_lit_testsuite.

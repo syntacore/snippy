@@ -39,9 +39,60 @@ class AArch64Subtarget final : public AArch64GenSubtargetInfo {
 public:
   enum ARMProcFamilyEnum : uint8_t {
     Others,
-#define ARM_PROCESSOR_FAMILY(ENUM) ENUM,
-#include "llvm/TargetParser/AArch64TargetParserDef.inc"
-#undef ARM_PROCESSOR_FAMILY
+    A64FX,
+    Ampere1,
+    Ampere1A,
+    Ampere1B,
+    AppleA7,
+    AppleA10,
+    AppleA11,
+    AppleA12,
+    AppleA13,
+    AppleA14,
+    AppleA15,
+    AppleA16,
+    AppleA17,
+    Carmel,
+    CortexA35,
+    CortexA53,
+    CortexA55,
+    CortexA510,
+    CortexA520,
+    CortexA57,
+    CortexA65,
+    CortexA72,
+    CortexA73,
+    CortexA75,
+    CortexA76,
+    CortexA77,
+    CortexA78,
+    CortexA78C,
+    CortexA710,
+    CortexA715,
+    CortexA720,
+    CortexR82,
+    CortexX1,
+    CortexX1C,
+    CortexX2,
+    CortexX3,
+    CortexX4,
+    ExynosM3,
+    Falkor,
+    Kryo,
+    NeoverseE1,
+    NeoverseN1,
+    NeoverseN2,
+    Neoverse512TVB,
+    NeoverseV1,
+    NeoverseV2,
+    Saphira,
+    ThunderX2T99,
+    ThunderX,
+    ThunderXT81,
+    ThunderXT83,
+    ThunderXT88,
+    ThunderX3T110,
+    TSV110
   };
 
 protected:
@@ -79,8 +130,8 @@ protected:
 
   bool IsLittle;
 
-  bool IsStreaming;
-  bool IsStreamingCompatible;
+  bool StreamingSVEMode;
+  bool StreamingCompatibleSVEMode;
   unsigned MinSVEVectorSizeInBits;
   unsigned MaxSVEVectorSizeInBits;
   unsigned VScaleForTuning = 2;
@@ -120,7 +171,8 @@ public:
                    StringRef FS, const TargetMachine &TM, bool LittleEndian,
                    unsigned MinSVEVectorSizeInBitsOverride = 0,
                    unsigned MaxSVEVectorSizeInBitsOverride = 0,
-                   bool IsStreaming = false, bool IsStreamingCompatible = false,
+                   bool StreamingSVEMode = false,
+                   bool StreamingCompatibleSVEMode = false,
                    bool HasMinSize = false);
 
 // Getters for SubtargetFeatures defined in tablegen
@@ -150,9 +202,6 @@ public:
   bool enableMachineScheduler() const override { return true; }
   bool enablePostRAScheduler() const override { return usePostRAScheduler(); }
 
-  bool enableMachinePipeliner() const override;
-  bool useDFAforSMS() const override { return false; }
-
   /// Returns ARM processor family.
   /// Avoid this function! CPU specifics should be kept local to this class
   /// and preferably modeled with SubtargetFeatures or properties in
@@ -164,32 +213,20 @@ public:
   bool isXRaySupported() const override { return true; }
 
   /// Returns true if the function has a streaming body.
-  bool isStreaming() const { return IsStreaming; }
+  bool isStreaming() const { return StreamingSVEMode; }
 
   /// Returns true if the function has a streaming-compatible body.
-  bool isStreamingCompatible() const { return IsStreamingCompatible; }
+  bool isStreamingCompatible() const;
 
   /// Returns true if the target has NEON and the function at runtime is known
   /// to have NEON enabled (e.g. the function is known not to be in streaming-SVE
   /// mode, which disables NEON instructions).
-  bool isNeonAvailable() const {
-    return hasNEON() &&
-           (hasSMEFA64() || (!isStreaming() && !isStreamingCompatible()));
-  }
+  bool isNeonAvailable() const;
 
   /// Returns true if the target has SVE and can use the full range of SVE
   /// instructions, for example because it knows the function is known not to be
   /// in streaming-SVE mode or when the target has FEAT_FA64 enabled.
-  bool isSVEAvailable() const {
-    return hasSVE() &&
-           (hasSMEFA64() || (!isStreaming() && !isStreamingCompatible()));
-  }
-
-  /// Returns true if the target has access to either the full range of SVE instructions,
-  /// or the streaming-compatible subset of SVE instructions.
-  bool isSVEorStreamingSVEAvailable() const {
-    return hasSVE() || (hasSME() && isStreaming());
-  }
+  bool isSVEAvailable() const;
 
   unsigned getMinVectorRegisterBitWidth() const {
     // Don't assume any minimum vector size when PSTATE.SM may not be 0, because
@@ -209,7 +246,6 @@ public:
     AllReservedX |= ReserveXRegisterForRA;
     return AllReservedX.count();
   }
-  bool isLRReservedForRA() const { return ReserveLRForRA; }
   bool isXRegCustomCalleeSaved(size_t i) const {
     return CustomCallSavedXRegs[i];
   }
@@ -314,23 +350,17 @@ public:
 
   void overrideSchedPolicy(MachineSchedPolicy &Policy,
                            unsigned NumRegionInstrs) const override;
-  void adjustSchedDependency(SUnit *Def, int DefOpIdx, SUnit *Use, int UseOpIdx,
-                             SDep &Dep,
-                             const TargetSchedModel *SchedModel) const override;
 
   bool enableEarlyIfConversion() const override;
 
   std::unique_ptr<PBQPRAConstraint> getCustomPBQPConstraints() const override;
 
-  bool isCallingConvWin64(CallingConv::ID CC, bool IsVarArg) const {
+  bool isCallingConvWin64(CallingConv::ID CC) const {
     switch (CC) {
     case CallingConv::C:
     case CallingConv::Fast:
     case CallingConv::Swift:
-    case CallingConv::SwiftTail:
       return isTargetWindows();
-    case CallingConv::PreserveNone:
-      return IsVarArg && isTargetWindows();
     case CallingConv::Win64:
       return true;
     default:
@@ -364,27 +394,30 @@ public:
 
   void mirFileLoaded(MachineFunction &MF) const override;
 
+  bool hasSVEorSME() const { return hasSVE() || hasSME(); }
+  bool hasSVE2orSME() const { return hasSVE2() || hasSME(); }
+
   // Return the known range for the bit length of SVE data registers. A value
   // of 0 means nothing is known about that particular limit beyong what's
   // implied by the architecture.
   unsigned getMaxSVEVectorSizeInBits() const {
-    assert(isSVEorStreamingSVEAvailable() &&
+    assert(hasSVEorSME() &&
            "Tried to get SVE vector length without SVE support!");
     return MaxSVEVectorSizeInBits;
   }
 
   unsigned getMinSVEVectorSizeInBits() const {
-    assert(isSVEorStreamingSVEAvailable() &&
+    assert(hasSVEorSME() &&
            "Tried to get SVE vector length without SVE support!");
     return MinSVEVectorSizeInBits;
   }
 
   bool useSVEForFixedLengthVectors() const {
-    if (!isSVEorStreamingSVEAvailable())
-      return false;
+    if (!isNeonAvailable())
+      return hasSVEorSME();
 
     // Prefer NEON unless larger SVE registers are available.
-    return !isNeonAvailable() || getMinSVEVectorSizeInBits() >= 256;
+    return hasSVEorSME() && getMinSVEVectorSizeInBits() >= 256;
   }
 
   bool useSVEForFixedLengthVectors(EVT VT) const {
@@ -413,18 +446,7 @@ public:
   }
 
   /// Choose a method of checking LR before performing a tail call.
-  AArch64PAuth::AuthCheckMethod
-  getAuthenticatedLRCheckMethod(const MachineFunction &MF) const;
-
-  /// Compute the integer discriminator for a given BlockAddress constant, if
-  /// blockaddress signing is enabled, or std::nullopt otherwise.
-  /// Blockaddress signing is controlled by the function attribute
-  /// "ptrauth-indirect-gotos" on the parent function.
-  /// Note that this assumes the discriminator is independent of the indirect
-  /// goto branch site itself, i.e., it's the same for all BlockAddresses in
-  /// a function.
-  std::optional<uint16_t>
-  getPtrAuthBlockAddressDiscriminatorIfEnabled(const Function &ParentFn) const;
+  AArch64PAuth::AuthCheckMethod getAuthenticatedLRCheckMethod() const;
 
   const PseudoSourceValue *getAddressCheckPSV() const {
     return AddressCheckPSV.get();

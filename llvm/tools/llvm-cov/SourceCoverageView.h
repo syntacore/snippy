@@ -69,11 +69,13 @@ struct InstantiationView {
 
 /// A view that represents one or more branch regions on a given source line.
 struct BranchView {
-  SmallVector<CountedRegion, 0> Regions;
+  std::vector<CountedRegion> Regions;
+  std::unique_ptr<SourceCoverageView> View;
   unsigned Line;
 
-  BranchView(unsigned Line, SmallVector<CountedRegion, 0> Regions)
-      : Regions(std::move(Regions)), Line(Line) {}
+  BranchView(unsigned Line, ArrayRef<CountedRegion> Regions,
+             std::unique_ptr<SourceCoverageView> View)
+      : Regions(Regions), View(std::move(View)), Line(Line) {}
 
   unsigned getLine() const { return Line; }
 
@@ -84,11 +86,13 @@ struct BranchView {
 
 /// A view that represents one or more MCDC regions on a given source line.
 struct MCDCView {
-  SmallVector<MCDCRecord, 0> Records;
+  std::vector<MCDCRecord> Records;
+  std::unique_ptr<SourceCoverageView> View;
   unsigned Line;
 
-  MCDCView(unsigned Line, SmallVector<MCDCRecord, 0> Records)
-      : Records(std::move(Records)), Line(Line) {}
+  MCDCView(unsigned Line, ArrayRef<MCDCRecord> Records,
+           std::unique_ptr<SourceCoverageView> View)
+      : Records(Records), View(std::move(View)), Line(Line) {}
 
   unsigned getLine() const { return Line; }
 
@@ -171,10 +175,10 @@ class SourceCoverageView {
   std::vector<ExpansionView> ExpansionSubViews;
 
   /// A container for all branches in the source on display.
-  SmallVector<BranchView, 0> BranchSubViews;
+  std::vector<BranchView> BranchSubViews;
 
   /// A container for all MCDC records in the source on display.
-  SmallVector<MCDCView, 0> MCDCSubViews;
+  std::vector<MCDCView> MCDCSubViews;
 
   /// A container for all instantiations (e.g template functions) in the source
   /// on display.
@@ -258,7 +262,8 @@ protected:
   virtual void renderTitle(raw_ostream &OS, StringRef CellText) = 0;
 
   /// Render the table header for a given source file.
-  virtual void renderTableHeader(raw_ostream &OS, unsigned IndentLevel) = 0;
+  virtual void renderTableHeader(raw_ostream &OS, unsigned FirstUncoveredLineNo,
+                                 unsigned IndentLevel) = 0;
 
   /// @}
 
@@ -299,10 +304,12 @@ public:
                         std::unique_ptr<SourceCoverageView> View);
 
   /// Add a branch subview to this view.
-  void addBranch(unsigned Line, SmallVector<CountedRegion, 0> Regions);
+  void addBranch(unsigned Line, ArrayRef<CountedRegion> Regions,
+                 std::unique_ptr<SourceCoverageView> View);
 
   /// Add an MCDC subview to this view.
-  void addMCDCRecord(unsigned Line, SmallVector<MCDCRecord, 0> Records);
+  void addMCDCRecord(unsigned Line, ArrayRef<MCDCRecord> Records,
+                     std::unique_ptr<SourceCoverageView> View);
 
   /// Print the code coverage information for a specific portion of a
   /// source file to the output stream.

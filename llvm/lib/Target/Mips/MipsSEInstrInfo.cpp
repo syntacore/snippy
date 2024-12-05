@@ -42,7 +42,7 @@ const MipsRegisterInfo &MipsSEInstrInfo::getRegisterInfo() const {
 /// the destination along with the FrameIndex of the loaded stack slot.  If
 /// not, return 0.  This predicate must return 0 if the instruction has
 /// any side effects other than loading from the stack slot.
-Register MipsSEInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
+unsigned MipsSEInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
                                               int &FrameIndex) const {
   unsigned Opc = MI.getOpcode();
 
@@ -64,7 +64,7 @@ Register MipsSEInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
 /// the source reg along with the FrameIndex of the loaded stack slot.  If
 /// not, return 0.  This predicate must return 0 if the instruction has
 /// any side effects other than storing to the stack slot.
-Register MipsSEInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
+unsigned MipsSEInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
                                              int &FrameIndex) const {
   unsigned Opc = MI.getOpcode();
 

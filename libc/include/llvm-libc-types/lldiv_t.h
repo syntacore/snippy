@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_LLDIV_T_H
-#define LLVM_LIBC_TYPES_LLDIV_T_H
+#ifndef __LLVM_LIBC_TYPES_LLDIV_T_H__
+#define __LLVM_LIBC_TYPES_LLDIV_T_H__
 
 typedef struct {
   long long quot;
   long long rem;
 } lldiv_t;
 
-#endif // LLVM_LIBC_TYPES_LLDIV_T_H
+#endif // __LLVM_LIBC_TYPES_LLDIV_T_H__

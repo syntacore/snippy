@@ -6,22 +6,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "src/threads/cnd_wait.h"
+#include "CndVar.h"
+
 #include "src/__support/common.h"
-#include "src/__support/macros/config.h"
-#include "src/__support/threads/CndVar.h"
 #include "src/__support/threads/mutex.h"
+#include "src/threads/cnd_wait.h"
 
-#include <threads.h> // cnd_t, mtx_t, thrd_error, thrd_success
-
-namespace LIBC_NAMESPACE_DECL {
-
-static_assert(sizeof(CndVar) == sizeof(cnd_t));
+namespace LIBC_NAMESPACE {
 
 LLVM_LIBC_FUNCTION(int, cnd_wait, (cnd_t * cond, mtx_t *mtx)) {
   CndVar *cndvar = reinterpret_cast<CndVar *>(cond);
   Mutex *mutex = reinterpret_cast<Mutex *>(mtx);
-  return cndvar->wait(mutex) ? thrd_error : thrd_success;
+  return cndvar->wait(mutex);
 }
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE

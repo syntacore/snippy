@@ -658,6 +658,12 @@ public:
       return false;
 
     switch (L->getOpcode()) {
+    case Instruction::ICmp:
+    case Instruction::FCmp:
+      if (L->getPredicate() != R->getPredicate())
+        return false;
+      break;
+
     case Instruction::GetElementPtr:
       // FIXME: inbounds?
       break;

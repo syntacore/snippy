@@ -29,8 +29,7 @@ public:
                           StringRef FileName, bool IsAngled,
                           CharSourceRange FileNameRange,
                           OptionalFileEntryRef File, StringRef SearchPath,
-                          StringRef RelativePath, const Module *SuggestedModule,
-                          bool ModuleImported,
+                          StringRef RelativePath, const Module *Imported,
                           SrcMgr::CharacteristicKind FileType) override;
 
   void EndOfMainFile() override;
@@ -62,7 +61,7 @@ void KernelNameRestrictionCheck::registerPPCallbacks(const SourceManager &SM,
 void KernelNameRestrictionPPCallbacks::InclusionDirective(
     SourceLocation HashLoc, const Token &, StringRef FileName, bool,
     CharSourceRange, OptionalFileEntryRef, StringRef, StringRef, const Module *,
-    bool, SrcMgr::CharacteristicKind) {
+    SrcMgr::CharacteristicKind) {
   IncludeDirective ID = {HashLoc, FileName};
   IncludeDirectives.push_back(std::move(ID));
 }

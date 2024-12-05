@@ -41,10 +41,8 @@ static cl::opt<bool> EnableSubRegLiveness("enable-subreg-liveness", cl::Hidden,
 void MachineRegisterInfo::Delegate::anchor() {}
 
 MachineRegisterInfo::MachineRegisterInfo(MachineFunction *MF)
-    : MF(MF),
-      TracksSubRegLiveness(EnableSubRegLiveness.getNumOccurrences()
-                               ? EnableSubRegLiveness
-                               : MF->getSubtarget().enableSubRegLiveness()) {
+    : MF(MF), TracksSubRegLiveness(MF->getSubtarget().enableSubRegLiveness() &&
+                                   EnableSubRegLiveness) {
   unsigned NumRegs = getTargetRegisterInfo()->getNumRegs();
   VRegInfo.reserve(256);
   RegAllocHints.reserve(256);
@@ -165,15 +163,6 @@ MachineRegisterInfo::createVirtualRegister(const TargetRegisterClass *RegClass,
   // New virtual register number.
   Register Reg = createIncompleteVirtualRegister(Name);
   VRegInfo[Reg].first = RegClass;
-  noteNewVirtualRegister(Reg);
-  return Reg;
-}
-
-Register MachineRegisterInfo::createVirtualRegister(VRegAttrs RegAttr,
-                                                    StringRef Name) {
-  Register Reg = createIncompleteVirtualRegister(Name);
-  VRegInfo[Reg].first = RegAttr.RCOrRB;
-  setType(Reg, RegAttr.Ty);
   noteNewVirtualRegister(Reg);
   return Reg;
 }
@@ -519,8 +508,8 @@ LLVM_DUMP_METHOD void MachineRegisterInfo::dumpUses(Register Reg) const {
 }
 #endif
 
-void MachineRegisterInfo::freezeReservedRegs() {
-  ReservedRegs = getTargetRegisterInfo()->getReservedRegs(*MF);
+void MachineRegisterInfo::freezeReservedRegs(const MachineFunction &MF) {
+  ReservedRegs = getTargetRegisterInfo()->getReservedRegs(MF);
   assert(ReservedRegs.size() == getTargetRegisterInfo()->getNumRegs() &&
          "Invalid ReservedRegs vector from target");
 }
@@ -660,4 +649,19 @@ bool MachineRegisterInfo::isReservedRegUnit(unsigned Unit) const {
       return true;
   }
   return false;
+}
+
+bool MachineRegisterInfo::isArgumentRegister(const MachineFunction &MF,
+                                             MCRegister Reg) const {
+  return getTargetRegisterInfo()->isArgumentRegister(MF, Reg);
+}
+
+bool MachineRegisterInfo::isFixedRegister(const MachineFunction &MF,
+                                          MCRegister Reg) const {
+  return getTargetRegisterInfo()->isFixedRegister(MF, Reg);
+}
+
+bool MachineRegisterInfo::isGeneralPurposeRegister(const MachineFunction &MF,
+                                                   MCRegister Reg) const {
+  return getTargetRegisterInfo()->isGeneralPurposeRegister(MF, Reg);
 }

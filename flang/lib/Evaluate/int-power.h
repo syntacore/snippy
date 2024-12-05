@@ -33,10 +33,6 @@ ValueWithRealFlags<REAL> TimesIntPowerOf(const REAL &factor, const REAL &base,
     REAL squares{base};
     int nbits{INT::bits - absPower.LEADZ()};
     for (int j{0}; j < nbits; ++j) {
-      if (j > 0) { // avoid spurious overflow on last iteration
-        squares =
-            squares.Multiply(squares, rounding).AccumulateFlags(result.flags);
-      }
       if (absPower.BTEST(j)) {
         if (negativePower) {
           result.value = result.value.Divide(squares, rounding)
@@ -46,6 +42,8 @@ ValueWithRealFlags<REAL> TimesIntPowerOf(const REAL &factor, const REAL &base,
                              .AccumulateFlags(result.flags);
         }
       }
+      squares =
+          squares.Multiply(squares, rounding).AccumulateFlags(result.flags);
     }
   }
   return result;

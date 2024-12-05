@@ -200,6 +200,28 @@ FunctionPass *llvm::createInterleavedAccessPass() {
   return new InterleavedAccess();
 }
 
+/// Check if the mask is a DE-interleave mask of the given factor
+/// \p Factor like:
+///     <Index, Index+Factor, ..., Index+(NumElts-1)*Factor>
+static bool isDeInterleaveMaskOfFactor(ArrayRef<int> Mask, unsigned Factor,
+                                       unsigned &Index) {
+  // Check all potential start indices from 0 to (Factor - 1).
+  for (Index = 0; Index < Factor; Index++) {
+    unsigned i = 0;
+
+    // Check that elements are in ascending order by Factor. Ignore undef
+    // elements.
+    for (; i < Mask.size(); i++)
+      if (Mask[i] >= 0 && static_cast<unsigned>(Mask[i]) != Index + i * Factor)
+        break;
+
+    if (i == Mask.size())
+      return true;
+  }
+
+  return false;
+}
+
 /// Check if the mask is a DE-interleave mask for an interleaved load.
 ///
 /// E.g. DE-interleave masks (Factor = 2) could be:
@@ -216,7 +238,7 @@ static bool isDeInterleaveMask(ArrayRef<int> Mask, unsigned &Factor,
     // Make sure we don't produce a load wider than the input load.
     if (Mask.size() * Factor > NumLoadElements)
       return false;
-    if (ShuffleVectorInst::isDeInterleaveMaskOfFactor(Mask, Factor, Index))
+    if (isDeInterleaveMaskOfFactor(Mask, Factor, Index))
       return true;
   }
 
@@ -311,8 +333,8 @@ bool InterleavedAccessImpl::lowerInterleavedLoad(
   for (auto *Shuffle : Shuffles) {
     if (Shuffle->getType() != VecTy)
       return false;
-    if (!ShuffleVectorInst::isDeInterleaveMaskOfFactor(
-            Shuffle->getShuffleMask(), Factor, Index))
+    if (!isDeInterleaveMaskOfFactor(Shuffle->getShuffleMask(), Factor,
+                                    Index))
       return false;
 
     assert(Shuffle->getShuffleMask().size() <= NumLoadElements);
@@ -321,8 +343,8 @@ bool InterleavedAccessImpl::lowerInterleavedLoad(
   for (auto *Shuffle : BinOpShuffles) {
     if (Shuffle->getType() != VecTy)
       return false;
-    if (!ShuffleVectorInst::isDeInterleaveMaskOfFactor(
-            Shuffle->getShuffleMask(), Factor, Index))
+    if (!isDeInterleaveMaskOfFactor(Shuffle->getShuffleMask(), Factor,
+                                    Index))
       return false;
 
     assert(Shuffle->getShuffleMask().size() <= NumLoadElements);
@@ -366,15 +388,14 @@ bool InterleavedAccessImpl::replaceBinOpShuffles(
       return Idx < (int)cast<FixedVectorType>(BIOp0Ty)->getNumElements();
     }));
 
-    BasicBlock::iterator insertPos = SVI->getIterator();
     auto *NewSVI1 =
         new ShuffleVectorInst(BI->getOperand(0), PoisonValue::get(BIOp0Ty),
-                              Mask, SVI->getName(), insertPos);
+                              Mask, SVI->getName(), SVI);
     auto *NewSVI2 = new ShuffleVectorInst(
         BI->getOperand(1), PoisonValue::get(BI->getOperand(1)->getType()), Mask,
-        SVI->getName(), insertPos);
+        SVI->getName(), SVI);
     BinaryOperator *NewBI = BinaryOperator::CreateWithCopiedFlags(
-        BI->getOpcode(), NewSVI1, NewSVI2, BI, BI->getName(), insertPos);
+        BI->getOpcode(), NewSVI1, NewSVI2, BI, BI->getName(), SVI);
     SVI->replaceAllUsesWith(NewBI);
     LLVM_DEBUG(dbgs() << "  Replaced: " << *BI << "\n    And   : " << *SVI
                       << "\n  With    : " << *NewSVI1 << "\n    And   : "
@@ -535,9 +556,9 @@ bool InterleavedAccessImpl::runOnFunction(Function &F) {
     if (auto *II = dyn_cast<IntrinsicInst>(&I)) {
       // At present, we only have intrinsics to represent (de)interleaving
       // with a factor of 2.
-      if (II->getIntrinsicID() == Intrinsic::vector_deinterleave2)
+      if (II->getIntrinsicID() == Intrinsic::experimental_vector_deinterleave2)
         Changed |= lowerDeinterleaveIntrinsic(II, DeadInsts);
-      if (II->getIntrinsicID() == Intrinsic::vector_interleave2)
+      if (II->getIntrinsicID() == Intrinsic::experimental_vector_interleave2)
         Changed |= lowerInterleaveIntrinsic(II, DeadInsts);
     }
   }

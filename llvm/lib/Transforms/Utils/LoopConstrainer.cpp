@@ -42,11 +42,8 @@ static bool isSafeDecreasingBound(const SCEV *Start, const SCEV *BoundSCEV,
   ICmpInst::Predicate BoundPred =
       IsSigned ? CmpInst::ICMP_SGT : CmpInst::ICMP_UGT;
 
-  auto StartLG = SE.applyLoopGuards(Start, L);
-  auto BoundLG = SE.applyLoopGuards(BoundSCEV, L);
-
   if (LatchBrExitIdx == 1)
-    return SE.isLoopEntryGuardedByCond(L, BoundPred, StartLG, BoundLG);
+    return SE.isLoopEntryGuardedByCond(L, BoundPred, Start, BoundSCEV);
 
   assert(LatchBrExitIdx == 0 && "LatchBrExitIdx should be either 0 or 1");
 
@@ -57,10 +54,10 @@ static bool isSafeDecreasingBound(const SCEV *Start, const SCEV *BoundSCEV,
   const SCEV *Limit = SE.getMinusSCEV(SE.getConstant(Min), StepPlusOne);
 
   const SCEV *MinusOne =
-      SE.getMinusSCEV(BoundLG, SE.getOne(BoundLG->getType()));
+      SE.getMinusSCEV(BoundSCEV, SE.getOne(BoundSCEV->getType()));
 
-  return SE.isLoopEntryGuardedByCond(L, BoundPred, StartLG, MinusOne) &&
-         SE.isLoopEntryGuardedByCond(L, BoundPred, BoundLG, Limit);
+  return SE.isLoopEntryGuardedByCond(L, BoundPred, Start, MinusOne) &&
+         SE.isLoopEntryGuardedByCond(L, BoundPred, BoundSCEV, Limit);
 }
 
 /// Given a loop with an increasing induction variable, is it possible to
@@ -89,11 +86,8 @@ static bool isSafeIncreasingBound(const SCEV *Start, const SCEV *BoundSCEV,
   ICmpInst::Predicate BoundPred =
       IsSigned ? CmpInst::ICMP_SLT : CmpInst::ICMP_ULT;
 
-  auto StartLG = SE.applyLoopGuards(Start, L);
-  auto BoundLG = SE.applyLoopGuards(BoundSCEV, L);
-
   if (LatchBrExitIdx == 1)
-    return SE.isLoopEntryGuardedByCond(L, BoundPred, StartLG, BoundLG);
+    return SE.isLoopEntryGuardedByCond(L, BoundPred, Start, BoundSCEV);
 
   assert(LatchBrExitIdx == 0 && "LatchBrExitIdx should be 0 or 1");
 
@@ -103,9 +97,9 @@ static bool isSafeIncreasingBound(const SCEV *Start, const SCEV *BoundSCEV,
                        : APInt::getMaxValue(BitWidth);
   const SCEV *Limit = SE.getMinusSCEV(SE.getConstant(Max), StepMinusOne);
 
-  return (SE.isLoopEntryGuardedByCond(L, BoundPred, StartLG,
-                                      SE.getAddExpr(BoundLG, Step)) &&
-          SE.isLoopEntryGuardedByCond(L, BoundPred, BoundLG, Limit));
+  return (SE.isLoopEntryGuardedByCond(L, BoundPred, Start,
+                                      SE.getAddExpr(BoundSCEV, Step)) &&
+          SE.isLoopEntryGuardedByCond(L, BoundPred, BoundSCEV, Limit));
 }
 
 /// Returns estimate for max latch taken count of the loop of the narrowest
@@ -397,7 +391,7 @@ LoopStructure::parseLoopStructure(ScalarEvolution &SE, Loop &L,
   BasicBlock *LatchExit = LatchBr->getSuccessor(LatchBrExitIdx);
 
   assert(!L.contains(LatchExit) && "expected an exit block!");
-  const DataLayout &DL = Preheader->getDataLayout();
+  const DataLayout &DL = Preheader->getModule()->getDataLayout();
   SCEVExpander Expander(SE, DL, "loop-constrainer");
   Instruction *Ins = Preheader->getTerminator();
 
@@ -650,7 +644,7 @@ LoopConstrainer::RewrittenRangeInfo LoopConstrainer::changeIterationSpaceEnd(
   // value of the same PHI nodes if/when we continue execution.
   for (PHINode &PN : LS.Header->phis()) {
     PHINode *NewPHI = PHINode::Create(PN.getType(), 2, PN.getName() + ".copy",
-                                      BranchToContinuation->getIterator());
+                                      BranchToContinuation);
 
     NewPHI->addIncoming(PN.getIncomingValueForBlock(Preheader), Preheader);
     NewPHI->addIncoming(PN.getIncomingValueForBlock(LS.Latch),
@@ -659,7 +653,7 @@ LoopConstrainer::RewrittenRangeInfo LoopConstrainer::changeIterationSpaceEnd(
   }
 
   RRI.IndVarEnd = PHINode::Create(IndVarBase->getType(), 2, "indvar.end",
-                                  BranchToContinuation->getIterator());
+                                  BranchToContinuation);
   RRI.IndVarEnd->addIncoming(IndVarStart, Preheader);
   RRI.IndVarEnd->addIncoming(IndVarBase, RRI.ExitSelector);
 
@@ -733,7 +727,7 @@ bool LoopConstrainer::run() {
   bool Increasing = MainLoopStructure.IndVarIncreasing;
   IntegerType *IVTy = cast<IntegerType>(RangeTy);
 
-  SCEVExpander Expander(SE, F.getDataLayout(), "loop-constrainer");
+  SCEVExpander Expander(SE, F.getParent()->getDataLayout(), "loop-constrainer");
   Instruction *InsertPt = OriginalPreheader->getTerminator();
 
   // It would have been better to make `PreLoop' and `PostLoop'

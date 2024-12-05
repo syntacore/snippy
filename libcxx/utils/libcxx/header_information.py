@@ -143,7 +143,6 @@ headers_not_available = [
     "flat_set",
     "generator",
     "hazard_pointer",
-    "inplace_vector",
     "linalg",
     "rcu",
     "spanstream",
@@ -156,14 +155,11 @@ headers_not_available = [
 def is_header(file):
     """Returns whether the given file is a header (i.e. not a directory or the modulemap file)."""
     return not file.is_dir() and not file.name in [
+        "module.modulemap.in",
         "module.modulemap",
         "CMakeLists.txt",
         "libcxx.imp",
     ]
-
-
-def is_public_header(header):
-    return "__" not in header and not header.startswith("ext/")
 
 
 def is_modulemap_header(header):
@@ -197,18 +193,17 @@ test = pathlib.Path(os.path.join(libcxx_root, "test"))
 assert libcxx_root.exists()
 
 all_headers = sorted(
-    p.relative_to(include).as_posix() for p in include.rglob("[_a-z]*") if is_header(p)
+    p.relative_to(include).as_posix() for p in include.rglob("[a-z]*") if is_header(p)
 )
 toplevel_headers = sorted(
-    p.relative_to(include).as_posix() for p in include.glob("[_a-z]*") if is_header(p)
+    p.relative_to(include).as_posix() for p in include.glob("[a-z]*") if is_header(p)
 )
 experimental_headers = sorted(
     p.relative_to(include).as_posix()
     for p in include.glob("experimental/[a-z]*")
     if is_header(p)
 )
-
-public_headers = [p for p in all_headers if is_public_header(p)]
+public_headers = toplevel_headers + experimental_headers
 
 # The headers used in the std and std.compat modules.
 #
@@ -216,7 +211,7 @@ public_headers = [p for p in all_headers if is_public_header(p)]
 module_headers = [
     header
     for header in toplevel_headers
-    if not header.endswith(".h") and is_public_header(header)
+    if not header.endswith(".h")
     # These headers have been removed in C++20 so are never part of a module.
     and not header in ["ccomplex", "ciso646", "cstdbool", "ctgmath"]
 ]

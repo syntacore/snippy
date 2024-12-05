@@ -46,8 +46,8 @@ define ptr @scalar_stack_align16() nounwind {
 ; RV64-NEXT:    ret
   %a = alloca <vscale x 2 x i32>
   %c = alloca i64, align 16
-  call void @extern(ptr %a)
+  call void @extern(<vscale x 2 x i32>* %a)
   ret ptr %c
 }
 
-declare void @extern(ptr)
+declare void @extern(<vscale x 2 x i32>*)

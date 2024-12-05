@@ -1097,7 +1097,8 @@ void RuntimeDyldImpl::reassignSectionAddress(unsigned SectionID,
 
 void RuntimeDyldImpl::resolveRelocationList(const RelocationList &Relocs,
                                             uint64_t Value) {
-  for (const RelocationEntry &RE : Relocs) {
+  for (unsigned i = 0, e = Relocs.size(); i != e; ++i) {
+    const RelocationEntry &RE = Relocs[i];
     // Ignore relocations for sections that were not loaded
     if (RE.SectionID != AbsoluteSymbolSection &&
         Sections[RE.SectionID].getAddress() == nullptr)
@@ -1465,10 +1466,8 @@ void jitLinkForORC(
     return;
   }
 
-  if (auto Err = OnLoaded(*O.getBinary(), *Info, RTDyld.getSymbolTable())) {
+  if (auto Err = OnLoaded(*O.getBinary(), *Info, RTDyld.getSymbolTable()))
     OnEmitted(std::move(O), std::move(Info), std::move(Err));
-    return;
-  }
 
   RuntimeDyldImpl::finalizeAsync(std::move(RTDyld.Dyld), std::move(OnEmitted),
                                  std::move(O), std::move(Info));

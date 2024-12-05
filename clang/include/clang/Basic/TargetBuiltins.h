@@ -84,7 +84,7 @@ namespace clang {
   enum {
     LastTIBuiltin = clang::Builtin::FirstTSBuiltin - 1,
   #define BUILTIN(ID, TYPE, ATTRS) BI##ID,
-  #include "clang/Basic/BuiltinsBPF.inc"
+  #include "clang/Basic/BuiltinsBPF.def"
     LastTSBuiltin
   };
   }
@@ -159,7 +159,7 @@ namespace clang {
     FirstRVVBuiltin = clang::Builtin::FirstTSBuiltin,
     LastRVVBuiltin = RISCVVector::FirstTSBuiltin - 1,
 #define BUILTIN(ID, TYPE, ATTRS) BI##ID,
-#include "clang/Basic/BuiltinsRISCV.inc"
+#include "clang/Basic/BuiltinsRISCV.def"
     LastTSBuiltin
   };
   } // namespace RISCV

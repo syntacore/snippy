@@ -24,8 +24,8 @@ void ReplaceSystemMalloc();
 void AllocatorProcStart(Processor *proc);
 void AllocatorProcFinish(Processor *proc);
 void AllocatorPrintStats();
-void AllocatorLockBeforeFork();
-void AllocatorUnlockAfterFork(bool child);
+void AllocatorLock();
+void AllocatorUnlock();
 void GlobalProcessorLock();
 void GlobalProcessorUnlock();
 

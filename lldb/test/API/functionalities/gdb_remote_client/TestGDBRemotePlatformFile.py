@@ -147,9 +147,7 @@ class TestGDBRemotePlatformFile(GDBPlatformClientTestBase):
             log=server2.responder.packetLog,
         )
 
-    @expectedFailureAll(
-        hostoslist=["windows"], bugnumber="github.com/llvm/llvm-project/issues/92255"
-    )
+    @skipIfWindows
     def test_file_permissions(self):
         """Test 'platform get-permissions'"""
 
@@ -169,9 +167,7 @@ class TestGDBRemotePlatformFile(GDBPlatformClientTestBase):
             ]
         )
 
-    @expectedFailureAll(
-        hostoslist=["windows"], bugnumber="github.com/llvm/llvm-project/issues/92255"
-    )
+    @skipIfWindows
     def test_file_permissions_fallback(self):
         """Test 'platform get-permissions' fallback to fstat"""
 

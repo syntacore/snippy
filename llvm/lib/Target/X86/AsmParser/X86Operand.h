@@ -167,7 +167,7 @@ struct X86Operand final : public MCParsedAsmOperand {
     Tok.Length = Value.size();
   }
 
-  MCRegister getReg() const override {
+  unsigned getReg() const override {
     assert(Kind == Register && "Invalid access!");
     return Reg.RegNo;
   }

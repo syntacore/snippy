@@ -12,19 +12,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
-#include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/TypeUtilities.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
-namespace mlir {
-namespace vector {
-#define GEN_PASS_DEF_LOWERVECTORMULTIREDUCTION
-#include "mlir/Dialect/Vector/Transforms/Passes.h.inc"
-} // namespace vector
-} // namespace mlir
 
 #define DEBUG_TYPE "vector-multi-reduction"
 
@@ -437,10 +427,8 @@ struct OneDimMultiReductionToTwoDim
     auto loc = multiReductionOp.getLoc();
     auto srcVectorType = multiReductionOp.getSourceVectorType();
     auto srcShape = srcVectorType.getShape();
-    auto castedType = VectorType::get(
-        ArrayRef<int64_t>{1, srcShape.back()}, srcVectorType.getElementType(),
-        ArrayRef<bool>{false, srcVectorType.getScalableDims().back()});
-
+    auto castedType = VectorType::get(ArrayRef<int64_t>{1, srcShape.back()},
+                                      srcVectorType.getElementType());
     auto accType =
         VectorType::get(ArrayRef<int64_t>{1}, srcVectorType.getElementType());
     assert(!llvm::isa<VectorType>(multiReductionOp.getDestType()) &&
@@ -457,11 +445,10 @@ struct OneDimMultiReductionToTwoDim
         loc, accType, multiReductionOp.getAcc());
     Value castMask;
     if (maskableOp.isMasked()) {
-      auto maskType = llvm::cast<VectorType>(mask.getType());
-      auto castMaskType = VectorType::get(
-          ArrayRef<int64_t>{1, maskType.getShape().back()},
-          maskType.getElementType(),
-          ArrayRef<bool>{false, maskType.getScalableDims().back()});
+      auto maskType = llvm::cast<ShapedType>(mask.getType());
+      auto castMaskType =
+          VectorType::get(ArrayRef<int64_t>{1, maskType.getShape().back()},
+                          maskType.getElementType());
       castMask = rewriter.create<vector::BroadcastOp>(loc, castMaskType, mask);
     }
 
@@ -474,31 +461,6 @@ struct OneDimMultiReductionToTwoDim
     return success();
   }
 };
-
-struct LowerVectorMultiReductionPass
-    : public vector::impl::LowerVectorMultiReductionBase<
-          LowerVectorMultiReductionPass> {
-  LowerVectorMultiReductionPass(vector::VectorMultiReductionLowering option) {
-    this->loweringStrategy = option;
-  }
-
-  void runOnOperation() override {
-    Operation *op = getOperation();
-    MLIRContext *context = op->getContext();
-
-    RewritePatternSet loweringPatterns(context);
-    populateVectorMultiReductionLoweringPatterns(loweringPatterns,
-                                                 this->loweringStrategy);
-
-    if (failed(applyPatternsAndFoldGreedily(op, std::move(loweringPatterns))))
-      signalPassFailure();
-  }
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<vector::VectorDialect>();
-  }
-};
-
 } // namespace
 
 void mlir::vector::populateVectorMultiReductionLoweringPatterns(
@@ -513,9 +475,4 @@ void mlir::vector::populateVectorMultiReductionLoweringPatterns(
   else
     patterns.add<TwoDimMultiReductionToElementWise>(patterns.getContext(),
                                                     benefit);
-}
-
-std::unique_ptr<Pass> vector::createLowerVectorMultiReductionPass(
-    vector::VectorMultiReductionLowering option) {
-  return std::make_unique<LowerVectorMultiReductionPass>(option);
 }

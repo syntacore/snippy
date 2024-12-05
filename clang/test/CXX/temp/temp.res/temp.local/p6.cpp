@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -verify %s -fcxx-exceptions -std=c++1y -Wno-error=strict-primary-template-shadow
+// RUN: %clang_cc1 -verify %s -fcxx-exceptions -std=c++1y
 
 namespace N {}
 
@@ -127,30 +127,16 @@ template<int T> struct Z { // expected-note 16{{declared here}}
 template<typename T> // expected-note {{declared here}}
 void f(int T) {} // expected-error {{declaration of 'T' shadows template parameter}}
 
+// FIXME: These are ill-formed: a template-parameter shall not have the same name as the template name.
 namespace A {
   template<typename T> struct T {};  // expected-error{{declaration of 'T' shadows template parameter}}
                                      // expected-note@-1{{template parameter is declared here}}
-  template<typename T> struct U {
-    template<typename V> struct V {}; // expected-error{{declaration of 'V' shadows template parameter}}
-                                      // expected-note@-1{{template parameter is declared here}}
-  };
 }
 namespace B {
-  template<typename T> void T() {} // expected-warning{{declaration of 'T' shadows template parameter}}
-                                   // expected-note@-1{{template parameter is declared here}}
-
-  template<typename T> struct U {
-    template<typename V> void V(); // expected-warning{{declaration of 'V' shadows template parameter}}
-                                   // expected-note@-1{{template parameter is declared here}}
-  };
+  template<typename T> void T() {}
 }
 namespace C {
-  template<typename T> int T; // expected-warning{{declaration of 'T' shadows template parameter}}
-                              // expected-note@-1{{template parameter is declared here}}
-  template<typename T> struct U {
-    template<typename V> static int V; // expected-warning{{declaration of 'V' shadows template parameter}}
-                                       // expected-note@-1{{template parameter is declared here}}
-  };
+  template<typename T> int T;
 }
 
 namespace PR28023 {

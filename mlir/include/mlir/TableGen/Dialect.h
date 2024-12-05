@@ -14,8 +14,6 @@
 #define MLIR_TABLEGEN_DIALECT_H_
 
 #include "mlir/Support/LLVM.h"
-#include "llvm/TableGen/Record.h"
-
 #include <string>
 #include <vector>
 
@@ -91,10 +89,6 @@ public:
   /// Default to use properties for storing Attributes for operations in this
   /// dialect.
   bool usePropertiesForAttributes() const;
-
-  llvm::DagInit *getDiscardableAttributes() const;
-
-  const llvm::Record *getDef() const { return def; }
 
   // Returns whether two dialects are equal by checking the equality of the
   // underlying record.

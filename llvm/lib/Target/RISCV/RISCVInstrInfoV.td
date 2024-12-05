@@ -157,8 +157,10 @@ class SchedBinaryMC<string write, string read0, string read1,
 
 // For instructions with three operands.
 class SchedTernary<string write, string read0, string read1, string read2,
-                   string mx, int sew = 0, bit forceMasked = 0>
-    : SchedNary<write, [read0, read1, read2], mx, sew, forceMasked>;
+                   string mx, int sew = 0, bit forceMasked = 0,
+                   bit forceMergeOpRead = 0>
+    : SchedNary<write, [read0, read1, read2], mx, sew, forceMasked,
+                forceMergeOpRead>;
 class SchedTernaryMC<string write, string read0, string read1, string read2,
                      int sew = 0, bit forceMasked = 1>:
   SchedNary<write, [read0, read1, read2], "WorstCase", sew, forceMasked>;
@@ -531,6 +533,14 @@ class VALUVs2<bits<6> funct6, bits<5> vs1, RISCVVFormat opv, string opcodestr>
     : RVInstV<funct6, vs1, opv, (outs VR:$vd),
                (ins VR:$vs2, VMaskOp:$vm),
                opcodestr, "$vd, $vs2$vm">;
+
+// op vd, vs2 (use vs1 as instruction encoding)
+class VALUVs2NoVm<bits<6> funct6, bits<5> vs1, RISCVVFormat opv, string opcodestr>
+    : RVInstV<funct6, vs1, opv, (outs VR:$vd),
+              (ins VR:$vs2), opcodestr,
+              "$vd, $vs2"> {
+  let vm = 1;
+}
 } // hasSideEffects = 0, mayLoad = 0, mayStore = 0
 
 //===----------------------------------------------------------------------===//
@@ -567,7 +577,7 @@ multiclass VALU_IV_X<string opcodestr, bits<6> funct6> {
 }
 
 multiclass VALU_IV_I<string opcodestr, bits<6> funct6> {
-  def I  : VALUVI<funct6, opcodestr # ".vi">,
+  def I  : VALUVI<funct6, opcodestr # ".vi", simm5>,
            SchedUnaryMC<"WriteVIALUI", "ReadVIALUV">;
 }
 
@@ -653,7 +663,7 @@ multiclass VALUNoVm_IV_V_X<string opcodestr, bits<6> funct6> {
 
 multiclass VALUNoVm_IV_V_X_I<string opcodestr, bits<6> funct6>
    : VALUNoVm_IV_V_X<opcodestr, funct6> {
-  def I : VALUVINoVm<funct6, opcodestr # ".vi">,
+  def I : VALUVINoVm<funct6, opcodestr # ".vi", simm5>,
           SchedUnaryMC<"WriteVICALUI", "ReadVICALUV", forceMasked=0>;
 }
 
@@ -851,9 +861,9 @@ multiclass VMSFS_MV_V<string opcodestr, bits<6> funct6, bits<5> vs1> {
            SchedUnaryMC<"WriteVMSFSV", "ReadVMSFSV">;
 }
 
-multiclass VIOTA_MV_V<string opcodestr, bits<6> funct6, bits<5> vs1> {
+multiclass VMIOT_MV_V<string opcodestr, bits<6> funct6, bits<5> vs1> {
   def "" : VALUVs2<funct6, vs1, OPMVV, opcodestr>,
-           SchedUnaryMC<"WriteVIotaV", "ReadVIotaV">;
+           SchedUnaryMC<"WriteVMIotV", "ReadVMIotV">;
 }
 
 multiclass VSHT_IV_V_X_I<string opcodestr, bits<6> funct6> {
@@ -892,7 +902,7 @@ multiclass VCMP_IV_X<string opcodestr, bits<6> funct6> {
 }
 
 multiclass VCMP_IV_I<string opcodestr, bits<6> funct6> {
-  def I  : VALUVI<funct6, opcodestr # ".vi">,
+  def I  : VALUVI<funct6, opcodestr # ".vi", simm5>,
            SchedUnaryMC<"WriteVICmpI", "ReadVICmpV">;
 }
 
@@ -939,7 +949,7 @@ multiclass VSALU_IV_V_X<string opcodestr, bits<6> funct6> {
 
 multiclass VSALU_IV_V_X_I<string opcodestr, bits<6> funct6>
     : VSALU_IV_V_X<opcodestr, funct6> {
-  def I  : VALUVI<funct6, opcodestr # ".vi">,
+  def I  : VALUVI<funct6, opcodestr # ".vi", simm5>,
            SchedUnaryMC<"WriteVSALUI", "ReadVSALUV">;
 }
 
@@ -975,14 +985,11 @@ multiclass VNCLP_IV_V_X_I<string opcodestr, bits<6> funct6> {
            SchedUnaryMC<"WriteVNClipI", "ReadVNClipV">;
 }
 
-multiclass VSLD_IV_X_I<string opcodestr, bits<6> funct6, bit slidesUp> {
-  // Note: In the future, if VISlideI is also split into VSlideUpI and
-  // VSlideDownI, it'll probably better to use two separate multiclasses.
-  defvar WriteSlideX = !if(slidesUp, "WriteVSlideUpX", "WriteVSlideDownX");
+multiclass VSLD_IV_X_I<string opcodestr, bits<6> funct6> {
   def X  : VALUVX<funct6, OPIVX, opcodestr # ".vx">,
-           SchedBinaryMC<WriteSlideX, "ReadVISlideV", "ReadVISlideX">;
+           SchedBinaryMC<"WriteVISlideX", "ReadVISlideV", "ReadVISlideX">;
   def I  : VALUVI<funct6, opcodestr # ".vi", uimm5>,
-           SchedUnaryMC<"WriteVSlideI", "ReadVISlideV">;
+           SchedUnaryMC<"WriteVISlideI", "ReadVISlideV">;
 }
 
 multiclass VSLD1_MV_X<string opcodestr, bits<6> funct6> {
@@ -1614,7 +1621,7 @@ defm VMSIF_M : VMSFS_MV_V<"vmsif.m", 0b010100, 0b00011>;
 // vmsof.m set-only-first mask bit
 defm VMSOF_M : VMSFS_MV_V<"vmsof.m", 0b010100, 0b00010>;
 // Vector Iota Instruction
-defm VIOTA_M : VIOTA_MV_V<"viota.m", 0b010100, 0b10000>;
+defm VIOTA_M : VMIOT_MV_V<"viota.m", 0b010100, 0b10000>;
 
 } // Constraints = "@earlyclobber $vd", RVVConstraint = Iota
 
@@ -1624,17 +1631,17 @@ let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in {
 let vs2 = 0 in
 def VID_V : RVInstV<0b010100, 0b10001, OPMVV, (outs VR:$vd),
                     (ins VMaskOp:$vm), "vid.v", "$vd$vm">,
-            SchedNullaryMC<"WriteVIdxV">;
+            SchedNullaryMC<"WriteVMIdxV">;
 
 // Integer Scalar Move Instructions
 let vm = 1, RVVConstraint = NoConstraint in {
 def VMV_X_S : RVInstV<0b010000, 0b00000, OPMVV, (outs GPR:$vd),
                       (ins VR:$vs2), "vmv.x.s", "$vd, $vs2">,
-              Sched<[WriteVMovXS, ReadVMovXS]>;
+              Sched<[WriteVIMovVX, ReadVIMovVX]>;
 let Constraints = "$vd = $vd_wb" in
 def VMV_S_X : RVInstV2<0b010000, 0b00000, OPMVX, (outs VR:$vd_wb),
                       (ins VR:$vd, GPR:$rs1), "vmv.s.x", "$vd, $rs1">,
-              Sched<[WriteVMovSX, ReadVMovSX_V, ReadVMovSX_X]>;
+              Sched<[WriteVIMovXV, ReadVIMovXV, ReadVIMovXX]>;
 }
 
 } // hasSideEffects = 0, mayLoad = 0, mayStore = 0
@@ -1648,11 +1655,11 @@ let hasSideEffects = 0, mayLoad = 0, mayStore = 0, vm = 1,
 // Floating-Point Scalar Move Instructions
 def VFMV_F_S : RVInstV<0b010000, 0b00000, OPFVV, (outs FPR32:$vd),
                       (ins VR:$vs2), "vfmv.f.s", "$vd, $vs2">,
-               Sched<[WriteVMovFS, ReadVMovFS]>;
+               Sched<[WriteVFMovVF, ReadVFMovVF]>;
 let Constraints = "$vd = $vd_wb" in
 def VFMV_S_F : RVInstV2<0b010000, 0b00000, OPFVF, (outs VR:$vd_wb),
                        (ins VR:$vd, FPR32:$rs1), "vfmv.s.f", "$vd, $rs1">,
-               Sched<[WriteVMovSF, ReadVMovSF_V, ReadVMovSF_F]>;
+               Sched<[WriteVFMovFV, ReadVFMovFV, ReadVFMovFX]>;
 
 } // hasSideEffects = 0, mayLoad = 0, mayStore = 0, vm = 1
 
@@ -1661,10 +1668,10 @@ def VFMV_S_F : RVInstV2<0b010000, 0b00000, OPFVF, (outs VR:$vd_wb),
 let Predicates = [HasVInstructions] in {
 // Vector Slide Instructions
 let Constraints = "@earlyclobber $vd", RVVConstraint = SlideUp in {
-defm VSLIDEUP_V : VSLD_IV_X_I<"vslideup", 0b001110, /*slidesUp=*/true>;
+defm VSLIDEUP_V : VSLD_IV_X_I<"vslideup", 0b001110>;
 defm VSLIDE1UP_V : VSLD1_MV_X<"vslide1up", 0b001110>;
 } // Constraints = "@earlyclobber $vd", RVVConstraint = SlideUp
-defm VSLIDEDOWN_V : VSLD_IV_X_I<"vslidedown", 0b001111, /*slidesUp=*/false>;
+defm VSLIDEDOWN_V : VSLD_IV_X_I<"vslidedown", 0b001111>;
 defm VSLIDE1DOWN_V : VSLD1_MV_X<"vslide1down", 0b001111>;
 } // Predicates = [HasVInstructions]
 
@@ -1680,9 +1687,8 @@ let Predicates = [HasVInstructions] in {
 let Constraints = "@earlyclobber $vd", RVVConstraint = Vrgather in {
 defm VRGATHER_V : VGTR_IV_V_X_I<"vrgather", 0b001100>;
 def VRGATHEREI16_VV : VALUVV<0b001110, OPIVV, "vrgatherei16.vv">,
-                      SchedBinaryMC<"WriteVRGatherEI16VV",
-                                    "ReadVRGatherEI16VV_data",
-                                    "ReadVRGatherEI16VV_index">;
+                      SchedBinaryMC<"WriteVRGatherVV", "ReadVRGatherVV_data",
+                                    "ReadVRGatherVV_index">;
 } // Constraints = "@earlyclobber $vd", RVVConstraint = Vrgather
 
 // Vector Compress Instruction

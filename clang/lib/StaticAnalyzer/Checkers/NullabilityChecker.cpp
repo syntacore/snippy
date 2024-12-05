@@ -1082,8 +1082,7 @@ void NullabilityChecker::checkPostObjCMessage(const ObjCMethodCall &M,
       M.getMessageKind() == OCM_PropertyAccess && !C.wasInlined) {
     bool LookupResolved = false;
     if (const MemRegion *ReceiverRegion = getTrackRegion(M.getReceiverSVal())) {
-      if (const IdentifierInfo *Ident =
-              M.getSelector().getIdentifierInfoForSlot(0)) {
+      if (IdentifierInfo *Ident = M.getSelector().getIdentifierInfoForSlot(0)) {
         LookupResolved = true;
         ObjectPropPair Key = std::make_pair(ReceiverRegion, Ident);
         const ConstrainedPropertyVal *PrevPropVal =

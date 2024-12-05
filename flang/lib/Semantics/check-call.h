@@ -35,7 +35,7 @@ class SemanticsContext;
 // messages were created, true if all is well.
 bool CheckArguments(const evaluate::characteristics::Procedure &,
     evaluate::ActualArguments &, SemanticsContext &, const Scope &,
-    bool treatingExternalAsImplicit, bool ignoreImplicitVsExplicit,
+    bool treatingExternalAsImplicit,
     const evaluate::SpecificIntrinsic *intrinsic);
 
 bool CheckPPCIntrinsic(const Symbol &generic, const Symbol &specific,

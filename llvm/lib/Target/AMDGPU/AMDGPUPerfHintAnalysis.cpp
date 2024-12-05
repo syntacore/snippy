@@ -68,7 +68,7 @@ struct AMDGPUPerfHint {
 public:
   AMDGPUPerfHint(AMDGPUPerfHintAnalysis::FuncInfoMap &FIM_,
                  const TargetLowering *TLI_)
-      : FIM(FIM_), TLI(TLI_) {}
+      : FIM(FIM_), DL(nullptr), TLI(TLI_) {}
 
   bool runOnFunction(Function &F);
 
@@ -95,7 +95,7 @@ private:
 
   AMDGPUPerfHintAnalysis::FuncInfoMap &FIM;
 
-  const DataLayout *DL = nullptr;
+  const DataLayout *DL;
 
   const TargetLowering *TLI;
 

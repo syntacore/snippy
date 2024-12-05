@@ -47,7 +47,7 @@ public:
   bool revertWhileToDoLoop(MachineInstr *WLS);
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<MachineLoopInfoWrapperPass>();
+    AU.addRequired<MachineLoopInfo>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 };
@@ -217,9 +217,9 @@ bool ARMBlockPlacement::runOnMachineFunction(MachineFunction &MF) {
   if (!ST.hasLOB())
     return false;
   LLVM_DEBUG(dbgs() << DEBUG_PREFIX << "Running on " << MF.getName() << "\n");
-  MLI = &getAnalysis<MachineLoopInfoWrapperPass>().getLI();
+  MLI = &getAnalysis<MachineLoopInfo>();
   TII = static_cast<const ARMBaseInstrInfo *>(ST.getInstrInfo());
-  BBUtils = std::make_unique<ARMBasicBlockUtils>(MF);
+  BBUtils = std::unique_ptr<ARMBasicBlockUtils>(new ARMBasicBlockUtils(MF));
   MF.RenumberBlocks();
   BBUtils->computeAllBlockSizes();
   BBUtils->adjustBBOffsetsAfter(&MF.front());

@@ -459,13 +459,13 @@ uint64_t LongJmpPass::getSymbolAddress(const BinaryContext &BC,
   return Iter->second;
 }
 
-Error LongJmpPass::relaxStub(BinaryBasicBlock &StubBB, bool &Modified) {
+bool LongJmpPass::relaxStub(BinaryBasicBlock &StubBB) {
   const BinaryFunction &Func = *StubBB.getFunction();
   const BinaryContext &BC = Func.getBinaryContext();
   const int Bits = StubBits[&StubBB];
   // Already working with the largest range?
   if (Bits == static_cast<int>(BC.AsmInfo->getCodePointerSize() * 8))
-    return Error::success();
+    return false;
 
   const static int RangeShortJmp = BC.MIB->getShortJmpEncodingSize();
   const static int RangeSingleInstr = BC.MIB->getUncondBranchEncodingSize();
@@ -481,12 +481,12 @@ Error LongJmpPass::relaxStub(BinaryBasicBlock &StubBB, bool &Modified) {
                                                      : TgtAddress - DotAddress;
   // If it fits in one instruction, do not relax
   if (!(PCRelTgtAddress & SingleInstrMask))
-    return Error::success();
+    return false;
 
   // Fits short jmp
   if (!(PCRelTgtAddress & ShortJmpMask)) {
     if (Bits >= RangeShortJmp)
-      return Error::success();
+      return false;
 
     LLVM_DEBUG(dbgs() << "Relaxing stub to short jump. PCRelTgtAddress = "
                       << Twine::utohexstr(PCRelTgtAddress)
@@ -494,23 +494,22 @@ Error LongJmpPass::relaxStub(BinaryBasicBlock &StubBB, bool &Modified) {
                       << "\n");
     relaxStubToShortJmp(StubBB, RealTargetSym);
     StubBits[&StubBB] = RangeShortJmp;
-    Modified = true;
-    return Error::success();
+    return true;
   }
 
   // The long jmp uses absolute address on AArch64
   // So we could not use it for PIC binaries
-  if (BC.isAArch64() && !BC.HasFixedLoadAddress)
-    return createFatalBOLTError(
-        "BOLT-ERROR: Unable to relax stub for PIC binary\n");
+  if (BC.isAArch64() && !BC.HasFixedLoadAddress) {
+    errs() << "BOLT-ERROR: Unable to relax stub for PIC binary\n";
+    exit(1);
+  }
 
   LLVM_DEBUG(dbgs() << "Relaxing stub to long jump. PCRelTgtAddress = "
                     << Twine::utohexstr(PCRelTgtAddress)
                     << " RealTargetSym = " << RealTargetSym->getName() << "\n");
   relaxStubToLongJmp(StubBB, RealTargetSym);
   StubBits[&StubBB] = static_cast<int>(BC.AsmInfo->getCodePointerSize() * 8);
-  Modified = true;
-  return Error::success();
+  return true;
 }
 
 bool LongJmpPass::needsStub(const BinaryBasicBlock &BB, const MCInst &Inst,
@@ -540,8 +539,9 @@ bool LongJmpPass::needsStub(const BinaryBasicBlock &BB, const MCInst &Inst,
   return PCOffset < MinVal || PCOffset > MaxVal;
 }
 
-Error LongJmpPass::relax(BinaryFunction &Func, bool &Modified) {
+bool LongJmpPass::relax(BinaryFunction &Func) {
   const BinaryContext &BC = Func.getBinaryContext();
+  bool Modified = false;
 
   assert(BC.isAArch64() && "Unsupported arch");
   constexpr int InsnSize = 4; // AArch64
@@ -613,8 +613,7 @@ Error LongJmpPass::relax(BinaryFunction &Func, bool &Modified) {
     if (!Stubs[&Func].count(&BB) || !BB.isValid())
       continue;
 
-    if (auto E = relaxStub(BB, Modified))
-      return Error(std::move(E));
+    Modified |= relaxStub(BB);
   }
 
   for (std::pair<BinaryBasicBlock *, std::unique_ptr<BinaryBasicBlock>> &Elmt :
@@ -626,11 +625,11 @@ Error LongJmpPass::relax(BinaryFunction &Func, bool &Modified) {
     Func.insertBasicBlocks(Elmt.first, std::move(NewBBs), true);
   }
 
-  return Error::success();
+  return Modified;
 }
 
-Error LongJmpPass::runOnFunctions(BinaryContext &BC) {
-  BC.outs() << "BOLT-INFO: Starting stub-insertion pass\n";
+void LongJmpPass::runOnFunctions(BinaryContext &BC) {
+  outs() << "BOLT-INFO: Starting stub-insertion pass\n";
   std::vector<BinaryFunction *> Sorted = BC.getSortedFunctions();
   bool Modified;
   uint32_t Iterations = 0;
@@ -640,19 +639,19 @@ Error LongJmpPass::runOnFunctions(BinaryContext &BC) {
     tentativeLayout(BC, Sorted);
     updateStubGroups();
     for (BinaryFunction *Func : Sorted) {
-      if (auto E = relax(*Func, Modified))
-        return Error(std::move(E));
-      // Don't ruin non-simple functions, they can't afford to have the layout
-      // changed.
-      if (Modified && Func->isSimple())
-        Func->fixBranches();
+      if (relax(*Func)) {
+        // Don't ruin non-simple functions, they can't afford to have the layout
+        // changed.
+        if (Func->isSimple())
+          Func->fixBranches();
+        Modified = true;
+      }
     }
   } while (Modified);
-  BC.outs() << "BOLT-INFO: Inserted " << NumHotStubs
-            << " stubs in the hot area and " << NumColdStubs
-            << " stubs in the cold area. Shared " << NumSharedStubs
-            << " times, iterated " << Iterations << " times.\n";
-  return Error::success();
+  outs() << "BOLT-INFO: Inserted " << NumHotStubs
+         << " stubs in the hot area and " << NumColdStubs
+         << " stubs in the cold area. Shared " << NumSharedStubs
+         << " times, iterated " << Iterations << " times.\n";
 }
 } // namespace bolt
 } // namespace llvm

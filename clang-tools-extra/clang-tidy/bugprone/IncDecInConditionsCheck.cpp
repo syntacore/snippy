@@ -31,10 +31,6 @@ void IncDecInConditionsCheck::registerMatchers(MatchFinder *Finder) {
       anyOf(binaryOperator(anyOf(isComparisonOperator(), isLogicalOperator())),
             cxxOperatorCallExpr(isComparisonOperator())));
 
-  auto IsInUnevaluatedContext =
-      expr(anyOf(hasAncestor(expr(matchers::hasUnevaluatedContext())),
-                 hasAncestor(typeLoc())));
-
   Finder->addMatcher(
       expr(
           OperatorMatcher, unless(isExpansionInSystemHeader()),
@@ -46,14 +42,12 @@ void IncDecInConditionsCheck::registerMatchers(MatchFinder *Finder) {
                          cxxOperatorCallExpr(
                              isPrePostOperator(),
                              hasUnaryOperand(expr().bind("operand")))),
-                   unless(IsInUnevaluatedContext),
                    hasAncestor(
                        expr(equalsBoundNode("parent"),
                             hasDescendant(
                                 expr(unless(equalsBoundNode("operand")),
                                      matchers::isStatementIdenticalToBoundNode(
-                                         "operand"),
-                                     unless(IsInUnevaluatedContext))
+                                         "operand"))
                                     .bind("second")))))
                   .bind("operator"))),
       this);

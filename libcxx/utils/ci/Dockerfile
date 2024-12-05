@@ -7,13 +7,15 @@
 #===----------------------------------------------------------------------===##
 #
 # This file defines the buildkite and github actions builder images.
-# You can build both images using:
+# You can build & push both images using:
 #
 #   docker compose build
+#   docker compose push
 #
-# Or you can select a single image to build
+# Or you can select a single image to build & push using:
 #
 #  docker compose build buildkite-builder
+#  docker compose push buildkite-builder
 #
 # The final images can be found at
 #
@@ -21,8 +23,7 @@
 #  ghcr.io/libcxx/actions-builder
 #  ghcr.io/libcxx/android-buildkite-builder
 #
-# Members of the github.com/libcxx/ organizations can push new images to the CI.
-# This is done by GitHub actions in the https://github.com/libcxx/builders repo.
+# Members of the github.com/libcxx/ organizations have permissions required to push new images.
 #
 # ===----------------------------------------------------------------------===##
 #                     Running the buildkite image
@@ -64,43 +65,37 @@ RUN <<EOF
   echo "ALL ALL = (ALL) NOPASSWD: ALL" | tee /etc/sudoers || true
 EOF
 
-# Installing tzdata before other packages avoids the time zone prompts.
-# These prompts seem to ignore DEBIAN_FRONTEND=noninteractive.
 RUN sudo apt-get update \
     && sudo apt-get install -y \
-        tzdata
-
-RUN sudo apt-get update \
-    && sudo apt-get install -y \
-        bash \
-        ccache \
-        curl \
-        gdb \
+        python3 \
+        python3-distutils \
+        python3-psutil \
         git \
+        gdb \
+        ccache \
         gpg \
+        wget \
+        bash \
+        curl \
+        python3 \
+        python3-dev \
+        libpython3-dev \
+        uuid-dev \
+        libncurses5-dev \
+        swig3.0 \
+        libxml2-dev \
+        libedit-dev \
         language-pack-en \
         language-pack-fr \
         language-pack-ja \
         language-pack-ru \
         language-pack-zh-hans \
-        libedit-dev \
-        libncurses5-dev \
-        libpython3-dev \
-        libxml2-dev \
         lsb-release \
-        make \
-        python3 \
-        python3-dev \
-        python3-packaging \
-        python3-setuptools \
-        python3-psutil \
-        software-properties-common \
-        swig \
-        unzip \
-        uuid-dev \
         wget \
-        xz-utils \
+        unzip \
+        software-properties-common \
     && sudo rm -rf /var/lib/apt/lists/*
+
 
 # Install various tools used by the build or the test suite
 #RUN apt-get update && apt-get install -y ninja-build python3 python3-distutils python3-psutil git gdb ccache
@@ -142,15 +137,14 @@ EOF
 
 # Install the most recent GCC, like clang install the previous version as a transition.
 RUN <<EOF
-  sudo git clone https://github.com/compiler-explorer/infra.git /tmp/ce-infra
-  (cd /tmp/ce-infra && sudo make ce)
-  sudo /tmp/ce-infra/bin/ce_install install compilers/c++/x86/gcc $GCC_LATEST_VERSION.1.0
-  sudo /tmp/ce-infra/bin/ce_install install compilers/c++/x86/gcc $((GCC_LATEST_VERSION - 1)).1.0
-  sudo ln -s /opt/compiler-explorer/gcc-$GCC_LATEST_VERSION.1.0/bin/gcc /usr/bin/gcc-$GCC_LATEST_VERSION
-  sudo ln -s /opt/compiler-explorer/gcc-$GCC_LATEST_VERSION.1.0/bin/g++ /usr/bin/g++-$GCC_LATEST_VERSION
-  sudo ln -s /opt/compiler-explorer/gcc-$((GCC_LATEST_VERSION - 1)).1.0/bin/gcc /usr/bin/gcc-$((GCC_LATEST_VERSION - 1))
-  sudo ln -s /opt/compiler-explorer/gcc-$((GCC_LATEST_VERSION - 1)).1.0/bin/g++ /usr/bin/g++-$((GCC_LATEST_VERSION - 1))
-  sudo rm -rf /tmp/ce-infra
+  sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+  sudo apt-get update
+  sudo apt-get install -y \
+    gcc-$((GCC_LATEST_VERSION - 1)) \
+    g++-$((GCC_LATEST_VERSION - 1)) \
+    gcc-$GCC_LATEST_VERSION \
+    g++-$GCC_LATEST_VERSION
+  sudo rm -rf /var/lib/apt/lists/*
 EOF
 
 RUN <<EOF
@@ -289,5 +283,12 @@ CMD /opt/android/container-setup.sh && buildkite-agent start
 #
 FROM builder-base AS actions-builder
 
+# Install 'act' for running github actions locally. This provides an alternative to the run-buildbot script
+# while still providing reproducability.
+RUN curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
+
 WORKDIR /home/runner
 USER runner
+
+
+

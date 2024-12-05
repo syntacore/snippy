@@ -52,6 +52,7 @@
 
 #include "mlir/ExecutionEngine/SparseTensor/ArithmeticUtils.h"
 #include "mlir/ExecutionEngine/SparseTensor/COO.h"
+#include "mlir/ExecutionEngine/SparseTensor/ErrorHandling.h"
 #include "mlir/ExecutionEngine/SparseTensor/File.h"
 #include "mlir/ExecutionEngine/SparseTensor/Storage.h"
 
@@ -116,7 +117,20 @@ extern "C" {
     switch (action) {                                                          \
     case Action::kEmpty: {                                                     \
       return SparseTensorStorage<P, C, V>::newEmpty(                           \
-          dimRank, dimSizes, lvlRank, lvlSizes, lvlTypes, dim2lvl, lvl2dim);   \
+          dimRank, dimSizes, lvlRank, lvlSizes, lvlTypes, dim2lvl, lvl2dim,    \
+          false);                                                              \
+    }                                                                          \
+    case Action::kEmptyForward: {                                              \
+      return SparseTensorStorage<P, C, V>::newEmpty(                           \
+          dimRank, dimSizes, lvlRank, lvlSizes, lvlTypes, dim2lvl, lvl2dim,    \
+          true);                                                               \
+    }                                                                          \
+    case Action::kFromCOO: {                                                   \
+      assert(ptr && "Received nullptr for SparseTensorCOO object");            \
+      auto &coo = *static_cast<SparseTensorCOO<V> *>(ptr);                     \
+      return SparseTensorStorage<P, C, V>::newFromCOO(                         \
+          dimRank, dimSizes, lvlRank, lvlSizes, lvlTypes, dim2lvl, lvl2dim,    \
+          coo);                                                                \
     }                                                                          \
     case Action::kFromReader: {                                                \
       assert(ptr && "Received nullptr for SparseTensorReader object");         \
@@ -124,10 +138,15 @@ extern "C" {
       return static_cast<void *>(reader.readSparseTensor<P, C, V>(             \
           lvlRank, lvlSizes, lvlTypes, dim2lvl, lvl2dim));                     \
     }                                                                          \
+    case Action::kToCOO: {                                                     \
+      assert(ptr && "Received nullptr for SparseTensorStorage object");        \
+      auto &tensor = *static_cast<SparseTensorStorage<P, C, V> *>(ptr);        \
+      return tensor.toCOO();                                                   \
+    }                                                                          \
     case Action::kPack: {                                                      \
       assert(ptr && "Received nullptr for SparseTensorStorage object");        \
       intptr_t *buffers = static_cast<intptr_t *>(ptr);                        \
-      return SparseTensorStorage<P, C, V>::newFromBuffers(                     \
+      return SparseTensorStorage<P, C, V>::packFromLvlBuffers(                 \
           dimRank, dimSizes, lvlRank, lvlSizes, lvlTypes, dim2lvl, lvl2dim,    \
           dimRank, buffers);                                                   \
     }                                                                          \
@@ -138,8 +157,8 @@ extern "C" {
       return ptr;                                                              \
     }                                                                          \
     }                                                                          \
-    fprintf(stderr, "unknown action %d\n", static_cast<uint32_t>(action));     \
-    exit(1);                                                                   \
+    MLIR_SPARSETENSOR_FATAL("unknown action: %d\n",                            \
+                            static_cast<uint32_t>(action));                    \
   }
 
 #define CASE_SECSAME(p, v, P, V) CASE(p, p, v, P, P, V)
@@ -282,10 +301,10 @@ void *_mlir_ciface_newSparseTensor( // NOLINT
   CASE_SECSAME(OverheadType::kU64, PrimaryType::kC32, uint64_t, complex32);
 
   // Unsupported case (add above if needed).
-  fprintf(stderr, "unsupported combination of types: <P=%d, C=%d, V=%d>\n",
-          static_cast<int>(posTp), static_cast<int>(crdTp),
-          static_cast<int>(valTp));
-  exit(1);
+  MLIR_SPARSETENSOR_FATAL(
+      "unsupported combination of types: <P=%d, C=%d, V=%d>\n",
+      static_cast<int>(posTp), static_cast<int>(crdTp),
+      static_cast<int>(valTp));
 }
 #undef CASE
 #undef CASE_SECSAME
@@ -311,7 +330,6 @@ MLIR_SPARSETENSOR_FOREVERY_V(IMPL_SPARSEVALUES)
     assert(v);                                                                 \
     aliasIntoMemref(v->size(), v->data(), *ref);                               \
   }
-
 #define IMPL_SPARSEPOSITIONS(PNAME, P)                                         \
   IMPL_GETOVERHEAD(sparsePositions##PNAME, P, getPositions)
 MLIR_SPARSETENSOR_FOREVERY_O(IMPL_SPARSEPOSITIONS)
@@ -321,13 +339,22 @@ MLIR_SPARSETENSOR_FOREVERY_O(IMPL_SPARSEPOSITIONS)
   IMPL_GETOVERHEAD(sparseCoordinates##CNAME, C, getCoordinates)
 MLIR_SPARSETENSOR_FOREVERY_O(IMPL_SPARSECOORDINATES)
 #undef IMPL_SPARSECOORDINATES
-
-#define IMPL_SPARSECOORDINATESBUFFER(CNAME, C)                                 \
-  IMPL_GETOVERHEAD(sparseCoordinatesBuffer##CNAME, C, getCoordinatesBuffer)
-MLIR_SPARSETENSOR_FOREVERY_O(IMPL_SPARSECOORDINATESBUFFER)
-#undef IMPL_SPARSECOORDINATESBUFFER
-
 #undef IMPL_GETOVERHEAD
+
+#define IMPL_FORWARDINGINSERT(VNAME, V)                                        \
+  void _mlir_ciface_forwardingInsert##VNAME(                                   \
+      void *t, StridedMemRefType<V, 0> *vref,                                  \
+      StridedMemRefType<index_type, 1> *dimCoordsRef) {                        \
+    assert(t &&vref);                                                          \
+    ASSERT_NO_STRIDE(dimCoordsRef);                                            \
+    const index_type *dimCoords = MEMREF_GET_PAYLOAD(dimCoordsRef);            \
+    assert(dimCoords);                                                         \
+    const V *value = MEMREF_GET_PAYLOAD(vref);                                 \
+    static_cast<SparseTensorStorageBase *>(t)->forwardingInsert(dimCoords,     \
+                                                                *value);       \
+  }
+MLIR_SPARSETENSOR_FOREVERY_V(IMPL_FORWARDINGINSERT)
+#undef IMPL_FORWARDINGINSERT
 
 #define IMPL_LEXINSERT(VNAME, V)                                               \
   void _mlir_ciface_lexInsert##VNAME(                                          \
@@ -400,8 +427,8 @@ void _mlir_ciface_getSparseTensorReaderDimSizes(
     const uint64_t cSize = MEMREF_GET_USIZE(cref);                             \
     const uint64_t vSize = MEMREF_GET_USIZE(vref);                             \
     ASSERT_USIZE_EQ(lvl2dimRef, dimRank);                                      \
-    assert(cSize >= lvlRank * reader.getNSE());                                \
-    assert(vSize >= reader.getNSE());                                          \
+    assert(cSize >= lvlRank * vSize);                                          \
+    assert(vSize >= reader.getNSE() && "Not enough space in buffers");         \
     (void)dimRank;                                                             \
     (void)cSize;                                                               \
     (void)vSize;                                                               \
@@ -461,6 +488,10 @@ index_type sparseDimSize(void *tensor, index_type d) {
   return static_cast<SparseTensorStorageBase *>(tensor)->getDimSize(d);
 }
 
+void endForwardingInsert(void *tensor) {
+  return static_cast<SparseTensorStorageBase *>(tensor)->endForwardingInsert();
+}
+
 void endLexInsert(void *tensor) {
   return static_cast<SparseTensorStorageBase *>(tensor)->endLexInsert();
 }
@@ -469,15 +500,20 @@ void delSparseTensor(void *tensor) {
   delete static_cast<SparseTensorStorageBase *>(tensor);
 }
 
-char *getTensorFilename(index_type id) {
-  constexpr size_t bufSize = 80;
-  char var[bufSize];
-  snprintf(var, bufSize, "TENSOR%" PRIu64, id);
-  char *env = getenv(var);
-  if (!env) {
-    fprintf(stderr, "Environment variable %s is not set\n", var);
-    exit(1);
+#define IMPL_DELCOO(VNAME, V)                                                  \
+  void delSparseTensorCOO##VNAME(void *coo) {                                  \
+    delete static_cast<SparseTensorCOO<V> *>(coo);                             \
   }
+MLIR_SPARSETENSOR_FOREVERY_V(IMPL_DELCOO)
+#undef IMPL_DELCOO
+
+char *getTensorFilename(index_type id) {
+  constexpr size_t BUF_SIZE = 80;
+  char var[BUF_SIZE];
+  snprintf(var, BUF_SIZE, "TENSOR%" PRIu64, id);
+  char *env = getenv(var);
+  if (!env)
+    MLIR_SPARSETENSOR_FATAL("Environment variable %s is not set\n", var);
   return env;
 }
 

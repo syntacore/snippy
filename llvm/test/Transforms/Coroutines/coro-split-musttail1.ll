@@ -1,6 +1,7 @@
-; Tests that coro-split will convert coro.await.suspend.handle to a musttail call.
-; RUN: opt < %s -passes='cgscc(coro-split),simplifycfg,early-cse' -S | FileCheck --check-prefixes=CHECK %s
-; RUN: opt < %s -passes='pgo-instr-gen,cgscc(coro-split),simplifycfg,early-cse' -S | FileCheck --check-prefixes=CHECK %s
+; Tests that coro-split will convert coro.resume followed by a suspend to a
+; musttail call.
+; RUN: opt < %s -passes='cgscc(coro-split),simplifycfg,early-cse' -S | FileCheck --check-prefixes=CHECK,NOPGO %s
+; RUN: opt < %s -passes='pgo-instr-gen,cgscc(coro-split),simplifycfg,early-cse' -S | FileCheck --check-prefixes=CHECK,PGO %s
 
 define void @f() #0 {
 entry:
@@ -27,14 +28,17 @@ await.suspend:
   ]
 await.resume1:
   %hdl = call ptr @g()
-  call void @llvm.coro.await.suspend.handle(ptr null, ptr %hdl, ptr @await_suspend_function)
+  %addr2 = call ptr @llvm.coro.subfn.addr(ptr %hdl, i8 0)
+  call fastcc void %addr2(ptr %hdl)
   br label %final.suspend
 await.resume2:
   %hdl2 = call ptr @h()
-  call void @llvm.coro.await.suspend.handle(ptr null, ptr %hdl2, ptr @await_suspend_function)
+  %addr3 = call ptr @llvm.coro.subfn.addr(ptr %hdl2, i8 0)
+  call fastcc void %addr3(ptr %hdl2)
   br label %final.suspend
 await.resume3:
-  call void @llvm.coro.await.suspend.handle(ptr null, ptr null, ptr @await_suspend_function)
+  %addr4 = call ptr @llvm.coro.subfn.addr(ptr null, i8 0)
+  call fastcc void %addr4(ptr null)
   br label %final.suspend
 final.suspend:
   %suspend2 = call i8 @llvm.coro.suspend(token %save2, i1 false)
@@ -59,18 +63,18 @@ unreach:
 ; Verify that in the resume part resume call is marked with musttail.
 ; CHECK-LABEL: @f.resume(
 ; CHECK: %[[hdl:.+]] = call ptr @g()
-; CHECK-NEXT: call ptr @await_suspend_function
-; CHECK-NEXT: %[[addr2:.+]] = call ptr @llvm.coro.subfn.addr
-; CHECK-NEXT: musttail call fastcc void %[[addr2]]
+; CHECK-NEXT: %[[addr2:.+]] = call ptr @llvm.coro.subfn.addr(ptr %[[hdl]], i8 0)
+; NOPGO-NEXT: musttail call fastcc void %[[addr2]](ptr %[[hdl]])
+; PGO: musttail call fastcc void %[[addr2]](ptr %[[hdl]])
 ; CHECK-NEXT: ret void
 ; CHECK: %[[hdl2:.+]] = call ptr @h()
-; CHECK-NEXT: call ptr @await_suspend_function
-; CHECK-NEXT: %[[addr3:.+]] = call ptr @llvm.coro.subfn.addr
-; CHECK-NEXT: musttail call fastcc void %[[addr3]]
+; CHECK-NEXT: %[[addr3:.+]] = call ptr @llvm.coro.subfn.addr(ptr %[[hdl2]], i8 0)
+; NOPGO-NEXT: musttail call fastcc void %[[addr3]](ptr %[[hdl2]])
+; PGO: musttail call fastcc void %[[addr3]](ptr %[[hdl2]])
 ; CHECK-NEXT: ret void
-; CHECK: call ptr @await_suspend_function
-; CHECK: %[[addr4:.+]] = call ptr @llvm.coro.subfn.addr
-; CHECK-NEXT: musttail call fastcc void %[[addr4]]
+; CHECK: %[[addr4:.+]] = call ptr @llvm.coro.subfn.addr(ptr null, i8 0)
+; NOPGO-NEXT: musttail call fastcc void %[[addr4]](ptr null)
+; PGO: musttail call fastcc void %[[addr4]](ptr null)
 ; CHECK-NEXT: ret void
 
 
@@ -89,7 +93,6 @@ declare ptr @malloc(i64)
 declare i8 @switch_result()
 declare ptr @g()
 declare ptr @h()
-declare ptr @await_suspend_function(ptr %awaiter, ptr %hdl)
 
 attributes #0 = { presplitcoroutine }
 attributes #1 = { argmemonly nounwind readonly }

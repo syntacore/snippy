@@ -99,7 +99,7 @@ static inline MDString *getRVInstMarker(Module &M) {
 /// going to be removed from the IR before WinEHPrepare.
 CallInst *createCallInstWithColors(
     FunctionCallee Func, ArrayRef<Value *> Args, const Twine &NameStr,
-    BasicBlock::iterator InsertBefore,
+    Instruction *InsertBefore,
     const DenseMap<BasicBlock *, ColorVector> &BlockColors);
 
 class BundledRetainClaimRVs {
@@ -113,12 +113,11 @@ public:
   std::pair<bool, bool> insertAfterInvokes(Function &F, DominatorTree *DT);
 
   /// Insert a retainRV/claimRV call.
-  CallInst *insertRVCall(BasicBlock::iterator InsertPt,
-                         CallBase *AnnotatedCall);
+  CallInst *insertRVCall(Instruction *InsertPt, CallBase *AnnotatedCall);
 
   /// Insert a retainRV/claimRV call with colors.
   CallInst *insertRVCallWithColors(
-      BasicBlock::iterator InsertPt, CallBase *AnnotatedCall,
+      Instruction *InsertPt, CallBase *AnnotatedCall,
       const DenseMap<BasicBlock *, ColorVector> &BlockColors);
 
   /// See if an instruction is a bundled retainRV/claimRV call.
@@ -141,8 +140,7 @@ public:
           }
 
       auto *NewCall = CallBase::removeOperandBundle(
-          It->second, LLVMContext::OB_clang_arc_attachedcall,
-          It->second->getIterator());
+          It->second, LLVMContext::OB_clang_arc_attachedcall, It->second);
       NewCall->copyMetadata(*It->second);
       It->second->replaceAllUsesWith(NewCall);
       It->second->eraseFromParent();

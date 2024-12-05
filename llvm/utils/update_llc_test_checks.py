@@ -16,9 +16,7 @@ from UpdateTestChecks import common
 
 # llc is the only llc-like in the LLVM tree but downstream forks can add
 # additional ones here if they have them.
-LLC_LIKE_TOOLS = [
-    "llc",
-]
+LLC_LIKE_TOOLS = ("llc",)
 
 
 def main():
@@ -56,16 +54,6 @@ def main():
         default=False,
         help="Reduce scrubbing shuffles with memory operands",
     )
-    parser.add_argument(
-        "--tool",
-        default=None,
-        help="Treat the given tool name as an llc-like tool for which check lines should be generated",
-    )
-    parser.add_argument(
-        "--default-march",
-        default=None,
-        help="Set a default -march for when neither triple nor arch are found in a RUN line",
-    )
     parser.add_argument("tests", nargs="+")
     initial_args = common.parse_commandline_args(parser)
 
@@ -101,7 +89,7 @@ def main():
             if m:
                 triple_in_cmd = m.groups()[0]
 
-            march_in_cmd = ti.args.default_march
+            march_in_cmd = None
             m = common.MARCH_ARG_RE.search(llc_cmd)
             if m:
                 march_in_cmd = m.groups()[0]
@@ -113,11 +101,7 @@ def main():
                 from UpdateTestChecks import asm as output_type
 
             common.verify_filecheck_prefixes(filecheck_cmd)
-
-            llc_like_tools = LLC_LIKE_TOOLS[:]
-            if ti.args.tool:
-                llc_like_tools.append(ti.args.tool)
-            if llc_tool not in llc_like_tools:
+            if llc_tool not in LLC_LIKE_TOOLS:
                 common.warn("Skipping non-llc RUN line: " + l)
                 continue
 
@@ -149,7 +133,6 @@ def main():
         else:
             check_indent = ""
 
-        ginfo = common.make_asm_generalizer(version=1)
         builder = common.FunctionTestBuilder(
             run_list=run_list,
             flags=type(
@@ -165,7 +148,6 @@ def main():
             ),
             scrubber_args=[ti.args],
             path=ti.path,
-            ginfo=ginfo,
         )
 
         for (
@@ -191,7 +173,9 @@ def main():
                 triple = common.get_triple_from_march(march_in_cmd)
 
             scrubber, function_re = output_type.get_run_handler(triple)
-            builder.process_run_line(function_re, scrubber, raw_tool_output, prefixes)
+            builder.process_run_line(
+                function_re, scrubber, raw_tool_output, prefixes, True
+            )
             builder.processed_prefixes(prefixes)
 
         func_dict = builder.finish_and_get_func_dict()
@@ -234,7 +218,6 @@ def main():
                     prefixes,
                     func_dict,
                     func,
-                    ginfo,
                     global_vars_seen_dict,
                     is_filtered=builder.is_filtered(),
                 ),
@@ -260,7 +243,6 @@ def main():
                             run_list,
                             func_dict,
                             func_name,
-                            ginfo,
                             global_vars_seen_dict,
                             is_filtered=builder.is_filtered(),
                         )

@@ -56,8 +56,6 @@ public:
 
   virtual bool NeedToDoInitialImageFetch() = 0;
 
-  std::optional<lldb_private::Address> GetStartAddress() override;
-
 protected:
   void PrivateInitialize(lldb_private::Process *process);
 

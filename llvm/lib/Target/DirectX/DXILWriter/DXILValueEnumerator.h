@@ -236,7 +236,7 @@ public:
   void incorporateFunction(const Function &F);
 
   void purgeFunction();
-  uint64_t computeBitsRequiredForTypeIndices() const;
+  uint64_t computeBitsRequiredForTypeIndicies() const;
 
   void EnumerateType(Type *T);
 

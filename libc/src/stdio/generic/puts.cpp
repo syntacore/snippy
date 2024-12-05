@@ -10,12 +10,10 @@
 #include "src/__support/CPP/string_view.h"
 #include "src/__support/File/file.h"
 
-#include "hdr/types/FILE.h"
-#include "src/__support/macros/config.h"
 #include "src/errno/libc_errno.h"
-#include <stddef.h>
+#include <stdio.h>
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 
 namespace {
 
@@ -55,4 +53,4 @@ LLVM_LIBC_FUNCTION(int, puts, (const char *__restrict str)) {
   return 0;
 }
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE

@@ -9,7 +9,6 @@
 #include "PrintfMatcher.h"
 
 #include "src/__support/FPUtil/FPBits.h"
-#include "src/__support/macros/config.h"
 #include "src/stdio/printf_core/core_structs.h"
 
 #include "test/UnitTest/StringUtils.h"
@@ -17,7 +16,7 @@
 
 #include <stdint.h>
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 namespace testing {
 
 using printf_core::FormatFlags;
@@ -39,10 +38,6 @@ namespace {
 #define CASE_LM(lm)                                                            \
   case (LengthModifier::lm):                                                   \
     tlog << #lm;                                                               \
-    break
-#define CASE_LM_BIT_WIDTH(lm, bw)                                              \
-  case (LengthModifier::lm):                                                   \
-    tlog << #lm << "\n\tbit width: :" << bw;                                   \
     break
 
 static void display(FormatSection form) {
@@ -72,8 +67,6 @@ static void display(FormatSection form) {
       CASE_LM(z);
       CASE_LM(t);
       CASE_LM(L);
-      CASE_LM_BIT_WIDTH(w, form.bit_width);
-      CASE_LM_BIT_WIDTH(wf, form.bit_width);
     }
     tlog << "\n";
     tlog << "\tconversion name: " << form.conv_name << "\n";
@@ -101,4 +94,4 @@ void FormatSectionMatcher::explainError() {
 }
 
 } // namespace testing
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE

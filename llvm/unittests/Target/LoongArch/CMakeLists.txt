@@ -22,3 +22,5 @@ add_llvm_target_unittest(LoongArchTests
   InstSizes.cpp
   MCInstrAnalysisTest.cpp
   )
+
+set_property(TARGET LoongArchTests PROPERTY FOLDER "Tests/UnitTests/TargetTests")

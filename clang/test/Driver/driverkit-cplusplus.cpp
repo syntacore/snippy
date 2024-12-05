@@ -1,3 +1,4 @@
+// REQUIRES: x86-registered-target
 // RUN: %clang %s -target x86_64-apple-driverkit19.0 -fsyntax-only
 
 #if __cplusplus != 201703L

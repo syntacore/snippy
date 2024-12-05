@@ -432,7 +432,6 @@ RegistryMaps::RegistryMaps() {
   REGISTER_MATCHER(isExpansionInMainFile);
   REGISTER_MATCHER(isExpansionInSystemHeader);
   REGISTER_MATCHER(isExplicit);
-  REGISTER_MATCHER(isExplicitObjectMemberFunction);
   REGISTER_MATCHER(isExplicitTemplateSpecialization);
   REGISTER_MATCHER(isExpr);
   REGISTER_MATCHER(isExternC);

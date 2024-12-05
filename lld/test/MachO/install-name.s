@@ -31,7 +31,7 @@
 
 # ID:          cmd LC_ID_DYLIB
 # ID-NEXT: cmdsize
-# ID-NEXT:   name foo
+# LID-NEXT:   name foo
 
 .globl _main
 _main:

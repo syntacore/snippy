@@ -43,7 +43,7 @@ JSONString::JSONString(const std::string &s)
     : JSONValue(JSONValue::Kind::String), m_data(s) {}
 
 void JSONString::Write(std::ostream &s) {
-  s << "\"" << json_string_quote_metachars(m_data) << "\"";
+  s << "\"" << json_string_quote_metachars(m_data).c_str() << "\"";
 }
 
 uint64_t JSONNumber::GetAsUnsigned() const {
@@ -395,7 +395,7 @@ JSONParser::Token JSONParser::GetToken(std::string &value) {
           } else {
             error << "error: got exponent character but no exponent digits at "
                      "offset in float value \""
-                  << value << "\"";
+                  << value.c_str() << "\"";
             value = error.str();
             return Token::Status;
           }
@@ -405,7 +405,8 @@ JSONParser::Token JSONParser::GetToken(std::string &value) {
           if (got_frac_digits) {
             return Token::Float;
           } else {
-            error << "error: no digits after decimal point \"" << value << "\"";
+            error << "error: no digits after decimal point \"" << value.c_str()
+                  << "\"";
             value = error.str();
             return Token::Status;
           }
@@ -416,7 +417,7 @@ JSONParser::Token JSONParser::GetToken(std::string &value) {
           // We need at least some integer digits to make an integer
           return Token::Integer;
         } else {
-          error << "error: no digits negate sign \"" << value << "\"";
+          error << "error: no digits negate sign \"" << value.c_str() << "\"";
           value = error.str();
           return Token::Status;
         }

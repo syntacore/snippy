@@ -13,7 +13,6 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/ModuleSlotTracker.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/SourceMgr.h"
 #include "gtest/gtest.h"
 using namespace llvm;
@@ -256,8 +255,6 @@ TEST(ValueTest, getLocalSlotDeath) {
 TEST(ValueTest, replaceUsesOutsideBlock) {
   // Check that Value::replaceUsesOutsideBlock(New, BB) replaces uses outside
   // BB, including dbg.* uses of MetadataAsValue(ValueAsMetadata(this)).
-  bool OldDbgValueMode = UseNewDbgInfoFormat;
-  UseNewDbgInfoFormat = false;
   const auto *IR = R"(
     define i32 @f() !dbg !6 {
     entry:
@@ -318,12 +315,11 @@ TEST(ValueTest, replaceUsesOutsideBlock) {
   // These users are outside Entry so should be changed.
   ASSERT_TRUE(ExitDbg->getValue(0) == cast<Value>(B));
   ASSERT_TRUE(Ret->getOperand(0) == cast<Value>(B));
-  UseNewDbgInfoFormat = OldDbgValueMode;
 }
 
-TEST(ValueTest, replaceUsesOutsideBlockDbgVariableRecord) {
+TEST(ValueTest, replaceUsesOutsideBlockDPValue) {
   // Check that Value::replaceUsesOutsideBlock(New, BB) replaces uses outside
-  // BB, including DbgVariableRecords.
+  // BB, including DPValues.
   const auto *IR = R"(
     define i32 @f() !dbg !6 {
     entry:
@@ -363,6 +359,10 @@ TEST(ValueTest, replaceUsesOutsideBlockDbgVariableRecord) {
   if (!M)
     Err.print("ValueTest", errs());
 
+  bool OldDbgValueMode = UseNewDbgInfoFormat;
+  UseNewDbgInfoFormat = true;
+  M->convertToNewDbgValues();
+
   auto GetNext = [](auto *I) { return &*++I->getIterator(); };
 
   Function *F = M->getFunction("f");
@@ -376,19 +376,18 @@ TEST(ValueTest, replaceUsesOutsideBlockDbgVariableRecord) {
   BasicBlock *Exit = GetNext(Entry);
   Instruction *Ret = &Exit->front();
 
-  EXPECT_TRUE(Branch->hasDbgRecords());
-  EXPECT_TRUE(Ret->hasDbgRecords());
+  EXPECT_TRUE(Branch->hasDbgValues());
+  EXPECT_TRUE(Ret->hasDbgValues());
 
-  DbgVariableRecord *DVR1 =
-      cast<DbgVariableRecord>(&*Branch->getDbgRecordRange().begin());
-  DbgVariableRecord *DVR2 =
-      cast<DbgVariableRecord>(&*Ret->getDbgRecordRange().begin());
+  DPValue *DPV1 = &*Branch->getDbgValueRange().begin();
+  DPValue *DPV2 = &*Ret->getDbgValueRange().begin();
 
   A->replaceUsesOutsideBlock(B, Entry);
   // These users are in Entry so shouldn't be changed.
-  EXPECT_TRUE(DVR1->getVariableLocationOp(0) == cast<Value>(A));
+  EXPECT_TRUE(DPV1->getVariableLocationOp(0) == cast<Value>(A));
   // These users are outside Entry so should be changed.
-  EXPECT_TRUE(DVR2->getVariableLocationOp(0) == cast<Value>(B));
+  EXPECT_TRUE(DPV2->getVariableLocationOp(0) == cast<Value>(B));
+  UseNewDbgInfoFormat = OldDbgValueMode;
 }
 
 } // end anonymous namespace

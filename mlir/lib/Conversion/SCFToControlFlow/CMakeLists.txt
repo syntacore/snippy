@@ -14,6 +14,5 @@ add_mlir_conversion_library(MLIRSCFToControlFlow
   MLIRArithDialect
   MLIRControlFlowDialect
   MLIRSCFDialect
-  MLIRSCFTransforms
   MLIRTransforms
   )

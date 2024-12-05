@@ -94,7 +94,6 @@ class X86TTIImpl : public BasicTTIImplBase<X86TTIImpl> {
       X86::TuningNoDomainDelayBlend,
       X86::TuningPreferShiftShuffle,
       X86::TuningFastImmVectorShift,
-      X86::TuningFastDPWSSD,
 
       // Perf-tuning flags.
       X86::TuningFastGather,
@@ -111,7 +110,7 @@ class X86TTIImpl : public BasicTTIImplBase<X86TTIImpl> {
 
 public:
   explicit X86TTIImpl(const X86TargetMachine *TM, const Function &F)
-      : BaseT(TM, F.getDataLayout()), ST(TM->getSubtargetImpl(F)),
+      : BaseT(TM, F.getParent()->getDataLayout()), ST(TM->getSubtargetImpl(F)),
         TLI(ST->getTargetLowering()) {}
 
   /// \name Scalar TTI Implementations
@@ -132,7 +131,6 @@ public:
   /// @{
 
   unsigned getNumberOfRegisters(unsigned ClassID) const;
-  bool hasConditionalLoadStoreForType(Type *Ty = nullptr) const;
   TypeSize getRegisterBitWidth(TargetTransformInfo::RegisterKind K) const;
   unsigned getLoadStoreVecRegBitWidth(unsigned AS) const;
   unsigned getMaxInterleaveFactor(ElementCount VF);
@@ -140,7 +138,7 @@ public:
       unsigned Opcode, Type *Ty, TTI::TargetCostKind CostKind,
       TTI::OperandValueInfo Op1Info = {TTI::OK_AnyValue, TTI::OP_None},
       TTI::OperandValueInfo Op2Info = {TTI::OK_AnyValue, TTI::OP_None},
-      ArrayRef<const Value *> Args = std::nullopt,
+      ArrayRef<const Value *> Args = ArrayRef<const Value *>(),
       const Instruction *CxtI = nullptr);
   InstructionCost getAltInstrCost(VectorType *VecTy, unsigned Opcode0,
                                   unsigned Opcode1,
@@ -151,8 +149,7 @@ public:
                                  ArrayRef<int> Mask,
                                  TTI::TargetCostKind CostKind, int Index,
                                  VectorType *SubTp,
-                                 ArrayRef<const Value *> Args = std::nullopt,
-                                 const Instruction *CxtI = nullptr);
+                                 ArrayRef<const Value *> Args = std::nullopt);
   InstructionCost getCastInstrCost(unsigned Opcode, Type *Dst, Type *Src,
                                    TTI::CastContextHint CCH,
                                    TTI::TargetCostKind CostKind,
@@ -254,7 +251,7 @@ public:
   /// If the AM is supported, the return value must be >= 0.
   /// If the AM is not supported, it returns a negative value.
   InstructionCost getScalingFactorCost(Type *Ty, GlobalValue *BaseGV,
-                                       StackOffset BaseOffset, bool HasBaseReg,
+                                       int64_t BaseOffset, bool HasBaseReg,
                                        int64_t Scale, unsigned AddrSpace) const;
 
   bool isLSRCostLess(const TargetTransformInfo::LSRCost &C1,
@@ -272,8 +269,8 @@ public:
   bool isLegalMaskedGatherScatter(Type *DataType, Align Alignment);
   bool isLegalMaskedGather(Type *DataType, Align Alignment);
   bool isLegalMaskedScatter(Type *DataType, Align Alignment);
-  bool isLegalMaskedExpandLoad(Type *DataType, Align Alignment);
-  bool isLegalMaskedCompressStore(Type *DataType, Align Alignment);
+  bool isLegalMaskedExpandLoad(Type *DataType);
+  bool isLegalMaskedCompressStore(Type *DataType);
   bool isLegalAltInstr(VectorType *VecTy, unsigned Opcode0, unsigned Opcode1,
                        const SmallBitVector &OpcodeMask) const;
   bool hasDivRemOp(Type *DataType, bool IsSigned);
@@ -294,13 +291,14 @@ public:
   bool supportsEfficientVectorElementLoadStore() const;
   bool enableInterleavedAccessVectorization();
 
-  InstructionCost getBranchMispredictPenalty() const;
-
 private:
   bool supportsGather() const;
-  InstructionCost getGSVectorCost(unsigned Opcode, TTI::TargetCostKind CostKind,
-                                  Type *DataTy, const Value *Ptr,
-                                  Align Alignment, unsigned AddressSpace);
+  InstructionCost getGSScalarCost(unsigned Opcode, Type *DataTy,
+                                  bool VariableMask, Align Alignment,
+                                  unsigned AddressSpace);
+  InstructionCost getGSVectorCost(unsigned Opcode, Type *DataTy,
+                                  const Value *Ptr, Align Alignment,
+                                  unsigned AddressSpace);
 
   int getGatherOverhead() const;
   int getScatterOverhead() const;

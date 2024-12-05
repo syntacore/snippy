@@ -40,25 +40,23 @@ public:
 
   ~NSIndexPathSyntheticFrontEnd() override = default;
 
-  llvm::Expected<uint32_t> CalculateNumChildren() override {
-    return m_impl.GetNumIndexes();
-  }
+  size_t CalculateNumChildren() override { return m_impl.GetNumIndexes(); }
 
-  lldb::ValueObjectSP GetChildAtIndex(uint32_t idx) override {
+  lldb::ValueObjectSP GetChildAtIndex(size_t idx) override {
     return m_impl.GetIndexAtIndex(idx, m_uint_star_type);
   }
 
-  lldb::ChildCacheState Update() override {
+  bool Update() override {
     m_impl.Clear();
 
     auto type_system = m_backend.GetCompilerType().GetTypeSystem();
     if (!type_system)
-      return lldb::ChildCacheState::eRefetch;
+      return false;
 
     auto ast = ScratchTypeSystemClang::GetForTarget(
         *m_backend.GetExecutionContextRef().GetTargetSP());
     if (!ast)
-      return lldb::ChildCacheState::eRefetch;
+      return false;
 
     m_uint_star_type = ast->GetPointerSizedIntType(false);
 
@@ -67,18 +65,18 @@ public:
 
     ProcessSP process_sp = m_backend.GetProcessSP();
     if (!process_sp)
-      return lldb::ChildCacheState::eRefetch;
+      return false;
 
     ObjCLanguageRuntime *runtime = ObjCLanguageRuntime::Get(*process_sp);
 
     if (!runtime)
-      return lldb::ChildCacheState::eRefetch;
+      return false;
 
     ObjCLanguageRuntime::ClassDescriptorSP descriptor(
         runtime->GetClassDescriptor(m_backend));
 
     if (!descriptor.get() || !descriptor->IsValid())
-      return lldb::ChildCacheState::eRefetch;
+      return false;
 
     uint64_t info_bits(0), value_bits(0), payload(0);
 
@@ -121,7 +119,7 @@ public:
         }
       }
     }
-    return lldb::ChildCacheState::eRefetch;
+    return false;
   }
 
   bool MightHaveChildren() override { return m_impl.m_mode != Mode::Invalid; }
@@ -129,7 +127,7 @@ public:
   size_t GetIndexOfChildWithName(ConstString name) override {
     const char *item_name = name.GetCString();
     uint32_t idx = ExtractIndexFromString(item_name);
-    if (idx < UINT32_MAX && idx >= CalculateNumChildrenIgnoringErrors())
+    if (idx < UINT32_MAX && idx >= CalculateNumChildren())
       return UINT32_MAX;
     return idx;
   }

@@ -148,8 +148,6 @@ module m2b
     end
     module subroutine s6() bind(c)
     end
-    module subroutine s7() bind(c, name="s7")
-    end
   end interface
 end
 
@@ -173,8 +171,6 @@ contains
   end
   !ERROR: Module subprogram 's6' has binding label 'not_s6' but the corresponding interface body has 's6'
   module subroutine s6() bind(c, name="not_s6")
-  end
-  module procedure s7
   end
 end
 

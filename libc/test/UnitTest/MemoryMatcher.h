@@ -6,23 +6,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TEST_UNITTEST_MEMORYMATCHER_H
-#define LLVM_LIBC_TEST_UNITTEST_MEMORYMATCHER_H
+#ifndef LLVM_LIBC_UTILS_UNITTEST_MEMORY_MATCHER_H
+#define LLVM_LIBC_UTILS_UNITTEST_MEMORY_MATCHER_H
 
 #include "src/__support/CPP/span.h"
 
-#include "src/__support/macros/config.h"
 #include "test/UnitTest/Test.h"
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 namespace testing {
 
 using MemoryView = LIBC_NAMESPACE::cpp::span<const char>;
 
 } // namespace testing
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE
 
-#if !LIBC_TEST_HAS_MATCHERS()
+#ifdef LIBC_COPT_TEST_USE_FUCHSIA
 
 #define EXPECT_MEM_EQ(expected, actual)                                        \
   do {                                                                         \
@@ -40,10 +39,9 @@ using MemoryView = LIBC_NAMESPACE::cpp::span<const char>;
     ASSERT_BYTES_EQ(e.data(), a.data(), e.size());                             \
   } while (0)
 
-#else // LIBC_TEST_HAS_MATCHERS()
+#else
 
-namespace LIBC_NAMESPACE_DECL {
-namespace testing {
+namespace LIBC_NAMESPACE::testing {
 
 class MemoryMatcher : public Matcher<MemoryView> {
   MemoryView expected;
@@ -59,14 +57,13 @@ public:
   void explainError() override;
 };
 
-} // namespace testing
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE::testing
 
 #define EXPECT_MEM_EQ(expected, actual)                                        \
   EXPECT_THAT(actual, LIBC_NAMESPACE::testing::MemoryMatcher(expected))
 #define ASSERT_MEM_EQ(expected, actual)                                        \
   ASSERT_THAT(actual, LIBC_NAMESPACE::testing::MemoryMatcher(expected))
 
-#endif // !LIBC_TEST_HAS_MATCHERS()
+#endif
 
-#endif // LLVM_LIBC_TEST_UNITTEST_MEMORYMATCHER_H
+#endif // LLVM_LIBC_UTILS_UNITTEST_MEMORY_MATCHER_H

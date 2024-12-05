@@ -5,7 +5,6 @@ set(LLVM_LINK_COMPONENTS
 
 add_llvm_unittest(BinaryFormatTests
   DwarfTest.cpp
-  ELFTest.cpp
   MachOTest.cpp
   MsgPackDocumentTest.cpp
   MsgPackReaderTest.cpp

@@ -157,23 +157,22 @@ Clang Implementation
   of the changes in the prototype implementation are restoring Clang-3.7 code
   that was previously modified to its original state.
 
-The implementation in clang adds a new non-decaying array type, a new AST node
-to represent output parameters, and minor extensions to Clang's existing support
-for Objective-C write-back arguments. The goal of this design is to capture the
-semantic details of HLSL function calls in the AST, and minimize the amount of
-magic that needs to occur during IR generation.
+The implementation in clang depends on two new AST nodes and minor extensions to
+Clang's existing support for Objective-C write-back arguments. The goal of this
+design is to capture the semantic details of HLSL function calls in the AST, and
+minimize the amount of magic that needs to occur during IR generation.
+
+The two new AST nodes are ``HLSLArrayTemporaryExpr`` and ``HLSLOutParamExpr``,
+which respectively represent the temporaries used for passing arrays by value
+and the temporaries created for function outputs.
 
 Array Temporaries
 -----------------
 
-The new ``ArrayParameterType`` is a sub-class of ``ConstantArrayType``
-inheriting all the behaviors and methods of the parent except that it does not
-decay to a pointer during overload resolution or template type deduction.
-
-An argument of ``ConstantArrayType`` can be implicitly converted to an
-equivalent non-decayed ``ArrayParameterType`` if the underlying canonical
-``ConstantArrayType`` is the same. This occurs during overload resolution
-instead of array to pointer decay.
+The ``HLSLArrayTemporaryExpr`` represents temporary values for input
+constant-sized array arguments. This applies for all constant-sized array
+arguments regardless of whether or not the parameter is constant-sized or
+unsized.
 
 .. code-block:: c++
 
@@ -194,7 +193,7 @@ In the example above, the following AST is generated for the call to
   CallExpr 'void'
   |-ImplicitCastExpr 'void (*)(float [4])' <FunctionToPointerDecay>
   | `-DeclRefExpr 'void (float [4])' lvalue Function 'SizedArray' 'void (float [4])'
-  `-ImplicitCastExpr 'float [4]' <HLSLArrayRValue>
+  `-HLSLArrayTemporaryExpr 'float [4]'
     `-DeclRefExpr 'float [4]' lvalue Var 'arr' 'float [4]'
 
 In the example above, the following AST is generated for the call to
@@ -205,7 +204,7 @@ In the example above, the following AST is generated for the call to
   CallExpr 'void'
   |-ImplicitCastExpr 'void (*)(float [])' <FunctionToPointerDecay>
   | `-DeclRefExpr 'void (float [])' lvalue Function 'UnsizedArray' 'void (float [])'
-  `-ImplicitCastExpr 'float [4]' <HLSLArrayRValue>
+  `-HLSLArrayTemporaryExpr 'float [4]'
     `-DeclRefExpr 'float [4]' lvalue Var 'arr' 'float [4]'
 
 In both of these cases the argument expression is of known array size so we can
@@ -237,7 +236,7 @@ An expected AST should be something like:
   CallExpr 'void'
   |-ImplicitCastExpr 'void (*)(float [])' <FunctionToPointerDecay>
   | `-DeclRefExpr 'void (float [])' lvalue Function 'UnsizedArray' 'void (float [])'
-  `-ImplicitCastExpr 'float [4]' <HLSLArrayRValue>
+  `-HLSLArrayTemporaryExpr 'float [4]'
     `-DeclRefExpr 'float [4]' lvalue Var 'arr' 'float [4]'
 
 Out Parameter Temporaries

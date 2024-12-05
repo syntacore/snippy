@@ -232,11 +232,7 @@ bool isSpelledInSource(SourceLocation Loc, const SourceManager &SM) {
   if (Loc.isFileID())
     return true;
   auto Spelling = SM.getDecomposedSpellingLoc(Loc);
-  bool InvalidSLocEntry = false;
-  const auto SLocEntry = SM.getSLocEntry(Spelling.first, &InvalidSLocEntry);
-  if (InvalidSLocEntry)
-    return false;
-  StringRef SpellingFile = SLocEntry.getFile().getName();
+  StringRef SpellingFile = SM.getSLocEntry(Spelling.first).getFile().getName();
   if (SpellingFile == "<scratch space>")
     return false;
   if (SpellingFile == "<built-in>")
@@ -582,21 +578,7 @@ std::optional<FileDigest> digestFile(const SourceManager &SM, FileID FID) {
 
 format::FormatStyle getFormatStyleForFile(llvm::StringRef File,
                                           llvm::StringRef Content,
-                                          const ThreadsafeFS &TFS,
-                                          bool FormatFile) {
-  // Unless we're formatting a substantial amount of code (the entire file
-  // or an arbitrarily large range), skip libFormat's heuristic check for
-  // .h files that tries to determine whether the file contains objective-c
-  // code. (This is accomplished by passing empty code contents to getStyle().
-  // The heuristic is the only thing that looks at the contents.)
-  // This is a workaround for PR60151, a known issue in libFormat where this
-  // heuristic can OOM on large files. If we *are* formatting the entire file,
-  // there's no point in doing this because the actual format::reformat() call
-  // will run into the same OOM; we'd just be risking inconsistencies between
-  // clangd and clang-format on smaller .h files where they disagree on what
-  // language is detected.
-  if (!FormatFile)
-    Content = {};
+                                          const ThreadsafeFS &TFS) {
   auto Style = format::getStyle(format::DefaultFormatStyle, File,
                                 format::DefaultFallbackStyle, Content,
                                 TFS.view(/*CWD=*/std::nullopt).get());

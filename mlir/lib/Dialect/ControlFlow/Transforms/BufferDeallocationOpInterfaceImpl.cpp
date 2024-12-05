@@ -17,7 +17,7 @@
 using namespace mlir;
 using namespace mlir::bufferization;
 
-static bool isMemref(Value v) { return isa<BaseMemRefType>(v.getType()); }
+static bool isMemref(Value v) { return v.getType().isa<BaseMemRefType>(); }
 
 namespace {
 /// While CondBranchOp also implement the BranchOpInterface, we add a
@@ -84,7 +84,7 @@ struct CondBranchOpInterface
             DenseMap<Value, Value> &mapping) -> DeallocOp {
       SmallVector<Value> toRetain;
       state.getMemrefsToRetain(condBr->getBlock(), target,
-                               destOperands.getAsOperandRange(), toRetain);
+                               OperandRange(destOperands), toRetain);
       SmallVector<Value> adaptedConditions(
           llvm::map_range(conditions, conditionModifier));
       auto deallocOp = builder.create<bufferization::DeallocOp>(

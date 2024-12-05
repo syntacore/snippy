@@ -6,7 +6,8 @@
 SUPPRESS1 int global = 42;
 
 SUPPRESS1 void foo() {
-  SUPPRESS1 int *p; // no-warning
+  // expected-error@-1 {{'suppress' attribute only applies to variables and statements}}
+  SUPPRESS1 int *p;
 
   SUPPRESS1 int a = 0; // no-warning
   SUPPRESS2()
@@ -27,19 +28,23 @@ SUPPRESS1 void foo() {
   // GNU-style attributes and C++11 attributes apply to different things when
   // written like this.  GNU  attribute gets attached to the declaration, while
   // C++11 attribute ends up on the type.
-  int SUPPRESS2("r") z; // no-warning
-  SUPPRESS2(foo) // no-warning
+  int SUPPRESS2("r") z;
+  SUPPRESS2(foo)
   float f;
   // expected-error@-2 {{expected string literal as argument of 'suppress' attribute}}
 }
 
-union SUPPRESS2("type.1") U { // no-warning
+union SUPPRESS2("type.1") U {
+  // expected-error@-1 {{'suppress' attribute only applies to variables and statements}}
   int i;
   float f;
 };
 
-SUPPRESS1 @interface Test { // no-warning
+SUPPRESS1 @interface Test {
+  // expected-error@-1 {{'suppress' attribute only applies to variables and statements}}
 }
-@property SUPPRESS2("prop") int *prop; // no-warning
-- (void)bar:(int)x SUPPRESS1; // no-warning
+@property SUPPRESS2("prop") int *prop;
+// expected-error@-1 {{'suppress' attribute only applies to variables and statements}}
+- (void)bar:(int)x SUPPRESS1;
+// expected-error@-1 {{'suppress' attribute only applies to variables and statements}}
 @end

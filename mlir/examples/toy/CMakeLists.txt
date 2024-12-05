@@ -1,5 +1,5 @@
 add_custom_target(Toy)
-set_target_properties(Toy PROPERTIES FOLDER "MLIR/Examples")
+set_target_properties(Toy PROPERTIES FOLDER Examples)
 
 macro(add_toy_chapter name)
   add_dependencies(Toy ${name})

@@ -16,20 +16,15 @@
 #include <limits>
 
 #ifdef _WIN32
-#include "flang/Common/windows-include.h"
-#include <direct.h>
-#define getcwd _getcwd
-#define PATH_MAX MAX_PATH
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
 
 // On Windows GetCurrentProcessId returns a DWORD aka uint32_t
 #include <processthreadsapi.h>
 inline pid_t getpid() { return GetCurrentProcessId(); }
 #else
 #include <unistd.h> //getpid()
-
-#ifndef PATH_MAX
-#define PATH_MAX 4096
-#endif
 #endif
 
 namespace Fortran::runtime {
@@ -47,9 +42,13 @@ pid_t RTNAME(GetPID)() { return getpid(); }
 // Returns the length of the \p string. Assumes \p string is valid.
 static std::int64_t StringLength(const char *string) {
   std::size_t length{std::strlen(string)};
-  if (length <= std::numeric_limits<std::int64_t>::max())
+  if constexpr (sizeof(std::size_t) < sizeof(std::int64_t)) {
     return static_cast<std::int64_t>(length);
-  return 0;
+  } else {
+    std::size_t max{std::numeric_limits<std::int64_t>::max()};
+    return length > max ? 0 // Just fail.
+                        : static_cast<std::int64_t>(length);
+  }
 }
 
 static void FillWithSpaces(const Descriptor &value, std::size_t offset = 0) {
@@ -197,11 +196,11 @@ std::int32_t RTNAME(GetCommand)(const Descriptor *value,
 }
 
 static std::size_t LengthWithoutTrailingSpaces(const Descriptor &d) {
-  std::size_t s{d.ElementBytes()}; // This can be 0.
-  while (s != 0 && *d.OffsetElement(s - 1) == ' ') {
+  std::size_t s{d.ElementBytes() - 1};
+  while (*d.OffsetElement(s) == ' ') {
     --s;
   }
-  return s;
+  return s + 1;
 }
 
 std::int32_t RTNAME(GetEnvVariable)(const Descriptor &name,
@@ -240,25 +239,6 @@ std::int32_t RTNAME(GetEnvVariable)(const Descriptor &name,
     return CopyCharsToDescriptor(*value, rawValue, varLen, errmsg);
   }
   return StatOk;
-}
-
-std::int32_t RTNAME(GetCwd)(
-    const Descriptor &cwd, const char *sourceFile, int line) {
-  Terminator terminator{sourceFile, line};
-
-  RUNTIME_CHECK(terminator, IsValidCharDescriptor(&cwd));
-
-  char *buf{(char *)AllocateMemoryOrCrash(terminator, PATH_MAX)};
-
-  if (!getcwd(buf, PATH_MAX)) {
-    return StatMissingCurrentWorkDirectory;
-  }
-
-  std::int64_t strLen{StringLength(buf)};
-  std::int32_t status{CopyCharsToDescriptor(cwd, buf, strLen)};
-
-  std::free(buf);
-  return status;
 }
 
 } // namespace Fortran::runtime

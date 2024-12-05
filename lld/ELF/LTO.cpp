@@ -61,8 +61,6 @@ static lto::Config createConfig() {
   c.Options.FunctionSections = true;
   c.Options.DataSections = true;
 
-  c.Options.BBAddrMap = config->ltoBBAddrMap;
-
   // Check if basic block sections must be used.
   // Allowed values for --lto-basic-block-sections are "all", "labels",
   // "<file name specifying basic block ids>", or none.  This is the equivalent
@@ -147,7 +145,7 @@ static lto::Config createConfig() {
   c.PGOWarnMismatch = config->ltoPGOWarnMismatch;
 
   if (config->emitLLVM) {
-    c.PreCodeGenModuleHook = [](size_t task, const Module &m) {
+    c.PostInternalizeModuleHook = [](size_t task, const Module &m) {
       if (std::unique_ptr<raw_fd_ostream> os =
               openLTOOutputFile(config->outputFile))
         WriteBitcodeToFile(m, *os, false);

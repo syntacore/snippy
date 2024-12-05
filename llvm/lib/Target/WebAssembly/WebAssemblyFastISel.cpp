@@ -137,10 +137,6 @@ private:
       if (Subtarget->hasReferenceTypes())
         return VT;
       break;
-    case MVT::exnref:
-      if (Subtarget->hasReferenceTypes() && Subtarget->hasExceptionHandling())
-        return VT;
-      break;
     case MVT::f16:
       return MVT::f32;
     case MVT::v16i8:
@@ -563,8 +559,6 @@ unsigned WebAssemblyFastISel::getRegForUnsignedValue(const Value *V) {
   Register VReg = getRegForValue(V);
   if (VReg == 0)
     return 0;
-  if (From == To)
-    return VReg;
   return zeroExtend(VReg, V, From, To);
 }
 
@@ -574,8 +568,6 @@ unsigned WebAssemblyFastISel::getRegForSignedValue(const Value *V) {
   Register VReg = getRegForValue(V);
   if (VReg == 0)
     return 0;
-  if (From == To)
-    return VReg;
   return signExtend(VReg, V, From, To);
 }
 
@@ -721,10 +713,6 @@ bool WebAssemblyFastISel::fastLowerArguments() {
       Opc = WebAssembly::ARGUMENT_externref;
       RC = &WebAssembly::EXTERNREFRegClass;
       break;
-    case MVT::exnref:
-      Opc = WebAssembly::ARGUMENT_exnref;
-      RC = &WebAssembly::EXNREFRegClass;
-      break;
     default:
       return false;
     }
@@ -829,9 +817,6 @@ bool WebAssemblyFastISel::selectCall(const Instruction *I) {
     case MVT::externref:
       ResultReg = createResultReg(&WebAssembly::EXTERNREFRegClass);
       break;
-    case MVT::exnref:
-      ResultReg = createResultReg(&WebAssembly::EXNREFRegClass);
-      break;
     default:
       return false;
     }
@@ -886,7 +871,7 @@ bool WebAssemblyFastISel::selectCall(const Instruction *I) {
     MIB.addImm(0);
     // The table into which this call_indirect indexes.
     MCSymbolWasm *Table = WebAssembly::getOrCreateFunctionTableSymbol(
-        MF->getContext(), Subtarget);
+        MF->getMMI().getContext(), Subtarget);
     if (Subtarget->hasReferenceTypes()) {
       MIB.addSym(Table);
     } else {
@@ -895,6 +880,18 @@ bool WebAssemblyFastISel::selectCall(const Instruction *I) {
       // ensure the table is live.
       Table->setNoStrip();
       MIB.addImm(0);
+    }
+    // See if we must truncate the function pointer.
+    // CALL_INDIRECT takes an i32, but in wasm64 we represent function pointers
+    // as 64-bit for uniformity with other pointer types.
+    // See also: WebAssemblyISelLowering.cpp: LowerCallResults
+    if (Subtarget->hasAddr64()) {
+      auto Wrap = BuildMI(*FuncInfo.MBB, std::prev(FuncInfo.InsertPt), MIMD,
+                          TII.get(WebAssembly::I32_WRAP_I64));
+      Register Reg32 = createResultReg(&WebAssembly::I32RegClass);
+      Wrap.addReg(Reg32, RegState::Define);
+      Wrap.addReg(CalleeReg);
+      CalleeReg = Reg32;
     }
   }
 
@@ -958,10 +955,6 @@ bool WebAssemblyFastISel::selectSelect(const Instruction *I) {
   case MVT::externref:
     Opc = WebAssembly::SELECT_EXTERNREF;
     RC = &WebAssembly::EXTERNREFRegClass;
-    break;
-  case MVT::exnref:
-    Opc = WebAssembly::SELECT_EXNREF;
-    RC = &WebAssembly::EXNREFRegClass;
     break;
   default:
     return false;
@@ -1370,7 +1363,6 @@ bool WebAssemblyFastISel::selectRet(const Instruction *I) {
   case MVT::v2f64:
   case MVT::funcref:
   case MVT::externref:
-  case MVT::exnref:
     break;
   default:
     return false;

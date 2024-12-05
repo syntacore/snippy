@@ -110,10 +110,8 @@ void transferOpflowOpt(RewriterBase &rewriter, Operation *rootOp);
 
 /// Cast away the leading unit dim, if exists, for the given contract op.
 /// Return success if the transformation applies; return failure otherwise.
-FailureOr<Value>
-castAwayContractionLeadingOneDim(vector::ContractionOp contractOp,
-                                 MaskingOpInterface maskingOp,
-                                 RewriterBase &rewriter);
+LogicalResult castAwayContractionLeadingOneDim(vector::ContractionOp contractOp,
+                                               RewriterBase &rewriter);
 
 } // namespace vector
 } // namespace mlir

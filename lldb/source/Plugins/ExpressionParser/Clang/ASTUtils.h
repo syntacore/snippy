@@ -9,18 +9,12 @@
 #ifndef LLDB_SOURCE_PLUGINS_EXPRESSIONPARSER_CLANG_ASTUTILS_H
 #define LLDB_SOURCE_PLUGINS_EXPRESSIONPARSER_CLANG_ASTUTILS_H
 
-#include "clang/Basic/ASTSourceDescriptor.h"
+#include "clang/Basic/Module.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/MultiplexExternalSemaSource.h"
 #include "clang/Sema/Sema.h"
 #include "clang/Sema/SemaConsumer.h"
 #include <optional>
-
-namespace clang {
-
-class Module;
-
-} // namespace clang
 
 namespace lldb_private {
 
@@ -36,7 +30,7 @@ public:
 
   ~ExternalASTSourceWrapper() override;
 
-  clang::Decl *GetExternalDecl(clang::GlobalDeclID ID) override {
+  clang::Decl *GetExternalDecl(uint32_t ID) override {
     return m_Source->GetExternalDecl(ID);
   }
 
@@ -62,7 +56,7 @@ public:
     return m_Source->GetExternalCXXBaseSpecifiers(Offset);
   }
 
-  void updateOutOfDateIdentifier(const clang::IdentifierInfo &II) override {
+  void updateOutOfDateIdentifier(clang::IdentifierInfo &II) override {
     m_Source->updateOutOfDateIdentifier(II);
   }
 
@@ -272,7 +266,7 @@ public:
   // ExternalASTSource.
   //===--------------------------------------------------------------------===//
 
-  clang::Decl *GetExternalDecl(clang::GlobalDeclID ID) override {
+  clang::Decl *GetExternalDecl(uint32_t ID) override {
     for (size_t i = 0; i < Sources.size(); ++i)
       if (clang::Decl *Result = Sources[i]->GetExternalDecl(ID))
         return Result;

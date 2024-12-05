@@ -9,14 +9,13 @@
 #ifndef LLVM_LIBC_SRC_STDIO_PRINTF_CORE_WRITE_INT_CONVERTER_H
 #define LLVM_LIBC_SRC_STDIO_PRINTF_CORE_WRITE_INT_CONVERTER_H
 
-#include "src/__support/macros/config.h"
 #include "src/stdio/printf_core/core_structs.h"
 #include "src/stdio/printf_core/writer.h"
 
 #include <inttypes.h>
 #include <stddef.h>
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 namespace printf_core {
 
 LIBC_INLINE int convert_write_int(Writer *writer,
@@ -56,8 +55,6 @@ LIBC_INLINE int convert_write_int(Writer *writer,
     *reinterpret_cast<ptrdiff_t *>(to_conv.conv_val_ptr) = written;
     break;
   case LengthModifier::j:
-  case LengthModifier::w:
-  case LengthModifier::wf:
     *reinterpret_cast<uintmax_t *>(to_conv.conv_val_ptr) = written;
     break;
   }
@@ -65,6 +62,6 @@ LIBC_INLINE int convert_write_int(Writer *writer,
 }
 
 } // namespace printf_core
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE
 
 #endif // LLVM_LIBC_SRC_STDIO_PRINTF_CORE_WRITE_INT_CONVERTER_H

@@ -37,21 +37,17 @@ class MCSectionXCOFF final : public MCSection {
   StringRef SymbolTableName;
   std::optional<XCOFF::DwarfSectionSubtypeFlags> DwarfSubtypeFlags;
   bool MultiSymbolsAllowed;
-  SectionKind Kind;
   static constexpr unsigned DefaultAlignVal = 4;
   static constexpr unsigned DefaultTextAlignVal = 32;
 
-  // XTY_CM sections are virtual except for toc-data symbols.
   MCSectionXCOFF(StringRef Name, XCOFF::StorageMappingClass SMC,
                  XCOFF::SymbolType ST, SectionKind K, MCSymbolXCOFF *QualName,
                  MCSymbol *Begin, StringRef SymbolTableName,
                  bool MultiSymbolsAllowed)
-      : MCSection(SV_XCOFF, Name, K.isText(),
-                  /*IsVirtual=*/ST == XCOFF::XTY_CM && SMC != XCOFF::XMC_TD,
-                  Begin),
+      : MCSection(SV_XCOFF, Name, K, Begin),
         CsectProp(XCOFF::CsectProperties(SMC, ST)), QualName(QualName),
         SymbolTableName(SymbolTableName), DwarfSubtypeFlags(std::nullopt),
-        MultiSymbolsAllowed(MultiSymbolsAllowed), Kind(K) {
+        MultiSymbolsAllowed(MultiSymbolsAllowed) {
     assert(
         (ST == XCOFF::XTY_SD || ST == XCOFF::XTY_CM || ST == XCOFF::XTY_ER) &&
         "Invalid or unhandled type for csect.");
@@ -72,15 +68,13 @@ class MCSectionXCOFF final : public MCSection {
     }
   }
 
-  // DWARF sections are never virtual.
   MCSectionXCOFF(StringRef Name, SectionKind K, MCSymbolXCOFF *QualName,
                  XCOFF::DwarfSectionSubtypeFlags DwarfSubtypeFlags,
                  MCSymbol *Begin, StringRef SymbolTableName,
                  bool MultiSymbolsAllowed)
-      : MCSection(SV_XCOFF, Name, K.isText(), /*IsVirtual=*/false, Begin),
-        QualName(QualName), SymbolTableName(SymbolTableName),
-        DwarfSubtypeFlags(DwarfSubtypeFlags),
-        MultiSymbolsAllowed(MultiSymbolsAllowed), Kind(K) {
+      : MCSection(SV_XCOFF, Name, K, Begin), QualName(QualName),
+        SymbolTableName(SymbolTableName), DwarfSubtypeFlags(DwarfSubtypeFlags),
+        MultiSymbolsAllowed(MultiSymbolsAllowed) {
     assert(QualName != nullptr && "QualName is needed.");
 
     // FIXME: use a more meaningful name for non csect sections.
@@ -117,8 +111,9 @@ public:
 
   void printSwitchToSection(const MCAsmInfo &MAI, const Triple &T,
                             raw_ostream &OS,
-                            uint32_t Subsection) const override;
+                            const MCExpr *Subsection) const override;
   bool useCodeAlign() const override;
+  bool isVirtualSection() const override;
   StringRef getSymbolTableName() const { return SymbolTableName; }
   void setSymbolTableName(StringRef STN) { SymbolTableName = STN; }
   bool isMultiSymbolsAllowed() const { return MultiSymbolsAllowed; }
@@ -130,7 +125,6 @@ public:
   std::optional<XCOFF::CsectProperties> getCsectProp() const {
     return CsectProp;
   }
-  SectionKind getKind() const { return Kind; }
 };
 
 } // end namespace llvm

@@ -318,7 +318,7 @@ public:
       mlir::Value shape = builder.genShape(loc, extents);
       declare = builder.create<hlfir::DeclareOp>(
           loc, tempStorage, tempName, shape, lengths,
-          /*dummy_scope=*/nullptr, fir::FortranVariableFlagsAttr{});
+          fir::FortranVariableFlagsAttr{});
       initialBoxValue =
           builder.createBox(loc, boxType, declare->getOriginalBase(), shape,
                             /*slice=*/mlir::Value{}, lengths, /*tdesc=*/{});
@@ -336,7 +336,7 @@ public:
       if (!extent)
         extent = builder.createIntegerConstant(loc, builder.getIndexType(), 0);
       if (missingLengthParameters) {
-        if (mlir::isa<fir::CharacterType>(declaredType.getEleTy()))
+        if (declaredType.getEleTy().isa<fir::CharacterType>())
           emboxLengths.push_back(builder.createIntegerConstant(
               loc, builder.getCharacterLengthType(), 0));
         else
@@ -357,7 +357,7 @@ public:
 
   bool useSimplePushRuntime(hlfir::Entity value) {
     return value.isScalar() &&
-           !mlir::isa<fir::CharacterType>(arrayConstructorElementType) &&
+           !arrayConstructorElementType.isa<fir::CharacterType>() &&
            !fir::isRecordWithAllocatableMember(arrayConstructorElementType) &&
            !fir::isRecordWithTypeParameters(arrayConstructorElementType);
   }
@@ -370,7 +370,7 @@ public:
       auto [addrExv, cleanUp] = hlfir::convertToAddress(
           loc, builder, value, arrayConstructorElementType);
       mlir::Value addr = fir::getBase(addrExv);
-      if (mlir::isa<fir::BaseBoxType>(addr.getType()))
+      if (addr.getType().isa<fir::BaseBoxType>())
         addr = builder.create<fir::BoxAddrOp>(loc, addr);
       fir::runtime::genPushArrayConstructorSimpleScalar(
           loc, builder, arrayConstructorVector, addr);
@@ -438,7 +438,7 @@ public:
 
   void pushValue(mlir::Location loc, fir::FirOpBuilder &builder,
                  hlfir::Entity value) {
-    return Fortran::common::visit(
+    return std::visit(
         [&](auto &impl) { return impl.pushValue(loc, builder, value); },
         implVariant);
   }
@@ -446,7 +446,7 @@ public:
   mlir::Value startImpliedDo(mlir::Location loc, fir::FirOpBuilder &builder,
                              mlir::Value lower, mlir::Value upper,
                              mlir::Value stride) {
-    return Fortran::common::visit(
+    return std::visit(
         [&](auto &impl) {
           return impl.startImpliedDo(loc, builder, lower, upper, stride);
         },
@@ -455,13 +455,13 @@ public:
 
   hlfir::Entity finishArrayCtorLowering(mlir::Location loc,
                                         fir::FirOpBuilder &builder) {
-    return Fortran::common::visit(
+    return std::visit(
         [&](auto &impl) { return impl.finishArrayCtorLowering(loc, builder); },
         implVariant);
   }
 
   void startImpliedDoScope(llvm::StringRef doName, mlir::Value indexValue) {
-    Fortran::common::visit(
+    std::visit(
         [&](auto &impl) {
           return impl.startImpliedDoScope(doName, indexValue);
         },
@@ -469,8 +469,8 @@ public:
   }
 
   void endImpliedDoScope() {
-    Fortran::common::visit([&](auto &impl) { return impl.endImpliedDoScope(); },
-                           implVariant);
+    std::visit([&](auto &impl) { return impl.endImpliedDoScope(); },
+               implVariant);
   }
 
 private:
@@ -564,7 +564,7 @@ struct LengthAndTypeCollector<Character<Kind>> {
 /// lowering an ac-value and must be delayed?
 static bool missingLengthParameters(mlir::Type elementType,
                                     llvm::ArrayRef<mlir::Value> lengths) {
-  return (mlir::isa<fir::CharacterType>(elementType) ||
+  return (elementType.isa<fir::CharacterType>() ||
           fir::isRecordWithTypeParameters(elementType)) &&
          lengths.empty();
 }
@@ -612,17 +612,16 @@ ArrayCtorAnalysis::ArrayCtorAnalysis(
         arrayValueListStack.pop_back_val();
     for (const Fortran::evaluate::ArrayConstructorValue<T> &acValue :
          *currentArrayValueList)
-      Fortran::common::visit(
-          Fortran::common::visitors{
-              [&](const Fortran::evaluate::ImpliedDo<T> &impledDo) {
-                arrayValueListStack.push_back(&impledDo.values());
-                localNumberOfImpliedDo++;
-              },
-              [&](const Fortran::evaluate::Expr<T> &expr) {
-                localNumberOfExpr++;
-                anyArrayExpr = anyArrayExpr || expr.Rank() > 0;
-              }},
-          acValue.u);
+      std::visit(Fortran::common::visitors{
+                     [&](const Fortran::evaluate::ImpliedDo<T> &impledDo) {
+                       arrayValueListStack.push_back(&impledDo.values());
+                       localNumberOfImpliedDo++;
+                     },
+                     [&](const Fortran::evaluate::Expr<T> &expr) {
+                       localNumberOfExpr++;
+                       anyArrayExpr = anyArrayExpr || expr.Rank() > 0;
+                     }},
+                 acValue.u);
     anyImpliedDo = anyImpliedDo || localNumberOfImpliedDo > 0;
 
     if (localNumberOfImpliedDo == 0) {
@@ -703,8 +702,7 @@ static ArrayCtorLoweringStrategy selectArrayCtorLoweringStrategy(
   // Based on what was gathered and the result of the analysis, select and
   // instantiate the right lowering strategy for the array constructor.
   if (!extent || needToEvaluateOneExprToGetLengthParameters ||
-      analysis.anyArrayExpr ||
-      mlir::isa<fir::RecordType>(declaredType.getEleTy()))
+      analysis.anyArrayExpr || declaredType.getEleTy().isa<fir::RecordType>())
     return RuntimeTempStrategy(
         loc, builder, stmtCtx, symMap, declaredType,
         extent ? std::optional<mlir::Value>(extent) : std::nullopt, lengths,
@@ -766,7 +764,7 @@ static void genAcValue(mlir::Location loc,
                                    impliedDoIndexValue);
 
   for (const auto &acValue : impledDo.values())
-    Fortran::common::visit(
+    std::visit(
         [&](const auto &x) {
           genAcValue(loc, converter, x, symMap, stmtCtx, arrayBuilder);
         },
@@ -788,7 +786,7 @@ hlfir::EntityWithAttributes Fortran::lower::ArrayConstructorBuilder<T>::gen(
       loc, converter, arrayCtorExpr, symMap, stmtCtx);
   // Run the array lowering strategy through the ac-values.
   for (const auto &acValue : arrayCtorExpr)
-    Fortran::common::visit(
+    std::visit(
         [&](const auto &x) {
           genAcValue(loc, converter, x, symMap, stmtCtx, arrayBuilder);
         },

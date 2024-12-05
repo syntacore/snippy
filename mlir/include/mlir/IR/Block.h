@@ -18,7 +18,6 @@
 
 namespace llvm {
 class BitVector;
-class raw_ostream;
 } // namespace llvm
 
 namespace mlir {
@@ -67,10 +66,6 @@ public:
   /// Unlink this block from its current region and insert it right before the
   /// specific block.
   void moveBefore(Block *block);
-
-  /// Unlink this block from its current region and insert it right before the
-  /// block that the given iterator points to in the region region.
-  void moveBefore(Region *region, llvm::iplist<Block>::iterator iterator);
 
   /// Unlink this Block from its parent region and delete it.
   void erase();
@@ -402,8 +397,6 @@ private:
 
   friend struct llvm::ilist_traits<Block>;
 };
-
-raw_ostream &operator<<(raw_ostream &, Block &);
 } // namespace mlir
 
 #endif // MLIR_IR_BLOCK_H

@@ -3,9 +3,6 @@
 ; RUN: llc %s -o - -mtriple=aarch64-unknown -mcpu=exynos-m3     | FileCheck %s
 ; RUN: llc %s -o - -mtriple=aarch64-unknown -mcpu=exynos-m4     | FileCheck %s
 ; RUN: llc %s -o - -mtriple=aarch64-unknown -mcpu=exynos-m5     | FileCheck %s
-; RUN: llc %s -o - -mtriple=aarch64-unknown -mcpu=ampere1       | FileCheck %s
-; RUN: llc %s -o - -mtriple=aarch64-unknown -mcpu=ampere1a      | FileCheck %s
-; RUN: llc %s -o - -mtriple=aarch64-unknown -mcpu=ampere1b      | FileCheck %s
 
 target triple = "aarch64-unknown"
 

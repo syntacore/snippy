@@ -221,13 +221,8 @@ static const ValueDecl *getAsSimpleValueDeclRef(const ASTContext &Ctx,
 
   // We model class non-type template parameters as their template parameter
   // object declaration.
-  if (V.isStruct() || V.isUnion()) {
-    // Dependent types are not supposed to be described as
-    // TemplateParamObjectDecls.
-    if (T->isDependentType() || T->isInstantiationDependentType())
-      return nullptr;
+  if (V.isStruct() || V.isUnion())
     return Ctx.getTemplateParamObjectDecl(T, V);
-  }
 
   // Pointers and references with an empty path use the special 'Declaration'
   // representation.
@@ -543,10 +538,9 @@ void TemplateArgument::print(const PrintingPolicy &Policy, raw_ostream &Out,
     Out << "nullptr";
     break;
 
-  case Template: {
-    getAsTemplate().print(Out, Policy);
+  case Template:
+    getAsTemplate().print(Out, Policy, TemplateName::Qualified::Fully);
     break;
-  }
 
   case TemplateExpansion:
     getAsTemplateOrTemplatePattern().print(Out, Policy);
@@ -576,6 +570,15 @@ void TemplateArgument::print(const PrintingPolicy &Policy, raw_ostream &Out,
     break;
   }
 }
+
+void TemplateArgument::dump(raw_ostream &Out) const {
+  LangOptions LO; // FIXME! see also TemplateName::dump().
+  LO.CPlusPlus = true;
+  LO.Bool = true;
+  print(PrintingPolicy(LO), Out, /*IncludeType*/ true);
+}
+
+LLVM_DUMP_METHOD void TemplateArgument::dump() const { dump(llvm::errs()); }
 
 //===----------------------------------------------------------------------===//
 // TemplateArgumentLoc Implementation

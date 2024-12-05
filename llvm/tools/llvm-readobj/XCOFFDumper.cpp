@@ -12,7 +12,6 @@
 
 #include "ObjDumper.h"
 #include "llvm-readobj.h"
-#include "llvm/Demangle/Demangle.h"
 #include "llvm/Object/XCOFFObjectFile.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/ScopedPrinter.h"
@@ -251,8 +250,7 @@ void XCOFFDumper::printLoaderSectionSymbolsHelper(uintptr_t LoaderSectionAddr) {
     }
 
     DictScope DS(W, "Symbol");
-    StringRef SymbolName = SymbolNameOrErr.get();
-    W.printString("Name", opts::Demangle ? demangle(SymbolName) : SymbolName);
+    W.printString("Name", SymbolNameOrErr.get());
     W.printHex("Virtual Address", LoadSecSymEntPtr->Value);
     W.printNumber("SectionNum", LoadSecSymEntPtr->SectionNumber);
     W.printHex("SymbolType", LoadSecSymEntPtr->SymbolType);
@@ -328,8 +326,7 @@ void XCOFFDumper::printLoaderSectionRelocationEntry(
 
     uint8_t Info = Type >> 8;
     W.printHex("Virtual Address", LoaderSecRelEntPtr->VirtualAddr);
-    W.printNumber("Symbol", opts::Demangle ? demangle(SymbolName) : SymbolName,
-                  LoaderSecRelEntPtr->SymbolIndex);
+    W.printNumber("Symbol", SymbolName, LoaderSecRelEntPtr->SymbolIndex);
     W.printString("IsSigned", IsRelocationSigned(Info) ? "Yes" : "No");
     W.printNumber("FixupBitValue", IsFixupIndicated(Info) ? 1 : 0);
     W.printNumber("Length", GetRelocatedLength(Info));
@@ -343,9 +340,8 @@ void XCOFFDumper::printLoaderSectionRelocationEntry(
                   << XCOFF::getRelocationTypeString(
                          static_cast<XCOFF::RelocationType>(Type))
                   << ")" << format_decimal(LoaderSecRelEntPtr->SectionNum, 8)
-                  << "    "
-                  << (opts::Demangle ? demangle(SymbolName) : SymbolName)
-                  << " (" << LoaderSecRelEntPtr->SymbolIndex << ")\n";
+                  << "    " << SymbolName << " ("
+                  << LoaderSecRelEntPtr->SymbolIndex << ")\n";
   }
 }
 
@@ -470,17 +466,15 @@ template <typename RelTy> void XCOFFDumper::printRelocation(RelTy Reloc) {
   if (opts::ExpandRelocs) {
     DictScope Group(W, "Relocation");
     W.printHex("Virtual Address", Reloc.VirtualAddress);
-    W.printNumber("Symbol", opts::Demangle ? demangle(SymbolName) : SymbolName,
-                  Reloc.SymbolIndex);
+    W.printNumber("Symbol", SymbolName, Reloc.SymbolIndex);
     W.printString("IsSigned", Reloc.isRelocationSigned() ? "Yes" : "No");
     W.printNumber("FixupBitValue", Reloc.isFixupIndicated() ? 1 : 0);
     W.printNumber("Length", Reloc.getRelocatedLength());
     W.printEnum("Type", (uint8_t)Reloc.Type, ArrayRef(RelocationTypeNameclass));
   } else {
     raw_ostream &OS = W.startLine();
-    OS << W.hex(Reloc.VirtualAddress) << " " << RelocName << " "
-       << (opts::Demangle ? demangle(SymbolName) : SymbolName) << "("
-       << Reloc.SymbolIndex << ") " << W.hex(Reloc.Info) << "\n";
+    OS << W.hex(Reloc.VirtualAddress) << " " << RelocName << " " << SymbolName
+       << "(" << Reloc.SymbolIndex << ") " << W.hex(Reloc.Info) << "\n";
   }
 }
 
@@ -758,7 +752,7 @@ void XCOFFDumper::printSymbol(const SymbolRef &S) {
   XCOFF::StorageClass SymbolClass = SymbolEntRef.getStorageClass();
 
   W.printNumber("Index", SymbolIdx);
-  W.printString("Name", opts::Demangle ? demangle(SymbolName) : SymbolName);
+  W.printString("Name", SymbolName);
   W.printHex(GetSymbolValueName(SymbolClass), SymbolEntRef.getValue());
 
   StringRef SectionName =
@@ -989,17 +983,6 @@ const EnumEntry<XCOFF::SectionTypeFlags> SectionTypeFlagsNames[] = {
 #undef ECase
 };
 
-const EnumEntry<XCOFF::DwarfSectionSubtypeFlags>
-    DWARFSectionSubtypeFlagsNames[] = {
-#define ECase(X)                                                               \
-  { #X, XCOFF::X }
-        ECase(SSUBTYP_DWINFO),  ECase(SSUBTYP_DWLINE),  ECase(SSUBTYP_DWPBNMS),
-        ECase(SSUBTYP_DWPBTYP), ECase(SSUBTYP_DWARNGE), ECase(SSUBTYP_DWABREV),
-        ECase(SSUBTYP_DWSTR),   ECase(SSUBTYP_DWRNGES), ECase(SSUBTYP_DWLOC),
-        ECase(SSUBTYP_DWFRAME), ECase(SSUBTYP_DWMAC)
-#undef ECase
-};
-
 template <typename T>
 void XCOFFDumper::printOverflowSectionHeader(T &Sec) const {
   if (Obj.is64Bit()) {
@@ -1197,7 +1180,6 @@ void XCOFFDumper::printSectionHeaders(ArrayRef<T> Sections) {
 
     W.printNumber("Index", Index++);
     uint16_t SectionType = Sec.getSectionType();
-    int32_t SectionSubtype = Sec.getSectionSubtype();
     switch (SectionType) {
     case XCOFF::STYP_OVRFLO:
       printOverflowSectionHeader(Sec);
@@ -1215,13 +1197,8 @@ void XCOFFDumper::printSectionHeaders(ArrayRef<T> Sections) {
     }
     if (Sec.isReservedSectionType())
       W.printHex("Flags", "Reserved", SectionType);
-    else {
+    else
       W.printEnum("Type", SectionType, ArrayRef(SectionTypeFlagsNames));
-      if (SectionType == XCOFF::STYP_DWARF) {
-        W.printEnum("DWARFSubType", SectionSubtype,
-                    ArrayRef(DWARFSectionSubtypeFlagsNames));
-      }
-    }
   }
 
   if (opts::SectionRelocations)

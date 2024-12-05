@@ -8,7 +8,6 @@
 
 #include "Plugins/Platform/MacOSX/PlatformMacOSX.h"
 #include "Plugins/Platform/MacOSX/PlatformRemoteMacOSX.h"
-#include "TestingSupport/TestUtilities.h"
 #include "lldb/Core/Debugger.h"
 #include "lldb/Host/FileSystem.h"
 #include "lldb/Host/HostInfo.h"
@@ -30,8 +29,6 @@ public:
     FileSystem::Initialize();
     HostInfo::Initialize();
     PlatformMacOSX::Initialize();
-    std::call_once(TestUtilities::g_debugger_initialize_flag,
-                   []() { Debugger::Initialize(nullptr); });
   }
   void TearDown() override {
     PlatformMacOSX::Terminate();
@@ -142,13 +139,6 @@ ThreadSP CreateThread(ProcessSP &process_sp, bool should_stop,
   return thread_sp;
 }
 
-// Disable this test till I figure out why changing how events are sent
-// to Secondary Listeners (44d9692e6a657ec46e98e4912ac56417da67cfee)
-// caused this test to fail.  It is testing responses to events that are
-// not delivered in the way Process events are meant to be delivered, it
-// bypasses the private event queue, and I'm not sure is testing real
-// behaviors.
-#if 0
 TEST_F(ProcessEventDataTest, DoOnRemoval) {
   ArchSpec arch("x86_64-apple-macosx-");
 
@@ -188,7 +178,6 @@ TEST_F(ProcessEventDataTest, DoOnRemoval) {
                ->m_should_stop_hit_count == 0;
   ASSERT_TRUE(result);
 }
-#endif 
 
 TEST_F(ProcessEventDataTest, ShouldStop) {
   ArchSpec arch("x86_64-apple-macosx-");

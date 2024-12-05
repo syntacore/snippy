@@ -226,11 +226,13 @@ TEST(SegmentedArrayTest, SimulateStackBehaviour) {
 
 TEST(SegmentedArrayTest, PlacementNewOnAlignedStorage) {
   using AllocatorType = typename Array<ShadowStackEntry>::AllocatorType;
-  alignas(AllocatorType) std::byte AllocatorStorage[sizeof(AllocatorType)];
+  typename std::aligned_storage<sizeof(AllocatorType),
+                                alignof(AllocatorType)>::type AllocatorStorage;
   new (&AllocatorStorage) AllocatorType(1 << 10);
   auto *A = reinterpret_cast<AllocatorType *>(&AllocatorStorage);
-  alignas(Array<ShadowStackEntry>)
-      std::byte ArrayStorage[sizeof(Array<ShadowStackEntry>)];
+  typename std::aligned_storage<sizeof(Array<ShadowStackEntry>),
+                                alignof(Array<ShadowStackEntry>)>::type
+      ArrayStorage;
   new (&ArrayStorage) Array<ShadowStackEntry>(*A);
   auto *Data = reinterpret_cast<Array<ShadowStackEntry> *>(&ArrayStorage);
 

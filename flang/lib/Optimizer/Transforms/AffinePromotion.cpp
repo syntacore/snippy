@@ -63,7 +63,7 @@ struct AffineFunctionAnalysis {
 } // namespace
 
 static bool analyzeCoordinate(mlir::Value coordinate, mlir::Operation *op) {
-  if (auto blockArg = mlir::dyn_cast<mlir::BlockArgument>(coordinate)) {
+  if (auto blockArg = coordinate.dyn_cast<mlir::BlockArgument>()) {
     if (isa<fir::DoLoopOp>(blockArg.getOwner()->getParentOp()))
       return true;
     LLVM_DEBUG(llvm::dbgs() << "AffineLoopAnalysis: array coordinate is not a "
@@ -111,7 +111,7 @@ private:
 
   bool analyzeReference(mlir::Value memref, mlir::Operation *op) {
     if (auto acoOp = memref.getDefiningOp<ArrayCoorOp>()) {
-      if (mlir::isa<fir::BoxType>(acoOp.getMemref().getType())) {
+      if (acoOp.getMemref().getType().isa<fir::BoxType>()) {
         // TODO: Look if and how fir.box can be promoted to affine.
         LLVM_DEBUG(llvm::dbgs() << "AffineLoopAnalysis: cannot promote loop, "
                                    "array memory operation uses fir.box\n";
@@ -222,9 +222,9 @@ private:
       return affineBinaryOp(mlir::AffineExprKind::Mod, op.getLhs(),
                             op.getRhs());
     if (auto op = value.getDefiningOp<mlir::arith::ConstantOp>())
-      if (auto intConstant = mlir::dyn_cast<IntegerAttr>(op.getValue()))
+      if (auto intConstant = op.getValue().dyn_cast<IntegerAttr>())
         return toAffineExpr(intConstant.getInt());
-    if (auto blockArg = mlir::dyn_cast<mlir::BlockArgument>(value)) {
+    if (auto blockArg = value.dyn_cast<mlir::BlockArgument>()) {
       affineArgs.push_back(value);
       if (isa<fir::DoLoopOp>(blockArg.getOwner()->getParentOp()) ||
           isa<mlir::affine::AffineForOp>(blockArg.getOwner()->getParentOp()))
@@ -331,16 +331,15 @@ static mlir::AffineMap createArrayIndexAffineMap(unsigned dimensions,
 
 static std::optional<int64_t> constantIntegerLike(const mlir::Value value) {
   if (auto definition = value.getDefiningOp<mlir::arith::ConstantOp>())
-    if (auto stepAttr = mlir::dyn_cast<IntegerAttr>(definition.getValue()))
+    if (auto stepAttr = definition.getValue().dyn_cast<IntegerAttr>())
       return stepAttr.getInt();
   return {};
 }
 
 static mlir::Type coordinateArrayElement(fir::ArrayCoorOp op) {
   if (auto refType =
-          mlir::dyn_cast_or_null<ReferenceType>(op.getMemref().getType())) {
-    if (auto seqType =
-            mlir::dyn_cast_or_null<SequenceType>(refType.getEleTy())) {
+          op.getMemref().getType().dyn_cast_or_null<ReferenceType>()) {
+    if (auto seqType = refType.getEleTy().dyn_cast_or_null<SequenceType>()) {
       return seqType.getEleTy();
     }
   }
@@ -453,7 +452,7 @@ public:
   AffineLoopConversion(mlir::MLIRContext *context, AffineFunctionAnalysis &afa)
       : OpRewritePattern(context), functionAnalysis(afa) {}
 
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(fir::DoLoopOp loop,
                   mlir::PatternRewriter &rewriter) const override {
     LLVM_DEBUG(llvm::dbgs() << "AffineLoopConversion: rewriting loop:\n";
@@ -546,7 +545,7 @@ public:
   using OpRewritePattern::OpRewritePattern;
   AffineIfConversion(mlir::MLIRContext *context, AffineFunctionAnalysis &afa)
       : OpRewritePattern(context) {}
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(fir::IfOp op,
                   mlir::PatternRewriter &rewriter) const override {
     LLVM_DEBUG(llvm::dbgs() << "AffineIfConversion: rewriting if:\n";

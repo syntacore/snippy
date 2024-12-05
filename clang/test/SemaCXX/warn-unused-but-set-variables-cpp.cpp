@@ -69,11 +69,3 @@ template <typename T> void f5() {
   SWarnUnused swu;
   ++swu;
 }
-
-void f6() {
-  if (int x = 123) {} // expected-warning{{variable 'x' set but not used}}
-
-  while (int x = 123) {} // expected-warning{{variable 'x' set but not used}}
-
-  for (; int x = 123;) {} // expected-warning{{variable 'x' set but not used}}
-}

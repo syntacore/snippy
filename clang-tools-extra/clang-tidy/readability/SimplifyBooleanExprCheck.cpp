@@ -7,9 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SimplifyBooleanExprCheck.h"
-#include "clang/AST/Expr.h"
 #include "clang/AST/RecursiveASTVisitor.h"
-#include "clang/Basic/DiagnosticIDs.h"
 #include "clang/Lex/Lexer.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -282,8 +280,9 @@ public:
     if (!S) {
       return true;
     }
-    if (Check->canBeBypassed(S))
+    if (Check->IgnoreMacros && S->getBeginLoc().isMacroID()) {
       return false;
+    }
     if (!shouldIgnore(S))
       StmtStack.push_back(S);
     return true;
@@ -514,15 +513,9 @@ public:
     return true;
   }
 
-  bool isExpectedUnaryLNot(const Expr *E) {
-    return !Check->canBeBypassed(E) && isa<UnaryOperator>(E) &&
+  static bool isUnaryLNot(const Expr *E) {
+    return isa<UnaryOperator>(E) &&
            cast<UnaryOperator>(E)->getOpcode() == UO_LNot;
-  }
-
-  bool isExpectedBinaryOp(const Expr *E) {
-    const auto *BinaryOp = dyn_cast<BinaryOperator>(E);
-    return !Check->canBeBypassed(E) && BinaryOp && BinaryOp->isLogicalOp() &&
-           BinaryOp->getType()->isBooleanType();
   }
 
   template <typename Functor>
@@ -530,7 +523,7 @@ public:
     return Func(BO->getLHS()) || Func(BO->getRHS());
   }
 
-  bool nestedDemorgan(const Expr *E, unsigned NestingLevel) {
+  static bool nestedDemorgan(const Expr *E, unsigned NestingLevel) {
     const auto *BO = dyn_cast<BinaryOperator>(E->IgnoreUnlessSpelledInSource());
     if (!BO)
       return false;
@@ -546,13 +539,15 @@ public:
       return true;
     case BO_LAnd:
     case BO_LOr:
-      return checkEitherSide(
-                 BO,
-                 [this](const Expr *E) { return isExpectedUnaryLNot(E); }) ||
-             (NestingLevel &&
-              checkEitherSide(BO, [this, NestingLevel](const Expr *E) {
-                return nestedDemorgan(E, NestingLevel - 1);
-              }));
+      if (checkEitherSide(BO, isUnaryLNot))
+        return true;
+      if (NestingLevel) {
+        if (checkEitherSide(BO, [NestingLevel](const Expr *E) {
+              return nestedDemorgan(E, NestingLevel - 1);
+            }))
+          return true;
+      }
+      return false;
     default:
       return false;
     }
@@ -561,19 +556,19 @@ public:
   bool TraverseUnaryOperator(UnaryOperator *Op) {
     if (!Check->SimplifyDeMorgan || Op->getOpcode() != UO_LNot)
       return Base::TraverseUnaryOperator(Op);
-    const Expr *SubImp = Op->getSubExpr()->IgnoreImplicit();
-    const auto *Parens = dyn_cast<ParenExpr>(SubImp);
-    const Expr *SubExpr =
-        Parens ? Parens->getSubExpr()->IgnoreImplicit() : SubImp;
-    if (!isExpectedBinaryOp(SubExpr))
+    Expr *SubImp = Op->getSubExpr()->IgnoreImplicit();
+    auto *Parens = dyn_cast<ParenExpr>(SubImp);
+    auto *BinaryOp =
+        Parens
+            ? dyn_cast<BinaryOperator>(Parens->getSubExpr()->IgnoreImplicit())
+            : dyn_cast<BinaryOperator>(SubImp);
+    if (!BinaryOp || !BinaryOp->isLogicalOp() ||
+        !BinaryOp->getType()->isBooleanType())
       return Base::TraverseUnaryOperator(Op);
-    const auto *BinaryOp = cast<BinaryOperator>(SubExpr);
     if (Check->SimplifyDeMorganRelaxed ||
-        checkEitherSide(
-            BinaryOp,
-            [this](const Expr *E) { return isExpectedUnaryLNot(E); }) ||
-        checkEitherSide(
-            BinaryOp, [this](const Expr *E) { return nestedDemorgan(E, 1); })) {
+        checkEitherSide(BinaryOp, isUnaryLNot) ||
+        checkEitherSide(BinaryOp,
+                        [](const Expr *E) { return nestedDemorgan(E, 1); })) {
       if (Check->reportDeMorgan(Context, Op, BinaryOp, !IsProcessing, parent(),
                                 Parens) &&
           !Check->areDiagsSelfContained()) {
@@ -699,12 +694,7 @@ void SimplifyBooleanExprCheck::check(const MatchFinder::MatchResult &Result) {
   Visitor(this, *Result.Context).traverse();
 }
 
-bool SimplifyBooleanExprCheck::canBeBypassed(const Stmt *S) const {
-  return IgnoreMacros && S->getBeginLoc().isMacroID();
-}
-
-/// @brief return true when replacement created.
-bool SimplifyBooleanExprCheck::issueDiag(const ASTContext &Context,
+void SimplifyBooleanExprCheck::issueDiag(const ASTContext &Context,
                                          SourceLocation Loc,
                                          StringRef Description,
                                          SourceRange ReplacementRange,
@@ -714,10 +704,8 @@ bool SimplifyBooleanExprCheck::issueDiag(const ASTContext &Context,
                                Context.getSourceManager(), getLangOpts());
 
   DiagnosticBuilder Diag = diag(Loc, Description);
-  const bool HasReplacement = !containsDiscardedTokens(Context, CharRange);
-  if (HasReplacement)
+  if (!containsDiscardedTokens(Context, CharRange))
     Diag << FixItHint::CreateReplacement(CharRange, Replacement);
-  return HasReplacement;
 }
 
 void SimplifyBooleanExprCheck::replaceWithThenStatement(
@@ -755,18 +743,8 @@ void SimplifyBooleanExprCheck::replaceWithReturnCondition(
       replacementExpression(Context, Negated, If->getCond());
   std::string Replacement = ("return " + Condition + Terminator).str();
   SourceLocation Start = BoolLiteral->getBeginLoc();
-
-  const bool HasReplacement =
-      issueDiag(Context, Start, SimplifyConditionalReturnDiagnostic,
-                If->getSourceRange(), Replacement);
-
-  if (!HasReplacement) {
-    const SourceRange ConditionRange = If->getCond()->getSourceRange();
-    if (ConditionRange.isValid())
-      diag(ConditionRange.getBegin(), "conditions that can be simplified",
-           DiagnosticIDs::Note)
-          << ConditionRange;
-  }
+  issueDiag(Context, Start, SimplifyConditionalReturnDiagnostic,
+            If->getSourceRange(), Replacement);
 }
 
 void SimplifyBooleanExprCheck::replaceCompoundReturnWithCondition(
@@ -774,23 +752,9 @@ void SimplifyBooleanExprCheck::replaceCompoundReturnWithCondition(
     const IfStmt *If, const Expr *ThenReturn) {
   const std::string Replacement =
       "return " + replacementExpression(Context, Negated, If->getCond());
-
-  const bool HasReplacement = issueDiag(
-      Context, ThenReturn->getBeginLoc(), SimplifyConditionalReturnDiagnostic,
-      SourceRange(If->getBeginLoc(), Ret->getEndLoc()), Replacement);
-
-  if (!HasReplacement) {
-    const SourceRange ConditionRange = If->getCond()->getSourceRange();
-    if (ConditionRange.isValid())
-      diag(ConditionRange.getBegin(), "conditions that can be simplified",
-           DiagnosticIDs::Note)
-          << ConditionRange;
-    const SourceRange ReturnRange = Ret->getSourceRange();
-    if (ReturnRange.isValid())
-      diag(ReturnRange.getBegin(), "return statement that can be simplified",
-           DiagnosticIDs::Note)
-          << ReturnRange;
-  }
+  issueDiag(Context, ThenReturn->getBeginLoc(),
+            SimplifyConditionalReturnDiagnostic,
+            SourceRange(If->getBeginLoc(), Ret->getEndLoc()), Replacement);
 }
 
 void SimplifyBooleanExprCheck::replaceWithAssignment(const ASTContext &Context,

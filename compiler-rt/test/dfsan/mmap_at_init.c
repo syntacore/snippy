@@ -4,9 +4,6 @@
 //
 // Tests that calling mmap() during during dfsan initialization works.
 
-// `internal_symbolizer` can not use `realloc` on memory from the test `calloc`.
-// UNSUPPORTED: internal_symbolizer
-
 #include <sanitizer/dfsan_interface.h>
 #include <sys/mman.h>
 #include <unistd.h>

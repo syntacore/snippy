@@ -24,4 +24,3 @@ subroutine sub()
     print *, a
   !$omp end parallel
 end subroutine
-

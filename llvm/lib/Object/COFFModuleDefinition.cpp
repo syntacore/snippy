@@ -39,7 +39,6 @@ enum Kind {
   KwConstant,
   KwData,
   KwExports,
-  KwExportAs,
   KwHeapsize,
   KwLibrary,
   KwName,
@@ -98,8 +97,10 @@ public:
     }
     case '=':
       Buf = Buf.drop_front();
-      if (Buf.consume_front("="))
+      if (Buf.starts_with("=")) {
+        Buf = Buf.drop_front();
         return Token(EqualEqual, "==");
+      }
       return Token(Equal, "=");
     case ',':
       Buf = Buf.drop_front();
@@ -117,7 +118,6 @@ public:
                    .Case("CONSTANT", KwConstant)
                    .Case("DATA", KwData)
                    .Case("EXPORTS", KwExports)
-                   .Case("EXPORTAS", KwExportAs)
                    .Case("HEAPSIZE", KwHeapsize)
                    .Case("LIBRARY", KwLibrary)
                    .Case("NAME", KwName)
@@ -281,19 +281,12 @@ private:
       }
       if (Tok.K == EqualEqual) {
         read();
-        E.ImportName = std::string(Tok.Value);
+        E.AliasTarget = std::string(Tok.Value);
+        if (AddUnderscores && !isDecorated(E.AliasTarget, MingwDef))
+          E.AliasTarget = std::string("_").append(E.AliasTarget);
         continue;
       }
-      // EXPORTAS must be at the end of export definition
-      if (Tok.K == KwExportAs) {
-        read();
-        if (Tok.K == Eof)
-          return createError(
-              "unexpected end of file, EXPORTAS identifier expected");
-        E.ExportAs = std::string(Tok.Value);
-      } else {
-        unget();
-      }
+      unget();
       Info.Exports.push_back(E);
       return Error::success();
     }

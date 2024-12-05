@@ -21,8 +21,8 @@ class TestSBLaunchInfo(TestBase):
     def test_environment_getset(self):
         info = lldb.SBLaunchInfo(None)
         info.SetEnvironmentEntries(["FOO=BAR"], False)
-        self.assertEqual(1, info.GetNumEnvironmentEntries())
+        self.assertEquals(1, info.GetNumEnvironmentEntries())
         info.SetEnvironmentEntries(["BAR=BAZ"], True)
-        self.assertEqual(2, info.GetNumEnvironmentEntries())
-        self.assertEqual("BAR", lookup(info, "FOO"))
-        self.assertEqual("BAZ", lookup(info, "BAR"))
+        self.assertEquals(2, info.GetNumEnvironmentEntries())
+        self.assertEquals("BAR", lookup(info, "FOO"))
+        self.assertEquals("BAZ", lookup(info, "BAR"))

@@ -85,15 +85,13 @@ class BSDArchivesTestCase(TestBase):
         api_error = var_list.GetError().GetCString()
 
         for s in error_strings:
-            self.assertIn(
-                s,
-                command_error,
+            self.assertTrue(
+                s in command_error,
                 'Make sure "%s" exists in the command error "%s"' % (s, command_error),
             )
         for s in error_strings:
-            self.assertIn(
-                s,
-                api_error,
+            self.assertTrue(
+                s in api_error,
                 'Make sure "%s" exists in the API error "%s"' % (s, api_error),
             )
 

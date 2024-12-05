@@ -20,18 +20,19 @@ struct X : Base<T> {
   bool f(T other) {
     // A pair of comparisons; 'inner' is a dependent name so can't be assumed
     // to be a template.
-    return this->inner < other > ::z; // expected-warning {{comparisons like 'X<=Y<=Z' don't have their mathematical meaning}}
+    return this->inner < other > ::z;
   }
 };
 
-void use_x(X<int> x) { x.f(0); } // expected-note {{requested here}}
+void use_x(X<int> x) { x.f(0); }
 
 template<typename T>
 struct Y {
   static int z;
 
   template<int U>
-  struct Inner; // expected-note {{declared here}}
+  struct Inner : Y { // expected-note {{declared here}}
+  };
 
   bool f(T other) {
     // We can determine that 'inner' does not exist at parse time, so can
@@ -39,10 +40,6 @@ struct Y {
     return this->inner<other>::z; // expected-error {{no template named 'inner' in 'Y<T>'; did you mean 'Inner'?}}
   }
 };
-
-template<typename T>
-template<int U>
-struct Y<T>::Inner : Y { };
 
 struct Q { constexpr operator int() { return 0; } };
 void use_y(Y<Q> x) { x.f(Q()); }

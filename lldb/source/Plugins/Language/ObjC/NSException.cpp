@@ -123,9 +123,11 @@ public:
 
   ~NSExceptionSyntheticFrontEnd() override = default;
 
-  llvm::Expected<uint32_t> CalculateNumChildren() override { return 4; }
+  size_t CalculateNumChildren() override {
+    return 4;
+  }
 
-  lldb::ValueObjectSP GetChildAtIndex(uint32_t idx) override {
+  lldb::ValueObjectSP GetChildAtIndex(size_t idx) override {
     switch (idx) {
       case 0: return m_name_sp;
       case 1: return m_reason_sp;
@@ -135,17 +137,14 @@ public:
     return lldb::ValueObjectSP();
   }
 
-  lldb::ChildCacheState Update() override {
+  bool Update() override {
     m_name_sp.reset();
     m_reason_sp.reset();
     m_userinfo_sp.reset();
     m_reserved_sp.reset();
 
-    const auto ret = ExtractFields(m_backend, &m_name_sp, &m_reason_sp,
-                                   &m_userinfo_sp, &m_reserved_sp);
-
-    return ret ? lldb::ChildCacheState::eReuse
-               : lldb::ChildCacheState::eRefetch;
+    return ExtractFields(m_backend, &m_name_sp, &m_reason_sp, &m_userinfo_sp,
+                         &m_reserved_sp);
   }
 
   bool MightHaveChildren() override { return true; }

@@ -25,7 +25,6 @@
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/GenericDomTree.h"
 #include <queue>
 
@@ -38,10 +37,9 @@ namespace IDFCalculatorDetail {
 /// successors.
 template <class NodeTy, bool IsPostDom> struct ChildrenGetterTy {
   using NodeRef = typename GraphTraits<NodeTy *>::NodeRef;
-  using ChildIteratorType = typename GraphTraits<NodeTy *>::ChildIteratorType;
-  using range = iterator_range<ChildIteratorType>;
+  using ChildrenTy = SmallVector<NodeRef, 8>;
 
-  range get(const NodeRef &N);
+  ChildrenTy get(const NodeRef &N);
 };
 
 } // end of namespace IDFCalculatorDetail
@@ -117,12 +115,13 @@ private:
 namespace IDFCalculatorDetail {
 
 template <class NodeTy, bool IsPostDom>
-typename ChildrenGetterTy<NodeTy, IsPostDom>::range
+typename ChildrenGetterTy<NodeTy, IsPostDom>::ChildrenTy
 ChildrenGetterTy<NodeTy, IsPostDom>::get(const NodeRef &N) {
   using OrderedNodeTy =
       typename IDFCalculatorBase<NodeTy, IsPostDom>::OrderedNodeTy;
 
-  return children<OrderedNodeTy>(N);
+  auto Children = children<OrderedNodeTy>(N);
+  return {Children.begin(), Children.end()};
 }
 
 } // end of namespace IDFCalculatorDetail

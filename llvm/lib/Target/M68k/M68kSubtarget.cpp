@@ -175,7 +175,7 @@ M68kSubtarget::classifyLocalReference(const GlobalValue *GV) const {
 }
 
 unsigned char M68kSubtarget::classifyExternalReference(const Module &M) const {
-  if (TM.shouldAssumeDSOLocal(nullptr))
+  if (TM.shouldAssumeDSOLocal(M, nullptr))
     return classifyLocalReference(nullptr);
 
   if (isPositionIndependent())
@@ -191,7 +191,7 @@ M68kSubtarget::classifyGlobalReference(const GlobalValue *GV) const {
 
 unsigned char M68kSubtarget::classifyGlobalReference(const GlobalValue *GV,
                                                      const Module &M) const {
-  if (TM.shouldAssumeDSOLocal(GV))
+  if (TM.shouldAssumeDSOLocal(M, GV))
     return classifyLocalReference(GV);
 
   switch (TM.getCodeModel()) {
@@ -240,7 +240,7 @@ unsigned char
 M68kSubtarget::classifyGlobalFunctionReference(const GlobalValue *GV,
                                                const Module &M) const {
   // local always use pc-rel referencing
-  if (TM.shouldAssumeDSOLocal(GV))
+  if (TM.shouldAssumeDSOLocal(M, GV))
     return M68kII::MO_NO_FLAG;
 
   // If the function is marked as non-lazy, generate an indirect call
@@ -251,6 +251,6 @@ M68kSubtarget::classifyGlobalFunctionReference(const GlobalValue *GV,
     return M68kII::MO_GOTPCREL;
   }
 
-  // Ensure that we don't emit PLT relocations when in non-pic modes.
-  return isPositionIndependent() ? M68kII::MO_PLT : M68kII::MO_ABSOLUTE_ADDRESS;
+  // otherwise linker will figure this out
+  return M68kII::MO_PLT;
 }

@@ -36,7 +36,6 @@ add_lldb_unittest(UtilityTests
   StringListTest.cpp
   StructuredDataTest.cpp
   SubsystemRAIITest.cpp
-  SupportFileTest.cpp
   TildeExpressionResolverTest.cpp
   TimeoutTest.cpp
   TimerTest.cpp

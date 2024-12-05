@@ -196,10 +196,7 @@ clang_tidy_library(
 
 clang_tidy_library(
     name = "boost",
-    deps = [
-        ":lib",
-        ":utils",
-    ],
+    deps = [":lib"],
 )
 
 clang_tidy_library(

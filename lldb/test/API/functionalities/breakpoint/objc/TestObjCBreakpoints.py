@@ -42,9 +42,8 @@ class TestObjCBreakpoints(TestBase):
         )
         for bp_loc in selector_bp:
             function_name = bp_loc.GetAddress().GetSymbol().GetName()
-            self.assertIn(
-                " myCategoryFunction]",
-                function_name,
+            self.assertTrue(
+                " myCategoryFunction]" in function_name,
                 'Make sure all function names have " myCategoryFunction]" in their names',
             )
 
@@ -109,9 +108,8 @@ class TestObjCBreakpoints(TestBase):
         )  # There are 93 on the latest MacOSX
         for bp_loc in selector_bp:
             function_name = bp_loc.GetAddress().GetSymbol().GetName()
-            self.assertIn(
-                " count]",
-                function_name,
+            self.assertTrue(
+                " count]" in function_name,
                 'Make sure all function names have " count]" in their names',
             )
 
@@ -134,9 +132,8 @@ class TestObjCBreakpoints(TestBase):
         )
         for bp_loc in selector_bp:
             function_name = bp_loc.GetAddress().GetSymbol().GetName()
-            self.assertIn(
-                " isEqual:]",
-                function_name,
+            self.assertTrue(
+                " isEqual:]" in function_name,
                 'Make sure all function names have " isEqual:]" in their names',
             )
 

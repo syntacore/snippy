@@ -11,9 +11,8 @@ from lldbsuite.test import lldbutil
 class StepAvoidsRegexTestCase(TestBase):
     def hit_correct_function(self, pattern):
         name = self.thread.frames[0].GetFunctionName()
-        self.assertIn(
-            pattern,
-            name,
+        self.assertTrue(
+            pattern in name,
             "Got to '%s' not the expected function '%s'." % (name, pattern),
         )
 

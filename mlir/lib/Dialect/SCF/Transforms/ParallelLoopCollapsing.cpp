@@ -28,7 +28,6 @@ namespace {
 struct TestSCFParallelLoopCollapsing
     : public impl::TestSCFParallelLoopCollapsingBase<
           TestSCFParallelLoopCollapsing> {
-
   void runOnOperation() override {
     Operation *module = getOperation();
 
@@ -89,7 +88,6 @@ struct TestSCFParallelLoopCollapsing
     // Only apply the transformation on parallel loops where the specified
     // transformation is valid, but do NOT early abort in the case of invalid
     // loops.
-    IRRewriter rewriter(&getContext());
     module->walk([&](scf::ParallelOp op) {
       if (flattenedCombinedLoops.size() != op.getNumLoops()) {
         op.emitOpError("has ")
@@ -99,7 +97,7 @@ struct TestSCFParallelLoopCollapsing
             << flattenedCombinedLoops.size() << " iter args.";
         return;
       }
-      collapseParallelLoops(rewriter, op, combinedLoops);
+      collapseParallelLoops(op, combinedLoops);
     });
   }
 };

@@ -13,6 +13,8 @@
 
 namespace llvm {
 
+class raw_ostream;
+
 namespace object {
 class ObjectFile;
 }
@@ -20,7 +22,6 @@ class ObjectFile;
 namespace gsym {
 
 class GsymCreator;
-class OutputAggregator;
 
 class ObjectFileTransformer {
 public:
@@ -39,8 +40,8 @@ public:
   ///
   /// \returns An error indicating any fatal issues that happen when parsing
   /// the DWARF, or Error::success() if all goes well.
-  static llvm::Error convert(const object::ObjectFile &Obj,
-                             OutputAggregator &Output, GsymCreator &Gsym);
+  static llvm::Error convert(const object::ObjectFile &Obj, raw_ostream *Log,
+                             GsymCreator &Gsym);
 };
 
 } // namespace gsym

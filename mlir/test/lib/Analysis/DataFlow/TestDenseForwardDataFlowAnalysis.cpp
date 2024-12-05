@@ -12,7 +12,6 @@
 
 #include "TestDenseDataFlowAnalysis.h"
 #include "TestDialect.h"
-#include "TestOps.h"
 #include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
 #include "mlir/Analysis/DataFlow/DenseAnalysis.h"

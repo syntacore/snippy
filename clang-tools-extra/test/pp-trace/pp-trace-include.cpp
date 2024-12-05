@@ -59,8 +59,7 @@
 // CHECK-NEXT:   File: "{{.*}}{{[/\\]}}Inputs/Level1A.h"
 // CHECK-NEXT:   SearchPath: "{{.*}}{{[/\\]}}pp-trace"
 // CHECK-NEXT:   RelativePath: "Inputs/Level1A.h"
-// CHECK-NEXT:   SuggestedModule: (null)
-// CHECK-NEXT:   ModuleImported: false
+// CHECK-NEXT:   Imported: (null)
 // CHECK-NEXT: - Callback: FileChanged
 // CHECK-NEXT:   Loc: "{{.*}}{{[/\\]}}Inputs/Level1A.h:1:1"
 // CHECK-NEXT:   Reason: EnterFile
@@ -75,8 +74,7 @@
 // CHECK-NEXT:   File: "{{.*}}{{[/\\]}}Inputs/Level2A.h"
 // CHECK-NEXT:   SearchPath: "{{.*}}{{[/\\]}}Inputs"
 // CHECK-NEXT:   RelativePath: "Level2A.h"
-// CHECK-NEXT:   SuggestedModule: (null)
-// CHECK-NEXT:   ModuleImported: false
+// CHECK-NEXT:   Imported: (null)
 // CHECK-NEXT: - Callback: FileChanged
 // CHECK-NEXT:   Loc: "{{.*}}{{[/\\]}}Inputs/Level2A.h:1:1"
 // CHECK-NEXT:   Reason: EnterFile
@@ -107,8 +105,7 @@
 // CHECK-NEXT:   File: "{{.*}}{{[/\\]}}Inputs/Level1B.h"
 // CHECK-NEXT:   SearchPath: "{{.*}}{{[/\\]}}pp-trace"
 // CHECK-NEXT:   RelativePath: "Inputs/Level1B.h"
-// CHECK-NEXT:   SuggestedModule: (null)
-// CHECK-NEXT:   ModuleImported: false
+// CHECK-NEXT:   Imported: (null)
 // CHECK-NEXT: - Callback: FileChanged
 // CHECK-NEXT:   Loc: "{{.*}}{{[/\\]}}Inputs/Level1B.h:1:1"
 // CHECK-NEXT:   Reason: EnterFile
@@ -123,8 +120,7 @@
 // CHECK-NEXT:   File: "{{.*}}{{[/\\]}}Inputs/Level2B.h"
 // CHECK-NEXT:   SearchPath: "{{.*}}{{[/\\]}}Inputs"
 // CHECK-NEXT:   RelativePath: "Level2B.h"
-// CHECK-NEXT:   SuggestedModule: (null)
-// CHECK-NEXT:   ModuleImported: false
+// CHECK-NEXT:   Imported: (null)
 // CHECK-NEXT: - Callback: FileChanged
 // CHECK-NEXT:   Loc: "{{.*}}{{[/\\]}}Inputs/Level2B.h:1:1"
 // CHECK-NEXT:   Reason: EnterFile

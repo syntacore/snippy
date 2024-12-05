@@ -9,7 +9,6 @@
 using namespace llvm;
 using namespace polly;
 
-#include "polly/Support/PollyDebug.h"
 #define DEBUG_TYPE "polly-scev-validator"
 
 namespace SCEVType {
@@ -137,7 +136,7 @@ public:
 
   ValidatorResult visitVScale(const SCEVVScale *VScale) {
     // We do not support VScale constants.
-    POLLY_DEBUG(dbgs() << "INVALID: VScale is not supported");
+    LLVM_DEBUG(dbgs() << "INVALID: VScale is not supported");
     return ValidatorResult(SCEVType::INVALID);
   }
 
@@ -204,7 +203,7 @@ public:
       }
 
       if ((Op.isIV() || Op.isPARAM()) && !Return.isINT()) {
-        POLLY_DEBUG(
+        LLVM_DEBUG(
             dbgs() << "INVALID: More than one non-int operand in MulExpr\n"
                    << "\tExpr: " << *Expr << "\n"
                    << "\tPrevious expression type: " << Return << "\n"
@@ -225,7 +224,7 @@ public:
 
   ValidatorResult visitAddRecExpr(const SCEVAddRecExpr *Expr) {
     if (!Expr->isAffine()) {
-      POLLY_DEBUG(dbgs() << "INVALID: AddRec is not affine");
+      LLVM_DEBUG(dbgs() << "INVALID: AddRec is not affine");
       return ValidatorResult(SCEVType::INVALID);
     }
 
@@ -240,7 +239,7 @@ public:
 
     auto *L = Expr->getLoop();
     if (R->contains(L) && (!Scope || !L->contains(Scope))) {
-      POLLY_DEBUG(
+      LLVM_DEBUG(
           dbgs() << "INVALID: Loop of AddRec expression boxed in an a "
                     "non-affine subregion or has a non-synthesizable exit "
                     "value.");
@@ -254,8 +253,8 @@ public:
         return Result;
       }
 
-      POLLY_DEBUG(dbgs() << "INVALID: AddRec within scop has non-int"
-                            "recurrence part");
+      LLVM_DEBUG(dbgs() << "INVALID: AddRec within scop has non-int"
+                           "recurrence part");
       return ValidatorResult(SCEVType::INVALID);
     }
 
@@ -315,7 +314,7 @@ public:
       ValidatorResult Op = visit(Expr->getOperand(i));
 
       if (!Op.isConstant()) {
-        POLLY_DEBUG(dbgs() << "INVALID: UMaxExpr has a non-constant operand");
+        LLVM_DEBUG(dbgs() << "INVALID: UMaxExpr has a non-constant operand");
         return ValidatorResult(SCEVType::INVALID);
       }
     }
@@ -330,7 +329,7 @@ public:
       ValidatorResult Op = visit(Expr->getOperand(i));
 
       if (!Op.isConstant()) {
-        POLLY_DEBUG(dbgs() << "INVALID: UMinExpr has a non-constant operand");
+        LLVM_DEBUG(dbgs() << "INVALID: UMinExpr has a non-constant operand");
         return ValidatorResult(SCEVType::INVALID);
       }
     }
@@ -345,7 +344,7 @@ public:
       ValidatorResult Op = visit(Expr->getOperand(i));
 
       if (!Op.isConstant()) {
-        POLLY_DEBUG(
+        LLVM_DEBUG(
             dbgs()
             << "INVALID: SCEVSequentialUMinExpr has a non-constant operand");
         return ValidatorResult(SCEVType::INVALID);
@@ -357,8 +356,8 @@ public:
 
   ValidatorResult visitGenericInst(Instruction *I, const SCEV *S) {
     if (R->contains(I)) {
-      POLLY_DEBUG(dbgs() << "INVALID: UnknownExpr references an instruction "
-                            "within the region\n");
+      LLVM_DEBUG(dbgs() << "INVALID: UnknownExpr references an instruction "
+                           "within the region\n");
       return ValidatorResult(SCEVType::INVALID);
     }
 
@@ -394,7 +393,7 @@ public:
     if (LHS.isConstant() && RHS.isConstant())
       return ValidatorResult(SCEVType::PARAM, DivExpr);
 
-    POLLY_DEBUG(
+    LLVM_DEBUG(
         dbgs() << "INVALID: unsigned division of non-constant expressions");
     return ValidatorResult(SCEVType::INVALID);
   }
@@ -435,13 +434,12 @@ public:
     Value *V = Expr->getValue();
 
     if (!Expr->getType()->isIntegerTy() && !Expr->getType()->isPointerTy()) {
-      POLLY_DEBUG(
-          dbgs() << "INVALID: UnknownExpr is not an integer or pointer");
+      LLVM_DEBUG(dbgs() << "INVALID: UnknownExpr is not an integer or pointer");
       return ValidatorResult(SCEVType::INVALID);
     }
 
     if (isa<UndefValue>(V)) {
-      POLLY_DEBUG(dbgs() << "INVALID: UnknownExpr references an undef value");
+      LLVM_DEBUG(dbgs() << "INVALID: UnknownExpr references an undef value");
       return ValidatorResult(SCEVType::INVALID);
     }
 
@@ -603,7 +601,7 @@ bool polly::isAffineExpr(const Region *R, llvm::Loop *Scope, const SCEV *Expr,
     return false;
 
   SCEVValidator Validator(R, Scope, SE, ILS);
-  POLLY_DEBUG({
+  LLVM_DEBUG({
     dbgs() << "\n";
     dbgs() << "Expr: " << *Expr << "\n";
     dbgs() << "Region: " << R->getNameStr() << "\n";
@@ -612,7 +610,7 @@ bool polly::isAffineExpr(const Region *R, llvm::Loop *Scope, const SCEV *Expr,
 
   ValidatorResult Result = Validator.visit(Expr);
 
-  POLLY_DEBUG({
+  LLVM_DEBUG({
     if (Result.isValid())
       dbgs() << "VALID\n";
     dbgs() << "\n";

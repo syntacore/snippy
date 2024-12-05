@@ -56,10 +56,6 @@ struct PurePublicDestructor              { public:    virtual ~PurePublicDestruc
 struct PureProtectedDestructor           { protected: virtual ~PureProtectedDestructor() = 0; };
 struct PurePrivateDestructor             { private:   virtual ~PurePrivateDestructor() = 0; };
 
-struct ExplicitlyNoThrowDestructor {
-    ~ExplicitlyNoThrowDestructor() TEST_NOEXCEPT {}
-};
-
 class Empty
 {
 };
@@ -96,12 +92,11 @@ int main(int, char**)
     test_is_nothrow_destructible<PublicDestructor>();
     test_is_nothrow_destructible<VirtualPublicDestructor>();
     test_is_nothrow_destructible<PurePublicDestructor>();
-#endif
-    test_is_nothrow_destructible<ExplicitlyNoThrowDestructor>();
     test_is_nothrow_destructible<bit_zero>();
     test_is_nothrow_destructible<Abstract>();
     test_is_nothrow_destructible<Empty>();
     test_is_nothrow_destructible<Union>();
+#endif
     // requires access control
     test_is_not_nothrow_destructible<ProtectedDestructor>();
     test_is_not_nothrow_destructible<PrivateDestructor>();

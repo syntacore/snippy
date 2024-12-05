@@ -222,6 +222,18 @@ void CoreEngine::dispatchWorkItem(ExplodedNode* Pred, ProgramPoint Loc,
   }
 }
 
+bool CoreEngine::ExecuteWorkListWithInitialState(const LocationContext *L,
+                                                 unsigned Steps,
+                                                 ProgramStateRef InitState,
+                                                 ExplodedNodeSet &Dst) {
+  bool DidNotFinish = ExecuteWorkList(L, Steps, InitState);
+  for (ExplodedGraph::eop_iterator I = G.eop_begin(), E = G.eop_end(); I != E;
+       ++I) {
+    Dst.Add(*I);
+  }
+  return DidNotFinish;
+}
+
 void CoreEngine::HandleBlockEdge(const BlockEdge &L, ExplodedNode *Pred) {
   const CFGBlock *Blk = L.getDst();
   NodeBuilderContext BuilderCtx(*this, Blk, Pred);
@@ -625,8 +637,8 @@ ExplodedNode* NodeBuilder::generateNodeImpl(const ProgramPoint &Loc,
                                             bool MarkAsSink) {
   HasGeneratedNodes = true;
   bool IsNew;
-  ExplodedNode *N = C.getEngine().G.getNode(Loc, State, MarkAsSink, &IsNew);
-  N->addPredecessor(FromN, C.getEngine().G);
+  ExplodedNode *N = C.Eng.G.getNode(Loc, State, MarkAsSink, &IsNew);
+  N->addPredecessor(FromN, C.Eng.G);
   Frontier.erase(FromN);
 
   if (!IsNew)
@@ -655,7 +667,7 @@ ExplodedNode *BranchNodeBuilder::generateNode(ProgramStateRef State,
   if (!isFeasible(branch))
     return nullptr;
 
-  ProgramPoint Loc = BlockEdge(C.getBlock(), branch ? DstT : DstF,
+  ProgramPoint Loc = BlockEdge(C.Block, branch ? DstT:DstF,
                                NodePred->getLocationContext());
   ExplodedNode *Succ = generateNodeImpl(Loc, State, NodePred);
   return Succ;

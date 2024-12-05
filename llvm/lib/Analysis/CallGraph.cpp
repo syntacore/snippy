@@ -319,13 +319,15 @@ PreservedAnalyses CallGraphSCCsPrinterPass::run(Module &M,
     const std::vector<CallGraphNode *> &nextSCC = *SCCI;
     OS << "\nSCC #" << ++sccNum << ": ";
     bool First = true;
-    for (CallGraphNode *CGN : nextSCC) {
+    for (std::vector<CallGraphNode *>::const_iterator I = nextSCC.begin(),
+                                                      E = nextSCC.end();
+         I != E; ++I) {
       if (First)
         First = false;
       else
         OS << ", ";
-      OS << (CGN->getFunction() ? CGN->getFunction()->getName()
-                                : "external node");
+      OS << ((*I)->getFunction() ? (*I)->getFunction()->getName()
+                                 : "external node");
     }
 
     if (nextSCC.size() == 1 && SCCI.hasCycle())

@@ -6,11 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES___THREAD_TYPE_H
-#define LLVM_LIBC_TYPES___THREAD_TYPE_H
+#ifndef __LLVM_LIBC_TYPES_THREAD_TYPE_H__
+#define __LLVM_LIBC_TYPES_THREAD_TYPE_H__
 
 typedef struct {
   void *__attrib;
 } __thread_type;
 
-#endif // LLVM_LIBC_TYPES___THREAD_TYPE_H
+#endif // __LLVM_LIBC_TYPES_THREAD_TYPE_H__

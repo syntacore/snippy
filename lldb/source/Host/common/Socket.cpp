@@ -87,7 +87,8 @@ llvm::Error Socket::Initialize() {
   if (err == 0) {
     if (wsaData.wVersion < wVersion) {
       WSACleanup();
-      return llvm::createStringError("WSASock version is not expected.");
+      return llvm::make_error<llvm::StringError>(
+          "WSASock version is not expected.", llvm::inconvertibleErrorCode());
     }
   } else {
     return llvm::errorCodeToError(llvm::mapWindowsError(::WSAGetLastError()));

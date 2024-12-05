@@ -225,8 +225,7 @@ bool RISCVInsertWriteVXRM::computeVXRMChanges(const MachineBasicBlock &MBB) {
       continue;
     }
 
-    if (MI.isCall() || MI.isInlineAsm() ||
-        MI.modifiesRegister(RISCV::VXRM, /*TRI=*/nullptr)) {
+    if (MI.isCall() || MI.isInlineAsm() || MI.modifiesRegister(RISCV::VXRM)) {
       if (!BBInfo.VXRMUse.isValid())
         BBInfo.VXRMUse.setUnknown();
 
@@ -387,8 +386,7 @@ void RISCVInsertWriteVXRM::emitWriteVXRM(MachineBasicBlock &MBB) {
       continue;
     }
 
-    if (MI.isCall() || MI.isInlineAsm() ||
-        MI.modifiesRegister(RISCV::VXRM, /*TRI=*/nullptr))
+    if (MI.isCall() || MI.isInlineAsm() || MI.modifiesRegister(RISCV::VXRM))
       Info.setUnknown();
   }
 

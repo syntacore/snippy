@@ -110,43 +110,43 @@ class TestWasm(GDBRemoteTestBase):
         )
 
         num_modules = target.GetNumModules()
-        self.assertEqual(1, num_modules)
+        self.assertEquals(1, num_modules)
 
         module = target.GetModuleAtIndex(0)
         num_sections = module.GetNumSections()
-        self.assertEqual(5, num_sections)
+        self.assertEquals(5, num_sections)
 
         code_section = module.GetSectionAtIndex(0)
-        self.assertEqual("code", code_section.GetName())
-        self.assertEqual(
+        self.assertEquals("code", code_section.GetName())
+        self.assertEquals(
             load_address | code_section.GetFileOffset(),
             code_section.GetLoadAddress(target),
         )
 
         debug_info_section = module.GetSectionAtIndex(1)
-        self.assertEqual(".debug_info", debug_info_section.GetName())
-        self.assertEqual(
+        self.assertEquals(".debug_info", debug_info_section.GetName())
+        self.assertEquals(
             load_address | debug_info_section.GetFileOffset(),
             debug_info_section.GetLoadAddress(target),
         )
 
         debug_abbrev_section = module.GetSectionAtIndex(2)
-        self.assertEqual(".debug_abbrev", debug_abbrev_section.GetName())
-        self.assertEqual(
+        self.assertEquals(".debug_abbrev", debug_abbrev_section.GetName())
+        self.assertEquals(
             load_address | debug_abbrev_section.GetFileOffset(),
             debug_abbrev_section.GetLoadAddress(target),
         )
 
         debug_line_section = module.GetSectionAtIndex(3)
-        self.assertEqual(".debug_line", debug_line_section.GetName())
-        self.assertEqual(
+        self.assertEquals(".debug_line", debug_line_section.GetName())
+        self.assertEquals(
             load_address | debug_line_section.GetFileOffset(),
             debug_line_section.GetLoadAddress(target),
         )
 
         debug_str_section = module.GetSectionAtIndex(4)
-        self.assertEqual(".debug_str", debug_str_section.GetName())
-        self.assertEqual(
+        self.assertEquals(".debug_str", debug_str_section.GetName())
+        self.assertEquals(
             load_address | debug_line_section.GetFileOffset(),
             debug_line_section.GetLoadAddress(target),
         )
@@ -180,40 +180,40 @@ class TestWasm(GDBRemoteTestBase):
         )
 
         num_modules = target.GetNumModules()
-        self.assertEqual(1, num_modules)
+        self.assertEquals(1, num_modules)
 
         module = target.GetModuleAtIndex(0)
         num_sections = module.GetNumSections()
-        self.assertEqual(5, num_sections)
+        self.assertEquals(5, num_sections)
 
         code_section = module.GetSectionAtIndex(0)
-        self.assertEqual("code", code_section.GetName())
-        self.assertEqual(
+        self.assertEquals("code", code_section.GetName())
+        self.assertEquals(
             load_address | code_section.GetFileOffset(),
             code_section.GetLoadAddress(target),
         )
 
         debug_info_section = module.GetSectionAtIndex(1)
-        self.assertEqual(".debug_info", debug_info_section.GetName())
-        self.assertEqual(
+        self.assertEquals(".debug_info", debug_info_section.GetName())
+        self.assertEquals(
             LLDB_INVALID_ADDRESS, debug_info_section.GetLoadAddress(target)
         )
 
         debug_abbrev_section = module.GetSectionAtIndex(2)
-        self.assertEqual(".debug_abbrev", debug_abbrev_section.GetName())
-        self.assertEqual(
+        self.assertEquals(".debug_abbrev", debug_abbrev_section.GetName())
+        self.assertEquals(
             LLDB_INVALID_ADDRESS, debug_abbrev_section.GetLoadAddress(target)
         )
 
         debug_line_section = module.GetSectionAtIndex(3)
-        self.assertEqual(".debug_line", debug_line_section.GetName())
-        self.assertEqual(
+        self.assertEquals(".debug_line", debug_line_section.GetName())
+        self.assertEquals(
             LLDB_INVALID_ADDRESS, debug_line_section.GetLoadAddress(target)
         )
 
         debug_str_section = module.GetSectionAtIndex(4)
-        self.assertEqual(".debug_str", debug_str_section.GetName())
-        self.assertEqual(
+        self.assertEquals(".debug_str", debug_str_section.GetName())
+        self.assertEquals(
             LLDB_INVALID_ADDRESS, debug_line_section.GetLoadAddress(target)
         )
 
@@ -236,39 +236,39 @@ class TestWasm(GDBRemoteTestBase):
         )
 
         num_modules = target.GetNumModules()
-        self.assertEqual(1, num_modules)
+        self.assertEquals(1, num_modules)
 
         module = target.GetModuleAtIndex(0)
         num_sections = module.GetNumSections()
-        self.assertEqual(5, num_sections)
+        self.assertEquals(5, num_sections)
 
         code_section = module.GetSectionAtIndex(0)
-        self.assertEqual("code", code_section.GetName())
-        self.assertEqual(
+        self.assertEquals("code", code_section.GetName())
+        self.assertEquals(
             load_address | code_section.GetFileOffset(),
             code_section.GetLoadAddress(target),
         )
 
         debug_info_section = module.GetSectionAtIndex(1)
-        self.assertEqual(".debug_info", debug_info_section.GetName())
-        self.assertEqual(
+        self.assertEquals(".debug_info", debug_info_section.GetName())
+        self.assertEquals(
             LLDB_INVALID_ADDRESS, debug_info_section.GetLoadAddress(target)
         )
 
         debug_abbrev_section = module.GetSectionAtIndex(2)
-        self.assertEqual(".debug_abbrev", debug_abbrev_section.GetName())
-        self.assertEqual(
+        self.assertEquals(".debug_abbrev", debug_abbrev_section.GetName())
+        self.assertEquals(
             LLDB_INVALID_ADDRESS, debug_abbrev_section.GetLoadAddress(target)
         )
 
         debug_line_section = module.GetSectionAtIndex(3)
-        self.assertEqual(".debug_line", debug_line_section.GetName())
-        self.assertEqual(
+        self.assertEquals(".debug_line", debug_line_section.GetName())
+        self.assertEquals(
             LLDB_INVALID_ADDRESS, debug_line_section.GetLoadAddress(target)
         )
 
         debug_str_section = module.GetSectionAtIndex(4)
-        self.assertEqual(".debug_str", debug_str_section.GetName())
-        self.assertEqual(
+        self.assertEquals(".debug_str", debug_str_section.GetName())
+        self.assertEquals(
             LLDB_INVALID_ADDRESS, debug_line_section.GetLoadAddress(target)
         )

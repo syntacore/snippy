@@ -18,18 +18,13 @@ module ieee_arithmetic
   use __fortran_ieee_exceptions
 
   use __fortran_builtins, only: &
-    ieee_away => __builtin_ieee_away, &
-    ieee_down => __builtin_ieee_down, &
     ieee_fma => __builtin_fma, &
     ieee_is_nan => __builtin_ieee_is_nan, &
     ieee_is_negative => __builtin_ieee_is_negative, &
     ieee_is_normal => __builtin_ieee_is_normal, &
-    ieee_nearest => __builtin_ieee_nearest, &
     ieee_next_after => __builtin_ieee_next_after, &
     ieee_next_down => __builtin_ieee_next_down, &
     ieee_next_up => __builtin_ieee_next_up, &
-    ieee_other => __builtin_ieee_other, &
-    ieee_round_type => __builtin_ieee_round_type, &
     ieee_scalb => scale, &
     ieee_selected_real_kind => __builtin_ieee_selected_real_kind, &
     ieee_support_datatype => __builtin_ieee_support_datatype, &
@@ -38,79 +33,19 @@ module ieee_arithmetic
     ieee_support_inf => __builtin_ieee_support_inf, &
     ieee_support_io => __builtin_ieee_support_io, &
     ieee_support_nan => __builtin_ieee_support_nan, &
-    ieee_support_rounding => __builtin_ieee_support_rounding, &
     ieee_support_sqrt => __builtin_ieee_support_sqrt, &
     ieee_support_standard => __builtin_ieee_support_standard, &
     ieee_support_subnormal => __builtin_ieee_support_subnormal, &
-    ieee_support_underflow_control => __builtin_ieee_support_underflow_control, &
-    ieee_to_zero => __builtin_ieee_to_zero, &
-    ieee_up => __builtin_ieee_up
-
+    ieee_support_underflow_control => __builtin_ieee_support_underflow_control
 
   implicit none
 
-  ! Set PRIVATE by default to explicitly only export what is meant
-  ! to be exported by this MODULE.
-  private
-
-  ! Explicitly export the symbols from __fortran_builtins
-  public :: ieee_away
-  public :: ieee_down
-  public :: ieee_fma
-  public :: ieee_is_nan
-  public :: ieee_is_negative
-  public :: ieee_is_normal
-  public :: ieee_nearest
-  public :: ieee_other
-  public :: ieee_next_after
-  public :: ieee_next_down
-  public :: ieee_next_up
-  public :: ieee_round_type
-  public :: ieee_scalb
-  public :: ieee_selected_real_kind
-  public :: ieee_support_datatype
-  public :: ieee_support_denormal
-  public :: ieee_support_divide
-  public :: ieee_support_inf
-  public :: ieee_support_io
-  public :: ieee_support_nan
-  public :: ieee_support_rounding
-  public :: ieee_support_sqrt
-  public :: ieee_support_standard
-  public :: ieee_support_subnormal
-  public :: ieee_support_underflow_control
-  public :: ieee_to_zero
-  public :: ieee_up
-
-  ! Explicitly export the symbols from __fortran_ieee_exceptions
-  public :: ieee_flag_type
-  public :: ieee_invalid
-  public :: ieee_overflow
-  public :: ieee_divide_by_zero
-  public :: ieee_underflow
-  public :: ieee_inexact
-  public :: ieee_denorm
-  public :: ieee_usual
-  public :: ieee_all
-  public :: ieee_modes_type
-  public :: ieee_status_type
-  public :: ieee_get_flag
-  public :: ieee_get_halting_mode
-  public :: ieee_get_modes
-  public :: ieee_get_status
-  public :: ieee_set_flag
-  public :: ieee_set_halting_mode
-  public :: ieee_set_modes
-  public :: ieee_set_status
-  public :: ieee_support_flag
-  public :: ieee_support_halting
-
-  type, public :: ieee_class_type
+  type :: ieee_class_type
     private
     integer(kind=1) :: which = 0
   end type ieee_class_type
 
-  type(ieee_class_type), parameter, public :: &
+  type(ieee_class_type), parameter :: &
     ieee_signaling_nan = ieee_class_type(_FORTRAN_RUNTIME_IEEE_SIGNALING_NAN), &
     ieee_quiet_nan = ieee_class_type(_FORTRAN_RUNTIME_IEEE_QUIET_NAN), &
     ieee_negative_inf = ieee_class_type(_FORTRAN_RUNTIME_IEEE_NEGATIVE_INF), &
@@ -127,9 +62,22 @@ module ieee_arithmetic
     ieee_positive_inf = ieee_class_type(_FORTRAN_RUNTIME_IEEE_POSITIVE_INF), &
     ieee_other_value = ieee_class_type(_FORTRAN_RUNTIME_IEEE_OTHER_VALUE)
 
-  type(ieee_class_type), parameter, public :: &
+  type(ieee_class_type), parameter :: &
     ieee_negative_denormal = ieee_negative_subnormal, &
     ieee_positive_denormal = ieee_positive_subnormal
+
+  type :: ieee_round_type
+    private
+    integer(kind=1) :: mode = 0
+  end type ieee_round_type
+
+  type(ieee_round_type), parameter :: &
+    ieee_to_zero = ieee_round_type(_FORTRAN_RUNTIME_IEEE_TO_ZERO), &
+    ieee_nearest = ieee_round_type(_FORTRAN_RUNTIME_IEEE_NEAREST), &
+    ieee_up = ieee_round_type(_FORTRAN_RUNTIME_IEEE_UP), &
+    ieee_down = ieee_round_type(_FORTRAN_RUNTIME_IEEE_DOWN), &
+    ieee_away = ieee_round_type(_FORTRAN_RUNTIME_IEEE_AWAY), &
+    ieee_other = ieee_round_type(_FORTRAN_RUNTIME_IEEE_OTHER)
 
   interface operator(==)
     elemental logical function ieee_class_eq(x, y)
@@ -141,8 +89,6 @@ module ieee_arithmetic
       type(ieee_round_type), intent(in) :: x, y
     end function ieee_round_eq
   end interface operator(==)
-  public :: operator(==)
-
   interface operator(/=)
     elemental logical function ieee_class_ne(x, y)
       import ieee_class_type
@@ -153,7 +99,7 @@ module ieee_arithmetic
       type(ieee_round_type), intent(in) :: x, y
     end function ieee_round_ne
   end interface operator(/=)
-  public :: operator(/=)
+  private :: ieee_class_eq, ieee_round_eq, ieee_class_ne, ieee_round_ne
 
 ! Define specifics with 1 or 2 INTEGER, LOGICAL, or REAL arguments for
 ! generic G.
@@ -208,6 +154,58 @@ module ieee_arithmetic
   G(16,2) G(16,3) G(16,4) G(16,8) G(16,16)
 #endif
 
+! Set PRIVATE accessibility for specifics with 1 or 2 INTEGER, LOGICAL, or REAL
+! arguments for generic G.
+#define PRIVATE_I(G) private :: \
+  G##_i1, G##_i2, G##_i4, G##_i8, G##_i16
+#define PRIVATE_L(G) private :: \
+  G##_l1, G##_l2, G##_l4, G##_l8
+#if __x86_64__
+#define PRIVATE_R(G) private :: \
+  G##_a2, G##_a3, G##_a4, G##_a8, G##_a10, G##_a16
+#else
+#define PRIVATE_R(G) private :: \
+  G##_a2, G##_a3, G##_a4, G##_a8, G##_a16
+#endif
+#define PRIVATE_II(G) private :: \
+  G##_i1_i1, G##_i1_i2, G##_i1_i4, G##_i1_i8, G##_i1_i16, \
+  G##_i2_i1, G##_i2_i2, G##_i2_i4, G##_i2_i8, G##_i2_i16, \
+  G##_i4_i1, G##_i4_i2, G##_i4_i4, G##_i4_i8, G##_i4_i16, \
+  G##_i8_i1, G##_i8_i2, G##_i8_i4, G##_i8_i8, G##_i8_i16, \
+  G##_i16_i1, G##_i16_i2, G##_i16_i4, G##_i16_i8, G##_i16_i16
+#if __x86_64__
+#define PRIVATE_RI(G) private :: \
+  G##_a2_i1, G##_a2_i2, G##_a2_i4, G##_a2_i8, G##_a2_i16, \
+  G##_a3_i1, G##_a3_i2, G##_a3_i4, G##_a3_i8, G##_a3_i16, \
+  G##_a4_i1, G##_a4_i2, G##_a4_i4, G##_a4_i8, G##_a4_i16, \
+  G##_a8_i1, G##_a8_i2, G##_a8_i4, G##_a8_i8, G##_a8_i16, \
+  G##_a10_i1, G##_a10_i2, G##_a10_i4, G##_a10_i8, G##_a10_i16, \
+  G##_a16_i1, G##_a16_i2, G##_a16_i4, G##_a16_i8, G##_a16_i16
+#else
+#define PRIVATE_RI(G) private :: \
+  G##_a2_i1, G##_a2_i2, G##_a2_i4, G##_a2_i8, G##_a2_i16, \
+  G##_a3_i1, G##_a3_i2, G##_a3_i4, G##_a3_i8, G##_a3_i16, \
+  G##_a4_i1, G##_a4_i2, G##_a4_i4, G##_a4_i8, G##_a4_i16, \
+  G##_a8_i1, G##_a8_i2, G##_a8_i4, G##_a8_i8, G##_a8_i16, \
+  G##_a16_i1, G##_a16_i2, G##_a16_i4, G##_a16_i8, G##_a16_i16
+#endif
+#if __x86_64__
+#define PRIVATE_RR(G) private :: \
+  G##_a2_a2, G##_a2_a3, G##_a2_a4, G##_a2_a8, G##_a2_a10, G##_a2_a16, \
+  G##_a3_a2, G##_a3_a3, G##_a3_a4, G##_a3_a8, G##_a3_a10, G##_a3_a16, \
+  G##_a4_a2, G##_a4_a3, G##_a4_a4, G##_a4_a8, G##_a4_a10, G##_a4_a16, \
+  G##_a8_a2, G##_a8_a3, G##_a8_a4, G##_a8_a8, G##_a8_a10, G##_a8_a16, \
+  G##_a10_a2, G##_a10_a3, G##_a10_a4, G##_a10_a8, G##_a10_a10, G##_a10_a16, \
+  G##_a16_a2, G##_a16_a3, G##_a16_a4, G##_a16_a8, G##_a16_a10, G##_a16_a16
+#else
+#define PRIVATE_RR(G) private :: \
+  G##_a2_a2, G##_a2_a3, G##_a2_a4, G##_a2_a8, G##_a2_a16, \
+  G##_a3_a2, G##_a3_a3, G##_a3_a4, G##_a3_a8, G##_a3_a16, \
+  G##_a4_a2, G##_a4_a3, G##_a4_a4, G##_a4_a8, G##_a4_a16, \
+  G##_a8_a2, G##_a8_a3, G##_a8_a4, G##_a8_a8, G##_a8_a16, \
+  G##_a16_a2, G##_a16_a3, G##_a16_a4, G##_a16_a8, G##_a16_a16
+#endif
+
 #define IEEE_CLASS_R(XKIND) \
   elemental type(ieee_class_type) function ieee_class_a##XKIND(x); \
     import ieee_class_type; \
@@ -216,7 +214,7 @@ module ieee_arithmetic
   interface ieee_class
     SPECIFICS_R(IEEE_CLASS_R)
   end interface ieee_class
-  public :: ieee_class
+  PRIVATE_R(IEEE_CLASS)
 #undef IEEE_CLASS_R
 
 #define IEEE_COPY_SIGN_RR(XKIND, YKIND) \
@@ -227,7 +225,7 @@ module ieee_arithmetic
   interface ieee_copy_sign
     SPECIFICS_RR(IEEE_COPY_SIGN_RR)
   end interface ieee_copy_sign
-  public :: ieee_copy_sign
+  PRIVATE_RR(IEEE_COPY_SIGN)
 #undef IEEE_COPY_SIGN_RR
 
 #define IEEE_GET_ROUNDING_MODE_I(RKIND) \
@@ -243,7 +241,7 @@ module ieee_arithmetic
     end subroutine ieee_get_rounding_mode_0
     SPECIFICS_I(IEEE_GET_ROUNDING_MODE_I)
   end interface ieee_get_rounding_mode
-  public :: ieee_get_rounding_mode
+  PRIVATE_I(IEEE_GET_ROUNDING_MODE)
 #undef IEEE_GET_ROUNDING_MODE_I
 
 #define IEEE_GET_UNDERFLOW_MODE_L(GKIND) \
@@ -253,7 +251,7 @@ module ieee_arithmetic
   interface ieee_get_underflow_mode
     SPECIFICS_L(IEEE_GET_UNDERFLOW_MODE_L)
   end interface ieee_get_underflow_mode
-  public ::  ieee_get_underflow_mode
+  PRIVATE_L(IEEE_GET_UNDERFLOW_MODE)
 #undef IEEE_GET_UNDERFLOW_MODE_L
 
 ! When kind argument is present, kind(result) is value(kind), not kind(kind).
@@ -275,7 +273,8 @@ module ieee_arithmetic
     SPECIFICS_R(IEEE_INT_R)
     SPECIFICS_RI(IEEE_INT_RI)
   end interface ieee_int
-  public :: ieee_int
+  PRIVATE_R(IEEE_INT)
+  PRIVATE_RI(IEEE_INT)
 #undef IEEE_INT_R
 #undef IEEE_INT_RI
 
@@ -286,7 +285,7 @@ module ieee_arithmetic
   interface ieee_is_finite
     SPECIFICS_R(IEEE_IS_FINITE_R)
   end interface ieee_is_finite
-  public :: ieee_is_finite
+  PRIVATE_R(IEEE_IS_FINITE)
 #undef IEEE_IS_FINITE_R
 
 #define IEEE_LOGB_R(XKIND) \
@@ -296,7 +295,7 @@ module ieee_arithmetic
   interface ieee_logb
     SPECIFICS_R(IEEE_LOGB_R)
   end interface ieee_logb
-  public :: ieee_logb
+  PRIVATE_R(IEEE_LOGB)
 #undef IEEE_LOGB_R
 
 #define IEEE_MAX_R(XKIND) \
@@ -306,7 +305,7 @@ module ieee_arithmetic
   interface ieee_max
     SPECIFICS_R(IEEE_MAX_R)
   end interface ieee_max
-  public :: ieee_max
+  PRIVATE_R(IEEE_MAX)
 #undef IEEE_MAX_R
 
 #define IEEE_MAX_MAG_R(XKIND) \
@@ -316,7 +315,7 @@ module ieee_arithmetic
   interface ieee_max_mag
     SPECIFICS_R(IEEE_MAX_MAG_R)
   end interface ieee_max_mag
-  public :: ieee_max_mag
+  PRIVATE_R(IEEE_MAX_MAG)
 #undef IEEE_MAX_MAG_R
 
 #define IEEE_MAX_NUM_R(XKIND) \
@@ -326,7 +325,7 @@ module ieee_arithmetic
   interface ieee_max_num
     SPECIFICS_R(IEEE_MAX_NUM_R)
   end interface ieee_max_num
-  public :: ieee_max_num
+  PRIVATE_R(IEEE_MAX_NUM)
 #undef IEEE_MAX_NUM_R
 
 #define IEEE_MAX_NUM_MAG_R(XKIND) \
@@ -336,7 +335,7 @@ module ieee_arithmetic
   interface ieee_max_num_mag
     SPECIFICS_R(IEEE_MAX_NUM_MAG_R)
   end interface ieee_max_num_mag
-  public :: ieee_max_num_mag
+  PRIVATE_R(IEEE_MAX_NUM_MAG)
 #undef IEEE_MAX_NUM_MAG_R
 
 #define IEEE_MIN_R(XKIND) \
@@ -346,7 +345,7 @@ module ieee_arithmetic
   interface ieee_min
     SPECIFICS_R(IEEE_MIN_R)
   end interface ieee_min
-  public :: ieee_min
+  PRIVATE_R(IEEE_MIN)
 #undef IEEE_MIN_R
 
 #define IEEE_MIN_MAG_R(XKIND) \
@@ -356,7 +355,7 @@ module ieee_arithmetic
   interface ieee_min_mag
     SPECIFICS_R(IEEE_MIN_MAG_R)
   end interface ieee_min_mag
-  public :: ieee_min_mag
+  PRIVATE_R(IEEE_MIN_MAG)
 #undef IEEE_MIN_MAG_R
 
 #define IEEE_MIN_NUM_R(XKIND) \
@@ -366,7 +365,7 @@ module ieee_arithmetic
   interface ieee_min_num
     SPECIFICS_R(IEEE_MIN_NUM_R)
   end interface ieee_min_num
-  public :: ieee_min_num
+  PRIVATE_R(IEEE_MIN_NUM)
 #undef IEEE_MIN_NUM_R
 
 #define IEEE_MIN_NUM_MAG_R(XKIND) \
@@ -376,7 +375,7 @@ module ieee_arithmetic
   interface ieee_min_num_mag
     SPECIFICS_R(IEEE_MIN_NUM_MAG_R)
   end interface ieee_min_num_mag
-  public ::ieee_min_num_mag
+  PRIVATE_R(IEEE_MIN_NUM_MAG)
 #undef IEEE_MIN_NUM_MAG_R
 
 #define IEEE_QUIET_EQ_R(AKIND) \
@@ -386,7 +385,7 @@ module ieee_arithmetic
   interface ieee_quiet_eq
     SPECIFICS_R(IEEE_QUIET_EQ_R)
   end interface ieee_quiet_eq
-  public :: ieee_quiet_eq
+  PRIVATE_R(IEEE_QUIET_EQ)
 #undef IEEE_QUIET_EQ_R
 
 #define IEEE_QUIET_GE_R(AKIND) \
@@ -396,7 +395,7 @@ module ieee_arithmetic
   interface ieee_quiet_ge
     SPECIFICS_R(IEEE_QUIET_GE_R)
   end interface ieee_quiet_ge
-  public :: ieee_quiet_ge
+  PRIVATE_R(IEEE_QUIET_GE)
 #undef IEEE_QUIET_GE_R
 
 #define IEEE_QUIET_GT_R(AKIND) \
@@ -406,7 +405,7 @@ module ieee_arithmetic
   interface ieee_quiet_gt
     SPECIFICS_R(IEEE_QUIET_GT_R)
   end interface ieee_quiet_gt
-  public :: ieee_quiet_gt
+  PRIVATE_R(IEEE_QUIET_GT)
 #undef IEEE_QUIET_GT_R
 
 #define IEEE_QUIET_LE_R(AKIND) \
@@ -416,7 +415,7 @@ module ieee_arithmetic
   interface ieee_quiet_le
     SPECIFICS_R(IEEE_QUIET_LE_R)
   end interface ieee_quiet_le
-  public :: ieee_quiet_le
+  PRIVATE_R(IEEE_QUIET_LE)
 #undef IEEE_QUIET_LE_R
 
 #define IEEE_QUIET_LT_R(AKIND) \
@@ -426,7 +425,7 @@ module ieee_arithmetic
   interface ieee_quiet_lt
     SPECIFICS_R(IEEE_QUIET_LT_R)
   end interface ieee_quiet_lt
-  public :: ieee_quiet_lt
+  PRIVATE_R(IEEE_QUIET_LT)
 #undef IEEE_QUIET_LT_R
 
 #define IEEE_QUIET_NE_R(AKIND) \
@@ -436,7 +435,7 @@ module ieee_arithmetic
   interface ieee_quiet_ne
     SPECIFICS_R(IEEE_QUIET_NE_R)
   end interface ieee_quiet_ne
-  public :: ieee_quiet_ne
+  PRIVATE_R(IEEE_QUIET_NE)
 #undef IEEE_QUIET_NE_R
 
 ! When kind argument is present, kind(result) is value(kind), not kind(kind).
@@ -465,7 +464,10 @@ module ieee_arithmetic
     SPECIFICS_II(IEEE_REAL_II)
     SPECIFICS_RI(IEEE_REAL_RI)
   end interface ieee_real
-  public :: ieee_real
+  PRIVATE_I(IEEE_REAL)
+  PRIVATE_R(IEEE_REAL)
+  PRIVATE_II(IEEE_REAL)
+  PRIVATE_RI(IEEE_REAL)
 #undef IEEE_REAL_I
 #undef IEEE_REAL_R
 #undef IEEE_REAL_II
@@ -479,7 +481,7 @@ module ieee_arithmetic
   interface ieee_rem
     SPECIFICS_RR(IEEE_REM_RR)
   end interface ieee_rem
-  public :: ieee_rem
+  PRIVATE_RR(IEEE_REM)
 #undef IEEE_REM_RR
 
 #define IEEE_RINT_R(XKIND) \
@@ -491,7 +493,7 @@ module ieee_arithmetic
   interface ieee_rint
     SPECIFICS_R(IEEE_RINT_R)
   end interface ieee_rint
-  public :: ieee_rint
+  PRIVATE_R(IEEE_RINT)
 #undef IEEE_RINT_R
 
 #define IEEE_SET_ROUNDING_MODE_I(RKIND) \
@@ -507,7 +509,7 @@ module ieee_arithmetic
     end subroutine ieee_set_rounding_mode_0
     SPECIFICS_I(IEEE_SET_ROUNDING_MODE_I)
   end interface ieee_set_rounding_mode
-  public :: ieee_set_rounding_mode
+  PRIVATE_I(IEEE_SET_ROUNDING_MODE)
 #undef IEEE_SET_ROUNDING_MODE_I
 
 #define IEEE_SET_UNDERFLOW_MODE_L(GKIND) \
@@ -517,7 +519,7 @@ module ieee_arithmetic
   interface ieee_set_underflow_mode
     SPECIFICS_L(IEEE_SET_UNDERFLOW_MODE_L)
   end interface ieee_set_underflow_mode
-  public :: ieee_set_underflow_mode
+  PRIVATE_L(IEEE_SET_UNDERFLOW_MODE)
 #undef IEEE_SET_UNDERFLOW_MODE_L
 
 #define IEEE_SIGNALING_EQ_R(AKIND) \
@@ -527,7 +529,7 @@ module ieee_arithmetic
   interface ieee_signaling_eq
     SPECIFICS_R(IEEE_SIGNALING_EQ_R)
   end interface ieee_signaling_eq
-  public :: ieee_signaling_eq
+  PRIVATE_R(IEEE_SIGNALING_EQ)
 #undef IEEE_SIGNALING_EQ_R
 
 #define IEEE_SIGNALING_GE_R(AKIND) \
@@ -537,7 +539,7 @@ module ieee_arithmetic
   interface ieee_signaling_ge
     SPECIFICS_R(IEEE_SIGNALING_GE_R)
   end interface ieee_signaling_ge
-  public :: ieee_signaling_ge
+  PRIVATE_R(IEEE_SIGNALING_GE)
 #undef IEEE_SIGNALING_GE_R
 
 #define IEEE_SIGNALING_GT_R(AKIND) \
@@ -547,7 +549,7 @@ module ieee_arithmetic
   interface ieee_signaling_gt
     SPECIFICS_R(IEEE_SIGNALING_GT_R)
   end interface ieee_signaling_gt
-  public :: ieee_signaling_gt
+  PRIVATE_R(IEEE_SIGNALING_GT)
 #undef IEEE_SIGNALING_GT_R
 
 #define IEEE_SIGNALING_LE_R(AKIND) \
@@ -557,7 +559,7 @@ module ieee_arithmetic
   interface ieee_signaling_le
     SPECIFICS_R(IEEE_SIGNALING_LE_R)
   end interface ieee_signaling_le
-  public :: ieee_signaling_le
+  PRIVATE_R(IEEE_SIGNALING_LE)
 #undef IEEE_SIGNALING_LE_R
 
 #define IEEE_SIGNALING_LT_R(AKIND) \
@@ -567,7 +569,7 @@ module ieee_arithmetic
   interface ieee_signaling_lt
     SPECIFICS_R(IEEE_SIGNALING_LT_R)
   end interface ieee_signaling_lt
-  public :: ieee_signaling_lt
+  PRIVATE_R(IEEE_SIGNALING_LT)
 #undef IEEE_SIGNALING_LT_R
 
 #define IEEE_SIGNALING_NE_R(AKIND) \
@@ -577,7 +579,7 @@ module ieee_arithmetic
   interface ieee_signaling_ne
     SPECIFICS_R(IEEE_SIGNALING_NE_R)
   end interface ieee_signaling_ne
-  public :: ieee_signaling_ne
+  PRIVATE_R(IEEE_SIGNALING_NE)
 #undef IEEE_SIGNALING_NE_R
 
 #define IEEE_SIGNBIT_R(XKIND) \
@@ -587,18 +589,34 @@ module ieee_arithmetic
   interface ieee_signbit
     SPECIFICS_R(IEEE_SIGNBIT_R)
   end interface ieee_signbit
-  public :: ieee_signbit
+  PRIVATE_R(IEEE_SIGNBIT)
 #undef IEEE_SIGNBIT_R
 
+#define IEEE_SUPPORT_ROUNDING_R(XKIND) \
+  pure logical function ieee_support_rounding_a##XKIND(round_value, x); \
+    import ieee_round_type; \
+    type(ieee_round_type), intent(in) :: round_value; \
+    real(XKIND), intent(in) :: x(..); \
+  end function ieee_support_rounding_a##XKIND;
+  interface ieee_support_rounding
+    pure logical function ieee_support_rounding_0(round_value)
+      import ieee_round_type
+      type(ieee_round_type), intent(in) :: round_value
+    end function ieee_support_rounding_0
+    SPECIFICS_R(IEEE_SUPPORT_ROUNDING_R)
+  end interface ieee_support_rounding
+  PRIVATE_R(IEEE_SUPPORT_ROUNDING)
+#undef IEEE_SUPPORT_ROUNDING_R
+
 #define IEEE_UNORDERED_RR(XKIND, YKIND) \
-  elemental logical function ieee_unordered_a##XKIND##_a##YKIND(x, y); \
+ elemental logical function ieee_unordered_a##XKIND##_a##YKIND(x, y); \
     real(XKIND), intent(in) :: x; \
     real(YKIND), intent(in) :: y; \
   end function ieee_unordered_a##XKIND##_a##YKIND;
   interface ieee_unordered
     SPECIFICS_RR(IEEE_UNORDERED_RR)
   end interface ieee_unordered
-  public :: ieee_unordered
+  PRIVATE_RR(IEEE_UNORDERED)
 #undef IEEE_UNORDERED_RR
 
 #define IEEE_VALUE_R(XKIND) \
@@ -610,7 +628,7 @@ module ieee_arithmetic
   interface ieee_value
     SPECIFICS_R(IEEE_VALUE_R)
   end interface ieee_value
-  public :: ieee_value
+  PRIVATE_R(IEEE_VALUE)
 #undef IEEE_VALUE_R
 
 end module ieee_arithmetic

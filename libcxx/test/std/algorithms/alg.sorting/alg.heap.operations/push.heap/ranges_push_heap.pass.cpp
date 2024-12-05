@@ -25,7 +25,6 @@
 #include <array>
 #include <concepts>
 #include <functional>
-#include <memory>
 #include <ranges>
 
 #include "almost_satisfies_types.h"

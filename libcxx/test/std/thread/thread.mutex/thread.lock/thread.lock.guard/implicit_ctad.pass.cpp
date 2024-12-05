@@ -6,24 +6,24 @@
 //
 //===----------------------------------------------------------------------===//
 
-// UNSUPPORTED: c++03, c++11, c++14
+// UNSUPPORTED: no-threads
+// UNSUPPORTED: c++98, c++03, c++11, c++14
 
 // <mutex>
 
-// template <class Mutex> class lock_guard;
+// lock_guard
 
 // Make sure that the implicitly-generated CTAD works.
 
 #include <mutex>
 
 #include "test_macros.h"
-#include "types.h"
 
 int main(int, char**) {
-  MyMutex m;
+  std::mutex mutex;
   {
-    std::lock_guard lg(m);
-    ASSERT_SAME_TYPE(decltype(lg), std::lock_guard<MyMutex>);
+    std::lock_guard lock(mutex);
+    ASSERT_SAME_TYPE(decltype(lock), std::lock_guard<std::mutex>);
   }
 
   return 0;

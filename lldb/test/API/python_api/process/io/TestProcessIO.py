@@ -175,7 +175,7 @@ class ProcessIOTestCase(TestBase):
         self.breakpoint = self.target.BreakpointCreateBySourceRegex(
             "Set breakpoint here", lldb.SBFileSpec("main.c")
         )
-        self.assertGreater(self.breakpoint.GetNumLocations(), 0, VALID_BREAKPOINT)
+        self.assertTrue(self.breakpoint.GetNumLocations() > 0, VALID_BREAKPOINT)
 
         # Launch the process, and do not stop at the entry point.
         error = lldb.SBError()
@@ -223,7 +223,11 @@ class ProcessIOTestCase(TestBase):
 
         for line in self.lines:
             check_line = "input line to stdout: %s" % (line)
-            self.assertIn(check_line, output, "verify stdout line shows up in STDOUT")
+            self.assertTrue(
+                check_line in output, "verify stdout line shows up in STDOUT"
+            )
         for line in self.lines:
             check_line = "input line to stderr: %s" % (line)
-            self.assertIn(check_line, error, "verify stderr line shows up in STDERR")
+            self.assertTrue(
+                check_line in error, "verify stderr line shows up in STDERR"
+            )

@@ -24,15 +24,6 @@ public:
   virtual void emitLocalCommonSymbolSorted(MCSymbol *Symbol, uint64_t Size,
                                            unsigned ByteAlign,
                                            unsigned AccessGranularity){};
-  void finish() override {}
-
-  virtual void finishAttributeSection() {}
-
-  virtual void emitAttribute(unsigned Attribute, unsigned Value) {}
-
-  void emitTargetAttributes(const MCSubtargetInfo &STI);
-
-  virtual void reset() {}
 };
 }
 

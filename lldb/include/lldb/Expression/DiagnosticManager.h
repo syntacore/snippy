@@ -28,6 +28,12 @@ enum DiagnosticOrigin {
   eDiagnosticOriginLLVM
 };
 
+enum DiagnosticSeverity {
+  eDiagnosticSeverityError,
+  eDiagnosticSeverityWarning,
+  eDiagnosticSeverityRemark
+};
+
 const uint32_t LLDB_INVALID_COMPILER_ID = UINT32_MAX;
 
 class Diagnostic {
@@ -49,7 +55,7 @@ public:
     }
   }
 
-  Diagnostic(llvm::StringRef message, lldb::Severity severity,
+  Diagnostic(llvm::StringRef message, DiagnosticSeverity severity,
              DiagnosticOrigin origin, uint32_t compiler_id)
       : m_message(message), m_severity(severity), m_origin(origin),
         m_compiler_id(compiler_id) {}
@@ -62,7 +68,7 @@ public:
 
   virtual bool HasFixIts() const { return false; }
 
-  lldb::Severity GetSeverity() const { return m_severity; }
+  DiagnosticSeverity GetSeverity() const { return m_severity; }
 
   uint32_t GetCompilerID() const { return m_compiler_id; }
 
@@ -77,7 +83,7 @@ public:
 
 protected:
   std::string m_message;
-  lldb::Severity m_severity;
+  DiagnosticSeverity m_severity;
   DiagnosticOrigin m_origin;
   uint32_t m_compiler_id; // Compiler-specific diagnostic ID
 };
@@ -100,7 +106,7 @@ public:
                         });
   }
 
-  void AddDiagnostic(llvm::StringRef message, lldb::Severity severity,
+  void AddDiagnostic(llvm::StringRef message, DiagnosticSeverity severity,
                      DiagnosticOrigin origin,
                      uint32_t compiler_id = LLDB_INVALID_COMPILER_ID) {
     m_diagnostics.emplace_back(
@@ -121,9 +127,9 @@ public:
     other.Clear();
   }
 
-  size_t Printf(lldb::Severity severity, const char *format, ...)
+  size_t Printf(DiagnosticSeverity severity, const char *format, ...)
       __attribute__((format(printf, 3, 4)));
-  void PutString(lldb::Severity severity, llvm::StringRef str);
+  void PutString(DiagnosticSeverity severity, llvm::StringRef str);
 
   void AppendMessageToDiagnostic(llvm::StringRef str) {
     if (!m_diagnostics.empty())

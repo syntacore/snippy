@@ -32,7 +32,7 @@ namespace {
 class ProcessFreeBSDKernelFVC : public ProcessFreeBSDKernel {
 public:
   ProcessFreeBSDKernelFVC(lldb::TargetSP target_sp, lldb::ListenerSP listener,
-                          fvc_t *fvc, const FileSpec &core_file);
+                          fvc_t *fvc);
 
   ~ProcessFreeBSDKernelFVC();
 
@@ -50,7 +50,7 @@ private:
 class ProcessFreeBSDKernelKVM : public ProcessFreeBSDKernel {
 public:
   ProcessFreeBSDKernelKVM(lldb::TargetSP target_sp, lldb::ListenerSP listener,
-                          kvm_t *fvc, const FileSpec &core_file);
+                          kvm_t *fvc);
 
   ~ProcessFreeBSDKernelKVM();
 
@@ -67,9 +67,8 @@ private:
 } // namespace
 
 ProcessFreeBSDKernel::ProcessFreeBSDKernel(lldb::TargetSP target_sp,
-                                           ListenerSP listener_sp,
-                                           const FileSpec &core_file)
-    : PostMortemProcess(target_sp, listener_sp, core_file) {}
+                                           ListenerSP listener_sp)
+    : PostMortemProcess(target_sp, listener_sp) {}
 
 lldb::ProcessSP ProcessFreeBSDKernel::CreateInstance(lldb::TargetSP target_sp,
                                                      ListenerSP listener_sp,
@@ -83,7 +82,7 @@ lldb::ProcessSP ProcessFreeBSDKernel::CreateInstance(lldb::TargetSP target_sp,
                  crash_file->GetPath().c_str(), nullptr, nullptr, nullptr);
     if (fvc)
       return std::make_shared<ProcessFreeBSDKernelFVC>(target_sp, listener_sp,
-                                                       fvc, *crash_file);
+                                                       fvc);
 #endif
 
 #if defined(__FreeBSD__)
@@ -92,7 +91,7 @@ lldb::ProcessSP ProcessFreeBSDKernel::CreateInstance(lldb::TargetSP target_sp,
                   crash_file->GetPath().c_str(), O_RDONLY, nullptr, nullptr);
     if (kvm)
       return std::make_shared<ProcessFreeBSDKernelKVM>(target_sp, listener_sp,
-                                                       kvm, *crash_file);
+                                                       kvm);
 #endif
   }
   return nullptr;
@@ -277,9 +276,8 @@ lldb::addr_t ProcessFreeBSDKernel::FindSymbol(const char *name) {
 
 ProcessFreeBSDKernelFVC::ProcessFreeBSDKernelFVC(lldb::TargetSP target_sp,
                                                  ListenerSP listener_sp,
-                                                 fvc_t *fvc,
-                                                 const FileSpec &core_file)
-    : ProcessFreeBSDKernel(target_sp, listener_sp, crash_file), m_fvc(fvc) {}
+                                                 fvc_t *fvc)
+    : ProcessFreeBSDKernel(target_sp, listener_sp), m_fvc(fvc) {}
 
 ProcessFreeBSDKernelFVC::~ProcessFreeBSDKernelFVC() {
   if (m_fvc)
@@ -305,9 +303,8 @@ const char *ProcessFreeBSDKernelFVC::GetError() { return fvc_geterr(m_fvc); }
 
 ProcessFreeBSDKernelKVM::ProcessFreeBSDKernelKVM(lldb::TargetSP target_sp,
                                                  ListenerSP listener_sp,
-                                                 kvm_t *fvc,
-                                                 const FileSpec &core_file)
-    : ProcessFreeBSDKernel(target_sp, listener_sp, core_file), m_kvm(fvc) {}
+                                                 kvm_t *fvc)
+    : ProcessFreeBSDKernel(target_sp, listener_sp), m_kvm(fvc) {}
 
 ProcessFreeBSDKernelKVM::~ProcessFreeBSDKernelKVM() {
   if (m_kvm)

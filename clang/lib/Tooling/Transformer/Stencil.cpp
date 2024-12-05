@@ -51,7 +51,7 @@ static Error printNode(StringRef Id, const MatchFinder::MatchResult &Match,
   if (auto Err = NodeOrErr.takeError())
     return Err;
   NodeOrErr->print(Os, PrintingPolicy(Match.Context->getLangOpts()));
-  *Result += Output;
+  *Result += Os.str();
   return Error::success();
 }
 
@@ -371,7 +371,7 @@ public:
       Stream << ", " << DefaultStencil->toString();
     }
     Stream << ")";
-    return Buffer;
+    return Stream.str();
   }
 
 private:

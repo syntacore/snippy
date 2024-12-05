@@ -28,7 +28,7 @@ namespace {
 
 class ObjCPropertyAttributeOrderFixerTest : public FormatTestBase {
 protected:
-  TokenList annotate(StringRef Code,
+  TokenList annotate(llvm::StringRef Code,
                      const FormatStyle &Style = getLLVMStyle()) {
     return TestLexer(Allocator, Buffers, Style).annotate(Code);
   }

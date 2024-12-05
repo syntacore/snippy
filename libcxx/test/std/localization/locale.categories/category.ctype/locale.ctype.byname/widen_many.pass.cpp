@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 // REQUIRES: locale.en_US.UTF-8
+// XFAIL: LIBCXX-AIX-FIXME
 // XFAIL: no-wide-characters
 
 // <locale>
@@ -62,7 +63,7 @@ int main(int, char**)
             assert(v[3] == L'.');
             assert(v[4] == L'a');
             assert(v[5] == L'1');
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(_WIN32) || defined(_AIX)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(_WIN32)
             assert(v[6] == L'\xfb');
 #else
             assert(v[6] == wchar_t(-1));

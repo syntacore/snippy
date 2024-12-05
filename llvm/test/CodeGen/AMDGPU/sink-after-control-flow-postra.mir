@@ -221,6 +221,7 @@ body:             |
   ; GFX10-NEXT:   successors: %bb.1(0x80000000)
   ; GFX10-NEXT:   liveins: $sgpr8, $vgpr0, $vgpr1
   ; GFX10-NEXT: {{  $}}
+  ; GFX10-NEXT: {{  $}}
   ; GFX10-NEXT: bb.1:
   ; GFX10-NEXT:   successors: %bb.7(0x40000000), %bb.2(0x40000000)
   ; GFX10-NEXT:   liveins: $sgpr8, $vgpr0
@@ -232,6 +233,7 @@ body:             |
   ; GFX10-NEXT: bb.2:
   ; GFX10-NEXT:   successors: %bb.3(0x80000000)
   ; GFX10-NEXT:   liveins: $sgpr4, $sgpr8, $vgpr0
+  ; GFX10-NEXT: {{  $}}
   ; GFX10-NEXT: {{  $}}
   ; GFX10-NEXT: bb.3:
   ; GFX10-NEXT:   successors: %bb.5(0x40000000), %bb.4(0x40000000)
@@ -245,6 +247,7 @@ body:             |
   ; GFX10-NEXT: bb.4:
   ; GFX10-NEXT:   successors: %bb.5(0x80000000)
   ; GFX10-NEXT:   liveins: $sgpr4, $sgpr5, $sgpr8, $vgpr0
+  ; GFX10-NEXT: {{  $}}
   ; GFX10-NEXT: {{  $}}
   ; GFX10-NEXT: bb.5:
   ; GFX10-NEXT:   successors: %bb.3(0x40000000), %bb.6(0x40000000)
@@ -274,6 +277,7 @@ body:             |
   ; GFX10-NEXT: {{  $}}
   ; GFX10-NEXT: bb.8:
   ; GFX10-NEXT:   successors: %bb.9(0x80000000)
+  ; GFX10-NEXT: {{  $}}
   ; GFX10-NEXT: {{  $}}
   ; GFX10-NEXT: bb.9:
   ; GFX10-NEXT:   successors: %bb.9(0x40000000), %bb.10(0x40000000)
@@ -353,6 +357,7 @@ body:             |
   ; GFX10-NEXT:   successors: %bb.1(0x80000000)
   ; GFX10-NEXT:   liveins: $sgpr8, $sgpr9, $sgpr10
   ; GFX10-NEXT: {{  $}}
+  ; GFX10-NEXT: {{  $}}
   ; GFX10-NEXT: bb.1:
   ; GFX10-NEXT:   successors: %bb.7(0x40000000), %bb.2(0x40000000)
   ; GFX10-NEXT:   liveins: $sgpr8, $sgpr9
@@ -364,6 +369,7 @@ body:             |
   ; GFX10-NEXT: bb.2:
   ; GFX10-NEXT:   successors: %bb.3(0x80000000)
   ; GFX10-NEXT:   liveins: $sgpr4, $sgpr8, $sgpr9
+  ; GFX10-NEXT: {{  $}}
   ; GFX10-NEXT: {{  $}}
   ; GFX10-NEXT: bb.3:
   ; GFX10-NEXT:   successors: %bb.5(0x40000000), %bb.4(0x40000000)
@@ -377,6 +383,7 @@ body:             |
   ; GFX10-NEXT: bb.4:
   ; GFX10-NEXT:   successors: %bb.5(0x80000000)
   ; GFX10-NEXT:   liveins: $sgpr4, $sgpr5, $sgpr8, $sgpr9
+  ; GFX10-NEXT: {{  $}}
   ; GFX10-NEXT: {{  $}}
   ; GFX10-NEXT: bb.5:
   ; GFX10-NEXT:   successors: %bb.3(0x40000000), %bb.6(0x40000000)
@@ -407,6 +414,7 @@ body:             |
   ; GFX10-NEXT: {{  $}}
   ; GFX10-NEXT: bb.8:
   ; GFX10-NEXT:   successors: %bb.9(0x80000000)
+  ; GFX10-NEXT: {{  $}}
   ; GFX10-NEXT: {{  $}}
   ; GFX10-NEXT: bb.9:
   ; GFX10-NEXT:   successors: %bb.9(0x40000000), %bb.10(0x40000000)

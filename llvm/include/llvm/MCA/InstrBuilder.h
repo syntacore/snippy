@@ -14,7 +14,6 @@
 #ifndef LLVM_MCA_INSTRBUILDER_H
 #define LLVM_MCA_INSTRBUILDER_H
 
-#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/MC/MCInstrAnalysis.h"
 #include "llvm/MC/MCInstrInfo.h"
@@ -72,19 +71,18 @@ class InstrBuilder {
            std::unique_ptr<const InstrDesc>>
       Descriptors;
 
-  // Key is a hash of the MCInstruction and a SchedClassID that describe the
-  // value InstrDesc
-  DenseMap<std::pair<hash_code, unsigned>, std::unique_ptr<const InstrDesc>>
+  // Key is the MCIInst and SchedClassID the describe the value InstrDesc
+  DenseMap<std::pair<const MCInst *, unsigned>,
+           std::unique_ptr<const InstrDesc>>
       VariantDescriptors;
 
   bool FirstCallInst;
   bool FirstReturnInst;
-  unsigned CallLatency;
 
-  using InstRecycleCallback = std::function<Instruction *(const InstrDesc &)>;
+  using InstRecycleCallback =
+      llvm::function_ref<Instruction *(const InstrDesc &)>;
   InstRecycleCallback InstRecycleCB;
 
-  Expected<unsigned> getVariantSchedClassID(const MCInst &MCI, unsigned SchedClassID);
   Expected<const InstrDesc &>
   createInstrDescImpl(const MCInst &MCI, const SmallVector<Instrument *> &IVec);
   Expected<const InstrDesc &>
@@ -101,7 +99,7 @@ class InstrBuilder {
 public:
   InstrBuilder(const MCSubtargetInfo &STI, const MCInstrInfo &MCII,
                const MCRegisterInfo &RI, const MCInstrAnalysis *IA,
-               const InstrumentManager &IM, unsigned CallLatency);
+               const InstrumentManager &IM);
 
   void clear() {
     Descriptors.clear();

@@ -11,11 +11,10 @@
 
 #include "src/__support/CPP/type_traits.h"
 #include "src/__support/common.h"
-#include "src/__support/macros/config.h"
 #include "src/__support/macros/properties/architectures.h"
 #include "src/__support/macros/properties/cpu_features.h" // LIBC_TARGET_CPU_HAS_FMA
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 namespace fputil {
 
 // Implement a simple wrapper for multiply-add operation:
@@ -35,27 +34,26 @@ multiply_add(T x, T y, T z) {
 }
 
 } // namespace fputil
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE
 
 #if defined(LIBC_TARGET_CPU_HAS_FMA)
 
 // FMA instructions are available.
-// We use builtins directly instead of including FMA.h to avoid a circular
-// dependency: multiply_add.h -> FMA.h -> generic/FMA.h -> dyadic_float.h.
+#include "FMA.h"
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 namespace fputil {
 
 LIBC_INLINE float multiply_add(float x, float y, float z) {
-  return __builtin_fmaf(x, y, z);
+  return fma(x, y, z);
 }
 
 LIBC_INLINE double multiply_add(double x, double y, double z) {
-  return __builtin_fma(x, y, z);
+  return fma(x, y, z);
 }
 
 } // namespace fputil
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE
 
 #endif // LIBC_TARGET_CPU_HAS_FMA
 

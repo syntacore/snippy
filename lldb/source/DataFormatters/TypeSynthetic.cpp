@@ -115,16 +115,6 @@ std::string CXXSyntheticChildren::GetDescription() {
   return std::string(sstr.GetString());
 }
 
-uint32_t
-SyntheticChildrenFrontEnd::CalculateNumChildrenIgnoringErrors(uint32_t max) {
-  auto value_or_err = CalculateNumChildren(max);
-  if (value_or_err)
-    return *value_or_err;
-  LLDB_LOG_ERRORV(GetLog(LLDBLog::DataFormatters), value_or_err.takeError(),
-                  "{0}");
-  return 0;
-}
-
 lldb::ValueObjectSP SyntheticChildrenFrontEnd::CreateValueObjectFromExpression(
     llvm::StringRef name, llvm::StringRef expression,
     const ExecutionContext &exe_ctx) {
@@ -177,7 +167,7 @@ ScriptedSyntheticChildren::FrontEnd::FrontEnd(std::string pclass,
 ScriptedSyntheticChildren::FrontEnd::~FrontEnd() = default;
 
 lldb::ValueObjectSP
-ScriptedSyntheticChildren::FrontEnd::GetChildAtIndex(uint32_t idx) {
+ScriptedSyntheticChildren::FrontEnd::GetChildAtIndex(size_t idx) {
   if (!m_wrapper_sp || !m_interpreter)
     return lldb::ValueObjectSP();
 
@@ -188,27 +178,23 @@ bool ScriptedSyntheticChildren::FrontEnd::IsValid() {
   return (m_wrapper_sp && m_wrapper_sp->IsValid() && m_interpreter);
 }
 
-llvm::Expected<uint32_t>
-ScriptedSyntheticChildren::FrontEnd::CalculateNumChildren() {
+size_t ScriptedSyntheticChildren::FrontEnd::CalculateNumChildren() {
   if (!m_wrapper_sp || m_interpreter == nullptr)
     return 0;
   return m_interpreter->CalculateNumChildren(m_wrapper_sp, UINT32_MAX);
 }
 
-llvm::Expected<uint32_t>
-ScriptedSyntheticChildren::FrontEnd::CalculateNumChildren(uint32_t max) {
+size_t ScriptedSyntheticChildren::FrontEnd::CalculateNumChildren(uint32_t max) {
   if (!m_wrapper_sp || m_interpreter == nullptr)
     return 0;
   return m_interpreter->CalculateNumChildren(m_wrapper_sp, max);
 }
 
-lldb::ChildCacheState ScriptedSyntheticChildren::FrontEnd::Update() {
+bool ScriptedSyntheticChildren::FrontEnd::Update() {
   if (!m_wrapper_sp || m_interpreter == nullptr)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
-  return m_interpreter->UpdateSynthProviderInstance(m_wrapper_sp)
-             ? lldb::ChildCacheState::eReuse
-             : lldb::ChildCacheState::eRefetch;
+  return m_interpreter->UpdateSynthProviderInstance(m_wrapper_sp);
 }
 
 bool ScriptedSyntheticChildren::FrontEnd::MightHaveChildren() {

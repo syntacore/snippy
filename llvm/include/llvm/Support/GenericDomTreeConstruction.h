@@ -72,7 +72,7 @@ struct SemiNCAInfo {
 
   // Number to node mapping is 1-based. Initialize the mapping to start with
   // a dummy element.
-  SmallVector<NodePtr, 64> NumToNode = {nullptr};
+  std::vector<NodePtr> NumToNode = {nullptr};
   DenseMap<NodePtr, InfoRec> NodeToInfo;
 
   using UpdateT = typename DomTreeT::UpdateType;
@@ -180,17 +180,15 @@ struct SemiNCAInfo {
                   unsigned AttachToNum,
                   const NodeOrderMap *SuccOrder = nullptr) {
     assert(V);
-    SmallVector<std::pair<NodePtr, unsigned>, 64> WorkList = {{V, AttachToNum}};
+    SmallVector<NodePtr, 64> WorkList = {V};
     NodeToInfo[V].Parent = AttachToNum;
 
     while (!WorkList.empty()) {
-      const auto [BB, ParentNum] = WorkList.pop_back_val();
+      const NodePtr BB = WorkList.pop_back_val();
       auto &BBInfo = NodeToInfo[BB];
-      BBInfo.ReverseChildren.push_back(ParentNum);
 
       // Visited nodes always have positive DFS numbers.
       if (BBInfo.DFSNum != 0) continue;
-      BBInfo.Parent = ParentNum;
       BBInfo.DFSNum = BBInfo.Semi = BBInfo.Label = ++LastNum;
       NumToNode.push_back(BB);
 
@@ -203,9 +201,22 @@ struct SemiNCAInfo {
             });
 
       for (const NodePtr Succ : Successors) {
+        const auto SIT = NodeToInfo.find(Succ);
+        // Don't visit nodes more than once but remember to collect
+        // ReverseChildren.
+        if (SIT != NodeToInfo.end() && SIT->second.DFSNum != 0) {
+          if (Succ != BB) SIT->second.ReverseChildren.push_back(LastNum);
+          continue;
+        }
+
         if (!Condition(BB, Succ)) continue;
 
-        WorkList.push_back({Succ, LastNum});
+        // It's fine to add Succ to the map, because we know that it will be
+        // visited later.
+        auto &SuccInfo = NodeToInfo[Succ];
+        WorkList.push_back(Succ);
+        SuccInfo.Parent = LastNum;
+        SuccInfo.ReverseChildren.push_back(LastNum);
       }
     }
 
@@ -584,7 +595,9 @@ struct SemiNCAInfo {
     // Attach the first unreachable block to AttachTo.
     NodeToInfo[NumToNode[1]].IDom = AttachTo->getBlock();
     // Loop over all of the discovered blocks in the function...
-    for (NodePtr W : llvm::drop_begin(NumToNode)) {
+    for (size_t i = 1, e = NumToNode.size(); i != e; ++i) {
+      NodePtr W = NumToNode[i];
+
       // Don't replace this with 'count', the insertion side effect is important
       if (DT.DomTreeNodes[W]) continue;  // Haven't calculated this node yet?
 
@@ -601,7 +614,8 @@ struct SemiNCAInfo {
 
   void reattachExistingSubtree(DomTreeT &DT, const TreeNodePtr AttachTo) {
     NodeToInfo[NumToNode[1]].IDom = AttachTo->getBlock();
-    for (const NodePtr N : llvm::drop_begin(NumToNode)) {
+    for (size_t i = 1, e = NumToNode.size(); i != e; ++i) {
+      const NodePtr N = NumToNode[i];
       const TreeNodePtr TN = DT.getNode(N);
       assert(TN);
       const TreeNodePtr NewIDom = DT.getNode(NodeToInfo[N].IDom);

@@ -13,6 +13,7 @@ add_clang_unittest(ToolingTests
   CastExprTest.cpp
   CommentHandlerTest.cpp
   CompilationDatabaseTest.cpp
+  DependencyScannerTest.cpp
   DiagnosticsYamlTest.cpp
   ExecutionTest.cpp
   FixItTest.cpp
@@ -23,8 +24,6 @@ add_clang_unittest(ToolingTests
   LookupTest.cpp
   QualTypeNamesTest.cpp
   RangeSelectorTest.cpp
-  DependencyScanning/DependencyScannerTest.cpp
-  DependencyScanning/DependencyScanningFilesystemTest.cpp
   RecursiveASTVisitorTests/Attr.cpp
   RecursiveASTVisitorTests/BitfieldInitializer.cpp
   RecursiveASTVisitorTests/CallbacksLeaf.cpp
@@ -40,7 +39,6 @@ add_clang_unittest(ToolingTests
   RecursiveASTVisitorTests/CXXMethodDecl.cpp
   RecursiveASTVisitorTests/CXXOperatorCallExprTraverser.cpp
   RecursiveASTVisitorTests/DeclRefExpr.cpp
-  RecursiveASTVisitorTests/DeductionGuide.cpp
   RecursiveASTVisitorTests/ImplicitCtor.cpp
   RecursiveASTVisitorTests/ImplicitCtorInitializer.cpp
   RecursiveASTVisitorTests/InitListExprPostOrder.cpp

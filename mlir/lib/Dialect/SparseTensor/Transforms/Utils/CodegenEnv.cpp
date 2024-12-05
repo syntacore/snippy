@@ -59,7 +59,7 @@ LogicalResult CodegenEnv::initTensorExp() {
   return success();
 }
 
-void CodegenEnv::startEmit(SparseEmitStrategy emitStrategy) {
+void CodegenEnv::startEmit() {
   assert(insChain == nullptr && "must only start emitting once");
   if (sparseOut) {
     insChain = sparseOut->get();
@@ -96,8 +96,7 @@ void CodegenEnv::startEmit(SparseEmitStrategy emitStrategy) {
       /*dependentLvlGetter=*/
       [this](TensorId t, Level lvl) -> std::vector<LoopCoeffPair> {
         return merger().getDependentLoops(t, lvl);
-      },
-      emitStrategy);
+      });
 }
 
 std::optional<Operation *> CodegenEnv::genLoopBoundary(

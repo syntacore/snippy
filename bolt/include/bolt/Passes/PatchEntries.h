@@ -34,7 +34,7 @@ public:
   explicit PatchEntries() : BinaryFunctionPass(false) {}
 
   const char *getName() const override { return "patch-entries"; }
-  Error runOnFunctions(BinaryContext &BC) override;
+  void runOnFunctions(BinaryContext &BC) override;
 };
 
 } // namespace bolt

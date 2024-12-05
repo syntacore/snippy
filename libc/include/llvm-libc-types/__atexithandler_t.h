@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES___ATEXITHANDLER_T_H
-#define LLVM_LIBC_TYPES___ATEXITHANDLER_T_H
+#ifndef __LLVM_LIBC_TYPES_ATEXITHANDLER_T_H__
+#define __LLVM_LIBC_TYPES_ATEXITHANDLER_T_H__
 
 typedef void (*__atexithandler_t)(void);
 
-#endif // LLVM_LIBC_TYPES___ATEXITHANDLER_T_H
+#endif // __LLVM_LIBC_TYPES_ATEXITHANDLER_T_H__

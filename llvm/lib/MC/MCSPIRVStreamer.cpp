@@ -34,8 +34,11 @@ void MCSPIRVStreamer::emitInstToData(const MCInst &Inst,
 MCStreamer *llvm::createSPIRVStreamer(MCContext &Context,
                                       std::unique_ptr<MCAsmBackend> &&MAB,
                                       std::unique_ptr<MCObjectWriter> &&OW,
-                                      std::unique_ptr<MCCodeEmitter> &&CE) {
+                                      std::unique_ptr<MCCodeEmitter> &&CE,
+                                      bool RelaxAll) {
   MCSPIRVStreamer *S = new MCSPIRVStreamer(Context, std::move(MAB),
                                            std::move(OW), std::move(CE));
+  if (RelaxAll)
+    S->getAssembler().setRelaxAll(true);
   return S;
 }

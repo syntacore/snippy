@@ -67,7 +67,8 @@ static std::string createReplacementText(const LambdaExpr *Lambda) {
       AppendName("this");
     }
   }
-  if (!Replacement.empty() && !Lambda->explicit_captures().empty()) {
+  if (!Replacement.empty() &&
+      Lambda->explicit_capture_begin() != Lambda->explicit_capture_end()) {
     // Add back separator if we are adding explicit capture variables.
     Stream << ", ";
   }

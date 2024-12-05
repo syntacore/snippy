@@ -8,7 +8,7 @@
 #ifndef MLIR_DIALECT_AMDGPU_UTILS_CHIPSET_H_
 #define MLIR_DIALECT_AMDGPU_UTILS_CHIPSET_H_
 
-#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
 namespace amdgpu {

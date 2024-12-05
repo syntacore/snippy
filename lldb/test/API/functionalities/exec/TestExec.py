@@ -45,8 +45,6 @@ class ExecTestCase(TestBase):
         # Create the target
         target = self.dbg.CreateTarget(exe)
 
-        lldbutil.install_to_target(self, secondprog)
-
         # Create any breakpoints we need
         breakpoint1 = target.BreakpointCreateBySourceRegex(
             "Set breakpoint 1 here", lldb.SBFileSpec("main.c", False)
@@ -144,8 +142,6 @@ class ExecTestCase(TestBase):
         self.build()
         exe = self.getBuildArtifact("a.out")
         target = self.dbg.CreateTarget(exe)
-
-        lldbutil.install_to_target(self, self.getBuildArtifact("secondprog"))
 
         (target, process, thread, breakpoint1) = lldbutil.run_to_source_breakpoint(
             self, "Set breakpoint 1 here", lldb.SBFileSpec("main.c", False)

@@ -1,10 +1,7 @@
 import("//llvm/utils/TableGen/tablegen.gni")
 
 tablegen("AMDGPUGenSearchableTables") {
-  visibility = [
-    ":Utils",
-    "//llvm/unittests/MC/AMDGPU:AMDGPUMCTests",
-  ]
+  visibility = [ ":Utils" ]
   args = [ "-gen-searchable-tables" ]
   td_file = "../AMDGPU.td"
 }
@@ -33,7 +30,6 @@ static_library("Utils") {
   sources = [
     "AMDGPUAsmUtils.cpp",
     "AMDGPUBaseInfo.cpp",
-    "AMDGPUDelayedMCExpr.cpp",
     "AMDGPUMemoryUtils.cpp",
     "AMDGPUPALMetadata.cpp",
     "AMDKernelCodeTUtils.cpp",

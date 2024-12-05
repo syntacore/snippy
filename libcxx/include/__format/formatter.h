@@ -10,8 +10,9 @@
 #ifndef _LIBCPP___FORMAT_FORMATTER_H
 #define _LIBCPP___FORMAT_FORMATTER_H
 
+#include <__availability>
 #include <__config>
-#include <__fwd/format.h>
+#include <__format/format_fwd.h>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #  pragma GCC system_header

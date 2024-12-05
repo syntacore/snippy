@@ -2,9 +2,9 @@
 
 --- |
 
-  define i32 @test(ptr %a) {
+  define i32 @test(i32* %a) {
   entry:
-    %b = load i32, ptr %a
+    %b = load i32, i32* %a
     ret i32 %b
   }
 

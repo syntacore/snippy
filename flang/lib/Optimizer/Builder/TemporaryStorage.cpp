@@ -83,8 +83,7 @@ fir::factory::HomogeneousScalarStack::HomogeneousScalarStack(
   mlir::Value shape = builder.genShape(loc, extents);
   temp = builder
              .create<hlfir::DeclareOp>(loc, tempStorage, tempName, shape,
-                                       lengths, /*dummy_scope=*/nullptr,
-                                       fir::FortranVariableFlagsAttr{})
+                                       lengths, fir::FortranVariableFlagsAttr{})
              .getBase();
 }
 
@@ -305,7 +304,8 @@ fir::factory::AnyVectorSubscriptStack::AnyVectorSubscriptStack(
     mlir::Type variableStaticType, bool shapeCanBeSavedAsRegister, int rank)
     : AnyVariableStack{loc, builder, variableStaticType} {
   if (shapeCanBeSavedAsRegister) {
-    shapeTemp = std::make_unique<TemporaryStorage>(SSARegister{});
+    shapeTemp =
+        std::unique_ptr<TemporaryStorage>(new TemporaryStorage{SSARegister{}});
     return;
   }
   // The shape will be tracked as the dimension inside a descriptor because
@@ -314,8 +314,8 @@ fir::factory::AnyVectorSubscriptStack::AnyVectorSubscriptStack(
   mlir::Type type =
       fir::BoxType::get(builder.getVarLenSeqTy(builder.getI32Type(), rank));
   boxType = type;
-  shapeTemp =
-      std::make_unique<TemporaryStorage>(AnyVariableStack{loc, builder, type});
+  shapeTemp = std::unique_ptr<TemporaryStorage>(
+      new TemporaryStorage{AnyVariableStack{loc, builder, type}});
 }
 
 void fir::factory::AnyVectorSubscriptStack::pushShape(

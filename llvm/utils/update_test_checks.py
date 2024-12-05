@@ -85,12 +85,6 @@ def main():
         choices=["none", "smart", "all"],
         help="Check global entries (global variables, metadata, attribute sets, ...) for functions",
     )
-    parser.add_argument(
-        "--reset-variable-names",
-        action="store_true",
-        help="Reset all variable names to correspond closely to the variable names in IR. "
-        "This tends to result in larger diffs.",
-    )
     parser.add_argument("tests", nargs="+")
     initial_args = common.parse_commandline_args(parser)
 
@@ -147,14 +141,9 @@ def main():
             # now, we just ignore all but the last.
             prefix_list.append((check_prefixes, tool_cmd_args, preprocess_cmd))
 
-        ginfo = common.make_ir_generalizer(ti.args.version)
         global_vars_seen_dict = {}
         builder = common.FunctionTestBuilder(
-            run_list=prefix_list,
-            flags=ti.args,
-            scrubber_args=[],
-            path=ti.path,
-            ginfo=ginfo,
+            run_list=prefix_list, flags=ti.args, scrubber_args=[], path=ti.path
         )
 
         tool_binary = ti.args.tool_binary
@@ -177,22 +166,17 @@ def main():
                 common.scrub_body,
                 raw_tool_output,
                 prefixes,
+                False,
             )
             builder.processed_prefixes(prefixes)
-
-        prefix_set = set(
-            [prefix for prefixes, _, _ in prefix_list for prefix in prefixes]
-        )
-
-        if not ti.args.reset_variable_names:
-            original_check_lines = common.collect_original_check_lines(ti, prefix_set)
-        else:
-            original_check_lines = {}
 
         func_dict = builder.finish_and_get_func_dict()
         is_in_function = False
         is_in_function_start = False
         has_checked_pre_function_globals = False
+        prefix_set = set(
+            [prefix for prefixes, _, _ in prefix_list for prefix in prefixes]
+        )
         common.debug("Rewriting FileCheck prefixes:", str(prefix_set))
         output_lines = []
 
@@ -221,7 +205,6 @@ def main():
                         ";",
                         prefix_list,
                         output_lines,
-                        ginfo,
                         global_vars_seen_dict,
                         args.preserve_names,
                         True,
@@ -244,16 +227,14 @@ def main():
                         func,
                         False,
                         args.function_signature,
-                        ginfo,
+                        args.version,
                         global_vars_seen_dict,
                         is_filtered=builder.is_filtered(),
-                        original_check_lines=original_check_lines.get(func, {}),
                     ),
                 )
             )
         else:
             # "Normal" mode.
-            dropped_previous_line = False
             for input_line_info in ti.iterlines(output_lines):
                 input_line = input_line_info.line
                 args = input_line_info.args
@@ -276,12 +257,9 @@ def main():
                             func_name,
                             args.preserve_names,
                             args.function_signature,
-                            ginfo,
+                            args.version,
                             global_vars_seen_dict,
                             is_filtered=builder.is_filtered(),
-                            original_check_lines=original_check_lines.get(
-                                func_name, {}
-                            ),
                         )
                     )
                     is_in_function_start = False
@@ -295,7 +273,6 @@ def main():
                                 ";",
                                 prefix_list,
                                 output_lines,
-                                ginfo,
                                 global_vars_seen_dict,
                                 args.preserve_names,
                                 True,
@@ -305,10 +282,7 @@ def main():
                     has_checked_pre_function_globals = True
 
                 if common.should_add_line_to_output(
-                    input_line,
-                    prefix_set,
-                    skip_global_checks=not is_in_function,
-                    skip_same_checks=dropped_previous_line,
+                    input_line, prefix_set, not is_in_function
                 ):
                     # This input line of the function body will go as-is into the output.
                     # Except make leading whitespace uniform: 2 spaces.
@@ -316,13 +290,9 @@ def main():
                         r"  ", input_line
                     )
                     output_lines.append(input_line)
-                    dropped_previous_line = False
                     if input_line.strip() == "}":
                         is_in_function = False
                         continue
-                else:
-                    # If we are removing a check line, and the next line is CHECK-SAME, it MUST also be removed
-                    dropped_previous_line = True
 
                 if is_in_function:
                     continue
@@ -343,7 +313,6 @@ def main():
                     ";",
                     prefix_list,
                     output_lines,
-                    ginfo,
                     global_vars_seen_dict,
                     args.preserve_names,
                     False,

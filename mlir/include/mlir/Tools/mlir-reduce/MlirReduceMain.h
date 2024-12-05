@@ -9,7 +9,7 @@
 #ifndef MLIR_TOOLS_MLIR_REDUCE_MLIRREDUCEMAIN_H
 #define MLIR_TOOLS_MLIR_REDUCE_MLIRREDUCEMAIN_H
 
-#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
 

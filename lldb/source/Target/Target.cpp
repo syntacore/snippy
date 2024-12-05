@@ -43,7 +43,6 @@
 #include "lldb/Symbol/ObjectFile.h"
 #include "lldb/Symbol/Symbol.h"
 #include "lldb/Target/ABI.h"
-#include "lldb/Target/ExecutionContext.h"
 #include "lldb/Target/Language.h"
 #include "lldb/Target/LanguageRuntime.h"
 #include "lldb/Target/Process.h"
@@ -87,8 +86,8 @@ const Target::Arch &Target::Arch::operator=(const ArchSpec &spec) {
   return *this;
 }
 
-llvm::StringRef Target::GetStaticBroadcasterClass() {
-  static constexpr llvm::StringLiteral class_name("lldb.target");
+ConstString &Target::GetStaticBroadcasterClass() {
+  static ConstString class_name("lldb.target");
   return class_name;
 }
 
@@ -96,7 +95,7 @@ Target::Target(Debugger &debugger, const ArchSpec &target_arch,
                const lldb::PlatformSP &platform_sp, bool is_dummy_target)
     : TargetProperties(this),
       Broadcaster(debugger.GetBroadcasterManager(),
-                  Target::GetStaticBroadcasterClass().str()),
+                  Target::GetStaticBroadcasterClass().AsCString()),
       ExecutionContextScope(), m_debugger(debugger), m_platform_sp(platform_sp),
       m_mutex(), m_arch(target_arch), m_images(this), m_section_load_history(),
       m_breakpoint_list(false), m_internal_breakpoint_list(true),
@@ -504,7 +503,7 @@ BreakpointSP Target::CreateBreakpoint(
     if (skip_prologue == eLazyBoolCalculate)
       skip_prologue = GetSkipPrologue() ? eLazyBoolYes : eLazyBoolNo;
     if (language == lldb::eLanguageTypeUnknown)
-      language = GetLanguage().AsLanguageType();
+      language = GetLanguage();
 
     BreakpointResolverSP resolver_sp(new BreakpointResolverName(
         nullptr, func_name, func_name_type_mask, language, Breakpoint::Exact,
@@ -530,7 +529,7 @@ Target::CreateBreakpoint(const FileSpecList *containingModules,
     if (skip_prologue == eLazyBoolCalculate)
       skip_prologue = GetSkipPrologue() ? eLazyBoolYes : eLazyBoolNo;
     if (language == lldb::eLanguageTypeUnknown)
-      language = GetLanguage().AsLanguageType();
+      language = GetLanguage();
 
     BreakpointResolverSP resolver_sp(
         new BreakpointResolverName(nullptr, func_names, func_name_type_mask,
@@ -559,7 +558,7 @@ Target::CreateBreakpoint(const FileSpecList *containingModules,
         skip_prologue = eLazyBoolNo;
     }
     if (language == lldb::eLanguageTypeUnknown)
-      language = GetLanguage().AsLanguageType();
+      language = GetLanguage();
 
     BreakpointResolverSP resolver_sp(new BreakpointResolverName(
         nullptr, func_names, num_names, func_name_type_mask, language, offset,
@@ -841,7 +840,7 @@ static bool CheckIfWatchpointsSupported(Target *target, Status &error) {
   if (!num_supported_hardware_watchpoints)
     return true;
 
-  if (*num_supported_hardware_watchpoints == 0) {
+  if (num_supported_hardware_watchpoints == 0) {
     error.SetErrorStringWithFormat(
         "Target supports (%u) hardware watchpoint slots.\n",
         *num_supported_hardware_watchpoints);
@@ -1569,8 +1568,14 @@ bool Target::SetArchitecture(const ArchSpec &arch_spec, bool set_platform,
 
       if (m_arch.GetSpec().IsCompatibleMatch(other)) {
         compatible_local_arch = true;
+        bool arch_changed, vendor_changed, os_changed, os_ver_changed,
+            env_changed;
 
-        if (m_arch.GetSpec().GetTriple() == other.GetTriple())
+        m_arch.GetSpec().PiecewiseTripleCompare(other, arch_changed,
+                                                vendor_changed, os_changed,
+                                                os_ver_changed, env_changed);
+
+        if (!arch_changed && !vendor_changed && !os_changed && !env_changed)
           replace_local_arch = false;
       }
     }
@@ -2414,7 +2419,8 @@ llvm::Expected<lldb::TypeSystemSP>
 Target::GetScratchTypeSystemForLanguage(lldb::LanguageType language,
                                         bool create_on_demand) {
   if (!m_valid)
-    return llvm::createStringError("Invalid Target");
+    return llvm::make_error<llvm::StringError>("Invalid Target",
+                                               llvm::inconvertibleErrorCode());
 
   if (language == eLanguageTypeMipsAssembler // GNU AS and LLVM use it for all
                                              // assembly code
@@ -2427,8 +2433,9 @@ Target::GetScratchTypeSystemForLanguage(lldb::LanguageType language,
                                  // target language.
     } else {
       if (languages_for_expressions.Empty())
-        return llvm::createStringError(
-            "No expression support for any languages");
+        return llvm::make_error<llvm::StringError>(
+            "No expression support for any languages",
+            llvm::inconvertibleErrorCode());
       language = (LanguageType)languages_for_expressions.bitvector.find_first();
     }
   }
@@ -2502,16 +2509,15 @@ Target::GetPersistentExpressionStateForLanguage(lldb::LanguageType language) {
 }
 
 UserExpression *Target::GetUserExpressionForLanguage(
-    llvm::StringRef expr, llvm::StringRef prefix, SourceLanguage language,
+    llvm::StringRef expr, llvm::StringRef prefix, lldb::LanguageType language,
     Expression::ResultType desired_type,
     const EvaluateExpressionOptions &options, ValueObject *ctx_obj,
     Status &error) {
-  auto type_system_or_err =
-      GetScratchTypeSystemForLanguage(language.AsLanguageType());
+  auto type_system_or_err = GetScratchTypeSystemForLanguage(language);
   if (auto err = type_system_or_err.takeError()) {
     error.SetErrorStringWithFormat(
         "Could not find type system for language %s: %s",
-        Language::GetNameForLanguageType(language.AsLanguageType()),
+        Language::GetNameForLanguageType(language),
         llvm::toString(std::move(err)).c_str());
     return nullptr;
   }
@@ -2520,7 +2526,7 @@ UserExpression *Target::GetUserExpressionForLanguage(
   if (!ts) {
     error.SetErrorStringWithFormat(
         "Type system for language %s is no longer live",
-        language.GetDescription().data());
+        Language::GetNameForLanguageType(language));
     return nullptr;
   }
 
@@ -2529,7 +2535,7 @@ UserExpression *Target::GetUserExpressionForLanguage(
   if (!user_expr)
     error.SetErrorStringWithFormat(
         "Could not create an expression for language %s",
-        language.GetDescription().data());
+        Language::GetNameForLanguageType(language));
 
   return user_expr;
 }
@@ -2572,20 +2578,23 @@ Target::CreateUtilityFunction(std::string expression, std::string name,
     return type_system_or_err.takeError();
   auto ts = *type_system_or_err;
   if (!ts)
-    return llvm::createStringError(
+    return llvm::make_error<llvm::StringError>(
         llvm::StringRef("Type system for language ") +
-        Language::GetNameForLanguageType(language) +
-        llvm::StringRef(" is no longer live"));
+            Language::GetNameForLanguageType(language) +
+            llvm::StringRef(" is no longer live"),
+        llvm::inconvertibleErrorCode());
   std::unique_ptr<UtilityFunction> utility_fn =
       ts->CreateUtilityFunction(std::move(expression), std::move(name));
   if (!utility_fn)
-    return llvm::createStringError(
+    return llvm::make_error<llvm::StringError>(
         llvm::StringRef("Could not create an expression for language") +
-        Language::GetNameForLanguageType(language));
+            Language::GetNameForLanguageType(language),
+        llvm::inconvertibleErrorCode());
 
   DiagnosticManager diagnostics;
   if (!utility_fn->Install(diagnostics, exe_ctx))
-    return llvm::createStringError(diagnostics.GetString());
+    return llvm::make_error<llvm::StringError>(diagnostics.GetString(),
+                                               llvm::inconvertibleErrorCode());
 
   return std::move(utility_fn);
 }
@@ -2616,7 +2625,8 @@ void Target::SetDefaultArchitecture(const ArchSpec &arch) {
 llvm::Error Target::SetLabel(llvm::StringRef label) {
   size_t n = LLDB_INVALID_INDEX32;
   if (llvm::to_integer(label, n))
-    return llvm::createStringError("Cannot use integer as target label.");
+    return llvm::make_error<llvm::StringError>(
+        "Cannot use integer as target label.", llvm::inconvertibleErrorCode());
   TargetList &targets = GetDebugger().GetTargetList();
   for (size_t i = 0; i < targets.GetNumTargets(); i++) {
     TargetSP target_sp = targets.GetTargetAtIndex(i);
@@ -2784,13 +2794,15 @@ llvm::Expected<lldb_private::Address> Target::GetEntryPointAddress() {
 
   // We haven't found the entry point address. Return an appropriate error.
   if (!has_primary_executable)
-    return llvm::createStringError(
+    return llvm::make_error<llvm::StringError>(
         "No primary executable found and could not find entry point address in "
-        "any executable module");
+        "any executable module",
+        llvm::inconvertibleErrorCode());
 
-  return llvm::createStringError(
+  return llvm::make_error<llvm::StringError>(
       "Could not find entry point address for primary executable module \"" +
-      exe_module->GetFileSpec().GetFilename().GetStringRef() + "\"");
+          exe_module->GetFileSpec().GetFilename().GetStringRef() + "\"",
+      llvm::inconvertibleErrorCode());
 }
 
 lldb::addr_t Target::GetCallableLoadAddress(lldb::addr_t load_addr,
@@ -4221,21 +4233,28 @@ void TargetProperties::UpdateLaunchInfoFromProperties() {
   DisableSTDIOValueChangedCallback();
 }
 
-std::optional<bool> TargetProperties::GetExperimentalPropertyValue(
-    size_t prop_idx, ExecutionContext *exe_ctx) const {
+bool TargetProperties::GetInjectLocalVariables(
+    ExecutionContext *exe_ctx) const {
   const Property *exp_property =
       m_collection_sp->GetPropertyAtIndex(ePropertyExperimental, exe_ctx);
   OptionValueProperties *exp_values =
       exp_property->GetValue()->GetAsProperties();
   if (exp_values)
-    return exp_values->GetPropertyAtIndexAs<bool>(prop_idx, exe_ctx);
-  return std::nullopt;
+    return exp_values
+        ->GetPropertyAtIndexAs<bool>(ePropertyInjectLocalVars, exe_ctx)
+        .value_or(true);
+  else
+    return true;
 }
 
-bool TargetProperties::GetInjectLocalVariables(
-    ExecutionContext *exe_ctx) const {
-  return GetExperimentalPropertyValue(ePropertyInjectLocalVars, exe_ctx)
-      .value_or(true);
+void TargetProperties::SetInjectLocalVariables(ExecutionContext *exe_ctx,
+                                               bool b) {
+  const Property *exp_property =
+      m_collection_sp->GetPropertyAtIndex(ePropertyExperimental, exe_ctx);
+  OptionValueProperties *exp_values =
+      exp_property->GetValue()->GetAsProperties();
+  if (exp_values)
+    exp_values->SetPropertyAtIndex(ePropertyInjectLocalVars, true, exe_ctx);
 }
 
 ArchSpec TargetProperties::GetDefaultArchitecture() const {
@@ -4639,9 +4658,9 @@ void TargetProperties::SetStandardErrorPath(llvm::StringRef path) {
   SetPropertyAtIndex(idx, path);
 }
 
-SourceLanguage TargetProperties::GetLanguage() const {
+LanguageType TargetProperties::GetLanguage() const {
   const uint32_t idx = ePropertyLanguage;
-  return {GetPropertyAtIndexAs<LanguageType>(idx, {})};
+  return GetPropertyAtIndexAs<LanguageType>(idx, {});
 }
 
 llvm::StringRef TargetProperties::GetExpressionPrefixContents() {
@@ -4943,7 +4962,4 @@ std::recursive_mutex &Target::GetAPIMutex() {
 }
 
 /// Get metrics associated with this target in JSON format.
-llvm::json::Value
-Target::ReportStatistics(const lldb_private::StatisticsOptions &options) {
-  return m_stats.ToJSON(*this, options);
-}
+llvm::json::Value Target::ReportStatistics() { return m_stats.ToJSON(*this); }

@@ -1,4 +1,6 @@
 // REQUIRES: system-linux
+// REQUIRES: x86-registered-target
+// REQUIRES: amdgpu-registered-target
 // REQUIRES: shell
 
 // RUN: mkdir -p %t

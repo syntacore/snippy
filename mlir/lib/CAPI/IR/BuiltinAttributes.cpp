@@ -289,10 +289,6 @@ MlirTypeID mlirSymbolRefAttrGetTypeID(void) {
   return wrap(SymbolRefAttr::getTypeID());
 }
 
-MlirAttribute mlirDisctinctAttrCreate(MlirAttribute referencedAttr) {
-  return wrap(mlir::DistinctAttr::create(unwrap(referencedAttr)));
-}
-
 //===----------------------------------------------------------------------===//
 // Flat SymbolRef attribute.
 //===----------------------------------------------------------------------===//

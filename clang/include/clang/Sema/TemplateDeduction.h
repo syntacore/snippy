@@ -33,7 +33,6 @@ namespace clang {
 class Decl;
 struct DeducedPack;
 class Sema;
-enum class TemplateDeductionResult;
 
 namespace sema {
 
@@ -296,10 +295,6 @@ struct DeductionFailureInfo {
 
   /// Free any memory associated with this deduction failure.
   void Destroy();
-
-  TemplateDeductionResult getResult() const {
-    return static_cast<TemplateDeductionResult>(Result);
-  }
 };
 
 /// TemplateSpecCandidate - This is a generalization of OverloadCandidate

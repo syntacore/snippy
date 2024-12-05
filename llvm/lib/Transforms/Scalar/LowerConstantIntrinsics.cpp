@@ -85,11 +85,8 @@ static bool replaceConditionalBranchesOnConstant(Instruction *II,
     if (Target && Target != Other) {
       BasicBlock *Source = BI->getParent();
       Other->removePredecessor(Source);
-
-      Instruction *NewBI = BranchInst::Create(Target, Source);
-      NewBI->setDebugLoc(BI->getDebugLoc());
       BI->eraseFromParent();
-
+      BranchInst::Create(Target, Source);
       if (DTU)
         DTU->applyUpdates({{DominatorTree::Delete, Source, Other}});
       if (pred_empty(Other))
@@ -106,7 +103,7 @@ static bool lowerConstantIntrinsics(Function &F, const TargetLibraryInfo &TLI,
     DTU.emplace(DT, DomTreeUpdater::UpdateStrategy::Lazy);
 
   bool HasDeadBlocks = false;
-  const auto &DL = F.getDataLayout();
+  const auto &DL = F.getParent()->getDataLayout();
   SmallVector<WeakTrackingVH, 8> Worklist;
 
   ReversePostOrderTraversal<Function *> RPOT(&F);

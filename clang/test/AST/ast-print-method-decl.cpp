@@ -32,7 +32,8 @@ struct DelegatingCtor2 {
 
 // CHECK: struct DelegatingCtor3 {
 struct DelegatingCtor3 {
-  // CHECK: DelegatingCtor3(auto);
+  // FIXME: template <> should not be output
+  // CHECK: template <> DelegatingCtor3(auto);
   DelegatingCtor3(auto);
 
   // FIXME: Implicitly specialized method should not be output
@@ -94,7 +95,7 @@ struct DefMethodsWithoutBody {
   // CHECK-NEXT: DefMethodsWithoutBody() = default;
   ~DefMethodsWithoutBody() = default;
 
-  // CHECK-NEXT: void m1() __attribute__((alias("X")));
+  // CHECK-NEXT: __attribute__((alias("X"))) void m1();
   void m1() __attribute__((alias("X")));
 
   // CHECK-NEXT: };

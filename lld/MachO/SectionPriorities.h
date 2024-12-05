@@ -11,7 +11,6 @@
 
 #include "InputSection.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/MapVector.h"
 
 namespace lld::macho {
 

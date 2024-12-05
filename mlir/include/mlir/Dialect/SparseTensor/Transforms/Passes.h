@@ -16,7 +16,6 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "mlir/Transforms/OneToNTypeConversion.h"
 
 //===----------------------------------------------------------------------===//
 // Include the generated pass header (which needs some early definitions).
@@ -48,24 +47,8 @@ enum class ReinterpretMapScope {
   kExceptGeneric, // reinterprets operation other than linalg.generic
 };
 
-/// Defines a scope for reinterpret map pass.
-enum class SparseEmitStrategy {
-  kFunctional,     // generate fully inlined (and functional) sparse iteration
-  kSparseIterator, // generate (experimental) loop using sparse iterator.
-  kDebugInterface, // generate only place-holder for sparse iteration
-};
-
 #define GEN_PASS_DECL
 #include "mlir/Dialect/SparseTensor/Transforms/Passes.h.inc"
-
-//===----------------------------------------------------------------------===//
-// The SparseAssembler pass.
-//===----------------------------------------------------------------------===//
-
-void populateSparseAssembler(RewritePatternSet &patterns, bool directOut);
-
-std::unique_ptr<Pass> createSparseAssembler();
-std::unique_ptr<Pass> createSparseAssembler(bool directOut);
 
 //===----------------------------------------------------------------------===//
 // The SparseReinterpretMap pass.
@@ -91,20 +74,11 @@ std::unique_ptr<Pass> createPreSparsificationRewritePass();
 
 /// Options for the Sparsification pass.
 struct SparsificationOptions {
-  SparsificationOptions(SparseParallelizationStrategy p, SparseEmitStrategy d,
-                        bool enableRT)
-      : parallelizationStrategy(p), sparseEmitStrategy(d),
-        enableRuntimeLibrary(enableRT) {}
-
   SparsificationOptions(SparseParallelizationStrategy p, bool enableRT)
-      : SparsificationOptions(p, SparseEmitStrategy::kFunctional, enableRT) {}
-
+      : parallelizationStrategy(p), enableRuntimeLibrary(enableRT) {}
   SparsificationOptions()
-      : SparsificationOptions(SparseParallelizationStrategy::kNone,
-                              SparseEmitStrategy::kFunctional, true) {}
-
+      : SparsificationOptions(SparseParallelizationStrategy::kNone, true) {}
   SparseParallelizationStrategy parallelizationStrategy;
-  SparseEmitStrategy sparseEmitStrategy;
   bool enableRuntimeLibrary;
 };
 
@@ -144,20 +118,6 @@ std::unique_ptr<Pass> createLowerSparseOpsToForeachPass(bool enableRT,
 void populateLowerForeachToSCFPatterns(RewritePatternSet &patterns);
 
 std::unique_ptr<Pass> createLowerForeachToSCFPass();
-
-//===----------------------------------------------------------------------===//
-// The LowerSparseIterationToSCF pass.
-//===----------------------------------------------------------------------===//
-
-/// Type converter for iter_space and iterator.
-struct SparseIterationTypeConverter : public OneToNTypeConverter {
-  SparseIterationTypeConverter();
-};
-
-void populateLowerSparseIterationToSCFPatterns(TypeConverter &converter,
-                                               RewritePatternSet &patterns);
-
-std::unique_ptr<Pass> createLowerSparseIterationToSCFPass();
 
 //===----------------------------------------------------------------------===//
 // The SparseTensorConversion pass.
@@ -262,14 +222,7 @@ std::unique_ptr<Pass> createSparsificationAndBufferizationPass(
     const SparsificationOptions &sparsificationOptions,
     bool createSparseDeallocs, bool enableRuntimeLibrary,
     bool enableBufferInitialization, unsigned vectorLength,
-    bool enableVLAVectorization, bool enableSIMDIndex32, bool enableGPULibgen,
-    SparseEmitStrategy emitStrategy);
-
-//===----------------------------------------------------------------------===//
-// Sparse Iteration Transform Passes
-//===----------------------------------------------------------------------===//
-
-std::unique_ptr<Pass> createSparseSpaceCollapsePass();
+    bool enableVLAVectorization, bool enableSIMDIndex32, bool enableGPULibgen);
 
 //===----------------------------------------------------------------------===//
 // Registration.

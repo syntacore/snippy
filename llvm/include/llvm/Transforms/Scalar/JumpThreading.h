@@ -22,7 +22,6 @@
 #include "llvm/Analysis/BranchProbabilityInfo.h"
 #include "llvm/Analysis/DomTreeUpdater.h"
 #include "llvm/IR/ValueHandle.h"
-#include "llvm/Transforms/Utils/ValueMapper.h"
 #include <optional>
 #include <utility>
 
@@ -115,10 +114,11 @@ public:
   bool processBlock(BasicBlock *BB);
   bool maybeMergeBasicBlockIntoOnlyPred(BasicBlock *BB);
   void updateSSA(BasicBlock *BB, BasicBlock *NewBB,
-                 ValueToValueMapTy &ValueMapping);
-  void cloneInstructions(ValueToValueMapTy &ValueMapping,
-                         BasicBlock::iterator BI, BasicBlock::iterator BE,
-                         BasicBlock *NewBB, BasicBlock *PredBB);
+                 DenseMap<Instruction *, Value *> &ValueMapping);
+  DenseMap<Instruction *, Value *> cloneInstructions(BasicBlock::iterator BI,
+                                                     BasicBlock::iterator BE,
+                                                     BasicBlock *NewBB,
+                                                     BasicBlock *PredBB);
   bool tryThreadEdge(BasicBlock *BB,
                      const SmallVectorImpl<BasicBlock *> &PredBBs,
                      BasicBlock *SuccBB);
@@ -130,19 +130,19 @@ public:
   bool computeValueKnownInPredecessorsImpl(
       Value *V, BasicBlock *BB, jumpthreading::PredValueInfo &Result,
       jumpthreading::ConstantPreference Preference,
-      SmallPtrSet<Value *, 4> &RecursionSet, Instruction *CxtI = nullptr);
+      DenseSet<Value *> &RecursionSet, Instruction *CxtI = nullptr);
   bool
   computeValueKnownInPredecessors(Value *V, BasicBlock *BB,
                                   jumpthreading::PredValueInfo &Result,
                                   jumpthreading::ConstantPreference Preference,
                                   Instruction *CxtI = nullptr) {
-    SmallPtrSet<Value *, 4> RecursionSet;
+    DenseSet<Value *> RecursionSet;
     return computeValueKnownInPredecessorsImpl(V, BB, Result, Preference,
                                                RecursionSet, CxtI);
   }
 
   Constant *evaluateOnPredecessorEdge(BasicBlock *BB, BasicBlock *PredPredBB,
-                                      Value *cond, const DataLayout &DL);
+                                      Value *cond);
   bool maybethreadThroughTwoBasicBlocks(BasicBlock *BB, Value *Cond);
   void threadThroughTwoBasicBlocks(BasicBlock *PredPredBB, BasicBlock *PredBB,
                                    BasicBlock *BB, BasicBlock *SuccBB);

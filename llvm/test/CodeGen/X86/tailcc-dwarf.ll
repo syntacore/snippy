@@ -1,25 +1,25 @@
 ; RUN: llc -mtriple=x86_64-unknown-linux-gnu -O0 --frame-pointer=non-leaf %s -o - | FileCheck %s
 
-%block = type { %blockheader, [0 x ptr] }
+%block = type { %blockheader, [0 x i64*] }
 %blockheader = type { i64 }
 
 define void @scanStackRoots(i32) {
   ret void
 }
 
-define i32 @main(i32 %argc, ptr %argv) {
+define i32 @main(i32 %argc, i8** %argv) {
 entry:
-  %0 = call tailcc ptr @apply_rule_6870(ptr null, ptr null)
+  %0 = call tailcc %block* @apply_rule_6870(%block* null, %block* null)
   ret i32 0
 }
 
-define internal tailcc ptr @apply_rule_6870(ptr %0, ptr %1) {
+define internal tailcc %block* @apply_rule_6870(%block* %0, %block* %1) {
 entry:
-  %2 = tail call tailcc ptr @sender12(ptr %0, ptr %1)
-  ret ptr null
+  %2 = tail call tailcc %block* @sender12(%block* %0, %block* %1)
+  ret %block* null
 }
 
-define internal tailcc ptr @sender12(ptr %0, ptr %1) {
+define internal tailcc %block* @sender12(%block* %0, %block* %1) {
 ; CHECK-LABEL: sender12:
 ; CHECK: .cfi_startproc
 ; CHECK: subq $8160, %rsp
@@ -28,20 +28,20 @@ define internal tailcc ptr @sender12(ptr %0, ptr %1) {
 ; CHECK: .cfi_offset %rbp, -8176
 entry:
   %a = alloca [1024 x i32]
-  %b = load [1024 x i32], ptr %a
+  %b = load [1024 x i32], [1024 x i32]* %a
   call void @scanStackRoots(i32 1)
-  %2 = tail call tailcc ptr @apply_rule_6300(ptr %0, ptr %1, [1024 x i32] %b)
-  ret ptr %2
+  %2 = tail call tailcc %block* @apply_rule_6300(%block* %0, %block* %1, [1024 x i32] %b)
+  ret %block* %2
 }
 
-define internal tailcc ptr @apply_rule_6300(ptr %0, ptr %1, [1024 x i32] %2) {
+define internal tailcc %block* @apply_rule_6300(%block* %0, %block* %1, [1024 x i32] %2) {
 entry:
-  %3 = tail call tailcc ptr @sender4(ptr %0, ptr %1)
-  ret ptr %3
+  %3 = tail call tailcc %block* @sender4(%block* %0, %block* %1)
+  ret %block* %3
 }
 
-define internal tailcc ptr @sender4(ptr %0, ptr %1) {
+define internal tailcc %block* @sender4(%block* %0, %block* %1) {
 entry:
   call void @scanStackRoots(i32 2)
-  ret ptr null
+  ret %block* null
 }

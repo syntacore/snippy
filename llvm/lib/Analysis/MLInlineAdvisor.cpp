@@ -14,7 +14,6 @@
 #include "llvm/Analysis/MLInlineAdvisor.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Analysis/AssumptionCache.h"
-#include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/FunctionPropertiesAnalysis.h"
 #include "llvm/Analysis/InlineCost.h"
@@ -24,12 +23,10 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/MLModelRunner.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
-#include "llvm/Analysis/ProfileSummaryInfo.h"
 #include "llvm/Analysis/ReleaseModeModelRunner.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/InstIterator.h"
-#include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -49,17 +46,6 @@ static cl::opt<bool>
     InteractiveIncludeDefault("inliner-interactive-include-default", cl::Hidden,
                               cl::desc(InclDefaultMsg));
 
-enum class SkipMLPolicyCriteria { Never, IfCallerIsNotCold };
-
-static cl::opt<SkipMLPolicyCriteria> SkipPolicy(
-    "ml-inliner-skip-policy", cl::Hidden, cl::init(SkipMLPolicyCriteria::Never),
-    cl::values(clEnumValN(SkipMLPolicyCriteria::Never, "never", "never"),
-               clEnumValN(SkipMLPolicyCriteria::IfCallerIsNotCold,
-                          "if-caller-not-cold", "if the caller is not cold")));
-
-static cl::opt<std::string> ModelSelector("ml-inliner-model-selector",
-                                          cl::Hidden, cl::init(""));
-
 #if defined(LLVM_HAVE_TF_AOT_INLINERSIZEMODEL)
 // codegen-ed file
 #include "InlinerSizeModel.h" // NOLINT
@@ -77,8 +63,7 @@ llvm::getReleaseModeAdvisor(Module &M, ModuleAnalysisManager &MAM,
   std::unique_ptr<MLModelRunner> AOTRunner;
   if (InteractiveChannelBaseName.empty())
     AOTRunner = std::make_unique<ReleaseModeModelRunner<CompiledModelType>>(
-        M.getContext(), FeatureMap, DecisionName,
-        EmbeddedModelRunnerOptions().setModelSelector(ModelSelector));
+        M.getContext(), FeatureMap, DecisionName);
   else {
     auto Features = FeatureMap;
     if (InteractiveIncludeDefault)
@@ -144,8 +129,7 @@ MLInlineAdvisor::MLInlineAdvisor(
           M, MAM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager()),
       ModelRunner(std::move(Runner)), GetDefaultAdvice(GetDefaultAdvice),
       CG(MAM.getResult<LazyCallGraphAnalysis>(M)),
-      InitialIRSize(getModuleIRSize()), CurrentIRSize(InitialIRSize),
-      PSI(MAM.getResult<ProfileSummaryAnalysis>(M)) {
+      InitialIRSize(getModuleIRSize()), CurrentIRSize(InitialIRSize) {
   assert(ModelRunner);
   ModelRunner->switchContext("");
   // Extract the 'call site height' feature - the position of a call site
@@ -192,8 +176,8 @@ unsigned MLInlineAdvisor::getInitialFunctionLevel(const Function &F) const {
   return CG.lookup(F) ? FunctionLevels.at(CG.lookup(F)) : 0;
 }
 
-void MLInlineAdvisor::onPassEntry(LazyCallGraph::SCC *CurSCC) {
-  if (!CurSCC || ForceStop)
+void MLInlineAdvisor::onPassEntry(LazyCallGraph::SCC *LastSCC) {
+  if (!LastSCC || ForceStop)
     return;
   FPICache.clear();
   // Function passes executed between InlinerPass runs may have changed the
@@ -211,21 +195,23 @@ void MLInlineAdvisor::onPassEntry(LazyCallGraph::SCC *CurSCC) {
   // care about the nature of the Edge (call or ref). `FunctionLevels`-wise, we
   // record them at the same level as the original node (this is a choice, may
   // need revisiting).
-  // - nodes are only deleted at the end of a call graph walk where they are
-  // batch deleted, so we shouldn't see any dead nodes here.
+  NodeCount -= static_cast<int64_t>(NodesInLastSCC.size());
   while (!NodesInLastSCC.empty()) {
     const auto *N = *NodesInLastSCC.begin();
-    assert(!N->isDead());
     NodesInLastSCC.erase(N);
+    // The Function wrapped by N could have been deleted since we last saw it.
+    if (N->isDead()) {
+      assert(!N->getFunction().isDeclaration());
+      continue;
+    }
+    ++NodeCount;
     EdgeCount += getLocalCalls(N->getFunction());
     const auto NLevel = FunctionLevels.at(N);
     for (const auto &E : *(*N)) {
       const auto *AdjNode = &E.getNode();
       assert(!AdjNode->isDead() && !AdjNode->getFunction().isDeclaration());
       auto I = AllNodes.insert(AdjNode);
-      // We've discovered a new function.
       if (I.second) {
-        ++NodeCount;
         NodesInLastSCC.insert(AdjNode);
         FunctionLevels[AdjNode] = NLevel;
       }
@@ -238,15 +224,15 @@ void MLInlineAdvisor::onPassEntry(LazyCallGraph::SCC *CurSCC) {
   // (Re)use NodesInLastSCC to remember the nodes in the SCC right now,
   // in case the SCC is split before onPassExit and some nodes are split out
   assert(NodesInLastSCC.empty());
-  for (const auto &N : *CurSCC)
+  for (const auto &N : *LastSCC)
     NodesInLastSCC.insert(&N);
 }
 
-void MLInlineAdvisor::onPassExit(LazyCallGraph::SCC *CurSCC) {
+void MLInlineAdvisor::onPassExit(LazyCallGraph::SCC *LastSCC) {
   // No need to keep this around - function passes will invalidate it.
   if (!KeepFPICache)
     FPICache.clear();
-  if (!CurSCC || ForceStop)
+  if (!LastSCC || ForceStop)
     return;
   // Keep track of the nodes and edges we last saw. Then, in onPassEntry,
   // we update the node count and edge count from the subset of these nodes that
@@ -254,13 +240,15 @@ void MLInlineAdvisor::onPassExit(LazyCallGraph::SCC *CurSCC) {
   EdgesOfLastSeenNodes = 0;
 
   // Check on nodes that were in SCC onPassEntry
-  for (const LazyCallGraph::Node *N : NodesInLastSCC) {
-    assert(!N->isDead());
-    EdgesOfLastSeenNodes += getLocalCalls(N->getFunction());
+  for (auto I = NodesInLastSCC.begin(); I != NodesInLastSCC.end();) {
+    if ((*I)->isDead())
+      NodesInLastSCC.erase(*I++);
+    else
+      EdgesOfLastSeenNodes += getLocalCalls((*I++)->getFunction());
   }
 
   // Check on nodes that may have got added to SCC
-  for (const auto &N : *CurSCC) {
+  for (const auto &N : *LastSCC) {
     assert(!N.isDead());
     auto I = NodesInLastSCC.insert(&N);
     if (I.second)
@@ -307,17 +295,11 @@ void MLInlineAdvisor::onSuccessfulInlining(const MLInlineAdvice &Advice,
   int64_t NewCallerAndCalleeEdges =
       getCachedFPI(*Caller).DirectCallsToDefinedFunctions;
 
-  // A dead function's node is not actually removed from the call graph until
-  // the end of the call graph walk, but the node no longer belongs to any valid
-  // SCC.
-  if (CalleeWasDeleted) {
+  if (CalleeWasDeleted)
     --NodeCount;
-    NodesInLastSCC.erase(CG.lookup(*Callee));
-    DeadFunctions.insert(Callee);
-  } else {
+  else
     NewCallerAndCalleeEdges +=
         getCachedFPI(*Callee).DirectCallsToDefinedFunctions;
-  }
   EdgeCount += (NewCallerAndCalleeEdges - Advice.CallerAndCalleeEdges);
   assert(CurrentIRSize >= 0 && EdgeCount >= 0 && NodeCount >= 0);
 }
@@ -352,11 +334,6 @@ std::unique_ptr<InlineAdvice> MLInlineAdvisor::getAdviceImpl(CallBase &CB) {
   auto &TIR = FAM.getResult<TargetIRAnalysis>(Callee);
   auto &ORE = FAM.getResult<OptimizationRemarkEmitterAnalysis>(Caller);
 
-  if (SkipPolicy == SkipMLPolicyCriteria::IfCallerIsNotCold) {
-    if (!PSI.isFunctionEntryCold(&Caller))
-      return std::make_unique<InlineAdvice>(this, CB, ORE,
-                                            GetDefaultAdvice(CB));
-  }
   auto MandatoryKind = InlineAdvisor::getMandatoryKind(CB, FAM, ORE);
   // If this is a "never inline" case, there won't be any changes to internal
   // state we need to track, so we can just return the base InlineAdvice, which
@@ -430,10 +407,6 @@ std::unique_ptr<InlineAdvice> MLInlineAdvisor::getAdviceImpl(CallBase &CB) {
   *ModelRunner->getTensor<int64_t>(FeatureIndex::callee_users) =
       CalleeBefore.Uses;
   *ModelRunner->getTensor<int64_t>(FeatureIndex::cost_estimate) = CostEstimate;
-  *ModelRunner->getTensor<int64_t>(FeatureIndex::is_callee_avail_external) =
-      Callee.hasAvailableExternallyLinkage();
-  *ModelRunner->getTensor<int64_t>(FeatureIndex::is_caller_avail_external) =
-      Caller.hasAvailableExternallyLinkage();
 
   // Add the cost features
   for (size_t I = 0;
@@ -495,9 +468,7 @@ void MLInlineAdvisor::print(raw_ostream &OS) const {
   OS << "\n";
   OS << "[MLInlineAdvisor] FuncLevels:\n";
   for (auto I : FunctionLevels)
-    OS << (DeadFunctions.contains(&I.first->getFunction())
-               ? "<deleted>"
-               : I.first->getFunction().getName())
+    OS << (I.first->isDead() ? "<deleted>" : I.first->getFunction().getName())
        << " : " << I.second << "\n";
 
   OS << "\n";

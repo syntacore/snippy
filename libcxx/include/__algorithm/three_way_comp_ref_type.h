@@ -9,7 +9,6 @@
 #ifndef _LIBCPP___ALGORITHM_THREE_WAY_COMP_REF_TYPE_H
 #define _LIBCPP___ALGORITHM_THREE_WAY_COMP_REF_TYPE_H
 
-#include <__assert>
 #include <__compare/ordering.h>
 #include <__config>
 #include <__utility/declval.h>

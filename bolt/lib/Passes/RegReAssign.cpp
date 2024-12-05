@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "bolt/Passes/RegReAssign.h"
-#include "bolt/Core/BinaryFunctionCallGraph.h"
 #include "bolt/Core/MCPlus.h"
+#include "bolt/Passes/BinaryFunctionCallGraph.h"
 #include "bolt/Passes/DataflowAnalysis.h"
 #include "bolt/Passes/DataflowInfoManager.h"
 #include "bolt/Utils/Utils.h"
@@ -452,7 +452,7 @@ void RegReAssign::setupConservativePass(
   });
 }
 
-Error RegReAssign::runOnFunctions(BinaryContext &BC) {
+void RegReAssign::runOnFunctions(BinaryContext &BC) {
   RegScore = std::vector<int64_t>(BC.MRI->getNumRegs(), 0);
   RankedRegs = std::vector<size_t>(BC.MRI->getNumRegs(), 0);
 
@@ -480,20 +480,18 @@ Error RegReAssign::runOnFunctions(BinaryContext &BC) {
   }
 
   if (FuncsChanged.empty()) {
-    BC.outs() << "BOLT-INFO: Reg Reassignment Pass: no changes were made.\n";
-    return Error::success();
+    outs() << "BOLT-INFO: Reg Reassignment Pass: no changes were made.\n";
+    return;
   }
   if (opts::UpdateDebugSections)
-    BC.outs()
-        << "BOLT-WARNING: You used -reg-reassign and -update-debug-sections."
-        << " Some registers were changed but associated AT_LOCATION for "
-        << "impacted variables were NOT updated! This operation is "
-        << "currently unsupported by BOLT.\n";
-  BC.outs() << "BOLT-INFO: Reg Reassignment Pass Stats:\n";
-  BC.outs() << "\t   " << FuncsChanged.size() << " functions affected.\n";
-  BC.outs() << "\t   " << StaticBytesSaved << " static bytes saved.\n";
-  BC.outs() << "\t   " << DynBytesSaved << " dynamic bytes saved.\n";
-  return Error::success();
+    outs() << "BOLT-WARNING: You used -reg-reassign and -update-debug-sections."
+           << " Some registers were changed but associated AT_LOCATION for "
+           << "impacted variables were NOT updated! This operation is "
+           << "currently unsupported by BOLT.\n";
+  outs() << "BOLT-INFO: Reg Reassignment Pass Stats:\n";
+  outs() << "\t   " << FuncsChanged.size() << " functions affected.\n";
+  outs() << "\t   " << StaticBytesSaved << " static bytes saved.\n";
+  outs() << "\t   " << DynBytesSaved << " dynamic bytes saved.\n";
 }
 
 } // namespace bolt

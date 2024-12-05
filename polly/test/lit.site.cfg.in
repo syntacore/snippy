@@ -48,6 +48,7 @@ else:
     config.substitutions.append(('%loadPolly', commonOpts ))
     config.substitutions.append(('%loadNPMPolly', commonOpts ))
 
+
 import lit.llvm
 lit.llvm.initialize(lit_config, config)
 

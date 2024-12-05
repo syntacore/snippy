@@ -32,7 +32,6 @@
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/MC/MCSymbolWasm.h"
 #include "llvm/MC/MachineLocation.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
@@ -42,20 +41,6 @@
 #include <utility>
 
 using namespace llvm;
-
-/// Query value using AddLinkageNamesToDeclCallOriginsForTuning.
-cl::opt<cl::boolOrDefault> AddLinkageNamesToDeclCallOrigins(
-    "add-linkage-names-to-declaration-call-origins", cl::Hidden,
-    cl::desc("Add DW_AT_linkage_name to function declaration DIEs "
-             "referenced by DW_AT_call_origin attributes. Enabled by default "
-             "for -gsce debugger tuning."));
-
-static bool AddLinkageNamesToDeclCallOriginsForTuning(const DwarfDebug *DD) {
-  bool EnabledByDefault = DD->tuneForSCE();
-  if (EnabledByDefault)
-    return AddLinkageNamesToDeclCallOrigins != cl::boolOrDefault::BOU_FALSE;
-  return AddLinkageNamesToDeclCallOrigins == cl::boolOrDefault::BOU_TRUE;
-}
 
 static dwarf::Tag GetCompileUnitType(UnitKind Kind, DwarfDebug *DW) {
 
@@ -684,7 +669,7 @@ void DwarfCompileUnit::attachRangesOrLowHighPC(
     // the order of blocks will be frozen beyond this point.
     do {
       if (MBB->sameSection(EndMBB) || MBB->isEndSection()) {
-        auto MBBSectionRange = Asm->MBBSectionRanges[MBB->getSectionID()];
+        auto MBBSectionRange = Asm->MBBSectionRanges[MBB->getSectionIDNum()];
         List.push_back(
             {MBB->sameSection(BeginMBB) ? BeginLabel
                                         : MBBSectionRange.BeginLabel,
@@ -1275,12 +1260,6 @@ DIE &DwarfCompileUnit::constructCallSiteEntryDIE(DIE &ScopeDIE,
   } else {
     DIE *CalleeDIE = getOrCreateSubprogramDIE(CalleeSP);
     assert(CalleeDIE && "Could not create DIE for call site entry origin");
-    if (AddLinkageNamesToDeclCallOriginsForTuning(DD) &&
-        !CalleeSP->isDefinition() &&
-        !CalleeDIE->findAttribute(dwarf::DW_AT_linkage_name)) {
-      addLinkageName(*CalleeDIE, CalleeSP->getLinkageName());
-    }
-
     addDIEEntry(CallSiteDIE, getDwarf5OrGNUAttr(dwarf::DW_AT_call_origin),
                 *CalleeDIE);
   }
@@ -1539,8 +1518,8 @@ void DwarfCompileUnit::addGlobalNameForTypeUnit(StringRef Name,
 }
 
 /// Add a new global type to the unit.
-void DwarfCompileUnit::addGlobalTypeImpl(const DIType *Ty, const DIE &Die,
-                                         const DIScope *Context) {
+void DwarfCompileUnit::addGlobalType(const DIType *Ty, const DIE &Die,
+                                     const DIScope *Context) {
   if (!hasDwarfPubSections())
     return;
   std::string FullName = getParentContextString(Context) + Ty->getName().str();

@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_POSIX_SPAWN_FILE_ACTIONS_T_H
-#define LLVM_LIBC_TYPES_POSIX_SPAWN_FILE_ACTIONS_T_H
+#ifndef __LLVM_LIBC_TYPES_POSIX_SPAWN_FILE_ACTIONS_T_T_H
+#define __LLVM_LIBC_TYPES_POSIX_SPAWN_FILE_ACTIONS_T_T_H
 
 typedef struct {
   void *__front;
   void *__back;
 } posix_spawn_file_actions_t;
 
-#endif // LLVM_LIBC_TYPES_POSIX_SPAWN_FILE_ACTIONS_T_H
+#endif // __LLVM_LIBC_TYPES_POSIX_SPAWN_FILE_ACTIONS_T_T_H

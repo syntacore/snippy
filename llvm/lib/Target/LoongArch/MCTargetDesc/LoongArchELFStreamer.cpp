@@ -27,8 +27,7 @@ LoongArchTargetELFStreamer::LoongArchTargetELFStreamer(
   auto &MAB = static_cast<LoongArchAsmBackend &>(
       getStreamer().getAssembler().getBackend());
   setTargetABI(LoongArchABI::computeTargetABI(
-      STI.getTargetTriple(), STI.getFeatureBits(),
-      MAB.getTargetOptions().getABIName()));
+      STI.getTargetTriple(), MAB.getTargetOptions().getABIName()));
 }
 
 MCELFStreamer &LoongArchTargetELFStreamer::getStreamer() {
@@ -37,7 +36,7 @@ MCELFStreamer &LoongArchTargetELFStreamer::getStreamer() {
 
 void LoongArchTargetELFStreamer::finish() {
   LoongArchTargetStreamer::finish();
-  ELFObjectWriter &W = getStreamer().getWriter();
+  MCAssembler &MCA = getStreamer().getAssembler();
   LoongArchABI::ABI ABI = getTargetABI();
 
   // Figure out the e_flags.
@@ -48,7 +47,7 @@ void LoongArchTargetELFStreamer::finish() {
   // based relocs from day one.
   //
   // Refer to LoongArch ELF psABI v2.01 for details.
-  unsigned EFlags = W.getELFHeaderEFlags();
+  unsigned EFlags = MCA.getELFHeaderEFlags();
   EFlags |= ELF::EF_LOONGARCH_OBJABI_V1;
   switch (ABI) {
   case LoongArchABI::ABI_ILP32S:
@@ -66,7 +65,7 @@ void LoongArchTargetELFStreamer::finish() {
   case LoongArchABI::ABI_Unknown:
     llvm_unreachable("Improperly initialized target ABI");
   }
-  W.setELFHeaderEFlags(EFlags);
+  MCA.setELFHeaderEFlags(EFlags);
 }
 
 namespace {
@@ -83,9 +82,11 @@ namespace llvm {
 MCELFStreamer *createLoongArchELFStreamer(MCContext &C,
                                           std::unique_ptr<MCAsmBackend> MAB,
                                           std::unique_ptr<MCObjectWriter> MOW,
-                                          std::unique_ptr<MCCodeEmitter> MCE) {
+                                          std::unique_ptr<MCCodeEmitter> MCE,
+                                          bool RelaxAll) {
   LoongArchELFStreamer *S = new LoongArchELFStreamer(
       C, std::move(MAB), std::move(MOW), std::move(MCE));
+  S->getAssembler().setRelaxAll(RelaxAll);
   return S;
 }
 } // end namespace llvm

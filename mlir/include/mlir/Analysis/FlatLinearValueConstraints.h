@@ -13,6 +13,7 @@
 #include "mlir/Analysis/Presburger/Matrix.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/Support/LogicalResult.h"
 #include <optional>
 
 namespace mlir {
@@ -65,10 +66,6 @@ public:
   /// Return the kind of this object.
   Kind getKind() const override { return Kind::FlatLinearConstraints; }
 
-  /// Flag to control if conservative semi-affine bounds should be added in
-  /// `addBound()`.
-  enum class AddConservativeSemiAffineBounds { No = 0, Yes };
-
   /// Adds a bound for the variable at the specified position with constraints
   /// being drawn from the specified bound map. In case of an EQ bound, the
   /// bound map is expected to have exactly one result. In case of a LB/UB, the
@@ -80,39 +77,21 @@ public:
   /// as a closed bound by +1/-1 respectively. In case of an EQ bound, it can
   /// only be added as a closed bound.
   ///
-  /// Conservative bounds for semi-affine expressions will be added if
-  /// `AddConservativeSemiAffineBounds` is set to `Yes`. This currently only
-  /// covers semi-affine `mod` expressions, so `addBound()` will still fail if
-  /// it encounters a semi-affine `floordiv`, `ceildiv`, or `mul`. Note: If
-  /// enabled it is possible for the resulting constraint set to become empty if
-  /// a precondition of a conservative bound is found not to hold.
-  ///
   /// Note: The dimensions/symbols of this FlatLinearConstraints must match the
   /// dimensions/symbols of the affine map.
-  LogicalResult addBound(
-      presburger::BoundType type, unsigned pos, AffineMap boundMap,
-      bool isClosedBound,
-      AddConservativeSemiAffineBounds = AddConservativeSemiAffineBounds::No);
+  LogicalResult addBound(presburger::BoundType type, unsigned pos,
+                         AffineMap boundMap, bool isClosedBound);
 
   /// Adds a bound for the variable at the specified position with constraints
   /// being drawn from the specified bound map. In case of an EQ bound, the
   /// bound map is expected to have exactly one result. In case of a LB/UB, the
   /// bound map may have more than one result, for each of which an inequality
   /// is added.
-  ///
-  /// Conservative bounds for semi-affine expressions will be added if
-  /// `AddConservativeSemiAffineBounds` is set to `Yes`. This currently only
-  /// covers semi-affine `mod` expressions, so `addBound()` will still fail if
-  /// it encounters a semi-affine `floordiv`, `ceildiv`, or `mul`. Note: If
-  /// enabled it is possible for the resulting constraint set to become empty if
-  /// a precondition of a conservative bound is found not to hold.
-  ///
   /// Note: The dimensions/symbols of this FlatLinearConstraints must match the
   /// dimensions/symbols of the affine map. By default the lower bound is closed
   /// and the upper bound is open.
-  LogicalResult addBound(
-      presburger::BoundType type, unsigned pos, AffineMap boundMap,
-      AddConservativeSemiAffineBounds = AddConservativeSemiAffineBounds::No);
+  LogicalResult addBound(presburger::BoundType type, unsigned pos,
+                         AffineMap boundMap);
 
   /// The `addBound` overload above hides the inherited overloads by default, so
   /// we explicitly introduce them here.
@@ -214,8 +193,7 @@ protected:
   /// Note: This is a shared helper function of `addLowerOrUpperBound` and
   ///       `composeMatchingMap`.
   LogicalResult flattenAlignedMapAndMergeLocals(
-      AffineMap map, std::vector<SmallVector<int64_t, 8>> *flattenedExprs,
-      bool addConservativeSemiAffineBounds = false);
+      AffineMap map, std::vector<SmallVector<int64_t, 8>> *flattenedExprs);
 
   /// Prints the number of constraints, dimensions, symbols and locals in the
   /// FlatLinearConstraints. Also, prints for each variable whether there is
@@ -227,10 +205,6 @@ protected:
 /// where each non-local variable can have an SSA Value attached to it.
 class FlatLinearValueConstraints : public FlatLinearConstraints {
 public:
-  /// The SSA Values attached to each non-local variable are stored as
-  /// identifiers in the constraint system's space.
-  using Identifier = presburger::Identifier;
-
   /// Constructs a constraint system reserving memory for the specified number
   /// of constraints and variables. `valArgs` are the optional SSA values
   /// associated with each dimension/symbol. These must either be empty or match
@@ -243,9 +217,11 @@ public:
       : FlatLinearConstraints(numReservedInequalities, numReservedEqualities,
                               numReservedCols, numDims, numSymbols, numLocals) {
     assert(valArgs.empty() || valArgs.size() == getNumDimAndSymbolVars());
-    for (unsigned i = 0, e = valArgs.size(); i < e; ++i)
-      if (valArgs[i])
-        setValue(i, *valArgs[i]);
+    values.reserve(numReservedCols);
+    if (valArgs.empty())
+      values.resize(getNumDimAndSymbolVars(), std::nullopt);
+    else
+      values.append(valArgs.begin(), valArgs.end());
   }
 
   /// Constructs a constraint system reserving memory for the specified number
@@ -260,9 +236,11 @@ public:
       : FlatLinearConstraints(numReservedInequalities, numReservedEqualities,
                               numReservedCols, numDims, numSymbols, numLocals) {
     assert(valArgs.empty() || valArgs.size() == getNumDimAndSymbolVars());
-    for (unsigned i = 0, e = valArgs.size(); i < e; ++i)
-      if (valArgs[i])
-        setValue(i, valArgs[i]);
+    values.reserve(numReservedCols);
+    if (valArgs.empty())
+      values.resize(getNumDimAndSymbolVars(), std::nullopt);
+    else
+      values.append(valArgs.begin(), valArgs.end());
   }
 
   /// Constructs a constraint system with the specified number of dimensions
@@ -294,12 +272,11 @@ public:
   FlatLinearValueConstraints(const IntegerPolyhedron &fac,
                              ArrayRef<std::optional<Value>> valArgs = {})
       : FlatLinearConstraints(fac) {
+    assert(valArgs.empty() || valArgs.size() == getNumDimAndSymbolVars());
     if (valArgs.empty())
-      return;
-    assert(valArgs.size() == getNumDimAndSymbolVars());
-    for (unsigned i = 0, e = valArgs.size(); i < e; ++i)
-      if (valArgs[i])
-        setValue(i, *valArgs[i]);
+      values.resize(getNumDimAndSymbolVars(), std::nullopt);
+    else
+      values.append(valArgs.begin(), valArgs.end());
   }
 
   /// Creates an affine constraint system from an IntegerSet.
@@ -313,6 +290,9 @@ public:
            cst->getKind() <= Kind::FlatAffineRelation;
   }
 
+  /// Replaces the contents of this FlatLinearValueConstraints with `other`.
+  void clearAndCopyFrom(const IntegerRelation &other) override;
+
   /// Adds a constant bound for the variable associated with the given Value.
   void addBound(presburger::BoundType type, Value val, int64_t value);
   using FlatLinearConstraints::addBound;
@@ -322,9 +302,7 @@ public:
   inline Value getValue(unsigned pos) const {
     assert(pos < getNumDimAndSymbolVars() && "Invalid position");
     assert(hasValue(pos) && "variable's Value not set");
-    VarKind kind = getVarKindAt(pos);
-    unsigned relativePos = pos - getVarKindOffset(kind);
-    return space.getId(kind, relativePos).getValue<Value>();
+    return *values[pos];
   }
 
   /// Returns the Values associated with variables in range [start, end).
@@ -335,44 +313,25 @@ public:
     assert(start <= end && "invalid start position");
     values->clear();
     values->reserve(end - start);
-    for (unsigned i = start; i < end; ++i)
+    for (unsigned i = start; i < end; i++)
       values->push_back(getValue(i));
   }
 
-  inline SmallVector<std::optional<Value>> getMaybeValues() const {
-    SmallVector<std::optional<Value>> maybeValues;
-    maybeValues.reserve(getNumDimAndSymbolVars());
-    for (unsigned i = 0, e = getNumDimAndSymbolVars(); i < e; ++i)
-      if (hasValue(i)) {
-        maybeValues.push_back(getValue(i));
-      } else {
-        maybeValues.push_back(std::nullopt);
-      }
-    return maybeValues;
+  inline ArrayRef<std::optional<Value>> getMaybeValues() const {
+    return {values.data(), values.size()};
   }
 
-  inline SmallVector<std::optional<Value>>
+  inline ArrayRef<std::optional<Value>>
   getMaybeValues(presburger::VarKind kind) const {
     assert(kind != VarKind::Local &&
            "Local variables do not have any value attached to them.");
-    SmallVector<std::optional<Value>> maybeValues;
-    maybeValues.reserve(getNumVarKind(kind));
-    const unsigned offset = space.getVarKindOffset(kind);
-    for (unsigned i = 0, e = getNumVarKind(kind); i < e; ++i) {
-      if (hasValue(offset + i))
-        maybeValues.push_back(getValue(offset + i));
-      else
-        maybeValues.push_back(std::nullopt);
-    }
-    return maybeValues;
+    return {values.data() + getVarKindOffset(kind), getNumVarKind(kind)};
   }
 
   /// Returns true if the pos^th variable has an associated Value.
   inline bool hasValue(unsigned pos) const {
     assert(pos < getNumDimAndSymbolVars() && "Invalid position");
-    VarKind kind = getVarKindAt(pos);
-    unsigned relativePos = pos - getVarKindOffset(kind);
-    return space.getId(kind, relativePos).hasValue();
+    return values[pos].has_value();
   }
 
   unsigned appendDimVar(ValueRange vals);
@@ -399,12 +358,9 @@ public:
   using IntegerPolyhedron::removeVarRange;
 
   /// Sets the Value associated with the pos^th variable.
-  /// Stores the Value in the space's identifiers.
   inline void setValue(unsigned pos, Value val) {
     assert(pos < getNumDimAndSymbolVars() && "invalid var position");
-    VarKind kind = getVarKindAt(pos);
-    unsigned relativePos = pos - getVarKindOffset(kind);
-    space.setId(kind, relativePos, presburger::Identifier(val));
+    values[pos] = val;
   }
 
   /// Sets the Values associated with the variables in the range [start, end).
@@ -430,6 +386,9 @@ public:
   /// Projects out the variable that is associate with Value.
   void projectOut(Value val);
   using IntegerPolyhedron::projectOut;
+
+  /// Swap the posA^th variable with the posB^th variable.
+  void swapVar(unsigned posA, unsigned posB) override;
 
   /// Prints the number of constraints, dimensions, symbols and locals in the
   /// FlatAffineValueConstraints. Also, prints for each variable whether there
@@ -485,24 +444,45 @@ public:
   ///    output = {0 <= d0 <= 6, 1 <= d1 <= 15}
   LogicalResult unionBoundingBox(const FlatLinearValueConstraints &other);
   using IntegerPolyhedron::unionBoundingBox;
+
+protected:
+  /// Eliminates the variable at the specified position using Fourier-Motzkin
+  /// variable elimination, but uses Gaussian elimination if there is an
+  /// equality involving that variable. If the result of the elimination is
+  /// integer exact, `*isResultIntegerExact` is set to true. If `darkShadow` is
+  /// set to true, a potential under approximation (subset) of the rational
+  /// shadow / exact integer shadow is computed.
+  // See implementation comments for more details.
+  void fourierMotzkinEliminate(unsigned pos, bool darkShadow = false,
+                               bool *isResultIntegerExact = nullptr) override;
+
+  /// Returns false if the fields corresponding to various variable counts, or
+  /// equality/inequality buffer sizes aren't consistent; true otherwise. This
+  /// is meant to be used within an assert internally.
+  bool hasConsistentState() const override;
+
+  /// Values corresponding to the (column) non-local variables of this
+  /// constraint system appearing in the order the variables correspond to
+  /// columns. Variables that aren't associated with any Value are set to
+  /// std::nullopt.
+  SmallVector<std::optional<Value>, 8> values;
 };
 
 /// Flattens 'expr' into 'flattenedExpr', which contains the coefficients of the
 /// dimensions, symbols, and additional variables that represent floor divisions
 /// of dimensions, symbols, and in turn other floor divisions.  Returns failure
-/// if 'expr' could not be flattened (i.e., an unhandled semi-affine was found).
+/// if 'expr' could not be flattened (i.e., semi-affine is not yet handled).
 /// 'cst' contains constraints that connect newly introduced local variables
 /// to existing dimensional and symbolic variables. See documentation for
 /// AffineExprFlattener on how mod's and div's are flattened.
-LogicalResult
-getFlattenedAffineExpr(AffineExpr expr, unsigned numDims, unsigned numSymbols,
-                       SmallVectorImpl<int64_t> *flattenedExpr,
-                       FlatLinearConstraints *cst = nullptr,
-                       bool addConservativeSemiAffineBounds = false);
+LogicalResult getFlattenedAffineExpr(AffineExpr expr, unsigned numDims,
+                                     unsigned numSymbols,
+                                     SmallVectorImpl<int64_t> *flattenedExpr,
+                                     FlatLinearConstraints *cst = nullptr);
 
 /// Flattens the result expressions of the map to their corresponding flattened
 /// forms and set in 'flattenedExprs'. Returns failure if any expression in the
-/// map could not be flattened (i.e., an unhandled semi-affine was found). 'cst'
+/// map could not be flattened (i.e., semi-affine is not yet handled). 'cst'
 /// contains constraints that connect newly introduced local variables to
 /// existing dimensional and / symbolic variables. See documentation for
 /// AffineExprFlattener on how mod's and div's are flattened. For all affine
@@ -513,8 +493,7 @@ getFlattenedAffineExpr(AffineExpr expr, unsigned numDims, unsigned numSymbols,
 LogicalResult
 getFlattenedAffineExprs(AffineMap map,
                         std::vector<SmallVector<int64_t, 8>> *flattenedExprs,
-                        FlatLinearConstraints *cst = nullptr,
-                        bool addConservativeSemiAffineBounds = false);
+                        FlatLinearConstraints *cst = nullptr);
 LogicalResult
 getFlattenedAffineExprs(IntegerSet set,
                         std::vector<SmallVector<int64_t, 8>> *flattenedExprs,

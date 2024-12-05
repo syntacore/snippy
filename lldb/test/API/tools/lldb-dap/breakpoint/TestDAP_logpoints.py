@@ -20,6 +20,7 @@ class TestDAP_logpoints(lldbdap_testcase.DAPTestCaseBase):
         self.main_path = os.path.realpath(self.getBuildArtifact(self.main_basename))
 
     @skipIfWindows
+    @skipIfRemote
     def test_logmessage_basic(self):
         """Tests breakpoint logmessage basic functionality."""
         before_loop_line = line_number("main.cpp", "// before loop")
@@ -33,7 +34,7 @@ class TestDAP_logpoints(lldbdap_testcase.DAPTestCaseBase):
         before_loop_breakpoint_ids = self.set_source_breakpoints(
             self.main_path, [before_loop_line]
         )
-        self.assertEqual(len(before_loop_breakpoint_ids), 1, "expect one breakpoint")
+        self.assertEquals(len(before_loop_breakpoint_ids), 1, "expect one breakpoint")
 
         self.dap_server.request_continue()
 
@@ -76,12 +77,11 @@ class TestDAP_logpoints(lldbdap_testcase.DAPTestCaseBase):
         # Verify log message match
         for idx, logMessage_line in enumerate(logMessage_output):
             result = idx + 3
-            reg_str = (
-                f"{logMessage_prefix}{result}, {message_addr_pattern} {message_content}"
-            )
+            reg_str = f"{logMessage_prefix}{result}, {message_addr_pattern} {message_content}"
             self.assertRegex(logMessage_line, reg_str)
 
     @skipIfWindows
+    @skipIfRemote
     def test_logmessage_advanced(self):
         """Tests breakpoint logmessage functionality for complex expression."""
         before_loop_line = line_number("main.cpp", "// before loop")
@@ -95,7 +95,7 @@ class TestDAP_logpoints(lldbdap_testcase.DAPTestCaseBase):
         before_loop_breakpoint_ids = self.set_source_breakpoints(
             self.main_path, [before_loop_line]
         )
-        self.assertEqual(len(before_loop_breakpoint_ids), 1, "expect one breakpoint")
+        self.assertEquals(len(before_loop_breakpoint_ids), 1, "expect one breakpoint")
 
         self.dap_server.request_continue()
 
@@ -142,6 +142,7 @@ class TestDAP_logpoints(lldbdap_testcase.DAPTestCaseBase):
             self.assertEqual(logMessage_line, logMessage_prefix + str(result))
 
     @skipIfWindows
+    @skipIfRemote
     def test_logmessage_format(self):
         """
         Tests breakpoint logmessage functionality with format.
@@ -157,7 +158,7 @@ class TestDAP_logpoints(lldbdap_testcase.DAPTestCaseBase):
         before_loop_breakpoint_ids = self.set_source_breakpoints(
             self.main_path, [before_loop_line]
         )
-        self.assertEqual(len(before_loop_breakpoint_ids), 1, "expect one breakpoint")
+        self.assertEquals(len(before_loop_breakpoint_ids), 1, "expect one breakpoint")
 
         self.dap_server.request_continue()
 
@@ -206,6 +207,7 @@ class TestDAP_logpoints(lldbdap_testcase.DAPTestCaseBase):
             )
 
     @skipIfWindows
+    @skipIfRemote
     def test_logmessage_format_failure(self):
         """
         Tests breakpoint logmessage format with parsing failure.
@@ -221,7 +223,7 @@ class TestDAP_logpoints(lldbdap_testcase.DAPTestCaseBase):
         before_loop_breakpoint_ids = self.set_source_breakpoints(
             self.main_path, [before_loop_line]
         )
-        self.assertEqual(len(before_loop_breakpoint_ids), 1, "expect one breakpoint")
+        self.assertEquals(len(before_loop_breakpoint_ids), 1, "expect one breakpoint")
 
         self.dap_server.request_continue()
 

@@ -57,8 +57,7 @@ class ComdatSelectorOp;
 /// needs to look up block and function mappings.
 class ModuleTranslation {
   friend std::unique_ptr<llvm::Module>
-  mlir::translateModuleToLLVMIR(Operation *, llvm::LLVMContext &, StringRef,
-                                bool);
+  mlir::translateModuleToLLVMIR(Operation *, llvm::LLVMContext &, StringRef);
 
 public:
   /// Stores the mapping between a function name and its LLVM IR representation.
@@ -202,13 +201,6 @@ public:
   /// Translates the given LLVM debug info metadata.
   llvm::Metadata *translateDebugInfo(LLVM::DINodeAttr attr);
 
-  /// Translates the given LLVM rounding mode metadata.
-  llvm::RoundingMode translateRoundingMode(LLVM::RoundingMode rounding);
-
-  /// Translates the given LLVM FP exception behavior metadata.
-  llvm::fp::ExceptionBehavior
-  translateFPExceptionBehavior(LLVM::FPExceptionBehavior exceptionBehavior);
-
   /// Translates the contents of the given block to LLVM IR using this
   /// translator. The LLVM IR basic block corresponding to the given block is
   /// expected to exist in the mapping of this translator. Uses `builder` to
@@ -335,9 +327,7 @@ private:
                            ArrayRef<llvm::Instruction *> instructions);
 
   /// Translates parameter attributes and adds them to the returned AttrBuilder.
-  /// Returns failure if any of the translations failed.
-  FailureOr<llvm::AttrBuilder>
-  convertParameterAttrs(LLVMFuncOp func, int argIdx, DictionaryAttr paramAttrs);
+  llvm::AttrBuilder convertParameterAttrs(DictionaryAttr paramAttrs);
 
   /// Original and translated module.
   Operation *mlirModule;

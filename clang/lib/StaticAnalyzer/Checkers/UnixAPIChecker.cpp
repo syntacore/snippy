@@ -17,10 +17,7 @@
 #include "clang/StaticAnalyzer/Core/BugReporter/CommonBugCategories.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/CheckerManager.h"
-#include "clang/StaticAnalyzer/Core/PathSensitive/CallEvent.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
-#include "clang/StaticAnalyzer/Core/PathSensitive/CheckerHelpers.h"
-#include "clang/StaticAnalyzer/Core/PathSensitive/DynamicExtent.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -42,42 +39,27 @@ enum class OpenVariant {
 
 namespace {
 
-class UnixAPIMisuseChecker
-    : public Checker<check::PreCall, check::ASTDecl<TranslationUnitDecl>> {
+class UnixAPIMisuseChecker : public Checker< check::PreStmt<CallExpr> > {
   const BugType BT_open{this, "Improper use of 'open'", categories::UnixAPI};
-  const BugType BT_getline{this, "Improper use of getdelim",
-                           categories::UnixAPI};
   const BugType BT_pthreadOnce{this, "Improper use of 'pthread_once'",
                                categories::UnixAPI};
-  const BugType BT_ArgumentNull{this, "NULL pointer", categories::UnixAPI};
   mutable std::optional<uint64_t> Val_O_CREAT;
 
-  ProgramStateRef
-  EnsurePtrNotNull(SVal PtrVal, const Expr *PtrExpr, CheckerContext &C,
-                   ProgramStateRef State, const StringRef PtrDescr,
-                   std::optional<std::reference_wrapper<const BugType>> BT =
-                       std::nullopt) const;
-
-  ProgramStateRef EnsureGetdelimBufferAndSizeCorrect(
-      SVal LinePtrPtrSVal, SVal SizePtrSVal, const Expr *LinePtrPtrExpr,
-      const Expr *SizePtrExpr, CheckerContext &C, ProgramStateRef State) const;
-
 public:
-  void checkASTDecl(const TranslationUnitDecl *TU, AnalysisManager &Mgr,
-                    BugReporter &BR) const;
+  void checkPreStmt(const CallExpr *CE, CheckerContext &C) const;
 
-  void checkPreCall(const CallEvent &Call, CheckerContext &C) const;
+  void CheckOpen(CheckerContext &C, const CallExpr *CE) const;
+  void CheckOpenAt(CheckerContext &C, const CallExpr *CE) const;
+  void CheckPthreadOnce(CheckerContext &C, const CallExpr *CE) const;
 
-  void CheckOpen(CheckerContext &C, const CallEvent &Call) const;
-  void CheckOpenAt(CheckerContext &C, const CallEvent &Call) const;
-  void CheckGetDelim(CheckerContext &C, const CallEvent &Call) const;
-  void CheckPthreadOnce(CheckerContext &C, const CallEvent &Call) const;
+  void CheckOpenVariant(CheckerContext &C,
+                        const CallExpr *CE, OpenVariant Variant) const;
 
-  void CheckOpenVariant(CheckerContext &C, const CallEvent &Call,
-                        OpenVariant Variant) const;
-
-  void ReportOpenBug(CheckerContext &C, ProgramStateRef State, const char *Msg,
+  void ReportOpenBug(CheckerContext &C,
+                     ProgramStateRef State,
+                     const char *Msg,
                      SourceRange SR) const;
+
 };
 
 class UnixAPIPortabilityChecker : public Checker< check::PreStmt<CallExpr> > {
@@ -108,53 +90,15 @@ private:
                             const char *fn) const;
 };
 
-} // end anonymous namespace
-
-ProgramStateRef UnixAPIMisuseChecker::EnsurePtrNotNull(
-    SVal PtrVal, const Expr *PtrExpr, CheckerContext &C, ProgramStateRef State,
-    const StringRef PtrDescr,
-    std::optional<std::reference_wrapper<const BugType>> BT) const {
-  const auto Ptr = PtrVal.getAs<DefinedSVal>();
-  if (!Ptr)
-    return State;
-
-  const auto [PtrNotNull, PtrNull] = State->assume(*Ptr);
-  if (!PtrNotNull && PtrNull) {
-    if (ExplodedNode *N = C.generateErrorNode(PtrNull)) {
-      auto R = std::make_unique<PathSensitiveBugReport>(
-          BT.value_or(std::cref(BT_ArgumentNull)),
-          (PtrDescr + " pointer might be NULL.").str(), N);
-      if (PtrExpr)
-        bugreporter::trackExpressionValue(N, PtrExpr, *R);
-      C.emitReport(std::move(R));
-    }
-    return nullptr;
-  }
-
-  return PtrNotNull;
-}
-
-void UnixAPIMisuseChecker::checkASTDecl(const TranslationUnitDecl *TU,
-                                        AnalysisManager &Mgr,
-                                        BugReporter &) const {
-  // The definition of O_CREAT is platform specific.
-  // Try to get the macro value from the preprocessor.
-  Val_O_CREAT = tryExpandAsInteger("O_CREAT", Mgr.getPreprocessor());
-  // If we failed, fall-back to known values.
-  if (!Val_O_CREAT) {
-    if (TU->getASTContext().getTargetInfo().getTriple().getVendor() ==
-        llvm::Triple::Apple)
-      Val_O_CREAT = 0x0200;
-  }
-}
+} //end anonymous namespace
 
 //===----------------------------------------------------------------------===//
 // "open" (man 2 open)
 //===----------------------------------------------------------------------===/
 
-void UnixAPIMisuseChecker::checkPreCall(const CallEvent &Call,
+void UnixAPIMisuseChecker::checkPreStmt(const CallExpr *CE,
                                         CheckerContext &C) const {
-  const FunctionDecl *FD = dyn_cast_if_present<FunctionDecl>(Call.getDecl());
+  const FunctionDecl *FD = C.getCalleeDecl(CE);
   if (!FD || FD->getKind() != Decl::Function)
     return;
 
@@ -169,16 +113,13 @@ void UnixAPIMisuseChecker::checkPreCall(const CallEvent &Call,
     return;
 
   if (FName == "open")
-    CheckOpen(C, Call);
+    CheckOpen(C, CE);
 
   else if (FName == "openat")
-    CheckOpenAt(C, Call);
+    CheckOpenAt(C, CE);
 
   else if (FName == "pthread_once")
-    CheckPthreadOnce(C, Call);
-
-  else if (is_contained({"getdelim", "getline"}, FName))
-    CheckGetDelim(C, Call);
+    CheckPthreadOnce(C, CE);
 }
 void UnixAPIMisuseChecker::ReportOpenBug(CheckerContext &C,
                                          ProgramStateRef State,
@@ -194,17 +135,17 @@ void UnixAPIMisuseChecker::ReportOpenBug(CheckerContext &C,
 }
 
 void UnixAPIMisuseChecker::CheckOpen(CheckerContext &C,
-                                     const CallEvent &Call) const {
-  CheckOpenVariant(C, Call, OpenVariant::Open);
+                                     const CallExpr *CE) const {
+  CheckOpenVariant(C, CE, OpenVariant::Open);
 }
 
 void UnixAPIMisuseChecker::CheckOpenAt(CheckerContext &C,
-                                       const CallEvent &Call) const {
-  CheckOpenVariant(C, Call, OpenVariant::OpenAt);
+                                       const CallExpr *CE) const {
+  CheckOpenVariant(C, CE, OpenVariant::OpenAt);
 }
 
 void UnixAPIMisuseChecker::CheckOpenVariant(CheckerContext &C,
-                                            const CallEvent &Call,
+                                            const CallExpr *CE,
                                             OpenVariant Variant) const {
   // The index of the argument taking the flags open flags (O_RDONLY,
   // O_WRONLY, O_CREAT, etc.),
@@ -233,11 +174,11 @@ void UnixAPIMisuseChecker::CheckOpenVariant(CheckerContext &C,
 
   ProgramStateRef state = C.getState();
 
-  if (Call.getNumArgs() < MinArgCount) {
+  if (CE->getNumArgs() < MinArgCount) {
     // The frontend should issue a warning for this case. Just return.
     return;
-  } else if (Call.getNumArgs() == MaxArgCount) {
-    const Expr *Arg = Call.getArgExpr(CreateModeArgIndex);
+  } else if (CE->getNumArgs() == MaxArgCount) {
+    const Expr *Arg = CE->getArg(CreateModeArgIndex);
     QualType QT = Arg->getType();
     if (!QT->isIntegerType()) {
       SmallString<256> SBuf;
@@ -251,24 +192,36 @@ void UnixAPIMisuseChecker::CheckOpenVariant(CheckerContext &C,
                     Arg->getSourceRange());
       return;
     }
-  } else if (Call.getNumArgs() > MaxArgCount) {
+  } else if (CE->getNumArgs() > MaxArgCount) {
     SmallString<256> SBuf;
     llvm::raw_svector_ostream OS(SBuf);
     OS << "Call to '" << VariantName << "' with more than " << MaxArgCount
        << " arguments";
 
-    ReportOpenBug(C, state, SBuf.c_str(),
-                  Call.getArgExpr(MaxArgCount)->getSourceRange());
+    ReportOpenBug(C, state,
+                  SBuf.c_str(),
+                  CE->getArg(MaxArgCount)->getSourceRange());
     return;
   }
 
+  // The definition of O_CREAT is platform specific.  We need a better way
+  // of querying this information from the checking environment.
   if (!Val_O_CREAT) {
-    return;
+    if (C.getASTContext().getTargetInfo().getTriple().getVendor()
+                                                      == llvm::Triple::Apple)
+      Val_O_CREAT = 0x0200;
+    else {
+      // FIXME: We need a more general way of getting the O_CREAT value.
+      // We could possibly grovel through the preprocessor state, but
+      // that would require passing the Preprocessor object to the ExprEngine.
+      // See also: MallocChecker.cpp / M_ZERO.
+      return;
+    }
   }
 
   // Now check if oflags has O_CREAT set.
-  const Expr *oflagsEx = Call.getArgExpr(FlagsArgIndex);
-  const SVal V = Call.getArgSVal(FlagsArgIndex);
+  const Expr *oflagsEx = CE->getArg(FlagsArgIndex);
+  const SVal V = C.getSVal(oflagsEx);
   if (!isa<NonLoc>(V)) {
     // The case where 'V' can be a location can only be due to a bad header,
     // so in this case bail out.
@@ -294,7 +247,7 @@ void UnixAPIMisuseChecker::CheckOpenVariant(CheckerContext &C,
   if (!(trueState && !falseState))
     return;
 
-  if (Call.getNumArgs() < MaxArgCount) {
+  if (CE->getNumArgs() < MaxArgCount) {
     SmallString<256> SBuf;
     llvm::raw_svector_ostream OS(SBuf);
     OS << "Call to '" << VariantName << "' requires a "
@@ -308,109 +261,22 @@ void UnixAPIMisuseChecker::CheckOpenVariant(CheckerContext &C,
 }
 
 //===----------------------------------------------------------------------===//
-// getdelim and getline
-//===----------------------------------------------------------------------===//
-
-ProgramStateRef UnixAPIMisuseChecker::EnsureGetdelimBufferAndSizeCorrect(
-    SVal LinePtrPtrSVal, SVal SizePtrSVal, const Expr *LinePtrPtrExpr,
-    const Expr *SizePtrExpr, CheckerContext &C, ProgramStateRef State) const {
-  static constexpr llvm::StringLiteral SizeGreaterThanBufferSize =
-      "The buffer from the first argument is smaller than the size "
-      "specified by the second parameter";
-  static constexpr llvm::StringLiteral SizeUndef =
-      "The buffer from the first argument is not NULL, but the size specified "
-      "by the second parameter is undefined.";
-
-  auto EmitBugReport = [this, &C, SizePtrExpr, LinePtrPtrExpr](
-                           ProgramStateRef BugState, StringRef ErrMsg) {
-    if (ExplodedNode *N = C.generateErrorNode(BugState)) {
-      auto R = std::make_unique<PathSensitiveBugReport>(BT_getline, ErrMsg, N);
-      bugreporter::trackExpressionValue(N, SizePtrExpr, *R);
-      bugreporter::trackExpressionValue(N, LinePtrPtrExpr, *R);
-      C.emitReport(std::move(R));
-    }
-  };
-
-  // We have a pointer to a pointer to the buffer, and a pointer to the size.
-  // We want what they point at.
-  auto LinePtrSVal = getPointeeVal(LinePtrPtrSVal, State)->getAs<DefinedSVal>();
-  auto NSVal = getPointeeVal(SizePtrSVal, State);
-  if (!LinePtrSVal || !NSVal || NSVal->isUnknown())
-    return nullptr;
-
-  assert(LinePtrPtrExpr && SizePtrExpr);
-
-  const auto [LinePtrNotNull, LinePtrNull] = State->assume(*LinePtrSVal);
-  if (LinePtrNotNull && !LinePtrNull) {
-    // If `*lineptr` is not null, but `*n` is undefined, there is UB.
-    if (NSVal->isUndef()) {
-      EmitBugReport(LinePtrNotNull, SizeUndef);
-      return nullptr;
-    }
-
-    // If it is defined, and known, its size must be less than or equal to
-    // the buffer size.
-    auto NDefSVal = NSVal->getAs<DefinedSVal>();
-    auto &SVB = C.getSValBuilder();
-    auto LineBufSize =
-        getDynamicExtent(LinePtrNotNull, LinePtrSVal->getAsRegion(), SVB);
-    auto LineBufSizeGtN = SVB.evalBinOp(LinePtrNotNull, BO_GE, LineBufSize,
-                                        *NDefSVal, SVB.getConditionType())
-                              .getAs<DefinedOrUnknownSVal>();
-    if (!LineBufSizeGtN)
-      return LinePtrNotNull;
-    if (auto LineBufSizeOk = LinePtrNotNull->assume(*LineBufSizeGtN, true))
-      return LineBufSizeOk;
-
-    EmitBugReport(LinePtrNotNull, SizeGreaterThanBufferSize);
-    return nullptr;
-  }
-  return State;
-}
-
-void UnixAPIMisuseChecker::CheckGetDelim(CheckerContext &C,
-                                         const CallEvent &Call) const {
-  ProgramStateRef State = C.getState();
-
-  // The parameter `n` must not be NULL.
-  SVal SizePtrSval = Call.getArgSVal(1);
-  State = EnsurePtrNotNull(SizePtrSval, Call.getArgExpr(1), C, State, "Size");
-  if (!State)
-    return;
-
-  // The parameter `lineptr` must not be NULL.
-  SVal LinePtrPtrSVal = Call.getArgSVal(0);
-  State =
-      EnsurePtrNotNull(LinePtrPtrSVal, Call.getArgExpr(0), C, State, "Line");
-  if (!State)
-    return;
-
-  State = EnsureGetdelimBufferAndSizeCorrect(LinePtrPtrSVal, SizePtrSval,
-                                             Call.getArgExpr(0),
-                                             Call.getArgExpr(1), C, State);
-  if (!State)
-    return;
-
-  C.addTransition(State);
-}
-
-//===----------------------------------------------------------------------===//
 // pthread_once
 //===----------------------------------------------------------------------===//
 
 void UnixAPIMisuseChecker::CheckPthreadOnce(CheckerContext &C,
-                                            const CallEvent &Call) const {
+                                      const CallExpr *CE) const {
 
   // This is similar to 'CheckDispatchOnce' in the MacOSXAPIChecker.
   // They can possibly be refactored.
 
-  if (Call.getNumArgs() < 1)
+  if (CE->getNumArgs() < 1)
     return;
 
   // Check if the first argument is stack allocated.  If so, issue a warning
   // because that's likely to be bad news.
   ProgramStateRef state = C.getState();
-  const MemRegion *R = Call.getArgSVal(0).getAsRegion();
+  const MemRegion *R = C.getSVal(CE->getArg(0)).getAsRegion();
   if (!R || !isa<StackSpaceRegion>(R->getMemorySpace()))
     return;
 
@@ -432,7 +298,7 @@ void UnixAPIMisuseChecker::CheckPthreadOnce(CheckerContext &C,
 
   auto report =
       std::make_unique<PathSensitiveBugReport>(BT_pthreadOnce, os.str(), N);
-  report->addRange(Call.getArgExpr(0)->getSourceRange());
+  report->addRange(CE->getArg(0)->getSourceRange());
   C.emitReport(std::move(report));
 }
 

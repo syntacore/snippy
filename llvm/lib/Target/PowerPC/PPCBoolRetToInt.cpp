@@ -101,7 +101,7 @@ class PPCBoolRetToInt : public FunctionPass {
       // runOnUse.
       Value *Zero = Constant::getNullValue(IntTy);
       PHINode *Q =
-        PHINode::Create(IntTy, P->getNumIncomingValues(), P->getName(), P->getIterator());
+        PHINode::Create(IntTy, P->getNumIncomingValues(), P->getName(), P);
       for (unsigned i = 0; i < P->getNumOperands(); ++i)
         Q->addIncoming(Zero, P->getIncomingBlock(i));
       return Q;
@@ -263,8 +263,7 @@ class PPCBoolRetToInt : public FunctionPass {
     Value *IntRetVal = BoolToIntMap[U];
     Type *Int1Ty = Type::getInt1Ty(U->getContext());
     auto *I = cast<Instruction>(U.getUser());
-    Value *BackToBool =
-        new TruncInst(IntRetVal, Int1Ty, "backToBool", I->getIterator());
+    Value *BackToBool = new TruncInst(IntRetVal, Int1Ty, "backToBool", I);
     U.set(BackToBool);
 
     return true;

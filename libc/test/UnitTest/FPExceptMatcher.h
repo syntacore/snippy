@@ -6,16 +6,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TEST_UNITTEST_FPEXCEPTMATCHER_H
-#define LLVM_LIBC_TEST_UNITTEST_FPEXCEPTMATCHER_H
+#ifndef LLVM_LIBC_UTILS_UNITTEST_FPEXCEPTMATCHER_H
+#define LLVM_LIBC_UTILS_UNITTEST_FPEXCEPTMATCHER_H
 
-#include "src/__support/macros/config.h"
+#ifndef LIBC_COPT_TEST_USE_FUCHSIA
+
 #include "test/UnitTest/Test.h"
-#include "test/UnitTest/TestLogger.h"
 
-#if LIBC_TEST_HAS_MATCHERS()
-
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 namespace testing {
 
 // TODO: Make the matcher match specific exceptions instead of just identifying
@@ -26,7 +24,7 @@ class FPExceptMatcher : public Matcher<bool> {
 public:
   class FunctionCaller {
   public:
-    virtual ~FunctionCaller() {}
+    virtual ~FunctionCaller(){};
     virtual void call() = 0;
   };
 
@@ -52,18 +50,15 @@ public:
 };
 
 } // namespace testing
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE
 
 #define ASSERT_RAISES_FP_EXCEPT(func)                                          \
   ASSERT_THAT(                                                                 \
       true,                                                                    \
       LIBC_NAMESPACE::testing::FPExceptMatcher(                                \
           LIBC_NAMESPACE::testing::FPExceptMatcher::getFunctionCaller(func)))
-
-#else // !LIBC_TEST_HAS_MATCHERS()
-
+#else
 #define ASSERT_RAISES_FP_EXCEPT(func) ASSERT_DEATH(func, WITH_SIGNAL(SIGFPE))
+#endif // LIBC_COPT_TEST_USE_FUCHSIA
 
-#endif // LIBC_TEST_HAS_MATCHERS()
-
-#endif // LLVM_LIBC_TEST_UNITTEST_FPEXCEPTMATCHER_H
+#endif // LLVM_LIBC_UTILS_UNITTEST_FPEXCEPTMATCHER_H

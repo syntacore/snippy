@@ -17,9 +17,7 @@
 # CHECK-NEXT: Info: 0
 # CHECK-NEXT: AddressAlignment: 4
 
-# CHECK:      Size: 0x1C
-# CHECK-NEXT: Notes [
-# CHECK-NEXT: {
+# CHECK:      Note {
 # CHECK-NEXT:   Owner: GNU
 # CHECK-NEXT:   Data size: 0xC
 # CHECK-NEXT:   Type: NT_GNU_PROPERTY_TYPE_0 (property note)

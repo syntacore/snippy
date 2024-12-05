@@ -17,7 +17,7 @@
 // UNSUPPORTED: c++03
 
 #include <tuple>
-#include <utility>
+#include <type_traits>
 
 #include "test_macros.h"
 

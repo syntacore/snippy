@@ -41,47 +41,19 @@
 #include <algorithm>
 using namespace llvm;
 
-AnalysisKey LiveVariablesAnalysis::Key;
-
-LiveVariablesAnalysis::Result
-LiveVariablesAnalysis::run(MachineFunction &MF,
-                           MachineFunctionAnalysisManager &) {
-  return Result(MF);
-}
-
-PreservedAnalyses
-LiveVariablesPrinterPass::run(MachineFunction &MF,
-                              MachineFunctionAnalysisManager &MFAM) {
-  OS << "Live variables in machine function: " << MF.getName() << '\n';
-  MFAM.getResult<LiveVariablesAnalysis>(MF).print(OS);
-  return PreservedAnalyses::all();
-}
-
-char LiveVariablesWrapperPass::ID = 0;
-char &llvm::LiveVariablesID = LiveVariablesWrapperPass::ID;
-INITIALIZE_PASS_BEGIN(LiveVariablesWrapperPass, "livevars",
-                      "Live Variable Analysis", false, false)
+char LiveVariables::ID = 0;
+char &llvm::LiveVariablesID = LiveVariables::ID;
+INITIALIZE_PASS_BEGIN(LiveVariables, "livevars",
+                "Live Variable Analysis", false, false)
 INITIALIZE_PASS_DEPENDENCY(UnreachableMachineBlockElim)
-INITIALIZE_PASS_END(LiveVariablesWrapperPass, "livevars",
-                    "Live Variable Analysis", false, false)
+INITIALIZE_PASS_END(LiveVariables, "livevars",
+                "Live Variable Analysis", false, false)
 
-void LiveVariablesWrapperPass::getAnalysisUsage(AnalysisUsage &AU) const {
+
+void LiveVariables::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequiredID(UnreachableMachineBlockElimID);
   AU.setPreservesAll();
   MachineFunctionPass::getAnalysisUsage(AU);
-}
-
-LiveVariables::LiveVariables(MachineFunction &MF)
-    : MF(&MF), MRI(&MF.getRegInfo()), TRI(MF.getSubtarget().getRegisterInfo()) {
-  analyze(MF);
-}
-
-void LiveVariables::print(raw_ostream &OS) const {
-  for (size_t I = 0, E = VirtRegInfo.size(); I != E; ++I) {
-    const Register Reg = Register::index2VirtReg(I);
-    OS << "Virtual register '%" << I << "':\n";
-    VirtRegInfo[Reg].print(OS);
-  }
 }
 
 MachineInstr *
@@ -92,22 +64,20 @@ LiveVariables::VarInfo::findKill(const MachineBasicBlock *MBB) const {
   return nullptr;
 }
 
-void LiveVariables::VarInfo::print(raw_ostream &OS) const {
-  OS << "  Alive in blocks: ";
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+LLVM_DUMP_METHOD void LiveVariables::VarInfo::dump() const {
+  dbgs() << "  Alive in blocks: ";
   for (unsigned AB : AliveBlocks)
-    OS << AB << ", ";
-  OS << "\n  Killed by:";
+    dbgs() << AB << ", ";
+  dbgs() << "\n  Killed by:";
   if (Kills.empty())
-    OS << " No instructions.\n\n";
+    dbgs() << " No instructions.\n";
   else {
     for (unsigned i = 0, e = Kills.size(); i != e; ++i)
-      OS << "\n    #" << i << ": " << *Kills[i];
-    OS << "\n";
+      dbgs() << "\n    #" << i << ": " << *Kills[i];
+    dbgs() << "\n";
   }
 }
-
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-LLVM_DUMP_METHOD void LiveVariables::VarInfo::dump() const { print(dbgs()); }
 #endif
 
 /// getVarInfo - Get (possibly creating) a VarInfo object for the given vreg.
@@ -288,7 +258,7 @@ void LiveVariables::HandlePhysRegUse(Register Reg, MachineInstr &MI) {
       }
     }
   } else if (LastDef && !PhysRegUse[Reg] &&
-             !LastDef->findRegisterDefOperand(Reg, /*TRI=*/nullptr))
+             !LastDef->findRegisterDefOperand(Reg))
     // Last def defines the super register, add an implicit def of reg.
     LastDef->addOperand(MachineOperand::CreateReg(Reg, true/*IsDef*/,
                                                   true/*IsImp*/));
@@ -391,8 +361,7 @@ bool LiveVariables::HandlePhysRegKill(Register Reg, MachineInstr *MI) {
         continue;
       bool NeedDef = true;
       if (PhysRegDef[Reg] == PhysRegDef[SubReg]) {
-        MachineOperand *MO =
-            PhysRegDef[Reg]->findRegisterDefOperand(SubReg, /*TRI=*/nullptr);
+        MachineOperand *MO = PhysRegDef[Reg]->findRegisterDefOperand(SubReg);
         if (MO) {
           NeedDef = false;
           assert(!MO->isDead());
@@ -419,7 +388,7 @@ bool LiveVariables::HandlePhysRegKill(Register Reg, MachineInstr *MI) {
                                                 true/*IsImp*/, true/*IsKill*/));
     else {
       MachineOperand *MO =
-          LastRefOrPartRef->findRegisterDefOperand(Reg, TRI, false, false);
+        LastRefOrPartRef->findRegisterDefOperand(Reg, false, false, TRI);
       bool NeedEC = MO->isEarlyClobber() && MO->getReg() != Reg;
       // If the last reference is the last def, then it's not used at all.
       // That is, unless we are currently processing the last reference itself.
@@ -427,7 +396,7 @@ bool LiveVariables::HandlePhysRegKill(Register Reg, MachineInstr *MI) {
       if (NeedEC) {
         // If we are adding a subreg def and the superreg def is marked early
         // clobber, add an early clobber marker to the subreg def.
-        MO = LastRefOrPartRef->findRegisterDefOperand(Reg, /*TRI=*/nullptr);
+        MO = LastRefOrPartRef->findRegisterDefOperand(Reg);
         if (MO)
           MO->setIsEarlyClobber();
       }
@@ -625,7 +594,7 @@ void LiveVariables::runOnBlock(MachineBasicBlock *MBB, unsigned NumRegs) {
       HandlePhysRegDef(i, nullptr, Defs);
 }
 
-void LiveVariables::analyze(MachineFunction &mf) {
+bool LiveVariables::runOnMachineFunction(MachineFunction &mf) {
   MF = &mf;
   MRI = &mf.getRegInfo();
   TRI = MF->getSubtarget().getRegisterInfo();
@@ -679,6 +648,8 @@ void LiveVariables::analyze(MachineFunction &mf) {
   PhysRegDef.clear();
   PhysRegUse.clear();
   PHIVarInfo.clear();
+
+  return false;
 }
 
 void LiveVariables::recomputeForSingleDefVirtReg(Register Reg) {
@@ -756,7 +727,7 @@ void LiveVariables::recomputeForSingleDefVirtReg(Register Reg) {
       if (MI.isPHI())
         break;
       if (MI.readsVirtualRegister(Reg)) {
-        assert(!MI.killsRegister(Reg, /*TRI=*/nullptr));
+        assert(!MI.killsRegister(Reg));
         MI.addRegisterKilled(Reg, nullptr);
         VI.Kills.push_back(&MI);
         break;

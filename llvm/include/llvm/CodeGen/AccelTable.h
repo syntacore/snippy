@@ -257,33 +257,17 @@ public:
 
 /// Helper class to identify an entry in DWARF5AccelTable based on their DIE
 /// offset and UnitID.
-struct OffsetAndUnitID {
-  uint64_t Offset = 0;
-  uint32_t UnitID = 0;
-  bool IsTU = false;
-  OffsetAndUnitID() = delete;
-  OffsetAndUnitID(uint64_t Offset, uint32_t UnitID, bool IsTU)
-      : Offset(Offset), UnitID(UnitID), IsTU(IsTU) {}
-  uint64_t offset() const { return Offset; };
-  uint32_t unitID() const { return UnitID; };
-  bool isTU() const { return IsTU; }
+struct OffsetAndUnitID : std::pair<uint64_t, uint32_t> {
+  using Base = std::pair<uint64_t, uint32_t>;
+  OffsetAndUnitID(Base B) : Base(B) {}
+
+  OffsetAndUnitID(uint64_t Offset, uint32_t UnitID) : Base(Offset, UnitID) {}
+  uint64_t offset() const { return first; };
+  uint32_t unitID() const { return second; };
 };
 
-template <> struct DenseMapInfo<OffsetAndUnitID> {
-  static inline OffsetAndUnitID getEmptyKey() {
-    return OffsetAndUnitID(-1, -1, false);
-  }
-  static inline OffsetAndUnitID getTombstoneKey() {
-    return OffsetAndUnitID(-2, -2, false);
-  }
-  static unsigned getHashValue(const OffsetAndUnitID &Val) {
-    return (unsigned)llvm::hash_combine(Val.offset(), Val.unitID(), Val.IsTU);
-  }
-  static bool isEqual(const OffsetAndUnitID &LHS, const OffsetAndUnitID &RHS) {
-    return LHS.offset() == RHS.offset() && LHS.unitID() == RHS.unitID() &&
-           LHS.IsTU == RHS.isTU();
-  }
-};
+template <>
+struct DenseMapInfo<OffsetAndUnitID> : DenseMapInfo<OffsetAndUnitID::Base> {};
 
 /// The Data class implementation for DWARF v5 accelerator table. Unlike the
 /// Apple Data classes, this class is just a DIE wrapper, and does not know to
@@ -291,15 +275,21 @@ template <> struct DenseMapInfo<OffsetAndUnitID> {
 /// emitDWARF5AccelTable function.
 class DWARF5AccelTableData : public AccelTableData {
 public:
+  struct AttributeEncoding {
+    dwarf::Index Index;
+    dwarf::Form Form;
+  };
+
   static uint32_t hash(StringRef Name) { return caseFoldingDjbHash(Name); }
 
-  DWARF5AccelTableData(const DIE &Die, const uint32_t UnitID, const bool IsTU);
+  DWARF5AccelTableData(const DIE &Die, const uint32_t UnitID,
+                       const bool IsTU = false);
   DWARF5AccelTableData(const uint64_t DieOffset,
                        const std::optional<uint64_t> DefiningParentOffset,
                        const unsigned DieTag, const unsigned UnitID,
-                       const bool IsTU)
+                       const bool IsTU = false)
       : OffsetVal(DieOffset), ParentOffset(DefiningParentOffset),
-        DieTag(DieTag), AbbrevNumber(0), IsTU(IsTU), UnitID(UnitID) {}
+        DieTag(DieTag), UnitID(UnitID), IsTU(IsTU) {}
 
 #ifndef NDEBUG
   void print(raw_ostream &OS) const override;
@@ -311,7 +301,7 @@ public:
   }
 
   OffsetAndUnitID getDieOffsetAndUnitID() const {
-    return {getDieOffset(), getUnitID(), isTU()};
+    return {getDieOffset(), UnitID};
   }
 
   unsigned getDieTag() const { return DieTag; }
@@ -337,14 +327,8 @@ public:
     assert(isNormalized() && "Accessing DIE Offset before normalizing.");
     if (!ParentOffset)
       return std::nullopt;
-    return OffsetAndUnitID(*ParentOffset, getUnitID(), isTU());
+    return OffsetAndUnitID(*ParentOffset, getUnitID());
   }
-
-  /// Sets AbbrevIndex for an Entry.
-  void setAbbrevNumber(uint16_t AbbrevNum) { AbbrevNumber = AbbrevNum; }
-
-  /// Returns AbbrevIndex for an Entry.
-  uint16_t getAbbrevNumber() const { return AbbrevNumber; }
 
   /// If `Die` has a non-null parent and the parent is not a declaration,
   /// return its offset.
@@ -354,40 +338,10 @@ protected:
   std::variant<const DIE *, uint64_t> OffsetVal;
   std::optional<uint64_t> ParentOffset;
   uint32_t DieTag : 16;
-  uint32_t AbbrevNumber : 15;
+  uint32_t UnitID : 15;
   uint32_t IsTU : 1;
-  uint32_t UnitID;
+
   uint64_t order() const override { return getDieOffset(); }
-};
-
-class DebugNamesAbbrev : public FoldingSetNode {
-public:
-  uint32_t DieTag;
-  uint32_t Number;
-  struct AttributeEncoding {
-    dwarf::Index Index;
-    dwarf::Form Form;
-  };
-  DebugNamesAbbrev(uint32_t DieTag) : DieTag(DieTag), Number(0) {}
-  /// Add attribute encoding to an abbreviation.
-  void addAttribute(const DebugNamesAbbrev::AttributeEncoding &Attr) {
-    AttrVect.push_back(Attr);
-  }
-  /// Set abbreviation tag index.
-  void setNumber(uint32_t AbbrevNumber) { Number = AbbrevNumber; }
-  /// Get abbreviation tag index.
-  uint32_t getNumber() const { return Number; }
-  /// Get DIE Tag.
-  uint32_t getDieTag() const { return DieTag; }
-  /// Used to gather unique data for the abbreviation folding set.
-  void Profile(FoldingSetNodeID &ID) const;
-  /// Returns attributes for an abbreviation.
-  const SmallVector<AttributeEncoding, 1> &getAttributes() const {
-    return AttrVect;
-  }
-
-private:
-  SmallVector<AttributeEncoding, 1> AttrVect;
 };
 
 struct TypeUnitMetaInfo {
@@ -404,7 +358,7 @@ class DWARF5AccelTable : public AccelTable<DWARF5AccelTableData> {
 public:
   struct UnitIndexAndEncoding {
     unsigned Index;
-    DebugNamesAbbrev::AttributeEncoding Encoding;
+    DWARF5AccelTableData::AttributeEncoding Encoding;
   };
   /// Returns type units that were constructed.
   const TUVectorTy &getTypeUnitsSymbols() { return TUSymbolsOrHashes; }
@@ -431,7 +385,7 @@ public:
       for (auto *Data : Entry.second.getValues<DWARF5AccelTableData *>()) {
         addName(Entry.second.Name, Data->getDieOffset(),
                 Data->getParentDieOffset(), Data->getDieTag(),
-                Data->getUnitID(), Data->isTU());
+                Data->getUnitID(), true);
       }
     }
   }

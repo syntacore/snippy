@@ -9,18 +9,15 @@
 #include "src/fenv/fegetround.h"
 #include "src/fenv/fesetround.h"
 
-#include "test/UnitTest/FEnvSafeTest.h"
 #include "test/UnitTest/Test.h"
 
-#include "hdr/fenv_macros.h"
+#include <fenv.h>
 
-using LlvmLibcRoundingModeTest = LIBC_NAMESPACE::testing::FEnvSafeTest;
-
-TEST_F(LlvmLibcRoundingModeTest, SetAndGet) {
+TEST(LlvmLibcRoundingModeTest, SetAndGet) {
   struct ResetDefaultRoundingMode {
-    int original = LIBC_NAMESPACE::fegetround();
+    int original;
     ~ResetDefaultRoundingMode() { LIBC_NAMESPACE::fesetround(original); }
-  } reset;
+  } reset{LIBC_NAMESPACE::fegetround()};
 
   int s = LIBC_NAMESPACE::fesetround(FE_TONEAREST);
   EXPECT_EQ(s, 0);

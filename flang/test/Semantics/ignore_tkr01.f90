@@ -92,11 +92,6 @@ module m
       real x(:)
     end
 
-    module subroutine t24(x)
-!dir$ ignore_tkr(t) x
-      real x(:)
-    end
-
   end interface
 
  contains
@@ -161,14 +156,6 @@ subroutine bad1(x)
 !dir$ ignore_tkr x
 !ERROR: !DIR$ IGNORE_TKR may apply only in an interface or a module procedure
   real, intent(in) :: x
-end
-
-submodule(m) subm
- contains
-  module subroutine t24(x)
-!dir$ ignore_tkr(t) x
-    real x(:)
-  end
 end
 
 program test

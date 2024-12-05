@@ -44,7 +44,15 @@ int main(int, char**)
     {
         optional<X> opt; ((void)opt);
         ASSERT_SAME_TYPE(decltype(*std::move(opt)), X&&);
-        ASSERT_NOEXCEPT(*std::move(opt));
+        LIBCPP_STATIC_ASSERT(noexcept(*opt));
+        // ASSERT_NOT_NOEXCEPT(*std::move(opt));
+        // FIXME: This assertion fails with GCC because it can see that
+        // (A) operator*() is constexpr, and
+        // (B) there is no path through the function that throws.
+        // It's arguable if this is the correct behavior for the noexcept
+        // operator.
+        // Regardless this function should still be noexcept(false) because
+        // it has a narrow contract.
     }
     {
         optional<X> opt(X{});

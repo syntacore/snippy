@@ -27,12 +27,11 @@ GCC-compatible ``clang`` and ``clang++`` drivers.
 
 }];
 
-  string Program = "Clang";
+  string Program = "clang";
   // Note: We *must* use DefaultVis and not ClangOption, since that's
   // the name of the actual TableGen record. The alias will not work.
   list<string> VisibilityMask = ["DefaultVis"];
   list<string> IgnoreFlags = ["HelpHidden", "Unsupported", "Ignored"];
 }
 
-#define GENERATING_DOCS
 include "Options.td"

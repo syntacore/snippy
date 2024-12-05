@@ -148,11 +148,9 @@ void MetadataAsValue::untrack() {
     MetadataTracking::untrack(MD);
 }
 
-DbgVariableRecord *DebugValueUser::getUser() {
-  return static_cast<DbgVariableRecord *>(this);
-}
-const DbgVariableRecord *DebugValueUser::getUser() const {
-  return static_cast<const DbgVariableRecord *>(this);
+DPValue *DebugValueUser::getUser() { return static_cast<DPValue *>(this); }
+const DPValue *DebugValueUser::getUser() const {
+  return static_cast<const DPValue *>(this);
 }
 
 void DebugValueUser::handleChangedValue(void *Old, Metadata *New) {
@@ -160,12 +158,6 @@ void DebugValueUser::handleChangedValue(void *Old, Metadata *New) {
   // getOwner, if needed.
   auto OldMD = static_cast<Metadata **>(Old);
   ptrdiff_t Idx = std::distance(&*DebugValues.begin(), OldMD);
-  // If replacing a ValueAsMetadata with a nullptr, replace it with a
-  // PoisonValue instead.
-  if (OldMD && isa<ValueAsMetadata>(*OldMD) && !New) {
-    auto *OldVAM = cast<ValueAsMetadata>(*OldMD);
-    New = ValueAsMetadata::get(PoisonValue::get(OldVAM->getValue()->getType()));
-  }
   resetDebugValue(Idx, New);
 }
 
@@ -268,29 +260,28 @@ SmallVector<Metadata *> ReplaceableMetadataImpl::getAllArgListUsers() {
   return MDUsers;
 }
 
-SmallVector<DbgVariableRecord *>
-ReplaceableMetadataImpl::getAllDbgVariableRecordUsers() {
-  SmallVector<std::pair<OwnerTy, uint64_t> *> DVRUsersWithID;
+SmallVector<DPValue *> ReplaceableMetadataImpl::getAllDPValueUsers() {
+  SmallVector<std::pair<OwnerTy, uint64_t> *> DPVUsersWithID;
   for (auto Pair : UseMap) {
     OwnerTy Owner = Pair.second.first;
     if (Owner.isNull())
       continue;
     if (!Owner.is<DebugValueUser *>())
       continue;
-    DVRUsersWithID.push_back(&UseMap[Pair.first]);
+    DPVUsersWithID.push_back(&UseMap[Pair.first]);
   }
-  // Order DbgVariableRecord users in reverse-creation order. Normal dbg.value
-  // users of MetadataAsValues are ordered by their UseList, i.e. reverse order
-  // of when they were added: we need to replicate that here. The structure of
+  // Order DPValue users in reverse-creation order. Normal dbg.value users
+  // of MetadataAsValues are ordered by their UseList, i.e. reverse order of
+  // when they were added: we need to replicate that here. The structure of
   // debug-info output depends on the ordering of intrinsics, thus we need
   // to keep them consistent for comparisons sake.
-  llvm::sort(DVRUsersWithID, [](auto UserA, auto UserB) {
+  llvm::sort(DPVUsersWithID, [](auto UserA, auto UserB) {
     return UserA->second > UserB->second;
   });
-  SmallVector<DbgVariableRecord *> DVRUsers;
-  for (auto UserWithID : DVRUsersWithID)
-    DVRUsers.push_back(UserWithID->first.get<DebugValueUser *>()->getUser());
-  return DVRUsers;
+  SmallVector<DPValue *> DPVUsers;
+  for (auto UserWithID : DPVUsersWithID)
+    DPVUsers.push_back(UserWithID->first.get<DebugValueUser *>()->getUser());
+  return DPVUsers;
 }
 
 void ReplaceableMetadataImpl::addRef(void *Ref, OwnerTy Owner) {
@@ -1195,11 +1186,12 @@ MDNode *MDNode::mergeDirectCallProfMetadata(MDNode *A, MDNode *B,
          "first operand should be a non-null MDString");
   StringRef AProfName = AMDS->getString();
   StringRef BProfName = BMDS->getString();
-  if (AProfName == "branch_weights" && BProfName == "branch_weights") {
-    ConstantInt *AInstrWeight = mdconst::dyn_extract<ConstantInt>(
-        A->getOperand(getBranchWeightOffset(A)));
-    ConstantInt *BInstrWeight = mdconst::dyn_extract<ConstantInt>(
-        B->getOperand(getBranchWeightOffset(B)));
+  if (AProfName.equals("branch_weights") &&
+      BProfName.equals("branch_weights")) {
+    ConstantInt *AInstrWeight =
+        mdconst::dyn_extract<ConstantInt>(A->getOperand(1));
+    ConstantInt *BInstrWeight =
+        mdconst::dyn_extract<ConstantInt>(B->getOperand(1));
     assert(AInstrWeight && BInstrWeight && "verified by LLVM verifier");
     return MDNode::get(Ctx,
                        {MDHelper.createString("branch_weights"),
@@ -1287,12 +1279,12 @@ MDNode *MDNode::getMostGenericRange(MDNode *A, MDNode *B) {
     return A;
 
   // First, walk both lists in order of the lower boundary of each interval.
-  // At each step, try to merge the new interval to the last one we added.
+  // At each step, try to merge the new interval to the last one we adedd.
   SmallVector<ConstantInt *, 4> EndPoints;
-  unsigned AI = 0;
-  unsigned BI = 0;
-  unsigned AN = A->getNumOperands() / 2;
-  unsigned BN = B->getNumOperands() / 2;
+  int AI = 0;
+  int BI = 0;
+  int AN = A->getNumOperands() / 2;
+  int BN = B->getNumOperands() / 2;
   while (AI < AN && BI < BN) {
     ConstantInt *ALow = mdconst::extract<ConstantInt>(A->getOperand(2 * AI));
     ConstantInt *BLow = mdconst::extract<ConstantInt>(B->getOperand(2 * BI));
@@ -1318,11 +1310,10 @@ MDNode *MDNode::getMostGenericRange(MDNode *A, MDNode *B) {
     ++BI;
   }
 
-  // We haven't handled wrap in the previous merge,
-  // if we have at least 2 ranges (4 endpoints) we have to try to merge
+  // If we have more than 2 ranges (4 endpoints) we have to try to merge
   // the last and first ones.
   unsigned Size = EndPoints.size();
-  if (Size > 2) {
+  if (Size > 4) {
     ConstantInt *FB = EndPoints[0];
     ConstantInt *FE = EndPoints[1];
     if (tryMergeRange(EndPoints, FB, FE)) {
@@ -1591,7 +1582,7 @@ void Instruction::dropUnknownNonDebugMetadata(ArrayRef<unsigned> KnownIDs) {
   if (!Value::hasMetadata())
     return; // Nothing to remove!
 
-  SmallSet<unsigned, 32> KnownSet;
+  SmallSet<unsigned, 4> KnownSet;
   KnownSet.insert(KnownIDs.begin(), KnownIDs.end());
 
   // A DIAssignID attachment is debug metadata, don't drop it.

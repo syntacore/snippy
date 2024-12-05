@@ -23,9 +23,6 @@ void check_ctz(int n) {
 
   // CHECK: call void @__ubsan_handle_invalid_builtin
   __builtin_ctzll(n);
-
-  // CHECK: call void @__ubsan_handle_invalid_builtin
-  __builtin_ctzg((unsigned int)n);
 }
 
 // CHECK: define{{.*}} void @check_clz
@@ -47,7 +44,4 @@ void check_clz(int n) {
 
   // CHECK: call void @__ubsan_handle_invalid_builtin
   __builtin_clzll(n);
-
-  // CHECK: call void @__ubsan_handle_invalid_builtin
-  __builtin_clzg((unsigned int)n);
 }

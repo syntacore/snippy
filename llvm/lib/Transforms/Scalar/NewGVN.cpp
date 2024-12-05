@@ -529,11 +529,7 @@ class NewGVN {
   // IR.
   SmallPtrSet<const Instruction *, 8> PHINodeUses;
 
-  // The cached results, in general, are only valid for the specific block where
-  // they were computed. The unsigned part of the key is a unique block
-  // identifier
-  DenseMap<std::pair<const Value *, unsigned>, bool> OpSafeForPHIOfOps;
-  unsigned CacheIdx;
+  DenseMap<const Value *, bool> OpSafeForPHIOfOps;
 
   // Map a temporary instruction we created to a parent block.
   DenseMap<const Value *, BasicBlock *> TempToBlock;
@@ -896,7 +892,7 @@ private:
 
   // Debug counter info.  When verifying, we have to reset the value numbering
   // debug counter to the same state it started in to get the same results.
-  DebugCounter::CounterState StartingVNCounter;
+  int64_t StartingVNCounter = 0;
 };
 
 } // end anonymous namespace
@@ -1203,7 +1199,7 @@ NewGVN::ExprResult NewGVN::createExpression(Instruction *I) const {
   } else if (auto *GEPI = dyn_cast<GetElementPtrInst>(I)) {
     Value *V = simplifyGEPInst(GEPI->getSourceElementType(), *E->op_begin(),
                                ArrayRef(std::next(E->op_begin()), E->op_end()),
-                               GEPI->getNoWrapFlags(), Q);
+                               GEPI->isInBounds(), Q);
     if (auto Simplified = checkExprResults(E, I, V))
       return Simplified;
   } else if (AllConstant) {
@@ -2529,14 +2525,18 @@ void NewGVN::processOutgoingEdges(Instruction *TI, BasicBlock *B) {
       BasicBlock *TargetBlock = Case.getCaseSuccessor();
       updateReachableEdge(B, TargetBlock);
     } else {
-      for (BasicBlock *TargetBlock : successors(SI->getParent()))
+      for (unsigned i = 0, e = SI->getNumSuccessors(); i != e; ++i) {
+        BasicBlock *TargetBlock = SI->getSuccessor(i);
         updateReachableEdge(B, TargetBlock);
+      }
     }
   } else {
     // Otherwise this is either unconditional, or a type we have no
     // idea about. Just mark successors as reachable.
-    for (BasicBlock *TargetBlock : successors(TI->getParent()))
+    for (unsigned i = 0, e = TI->getNumSuccessors(); i != e; ++i) {
+      BasicBlock *TargetBlock = TI->getSuccessor(i);
       updateReachableEdge(B, TargetBlock);
+    }
 
     // This also may be a memory defining terminator, in which case, set it
     // equivalent only to itself.
@@ -2600,19 +2600,19 @@ bool NewGVN::OpIsSafeForPHIOfOps(Value *V, const BasicBlock *PHIBlock,
     if (!isa<Instruction>(I))
       continue;
 
-    auto OISIt = OpSafeForPHIOfOps.find({I, CacheIdx});
+    auto OISIt = OpSafeForPHIOfOps.find(I);
     if (OISIt != OpSafeForPHIOfOps.end())
       return OISIt->second;
 
     // Keep walking until we either dominate the phi block, or hit a phi, or run
     // out of things to check.
     if (DT->properlyDominates(getBlockForValue(I), PHIBlock)) {
-      OpSafeForPHIOfOps.insert({{I, CacheIdx}, true});
+      OpSafeForPHIOfOps.insert({I, true});
       continue;
     }
     // PHI in the same block.
     if (isa<PHINode>(I) && getBlockForValue(I) == PHIBlock) {
-      OpSafeForPHIOfOps.insert({{I, CacheIdx}, false});
+      OpSafeForPHIOfOps.insert({I, false});
       return false;
     }
 
@@ -2631,10 +2631,10 @@ bool NewGVN::OpIsSafeForPHIOfOps(Value *V, const BasicBlock *PHIBlock,
       if (!isa<Instruction>(Op))
         continue;
       // Stop now if we find an unsafe operand.
-      auto OISIt = OpSafeForPHIOfOps.find({OrigI, CacheIdx});
+      auto OISIt = OpSafeForPHIOfOps.find(OrigI);
       if (OISIt != OpSafeForPHIOfOps.end()) {
         if (!OISIt->second) {
-          OpSafeForPHIOfOps.insert({{I, CacheIdx}, false});
+          OpSafeForPHIOfOps.insert({I, false});
           return false;
         }
         continue;
@@ -2644,7 +2644,7 @@ bool NewGVN::OpIsSafeForPHIOfOps(Value *V, const BasicBlock *PHIBlock,
       Worklist.push_back(cast<Instruction>(Op));
     }
   }
-  OpSafeForPHIOfOps.insert({{V, CacheIdx}, true});
+  OpSafeForPHIOfOps.insert({V, true});
   return true;
 }
 
@@ -3278,7 +3278,7 @@ void NewGVN::verifyIterationSettled(Function &F) {
 #ifndef NDEBUG
   LLVM_DEBUG(dbgs() << "Beginning iteration verification\n");
   if (DebugCounter::isCounterSet(VNCounter))
-    DebugCounter::setCounterState(VNCounter, StartingVNCounter);
+    DebugCounter::setCounterValue(VNCounter, StartingVNCounter);
 
   // Note that we have to store the actual classes, as we may change existing
   // classes during iteration.  This is because our memory iteration propagation
@@ -3297,7 +3297,6 @@ void NewGVN::verifyIterationSettled(Function &F) {
   TouchedInstructions.set();
   TouchedInstructions.reset(0);
   OpSafeForPHIOfOps.clear();
-  CacheIdx = 0;
   iterateTouchedInstructions();
   DenseSet<std::pair<const CongruenceClass *, const CongruenceClass *>>
       EqualClasses;
@@ -3401,8 +3400,6 @@ void NewGVN::iterateTouchedInstructions() {
                             << " because it is unreachable\n");
           continue;
         }
-        // Use the appropriate cache for "OpIsSafeForPHIOfOps".
-        CacheIdx = RPOOrdering.lookup(DT->getNode(CurrBlock)) - 1;
         updateProcessedCount(CurrBlock);
       }
       // Reset after processing (because we may mark ourselves as touched when
@@ -3426,7 +3423,7 @@ void NewGVN::iterateTouchedInstructions() {
 // This is the main transformation entry point.
 bool NewGVN::runGVN() {
   if (DebugCounter::isCounterSet(VNCounter))
-    StartingVNCounter = DebugCounter::getCounterState(VNCounter);
+    StartingVNCounter = DebugCounter::getCounterValue(VNCounter);
   bool Changed = false;
   NumFuncArgs = F.arg_size();
   MSSAWalker = MSSA->getWalker();
@@ -3482,8 +3479,6 @@ bool NewGVN::runGVN() {
   LLVM_DEBUG(dbgs() << "Block " << getBlockName(&F.getEntryBlock())
                     << " marked reachable\n");
   ReachableBlocks.insert(&F.getEntryBlock());
-  // Use index corresponding to entry block.
-  CacheIdx = 0;
 
   iterateTouchedInstructions();
   verifyMemoryCongruency();
@@ -3726,7 +3721,7 @@ void NewGVN::deleteInstructionsInBlock(BasicBlock *BB) {
   new StoreInst(
       PoisonValue::get(Int8Ty),
       Constant::getNullValue(PointerType::getUnqual(BB->getContext())),
-      BB->getTerminator()->getIterator());
+      BB->getTerminator());
 }
 
 void NewGVN::markInstructionForDeletion(Instruction *I) {
@@ -4024,7 +4019,7 @@ bool NewGVN::eliminateInstructions(Function &F) {
           // dominated defs as dead.
           if (Def) {
             // For anything in this case, what and how we value number
-            // guarantees that any side-effects that would have occurred (ie
+            // guarantees that any side-effets that would have occurred (ie
             // throwing, etc) can be proven to either still occur (because it's
             // dominated by something that has the same side-effects), or never
             // occur.  Otherwise, we would not have been able to prove it value
@@ -4242,7 +4237,7 @@ PreservedAnalyses NewGVNPass::run(Function &F, AnalysisManager<Function> &AM) {
   auto &AA = AM.getResult<AAManager>(F);
   auto &MSSA = AM.getResult<MemorySSAAnalysis>(F).getMSSA();
   bool Changed =
-      NewGVN(F, &DT, &AC, &TLI, &AA, &MSSA, F.getDataLayout())
+      NewGVN(F, &DT, &AC, &TLI, &AA, &MSSA, F.getParent()->getDataLayout())
           .runGVN();
   if (!Changed)
     return PreservedAnalyses::all();

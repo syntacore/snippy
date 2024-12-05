@@ -25,6 +25,7 @@
 #define LLVM_TRANSFORMS_VECTORIZE_VPLAN_VPLANHCFGBUILDER_H
 
 #include "VPlanDominatorTree.h"
+#include "VPlanVerifier.h"
 
 namespace llvm {
 
@@ -47,6 +48,9 @@ private:
 
   // The VPlan that will contain the H-CFG we are building.
   VPlan &Plan;
+
+  // VPlan verifier utility.
+  VPlanVerifier Verifier;
 
   // Dominator analysis for VPlan plain CFG to be used in the
   // construction of the H-CFG. This analysis is no longer valid once regions

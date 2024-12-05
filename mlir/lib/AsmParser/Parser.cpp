@@ -34,6 +34,7 @@
 #include "mlir/IR/Verifier.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/TypeID.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/DenseMap.h"
@@ -325,15 +326,19 @@ ParseResult Parser::parseFloatFromIntegerLiteral(
                           "leading minus");
   }
 
-  APInt intValue;
-  tok.getSpelling().getAsInteger(isHex ? 0 : 10, intValue);
-  if (intValue.getActiveBits() > typeSizeInBits)
+  std::optional<uint64_t> value = tok.getUInt64IntegerValue();
+  if (!value)
     return emitError(loc, "hexadecimal float constant out of range for type");
 
-  APInt truncatedValue(typeSizeInBits, intValue.getNumWords(),
-                       intValue.getRawData());
+  if (&semantics == &APFloat::IEEEdouble()) {
+    result = APFloat(semantics, APInt(typeSizeInBits, *value));
+    return success();
+  }
 
-  result.emplace(semantics, truncatedValue);
+  APInt apInt(typeSizeInBits, *value);
+  if (apInt != *value)
+    return emitError(loc, "hexadecimal float constant out of range for type");
+  result = APFloat(semantics, apInt);
 
   return success();
 }

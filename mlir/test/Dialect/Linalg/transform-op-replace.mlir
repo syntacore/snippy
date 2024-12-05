@@ -12,10 +12,8 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
     transform.structured.replace %0 {
-      builtin.module {
-        func.func @foo() {
-          "dummy_op"() : () -> ()
-        }
+      func.func @foo() {
+        "dummy_op"() : () -> ()
       }
     } : (!transform.any_op) -> !transform.any_op
     transform.yield

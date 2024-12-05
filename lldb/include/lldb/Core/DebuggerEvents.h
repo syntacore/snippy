@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "lldb/Core/ModuleSpec.h"
-#include "lldb/Core/Progress.h"
 #include "lldb/Utility/Event.h"
 #include "lldb/Utility/StructuredData.h"
 
@@ -40,7 +39,7 @@ public:
   GetAsStructuredData(const Event *event_ptr);
 
   uint64_t GetID() const { return m_id; }
-  bool IsFinite() const { return m_total != Progress::kNonDeterministicTotal; }
+  bool IsFinite() const { return m_total != UINT64_MAX; }
   uint64_t GetCompleted() const { return m_completed; }
   uint64_t GetTotal() const { return m_total; }
   std::string GetMessage() const {
@@ -76,15 +75,19 @@ private:
 
 class DiagnosticEventData : public EventData {
 public:
-  DiagnosticEventData(lldb::Severity severity, std::string message,
-                      bool debugger_specific)
-      : m_message(std::move(message)), m_severity(severity),
+  enum class Type {
+    Info,
+    Warning,
+    Error,
+  };
+  DiagnosticEventData(Type type, std::string message, bool debugger_specific)
+      : m_message(std::move(message)), m_type(type),
         m_debugger_specific(debugger_specific) {}
   ~DiagnosticEventData() override = default;
 
   const std::string &GetMessage() const { return m_message; }
   bool IsDebuggerSpecific() const { return m_debugger_specific; }
-  lldb::Severity GetSeverity() const { return m_severity; }
+  Type GetType() const { return m_type; }
 
   llvm::StringRef GetPrefix() const;
 
@@ -101,7 +104,7 @@ public:
 
 protected:
   std::string m_message;
-  lldb::Severity m_severity;
+  Type m_type;
   const bool m_debugger_specific;
 
   DiagnosticEventData(const DiagnosticEventData &) = delete;

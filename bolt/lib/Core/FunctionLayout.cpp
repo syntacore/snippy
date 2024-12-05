@@ -1,17 +1,12 @@
-//===- bolt/Core/FunctionLayout.cpp - Fragmented Function Layout -*- C++ -*-==//
-//
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
-
 #include "bolt/Core/FunctionLayout.h"
-#include "bolt/Core/BinaryBasicBlock.h"
+#include "bolt/Core/BinaryFunction.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/edit_distance.h"
 #include <algorithm>
+#include <cstddef>
+#include <functional>
 #include <iterator>
+#include <memory>
 
 using namespace llvm;
 using namespace bolt;
@@ -164,19 +159,14 @@ void FunctionLayout::eraseBasicBlocks(
   updateLayoutIndices();
 }
 
-void FunctionLayout::updateLayoutIndices() const {
+void FunctionLayout::updateLayoutIndices() {
   unsigned BlockIndex = 0;
-  for (const FunctionFragment &FF : fragments()) {
+  for (FunctionFragment &FF : fragments()) {
     for (BinaryBasicBlock *const BB : FF) {
       BB->setLayoutIndex(BlockIndex++);
       BB->setFragmentNum(FF.getFragmentNum());
     }
   }
-}
-void FunctionLayout::updateLayoutIndices(
-    ArrayRef<BinaryBasicBlock *> Order) const {
-  for (auto [Index, BB] : llvm::enumerate(Order))
-    BB->setLayoutIndex(Index);
 }
 
 bool FunctionLayout::update(const ArrayRef<BinaryBasicBlock *> NewLayout) {

@@ -52,7 +52,6 @@
 #include <cassert>
 #include <cstdlib>
 
-#include "polly/Support/PollyDebug.h"
 #define DEBUG_TYPE "polly-ast"
 
 using namespace llvm;
@@ -644,14 +643,14 @@ static std::unique_ptr<IslAstInfo> runIslAst(
   const Dependences &D = GetDeps(Dependences::AL_Statement);
 
   if (D.getSharedIslCtx() != Scop.getSharedIslCtx()) {
-    POLLY_DEBUG(
+    LLVM_DEBUG(
         dbgs() << "Got dependence analysis for different SCoP/isl_ctx\n");
     return {};
   }
 
   std::unique_ptr<IslAstInfo> Ast = std::make_unique<IslAstInfo>(Scop, D);
 
-  POLLY_DEBUG({
+  LLVM_DEBUG({
     if (Ast)
       Ast->print(dbgs());
   });
@@ -752,7 +751,7 @@ void IslAstInfo::print(raw_ostream &OS) {
   P = isl_ast_node_print(RootNode.get(), P, Options);
   AstStr = isl_printer_get_str(P);
 
-  POLLY_DEBUG({
+  LLVM_DEBUG({
     dbgs() << S.getContextStr() << "\n";
     dbgs() << stringFromIslObj(S.getScheduleTree(), "null");
   });

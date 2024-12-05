@@ -107,10 +107,4 @@ long long test_InterlockedCompareExchange64(X *x) {
 long test_InterlockedAdd(X *x) {
   return _InterlockedAdd(&x->c, 4);
 }
-
-// CHECK-AARCH64-LABEL: @test_InterlockedAdd64(
-// CHECK-AARCH64:   atomicrmw {{.*}} align 8
-long test_InterlockedAdd64(X *x) {
-  return _InterlockedAdd64(&x->c, 4);
-}
 #endif

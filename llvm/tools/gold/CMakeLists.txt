@@ -12,7 +12,7 @@ if( LLVM_ENABLE_PIC AND LLVM_BINUTILS_INCDIR )
      TargetParser
      )
 
-  add_llvm_library(LLVMgold MODULE INSTALL_WITH_TOOLCHAIN
+  add_llvm_library(LLVMgold MODULE
     gold-plugin.cpp
     )
 

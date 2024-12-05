@@ -13,8 +13,8 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
-#include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 using namespace mlir;
@@ -216,14 +216,14 @@ LogicalResult transform::CastAndCallOp::verify() {
 
 void transform::CastAndCallOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getInsertionPointMutable(), effects);
+  transform::onlyReadsHandle(getInsertionPoint(), effects);
   if (getInputs())
-    transform::onlyReadsHandle(getInputsMutable(), effects);
+    transform::onlyReadsHandle(getInputs(), effects);
   if (getOutputs())
-    transform::onlyReadsHandle(getOutputsMutable(), effects);
+    transform::onlyReadsHandle(getOutputs(), effects);
   if (getFunction())
-    transform::onlyReadsHandle(getFunctionMutable(), effects);
-  transform::producesHandle(getOperation()->getOpResults(), effects);
+    transform::onlyReadsHandle(getFunction(), effects);
+  transform::producesHandle(getResult(), effects);
   transform::modifiesPayload(effects);
 }
 

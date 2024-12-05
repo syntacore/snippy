@@ -136,12 +136,14 @@ void InterferenceCache::Entry::update(unsigned MBBNum) {
   // Use advanceTo only when possible.
   if (PrevPos != Start) {
     if (!PrevPos.isValid() || Start < PrevPos) {
-      for (RegUnitInfo &RUI : RegUnits) {
+      for (unsigned i = 0, e = RegUnits.size(); i != e; ++i) {
+        RegUnitInfo &RUI = RegUnits[i];
         RUI.VirtI.find(Start);
         RUI.FixedI = RUI.Fixed->find(Start);
       }
     } else {
-      for (RegUnitInfo &RUI : RegUnits) {
+      for (unsigned i = 0, e = RegUnits.size(); i != e; ++i) {
+        RegUnitInfo &RUI = RegUnits[i];
         RUI.VirtI.advanceTo(Start);
         if (RUI.FixedI != RUI.Fixed->end())
           RUI.FixedI = RUI.Fixed->advanceTo(RUI.FixedI, Start);
@@ -160,8 +162,8 @@ void InterferenceCache::Entry::update(unsigned MBBNum) {
     BI->First = BI->Last = SlotIndex();
 
     // Check for first interference from virtregs.
-    for (RegUnitInfo &RUI : RegUnits) {
-      LiveIntervalUnion::SegmentIter &I = RUI.VirtI;
+    for (unsigned i = 0, e = RegUnits.size(); i != e; ++i) {
+      LiveIntervalUnion::SegmentIter &I = RegUnits[i].VirtI;
       if (!I.valid())
         continue;
       SlotIndex StartI = I.start();
@@ -172,9 +174,9 @@ void InterferenceCache::Entry::update(unsigned MBBNum) {
     }
 
     // Same thing for fixed interference.
-    for (RegUnitInfo &RUI : RegUnits) {
-      LiveInterval::const_iterator I = RUI.FixedI;
-      LiveInterval::const_iterator E = RUI.Fixed->end();
+    for (unsigned i = 0, e = RegUnits.size(); i != e; ++i) {
+      LiveInterval::const_iterator I = RegUnits[i].FixedI;
+      LiveInterval::const_iterator E = RegUnits[i].Fixed->end();
       if (I == E)
         continue;
       SlotIndex StartI = I->start;
@@ -211,8 +213,8 @@ void InterferenceCache::Entry::update(unsigned MBBNum) {
   }
 
   // Check for last interference in block.
-  for (RegUnitInfo &RUI : RegUnits) {
-    LiveIntervalUnion::SegmentIter &I = RUI.VirtI;
+  for (unsigned i = 0, e = RegUnits.size(); i != e; ++i) {
+    LiveIntervalUnion::SegmentIter &I = RegUnits[i].VirtI;
     if (!I.valid() || I.start() >= Stop)
       continue;
     I.advanceTo(Stop);
@@ -227,9 +229,9 @@ void InterferenceCache::Entry::update(unsigned MBBNum) {
   }
 
   // Fixed interference.
-  for (RegUnitInfo &RUI : RegUnits) {
-    LiveInterval::iterator &I = RUI.FixedI;
-    LiveRange *LR = RUI.Fixed;
+  for (unsigned i = 0, e = RegUnits.size(); i != e; ++i) {
+    LiveInterval::iterator &I = RegUnits[i].FixedI;
+    LiveRange *LR = RegUnits[i].Fixed;
     if (I == LR->end() || I->start >= Stop)
       continue;
     I = LR->advanceTo(I, Stop);

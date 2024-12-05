@@ -63,9 +63,6 @@ public:
 
     /// Limit the number of references returned (0 means no limit).
     size_t ReferencesLimit = 0;
-
-    /// Flag to hint the experimental modules support is enabled.
-    bool EnableExperimentalModulesSupport = false;
   };
 
   ClangdLSPServer(Transport &Transp, const ThreadsafeFS &TFS,
@@ -137,7 +134,7 @@ private:
   void onWorkspaceSymbol(const WorkspaceSymbolParams &,
                          Callback<std::vector<SymbolInformation>>);
   void onPrepareRename(const TextDocumentPositionParams &,
-                       Callback<PrepareRenameResult>);
+                       Callback<std::optional<Range>>);
   void onRename(const RenameParams &, Callback<WorkspaceEdit>);
   void onHover(const TextDocumentPositionParams &,
                Callback<std::optional<Hover>>);
@@ -177,7 +174,6 @@ private:
   /// Implement commands.
   void onCommandApplyEdit(const WorkspaceEdit &, Callback<llvm::json::Value>);
   void onCommandApplyTweak(const TweakArgs &, Callback<llvm::json::Value>);
-  void onCommandApplyRename(const RenameParams &, Callback<llvm::json::Value>);
 
   /// Outgoing LSP calls.
   LSPBinder::OutgoingMethod<ApplyWorkspaceEditParams,
@@ -326,8 +322,6 @@ private:
   std::optional<OverlayCDB> CDB;
   // The ClangdServer is created by the "initialize" LSP method.
   std::optional<ClangdServer> Server;
-  // Manages to build module files.
-  std::optional<ModulesBuilder> ModulesManager;
 };
 } // namespace clangd
 } // namespace clang

@@ -115,7 +115,7 @@ llvm::Error AllTUsToolExecutor::execute(
   auto &Action = Actions.front();
 
   {
-    llvm::DefaultThreadPool Pool(llvm::hardware_concurrency(ThreadCount));
+    llvm::ThreadPool Pool(llvm::hardware_concurrency(ThreadCount));
     for (std::string File : Files) {
       Pool.async(
           [&](std::string Path) {

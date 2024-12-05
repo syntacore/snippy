@@ -272,7 +272,6 @@ std::optional<Expr<SomeType>> FoldTransfer(
     }
   }
   if (sourceBytes && IsActuallyConstant(*source) && moldType && extents &&
-      !moldType->IsPolymorphic() &&
       (moldLength || moldType->category() != TypeCategory::Character)) {
     std::size_t elements{
         extents->empty() ? 1 : static_cast<std::size_t>((*extents)[0])};

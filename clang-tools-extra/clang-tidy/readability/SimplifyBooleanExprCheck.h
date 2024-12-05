@@ -60,11 +60,9 @@ private:
                       const BinaryOperator *Inner, bool TryOfferFix,
                       const Stmt *Parent, const ParenExpr *Parens);
 
-  bool issueDiag(const ASTContext &Context, SourceLocation Loc,
+  void issueDiag(const ASTContext &Context, SourceLocation Loc,
                  StringRef Description, SourceRange ReplacementRange,
                  StringRef Replacement);
-
-  bool canBeBypassed(const Stmt *S) const;
 
   const bool IgnoreMacros;
   const bool ChainedConditionalReturn;

@@ -9,7 +9,7 @@
 # Test that all headers include all the other headers they're supposed to, as
 # prescribed by the Standard.
 
-# RUN: %{python} %s %{libcxx-dir}/utils
+# RUN: %{python} %s %{libcxx}/utils
 
 import sys
 sys.path.append(sys.argv[1])

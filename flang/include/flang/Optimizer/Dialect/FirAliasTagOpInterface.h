@@ -16,10 +16,10 @@
 
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Operation.h"
-#include "llvm/Support/LogicalResult.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace fir::detail {
-llvm::LogicalResult verifyFirAliasTagOpInterface(mlir::Operation *op);
+mlir::LogicalResult verifyFirAliasTagOpInterface(mlir::Operation *op);
 } // namespace fir::detail
 
 #include "flang/Optimizer/Dialect/FirAliasTagOpInterface.h.inc"

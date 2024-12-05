@@ -770,7 +770,8 @@ bool PolynomialMultiplyRecognize::matchLeftShift(SelectInst *SelI,
     //          select +++ ? T : 0
 
     Value *U = *SelI->user_begin();
-    if (!match(U, m_c_Xor(m_Specific(SelI), m_Value(R))))
+    if (!match(U, m_Xor(m_Specific(SelI), m_Value(R))) &&
+        !match(U, m_Xor(m_Value(R), m_Specific(SelI))))
       return false;
     // Matched: xor (select +++ ? 0 : T), R
     //          xor (select +++ ? T : 0), R
@@ -813,13 +814,15 @@ bool PolynomialMultiplyRecognize::matchRightShift(SelectInst *SelI,
   CmpInst::Predicate P;
   bool TrueIfZero;
 
-  if (match(CondV, m_c_ICmp(P, m_Value(C), m_Zero()))) {
+  if (match(CondV, m_ICmp(P, m_Value(C), m_Zero())) ||
+      match(CondV, m_ICmp(P, m_Zero(), m_Value(C)))) {
     if (P != CmpInst::ICMP_EQ && P != CmpInst::ICMP_NE)
       return false;
     // Matched: select C == 0 ? ... : ...
     //          select C != 0 ? ... : ...
     TrueIfZero = (P == CmpInst::ICMP_EQ);
-  } else if (match(CondV, m_c_ICmp(P, m_Value(C), m_One()))) {
+  } else if (match(CondV, m_ICmp(P, m_Value(C), m_One())) ||
+             match(CondV, m_ICmp(P, m_One(), m_Value(C)))) {
     if (P != CmpInst::ICMP_EQ && P != CmpInst::ICMP_NE)
       return false;
     // Matched: select C == 1 ? ... : ...
@@ -829,7 +832,8 @@ bool PolynomialMultiplyRecognize::matchRightShift(SelectInst *SelI,
     return false;
 
   Value *X = nullptr;
-  if (!match(C, m_And(m_Value(X), m_One())))
+  if (!match(C, m_And(m_Value(X), m_One())) &&
+      !match(C, m_And(m_One(), m_Value(X))))
     return false;
   // Matched: select (X & 1) == +++ ? ... : ...
   //          select (X & 1) != +++ ? ... : ...
@@ -841,7 +845,8 @@ bool PolynomialMultiplyRecognize::matchRightShift(SelectInst *SelI,
     if (!match(TrueV, m_LShr(m_Value(R), m_One())))
       return false;
     // Matched: select +++ ? (R >> 1) : ...
-    if (!match(FalseV, m_c_Xor(m_Specific(TrueV), m_Value(Q))))
+    if (!match(FalseV, m_Xor(m_Specific(TrueV), m_Value(Q))) &&
+        !match(FalseV, m_Xor(m_Value(Q), m_Specific(TrueV))))
       return false;
     // Matched: select +++ ? (R >> 1) : (R >> 1) ^ Q
     // with commuting ^.
@@ -851,7 +856,8 @@ bool PolynomialMultiplyRecognize::matchRightShift(SelectInst *SelI,
     if (!match(FalseV, m_LShr(m_Value(R), m_One())))
       return false;
     // Matched: select +++ ? ... : (R >> 1)
-    if (!match(TrueV, m_c_Xor(m_Specific(FalseV), m_Value(Q))))
+    if (!match(TrueV, m_Xor(m_Specific(FalseV), m_Value(Q))) &&
+        !match(TrueV, m_Xor(m_Value(Q), m_Specific(FalseV))))
       return false;
     // Matched: select +++ ? (R >> 1) ^ Q : (R >> 1)
     // with commuting ^.
@@ -2419,7 +2425,7 @@ bool HexagonLoopIdiomRecognize::run(Loop *L) {
   if (Name == "memset" || Name == "memcpy" || Name == "memmove")
     return false;
 
-  DL = &L->getHeader()->getDataLayout();
+  DL = &L->getHeader()->getModule()->getDataLayout();
 
   HasMemcpy = TLI->has(LibFunc_memcpy);
   HasMemmove = TLI->has(LibFunc_memmove);

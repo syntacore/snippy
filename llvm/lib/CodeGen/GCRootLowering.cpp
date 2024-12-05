@@ -81,9 +81,6 @@ public:
 
 PreservedAnalyses GCLoweringPass::run(Function &F,
                                       FunctionAnalysisManager &FAM) {
-  if (!F.hasGC())
-    return PreservedAnalyses::all();
-
   auto &Info = FAM.getResult<GCFunctionAnalysis>(F);
 
   bool Changed = DoLowering(F, Info.getStrategy());
@@ -181,7 +178,7 @@ static bool InsertRootInitializers(Function &F, ArrayRef<AllocaInst *> Roots) {
     if (!InitedRoots.count(Root)) {
       new StoreInst(
           ConstantPointerNull::get(cast<PointerType>(Root->getAllocatedType())),
-          Root, std::next(Root->getIterator()));
+          Root, Root->getNextNode());
       MadeChange = true;
     }
 
@@ -216,8 +213,8 @@ bool DoLowering(Function &F, GCStrategy &S) {
       default: break;
       case Intrinsic::gcwrite: {
         // Replace a write barrier with a simple store.
-        Value *St = new StoreInst(CI->getArgOperand(0), CI->getArgOperand(2),
-                                  CI->getIterator());
+        Value *St = new StoreInst(CI->getArgOperand(0),
+                                  CI->getArgOperand(2), CI);
         CI->replaceAllUsesWith(St);
         CI->eraseFromParent();
         MadeChange = true;
@@ -225,8 +222,7 @@ bool DoLowering(Function &F, GCStrategy &S) {
       }
       case Intrinsic::gcread: {
         // Replace a read barrier with a simple load.
-        Value *Ld = new LoadInst(CI->getType(), CI->getArgOperand(1), "",
-                                 CI->getIterator());
+        Value *Ld = new LoadInst(CI->getType(), CI->getArgOperand(1), "", CI);
         Ld->takeName(CI);
         CI->replaceAllUsesWith(Ld);
         CI->eraseFromParent();

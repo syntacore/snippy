@@ -157,9 +157,7 @@ std::string getMainExecutable(const char *argv0, void *MainExecAddr) {
 
   SmallString<256> RealPath;
   sys::fs::real_path(PathNameUTF8, RealPath);
-  if (RealPath.size())
-    return std::string(RealPath);
-  return std::string(PathNameUTF8.data());
+  return std::string(RealPath);
 }
 
 UniqueID file_status::getUniqueID() const {
@@ -625,10 +623,6 @@ std::error_code access(const Twine &Path, AccessMode Mode) {
   DWORD Attributes = ::GetFileAttributesW(PathUtf16.begin());
 
   if (Attributes == INVALID_FILE_ATTRIBUTES) {
-    // Avoid returning unexpected error codes when querying for existence.
-    if (Mode == AccessMode::Exist)
-      return errc::no_such_file_or_directory;
-
     // See if the file didn't actually exist.
     DWORD LastError = ::GetLastError();
     if (LastError != ERROR_FILE_NOT_FOUND && LastError != ERROR_PATH_NOT_FOUND)
@@ -760,14 +754,14 @@ static std::error_code getStatus(HANDLE FileHandle, file_status &Result) {
   return std::error_code();
 
 handle_status_error:
-  std::error_code Err = mapLastWindowsError();
-  if (Err == std::errc::no_such_file_or_directory)
+  DWORD LastError = ::GetLastError();
+  if (LastError == ERROR_FILE_NOT_FOUND || LastError == ERROR_PATH_NOT_FOUND)
     Result = file_status(file_type::file_not_found);
-  else if (Err == std::errc::permission_denied)
+  else if (LastError == ERROR_SHARING_VIOLATION)
     Result = file_status(file_type::type_unknown);
   else
     Result = file_status(file_type::status_error);
-  return Err;
+  return mapWindowsError(LastError);
 }
 
 std::error_code status(const Twine &path, file_status &result, bool Follow) {

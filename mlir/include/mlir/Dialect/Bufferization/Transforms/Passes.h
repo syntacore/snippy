@@ -1,7 +1,6 @@
 #ifndef MLIR_DIALECT_BUFFERIZATION_TRANSFORMS_PASSES_H
 #define MLIR_DIALECT_BUFFERIZATION_TRANSFORMS_PASSES_H
 
-#include "mlir/Dialect/Bufferization/IR/BufferDeallocationOpInterface.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -18,9 +17,6 @@ class FuncOp;
 namespace bufferization {
 struct OneShotBufferizationOptions;
 
-/// Maps from symbol table to its corresponding dealloc helper function.
-using DeallocHelperMap = llvm::DenseMap<Operation *, func::FuncOp>;
-
 //===----------------------------------------------------------------------===//
 // Passes
 //===----------------------------------------------------------------------===//
@@ -35,7 +31,7 @@ std::unique_ptr<Pass> createBufferDeallocationPass();
 /// Creates an instance of the OwnershipBasedBufferDeallocation pass to free all
 /// allocated buffers.
 std::unique_ptr<Pass> createOwnershipBasedBufferDeallocationPass(
-    DeallocationOptions options = DeallocationOptions());
+    bool privateFuncDynamicOwnership = false);
 
 /// Creates a pass that optimizes `bufferization.dealloc` operations. For
 /// example, it reduces the number of alias checks needed at runtime using
@@ -49,7 +45,7 @@ std::unique_ptr<Pass> createLowerDeallocationsPass();
 /// Adds the conversion pattern of the `bufferization.dealloc` operation to the
 /// given pattern set for use in other transformation passes.
 void populateBufferizationDeallocLoweringPattern(
-    RewritePatternSet &patterns, const DeallocHelperMap &deallocHelperFuncMap);
+    RewritePatternSet &patterns, func::FuncOp deallocLibraryFunc);
 
 /// Construct the library function needed for the fully generic
 /// `bufferization.dealloc` lowering implemented in the LowerDeallocations pass.
@@ -137,9 +133,9 @@ func::FuncOp buildDeallocationLibraryFunction(OpBuilder &builder, Location loc,
 /// Run buffer deallocation.
 LogicalResult deallocateBuffers(Operation *op);
 
-/// Run the ownership-based buffer deallocation.
+/// Run ownership basedbuffer deallocation.
 LogicalResult deallocateBuffersOwnershipBased(FunctionOpInterface op,
-                                              DeallocationOptions options);
+                                              bool privateFuncDynamicOwnership);
 
 /// Creates a pass that moves allocations upwards to reduce the number of
 /// required copies that are inserted during the BufferDeallocation pass.
@@ -151,39 +147,23 @@ std::unique_ptr<Pass> createBufferLoopHoistingPass();
 
 // Options struct for BufferResultsToOutParams pass.
 // Note: defined only here, not in tablegen.
-struct BufferResultsToOutParamsOpts {
-  /// Memcpy function: Generate a memcpy between two memrefs.
-  using MemCpyFn =
-      std::function<LogicalResult(OpBuilder &, Location, Value, Value)>;
-
+struct BufferResultsToOutParamsOptions {
   // Filter function; returns true if the function should be converted.
   // Defaults to true, i.e. all functions are converted.
   llvm::function_ref<bool(func::FuncOp *)> filterFn = [](func::FuncOp *func) {
     return true;
   };
-
-  /// Memcpy function; used to create a copy between two memrefs.
-  /// If this is empty, memref.copy is used.
-  std::optional<MemCpyFn> memCpyFn;
-
-  /// If true, the pass adds a "bufferize.result" attribute to each output
-  /// parameter.
-  bool addResultAttribute = false;
-
-  /// If true, the pass eliminates the memref.alloc and memcpy if the returned
-  /// memref is allocated in the current function.
-  bool hoistStaticAllocs = false;
 };
 
 /// Creates a pass that converts memref function results to out-params.
 std::unique_ptr<Pass> createBufferResultsToOutParamsPass(
-    const BufferResultsToOutParamsOpts &options = {});
+    const BufferResultsToOutParamsOptions &options = {});
 
 /// Replace buffers that are returned from a function with an out parameter.
 /// Also update all call sites.
 LogicalResult
 promoteBufferResultsToOutParams(ModuleOp module,
-                                const BufferResultsToOutParamsOpts &options);
+                                const BufferResultsToOutParamsOptions &options);
 
 /// Creates a pass that drops memref function results that are equivalent to a
 /// function argument.
@@ -223,6 +203,9 @@ createPromoteBuffersToStackPass(std::function<bool(Value)> isSmallAlloc);
 /// Create a pass that tries to eliminate tensor.empty ops that are anchored on
 /// insert_slice ops.
 std::unique_ptr<Pass> createEmptyTensorEliminationPass();
+
+/// Create a pass that bufferizes ops from the bufferization dialect.
+std::unique_ptr<Pass> createBufferizationBufferizePass();
 
 //===----------------------------------------------------------------------===//
 // Registration

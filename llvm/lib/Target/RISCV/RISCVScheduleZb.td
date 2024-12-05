@@ -25,7 +25,6 @@ def WriteCPOP        : SchedWrite;
 def WriteCPOP32      : SchedWrite;
 def WriteREV8        : SchedWrite;
 def WriteORCB        : SchedWrite;
-def WriteIMinMax     : SchedWrite;
 
 // Zbc extension
 def WriteCLMUL       : SchedWrite; // CLMUL/CLMULR/CLMULH
@@ -64,7 +63,6 @@ def ReadCPOP        : SchedRead;
 def ReadCPOP32      : SchedRead;
 def ReadREV8        : SchedRead;
 def ReadORCB        : SchedRead;
-def ReadIMinMax     : SchedRead;
 
 // Zbc extension
 def ReadCLMUL       : SchedRead; // CLMUL/CLMULR/CLMULH
@@ -108,7 +106,6 @@ def : WriteRes<WriteCPOP, []>;
 def : WriteRes<WriteCPOP32, []>;
 def : WriteRes<WriteREV8, []>;
 def : WriteRes<WriteORCB, []>;
-def : WriteRes<WriteIMinMax, []>;
 
 def : ReadAdvance<ReadRotateImm, 0>;
 def : ReadAdvance<ReadRotateImm32, 0>;
@@ -122,7 +119,6 @@ def : ReadAdvance<ReadCPOP, 0>;
 def : ReadAdvance<ReadCPOP32, 0>;
 def : ReadAdvance<ReadREV8, 0>;
 def : ReadAdvance<ReadORCB, 0>;
-def : ReadAdvance<ReadIMinMax, 0>;
 }
 }
 

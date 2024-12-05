@@ -8,10 +8,10 @@
 //===----------------------------------------------------------------------===//
 
 export {
-  using ::sig_atomic_t _LIBCPP_USING_IF_EXISTS;
+  using ::sig_atomic_t;
 
   // [support.signal], signal handlers
-  using ::signal _LIBCPP_USING_IF_EXISTS;
+  using ::signal;
 
-  using ::raise _LIBCPP_USING_IF_EXISTS;
+  using ::raise;
 } // export

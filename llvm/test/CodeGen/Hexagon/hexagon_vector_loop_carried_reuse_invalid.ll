@@ -1,4 +1,4 @@
-; RUN: opt -mtriple=hexagon-- -passes=hexagon-vlcr -S %s | FileCheck %s
+; RUN: opt -hexagon-vlcr < %s -S | FileCheck %s
 
 ; Test that reuse doesn't occur due to two shufflevectors with different masks.
 

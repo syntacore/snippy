@@ -35,7 +35,7 @@ class TransposeAsElementalConversion
 public:
   using mlir::OpRewritePattern<hlfir::TransposeOp>::OpRewritePattern;
 
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(hlfir::TransposeOp transpose,
                   mlir::PatternRewriter &rewriter) const override {
     mlir::Location loc = transpose.getLoc();
@@ -94,6 +94,7 @@ class SimplifyHLFIRIntrinsics
     : public hlfir::impl::SimplifyHLFIRIntrinsicsBase<SimplifyHLFIRIntrinsics> {
 public:
   void runOnOperation() override {
+    mlir::func::FuncOp func = this->getOperation();
     mlir::MLIRContext *context = &getContext();
     mlir::RewritePatternSet patterns(context);
     patterns.insert<TransposeAsElementalConversion>(context);
@@ -102,17 +103,20 @@ public:
     // by hlfir.elemental)
     target.addDynamicallyLegalOp<hlfir::TransposeOp>(
         [](hlfir::TransposeOp transpose) {
-          return mlir::cast<hlfir::ExprType>(transpose.getType())
-              .isPolymorphic();
+          return transpose.getType().cast<hlfir::ExprType>().isPolymorphic();
         });
     target.markUnknownOpDynamicallyLegal(
         [](mlir::Operation *) { return true; });
-    if (mlir::failed(mlir::applyFullConversion(getOperation(), target,
-                                               std::move(patterns)))) {
-      mlir::emitError(getOperation()->getLoc(),
+    if (mlir::failed(
+            mlir::applyFullConversion(func, target, std::move(patterns)))) {
+      mlir::emitError(func->getLoc(),
                       "failure in HLFIR intrinsic simplification");
       signalPassFailure();
     }
   }
 };
 } // namespace
+
+std::unique_ptr<mlir::Pass> hlfir::createSimplifyHLFIRIntrinsicsPass() {
+  return std::make_unique<SimplifyHLFIRIntrinsics>();
+}

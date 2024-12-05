@@ -35,7 +35,6 @@
 #include "clang/StaticAnalyzer/Core/AnalyzerOptions.h"
 #include "clang/StaticAnalyzer/Core/BugReporter/BugReporterVisitors.h"
 #include "clang/StaticAnalyzer/Core/BugReporter/BugType.h"
-#include "clang/StaticAnalyzer/Core/BugReporter/Z3CrosscheckVisitor.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/CheckerManager.h"
 #include "clang/StaticAnalyzer/Core/CheckerRegistryData.h"
@@ -86,14 +85,6 @@ STATISTIC(MaxBugClassSize,
 STATISTIC(MaxValidBugClassSize,
           "The maximum number of bug reports in the same equivalence class "
           "where at least one report is valid (not suppressed)");
-
-STATISTIC(NumTimesReportPassesZ3, "Number of reports passed Z3");
-STATISTIC(NumTimesReportRefuted, "Number of reports refuted by Z3");
-STATISTIC(NumTimesReportEQClassAborted,
-          "Number of times a report equivalence class was aborted by the Z3 "
-          "oracle heuristic");
-STATISTIC(NumTimesReportEQClassWasExhausted,
-          "Number of times all reports of an equivalence class was refuted");
 
 BugReporterVisitor::~BugReporterVisitor() = default;
 
@@ -147,8 +138,7 @@ public:
 public:
   PathDiagnosticConstruct(const PathDiagnosticConsumer *PDC,
                           const ExplodedNode *ErrorNode,
-                          const PathSensitiveBugReport *R,
-                          const Decl *AnalysisEntryPoint);
+                          const PathSensitiveBugReport *R);
 
   /// \returns the location context associated with the current position in the
   /// bug path.
@@ -1333,26 +1323,24 @@ void PathDiagnosticBuilder::generatePathDiagnosticsForNode(
 }
 
 static std::unique_ptr<PathDiagnostic>
-generateDiagnosticForBasicReport(const BasicBugReport *R,
-                                 const Decl *AnalysisEntryPoint) {
+generateDiagnosticForBasicReport(const BasicBugReport *R) {
   const BugType &BT = R->getBugType();
   return std::make_unique<PathDiagnostic>(
       BT.getCheckerName(), R->getDeclWithIssue(), BT.getDescription(),
       R->getDescription(), R->getShortDescription(/*UseFallback=*/false),
       BT.getCategory(), R->getUniqueingLocation(), R->getUniqueingDecl(),
-      AnalysisEntryPoint, std::make_unique<FilesToLineNumsMap>());
+      std::make_unique<FilesToLineNumsMap>());
 }
 
 static std::unique_ptr<PathDiagnostic>
 generateEmptyDiagnosticForReport(const PathSensitiveBugReport *R,
-                                 const SourceManager &SM,
-                                 const Decl *AnalysisEntryPoint) {
+                                 const SourceManager &SM) {
   const BugType &BT = R->getBugType();
   return std::make_unique<PathDiagnostic>(
       BT.getCheckerName(), R->getDeclWithIssue(), BT.getDescription(),
       R->getDescription(), R->getShortDescription(/*UseFallback=*/false),
       BT.getCategory(), R->getUniqueingLocation(), R->getUniqueingDecl(),
-      AnalysisEntryPoint, findExecutedLines(SM, R->getErrorNode()));
+      findExecutedLines(SM, R->getErrorNode()));
 }
 
 static const Stmt *getStmtParent(const Stmt *S, const ParentMap &PM) {
@@ -1988,11 +1976,10 @@ static void updateExecutedLinesWithDiagnosticPieces(PathDiagnostic &PD) {
 
 PathDiagnosticConstruct::PathDiagnosticConstruct(
     const PathDiagnosticConsumer *PDC, const ExplodedNode *ErrorNode,
-    const PathSensitiveBugReport *R, const Decl *AnalysisEntryPoint)
+    const PathSensitiveBugReport *R)
     : Consumer(PDC), CurrentNode(ErrorNode),
       SM(CurrentNode->getCodeDecl().getASTContext().getSourceManager()),
-      PD(generateEmptyDiagnosticForReport(R, getSourceManager(),
-                                          AnalysisEntryPoint)) {
+      PD(generateEmptyDiagnosticForReport(R, getSourceManager())) {
   LCM[&PD->getActivePath()] = ErrorNode->getLocationContext();
 }
 
@@ -2006,14 +1993,13 @@ PathDiagnosticBuilder::PathDiagnosticBuilder(
 
 std::unique_ptr<PathDiagnostic>
 PathDiagnosticBuilder::generate(const PathDiagnosticConsumer *PDC) const {
-  const Decl *EntryPoint = getBugReporter().getAnalysisEntryPoint();
-  PathDiagnosticConstruct Construct(PDC, ErrorNode, R, EntryPoint);
+  PathDiagnosticConstruct Construct(PDC, ErrorNode, R);
 
   const SourceManager &SM = getSourceManager();
   const AnalyzerOptions &Opts = getAnalyzerOptions();
 
   if (!PDC->shouldGenerateDiagnostics())
-    return generateEmptyDiagnosticForReport(R, getSourceManager(), EntryPoint);
+    return generateEmptyDiagnosticForReport(R, getSourceManager());
 
   // Construct the final (warning) event for the bug report.
   auto EndNotes = VisitorsDiagnostics->find(ErrorNode);
@@ -2198,7 +2184,7 @@ const Decl *PathSensitiveBugReport::getDeclWithIssue() const {
 void BasicBugReport::Profile(llvm::FoldingSetNodeID& hash) const {
   hash.AddInteger(static_cast<int>(getKind()));
   hash.AddPointer(&BT);
-  hash.AddString(getShortDescription());
+  hash.AddString(Description);
   assert(Location.isValid());
   Location.Profile(hash);
 
@@ -2213,7 +2199,7 @@ void BasicBugReport::Profile(llvm::FoldingSetNodeID& hash) const {
 void PathSensitiveBugReport::Profile(llvm::FoldingSetNodeID &hash) const {
   hash.AddInteger(static_cast<int>(getKind()));
   hash.AddPointer(&BT);
-  hash.AddString(getShortDescription());
+  hash.AddString(Description);
   PathDiagnosticLocation UL = getUniqueingLocation();
   if (UL.isValid()) {
     UL.Profile(hash);
@@ -2481,9 +2467,7 @@ ProgramStateManager &PathSensitiveBugReporter::getStateManager() const {
   return Eng.getStateManager();
 }
 
-BugReporter::BugReporter(BugReporterData &D)
-    : D(D), UserSuppressions(D.getASTContext()) {}
-
+BugReporter::BugReporter(BugReporterData &d) : D(d) {}
 BugReporter::~BugReporter() {
   // Make sure reports are flushed.
   assert(StrBugTypes.empty() &&
@@ -2843,7 +2827,6 @@ generateVisitorsDiagnostics(PathSensitiveBugReport *R,
 std::optional<PathDiagnosticBuilder> PathDiagnosticBuilder::findValidReport(
     ArrayRef<PathSensitiveBugReport *> &bugReports,
     PathSensitiveBugReporter &Reporter) {
-  Z3CrosscheckOracle Z3Oracle(Reporter.getAnalyzerOptions());
 
   BugPathGetter BugGraph(&Reporter.getGraph(), bugReports);
 
@@ -2874,35 +2857,21 @@ std::optional<PathDiagnosticBuilder> PathDiagnosticBuilder::findValidReport(
         // If crosscheck is enabled, remove all visitors, add the refutation
         // visitor and check again
         R->clearVisitors();
-        Z3CrosscheckVisitor::Z3Result CrosscheckResult;
-        R->addVisitor<Z3CrosscheckVisitor>(CrosscheckResult,
-                                           Reporter.getAnalyzerOptions());
+        R->addVisitor<FalsePositiveRefutationBRVisitor>();
 
         // We don't overwrite the notes inserted by other visitors because the
         // refutation manager does not add any new note to the path
         generateVisitorsDiagnostics(R, BugPath->ErrorNode, BRC);
-        switch (Z3Oracle.interpretQueryResult(CrosscheckResult)) {
-        case Z3CrosscheckOracle::RejectReport:
-          ++NumTimesReportRefuted;
-          R->markInvalid("Infeasible constraints", /*Data=*/nullptr);
-          continue;
-        case Z3CrosscheckOracle::RejectEQClass:
-          ++NumTimesReportEQClassAborted;
-          return {};
-        case Z3CrosscheckOracle::AcceptReport:
-          ++NumTimesReportPassesZ3;
-          break;
-        }
       }
 
-      assert(R->isValid());
-      return PathDiagnosticBuilder(std::move(BRC), std::move(BugPath->BugPath),
-                                   BugPath->Report, BugPath->ErrorNode,
-                                   std::move(visitorNotes));
+      // Check if the bug is still valid
+      if (R->isValid())
+        return PathDiagnosticBuilder(
+            std::move(BRC), std::move(BugPath->BugPath), BugPath->Report,
+            BugPath->ErrorNode, std::move(visitorNotes));
     }
   }
 
-  ++NumTimesReportEQClassWasExhausted;
   return {};
 }
 
@@ -3152,16 +3121,6 @@ void BugReporter::FlushReport(BugReportEquivClass& EQ) {
       Pieces.back()->addFixit(I);
 
     updateExecutedLinesWithDiagnosticPieces(*PD);
-
-    // If we are debugging, let's have the entry point as the first note.
-    if (getAnalyzerOptions().AnalyzerDisplayProgress ||
-        getAnalyzerOptions().AnalyzerNoteAnalysisEntryPoints) {
-      const Decl *EntryPoint = getAnalysisEntryPoint();
-      Pieces.push_front(std::make_shared<PathDiagnosticEventPiece>(
-          PathDiagnosticLocation{EntryPoint->getLocation(), getSourceManager()},
-          "[debug] analyzing from " +
-              AnalysisDeclContext::getFunctionName(EntryPoint)));
-    }
     Consumer->HandlePathDiagnostic(std::move(PD));
   }
 }
@@ -3250,8 +3209,7 @@ BugReporter::generateDiagnosticForConsumerMap(
   auto *basicReport = cast<BasicBugReport>(exampleReport);
   auto Out = std::make_unique<DiagnosticForConsumerMapTy>();
   for (auto *Consumer : consumers)
-    (*Out)[Consumer] =
-        generateDiagnosticForBasicReport(basicReport, AnalysisEntryPoint);
+    (*Out)[Consumer] = generateDiagnosticForBasicReport(basicReport);
   return Out;
 }
 

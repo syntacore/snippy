@@ -140,10 +140,6 @@ public:
     CPU = getCPUKind(Name);
     return CPU != CK_GENERIC;
   }
-
-  std::pair<unsigned, unsigned> hardwareInterferenceSizes() const override {
-    return std::make_pair(32, 32);
-  }
 };
 
 // SPARC v8 is the 32-bit mode selected by Triple::sparc.

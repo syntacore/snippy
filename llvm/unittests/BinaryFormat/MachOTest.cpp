@@ -6,7 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/bit.h"
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/TargetParser/Triple.h"
 #include "gtest/gtest.h"
@@ -14,15 +13,7 @@
 using namespace llvm;
 using namespace llvm::MachO;
 
-#if BYTE_ORDER == BIG_ENDIAN
-// As discussed in Issue #86793, this test cannot work on a strict-alignment
-// targets like SPARC.  Besides, it's undefined behaviour on big-endian hosts.
-#define MAYBE_UnalignedLC DISABLED_UnalignedLC
-#else
-#define MAYBE_UnalignedLC UnalignedLC
-#endif
-
-TEST(MachOTest, MAYBE_UnalignedLC) {
+TEST(MachOTest, UnalignedLC) {
   unsigned char Valid32BitMachO[] = {
       0xCE, 0xFA, 0xED, 0xFE, 0x07, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
       0x02, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x70, 0x00, 0x00, 0x00,

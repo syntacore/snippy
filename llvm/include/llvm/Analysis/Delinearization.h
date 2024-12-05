@@ -22,7 +22,6 @@ namespace llvm {
 class raw_ostream;
 template <typename T> class SmallVectorImpl;
 class GetElementPtrInst;
-class Instruction;
 class ScalarEvolution;
 class SCEV;
 

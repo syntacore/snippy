@@ -60,11 +60,11 @@ public:
     if (llvm::isa<FloatType>(resElemType))
       return impl::verifySameOperandsAndResultElementType(op);
 
-    if (auto resIntType = dyn_cast<IntegerType>(resElemType)) {
+    if (auto resIntType = resElemType.dyn_cast<IntegerType>()) {
       IntegerType lhsIntType =
-          cast<IntegerType>(getElementTypeOrSelf(op->getOperand(0)));
+          getElementTypeOrSelf(op->getOperand(0)).cast<IntegerType>();
       IntegerType rhsIntType =
-          cast<IntegerType>(getElementTypeOrSelf(op->getOperand(1)));
+          getElementTypeOrSelf(op->getOperand(1)).cast<IntegerType>();
       if (lhsIntType != rhsIntType)
         return op->emitOpError(
             "requires the same element type for all operands");
@@ -78,9 +78,7 @@ public:
       return success();
     }
 
-    // In cases of all other types, op requires the same element
-    // type for all operands and result.
-    return impl::verifySameOperandsAndResultElementType(op);
+    return failure();
   }
 };
 

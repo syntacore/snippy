@@ -8,11 +8,13 @@
 #include <riscv_vector.h>
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_i8mf8x2
-// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 1 x i8>, <vscale x 1 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0:[0-9]+]] {
+// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 1 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 1 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0:[0-9]+]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv1i8.i64(<vscale x 1 x i8> [[TMP0]], <vscale x 1 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } poison, <vscale x 1 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[TMP0]], <vscale x 1 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv1i8.i64(<vscale x 1 x i8> [[TMP2]], <vscale x 1 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_i8mf8x2(int8_t *base, ptrdiff_t bstride, vint8mf8x2_t v_tuple, size_t vl) {
@@ -20,11 +22,13 @@ void test_vssseg2e8_v_i8mf8x2(int8_t *base, ptrdiff_t bstride, vint8mf8x2_t v_tu
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_i8mf4x2
-// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 2 x i8>, <vscale x 2 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 2 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 2 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv2i8.i64(<vscale x 2 x i8> [[TMP0]], <vscale x 2 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } poison, <vscale x 2 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[TMP0]], <vscale x 2 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv2i8.i64(<vscale x 2 x i8> [[TMP2]], <vscale x 2 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_i8mf4x2(int8_t *base, ptrdiff_t bstride, vint8mf4x2_t v_tuple, size_t vl) {
@@ -32,11 +36,13 @@ void test_vssseg2e8_v_i8mf4x2(int8_t *base, ptrdiff_t bstride, vint8mf4x2_t v_tu
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_i8mf2x2
-// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 4 x i8>, <vscale x 4 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 4 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 4 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv4i8.i64(<vscale x 4 x i8> [[TMP0]], <vscale x 4 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } poison, <vscale x 4 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[TMP0]], <vscale x 4 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv4i8.i64(<vscale x 4 x i8> [[TMP2]], <vscale x 4 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_i8mf2x2(int8_t *base, ptrdiff_t bstride, vint8mf2x2_t v_tuple, size_t vl) {
@@ -44,11 +50,13 @@ void test_vssseg2e8_v_i8mf2x2(int8_t *base, ptrdiff_t bstride, vint8mf2x2_t v_tu
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_i8m1x2
-// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 8 x i8>, <vscale x 8 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 8 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 8 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv8i8.i64(<vscale x 8 x i8> [[TMP0]], <vscale x 8 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } poison, <vscale x 8 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[TMP0]], <vscale x 8 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv8i8.i64(<vscale x 8 x i8> [[TMP2]], <vscale x 8 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_i8m1x2(int8_t *base, ptrdiff_t bstride, vint8m1x2_t v_tuple, size_t vl) {
@@ -56,11 +64,13 @@ void test_vssseg2e8_v_i8m1x2(int8_t *base, ptrdiff_t bstride, vint8m1x2_t v_tupl
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_i8m2x2
-// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 16 x i8>, <vscale x 16 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 16 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 16 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv16i8.i64(<vscale x 16 x i8> [[TMP0]], <vscale x 16 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } poison, <vscale x 16 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[TMP0]], <vscale x 16 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv16i8.i64(<vscale x 16 x i8> [[TMP2]], <vscale x 16 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_i8m2x2(int8_t *base, ptrdiff_t bstride, vint8m2x2_t v_tuple, size_t vl) {
@@ -68,11 +78,13 @@ void test_vssseg2e8_v_i8m2x2(int8_t *base, ptrdiff_t bstride, vint8m2x2_t v_tupl
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_i8m4x2
-// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 32 x i8>, <vscale x 32 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 32 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 32 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv32i8.i64(<vscale x 32 x i8> [[TMP0]], <vscale x 32 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } poison, <vscale x 32 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[TMP0]], <vscale x 32 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv32i8.i64(<vscale x 32 x i8> [[TMP2]], <vscale x 32 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_i8m4x2(int8_t *base, ptrdiff_t bstride, vint8m4x2_t v_tuple, size_t vl) {
@@ -80,11 +92,13 @@ void test_vssseg2e8_v_i8m4x2(int8_t *base, ptrdiff_t bstride, vint8m4x2_t v_tupl
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_u8mf8x2
-// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 1 x i8>, <vscale x 1 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 1 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 1 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv1i8.i64(<vscale x 1 x i8> [[TMP0]], <vscale x 1 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } poison, <vscale x 1 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[TMP0]], <vscale x 1 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv1i8.i64(<vscale x 1 x i8> [[TMP2]], <vscale x 1 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_u8mf8x2(uint8_t *base, ptrdiff_t bstride, vuint8mf8x2_t v_tuple, size_t vl) {
@@ -92,11 +106,13 @@ void test_vssseg2e8_v_u8mf8x2(uint8_t *base, ptrdiff_t bstride, vuint8mf8x2_t v_
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_u8mf4x2
-// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 2 x i8>, <vscale x 2 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 2 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 2 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv2i8.i64(<vscale x 2 x i8> [[TMP0]], <vscale x 2 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } poison, <vscale x 2 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[TMP0]], <vscale x 2 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv2i8.i64(<vscale x 2 x i8> [[TMP2]], <vscale x 2 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_u8mf4x2(uint8_t *base, ptrdiff_t bstride, vuint8mf4x2_t v_tuple, size_t vl) {
@@ -104,11 +120,13 @@ void test_vssseg2e8_v_u8mf4x2(uint8_t *base, ptrdiff_t bstride, vuint8mf4x2_t v_
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_u8mf2x2
-// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 4 x i8>, <vscale x 4 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 4 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 4 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv4i8.i64(<vscale x 4 x i8> [[TMP0]], <vscale x 4 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } poison, <vscale x 4 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[TMP0]], <vscale x 4 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv4i8.i64(<vscale x 4 x i8> [[TMP2]], <vscale x 4 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_u8mf2x2(uint8_t *base, ptrdiff_t bstride, vuint8mf2x2_t v_tuple, size_t vl) {
@@ -116,11 +134,13 @@ void test_vssseg2e8_v_u8mf2x2(uint8_t *base, ptrdiff_t bstride, vuint8mf2x2_t v_
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_u8m1x2
-// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 8 x i8>, <vscale x 8 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 8 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 8 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv8i8.i64(<vscale x 8 x i8> [[TMP0]], <vscale x 8 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } poison, <vscale x 8 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[TMP0]], <vscale x 8 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv8i8.i64(<vscale x 8 x i8> [[TMP2]], <vscale x 8 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_u8m1x2(uint8_t *base, ptrdiff_t bstride, vuint8m1x2_t v_tuple, size_t vl) {
@@ -128,11 +148,13 @@ void test_vssseg2e8_v_u8m1x2(uint8_t *base, ptrdiff_t bstride, vuint8m1x2_t v_tu
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_u8m2x2
-// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 16 x i8>, <vscale x 16 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 16 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 16 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv16i8.i64(<vscale x 16 x i8> [[TMP0]], <vscale x 16 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } poison, <vscale x 16 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[TMP0]], <vscale x 16 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv16i8.i64(<vscale x 16 x i8> [[TMP2]], <vscale x 16 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_u8m2x2(uint8_t *base, ptrdiff_t bstride, vuint8m2x2_t v_tuple, size_t vl) {
@@ -140,11 +162,13 @@ void test_vssseg2e8_v_u8m2x2(uint8_t *base, ptrdiff_t bstride, vuint8m2x2_t v_tu
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_u8m4x2
-// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 32 x i8>, <vscale x 32 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 32 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 32 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv32i8.i64(<vscale x 32 x i8> [[TMP0]], <vscale x 32 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } poison, <vscale x 32 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[TMP0]], <vscale x 32 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.nxv32i8.i64(<vscale x 32 x i8> [[TMP2]], <vscale x 32 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_u8m4x2(uint8_t *base, ptrdiff_t bstride, vuint8m4x2_t v_tuple, size_t vl) {
@@ -152,11 +176,13 @@ void test_vssseg2e8_v_u8m4x2(uint8_t *base, ptrdiff_t bstride, vuint8m4x2_t v_tu
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_i8mf8x2_m
-// CHECK-RV64-SAME: (<vscale x 1 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 1 x i8>, <vscale x 1 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (<vscale x 1 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 1 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 1 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv1i8.i64(<vscale x 1 x i8> [[TMP0]], <vscale x 1 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 1 x i1> [[MASK]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } poison, <vscale x 1 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[TMP0]], <vscale x 1 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv1i8.i64(<vscale x 1 x i8> [[TMP2]], <vscale x 1 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 1 x i1> [[MASK]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_i8mf8x2_m(vbool64_t mask, int8_t *base, ptrdiff_t bstride, vint8mf8x2_t v_tuple, size_t vl) {
@@ -164,11 +190,13 @@ void test_vssseg2e8_v_i8mf8x2_m(vbool64_t mask, int8_t *base, ptrdiff_t bstride,
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_i8mf4x2_m
-// CHECK-RV64-SAME: (<vscale x 2 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 2 x i8>, <vscale x 2 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (<vscale x 2 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 2 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 2 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv2i8.i64(<vscale x 2 x i8> [[TMP0]], <vscale x 2 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 2 x i1> [[MASK]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } poison, <vscale x 2 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[TMP0]], <vscale x 2 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv2i8.i64(<vscale x 2 x i8> [[TMP2]], <vscale x 2 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 2 x i1> [[MASK]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_i8mf4x2_m(vbool32_t mask, int8_t *base, ptrdiff_t bstride, vint8mf4x2_t v_tuple, size_t vl) {
@@ -176,11 +204,13 @@ void test_vssseg2e8_v_i8mf4x2_m(vbool32_t mask, int8_t *base, ptrdiff_t bstride,
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_i8mf2x2_m
-// CHECK-RV64-SAME: (<vscale x 4 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 4 x i8>, <vscale x 4 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (<vscale x 4 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 4 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 4 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv4i8.i64(<vscale x 4 x i8> [[TMP0]], <vscale x 4 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 4 x i1> [[MASK]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } poison, <vscale x 4 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[TMP0]], <vscale x 4 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv4i8.i64(<vscale x 4 x i8> [[TMP2]], <vscale x 4 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 4 x i1> [[MASK]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_i8mf2x2_m(vbool16_t mask, int8_t *base, ptrdiff_t bstride, vint8mf2x2_t v_tuple, size_t vl) {
@@ -188,11 +218,13 @@ void test_vssseg2e8_v_i8mf2x2_m(vbool16_t mask, int8_t *base, ptrdiff_t bstride,
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_i8m1x2_m
-// CHECK-RV64-SAME: (<vscale x 8 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 8 x i8>, <vscale x 8 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (<vscale x 8 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 8 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 8 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv8i8.i64(<vscale x 8 x i8> [[TMP0]], <vscale x 8 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 8 x i1> [[MASK]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } poison, <vscale x 8 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[TMP0]], <vscale x 8 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv8i8.i64(<vscale x 8 x i8> [[TMP2]], <vscale x 8 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 8 x i1> [[MASK]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_i8m1x2_m(vbool8_t mask, int8_t *base, ptrdiff_t bstride, vint8m1x2_t v_tuple, size_t vl) {
@@ -200,11 +232,13 @@ void test_vssseg2e8_v_i8m1x2_m(vbool8_t mask, int8_t *base, ptrdiff_t bstride, v
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_i8m2x2_m
-// CHECK-RV64-SAME: (<vscale x 16 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 16 x i8>, <vscale x 16 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (<vscale x 16 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 16 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 16 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv16i8.i64(<vscale x 16 x i8> [[TMP0]], <vscale x 16 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 16 x i1> [[MASK]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } poison, <vscale x 16 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[TMP0]], <vscale x 16 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv16i8.i64(<vscale x 16 x i8> [[TMP2]], <vscale x 16 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 16 x i1> [[MASK]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_i8m2x2_m(vbool4_t mask, int8_t *base, ptrdiff_t bstride, vint8m2x2_t v_tuple, size_t vl) {
@@ -212,11 +246,13 @@ void test_vssseg2e8_v_i8m2x2_m(vbool4_t mask, int8_t *base, ptrdiff_t bstride, v
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_i8m4x2_m
-// CHECK-RV64-SAME: (<vscale x 32 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 32 x i8>, <vscale x 32 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (<vscale x 32 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 32 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 32 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv32i8.i64(<vscale x 32 x i8> [[TMP0]], <vscale x 32 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 32 x i1> [[MASK]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } poison, <vscale x 32 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[TMP0]], <vscale x 32 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv32i8.i64(<vscale x 32 x i8> [[TMP2]], <vscale x 32 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 32 x i1> [[MASK]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_i8m4x2_m(vbool2_t mask, int8_t *base, ptrdiff_t bstride, vint8m4x2_t v_tuple, size_t vl) {
@@ -224,11 +260,13 @@ void test_vssseg2e8_v_i8m4x2_m(vbool2_t mask, int8_t *base, ptrdiff_t bstride, v
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_u8mf8x2_m
-// CHECK-RV64-SAME: (<vscale x 1 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 1 x i8>, <vscale x 1 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (<vscale x 1 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 1 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 1 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv1i8.i64(<vscale x 1 x i8> [[TMP0]], <vscale x 1 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 1 x i1> [[MASK]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } poison, <vscale x 1 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[TMP0]], <vscale x 1 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 1 x i8>, <vscale x 1 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv1i8.i64(<vscale x 1 x i8> [[TMP2]], <vscale x 1 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 1 x i1> [[MASK]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_u8mf8x2_m(vbool64_t mask, uint8_t *base, ptrdiff_t bstride, vuint8mf8x2_t v_tuple, size_t vl) {
@@ -236,11 +274,13 @@ void test_vssseg2e8_v_u8mf8x2_m(vbool64_t mask, uint8_t *base, ptrdiff_t bstride
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_u8mf4x2_m
-// CHECK-RV64-SAME: (<vscale x 2 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 2 x i8>, <vscale x 2 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (<vscale x 2 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 2 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 2 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv2i8.i64(<vscale x 2 x i8> [[TMP0]], <vscale x 2 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 2 x i1> [[MASK]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } poison, <vscale x 2 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[TMP0]], <vscale x 2 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 2 x i8>, <vscale x 2 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv2i8.i64(<vscale x 2 x i8> [[TMP2]], <vscale x 2 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 2 x i1> [[MASK]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_u8mf4x2_m(vbool32_t mask, uint8_t *base, ptrdiff_t bstride, vuint8mf4x2_t v_tuple, size_t vl) {
@@ -248,11 +288,13 @@ void test_vssseg2e8_v_u8mf4x2_m(vbool32_t mask, uint8_t *base, ptrdiff_t bstride
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_u8mf2x2_m
-// CHECK-RV64-SAME: (<vscale x 4 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 4 x i8>, <vscale x 4 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (<vscale x 4 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 4 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 4 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv4i8.i64(<vscale x 4 x i8> [[TMP0]], <vscale x 4 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 4 x i1> [[MASK]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } poison, <vscale x 4 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[TMP0]], <vscale x 4 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 4 x i8>, <vscale x 4 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv4i8.i64(<vscale x 4 x i8> [[TMP2]], <vscale x 4 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 4 x i1> [[MASK]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_u8mf2x2_m(vbool16_t mask, uint8_t *base, ptrdiff_t bstride, vuint8mf2x2_t v_tuple, size_t vl) {
@@ -260,11 +302,13 @@ void test_vssseg2e8_v_u8mf2x2_m(vbool16_t mask, uint8_t *base, ptrdiff_t bstride
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_u8m1x2_m
-// CHECK-RV64-SAME: (<vscale x 8 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 8 x i8>, <vscale x 8 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (<vscale x 8 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 8 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 8 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv8i8.i64(<vscale x 8 x i8> [[TMP0]], <vscale x 8 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 8 x i1> [[MASK]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } poison, <vscale x 8 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[TMP0]], <vscale x 8 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 8 x i8>, <vscale x 8 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv8i8.i64(<vscale x 8 x i8> [[TMP2]], <vscale x 8 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 8 x i1> [[MASK]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_u8m1x2_m(vbool8_t mask, uint8_t *base, ptrdiff_t bstride, vuint8m1x2_t v_tuple, size_t vl) {
@@ -272,11 +316,13 @@ void test_vssseg2e8_v_u8m1x2_m(vbool8_t mask, uint8_t *base, ptrdiff_t bstride, 
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_u8m2x2_m
-// CHECK-RV64-SAME: (<vscale x 16 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 16 x i8>, <vscale x 16 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (<vscale x 16 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 16 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 16 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv16i8.i64(<vscale x 16 x i8> [[TMP0]], <vscale x 16 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 16 x i1> [[MASK]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } poison, <vscale x 16 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[TMP0]], <vscale x 16 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 16 x i8>, <vscale x 16 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv16i8.i64(<vscale x 16 x i8> [[TMP2]], <vscale x 16 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 16 x i1> [[MASK]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_u8m2x2_m(vbool4_t mask, uint8_t *base, ptrdiff_t bstride, vuint8m2x2_t v_tuple, size_t vl) {
@@ -284,11 +330,13 @@ void test_vssseg2e8_v_u8m2x2_m(vbool4_t mask, uint8_t *base, ptrdiff_t bstride, 
 }
 
 // CHECK-RV64-LABEL: define dso_local void @test_vssseg2e8_v_u8m4x2_m
-// CHECK-RV64-SAME: (<vscale x 32 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], { <vscale x 32 x i8>, <vscale x 32 x i8> } [[V_TUPLE:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
+// CHECK-RV64-SAME: (<vscale x 32 x i1> [[MASK:%.*]], ptr noundef [[BASE:%.*]], i64 noundef [[BSTRIDE:%.*]], <vscale x 32 x i8> [[V_TUPLE_COERCE0:%.*]], <vscale x 32 x i8> [[V_TUPLE_COERCE1:%.*]], i64 noundef [[VL:%.*]]) #[[ATTR0]] {
 // CHECK-RV64-NEXT:  entry:
-// CHECK-RV64-NEXT:    [[TMP0:%.*]] = extractvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[V_TUPLE]], 0
-// CHECK-RV64-NEXT:    [[TMP1:%.*]] = extractvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[V_TUPLE]], 1
-// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv32i8.i64(<vscale x 32 x i8> [[TMP0]], <vscale x 32 x i8> [[TMP1]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 32 x i1> [[MASK]], i64 [[VL]])
+// CHECK-RV64-NEXT:    [[TMP0:%.*]] = insertvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } poison, <vscale x 32 x i8> [[V_TUPLE_COERCE0]], 0
+// CHECK-RV64-NEXT:    [[TMP1:%.*]] = insertvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[TMP0]], <vscale x 32 x i8> [[V_TUPLE_COERCE1]], 1
+// CHECK-RV64-NEXT:    [[TMP2:%.*]] = extractvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[TMP1]], 0
+// CHECK-RV64-NEXT:    [[TMP3:%.*]] = extractvalue { <vscale x 32 x i8>, <vscale x 32 x i8> } [[TMP1]], 1
+// CHECK-RV64-NEXT:    call void @llvm.riscv.vssseg2.mask.nxv32i8.i64(<vscale x 32 x i8> [[TMP2]], <vscale x 32 x i8> [[TMP3]], ptr [[BASE]], i64 [[BSTRIDE]], <vscale x 32 x i1> [[MASK]], i64 [[VL]])
 // CHECK-RV64-NEXT:    ret void
 //
 void test_vssseg2e8_v_u8m4x2_m(vbool2_t mask, uint8_t *base, ptrdiff_t bstride, vuint8m4x2_t v_tuple, size_t vl) {

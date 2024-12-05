@@ -159,22 +159,6 @@ ArrayType::ArrayType(TypeClass tc, QualType et, QualType can,
   ArrayTypeBits.SizeModifier = llvm::to_underlying(sm);
 }
 
-ConstantArrayType *
-ConstantArrayType::Create(const ASTContext &Ctx, QualType ET, QualType Can,
-                          const llvm::APInt &Sz, const Expr *SzExpr,
-                          ArraySizeModifier SzMod, unsigned Qual) {
-  bool NeedsExternalSize = SzExpr != nullptr || Sz.ugt(0x0FFFFFFFFFFFFFFF) ||
-                           Sz.getBitWidth() > 0xFF;
-  if (!NeedsExternalSize)
-    return new (Ctx, alignof(ConstantArrayType)) ConstantArrayType(
-        ET, Can, Sz.getBitWidth(), Sz.getZExtValue(), SzMod, Qual);
-
-  auto *SzPtr = new (Ctx, alignof(ConstantArrayType::ExternalSize))
-      ConstantArrayType::ExternalSize(Sz, SzExpr);
-  return new (Ctx, alignof(ConstantArrayType))
-      ConstantArrayType(ET, Can, SzPtr, SzMod, Qual);
-}
-
 unsigned ConstantArrayType::getNumAddressingBits(const ASTContext &Context,
                                                  QualType ElementType,
                                                const llvm::APInt &NumElements) {
@@ -229,10 +213,11 @@ unsigned ConstantArrayType::getMaxSizeBits(const ASTContext &Context) {
 
 void ConstantArrayType::Profile(llvm::FoldingSetNodeID &ID,
                                 const ASTContext &Context, QualType ET,
-                                uint64_t ArraySize, const Expr *SizeExpr,
-                                ArraySizeModifier SizeMod, unsigned TypeQuals) {
+                                const llvm::APInt &ArraySize,
+                                const Expr *SizeExpr, ArraySizeModifier SizeMod,
+                                unsigned TypeQuals) {
   ID.AddPointer(ET.getAsOpaquePtr());
-  ID.AddInteger(ArraySize);
+  ID.AddInteger(ArraySize.getZExtValue());
   ID.AddInteger(llvm::to_underlying(SizeMod));
   ID.AddInteger(TypeQuals);
   ID.AddBoolean(SizeExpr != nullptr);
@@ -256,8 +241,7 @@ void DependentSizedArrayType::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddPointer(ET.getAsOpaquePtr());
   ID.AddInteger(llvm::to_underlying(SizeMod));
   ID.AddInteger(TypeQuals);
-  if (E)
-    E->Profile(ID, Context, true);
+  E->Profile(ID, Context, true);
 }
 
 DependentVectorType::DependentVectorType(QualType ElementType,
@@ -401,26 +385,6 @@ void DependentBitIntType::Profile(llvm::FoldingSetNodeID &ID,
   NumBitsExpr->Profile(ID, Context, true);
 }
 
-bool BoundsAttributedType::referencesFieldDecls() const {
-  return llvm::any_of(dependent_decls(),
-                      [](const TypeCoupledDeclRefInfo &Info) {
-                        return isa<FieldDecl>(Info.getDecl());
-                      });
-}
-
-void CountAttributedType::Profile(llvm::FoldingSetNodeID &ID,
-                                  QualType WrappedTy, Expr *CountExpr,
-                                  bool CountInBytes, bool OrNull) {
-  ID.AddPointer(WrappedTy.getAsOpaquePtr());
-  ID.AddBoolean(CountInBytes);
-  ID.AddBoolean(OrNull);
-  // We profile it as a pointer as the StmtProfiler considers parameter
-  // expressions on function declaration and function definition as the
-  // same, resulting in count expression being evaluated with ParamDecl
-  // not in the function scope.
-  ID.AddPointer(CountExpr);
-}
-
 /// getArrayElementTypeNoTypeQual - If this is an array type, return the
 /// element type of the array, potentially with type qualifiers missing.
 /// This method should never be used when type qualifiers are meaningful.
@@ -468,8 +432,12 @@ QualType QualType::getSingleStepDesugaredTypeImpl(QualType type,
 // Check that no type class has a non-trival destructor. Types are
 // allocated with the BumpPtrAllocator from ASTContext and therefore
 // their destructor is not executed.
+//
+// FIXME: ConstantArrayType is not trivially destructible because of its
+// APInt member. It should be replaced in favor of ASTContext allocation.
 #define TYPE(CLASS, BASE)                                                      \
-  static_assert(std::is_trivially_destructible<CLASS##Type>::value,            \
+  static_assert(std::is_trivially_destructible<CLASS##Type>::value ||          \
+                    std::is_same<CLASS##Type, ConstantArrayType>::value,       \
                 #CLASS "Type should be trivially destructible!");
 #include "clang/AST/TypeNodes.inc"
 
@@ -591,14 +559,6 @@ template <> const AttributedType *Type::getAs() const {
   return getAsSugar<AttributedType>(this);
 }
 
-template <> const BoundsAttributedType *Type::getAs() const {
-  return getAsSugar<BoundsAttributedType>(this);
-}
-
-template <> const CountAttributedType *Type::getAs() const {
-  return getAsSugar<CountAttributedType>(this);
-}
-
 /// getUnqualifiedDesugaredType - Pull any qualifiers and syntactic
 /// sugar off the given type.  This should produce an object of the
 /// same dynamic type as the canonical type.
@@ -630,16 +590,6 @@ bool Type::isStructureType() const {
   if (const auto *RT = getAs<RecordType>())
     return RT->getDecl()->isStruct();
   return false;
-}
-
-bool Type::isStructureTypeWithFlexibleArrayMember() const {
-  const auto *RT = getAs<RecordType>();
-  if (!RT)
-    return false;
-  const auto *Decl = RT->getDecl();
-  if (!Decl->isStruct())
-    return false;
-  return Decl->hasFlexibleArrayMember();
 }
 
 bool Type::isObjCBoxableRecordType() const {
@@ -689,10 +639,6 @@ bool Type::isScopedEnumeralType() const {
   if (const auto *ET = getAs<EnumType>())
     return ET->getDecl()->isScoped();
   return false;
-}
-
-bool Type::isCountAttributedType() const {
-  return getAs<CountAttributedType>();
 }
 
 const ComplexType *Type::getAsComplexIntegerType() const {
@@ -1208,14 +1154,6 @@ public:
     return Ctx.getDecayedType(originalType);
   }
 
-  QualType VisitArrayParameterType(const ArrayParameterType *T) {
-    QualType ArrTy = VisitConstantArrayType(T);
-    if (ArrTy.isNull())
-      return {};
-
-    return Ctx.getArrayParameterType(ArrTy);
-  }
-
   SUGARED_TYPE_CLASS(TypeOfExpr)
   SUGARED_TYPE_CLASS(TypeOf)
   SUGARED_TYPE_CLASS(Decltype)
@@ -1627,10 +1565,9 @@ QualType QualType::stripObjCKindOfType(const ASTContext &constCtx) const {
 }
 
 QualType QualType::getAtomicUnqualifiedType() const {
-  QualType T = *this;
-  if (const auto AT = T.getTypePtr()->getAs<AtomicType>())
-    T = AT->getValueType();
-  return T.getUnqualifiedType();
+  if (const auto AT = getTypePtr()->getAs<AtomicType>())
+    return AT->getValueType().getUnqualifiedType();
+  return getUnqualifiedType();
 }
 
 std::optional<ArrayRef<QualType>>
@@ -2383,14 +2320,6 @@ bool Type::isIncompleteType(NamedDecl **Def) const {
       *Def = Rec;
     return !Rec->isCompleteDefinition();
   }
-  case InjectedClassName: {
-    CXXRecordDecl *Rec = cast<InjectedClassNameType>(CanonicalType)->getDecl();
-    if (!Rec->isBeingDefined())
-      return false;
-    if (Def)
-      *Def = Rec;
-    return true;
-  }
   case ConstantArray:
   case VariableArray:
     // An array is incomplete if its element type is incomplete
@@ -2528,18 +2457,6 @@ bool Type::isSveVLSBuiltinType() const {
     }
   }
   return false;
-}
-
-QualType Type::getSizelessVectorEltType(const ASTContext &Ctx) const {
-  assert(isSizelessVectorType() && "Must be sizeless vector type");
-  // Currently supports SVE and RVV
-  if (isSVESizelessBuiltinType())
-    return getSveEltType(Ctx);
-
-  if (isRVVSizelessBuiltinType())
-    return getRVVEltType(Ctx);
-
-  llvm_unreachable("Unhandled type");
 }
 
 QualType Type::getSveEltType(const ASTContext &Ctx) const {
@@ -2750,43 +2667,6 @@ bool QualType::isTriviallyCopyableType(const ASTContext &Context) const {
                                      /*IsCopyConstructible=*/false);
 }
 
-// FIXME: each call will trigger a full computation, cache the result.
-bool QualType::isBitwiseCloneableType(const ASTContext &Context) const {
-  auto CanonicalType = getCanonicalType();
-  if (CanonicalType.hasNonTrivialObjCLifetime())
-    return false;
-  if (CanonicalType->isArrayType())
-    return Context.getBaseElementType(CanonicalType)
-        .isBitwiseCloneableType(Context);
-
-  if (CanonicalType->isIncompleteType())
-    return false;
-  const auto *RD = CanonicalType->getAsRecordDecl(); // struct/union/class
-  if (!RD)
-    return true;
-
-  // Never allow memcpy when we're adding poisoned padding bits to the struct.
-  // Accessing these posioned bits will trigger false alarms on
-  // SanitizeAddressFieldPadding etc.
-  if (RD->mayInsertExtraPadding())
-    return false;
-
-  for (auto *const Field : RD->fields()) {
-    if (!Field->getType().isBitwiseCloneableType(Context))
-      return false;
-  }
-
-  if (const auto *CXXRD = dyn_cast<CXXRecordDecl>(RD)) {
-    for (auto Base : CXXRD->bases())
-      if (!Base.getType().isBitwiseCloneableType(Context))
-        return false;
-    for (auto VBase : CXXRD->vbases())
-      if (!VBase.getType().isBitwiseCloneableType(Context))
-        return false;
-  }
-  return true;
-}
-
 bool QualType::isTriviallyCopyConstructibleType(
     const ASTContext &Context) const {
   return isTriviallyCopyableTypeImpl(*this, Context,
@@ -2802,8 +2682,6 @@ bool QualType::isTriviallyRelocatableType(const ASTContext &Context) const {
     return false;
   } else if (const auto *RD = BaseElementType->getAsRecordDecl()) {
     return RD->canPassInRegisters();
-  } else if (BaseElementType.isTriviallyCopyableType(Context)) {
-    return true;
   } else {
     switch (isNonTrivialToPrimitiveDestructiveMove()) {
     case PCK_Trivial:
@@ -2814,6 +2692,66 @@ bool QualType::isTriviallyRelocatableType(const ASTContext &Context) const {
       return false;
     }
   }
+}
+
+static bool
+HasNonDeletedDefaultedEqualityComparison(const CXXRecordDecl *Decl) {
+  if (Decl->isUnion())
+    return false;
+  if (Decl->isLambda())
+    return Decl->isCapturelessLambda();
+
+  auto IsDefaultedOperatorEqualEqual = [&](const FunctionDecl *Function) {
+    return Function->getOverloadedOperator() ==
+               OverloadedOperatorKind::OO_EqualEqual &&
+           Function->isDefaulted() && Function->getNumParams() > 0 &&
+           (Function->getParamDecl(0)->getType()->isReferenceType() ||
+            Decl->isTriviallyCopyable());
+  };
+
+  if (llvm::none_of(Decl->methods(), IsDefaultedOperatorEqualEqual) &&
+      llvm::none_of(Decl->friends(), [&](const FriendDecl *Friend) {
+        if (NamedDecl *ND = Friend->getFriendDecl()) {
+          return ND->isFunctionOrFunctionTemplate() &&
+                 IsDefaultedOperatorEqualEqual(ND->getAsFunction());
+        }
+        return false;
+      }))
+    return false;
+
+  return llvm::all_of(Decl->bases(),
+                      [](const CXXBaseSpecifier &BS) {
+                        if (const auto *RD = BS.getType()->getAsCXXRecordDecl())
+                          return HasNonDeletedDefaultedEqualityComparison(RD);
+                        return true;
+                      }) &&
+         llvm::all_of(Decl->fields(), [](const FieldDecl *FD) {
+           auto Type = FD->getType();
+           if (Type->isArrayType())
+             Type = Type->getBaseElementTypeUnsafe()->getCanonicalTypeUnqualified();
+
+           if (Type->isReferenceType() || Type->isEnumeralType())
+             return false;
+           if (const auto *RD = Type->getAsCXXRecordDecl())
+             return HasNonDeletedDefaultedEqualityComparison(RD);
+           return true;
+         });
+}
+
+bool QualType::isTriviallyEqualityComparableType(
+    const ASTContext &Context) const {
+  QualType CanonicalType = getCanonicalType();
+  if (CanonicalType->isIncompleteType() || CanonicalType->isDependentType() ||
+      CanonicalType->isEnumeralType() || CanonicalType->isArrayType())
+    return false;
+
+  if (const auto *RD = CanonicalType->getAsCXXRecordDecl()) {
+    if (!HasNonDeletedDefaultedEqualityComparison(RD))
+      return false;
+  }
+
+  return Context.hasUniqueObjectRepresentations(
+      CanonicalType, /*CheckIfTriviallyCopyable=*/false);
 }
 
 bool QualType::isNonWeakInMRRWithObjCWeak(const ASTContext &Context) const {
@@ -3390,8 +3328,6 @@ StringRef BuiltinType::getName(const PrintingPolicy &Policy) const {
     return "<overloaded function type>";
   case BoundMember:
     return "<bound member function type>";
-  case UnresolvedTemplate:
-    return "<unresolved template type>";
   case PseudoObject:
     return "<pseudo-object type>";
   case Dependent:
@@ -3424,8 +3360,8 @@ StringRef BuiltinType::getName(const PrintingPolicy &Policy) const {
     return "reserve_id_t";
   case IncompleteMatrixIdx:
     return "<incomplete matrix index type>";
-  case ArraySection:
-    return "<array section type>";
+  case OMPArraySection:
+    return "<OpenMP array section type>";
   case OMPArrayShaping:
     return "<OpenMP array shaping type>";
   case OMPIterator:
@@ -3450,10 +3386,6 @@ StringRef BuiltinType::getName(const PrintingPolicy &Policy) const {
   case Id:                                                                     \
     return Name;
 #include "clang/Basic/WebAssemblyReferenceTypes.def"
-#define AMDGPU_TYPE(Name, Id, SingletonId)                                     \
-  case Id:                                                                     \
-    return Name;
-#include "clang/Basic/AMDGPUTypes.def"
   }
 
   llvm_unreachable("Invalid builtin type.");
@@ -3506,10 +3438,6 @@ StringRef FunctionType::getNameForCallConv(CallingConv CC) {
   case CC_PreserveMost: return "preserve_most";
   case CC_PreserveAll: return "preserve_all";
   case CC_M68kRTD: return "m68k_rtd";
-  case CC_PreserveNone: return "preserve_none";
-    // clang-format off
-  case CC_RISCVVectorCall: return "riscv_vector_cc";
-    // clang-format on
   }
 
   llvm_unreachable("Invalid calling convention.");
@@ -3652,34 +3580,6 @@ FunctionProtoType::FunctionProtoType(QualType result, ArrayRef<QualType> params,
     auto &EllipsisLoc = *getTrailingObjects<SourceLocation>();
     EllipsisLoc = epi.EllipsisLoc;
   }
-
-  if (!epi.FunctionEffects.empty()) {
-    auto &ExtraBits = *getTrailingObjects<FunctionTypeExtraBitfields>();
-    size_t EffectsCount = epi.FunctionEffects.size();
-    ExtraBits.NumFunctionEffects = EffectsCount;
-    assert(ExtraBits.NumFunctionEffects == EffectsCount &&
-           "effect bitfield overflow");
-
-    ArrayRef<FunctionEffect> SrcFX = epi.FunctionEffects.effects();
-    auto *DestFX = getTrailingObjects<FunctionEffect>();
-    std::uninitialized_copy(SrcFX.begin(), SrcFX.end(), DestFX);
-
-    ArrayRef<EffectConditionExpr> SrcConds = epi.FunctionEffects.conditions();
-    if (!SrcConds.empty()) {
-      ExtraBits.EffectsHaveConditions = true;
-      auto *DestConds = getTrailingObjects<EffectConditionExpr>();
-      std::uninitialized_copy(SrcConds.begin(), SrcConds.end(), DestConds);
-      assert(std::any_of(SrcConds.begin(), SrcConds.end(),
-                         [](const EffectConditionExpr &EC) {
-                           if (const Expr *E = EC.getCondition())
-                             return E->isTypeDependent() ||
-                                    E->isValueDependent();
-                           return false;
-                         }) &&
-             "expected a dependent expression among the conditions");
-      addDependence(TypeDependence::DependentInstantiation);
-    }
-  }
 }
 
 bool FunctionProtoType::hasDependentExceptionSpec() const {
@@ -3763,7 +3663,6 @@ void FunctionProtoType::Profile(llvm::FoldingSetNodeID &ID, QualType Result,
   // Finally we have a trailing return type flag (bool)
   // combined with AArch64 SME Attributes, to save space:
   //      int
-  // combined with any FunctionEffects
   //
   // There is no ambiguity between the consumed arguments and an empty EH
   // spec because of the leading 'bool' which unambiguously indicates
@@ -3798,61 +3697,13 @@ void FunctionProtoType::Profile(llvm::FoldingSetNodeID &ID, QualType Result,
   }
 
   epi.ExtInfo.Profile(ID);
-
-  unsigned EffectCount = epi.FunctionEffects.size();
-  bool HasConds = !epi.FunctionEffects.Conditions.empty();
-
-  ID.AddInteger((EffectCount << 3) | (HasConds << 2) |
-                (epi.AArch64SMEAttributes << 1) | epi.HasTrailingReturn);
-
-  for (unsigned Idx = 0; Idx != EffectCount; ++Idx) {
-    ID.AddInteger(epi.FunctionEffects.Effects[Idx].toOpaqueInt32());
-    if (HasConds)
-      ID.AddPointer(epi.FunctionEffects.Conditions[Idx].getCondition());
-  }
+  ID.AddInteger((epi.AArch64SMEAttributes << 1) | epi.HasTrailingReturn);
 }
 
 void FunctionProtoType::Profile(llvm::FoldingSetNodeID &ID,
                                 const ASTContext &Ctx) {
   Profile(ID, getReturnType(), param_type_begin(), getNumParams(),
           getExtProtoInfo(), Ctx, isCanonicalUnqualified());
-}
-
-TypeCoupledDeclRefInfo::TypeCoupledDeclRefInfo(ValueDecl *D, bool Deref)
-    : Data(D, Deref << DerefShift) {}
-
-bool TypeCoupledDeclRefInfo::isDeref() const {
-  return Data.getInt() & DerefMask;
-}
-ValueDecl *TypeCoupledDeclRefInfo::getDecl() const { return Data.getPointer(); }
-unsigned TypeCoupledDeclRefInfo::getInt() const { return Data.getInt(); }
-void *TypeCoupledDeclRefInfo::getOpaqueValue() const {
-  return Data.getOpaqueValue();
-}
-bool TypeCoupledDeclRefInfo::operator==(
-    const TypeCoupledDeclRefInfo &Other) const {
-  return getOpaqueValue() == Other.getOpaqueValue();
-}
-void TypeCoupledDeclRefInfo::setFromOpaqueValue(void *V) {
-  Data.setFromOpaqueValue(V);
-}
-
-BoundsAttributedType::BoundsAttributedType(TypeClass TC, QualType Wrapped,
-                                           QualType Canon)
-    : Type(TC, Canon, Wrapped->getDependence()), WrappedTy(Wrapped) {}
-
-CountAttributedType::CountAttributedType(
-    QualType Wrapped, QualType Canon, Expr *CountExpr, bool CountInBytes,
-    bool OrNull, ArrayRef<TypeCoupledDeclRefInfo> CoupledDecls)
-    : BoundsAttributedType(CountAttributed, Wrapped, Canon),
-      CountExpr(CountExpr) {
-  CountAttributedTypeBits.NumCoupledDecls = CoupledDecls.size();
-  CountAttributedTypeBits.CountInBytes = CountInBytes;
-  CountAttributedTypeBits.OrNull = OrNull;
-  auto *DeclSlot = getTrailingObjects<TypeCoupledDeclRefInfo>();
-  Decls = llvm::ArrayRef(DeclSlot, CoupledDecls.size());
-  for (unsigned i = 0; i != CoupledDecls.size(); ++i)
-    DeclSlot[i] = CoupledDecls[i];
 }
 
 TypedefType::TypedefType(TypeClass tc, const TypedefNameDecl *D,
@@ -3900,19 +3751,18 @@ QualType MacroQualifiedType::getModifiedType() const {
   return Inner;
 }
 
-TypeOfExprType::TypeOfExprType(const ASTContext &Context, Expr *E,
-                               TypeOfKind Kind, QualType Can)
+TypeOfExprType::TypeOfExprType(Expr *E, TypeOfKind Kind, QualType Can)
     : Type(TypeOfExpr,
            // We have to protect against 'Can' being invalid through its
            // default argument.
            Kind == TypeOfKind::Unqualified && !Can.isNull()
-               ? Context.getUnqualifiedArrayType(Can).getAtomicUnqualifiedType()
+               ? Can.getAtomicUnqualifiedType()
                : Can,
            toTypeDependence(E->getDependence()) |
                (E->getType()->getDependence() &
                 TypeDependence::VariablyModified)),
-      TOExpr(E), Context(Context) {
-  TypeOfBits.Kind = static_cast<unsigned>(Kind);
+      TOExpr(E) {
+  TypeOfBits.IsUnqual = Kind == TypeOfKind::Unqualified;
 }
 
 bool TypeOfExprType::isSugared() const {
@@ -3922,9 +3772,7 @@ bool TypeOfExprType::isSugared() const {
 QualType TypeOfExprType::desugar() const {
   if (isSugared()) {
     QualType QT = getUnderlyingExpr()->getType();
-    return getKind() == TypeOfKind::Unqualified
-               ? Context.getUnqualifiedArrayType(QT).getAtomicUnqualifiedType()
-               : QT;
+    return TypeOfBits.IsUnqual ? QT.getAtomicUnqualifiedType() : QT;
   }
   return QualType(this, 0);
 }
@@ -3934,24 +3782,6 @@ void DependentTypeOfExprType::Profile(llvm::FoldingSetNodeID &ID,
                                       bool IsUnqual) {
   E->Profile(ID, Context, true);
   ID.AddBoolean(IsUnqual);
-}
-
-TypeOfType::TypeOfType(const ASTContext &Context, QualType T, QualType Can,
-                       TypeOfKind Kind)
-    : Type(TypeOf,
-           Kind == TypeOfKind::Unqualified
-               ? Context.getUnqualifiedArrayType(Can).getAtomicUnqualifiedType()
-               : Can,
-           T->getDependence()),
-      TOType(T), Context(Context) {
-  TypeOfBits.Kind = static_cast<unsigned>(Kind);
-}
-
-QualType TypeOfType::desugar() const {
-  QualType QT = getUnmodifiedType();
-  return getKind() == TypeOfKind::Unqualified
-             ? Context.getUnqualifiedArrayType(QT).getAtomicUnqualifiedType()
-             : QT;
 }
 
 DecltypeType::DecltypeType(Expr *E, QualType underlyingType, QualType can)
@@ -3980,63 +3810,6 @@ DependentDecltypeType::DependentDecltypeType(Expr *E, QualType UnderlyingType)
 
 void DependentDecltypeType::Profile(llvm::FoldingSetNodeID &ID,
                                     const ASTContext &Context, Expr *E) {
-  E->Profile(ID, Context, true);
-}
-
-PackIndexingType::PackIndexingType(const ASTContext &Context,
-                                   QualType Canonical, QualType Pattern,
-                                   Expr *IndexExpr,
-                                   ArrayRef<QualType> Expansions)
-    : Type(PackIndexing, Canonical,
-           computeDependence(Pattern, IndexExpr, Expansions)),
-      Context(Context), Pattern(Pattern), IndexExpr(IndexExpr),
-      Size(Expansions.size()) {
-
-  std::uninitialized_copy(Expansions.begin(), Expansions.end(),
-                          getTrailingObjects<QualType>());
-}
-
-std::optional<unsigned> PackIndexingType::getSelectedIndex() const {
-  if (isInstantiationDependentType())
-    return std::nullopt;
-  // Should only be not a constant for error recovery.
-  ConstantExpr *CE = dyn_cast<ConstantExpr>(getIndexExpr());
-  if (!CE)
-    return std::nullopt;
-  auto Index = CE->getResultAsAPSInt();
-  assert(Index.isNonNegative() && "Invalid index");
-  return static_cast<unsigned>(Index.getExtValue());
-}
-
-TypeDependence
-PackIndexingType::computeDependence(QualType Pattern, Expr *IndexExpr,
-                                    ArrayRef<QualType> Expansions) {
-  TypeDependence IndexD = toTypeDependence(IndexExpr->getDependence());
-
-  TypeDependence TD = IndexD | (IndexExpr->isInstantiationDependent()
-                                    ? TypeDependence::DependentInstantiation
-                                    : TypeDependence::None);
-  if (Expansions.empty())
-    TD |= Pattern->getDependence() & TypeDependence::DependentInstantiation;
-  else
-    for (const QualType &T : Expansions)
-      TD |= T->getDependence();
-
-  if (!(IndexD & TypeDependence::UnexpandedPack))
-    TD &= ~TypeDependence::UnexpandedPack;
-
-  // If the pattern does not contain an unexpended pack,
-  // the type is still dependent, and invalid
-  if (!Pattern->containsUnexpandedParameterPack())
-    TD |= TypeDependence::Error | TypeDependence::DependentInstantiation;
-
-  return TD;
-}
-
-void PackIndexingType::Profile(llvm::FoldingSetNodeID &ID,
-                               const ASTContext &Context, QualType Pattern,
-                               Expr *E) {
-  Pattern.Profile(ID);
   E->Profile(ID, Context, true);
 }
 
@@ -4160,8 +3933,6 @@ bool AttributedType::isCallingConv() const {
   case attr::PreserveMost:
   case attr::PreserveAll:
   case attr::M68kRTD:
-  case attr::PreserveNone:
-  case attr::RISCVVectorCC:
     return true;
   }
   llvm_unreachable("invalid attr kind");
@@ -4294,8 +4065,7 @@ TemplateSpecializationType::TemplateSpecializationType(
   assert((T.getKind() == TemplateName::Template ||
           T.getKind() == TemplateName::SubstTemplateTemplateParm ||
           T.getKind() == TemplateName::SubstTemplateTemplateParmPack ||
-          T.getKind() == TemplateName::UsingTemplate ||
-          T.getKind() == TemplateName::QualifiedTemplate) &&
+          T.getKind() == TemplateName::UsingTemplate) &&
          "Unexpected template name for TemplateSpecializationType");
 
   auto *TemplateArgs = reinterpret_cast<TemplateArgument *>(this + 1);
@@ -4487,6 +4257,7 @@ static CachedProperties computeCachedProperties(const Type *T) {
 #define NON_CANONICAL_UNLESS_DEPENDENT_TYPE(Class,Base) case Type::Class:
 #include "clang/AST/TypeNodes.inc"
     // Treat instantiation-dependent types as external.
+    if (!T->isInstantiationDependentType()) T->dump();
     assert(T->isInstantiationDependentType());
     return CachedProperties(Linkage::External, false);
 
@@ -4538,7 +4309,6 @@ static CachedProperties computeCachedProperties(const Type *T) {
   case Type::ConstantArray:
   case Type::IncompleteArray:
   case Type::VariableArray:
-  case Type::ArrayParameter:
     return Cache::get(cast<ArrayType>(T)->getElementType());
   case Type::Vector:
   case Type::ExtVector:
@@ -4627,7 +4397,6 @@ LinkageInfo LinkageComputer::computeTypeLinkageInfo(const Type *T) {
   case Type::ConstantArray:
   case Type::IncompleteArray:
   case Type::VariableArray:
-  case Type::ArrayParameter:
     return computeTypeLinkageInfo(cast<ArrayType>(T)->getElementType());
   case Type::Vector:
   case Type::ExtVector:
@@ -4719,7 +4488,6 @@ bool Type::canHaveNullability(bool ResultIfUnknown) const {
   case Type::TypeOfExpr:
   case Type::TypeOf:
   case Type::Decltype:
-  case Type::PackIndexing:
   case Type::UnaryTransform:
   case Type::TemplateTypeParm:
   case Type::SubstTemplateTypeParmPack:
@@ -4728,15 +4496,16 @@ bool Type::canHaveNullability(bool ResultIfUnknown) const {
   case Type::Auto:
     return ResultIfUnknown;
 
-  // Dependent template specializations could instantiate to pointer types.
+  // Dependent template specializations can instantiate to pointer
+  // types unless they're known to be specializations of a class
+  // template.
   case Type::TemplateSpecialization:
-    // If it's a known class template, we can already check if it's nullable.
-    if (TemplateDecl *templateDecl =
-            cast<TemplateSpecializationType>(type.getTypePtr())
-                ->getTemplateName()
-                .getAsTemplateDecl())
-      if (auto *CTD = dyn_cast<ClassTemplateDecl>(templateDecl))
-        return CTD->getTemplatedDecl()->hasAttr<TypeNullableAttr>();
+    if (TemplateDecl *templateDecl
+          = cast<TemplateSpecializationType>(type.getTypePtr())
+              ->getTemplateName().getAsTemplateDecl()) {
+      if (isa<ClassTemplateDecl>(templateDecl))
+        return false;
+    }
     return ResultIfUnknown;
 
   case Type::Builtin:
@@ -4749,7 +4518,6 @@ bool Type::canHaveNullability(bool ResultIfUnknown) const {
 #include "clang/AST/BuiltinTypes.def"
       return false;
 
-    case BuiltinType::UnresolvedTemplate:
     // Dependent types that could instantiate to a pointer type.
     case BuiltinType::Dependent:
     case BuiltinType::Overload:
@@ -4784,28 +4552,15 @@ bool Type::canHaveNullability(bool ResultIfUnknown) const {
 #include "clang/Basic/RISCVVTypes.def"
 #define WASM_TYPE(Name, Id, SingletonId) case BuiltinType::Id:
 #include "clang/Basic/WebAssemblyReferenceTypes.def"
-#define AMDGPU_TYPE(Name, Id, SingletonId) case BuiltinType::Id:
-#include "clang/Basic/AMDGPUTypes.def"
     case BuiltinType::BuiltinFn:
     case BuiltinType::NullPtr:
     case BuiltinType::IncompleteMatrixIdx:
-    case BuiltinType::ArraySection:
+    case BuiltinType::OMPArraySection:
     case BuiltinType::OMPArrayShaping:
     case BuiltinType::OMPIterator:
       return false;
     }
     llvm_unreachable("unknown builtin type");
-
-  case Type::Record: {
-    const RecordDecl *RD = cast<RecordType>(type)->getDecl();
-    // For template specializations, look only at primary template attributes.
-    // This is a consistent regardless of whether the instantiation is known.
-    if (const auto *CTSD = dyn_cast<ClassTemplateSpecializationDecl>(RD))
-      return CTSD->getSpecializedTemplate()
-          ->getTemplatedDecl()
-          ->hasAttr<TypeNullableAttr>();
-    return RD->hasAttr<TypeNullableAttr>();
-  }
 
   // Non-pointer types.
   case Type::Complex:
@@ -4824,6 +4579,7 @@ bool Type::canHaveNullability(bool ResultIfUnknown) const {
   case Type::DependentAddressSpace:
   case Type::FunctionProto:
   case Type::FunctionNoProto:
+  case Type::Record:
   case Type::DeducedTemplateSpecialization:
   case Type::Enum:
   case Type::InjectedClassName:
@@ -4834,7 +4590,6 @@ bool Type::canHaveNullability(bool ResultIfUnknown) const {
   case Type::Pipe:
   case Type::BitInt:
   case Type::DependentBitInt:
-  case Type::ArrayParameter:
     return false;
   }
   llvm_unreachable("bad type kind!");
@@ -5094,235 +4849,4 @@ void AutoType::Profile(llvm::FoldingSetNodeID &ID, const ASTContext &Context,
 void AutoType::Profile(llvm::FoldingSetNodeID &ID, const ASTContext &Context) {
   Profile(ID, Context, getDeducedType(), getKeyword(), isDependentType(),
           getTypeConstraintConcept(), getTypeConstraintArguments());
-}
-
-FunctionEffect::Kind FunctionEffect::oppositeKind() const {
-  switch (kind()) {
-  case Kind::NonBlocking:
-    return Kind::Blocking;
-  case Kind::Blocking:
-    return Kind::NonBlocking;
-  case Kind::NonAllocating:
-    return Kind::Allocating;
-  case Kind::Allocating:
-    return Kind::NonAllocating;
-  case Kind::None:
-    return Kind::None;
-  }
-  llvm_unreachable("unknown effect kind");
-}
-
-StringRef FunctionEffect::name() const {
-  switch (kind()) {
-  case Kind::NonBlocking:
-    return "nonblocking";
-  case Kind::NonAllocating:
-    return "nonallocating";
-  case Kind::Blocking:
-    return "blocking";
-  case Kind::Allocating:
-    return "allocating";
-  case Kind::None:
-    return "(none)";
-  }
-  llvm_unreachable("unknown effect kind");
-}
-
-bool FunctionEffect::canInferOnFunction(const Decl &Callee) const {
-  switch (kind()) {
-  case Kind::NonAllocating:
-  case Kind::NonBlocking: {
-    FunctionEffectsRef CalleeFX;
-    if (auto *FD = Callee.getAsFunction())
-      CalleeFX = FD->getFunctionEffects();
-    else if (auto *BD = dyn_cast<BlockDecl>(&Callee))
-      CalleeFX = BD->getFunctionEffects();
-    else
-      return false;
-    for (const FunctionEffectWithCondition &CalleeEC : CalleeFX) {
-      // nonblocking/nonallocating cannot call allocating.
-      if (CalleeEC.Effect.kind() == Kind::Allocating)
-        return false;
-      // nonblocking cannot call blocking.
-      if (kind() == Kind::NonBlocking &&
-          CalleeEC.Effect.kind() == Kind::Blocking)
-        return false;
-    }
-    return true;
-  }
-
-  case Kind::Allocating:
-  case Kind::Blocking:
-    return false;
-
-  case Kind::None:
-    assert(0 && "canInferOnFunction with None");
-    break;
-  }
-  llvm_unreachable("unknown effect kind");
-}
-
-bool FunctionEffect::shouldDiagnoseFunctionCall(
-    bool Direct, ArrayRef<FunctionEffect> CalleeFX) const {
-  switch (kind()) {
-  case Kind::NonAllocating:
-  case Kind::NonBlocking: {
-    const Kind CallerKind = kind();
-    for (const auto &Effect : CalleeFX) {
-      const Kind EK = Effect.kind();
-      // Does callee have same or stronger constraint?
-      if (EK == CallerKind ||
-          (CallerKind == Kind::NonAllocating && EK == Kind::NonBlocking)) {
-        return false; // no diagnostic
-      }
-    }
-    return true; // warning
-  }
-  case Kind::Allocating:
-  case Kind::Blocking:
-    return false;
-  case Kind::None:
-    assert(0 && "shouldDiagnoseFunctionCall with None");
-    break;
-  }
-  llvm_unreachable("unknown effect kind");
-}
-
-// =====
-
-bool FunctionEffectSet::insert(const FunctionEffectWithCondition &NewEC,
-                               Conflicts &Errs) {
-  FunctionEffect::Kind NewOppositeKind = NewEC.Effect.oppositeKind();
-  Expr *NewCondition = NewEC.Cond.getCondition();
-
-  // The index at which insertion will take place; default is at end
-  // but we might find an earlier insertion point.
-  unsigned InsertIdx = Effects.size();
-  unsigned Idx = 0;
-  for (const FunctionEffectWithCondition &EC : *this) {
-    // Note about effects with conditions: They are considered distinct from
-    // those without conditions; they are potentially unique, redundant, or
-    // in conflict, but we can't tell which until the condition is evaluated.
-    if (EC.Cond.getCondition() == nullptr && NewCondition == nullptr) {
-      if (EC.Effect.kind() == NewEC.Effect.kind()) {
-        // There is no condition, and the effect kind is already present,
-        // so just fail to insert the new one (creating a duplicate),
-        // and return success.
-        return true;
-      }
-
-      if (EC.Effect.kind() == NewOppositeKind) {
-        Errs.push_back({EC, NewEC});
-        return false;
-      }
-    }
-
-    if (NewEC.Effect.kind() < EC.Effect.kind() && InsertIdx > Idx)
-      InsertIdx = Idx;
-
-    ++Idx;
-  }
-
-  if (NewCondition || !Conditions.empty()) {
-    if (Conditions.empty() && !Effects.empty())
-      Conditions.resize(Effects.size());
-    Conditions.insert(Conditions.begin() + InsertIdx,
-                      NewEC.Cond.getCondition());
-  }
-  Effects.insert(Effects.begin() + InsertIdx, NewEC.Effect);
-  return true;
-}
-
-bool FunctionEffectSet::insert(const FunctionEffectsRef &Set, Conflicts &Errs) {
-  for (const auto &Item : Set)
-    insert(Item, Errs);
-  return Errs.empty();
-}
-
-FunctionEffectSet FunctionEffectSet::getIntersection(FunctionEffectsRef LHS,
-                                                     FunctionEffectsRef RHS) {
-  FunctionEffectSet Result;
-  FunctionEffectSet::Conflicts Errs;
-
-  // We could use std::set_intersection but that would require expanding the
-  // container interface to include push_back, making it available to clients
-  // who might fail to maintain invariants.
-  auto IterA = LHS.begin(), EndA = LHS.end();
-  auto IterB = RHS.begin(), EndB = RHS.end();
-
-  auto FEWCLess = [](const FunctionEffectWithCondition &LHS,
-                     const FunctionEffectWithCondition &RHS) {
-    return std::tuple(LHS.Effect, uintptr_t(LHS.Cond.getCondition())) <
-           std::tuple(RHS.Effect, uintptr_t(RHS.Cond.getCondition()));
-  };
-
-  while (IterA != EndA && IterB != EndB) {
-    FunctionEffectWithCondition A = *IterA;
-    FunctionEffectWithCondition B = *IterB;
-    if (FEWCLess(A, B))
-      ++IterA;
-    else if (FEWCLess(B, A))
-      ++IterB;
-    else {
-      Result.insert(A, Errs);
-      ++IterA;
-      ++IterB;
-    }
-  }
-
-  // Insertion shouldn't be able to fail; that would mean both input
-  // sets contained conflicts.
-  assert(Errs.empty() && "conflict shouldn't be possible in getIntersection");
-
-  return Result;
-}
-
-FunctionEffectSet FunctionEffectSet::getUnion(FunctionEffectsRef LHS,
-                                              FunctionEffectsRef RHS,
-                                              Conflicts &Errs) {
-  // Optimize for either of the two sets being empty (very common).
-  if (LHS.empty())
-    return FunctionEffectSet(RHS);
-
-  FunctionEffectSet Combined(LHS);
-  Combined.insert(RHS, Errs);
-  return Combined;
-}
-
-LLVM_DUMP_METHOD void FunctionEffectsRef::dump(llvm::raw_ostream &OS) const {
-  OS << "Effects{";
-  bool First = true;
-  for (const auto &CFE : *this) {
-    if (!First)
-      OS << ", ";
-    else
-      First = false;
-    OS << CFE.Effect.name();
-    if (Expr *E = CFE.Cond.getCondition()) {
-      OS << '(';
-      E->dump();
-      OS << ')';
-    }
-  }
-  OS << "}";
-}
-
-LLVM_DUMP_METHOD void FunctionEffectSet::dump(llvm::raw_ostream &OS) const {
-  FunctionEffectsRef(*this).dump(OS);
-}
-
-FunctionEffectsRef
-FunctionEffectsRef::create(ArrayRef<FunctionEffect> FX,
-                           ArrayRef<EffectConditionExpr> Conds) {
-  assert(std::is_sorted(FX.begin(), FX.end()) && "effects should be sorted");
-  assert((Conds.empty() || Conds.size() == FX.size()) &&
-         "effects size should match conditions size");
-  return FunctionEffectsRef(FX, Conds);
-}
-
-std::string FunctionEffectWithCondition::description() const {
-  std::string Result(Effect.name().str());
-  if (Cond.getCondition() != nullptr)
-    Result += "(expr)";
-  return Result;
 }

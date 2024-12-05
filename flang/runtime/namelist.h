@@ -12,7 +12,6 @@
 #define FORTRAN_RUNTIME_NAMELIST_H_
 
 #include "non-tbp-dio.h"
-#include "flang/Common/api-attrs.h"
 
 #include <cstddef>
 
@@ -48,7 +47,7 @@ public:
 // character; for use in disambiguating a name-like value (e.g. F or T) from a
 // NAMELIST group item name and for coping with short arrays.  Always false
 // when not reading a NAMELIST.
-RT_API_ATTRS bool IsNamelistNameOrSlash(IoStatementState &);
+bool IsNamelistNameOrSlash(IoStatementState &);
 
 } // namespace Fortran::runtime::io
 #endif // FORTRAN_RUNTIME_NAMELIST_H_

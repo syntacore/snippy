@@ -40,15 +40,6 @@ void ValidatorVersionMD::update(VersionTuple ValidatorVer) {
 
 bool ValidatorVersionMD::isEmpty() { return Entry->getNumOperands() == 0; }
 
-VersionTuple ValidatorVersionMD::getAsVersionTuple() {
-  if (isEmpty())
-    return VersionTuple(1, 0);
-  auto *ValVerMD = cast<MDNode>(Entry->getOperand(0));
-  auto *MajorMD = mdconst::extract<ConstantInt>(ValVerMD->getOperand(0));
-  auto *MinorMD = mdconst::extract<ConstantInt>(ValVerMD->getOperand(1));
-  return VersionTuple(MajorMD->getZExtValue(), MinorMD->getZExtValue());
-}
-
 static StringRef getShortShaderStage(Triple::EnvironmentType Env) {
   switch (Env) {
   case Triple::Pixel:
@@ -87,18 +78,6 @@ void dxil::createShaderModelMD(Module &M) {
   Vals[0] = MDString::get(Ctx, getShortShaderStage(TT.getEnvironment()));
   Vals[1] = ConstantAsMetadata::get(B.getInt32(Ver.getMajor()));
   Vals[2] = ConstantAsMetadata::get(B.getInt32(Ver.getMinor().value_or(0)));
-  Entry->addOperand(MDNode::get(Ctx, Vals));
-}
-
-void dxil::createDXILVersionMD(Module &M) {
-  Triple TT(Triple::normalize(M.getTargetTriple()));
-  VersionTuple Ver = TT.getDXILVersion();
-  LLVMContext &Ctx = M.getContext();
-  IRBuilder<> B(Ctx);
-  NamedMDNode *Entry = M.getOrInsertNamedMetadata("dx.version");
-  Metadata *Vals[2];
-  Vals[0] = ConstantAsMetadata::get(B.getInt32(Ver.getMajor()));
-  Vals[1] = ConstantAsMetadata::get(B.getInt32(Ver.getMinor().value_or(0)));
   Entry->addOperand(MDNode::get(Ctx, Vals));
 }
 
@@ -234,7 +213,7 @@ public:
     // FIXME: add signature for profile other than CS.
     // See https://github.com/llvm/llvm-project/issues/57928.
     MDTuple *Signatures = nullptr;
-    return emitDXILEntryPointTuple(
+    return emitDxilEntryPointTuple(
         &F, F.getName().str(), Signatures, Resources,
         Props.emitDXILEntryProps(RawShaderFlag, Ctx, /*IsLib*/ false), Ctx);
   }
@@ -243,7 +222,7 @@ public:
     // FIXME: add signature for profile other than CS.
     // See https://github.com/llvm/llvm-project/issues/57928.
     MDTuple *Signatures = nullptr;
-    return emitDXILEntryPointTuple(
+    return emitDxilEntryPointTuple(
         &F, F.getName().str(), Signatures,
         /*entry in lib doesn't need resources metadata*/ nullptr,
         Props.emitDXILEntryProps(RawShaderFlag, Ctx, /*IsLib*/ true), Ctx);
@@ -254,13 +233,13 @@ public:
   static MDTuple *emitEmptyEntryForLib(MDTuple *Resources,
                                        uint64_t RawShaderFlag,
                                        LLVMContext &Ctx) {
-    return emitDXILEntryPointTuple(
+    return emitDxilEntryPointTuple(
         nullptr, "", nullptr, Resources,
         EntryProps::emitEntryPropsForEmptyEntry(RawShaderFlag, Ctx), Ctx);
   }
 
 private:
-  static MDTuple *emitDXILEntryPointTuple(Function *Fn, const std::string &Name,
+  static MDTuple *emitDxilEntryPointTuple(Function *Fn, const std::string &Name,
                                           MDTuple *Signatures,
                                           MDTuple *Resources,
                                           MDTuple *Properties,

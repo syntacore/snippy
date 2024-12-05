@@ -147,9 +147,9 @@ void AlignerPass::alignBlocks(BinaryFunction &Function,
   }
 }
 
-Error AlignerPass::runOnFunctions(BinaryContext &BC) {
+void AlignerPass::runOnFunctions(BinaryContext &BC) {
   if (!BC.HasRelocations)
-    return Error::success();
+    return;
 
   AlignHistogram.resize(opts::BlockAlignment);
 
@@ -179,7 +179,6 @@ Error AlignerPass::runOnFunctions(BinaryContext &BC) {
     dbgs() << "BOLT-DEBUG: total execution count of aligned blocks: "
            << AlignedBlocksCount << '\n';
   );
-  return Error::success();
 }
 
 } // end namespace bolt

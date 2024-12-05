@@ -14,6 +14,7 @@
 #ifndef BOLT_PASSES_REORDER_UTILS_H
 #define BOLT_PASSES_REORDER_UTILS_H
 
+#include <memory>
 #include <vector>
 
 #include "llvm/ADT/BitVector.h"

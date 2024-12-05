@@ -13,6 +13,7 @@
 #include <optional>
 
 #include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/FunctionExtras.h"
 #include "llvm/Support/SourceMgr.h"
 

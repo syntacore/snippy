@@ -265,7 +265,7 @@ bool AArch64RedundantCopyElimination::knownRegValInBlock(
     }
 
     // Bail if we see an instruction that defines NZCV that we don't handle.
-    if (PredI.definesRegister(AArch64::NZCV, /*TRI=*/nullptr))
+    if (PredI.definesRegister(AArch64::NZCV))
       return false;
 
     // Track clobbered and used registers.

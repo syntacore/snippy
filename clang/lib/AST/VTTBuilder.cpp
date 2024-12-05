@@ -189,7 +189,7 @@ void VTTBuilder::LayoutVTT(BaseSubobject Base, bool BaseIsVirtual) {
 
   if (!IsPrimaryVTT) {
     // Remember the sub-VTT index.
-    SubVTTIndices[Base] = VTTComponents.size();
+    SubVTTIndicies[Base] = VTTComponents.size();
   }
 
   uint64_t VTableIndex = VTTVTables.size();

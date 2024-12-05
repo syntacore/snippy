@@ -832,7 +832,7 @@ void DebugSHandler::advanceRelocIndex(SectionChunk *sc,
   assert(vaBegin > 0);
   auto relocs = sc->getRelocs();
   for (; nextRelocIndex < relocs.size(); ++nextRelocIndex) {
-    if (relocs[nextRelocIndex].VirtualAddress >= (uint32_t)vaBegin)
+    if (relocs[nextRelocIndex].VirtualAddress >= vaBegin)
       break;
   }
 }
@@ -1726,15 +1726,15 @@ void PDBLinker::commit(codeview::GUID *guid) {
   }
 }
 
-static uint32_t getSecrelReloc(Triple::ArchType arch) {
-  switch (arch) {
-  case Triple::x86_64:
+static uint32_t getSecrelReloc(llvm::COFF::MachineTypes machine) {
+  switch (machine) {
+  case AMD64:
     return COFF::IMAGE_REL_AMD64_SECREL;
-  case Triple::x86:
+  case I386:
     return COFF::IMAGE_REL_I386_SECREL;
-  case Triple::thumb:
+  case ARMNT:
     return COFF::IMAGE_REL_ARM_SECREL;
-  case Triple::aarch64:
+  case ARM64:
     return COFF::IMAGE_REL_ARM64_SECREL;
   default:
     llvm_unreachable("unknown machine type");
@@ -1752,7 +1752,7 @@ static bool findLineTable(const SectionChunk *c, uint32_t addr,
                           DebugLinesSubsectionRef &lines,
                           uint32_t &offsetInLinetable) {
   ExitOnError exitOnErr;
-  const uint32_t secrelReloc = getSecrelReloc(c->getArch());
+  const uint32_t secrelReloc = getSecrelReloc(c->file->ctx.config.machine);
 
   for (SectionChunk *dbgC : c->file->getDebugChunks()) {
     if (dbgC->getSectionName() != ".debug$S")

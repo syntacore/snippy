@@ -1,4 +1,4 @@
-# REQUIRES: system-linux
+# REQUIRES: python-38, system-linux
 
 ## Test the functionality of combine_training_corpus_lib
 

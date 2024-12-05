@@ -618,7 +618,8 @@ SymbolCache::getSourceFileById(SymIndexId FileId) const {
   if (FileId == 0)
     return nullptr;
 
-  return std::make_unique<NativeSourceFile>(*SourceFiles[FileId].get());
+  return std::unique_ptr<NativeSourceFile>(
+      new NativeSourceFile(*SourceFiles[FileId].get()));
 }
 
 SymIndexId

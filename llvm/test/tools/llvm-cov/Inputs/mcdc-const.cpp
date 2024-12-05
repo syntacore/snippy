@@ -1,11 +1,11 @@
+
 #include <stdio.h>
 
+extern "C" {
+extern void __llvm_profile_write_file(void);
+}
 
-
-
-
-
-
+extern int foo();
 
 void test(bool a, bool b, bool c, bool d) {
 
@@ -22,5 +22,6 @@ int main()
 
     test(true,false,false,false);
 
+    __llvm_profile_write_file();
     return 0;
 }

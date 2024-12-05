@@ -6,22 +6,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "CndVar.h"
+
 #include "src/threads/cnd_broadcast.h"
 #include "src/__support/common.h"
-#include "src/__support/macros/config.h"
-#include "src/__support/threads/CndVar.h"
 
-// TODO: https://github.com/llvm/llvm-project/issues/92968
-#include <threads.h> // cnd_t, thrd_error, thrd_success
-
-namespace LIBC_NAMESPACE_DECL {
-
-static_assert(sizeof(CndVar) == sizeof(cnd_t));
+namespace LIBC_NAMESPACE {
 
 LLVM_LIBC_FUNCTION(int, cnd_broadcast, (cnd_t * cond)) {
   CndVar *cndvar = reinterpret_cast<CndVar *>(cond);
-  cndvar->broadcast();
-  return thrd_success;
+  return cndvar->broadcast();
 }
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE

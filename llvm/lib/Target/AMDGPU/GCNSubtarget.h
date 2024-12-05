@@ -87,7 +87,6 @@ protected:
   bool EnableTgSplit = false;
   bool EnableCuMode = false;
   bool TrapHandler = false;
-  bool EnablePreciseMemory = false;
 
   // Used as options.
   bool EnableLoadStoreOpt = false;
@@ -154,34 +153,21 @@ protected:
   bool HasDot8Insts = false;
   bool HasDot9Insts = false;
   bool HasDot10Insts = false;
-  bool HasDot11Insts = false;
   bool HasMAIInsts = false;
   bool HasFP8Insts = false;
   bool HasFP8ConversionInsts = false;
   bool HasPkFmacF16Inst = false;
-  bool HasAtomicFMinFMaxF32GlobalInsts = false;
-  bool HasAtomicFMinFMaxF64GlobalInsts = false;
-  bool HasAtomicFMinFMaxF32FlatInsts = false;
-  bool HasAtomicFMinFMaxF64FlatInsts = false;
   bool HasAtomicDsPkAdd16Insts = false;
   bool HasAtomicFlatPkAdd16Insts = false;
   bool HasAtomicFaddRtnInsts = false;
   bool HasAtomicFaddNoRtnInsts = false;
-  bool HasMemoryAtomicFaddF32DenormalSupport = false;
   bool HasAtomicBufferGlobalPkAddF16NoRtnInsts = false;
   bool HasAtomicBufferGlobalPkAddF16Insts = false;
   bool HasAtomicCSubNoRtnInsts = false;
   bool HasAtomicGlobalPkAddBF16Inst = false;
-  bool HasAtomicBufferPkAddBF16Inst = false;
   bool HasFlatAtomicFaddF32Inst = false;
-  bool HasFlatBufferGlobalAtomicFaddF64Inst = false;
   bool HasDefaultComponentZero = false;
-  bool HasAgentScopeFineGrainedRemoteMemoryAtomics = false;
   bool HasDefaultComponentBroadcast = false;
-  /// The maximum number of instructions that may be placed within an S_CLAUSE,
-  /// which is one greater than the maximum argument to S_CLAUSE. A value of 0
-  /// indicates a lack of S_CLAUSE support.
-  unsigned MaxHardClauseLength = 0;
   bool SupportsSRAMECC = false;
 
   // This should not be used directly. 'TargetID' tracks the dynamic settings
@@ -232,16 +218,11 @@ protected:
   bool HasImageStoreD16Bug = false;
   bool HasImageGather4D16Bug = false;
   bool HasMSAALoadDstSelBug = false;
-  bool HasPrivEnabledTrap2NopBug = false;
-  bool Has1_5xVGPRs = false;
+  bool HasGFX11FullVGPRs = false;
   bool HasMADIntraFwdBug = false;
   bool HasVOPDInsts = false;
   bool HasVALUTransUseHazard = false;
   bool HasForceStoreSC0SC1 = false;
-  bool HasRequiredExportPriority = false;
-  bool HasVmemWriteVgprInOrder = false;
-
-  bool RequiresCOV6 = false;
 
   // Dummy feature to use for assembler in tablegen.
   bool FeatureDisable = false;
@@ -259,10 +240,6 @@ public:
 
   GCNSubtarget &initializeSubtargetDependencies(const Triple &TT,
                                                    StringRef GPU, StringRef FS);
-
-  /// Diagnose inconsistent subtarget features before attempting to codegen
-  /// function \p F.
-  void checkSubtargetFeatures(const Function &F) const;
 
   const SIInstrInfo *getInstrInfo() const override {
     return &InstrInfo;
@@ -615,8 +592,6 @@ public:
     return EnableCuMode;
   }
 
-  bool isPreciseMemoryEnabled() const { return EnablePreciseMemory; }
-
   bool hasFlatAddressSpace() const {
     return FlatAddressSpace;
   }
@@ -662,17 +637,6 @@ public:
   bool hasAtomicCSub() const {
     return GFX10_BEncoding;
   }
-
-  bool hasExportInsts() const {
-    return !hasGFX940Insts();
-  }
-
-  bool hasVINTERPEncoding() const {
-    return GFX11Insts;
-  }
-
-  // DS_ADD_F64/DS_ADD_RTN_F64
-  bool hasLdsAtomicAddF64() const { return hasGFX90AInsts(); }
 
   bool hasMultiDwordFlatScratchAddressing() const {
     return getGeneration() >= GFX9;
@@ -809,10 +773,6 @@ public:
     return HasDot10Insts;
   }
 
-  bool hasDot11Insts() const {
-    return HasDot11Insts;
-  }
-
   bool hasMAIInsts() const {
     return HasMAIInsts;
   }
@@ -825,22 +785,6 @@ public:
 
   bool hasPkFmacF16Inst() const {
     return HasPkFmacF16Inst;
-  }
-
-  bool hasAtomicFMinFMaxF32GlobalInsts() const {
-    return HasAtomicFMinFMaxF32GlobalInsts;
-  }
-
-  bool hasAtomicFMinFMaxF64GlobalInsts() const {
-    return HasAtomicFMinFMaxF64GlobalInsts;
-  }
-
-  bool hasAtomicFMinFMaxF32FlatInsts() const {
-    return HasAtomicFMinFMaxF32FlatInsts;
-  }
-
-  bool hasAtomicFMinFMaxF64FlatInsts() const {
-    return HasAtomicFMinFMaxF64FlatInsts;
   }
 
   bool hasAtomicDsPkAdd16Insts() const { return HasAtomicDsPkAdd16Insts; }
@@ -867,30 +811,7 @@ public:
     return HasAtomicGlobalPkAddBF16Inst;
   }
 
-  bool hasAtomicBufferPkAddBF16Inst() const {
-    return HasAtomicBufferPkAddBF16Inst;
-  }
-
   bool hasFlatAtomicFaddF32Inst() const { return HasFlatAtomicFaddF32Inst; }
-
-  /// \return true if the target has flat, global, and buffer atomic fadd for
-  /// double.
-  bool hasFlatBufferGlobalAtomicFaddF64Inst() const {
-    return HasFlatBufferGlobalAtomicFaddF64Inst;
-  }
-
-  /// \return true if the target's flat, global, and buffer atomic fadd for
-  /// float supports denormal handling.
-  bool hasMemoryAtomicFaddF32DenormalSupport() const {
-    return HasMemoryAtomicFaddF32DenormalSupport;
-  }
-
-  /// \return true if atomic operations targeting fine-grained memory work
-  /// correctly at device scope, in allocations in host or peer PCIe device
-  /// memory.
-  bool supportsAgentScopeFineGrainedRemoteMemoryAtomics() const {
-    return HasAgentScopeFineGrainedRemoteMemoryAtomics;
-  }
 
   bool hasDefaultComponentZero() const { return HasDefaultComponentZero; }
 
@@ -977,8 +898,6 @@ public:
   void overrideSchedPolicy(MachineSchedPolicy &Policy,
                            unsigned NumRegionInstrs) const override;
 
-  void mirFileLoaded(MachineFunction &MF) const override;
-
   unsigned getMaxNumUserSGPRs() const {
     return AMDGPU::getMaxNumUserSGPRs(*this);
   }
@@ -1011,8 +930,7 @@ public:
     return HasScalarAtomics;
   }
 
-  bool hasLDSFPAtomicAddF32() const { return GFX8Insts; }
-  bool hasLDSFPAtomicAddF64() const { return GFX90AInsts; }
+  bool hasLDSFPAtomicAdd() const { return GFX8Insts; }
 
   /// \returns true if the subtarget has the v_permlanex16_b32 instruction.
   bool hasPermLaneX16() const { return getGeneration() >= GFX10; }
@@ -1082,8 +1000,6 @@ public:
   bool hasMADIntraFwdBug() const { return HasMADIntraFwdBug; }
 
   bool hasMSAALoadDstSelBug() const { return HasMSAALoadDstSelBug; }
-
-  bool hasPrivEnabledTrap2NopBug() const { return HasPrivEnabledTrap2NopBug; }
 
   bool hasNSAEncoding() const { return HasNSAEncoding; }
 
@@ -1221,7 +1137,7 @@ public:
 
   bool hasNSAClauseBug() const { return HasNSAClauseBug; }
 
-  bool hasHardClauses() const { return MaxHardClauseLength > 0; }
+  bool hasHardClauses() const { return getGeneration() >= GFX10; }
 
   bool hasGFX90AInsts() const { return GFX90AInsts; }
 
@@ -1243,8 +1159,6 @@ public:
 
   bool hasForceStoreSC0SC1() const { return HasForceStoreSC0SC1; }
 
-  bool requiresCodeObjectV6() const { return RequiresCOV6; }
-
   bool hasVALUMaskWriteHazard() const { return getGeneration() == GFX11; }
 
   /// Return if operations acting on VGPR tuples require even alignment.
@@ -1261,7 +1175,7 @@ public:
   /// target.
   bool hasNullExportTarget() const { return !GFX11Insts; }
 
-  bool has1_5xVGPRs() const { return Has1_5xVGPRs; }
+  bool hasGFX11FullVGPRs() const { return HasGFX11FullVGPRs; }
 
   bool hasVOPDInsts() const { return HasVOPDInsts; }
 
@@ -1284,24 +1198,9 @@ public:
 
   bool hasRestrictedSOffset() const { return HasRestrictedSOffset; }
 
-  bool hasRequiredExportPriority() const { return HasRequiredExportPriority; }
-
-  bool hasVmemWriteVgprInOrder() const { return HasVmemWriteVgprInOrder; }
-
   /// \returns true if the target uses LOADcnt/SAMPLEcnt/BVHcnt, DScnt/KMcnt
   /// and STOREcnt rather than VMcnt, LGKMcnt and VScnt respectively.
   bool hasExtendedWaitCounts() const { return getGeneration() >= GFX12; }
-
-  /// \returns true if inline constants are not supported for F16 pseudo
-  /// scalar transcendentals.
-  bool hasNoF16PseudoScalarTransInlineConstants() const {
-    return getGeneration() == GFX12;
-  }
-
-  /// \returns The maximum number of instructions that can be enclosed in an
-  /// S_CLAUSE on the given subtarget, or 0 for targets that do not support that
-  /// instruction.
-  unsigned maxHardClauseLength() const { return MaxHardClauseLength; }
 
   /// Return the maximum number of waves per SIMD for kernels using \p SGPRs
   /// SGPRs
@@ -1349,6 +1248,12 @@ public:
   // \returns true if preloading kernel arguments is supported.
   bool hasKernargPreload() const { return KernargPreload; }
 
+  // \returns true if we need to generate backwards compatible code when
+  // preloading kernel arguments.
+  bool needsKernargPreloadBackwardsCompatibility() const {
+    return hasKernargPreload() && !hasGFX940Insts();
+  }
+
   // \returns true if the target has split barriers feature
   bool hasSplitBarriers() const { return getGeneration() >= GFX12; }
 
@@ -1367,9 +1272,6 @@ public:
 
   // \returns true if the target has IEEE fminimum/fmaximum instructions
   bool hasIEEEMinMax() const { return getGeneration() >= GFX12; }
-
-  // \returns true if the target has IEEE fminimum3/fmaximum3 instructions
-  bool hasIEEEMinMax3() const { return hasIEEEMinMax(); }
 
   // \returns true if the target has WG_RR_MODE kernel descriptor mode bit
   bool hasRrWGMode() const { return getGeneration() >= GFX12; }
@@ -1467,12 +1369,6 @@ public:
     return AMDGPU::IsaInfo::getTotalNumVGPRs(this);
   }
 
-  /// \returns Addressable number of architectural VGPRs supported by the
-  /// subtarget.
-  unsigned getAddressableNumArchVGPRs() const {
-    return AMDGPU::IsaInfo::getAddressableNumArchVGPRs(this);
-  }
-
   /// \returns Addressable number of VGPRs supported by the subtarget.
   unsigned getAddressableNumVGPRs() const {
     return AMDGPU::IsaInfo::getAddressableNumVGPRs(this);
@@ -1567,8 +1463,7 @@ public:
   }
 
   void adjustSchedDependency(SUnit *Def, int DefOpIdx, SUnit *Use, int UseOpIdx,
-                             SDep &Dep,
-                             const TargetSchedModel *SchedModel) const override;
+                             SDep &Dep) const override;
 
   // \returns true if it's beneficial on this subtarget for the scheduler to
   // cluster stores as well as loads.
@@ -1602,8 +1497,6 @@ public:
   bool hasDispatchID() const { return DispatchID; }
 
   bool hasFlatScratchInit() const { return FlatScratchInit; }
-
-  bool hasPrivateSegmentSize() const { return PrivateSegmentSize; }
 
   unsigned getNumKernargPreloadSGPRs() const { return NumKernargPreloadSGPRs; }
 
@@ -1668,8 +1561,6 @@ private:
   bool DispatchID = false;
 
   bool FlatScratchInit = false;
-
-  bool PrivateSegmentSize = false;
 
   unsigned NumKernargPreloadSGPRs = 0;
 

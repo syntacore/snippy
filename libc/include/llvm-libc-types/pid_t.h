@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_PID_T_H
-#define LLVM_LIBC_TYPES_PID_T_H
+#ifndef __LLVM_LIBC_TYPES_PID_t_H__
+#define __LLVM_LIBC_TYPES_PID_t_H__
 
 typedef __INT32_TYPE__ pid_t;
 
-#endif // LLVM_LIBC_TYPES_PID_T_H
+#endif // __LLVM_LIBC_TYPES_PID_t_H__

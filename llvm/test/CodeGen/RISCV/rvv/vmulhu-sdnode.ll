@@ -11,7 +11,9 @@ define <vscale x 1 x i32> @vmulhu_vv_nxv1i32(<vscale x 1 x i32> %va, <vscale x 1
   %vc = zext <vscale x 1 x i32> %vb to <vscale x 1 x i64>
   %vd = zext <vscale x 1 x i32> %va to <vscale x 1 x i64>
   %ve = mul <vscale x 1 x i64> %vc, %vd
-  %vf = lshr <vscale x 1 x i64> %ve, splat (i64 32)
+  %head = insertelement <vscale x 1 x i64> poison, i64 32, i32 0
+  %splat = shufflevector <vscale x 1 x i64> %head, <vscale x 1 x i64> poison, <vscale x 1 x i32> zeroinitializer
+  %vf = lshr <vscale x 1 x i64> %ve, %splat
   %vg = trunc <vscale x 1 x i64> %vf to <vscale x 1 x i32>
   ret <vscale x 1 x i32> %vg
 }
@@ -27,7 +29,9 @@ define <vscale x 1 x i32> @vmulhu_vx_nxv1i32(<vscale x 1 x i32> %va, i32 %x) {
   %vb = zext <vscale x 1 x i32> %splat1 to <vscale x 1 x i64>
   %vc = zext <vscale x 1 x i32> %va to <vscale x 1 x i64>
   %vd = mul <vscale x 1 x i64> %vb, %vc
-  %ve = lshr <vscale x 1 x i64> %vd, splat (i64 32)
+  %head2 = insertelement <vscale x 1 x i64> poison, i64 32, i32 0
+  %splat2 = shufflevector <vscale x 1 x i64> %head2, <vscale x 1 x i64> poison, <vscale x 1 x i32> zeroinitializer
+  %ve = lshr <vscale x 1 x i64> %vd, %splat2
   %vf = trunc <vscale x 1 x i64> %ve to <vscale x 1 x i32>
   ret <vscale x 1 x i32> %vf
 }
@@ -39,10 +43,14 @@ define <vscale x 1 x i32> @vmulhu_vi_nxv1i32_0(<vscale x 1 x i32> %va) {
 ; CHECK-NEXT:    vsetvli a1, zero, e32, mf2, ta, ma
 ; CHECK-NEXT:    vmulhu.vx v8, v8, a0
 ; CHECK-NEXT:    ret
-  %vb = zext <vscale x 1 x i32> splat (i32 -7) to <vscale x 1 x i64>
+  %head1 = insertelement <vscale x 1 x i32> poison, i32 -7, i32 0
+  %splat1 = shufflevector <vscale x 1 x i32> %head1, <vscale x 1 x i32> poison, <vscale x 1 x i32> zeroinitializer
+  %vb = zext <vscale x 1 x i32> %splat1 to <vscale x 1 x i64>
   %vc = zext <vscale x 1 x i32> %va to <vscale x 1 x i64>
   %vd = mul <vscale x 1 x i64> %vb, %vc
-  %ve = lshr <vscale x 1 x i64> %vd, splat (i64 32)
+  %head2 = insertelement <vscale x 1 x i64> poison, i64 32, i32 0
+  %splat2 = shufflevector <vscale x 1 x i64> %head2, <vscale x 1 x i64> poison, <vscale x 1 x i32> zeroinitializer
+  %ve = lshr <vscale x 1 x i64> %vd, %splat2
   %vf = trunc <vscale x 1 x i64> %ve to <vscale x 1 x i32>
   ret <vscale x 1 x i32> %vf
 }
@@ -60,10 +68,14 @@ define <vscale x 1 x i32> @vmulhu_vi_nxv1i32_1(<vscale x 1 x i32> %va) {
 ; RV64-NEXT:    vsetvli a1, zero, e32, mf2, ta, ma
 ; RV64-NEXT:    vmulhu.vx v8, v8, a0
 ; RV64-NEXT:    ret
-  %vb = zext <vscale x 1 x i32> splat (i32 16) to <vscale x 1 x i64>
+  %head1 = insertelement <vscale x 1 x i32> poison, i32 16, i32 0
+  %splat1 = shufflevector <vscale x 1 x i32> %head1, <vscale x 1 x i32> poison, <vscale x 1 x i32> zeroinitializer
+  %vb = zext <vscale x 1 x i32> %splat1 to <vscale x 1 x i64>
   %vc = zext <vscale x 1 x i32> %va to <vscale x 1 x i64>
   %vd = mul <vscale x 1 x i64> %vb, %vc
-  %ve = lshr <vscale x 1 x i64> %vd, splat (i64 32)
+  %head2 = insertelement <vscale x 1 x i64> poison, i64 32, i32 0
+  %splat2 = shufflevector <vscale x 1 x i64> %head2, <vscale x 1 x i64> poison, <vscale x 1 x i32> zeroinitializer
+  %ve = lshr <vscale x 1 x i64> %vd, %splat2
   %vf = trunc <vscale x 1 x i64> %ve to <vscale x 1 x i32>
   ret <vscale x 1 x i32> %vf
 }
@@ -77,7 +89,9 @@ define <vscale x 2 x i32> @vmulhu_vv_nxv2i32(<vscale x 2 x i32> %va, <vscale x 2
   %vc = zext <vscale x 2 x i32> %vb to <vscale x 2 x i64>
   %vd = zext <vscale x 2 x i32> %va to <vscale x 2 x i64>
   %ve = mul <vscale x 2 x i64> %vc, %vd
-  %vf = lshr <vscale x 2 x i64> %ve, splat (i64 32)
+  %head = insertelement <vscale x 2 x i64> poison, i64 32, i32 0
+  %splat = shufflevector <vscale x 2 x i64> %head, <vscale x 2 x i64> poison, <vscale x 2 x i32> zeroinitializer
+  %vf = lshr <vscale x 2 x i64> %ve, %splat
   %vg = trunc <vscale x 2 x i64> %vf to <vscale x 2 x i32>
   ret <vscale x 2 x i32> %vg
 }
@@ -93,7 +107,9 @@ define <vscale x 2 x i32> @vmulhu_vx_nxv2i32(<vscale x 2 x i32> %va, i32 %x) {
   %vb = zext <vscale x 2 x i32> %splat1 to <vscale x 2 x i64>
   %vc = zext <vscale x 2 x i32> %va to <vscale x 2 x i64>
   %vd = mul <vscale x 2 x i64> %vb, %vc
-  %ve = lshr <vscale x 2 x i64> %vd, splat (i64 32)
+  %head2 = insertelement <vscale x 2 x i64> poison, i64 32, i32 0
+  %splat2 = shufflevector <vscale x 2 x i64> %head2, <vscale x 2 x i64> poison, <vscale x 2 x i32> zeroinitializer
+  %ve = lshr <vscale x 2 x i64> %vd, %splat2
   %vf = trunc <vscale x 2 x i64> %ve to <vscale x 2 x i32>
   ret <vscale x 2 x i32> %vf
 }
@@ -105,10 +121,14 @@ define <vscale x 2 x i32> @vmulhu_vi_nxv2i32_0(<vscale x 2 x i32> %va) {
 ; CHECK-NEXT:    vsetvli a1, zero, e32, m1, ta, ma
 ; CHECK-NEXT:    vmulhu.vx v8, v8, a0
 ; CHECK-NEXT:    ret
-  %vb = zext <vscale x 2 x i32> splat (i32 -7) to <vscale x 2 x i64>
+  %head1 = insertelement <vscale x 2 x i32> poison, i32 -7, i32 0
+  %splat1 = shufflevector <vscale x 2 x i32> %head1, <vscale x 2 x i32> poison, <vscale x 2 x i32> zeroinitializer
+  %vb = zext <vscale x 2 x i32> %splat1 to <vscale x 2 x i64>
   %vc = zext <vscale x 2 x i32> %va to <vscale x 2 x i64>
   %vd = mul <vscale x 2 x i64> %vb, %vc
-  %ve = lshr <vscale x 2 x i64> %vd, splat (i64 32)
+  %head2 = insertelement <vscale x 2 x i64> poison, i64 32, i32 0
+  %splat2 = shufflevector <vscale x 2 x i64> %head2, <vscale x 2 x i64> poison, <vscale x 2 x i32> zeroinitializer
+  %ve = lshr <vscale x 2 x i64> %vd, %splat2
   %vf = trunc <vscale x 2 x i64> %ve to <vscale x 2 x i32>
   ret <vscale x 2 x i32> %vf
 }
@@ -126,10 +146,14 @@ define <vscale x 2 x i32> @vmulhu_vi_nxv2i32_1(<vscale x 2 x i32> %va) {
 ; RV64-NEXT:    vsetvli a1, zero, e32, m1, ta, ma
 ; RV64-NEXT:    vmulhu.vx v8, v8, a0
 ; RV64-NEXT:    ret
-  %vb = zext <vscale x 2 x i32> splat (i32 16) to <vscale x 2 x i64>
+  %head1 = insertelement <vscale x 2 x i32> poison, i32 16, i32 0
+  %splat1 = shufflevector <vscale x 2 x i32> %head1, <vscale x 2 x i32> poison, <vscale x 2 x i32> zeroinitializer
+  %vb = zext <vscale x 2 x i32> %splat1 to <vscale x 2 x i64>
   %vc = zext <vscale x 2 x i32> %va to <vscale x 2 x i64>
   %vd = mul <vscale x 2 x i64> %vb, %vc
-  %ve = lshr <vscale x 2 x i64> %vd, splat (i64 32)
+  %head2 = insertelement <vscale x 2 x i64> poison, i64 32, i32 0
+  %splat2 = shufflevector <vscale x 2 x i64> %head2, <vscale x 2 x i64> poison, <vscale x 2 x i32> zeroinitializer
+  %ve = lshr <vscale x 2 x i64> %vd, %splat2
   %vf = trunc <vscale x 2 x i64> %ve to <vscale x 2 x i32>
   ret <vscale x 2 x i32> %vf
 }
@@ -143,7 +167,9 @@ define <vscale x 4 x i32> @vmulhu_vv_nxv4i32(<vscale x 4 x i32> %va, <vscale x 4
   %vc = zext <vscale x 4 x i32> %vb to <vscale x 4 x i64>
   %vd = zext <vscale x 4 x i32> %va to <vscale x 4 x i64>
   %ve = mul <vscale x 4 x i64> %vc, %vd
-  %vf = lshr <vscale x 4 x i64> %ve, splat (i64 32)
+  %head = insertelement <vscale x 4 x i64> poison, i64 32, i32 0
+  %splat = shufflevector <vscale x 4 x i64> %head, <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
+  %vf = lshr <vscale x 4 x i64> %ve, %splat
   %vg = trunc <vscale x 4 x i64> %vf to <vscale x 4 x i32>
   ret <vscale x 4 x i32> %vg
 }
@@ -159,7 +185,9 @@ define <vscale x 4 x i32> @vmulhu_vx_nxv4i32(<vscale x 4 x i32> %va, i32 %x) {
   %vb = zext <vscale x 4 x i32> %splat1 to <vscale x 4 x i64>
   %vc = zext <vscale x 4 x i32> %va to <vscale x 4 x i64>
   %vd = mul <vscale x 4 x i64> %vb, %vc
-  %ve = lshr <vscale x 4 x i64> %vd, splat (i64 32)
+  %head2 = insertelement <vscale x 4 x i64> poison, i64 32, i32 0
+  %splat2 = shufflevector <vscale x 4 x i64> %head2, <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
+  %ve = lshr <vscale x 4 x i64> %vd, %splat2
   %vf = trunc <vscale x 4 x i64> %ve to <vscale x 4 x i32>
   ret <vscale x 4 x i32> %vf
 }
@@ -171,10 +199,14 @@ define <vscale x 4 x i32> @vmulhu_vi_nxv4i32_0(<vscale x 4 x i32> %va) {
 ; CHECK-NEXT:    vsetvli a1, zero, e32, m2, ta, ma
 ; CHECK-NEXT:    vmulhu.vx v8, v8, a0
 ; CHECK-NEXT:    ret
-  %vb = zext <vscale x 4 x i32> splat (i32 -7) to <vscale x 4 x i64>
+  %head1 = insertelement <vscale x 4 x i32> poison, i32 -7, i32 0
+  %splat1 = shufflevector <vscale x 4 x i32> %head1, <vscale x 4 x i32> poison, <vscale x 4 x i32> zeroinitializer
+  %vb = zext <vscale x 4 x i32> %splat1 to <vscale x 4 x i64>
   %vc = zext <vscale x 4 x i32> %va to <vscale x 4 x i64>
   %vd = mul <vscale x 4 x i64> %vb, %vc
-  %ve = lshr <vscale x 4 x i64> %vd, splat (i64 32)
+  %head2 = insertelement <vscale x 4 x i64> poison, i64 32, i32 0
+  %splat2 = shufflevector <vscale x 4 x i64> %head2, <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
+  %ve = lshr <vscale x 4 x i64> %vd, %splat2
   %vf = trunc <vscale x 4 x i64> %ve to <vscale x 4 x i32>
   ret <vscale x 4 x i32> %vf
 }
@@ -192,10 +224,14 @@ define <vscale x 4 x i32> @vmulhu_vi_nxv4i32_1(<vscale x 4 x i32> %va) {
 ; RV64-NEXT:    vsetvli a1, zero, e32, m2, ta, ma
 ; RV64-NEXT:    vmulhu.vx v8, v8, a0
 ; RV64-NEXT:    ret
-  %vb = zext <vscale x 4 x i32> splat (i32 16) to <vscale x 4 x i64>
+  %head1 = insertelement <vscale x 4 x i32> poison, i32 16, i32 0
+  %splat1 = shufflevector <vscale x 4 x i32> %head1, <vscale x 4 x i32> poison, <vscale x 4 x i32> zeroinitializer
+  %vb = zext <vscale x 4 x i32> %splat1 to <vscale x 4 x i64>
   %vc = zext <vscale x 4 x i32> %va to <vscale x 4 x i64>
   %vd = mul <vscale x 4 x i64> %vb, %vc
-  %ve = lshr <vscale x 4 x i64> %vd, splat (i64 32)
+  %head2 = insertelement <vscale x 4 x i64> poison, i64 32, i32 0
+  %splat2 = shufflevector <vscale x 4 x i64> %head2, <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
+  %ve = lshr <vscale x 4 x i64> %vd, %splat2
   %vf = trunc <vscale x 4 x i64> %ve to <vscale x 4 x i32>
   ret <vscale x 4 x i32> %vf
 }
@@ -209,7 +245,9 @@ define <vscale x 8 x i32> @vmulhu_vv_nxv8i32(<vscale x 8 x i32> %va, <vscale x 8
   %vc = zext <vscale x 8 x i32> %vb to <vscale x 8 x i64>
   %vd = zext <vscale x 8 x i32> %va to <vscale x 8 x i64>
   %ve = mul <vscale x 8 x i64> %vc, %vd
-  %vf = lshr <vscale x 8 x i64> %ve, splat (i64 32)
+  %head = insertelement <vscale x 8 x i64> poison, i64 32, i32 0
+  %splat = shufflevector <vscale x 8 x i64> %head, <vscale x 8 x i64> poison, <vscale x 8 x i32> zeroinitializer
+  %vf = lshr <vscale x 8 x i64> %ve, %splat
   %vg = trunc <vscale x 8 x i64> %vf to <vscale x 8 x i32>
   ret <vscale x 8 x i32> %vg
 }
@@ -225,7 +263,9 @@ define <vscale x 8 x i32> @vmulhu_vx_nxv8i32(<vscale x 8 x i32> %va, i32 %x) {
   %vb = zext <vscale x 8 x i32> %splat1 to <vscale x 8 x i64>
   %vc = zext <vscale x 8 x i32> %va to <vscale x 8 x i64>
   %vd = mul <vscale x 8 x i64> %vb, %vc
-  %ve = lshr <vscale x 8 x i64> %vd, splat (i64 32)
+  %head2 = insertelement <vscale x 8 x i64> poison, i64 32, i32 0
+  %splat2 = shufflevector <vscale x 8 x i64> %head2, <vscale x 8 x i64> poison, <vscale x 8 x i32> zeroinitializer
+  %ve = lshr <vscale x 8 x i64> %vd, %splat2
   %vf = trunc <vscale x 8 x i64> %ve to <vscale x 8 x i32>
   ret <vscale x 8 x i32> %vf
 }
@@ -237,10 +277,14 @@ define <vscale x 8 x i32> @vmulhu_vi_nxv8i32_0(<vscale x 8 x i32> %va) {
 ; CHECK-NEXT:    vsetvli a1, zero, e32, m4, ta, ma
 ; CHECK-NEXT:    vmulhu.vx v8, v8, a0
 ; CHECK-NEXT:    ret
-  %vb = zext <vscale x 8 x i32> splat (i32 -7) to <vscale x 8 x i64>
+  %head1 = insertelement <vscale x 8 x i32> poison, i32 -7, i32 0
+  %splat1 = shufflevector <vscale x 8 x i32> %head1, <vscale x 8 x i32> poison, <vscale x 8 x i32> zeroinitializer
+  %vb = zext <vscale x 8 x i32> %splat1 to <vscale x 8 x i64>
   %vc = zext <vscale x 8 x i32> %va to <vscale x 8 x i64>
   %vd = mul <vscale x 8 x i64> %vb, %vc
-  %ve = lshr <vscale x 8 x i64> %vd, splat (i64 32)
+  %head2 = insertelement <vscale x 8 x i64> poison, i64 32, i32 0
+  %splat2 = shufflevector <vscale x 8 x i64> %head2, <vscale x 8 x i64> poison, <vscale x 8 x i32> zeroinitializer
+  %ve = lshr <vscale x 8 x i64> %vd, %splat2
   %vf = trunc <vscale x 8 x i64> %ve to <vscale x 8 x i32>
   ret <vscale x 8 x i32> %vf
 }
@@ -258,10 +302,14 @@ define <vscale x 8 x i32> @vmulhu_vi_nxv8i32_1(<vscale x 8 x i32> %va) {
 ; RV64-NEXT:    vsetvli a1, zero, e32, m4, ta, ma
 ; RV64-NEXT:    vmulhu.vx v8, v8, a0
 ; RV64-NEXT:    ret
-  %vb = zext <vscale x 8 x i32> splat (i32 16) to <vscale x 8 x i64>
+  %head1 = insertelement <vscale x 8 x i32> poison, i32 16, i32 0
+  %splat1 = shufflevector <vscale x 8 x i32> %head1, <vscale x 8 x i32> poison, <vscale x 8 x i32> zeroinitializer
+  %vb = zext <vscale x 8 x i32> %splat1 to <vscale x 8 x i64>
   %vc = zext <vscale x 8 x i32> %va to <vscale x 8 x i64>
   %vd = mul <vscale x 8 x i64> %vb, %vc
-  %ve = lshr <vscale x 8 x i64> %vd, splat (i64 32)
+  %head2 = insertelement <vscale x 8 x i64> poison, i64 32, i32 0
+  %splat2 = shufflevector <vscale x 8 x i64> %head2, <vscale x 8 x i64> poison, <vscale x 8 x i32> zeroinitializer
+  %ve = lshr <vscale x 8 x i64> %vd, %splat2
   %vf = trunc <vscale x 8 x i64> %ve to <vscale x 8 x i32>
   ret <vscale x 8 x i32> %vf
 }

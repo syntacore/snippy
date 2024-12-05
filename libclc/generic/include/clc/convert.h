@@ -20,19 +20,10 @@
   _CLC_VECTOR_CONVERT_DECL(FROM_TYPE, ulong, SUFFIX) \
   _CLC_VECTOR_CONVERT_DECL(FROM_TYPE, float, SUFFIX)
 
-#if defined(cl_khr_fp64) && defined(cl_khr_fp16)
-#define _CLC_VECTOR_CONVERT_FROM(FROM_TYPE, SUFFIX)                            \
-  _CLC_VECTOR_CONVERT_FROM1(FROM_TYPE, SUFFIX)                                 \
-  _CLC_VECTOR_CONVERT_DECL(FROM_TYPE, double, SUFFIX)                          \
-  _CLC_VECTOR_CONVERT_DECL(FROM_TYPE, half, SUFFIX)
-#elif defined(cl_khr_fp64)
+#ifdef cl_khr_fp64
 #define _CLC_VECTOR_CONVERT_FROM(FROM_TYPE, SUFFIX) \
   _CLC_VECTOR_CONVERT_FROM1(FROM_TYPE, SUFFIX) \
   _CLC_VECTOR_CONVERT_DECL(FROM_TYPE, double, SUFFIX)
-#elif defined(cl_khr_fp16)
-#define _CLC_VECTOR_CONVERT_FROM(FROM_TYPE, SUFFIX)                            \
-  _CLC_VECTOR_CONVERT_FROM1(FROM_TYPE, SUFFIX)                                 \
-  _CLC_VECTOR_CONVERT_DECL(FROM_TYPE, half, SUFFIX)
 #else
 #define _CLC_VECTOR_CONVERT_FROM(FROM_TYPE, SUFFIX) \
   _CLC_VECTOR_CONVERT_FROM1(FROM_TYPE, SUFFIX)
@@ -49,19 +40,10 @@
   _CLC_VECTOR_CONVERT_FROM(ulong, SUFFIX) \
   _CLC_VECTOR_CONVERT_FROM(float, SUFFIX)
 
-#if defined(cl_khr_fp64) && defined(cl_khr_fp16)
-#define _CLC_VECTOR_CONVERT_TO(SUFFIX)                                         \
-  _CLC_VECTOR_CONVERT_TO1(SUFFIX)                                              \
-  _CLC_VECTOR_CONVERT_FROM(double, SUFFIX)                                     \
-  _CLC_VECTOR_CONVERT_FROM(half, SUFFIX)
-#elif defined(cl_khr_fp64)
+#ifdef cl_khr_fp64
 #define _CLC_VECTOR_CONVERT_TO(SUFFIX) \
   _CLC_VECTOR_CONVERT_TO1(SUFFIX) \
   _CLC_VECTOR_CONVERT_FROM(double, SUFFIX)
-#elif defined(cl_khr_fp16)
-#define _CLC_VECTOR_CONVERT_TO(SUFFIX)                                         \
-  _CLC_VECTOR_CONVERT_TO1(SUFFIX)                                              \
-  _CLC_VECTOR_CONVERT_FROM(half, SUFFIX)
 #else
 #define _CLC_VECTOR_CONVERT_TO(SUFFIX) \
   _CLC_VECTOR_CONVERT_TO1(SUFFIX)

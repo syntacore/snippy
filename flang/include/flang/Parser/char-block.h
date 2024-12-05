@@ -129,23 +129,13 @@ public:
 
 private:
   int Compare(const CharBlock &that) const {
-    // "memcmp" in glibc has "nonnull" attributes on the input pointers.
-    // Avoid passing null pointers, since it would result in an undefined
-    // behavior.
-    if (size() == 0) {
-      return that.size() == 0 ? 0 : -1;
-    } else if (that.size() == 0) {
-      return 1;
-    } else {
-      std::size_t bytes{std::min(size(), that.size())};
-      int cmp{std::memcmp(static_cast<const void *>(begin()),
-          static_cast<const void *>(that.begin()), bytes)};
-      if (cmp != 0) {
-        return cmp;
-      } else {
-        return size() < that.size() ? -1 : size() > that.size();
-      }
+    std::size_t bytes{std::min(size(), that.size())};
+    int cmp{std::memcmp(static_cast<const void *>(begin()),
+        static_cast<const void *>(that.begin()), bytes)};
+    if (cmp != 0) {
+      return cmp;
     }
+    return size() < that.size() ? -1 : size() > that.size();
   }
 
   int Compare(const char *that) const {

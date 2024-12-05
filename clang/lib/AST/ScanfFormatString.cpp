@@ -448,7 +448,9 @@ bool ScanfSpecifier::fixType(QualType QT, QualType RawQT,
     if (const ConstantArrayType *CAT = Ctx.getAsConstantArrayType(RawQT)) {
       if (CAT->getSizeModifier() == ArraySizeModifier::Normal)
         FieldWidth = OptionalAmount(OptionalAmount::Constant,
-                                    CAT->getZExtSize() - 1, "", 0, false);
+                                    CAT->getSize().getZExtValue() - 1,
+                                    "", 0, false);
+
     }
     return true;
   }

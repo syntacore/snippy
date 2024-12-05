@@ -503,7 +503,8 @@ llvm::Error dwarfgen::Generator::init(Triple TheTriple, uint16_t V) {
   MS = TheTarget->createMCObjectStreamer(
       TheTriple, *MC, std::unique_ptr<MCAsmBackend>(MAB),
       MAB->createObjectWriter(*Stream), std::unique_ptr<MCCodeEmitter>(MCE),
-      *MSTI);
+      *MSTI, MCOptions.MCRelaxAll, MCOptions.MCIncrementalLinkerCompatible,
+      /*DWARFMustBeAtTheEnd*/ false);
   if (!MS)
     return make_error<StringError>("no object streamer for target " +
                                        TripleName,
@@ -567,20 +568,12 @@ StringRef dwarfgen::Generator::generate() {
   for (auto &CU : CompileUnits) {
     // Set the absolute .debug_info offset for this compile unit.
     CU->setOffset(SecOffset);
-    // The DIEs contain compile unit relative offsets and the offset depends
-    // on the Dwarf version.
-    unsigned CUOffset = 4 + // Length
-                        2 + // Version
-                        4 + // Abbreviation offset
-                        1;  // Address size
-    if (Asm->getDwarfVersion() >= 5)
-      CUOffset += 1; // DW_UT_compile tag.
-
+    // The DIEs contain compile unit relative offsets.
+    unsigned CUOffset = 11;
     CUOffset = CU->getUnitDIE().computeSizeAndOffsets(CUOffset);
     // Update our absolute .debug_info offset.
     SecOffset += CUOffset;
-    unsigned CUOffsetUnitLength = 4;
-    CU->setLength(CUOffset - CUOffsetUnitLength);
+    CU->setLength(CUOffset - 4);
   }
   Abbreviations.Emit(Asm.get(), TLOF->getDwarfAbbrevSection());
 

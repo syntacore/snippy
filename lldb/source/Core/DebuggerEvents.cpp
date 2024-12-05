@@ -9,7 +9,6 @@
 #include "lldb/Core/DebuggerEvents.h"
 #include "lldb/Core/Debugger.h"
 #include "lldb/Core/Module.h"
-#include "lldb/Core/Progress.h"
 #include "llvm/Support/WithColor.h"
 
 using namespace lldb_private;
@@ -42,7 +41,7 @@ void ProgressEventData::Dump(Stream *s) const {
     s->PutCString(", type = update");
   // If m_total is UINT64_MAX, there is no progress to report, just "start"
   // and "end". If it isn't we will show the completed and total amounts.
-  if (m_total != Progress::kNonDeterministicTotal)
+  if (m_total != UINT64_MAX)
     s->Printf(", progress = %" PRIu64 " of %" PRIu64, m_completed, m_total);
 }
 
@@ -73,19 +72,19 @@ ProgressEventData::GetAsStructuredData(const Event *event_ptr) {
 }
 
 llvm::StringRef DiagnosticEventData::GetPrefix() const {
-  switch (m_severity) {
-  case Severity::eSeverityInfo:
+  switch (m_type) {
+  case Type::Info:
     return "info";
-  case Severity::eSeverityWarning:
+  case Type::Warning:
     return "warning";
-  case Severity::eSeverityError:
+  case Type::Error:
     return "error";
   }
   llvm_unreachable("Fully covered switch above!");
 }
 
 void DiagnosticEventData::Dump(Stream *s) const {
-  llvm::HighlightColor color = m_severity == lldb::eSeverityWarning
+  llvm::HighlightColor color = m_type == Type::Warning
                                    ? llvm::HighlightColor::Warning
                                    : llvm::HighlightColor::Error;
   llvm::WithColor(s->AsRawOstream(), color, llvm::ColorMode::Enable)

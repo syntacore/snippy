@@ -88,16 +88,20 @@ createCSKYObjectTargetStreamer(MCStreamer &S, const MCSubtargetInfo &STI) {
 static MCStreamer *createELFStreamer(const Triple &T, MCContext &Ctx,
                                      std::unique_ptr<MCAsmBackend> &&MAB,
                                      std::unique_ptr<MCObjectWriter> &&OW,
-                                     std::unique_ptr<MCCodeEmitter> &&Emitter) {
+                                     std::unique_ptr<MCCodeEmitter> &&Emitter,
+                                     bool RelaxAll) {
   CSKYELFStreamer *S = new CSKYELFStreamer(Ctx, std::move(MAB), std::move(OW),
                                            std::move(Emitter));
 
+  if (RelaxAll)
+    S->getAssembler().setRelaxAll(true);
   return S;
 }
 
-static MCTargetStreamer *
-createCSKYAsmTargetStreamer(MCStreamer &S, formatted_raw_ostream &OS,
-                            MCInstPrinter *InstPrinter) {
+static MCTargetStreamer *createCSKYAsmTargetStreamer(MCStreamer &S,
+                                                     formatted_raw_ostream &OS,
+                                                     MCInstPrinter *InstPrinter,
+                                                     bool isVerboseAsm) {
   return new CSKYTargetAsmStreamer(S, OS);
 }
 

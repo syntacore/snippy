@@ -8,11 +8,11 @@
 //===----------------------------------------------------------------------===//
 
 export namespace std {
-  using std::sig_atomic_t _LIBCPP_USING_IF_EXISTS;
+  using std::sig_atomic_t;
 
   // [support.signal], signal handlers
-  using std::signal _LIBCPP_USING_IF_EXISTS;
+  using std::signal;
 
-  using std::raise _LIBCPP_USING_IF_EXISTS;
+  using std::raise;
 
 } // namespace std

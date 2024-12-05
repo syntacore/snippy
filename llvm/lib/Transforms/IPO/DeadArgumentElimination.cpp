@@ -204,9 +204,9 @@ bool DeadArgumentEliminationPass::deleteDeadVarargs(Function &F) {
     CallBase *NewCB = nullptr;
     if (InvokeInst *II = dyn_cast<InvokeInst>(CB)) {
       NewCB = InvokeInst::Create(NF, II->getNormalDest(), II->getUnwindDest(),
-                                 Args, OpBundles, "", CB->getIterator());
+                                 Args, OpBundles, "", CB);
     } else {
-      NewCB = CallInst::Create(NF, Args, OpBundles, "", CB->getIterator());
+      NewCB = CallInst::Create(NF, Args, OpBundles, "", CB);
       cast<CallInst>(NewCB)->setTailCallKind(
           cast<CallInst>(CB)->getTailCallKind());
     }
@@ -319,7 +319,9 @@ bool DeadArgumentEliminationPass::removeDeadArgumentsFromCallers(Function &F) {
       continue;
 
     // Now go through all unused args and replace them with poison.
-    for (unsigned ArgNo : UnusedArgs) {
+    for (unsigned I = 0, E = UnusedArgs.size(); I != E; ++I) {
+      unsigned ArgNo = UnusedArgs[I];
+
       Value *Arg = CB->getArgOperand(ArgNo);
       CB->setArgOperand(ArgNo, PoisonValue::get(Arg->getType()));
       CB->removeParamAttrs(ArgNo, UBImplyingAttributes);
@@ -944,7 +946,7 @@ bool DeadArgumentEliminationPass::removeDeadStuffFromFunction(Function *F) {
       NewCB = InvokeInst::Create(NF, II->getNormalDest(), II->getUnwindDest(),
                                  Args, OpBundles, "", CB.getParent());
     } else {
-      NewCB = CallInst::Create(NFTy, NF, Args, OpBundles, "", CB.getIterator());
+      NewCB = CallInst::Create(NFTy, NF, Args, OpBundles, "", &CB);
       cast<CallInst>(NewCB)->setTailCallKind(
           cast<CallInst>(&CB)->getTailCallKind());
     }
@@ -1068,8 +1070,7 @@ bool DeadArgumentEliminationPass::removeDeadStuffFromFunction(Function *F) {
         }
         // Replace the return instruction with one returning the new return
         // value (possibly 0 if we became void).
-        auto *NewRet =
-            ReturnInst::Create(F->getContext(), RetVal, RI->getIterator());
+        auto *NewRet = ReturnInst::Create(F->getContext(), RetVal, RI);
         NewRet->setDebugLoc(RI->getDebugLoc());
         RI->eraseFromParent();
       }

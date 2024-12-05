@@ -3,17 +3,6 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${LIBC_TARGET_OS})
 endif()
 
 add_entrypoint_object(
-  _exit
-  SRCS
-    _exit.cpp
-  HDRS
-    _exit.h
-  DEPENDS
-    libc.include.unistd
-    libc.src.__support.OSUtil.osutil
-)
-
-add_entrypoint_object(
   access
   ALIAS
   DEPENDS
@@ -67,13 +56,6 @@ add_entrypoint_object(
   ALIAS
   DEPENDS
     .${LIBC_TARGET_OS}.fork
-)
-
-add_entrypoint_object(
-  fpathconf
-  ALIAS
-  DEPENDS
-    .${LIBC_TARGET_OS}.fpathconf
 )
 
 add_entrypoint_object(
@@ -165,21 +147,6 @@ add_entrypoint_object(
   ALIAS
   DEPENDS
     .${LIBC_TARGET_OS}.lseek
-)
-
-add_entrypoint_object(
-  pathconf
-  ALIAS
-  DEPENDS
-    .${LIBC_TARGET_OS}.pathconf
-)
-
-
-add_entrypoint_object(
-  pipe
-  ALIAS
-  DEPENDS
-    .${LIBC_TARGET_OS}.pipe
 )
 
 add_entrypoint_object(
@@ -332,14 +299,4 @@ add_entrypoint_external(
 
 add_entrypoint_external(
   opterr
-)
-
-add_entrypoint_object(
-  gettid
-  SRCS
-    gettid.cpp
-  HDRS
-    gettid.h
-  DEPENDS
-    libc.src.__support.threads.tid
 )

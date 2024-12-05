@@ -34,7 +34,8 @@ struct TestLinalgDropUnitDims
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestLinalgDropUnitDims)
 
   TestLinalgDropUnitDims() = default;
-  TestLinalgDropUnitDims(const TestLinalgDropUnitDims &pass) = default;
+  TestLinalgDropUnitDims(const TestLinalgDropUnitDims &pass)
+      : PassWrapper(pass) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();

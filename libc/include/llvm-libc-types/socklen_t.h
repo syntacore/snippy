@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_SOCKLEN_T_H
-#define LLVM_LIBC_TYPES_SOCKLEN_T_H
+#ifndef __LLVM_LIBC_TYPES_SOCKLEN_T_H__
+#define __LLVM_LIBC_TYPES_SOCKLEN_T_H__
 
 // The posix standard only says of socklen_t that it must be an integer type of
 // width of at least 32 bits. The long type is defined as being at least 32
@@ -15,4 +15,4 @@
 
 typedef unsigned long socklen_t;
 
-#endif // LLVM_LIBC_TYPES_SOCKLEN_T_H
+#endif // __LLVM_LIBC_TYPES_SOCKLEN_T_H__

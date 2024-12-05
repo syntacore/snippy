@@ -368,12 +368,14 @@ public:
 
     // 'Items' starts with a 16-bit unsigned integer representing the
     // number of items in this bucket.
-    unsigned Len = endian::readNext<uint16_t, llvm::endianness::little>(Items);
+    unsigned Len =
+        endian::readNext<uint16_t, llvm::endianness::little, unaligned>(Items);
 
     for (unsigned i = 0; i < Len; ++i) {
       // Read the hash.
       hash_value_type ItemHash =
-          endian::readNext<hash_value_type, llvm::endianness::little>(Items);
+          endian::readNext<hash_value_type, llvm::endianness::little,
+                           unaligned>(Items);
 
       // Determine the length of the key and the data.
       const std::pair<offset_type, offset_type> &L =
@@ -471,7 +473,8 @@ private:
         // 'Items' starts with a 16-bit unsigned integer representing the
         // number of items in this bucket.
         NumItemsInBucketLeft =
-            endian::readNext<uint16_t, llvm::endianness::little>(Ptr);
+            endian::readNext<uint16_t, llvm::endianness::little, unaligned>(
+                Ptr);
       }
       Ptr += sizeof(hash_value_type); // Skip the hash.
       // Determine the length of the key and the data.

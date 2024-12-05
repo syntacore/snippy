@@ -6,7 +6,7 @@
 program omp_do
   integer ::  i = 0,k
   !$omp do
-  !ERROR: The associated loop of a loop-associated directive cannot be a DO WHILE.
+  !ERROR: The DO loop cannot be a DO WHILE with DO directive.
   do while (i <= 10)
     print *, "it",i
     i = i+1
@@ -14,7 +14,7 @@ program omp_do
   !$omp end do
 
   !$omp do
-  !ERROR: The associated loop of a loop-associated directive cannot be a DO WHILE.
+  !ERROR: The DO loop cannot be a DO WHILE with DO directive.
   do while (i <= 10)
     do while (j <= 10)
       print *, "it",k

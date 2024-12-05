@@ -84,20 +84,21 @@ BaseIndexOffset GISelAddressing::getPointerInfo(Register Ptr,
                                                 MachineRegisterInfo &MRI) {
   BaseIndexOffset Info;
   Register PtrAddRHS;
-  Register BaseReg;
-  if (!mi_match(Ptr, MRI, m_GPtrAdd(m_Reg(BaseReg), m_Reg(PtrAddRHS)))) {
-    Info.setBase(Ptr);
-    Info.setOffset(0);
+  if (!mi_match(Ptr, MRI, m_GPtrAdd(m_Reg(Info.BaseReg), m_Reg(PtrAddRHS)))) {
+    Info.BaseReg = Ptr;
+    Info.IndexReg = Register();
+    Info.IsIndexSignExt = false;
     return Info;
   }
-  Info.setBase(BaseReg);
+
   auto RHSCst = getIConstantVRegValWithLookThrough(PtrAddRHS, MRI);
   if (RHSCst)
-    Info.setOffset(RHSCst->Value.getSExtValue());
+    Info.Offset = RHSCst->Value.getSExtValue();
 
   // Just recognize a simple case for now. In future we'll need to match
   // indexing patterns for base + index + constant.
-  Info.setIndex(PtrAddRHS);
+  Info.IndexReg = PtrAddRHS;
+  Info.IsIndexSignExt = false;
   return Info;
 }
 
@@ -113,33 +114,34 @@ bool GISelAddressing::aliasIsKnownForLoadStore(const MachineInstr &MI1,
   BaseIndexOffset BasePtr0 = getPointerInfo(LdSt1->getPointerReg(), MRI);
   BaseIndexOffset BasePtr1 = getPointerInfo(LdSt2->getPointerReg(), MRI);
 
-  if (!BasePtr0.getBase().isValid() || !BasePtr1.getBase().isValid())
+  if (!BasePtr0.BaseReg.isValid() || !BasePtr1.BaseReg.isValid())
     return false;
 
-  LocationSize Size1 = LdSt1->getMemSize();
-  LocationSize Size2 = LdSt2->getMemSize();
+  int64_t Size1 = LdSt1->getMemSize();
+  int64_t Size2 = LdSt2->getMemSize();
 
   int64_t PtrDiff;
-  if (BasePtr0.getBase() == BasePtr1.getBase() && BasePtr0.hasValidOffset() &&
-      BasePtr1.hasValidOffset()) {
-    PtrDiff = BasePtr1.getOffset() - BasePtr0.getOffset();
+  if (BasePtr0.BaseReg == BasePtr1.BaseReg) {
+    PtrDiff = BasePtr1.Offset - BasePtr0.Offset;
     // If the size of memory access is unknown, do not use it to do analysis.
     // One example of unknown size memory access is to load/store scalable
     // vector objects on the stack.
     // BasePtr1 is PtrDiff away from BasePtr0. They alias if none of the
     // following situations arise:
-    if (PtrDiff >= 0 && Size1.hasValue() && !Size1.isScalable()) {
+    if (PtrDiff >= 0 &&
+        Size1 != static_cast<int64_t>(MemoryLocation::UnknownSize)) {
       // [----BasePtr0----]
       //                         [---BasePtr1--]
       // ========PtrDiff========>
-      IsAlias = !((int64_t)Size1.getValue() <= PtrDiff);
+      IsAlias = !(Size1 <= PtrDiff);
       return true;
     }
-    if (PtrDiff < 0 && Size2.hasValue() && !Size2.isScalable()) {
+    if (PtrDiff < 0 &&
+        Size2 != static_cast<int64_t>(MemoryLocation::UnknownSize)) {
       //                     [----BasePtr0----]
       // [---BasePtr1--]
       // =====(-PtrDiff)====>
-      IsAlias = !((PtrDiff + (int64_t)Size2.getValue()) <= 0);
+      IsAlias = !((PtrDiff + Size2) <= 0);
       return true;
     }
     return false;
@@ -149,8 +151,8 @@ bool GISelAddressing::aliasIsKnownForLoadStore(const MachineInstr &MI1,
   // able to calculate their relative offset if at least one arises
   // from an alloca. However, these allocas cannot overlap and we
   // can infer there is no alias.
-  auto *Base0Def = getDefIgnoringCopies(BasePtr0.getBase(), MRI);
-  auto *Base1Def = getDefIgnoringCopies(BasePtr1.getBase(), MRI);
+  auto *Base0Def = getDefIgnoringCopies(BasePtr0.BaseReg, MRI);
+  auto *Base1Def = getDefIgnoringCopies(BasePtr1.BaseReg, MRI);
   if (!Base0Def || !Base1Def)
     return false; // Couldn't tell anything.
 
@@ -194,7 +196,7 @@ bool GISelAddressing::instMayAlias(const MachineInstr &MI,
     bool IsAtomic;
     Register BasePtr;
     int64_t Offset;
-    LocationSize NumBytes;
+    uint64_t NumBytes;
     MachineMemOperand *MMO;
   };
 
@@ -210,17 +212,16 @@ bool GISelAddressing::instMayAlias(const MachineInstr &MI,
         Offset = 0;
       }
 
-      LocationSize Size = LS->getMMO().getSize();
-      return {LS->isVolatile(),       LS->isAtomic(), BaseReg,
-              Offset /*base offset*/, Size,           &LS->getMMO()};
+      uint64_t Size = MemoryLocation::getSizeOrUnknown(
+          LS->getMMO().getMemoryType().getSizeInBytes());
+      return {LS->isVolatile(),       LS->isAtomic(),          BaseReg,
+              Offset /*base offset*/, Size, &LS->getMMO()};
     }
     // FIXME: support recognizing lifetime instructions.
     // Default.
     return {false /*isvolatile*/,
-            /*isAtomic*/ false,
-            Register(),
-            (int64_t)0 /*offset*/,
-            LocationSize::beforeOrAfterPointer() /*size*/,
+            /*isAtomic*/ false,          Register(),
+            (int64_t)0 /*offset*/,       0 /*size*/,
             (MachineMemOperand *)nullptr};
   };
   MemUseCharacteristics MUC0 = getCharacteristics(&MI),
@@ -248,20 +249,10 @@ bool GISelAddressing::instMayAlias(const MachineInstr &MI,
       return false;
   }
 
-  // If NumBytes is scalable and offset is not 0, conservatively return may
-  // alias
-  if ((MUC0.NumBytes.isScalable() && MUC0.Offset != 0) ||
-      (MUC1.NumBytes.isScalable() && MUC1.Offset != 0))
-    return true;
-
-  const bool BothNotScalable =
-      !MUC0.NumBytes.isScalable() && !MUC1.NumBytes.isScalable();
-
   // Try to prove that there is aliasing, or that there is no aliasing. Either
   // way, we can return now. If nothing can be proved, proceed with more tests.
   bool IsAlias;
-  if (BothNotScalable &&
-      GISelAddressing::aliasIsKnownForLoadStore(MI, Other, IsAlias, MRI))
+  if (GISelAddressing::aliasIsKnownForLoadStore(MI, Other, IsAlias, MRI))
     return IsAlias;
 
   // The following all rely on MMO0 and MMO1 being valid.
@@ -271,24 +262,19 @@ bool GISelAddressing::instMayAlias(const MachineInstr &MI,
   // FIXME: port the alignment based alias analysis from SDAG's isAlias().
   int64_t SrcValOffset0 = MUC0.MMO->getOffset();
   int64_t SrcValOffset1 = MUC1.MMO->getOffset();
-  LocationSize Size0 = MUC0.NumBytes;
-  LocationSize Size1 = MUC1.NumBytes;
-  if (AA && MUC0.MMO->getValue() && MUC1.MMO->getValue() && Size0.hasValue() &&
-      Size1.hasValue()) {
+  uint64_t Size0 = MUC0.NumBytes;
+  uint64_t Size1 = MUC1.NumBytes;
+  if (AA && MUC0.MMO->getValue() && MUC1.MMO->getValue() &&
+      Size0 != MemoryLocation::UnknownSize &&
+      Size1 != MemoryLocation::UnknownSize) {
     // Use alias analysis information.
     int64_t MinOffset = std::min(SrcValOffset0, SrcValOffset1);
-    int64_t Overlap0 =
-        Size0.getValue().getKnownMinValue() + SrcValOffset0 - MinOffset;
-    int64_t Overlap1 =
-        Size1.getValue().getKnownMinValue() + SrcValOffset1 - MinOffset;
-    LocationSize Loc0 =
-        Size0.isScalable() ? Size0 : LocationSize::precise(Overlap0);
-    LocationSize Loc1 =
-        Size1.isScalable() ? Size1 : LocationSize::precise(Overlap1);
-
-    if (AA->isNoAlias(
-            MemoryLocation(MUC0.MMO->getValue(), Loc0, MUC0.MMO->getAAInfo()),
-            MemoryLocation(MUC1.MMO->getValue(), Loc1, MUC1.MMO->getAAInfo())))
+    int64_t Overlap0 = Size0 + SrcValOffset0 - MinOffset;
+    int64_t Overlap1 = Size1 + SrcValOffset1 - MinOffset;
+    if (AA->isNoAlias(MemoryLocation(MUC0.MMO->getValue(), Overlap0,
+                                     MUC0.MMO->getAAInfo()),
+                      MemoryLocation(MUC1.MMO->getValue(), Overlap1,
+                                     MUC1.MMO->getAAInfo())))
       return false;
   }
 
@@ -318,7 +304,7 @@ bool LoadStoreOpt::mergeStores(SmallVectorImpl<GStore *> &StoresToMerge) {
     assert(MRI->getType(StoreMI->getValueReg()) == OrigTy);
 #endif
 
-  const auto &DL = MF->getFunction().getDataLayout();
+  const auto &DL = MF->getFunction().getParent()->getDataLayout();
   bool AnyMerged = false;
   do {
     unsigned NumPow2 = llvm::bit_floor(StoresToMerge.size());
@@ -534,20 +520,16 @@ bool LoadStoreOpt::addStoreToCandidate(GStore &StoreMI,
 
   Register StoreAddr = StoreMI.getPointerReg();
   auto BIO = getPointerInfo(StoreAddr, *MRI);
-  Register StoreBase = BIO.getBase();
+  Register StoreBase = BIO.BaseReg;
+  uint64_t StoreOffCst = BIO.Offset;
   if (C.Stores.empty()) {
-    C.BasePtr = StoreBase;
-    if (!BIO.hasValidOffset()) {
-      C.CurrentLowestOffset = 0;
-    } else {
-      C.CurrentLowestOffset = BIO.getOffset();
-    }
     // This is the first store of the candidate.
     // If the offset can't possibly allow for a lower addressed store with the
     // same base, don't bother adding it.
-    if (BIO.hasValidOffset() &&
-        BIO.getOffset() < static_cast<int64_t>(ValueTy.getSizeInBytes()))
+    if (StoreOffCst < ValueTy.getSizeInBytes())
       return false;
+    C.BasePtr = StoreBase;
+    C.CurrentLowestOffset = StoreOffCst;
     C.Stores.emplace_back(&StoreMI);
     LLVM_DEBUG(dbgs() << "Starting a new merge candidate group with: "
                       << StoreMI);
@@ -567,12 +549,8 @@ bool LoadStoreOpt::addStoreToCandidate(GStore &StoreMI,
   // writes to the next lowest adjacent address.
   if (C.BasePtr != StoreBase)
     return false;
-  // If we don't have a valid offset, we can't guarantee to be an adjacent
-  // offset.
-  if (!BIO.hasValidOffset())
-    return false;
-  if ((C.CurrentLowestOffset -
-       static_cast<int64_t>(ValueTy.getSizeInBytes())) != BIO.getOffset())
+  if ((C.CurrentLowestOffset - ValueTy.getSizeInBytes()) !=
+      static_cast<uint64_t>(StoreOffCst))
     return false;
 
   // This writes to an adjacent address. Allow it.
@@ -955,7 +933,7 @@ void LoadStoreOpt::initializeStoreMergeTargetInfo(unsigned AddrSpace) {
   // Need to reserve at least MaxStoreSizeToForm + 1 bits.
   BitVector LegalSizes(MaxStoreSizeToForm * 2);
   const auto &LI = *MF->getSubtarget().getLegalizerInfo();
-  const auto &DL = MF->getFunction().getDataLayout();
+  const auto &DL = MF->getFunction().getParent()->getDataLayout();
   Type *IRPtrTy = PointerType::get(MF->getFunction().getContext(), AddrSpace);
   LLT PtrTy = getLLTForType(*IRPtrTy, DL);
   // We assume that we're not going to be generating any stores wider than

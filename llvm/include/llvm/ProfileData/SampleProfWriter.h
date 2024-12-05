@@ -169,7 +169,7 @@ public:
 
 protected:
   SampleProfileWriterText(std::unique_ptr<raw_ostream> &OS)
-      : SampleProfileWriter(OS) {}
+      : SampleProfileWriter(OS), Indent(0) {}
 
   std::error_code writeHeader(const SampleProfileMap &ProfileMap) override {
     LineCount = 0;
@@ -180,7 +180,7 @@ private:
   /// Indent level to use when writing.
   ///
   /// This is used when printing inlined callees.
-  unsigned Indent = 0;
+  unsigned Indent;
 
   friend ErrorOr<std::unique_ptr<SampleProfileWriter>>
   SampleProfileWriter::create(std::unique_ptr<raw_ostream> &OS,

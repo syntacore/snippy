@@ -21,7 +21,6 @@
 #include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/CodeGen/MachineOperand.h"
 #include "llvm/CodeGen/Passes.h"
-#include "llvm/IR/Module.h"
 #include "llvm/InitializePasses.h"
 
 using namespace llvm;
@@ -62,7 +61,7 @@ FunctionPass *llvm::createCFGuardLongjmpPass() { return new CFGuardLongjmp(); }
 bool CFGuardLongjmp::runOnMachineFunction(MachineFunction &MF) {
 
   // Skip modules for which the cfguard flag is not set.
-  if (!MF.getFunction().getParent()->getModuleFlag("cfguard"))
+  if (!MF.getMMI().getModule()->getModuleFlag("cfguard"))
     return false;
 
   // Skip functions that do not have calls to _setjmp.

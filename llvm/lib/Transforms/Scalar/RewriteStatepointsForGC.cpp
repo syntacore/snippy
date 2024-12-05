@@ -1143,8 +1143,7 @@ static Value *findBasePointer(Value *I, DefiningValueMapTy &Cache,
     assert(Base && "Can't be null");
     // The cast is needed since base traversal may strip away bitcasts
     if (Base->getType() != Input->getType() && InsertPt)
-      Base = new BitCastInst(Base, Input->getType(), "cast",
-                             InsertPt->getIterator());
+      Base = new BitCastInst(Base, Input->getType(), "cast", InsertPt);
     return Base;
   };
 
@@ -1252,7 +1251,7 @@ static Value *findBasePointer(Value *I, DefiningValueMapTy &Cache,
 
   // get the data layout to compare the sizes of base/derived pointer values
   [[maybe_unused]] auto &DL =
-      cast<llvm::Instruction>(Def)->getDataLayout();
+      cast<llvm::Instruction>(Def)->getModule()->getDataLayout();
   // Cache all of our results so we can cheaply reuse them
   // NOTE: This is actually two caches: one of the base defining value
   // relation and one of the base pointer relation!  FIXME
@@ -1323,7 +1322,7 @@ static void findBasePointers(DominatorTree &DT, DefiningValueMapTy &DVCache,
                              IsKnownBaseMapTy &KnownBases) {
   StatepointLiveSetTy PotentiallyDerivedPointers = result.LiveSet;
   // We assume that all pointers passed to deopt are base pointers; as an
-  // optimization, we can use this to avoid separately materializing the base
+  // optimization, we can use this to avoid seperately materializing the base
   // pointer graph.  This is only relevant since we're very conservative about
   // generating new conflict nodes during base pointer insertion.  If we were
   // smarter there, this would be irrelevant.
@@ -1613,7 +1612,7 @@ public:
       // Note: we've inserted instructions, so the call to llvm.deoptimize may
       // not necessarily be followed by the matching return.
       auto *RI = cast<ReturnInst>(OldI->getParent()->getTerminator());
-      new UnreachableInst(RI->getContext(), RI->getIterator());
+      new UnreachableInst(RI->getContext(), RI);
       RI->eraseFromParent();
     }
 
@@ -1685,10 +1684,10 @@ makeStatepointExplicitImpl(CallBase *Call, /* to replace */
 
   // Pass through the requested lowering if any.  The default is live-through.
   StringRef DeoptLowering = getDeoptLowering(Call);
-  if (DeoptLowering == "live-in")
+  if (DeoptLowering.equals("live-in"))
     Flags |= uint32_t(StatepointFlags::DeoptLiveIn);
   else {
-    assert(DeoptLowering == "live-through" && "Unsupported value!");
+    assert(DeoptLowering.equals("live-through") && "Unsupported value!");
   }
 
   FunctionCallee CallTarget(Call->getFunctionType(), Call->getCalledOperand());
@@ -1734,7 +1733,7 @@ makeStatepointExplicitImpl(CallBase *Call, /* to replace */
       //   memcpy(dest_derived, source_derived, ...) =>
       //   memcpy(dest_base, dest_offset, source_base, source_offset, ...)
       auto &Context = Call->getContext();
-      auto &DL = Call->getDataLayout();
+      auto &DL = Call->getModule()->getDataLayout();
       auto GetBaseAndOffset = [&](Value *Derived) {
         Value *Base = nullptr;
         // Optimizations in unreachable code might substitute the real pointer
@@ -1977,7 +1976,7 @@ insertRelocationStores(iterator_range<Value::user_iterator> GCRelocs,
     // Emit store into the related alloca.
     assert(Relocate->getNextNode() &&
            "Should always have one since it's not a terminator");
-    new StoreInst(Relocate, Alloca, std::next(Relocate->getIterator()));
+    new StoreInst(Relocate, Alloca, Relocate->getNextNode());
 
 #ifndef NDEBUG
     VisitedLiveValues.insert(OriginalValue);
@@ -2000,7 +1999,7 @@ static void insertRematerializationStores(
     Value *Alloca = AllocaMap[OriginalValue];
 
     new StoreInst(RematerializedValue, Alloca,
-                  std::next(RematerializedValue->getIterator()));
+                  RematerializedValue->getNextNode());
 
 #ifndef NDEBUG
     VisitedLiveValues.insert(OriginalValue);
@@ -2030,11 +2029,11 @@ static void relocationViaAlloca(
 
   // Emit alloca for "LiveValue" and record it in "allocaMap" and
   // "PromotableAllocas"
-  const DataLayout &DL = F.getDataLayout();
+  const DataLayout &DL = F.getParent()->getDataLayout();
   auto emitAllocaFor = [&](Value *LiveValue) {
-    AllocaInst *Alloca =
-        new AllocaInst(LiveValue->getType(), DL.getAllocaAddrSpace(), "",
-                       F.getEntryBlock().getFirstNonPHIIt());
+    AllocaInst *Alloca = new AllocaInst(LiveValue->getType(),
+                                        DL.getAllocaAddrSpace(), "",
+                                        F.getEntryBlock().getFirstNonPHI());
     AllocaMap[LiveValue] = Alloca;
     PromotableAllocas.push_back(Alloca);
   };
@@ -2101,7 +2100,7 @@ static void relocationViaAlloca(
         ToClobber.push_back(Alloca);
       }
 
-      auto InsertClobbersAt = [&](BasicBlock::iterator IP) {
+      auto InsertClobbersAt = [&](Instruction *IP) {
         for (auto *AI : ToClobber) {
           auto AT = AI->getAllocatedType();
           Constant *CPN;
@@ -2116,11 +2115,10 @@ static void relocationViaAlloca(
       // Insert the clobbering stores.  These may get intermixed with the
       // gc.results and gc.relocates, but that's fine.
       if (auto II = dyn_cast<InvokeInst>(Statepoint)) {
-        InsertClobbersAt(II->getNormalDest()->getFirstInsertionPt());
-        InsertClobbersAt(II->getUnwindDest()->getFirstInsertionPt());
+        InsertClobbersAt(&*II->getNormalDest()->getFirstInsertionPt());
+        InsertClobbersAt(&*II->getUnwindDest()->getFirstInsertionPt());
       } else {
-        InsertClobbersAt(
-            std::next(cast<Instruction>(Statepoint)->getIterator()));
+        InsertClobbersAt(cast<Instruction>(Statepoint)->getNextNode());
       }
     }
   }
@@ -2148,7 +2146,7 @@ static void relocationViaAlloca(
     }
 
     llvm::sort(Uses);
-    auto Last = llvm::unique(Uses);
+    auto Last = std::unique(Uses.begin(), Uses.end());
     Uses.erase(Last, Uses.end());
 
     for (Instruction *Use : Uses) {
@@ -2156,15 +2154,15 @@ static void relocationViaAlloca(
         PHINode *Phi = cast<PHINode>(Use);
         for (unsigned i = 0; i < Phi->getNumIncomingValues(); i++) {
           if (Def == Phi->getIncomingValue(i)) {
-            LoadInst *Load = new LoadInst(
-                Alloca->getAllocatedType(), Alloca, "",
-                Phi->getIncomingBlock(i)->getTerminator()->getIterator());
+            LoadInst *Load =
+                new LoadInst(Alloca->getAllocatedType(), Alloca, "",
+                             Phi->getIncomingBlock(i)->getTerminator());
             Phi->setIncomingValue(i, Load);
           }
         }
       } else {
-        LoadInst *Load = new LoadInst(Alloca->getAllocatedType(), Alloca, "",
-                                      Use->getIterator());
+        LoadInst *Load =
+            new LoadInst(Alloca->getAllocatedType(), Alloca, "", Use);
         Use->replaceUsesOfWith(Def, Load);
       }
     }
@@ -2231,16 +2229,16 @@ static void insertUseHolderAfter(CallBase *Call, const ArrayRef<Value *> Values,
   if (isa<CallInst>(Call)) {
     // For call safepoints insert dummy calls right after safepoint
     Holders.push_back(
-        CallInst::Create(Func, Values, "", std::next(Call->getIterator())));
+        CallInst::Create(Func, Values, "", &*++Call->getIterator()));
     return;
   }
   // For invoke safepooints insert dummy calls both in normal and
   // exceptional destination blocks
   auto *II = cast<InvokeInst>(Call);
   Holders.push_back(CallInst::Create(
-      Func, Values, "", II->getNormalDest()->getFirstInsertionPt()));
+      Func, Values, "", &*II->getNormalDest()->getFirstInsertionPt()));
   Holders.push_back(CallInst::Create(
-      Func, Values, "", II->getUnwindDest()->getFirstInsertionPt()));
+      Func, Values, "", &*II->getUnwindDest()->getFirstInsertionPt()));
 }
 
 static void findLiveReferences(
@@ -2271,7 +2269,7 @@ static Value* findRematerializableChainToBasePointer(
   }
 
   if (CastInst *CI = dyn_cast<CastInst>(CurrentValue)) {
-    if (!CI->isNoopCast(CI->getDataLayout()))
+    if (!CI->isNoopCast(CI->getModule()->getDataLayout()))
       return CI;
 
     ChainToBase.push_back(CI);
@@ -2293,7 +2291,7 @@ chainToBasePointerCost(SmallVectorImpl<Instruction *> &Chain,
 
   for (Instruction *Instr : Chain) {
     if (CastInst *CI = dyn_cast<CastInst>(Instr)) {
-      assert(CI->isNoopCast(CI->getDataLayout()) &&
+      assert(CI->isNoopCast(CI->getModule()->getDataLayout()) &&
              "non noop cast is found during rematerialization");
 
       Type *SrcTy = CI->getOperand(0)->getType();
@@ -2601,7 +2599,7 @@ static bool inlineGetBaseAndOffset(Function &F,
                                    DefiningValueMapTy &DVCache,
                                    IsKnownBaseMapTy &KnownBases) {
   auto &Context = F.getContext();
-  auto &DL = F.getDataLayout();
+  auto &DL = F.getParent()->getDataLayout();
   bool Changed = false;
 
   for (auto *Callsite : Intrinsics)
@@ -3046,7 +3044,8 @@ bool RewriteStatepointsForGC::runOnFunction(Function &F, DominatorTree &DT,
       // which doesn't know how to produce a proper deopt state. So if we see a
       // non-leaf memcpy/memmove without deopt state just treat it as a leaf
       // copy and don't produce a statepoint.
-      if (!AllowStatepointWithNoDeoptInfo && !Call->hasDeoptState()) {
+      if (!AllowStatepointWithNoDeoptInfo &&
+          !Call->getOperandBundle(LLVMContext::OB_deopt)) {
         assert((isa<AtomicMemCpyInst>(Call) || isa<AtomicMemMoveInst>(Call)) &&
                "Don't expect any other calls here!");
         return false;

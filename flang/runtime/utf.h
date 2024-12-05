@@ -41,30 +41,28 @@
 #ifndef FORTRAN_RUNTIME_UTF_H_
 #define FORTRAN_RUNTIME_UTF_H_
 
-#include "flang/Common/optional.h"
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 namespace Fortran::runtime {
 
 // Derive the length of a UTF-8 character encoding from its first byte.
 // A zero result signifies an invalid encoding.
-RT_OFFLOAD_VAR_GROUP_BEGIN
-extern const RT_CONST_VAR_ATTRS std::uint8_t UTF8FirstByteTable[256];
-static constexpr std::size_t maxUTF8Bytes{7};
-RT_OFFLOAD_VAR_GROUP_END
-
-static inline RT_API_ATTRS std::size_t MeasureUTF8Bytes(char first) {
+extern const std::uint8_t UTF8FirstByteTable[256];
+static inline std::size_t MeasureUTF8Bytes(char first) {
   return UTF8FirstByteTable[static_cast<std::uint8_t>(first)];
 }
 
+static constexpr std::size_t maxUTF8Bytes{7};
+
 // Ensure that all bytes are present in sequence in the input buffer
 // before calling; use MeasureUTF8Bytes(first byte) to count them.
-RT_API_ATTRS Fortran::common::optional<char32_t> DecodeUTF8(const char *);
+std::optional<char32_t> DecodeUTF8(const char *);
 
 // Ensure that at least maxUTF8Bytes remain in the output
 // buffer before calling.
-RT_API_ATTRS std::size_t EncodeUTF8(char *, char32_t);
+std::size_t EncodeUTF8(char *, char32_t);
 
 } // namespace Fortran::runtime
 #endif // FORTRAN_RUNTIME_UTF_H_

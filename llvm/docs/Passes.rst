@@ -7,9 +7,6 @@ LLVM's Analysis and Transform Passes
 
 Introduction
 ============
-.. warning:: This document is not updated frequently, and the list of passes
-  is most likely incomplete. It is possible to list passes known by the opt
-  tool using ``opt -print-passes``.
 
 This document serves as a high level summary of the optimization features that
 LLVM provides.  Optimizations are implemented as Passes that traverse some
@@ -196,11 +193,14 @@ memory operations it depends on.  It builds on alias analysis information, and
 tries to provide a lazy, caching interface to a common kind of alias
 information query.
 
-``print<module-debuginfo>``: Decodes module-level debug info
-------------------------------------------------------------
+``module-debuginfo``: Decodes module-level debug info
+-----------------------------------------------------
 
-This pass decodes the debug info metadata in a module and prints it to standard output in a
+This pass decodes the debug info metadata in a module and prints in a
 (sufficiently-prepared-) human-readable form.
+
+For example, run this pass from ``opt`` along with the ``-analyze`` option, and
+it'll print to standard output.
 
 ``postdomtree``: Post-Dominator Tree Construction
 -------------------------------------------------
@@ -228,18 +228,18 @@ standard error in a human-readable form.
 ``print-cfg-sccs``: Print SCCs of each function CFG
 ---------------------------------------------------
 
-This pass, only available in ``opt``, prints the SCCs of each function CFG to
+This pass, only available in ``opt``, printsthe SCCs of each function CFG to
 standard error in a human-readable fom.
 
-``function(print)``: Print function to stderr
----------------------------------------------
+``print-function``: Print function to stderr
+--------------------------------------------
 
 The ``PrintFunctionPass`` class is designed to be pipelined with other
 ``FunctionPasses``, and prints out the functions of the module as they are
 processed.
 
-``module(print)``: Print module to stderr
------------------------------------------
+``print-module``: Print module to stderr
+----------------------------------------
 
 This pass simply prints out the entire module when it is executed.
 
@@ -728,8 +728,8 @@ wrapper functions that are registered as global constructors in
 ``llvm.global_ctors`` and which contain a call to ``__cxa_atexit`` to register
 their destructor functions.
 
-``lower-atomic``: Lower atomic intrinsics to non-atomic form
-------------------------------------------------------------
+``loweratomic``: Lower atomic intrinsics to non-atomic form
+-----------------------------------------------------------
 
 This pass lowers atomic intrinsics to non-atomic form for use in a known
 non-preemptible environment.
@@ -739,8 +739,8 @@ this would require knowledge of the entire call graph of the program including
 any libraries which may not be available in bitcode form); it simply lowers
 every atomic intrinsic.
 
-``lower-invoke``: Lower invokes to calls, for unwindless code generators
-------------------------------------------------------------------------
+``lowerinvoke``: Lower invokes to calls, for unwindless code generators
+-----------------------------------------------------------------------
 
 This transformation is designed for use by code generators which do not yet
 support stack unwinding.  This pass converts ``invoke`` instructions to
@@ -748,8 +748,8 @@ support stack unwinding.  This pass converts ``invoke`` instructions to
 become dead code (which can be removed by running the ``-simplifycfg`` pass
 afterwards).
 
-``lower-switch``: Lower ``SwitchInst``\ s to branches
------------------------------------------------------
+``lowerswitch``: Lower ``SwitchInst``\ s to branches
+----------------------------------------------------
 
 Rewrites switch instructions with a sequence of branches, which allows targets
 to get away with not implementing the switch instruction until it is
@@ -924,8 +924,17 @@ code size or making it harder to reverse engineer code.
 ``strip-dead-debug-info``: Strip debug info for unused symbols
 --------------------------------------------------------------
 
-Performs code stripping. Similar to strip, but only strips debug info for
-unused symbols.
+.. FIXME: this description is the same as for -strip
+
+performs code stripping. this transformation can delete:
+
+* names for virtual registers
+* symbols for internal globals and functions
+* debug information
+
+note that this transformation makes code much less readable, so it should only
+be used in situations where the strip utility would be used, such as reducing
+code size or making it harder to reverse engineer code.
 
 ``strip-dead-prototypes``: Strip Unused Function Prototypes
 -----------------------------------------------------------
@@ -935,17 +944,35 @@ declarations and removes them.  Dead declarations are declarations of functions
 for which no implementation is available (i.e., declarations for unused library
 functions).
 
-``strip-debug-declare``: Strip all ``llvm.dbg.declare`` intrinsics and
-``#dbg_declare`` records.
--------------------------------------------------------------------
+``strip-debug-declare``: Strip all ``llvm.dbg.declare`` intrinsics
+------------------------------------------------------------------
 
-Performs code stripping. Similar to strip, but only strips
-``llvm.dbg.declare`` intrinsics.
+.. FIXME: this description is the same as for -strip
+
+This pass implements code stripping.  Specifically, it can delete:
+
+#. names for virtual registers
+#. symbols for internal globals and functions
+#. debug information
+
+Note that this transformation makes code much less readable, so it should only
+be used in situations where the 'strip' utility would be used, such as reducing
+code size or making it harder to reverse engineer code.
 
 ``strip-nondebug``: Strip all symbols, except dbg symbols, from a module
 ------------------------------------------------------------------------
 
-Performs code stripping. Similar to strip, but dbg info is preserved.
+.. FIXME: this description is the same as for -strip
+
+This pass implements code stripping.  Specifically, it can delete:
+
+#. names for virtual registers
+#. symbols for internal globals and functions
+#. debug information
+
+Note that this transformation makes code much less readable, so it should only
+be used in situations where the 'strip' utility would be used, such as reducing
+code size or making it harder to reverse engineer code.
 
 ``tailcallelim``: Tail Call Elimination
 ---------------------------------------
