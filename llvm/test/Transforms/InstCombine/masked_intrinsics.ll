@@ -292,11 +292,7 @@ entry:
 define void @scatter_nxv4i16_uniform_vals_uniform_ptrs_all_active_mask(ptr %dst, i16 %val) {
 ; CHECK-LABEL: @scatter_nxv4i16_uniform_vals_uniform_ptrs_all_active_mask(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x ptr> poison, ptr [[DST:%.*]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x ptr> [[BROADCAST_SPLATINSERT]], <vscale x 4 x ptr> poison, <vscale x 4 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_VALUE:%.*]] = insertelement <vscale x 4 x i16> poison, i16 [[VAL:%.*]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLATVALUE:%.*]] = shufflevector <vscale x 4 x i16> [[BROADCAST_VALUE]], <vscale x 4 x i16> poison, <vscale x 4 x i32> zeroinitializer
-; CHECK-NEXT:    call void @llvm.masked.scatter.nxv4i16.nxv4p0(<vscale x 4 x i16> [[BROADCAST_SPLATVALUE]], <vscale x 4 x ptr> [[BROADCAST_SPLAT]], i32 2, <vscale x 4 x i1> shufflevector (<vscale x 4 x i1> insertelement (<vscale x 4 x i1> zeroinitializer, i1 true, i32 0), <vscale x 4 x i1> zeroinitializer, <vscale x 4 x i32> zeroinitializer))
+; CHECK-NEXT:    store i16 [[VAL:%.*]], ptr [[DST:%.*]], align 2
 ; CHECK-NEXT:    ret void
 ;
 entry:
@@ -304,7 +300,7 @@ entry:
   %broadcast.splat = shufflevector <vscale x 4 x ptr> %broadcast.splatinsert, <vscale x 4 x ptr> poison, <vscale x 4 x i32> zeroinitializer
   %broadcast.value = insertelement <vscale x 4 x i16> poison, i16 %val, i32 0
   %broadcast.splatvalue = shufflevector <vscale x 4 x i16> %broadcast.value, <vscale x 4 x i16> poison, <vscale x 4 x i32> zeroinitializer
-  call void @llvm.masked.scatter.nxv4i16.nxv4p0(<vscale x 4 x i16> %broadcast.splatvalue, <vscale x 4 x ptr> %broadcast.splat, i32 2, <vscale x 4 x i1> shufflevector (<vscale x 4 x i1> insertelement (<vscale x 4 x i1> zeroinitializer , i1 true, i32 0), <vscale x 4 x i1> zeroinitializer, <vscale x 4 x i32> zeroinitializer))
+  call void @llvm.masked.scatter.nxv4i16.nxv4p0(<vscale x 4 x i16> %broadcast.splatvalue, <vscale x 4 x ptr> %broadcast.splat, i32 2, <vscale x 4 x i1> splat (i1 true))
   ret void
 }
 
@@ -340,7 +336,7 @@ entry:
   %broadcast.splatinsert = insertelement <vscale x 4 x ptr> poison, ptr %dst, i32 0
   %broadcast.splat = shufflevector <vscale x 4 x ptr> %broadcast.splatinsert, <vscale x 4 x ptr> poison, <vscale x 4 x i32> zeroinitializer
   %wide.load = load <vscale x 4 x i16>, ptr %src, align 2
-  call void @llvm.masked.scatter.nxv4i16.nxv4p0(<vscale x 4 x i16> %wide.load, <vscale x 4 x ptr> %broadcast.splat, i32 2, <vscale x 4 x i1> shufflevector (<vscale x 4 x i1> insertelement (<vscale x 4 x i1> poison, i1 true, i32 0), <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer))
+  call void @llvm.masked.scatter.nxv4i16.nxv4p0(<vscale x 4 x i16> %wide.load, <vscale x 4 x ptr> %broadcast.splat, i32 2, <vscale x 4 x i1> splat (i1 true))
   ret void
 }
 
@@ -393,7 +389,7 @@ define <vscale x 2 x i64> @gather_nxv2i64_uniform_ptrs_all_active_mask(ptr %src)
 ;
   %broadcast.splatinsert = insertelement <vscale x 2 x ptr> poison, ptr %src, i32 0
   %broadcast.splat = shufflevector <vscale x 2 x ptr> %broadcast.splatinsert, <vscale x 2 x ptr> poison, <vscale x 2 x i32> zeroinitializer
-  %res = call <vscale x 2 x i64> @llvm.masked.gather.nxv2i64(<vscale x 2 x ptr> %broadcast.splat, i32 8, <vscale x 2 x i1> shufflevector (<vscale x 2 x i1> insertelement (<vscale x 2 x i1> poison, i1 true, i32 0), <vscale x 2 x i1> poison, <vscale x 2 x i32> zeroinitializer), <vscale x 2 x i64> undef)
+  %res = call <vscale x 2 x i64> @llvm.masked.gather.nxv2i64(<vscale x 2 x ptr> %broadcast.splat, i32 8, <vscale x 2 x i1> splat (i1 true), <vscale x 2 x i64> undef)
   ret <vscale x 2 x i64> %res
 }
 

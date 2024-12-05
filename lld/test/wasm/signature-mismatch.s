@@ -9,7 +9,7 @@
 # RUN: obj2yaml %t.reloc.o | FileCheck %s -check-prefix=RELOC
 
 # RUN: rm -f %t.a
-# RUN: ar crS %t.a %t.ret32.o %t.call.o
+# RUN: llvm-ar crS %t.a %t.ret32.o %t.call.o
 # RUN: wasm-ld --export=call_ret32 --export=ret32 -o %t2.wasm %t.main.o %t.a 2>&1 | FileCheck %s -check-prefix=ARCHIVE
 # RUN: obj2yaml %t2.wasm | FileCheck %s -check-prefix=YAML
 
@@ -93,7 +93,7 @@ ret32_address_main:
 # RELOC-NEXT:       - Index:           1
 # RELOC-NEXT:         Kind:            FUNCTION
 # RELOC-NEXT:         Name:            ret32
-# RELOC-NEXT:         Flags:           [ VISIBILITY_HIDDEN ]
+# RELOC-NEXT:         Flags:           [ ]
 # RELOC-NEXT:         Function:        2
 # RELOC-NEXT:       - Index:           2
 # RELOC-NEXT:         Kind:            DATA
