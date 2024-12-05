@@ -404,8 +404,8 @@ bool DynamicLoaderDarwin::JSONImageInformationIntoImageInfo(
         image_infos[i].os_type = llvm::Triple::TvOS;
       else if (os_name == "watchos")
         image_infos[i].os_type = llvm::Triple::WatchOS;
-      // NEED_BRIDGEOS_TRIPLE else if (os_name == "bridgeos")
-      // NEED_BRIDGEOS_TRIPLE   image_infos[i].os_type = llvm::Triple::BridgeOS;
+      else if (os_name == "bridgeos")
+        image_infos[i].os_type = llvm::Triple::BridgeOS;
       else if (os_name == "maccatalyst") {
         image_infos[i].os_type = llvm::Triple::IOS;
         image_infos[i].os_env = llvm::Triple::MacABI;
@@ -607,6 +607,26 @@ void DynamicLoaderDarwin::UpdateDYLDImageInfoFromNewImageInfo(
       SetDYLDModule(dyld_sp);
     }
   }
+}
+
+std::optional<lldb_private::Address> DynamicLoaderDarwin::GetStartAddress() {
+  Log *log = GetLog(LLDBLog::DynamicLoader);
+
+  auto log_err = [log](llvm::StringLiteral err_msg) -> std::nullopt_t {
+    LLDB_LOGV(log, "{}", err_msg);
+    return std::nullopt;
+  };
+
+  ModuleSP dyld_sp = GetDYLDModule();
+  if (!dyld_sp)
+    return log_err("Couldn't retrieve DYLD module. Cannot get `start` symbol.");
+
+  const Symbol *symbol =
+      dyld_sp->FindFirstSymbolWithNameAndType(ConstString("_dyld_start"));
+  if (!symbol)
+    return log_err("Cannot find `start` symbol in DYLD module.");
+
+  return symbol->GetAddress();
 }
 
 void DynamicLoaderDarwin::SetDYLDModule(lldb::ModuleSP &dyld_module_sp) {
