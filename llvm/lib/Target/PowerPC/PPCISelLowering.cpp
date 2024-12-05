@@ -1469,6 +1469,7 @@ PPCTargetLowering::PPCTargetLowering(const PPCTargetMachine &TM,
   case PPC::DIR_PWR8:
   case PPC::DIR_PWR9:
   case PPC::DIR_PWR10:
+  case PPC::DIR_PWR11:
   case PPC::DIR_PWR_FUTURE:
     setPrefLoopAlignment(Align(16));
     setPrefFunctionAlignment(Align(16));
@@ -9337,14 +9338,19 @@ SDValue PPCTargetLowering::LowerBITCAST(SDValue Op, SelectionDAG &DAG) const {
   SDLoc dl(Op);
   SDValue Op0 = Op->getOperand(0);
 
-  if ((Op.getValueType() != MVT::f128) ||
-      (Op0.getOpcode() != ISD::BUILD_PAIR) ||
-      (Op0.getOperand(0).getValueType() != MVT::i64) ||
-      (Op0.getOperand(1).getValueType() != MVT::i64) || !Subtarget.isPPC64())
+  if (!Subtarget.isPPC64() || (Op0.getOpcode() != ISD::BUILD_PAIR) ||
+      (Op.getValueType() != MVT::f128))
     return SDValue();
 
-  return DAG.getNode(PPCISD::BUILD_FP128, dl, MVT::f128, Op0.getOperand(0),
-                     Op0.getOperand(1));
+  SDValue Lo = Op0.getOperand(0);
+  SDValue Hi = Op0.getOperand(1);
+  if ((Lo.getValueType() != MVT::i64) || (Hi.getValueType() != MVT::i64))
+    return SDValue();
+
+  if (!Subtarget.isLittleEndian())
+    std::swap(Lo, Hi);
+
+  return DAG.getNode(PPCISD::BUILD_FP128, dl, MVT::f128, Lo, Hi);
 }
 
 static const SDValue *getNormalLoadInput(const SDValue &Op, bool &IsPermuted) {
@@ -16664,6 +16670,7 @@ Align PPCTargetLowering::getPrefLoopAlignment(MachineLoop *ML) const {
   case PPC::DIR_PWR8:
   case PPC::DIR_PWR9:
   case PPC::DIR_PWR10:
+  case PPC::DIR_PWR11:
   case PPC::DIR_PWR_FUTURE: {
     if (!ML)
       break;
@@ -18046,6 +18053,7 @@ SDValue PPCTargetLowering::combineMUL(SDNode *N, DAGCombinerInfo &DCI) const {
       return true;
     case PPC::DIR_PWR9:
     case PPC::DIR_PWR10:
+    case PPC::DIR_PWR11:
     case PPC::DIR_PWR_FUTURE:
       //  type        mul     add    shl
       // scalar        5       2      2
