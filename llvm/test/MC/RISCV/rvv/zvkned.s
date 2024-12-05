@@ -12,76 +12,76 @@ vaesdf.vv v10, v9
 # CHECK-INST: vaesdf.vv v10, v9
 # CHECK-ENCODING: [0x77,0xa5,0x90,0xa2]
 # CHECK-ERROR: instruction requires the following: 'Zvkned' (Vector AES Encryption & Decryption (Single Round)){{$}}
-# CHECK-UNKNOWN: a290a577 <unknown>
+# CHECK-UNKNOWN: 77 a5 90 a2   <unknown>
 
 vaesdf.vs v10, v9
 # CHECK-INST: vaesdf.vs v10, v9
 # CHECK-ENCODING: [0x77,0xa5,0x90,0xa6]
 # CHECK-ERROR: instruction requires the following: 'Zvkned' (Vector AES Encryption & Decryption (Single Round)){{$}}
-# CHECK-UNKNOWN: a690a577 <unknown>
+# CHECK-UNKNOWN: 77 a5 90 a6   <unknown>
 
 vaesef.vv v10, v9
 # CHECK-INST: vaesef.vv v10, v9
 # CHECK-ENCODING: [0x77,0xa5,0x91,0xa2]
 # CHECK-ERROR: instruction requires the following: 'Zvkned' (Vector AES Encryption & Decryption (Single Round)){{$}}
-# CHECK-UNKNOWN: a291a577 <unknown>
+# CHECK-UNKNOWN: 77 a5 91 a2   <unknown>
                        
 vaesef.vs v10, v9
 # CHECK-INST: vaesef.vs v10, v9
 # CHECK-ENCODING: [0x77,0xa5,0x91,0xa6]
 # CHECK-ERROR: instruction requires the following: 'Zvkned' (Vector AES Encryption & Decryption (Single Round)){{$}}
-# CHECK-UNKNOWN: a691a577 <unknown>
+# CHECK-UNKNOWN: 77 a5 91 a6   <unknown>
 
 vaesdm.vv v10, v9
 # CHECK-INST: vaesdm.vv v10, v9
 # CHECK-ENCODING: [0x77,0x25,0x90,0xa2]
 # CHECK-ERROR: instruction requires the following: 'Zvkned' (Vector AES Encryption & Decryption (Single Round)){{$}}
-# CHECK-UNKNOWN: a2902577 <unknown>
+# CHECK-UNKNOWN: 77 25 90 a2   <unknown>
                        
 vaesdm.vs v10, v9
 # CHECK-INST: vaesdm.vs v10, v9
 # CHECK-ENCODING: [0x77,0x25,0x90,0xa6]
 # CHECK-ERROR: instruction requires the following: 'Zvkned' (Vector AES Encryption & Decryption (Single Round)){{$}}
-# CHECK-UNKNOWN: a6902577 <unknown>
+# CHECK-UNKNOWN: 77 25 90 a6   <unknown>
 
 vaesem.vv v10, v9
 # CHECK-INST: vaesem.vv v10, v9
 # CHECK-ENCODING: [0x77,0x25,0x91,0xa2]
 # CHECK-ERROR: instruction requires the following: 'Zvkned' (Vector AES Encryption & Decryption (Single Round)){{$}}
-# CHECK-UNKNOWN: a2912577 <unknown>
+# CHECK-UNKNOWN: 77 25 91 a2   <unknown>
                        
 vaesem.vs v10, v9
 # CHECK-INST: vaesem.vs v10, v9
 # CHECK-ENCODING: [0x77,0x25,0x91,0xa6]
 # CHECK-ERROR: instruction requires the following: 'Zvkned' (Vector AES Encryption & Decryption (Single Round)){{$}}
-# CHECK-UNKNOWN: a6912577 <unknown>
+# CHECK-UNKNOWN: 77 25 91 a6   <unknown>
 
 vaeskf1.vi v10, v9, 1
 # CHECK-INST: vaeskf1.vi v10, v9, 1
 # CHECK-ENCODING: [0x77,0xa5,0x90,0x8a]
 # CHECK-ERROR: instruction requires the following: 'Zvkned' (Vector AES Encryption & Decryption (Single Round)){{$}}
-# CHECK-UNKNOWN: 8a90a577 <unknown>
+# CHECK-UNKNOWN: 77 a5 90 8a   <unknown>
 
 vaeskf1.vi v10, v9, 31
 # CHECK-INST: vaeskf1.vi v10, v9, 31
 # CHECK-ENCODING: [0x77,0xa5,0x9f,0x8a]
 # CHECK-ERROR: instruction requires the following: 'Zvkned' (Vector AES Encryption & Decryption (Single Round)){{$}}
-# CHECK-UNKNOWN: 8a9fa577 <unknown>
+# CHECK-UNKNOWN: 77 a5 9f 8a   <unknown>
 
 vaeskf2.vi v10, v9, 2
 # CHECK-INST: vaeskf2.vi v10, v9, 2
 # CHECK-ENCODING: [0x77,0x25,0x91,0xaa]
 # CHECK-ERROR: instruction requires the following: 'Zvkned' (Vector AES Encryption & Decryption (Single Round)){{$}}
-# CHECK-UNKNOWN: aa912577 <unknown>
+# CHECK-UNKNOWN: 77 25 91 aa   <unknown>
 
 vaeskf2.vi v10, v9, 31
 # CHECK-INST: vaeskf2.vi v10, v9, 31
 # CHECK-ENCODING: [0x77,0xa5,0x9f,0xaa]
 # CHECK-ERROR: instruction requires the following: 'Zvkned' (Vector AES Encryption & Decryption (Single Round)){{$}}
-# CHECK-UNKNOWN: aa9fa577 <unknown>
+# CHECK-UNKNOWN: 77 a5 9f aa   <unknown>
 
 vaesz.vs v10, v9
 # CHECK-INST: vaesz.vs v10, v9
 # CHECK-ENCODING: [0x77,0xa5,0x93,0xa6]
 # CHECK-ERROR: instruction requires the following: 'Zvkned' (Vector AES Encryption & Decryption (Single Round)){{$}}
-# CHECK-UNKNOWN: a693a577 <unknown>
+# CHECK-UNKNOWN: 77 a5 93 a6   <unknown>

@@ -12,9 +12,8 @@ learn more about this project.
 
 .. toctree::
 
-   building
    using
    support
-   rpc
    testing
+   rpc
    motivation

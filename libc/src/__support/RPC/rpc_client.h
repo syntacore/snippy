@@ -11,16 +11,15 @@
 
 #include "rpc.h"
 
-#include "include/llvm-libc-types/rpc_opcodes_t.h"
-#include "src/__support/macros/config.h"
+#include "llvm-libc-types/rpc_opcodes_t.h"
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 namespace rpc {
 
 /// The libc client instance used to communicate with the server.
 extern Client client;
 
 } // namespace rpc
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE
 
 #endif

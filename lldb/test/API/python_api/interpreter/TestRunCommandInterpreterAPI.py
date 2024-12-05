@@ -47,65 +47,27 @@ class CommandRunInterpreterAPICase(TestBase):
         TestBase.setUp(self)
 
         self.stdin_path = self.getBuildArtifact("stdin.txt")
-        self.stdout_path = self.getBuildArtifact("stdout.txt")
-
-    def run_commands_string(
-        self, command_string, options=lldb.SBCommandInterpreterRunOptions()
-    ):
-        """Run the commands in command_string through RunCommandInterpreter.
-        Returns (n_errors, quit_requested, has_crashed, result_string)."""
 
         with open(self.stdin_path, "w") as input_handle:
-            input_handle.write(command_string)
+            input_handle.write("nonexistingcommand\nquit")
 
-        n_errors = 0
-        quit_requested = False
-        has_crashed = False
+        self.dbg.SetInputFile(open(self.stdin_path, "r"))
 
-        with open(self.stdin_path, "r") as in_fileH, open(
-            self.stdout_path, "w"
-        ) as out_fileH:
-            self.dbg.SetInputFile(in_fileH)
-
-            self.dbg.SetOutputFile(out_fileH)
-            self.dbg.SetErrorFile(out_fileH)
-
-            n_errors, quit_requested, has_crashed = self.dbg.RunCommandInterpreter(
-                True, False, options, 0, False, False
-            )
-
-        result_string = None
-        with open(self.stdout_path, "r") as out_fileH:
-            result_string = out_fileH.read()
-
-        return (n_errors, quit_requested, has_crashed, result_string)
+        # No need to track the output
+        devnull = open(os.devnull, "w")
+        self.dbg.SetOutputFile(devnull)
+        self.dbg.SetErrorFile(devnull)
 
     def test_run_session_with_error_and_quit(self):
         """Run non-existing and quit command returns appropriate values"""
 
-        n_errors, quit_requested, has_crashed, _ = self.run_commands_string(
-            "nonexistingcommand\nquit\n"
+        n_errors, quit_requested, has_crashed = self.dbg.RunCommandInterpreter(
+            True, False, lldb.SBCommandInterpreterRunOptions(), 0, False, False
         )
+
         self.assertGreater(n_errors, 0)
         self.assertTrue(quit_requested)
         self.assertFalse(has_crashed)
-
-    def test_allow_repeat(self):
-        """Try auto-repeat of process launch - the command will fail and
-        the auto-repeat will fail because of no auto-repeat."""
-        options = lldb.SBCommandInterpreterRunOptions()
-        options.SetEchoCommands(False)
-        options.SetAllowRepeats(True)
-
-        n_errors, quit_requested, has_crashed, result_str = self.run_commands_string(
-            "process launch\n\n", options
-        )
-        self.assertEqual(n_errors, 2)
-        self.assertFalse(quit_requested)
-        self.assertFalse(has_crashed)
-
-        self.assertIn("invalid target", result_str)
-        self.assertIn("No auto repeat", result_str)
 
 
 class SBCommandInterpreterRunOptionsCase(TestBase):
@@ -117,14 +79,13 @@ class SBCommandInterpreterRunOptionsCase(TestBase):
         opts = lldb.SBCommandInterpreterRunOptions()
 
         # Check getters with default values
-        self.assertFalse(opts.GetStopOnContinue())
-        self.assertFalse(opts.GetStopOnError())
-        self.assertFalse(opts.GetStopOnCrash())
-        self.assertTrue(opts.GetEchoCommands())
-        self.assertTrue(opts.GetPrintResults())
-        self.assertTrue(opts.GetPrintErrors())
-        self.assertTrue(opts.GetAddToHistory())
-        self.assertFalse(opts.GetAllowRepeats())
+        self.assertEqual(opts.GetStopOnContinue(), False)
+        self.assertEqual(opts.GetStopOnError(), False)
+        self.assertEqual(opts.GetStopOnCrash(), False)
+        self.assertEqual(opts.GetEchoCommands(), True)
+        self.assertEqual(opts.GetPrintResults(), True)
+        self.assertEqual(opts.GetPrintErrors(), True)
+        self.assertEqual(opts.GetAddToHistory(), True)
 
         # Invert values
         opts.SetStopOnContinue(not opts.GetStopOnContinue())
@@ -134,14 +95,12 @@ class SBCommandInterpreterRunOptionsCase(TestBase):
         opts.SetPrintResults(not opts.GetPrintResults())
         opts.SetPrintErrors(not opts.GetPrintErrors())
         opts.SetAddToHistory(not opts.GetAddToHistory())
-        opts.SetAllowRepeats(not opts.GetAllowRepeats())
 
         # Check the value changed
-        self.assertTrue(opts.GetStopOnContinue())
-        self.assertTrue(opts.GetStopOnError())
-        self.assertTrue(opts.GetStopOnCrash())
-        self.assertFalse(opts.GetEchoCommands())
-        self.assertFalse(opts.GetPrintResults())
-        self.assertFalse(opts.GetPrintErrors())
-        self.assertFalse(opts.GetAddToHistory())
-        self.assertTrue(opts.GetAllowRepeats())
+        self.assertEqual(opts.GetStopOnContinue(), True)
+        self.assertEqual(opts.GetStopOnError(), True)
+        self.assertEqual(opts.GetStopOnCrash(), True)
+        self.assertEqual(opts.GetEchoCommands(), False)
+        self.assertEqual(opts.GetPrintResults(), False)
+        self.assertEqual(opts.GetPrintErrors(), False)
+        self.assertEqual(opts.GetAddToHistory(), False)

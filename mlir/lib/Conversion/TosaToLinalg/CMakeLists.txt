@@ -15,14 +15,13 @@ add_mlir_conversion_library(MLIRTosaToLinalg
   MLIRArithDialect
   MLIRDialectUtils
   MLIRIR
-  MLIRIndexDialect
   MLIRLinalgDialect
   MLIRLinalgUtils
   MLIRMathDialect
   MLIRPass
-  MLIRSupport
   MLIRTensorDialect
+  MLIRTransforms
   MLIRTosaDialect
   MLIRTosaTransforms
-  MLIRTransforms
+  MLIRSupport
   )

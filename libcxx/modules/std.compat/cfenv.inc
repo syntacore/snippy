@@ -9,21 +9,21 @@
 
 export {
   // types
-  using ::fenv_t _LIBCPP_USING_IF_EXISTS;
-  using ::fexcept_t _LIBCPP_USING_IF_EXISTS;
+  using ::fenv_t;
+  using ::fexcept_t;
 
   // functions
-  using ::feclearexcept _LIBCPP_USING_IF_EXISTS;
-  using ::fegetexceptflag _LIBCPP_USING_IF_EXISTS;
-  using ::feraiseexcept _LIBCPP_USING_IF_EXISTS;
-  using ::fesetexceptflag _LIBCPP_USING_IF_EXISTS;
-  using ::fetestexcept _LIBCPP_USING_IF_EXISTS;
+  using ::feclearexcept;
+  using ::fegetexceptflag;
+  using ::feraiseexcept;
+  using ::fesetexceptflag;
+  using ::fetestexcept;
 
-  using ::fegetround _LIBCPP_USING_IF_EXISTS;
-  using ::fesetround _LIBCPP_USING_IF_EXISTS;
+  using ::fegetround;
+  using ::fesetround;
 
-  using ::fegetenv _LIBCPP_USING_IF_EXISTS;
-  using ::feholdexcept _LIBCPP_USING_IF_EXISTS;
-  using ::fesetenv _LIBCPP_USING_IF_EXISTS;
-  using ::feupdateenv _LIBCPP_USING_IF_EXISTS;
+  using ::fegetenv;
+  using ::feholdexcept;
+  using ::fesetenv;
+  using ::feupdateenv;
 } // export

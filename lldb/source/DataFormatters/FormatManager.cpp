@@ -9,7 +9,6 @@
 #include "lldb/DataFormatters/FormatManager.h"
 
 #include "lldb/Core/Debugger.h"
-#include "lldb/Core/ValueObject.h"
 #include "lldb/DataFormatters/FormattersHelpers.h"
 #include "lldb/DataFormatters/LanguageCategory.h"
 #include "lldb/Interpreter/ScriptInterpreter.h"
@@ -92,7 +91,7 @@ static bool GetFormatFromFormatChar(char format_char, Format &format) {
 }
 
 static bool GetFormatFromFormatName(llvm::StringRef format_name,
-                                    Format &format) {
+                                    bool partial_match_ok, Format &format) {
   uint32_t i;
   for (i = 0; i < g_num_format_infos; ++i) {
     if (format_name.equals_insensitive(g_format_infos[i].format_name)) {
@@ -101,11 +100,13 @@ static bool GetFormatFromFormatName(llvm::StringRef format_name,
     }
   }
 
-  for (i = 0; i < g_num_format_infos; ++i) {
-    if (llvm::StringRef(g_format_infos[i].format_name)
-            .starts_with_insensitive(format_name)) {
-      format = g_format_infos[i].format;
-      return true;
+  if (partial_match_ok) {
+    for (i = 0; i < g_num_format_infos; ++i) {
+      if (llvm::StringRef(g_format_infos[i].format_name)
+              .starts_with_insensitive(format_name)) {
+        format = g_format_infos[i].format;
+        return true;
+      }
     }
   }
   format = eFormatInvalid;
@@ -123,6 +124,7 @@ void FormatManager::Changed() {
 }
 
 bool FormatManager::GetFormatFromCString(const char *format_cstr,
+                                         bool partial_match_ok,
                                          lldb::Format &format) {
   bool success = false;
   if (format_cstr && format_cstr[0]) {
@@ -132,7 +134,7 @@ bool FormatManager::GetFormatFromCString(const char *format_cstr,
         return true;
     }
 
-    success = GetFormatFromFormatName(format_cstr, format);
+    success = GetFormatFromFormatName(format_cstr, partial_match_ok, format);
   }
   if (!success)
     format = eFormatInvalid;
@@ -177,14 +179,8 @@ void FormatManager::GetPossibleMatches(
     FormattersMatchCandidate::Flags current_flags, bool root_level) {
   compiler_type = compiler_type.GetTypeForFormatters();
   ConstString type_name(compiler_type.GetTypeName());
-  // A ValueObject that couldn't be made correctly won't necessarily have a
-  // target.  We aren't going to find a formatter in this case anyway, so we
-  // should just exit.
-  TargetSP target_sp = valobj.GetTargetSP();
-  if (!target_sp)
-    return;
   ScriptInterpreter *script_interpreter =
-      target_sp->GetDebugger().GetScriptInterpreter();
+      valobj.GetTargetSP()->GetDebugger().GetScriptInterpreter();
   if (valobj.GetBitfieldBitSize() > 0) {
     StreamString sstring;
     sstring.Printf("%s:%d", type_name.AsCString(), valobj.GetBitfieldBitSize());
@@ -449,25 +445,17 @@ lldb::Format FormatManager::GetSingleItemFormat(lldb::Format vector_format) {
 }
 
 bool FormatManager::ShouldPrintAsOneLiner(ValueObject &valobj) {
-  TargetSP target_sp = valobj.GetTargetSP();
   // if settings say no oneline whatsoever
-  if (target_sp && !target_sp->GetDebugger().GetAutoOneLineSummaries())
+  if (valobj.GetTargetSP().get() &&
+      !valobj.GetTargetSP()->GetDebugger().GetAutoOneLineSummaries())
     return false; // then don't oneline
 
   // if this object has a summary, then ask the summary
   if (valobj.GetSummaryFormat().get() != nullptr)
     return valobj.GetSummaryFormat()->IsOneLiner();
 
-  const size_t max_num_children =
-      (target_sp ? *target_sp : Target::GetGlobalProperties())
-          .GetMaximumNumberOfChildrenToDisplay();
-  auto num_children = valobj.GetNumChildren(max_num_children);
-  if (!num_children) {
-    llvm::consumeError(num_children.takeError());
-    return true;
-  }
   // no children, no party
-  if (*num_children == 0)
+  if (valobj.GetNumChildren() == 0)
     return false;
 
   // ask the type if it has any opinion about this eLazyBoolCalculate == no
@@ -486,7 +474,7 @@ bool FormatManager::ShouldPrintAsOneLiner(ValueObject &valobj) {
 
   size_t total_children_name_len = 0;
 
-  for (size_t idx = 0; idx < *num_children; idx++) {
+  for (size_t idx = 0; idx < valobj.GetNumChildren(); idx++) {
     bool is_synth_val = false;
     ValueObjectSP child_sp(valobj.GetChildAtIndex(idx));
     // something is wrong here - bail out
@@ -538,7 +526,7 @@ bool FormatManager::ShouldPrintAsOneLiner(ValueObject &valobj) {
     }
 
     // if this child has children..
-    if (child_sp->HasChildren()) {
+    if (child_sp->GetNumChildren()) {
       // ...and no summary...
       // (if it had a summary and the summary wanted children, we would have
       // bailed out anyway

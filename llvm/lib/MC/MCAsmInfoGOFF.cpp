@@ -21,7 +21,7 @@ void MCAsmInfoGOFF::anchor() {}
 MCAsmInfoGOFF::MCAsmInfoGOFF() {
   Data64bitsDirective = "\t.quad\t";
   HasDotTypeDotSizeDirective = false;
-  PrivateGlobalPrefix = "L#";
-  PrivateLabelPrefix = "L#";
+  PrivateGlobalPrefix = "@@";
+  PrivateLabelPrefix = "@";
   ZeroDirective = "\t.space\t";
 }

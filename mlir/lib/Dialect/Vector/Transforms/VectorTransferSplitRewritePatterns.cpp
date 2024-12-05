@@ -171,7 +171,7 @@ static MemRefType getCastCompatibleMemRefType(MemRefType aT, MemRefType bT) {
 /// is first inserted, followed by a `memref.cast`.
 static Value castToCompatibleMemRefType(OpBuilder &b, Value memref,
                                         MemRefType compatibleMemRefType) {
-  MemRefType sourceType = cast<MemRefType>(memref.getType());
+  MemRefType sourceType = memref.getType().cast<MemRefType>();
   Value res = memref;
   if (sourceType.getMemorySpace() != compatibleMemRefType.getMemorySpace()) {
     sourceType = MemRefType::get(
@@ -209,7 +209,7 @@ createSubViewIntersection(RewriterBase &b, VectorTransferOpInterface xferOp,
     AffineExpr i, j, k;
     bindDims(xferOp.getContext(), i, j, k);
     SmallVector<AffineMap, 4> maps =
-        AffineMap::inferFromExprList(MapList{{i - j, k}}, b.getContext());
+        AffineMap::inferFromExprList(MapList{{i - j, k}});
     // affine_min(%dimMemRef - %index, %dimAlloc)
     Value affineMin = b.create<affine::AffineMinOp>(
         loc, index.getType(), maps[0], ValueRange{dimMemRef, index, dimAlloc});

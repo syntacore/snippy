@@ -104,7 +104,9 @@ INTERCEPTOR(void *, aligned_alloc, uptr boundary, uptr size) {
 #endif // SANITIZER_INTERCEPT_ALIGNED_ALLOC
 
 INTERCEPTOR(uptr, malloc_usable_size, void *ptr) {
-  return memprof_malloc_usable_size(ptr);
+  GET_CURRENT_PC_BP_SP;
+  (void)sp;
+  return memprof_malloc_usable_size(ptr, pc, bp);
 }
 
 #if SANITIZER_INTERCEPT_MALLOPT_AND_MALLINFO

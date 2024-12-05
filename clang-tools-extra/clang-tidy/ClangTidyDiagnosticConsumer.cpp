@@ -62,7 +62,8 @@ protected:
     // appending the check name to the message in ClangTidyContext::diag and
     // using getCustomDiagID.
     std::string CheckNameInMessage = " [" + Error.DiagnosticName + "]";
-    Message.consume_back(CheckNameInMessage);
+    if (Message.ends_with(CheckNameInMessage))
+      Message = Message.substr(0, Message.size() - CheckNameInMessage.size());
 
     auto TidyMessage =
         Loc.isValid()
@@ -311,18 +312,7 @@ ClangTidyDiagnosticConsumer::ClangTidyDiagnosticConsumer(
     : Context(Ctx), ExternalDiagEngine(ExternalDiagEngine),
       RemoveIncompatibleErrors(RemoveIncompatibleErrors),
       GetFixesFromNotes(GetFixesFromNotes),
-      EnableNolintBlocks(EnableNolintBlocks) {
-
-  if (Context.getOptions().HeaderFilterRegex &&
-      !Context.getOptions().HeaderFilterRegex->empty())
-    HeaderFilter =
-        std::make_unique<llvm::Regex>(*Context.getOptions().HeaderFilterRegex);
-
-  if (Context.getOptions().ExcludeHeaderFilterRegex &&
-      !Context.getOptions().ExcludeHeaderFilterRegex->empty())
-    ExcludeHeaderFilter = std::make_unique<llvm::Regex>(
-        *Context.getOptions().ExcludeHeaderFilterRegex);
-}
+      EnableNolintBlocks(EnableNolintBlocks) {}
 
 void ClangTidyDiagnosticConsumer::finalizeLastError() {
   if (!Errors.empty()) {
@@ -573,15 +563,20 @@ void ClangTidyDiagnosticConsumer::checkFilters(SourceLocation Location,
   }
 
   StringRef FileName(File->getName());
-  LastErrorRelatesToUserCode =
-      LastErrorRelatesToUserCode || Sources.isInMainFile(Location) ||
-      (HeaderFilter &&
-       (HeaderFilter->match(FileName) &&
-        !(ExcludeHeaderFilter && ExcludeHeaderFilter->match(FileName))));
+  LastErrorRelatesToUserCode = LastErrorRelatesToUserCode ||
+                               Sources.isInMainFile(Location) ||
+                               getHeaderFilter()->match(FileName);
 
   unsigned LineNumber = Sources.getExpansionLineNumber(Location);
   LastErrorPassesLineFilter =
       LastErrorPassesLineFilter || passesLineFilter(FileName, LineNumber);
+}
+
+llvm::Regex *ClangTidyDiagnosticConsumer::getHeaderFilter() {
+  if (!HeaderFilter)
+    HeaderFilter =
+        std::make_unique<llvm::Regex>(*Context.getOptions().HeaderFilterRegex);
+  return HeaderFilter.get();
 }
 
 void ClangTidyDiagnosticConsumer::removeIncompatibleErrors() {

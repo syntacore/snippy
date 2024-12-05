@@ -147,7 +147,7 @@ SBModule SBTarget::GetModuleAtIndexFromEvent(const uint32_t idx,
 const char *SBTarget::GetBroadcasterClassName() {
   LLDB_INSTRUMENT();
 
-  return ConstString(Target::GetStaticBroadcasterClass()).AsCString();
+  return Target::GetStaticBroadcasterClass().AsCString();
 }
 
 bool SBTarget::IsValid() const {
@@ -199,22 +199,15 @@ SBDebugger SBTarget::GetDebugger() const {
 
 SBStructuredData SBTarget::GetStatistics() {
   LLDB_INSTRUMENT_VA(this);
-  SBStatisticsOptions options;
-  return GetStatistics(options);
-}
-
-SBStructuredData SBTarget::GetStatistics(SBStatisticsOptions options) {
-  LLDB_INSTRUMENT_VA(this);
 
   SBStructuredData data;
   TargetSP target_sp(GetSP());
   if (!target_sp)
     return data;
   std::string json_str =
-      llvm::formatv("{0:2}", DebuggerStats::ReportStatistics(
-                                 target_sp->GetDebugger(), target_sp.get(),
-                                 options.ref()))
-          .str();
+      llvm::formatv("{0:2}",
+          DebuggerStats::ReportStatistics(target_sp->GetDebugger(),
+                                          target_sp.get())).str();
   data.m_impl_up->SetObjectSP(StructuredData::ParseJSON(json_str));
   return data;
 }
@@ -1147,7 +1140,7 @@ void SBTarget::GetBreakpointNames(SBStringList &names) {
 
     std::vector<std::string> name_vec;
     target_sp->GetBreakpointNames(name_vec);
-    for (const auto &name : name_vec)
+    for (auto name : name_vec)
       names.AppendString(name.c_str());
   }
 }
@@ -1789,11 +1782,6 @@ lldb::SBSymbolContextList SBTarget::FindGlobalFunctions(const char *name,
         target_sp->GetImages().FindFunctions(RegularExpression(name_ref),
                                              function_options, *sb_sc_list);
         break;
-      case eMatchTypeRegexInsensitive:
-        target_sp->GetImages().FindFunctions(
-            RegularExpression(name_ref, llvm::Regex::RegexFlags::IgnoreCase),
-            function_options, *sb_sc_list);
-        break;
       case eMatchTypeStartsWith:
         regexstr = llvm::Regex::escape(name) + ".*";
         target_sp->GetImages().FindFunctions(RegularExpression(regexstr),
@@ -1941,11 +1929,6 @@ SBValueList SBTarget::FindGlobalVariables(const char *name,
       target_sp->GetImages().FindGlobalVariables(RegularExpression(name_ref),
                                                  max_matches, variable_list);
       break;
-    case eMatchTypeRegexInsensitive:
-      target_sp->GetImages().FindGlobalVariables(
-          RegularExpression(name_ref, llvm::Regex::IgnoreCase), max_matches,
-          variable_list);
-      break;
     case eMatchTypeStartsWith:
       regexstr = "^" + llvm::Regex::escape(name) + ".*";
       target_sp->GetImages().FindGlobalVariables(RegularExpression(regexstr),
@@ -2018,30 +2001,6 @@ lldb::SBInstructionList SBTarget::ReadInstructions(lldb::SBAddress base_addr,
     }
   }
 
-  return sb_instructions;
-}
-
-lldb::SBInstructionList SBTarget::ReadInstructions(lldb::SBAddress start_addr,
-                                                   lldb::SBAddress end_addr,
-                                                   const char *flavor_string) {
-  LLDB_INSTRUMENT_VA(this, start_addr, end_addr, flavor_string);
-
-  SBInstructionList sb_instructions;
-
-  TargetSP target_sp(GetSP());
-  if (target_sp) {
-    lldb::addr_t start_load_addr = start_addr.GetLoadAddress(*this);
-    lldb::addr_t end_load_addr = end_addr.GetLoadAddress(*this);
-    if (end_load_addr > start_load_addr) {
-      lldb::addr_t size = end_load_addr - start_load_addr;
-
-      AddressRange range(start_load_addr, size);
-      const bool force_live_memory = true;
-      sb_instructions.SetDisassembler(Disassembler::DisassembleRange(
-          target_sp->GetArchitecture(), nullptr, flavor_string, *target_sp,
-          range, force_live_memory));
-    }
-  }
   return sb_instructions;
 }
 

@@ -19,7 +19,7 @@
 #ifndef FORTRAN_RUNTIME_ENTRY_NAMES_H
 #define FORTRAN_RUNTIME_ENTRY_NAMES_H
 
-#include "flang/Common/api-attrs.h"
+#include "flang/Runtime/api-attrs.h"
 
 #ifndef RTNAME
 #define NAME_WITH_PREFIX_AND_REVISION(prefix, revision, name) \

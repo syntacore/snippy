@@ -52,19 +52,16 @@ inline bool pureCall(mlir::Operation *op) {
 /// Get or create a FuncOp in a module.
 ///
 /// If `module` already contains FuncOp `name`, it is returned. Otherwise, a new
-/// FuncOp is created, and that new FuncOp is returned. A symbol table can
-/// be provided to speed-up the lookups.
-mlir::func::FuncOp createFuncOp(mlir::Location loc, mlir::ModuleOp module,
-                                llvm::StringRef name, mlir::FunctionType type,
-                                llvm::ArrayRef<mlir::NamedAttribute> attrs = {},
-                                const mlir::SymbolTable *symbolTable = nullptr);
+/// FuncOp is created, and that new FuncOp is returned.
+mlir::func::FuncOp
+createFuncOp(mlir::Location loc, mlir::ModuleOp module, llvm::StringRef name,
+             mlir::FunctionType type,
+             llvm::ArrayRef<mlir::NamedAttribute> attrs = {});
 
-/// Get or create a GlobalOp in a module. A symbol table can be provided to
-/// speed-up the lookups.
+/// Get or create a GlobalOp in a module.
 fir::GlobalOp createGlobalOp(mlir::Location loc, mlir::ModuleOp module,
                              llvm::StringRef name, mlir::Type type,
-                             llvm::ArrayRef<mlir::NamedAttribute> attrs = {},
-                             const mlir::SymbolTable *symbolTable = nullptr);
+                             llvm::ArrayRef<mlir::NamedAttribute> attrs = {});
 
 /// Attribute to mark Fortran entities with the CONTIGUOUS attribute.
 constexpr llvm::StringRef getContiguousAttrName() { return "fir.contiguous"; }
@@ -91,9 +88,9 @@ static constexpr llvm::StringRef getHostAssocAttrName() {
   return "fir.host_assoc";
 }
 
-/// Attribute to link an internal procedure to its host procedure symbol.
-static constexpr llvm::StringRef getHostSymbolAttrName() {
-  return "fir.host_symbol";
+/// Attribute to mark an internal procedure.
+static constexpr llvm::StringRef getInternalProcedureAttrName() {
+  return "fir.internal_proc";
 }
 
 /// Attribute containing the original name of a function from before the
@@ -109,8 +106,8 @@ bool hasHostAssociationArgument(mlir::func::FuncOp func);
 /// Is the function, \p func an internal procedure ?
 /// Some internal procedures may have access to saved host procedure
 /// variables even when they do not have a tuple argument.
-inline bool isInternalProcedure(mlir::func::FuncOp func) {
-  return func->hasAttr(fir::getHostSymbolAttrName());
+inline bool isInternalPorcedure(mlir::func::FuncOp func) {
+  return func->hasAttr(fir::getInternalProcedureAttrName());
 }
 
 /// Tell if \p value is:
@@ -142,22 +139,16 @@ bool valueMayHaveFirAttributes(mlir::Value value,
 bool anyFuncArgsHaveAttr(mlir::func::FuncOp func, llvm::StringRef attr);
 
 /// Unwrap integer constant from an mlir::Value.
-std::optional<std::int64_t> getIntIfConstant(mlir::Value value);
+inline std::optional<std::int64_t> getIntIfConstant(mlir::Value value) {
+  if (auto *definingOp = value.getDefiningOp())
+    if (auto cst = mlir::dyn_cast<mlir::arith::ConstantOp>(definingOp))
+      if (auto intAttr = cst.getValue().dyn_cast<mlir::IntegerAttr>())
+        return intAttr.getInt();
+  return {};
+}
 
 static constexpr llvm::StringRef getAdaptToByRefAttrName() {
   return "adapt.valuebyref";
-}
-
-static constexpr llvm::StringRef getFuncPureAttrName() {
-  return "fir.func_pure";
-}
-
-static constexpr llvm::StringRef getFuncElementalAttrName() {
-  return "fir.func_elemental";
-}
-
-static constexpr llvm::StringRef getFuncRecursiveAttrName() {
-  return "fir.func_recursive";
 }
 
 // Attribute for an alloca that is a trivial adaptor for converting a value to
@@ -172,7 +163,6 @@ inline mlir::NamedAttribute getAdaptToByRefAttr(Builder &builder) {
           builder.getUnitAttr()};
 }
 
-bool isDummyArgument(mlir::Value v);
 } // namespace fir
 
 #endif // FORTRAN_OPTIMIZER_DIALECT_FIROPSSUPPORT_H

@@ -94,7 +94,8 @@ namespace {
 
 protected:
     bool hasTOCLoReloc(const MachineInstr &MI) {
-      if (MI.getOpcode() == PPC::LDtocL || MI.getOpcode() == PPC::ADDItocL8 ||
+      if (MI.getOpcode() == PPC::LDtocL ||
+          MI.getOpcode() == PPC::ADDItocL ||
           MI.getOpcode() == PPC::LWZtocL)
         return true;
 

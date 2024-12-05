@@ -80,7 +80,7 @@ static std::string getOutputFilePath(llvm::StringRef outputFilename,
   if (!extension.empty() && (inputFilename != "-")) {
     llvm::SmallString<128> path(inputFilename);
     llvm::sys::path::replace_extension(path, extension);
-    outFile = std::string(path);
+    outFile = std::string(path.str());
   }
 
   return outFile;
@@ -212,6 +212,7 @@ getExplicitAndImplicitAMDGPUTargetFeatures(clang::DiagnosticsEngine &diags,
                                            const llvm::Triple triple) {
   llvm::StringRef cpu = targetOpts.cpu;
   llvm::StringMap<bool> implicitFeaturesMap;
+  std::string errorMsg;
   // Get the set of implicit target features
   llvm::AMDGPU::fillAMDGPUFeatureMap(cpu, triple, implicitFeaturesMap);
 
@@ -221,12 +222,11 @@ getExplicitAndImplicitAMDGPUTargetFeatures(clang::DiagnosticsEngine &diags,
     implicitFeaturesMap[userKeyString] = (userFeature[0] == '+');
   }
 
-  auto HasError =
-      llvm::AMDGPU::insertWaveSizeFeature(cpu, triple, implicitFeaturesMap);
-  if (HasError.first) {
+  if (!llvm::AMDGPU::insertWaveSizeFeature(cpu, triple, implicitFeaturesMap,
+                                           errorMsg)) {
     unsigned diagID = diags.getCustomDiagID(clang::DiagnosticsEngine::Error,
                                             "Unsupported feature ID: %0");
-    diags.Report(diagID) << HasError.second;
+    diags.Report(diagID) << errorMsg.data();
     return std::string();
   }
 
@@ -321,19 +321,11 @@ bool CompilerInstance::setUpTargetMachine() {
   assert(OptLevelOrNone && "Invalid optimization level!");
   llvm::CodeGenOptLevel OptLevel = *OptLevelOrNone;
   std::string featuresStr = getTargetFeatures();
-  std::optional<llvm::CodeModel::Model> cm = getCodeModel(CGOpts.CodeModel);
   targetMachine.reset(theTarget->createTargetMachine(
       theTriple, /*CPU=*/targetOpts.cpu,
       /*Features=*/featuresStr, llvm::TargetOptions(),
       /*Reloc::Model=*/CGOpts.getRelocationModel(),
-      /*CodeModel::Model=*/cm, OptLevel));
+      /*CodeModel::Model=*/std::nullopt, OptLevel));
   assert(targetMachine && "Failed to create TargetMachine");
-  if (cm.has_value()) {
-    const llvm::Triple triple(theTriple);
-    if ((cm == llvm::CodeModel::Medium || cm == llvm::CodeModel::Large) &&
-        triple.getArch() == llvm::Triple::x86_64) {
-      targetMachine->setLargeDataThreshold(CGOpts.LargeDataThreshold);
-    }
-  }
   return true;
 }

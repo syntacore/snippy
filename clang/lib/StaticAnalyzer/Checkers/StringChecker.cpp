@@ -27,7 +27,7 @@ class StringChecker : public Checker<check::PreCall> {
   mutable const FunctionDecl *StringConstCharPtrCtor = nullptr;
   mutable CanQualType SizeTypeTy;
   const CallDescription TwoParamStdStringCtor = {
-      CDM::CXXMethod, {"std", "basic_string", "basic_string"}, 2, 2};
+      {"std", "basic_string", "basic_string"}, 2, 2};
 
   bool isCharToStringCtor(const CallEvent &Call, const ASTContext &ACtx) const;
 

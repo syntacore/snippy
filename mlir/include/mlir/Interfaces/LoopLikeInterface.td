@@ -15,10 +15,6 @@
 
 include "mlir/IR/OpBase.td"
 
-//===----------------------------------------------------------------------===//
-// Interfaces
-//===----------------------------------------------------------------------===//
-
 def LoopLikeOpInterface : OpInterface<"LoopLikeOpInterface"> {
   let description = [{
     Contains helper functions to query properties and perform transformations
@@ -84,7 +80,7 @@ def LoopLikeOpInterface : OpInterface<"LoopLikeOpInterface"> {
         have a single iteration. Returns "success" if the promotion was
         successful.
       }],
-      /*retTy=*/"::llvm::LogicalResult",
+      /*retTy=*/"::mlir::LogicalResult",
       /*methodName=*/"promoteIfSingleIteration",
       /*args=*/(ins "::mlir::RewriterBase &":$rewriter),
       /*methodBody=*/"",
@@ -93,59 +89,51 @@ def LoopLikeOpInterface : OpInterface<"LoopLikeOpInterface"> {
       }]
     >,
     InterfaceMethod<[{
-        Return all induction variables, if they exist. If the op has no notion of
-        induction variable, then return std::nullopt. If it does have
-        a notion but an instance doesn't have induction variables, then
-        return empty vector.
+        If there is a single induction variable return it, otherwise return
+        std::nullopt.
       }],
-      /*retTy=*/"::std::optional<::llvm::SmallVector<::mlir::Value>>",
-      /*methodName=*/"getLoopInductionVars",
+      /*retTy=*/"::std::optional<::mlir::Value>",
+      /*methodName=*/"getSingleInductionVar",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return ::std::nullopt;
+        return std::nullopt;
       }]
     >,
     InterfaceMethod<[{
-        Return all lower bounds, if they exist. If the op has no notion of
-        lower bounds, then return std::nullopt. If it does have
-        a notion but an instance doesn't have lower bounds, then
-        return empty vector.
+        Return the single lower bound value or attribute if it exists, otherwise
+        return std::nullopt.
       }],
-      /*retTy=*/"::std::optional<::llvm::SmallVector<::mlir::OpFoldResult>>",
-      /*methodName=*/"getLoopLowerBounds",
+      /*retTy=*/"::std::optional<::mlir::OpFoldResult>",
+      /*methodName=*/"getSingleLowerBound",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return ::std::nullopt;
+        return std::nullopt;
       }]
     >,
     InterfaceMethod<[{
-        Return all steps, if they exist. If the op has no notion of
-        steps, then return std::nullopt. If it does have
-        a notion but an instance doesn't have steps, then
-        return empty vector.
+        Return the single step value or attribute if it exists, otherwise
+        return std::nullopt.
       }],
-      /*retTy=*/"::std::optional<::llvm::SmallVector<::mlir::OpFoldResult>>",
-      /*methodName=*/"getLoopSteps",
+      /*retTy=*/"::std::optional<::mlir::OpFoldResult>",
+      /*methodName=*/"getSingleStep",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return ::std::nullopt;
+        return std::nullopt;
       }]
     >,
     InterfaceMethod<[{
-        Return all upper bounds, if they exist. If the op has no notion of
-        lower bounds, then return std::nullopt. If it does have
-        a notion but an instance doesn't have lower bounds, then
-        return empty vector.
+        Return the single upper bound value or attribute if it exists, otherwise
+        return std::nullopt.
       }],
-      /*retTy=*/"::std::optional<::llvm::SmallVector<::mlir::OpFoldResult>>",
-      /*methodName=*/"getLoopUpperBounds",
+      /*retTy=*/"::std::optional<::mlir::OpFoldResult>",
+      /*methodName=*/"getSingleUpperBound",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return ::std::nullopt;
+        return std::nullopt;
       }]
     >,
     InterfaceMethod<[{
@@ -176,16 +164,13 @@ def LoopLikeOpInterface : OpInterface<"LoopLikeOpInterface"> {
     InterfaceMethod<[{
         Return the mutable operand range of values that are yielded to the next
         iteration by the loop terminator.
-
-        For loop operations that dont yield a value, this should return
-        std::nullopt.
       }],
-      /*retTy=*/"std::optional<::llvm::MutableArrayRef<::mlir::OpOperand>>",
+      /*retTy=*/"::llvm::MutableArrayRef<::mlir::OpOperand>",
       /*methodName=*/"getYieldedValuesMutable",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return std::nullopt;
+        return {};
       }]
     >,
     InterfaceMethod<[{
@@ -232,7 +217,7 @@ def LoopLikeOpInterface : OpInterface<"LoopLikeOpInterface"> {
       /*defaultImplementation=*/[{
         return ::mlir::failure();
       }]
-    >
+    >,
   ];
 
   let extraClassDeclaration = [{
@@ -243,39 +228,6 @@ def LoopLikeOpInterface : OpInterface<"LoopLikeOpInterface"> {
   }];
 
   let extraSharedClassDeclaration = [{
-    /// If there is a single induction variable return it, otherwise return
-    /// std::nullopt.
-    ::std::optional<::mlir::Value> getSingleInductionVar() {
-      auto inductionVars = $_op.getLoopInductionVars();
-      if (inductionVars.has_value() && (*inductionVars).size() == 1)
-          return (*inductionVars)[0];
-        return std::nullopt;
-    }
-    /// Return the single lower bound value or attribute if it exists, otherwise
-    /// return std::nullopt.
-    ::std::optional<::mlir::OpFoldResult> getSingleLowerBound() {
-      auto lowerBounds = $_op.getLoopLowerBounds();
-      if (lowerBounds.has_value() && (*lowerBounds).size() == 1)
-          return (*lowerBounds)[0];
-      return std::nullopt;
-    }
-    /// Return the single step value or attribute if it exists, otherwise
-    /// return std::nullopt.
-    ::std::optional<::mlir::OpFoldResult> getSingleStep() {
-      auto steps = $_op.getLoopSteps();
-      if (steps.has_value() && (*steps).size() == 1)
-          return (*steps)[0];
-      return std::nullopt;
-    }
-    /// Return the single upper bound value or attribute if it exists, otherwise
-    /// return std::nullopt.
-    ::std::optional<::mlir::OpFoldResult> getSingleUpperBound() {
-      auto upperBounds = $_op.getLoopUpperBounds();
-      if (upperBounds.has_value() && (*upperBounds).size() == 1)
-          return (*upperBounds)[0];
-      return std::nullopt;
-    }
-
     /// Append the specified additional "init" operands: replace this loop with
     /// a new loop that has the additional init operands. The loop body of this
     /// loop is moved over to the new loop.
@@ -292,17 +244,16 @@ def LoopLikeOpInterface : OpInterface<"LoopLikeOpInterface"> {
           });
     }
 
-    /// Return the values that are yielded to the next iteration. If
-    /// the loop doesnt yield any values return `{}`.
+    /// Return the values that are yielded to the next iteration.
     ::mlir::ValueRange getYieldedValues() {
       auto mutableValues = $_op.getYieldedValuesMutable();
-      if (!mutableValues || mutableValues->empty())
+      if (mutableValues.empty())
         return {};
-      Operation *yieldOp = mutableValues->begin()->getOwner();
-      unsigned firstOperandIndex = mutableValues->begin()->getOperandNumber();
+      Operation *yieldOp = mutableValues.begin()->getOwner();
+      unsigned firstOperandIndex = mutableValues.begin()->getOperandNumber();
       return OperandRange(
           yieldOp->operand_begin() + firstOperandIndex,
-          yieldOp->operand_begin() + firstOperandIndex + mutableValues->size());
+          yieldOp->operand_begin() + firstOperandIndex + mutableValues.size());
     }
 
     /// Return the "init" operands that are used as initialization values for
@@ -367,17 +318,14 @@ def LoopLikeOpInterface : OpInterface<"LoopLikeOpInterface"> {
 
     /// Return the yielded value that corresponds to the given region iter_arg.
     /// Return "nullptr" if the given block argument is not a region iter_arg
-    /// of this loop op or if there is no yield corresponding to this `bbArg`.
+    /// of this loop op.
     OpOperand *getTiedLoopYieldedValue(BlockArgument bbArg) {
       auto iterArgs = $_op.getRegionIterArgs();
       auto it = llvm::find(iterArgs, bbArg);
       if (it == iterArgs.end())
         return {};
-      std::optional<llvm::MutableArrayRef<::mlir::OpOperand>> yieldValues =
-        $_op.getYieldedValuesMutable();
-      if (!yieldValues)
-        return {};
-      return &yieldValues.value()[std::distance(iterArgs.begin(), it)];
+      return
+          &$_op.getYieldedValuesMutable()[std::distance(iterArgs.begin(), it)];
     }
 
     /// Return the loop result that corresponds to the given init operand.
@@ -415,12 +363,5 @@ def LoopLikeOpInterface : OpInterface<"LoopLikeOpInterface"> {
     return detail::verifyLoopLikeOpInterface($_op);
   }];
 }
-
-//===----------------------------------------------------------------------===//
-// Traits
-//===----------------------------------------------------------------------===//
-
-// Op contains a region with parallel execution semantics
-def HasParallelRegion : NativeOpTrait<"HasParallelRegion">;
 
 #endif // MLIR_INTERFACES_LOOPLIKEINTERFACE

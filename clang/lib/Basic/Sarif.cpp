@@ -57,7 +57,8 @@ static std::string percentEncodeURICharacter(char C) {
   // should be written out directly. Otherwise, percent
   // encode the character and write that out instead of the
   // reserved character.
-  if (llvm::isAlnum(C) || StringRef("-._~:@!$&'()*+,;=").contains(C))
+  if (llvm::isAlnum(C) ||
+      StringRef::npos != StringRef("-._~:@!$&'()*+,;=").find(C))
     return std::string(&C, 1);
   return "%" + llvm::toHex(StringRef(&C, 1));
 }

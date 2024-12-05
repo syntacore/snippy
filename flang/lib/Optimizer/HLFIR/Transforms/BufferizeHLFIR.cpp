@@ -30,6 +30,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/TypeSwitch.h"
 
@@ -76,7 +77,7 @@ static mlir::Value packageBufferizedExpr(mlir::Location loc,
 /// currently enforced by the verifiers that only accept HLFIR value or
 /// variable types which do not include tuples.
 static hlfir::Entity getBufferizedExprStorage(mlir::Value bufferizedExpr) {
-  auto tupleType = mlir::dyn_cast<mlir::TupleType>(bufferizedExpr.getType());
+  auto tupleType = bufferizedExpr.getType().dyn_cast<mlir::TupleType>();
   if (!tupleType)
     return hlfir::Entity{bufferizedExpr};
   assert(tupleType.size() == 2 && "unexpected tuple type");
@@ -89,7 +90,7 @@ static hlfir::Entity getBufferizedExprStorage(mlir::Value bufferizedExpr) {
 /// Helper to extract the clean-up flag from a tuple created by
 /// packageBufferizedExpr.
 static mlir::Value getBufferizedExprMustFreeFlag(mlir::Value bufferizedExpr) {
-  auto tupleType = mlir::dyn_cast<mlir::TupleType>(bufferizedExpr.getType());
+  auto tupleType = bufferizedExpr.getType().dyn_cast<mlir::TupleType>();
   if (!tupleType)
     return bufferizedExpr;
   assert(tupleType.size() == 2 && "unexpected tuple type");
@@ -121,10 +122,9 @@ createArrayTemp(mlir::Location loc, fir::FirOpBuilder &builder,
         fir::FortranVariableFlagsAttr::get(
             builder.getContext(), fir::FortranVariableFlagsEnum::allocatable);
 
-    auto declareOp =
-        builder.create<hlfir::DeclareOp>(loc, alloc, tmpName,
-                                         /*shape=*/nullptr, lenParams,
-                                         /*dummy_scope=*/nullptr, declAttrs);
+    auto declareOp = builder.create<hlfir::DeclareOp>(loc, alloc, tmpName,
+                                                      /*shape=*/nullptr,
+                                                      lenParams, declAttrs);
 
     int rank = extents.size();
     fir::runtime::genAllocatableApplyMold(builder, loc, alloc,
@@ -152,34 +152,18 @@ createArrayTemp(mlir::Location loc, fir::FirOpBuilder &builder,
 
   mlir::Value allocmem = builder.createHeapTemporary(loc, sequenceType, tmpName,
                                                      extents, lenParams);
-  auto declareOp = builder.create<hlfir::DeclareOp>(
-      loc, allocmem, tmpName, shape, lenParams,
-      /*dummy_scope=*/nullptr, fir::FortranVariableFlagsAttr{});
+  auto declareOp =
+      builder.create<hlfir::DeclareOp>(loc, allocmem, tmpName, shape, lenParams,
+                                       fir::FortranVariableFlagsAttr{});
   mlir::Value trueVal = builder.createBool(loc, true);
   return {hlfir::Entity{declareOp.getBase()}, trueVal};
-}
-
-/// Copy \p source into a new temporary and package the temporary into a
-/// <temp,cleanup> tuple. The temporary may be heap or stack allocated.
-static mlir::Value copyInTempAndPackage(mlir::Location loc,
-                                        fir::FirOpBuilder &builder,
-                                        hlfir::Entity source) {
-  auto [temp, cleanup] = hlfir::createTempFromMold(loc, builder, source);
-  builder.create<hlfir::AssignOp>(loc, source, temp, temp.isAllocatable(),
-                                  /*keep_lhs_length_if_realloc=*/false,
-                                  /*temporary_lhs=*/true);
-  // Dereference allocatable temporary directly to simplify processing
-  // of its uses.
-  if (temp.isAllocatable())
-    temp = hlfir::derefPointersAndAllocatables(loc, builder, temp);
-  return packageBufferizedExpr(loc, builder, temp, cleanup);
 }
 
 struct AsExprOpConversion : public mlir::OpConversionPattern<hlfir::AsExprOp> {
   using mlir::OpConversionPattern<hlfir::AsExprOp>::OpConversionPattern;
   explicit AsExprOpConversion(mlir::MLIRContext *ctx)
       : mlir::OpConversionPattern<hlfir::AsExprOp>{ctx} {}
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(hlfir::AsExprOp asExpr, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::Location loc = asExpr->getLoc();
@@ -194,7 +178,12 @@ struct AsExprOpConversion : public mlir::OpConversionPattern<hlfir::AsExprOp> {
     }
     // Otherwise, create a copy in a new buffer.
     hlfir::Entity source = hlfir::Entity{adaptor.getVar()};
-    mlir::Value bufferizedExpr = copyInTempAndPackage(loc, builder, source);
+    auto [temp, cleanup] = hlfir::createTempFromMold(loc, builder, source);
+    builder.create<hlfir::AssignOp>(loc, source, temp, temp.isAllocatable(),
+                                    /*keep_lhs_length_if_realloc=*/false,
+                                    /*temporary_lhs=*/true);
+    mlir::Value bufferizedExpr =
+        packageBufferizedExpr(loc, builder, temp, cleanup);
     rewriter.replaceOp(asExpr, bufferizedExpr);
     return mlir::success();
   }
@@ -204,7 +193,7 @@ struct ShapeOfOpConversion
     : public mlir::OpConversionPattern<hlfir::ShapeOfOp> {
   using mlir::OpConversionPattern<hlfir::ShapeOfOp>::OpConversionPattern;
 
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(hlfir::ShapeOfOp shapeOf, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::Location loc = shapeOf.getLoc();
@@ -218,7 +207,7 @@ struct ShapeOfOpConversion
     } else {
       // everything else failed so try to create a shape from static type info
       hlfir::ExprType exprTy =
-          mlir::dyn_cast_or_null<hlfir::ExprType>(adaptor.getExpr().getType());
+          adaptor.getExpr().getType().dyn_cast_or_null<hlfir::ExprType>();
       if (exprTy)
         shape = hlfir::genExprShape(builder, loc, exprTy);
     }
@@ -236,7 +225,7 @@ struct ApplyOpConversion : public mlir::OpConversionPattern<hlfir::ApplyOp> {
   using mlir::OpConversionPattern<hlfir::ApplyOp>::OpConversionPattern;
   explicit ApplyOpConversion(mlir::MLIRContext *ctx)
       : mlir::OpConversionPattern<hlfir::ApplyOp>{ctx} {}
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(hlfir::ApplyOp apply, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::Location loc = apply->getLoc();
@@ -261,7 +250,7 @@ struct AssignOpConversion : public mlir::OpConversionPattern<hlfir::AssignOp> {
   using mlir::OpConversionPattern<hlfir::AssignOp>::OpConversionPattern;
   explicit AssignOpConversion(mlir::MLIRContext *ctx)
       : mlir::OpConversionPattern<hlfir::AssignOp>{ctx} {}
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(hlfir::AssignOp assign, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     llvm::SmallVector<mlir::Value> newOperands;
@@ -278,7 +267,7 @@ struct ConcatOpConversion : public mlir::OpConversionPattern<hlfir::ConcatOp> {
   using mlir::OpConversionPattern<hlfir::ConcatOp>::OpConversionPattern;
   explicit ConcatOpConversion(mlir::MLIRContext *ctx)
       : mlir::OpConversionPattern<hlfir::ConcatOp>{ctx} {}
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(hlfir::ConcatOp concat, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::Location loc = concat->getLoc();
@@ -317,7 +306,7 @@ struct SetLengthOpConversion
   using mlir::OpConversionPattern<hlfir::SetLengthOp>::OpConversionPattern;
   explicit SetLengthOpConversion(mlir::MLIRContext *ctx)
       : mlir::OpConversionPattern<hlfir::SetLengthOp>{ctx} {}
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(hlfir::SetLengthOp setLength, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::Location loc = setLength->getLoc();
@@ -331,7 +320,7 @@ struct SetLengthOpConversion
                                           /*shape=*/std::nullopt, lenParams);
     auto declareOp = builder.create<hlfir::DeclareOp>(
         loc, alloca, tmpName, /*shape=*/mlir::Value{}, lenParams,
-        /*dummy_scope=*/nullptr, fir::FortranVariableFlagsAttr{});
+        fir::FortranVariableFlagsAttr{});
     hlfir::Entity temp{declareOp.getBase()};
     // Assign string value to the created temp.
     builder.create<hlfir::AssignOp>(loc, string, temp,
@@ -350,7 +339,7 @@ struct GetLengthOpConversion
   using mlir::OpConversionPattern<hlfir::GetLengthOp>::OpConversionPattern;
   explicit GetLengthOpConversion(mlir::MLIRContext *ctx)
       : mlir::OpConversionPattern<hlfir::GetLengthOp>{ctx} {}
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(hlfir::GetLengthOp getLength, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::Location loc = getLength->getLoc();
@@ -440,7 +429,7 @@ struct AssociateOpConversion
   using mlir::OpConversionPattern<hlfir::AssociateOp>::OpConversionPattern;
   explicit AssociateOpConversion(mlir::MLIRContext *ctx)
       : mlir::OpConversionPattern<hlfir::AssociateOp>{ctx} {}
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(hlfir::AssociateOp associate, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::Location loc = associate->getLoc();
@@ -480,10 +469,10 @@ struct AssociateOpConversion
           assert(mlir::isa<fir::ClassType>(sourceVar.getType()) &&
                  fir::isAllocatableType(sourceVar.getType()));
           assert(sourceVar.getType() == assocType);
-        } else if ((mlir::isa<fir::BaseBoxType>(sourceVar.getType()) &&
-                    !mlir::isa<fir::BaseBoxType>(assocType)) ||
-                   ((mlir::isa<fir::BoxCharType>(sourceVar.getType()) &&
-                     !mlir::isa<fir::BoxCharType>(assocType)))) {
+        } else if ((sourceVar.getType().isa<fir::BaseBoxType>() &&
+                    !assocType.isa<fir::BaseBoxType>()) ||
+                   ((sourceVar.getType().isa<fir::BoxCharType>() &&
+                     !assocType.isa<fir::BoxCharType>()))) {
           sourceVar = builder.create<fir::BoxAddrOp>(loc, assocType, sourceVar);
         } else {
           sourceVar = builder.createConvert(loc, assocType, sourceVar);
@@ -533,11 +522,6 @@ struct AssociateOpConversion
       mlir::Value firBase = hlfir::Entity{bufferizedExpr}.getFirBase();
       replaceWith(bufferizedExpr, firBase, mustFree);
       eraseAllUsesInDestroys(associate.getSource(), rewriter);
-      // Make sure to erase the hlfir.destroy if there is an indirection through
-      // a hlfir.no_reassoc operation.
-      if (auto noReassoc = mlir::dyn_cast_or_null<hlfir::NoReassocOp>(
-              associate.getSource().getDefiningOp()))
-        eraseAllUsesInDestroys(noReassoc.getVal(), rewriter);
       return mlir::success();
     }
     if (isTrivialValue) {
@@ -558,7 +542,12 @@ struct AssociateOpConversion
     // non-trivial value with more than one use. We will have to make a copy and
     // use that
     hlfir::Entity source = hlfir::Entity{bufferizedExpr};
-    mlir::Value bufferTuple = copyInTempAndPackage(loc, builder, source);
+    auto [temp, cleanup] = hlfir::createTempFromMold(loc, builder, source);
+    builder.create<hlfir::AssignOp>(loc, source, temp, temp.isAllocatable(),
+                                    /*keep_lhs_length_if_realloc=*/false,
+                                    /*temporary_lhs=*/true);
+    mlir::Value bufferTuple =
+        packageBufferizedExpr(loc, builder, temp, cleanup);
     bufferizedExpr = getBufferizedExprStorage(bufferTuple);
     replaceWith(bufferizedExpr, hlfir::Entity{bufferizedExpr}.getFirBase(),
                 getBufferizedExprMustFreeFlag(bufferTuple));
@@ -595,13 +584,13 @@ static void genBufferDestruction(mlir::Location loc, fir::FirOpBuilder &builder,
       // for MERGE with polymorphic results.
       if (mustFinalize)
         TODO(loc, "finalizing polymorphic temporary in HLFIR");
-    } else if (mlir::isa<fir::BaseBoxType, fir::BoxCharType>(var.getType())) {
+    } else if (var.getType().isa<fir::BaseBoxType, fir::BoxCharType>()) {
       if (mustFinalize && !mlir::isa<fir::BaseBoxType>(var.getType()))
         fir::emitFatalError(loc, "non-finalizable variable");
 
       addr = builder.create<fir::BoxAddrOp>(loc, heapType, var);
     } else {
-      if (!mlir::isa<fir::HeapType>(var.getType()))
+      if (!var.getType().isa<fir::HeapType>())
         addr = builder.create<fir::ConvertOp>(loc, heapType, var);
 
       if (mustFinalize || deallocComponents) {
@@ -659,7 +648,7 @@ struct EndAssociateOpConversion
   using mlir::OpConversionPattern<hlfir::EndAssociateOp>::OpConversionPattern;
   explicit EndAssociateOpConversion(mlir::MLIRContext *ctx)
       : mlir::OpConversionPattern<hlfir::EndAssociateOp>{ctx} {}
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(hlfir::EndAssociateOp endAssociate, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::Location loc = endAssociate->getLoc();
@@ -676,7 +665,7 @@ struct DestroyOpConversion
   using mlir::OpConversionPattern<hlfir::DestroyOp>::OpConversionPattern;
   explicit DestroyOpConversion(mlir::MLIRContext *ctx)
       : mlir::OpConversionPattern<hlfir::DestroyOp>{ctx} {}
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(hlfir::DestroyOp destroy, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     // If expr was bufferized on the heap, now is time to deallocate the buffer.
@@ -705,7 +694,7 @@ struct NoReassocOpConversion
   using mlir::OpConversionPattern<hlfir::NoReassocOp>::OpConversionPattern;
   explicit NoReassocOpConversion(mlir::MLIRContext *ctx)
       : mlir::OpConversionPattern<hlfir::NoReassocOp>{ctx} {}
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(hlfir::NoReassocOp noreassoc, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::Location loc = noreassoc->getLoc();
@@ -741,15 +730,13 @@ struct HLFIRListener : public mlir::OpBuilder::Listener {
   HLFIRListener(fir::FirOpBuilder &builder,
                 mlir::ConversionPatternRewriter &rewriter)
       : builder{builder}, rewriter{rewriter} {}
-  void notifyOperationInserted(mlir::Operation *op,
-                               mlir::OpBuilder::InsertPoint previous) override {
-    builder.notifyOperationInserted(op, previous);
-    rewriter.getListener()->notifyOperationInserted(op, previous);
+  void notifyOperationInserted(mlir::Operation *op) override {
+    builder.notifyOperationInserted(op);
+    rewriter.notifyOperationInserted(op);
   }
-  virtual void notifyBlockInserted(mlir::Block *block, mlir::Region *previous,
-                                   mlir::Region::iterator previousIt) override {
-    builder.notifyBlockInserted(block, previous, previousIt);
-    rewriter.getListener()->notifyBlockInserted(block, previous, previousIt);
+  virtual void notifyBlockCreated(mlir::Block *block) override {
+    builder.notifyBlockCreated(block);
+    rewriter.notifyBlockCreated(block);
   }
   fir::FirOpBuilder &builder;
   mlir::ConversionPatternRewriter &rewriter;
@@ -766,7 +753,7 @@ struct ElementalOpConversion
     // by the nesting level of ElementalOp's.
     setHasBoundedRewriteRecursion();
   }
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(hlfir::ElementalOp elemental, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::Location loc = elemental->getLoc();
@@ -836,7 +823,7 @@ struct ElementalOpConversion
       // the assign, insert an hlfir.destroy to mark the expression end-of-life.
       // If the expression creation allocated a buffer on the heap inside the
       // loop, this will ensure the buffer properly deallocated.
-      if (mlir::isa<hlfir::ExprType>(elementValue.getType()) &&
+      if (elementValue.getType().isa<hlfir::ExprType>() &&
           wasCreatedInCurrentBlock(elementValue, builder))
         builder.create<hlfir::DestroyOp>(loc, elementValue);
     }
@@ -859,7 +846,7 @@ struct CharExtremumOpConversion
   using mlir::OpConversionPattern<hlfir::CharExtremumOp>::OpConversionPattern;
   explicit CharExtremumOpConversion(mlir::MLIRContext *ctx)
       : mlir::OpConversionPattern<hlfir::CharExtremumOp>{ctx} {}
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(hlfir::CharExtremumOp char_extremum, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::Location loc = char_extremum->getLoc();
@@ -931,12 +918,11 @@ public:
                         hlfir::EndAssociateOp, hlfir::SetLengthOp>();
 
     target.markUnknownOpDynamicallyLegal([](mlir::Operation *op) {
-      return llvm::all_of(op->getResultTypes(),
-                          [](mlir::Type ty) {
-                            return !mlir::isa<hlfir::ExprType>(ty);
-                          }) &&
+      return llvm::all_of(
+                 op->getResultTypes(),
+                 [](mlir::Type ty) { return !ty.isa<hlfir::ExprType>(); }) &&
              llvm::all_of(op->getOperandTypes(), [](mlir::Type ty) {
-               return !mlir::isa<hlfir::ExprType>(ty);
+               return !ty.isa<hlfir::ExprType>();
              });
     });
     if (mlir::failed(
@@ -948,3 +934,7 @@ public:
   }
 };
 } // namespace
+
+std::unique_ptr<mlir::Pass> hlfir::createBufferizeHLFIRPass() {
+  return std::make_unique<BufferizeHLFIR>();
+}

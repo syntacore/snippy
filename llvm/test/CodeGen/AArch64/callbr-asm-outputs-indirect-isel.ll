@@ -18,7 +18,7 @@ define i32 @test0() {
   ; CHECK: bb.0.entry:
   ; CHECK-NEXT:   successors: %bb.2(0x80000000), %bb.1(0x00000000)
   ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   INLINEASM_BR &"# $0", 0 /* attdialect */, {{[0-9]+}} /* regdef:GPR32common */, def %5, 13 /* imm */, %bb.1
+  ; CHECK-NEXT:   INLINEASM_BR &"# $0", 0 /* attdialect */, 1703946 /* regdef:GPR32common */, def %5, 13 /* imm */, %bb.1
   ; CHECK-NEXT:   [[COPY:%[0-9]+]]:gpr32all = COPY %5
   ; CHECK-NEXT:   B %bb.2
   ; CHECK-NEXT: {{  $}}
@@ -31,7 +31,7 @@ define i32 @test0() {
   ; CHECK-NEXT: bb.2.direct:
   ; CHECK-NEXT:   successors: %bb.4(0x80000000), %bb.3(0x00000000)
   ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   INLINEASM_BR &"# $0", 0 /* attdialect */, {{[0-9]+}} /* regdef:GPR32common */, def %7, 13 /* imm */, %bb.3
+  ; CHECK-NEXT:   INLINEASM_BR &"# $0", 0 /* attdialect */, 1703946 /* regdef:GPR32common */, def %7, 13 /* imm */, %bb.3
   ; CHECK-NEXT:   [[COPY2:%[0-9]+]]:gpr32all = COPY %7
   ; CHECK-NEXT:   B %bb.4
   ; CHECK-NEXT: {{  $}}
@@ -107,7 +107,7 @@ define i32 @dont_split1() {
   ; CHECK: bb.0.entry:
   ; CHECK-NEXT:   successors: %bb.1(0x80000000), %bb.2(0x00000000)
   ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, {{[0-9]+}} /* regdef:GPR32common */, def %1, 13 /* imm */, %bb.2
+  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, 1703946 /* regdef:GPR32common */, def %1, 13 /* imm */, %bb.2
   ; CHECK-NEXT:   [[COPY:%[0-9]+]]:gpr32all = COPY %1
   ; CHECK-NEXT:   B %bb.1
   ; CHECK-NEXT: {{  $}}
@@ -168,11 +168,12 @@ define i32 @dont_split3() {
   ; CHECK: bb.0.entry:
   ; CHECK-NEXT:   successors: %bb.1(0x80000000), %bb.2(0x00000000)
   ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, {{[0-9]+}} /* regdef:GPR32common */, def %0, 13 /* imm */, %bb.2
+  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, 1703946 /* regdef:GPR32common */, def %0, 13 /* imm */, %bb.2
   ; CHECK-NEXT:   B %bb.1
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.1.x:
   ; CHECK-NEXT:   successors: %bb.2(0x80000000)
+  ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.2.v (machine-block-address-taken, inlineasm-br-indirect-target):
   ; CHECK-NEXT:   [[MOVi32imm:%[0-9]+]]:gpr32 = MOVi32imm 42
@@ -194,7 +195,7 @@ define i32 @split_me0() {
   ; CHECK: bb.0.entry:
   ; CHECK-NEXT:   successors: %bb.2(0x80000000), %bb.1(0x00000000)
   ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, {{[0-9]+}} /* regdef:GPR32common */, def %3, 13 /* imm */, %bb.1
+  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, 1703946 /* regdef:GPR32common */, def %3, 13 /* imm */, %bb.1
   ; CHECK-NEXT:   [[COPY:%[0-9]+]]:gpr32all = COPY %3
   ; CHECK-NEXT:   B %bb.2
   ; CHECK-NEXT: {{  $}}
@@ -244,7 +245,7 @@ define i32 @split_me1(i1 %z) {
   ; CHECK-NEXT: bb.1.w:
   ; CHECK-NEXT:   successors: %bb.3(0x80000000), %bb.2(0x00000000)
   ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, {{[0-9]+}} /* regdef:GPR32common */, def %5, 13 /* imm */, %bb.2, 13 /* imm */, %bb.2
+  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, 1703946 /* regdef:GPR32common */, def %5, 13 /* imm */, %bb.2, 13 /* imm */, %bb.2
   ; CHECK-NEXT:   [[COPY1:%[0-9]+]]:gpr32all = COPY %5
   ; CHECK-NEXT:   B %bb.3
   ; CHECK-NEXT: {{  $}}
@@ -297,7 +298,7 @@ define i32 @split_me2(i1 %z) {
   ; CHECK-NEXT: bb.1.w:
   ; CHECK-NEXT:   successors: %bb.3(0x80000000), %bb.2(0x00000000)
   ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, {{[0-9]+}} /* regdef:GPR32common */, def %6, 13 /* imm */, %bb.2, 13 /* imm */, %bb.2
+  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, 1703946 /* regdef:GPR32common */, def %6, 13 /* imm */, %bb.2, 13 /* imm */, %bb.2
   ; CHECK-NEXT:   [[COPY2:%[0-9]+]]:gpr32all = COPY %6
   ; CHECK-NEXT:   B %bb.3
   ; CHECK-NEXT: {{  $}}
@@ -340,7 +341,7 @@ define i32 @dont_split4() {
   ; CHECK: bb.0.entry:
   ; CHECK-NEXT:   successors: %bb.1(0x80000000), %bb.2(0x00000000)
   ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, {{[0-9]+}} /* regdef:GPR32common */, def %3, 13 /* imm */, %bb.2
+  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, 1703946 /* regdef:GPR32common */, def %3, 13 /* imm */, %bb.2
   ; CHECK-NEXT:   [[COPY:%[0-9]+]]:gpr32all = COPY %3
   ; CHECK-NEXT:   B %bb.1
   ; CHECK-NEXT: {{  $}}
@@ -379,7 +380,7 @@ define i32 @dont_split5() {
   ; CHECK: bb.0.entry:
   ; CHECK-NEXT:   successors: %bb.2(0x80000000), %bb.1(0x00000000)
   ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, {{[0-9]+}} /* regdef:GPR32common */, def %3, 13 /* imm */, %bb.1
+  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, 1703946 /* regdef:GPR32common */, def %3, 13 /* imm */, %bb.1
   ; CHECK-NEXT:   [[COPY:%[0-9]+]]:gpr32all = COPY %3
   ; CHECK-NEXT:   B %bb.2
   ; CHECK-NEXT: {{  $}}
@@ -410,7 +411,7 @@ define i32 @split_me3() {
   ; CHECK: bb.0.entry:
   ; CHECK-NEXT:   successors: %bb.2(0x80000000), %bb.1(0x00000000)
   ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, {{[0-9]+}} /* regdef:GPR32common */, def %3, 13 /* imm */, %bb.1
+  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, 1703946 /* regdef:GPR32common */, def %3, 13 /* imm */, %bb.1
   ; CHECK-NEXT:   [[COPY:%[0-9]+]]:gpr32all = COPY %3
   ; CHECK-NEXT:   B %bb.2
   ; CHECK-NEXT: {{  $}}
@@ -422,6 +423,7 @@ define i32 @split_me3() {
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.2.y:
   ; CHECK-NEXT:   successors: %bb.3(0x80000000)
+  ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.3.out:
   ; CHECK-NEXT:   [[PHI:%[0-9]+]]:gpr32all = PHI [[COPY1]], %bb.1, [[COPY]], %bb.2
@@ -456,7 +458,7 @@ define i32 @dont_split6(i32 %0) {
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT:   [[PHI:%[0-9]+]]:gpr32all = PHI [[COPY]], %bb.0, %2, %bb.2
   ; CHECK-NEXT:   [[COPY1:%[0-9]+]]:gpr32common = COPY [[PHI]]
-  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, {{[0-9]+}} /* regdef:GPR32common */, def %4, 2147483657 /* reguse tiedto:$0 */, [[COPY1]](tied-def 3), 13 /* imm */, %bb.2
+  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, 1703946 /* regdef:GPR32common */, def %4, 2147483657 /* reguse tiedto:$0 */, [[COPY1]](tied-def 3), 13 /* imm */, %bb.2
   ; CHECK-NEXT:   [[COPY2:%[0-9]+]]:gpr32all = COPY %4
   ; CHECK-NEXT:   B %bb.3
   ; CHECK-NEXT: {{  $}}
@@ -491,7 +493,7 @@ define i32 @split_me4() {
   ; CHECK: bb.0.entry:
   ; CHECK-NEXT:   successors: %bb.2(0x80000000), %bb.1(0x00000000)
   ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, {{[0-9]+}} /* regdef:GPR32common */, def %3, 13 /* imm */, %bb.1
+  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, 1703946 /* regdef:GPR32common */, def %3, 13 /* imm */, %bb.1
   ; CHECK-NEXT:   [[COPY:%[0-9]+]]:gpr32all = COPY %3
   ; CHECK-NEXT:   B %bb.2
   ; CHECK-NEXT: {{  $}}
@@ -522,7 +524,7 @@ define i32 @split_me5() {
   ; CHECK: bb.0.entry:
   ; CHECK-NEXT:   successors: %bb.2(0x80000000), %bb.1(0x00000000)
   ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, {{[0-9]+}} /* regdef:GPR32common */, def %3, 13 /* imm */, %bb.1
+  ; CHECK-NEXT:   INLINEASM_BR &"", 0 /* attdialect */, 1703946 /* regdef:GPR32common */, def %3, 13 /* imm */, %bb.1
   ; CHECK-NEXT:   [[COPY:%[0-9]+]]:gpr32all = COPY %3
   ; CHECK-NEXT:   B %bb.2
   ; CHECK-NEXT: {{  $}}

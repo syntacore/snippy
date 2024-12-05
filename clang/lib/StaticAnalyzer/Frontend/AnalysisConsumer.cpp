@@ -527,8 +527,7 @@ static void reportAnalyzerFunctionMisuse(const AnalyzerOptions &Opts,
 
 void AnalysisConsumer::runAnalysisOnTranslationUnit(ASTContext &C) {
   BugReporter BR(*Mgr);
-  const TranslationUnitDecl *TU = C.getTranslationUnitDecl();
-  BR.setAnalysisEntryPoint(TU);
+  TranslationUnitDecl *TU = C.getTranslationUnitDecl();
   if (SyntaxCheckTimer)
     SyntaxCheckTimer->startTimer();
   checkerMgr->runCheckersOnASTDecl(TU, *Mgr, BR);
@@ -676,7 +675,6 @@ void AnalysisConsumer::HandleCode(Decl *D, AnalysisMode Mode,
 
   DisplayFunction(D, Mode, IMode);
   BugReporter BR(*Mgr);
-  BR.setAnalysisEntryPoint(D);
 
   if (Mode & AM_Syntax) {
     llvm::TimeRecord CheckerStartTime;

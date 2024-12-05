@@ -342,10 +342,9 @@ void emitOption(const DocumentedOption &Option, const Record *DocInfo,
       })];
   for (auto &S : SphinxOptionIDs)
     NextSuffix[S] = SphinxWorkaroundSuffix + 1;
-
-  std::string Program = DocInfo->getValueAsString("Program").lower();
   if (SphinxWorkaroundSuffix)
-    OS << ".. program:: " << Program << SphinxWorkaroundSuffix << "\n";
+    OS << ".. program:: " << DocInfo->getValueAsString("Program")
+       << SphinxWorkaroundSuffix << "\n";
 
   // Emit the names of the option.
   OS << ".. option:: ";
@@ -354,43 +353,13 @@ void emitOption(const DocumentedOption &Option, const Record *DocInfo,
     EmittedAny = emitOptionNames(Option, OS, EmittedAny);
   });
   if (SphinxWorkaroundSuffix)
-    OS << "\n.. program:: " << Program;
+    OS << "\n.. program:: " << DocInfo->getValueAsString("Program");
   OS << "\n\n";
 
   // Emit the description, if we have one.
   const Record *R = Option.Option;
-  std::string Description;
-
-  // Prefer a program specific help string.
-  // This is a list of (visibilities, string) pairs.
-  std::vector<Record *> VisibilitiesHelp =
-      R->getValueAsListOfDefs("HelpTextsForVariants");
-  for (Record *VisibilityHelp : VisibilitiesHelp) {
-    // This is a list of visibilities.
-    ArrayRef<Init *> Visibilities =
-        VisibilityHelp->getValueAsListInit("Visibilities")->getValues();
-
-    // See if any of the program's visibilities are in the list.
-    for (StringRef DocInfoMask :
-         DocInfo->getValueAsListOfStrings("VisibilityMask")) {
-      for (Init *Visibility : Visibilities) {
-        if (Visibility->getAsUnquotedString() == DocInfoMask) {
-          // Use the first one we find.
-          Description = escapeRST(VisibilityHelp->getValueAsString("Text"));
-          break;
-        }
-      }
-      if (!Description.empty())
-        break;
-    }
-
-    if (!Description.empty())
-      break;
-  }
-
-  // If there's not a program specific string, use the default one.
-  if (Description.empty())
-    Description = getRSTStringWithTextFallback(R, "DocBrief", "HelpText");
+  std::string Description =
+      getRSTStringWithTextFallback(R, "DocBrief", "HelpText");
 
   if (!isa<UnsetInit>(R->getValueInit("Values"))) {
     if (!Description.empty() && Description.back() != '.')
@@ -452,7 +421,7 @@ void clang::EmitClangOptDocs(RecordKeeper &Records, raw_ostream &OS) {
     return;
   }
   OS << DocInfo->getValueAsString("Intro") << "\n";
-  OS << ".. program:: " << DocInfo->getValueAsString("Program").lower() << "\n";
+  OS << ".. program:: " << DocInfo->getValueAsString("Program") << "\n";
 
   emitDocumentation(0, extractDocumentation(Records, DocInfo), DocInfo, OS);
 }

@@ -467,9 +467,8 @@ private:
   /// If \p CreatePushOrPop is true, create a push/pop instead. Current SP/FP
   /// values, as determined by StackPointerTracking, should be informed via
   /// \p SPVal and \p FPVal in order to emit the correct offset form SP/FP.
-  Expected<MCInst> createStackAccess(int SPVal, int FPVal,
-                                     const FrameIndexEntry &FIE,
-                                     bool CreatePushOrPop);
+  MCInst createStackAccess(int SPVal, int FPVal, const FrameIndexEntry &FIE,
+                           bool CreatePushOrPop);
 
   /// Update the CFI referenced by \p Inst with \p NewOffset, if the CFI has
   /// an offset.
@@ -485,23 +484,22 @@ private:
   /// InsertionPoint for other instructions that need to be inserted at the same
   /// original location, since this insertion may have invalidated the previous
   /// location.
-  Expected<BBIterTy> processInsertion(BBIterTy InsertionPoint,
-                                      BinaryBasicBlock *CurBB,
-                                      const WorklistItem &Item, int64_t SPVal,
-                                      int64_t FPVal);
+  BBIterTy processInsertion(BBIterTy InsertionPoint, BinaryBasicBlock *CurBB,
+                            const WorklistItem &Item, int64_t SPVal,
+                            int64_t FPVal);
 
   /// Auxiliary function to processInsertions(), helping perform all the
   /// insertion tasks in the todo list associated with a single insertion point.
   /// Return true if at least one insertion was performed.
-  Expected<BBIterTy> processInsertionsList(BBIterTy InsertionPoint,
-                                           BinaryBasicBlock *CurBB,
-                                           std::vector<WorklistItem> &TodoList,
-                                           int64_t SPVal, int64_t FPVal);
+  BBIterTy processInsertionsList(BBIterTy InsertionPoint,
+                                 BinaryBasicBlock *CurBB,
+                                 std::vector<WorklistItem> &TodoList,
+                                 int64_t SPVal, int64_t FPVal);
 
   /// Apply all insertion todo tasks regarding insertion of new stores/loads or
   /// push/pops at annotated points. Return false if the entire function had
   /// no todo tasks annotation and this pass has nothing to do.
-  Expected<bool> processInsertions();
+  bool processInsertions();
 
   /// Apply all deletion todo tasks (or tasks to change a push/pop to a memory
   /// access no-op)
@@ -521,9 +519,9 @@ public:
         BC.MIB->removeAnnotation(Inst, getAnnotationIndex());
   }
 
-  Expected<bool> perform(bool HotOnly = false);
+  bool perform(bool HotOnly = false);
 
-  static void printStats(BinaryContext &BC);
+  static void printStats();
 };
 
 } // end namespace bolt

@@ -188,7 +188,8 @@ void DAGTypeLegalizer::PerformExpensiveChecks() {
 
 #ifndef NDEBUG
   // Checked that NewNodes are only used by other NewNodes.
-  for (SDNode *N : NewNodes) {
+  for (unsigned i = 0, e = NewNodes.size(); i != e; ++i) {
+    SDNode *N = NewNodes[i];
     for (SDNode *U : N->uses())
       assert(U->getNodeId() == NewNode && "NewNode used by non-NewNode!");
   }

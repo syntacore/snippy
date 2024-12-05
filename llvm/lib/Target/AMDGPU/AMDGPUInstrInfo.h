@@ -37,7 +37,7 @@ namespace AMDGPU {
 /// These opcodes have an Intrinsic::ID operand similar to a GIntrinsic. But
 /// they are not actual instances of GIntrinsics, so we cannot use
 /// GIntrinsic::getIntrinsicID() on them.
-Intrinsic::ID getIntrinsicID(const MachineInstr &I);
+unsigned getIntrinsicID(const MachineInstr &I);
 
 struct RsrcIntrinsic {
   unsigned Intr;

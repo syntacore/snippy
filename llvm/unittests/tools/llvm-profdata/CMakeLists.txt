@@ -9,3 +9,5 @@ add_llvm_unittest(LLVMProfdataTests
   )
 
 target_link_libraries(LLVMProfdataTests PRIVATE LLVMTestingSupport)
+
+set_property(TARGET LLVMProfdataTests PROPERTY FOLDER "Tests/UnitTests/ToolTests")

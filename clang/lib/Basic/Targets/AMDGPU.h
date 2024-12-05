@@ -168,7 +168,9 @@ public:
       return true;
     }
 
-    bool HasLeftParen = S.consume_front("{");
+    bool HasLeftParen = false;
+    if (S.consume_front("{"))
+      HasLeftParen = true;
     if (S.empty())
       return false;
     if (S.front() != 'v' && S.front() != 's' && S.front() != 'a') {
@@ -194,7 +196,9 @@ public:
       Name = S.data() - 1;
       return true;
     }
-    bool HasLeftBracket = S.consume_front("[");
+    bool HasLeftBracket = false;
+    if (S.consume_front("["))
+      HasLeftBracket = true;
     unsigned long long N;
     if (S.empty() || consumeUnsignedInteger(S, 10, N))
       return false;
@@ -414,10 +418,8 @@ public:
   // value ~0.
   uint64_t getNullPointerValue(LangAS AS) const override {
     // FIXME: Also should handle region.
-    return (AS == LangAS::opencl_local || AS == LangAS::opencl_private ||
-            AS == LangAS::sycl_local || AS == LangAS::sycl_private)
-               ? ~0
-               : 0;
+    return (AS == LangAS::opencl_local || AS == LangAS::opencl_private)
+      ? ~0 : 0;
   }
 
   void setAuxTarget(const TargetInfo *Aux) override;

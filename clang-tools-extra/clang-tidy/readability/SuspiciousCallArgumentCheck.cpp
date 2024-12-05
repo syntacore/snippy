@@ -138,11 +138,11 @@ static bool applyAbbreviationHeuristic(
     const llvm::StringMap<std::string> &AbbreviationDictionary, StringRef Arg,
     StringRef Param) {
   if (AbbreviationDictionary.contains(Arg) &&
-      Param == AbbreviationDictionary.lookup(Arg))
+      Param.equals(AbbreviationDictionary.lookup(Arg)))
     return true;
 
   if (AbbreviationDictionary.contains(Param) &&
-      Arg == AbbreviationDictionary.lookup(Param))
+      Arg.equals(AbbreviationDictionary.lookup(Param)))
     return true;
 
   return false;

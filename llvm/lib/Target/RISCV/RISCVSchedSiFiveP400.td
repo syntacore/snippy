@@ -13,6 +13,7 @@ def SiFiveP400Model : SchedMachineModel {
   let MicroOpBufferSize = 56; // Max micro-ops that can be buffered.
   let LoadLatency = 4;        // Cycles for loads to access the cache.
   let MispredictPenalty = 9;  // Extra cycles for a mispredicted branch.
+  let PostRAScheduler = true;
   let UnsupportedFeatures = [HasStdExtZbkb, HasStdExtZbkc, HasStdExtZbkx,
                              HasStdExtZcmt, HasStdExtZknd, HasStdExtZkne,
                              HasStdExtZknh, HasStdExtZksed, HasStdExtZksh,
@@ -85,16 +86,6 @@ def : WriteRes<WriteIDiv32, [SiFiveP400MulDiv, SiFiveP400Div]> {
   let ReleaseAtCycles = [1, 19];
 }
 
-// Integer remainder
-def : WriteRes<WriteIRem, [SiFiveP400MulDiv, SiFiveP400Div]> {
-  let Latency = 35;
-  let ReleaseAtCycles = [1, 34];
-}
-def : WriteRes<WriteIRem32, [SiFiveP400MulDiv, SiFiveP400Div]> {
-  let Latency = 20;
-  let ReleaseAtCycles = [1, 19];
-}
-
 let Latency = 1 in {
 // Bitmanip
 def : WriteRes<WriteRotateImm, [SiFiveP400IntArith]>;
@@ -108,7 +99,6 @@ def : WriteRes<WriteCTZ, [SiFiveP400IntArith]>;
 def : WriteRes<WriteCTZ32, [SiFiveP400IntArith]>;
 
 def : WriteRes<WriteORCB, [SiFiveP400IntArith]>;
-def : WriteRes<WriteIMinMax, [SiFiveP400IntArith]>;
 
 def : WriteRes<WriteREV8, [SiFiveP400IntArith]>;
 
@@ -140,7 +130,7 @@ def : WriteRes<WriteLDW, [SiFiveP400Load]>;
 def : WriteRes<WriteLDD, [SiFiveP400Load]>;
 }
 
-let Latency = 5 in {
+let Latency = 6 in {
 def : WriteRes<WriteFLD16, [SiFiveP400Load]>;
 def : WriteRes<WriteFLD32, [SiFiveP400Load]>;
 def : WriteRes<WriteFLD64, [SiFiveP400Load]>;
@@ -268,8 +258,6 @@ def : ReadAdvance<ReadShiftReg, 0>;
 def : ReadAdvance<ReadShiftReg32, 0>;
 def : ReadAdvance<ReadIDiv, 0>;
 def : ReadAdvance<ReadIDiv32, 0>;
-def : ReadAdvance<ReadIRem, 0>;
-def : ReadAdvance<ReadIRem32, 0>;
 def : ReadAdvance<ReadIMul, 0>;
 def : ReadAdvance<ReadIMul32, 0>;
 def : ReadAdvance<ReadAtomicWA, 0>;
@@ -349,7 +337,6 @@ def : ReadAdvance<ReadCTZ32, 0>;
 def : ReadAdvance<ReadCPOP, 0>;
 def : ReadAdvance<ReadCPOP32, 0>;
 def : ReadAdvance<ReadORCB, 0>;
-def : ReadAdvance<ReadIMinMax, 0>;
 def : ReadAdvance<ReadREV8, 0>;
 def : ReadAdvance<ReadSHXADD, 0>;
 def : ReadAdvance<ReadSHXADD32, 0>;
@@ -358,13 +345,10 @@ def : ReadAdvance<ReadSingleBitImm, 0>;
 
 //===----------------------------------------------------------------------===//
 // Unsupported extensions
-defm : UnsupportedSchedZabha;
 defm : UnsupportedSchedZbc;
 defm : UnsupportedSchedZbkb;
 defm : UnsupportedSchedZbkx;
 defm : UnsupportedSchedSFB;
 defm : UnsupportedSchedZfa;
 defm : UnsupportedSchedV;
-defm : UnsupportedSchedXsfvcp;
-defm : UnsupportedSchedZvk;
 }

@@ -84,9 +84,9 @@ public:
                    bool KillSrc) const override;
 
   /// Stack Spill & Reload {
-  Register isLoadFromStackSlot(const MachineInstr &MI,
+  unsigned isLoadFromStackSlot(const MachineInstr &MI,
                                int &FrameIndex) const override;
-  Register isStoreToStackSlot(const MachineInstr &MI,
+  unsigned isStoreToStackSlot(const MachineInstr &MI,
                               int &FrameIndex) const override;
   void storeRegToStackSlot(MachineBasicBlock &MBB,
                            MachineBasicBlock::iterator MBBI, Register SrcReg,
@@ -104,7 +104,7 @@ public:
 
   /// Optimization {
 
-  bool foldImmediate(MachineInstr &UseMI, MachineInstr &DefMI, Register Reg,
+  bool FoldImmediate(MachineInstr &UseMI, MachineInstr &DefMI, Register Reg,
                      MachineRegisterInfo *MRI) const override;
 
   /// } Optimization

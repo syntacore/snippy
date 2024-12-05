@@ -795,12 +795,10 @@ void IoChecker::Leave(const parser::ReadStmt &readStmt) {
   CheckForProhibitedSpecifier(IoSpecKind::Rec, IoSpecKind::End); // C1220
   if (specifierSet_.test(IoSpecKind::Size)) {
     // F'2023 C1214 - allow with a warning
-    if (context_.ShouldWarn(common::LanguageFeature::ListDirectedSize)) {
-      if (specifierSet_.test(IoSpecKind::Nml)) {
-        context_.Say("If NML appears, SIZE should not appear"_port_en_US);
-      } else if (flags_.test(Flag::StarFmt)) {
-        context_.Say("If FMT=* appears, SIZE should not appear"_port_en_US);
-      }
+    if (specifierSet_.test(IoSpecKind::Nml)) {
+      context_.Say("If NML appears, SIZE should not appear"_port_en_US);
+    } else if (flags_.test(Flag::StarFmt)) {
+      context_.Say("If FMT=* appears, SIZE should not appear"_port_en_US);
     }
   }
   CheckForRequiredSpecifier(IoSpecKind::Eor,
@@ -920,7 +918,7 @@ void IoChecker::CheckStringValue(IoSpecKind specKind, const std::string &value,
           // Open values; Close values are {"DELETE", "KEEP"}.
           {"NEW", "OLD", "REPLACE", "SCRATCH", "UNKNOWN"}},
       {IoSpecKind::Carriagecontrol, {"LIST", "FORTRAN", "NONE"}},
-      {IoSpecKind::Convert, {"BIG_ENDIAN", "LITTLE_ENDIAN", "NATIVE", "SWAP"}},
+      {IoSpecKind::Convert, {"BIG_ENDIAN", "LITTLE_ENDIAN", "NATIVE"}},
       {IoSpecKind::Dispose, {"DELETE", "KEEP"}},
   };
   auto upper{Normalize(value)};
@@ -1034,16 +1032,11 @@ void IoChecker::CheckForDefinableVariable(
       if (auto whyNot{WhyNotDefinable(at, context_.FindScope(at),
               DefinabilityFlags{DefinabilityFlag::VectorSubscriptIsOk},
               *expr)}) {
-        if (whyNot->IsFatal()) {
-          const Symbol *base{GetFirstSymbol(*expr)};
-          context_
-              .Say(at, "%s variable '%s' is not definable"_err_en_US, s,
-                  (base ? base->name() : at).ToString())
-              .Attach(
-                  std::move(whyNot->set_severity(parser::Severity::Because)));
-        } else {
-          context_.Say(std::move(*whyNot));
-        }
+        const Symbol *base{GetFirstSymbol(*expr)};
+        context_
+            .Say(at, "%s variable '%s' is not definable"_err_en_US, s,
+                (base ? base->name() : at).ToString())
+            .Attach(std::move(*whyNot));
       }
     }
   }
@@ -1196,7 +1189,7 @@ void IoChecker::CheckNamelist(const Symbol &namelist, common::DefinedIo which,
               .Say(namelistLocation,
                   "NAMELIST input group must not contain undefinable item '%s'"_err_en_US,
                   object.name())
-              .Attach(std::move(why->set_severity(parser::Severity::Because)));
+              .Attach(std::move(*why));
           context_.SetError(namelist);
         }
       }

@@ -191,19 +191,15 @@ typedef uptr OFF_T;
 #endif
 typedef u64  OFF64_T;
 
-#ifdef __SIZE_TYPE__
-typedef __SIZE_TYPE__ usize;
+#if (SANITIZER_WORDSIZE == 64) || SANITIZER_APPLE
+typedef uptr operator_new_size_type;
 #else
-// Since we use this for operator new, usize must match the real size_t, but on
-// 32-bit Windows the definition of uptr does not actually match uintptr_t or
-// size_t because we are working around typedef mismatches for the (S)SIZE_T
-// types used in interception.h.
-// Until the definition of uptr has been fixed we have to special case Win32.
-#  if SANITIZER_WINDOWS && SANITIZER_WORDSIZE == 32
-typedef unsigned int usize;
-#  else
-typedef uptr usize;
-#  endif
+# if defined(__s390__) && !defined(__s390x__)
+// Special case: 31-bit s390 has unsigned long as size_t.
+typedef unsigned long operator_new_size_type;
+# else
+typedef u32 operator_new_size_type;
+# endif
 #endif
 
 typedef u64 tid_t;

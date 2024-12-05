@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_ENTRY_H
-#define LLVM_LIBC_TYPES_ENTRY_H
+#ifndef __LLVM_LIBC_TYPES_ENTRY_H__
+#define __LLVM_LIBC_TYPES_ENTRY_H__
 
 typedef struct {
   char *key;
   void *data;
 } ENTRY;
 
-#endif // LLVM_LIBC_TYPES_ENTRY_H
+#endif // __LLVM_LIBC_TYPES_ENTRY_H__

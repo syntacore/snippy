@@ -1,6 +1,7 @@
 ; Test memcmp with 0 size.
 
 ; RUN: llc < %s -mtriple=s390x-linux-gnu | FileCheck %s
+; REQUIRES: asserts
 
 declare i32 @memcmp(ptr nocapture, ptr nocapture, i64)
 

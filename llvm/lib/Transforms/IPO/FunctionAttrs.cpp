@@ -1169,7 +1169,7 @@ static bool isReturnNonNull(Function *F, const SCCNodeSet &SCCNodes,
     if (auto *Ret = dyn_cast<ReturnInst>(BB.getTerminator()))
       FlowsToReturn.insert(Ret->getReturnValue());
 
-  auto &DL = F->getDataLayout();
+  auto &DL = F->getParent()->getDataLayout();
 
   for (unsigned i = 0; i != FlowsToReturn.size(); ++i) {
     Value *RetVal = FlowsToReturn[i];
@@ -1186,15 +1186,10 @@ static bool isReturnNonNull(Function *F, const SCCNodeSet &SCCNodes,
     switch (RVI->getOpcode()) {
     // Extend the analysis by looking upwards.
     case Instruction::BitCast:
+    case Instruction::GetElementPtr:
     case Instruction::AddrSpaceCast:
       FlowsToReturn.insert(RVI->getOperand(0));
       continue;
-    case Instruction::GetElementPtr:
-      if (cast<GEPOperator>(RVI)->isInBounds()) {
-        FlowsToReturn.insert(RVI->getOperand(0));
-        continue;
-      }
-      return false;
     case Instruction::Select: {
       SelectInst *SI = cast<SelectInst>(RVI);
       FlowsToReturn.insert(SI->getTrueValue());
@@ -1292,8 +1287,7 @@ static void addNoUndefAttrs(const SCCNodeSet &SCCNodes,
   // values.
   for (Function *F : SCCNodes) {
     // Already noundef.
-    AttributeList Attrs = F->getAttributes();
-    if (Attrs.hasRetAttr(Attribute::NoUndef))
+    if (F->getAttributes().hasRetAttr(Attribute::NoUndef))
       continue;
 
     // We can infer and propagate function attributes only when we know that the
@@ -1311,30 +1305,10 @@ static void addNoUndefAttrs(const SCCNodeSet &SCCNodes,
     if (F->getReturnType()->isVoidTy())
       continue;
 
-    const DataLayout &DL = F->getDataLayout();
-    if (all_of(*F, [&](BasicBlock &BB) {
+    if (all_of(*F, [](BasicBlock &BB) {
           if (auto *Ret = dyn_cast<ReturnInst>(BB.getTerminator())) {
             // TODO: perform context-sensitive analysis?
-            Value *RetVal = Ret->getReturnValue();
-            if (!isGuaranteedNotToBeUndefOrPoison(RetVal))
-              return false;
-
-            // We know the original return value is not poison now, but it
-            // could still be converted to poison by another return attribute.
-            // Try to explicitly re-prove the relevant attributes.
-            if (Attrs.hasRetAttr(Attribute::NonNull) &&
-                !isKnownNonZero(RetVal, DL))
-              return false;
-
-            if (MaybeAlign Align = Attrs.getRetAlignment())
-              if (RetVal->getPointerAlignment(DL) < *Align)
-                return false;
-
-            Attribute Attr = Attrs.getRetAttr(Attribute::Range);
-            if (Attr.isValid() &&
-                !Attr.getRange().contains(
-                    computeConstantRange(RetVal, /*ForSigned=*/false)))
-              return false;
+            return isGuaranteedNotToBeUndefOrPoison(Ret->getReturnValue());
           }
           return true;
         })) {

@@ -135,8 +135,7 @@ void PPCallbacksTracker::InclusionDirective(
     SourceLocation HashLoc, const Token &IncludeTok, llvm::StringRef FileName,
     bool IsAngled, CharSourceRange FilenameRange, OptionalFileEntryRef File,
     llvm::StringRef SearchPath, llvm::StringRef RelativePath,
-    const Module *SuggestedModule, bool ModuleImported,
-    SrcMgr::CharacteristicKind FileType) {
+    const Module *Imported, SrcMgr::CharacteristicKind FileType) {
   beginCallback("InclusionDirective");
   appendArgument("HashLoc", HashLoc);
   appendArgument("IncludeTok", IncludeTok);
@@ -146,8 +145,7 @@ void PPCallbacksTracker::InclusionDirective(
   appendArgument("File", File);
   appendFilePathArgument("SearchPath", SearchPath);
   appendFilePathArgument("RelativePath", RelativePath);
-  appendArgument("SuggestedModule", SuggestedModule);
-  appendArgument("ModuleImported", ModuleImported);
+  appendArgument("Imported", Imported);
 }
 
 // Callback invoked whenever there was an explicit module-import

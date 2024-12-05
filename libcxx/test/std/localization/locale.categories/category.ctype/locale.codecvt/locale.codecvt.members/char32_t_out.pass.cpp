@@ -20,7 +20,7 @@
 // Test is intended to convert between UTF8 and UTF16/32, it will fail on
 // z/OS since at default char type on z/OS is EBCDIC character which has
 // value different from ASCII character.
-// XFAIL: target={{.+}}-zos{{.*}}
+// UNSUPPORTED: target={{.+}}-zos{{.*}}
 
 #include <locale>
 #include <string>

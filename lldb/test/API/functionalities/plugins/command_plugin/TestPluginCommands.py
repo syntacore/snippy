@@ -13,7 +13,9 @@ class PluginCommandTestCase(TestBase):
         TestBase.setUp(self)
 
     @skipIfNoSBHeaders
-    @skipIfHostIncompatibleWithTarget
+    # Requires a compatible arch and platform to link against the host's built
+    # lldb lib.
+    @skipIfHostIncompatibleWithRemote
     @expectedFailureAll(oslist=["windows"], bugnumber="llvm.org/pr24778")
     @no_debug_info_test
     def test_load_plugin(self):

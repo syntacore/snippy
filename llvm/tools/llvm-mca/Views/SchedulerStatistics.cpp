@@ -105,7 +105,8 @@ void SchedulerStatistics::printSchedulerStats(raw_ostream &OS) const {
   OS << "[# issued], [# cycles]\n";
 
   bool HasColors = OS.has_colors();
-  const auto It = llvm::max_element(IssueWidthPerCycle);
+  const auto It =
+      std::max_element(IssueWidthPerCycle.begin(), IssueWidthPerCycle.end());
   for (const std::pair<const unsigned, unsigned> &Entry : IssueWidthPerCycle) {
     unsigned NumIssued = Entry.first;
     if (NumIssued == It->first && HasColors)

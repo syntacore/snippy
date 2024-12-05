@@ -193,9 +193,10 @@ namespace {
 MCStreamer *createLoongArchELFStreamer(const Triple &T, MCContext &Context,
                                        std::unique_ptr<MCAsmBackend> &&MAB,
                                        std::unique_ptr<MCObjectWriter> &&MOW,
-                                       std::unique_ptr<MCCodeEmitter> &&MCE) {
+                                       std::unique_ptr<MCCodeEmitter> &&MCE,
+                                       bool RelaxAll) {
   return createLoongArchELFStreamer(Context, std::move(MAB), std::move(MOW),
-                                    std::move(MCE));
+                                    std::move(MCE), RelaxAll);
 }
 } // end namespace
 

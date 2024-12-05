@@ -71,7 +71,7 @@ public:
 
   virtual void writeObjCMsgSendStub(uint8_t *buf, Symbol *sym,
                                     uint64_t stubsAddr, uint64_t &stubOffset,
-                                    uint64_t selrefVA,
+                                    uint64_t selrefsVA, uint64_t selectorIndex,
                                     Symbol *objcMsgSend) const = 0;
 
   // Symbols may be referenced via either the GOT or the stubs section,

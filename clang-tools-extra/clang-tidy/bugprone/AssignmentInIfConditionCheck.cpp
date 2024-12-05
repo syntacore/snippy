@@ -39,12 +39,6 @@ void AssignmentInIfConditionCheck::check(
           return true;
         }
 
-        // Dont traverse into any requires expressions.
-        bool TraverseRequiresExpr(RequiresExpr *,
-                                  DataRecursionQueue * = nullptr) {
-          return true;
-        }
-
         bool VisitBinaryOperator(BinaryOperator *BO) {
           if (BO->isAssignmentOp())
             Check.report(BO);

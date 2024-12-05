@@ -91,7 +91,7 @@ void AVRInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
   }
 }
 
-Register AVRInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
+unsigned AVRInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
                                            int &FrameIndex) const {
   switch (MI.getOpcode()) {
   case AVR::LDDRdPtrQ:
@@ -110,7 +110,7 @@ Register AVRInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
   return 0;
 }
 
-Register AVRInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
+unsigned AVRInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
                                           int &FrameIndex) const {
   switch (MI.getOpcode()) {
   case AVR::STDPtrQRr:

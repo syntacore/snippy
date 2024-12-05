@@ -35,14 +35,6 @@ target triple = "aarch64-unknown-linux-gnu"
 ; CHECK-NEXT: Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT: middle.block:
-; CHECK-NEXT:   EMIT vp<[[CMP:%.+]]> = icmp eq ir<1024>, vp<[[VTC]]>
-; CHECK-NEXT:   EMIT branch-on-cond vp<[[CMP]]>
-; CHECK-NEXT: Successor(s): ir-bb<for.cond.cleanup>, scalar.ph
-; CHECK-EMPTY:
-; CHECK-NEXT: ir-bb<for.cond.cleanup>:
-; CHECK-NEXT: No successors
-; CHECK-EMPTY:
-; CHECK-NEXT: scalar.ph:
 ; CHECK-NEXT: No successors
 ; CHECK-NEXT: }
 
@@ -72,14 +64,6 @@ target triple = "aarch64-unknown-linux-gnu"
 ; CHECK-NEXT: Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT: middle.block:
-; CHECK-NEXT:   EMIT vp<[[CMP:%.+]]> = icmp eq ir<1024>, vp<[[VTC]]>
-; CHECK-NEXT:   EMIT branch-on-cond vp<[[CMP]]>
-; CHECK-NEXT: Successor(s): ir-bb<for.cond.cleanup>, scalar.ph
-; CHECK-EMPTY:
-; CHECK-NEXT: ir-bb<for.cond.cleanup>:
-; CHECK-NEXT: No successors
-; CHECK-EMPTY:
-; CHECK-NEXT: scalar.ph:
 ; CHECK-NEXT: No successors
 ; CHECK-NEXT: }
 
@@ -114,14 +98,6 @@ target triple = "aarch64-unknown-linux-gnu"
 ; CHECK-NEXT: Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT: middle.block:
-; CHECK-NEXT:   EMIT vp<[[CMP:%.+]]> = icmp eq ir<1024>, vp<[[VTC]]>
-; CHECK-NEXT:   EMIT branch-on-cond vp<[[CMP]]>
-; CHECK-NEXT: Successor(s): ir-bb<for.cond.cleanup>, scalar.ph
-; CHECK-EMPTY:
-; CHECK-NEXT: ir-bb<for.cond.cleanup>:
-; CHECK-NEXT: No successors
-; CHECK-EMPTY:
-; CHECK-NEXT: scalar.ph:
 ; CHECK-NEXT: No successors
 ; CHECK-NEXT: }
 
@@ -151,14 +127,6 @@ target triple = "aarch64-unknown-linux-gnu"
 ; CHECK-NEXT: Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT: middle.block:
-; CHECK-NEXT:   EMIT vp<[[CMP:%.+]]> = icmp eq ir<1024>, vp<[[VTC]]>
-; CHECK-NEXT:   EMIT branch-on-cond vp<[[CMP]]>
-; CHECK-NEXT: Successor(s): ir-bb<for.cond.cleanup>, scalar.ph
-; CHECK-EMPTY:
-; CHECK-NEXT: ir-bb<for.cond.cleanup>:
-; CHECK-NEXT: No successors
-; CHECK-EMPTY:
-; CHECK-NEXT: scalar.ph:
 ; CHECK-NEXT: No successors
 ; CHECK-NEXT: }
 
@@ -192,14 +160,6 @@ target triple = "aarch64-unknown-linux-gnu"
 ; CHECK-NEXT: Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT: middle.block:
-; CHECK-NEXT:   EMIT vp<[[CMP:%.+]]> = icmp eq ir<1024>, vp<[[VTC]]>
-; CHECK-NEXT:   EMIT branch-on-cond vp<[[CMP]]>
-; CHECK-NEXT: Successor(s): ir-bb<for.cond.cleanup>, scalar.ph
-; CHECK-EMPTY:
-; CHECK-NEXT: ir-bb<for.cond.cleanup>:
-; CHECK-NEXT: No successors
-; CHECK-EMPTY:
-; CHECK-NEXT: scalar.ph:
 ; CHECK-NEXT: No successors
 ; CHECK-NEXT: }
 
@@ -229,14 +189,6 @@ target triple = "aarch64-unknown-linux-gnu"
 ; CHECK-NEXT: Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT: middle.block:
-; CHECK-NEXT:   EMIT vp<[[CMP:%.+]]> = icmp eq ir<1024>, vp<[[VTC]]>
-; CHECK-NEXT:   EMIT branch-on-cond vp<[[CMP]]>
-; CHECK-NEXT: Successor(s): ir-bb<for.cond.cleanup>, scalar.ph
-; CHECK-EMPTY:
-; CHECK-NEXT: ir-bb<for.cond.cleanup>:
-; CHECK-NEXT: No successors
-; CHECK-EMPTY:
-; CHECK-NEXT: scalar.ph:
 ; CHECK-NEXT: No successors
 ; CHECK-NEXT: }
 

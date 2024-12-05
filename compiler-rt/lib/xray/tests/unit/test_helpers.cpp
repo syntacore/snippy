@@ -69,7 +69,8 @@ namespace __xray {
 
 std::string serialize(BufferQueue &Buffers, int32_t Version) {
   std::string Serialized;
-  alignas(XRayFileHeader) std::byte HeaderStorage[sizeof(XRayFileHeader)];
+  std::aligned_storage<sizeof(XRayFileHeader), alignof(XRayFileHeader)>::type
+      HeaderStorage;
   auto *Header = reinterpret_cast<XRayFileHeader *>(&HeaderStorage);
   new (Header) XRayFileHeader();
   Header->Version = Version;

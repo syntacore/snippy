@@ -160,7 +160,7 @@ TEST(Parallel, ParallelNestedTaskGroup) {
       });
     };
 
-    DefaultThreadPool Pool;
+    ThreadPool Pool;
 
     Pool.async(Fn);
     Pool.async(Fn);

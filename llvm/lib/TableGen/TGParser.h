@@ -143,7 +143,6 @@ class TGParser {
   TGLexer Lex;
   std::vector<SmallVector<LetRecord, 4>> LetStack;
   std::map<std::string, std::unique_ptr<MultiClass>> MultiClasses;
-  std::map<std::string, RecTy *> TypeAliases;
 
   /// Loops - Keep track of any foreach loops we are within.
   ///
@@ -265,7 +264,6 @@ private:  // Parser methods.
   bool ParseDefm(MultiClass *CurMultiClass);
   bool ParseDef(MultiClass *CurMultiClass);
   bool ParseDefset();
-  bool ParseDeftype();
   bool ParseDefvar(Record *CurRec = nullptr);
   bool ParseDump(MultiClass *CurMultiClass, Record *CurRec = nullptr);
   bool ParseForeach(MultiClass *CurMultiClass);

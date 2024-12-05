@@ -16,7 +16,6 @@
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/StmtCXX.h"
 #include "clang/AST/StmtObjC.h"
-#include "clang/AST/StmtOpenACC.h"
 #include "clang/AST/StmtOpenMP.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Sema/SemaInternal.h"
@@ -180,8 +179,7 @@ static ScopePair GetDiagForGotoScopeDecl(Sema &S, const Decl *D) {
     }
 
     const Expr *Init = VD->getInit();
-    if (S.Context.getLangOpts().CPlusPlus && VD->hasLocalStorage() && Init &&
-        !Init->containsErrors()) {
+    if (S.Context.getLangOpts().CPlusPlus && VD->hasLocalStorage() && Init) {
       // C++11 [stmt.dcl]p3:
       //   A program that jumps from a point where a variable with automatic
       //   storage duration is not in scope to a point where it is in scope
@@ -579,8 +577,11 @@ void JumpScopeChecker::BuildScopeInformation(Stmt *S,
     // automatic storage duration.
     MaterializeTemporaryExpr *MTE = cast<MaterializeTemporaryExpr>(S);
     if (MTE->getStorageDuration() == SD_Automatic) {
+      SmallVector<const Expr *, 4> CommaLHS;
+      SmallVector<SubobjectAdjustment, 4> Adjustments;
       const Expr *ExtendedObject =
-          MTE->getSubExpr()->skipRValueSubobjectAdjustments();
+          MTE->getSubExpr()->skipRValueSubobjectAdjustments(CommaLHS,
+                                                            Adjustments);
       if (ExtendedObject->getType().isDestructedType()) {
         Scopes.push_back(GotoScope(ParentScope, 0,
                                    diag::note_exits_temporary_dtor,
@@ -604,16 +605,6 @@ void JumpScopeChecker::BuildScopeInformation(Stmt *S,
       MustTailStmts.push_back(AS);
     }
     break;
-  }
-
-  case Stmt::OpenACCComputeConstructClass: {
-    unsigned NewParentScope = Scopes.size();
-    OpenACCComputeConstruct *CC = cast<OpenACCComputeConstruct>(S);
-    Scopes.push_back(GotoScope(
-        ParentScope, diag::note_acc_branch_into_compute_construct,
-        diag::note_acc_branch_out_of_compute_construct, CC->getBeginLoc()));
-    BuildScopeInformation(CC->getStructuredBlock(), NewParentScope);
-    return;
   }
 
   default:
@@ -948,16 +939,11 @@ void JumpScopeChecker::CheckJump(Stmt *From, Stmt *To, SourceLocation DiagLoc,
       if (Scopes[I].InDiag == diag::note_protected_by_seh_finally) {
         S.Diag(From->getBeginLoc(), diag::warn_jump_out_of_seh_finally);
         break;
-      } else if (Scopes[I].InDiag ==
-                 diag::note_omp_protected_structured_block) {
+      }
+      if (Scopes[I].InDiag == diag::note_omp_protected_structured_block) {
         S.Diag(From->getBeginLoc(), diag::err_goto_into_protected_scope);
         S.Diag(To->getBeginLoc(), diag::note_omp_exits_structured_block);
         break;
-      } else if (Scopes[I].InDiag ==
-                 diag::note_acc_branch_into_compute_construct) {
-        S.Diag(From->getBeginLoc(), diag::err_goto_into_protected_scope);
-        S.Diag(Scopes[I].Loc, diag::note_acc_branch_out_of_compute_construct);
-        return;
       }
     }
   }

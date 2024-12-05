@@ -13,6 +13,7 @@
 #include "test/UnitTest/ErrnoSetterMatcher.h"
 #include "test/UnitTest/Test.h"
 
+#include <limits.h>
 #include <stddef.h>
 
 using LIBC_NAMESPACE::testing::ErrnoSetterMatcher::Succeeds;
@@ -23,13 +24,13 @@ TEST(LlvmLibcAToFTest, SimpleTest) {
   LIBC_NAMESPACE::fputil::FPBits<double> expected_fp =
       LIBC_NAMESPACE::fputil::FPBits<double>(uint64_t(0x405ec00000000000));
 
-  LIBC_NAMESPACE::libc_errno = 0;
+  libc_errno = 0;
   EXPECT_THAT(LIBC_NAMESPACE::atof("123"),
               Succeeds<double>(expected_fp.get_val()));
 }
 
 TEST(LlvmLibcAToFTest, FailedParsingTest) {
-  LIBC_NAMESPACE::libc_errno = 0;
+  libc_errno = 0;
   // atof does not flag errors.
   EXPECT_THAT(LIBC_NAMESPACE::atof("???"), Succeeds<double>(0.0));
 }

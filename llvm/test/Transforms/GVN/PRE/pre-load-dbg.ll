@@ -21,8 +21,7 @@ define void @withdbg() {
 
 entry:
   %agg.tmp.ensured.sroa.0.i = alloca i16, align 1
-  %cmp = icmp ne ptr @withdbg, null
-  br i1 %cmp, label %lor.end, label %lor.rhs
+  br i1 icmp ne (ptr  @withdbg, ptr  null), label %lor.end, label %lor.rhs
 
 lor.rhs:                                          ; preds = %entry
   call void @llvm.dbg.declare(metadata ptr undef, metadata !46, metadata !DIExpression()), !dbg !40
@@ -71,8 +70,7 @@ define void @lessdbg() {
 
 entry:
   %agg.tmp.ensured.sroa.0.i = alloca i16, align 1
-  %cmp = icmp ne ptr @lessdbg, null
-  br i1 %cmp, label %lor.end, label %lor.rhs
+  br i1 icmp ne (ptr  @lessdbg, ptr  null), label %lor.end, label %lor.rhs
 
 lor.rhs:                                          ; preds = %entry
   %agg.tmp.ensured.sroa.0.0.copyload.i = load volatile i16, ptr @h, align 1

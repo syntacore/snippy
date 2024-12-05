@@ -462,8 +462,10 @@ private:
         NodeStack.push_back(NId);
         G.disconnectAllNeighborsFromNode(NId);
       } else if (!NotProvablyAllocatableNodes.empty()) {
-        NodeSet::iterator NItr = llvm::min_element(NotProvablyAllocatableNodes,
-                                                   SpillCostComparator(G));
+        NodeSet::iterator NItr =
+          std::min_element(NotProvablyAllocatableNodes.begin(),
+                           NotProvablyAllocatableNodes.end(),
+                           SpillCostComparator(G));
         NodeId NId = *NItr;
         NotProvablyAllocatableNodes.erase(NItr);
         NodeStack.push_back(NId);

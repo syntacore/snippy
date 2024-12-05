@@ -2,7 +2,6 @@ set(LLVM_LINK_COMPONENTS
   support
   AllTargetsInfos
   FrontendOpenMP
-  TargetParser
   )
 
 if(CLANG_BUILT_STANDALONE)
@@ -29,7 +28,6 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/../quality/CompletionModel.cmake)
 gen_decision_forest(${CMAKE_CURRENT_SOURCE_DIR}/decision_forest_model DecisionForestRuntimeTest ::ns1::ns2::test::Example)
 
 add_custom_target(ClangdUnitTests)
-set_target_properties(ClangdUnitTests PROPERTIES FOLDER "Clang Tools Extra/Tests")
 add_unittest(ClangdUnitTests ClangdTests
   Annotations.cpp
   ASTTests.cpp
@@ -74,7 +72,6 @@ add_unittest(ClangdUnitTests ClangdTests
   LoggerTests.cpp
   LSPBinderTests.cpp
   LSPClient.cpp
-  PrerequisiteModulesTest.cpp
   ModulesTests.cpp
   ParsedASTTests.cpp
   PathMappingTests.cpp
@@ -178,7 +175,6 @@ target_link_libraries(ClangdTests
   clangIncludeCleaner
   clangTesting
   clangTidy
-  clangTidyUtils
   clangdSupport
   )
 

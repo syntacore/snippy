@@ -129,7 +129,7 @@ MCSymbol *TargetLoweringObjectFile::getSymbolWithGlobalValueBase(
   assert(!Suffix.empty());
 
   SmallString<60> NameStr;
-  NameStr += GV->getDataLayout().getPrivateGlobalPrefix();
+  NameStr += GV->getParent()->getDataLayout().getPrivateGlobalPrefix();
   TM.getNameWithPrefix(NameStr, GV, *Mang);
   NameStr.append(Suffix.begin(), Suffix.end());
   return getContext().getOrCreateSymbol(NameStr);
@@ -284,7 +284,7 @@ SectionKind TargetLoweringObjectFile::getKindForGlobal(const GlobalObject *GO,
       // a section for this size, use it, otherwise use the arbitrary sized
       // mergable section.
       switch (
-          GVar->getDataLayout().getTypeAllocSize(C->getType())) {
+          GVar->getParent()->getDataLayout().getTypeAllocSize(C->getType())) {
       case 4:  return SectionKind::getMergeableConst4();
       case 8:  return SectionKind::getMergeableConst8();
       case 16: return SectionKind::getMergeableConst16();
@@ -334,6 +334,11 @@ MCSection *TargetLoweringObjectFile::SectionForGlobal(
     }
   }
 
+  if (auto *F = dyn_cast<Function>(GO)) {
+    if (F->hasFnAttribute("implicit-section-name"))
+      return getExplicitSectionGlobal(GO, Kind, TM);
+  }
+
   // Use default section depending on the 'type' of global
   return SelectSectionForGlobal(GO, Kind, TM);
 }
@@ -350,7 +355,7 @@ TargetLoweringObjectFile::SectionForGlobal(const GlobalObject *GO,
 MCSection *TargetLoweringObjectFile::getSectionForJumpTable(
     const Function &F, const TargetMachine &TM) const {
   Align Alignment(1);
-  return getSectionForConstant(F.getDataLayout(),
+  return getSectionForConstant(F.getParent()->getDataLayout(),
                                SectionKind::getReadOnly(), /*C=*/nullptr,
                                Alignment);
 }

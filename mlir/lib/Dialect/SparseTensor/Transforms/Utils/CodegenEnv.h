@@ -52,7 +52,7 @@ public:
   Merger &merger() { return latticeMerger; }
   LoopEmitter &emitter() { return loopEmitter; }
 
-  void startEmit(SparseEmitStrategy emitStrategy);
+  void startEmit();
 
   /// Generates loop boundary statements (entering/exiting loops). The function
   /// passes and updates the passed-in parameters.

@@ -299,7 +299,7 @@ std::string ScheduleDAGSDNodes::getGraphNodeLabel(const SUnit *SU) const {
   } else {
     O << "CROSS RC COPY";
   }
-  return s;
+  return O.str();
 }
 
 void ScheduleDAGSDNodes::getCustomGraphFeatures(GraphWriter<ScheduleDAG*> &GW) const {

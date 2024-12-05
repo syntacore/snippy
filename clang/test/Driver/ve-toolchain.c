@@ -1,4 +1,5 @@
 /// Check the behavior of toolchain for NEC Aurora VE
+/// REQUIRES: ve-registered-target
 /// UNSUPPORTED: system-windows
 
 ///-----------------------------------------------------------------------------
@@ -79,7 +80,7 @@
 ///  - nld VE specific options
 ///  - sjlj exception
 
-// RUN: %clang -### -no-canonical-prefixes --target=ve-unknown-linux-gnu \
+// RUN: %clang -### --target=ve-unknown-linux-gnu \
 // RUN:     --sysroot %S/Inputs/basic_ve_tree \
 // RUN:     -resource-dir=%S/Inputs/basic_ve_tree/resource_dir \
 // RUN:     --unwindlib=none \

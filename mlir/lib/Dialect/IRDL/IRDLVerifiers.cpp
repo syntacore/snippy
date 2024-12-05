@@ -19,6 +19,7 @@
 #include "mlir/IR/Location.h"
 #include "mlir/IR/Region.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/FormatVariadic.h"
 
 using namespace mlir;

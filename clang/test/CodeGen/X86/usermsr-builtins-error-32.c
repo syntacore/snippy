@@ -1,5 +1,5 @@
 // RUN: %clang_cc1 %s -ffreestanding -triple=i386-unknown-unknown -target-feature +usermsr \
-// RUN: -fsyntax-only -verify
+// RUN: -emit-llvm -fsyntax-only -verify
 
 #include <x86gprintrin.h>
 

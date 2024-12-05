@@ -10,9 +10,8 @@
 #define LLVM_LIBC_SRC___SUPPORT_FPUTIL_SQRT_H
 
 #include "src/__support/macros/properties/architectures.h"
-#include "src/__support/macros/properties/cpu_features.h"
 
-#if defined(LIBC_TARGET_ARCH_IS_X86_64) && defined(LIBC_TARGET_CPU_HAS_SSE2)
+#if defined(LIBC_TARGET_ARCH_IS_X86_64)
 #include "x86_64/sqrt.h"
 #elif defined(LIBC_TARGET_ARCH_IS_AARCH64)
 #include "aarch64/sqrt.h"

@@ -14,10 +14,6 @@ int main() {
 
   std::variant<int, double, char> v1;
   std::variant<int, double, char> &v1_ref = v1;
-  using V1_typedef = std::variant<int, double, char>;
-  V1_typedef v1_typedef;
-  V1_typedef &v1_typedef_ref = v1_typedef;
-
   std::variant<int, double, char> v2;
   std::variant<int, double, char> v3;
   std::variant<std::variant<int, double, char>> v_v1;
@@ -47,7 +43,6 @@ int main() {
       v_many_types_no_value;
 
   v1 = 12; // v contains int
-  v1_typedef = v1;
   v_v1 = v1;
   int i = std::get<int>(v1);
   printf("%d\n", i); // break here

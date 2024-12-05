@@ -67,7 +67,7 @@ public:
 
   lldb::ValueType GetValueType() const override;
 
-  llvm::Expected<uint32_t> CalculateNumChildren(uint32_t max) override;
+  size_t CalculateNumChildren(uint32_t max) override;
 
   ConstString GetTypeName() override;
 
@@ -78,6 +78,9 @@ public:
   void SetByteSize(size_t size);
 
   lldb::ValueObjectSP Dereference(Status &error) override;
+
+  ValueObject *CreateChildAtIndex(size_t idx, bool synthetic_array_member,
+                                  int32_t synthetic_index) override;
 
   lldb::ValueObjectSP GetSyntheticChildAtOffset(
       uint32_t offset, const CompilerType &type, bool can_create,
@@ -147,13 +150,6 @@ private:
 
   ValueObjectConstResult(ExecutionContextScope *exe_scope,
                          ValueObjectManager &manager, const Status &error);
-
-  ValueObject *CreateChildAtIndex(size_t idx) override {
-    return m_impl.CreateChildAtIndex(idx);
-  }
-  ValueObject *CreateSyntheticArrayMember(size_t idx) override {
-    return m_impl.CreateSyntheticArrayMember(idx);
-  }
 
   ValueObjectConstResult(const ValueObjectConstResult &) = delete;
   const ValueObjectConstResult &

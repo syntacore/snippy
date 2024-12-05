@@ -65,12 +65,6 @@ template <typename T> uint16_t XCOFFSectionHeader<T>::getSectionType() const {
 }
 
 template <typename T>
-uint32_t XCOFFSectionHeader<T>::getSectionSubtype() const {
-  const T &DerivedXCOFFSectionHeader = static_cast<const T &>(*this);
-  return DerivedXCOFFSectionHeader.Flags & ~SectionFlagsTypeMask;
-}
-
-template <typename T>
 bool XCOFFSectionHeader<T>::isReservedSectionType() const {
   return getSectionType() & SectionFlagsReservedMask;
 }
@@ -737,11 +731,9 @@ bool XCOFFObjectFile::isRelocatableObject() const {
 }
 
 Expected<uint64_t> XCOFFObjectFile::getStartAddress() const {
-  if (AuxiliaryHeader == nullptr)
-    return 0;
-
-  return is64Bit() ? auxiliaryHeader64()->getEntryPointAddr()
-                   : auxiliaryHeader32()->getEntryPointAddr();
+  // TODO FIXME Should get from auxiliary_header->o_entry when support for the
+  // auxiliary_header is added.
+  return 0;
 }
 
 StringRef XCOFFObjectFile::mapDebugSectionName(StringRef Name) const {
@@ -1369,7 +1361,7 @@ Expected<StringRef> XCOFFSymbolRef::getName() const {
   return getObject()->getStringTableEntry(getSymbol64()->Offset);
 }
 
-// Explicitly instantiate template classes.
+// Explictly instantiate template classes.
 template struct XCOFFSectionHeader<XCOFFSectionHeader32>;
 template struct XCOFFSectionHeader<XCOFFSectionHeader64>;
 

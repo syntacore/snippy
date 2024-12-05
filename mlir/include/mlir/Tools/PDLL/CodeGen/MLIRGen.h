@@ -11,6 +11,8 @@
 
 #include <memory>
 
+#include "mlir/Support/LogicalResult.h"
+
 namespace llvm {
 class SourceMgr;
 } // namespace llvm

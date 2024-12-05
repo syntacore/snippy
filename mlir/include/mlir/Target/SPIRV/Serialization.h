@@ -16,6 +16,7 @@
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {
+struct LogicalResult;
 class MLIRContext;
 
 namespace spirv {

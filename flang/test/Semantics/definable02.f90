@@ -1,4 +1,4 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1 -pedantic -Werror
+! RUN: %python %S/test_errors.py %s %flang_fc1
 
 ! Ensure that FINAL subroutine can be called for array with vector-valued
 ! subscript.
@@ -36,9 +36,11 @@ program test
   x1(:) = [t1()] ! ok
   x2(:) = [t2()] ! ok
   x3(:) = [t3()] ! ok
-  !PORTABILITY: Variable 'x1([INTEGER(8)::1_8])' has a vector subscript and will be finalized by non-elemental subroutine 'f1'
+  !ERROR: Left-hand side of assignment is not definable
+  !BECAUSE: Variable 'x1([INTEGER(8)::1_8])' has a vector subscript and cannot be finalized by non-elemental subroutine 'f1'
   x1([1]) = [t1()]
-  !PORTABILITY: Variable 'x2([INTEGER(8)::1_8])' has a vector subscript and will be finalized by non-elemental subroutine 'f2'
+  !ERROR: Left-hand side of assignment is not definable
+  !BECAUSE: Variable 'x2([INTEGER(8)::1_8])' has a vector subscript and cannot be finalized by non-elemental subroutine 'f2'
   x2([1]) = [t2()]
   x3([1]) = [t3()] ! ok
 end

@@ -30,6 +30,7 @@ AnalysisKey InlineSizeEstimatorAnalysis::Key;
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/MC/MCAsmLayout.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include <algorithm>

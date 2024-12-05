@@ -51,7 +51,7 @@ class SBModuleAPICase(TestBase):
         )
         self.assertTrue(error.Success() and process, PROCESS_IS_VALID)
         main_module = target.FindModule(lldb.SBFileSpec("a.out"))
-        self.assertIsNotNone(main_module)
+        self.assertTrue(main_module is not None)
         self.assertFalse(
             main_module.IsFileBacked(),
             "The module should not be backed by a file on disk.",

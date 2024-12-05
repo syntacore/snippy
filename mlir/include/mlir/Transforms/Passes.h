@@ -15,7 +15,6 @@
 #define MLIR_TRANSFORMS_PASSES_H
 
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/LocationSnapshot.h"
 #include "mlir/Transforms/ViewOpGraph.h"
 #include "llvm/Support/Debug.h"
@@ -44,7 +43,6 @@ class GreedyRewriteConfig;
 #define GEN_PASS_DECL_SYMBOLDCE
 #define GEN_PASS_DECL_SYMBOLPRIVATIZE
 #define GEN_PASS_DECL_TOPOLOGICALSORT
-#define GEN_PASS_DECL_COMPOSITEFIXEDPOINTPASS
 #include "mlir/Transforms/Passes.h.inc"
 
 /// Creates an instance of the Canonicalizer pass, configured with default
@@ -131,12 +129,6 @@ createSymbolPrivatizePass(ArrayRef<std::string> excludeSymbols = {});
 /// topologically such that, as much as possible, users of values appear after
 /// their producers.
 std::unique_ptr<Pass> createTopologicalSortPass();
-
-/// Create composite pass, which runs provided set of passes until fixed point
-/// or maximum number of iterations reached.
-std::unique_ptr<Pass> createCompositeFixedPointPass(
-    std::string name, llvm::function_ref<void(OpPassManager &)> populateFunc,
-    int maxIterations = 10);
 
 //===----------------------------------------------------------------------===//
 // Registration

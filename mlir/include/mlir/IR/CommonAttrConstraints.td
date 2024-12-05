@@ -755,7 +755,7 @@ class AllAttrOf<list<AttrConstraint> constraints> : AttrConstraint<
 
 class IntNEQValue<int n> : AttrConstraint<
     CPred<"::llvm::cast<::mlir::IntegerAttr>($_self).getInt() != " # n>,
-    "whose value is not " # n>;
+    "whose minimum value is " # n>;
 
 class IntMinValue<int n> : AttrConstraint<
     CPred<"::llvm::cast<::mlir::IntegerAttr>($_self).getInt() >= " # n>,
@@ -772,10 +772,6 @@ def IntNonNegative : AttrConstraint<
 def IntPositive : AttrConstraint<
     CPred<"::llvm::cast<::mlir::IntegerAttr>($_self).getValue().isStrictlyPositive()">,
     "whose value is positive">;
-
-class ArrayMaxCount<int n> : AttrConstraint<
-    CPred<"::llvm::cast<::mlir::ArrayAttr>($_self).size() <= " # n>,
-    "with at most " # n # " elements">;
 
 class ArrayMinCount<int n> : AttrConstraint<
     CPred<"::llvm::cast<::mlir::ArrayAttr>($_self).size() >= " # n>,

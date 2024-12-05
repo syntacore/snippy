@@ -116,7 +116,8 @@ void ARCFrameLowering::emitPrologue(MachineFunction &MF,
                                     MachineBasicBlock &MBB) const {
   LLVM_DEBUG(dbgs() << "Emit Prologue: " << MF.getName() << "\n");
   auto *AFI = MF.getInfo<ARCFunctionInfo>();
-  MCContext &Context = MF.getContext();
+  MachineModuleInfo &MMI = MF.getMMI();
+  MCContext &Context = MMI.getContext();
   const MCRegisterInfo *MRI = Context.getRegisterInfo();
   const ARCInstrInfo *TII = MF.getSubtarget<ARCSubtarget>().getInstrInfo();
   MachineBasicBlock::iterator MBBI = MBB.begin();

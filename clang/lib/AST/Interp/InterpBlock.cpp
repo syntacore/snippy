@@ -73,7 +73,7 @@ void Block::replacePointer(Pointer *Old, Pointer *New) {
   removePointer(Old);
   addPointer(New);
 
-  Old->PointeeStorage.BS.Pointee = nullptr;
+  Old->Pointee = nullptr;
 
 #ifndef NDEBUG
   assert(!hasPointer(Old));
@@ -92,8 +92,7 @@ bool Block::hasPointer(const Pointer *P) const {
 #endif
 
 DeadBlock::DeadBlock(DeadBlock *&Root, Block *Blk)
-    : Root(Root),
-      B(~0u, Blk->Desc, Blk->IsStatic, Blk->IsExtern, /*isDead=*/true) {
+    : Root(Root), B(Blk->Desc, Blk->IsStatic, Blk->IsExtern, /*isDead=*/true) {
   // Add the block to the chain of dead blocks.
   if (Root)
     Root->Prev = this;
@@ -105,14 +104,10 @@ DeadBlock::DeadBlock(DeadBlock *&Root, Block *Blk)
   // Transfer pointers.
   B.Pointers = Blk->Pointers;
   for (Pointer *P = Blk->Pointers; P; P = P->Next)
-    P->PointeeStorage.BS.Pointee = &B;
-  Blk->Pointers = nullptr;
+    P->Pointee = &B;
 }
 
 void DeadBlock::free() {
-  if (B.IsInitialized)
-    B.invokeDtor();
-
   if (Prev)
     Prev->Next = Next;
   if (Next)

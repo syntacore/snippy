@@ -29,15 +29,15 @@
 using namespace lldb;
 using namespace lldb_private;
 
-llvm::StringRef TargetList::GetStaticBroadcasterClass() {
-  static constexpr llvm::StringLiteral class_name("lldb.targetList");
+ConstString &TargetList::GetStaticBroadcasterClass() {
+  static ConstString class_name("lldb.targetList");
   return class_name;
 }
 
 // TargetList constructor
 TargetList::TargetList(Debugger &debugger)
     : Broadcaster(debugger.GetBroadcasterManager(),
-                  TargetList::GetStaticBroadcasterClass().str()),
+                  TargetList::GetStaticBroadcasterClass().AsCString()),
       m_target_list(), m_target_list_mutex(), m_selected_target_idx(0) {
   CheckInWithManager();
 }
@@ -532,13 +532,9 @@ void TargetList::SetSelectedTarget(uint32_t index) {
 }
 
 void TargetList::SetSelectedTarget(const TargetSP &target_sp) {
-  // Don't allow an invalid target shared pointer or a target that has been
-  // destroyed to become the selected target.
-  if (target_sp && target_sp->IsValid()) {
-    std::lock_guard<std::recursive_mutex> guard(m_target_list_mutex);
-    auto it = llvm::find(m_target_list, target_sp);
-    SetSelectedTargetInternal(std::distance(m_target_list.begin(), it));
-  }
+  std::lock_guard<std::recursive_mutex> guard(m_target_list_mutex);
+  auto it = llvm::find(m_target_list, target_sp);
+  SetSelectedTargetInternal(std::distance(m_target_list.begin(), it));
 }
 
 lldb::TargetSP TargetList::GetSelectedTarget() {

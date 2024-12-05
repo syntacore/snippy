@@ -6,10 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_MACROS_OFFSETOF_MACRO_H
-#define LLVM_LIBC_MACROS_OFFSETOF_MACRO_H
+#ifndef __LLVM_LIBC_MACROS_OFFSETOF_MACRO_H
+#define __LLVM_LIBC_MACROS_OFFSETOF_MACRO_H
 
 #define __need_offsetof
 #include <stddef.h>
 
-#endif // LLVM_LIBC_MACROS_OFFSETOF_MACRO_H
+#endif // __LLVM_LIBC_MACROS_OFFSETOF_MACRO_H

@@ -198,8 +198,7 @@ struct S implicit_load(_Atomic(struct S) *a) {
 struct S fd1(struct S *a) {
   // CHECK-LABEL: @fd1
   // CHECK: [[RETVAL:%.*]] = alloca %struct.S, align 4
-  // CHECK: [[TMP1:%.*]] = load atomic i64, ptr {{%.*}} seq_cst, align 4
-  // CHECK-NEXT: store i64 [[TMP1]], ptr [[RETVAL]], align 4
+  // CHECK: call void @__atomic_load(i32 noundef 8, ptr noundef {{.*}}, ptr noundef [[RETVAL]], i32 noundef 5)
   // CHECK: ret
   struct S ret;
   __atomic_load(a, &ret, memory_order_seq_cst);
@@ -214,8 +213,7 @@ void fd2(struct S *a, struct S *b) {
   // CHECK-NEXT: store ptr %b, ptr [[B_ADDR]], align 4
   // CHECK-NEXT: [[LOAD_A_PTR:%.*]] = load ptr, ptr [[A_ADDR]], align 4
   // CHECK-NEXT: [[LOAD_B_PTR:%.*]] = load ptr, ptr [[B_ADDR]], align 4
-  // CHECK-NEXT: [[LOAD_B:%.*]] = load i64, ptr [[LOAD_B_PTR]], align 4
-  // CHECK-NEXT: store atomic i64 [[LOAD_B]], ptr [[LOAD_A_PTR]] seq_cst, align 4
+  // CHECK-NEXT: call void @__atomic_store(i32 noundef 8, ptr noundef [[LOAD_A_PTR]], ptr noundef [[LOAD_B_PTR]],
   // CHECK-NEXT: ret void
   __atomic_store(a, b, memory_order_seq_cst);
 }
@@ -231,9 +229,7 @@ void fd3(struct S *a, struct S *b, struct S *c) {
   // CHECK-NEXT: [[LOAD_A_PTR:%.*]] = load ptr, ptr [[A_ADDR]], align 4
   // CHECK-NEXT: [[LOAD_B_PTR:%.*]] = load ptr, ptr [[B_ADDR]], align 4
   // CHECK-NEXT: [[LOAD_C_PTR:%.*]] = load ptr, ptr [[C_ADDR]], align 4
-  // CHECK-NEXT: [[LOAD_B:%.*]] = load i64, ptr [[LOAD_B_PTR]], align 4
-  // CHECK-NEXT: [[RESULT:%.*]] = atomicrmw xchg ptr [[LOAD_A_PTR]], i64 [[LOAD_B]] seq_cst, align 4
-  // CHECK-NEXT: store i64 [[RESULT]], ptr [[LOAD_C_PTR]], align 4
+  // CHECK-NEXT: call void @__atomic_exchange(i32 noundef 8, ptr noundef [[LOAD_A_PTR]], ptr noundef [[LOAD_B_PTR]], ptr noundef [[LOAD_C_PTR]],
 
   __atomic_exchange(a, b, c, memory_order_seq_cst);
 }
@@ -249,9 +245,8 @@ _Bool fd4(struct S *a, struct S *b, struct S *c) {
   // CHECK-NEXT: [[LOAD_A_PTR:%.*]] = load ptr, ptr [[A_ADDR]], align 4
   // CHECK-NEXT: [[LOAD_B_PTR:%.*]] = load ptr, ptr [[B_ADDR]], align 4
   // CHECK-NEXT: [[LOAD_C_PTR:%.*]] = load ptr, ptr [[C_ADDR]], align 4
-  // CHECK-NEXT: [[LOAD_B:%.*]] = load i64, ptr [[LOAD_B_PTR]], align 4
-  // CHECK-NEXT: [[LOAD_C:%.*]] = load i64, ptr [[LOAD_C_PTR]], align 4
-  // CHECK-NEXT: {{.*}} = cmpxchg weak ptr [[LOAD_A_PTR]], i64 [[LOAD_B]], i64 [[LOAD_C]] seq_cst seq_cst, align 4
+  // CHECK-NEXT: [[CALL:%.*]] = call zeroext i1 @__atomic_compare_exchange(i32 noundef 8, ptr noundef [[LOAD_A_PTR]], ptr noundef [[LOAD_B_PTR]], ptr noundef [[LOAD_C_PTR]],
+  // CHECK-NEXT: ret i1 [[CALL]]
   return __atomic_compare_exchange(a, b, c, 1, 5, 5);
 }
 
@@ -687,13 +682,13 @@ void test_underaligned(void) {
   // CHECK-LABEL: @test_underaligned
   struct Underaligned { char c[8]; } underaligned_a, underaligned_b, underaligned_c;
 
-  // CHECK: load atomic i64, {{.*}}, align 1
+  // CHECK: call void @__atomic_load(i32 noundef 8,
   __atomic_load(&underaligned_a, &underaligned_b, memory_order_seq_cst);
-  // CHECK: store atomic i64 {{.*}}, align 1
+  // CHECK: call void @__atomic_store(i32 noundef 8,
   __atomic_store(&underaligned_a, &underaligned_b, memory_order_seq_cst);
-  // CHECK: atomicrmw xchg ptr {{.*}}, align 1
+  // CHECK: call void @__atomic_exchange(i32 noundef 8,
   __atomic_exchange(&underaligned_a, &underaligned_b, &underaligned_c, memory_order_seq_cst);
-  // CHECK: cmpxchg weak ptr {{.*}}, align 1
+  // CHECK: call {{.*}} @__atomic_compare_exchange(i32 noundef 8,
   __atomic_compare_exchange(&underaligned_a, &underaligned_b, &underaligned_c, 1, memory_order_seq_cst, memory_order_seq_cst);
 
   __attribute__((aligned)) struct Underaligned aligned_a, aligned_b, aligned_c;
@@ -752,7 +747,7 @@ void test_minmax_postop(int *si, unsigned *ui, unsigned short *us, signed char *
   // CHECK: [[NEW:%.*]] = select i1 [[TST]], i32 [[OLD]], i32 [[RHS]]
   // CHECK: store i32 [[NEW]], ptr
   *si = __atomic_min_fetch(si, 42, memory_order_release);
-
+  
   // CHECK: [[OLD:%.*]] = atomicrmw umax ptr [[PTR:%.*]], i32 [[RHS:%.*]] release, align 4
   // CHECK: [[TST:%.*]] = icmp ugt i32 [[OLD]], [[RHS]]
   // CHECK: [[NEW:%.*]] = select i1 [[TST]], i32 [[OLD]], i32 [[RHS]]
@@ -777,7 +772,7 @@ void test_minmax_postop(int *si, unsigned *ui, unsigned short *us, signed char *
   // CHECK: store i8 [[NEW]], ptr
   *sc = __atomic_min_fetch(sc, 42, memory_order_release);
 
-  // CHECK: [[OLD:%.*]] = atomicrmw umin ptr {{%.*}}, i64 [[RHS:%.*]] release, align 4
+  // CHECK: [[OLD:%.*]] = call i64 @__atomic_fetch_umin_8(ptr noundef {{%.*}}, i64 noundef [[RHS:%.*]],
   // CHECK: [[TST:%.*]] = icmp ult i64 [[OLD]], [[RHS]]
   // CHECK: [[NEW:%.*]] = select i1 [[TST]], i64 [[OLD]], i64 [[RHS]]
   // CHECK: store i64 [[NEW]], ptr

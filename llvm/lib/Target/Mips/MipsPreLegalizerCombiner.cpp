@@ -70,10 +70,9 @@ public:
       // subtarget doesn't support them.
       auto MMO = *MI.memoperands_begin();
       const MipsSubtarget &STI = MI.getMF()->getSubtarget<MipsSubtarget>();
-      if (!MMO->getSize().hasValue() ||
-          !isPowerOf2_64(MMO->getSize().getValue()))
+      if (!isPowerOf2_64(MMO->getSize()))
         return false;
-      bool isUnaligned = MMO->getAlign() < MMO->getSize().getValue();
+      bool isUnaligned = MMO->getAlign() < MMO->getSize();
       if (!STI.systemSupportsUnalignedAccess() && isUnaligned)
         return false;
 

@@ -764,11 +764,10 @@ doesn't know that munl.mu == mutex.  The SCOPED_CAPABILITY attribute handles
 aliasing for MutexLocker, but does so only for that particular pattern.
 
 
-ACQUIRED_BEFORE(...) and ACQUIRED_AFTER(...) support is still experimental.
----------------------------------------------------------------------------
+ACQUIRED_BEFORE(...) and ACQUIRED_AFTER(...) are currently unimplemented.
+-------------------------------------------------------------------------
 
-ACQUIRED_BEFORE(...) and ACQUIRED_AFTER(...) are currently being developed under
-the ``-Wthread-safety-beta`` flag.
+To be fixed in a future update.
 
 
 .. _mutexheader:

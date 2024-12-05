@@ -10,7 +10,6 @@
 #include "Boolean.h"
 #include "Floating.h"
 #include "Integral.h"
-#include "MemberPointer.h"
 #include "Pointer.h"
 #include <cassert>
 #include <cstdlib>

@@ -9,7 +9,6 @@
 #include "llvm/DebugInfo/GSYM/FileWriter.h"
 #include "llvm/DebugInfo/GSYM/Header.h"
 #include "llvm/DebugInfo/GSYM/LineTable.h"
-#include "llvm/DebugInfo/GSYM/OutputAggregator.h"
 #include "llvm/MC/StringTableBuilder.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -56,10 +55,7 @@ uint32_t GsymCreator::copyFile(const GsymCreator &SrcGC, uint32_t FileIdx) {
     return 0;
   const FileEntry SrcFE = SrcGC.Files[FileIdx];
   // Copy the strings for the file and then add the newly converted file entry.
-  uint32_t Dir =
-      SrcFE.Dir == 0
-          ? 0
-          : StrTab.add(SrcGC.StringOffsetMap.find(SrcFE.Dir)->second);
+  uint32_t Dir = StrTab.add(SrcGC.StringOffsetMap.find(SrcFE.Dir)->second);
   uint32_t Base = StrTab.add(SrcGC.StringOffsetMap.find(SrcFE.Base)->second);
   FileEntry DstFE(Dir, Base);
   return insertFileEntry(DstFE);
@@ -189,7 +185,7 @@ llvm::Error GsymCreator::encode(FileWriter &O) const {
   return ErrorSuccess();
 }
 
-llvm::Error GsymCreator::finalize(OutputAggregator &Out) {
+llvm::Error GsymCreator::finalize(llvm::raw_ostream &OS) {
   std::lock_guard<std::mutex> Guard(Mutex);
   if (Finalized)
     return createStringError(std::errc::invalid_argument, "already finalized");
@@ -248,29 +244,26 @@ llvm::Error GsymCreator::finalize(OutputAggregator &Out) {
             // address ranges that have debug info are last in
             // the sort.
             if (!(Prev == Curr)) {
-              if (Prev.hasRichInfo() && Curr.hasRichInfo())
-                Out.Report(
-                    "Duplicate address ranges with different debug info.",
-                    [&](raw_ostream &OS) {
-                      OS << "warning: same address range contains "
-                            "different debug "
-                         << "info. Removing:\n"
-                         << Prev << "\nIn favor of this one:\n"
-                         << Curr << "\n";
-                    });
-
+              if (Prev.hasRichInfo() && Curr.hasRichInfo()) {
+                if (!Quiet) {
+                  OS << "warning: same address range contains "
+                        "different debug "
+                    << "info. Removing:\n"
+                    << Prev << "\nIn favor of this one:\n"
+                    << Curr << "\n";
+                }
+              }
               // We want to swap the current entry with the previous since
               // later entries with the same range always have more debug info
               // or different debug info.
               std::swap(Prev, Curr);
             }
           } else {
-            Out.Report("Overlapping function ranges", [&](raw_ostream &OS) {
-              // print warnings about overlaps
+            if (!Quiet) { // print warnings about overlaps
               OS << "warning: function ranges overlap:\n"
                 << Prev << "\n"
                 << Curr << "\n";
-            });
+            }
             FinalizedFuncs.emplace_back(std::move(Curr));
           }
         } else {
@@ -297,8 +290,8 @@ llvm::Error GsymCreator::finalize(OutputAggregator &Out) {
         Funcs.back().Range = {Funcs.back().Range.start(), Range->end()};
       }
     }
-    Out << "Pruned " << NumBefore - Funcs.size() << " functions, ended with "
-        << Funcs.size() << " total\n";
+    OS << "Pruned " << NumBefore - Funcs.size() << " functions, ended with "
+      << Funcs.size() << " total\n";
   }
   return Error::success();
 }
@@ -498,9 +491,8 @@ llvm::Error GsymCreator::saveSegments(StringRef Path,
       GsymCreator *GC = ExpectedGC->get();
       if (GC == NULL)
         break; // We had not more functions to encode.
-      // Don't collect any messages at all
-      OutputAggregator Out(nullptr);
-      llvm::Error Err = GC->finalize(Out);
+      raw_null_ostream ErrorStrm;
+      llvm::Error Err = GC->finalize(ErrorStrm);
       if (Err)
         return Err;
       std::string SegmentedGsymPath;

@@ -36,11 +36,6 @@ class MachineModuleInfoMachO : public MachineModuleInfoImpl {
   /// bit is true if this GV is external.
   DenseMap<MCSymbol *, StubValueTy> ThreadLocalGVStubs;
 
-  /// Darwin '$auth_ptr' stubs.  The key is the stub symbol, like
-  /// "Lfoo$auth_ptr$ib$12".  The value is the MCExpr representing that
-  /// signed pointer, something like "_foo@AUTH(ib, 12)".
-  DenseMap<MCSymbol *, const MCExpr *> AuthPtrStubs;
-
   virtual void anchor(); // Out of line virtual method.
 
 public:
@@ -56,19 +51,10 @@ public:
     return ThreadLocalGVStubs[Sym];
   }
 
-  const MCExpr *&getAuthPtrStubEntry(MCSymbol *Sym) {
-    assert(Sym && "Key cannot be null");
-    return AuthPtrStubs[Sym];
-  }
-
   /// Accessor methods to return the set of stubs in sorted order.
   SymbolListTy GetGVStubList() { return getSortedStubs(GVStubs); }
   SymbolListTy GetThreadLocalGVStubList() {
     return getSortedStubs(ThreadLocalGVStubs);
-  }
-
-  ExprStubListTy getAuthGVStubList() {
-    return getSortedExprStubs(AuthPtrStubs);
   }
 };
 
@@ -78,10 +64,6 @@ class MachineModuleInfoELF : public MachineModuleInfoImpl {
   /// GVStubs - These stubs are used to materialize global addresses in PIC
   /// mode.
   DenseMap<MCSymbol *, StubValueTy> GVStubs;
-
-  /// AuthPtrStubs - These stubs are used to materialize signed addresses for
-  /// extern_weak symbols.
-  DenseMap<MCSymbol *, const MCExpr *> AuthPtrStubs;
 
   virtual void anchor(); // Out of line virtual method.
 
@@ -93,18 +75,9 @@ public:
     return GVStubs[Sym];
   }
 
-  const MCExpr *&getAuthPtrStubEntry(MCSymbol *Sym) {
-    assert(Sym && "Key cannot be null");
-    return AuthPtrStubs[Sym];
-  }
-
   /// Accessor methods to return the set of stubs in sorted order.
 
   SymbolListTy GetGVStubList() { return getSortedStubs(GVStubs); }
-
-  ExprStubListTy getAuthGVStubList() {
-    return getSortedExprStubs(AuthPtrStubs);
-  }
 };
 
 /// MachineModuleInfoCOFF - This is a MachineModuleInfoImpl implementation

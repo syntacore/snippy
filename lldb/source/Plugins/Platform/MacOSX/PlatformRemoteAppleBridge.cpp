@@ -103,8 +103,9 @@ PlatformSP PlatformRemoteAppleBridge::CreateInstance(bool force,
 #pragma warning(disable : 4065)
 #endif
         switch (triple.getOS()) {
-        case llvm::Triple::BridgeOS:
-          break;
+          // NEED_BRIDGEOS_TRIPLE case llvm::Triple::BridgeOS:
+          //  break;
+
         default:
           create = false;
           break;

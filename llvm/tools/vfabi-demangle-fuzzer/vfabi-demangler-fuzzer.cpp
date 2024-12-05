@@ -11,9 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/AsmParser/Parser.h"
-#include "llvm/IR/Module.h"
 #include "llvm/IR/VFABIDemangler.h"
-#include "llvm/Support/SourceMgr.h"
 
 using namespace llvm;
 

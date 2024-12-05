@@ -2,7 +2,7 @@
 ; RUN: llc < %s -mtriple=i686-unknown-unknown -mattr=+sse2 | FileCheck %s --check-prefixes=X86
 ; RUN: llc < %s -mtriple=x86_64-unknown-unknown -mattr=+sse2 | FileCheck %s --check-prefixes=X64
 
-define float @fneg_strict_fadd_to_strict_fsub(float %x, float %y) nounwind strictfp {
+define float @fneg_strict_fadd_to_strict_fsub(float %x, float %y) nounwind {
 ; X86-LABEL: fneg_strict_fadd_to_strict_fsub:
 ; X86:       # %bb.0:
 ; X86-NEXT:    pushl %eax
@@ -10,7 +10,6 @@ define float @fneg_strict_fadd_to_strict_fsub(float %x, float %y) nounwind stric
 ; X86-NEXT:    subss {{[0-9]+}}(%esp), %xmm0
 ; X86-NEXT:    movss %xmm0, (%esp)
 ; X86-NEXT:    flds (%esp)
-; X86-NEXT:    wait
 ; X86-NEXT:    popl %eax
 ; X86-NEXT:    retl
 ;
@@ -23,7 +22,7 @@ define float @fneg_strict_fadd_to_strict_fsub(float %x, float %y) nounwind stric
   ret float %add
 }
 
-define float @fneg_strict_fadd_to_strict_fsub_2(float %x, float %y) nounwind strictfp {
+define float @fneg_strict_fadd_to_strict_fsub_2(float %x, float %y) nounwind {
 ; X86-LABEL: fneg_strict_fadd_to_strict_fsub_2:
 ; X86:       # %bb.0:
 ; X86-NEXT:    pushl %eax
@@ -31,7 +30,6 @@ define float @fneg_strict_fadd_to_strict_fsub_2(float %x, float %y) nounwind str
 ; X86-NEXT:    subss {{[0-9]+}}(%esp), %xmm0
 ; X86-NEXT:    movss %xmm0, (%esp)
 ; X86-NEXT:    flds (%esp)
-; X86-NEXT:    wait
 ; X86-NEXT:    popl %eax
 ; X86-NEXT:    retl
 ;
@@ -44,7 +42,7 @@ define float @fneg_strict_fadd_to_strict_fsub_2(float %x, float %y) nounwind str
   ret float %add
 }
 
-define double @fneg_strict_fadd_to_strict_fsub_d(double %x, double %y) nounwind strictfp {
+define double @fneg_strict_fadd_to_strict_fsub_d(double %x, double %y) nounwind {
 ; X86-LABEL: fneg_strict_fadd_to_strict_fsub_d:
 ; X86:       # %bb.0:
 ; X86-NEXT:    pushl %ebp
@@ -55,7 +53,6 @@ define double @fneg_strict_fadd_to_strict_fsub_d(double %x, double %y) nounwind 
 ; X86-NEXT:    subsd 16(%ebp), %xmm0
 ; X86-NEXT:    movsd %xmm0, (%esp)
 ; X86-NEXT:    fldl (%esp)
-; X86-NEXT:    wait
 ; X86-NEXT:    movl %ebp, %esp
 ; X86-NEXT:    popl %ebp
 ; X86-NEXT:    retl
@@ -69,7 +66,7 @@ define double @fneg_strict_fadd_to_strict_fsub_d(double %x, double %y) nounwind 
   ret double %add
 }
 
-define double @fneg_strict_fadd_to_strict_fsub_2d(double %x, double %y) nounwind strictfp {
+define double @fneg_strict_fadd_to_strict_fsub_2d(double %x, double %y) nounwind {
 ; X86-LABEL: fneg_strict_fadd_to_strict_fsub_2d:
 ; X86:       # %bb.0:
 ; X86-NEXT:    pushl %ebp
@@ -80,7 +77,6 @@ define double @fneg_strict_fadd_to_strict_fsub_2d(double %x, double %y) nounwind
 ; X86-NEXT:    subsd 16(%ebp), %xmm0
 ; X86-NEXT:    movsd %xmm0, (%esp)
 ; X86-NEXT:    fldl (%esp)
-; X86-NEXT:    wait
 ; X86-NEXT:    movl %ebp, %esp
 ; X86-NEXT:    popl %ebp
 ; X86-NEXT:    retl

@@ -27,12 +27,6 @@ public:
     Inst.setOpcode(Opcode);
   }
 
-  /// Set the location.
-  MCInstBuilder &setLoc(SMLoc SM) {
-    Inst.setLoc(SM);
-    return *this;
-  }
-
   /// Add a new register operand.
   MCInstBuilder &addReg(unsigned Reg) {
     Inst.addOperand(MCOperand::createReg(Reg));

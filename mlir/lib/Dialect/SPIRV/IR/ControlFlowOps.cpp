@@ -87,9 +87,7 @@ ParseResult BranchConditionalOp::parse(OpAsmParser &parser,
         parser.parseRSquare())
       return failure();
 
-    StringAttr branchWeightsAttrName =
-        BranchConditionalOp::getBranchWeightsAttrName(result.name);
-    result.addAttribute(branchWeightsAttrName,
+    result.addAttribute(kBranchWeightAttrName,
                         builder.getArrayAttr({trueWeight, falseWeight}));
   }
 
@@ -201,11 +199,11 @@ LogicalResult FunctionCallOp::verify() {
 }
 
 CallInterfaceCallable FunctionCallOp::getCallableForCallee() {
-  return (*this)->getAttrOfType<SymbolRefAttr>(getCalleeAttrName());
+  return (*this)->getAttrOfType<SymbolRefAttr>(kCallee);
 }
 
 void FunctionCallOp::setCalleeFromCallable(CallInterfaceCallable callee) {
-  (*this)->setAttr(getCalleeAttrName(), callee.get<SymbolRefAttr>());
+  (*this)->setAttr(kCallee, callee.get<SymbolRefAttr>());
 }
 
 Operation::operand_range FunctionCallOp::getArgOperands() {
@@ -367,11 +365,12 @@ Block *LoopOp::getMergeBlock() {
   return &getBody().back();
 }
 
-void LoopOp::addEntryAndMergeBlock(OpBuilder &builder) {
+void LoopOp::addEntryAndMergeBlock() {
   assert(getBody().empty() && "entry and merge block already exist");
-  OpBuilder::InsertionGuard g(builder);
-  builder.createBlock(&getBody());
-  builder.createBlock(&getBody());
+  getBody().push_back(new Block());
+  auto *mergeBlock = new Block();
+  getBody().push_back(mergeBlock);
+  OpBuilder builder = OpBuilder::atBlockEnd(mergeBlock);
 
   // Add a spirv.mlir.merge op into the merge block.
   builder.create<spirv::MergeOp>(getLoc());
@@ -526,10 +525,11 @@ Block *SelectionOp::getMergeBlock() {
   return &getBody().back();
 }
 
-void SelectionOp::addMergeBlock(OpBuilder &builder) {
+void SelectionOp::addMergeBlock() {
   assert(getBody().empty() && "entry and merge block already exist");
-  OpBuilder::InsertionGuard guard(builder);
-  builder.createBlock(&getBody());
+  auto *mergeBlock = new Block();
+  getBody().push_back(mergeBlock);
+  OpBuilder builder = OpBuilder::atBlockEnd(mergeBlock);
 
   // Add a spirv.mlir.merge op into the merge block.
   builder.create<spirv::MergeOp>(getLoc());
@@ -542,7 +542,7 @@ SelectionOp::createIfThen(Location loc, Value condition,
   auto selectionOp =
       builder.create<spirv::SelectionOp>(loc, spirv::SelectionControl::None);
 
-  selectionOp.addMergeBlock(builder);
+  selectionOp.addMergeBlock();
   Block *mergeBlock = selectionOp.getMergeBlock();
   Block *thenBlock = nullptr;
 

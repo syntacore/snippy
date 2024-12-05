@@ -21,7 +21,10 @@ class CompileRunToBreakpointBench(BenchBase):
 
     @benchmarks_test
     @no_debug_info_test
-    @add_test_categories(["pexpect"])
+    @expectedFailureAll(
+        oslist=["windows"],
+        bugnumber="llvm.org/pr22274: need a pexpect replacement for windows",
+    )
     def test_run_lldb_then_gdb(self):
         """Benchmark turnaround time with lldb vs. gdb."""
         print()

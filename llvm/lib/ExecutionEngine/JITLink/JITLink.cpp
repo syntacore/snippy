@@ -338,8 +338,7 @@ void LinkGraph::dump(raw_ostream &OS) {
   OS << "\nExternal symbols:\n";
   if (!external_symbols().empty()) {
     for (auto *Sym : external_symbols())
-      OS << "  " << Sym->getAddress() << ": " << *Sym
-         << (Sym->isWeaklyReferenced() ? " (weakly referenced)" : "") << "\n";
+      OS << "  " << Sym->getAddress() << ": " << *Sym << "\n";
   } else
     OS << "  none\n";
 }

@@ -5,11 +5,9 @@ target datalayout = "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f3
 target triple = "i386-pc-linux-gnu"
 
 define i1 @f1() {
-  %cmp = icmp eq ptr inttoptr (i32 1 to ptr), inttoptr (i32 2 to ptr)
-  ret i1 %cmp
+  ret i1 icmp eq (ptr inttoptr (i32 1 to ptr), ptr inttoptr (i32 2 to ptr))
 }
 
 define i1 @f2() {
-  %cmp = icmp eq ptr inttoptr (i16 1 to ptr), inttoptr (i16 2 to ptr)
-  ret i1 %cmp
+  ret i1 icmp eq (ptr inttoptr (i16 1 to ptr), ptr inttoptr (i16 2 to ptr))
 }

@@ -18,6 +18,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/Support/raw_ostream.h"
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -107,6 +108,7 @@ public:
   std::vector<MCSymbol *> &getSymbols() { return Symbols; }
 
   bool hasName(StringRef Name) const;
+  bool hasNameRegex(StringRef Name) const;
   bool nameStartsWith(StringRef Prefix) const;
 
   bool hasSymbol(const MCSymbol *Symbol) const {

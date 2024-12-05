@@ -18,21 +18,28 @@
 using namespace lldb;
 using namespace lldb_private;
 
-Listener::Listener(const char *name) : m_name(name) {
-  LLDB_LOGF(GetLog(LLDBLog::Object), "%p Listener::Listener('%s')",
-            static_cast<void *>(this), m_name.c_str());
+Listener::Listener(const char *name)
+    : m_name(name), m_broadcasters(), m_broadcasters_mutex(), m_events(),
+      m_events_mutex(), m_is_shadow() {
+  Log *log = GetLog(LLDBLog::Object);
+  if (log != nullptr)
+    LLDB_LOGF(log, "%p Listener::Listener('%s')", static_cast<void *>(this),
+              m_name.c_str());
 }
 
 Listener::~Listener() {
-  // Don't call Clear() from here as that can cause races. See #96750.
+  Log *log = GetLog(LLDBLog::Object);
 
-  LLDB_LOGF(GetLog(LLDBLog::Object), "%p Listener::%s('%s')",
-            static_cast<void *>(this), __FUNCTION__, m_name.c_str());
+  Clear();
+
+  LLDB_LOGF(log, "%p Listener::%s('%s')", static_cast<void *>(this),
+            __FUNCTION__, m_name.c_str());
 }
 
 void Listener::Clear() {
   Log *log = GetLog(LLDBLog::Object);
-  std::lock_guard<std::mutex> broadcasters_guard(m_broadcasters_mutex);
+  std::lock_guard<std::recursive_mutex> broadcasters_guard(
+      m_broadcasters_mutex);
   broadcaster_collection::iterator pos, end = m_broadcasters.end();
   for (pos = m_broadcasters.begin(); pos != end; ++pos) {
     Broadcaster::BroadcasterImplSP broadcaster_sp(pos->first.lock());
@@ -61,7 +68,8 @@ uint32_t Listener::StartListeningForEvents(Broadcaster *broadcaster,
     // Scope for "locker"
     // Tell the broadcaster to add this object as a listener
     {
-      std::lock_guard<std::mutex> broadcasters_guard(m_broadcasters_mutex);
+      std::lock_guard<std::recursive_mutex> broadcasters_guard(
+          m_broadcasters_mutex);
       Broadcaster::BroadcasterImplWP impl_wp(broadcaster->GetBroadcasterImpl());
       m_broadcasters.insert(
           std::make_pair(impl_wp, BroadcasterInfo(event_mask)));
@@ -91,7 +99,8 @@ uint32_t Listener::StartListeningForEvents(Broadcaster *broadcaster,
     // Scope for "locker"
     // Tell the broadcaster to add this object as a listener
     {
-      std::lock_guard<std::mutex> broadcasters_guard(m_broadcasters_mutex);
+      std::lock_guard<std::recursive_mutex> broadcasters_guard(
+          m_broadcasters_mutex);
       Broadcaster::BroadcasterImplWP impl_wp(broadcaster->GetBroadcasterImpl());
       m_broadcasters.insert(std::make_pair(
           impl_wp, BroadcasterInfo(event_mask, callback, callback_user_data)));
@@ -122,7 +131,8 @@ bool Listener::StopListeningForEvents(Broadcaster *broadcaster,
   if (broadcaster) {
     // Scope for "locker"
     {
-      std::lock_guard<std::mutex> broadcasters_guard(m_broadcasters_mutex);
+      std::lock_guard<std::recursive_mutex> broadcasters_guard(
+          m_broadcasters_mutex);
       m_broadcasters.erase(broadcaster->GetBroadcasterImpl());
     }
     // Remove the broadcaster from our set of broadcasters
@@ -137,7 +147,8 @@ bool Listener::StopListeningForEvents(Broadcaster *broadcaster,
 void Listener::BroadcasterWillDestruct(Broadcaster *broadcaster) {
   // Scope for "broadcasters_locker"
   {
-    std::lock_guard<std::mutex> broadcasters_guard(m_broadcasters_mutex);
+    std::lock_guard<std::recursive_mutex> broadcasters_guard(
+        m_broadcasters_mutex);
     m_broadcasters.erase(broadcaster->GetBroadcasterImpl());
   }
 
@@ -311,7 +322,7 @@ bool Listener::GetEvent(EventSP &event_sp, const Timeout<std::micro> &timeout) {
 
 size_t Listener::HandleBroadcastEvent(EventSP &event_sp) {
   size_t num_handled = 0;
-  std::lock_guard<std::mutex> guard(m_broadcasters_mutex);
+  std::lock_guard<std::recursive_mutex> guard(m_broadcasters_mutex);
   Broadcaster *broadcaster = event_sp->GetBroadcaster();
   if (!broadcaster)
     return 0;
@@ -345,10 +356,11 @@ Listener::StartListeningForEventSpec(const BroadcasterManagerSP &manager_sp,
   };
   // The BroadcasterManager mutex must be locked before m_broadcasters_mutex to
   // avoid violating the lock hierarchy (manager before broadcasters).
-  std::lock_guard<std::mutex> manager_guard(manager_sp->m_manager_mutex);
-  std::lock_guard<std::mutex> guard(m_broadcasters_mutex);
+  std::lock_guard<std::recursive_mutex> manager_guard(
+      manager_sp->m_manager_mutex);
+  std::lock_guard<std::recursive_mutex> guard(m_broadcasters_mutex);
 
-  uint32_t bits_acquired = manager_sp->RegisterListenerForEventsNoLock(
+  uint32_t bits_acquired = manager_sp->RegisterListenerForEvents(
       this->shared_from_this(), event_spec);
   if (bits_acquired) {
     BroadcasterManagerWP manager_wp(manager_sp);
@@ -365,12 +377,9 @@ bool Listener::StopListeningForEventSpec(const BroadcasterManagerSP &manager_sp,
   if (!manager_sp)
     return false;
 
-  // The BroadcasterManager mutex must be locked before m_broadcasters_mutex to
-  // avoid violating the lock hierarchy (manager before broadcasters).
-  std::lock_guard<std::mutex> manager_guard(manager_sp->m_manager_mutex);
-  std::lock_guard<std::mutex> guard(m_broadcasters_mutex);
-  return manager_sp->UnregisterListenerForEventsNoLock(this->shared_from_this(),
-                                                       event_spec);
+  std::lock_guard<std::recursive_mutex> guard(m_broadcasters_mutex);
+  return manager_sp->UnregisterListenerForEvents(this->shared_from_this(),
+                                                 event_spec);
 }
 
 ListenerSP Listener::MakeListener(const char *name) {

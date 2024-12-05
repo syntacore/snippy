@@ -13,7 +13,6 @@ add_mlir_dialect_library(MLIRSCFTransformOps
   MLIRIR
   MLIRLoopLikeInterface
   MLIRSCFDialect
-  MLIRSCFToControlFlow
   MLIRSCFTransforms
   MLIRSCFUtils
   MLIRTransformDialect

@@ -978,7 +978,8 @@ RVVIntrinsic::RVVIntrinsic(
     bool HasMaskedOffOperand, bool HasVL, PolicyScheme Scheme,
     bool SupportOverloading, bool HasBuiltinAlias, StringRef ManualCodegen,
     const RVVTypes &OutInTypes, const std::vector<int64_t> &NewIntrinsicTypes,
-    unsigned NF, Policy NewPolicyAttrs, bool HasFRMRoundModeOp)
+    const std::vector<StringRef> &RequiredFeatures, unsigned NF,
+    Policy NewPolicyAttrs, bool HasFRMRoundModeOp)
     : IRName(IRName), IsMasked(IsMasked),
       HasMaskedOffOperand(HasMaskedOffOperand), HasVL(HasVL), Scheme(Scheme),
       SupportOverloading(SupportOverloading), HasBuiltinAlias(HasBuiltinAlias),
@@ -1148,6 +1149,11 @@ void RVVIntrinsic::updateNamesAndPolicy(
     BuiltinName += suffix;
     OverloadedName += suffix;
   };
+
+  // This follows the naming guideline under riscv-c-api-doc to add the
+  // `__riscv_` suffix for all RVV intrinsics.
+  Name = "__riscv_" + Name;
+  OverloadedName = "__riscv_" + OverloadedName;
 
   if (HasFRMRoundModeOp) {
     Name += "_rm";

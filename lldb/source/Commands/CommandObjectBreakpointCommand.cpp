@@ -185,7 +185,19 @@ are no syntax errors may indicate that a function was declared but never called.
                          LLDB_OPT_SET_2);
     m_all_options.Finalize();
 
-    AddSimpleArgumentList(eArgTypeBreakpointID, eArgRepeatOptional);
+    CommandArgumentEntry arg;
+    CommandArgumentData bp_id_arg;
+
+    // Define the first (and only) variant of this arg.
+    bp_id_arg.arg_type = eArgTypeBreakpointID;
+    bp_id_arg.arg_repetition = eArgRepeatOptional;
+
+    // There is only one variant this argument could be; put it into the
+    // argument entry.
+    arg.push_back(bp_id_arg);
+
+    // Push the data for the first argument into the m_arguments vector.
+    m_arguments.push_back(arg);
   }
 
   ~CommandObjectBreakpointCommandAdd() override = default;
@@ -437,7 +449,19 @@ public:
       : CommandObjectParsed(interpreter, "delete",
                             "Delete the set of commands from a breakpoint.",
                             nullptr) {
-    AddSimpleArgumentList(eArgTypeBreakpointID);
+    CommandArgumentEntry arg;
+    CommandArgumentData bp_id_arg;
+
+    // Define the first (and only) variant of this arg.
+    bp_id_arg.arg_type = eArgTypeBreakpointID;
+    bp_id_arg.arg_repetition = eArgRepeatPlain;
+
+    // There is only one variant this argument could be; put it into the
+    // argument entry.
+    arg.push_back(bp_id_arg);
+
+    // Push the data for the first argument into the m_arguments vector.
+    m_arguments.push_back(arg);
   }
 
   ~CommandObjectBreakpointCommandDelete() override = default;
@@ -541,7 +565,19 @@ public:
                             "List the script or set of commands to be "
                             "executed when the breakpoint is hit.",
                             nullptr, eCommandRequiresTarget) {
-    AddSimpleArgumentList(eArgTypeBreakpointID);
+    CommandArgumentEntry arg;
+    CommandArgumentData bp_id_arg;
+
+    // Define the first (and only) variant of this arg.
+    bp_id_arg.arg_type = eArgTypeBreakpointID;
+    bp_id_arg.arg_repetition = eArgRepeatPlain;
+
+    // There is only one variant this argument could be; put it into the
+    // argument entry.
+    arg.push_back(bp_id_arg);
+
+    // Push the data for the first argument into the m_arguments vector.
+    m_arguments.push_back(arg);
   }
 
   ~CommandObjectBreakpointCommandList() override = default;

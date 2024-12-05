@@ -28,7 +28,7 @@ namespace __lsan {
 
 static const char kLinkerName[] = "ld";
 
-alignas(64) static char linker_placeholder[sizeof(LoadedModule)];
+static char linker_placeholder[sizeof(LoadedModule)] ALIGNED(64);
 static LoadedModule *linker = nullptr;
 
 static bool IsLinker(const LoadedModule& module) {

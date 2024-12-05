@@ -170,11 +170,11 @@ public:
   /// It can't be nullptr when multi-threading is enabled. Otherwise if
   /// multi-threading is disabled, and the threadpool wasn't externally provided
   /// using `setThreadPool`, this will be nullptr.
-  llvm::ThreadPoolInterface *threadPool = nullptr;
+  llvm::ThreadPool *threadPool = nullptr;
 
   /// In case where the thread pool is owned by the context, this ensures
   /// destruction with the context.
-  std::unique_ptr<llvm::ThreadPoolInterface> ownedThreadPool;
+  std::unique_ptr<llvm::ThreadPool> ownedThreadPool;
 
   /// An allocator used for AbstractAttribute and AbstractType objects.
   llvm::BumpPtrAllocator abstractDialectSymbolAllocator;
@@ -183,8 +183,7 @@ public:
   llvm::StringMap<std::unique_ptr<OperationName::Impl>> operations;
 
   /// A vector of operation info specifically for registered operations.
-  llvm::DenseMap<TypeID, RegisteredOperationName> registeredOperations;
-  llvm::StringMap<RegisteredOperationName> registeredOperationsByName;
+  llvm::StringMap<RegisteredOperationName> registeredOperations;
 
   /// This is a sorted container of registered operations for a deterministic
   /// and efficient `getRegisteredOperations` implementation.
@@ -222,7 +221,6 @@ public:
 
   /// Cached Type Instances.
   Float8E5M2Type f8E5M2Ty;
-  Float8E4M3Type f8E4M3Ty;
   Float8E4M3FNType f8E4M3FNTy;
   Float8E5M2FNUZType f8E5M2FNUZTy;
   Float8E4M3FNUZType f8E4M3FNUZTy;
@@ -276,7 +274,7 @@ public:
   MLIRContextImpl(bool threadingIsEnabled)
       : threadingIsEnabled(threadingIsEnabled) {
     if (threadingIsEnabled) {
-      ownedThreadPool = std::make_unique<llvm::DefaultThreadPool>();
+      ownedThreadPool = std::make_unique<llvm::ThreadPool>();
       threadPool = ownedThreadPool.get();
     }
   }
@@ -313,7 +311,6 @@ MLIRContext::MLIRContext(const DialectRegistry &registry, Threading setting)
   //// Types.
   /// Floating-point Types.
   impl->f8E5M2Ty = TypeUniquer::get<Float8E5M2Type>(this);
-  impl->f8E4M3Ty = TypeUniquer::get<Float8E4M3Type>(this);
   impl->f8E4M3FNTy = TypeUniquer::get<Float8E4M3FNType>(this);
   impl->f8E5M2FNUZTy = TypeUniquer::get<Float8E5M2FNUZType>(this);
   impl->f8E4M3FNUZTy = TypeUniquer::get<Float8E4M3FNUZType>(this);
@@ -624,12 +621,12 @@ void MLIRContext::disableMultithreading(bool disable) {
   } else if (!impl->threadPool) {
     // The thread pool isn't externally provided.
     assert(!impl->ownedThreadPool);
-    impl->ownedThreadPool = std::make_unique<llvm::DefaultThreadPool>();
+    impl->ownedThreadPool = std::make_unique<llvm::ThreadPool>();
     impl->threadPool = impl->ownedThreadPool.get();
   }
 }
 
-void MLIRContext::setThreadPool(llvm::ThreadPoolInterface &pool) {
+void MLIRContext::setThreadPool(llvm::ThreadPool &pool) {
   assert(!isMultithreadingEnabled() &&
          "expected multi-threading to be disabled when setting a ThreadPool");
   impl->threadPool = &pool;
@@ -641,13 +638,13 @@ unsigned MLIRContext::getNumThreads() {
   if (isMultithreadingEnabled()) {
     assert(impl->threadPool &&
            "multi-threading is enabled but threadpool not set");
-    return impl->threadPool->getMaxConcurrency();
+    return impl->threadPool->getThreadCount();
   }
   // No multithreading or active thread pool. Return 1 thread.
   return 1;
 }
 
-llvm::ThreadPoolInterface &MLIRContext::getThreadPool() {
+llvm::ThreadPool &MLIRContext::getThreadPool() {
   assert(isMultithreadingEnabled() &&
          "expected multi-threading to be enabled within the context");
   assert(impl->threadPool &&
@@ -783,8 +780,8 @@ OperationName::OperationName(StringRef name, MLIRContext *context) {
     // Check the registered info map first. In the overwhelmingly common case,
     // the entry will be in here and it also removes the need to acquire any
     // locks.
-    auto registeredIt = ctxImpl.registeredOperationsByName.find(name);
-    if (LLVM_LIKELY(registeredIt != ctxImpl.registeredOperationsByName.end())) {
+    auto registeredIt = ctxImpl.registeredOperations.find(name);
+    if (LLVM_LIKELY(registeredIt != ctxImpl.registeredOperations.end())) {
       impl = registeredIt->second.impl;
       return;
     }
@@ -912,19 +909,10 @@ OperationName::UnregisteredOpModel::hashProperties(OpaqueProperties prop) {
 //===----------------------------------------------------------------------===//
 
 std::optional<RegisteredOperationName>
-RegisteredOperationName::lookup(TypeID typeID, MLIRContext *ctx) {
-  auto &impl = ctx->getImpl();
-  auto it = impl.registeredOperations.find(typeID);
-  if (it != impl.registeredOperations.end())
-    return it->second;
-  return std::nullopt;
-}
-
-std::optional<RegisteredOperationName>
 RegisteredOperationName::lookup(StringRef name, MLIRContext *ctx) {
   auto &impl = ctx->getImpl();
-  auto it = impl.registeredOperationsByName.find(name);
-  if (it != impl.registeredOperationsByName.end())
+  auto it = impl.registeredOperations.find(name);
+  if (it != impl.registeredOperations.end())
     return it->getValue();
   return std::nullopt;
 }
@@ -957,16 +945,11 @@ void RegisteredOperationName::insert(
 
   // Update the registered info for this operation.
   auto emplaced = ctxImpl.registeredOperations.try_emplace(
-      impl->getTypeID(), RegisteredOperationName(impl));
-  assert(emplaced.second && "operation name registration must be successful");
-  auto emplacedByName = ctxImpl.registeredOperationsByName.try_emplace(
       name, RegisteredOperationName(impl));
-  (void)emplacedByName;
-  assert(emplacedByName.second &&
-         "operation name registration must be successful");
+  assert(emplaced.second && "operation name registration must be successful");
 
   // Add emplaced operation name to the sorted operations container.
-  RegisteredOperationName &value = emplaced.first->second;
+  RegisteredOperationName &value = emplaced.first->getValue();
   ctxImpl.sortedRegisteredOperations.insert(
       llvm::upper_bound(ctxImpl.sortedRegisteredOperations, value,
                         [](auto &lhs, auto &rhs) {
@@ -1013,9 +996,6 @@ StorageUniquer &MLIRContext::getTypeUniquer() { return getImpl().typeUniquer; }
 
 Float8E5M2Type Float8E5M2Type::get(MLIRContext *context) {
   return context->getImpl().f8E5M2Ty;
-}
-Float8E4M3Type Float8E4M3Type::get(MLIRContext *context) {
-  return context->getImpl().f8E4M3Ty;
 }
 Float8E4M3FNType Float8E4M3FNType::get(MLIRContext *context) {
   return context->getImpl().f8E4M3FNTy;

@@ -12,31 +12,30 @@
 #include <algorithm>
 
 namespace Fortran::runtime::io {
-RT_OFFLOAD_API_GROUP_BEGIN
 
-RT_API_ATTRS std::size_t ConnectionState::RemainingSpaceInRecord() const {
+std::size_t ConnectionState::RemainingSpaceInRecord() const {
   auto recl{recordLength.value_or(openRecl.value_or(
       executionEnvironment.listDirectedOutputLineLengthLimit))};
   return positionInRecord >= recl ? 0 : recl - positionInRecord;
 }
 
-RT_API_ATTRS bool ConnectionState::NeedAdvance(std::size_t width) const {
+bool ConnectionState::NeedAdvance(std::size_t width) const {
   return positionInRecord > 0 && width > RemainingSpaceInRecord();
 }
 
-RT_API_ATTRS bool ConnectionState::IsAtEOF() const {
+bool ConnectionState::IsAtEOF() const {
   return endfileRecordNumber && currentRecordNumber >= *endfileRecordNumber;
 }
 
-RT_API_ATTRS bool ConnectionState::IsAfterEndfile() const {
+bool ConnectionState::IsAfterEndfile() const {
   return endfileRecordNumber && currentRecordNumber > *endfileRecordNumber;
 }
 
-RT_API_ATTRS void ConnectionState::HandleAbsolutePosition(std::int64_t n) {
+void ConnectionState::HandleAbsolutePosition(std::int64_t n) {
   positionInRecord = std::max(n, std::int64_t{0}) + leftTabLimit.value_or(0);
 }
 
-RT_API_ATTRS void ConnectionState::HandleRelativePosition(std::int64_t n) {
+void ConnectionState::HandleRelativePosition(std::int64_t n) {
   positionInRecord = std::max(leftTabLimit.value_or(0), positionInRecord + n);
 }
 
@@ -58,6 +57,4 @@ SavedPosition::~SavedPosition() {
     conn.pinnedFrame = saved_.pinnedFrame;
   }
 }
-
-RT_OFFLOAD_API_GROUP_END
 } // namespace Fortran::runtime::io

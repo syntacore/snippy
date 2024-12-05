@@ -25,7 +25,7 @@ public:
 
   const char *getName() const override { return "validate-mem-refs"; }
 
-  Error runOnFunctions(BinaryContext &BC) override;
+  void runOnFunctions(BinaryContext &BC) override;
 
 private:
   bool checkAndFixJTReference(BinaryFunction &BF, MCInst &Inst,

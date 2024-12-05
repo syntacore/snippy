@@ -244,7 +244,7 @@ private:
                             SynthesizedFilenameTok.getEndLoc())
               .toCharRange(SM),
           File, "SearchPath", "RelPath",
-          /*SuggestedModule=*/nullptr, /*ModuleImported=*/false, Inc.FileKind);
+          /*Imported=*/nullptr, Inc.FileKind);
       if (File)
         Delegate->FileSkipped(*File, SynthesizedFilenameTok, Inc.FileKind);
     }
@@ -360,8 +360,7 @@ void applyWarningOptions(llvm::ArrayRef<std::string> ExtraArgs,
   }
 }
 
-std::vector<Diag> getIncludeCleanerDiags(ParsedAST &AST, llvm::StringRef Code,
-                                         const ThreadsafeFS &TFS) {
+std::vector<Diag> getIncludeCleanerDiags(ParsedAST &AST, llvm::StringRef Code) {
   auto &Cfg = Config::current();
   if (Cfg.Diagnostics.SuppressAll)
     return {};
@@ -373,13 +372,12 @@ std::vector<Diag> getIncludeCleanerDiags(ParsedAST &AST, llvm::StringRef Code,
       Cfg.Diagnostics.UnusedIncludes == Config::IncludesPolicy::None;
   if (SuppressMissing && SuppressUnused)
     return {};
-  auto Findings = computeIncludeCleanerFindings(
-      AST, Cfg.Diagnostics.Includes.AnalyzeAngledIncludes);
+  auto Findings = computeIncludeCleanerFindings(AST);
   if (SuppressMissing)
     Findings.MissingIncludes.clear();
   if (SuppressUnused)
     Findings.UnusedIncludes.clear();
-  return issueIncludeCleanerDiagnostics(AST, Code, Findings, TFS,
+  return issueIncludeCleanerDiagnostics(AST, Code, Findings,
                                         Cfg.Diagnostics.Includes.IgnoreHeader);
 }
 
@@ -446,12 +444,6 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
           L->sawDiagnostic(D, Diag);
       });
 
-  // Adjust header search options to load the built module files recorded
-  // in RequiredModules.
-  if (Preamble && Preamble->RequiredModules)
-    Preamble->RequiredModules->adjustHeaderSearchOptions(
-        CI->getHeaderSearchOpts());
-
   std::optional<PreamblePatch> Patch;
   // We might use an ignoring diagnostic consumer if they are going to be
   // dropped later on to not pay for extra latency by processing them.
@@ -465,7 +457,6 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
       std::move(CI), PreamblePCH,
       llvm::MemoryBuffer::getMemBufferCopy(Inputs.Contents, Filename), VFS,
       *DiagConsumer);
-
   if (!Clang) {
     // The last diagnostic contains information about the reason of this
     // failure.
@@ -634,7 +625,7 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
     // (e.g. incomplete type) and attach include insertion fixes to diagnostics.
     if (Inputs.Index && !BuildDir.getError()) {
       auto Style =
-          getFormatStyleForFile(Filename, Inputs.Contents, *Inputs.TFS, false);
+          getFormatStyleForFile(Filename, Inputs.Contents, *Inputs.TFS);
       auto Inserter = std::make_shared<IncludeInserter>(
           Filename, Inputs.Contents, Style, BuildDir.get(),
           &Clang->getPreprocessor().getHeaderSearchInfo());
@@ -750,7 +741,7 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
                    std::move(Clang), std::move(Action), std::move(Tokens),
                    std::move(Macros), std::move(Marks), std::move(ParsedDecls),
                    std::move(Diags), std::move(Includes), std::move(PI));
-  llvm::move(getIncludeCleanerDiags(Result, Inputs.Contents, *Inputs.TFS),
+  llvm::move(getIncludeCleanerDiags(Result, Inputs.Contents),
              std::back_inserter(Result.Diags));
   return std::move(Result);
 }

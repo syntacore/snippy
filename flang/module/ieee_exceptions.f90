@@ -8,9 +8,4 @@
 
 module ieee_exceptions
   use __fortran_ieee_exceptions
-
-  implicit none
-
-  ! Because this MODULE simply re-exports an internal MODULE file,
-  ! we do not use PRIVATE in here.
 end module ieee_exceptions

@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES___QSORTRCOMPARE_T_H
-#define LLVM_LIBC_TYPES___QSORTRCOMPARE_T_H
+#ifndef __LLVM_LIBC_TYPES_QSORTRCOMPARE_T_H__
+#define __LLVM_LIBC_TYPES_QSORTRCOMPARE_T_H__
 
 typedef int (*__qsortrcompare_t)(const void *, const void *, void *);
 
-#endif // LLVM_LIBC_TYPES___QSORTRCOMPARE_T_H
+#endif // __LLVM_LIBC_TYPES_QSORTRCOMPARE_T_H__

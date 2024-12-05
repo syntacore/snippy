@@ -21,7 +21,7 @@ class ThreadExitTestCase(TestBase):
         )
 
         # There should be one (non-main) thread left
-        self.assertEqual(self.process().GetNumThreads(), 1)
+        self.assertEquals(self.process().GetNumThreads(), 1)
 
         # Ensure we can evaluate_expressions in this state
         self.expect_expr("call_me()", result_value="12345")

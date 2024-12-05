@@ -75,7 +75,8 @@ ClangUtilityFunction::~ClangUtilityFunction() = default;
 bool ClangUtilityFunction::Install(DiagnosticManager &diagnostic_manager,
                                    ExecutionContext &exe_ctx) {
   if (m_jit_start_addr != LLDB_INVALID_ADDRESS) {
-    diagnostic_manager.PutString(lldb::eSeverityWarning, "already installed");
+    diagnostic_manager.PutString(eDiagnosticSeverityWarning,
+                                 "already installed");
     return false;
   }
 
@@ -86,21 +87,21 @@ bool ClangUtilityFunction::Install(DiagnosticManager &diagnostic_manager,
   Target *target = exe_ctx.GetTargetPtr();
 
   if (!target) {
-    diagnostic_manager.PutString(lldb::eSeverityError, "invalid target");
+    diagnostic_manager.PutString(eDiagnosticSeverityError, "invalid target");
     return false;
   }
 
   Process *process = exe_ctx.GetProcessPtr();
 
   if (!process) {
-    diagnostic_manager.PutString(lldb::eSeverityError, "invalid process");
+    diagnostic_manager.PutString(eDiagnosticSeverityError, "invalid process");
     return false;
   }
 
   // Since we might need to call allocate memory and maybe call code to make
   // the caller, we need to be stopped.
   if (process->GetState() != lldb::eStateStopped) {
-    diagnostic_manager.PutString(lldb::eSeverityError, "process running");
+    diagnostic_manager.PutString(eDiagnosticSeverityError, "process running");
     return false;
   }
   //////////////////////////
@@ -113,7 +114,7 @@ bool ClangUtilityFunction::Install(DiagnosticManager &diagnostic_manager,
 
   if (!DeclMap()->WillParse(exe_ctx, nullptr)) {
     diagnostic_manager.PutString(
-        lldb::eSeverityError,
+        eDiagnosticSeverityError,
         "current process state is unsuitable for expression parsing");
     return false;
   }
@@ -165,9 +166,9 @@ bool ClangUtilityFunction::Install(DiagnosticManager &diagnostic_manager,
   } else {
     const char *error_cstr = jit_error.AsCString();
     if (error_cstr && error_cstr[0]) {
-      diagnostic_manager.Printf(lldb::eSeverityError, "%s", error_cstr);
+      diagnostic_manager.Printf(eDiagnosticSeverityError, "%s", error_cstr);
     } else {
-      diagnostic_manager.PutString(lldb::eSeverityError,
+      diagnostic_manager.PutString(eDiagnosticSeverityError,
                                    "expression can't be interpreted or run");
     }
     return false;

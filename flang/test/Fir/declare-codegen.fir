@@ -1,7 +1,5 @@
 // Test rewrite of fir.declare. The result is replaced by the memref operand.
-// RUN: fir-opt --cg-rewrite="preserve-declare=true" %s -o - | FileCheck %s --check-prefixes DECL
-// RUN: fir-opt --cg-rewrite="preserve-declare=false" %s -o - | FileCheck %s --check-prefixes NODECL
-// RUN: fir-opt --cg-rewrite %s -o - | FileCheck %s --check-prefixes NODECL
+// RUN: fir-opt --cg-rewrite %s -o - | FileCheck %s
 
 
 func.func @test(%arg0: !fir.ref<!fir.array<12x23xi32>>) {
@@ -17,14 +15,9 @@ func.func @test(%arg0: !fir.ref<!fir.array<12x23xi32>>) {
 func.func private @bar(%arg0: !fir.ref<!fir.array<12x23xi32>>)
 
 
-// NODECL-LABEL: func.func @test(
-// NODECL-SAME: %[[arg0:.*]]: !fir.ref<!fir.array<12x23xi32>>) {
-// NODECL-NEXT: fir.call @bar(%[[arg0]]) : (!fir.ref<!fir.array<12x23xi32>>) -> ()
-
-// DECL-LABEL: func.func @test(
-// DECL-SAME: %[[arg0:.*]]: !fir.ref<!fir.array<12x23xi32>>) {
-// DECL: fircg.ext_declare
-
+// CHECK-LABEL: func.func @test(
+// CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.array<12x23xi32>>) {
+// CHECK-NEXT: fir.call @bar(%[[arg0]]) : (!fir.ref<!fir.array<12x23xi32>>) -> ()
 
 func.func @useless_shape_with_duplicate_extent_operand(%arg0: !fir.ref<!fir.array<3x3xf32>>) {
   %c3 = arith.constant 3 : index
@@ -33,22 +26,5 @@ func.func @useless_shape_with_duplicate_extent_operand(%arg0: !fir.ref<!fir.arra
   return
 }
 
-// NODECL-LABEL: func.func @useless_shape_with_duplicate_extent_operand(
-// NODECL-NEXT: return
-
-// DECL-LABEL: func.func @useless_shape_with_duplicate_extent_operand(
-// DECL: fircg.ext_declare
-
-// Test DCE does not crash because of unreachable code.
-func.func @unreachable_code(%arg0: !fir.ref<!fir.char<1,10>>) {
-  %c10 = arith.constant 10 : index
-  %2 = fir.declare %arg0 typeparams %c10 {uniq_name = "live_code"} : (!fir.ref<!fir.char<1,10>>, index) -> (!fir.ref<!fir.char<1,10>>)
-  return
-^bb2:  // no predecessors
-  %3 = fir.declare %arg0 typeparams %c10 {uniq_name = "dead_code"} : (!fir.ref<!fir.char<1,10>>, index) -> (!fir.ref<!fir.char<1,10>>)
-  fir.unreachable
-}
-// NODECL-LABEL:   func.func @unreachable_code(
-// NODECL-NOT:       uniq_name = "live_code"
-// DECL-LABEL:    func.func @unreachable_code(
-// DECL:             uniq_name = "live_code"
+// CHECK-LABEL: func.func @useless_shape_with_duplicate_extent_operand(
+// CHECK-NEXT: return

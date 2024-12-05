@@ -137,7 +137,7 @@ public:
   }
 
   Value getAOSMemRef() const {
-    const Level cooStart = rType.getAoSCOOStart();
+    const Level cooStart = rType.getCOOStart();
     assert(cooStart < rType.getLvlRank());
     return getMemRefField(SparseTensorFieldKind::CrdMemRef, cooStart);
   }

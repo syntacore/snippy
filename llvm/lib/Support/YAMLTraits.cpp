@@ -120,7 +120,7 @@ bool Input::mapTag(StringRef Tag, bool Default) {
     return Default;
   }
   // Return true iff found tag matches supplied tag.
-  return Tag == foundTag;
+  return Tag.equals(foundTag);
 }
 
 void Input::beginMapping() {
@@ -271,7 +271,7 @@ bool Input::matchEnumScalar(const char *Str, bool) {
   if (ScalarMatchFound)
     return false;
   if (ScalarHNode *SN = dyn_cast<ScalarHNode>(CurrentNode)) {
-    if (SN->value() == Str) {
+    if (SN->value().equals(Str)) {
       ScalarMatchFound = true;
       return true;
     }
@@ -310,7 +310,7 @@ bool Input::bitSetMatch(const char *Str, bool) {
     unsigned Index = 0;
     for (auto &N : SQ->Entries) {
       if (ScalarHNode *SN = dyn_cast<ScalarHNode>(N)) {
-        if (SN->value() == Str) {
+        if (SN->value().equals(Str)) {
           BitValuesUsed[Index] = true;
           return true;
         }
@@ -718,8 +718,40 @@ void Output::scalarString(StringRef &S, QuotingType MustQuote) {
     outputUpToEndOfLine("''");
     return;
   }
-  output(S, MustQuote);
-  outputUpToEndOfLine("");
+  if (MustQuote == QuotingType::None) {
+    // Only quote if we must.
+    outputUpToEndOfLine(S);
+    return;
+  }
+
+  const char *const Quote = MustQuote == QuotingType::Single ? "'" : "\"";
+  output(Quote); // Starting quote.
+
+  // When using double-quoted strings (and only in that case), non-printable characters may be
+  // present, and will be escaped using a variety of unicode-scalar and special short-form
+  // escapes. This is handled in yaml::escape.
+  if (MustQuote == QuotingType::Double) {
+    output(yaml::escape(S, /* EscapePrintable= */ false));
+    outputUpToEndOfLine(Quote);
+    return;
+  }
+
+  unsigned i = 0;
+  unsigned j = 0;
+  unsigned End = S.size();
+  const char *Base = S.data();
+
+  // When using single-quoted strings, any single quote ' must be doubled to be escaped.
+  while (j < End) {
+    if (S[j] == '\'') {                    // Escape quotes.
+      output(StringRef(&Base[i], j - i));  // "flush".
+      output(StringLiteral("''"));         // Print it as ''
+      i = j + 1;
+    }
+    ++j;
+  }
+  output(StringRef(&Base[i], j - i));
+  outputUpToEndOfLine(Quote); // Ending quote.
 }
 
 void Output::blockScalarString(StringRef &S) {
@@ -767,46 +799,6 @@ bool Output::canElideEmptySequence() {
 void Output::output(StringRef s) {
   Column += s.size();
   Out << s;
-}
-
-void Output::output(StringRef S, QuotingType MustQuote) {
-  if (MustQuote == QuotingType::None) {
-    // Only quote if we must.
-    output(S);
-    return;
-  }
-
-  StringLiteral Quote = MustQuote == QuotingType::Single ? StringLiteral("'")
-                                                         : StringLiteral("\"");
-  output(Quote); // Starting quote.
-
-  // When using double-quoted strings (and only in that case), non-printable
-  // characters may be present, and will be escaped using a variety of
-  // unicode-scalar and special short-form escapes. This is handled in
-  // yaml::escape.
-  if (MustQuote == QuotingType::Double) {
-    output(yaml::escape(S, /* EscapePrintable= */ false));
-    output(Quote);
-    return;
-  }
-
-  unsigned i = 0;
-  unsigned j = 0;
-  unsigned End = S.size();
-  const char *Base = S.data();
-
-  // When using single-quoted strings, any single quote ' must be doubled to be
-  // escaped.
-  while (j < End) {
-    if (S[j] == '\'') {                   // Escape quotes.
-      output(StringRef(&Base[i], j - i)); // "flush".
-      output(StringLiteral("''"));        // Print it as ''
-      i = j + 1;
-    }
-    ++j;
-  }
-  output(StringRef(&Base[i], j - i));
-  output(Quote); // Ending quote.
 }
 
 void Output::outputUpToEndOfLine(StringRef s) {
@@ -861,7 +853,7 @@ void Output::newLineCheck(bool EmptySequence) {
 }
 
 void Output::paddedKey(StringRef key) {
-  output(key, needsQuotes(key, false));
+  output(key);
   output(":");
   const char *spaces = "                ";
   if (key.size() < strlen(spaces))
@@ -880,7 +872,7 @@ void Output::flowKey(StringRef Key) {
     Column = ColumnAtMapFlowStart;
     output("  ");
   }
-  output(Key, needsQuotes(Key, false));
+  output(Key);
   output(": ");
 }
 

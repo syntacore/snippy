@@ -6,6 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+// TODO: Investigate
+// UNSUPPORTED: LIBCXX-AIX-FIXME
+
 // QEMU does not detect EOF, when reading from stdin
 // "echo -n" suppresses any characters after the output and so the test hangs.
 // https://gitlab.com/qemu-project/qemu/-/issues/1963
@@ -20,8 +23,7 @@
 // istream cin;
 
 // RUN: %{build}
-// RUN: echo -n 1234 > %t.input
-// RUN: %{exec} %t.exe < %t.input
+// RUN: echo -n 1234 | %{exec} %t.exe
 
 #include <iostream>
 #include <cassert>

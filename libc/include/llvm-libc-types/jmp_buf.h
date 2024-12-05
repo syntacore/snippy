@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_JMP_BUF_H
-#define LLVM_LIBC_TYPES_JMP_BUF_H
+#ifndef __LLVM_LIBC_TYPES_JMP_BUF_H__
+#define __LLVM_LIBC_TYPES_JMP_BUF_H__
 
 typedef struct {
 #ifdef __x86_64__
@@ -32,9 +32,6 @@ typedef struct {
 #elif defined(__riscv_float_abi_single)
 #error "__jmp_buf not available for your target architecture."
 #endif
-#elif defined(__arm__)
-  // r4, r5, r6, r7, r8, r9, r10, r11, r12, lr
-  long opaque[10];
 #else
 #error "__jmp_buf not available for your target architecture."
 #endif
@@ -42,4 +39,4 @@ typedef struct {
 
 typedef __jmp_buf jmp_buf[1];
 
-#endif // LLVM_LIBC_TYPES_JMP_BUF_H
+#endif // __LLVM_LIBC_TYPES_JMP_BUF_H__

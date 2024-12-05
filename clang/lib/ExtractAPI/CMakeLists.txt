@@ -6,6 +6,7 @@ set(LLVM_LINK_COMPONENTS
 add_clang_library(clangExtractAPI
   API.cpp
   APIIgnoresList.cpp
+  AvailabilityInfo.cpp
   ExtractAPIConsumer.cpp
   DeclarationFragments.cpp
   Serialization/SymbolGraphSerializer.cpp
@@ -16,6 +17,5 @@ add_clang_library(clangExtractAPI
   clangBasic
   clangFrontend
   clangIndex
-  clangInstallAPI
   clangLex
   )

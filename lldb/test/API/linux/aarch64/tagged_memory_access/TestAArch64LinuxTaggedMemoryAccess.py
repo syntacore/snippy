@@ -6,6 +6,7 @@ These tests use the top byte ignore feature of AArch64. Which Linux
 always enables.
 """
 
+
 import lldb
 from lldbsuite.test.decorators import *
 from lldbsuite.test.lldbtest import *
@@ -82,6 +83,8 @@ class AArch64LinuxTaggedMemoryReadTestCase(TestBase):
         out = self.res.GetOutput()
         # memory find does not fail when it doesn't find the data.
         # First check we actually got something.
-        self.assertRegex(out, "data found at location: 0x[0-9A-Fa-f]+")
+        self.assertRegexpMatches(out, "data found at location: 0x[0-9A-Fa-f]+")
         # Then that the location found does not display the tag bits.
-        self.assertNotRegex(out, "data found at location: 0x(34|56)[0-9A-Fa-f]+")
+        self.assertNotRegexpMatches(
+            out, "data found at location: 0x(34|56)[0-9A-Fa-f]+"
+        )

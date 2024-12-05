@@ -142,7 +142,7 @@ mlir::transform::HasOperandSatisfyingOp::apply(
     transform::detail::prepareValueMappings(
         yieldedMappings, getBody().front().getTerminator()->getOperands(),
         state);
-    results.setParams(cast<OpResult>(getPosition()),
+    results.setParams(getPosition().cast<OpResult>(),
                       {rewriter.getI32IntegerAttr(operand.getOperandNumber())});
     for (auto &&[result, mapping] : llvm::zip(getResults(), yieldedMappings))
       results.setMappedValues(result, mapping);
@@ -160,13 +160,14 @@ mlir::transform::HasOperandSatisfyingOp::apply(
 void mlir::transform::HasOperandSatisfyingOp::getEffects(
     llvm::SmallVectorImpl<mlir::MemoryEffects::EffectInstance> &effects) {
   onlyReadsPayload(effects);
-  onlyReadsHandle(getOpMutable(), effects);
-  producesHandle(getOperation()->getOpResults(), effects);
+  onlyReadsHandle(getOp(), effects);
+  producesHandle(getPosition(), effects);
+  producesHandle(getResults(), effects);
 }
 
 // Verify well-formedness of the operation and emit diagnostics if it is
 // ill-formed.
-llvm::LogicalResult mlir::transform::HasOperandSatisfyingOp::verify() {
+mlir::LogicalResult mlir::transform::HasOperandSatisfyingOp::verify() {
   mlir::Block &bodyBlock = getBody().front();
   if (bodyBlock.getNumArguments() != 1 ||
       !isa<TransformValueHandleTypeInterface>(

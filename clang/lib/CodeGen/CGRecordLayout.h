@@ -71,7 +71,6 @@ struct CGBitFieldInfo {
   unsigned Size : 15;
 
   /// Whether the bit-field is signed.
-  LLVM_PREFERRED_TYPE(bool)
   unsigned IsSigned : 1;
 
   /// The storage size in bits which should be used when accessing this
@@ -191,10 +190,6 @@ public:
   /// with a zeroinitializer when considered as a base subobject.
   bool isZeroInitializableAsBase() const {
     return IsZeroInitializableAsBase;
-  }
-
-  bool containsFieldDecl(const FieldDecl *FD) const {
-    return FieldInfo.count(FD) != 0;
   }
 
   /// Return llvm::StructType element number that corresponds to the

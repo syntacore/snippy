@@ -13,11 +13,8 @@
 #ifndef MLIR_DIALECT_IRDL_IRDLREGISTRATION_H
 #define MLIR_DIALECT_IRDL_IRDLREGISTRATION_H
 
-namespace llvm {
-struct LogicalResult;
-} // namespace llvm
-
 namespace mlir {
+struct LogicalResult;
 class ModuleOp;
 } // namespace mlir
 
@@ -25,7 +22,7 @@ namespace mlir {
 namespace irdl {
 
 /// Load all the dialects defined in the module.
-llvm::LogicalResult loadDialects(ModuleOp op);
+LogicalResult loadDialects(ModuleOp op);
 
 } // namespace irdl
 } // namespace mlir

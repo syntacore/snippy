@@ -11,12 +11,11 @@
 #include "src/__support/FPUtil/PolyEval.h"
 #include "src/__support/FPUtil/multiply_add.h"
 #include "src/__support/FPUtil/sqrt.h"
-#include "src/__support/macros/config.h"
 #include "src/__support/macros/optimization.h" // LIBC_UNLIKELY
 #include "src/math/generic/common_constants.h"
 #include "src/math/generic/explogxf.h"
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 
 LLVM_LIBC_FUNCTION(float, asinhf, (float x)) {
   using FPBits_t = typename fputil::FPBits<float>;
@@ -60,8 +59,10 @@ LLVM_LIBC_FUNCTION(float, asinhf, (float x)) {
   };
 
   if (LIBC_UNLIKELY(x_abs >= 0x4bdd'65a5U)) {
-    if (LIBC_UNLIKELY(xbits.is_inf_or_nan()))
+    if (LIBC_UNLIKELY(x_abs >= 0x7f80'0000U)) {
+      // x is +-inf or nan
       return x;
+    }
 
     // Exceptional cases when x > 2^24.
     switch (x_abs) {
@@ -98,9 +99,9 @@ LLVM_LIBC_FUNCTION(float, asinhf, (float x)) {
 
   // asinh(x) = log(x + sqrt(x^2 + 1))
   return static_cast<float>(
-      x_sign * log_eval(fputil::multiply_add(
-                   x_d, x_sign,
-                   fputil::sqrt<double>(fputil::multiply_add(x_d, x_d, 1.0)))));
+      x_sign *
+      log_eval(fputil::multiply_add(
+          x_d, x_sign, fputil::sqrt(fputil::multiply_add(x_d, x_d, 1.0)))));
 }
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE

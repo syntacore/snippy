@@ -28,7 +28,7 @@
 #include <__type_traits/decay.h>
 #include <__type_traits/is_core_convertible.h>
 #include <__type_traits/is_scalar.h>
-#include <__type_traits/is_trivially_constructible.h>
+#include <__type_traits/is_trivially_copy_constructible.h>
 #include <__type_traits/is_trivially_destructible.h>
 #include <__type_traits/is_void.h>
 #include <__type_traits/strip_signature.h>
@@ -55,9 +55,7 @@ _LIBCPP_BEGIN_NAMESPACE_STD
 // bad_function_call
 
 _LIBCPP_DIAGNOSTIC_PUSH
-#  if !_LIBCPP_AVAILABILITY_HAS_BAD_FUNCTION_CALL_KEY_FUNCTION
 _LIBCPP_CLANG_DIAGNOSTIC_IGNORED("-Wweak-vtables")
-#  endif
 class _LIBCPP_EXPORTED_FROM_ABI bad_function_call : public exception {
 public:
   _LIBCPP_HIDE_FROM_ABI bad_function_call() _NOEXCEPT                                    = default;
@@ -66,7 +64,7 @@ public:
 // Note that when a key function is not used, every translation unit that uses
 // bad_function_call will end up containing a weak definition of the vtable and
 // typeinfo.
-#  if _LIBCPP_AVAILABILITY_HAS_BAD_FUNCTION_CALL_KEY_FUNCTION
+#  ifdef _LIBCPP_ABI_BAD_FUNCTION_CALL_KEY_FUNCTION
   ~bad_function_call() _NOEXCEPT override;
 #  else
   _LIBCPP_HIDE_FROM_ABI_VIRTUAL ~bad_function_call() _NOEXCEPT override {}
@@ -232,10 +230,10 @@ class _LIBCPP_TEMPLATE_VIS __base;
 
 template <class _Rp, class... _ArgTypes>
 class __base<_Rp(_ArgTypes...)> {
-public:
-  __base(const __base&)            = delete;
-  __base& operator=(const __base&) = delete;
+  __base(const __base&);
+  __base& operator=(const __base&);
 
+public:
   _LIBCPP_HIDE_FROM_ABI __base() {}
   _LIBCPP_HIDE_FROM_ABI_VIRTUAL virtual ~__base() {}
   virtual __base* __clone() const             = 0;
@@ -516,7 +514,7 @@ struct __policy {
   }
 
   _LIBCPP_HIDE_FROM_ABI static const __policy* __create_empty() {
-    static constexpr __policy __policy = {
+    static const _LIBCPP_CONSTEXPR __policy __policy = {
         nullptr,
         nullptr,
         true,
@@ -543,7 +541,7 @@ private:
 
   template <typename _Fun>
   _LIBCPP_HIDE_FROM_ABI static const __policy* __choose_policy(/* is_small = */ false_type) {
-    static constexpr __policy __policy = {
+    static const _LIBCPP_CONSTEXPR __policy __policy = {
         &__large_clone<_Fun>,
         &__large_destroy<_Fun>,
         false,
@@ -558,7 +556,7 @@ private:
 
   template <typename _Fun>
   _LIBCPP_HIDE_FROM_ABI static const __policy* __choose_policy(/* is_small = */ true_type) {
-    static constexpr __policy __policy = {
+    static const _LIBCPP_CONSTEXPR __policy __policy = {
         nullptr,
         nullptr,
         false,
@@ -770,7 +768,7 @@ public:
   {
   }
 
-  _LIBCPP_HIDE_FROM_ABI_VIRTUAL virtual __base<_Rp(_ArgTypes...)>* __clone() const {
+  virtual __base<_Rp(_ArgTypes...)>* __clone() const {
     _LIBCPP_ASSERT_INTERNAL(
         false,
         "Block pointers are just pointers, so they should always fit into "
@@ -779,11 +777,9 @@ public:
     return nullptr;
   }
 
-  _LIBCPP_HIDE_FROM_ABI_VIRTUAL virtual void __clone(__base<_Rp(_ArgTypes...)>* __p) const {
-    ::new ((void*)__p) __func(__f_);
-  }
+  virtual void __clone(__base<_Rp(_ArgTypes...)>* __p) const { ::new ((void*)__p) __func(__f_); }
 
-  _LIBCPP_HIDE_FROM_ABI_VIRTUAL virtual void destroy() _NOEXCEPT {
+  virtual void destroy() _NOEXCEPT {
 #    ifndef _LIBCPP_HAS_OBJC_ARC
     if (__f_)
       _Block_release(__f_);
@@ -791,7 +787,7 @@ public:
     __f_ = 0;
   }
 
-  _LIBCPP_HIDE_FROM_ABI_VIRTUAL virtual void destroy_deallocate() _NOEXCEPT {
+  virtual void destroy_deallocate() _NOEXCEPT {
     _LIBCPP_ASSERT_INTERNAL(
         false,
         "Block pointers are just pointers, so they should always fit into "
@@ -799,20 +795,16 @@ public:
         "never be invoked.");
   }
 
-  _LIBCPP_HIDE_FROM_ABI_VIRTUAL virtual _Rp operator()(_ArgTypes&&... __arg) {
-    return std::__invoke(__f_, std::forward<_ArgTypes>(__arg)...);
-  }
+  virtual _Rp operator()(_ArgTypes&&... __arg) { return std::__invoke(__f_, std::forward<_ArgTypes>(__arg)...); }
 
 #    ifndef _LIBCPP_HAS_NO_RTTI
-  _LIBCPP_HIDE_FROM_ABI_VIRTUAL virtual const void* target(type_info const& __ti) const _NOEXCEPT {
+  virtual const void* target(type_info const& __ti) const _NOEXCEPT {
     if (__ti == typeid(__func::__block_type))
       return &__f_;
     return (const void*)nullptr;
   }
 
-  _LIBCPP_HIDE_FROM_ABI_VIRTUAL virtual const std::type_info& target_type() const _NOEXCEPT {
-    return typeid(__func::__block_type);
-  }
+  virtual const std::type_info& target_type() const _NOEXCEPT { return typeid(__func::__block_type); }
 #    endif // _LIBCPP_HAS_NO_RTTI
 };
 

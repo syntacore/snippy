@@ -1,7 +1,6 @@
-#include "src/__support/macros/config.h"
 #include "str_to_fp_test.h"
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 
 using LlvmLibcStrToFltTest = LlvmLibcStrToFloatTest<float>;
 
@@ -47,7 +46,7 @@ TEST(LlvmLibcStrToFltTest, SimpleDecimalConversionExtraTypes) {
   uint32_t float_output_mantissa = 0;
   uint32_t output_exp2 = 0;
 
-  LIBC_NAMESPACE::libc_errno = 0;
+  libc_errno = 0;
   auto float_result =
       internal::simple_decimal_conversion<float>("123456789012345678900");
   float_output_mantissa = float_result.num.mantissa;
@@ -57,4 +56,4 @@ TEST(LlvmLibcStrToFltTest, SimpleDecimalConversionExtraTypes) {
   EXPECT_EQ(float_result.error, 0);
 }
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE

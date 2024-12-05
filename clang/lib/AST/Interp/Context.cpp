@@ -8,7 +8,9 @@
 
 #include "Context.h"
 #include "ByteCodeEmitter.h"
-#include "Compiler.h"
+#include "ByteCodeExprGen.h"
+#include "ByteCodeGenError.h"
+#include "ByteCodeStmtGen.h"
 #include "EvalEmitter.h"
 #include "Interp.h"
 #include "InterpFrame.h"
@@ -29,96 +31,102 @@ bool Context::isPotentialConstantExpr(State &Parent, const FunctionDecl *FD) {
   assert(Stk.empty());
   Function *Func = P->getFunction(FD);
   if (!Func || !Func->hasBody())
-    Func = Compiler<ByteCodeEmitter>(*this, *P).compileFunc(FD);
-
-  if (!Func)
-    return false;
+    Func = ByteCodeStmtGen<ByteCodeEmitter>(*this, *P).compileFunc(FD);
 
   APValue DummyResult;
-  if (!Run(Parent, Func, DummyResult))
+  if (!Run(Parent, Func, DummyResult)) {
     return false;
+  }
 
   return Func->isConstexpr();
 }
 
 bool Context::evaluateAsRValue(State &Parent, const Expr *E, APValue &Result) {
-  ++EvalID;
-  bool Recursing = !Stk.empty();
-  Compiler<EvalEmitter> C(*this, *P, Parent, Stk);
+  assert(Stk.empty());
+  ByteCodeExprGen<EvalEmitter> C(*this, *P, Parent, Stk, Result);
 
-  auto Res = C.interpretExpr(E, /*ConvertResultToRValue=*/E->isGLValue());
+  auto Res = C.interpretExpr(E);
 
   if (Res.isInvalid()) {
-    C.cleanup();
     Stk.clear();
     return false;
   }
 
-  if (!Recursing) {
-    assert(Stk.empty());
+  assert(Stk.empty());
 #ifndef NDEBUG
-    // Make sure we don't rely on some value being still alive in
-    // InterpStack memory.
-    Stk.clear();
+  // Make sure we don't rely on some value being still alive in
+  // InterpStack memory.
+  Stk.clear();
 #endif
-  }
 
-  Result = Res.toAPValue();
+  // Implicit lvalue-to-rvalue conversion.
+  if (E->isGLValue()) {
+    std::optional<APValue> RValueResult = Res.toRValue();
+    if (!RValueResult) {
+      return false;
+    }
+    Result = *RValueResult;
+  } else {
+    Result = Res.toAPValue();
+  }
 
   return true;
 }
 
 bool Context::evaluate(State &Parent, const Expr *E, APValue &Result) {
-  ++EvalID;
-  bool Recursing = !Stk.empty();
-  Compiler<EvalEmitter> C(*this, *P, Parent, Stk);
+  assert(Stk.empty());
+  ByteCodeExprGen<EvalEmitter> C(*this, *P, Parent, Stk, Result);
 
   auto Res = C.interpretExpr(E);
   if (Res.isInvalid()) {
-    C.cleanup();
     Stk.clear();
     return false;
   }
 
-  if (!Recursing) {
-    assert(Stk.empty());
+  assert(Stk.empty());
 #ifndef NDEBUG
-    // Make sure we don't rely on some value being still alive in
-    // InterpStack memory.
-    Stk.clear();
+  // Make sure we don't rely on some value being still alive in
+  // InterpStack memory.
+  Stk.clear();
 #endif
-  }
-
   Result = Res.toAPValue();
   return true;
 }
 
 bool Context::evaluateAsInitializer(State &Parent, const VarDecl *VD,
                                     APValue &Result) {
-  ++EvalID;
-  bool Recursing = !Stk.empty();
-  Compiler<EvalEmitter> C(*this, *P, Parent, Stk);
+  assert(Stk.empty());
+  ByteCodeExprGen<EvalEmitter> C(*this, *P, Parent, Stk, Result);
 
-  bool CheckGlobalInitialized =
-      shouldBeGloballyIndexed(VD) &&
-      (VD->getType()->isRecordType() || VD->getType()->isArrayType());
-  auto Res = C.interpretDecl(VD, CheckGlobalInitialized);
+  auto Res = C.interpretDecl(VD);
   if (Res.isInvalid()) {
-    C.cleanup();
     Stk.clear();
     return false;
   }
 
-  if (!Recursing) {
-    assert(Stk.empty());
+  assert(Stk.empty());
 #ifndef NDEBUG
-    // Make sure we don't rely on some value being still alive in
-    // InterpStack memory.
-    Stk.clear();
+  // Make sure we don't rely on some value being still alive in
+  // InterpStack memory.
+  Stk.clear();
 #endif
-  }
 
-  Result = Res.toAPValue();
+  // Ensure global variables are fully initialized.
+  if (shouldBeGloballyIndexed(VD) && !Res.isInvalid() &&
+      (VD->getType()->isRecordType() || VD->getType()->isArrayType())) {
+    assert(Res.isLValue());
+
+    if (!Res.checkFullyInitialized(C.getState()))
+      return false;
+
+    // lvalue-to-rvalue conversion.
+    std::optional<APValue> RValueResult = Res.toRValue();
+    if (!RValueResult)
+      return false;
+    Result = *RValueResult;
+
+  } else
+    Result = Res.toAPValue();
   return true;
 }
 
@@ -128,8 +136,7 @@ std::optional<PrimType> Context::classify(QualType T) const {
   if (T->isBooleanType())
     return PT_Bool;
 
-  // We map these to primitive arrays.
-  if (T->isAnyComplexType() || T->isVectorType())
+  if (T->isAnyComplexType())
     return std::nullopt;
 
   if (T->isSignedIntegerOrEnumerationType()) {
@@ -168,23 +175,21 @@ std::optional<PrimType> Context::classify(QualType T) const {
   if (T->isFloatingType())
     return PT_Float;
 
-  if (T->isSpecificBuiltinType(BuiltinType::BoundMember) ||
-      T->isMemberPointerType())
-    return PT_MemberPtr;
-
   if (T->isFunctionPointerType() || T->isFunctionReferenceType() ||
-      T->isFunctionType())
+      T->isFunctionType() || T->isSpecificBuiltinType(BuiltinType::BoundMember))
     return PT_FnPtr;
 
-  if (T->isReferenceType() || T->isPointerType() ||
-      T->isObjCObjectPointerType())
+  if (T->isReferenceType() || T->isPointerType())
     return PT_Ptr;
 
-  if (const auto *AT = T->getAs<AtomicType>())
+  if (const auto *AT = dyn_cast<AtomicType>(T))
     return classify(AT->getValueType());
 
   if (const auto *DT = dyn_cast<DecltypeType>(T))
     return classify(DT->getUnderlyingType());
+
+  if (const auto *DT = dyn_cast<MemberPointerType>(T))
+    return classify(DT->getPointeeType());
 
   return std::nullopt;
 }
@@ -203,8 +208,7 @@ bool Context::Run(State &Parent, const Function *Func, APValue &Result) {
 
   {
     InterpState State(Parent, *P, Stk, *this);
-    State.Current = new InterpFrame(State, Func, /*Caller=*/nullptr, CodePtr(),
-                                    Func->getArgSize());
+    State.Current = new InterpFrame(State, Func, /*Caller=*/nullptr, {});
     if (Interpret(State, Result)) {
       assert(Stk.empty());
       return true;
@@ -218,14 +222,22 @@ bool Context::Run(State &Parent, const Function *Func, APValue &Result) {
   return false;
 }
 
+bool Context::Check(State &Parent, llvm::Expected<bool> &&Flag) {
+  if (Flag)
+    return *Flag;
+  handleAllErrors(Flag.takeError(), [&Parent](ByteCodeGenError &Err) {
+    Parent.FFDiag(Err.getRange().getBegin(),
+                  diag::err_experimental_clang_interp_failed)
+        << Err.getRange();
+  });
+  return false;
+}
+
 // TODO: Virtual bases?
 const CXXMethodDecl *
 Context::getOverridingFunction(const CXXRecordDecl *DynamicDecl,
                                const CXXRecordDecl *StaticDecl,
                                const CXXMethodDecl *InitialFunction) const {
-  assert(DynamicDecl);
-  assert(StaticDecl);
-  assert(InitialFunction);
 
   const CXXRecordDecl *CurRecord = DynamicDecl;
   const CXXMethodDecl *FoundFunction = InitialFunction;
@@ -266,44 +278,9 @@ const Function *Context::getOrCreateFunction(const FunctionDecl *FD) {
     return Func;
 
   if (!Func || WasNotDefined) {
-    if (auto F = Compiler<ByteCodeEmitter>(*this, *P).compileFunc(FD))
+    if (auto F = ByteCodeStmtGen<ByteCodeEmitter>(*this, *P).compileFunc(FD))
       Func = F;
   }
 
   return Func;
-}
-
-unsigned Context::collectBaseOffset(const RecordDecl *BaseDecl,
-                                    const RecordDecl *DerivedDecl) const {
-  assert(BaseDecl);
-  assert(DerivedDecl);
-  const auto *FinalDecl = cast<CXXRecordDecl>(BaseDecl);
-  const RecordDecl *CurDecl = DerivedDecl;
-  const Record *CurRecord = P->getOrCreateRecord(CurDecl);
-  assert(CurDecl && FinalDecl);
-
-  unsigned OffsetSum = 0;
-  for (;;) {
-    assert(CurRecord->getNumBases() > 0);
-    // One level up
-    for (const Record::Base &B : CurRecord->bases()) {
-      const auto *BaseDecl = cast<CXXRecordDecl>(B.Decl);
-
-      if (BaseDecl == FinalDecl || BaseDecl->isDerivedFrom(FinalDecl)) {
-        OffsetSum += B.Offset;
-        CurRecord = B.R;
-        CurDecl = BaseDecl;
-        break;
-      }
-    }
-    if (CurDecl == FinalDecl)
-      break;
-  }
-
-  assert(OffsetSum > 0);
-  return OffsetSum;
-}
-
-const Record *Context::getRecord(const RecordDecl *D) const {
-  return P->getOrCreateRecord(D);
 }

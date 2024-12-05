@@ -648,7 +648,8 @@ ModuleMap::findOrCreateModuleForHeaderInUmbrellaDir(FileEntryRef File) {
       UmbrellaModule = UmbrellaModule->Parent;
 
     if (UmbrellaModule->InferSubmodules) {
-      FileID UmbrellaModuleMap = getModuleMapFileIDForUniquing(UmbrellaModule);
+      OptionalFileEntryRef UmbrellaModuleMap =
+          getModuleMapFileForUniquing(UmbrellaModule);
 
       // Infer submodules for each of the directories we found between
       // the directory of the umbrella header and the directory where
@@ -1020,7 +1021,7 @@ Module *ModuleMap::inferFrameworkModule(DirectoryEntryRef FrameworkDir,
 
   // If the framework has a parent path from which we're allowed to infer
   // a framework module, do so.
-  FileID ModuleMapFID;
+  OptionalFileEntryRef ModuleMapFile;
   if (!Parent) {
     // Determine whether we're allowed to infer a module map.
     bool canInfer = false;
@@ -1059,7 +1060,7 @@ Module *ModuleMap::inferFrameworkModule(DirectoryEntryRef FrameworkDir,
           Attrs.IsExhaustive |= inferred->second.Attrs.IsExhaustive;
           Attrs.NoUndeclaredIncludes |=
               inferred->second.Attrs.NoUndeclaredIncludes;
-          ModuleMapFID = inferred->second.ModuleMapFID;
+          ModuleMapFile = inferred->second.ModuleMapFile;
         }
       }
     }
@@ -1068,7 +1069,7 @@ Module *ModuleMap::inferFrameworkModule(DirectoryEntryRef FrameworkDir,
     if (!canInfer)
       return nullptr;
   } else {
-    ModuleMapFID = getModuleMapFileIDForUniquing(Parent);
+    ModuleMapFile = getModuleMapFileForUniquing(Parent);
   }
 
   // Look for an umbrella header.
@@ -1085,7 +1086,7 @@ Module *ModuleMap::inferFrameworkModule(DirectoryEntryRef FrameworkDir,
   Module *Result = new Module(ModuleName, SourceLocation(), Parent,
                               /*IsFramework=*/true, /*IsExplicit=*/false,
                               NumCreatedModules++);
-  InferredModuleAllowedBy[Result] = ModuleMapFID;
+  InferredModuleAllowedBy[Result] = ModuleMapFile;
   Result->IsInferred = true;
   if (!Parent) {
     if (LangOpts.CurrentModule == ModuleName)
@@ -1306,34 +1307,28 @@ void ModuleMap::addHeader(Module *Mod, Module::Header Header,
     Cb->moduleMapAddHeader(Header.Entry.getName());
 }
 
-FileID ModuleMap::getContainingModuleMapFileID(const Module *Module) const {
-  if (Module->DefinitionLoc.isInvalid())
-    return {};
-
-  return SourceMgr.getFileID(Module->DefinitionLoc);
-}
-
 OptionalFileEntryRef
 ModuleMap::getContainingModuleMapFile(const Module *Module) const {
-  return SourceMgr.getFileEntryRefForID(getContainingModuleMapFileID(Module));
-}
+  if (Module->DefinitionLoc.isInvalid())
+    return std::nullopt;
 
-FileID ModuleMap::getModuleMapFileIDForUniquing(const Module *M) const {
-  if (M->IsInferred) {
-    assert(InferredModuleAllowedBy.count(M) && "missing inferred module map");
-    return InferredModuleAllowedBy.find(M)->second;
-  }
-  return getContainingModuleMapFileID(M);
+  return SourceMgr.getFileEntryRefForID(
+      SourceMgr.getFileID(Module->DefinitionLoc));
 }
 
 OptionalFileEntryRef
 ModuleMap::getModuleMapFileForUniquing(const Module *M) const {
-  return SourceMgr.getFileEntryRefForID(getModuleMapFileIDForUniquing(M));
+  if (M->IsInferred) {
+    assert(InferredModuleAllowedBy.count(M) && "missing inferred module map");
+    return InferredModuleAllowedBy.find(M)->second;
+  }
+  return getContainingModuleMapFile(M);
 }
 
-void ModuleMap::setInferredModuleAllowedBy(Module *M, FileID ModMapFID) {
+void ModuleMap::setInferredModuleAllowedBy(Module *M,
+                                           OptionalFileEntryRef ModMap) {
   assert(M->IsInferred && "module not inferred");
-  InferredModuleAllowedBy[M] = ModMapFID;
+  InferredModuleAllowedBy[M] = ModMap;
 }
 
 std::error_code
@@ -1522,7 +1517,7 @@ namespace clang {
     ModuleMap &Map;
 
     /// The current module map file.
-    FileID ModuleMapFID;
+    FileEntryRef ModuleMapFile;
 
     /// Source location of most recent parsed module declaration
     SourceLocation CurrModuleDeclLoc;
@@ -1590,12 +1585,13 @@ namespace clang {
     bool parseOptionalAttributes(Attributes &Attrs);
 
   public:
-    ModuleMapParser(Lexer &L, SourceManager &SourceMgr,
-                    const TargetInfo *Target, DiagnosticsEngine &Diags,
-                    ModuleMap &Map, FileID ModuleMapFID,
-                    DirectoryEntryRef Directory, bool IsSystem)
+    explicit ModuleMapParser(Lexer &L, SourceManager &SourceMgr,
+                             const TargetInfo *Target, DiagnosticsEngine &Diags,
+                             ModuleMap &Map, FileEntryRef ModuleMapFile,
+                             DirectoryEntryRef Directory, bool IsSystem)
         : L(L), SourceMgr(SourceMgr), Target(Target), Diags(Diags), Map(Map),
-          ModuleMapFID(ModuleMapFID), Directory(Directory), IsSystem(IsSystem) {
+          ModuleMapFile(ModuleMapFile), Directory(Directory),
+          IsSystem(IsSystem) {
       Tok.clear();
       consumeToken();
     }
@@ -2015,13 +2011,11 @@ void ModuleMapParser::parseModuleDecl() {
     }
 
     if (TopLevelModule &&
-        ModuleMapFID != Map.getContainingModuleMapFileID(TopLevelModule)) {
-      assert(ModuleMapFID !=
-                 Map.getModuleMapFileIDForUniquing(TopLevelModule) &&
+        ModuleMapFile != Map.getContainingModuleMapFile(TopLevelModule)) {
+      assert(ModuleMapFile != Map.getModuleMapFileForUniquing(TopLevelModule) &&
              "submodule defined in same file as 'module *' that allowed its "
              "top-level module");
-      Map.addAdditionalModuleMapFile(
-          TopLevelModule, *SourceMgr.getFileEntryRefForID(ModuleMapFID));
+      Map.addAdditionalModuleMapFile(TopLevelModule, ModuleMapFile);
     }
   }
 
@@ -2126,8 +2120,7 @@ void ModuleMapParser::parseModuleDecl() {
     ActiveModule->NoUndeclaredIncludes = true;
   ActiveModule->Directory = Directory;
 
-  StringRef MapFileName(
-      SourceMgr.getFileEntryRefForID(ModuleMapFID)->getName());
+  StringRef MapFileName(ModuleMapFile.getName());
   if (MapFileName.ends_with("module.private.modulemap") ||
       MapFileName.ends_with("module_private.map")) {
     ActiveModule->ModuleMapIsPrivate = true;
@@ -2913,7 +2906,7 @@ void ModuleMapParser::parseInferredModuleDecl(bool Framework, bool Explicit) {
     // We'll be inferring framework modules for this directory.
     Map.InferredDirectories[Directory].InferModules = true;
     Map.InferredDirectories[Directory].Attrs = Attrs;
-    Map.InferredDirectories[Directory].ModuleMapFID = ModuleMapFID;
+    Map.InferredDirectories[Directory].ModuleMapFile = ModuleMapFile;
     // FIXME: Handle the 'framework' keyword.
   }
 
@@ -3146,7 +3139,8 @@ bool ModuleMap::parseModuleMapFile(FileEntryRef File, bool IsSystem,
           Buffer->getBufferStart() + (Offset ? *Offset : 0),
           Buffer->getBufferEnd());
   SourceLocation Start = L.getSourceLocation();
-  ModuleMapParser Parser(L, SourceMgr, Target, Diags, *this, ID, Dir, IsSystem);
+  ModuleMapParser Parser(L, SourceMgr, Target, Diags, *this, File, Dir,
+                         IsSystem);
   bool Result = Parser.parseModuleMapFile();
   ParsedModuleMap[File] = Result;
 

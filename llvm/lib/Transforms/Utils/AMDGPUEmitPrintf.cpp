@@ -18,7 +18,6 @@
 #include "llvm/ADT/SparseBitVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Analysis/ValueTracking.h"
-#include "llvm/IR/Module.h"
 #include "llvm/Support/DataExtractor.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/MathExtras.h"
@@ -154,11 +153,12 @@ static Value *getStrlenWithNull(IRBuilder<> &Builder, Value *Str) {
 static Value *callAppendStringN(IRBuilder<> &Builder, Value *Desc, Value *Str,
                                 Value *Length, bool isLast) {
   auto Int64Ty = Builder.getInt64Ty();
-  auto IsLastInt32 = Builder.getInt32(isLast);
+  auto PtrTy = Builder.getPtrTy();
+  auto Int32Ty = Builder.getInt32Ty();
   auto M = Builder.GetInsertBlock()->getModule();
   auto Fn = M->getOrInsertFunction("__ockl_printf_append_string_n", Int64Ty,
-                                   Desc->getType(), Str->getType(),
-                                   Length->getType(), IsLastInt32->getType());
+                                   Int64Ty, PtrTy, Int64Ty, Int32Ty);
+  auto IsLastInt32 = Builder.getInt32(isLast);
   return Builder.CreateCall(Fn, {Desc, Str, Length, IsLastInt32});
 }
 
@@ -351,7 +351,7 @@ static void processConstantStringArg(StringData *SD, IRBuilder<> &Builder,
 }
 
 static Value *processNonStringArg(Value *Arg, IRBuilder<> &Builder) {
-  const DataLayout &DL = Builder.GetInsertBlock()->getDataLayout();
+  const DataLayout &DL = Builder.GetInsertBlock()->getModule()->getDataLayout();
   auto Ty = Arg->getType();
 
   if (auto IntTy = dyn_cast<IntegerType>(Ty)) {
@@ -408,7 +408,9 @@ callBufferedPrintfArgPush(IRBuilder<> &Builder, ArrayRef<Value *> Args,
       WhatToStore.push_back(processNonStringArg(Args[i], Builder));
     }
 
-    for (Value *toStore : WhatToStore) {
+    for (unsigned I = 0, E = WhatToStore.size(); I != E; ++I) {
+      Value *toStore = WhatToStore[I];
+
       StoreInst *StBuff = Builder.CreateStore(toStore, PtrToStore);
       LLVM_DEBUG(dbgs() << "inserting store to printf buffer:" << *StBuff
                         << '\n');

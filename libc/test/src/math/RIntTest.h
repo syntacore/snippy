@@ -9,16 +9,15 @@
 #ifndef LLVM_LIBC_TEST_SRC_MATH_RINTTEST_H
 #define LLVM_LIBC_TEST_SRC_MATH_RINTTEST_H
 
-#include "src/__support/CPP/algorithm.h"
 #include "src/__support/FPUtil/FEnvImpl.h"
 #include "src/__support/FPUtil/FPBits.h"
-#include "test/UnitTest/FEnvSafeTest.h"
 #include "test/UnitTest/FPMatcher.h"
 #include "test/UnitTest/Test.h"
 #include "utils/MPFRWrapper/MPFRUtils.h"
 
-#include "hdr/fenv_macros.h"
-#include "hdr/math_macros.h"
+#include <fenv.h>
+#include <math.h>
+#include <stdio.h>
 
 namespace mpfr = LIBC_NAMESPACE::testing::mpfr;
 
@@ -26,19 +25,20 @@ static constexpr int ROUNDING_MODES[4] = {FE_UPWARD, FE_DOWNWARD, FE_TOWARDZERO,
                                           FE_TONEAREST};
 
 template <typename T>
-class RIntTestTemplate : public LIBC_NAMESPACE::testing::FEnvSafeTest {
+class RIntTestTemplate : public LIBC_NAMESPACE::testing::Test {
 public:
   typedef T (*RIntFunc)(T);
 
 private:
   using FPBits = LIBC_NAMESPACE::fputil::FPBits<T>;
   using StorageType = typename FPBits::StorageType;
+  using Sign = LIBC_NAMESPACE::fputil::Sign;
 
   const T inf = FPBits::inf(Sign::POS).get_val();
   const T neg_inf = FPBits::inf(Sign::NEG).get_val();
   const T zero = FPBits::zero(Sign::POS).get_val();
   const T neg_zero = FPBits::zero(Sign::NEG).get_val();
-  const T nan = FPBits::quiet_nan().get_val();
+  const T nan = FPBits::build_quiet_nan().get_val();
 
   static constexpr StorageType MIN_SUBNORMAL =
       FPBits::min_subnormal().uintval();
@@ -101,10 +101,8 @@ public:
   }
 
   void testSubnormalRange(RIntFunc func) {
-    constexpr int COUNT = 100'001;
-    constexpr StorageType STEP = LIBC_NAMESPACE::cpp::max(
-        static_cast<StorageType>((MAX_SUBNORMAL - MIN_SUBNORMAL) / COUNT),
-        StorageType(1));
+    constexpr StorageType COUNT = 100'001;
+    constexpr StorageType STEP = (MAX_SUBNORMAL - MIN_SUBNORMAL) / COUNT;
     for (StorageType i = MIN_SUBNORMAL; i <= MAX_SUBNORMAL; i += STEP) {
       T x = FPBits(i).get_val();
       for (int mode : ROUNDING_MODES) {
@@ -116,17 +114,15 @@ public:
   }
 
   void testNormalRange(RIntFunc func) {
-    constexpr int COUNT = 100'001;
-    constexpr StorageType STEP = LIBC_NAMESPACE::cpp::max(
-        static_cast<StorageType>((MAX_NORMAL - MIN_NORMAL) / COUNT),
-        StorageType(1));
+    constexpr StorageType COUNT = 100'001;
+    constexpr StorageType STEP = (MAX_NORMAL - MIN_NORMAL) / COUNT;
     for (StorageType i = MIN_NORMAL; i <= MAX_NORMAL; i += STEP) {
-      FPBits xbits(i);
-      T x = xbits.get_val();
+      T x = FPBits(i).get_val();
       // In normal range on x86 platforms, the long double implicit 1 bit can be
       // zero making the numbers NaN. We will skip them.
-      if (xbits.is_nan())
+      if (isnan(x)) {
         continue;
+      }
 
       for (int mode : ROUNDING_MODES) {
         LIBC_NAMESPACE::fputil::set_round(mode);

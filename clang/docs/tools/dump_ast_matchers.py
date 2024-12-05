@@ -116,8 +116,6 @@ def strip_doxygen(comment):
 
 def unify_arguments(args):
     """Gets rid of anything the user doesn't care about in the argument list."""
-    args = re.sub(r"clang::ast_matchers::internal::", r"", args)
-    args = re.sub(r"ast_matchers::internal::", r"", args)
     args = re.sub(r"internal::", r"", args)
     args = re.sub(r"extern const\s+(.*)&", r"\1 ", args)
     args = re.sub(r"&", r" ", args)

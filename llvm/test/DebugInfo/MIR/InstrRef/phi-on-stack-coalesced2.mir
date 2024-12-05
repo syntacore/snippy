@@ -71,7 +71,6 @@ liveins:
   - { reg: '$esi', virtual-reg: '%2' }
 frameInfo:
   maxAlignment:    1
-  adjustsStack:    true
   hasCalls:        true
 machineFunctionInfo: {}
 body:             |

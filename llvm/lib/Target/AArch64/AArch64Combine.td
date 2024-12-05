@@ -52,19 +52,6 @@ def ext_uaddv_to_uaddlv : GICombineRule<
   (apply [{ applyExtUaddvToUaddlv(*${root}, MRI, B, Observer, ${matchinfo}); }])
 >;
 
-class push_opcode_through_ext<Instruction opcode, Instruction extOpcode> : GICombineRule <
-  (defs root:$root),
-  (match (extOpcode $ext1, $src1):$ExtMI,
-         (extOpcode $ext2, $src2),
-         (opcode $dst, $ext1, $ext2):$root,
-         [{ return matchPushAddSubExt(*${root}, MRI, ${dst}.getReg(), ${src1}.getReg(), ${src2}.getReg()); }]),
-  (apply [{ applyPushAddSubExt(*${root}, MRI, B, ${ExtMI}->getOpcode() == TargetOpcode::G_SEXT, ${dst}.getReg(), ${src1}.getReg(), ${src2}.getReg()); }])>;
-
-def push_sub_through_zext : push_opcode_through_ext<G_SUB, G_ZEXT>;
-def push_add_through_zext : push_opcode_through_ext<G_ADD, G_ZEXT>;
-def push_sub_through_sext : push_opcode_through_ext<G_SUB, G_SEXT>;
-def push_add_through_sext : push_opcode_through_ext<G_ADD, G_SEXT>;
-
 def AArch64PreLegalizerCombiner: GICombiner<
   "AArch64PreLegalizerCombinerImpl", [all_combines,
                                       fconstant_to_constant,
@@ -72,11 +59,7 @@ def AArch64PreLegalizerCombiner: GICombiner<
                                       fold_global_offset,
                                       shuffle_to_extract,
                                       ext_addv_to_udot_addv,
-                                      ext_uaddv_to_uaddlv,
-                                      push_sub_through_zext,
-                                      push_add_through_zext,
-                                      push_sub_through_sext,
-                                      push_add_through_sext]> {
+                                      ext_uaddv_to_uaddlv]> {
   let CombineAllMethodName = "tryCombineAllImpl";
 }
 
@@ -131,13 +114,6 @@ def ext: GICombineRule <
   (apply [{ applyEXT(*${root}, ${matchinfo}); }])
 >;
 
-def insertelt_nonconst: GICombineRule <
-  (defs root:$root, shuffle_matchdata:$matchinfo),
-  (match (wip_match_opcode G_INSERT_VECTOR_ELT):$root,
-         [{ return matchNonConstInsert(*${root}, MRI); }]),
-  (apply [{ applyNonConstInsert(*${root}, MRI, B); }])
->;
-
 def shuf_to_ins_matchdata : GIDefMatchData<"std::tuple<Register, int, Register, int>">;
 def shuf_to_ins: GICombineRule <
   (defs root:$root, shuf_to_ins_matchdata:$matchinfo),
@@ -164,7 +140,8 @@ def form_duplane : GICombineRule <
 >;
 
 def shuffle_vector_lowering : GICombineGroup<[dup, rev, ext, zip, uzp, trn,
-                                              form_duplane, shuf_to_ins]>;
+                                              form_duplane,
+                                              shuf_to_ins]>;
 
 // Turn G_UNMERGE_VALUES -> G_EXTRACT_VECTOR_ELT's
 def vector_unmerge_lowering : GICombineRule <
@@ -282,14 +259,6 @@ def or_to_bsp: GICombineRule <
   (apply [{ applyOrToBSP(*${root}, MRI, B, ${matchinfo}); }])
 >;
 
-// Combines Mul(And(Srl(X, 15), 0x10001), 0xffff) into CMLTz
-def combine_mul_cmlt : GICombineRule<
-  (defs root:$root, register_matchinfo:$matchinfo),
-  (match (wip_match_opcode G_MUL):$root,
-        [{ return matchCombineMulCMLT(*${root}, MRI, ${matchinfo}); }]),
-  (apply [{ applyCombineMulCMLT(*${root}, MRI, B, ${matchinfo}); }])
->;
-
 // Post-legalization combines which should happen at all optimization levels.
 // (E.g. ones that facilitate matching for the selector) For example, matching
 // pseudos.
@@ -300,7 +269,7 @@ def AArch64PostLegalizerLowering
                         lower_vector_fcmp, form_truncstore,
                         vector_sext_inreg_to_shift,
                         unmerge_ext_to_unmerge, lower_mull,
-                        vector_unmerge_lowering, insertelt_nonconst]> {
+                        vector_unmerge_lowering]> {
 }
 
 // Post-legalization combines which are primarily optimizations.
@@ -319,8 +288,5 @@ def AArch64PostLegalizerCombiner
                         constant_fold_binops, identity_combines,
                         ptr_add_immed_chain, overlapping_and,
                         split_store_zero_128, undef_combines,
-                        select_to_minmax, or_to_bsp, combine_concat_vector,
-                        commute_constant_to_rhs,
-                        push_freeze_to_prevent_poison_from_propagating,
-                        combine_mul_cmlt]> {
+                        select_to_minmax, or_to_bsp]> {
 }

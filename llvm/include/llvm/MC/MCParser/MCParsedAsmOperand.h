@@ -15,7 +15,6 @@
 
 namespace llvm {
 
-class MCRegister;
 class raw_ostream;
 
 /// MCParsedAsmOperand - This abstract class represents a source-level assembly
@@ -58,7 +57,7 @@ public:
   virtual bool isImm() const = 0;
   /// isReg - Is this a register operand?
   virtual bool isReg() const = 0;
-  virtual MCRegister getReg() const = 0;
+  virtual unsigned getReg() const = 0;
 
   /// isMem - Is this a memory operand?
   virtual bool isMem() const = 0;

@@ -16,4 +16,3 @@ class TestCase(TestBase):
         # Verify specified class alignments.
         self.expect_expr("alignof(B2)", result_value="8")
         self.expect_expr("alignof(EmptyClassAlign8)", result_value="8")
-        self.expect_expr("alignof(Derived)", result_value="8")

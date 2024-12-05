@@ -5,8 +5,13 @@ from lldbsuite.test import lldbutil
 
 
 class TestWithLimitDebugInfo(TestBase):
-    def _run_test(self, build_dict):
-        self.build(dictionary=build_dict)
+    @add_test_categories(["dwarf", "dwo"])
+    def test_limit_debug_info(self):
+        self.build()
+
+        src_file = os.path.join(self.getSourceDir(), "main.cpp")
+        src_file_spec = lldb.SBFileSpec(src_file)
+        self.assertTrue(src_file_spec.IsValid(), "breakpoint file")
 
         # Get the path of the executable
         exe_path = self.getBuildArtifact("a.out")
@@ -16,11 +21,9 @@ class TestWithLimitDebugInfo(TestBase):
         self.assertTrue(target.IsValid(), VALID_TARGET)
 
         # Break on main function
-        lldbutil.run_break_set_by_file_and_line(
-            self, "derived.h", line_number("derived.h", "// break1")
-        )
-        lldbutil.run_break_set_by_file_and_line(
-            self, "derived.h", line_number("derived.h", "// break2")
+        breakpoint = target.BreakpointCreateBySourceRegex("break here", src_file_spec)
+        self.assertTrue(
+            breakpoint.IsValid() and breakpoint.GetNumLocations() >= 1, VALID_BREAKPOINT
         )
 
         # Launch the process
@@ -29,23 +32,14 @@ class TestWithLimitDebugInfo(TestBase):
 
         # Get the thread of the process
         self.assertEqual(process.GetState(), lldb.eStateStopped, PROCESS_STOPPED)
+        thread = lldbutil.get_stopped_thread(process, lldb.eStopReasonBreakpoint)
+        thread.StepInto()
+
+        # Get frame for current thread
+        frame = thread.GetSelectedFrame()
 
         self.expect_expr("1", result_type="int", result_value="1")
-        self.expect_expr("this", result_type="Foo *")
-        self.expect_expr("this->x", result_type="int", result_value="12345")
 
-        self.runCmd("continue")
-
-        self.expect_expr("1", result_type="int", result_value="1")
-        self.expect_expr("this", result_type="ns::Foo2 *")
-        self.expect_expr("this->x", result_type="int", result_value="23456")
-
-    @add_test_categories(["dwarf", "dwo"])
-    def test_default(self):
-        self._run_test(dict(CFLAGS_EXTRAS="$(LIMIT_DEBUG_INFO_FLAGS)"))
-
-    @add_test_categories(["dwarf", "dwo"])
-    def test_debug_names(self):
-        self._run_test(
-            dict(CFLAGS_EXTRAS="$(LIMIT_DEBUG_INFO_FLAGS) -gdwarf-5 -gpubnames")
-        )
+        v2 = frame.EvaluateExpression("this")
+        self.assertTrue(v2.IsValid(), "'expr this' results in a valid SBValue object")
+        self.assertSuccess(v2.GetError(), "'expr this' succeeds without an error.")

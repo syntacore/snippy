@@ -90,11 +90,11 @@ public:
 
   ~LibcxxStdAtomicSyntheticFrontEnd() override = default;
 
-  llvm::Expected<uint32_t> CalculateNumChildren() override;
+  size_t CalculateNumChildren() override;
 
-  lldb::ValueObjectSP GetChildAtIndex(uint32_t idx) override;
+  lldb::ValueObjectSP GetChildAtIndex(size_t idx) override;
 
-  lldb::ChildCacheState Update() override;
+  bool Update() override;
 
   bool MightHaveChildren() override;
 
@@ -110,13 +110,12 @@ lldb_private::formatters::LibcxxStdAtomicSyntheticFrontEnd::
     LibcxxStdAtomicSyntheticFrontEnd(lldb::ValueObjectSP valobj_sp)
     : SyntheticChildrenFrontEnd(*valobj_sp) {}
 
-lldb::ChildCacheState
-lldb_private::formatters::LibcxxStdAtomicSyntheticFrontEnd::Update() {
+bool lldb_private::formatters::LibcxxStdAtomicSyntheticFrontEnd::Update() {
   ValueObjectSP atomic_value = GetLibCxxAtomicValue(m_backend);
   if (atomic_value)
     m_real_child = GetLibCxxAtomicValue(m_backend).get();
 
-  return lldb::ChildCacheState::eRefetch;
+  return false;
 }
 
 bool lldb_private::formatters::LibcxxStdAtomicSyntheticFrontEnd::
@@ -124,14 +123,14 @@ bool lldb_private::formatters::LibcxxStdAtomicSyntheticFrontEnd::
   return true;
 }
 
-llvm::Expected<uint32_t> lldb_private::formatters::
-    LibcxxStdAtomicSyntheticFrontEnd::CalculateNumChildren() {
+size_t lldb_private::formatters::LibcxxStdAtomicSyntheticFrontEnd::
+    CalculateNumChildren() {
   return m_real_child ? 1 : 0;
 }
 
 lldb::ValueObjectSP
 lldb_private::formatters::LibcxxStdAtomicSyntheticFrontEnd::GetChildAtIndex(
-    uint32_t idx) {
+    size_t idx) {
   if (idx == 0)
     return m_real_child->GetSP()->Clone(ConstString("Value"));
   return nullptr;

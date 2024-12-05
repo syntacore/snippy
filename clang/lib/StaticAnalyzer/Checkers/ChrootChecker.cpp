@@ -43,8 +43,7 @@ class ChrootChecker : public Checker<eval::Call, check::PreCall> {
   // This bug refers to possibly break out of a chroot() jail.
   const BugType BT_BreakJail{this, "Break out of jail"};
 
-  const CallDescription Chroot{CDM::CLibrary, {"chroot"}, 1},
-      Chdir{CDM::CLibrary, {"chdir"}, 1};
+  const CallDescription Chroot{{"chroot"}, 1}, Chdir{{"chdir"}, 1};
 
 public:
   ChrootChecker() {}

@@ -8,7 +8,6 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Analysis/CFG.h"
-#include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
@@ -21,23 +20,23 @@ using namespace llvm;
 /// invalidating the SSA information for the value.  It returns the pointer to
 /// the alloca inserted to create a stack slot for I.
 AllocaInst *llvm::DemoteRegToStack(Instruction &I, bool VolatileLoads,
-                                   std::optional<BasicBlock::iterator> AllocaPoint) {
+                                   Instruction *AllocaPoint) {
   if (I.use_empty()) {
     I.eraseFromParent();
     return nullptr;
   }
 
   Function *F = I.getParent()->getParent();
-  const DataLayout &DL = F->getDataLayout();
+  const DataLayout &DL = F->getParent()->getDataLayout();
 
   // Create a stack slot to hold the value.
   AllocaInst *Slot;
   if (AllocaPoint) {
     Slot = new AllocaInst(I.getType(), DL.getAllocaAddrSpace(), nullptr,
-                          I.getName()+".reg2mem", *AllocaPoint);
+                          I.getName()+".reg2mem", AllocaPoint);
   } else {
     Slot = new AllocaInst(I.getType(), DL.getAllocaAddrSpace(), nullptr,
-                          I.getName() + ".reg2mem", F->getEntryBlock().begin());
+                          I.getName() + ".reg2mem", &F->getEntryBlock().front());
   }
 
   // We cannot demote invoke instructions to the stack if their normal edge
@@ -50,15 +49,6 @@ AllocaInst *llvm::DemoteRegToStack(Instruction &I, bool VolatileLoads,
       BasicBlock *BB = SplitCriticalEdge(II, SuccNum);
       assert(BB && "Unable to split critical edge.");
       (void)BB;
-    }
-  } else if (CallBrInst *CBI = dyn_cast<CallBrInst>(&I)) {
-    for (unsigned i = 0; i < CBI->getNumSuccessors(); i++) {
-      auto *Succ = CBI->getSuccessor(i);
-      if (!Succ->getSinglePredecessor()) {
-        assert(isCriticalEdge(II, i) && "Expected a critical edge!");
-        [[maybe_unused]] BasicBlock *BB = SplitCriticalEdge(II, i);
-        assert(BB && "Unable to split critical edge.");
-      }
     }
   }
 
@@ -83,7 +73,7 @@ AllocaInst *llvm::DemoteRegToStack(Instruction &I, bool VolatileLoads,
             // Insert the load into the predecessor block
             V = new LoadInst(I.getType(), Slot, I.getName() + ".reload",
                              VolatileLoads,
-                             PN->getIncomingBlock(i)->getTerminator()->getIterator());
+                             PN->getIncomingBlock(i)->getTerminator());
             Loads[PN->getIncomingBlock(i)] = V;
           }
           PN->setIncomingValue(i, V);
@@ -92,7 +82,7 @@ AllocaInst *llvm::DemoteRegToStack(Instruction &I, bool VolatileLoads,
     } else {
       // If this is a normal instruction, just insert a load.
       Value *V = new LoadInst(I.getType(), Slot, I.getName() + ".reload",
-                              VolatileLoads, U->getIterator());
+                              VolatileLoads, U);
       U->replaceUsesOfWith(&I, V);
     }
   }
@@ -109,44 +99,39 @@ AllocaInst *llvm::DemoteRegToStack(Instruction &I, bool VolatileLoads,
         break;
     if (isa<CatchSwitchInst>(InsertPt)) {
       for (BasicBlock *Handler : successors(&*InsertPt))
-        new StoreInst(&I, Slot, Handler->getFirstInsertionPt());
+        new StoreInst(&I, Slot, &*Handler->getFirstInsertionPt());
       return Slot;
     }
-  } else if (InvokeInst *II = dyn_cast<InvokeInst>(&I)) {
-    InsertPt = II->getNormalDest()->getFirstInsertionPt();
-  } else if (CallBrInst *CBI = dyn_cast<CallBrInst>(&I)) {
-    for (BasicBlock *Succ : successors(CBI))
-      new StoreInst(CBI, Slot, Succ->getFirstInsertionPt());
-    return Slot;
   } else {
-    llvm_unreachable("Unsupported terminator for Reg2Mem");
+    InvokeInst &II = cast<InvokeInst>(I);
+    InsertPt = II.getNormalDest()->getFirstInsertionPt();
   }
 
-  new StoreInst(&I, Slot, InsertPt);
+  new StoreInst(&I, Slot, &*InsertPt);
   return Slot;
 }
 
 /// DemotePHIToStack - This function takes a virtual register computed by a PHI
 /// node and replaces it with a slot in the stack frame allocated via alloca.
 /// The PHI node is deleted. It returns the pointer to the alloca inserted.
-AllocaInst *llvm::DemotePHIToStack(PHINode *P, std::optional<BasicBlock::iterator> AllocaPoint) {
+AllocaInst *llvm::DemotePHIToStack(PHINode *P, Instruction *AllocaPoint) {
   if (P->use_empty()) {
     P->eraseFromParent();
     return nullptr;
   }
 
-  const DataLayout &DL = P->getDataLayout();
+  const DataLayout &DL = P->getModule()->getDataLayout();
 
   // Create a stack slot to hold the value.
   AllocaInst *Slot;
   if (AllocaPoint) {
     Slot = new AllocaInst(P->getType(), DL.getAllocaAddrSpace(), nullptr,
-                          P->getName()+".reg2mem", *AllocaPoint);
+                          P->getName()+".reg2mem", AllocaPoint);
   } else {
     Function *F = P->getParent()->getParent();
     Slot = new AllocaInst(P->getType(), DL.getAllocaAddrSpace(), nullptr,
                           P->getName() + ".reg2mem",
-                          F->getEntryBlock().begin());
+                          &F->getEntryBlock().front());
   }
 
   // Iterate over each operand inserting a store in each predecessor.
@@ -156,7 +141,7 @@ AllocaInst *llvm::DemotePHIToStack(PHINode *P, std::optional<BasicBlock::iterato
              "Invoke edge not supported yet"); (void)II;
     }
     new StoreInst(P->getIncomingValue(i), Slot,
-                  P->getIncomingBlock(i)->getTerminator()->getIterator());
+                  P->getIncomingBlock(i)->getTerminator());
   }
 
   // Insert a load in place of the PHI and replace all uses.
@@ -174,12 +159,12 @@ AllocaInst *llvm::DemotePHIToStack(PHINode *P, std::optional<BasicBlock::iterato
     }
     for (Instruction *User : Users) {
       Value *V =
-          new LoadInst(P->getType(), Slot, P->getName() + ".reload", User->getIterator());
+          new LoadInst(P->getType(), Slot, P->getName() + ".reload", User);
       User->replaceUsesOfWith(P, V);
     }
   } else {
     Value *V =
-        new LoadInst(P->getType(), Slot, P->getName() + ".reload", InsertPt);
+        new LoadInst(P->getType(), Slot, P->getName() + ".reload", &*InsertPt);
     P->replaceAllUsesWith(V);
   }
   // Delete PHI.

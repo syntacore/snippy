@@ -16,9 +16,11 @@ define <2 x half> @vfnmacc_vv_v2f16(<2 x half> %a, <2 x half> %b, <2 x half> %c,
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9, v0.t
 ; CHECK-NEXT:    vmv1r.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x half> @llvm.vp.fma.v2f16(<2 x half> %nega, <2 x half> %b, <2 x half> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x half> @llvm.vp.fma.v2f16(<2 x half> %nega, <2 x half> %b, <2 x half> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x half> @llvm.vp.merge.v2f16(<2 x i1> %m, <2 x half> %v, <2 x half> %c, i32 %evl)
   ret <2 x half> %u
 }
@@ -30,10 +32,12 @@ define <2 x half> @vfnmacc_vv_v2f16_unmasked(<2 x half> %a, <2 x half> %b, <2 x 
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9
 ; CHECK-NEXT:    vmv1r.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x half> @llvm.vp.fma.v2f16(<2 x half> %nega, <2 x half> %b, <2 x half> %negc, <2 x i1> splat (i1 -1), i32 %evl)
-  %u = call <2 x half> @llvm.vp.merge.v2f16(<2 x i1> splat (i1 -1), <2 x half> %v, <2 x half> %c, i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x half> @llvm.vp.fma.v2f16(<2 x half> %nega, <2 x half> %b, <2 x half> %negc, <2 x i1> %allones, i32 %evl)
+  %u = call <2 x half> @llvm.vp.merge.v2f16(<2 x i1> %allones, <2 x half> %v, <2 x half> %c, i32 %evl)
   ret <2 x half> %u
 }
 
@@ -46,9 +50,11 @@ define <2 x half> @vfnmacc_vf_v2f16(<2 x half> %a, half %b, <2 x half> %c, <2 x 
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <2 x half> poison, half %b, i32 0
   %vb = shufflevector <2 x half> %elt.head, <2 x half> poison, <2 x i32> zeroinitializer
-  %nega = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x half> @llvm.vp.fma.v2f16(<2 x half> %nega, <2 x half> %vb, <2 x half> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x half> @llvm.vp.fma.v2f16(<2 x half> %nega, <2 x half> %vb, <2 x half> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x half> @llvm.vp.merge.v2f16(<2 x i1> %m, <2 x half> %v, <2 x half> %c, i32 %evl)
   ret <2 x half> %u
 }
@@ -62,9 +68,11 @@ define <2 x half> @vfnmacc_vf_v2f16_commute(<2 x half> %a, half %b, <2 x half> %
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <2 x half> poison, half %b, i32 0
   %vb = shufflevector <2 x half> %elt.head, <2 x half> poison, <2 x i32> zeroinitializer
-  %nega = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x half> @llvm.vp.fma.v2f16(<2 x half> %vb, <2 x half> %nega, <2 x half> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x half> @llvm.vp.fma.v2f16(<2 x half> %vb, <2 x half> %nega, <2 x half> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x half> @llvm.vp.merge.v2f16(<2 x i1> %m, <2 x half> %v, <2 x half> %c, i32 %evl)
   ret <2 x half> %u
 }
@@ -78,10 +86,12 @@ define <2 x half> @vfnmacc_vf_v2f16_unmasked(<2 x half> %a, half %b, <2 x half> 
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <2 x half> poison, half %b, i32 0
   %vb = shufflevector <2 x half> %elt.head, <2 x half> poison, <2 x i32> zeroinitializer
-  %nega = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x half> @llvm.vp.fma.v2f16(<2 x half> %nega, <2 x half> %vb, <2 x half> %negc, <2 x i1> splat (i1 -1), i32 %evl)
-  %u = call <2 x half> @llvm.vp.merge.v2f16(<2 x i1> splat (i1 -1), <2 x half> %v, <2 x half> %c, i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x half> @llvm.vp.fma.v2f16(<2 x half> %nega, <2 x half> %vb, <2 x half> %negc, <2 x i1> %allones, i32 %evl)
+  %u = call <2 x half> @llvm.vp.merge.v2f16(<2 x i1> %allones, <2 x half> %v, <2 x half> %c, i32 %evl)
   ret <2 x half> %u
 }
 
@@ -92,9 +102,11 @@ define <2 x half> @vfnmacc_vv_v2f16_ta(<2 x half> %a, <2 x half> %b, <2 x half> 
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9, v0.t
 ; CHECK-NEXT:    vmv1r.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x half> @llvm.vp.fma.v2f16(<2 x half> %nega, <2 x half> %b, <2 x half> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x half> @llvm.vp.fma.v2f16(<2 x half> %nega, <2 x half> %b, <2 x half> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x half> @llvm.vp.select.v2f16(<2 x i1> %m, <2 x half> %v, <2 x half> %c, i32 %evl)
   ret <2 x half> %u
 }
@@ -108,9 +120,11 @@ define <2 x half> @vfnmacc_vf_v2f16_ta(<2 x half> %a, half %b, <2 x half> %c, <2
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <2 x half> poison, half %b, i32 0
   %vb = shufflevector <2 x half> %elt.head, <2 x half> poison, <2 x i32> zeroinitializer
-  %nega = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x half> @llvm.vp.fma.v2f16(<2 x half> %nega, <2 x half> %vb, <2 x half> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x half> @llvm.vp.fma.v2f16(<2 x half> %nega, <2 x half> %vb, <2 x half> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x half> @llvm.vp.select.v2f16(<2 x i1> %m, <2 x half> %v, <2 x half> %c, i32 %evl)
   ret <2 x half> %u
 }
@@ -124,9 +138,11 @@ define <2 x half> @vfnmacc_vf_v2f16_commute_ta(<2 x half> %a, half %b, <2 x half
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <2 x half> poison, half %b, i32 0
   %vb = shufflevector <2 x half> %elt.head, <2 x half> poison, <2 x i32> zeroinitializer
-  %nega = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x half> @llvm.vp.fma.v2f16(<2 x half> %vb, <2 x half> %nega, <2 x half> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x half> @llvm.vp.fneg.v2f16(<2 x half> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x half> @llvm.vp.fma.v2f16(<2 x half> %vb, <2 x half> %nega, <2 x half> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x half> @llvm.vp.select.v2f16(<2 x i1> %m, <2 x half> %v, <2 x half> %c, i32 %evl)
   ret <2 x half> %u
 }
@@ -143,9 +159,11 @@ define <4 x half> @vfnmacc_vv_v4f16(<4 x half> %a, <4 x half> %b, <4 x half> %c,
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9, v0.t
 ; CHECK-NEXT:    vmv1r.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x half> @llvm.vp.fma.v4f16(<4 x half> %nega, <4 x half> %b, <4 x half> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x half> @llvm.vp.fma.v4f16(<4 x half> %nega, <4 x half> %b, <4 x half> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x half> @llvm.vp.merge.v4f16(<4 x i1> %m, <4 x half> %v, <4 x half> %c, i32 %evl)
   ret <4 x half> %u
 }
@@ -157,10 +175,12 @@ define <4 x half> @vfnmacc_vv_v4f16_unmasked(<4 x half> %a, <4 x half> %b, <4 x 
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9
 ; CHECK-NEXT:    vmv1r.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x half> @llvm.vp.fma.v4f16(<4 x half> %nega, <4 x half> %b, <4 x half> %negc, <4 x i1> splat (i1 -1), i32 %evl)
-  %u = call <4 x half> @llvm.vp.merge.v4f16(<4 x i1> splat (i1 -1), <4 x half> %v, <4 x half> %c, i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x half> @llvm.vp.fma.v4f16(<4 x half> %nega, <4 x half> %b, <4 x half> %negc, <4 x i1> %allones, i32 %evl)
+  %u = call <4 x half> @llvm.vp.merge.v4f16(<4 x i1> %allones, <4 x half> %v, <4 x half> %c, i32 %evl)
   ret <4 x half> %u
 }
 
@@ -173,9 +193,11 @@ define <4 x half> @vfnmacc_vf_v4f16(<4 x half> %a, half %b, <4 x half> %c, <4 x 
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <4 x half> poison, half %b, i32 0
   %vb = shufflevector <4 x half> %elt.head, <4 x half> poison, <4 x i32> zeroinitializer
-  %nega = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x half> @llvm.vp.fma.v4f16(<4 x half> %nega, <4 x half> %vb, <4 x half> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x half> @llvm.vp.fma.v4f16(<4 x half> %nega, <4 x half> %vb, <4 x half> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x half> @llvm.vp.merge.v4f16(<4 x i1> %m, <4 x half> %v, <4 x half> %c, i32 %evl)
   ret <4 x half> %u
 }
@@ -189,9 +211,11 @@ define <4 x half> @vfnmacc_vf_v4f16_commute(<4 x half> %a, half %b, <4 x half> %
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <4 x half> poison, half %b, i32 0
   %vb = shufflevector <4 x half> %elt.head, <4 x half> poison, <4 x i32> zeroinitializer
-  %nega = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x half> @llvm.vp.fma.v4f16(<4 x half> %vb, <4 x half> %nega, <4 x half> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x half> @llvm.vp.fma.v4f16(<4 x half> %vb, <4 x half> %nega, <4 x half> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x half> @llvm.vp.merge.v4f16(<4 x i1> %m, <4 x half> %v, <4 x half> %c, i32 %evl)
   ret <4 x half> %u
 }
@@ -205,10 +229,12 @@ define <4 x half> @vfnmacc_vf_v4f16_unmasked(<4 x half> %a, half %b, <4 x half> 
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <4 x half> poison, half %b, i32 0
   %vb = shufflevector <4 x half> %elt.head, <4 x half> poison, <4 x i32> zeroinitializer
-  %nega = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x half> @llvm.vp.fma.v4f16(<4 x half> %nega, <4 x half> %vb, <4 x half> %negc, <4 x i1> splat (i1 -1), i32 %evl)
-  %u = call <4 x half> @llvm.vp.merge.v4f16(<4 x i1> splat (i1 -1), <4 x half> %v, <4 x half> %c, i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x half> @llvm.vp.fma.v4f16(<4 x half> %nega, <4 x half> %vb, <4 x half> %negc, <4 x i1> %allones, i32 %evl)
+  %u = call <4 x half> @llvm.vp.merge.v4f16(<4 x i1> %allones, <4 x half> %v, <4 x half> %c, i32 %evl)
   ret <4 x half> %u
 }
 
@@ -219,9 +245,11 @@ define <4 x half> @vfnmacc_vv_v4f16_ta(<4 x half> %a, <4 x half> %b, <4 x half> 
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9, v0.t
 ; CHECK-NEXT:    vmv1r.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x half> @llvm.vp.fma.v4f16(<4 x half> %nega, <4 x half> %b, <4 x half> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x half> @llvm.vp.fma.v4f16(<4 x half> %nega, <4 x half> %b, <4 x half> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x half> @llvm.vp.select.v4f16(<4 x i1> %m, <4 x half> %v, <4 x half> %c, i32 %evl)
   ret <4 x half> %u
 }
@@ -235,9 +263,11 @@ define <4 x half> @vfnmacc_vf_v4f16_ta(<4 x half> %a, half %b, <4 x half> %c, <4
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <4 x half> poison, half %b, i32 0
   %vb = shufflevector <4 x half> %elt.head, <4 x half> poison, <4 x i32> zeroinitializer
-  %nega = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x half> @llvm.vp.fma.v4f16(<4 x half> %nega, <4 x half> %vb, <4 x half> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x half> @llvm.vp.fma.v4f16(<4 x half> %nega, <4 x half> %vb, <4 x half> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x half> @llvm.vp.select.v4f16(<4 x i1> %m, <4 x half> %v, <4 x half> %c, i32 %evl)
   ret <4 x half> %u
 }
@@ -251,9 +281,11 @@ define <4 x half> @vfnmacc_vf_v4f16_commute_ta(<4 x half> %a, half %b, <4 x half
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <4 x half> poison, half %b, i32 0
   %vb = shufflevector <4 x half> %elt.head, <4 x half> poison, <4 x i32> zeroinitializer
-  %nega = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x half> @llvm.vp.fma.v4f16(<4 x half> %vb, <4 x half> %nega, <4 x half> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x half> @llvm.vp.fneg.v4f16(<4 x half> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x half> @llvm.vp.fma.v4f16(<4 x half> %vb, <4 x half> %nega, <4 x half> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x half> @llvm.vp.select.v4f16(<4 x i1> %m, <4 x half> %v, <4 x half> %c, i32 %evl)
   ret <4 x half> %u
 }
@@ -270,9 +302,11 @@ define <8 x half> @vfnmacc_vv_v8f16(<8 x half> %a, <8 x half> %b, <8 x half> %c,
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9, v0.t
 ; CHECK-NEXT:    vmv1r.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x half> @llvm.vp.fma.v8f16(<8 x half> %nega, <8 x half> %b, <8 x half> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x half> @llvm.vp.fma.v8f16(<8 x half> %nega, <8 x half> %b, <8 x half> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x half> @llvm.vp.merge.v8f16(<8 x i1> %m, <8 x half> %v, <8 x half> %c, i32 %evl)
   ret <8 x half> %u
 }
@@ -284,10 +318,12 @@ define <8 x half> @vfnmacc_vv_v8f16_unmasked(<8 x half> %a, <8 x half> %b, <8 x 
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9
 ; CHECK-NEXT:    vmv1r.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x half> @llvm.vp.fma.v8f16(<8 x half> %nega, <8 x half> %b, <8 x half> %negc, <8 x i1> splat (i1 -1), i32 %evl)
-  %u = call <8 x half> @llvm.vp.merge.v8f16(<8 x i1> splat (i1 -1), <8 x half> %v, <8 x half> %c, i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x half> @llvm.vp.fma.v8f16(<8 x half> %nega, <8 x half> %b, <8 x half> %negc, <8 x i1> %allones, i32 %evl)
+  %u = call <8 x half> @llvm.vp.merge.v8f16(<8 x i1> %allones, <8 x half> %v, <8 x half> %c, i32 %evl)
   ret <8 x half> %u
 }
 
@@ -300,9 +336,11 @@ define <8 x half> @vfnmacc_vf_v8f16(<8 x half> %a, half %b, <8 x half> %c, <8 x 
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <8 x half> poison, half %b, i32 0
   %vb = shufflevector <8 x half> %elt.head, <8 x half> poison, <8 x i32> zeroinitializer
-  %nega = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x half> @llvm.vp.fma.v8f16(<8 x half> %nega, <8 x half> %vb, <8 x half> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x half> @llvm.vp.fma.v8f16(<8 x half> %nega, <8 x half> %vb, <8 x half> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x half> @llvm.vp.merge.v8f16(<8 x i1> %m, <8 x half> %v, <8 x half> %c, i32 %evl)
   ret <8 x half> %u
 }
@@ -316,9 +354,11 @@ define <8 x half> @vfnmacc_vf_v8f16_commute(<8 x half> %a, half %b, <8 x half> %
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <8 x half> poison, half %b, i32 0
   %vb = shufflevector <8 x half> %elt.head, <8 x half> poison, <8 x i32> zeroinitializer
-  %nega = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x half> @llvm.vp.fma.v8f16(<8 x half> %vb, <8 x half> %nega, <8 x half> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x half> @llvm.vp.fma.v8f16(<8 x half> %vb, <8 x half> %nega, <8 x half> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x half> @llvm.vp.merge.v8f16(<8 x i1> %m, <8 x half> %v, <8 x half> %c, i32 %evl)
   ret <8 x half> %u
 }
@@ -332,10 +372,12 @@ define <8 x half> @vfnmacc_vf_v8f16_unmasked(<8 x half> %a, half %b, <8 x half> 
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <8 x half> poison, half %b, i32 0
   %vb = shufflevector <8 x half> %elt.head, <8 x half> poison, <8 x i32> zeroinitializer
-  %nega = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x half> @llvm.vp.fma.v8f16(<8 x half> %nega, <8 x half> %vb, <8 x half> %negc, <8 x i1> splat (i1 -1), i32 %evl)
-  %u = call <8 x half> @llvm.vp.merge.v8f16(<8 x i1> splat (i1 -1), <8 x half> %v, <8 x half> %c, i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x half> @llvm.vp.fma.v8f16(<8 x half> %nega, <8 x half> %vb, <8 x half> %negc, <8 x i1> %allones, i32 %evl)
+  %u = call <8 x half> @llvm.vp.merge.v8f16(<8 x i1> %allones, <8 x half> %v, <8 x half> %c, i32 %evl)
   ret <8 x half> %u
 }
 
@@ -346,9 +388,11 @@ define <8 x half> @vfnmacc_vv_v8f16_ta(<8 x half> %a, <8 x half> %b, <8 x half> 
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9, v0.t
 ; CHECK-NEXT:    vmv.v.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x half> @llvm.vp.fma.v8f16(<8 x half> %nega, <8 x half> %b, <8 x half> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x half> @llvm.vp.fma.v8f16(<8 x half> %nega, <8 x half> %b, <8 x half> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x half> @llvm.vp.select.v8f16(<8 x i1> %m, <8 x half> %v, <8 x half> %c, i32 %evl)
   ret <8 x half> %u
 }
@@ -362,9 +406,11 @@ define <8 x half> @vfnmacc_vf_v8f16_ta(<8 x half> %a, half %b, <8 x half> %c, <8
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <8 x half> poison, half %b, i32 0
   %vb = shufflevector <8 x half> %elt.head, <8 x half> poison, <8 x i32> zeroinitializer
-  %nega = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x half> @llvm.vp.fma.v8f16(<8 x half> %nega, <8 x half> %vb, <8 x half> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x half> @llvm.vp.fma.v8f16(<8 x half> %nega, <8 x half> %vb, <8 x half> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x half> @llvm.vp.select.v8f16(<8 x i1> %m, <8 x half> %v, <8 x half> %c, i32 %evl)
   ret <8 x half> %u
 }
@@ -378,9 +424,11 @@ define <8 x half> @vfnmacc_vf_v8f16_commute_ta(<8 x half> %a, half %b, <8 x half
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <8 x half> poison, half %b, i32 0
   %vb = shufflevector <8 x half> %elt.head, <8 x half> poison, <8 x i32> zeroinitializer
-  %nega = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x half> @llvm.vp.fma.v8f16(<8 x half> %vb, <8 x half> %nega, <8 x half> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x half> @llvm.vp.fneg.v8f16(<8 x half> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x half> @llvm.vp.fma.v8f16(<8 x half> %vb, <8 x half> %nega, <8 x half> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x half> @llvm.vp.select.v8f16(<8 x i1> %m, <8 x half> %v, <8 x half> %c, i32 %evl)
   ret <8 x half> %u
 }
@@ -397,9 +445,11 @@ define <16 x half> @vfnmacc_vv_v16f16(<16 x half> %a, <16 x half> %b, <16 x half
 ; CHECK-NEXT:    vfnmacc.vv v12, v8, v10, v0.t
 ; CHECK-NEXT:    vmv2r.v v8, v12
 ; CHECK-NEXT:    ret
-  %nega = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %a, <16 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %c, <16 x i1> splat (i1 -1), i32 %evl)
-  %v = call <16 x half> @llvm.vp.fma.v16f16(<16 x half> %nega, <16 x half> %b, <16 x half> %negc, <16 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <16 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <16 x i1> %splat, <16 x i1> poison, <16 x i32> zeroinitializer
+  %nega = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %a, <16 x i1> %allones, i32 %evl)
+  %negc = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %c, <16 x i1> %allones, i32 %evl)
+  %v = call <16 x half> @llvm.vp.fma.v16f16(<16 x half> %nega, <16 x half> %b, <16 x half> %negc, <16 x i1> %allones, i32 %evl)
   %u = call <16 x half> @llvm.vp.merge.v16f16(<16 x i1> %m, <16 x half> %v, <16 x half> %c, i32 %evl)
   ret <16 x half> %u
 }
@@ -411,10 +461,12 @@ define <16 x half> @vfnmacc_vv_v16f16_unmasked(<16 x half> %a, <16 x half> %b, <
 ; CHECK-NEXT:    vfnmacc.vv v12, v8, v10
 ; CHECK-NEXT:    vmv2r.v v8, v12
 ; CHECK-NEXT:    ret
-  %nega = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %a, <16 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %c, <16 x i1> splat (i1 -1), i32 %evl)
-  %v = call <16 x half> @llvm.vp.fma.v16f16(<16 x half> %nega, <16 x half> %b, <16 x half> %negc, <16 x i1> splat (i1 -1), i32 %evl)
-  %u = call <16 x half> @llvm.vp.merge.v16f16(<16 x i1> splat (i1 -1), <16 x half> %v, <16 x half> %c, i32 %evl)
+  %splat = insertelement <16 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <16 x i1> %splat, <16 x i1> poison, <16 x i32> zeroinitializer
+  %nega = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %a, <16 x i1> %allones, i32 %evl)
+  %negc = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %c, <16 x i1> %allones, i32 %evl)
+  %v = call <16 x half> @llvm.vp.fma.v16f16(<16 x half> %nega, <16 x half> %b, <16 x half> %negc, <16 x i1> %allones, i32 %evl)
+  %u = call <16 x half> @llvm.vp.merge.v16f16(<16 x i1> %allones, <16 x half> %v, <16 x half> %c, i32 %evl)
   ret <16 x half> %u
 }
 
@@ -427,9 +479,11 @@ define <16 x half> @vfnmacc_vf_v16f16(<16 x half> %a, half %b, <16 x half> %c, <
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <16 x half> poison, half %b, i32 0
   %vb = shufflevector <16 x half> %elt.head, <16 x half> poison, <16 x i32> zeroinitializer
-  %nega = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %a, <16 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %c, <16 x i1> splat (i1 -1), i32 %evl)
-  %v = call <16 x half> @llvm.vp.fma.v16f16(<16 x half> %nega, <16 x half> %vb, <16 x half> %negc, <16 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <16 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <16 x i1> %splat, <16 x i1> poison, <16 x i32> zeroinitializer
+  %nega = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %a, <16 x i1> %allones, i32 %evl)
+  %negc = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %c, <16 x i1> %allones, i32 %evl)
+  %v = call <16 x half> @llvm.vp.fma.v16f16(<16 x half> %nega, <16 x half> %vb, <16 x half> %negc, <16 x i1> %allones, i32 %evl)
   %u = call <16 x half> @llvm.vp.merge.v16f16(<16 x i1> %m, <16 x half> %v, <16 x half> %c, i32 %evl)
   ret <16 x half> %u
 }
@@ -443,9 +497,11 @@ define <16 x half> @vfnmacc_vf_v16f16_commute(<16 x half> %a, half %b, <16 x hal
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <16 x half> poison, half %b, i32 0
   %vb = shufflevector <16 x half> %elt.head, <16 x half> poison, <16 x i32> zeroinitializer
-  %nega = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %a, <16 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %c, <16 x i1> splat (i1 -1), i32 %evl)
-  %v = call <16 x half> @llvm.vp.fma.v16f16(<16 x half> %vb, <16 x half> %nega, <16 x half> %negc, <16 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <16 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <16 x i1> %splat, <16 x i1> poison, <16 x i32> zeroinitializer
+  %nega = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %a, <16 x i1> %allones, i32 %evl)
+  %negc = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %c, <16 x i1> %allones, i32 %evl)
+  %v = call <16 x half> @llvm.vp.fma.v16f16(<16 x half> %vb, <16 x half> %nega, <16 x half> %negc, <16 x i1> %allones, i32 %evl)
   %u = call <16 x half> @llvm.vp.merge.v16f16(<16 x i1> %m, <16 x half> %v, <16 x half> %c, i32 %evl)
   ret <16 x half> %u
 }
@@ -459,10 +515,12 @@ define <16 x half> @vfnmacc_vf_v16f16_unmasked(<16 x half> %a, half %b, <16 x ha
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <16 x half> poison, half %b, i32 0
   %vb = shufflevector <16 x half> %elt.head, <16 x half> poison, <16 x i32> zeroinitializer
-  %nega = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %a, <16 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %c, <16 x i1> splat (i1 -1), i32 %evl)
-  %v = call <16 x half> @llvm.vp.fma.v16f16(<16 x half> %nega, <16 x half> %vb, <16 x half> %negc, <16 x i1> splat (i1 -1), i32 %evl)
-  %u = call <16 x half> @llvm.vp.merge.v16f16(<16 x i1> splat (i1 -1), <16 x half> %v, <16 x half> %c, i32 %evl)
+  %splat = insertelement <16 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <16 x i1> %splat, <16 x i1> poison, <16 x i32> zeroinitializer
+  %nega = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %a, <16 x i1> %allones, i32 %evl)
+  %negc = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %c, <16 x i1> %allones, i32 %evl)
+  %v = call <16 x half> @llvm.vp.fma.v16f16(<16 x half> %nega, <16 x half> %vb, <16 x half> %negc, <16 x i1> %allones, i32 %evl)
+  %u = call <16 x half> @llvm.vp.merge.v16f16(<16 x i1> %allones, <16 x half> %v, <16 x half> %c, i32 %evl)
   ret <16 x half> %u
 }
 
@@ -473,9 +531,11 @@ define <16 x half> @vfnmacc_vv_v16f16_ta(<16 x half> %a, <16 x half> %b, <16 x h
 ; CHECK-NEXT:    vfnmacc.vv v12, v8, v10, v0.t
 ; CHECK-NEXT:    vmv.v.v v8, v12
 ; CHECK-NEXT:    ret
-  %nega = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %a, <16 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %c, <16 x i1> splat (i1 -1), i32 %evl)
-  %v = call <16 x half> @llvm.vp.fma.v16f16(<16 x half> %nega, <16 x half> %b, <16 x half> %negc, <16 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <16 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <16 x i1> %splat, <16 x i1> poison, <16 x i32> zeroinitializer
+  %nega = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %a, <16 x i1> %allones, i32 %evl)
+  %negc = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %c, <16 x i1> %allones, i32 %evl)
+  %v = call <16 x half> @llvm.vp.fma.v16f16(<16 x half> %nega, <16 x half> %b, <16 x half> %negc, <16 x i1> %allones, i32 %evl)
   %u = call <16 x half> @llvm.vp.select.v16f16(<16 x i1> %m, <16 x half> %v, <16 x half> %c, i32 %evl)
   ret <16 x half> %u
 }
@@ -489,9 +549,11 @@ define <16 x half> @vfnmacc_vf_v16f16_ta(<16 x half> %a, half %b, <16 x half> %c
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <16 x half> poison, half %b, i32 0
   %vb = shufflevector <16 x half> %elt.head, <16 x half> poison, <16 x i32> zeroinitializer
-  %nega = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %a, <16 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %c, <16 x i1> splat (i1 -1), i32 %evl)
-  %v = call <16 x half> @llvm.vp.fma.v16f16(<16 x half> %nega, <16 x half> %vb, <16 x half> %negc, <16 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <16 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <16 x i1> %splat, <16 x i1> poison, <16 x i32> zeroinitializer
+  %nega = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %a, <16 x i1> %allones, i32 %evl)
+  %negc = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %c, <16 x i1> %allones, i32 %evl)
+  %v = call <16 x half> @llvm.vp.fma.v16f16(<16 x half> %nega, <16 x half> %vb, <16 x half> %negc, <16 x i1> %allones, i32 %evl)
   %u = call <16 x half> @llvm.vp.select.v16f16(<16 x i1> %m, <16 x half> %v, <16 x half> %c, i32 %evl)
   ret <16 x half> %u
 }
@@ -505,9 +567,11 @@ define <16 x half> @vfnmacc_vf_v16f16_commute_ta(<16 x half> %a, half %b, <16 x 
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <16 x half> poison, half %b, i32 0
   %vb = shufflevector <16 x half> %elt.head, <16 x half> poison, <16 x i32> zeroinitializer
-  %nega = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %a, <16 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %c, <16 x i1> splat (i1 -1), i32 %evl)
-  %v = call <16 x half> @llvm.vp.fma.v16f16(<16 x half> %vb, <16 x half> %nega, <16 x half> %negc, <16 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <16 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <16 x i1> %splat, <16 x i1> poison, <16 x i32> zeroinitializer
+  %nega = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %a, <16 x i1> %allones, i32 %evl)
+  %negc = call <16 x half> @llvm.vp.fneg.v16f16(<16 x half> %c, <16 x i1> %allones, i32 %evl)
+  %v = call <16 x half> @llvm.vp.fma.v16f16(<16 x half> %vb, <16 x half> %nega, <16 x half> %negc, <16 x i1> %allones, i32 %evl)
   %u = call <16 x half> @llvm.vp.select.v16f16(<16 x i1> %m, <16 x half> %v, <16 x half> %c, i32 %evl)
   ret <16 x half> %u
 }
@@ -524,9 +588,11 @@ define <32 x half> @vfnmacc_vv_v32f16(<32 x half> %a, <32 x half> %b, <32 x half
 ; CHECK-NEXT:    vfnmacc.vv v16, v8, v12, v0.t
 ; CHECK-NEXT:    vmv4r.v v8, v16
 ; CHECK-NEXT:    ret
-  %nega = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %a, <32 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %c, <32 x i1> splat (i1 -1), i32 %evl)
-  %v = call <32 x half> @llvm.vp.fma.v32f16(<32 x half> %nega, <32 x half> %b, <32 x half> %negc, <32 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <32 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <32 x i1> %splat, <32 x i1> poison, <32 x i32> zeroinitializer
+  %nega = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %a, <32 x i1> %allones, i32 %evl)
+  %negc = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %c, <32 x i1> %allones, i32 %evl)
+  %v = call <32 x half> @llvm.vp.fma.v32f16(<32 x half> %nega, <32 x half> %b, <32 x half> %negc, <32 x i1> %allones, i32 %evl)
   %u = call <32 x half> @llvm.vp.merge.v32f16(<32 x i1> %m, <32 x half> %v, <32 x half> %c, i32 %evl)
   ret <32 x half> %u
 }
@@ -538,10 +604,12 @@ define <32 x half> @vfnmacc_vv_v32f16_unmasked(<32 x half> %a, <32 x half> %b, <
 ; CHECK-NEXT:    vfnmacc.vv v16, v8, v12
 ; CHECK-NEXT:    vmv4r.v v8, v16
 ; CHECK-NEXT:    ret
-  %nega = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %a, <32 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %c, <32 x i1> splat (i1 -1), i32 %evl)
-  %v = call <32 x half> @llvm.vp.fma.v32f16(<32 x half> %nega, <32 x half> %b, <32 x half> %negc, <32 x i1> splat (i1 -1), i32 %evl)
-  %u = call <32 x half> @llvm.vp.merge.v32f16(<32 x i1> splat (i1 -1), <32 x half> %v, <32 x half> %c, i32 %evl)
+  %splat = insertelement <32 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <32 x i1> %splat, <32 x i1> poison, <32 x i32> zeroinitializer
+  %nega = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %a, <32 x i1> %allones, i32 %evl)
+  %negc = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %c, <32 x i1> %allones, i32 %evl)
+  %v = call <32 x half> @llvm.vp.fma.v32f16(<32 x half> %nega, <32 x half> %b, <32 x half> %negc, <32 x i1> %allones, i32 %evl)
+  %u = call <32 x half> @llvm.vp.merge.v32f16(<32 x i1> %allones, <32 x half> %v, <32 x half> %c, i32 %evl)
   ret <32 x half> %u
 }
 
@@ -554,9 +622,11 @@ define <32 x half> @vfnmacc_vf_v32f16(<32 x half> %a, half %b, <32 x half> %c, <
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <32 x half> poison, half %b, i32 0
   %vb = shufflevector <32 x half> %elt.head, <32 x half> poison, <32 x i32> zeroinitializer
-  %nega = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %a, <32 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %c, <32 x i1> splat (i1 -1), i32 %evl)
-  %v = call <32 x half> @llvm.vp.fma.v32f16(<32 x half> %nega, <32 x half> %vb, <32 x half> %negc, <32 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <32 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <32 x i1> %splat, <32 x i1> poison, <32 x i32> zeroinitializer
+  %nega = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %a, <32 x i1> %allones, i32 %evl)
+  %negc = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %c, <32 x i1> %allones, i32 %evl)
+  %v = call <32 x half> @llvm.vp.fma.v32f16(<32 x half> %nega, <32 x half> %vb, <32 x half> %negc, <32 x i1> %allones, i32 %evl)
   %u = call <32 x half> @llvm.vp.merge.v32f16(<32 x i1> %m, <32 x half> %v, <32 x half> %c, i32 %evl)
   ret <32 x half> %u
 }
@@ -570,9 +640,11 @@ define <32 x half> @vfnmacc_vf_v32f16_commute(<32 x half> %a, half %b, <32 x hal
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <32 x half> poison, half %b, i32 0
   %vb = shufflevector <32 x half> %elt.head, <32 x half> poison, <32 x i32> zeroinitializer
-  %nega = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %a, <32 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %c, <32 x i1> splat (i1 -1), i32 %evl)
-  %v = call <32 x half> @llvm.vp.fma.v32f16(<32 x half> %vb, <32 x half> %nega, <32 x half> %negc, <32 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <32 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <32 x i1> %splat, <32 x i1> poison, <32 x i32> zeroinitializer
+  %nega = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %a, <32 x i1> %allones, i32 %evl)
+  %negc = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %c, <32 x i1> %allones, i32 %evl)
+  %v = call <32 x half> @llvm.vp.fma.v32f16(<32 x half> %vb, <32 x half> %nega, <32 x half> %negc, <32 x i1> %allones, i32 %evl)
   %u = call <32 x half> @llvm.vp.merge.v32f16(<32 x i1> %m, <32 x half> %v, <32 x half> %c, i32 %evl)
   ret <32 x half> %u
 }
@@ -586,10 +658,12 @@ define <32 x half> @vfnmacc_vf_v32f16_unmasked(<32 x half> %a, half %b, <32 x ha
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <32 x half> poison, half %b, i32 0
   %vb = shufflevector <32 x half> %elt.head, <32 x half> poison, <32 x i32> zeroinitializer
-  %nega = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %a, <32 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %c, <32 x i1> splat (i1 -1), i32 %evl)
-  %v = call <32 x half> @llvm.vp.fma.v32f16(<32 x half> %nega, <32 x half> %vb, <32 x half> %negc, <32 x i1> splat (i1 -1), i32 %evl)
-  %u = call <32 x half> @llvm.vp.merge.v32f16(<32 x i1> splat (i1 -1), <32 x half> %v, <32 x half> %c, i32 %evl)
+  %splat = insertelement <32 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <32 x i1> %splat, <32 x i1> poison, <32 x i32> zeroinitializer
+  %nega = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %a, <32 x i1> %allones, i32 %evl)
+  %negc = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %c, <32 x i1> %allones, i32 %evl)
+  %v = call <32 x half> @llvm.vp.fma.v32f16(<32 x half> %nega, <32 x half> %vb, <32 x half> %negc, <32 x i1> %allones, i32 %evl)
+  %u = call <32 x half> @llvm.vp.merge.v32f16(<32 x i1> %allones, <32 x half> %v, <32 x half> %c, i32 %evl)
   ret <32 x half> %u
 }
 
@@ -600,9 +674,11 @@ define <32 x half> @vfnmacc_vv_v32f16_ta(<32 x half> %a, <32 x half> %b, <32 x h
 ; CHECK-NEXT:    vfnmacc.vv v16, v8, v12, v0.t
 ; CHECK-NEXT:    vmv.v.v v8, v16
 ; CHECK-NEXT:    ret
-  %nega = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %a, <32 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %c, <32 x i1> splat (i1 -1), i32 %evl)
-  %v = call <32 x half> @llvm.vp.fma.v32f16(<32 x half> %nega, <32 x half> %b, <32 x half> %negc, <32 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <32 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <32 x i1> %splat, <32 x i1> poison, <32 x i32> zeroinitializer
+  %nega = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %a, <32 x i1> %allones, i32 %evl)
+  %negc = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %c, <32 x i1> %allones, i32 %evl)
+  %v = call <32 x half> @llvm.vp.fma.v32f16(<32 x half> %nega, <32 x half> %b, <32 x half> %negc, <32 x i1> %allones, i32 %evl)
   %u = call <32 x half> @llvm.vp.select.v32f16(<32 x i1> %m, <32 x half> %v, <32 x half> %c, i32 %evl)
   ret <32 x half> %u
 }
@@ -616,9 +692,11 @@ define <32 x half> @vfnmacc_vf_v32f16_ta(<32 x half> %a, half %b, <32 x half> %c
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <32 x half> poison, half %b, i32 0
   %vb = shufflevector <32 x half> %elt.head, <32 x half> poison, <32 x i32> zeroinitializer
-  %nega = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %a, <32 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %c, <32 x i1> splat (i1 -1), i32 %evl)
-  %v = call <32 x half> @llvm.vp.fma.v32f16(<32 x half> %nega, <32 x half> %vb, <32 x half> %negc, <32 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <32 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <32 x i1> %splat, <32 x i1> poison, <32 x i32> zeroinitializer
+  %nega = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %a, <32 x i1> %allones, i32 %evl)
+  %negc = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %c, <32 x i1> %allones, i32 %evl)
+  %v = call <32 x half> @llvm.vp.fma.v32f16(<32 x half> %nega, <32 x half> %vb, <32 x half> %negc, <32 x i1> %allones, i32 %evl)
   %u = call <32 x half> @llvm.vp.select.v32f16(<32 x i1> %m, <32 x half> %v, <32 x half> %c, i32 %evl)
   ret <32 x half> %u
 }
@@ -632,9 +710,11 @@ define <32 x half> @vfnmacc_vf_v32f16_commute_ta(<32 x half> %a, half %b, <32 x 
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <32 x half> poison, half %b, i32 0
   %vb = shufflevector <32 x half> %elt.head, <32 x half> poison, <32 x i32> zeroinitializer
-  %nega = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %a, <32 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %c, <32 x i1> splat (i1 -1), i32 %evl)
-  %v = call <32 x half> @llvm.vp.fma.v32f16(<32 x half> %vb, <32 x half> %nega, <32 x half> %negc, <32 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <32 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <32 x i1> %splat, <32 x i1> poison, <32 x i32> zeroinitializer
+  %nega = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %a, <32 x i1> %allones, i32 %evl)
+  %negc = call <32 x half> @llvm.vp.fneg.v32f16(<32 x half> %c, <32 x i1> %allones, i32 %evl)
+  %v = call <32 x half> @llvm.vp.fma.v32f16(<32 x half> %vb, <32 x half> %nega, <32 x half> %negc, <32 x i1> %allones, i32 %evl)
   %u = call <32 x half> @llvm.vp.select.v32f16(<32 x i1> %m, <32 x half> %v, <32 x half> %c, i32 %evl)
   ret <32 x half> %u
 }
@@ -651,9 +731,11 @@ define <2 x float> @vfnmacc_vv_v2f32(<2 x float> %a, <2 x float> %b, <2 x float>
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9, v0.t
 ; CHECK-NEXT:    vmv1r.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x float> @llvm.vp.fma.v2f32(<2 x float> %nega, <2 x float> %b, <2 x float> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x float> @llvm.vp.fma.v2f32(<2 x float> %nega, <2 x float> %b, <2 x float> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x float> @llvm.vp.merge.v2f32(<2 x i1> %m, <2 x float> %v, <2 x float> %c, i32 %evl)
   ret <2 x float> %u
 }
@@ -665,10 +747,12 @@ define <2 x float> @vfnmacc_vv_v2f32_unmasked(<2 x float> %a, <2 x float> %b, <2
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9
 ; CHECK-NEXT:    vmv1r.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x float> @llvm.vp.fma.v2f32(<2 x float> %nega, <2 x float> %b, <2 x float> %negc, <2 x i1> splat (i1 -1), i32 %evl)
-  %u = call <2 x float> @llvm.vp.merge.v2f32(<2 x i1> splat (i1 -1), <2 x float> %v, <2 x float> %c, i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x float> @llvm.vp.fma.v2f32(<2 x float> %nega, <2 x float> %b, <2 x float> %negc, <2 x i1> %allones, i32 %evl)
+  %u = call <2 x float> @llvm.vp.merge.v2f32(<2 x i1> %allones, <2 x float> %v, <2 x float> %c, i32 %evl)
   ret <2 x float> %u
 }
 
@@ -681,9 +765,11 @@ define <2 x float> @vfnmacc_vf_v2f32(<2 x float> %a, float %b, <2 x float> %c, <
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <2 x float> poison, float %b, i32 0
   %vb = shufflevector <2 x float> %elt.head, <2 x float> poison, <2 x i32> zeroinitializer
-  %nega = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x float> @llvm.vp.fma.v2f32(<2 x float> %nega, <2 x float> %vb, <2 x float> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x float> @llvm.vp.fma.v2f32(<2 x float> %nega, <2 x float> %vb, <2 x float> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x float> @llvm.vp.merge.v2f32(<2 x i1> %m, <2 x float> %v, <2 x float> %c, i32 %evl)
   ret <2 x float> %u
 }
@@ -697,9 +783,11 @@ define <2 x float> @vfnmacc_vf_v2f32_commute(<2 x float> %a, float %b, <2 x floa
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <2 x float> poison, float %b, i32 0
   %vb = shufflevector <2 x float> %elt.head, <2 x float> poison, <2 x i32> zeroinitializer
-  %nega = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x float> @llvm.vp.fma.v2f32(<2 x float> %vb, <2 x float> %nega, <2 x float> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x float> @llvm.vp.fma.v2f32(<2 x float> %vb, <2 x float> %nega, <2 x float> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x float> @llvm.vp.merge.v2f32(<2 x i1> %m, <2 x float> %v, <2 x float> %c, i32 %evl)
   ret <2 x float> %u
 }
@@ -713,10 +801,12 @@ define <2 x float> @vfnmacc_vf_v2f32_unmasked(<2 x float> %a, float %b, <2 x flo
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <2 x float> poison, float %b, i32 0
   %vb = shufflevector <2 x float> %elt.head, <2 x float> poison, <2 x i32> zeroinitializer
-  %nega = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x float> @llvm.vp.fma.v2f32(<2 x float> %nega, <2 x float> %vb, <2 x float> %negc, <2 x i1> splat (i1 -1), i32 %evl)
-  %u = call <2 x float> @llvm.vp.merge.v2f32(<2 x i1> splat (i1 -1), <2 x float> %v, <2 x float> %c, i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x float> @llvm.vp.fma.v2f32(<2 x float> %nega, <2 x float> %vb, <2 x float> %negc, <2 x i1> %allones, i32 %evl)
+  %u = call <2 x float> @llvm.vp.merge.v2f32(<2 x i1> %allones, <2 x float> %v, <2 x float> %c, i32 %evl)
   ret <2 x float> %u
 }
 
@@ -727,9 +817,11 @@ define <2 x float> @vfnmacc_vv_v2f32_ta(<2 x float> %a, <2 x float> %b, <2 x flo
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9, v0.t
 ; CHECK-NEXT:    vmv1r.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x float> @llvm.vp.fma.v2f32(<2 x float> %nega, <2 x float> %b, <2 x float> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x float> @llvm.vp.fma.v2f32(<2 x float> %nega, <2 x float> %b, <2 x float> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x float> @llvm.vp.select.v2f32(<2 x i1> %m, <2 x float> %v, <2 x float> %c, i32 %evl)
   ret <2 x float> %u
 }
@@ -743,9 +835,11 @@ define <2 x float> @vfnmacc_vf_v2f32_ta(<2 x float> %a, float %b, <2 x float> %c
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <2 x float> poison, float %b, i32 0
   %vb = shufflevector <2 x float> %elt.head, <2 x float> poison, <2 x i32> zeroinitializer
-  %nega = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x float> @llvm.vp.fma.v2f32(<2 x float> %nega, <2 x float> %vb, <2 x float> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x float> @llvm.vp.fma.v2f32(<2 x float> %nega, <2 x float> %vb, <2 x float> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x float> @llvm.vp.select.v2f32(<2 x i1> %m, <2 x float> %v, <2 x float> %c, i32 %evl)
   ret <2 x float> %u
 }
@@ -759,9 +853,11 @@ define <2 x float> @vfnmacc_vf_v2f32_commute_ta(<2 x float> %a, float %b, <2 x f
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <2 x float> poison, float %b, i32 0
   %vb = shufflevector <2 x float> %elt.head, <2 x float> poison, <2 x i32> zeroinitializer
-  %nega = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x float> @llvm.vp.fma.v2f32(<2 x float> %vb, <2 x float> %nega, <2 x float> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x float> @llvm.vp.fneg.v2f32(<2 x float> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x float> @llvm.vp.fma.v2f32(<2 x float> %vb, <2 x float> %nega, <2 x float> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x float> @llvm.vp.select.v2f32(<2 x i1> %m, <2 x float> %v, <2 x float> %c, i32 %evl)
   ret <2 x float> %u
 }
@@ -778,9 +874,11 @@ define <4 x float> @vfnmacc_vv_v4f32(<4 x float> %a, <4 x float> %b, <4 x float>
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9, v0.t
 ; CHECK-NEXT:    vmv1r.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x float> @llvm.vp.fma.v4f32(<4 x float> %nega, <4 x float> %b, <4 x float> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x float> @llvm.vp.fma.v4f32(<4 x float> %nega, <4 x float> %b, <4 x float> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x float> @llvm.vp.merge.v4f32(<4 x i1> %m, <4 x float> %v, <4 x float> %c, i32 %evl)
   ret <4 x float> %u
 }
@@ -792,10 +890,12 @@ define <4 x float> @vfnmacc_vv_v4f32_unmasked(<4 x float> %a, <4 x float> %b, <4
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9
 ; CHECK-NEXT:    vmv1r.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x float> @llvm.vp.fma.v4f32(<4 x float> %nega, <4 x float> %b, <4 x float> %negc, <4 x i1> splat (i1 -1), i32 %evl)
-  %u = call <4 x float> @llvm.vp.merge.v4f32(<4 x i1> splat (i1 -1), <4 x float> %v, <4 x float> %c, i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x float> @llvm.vp.fma.v4f32(<4 x float> %nega, <4 x float> %b, <4 x float> %negc, <4 x i1> %allones, i32 %evl)
+  %u = call <4 x float> @llvm.vp.merge.v4f32(<4 x i1> %allones, <4 x float> %v, <4 x float> %c, i32 %evl)
   ret <4 x float> %u
 }
 
@@ -808,9 +908,11 @@ define <4 x float> @vfnmacc_vf_v4f32(<4 x float> %a, float %b, <4 x float> %c, <
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <4 x float> poison, float %b, i32 0
   %vb = shufflevector <4 x float> %elt.head, <4 x float> poison, <4 x i32> zeroinitializer
-  %nega = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x float> @llvm.vp.fma.v4f32(<4 x float> %nega, <4 x float> %vb, <4 x float> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x float> @llvm.vp.fma.v4f32(<4 x float> %nega, <4 x float> %vb, <4 x float> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x float> @llvm.vp.merge.v4f32(<4 x i1> %m, <4 x float> %v, <4 x float> %c, i32 %evl)
   ret <4 x float> %u
 }
@@ -824,9 +926,11 @@ define <4 x float> @vfnmacc_vf_v4f32_commute(<4 x float> %a, float %b, <4 x floa
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <4 x float> poison, float %b, i32 0
   %vb = shufflevector <4 x float> %elt.head, <4 x float> poison, <4 x i32> zeroinitializer
-  %nega = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x float> @llvm.vp.fma.v4f32(<4 x float> %vb, <4 x float> %nega, <4 x float> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x float> @llvm.vp.fma.v4f32(<4 x float> %vb, <4 x float> %nega, <4 x float> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x float> @llvm.vp.merge.v4f32(<4 x i1> %m, <4 x float> %v, <4 x float> %c, i32 %evl)
   ret <4 x float> %u
 }
@@ -840,10 +944,12 @@ define <4 x float> @vfnmacc_vf_v4f32_unmasked(<4 x float> %a, float %b, <4 x flo
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <4 x float> poison, float %b, i32 0
   %vb = shufflevector <4 x float> %elt.head, <4 x float> poison, <4 x i32> zeroinitializer
-  %nega = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x float> @llvm.vp.fma.v4f32(<4 x float> %nega, <4 x float> %vb, <4 x float> %negc, <4 x i1> splat (i1 -1), i32 %evl)
-  %u = call <4 x float> @llvm.vp.merge.v4f32(<4 x i1> splat (i1 -1), <4 x float> %v, <4 x float> %c, i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x float> @llvm.vp.fma.v4f32(<4 x float> %nega, <4 x float> %vb, <4 x float> %negc, <4 x i1> %allones, i32 %evl)
+  %u = call <4 x float> @llvm.vp.merge.v4f32(<4 x i1> %allones, <4 x float> %v, <4 x float> %c, i32 %evl)
   ret <4 x float> %u
 }
 
@@ -854,9 +960,11 @@ define <4 x float> @vfnmacc_vv_v4f32_ta(<4 x float> %a, <4 x float> %b, <4 x flo
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9, v0.t
 ; CHECK-NEXT:    vmv.v.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x float> @llvm.vp.fma.v4f32(<4 x float> %nega, <4 x float> %b, <4 x float> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x float> @llvm.vp.fma.v4f32(<4 x float> %nega, <4 x float> %b, <4 x float> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x float> @llvm.vp.select.v4f32(<4 x i1> %m, <4 x float> %v, <4 x float> %c, i32 %evl)
   ret <4 x float> %u
 }
@@ -870,9 +978,11 @@ define <4 x float> @vfnmacc_vf_v4f32_ta(<4 x float> %a, float %b, <4 x float> %c
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <4 x float> poison, float %b, i32 0
   %vb = shufflevector <4 x float> %elt.head, <4 x float> poison, <4 x i32> zeroinitializer
-  %nega = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x float> @llvm.vp.fma.v4f32(<4 x float> %nega, <4 x float> %vb, <4 x float> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x float> @llvm.vp.fma.v4f32(<4 x float> %nega, <4 x float> %vb, <4 x float> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x float> @llvm.vp.select.v4f32(<4 x i1> %m, <4 x float> %v, <4 x float> %c, i32 %evl)
   ret <4 x float> %u
 }
@@ -886,9 +996,11 @@ define <4 x float> @vfnmacc_vf_v4f32_commute_ta(<4 x float> %a, float %b, <4 x f
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <4 x float> poison, float %b, i32 0
   %vb = shufflevector <4 x float> %elt.head, <4 x float> poison, <4 x i32> zeroinitializer
-  %nega = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x float> @llvm.vp.fma.v4f32(<4 x float> %vb, <4 x float> %nega, <4 x float> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x float> @llvm.vp.fneg.v4f32(<4 x float> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x float> @llvm.vp.fma.v4f32(<4 x float> %vb, <4 x float> %nega, <4 x float> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x float> @llvm.vp.select.v4f32(<4 x i1> %m, <4 x float> %v, <4 x float> %c, i32 %evl)
   ret <4 x float> %u
 }
@@ -905,9 +1017,11 @@ define <8 x float> @vfnmacc_vv_v8f32(<8 x float> %a, <8 x float> %b, <8 x float>
 ; CHECK-NEXT:    vfnmacc.vv v12, v8, v10, v0.t
 ; CHECK-NEXT:    vmv2r.v v8, v12
 ; CHECK-NEXT:    ret
-  %nega = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x float> @llvm.vp.fma.v8f32(<8 x float> %nega, <8 x float> %b, <8 x float> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x float> @llvm.vp.fma.v8f32(<8 x float> %nega, <8 x float> %b, <8 x float> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x float> @llvm.vp.merge.v8f32(<8 x i1> %m, <8 x float> %v, <8 x float> %c, i32 %evl)
   ret <8 x float> %u
 }
@@ -919,10 +1033,12 @@ define <8 x float> @vfnmacc_vv_v8f32_unmasked(<8 x float> %a, <8 x float> %b, <8
 ; CHECK-NEXT:    vfnmacc.vv v12, v8, v10
 ; CHECK-NEXT:    vmv2r.v v8, v12
 ; CHECK-NEXT:    ret
-  %nega = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x float> @llvm.vp.fma.v8f32(<8 x float> %nega, <8 x float> %b, <8 x float> %negc, <8 x i1> splat (i1 -1), i32 %evl)
-  %u = call <8 x float> @llvm.vp.merge.v8f32(<8 x i1> splat (i1 -1), <8 x float> %v, <8 x float> %c, i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x float> @llvm.vp.fma.v8f32(<8 x float> %nega, <8 x float> %b, <8 x float> %negc, <8 x i1> %allones, i32 %evl)
+  %u = call <8 x float> @llvm.vp.merge.v8f32(<8 x i1> %allones, <8 x float> %v, <8 x float> %c, i32 %evl)
   ret <8 x float> %u
 }
 
@@ -935,9 +1051,11 @@ define <8 x float> @vfnmacc_vf_v8f32(<8 x float> %a, float %b, <8 x float> %c, <
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <8 x float> poison, float %b, i32 0
   %vb = shufflevector <8 x float> %elt.head, <8 x float> poison, <8 x i32> zeroinitializer
-  %nega = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x float> @llvm.vp.fma.v8f32(<8 x float> %nega, <8 x float> %vb, <8 x float> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x float> @llvm.vp.fma.v8f32(<8 x float> %nega, <8 x float> %vb, <8 x float> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x float> @llvm.vp.merge.v8f32(<8 x i1> %m, <8 x float> %v, <8 x float> %c, i32 %evl)
   ret <8 x float> %u
 }
@@ -951,9 +1069,11 @@ define <8 x float> @vfnmacc_vf_v8f32_commute(<8 x float> %a, float %b, <8 x floa
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <8 x float> poison, float %b, i32 0
   %vb = shufflevector <8 x float> %elt.head, <8 x float> poison, <8 x i32> zeroinitializer
-  %nega = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x float> @llvm.vp.fma.v8f32(<8 x float> %vb, <8 x float> %nega, <8 x float> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x float> @llvm.vp.fma.v8f32(<8 x float> %vb, <8 x float> %nega, <8 x float> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x float> @llvm.vp.merge.v8f32(<8 x i1> %m, <8 x float> %v, <8 x float> %c, i32 %evl)
   ret <8 x float> %u
 }
@@ -967,10 +1087,12 @@ define <8 x float> @vfnmacc_vf_v8f32_unmasked(<8 x float> %a, float %b, <8 x flo
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <8 x float> poison, float %b, i32 0
   %vb = shufflevector <8 x float> %elt.head, <8 x float> poison, <8 x i32> zeroinitializer
-  %nega = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x float> @llvm.vp.fma.v8f32(<8 x float> %nega, <8 x float> %vb, <8 x float> %negc, <8 x i1> splat (i1 -1), i32 %evl)
-  %u = call <8 x float> @llvm.vp.merge.v8f32(<8 x i1> splat (i1 -1), <8 x float> %v, <8 x float> %c, i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x float> @llvm.vp.fma.v8f32(<8 x float> %nega, <8 x float> %vb, <8 x float> %negc, <8 x i1> %allones, i32 %evl)
+  %u = call <8 x float> @llvm.vp.merge.v8f32(<8 x i1> %allones, <8 x float> %v, <8 x float> %c, i32 %evl)
   ret <8 x float> %u
 }
 
@@ -981,9 +1103,11 @@ define <8 x float> @vfnmacc_vv_v8f32_ta(<8 x float> %a, <8 x float> %b, <8 x flo
 ; CHECK-NEXT:    vfnmacc.vv v12, v8, v10, v0.t
 ; CHECK-NEXT:    vmv.v.v v8, v12
 ; CHECK-NEXT:    ret
-  %nega = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x float> @llvm.vp.fma.v8f32(<8 x float> %nega, <8 x float> %b, <8 x float> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x float> @llvm.vp.fma.v8f32(<8 x float> %nega, <8 x float> %b, <8 x float> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x float> @llvm.vp.select.v8f32(<8 x i1> %m, <8 x float> %v, <8 x float> %c, i32 %evl)
   ret <8 x float> %u
 }
@@ -997,9 +1121,11 @@ define <8 x float> @vfnmacc_vf_v8f32_ta(<8 x float> %a, float %b, <8 x float> %c
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <8 x float> poison, float %b, i32 0
   %vb = shufflevector <8 x float> %elt.head, <8 x float> poison, <8 x i32> zeroinitializer
-  %nega = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x float> @llvm.vp.fma.v8f32(<8 x float> %nega, <8 x float> %vb, <8 x float> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x float> @llvm.vp.fma.v8f32(<8 x float> %nega, <8 x float> %vb, <8 x float> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x float> @llvm.vp.select.v8f32(<8 x i1> %m, <8 x float> %v, <8 x float> %c, i32 %evl)
   ret <8 x float> %u
 }
@@ -1013,9 +1139,11 @@ define <8 x float> @vfnmacc_vf_v8f32_commute_ta(<8 x float> %a, float %b, <8 x f
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <8 x float> poison, float %b, i32 0
   %vb = shufflevector <8 x float> %elt.head, <8 x float> poison, <8 x i32> zeroinitializer
-  %nega = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x float> @llvm.vp.fma.v8f32(<8 x float> %vb, <8 x float> %nega, <8 x float> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x float> @llvm.vp.fneg.v8f32(<8 x float> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x float> @llvm.vp.fma.v8f32(<8 x float> %vb, <8 x float> %nega, <8 x float> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x float> @llvm.vp.select.v8f32(<8 x i1> %m, <8 x float> %v, <8 x float> %c, i32 %evl)
   ret <8 x float> %u
 }
@@ -1032,9 +1160,11 @@ define <16 x float> @vfnmacc_vv_v16f32(<16 x float> %a, <16 x float> %b, <16 x f
 ; CHECK-NEXT:    vfnmacc.vv v16, v8, v12, v0.t
 ; CHECK-NEXT:    vmv4r.v v8, v16
 ; CHECK-NEXT:    ret
-  %nega = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %a, <16 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %c, <16 x i1> splat (i1 -1), i32 %evl)
-  %v = call <16 x float> @llvm.vp.fma.v16f32(<16 x float> %nega, <16 x float> %b, <16 x float> %negc, <16 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <16 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <16 x i1> %splat, <16 x i1> poison, <16 x i32> zeroinitializer
+  %nega = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %a, <16 x i1> %allones, i32 %evl)
+  %negc = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %c, <16 x i1> %allones, i32 %evl)
+  %v = call <16 x float> @llvm.vp.fma.v16f32(<16 x float> %nega, <16 x float> %b, <16 x float> %negc, <16 x i1> %allones, i32 %evl)
   %u = call <16 x float> @llvm.vp.merge.v16f32(<16 x i1> %m, <16 x float> %v, <16 x float> %c, i32 %evl)
   ret <16 x float> %u
 }
@@ -1046,10 +1176,12 @@ define <16 x float> @vfnmacc_vv_v16f32_unmasked(<16 x float> %a, <16 x float> %b
 ; CHECK-NEXT:    vfnmacc.vv v16, v8, v12
 ; CHECK-NEXT:    vmv4r.v v8, v16
 ; CHECK-NEXT:    ret
-  %nega = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %a, <16 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %c, <16 x i1> splat (i1 -1), i32 %evl)
-  %v = call <16 x float> @llvm.vp.fma.v16f32(<16 x float> %nega, <16 x float> %b, <16 x float> %negc, <16 x i1> splat (i1 -1), i32 %evl)
-  %u = call <16 x float> @llvm.vp.merge.v16f32(<16 x i1> splat (i1 -1), <16 x float> %v, <16 x float> %c, i32 %evl)
+  %splat = insertelement <16 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <16 x i1> %splat, <16 x i1> poison, <16 x i32> zeroinitializer
+  %nega = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %a, <16 x i1> %allones, i32 %evl)
+  %negc = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %c, <16 x i1> %allones, i32 %evl)
+  %v = call <16 x float> @llvm.vp.fma.v16f32(<16 x float> %nega, <16 x float> %b, <16 x float> %negc, <16 x i1> %allones, i32 %evl)
+  %u = call <16 x float> @llvm.vp.merge.v16f32(<16 x i1> %allones, <16 x float> %v, <16 x float> %c, i32 %evl)
   ret <16 x float> %u
 }
 
@@ -1062,9 +1194,11 @@ define <16 x float> @vfnmacc_vf_v16f32(<16 x float> %a, float %b, <16 x float> %
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <16 x float> poison, float %b, i32 0
   %vb = shufflevector <16 x float> %elt.head, <16 x float> poison, <16 x i32> zeroinitializer
-  %nega = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %a, <16 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %c, <16 x i1> splat (i1 -1), i32 %evl)
-  %v = call <16 x float> @llvm.vp.fma.v16f32(<16 x float> %nega, <16 x float> %vb, <16 x float> %negc, <16 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <16 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <16 x i1> %splat, <16 x i1> poison, <16 x i32> zeroinitializer
+  %nega = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %a, <16 x i1> %allones, i32 %evl)
+  %negc = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %c, <16 x i1> %allones, i32 %evl)
+  %v = call <16 x float> @llvm.vp.fma.v16f32(<16 x float> %nega, <16 x float> %vb, <16 x float> %negc, <16 x i1> %allones, i32 %evl)
   %u = call <16 x float> @llvm.vp.merge.v16f32(<16 x i1> %m, <16 x float> %v, <16 x float> %c, i32 %evl)
   ret <16 x float> %u
 }
@@ -1078,9 +1212,11 @@ define <16 x float> @vfnmacc_vf_v16f32_commute(<16 x float> %a, float %b, <16 x 
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <16 x float> poison, float %b, i32 0
   %vb = shufflevector <16 x float> %elt.head, <16 x float> poison, <16 x i32> zeroinitializer
-  %nega = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %a, <16 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %c, <16 x i1> splat (i1 -1), i32 %evl)
-  %v = call <16 x float> @llvm.vp.fma.v16f32(<16 x float> %vb, <16 x float> %nega, <16 x float> %negc, <16 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <16 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <16 x i1> %splat, <16 x i1> poison, <16 x i32> zeroinitializer
+  %nega = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %a, <16 x i1> %allones, i32 %evl)
+  %negc = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %c, <16 x i1> %allones, i32 %evl)
+  %v = call <16 x float> @llvm.vp.fma.v16f32(<16 x float> %vb, <16 x float> %nega, <16 x float> %negc, <16 x i1> %allones, i32 %evl)
   %u = call <16 x float> @llvm.vp.merge.v16f32(<16 x i1> %m, <16 x float> %v, <16 x float> %c, i32 %evl)
   ret <16 x float> %u
 }
@@ -1094,10 +1230,12 @@ define <16 x float> @vfnmacc_vf_v16f32_unmasked(<16 x float> %a, float %b, <16 x
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <16 x float> poison, float %b, i32 0
   %vb = shufflevector <16 x float> %elt.head, <16 x float> poison, <16 x i32> zeroinitializer
-  %nega = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %a, <16 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %c, <16 x i1> splat (i1 -1), i32 %evl)
-  %v = call <16 x float> @llvm.vp.fma.v16f32(<16 x float> %nega, <16 x float> %vb, <16 x float> %negc, <16 x i1> splat (i1 -1), i32 %evl)
-  %u = call <16 x float> @llvm.vp.merge.v16f32(<16 x i1> splat (i1 -1), <16 x float> %v, <16 x float> %c, i32 %evl)
+  %splat = insertelement <16 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <16 x i1> %splat, <16 x i1> poison, <16 x i32> zeroinitializer
+  %nega = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %a, <16 x i1> %allones, i32 %evl)
+  %negc = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %c, <16 x i1> %allones, i32 %evl)
+  %v = call <16 x float> @llvm.vp.fma.v16f32(<16 x float> %nega, <16 x float> %vb, <16 x float> %negc, <16 x i1> %allones, i32 %evl)
+  %u = call <16 x float> @llvm.vp.merge.v16f32(<16 x i1> %allones, <16 x float> %v, <16 x float> %c, i32 %evl)
   ret <16 x float> %u
 }
 
@@ -1108,9 +1246,11 @@ define <16 x float> @vfnmacc_vv_v16f32_ta(<16 x float> %a, <16 x float> %b, <16 
 ; CHECK-NEXT:    vfnmacc.vv v16, v8, v12, v0.t
 ; CHECK-NEXT:    vmv.v.v v8, v16
 ; CHECK-NEXT:    ret
-  %nega = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %a, <16 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %c, <16 x i1> splat (i1 -1), i32 %evl)
-  %v = call <16 x float> @llvm.vp.fma.v16f32(<16 x float> %nega, <16 x float> %b, <16 x float> %negc, <16 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <16 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <16 x i1> %splat, <16 x i1> poison, <16 x i32> zeroinitializer
+  %nega = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %a, <16 x i1> %allones, i32 %evl)
+  %negc = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %c, <16 x i1> %allones, i32 %evl)
+  %v = call <16 x float> @llvm.vp.fma.v16f32(<16 x float> %nega, <16 x float> %b, <16 x float> %negc, <16 x i1> %allones, i32 %evl)
   %u = call <16 x float> @llvm.vp.select.v16f32(<16 x i1> %m, <16 x float> %v, <16 x float> %c, i32 %evl)
   ret <16 x float> %u
 }
@@ -1124,9 +1264,11 @@ define <16 x float> @vfnmacc_vf_v16f32_ta(<16 x float> %a, float %b, <16 x float
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <16 x float> poison, float %b, i32 0
   %vb = shufflevector <16 x float> %elt.head, <16 x float> poison, <16 x i32> zeroinitializer
-  %nega = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %a, <16 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %c, <16 x i1> splat (i1 -1), i32 %evl)
-  %v = call <16 x float> @llvm.vp.fma.v16f32(<16 x float> %nega, <16 x float> %vb, <16 x float> %negc, <16 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <16 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <16 x i1> %splat, <16 x i1> poison, <16 x i32> zeroinitializer
+  %nega = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %a, <16 x i1> %allones, i32 %evl)
+  %negc = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %c, <16 x i1> %allones, i32 %evl)
+  %v = call <16 x float> @llvm.vp.fma.v16f32(<16 x float> %nega, <16 x float> %vb, <16 x float> %negc, <16 x i1> %allones, i32 %evl)
   %u = call <16 x float> @llvm.vp.select.v16f32(<16 x i1> %m, <16 x float> %v, <16 x float> %c, i32 %evl)
   ret <16 x float> %u
 }
@@ -1140,9 +1282,11 @@ define <16 x float> @vfnmacc_vf_v16f32_commute_ta(<16 x float> %a, float %b, <16
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <16 x float> poison, float %b, i32 0
   %vb = shufflevector <16 x float> %elt.head, <16 x float> poison, <16 x i32> zeroinitializer
-  %nega = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %a, <16 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %c, <16 x i1> splat (i1 -1), i32 %evl)
-  %v = call <16 x float> @llvm.vp.fma.v16f32(<16 x float> %vb, <16 x float> %nega, <16 x float> %negc, <16 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <16 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <16 x i1> %splat, <16 x i1> poison, <16 x i32> zeroinitializer
+  %nega = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %a, <16 x i1> %allones, i32 %evl)
+  %negc = call <16 x float> @llvm.vp.fneg.v16f32(<16 x float> %c, <16 x i1> %allones, i32 %evl)
+  %v = call <16 x float> @llvm.vp.fma.v16f32(<16 x float> %vb, <16 x float> %nega, <16 x float> %negc, <16 x i1> %allones, i32 %evl)
   %u = call <16 x float> @llvm.vp.select.v16f32(<16 x i1> %m, <16 x float> %v, <16 x float> %c, i32 %evl)
   ret <16 x float> %u
 }
@@ -1159,9 +1303,11 @@ define <2 x double> @vfnmacc_vv_v2f64(<2 x double> %a, <2 x double> %b, <2 x dou
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9, v0.t
 ; CHECK-NEXT:    vmv1r.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x double> @llvm.vp.fma.v2f64(<2 x double> %nega, <2 x double> %b, <2 x double> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x double> @llvm.vp.fma.v2f64(<2 x double> %nega, <2 x double> %b, <2 x double> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x double> @llvm.vp.merge.v2f64(<2 x i1> %m, <2 x double> %v, <2 x double> %c, i32 %evl)
   ret <2 x double> %u
 }
@@ -1173,10 +1319,12 @@ define <2 x double> @vfnmacc_vv_v2f64_unmasked(<2 x double> %a, <2 x double> %b,
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9
 ; CHECK-NEXT:    vmv1r.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x double> @llvm.vp.fma.v2f64(<2 x double> %nega, <2 x double> %b, <2 x double> %negc, <2 x i1> splat (i1 -1), i32 %evl)
-  %u = call <2 x double> @llvm.vp.merge.v2f64(<2 x i1> splat (i1 -1), <2 x double> %v, <2 x double> %c, i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x double> @llvm.vp.fma.v2f64(<2 x double> %nega, <2 x double> %b, <2 x double> %negc, <2 x i1> %allones, i32 %evl)
+  %u = call <2 x double> @llvm.vp.merge.v2f64(<2 x i1> %allones, <2 x double> %v, <2 x double> %c, i32 %evl)
   ret <2 x double> %u
 }
 
@@ -1189,9 +1337,11 @@ define <2 x double> @vfnmacc_vf_v2f64(<2 x double> %a, double %b, <2 x double> %
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <2 x double> poison, double %b, i32 0
   %vb = shufflevector <2 x double> %elt.head, <2 x double> poison, <2 x i32> zeroinitializer
-  %nega = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x double> @llvm.vp.fma.v2f64(<2 x double> %nega, <2 x double> %vb, <2 x double> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x double> @llvm.vp.fma.v2f64(<2 x double> %nega, <2 x double> %vb, <2 x double> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x double> @llvm.vp.merge.v2f64(<2 x i1> %m, <2 x double> %v, <2 x double> %c, i32 %evl)
   ret <2 x double> %u
 }
@@ -1205,9 +1355,11 @@ define <2 x double> @vfnmacc_vf_v2f64_commute(<2 x double> %a, double %b, <2 x d
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <2 x double> poison, double %b, i32 0
   %vb = shufflevector <2 x double> %elt.head, <2 x double> poison, <2 x i32> zeroinitializer
-  %nega = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x double> @llvm.vp.fma.v2f64(<2 x double> %vb, <2 x double> %nega, <2 x double> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x double> @llvm.vp.fma.v2f64(<2 x double> %vb, <2 x double> %nega, <2 x double> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x double> @llvm.vp.merge.v2f64(<2 x i1> %m, <2 x double> %v, <2 x double> %c, i32 %evl)
   ret <2 x double> %u
 }
@@ -1221,10 +1373,12 @@ define <2 x double> @vfnmacc_vf_v2f64_unmasked(<2 x double> %a, double %b, <2 x 
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <2 x double> poison, double %b, i32 0
   %vb = shufflevector <2 x double> %elt.head, <2 x double> poison, <2 x i32> zeroinitializer
-  %nega = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x double> @llvm.vp.fma.v2f64(<2 x double> %nega, <2 x double> %vb, <2 x double> %negc, <2 x i1> splat (i1 -1), i32 %evl)
-  %u = call <2 x double> @llvm.vp.merge.v2f64(<2 x i1> splat (i1 -1), <2 x double> %v, <2 x double> %c, i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x double> @llvm.vp.fma.v2f64(<2 x double> %nega, <2 x double> %vb, <2 x double> %negc, <2 x i1> %allones, i32 %evl)
+  %u = call <2 x double> @llvm.vp.merge.v2f64(<2 x i1> %allones, <2 x double> %v, <2 x double> %c, i32 %evl)
   ret <2 x double> %u
 }
 
@@ -1235,9 +1389,11 @@ define <2 x double> @vfnmacc_vv_v2f64_ta(<2 x double> %a, <2 x double> %b, <2 x 
 ; CHECK-NEXT:    vfnmacc.vv v10, v8, v9, v0.t
 ; CHECK-NEXT:    vmv.v.v v8, v10
 ; CHECK-NEXT:    ret
-  %nega = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x double> @llvm.vp.fma.v2f64(<2 x double> %nega, <2 x double> %b, <2 x double> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x double> @llvm.vp.fma.v2f64(<2 x double> %nega, <2 x double> %b, <2 x double> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x double> @llvm.vp.select.v2f64(<2 x i1> %m, <2 x double> %v, <2 x double> %c, i32 %evl)
   ret <2 x double> %u
 }
@@ -1251,9 +1407,11 @@ define <2 x double> @vfnmacc_vf_v2f64_ta(<2 x double> %a, double %b, <2 x double
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <2 x double> poison, double %b, i32 0
   %vb = shufflevector <2 x double> %elt.head, <2 x double> poison, <2 x i32> zeroinitializer
-  %nega = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x double> @llvm.vp.fma.v2f64(<2 x double> %nega, <2 x double> %vb, <2 x double> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x double> @llvm.vp.fma.v2f64(<2 x double> %nega, <2 x double> %vb, <2 x double> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x double> @llvm.vp.select.v2f64(<2 x i1> %m, <2 x double> %v, <2 x double> %c, i32 %evl)
   ret <2 x double> %u
 }
@@ -1267,9 +1425,11 @@ define <2 x double> @vfnmacc_vf_v2f64_commute_ta(<2 x double> %a, double %b, <2 
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <2 x double> poison, double %b, i32 0
   %vb = shufflevector <2 x double> %elt.head, <2 x double> poison, <2 x i32> zeroinitializer
-  %nega = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %a, <2 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %c, <2 x i1> splat (i1 -1), i32 %evl)
-  %v = call <2 x double> @llvm.vp.fma.v2f64(<2 x double> %vb, <2 x double> %nega, <2 x double> %negc, <2 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <2 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <2 x i1> %splat, <2 x i1> poison, <2 x i32> zeroinitializer
+  %nega = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %a, <2 x i1> %allones, i32 %evl)
+  %negc = call <2 x double> @llvm.vp.fneg.v2f64(<2 x double> %c, <2 x i1> %allones, i32 %evl)
+  %v = call <2 x double> @llvm.vp.fma.v2f64(<2 x double> %vb, <2 x double> %nega, <2 x double> %negc, <2 x i1> %allones, i32 %evl)
   %u = call <2 x double> @llvm.vp.select.v2f64(<2 x i1> %m, <2 x double> %v, <2 x double> %c, i32 %evl)
   ret <2 x double> %u
 }
@@ -1286,9 +1446,11 @@ define <4 x double> @vfnmacc_vv_v4f64(<4 x double> %a, <4 x double> %b, <4 x dou
 ; CHECK-NEXT:    vfnmacc.vv v12, v8, v10, v0.t
 ; CHECK-NEXT:    vmv2r.v v8, v12
 ; CHECK-NEXT:    ret
-  %nega = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x double> @llvm.vp.fma.v4f64(<4 x double> %nega, <4 x double> %b, <4 x double> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x double> @llvm.vp.fma.v4f64(<4 x double> %nega, <4 x double> %b, <4 x double> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x double> @llvm.vp.merge.v4f64(<4 x i1> %m, <4 x double> %v, <4 x double> %c, i32 %evl)
   ret <4 x double> %u
 }
@@ -1300,10 +1462,12 @@ define <4 x double> @vfnmacc_vv_v4f64_unmasked(<4 x double> %a, <4 x double> %b,
 ; CHECK-NEXT:    vfnmacc.vv v12, v8, v10
 ; CHECK-NEXT:    vmv2r.v v8, v12
 ; CHECK-NEXT:    ret
-  %nega = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x double> @llvm.vp.fma.v4f64(<4 x double> %nega, <4 x double> %b, <4 x double> %negc, <4 x i1> splat (i1 -1), i32 %evl)
-  %u = call <4 x double> @llvm.vp.merge.v4f64(<4 x i1> splat (i1 -1), <4 x double> %v, <4 x double> %c, i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x double> @llvm.vp.fma.v4f64(<4 x double> %nega, <4 x double> %b, <4 x double> %negc, <4 x i1> %allones, i32 %evl)
+  %u = call <4 x double> @llvm.vp.merge.v4f64(<4 x i1> %allones, <4 x double> %v, <4 x double> %c, i32 %evl)
   ret <4 x double> %u
 }
 
@@ -1316,9 +1480,11 @@ define <4 x double> @vfnmacc_vf_v4f64(<4 x double> %a, double %b, <4 x double> %
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <4 x double> poison, double %b, i32 0
   %vb = shufflevector <4 x double> %elt.head, <4 x double> poison, <4 x i32> zeroinitializer
-  %nega = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x double> @llvm.vp.fma.v4f64(<4 x double> %nega, <4 x double> %vb, <4 x double> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x double> @llvm.vp.fma.v4f64(<4 x double> %nega, <4 x double> %vb, <4 x double> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x double> @llvm.vp.merge.v4f64(<4 x i1> %m, <4 x double> %v, <4 x double> %c, i32 %evl)
   ret <4 x double> %u
 }
@@ -1332,9 +1498,11 @@ define <4 x double> @vfnmacc_vf_v4f64_commute(<4 x double> %a, double %b, <4 x d
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <4 x double> poison, double %b, i32 0
   %vb = shufflevector <4 x double> %elt.head, <4 x double> poison, <4 x i32> zeroinitializer
-  %nega = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x double> @llvm.vp.fma.v4f64(<4 x double> %vb, <4 x double> %nega, <4 x double> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x double> @llvm.vp.fma.v4f64(<4 x double> %vb, <4 x double> %nega, <4 x double> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x double> @llvm.vp.merge.v4f64(<4 x i1> %m, <4 x double> %v, <4 x double> %c, i32 %evl)
   ret <4 x double> %u
 }
@@ -1348,10 +1516,12 @@ define <4 x double> @vfnmacc_vf_v4f64_unmasked(<4 x double> %a, double %b, <4 x 
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <4 x double> poison, double %b, i32 0
   %vb = shufflevector <4 x double> %elt.head, <4 x double> poison, <4 x i32> zeroinitializer
-  %nega = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x double> @llvm.vp.fma.v4f64(<4 x double> %nega, <4 x double> %vb, <4 x double> %negc, <4 x i1> splat (i1 -1), i32 %evl)
-  %u = call <4 x double> @llvm.vp.merge.v4f64(<4 x i1> splat (i1 -1), <4 x double> %v, <4 x double> %c, i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x double> @llvm.vp.fma.v4f64(<4 x double> %nega, <4 x double> %vb, <4 x double> %negc, <4 x i1> %allones, i32 %evl)
+  %u = call <4 x double> @llvm.vp.merge.v4f64(<4 x i1> %allones, <4 x double> %v, <4 x double> %c, i32 %evl)
   ret <4 x double> %u
 }
 
@@ -1362,9 +1532,11 @@ define <4 x double> @vfnmacc_vv_v4f64_ta(<4 x double> %a, <4 x double> %b, <4 x 
 ; CHECK-NEXT:    vfnmacc.vv v12, v8, v10, v0.t
 ; CHECK-NEXT:    vmv.v.v v8, v12
 ; CHECK-NEXT:    ret
-  %nega = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x double> @llvm.vp.fma.v4f64(<4 x double> %nega, <4 x double> %b, <4 x double> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x double> @llvm.vp.fma.v4f64(<4 x double> %nega, <4 x double> %b, <4 x double> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x double> @llvm.vp.select.v4f64(<4 x i1> %m, <4 x double> %v, <4 x double> %c, i32 %evl)
   ret <4 x double> %u
 }
@@ -1378,9 +1550,11 @@ define <4 x double> @vfnmacc_vf_v4f64_ta(<4 x double> %a, double %b, <4 x double
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <4 x double> poison, double %b, i32 0
   %vb = shufflevector <4 x double> %elt.head, <4 x double> poison, <4 x i32> zeroinitializer
-  %nega = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x double> @llvm.vp.fma.v4f64(<4 x double> %nega, <4 x double> %vb, <4 x double> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x double> @llvm.vp.fma.v4f64(<4 x double> %nega, <4 x double> %vb, <4 x double> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x double> @llvm.vp.select.v4f64(<4 x i1> %m, <4 x double> %v, <4 x double> %c, i32 %evl)
   ret <4 x double> %u
 }
@@ -1394,9 +1568,11 @@ define <4 x double> @vfnmacc_vf_v4f64_commute_ta(<4 x double> %a, double %b, <4 
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <4 x double> poison, double %b, i32 0
   %vb = shufflevector <4 x double> %elt.head, <4 x double> poison, <4 x i32> zeroinitializer
-  %nega = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %a, <4 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %c, <4 x i1> splat (i1 -1), i32 %evl)
-  %v = call <4 x double> @llvm.vp.fma.v4f64(<4 x double> %vb, <4 x double> %nega, <4 x double> %negc, <4 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <4 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <4 x i1> %splat, <4 x i1> poison, <4 x i32> zeroinitializer
+  %nega = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %a, <4 x i1> %allones, i32 %evl)
+  %negc = call <4 x double> @llvm.vp.fneg.v4f64(<4 x double> %c, <4 x i1> %allones, i32 %evl)
+  %v = call <4 x double> @llvm.vp.fma.v4f64(<4 x double> %vb, <4 x double> %nega, <4 x double> %negc, <4 x i1> %allones, i32 %evl)
   %u = call <4 x double> @llvm.vp.select.v4f64(<4 x i1> %m, <4 x double> %v, <4 x double> %c, i32 %evl)
   ret <4 x double> %u
 }
@@ -1413,9 +1589,11 @@ define <8 x double> @vfnmacc_vv_v8f64(<8 x double> %a, <8 x double> %b, <8 x dou
 ; CHECK-NEXT:    vfnmacc.vv v16, v8, v12, v0.t
 ; CHECK-NEXT:    vmv4r.v v8, v16
 ; CHECK-NEXT:    ret
-  %nega = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x double> @llvm.vp.fma.v8f64(<8 x double> %nega, <8 x double> %b, <8 x double> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x double> @llvm.vp.fma.v8f64(<8 x double> %nega, <8 x double> %b, <8 x double> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x double> @llvm.vp.merge.v8f64(<8 x i1> %m, <8 x double> %v, <8 x double> %c, i32 %evl)
   ret <8 x double> %u
 }
@@ -1427,10 +1605,12 @@ define <8 x double> @vfnmacc_vv_v8f64_unmasked(<8 x double> %a, <8 x double> %b,
 ; CHECK-NEXT:    vfnmacc.vv v16, v8, v12
 ; CHECK-NEXT:    vmv4r.v v8, v16
 ; CHECK-NEXT:    ret
-  %nega = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x double> @llvm.vp.fma.v8f64(<8 x double> %nega, <8 x double> %b, <8 x double> %negc, <8 x i1> splat (i1 -1), i32 %evl)
-  %u = call <8 x double> @llvm.vp.merge.v8f64(<8 x i1> splat (i1 -1), <8 x double> %v, <8 x double> %c, i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x double> @llvm.vp.fma.v8f64(<8 x double> %nega, <8 x double> %b, <8 x double> %negc, <8 x i1> %allones, i32 %evl)
+  %u = call <8 x double> @llvm.vp.merge.v8f64(<8 x i1> %allones, <8 x double> %v, <8 x double> %c, i32 %evl)
   ret <8 x double> %u
 }
 
@@ -1443,9 +1623,11 @@ define <8 x double> @vfnmacc_vf_v8f64(<8 x double> %a, double %b, <8 x double> %
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <8 x double> poison, double %b, i32 0
   %vb = shufflevector <8 x double> %elt.head, <8 x double> poison, <8 x i32> zeroinitializer
-  %nega = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x double> @llvm.vp.fma.v8f64(<8 x double> %nega, <8 x double> %vb, <8 x double> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x double> @llvm.vp.fma.v8f64(<8 x double> %nega, <8 x double> %vb, <8 x double> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x double> @llvm.vp.merge.v8f64(<8 x i1> %m, <8 x double> %v, <8 x double> %c, i32 %evl)
   ret <8 x double> %u
 }
@@ -1459,9 +1641,11 @@ define <8 x double> @vfnmacc_vf_v8f64_commute(<8 x double> %a, double %b, <8 x d
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <8 x double> poison, double %b, i32 0
   %vb = shufflevector <8 x double> %elt.head, <8 x double> poison, <8 x i32> zeroinitializer
-  %nega = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x double> @llvm.vp.fma.v8f64(<8 x double> %vb, <8 x double> %nega, <8 x double> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x double> @llvm.vp.fma.v8f64(<8 x double> %vb, <8 x double> %nega, <8 x double> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x double> @llvm.vp.merge.v8f64(<8 x i1> %m, <8 x double> %v, <8 x double> %c, i32 %evl)
   ret <8 x double> %u
 }
@@ -1475,10 +1659,12 @@ define <8 x double> @vfnmacc_vf_v8f64_unmasked(<8 x double> %a, double %b, <8 x 
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <8 x double> poison, double %b, i32 0
   %vb = shufflevector <8 x double> %elt.head, <8 x double> poison, <8 x i32> zeroinitializer
-  %nega = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x double> @llvm.vp.fma.v8f64(<8 x double> %nega, <8 x double> %vb, <8 x double> %negc, <8 x i1> splat (i1 -1), i32 %evl)
-  %u = call <8 x double> @llvm.vp.merge.v8f64(<8 x i1> splat (i1 -1), <8 x double> %v, <8 x double> %c, i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x double> @llvm.vp.fma.v8f64(<8 x double> %nega, <8 x double> %vb, <8 x double> %negc, <8 x i1> %allones, i32 %evl)
+  %u = call <8 x double> @llvm.vp.merge.v8f64(<8 x i1> %allones, <8 x double> %v, <8 x double> %c, i32 %evl)
   ret <8 x double> %u
 }
 
@@ -1489,9 +1675,11 @@ define <8 x double> @vfnmacc_vv_v8f64_ta(<8 x double> %a, <8 x double> %b, <8 x 
 ; CHECK-NEXT:    vfnmacc.vv v16, v8, v12, v0.t
 ; CHECK-NEXT:    vmv.v.v v8, v16
 ; CHECK-NEXT:    ret
-  %nega = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x double> @llvm.vp.fma.v8f64(<8 x double> %nega, <8 x double> %b, <8 x double> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x double> @llvm.vp.fma.v8f64(<8 x double> %nega, <8 x double> %b, <8 x double> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x double> @llvm.vp.select.v8f64(<8 x i1> %m, <8 x double> %v, <8 x double> %c, i32 %evl)
   ret <8 x double> %u
 }
@@ -1505,9 +1693,11 @@ define <8 x double> @vfnmacc_vf_v8f64_ta(<8 x double> %a, double %b, <8 x double
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <8 x double> poison, double %b, i32 0
   %vb = shufflevector <8 x double> %elt.head, <8 x double> poison, <8 x i32> zeroinitializer
-  %nega = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x double> @llvm.vp.fma.v8f64(<8 x double> %nega, <8 x double> %vb, <8 x double> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x double> @llvm.vp.fma.v8f64(<8 x double> %nega, <8 x double> %vb, <8 x double> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x double> @llvm.vp.select.v8f64(<8 x i1> %m, <8 x double> %v, <8 x double> %c, i32 %evl)
   ret <8 x double> %u
 }
@@ -1521,9 +1711,11 @@ define <8 x double> @vfnmacc_vf_v8f64_commute_ta(<8 x double> %a, double %b, <8 
 ; CHECK-NEXT:    ret
   %elt.head = insertelement <8 x double> poison, double %b, i32 0
   %vb = shufflevector <8 x double> %elt.head, <8 x double> poison, <8 x i32> zeroinitializer
-  %nega = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %a, <8 x i1> splat (i1 -1), i32 %evl)
-  %negc = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %c, <8 x i1> splat (i1 -1), i32 %evl)
-  %v = call <8 x double> @llvm.vp.fma.v8f64(<8 x double> %vb, <8 x double> %nega, <8 x double> %negc, <8 x i1> splat (i1 -1), i32 %evl)
+  %splat = insertelement <8 x i1> poison, i1 -1, i32 0
+  %allones = shufflevector <8 x i1> %splat, <8 x i1> poison, <8 x i32> zeroinitializer
+  %nega = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %a, <8 x i1> %allones, i32 %evl)
+  %negc = call <8 x double> @llvm.vp.fneg.v8f64(<8 x double> %c, <8 x i1> %allones, i32 %evl)
+  %v = call <8 x double> @llvm.vp.fma.v8f64(<8 x double> %vb, <8 x double> %nega, <8 x double> %negc, <8 x i1> %allones, i32 %evl)
   %u = call <8 x double> @llvm.vp.select.v8f64(<8 x i1> %m, <8 x double> %v, <8 x double> %c, i32 %evl)
   ret <8 x double> %u
 }

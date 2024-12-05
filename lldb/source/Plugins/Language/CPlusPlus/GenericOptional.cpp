@@ -19,7 +19,7 @@ using namespace lldb_private;
 bool lldb_private::formatters::GenericOptionalSummaryProvider(
     ValueObject &valobj, Stream &stream, const TypeSummaryOptions &options) {
   stream.Printf(" Has Value=%s ",
-                valobj.GetNumChildrenIgnoringErrors() == 0 ? "false" : "true");
+                valobj.GetNumChildren() == 0 ? "false" : "true");
 
   return true;
 }
@@ -41,12 +41,10 @@ public:
   }
 
   bool MightHaveChildren() override { return true; }
-  llvm::Expected<uint32_t> CalculateNumChildren() override {
-    return m_has_value ? 1U : 0U;
-  }
+  size_t CalculateNumChildren() override { return m_has_value ? 1U : 0U; }
 
-  ValueObjectSP GetChildAtIndex(uint32_t idx) override;
-  lldb::ChildCacheState Update() override;
+  ValueObjectSP GetChildAtIndex(size_t idx) override;
+  bool Update() override;
 
 private:
   bool m_has_value = false;
@@ -63,7 +61,7 @@ GenericOptionalFrontend::GenericOptionalFrontend(ValueObject &valobj,
   }
 }
 
-lldb::ChildCacheState GenericOptionalFrontend::Update() {
+bool GenericOptionalFrontend::Update() {
   ValueObjectSP engaged_sp;
 
   if (m_stdlib == StdLib::LibCxx)
@@ -73,17 +71,17 @@ lldb::ChildCacheState GenericOptionalFrontend::Update() {
                      ->GetChildMemberWithName("_M_engaged");
 
   if (!engaged_sp)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
   // _M_engaged/__engaged is a bool flag and is true if the optional contains a
   // value. Converting it to unsigned gives us a size of 1 if it contains a
   // value and 0 if not.
   m_has_value = engaged_sp->GetValueAsUnsigned(0) != 0;
 
-  return lldb::ChildCacheState::eRefetch;
+  return false;
 }
 
-ValueObjectSP GenericOptionalFrontend::GetChildAtIndex(uint32_t _idx) {
+ValueObjectSP GenericOptionalFrontend::GetChildAtIndex(size_t _idx) {
   if (!m_has_value)
     return ValueObjectSP();
 

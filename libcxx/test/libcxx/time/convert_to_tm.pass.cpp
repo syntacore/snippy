@@ -15,7 +15,6 @@
 // Most of the code is tested indirectly in the chrono formatters. This only
 // tests the hour overflow.
 
-#include <__chrono/convert_to_tm.h>
 #include <chrono>
 #include <cassert>
 #include <format>

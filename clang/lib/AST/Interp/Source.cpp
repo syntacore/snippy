@@ -33,7 +33,7 @@ SourceRange SourceInfo::getRange() const {
 }
 
 const Expr *SourceInfo::asExpr() const {
-  if (const auto *S = Source.dyn_cast<const Stmt *>())
+  if (auto *S = Source.dyn_cast<const Stmt *>())
     return dyn_cast<Expr>(S);
   return nullptr;
 }

@@ -208,7 +208,7 @@ BlockT *LoopBase<BlockT, LoopT>::getLoopPreheader() const {
     return nullptr;
 
   // Make sure there is only one exit out of the preheader.
-  if (!llvm::hasSingleElement(llvm::children<BlockT *>(Out)))
+  if (llvm::size(llvm::children<BlockT *>(Out)) != 1)
     return nullptr; // Multiple exits from the block, must not be a preheader.
 
   // The predecessor has exactly one successor, so it is a preheader.

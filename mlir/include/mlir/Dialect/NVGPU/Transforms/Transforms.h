@@ -14,6 +14,7 @@
 #define MLIR_DIALECT_NVGPU_TRANSFORMS_TRANSFORMS_H_
 
 #include "mlir/IR/Operation.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
 class RewriterBase;
@@ -43,7 +44,7 @@ namespace nvgpu {
 /// function that depends on the row Index. The permutation function is chosen
 /// to ensure that sequential distributed+vectorized reads/writes down a single
 /// dimension of the memref have minimal conflicts.
-llvm::LogicalResult optimizeSharedMemoryReadsAndWrites(Operation *parentOp,
+mlir::LogicalResult optimizeSharedMemoryReadsAndWrites(Operation *parentOp,
                                                        Value memrefValue);
 
 ///

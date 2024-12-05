@@ -22,7 +22,6 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/IntrinsicsAArch64.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -61,8 +60,10 @@ FunctionPass *llvm::createSMEABIPass() { return new SMEABI(); }
 void emitTPIDR2Save(Module *M, IRBuilder<> &Builder) {
   auto *TPIDR2SaveTy =
       FunctionType::get(Builder.getVoidTy(), {}, /*IsVarArgs=*/false);
-  auto Attrs = AttributeList().addFnAttribute(M->getContext(),
-                                              "aarch64_pstate_sm_compatible");
+  auto Attrs =
+      AttributeList()
+          .addFnAttribute(M->getContext(), "aarch64_pstate_sm_compatible")
+          .addFnAttribute(M->getContext(), "aarch64_pstate_za_preserved");
   FunctionCallee Callee =
       M->getOrInsertFunction("__arm_tpidr2_save", TPIDR2SaveTy, Attrs);
   CallInst *Call = Builder.CreateCall(Callee);
@@ -77,7 +78,7 @@ void emitTPIDR2Save(Module *M, IRBuilder<> &Builder) {
 }
 
 /// This function generates code at the beginning and end of a function marked
-/// with either `aarch64_new_za` or `aarch64_new_zt0`.
+/// with either `aarch64_pstate_za_new` or `aarch64_new_zt0`.
 /// At the beginning of the function, the following code is generated:
 ///  - Commit lazy-save if active   [Private-ZA Interface*]
 ///  - Enable PSTATE.ZA             [Private-ZA Interface]
@@ -132,7 +133,7 @@ bool SMEABI::updateNewStateFunctions(Module *M, Function *F,
     Builder.CreateCall(EnableZAIntr->getFunctionType(), EnableZAIntr);
   }
 
-  if (FnAttrs.isNewZA()) {
+  if (FnAttrs.hasNewZABody()) {
     Function *ZeroIntr =
         Intrinsic::getDeclaration(M, Intrinsic::aarch64_sme_zero);
     Builder.CreateCall(ZeroIntr->getFunctionType(), ZeroIntr,
@@ -173,7 +174,7 @@ bool SMEABI::runOnFunction(Function &F) {
 
   bool Changed = false;
   SMEAttrs FnAttrs(F);
-  if (FnAttrs.isNewZA() || FnAttrs.isNewZT0())
+  if (FnAttrs.hasNewZABody() || FnAttrs.isNewZT0())
     Changed |= updateNewStateFunctions(M, &F, Builder, FnAttrs);
 
   return Changed;

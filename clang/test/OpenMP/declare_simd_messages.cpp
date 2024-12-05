@@ -33,9 +33,10 @@ int main();
 int main();
 
 struct A {
+// expected-error@+1 {{function declaration is expected after 'declare simd' directive}}
   #pragma omp declare simd
   template<typename T>
-  T infunc1(T a);
+  T infunc1(T a), infunc2(T a);
 };
 
 // expected-error@+1 {{single declaration is expected after 'declare simd' directive}}

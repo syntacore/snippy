@@ -13,7 +13,7 @@
 #ifndef VULKAN_RUNTIME_H
 #define VULKAN_RUNTIME_H
 
-#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 
 #include <unordered_map>
 #include <vector>

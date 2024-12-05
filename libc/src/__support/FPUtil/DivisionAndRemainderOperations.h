@@ -15,9 +15,8 @@
 
 #include "src/__support/CPP/type_traits.h"
 #include "src/__support/common.h"
-#include "src/__support/macros/config.h"
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 namespace fputil {
 
 static constexpr int QUOTIENT_LSB_BITS = 3;
@@ -32,7 +31,7 @@ LIBC_INLINE T remquo(T x, T y, int &q) {
   if (ybits.is_nan())
     return y;
   if (xbits.is_inf() || ybits.is_zero())
-    return FPBits<T>::quiet_nan().get_val();
+    return FPBits<T>::build_quiet_nan().get_val();
 
   if (xbits.is_zero()) {
     q = 0;
@@ -116,6 +115,6 @@ LIBC_INLINE T remquo(T x, T y, int &q) {
 }
 
 } // namespace fputil
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE
 
 #endif // LLVM_LIBC_SRC___SUPPORT_FPUTIL_DIVISIONANDREMAINDEROPERATIONS_H

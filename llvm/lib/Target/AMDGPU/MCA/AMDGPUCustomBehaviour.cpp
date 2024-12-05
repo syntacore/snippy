@@ -13,12 +13,13 @@
 
 #include "AMDGPUCustomBehaviour.h"
 #include "MCTargetDesc/AMDGPUMCTargetDesc.h"
-#include "TargetInfo/AMDGPUTargetInfo.h"
 #include "Utils/AMDGPUBaseInfo.h"
+#include "TargetInfo/AMDGPUTargetInfo.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/WithColor.h"
 
-namespace llvm::mca {
+namespace llvm {
+namespace mca {
 
 void AMDGPUInstrPostProcess::postProcessInstruction(
     std::unique_ptr<Instruction> &Inst, const MCInst &MCI) {
@@ -331,7 +332,8 @@ bool AMDGPUCustomBehaviour::isAlwaysGDS(uint16_t Opcode) const {
   return Opcode == AMDGPU::DS_ORDERED_COUNT || isGWS(Opcode);
 }
 
-} // namespace llvm::mca
+} // namespace mca
+} // namespace llvm
 
 using namespace llvm;
 using namespace mca;

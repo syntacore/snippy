@@ -38,10 +38,11 @@ configure_lit_site_cfg(
   "LLD_SOURCE_DIR"
 )
 
-set(LLD_TEST_DEPS lld LLDUnitTests)
+set(LLD_TEST_DEPS lld)
 if (NOT LLD_BUILT_STANDALONE)
   list(APPEND LLD_TEST_DEPS
     FileCheck
+    LLDUnitTests
     count
     dsymutil
     llc
@@ -83,9 +84,10 @@ add_lit_testsuite(check-lld "Running lld test suite"
   ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${LLD_TEST_DEPS}
   )
+set_target_properties(check-lld PROPERTIES FOLDER "lld tests")
 
 add_custom_target(lld-test-depends DEPENDS ${LLD_TEST_DEPS})
-set_target_properties(lld-test-depends PROPERTIES FOLDER "LLD/Tests")
+set_target_properties(lld-test-depends PROPERTIES FOLDER "lld tests")
 
 add_lit_testsuites(LLD ${CMAKE_CURRENT_SOURCE_DIR}
   DEPENDS ${LLD_TEST_DEPS}
@@ -94,4 +96,4 @@ add_lit_testsuites(LLD ${CMAKE_CURRENT_SOURCE_DIR}
 # Add a legacy target spelling: lld-test
 add_custom_target(lld-test)
 add_dependencies(lld-test check-lld)
-set_target_properties(lld-test PROPERTIES FOLDER "LLD/Tests")
+set_target_properties(lld-test PROPERTIES FOLDER "lld tests")

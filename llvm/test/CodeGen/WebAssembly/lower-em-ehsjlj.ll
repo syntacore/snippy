@@ -49,7 +49,7 @@ try.cont:                                         ; preds = %lpad, %entry
 
 ; longjmp checking part
 ; CHECK:    if.then1:
-; CHECK:      call i32 @__wasm_setjmp_test
+; CHECK:      call i32 @testSetjmp
 }
 
 ; @foo can either throw an exception or longjmp. Because this function doesn't
@@ -117,6 +117,7 @@ if.end:                                           ; preds = %entry
 
 ; CHECK:    rethrow.exn:
 ; CHECK-NEXT: %exn = call ptr @__cxa_find_matching_catch_2()
+; CHECK-NEXT: call void @free(ptr %setjmpTable{{.*}})
 ; CHECK-NEXT: call void @__resumeException(ptr %exn)
 ; CHECK-NEXT: unreachable
 
@@ -146,6 +147,7 @@ throw:                                            ; preds = %if.end, %entry
   unreachable
 
 ; CHECK:    throw:
+; CHECK-NEXT: call void @free(ptr %setjmpTable{{.*}})
 ; CHECK-NEXT: call void @__cxa_throw(ptr null, ptr null, ptr null)
 ; CHECK-NEXT: unreachable
 }
@@ -206,6 +208,7 @@ return:                                           ; preds = %entry, %if.end
 
 ; CHECK:    rethrow.exn:
 ; CHECK-NEXT: %exn = call ptr @__cxa_find_matching_catch_2()
+; CHECK-NEXT: tail call void @free(ptr %setjmpTable{{.*}})
 ; CHECK-NEXT: call void @__resumeException(ptr %exn)
 ; CHECK-NEXT: unreachable
 }

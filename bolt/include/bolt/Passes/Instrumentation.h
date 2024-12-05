@@ -31,7 +31,7 @@ public:
         Summary(std::make_unique<InstrumentationSummary>()) {}
 
   /// Modifies all functions by inserting instrumentation code (first step)
-  Error runOnFunctions(BinaryContext &BC) override;
+  void runOnFunctions(BinaryContext &BC) override;
 
   const char *getName() const override { return "instrumentation"; }
 

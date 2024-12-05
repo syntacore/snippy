@@ -14,7 +14,6 @@
 
 #include <format>
 #include <cassert>
-#include <limits>
 #include <type_traits>
 
 #include "test_macros.h"
@@ -25,17 +24,14 @@ void test(From value) {
   auto store = std::make_format_args<Context>(value);
   const std::basic_format_args<Context> format_args{store};
 
-  auto visitor = [v = To(value)](auto a) {
-    if constexpr (std::is_same_v<To, decltype(a)>)
-      assert(v == a);
-    else
-      assert(false);
-  };
-#if TEST_STD_VER >= 26 && defined(TEST_HAS_EXPLICIT_THIS_PARAMETER)
-  format_args.get(0).visit(visitor);
-#else
-  std::visit_format_arg(visitor, format_args.get(0));
-#endif
+  std::visit_format_arg(
+      [v = To(value)](auto a) {
+        if constexpr (std::is_same_v<To, decltype(a)>)
+          assert(v == a);
+        else
+          assert(false);
+      },
+      format_args.get(0));
 }
 
 // Some types, as an extension, are stored in the variant. The Standard
@@ -45,12 +41,9 @@ void test_handle(T value) {
   auto store = std::make_format_args<Context>(value);
   std::basic_format_args<Context> format_args{store};
 
-  auto visitor = [](auto a) { assert((std::is_same_v<decltype(a), typename std::basic_format_arg<Context>::handle>)); };
-#if TEST_STD_VER >= 26 && defined(TEST_HAS_EXPLICIT_THIS_PARAMETER)
-  format_args.get(0).visit(visitor);
-#else
-  std::visit_format_arg(visitor, format_args.get(0));
-#endif
+  std::visit_format_arg(
+      [](auto a) { assert((std::is_same_v<decltype(a), typename std::basic_format_arg<Context>::handle>)); },
+      format_args.get(0));
 }
 
 // Test specific for string and string_view.
@@ -65,23 +58,25 @@ void test_string_view(From value) {
   using CharT = typename Context::char_type;
   using To = std::basic_string_view<CharT>;
   using V = std::basic_string<CharT>;
-
-  auto visitor = [v = V(value.begin(), value.end())](auto a) {
-    if constexpr (std::is_same_v<To, decltype(a)>)
-      assert(v == a);
-    else
-      assert(false);
-  };
-#if TEST_STD_VER >= 26 && defined(TEST_HAS_EXPLICIT_THIS_PARAMETER)
-  format_args.get(0).visit(visitor);
-#else
-  std::visit_format_arg(visitor, format_args.get(0));
-#endif
+  std::visit_format_arg(
+      [v = V(value.begin(), value.end())](auto a) {
+        if constexpr (std::is_same_v<To, decltype(a)>)
+          assert(v == a);
+        else
+          assert(false);
+      },
+      format_args.get(0));
 }
 
 template <class CharT>
 void test() {
-  using Context   = std::basic_format_context<CharT*, CharT>;
+  using Context = std::basic_format_context<CharT*, CharT>;
+  {
+    const std::basic_format_args<Context> format_args{};
+    ASSERT_NOEXCEPT(format_args.get(0));
+    assert(!format_args.get(0));
+  }
+
   using char_type = typename Context::char_type;
   std::basic_string<char_type> empty;
   std::basic_string<char_type> str = MAKE_STRING(char_type, "abc");

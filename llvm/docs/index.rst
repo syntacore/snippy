@@ -24,12 +24,6 @@ Several introductory papers and presentations.
    FAQ
    Lexicon
 
-:doc:`FAQ`
-  Frequently asked questions.
-
-:doc:`Lexicon`
-  Glossary.
-
 `Introduction to the LLVM Compiler`__
   Presentation providing a users introduction to LLVM.
 

@@ -10,14 +10,8 @@
 #define LLDB_SOURCE_PLUGINS_EXPRESSIONPARSER_CLANG_CLANGEXTERNALASTSOURCECALLBACKS_H
 
 #include "Plugins/TypeSystem/Clang/TypeSystemClang.h"
-#include "clang/Basic/ASTSourceDescriptor.h"
+#include "clang/Basic/Module.h"
 #include <optional>
-
-namespace clang {
-
-class Module;
-
-} // namespace clang
 
 namespace lldb_private {
 

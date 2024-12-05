@@ -9,20 +9,20 @@
 #include "ImplicitWideningOfMultiplicationResultCheck.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
-#include "clang/ASTMatchers/ASTMatchersMacros.h"
 #include "clang/Lex/Lexer.h"
 #include <optional>
 
 using namespace clang::ast_matchers;
 
-namespace clang::tidy::bugprone {
-
+namespace clang {
 namespace {
 AST_MATCHER(ImplicitCastExpr, isPartOfExplicitCast) {
   return Node.isPartOfExplicitCast();
 }
-AST_MATCHER(Expr, containsErrors) { return Node.containsErrors(); }
 } // namespace
+} // namespace clang
+
+namespace clang::tidy::bugprone {
 
 static const Expr *getLHSOfMulBinOp(const Expr *E) {
   assert(E == E->IgnoreParens() && "Already skipped all parens!");
@@ -42,7 +42,6 @@ ImplicitWideningOfMultiplicationResultCheck::
       UseCXXStaticCastsInCppSources(
           Options.get("UseCXXStaticCastsInCppSources", true)),
       UseCXXHeadersInCppSources(Options.get("UseCXXHeadersInCppSources", true)),
-      IgnoreConstantIntExpr(Options.get("IgnoreConstantIntExpr", false)),
       IncludeInserter(Options.getLocalOrGlobal("IncludeStyle",
                                                utils::IncludeSorter::IS_LLVM),
                       areDiagsSelfContained()) {}
@@ -57,7 +56,6 @@ void ImplicitWideningOfMultiplicationResultCheck::storeOptions(
   Options.store(Opts, "UseCXXStaticCastsInCppSources",
                 UseCXXStaticCastsInCppSources);
   Options.store(Opts, "UseCXXHeadersInCppSources", UseCXXHeadersInCppSources);
-  Options.store(Opts, "IgnoreConstantIntExpr", IgnoreConstantIntExpr);
   Options.store(Opts, "IncludeStyle", IncludeInserter.getStyle());
 }
 
@@ -85,19 +83,6 @@ void ImplicitWideningOfMultiplicationResultCheck::handleImplicitCastExpr(
   unsigned TgtWidth = Context->getIntWidth(Ty);
   if (TgtWidth <= SrcWidth)
     return;
-
-  // Is the expression a compile-time constexpr that we know can fit in the
-  // source type?
-  if (IgnoreConstantIntExpr && ETy->isIntegerType() &&
-      !ETy->isUnsignedIntegerType()) {
-    if (const auto ConstExprResult = E->getIntegerConstantExpr(*Context)) {
-      const auto TypeSize = Context->getTypeSize(ETy);
-      llvm::APSInt WidenedResult = ConstExprResult->extOrTrunc(TypeSize);
-      if (WidenedResult <= llvm::APSInt::getMaxValue(TypeSize, false) &&
-          WidenedResult >= llvm::APSInt::getMinValue(TypeSize, false))
-        return;
-    }
-  }
 
   // Does the index expression look like it might be unintentionally computed
   // in a narrower-than-wanted type?
@@ -265,8 +250,7 @@ void ImplicitWideningOfMultiplicationResultCheck::handlePointerOffsetting(
 
 void ImplicitWideningOfMultiplicationResultCheck::registerMatchers(
     MatchFinder *Finder) {
-  Finder->addMatcher(implicitCastExpr(unless(anyOf(containsErrors(),
-                                                   isInTemplateInstantiation(),
+  Finder->addMatcher(implicitCastExpr(unless(anyOf(isInTemplateInstantiation(),
                                                    isPartOfExplicitCast())),
                                       hasCastKind(CK_IntegralCast))
                          .bind("x"),

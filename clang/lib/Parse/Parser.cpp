@@ -21,7 +21,6 @@
 #include "clang/Sema/DeclSpec.h"
 #include "clang/Sema/ParsedTemplate.h"
 #include "clang/Sema/Scope.h"
-#include "clang/Sema/SemaCodeCompletion.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TimeProfiler.h"
 using namespace clang;
@@ -686,7 +685,7 @@ bool Parser::ParseTopLevelDecl(DeclGroupPtrTy &Result,
     // FIXME: We need a better way to disambiguate C++ clang modules and
     // standard C++ modules.
     if (!getLangOpts().CPlusPlusModules || !Mod->isHeaderUnit())
-      Actions.ActOnAnnotModuleInclude(Loc, Mod);
+      Actions.ActOnModuleInclude(Loc, Mod);
     else {
       DeclResult Import =
           Actions.ActOnModuleImport(Loc, SourceLocation(), Loc, Mod);
@@ -698,17 +697,15 @@ bool Parser::ParseTopLevelDecl(DeclGroupPtrTy &Result,
   }
 
   case tok::annot_module_begin:
-    Actions.ActOnAnnotModuleBegin(
-        Tok.getLocation(),
-        reinterpret_cast<Module *>(Tok.getAnnotationValue()));
+    Actions.ActOnModuleBegin(Tok.getLocation(), reinterpret_cast<Module *>(
+                                                    Tok.getAnnotationValue()));
     ConsumeAnnotationToken();
     ImportState = Sema::ModuleImportState::NotACXX20Module;
     return false;
 
   case tok::annot_module_end:
-    Actions.ActOnAnnotModuleEnd(
-        Tok.getLocation(),
-        reinterpret_cast<Module *>(Tok.getAnnotationValue()));
+    Actions.ActOnModuleEnd(Tok.getLocation(), reinterpret_cast<Module *>(
+                                                  Tok.getAnnotationValue()));
     ConsumeAnnotationToken();
     ImportState = Sema::ModuleImportState::NotACXX20Module;
     return false;
@@ -945,21 +942,20 @@ Parser::ParseExternalDeclaration(ParsedAttributes &Attrs,
     cutOffParsing();
     if (CurParsedObjCImpl) {
       // Code-complete Objective-C methods even without leading '-'/'+' prefix.
-      Actions.CodeCompletion().CodeCompleteObjCMethodDecl(
-          getCurScope(),
-          /*IsInstanceMethod=*/std::nullopt,
-          /*ReturnType=*/nullptr);
+      Actions.CodeCompleteObjCMethodDecl(getCurScope(),
+                                         /*IsInstanceMethod=*/std::nullopt,
+                                         /*ReturnType=*/nullptr);
     }
 
-    SemaCodeCompletion::ParserCompletionContext PCC;
+    Sema::ParserCompletionContext PCC;
     if (CurParsedObjCImpl) {
-      PCC = SemaCodeCompletion::PCC_ObjCImplementation;
+      PCC = Sema::PCC_ObjCImplementation;
     } else if (PP.isIncrementalProcessingEnabled()) {
-      PCC = SemaCodeCompletion::PCC_TopLevelOrExpression;
+      PCC = Sema::PCC_TopLevelOrExpression;
     } else {
-      PCC = SemaCodeCompletion::PCC_Namespace;
+      PCC = Sema::PCC_Namespace;
     };
-    Actions.CodeCompletion().CodeCompleteOrdinaryName(getCurScope(), PCC);
+    Actions.CodeCompleteOrdinaryName(getCurScope(), PCC);
     return nullptr;
   case tok::kw_import: {
     Sema::ModuleImportState IS = Sema::ModuleImportState::NotACXX20Module;
@@ -970,7 +966,7 @@ Parser::ParseExternalDeclaration(ParsedAttributes &Attrs,
     SingleDecl = ParseModuleImport(SourceLocation(), IS);
   } break;
   case tok::kw_export:
-    if (getLangOpts().CPlusPlusModules || getLangOpts().HLSL) {
+    if (getLangOpts().CPlusPlusModules) {
       ProhibitAttributes(Attrs);
       SingleDecl = ParseExportDeclaration();
       break;
@@ -1044,8 +1040,8 @@ Parser::ParseExternalDeclaration(ParsedAttributes &Attrs,
              diag::warn_cxx98_compat_extern_template :
              diag::ext_extern_template) << SourceRange(ExternLoc, TemplateLoc);
       SourceLocation DeclEnd;
-      return ParseExplicitInstantiation(DeclaratorContext::File, ExternLoc,
-                                        TemplateLoc, DeclEnd, Attrs);
+      return Actions.ConvertDeclToDeclGroup(ParseExplicitInstantiation(
+          DeclaratorContext::File, ExternLoc, TemplateLoc, DeclEnd, Attrs));
     }
     goto dont_know;
 
@@ -1147,10 +1143,9 @@ Parser::DeclGroupPtrTy Parser::ParseDeclOrFunctionDefInternal(
   DS.SetRangeEnd(DeclSpecAttrs.Range.getEnd());
   DS.takeAttributesFrom(DeclSpecAttrs);
 
-  ParsedTemplateInfo TemplateInfo;
   MaybeParseMicrosoftAttributes(DS.getAttributes());
   // Parse the common declaration-specifiers piece.
-  ParseDeclarationSpecifiers(DS, TemplateInfo, AS,
+  ParseDeclarationSpecifiers(DS, ParsedTemplateInfo(), AS,
                              DeclSpecContext::DSC_top_level);
 
   // If we had a free-standing type definition with a missing semicolon, we
@@ -1246,7 +1241,7 @@ Parser::DeclGroupPtrTy Parser::ParseDeclOrFunctionDefInternal(
     return Actions.ConvertDeclToDeclGroup(TheDecl);
   }
 
-  return ParseDeclGroup(DS, DeclaratorContext::File, Attrs, TemplateInfo);
+  return ParseDeclGroup(DS, DeclaratorContext::File, Attrs);
 }
 
 Parser::DeclGroupPtrTy Parser::ParseDeclarationOrFunctionDefinition(
@@ -1406,7 +1401,6 @@ Decl *Parser::ParseFunctionDefinition(ParsingDeclarator &D,
 
   // Parse function body eagerly if it is either '= delete;' or '= default;' as
   // ActOnStartOfFunctionDef needs to know whether the function is deleted.
-  StringLiteral *DeletedMessage = nullptr;
   Sema::FnBodyKind BodyKind = Sema::FnBodyKind::Other;
   SourceLocation KWLoc;
   if (TryConsumeToken(tok::equal)) {
@@ -1418,7 +1412,6 @@ Decl *Parser::ParseFunctionDefinition(ParsingDeclarator &D,
                       : diag::ext_defaulted_deleted_function)
           << 1 /* deleted */;
       BodyKind = Sema::FnBodyKind::Delete;
-      DeletedMessage = ParseCXXDeletedFunctionMessage();
     } else if (TryConsumeToken(tok::kw_default, KWLoc)) {
       Diag(KWLoc, getLangOpts().CPlusPlus11
                       ? diag::warn_cxx98_compat_defaulted_deleted_function
@@ -1441,11 +1434,9 @@ Decl *Parser::ParseFunctionDefinition(ParsingDeclarator &D,
     }
   }
 
-  Sema::FPFeaturesStateRAII SaveFPFeatures(Actions);
-
   // Tell the actions module that we have entered a function definition with the
   // specified Declarator for the function.
-  SkipBodyInfo SkipBody;
+  Sema::SkipBodyInfo SkipBody;
   Decl *Res = Actions.ActOnStartOfFunctionDef(getCurScope(), D,
                                               TemplateInfo.TemplateParams
                                                   ? *TemplateInfo.TemplateParams
@@ -1479,7 +1470,7 @@ Decl *Parser::ParseFunctionDefinition(ParsingDeclarator &D,
   D.getMutableDeclSpec().abort();
 
   if (BodyKind != Sema::FnBodyKind::Other) {
-    Actions.SetFunctionBodyKind(Res, KWLoc, BodyKind, DeletedMessage);
+    Actions.SetFunctionBodyKind(Res, KWLoc, BodyKind);
     Stmt *GeneratedBody = Res ? Res->getBody() : nullptr;
     Actions.ActOnFinishFunctionBody(Res, GeneratedBody, false);
     return Res;
@@ -1564,8 +1555,7 @@ void Parser::ParseKNRParamDeclarations(Declarator &D) {
 
     // Parse the common declaration-specifiers piece.
     DeclSpec DS(AttrFactory);
-    ParsedTemplateInfo TemplateInfo;
-    ParseDeclarationSpecifiers(DS, TemplateInfo);
+    ParseDeclarationSpecifiers(DS);
 
     // C99 6.9.1p6: 'each declaration in the declaration list shall have at
     // least one declarator'.
@@ -2002,8 +1992,7 @@ bool Parser::TryAnnotateTypeOrScopeToken(
   assert((Tok.is(tok::identifier) || Tok.is(tok::coloncolon) ||
           Tok.is(tok::kw_typename) || Tok.is(tok::annot_cxxscope) ||
           Tok.is(tok::kw_decltype) || Tok.is(tok::annot_template_id) ||
-          Tok.is(tok::kw___super) || Tok.is(tok::kw_auto) ||
-          Tok.is(tok::annot_pack_indexing_type)) &&
+          Tok.is(tok::kw___super) || Tok.is(tok::kw_auto)) &&
          "Cannot be a type or scope token!");
 
   if (Tok.is(tok::kw_typename)) {
@@ -2060,19 +2049,9 @@ bool Parser::TryAnnotateTypeOrScopeToken(
       return true;
     }
 
-    bool TemplateKWPresent = false;
-    if (Tok.is(tok::kw_template)) {
-      ConsumeToken();
-      TemplateKWPresent = true;
-    }
-
     TypeResult Ty;
     if (Tok.is(tok::identifier)) {
-      if (TemplateKWPresent && NextToken().isNot(tok::less)) {
-        Diag(Tok.getLocation(),
-             diag::missing_template_arg_list_after_template_kw);
-        return true;
-      }
+      // FIXME: check whether the next token is '<', first!
       Ty = Actions.ActOnTypenameType(getCurScope(), TypenameLoc, SS,
                                      *Tok.getIdentifierInfo(),
                                      Tok.getLocation());
@@ -2293,57 +2272,54 @@ SourceLocation Parser::handleUnexpectedCodeCompletionToken() {
   for (Scope *S = getCurScope(); S; S = S->getParent()) {
     if (S->isFunctionScope()) {
       cutOffParsing();
-      Actions.CodeCompletion().CodeCompleteOrdinaryName(
-          getCurScope(), SemaCodeCompletion::PCC_RecoveryInFunction);
+      Actions.CodeCompleteOrdinaryName(getCurScope(),
+                                       Sema::PCC_RecoveryInFunction);
       return PrevTokLocation;
     }
 
     if (S->isClassScope()) {
       cutOffParsing();
-      Actions.CodeCompletion().CodeCompleteOrdinaryName(
-          getCurScope(), SemaCodeCompletion::PCC_Class);
+      Actions.CodeCompleteOrdinaryName(getCurScope(), Sema::PCC_Class);
       return PrevTokLocation;
     }
   }
 
   cutOffParsing();
-  Actions.CodeCompletion().CodeCompleteOrdinaryName(
-      getCurScope(), SemaCodeCompletion::PCC_Namespace);
+  Actions.CodeCompleteOrdinaryName(getCurScope(), Sema::PCC_Namespace);
   return PrevTokLocation;
 }
 
 // Code-completion pass-through functions
 
 void Parser::CodeCompleteDirective(bool InConditional) {
-  Actions.CodeCompletion().CodeCompletePreprocessorDirective(InConditional);
+  Actions.CodeCompletePreprocessorDirective(InConditional);
 }
 
 void Parser::CodeCompleteInConditionalExclusion() {
-  Actions.CodeCompletion().CodeCompleteInPreprocessorConditionalExclusion(
-      getCurScope());
+  Actions.CodeCompleteInPreprocessorConditionalExclusion(getCurScope());
 }
 
 void Parser::CodeCompleteMacroName(bool IsDefinition) {
-  Actions.CodeCompletion().CodeCompletePreprocessorMacroName(IsDefinition);
+  Actions.CodeCompletePreprocessorMacroName(IsDefinition);
 }
 
 void Parser::CodeCompletePreprocessorExpression() {
-  Actions.CodeCompletion().CodeCompletePreprocessorExpression();
+  Actions.CodeCompletePreprocessorExpression();
 }
 
 void Parser::CodeCompleteMacroArgument(IdentifierInfo *Macro,
                                        MacroInfo *MacroInfo,
                                        unsigned ArgumentIndex) {
-  Actions.CodeCompletion().CodeCompletePreprocessorMacroArgument(
-      getCurScope(), Macro, MacroInfo, ArgumentIndex);
+  Actions.CodeCompletePreprocessorMacroArgument(getCurScope(), Macro, MacroInfo,
+                                                ArgumentIndex);
 }
 
 void Parser::CodeCompleteIncludedFile(llvm::StringRef Dir, bool IsAngled) {
-  Actions.CodeCompletion().CodeCompleteIncludedFile(Dir, IsAngled);
+  Actions.CodeCompleteIncludedFile(Dir, IsAngled);
 }
 
 void Parser::CodeCompleteNaturalLanguage() {
-  Actions.CodeCompletion().CodeCompleteNaturalLanguage();
+  Actions.CodeCompleteNaturalLanguage();
 }
 
 bool Parser::ParseMicrosoftIfExistsCondition(IfExistsCondition& Result) {
@@ -2697,7 +2673,7 @@ bool Parser::ParseModuleName(
     if (!Tok.is(tok::identifier)) {
       if (Tok.is(tok::code_completion)) {
         cutOffParsing();
-        Actions.CodeCompletion().CodeCompleteModuleImport(UseLoc, Path);
+        Actions.CodeCompleteModuleImport(UseLoc, Path);
         return true;
       }
 
@@ -2730,9 +2706,9 @@ bool Parser::parseMisplacedModuleImport() {
       // happens.
       if (MisplacedModuleBeginCount) {
         --MisplacedModuleBeginCount;
-        Actions.ActOnAnnotModuleEnd(
-            Tok.getLocation(),
-            reinterpret_cast<Module *>(Tok.getAnnotationValue()));
+        Actions.ActOnModuleEnd(Tok.getLocation(),
+                               reinterpret_cast<Module *>(
+                                   Tok.getAnnotationValue()));
         ConsumeAnnotationToken();
         continue;
       }
@@ -2742,18 +2718,18 @@ bool Parser::parseMisplacedModuleImport() {
       return true;
     case tok::annot_module_begin:
       // Recover by entering the module (Sema will diagnose).
-      Actions.ActOnAnnotModuleBegin(
-          Tok.getLocation(),
-          reinterpret_cast<Module *>(Tok.getAnnotationValue()));
+      Actions.ActOnModuleBegin(Tok.getLocation(),
+                               reinterpret_cast<Module *>(
+                                   Tok.getAnnotationValue()));
       ConsumeAnnotationToken();
       ++MisplacedModuleBeginCount;
       continue;
     case tok::annot_module_include:
       // Module import found where it should not be, for instance, inside a
       // namespace. Recover by importing the module.
-      Actions.ActOnAnnotModuleInclude(
-          Tok.getLocation(),
-          reinterpret_cast<Module *>(Tok.getAnnotationValue()));
+      Actions.ActOnModuleInclude(Tok.getLocation(),
+                                 reinterpret_cast<Module *>(
+                                     Tok.getAnnotationValue()));
       ConsumeAnnotationToken();
       // If there is another module import, process it.
       continue;
@@ -2762,15 +2738,6 @@ bool Parser::parseMisplacedModuleImport() {
     }
   }
   return false;
-}
-
-void Parser::diagnoseUseOfC11Keyword(const Token &Tok) {
-  // Warn that this is a C11 extension if in an older mode or if in C++.
-  // Otherwise, warn that it is incompatible with standards before C11 if in
-  // C11 or later.
-  Diag(Tok, getLangOpts().C11 ? diag::warn_c11_compat_keyword
-                              : diag::ext_c11_feature)
-      << Tok.getName();
 }
 
 bool BalancedDelimiterTracker::diagnoseOverflow() {

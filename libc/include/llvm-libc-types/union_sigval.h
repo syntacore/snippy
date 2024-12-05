@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_UNION_SIGVAL_H
-#define LLVM_LIBC_TYPES_UNION_SIGVAL_H
+#ifndef __LLVM_LIBC_TYPES_UNION_SIGVAL_H__
+#define __LLVM_LIBC_TYPES_UNION_SIGVAL_H__
 
 union sigval {
   int sival_int;
   void *sival_ptr;
 };
 
-#endif // LLVM_LIBC_TYPES_UNION_SIGVAL_H
+#endif // __LLVM_LIBC_TYPES_UNION_SIGVAL_H__

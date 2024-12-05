@@ -83,7 +83,7 @@ public:
   void InclusionDirective(SourceLocation, const Token &, StringRef FilePath,
                           bool, CharSourceRange Range,
                           OptionalFileEntryRef File, StringRef, StringRef,
-                          const Module *, bool,
+                          const Module *,
                           SrcMgr::CharacteristicKind FileType) override {
     if (FileType != clang::SrcMgr::C_User)
       return;
@@ -130,15 +130,18 @@ public:
         << FileName;
 
     const bool IsIncludePathValid =
-        std::all_of(Files.rbegin(), It + 1, [](const Include &Elem) {
+        std::all_of(Files.rbegin(), It, [](const Include &Elem) {
           return !Elem.Name.empty() && Elem.Loc.isValid();
         });
+
     if (!IsIncludePathValid)
       return;
 
-    for (const Include &I : llvm::make_range(Files.rbegin(), It + 1))
-      Check.diag(I.Loc, "'%0' included from here", DiagnosticIDs::Note)
-          << I.Name;
+    auto CurrentIt = Files.rbegin();
+    do {
+      Check.diag(CurrentIt->Loc, "'%0' included from here", DiagnosticIDs::Note)
+          << CurrentIt->Name;
+    } while (CurrentIt++ != It);
   }
 
   bool isFileIgnored(StringRef FileName) const {

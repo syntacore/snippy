@@ -69,19 +69,15 @@ struct Configuration {
   bool relocatable;
   bool saveTemps;
   bool shared;
-  bool shlibSigCheck;
   bool stripAll;
   bool stripDebug;
   bool stackFirst;
-  // Because dyamanic linking under Wasm is still experimental we default to
-  // static linking
-  bool isStatic = true;
+  bool isStatic = false;
   bool trace;
   uint64_t globalBase;
   uint64_t initialHeap;
   uint64_t initialMemory;
   uint64_t maxMemory;
-  bool noGrowableMemory;
   // The table offset at which to place function addresses.  We reserve zero
   // for the null function pointer.  This gets set to 1 for executables and 0
   // for shared libraries (since they always added to a dynamic offset at

@@ -40,7 +40,7 @@ class ValueMD5CrashTestCase(TestBase):
 
         v = value.GetValue()
         type_name = value.GetTypeName()
-        self.assertEqual(type_name, "B *", "a is a B*")
+        self.assertEquals(type_name, "B *", "a is a B*")
 
         self.runCmd("next")
         self.runCmd("process kill")

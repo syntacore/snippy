@@ -219,10 +219,11 @@ contains
     SELECT RANK(ptr=>x)
     RANK (3)
       PRINT *, "PRINT RANK 3"
-      !ERROR: 'kind=' argument must be a constant scalar integer whose value is a supported kind for the intrinsic result type
+      !ERROR: 'ptr' is not an object that can appear in an expression
       j = INT(0, KIND=MERGE(KIND(0), -1, RANK(ptr) == 0))
     RANK (1)
       PRINT *, "PRINT RANK 1"
+      !ERROR: 'ptr' is not an object that can appear in an expression
       j = INT(0, KIND=MERGE(KIND(0), -1, RANK(ptr) == 1))
     END SELECT
    end subroutine

@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_GID_T_H
-#define LLVM_LIBC_TYPES_GID_T_H
+#ifndef __LLVM_LIBC_TYPES_GID_T_H__
+#define __LLVM_LIBC_TYPES_GID_T_H__
 
 typedef __UINT32_TYPE__ gid_t;
 
-#endif // LLVM_LIBC_TYPES_GID_T_H
+#endif // __LLVM_LIBC_TYPES_GID_T_H__

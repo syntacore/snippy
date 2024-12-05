@@ -682,8 +682,9 @@ EndStmt:
   }
 
   if (UseLastGroup) {
+    MCSectionSubPair CurrentSection = getStreamer().getCurrentSection();
     if (const MCSectionELF *Section =
-            cast_or_null<MCSectionELF>(getStreamer().getCurrentSectionOnly()))
+            cast_or_null<MCSectionELF>(CurrentSection.first))
       if (const MCSymbol *Group = Section->getGroup()) {
         GroupName = Group->getName();
         IsComdat = Section->isComdat();
@@ -715,8 +716,16 @@ EndStmt:
       (Section->getFlags() & ELF::SHF_ALLOC) &&
       (Section->getFlags() & ELF::SHF_EXECINSTR)) {
     bool InsertResult = getContext().addGenDwarfSection(Section);
-    if (InsertResult && getContext().getDwarfVersion() <= 2)
-      Warning(loc, "DWARF2 only supports one section per compilation unit");
+    if (InsertResult) {
+      if (getContext().getDwarfVersion() <= 2)
+        Warning(loc, "DWARF2 only supports one section per compilation unit");
+
+      if (!Section->getBeginSymbol()) {
+        MCSymbol *SectionStartSymbol = getContext().createTempSymbol();
+        getStreamer().emitLabel(SectionStartSymbol);
+        Section->setBeginSymbol(SectionStartSymbol);
+      }
+    }
   }
 
   return false;
@@ -907,7 +916,7 @@ bool ELFAsmParser::ParseDirectiveWeakref(StringRef, SMLoc) {
 }
 
 bool ELFAsmParser::ParseDirectiveSubsection(StringRef, SMLoc) {
-  const MCExpr *Subsection = MCConstantExpr::create(0, getContext());
+  const MCExpr *Subsection = nullptr;
   if (getLexer().isNot(AsmToken::EndOfStatement)) {
     if (getParser().parseExpression(Subsection))
      return true;
@@ -918,8 +927,8 @@ bool ELFAsmParser::ParseDirectiveSubsection(StringRef, SMLoc) {
 
   Lex();
 
-  return getStreamer().switchSection(getStreamer().getCurrentSectionOnly(),
-                                     Subsection);
+  getStreamer().subSection(Subsection);
+  return false;
 }
 
 bool ELFAsmParser::ParseDirectiveCGProfile(StringRef S, SMLoc Loc) {

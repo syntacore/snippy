@@ -21,7 +21,7 @@
 #include <utility>
 
 namespace mlir {
-#define GEN_PASS_DEF_LINALGDETENSORIZEPASS
+#define GEN_PASS_DEF_LINALGDETENSORIZE
 #include "mlir/Dialect/Linalg/Passes.h.inc"
 } // namespace mlir
 
@@ -106,23 +106,27 @@ struct FunctionNonEntryBlockConversion
                   ConversionPatternRewriter &rewriter) const override {
     rewriter.startOpModification(op);
     Region &region = op.getFunctionBody();
+    SmallVector<TypeConverter::SignatureConversion, 2> conversions;
 
-    for (Block &block :
-         llvm::make_early_inc_range(llvm::drop_begin(region, 1))) {
-      TypeConverter::SignatureConversion conversion(
-          /*numOrigInputs=*/block.getNumArguments());
+    for (Block &block : llvm::drop_begin(region, 1)) {
+      conversions.emplace_back(block.getNumArguments());
+      TypeConverter::SignatureConversion &back = conversions.back();
 
       for (BlockArgument blockArgument : block.getArguments()) {
         int idx = blockArgument.getArgNumber();
 
         if (blockArgsToDetensor.count(blockArgument))
-          conversion.addInputs(idx, {getTypeConverter()->convertType(
-                                        block.getArgumentTypes()[idx])});
+          back.addInputs(idx, {getTypeConverter()->convertType(
+                                  block.getArgumentTypes()[idx])});
         else
-          conversion.addInputs(idx, {block.getArgumentTypes()[idx]});
+          back.addInputs(idx, {block.getArgumentTypes()[idx]});
       }
+    }
 
-      rewriter.applySignatureConversion(&block, conversion, getTypeConverter());
+    if (failed(rewriter.convertNonEntryRegionTypes(&region, *typeConverter,
+                                                   conversions))) {
+      rewriter.cancelOpModification(op);
+      return failure();
     }
 
     rewriter.finalizeOpModification(op);
@@ -160,9 +164,7 @@ public:
 
 /// @see LinalgDetensorize in Linalg/Passes.td for more details.
 struct LinalgDetensorize
-    : public impl::LinalgDetensorizePassBase<LinalgDetensorize> {
-  using impl::LinalgDetensorizePassBase<
-      LinalgDetensorize>::LinalgDetensorizePassBase;
+    : public impl::LinalgDetensorizeBase<LinalgDetensorize> {
   LinalgDetensorize() = default;
 
   class CostModel {
@@ -574,3 +576,7 @@ struct LinalgDetensorize
   }
 };
 } // namespace
+
+std::unique_ptr<Pass> mlir::createLinalgDetensorizePass() {
+  return std::make_unique<LinalgDetensorize>();
+}

@@ -44,7 +44,7 @@ void TestAffineWalk::runOnOperation() {
   // Test whether the walk is being correctly interrupted.
   m.walk([](Operation *op) {
     for (NamedAttribute attr : op->getAttrs()) {
-      auto mapAttr = dyn_cast<AffineMapAttr>(attr.getValue());
+      auto mapAttr = attr.getValue().dyn_cast<AffineMapAttr>();
       if (!mapAttr)
         return;
       checkMod(mapAttr.getAffineMap(), op->getLoc());

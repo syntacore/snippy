@@ -12,7 +12,8 @@
 
 // __is_implicitly_default_constructible<Tp>
 
-#include <__type_traits/is_implicitly_default_constructible.h>
+#include <type_traits>
+
 
 struct ExplicitlyDefaultConstructible1 {
     explicit ExplicitlyDefaultConstructible1() = default;

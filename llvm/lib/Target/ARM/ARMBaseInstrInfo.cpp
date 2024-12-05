@@ -49,7 +49,6 @@
 #include "llvm/IR/DebugLoc.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalValue.h"
-#include "llvm/IR/Module.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCInstrDesc.h"
 #include "llvm/MC/MCInstrItineraries.h"
@@ -327,7 +326,7 @@ ARMBaseInstrInfo::convertToThreeAddress(MachineInstr &MI, LiveVariables *LV,
           for (unsigned j = 0; j < 2; ++j) {
             // Look at the two new MI's in reverse order.
             MachineInstr *NewMI = NewMIs[j];
-            if (!NewMI->readsRegister(Reg, /*TRI=*/nullptr))
+            if (!NewMI->readsRegister(Reg))
               continue;
             LV->addVirtualRegisterKilled(Reg, *NewMI);
             if (VI.removeKill(MI))
@@ -1305,7 +1304,7 @@ void ARMBaseInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
   }
 }
 
-Register ARMBaseInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
+unsigned ARMBaseInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
                                               int &FrameIndex) const {
   switch (MI.getOpcode()) {
   default: break;
@@ -1357,7 +1356,7 @@ Register ARMBaseInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
   return 0;
 }
 
-Register ARMBaseInstrInfo::isStoreToStackSlotPostFE(const MachineInstr &MI,
+unsigned ARMBaseInstrInfo::isStoreToStackSlotPostFE(const MachineInstr &MI,
                                                     int &FrameIndex) const {
   SmallVector<const MachineMemOperand *, 1> Accesses;
   if (MI.mayStore() && hasStoreToStackSlot(MI, Accesses) &&
@@ -1556,7 +1555,7 @@ void ARMBaseInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
   }
 }
 
-Register ARMBaseInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
+unsigned ARMBaseInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
                                                int &FrameIndex) const {
   switch (MI.getOpcode()) {
   default: break;
@@ -1614,7 +1613,7 @@ Register ARMBaseInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
   return 0;
 }
 
-Register ARMBaseInstrInfo::isLoadFromStackSlotPostFE(const MachineInstr &MI,
+unsigned ARMBaseInstrInfo::isLoadFromStackSlotPostFE(const MachineInstr &MI,
                                                      int &FrameIndex) const {
   SmallVector<const MachineMemOperand *, 1> Accesses;
   if (MI.mayLoad() && hasLoadFromStackSlot(MI, Accesses) &&
@@ -1733,7 +1732,7 @@ bool ARMBaseInstrInfo::expandPostRAPseudo(MachineInstr &MI) const {
 
   // Get rid of the old implicit-def of DstRegD.  Leave it if it defines a Q-reg
   // or some other super-register.
-  int ImpDefIdx = MI.findRegisterDefOperandIdx(DstRegD, /*TRI=*/nullptr);
+  int ImpDefIdx = MI.findRegisterDefOperandIdx(DstRegD);
   if (ImpDefIdx != -1)
     MI.removeOperand(ImpDefIdx);
 
@@ -2086,7 +2085,7 @@ bool ARMBaseInstrInfo::isSchedulingBoundary(const MachineInstr &MI,
   // Calls don't actually change the stack pointer, even if they have imp-defs.
   // No ARM calling conventions change the stack pointer. (X86 calling
   // conventions sometimes do).
-  if (!MI.isCall() && MI.definesRegister(ARM::SP, /*TRI=*/nullptr))
+  if (!MI.isCall() && MI.definesRegister(ARM::SP))
     return true;
 
   return false;
@@ -3309,7 +3308,7 @@ bool ARMBaseInstrInfo::shouldSink(const MachineInstr &MI) const {
   return true;
 }
 
-bool ARMBaseInstrInfo::foldImmediate(MachineInstr &UseMI, MachineInstr &DefMI,
+bool ARMBaseInstrInfo::FoldImmediate(MachineInstr &UseMI, MachineInstr &DefMI,
                                      Register Reg,
                                      MachineRegisterInfo *MRI) const {
   // Fold large immediates into add, sub, or, xor.
@@ -3711,7 +3710,7 @@ unsigned ARMBaseInstrInfo::getNumLDMAddresses(const MachineInstr &MI) const {
   for (MachineInstr::mmo_iterator I = MI.memoperands_begin(),
                                   E = MI.memoperands_end();
        I != E; ++I) {
-    Size += (*I)->getSize().getValue();
+    Size += (*I)->getSize();
   }
   // FIXME: The scheduler currently can't handle values larger than 16. But
   // the values can actually go up to 32 for floating-point load/store
@@ -4138,7 +4137,7 @@ static const MachineInstr *getBundledDefMI(const TargetRegisterInfo *TRI,
 
   int Idx = -1;
   while (II->isInsideBundle()) {
-    Idx = II->findRegisterDefOperandIdx(Reg, TRI, false, true);
+    Idx = II->findRegisterDefOperandIdx(Reg, false, true, TRI);
     if (Idx != -1)
       break;
     --II;
@@ -4162,7 +4161,7 @@ static const MachineInstr *getBundledUseMI(const TargetRegisterInfo *TRI,
   // FIXME: This doesn't properly handle multiple uses.
   int Idx = -1;
   while (II != E && II->isInsideBundle()) {
-    Idx = II->findRegisterUseOperandIdx(Reg, TRI, false);
+    Idx = II->findRegisterUseOperandIdx(Reg, false, TRI);
     if (Idx != -1)
       break;
     if (II->getOpcode() != ARM::t2IT)
@@ -5362,7 +5361,7 @@ unsigned ARMBaseInstrInfo::getPartialRegUpdateClearance(
   case ARM::VMOVv2i32:
   case ARM::VMOVv2f32:
   case ARM::VMOVv1i64:
-    UseOp = MI.findRegisterUseOperandIdx(Reg, TRI, false);
+    UseOp = MI.findRegisterUseOperandIdx(Reg, false, TRI);
     break;
 
     // Explicitly reads the dependency.
@@ -5874,8 +5873,10 @@ static bool isLRAvailable(const TargetRegisterInfo &TRI,
 std::optional<outliner::OutlinedFunction>
 ARMBaseInstrInfo::getOutliningCandidateInfo(
     std::vector<outliner::Candidate> &RepeatedSequenceLocs) const {
+  outliner::Candidate &FirstCand = RepeatedSequenceLocs[0];
+
   unsigned SequenceSize = 0;
-  for (auto &MI : RepeatedSequenceLocs[0])
+  for (auto &MI : FirstCand)
     SequenceSize += getInstSizeInBytes(MI);
 
   // Properties about candidate MBBs that hold for all of them.
@@ -6061,8 +6062,6 @@ ARMBaseInstrInfo::getOutliningCandidateInfo(
         RepeatedSequenceLocs.size() * Costs.CallDefault) {
       RepeatedSequenceLocs = CandidatesWithoutStackFixups;
       FrameID = MachineOutlinerNoLRSave;
-      if (RepeatedSequenceLocs.size() < 2)
-        return std::nullopt;
     } else
       SetCandidateCallInfo(MachineOutlinerDefault, Costs.CallDefault);
   }
@@ -6072,7 +6071,6 @@ ARMBaseInstrInfo::getOutliningCandidateInfo(
   if (FlagsSetInAll & MachineOutlinerMBBFlags::HasCalls) {
     // check if the range contains a call.  These require a save + restore of
     // the link register.
-    outliner::Candidate &FirstCand = RepeatedSequenceLocs[0];
     if (std::any_of(FirstCand.begin(), std::prev(FirstCand.end()),
                     [](const MachineInstr &MI) { return MI.isCall(); }))
       NumBytesToCreateFrame += Costs.SaveRestoreLROnStack;
@@ -6094,7 +6092,7 @@ ARMBaseInstrInfo::getOutliningCandidateInfo(
 bool ARMBaseInstrInfo::checkAndUpdateStackOffset(MachineInstr *MI,
                                                  int64_t Fixup,
                                                  bool Updt) const {
-  int SPIdx = MI->findRegisterUseOperandIdx(ARM::SP, /*TRI=*/nullptr);
+  int SPIdx = MI->findRegisterUseOperandIdx(ARM::SP);
   unsigned AddrMode = (MI->getDesc().TSFlags & ARMII::AddrModeMask);
   if (SPIdx < 0)
     // No SP operand

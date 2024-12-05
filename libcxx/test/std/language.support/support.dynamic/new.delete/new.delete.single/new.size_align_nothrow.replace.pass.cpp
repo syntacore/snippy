@@ -15,7 +15,7 @@
 
 // Libc++ when built for z/OS doesn't contain the aligned allocation functions,
 // nor does the dynamic library shipped with z/OS.
-// XFAIL: target={{.+}}-zos{{.*}}
+// UNSUPPORTED: target={{.+}}-zos{{.*}}
 
 #include <new>
 #include <cstddef>
@@ -47,12 +47,11 @@ int main(int, char**) {
     // Test with an overaligned type
     {
         new_nothrow_called = delete_called = 0;
-        OverAligned* dummy_data_block      = new (std::nothrow) OverAligned;
-        OverAligned* x                     = DoNotOptimize(dummy_data_block);
+        OverAligned* x = new (std::nothrow) OverAligned;
         assert(static_cast<void*>(x) == DummyData);
         ASSERT_WITH_OPERATOR_NEW_FALLBACKS(new_nothrow_called == 1);
 
-        delete dummy_data_block;
+        delete x;
         ASSERT_WITH_OPERATOR_NEW_FALLBACKS(delete_called == 1);
     }
 

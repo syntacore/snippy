@@ -9,6 +9,7 @@
 #ifndef _LIBCPP___EXCEPTION_OPERATIONS_H
 #define _LIBCPP___EXCEPTION_OPERATIONS_H
 
+#include <__availability>
 #include <__config>
 #include <cstddef>
 

@@ -32,7 +32,6 @@ alignment:       2
 tracksRegLiveness: true
 frameInfo:
   maxAlignment:    4
-  adjustsStack:    true
   hasCalls:        true
   localFrameSize:  2048
 stack:
@@ -118,7 +117,6 @@ alignment:       2
 tracksRegLiveness: true
 frameInfo:
   maxAlignment:    4
-  adjustsStack:    true
   hasCalls:        true
   localFrameSize:  4096
 stack:
@@ -212,7 +210,6 @@ alignment:       2
 tracksRegLiveness: true
 frameInfo:
   maxAlignment:    4
-  adjustsStack:    true
   hasCalls:        true
   localFrameSize:  8192
 stack:

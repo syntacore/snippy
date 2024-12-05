@@ -3,8 +3,8 @@
 ; RUN:     -print-after=simple-loop-unswitch \
 ; RUN:	   | FileCheck %s
 
-; CHECK: *** IR Dump After SimpleLoopUnswitchPass on loop %for.cond in function loop ***
-; CHECK: *** IR Dump After SimpleLoopUnswitchPass on loop %for.cond.us in function loop ***
+; CHECK: *** IR Dump After SimpleLoopUnswitchPass on for.cond ***
+; CHECK: *** IR Dump After SimpleLoopUnswitchPass on for.cond.us ***
 
 define void @loop(i1 %w)  {
 entry:

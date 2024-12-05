@@ -1,46 +1,22 @@
-// RUN: %clang_analyze_cc1 -verify %s 2>&1 \
-// RUN:   -analyzer-display-progress \
-// RUN:   -analyzer-checker=debug.ExprInspection \
-// RUN:   -analyzer-output=text \
-// RUN: | FileCheck %s
+// RUN: %clang_analyze_cc1 -analyzer-display-progress %s 2>&1 | FileCheck %s
 
-void clang_analyzer_warnIfReached();
-
-// expected-note@+2 {{[debug] analyzing from f()}}
-// expected-warning@+1 {{REACHABLE}} expected-note@+1 {{REACHABLE}}
-void f() { clang_analyzer_warnIfReached(); }
-
-// expected-note@+2 {{[debug] analyzing from g()}}
-// expected-warning@+1 {{REACHABLE}} expected-note@+1 {{REACHABLE}}
-void g() { clang_analyzer_warnIfReached(); }
-
-// expected-note@+2 {{[debug] analyzing from h()}}
-// expected-warning@+1 {{REACHABLE}} expected-note@+1 {{REACHABLE}}
-void h() { clang_analyzer_warnIfReached(); }
+void f() {};
+void g() {};
+void h() {}
 
 struct SomeStruct {
-  // expected-note@+2 {{[debug] analyzing from SomeStruct::f()}}
-  // expected-warning@+1 {{REACHABLE}} expected-note@+1 {{REACHABLE}}
-  void f() { clang_analyzer_warnIfReached(); }
+  void f() {}
 };
 
 struct SomeOtherStruct {
-  // expected-note@+2 {{[debug] analyzing from SomeOtherStruct::f()}}
-  // expected-warning@+1 {{REACHABLE}} expected-note@+1 {{REACHABLE}}
-  void f() { clang_analyzer_warnIfReached(); }
+  void f() {}
 };
 
 namespace ns {
   struct SomeStruct {
-    // expected-note@+2 {{[debug] analyzing from ns::SomeStruct::f(int)}}
-    // expected-warning@+1 {{REACHABLE}} expected-note@+1 {{REACHABLE}}
-    void f(int) { clang_analyzer_warnIfReached(); }
-    // expected-note@+2 {{[debug] analyzing from ns::SomeStruct::f(float, ::SomeStruct)}}
-    // expected-warning@+1 {{REACHABLE}} expected-note@+1 {{REACHABLE}}
-    void f(float, ::SomeStruct) { clang_analyzer_warnIfReached(); }
-    // expected-note@+2 {{[debug] analyzing from ns::SomeStruct::f(float, SomeStruct)}}
-    // expected-warning@+1 {{REACHABLE}} expected-note@+1 {{REACHABLE}}
-    void f(float, SomeStruct) { clang_analyzer_warnIfReached(); }
+    void f(int) {}
+    void f(float, ::SomeStruct) {}
+    void f(float, SomeStruct) {}
   };
 }
 

@@ -214,12 +214,29 @@ UsingShadowDecl *TemplateName::getAsUsingShadowDecl() const {
   return nullptr;
 }
 
+TemplateName TemplateName::getNameToSubstitute() const {
+  TemplateDecl *Decl = getAsTemplateDecl();
+
+  // Substituting a dependent template name: preserve it as written.
+  if (!Decl)
+    return *this;
+
+  // If we have a template declaration, use the most recent non-friend
+  // declaration of that template.
+  Decl = cast<TemplateDecl>(Decl->getMostRecentDecl());
+  while (Decl->getFriendObjectKind()) {
+    Decl = cast<TemplateDecl>(Decl->getPreviousDecl());
+    assert(Decl && "all declarations of template are friends");
+  }
+  return TemplateName(Decl);
+}
+
 TemplateNameDependence TemplateName::getDependence() const {
   auto D = TemplateNameDependence::None;
   switch (getKind()) {
   case TemplateName::NameKind::QualifiedTemplate:
-    if (NestedNameSpecifier *NNS = getAsQualifiedTemplateName()->getQualifier())
-      D |= toTemplateNameDependence(NNS->getDependence());
+    D |= toTemplateNameDependence(
+        getAsQualifiedTemplateName()->getQualifier()->getDependence());
     break;
   case TemplateName::NameKind::DependentTemplate:
     D |= toTemplateNameDependence(
@@ -275,16 +292,9 @@ void TemplateName::Profile(llvm::FoldingSetNodeID &ID) {
 
 void TemplateName::print(raw_ostream &OS, const PrintingPolicy &Policy,
                          Qualified Qual) const {
-  auto handleAnonymousTTP = [](TemplateDecl *TD, raw_ostream &OS) {
-    if (TemplateTemplateParmDecl *TTP = dyn_cast<TemplateTemplateParmDecl>(TD);
-        TTP && TTP->getIdentifier() == nullptr) {
-      OS << "template-parameter-" << TTP->getDepth() << "-" << TTP->getIndex();
-      return true;
-    }
-    return false;
-  };
-  if (NameKind Kind = getKind();
-      Kind == TemplateName::Template || Kind == TemplateName::UsingTemplate) {
+  auto Kind = getKind();
+  TemplateDecl *Template = nullptr;
+  if (Kind == TemplateName::Template || Kind == TemplateName::UsingTemplate) {
     // After `namespace ns { using std::vector }`, what is the fully-qualified
     // name of the UsingTemplateName `vector` within ns?
     //
@@ -294,49 +304,46 @@ void TemplateName::print(raw_ostream &OS, const PrintingPolicy &Policy,
     // Similar to the UsingType behavior, using declarations are used to import
     // names more often than to export them, thus using the original name is
     // most useful in this case.
-    TemplateDecl *Template = getAsTemplateDecl();
-    if (handleAnonymousTTP(Template, OS))
-      return;
-    if (Qual == Qualified::None)
-      OS << *Template;
-    else
+    Template = getAsTemplateDecl();
+  }
+
+  if (Template)
+    if (Policy.CleanUglifiedParameters &&
+        isa<TemplateTemplateParmDecl>(Template) && Template->getIdentifier())
+      OS << Template->getIdentifier()->deuglifiedName();
+    else if (Qual == Qualified::Fully &&
+             getDependence() !=
+                 TemplateNameDependenceScope::DependentInstantiation)
       Template->printQualifiedName(OS, Policy);
-  } else if (QualifiedTemplateName *QTN = getAsQualifiedTemplateName()) {
-    if (NestedNameSpecifier *NNS = QTN->getQualifier();
-        Qual != Qualified::None && NNS)
-      NNS->print(OS, Policy);
+    else
+      OS << *Template;
+  else if (QualifiedTemplateName *QTN = getAsQualifiedTemplateName()) {
+    if (Qual == Qualified::Fully &&
+        getDependence() !=
+            TemplateNameDependenceScope::DependentInstantiation) {
+      QTN->getUnderlyingTemplate().getAsTemplateDecl()->printQualifiedName(
+          OS, Policy);
+      return;
+    }
+    if (Qual == Qualified::AsWritten)
+      QTN->getQualifier()->print(OS, Policy);
     if (QTN->hasTemplateKeyword())
       OS << "template ";
-
-    TemplateName Underlying = QTN->getUnderlyingTemplate();
-    assert(Underlying.getKind() == TemplateName::Template ||
-           Underlying.getKind() == TemplateName::UsingTemplate);
-
-    TemplateDecl *UTD = Underlying.getAsTemplateDecl();
-
-    if (handleAnonymousTTP(UTD, OS))
-      return;
-
-    if (IdentifierInfo *II = UTD->getIdentifier();
-        Policy.CleanUglifiedParameters && II &&
-        isa<TemplateTemplateParmDecl>(UTD))
-      OS << II->deuglifiedName();
-    else
-      OS << *UTD;
+    OS << *QTN->getUnderlyingTemplate().getAsTemplateDecl();
   } else if (DependentTemplateName *DTN = getAsDependentTemplateName()) {
-    if (NestedNameSpecifier *NNS = DTN->getQualifier())
-      NNS->print(OS, Policy);
+    if (Qual == Qualified::AsWritten && DTN->getQualifier())
+      DTN->getQualifier()->print(OS, Policy);
     OS << "template ";
 
     if (DTN->isIdentifier())
       OS << DTN->getIdentifier()->getName();
     else
       OS << "operator " << getOperatorSpelling(DTN->getOperator());
-  } else if (SubstTemplateTemplateParmStorage *subst =
-                 getAsSubstTemplateTemplateParm()) {
+  } else if (SubstTemplateTemplateParmStorage *subst
+               = getAsSubstTemplateTemplateParm()) {
     subst->getReplacement().print(OS, Policy, Qual);
-  } else if (SubstTemplateTemplateParmPackStorage *SubstPack =
-                 getAsSubstTemplateTemplateParmPack())
+  } else if (SubstTemplateTemplateParmPackStorage *SubstPack
+                                        = getAsSubstTemplateTemplateParmPack())
     OS << *SubstPack->getParameterPack();
   else if (AssumedTemplateStorage *Assumed = getAsAssumedTemplateName()) {
     Assumed->getDeclName().print(OS, Policy);
@@ -359,4 +366,15 @@ const StreamingDiagnostic &clang::operator<<(const StreamingDiagnostic &DB,
   OS << '\'';
   OS.flush();
   return DB << NameStr;
+}
+
+void TemplateName::dump(raw_ostream &OS) const {
+  LangOptions LO;  // FIXME!
+  LO.CPlusPlus = true;
+  LO.Bool = true;
+  print(OS, PrintingPolicy(LO));
+}
+
+LLVM_DUMP_METHOD void TemplateName::dump() const {
+  dump(llvm::errs());
 }

@@ -21,7 +21,6 @@
 
 #include "test_macros.h"
 #include "truncate_fp.h"
-#include "../../rep.h"
 
 int main(int, char**)
 {
@@ -66,17 +65,7 @@ int main(int, char**)
     constexpr std::chrono::duration<double, std::ratio<3, 5> > s2(5);
     static_assert(s1 / s2 == 20./3, "");
     }
-    {
-      std::chrono::duration<int> d(5);
-      RepConstConvertibleLWG3050 x;
+#endif
 
-      {
-        auto r = d / x;
-        assert(r.count() == 2);
-        ASSERT_SAME_TYPE(std::chrono::duration<long>, decltype(r));
-      }
-    }
-#endif // TEST_STD_VER >= 11
-
-    return 0;
+  return 0;
 }

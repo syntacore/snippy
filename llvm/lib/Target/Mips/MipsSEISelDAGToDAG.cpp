@@ -44,9 +44,9 @@ bool MipsSEDAGToDAGISel::runOnMachineFunction(MachineFunction &MF) {
   return MipsDAGToDAGISel::runOnMachineFunction(MF);
 }
 
-void MipsSEDAGToDAGISelLegacy::getAnalysisUsage(AnalysisUsage &AU) const {
+void MipsSEDAGToDAGISel::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<DominatorTreeWrapperPass>();
-  SelectionDAGISelLegacy::getAnalysisUsage(AU);
+  SelectionDAGISel::getAnalysisUsage(AU);
 }
 
 void MipsSEDAGToDAGISel::addDSPCtrlRegOperands(bool IsDef, MachineInstr &MI,
@@ -741,8 +741,8 @@ bool MipsSEDAGToDAGISel::trySelect(SDNode *Node) {
   switch(Opcode) {
   default: break;
 
-  case MipsISD::DOUBLE_SELECT_I:
-  case MipsISD::DOUBLE_SELECT_I64: {
+  case Mips::PseudoD_SELECT_I:
+  case Mips::PseudoD_SELECT_I64: {
     MVT VT = Subtarget->isGP64bit() ? MVT::i64 : MVT::i32;
     SDValue cond = Node->getOperand(0);
     SDValue Hi1 = Node->getOperand(1);
@@ -1439,11 +1439,7 @@ bool MipsSEDAGToDAGISel::SelectInlineAsmMemoryOperand(
   return true;
 }
 
-MipsSEDAGToDAGISelLegacy::MipsSEDAGToDAGISelLegacy(MipsTargetMachine &TM,
-                                                   CodeGenOptLevel OL)
-    : MipsDAGToDAGISelLegacy(std::make_unique<MipsSEDAGToDAGISel>(TM, OL)) {}
-
 FunctionPass *llvm::createMipsSEISelDag(MipsTargetMachine &TM,
                                         CodeGenOptLevel OptLevel) {
-  return new MipsSEDAGToDAGISelLegacy(TM, OptLevel);
+  return new MipsSEDAGToDAGISel(TM, OptLevel);
 }

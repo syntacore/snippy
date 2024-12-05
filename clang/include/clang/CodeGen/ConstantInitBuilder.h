@@ -25,11 +25,8 @@
 #include <vector>
 
 namespace clang {
-class GlobalDecl;
-class PointerAuthSchema;
-class QualType;
-
 namespace CodeGen {
+
 class CodeGenModule;
 
 /// A convenience builder class for complex constant initializers,
@@ -201,11 +198,6 @@ public:
               bool isSigned = false) {
     add(llvm::ConstantInt::get(intTy, value, isSigned));
   }
-
-  /// Add a signed pointer using the given pointer authentication schema.
-  void addSignedPointer(llvm::Constant *Pointer,
-                        const PointerAuthSchema &Schema, GlobalDecl CalleeDecl,
-                        QualType CalleeType);
 
   /// Add a null pointer of a specific type.
   void addNullPointer(llvm::PointerType *ptrTy) {

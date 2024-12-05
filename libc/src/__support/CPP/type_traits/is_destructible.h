@@ -18,11 +18,10 @@
 #include "src/__support/macros/attributes.h"
 #include "src/__support/macros/config.h"
 
-namespace LIBC_NAMESPACE_DECL {
-namespace cpp {
+namespace LIBC_NAMESPACE::cpp {
 
 // is_destructible
-#if __has_builtin(__is_destructible)
+#if LIBC_HAS_BUILTIN(__is_destructible)
 template <typename T>
 struct is_destructible : bool_constant<__is_destructible(T)> {};
 #else
@@ -62,7 +61,6 @@ template <> struct is_destructible<void> : public false_type {};
 template <class T>
 LIBC_INLINE_VAR constexpr bool is_destructible_v = is_destructible<T>::value;
 
-} // namespace cpp
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE::cpp
 
 #endif // LLVM_LIBC_SRC___SUPPORT_CPP_TYPE_TRAITS_IS_DESTRUCTIBLE_H

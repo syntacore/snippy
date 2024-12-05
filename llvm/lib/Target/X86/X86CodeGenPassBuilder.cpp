@@ -10,22 +10,19 @@
 /// TODO: Port CodeGen passes to new pass manager.
 //===----------------------------------------------------------------------===//
 
-#include "X86ISelDAGToDAG.h"
 #include "X86TargetMachine.h"
 
+#include "llvm/CodeGen/CodeGenPassBuilder.h"
 #include "llvm/MC/MCStreamer.h"
-#include "llvm/Passes/CodeGenPassBuilder.h"
-#include "llvm/Passes/PassBuilder.h"
 
 using namespace llvm;
 
 namespace {
 
-class X86CodeGenPassBuilder
-    : public CodeGenPassBuilder<X86CodeGenPassBuilder, X86TargetMachine> {
+class X86CodeGenPassBuilder : public CodeGenPassBuilder<X86CodeGenPassBuilder> {
 public:
-  explicit X86CodeGenPassBuilder(X86TargetMachine &TM,
-                                 const CGPassBuilderOption &Opts,
+  explicit X86CodeGenPassBuilder(LLVMTargetMachine &TM,
+                                 CGPassBuilderOption Opts,
                                  PassInstrumentationCallbacks *PIC)
       : CodeGenPassBuilder(TM, Opts, PIC) {}
   void addPreISel(AddIRPass &addPass) const;
@@ -42,23 +39,18 @@ void X86CodeGenPassBuilder::addAsmPrinter(AddMachinePass &addPass,
   // TODO: Add AsmPrinter.
 }
 
-Error X86CodeGenPassBuilder::addInstSelector(AddMachinePass &addPass) const {
-  // TODO: Add instruction selector related passes.
-  addPass(X86ISelDAGToDAGPass(TM));
+Error X86CodeGenPassBuilder::addInstSelector(AddMachinePass &) const {
+  // TODO: Add instruction selector.
   return Error::success();
 }
 
 } // namespace
 
-void X86TargetMachine::registerPassBuilderCallbacks(PassBuilder &PB) {
-#define GET_PASS_REGISTRY "X86PassRegistry.def"
-#include "llvm/Passes/TargetPassRegistry.inc"
-}
-
 Error X86TargetMachine::buildCodeGenPipeline(
-    ModulePassManager &MPM, raw_pwrite_stream &Out, raw_pwrite_stream *DwoOut,
-    CodeGenFileType FileType, const CGPassBuilderOption &Opt,
-    PassInstrumentationCallbacks *PIC) {
+    ModulePassManager &MPM, MachineFunctionPassManager &MFPM,
+    MachineFunctionAnalysisManager &, raw_pwrite_stream &Out,
+    raw_pwrite_stream *DwoOut, CodeGenFileType FileType,
+    CGPassBuilderOption Opt, PassInstrumentationCallbacks *PIC) {
   auto CGPB = X86CodeGenPassBuilder(*this, Opt, PIC);
-  return CGPB.buildPipeline(MPM, Out, DwoOut, FileType);
+  return CGPB.buildPipeline(MPM, MFPM, Out, DwoOut, FileType);
 }

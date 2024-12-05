@@ -208,7 +208,10 @@ bool PPCExpandAtomicPseudo::expandAtomicRMW128(
       .addMBB(LoopMBB);
   CurrentMBB->addSuccessor(LoopMBB);
   CurrentMBB->addSuccessor(ExitMBB);
-  fullyRecomputeLiveIns({ExitMBB, LoopMBB});
+  bool anyChange = false;
+  do {
+    anyChange = recomputeLiveIns(*ExitMBB) || recomputeLiveIns(*LoopMBB);
+  } while (anyChange);
   NMBBI = MBB.end();
   MI.eraseFromParent();
   return true;
@@ -285,7 +288,11 @@ bool PPCExpandAtomicPseudo::expandAtomicCmpSwap128(
   CurrentMBB->addSuccessor(LoopCmpMBB);
   CurrentMBB->addSuccessor(ExitMBB);
 
-  fullyRecomputeLiveIns({ExitMBB, CmpSuccMBB, LoopCmpMBB});
+  bool anyChange = false;
+  do {
+    anyChange = recomputeLiveIns(*ExitMBB) || recomputeLiveIns(*CmpSuccMBB) ||
+                recomputeLiveIns(*LoopCmpMBB);
+  } while (anyChange);
   NMBBI = MBB.end();
   MI.eraseFromParent();
   return true;

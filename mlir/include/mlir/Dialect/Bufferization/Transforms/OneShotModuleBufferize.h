@@ -9,11 +9,9 @@
 #ifndef MLIR_DIALECT_BUFFERIZATION_TRANSFORMS_ONESHOTMODULEBUFFERIZE_H
 #define MLIR_DIALECT_BUFFERIZATION_TRANSFORMS_ONESHOTMODULEBUFFERIZE_H
 
-namespace llvm {
-struct LogicalResult;
-} // namespace llvm
-
 namespace mlir {
+
+struct LogicalResult;
 class ModuleOp;
 
 namespace bufferization {
@@ -23,9 +21,8 @@ struct OneShotBufferizationOptions;
 
 /// Analyze `moduleOp` and its nested ops. Bufferization decisions are stored in
 /// `state`.
-llvm::LogicalResult
-analyzeModuleOp(ModuleOp moduleOp, OneShotAnalysisState &state,
-                BufferizationStatistics *statistics = nullptr);
+LogicalResult analyzeModuleOp(ModuleOp moduleOp, OneShotAnalysisState &state,
+                              BufferizationStatistics *statistics = nullptr);
 
 /// Bufferize `op` and its nested ops that implement `BufferizableOpInterface`.
 ///
@@ -36,9 +33,9 @@ analyzeModuleOp(ModuleOp moduleOp, OneShotAnalysisState &state,
 /// - `options.copyBeforeWrite` is not set and `options.noAnalysisFuncFilter`
 ///   is not empty. The FuncOps it contains were not analyzed. Buffer copies
 ///   will be inserted only to these FuncOps.
-llvm::LogicalResult
-bufferizeModuleOp(ModuleOp moduleOp, const OneShotBufferizationOptions &options,
-                  BufferizationStatistics *statistics = nullptr);
+LogicalResult bufferizeModuleOp(ModuleOp moduleOp,
+                                const OneShotBufferizationOptions &options,
+                                BufferizationStatistics *statistics = nullptr);
 
 /// Remove bufferization attributes on every FuncOp arguments in the ModuleOp.
 void removeBufferizationAttributesInModule(ModuleOp moduleOp);
@@ -47,7 +44,7 @@ void removeBufferizationAttributesInModule(ModuleOp moduleOp);
 /// function call analysis to determine which function arguments are
 /// inplaceable. Then analyzes and bufferizes FuncOps one-by-one with One-Shot
 /// Bufferize.
-llvm::LogicalResult runOneShotModuleBufferize(
+LogicalResult runOneShotModuleBufferize(
     ModuleOp moduleOp,
     const bufferization::OneShotBufferizationOptions &options,
     BufferizationStatistics *statistics = nullptr);

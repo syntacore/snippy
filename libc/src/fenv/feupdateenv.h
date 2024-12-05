@@ -9,13 +9,12 @@
 #ifndef LLVM_LIBC_SRC_FENV_FEUPDATEENV_H
 #define LLVM_LIBC_SRC_FENV_FEUPDATEENV_H
 
-#include "hdr/types/fenv_t.h"
-#include "src/__support/macros/config.h"
+#include <fenv.h>
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 
 int feupdateenv(const fenv_t *);
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE
 
 #endif // LLVM_LIBC_SRC_FENV_FEUPDATEENV_H

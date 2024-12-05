@@ -665,7 +665,16 @@ DWARFFormValue::getAsSectionedAddress() const {
   return getAsSectionedAddress(Value, Form, U);
 }
 
-std::optional<uint64_t> DWARFFormValue::getAsRelativeReference() const {
+std::optional<uint64_t> DWARFFormValue::getAsReference() const {
+  if (auto R = getAsRelativeReference())
+    return R->Unit ? R->Unit->getOffset() + R->Offset : R->Offset;
+  return std::nullopt;
+}
+
+std::optional<DWARFFormValue::UnitOffset>
+DWARFFormValue::getAsRelativeReference() const {
+  if (!isFormClass(FC_Reference))
+    return std::nullopt;
   switch (Form) {
   case DW_FORM_ref1:
   case DW_FORM_ref2:
@@ -674,30 +683,11 @@ std::optional<uint64_t> DWARFFormValue::getAsRelativeReference() const {
   case DW_FORM_ref_udata:
     if (!U)
       return std::nullopt;
-    return Value.uval;
-  default:
-    return std::nullopt;
-  }
-}
-
-std::optional<uint64_t> DWARFFormValue::getAsDebugInfoReference() const {
-  if (Form == DW_FORM_ref_addr)
-    return Value.uval;
-  return std::nullopt;
-}
-
-std::optional<uint64_t> DWARFFormValue::getAsSignatureReference() const {
-  if (Form == DW_FORM_ref_sig8)
-    return Value.uval;
-  return std::nullopt;
-}
-
-std::optional<uint64_t> DWARFFormValue::getAsSupplementaryReference() const {
-  switch (Form) {
+    return UnitOffset{const_cast<DWARFUnit*>(U), Value.uval};
+  case DW_FORM_ref_addr:
+  case DW_FORM_ref_sig8:
   case DW_FORM_GNU_ref_alt:
-  case DW_FORM_ref_sup4:
-  case DW_FORM_ref_sup8:
-    return Value.uval;
+    return UnitOffset{nullptr, Value.uval};
   default:
     return std::nullopt;
   }
@@ -771,7 +761,8 @@ DWARFFormValue::getAsFile(DILineInfoSpecifier::FileLineInfoKind Kind) const {
 bool llvm::dwarf::doesFormBelongToClass(dwarf::Form Form, DWARFFormValue::FormClass FC,
                            uint16_t DwarfVersion) {
   // First, check DWARF5 form classes.
-  if (Form < std::size(DWARF5FormClasses) && DWARF5FormClasses[Form] == FC)
+  if (Form < ArrayRef(DWARF5FormClasses).size() &&
+      DWARF5FormClasses[Form] == FC)
     return true;
   // Check more forms from extensions and proposals.
   switch (Form) {

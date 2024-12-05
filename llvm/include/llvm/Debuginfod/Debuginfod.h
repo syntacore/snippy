@@ -97,7 +97,7 @@ Expected<std::string> getCachedOrDownloadArtifact(
     StringRef UniqueKey, StringRef UrlPath, StringRef CacheDirectoryPath,
     ArrayRef<StringRef> DebuginfodUrls, std::chrono::milliseconds Timeout);
 
-class ThreadPoolInterface;
+class ThreadPool;
 
 struct DebuginfodLogEntry {
   std::string Message;
@@ -135,7 +135,7 @@ class DebuginfodCollection {
   // error.
   Expected<bool> updateIfStale();
   DebuginfodLog &Log;
-  ThreadPoolInterface &Pool;
+  ThreadPool &Pool;
   Timer UpdateTimer;
   sys::Mutex UpdateMutex;
 
@@ -145,7 +145,7 @@ class DebuginfodCollection {
 
 public:
   DebuginfodCollection(ArrayRef<StringRef> Paths, DebuginfodLog &Log,
-                       ThreadPoolInterface &Pool, double MinInterval);
+                       ThreadPool &Pool, double MinInterval);
   Error update();
   Error updateForever(std::chrono::milliseconds Interval);
   Expected<std::string> findDebugBinaryPath(object::BuildIDRef);

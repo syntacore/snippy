@@ -364,17 +364,18 @@ public:
     LatticeTransferState State(L, Env);
     TransferMatchSwitch(Elt, getASTContext(), State);
   }
-  void join(QualType Type, const Value &Val1, const Environment &Env1,
-            const Value &Val2, const Environment &Env2, Value &MergedVal,
-            Environment &MergedEnv) override;
+  bool merge(QualType Type, const Value &Val1, const Environment &Env1,
+             const Value &Val2, const Environment &Env2, Value &MergedVal,
+             Environment &MergedEnv) override;
 
 private:
   CFGMatchSwitch<TransferState<NoopLattice>> TransferMatchSwitch;
 };
 
-BoolValue &joinBoolValues(BoolValue &Bool1, const Environment &Env1,
-                          BoolValue &Bool2, const Environment &Env2,
-                          Environment &JoinedEnv) {
+// Copied from crubit.
+BoolValue &mergeBoolValues(BoolValue &Bool1, const Environment &Env1,
+                           BoolValue &Bool2, const Environment &Env2,
+                           Environment &MergedEnv) {
   if (&Bool1 == &Bool2) {
     return Bool1;
   }
@@ -382,40 +383,41 @@ BoolValue &joinBoolValues(BoolValue &Bool1, const Environment &Env1,
   auto &B1 = Bool1.formula();
   auto &B2 = Bool2.formula();
 
-  auto &A = JoinedEnv.arena();
-  auto &JoinedBool = JoinedEnv.makeAtomicBoolValue();
+  auto &A = MergedEnv.arena();
+  auto &MergedBool = MergedEnv.makeAtomicBoolValue();
 
   // If `Bool1` and `Bool2` is constrained to the same true / false value,
-  // `JoinedBool` can be constrained similarly without needing to consider the
-  // path taken - this simplifies the flow condition tracked in `JoinedEnv`.
+  // `MergedBool` can be constrained similarly without needing to consider the
+  // path taken - this simplifies the flow condition tracked in `MergedEnv`.
   // Otherwise, information about which path was taken is used to associate
-  // `JoinedBool` with `Bool1` and `Bool2`.
+  // `MergedBool` with `Bool1` and `Bool2`.
   if (Env1.proves(B1) && Env2.proves(B2)) {
-    JoinedEnv.assume(JoinedBool.formula());
+    MergedEnv.assume(MergedBool.formula());
   } else if (Env1.proves(A.makeNot(B1)) && Env2.proves(A.makeNot(B2))) {
-    JoinedEnv.assume(A.makeNot(JoinedBool.formula()));
+    MergedEnv.assume(A.makeNot(MergedBool.formula()));
   }
-  return JoinedBool;
+  return MergedBool;
 }
 
-void SignPropagationAnalysis::join(QualType Type, const Value &Val1,
-                                   const Environment &Env1, const Value &Val2,
-                                   const Environment &Env2, Value &JoinedVal,
-                                   Environment &JoinedEnv) {
+bool SignPropagationAnalysis::merge(QualType Type, const Value &Val1,
+                                    const Environment &Env1, const Value &Val2,
+                                    const Environment &Env2, Value &MergedVal,
+                                    Environment &MergedEnv) {
   if (!Type->isIntegerType())
-    return;
+    return false;
   SignProperties Ps1 = getSignProperties(Val1, Env1);
   SignProperties Ps2 = getSignProperties(Val2, Env2);
   if (!Ps1.Neg || !Ps2.Neg)
-    return;
-  BoolValue &JoinedNeg =
-      joinBoolValues(*Ps1.Neg, Env1, *Ps2.Neg, Env2, JoinedEnv);
-  BoolValue &JoinedZero =
-      joinBoolValues(*Ps1.Zero, Env1, *Ps2.Zero, Env2, JoinedEnv);
-  BoolValue &JoinedPos =
-      joinBoolValues(*Ps1.Pos, Env1, *Ps2.Pos, Env2, JoinedEnv);
-  setSignProperties(JoinedVal,
-                    SignProperties{&JoinedNeg, &JoinedZero, &JoinedPos});
+    return false;
+  BoolValue &MergedNeg =
+      mergeBoolValues(*Ps1.Neg, Env1, *Ps2.Neg, Env2, MergedEnv);
+  BoolValue &MergedZero =
+      mergeBoolValues(*Ps1.Zero, Env1, *Ps2.Zero, Env2, MergedEnv);
+  BoolValue &MergedPos =
+      mergeBoolValues(*Ps1.Pos, Env1, *Ps2.Pos, Env2, MergedEnv);
+  setSignProperties(MergedVal,
+                    SignProperties{&MergedNeg, &MergedZero, &MergedPos});
+  return true;
 }
 
 template <typename Matcher>

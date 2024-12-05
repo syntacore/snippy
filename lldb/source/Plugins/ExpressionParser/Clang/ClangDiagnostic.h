@@ -29,7 +29,7 @@ public:
     return diag->getKind() == eDiagnosticOriginClang;
   }
 
-  ClangDiagnostic(llvm::StringRef message, lldb::Severity severity,
+  ClangDiagnostic(llvm::StringRef message, DiagnosticSeverity severity,
                   uint32_t compiler_id)
       : Diagnostic(message, severity, eDiagnosticOriginClang, compiler_id) {}
 

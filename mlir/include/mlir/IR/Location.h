@@ -78,17 +78,14 @@ public:
 
   /// Type casting utilities on the underlying location.
   template <typename U>
-  [[deprecated("Use mlir::isa<U>() instead")]]
   bool isa() const {
     return llvm::isa<U>(*this);
   }
   template <typename U>
-  [[deprecated("Use mlir::dyn_cast<U>() instead")]]
   U dyn_cast() const {
     return llvm::dyn_cast<U>(*this);
   }
   template <typename U>
-  [[deprecated("Use mlir::cast<U>() instead")]]
   U cast() const {
     return llvm::cast<U>(*this);
   }
@@ -157,7 +154,7 @@ public:
   /// Support llvm style casting.
   static bool classof(Attribute attr) {
     auto fusedLoc = llvm::dyn_cast<FusedLoc>(attr);
-    return fusedLoc && mlir::isa_and_nonnull<MetadataT>(fusedLoc.getMetadata());
+    return fusedLoc && fusedLoc.getMetadata().isa_and_nonnull<MetadataT>();
   }
 };
 

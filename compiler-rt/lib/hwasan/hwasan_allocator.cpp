@@ -44,7 +44,7 @@ enum {
 
 
 // Initialized in HwasanAllocatorInit, an never changed.
-alignas(16) static u8 tail_magic[kShadowAlignment - 1];
+static ALIGNED(16) u8 tail_magic[kShadowAlignment - 1];
 static uptr max_malloc_size;
 
 bool HwasanChunkView::IsAllocated() const {
@@ -289,9 +289,6 @@ static void HwasanDeallocate(StackTrace *stack, void *tagged_ptr) {
   CHECK(tagged_ptr);
   void *untagged_ptr = UntagPtr(tagged_ptr);
 
-  if (RunFreeHooks(tagged_ptr))
-    return;
-
   if (CheckInvalidFree(stack, untagged_ptr, tagged_ptr))
     return;
 
@@ -304,6 +301,8 @@ static void HwasanDeallocate(StackTrace *stack, void *tagged_ptr) {
     ReportInvalidFree(stack, reinterpret_cast<uptr>(tagged_ptr));
     return;
   }
+
+  RunFreeHooks(tagged_ptr);
 
   uptr orig_size = meta->GetRequestedSize();
   u32 free_context_id = StackDepotPut(*stack);

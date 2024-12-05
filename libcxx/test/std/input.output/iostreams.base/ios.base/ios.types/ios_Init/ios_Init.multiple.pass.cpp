@@ -14,8 +14,9 @@
 // Test to make sure that the streams only get initialized once
 // Taken from https://llvm.org/PR43300
 
-// This test requires the fix for PR43300 (7b81a13bfcd1).
-// XFAIL: using-built-library-before-llvm-9
+// The dylibs shipped on macOS so far do not contain the fix for PR43300, so
+// this test fails.
+// XFAIL: stdlib=apple-libc++ && target={{.+}}-apple-macosx10.{{9|10|11|12|13|14}}
 
 int main(int, char**)
 {

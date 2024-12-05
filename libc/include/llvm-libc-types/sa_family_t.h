@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_SA_FAMILY_T_H
-#define LLVM_LIBC_TYPES_SA_FAMILY_T_H
+#ifndef __LLVM_LIBC_TYPES_SA_FAMILY_T_H__
+#define __LLVM_LIBC_TYPES_SA_FAMILY_T_H__
 
 // The posix standard only says of sa_family_t that it must be unsigned. The
 // linux man page for "address_families" lists approximately 32 different
@@ -16,4 +16,4 @@
 
 typedef unsigned short sa_family_t;
 
-#endif // LLVM_LIBC_TYPES_SA_FAMILY_T_H
+#endif // __LLVM_LIBC_TYPES_SA_FAMILY_T_H__

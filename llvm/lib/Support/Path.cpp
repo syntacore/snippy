@@ -23,6 +23,7 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Signals.h"
 #include <cctype>
+#include <cerrno>
 
 #if !defined(_MSC_VER) && !defined(__MINGW32__)
 #include <unistd.h>
@@ -849,7 +850,7 @@ createTemporaryFile(const Twine &Model, int &ResultFD,
          "Model must be a simple filename.");
   // Use P.begin() so that createUniqueEntity doesn't need to recreate Storage.
   return createUniqueEntity(P.begin(), ResultFD, ResultPath, true, Type, Flags,
-                            all_read | all_write);
+                            owner_read | owner_write);
 }
 
 static std::error_code
@@ -1009,7 +1010,7 @@ static std::error_code copy_file_internal(int ReadFD, int WriteFD) {
   delete[] Buf;
 
   if (BytesRead < 0 || BytesWritten < 0)
-    return errnoAsErrorCode();
+    return std::error_code(errno, std::generic_category());
   return std::error_code();
 }
 
@@ -1059,7 +1060,7 @@ ErrorOr<MD5::MD5Result> md5_contents(int FD) {
   }
 
   if (BytesRead < 0)
-    return errnoAsErrorCode();
+    return std::error_code(errno, std::generic_category());
   MD5::MD5Result Result;
   Hash.final(Result);
   return Result;
@@ -1227,7 +1228,7 @@ TempFile::~TempFile() { assert(Done); }
 Error TempFile::discard() {
   Done = true;
   if (FD != -1 && close(FD) == -1) {
-    std::error_code EC = errnoAsErrorCode();
+    std::error_code EC = std::error_code(errno, std::generic_category());
     return errorCodeToError(EC);
   }
   FD = -1;
@@ -1296,8 +1297,10 @@ Error TempFile::keep(const Twine &Name) {
   if (!RenameEC)
     TmpName = "";
 
-  if (close(FD) == -1)
-    return errorCodeToError(errnoAsErrorCode());
+  if (close(FD) == -1) {
+    std::error_code EC(errno, std::generic_category());
+    return errorCodeToError(EC);
+  }
   FD = -1;
 
   return errorCodeToError(RenameEC);
@@ -1316,8 +1319,10 @@ Error TempFile::keep() {
 
   TmpName = "";
 
-  if (close(FD) == -1)
-    return errorCodeToError(errnoAsErrorCode());
+  if (close(FD) == -1) {
+    std::error_code EC(errno, std::generic_category());
+    return errorCodeToError(EC);
+  }
   FD = -1;
 
   return Error::success();

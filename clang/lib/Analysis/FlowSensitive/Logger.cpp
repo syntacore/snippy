@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/Analysis/FlowSensitive/Logger.h"
-#include "clang/Analysis/FlowSensitive/AdornedCFG.h"
+#include "clang/Analysis/FlowSensitive/ControlFlowContext.h"
 #include "clang/Analysis/FlowSensitive/TypeErasedDataflowAnalysis.h"
 #include "llvm/Support/WithColor.h"
 
@@ -33,17 +33,17 @@ struct TextualLogger final : Logger {
   TextualLogger(llvm::raw_ostream &OS)
       : OS(OS), ShowColors(llvm::WithColor::defaultAutoDetectFunction()(OS)) {}
 
-  virtual void beginAnalysis(const AdornedCFG &ACFG,
+  virtual void beginAnalysis(const ControlFlowContext &CFG,
                              TypeErasedDataflowAnalysis &Analysis) override {
     {
       llvm::WithColor Header(OS, llvm::raw_ostream::Colors::RED, /*Bold=*/true);
       OS << "=== Beginning data flow analysis ===\n";
     }
-    auto &D = ACFG.getDecl();
+    auto &D = CFG.getDecl();
     D.print(OS);
     OS << "\n";
     D.dump(OS);
-    CurrentCFG = &ACFG.getCFG();
+    CurrentCFG = &CFG.getCFG();
     CurrentCFG->print(OS, Analysis.getASTContext().getLangOpts(), ShowColors);
     CurrentAnalysis = &Analysis;
   }

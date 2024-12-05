@@ -43,15 +43,14 @@ const MCExpr *ConstantPool::addEntry(const MCExpr *Value, MCContext &Context,
 
   // Check if there is existing entry for the same constant. If so, reuse it.
   if (C) {
-    auto CItr = CachedConstantEntries.find(std::make_pair(C->getValue(), Size));
+    auto CItr = CachedConstantEntries.find(C->getValue());
     if (CItr != CachedConstantEntries.end())
       return CItr->second;
   }
 
   // Check if there is existing entry for the same symbol. If so, reuse it.
   if (S) {
-    auto SItr =
-        CachedSymbolEntries.find(std::make_pair(&(S->getSymbol()), Size));
+    auto SItr = CachedSymbolEntries.find(&(S->getSymbol()));
     if (SItr != CachedSymbolEntries.end())
       return SItr->second;
   }
@@ -61,9 +60,9 @@ const MCExpr *ConstantPool::addEntry(const MCExpr *Value, MCContext &Context,
   Entries.push_back(ConstantPoolEntry(CPEntryLabel, Value, Size, Loc));
   const auto SymRef = MCSymbolRefExpr::create(CPEntryLabel, Context);
   if (C)
-    CachedConstantEntries[std::make_pair(C->getValue(), Size)] = SymRef;
+    CachedConstantEntries[C->getValue()] = SymRef;
   if (S)
-    CachedSymbolEntries[std::make_pair(&(S->getSymbol()), Size)] = SymRef;
+    CachedSymbolEntries[&(S->getSymbol())] = SymRef;
   return SymRef;
 }
 

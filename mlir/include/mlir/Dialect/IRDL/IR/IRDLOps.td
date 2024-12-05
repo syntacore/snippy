@@ -503,8 +503,7 @@ def IRDL_BaseOp : IRDL_ConstraintOp<"base",
 }
 
 def IRDL_ParametricOp : IRDL_ConstraintOp<"parametric",
-    [ParentOneOf<["TypeOp", "AttributeOp", "OperationOp"]>,
-     DeclareOpInterfaceMethods<SymbolUserOpInterface>, Pure]> {
+    [ParentOneOf<["TypeOp", "AttributeOp", "OperationOp"]>, Pure]> {
   let summary = "Constraints an attribute/type base and its parameters";
   let description = [{
     `irdl.parametric` defines a constraint that accepts only a single type

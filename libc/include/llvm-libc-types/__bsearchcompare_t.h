@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES___BSEARCHCOMPARE_T_H
-#define LLVM_LIBC_TYPES___BSEARCHCOMPARE_T_H
+#ifndef __LLVM_LIBC_TYPES_BSEARCHCOMPARE_T_H__
+#define __LLVM_LIBC_TYPES_BSEARCHCOMPARE_T_H__
 
 typedef int (*__bsearchcompare_t)(const void *, const void *);
 
-#endif // LLVM_LIBC_TYPES___BSEARCHCOMPARE_T_H
+#endif // __LLVM_LIBC_TYPES_BSEARCHCOMPARE_T_H__

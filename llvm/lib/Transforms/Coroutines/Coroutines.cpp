@@ -47,15 +47,15 @@ coro::LowererBase::LowererBase(Module &M)
 //
 //    call ptr @llvm.coro.subfn.addr(ptr %Arg, i8 %index)
 
-CallInst *coro::LowererBase::makeSubFnCall(Value *Arg, int Index,
-                                           Instruction *InsertPt) {
+Value *coro::LowererBase::makeSubFnCall(Value *Arg, int Index,
+                                        Instruction *InsertPt) {
   auto *IndexVal = ConstantInt::get(Type::getInt8Ty(Context), Index);
   auto *Fn = Intrinsic::getDeclaration(&TheModule, Intrinsic::coro_subfn_addr);
 
   assert(Index >= CoroSubFnInst::IndexFirst &&
          Index < CoroSubFnInst::IndexLast &&
          "makeSubFnCall: Index value out of range");
-  return CallInst::Create(Fn, {Arg, IndexVal}, "", InsertPt->getIterator());
+  return CallInst::Create(Fn, {Arg, IndexVal}, "", InsertPt);
 }
 
 // NOTE: Must be sorted!
@@ -67,9 +67,6 @@ static const char *const CoroIntrinsics[] = {
     "llvm.coro.async.resume",
     "llvm.coro.async.size.replace",
     "llvm.coro.async.store_resume",
-    "llvm.coro.await.suspend.bool",
-    "llvm.coro.await.suspend.handle",
-    "llvm.coro.await.suspend.void",
     "llvm.coro.begin",
     "llvm.coro.destroy",
     "llvm.coro.done",
@@ -160,8 +157,8 @@ static CoroSaveInst *createCoroSave(CoroBeginInst *CoroBegin,
                                     CoroSuspendInst *SuspendInst) {
   Module *M = SuspendInst->getModule();
   auto *Fn = Intrinsic::getDeclaration(M, Intrinsic::coro_save);
-  auto *SaveInst = cast<CoroSaveInst>(
-      CallInst::Create(Fn, CoroBegin, "", SuspendInst->getIterator()));
+  auto *SaveInst =
+      cast<CoroSaveInst>(CallInst::Create(Fn, CoroBegin, "", SuspendInst));
   assert(!SuspendInst->getCoroSave());
   SuspendInst->setArgOperand(0, SaveInst);
   return SaveInst;
@@ -177,11 +174,7 @@ void coro::Shape::buildFrom(Function &F) {
   SmallVector<CoroSaveInst *, 2> UnusedCoroSaves;
 
   for (Instruction &I : instructions(F)) {
-    // FIXME: coro_await_suspend_* are not proper `IntrinisicInst`s
-    // because they might be invoked
-    if (auto AWS = dyn_cast<CoroAwaitSuspendInst>(&I)) {
-      CoroAwaitSuspends.push_back(AWS);
-    } else if (auto II = dyn_cast<IntrinsicInst>(&I)) {
+    if (auto II = dyn_cast<IntrinsicInst>(&I)) {
       switch (II->getIntrinsicID()) {
       default:
         continue;
@@ -369,7 +362,7 @@ void coro::Shape::buildFrom(Function &F) {
           // calls, but that messes with our invariants.  Re-insert the
           // bitcast and ignore this type mismatch.
           if (CastInst::isBitCastable(SrcTy, *RI)) {
-            auto BCI = new BitCastInst(*SI, *RI, "", Suspend->getIterator());
+            auto BCI = new BitCastInst(*SI, *RI, "", Suspend);
             SI->set(BCI);
             continue;
           }

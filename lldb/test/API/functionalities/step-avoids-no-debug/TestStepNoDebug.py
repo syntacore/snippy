@@ -83,9 +83,8 @@ class StepAvoidsNoDebugTestCase(TestBase):
 
     def hit_correct_function(self, pattern):
         name = self.thread.frames[0].GetFunctionName()
-        self.assertIn(
-            pattern,
-            name,
+        self.assertTrue(
+            pattern in name,
             "Got to '%s' not the expected function '%s'." % (name, pattern),
         )
 
@@ -110,7 +109,7 @@ class StepAvoidsNoDebugTestCase(TestBase):
 
         # Now finish, and make sure the return value is correct.
         threads = lldbutil.get_threads_stopped_at_breakpoint(self.process, inner_bkpt)
-        self.assertEqual(len(threads), 1, "Stopped at inner breakpoint.")
+        self.assertEquals(len(threads), 1, "Stopped at inner breakpoint.")
         self.thread = threads[0]
 
     def do_step_out_past_nodebug(self):

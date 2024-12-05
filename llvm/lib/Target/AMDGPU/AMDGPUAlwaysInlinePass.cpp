@@ -42,7 +42,7 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.setPreservesAll();
-  }
+ }
 };
 
 } // End anonymous namespace
@@ -89,7 +89,6 @@ recursivelyVisitUsers(GlobalValue &GV,
 static bool alwaysInlineImpl(Module &M, bool GlobalOpt) {
   std::vector<GlobalAlias*> AliasesToRemove;
 
-  bool Changed = false;
   SmallPtrSet<Function *, 8> FuncsToAlwaysInline;
   SmallPtrSet<Function *, 8> FuncsToNoInline;
   Triple TT(M.getTargetTriple());
@@ -99,7 +98,6 @@ static bool alwaysInlineImpl(Module &M, bool GlobalOpt) {
       if (TT.getArch() == Triple::amdgcn &&
           A.getLinkage() != GlobalValue::InternalLinkage)
         continue;
-      Changed = true;
       A.replaceAllUsesWith(F);
       AliasesToRemove.push_back(&A);
     }
@@ -155,7 +153,7 @@ static bool alwaysInlineImpl(Module &M, bool GlobalOpt) {
   for (Function *F : FuncsToNoInline)
     F->addFnAttr(Attribute::NoInline);
 
-  return Changed || !FuncsToAlwaysInline.empty() || !FuncsToNoInline.empty();
+  return !FuncsToAlwaysInline.empty() || !FuncsToNoInline.empty();
 }
 
 bool AMDGPUAlwaysInline::runOnModule(Module &M) {
@@ -168,6 +166,6 @@ ModulePass *llvm::createAMDGPUAlwaysInlinePass(bool GlobalOpt) {
 
 PreservedAnalyses AMDGPUAlwaysInlinePass::run(Module &M,
                                               ModuleAnalysisManager &AM) {
-  const bool Changed = alwaysInlineImpl(M, GlobalOpt);
-  return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+  alwaysInlineImpl(M, GlobalOpt);
+  return PreservedAnalyses::all();
 }

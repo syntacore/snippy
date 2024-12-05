@@ -21,7 +21,6 @@
 namespace clang {
 
 class CXXMethodDecl;
-class Type;
 
 /// A return adjustment.
 struct ReturnAdjustment {
@@ -163,24 +162,20 @@ struct ThunkInfo {
 
   /// Holds a pointer to the overridden method this thunk is for,
   /// if needed by the ABI to distinguish different thunks with equal
-  /// adjustments.
-  /// In the Itanium ABI, this field can hold the method that created the
-  /// vtable entry for this thunk.
-  /// Otherwise, null.
+  /// adjustments. Otherwise, null.
   /// CAUTION: In the unlikely event you need to sort ThunkInfos, consider using
   /// an ABI-specific comparator.
   const CXXMethodDecl *Method;
-  const Type *ThisType;
 
-  ThunkInfo() : Method(nullptr), ThisType(nullptr) {}
+  ThunkInfo() : Method(nullptr) {}
 
   ThunkInfo(const ThisAdjustment &This, const ReturnAdjustment &Return,
-            const Type *ThisT, const CXXMethodDecl *Method = nullptr)
-      : This(This), Return(Return), Method(Method), ThisType(ThisT) {}
+            const CXXMethodDecl *Method = nullptr)
+      : This(This), Return(Return), Method(Method) {}
 
   friend bool operator==(const ThunkInfo &LHS, const ThunkInfo &RHS) {
     return LHS.This == RHS.This && LHS.Return == RHS.Return &&
-           LHS.Method == RHS.Method && LHS.ThisType == RHS.ThisType;
+           LHS.Method == RHS.Method;
   }
 
   bool isEmpty() const {

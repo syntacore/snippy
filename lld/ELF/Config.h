@@ -102,9 +102,6 @@ enum class GnuStackKind { None, Exec, NoExec };
 // For --lto=
 enum LtoKind : uint8_t {UnifiedThin, UnifiedRegular, Default};
 
-// For -z gcs=
-enum class GcsPolicy { Implicit, Never, Always };
-
 struct SymbolVersion {
   llvm::StringRef name;
   bool isExternCpp;
@@ -129,7 +126,7 @@ public:
 private:
   void createFiles(llvm::opt::InputArgList &args);
   void inferMachineType();
-  template <class ELFT> void link(llvm::opt::InputArgList &args);
+  void link(llvm::opt::InputArgList &args);
   template <class ELFT> void compileBitcodeFiles(bool skipLinkedOutput);
   bool tryAddFatLTOFile(MemoryBufferRef mb, StringRef archiveName,
                         uint64_t offsetInArchive, bool lazy);
@@ -141,7 +138,7 @@ private:
 
   std::unique_ptr<BitcodeCompiler> lto;
   std::vector<InputFile *> files;
-  InputFile *armCmseImpLib = nullptr;
+  std::optional<InputFile *> armCmseImpLib;
 
 public:
   SmallVector<std::pair<StringRef, unsigned>, 0> archiveFiles;
@@ -190,9 +187,6 @@ struct Config {
   llvm::StringRef cmseOutputLib;
   StringRef zBtiReport = "none";
   StringRef zCetReport = "none";
-  StringRef zPauthReport = "none";
-  StringRef zGcsReport = "none";
-  bool ltoBBAddrMap;
   llvm::StringRef ltoBasicBlockSections;
   std::pair<llvm::StringRef, llvm::StringRef> thinLTOObjectSuffixReplace;
   llvm::StringRef thinLTOPrefixReplaceOld;
@@ -217,8 +211,6 @@ struct Config {
   bool allowMultipleDefinition;
   bool fatLTOObjects;
   bool androidPackDynRelocs = false;
-  bool armHasArmISA = false;
-  bool armHasThumb2ISA = false;
   bool armHasBlx = false;
   bool armHasMovtMovw = false;
   bool armJ1J2BranchEncoding = false;
@@ -229,14 +221,10 @@ struct Config {
   CGProfileSortKind callGraphProfileSort;
   bool checkSections;
   bool checkDynamicRelocs;
-  std::optional<llvm::DebugCompressionType> compressDebugSections;
-  llvm::SmallVector<
-      std::tuple<llvm::GlobPattern, llvm::DebugCompressionType, unsigned>, 0>
-      compressSections;
+  llvm::DebugCompressionType compressDebugSections;
   bool cref;
   llvm::SmallVector<std::pair<llvm::GlobPattern, uint64_t>, 0>
       deadRelocInNonAlloc;
-  bool debugNames;
   bool demangle = true;
   bool dependentLibraries;
   bool disableVerify;
@@ -244,7 +232,6 @@ struct Config {
   bool emitLLVM;
   bool emitRelocs;
   bool enableNewDtags;
-  bool enableNonContiguousRegions;
   bool executeOnly;
   bool exportDynamic;
   bool fixCortexA53Errata843419;
@@ -283,11 +270,9 @@ struct Config {
   bool printGcSections;
   bool printIcfSections;
   bool printMemoryUsage;
-  bool rejectMismatch;
   bool relax;
   bool relaxGP;
   bool relocatable;
-  bool resolveGroups;
   bool relrGlibc = false;
   bool relrPackDynRelocs = false;
   llvm::DenseSet<llvm::StringRef> saveTempsArgs;
@@ -324,7 +309,6 @@ struct Config {
   bool zInitfirst;
   bool zInterpose;
   bool zKeepTextSectionPrefix;
-  bool zLrodataAfterBss;
   bool zNodefaultlib;
   bool zNodelete;
   bool zNodlopen;
@@ -348,7 +332,6 @@ struct Config {
   UnresolvedPolicy unresolvedSymbols;
   UnresolvedPolicy unresolvedSymbolsInShlib;
   Target2Policy target2;
-  GcsPolicy zGcs;
   bool power10Stubs;
   ARMVFPArgKind armVFPArgs = ARMVFPArgKind::Default;
   BuildIdKind buildId = BuildIdKind::None;
@@ -511,8 +494,6 @@ struct Ctx {
   void reset();
 
   llvm::raw_fd_ostream openAuxiliaryFile(llvm::StringRef, std::error_code &);
-
-  ArrayRef<uint8_t> aarch64PauthAbiCoreInfo;
 };
 
 LLVM_LIBRARY_VISIBILITY extern Ctx ctx;

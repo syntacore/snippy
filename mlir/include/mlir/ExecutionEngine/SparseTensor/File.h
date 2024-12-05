@@ -115,12 +115,10 @@ public:
     SparseTensorReader *reader = new SparseTensorReader(filename);
     reader->openFile();
     reader->readHeader();
-    if (!reader->canReadAs(valTp)) {
-      fprintf(stderr,
-              "Tensor element type %d not compatible with values in file %s\n",
-              static_cast<int>(valTp), filename);
-      exit(1);
-    }
+    if (!reader->canReadAs(valTp))
+      MLIR_SPARSETENSOR_FATAL(
+          "Tensor element type %d not compatible with values in file %s\n",
+          static_cast<int>(valTp), filename);
     reader->assertMatchesShape(dimRank, dimShape);
     return reader;
   }
@@ -206,7 +204,7 @@ public:
     auto *lvlCOO = readCOO<V>(map, lvlSizes);
     auto *tensor = SparseTensorStorage<P, I, V>::newFromCOO(
         dimRank, getDimSizes(), lvlRank, lvlSizes, lvlTypes, dim2lvl, lvl2dim,
-        lvlCOO);
+        *lvlCOO);
     delete lvlCOO;
     return tensor;
   }

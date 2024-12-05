@@ -25,10 +25,10 @@ const int OPR_ID_UNSUPPORTED = -2;
 const int OPR_ID_DUPLICATE = -3;
 const int OPR_VAL_INVALID = -4;
 
-struct CustomOperand {
+template <class T> struct CustomOperand {
   StringLiteral Name;
-  unsigned Encoding = 0;
-  bool (*Cond)(const MCSubtargetInfo &STI) = nullptr;
+  int Encoding = 0;
+  bool (*Cond)(T Context) = nullptr;
 };
 
 struct CustomOperandVal {
@@ -60,34 +60,20 @@ extern const int DEP_CTR_SIZE;
 
 } // namespace DepCtr
 
-// Symbolic names for the sendmsg(msg_id, operation, stream) syntax.
-namespace SendMsg {
+namespace SendMsg { // Symbolic names for the sendmsg(...) syntax.
 
-/// Map from a symbolic name for a msg_id to the message portion of the
-/// immediate encoding. A negative return value indicates that the Name was
-/// unknown or unsupported on this target.
-int64_t getMsgId(StringRef Name, const MCSubtargetInfo &STI);
+extern const CustomOperand<const MCSubtargetInfo &> Msg[];
+extern const int MSG_SIZE;
 
-/// Map from an encoding to the symbolic name for a msg_id immediate. This is
-/// doing opposite of getMsgId().
-StringRef getMsgName(uint64_t Encoding, const MCSubtargetInfo &STI);
-
-/// Map from a symbolic name for a sendmsg operation to the operation portion of
-/// the immediate encoding. A negative return value indicates that the Name was
-/// unknown or unsupported on this target.
-int64_t getMsgOpId(int64_t MsgId, StringRef Name, const MCSubtargetInfo &STI);
-
-/// Map from an encoding to the symbolic name for a sendmsg operation. This is
-/// doing opposite of getMsgOpId().
-StringRef getMsgOpName(int64_t MsgId, uint64_t Encoding,
-                       const MCSubtargetInfo &STI);
+extern const char *const OpSysSymbolic[OP_SYS_LAST_];
+extern const char *const OpGsSymbolic[OP_GS_LAST_];
 
 } // namespace SendMsg
 
 namespace Hwreg { // Symbolic names for the hwreg(...) syntax.
 
-int64_t getHwregId(StringRef Name, const MCSubtargetInfo &STI);
-StringRef getHwreg(uint64_t Encoding, const MCSubtargetInfo &STI);
+extern const CustomOperand<const MCSubtargetInfo &> Opr[];
+extern const int OPR_SIZE;
 
 } // namespace Hwreg
 
@@ -115,17 +101,6 @@ namespace VGPRIndexMode { // Symbolic names for the gpr_idx(...) syntax.
 extern const char* const IdSymbolic[];
 
 } // namespace VGPRIndexMode
-
-namespace UCVersion {
-
-struct GFXVersion {
-  StringLiteral Symbol;
-  unsigned Code;
-};
-
-ArrayRef<GFXVersion> getGFXVersions();
-
-} // namespace UCVersion
 
 } // namespace AMDGPU
 } // namespace llvm

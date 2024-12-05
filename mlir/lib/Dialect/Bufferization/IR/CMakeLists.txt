@@ -4,7 +4,6 @@ add_mlir_dialect_library(MLIRBufferizationDialect
   BufferDeallocationOpInterface.cpp
   BufferizationOps.cpp
   BufferizationDialect.cpp
-  BufferViewFlowOpInterface.cpp
   UnstructuredControlFlow.cpp
 
   ADDITIONAL_HEADER_DIRS

@@ -208,10 +208,12 @@ static gpu::GPUFuncOp outlineKernelFuncImpl(gpu::LaunchOp launchOp,
   // because multiple launches with the same body are not deduplicated.
   if (auto blockBounds =
           maybeConstantDimsAttr(launchOp.getBlockSizeOperandValues()))
-    outlinedFunc.setKnownBlockSizeAttr(blockBounds);
+    outlinedFunc->setAttr(gpu::GPUFuncOp::getKnownBlockSizeAttrName(),
+                          blockBounds);
   if (auto gridBounds =
           maybeConstantDimsAttr(launchOp.getGridSizeOperandValues()))
-    outlinedFunc.setKnownGridSizeAttr(gridBounds);
+    outlinedFunc->setAttr(gpu::GPUFuncOp::getKnownGridSizeAttrName(),
+                          gridBounds);
 
   IRMapping map;
 
@@ -239,26 +241,24 @@ static gpu::GPUFuncOp outlineKernelFuncImpl(gpu::LaunchOp launchOp,
     map.map(operand.value(), entryBlock.getArgument(operand.index()));
 
   // Clone the region of the gpu.launch operation into the gpu.func operation.
+  // TODO: If cloneInto can be modified such that if a mapping for
+  // a block exists, that block will be used to clone operations into (at the
+  // end of the block), instead of creating a new block, this would be much
+  // cleaner.
   launchOpBody.cloneInto(&outlinedFuncBody, map);
 
-  // Replace the terminator op with returns.
-  for (Block &block : launchOpBody) {
-    Block *clonedBlock = map.lookup(&block);
-    auto terminator = dyn_cast<gpu::TerminatorOp>(clonedBlock->getTerminator());
-    if (!terminator)
-      continue;
-    OpBuilder replacer(terminator);
-    replacer.create<gpu::ReturnOp>(terminator->getLoc());
-    terminator->erase();
-  }
+  // Branch from entry of the gpu.func operation to the block that is cloned
+  // from the entry block of the gpu.launch operation.
+  Block &launchOpEntry = launchOpBody.front();
+  Block *clonedLaunchOpEntry = map.lookup(&launchOpEntry);
+  builder.setInsertionPointToEnd(&entryBlock);
+  builder.create<cf::BranchOp>(loc, clonedLaunchOpEntry);
 
-  // Splice now the entry block of the gpu.launch operation at the end of the
-  // gpu.func entry block and erase the redundant block.
-  Block *clonedLaunchOpEntry = map.lookup(&launchOpBody.front());
-  entryBlock.getOperations().splice(entryBlock.getOperations().end(),
-                                    clonedLaunchOpEntry->getOperations());
-  clonedLaunchOpEntry->erase();
-
+  outlinedFunc.walk([](gpu::TerminatorOp op) {
+    OpBuilder replacer(op);
+    replacer.create<gpu::ReturnOp>(op.getLoc());
+    op.erase();
+  });
   return outlinedFunc;
 }
 

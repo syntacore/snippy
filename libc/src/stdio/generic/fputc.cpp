@@ -9,12 +9,10 @@
 #include "src/stdio/fputc.h"
 #include "src/__support/File/file.h"
 
-#include "hdr/types/FILE.h"
-#include "src/__support/macros/config.h"
 #include "src/errno/libc_errno.h"
-#include <stddef.h>
+#include <stdio.h>
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 
 LLVM_LIBC_FUNCTION(int, fputc, (int c, ::FILE *stream)) {
   unsigned char uc = static_cast<unsigned char>(c);
@@ -31,4 +29,4 @@ LLVM_LIBC_FUNCTION(int, fputc, (int c, ::FILE *stream)) {
   return 0;
 }
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE

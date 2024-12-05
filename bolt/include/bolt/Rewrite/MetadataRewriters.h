@@ -21,8 +21,6 @@ class BinaryContext;
 
 std::unique_ptr<MetadataRewriter> createLinuxKernelRewriter(BinaryContext &);
 
-std::unique_ptr<MetadataRewriter> createBuildIDRewriter(BinaryContext &);
-
 std::unique_ptr<MetadataRewriter> createPseudoProbeRewriter(BinaryContext &);
 
 std::unique_ptr<MetadataRewriter> createSDTRewriter(BinaryContext &);

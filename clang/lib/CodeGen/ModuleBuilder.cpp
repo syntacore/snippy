@@ -180,7 +180,7 @@ namespace {
 
     bool HandleTopLevelDecl(DeclGroupRef DG) override {
       // FIXME: Why not return false and abort parsing?
-      if (Diags.hasUnrecoverableErrorOccurred())
+      if (Diags.hasErrorOccurred())
         return true;
 
       HandlingTopLevelDeclRAII HandlingDecl(*this);
@@ -206,7 +206,7 @@ namespace {
     }
 
     void HandleInlineFunctionDefinition(FunctionDecl *D) override {
-      if (Diags.hasUnrecoverableErrorOccurred())
+      if (Diags.hasErrorOccurred())
         return;
 
       assert(D->doesThisDeclarationHaveABody());
@@ -233,7 +233,7 @@ namespace {
     /// client hack on the type, which can occur at any point in the file
     /// (because these can be defined in declspecs).
     void HandleTagDeclDefinition(TagDecl *D) override {
-      if (Diags.hasUnrecoverableErrorOccurred())
+      if (Diags.hasErrorOccurred())
         return;
 
       // Don't allow re-entrant calls to CodeGen triggered by PCH
@@ -269,7 +269,7 @@ namespace {
     }
 
     void HandleTagDeclRequiredDefinition(const TagDecl *D) override {
-      if (Diags.hasUnrecoverableErrorOccurred())
+      if (Diags.hasErrorOccurred())
         return;
 
       // Don't allow re-entrant calls to CodeGen triggered by PCH
@@ -283,7 +283,7 @@ namespace {
 
     void HandleTranslationUnit(ASTContext &Ctx) override {
       // Release the Builder when there is no error.
-      if (!Diags.hasUnrecoverableErrorOccurred() && Builder)
+      if (!Diags.hasErrorOccurred() && Builder)
         Builder->Release();
 
       // If there are errors before or when releasing the Builder, reset
@@ -297,25 +297,25 @@ namespace {
     }
 
     void AssignInheritanceModel(CXXRecordDecl *RD) override {
-      if (Diags.hasUnrecoverableErrorOccurred())
+      if (Diags.hasErrorOccurred())
         return;
 
       Builder->RefreshTypeCacheForClass(RD);
     }
 
     void CompleteTentativeDefinition(VarDecl *D) override {
-      if (Diags.hasUnrecoverableErrorOccurred())
+      if (Diags.hasErrorOccurred())
         return;
 
       Builder->EmitTentativeDefinition(D);
     }
 
-    void CompleteExternalDeclaration(DeclaratorDecl *D) override {
+    void CompleteExternalDeclaration(VarDecl *D) override {
       Builder->EmitExternalDeclaration(D);
     }
 
     void HandleVTable(CXXRecordDecl *RD) override {
-      if (Diags.hasUnrecoverableErrorOccurred())
+      if (Diags.hasErrorOccurred())
         return;
 
       Builder->EmitVTable(RD);

@@ -170,6 +170,5 @@ SBBroadcaster SBCommunication::GetBroadcaster() {
 const char *SBCommunication::GetBroadcasterClass() {
   LLDB_INSTRUMENT();
 
-  return ConstString(ThreadedCommunication::GetStaticBroadcasterClass())
-      .AsCString();
+  return ThreadedCommunication::GetStaticBroadcasterClass().AsCString();
 }

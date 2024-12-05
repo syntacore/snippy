@@ -8,7 +8,6 @@
 
 #include "llvm/Linker/IRMover.h"
 #include "LinkDiagnosticInfo.h"
-#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -695,7 +694,6 @@ Function *IRLinker::copyFunctionProto(const Function *SF) {
                              SF->getAddressSpace(), SF->getName(), &DstM);
   F->copyAttributesFrom(SF);
   F->setAttributes(mapAttributeTypes(F->getContext(), F->getAttributes()));
-  F->IsNewDbgInfoFormat = SF->IsNewDbgInfoFormat;
   return F;
 }
 
@@ -1192,8 +1190,8 @@ void IRLinker::prepareCompileUnitsForImport() {
   // When importing for ThinLTO, prevent importing of types listed on
   // the DICompileUnit that we don't need a copy of in the importing
   // module. They will be emitted by the originating module.
-  for (MDNode *N : SrcCompileUnits->operands()) {
-    auto *CU = cast<DICompileUnit>(N);
+  for (unsigned I = 0, E = SrcCompileUnits->getNumOperands(); I != E; ++I) {
+    auto *CU = cast<DICompileUnit>(SrcCompileUnits->getOperand(I));
     assert(CU && "Expected valid compile unit");
     // Enums, macros, and retained types don't need to be listed on the
     // imported DICompileUnit. This means they will only be imported
@@ -1489,7 +1487,8 @@ Error IRLinker::linkModuleFlagsMetadata() {
   }
 
   // Check all of the requirements.
-  for (MDNode *Requirement : Requirements) {
+  for (unsigned I = 0, E = Requirements.size(); I != E; ++I) {
+    MDNode *Requirement = Requirements[I];
     MDString *Flag = cast<MDString>(Requirement->getOperand(0));
     Metadata *ReqValue = Requirement->getOperand(1);
 
@@ -1546,11 +1545,10 @@ Error IRLinker::run() {
     if (Error Err = SrcM->getMaterializer()->materializeMetadata())
       return Err;
 
-  // Convert source module to match dest for the duration of the link.
-  ScopedDbgInfoFormatSetter FormatSetter(*SrcM, DstM.IsNewDbgInfoFormat);
+  DstM.IsNewDbgInfoFormat = SrcM->IsNewDbgInfoFormat;
 
-  // Inherit the target data from the source module if the destination
-  // module doesn't have one already.
+  // Inherit the target data from the source module if the destination module
+  // doesn't have one already.
   if (DstM.getDataLayout().isDefault())
     DstM.setDataLayout(SrcM->getDataLayout());
 

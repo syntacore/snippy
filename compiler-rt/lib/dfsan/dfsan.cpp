@@ -33,9 +33,6 @@
 #include "sanitizer_common/sanitizer_libc.h"
 #include "sanitizer_common/sanitizer_report_decorator.h"
 #include "sanitizer_common/sanitizer_stacktrace.h"
-#if SANITIZER_LINUX
-#  include <sys/personality.h>
-#endif
 
 using namespace __dfsan;
 
@@ -1130,12 +1127,11 @@ static void CheckMemoryLayoutSanity() {
 
 // TODO: CheckMemoryRangeAvailability is based on msan.
 // Consider refactoring these into a shared implementation.
-static bool CheckMemoryRangeAvailability(uptr beg, uptr size, bool verbose) {
+static bool CheckMemoryRangeAvailability(uptr beg, uptr size) {
   if (size > 0) {
     uptr end = beg + size - 1;
     if (!MemoryRangeIsAvailable(beg, end)) {
-      if (verbose)
-        Printf("FATAL: Memory range %p - %p is not available.\n", beg, end);
+      Printf("FATAL: Memory range %p - %p is not available.\n", beg, end);
       return false;
     }
   }
@@ -1167,7 +1163,7 @@ static bool ProtectMemoryRange(uptr beg, uptr size, const char *name) {
 
 // TODO: InitShadow is based on msan.
 // Consider refactoring these into a shared implementation.
-bool InitShadow(bool init_origins, bool dry_run) {
+bool InitShadow(bool init_origins) {
   // Let user know mapping parameters first.
   VPrintf(1, "dfsan_init %p\n", (void *)&__dfsan::dfsan_init);
   for (unsigned i = 0; i < kMemoryLayoutSize; ++i)
@@ -1177,9 +1173,8 @@ bool InitShadow(bool init_origins, bool dry_run) {
   CheckMemoryLayoutSanity();
 
   if (!MEM_IS_APP(&__dfsan::dfsan_init)) {
-    if (!dry_run)
-      Printf("FATAL: Code %p is out of application range. Non-PIE build?\n",
-             (uptr)&__dfsan::dfsan_init);
+    Printf("FATAL: Code %p is out of application range. Non-PIE build?\n",
+           (uptr)&__dfsan::dfsan_init);
     return false;
   }
 
@@ -1200,60 +1195,25 @@ bool InitShadow(bool init_origins, bool dry_run) {
     bool protect = type == MappingDesc::INVALID ||
                    (!init_origins && type == MappingDesc::ORIGIN);
     CHECK(!(map && protect));
-    if (!map && !protect) {
-      CHECK(type == MappingDesc::APP || type == MappingDesc::ALLOCATOR);
-
-      if (dry_run && type == MappingDesc::ALLOCATOR &&
-          !CheckMemoryRangeAvailability(start, size, !dry_run))
-        return false;
-    }
+    if (!map && !protect)
+      CHECK(type == MappingDesc::APP);
     if (map) {
-      if (dry_run && !CheckMemoryRangeAvailability(start, size, !dry_run))
+      if (!CheckMemoryRangeAvailability(start, size))
         return false;
-      if (!dry_run &&
-          !MmapFixedSuperNoReserve(start, size, kMemoryLayout[i].name))
+      if (!MmapFixedSuperNoReserve(start, size, kMemoryLayout[i].name))
         return false;
-      if (!dry_run && common_flags()->use_madv_dontdump)
+      if (common_flags()->use_madv_dontdump)
         DontDumpShadowMemory(start, size);
     }
     if (protect) {
-      if (dry_run && !CheckMemoryRangeAvailability(start, size, !dry_run))
+      if (!CheckMemoryRangeAvailability(start, size))
         return false;
-      if (!dry_run && !ProtectMemoryRange(start, size, kMemoryLayout[i].name))
+      if (!ProtectMemoryRange(start, size, kMemoryLayout[i].name))
         return false;
     }
   }
 
   return true;
-}
-
-bool InitShadowWithReExec(bool init_origins) {
-  // Start with dry run: check layout is ok, but don't print warnings because
-  // warning messages will cause tests to fail (even if we successfully re-exec
-  // after the warning).
-  bool success = InitShadow(init_origins, true);
-  if (!success) {
-#if SANITIZER_LINUX
-    // Perhaps ASLR entropy is too high. If ASLR is enabled, re-exec without it.
-    int old_personality = personality(0xffffffff);
-    bool aslr_on =
-        (old_personality != -1) && ((old_personality & ADDR_NO_RANDOMIZE) == 0);
-
-    if (aslr_on) {
-      VReport(1,
-              "WARNING: DataflowSanitizer: memory layout is incompatible, "
-              "possibly due to high-entropy ASLR.\n"
-              "Re-execing with fixed virtual address space.\n"
-              "N.B. reducing ASLR entropy is preferable.\n");
-      CHECK_NE(personality(old_personality | ADDR_NO_RANDOMIZE), -1);
-      ReExec();
-    }
-#endif
-  }
-
-  // The earlier dry run didn't actually map or protect anything. Run again in
-  // non-dry run mode.
-  return success && InitShadow(init_origins, false);
 }
 
 static void DFsanInit(int argc, char **argv, char **envp) {
@@ -1269,11 +1229,7 @@ static void DFsanInit(int argc, char **argv, char **envp) {
 
   CheckASLR();
 
-  if (!InitShadowWithReExec(dfsan_get_track_origins())) {
-    Printf("FATAL: DataflowSanitizer can not mmap the shadow memory.\n");
-    DumpProcessMap();
-    Die();
-  }
+  InitShadow(dfsan_get_track_origins());
 
   initialize_interceptors();
 

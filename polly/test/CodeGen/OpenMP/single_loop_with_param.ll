@@ -1,15 +1,15 @@
-; RUN: opt %loadNPMPolly -polly-parallel \
-; RUN: -polly-parallel-force -passes=polly-codegen \
+; RUN: opt %loadPolly -polly-parallel \
+; RUN: -polly-parallel-force -polly-codegen \
 ; RUN: -S -verify-dom-info < %s \
 ; RUN: | FileCheck %s -check-prefix=IR
 
-; RUN: opt %loadNPMPolly -polly-parallel \
-; RUN: -polly-parallel-force -passes=polly-codegen -polly-omp-backend=LLVM \
+; RUN: opt %loadPolly -polly-parallel \
+; RUN: -polly-parallel-force -polly-codegen -polly-omp-backend=LLVM \
 ; RUN: -S -verify-dom-info < %s \
 ; RUN: | FileCheck %s -check-prefix=LIBOMP-IR
 
-; RUN: opt %loadNPMPolly -polly-parallel \
-; RUN: -polly-parallel-force -passes=polly-codegen -polly-omp-backend=LLVM \
+; RUN: opt %loadPolly -polly-parallel \
+; RUN: -polly-parallel-force -polly-codegen -polly-omp-backend=LLVM \
 ; RUN: -polly-scheduling=static \
 ; RUN: -S -verify-dom-info < %s \
 ; RUN: | FileCheck %s -check-prefix=LIBOMP-STATIC-IR

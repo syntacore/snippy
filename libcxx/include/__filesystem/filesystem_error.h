@@ -10,6 +10,7 @@
 #ifndef _LIBCPP___FILESYSTEM_FILESYSTEM_ERROR_H
 #define _LIBCPP___FILESYSTEM_FILESYSTEM_ERROR_H
 
+#include <__availability>
 #include <__config>
 #include <__filesystem/path.h>
 #include <__memory/shared_ptr.h>

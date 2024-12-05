@@ -75,8 +75,6 @@ AArch64RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
     // GHC set of callee saved regs is empty as all those regs are
     // used for passing STG regs around
     return CSR_AArch64_NoRegs_SaveList;
-  if (MF->getFunction().getCallingConv() == CallingConv::PreserveNone)
-    return CSR_AArch64_NoneRegs_SaveList;
   if (MF->getFunction().getCallingConv() == CallingConv::AnyReg)
     return CSR_AArch64_AllRegs_SaveList;
 
@@ -107,22 +105,13 @@ AArch64RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   if (MF->getFunction().getCallingConv() ==
           CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X0)
     report_fatal_error(
-        "Calling convention "
-        "AArch64_SME_ABI_Support_Routines_PreserveMost_From_X0 is only "
-        "supported to improve calls to SME ACLE save/restore/disable-za "
+        "Calling convention AArch64_SME_ABI_Support_Routines_PreserveMost_From_X0 is "
+        "only supported to improve calls to SME ACLE save/restore/disable-za "
         "functions, and is not intended to be used beyond that scope.");
-  if (MF->getFunction().getCallingConv() ==
-      CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X1)
-    report_fatal_error(
-        "Calling convention "
-        "AArch64_SME_ABI_Support_Routines_PreserveMost_From_X1 is "
-        "only supported to improve calls to SME ACLE __arm_get_current_vg "
-        "function, and is not intended to be used beyond that scope.");
   if (MF->getFunction().getCallingConv() ==
           CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X2)
     report_fatal_error(
-        "Calling convention "
-        "AArch64_SME_ABI_Support_Routines_PreserveMost_From_X2 is "
+        "Calling convention AArch64_SME_ABI_Support_Routines_PreserveMost_From_X2 is "
         "only supported to improve calls to SME ACLE __arm_sme_state "
         "and is not intended to be used beyond that scope.");
   if (MF->getSubtarget<AArch64Subtarget>().getTargetLowering()
@@ -162,22 +151,13 @@ AArch64RegisterInfo::getDarwinCalleeSavedRegs(const MachineFunction *MF) const {
   if (MF->getFunction().getCallingConv() ==
           CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X0)
     report_fatal_error(
-        "Calling convention "
-        "AArch64_SME_ABI_Support_Routines_PreserveMost_From_X0 is "
+        "Calling convention AArch64_SME_ABI_Support_Routines_PreserveMost_From_X0 is "
         "only supported to improve calls to SME ACLE save/restore/disable-za "
         "functions, and is not intended to be used beyond that scope.");
   if (MF->getFunction().getCallingConv() ==
-      CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X1)
-    report_fatal_error(
-        "Calling convention "
-        "AArch64_SME_ABI_Support_Routines_PreserveMost_From_X1 is "
-        "only supported to improve calls to SME ACLE __arm_get_current_vg "
-        "function, and is not intended to be used beyond that scope.");
-  if (MF->getFunction().getCallingConv() ==
           CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X2)
     report_fatal_error(
-        "Calling convention "
-        "AArch64_SME_ABI_Support_Routines_PreserveMost_From_X2 is "
+        "Calling convention AArch64_SME_ABI_Support_Routines_PreserveMost_From_X2 is "
         "only supported to improve calls to SME ACLE __arm_sme_state "
         "and is not intended to be used beyond that scope.");
   if (MF->getFunction().getCallingConv() == CallingConv::CXX_FAST_TLS)
@@ -253,11 +233,13 @@ AArch64RegisterInfo::getDarwinCallPreservedMask(const MachineFunction &MF,
     report_fatal_error(
         "Calling convention SVE_VectorCall is unsupported on Darwin.");
   if (CC == CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X0)
-    return CSR_AArch64_SME_ABI_Support_Routines_PreserveMost_From_X0_RegMask;
-  if (CC == CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X1)
-    return CSR_AArch64_SME_ABI_Support_Routines_PreserveMost_From_X1_RegMask;
+    report_fatal_error(
+        "Calling convention AArch64_SME_ABI_Support_Routines_PreserveMost_From_X0 is "
+        "unsupported on Darwin.");
   if (CC == CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X2)
-    return CSR_AArch64_SME_ABI_Support_Routines_PreserveMost_From_X2_RegMask;
+    report_fatal_error(
+        "Calling convention AArch64_SME_ABI_Support_Routines_PreserveMost_From_X2 is "
+        "unsupported on Darwin.");
   if (CC == CallingConv::CFGuard_Check)
     report_fatal_error(
         "Calling convention CFGuard_Check is unsupported on Darwin.");
@@ -282,9 +264,6 @@ AArch64RegisterInfo::getCallPreservedMask(const MachineFunction &MF,
   if (CC == CallingConv::GHC)
     // This is academic because all GHC calls are (supposed to be) tail calls
     return SCS ? CSR_AArch64_NoRegs_SCS_RegMask : CSR_AArch64_NoRegs_RegMask;
-  if (CC == CallingConv::PreserveNone)
-    return SCS ? CSR_AArch64_NoneRegs_SCS_RegMask
-               : CSR_AArch64_NoneRegs_RegMask;
   if (CC == CallingConv::AnyReg)
     return SCS ? CSR_AArch64_AllRegs_SCS_RegMask : CSR_AArch64_AllRegs_RegMask;
 
@@ -302,8 +281,6 @@ AArch64RegisterInfo::getCallPreservedMask(const MachineFunction &MF,
                : CSR_AArch64_SVE_AAPCS_RegMask;
   if (CC == CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X0)
     return CSR_AArch64_SME_ABI_Support_Routines_PreserveMost_From_X0_RegMask;
-  if (CC == CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X1)
-    return CSR_AArch64_SME_ABI_Support_Routines_PreserveMost_From_X1_RegMask;
   if (CC == CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X2)
     return CSR_AArch64_SME_ABI_Support_Routines_PreserveMost_From_X2_RegMask;
   if (CC == CallingConv::CFGuard_Check)
@@ -321,11 +298,12 @@ AArch64RegisterInfo::getCallPreservedMask(const MachineFunction &MF,
   if (CC == CallingConv::PreserveMost)
     return SCS ? CSR_AArch64_RT_MostRegs_SCS_RegMask
                : CSR_AArch64_RT_MostRegs_RegMask;
-  if (CC == CallingConv::PreserveAll)
+  else if (CC == CallingConv::PreserveAll)
     return SCS ? CSR_AArch64_RT_AllRegs_SCS_RegMask
                : CSR_AArch64_RT_AllRegs_RegMask;
 
-  return SCS ? CSR_AArch64_AAPCS_SCS_RegMask : CSR_AArch64_AAPCS_RegMask;
+  else
+    return SCS ? CSR_AArch64_AAPCS_SCS_RegMask : CSR_AArch64_AAPCS_RegMask;
 }
 
 const uint32_t *AArch64RegisterInfo::getCustomEHPadPreservedMask(
@@ -459,18 +437,11 @@ AArch64RegisterInfo::getStrictlyReservedRegs(const MachineFunction &MF) const {
   if (MF.getFunction().hasFnAttribute(Attribute::SpeculativeLoadHardening))
     markSuperRegs(Reserved, AArch64::W16);
 
-  // FFR is modelled as global state that cannot be allocated.
-  if (MF.getSubtarget<AArch64Subtarget>().hasSVE())
-    Reserved.set(AArch64::FFR);
-
   // SME tiles are not allocatable.
   if (MF.getSubtarget<AArch64Subtarget>().hasSME()) {
     for (MCPhysReg SubReg : subregs_inclusive(AArch64::ZA))
       Reserved.set(SubReg);
   }
-
-  // VG cannot be allocated
-  Reserved.set(AArch64::VG);
 
   if (MF.getSubtarget<AArch64Subtarget>().hasSME2()) {
     for (MCSubRegIterator SubReg(AArch64::ZT0, this, /*self=*/true);
@@ -479,7 +450,6 @@ AArch64RegisterInfo::getStrictlyReservedRegs(const MachineFunction &MF) const {
   }
 
   markSuperRegs(Reserved, AArch64::FPCR);
-  markSuperRegs(Reserved, AArch64::FPSR);
 
   if (MF.getFunction().getCallingConv() == CallingConv::GRAAL) {
     markSuperRegs(Reserved, AArch64::X27);
@@ -499,17 +469,6 @@ AArch64RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   for (size_t i = 0; i < AArch64::GPR32commonRegClass.getNumRegs(); ++i) {
     if (MF.getSubtarget<AArch64Subtarget>().isXRegisterReservedForRA(i))
       markSuperRegs(Reserved, AArch64::GPR32commonRegClass.getRegister(i));
-  }
-
-  if (MF.getSubtarget<AArch64Subtarget>().isLRReservedForRA()) {
-    // In order to prevent the register allocator from using LR, we need to
-    // mark it as reserved. However we don't want to keep it reserved throughout
-    // the pipeline since it prevents other infrastructure from reasoning about
-    // it's liveness. We use the NoVRegs property instead of IsSSA because
-    // IsSSA is removed before VirtRegRewriter runs.
-    if (!MF.getProperties().hasProperty(
-            MachineFunctionProperties::Property::NoVRegs))
-      markSuperRegs(Reserved, AArch64::LR);
   }
 
   assert(checkAllSuperRegsMarked(Reserved));
@@ -585,8 +544,7 @@ bool AArch64RegisterInfo::hasBasePointer(const MachineFunction &MF) const {
     if (hasStackRealignment(MF))
       return true;
 
-    auto &ST = MF.getSubtarget<AArch64Subtarget>();
-    if (ST.hasSVE() || ST.isStreaming()) {
+    if (MF.getSubtarget<AArch64Subtarget>().hasSVE()) {
       const AArch64FunctionInfo *AFI = MF.getInfo<AArch64FunctionInfo>();
       // Frames that have variable sized objects and scalable SVE objects,
       // should always use a basepointer.
@@ -611,8 +569,7 @@ bool AArch64RegisterInfo::isArgumentRegister(const MachineFunction &MF,
                                              MCRegister Reg) const {
   CallingConv::ID CC = MF.getFunction().getCallingConv();
   const AArch64Subtarget &STI = MF.getSubtarget<AArch64Subtarget>();
-  bool IsVarArg = STI.isCallingConvWin64(MF.getFunction().getCallingConv(),
-                                         MF.getFunction().isVarArg());
+  bool IsVarArg = STI.isCallingConvWin64(MF.getFunction().getCallingConv());
 
   auto HasReg = [](ArrayRef<MCRegister> RegList, MCRegister Reg) {
     return llvm::is_contained(RegList, Reg);
@@ -623,10 +580,6 @@ bool AArch64RegisterInfo::isArgumentRegister(const MachineFunction &MF,
     report_fatal_error("Unsupported calling convention.");
   case CallingConv::GHC:
     return HasReg(CC_AArch64_GHC_ArgRegs, Reg);
-  case CallingConv::PreserveNone:
-    if (!MF.getFunction().isVarArg())
-      return HasReg(CC_AArch64_Preserve_None_ArgRegs, Reg);
-    [[fallthrough]];
   case CallingConv::C:
   case CallingConv::Fast:
   case CallingConv::PreserveMost:
@@ -679,7 +632,6 @@ bool AArch64RegisterInfo::isArgumentRegister(const MachineFunction &MF,
   case CallingConv::AArch64_VectorCall:
   case CallingConv::AArch64_SVE_VectorCall:
   case CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X0:
-  case CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X1:
   case CallingConv::AArch64_SME_ABI_Support_Routines_PreserveMost_From_X2:
     if (STI.isTargetWindows())
       return HasReg(CC_AArch64_Win64PCS_ArgRegs, Reg);
@@ -1111,9 +1063,4 @@ bool AArch64RegisterInfo::shouldCoalesce(
   }
 
   return true;
-}
-
-bool AArch64RegisterInfo::shouldAnalyzePhysregInMachineLoopInfo(
-    MCRegister R) const {
-  return R == AArch64::VG;
 }

@@ -16,7 +16,6 @@
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/CodeGen/TargetLowering.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/CodeGen.h"
@@ -47,7 +46,7 @@ class RegAllocDevelopmentFeaturesTest : public ::Test {
 protected:
   SmallVector<LRStartEndInfo>
   setupOverlapProblem(const SmallVectorImpl<LRPosInfoIndexes> &Segments,
-                      simple_ilist<IndexListEntry> &IndexList) {
+                      ilist<IndexListEntry> &IndexList) {
     SmallVector<LRStartEndInfo> PositionsToReturn;
     PositionsToReturn.reserve(Segments.size());
     for (auto CurrentPosIndexInfo : Segments) {
@@ -62,7 +61,7 @@ protected:
           Allocator.Allocate(sizeof(IndexListEntry), alignof(IndexListEntry)));
       auto *CurrentListEntry =
           new (CurrentLEMem) IndexListEntry(nullptr, CurrentIndex);
-      IndexList.push_back(*CurrentListEntry);
+      IndexList.push_back(CurrentListEntry);
       for (size_t CurrentPosInfoIndex = 0;
            CurrentPosInfoIndex < Segments.size(); ++CurrentPosInfoIndex) {
         if ((CurrentIndex / SlotIndex::InstrDist) ==
@@ -108,7 +107,7 @@ protected:
   }
 
   void runOverlapTest(SmallVectorImpl<LRPosInfoIndexes> &OverlapSetup) {
-    simple_ilist<IndexListEntry> IndexList;
+    ilist<IndexListEntry> IndexList;
     auto OverlapProblem = setupOverlapProblem(OverlapSetup, IndexList);
     NoInferenceModelRunner ModelRunner = setupModelRunner();
     size_t MaxIndex = 0;
@@ -132,7 +131,7 @@ protected:
             NumberOfInterferences * ModelMaxSupportedInstructionCount);
     ASSERT_THAT(MappingMatrix,
                 ContainerEq(getExpectedMappingMatrix(OverlapSetup)));
-    IndexList.clear();
+    IndexList.clearAndLeakNodesUnsafely();
   }
 
   BumpPtrAllocator Allocator;
@@ -145,7 +144,7 @@ TEST_F(RegAllocDevelopmentFeaturesTest,
   SmallVector<LRPosInfoIndexes, 2> OverlapSetup;
   OverlapSetup.push_back({0, 5, 0});
   OverlapSetup.push_back({5, 10, 0});
-  simple_ilist<IndexListEntry> IndexList;
+  ilist<IndexListEntry> IndexList;
   auto OverlapProblem = setupOverlapProblem(OverlapSetup, IndexList);
   ASSERT_EQ(OverlapProblem[0].End.distance(OverlapProblem[1].End),
             5 * SlotIndex::InstrDist);
@@ -155,7 +154,7 @@ TEST_F(RegAllocDevelopmentFeaturesTest,
 TEST_F(RegAllocDevelopmentFeaturesTest, MetaSlotIndicesAreValid) {
   SmallVector<LRPosInfoIndexes, 1> OverlapSetup;
   OverlapSetup.push_back({0, 10, 0});
-  simple_ilist<IndexListEntry> IndexList;
+  ilist<IndexListEntry> IndexList;
   auto OverlapProblem = setupOverlapProblem(OverlapSetup, IndexList);
   ASSERT_TRUE(OverlapProblem[0].Begin.isValid());
   ASSERT_TRUE(OverlapProblem[0].End.isValid());
@@ -166,7 +165,7 @@ TEST_F(RegAllocDevelopmentFeaturesTest, MetaSlotIndicesAreValid) {
 TEST_F(RegAllocDevelopmentFeaturesTest, InstructionOpcodesAreCorrect) {
   SmallVector<LRPosInfoIndexes, 1> OverlapSetup;
   OverlapSetup.push_back({0, ModelMaxSupportedInstructionCount - 1, 0});
-  simple_ilist<IndexListEntry> IndexList;
+  ilist<IndexListEntry> IndexList;
   auto OverlapProblem = setupOverlapProblem(OverlapSetup, IndexList);
   NoInferenceModelRunner ModelRunner = setupModelRunner();
   SlotIndex LastIndex = OverlapProblem[0].End;
@@ -248,7 +247,7 @@ TEST_F(RegAllocDevelopmentFeaturesTest, SingleMBBTest) {
 TEST_F(RegAllocDevelopmentFeaturesTest, MBBFullTruncated) {
   SmallVector<LRPosInfoIndexes, 1> OverlapSetup;
   OverlapSetup.push_back({0, ModelMaxSupportedInstructionCount - 1, 0});
-  simple_ilist<IndexListEntry> IndexList;
+  ilist<IndexListEntry> IndexList;
   auto OverlapProblem = setupOverlapProblem(OverlapSetup, IndexList);
   NoInferenceModelRunner ModelRunner = setupModelRunner();
   SlotIndex LastIndex = OverlapProblem[0].End;

@@ -95,7 +95,7 @@ bool LanaiTargetObjectFile::isGlobalInSmallSectionImpl(
 
   Type *Ty = GVA->getValueType();
   return isInSmallSection(
-      GVA->getDataLayout().getTypeAllocSize(Ty));
+      GVA->getParent()->getDataLayout().getTypeAllocSize(Ty));
 }
 
 MCSection *LanaiTargetObjectFile::SelectSectionForGlobal(

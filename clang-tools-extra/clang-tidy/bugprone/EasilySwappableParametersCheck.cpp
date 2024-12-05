@@ -967,8 +967,7 @@ approximateStandardConversionSequence(const TheCheck &Check, QualType From,
   // Get out the qualifiers of the original type. This will always be
   // re-applied to the WorkType to ensure it is the same qualification as the
   // original From was.
-  auto FastQualifiersToApply = static_cast<unsigned>(
-      From.split().Quals.getAsOpaqueValue() & Qualifiers::FastMask);
+  auto QualifiersToApply = From.split().Quals.getAsOpaqueValue();
 
   // LValue->RValue is irrelevant for the check, because it is a thing to be
   // done at a call site, and will be performed if need be performed.
@@ -994,7 +993,7 @@ approximateStandardConversionSequence(const TheCheck &Check, QualType From,
     // "const double -> double".
     LLVM_DEBUG(llvm::dbgs()
                << "--- approximateStdConv. Conversion between numerics.\n");
-    WorkType = QualType{ToBuiltin, FastQualifiersToApply};
+    WorkType = QualType{ToBuiltin, QualifiersToApply};
   }
 
   const auto *FromEnum = WorkType->getAs<EnumType>();
@@ -1003,7 +1002,7 @@ approximateStandardConversionSequence(const TheCheck &Check, QualType From,
     // Unscoped enumerations (or enumerations in C) convert to numerics.
     LLVM_DEBUG(llvm::dbgs()
                << "--- approximateStdConv. Unscoped enum to numeric.\n");
-    WorkType = QualType{ToBuiltin, FastQualifiersToApply};
+    WorkType = QualType{ToBuiltin, QualifiersToApply};
   } else if (FromNumeric && ToEnum && ToEnum->isUnscopedEnumerationType()) {
     // Numeric types convert to enumerations only in C.
     if (Ctx.getLangOpts().CPlusPlus) {
@@ -1014,7 +1013,7 @@ approximateStandardConversionSequence(const TheCheck &Check, QualType From,
 
     LLVM_DEBUG(llvm::dbgs()
                << "--- approximateStdConv. Numeric to unscoped enum.\n");
-    WorkType = QualType{ToEnum, FastQualifiersToApply};
+    WorkType = QualType{ToEnum, QualifiersToApply};
   }
 
   // Check for pointer conversions.
@@ -1023,14 +1022,14 @@ approximateStandardConversionSequence(const TheCheck &Check, QualType From,
   if (FromPtr && ToPtr) {
     if (ToPtr->isVoidPointerType()) {
       LLVM_DEBUG(llvm::dbgs() << "--- approximateStdConv. To void pointer.\n");
-      WorkType = QualType{ToPtr, FastQualifiersToApply};
+      WorkType = QualType{ToPtr, QualifiersToApply};
     }
 
     const auto *FromRecordPtr = FromPtr->getPointeeCXXRecordDecl();
     const auto *ToRecordPtr = ToPtr->getPointeeCXXRecordDecl();
     if (isDerivedToBase(FromRecordPtr, ToRecordPtr)) {
       LLVM_DEBUG(llvm::dbgs() << "--- approximateStdConv. Derived* to Base*\n");
-      WorkType = QualType{ToPtr, FastQualifiersToApply};
+      WorkType = QualType{ToPtr, QualifiersToApply};
     }
   }
 
@@ -1040,7 +1039,7 @@ approximateStandardConversionSequence(const TheCheck &Check, QualType From,
   const auto *ToRecord = To->getAsCXXRecordDecl();
   if (isDerivedToBase(FromRecord, ToRecord)) {
     LLVM_DEBUG(llvm::dbgs() << "--- approximateStdConv. Derived To Base.\n");
-    WorkType = QualType{ToRecord->getTypeForDecl(), FastQualifiersToApply};
+    WorkType = QualType{ToRecord->getTypeForDecl(), QualifiersToApply};
   }
 
   if (Ctx.getLangOpts().CPlusPlus17 && FromPtr && ToPtr) {
@@ -1055,7 +1054,7 @@ approximateStandardConversionSequence(const TheCheck &Check, QualType From,
         !ToFunctionPtr->hasNoexceptExceptionSpec()) {
       LLVM_DEBUG(llvm::dbgs() << "--- approximateStdConv. noexcept function "
                                  "pointer to non-noexcept.\n");
-      WorkType = QualType{ToPtr, FastQualifiersToApply};
+      WorkType = QualType{ToPtr, QualifiersToApply};
     }
   }
 

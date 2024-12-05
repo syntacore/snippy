@@ -165,21 +165,9 @@ struct BBAddrMapEntry {
   };
   uint8_t Version;
   llvm::yaml::Hex8 Feature;
-
-  struct BBRangeEntry {
-    llvm::yaml::Hex64 BaseAddress;
-    std::optional<uint64_t> NumBlocks;
-    std::optional<std::vector<BBEntry>> BBEntries;
-  };
-
-  std::optional<uint64_t> NumBBRanges;
-  std::optional<std::vector<BBRangeEntry>> BBRanges;
-
-  llvm::yaml::Hex64 getFunctionAddress() const {
-    if (!BBRanges || BBRanges->empty())
-      return 0;
-    return BBRanges->front().BaseAddress;
-  }
+  llvm::yaml::Hex64 Address;
+  std::optional<uint64_t> NumBlocks;
+  std::optional<std::vector<BBEntry>> BBEntries;
 };
 
 struct PGOAnalysisMapEntry {
@@ -763,7 +751,6 @@ bool shouldAllocateFileSpace(ArrayRef<ProgramHeader> Phdrs,
 LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::ELFYAML::StackSizeEntry)
 LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::ELFYAML::BBAddrMapEntry)
 LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::ELFYAML::BBAddrMapEntry::BBEntry)
-LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::ELFYAML::BBAddrMapEntry::BBRangeEntry)
 LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::ELFYAML::PGOAnalysisMapEntry)
 LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::ELFYAML::PGOAnalysisMapEntry::PGOBBEntry)
 LLVM_YAML_IS_SEQUENCE_VECTOR(
@@ -929,15 +916,11 @@ template <> struct MappingTraits<ELFYAML::StackSizeEntry> {
 };
 
 template <> struct MappingTraits<ELFYAML::BBAddrMapEntry> {
-  static void mapping(IO &IO, ELFYAML::BBAddrMapEntry &E);
-};
-
-template <> struct MappingTraits<ELFYAML::BBAddrMapEntry::BBRangeEntry> {
-  static void mapping(IO &IO, ELFYAML::BBAddrMapEntry::BBRangeEntry &E);
+  static void mapping(IO &IO, ELFYAML::BBAddrMapEntry &Rel);
 };
 
 template <> struct MappingTraits<ELFYAML::BBAddrMapEntry::BBEntry> {
-  static void mapping(IO &IO, ELFYAML::BBAddrMapEntry::BBEntry &E);
+  static void mapping(IO &IO, ELFYAML::BBAddrMapEntry::BBEntry &Rel);
 };
 
 template <> struct MappingTraits<ELFYAML::PGOAnalysisMapEntry> {

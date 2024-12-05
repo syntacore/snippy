@@ -48,8 +48,8 @@ public:
                                   int &ArgFPRsLeft) const;
   ABIArgInfo classifyReturnType(QualType RetTy) const;
 
-  RValue EmitVAArg(CodeGenFunction &CGF, Address VAListAddr, QualType Ty,
-                   AggValueSlot Slot) const override;
+  Address EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
+                    QualType Ty) const override;
 
   ABIArgInfo extendType(QualType Ty) const;
 
@@ -152,7 +152,7 @@ bool RISCVABIInfo::detectFPCCEligibleStructHelper(QualType Ty, CharUnits CurOff,
   }
 
   if (const ConstantArrayType *ATy = getContext().getAsConstantArrayType(Ty)) {
-    uint64_t ArraySize = ATy->getZExtSize();
+    uint64_t ArraySize = ATy->getSize().getZExtValue();
     QualType EltTy = ATy->getElementType();
     // Non-zero-length arrays of empty records make the struct ineligible for
     // the FP calling convention in C++.
@@ -361,12 +361,11 @@ ABIArgInfo RISCVABIInfo::classifyArgumentType(QualType Ty, bool IsFixed,
                                            CGCXXABI::RAA_DirectInMemory);
   }
 
-  uint64_t Size = getContext().getTypeSize(Ty);
-
-  // Ignore empty structs/unions whose size is zero. According to the calling
-  // convention empty structs/unions are required to be sized types in C++.
-  if (isEmptyRecord(getContext(), Ty, true) && Size == 0)
+  // Ignore empty structs/unions.
+  if (isEmptyRecord(getContext(), Ty, true))
     return ABIArgInfo::getIgnore();
+
+  uint64_t Size = getContext().getTypeSize(Ty);
 
   // Pass floating point values via FPRs if possible.
   if (IsFixed && Ty->isFloatingType() && !Ty->isComplexType() &&
@@ -442,13 +441,7 @@ ABIArgInfo RISCVABIInfo::classifyArgumentType(QualType Ty, bool IsFixed,
         return getNaturalAlignIndirect(Ty, /*ByVal=*/false);
     }
 
-    ABIArgInfo Info = ABIArgInfo::getDirect();
-
-    // If it is tuple type, it can't be flattened.
-    if (llvm::StructType *STy = dyn_cast<llvm::StructType>(CGT.ConvertType(Ty)))
-      Info.setCanBeFlattened(!STy->containsHomogeneousScalableVectorTypes());
-
-    return Info;
+    return ABIArgInfo::getDirect();
   }
 
   if (const VectorType *VT = Ty->getAs<VectorType>())
@@ -490,13 +483,15 @@ ABIArgInfo RISCVABIInfo::classifyReturnType(QualType RetTy) const {
                               ArgFPRsLeft);
 }
 
-RValue RISCVABIInfo::EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
-                               QualType Ty, AggValueSlot Slot) const {
+Address RISCVABIInfo::EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
+                                QualType Ty) const {
   CharUnits SlotSize = CharUnits::fromQuantity(XLen / 8);
 
   // Empty records are ignored for parameter passing purposes.
-  if (isEmptyRecord(getContext(), Ty, true))
-    return Slot.asRValue();
+  if (isEmptyRecord(getContext(), Ty, true)) {
+    return Address(CGF.Builder.CreateLoad(VAListAddr),
+                   CGF.ConvertTypeForMem(Ty), SlotSize);
+  }
 
   auto TInfo = getContext().getTypeInfoInChars(Ty);
 
@@ -510,8 +505,8 @@ RValue RISCVABIInfo::EmitVAArg(CodeGenFunction &CGF, Address VAListAddr,
   // Arguments bigger than 2*Xlen bytes are passed indirectly.
   bool IsIndirect = TInfo.Width > 2 * SlotSize;
 
-  return emitVoidPtrVAArg(CGF, VAListAddr, Ty, IsIndirect, TInfo, SlotSize,
-                          /*AllowHigherAlign=*/true, Slot);
+  return emitVoidPtrVAArg(CGF, VAListAddr, Ty, IsIndirect, TInfo,
+                          SlotSize, /*AllowHigherAlign=*/true);
 }
 
 ABIArgInfo RISCVABIInfo::extendType(QualType Ty) const {
@@ -528,10 +523,7 @@ public:
   RISCVTargetCodeGenInfo(CodeGen::CodeGenTypes &CGT, unsigned XLen,
                          unsigned FLen, bool EABI)
       : TargetCodeGenInfo(
-            std::make_unique<RISCVABIInfo>(CGT, XLen, FLen, EABI)) {
-    SwiftInfo =
-        std::make_unique<SwiftABIInfo>(CGT, /*SwiftErrorInRegister=*/false);
-  }
+            std::make_unique<RISCVABIInfo>(CGT, XLen, FLen, EABI)) {}
 
   void setTargetAttributes(const Decl *D, llvm::GlobalValue *GV,
                            CodeGen::CodeGenModule &CGM) const override {

@@ -19,7 +19,6 @@
 #include <string>
 
 namespace Fortran::common {
-class LanguageFeatureControl;
 
 // Fortran has five kinds of intrinsic data types, plus the derived types.
 ENUM_CLASS(TypeCategory, Integer, Real, Complex, Character, Logical, Derived)
@@ -67,14 +66,12 @@ ENUM_CLASS(
 const char *AsFortran(DefinedIo);
 
 // Floating-point rounding modes; these are packed into a byte to save
-// room in the runtime's format processing context structure.  These
-// enumerators are defined with the corresponding values returned from
-// llvm.get.rounding.
+// room in the runtime's format processing context structure.
 enum class RoundingMode : std::uint8_t {
-  ToZero, // ROUND=ZERO, RZ - truncation
   TiesToEven, // ROUND=NEAREST, RN - default IEEE rounding
-  Up, // ROUND=UP, RU
+  ToZero, // ROUND=ZERO, RZ - truncation
   Down, // ROUND=DOWN, RD
+  Up, // ROUND=UP, RU
   TiesAwayFromZero, // ROUND=COMPATIBLE, RC - ties round away from zero
 };
 
@@ -88,8 +85,7 @@ static constexpr int maxRank{15};
 ENUM_CLASS(CUDASubprogramAttrs, Host, Device, HostDevice, Global, Grid_Global)
 
 // CUDA data attributes; mutually exclusive
-ENUM_CLASS(
-    CUDADataAttr, Constant, Device, Managed, Pinned, Shared, Texture, Unified)
+ENUM_CLASS(CUDADataAttr, Constant, Device, Managed, Pinned, Shared, Texture)
 
 // OpenACC device types
 ENUM_CLASS(
@@ -117,9 +113,8 @@ static constexpr IgnoreTKRSet ignoreTKRAll{IgnoreTKR::Type, IgnoreTKR::Kind,
     IgnoreTKR::Rank, IgnoreTKR::Device, IgnoreTKR::Managed};
 std::string AsFortran(IgnoreTKRSet);
 
-bool AreCompatibleCUDADataAttrs(std::optional<CUDADataAttr>,
-    std::optional<CUDADataAttr>, IgnoreTKRSet, bool allowUnifiedMatchingRule,
-    const LanguageFeatureControl *features = nullptr);
+bool AreCompatibleCUDADataAttrs(
+    std::optional<CUDADataAttr>, std::optional<CUDADataAttr>, IgnoreTKRSet);
 
 static constexpr char blankCommonObjectName[] = "__BLNK__";
 

@@ -64,9 +64,9 @@
 
 //===----------------------------------------------------------------------===//
 
-#include "Common/CodeGenInstruction.h"
-#include "Common/CodeGenRegisters.h"
-#include "Common/CodeGenTarget.h"
+#include "CodeGenInstruction.h"
+#include "CodeGenRegisters.h"
+#include "CodeGenTarget.h"
 #include "llvm/ADT/IndexedMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
@@ -618,7 +618,7 @@ void CompressInstEmitter::emitCompressInstEmitter(raw_ostream &OS,
   }
 
   if (CompressPatterns.empty()) {
-    OS << FH;
+    OS << FuncH.str();
     OS.indent(2) << "return false;\n}\n";
     if (EType == EmitterType::Compress)
       OS << "\n#endif //GEN_COMPRESS_INSTR\n";
@@ -835,10 +835,10 @@ void CompressInstEmitter::emitCompressInstEmitter(raw_ostream &OS,
     }
     if (CompressOrUncompress)
       CodeStream.indent(6) << "OutInst.setLoc(MI.getLoc());\n";
-    mergeCondAndCode(CaseStream, CondString, CodeString);
+    mergeCondAndCode(CaseStream, CondStream.str(), CodeStream.str());
     PrevOp = CurOp;
   }
-  Func << CaseString << "\n";
+  Func << CaseStream.str() << "\n";
   // Close brace for the last case.
   Func.indent(4) << "} // case " << CurOp << "\n";
   Func.indent(2) << "} // switch\n";
@@ -876,8 +876,8 @@ void CompressInstEmitter::emitCompressInstEmitter(raw_ostream &OS,
        << "}\n\n";
   }
 
-  OS << FH;
-  OS << F;
+  OS << FuncH.str();
+  OS << Func.str();
 
   if (EType == EmitterType::Compress)
     OS << "\n#endif //GEN_COMPRESS_INSTR\n";

@@ -36,7 +36,6 @@ static_library("lib") {
     "PerfHelper.cpp",
     "RegisterAliasing.cpp",
     "RegisterValue.cpp",
-    "ResultAggregator.cpp",
     "SchedClassResolution.cpp",
     "SerialSnippetGenerator.cpp",
     "SnippetFile.cpp",
@@ -45,7 +44,6 @@ static_library("lib") {
     "SubprocessMemory.cpp",
     "Target.cpp",
     "UopsBenchmarkRunner.cpp",
-    "ValidationEvent.cpp",
   ]
 
   deps += targets_with_exegesis

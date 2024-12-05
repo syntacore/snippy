@@ -87,7 +87,7 @@ void SDTRewriter::readSection() {
 
     StringRef Name = DE.getCStr(&Offset);
 
-    if (Name != "stapsdt")
+    if (!Name.equals("stapsdt"))
       errs() << "BOLT-WARNING: SDT note name \"" << Name
              << "\" is not expected\n";
 

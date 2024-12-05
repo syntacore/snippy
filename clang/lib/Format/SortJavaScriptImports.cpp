@@ -34,6 +34,8 @@ namespace format {
 
 class FormatTokenLexer;
 
+using clang::format::FormatStyle;
+
 // An imported symbol in a JavaScript ES6 import/export, possibly aliased.
 struct JsImportedSymbol {
   StringRef Symbol;
@@ -176,7 +178,7 @@ public:
         }
       }
     }
-    StringRef PreviousText = getSourceText(InsertionPoint);
+    llvm::StringRef PreviousText = getSourceText(InsertionPoint);
     if (ReferencesText == PreviousText)
       return {Result, 0};
 
@@ -207,7 +209,7 @@ public:
     // FIXME: better error handling. For now, just print error message and skip
     // the replacement for the release version.
     if (Err) {
-      llvm::errs() << toString(std::move(Err)) << "\n";
+      llvm::errs() << llvm::toString(std::move(Err)) << "\n";
       assert(false);
     }
 
@@ -274,7 +276,7 @@ private:
         SortChunk.push_back(*Start);
         ++Start;
       }
-      stable_sort(SortChunk);
+      llvm::stable_sort(SortChunk);
       mergeModuleReferences(SortChunk);
       ReferencesSorted.insert(ReferencesSorted.end(), SortChunk.begin(),
                               SortChunk.end());
@@ -332,10 +334,10 @@ private:
     // Sort the individual symbols within the import.
     // E.g. `import {b, a} from 'x';` -> `import {a, b} from 'x';`
     SmallVector<JsImportedSymbol, 1> Symbols = Reference.Symbols;
-    stable_sort(Symbols,
-                [&](const JsImportedSymbol &LHS, const JsImportedSymbol &RHS) {
-                  return LHS.Symbol.compare_insensitive(RHS.Symbol) < 0;
-                });
+    llvm::stable_sort(
+        Symbols, [&](const JsImportedSymbol &LHS, const JsImportedSymbol &RHS) {
+          return LHS.Symbol.compare_insensitive(RHS.Symbol) < 0;
+        });
     if (!Reference.SymbolsMerged && Symbols == Reference.Symbols) {
       // Symbols didn't change, just emit the entire module reference.
       StringRef ReferenceStmt = getSourceText(Reference.Range);
@@ -347,7 +349,7 @@ private:
     // ... then the references in order ...
     if (!Symbols.empty()) {
       Buffer += getSourceText(Symbols.front().Range);
-      for (const JsImportedSymbol &Symbol : drop_begin(Symbols)) {
+      for (const JsImportedSymbol &Symbol : llvm::drop_begin(Symbols)) {
         Buffer += ",";
         Buffer += getSourceText(Symbol.Range);
       }

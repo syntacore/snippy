@@ -18,9 +18,9 @@ sqdecd sp
 // CHECK-NEXT: sqdecd sp
 // CHECK-NOT: [[@LINE-1]]:{{[0-9]+}}:
 
-sqdecd z0.s
+uqdecd z0.s
 // CHECK: [[@LINE-1]]:{{[0-9]+}}: error: invalid element width
-// CHECK-NEXT: sqdecd z0.s
+// CHECK-NEXT: uqdecd z0.s
 // CHECK-NOT: [[@LINE-1]]:{{[0-9]+}}:
 
 

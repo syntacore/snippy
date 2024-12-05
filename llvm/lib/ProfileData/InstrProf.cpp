@@ -13,6 +13,7 @@
 
 #include "llvm/ProfileData/InstrProf.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
@@ -33,7 +34,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Compression.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -56,8 +56,6 @@
 #include <vector>
 
 using namespace llvm;
-
-#define DEBUG_TYPE "instrprof"
 
 static cl::opt<bool> StaticFuncFullModulePrefix(
     "static-func-full-module-prefix", cl::init(true), cl::Hidden,
@@ -221,18 +219,6 @@ cl::opt<bool> DoInstrProfNameCompression(
     "enable-name-compression",
     cl::desc("Enable name/filename string compression"), cl::init(true));
 
-cl::opt<bool> EnableVTableValueProfiling(
-    "enable-vtable-value-profiling", cl::init(false),
-    cl::desc("If true, the virtual table address will be instrumented to know "
-             "the types of a C++ pointer. The information is used in indirect "
-             "call promotion to do selective vtable-based comparison."));
-
-cl::opt<bool> EnableVTableProfileUse(
-    "enable-vtable-profile-use", cl::init(false),
-    cl::desc("If ThinLTO and WPD is enabled and this option is true, vtable "
-             "profiles will be used by ICP pass for more efficient indirect "
-             "call sequence. If false, type profiles won't be used."));
-
 std::string getInstrProfSectionName(InstrProfSectKind IPSK,
                                     Triple::ObjectFormatType OF,
                                     bool AddSegmentInfo) {
@@ -287,7 +273,7 @@ std::string getPGOFuncName(StringRef Name, GlobalValue::LinkageTypes Linkage,
 static StringRef stripDirPrefix(StringRef PathNameStr, uint32_t NumPrefix) {
   uint32_t Count = NumPrefix;
   uint32_t Pos = 0, LastPos = 0;
-  for (const auto &CI : PathNameStr) {
+  for (auto & CI : PathNameStr) {
     ++Pos;
     if (llvm::sys::path::is_separator(CI)) {
       LastPos = Pos;
@@ -392,19 +378,13 @@ std::string getPGOFuncName(const Function &F, bool InLTO, uint64_t Version) {
   return getPGOFuncName(F.getName(), GlobalValue::ExternalLinkage, "");
 }
 
-std::string getPGOName(const GlobalVariable &V, bool InLTO) {
-  // PGONameMetadata should be set by compiler at profile use time
-  // and read by symtab creation to look up symbols corresponding to
-  // a MD5 hash.
-  return getIRPGOObjectName(V, InLTO, V.getMetadata(getPGONameMetadataName()));
-}
-
-// See getIRPGOObjectName() for a discription of the format.
-std::pair<StringRef, StringRef> getParsedIRPGOName(StringRef IRPGOName) {
-  auto [FileName, MangledName] = IRPGOName.split(GlobalIdentifierDelimiter);
-  if (MangledName.empty())
-    return std::make_pair(StringRef(), IRPGOName);
-  return std::make_pair(FileName, MangledName);
+// See getIRPGOFuncName() for a discription of the format.
+std::pair<StringRef, StringRef>
+getParsedIRPGOFuncName(StringRef IRPGOFuncName) {
+  auto [FileName, FuncName] = IRPGOFuncName.split(';');
+  if (FuncName.empty())
+    return std::make_pair(StringRef(), IRPGOFuncName);
+  return std::make_pair(FileName, FuncName);
 }
 
 StringRef getFuncNameWithoutPrefix(StringRef PGOFuncName, StringRef FileName) {
@@ -429,10 +409,10 @@ std::string getPGOFuncNameVarName(StringRef FuncName,
 
   // Now fix up illegal chars in local VarName that may upset the assembler.
   const char InvalidChars[] = "-:;<>/\"'";
-  size_t FoundPos = VarName.find_first_of(InvalidChars);
-  while (FoundPos != std::string::npos) {
-    VarName[FoundPos] = '_';
-    FoundPos = VarName.find_first_of(InvalidChars, FoundPos + 1);
+  size_t found = VarName.find_first_of(InvalidChars);
+  while (found != std::string::npos) {
+    VarName[found] = '_';
+    found = VarName.find_first_of(InvalidChars, found + 1);
   }
   return VarName;
 }
@@ -453,7 +433,7 @@ GlobalVariable *createPGOFuncNameVar(Module &M,
 
   auto *Value =
       ConstantDataArray::getString(M.getContext(), PGOFuncName, false);
-  auto *FuncNameVar =
+  auto FuncNameVar =
       new GlobalVariable(M, Value->getType(), true, Linkage, Value,
                          getPGOFuncNameVarName(PGOFuncName, Linkage));
 
@@ -480,40 +460,8 @@ Error InstrProfSymtab::create(Module &M, bool InLTO) {
     if (Error E = addFuncWithName(F, getPGOFuncName(F, InLTO)))
       return E;
   }
-
-  SmallVector<MDNode *, 2> Types;
-  for (GlobalVariable &G : M.globals()) {
-    if (!G.hasName() || !G.hasMetadata(LLVMContext::MD_type))
-      continue;
-    if (Error E = addVTableWithName(G, getPGOName(G, InLTO)))
-      return E;
-  }
-
   Sorted = false;
   finalizeSymtab();
-  return Error::success();
-}
-
-Error InstrProfSymtab::addVTableWithName(GlobalVariable &VTable,
-                                         StringRef VTablePGOName) {
-  auto NameToGUIDMap = [&](StringRef Name) -> Error {
-    if (Error E = addSymbolName(Name))
-      return E;
-
-    bool Inserted = true;
-    std::tie(std::ignore, Inserted) =
-        MD5VTableMap.try_emplace(GlobalValue::getGUID(Name), &VTable);
-    if (!Inserted)
-      LLVM_DEBUG(dbgs() << "GUID conflict within one module");
-    return Error::success();
-  };
-  if (Error E = NameToGUIDMap(VTablePGOName))
-    return E;
-
-  StringRef CanonicalName = getCanonicalName(VTablePGOName);
-  if (CanonicalName != VTablePGOName)
-    return NameToGUIDMap(CanonicalName);
-
   return Error::success();
 }
 
@@ -531,10 +479,10 @@ readAndDecodeStrings(StringRef NameStrings,
     P += N;
     uint64_t CompressedSize = decodeULEB128(P, &N);
     P += N;
-    const bool IsCompressed = (CompressedSize != 0);
+    bool isCompressed = (CompressedSize != 0);
     SmallVector<uint8_t, 128> UncompressedNameStrings;
     StringRef NameStrings;
-    if (IsCompressed) {
+    if (isCompressed) {
       if (!llvm::compression::zlib::isAvailable())
         return make_error<InstrProfError>(instrprof_error::zlib_unavailable);
 
@@ -570,72 +518,36 @@ Error InstrProfSymtab::create(StringRef NameStrings) {
       std::bind(&InstrProfSymtab::addFuncName, this, std::placeholders::_1));
 }
 
-Error InstrProfSymtab::create(StringRef FuncNameStrings,
-                              StringRef VTableNameStrings) {
-  if (Error E = readAndDecodeStrings(FuncNameStrings,
-                                     std::bind(&InstrProfSymtab::addFuncName,
-                                               this, std::placeholders::_1)))
+Error InstrProfSymtab::addFuncWithName(Function &F, StringRef PGOFuncName) {
+  if (Error E = addFuncName(PGOFuncName))
     return E;
-
-  return readAndDecodeStrings(
-      VTableNameStrings,
-      std::bind(&InstrProfSymtab::addVTableName, this, std::placeholders::_1));
-}
-
-Error InstrProfSymtab::initVTableNamesFromCompressedStrings(
-    StringRef CompressedVTableStrings) {
-  return readAndDecodeStrings(
-      CompressedVTableStrings,
-      std::bind(&InstrProfSymtab::addVTableName, this, std::placeholders::_1));
-}
-
-StringRef InstrProfSymtab::getCanonicalName(StringRef PGOName) {
+  MD5FuncMap.emplace_back(Function::getGUID(PGOFuncName), &F);
   // In ThinLTO, local function may have been promoted to global and have
   // suffix ".llvm." added to the function name. We need to add the
   // stripped function name to the symbol table so that we can find a match
   // from profile.
   //
-  // ".__uniq." suffix is used to differentiate internal linkage functions in
-  // different modules and should be kept. This is the only suffix with the
-  // pattern ".xxx" which is kept before matching, other suffixes similar as
-  // ".llvm." will be stripped.
+  // We may have other suffixes similar as ".llvm." which are needed to
+  // be stripped before the matching, but ".__uniq." suffix which is used
+  // to differentiate internal linkage functions in different modules
+  // should be kept. Now this is the only suffix with the pattern ".xxx"
+  // which is kept before matching.
   const std::string UniqSuffix = ".__uniq.";
-  size_t Pos = PGOName.find(UniqSuffix);
-  if (Pos != StringRef::npos)
-    Pos += UniqSuffix.length();
+  auto pos = PGOFuncName.find(UniqSuffix);
+  // Search '.' after ".__uniq." if ".__uniq." exists, otherwise
+  // search '.' from the beginning.
+  if (pos != std::string::npos)
+    pos += UniqSuffix.length();
   else
-    Pos = 0;
-
-  // Search '.' after ".__uniq." if ".__uniq." exists, otherwise search '.' from
-  // the beginning.
-  Pos = PGOName.find('.', Pos);
-  if (Pos != StringRef::npos && Pos != 0)
-    return PGOName.substr(0, Pos);
-
-  return PGOName;
-}
-
-Error InstrProfSymtab::addFuncWithName(Function &F, StringRef PGOFuncName) {
-  auto NameToGUIDMap = [&](StringRef Name) -> Error {
-    if (Error E = addFuncName(Name))
+    pos = 0;
+  pos = PGOFuncName.find('.', pos);
+  if (pos != std::string::npos && pos != 0) {
+    StringRef OtherFuncName = PGOFuncName.substr(0, pos);
+    if (Error E = addFuncName(OtherFuncName))
       return E;
-    MD5FuncMap.emplace_back(Function::getGUID(Name), &F);
-    return Error::success();
-  };
-  if (Error E = NameToGUIDMap(PGOFuncName))
-    return E;
-
-  StringRef CanonicalFuncName = getCanonicalName(PGOFuncName);
-  if (CanonicalFuncName != PGOFuncName)
-    return NameToGUIDMap(CanonicalFuncName);
-
+    MD5FuncMap.emplace_back(Function::getGUID(OtherFuncName), &F);
+  }
   return Error::success();
-}
-
-uint64_t InstrProfSymtab::getVTableHashFromAddress(uint64_t Address) {
-  // Given a runtime address, look up the hash value in the interval map, and
-  // fallback to value 0 if a hash value is not found.
-  return VTableAddrMap.lookup(Address, 0);
 }
 
 uint64_t InstrProfSymtab::getFunctionHashFromAddress(uint64_t Address) {
@@ -660,7 +572,7 @@ void InstrProfSymtab::dumpNames(raw_ostream &OS) const {
 }
 
 Error collectGlobalObjectNameStrings(ArrayRef<std::string> NameStrs,
-                                     bool DoCompression, std::string &Result) {
+                                     bool doCompression, std::string &Result) {
   assert(!NameStrs.empty() && "No name data to emit");
 
   uint8_t Header[20], *P = Header;
@@ -684,7 +596,7 @@ Error collectGlobalObjectNameStrings(ArrayRef<std::string> NameStrs,
     return Error::success();
   };
 
-  if (!DoCompression) {
+  if (!doCompression) {
     return WriteStringToResult(0, UncompressedNameStrings);
   }
 
@@ -705,23 +617,13 @@ StringRef getPGOFuncNameVarInitializer(GlobalVariable *NameVar) {
 }
 
 Error collectPGOFuncNameStrings(ArrayRef<GlobalVariable *> NameVars,
-                                std::string &Result, bool DoCompression) {
+                                std::string &Result, bool doCompression) {
   std::vector<std::string> NameStrs;
   for (auto *NameVar : NameVars) {
     NameStrs.push_back(std::string(getPGOFuncNameVarInitializer(NameVar)));
   }
   return collectGlobalObjectNameStrings(
-      NameStrs, compression::zlib::isAvailable() && DoCompression, Result);
-}
-
-Error collectVTableStrings(ArrayRef<GlobalVariable *> VTables,
-                           std::string &Result, bool DoCompression) {
-  std::vector<std::string> VTableNameStrs;
-  for (auto *VTable : VTables)
-    VTableNameStrs.push_back(getPGOName(*VTable));
-  return collectGlobalObjectNameStrings(
-      VTableNameStrs, compression::zlib::isAvailable() && DoCompression,
-      Result);
+      NameStrs, compression::zlib::isAvailable() && doCompression, Result);
 }
 
 void InstrProfRecord::accumulateCounts(CountSumOrPercent &Sum) const {
@@ -735,8 +637,10 @@ void InstrProfRecord::accumulateCounts(CountSumOrPercent &Sum) const {
     uint64_t KindSum = 0;
     uint32_t NumValueSites = getNumValueSites(VK);
     for (size_t I = 0; I < NumValueSites; ++I) {
-      for (const auto &V : getValueArrayForSite(VK, I))
-        KindSum += V.Count;
+      uint32_t NV = getNumValueDataForSite(VK, I);
+      std::unique_ptr<InstrProfValueData[]> VD = getValueForSite(VK, I);
+      for (uint32_t V = 0; V < NV; V++)
+        KindSum += VD[V].Count;
     }
     Sum.ValueCounts[VK] += KindSum;
   }
@@ -849,26 +753,19 @@ void InstrProfValueSiteRecord::merge(InstrProfValueSiteRecord &Input,
   Input.sortByTargetValues();
   auto I = ValueData.begin();
   auto IE = ValueData.end();
-  std::vector<InstrProfValueData> Merged;
-  Merged.reserve(std::max(ValueData.size(), Input.ValueData.size()));
   for (const InstrProfValueData &J : Input.ValueData) {
-    while (I != IE && I->Value < J.Value) {
-      Merged.push_back(*I);
+    while (I != IE && I->Value < J.Value)
       ++I;
-    }
     if (I != IE && I->Value == J.Value) {
       bool Overflowed;
       I->Count = SaturatingMultiplyAdd(J.Count, Weight, I->Count, &Overflowed);
       if (Overflowed)
         Warn(instrprof_error::counter_overflow);
-      Merged.push_back(*I);
       ++I;
       continue;
     }
-    Merged.push_back(J);
+    ValueData.insert(I, J);
   }
-  Merged.insert(Merged.end(), I, IE);
-  ValueData = std::move(Merged);
 }
 
 void InstrProfValueSiteRecord::scale(uint64_t N, uint64_t D,
@@ -991,85 +888,63 @@ uint64_t InstrProfRecord::remapValue(uint64_t Value, uint32_t ValueKind,
   if (ValueKind == IPVK_IndirectCallTarget)
     return SymTab->getFunctionHashFromAddress(Value);
 
-  if (ValueKind == IPVK_VTableTarget)
-    return SymTab->getVTableHashFromAddress(Value);
-
   return Value;
 }
 
 void InstrProfRecord::addValueData(uint32_t ValueKind, uint32_t Site,
-                                   ArrayRef<InstrProfValueData> VData,
+                                   InstrProfValueData *VData, uint32_t N,
                                    InstrProfSymtab *ValueMap) {
-  // Remap values.
-  std::vector<InstrProfValueData> RemappedVD;
-  RemappedVD.reserve(VData.size());
-  for (const auto &V : VData) {
-    uint64_t NewValue = remapValue(V.Value, ValueKind, ValueMap);
-    RemappedVD.push_back({NewValue, V.Count});
+  for (uint32_t I = 0; I < N; I++) {
+    VData[I].Value = remapValue(VData[I].Value, ValueKind, ValueMap);
   }
-
   std::vector<InstrProfValueSiteRecord> &ValueSites =
       getOrCreateValueSitesForKind(ValueKind);
-  assert(ValueSites.size() == Site);
-
-  // Add a new value site with remapped value profiling data.
-  ValueSites.emplace_back(std::move(RemappedVD));
+  if (N == 0)
+    ValueSites.emplace_back();
+  else
+    ValueSites.emplace_back(VData, VData + N);
 }
 
-void TemporalProfTraceTy::createBPFunctionNodes(
-    ArrayRef<TemporalProfTraceTy> Traces, std::vector<BPFunctionNode> &Nodes,
-    bool RemoveOutlierUNs) {
+std::vector<BPFunctionNode> TemporalProfTraceTy::createBPFunctionNodes(
+    ArrayRef<TemporalProfTraceTy> Traces) {
   using IDT = BPFunctionNode::IDT;
   using UtilityNodeT = BPFunctionNode::UtilityNodeT;
-  UtilityNodeT MaxUN = 0;
-  DenseMap<IDT, size_t> IdToFirstTimestamp;
-  DenseMap<IDT, UtilityNodeT> IdToFirstUN;
-  DenseMap<IDT, SmallVector<UtilityNodeT>> IdToUNs;
+  // Collect all function IDs ordered by their smallest timestamp. This will be
+  // used as the initial FunctionNode order.
+  SetVector<IDT> FunctionIds;
+  size_t LargestTraceSize = 0;
+  for (auto &Trace : Traces)
+    LargestTraceSize =
+        std::max(LargestTraceSize, Trace.FunctionNameRefs.size());
+  for (size_t Timestamp = 0; Timestamp < LargestTraceSize; Timestamp++)
+    for (auto &Trace : Traces)
+      if (Timestamp < Trace.FunctionNameRefs.size())
+        FunctionIds.insert(Trace.FunctionNameRefs[Timestamp]);
+
+  const int N = Log2_64(LargestTraceSize) + 1;
+
   // TODO: We need to use the Trace.Weight field to give more weight to more
   // important utilities
-  for (auto &Trace : Traces) {
-    size_t CutoffTimestamp = 1;
-    for (size_t Timestamp = 0; Timestamp < Trace.FunctionNameRefs.size();
-         Timestamp++) {
-      IDT Id = Trace.FunctionNameRefs[Timestamp];
-      auto [It, WasInserted] = IdToFirstTimestamp.try_emplace(Id, Timestamp);
-      if (!WasInserted)
-        It->getSecond() = std::min<size_t>(It->getSecond(), Timestamp);
-      if (Timestamp >= CutoffTimestamp) {
-        ++MaxUN;
-        CutoffTimestamp = 2 * Timestamp;
+  DenseMap<IDT, SmallVector<UtilityNodeT, 4>> FuncGroups;
+  for (size_t TraceIdx = 0; TraceIdx < Traces.size(); TraceIdx++) {
+    auto &Trace = Traces[TraceIdx].FunctionNameRefs;
+    for (size_t Timestamp = 0; Timestamp < Trace.size(); Timestamp++) {
+      for (int I = Log2_64(Timestamp + 1); I < N; I++) {
+        auto FunctionId = Trace[Timestamp];
+        UtilityNodeT GroupId = TraceIdx * N + I;
+        FuncGroups[FunctionId].push_back(GroupId);
       }
-      IdToFirstUN.try_emplace(Id, MaxUN);
     }
-    for (auto &[Id, FirstUN] : IdToFirstUN)
-      for (auto UN = FirstUN; UN <= MaxUN; ++UN)
-        IdToUNs[Id].push_back(UN);
-    ++MaxUN;
-    IdToFirstUN.clear();
   }
 
-  if (RemoveOutlierUNs) {
-    DenseMap<UtilityNodeT, unsigned> UNFrequency;
-    for (auto &[Id, UNs] : IdToUNs)
-      for (auto &UN : UNs)
-        ++UNFrequency[UN];
-    // Filter out utility nodes that are too infrequent or too prevalent to make
-    // BalancedPartitioning more effective.
-    for (auto &[Id, UNs] : IdToUNs)
-      llvm::erase_if(UNs, [&](auto &UN) {
-        return UNFrequency[UN] <= 1 || 2 * UNFrequency[UN] > IdToUNs.size();
-      });
-  }
-
-  for (auto &[Id, UNs] : IdToUNs)
+  std::vector<BPFunctionNode> Nodes;
+  for (auto Id : FunctionIds) {
+    auto &UNs = FuncGroups[Id];
+    llvm::sort(UNs);
+    UNs.erase(std::unique(UNs.begin(), UNs.end()), UNs.end());
     Nodes.emplace_back(Id, UNs);
-
-  // Since BalancedPartitioning is sensitive to the initial order, we explicitly
-  // order nodes by their earliest timestamp.
-  llvm::sort(Nodes, [&](auto &L, auto &R) {
-    return std::make_pair(IdToFirstTimestamp[L.Id], L.Id) <
-           std::make_pair(IdToFirstTimestamp[R.Id], R.Id);
-  });
+  }
+  return Nodes;
 }
 
 #define INSTR_PROF_COMMON_API_IMPL
@@ -1096,14 +971,13 @@ uint32_t getNumValueDataInstrProf(const void *Record, uint32_t VKind) {
 
 uint32_t getNumValueDataForSiteInstrProf(const void *R, uint32_t VK,
                                          uint32_t S) {
-  const auto *IPR = reinterpret_cast<const InstrProfRecord *>(R);
-  return IPR->getValueArrayForSite(VK, S).size();
+  return reinterpret_cast<const InstrProfRecord *>(R)
+      ->getNumValueDataForSite(VK, S);
 }
 
 void getValueForSiteInstrProf(const void *R, InstrProfValueData *Dst,
                               uint32_t K, uint32_t S) {
-  const auto *IPR = reinterpret_cast<const InstrProfRecord *>(R);
-  llvm::copy(IPR->getValueArrayForSite(K, S), Dst);
+  reinterpret_cast<const InstrProfRecord *>(R)->getValueForSite(Dst, K, S);
 }
 
 ValueProfData *allocValueProfDataInstrProf(size_t TotalSizeInBytes) {
@@ -1147,8 +1021,7 @@ void ValueProfRecord::deserializeTo(InstrProfRecord &Record,
   InstrProfValueData *ValueData = getValueProfRecordValueData(this);
   for (uint64_t VSite = 0; VSite < NumValueSites; ++VSite) {
     uint8_t ValueDataCount = this->SiteCountArray[VSite];
-    ArrayRef<InstrProfValueData> VDs(ValueData, ValueDataCount);
-    Record.addValueData(Kind, VSite, VDs, SymTab);
+    Record.addValueData(Kind, VSite, ValueData, ValueDataCount, SymTab);
     ValueData += ValueDataCount;
   }
 }
@@ -1192,6 +1065,16 @@ void ValueProfData::deserializeTo(InstrProfRecord &Record,
   }
 }
 
+template <class T>
+static T swapToHostOrder(const unsigned char *&D, llvm::endianness Orig) {
+  using namespace support;
+
+  if (Orig == llvm::endianness::little)
+    return endian::readNext<T, llvm::endianness::little, unaligned>(D);
+  else
+    return endian::readNext<T, llvm::endianness::big, unaligned>(D);
+}
+
 static std::unique_ptr<ValueProfData> allocValueProfData(uint32_t TotalSize) {
   return std::unique_ptr<ValueProfData>(new (::operator new(TotalSize))
                                             ValueProfData());
@@ -1230,8 +1113,7 @@ ValueProfData::getValueProfData(const unsigned char *D,
     return make_error<InstrProfError>(instrprof_error::truncated);
 
   const unsigned char *Header = D;
-  uint32_t TotalSize = endian::readNext<uint32_t>(Header, Endianness);
-
+  uint32_t TotalSize = swapToHostOrder<uint32_t>(Header, Endianness);
   if (D + TotalSize > BufferEnd)
     return make_error<InstrProfError>(instrprof_error::too_large);
 
@@ -1283,12 +1165,15 @@ void annotateValueSite(Module &M, Instruction &Inst,
                        const InstrProfRecord &InstrProfR,
                        InstrProfValueKind ValueKind, uint32_t SiteIdx,
                        uint32_t MaxMDCount) {
-  auto VDs = InstrProfR.getValueArrayForSite(ValueKind, SiteIdx);
-  if (VDs.empty())
+  uint32_t NV = InstrProfR.getNumValueDataForSite(ValueKind, SiteIdx);
+  if (!NV)
     return;
+
   uint64_t Sum = 0;
-  for (const InstrProfValueData &V : VDs)
-    Sum = SaturatingAdd(Sum, V.Count);
+  std::unique_ptr<InstrProfValueData[]> VD =
+      InstrProfR.getValueForSite(ValueKind, SiteIdx, &Sum);
+
+  ArrayRef<InstrProfValueData> VDs(VD.get(), NV);
   annotateValueSite(M, Inst, VDs, Sum, ValueKind, MaxMDCount);
 }
 
@@ -1296,8 +1181,6 @@ void annotateValueSite(Module &M, Instruction &Inst,
                        ArrayRef<InstrProfValueData> VDs,
                        uint64_t Sum, InstrProfValueKind ValueKind,
                        uint32_t MaxMDCount) {
-  if (VDs.empty())
-    return;
   LLVMContext &Ctx = M.getContext();
   MDBuilder MDHelper(Ctx);
   SmallVector<Metadata *, 3> Vals;
@@ -1312,7 +1195,7 @@ void annotateValueSite(Module &M, Instruction &Inst,
 
   // Value Profile Data
   uint32_t MDCount = MaxMDCount;
-  for (const auto &VD : VDs) {
+  for (auto &VD : VDs) {
     Vals.push_back(MDHelper.createConstant(
         ConstantInt::get(Type::getInt64Ty(Ctx), VD.Value)));
     Vals.push_back(MDHelper.createConstant(
@@ -1323,98 +1206,80 @@ void annotateValueSite(Module &M, Instruction &Inst,
   Inst.setMetadata(LLVMContext::MD_prof, MDNode::get(Ctx, Vals));
 }
 
-MDNode *mayHaveValueProfileOfKind(const Instruction &Inst,
-                                  InstrProfValueKind ValueKind) {
+bool getValueProfDataFromInst(const Instruction &Inst,
+                              InstrProfValueKind ValueKind,
+                              uint32_t MaxNumValueData,
+                              InstrProfValueData ValueData[],
+                              uint32_t &ActualNumValueData, uint64_t &TotalC,
+                              bool GetNoICPValue) {
   MDNode *MD = Inst.getMetadata(LLVMContext::MD_prof);
   if (!MD)
-    return nullptr;
+    return false;
 
-  if (MD->getNumOperands() < 5)
-    return nullptr;
+  unsigned NOps = MD->getNumOperands();
 
+  if (NOps < 5)
+    return false;
+
+  // Operand 0 is a string tag "VP":
   MDString *Tag = cast<MDString>(MD->getOperand(0));
-  if (!Tag || Tag->getString() != "VP")
-    return nullptr;
+  if (!Tag)
+    return false;
+
+  if (!Tag->getString().equals("VP"))
+    return false;
 
   // Now check kind:
   ConstantInt *KindInt = mdconst::dyn_extract<ConstantInt>(MD->getOperand(1));
   if (!KindInt)
-    return nullptr;
+    return false;
   if (KindInt->getZExtValue() != ValueKind)
-    return nullptr;
+    return false;
 
-  return MD;
-}
-
-SmallVector<InstrProfValueData, 4>
-getValueProfDataFromInst(const Instruction &Inst, InstrProfValueKind ValueKind,
-                         uint32_t MaxNumValueData, uint64_t &TotalC,
-                         bool GetNoICPValue) {
-  // Four inline elements seem to work well in practice.  With MaxNumValueData,
-  // this array won't grow very big anyway.
-  SmallVector<InstrProfValueData, 4> ValueData;
-  MDNode *MD = mayHaveValueProfileOfKind(Inst, ValueKind);
-  if (!MD)
-    return ValueData;
-  const unsigned NOps = MD->getNumOperands();
   // Get total count
   ConstantInt *TotalCInt = mdconst::dyn_extract<ConstantInt>(MD->getOperand(2));
   if (!TotalCInt)
-    return ValueData;
+    return false;
   TotalC = TotalCInt->getZExtValue();
 
-  ValueData.reserve((NOps - 3) / 2);
+  ActualNumValueData = 0;
+
   for (unsigned I = 3; I < NOps; I += 2) {
-    if (ValueData.size() >= MaxNumValueData)
+    if (ActualNumValueData >= MaxNumValueData)
       break;
     ConstantInt *Value = mdconst::dyn_extract<ConstantInt>(MD->getOperand(I));
     ConstantInt *Count =
         mdconst::dyn_extract<ConstantInt>(MD->getOperand(I + 1));
-    if (!Value || !Count) {
-      ValueData.clear();
-      return ValueData;
-    }
+    if (!Value || !Count)
+      return false;
     uint64_t CntValue = Count->getZExtValue();
     if (!GetNoICPValue && (CntValue == NOMORE_ICP_MAGICNUM))
       continue;
-    InstrProfValueData V;
-    V.Value = Value->getZExtValue();
-    V.Count = CntValue;
-    ValueData.push_back(V);
+    ValueData[ActualNumValueData].Value = Value->getZExtValue();
+    ValueData[ActualNumValueData].Count = CntValue;
+    ActualNumValueData++;
   }
-  return ValueData;
+  return true;
 }
 
 MDNode *getPGOFuncNameMetadata(const Function &F) {
   return F.getMetadata(getPGOFuncNameMetadataName());
 }
 
-static void createPGONameMetadata(GlobalObject &GO, StringRef MetadataName,
-                                  StringRef PGOName) {
-  // Only for internal linkage functions or global variables. The name is not
-  // the same as PGO name for these global objects.
-  if (GO.getName() == PGOName)
-    return;
-
-  // Don't create duplicated metadata.
-  if (GO.getMetadata(MetadataName))
-    return;
-
-  LLVMContext &C = GO.getContext();
-  MDNode *N = MDNode::get(C, MDString::get(C, PGOName));
-  GO.setMetadata(MetadataName, N);
-}
-
 void createPGOFuncNameMetadata(Function &F, StringRef PGOFuncName) {
-  return createPGONameMetadata(F, getPGOFuncNameMetadataName(), PGOFuncName);
+  // Only for internal linkage functions.
+  if (PGOFuncName == F.getName())
+      return;
+  // Don't create duplicated meta-data.
+  if (getPGOFuncNameMetadata(F))
+    return;
+  LLVMContext &C = F.getContext();
+  MDNode *N = MDNode::get(C, MDString::get(C, PGOFuncName));
+  F.setMetadata(getPGOFuncNameMetadataName(), N);
 }
 
-void createPGONameMetadata(GlobalObject &GO, StringRef PGOName) {
-  return createPGONameMetadata(GO, getPGONameMetadataName(), PGOName);
-}
-
-bool needsComdatForCounter(const GlobalObject &GO, const Module &M) {
-  if (GO.hasComdat())
+bool needsComdatForCounter(const Function &F, const Module &M) {
+  if (F.hasComdat())
     return true;
 
   if (!Triple(M.getTargetTriple()).supportsCOMDAT())
@@ -1430,7 +1295,7 @@ bool needsComdatForCounter(const GlobalObject &GO, const Module &M) {
   // available_externally functions will end up being duplicated in raw profile
   // data. This can result in distorted profile as the counts of those dups
   // will be accumulated by the profile merger.
-  GlobalValue::LinkageTypes Linkage = GO.getLinkage();
+  GlobalValue::LinkageTypes Linkage = F.getLinkage();
   if (Linkage != GlobalValue::ExternalWeakLinkage &&
       Linkage != GlobalValue::AvailableExternallyLinkage)
     return false;
@@ -1440,7 +1305,7 @@ bool needsComdatForCounter(const GlobalObject &GO, const Module &M) {
 
 // Check if INSTR_PROF_RAW_VERSION_VAR is defined.
 bool isIRPGOFlagSet(const Module *M) {
-  const GlobalVariable *IRInstrVar =
+  auto IRInstrVar =
       M->getNamedGlobal(INSTR_PROF_QUOTE(INSTR_PROF_RAW_VERSION_VAR));
   if (!IRInstrVar || IRInstrVar->hasLocalLinkage())
     return false;
@@ -1504,7 +1369,7 @@ void createProfileFileNameVar(Module &M, StringRef InstrProfileOutput) {
 Error OverlapStats::accumulateCounts(const std::string &BaseFilename,
                                      const std::string &TestFilename,
                                      bool IsCS) {
-  auto GetProfileSum = [IsCS](const std::string &Filename,
+  auto getProfileSum = [IsCS](const std::string &Filename,
                               CountSumOrPercent &Sum) -> Error {
     // This function is only used from llvm-profdata that doesn't use any kind
     // of VFS. Just create a default RealFileSystem to read profiles.
@@ -1517,10 +1382,10 @@ Error OverlapStats::accumulateCounts(const std::string &BaseFilename,
     Reader->accumulateCounts(Sum, IsCS);
     return Error::success();
   };
-  auto Ret = GetProfileSum(BaseFilename, Base);
+  auto Ret = getProfileSum(BaseFilename, Base);
   if (Ret)
     return Ret;
-  Ret = GetProfileSum(TestFilename, Test);
+  Ret = getProfileSum(TestFilename, Test);
   if (Ret)
     return Ret;
   this->BaseFilename = &BaseFilename;
@@ -1586,16 +1451,13 @@ void OverlapStats::dump(raw_fd_ostream &OS) const {
   for (unsigned I = 0; I < IPVK_Last - IPVK_First + 1; I++) {
     if (Base.ValueCounts[I] < 1.0f && Test.ValueCounts[I] < 1.0f)
       continue;
-    char ProfileKindName[20] = {0};
+    char ProfileKindName[20];
     switch (I) {
     case IPVK_IndirectCallTarget:
       strncpy(ProfileKindName, "IndirectCall", 19);
       break;
     case IPVK_MemOPSize:
       strncpy(ProfileKindName, "MemOP", 19);
-      break;
-    case IPVK_VTableTarget:
-      strncpy(ProfileKindName, "VTable", 19);
       break;
     default:
       snprintf(ProfileKindName, 19, "VP[%d]", I);
@@ -1621,72 +1483,89 @@ void OverlapStats::dump(raw_fd_ostream &OS) const {
 }
 
 namespace IndexedInstrProf {
+// A C++14 compatible version of the offsetof macro.
+template <typename T1, typename T2>
+inline size_t constexpr offsetOf(T1 T2::*Member) {
+  constexpr T2 Object{};
+  return size_t(&(Object.*Member)) - size_t(&Object);
+}
+
+static inline uint64_t read(const unsigned char *Buffer, size_t Offset) {
+  return *reinterpret_cast<const uint64_t *>(Buffer + Offset);
+}
+
+uint64_t Header::formatVersion() const {
+  using namespace support;
+  return endian::byte_swap<uint64_t, llvm::endianness::little>(Version);
+}
+
 Expected<Header> Header::readFromBuffer(const unsigned char *Buffer) {
   using namespace support;
   static_assert(std::is_standard_layout_v<Header>,
-                "Use standard layout for Header for simplicity");
+                "The header should be standard layout type since we use offset "
+                "of fields to read.");
   Header H;
 
-  H.Magic = endian::readNext<uint64_t, llvm::endianness::little>(Buffer);
+  H.Magic = read(Buffer, offsetOf(&Header::Magic));
   // Check the magic number.
-  if (H.Magic != IndexedInstrProf::Magic)
+  uint64_t Magic =
+      endian::byte_swap<uint64_t, llvm::endianness::little>(H.Magic);
+  if (Magic != IndexedInstrProf::Magic)
     return make_error<InstrProfError>(instrprof_error::bad_magic);
 
   // Read the version.
-  H.Version = endian::readNext<uint64_t, llvm::endianness::little>(Buffer);
-  if (H.getIndexedProfileVersion() >
+  H.Version = read(Buffer, offsetOf(&Header::Version));
+  if (GET_VERSION(H.formatVersion()) >
       IndexedInstrProf::ProfVersion::CurrentVersion)
     return make_error<InstrProfError>(instrprof_error::unsupported_version);
 
-  static_assert(IndexedInstrProf::ProfVersion::CurrentVersion == Version12,
-                "Please update the reader as needed when a new field is added "
-                "or when indexed profile version gets bumped.");
-
-  Buffer += sizeof(uint64_t); // Skip Header.Unused field.
-  H.HashType = endian::readNext<uint64_t, llvm::endianness::little>(Buffer);
-  H.HashOffset = endian::readNext<uint64_t, llvm::endianness::little>(Buffer);
-  if (H.getIndexedProfileVersion() >= 8)
-    H.MemProfOffset =
-        endian::readNext<uint64_t, llvm::endianness::little>(Buffer);
-  if (H.getIndexedProfileVersion() >= 9)
-    H.BinaryIdOffset =
-        endian::readNext<uint64_t, llvm::endianness::little>(Buffer);
-  // Version 11 is handled by this condition.
-  if (H.getIndexedProfileVersion() >= 10)
-    H.TemporalProfTracesOffset =
-        endian::readNext<uint64_t, llvm::endianness::little>(Buffer);
-  if (H.getIndexedProfileVersion() >= 12)
-    H.VTableNamesOffset =
-        endian::readNext<uint64_t, llvm::endianness::little>(Buffer);
-  return H;
-}
-
-uint64_t Header::getIndexedProfileVersion() const {
-  return GET_VERSION(Version);
-}
-
-size_t Header::size() const {
-  switch (getIndexedProfileVersion()) {
-    // To retain backward compatibility, new fields must be appended to the end
-    // of the header, and byte offset of existing fields shouldn't change when
-    // indexed profile version gets incremented.
+  switch (GET_VERSION(H.formatVersion())) {
+    // When a new field is added in the header add a case statement here to
+    // populate it.
     static_assert(
-        IndexedInstrProf::ProfVersion::CurrentVersion == Version12,
-        "Please update the size computation below if a new field has "
-        "been added to the header; for a version bump without new "
-        "fields, add a case statement to fall through to the latest version.");
-  case 12ull:
-    return 72;
+        IndexedInstrProf::ProfVersion::CurrentVersion == Version11,
+        "Please update the reading code below if a new field has been added, "
+        "if not add a case statement to fall through to the latest version.");
   case 11ull:
     [[fallthrough]];
   case 10ull:
-    return 64;
+    H.TemporalProfTracesOffset =
+        read(Buffer, offsetOf(&Header::TemporalProfTracesOffset));
+    [[fallthrough]];
   case 9ull:
-    return 56;
+    H.BinaryIdOffset = read(Buffer, offsetOf(&Header::BinaryIdOffset));
+    [[fallthrough]];
   case 8ull:
-    return 48;
+    H.MemProfOffset = read(Buffer, offsetOf(&Header::MemProfOffset));
+    [[fallthrough]];
   default: // Version7 (when the backwards compatible header was introduced).
-    return 40;
+    H.HashType = read(Buffer, offsetOf(&Header::HashType));
+    H.HashOffset = read(Buffer, offsetOf(&Header::HashOffset));
+  }
+
+  return H;
+}
+
+size_t Header::size() const {
+  switch (GET_VERSION(formatVersion())) {
+    // When a new field is added to the header add a case statement here to
+    // compute the size as offset of the new field + size of the new field. This
+    // relies on the field being added to the end of the list.
+    static_assert(IndexedInstrProf::ProfVersion::CurrentVersion == Version11,
+                  "Please update the size computation below if a new field has "
+                  "been added to the header, if not add a case statement to "
+                  "fall through to the latest version.");
+  case 11ull:
+    [[fallthrough]];
+  case 10ull:
+    return offsetOf(&Header::TemporalProfTracesOffset) +
+           sizeof(Header::TemporalProfTracesOffset);
+  case 9ull:
+    return offsetOf(&Header::BinaryIdOffset) + sizeof(Header::BinaryIdOffset);
+  case 8ull:
+    return offsetOf(&Header::MemProfOffset) + sizeof(Header::MemProfOffset);
+  default: // Version7 (when the backwards compatible header was introduced).
+    return offsetOf(&Header::HashOffset) + sizeof(Header::HashOffset);
   }
 }
 

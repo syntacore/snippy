@@ -35,8 +35,6 @@ namespace llvm {
 
 class AAResults;
 class AssumptionCache;
-class BlockFrequencyInfo;
-class BranchProbabilityInfo;
 class DominatorTree;
 class Function;
 class Loop;

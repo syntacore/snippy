@@ -36,8 +36,6 @@ namespace Fortran::parser {
 std::string DirectoryName(std::string path);
 std::optional<std::string> LocateSourceFile(
     std::string name, const std::list<std::string> &searchPath);
-std::vector<std::string> LocateSourceFileAll(
-    std::string name, const std::vector<std::string> &searchPath);
 
 class SourceFile;
 

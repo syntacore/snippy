@@ -80,7 +80,7 @@ body:             |
   ; MIPS32FP32-NEXT:   [[COPY1:%[0-9]+]]:gpr32 = COPY $a1
   ; MIPS32FP32-NEXT:   [[COPY2:%[0-9]+]]:gpr32 = COPY $a2
   ; MIPS32FP32-NEXT:   [[ANDi:%[0-9]+]]:gpr32 = ANDi [[COPY]], 1
-  ; MIPS32FP32-NEXT:   BNE [[ANDi]], $zero, %bb.1, implicit-def dead $at
+  ; MIPS32FP32-NEXT:   BNE [[ANDi]], $zero, %bb.1, implicit-def $at
   ; MIPS32FP32-NEXT:   J %bb.2, implicit-def dead $at
   ; MIPS32FP32-NEXT: {{  $}}
   ; MIPS32FP32-NEXT: bb.1.cond.true:
@@ -90,6 +90,7 @@ body:             |
   ; MIPS32FP32-NEXT: {{  $}}
   ; MIPS32FP32-NEXT: bb.2.cond.false:
   ; MIPS32FP32-NEXT:   successors: %bb.3(0x80000000)
+  ; MIPS32FP32-NEXT: {{  $}}
   ; MIPS32FP32-NEXT: {{  $}}
   ; MIPS32FP32-NEXT: bb.3.cond.end:
   ; MIPS32FP32-NEXT:   [[PHI:%[0-9]+]]:gpr32 = PHI [[COPY1]], %bb.1, [[COPY2]], %bb.2
@@ -105,7 +106,7 @@ body:             |
   ; MIPS32FP64-NEXT:   [[COPY1:%[0-9]+]]:gpr32 = COPY $a1
   ; MIPS32FP64-NEXT:   [[COPY2:%[0-9]+]]:gpr32 = COPY $a2
   ; MIPS32FP64-NEXT:   [[ANDi:%[0-9]+]]:gpr32 = ANDi [[COPY]], 1
-  ; MIPS32FP64-NEXT:   BNE [[ANDi]], $zero, %bb.1, implicit-def dead $at
+  ; MIPS32FP64-NEXT:   BNE [[ANDi]], $zero, %bb.1, implicit-def $at
   ; MIPS32FP64-NEXT:   J %bb.2, implicit-def dead $at
   ; MIPS32FP64-NEXT: {{  $}}
   ; MIPS32FP64-NEXT: bb.1.cond.true:
@@ -115,6 +116,7 @@ body:             |
   ; MIPS32FP64-NEXT: {{  $}}
   ; MIPS32FP64-NEXT: bb.2.cond.false:
   ; MIPS32FP64-NEXT:   successors: %bb.3(0x80000000)
+  ; MIPS32FP64-NEXT: {{  $}}
   ; MIPS32FP64-NEXT: {{  $}}
   ; MIPS32FP64-NEXT: bb.3.cond.end:
   ; MIPS32FP64-NEXT:   [[PHI:%[0-9]+]]:gpr32 = PHI [[COPY1]], %bb.1, [[COPY2]], %bb.2
@@ -166,7 +168,7 @@ body:             |
   ; MIPS32FP32-NEXT:   [[ADDiu1:%[0-9]+]]:gpr32 = ADDiu %fixed-stack.1, 0
   ; MIPS32FP32-NEXT:   [[LW1:%[0-9]+]]:gpr32 = LW [[ADDiu1]], 0 :: (load (s32) from %fixed-stack.1)
   ; MIPS32FP32-NEXT:   [[ANDi:%[0-9]+]]:gpr32 = ANDi [[COPY]], 1
-  ; MIPS32FP32-NEXT:   BNE [[ANDi]], $zero, %bb.1, implicit-def dead $at
+  ; MIPS32FP32-NEXT:   BNE [[ANDi]], $zero, %bb.1, implicit-def $at
   ; MIPS32FP32-NEXT:   J %bb.2, implicit-def dead $at
   ; MIPS32FP32-NEXT: {{  $}}
   ; MIPS32FP32-NEXT: bb.1.cond.true:
@@ -176,6 +178,7 @@ body:             |
   ; MIPS32FP32-NEXT: {{  $}}
   ; MIPS32FP32-NEXT: bb.2.cond.false:
   ; MIPS32FP32-NEXT:   successors: %bb.3(0x80000000)
+  ; MIPS32FP32-NEXT: {{  $}}
   ; MIPS32FP32-NEXT: {{  $}}
   ; MIPS32FP32-NEXT: bb.3.cond.end:
   ; MIPS32FP32-NEXT:   [[PHI:%[0-9]+]]:gpr32 = PHI [[COPY1]], %bb.1, [[LW]], %bb.2
@@ -197,7 +200,7 @@ body:             |
   ; MIPS32FP64-NEXT:   [[ADDiu1:%[0-9]+]]:gpr32 = ADDiu %fixed-stack.1, 0
   ; MIPS32FP64-NEXT:   [[LW1:%[0-9]+]]:gpr32 = LW [[ADDiu1]], 0 :: (load (s32) from %fixed-stack.1)
   ; MIPS32FP64-NEXT:   [[ANDi:%[0-9]+]]:gpr32 = ANDi [[COPY]], 1
-  ; MIPS32FP64-NEXT:   BNE [[ANDi]], $zero, %bb.1, implicit-def dead $at
+  ; MIPS32FP64-NEXT:   BNE [[ANDi]], $zero, %bb.1, implicit-def $at
   ; MIPS32FP64-NEXT:   J %bb.2, implicit-def dead $at
   ; MIPS32FP64-NEXT: {{  $}}
   ; MIPS32FP64-NEXT: bb.1.cond.true:
@@ -207,6 +210,7 @@ body:             |
   ; MIPS32FP64-NEXT: {{  $}}
   ; MIPS32FP64-NEXT: bb.2.cond.false:
   ; MIPS32FP64-NEXT:   successors: %bb.3(0x80000000)
+  ; MIPS32FP64-NEXT: {{  $}}
   ; MIPS32FP64-NEXT: {{  $}}
   ; MIPS32FP64-NEXT: bb.3.cond.end:
   ; MIPS32FP64-NEXT:   [[PHI:%[0-9]+]]:gpr32 = PHI [[COPY1]], %bb.1, [[LW]], %bb.2
@@ -259,7 +263,7 @@ body:             |
   ; MIPS32FP32-NEXT:   [[COPY1:%[0-9]+]]:gpr32 = COPY $a1
   ; MIPS32FP32-NEXT:   [[COPY2:%[0-9]+]]:gpr32 = COPY $a2
   ; MIPS32FP32-NEXT:   [[ANDi:%[0-9]+]]:gpr32 = ANDi [[COPY]], 1
-  ; MIPS32FP32-NEXT:   BNE [[ANDi]], $zero, %bb.1, implicit-def dead $at
+  ; MIPS32FP32-NEXT:   BNE [[ANDi]], $zero, %bb.1, implicit-def $at
   ; MIPS32FP32-NEXT:   J %bb.2, implicit-def dead $at
   ; MIPS32FP32-NEXT: {{  $}}
   ; MIPS32FP32-NEXT: bb.1.cond.true:
@@ -269,6 +273,7 @@ body:             |
   ; MIPS32FP32-NEXT: {{  $}}
   ; MIPS32FP32-NEXT: bb.2.cond.false:
   ; MIPS32FP32-NEXT:   successors: %bb.3(0x80000000)
+  ; MIPS32FP32-NEXT: {{  $}}
   ; MIPS32FP32-NEXT: {{  $}}
   ; MIPS32FP32-NEXT: bb.3.cond.end:
   ; MIPS32FP32-NEXT:   [[PHI:%[0-9]+]]:gpr32 = PHI [[COPY1]], %bb.1, [[COPY2]], %bb.2
@@ -284,7 +289,7 @@ body:             |
   ; MIPS32FP64-NEXT:   [[COPY1:%[0-9]+]]:gpr32 = COPY $a1
   ; MIPS32FP64-NEXT:   [[COPY2:%[0-9]+]]:gpr32 = COPY $a2
   ; MIPS32FP64-NEXT:   [[ANDi:%[0-9]+]]:gpr32 = ANDi [[COPY]], 1
-  ; MIPS32FP64-NEXT:   BNE [[ANDi]], $zero, %bb.1, implicit-def dead $at
+  ; MIPS32FP64-NEXT:   BNE [[ANDi]], $zero, %bb.1, implicit-def $at
   ; MIPS32FP64-NEXT:   J %bb.2, implicit-def dead $at
   ; MIPS32FP64-NEXT: {{  $}}
   ; MIPS32FP64-NEXT: bb.1.cond.true:
@@ -294,6 +299,7 @@ body:             |
   ; MIPS32FP64-NEXT: {{  $}}
   ; MIPS32FP64-NEXT: bb.2.cond.false:
   ; MIPS32FP64-NEXT:   successors: %bb.3(0x80000000)
+  ; MIPS32FP64-NEXT: {{  $}}
   ; MIPS32FP64-NEXT: {{  $}}
   ; MIPS32FP64-NEXT: bb.3.cond.end:
   ; MIPS32FP64-NEXT:   [[PHI:%[0-9]+]]:gpr32 = PHI [[COPY1]], %bb.1, [[COPY2]], %bb.2
@@ -341,7 +347,7 @@ body:             |
   ; MIPS32FP32-NEXT:   [[ADDiu:%[0-9]+]]:gpr32 = ADDiu %fixed-stack.0, 0
   ; MIPS32FP32-NEXT:   [[LW:%[0-9]+]]:gpr32 = LW [[ADDiu]], 0 :: (load (s32) from %fixed-stack.0, align 8)
   ; MIPS32FP32-NEXT:   [[ANDi:%[0-9]+]]:gpr32 = ANDi [[LW]], 1
-  ; MIPS32FP32-NEXT:   BNE [[ANDi]], $zero, %bb.1, implicit-def dead $at
+  ; MIPS32FP32-NEXT:   BNE [[ANDi]], $zero, %bb.1, implicit-def $at
   ; MIPS32FP32-NEXT:   J %bb.2, implicit-def dead $at
   ; MIPS32FP32-NEXT: {{  $}}
   ; MIPS32FP32-NEXT: bb.1.cond.true:
@@ -351,6 +357,7 @@ body:             |
   ; MIPS32FP32-NEXT: {{  $}}
   ; MIPS32FP32-NEXT: bb.2.cond.false:
   ; MIPS32FP32-NEXT:   successors: %bb.3(0x80000000)
+  ; MIPS32FP32-NEXT: {{  $}}
   ; MIPS32FP32-NEXT: {{  $}}
   ; MIPS32FP32-NEXT: bb.3.cond.end:
   ; MIPS32FP32-NEXT:   [[PHI:%[0-9]+]]:afgr64 = PHI [[COPY]], %bb.1, [[COPY1]], %bb.2
@@ -367,7 +374,7 @@ body:             |
   ; MIPS32FP64-NEXT:   [[ADDiu:%[0-9]+]]:gpr32 = ADDiu %fixed-stack.0, 0
   ; MIPS32FP64-NEXT:   [[LW:%[0-9]+]]:gpr32 = LW [[ADDiu]], 0 :: (load (s32) from %fixed-stack.0, align 8)
   ; MIPS32FP64-NEXT:   [[ANDi:%[0-9]+]]:gpr32 = ANDi [[LW]], 1
-  ; MIPS32FP64-NEXT:   BNE [[ANDi]], $zero, %bb.1, implicit-def dead $at
+  ; MIPS32FP64-NEXT:   BNE [[ANDi]], $zero, %bb.1, implicit-def $at
   ; MIPS32FP64-NEXT:   J %bb.2, implicit-def dead $at
   ; MIPS32FP64-NEXT: {{  $}}
   ; MIPS32FP64-NEXT: bb.1.cond.true:
@@ -377,6 +384,7 @@ body:             |
   ; MIPS32FP64-NEXT: {{  $}}
   ; MIPS32FP64-NEXT: bb.2.cond.false:
   ; MIPS32FP64-NEXT:   successors: %bb.3(0x80000000)
+  ; MIPS32FP64-NEXT: {{  $}}
   ; MIPS32FP64-NEXT: {{  $}}
   ; MIPS32FP64-NEXT: bb.3.cond.end:
   ; MIPS32FP64-NEXT:   [[PHI:%[0-9]+]]:fgr64 = PHI [[COPY]], %bb.1, [[COPY1]], %bb.2

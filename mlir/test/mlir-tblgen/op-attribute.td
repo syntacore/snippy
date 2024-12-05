@@ -68,7 +68,7 @@ def AOp : NS_Op<"a_op", []> {
 // Test verify method
 // ---
 
-// DEF:      ::llvm::LogicalResult AOpAdaptor::verify
+// DEF:      ::mlir::LogicalResult AOpAdaptor::verify
 // DEF:      ::mlir::Attribute tblgen_aAttr;
 // DEF: while (true) {
 // DEF-NEXT:   if (namedAttrIt == namedAttrRange.end())
@@ -98,26 +98,26 @@ def AOp : NS_Op<"a_op", []> {
 // Test getter methods
 // ---
 
-// DECL:      some-attr-kind getAAttrAttr()
-// DECL-NEXT:   ::llvm::cast<some-attr-kind>(::mlir::impl::getAttrFromSortedRange((*this)->getAttrs().begin() + 0, (*this)->getAttrs().end() - 0, getAAttrAttrName()))
+// DEF:      some-attr-kind AOp::getAAttrAttr()
+// DEF-NEXT:   ::llvm::cast<some-attr-kind>(::mlir::impl::getAttrFromSortedRange((*this)->getAttrs().begin() + 0, (*this)->getAttrs().end() - 0, getAAttrAttrName()))
 // DEF:      some-return-type AOp::getAAttr() {
 // DEF-NEXT:   auto attr = getAAttrAttr()
 // DEF-NEXT:   return attr.some-convert-from-storage();
 
-// DECL:      some-attr-kind getBAttrAttr()
-// DECL-NEXT:   ::llvm::dyn_cast_or_null<some-attr-kind>(::mlir::impl::getAttrFromSortedRange((*this)->getAttrs().begin() + 1, (*this)->getAttrs().end() - 0, getBAttrAttrName()))
+// DEF:      some-attr-kind AOp::getBAttrAttr()
+// DEF-NEXT:   ::llvm::dyn_cast_or_null<some-attr-kind>(::mlir::impl::getAttrFromSortedRange((*this)->getAttrs().begin() + 1, (*this)->getAttrs().end() - 0, getBAttrAttrName()))
 // DEF:      some-return-type AOp::getBAttr() {
 // DEF-NEXT:   auto attr = getBAttrAttr();
 // DEF-NEXT:   return attr.some-convert-from-storage();
 
-// DECL:      some-attr-kind getCAttrAttr()
-// DECL-NEXT:   ::llvm::dyn_cast_or_null<some-attr-kind>(::mlir::impl::getAttrFromSortedRange((*this)->getAttrs().begin() + 1, (*this)->getAttrs().end() - 0, getCAttrAttrName()))
+// DEF:      some-attr-kind AOp::getCAttrAttr()
+// DEF-NEXT:   ::llvm::dyn_cast_or_null<some-attr-kind>(::mlir::impl::getAttrFromSortedRange((*this)->getAttrs().begin() + 1, (*this)->getAttrs().end() - 0, getCAttrAttrName()))
 // DEF:      ::std::optional<some-return-type> AOp::getCAttr() {
 // DEF-NEXT:   auto attr = getCAttrAttr()
 // DEF-NEXT:   return attr ? ::std::optional<some-return-type>(attr.some-convert-from-storage()) : (::std::nullopt);
 
-// DECL:      some-attr-kind getDAttrAttr()
-// DECL-NEXT:   ::llvm::dyn_cast_or_null<some-attr-kind>(::mlir::impl::getAttrFromSortedRange((*this)->getAttrs().begin() + 1, (*this)->getAttrs().end() - 0, getDAttrAttrName()))
+// DEF:      some-attr-kind AOp::getDAttrAttr()
+// DEF-NEXT:   ::llvm::dyn_cast_or_null<some-attr-kind>(::mlir::impl::getAttrFromSortedRange((*this)->getAttrs().begin() + 1, (*this)->getAttrs().end() - 0, getDAttrAttrName()))
 // DEF:      some-return-type AOp::getDAttr() {
 // DEF-NEXT:   auto attr = getDAttrAttr();
 // DEF-NEXT:   if (!attr)
@@ -127,16 +127,16 @@ def AOp : NS_Op<"a_op", []> {
 // Test setter methods
 // ---
 
-// DECL:      void setAAttrAttr(some-attr-kind attr) {
-// DECL-NEXT:   (*this)->setAttr(getAAttrAttrName(), attr);
+// DEF:      void AOp::setAAttrAttr(some-attr-kind attr) {
+// DEF-NEXT:   (*this)->setAttr(getAAttrAttrName(), attr);
 // DEF:      void AOp::setAAttr(some-return-type attrValue) {
 // DEF-NEXT:   (*this)->setAttr(getAAttrAttrName(), some-const-builder-call(::mlir::Builder((*this)->getContext()), attrValue));
-// DECL:      void setBAttrAttr(some-attr-kind attr) {
-// DECL-NEXT:   (*this)->setAttr(getBAttrAttrName(), attr);
+// DEF:      void AOp::setBAttrAttr(some-attr-kind attr) {
+// DEF-NEXT:   (*this)->setAttr(getBAttrAttrName(), attr);
 // DEF:      void AOp::setBAttr(some-return-type attrValue) {
 // DEF-NEXT:   (*this)->setAttr(getBAttrAttrName(), some-const-builder-call(::mlir::Builder((*this)->getContext()), attrValue));
-// DECL:      void setCAttrAttr(some-attr-kind attr) {
-// DECL-NEXT:   (*this)->setAttr(getCAttrAttrName(), attr);
+// DEF:      void AOp::setCAttrAttr(some-attr-kind attr) {
+// DEF-NEXT:   (*this)->setAttr(getCAttrAttrName(), attr);
 // DEF:      void AOp::setCAttr(::std::optional<some-return-type> attrValue) {
 // DEF-NEXT:   if (attrValue)
 // DEF-NEXT:     return (*this)->setAttr(getCAttrAttrName(), some-const-builder-call(::mlir::Builder((*this)->getContext()), *attrValue));
@@ -145,8 +145,8 @@ def AOp : NS_Op<"a_op", []> {
 // Test remove methods
 // ---
 
-// DECL: ::mlir::Attribute removeCAttrAttr() {
-// DECL-NEXT: return (*this)->removeAttr(getCAttrAttrName());
+// DEF: ::mlir::Attribute AOp::removeCAttrAttr() {
+// DEF-NEXT: return (*this)->removeAttr(getCAttrAttrName());
 
 // Test build methods
 // ---
@@ -220,7 +220,7 @@ def AgetOp : Op<Test2_Dialect, "a_get_op", []> {
 // Test verify method
 // ---
 
-// DEF:      ::llvm::LogicalResult AgetOpAdaptor::verify
+// DEF:      ::mlir::LogicalResult AgetOpAdaptor::verify
 // DEF:      ::mlir::Attribute tblgen_aAttr;
 // DEF: while (true)
 // DEF:      ::mlir::Attribute tblgen_bAttr;
@@ -236,22 +236,22 @@ def AgetOp : Op<Test2_Dialect, "a_get_op", []> {
 // Test getter methods
 // ---
 
-// DECL:      some-attr-kind getAAttrAttr()
-// DECL-NEXT:   ::llvm::cast<some-attr-kind>(::mlir::impl::getAttrFromSortedRange({{.*}}))
+// DEF:      some-attr-kind AgetOp::getAAttrAttr()
+// DEF-NEXT:   ::llvm::cast<some-attr-kind>(::mlir::impl::getAttrFromSortedRange({{.*}}))
 // DEF:      some-return-type AgetOp::getAAttr() {
 // DEF-NEXT:   auto attr = getAAttrAttr()
 // DEF-NEXT:   return attr.some-convert-from-storage();
 
-// DECL:      some-attr-kind getBAttrAttr()
-// DECL-NEXT:   return ::llvm::dyn_cast_or_null<some-attr-kind>(::mlir::impl::getAttrFromSortedRange({{.*}}))
+// DEF:      some-attr-kind AgetOp::getBAttrAttr()
+// DEF-NEXT:   return ::llvm::dyn_cast_or_null<some-attr-kind>(::mlir::impl::getAttrFromSortedRange({{.*}}))
 // DEF:      some-return-type AgetOp::getBAttr() {
 // DEF-NEXT:   auto attr = getBAttrAttr();
 // DEF-NEXT:   if (!attr)
 // DEF-NEXT:       return some-const-builder-call(::mlir::Builder((*this)->getContext()), 4.2).some-convert-from-storage();
 // DEF-NEXT:   return attr.some-convert-from-storage();
 
-// DECL:      some-attr-kind getCAttrAttr()
-// DECL-NEXT:   return ::llvm::dyn_cast_or_null<some-attr-kind>(::mlir::impl::getAttrFromSortedRange({{.*}}))
+// DEF:      some-attr-kind AgetOp::getCAttrAttr()
+// DEF-NEXT:   return ::llvm::dyn_cast_or_null<some-attr-kind>(::mlir::impl::getAttrFromSortedRange({{.*}}))
 // DEF:      ::std::optional<some-return-type> AgetOp::getCAttr() {
 // DEF-NEXT:   auto attr = getCAttrAttr()
 // DEF-NEXT:   return attr ? ::std::optional<some-return-type>(attr.some-convert-from-storage()) : (::std::nullopt);
@@ -259,18 +259,18 @@ def AgetOp : Op<Test2_Dialect, "a_get_op", []> {
 // Test setter methods
 // ---
 
-// DECL:      void setAAttrAttr(some-attr-kind attr) {
-// DECL-NEXT:   (*this)->setAttr(getAAttrAttrName(), attr);
-// DECL:      void setBAttrAttr(some-attr-kind attr) {
-// DECL-NEXT:   (*this)->setAttr(getBAttrAttrName(), attr);
-// DECL:      void setCAttrAttr(some-attr-kind attr) {
-// DECL-NEXT:   (*this)->setAttr(getCAttrAttrName(), attr);
+// DEF:      void AgetOp::setAAttrAttr(some-attr-kind attr) {
+// DEF-NEXT:   (*this)->setAttr(getAAttrAttrName(), attr);
+// DEF:      void AgetOp::setBAttrAttr(some-attr-kind attr) {
+// DEF-NEXT:   (*this)->setAttr(getBAttrAttrName(), attr);
+// DEF:      void AgetOp::setCAttrAttr(some-attr-kind attr) {
+// DEF-NEXT:   (*this)->setAttr(getCAttrAttrName(), attr);
 
 // Test remove methods
 // ---
 
-// DECL: ::mlir::Attribute removeCAttrAttr() {
-// DECL-NEXT: return (*this)->removeAttr(getCAttrAttrName());
+// DEF: ::mlir::Attribute AgetOp::removeCAttrAttr() {
+// DEF-NEXT: return (*this)->removeAttr(getCAttrAttrName());
 
 // Test build methods
 // ---
@@ -476,6 +476,9 @@ def NamespaceOp : NS_Op<"namespace_op", []> {
       SomeAttrDef:$AttrDef
   );
 }
+// DECL: NamespaceOp
+// DECL: foobar::SomeAttrAttr getAttrDef()
+
 
 // Test mixing operands and attributes in arbitrary order
 // ---
@@ -483,14 +486,6 @@ def NamespaceOp : NS_Op<"namespace_op", []> {
 def MixOperandsAndAttrs : NS_Op<"mix_operands_and_attrs", []> {
   let arguments = (ins F32Attr:$attr, F32:$operand, F32Attr:$otherAttr, F32:$otherArg);
 }
-
-// DECL-LABEL: MixOperandsAndAttrs declarations
-// DECL-DAG: ::mlir::TypedValue<::mlir::FloatType> getOperand()
-// DECL-DAG: ::mlir::TypedValue<::mlir::FloatType> getOtherArg()
-
-// DECL-LABEL: NamespaceOp declarations
-// DECL: foobar::SomeAttrAttr getAttrDef()
-
 
 def OpWithDefaultAndRegion : NS_Op<"default_with_region", []> {
   let arguments = (ins
@@ -514,9 +509,11 @@ def OpWithDefaultAndSuccessor : NS_Op<"default_with_succ", []> {
 // We should not have a default attribute in this case.
 
 // DECL-LABEL: OpWithDefaultAndSuccessor declarations
-// DECL-DAG: static void build({{.*}}, bool dv_bool_attr, ::mlir::BlockRange succ)
+// DECL: static void build({{.*}}, bool dv_bool_attr, ::mlir::BlockRange succ)
 
 // DEF-LABEL: MixOperandsAndAttrs definitions
+// DEF-DAG: ::mlir::TypedValue<::mlir::FloatType> MixOperandsAndAttrs::getOperand()
+// DEF-DAG: ::mlir::TypedValue<::mlir::FloatType> MixOperandsAndAttrs::getOtherArg()
 // DEF-DAG: void MixOperandsAndAttrs::build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, ::mlir::FloatAttr attr, ::mlir::Value operand, ::mlir::FloatAttr otherAttr, ::mlir::Value otherArg)
 // DEF-DAG: ::llvm::APFloat MixOperandsAndAttrs::getAttr()
 // DEF-DAG: ::llvm::APFloat MixOperandsAndAttrs::getOtherAttr()
@@ -532,13 +529,14 @@ def UnitAttrOp : NS_Op<"unit_attr_op", []> {
 // DEF: bool UnitAttrOp::getAttr() {
 // DEF:   return {{.*}} != nullptr
 
+// DEF: ::mlir::Attribute UnitAttrOp::removeAttrAttr() {
+// DEF-NEXT:   (*this)->removeAttr(getAttrAttrName());
 
 // DEF: build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, /*optional*/::mlir::UnitAttr attr)
 // DEF: build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, /*optional*/bool attr)
 
 // DECL-LABEL: UnitAttrOp declarations
-// DECL: ::mlir::Attribute removeAttrAttr() {
-// DECL-NEXT:   (*this)->removeAttr(getAttrAttrName());
+// DECL-NOT: declarations
 // DECL: build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, /*optional*/bool attr = false)
 
 

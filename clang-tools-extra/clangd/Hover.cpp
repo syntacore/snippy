@@ -247,12 +247,8 @@ fetchTemplateParameters(const TemplateParameterList *Params,
       if (!TTP->getName().empty())
         P.Name = TTP->getNameAsString();
 
-      if (TTP->hasDefaultArgument()) {
-        P.Default.emplace();
-        llvm::raw_string_ostream Out(*P.Default);
-        TTP->getDefaultArgument().getArgument().print(PP, Out,
-                                                      /*IncludeType=*/false);
-      }
+      if (TTP->hasDefaultArgument())
+        P.Default = TTP->getDefaultArgument().getAsString(PP);
     } else if (const auto *NTTP = dyn_cast<NonTypeTemplateParmDecl>(Param)) {
       P.Type = printType(NTTP, PP);
 
@@ -262,8 +258,7 @@ fetchTemplateParameters(const TemplateParameterList *Params,
       if (NTTP->hasDefaultArgument()) {
         P.Default.emplace();
         llvm::raw_string_ostream Out(*P.Default);
-        NTTP->getDefaultArgument().getArgument().print(PP, Out,
-                                                       /*IncludeType=*/false);
+        NTTP->getDefaultArgument()->printPretty(Out, nullptr, PP);
       }
     } else if (const auto *TTPD = dyn_cast<TemplateTemplateParmDecl>(Param)) {
       P.Type = printType(TTPD, PP);

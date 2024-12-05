@@ -37,6 +37,8 @@ CHECK: --arch
 CHECK: -a
 CHECK: --core
 CHECK: -c
+CHECK: --debug
+CHECK: -d
 CHECK: --editor
 CHECK: -e
 CHECK: --file

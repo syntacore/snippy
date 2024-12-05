@@ -159,6 +159,13 @@ namespace llvm {
       return StringRef(S, Length);
     }
 
+    /// equals - Check for string equality, this is more efficient than
+    /// compare() when the relative ordering of inequal strings isn't needed.
+    [[nodiscard]] bool equals(StringRef RHS) const {
+      return (Length == RHS.Length &&
+              compareMemory(Data, RHS.Data, RHS.Length) == 0);
+    }
+
     /// Check for string equality, ignoring case.
     [[nodiscard]] bool equals_insensitive(StringRef RHS) const {
       return Length == RHS.Length && compare_insensitive(RHS) == 0;
@@ -251,8 +258,10 @@ namespace llvm {
       return Length >= Prefix.Length &&
              compareMemory(Data, Prefix.Data, Prefix.Length) == 0;
     }
-    [[nodiscard]] bool starts_with(char Prefix) const {
-      return !empty() && front() == Prefix;
+    [[nodiscard]] LLVM_DEPRECATED(
+        "Use starts_with instead",
+        "starts_with") bool startswith(StringRef Prefix) const {
+      return starts_with(Prefix);
     }
 
     /// Check if this string starts with the given \p Prefix, ignoring case.
@@ -264,8 +273,10 @@ namespace llvm {
              compareMemory(end() - Suffix.Length, Suffix.Data, Suffix.Length) ==
                  0;
     }
-    [[nodiscard]] bool ends_with(char Suffix) const {
-      return !empty() && back() == Suffix;
+    [[nodiscard]] LLVM_DEPRECATED(
+        "Use ends_with instead",
+        "ends_with") bool endswith(StringRef Suffix) const {
+      return ends_with(Suffix);
     }
 
     /// Check if this string ends with the given \p Suffix, ignoring case.
@@ -864,11 +875,7 @@ namespace llvm {
   /// @{
 
   inline bool operator==(StringRef LHS, StringRef RHS) {
-    if (LHS.size() != RHS.size())
-      return false;
-    if (LHS.empty())
-      return true;
-    return ::memcmp(LHS.data(), RHS.data(), LHS.size()) == 0;
+    return LHS.equals(RHS);
   }
 
   inline bool operator!=(StringRef LHS, StringRef RHS) { return !(LHS == RHS); }

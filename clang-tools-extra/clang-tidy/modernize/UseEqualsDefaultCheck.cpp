@@ -26,7 +26,7 @@ getAllNamedFields(const CXXRecordDecl *Record) {
   std::set<const FieldDecl *> Result;
   for (const auto *Field : Record->fields()) {
     // Static data members are not in this range.
-    if (Field->isUnnamedBitField())
+    if (Field->isUnnamedBitfield())
       continue;
     Result.insert(Field);
   }

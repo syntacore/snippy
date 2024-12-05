@@ -28,7 +28,7 @@ class TestArmMachoCorefileRegctx(TestBase):
         target = self.dbg.CreateTarget("")
         err = lldb.SBError()
         process = target.LoadCore(self.corefile)
-        self.assertTrue(process.IsValid())
+        self.assertEqual(process.IsValid(), True)
         thread = process.GetSelectedThread()
         frame = thread.GetSelectedFrame()
 
@@ -51,7 +51,7 @@ class TestArmMachoCorefileRegctx(TestBase):
         target = self.dbg.CreateTarget("")
         err = lldb.SBError()
         process = target.LoadCore(self.corefile)
-        self.assertTrue(process.IsValid())
+        self.assertEqual(process.IsValid(), True)
         thread = process.GetSelectedThread()
         frame = thread.GetSelectedFrame()
 

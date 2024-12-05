@@ -42,7 +42,7 @@ def testAffineExprEq():
         # CHECK: False
         print(a1 == a3)
         # CHECK: False
-        print(a1 is None)
+        print(a1 == None)
         # CHECK: False
         print(a1 == "foo")
 

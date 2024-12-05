@@ -37,7 +37,6 @@
 #include "llvm/Analysis/ModelUnderTrainingRunner.h"
 #include "llvm/Analysis/NoInferenceModelRunner.h"
 #include "llvm/Analysis/Utils/TrainingLogger.h"
-#include "llvm/IR/Module.h"
 #endif
 
 using namespace llvm;
@@ -134,7 +133,7 @@ public:
 private:
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.setPreservesAll();
-    AU.addRequired<SlotIndexesWrapperPass>();
+    AU.addRequired<SlotIndexes>();
     RegAllocPriorityAdvisorAnalysis::getAnalysisUsage(AU);
   }
 
@@ -151,7 +150,7 @@ private:
             InteractiveChannelBaseName + ".in");
     }
     return std::make_unique<MLPriorityAdvisor>(
-        MF, RA, &getAnalysis<SlotIndexesWrapperPass>().getSI(), Runner.get());
+        MF, RA, &getAnalysis<SlotIndexes>(), Runner.get());
   }
   std::unique_ptr<MLModelRunner> Runner;
 };
@@ -215,7 +214,7 @@ public:
 private:
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.setPreservesAll();
-    AU.addRequired<SlotIndexesWrapperPass>();
+    AU.addRequired<SlotIndexes>();
     RegAllocPriorityAdvisorAnalysis::getAnalysisUsage(AU);
   }
 
@@ -266,8 +265,7 @@ private:
     }
 
     return std::make_unique<DevelopmentModePriorityAdvisor>(
-        MF, RA, &getAnalysis<SlotIndexesWrapperPass>().getSI(), Runner.get(),
-        Log.get());
+        MF, RA, &getAnalysis<SlotIndexes>(), Runner.get(), Log.get());
   }
 
   std::unique_ptr<MLModelRunner> Runner;

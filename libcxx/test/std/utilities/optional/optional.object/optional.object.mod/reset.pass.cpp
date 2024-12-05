@@ -31,19 +31,20 @@ struct X
 
 bool X::dtor_called = false;
 
-TEST_CONSTEXPR_CXX20 bool check_reset() {
-  {
-    optional<int> opt;
-    static_assert(noexcept(opt.reset()) == true, "");
-    opt.reset();
-    assert(static_cast<bool>(opt) == false);
-  }
-  {
-    optional<int> opt(3);
-    opt.reset();
-    assert(static_cast<bool>(opt) == false);
-  }
-  return true;
+constexpr bool check_reset()
+{
+    {
+        optional<int> opt;
+        static_assert(noexcept(opt.reset()) == true, "");
+        opt.reset();
+        assert(static_cast<bool>(opt) == false);
+    }
+    {
+        optional<int> opt(3);
+        opt.reset();
+        assert(static_cast<bool>(opt) == false);
+    }
+    return true;
 }
 
 int main(int, char**)

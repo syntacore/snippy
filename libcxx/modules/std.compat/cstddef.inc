@@ -8,10 +8,10 @@
 //===----------------------------------------------------------------------===//
 
 export {
-  using ::max_align_t _LIBCPP_USING_IF_EXISTS;
+  using ::max_align_t;
   using ::nullptr_t;
-  using ::ptrdiff_t _LIBCPP_USING_IF_EXISTS;
-  using ::size_t _LIBCPP_USING_IF_EXISTS;
+  using ::ptrdiff_t;
+  using ::size_t;
 
   // [support.c.headers]/1
   // ...  placed within the global namespace scope, except for ... the

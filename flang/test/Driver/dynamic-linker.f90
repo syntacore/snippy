@@ -16,6 +16,7 @@
 ! GNU-LINKER-OPTIONS-SAME: "-shared"
 ! GNU-LINKER-OPTIONS-SAME: "-static"
 ! GNU-LINKER-OPTIONS-SAME: "-rpath" "/path/to/dir"
+! GNU-LINKER-OPTIONS-NOT: "-lFortran_main.a"
 
 ! RDYNAMIC-LINKER-OPTION: "{{.*}}ld"
 ! RDYNAMIC-LINKER-OPTION-SAME: "-export-dynamic"
@@ -24,3 +25,4 @@
 ! MSVC-LINKER-OPTIONS: "{{.*}}link{{(.exe)?}}"
 ! MSVC-LINKER-OPTIONS-SAME: "-dll"
 ! MSVC-LINKER-OPTIONS-SAME: "-rpath" "/path/to/dir"
+! MSVC-LINKER-OPTIONS-NOT: "/WHOLEARCHIVE:Fortran_main"

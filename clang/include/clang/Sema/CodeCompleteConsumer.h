@@ -362,7 +362,7 @@ private:
   QualType BaseType;
 
   /// The identifiers for Objective-C selector parts.
-  ArrayRef<const IdentifierInfo *> SelIdents;
+  ArrayRef<IdentifierInfo *> SelIdents;
 
   /// The scope specifier that comes before the completion token e.g.
   /// "a::b::"
@@ -378,9 +378,8 @@ public:
       : CCKind(CCKind), IsUsingDeclaration(false), SelIdents(std::nullopt) {}
 
   /// Construct a new code-completion context of the given kind.
-  CodeCompletionContext(
-      Kind CCKind, QualType T,
-      ArrayRef<const IdentifierInfo *> SelIdents = std::nullopt)
+  CodeCompletionContext(Kind CCKind, QualType T,
+                        ArrayRef<IdentifierInfo *> SelIdents = std::nullopt)
       : CCKind(CCKind), IsUsingDeclaration(false), SelIdents(SelIdents) {
     if (CCKind == CCC_DotMemberAccess || CCKind == CCC_ArrowMemberAccess ||
         CCKind == CCC_ObjCPropertyAccess || CCKind == CCC_ObjCClassMessage ||
@@ -407,7 +406,7 @@ public:
   QualType getBaseType() const { return BaseType; }
 
   /// Retrieve the Objective-C selector identifiers.
-  ArrayRef<const IdentifierInfo *> getSelIdents() const { return SelIdents; }
+  ArrayRef<IdentifierInfo *> getSelIdents() const { return SelIdents; }
 
   /// Determines whether we want C++ constructors as results within this
   /// context.
@@ -582,7 +581,6 @@ private:
   unsigned Priority : 16;
 
   /// The availability of this code-completion result.
-  LLVM_PREFERRED_TYPE(CXAvailabilityKind)
   unsigned Availability : 2;
 
   /// The name of the parent context.

@@ -35,9 +35,9 @@ protected:
 public:
   explicit CSKYInstrInfo(CSKYSubtarget &STI);
 
-  Register isLoadFromStackSlot(const MachineInstr &MI,
+  unsigned isLoadFromStackSlot(const MachineInstr &MI,
                                int &FrameIndex) const override;
-  Register isStoreToStackSlot(const MachineInstr &MI,
+  unsigned isStoreToStackSlot(const MachineInstr &MI,
                               int &FrameIndex) const override;
 
   void storeRegToStackSlot(MachineBasicBlock &MBB,

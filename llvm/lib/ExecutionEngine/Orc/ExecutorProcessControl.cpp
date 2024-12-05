@@ -61,8 +61,13 @@ SelfExecutorProcessControl::Create(
   if (!SSP)
     SSP = std::make_shared<SymbolStringPool>();
 
-  if (!D)
+  if (!D) {
+#if LLVM_ENABLE_THREADS
+    D = std::make_unique<DynamicThreadPoolTaskDispatcher>();
+#else
     D = std::make_unique<InPlaceTaskDispatcher>();
+#endif
+  }
 
   auto PageSize = sys::Process::getPageSize();
   if (!PageSize)
@@ -84,9 +89,8 @@ SelfExecutorProcessControl::loadDylib(const char *DylibPath) {
   return ExecutorAddr::fromPtr(Dylib.getOSSpecificHandle());
 }
 
-void SelfExecutorProcessControl::lookupSymbolsAsync(
-    ArrayRef<LookupRequest> Request,
-    ExecutorProcessControl::SymbolLookupCompleteFn Complete) {
+Expected<std::vector<tpctypes::LookupResult>>
+SelfExecutorProcessControl::lookupSymbols(ArrayRef<LookupRequest> Request) {
   std::vector<tpctypes::LookupResult> R;
 
   for (auto &Elem : Request) {
@@ -101,8 +105,7 @@ void SelfExecutorProcessControl::lookupSymbolsAsync(
         // FIXME: Collect all failing symbols before erroring out.
         SymbolNameVector MissingSymbols;
         MissingSymbols.push_back(Sym);
-        return Complete(
-            make_error<SymbolsNotFound>(SSP, std::move(MissingSymbols)));
+        return make_error<SymbolsNotFound>(SSP, std::move(MissingSymbols));
       }
       // FIXME: determine accurate JITSymbolFlags.
       R.back().push_back(
@@ -110,7 +113,7 @@ void SelfExecutorProcessControl::lookupSymbolsAsync(
     }
   }
 
-  Complete(std::move(R));
+  return R;
 }
 
 Expected<int32_t>

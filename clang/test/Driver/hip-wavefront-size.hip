@@ -1,3 +1,5 @@
+// REQUIRES: amdgpu-registered-target
+
 // RUN: %clang -### --target=x86_64-linux-gnu \
 // RUN:   --cuda-gpu-arch=gfx900 \
 // RUN:   --rocm-path=%S/Inputs/rocm --cuda-device-only %s \

@@ -187,8 +187,8 @@ struct DisassembleOpInterface
   }
 };
 
-struct ForeachOpInterface : public SparseBufferizableOpInterfaceExternalModel<
-                                ForeachOpInterface, sparse_tensor::ForeachOp> {
+struct InsertOpInterface : public SparseBufferizableOpInterfaceExternalModel<
+                               InsertOpInterface, sparse_tensor::InsertOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
     return true;
@@ -196,23 +196,15 @@ struct ForeachOpInterface : public SparseBufferizableOpInterfaceExternalModel<
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                const AnalysisState &state) const {
-    return false;
+    // InsertOp writes to memory.
+    return true;
   }
 
   AliasingValueList getAliasingValues(Operation *op, OpOperand &opOperand,
                                       const AnalysisState &state) const {
-    return {};
-  }
-
-  LogicalResult verifyAnalysis(Operation *op,
-                               const AnalysisState &state) const {
-    // A more complex analysis (similar to scf.for) is needed if the op returns
-    // a tensor. That tensor would have to be bufferized (not implemented yet).
-    for (OpResult result : op->getResults()) {
-      if (isa<TensorType>(result.getType()))
-        return op->emitOpError("tensor results are not supported yet");
-    }
-    return success();
+    // InsertOp returns an alias of its operand.
+    assert(op->getNumResults() == 1);
+    return {{op->getOpResult(0), BufferRelation::Equivalent}};
   }
 };
 
@@ -332,11 +324,11 @@ void mlir::sparse_tensor::registerBufferizableOpInterfaceExternalModels(
     sparse_tensor::ConvertOp::attachInterface<ConvertOpInterface>(*ctx);
     sparse_tensor::LoadOp::attachInterface<LoadOpInterface>(*ctx);
     sparse_tensor::NewOp::attachInterface<NewOpInterface>(*ctx);
+    sparse_tensor::InsertOp::attachInterface<InsertOpInterface>(*ctx);
     sparse_tensor::NumberOfEntriesOp::attachInterface<
         NumberOfEntriesOpInterface>(*ctx);
     sparse_tensor::AssembleOp::attachInterface<AssembleOpInterface>(*ctx);
     sparse_tensor::DisassembleOp::attachInterface<DisassembleOpInterface>(*ctx);
-    sparse_tensor::ForeachOp::attachInterface<ForeachOpInterface>(*ctx);
     sparse_tensor::ToCoordinatesBufferOp::attachInterface<
         ToCoordinatesBufferOpInterface>(*ctx);
     sparse_tensor::ToCoordinatesOp::attachInterface<ToCoordinatesOpInterface>(

@@ -51,11 +51,8 @@
 // REL_CHECK: [[#REL_SYMB_ADDR]] {{.*}} FUNC {{.*}} resolver_foo
 
 static void foo() {}
-static void bar() {}
 
-extern int use_foo;
-
-static void *resolver_foo(void) { return use_foo ? foo : bar; }
+static void *resolver_foo(void) { return foo; }
 
 __attribute__((ifunc("resolver_foo"))) void ifoo();
 

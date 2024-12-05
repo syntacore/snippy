@@ -198,10 +198,12 @@ void DWARFExpressionList::GetDescription(Stream *s,
   }
 }
 
-llvm::Expected<Value> DWARFExpressionList::Evaluate(
-    ExecutionContext *exe_ctx, RegisterContext *reg_ctx,
-    lldb::addr_t func_load_addr, const Value *initial_value_ptr,
-    const Value *object_address_ptr) const {
+bool DWARFExpressionList::Evaluate(ExecutionContext *exe_ctx,
+                                   RegisterContext *reg_ctx,
+                                   lldb::addr_t func_load_addr,
+                                   const Value *initial_value_ptr,
+                                   const Value *object_address_ptr,
+                                   Value &result, Status *error_ptr) const {
   ModuleSP module_sp = m_module_wp.lock();
   DataExtractor data;
   RegisterKind reg_kind;
@@ -215,26 +217,32 @@ llvm::Expected<Value> DWARFExpressionList::Evaluate(
       if (exe_ctx)
         frame = exe_ctx->GetFramePtr();
       if (!frame)
-        return llvm::createStringError("no frame");
+        return false;
       RegisterContextSP reg_ctx_sp = frame->GetRegisterContext();
       if (!reg_ctx_sp)
-        return llvm::createStringError("no register context");
+        return false;
       reg_ctx_sp->GetPCForSymbolication(pc);
     }
 
     if (!pc.IsValid()) {
-      return llvm::createStringError("Invalid PC in frame.");
+      if (error_ptr)
+        error_ptr->SetErrorString("Invalid PC in frame.");
+      return false;
     }
     addr_t pc_load_addr = pc.GetLoadAddress(exe_ctx->GetTargetPtr());
     const DWARFExpression *entry =
         GetExpressionAtAddress(func_load_addr, pc_load_addr);
-    if (!entry)
-      return llvm::createStringError("variable not available");
+    if (!entry) {
+      if (error_ptr) {
+        error_ptr->SetErrorString("variable not available");
+      }
+      return false;
+    }
     expr = *entry;
   }
   expr.GetExpressionData(data);
   reg_kind = expr.GetRegisterKind();
   return DWARFExpression::Evaluate(exe_ctx, reg_ctx, module_sp, data,
                                    m_dwarf_cu, reg_kind, initial_value_ptr,
-                                   object_address_ptr);
+                                   object_address_ptr, result, error_ptr);
 }

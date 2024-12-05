@@ -1,4 +1,5 @@
-// RUN: %clang_cc1 -triple riscv64 -target-feature +zve32x \
+// RUN: %clang_cc1 -triple riscv64 -target-feature +f -target-feature +d \
+// RUN:   -target-feature +zve64f -target-feature +zfh \
 // RUN:   -disable-O0-optnone -o - -fsyntax-only %s -verify 
 // REQUIRES: riscv-registered-target
 #include <riscv_vector.h>

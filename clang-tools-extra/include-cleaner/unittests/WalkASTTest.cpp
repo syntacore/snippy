@@ -213,8 +213,6 @@ TEST(WalkAST, VarTemplates) {
     template<typename T> T* $explicit^Foo<T*> = nullptr;)cpp",
                        "int *x = ^Foo<int *>;"),
               ElementsAre(Decl::VarTemplateSpecialization));
-  // Implicit specializations through explicit instantiations has source
-  // locations pointing at the primary template.
   EXPECT_THAT(testWalk(R"cpp(
     template<typename T> T $explicit^Foo = 0;
     template int Foo<int>;)cpp",
@@ -229,27 +227,30 @@ TEST(WalkAST, FunctionTemplates) {
   EXPECT_THAT(testWalk("template<typename T> void foo(T) {}",
                        "template void ^foo<int>(int);"),
               ElementsAre());
-  EXPECT_THAT(testWalk("template<typename T> void $explicit^foo(T);",
+  // FIXME: Report specialized template as used from explicit specializations.
+  EXPECT_THAT(testWalk("template<typename T> void foo(T);",
                        "template<> void ^foo<int>(int);"),
-              ElementsAre(Decl::FunctionTemplate));
+              ElementsAre());
+  EXPECT_THAT(testWalk("template<typename T> void foo(T) {}",
+                       "template<typename T> void ^foo(T*) {}"),
+              ElementsAre());
 
   // Implicit instantiations references most relevant template.
   EXPECT_THAT(testWalk(R"cpp(
     template <typename T> void $explicit^foo() {})cpp",
                        "auto x = []{ ^foo<int>(); };"),
-              ElementsAre(Decl::Function));
+              ElementsAre(Decl::FunctionTemplate));
+  // FIXME: DeclRefExpr points at primary template, not the specialization.
   EXPECT_THAT(testWalk(R"cpp(
-    template<typename T> void foo() {}
-    template<> void $explicit^foo<int>(){})cpp",
+    template<typename T> void $explicit^foo() {}
+    template<> void foo<int>(){})cpp",
                        "auto x = []{ ^foo<int>(); };"),
-              ElementsAre(Decl::Function));
-  // The decl is actually the specialization, but explicit instantations point
-  // at the primary template.
+              ElementsAre(Decl::FunctionTemplate));
   EXPECT_THAT(testWalk(R"cpp(
     template<typename T> void $explicit^foo() {};
     template void foo<int>();)cpp",
                        "auto x = [] { ^foo<int>(); };"),
-              ElementsAre(Decl::Function));
+              ElementsAre(Decl::FunctionTemplate));
 }
 TEST(WalkAST, TemplateSpecializationsFromUsingDecl) {
   // Class templates
@@ -506,8 +507,6 @@ TEST(WalkAST, Functions) {
   // Definition uses declaration, not the other way around.
   testWalk("void $explicit^foo();", "void ^foo() {}");
   testWalk("void foo() {}", "void ^foo();");
-  testWalk("template <typename> void $explicit^foo();",
-           "template <typename> void ^foo() {}");
 
   // Unresolved calls marks all the overloads.
   testWalk("void $ambiguous^foo(int); void $ambiguous^foo(char);",
@@ -534,7 +533,7 @@ TEST(WalkAST, Enums) {
 TEST(WalkAST, InitializerList) {
   testWalk(R"cpp(
        namespace std {
-        template <typename T> struct $implicit^initializer_list { const T *a, *b; };
+        template <typename T> struct $implicit^initializer_list {};
        })cpp",
            R"cpp(
        const char* s = "";
@@ -548,7 +547,8 @@ TEST(WalkAST, Concepts) {
   testWalk(Concept, "template<typename T> requires ^Foo<T> void func() {}");
   testWalk(Concept, "template<typename T> void func() requires ^Foo<T> {}");
   testWalk(Concept, "void func(^Foo auto x) {}");
-  testWalk(Concept, "void func() { ^Foo auto x = 1; }");
+  // FIXME: Foo should be explicitly referenced.
+  testWalk("template<typename T> concept Foo = true;", "void func() { ^Foo auto x = 1; }");
 }
 
 TEST(WalkAST, FriendDecl) {

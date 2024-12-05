@@ -68,8 +68,9 @@ public:
   bool mayNeedRelaxation(const MCInst &Inst,
                          const MCSubtargetInfo &STI) const override;
 
-  bool fixupNeedsRelaxation(const MCFixup &Fixup,
-                            uint64_t Value) const override;
+  bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
+                            const MCRelaxableFragment *DF,
+                            const MCAsmLayout &Layout) const override;
 
   void relaxInstruction(MCInst &Inst,
                         const MCSubtargetInfo &STI) const override;
@@ -165,8 +166,9 @@ bool M68kAsmBackend::mayNeedRelaxation(const MCInst &Inst,
   return false;
 }
 
-bool M68kAsmBackend::fixupNeedsRelaxation(const MCFixup &Fixup,
-                                          uint64_t Value) const {
+bool M68kAsmBackend::fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
+                                          const MCRelaxableFragment *DF,
+                                          const MCAsmLayout &Layout) const {
   // TODO Newer CPU can use 32 bit offsets, so check for this when ready
   if (!isInt<16>(Value)) {
     llvm_unreachable("Cannot relax the instruction, value does not fit");

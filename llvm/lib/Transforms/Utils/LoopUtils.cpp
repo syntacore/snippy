@@ -222,7 +222,7 @@ void llvm::addStringMetadataToLoop(Loop *TheLoop, const char *StringMD,
       // If it is of form key = value, try to parse it.
       if (Node->getNumOperands() == 2) {
         MDString *S = dyn_cast<MDString>(Node->getOperand(0));
-        if (S && S->getString() == StringMD) {
+        if (S && S->getString().equals(StringMD)) {
           ConstantInt *IntMD =
               mdconst::extract_or_null<ConstantInt>(Node->getOperand(1));
           if (IntMD && IntMD->getSExtValue() == V)
@@ -468,7 +468,6 @@ llvm::collectChildrenInLoop(DomTreeNode *N, const Loop *CurLoop) {
 
 bool llvm::isAlmostDeadIV(PHINode *PN, BasicBlock *LatchBlock, Value *Cond) {
   int LatchIdx = PN->getBasicBlockIndex(LatchBlock);
-  assert(LatchIdx != -1 && "LatchBlock is not a case in this PHINode");
   Value *IncV = PN->getIncomingValue(LatchIdx);
 
   for (User *U : PN->users())
@@ -605,7 +604,7 @@ void llvm::deleteDeadLoop(Loop *L, DominatorTree *DT, ScalarEvolution *SE,
   // Use a map to unique and a vector to guarantee deterministic ordering.
   llvm::SmallDenseSet<DebugVariable, 4> DeadDebugSet;
   llvm::SmallVector<DbgVariableIntrinsic *, 4> DeadDebugInst;
-  llvm::SmallVector<DbgVariableRecord *, 4> DeadDbgVariableRecords;
+  llvm::SmallVector<DPValue *, 4> DeadDPValues;
 
   if (ExitBlock) {
     // Given LCSSA form is satisfied, we should not have users of instructions
@@ -631,17 +630,17 @@ void llvm::deleteDeadLoop(Loop *L, DominatorTree *DT, ScalarEvolution *SE,
           U.set(Poison);
         }
 
-        // RemoveDIs: do the same as below for DbgVariableRecords.
+        // RemoveDIs: do the same as below for DPValues.
         if (Block->IsNewDbgInfoFormat) {
-          for (DbgVariableRecord &DVR : llvm::make_early_inc_range(
-                   filterDbgVars(I.getDbgRecordRange()))) {
-            DebugVariable Key(DVR.getVariable(), DVR.getExpression(),
-                              DVR.getDebugLoc().get());
+          for (DPValue &DPV :
+               llvm::make_early_inc_range(I.getDbgValueRange())) {
+            DebugVariable Key(DPV.getVariable(), DPV.getExpression(),
+                              DPV.getDebugLoc().get());
             if (!DeadDebugSet.insert(Key).second)
               continue;
-            // Unlinks the DVR from it's container, for later insertion.
-            DVR.removeFromParent();
-            DeadDbgVariableRecords.push_back(&DVR);
+            // Unlinks the DPV from it's container, for later insertion.
+            DPV.removeFromParent();
+            DeadDPValues.push_back(&DPV);
           }
         }
 
@@ -673,11 +672,11 @@ void llvm::deleteDeadLoop(Loop *L, DominatorTree *DT, ScalarEvolution *SE,
       DVI->moveBefore(*ExitBlock, InsertDbgValueBefore);
 
     // Due to the "head" bit in BasicBlock::iterator, we're going to insert
-    // each DbgVariableRecord right at the start of the block, wheras dbg.values
-    // would be repeatedly inserted before the first instruction. To replicate
-    // this behaviour, do it backwards.
-    for (DbgVariableRecord *DVR : llvm::reverse(DeadDbgVariableRecords))
-      ExitBlock->insertDbgRecordBefore(DVR, InsertDbgValueBefore);
+    // each DPValue right at the start of the block, wheras dbg.values would be
+    // repeatedly inserted before the first instruction. To replicate this
+    // behaviour, do it backwards.
+    for (DPValue *DPV : llvm::reverse(DeadDPValues))
+      ExitBlock->insertDPValueBefore(DPV, InsertDbgValueBefore);
   }
 
   // Remove the block from the reference counting scheme, so that we can
@@ -918,96 +917,6 @@ bool llvm::hasIterationCountInvariantInParent(Loop *InnerLoop,
   return true;
 }
 
-constexpr Intrinsic::ID llvm::getReductionIntrinsicID(RecurKind RK) {
-  switch (RK) {
-  default:
-    llvm_unreachable("Unexpected recurrence kind");
-  case RecurKind::Add:
-    return Intrinsic::vector_reduce_add;
-  case RecurKind::Mul:
-    return Intrinsic::vector_reduce_mul;
-  case RecurKind::And:
-    return Intrinsic::vector_reduce_and;
-  case RecurKind::Or:
-    return Intrinsic::vector_reduce_or;
-  case RecurKind::Xor:
-    return Intrinsic::vector_reduce_xor;
-  case RecurKind::FMulAdd:
-  case RecurKind::FAdd:
-    return Intrinsic::vector_reduce_fadd;
-  case RecurKind::FMul:
-    return Intrinsic::vector_reduce_fmul;
-  case RecurKind::SMax:
-    return Intrinsic::vector_reduce_smax;
-  case RecurKind::SMin:
-    return Intrinsic::vector_reduce_smin;
-  case RecurKind::UMax:
-    return Intrinsic::vector_reduce_umax;
-  case RecurKind::UMin:
-    return Intrinsic::vector_reduce_umin;
-  case RecurKind::FMax:
-    return Intrinsic::vector_reduce_fmax;
-  case RecurKind::FMin:
-    return Intrinsic::vector_reduce_fmin;
-  case RecurKind::FMaximum:
-    return Intrinsic::vector_reduce_fmaximum;
-  case RecurKind::FMinimum:
-    return Intrinsic::vector_reduce_fminimum;
-  }
-}
-
-unsigned llvm::getArithmeticReductionInstruction(Intrinsic::ID RdxID) {
-  switch (RdxID) {
-  case Intrinsic::vector_reduce_fadd:
-    return Instruction::FAdd;
-  case Intrinsic::vector_reduce_fmul:
-    return Instruction::FMul;
-  case Intrinsic::vector_reduce_add:
-    return Instruction::Add;
-  case Intrinsic::vector_reduce_mul:
-    return Instruction::Mul;
-  case Intrinsic::vector_reduce_and:
-    return Instruction::And;
-  case Intrinsic::vector_reduce_or:
-    return Instruction::Or;
-  case Intrinsic::vector_reduce_xor:
-    return Instruction::Xor;
-  case Intrinsic::vector_reduce_smax:
-  case Intrinsic::vector_reduce_smin:
-  case Intrinsic::vector_reduce_umax:
-  case Intrinsic::vector_reduce_umin:
-    return Instruction::ICmp;
-  case Intrinsic::vector_reduce_fmax:
-  case Intrinsic::vector_reduce_fmin:
-    return Instruction::FCmp;
-  default:
-    llvm_unreachable("Unexpected ID");
-  }
-}
-
-Intrinsic::ID llvm::getMinMaxReductionIntrinsicOp(Intrinsic::ID RdxID) {
-  switch (RdxID) {
-  default:
-    llvm_unreachable("Unknown min/max recurrence kind");
-  case Intrinsic::vector_reduce_umin:
-    return Intrinsic::umin;
-  case Intrinsic::vector_reduce_umax:
-    return Intrinsic::umax;
-  case Intrinsic::vector_reduce_smin:
-    return Intrinsic::smin;
-  case Intrinsic::vector_reduce_smax:
-    return Intrinsic::smax;
-  case Intrinsic::vector_reduce_fmin:
-    return Intrinsic::minnum;
-  case Intrinsic::vector_reduce_fmax:
-    return Intrinsic::maxnum;
-  case Intrinsic::vector_reduce_fminimum:
-    return Intrinsic::minimum;
-  case Intrinsic::vector_reduce_fmaximum:
-    return Intrinsic::maximum;
-  }
-}
-
 Intrinsic::ID llvm::getMinMaxReductionIntrinsicOp(RecurKind RK) {
   switch (RK) {
   default:
@@ -1031,25 +940,6 @@ Intrinsic::ID llvm::getMinMaxReductionIntrinsicOp(RecurKind RK) {
   }
 }
 
-RecurKind llvm::getMinMaxReductionRecurKind(Intrinsic::ID RdxID) {
-  switch (RdxID) {
-  case Intrinsic::vector_reduce_smax:
-    return RecurKind::SMax;
-  case Intrinsic::vector_reduce_smin:
-    return RecurKind::SMin;
-  case Intrinsic::vector_reduce_umax:
-    return RecurKind::UMax;
-  case Intrinsic::vector_reduce_umin:
-    return RecurKind::UMin;
-  case Intrinsic::vector_reduce_fmax:
-    return RecurKind::FMax;
-  case Intrinsic::vector_reduce_fmin:
-    return RecurKind::FMin;
-  default:
-    return RecurKind::None;
-  }
-}
-
 CmpInst::Predicate llvm::getMinMaxReductionPredicate(RecurKind RK) {
   switch (RK) {
   default:
@@ -1070,6 +960,15 @@ CmpInst::Predicate llvm::getMinMaxReductionPredicate(RecurKind RK) {
   // equivalent predicate which compares signed zeroes according to the
   // semantics of the intrinsics (llvm.minimum/maximum).
   }
+}
+
+Value *llvm::createAnyOfOp(IRBuilderBase &Builder, Value *StartVal,
+                           RecurKind RK, Value *Left, Value *Right) {
+  if (auto VTy = dyn_cast<VectorType>(Left->getType()))
+    StartVal = Builder.CreateVectorSplat(VTy->getElementCount(), StartVal);
+  Value *Cmp =
+      Builder.CreateCmp(CmpInst::ICMP_NE, Left, StartVal, "rdx.select.cmp");
+  return Builder.CreateSelect(Cmp, Left, Right, "rdx.select");
 }
 
 Value *llvm::createMinMaxOp(IRBuilderBase &Builder, RecurKind RK, Value *Left,
@@ -1115,9 +1014,7 @@ Value *llvm::getOrderedReduction(IRBuilderBase &Builder, Value *Acc, Value *Src,
 
 // Helper to generate a log2 shuffle reduction.
 Value *llvm::getShuffleReduction(IRBuilderBase &Builder, Value *Src,
-                                 unsigned Op,
-                                 TargetTransformInfo::ReductionShuffle RS,
-                                 RecurKind RdxKind) {
+                                 unsigned Op, RecurKind RdxKind) {
   unsigned VF = cast<FixedVectorType>(Src->getType())->getNumElements();
   // VF is a power of 2 so we can emit the reduction using log2(VF) shuffles
   // and vector ops, reducing the set of values being computed by half each
@@ -1131,10 +1028,18 @@ Value *llvm::getShuffleReduction(IRBuilderBase &Builder, Value *Src,
   // will never be relevant here.  Note that it would be generally unsound to
   // propagate these from an intrinsic call to the expansion anyways as we/
   // change the order of operations.
-  auto BuildShuffledOp = [&Builder, &Op,
-                          &RdxKind](SmallVectorImpl<int> &ShuffleMask,
-                                    Value *&TmpVec) -> void {
+  Value *TmpVec = Src;
+  SmallVector<int, 32> ShuffleMask(VF);
+  for (unsigned i = VF; i != 1; i >>= 1) {
+    // Move the upper half of the vector to the lower half.
+    for (unsigned j = 0; j != i / 2; ++j)
+      ShuffleMask[j] = i / 2 + j;
+
+    // Fill the rest of the mask with undef.
+    std::fill(&ShuffleMask[i / 2], ShuffleMask.end(), -1);
+
     Value *Shuf = Builder.CreateShuffleVector(TmpVec, ShuffleMask, "rdx.shuf");
+
     if (Op != Instruction::ICmp && Op != Instruction::FCmp) {
       TmpVec = Builder.CreateBinOp((Instruction::BinaryOps)Op, TmpVec, Shuf,
                                    "bin.rdx");
@@ -1142,30 +1047,6 @@ Value *llvm::getShuffleReduction(IRBuilderBase &Builder, Value *Src,
       assert(RecurrenceDescriptor::isMinMaxRecurrenceKind(RdxKind) &&
              "Invalid min/max");
       TmpVec = createMinMaxOp(Builder, RdxKind, TmpVec, Shuf);
-    }
-  };
-
-  Value *TmpVec = Src;
-  if (TargetTransformInfo::ReductionShuffle::Pairwise == RS) {
-    SmallVector<int, 32> ShuffleMask(VF);
-    for (unsigned stride = 1; stride < VF; stride <<= 1) {
-      // Initialise the mask with undef.
-      std::fill(ShuffleMask.begin(), ShuffleMask.end(), -1);
-      for (unsigned j = 0; j < VF; j += stride << 1) {
-        ShuffleMask[j] = j + stride;
-      }
-      BuildShuffledOp(ShuffleMask, TmpVec);
-    }
-  } else {
-    SmallVector<int, 32> ShuffleMask(VF);
-    for (unsigned i = VF; i != 1; i >>= 1) {
-      // Move the upper half of the vector to the lower half.
-      for (unsigned j = 0; j != i / 2; ++j)
-        ShuffleMask[j] = i / 2 + j;
-
-      // Fill the rest of the mask with undef.
-      std::fill(&ShuffleMask[i / 2], ShuffleMask.end(), -1);
-      BuildShuffledOp(ShuffleMask, TmpVec);
     }
   }
   // The result is in the first element of the vector.
@@ -1198,13 +1079,16 @@ Value *llvm::createAnyOfTargetReduction(IRBuilderBase &Builder, Value *Src,
     NewVal = SI->getTrueValue();
   }
 
+  // Create a splat vector with the new value and compare this to the vector
+  // we want to reduce.
+  ElementCount EC = cast<VectorType>(Src->getType())->getElementCount();
+  Value *Right = Builder.CreateVectorSplat(EC, InitVal);
+  Value *Cmp =
+      Builder.CreateCmp(CmpInst::ICMP_NE, Src, Right, "rdx.select.cmp");
+
   // If any predicate is true it means that we want to select the new value.
-  Value *AnyOf =
-      Src->getType()->isVectorTy() ? Builder.CreateOrReduce(Src) : Src;
-  // The compares in the loop may yield poison, which propagates through the
-  // bitwise ORs. Freeze it here before the condition is used.
-  AnyOf = Builder.CreateFreeze(AnyOf);
-  return Builder.CreateSelect(AnyOf, NewVal, InitVal, "rdx.select");
+  Cmp = Builder.CreateOrReduce(Cmp);
+  return Builder.CreateSelect(Cmp, NewVal, InitVal, "rdx.select");
 }
 
 Value *llvm::createSimpleTargetReduction(IRBuilderBase &Builder, Value *Src,
@@ -1248,20 +1132,6 @@ Value *llvm::createSimpleTargetReduction(IRBuilderBase &Builder, Value *Src,
   }
 }
 
-Value *llvm::createSimpleTargetReduction(VectorBuilder &VBuilder, Value *Src,
-                                         const RecurrenceDescriptor &Desc) {
-  RecurKind Kind = Desc.getRecurrenceKind();
-  assert(!RecurrenceDescriptor::isAnyOfRecurrenceKind(Kind) &&
-         "AnyOf reduction is not supported.");
-  Intrinsic::ID Id = getReductionIntrinsicID(Kind);
-  auto *SrcTy = cast<VectorType>(Src->getType());
-  Type *SrcEltTy = SrcTy->getElementType();
-  Value *Iden =
-      Desc.getRecurrenceIdentity(Kind, SrcEltTy, Desc.getFastMathFlags());
-  Value *Ops[] = {Iden, Src};
-  return VBuilder.createSimpleTargetReduction(Id, SrcTy, Ops);
-}
-
 Value *llvm::createTargetReduction(IRBuilderBase &B,
                                    const RecurrenceDescriptor &Desc, Value *Src,
                                    PHINode *OrigPhi) {
@@ -1288,21 +1158,6 @@ Value *llvm::createOrderedReduction(IRBuilderBase &B,
   assert(!Start->getType()->isVectorTy() && "Expected a scalar type");
 
   return B.CreateFAddReduce(Start, Src);
-}
-
-Value *llvm::createOrderedReduction(VectorBuilder &VBuilder,
-                                    const RecurrenceDescriptor &Desc,
-                                    Value *Src, Value *Start) {
-  assert((Desc.getRecurrenceKind() == RecurKind::FAdd ||
-          Desc.getRecurrenceKind() == RecurKind::FMulAdd) &&
-         "Unexpected reduction kind");
-  assert(Src->getType()->isVectorTy() && "Expected a vector type");
-  assert(!Start->getType()->isVectorTy() && "Expected a scalar type");
-
-  Intrinsic::ID Id = getReductionIntrinsicID(RecurKind::FAdd);
-  auto *SrcTy = cast<VectorType>(Src->getType());
-  Value *Ops[] = {Start, Src};
-  return VBuilder.createSimpleTargetReduction(Id, SrcTy, Ops);
 }
 
 void llvm::propagateIRFlags(Value *I, ArrayRef<Value *> VL, Value *OpValue,
@@ -1828,16 +1683,16 @@ static PointerBounds expandBounds(const RuntimeCheckingPtrGroup *CG,
     auto *HighAR = cast<SCEVAddRecExpr>(High);
     auto *LowAR = cast<SCEVAddRecExpr>(Low);
     const Loop *OuterLoop = TheLoop->getParentLoop();
-    ScalarEvolution &SE = *Exp.getSE();
-    const SCEV *Recur = LowAR->getStepRecurrence(SE);
-    if (Recur == HighAR->getStepRecurrence(SE) &&
+    const SCEV *Recur = LowAR->getStepRecurrence(*Exp.getSE());
+    if (Recur == HighAR->getStepRecurrence(*Exp.getSE()) &&
         HighAR->getLoop() == OuterLoop && LowAR->getLoop() == OuterLoop) {
       BasicBlock *OuterLoopLatch = OuterLoop->getLoopLatch();
-      const SCEV *OuterExitCount = SE.getExitCount(OuterLoop, OuterLoopLatch);
+      const SCEV *OuterExitCount =
+          Exp.getSE()->getExitCount(OuterLoop, OuterLoopLatch);
       if (!isa<SCEVCouldNotCompute>(OuterExitCount) &&
           OuterExitCount->getType()->isIntegerTy()) {
-        const SCEV *NewHigh =
-            cast<SCEVAddRecExpr>(High)->evaluateAtIteration(OuterExitCount, SE);
+        const SCEV *NewHigh = cast<SCEVAddRecExpr>(High)->evaluateAtIteration(
+            OuterExitCount, *Exp.getSE());
         if (!isa<SCEVCouldNotCompute>(NewHigh)) {
           LLVM_DEBUG(dbgs() << "LAA: Expanded RT check for range to include "
                                "outer loop in order to permit hoisting\n");
@@ -1845,8 +1700,7 @@ static PointerBounds expandBounds(const RuntimeCheckingPtrGroup *CG,
           Low = cast<SCEVAddRecExpr>(Low)->getStart();
           // If there is a possibility that the stride is negative then we have
           // to generate extra checks to ensure the stride is positive.
-          if (!SE.isKnownNonNegative(
-                  SE.applyLoopGuards(Recur, HighAR->getLoop()))) {
+          if (!Exp.getSE()->isKnownNonNegative(Recur)) {
             Stride = Recur;
             LLVM_DEBUG(dbgs() << "LAA: ... but need to check stride is "
                                  "positive: "
@@ -1902,12 +1756,13 @@ Value *llvm::addRuntimeChecks(
 
   LLVMContext &Ctx = Loc->getContext();
   IRBuilder<InstSimplifyFolder> ChkBuilder(Ctx,
-                                           Loc->getDataLayout());
+                                           Loc->getModule()->getDataLayout());
   ChkBuilder.SetInsertPoint(Loc);
   // Our instructions might fold to a constant.
   Value *MemoryRuntimeCheck = nullptr;
 
-  for (const auto &[A, B] : ExpandedChecks) {
+  for (const auto &Check : ExpandedChecks) {
+    const PointerBounds &A = Check.first, &B = Check.second;
     // Check if two pointers (A and B) conflict where conflict is computed as:
     // start(A) <= end(B) && start(B) <= end(A)
 
@@ -1956,7 +1811,7 @@ Value *llvm::addDiffRuntimeChecks(
 
   LLVMContext &Ctx = Loc->getContext();
   IRBuilder<InstSimplifyFolder> ChkBuilder(Ctx,
-                                           Loc->getDataLayout());
+                                           Loc->getModule()->getDataLayout());
   ChkBuilder.SetInsertPoint(Loc);
   // Our instructions might fold to a constant.
   Value *MemoryRuntimeCheck = nullptr;
@@ -1965,14 +1820,14 @@ Value *llvm::addDiffRuntimeChecks(
   // Map to keep track of created compares, The key is the pair of operands for
   // the compare, to allow detecting and re-using redundant compares.
   DenseMap<std::pair<Value *, Value *>, Value *> SeenCompares;
-  for (const auto &[SrcStart, SinkStart, AccessSize, NeedsFreeze] : Checks) {
-    Type *Ty = SinkStart->getType();
+  for (const auto &C : Checks) {
+    Type *Ty = C.SinkStart->getType();
     // Compute VF * IC * AccessSize.
     auto *VFTimesUFTimesSize =
         ChkBuilder.CreateMul(GetVF(ChkBuilder, Ty->getScalarSizeInBits()),
-                             ConstantInt::get(Ty, IC * AccessSize));
-    Value *Diff =
-        Expander.expandCodeFor(SE.getMinusSCEV(SinkStart, SrcStart), Ty, Loc);
+                             ConstantInt::get(Ty, IC * C.AccessSize));
+    Value *Diff = Expander.expandCodeFor(
+        SE.getMinusSCEV(C.SinkStart, C.SrcStart), Ty, Loc);
 
     // Check if the same compare has already been created earlier. In that case,
     // there is no need to check it again.
@@ -1983,7 +1838,7 @@ Value *llvm::addDiffRuntimeChecks(
     IsConflict =
         ChkBuilder.CreateICmpULT(Diff, VFTimesUFTimesSize, "diff.check");
     SeenCompares.insert({{Diff, VFTimesUFTimesSize}, IsConflict});
-    if (NeedsFreeze)
+    if (C.NeedsFreeze)
       IsConflict =
           ChkBuilder.CreateFreeze(IsConflict, IsConflict->getName() + ".fr");
     if (MemoryRuntimeCheck) {
@@ -2003,12 +1858,10 @@ llvm::hasPartialIVCondition(const Loop &L, unsigned MSSAThreshold,
   if (!TI || !TI->isConditional())
     return {};
 
-  auto *CondI = dyn_cast<Instruction>(TI->getCondition());
+  auto *CondI = dyn_cast<CmpInst>(TI->getCondition());
   // The case with the condition outside the loop should already be handled
   // earlier.
-  // Allow CmpInst and TruncInsts as they may be users of load instructions
-  // and have potential for partial unswitching
-  if (!CondI || !isa<CmpInst, TruncInst>(CondI) || !L.contains(CondI))
+  if (!CondI || !L.contains(CondI))
     return {};
 
   SmallVector<Instruction *> InstToDuplicate;

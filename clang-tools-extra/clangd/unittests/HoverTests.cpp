@@ -965,19 +965,6 @@ class Foo final {})cpp";
          // Bindings are in theory public members of an anonymous struct.
          HI.AccessSpecifier = "public";
        }},
-      {// Don't crash on invalid decl with invalid init expr.
-       R"cpp(
-          Unknown [[^abc]] = invalid;
-          // error-ok
-          )cpp",
-       [](HoverInfo &HI) {
-         HI.Name = "abc";
-         HI.Kind = index::SymbolKind::Variable;
-         HI.NamespaceScope = "";
-         HI.Definition = "int abc = <recovery - expr>()";
-         HI.Type = "int";
-         HI.AccessSpecifier = "public";
-       }},
       {// Extra info for function call.
        R"cpp(
           void fun(int arg_a, int &arg_b) {};
@@ -1996,14 +1983,10 @@ TEST(Hover, All) {
             HI.Kind = index::SymbolKind::Macro;
             HI.Definition =
                 R"cpp(#define MACRO                                                                  \
-  {                                                                            \
-    return 0;                                                                  \
-  }
+  { return 0; }
 
 // Expands to
-{
-  return 0;
-})cpp";
+{ return 0; })cpp";
           }},
       {
           R"cpp(// Forward class declaration
@@ -2284,7 +2267,7 @@ TEST(Hover, All) {
             namespace std
             {
               template<class _E>
-              class initializer_list { const _E *a, *b; };
+              class initializer_list {};
             }
             void foo() {
               ^[[auto]] i = {1,2};
@@ -3091,7 +3074,7 @@ TEST(Hover, All) {
             HI.NamespaceScope = "";
             HI.Definition =
                 "bool operator==(const Foo &) const noexcept = default";
-            HI.Documentation = "";
+            HI.Documentation = "Foo spaceship";
           }},
   };
 
@@ -3894,7 +3877,7 @@ TEST(Hover, SpaceshipTemplateNoCrash) {
   TU.ExtraArgs.push_back("-std=c++20");
   auto AST = TU.build();
   auto HI = getHover(AST, T.point(), format::getLLVMStyle(), nullptr);
-  EXPECT_EQ(HI->Documentation, "");
+  EXPECT_EQ(HI->Documentation, "Foo bar baz");
 }
 
 TEST(Hover, ForwardStructNoCrash) {

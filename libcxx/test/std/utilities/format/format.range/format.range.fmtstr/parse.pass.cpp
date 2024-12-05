@@ -7,6 +7,9 @@
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17, c++20
 
+// TODO FMT Investigate why this fails.
+// UNSUPPORTED: stdlib=apple-libc++ && target={{.+}}-apple-macosx{{10.9|10.10|10.11|10.12|10.13|10.14|10.15|11.0|12.0}}
+
 // <format>
 
 // template<ranges::input_range R, class charT>
@@ -23,9 +26,9 @@
 #include <cassert>
 #include <concepts>
 #include <format>
-#include <memory>
 
 #include "format.functions.tests.h"
+#include "test_format_context.h"
 #include "test_macros.h"
 
 template <class FormatterT, class StringViewT>
@@ -36,8 +39,7 @@ constexpr void test_parse(StringViewT fmt, std::size_t offset) {
   static_assert(std::semiregular<decltype(formatter)>);
 
   std::same_as<typename StringViewT::iterator> auto it = formatter.parse(parse_ctx);
-  // std::to_address works around LWG3989 and MSVC STL's iterator debugging mechanism.
-  assert(std::to_address(it) == std::to_address(fmt.end()) - offset);
+  assert(it == fmt.end() - offset);
 }
 
 template <class StringViewT>

@@ -28,7 +28,9 @@ define <vscale x 2 x i1> @isnan_nxv2f16_unmasked(<vscale x 2 x half> %x, i32 zer
 ; CHECK-NEXT:    vand.vx v8, v8, a0
 ; CHECK-NEXT:    vmsne.vi v0, v8, 0
 ; CHECK-NEXT:    ret
-  %1 = call <vscale x 2 x i1> @llvm.vp.is.fpclass.nxv2f16(<vscale x 2 x half> %x, i32 3, <vscale x 2 x i1> splat (i1 true), i32 %evl)  ; nan
+  %head = insertelement <vscale x 2 x i1> poison, i1 true, i32 0
+  %m = shufflevector <vscale x 2 x i1> %head, <vscale x 2 x i1> poison, <vscale x 2 x i32> zeroinitializer
+  %1 = call <vscale x 2 x i1> @llvm.vp.is.fpclass.nxv2f16(<vscale x 2 x half> %x, i32 3, <vscale x 2 x i1> %m, i32 %evl)  ; nan
   ret <vscale x 2 x i1> %1
 }
 
@@ -56,7 +58,9 @@ define <vscale x 2 x i1> @isnan_nxv2f32_unmasked(<vscale x 2 x float> %x, i32 ze
 ; CHECK-NEXT:    vand.vx v8, v8, a0
 ; CHECK-NEXT:    vmsne.vi v0, v8, 0
 ; CHECK-NEXT:    ret
-  %1 = call <vscale x 2 x i1> @llvm.vp.is.fpclass.nxv2f32(<vscale x 2 x float> %x, i32 639, <vscale x 2 x i1> splat (i1 true), i32 %evl)
+  %head = insertelement <vscale x 2 x i1> poison, i1 true, i32 0
+  %m = shufflevector <vscale x 2 x i1> %head, <vscale x 2 x i1> poison, <vscale x 2 x i32> zeroinitializer
+  %1 = call <vscale x 2 x i1> @llvm.vp.is.fpclass.nxv2f32(<vscale x 2 x float> %x, i32 639, <vscale x 2 x i1> %m, i32 %evl)
   ret <vscale x 2 x i1> %1
 }
 
@@ -84,7 +88,9 @@ define <vscale x 4 x i1> @isnan_nxv4f32_unmasked(<vscale x 4 x float> %x, i32 ze
 ; CHECK-NEXT:    vand.vx v8, v8, a0
 ; CHECK-NEXT:    vmsne.vi v0, v8, 0
 ; CHECK-NEXT:    ret
-  %1 = call <vscale x 4 x i1> @llvm.vp.is.fpclass.nxv4f32(<vscale x 4 x float> %x, i32 3, <vscale x 4 x i1> splat (i1 true), i32 %evl)  ; nan
+  %head = insertelement <vscale x 4 x i1> poison, i1 true, i32 0
+  %m = shufflevector <vscale x 4 x i1> %head, <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
+  %1 = call <vscale x 4 x i1> @llvm.vp.is.fpclass.nxv4f32(<vscale x 4 x float> %x, i32 3, <vscale x 4 x i1> %m, i32 %evl)  ; nan
   ret <vscale x 4 x i1> %1
 }
 
@@ -110,7 +116,9 @@ define <vscale x 8 x i1> @isnan_nxv8f32_unmasked(<vscale x 8 x float> %x, i32 ze
 ; CHECK-NEXT:    vsetvli a1, zero, e32, m4, ta, ma
 ; CHECK-NEXT:    vmseq.vx v0, v8, a0
 ; CHECK-NEXT:    ret
-  %1 = call <vscale x 8 x i1> @llvm.vp.is.fpclass.nxv8f32(<vscale x 8 x float> %x, i32 2, <vscale x 8 x i1> splat (i1 true), i32 %evl)
+  %head = insertelement <vscale x 8 x i1> poison, i1 true, i32 0
+  %m = shufflevector <vscale x 8 x i1> %head, <vscale x 8 x i1> poison, <vscale x 8 x i32> zeroinitializer
+  %1 = call <vscale x 8 x i1> @llvm.vp.is.fpclass.nxv8f32(<vscale x 8 x float> %x, i32 2, <vscale x 8 x i1> %m, i32 %evl)
   ret <vscale x 8 x i1> %1
 }
 
@@ -136,7 +144,9 @@ define <vscale x 16 x i1> @isnan_nxv16f32_unmasked(<vscale x 16 x float> %x, i32
 ; CHECK-NEXT:    vsetvli a1, zero, e32, m8, ta, ma
 ; CHECK-NEXT:    vmseq.vx v0, v8, a0
 ; CHECK-NEXT:    ret
-  %1 = call <vscale x 16 x i1> @llvm.vp.is.fpclass.nxv16f32(<vscale x 16 x float> %x, i32 1, <vscale x 16 x i1> splat (i1 true), i32 %evl)
+    %head = insertelement <vscale x 16 x i1> poison, i1 true, i32 0
+  %m = shufflevector <vscale x 16 x i1> %head, <vscale x 16 x i1> poison, <vscale x 16 x i32> zeroinitializer
+  %1 = call <vscale x 16 x i1> @llvm.vp.is.fpclass.nxv16f32(<vscale x 16 x float> %x, i32 1, <vscale x 16 x i1> %m, i32 %evl)
   ret <vscale x 16 x i1> %1
 }
 
@@ -164,7 +174,9 @@ define <vscale x 2 x i1> @isnormal_nxv2f64_unmasked(<vscale x 2 x double> %x, i3
 ; CHECK-NEXT:    vand.vx v8, v8, a0
 ; CHECK-NEXT:    vmsne.vi v0, v8, 0
 ; CHECK-NEXT:    ret
-  %1 = call <vscale x 2 x i1> @llvm.vp.is.fpclass.nxv2f64(<vscale x 2 x double> %x, i32 516, <vscale x 2 x i1> splat (i1 true), i32 %evl) ; 0x204 = "inf"
+  %head = insertelement <vscale x 2 x i1> poison, i1 true, i32 0
+  %m = shufflevector <vscale x 2 x i1> %head, <vscale x 2 x i1> poison, <vscale x 2 x i32> zeroinitializer
+  %1 = call <vscale x 2 x i1> @llvm.vp.is.fpclass.nxv2f64(<vscale x 2 x double> %x, i32 516, <vscale x 2 x i1> %m, i32 %evl) ; 0x204 = "inf"
   ret <vscale x 2 x i1> %1
 }
 
@@ -190,7 +202,9 @@ define <vscale x 4 x i1> @isposinf_nxv4f64_unmasked(<vscale x 4 x double> %x, i3
 ; CHECK-NEXT:    vsetvli a1, zero, e64, m4, ta, ma
 ; CHECK-NEXT:    vmseq.vx v0, v8, a0
 ; CHECK-NEXT:    ret
-  %1 = call <vscale x 4 x i1> @llvm.vp.is.fpclass.nxv4f64(<vscale x 4 x double> %x, i32 512, <vscale x 4 x i1> splat (i1 true), i32 %evl) ; 0x200 = "+inf"
+  %head = insertelement <vscale x 4 x i1> poison, i1 true, i32 0
+  %m = shufflevector <vscale x 4 x i1> %head, <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
+  %1 = call <vscale x 4 x i1> @llvm.vp.is.fpclass.nxv4f64(<vscale x 4 x double> %x, i32 512, <vscale x 4 x i1> %m, i32 %evl) ; 0x200 = "+inf"
   ret <vscale x 4 x i1> %1
 }
 
@@ -214,7 +228,9 @@ define <vscale x 8 x i1> @isneginf_nxv8f64_unmasked(<vscale x 8 x double> %x, i3
 ; CHECK-NEXT:    vsetvli a0, zero, e64, m8, ta, ma
 ; CHECK-NEXT:    vmseq.vi v0, v8, 1
 ; CHECK-NEXT:    ret
-  %1 = call <vscale x 8 x i1> @llvm.vp.is.fpclass.nxv8f64(<vscale x 8 x double> %x, i32 4, <vscale x 8 x i1> splat (i1 true), i32 %evl) ; "-inf"
+  %head = insertelement <vscale x 8 x i1> poison, i1 true, i32 0
+  %m = shufflevector <vscale x 8 x i1> %head, <vscale x 8 x i1> poison, <vscale x 8 x i32> zeroinitializer
+  %1 = call <vscale x 8 x i1> @llvm.vp.is.fpclass.nxv8f64(<vscale x 8 x double> %x, i32 4, <vscale x 8 x i1> %m, i32 %evl) ; "-inf"
   ret <vscale x 8 x i1> %1
 }
 

@@ -95,9 +95,7 @@ struct SPIRVInlinerInterface : public DialectInlinerInterface {
       OpBuilder(op).create<spirv::BranchOp>(op->getLoc(), newDest);
       op->erase();
     } else if (auto retValOp = dyn_cast<spirv::ReturnValueOp>(op)) {
-      OpBuilder(op).create<spirv::BranchOp>(retValOp->getLoc(), newDest,
-                                            retValOp->getOperands());
-      op->erase();
+      llvm_unreachable("unimplemented spirv.ReturnValue in inliner");
     }
   }
 
@@ -135,7 +133,7 @@ void SPIRVDialect::initialize() {
 
   // Allow unknown operations because SPIR-V is extensible.
   allowUnknownOperations();
-  declarePromisedInterface<gpu::TargetAttrInterface, TargetEnvAttr>();
+  declarePromisedInterface<TargetEnvAttr, gpu::TargetAttrInterface>();
 }
 
 std::string SPIRVDialect::getAttributeName(Decoration decoration) {

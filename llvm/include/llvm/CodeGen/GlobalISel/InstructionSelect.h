@@ -49,8 +49,8 @@ public:
         MachineFunctionProperties::Property::Selected);
   }
 
-  InstructionSelect(CodeGenOptLevel OL = CodeGenOptLevel::Default,
-                    char &PassID = ID);
+  InstructionSelect(CodeGenOptLevel OL);
+  InstructionSelect();
 
   bool runOnMachineFunction(MachineFunction &MF) override;
 

@@ -6,11 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_POSIX_SPAWNATTR_T_H
-#define LLVM_LIBC_TYPES_POSIX_SPAWNATTR_T_H
+#ifndef __LLVM_LIBC_TYPES_POSIX_SPAWNATTR_T_H
+#define __LLVM_LIBC_TYPES_POSIX_SPAWNATTR_T_H
 
 typedef struct {
   // This data structure will be populated as required.
 } posix_spawnattr_t;
 
-#endif // LLVM_LIBC_TYPES_POSIX_SPAWNATTR_T_H
+#endif // __LLVM_LIBC_TYPES_POSIX_SPAWNATTR_T_H

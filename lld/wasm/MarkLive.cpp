@@ -40,9 +40,7 @@ public:
 
 private:
   void enqueue(Symbol *sym);
-  void enqueue(InputChunk *chunk);
   void enqueueInitFunctions(const ObjFile *sym);
-  void enqueueRetainedSegments(const ObjFile *file);
   void mark();
   bool isCallCtorsLive();
 
@@ -58,30 +56,19 @@ void MarkLive::enqueue(Symbol *sym) {
   LLVM_DEBUG(dbgs() << "markLive: " << sym->getName() << "\n");
 
   InputFile *file = sym->getFile();
-  bool markImplicitDeps = file && !file->isLive() && sym->isDefined();
+  bool needInitFunctions = file && !file->isLive() && sym->isDefined();
 
   sym->markLive();
 
-  if (markImplicitDeps) {
-    if (auto obj = dyn_cast<ObjFile>(file)) {
-      // Mark as live the ctor functions in the object that defines this symbol.
-      // The ctor functions are all referenced by the synthetic callCtors
-      // function. However, this function does not contain relocations so we
-      // have to manually mark the ctors as live.
-      enqueueInitFunctions(obj);
-      // Mark retained segments in the object that defines this symbol live.
-      enqueueRetainedSegments(obj);
-    }
-  }
+  // Mark ctor functions in the object that defines this symbol live.
+  // The ctor functions are all referenced by the synthetic callCtors
+  // function. However, this function does not contain relocations so we
+  // have to manually mark the ctors as live.
+  if (needInitFunctions)
+    enqueueInitFunctions(cast<ObjFile>(file));
 
   if (InputChunk *chunk = sym->getChunk())
     queue.push_back(chunk);
-}
-
-void MarkLive::enqueue(InputChunk *chunk) {
-  LLVM_DEBUG(dbgs() << "markLive: " << toString(chunk) << "\n");
-  chunk->live = true;
-  queue.push_back(chunk);
 }
 
 // The ctor functions are all referenced by the synthetic callCtors
@@ -94,14 +81,6 @@ void MarkLive::enqueueInitFunctions(const ObjFile *obj) {
     if (!initSym->isDiscarded())
       enqueue(initSym);
   }
-}
-
-// Mark segments flagged by segment-level no-strip. Segment-level no-strip is
-// usually used to retain segments without having symbol table entry.
-void MarkLive::enqueueRetainedSegments(const ObjFile *file) {
-  for (InputChunk *chunk : file->segments)
-    if (chunk->isRetained())
-      enqueue(chunk);
 }
 
 void MarkLive::run() {
@@ -117,14 +96,10 @@ void MarkLive::run() {
   if (WasmSym::callDtors)
     enqueue(WasmSym::callDtors);
 
+  // Enqueue constructors in objects explicitly live from the command-line.
   for (const ObjFile *obj : ctx.objectFiles)
-    if (obj->isLive()) {
-      // Enqueue constructors in objects explicitly live from the command-line.
+    if (obj->isLive())
       enqueueInitFunctions(obj);
-      // Enqueue retained segments in objects explicitly live from the
-      // command-line.
-      enqueueRetainedSegments(obj);
-    }
 
   mark();
 

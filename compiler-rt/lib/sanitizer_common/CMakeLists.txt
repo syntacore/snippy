@@ -122,6 +122,9 @@ set(SANITIZER_IMPL_HEADERS
   sanitizer_asm.h
   sanitizer_atomic.h
   sanitizer_atomic_clang.h
+  sanitizer_atomic_clang_mips.h
+  sanitizer_atomic_clang_other.h
+  sanitizer_atomic_clang_x86.h
   sanitizer_atomic_msvc.h
   sanitizer_bitvector.h
   sanitizer_bvgraph.h
@@ -215,8 +218,6 @@ include_directories(..)
 set(SANITIZER_COMMON_DEFINITIONS
   HAVE_RPC_XDR_H=${HAVE_RPC_XDR_H})
 
-# note: L not I, this is nodefaultlibs for msvc
-append_list_if(MSVC /Zl SANITIZER_COMMON_CFLAGS)
 set(SANITIZER_CFLAGS ${SANITIZER_COMMON_CFLAGS})
 
 # Too many existing bugs, needs cleanup.

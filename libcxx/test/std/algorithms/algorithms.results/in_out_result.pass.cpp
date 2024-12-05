@@ -59,7 +59,6 @@ struct ConvertibleFrom {
 };
 
 constexpr bool test() {
-  // Checks that conversion operations are correct.
   {
     std::ranges::in_out_result<double, int> res{10, 1};
     assert(res.in == 10);
@@ -68,8 +67,6 @@ constexpr bool test() {
     assert(res2.in.content == 10);
     assert(res2.out.content == 1);
   }
-
-  // Checks that conversions are possible when one of the types is move-only.
   {
     std::ranges::in_out_result<MoveOnly, int> res{MoveOnly{}, 10};
     assert(res.in.get() == 1);
@@ -80,8 +77,6 @@ constexpr bool test() {
     assert(res2.in.get() == 1);
     assert(res2.out == 10);
   }
-
-  // Checks that structured bindings get the correct values.
   {
     auto [min, max] = std::ranges::in_out_result<int, int>{1, 2};
     assert(min == 1);

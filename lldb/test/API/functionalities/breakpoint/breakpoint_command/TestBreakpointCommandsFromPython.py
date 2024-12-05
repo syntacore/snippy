@@ -76,9 +76,7 @@ class PythonBreakpointCommandSettingTestCase(TestBase):
         )
         self.assertTrue(no_files_bkpt, VALID_BREAKPOINT)
         num_locations = no_files_bkpt.GetNumLocations()
-        self.assertGreaterEqual(
-            num_locations, 2, "Got at least two breakpoint locations"
-        )
+        self.assertTrue(num_locations >= 2, "Got at least two breakpoint locations")
         got_one_in_A = False
         got_one_in_B = False
         for idx in range(0, num_locations):
@@ -165,7 +163,7 @@ class PythonBreakpointCommandSettingTestCase(TestBase):
 
         # Now finish, and make sure the return value is correct.
         threads = lldbutil.get_threads_stopped_at_breakpoint(self.process, body_bkpt)
-        self.assertEqual(len(threads), 1, "Stopped at inner breakpoint.")
+        self.assertEquals(len(threads), 1, "Stopped at inner breakpoint.")
         self.thread = threads[0]
 
         print(
@@ -173,12 +171,12 @@ class PythonBreakpointCommandSettingTestCase(TestBase):
                 list_bkpt.GetNumLocations(), list_bkpt.GetHitCount()
             )
         )
-        self.assertEqual("callback was here", side_effect.callback)
-        self.assertEqual("function was here", side_effect.bktptcmd)
-        self.assertEqual("I am fancy", side_effect.fancy)
-        self.assertEqual("I am fancier", side_effect.fancier)
-        self.assertEqual("Not so fancy", side_effect.not_so_fancy)
-        self.assertEqual("I come from list input", side_effect.from_list)
+        self.assertEquals("callback was here", side_effect.callback)
+        self.assertEquals("function was here", side_effect.bktptcmd)
+        self.assertEquals("I am fancy", side_effect.fancy)
+        self.assertEquals("I am fancier", side_effect.fancier)
+        self.assertEquals("Not so fancy", side_effect.not_so_fancy)
+        self.assertEquals("I come from list input", side_effect.from_list)
 
     def do_bad_args_to_python_command(self):
         error = lldb.SBError()

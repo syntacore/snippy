@@ -40,12 +40,15 @@ namespace {
 ///   void f() { E e1 = EV1; }
 ///
 /// After:
-///   enum class E { V1, V2 };
-///   void f() { E e1 = E::V1; }
+///   enum class E { EV1, EV2 };
+///   void f() { E e1 = E::EV1; }
 ///
 /// Note that the respective project code might not compile anymore
 /// if it made use of the now-gone implicit conversion to int.
 /// This is out of scope for this tweak.
+///
+/// TODO: In the above example, we could detect that the values
+///       start with the enum name, and remove that prefix.
 
 class ScopifyEnum : public Tweak {
   const char *id() const final;
@@ -60,13 +63,14 @@ class ScopifyEnum : public Tweak {
       std::function<tooling::Replacement(StringRef, StringRef, unsigned)>;
   llvm::Error addClassKeywordToDeclarations();
   llvm::Error scopifyEnumValues();
-  llvm::Error scopifyEnumValue(const EnumConstantDecl &CD, StringRef EnumName,
-                               bool StripPrefix);
+  llvm::Error scopifyEnumValue(const EnumConstantDecl &CD, StringRef Prefix);
   llvm::Expected<StringRef> getContentForFile(StringRef FilePath);
+  unsigned getOffsetFromPosition(const Position &Pos, StringRef Content) const;
   llvm::Error addReplacementForReference(const ReferencesResult::Reference &Ref,
                                          const MakeReplacement &GetReplacement);
   llvm::Error addReplacement(StringRef FilePath, StringRef Content,
                              const tooling::Replacement &Replacement);
+  Position getPosition(const Decl &D) const;
 
   const EnumDecl *D = nullptr;
   const Selection *S = nullptr;
@@ -105,8 +109,7 @@ Expected<Tweak::Effect> ScopifyEnum::apply(const Selection &Inputs) {
 
 llvm::Error ScopifyEnum::addClassKeywordToDeclarations() {
   for (const auto &Ref :
-       findReferences(*S->AST, sourceLocToPosition(*SM, D->getBeginLoc()), 0,
-                      S->Index, false)
+       findReferences(*S->AST, getPosition(*D), 0, S->Index, false)
            .References) {
     if (!(Ref.Attributes & ReferencesResult::Declaration))
       continue;
@@ -122,46 +125,25 @@ llvm::Error ScopifyEnum::addClassKeywordToDeclarations() {
 }
 
 llvm::Error ScopifyEnum::scopifyEnumValues() {
-  StringRef EnumName(D->getName());
-  bool StripPrefix = true;
-  for (const EnumConstantDecl *E : D->enumerators()) {
-    if (!E->getName().starts_with(EnumName)) {
-      StripPrefix = false;
-      break;
-    }
-  }
-  for (const EnumConstantDecl *E : D->enumerators()) {
-    if (auto Err = scopifyEnumValue(*E, EnumName, StripPrefix))
+  std::string PrefixToInsert(D->getName());
+  PrefixToInsert += "::";
+  for (auto E : D->enumerators()) {
+    if (auto Err = scopifyEnumValue(*E, PrefixToInsert))
       return Err;
   }
   return llvm::Error::success();
 }
 
 llvm::Error ScopifyEnum::scopifyEnumValue(const EnumConstantDecl &CD,
-                                          StringRef EnumName,
-                                          bool StripPrefix) {
+                                          StringRef Prefix) {
   for (const auto &Ref :
-       findReferences(*S->AST, sourceLocToPosition(*SM, CD.getBeginLoc()), 0,
-                      S->Index, false)
+       findReferences(*S->AST, getPosition(CD), 0, S->Index, false)
            .References) {
-    if (Ref.Attributes & ReferencesResult::Declaration) {
-      if (StripPrefix) {
-        const auto MakeReplacement = [&EnumName](StringRef FilePath,
-                                                 StringRef Content,
-                                                 unsigned Offset) {
-          unsigned Length = EnumName.size();
-          if (Content[Offset + Length] == '_')
-            ++Length;
-          return tooling::Replacement(FilePath, Offset, Length, {});
-        };
-        if (auto Err = addReplacementForReference(Ref, MakeReplacement))
-          return Err;
-      }
+    if (Ref.Attributes & ReferencesResult::Declaration)
       continue;
-    }
 
-    const auto MakeReplacement = [&](StringRef FilePath, StringRef Content,
-                                     unsigned Offset) {
+    const auto MakeReplacement = [&Prefix](StringRef FilePath,
+                                           StringRef Content, unsigned Offset) {
       const auto IsAlreadyScoped = [Content, Offset] {
         if (Offset < 2)
           return false;
@@ -182,18 +164,9 @@ llvm::Error ScopifyEnum::scopifyEnumValue(const EnumConstantDecl &CD,
         }
         return false;
       };
-      if (StripPrefix) {
-        const int ExtraLength =
-            Content[Offset + EnumName.size()] == '_' ? 1 : 0;
-        if (IsAlreadyScoped())
-          return tooling::Replacement(FilePath, Offset,
-                                      EnumName.size() + ExtraLength, {});
-        return tooling::Replacement(FilePath, Offset + EnumName.size(),
-                                    ExtraLength, "::");
-      }
-      return IsAlreadyScoped() ? tooling::Replacement()
-                               : tooling::Replacement(FilePath, Offset, 0,
-                                                      EnumName.str() + "::");
+      return IsAlreadyScoped()
+                 ? tooling::Replacement()
+                 : tooling::Replacement(FilePath, Offset, 0, Prefix);
     };
     if (auto Err = addReplacementForReference(Ref, MakeReplacement))
       return Err;
@@ -214,19 +187,27 @@ llvm::Expected<StringRef> ScopifyEnum::getContentForFile(StringRef FilePath) {
   return Content;
 }
 
+unsigned int ScopifyEnum::getOffsetFromPosition(const Position &Pos,
+                                                StringRef Content) const {
+  unsigned int Offset = 0;
+
+  for (std::size_t LinesRemaining = Pos.line;
+       Offset < Content.size() && LinesRemaining;) {
+    if (Content[Offset++] == '\n')
+      --LinesRemaining;
+  }
+  return Offset + Pos.character;
+}
+
 llvm::Error
 ScopifyEnum::addReplacementForReference(const ReferencesResult::Reference &Ref,
                                         const MakeReplacement &GetReplacement) {
   StringRef FilePath = Ref.Loc.uri.file();
-  llvm::Expected<StringRef> Content = getContentForFile(FilePath);
+  auto Content = getContentForFile(FilePath);
   if (!Content)
     return Content.takeError();
-  llvm::Expected<size_t> Offset =
-      positionToOffset(*Content, Ref.Loc.range.start);
-  if (!Offset)
-    return Offset.takeError();
-  tooling::Replacement Replacement =
-      GetReplacement(FilePath, *Content, *Offset);
+  unsigned Offset = getOffsetFromPosition(Ref.Loc.range.start, *Content);
+  tooling::Replacement Replacement = GetReplacement(FilePath, *Content, Offset);
   if (Replacement.isApplicable())
     return addReplacement(FilePath, *Content, Replacement);
   return llvm::Error::success();
@@ -240,6 +221,14 @@ ScopifyEnum::addReplacement(StringRef FilePath, StringRef Content,
   if (auto Err = TheEdit.Replacements.add(Replacement))
     return Err;
   return llvm::Error::success();
+}
+
+Position ScopifyEnum::getPosition(const Decl &D) const {
+  const SourceLocation Loc = D.getLocation();
+  Position Pos;
+  Pos.line = SM->getSpellingLineNumber(Loc) - 1;
+  Pos.character = SM->getSpellingColumnNumber(Loc) - 1;
+  return Pos;
 }
 
 } // namespace

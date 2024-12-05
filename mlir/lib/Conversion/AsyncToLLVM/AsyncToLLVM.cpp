@@ -259,7 +259,7 @@ static void addResumeFunction(ModuleOp module) {
       kResume, LLVM::LLVMFunctionType::get(voidTy, {ptrType}));
   resumeOp.setPrivate();
 
-  auto *block = resumeOp.addEntryBlock(moduleBuilder);
+  auto *block = resumeOp.addEntryBlock();
   auto blockBuilder = ImplicitLocOpBuilder::atBlockEnd(loc, block);
 
   blockBuilder.create<LLVM::CoroResumeOp>(resumeOp.getArgument(0));

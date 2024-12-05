@@ -18,7 +18,6 @@
 
 #include "bolt/Core/MCPlusBuilder.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/ThreadPool.h"
 
 using namespace llvm;
 
@@ -29,6 +28,8 @@ extern cl::opt<unsigned> TaskCount;
 } // namespace opts
 
 namespace llvm {
+class ThreadPool;
+
 namespace bolt {
 class BinaryContext;
 class BinaryFunction;
@@ -49,8 +50,8 @@ enum SchedulingPolicy {
   SP_BB_QUADRATIC,   /// cost is estimated by the square of the BB count
 };
 
-/// Return the managed thread pool and initialize it if not initialized.
-ThreadPoolInterface &getThreadPool();
+/// Return the managed thread pool and initialize it if not initiliazed.
+ThreadPool &getThreadPool();
 
 /// Perform the work on each BinaryFunction except those that are accepted
 /// by SkipPredicate, scheduling heuristic is based on SchedPolicy.

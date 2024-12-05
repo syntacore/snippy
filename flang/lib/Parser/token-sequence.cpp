@@ -6,8 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "flang/Parser/token-sequence.h"
-
+#include "token-sequence.h"
 #include "prescan.h"
 #include "flang/Parser/characters.h"
 #include "flang/Parser/message.h"
@@ -137,10 +136,7 @@ void TokenSequence::Put(
 }
 
 void TokenSequence::Put(const CharBlock &t, Provenance provenance) {
-  // Avoid t[0] if t is empty: it would create a reference to nullptr,
-  // which is UB.
-  const char *addr{t.size() ? &t[0] : nullptr};
-  Put(addr, t.size(), provenance);
+  Put(&t[0], t.size(), provenance);
 }
 
 void TokenSequence::Put(const std::string &s, Provenance provenance) {
@@ -266,7 +262,7 @@ TokenSequence &TokenSequence::ClipComment(
     if (std::size_t blanks{tok.CountLeadingBlanks()};
         blanks < tok.size() && tok[blanks] == '!') {
       // Retain active compiler directive sentinels (e.g. "!dir$")
-      for (std::size_t k{j + 1}; k < tokens && tok.size() <= blanks + 5; ++k) {
+      for (std::size_t k{j + 1}; k < tokens && tok.size() < blanks + 5; ++k) {
         if (tok.begin() + tok.size() == TokenAt(k).begin()) {
           tok.ExtendToCover(TokenAt(k));
         } else {
@@ -274,9 +270,12 @@ TokenSequence &TokenSequence::ClipComment(
         }
       }
       bool isSentinel{false};
-      if (tok.size() > blanks + 5) {
-        isSentinel = prescanner.IsCompilerDirectiveSentinel(&tok[blanks + 1])
-                         .has_value();
+      if (tok.size() == blanks + 5) {
+        char sentinel[4];
+        for (int k{0}; k < 4; ++k) {
+          sentinel[k] = ToLowerCaseLetter(tok[blanks + k + 1]);
+        }
+        isSentinel = prescanner.IsCompilerDirectiveSentinel(sentinel, 4);
       }
       if (isSentinel) {
       } else if (skipFirst) {
@@ -344,8 +343,7 @@ ProvenanceRange TokenSequence::GetProvenanceRange() const {
 }
 
 const TokenSequence &TokenSequence::CheckBadFortranCharacters(
-    Messages &messages, const Prescanner &prescanner,
-    bool allowAmpersand) const {
+    Messages &messages, const Prescanner &prescanner) const {
   std::size_t tokens{SizeInTokens()};
   for (std::size_t j{0}; j < tokens; ++j) {
     CharBlock token{TokenAt(j)};
@@ -360,8 +358,6 @@ const TokenSequence &TokenSequence::CheckBadFortranCharacters(
           ++j;
           continue;
         }
-      } else if (ch == '&' && allowAmpersand) {
-        continue;
       }
       if (ch < ' ' || ch >= '\x7f') {
         messages.Say(GetTokenProvenanceRange(j),
@@ -375,7 +371,9 @@ const TokenSequence &TokenSequence::CheckBadFortranCharacters(
   return *this;
 }
 
-bool TokenSequence::BadlyNestedParentheses() const {
+const TokenSequence &TokenSequence::CheckBadParentheses(
+    Messages &messages) const {
+  // First, a quick pass with no allocation for the common case
   int nesting{0};
   std::size_t tokens{SizeInTokens()};
   for (std::size_t j{0}; j < tokens; ++j) {
@@ -389,14 +387,8 @@ bool TokenSequence::BadlyNestedParentheses() const {
       }
     }
   }
-  return nesting != 0;
-}
-
-const TokenSequence &TokenSequence::CheckBadParentheses(
-    Messages &messages) const {
-  if (BadlyNestedParentheses()) {
+  if (nesting != 0) {
     // There's an error; diagnose it
-    std::size_t tokens{SizeInTokens()};
     std::vector<std::size_t> stack;
     for (std::size_t j{0}; j < tokens; ++j) {
       CharBlock token{TokenAt(j)};

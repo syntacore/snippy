@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES___CALL_ONCE_FUNC_T_H
-#define LLVM_LIBC_TYPES___CALL_ONCE_FUNC_T_H
+#ifndef __LLVM_LIBC_TYPES_CALL_ONCE_FUNC_T_H__
+#define __LLVM_LIBC_TYPES_CALL_ONCE_FUNC_T_H__
 
 typedef void (*__call_once_func_t)(void);
 
-#endif // LLVM_LIBC_TYPES___CALL_ONCE_FUNC_T_H
+#endif // __LLVM_LIBC_TYPES_CALL_ONCE_FUNC_T_H__

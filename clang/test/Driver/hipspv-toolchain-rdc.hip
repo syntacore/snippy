@@ -1,7 +1,8 @@
+// REQUIRES: x86-registered-target
 // UNSUPPORTED: system-windows
 
 // RUN: %clang -### -x hip -target x86_64-linux-gnu --offload=spirv64 \
-// RUN:   --no-offload-new-driver -fgpu-rdc --hip-path=%S/Inputs/hipspv -nohipwrapperinc \
+// RUN:   -fgpu-rdc --hip-path=%S/Inputs/hipspv -nohipwrapperinc \
 // RUN:   %S/Inputs/hip_multiple_inputs/a.cu \
 // RUN:   %S/Inputs/hip_multiple_inputs/b.hip \
 // RUN: 2>&1 | FileCheck %s

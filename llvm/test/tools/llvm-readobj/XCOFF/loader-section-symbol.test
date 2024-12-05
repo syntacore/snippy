@@ -6,18 +6,10 @@
 
 # RUN: llvm-readobj --loader-section-symbols %t_xcoff32.o |\
 # RUN:   FileCheck %s --check-prefixes=CHECK32
-# RUN: llvm-readobj --loader-section-symbols --no-demangle %t_xcoff32.o |\
-# RUN:   FileCheck %s --check-prefixes=CHECK32
-# RUN: llvm-readobj --loader-section-symbols --demangle %t_xcoff32.o |\
-# RUN:   FileCheck %s --check-prefixes=CHECK32
 # RUN: llvm-readobj --loader-section-symbols %t_xcoff32_invalid.o 2>&1 |\
 # RUN:   FileCheck -DFILE=%t_xcoff32_invalid.o %s --check-prefixes=CHECK32,WARN
 # RUN: llvm-readobj --loader-section-symbols %t_xcoff64.o |\
-# RUN:   FileCheck %s --check-prefixes=CHECK64,NODEMAN64
-# RUN: llvm-readobj --loader-section-symbols --no-demangle %t_xcoff64.o |\
-# RUN:   FileCheck %s --check-prefixes=CHECK64,NODEMAN64
-# RUN: llvm-readobj --loader-section-symbols --demangle %t_xcoff64.o |\
-# RUN:   FileCheck %s --check-prefixes=CHECK64,DEMAN64
+# RUN:   FileCheck %s --check-prefixes=CHECK64
 
 --- !XCOFF
 FileHeader:
@@ -120,8 +112,7 @@ Sections:
 # CHECK64-NEXT:         ParameterTypeCheck: 0
 # CHECK64-NEXT:       }
 # CHECK64-NEXT:       Symbol {
-# NODEMAN64-NEXT:       Name: _Z5func0v
-# DEMAN64-NEXT:         Name: func0()
+# CHECK64-NEXT:         Name: _Z5func0v
 # CHECK64-NEXT:         Virtual Address: 0x110000308
 # CHECK64-NEXT:         SectionNum: 2
 # CHECK64-NEXT:         SymbolType: 0x11

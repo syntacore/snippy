@@ -31,7 +31,7 @@ public:
   const char *getName() const override { return "fix-relaxations"; }
 
   /// Pass entry point
-  Error runOnFunctions(BinaryContext &BC) override;
+  void runOnFunctions(BinaryContext &BC) override;
 };
 
 } // namespace bolt

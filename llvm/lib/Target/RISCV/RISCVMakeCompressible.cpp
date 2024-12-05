@@ -99,13 +99,6 @@ static unsigned log2LdstWidth(unsigned Opcode) {
   switch (Opcode) {
   default:
     llvm_unreachable("Unexpected opcode");
-  case RISCV::LBU:
-  case RISCV::SB:
-    return 0;
-  case RISCV::LH:
-  case RISCV::LHU:
-  case RISCV::SH:
-    return 1;
   case RISCV::LW:
   case RISCV::SW:
   case RISCV::FLW:
@@ -119,47 +112,17 @@ static unsigned log2LdstWidth(unsigned Opcode) {
   }
 }
 
-// Return bit field size of immediate operand of Opcode.
-static unsigned offsetMask(unsigned Opcode) {
-  switch (Opcode) {
-  default:
-    llvm_unreachable("Unexpected opcode");
-  case RISCV::LBU:
-  case RISCV::SB:
-    return maskTrailingOnes<unsigned>(2U);
-  case RISCV::LH:
-  case RISCV::LHU:
-  case RISCV::SH:
-    return maskTrailingOnes<unsigned>(1U);
-  case RISCV::LW:
-  case RISCV::SW:
-  case RISCV::FLW:
-  case RISCV::FSW:
-  case RISCV::LD:
-  case RISCV::SD:
-  case RISCV::FLD:
-  case RISCV::FSD:
-    return maskTrailingOnes<unsigned>(5U);
-  }
-}
-
 // Return a mask for the offset bits of a non-stack-pointer based compressed
 // load/store.
 static uint8_t compressedLDSTOffsetMask(unsigned Opcode) {
-  return offsetMask(Opcode) << log2LdstWidth(Opcode);
+  return 0x1f << log2LdstWidth(Opcode);
 }
 
 // Return true if Offset fits within a compressed stack-pointer based
 // load/store.
 static bool compressibleSPOffset(int64_t Offset, unsigned Opcode) {
-  // Compressed sp-based loads and stores only work for 32/64 bits.
-  switch (log2LdstWidth(Opcode)) {
-  case 2:
-    return isShiftedUInt<6, 2>(Offset);
-  case 3:
-    return isShiftedUInt<6, 3>(Offset);
-  }
-  return false;
+  return log2LdstWidth(Opcode) == 2 ? isShiftedUInt<6, 2>(Offset)
+                                    : isShiftedUInt<6, 3>(Offset);
 }
 
 // Given an offset for a load/store, return the adjustment required to the base
@@ -180,42 +143,19 @@ static bool isCompressedReg(Register Reg) {
 // Return true if MI is a load for which there exists a compressed version.
 static bool isCompressibleLoad(const MachineInstr &MI) {
   const RISCVSubtarget &STI = MI.getMF()->getSubtarget<RISCVSubtarget>();
+  const unsigned Opcode = MI.getOpcode();
 
-  switch (MI.getOpcode()) {
-  default:
-    return false;
-  case RISCV::LBU:
-  case RISCV::LH:
-  case RISCV::LHU:
-    return STI.hasStdExtZcb();
-  case RISCV::LW:
-  case RISCV::LD:
-    return STI.hasStdExtCOrZca();
-  case RISCV::FLW:
-    return !STI.is64Bit() && STI.hasStdExtCOrZcfOrZce();
-  case RISCV::FLD:
-    return STI.hasStdExtCOrZcd();
-  }
+  return Opcode == RISCV::LW || (!STI.is64Bit() && Opcode == RISCV::FLW) ||
+         Opcode == RISCV::LD || Opcode == RISCV::FLD;
 }
 
 // Return true if MI is a store for which there exists a compressed version.
 static bool isCompressibleStore(const MachineInstr &MI) {
   const RISCVSubtarget &STI = MI.getMF()->getSubtarget<RISCVSubtarget>();
+  const unsigned Opcode = MI.getOpcode();
 
-  switch (MI.getOpcode()) {
-  default:
-    return false;
-  case RISCV::SB:
-  case RISCV::SH:
-    return STI.hasStdExtZcb();
-  case RISCV::SW:
-  case RISCV::SD:
-    return STI.hasStdExtCOrZca();
-  case RISCV::FSW:
-    return !STI.is64Bit() && STI.hasStdExtCOrZcfOrZce();
-  case RISCV::FSD:
-    return STI.hasStdExtCOrZcd();
-  }
+  return Opcode == RISCV::SW || (!STI.is64Bit() && Opcode == RISCV::FSW) ||
+         Opcode == RISCV::SD || Opcode == RISCV::FSD;
 }
 
 // Find a single register and/or large offset which, if compressible, would
@@ -384,7 +324,8 @@ bool RISCVMakeCompressibleOpt::runOnMachineFunction(MachineFunction &Fn) {
   const RISCVInstrInfo &TII = *STI.getInstrInfo();
 
   // This optimization only makes sense if compressed instructions are emitted.
-  if (!STI.hasStdExtCOrZca())
+  // FIXME: Support Zca, Zcf, Zcd granularity.
+  if (!STI.hasStdExtC())
     return false;
 
   for (MachineBasicBlock &MBB : Fn) {

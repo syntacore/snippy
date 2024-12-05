@@ -26,7 +26,8 @@ namespace parallel {
 class DWARFLinkerImpl : public DWARFLinker {
 public:
   DWARFLinkerImpl(MessageHandlerTy ErrorHandler,
-                  MessageHandlerTy WarningHandler);
+                  MessageHandlerTy WarningHandler,
+                  TranslatorFuncTy StringsTranslator);
 
   /// Add object file to be linked. Pre-load compile unit die. Call
   /// \p OnCUDieLoaded for each compile unit die. If specified \p File
@@ -350,9 +351,6 @@ protected:
   /// \defgroup Data members accessed sequentially.
   ///
   /// @{
-  /// Data global for the whole linking process.
-  LinkingGlobalData GlobalData;
-
   /// DwarfStringPoolEntries for .debug_str section.
   StringEntryToDwarfStringPoolEntryMap DebugStrStrings;
 
@@ -370,6 +368,9 @@ protected:
 
   /// Overall compile units number.
   uint64_t OverallNumberOfCU = 0;
+
+  /// Data global for the whole linking process.
+  LinkingGlobalData GlobalData;
   /// @}
 };
 

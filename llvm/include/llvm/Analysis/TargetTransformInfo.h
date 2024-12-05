@@ -21,7 +21,6 @@
 #ifndef LLVM_ANALYSIS_TARGETTRANSFORMINFO_H
 #define LLVM_ANALYSIS_TARGETTRANSFORMINFO_H
 
-#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/IR/FMF.h"
 #include "llvm/IR/InstrTypes.h"
@@ -191,10 +190,7 @@ enum class TailFoldingStyle {
   /// Use predicate to control both data and control flow, but modify
   /// the trip count so that a runtime overflow check can be avoided
   /// and such that the scalar epilogue loop can always be removed.
-  DataAndControlFlowWithoutRuntimeCheck,
-  /// Use predicated EVL instructions for tail-folding.
-  /// Indicates that VP intrinsics should be used.
-  DataWithEVL,
+  DataAndControlFlowWithoutRuntimeCheck
 };
 
 struct TailFoldingInfo {
@@ -418,12 +414,6 @@ public:
   /// If a branch or a select condition is skewed in one direction by more than
   /// this factor, it is very likely to be predicted correctly.
   BranchProbability getPredictableBranchThreshold() const;
-
-  /// Returns estimated penalty of a branch misprediction in latency. Indicates
-  /// how aggressive the target wants for eliminating unpredictable branches. A
-  /// zero return value means extra optimization applied to them should be
-  /// minimal.
-  InstructionCost getBranchMispredictPenalty() const;
 
   /// Return true if branch divergence exists.
   ///
@@ -706,12 +696,6 @@ public:
   /// immediate without having to materialize the immediate into a register.
   bool isLegalAddImmediate(int64_t Imm) const;
 
-  /// Return true if adding the specified scalable immediate is legal, that is
-  /// the target has add instructions which can add a register with the
-  /// immediate (multiplied by vscale) without having to materialize the
-  /// immediate into a register.
-  bool isLegalAddScalableImmediate(int64_t Imm) const;
-
   /// Return true if the specified immediate is legal icmp immediate,
   /// that is the target has icmp instructions which can compare a register
   /// against the immediate without having to materialize the immediate into a
@@ -723,15 +707,11 @@ public:
   /// The type may be VoidTy, in which case only return true if the addressing
   /// mode is legal for a load/store of any legal type.
   /// If target returns true in LSRWithInstrQueries(), I may be valid.
-  /// \param ScalableOffset represents a quantity of bytes multiplied by vscale,
-  /// an invariant value known only at runtime. Most targets should not accept
-  /// a scalable offset.
-  ///
   /// TODO: Handle pre/postinc as well.
   bool isLegalAddressingMode(Type *Ty, GlobalValue *BaseGV, int64_t BaseOffset,
                              bool HasBaseReg, int64_t Scale,
-                             unsigned AddrSpace = 0, Instruction *I = nullptr,
-                             int64_t ScalableOffset = 0) const;
+                             unsigned AddrSpace = 0,
+                             Instruction *I = nullptr) const;
 
   /// Return true if LSR cost of C1 is lower than C2.
   bool isLSRCostLess(const TargetTransformInfo::LSRCost &C1,
@@ -746,10 +726,6 @@ public:
   /// primary IV in the latch condition with another IV available in the loop.
   /// When successful, makes the primary IV dead.
   bool shouldFoldTerminatingConditionAfterLSR() const;
-
-  /// Return true if LSR should drop a found solution if it's calculated to be
-  /// less profitable than the baseline.
-  bool shouldDropLSRSolutionIfLessProfitable() const;
 
   /// \returns true if LSR should not optimize a chain that includes \p I.
   bool isProfitableLSRChainElement(Instruction *I) const;
@@ -801,15 +777,9 @@ public:
   bool forceScalarizeMaskedScatter(VectorType *Type, Align Alignment) const;
 
   /// Return true if the target supports masked compress store.
-  bool isLegalMaskedCompressStore(Type *DataType, Align Alignment) const;
+  bool isLegalMaskedCompressStore(Type *DataType) const;
   /// Return true if the target supports masked expand load.
-  bool isLegalMaskedExpandLoad(Type *DataType, Align Alignment) const;
-
-  /// Return true if the target supports strided load.
-  bool isLegalStridedLoadStore(Type *DataType, Align Alignment) const;
-
-  // Return true if the target supports masked vector histograms.
-  bool isLegalMaskedVectorHistogram(Type *AddrType, Type *DataType) const;
+  bool isLegalMaskedExpandLoad(Type *DataType) const;
 
   /// Return true if this is an alternating opcode pattern that can be lowered
   /// to a single instruction on the target. In X86 this is for the addsub
@@ -848,7 +818,7 @@ public:
   /// If the AM is not supported, it returns a negative value.
   /// TODO: Handle pre/postinc as well.
   InstructionCost getScalingFactorCost(Type *Ty, GlobalValue *BaseGV,
-                                       StackOffset BaseOffset, bool HasBaseReg,
+                                       int64_t BaseOffset, bool HasBaseReg,
                                        int64_t Scale,
                                        unsigned AddrSpace = 0) const;
 
@@ -1120,10 +1090,6 @@ public:
   /// \return the number of registers in the target-provided register class.
   unsigned getNumberOfRegisters(unsigned ClassID) const;
 
-  /// \return true if the target supports load/store that enables fault
-  /// suppression of memory operands when the source condition is false.
-  bool hasConditionalLoadStoreForType(Type *Ty = nullptr) const;
-
   /// \return the target-provided register class ID for the provided type,
   /// accounting for type promotion and other type-legalization techniques that
   /// the target might apply. However, it specifically does not account for the
@@ -1278,16 +1244,13 @@ public:
   /// cases or optimizations based on those values.
   /// \p CxtI is the optional original context instruction, if one exists, to
   /// provide even more information.
-  /// \p TLibInfo is used to search for platform specific vector library
-  /// functions for instructions that might be converted to calls (e.g. frem).
   InstructionCost getArithmeticInstrCost(
       unsigned Opcode, Type *Ty,
       TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput,
       TTI::OperandValueInfo Opd1Info = {TTI::OK_AnyValue, TTI::OP_None},
       TTI::OperandValueInfo Opd2Info = {TTI::OK_AnyValue, TTI::OP_None},
-      ArrayRef<const Value *> Args = std::nullopt,
-      const Instruction *CxtI = nullptr,
-      const TargetLibraryInfo *TLibInfo = nullptr) const;
+      ArrayRef<const Value *> Args = ArrayRef<const Value *>(),
+      const Instruction *CxtI = nullptr) const;
 
   /// Returns the cost estimation for alternating opcode pattern that can be
   /// lowered to a single instruction on the target. In X86 this is for the
@@ -1309,11 +1272,12 @@ public:
   /// passed through \p Args, which helps improve the cost estimation in some
   /// cases, like in broadcast loads.
   /// NOTE: For subvector extractions Tp represents the source type.
-  InstructionCost getShuffleCost(
-      ShuffleKind Kind, VectorType *Tp, ArrayRef<int> Mask = std::nullopt,
-      TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput, int Index = 0,
-      VectorType *SubTp = nullptr, ArrayRef<const Value *> Args = std::nullopt,
-      const Instruction *CxtI = nullptr) const;
+  InstructionCost
+  getShuffleCost(ShuffleKind Kind, VectorType *Tp,
+                 ArrayRef<int> Mask = std::nullopt,
+                 TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput,
+                 int Index = 0, VectorType *SubTp = nullptr,
+                 ArrayRef<const Value *> Args = std::nullopt) const;
 
   /// Represents a hint about the context in which a cast is used.
   ///
@@ -1412,7 +1376,7 @@ public:
   InstructionCost getReplicationShuffleCost(Type *EltTy, int ReplicationFactor,
                                             int VF,
                                             const APInt &DemandedDstElts,
-                                            TTI::TargetCostKind CostKind) const;
+                                            TTI::TargetCostKind CostKind);
 
   /// \return The cost of Load and Store instructions.
   InstructionCost
@@ -1444,20 +1408,6 @@ public:
   /// \p I - the optional original context instruction, if one exists, e.g. the
   ///        load/store to transform or the call to the gather/scatter intrinsic
   InstructionCost getGatherScatterOpCost(
-      unsigned Opcode, Type *DataTy, const Value *Ptr, bool VariableMask,
-      Align Alignment, TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput,
-      const Instruction *I = nullptr) const;
-
-  /// \return The cost of strided memory operations.
-  /// \p Opcode - is a type of memory access Load or Store
-  /// \p DataTy - a vector type of the data to be loaded or stored
-  /// \p Ptr - pointer [or vector of pointers] - address[es] in memory
-  /// \p VariableMask - true when the memory access is predicated with a mask
-  ///                   that is not a compile-time constant
-  /// \p Alignment - alignment of single element
-  /// \p I - the optional original context instruction, if one exists, e.g. the
-  ///        load/store to transform or the call to the gather/scatter intrinsic
-  InstructionCost getStridedMemoryOpCost(
       unsigned Opcode, Type *DataTy, const Value *Ptr, bool VariableMask,
       Align Alignment, TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput,
       const Instruction *I = nullptr) const;
@@ -1685,11 +1635,6 @@ public:
         false; ///< If op is an fp min/max, whether NaNs may be present.
   };
 
-  /// \returns True if the targets prefers fixed width vectorization if the
-  /// loop vectorizer's cost-model assigns an equal cost to the fixed and
-  /// scalable version of the vectorized loop.
-  bool preferFixedOverScalableIfEqualCost() const;
-
   /// \returns True if the target prefers reductions in loop.
   bool preferInLoopReduction(unsigned Opcode, Type *Ty,
                              ReductionFlags Flags) const;
@@ -1715,13 +1660,6 @@ public:
   /// \returns True if the target wants to expand the given reduction intrinsic
   /// into a shuffle sequence.
   bool shouldExpandReduction(const IntrinsicInst *II) const;
-
-  enum struct ReductionShuffle { SplitHalf, Pairwise };
-
-  /// \returns The shuffle sequence pattern used to expand the given reduction
-  /// intrinsic.
-  ReductionShuffle
-  getPreferredExpandedReductionShuffle(const IntrinsicInst *II) const;
 
   /// \returns the size cost of rematerializing a GlobalValue address relative
   /// to a stack reload.
@@ -1838,7 +1776,6 @@ public:
                                              ArrayRef<const Value *> Operands,
                                              TargetCostKind CostKind) = 0;
   virtual BranchProbability getPredictableBranchThreshold() = 0;
-  virtual InstructionCost getBranchMispredictPenalty() = 0;
   virtual bool hasBranchDivergence(const Function *F = nullptr) = 0;
   virtual bool isSourceOfDivergence(const Value *V) = 0;
   virtual bool isAlwaysUniform(const Value *V) = 0;
@@ -1881,18 +1818,15 @@ public:
       std::function<void(Instruction *, unsigned, APInt, APInt &)>
           SimplifyAndSetOp) = 0;
   virtual bool isLegalAddImmediate(int64_t Imm) = 0;
-  virtual bool isLegalAddScalableImmediate(int64_t Imm) = 0;
   virtual bool isLegalICmpImmediate(int64_t Imm) = 0;
   virtual bool isLegalAddressingMode(Type *Ty, GlobalValue *BaseGV,
                                      int64_t BaseOffset, bool HasBaseReg,
                                      int64_t Scale, unsigned AddrSpace,
-                                     Instruction *I,
-                                     int64_t ScalableOffset) = 0;
+                                     Instruction *I) = 0;
   virtual bool isLSRCostLess(const TargetTransformInfo::LSRCost &C1,
                              const TargetTransformInfo::LSRCost &C2) = 0;
   virtual bool isNumRegsMajorCostOfLSR() = 0;
   virtual bool shouldFoldTerminatingConditionAfterLSR() const = 0;
-  virtual bool shouldDropLSRSolutionIfLessProfitable() const = 0;
   virtual bool isProfitableLSRChainElement(Instruction *I) = 0;
   virtual bool canMacroFuseCmp() = 0;
   virtual bool canSaveCmp(Loop *L, BranchInst **BI, ScalarEvolution *SE,
@@ -1912,10 +1846,8 @@ public:
                                           Align Alignment) = 0;
   virtual bool forceScalarizeMaskedScatter(VectorType *DataType,
                                            Align Alignment) = 0;
-  virtual bool isLegalMaskedCompressStore(Type *DataType, Align Alignment) = 0;
-  virtual bool isLegalMaskedExpandLoad(Type *DataType, Align Alignment) = 0;
-  virtual bool isLegalStridedLoadStore(Type *DataType, Align Alignment) = 0;
-  virtual bool isLegalMaskedVectorHistogram(Type *AddrType, Type *DataType) = 0;
+  virtual bool isLegalMaskedCompressStore(Type *DataType) = 0;
+  virtual bool isLegalMaskedExpandLoad(Type *DataType) = 0;
   virtual bool isLegalAltInstr(VectorType *VecTy, unsigned Opcode0,
                                unsigned Opcode1,
                                const SmallBitVector &OpcodeMask) const = 0;
@@ -1924,7 +1856,7 @@ public:
   virtual bool hasVolatileVariant(Instruction *I, unsigned AddrSpace) = 0;
   virtual bool prefersVectorizedAddressing() = 0;
   virtual InstructionCost getScalingFactorCost(Type *Ty, GlobalValue *BaseGV,
-                                               StackOffset BaseOffset,
+                                               int64_t BaseOffset,
                                                bool HasBaseReg, int64_t Scale,
                                                unsigned AddrSpace) = 0;
   virtual bool LSRWithInstrQueries() = 0;
@@ -1980,7 +1912,6 @@ public:
   virtual bool preferToKeepConstantsAttached(const Instruction &Inst,
                                              const Function &Fn) const = 0;
   virtual unsigned getNumberOfRegisters(unsigned ClassID) const = 0;
-  virtual bool hasConditionalLoadStoreForType(Type *Ty = nullptr) const = 0;
   virtual unsigned getRegisterClassForType(bool Vector,
                                            Type *Ty = nullptr) const = 0;
   virtual const char *getRegisterClassName(unsigned ClassID) const = 0;
@@ -2041,10 +1972,11 @@ public:
       const SmallBitVector &OpcodeMask,
       TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput) const = 0;
 
-  virtual InstructionCost
-  getShuffleCost(ShuffleKind Kind, VectorType *Tp, ArrayRef<int> Mask,
-                 TTI::TargetCostKind CostKind, int Index, VectorType *SubTp,
-                 ArrayRef<const Value *> Args, const Instruction *CxtI) = 0;
+  virtual InstructionCost getShuffleCost(ShuffleKind Kind, VectorType *Tp,
+                                         ArrayRef<int> Mask,
+                                         TTI::TargetCostKind CostKind,
+                                         int Index, VectorType *SubTp,
+                                         ArrayRef<const Value *> Args) = 0;
   virtual InstructionCost getCastInstrCost(unsigned Opcode, Type *Dst,
                                            Type *Src, CastContextHint CCH,
                                            TTI::TargetCostKind CostKind,
@@ -2088,11 +2020,6 @@ public:
                         TTI::TargetCostKind CostKind) = 0;
   virtual InstructionCost
   getGatherScatterOpCost(unsigned Opcode, Type *DataTy, const Value *Ptr,
-                         bool VariableMask, Align Alignment,
-                         TTI::TargetCostKind CostKind,
-                         const Instruction *I = nullptr) = 0;
-  virtual InstructionCost
-  getStridedMemoryOpCost(unsigned Opcode, Type *DataTy, const Value *Ptr,
                          bool VariableMask, Align Alignment,
                          TTI::TargetCostKind CostKind,
                          const Instruction *I = nullptr) = 0;
@@ -2168,7 +2095,6 @@ public:
   virtual unsigned getStoreVectorFactor(unsigned VF, unsigned StoreSize,
                                         unsigned ChainSizeInBytes,
                                         VectorType *VecTy) const = 0;
-  virtual bool preferFixedOverScalableIfEqualCost() const = 0;
   virtual bool preferInLoopReduction(unsigned Opcode, Type *Ty,
                                      ReductionFlags) const = 0;
   virtual bool preferPredicatedReductionSelect(unsigned Opcode, Type *Ty,
@@ -2176,8 +2102,6 @@ public:
   virtual bool preferEpilogueVectorization() const = 0;
 
   virtual bool shouldExpandReduction(const IntrinsicInst *II) const = 0;
-  virtual ReductionShuffle
-  getPreferredExpandedReductionShuffle(const IntrinsicInst *II) const = 0;
   virtual unsigned getGISelRematGlobalCost() const = 0;
   virtual unsigned getMinTripCountTailFoldingThreshold() const = 0;
   virtual bool enableScalableVectorization() const = 0;
@@ -2249,9 +2173,6 @@ public:
   }
   BranchProbability getPredictableBranchThreshold() override {
     return Impl.getPredictableBranchThreshold();
-  }
-  InstructionCost getBranchMispredictPenalty() override {
-    return Impl.getBranchMispredictPenalty();
   }
   bool hasBranchDivergence(const Function *F = nullptr) override {
     return Impl.hasBranchDivergence(F);
@@ -2351,17 +2272,14 @@ public:
   bool isLegalAddImmediate(int64_t Imm) override {
     return Impl.isLegalAddImmediate(Imm);
   }
-  bool isLegalAddScalableImmediate(int64_t Imm) override {
-    return Impl.isLegalAddScalableImmediate(Imm);
-  }
   bool isLegalICmpImmediate(int64_t Imm) override {
     return Impl.isLegalICmpImmediate(Imm);
   }
   bool isLegalAddressingMode(Type *Ty, GlobalValue *BaseGV, int64_t BaseOffset,
                              bool HasBaseReg, int64_t Scale, unsigned AddrSpace,
-                             Instruction *I, int64_t ScalableOffset) override {
+                             Instruction *I) override {
     return Impl.isLegalAddressingMode(Ty, BaseGV, BaseOffset, HasBaseReg, Scale,
-                                      AddrSpace, I, ScalableOffset);
+                                      AddrSpace, I);
   }
   bool isLSRCostLess(const TargetTransformInfo::LSRCost &C1,
                      const TargetTransformInfo::LSRCost &C2) override {
@@ -2372,9 +2290,6 @@ public:
   }
   bool shouldFoldTerminatingConditionAfterLSR() const override {
     return Impl.shouldFoldTerminatingConditionAfterLSR();
-  }
-  bool shouldDropLSRSolutionIfLessProfitable() const override {
-    return Impl.shouldDropLSRSolutionIfLessProfitable();
   }
   bool isProfitableLSRChainElement(Instruction *I) override {
     return Impl.isProfitableLSRChainElement(I);
@@ -2420,17 +2335,11 @@ public:
                                    Align Alignment) override {
     return Impl.forceScalarizeMaskedScatter(DataType, Alignment);
   }
-  bool isLegalMaskedCompressStore(Type *DataType, Align Alignment) override {
-    return Impl.isLegalMaskedCompressStore(DataType, Alignment);
+  bool isLegalMaskedCompressStore(Type *DataType) override {
+    return Impl.isLegalMaskedCompressStore(DataType);
   }
-  bool isLegalMaskedExpandLoad(Type *DataType, Align Alignment) override {
-    return Impl.isLegalMaskedExpandLoad(DataType, Alignment);
-  }
-  bool isLegalStridedLoadStore(Type *DataType, Align Alignment) override {
-    return Impl.isLegalStridedLoadStore(DataType, Alignment);
-  }
-  bool isLegalMaskedVectorHistogram(Type *AddrType, Type *DataType) override {
-    return Impl.isLegalMaskedVectorHistogram(AddrType, DataType);
+  bool isLegalMaskedExpandLoad(Type *DataType) override {
+    return Impl.isLegalMaskedExpandLoad(DataType);
   }
   bool isLegalAltInstr(VectorType *VecTy, unsigned Opcode0, unsigned Opcode1,
                        const SmallBitVector &OpcodeMask) const override {
@@ -2449,7 +2358,7 @@ public:
     return Impl.prefersVectorizedAddressing();
   }
   InstructionCost getScalingFactorCost(Type *Ty, GlobalValue *BaseGV,
-                                       StackOffset BaseOffset, bool HasBaseReg,
+                                       int64_t BaseOffset, bool HasBaseReg,
                                        int64_t Scale,
                                        unsigned AddrSpace) override {
     return Impl.getScalingFactorCost(Ty, BaseGV, BaseOffset, HasBaseReg, Scale,
@@ -2574,9 +2483,6 @@ public:
   unsigned getNumberOfRegisters(unsigned ClassID) const override {
     return Impl.getNumberOfRegisters(ClassID);
   }
-  bool hasConditionalLoadStoreForType(Type *Ty = nullptr) const override {
-    return Impl.hasConditionalLoadStoreForType(Ty);
-  }
   unsigned getRegisterClassForType(bool Vector,
                                    Type *Ty = nullptr) const override {
     return Impl.getRegisterClassForType(Vector, Ty);
@@ -2694,10 +2600,8 @@ public:
                                  ArrayRef<int> Mask,
                                  TTI::TargetCostKind CostKind, int Index,
                                  VectorType *SubTp,
-                                 ArrayRef<const Value *> Args,
-                                 const Instruction *CxtI) override {
-    return Impl.getShuffleCost(Kind, Tp, Mask, CostKind, Index, SubTp, Args,
-                               CxtI);
+                                 ArrayRef<const Value *> Args) override {
+    return Impl.getShuffleCost(Kind, Tp, Mask, CostKind, Index, SubTp, Args);
   }
   InstructionCost getCastInstrCost(unsigned Opcode, Type *Dst, Type *Src,
                                    CastContextHint CCH,
@@ -2765,14 +2669,6 @@ public:
                          TTI::TargetCostKind CostKind,
                          const Instruction *I = nullptr) override {
     return Impl.getGatherScatterOpCost(Opcode, DataTy, Ptr, VariableMask,
-                                       Alignment, CostKind, I);
-  }
-  InstructionCost
-  getStridedMemoryOpCost(unsigned Opcode, Type *DataTy, const Value *Ptr,
-                         bool VariableMask, Align Alignment,
-                         TTI::TargetCostKind CostKind,
-                         const Instruction *I = nullptr) override {
-    return Impl.getStridedMemoryOpCost(Opcode, DataTy, Ptr, VariableMask,
                                        Alignment, CostKind, I);
   }
   InstructionCost getInterleavedMemoryOpCost(
@@ -2907,9 +2803,6 @@ public:
                                 VectorType *VecTy) const override {
     return Impl.getStoreVectorFactor(VF, StoreSize, ChainSizeInBytes, VecTy);
   }
-  bool preferFixedOverScalableIfEqualCost() const override {
-    return Impl.preferFixedOverScalableIfEqualCost();
-  }
   bool preferInLoopReduction(unsigned Opcode, Type *Ty,
                              ReductionFlags Flags) const override {
     return Impl.preferInLoopReduction(Opcode, Ty, Flags);
@@ -2924,11 +2817,6 @@ public:
 
   bool shouldExpandReduction(const IntrinsicInst *II) const override {
     return Impl.shouldExpandReduction(II);
-  }
-
-  ReductionShuffle
-  getPreferredExpandedReductionShuffle(const IntrinsicInst *II) const override {
-    return Impl.getPreferredExpandedReductionShuffle(II);
   }
 
   unsigned getGISelRematGlobalCost() const override {

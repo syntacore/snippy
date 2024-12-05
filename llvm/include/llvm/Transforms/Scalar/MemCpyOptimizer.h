@@ -37,7 +37,6 @@ class MemSetInst;
 class PostDominatorTree;
 class StoreInst;
 class TargetLibraryInfo;
-class TypeSize;
 class Value;
 
 class MemCpyOptPass : public PassInfoMixin<MemCpyOptPass> {

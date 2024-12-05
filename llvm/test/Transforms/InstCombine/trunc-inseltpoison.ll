@@ -49,15 +49,15 @@ define <2 x i64> @test1_vec_nonuniform(<2 x i64> %a) {
   ret <2 x i64> %d
 }
 
-define <2 x i64> @test1_vec_poison(<2 x i64> %a) {
-; CHECK-LABEL: @test1_vec_poison(
+define <2 x i64> @test1_vec_undef(<2 x i64> %a) {
+; CHECK-LABEL: @test1_vec_undef(
 ; CHECK-NEXT:    [[B:%.*]] = trunc <2 x i64> [[A:%.*]] to <2 x i32>
-; CHECK-NEXT:    [[D:%.*]] = and <2 x i64> [[A]], <i64 15, i64 poison>
+; CHECK-NEXT:    [[D:%.*]] = and <2 x i64> [[A]], <i64 15, i64 0>
 ; CHECK-NEXT:    call void @use_vec(<2 x i32> [[B]])
 ; CHECK-NEXT:    ret <2 x i64> [[D]]
 ;
   %b = trunc <2 x i64> %a to <2 x i32>
-  %c = and <2 x i32> %b, <i32 15, i32 poison>
+  %c = and <2 x i32> %b, <i32 15, i32 undef>
   %d = zext <2 x i32> %c to <2 x i64>
   call void @use_vec(<2 x i32> %b)
   ret <2 x i64> %d
@@ -111,17 +111,17 @@ define <2 x i64> @test2_vec_nonuniform(<2 x i64> %a) {
   ret <2 x i64> %d
 }
 
-define <2 x i64> @test2_vec_poison(<2 x i64> %a) {
-; CHECK-LABEL: @test2_vec_poison(
+define <2 x i64> @test2_vec_undef(<2 x i64> %a) {
+; CHECK-LABEL: @test2_vec_undef(
 ; CHECK-NEXT:    [[B:%.*]] = trunc <2 x i64> [[A:%.*]] to <2 x i32>
-; CHECK-NEXT:    [[D1:%.*]] = shl <2 x i64> [[A]], <i64 36, i64 poison>
-; CHECK-NEXT:    [[D:%.*]] = ashr exact <2 x i64> [[D1]], <i64 36, i64 poison>
+; CHECK-NEXT:    [[D1:%.*]] = shl <2 x i64> [[A]], <i64 36, i64 undef>
+; CHECK-NEXT:    [[D:%.*]] = ashr exact <2 x i64> [[D1]], <i64 36, i64 undef>
 ; CHECK-NEXT:    call void @use_vec(<2 x i32> [[B]])
 ; CHECK-NEXT:    ret <2 x i64> [[D]]
 ;
   %b = trunc <2 x i64> %a to <2 x i32>
-  %c = shl <2 x i32> %b, <i32 4, i32 poison>
-  %q = ashr <2 x i32> %c, <i32 4, i32 poison>
+  %c = shl <2 x i32> %b, <i32 4, i32 undef>
+  %q = ashr <2 x i32> %c, <i32 4, i32 undef>
   %d = sext <2 x i32> %q to <2 x i64>
   call void @use_vec(<2 x i32> %b)
   ret <2 x i64> %d
@@ -171,7 +171,7 @@ define i32 @test5(i32 %A) {
 define i32 @test6(i64 %A) {
 ; CHECK-LABEL: @test6(
 ; CHECK-NEXT:    [[TMP1:%.*]] = lshr i64 [[A:%.*]], 32
-; CHECK-NEXT:    [[D:%.*]] = trunc nuw i64 [[TMP1]] to i32
+; CHECK-NEXT:    [[D:%.*]] = trunc i64 [[TMP1]] to i32
 ; CHECK-NEXT:    ret i32 [[D]]
 ;
   %B = zext i64 %A to i128
@@ -300,17 +300,18 @@ define <2 x i64> @test8_vec_nonuniform(<2 x i32> %A, <2 x i32> %B) {
   ret <2 x i64> %G
 }
 
-define <2 x i64> @test8_vec_poison(<2 x i32> %A, <2 x i32> %B) {
-; CHECK-LABEL: @test8_vec_poison(
-; CHECK-NEXT:    [[C:%.*]] = zext <2 x i32> [[A:%.*]] to <2 x i64>
-; CHECK-NEXT:    [[D:%.*]] = zext <2 x i32> [[B:%.*]] to <2 x i64>
-; CHECK-NEXT:    [[E:%.*]] = shl nuw <2 x i64> [[D]], <i64 32, i64 poison>
-; CHECK-NEXT:    [[G:%.*]] = or disjoint <2 x i64> [[E]], [[C]]
+define <2 x i64> @test8_vec_undef(<2 x i32> %A, <2 x i32> %B) {
+; CHECK-LABEL: @test8_vec_undef(
+; CHECK-NEXT:    [[C:%.*]] = zext <2 x i32> [[A:%.*]] to <2 x i128>
+; CHECK-NEXT:    [[D:%.*]] = zext <2 x i32> [[B:%.*]] to <2 x i128>
+; CHECK-NEXT:    [[E:%.*]] = shl <2 x i128> [[D]], <i128 32, i128 undef>
+; CHECK-NEXT:    [[F:%.*]] = or <2 x i128> [[E]], [[C]]
+; CHECK-NEXT:    [[G:%.*]] = trunc <2 x i128> [[F]] to <2 x i64>
 ; CHECK-NEXT:    ret <2 x i64> [[G]]
 ;
   %C = zext <2 x i32> %A to <2 x i128>
   %D = zext <2 x i32> %B to <2 x i128>
-  %E = shl <2 x i128> %D, <i128 32, i128 poison>
+  %E = shl <2 x i128> %D, <i128 32, i128 undef>
   %F = or <2 x i128> %E, %C
   %G = trunc <2 x i128> %F to <2 x i64>
   ret <2 x i64> %G
@@ -387,17 +388,18 @@ define <2 x i64> @test11_vec_nonuniform(<2 x i32> %A, <2 x i32> %B) {
   ret <2 x i64> %G
 }
 
-define <2 x i64> @test11_vec_poison(<2 x i32> %A, <2 x i32> %B) {
-; CHECK-LABEL: @test11_vec_poison(
-; CHECK-NEXT:    [[C:%.*]] = zext <2 x i32> [[A:%.*]] to <2 x i64>
-; CHECK-NEXT:    [[TMP1:%.*]] = and <2 x i32> [[B:%.*]], <i32 31, i32 poison>
-; CHECK-NEXT:    [[E:%.*]] = zext nneg <2 x i32> [[TMP1]] to <2 x i64>
-; CHECK-NEXT:    [[G:%.*]] = shl nuw nsw <2 x i64> [[C]], [[E]]
+define <2 x i64> @test11_vec_undef(<2 x i32> %A, <2 x i32> %B) {
+; CHECK-LABEL: @test11_vec_undef(
+; CHECK-NEXT:    [[C:%.*]] = zext <2 x i32> [[A:%.*]] to <2 x i128>
+; CHECK-NEXT:    [[D:%.*]] = zext <2 x i32> [[B:%.*]] to <2 x i128>
+; CHECK-NEXT:    [[E:%.*]] = and <2 x i128> [[D]], <i128 31, i128 undef>
+; CHECK-NEXT:    [[F:%.*]] = shl <2 x i128> [[C]], [[E]]
+; CHECK-NEXT:    [[G:%.*]] = trunc <2 x i128> [[F]] to <2 x i64>
 ; CHECK-NEXT:    ret <2 x i64> [[G]]
 ;
   %C = zext <2 x i32> %A to <2 x i128>
   %D = zext <2 x i32> %B to <2 x i128>
-  %E = and <2 x i128> %D, <i128 31, i128 poison>
+  %E = and <2 x i128> %D, <i128 31, i128 undef>
   %F = shl <2 x i128> %C, %E
   %G = trunc <2 x i128> %F to <2 x i64>
   ret <2 x i64> %G
@@ -451,17 +453,18 @@ define <2 x i64> @test12_vec_nonuniform(<2 x i32> %A, <2 x i32> %B) {
   ret <2 x i64> %G
 }
 
-define <2 x i64> @test12_vec_poison(<2 x i32> %A, <2 x i32> %B) {
-; CHECK-LABEL: @test12_vec_poison(
-; CHECK-NEXT:    [[C:%.*]] = zext <2 x i32> [[A:%.*]] to <2 x i64>
-; CHECK-NEXT:    [[TMP1:%.*]] = and <2 x i32> [[B:%.*]], <i32 31, i32 poison>
-; CHECK-NEXT:    [[E:%.*]] = zext nneg <2 x i32> [[TMP1]] to <2 x i64>
-; CHECK-NEXT:    [[G:%.*]] = lshr <2 x i64> [[C]], [[E]]
+define <2 x i64> @test12_vec_undef(<2 x i32> %A, <2 x i32> %B) {
+; CHECK-LABEL: @test12_vec_undef(
+; CHECK-NEXT:    [[C:%.*]] = zext <2 x i32> [[A:%.*]] to <2 x i128>
+; CHECK-NEXT:    [[D:%.*]] = zext <2 x i32> [[B:%.*]] to <2 x i128>
+; CHECK-NEXT:    [[E:%.*]] = and <2 x i128> [[D]], <i128 31, i128 undef>
+; CHECK-NEXT:    [[F:%.*]] = lshr <2 x i128> [[C]], [[E]]
+; CHECK-NEXT:    [[G:%.*]] = trunc <2 x i128> [[F]] to <2 x i64>
 ; CHECK-NEXT:    ret <2 x i64> [[G]]
 ;
   %C = zext <2 x i32> %A to <2 x i128>
   %D = zext <2 x i32> %B to <2 x i128>
-  %E = and <2 x i128> %D, <i128 31, i128 poison>
+  %E = and <2 x i128> %D, <i128 31, i128 undef>
   %F = lshr <2 x i128> %C, %E
   %G = trunc <2 x i128> %F to <2 x i64>
   ret <2 x i64> %G
@@ -515,17 +518,18 @@ define <2 x i64> @test13_vec_nonuniform(<2 x i32> %A, <2 x i32> %B) {
   ret <2 x i64> %G
 }
 
-define <2 x i64> @test13_vec_poison(<2 x i32> %A, <2 x i32> %B) {
-; CHECK-LABEL: @test13_vec_poison(
-; CHECK-NEXT:    [[C:%.*]] = sext <2 x i32> [[A:%.*]] to <2 x i64>
-; CHECK-NEXT:    [[TMP1:%.*]] = and <2 x i32> [[B:%.*]], <i32 31, i32 poison>
-; CHECK-NEXT:    [[E:%.*]] = zext nneg <2 x i32> [[TMP1]] to <2 x i64>
-; CHECK-NEXT:    [[G:%.*]] = ashr <2 x i64> [[C]], [[E]]
+define <2 x i64> @test13_vec_undef(<2 x i32> %A, <2 x i32> %B) {
+; CHECK-LABEL: @test13_vec_undef(
+; CHECK-NEXT:    [[C:%.*]] = sext <2 x i32> [[A:%.*]] to <2 x i128>
+; CHECK-NEXT:    [[D:%.*]] = zext <2 x i32> [[B:%.*]] to <2 x i128>
+; CHECK-NEXT:    [[E:%.*]] = and <2 x i128> [[D]], <i128 31, i128 undef>
+; CHECK-NEXT:    [[F:%.*]] = ashr <2 x i128> [[C]], [[E]]
+; CHECK-NEXT:    [[G:%.*]] = trunc <2 x i128> [[F]] to <2 x i64>
 ; CHECK-NEXT:    ret <2 x i64> [[G]]
 ;
   %C = sext <2 x i32> %A to <2 x i128>
   %D = zext <2 x i32> %B to <2 x i128>
-  %E = and <2 x i128> %D, <i128 31, i128 poison>
+  %E = and <2 x i128> %D, <i128 31, i128 undef>
   %F = ashr <2 x i128> %C, %E
   %G = trunc <2 x i128> %F to <2 x i64>
   ret <2 x i64> %G
@@ -762,13 +766,13 @@ define <2 x i32> @trunc_shl_v2i32_v2i64_uniform(<2 x i64> %val) {
   ret <2 x i32> %trunc
 }
 
-define <2 x i32> @trunc_shl_v2i32_v2i64_poison(<2 x i64> %val) {
-; CHECK-LABEL: @trunc_shl_v2i32_v2i64_poison(
+define <2 x i32> @trunc_shl_v2i32_v2i64_undef(<2 x i64> %val) {
+; CHECK-LABEL: @trunc_shl_v2i32_v2i64_undef(
 ; CHECK-NEXT:    [[VAL_TR:%.*]] = trunc <2 x i64> [[VAL:%.*]] to <2 x i32>
-; CHECK-NEXT:    [[TRUNC:%.*]] = shl <2 x i32> [[VAL_TR]], <i32 31, i32 poison>
+; CHECK-NEXT:    [[TRUNC:%.*]] = shl <2 x i32> [[VAL_TR]], <i32 31, i32 undef>
 ; CHECK-NEXT:    ret <2 x i32> [[TRUNC]]
 ;
-  %shl = shl <2 x i64> %val, <i64 31, i64 poison>
+  %shl = shl <2 x i64> %val, <i64 31, i64 undef>
   %trunc = trunc <2 x i64> %shl to <2 x i32>
   ret <2 x i32> %trunc
 }
@@ -913,7 +917,7 @@ define <4 x i8> @wide_shuf(<4 x i32> %x) {
   ret <4 x i8> %trunc
 }
 
-; trunc (shuffle X, poison, SplatMask) --> shuffle (trunc X), poison, SplatMask
+; trunc (shuffle X, undef, SplatMask) --> shuffle (trunc X), undef, SplatMask
 
 define <4 x i8> @wide_splat1(<4 x i32> %x) {
 ; CHECK-LABEL: @wide_splat1(
@@ -927,7 +931,7 @@ define <4 x i8> @wide_splat1(<4 x i32> %x) {
 }
 
 ; Test weird types.
-; trunc (shuffle X, poison, SplatMask) --> shuffle (trunc X), poison, SplatMask
+; trunc (shuffle X, undef, SplatMask) --> shuffle (trunc X), undef, SplatMask
 
 define <3 x i31> @wide_splat2(<3 x i33> %x) {
 ; CHECK-LABEL: @wide_splat2(
@@ -941,8 +945,8 @@ define <3 x i31> @wide_splat2(<3 x i33> %x) {
 }
 
 ; FIXME:
-; trunc (shuffle X, poison, SplatMask) --> shuffle (trunc X), poison, SplatMask
-; A mask with poison elements should still be considered a splat mask.
+; trunc (shuffle X, undef, SplatMask) --> shuffle (trunc X), undef, SplatMask
+; A mask with undef elements should still be considered a splat mask.
 
 define <3 x i31> @wide_splat3(<3 x i33> %x) {
 ; CHECK-LABEL: @wide_splat3(
@@ -950,7 +954,7 @@ define <3 x i31> @wide_splat3(<3 x i33> %x) {
 ; CHECK-NEXT:    [[TRUNC:%.*]] = trunc <3 x i33> [[SHUF]] to <3 x i31>
 ; CHECK-NEXT:    ret <3 x i31> [[TRUNC]]
 ;
-  %shuf = shufflevector <3 x i33> %x, <3 x i33> poison, <3 x i32> <i32 poison, i32 1, i32 1>
+  %shuf = shufflevector <3 x i33> %x, <3 x i33> poison, <3 x i32> <i32 undef, i32 1, i32 1>
   %trunc = trunc <3 x i33> %shuf to <3 x i31>
   ret <3 x i31> %trunc
 }

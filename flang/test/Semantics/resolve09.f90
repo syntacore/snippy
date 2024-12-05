@@ -52,40 +52,16 @@ contains
   end
 end
 
-module m1
-  !Function vs subroutine in a module is resolved to a subroutine if
-  !no other information.
-  external :: exts, extf, extunk
-  procedure() :: procs, procf, procunk
+module m
+  ! subroutine vs. function is determined at end of specification part
+  external :: a
+  procedure() :: b
 contains
-  subroutine s
-    call exts()
-    call procs()
-    x = extf()
-    x = procf()
+  subroutine s()
+    call a()
+    !ERROR: Cannot call subroutine 'b' like a function
+    x = b()
   end
-end
-
-module m2
-  use m1
- contains
-  subroutine test
-    call exts() ! ok
-    call procs() ! ok
-    call extunk() ! ok
-    call procunk() ! ok
-    x = extf() ! ok
-    x = procf() ! ok
-    !ERROR: Cannot call subroutine 'extunk' like a function
-    !ERROR: Function result characteristics are not known
-    x = extunk()
-    !ERROR: Cannot call subroutine 'procunk' like a function
-    !ERROR: Function result characteristics are not known
-    x = procunk()
-  end
-end
-
-module modulename
 end
 
 ! Call to entity in global scope, even with IMPORT, NONE
@@ -93,8 +69,8 @@ subroutine s4
   block
     import, none
     integer :: i
-    !ERROR: 'modulename' is not a callable procedure
-    call modulename()
+    !ERROR: 'm' is not a callable procedure
+    call m()
   end block
 end
 
@@ -152,11 +128,4 @@ subroutine s10
   call a10
   !ERROR: Actual argument for 'a=' may not be a procedure
   print *, abs(a10)
-end
-
-subroutine s11
-  real, pointer :: p(:)
-  !ERROR: A NULL() pointer is not allowed for 'a=' intrinsic argument
-  print *, rank(null())
-  print *, rank(null(mold=p)) ! ok
 end

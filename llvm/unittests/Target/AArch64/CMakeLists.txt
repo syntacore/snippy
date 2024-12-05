@@ -29,5 +29,6 @@ add_llvm_target_unittest(AArch64Tests
   MatrixRegisterAliasing.cpp
   SMEAttributesTest.cpp
   AArch64SVESchedPseudoTest.cpp
-  Immediates.cpp
   )
+
+set_property(TARGET AArch64Tests PROPERTY FOLDER "Tests/UnitTests/TargetTests")

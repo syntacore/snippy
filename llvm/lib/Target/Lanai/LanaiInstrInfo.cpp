@@ -102,15 +102,14 @@ bool LanaiInstrInfo::areMemAccessesTriviallyDisjoint(
   const TargetRegisterInfo *TRI = &getRegisterInfo();
   const MachineOperand *BaseOpA = nullptr, *BaseOpB = nullptr;
   int64_t OffsetA = 0, OffsetB = 0;
-  LocationSize WidthA = 0, WidthB = 0;
+  unsigned int WidthA = 0, WidthB = 0;
   if (getMemOperandWithOffsetWidth(MIa, BaseOpA, OffsetA, WidthA, TRI) &&
       getMemOperandWithOffsetWidth(MIb, BaseOpB, OffsetB, WidthB, TRI)) {
     if (BaseOpA->isIdenticalTo(*BaseOpB)) {
       int LowOffset = std::min(OffsetA, OffsetB);
       int HighOffset = std::max(OffsetA, OffsetB);
-      LocationSize LowWidth = (LowOffset == OffsetA) ? WidthA : WidthB;
-      if (LowWidth.hasValue() &&
-          LowOffset + (int)LowWidth.getValue() <= HighOffset)
+      int LowWidth = (LowOffset == OffsetA) ? WidthA : WidthB;
+      if (LowOffset + LowWidth <= HighOffset)
         return true;
     }
   }
@@ -711,7 +710,7 @@ unsigned LanaiInstrInfo::removeBranch(MachineBasicBlock &MBB,
   return Count;
 }
 
-Register LanaiInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
+unsigned LanaiInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
                                              int &FrameIndex) const {
   if (MI.getOpcode() == Lanai::LDW_RI)
     if (MI.getOperand(1).isFI() && MI.getOperand(2).isImm() &&
@@ -722,7 +721,7 @@ Register LanaiInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
   return 0;
 }
 
-Register LanaiInstrInfo::isLoadFromStackSlotPostFE(const MachineInstr &MI,
+unsigned LanaiInstrInfo::isLoadFromStackSlotPostFE(const MachineInstr &MI,
                                                    int &FrameIndex) const {
   if (MI.getOpcode() == Lanai::LDW_RI) {
     unsigned Reg;
@@ -740,7 +739,7 @@ Register LanaiInstrInfo::isLoadFromStackSlotPostFE(const MachineInstr &MI,
   return 0;
 }
 
-Register LanaiInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
+unsigned LanaiInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
                                             int &FrameIndex) const {
   if (MI.getOpcode() == Lanai::SW_RI)
     if (MI.getOperand(0).isFI() && MI.getOperand(1).isImm() &&
@@ -753,7 +752,7 @@ Register LanaiInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
 
 bool LanaiInstrInfo::getMemOperandWithOffsetWidth(
     const MachineInstr &LdSt, const MachineOperand *&BaseOp, int64_t &Offset,
-    LocationSize &Width, const TargetRegisterInfo * /*TRI*/) const {
+    unsigned &Width, const TargetRegisterInfo * /*TRI*/) const {
   // Handle only loads/stores with base register followed by immediate offset
   // and with add as ALU op.
   if (LdSt.getNumOperands() != 4)
@@ -794,7 +793,7 @@ bool LanaiInstrInfo::getMemOperandWithOffsetWidth(
 
 bool LanaiInstrInfo::getMemOperandsWithOffsetWidth(
     const MachineInstr &LdSt, SmallVectorImpl<const MachineOperand *> &BaseOps,
-    int64_t &Offset, bool &OffsetIsScalable, LocationSize &Width,
+    int64_t &Offset, bool &OffsetIsScalable, unsigned &Width,
     const TargetRegisterInfo *TRI) const {
   switch (LdSt.getOpcode()) {
   default:

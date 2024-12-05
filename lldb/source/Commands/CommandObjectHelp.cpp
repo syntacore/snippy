@@ -48,9 +48,20 @@ CommandObjectHelp::CommandObjectHelp(CommandInterpreter &interpreter)
                           "commands, or give details "
                           "about a specific command.",
                           "help [<cmd-name>]") {
+  CommandArgumentEntry arg;
+  CommandArgumentData command_arg;
+
   // A list of command names forming a path to the command we want help on.
   // No names is allowed - in which case we dump the top-level help.
-  AddSimpleArgumentList(eArgTypeCommand, eArgRepeatStar);
+  command_arg.arg_type = eArgTypeCommand;
+  command_arg.arg_repetition = eArgRepeatStar;
+
+  // There is only one variant this argument could be; put it into the argument
+  // entry.
+  arg.push_back(command_arg);
+
+  // Push the data for the first argument into the m_arguments vector.
+  m_arguments.push_back(arg);
 }
 
 CommandObjectHelp::~CommandObjectHelp() = default;

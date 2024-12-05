@@ -1,6 +1,6 @@
 ; RUN: opt < %s -passes='loop-mssa(loop-rotate,licm,simple-loop-unswitch)' -disable-output
 
-define i32 @main(i32 %argc, ptr %argv) {
+define i32 @main(i32 %argc, i8** %argv) {
 entry:
 	br label %bb7
 

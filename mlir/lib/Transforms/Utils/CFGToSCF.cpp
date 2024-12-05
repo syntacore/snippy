@@ -1183,7 +1183,8 @@ static FailureOr<SmallVector<Block *>> transformToStructuredCFBranches(
     auto builder = OpBuilder::atBlockTerminator(user->getBlock());
     LogicalResult result = interface.createStructuredBranchRegionTerminatorOp(
         user->getLoc(), builder, structuredCondOp, user,
-        getMutableSuccessorOperands(user->getBlock(), 0).getAsOperandRange());
+        static_cast<OperandRange>(
+            getMutableSuccessorOperands(user->getBlock(), 0)));
     if (failed(result))
       return failure();
     user->erase();

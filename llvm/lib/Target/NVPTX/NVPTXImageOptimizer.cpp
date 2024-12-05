@@ -157,7 +157,7 @@ void NVPTXImageOptimizer::replaceWith(Instruction *From, ConstantInt *To) {
       else
         // Get true block
         Dest = BI->getSuccessor(0);
-      BranchInst::Create(Dest, BI->getIterator());
+      BranchInst::Create(Dest, BI);
       InstrToDelete.push_back(BI);
     }
   }

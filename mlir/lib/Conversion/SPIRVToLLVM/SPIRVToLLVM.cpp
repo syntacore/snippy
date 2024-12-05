@@ -20,6 +20,7 @@
 #include "mlir/Dialect/SPIRV/Utils/LayoutUtils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -239,7 +240,7 @@ static LogicalResult replaceWithLoadOrStore(Operation *op, ValueRange operands,
   if (auto loadOp = dyn_cast<spirv::LoadOp>(op)) {
     auto dstType = typeConverter.convertType(loadOp.getType());
     if (!dstType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
+      return failure();
     rewriter.replaceOpWithNewOp<LLVM::LoadOp>(
         loadOp, dstType, spirv::LoadOpAdaptor(operands).getPtr(), alignment,
         isVolatile, isNonTemporal);
@@ -356,23 +357,22 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     auto dstType = typeConverter.convertType(op.getComponentPtr().getType());
     if (!dstType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
+      return failure();
     // To use GEP we need to add a first 0 index to go through the pointer.
     auto indices = llvm::to_vector<4>(adaptor.getIndices());
     Type indexType = op.getIndices().front().getType();
     auto llvmIndexType = typeConverter.convertType(indexType);
     if (!llvmIndexType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
+      return failure();
     Value zero = rewriter.create<LLVM::ConstantOp>(
         op.getLoc(), llvmIndexType, rewriter.getIntegerAttr(indexType, 0));
     indices.insert(indices.begin(), zero);
-
-    auto elementType = typeConverter.convertType(
-        cast<spirv::PointerType>(op.getBasePtr().getType()).getPointeeType());
-    if (!elementType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
-    rewriter.replaceOpWithNewOp<LLVM::GEPOp>(op, dstType, elementType,
-                                             adaptor.getBasePtr(), indices);
+    rewriter.replaceOpWithNewOp<LLVM::GEPOp>(
+        op, dstType,
+        typeConverter.convertType(
+            cast<spirv::PointerType>(op.getBasePtr().getType())
+                .getPointeeType()),
+        adaptor.getBasePtr(), indices);
     return success();
   }
 };
@@ -386,7 +386,7 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     auto dstType = typeConverter.convertType(op.getPointer().getType());
     if (!dstType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
+      return failure();
     rewriter.replaceOpWithNewOp<LLVM::AddressOfOp>(op, dstType,
                                                    op.getVariable());
     return success();
@@ -404,7 +404,7 @@ public:
     auto srcType = op.getType();
     auto dstType = typeConverter.convertType(srcType);
     if (!dstType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
+      return failure();
     Location loc = op.getLoc();
 
     // Process `Offset` and `Count`: broadcast and extend/truncate if needed.
@@ -451,7 +451,7 @@ public:
 
     auto dstType = typeConverter.convertType(srcType);
     if (!dstType)
-      return rewriter.notifyMatchFailure(constOp, "type conversion failed");
+      return failure();
 
     // SPIR-V constant can be a signed/unsigned integer, which has to be
     // casted to signless integer when converting to LLVM dialect. Removing the
@@ -492,7 +492,7 @@ public:
     auto srcType = op.getType();
     auto dstType = typeConverter.convertType(srcType);
     if (!dstType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
+      return failure();
     Location loc = op.getLoc();
 
     // Process `Offset` and `Count`: broadcast and extend/truncate if needed.
@@ -545,7 +545,7 @@ public:
     auto srcType = op.getType();
     auto dstType = typeConverter.convertType(srcType);
     if (!dstType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
+      return failure();
     Location loc = op.getLoc();
 
     // Process `Offset` and `Count`: broadcast and extend/truncate if needed.
@@ -621,7 +621,7 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     auto dstType = this->typeConverter.convertType(op.getType());
     if (!dstType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
+      return failure();
 
     Type containerType = op.getComposite().getType();
     if (isa<VectorType>(containerType)) {
@@ -653,7 +653,7 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     auto dstType = this->typeConverter.convertType(op.getType());
     if (!dstType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
+      return failure();
 
     Type containerType = op.getComposite().getType();
     if (isa<VectorType>(containerType)) {
@@ -680,13 +680,13 @@ public:
   using SPIRVToLLVMConversion<SPIRVOp>::SPIRVToLLVMConversion;
 
   LogicalResult
-  matchAndRewrite(SPIRVOp op, typename SPIRVOp::Adaptor adaptor,
+  matchAndRewrite(SPIRVOp operation, typename SPIRVOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto dstType = this->typeConverter.convertType(op.getType());
+    auto dstType = this->typeConverter.convertType(operation.getType());
     if (!dstType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
+      return failure();
     rewriter.template replaceOpWithNewOp<LLVMOp>(
-        op, dstType, adaptor.getOperands(), op->getAttrs());
+        operation, dstType, adaptor.getOperands(), operation->getAttrs());
     return success();
   }
 };
@@ -790,7 +790,7 @@ public:
     auto srcType = cast<spirv::PointerType>(op.getType());
     auto dstType = typeConverter.convertType(srcType.getPointeeType());
     if (!dstType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
+      return failure();
 
     // Limit conversion to the current invocation only or `StorageBuffer`
     // required by SPIR-V runner.
@@ -843,23 +843,23 @@ public:
   using SPIRVToLLVMConversion<SPIRVOp>::SPIRVToLLVMConversion;
 
   LogicalResult
-  matchAndRewrite(SPIRVOp op, typename SPIRVOp::Adaptor adaptor,
+  matchAndRewrite(SPIRVOp operation, typename SPIRVOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
 
-    Type fromType = op.getOperand().getType();
-    Type toType = op.getType();
+    Type fromType = operation.getOperand().getType();
+    Type toType = operation.getType();
 
     auto dstType = this->typeConverter.convertType(toType);
     if (!dstType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
+      return failure();
 
     if (getBitWidth(fromType) < getBitWidth(toType)) {
-      rewriter.template replaceOpWithNewOp<LLVMExtOp>(op, dstType,
+      rewriter.template replaceOpWithNewOp<LLVMExtOp>(operation, dstType,
                                                       adaptor.getOperands());
       return success();
     }
     if (getBitWidth(fromType) > getBitWidth(toType)) {
-      rewriter.template replaceOpWithNewOp<LLVMTruncOp>(op, dstType,
+      rewriter.template replaceOpWithNewOp<LLVMTruncOp>(operation, dstType,
                                                         adaptor.getOperands());
       return success();
     }
@@ -883,8 +883,6 @@ public:
 
     // Function returns a single result.
     auto dstType = typeConverter.convertType(callOp.getType(0));
-    if (!dstType)
-      return rewriter.notifyMatchFailure(callOp, "type conversion failed");
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
         callOp, dstType, adaptor.getOperands(), callOp->getAttrs());
     return success();
@@ -898,15 +896,16 @@ public:
   using SPIRVToLLVMConversion<SPIRVOp>::SPIRVToLLVMConversion;
 
   LogicalResult
-  matchAndRewrite(SPIRVOp op, typename SPIRVOp::Adaptor adaptor,
+  matchAndRewrite(SPIRVOp operation, typename SPIRVOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
 
-    auto dstType = this->typeConverter.convertType(op.getType());
+    auto dstType = this->typeConverter.convertType(operation.getType());
     if (!dstType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
+      return failure();
 
     rewriter.template replaceOpWithNewOp<LLVM::FCmpOp>(
-        op, dstType, predicate, op.getOperand1(), op.getOperand2());
+        operation, dstType, predicate, operation.getOperand1(),
+        operation.getOperand2());
     return success();
   }
 };
@@ -918,15 +917,16 @@ public:
   using SPIRVToLLVMConversion<SPIRVOp>::SPIRVToLLVMConversion;
 
   LogicalResult
-  matchAndRewrite(SPIRVOp op, typename SPIRVOp::Adaptor adaptor,
+  matchAndRewrite(SPIRVOp operation, typename SPIRVOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
 
-    auto dstType = this->typeConverter.convertType(op.getType());
+    auto dstType = this->typeConverter.convertType(operation.getType());
     if (!dstType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
+      return failure();
 
     rewriter.template replaceOpWithNewOp<LLVM::ICmpOp>(
-        op, dstType, predicate, op.getOperand1(), op.getOperand2());
+        operation, dstType, predicate, operation.getOperand1(),
+        operation.getOperand2());
     return success();
   }
 };
@@ -942,7 +942,7 @@ public:
     auto srcType = op.getType();
     auto dstType = typeConverter.convertType(srcType);
     if (!dstType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
+      return failure();
 
     Location loc = op.getLoc();
     Value one = createFPConstant(loc, srcType, dstType, rewriter, 1.0);
@@ -1000,7 +1000,7 @@ public:
     auto srcType = notOp.getType();
     auto dstType = this->typeConverter.convertType(srcType);
     if (!dstType)
-      return rewriter.notifyMatchFailure(notOp, "type conversion failed");
+      return failure();
 
     Location loc = notOp.getLoc();
     IntegerAttr minusOne = minusOneIntegerAttribute(srcType, rewriter);
@@ -1226,18 +1226,18 @@ public:
   using SPIRVToLLVMConversion<SPIRVOp>::SPIRVToLLVMConversion;
 
   LogicalResult
-  matchAndRewrite(SPIRVOp op, typename SPIRVOp::Adaptor adaptor,
+  matchAndRewrite(SPIRVOp operation, typename SPIRVOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
 
-    auto dstType = this->typeConverter.convertType(op.getType());
+    auto dstType = this->typeConverter.convertType(operation.getType());
     if (!dstType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
+      return failure();
 
-    Type op1Type = op.getOperand1().getType();
-    Type op2Type = op.getOperand2().getType();
+    Type op1Type = operation.getOperand1().getType();
+    Type op2Type = operation.getOperand2().getType();
 
     if (op1Type == op2Type) {
-      rewriter.template replaceOpWithNewOp<LLVMOp>(op, dstType,
+      rewriter.template replaceOpWithNewOp<LLVMOp>(operation, dstType,
                                                    adaptor.getOperands());
       return success();
     }
@@ -1250,7 +1250,7 @@ public:
     if (!dstTypeWidth || !op2TypeWidth)
       return failure();
 
-    Location loc = op.getLoc();
+    Location loc = operation.getLoc();
     Value extended;
     if (op2TypeWidth < dstTypeWidth) {
       if (isUnsignedIntegerOrVector(op2Type)) {
@@ -1268,7 +1268,7 @@ public:
 
     Value result = rewriter.template create<LLVMOp>(
         loc, dstType, adaptor.getOperand1(), extended);
-    rewriter.replaceOp(op, result);
+    rewriter.replaceOp(operation, result);
     return success();
   }
 };
@@ -1282,7 +1282,7 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     auto dstType = typeConverter.convertType(tanOp.getType());
     if (!dstType)
-      return rewriter.notifyMatchFailure(tanOp, "type conversion failed");
+      return failure();
 
     Location loc = tanOp.getLoc();
     Value sin = rewriter.create<LLVM::SinOp>(loc, dstType, tanOp.getOperand());
@@ -1308,7 +1308,7 @@ public:
     auto srcType = tanhOp.getType();
     auto dstType = typeConverter.convertType(srcType);
     if (!dstType)
-      return rewriter.notifyMatchFailure(tanhOp, "type conversion failed");
+      return failure();
 
     Location loc = tanhOp.getLoc();
     Value two = createFPConstant(loc, srcType, dstType, rewriter, 2.0);
@@ -1342,23 +1342,17 @@ public:
 
     auto dstType = typeConverter.convertType(srcType);
     if (!dstType)
-      return rewriter.notifyMatchFailure(varOp, "type conversion failed");
+      return failure();
 
     Location loc = varOp.getLoc();
     Value size = createI32ConstantOf(loc, rewriter, 1);
     if (!init) {
-      auto elementType = typeConverter.convertType(pointerTo);
-      if (!elementType)
-        return rewriter.notifyMatchFailure(varOp, "type conversion failed");
-      rewriter.replaceOpWithNewOp<LLVM::AllocaOp>(varOp, dstType, elementType,
-                                                  size);
+      rewriter.replaceOpWithNewOp<LLVM::AllocaOp>(
+          varOp, dstType, typeConverter.convertType(pointerTo), size);
       return success();
     }
-    auto elementType = typeConverter.convertType(pointerTo);
-    if (!elementType)
-      return rewriter.notifyMatchFailure(varOp, "type conversion failed");
-    Value allocated =
-        rewriter.create<LLVM::AllocaOp>(loc, dstType, elementType, size);
+    Value allocated = rewriter.create<LLVM::AllocaOp>(
+        loc, dstType, typeConverter.convertType(pointerTo), size);
     rewriter.create<LLVM::StoreOp>(loc, adaptor.getInitializer(), allocated);
     rewriter.replaceOp(varOp, allocated);
     return success();
@@ -1379,7 +1373,7 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     auto dstType = typeConverter.convertType(bitcastOp.getType());
     if (!dstType)
-      return rewriter.notifyMatchFailure(bitcastOp, "type conversion failed");
+      return failure();
 
     // LLVM's opaque pointers do not require bitcasts.
     if (isa<LLVM::LLVMPointerType>(dstType)) {
@@ -1424,18 +1418,15 @@ public:
     // Convert SPIR-V Function Control to equivalent LLVM function attribute
     MLIRContext *context = funcOp.getContext();
     switch (funcOp.getFunctionControl()) {
-    case spirv::FunctionControl::Inline:
-      newFuncOp.setAlwaysInline(true);
-      break;
-    case spirv::FunctionControl::DontInline:
-      newFuncOp.setNoInline(true);
-      break;
-
 #define DISPATCH(functionControl, llvmAttr)                                    \
   case functionControl:                                                        \
     newFuncOp->setAttr("passthrough", ArrayAttr::get(context, {llvmAttr}));    \
     break;
 
+      DISPATCH(spirv::FunctionControl::Inline,
+               StringAttr::get(context, "alwaysinline"));
+      DISPATCH(spirv::FunctionControl::DontInline,
+               StringAttr::get(context, "noinline"));
       DISPATCH(spirv::FunctionControl::Pure,
                StringAttr::get(context, "readonly"));
       DISPATCH(spirv::FunctionControl::Const,
@@ -1508,8 +1499,6 @@ public:
     }
 
     auto dstType = typeConverter.convertType(op.getType());
-    if (!dstType)
-      return rewriter.notifyMatchFailure(op, "type conversion failed");
     auto scalarType = cast<VectorType>(dstType).getElementType();
     auto componentsArray = components.getValue();
     auto *context = rewriter.getContext();

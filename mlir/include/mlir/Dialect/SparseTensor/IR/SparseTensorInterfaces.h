@@ -1,4 +1,5 @@
-//===- SparseTensorInterfaces.h - sparse tensor operations interfaces------===//
+//===- SparseTensorInterfaces.h - sparse tensor operations
+//interfaces-------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -19,7 +20,7 @@ class StageWithSortSparseOp;
 
 namespace detail {
 LogicalResult stageWithSortImpl(sparse_tensor::StageWithSortSparseOp op,
-                                PatternRewriter &rewriter, Value &tmpBufs);
+                                PatternRewriter &rewriter);
 } // namespace detail
 } // namespace sparse_tensor
 } // namespace mlir

@@ -25,8 +25,8 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/MathExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
-#include "llvm/Support/MathExtras.h"
 #include <optional>
 
 namespace mlir {
@@ -520,7 +520,9 @@ struct GlobalMemrefOpLowering
         global, arrayTy, global.getConstant(), linkage, global.getSymName(),
         initialValue, alignment, *addressSpace);
     if (!global.isExternal() && global.isUninitialized()) {
-      rewriter.createBlock(&newGlobal.getInitializerRegion());
+      Block *blk = new Block();
+      newGlobal.getInitializerRegion().push_back(blk);
+      rewriter.setInsertionPointToStart(blk);
       Value undef[] = {
           rewriter.create<LLVM::UndefOp>(global.getLoc(), arrayTy)};
       rewriter.create<LLVM::ReturnOp>(global.getLoc(), undef);
@@ -971,8 +973,8 @@ struct MemorySpaceCastOpLowering
                                resultUnderlyingDesc, resultElemPtrType);
 
       int64_t bytesToSkip =
-          2 * llvm::divideCeil(
-                  getTypeConverter()->getPointerBitwidth(resultAddrSpace), 8);
+          2 *
+          ceilDiv(getTypeConverter()->getPointerBitwidth(resultAddrSpace), 8);
       Value bytesToSkipConst = rewriter.create<LLVM::ConstantOp>(
           loc, getIndexType(), rewriter.getIndexAttr(bytesToSkip));
       Value copySize = rewriter.create<LLVM::SubOp>(
@@ -1590,26 +1592,10 @@ public:
   matchAndRewrite(memref::ExtractAlignedPointerAsIndexOp extractOp,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    BaseMemRefType sourceTy = extractOp.getSource().getType();
-
-    Value alignedPtr;
-    if (sourceTy.hasRank()) {
-      MemRefDescriptor desc(adaptor.getSource());
-      alignedPtr = desc.alignedPtr(rewriter, extractOp->getLoc());
-    } else {
-      auto elementPtrTy = LLVM::LLVMPointerType::get(
-          rewriter.getContext(), sourceTy.getMemorySpaceAsInt());
-
-      UnrankedMemRefDescriptor desc(adaptor.getSource());
-      Value descPtr = desc.memRefDescPtr(rewriter, extractOp->getLoc());
-
-      alignedPtr = UnrankedMemRefDescriptor::alignedPtr(
-          rewriter, extractOp->getLoc(), *getTypeConverter(), descPtr,
-          elementPtrTy);
-    }
-
+    MemRefDescriptor desc(adaptor.getSource());
     rewriter.replaceOpWithNewOp<LLVM::PtrToIntOp>(
-        extractOp, getTypeConverter()->getIndexType(), alignedPtr);
+        extractOp, getTypeConverter()->getIndexType(),
+        desc.alignedPtr(rewriter, extractOp->getLoc()));
     return success();
   }
 };

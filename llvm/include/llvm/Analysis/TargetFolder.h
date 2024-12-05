@@ -99,11 +99,11 @@ public:
     return FoldBinOp(Opc, LHS, RHS);
   }
 
-  Value *FoldCmp(CmpInst::Predicate P, Value *LHS, Value *RHS) const override {
+  Value *FoldICmp(CmpInst::Predicate P, Value *LHS, Value *RHS) const override {
     auto *LC = dyn_cast<Constant>(LHS);
     auto *RC = dyn_cast<Constant>(RHS);
     if (LC && RC)
-      return ConstantFoldCompareInstOperands(P, LC, RC, DL);
+      return Fold(ConstantExpr::getCompare(P, LC, RC));
     return nullptr;
   }
 
@@ -115,7 +115,7 @@ public:
   }
 
   Value *FoldGEP(Type *Ty, Value *Ptr, ArrayRef<Value *> IdxList,
-                 GEPNoWrapFlags NW) const override {
+                 bool IsInBounds = false) const override {
     if (!ConstantExpr::isSupportedGetElementPtr(Ty))
       return nullptr;
 
@@ -123,7 +123,10 @@ public:
       // Every index must be constant.
       if (any_of(IdxList, [](Value *V) { return !isa<Constant>(V); }))
         return nullptr;
-      return Fold(ConstantExpr::getGetElementPtr(Ty, PC, IdxList, NW));
+      if (IsInBounds)
+        return Fold(ConstantExpr::getInBoundsGetElementPtr(Ty, PC, IdxList));
+      else
+        return Fold(ConstantExpr::getGetElementPtr(Ty, PC, IdxList));
     }
     return nullptr;
   }
@@ -188,15 +191,6 @@ public:
     return nullptr;
   }
 
-  Value *FoldBinaryIntrinsic(Intrinsic::ID ID, Value *LHS, Value *RHS, Type *Ty,
-                             Instruction *FMFSource) const override {
-    auto *C1 = dyn_cast<Constant>(LHS);
-    auto *C2 = dyn_cast<Constant>(RHS);
-    if (C1 && C2)
-      return ConstantFoldBinaryIntrinsic(ID, C1, C2, Ty, FMFSource);
-    return nullptr;
-  }
-
   //===--------------------------------------------------------------------===//
   // Cast/Conversion Operators
   //===--------------------------------------------------------------------===//
@@ -212,6 +206,15 @@ public:
     if (C->getType() == DestTy)
       return C; // avoid calling Fold
     return Fold(ConstantExpr::getPointerBitCastOrAddrSpaceCast(C, DestTy));
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Compare Instructions
+  //===--------------------------------------------------------------------===//
+
+  Constant *CreateFCmp(CmpInst::Predicate P, Constant *LHS,
+                       Constant *RHS) const override {
+    return Fold(ConstantExpr::getCompare(P, LHS, RHS));
   }
 };
 

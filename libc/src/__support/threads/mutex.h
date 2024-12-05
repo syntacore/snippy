@@ -38,9 +38,23 @@
 // want the constructors of the Mutex classes to be constexprs.
 
 #if defined(__linux__)
-#include "src/__support/threads/linux/mutex.h"
+#include "linux/mutex.h"
 #elif defined(LIBC_TARGET_ARCH_IS_GPU)
-#include "src/__support/threads/gpu/mutex.h"
+#include "gpu/mutex.h"
 #endif // __linux__
+
+namespace LIBC_NAMESPACE {
+
+// An RAII class for easy locking and unlocking of mutexes.
+class MutexLock {
+  Mutex *mutex;
+
+public:
+  explicit MutexLock(Mutex *m) : mutex(m) { mutex->lock(); }
+
+  ~MutexLock() { mutex->unlock(); }
+};
+
+} // namespace LIBC_NAMESPACE
 
 #endif // LLVM_LIBC_SRC___SUPPORT_THREADS_MUTEX_H

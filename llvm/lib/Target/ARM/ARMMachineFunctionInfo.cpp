@@ -8,7 +8,6 @@
 
 #include "ARMMachineFunctionInfo.h"
 #include "ARMSubtarget.h"
-#include "llvm/IR/Module.h"
 
 using namespace llvm;
 
@@ -31,24 +30,44 @@ static bool GetBranchTargetEnforcement(const Function &F,
   if (!Subtarget->isMClass() || !Subtarget->hasV7Ops())
     return false;
 
-  return F.hasFnAttribute("branch-target-enforcement");
+  if (!F.hasFnAttribute("branch-target-enforcement")) {
+    if (const auto *BTE = mdconst::extract_or_null<ConstantInt>(
+            F.getParent()->getModuleFlag("branch-target-enforcement")))
+      return BTE->getZExtValue();
+    return false;
+  }
+
+  const StringRef BTIEnable =
+      F.getFnAttribute("branch-target-enforcement").getValueAsString();
+  assert(BTIEnable == "true" || BTIEnable == "false");
+  return BTIEnable == "true";
 }
 
 // The pair returns values for the ARMFunctionInfo members
 // SignReturnAddress and SignReturnAddressAll respectively.
 static std::pair<bool, bool> GetSignReturnAddress(const Function &F) {
   if (!F.hasFnAttribute("sign-return-address")) {
+    const Module &M = *F.getParent();
+    if (const auto *Sign = mdconst::extract_or_null<ConstantInt>(
+            M.getModuleFlag("sign-return-address"))) {
+      if (Sign->getZExtValue()) {
+        if (const auto *All = mdconst::extract_or_null<ConstantInt>(
+                M.getModuleFlag("sign-return-address-all")))
+          return {true, All->getZExtValue()};
+        return {true, false};
+      }
+    }
     return {false, false};
   }
 
   StringRef Scope = F.getFnAttribute("sign-return-address").getValueAsString();
-  if (Scope == "none")
+  if (Scope.equals("none"))
     return {false, false};
 
-  if (Scope == "all")
+  if (Scope.equals("all"))
     return {true, true};
 
-  assert(Scope == "non-leaf");
+  assert(Scope.equals("non-leaf"));
   return {true, false};
 }
 

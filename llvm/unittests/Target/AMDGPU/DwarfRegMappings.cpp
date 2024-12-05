@@ -29,7 +29,6 @@ TEST(AMDGPU, TestWave64DwarfRegMapping) {
              {16, 17, 32, 95, 1088, 1129, 2560, 2815, 3072, 3327}) {
           MCRegister PCReg(*MRI->getLLVMRegNum(llvmReg, false));
           EXPECT_EQ(llvmReg, MRI->getDwarfRegNum(PCReg, false));
-          EXPECT_EQ(llvmReg, MRI->getDwarfRegNum(PCReg, true));
         }
       }
     }
@@ -53,7 +52,6 @@ TEST(AMDGPU, TestWave32DwarfRegMapping) {
              {16, 1, 32, 95, 1088, 1129, 1536, 1791, 2048, 2303}) {
           MCRegister PCReg(*MRI->getLLVMRegNum(llvmReg, false));
           EXPECT_EQ(llvmReg, MRI->getDwarfRegNum(PCReg, false));
-          EXPECT_EQ(llvmReg, MRI->getDwarfRegNum(PCReg, true));
         }
       }
     }

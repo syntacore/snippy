@@ -27,6 +27,7 @@
 #include "bolt/Passes/Inliner.h"
 #include "bolt/Core/MCPlus.h"
 #include "llvm/Support/CommandLine.h"
+#include <map>
 
 #define DEBUG_TYPE "bolt-inliner"
 
@@ -355,9 +356,7 @@ Inliner::inlineCall(BinaryBasicBlock &CallerBB,
     std::vector<BinaryBasicBlock *> Successors(BB.succ_size());
     llvm::transform(BB.successors(), Successors.begin(),
                     [&InlinedBBMap](const BinaryBasicBlock *BB) {
-                      auto It = InlinedBBMap.find(BB);
-                      assert(It != InlinedBBMap.end());
-                      return It->second;
+                      return InlinedBBMap.at(BB);
                     });
 
     if (CallerFunction.hasValidProfile() && Callee.hasValidProfile())
@@ -497,11 +496,11 @@ bool Inliner::inlineCallsInFunction(BinaryFunction &Function) {
   return DidInlining;
 }
 
-Error Inliner::runOnFunctions(BinaryContext &BC) {
+void Inliner::runOnFunctions(BinaryContext &BC) {
   opts::syncOptions();
 
   if (!opts::inliningEnabled())
-    return Error::success();
+    return;
 
   bool InlinedOnce;
   unsigned NumIters = 0;
@@ -541,11 +540,10 @@ Error Inliner::runOnFunctions(BinaryContext &BC) {
   } while (InlinedOnce && NumIters < opts::InlineMaxIters);
 
   if (NumInlinedCallSites)
-    BC.outs() << "BOLT-INFO: inlined " << NumInlinedDynamicCalls << " calls at "
-              << NumInlinedCallSites << " call sites in " << NumIters
-              << " iteration(s). Change in binary size: " << TotalInlinedBytes
-              << " bytes.\n";
-  return Error::success();
+    outs() << "BOLT-INFO: inlined " << NumInlinedDynamicCalls << " calls at "
+           << NumInlinedCallSites << " call sites in " << NumIters
+           << " iteration(s). Change in binary size: " << TotalInlinedBytes
+           << " bytes.\n";
 }
 
 } // namespace bolt

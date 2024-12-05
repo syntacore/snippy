@@ -34,7 +34,6 @@
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Casting.h"
-#include "llvm/Support/ErrorHandling.h"
 #include <cassert>
 #include <cstdint>
 #include <limits>
@@ -100,8 +99,6 @@ public:
 #define REGION(Id, Parent) Id ## Kind,
 #define REGION_RANGE(Id, First, Last) BEGIN_##Id = First, END_##Id = Last,
 #include "clang/StaticAnalyzer/Core/PathSensitive/Regions.def"
-#undef REGION
-#undef REGION_RANGE
   };
 
 private:
@@ -173,8 +170,6 @@ public:
   virtual void printPrettyAsExpr(raw_ostream &os) const;
 
   Kind getKind() const { return kind; }
-
-  StringRef getKindStr() const;
 
   template<typename RegionTy> const RegionTy* getAs() const;
   template <typename RegionTy>
@@ -786,7 +781,7 @@ class SymbolicRegion : public SubRegion {
       : SubRegion(sreg, SymbolicRegionKind), sym(s) {
     // Because pointer arithmetic is represented by ElementRegion layers,
     // the base symbol here should not contain any arithmetic.
-    assert(isa_and_nonnull<SymbolData>(s));
+    assert(s && isa<SymbolData>(s));
     assert(s->getType()->isAnyPointerType() ||
            s->getType()->isReferenceType() ||
            s->getType()->isBlockPointerType());
@@ -1508,7 +1503,7 @@ public:
   ///  associated element type, index, and super region.
   const ElementRegion *getElementRegion(QualType elementType, NonLoc Idx,
                                         const SubRegion *superRegion,
-                                        const ASTContext &Ctx);
+                                        ASTContext &Ctx);
 
   const ElementRegion *getElementRegionWithSuper(const ElementRegion *ER,
                                                  const SubRegion *superRegion) {

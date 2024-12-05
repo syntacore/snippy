@@ -17,6 +17,7 @@
 
 #include "bolt/Core/Linker.h"
 #include "llvm/ADT/StringRef.h"
+#include <functional>
 #include <vector>
 
 namespace llvm {

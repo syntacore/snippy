@@ -202,9 +202,11 @@ void R600SchedStrategy::releaseBottomNode(SUnit *SU) {
 
 bool R600SchedStrategy::regBelongsToClass(Register Reg,
                                           const TargetRegisterClass *RC) const {
-  if (!Reg.isVirtual())
+  if (!Reg.isVirtual()) {
     return RC->contains(Reg);
-  return MRI->getRegClass(Reg) == RC;
+  } else {
+    return MRI->getRegClass(Reg) == RC;
+  }
 }
 
 R600SchedStrategy::AluKind R600SchedStrategy::getAluKind(SUnit *SU) const {
@@ -317,8 +319,9 @@ SUnit *R600SchedStrategy::PopInst(std::vector<SUnit *> &Q, bool AnyALU) {
       InstructionsGroupCandidate.pop_back();
       Q.erase((It + 1).base());
       return SU;
+    } else {
+      InstructionsGroupCandidate.pop_back();
     }
-    InstructionsGroupCandidate.pop_back();
   }
   return nullptr;
 }

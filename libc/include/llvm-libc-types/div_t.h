@@ -6,12 +6,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_DIV_T_H
-#define LLVM_LIBC_TYPES_DIV_T_H
+#ifndef __LLVM_LIBC_TYPES_DIV_T_H__
+#define __LLVM_LIBC_TYPES_DIV_T_H__
 
 typedef struct {
   int quot;
   int rem;
 } div_t;
 
-#endif // LLVM_LIBC_TYPES_DIV_T_H
+#endif // __LLVM_LIBC_TYPES_DIV_T_H__

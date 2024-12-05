@@ -73,10 +73,7 @@ Each toolchain provides a good reference for what it accepts:
 
   * libstdc++: https://gcc.gnu.org/onlinedocs/libstdc++/manual/status.html#status.iso.2017
 
-* MSVC: https://learn.microsoft.com/cpp/overview/visual-cpp-language-conformance
-
-Additionally, there are compiler comparison tables of supported C++ features on
-`cppreference.com <https://en.cppreference.com/w/cpp/compiler_support/17>`_.
+* MSVC: https://msdn.microsoft.com/en-us/library/hh567368.aspx
 
 
 C++ Standard Library

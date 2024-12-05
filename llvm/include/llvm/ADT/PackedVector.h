@@ -141,8 +141,6 @@ public:
     Bits |= RHS.Bits;
     return *this;
   }
-
-  const BitVectorTy &raw_bits() const { return Bits; }
 };
 
 // Leave BitNum=0 undefined.

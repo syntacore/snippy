@@ -22,7 +22,6 @@ class MCSection;
 class MCSubtargetInfo;
 class MCSymbol;
 class StringRef;
-class WinCOFFObjectWriter;
 class raw_pwrite_stream;
 
 class MCWinCOFFStreamer : public MCObjectStreamer {
@@ -37,13 +36,10 @@ public:
     MCObjectStreamer::reset();
   }
 
-  WinCOFFObjectWriter &getWriter();
-
   /// \name MCStreamer interface
   /// \{
 
   void initSections(bool NoExecStack, const MCSubtargetInfo &STI) override;
-  void changeSection(MCSection *Section, uint32_t Subsection = 0) override;
   void emitLabel(MCSymbol *Symbol, SMLoc Loc = SMLoc()) override;
   void emitAssemblerFlag(MCAssemblerFlag Flag) override;
   void emitThumbFunc(MCSymbol *Func) override;
@@ -81,6 +77,7 @@ protected:
   void emitInstToData(const MCInst &Inst, const MCSubtargetInfo &STI) override;
 
   void finalizeCGProfileEntry(const MCSymbolRefExpr *&S);
+  void finalizeCGProfile();
 
 private:
   void Error(const Twine &Msg) const;

@@ -435,9 +435,11 @@ static std::string replaceDotDot(StringRef Path) {
   llvm::sys::path::const_iterator B = llvm::sys::path::begin(Path),
     E = llvm::sys::path::end(Path);
   while (B != E) {
-    if (*B == "..")
+    if (B->compare(".") == 0) {
+    }
+    else if (B->compare("..") == 0)
       llvm::sys::path::remove_filename(Buffer);
-    else if (*B != ".")
+    else
       llvm::sys::path::append(Buffer, *B);
     ++B;
   }
@@ -485,7 +487,7 @@ std::string ModularizeUtilities::getDirectoryFromPath(StringRef Path) {
   sys::path::remove_filename(Directory);
   if (Directory.size() == 0)
     return ".";
-  return std::string(Directory);
+  return std::string(Directory.str());
 }
 
 // Add unique problem file.

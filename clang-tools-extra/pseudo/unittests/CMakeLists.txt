@@ -3,7 +3,6 @@ set(LLVM_LINK_COMPONENTS
   )
 
 add_custom_target(ClangPseudoUnitTests)
-set_target_properties(ClangPseudoUnitTests PROPERTIES FOLDER "Clang Tools Extra/Tests")
 add_unittest(ClangPseudoUnitTests ClangPseudoTests
   BracketTest.cpp
   CXXTest.cpp

@@ -402,5 +402,11 @@ SBListener SBLaunchInfo::GetShadowListener() {
 void SBLaunchInfo::SetShadowListener(SBListener &listener) {
   LLDB_INSTRUMENT_VA(this, listener);
 
-  m_opaque_sp->SetShadowListener(listener.GetSP());
+  ListenerSP listener_sp = listener.GetSP();
+  if (listener_sp && listener.IsValid())
+    listener_sp->SetShadow(true);
+  else
+    listener_sp = nullptr;
+
+  m_opaque_sp->SetShadowListener(listener_sp);
 }

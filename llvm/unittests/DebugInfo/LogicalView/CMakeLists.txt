@@ -12,7 +12,7 @@ add_llvm_unittest_with_input_files(DebugInfoLogicalViewTests
   CodeViewReaderTest.cpp
   CommandLineOptionsTest.cpp
   CompareElementsTest.cpp
-  DWARFReaderTest.cpp
+  ELFReaderTest.cpp
   SelectElementsTest.cpp
   LocationRangesTest.cpp
   LogicalElementsTest.cpp

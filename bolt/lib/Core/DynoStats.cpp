@@ -99,7 +99,7 @@ void DynoStats::print(raw_ostream &OS, const DynoStats *Other,
     printStatWithDelta(Desc[Stat], Stats[Stat], Other ? (*Other)[Stat] : 0);
   }
   if (opts::PrintDynoOpcodeStat && Printer) {
-    OS << "\nProgram-wide opcode histogram:\n";
+    outs() << "\nProgram-wide opcode histogram:\n";
     OS << "              Opcode,   Execution Count,     Max Exec Count, "
           "Function Name:Offset ...\n";
     std::vector<std::pair<uint64_t, unsigned>> SortedHistogram;
@@ -114,9 +114,8 @@ void DynoStats::print(raw_ostream &OS, const DynoStats *Other,
     for (auto &Stat : llvm::reverse(SortedHistogram)) {
       OS << format("%20s,%'18lld", Printer->getOpcodeName(Stat.second).data(),
                    Stat.first * opts::DynoStatsScale);
-      auto It = OpcodeHistogram.find(Stat.second);
-      assert(It != OpcodeHistogram.end());
-      MaxOpcodeHistogramTy MaxMultiMap = It->second.second;
+
+      MaxOpcodeHistogramTy MaxMultiMap = OpcodeHistogram.at(Stat.second).second;
       // Start with function name:BB offset with highest execution count.
       for (auto &Max : llvm::reverse(MaxMultiMap)) {
         OS << format(", %'18lld, ", Max.first * opts::DynoStatsScale)

@@ -16,24 +16,22 @@
 
 #include "MCTargetDesc/WebAssemblyMCTargetDesc.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/CodeGen/RuntimeLibcallUtil.h"
+#include "llvm/CodeGen/RuntimeLibcalls.h"
 
 namespace llvm {
 
 class WebAssemblySubtarget;
 
-namespace WebAssembly {
+extern void getLibcallSignature(const WebAssemblySubtarget &Subtarget,
+                                RTLIB::Libcall LC,
+                                SmallVectorImpl<wasm::ValType> &Rets,
+                                SmallVectorImpl<wasm::ValType> &Params);
 
-void getLibcallSignature(const WebAssemblySubtarget &Subtarget,
-                         RTLIB::Libcall LC,
-                         SmallVectorImpl<wasm::ValType> &Rets,
-                         SmallVectorImpl<wasm::ValType> &Params);
+extern void getLibcallSignature(const WebAssemblySubtarget &Subtarget,
+                                StringRef Name,
+                                SmallVectorImpl<wasm::ValType> &Rets,
+                                SmallVectorImpl<wasm::ValType> &Params);
 
-void getLibcallSignature(const WebAssemblySubtarget &Subtarget, StringRef Name,
-                         SmallVectorImpl<wasm::ValType> &Rets,
-                         SmallVectorImpl<wasm::ValType> &Params);
-
-} // end namespace WebAssembly
 } // end namespace llvm
 
 #endif

@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only -std=c++20 -verify %s
-// RUN: %clang_cc1 -fsyntax-only -std=c++20 -verify %s -fexperimental-new-constant-interpreter
 
 template <typename Iterator> class normal_iterator {};
 

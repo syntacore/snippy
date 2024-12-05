@@ -18,7 +18,6 @@
 #include "polly/ScopPass.h"
 #include "polly/Support/ISLOStream.h"
 #include "polly/Support/ISLTools.h"
-#include "polly/Support/PollyDebug.h"
 #define DEBUG_TYPE "polly-flatten-schedule"
 
 using namespace polly;
@@ -58,23 +57,23 @@ public:
     // OldSchedule.
     IslCtx = S.getSharedIslCtx();
 
-    POLLY_DEBUG(dbgs() << "Going to flatten old schedule:\n");
+    LLVM_DEBUG(dbgs() << "Going to flatten old schedule:\n");
     OldSchedule = S.getSchedule();
-    POLLY_DEBUG(printSchedule(dbgs(), OldSchedule, 2));
+    LLVM_DEBUG(printSchedule(dbgs(), OldSchedule, 2));
 
     auto Domains = S.getDomains();
     auto RestrictedOldSchedule = OldSchedule.intersect_domain(Domains);
-    POLLY_DEBUG(dbgs() << "Old schedule with domains:\n");
-    POLLY_DEBUG(printSchedule(dbgs(), RestrictedOldSchedule, 2));
+    LLVM_DEBUG(dbgs() << "Old schedule with domains:\n");
+    LLVM_DEBUG(printSchedule(dbgs(), RestrictedOldSchedule, 2));
 
     auto NewSchedule = flattenSchedule(RestrictedOldSchedule);
 
-    POLLY_DEBUG(dbgs() << "Flattened new schedule:\n");
-    POLLY_DEBUG(printSchedule(dbgs(), NewSchedule, 2));
+    LLVM_DEBUG(dbgs() << "Flattened new schedule:\n");
+    LLVM_DEBUG(printSchedule(dbgs(), NewSchedule, 2));
 
     NewSchedule = NewSchedule.gist_domain(Domains);
-    POLLY_DEBUG(dbgs() << "Gisted, flattened new schedule:\n");
-    POLLY_DEBUG(printSchedule(dbgs(), NewSchedule, 2));
+    LLVM_DEBUG(dbgs() << "Gisted, flattened new schedule:\n");
+    LLVM_DEBUG(printSchedule(dbgs(), NewSchedule, 2));
 
     S.setSchedule(NewSchedule);
     return false;

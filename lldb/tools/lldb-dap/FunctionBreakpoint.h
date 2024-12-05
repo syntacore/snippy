@@ -9,11 +9,11 @@
 #ifndef LLDB_TOOLS_LLDB_DAP_FUNCTIONBREAKPOINT_H
 #define LLDB_TOOLS_LLDB_DAP_FUNCTIONBREAKPOINT_H
 
-#include "Breakpoint.h"
+#include "BreakpointBase.h"
 
 namespace lldb_dap {
 
-struct FunctionBreakpoint : public Breakpoint {
+struct FunctionBreakpoint : public BreakpointBase {
   std::string functionName;
 
   FunctionBreakpoint() = default;

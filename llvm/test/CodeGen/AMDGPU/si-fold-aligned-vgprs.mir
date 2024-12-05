@@ -16,7 +16,6 @@ body:             |
     ; GFX908-NEXT: [[COPY:%[0-9]+]]:vreg_64_align2 = COPY $vgpr0_vgpr1
     ; GFX908-NEXT: [[DEF:%[0-9]+]]:vreg_64_align2 = IMPLICIT_DEF
     ; GFX908-NEXT: GLOBAL_STORE_DWORDX2 [[COPY]], [[DEF]], 0, 0, implicit $exec
-    ;
     ; GFX90A-LABEL: name: aligned_vgpr_64
     ; GFX90A: liveins: $vgpr0_vgpr1
     ; GFX90A-NEXT: {{  $}}
@@ -41,7 +40,6 @@ body:             |
     ; GFX908-NEXT: [[COPY:%[0-9]+]]:vreg_64_align2 = COPY $vgpr0_vgpr1
     ; GFX908-NEXT: [[DEF:%[0-9]+]]:vreg_64 = IMPLICIT_DEF
     ; GFX908-NEXT: GLOBAL_STORE_DWORDX2 [[COPY]], [[DEF]], 0, 0, implicit $exec
-    ;
     ; GFX90A-LABEL: name: unaligned_vgpr_64
     ; GFX90A: liveins: $vgpr0_vgpr1
     ; GFX90A-NEXT: {{  $}}
@@ -67,7 +65,6 @@ body:             |
     ; GFX908-NEXT: [[COPY:%[0-9]+]]:vreg_64_align2 = COPY $vgpr0_vgpr1
     ; GFX908-NEXT: [[DEF:%[0-9]+]]:vreg_96_align2 = IMPLICIT_DEF
     ; GFX908-NEXT: GLOBAL_STORE_DWORDX2 [[COPY]], [[DEF]].sub0_sub1, 0, 0, implicit $exec
-    ;
     ; GFX90A-LABEL: name: aligned_vgpr_96_sub0_subg1
     ; GFX90A: liveins: $vgpr0_vgpr1
     ; GFX90A-NEXT: {{  $}}
@@ -92,7 +89,6 @@ body:             |
     ; GFX908-NEXT: [[COPY:%[0-9]+]]:vreg_64_align2 = COPY $vgpr0_vgpr1
     ; GFX908-NEXT: [[DEF:%[0-9]+]]:vreg_96_align2 = IMPLICIT_DEF
     ; GFX908-NEXT: GLOBAL_STORE_DWORDX2 [[COPY]], [[DEF]].sub1_sub2, 0, 0, implicit $exec
-    ;
     ; GFX90A-LABEL: name: unaligned_vgpr_96_sub1_sub2
     ; GFX90A: liveins: $vgpr0_vgpr1
     ; GFX90A-NEXT: {{  $}}
@@ -118,7 +114,6 @@ body:             |
     ; GFX908-NEXT: [[COPY:%[0-9]+]]:vreg_64_align2 = COPY $vgpr0_vgpr1
     ; GFX908-NEXT: [[DEF:%[0-9]+]]:vreg_96_align2 = IMPLICIT_DEF
     ; GFX908-NEXT: GLOBAL_STORE_DWORDX3 [[COPY]], [[DEF]], 0, 0, implicit $exec
-    ;
     ; GFX90A-LABEL: name: aligned_vgpr_96
     ; GFX90A: liveins: $vgpr0_vgpr1
     ; GFX90A-NEXT: {{  $}}
@@ -143,7 +138,6 @@ body:             |
     ; GFX908-NEXT: [[COPY:%[0-9]+]]:vreg_64_align2 = COPY $vgpr0_vgpr1
     ; GFX908-NEXT: [[DEF:%[0-9]+]]:vreg_96 = IMPLICIT_DEF
     ; GFX908-NEXT: GLOBAL_STORE_DWORDX3 [[COPY]], [[DEF]], 0, 0, implicit $exec
-    ;
     ; GFX90A-LABEL: name: unaligned_vgpr_96
     ; GFX90A: liveins: $vgpr0_vgpr1
     ; GFX90A-NEXT: {{  $}}
@@ -169,7 +163,6 @@ body:             |
     ; GFX908-NEXT: [[COPY:%[0-9]+]]:vreg_64_align2 = COPY $vgpr0_vgpr1
     ; GFX908-NEXT: [[DEF:%[0-9]+]]:vreg_128_align2 = IMPLICIT_DEF
     ; GFX908-NEXT: GLOBAL_STORE_DWORDX2 [[COPY]], [[DEF]].sub0_sub1, 0, 0, implicit $exec
-    ;
     ; GFX90A-LABEL: name: aligned_vgpr_128_sub0_sub1
     ; GFX90A: liveins: $vgpr0_vgpr1
     ; GFX90A-NEXT: {{  $}}
@@ -194,7 +187,6 @@ body:             |
     ; GFX908-NEXT: [[COPY:%[0-9]+]]:vreg_64_align2 = COPY $vgpr0_vgpr1
     ; GFX908-NEXT: [[DEF:%[0-9]+]]:vreg_128_align2 = IMPLICIT_DEF
     ; GFX908-NEXT: GLOBAL_STORE_DWORDX2 [[COPY]], [[DEF]].sub2_sub3, 0, 0, implicit $exec
-    ;
     ; GFX90A-LABEL: name: aligned_vgpr_128_sub2_sub3
     ; GFX90A: liveins: $vgpr0_vgpr1
     ; GFX90A-NEXT: {{  $}}
@@ -219,7 +211,6 @@ body:             |
     ; GFX908-NEXT: [[COPY:%[0-9]+]]:vreg_64_align2 = COPY $vgpr0_vgpr1
     ; GFX908-NEXT: [[DEF:%[0-9]+]]:vreg_128_align2 = IMPLICIT_DEF
     ; GFX908-NEXT: GLOBAL_STORE_DWORDX2 [[COPY]], [[DEF]].sub1_sub2, 0, 0, implicit $exec
-    ;
     ; GFX90A-LABEL: name: unaligned_vgpr_128_sub1_sub2
     ; GFX90A: liveins: $vgpr0_vgpr1
     ; GFX90A-NEXT: {{  $}}
@@ -245,7 +236,6 @@ body:             |
     ; GFX908-NEXT: [[COPY:%[0-9]+]]:vreg_64_align2 = COPY $vgpr0_vgpr1
     ; GFX908-NEXT: [[DEF:%[0-9]+]]:vreg_128_align2 = IMPLICIT_DEF
     ; GFX908-NEXT: GLOBAL_STORE_DWORDX3 [[COPY]], [[DEF]].sub0_sub1_sub2, 0, 0, implicit $exec
-    ;
     ; GFX90A-LABEL: name: aligned_vgpr_128_sub0_sub1_sub2
     ; GFX90A: liveins: $vgpr0_vgpr1
     ; GFX90A-NEXT: {{  $}}
@@ -270,7 +260,6 @@ body:             |
     ; GFX908-NEXT: [[COPY:%[0-9]+]]:vreg_64_align2 = COPY $vgpr0_vgpr1
     ; GFX908-NEXT: [[DEF:%[0-9]+]]:vreg_128_align2 = IMPLICIT_DEF
     ; GFX908-NEXT: GLOBAL_STORE_DWORDX3 [[COPY]], [[DEF]].sub1_sub2_sub3, 0, 0, implicit $exec
-    ;
     ; GFX90A-LABEL: name: unaligned_vgpr_128_sub1_sub2_sub3
     ; GFX90A: liveins: $vgpr0_vgpr1
     ; GFX90A-NEXT: {{  $}}
@@ -296,7 +285,6 @@ body:             |
     ; GFX908-NEXT: [[COPY:%[0-9]+]]:vreg_64_align2 = COPY $vgpr0_vgpr1
     ; GFX908-NEXT: [[DEF:%[0-9]+]]:vreg_128_align2 = IMPLICIT_DEF
     ; GFX908-NEXT: GLOBAL_STORE_DWORDX4 [[COPY]], [[DEF]], 0, 0, implicit $exec
-    ;
     ; GFX90A-LABEL: name: aligned_vgpr_128
     ; GFX90A: liveins: $vgpr0_vgpr1
     ; GFX90A-NEXT: {{  $}}
@@ -321,7 +309,6 @@ body:             |
     ; GFX908-NEXT: [[COPY:%[0-9]+]]:vreg_64_align2 = COPY $vgpr0_vgpr1
     ; GFX908-NEXT: [[DEF:%[0-9]+]]:vreg_128 = IMPLICIT_DEF
     ; GFX908-NEXT: GLOBAL_STORE_DWORDX4 [[COPY]], [[DEF]], 0, 0, implicit $exec
-    ;
     ; GFX90A-LABEL: name: unaligned_vgpr_128
     ; GFX90A: liveins: $vgpr0_vgpr1
     ; GFX90A-NEXT: {{  $}}

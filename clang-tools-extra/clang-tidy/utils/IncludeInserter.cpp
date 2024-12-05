@@ -25,8 +25,7 @@ public:
                           bool IsAngled, CharSourceRange FileNameRange,
                           OptionalFileEntryRef /*IncludedFile*/,
                           StringRef /*SearchPath*/, StringRef /*RelativePath*/,
-                          const Module * /*SuggestedModule*/,
-                          bool /*ModuleImported*/,
+                          const Module * /*ImportedModule*/,
                           SrcMgr::CharacteristicKind /*FileType*/) override {
     Inserter->addInclude(FileNameRef, IsAngled, HashLocation,
                          IncludeToken.getEndLoc());

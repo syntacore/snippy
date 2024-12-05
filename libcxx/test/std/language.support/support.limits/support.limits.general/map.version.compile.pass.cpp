@@ -19,12 +19,12 @@
     __cpp_lib_allocator_traits_is_always_equal       201411L [C++17]
     __cpp_lib_associative_heterogeneous_erasure      202110L [C++23]
     __cpp_lib_associative_heterogeneous_insertion    202306L [C++26]
-    __cpp_lib_containers_ranges                      202202L [C++23]
     __cpp_lib_erase_if                               202002L [C++20]
     __cpp_lib_generic_associative_lookup             201304L [C++14]
     __cpp_lib_map_try_emplace                        201411L [C++17]
     __cpp_lib_node_extract                           201606L [C++17]
     __cpp_lib_nonmember_container_access             201411L [C++17]
+    __cpp_lib_ranges_to_container                    202202L [C++23]
     __cpp_lib_tuple_like                             202207L [C++23]
                                                      202311L [C++26]
 */
@@ -44,10 +44,6 @@
 
 # ifdef __cpp_lib_associative_heterogeneous_insertion
 #   error "__cpp_lib_associative_heterogeneous_insertion should not be defined before c++26"
-# endif
-
-# ifdef __cpp_lib_containers_ranges
-#   error "__cpp_lib_containers_ranges should not be defined before c++23"
 # endif
 
 # ifdef __cpp_lib_erase_if
@@ -70,6 +66,10 @@
 #   error "__cpp_lib_nonmember_container_access should not be defined before c++17"
 # endif
 
+# ifdef __cpp_lib_ranges_to_container
+#   error "__cpp_lib_ranges_to_container should not be defined before c++23"
+# endif
+
 # ifdef __cpp_lib_tuple_like
 #   error "__cpp_lib_tuple_like should not be defined before c++23"
 # endif
@@ -86,10 +86,6 @@
 
 # ifdef __cpp_lib_associative_heterogeneous_insertion
 #   error "__cpp_lib_associative_heterogeneous_insertion should not be defined before c++26"
-# endif
-
-# ifdef __cpp_lib_containers_ranges
-#   error "__cpp_lib_containers_ranges should not be defined before c++23"
 # endif
 
 # ifdef __cpp_lib_erase_if
@@ -115,6 +111,10 @@
 #   error "__cpp_lib_nonmember_container_access should not be defined before c++17"
 # endif
 
+# ifdef __cpp_lib_ranges_to_container
+#   error "__cpp_lib_ranges_to_container should not be defined before c++23"
+# endif
+
 # ifdef __cpp_lib_tuple_like
 #   error "__cpp_lib_tuple_like should not be defined before c++23"
 # endif
@@ -134,10 +134,6 @@
 
 # ifdef __cpp_lib_associative_heterogeneous_insertion
 #   error "__cpp_lib_associative_heterogeneous_insertion should not be defined before c++26"
-# endif
-
-# ifdef __cpp_lib_containers_ranges
-#   error "__cpp_lib_containers_ranges should not be defined before c++23"
 # endif
 
 # ifdef __cpp_lib_erase_if
@@ -172,6 +168,10 @@
 #   error "__cpp_lib_nonmember_container_access should have the value 201411L in c++17"
 # endif
 
+# ifdef __cpp_lib_ranges_to_container
+#   error "__cpp_lib_ranges_to_container should not be defined before c++23"
+# endif
+
 # ifdef __cpp_lib_tuple_like
 #   error "__cpp_lib_tuple_like should not be defined before c++23"
 # endif
@@ -191,10 +191,6 @@
 
 # ifdef __cpp_lib_associative_heterogeneous_insertion
 #   error "__cpp_lib_associative_heterogeneous_insertion should not be defined before c++26"
-# endif
-
-# ifdef __cpp_lib_containers_ranges
-#   error "__cpp_lib_containers_ranges should not be defined before c++23"
 # endif
 
 # ifndef __cpp_lib_erase_if
@@ -232,6 +228,10 @@
 #   error "__cpp_lib_nonmember_container_access should have the value 201411L in c++20"
 # endif
 
+# ifdef __cpp_lib_ranges_to_container
+#   error "__cpp_lib_ranges_to_container should not be defined before c++23"
+# endif
+
 # ifdef __cpp_lib_tuple_like
 #   error "__cpp_lib_tuple_like should not be defined before c++23"
 # endif
@@ -260,13 +260,6 @@
 
 # ifdef __cpp_lib_associative_heterogeneous_insertion
 #   error "__cpp_lib_associative_heterogeneous_insertion should not be defined before c++26"
-# endif
-
-# ifndef __cpp_lib_containers_ranges
-#   error "__cpp_lib_containers_ranges should be defined in c++23"
-# endif
-# if __cpp_lib_containers_ranges != 202202L
-#   error "__cpp_lib_containers_ranges should have the value 202202L in c++23"
 # endif
 
 # ifndef __cpp_lib_erase_if
@@ -302,6 +295,13 @@
 # endif
 # if __cpp_lib_nonmember_container_access != 201411L
 #   error "__cpp_lib_nonmember_container_access should have the value 201411L in c++23"
+# endif
+
+# ifndef __cpp_lib_ranges_to_container
+#   error "__cpp_lib_ranges_to_container should be defined in c++23"
+# endif
+# if __cpp_lib_ranges_to_container != 202202L
+#   error "__cpp_lib_ranges_to_container should have the value 202202L in c++23"
 # endif
 
 # if !defined(_LIBCPP_VERSION)
@@ -352,13 +352,6 @@
 #   endif
 # endif
 
-# ifndef __cpp_lib_containers_ranges
-#   error "__cpp_lib_containers_ranges should be defined in c++26"
-# endif
-# if __cpp_lib_containers_ranges != 202202L
-#   error "__cpp_lib_containers_ranges should have the value 202202L in c++26"
-# endif
-
 # ifndef __cpp_lib_erase_if
 #   error "__cpp_lib_erase_if should be defined in c++26"
 # endif
@@ -392,6 +385,13 @@
 # endif
 # if __cpp_lib_nonmember_container_access != 201411L
 #   error "__cpp_lib_nonmember_container_access should have the value 201411L in c++26"
+# endif
+
+# ifndef __cpp_lib_ranges_to_container
+#   error "__cpp_lib_ranges_to_container should be defined in c++26"
+# endif
+# if __cpp_lib_ranges_to_container != 202202L
+#   error "__cpp_lib_ranges_to_container should have the value 202202L in c++26"
 # endif
 
 # if !defined(_LIBCPP_VERSION)

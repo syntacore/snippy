@@ -38,8 +38,6 @@ static const MCPhysReg QRegList[] = {AArch64::Q0, AArch64::Q1, AArch64::Q2,
 static const MCPhysReg ZRegList[] = {AArch64::Z0, AArch64::Z1, AArch64::Z2,
                                      AArch64::Z3, AArch64::Z4, AArch64::Z5,
                                      AArch64::Z6, AArch64::Z7};
-static const MCPhysReg PRegList[] = {AArch64::P0, AArch64::P1, AArch64::P2,
-                                     AArch64::P3};
 
 static bool finishStackBlock(SmallVectorImpl<CCValAssign> &PendingMembers,
                              MVT LocVT, ISD::ArgFlagsTy &ArgFlags,
@@ -61,16 +59,10 @@ static bool finishStackBlock(SmallVectorImpl<CCValAssign> &PendingMembers,
     // CCAssignFn again we want it to behave as if all remaining registers are
     // allocated. This will force the code to pass the tuple indirectly in
     // accordance with the PCS.
-    bool ZRegsAllocated[8];
+    bool RegsAllocated[8];
     for (int I = 0; I < 8; I++) {
-      ZRegsAllocated[I] = State.isAllocated(ZRegList[I]);
+      RegsAllocated[I] = State.isAllocated(ZRegList[I]);
       State.AllocateReg(ZRegList[I]);
-    }
-    // The same applies to P registers.
-    bool PRegsAllocated[4];
-    for (int I = 0; I < 4; I++) {
-      PRegsAllocated[I] = State.isAllocated(PRegList[I]);
-      State.AllocateReg(PRegList[I]);
     }
 
     auto &It = PendingMembers[0];
@@ -87,11 +79,8 @@ static bool finishStackBlock(SmallVectorImpl<CCValAssign> &PendingMembers,
     // Return the register state back to how it was before, leaving any
     // unallocated registers available for other smaller types.
     for (int I = 0; I < 8; I++)
-      if (!ZRegsAllocated[I])
+      if (!RegsAllocated[I])
         State.DeallocateReg(ZRegList[I]);
-    for (int I = 0; I < 4; I++)
-      if (!PRegsAllocated[I])
-        State.DeallocateReg(PRegList[I]);
 
     // All pending members have now been allocated
     PendingMembers.clear();
@@ -151,15 +140,9 @@ static bool CC_AArch64_Custom_Block(unsigned &ValNo, MVT &ValVT, MVT &LocVT,
     RegList = DRegList;
   else if (LocVT.SimpleTy == MVT::f128 || LocVT.is128BitVector())
     RegList = QRegList;
-  else if (LocVT.isScalableVector()) {
-    // Scalable masks should be pass by Predicate registers.
-    if (LocVT == MVT::nxv1i1 || LocVT == MVT::nxv2i1 || LocVT == MVT::nxv4i1 ||
-        LocVT == MVT::nxv8i1 || LocVT == MVT::nxv16i1 ||
-        LocVT == MVT::aarch64svcount)
-      RegList = PRegList;
-    else
-      RegList = ZRegList;
-  } else {
+  else if (LocVT.isScalableVector())
+    RegList = ZRegList;
+  else {
     // Not an array we want to split up after all.
     return false;
   }

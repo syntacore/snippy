@@ -57,10 +57,5 @@ template <typename A> common::IfNoLvalue<std::list<A>, A> singletonList(A &&x) {
   result.emplace_back(std::move(x));
   return result;
 }
-
-template <typename A>
-common::IfNoLvalue<std::optional<A>, A> presentOptional(A &&x) {
-  return std::make_optional(std::move(x));
-}
 } // namespace Fortran::parser
 #endif

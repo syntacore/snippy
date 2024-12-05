@@ -1,11 +1,4 @@
-//===- bolt/tools/heatmap/heatmap.cpp - Profile heatmap visualization tool ===//
-//
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
-
+#include "bolt/Profile/DataAggregator.h"
 #include "bolt/Rewrite/RewriteInstance.h"
 #include "bolt/Utils/CommandLineOpts.h"
 #include "llvm/MC/TargetRegistry.h"
@@ -13,8 +6,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/Error.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Program.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
 
 using namespace llvm;

@@ -13,17 +13,16 @@
 #include "FPBits.h"
 #include "rounding_mode.h"
 
-#include "hdr/math_macros.h"
 #include "src/__support/CPP/type_traits.h"
 #include "src/__support/common.h"
-#include "src/__support/macros/config.h"
 
-namespace LIBC_NAMESPACE_DECL {
+#include <math.h>
+
+namespace LIBC_NAMESPACE {
 namespace fputil {
 
 template <typename T, cpp::enable_if_t<cpp::is_floating_point_v<T>, int> = 0>
 LIBC_INLINE T trunc(T x) {
-  using StorageType = typename FPBits<T>::StorageType;
   FPBits<T> bits(x);
 
   // If x is infinity or NaN, return it.
@@ -45,15 +44,12 @@ LIBC_INLINE T trunc(T x) {
     return FPBits<T>::zero(bits.sign()).get_val();
 
   int trim_size = FPBits<T>::FRACTION_LEN - exponent;
-  StorageType trunc_mantissa =
-      static_cast<StorageType>((bits.get_mantissa() >> trim_size) << trim_size);
-  bits.set_mantissa(trunc_mantissa);
+  bits.set_mantissa((bits.get_mantissa() >> trim_size) << trim_size);
   return bits.get_val();
 }
 
 template <typename T, cpp::enable_if_t<cpp::is_floating_point_v<T>, int> = 0>
 LIBC_INLINE T ceil(T x) {
-  using StorageType = typename FPBits<T>::StorageType;
   FPBits<T> bits(x);
 
   // If x is infinity NaN or zero, return it.
@@ -76,16 +72,12 @@ LIBC_INLINE T ceil(T x) {
   }
 
   uint32_t trim_size = FPBits<T>::FRACTION_LEN - exponent;
-  StorageType x_u = bits.uintval();
-  StorageType trunc_u =
-      static_cast<StorageType>((x_u >> trim_size) << trim_size);
+  bits.set_mantissa((bits.get_mantissa() >> trim_size) << trim_size);
+  T trunc_value = bits.get_val();
 
   // If x is already an integer, return it.
-  if (trunc_u == x_u)
+  if (trunc_value == x)
     return x;
-
-  bits.set_uintval(trunc_u);
-  T trunc_value = bits.get_val();
 
   // If x is negative, the ceil operation is equivalent to the trunc operation.
   if (is_neg)
@@ -133,16 +125,12 @@ LIBC_INLINE T round(T x) {
   uint32_t trim_size = FPBits<T>::FRACTION_LEN - exponent;
   bool half_bit_set =
       bool(bits.get_mantissa() & (StorageType(1) << (trim_size - 1)));
-  StorageType x_u = bits.uintval();
-  StorageType trunc_u =
-      static_cast<StorageType>((x_u >> trim_size) << trim_size);
+  bits.set_mantissa((bits.get_mantissa() >> trim_size) << trim_size);
+  T trunc_value = bits.get_val();
 
   // If x is already an integer, return it.
-  if (trunc_u == x_u)
+  if (trunc_value == x)
     return x;
-
-  bits.set_uintval(trunc_u);
-  T trunc_value = bits.get_val();
 
   if (!half_bit_set) {
     // Franctional part is less than 0.5 so round value is the
@@ -153,9 +141,8 @@ LIBC_INLINE T round(T x) {
   }
 }
 
-template <typename T>
-LIBC_INLINE constexpr cpp::enable_if_t<cpp::is_floating_point_v<T>, T>
-round_using_specific_rounding_mode(T x, int rnd) {
+template <typename T, cpp::enable_if_t<cpp::is_floating_point_v<T>, int> = 0>
+LIBC_INLINE T round_using_current_rounding_mode(T x) {
   using StorageType = typename FPBits<T>::StorageType;
   FPBits<T> bits(x);
 
@@ -165,6 +152,7 @@ round_using_specific_rounding_mode(T x, int rnd) {
 
   bool is_neg = bits.is_neg();
   int exponent = bits.get_exponent();
+  int rounding_mode = quick_get_round();
 
   // If the exponent is greater than the most negative mantissa
   // exponent, then x is already an integer.
@@ -172,62 +160,49 @@ round_using_specific_rounding_mode(T x, int rnd) {
     return x;
 
   if (exponent <= -1) {
-    switch (rnd) {
-    case FP_INT_DOWNWARD:
+    switch (rounding_mode) {
+    case FE_DOWNWARD:
       return is_neg ? T(-1.0) : T(0.0);
-    case FP_INT_UPWARD:
+    case FE_UPWARD:
       return is_neg ? T(-0.0) : T(1.0);
-    case FP_INT_TOWARDZERO:
+    case FE_TOWARDZERO:
       return is_neg ? T(-0.0) : T(0.0);
-    case FP_INT_TONEARESTFROMZERO:
-      if (exponent < -1)
-        return is_neg ? T(-0.0) : T(0.0); // abs(x) < 0.5
-      return is_neg ? T(-1.0) : T(1.0);   // abs(x) >= 0.5
-    case FP_INT_TONEAREST:
-    default:
+    case FE_TONEAREST:
       if (exponent <= -2 || bits.get_mantissa() == 0)
         return is_neg ? T(-0.0) : T(0.0); // abs(x) <= 0.5
       else
         return is_neg ? T(-1.0) : T(1.0); // abs(x) > 0.5
+    default:
+      __builtin_unreachable();
     }
   }
 
   uint32_t trim_size = FPBits<T>::FRACTION_LEN - exponent;
-  StorageType x_u = bits.uintval();
-  StorageType trunc_u =
-      static_cast<StorageType>((x_u >> trim_size) << trim_size);
-
-  // If x is already an integer, return it.
-  if (trunc_u == x_u)
-    return x;
-
-  FPBits<T> new_bits(trunc_u);
+  FPBits<T> new_bits = bits;
+  new_bits.set_mantissa((bits.get_mantissa() >> trim_size) << trim_size);
   T trunc_value = new_bits.get_val();
 
+  // If x is already an integer, return it.
+  if (trunc_value == x)
+    return x;
+
   StorageType trim_value =
-      bits.get_mantissa() &
-      static_cast<StorageType>(((StorageType(1) << trim_size) - 1));
-  StorageType half_value =
-      static_cast<StorageType>((StorageType(1) << (trim_size - 1)));
+      bits.get_mantissa() & ((StorageType(1) << trim_size) - 1);
+  StorageType half_value = (StorageType(1) << (trim_size - 1));
   // If exponent is 0, trimSize will be equal to the mantissa width, and
   // truncIsOdd` will not be correct. So, we handle it as a special case
   // below.
   StorageType trunc_is_odd =
       new_bits.get_mantissa() & (StorageType(1) << trim_size);
 
-  switch (rnd) {
-  case FP_INT_DOWNWARD:
+  switch (rounding_mode) {
+  case FE_DOWNWARD:
     return is_neg ? trunc_value - T(1.0) : trunc_value;
-  case FP_INT_UPWARD:
+  case FE_UPWARD:
     return is_neg ? trunc_value : trunc_value + T(1.0);
-  case FP_INT_TOWARDZERO:
+  case FE_TOWARDZERO:
     return trunc_value;
-  case FP_INT_TONEARESTFROMZERO:
-    if (trim_value >= half_value)
-      return is_neg ? trunc_value - T(1.0) : trunc_value + T(1.0);
-    return trunc_value;
-  case FP_INT_TONEAREST:
-  default:
+  case FE_TONEAREST:
     if (trim_value > half_value) {
       return is_neg ? trunc_value - T(1.0) : trunc_value + T(1.0);
     } else if (trim_value == half_value) {
@@ -240,108 +215,9 @@ round_using_specific_rounding_mode(T x, int rnd) {
     } else {
       return trunc_value;
     }
-  }
-}
-
-template <typename T>
-LIBC_INLINE cpp::enable_if_t<cpp::is_floating_point_v<T>, T>
-round_using_current_rounding_mode(T x) {
-  int rounding_mode = quick_get_round();
-
-  switch (rounding_mode) {
-  case FE_DOWNWARD:
-    return round_using_specific_rounding_mode(x, FP_INT_DOWNWARD);
-  case FE_UPWARD:
-    return round_using_specific_rounding_mode(x, FP_INT_UPWARD);
-  case FE_TOWARDZERO:
-    return round_using_specific_rounding_mode(x, FP_INT_TOWARDZERO);
-  case FE_TONEAREST:
-    return round_using_specific_rounding_mode(x, FP_INT_TONEAREST);
   default:
     __builtin_unreachable();
   }
-}
-
-template <bool IsSigned, typename T>
-LIBC_INLINE constexpr cpp::enable_if_t<cpp::is_floating_point_v<T>, T>
-fromfp(T x, int rnd, unsigned int width) {
-  using StorageType = typename FPBits<T>::StorageType;
-
-  constexpr StorageType EXPLICIT_BIT =
-      FPBits<T>::SIG_MASK - FPBits<T>::FRACTION_MASK;
-
-  if (width == 0U) {
-    raise_except_if_required(FE_INVALID);
-    return FPBits<T>::quiet_nan().get_val();
-  }
-
-  FPBits<T> bits(x);
-
-  if (bits.is_inf_or_nan()) {
-    raise_except_if_required(FE_INVALID);
-    return FPBits<T>::quiet_nan().get_val();
-  }
-
-  T rounded_value = round_using_specific_rounding_mode(x, rnd);
-
-  if constexpr (IsSigned) {
-    // T can't hold a finite number >= 2.0 * 2^EXP_BIAS.
-    if (width - 1 > FPBits<T>::EXP_BIAS)
-      return rounded_value;
-
-    StorageType range_exp =
-        static_cast<StorageType>(width - 1 + FPBits<T>::EXP_BIAS);
-    // rounded_value < -2^(width - 1)
-    T range_min =
-        FPBits<T>::create_value(Sign::NEG, range_exp, EXPLICIT_BIT).get_val();
-    if (rounded_value < range_min) {
-      raise_except_if_required(FE_INVALID);
-      return FPBits<T>::quiet_nan().get_val();
-    }
-    // rounded_value > 2^(width - 1) - 1
-    T range_max =
-        FPBits<T>::create_value(Sign::POS, range_exp, EXPLICIT_BIT).get_val() -
-        T(1.0);
-    if (rounded_value > range_max) {
-      raise_except_if_required(FE_INVALID);
-      return FPBits<T>::quiet_nan().get_val();
-    }
-
-    return rounded_value;
-  }
-
-  if (rounded_value < T(0.0)) {
-    raise_except_if_required(FE_INVALID);
-    return FPBits<T>::quiet_nan().get_val();
-  }
-
-  // T can't hold a finite number >= 2.0 * 2^EXP_BIAS.
-  if (width > FPBits<T>::EXP_BIAS)
-    return rounded_value;
-
-  StorageType range_exp = static_cast<StorageType>(width + FPBits<T>::EXP_BIAS);
-  // rounded_value > 2^width - 1
-  T range_max =
-      FPBits<T>::create_value(Sign::POS, range_exp, EXPLICIT_BIT).get_val() -
-      T(1.0);
-  if (rounded_value > range_max) {
-    raise_except_if_required(FE_INVALID);
-    return FPBits<T>::quiet_nan().get_val();
-  }
-
-  return rounded_value;
-}
-
-template <bool IsSigned, typename T>
-LIBC_INLINE constexpr cpp::enable_if_t<cpp::is_floating_point_v<T>, T>
-fromfpx(T x, int rnd, unsigned int width) {
-  T rounded_value = fromfp<IsSigned>(x, rnd, width);
-  FPBits<T> bits(rounded_value);
-
-  if (!bits.is_nan() && rounded_value != x)
-    raise_except_if_required(FE_INEXACT);
-
-  return rounded_value;
 }
 
 namespace internal {
@@ -401,6 +277,6 @@ LIBC_INLINE I round_to_signed_integer_using_current_rounding_mode(F x) {
 }
 
 } // namespace fputil
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE
 
 #endif // LLVM_LIBC_SRC___SUPPORT_FPUTIL_NEARESTINTEGEROPERATIONS_H

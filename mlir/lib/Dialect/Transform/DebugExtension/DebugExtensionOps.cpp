@@ -21,15 +21,16 @@ DiagnosedSilenceableFailure
 transform::DebugEmitRemarkAtOp::apply(transform::TransformRewriter &rewriter,
                                       transform::TransformResults &results,
                                       transform::TransformState &state) {
-  if (isa<TransformHandleTypeInterface>(getAt().getType())) {
+  if (getAt().getType().isa<TransformHandleTypeInterface>()) {
     auto payload = state.getPayloadOps(getAt());
     for (Operation *op : payload)
       op->emitRemark() << getMessage();
     return DiagnosedSilenceableFailure::success();
   }
 
-  assert(isa<transform::TransformValueHandleTypeInterface>(getAt().getType()) &&
-         "unhandled kind of transform type");
+  assert(
+      getAt().getType().isa<transform::TransformValueHandleTypeInterface>() &&
+      "unhandled kind of transform type");
 
   auto describeValue = [](Diagnostic &os, Value value) {
     os << "value handle points to ";

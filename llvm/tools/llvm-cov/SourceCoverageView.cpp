@@ -175,13 +175,15 @@ void SourceCoverageView::addExpansion(
 }
 
 void SourceCoverageView::addBranch(unsigned Line,
-                                   SmallVector<CountedRegion, 0> Regions) {
-  BranchSubViews.emplace_back(Line, std::move(Regions));
+                                   ArrayRef<CountedRegion> Regions,
+                                   std::unique_ptr<SourceCoverageView> View) {
+  BranchSubViews.emplace_back(Line, Regions, std::move(View));
 }
 
-void SourceCoverageView::addMCDCRecord(unsigned Line,
-                                       SmallVector<MCDCRecord, 0> Records) {
-  MCDCSubViews.emplace_back(Line, std::move(Records));
+void SourceCoverageView::addMCDCRecord(
+    unsigned Line, ArrayRef<MCDCRecord> Records,
+    std::unique_ptr<SourceCoverageView> View) {
+  MCDCSubViews.emplace_back(Line, Records, std::move(View));
 }
 
 void SourceCoverageView::addInstantiation(
@@ -201,7 +203,8 @@ void SourceCoverageView::print(raw_ostream &OS, bool WholeFile,
   if (ShowSourceName)
     renderSourceName(OS, WholeFile);
 
-  renderTableHeader(OS, ViewDepth);
+  renderTableHeader(OS, (ViewDepth > 0) ? 0 : getFirstUncoveredLineNo(),
+                    ViewDepth);
 
   // We need the expansions, instantiations, and branches sorted so we can go
   // through them while we iterate lines.

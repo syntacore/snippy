@@ -45,7 +45,7 @@
   declare void @llvm.dbg.value(metadata, metadata, metadata)
   
   ; Function Attrs: nounwind
-  declare void @llvm.stackprotector(ptr, ptr)
+  declare void @llvm.stackprotector(i8*, i8**)
   
   attributes #0 = { "disable-tail-calls"="true" "frame-pointer"="all" }
   

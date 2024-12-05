@@ -75,7 +75,7 @@ struct X1 {
 
 template<typename T>
 template<typename U>
-void X1<T>::template B<U>::f() { } // expected-warning{{'template' cannot be used after a declarative}}
+void X1<T>::template B<U>::f() { }
 
 // PR5527
 template <template <class> class T>

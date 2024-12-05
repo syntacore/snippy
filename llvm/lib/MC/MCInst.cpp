@@ -38,10 +38,7 @@ void MCOperand::print(raw_ostream &OS, const MCRegisterInfo *RegInfo) const {
     OS << "Expr:(" << *getExpr() << ")";
   } else if (isInst()) {
     OS << "Inst:(";
-    if (const auto *Inst = getInst())
-      Inst->print(OS, RegInfo);
-    else
-      OS << "NULL";
+    getInst()->print(OS, RegInfo);
     OS << ")";
   } else
     OS << "UNDEFINED";

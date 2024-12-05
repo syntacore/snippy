@@ -57,7 +57,7 @@ static void EmitDeclInit(CodeGenFunction &CGF, const VarDecl &D,
     return;
   case TEK_Aggregate:
     CGF.EmitAggExpr(Init,
-                    AggValueSlot::forLValue(lv, AggValueSlot::IsDestructed,
+                    AggValueSlot::forLValue(lv, CGF, AggValueSlot::IsDestructed,
                                             AggValueSlot::DoesNotNeedGCBarriers,
                                             AggValueSlot::IsNotAliased,
                                             AggValueSlot::DoesNotOverlap));
@@ -162,8 +162,7 @@ void CodeGenFunction::EmitInvariantStart(llvm::Constant *Addr, CharUnits Size) {
   // Grab the llvm.invariant.start intrinsic.
   llvm::Intrinsic::ID InvStartID = llvm::Intrinsic::invariant_start;
   // Overloaded address space type.
-  assert(Addr->getType()->isPointerTy() && "Address must be a pointer");
-  llvm::Type *ObjectPtr[1] = {Addr->getType()};
+  llvm::Type *ObjectPtr[1] = {Int8PtrTy};
   llvm::Function *InvariantStart = CGM.getIntrinsic(InvStartID, ObjectPtr);
 
   // Emit a call with the size in bytes of the object.
@@ -232,7 +231,7 @@ void CodeGenFunction::EmitCXXGlobalVarDeclInit(const VarDecl &D,
 
 /// Create a stub function, suitable for being passed to atexit,
 /// which passes the given address to the given destructor function.
-llvm::Constant *CodeGenFunction::createAtExitStub(const VarDecl &VD,
+llvm::Function *CodeGenFunction::createAtExitStub(const VarDecl &VD,
                                                   llvm::FunctionCallee dtor,
                                                   llvm::Constant *addr) {
   // Get the destructor function type, void(*)(void).
@@ -264,12 +263,7 @@ llvm::Constant *CodeGenFunction::createAtExitStub(const VarDecl &VD,
 
   CGF.FinishFunction();
 
-  // Get a proper function pointer.
-  FunctionProtoType::ExtProtoInfo EPI(getContext().getDefaultCallingConvention(
-      /*IsVariadic=*/false, /*IsCXXMethod=*/false));
-  QualType fnType = getContext().getFunctionType(getContext().VoidTy,
-                                                 {getContext().VoidPtrTy}, EPI);
-  return CGM.getFunctionPointer(fn, fnType);
+  return fn;
 }
 
 /// Create a stub function, suitable for being passed to __pt_atexit_np,
@@ -338,8 +332,7 @@ void CodeGenFunction::registerGlobalDtorWithLLVM(const VarDecl &VD,
                                                  llvm::FunctionCallee Dtor,
                                                  llvm::Constant *Addr) {
   // Create a function which calls the destructor.
-  llvm::Function *dtorStub =
-      cast<llvm::Function>(createAtExitStub(VD, Dtor, Addr));
+  llvm::Function *dtorStub = createAtExitStub(VD, Dtor, Addr);
   CGM.AddGlobalDtor(dtorStub);
 }
 
@@ -482,10 +475,6 @@ llvm::Function *CodeGenModule::CreateGlobalInitOrCleanUpFunction(
   if (getLangOpts().Sanitize.has(SanitizerKind::Thread) &&
       !isInNoSanitizeList(SanitizerKind::Thread, Fn, Loc))
     Fn->addFnAttr(llvm::Attribute::SanitizeThread);
-
-  if (getLangOpts().Sanitize.has(SanitizerKind::NumericalStability) &&
-      !isInNoSanitizeList(SanitizerKind::NumericalStability, Fn, Loc))
-    Fn->addFnAttr(llvm::Attribute::SanitizeNumericalStability);
 
   if (getLangOpts().Sanitize.has(SanitizerKind::Memory) &&
       !isInNoSanitizeList(SanitizerKind::Memory, Fn, Loc))
@@ -845,10 +834,6 @@ CodeGenModule::EmitCXXGlobalInitFunc() {
     for (Module *M : ImportedModules) {
       // No Itanium initializer in header like modules.
       if (M->isHeaderLikeModule())
-        continue;
-      // We're allowed to skip the initialization if we are sure it doesn't
-      // do any thing.
-      if (!M->isNamedModuleInterfaceHasInit())
         continue;
       llvm::FunctionType *FTy = llvm::FunctionType::get(VoidTy, false);
       SmallString<256> FnName;

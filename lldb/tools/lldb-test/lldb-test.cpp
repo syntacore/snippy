@@ -306,7 +306,8 @@ llvm::SmallVector<CompilerContext, 4> parseCompilerContext() {
             .Case("TranslationUnit", CompilerContextKind::TranslationUnit)
             .Case("Module", CompilerContextKind::Module)
             .Case("Namespace", CompilerContextKind::Namespace)
-            .Case("ClassOrStruct", CompilerContextKind::ClassOrStruct)
+            .Case("Class", CompilerContextKind::Class)
+            .Case("Struct", CompilerContextKind::Struct)
             .Case("Union", CompilerContextKind::Union)
             .Case("Function", CompilerContextKind::Function)
             .Case("Variable", CompilerContextKind::Variable)
@@ -509,8 +510,8 @@ Error opts::symbols::findFunctions(lldb_private::Module &Module) {
         ContextOr->IsValid() ? *ContextOr : CompilerDeclContext();
 
     List.Clear();
-    lldb_private::Module::LookupInfo lookup_info(
-        ConstString(Name), getFunctionNameFlags(), eLanguageTypeUnknown);
+    Module::LookupInfo lookup_info(ConstString(Name), getFunctionNameFlags(),
+                                   eLanguageTypeUnknown);
     Symfile.FindFunctions(lookup_info, ContextPtr, true, List);
   }
   outs() << formatv("Found {0} functions:\n", List.GetSize());

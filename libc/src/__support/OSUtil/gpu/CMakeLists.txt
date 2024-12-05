@@ -1,9 +1,10 @@
 add_object_library(
   gpu_util
   SRCS
-    exit.cpp
+    quick_exit.cpp
     io.cpp
   HDRS
+    quick_exit.h
     io.h
   DEPENDS
     libc.src.__support.common

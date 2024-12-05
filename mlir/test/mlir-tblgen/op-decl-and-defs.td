@@ -58,14 +58,13 @@ def NS_AOp : NS_Op<"a_op", [IsolatedFromAbove, IsolatedFromAbove]> {
 // CHECK: namespace detail {
 // CHECK: class AOpGenericAdaptorBase {
 // CHECK: public:
-// CHECK:   AOpGenericAdaptorBase(::mlir::DictionaryAttr attrs = {}, const ::mlir::EmptyProperties &properties = {}, ::mlir::RegionRange regions = {}) : odsAttrs(attrs), odsRegions(regions)
-// CHECK:   AOpGenericAdaptorBase(::mlir::Operation *op) : odsAttrs(op->getRawDictionaryAttrs()), odsOpName(op->getName()), odsRegions(op->getRegions()) {}
+// CHECK:   AOpGenericAdaptorBase(AOp{{[[:space:]]}}
 // CHECK:   ::mlir::IntegerAttr getAttr1Attr();
 // CHECK:   uint32_t getAttr1();
 // CHECK:   ::mlir::FloatAttr getSomeAttr2Attr();
 // CHECK:   ::std::optional< ::llvm::APFloat > getSomeAttr2();
-// CHECK:   ::mlir::Region &getSomeRegion() {
-// CHECK:   ::mlir::RegionRange getSomeRegions() {
+// CHECK:   ::mlir::Region &getSomeRegion();
+// CHECK:   ::mlir::RegionRange getSomeRegions();
 // CHECK: };
 // CHECK: }
 
@@ -84,7 +83,7 @@ def NS_AOp : NS_Op<"a_op", [IsolatedFromAbove, IsolatedFromAbove]> {
 // CHECK: class AOpAdaptor : public AOpGenericAdaptor<::mlir::ValueRange> {
 // CHECK: public:
 // CHECK:   AOpAdaptor(AOp
-// CHECK:   ::llvm::LogicalResult verify(
+// CHECK:   ::mlir::LogicalResult verify(
 // CHECK: };
 
 // CHECK: class AOp : public ::mlir::Op<AOp, ::mlir::OpTrait::AtLeastNRegions<1>::Impl, ::mlir::OpTrait::AtLeastNResults<1>::Impl, ::mlir::OpTrait::ZeroSuccessors, ::mlir::OpTrait::AtLeastNOperands<1>::Impl, ::mlir::OpTrait::OpInvariants, ::mlir::OpTrait::IsIsolatedFromAbove
@@ -95,20 +94,20 @@ def NS_AOp : NS_Op<"a_op", [IsolatedFromAbove, IsolatedFromAbove]> {
 // CHECK:   static constexpr ::llvm::StringLiteral getOperationName() {
 // CHECK:     return ::llvm::StringLiteral("test.a_op");
 // CHECK:   }
-// CHECK:   ::mlir::Operation::operand_range getODSOperands(unsigned index) {
-// CHECK:   ::mlir::TypedValue<::mlir::IntegerType> getA() {
-// CHECK:   ::mlir::Operation::operand_range getB() {
-// CHECK:   ::mlir::OpOperand &getAMutable() {
+// CHECK:   ::mlir::Operation::operand_range getODSOperands(unsigned index);
+// CHECK:   ::mlir::TypedValue<::mlir::IntegerType> getA();
+// CHECK:   ::mlir::Operation::operand_range getB();
+// CHECK:   ::mlir::OpOperand &getAMutable();
 // CHECK:   ::mlir::MutableOperandRange getBMutable();
-// CHECK:   ::mlir::Operation::result_range getODSResults(unsigned index) {
-// CHECK:   ::mlir::TypedValue<::mlir::IntegerType> getR() {
-// CHECK:   ::mlir::Region &getSomeRegion() {
-// CHECK:   ::mlir::MutableArrayRef<::mlir::Region> getSomeRegions() {
-// CHECK:   ::mlir::IntegerAttr getAttr1Attr() {
+// CHECK:   ::mlir::Operation::result_range getODSResults(unsigned index);
+// CHECK:   ::mlir::TypedValue<::mlir::IntegerType> getR();
+// CHECK:   ::mlir::Region &getSomeRegion();
+// CHECK:   ::mlir::MutableArrayRef<::mlir::Region> getSomeRegions();
+// CHECK:   ::mlir::IntegerAttr getAttr1Attr()
 // CHECK:   uint32_t getAttr1();
-// CHECK:   ::mlir::FloatAttr getSomeAttr2Attr() {
+// CHECK:   ::mlir::FloatAttr getSomeAttr2Attr()
 // CHECK:   ::std::optional< ::llvm::APFloat > getSomeAttr2();
-// CHECK:   ::mlir::Attribute removeSomeAttr2Attr() {
+// CHECK:   ::mlir::Attribute removeSomeAttr2Attr();
 // CHECK:   static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, Value val);
 // CHECK:   static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, int integer = 0);
 // CHECK{LITERAL}:   [[deprecated("the deprecation message")]]
@@ -120,20 +119,27 @@ def NS_AOp : NS_Op<"a_op", [IsolatedFromAbove, IsolatedFromAbove]> {
 // CHECK:   static void build(::mlir::OpBuilder &, ::mlir::OperationState &odsState, ::mlir::TypeRange resultTypes, ::mlir::ValueRange operands, ::llvm::ArrayRef<::mlir::NamedAttribute> attributes, unsigned numRegions)
 // CHECK:   static ::mlir::ParseResult parse(::mlir::OpAsmParser &parser, ::mlir::OperationState &result);
 // CHECK:   void print(::mlir::OpAsmPrinter &p);
-// CHECK:   ::llvm::LogicalResult verifyInvariants();
+// CHECK:   ::mlir::LogicalResult verifyInvariants();
 // CHECK:   static void getCanonicalizationPatterns(::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context);
-// CHECK:   ::llvm::LogicalResult fold(FoldAdaptor adaptor, ::llvm::SmallVectorImpl<::mlir::OpFoldResult> &results);
+// CHECK:   ::mlir::LogicalResult fold(FoldAdaptor adaptor, ::llvm::SmallVectorImpl<::mlir::OpFoldResult> &results);
 // CHECK:   // Display a graph for debugging purposes.
 // CHECK:   void displayGraph();
 // CHECK: };
 
 // DEFS-LABEL: NS::AOp definitions
 
+// DEFS: AOpGenericAdaptorBase::AOpGenericAdaptorBase(::mlir::DictionaryAttr attrs, const ::mlir::EmptyProperties &properties, ::mlir::RegionRange regions) : odsAttrs(attrs), odsRegions(regions)
+
 // Check that `getAttrDictionary()` is used when not using properties.
 
-// DECLS: ::mlir::RegionRange AOpGenericAdaptorBase::getSomeRegions()
-// DECLS-NEXT: return odsRegions.drop_front(1);
-// DECLS: ::mlir::RegionRange AOpGenericAdaptorBase::getRegions()
+// DEFS: AOpGenericAdaptorBase::AOpGenericAdaptorBase(AOp op)
+// DEFS-SAME: op->getAttrDictionary()
+// DEFS-SAME: p.getProperties()
+// DEFS-SAME: op->getRegions()
+
+// DEFS: ::mlir::RegionRange AOpGenericAdaptorBase::getSomeRegions()
+// DEFS-NEXT: return odsRegions.drop_front(1);
+// DEFS: ::mlir::RegionRange AOpGenericAdaptorBase::getRegions()
 
 // Check AttrSizedOperandSegments
 // ---
@@ -190,9 +196,9 @@ def NS_EOp : NS_Op<"op_with_optionals", []> {
 }
 
 // CHECK-LABEL: NS::EOp declarations
-// CHECK:   ::mlir::TypedValue<::mlir::IntegerType> getA() {
+// CHECK:   ::mlir::TypedValue<::mlir::IntegerType> getA();
 // CHECK:   ::mlir::MutableOperandRange getAMutable();
-// CHECK:   ::mlir::TypedValue<::mlir::FloatType> getB() {
+// CHECK:   ::mlir::TypedValue<::mlir::FloatType> getB();
 // CHECK:   static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, /*optional*/::mlir::Type b, /*optional*/::mlir::Value a)
 
 // Check that all types match constraint results in generating builder.
@@ -205,7 +211,7 @@ def NS_FOp : NS_Op<"op_with_all_types_constraint",
 }
 
 // CHECK-LABEL: class FOp :
-// CHECK: static ::llvm::LogicalResult inferReturnTypes
+// CHECK: static ::mlir::LogicalResult inferReturnTypes
 
 def NS_GOp : NS_Op<"op_with_fixed_return_type", []> {
   let arguments = (ins AnyType:$a);
@@ -213,7 +219,7 @@ def NS_GOp : NS_Op<"op_with_fixed_return_type", []> {
 }
 
 // CHECK-LABEL: class GOp :
-// CHECK: static ::llvm::LogicalResult inferReturnTypes
+// CHECK: static ::mlir::LogicalResult inferReturnTypes
 
 // Check default value for collective params builder. Check that other builders
 // are generated as well.
@@ -338,11 +344,12 @@ def NS_NOp : NS_Op<"op_with_properties", []> {
   let arguments = (ins Property<"unsigned">:$value);
 }
 
-// DEFS: NOpGenericAdaptorBase::NOpGenericAdaptorBase(NOp op) :
-// DEFS-SAME: odsAttrs(op->getRawDictionaryAttrs())
-// DEFS-SAME: odsOpName(op->getName())
-// DEFS-SAME: properties(op.getProperties())
-// DEFS-SAME: odsRegions(op->getRegions())
+// Check that `getDiscardableAttrDictionary()` is used with properties.
+
+// DEFS: NOpGenericAdaptorBase::NOpGenericAdaptorBase(NOp op) : NOpGenericAdaptorBase(
+// DEFS-SAME: op->getDiscardableAttrDictionary()
+// DEFS-SAME: op.getProperties()
+// DEFS-SAME: op->getRegions()
 
 // Test that type defs have the proper namespaces when used as a constraint.
 // ---

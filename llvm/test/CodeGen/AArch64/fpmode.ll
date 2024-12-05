@@ -6,14 +6,17 @@ declare i32 @llvm.get.fpmode.i32()
 declare void @llvm.set.fpmode.i32(i32 %fpmode)
 declare void @llvm.reset.fpmode()
 
-define i32 @func_get_fpmode() #0 {
-; DAG-LABEL: func_get_fpmode:
+define i32 @func_get_fpmode_soft() #0 {
+; DAG-LABEL: func_get_fpmode_soft:
 ; DAG:       // %bb.0: // %entry
-; DAG-NEXT:    mrs x0, FPCR
-; DAG-NEXT:    // kill: def $w0 killed $w0 killed $x0
+; DAG-NEXT:    str x30, [sp, #-16]! // 8-byte Folded Spill
+; DAG-NEXT:    add x0, sp, #12
+; DAG-NEXT:    bl fegetmode
+; DAG-NEXT:    ldr w0, [sp, #12]
+; DAG-NEXT:    ldr x30, [sp], #16 // 8-byte Folded Reload
 ; DAG-NEXT:    ret
 ;
-; GIS-LABEL: func_get_fpmode:
+; GIS-LABEL: func_get_fpmode_soft:
 ; GIS:       // %bb.0: // %entry
 ; GIS-NEXT:    str x30, [sp, #-16]! // 8-byte Folded Spill
 ; GIS-NEXT:    add x0, sp, #12
@@ -26,14 +29,17 @@ entry:
   ret i32 %fpmode
 }
 
-define void @func_set_fpmode(i32 %fpmode) #0 {
-; DAG-LABEL: func_set_fpmode:
+define void @func_set_fpmode_soft(i32 %fpmode) #0 {
+; DAG-LABEL: func_set_fpmode_soft:
 ; DAG:       // %bb.0: // %entry
-; DAG-NEXT:    mov w8, w0
-; DAG-NEXT:    msr FPCR, x8
+; DAG-NEXT:    str x30, [sp, #-16]! // 8-byte Folded Spill
+; DAG-NEXT:    str w0, [sp, #12]
+; DAG-NEXT:    add x0, sp, #12
+; DAG-NEXT:    bl fesetmode
+; DAG-NEXT:    ldr x30, [sp], #16 // 8-byte Folded Reload
 ; DAG-NEXT:    ret
 ;
-; GIS-LABEL: func_set_fpmode:
+; GIS-LABEL: func_set_fpmode_soft:
 ; GIS:       // %bb.0: // %entry
 ; GIS-NEXT:    str x30, [sp, #-16]! // 8-byte Folded Spill
 ; GIS-NEXT:    str w0, [sp, #12]
@@ -46,17 +52,16 @@ entry:
   ret void
 }
 
-define void @func_reset_fpmode() #0 {
-; DAG-LABEL: func_reset_fpmode:
+define void @func_reset_fpmode_soft() #0 {
+; DAG-LABEL: func_reset_fpmode_soft:
 ; DAG:       // %bb.0: // %entry
-; DAG-NEXT:    mov x9, #-48904 // =0xffffffffffff40f8
-; DAG-NEXT:    mrs x8, FPCR
-; DAG-NEXT:    movk x9, #63488, lsl #16
-; DAG-NEXT:    and x8, x8, x9
-; DAG-NEXT:    msr FPCR, x8
+; DAG-NEXT:    str x30, [sp, #-16]! // 8-byte Folded Spill
+; DAG-NEXT:    mov x0, #-1 // =0xffffffffffffffff
+; DAG-NEXT:    bl fesetmode
+; DAG-NEXT:    ldr x30, [sp], #16 // 8-byte Folded Reload
 ; DAG-NEXT:    ret
 ;
-; GIS-LABEL: func_reset_fpmode:
+; GIS-LABEL: func_reset_fpmode_soft:
 ; GIS:       // %bb.0: // %entry
 ; GIS-NEXT:    mov x0, #-1 // =0xffffffffffffffff
 ; GIS-NEXT:    b fesetmode
@@ -65,4 +70,4 @@ entry:
   ret void
 }
 
-attributes #0 = { nounwind }
+attributes #0 = { nounwind "use-soft-float"="true" }

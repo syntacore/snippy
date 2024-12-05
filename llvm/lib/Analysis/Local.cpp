@@ -25,13 +25,13 @@ Value *llvm::emitGEPOffset(IRBuilderBase *Builder, const DataLayout &DL,
   Type *IntIdxTy = DL.getIndexType(GEP->getType());
   Value *Result = nullptr;
 
-  // nusw implies nsw for the offset arithmetic.
-  bool NSW = GEPOp->hasNoUnsignedSignedWrap() && !NoAssumptions;
-  bool NUW = GEPOp->hasNoUnsignedWrap() && !NoAssumptions;
+  // If the GEP is inbounds, we know that none of the addressing operations will
+  // overflow in a signed sense.
+  bool isInBounds = GEPOp->isInBounds() && !NoAssumptions;
   auto AddOffset = [&](Value *Offset) {
     if (Result)
       Result = Builder->CreateAdd(Result, Offset, GEP->getName() + ".offs",
-                                  NUW, NSW);
+                                  false /*NUW*/, isInBounds /*NSW*/);
     else
       Result = Offset;
   };
@@ -71,7 +71,8 @@ Value *llvm::emitGEPOffset(IRBuilderBase *Builder, const DataLayout &DL,
         Scale = Builder->CreateVectorSplat(
             cast<VectorType>(IntIdxTy)->getElementCount(), Scale);
       // We'll let instcombine(mul) convert this to a shl if possible.
-      Op = Builder->CreateMul(Op, Scale, GEP->getName() + ".idx", NUW, NSW);
+      Op = Builder->CreateMul(Op, Scale, GEP->getName() + ".idx", false /*NUW*/,
+                              isInBounds /*NSW*/);
     }
     AddOffset(Op);
   }

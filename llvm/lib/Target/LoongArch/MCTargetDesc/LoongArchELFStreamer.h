@@ -25,6 +25,7 @@ public:
 MCELFStreamer *createLoongArchELFStreamer(MCContext &C,
                                           std::unique_ptr<MCAsmBackend> MAB,
                                           std::unique_ptr<MCObjectWriter> MOW,
-                                          std::unique_ptr<MCCodeEmitter> MCE);
+                                          std::unique_ptr<MCCodeEmitter> MCE,
+                                          bool RelaxAll);
 } // end namespace llvm
 #endif

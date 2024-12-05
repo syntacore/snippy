@@ -456,9 +456,6 @@ void NativeThreadLinux::SetStoppedByFork(bool is_vfork, lldb::pid_t child_pid) {
   m_stop_info.signo = SIGTRAP;
   m_stop_info.details.fork.child_pid = child_pid;
   m_stop_info.details.fork.child_tid = child_pid;
-  m_stop_description = std::to_string(child_pid);
-  m_stop_description += " ";
-  m_stop_description += std::to_string(child_pid);
 }
 
 void NativeThreadLinux::SetStoppedByVForkDone() {

@@ -16,6 +16,7 @@
 
 #include "bolt/Core/BinaryBasicBlock.h"
 #include "llvm/IR/Dominators.h"
+#include "llvm/Support/GenericDomTreeConstruction.h"
 
 namespace llvm {
 namespace bolt {

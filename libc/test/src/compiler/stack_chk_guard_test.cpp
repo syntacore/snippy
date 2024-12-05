@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "include/llvm-libc-macros/signal-macros.h"
+#include "llvm-libc-macros/signal-macros.h"
 #include "src/__support/macros/sanitizer.h"
 #include "src/compiler/__stack_chk_fail.h"
 #include "src/string/memset.h"

@@ -175,22 +175,17 @@ private:
   mutable StringRef RawText;
   mutable const char *BriefText = nullptr;
 
-  LLVM_PREFERRED_TYPE(bool)
-  mutable unsigned RawTextValid : 1;
-  LLVM_PREFERRED_TYPE(bool)
-  mutable unsigned BriefTextValid : 1;
+  mutable bool RawTextValid : 1;   ///< True if RawText is valid
+  mutable bool BriefTextValid : 1; ///< True if BriefText is valid
 
   LLVM_PREFERRED_TYPE(CommentKind)
   unsigned Kind : 3;
 
   /// True if comment is attached to a declaration in ASTContext.
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned IsAttached : 1;
+  bool IsAttached : 1;
 
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned IsTrailingComment : 1;
-  LLVM_PREFERRED_TYPE(bool)
-  unsigned IsAlmostTrailingComment : 1;
+  bool IsTrailingComment : 1;
+  bool IsAlmostTrailingComment : 1;
 
   /// Constructor for AST deserialization.
   RawComment(SourceRange SR, CommentKind K, bool IsTrailingComment,

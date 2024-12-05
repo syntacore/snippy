@@ -13,7 +13,6 @@
 #define LLVM_LIB_TARGET_AMDGPU_AMDGPUALIASANALYSIS_H
 
 #include "llvm/Analysis/AliasAnalysis.h"
-#include "llvm/IR/Module.h"
 
 namespace llvm {
 
@@ -53,7 +52,7 @@ public:
   using Result = AMDGPUAAResult;
 
   AMDGPUAAResult run(Function &F, AnalysisManager<Function> &AM) {
-    return AMDGPUAAResult(F.getDataLayout());
+    return AMDGPUAAResult(F.getParent()->getDataLayout());
   }
 };
 

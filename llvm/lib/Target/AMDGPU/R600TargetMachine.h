@@ -31,18 +31,12 @@ private:
 
 public:
   R600TargetMachine(const Target &T, const Triple &TT, StringRef CPU,
-                    StringRef FS, const TargetOptions &Options,
+                    StringRef FS, TargetOptions Options,
                     std::optional<Reloc::Model> RM,
                     std::optional<CodeModel::Model> CM, CodeGenOptLevel OL,
                     bool JIT);
 
   TargetPassConfig *createPassConfig(PassManagerBase &PM) override;
-
-  Error buildCodeGenPipeline(ModulePassManager &MPM, raw_pwrite_stream &Out,
-                             raw_pwrite_stream *DwoOut,
-                             CodeGenFileType FileType,
-                             const CGPassBuilderOption &Opt,
-                             PassInstrumentationCallbacks *PIC) override;
 
   const TargetSubtargetInfo *getSubtargetImpl(const Function &) const override;
 

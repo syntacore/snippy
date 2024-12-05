@@ -16,6 +16,8 @@
 #define LLVM_CLANG_LIB_FORMAT_UNWRAPPEDLINEFORMATTER_H
 
 #include "ContinuationIndenter.h"
+#include "clang/Format/Format.h"
+#include <map>
 
 namespace clang {
 namespace format {

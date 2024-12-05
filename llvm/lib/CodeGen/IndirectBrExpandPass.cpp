@@ -100,7 +100,7 @@ FunctionPass *llvm::createIndirectBrExpandPass() {
 }
 
 bool runImpl(Function &F, const TargetLowering *TLI, DomTreeUpdater *DTU) {
-  auto &DL = F.getDataLayout();
+  auto &DL = F.getParent()->getDataLayout();
 
   SmallVector<IndirectBrInst *, 1> IndirectBrs;
 
@@ -113,7 +113,7 @@ bool runImpl(Function &F, const TargetLowering *TLI, DomTreeUpdater *DTU) {
       // Handle the degenerate case of no successors by replacing the indirectbr
       // with unreachable as there is no successor available.
       if (IBr->getNumSuccessors() == 0) {
-        (void)new UnreachableInst(F.getContext(), IBr->getIterator());
+        (void)new UnreachableInst(F.getContext(), IBr);
         IBr->eraseFromParent();
         continue;
       }
@@ -183,7 +183,7 @@ bool runImpl(Function &F, const TargetLowering *TLI, DomTreeUpdater *DTU) {
         for (BasicBlock *SuccBB : IBr->successors())
           Updates.push_back({DominatorTree::Delete, IBr->getParent(), SuccBB});
       }
-      (void)new UnreachableInst(F.getContext(), IBr->getIterator());
+      (void)new UnreachableInst(F.getContext(), IBr);
       IBr->eraseFromParent();
     }
     if (DTU) {
@@ -207,10 +207,9 @@ bool runImpl(Function &F, const TargetLowering *TLI, DomTreeUpdater *DTU) {
   }
 
   auto GetSwitchValue = [CommonITy](IndirectBrInst *IBr) {
-    return CastInst::CreatePointerCast(IBr->getAddress(), CommonITy,
-                                       Twine(IBr->getAddress()->getName()) +
-                                           ".switch_cast",
-                                       IBr->getIterator());
+    return CastInst::CreatePointerCast(
+        IBr->getAddress(), CommonITy,
+        Twine(IBr->getAddress()->getName()) + ".switch_cast", IBr);
   };
 
   SmallVector<DominatorTree::UpdateType, 8> Updates;
@@ -244,7 +243,7 @@ bool runImpl(Function &F, const TargetLowering *TLI, DomTreeUpdater *DTU) {
       Updates.reserve(IndirectBrs.size() + 2 * IndirectBrSuccs.size());
     for (auto *IBr : IndirectBrs) {
       SwitchPN->addIncoming(GetSwitchValue(IBr), IBr->getParent());
-      BranchInst::Create(SwitchBB, IBr->getIterator());
+      BranchInst::Create(SwitchBB, IBr);
       if (DTU) {
         Updates.push_back({DominatorTree::Insert, IBr->getParent(), SwitchBB});
         for (BasicBlock *SuccBB : IBr->successors())

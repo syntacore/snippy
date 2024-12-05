@@ -15,13 +15,12 @@
 // CHECK:        Type: PT_NOTE
 // CHECK-NEXT:   Offset: 0x{{0*}}[[NOTE_OFFSET:[^ ]*]]
 
-// CHECK:      NoteSections [
+// CHECK:      Notes [
 // CHECK-NEXT:   NoteSection {
 // CHECK-NEXT:     Name: .note.obj
 // CHECK-NEXT:     Offset: 0x{{0*}}[[NOTE_OFFSET]]
 // CHECK-NEXT:     Size:
-// CHECK-NEXT:	   Notes [
-// CHECK-NEXT:     {
+// CHECK-NEXT:     Note {
 // CHECK-NEXT:       Owner: foo
 // CHECK-NEXT:       Data size: 0x4
 // CHECK-NEXT:       Type: NT_VERSION (version)
@@ -29,20 +28,17 @@
 // CHECK-NEXT:         0000: 62617200                             |bar.|
 // CHECK-NEXT:       )
 // CHECK-NEXT:     }
-// CHECK-NEXT:	  ]
 // CHECK-NEXT:   }
 // CHECK-NEXT:   NoteSection {
 // CHECK-NEXT:     Name: .note.gnu.build-id
 // CHECK-NEXT:     Offset:
 // CHECK-NEXT:     Size:
-// CHECK-NEXT:	   Notes [
-// CHECK-NEXT:     {
+// CHECK-NEXT:     Note {
 // CHECK-NEXT:       Owner: GNU
 // CHECK-NEXT:       Data size:
 // CHECK-NEXT:       Type: NT_GNU_BUILD_ID (unique build ID bitstring)
 // CHECK-NEXT:       Build ID: d5101cb9d03b7e836ba9b64f5768a0b31980920f{{$}}
 // CHECK-NEXT:     }
-// CHECK-NEXT:	  ]
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
 

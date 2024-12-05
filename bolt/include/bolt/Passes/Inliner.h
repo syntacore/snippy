@@ -86,7 +86,7 @@ public:
     return BinaryFunctionPass::shouldPrint(BF) && Modified.count(&BF) > 0;
   }
 
-  Error runOnFunctions(BinaryContext &BC) override;
+  void runOnFunctions(BinaryContext &BC) override;
 };
 
 } // namespace bolt

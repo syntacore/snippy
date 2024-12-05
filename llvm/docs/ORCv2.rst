@@ -738,7 +738,7 @@ or creating any Modules attached to it. E.g.
 
     ThreadSafeContext TSCtx(std::make_unique<LLVMContext>());
 
-    DefaultThreadPool TP(NumThreads);
+    ThreadPool TP(NumThreads);
     JITStack J;
 
     for (auto &ModulePath : ModulePaths) {
@@ -780,7 +780,7 @@ constructs a new ThreadSafeContext value from a std::unique_ptr<LLVMContext>:
     // separate context.
     for (const auto &IRPath : IRPaths) {
       auto Ctx = std::make_unique<LLVMContext>();
-      auto M = std::make_unique<Module>("M", *Ctx);
+      auto M = std::make_unique<LLVMContext>("M", *Ctx);
       CompileLayer.add(MainJD, ThreadSafeModule(std::move(M), std::move(Ctx)));
     }
 

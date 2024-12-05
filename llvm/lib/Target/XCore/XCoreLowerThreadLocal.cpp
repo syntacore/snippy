@@ -79,7 +79,7 @@ static bool replaceConstantExprOp(ConstantExpr *CE, Pass *P) {
   do {
     SmallVector<WeakTrackingVH, 8> WUsers(CE->users());
     llvm::sort(WUsers);
-    WUsers.erase(llvm::unique(WUsers), WUsers.end());
+    WUsers.erase(std::unique(WUsers.begin(), WUsers.end()), WUsers.end());
     while (!WUsers.empty())
       if (WeakTrackingVH WU = WUsers.pop_back_val()) {
         if (PHINode *PN = dyn_cast<PHINode>(WU)) {
@@ -88,15 +88,12 @@ static bool replaceConstantExprOp(ConstantExpr *CE, Pass *P) {
               BasicBlock *PredBB = PN->getIncomingBlock(I);
               if (PredBB->getTerminator()->getNumSuccessors() > 1)
                 PredBB = SplitEdge(PredBB, PN->getParent());
-              BasicBlock::iterator InsertPos =
-                  PredBB->getTerminator()->getIterator();
-              Instruction *NewInst = CE->getAsInstruction();
-              NewInst->insertBefore(*PredBB, InsertPos);
+              Instruction *InsertPos = PredBB->getTerminator();
+              Instruction *NewInst = CE->getAsInstruction(InsertPos);
               PN->setOperand(I, NewInst);
             }
         } else if (Instruction *Instr = dyn_cast<Instruction>(WU)) {
-          Instruction *NewInst = CE->getAsInstruction();
-          NewInst->insertBefore(*Instr->getParent(), Instr->getIterator());
+          Instruction *NewInst = CE->getAsInstruction(Instr);
           Instr->replaceUsesOfWith(CE, NewInst);
         } else {
           ConstantExpr *CExpr = dyn_cast<ConstantExpr>(WU);
@@ -154,7 +151,8 @@ bool XCoreLowerThreadLocal::lowerGlobal(GlobalVariable *GV) {
 
   // Update uses.
   SmallVector<User *, 16> Users(GV->users());
-  for (User *U : Users) {
+  for (unsigned I = 0, E = Users.size(); I != E; ++I) {
+    User *U = Users[I];
     Instruction *Inst = cast<Instruction>(U);
     IRBuilder<> Builder(Inst);
     Function *GetID = Intrinsic::getDeclaration(GV->getParent(),
@@ -178,7 +176,8 @@ bool XCoreLowerThreadLocal::runOnModule(Module &M) {
   for (GlobalVariable &GV : M.globals())
     if (GV.isThreadLocal())
       ThreadLocalGlobals.push_back(&GV);
-  for (GlobalVariable *GV : ThreadLocalGlobals)
-    MadeChange |= lowerGlobal(GV);
+  for (unsigned I = 0, E = ThreadLocalGlobals.size(); I != E; ++I) {
+    MadeChange |= lowerGlobal(ThreadLocalGlobals[I]);
+  }
   return MadeChange;
 }

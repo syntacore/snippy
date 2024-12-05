@@ -31,11 +31,9 @@ public:
   DummySyntheticFrontEnd(ValueObject &backend)
       : SyntheticChildrenFrontEnd(backend) {}
 
-  llvm::Expected<uint32_t> CalculateNumChildren() override {
-    return m_backend.GetNumChildren();
-  }
+  size_t CalculateNumChildren() override { return m_backend.GetNumChildren(); }
 
-  lldb::ValueObjectSP GetChildAtIndex(uint32_t idx) override {
+  lldb::ValueObjectSP GetChildAtIndex(size_t idx) override {
     return m_backend.GetChildAtIndex(idx);
   }
 
@@ -45,9 +43,7 @@ public:
 
   bool MightHaveChildren() override { return m_backend.MightHaveChildren(); }
 
-  lldb::ChildCacheState Update() override {
-    return lldb::ChildCacheState::eRefetch;
-  }
+  bool Update() override { return false; }
 };
 
 ValueObjectSynthetic::ValueObjectSynthetic(ValueObject &parent,
@@ -86,8 +82,7 @@ ConstString ValueObjectSynthetic::GetDisplayTypeName() {
   return m_parent->GetDisplayTypeName();
 }
 
-llvm::Expected<uint32_t>
-ValueObjectSynthetic::CalculateNumChildren(uint32_t max) {
+size_t ValueObjectSynthetic::CalculateNumChildren(uint32_t max) {
   Log *log = GetLog(LLDBLog::DataFormatters);
 
   UpdateValueIfNeeded();
@@ -95,23 +90,18 @@ ValueObjectSynthetic::CalculateNumChildren(uint32_t max) {
     return m_synthetic_children_count <= max ? m_synthetic_children_count : max;
 
   if (max < UINT32_MAX) {
-    auto num_children = m_synth_filter_up->CalculateNumChildren(max);
+    size_t num_children = m_synth_filter_up->CalculateNumChildren(max);
     LLDB_LOGF(log,
               "[ValueObjectSynthetic::CalculateNumChildren] for VO of name "
-              "%s and type %s, the filter returned %u child values",
-              GetName().AsCString(), GetTypeName().AsCString(),
-              num_children ? *num_children : 0);
+              "%s and type %s, the filter returned %zu child values",
+              GetName().AsCString(), GetTypeName().AsCString(), num_children);
     return num_children;
   } else {
-    auto num_children_or_err = m_synth_filter_up->CalculateNumChildren(max);
-    if (!num_children_or_err) {
-      m_synthetic_children_count = 0;
-      return num_children_or_err;
-    }
-    auto num_children = (m_synthetic_children_count = *num_children_or_err);
+    size_t num_children = (m_synthetic_children_count =
+                               m_synth_filter_up->CalculateNumChildren(max));
     LLDB_LOGF(log,
               "[ValueObjectSynthetic::CalculateNumChildren] for VO of name "
-              "%s and type %s, the filter returned %u child values",
+              "%s and type %s, the filter returned %zu child values",
               GetName().AsCString(), GetTypeName().AsCString(), num_children);
     return num_children;
   }
@@ -187,7 +177,7 @@ bool ValueObjectSynthetic::UpdateValue() {
   }
 
   // let our backend do its update
-  if (m_synth_filter_up->Update() == lldb::ChildCacheState::eRefetch) {
+  if (!m_synth_filter_up->Update()) {
     LLDB_LOGF(log,
               "[ValueObjectSynthetic::UpdateValue] name=%s, synthetic "
               "filter said caches are stale - clearing",
@@ -244,13 +234,13 @@ bool ValueObjectSynthetic::UpdateValue() {
   return true;
 }
 
-lldb::ValueObjectSP ValueObjectSynthetic::GetChildAtIndex(uint32_t idx,
+lldb::ValueObjectSP ValueObjectSynthetic::GetChildAtIndex(size_t idx,
                                                           bool can_create) {
   Log *log = GetLog(LLDBLog::DataFormatters);
 
   LLDB_LOGF(log,
             "[ValueObjectSynthetic::GetChildAtIndex] name=%s, retrieving "
-            "child at index %u",
+            "child at index %zu",
             GetName().AsCString(), idx);
 
   UpdateValueIfNeeded();
@@ -269,7 +259,7 @@ lldb::ValueObjectSP ValueObjectSynthetic::GetChildAtIndex(uint32_t idx,
     if (can_create && m_synth_filter_up != nullptr) {
       LLDB_LOGF(log,
                 "[ValueObjectSynthetic::GetChildAtIndex] name=%s, child at "
-                "index %u not cached and will be created",
+                "index %zu not cached and will be created",
                 GetName().AsCString(), idx);
 
       lldb::ValueObjectSP synth_guy = m_synth_filter_up->GetChildAtIndex(idx);
@@ -277,7 +267,7 @@ lldb::ValueObjectSP ValueObjectSynthetic::GetChildAtIndex(uint32_t idx,
       LLDB_LOGF(
           log,
           "[ValueObjectSynthetic::GetChildAtIndex] name=%s, child at index "
-          "%u created as %p (is "
+          "%zu created as %p (is "
           "synthetic: %s)",
           GetName().AsCString(), idx, static_cast<void *>(synth_guy.get()),
           synth_guy.get()
@@ -299,7 +289,7 @@ lldb::ValueObjectSP ValueObjectSynthetic::GetChildAtIndex(uint32_t idx,
     } else {
       LLDB_LOGF(log,
                 "[ValueObjectSynthetic::GetChildAtIndex] name=%s, child at "
-                "index %u not cached and cannot "
+                "index %zu not cached and cannot "
                 "be created (can_create = %s, synth_filter = %p)",
                 GetName().AsCString(), idx, can_create ? "yes" : "no",
                 static_cast<void *>(m_synth_filter_up.get()));
@@ -309,7 +299,7 @@ lldb::ValueObjectSP ValueObjectSynthetic::GetChildAtIndex(uint32_t idx,
   } else {
     LLDB_LOGF(log,
               "[ValueObjectSynthetic::GetChildAtIndex] name=%s, child at "
-              "index %u cached as %p",
+              "index %zu cached as %p",
               GetName().AsCString(), idx, static_cast<void *>(valobj));
 
     return valobj->GetSP();

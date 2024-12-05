@@ -1,5 +1,4 @@
 set(LLVM_LINK_COMPONENTS
-  Core
   DebugInfoDWARF
   DWP
   JITLink
@@ -21,7 +20,6 @@ add_llvm_library(LLVMBOLTRewrite
   LinuxKernelRewriter.cpp
   MachORewriteInstance.cpp
   MetadataManager.cpp
-  BuildIDRewriter.cpp
   PseudoProbeRewriter.cpp
   RewriteInstance.cpp
   SDTRewriter.cpp

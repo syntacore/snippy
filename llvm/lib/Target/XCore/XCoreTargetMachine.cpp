@@ -84,7 +84,7 @@ TargetPassConfig *XCoreTargetMachine::createPassConfig(PassManagerBase &PM) {
 }
 
 void XCorePassConfig::addIRPasses() {
-  addPass(createAtomicExpandLegacyPass());
+  addPass(createAtomicExpandPass());
 
   TargetPassConfig::addIRPasses();
 }
@@ -107,7 +107,7 @@ void XCorePassConfig::addPreEmitPass() {
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeXCoreTarget() {
   RegisterTargetMachine<XCoreTargetMachine> X(getTheXCoreTarget());
   PassRegistry &PR = *PassRegistry::getPassRegistry();
-  initializeXCoreDAGToDAGISelLegacyPass(PR);
+  initializeXCoreDAGToDAGISelPass(PR);
 }
 
 TargetTransformInfo

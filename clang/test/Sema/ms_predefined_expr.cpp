@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 %s -fsyntax-only -Wmicrosoft -verify -fms-extensions
-// RUN: %clang_cc1 %s -fsyntax-only -Wmicrosoft -verify -fms-extensions -fexperimental-new-constant-interpreter
 
 using size_t = __SIZE_TYPE__;
 

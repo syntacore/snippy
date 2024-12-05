@@ -370,10 +370,10 @@ static bool writeReport(LocationInfoTy &LocationInfo) {
 
           if (!Succinct) {
             RS << LLI.UnrollCount;
-            RS << std::string(UCDigits - R.size(), ' ');
+            RS << std::string(UCDigits - RS.str().size(), ' ');
           }
 
-          return R;
+          return RS.str();
         };
 
         auto VStr = [VFDigits,
@@ -383,10 +383,10 @@ static bool writeReport(LocationInfoTy &LocationInfo) {
 
           if (!Succinct) {
             RS << LLI.VectorizationFactor << "," << LLI.InterleaveCount;
-            RS << std::string(VFDigits + ICDigits + 1 - R.size(), ' ');
+            RS << std::string(VFDigits + ICDigits + 1 - RS.str().size(), ' ');
           }
 
-          return R;
+          return RS.str();
         };
 
         OS << llvm::format_decimal(L, LNDigits) << " ";

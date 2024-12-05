@@ -3,7 +3,6 @@ add_custom_command(
   DEPENDS ${SWIG_SOURCES}
   DEPENDS ${SWIG_INTERFACES}
   DEPENDS ${SWIG_HEADERS}
-  DEPENDS lldb-sbapi-dwarf-enums
   COMMAND ${SWIG_EXECUTABLE}
       ${SWIG_COMMON_FLAGS}
       -I${CMAKE_CURRENT_SOURCE_DIR}
@@ -29,7 +28,7 @@ endfunction()
 function(finish_swig_lua swig_target lldb_lua_bindings_dir lldb_lua_target_dir)
   add_custom_target(${swig_target} ALL VERBATIM
     COMMAND ${CMAKE_COMMAND} -E make_directory ${lldb_lua_target_dir}
-    DEPENDS swig_wrapper_lua liblldb
+    DEPENDS swig_wrapper_lua
     COMMENT "LLDB Lua API")
   if(LLDB_BUILD_FRAMEWORK)
     set(LIBLLDB_SYMLINK_DEST "${LLDB_FRAMEWORK_ABSOLUTE_BUILD_DIR}/LLDB.framework/LLDB")
@@ -37,7 +36,11 @@ function(finish_swig_lua swig_target lldb_lua_bindings_dir lldb_lua_target_dir)
     set(LIBLLDB_SYMLINK_DEST "${LLVM_SHLIB_OUTPUT_INTDIR}/liblldb${CMAKE_SHARED_LIBRARY_SUFFIX}")
   endif()
   if(WIN32)
-    set(LIBLLDB_SYMLINK_OUTPUT_FILE "lldb.dll")
+    if(CMAKE_BUILD_TYPE STREQUAL Debug)
+      set(LIBLLDB_SYMLINK_OUTPUT_FILE "_lldb_d.pyd")
+    else()
+      set(LIBLLDB_SYMLINK_OUTPUT_FILE "_lldb.pyd")
+    endif()
   else()
     set(LIBLLDB_SYMLINK_OUTPUT_FILE "lldb.so")
   endif()
@@ -51,7 +54,7 @@ function(finish_swig_lua swig_target lldb_lua_bindings_dir lldb_lua_target_dir)
   add_dependencies(lldb ${swig_target})
 
   if(LLDB_BUILD_FRAMEWORK)
-    set(LLDB_LUA_INSTALL_PATH ${LLDB_FRAMEWORK_INSTALL_DIR}/LLDB.framework/Resources/Lua)
+    set(LLDB_LUA_INSTALL_PATH ${LLDB_FRAMEWORK_INSTALL_DIR}/LLDB.framework/Resources/Python)
   else()
     set(LLDB_LUA_INSTALL_PATH ${LLDB_LUA_RELATIVE_PATH})
   endif()

@@ -24,8 +24,7 @@ loop.end:
   ret void
 }
 
-; CHECK-LABEL: 'regression_test_loop_access_scalable_typesize'
-; CHECK: LAA: Found an analyzable loop: vector.body
+; CHECK-LABEL: LAA: Found a loop in regression_test_loop_access_scalable_typesize
 ; CHECK: LAA: Bad stride - Scalable object:
 define void @regression_test_loop_access_scalable_typesize(ptr %input_ptr) {
 entry:
@@ -43,8 +42,7 @@ end:
   ret void
 }
 
-; CHECK-LABEL: 'regression_test_loop_access_scalable_typesize_nonscalable_object'
-; CHECK: LAA: Found an analyzable loop: vector.body
+; CHECK-LABEL: LAA: Found a loop in regression_test_loop_access_scalable_typesize_nonscalable_object
 ; CHECK: LAA: Bad stride - Scalable object:
 define void @regression_test_loop_access_scalable_typesize_nonscalable_object(ptr %input_ptr) {
 entry:

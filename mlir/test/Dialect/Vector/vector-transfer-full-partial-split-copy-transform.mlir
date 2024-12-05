@@ -63,7 +63,7 @@ func.func @split_vector_transfer_read_strided_2d(
   %c0 = arith.constant 0 : index
   %f0 = arith.constant 0.0 : f32
 
-
+  
   //  CHECK-DAG: %[[c0:.*]] = arith.constant 0 : index
   //  CHECK-DAG: %[[c4:.*]] = arith.constant 4 : index
   //  CHECK-DAG: %[[c7:.*]] = arith.constant 7 : index
@@ -107,8 +107,7 @@ func.func @split_vector_transfer_read_strided_2d(
 }
 
 module attributes {transform.with_named_sequence} {
-  transform.named_sequence @__transform_main(%root : !transform.any_op {transform.readonly}) {
-    %func_op = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.op<"func.func">
+  transform.named_sequence @__transform_main(%func_op: !transform.op<"func.func"> {transform.readonly}) {
     transform.apply_patterns to %func_op {
       transform.apply_patterns.vector.split_transfer_full_partial split_transfer_strategy = "linalg-copy"
     } : !transform.op<"func.func">
@@ -171,8 +170,7 @@ func.func @split_vector_transfer_write_2d(%V: vector<4x8xf32>, %A: memref<?x8xf3
 // CHECK:         }
 
 module attributes {transform.with_named_sequence} {
-  transform.named_sequence @__transform_main(%root : !transform.any_op {transform.readonly}) {
-    %func_op = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.op<"func.func">
+  transform.named_sequence @__transform_main(%func_op: !transform.op<"func.func"> {transform.readonly}) {
     transform.apply_patterns to %func_op {
       transform.apply_patterns.vector.split_transfer_full_partial split_transfer_strategy = "linalg-copy"
     } : !transform.op<"func.func">
@@ -242,8 +240,7 @@ func.func @split_vector_transfer_write_strided_2d(
 // CHECK:         }
 
 module attributes {transform.with_named_sequence} {
-  transform.named_sequence @__transform_main(%root : !transform.any_op {transform.readonly}) {
-    %func_op = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.op<"func.func">
+  transform.named_sequence @__transform_main(%func_op: !transform.op<"func.func"> {transform.readonly}) {
     transform.apply_patterns to %func_op {
       transform.apply_patterns.vector.split_transfer_full_partial split_transfer_strategy = "linalg-copy"
     } : !transform.op<"func.func">

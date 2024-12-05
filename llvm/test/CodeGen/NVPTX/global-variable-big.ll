@@ -11,5 +11,8 @@ target triple = "nvptx64-nvidia-cuda"
 ; CHECK: .visible .global .align 16 .b8 gv[16] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
 
 ; Make sure that we do not overflow on large number of elements.
-; CHECK: .visible .global .align 1 .b8 large_data[4831838208];
+; CHECK-LABEL large_data
+; CHECK: .visible .global .align 1 .b8 large_data[4831838208]
 @large_data = global [4831838208 x i8] zeroinitializer
+
+

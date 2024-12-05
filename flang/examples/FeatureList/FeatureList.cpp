@@ -86,6 +86,8 @@ public:
   READ_FEATURE(AccObjectList)
   READ_FEATURE(AccObjectListWithModifier)
   READ_FEATURE(AccObjectListWithReduction)
+  READ_FEATURE(AccReductionOperator)
+  READ_FEATURE(AccReductionOperator::Operator)
   READ_FEATURE(AccSizeExpr)
   READ_FEATURE(AccSizeExprList)
   READ_FEATURE(AccSelfClause)
@@ -408,13 +410,10 @@ public:
   READ_FEATURE(LetterSpec)
   READ_FEATURE(LiteralConstant)
   READ_FEATURE(IntLiteralConstant)
-  READ_FEATURE(ReductionOperator)
-  READ_FEATURE(ReductionOperator::Operator)
   READ_FEATURE(LocalitySpec)
   READ_FEATURE(LocalitySpec::DefaultNone)
   READ_FEATURE(LocalitySpec::Local)
   READ_FEATURE(LocalitySpec::LocalInit)
-  READ_FEATURE(LocalitySpec::Reduce)
   READ_FEATURE(LocalitySpec::Shared)
   READ_FEATURE(LockStmt)
   READ_FEATURE(LockStmt::LockStat)
@@ -776,9 +775,7 @@ class FeatureListAction : public PluginParseTreeAction {
     }
   }
 
-  bool beginSourceFileAction() override {
-    return runPrescan() && runParse(/*emitMessages=*/true);
-  }
+  bool beginSourceFileAction() override { return runPrescan() && runParse(); }
 };
 
 static FrontendPluginRegistry::Add<FeatureListAction> X(

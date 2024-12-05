@@ -9,27 +9,23 @@
 #include "edit-input.h"
 #include "namelist.h"
 #include "utf.h"
-#include "flang/Common/optional.h"
 #include "flang/Common/real.h"
 #include "flang/Common/uint128.h"
-#include "flang/Runtime/freestanding-tools.h"
 #include <algorithm>
 #include <cfenv>
 
 namespace Fortran::runtime::io {
-RT_OFFLOAD_API_GROUP_BEGIN
 
 // Checks that a list-directed input value has been entirely consumed and
 // doesn't contain unparsed characters before the next value separator.
-static inline RT_API_ATTRS bool IsCharValueSeparator(
-    const DataEdit &edit, char32_t ch) {
+static inline bool IsCharValueSeparator(const DataEdit &edit, char32_t ch) {
   char32_t comma{
       edit.modes.editingFlags & decimalComma ? char32_t{';'} : char32_t{','}};
   return ch == ' ' || ch == '\t' || ch == comma || ch == '/' ||
       (edit.IsNamelist() && (ch == '&' || ch == '$'));
 }
 
-static RT_API_ATTRS bool CheckCompleteListDirectedField(
+static bool CheckCompleteListDirectedField(
     IoStatementState &io, const DataEdit &edit) {
   if (edit.IsListDirected()) {
     std::size_t byteCount;
@@ -55,12 +51,12 @@ static RT_API_ATTRS bool CheckCompleteListDirectedField(
 }
 
 template <int LOG2_BASE>
-static RT_API_ATTRS bool EditBOZInput(
+static bool EditBOZInput(
     IoStatementState &io, const DataEdit &edit, void *n, std::size_t bytes) {
   // Skip leading white space & zeroes
-  Fortran::common::optional<int> remaining{io.CueUpInput(edit)};
+  std::optional<int> remaining{io.CueUpInput(edit)};
   auto start{io.GetConnectionState().positionInRecord};
-  Fortran::common::optional<char32_t> next{io.NextInField(remaining, edit)};
+  std::optional<char32_t> next{io.NextInField(remaining, edit)};
   if (next.value_or('?') == '0') {
     do {
       start = io.GetConnectionState().positionInRecord;
@@ -154,14 +150,13 @@ static RT_API_ATTRS bool EditBOZInput(
   return CheckCompleteListDirectedField(io, edit);
 }
 
-static inline RT_API_ATTRS char32_t GetRadixPointChar(const DataEdit &edit) {
+static inline char32_t GetRadixPointChar(const DataEdit &edit) {
   return edit.modes.editingFlags & decimalComma ? char32_t{','} : char32_t{'.'};
 }
 
 // Prepares input from a field, and returns the sign, if any, else '\0'.
-static RT_API_ATTRS char ScanNumericPrefix(IoStatementState &io,
-    const DataEdit &edit, Fortran::common::optional<char32_t> &next,
-    Fortran::common::optional<int> &remaining) {
+static char ScanNumericPrefix(IoStatementState &io, const DataEdit &edit,
+    std::optional<char32_t> &next, std::optional<int> &remaining) {
   remaining = io.CueUpInput(edit);
   next = io.NextInField(remaining, edit);
   char sign{'\0'};
@@ -177,7 +172,7 @@ static RT_API_ATTRS char ScanNumericPrefix(IoStatementState &io,
   return sign;
 }
 
-RT_API_ATTRS bool EditIntegerInput(
+bool EditIntegerInput(
     IoStatementState &io, const DataEdit &edit, void *n, int kind) {
   RUNTIME_CHECK(io.GetIoErrorHandler(), kind >= 1 && !(kind & (kind - 1)));
   switch (edit.descriptor) {
@@ -203,8 +198,8 @@ RT_API_ATTRS bool EditIntegerInput(
         edit.descriptor);
     return false;
   }
-  Fortran::common::optional<int> remaining;
-  Fortran::common::optional<char32_t> next;
+  std::optional<int> remaining;
+  std::optional<char32_t> next;
   char sign{ScanNumericPrefix(io, edit, next, remaining)};
   common::UnsignedInt128 value{0};
   bool any{!!sign};
@@ -282,20 +277,18 @@ struct ScannedRealInput {
   int exponent{0}; // adjusted as necessary; binary if isHexadecimal
   bool isHexadecimal{false}; // 0X...
 };
-static RT_API_ATTRS ScannedRealInput ScanRealInput(
+static ScannedRealInput ScanRealInput(
     char *buffer, int bufferSize, IoStatementState &io, const DataEdit &edit) {
-  Fortran::common::optional<int> remaining;
-  Fortran::common::optional<char32_t> next;
+  std::optional<int> remaining;
+  std::optional<char32_t> next;
   int got{0};
-  Fortran::common::optional<int> radixPointOffset;
-  // The following lambda definition violates the conding style,
-  // but cuda-11.8 nvcc hits an internal error with the brace initialization.
-  auto Put = [&](char ch) -> void {
+  std::optional<int> radixPointOffset;
+  auto Put{[&](char ch) -> void {
     if (got < bufferSize) {
       buffer[got] = ch;
     }
     ++got;
-  };
+  }};
   char sign{ScanNumericPrefix(io, edit, next, remaining)};
   if (sign == '-') {
     Put('-');
@@ -492,21 +485,13 @@ static RT_API_ATTRS ScannedRealInput ScanRealInput(
   return {got, exponent, isHexadecimal};
 }
 
-static RT_API_ATTRS void RaiseFPExceptions(
-    decimal::ConversionResultFlags flags) {
+static void RaiseFPExceptions(decimal::ConversionResultFlags flags) {
 #undef RAISE
-#if defined(RT_DEVICE_COMPILATION)
-  Terminator terminator(__FILE__, __LINE__);
-#define RAISE(e) \
-  terminator.Crash( \
-      "not implemented yet: raising FP exception in device code: %s", #e);
-#else // !defined(RT_DEVICE_COMPILATION)
 #ifdef feraisexcept // a macro in some environments; omit std::
 #define RAISE feraiseexcept
 #else
 #define RAISE std::feraiseexcept
 #endif
-#endif // !defined(RT_DEVICE_COMPILATION)
   if (flags & decimal::ConversionResultFlags::Overflow) {
     RAISE(FE_OVERFLOW);
   }
@@ -527,7 +512,7 @@ static RT_API_ATTRS void RaiseFPExceptions(
 // converter without modification, this fast path for real input
 // saves time by avoiding memory copies and reformatting of the exponent.
 template <int PRECISION>
-static RT_API_ATTRS bool TryFastPathRealDecimalInput(
+static bool TryFastPathRealDecimalInput(
     IoStatementState &io, const DataEdit &edit, void *n) {
   if (edit.modes.editingFlags & (blankZero | decimalComma)) {
     return false;
@@ -599,8 +584,7 @@ static RT_API_ATTRS bool TryFastPathRealDecimalInput(
 }
 
 template <int binaryPrecision>
-RT_API_ATTRS decimal::ConversionToBinaryResult<binaryPrecision>
-ConvertHexadecimal(
+decimal::ConversionToBinaryResult<binaryPrecision> ConvertHexadecimal(
     const char *&p, enum decimal::FortranRounding rounding, int expo) {
   using RealType = decimal::BinaryFloatingPointNumber<binaryPrecision>;
   using RawType = typename RealType::RawType;
@@ -628,23 +612,11 @@ ConvertHexadecimal(
     } else {
       break;
     }
-    if (fraction >> binaryPrecision) {
-      while (fraction >> binaryPrecision) {
-        guardBit |= roundingBit;
-        roundingBit = (int)fraction & 1;
-        fraction >>= 1;
-        ++expo;
-      }
-      // Consume excess digits
-      while (*++p) {
-        if (*p == '0') {
-        } else if ((*p >= '1' && *p <= '9') || (*p >= 'A' && *p <= 'F')) {
-          guardBit = 1;
-        } else {
-          break;
-        }
-      }
-      break;
+    while (fraction >> binaryPrecision) {
+      guardBit |= roundingBit;
+      roundingBit = (int)fraction & 1;
+      fraction >>= 1;
+      ++expo;
     }
   }
   if (fraction) {
@@ -659,32 +631,31 @@ ConvertHexadecimal(
     while (expo > 1 && !(fraction >> (binaryPrecision - 1))) {
       fraction <<= 1;
       --expo;
-      guardBit = roundingBit = 0;
     }
-  }
-  // Rounding
-  bool increase{false};
-  switch (rounding) {
-  case decimal::RoundNearest: // RN & RP
-    increase = roundingBit && (guardBit | ((int)fraction & 1));
-    break;
-  case decimal::RoundUp: // RU
-    increase = !isNegative && (roundingBit | guardBit);
-    break;
-  case decimal::RoundDown: // RD
-    increase = isNegative && (roundingBit | guardBit);
-    break;
-  case decimal::RoundToZero: // RZ
-    break;
-  case decimal::RoundCompatible: // RC
-    increase = roundingBit != 0;
-    break;
-  }
-  if (increase) {
-    ++fraction;
-    if (fraction >> binaryPrecision) {
-      fraction >>= 1;
-      ++expo;
+    // Rounding
+    bool increase{false};
+    switch (rounding) {
+    case decimal::RoundNearest: // RN & RP
+      increase = roundingBit && (guardBit | ((int)fraction & 1));
+      break;
+    case decimal::RoundUp: // RU
+      increase = !isNegative && (roundingBit | guardBit);
+      break;
+    case decimal::RoundDown: // RD
+      increase = isNegative && (roundingBit | guardBit);
+      break;
+    case decimal::RoundToZero: // RZ
+      break;
+    case decimal::RoundCompatible: // RC
+      increase = roundingBit != 0;
+      break;
+    }
+    if (increase) {
+      ++fraction;
+      if (fraction >> binaryPrecision) {
+        fraction >>= 1;
+        ++expo;
+      }
     }
   }
   // Package & return result
@@ -716,8 +687,7 @@ ConvertHexadecimal(
 }
 
 template <int KIND>
-RT_API_ATTRS bool EditCommonRealInput(
-    IoStatementState &io, const DataEdit &edit, void *n) {
+bool EditCommonRealInput(IoStatementState &io, const DataEdit &edit, void *n) {
   constexpr int binaryPrecision{common::PrecisionOfRealKind(KIND)};
   if (TryFastPathRealDecimalInput<binaryPrecision>(io, edit, n)) {
     return CheckCompleteListDirectedField(io, edit);
@@ -813,8 +783,7 @@ RT_API_ATTRS bool EditCommonRealInput(
 }
 
 template <int KIND>
-RT_API_ATTRS bool EditRealInput(
-    IoStatementState &io, const DataEdit &edit, void *n) {
+bool EditRealInput(IoStatementState &io, const DataEdit &edit, void *n) {
   switch (edit.descriptor) {
   case DataEdit::ListDirected:
     if (IsNamelistNameOrSlash(io)) {
@@ -848,8 +817,7 @@ RT_API_ATTRS bool EditRealInput(
 }
 
 // 13.7.3 in Fortran 2018
-RT_API_ATTRS bool EditLogicalInput(
-    IoStatementState &io, const DataEdit &edit, bool &x) {
+bool EditLogicalInput(IoStatementState &io, const DataEdit &edit, bool &x) {
   switch (edit.descriptor) {
   case DataEdit::ListDirected:
     if (IsNamelistNameOrSlash(io)) {
@@ -865,8 +833,8 @@ RT_API_ATTRS bool EditLogicalInput(
         edit.descriptor);
     return false;
   }
-  Fortran::common::optional<int> remaining{io.CueUpInput(edit)};
-  Fortran::common::optional<char32_t> next{io.NextInField(remaining, edit)};
+  std::optional<int> remaining{io.CueUpInput(edit)};
+  std::optional<char32_t> next{io.NextInField(remaining, edit)};
   if (next && *next == '.') { // skip optional period
     next = io.NextInField(remaining, edit);
   }
@@ -899,7 +867,7 @@ RT_API_ATTRS bool EditLogicalInput(
 
 // See 13.10.3.1 paragraphs 7-9 in Fortran 2018
 template <typename CHAR>
-static RT_API_ATTRS bool EditDelimitedCharacterInput(
+static bool EditDelimitedCharacterInput(
     IoStatementState &io, CHAR *x, std::size_t length, char32_t delimiter) {
   bool result{true};
   while (true) {
@@ -928,12 +896,12 @@ static RT_API_ATTRS bool EditDelimitedCharacterInput(
       --length;
     }
   }
-  Fortran::runtime::fill_n(x, length, ' ');
+  std::fill_n(x, length, ' ');
   return result;
 }
 
 template <typename CHAR>
-static RT_API_ATTRS bool EditListDirectedCharacterInput(
+static bool EditListDirectedCharacterInput(
     IoStatementState &io, CHAR *x, std::size_t length, const DataEdit &edit) {
   std::size_t byteCount{0};
   auto ch{io.GetCurrentChar(byteCount)};
@@ -948,9 +916,8 @@ static RT_API_ATTRS bool EditListDirectedCharacterInput(
   // or the end of the current record.  Subtlety: the "remaining" count
   // here is a dummy that's used to avoid the interpretation of separators
   // in NextInField.
-  Fortran::common::optional<int> remaining{length > 0 ? maxUTF8Bytes : 0};
-  while (Fortran::common::optional<char32_t> next{
-      io.NextInField(remaining, edit)}) {
+  std::optional<int> remaining{length > 0 ? maxUTF8Bytes : 0};
+  while (std::optional<char32_t> next{io.NextInField(remaining, edit)}) {
     bool isSep{false};
     switch (*next) {
     case ' ':
@@ -978,13 +945,13 @@ static RT_API_ATTRS bool EditListDirectedCharacterInput(
       remaining = --length > 0 ? maxUTF8Bytes : 0;
     }
   }
-  Fortran::runtime::fill_n(x, length, ' ');
+  std::fill_n(x, length, ' ');
   return true;
 }
 
 template <typename CHAR>
-RT_API_ATTRS bool EditCharacterInput(IoStatementState &io, const DataEdit &edit,
-    CHAR *x, std::size_t lengthChars) {
+bool EditCharacterInput(IoStatementState &io, const DataEdit &edit, CHAR *x,
+    std::size_t lengthChars) {
   switch (edit.descriptor) {
   case DataEdit::ListDirected:
     return EditListDirectedCharacterInput(io, x, lengthChars, edit);
@@ -1028,7 +995,7 @@ RT_API_ATTRS bool EditCharacterInput(IoStatementState &io, const DataEdit &edit,
         if (io.CheckForEndOfRecord(readyBytes)) {
           if (readyBytes == 0) {
             // PAD='YES' and no more data
-            Fortran::runtime::fill_n(x, lengthChars, ' ');
+            std::fill_n(x, lengthChars, ' ');
             return !io.GetIoErrorHandler().InError();
           } else {
             // Do partial read(s) then pad on last iteration
@@ -1105,30 +1072,23 @@ RT_API_ATTRS bool EditCharacterInput(IoStatementState &io, const DataEdit &edit,
     readyBytes -= chunkBytes;
   }
   // Pad the remainder of the input variable, if any.
-  Fortran::runtime::fill_n(x, lengthChars, ' ');
+  std::fill_n(x, lengthChars, ' ');
   return CheckCompleteListDirectedField(io, edit);
 }
 
-template RT_API_ATTRS bool EditRealInput<2>(
-    IoStatementState &, const DataEdit &, void *);
-template RT_API_ATTRS bool EditRealInput<3>(
-    IoStatementState &, const DataEdit &, void *);
-template RT_API_ATTRS bool EditRealInput<4>(
-    IoStatementState &, const DataEdit &, void *);
-template RT_API_ATTRS bool EditRealInput<8>(
-    IoStatementState &, const DataEdit &, void *);
-template RT_API_ATTRS bool EditRealInput<10>(
-    IoStatementState &, const DataEdit &, void *);
+template bool EditRealInput<2>(IoStatementState &, const DataEdit &, void *);
+template bool EditRealInput<3>(IoStatementState &, const DataEdit &, void *);
+template bool EditRealInput<4>(IoStatementState &, const DataEdit &, void *);
+template bool EditRealInput<8>(IoStatementState &, const DataEdit &, void *);
+template bool EditRealInput<10>(IoStatementState &, const DataEdit &, void *);
 // TODO: double/double
-template RT_API_ATTRS bool EditRealInput<16>(
-    IoStatementState &, const DataEdit &, void *);
+template bool EditRealInput<16>(IoStatementState &, const DataEdit &, void *);
 
-template RT_API_ATTRS bool EditCharacterInput(
+template bool EditCharacterInput(
     IoStatementState &, const DataEdit &, char *, std::size_t);
-template RT_API_ATTRS bool EditCharacterInput(
+template bool EditCharacterInput(
     IoStatementState &, const DataEdit &, char16_t *, std::size_t);
-template RT_API_ATTRS bool EditCharacterInput(
+template bool EditCharacterInput(
     IoStatementState &, const DataEdit &, char32_t *, std::size_t);
 
-RT_OFFLOAD_API_GROUP_END
 } // namespace Fortran::runtime::io

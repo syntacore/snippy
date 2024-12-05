@@ -40,6 +40,11 @@ class Builder:
         """Returns the invocation for GNU make.
         The first argument is a tuple of the relative path to the testcase
         and its filename stem."""
+        if platform.system() == "FreeBSD" or platform.system() == "NetBSD":
+            make = "gmake"
+        else:
+            make = "make"
+
         # Construct the base make invocation.
         lldb_test = os.environ["LLDB_TEST"]
         if not (
@@ -57,7 +62,7 @@ class Builder:
         if not os.path.isfile(makefile):
             makefile = os.path.join(build_dir, "Makefile")
         return [
-            configuration.make_path,
+            make,
             "VPATH=" + src_dir,
             "-C",
             build_dir,
@@ -143,9 +148,6 @@ class Builder:
             return libcpp_args
         return []
 
-    def getLLDBObjRoot(self):
-        return ["LLDB_OBJ_ROOT={}".format(configuration.lldb_obj_root)]
-
     def _getDebugInfoArgs(self, debug_info):
         if debug_info is None:
             return []
@@ -183,7 +185,6 @@ class Builder:
             self.getSDKRootSpec(),
             self.getModuleCacheSpec(),
             self.getLibCxxArgs(),
-            self.getLLDBObjRoot(),
             self.getCmdLine(dictionary),
         ]
         command = list(itertools.chain(*command_parts))

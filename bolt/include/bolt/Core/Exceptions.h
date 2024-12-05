@@ -30,14 +30,13 @@ class FDE;
 
 namespace bolt {
 
-class BinaryContext;
 class BinaryFunction;
 
 /// \brief Wraps up information to read all CFI instructions and feed them to a
 /// BinaryFunction, as well as rewriting CFI sections.
 class CFIReaderWriter {
 public:
-  explicit CFIReaderWriter(BinaryContext &BC, const DWARFDebugFrame &EHFrame);
+  explicit CFIReaderWriter(const DWARFDebugFrame &EHFrame);
 
   bool fillCFIInfoFor(BinaryFunction &Function) const;
 
@@ -60,7 +59,6 @@ public:
   const FDEsMap &getFDEs() const { return FDEs; }
 
 private:
-  BinaryContext &BC;
   FDEsMap FDEs;
 };
 

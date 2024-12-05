@@ -36,7 +36,6 @@ add_llvm_target(SystemZCodeGen
   SystemZShortenInst.cpp
   SystemZSubtarget.cpp
   SystemZTargetMachine.cpp
-  SystemZTargetObjectFile.cpp
   SystemZTargetTransformInfo.cpp
   SystemZTDC.cpp
 
@@ -54,7 +53,6 @@ add_llvm_target(SystemZCodeGen
   SystemZInfo
   Target
   TargetParser
-  TransformUtils
 
   ADD_TO_COMPONENT
   SystemZ

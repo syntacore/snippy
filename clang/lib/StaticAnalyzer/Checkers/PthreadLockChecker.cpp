@@ -87,8 +87,7 @@ private:
                                               CheckerKind CheckKind) const;
   CallDescriptionMap<FnCheck> PThreadCallbacks = {
       // Init.
-      {{CDM::CLibrary, {"pthread_mutex_init"}, 2},
-       &PthreadLockChecker::InitAnyLock},
+      {{{"pthread_mutex_init"}, 2}, &PthreadLockChecker::InitAnyLock},
       // TODO: pthread_rwlock_init(2 arguments).
       // TODO: lck_mtx_init(3 arguments).
       // TODO: lck_mtx_alloc_init(2 arguments) => returns the mutex.
@@ -96,106 +95,74 @@ private:
       // TODO: lck_rw_alloc_init(2 arguments) => returns the mutex.
 
       // Acquire.
-      {{CDM::CLibrary, {"pthread_mutex_lock"}, 1},
-       &PthreadLockChecker::AcquirePthreadLock},
-      {{CDM::CLibrary, {"pthread_rwlock_rdlock"}, 1},
-       &PthreadLockChecker::AcquirePthreadLock},
-      {{CDM::CLibrary, {"pthread_rwlock_wrlock"}, 1},
-       &PthreadLockChecker::AcquirePthreadLock},
-      {{CDM::CLibrary, {"lck_mtx_lock"}, 1},
-       &PthreadLockChecker::AcquireXNULock},
-      {{CDM::CLibrary, {"lck_rw_lock_exclusive"}, 1},
-       &PthreadLockChecker::AcquireXNULock},
-      {{CDM::CLibrary, {"lck_rw_lock_shared"}, 1},
-       &PthreadLockChecker::AcquireXNULock},
+      {{{"pthread_mutex_lock"}, 1}, &PthreadLockChecker::AcquirePthreadLock},
+      {{{"pthread_rwlock_rdlock"}, 1}, &PthreadLockChecker::AcquirePthreadLock},
+      {{{"pthread_rwlock_wrlock"}, 1}, &PthreadLockChecker::AcquirePthreadLock},
+      {{{"lck_mtx_lock"}, 1}, &PthreadLockChecker::AcquireXNULock},
+      {{{"lck_rw_lock_exclusive"}, 1}, &PthreadLockChecker::AcquireXNULock},
+      {{{"lck_rw_lock_shared"}, 1}, &PthreadLockChecker::AcquireXNULock},
 
       // Try.
-      {{CDM::CLibrary, {"pthread_mutex_trylock"}, 1},
-       &PthreadLockChecker::TryPthreadLock},
-      {{CDM::CLibrary, {"pthread_rwlock_tryrdlock"}, 1},
-       &PthreadLockChecker::TryPthreadLock},
-      {{CDM::CLibrary, {"pthread_rwlock_trywrlock"}, 1},
-       &PthreadLockChecker::TryPthreadLock},
-      {{CDM::CLibrary, {"lck_mtx_try_lock"}, 1},
-       &PthreadLockChecker::TryXNULock},
-      {{CDM::CLibrary, {"lck_rw_try_lock_exclusive"}, 1},
-       &PthreadLockChecker::TryXNULock},
-      {{CDM::CLibrary, {"lck_rw_try_lock_shared"}, 1},
-       &PthreadLockChecker::TryXNULock},
+      {{{"pthread_mutex_trylock"}, 1}, &PthreadLockChecker::TryPthreadLock},
+      {{{"pthread_rwlock_tryrdlock"}, 1}, &PthreadLockChecker::TryPthreadLock},
+      {{{"pthread_rwlock_trywrlock"}, 1}, &PthreadLockChecker::TryPthreadLock},
+      {{{"lck_mtx_try_lock"}, 1}, &PthreadLockChecker::TryXNULock},
+      {{{"lck_rw_try_lock_exclusive"}, 1}, &PthreadLockChecker::TryXNULock},
+      {{{"lck_rw_try_lock_shared"}, 1}, &PthreadLockChecker::TryXNULock},
 
       // Release.
-      {{CDM::CLibrary, {"pthread_mutex_unlock"}, 1},
-       &PthreadLockChecker::ReleaseAnyLock},
-      {{CDM::CLibrary, {"pthread_rwlock_unlock"}, 1},
-       &PthreadLockChecker::ReleaseAnyLock},
-      {{CDM::CLibrary, {"lck_mtx_unlock"}, 1},
-       &PthreadLockChecker::ReleaseAnyLock},
-      {{CDM::CLibrary, {"lck_rw_unlock_exclusive"}, 1},
-       &PthreadLockChecker::ReleaseAnyLock},
-      {{CDM::CLibrary, {"lck_rw_unlock_shared"}, 1},
-       &PthreadLockChecker::ReleaseAnyLock},
-      {{CDM::CLibrary, {"lck_rw_done"}, 1},
-       &PthreadLockChecker::ReleaseAnyLock},
+      {{{"pthread_mutex_unlock"}, 1}, &PthreadLockChecker::ReleaseAnyLock},
+      {{{"pthread_rwlock_unlock"}, 1}, &PthreadLockChecker::ReleaseAnyLock},
+      {{{"lck_mtx_unlock"}, 1}, &PthreadLockChecker::ReleaseAnyLock},
+      {{{"lck_rw_unlock_exclusive"}, 1}, &PthreadLockChecker::ReleaseAnyLock},
+      {{{"lck_rw_unlock_shared"}, 1}, &PthreadLockChecker::ReleaseAnyLock},
+      {{{"lck_rw_done"}, 1}, &PthreadLockChecker::ReleaseAnyLock},
 
       // Destroy.
-      {{CDM::CLibrary, {"pthread_mutex_destroy"}, 1},
-       &PthreadLockChecker::DestroyPthreadLock},
-      {{CDM::CLibrary, {"lck_mtx_destroy"}, 2},
-       &PthreadLockChecker::DestroyXNULock},
+      {{{"pthread_mutex_destroy"}, 1}, &PthreadLockChecker::DestroyPthreadLock},
+      {{{"lck_mtx_destroy"}, 2}, &PthreadLockChecker::DestroyXNULock},
       // TODO: pthread_rwlock_destroy(1 argument).
       // TODO: lck_rw_destroy(2 arguments).
   };
 
   CallDescriptionMap<FnCheck> FuchsiaCallbacks = {
       // Init.
-      {{CDM::CLibrary, {"spin_lock_init"}, 1},
-       &PthreadLockChecker::InitAnyLock},
+      {{{"spin_lock_init"}, 1}, &PthreadLockChecker::InitAnyLock},
 
       // Acquire.
-      {{CDM::CLibrary, {"spin_lock"}, 1},
-       &PthreadLockChecker::AcquirePthreadLock},
-      {{CDM::CLibrary, {"spin_lock_save"}, 3},
-       &PthreadLockChecker::AcquirePthreadLock},
-      {{CDM::CLibrary, {"sync_mutex_lock"}, 1},
-       &PthreadLockChecker::AcquirePthreadLock},
-      {{CDM::CLibrary, {"sync_mutex_lock_with_waiter"}, 1},
+      {{{"spin_lock"}, 1}, &PthreadLockChecker::AcquirePthreadLock},
+      {{{"spin_lock_save"}, 3}, &PthreadLockChecker::AcquirePthreadLock},
+      {{{"sync_mutex_lock"}, 1}, &PthreadLockChecker::AcquirePthreadLock},
+      {{{"sync_mutex_lock_with_waiter"}, 1},
        &PthreadLockChecker::AcquirePthreadLock},
 
       // Try.
-      {{CDM::CLibrary, {"spin_trylock"}, 1},
-       &PthreadLockChecker::TryFuchsiaLock},
-      {{CDM::CLibrary, {"sync_mutex_trylock"}, 1},
-       &PthreadLockChecker::TryFuchsiaLock},
-      {{CDM::CLibrary, {"sync_mutex_timedlock"}, 2},
-       &PthreadLockChecker::TryFuchsiaLock},
+      {{{"spin_trylock"}, 1}, &PthreadLockChecker::TryFuchsiaLock},
+      {{{"sync_mutex_trylock"}, 1}, &PthreadLockChecker::TryFuchsiaLock},
+      {{{"sync_mutex_timedlock"}, 2}, &PthreadLockChecker::TryFuchsiaLock},
 
       // Release.
-      {{CDM::CLibrary, {"spin_unlock"}, 1},
-       &PthreadLockChecker::ReleaseAnyLock},
-      {{CDM::CLibrary, {"spin_unlock_restore"}, 3},
-       &PthreadLockChecker::ReleaseAnyLock},
-      {{CDM::CLibrary, {"sync_mutex_unlock"}, 1},
-       &PthreadLockChecker::ReleaseAnyLock},
+      {{{"spin_unlock"}, 1}, &PthreadLockChecker::ReleaseAnyLock},
+      {{{"spin_unlock_restore"}, 3}, &PthreadLockChecker::ReleaseAnyLock},
+      {{{"sync_mutex_unlock"}, 1}, &PthreadLockChecker::ReleaseAnyLock},
   };
 
   CallDescriptionMap<FnCheck> C11Callbacks = {
       // Init.
-      {{CDM::CLibrary, {"mtx_init"}, 2}, &PthreadLockChecker::InitAnyLock},
+      {{{"mtx_init"}, 2}, &PthreadLockChecker::InitAnyLock},
 
       // Acquire.
-      {{CDM::CLibrary, {"mtx_lock"}, 1},
-       &PthreadLockChecker::AcquirePthreadLock},
+      {{{"mtx_lock"}, 1}, &PthreadLockChecker::AcquirePthreadLock},
 
       // Try.
-      {{CDM::CLibrary, {"mtx_trylock"}, 1}, &PthreadLockChecker::TryC11Lock},
-      {{CDM::CLibrary, {"mtx_timedlock"}, 2}, &PthreadLockChecker::TryC11Lock},
+      {{{"mtx_trylock"}, 1}, &PthreadLockChecker::TryC11Lock},
+      {{{"mtx_timedlock"}, 2}, &PthreadLockChecker::TryC11Lock},
 
       // Release.
-      {{CDM::CLibrary, {"mtx_unlock"}, 1}, &PthreadLockChecker::ReleaseAnyLock},
+      {{{"mtx_unlock"}, 1}, &PthreadLockChecker::ReleaseAnyLock},
 
       // Destroy
-      {{CDM::CLibrary, {"mtx_destroy"}, 1},
-       &PthreadLockChecker::DestroyPthreadLock},
+      {{{"mtx_destroy"}, 1}, &PthreadLockChecker::DestroyPthreadLock},
   };
 
   ProgramStateRef resolvePossiblyDestroyedMutex(ProgramStateRef state,
@@ -291,9 +258,13 @@ REGISTER_MAP_WITH_PROGRAMSTATE(DestroyRetVal, const MemRegion *, SymbolRef)
 
 void PthreadLockChecker::checkPostCall(const CallEvent &Call,
                                        CheckerContext &C) const {
+  // An additional umbrella check that all functions modeled by this checker
+  // are global C functions.
+  // TODO: Maybe make this the default behavior of CallDescription
+  // with exactly one identifier?
   // FIXME: Try to handle cases when the implementation was inlined rather
   // than just giving up.
-  if (C.wasInlined)
+  if (!Call.isGlobalCFunction() || C.wasInlined)
     return;
 
   if (const FnCheck *Callback = PThreadCallbacks.lookup(Call))

@@ -1,4 +1,4 @@
-! RUN: %python %S/test_errors.py %s %flang_fc1 -pedantic
+! RUN: %python %S/test_errors.py %s %flang_fc1
 ! Test 15.5.2.5 constraints and restrictions for POINTER & ALLOCATABLE
 ! arguments when both sides of the call have the same attributes.
 
@@ -73,9 +73,9 @@ module m
     call sma(ma) ! ok
     call spp(pp) ! ok
     call spa(pa) ! ok
-    !PORTABILITY: If a POINTER or ALLOCATABLE actual argument is polymorphic, the corresponding dummy argument should also be so
+    !ERROR: If a POINTER or ALLOCATABLE dummy or actual argument is polymorphic, both must be so
     call smp(pp)
-    !PORTABILITY: If a POINTER or ALLOCATABLE actual argument is polymorphic, the corresponding dummy argument should also be so
+    !ERROR: If a POINTER or ALLOCATABLE dummy or actual argument is polymorphic, both must be so
     call sma(pa)
     !ERROR: If a POINTER or ALLOCATABLE dummy or actual argument is polymorphic, both must be so
     call spp(mp)
@@ -123,7 +123,9 @@ end module
 
 module m2
 
+  !ERROR: Procedure 't3' may not be ALLOCATABLE without an explicit interface
   character(len=10), allocatable :: t1, t2, t3, t4
+  !ERROR: Procedure 't6' may not be ALLOCATABLE without an explicit interface
   character(len=:), allocatable :: t5, t6, t7, t8(:)
 
   character(len=10), pointer :: p1
@@ -187,7 +189,7 @@ module m2
     !ERROR: ALLOCATABLE dummy argument 'a=' must be associated with an ALLOCATABLE actual argument
     call sma(t2(:))
 
-    !ERROR: 't3' is not a callable procedure
+    !ERROR: ALLOCATABLE dummy argument 'a=' must be associated with an ALLOCATABLE actual argument
     call sma(t3(1))
 
     !ERROR: ALLOCATABLE dummy argument 'a=' must be associated with an ALLOCATABLE actual argument
@@ -206,7 +208,7 @@ module m2
     !ERROR: ALLOCATABLE dummy argument 'a=' must be associated with an ALLOCATABLE actual argument
     call sma(t5(:))
 
-    !ERROR: 't6' is not a callable procedure
+    !ERROR: ALLOCATABLE dummy argument 'a=' must be associated with an ALLOCATABLE actual argument
     call sma(t6(1))
 
     !ERROR: ALLOCATABLE dummy argument 'a=' must be associated with an ALLOCATABLE actual argument

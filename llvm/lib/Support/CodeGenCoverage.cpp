@@ -21,6 +21,8 @@
 
 using namespace llvm;
 
+static sys::SmartMutex<true> OutputMutex;
+
 CodeGenCoverage::CodeGenCoverage() = default;
 
 void CodeGenCoverage::setCovered(uint64_t RuleID) {
@@ -51,7 +53,7 @@ bool CodeGenCoverage::parse(MemoryBuffer &Buffer, StringRef BackendName) {
     if (CurPtr == Buffer.getBufferEnd())
       return false; // Data is invalid, expected rule id's to follow.
 
-    bool IsForThisBackend = BackendName == LexedBackendName;
+    bool IsForThisBackend = BackendName.equals(LexedBackendName);
     while (CurPtr != Buffer.getBufferEnd()) {
       if (std::distance(CurPtr, Buffer.getBufferEnd()) < 8)
         return false; // Data is invalid. Not enough bytes for another rule id.
@@ -77,7 +79,6 @@ bool CodeGenCoverage::parse(MemoryBuffer &Buffer, StringRef BackendName) {
 bool CodeGenCoverage::emit(StringRef CoveragePrefix,
                            StringRef BackendName) const {
   if (!CoveragePrefix.empty() && !RuleCoverage.empty()) {
-    static sys::SmartMutex<true> OutputMutex;
     sys::SmartScopedLock<true> Lock(OutputMutex);
 
     // We can handle locking within a process easily enough but we don't want to

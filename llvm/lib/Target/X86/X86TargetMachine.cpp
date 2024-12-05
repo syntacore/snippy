@@ -31,8 +31,6 @@
 #include "llvm/CodeGen/GlobalISel/InstructionSelector.h"
 #include "llvm/CodeGen/GlobalISel/Legalizer.h"
 #include "llvm/CodeGen/GlobalISel/RegBankSelect.h"
-#include "llvm/CodeGen/MIRParser/MIParser.h"
-#include "llvm/CodeGen/MIRYamlMapping.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/RegAllocRegistry.h"
@@ -102,10 +100,8 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeX86Target() {
   initializeX86PartialReductionPass(PR);
   initializePseudoProbeInserterPass(PR);
   initializeX86ReturnThunksPass(PR);
-  initializeX86DAGToDAGISelLegacyPass(PR);
+  initializeX86DAGToDAGISelPass(PR);
   initializeX86ArgumentStackSlotPassPass(PR);
-  initializeX86FixupInstTuningPassPass(PR);
-  initializeX86FixupVectorConstantsPassPass(PR);
 }
 
 static std::unique_ptr<TargetLoweringObjectFile> createTLOF(const Triple &TT) {
@@ -213,9 +209,8 @@ static Reloc::Model getEffectiveRelocModel(const Triple &TT, bool JIT,
 }
 
 static CodeModel::Model
-getEffectiveX86CodeModel(const Triple &TT, std::optional<CodeModel::Model> CM,
-                         bool JIT) {
-  bool Is64Bit = TT.getArch() == Triple::x86_64;
+getEffectiveX86CodeModel(std::optional<CodeModel::Model> CM, bool JIT,
+                         bool Is64Bit) {
   if (CM) {
     if (*CM == CodeModel::Tiny)
       report_fatal_error("Target does not support the tiny CodeModel", false);
@@ -237,7 +232,7 @@ X86TargetMachine::X86TargetMachine(const Target &T, const Triple &TT,
     : LLVMTargetMachine(
           T, computeDataLayout(TT), TT, CPU, FS, Options,
           getEffectiveRelocModel(TT, JIT, RM),
-          getEffectiveX86CodeModel(TT, CM, JIT),
+          getEffectiveX86CodeModel(CM, JIT, TT.getArch() == Triple::x86_64),
           OL),
       TLOF(createTLOF(getTargetTriple())), IsJIT(JIT) {
   // On PS4/PS5, the "return address" of a 'noreturn' call must still be within
@@ -346,24 +341,6 @@ X86TargetMachine::getSubtargetImpl(const Function &F) const {
   return I.get();
 }
 
-yaml::MachineFunctionInfo *X86TargetMachine::createDefaultFuncInfoYAML() const {
-  return new yaml::X86MachineFunctionInfo();
-}
-
-yaml::MachineFunctionInfo *
-X86TargetMachine::convertFuncInfoToYAML(const MachineFunction &MF) const {
-  const auto *MFI = MF.getInfo<X86MachineFunctionInfo>();
-  return new yaml::X86MachineFunctionInfo(*MFI);
-}
-
-bool X86TargetMachine::parseMachineFunctionInfo(
-    const yaml::MachineFunctionInfo &MFI, PerFunctionMIParsingState &PFS,
-    SMDiagnostic &Error, SMRange &SourceRange) const {
-  const auto &YamlMFI = static_cast<const yaml::X86MachineFunctionInfo &>(MFI);
-  PFS.MF.getInfo<X86MachineFunctionInfo>()->initializeBaseYamlFields(YamlMFI);
-  return false;
-}
-
 bool X86TargetMachine::isNoopAddrSpaceCast(unsigned SrcAS,
                                            unsigned DestAS) const {
   assert(SrcAS != DestAS && "Expected different address spaces!");
@@ -461,7 +438,7 @@ MachineFunctionInfo *X86TargetMachine::createMachineFunctionInfo(
 }
 
 void X86PassConfig::addIRPasses() {
-  addPass(createAtomicExpandLegacyPass());
+  addPass(createAtomicExpandPass());
 
   // We add both pass anyway and when these two passes run, we skip the pass
   // based on the option level and option attribute.
@@ -525,9 +502,6 @@ bool X86PassConfig::addRegBankSelect() {
 
 bool X86PassConfig::addGlobalInstructionSelect() {
   addPass(new InstructionSelect(getOptLevel()));
-  // Add GlobalBaseReg in case there is no SelectionDAG passes afterwards
-  if (isGlobalISelAbortEnabled())
-    addPass(createX86GlobalBaseRegPass());
   return false;
 }
 
@@ -550,7 +524,6 @@ bool X86PassConfig::addPreISel() {
 void X86PassConfig::addPreRegAlloc() {
   if (getOptLevel() != CodeGenOptLevel::None) {
     addPass(&LiveRangeShrinkID);
-    addPass(createX86WinFixupBufferSecurityCheckPass());
     addPass(createX86FixupSetCC());
     addPass(createX86OptimizeLEAs());
     addPass(createX86CallFrameOptimization());
@@ -676,10 +649,8 @@ std::unique_ptr<CSEConfigBase> X86PassConfig::getCSEConfig() const {
 }
 
 static bool onlyAllocateTileRegisters(const TargetRegisterInfo &TRI,
-                                      const MachineRegisterInfo &MRI,
-                                      const Register Reg) {
-  const TargetRegisterClass *RC = MRI.getRegClass(Reg);
-  return static_cast<const X86RegisterInfo &>(TRI).isTileRegisterClass(RC);
+                                      const TargetRegisterClass &RC) {
+  return static_cast<const X86RegisterInfo &>(TRI).isTileRegisterClass(&RC);
 }
 
 bool X86PassConfig::addRegAssignAndRewriteOptimized() {

@@ -345,7 +345,7 @@ private:
 
   /// Helper to construct LoopBlock for \p BB.
   LoopBlock getLoopBlock(const BasicBlock *BB) const {
-    return LoopBlock(BB, *LI, *SccI);
+    return LoopBlock(BB, *LI, *SccI.get());
   }
 
   /// Returns true if destination block belongs to some loop and source block is

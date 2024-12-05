@@ -23,7 +23,8 @@ void foo() {
 }
 
 struct ST2 {
-// expected-warning@+1 {{'SV_DispatchThreadID' attribute only applies to parameters and non-static data members}}
+// expected-error@+1 {{use of undeclared identifier 'SV_DispatchThreadID'}}
     static uint X : SV_DispatchThreadID;
+// expected-error@+1 {{use of undeclared identifier 'SV_DispatchThreadID'}}
     uint s : SV_DispatchThreadID;
 };

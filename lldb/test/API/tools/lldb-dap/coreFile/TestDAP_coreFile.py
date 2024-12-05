@@ -13,6 +13,7 @@ import os
 
 class TestDAP_coreFile(lldbdap_testcase.DAPTestCaseBase):
     @skipIfWindows
+    @skipIfRemote
     @skipIfLLVMTargetMissing("X86")
     def test_core_file(self):
         current_dir = os.path.dirname(__file__)
@@ -24,7 +25,6 @@ class TestDAP_coreFile(lldbdap_testcase.DAPTestCaseBase):
 
         expected_frames = [
             {
-                "column": 0,
                 "id": 524288,
                 "line": 4,
                 "name": "bar",
@@ -32,7 +32,6 @@ class TestDAP_coreFile(lldbdap_testcase.DAPTestCaseBase):
                 "instructionPointerReference": "0x40011C",
             },
             {
-                "column": 0,
                 "id": 524289,
                 "line": 10,
                 "name": "foo",
@@ -40,7 +39,6 @@ class TestDAP_coreFile(lldbdap_testcase.DAPTestCaseBase):
                 "instructionPointerReference": "0x400142",
             },
             {
-                "column": 0,
                 "id": 524290,
                 "line": 16,
                 "name": "_start",
@@ -49,16 +47,17 @@ class TestDAP_coreFile(lldbdap_testcase.DAPTestCaseBase):
             },
         ]
 
-        self.assertEqual(self.get_stackFrames(), expected_frames)
+        self.assertEquals(self.get_stackFrames(), expected_frames)
 
         # Resuming should have no effect and keep the process stopped
         self.continue_to_next_stop()
-        self.assertEqual(self.get_stackFrames(), expected_frames)
+        self.assertEquals(self.get_stackFrames(), expected_frames)
 
         self.dap_server.request_next(threadId=32259)
-        self.assertEqual(self.get_stackFrames(), expected_frames)
+        self.assertEquals(self.get_stackFrames(), expected_frames)
 
     @skipIfWindows
+    @skipIfRemote
     @skipIfLLVMTargetMissing("X86")
     def test_core_file_source_mapping(self):
         """Test that sourceMap property is correctly applied when loading a core"""
@@ -71,4 +70,4 @@ class TestDAP_coreFile(lldbdap_testcase.DAPTestCaseBase):
         source_map = [["/home/labath/test", current_dir]]
         self.attach(exe_file, coreFile=core_file, sourceMap=source_map)
 
-        self.assertIn(current_dir, self.get_stackFrames()[0]["source"]["path"])
+        self.assertTrue(current_dir in self.get_stackFrames()[0]["source"]["path"])

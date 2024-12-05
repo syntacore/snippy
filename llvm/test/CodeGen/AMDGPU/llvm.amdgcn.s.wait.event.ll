@@ -5,10 +5,14 @@
 
 ; GCN-LABEL: {{^}}test_wait_event:
 ; GFX11: s_wait_event 0x0
-; GFX12: s_wait_event 0x2
+; GFX12: s_wait_event 0x1
 
-define amdgpu_ps void @test_wait_event() {
+define amdgpu_ps void @test_wait_event() #0 {
 entry:
-  call void @llvm.amdgcn.s.wait.event.export.ready()
+  call void @llvm.amdgcn.s.wait.event.export.ready() #0
   ret void
 }
+
+declare void @llvm.amdgcn.s.wait.event.export.ready() #0
+
+attributes #0 = { nounwind }

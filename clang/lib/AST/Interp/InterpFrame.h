@@ -15,6 +15,8 @@
 
 #include "Frame.h"
 #include "Program.h"
+#include <cstdint>
+#include <vector>
 
 namespace clang {
 namespace interp {
@@ -30,14 +32,13 @@ public:
 
   /// Creates a new frame for a method call.
   InterpFrame(InterpState &S, const Function *Func, InterpFrame *Caller,
-              CodePtr RetPC, unsigned ArgSize);
+              CodePtr RetPC);
 
   /// Creates a new frame with the values that make sense.
   /// I.e., the caller is the current frame of S,
   /// the This() pointer is the current Pointer on the top of S's stack,
   /// and the RVO pointer is before that.
-  InterpFrame(InterpState &S, const Function *Func, CodePtr RetPC,
-              unsigned VarArgSize = 0);
+  InterpFrame(InterpState &S, const Function *Func, CodePtr RetPC);
 
   /// Destroys the frame, killing all live pointers to stack slots.
   ~InterpFrame();
@@ -83,9 +84,11 @@ public:
   /// Returns the value of an argument.
   template <typename T> const T &getParam(unsigned Offset) const {
     auto Pt = Params.find(Offset);
-    if (Pt == Params.end())
+    if (Pt == Params.end()) {
       return stackRef<T>(Offset);
-    return Pointer(reinterpret_cast<Block *>(Pt->second.get())).deref<T>();
+    } else {
+      return Pointer(reinterpret_cast<Block *>(Pt->second.get())).deref<T>();
+    }
   }
 
   /// Mutates a local copy of a parameter.
@@ -118,9 +121,6 @@ public:
   SourceRange getRange(CodePtr PC) const;
 
   unsigned getDepth() const { return Depth; }
-
-  void dump() const { dump(llvm::errs(), 0); }
-  void dump(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
 private:
   /// Returns an original argument from the stack.

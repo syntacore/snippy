@@ -36,7 +36,7 @@ void testIncrement(char *p) { // expected-warning{{'p' is an unsafe pointer used
 void * voidPtrCall(void);
 char * charPtrCall(void);
 
-void testArraySubscripts(int idx, int *p, int **pp) {
+void testArraySubscripts(int *p, int **pp) {
 // expected-warning@-1{{'p' is an unsafe pointer used for buffer access}}
 // expected-warning@-2{{'pp' is an unsafe pointer used for buffer access}}
   foo(p[1],             // expected-note{{used in buffer access here}}
@@ -61,17 +61,15 @@ void testArraySubscripts(int idx, int *p, int **pp) {
       );
 
     int a[10];          // expected-warning{{'a' is an unsafe buffer that does not perform bounds checks}}
-                        // expected-note@-1{{change type of 'a' to 'std::array' to label it for hardening}}
     int b[10][10];      // expected-warning{{'b' is an unsafe buffer that does not perform bounds checks}}
 
-  foo(a[idx], idx[a],   // expected-note2{{used in buffer access here}}
-      b[idx][idx + 1],  // expected-warning{{unsafe buffer access}}
-                        // expected-note@-1{{used in buffer access here}}
-      (idx + 1)[b][idx],// expected-warning{{unsafe buffer access}}
-                        // expected-note@-1{{used in buffer access here}}
-      (idx + 1)[idx[b]]);
-                        // expected-warning@-1{{unsafe buffer access}}
-                        // expected-note@-2{{used in buffer access here}}
+  foo(a[1], 1[a],   // expected-note2{{used in buffer access here}}
+      b[3][4],      // expected-warning{{unsafe buffer access}}
+                    // expected-note@-1{{used in buffer access here}}
+      4[b][3],      // expected-warning{{unsafe buffer access}}
+                    // expected-note@-1{{used in buffer access here}}
+      4[3[b]]);     // expected-warning{{unsafe buffer access}}
+                    // expected-note@-1{{used in buffer access here}}
 
   // Not to warn when index is zero
   foo(p[0], pp[0][0], 0[0[pp]], 0[pp][0],
@@ -159,9 +157,9 @@ void testLambdaCaptureAndGlobal(int * p) {
   // expected-warning@-1{{'p' is an unsafe pointer used for buffer access}}
   int a[10];              // expected-warning{{'a' is an unsafe buffer that does not perform bounds checks}}
 
-  auto Lam = [p, a](int idx) {
+  auto Lam = [p, a]() {
     return p[1]           // expected-note{{used in buffer access here}}
-      + a[idx] + garray[idx]// expected-note2{{used in buffer access here}}
+      + a[1] + garray[1]  // expected-note2{{used in buffer access here}}
       + gp[1];            // expected-note{{used in buffer access here}}
 
   };
@@ -176,34 +174,31 @@ auto file_scope_lambda = [](int *ptr) {
 void testLambdaCapture() {
   int a[10];              // expected-warning{{'a' is an unsafe buffer that does not perform bounds checks}}
   int b[10];              // expected-warning{{'b' is an unsafe buffer that does not perform bounds checks}}
-                          // expected-note@-1{{change type of 'b' to 'std::array' to label it for hardening}}
   int c[10];
 
-  auto Lam1 = [a](unsigned idx) {
-    return a[idx];           // expected-note{{used in buffer access here}}
+  auto Lam1 = [a]() {
+    return a[1];           // expected-note{{used in buffer access here}}
   };
 
-  auto Lam2 = [x = b[c[5]]]() { // expected-note{{used in buffer access here}}
+  auto Lam2 = [x = b[3]]() { // expected-note{{used in buffer access here}}
     return x;
   };
 
-  auto Lam = [x = c](unsigned idx) { // expected-warning{{'x' is an unsafe pointer used for buffer access}}
-    return x[idx]; // expected-note{{used in buffer access here}}
+  auto Lam = [x = c]() { // expected-warning{{'x' is an unsafe pointer used for buffer access}}
+    return x[3]; // expected-note{{used in buffer access here}}
   };
 }
 
-void testLambdaImplicitCapture(long idx) {
+void testLambdaImplicitCapture() {
   int a[10];              // expected-warning{{'a' is an unsafe buffer that does not perform bounds checks}}
-                          // expected-note@-1{{change type of 'a' to 'std::array' to label it for hardening}}
   int b[10];              // expected-warning{{'b' is an unsafe buffer that does not perform bounds checks}}
-                          // expected-note@-1{{change type of 'b' to 'std::array' to label it for hardening}}
   
   auto Lam1 = [=]() {
-    return a[idx];           // expected-note{{used in buffer access here}}
+    return a[1];           // expected-note{{used in buffer access here}}
   };
   
   auto Lam2 = [&]() {
-    return b[idx];           // expected-note{{used in buffer access here}}
+    return b[1];           // expected-note{{used in buffer access here}}
   };
 }
 
@@ -345,37 +340,37 @@ int testVariableDecls(int * p) {
   return p[1];        // expected-note{{used in buffer access here}}
 }
 
-template<typename T> void fArr(T t[], long long idx) {
+template<typename T> void fArr(T t[]) {
   // expected-warning@-1{{'t' is an unsafe pointer used for buffer access}}
   foo(t[1]);    // expected-note{{used in buffer access here}}
   T ar[8];      // expected-warning{{'ar' is an unsafe buffer that does not perform bounds checks}}
-                // expected-note@-1{{change type of 'ar' to 'std::array' to label it for hardening}}
-  foo(ar[idx]);   // expected-note{{used in buffer access here}}
+  foo(ar[5]);   // expected-note{{used in buffer access here}}
 }
 
-template void fArr<int>(int t[], long long); // FIXME: expected note {{in instantiation of}}
+template void fArr<int>(int t[]); // FIXME: expected note {{in instantiation of}}
 
 int testReturn(int t[]) {// expected-note{{change type of 't' to 'std::span' to preserve bounds information}}
   // expected-warning@-1{{'t' is an unsafe pointer used for buffer access}}
   return t[1]; // expected-note{{used in buffer access here}}
 }
 
-int testArrayAccesses(int n, int idx) {
+int testArrayAccesses(int n) {
     // auto deduced array type
     int cArr[2][3] = {{1, 2, 3}, {4, 5, 6}};
     // expected-warning@-1{{'cArr' is an unsafe buffer that does not perform bounds checks}}
     int d = cArr[0][0];
     foo(cArr[0][0]);
-    foo(cArr[idx][idx + 1]);        // expected-note{{used in buffer access here}}
-                                    // expected-warning@-1{{unsafe buffer access}}
-    auto cPtr = cArr[idx][idx * 2]; // expected-note{{used in buffer access here}}
-                                    // expected-warning@-1{{unsafe buffer access}}
+    foo(cArr[1][2]);        // expected-note{{used in buffer access here}}
+                            // expected-warning@-1{{unsafe buffer access}}
+    auto cPtr = cArr[1][2]; // expected-note{{used in buffer access here}}
+                            // expected-warning@-1{{unsafe buffer access}}
     foo(cPtr);
 
     // Typdefs
     typedef int A[3];
     const A tArr = {4, 5, 6};
-    foo(tArr[0], tArr[1]);
+    // expected-warning@-1{{'tArr' is an unsafe buffer that does not perform bounds checks}}
+    foo(tArr[0], tArr[1]);  // expected-note{{used in buffer access here}}
     return cArr[0][1];      // expected-warning{{unsafe buffer access}}
 }
 

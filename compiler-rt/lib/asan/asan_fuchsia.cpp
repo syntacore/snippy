@@ -57,6 +57,8 @@ void AsanCheckDynamicRTPrereqs() {}
 void AsanCheckIncompatibleRT() {}
 void InitializeAsanInterceptors() {}
 
+void *AsanDoesNotSupportStaticLinkage() { return nullptr; }
+
 void InitializePlatformExceptionHandlers() {}
 void AsanOnDeadlySignal(int signo, void *siginfo, void *context) {
   UNIMPLEMENTED();

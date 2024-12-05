@@ -12,13 +12,21 @@
 namespace lldb_dap {
 
 FunctionBreakpoint::FunctionBreakpoint(const llvm::json::Object &obj)
-    : Breakpoint(obj), functionName(std::string(GetString(obj, "name"))) {}
+    : BreakpointBase(obj), functionName(std::string(GetString(obj, "name"))) {}
 
 void FunctionBreakpoint::SetBreakpoint() {
   if (functionName.empty())
     return;
   bp = g_dap.target.BreakpointCreateByName(functionName.c_str());
-  Breakpoint::SetBreakpoint();
+  // See comments in BreakpointBase::GetBreakpointLabel() for details of why
+  // we add a label to our breakpoints.
+  bp.AddName(GetBreakpointLabel());
+  if (!condition.empty())
+    SetCondition();
+  if (!hitCondition.empty())
+    SetHitCondition();
+  if (!logMessage.empty())
+    SetLogMessage();
 }
 
 } // namespace lldb_dap

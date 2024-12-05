@@ -85,8 +85,7 @@ TEST(ResourceSegments, add_02) {
 #ifndef NDEBUG
 TEST(ResourceSegmentsDeath, add_empty) {
   auto X = ResourceSegments({{10, 20}, {30, 40}});
-  X.add({22, 22});
-  EXPECT_EQ(X, ResourceSegments({{10, 20}, {30, 40}}));
+  EXPECT_DEATH(X.add({22, 22}), "Cannot add empty resource usage");
 }
 #endif
 

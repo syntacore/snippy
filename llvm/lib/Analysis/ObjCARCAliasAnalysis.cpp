@@ -142,5 +142,5 @@ ModRefInfo ObjCARCAAResult::getModRefInfo(const CallBase *Call,
 AnalysisKey ObjCARCAA::Key;
 
 ObjCARCAAResult ObjCARCAA::run(Function &F, FunctionAnalysisManager &AM) {
-  return ObjCARCAAResult(F.getDataLayout());
+  return ObjCARCAAResult(F.getParent()->getDataLayout());
 }

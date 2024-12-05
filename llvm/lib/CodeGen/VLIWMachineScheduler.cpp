@@ -130,12 +130,12 @@ bool VLIWResourceModel::isResourceAvailable(SUnit *SU, bool IsTop) {
   // Now see if there are no other dependencies to instructions already
   // in the packet.
   if (IsTop) {
-    for (const SUnit *U : Packet)
-      if (hasDependence(U, SU))
+    for (unsigned i = 0, e = Packet.size(); i != e; ++i)
+      if (hasDependence(Packet[i], SU))
         return false;
   } else {
-    for (const SUnit *U : Packet)
-      if (hasDependence(SU, U))
+    for (unsigned i = 0, e = Packet.size(); i != e; ++i)
+      if (hasDependence(SU, Packet[i]))
         return false;
   }
   return true;

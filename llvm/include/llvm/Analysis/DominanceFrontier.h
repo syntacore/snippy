@@ -29,7 +29,6 @@
 
 namespace llvm {
 
-class BasicBlock;
 class Function;
 class raw_ostream;
 
@@ -102,8 +101,8 @@ public:
   /// return true;
   bool compareDomSet(DomSetType &DS1, const DomSetType &DS2) const;
 
-  /// compare - Return false if the other dominance frontier base matches
-  /// this dominance frontier base. Otherwise return true.
+  /// compare - Return true if the other dominance frontier base matches
+  /// this dominance frontier base. Otherwise return false.
   bool compare(DominanceFrontierBase &Other) const;
 
   /// print - Convert to human readable form

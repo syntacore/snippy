@@ -129,20 +129,19 @@ class IteratorModeling
   CallDescriptionMap<AdvanceFn> AdvanceLikeFunctions = {
       // template<class InputIt, class Distance>
       // void advance(InputIt& it, Distance n);
-      {{CDM::SimpleFunc, {"std", "advance"}, 2},
-       &IteratorModeling::handleAdvance},
+      {{{"std", "advance"}, 2}, &IteratorModeling::handleAdvance},
 
       // template<class BidirIt>
       // BidirIt prev(
       //   BidirIt it,
       //   typename std::iterator_traits<BidirIt>::difference_type n = 1);
-      {{CDM::SimpleFunc, {"std", "prev"}, 2}, &IteratorModeling::handlePrev},
+      {{{"std", "prev"}, 2}, &IteratorModeling::handlePrev},
 
       // template<class ForwardIt>
       // ForwardIt next(
       //   ForwardIt it,
       //   typename std::iterator_traits<ForwardIt>::difference_type n = 1);
-      {{CDM::SimpleFunc, {"std", "next"}, 2}, &IteratorModeling::handleNext},
+      {{{"std", "next"}, 2}, &IteratorModeling::handleNext},
   };
 
 public:

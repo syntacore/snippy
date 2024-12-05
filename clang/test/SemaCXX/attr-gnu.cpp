@@ -1,4 +1,3 @@
-// RUN: %clang_cc1 -std=gnu++03 -fsyntax-only -fms-compatibility -Wno-c++11-extensions -Wno-c++17-extensions -verify %s
 // RUN: %clang_cc1 -std=gnu++17 -fsyntax-only -fms-compatibility -verify %s
 
 void f() {

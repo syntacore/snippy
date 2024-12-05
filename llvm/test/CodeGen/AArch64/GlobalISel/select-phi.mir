@@ -23,9 +23,9 @@
     ret i32 %res
   }
 
-  define ptr @test_phi_ptr(ptr %a, ptr %b, i1 %cond) {
+  define i64* @test_phi_ptr(i64* %a, i64* %b, i1 %cond) {
   entry:
-    ret ptr null
+    ret i64* null
   }
 
 ...

@@ -292,7 +292,7 @@ void CrashHandler() {
     zx_wait_item_t WaitItems[] = {
         {
             .handle = SignalHandlerEvent,
-            .waitfor = ZX_USER_SIGNAL_1,
+            .waitfor = ZX_SIGNAL_HANDLE_CLOSED,
             .pending = 0,
         },
         {
@@ -378,11 +378,10 @@ void CrashHandler() {
 }
 
 void StopSignalHandler() {
-  _zx_object_signal(SignalHandlerEvent, 0, ZX_USER_SIGNAL_1);
+  _zx_handle_close(SignalHandlerEvent);
   if (SignalHandler.joinable()) {
     SignalHandler.join();
   }
-  _zx_handle_close(SignalHandlerEvent);
 }
 
 } // namespace

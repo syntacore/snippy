@@ -176,7 +176,6 @@ private:
   ParseOptionType parseExStyleStmt();
   ParseOptionType parseFontStmt(OptStmtType DialogType);
   ParseOptionType parseStyleStmt();
-  ParseOptionType parseMenuStmt();
 
   // Raises an error. If IsAlreadyRead = false (default), this complains about
   // the token that couldn't be parsed. If the flag is on, this complains about

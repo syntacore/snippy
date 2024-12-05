@@ -58,7 +58,7 @@ RegisterContextPOSIX_riscv64::GetRegisterInfoAtIndex(size_t reg) {
 }
 
 size_t RegisterContextPOSIX_riscv64::GetRegisterSetCount() {
-  return m_register_info_up->GetRegisterSetCount();
+  return m_register_info_up->GetRegisterCount();
 }
 
 const lldb_private::RegisterSet *

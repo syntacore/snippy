@@ -229,7 +229,6 @@ static void PulseThread() {
 
 static void WorkerThread(const Command &BaseCmd, std::atomic<unsigned> *Counter,
                          unsigned NumJobs, std::atomic<bool> *HasErrors) {
-  ScopedDisableMsanInterceptorChecks S;
   while (true) {
     unsigned C = (*Counter)++;
     if (C >= NumJobs) break;

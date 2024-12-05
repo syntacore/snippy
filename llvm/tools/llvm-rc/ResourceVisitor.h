@@ -28,7 +28,6 @@ class FontStmt;
 class LanguageResource;
 class StyleStmt;
 class VersionStmt;
-class MenuStmt;
 
 class Visitor {
 public:
@@ -53,7 +52,6 @@ public:
   virtual Error visitLanguageStmt(const LanguageResource *) = 0;
   virtual Error visitStyleStmt(const StyleStmt *) = 0;
   virtual Error visitVersionStmt(const VersionStmt *) = 0;
-  virtual Error visitMenuStmt(const MenuStmt *) = 0;
 
   virtual ~Visitor() {}
 };

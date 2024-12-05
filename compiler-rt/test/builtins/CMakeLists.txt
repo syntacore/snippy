@@ -113,3 +113,4 @@ endforeach()
 add_lit_testsuite(check-builtins "Running the Builtins tests"
   ${BUILTINS_TESTSUITES}
   DEPENDS ${BUILTINS_TEST_DEPS})
+set_target_properties(check-builtins PROPERTIES FOLDER "Compiler-RT Misc")

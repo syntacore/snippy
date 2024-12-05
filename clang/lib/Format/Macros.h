@@ -39,9 +39,15 @@
 #define CLANG_LIB_FORMAT_MACROS_H
 
 #include <list>
+#include <map>
+#include <string>
+#include <vector>
 
 #include "FormatToken.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace clang {
 namespace format {
@@ -79,7 +85,7 @@ struct UnwrappedLineNode;
 ///
 class MacroExpander {
 public:
-  using ArgsList = ArrayRef<SmallVector<FormatToken *, 8>>;
+  using ArgsList = llvm::ArrayRef<llvm::SmallVector<FormatToken *, 8>>;
 
   /// Construct a macro expander from a set of macro definitions.
   /// Macro definitions must be encoded as UTF-8.
@@ -95,27 +101,27 @@ public:
   /// Macros that cannot be parsed will be silently discarded.
   ///
   MacroExpander(const std::vector<std::string> &Macros,
-                SourceManager &SourceMgr, const FormatStyle &Style,
+                clang::SourceManager &SourceMgr, const FormatStyle &Style,
                 llvm::SpecificBumpPtrAllocator<FormatToken> &Allocator,
                 IdentifierTable &IdentTable);
   ~MacroExpander();
 
   /// Returns whether any macro \p Name is defined, regardless of overloads.
-  bool defined(StringRef Name) const;
+  bool defined(llvm::StringRef Name) const;
 
   /// Returns whetherh there is an object-like overload, i.e. where the macro
   /// has no arguments and should not consume subsequent parentheses.
-  bool objectLike(StringRef Name) const;
+  bool objectLike(llvm::StringRef Name) const;
 
   /// Returns whether macro \p Name provides an overload with the given arity.
-  bool hasArity(StringRef Name, unsigned Arity) const;
+  bool hasArity(llvm::StringRef Name, unsigned Arity) const;
 
   /// Returns the expanded stream of format tokens for \p ID, where
   /// each element in \p Args is a positional argument to the macro call.
   /// If \p Args is not set, the object-like overload is used.
   /// If \p Args is set, the overload with the arity equal to \c Args.size() is
   /// used.
-  SmallVector<FormatToken *, 8>
+  llvm::SmallVector<FormatToken *, 8>
   expand(FormatToken *ID, std::optional<ArgsList> OptionalArgs) const;
 
 private:
@@ -124,7 +130,7 @@ private:
 
   void parseDefinition(const std::string &Macro);
 
-  SourceManager &SourceMgr;
+  clang::SourceManager &SourceMgr;
   const FormatStyle &Style;
   llvm::SpecificBumpPtrAllocator<FormatToken> &Allocator;
   IdentifierTable &IdentTable;
@@ -225,9 +231,8 @@ public:
   UnwrappedLine takeResult() &&;
 
 private:
-  void add(FormatToken *Token, FormatToken *ExpandedParent, bool First,
-           unsigned Level);
-  void prepareParent(FormatToken *ExpandedParent, bool First, unsigned Level);
+  void add(FormatToken *Token, FormatToken *ExpandedParent, bool First);
+  void prepareParent(FormatToken *ExpandedParent, bool First);
   FormatToken *getParentInResult(FormatToken *Parent);
   void reconstruct(FormatToken *Token);
   void startReconstruction(FormatToken *Token);
@@ -260,16 +265,14 @@ private:
     LineNode() = default;
     LineNode(FormatToken *Tok) : Tok(Tok) {}
     FormatToken *Tok = nullptr;
-    SmallVector<std::unique_ptr<ReconstructedLine>> Children;
+    llvm::SmallVector<std::unique_ptr<ReconstructedLine>> Children;
   };
 
   // Line in which we build up the resulting unwrapped line.
   // FIXME: Investigate changing UnwrappedLine to a pointer type and using it
   // instead of rolling our own type.
   struct ReconstructedLine {
-    explicit ReconstructedLine(unsigned Level) : Level(Level) {}
-    unsigned Level;
-    SmallVector<std::unique_ptr<LineNode>> Tokens;
+    llvm::SmallVector<std::unique_ptr<LineNode>> Tokens;
   };
 
   // The line in which we collect the resulting reconstructed output.
@@ -285,7 +288,7 @@ private:
 
   // Stack of currently "open" lines, where each line's predecessor's last
   // token is the parent token for that line.
-  SmallVector<ReconstructedLine *> ActiveReconstructedLines;
+  llvm::SmallVector<ReconstructedLine *> ActiveReconstructedLines;
 
   // Maps from the expanded token to the token that takes its place in the
   // reconstructed token stream in terms of parent-child relationships.
@@ -325,7 +328,7 @@ private:
   };
 
   // Stack of macro calls for which we're in the middle of an expansion.
-  SmallVector<Expansion> ActiveExpansions;
+  llvm::SmallVector<Expansion> ActiveExpansions;
 
   struct MacroCallState {
     MacroCallState(ReconstructedLine *Line, FormatToken *ParentLastToken,
@@ -368,7 +371,10 @@ private:
   // |- ,
   // |  \- <argument>
   // \- )
-  SmallVector<MacroCallState> MacroCallStructure;
+  llvm::SmallVector<MacroCallState> MacroCallStructure;
+
+  // Level the generated UnwrappedLine will be at.
+  const unsigned Level;
 
   // Maps from identifier of the macro call to an unwrapped line containing
   // all tokens of the macro call.

@@ -87,7 +87,7 @@ private:
       DCHECK_NE(Offset, Max);
       do {
         ++Offset;
-      } while (Offset != Max && !Buffers[Offset].Used);
+      } while (!Buffers[Offset].Used && Offset != Max);
       return *this;
     }
 
@@ -107,7 +107,7 @@ private:
           Max(M) {
       // We want to advance to the first Offset where the 'Used' property is
       // true, or to the end of the list/queue.
-      while (Offset != Max && !Buffers[Offset].Used) {
+      while (!Buffers[Offset].Used && Offset != Max) {
         ++Offset;
       }
     }

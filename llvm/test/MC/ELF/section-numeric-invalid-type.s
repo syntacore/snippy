@@ -1,7 +1,7 @@
-// RUN: llvm-mc -filetype=obj -triple=x86_64-pc-linux-gnu %s \
+// RUN: llvm-mc -filetype=obj -triple=x86_64-pc-linux-gnu %s -o - \
 // RUN:   | llvm-readobj -S --symbols - | FileCheck --check-prefix=OBJ %s
 
-// RUN: llvm-mc -filetype=asm -triple=x86_64-pc-linux-gnu %s \
+// RUN: not --crash llvm-mc -filetype=asm -triple=x86_64-pc-linux-gnu %s -o - 2>&1 \
 // RUN:   | FileCheck --check-prefix=ASM %s
 
   .section .sec,"a",@0x7fffffff
@@ -11,4 +11,4 @@
 // OBJ-NEXT:   Type: Unknown (0x7FFFFFFF)
 // OBJ:      }
 
-// ASM: .section .sec,"a",@0x7fffffff
+// ASM: unsupported type 0x7fffffff for section .sec

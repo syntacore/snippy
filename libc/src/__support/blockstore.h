@@ -9,16 +9,14 @@
 #ifndef LLVM_LIBC_SRC___SUPPORT_BLOCKSTORE_H
 #define LLVM_LIBC_SRC___SUPPORT_BLOCKSTORE_H
 
-#include "src/__support/CPP/array.h"
-#include "src/__support/CPP/new.h"
-#include "src/__support/CPP/type_traits.h"
-#include "src/__support/libc_assert.h"
-#include "src/__support/macros/config.h"
+#include <src/__support/CPP/new.h>
+#include <src/__support/libc_assert.h>
 
 #include <stddef.h>
 #include <stdint.h>
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
+namespace cpp {
 
 // The difference between BlockStore a traditional vector types is that,
 // when more capacity is desired, a new block is added instead of allocating
@@ -47,7 +45,7 @@ protected:
   struct Pair {
     Block *first, *second;
   };
-  LIBC_INLINE Pair get_last_blocks() {
+  Pair getLastBlocks() {
     if (REVERSE_ORDER)
       return {current, current->next};
     Block *prev = nullptr;
@@ -58,20 +56,20 @@ protected:
     return {curr, prev};
   }
 
-  LIBC_INLINE Block *get_last_block() { return get_last_blocks().first; }
+  Block *getLastBlock() { return getLastBlocks().first; }
 
 public:
-  LIBC_INLINE constexpr BlockStore() = default;
-  LIBC_INLINE ~BlockStore() = default;
+  constexpr BlockStore() = default;
+  ~BlockStore() = default;
 
-  class Iterator {
+  class iterator {
     Block *block;
     size_t index;
 
   public:
-    LIBC_INLINE constexpr Iterator(Block *b, size_t i) : block(b), index(i) {}
+    constexpr iterator(Block *b, size_t i) : block(b), index(i) {}
 
-    LIBC_INLINE Iterator &operator++() {
+    iterator &operator++() {
       if (REVERSE_ORDER) {
         if (index == 0)
           return *this;
@@ -95,34 +93,23 @@ public:
       return *this;
     }
 
-    LIBC_INLINE T &operator*() {
+    T &operator*() {
       size_t true_index = REVERSE_ORDER ? index - 1 : index;
       return *reinterpret_cast<T *>(block->data + sizeof(T) * true_index);
     }
 
-    LIBC_INLINE Iterator operator+(int i) {
-      LIBC_ASSERT(i >= 0 &&
-                  "BlockStore iterators only support incrementation.");
-      auto other = *this;
-      for (int j = 0; j < i; ++j)
-        ++other;
-
-      return other;
-    }
-
-    LIBC_INLINE bool operator==(const Iterator &rhs) const {
+    bool operator==(const iterator &rhs) const {
       return block == rhs.block && index == rhs.index;
     }
 
-    LIBC_INLINE bool operator!=(const Iterator &rhs) const {
+    bool operator!=(const iterator &rhs) const {
       return block != rhs.block || index != rhs.index;
     }
   };
 
-  LIBC_INLINE static void
-  destroy(BlockStore<T, BLOCK_SIZE, REVERSE_ORDER> *block_store);
+  static void destroy(BlockStore<T, BLOCK_SIZE, REVERSE_ORDER> *block_store);
 
-  LIBC_INLINE T *new_obj() {
+  T *new_obj() {
     if (fill_count == BLOCK_SIZE) {
       AllocChecker ac;
       auto new_block = new (ac) Block();
@@ -142,7 +129,7 @@ public:
     return obj;
   }
 
-  [[nodiscard]] LIBC_INLINE bool push_back(const T &value) {
+  [[nodiscard]] bool push_back(const T &value) {
     T *ptr = new_obj();
     if (ptr == nullptr)
       return false;
@@ -150,16 +137,16 @@ public:
     return true;
   }
 
-  LIBC_INLINE T &back() {
-    return *reinterpret_cast<T *>(get_last_block()->data +
+  T &back() {
+    return *reinterpret_cast<T *>(getLastBlock()->data +
                                   sizeof(T) * (fill_count - 1));
   }
 
-  LIBC_INLINE void pop_back() {
+  void pop_back() {
     fill_count--;
     if (fill_count || current == &first)
       return;
-    auto [last, prev] = get_last_blocks();
+    auto [last, prev] = getLastBlocks();
     if (REVERSE_ORDER) {
       LIBC_ASSERT(last == current);
       current = current->next;
@@ -173,66 +160,25 @@ public:
     fill_count = BLOCK_SIZE;
   }
 
-  LIBC_INLINE bool empty() const { return current == &first && !fill_count; }
+  bool empty() const { return current == &first && !fill_count; }
 
-  LIBC_INLINE Iterator begin() {
+  iterator begin() {
     if (REVERSE_ORDER)
-      return Iterator(current, fill_count);
+      return iterator(current, fill_count);
     else
-      return Iterator(&first, 0);
+      return iterator(&first, 0);
   }
 
-  LIBC_INLINE Iterator end() {
+  iterator end() {
     if (REVERSE_ORDER)
-      return Iterator(&first, 0);
+      return iterator(&first, 0);
     else
-      return Iterator(current, fill_count);
-  }
-
-  // Removes the element at pos, then moves all the objects after back by one to
-  // fill the hole. It's assumed that pos is a valid iterator to somewhere in
-  // this block_store.
-  LIBC_INLINE void erase(Iterator pos) {
-    const Iterator last_item = Iterator(current, fill_count);
-    if (pos == last_item) {
-      pop_back();
-      return;
-    }
-
-    if constexpr (REVERSE_ORDER) {
-      // REVERSE: Iterate from begin to pos
-      const Iterator range_end = pos;
-      Iterator cur = begin();
-      T prev_val = *cur;
-      ++cur;
-      T cur_val = *cur;
-
-      for (; cur != range_end; ++cur) {
-        cur_val = *cur;
-        *cur = prev_val;
-        prev_val = cur_val;
-      }
-      // As long as this isn't the end we will always need to move at least one
-      // item (since we know that pos isn't the last item due to the check
-      // above).
-      if (range_end != end())
-        *cur = prev_val;
-    } else {
-      // FORWARD: Iterate from pos to end
-      const Iterator range_end = end();
-      Iterator cur = pos;
-      Iterator prev = cur;
-      ++cur;
-
-      for (; cur != range_end; prev = cur, ++cur)
-        *prev = *cur;
-    }
-    pop_back();
+      return iterator(current, fill_count);
   }
 };
 
 template <typename T, size_t BLOCK_SIZE, bool REVERSE_ORDER>
-LIBC_INLINE void BlockStore<T, BLOCK_SIZE, REVERSE_ORDER>::destroy(
+void BlockStore<T, BLOCK_SIZE, REVERSE_ORDER>::destroy(
     BlockStore<T, BLOCK_SIZE, REVERSE_ORDER> *block_store) {
   if (REVERSE_ORDER) {
     auto current = block_store->current;
@@ -257,6 +203,7 @@ LIBC_INLINE void BlockStore<T, BLOCK_SIZE, REVERSE_ORDER>::destroy(
 template <typename T, size_t BLOCK_SIZE>
 using ReverseOrderBlockStore = BlockStore<T, BLOCK_SIZE, true>;
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace cpp
+} // namespace LIBC_NAMESPACE
 
 #endif // LLVM_LIBC_SRC___SUPPORT_BLOCKSTORE_H

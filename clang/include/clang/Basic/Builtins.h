@@ -64,7 +64,7 @@ namespace Builtin {
 enum ID {
   NotBuiltin  = 0,      // This is not a builtin function.
 #define BUILTIN(ID, TYPE, ATTRS) BI##ID,
-#include "clang/Basic/Builtins.inc"
+#include "clang/Basic/Builtins.def"
   FirstTSBuiltin
 };
 
@@ -278,11 +278,6 @@ public:
   /// Return true if this function can be constant evaluated by Clang frontend.
   bool isConstantEvaluated(unsigned ID) const {
     return strchr(getRecord(ID).Attributes, 'E') != nullptr;
-  }
-
-  /// Returns true if this is an immediate (consteval) function
-  bool isImmediate(unsigned ID) const {
-    return strchr(getRecord(ID).Attributes, 'G') != nullptr;
   }
 
 private:

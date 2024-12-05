@@ -18,6 +18,8 @@ class SourceMgr;
 } // namespace llvm
 
 namespace mlir {
+struct LogicalResult;
+
 namespace pdll {
 class CodeCompleteContext;
 

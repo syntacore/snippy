@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_STRUCT_TM_H
-#define LLVM_LIBC_TYPES_STRUCT_TM_H
+#ifndef __LLVM_LIBC_TYPES_TM_H__
+#define __LLVM_LIBC_TYPES_TM_H__
 
 struct tm {
   int tm_sec;   // seconds after the minute
@@ -21,4 +21,4 @@ struct tm {
   int tm_isdst; // Daylight Saving Time flag
 };
 
-#endif // LLVM_LIBC_TYPES_STRUCT_TM_H
+#endif // __LLVM_LIBC_TYPES_TM_H__

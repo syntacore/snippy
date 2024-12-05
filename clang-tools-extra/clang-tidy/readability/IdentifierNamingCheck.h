@@ -205,7 +205,6 @@ private:
                        const NamingCheckFailure &Failure) const override;
 
   const FileStyle &getStyleForFile(StringRef FileName) const;
-  StringRef getRealFileName(StringRef FileName) const;
 
   /// Find the style kind of a field in an anonymous record.
   StyleKind findStyleKindForAnonField(
@@ -223,7 +222,6 @@ private:
   /// Stores the style options as a vector, indexed by the specified \ref
   /// StyleKind, for a given directory.
   mutable llvm::StringMap<FileStyle> NamingStylesCache;
-  mutable llvm::StringMap<SmallString<256U>> RealFileNameCache;
   FileStyle *MainFileStyle;
   ClangTidyContext *Context;
   const bool GetConfigPerFile;

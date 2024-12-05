@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s
+// RUN: %clang_cc1 -fsyntax-only -verify -std=c++11 %s 
 
 typedef double A;
 template<typename T> class B {
@@ -334,9 +334,8 @@ int arr[sizeof(Sub)];
 namespace PR11421 {
 template < unsigned > struct X {
   static const unsigned dimension = 3;
-  template<unsigned dim=dimension>
-  struct Y: Y<dim> { }; // expected-error{{base class has incomplete type}}
-                        // expected-note@-1{{definition of 'Y<dim>' is not complete until the closing '}'}}
+  template<unsigned dim=dimension> 
+  struct Y: Y<dim> { }; // expected-error{{circular inheritance between 'Y<dim>' and 'Y<dim>'}}
 };
 typedef X<3> X3;
 X3::Y<>::iterator it; // expected-error {{no type named 'iterator' in 'PR11421::X<3>::Y<>'}}
@@ -345,12 +344,11 @@ X3::Y<>::iterator it; // expected-error {{no type named 'iterator' in 'PR11421::
 namespace rdar12629723 {
   template<class T>
   struct X {
-    struct C : public C { }; // expected-error{{base class has incomplete type}}
-                             // expected-note@-1{{definition of 'rdar12629723::X::C' is not complete until the closing '}'}}
+    struct C : public C { }; // expected-error{{circular inheritance between 'C' and 'rdar12629723::X::C'}}
 
     struct B;
 
-    struct A : public B {
+    struct A : public B {  // expected-note{{'A' declared here}}
       virtual void foo() { }
     };
 
@@ -359,7 +357,7 @@ namespace rdar12629723 {
   };
 
   template<class T>
-  struct X<T>::B : public A {
+  struct X<T>::B : public A {  // expected-error{{circular inheritance between 'A' and 'rdar12629723::X::B'}}
     virtual void foo() { }
   };
 }
@@ -420,7 +418,7 @@ template <typename> struct CT2 {
 template <typename T> int CT2<int>::X<>; // expected-error {{template parameter list matching the non-templated nested type 'CT2<int>' should be empty}}
 
 namespace DependentTemplateIdWithNoArgs {
-  template<typename T> void f() { T::template f(); } // expected-error {{a template argument list is expected after a name prefixed by the template keyword}}
+  template<typename T> void f() { T::template f(); }
   struct X {
     template<int = 0> static void f();
   };
@@ -431,7 +429,7 @@ namespace DependentUnresolvedUsingTemplate {
   template<typename T>
   struct X : T {
     using T::foo;
-    void f() { this->template foo(); } // expected-error {{does not refer to a template}} expected-error {{a template argument list is expected after a name prefixed by the template keyword}}
+    void f() { this->template foo(); } // expected-error {{does not refer to a template}}
     void g() { this->template foo<>(); } // expected-error {{does not refer to a template}}
     void h() { this->template foo<int>(); } // expected-error {{does not refer to a template}}
   };
@@ -450,7 +448,7 @@ namespace DependentUnresolvedUsingTemplate {
 namespace PR37680 {
   template <class a> struct b : a {
     using a::add;
-    template<int> int add() { return this->template add(0); } // expected-error {{a template argument list is expected after a name prefixed by the template keyword}}
+    template<int> int add() { return this->template add(0); }
   };
   struct a {
     template<typename T = void> int add(...);

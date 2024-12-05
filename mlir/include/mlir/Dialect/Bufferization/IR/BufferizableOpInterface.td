@@ -378,7 +378,7 @@ def BufferizableOpInterface : OpInterface<"BufferizableOpInterface"> {
           This method can query analysis information from the given analysis
           state.
         }],
-        /*retType=*/"::llvm::LogicalResult",
+        /*retType=*/"::mlir::LogicalResult",
         /*methodName=*/"resolveConflicts",
         /*args=*/(ins "::mlir::RewriterBase &":$rewriter,
                       "const ::mlir::bufferization::AnalysisState &":$state),
@@ -423,7 +423,7 @@ def BufferizableOpInterface : OpInterface<"BufferizableOpInterface"> {
           suggestion to make sure IR is valid at every point in time and could
           be done differently).
         }],
-        /*retType=*/"::llvm::LogicalResult",
+        /*retType=*/"::mlir::LogicalResult",
         /*methodName=*/"bufferize",
         /*args=*/(ins "::mlir::RewriterBase &":$rewriter,
                       "const ::mlir::bufferization::BufferizationOptions &":$options),
@@ -490,7 +490,7 @@ def BufferizableOpInterface : OpInterface<"BufferizableOpInterface"> {
           This method can be used to check expected invariants and limitations
           of the current bufferization implementation.
         }],
-        /*retType=*/"::llvm::LogicalResult",
+        /*retType=*/"::mlir::LogicalResult",
         /*methodName=*/"verifyAnalysis",
         /*args=*/(ins "const ::mlir::bufferization::AnalysisState &":$state),
         /*methodBody=*/"",
@@ -613,7 +613,7 @@ def BufferizableOpInterface : OpInterface<"BufferizableOpInterface"> {
   let extraClassDeclaration = [{
     /// Resolve out-of-place tensor OpOperands with explicit allocations in the
     /// form of `bufferization.alloc_tensor` ops.
-    ::llvm::LogicalResult resolveTensorOpOperandConflicts(
+    ::mlir::LogicalResult resolveTensorOpOperandConflicts(
         ::mlir::RewriterBase &rewriter,
         const ::mlir::bufferization::AnalysisState &state);
 

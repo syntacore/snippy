@@ -1,5 +1,5 @@
 add_custom_target(LLDBUnitTests)
-set_target_properties(LLDBUnitTests PROPERTIES FOLDER "LLDB/Tests")
+set_target_properties(LLDBUnitTests PROPERTIES FOLDER "lldb tests")
 
 add_dependencies(lldb-unit-test-deps LLDBUnitTests)
 
@@ -52,7 +52,6 @@ if (NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
   add_subdirectory(API)
 endif()
 add_subdirectory(Breakpoint)
-add_subdirectory(Callback)
 add_subdirectory(Core)
 add_subdirectory(DataFormatter)
 add_subdirectory(Disassembler)
@@ -74,7 +73,6 @@ add_subdirectory(tools)
 add_subdirectory(UnwindAssembly)
 add_subdirectory(Utility)
 add_subdirectory(Thread)
-add_subdirectory(ValueObject)
 
 if(LLDB_CAN_USE_DEBUGSERVER AND LLDB_TOOL_DEBUGSERVER_BUILD AND NOT LLDB_USE_SYSTEM_DEBUGSERVER)
   add_subdirectory(debugserver)

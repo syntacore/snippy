@@ -209,9 +209,7 @@ TEST_F(BracesRemoverTest, RemoveBraces) {
   verifyFormat("if (a) {\n"
                "  b;\n"
                "} else {\n"
-               "  {\n"
-               "    c;\n"
-               "  }\n"
+               "  { c; }\n"
                "}",
                Style);
 

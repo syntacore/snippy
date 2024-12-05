@@ -18,6 +18,7 @@
 #include "mlir/Query/Query.h"
 #include "mlir/Query/QuerySession.h"
 #include "mlir/Support/FileUtilities.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/LineEditor/LineEditor.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
@@ -27,7 +28,7 @@
 // Query Parser
 //===----------------------------------------------------------------------===//
 
-llvm::LogicalResult
+mlir::LogicalResult
 mlir::mlirQueryMain(int argc, char **argv, MLIRContext &context,
                     const mlir::query::matcher::Registry &matcherRegistry) {
 

@@ -11,6 +11,7 @@
 #define _LIBCPP___FILESYSTEM_DIRECTORY_ITERATOR_H
 
 #include <__assert>
+#include <__availability>
 #include <__config>
 #include <__filesystem/directory_entry.h>
 #include <__filesystem/directory_options.h>

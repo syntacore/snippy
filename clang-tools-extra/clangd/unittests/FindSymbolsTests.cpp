@@ -750,9 +750,6 @@ TEST(DocumentSymbols, RangeFromMacro) {
     $fullDef[[FF3() {
       int var = 42;
     }]]
-
-    #define FF4(name) int name = 0
-    $FooRange[[FF4($FooSelectionRange[[foo]])]];
   )");
   TU.Code = Main.code().str();
   EXPECT_THAT(
@@ -769,11 +766,7 @@ TEST(DocumentSymbols, RangeFromMacro) {
           AllOf(withName("FF3"), withDetail("()"),
                 symRange(Main.range("fullDef")),
                 children(AllOf(withName("waldo"), withDetail("void ()"),
-                               symRange(Main.range("fullDef"))))),
-          AllOf(
-              withName("FF4"), withDetail("(foo)"),
-              children(AllOf(withName("foo"), symRange(Main.range("FooRange")),
-                             symNameRange(Main.range("FooSelectionRange")))))));
+                               symRange(Main.range("fullDef")))))));
 }
 
 TEST(DocumentSymbols, FuncTemplates) {

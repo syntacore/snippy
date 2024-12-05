@@ -17,15 +17,13 @@
 #include <endian.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-#include <sys/syscall.h>
 #include <unistd.h>
 #endif // __linux__
 
 namespace llvm {
 namespace exegesis {
 
-#if defined(__linux__) && !defined(__ANDROID__) &&                             \
-    !(defined(__powerpc__) || defined(__s390x__) || defined(__sparc__))
+#if defined(__linux__) && !defined(__ANDROID__)
 
 // This needs to be updated anytime a test is added or removed from the test
 // suite.
@@ -51,9 +49,7 @@ protected:
 
   std::string getSharedMemoryName(const unsigned TestNumber,
                                   const unsigned DefinitionNumber) {
-    long CurrentTID = syscall(SYS_gettid);
-    return "/" + std::to_string(getSharedMemoryNumber(TestNumber)) + "t" +
-           std::to_string(CurrentTID) + "memdef" +
+    return "/" + std::to_string(getSharedMemoryNumber(TestNumber)) + "memdef" +
            std::to_string(DefinitionNumber);
   }
 
@@ -78,12 +74,20 @@ protected:
 // memory calls not working in some cases, so they have been disabled.
 // TODO(boomanaiden154): Investigate and fix this issue on PPC.
 
+#if defined(__powerpc__) || defined(__s390x__)
+TEST_F(SubprocessMemoryTest, DISABLED_OneDefinition) {
+#else
 TEST_F(SubprocessMemoryTest, OneDefinition) {
+#endif
   testCommon({{"test1", {APInt(8, 0xff), 4096, 0}}}, 0);
   checkSharedMemoryDefinition(getSharedMemoryName(0, 0), 4096, {0xff});
 }
 
+#if defined(__powerpc__) || defined(__s390x__)
+TEST_F(SubprocessMemoryTest, DISABLED_MultipleDefinitions) {
+#else
 TEST_F(SubprocessMemoryTest, MultipleDefinitions) {
+#endif
   testCommon({{"test1", {APInt(8, 0xaa), 4096, 0}},
               {"test2", {APInt(8, 0xbb), 4096, 1}},
               {"test3", {APInt(8, 0xcc), 4096, 2}}},
@@ -93,7 +97,11 @@ TEST_F(SubprocessMemoryTest, MultipleDefinitions) {
   checkSharedMemoryDefinition(getSharedMemoryName(1, 2), 4096, {0xcc});
 }
 
+#if defined(__powerpc__) || defined(__s390x__)
+TEST_F(SubprocessMemoryTest, DISABLED_DefinitionFillsCompletely) {
+#else
 TEST_F(SubprocessMemoryTest, DefinitionFillsCompletely) {
+#endif
   testCommon({{"test1", {APInt(8, 0xaa), 4096, 0}},
               {"test2", {APInt(16, 0xbbbb), 4096, 1}},
               {"test3", {APInt(24, 0xcccccc), 4096, 2}}},
@@ -107,7 +115,7 @@ TEST_F(SubprocessMemoryTest, DefinitionFillsCompletely) {
 }
 
 // The following test is only supported on little endian systems.
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#if defined(__powerpc__) || defined(__s390x__) || __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 TEST_F(SubprocessMemoryTest, DISABLED_DefinitionEndTruncation) {
 #else
 TEST_F(SubprocessMemoryTest, DefinitionEndTruncation) {
@@ -139,7 +147,7 @@ TEST_F(SubprocessMemoryTest, DefinitionEndTruncation) {
   checkSharedMemoryDefinition(getSharedMemoryName(3, 0), 4096, Test1Expected);
 }
 
-#endif // __linux__ && !__ANDROID__ && !(__powerpc__ || __s390x__ || __sparc__)
+#endif // defined(__linux__) && !defined(__ANDROID__)
 
 } // namespace exegesis
 } // namespace llvm

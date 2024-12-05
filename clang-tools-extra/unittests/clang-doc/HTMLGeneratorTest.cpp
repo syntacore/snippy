@@ -30,7 +30,7 @@ ClangDocContext
 getClangDocContext(std::vector<std::string> UserStylesheets = {},
                    StringRef RepositoryUrl = "") {
   ClangDocContext CDCtx{
-      {}, "test-project", {}, {}, {}, RepositoryUrl, UserStylesheets};
+      {}, "test-project", {}, {}, {}, RepositoryUrl, UserStylesheets, {}};
   CDCtx.UserStylesheets.insert(
       CDCtx.UserStylesheets.begin(),
       "../share/clang/clang-doc-default-stylesheet.css");
@@ -66,7 +66,6 @@ TEST(HTMLGeneratorTest, emitNamespaceHTML) {
 <title>namespace Namespace</title>
 <link rel="stylesheet" href="../clang-doc-default-stylesheet.css"/>
 <link rel="stylesheet" href="../user-provided-stylesheet.css"/>
-<script src="../index_json.js"></script>
 <script src="../index.js"></script>
 <header id="project-title">test-project</header>
 <main>
@@ -177,7 +176,6 @@ TEST(HTMLGeneratorTest, emitRecordHTML) {
 <meta charset="utf-8"/>
 <title>class r</title>
 <link rel="stylesheet" href="../../../clang-doc-default-stylesheet.css"/>
-<script src="../../../index_json.js"></script>
 <script src="../../../index.js"></script>
 <header id="project-title">test-project</header>
 <main>
@@ -292,7 +290,6 @@ TEST(HTMLGeneratorTest, emitFunctionHTML) {
 <meta charset="utf-8"/>
 <title></title>
 <link rel="stylesheet" href="clang-doc-default-stylesheet.css"/>
-<script src="index_json.js"></script>
 <script src="index.js"></script>
 <header id="project-title">test-project</header>
 <main>
@@ -340,7 +337,6 @@ TEST(HTMLGeneratorTest, emitEnumHTML) {
 <meta charset="utf-8"/>
 <title></title>
 <link rel="stylesheet" href="clang-doc-default-stylesheet.css"/>
-<script src="index_json.js"></script>
 <script src="index.js"></script>
 <header id="project-title">test-project</header>
 <main>
@@ -426,7 +422,6 @@ TEST(HTMLGeneratorTest, emitCommentHTML) {
 <meta charset="utf-8"/>
 <title></title>
 <link rel="stylesheet" href="clang-doc-default-stylesheet.css"/>
-<script src="index_json.js"></script>
 <script src="index.js"></script>
 <header id="project-title">test-project</header>
 <main>

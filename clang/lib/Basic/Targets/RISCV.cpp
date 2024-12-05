@@ -96,8 +96,7 @@ bool RISCVTargetInfo::validateAsmConstraint(
     // An address that is held in a general-purpose register.
     Info.setAllowsMemory();
     return true;
-  case 's':
-  case 'S': // A symbol or label reference with a constant offset
+  case 'S': // A symbolic address
     Info.setAllowsRegister();
     return true;
   case 'v':
@@ -168,7 +167,7 @@ void RISCVTargetInfo::getTargetDefines(const LangOptions &Opts,
                         Twine(getVersionValue(ExtInfo.Major, ExtInfo.Minor)));
   }
 
-  if (ISAInfo->hasExtension("zmmul"))
+  if (ISAInfo->hasExtension("m") || ISAInfo->hasExtension("zmmul"))
     Builder.defineMacro("__riscv_mul");
 
   if (ISAInfo->hasExtension("m")) {
@@ -211,7 +210,7 @@ void RISCVTargetInfo::getTargetDefines(const LangOptions &Opts,
     Builder.defineMacro("__riscv_v_fixed_vlen",
                         Twine(VScale->first * llvm::RISCV::RVVBitsPerBlock));
 
-  if (FastScalarUnalignedAccess)
+  if (FastUnalignedAccess)
     Builder.defineMacro("__riscv_misaligned_fast");
   else
     Builder.defineMacro("__riscv_misaligned_avoid");
@@ -234,7 +233,7 @@ static constexpr Builtin::Info BuiltinInfo[] = {
   {#ID, TYPE, ATTRS, nullptr, HeaderDesc::NO_HEADER, ALL_LANGUAGES},
 #define TARGET_BUILTIN(ID, TYPE, ATTRS, FEATURE)                               \
   {#ID, TYPE, ATTRS, FEATURE, HeaderDesc::NO_HEADER, ALL_LANGUAGES},
-#include "clang/Basic/BuiltinsRISCV.inc"
+#include "clang/Basic/BuiltinsRISCV.def"
 };
 
 ArrayRef<Builtin::Info> RISCVTargetInfo::getTargetBuiltins() const {
@@ -353,8 +352,7 @@ bool RISCVTargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
   if (ISAInfo->hasExtension("zfh") || ISAInfo->hasExtension("zhinx"))
     HasLegalHalfType = true;
 
-  FastScalarUnalignedAccess =
-      llvm::is_contained(Features, "+unaligned-scalar-mem");
+  FastUnalignedAccess = llvm::is_contained(Features, "+fast-unaligned-access");
 
   if (llvm::is_contained(Features, "+experimental"))
     HasExperimental = true;
@@ -467,15 +465,4 @@ ParsedTargetAttr RISCVTargetInfo::parseTargetAttr(StringRef Features) const {
     }
   }
   return Ret;
-}
-
-TargetInfo::CallingConvCheckResult
-RISCVTargetInfo::checkCallingConvention(CallingConv CC) const {
-  switch (CC) {
-  default:
-    return CCCR_Warning;
-  case CC_C:
-  case CC_RISCVVectorCall:
-    return CCCR_OK;
-  }
 }

@@ -39,7 +39,6 @@ define amdgpu_ps <4 x float> @sample_d_3d(<8 x i32> inreg %rsrc, <4 x i32> inreg
   ; GFX10-NEXT:   $vgpr2 = COPY [[UV2]](s32)
   ; GFX10-NEXT:   $vgpr3 = COPY [[UV3]](s32)
   ; GFX10-NEXT:   SI_RETURN_TO_EPILOG implicit $vgpr0, implicit $vgpr1, implicit $vgpr2, implicit $vgpr3
-  ;
   ; GFX11-LABEL: name: sample_d_3d
   ; GFX11: bb.1.main_body:
   ; GFX11-NEXT:   liveins: $sgpr2, $sgpr3, $sgpr4, $sgpr5, $sgpr6, $sgpr7, $sgpr8, $sgpr9, $sgpr10, $sgpr11, $sgpr12, $sgpr13, $vgpr0, $vgpr1, $vgpr2, $vgpr3, $vgpr4, $vgpr5, $vgpr6, $vgpr7, $vgpr8
@@ -75,7 +74,6 @@ define amdgpu_ps <4 x float> @sample_d_3d(<8 x i32> inreg %rsrc, <4 x i32> inreg
   ; GFX11-NEXT:   $vgpr2 = COPY [[UV2]](s32)
   ; GFX11-NEXT:   $vgpr3 = COPY [[UV3]](s32)
   ; GFX11-NEXT:   SI_RETURN_TO_EPILOG implicit $vgpr0, implicit $vgpr1, implicit $vgpr2, implicit $vgpr3
-  ;
   ; GFX12-LABEL: name: sample_d_3d
   ; GFX12: bb.1.main_body:
   ; GFX12-NEXT:   liveins: $sgpr2, $sgpr3, $sgpr4, $sgpr5, $sgpr6, $sgpr7, $sgpr8, $sgpr9, $sgpr10, $sgpr11, $sgpr12, $sgpr13, $vgpr0, $vgpr1, $vgpr2, $vgpr3, $vgpr4, $vgpr5, $vgpr6, $vgpr7, $vgpr8
@@ -153,7 +151,6 @@ define amdgpu_ps <4 x float> @sample_c_d_3d(<8 x i32> inreg %rsrc, <4 x i32> inr
   ; GFX10-NEXT:   $vgpr2 = COPY [[UV2]](s32)
   ; GFX10-NEXT:   $vgpr3 = COPY [[UV3]](s32)
   ; GFX10-NEXT:   SI_RETURN_TO_EPILOG implicit $vgpr0, implicit $vgpr1, implicit $vgpr2, implicit $vgpr3
-  ;
   ; GFX11-LABEL: name: sample_c_d_3d
   ; GFX11: bb.1.main_body:
   ; GFX11-NEXT:   liveins: $sgpr2, $sgpr3, $sgpr4, $sgpr5, $sgpr6, $sgpr7, $sgpr8, $sgpr9, $sgpr10, $sgpr11, $sgpr12, $sgpr13, $vgpr0, $vgpr1, $vgpr2, $vgpr3, $vgpr4, $vgpr5, $vgpr6, $vgpr7, $vgpr8, $vgpr9
@@ -190,7 +187,6 @@ define amdgpu_ps <4 x float> @sample_c_d_3d(<8 x i32> inreg %rsrc, <4 x i32> inr
   ; GFX11-NEXT:   $vgpr2 = COPY [[UV2]](s32)
   ; GFX11-NEXT:   $vgpr3 = COPY [[UV3]](s32)
   ; GFX11-NEXT:   SI_RETURN_TO_EPILOG implicit $vgpr0, implicit $vgpr1, implicit $vgpr2, implicit $vgpr3
-  ;
   ; GFX12-LABEL: name: sample_c_d_3d
   ; GFX12: bb.1.main_body:
   ; GFX12-NEXT:   liveins: $sgpr2, $sgpr3, $sgpr4, $sgpr5, $sgpr6, $sgpr7, $sgpr8, $sgpr9, $sgpr10, $sgpr11, $sgpr12, $sgpr13, $vgpr0, $vgpr1, $vgpr2, $vgpr3, $vgpr4, $vgpr5, $vgpr6, $vgpr7, $vgpr8, $vgpr9
@@ -270,7 +266,6 @@ define amdgpu_ps <4 x float> @sample_c_d_cl_3d(<8 x i32> inreg %rsrc, <4 x i32> 
   ; GFX10-NEXT:   $vgpr2 = COPY [[UV2]](s32)
   ; GFX10-NEXT:   $vgpr3 = COPY [[UV3]](s32)
   ; GFX10-NEXT:   SI_RETURN_TO_EPILOG implicit $vgpr0, implicit $vgpr1, implicit $vgpr2, implicit $vgpr3
-  ;
   ; GFX11-LABEL: name: sample_c_d_cl_3d
   ; GFX11: bb.1.main_body:
   ; GFX11-NEXT:   liveins: $sgpr2, $sgpr3, $sgpr4, $sgpr5, $sgpr6, $sgpr7, $sgpr8, $sgpr9, $sgpr10, $sgpr11, $sgpr12, $sgpr13, $vgpr0, $vgpr1, $vgpr2, $vgpr3, $vgpr4, $vgpr5, $vgpr6, $vgpr7, $vgpr8, $vgpr9, $vgpr10
@@ -308,7 +303,6 @@ define amdgpu_ps <4 x float> @sample_c_d_cl_3d(<8 x i32> inreg %rsrc, <4 x i32> 
   ; GFX11-NEXT:   $vgpr2 = COPY [[UV2]](s32)
   ; GFX11-NEXT:   $vgpr3 = COPY [[UV3]](s32)
   ; GFX11-NEXT:   SI_RETURN_TO_EPILOG implicit $vgpr0, implicit $vgpr1, implicit $vgpr2, implicit $vgpr3
-  ;
   ; GFX12-LABEL: name: sample_c_d_cl_3d
   ; GFX12: bb.1.main_body:
   ; GFX12-NEXT:   liveins: $sgpr2, $sgpr3, $sgpr4, $sgpr5, $sgpr6, $sgpr7, $sgpr8, $sgpr9, $sgpr10, $sgpr11, $sgpr12, $sgpr13, $vgpr0, $vgpr1, $vgpr2, $vgpr3, $vgpr4, $vgpr5, $vgpr6, $vgpr7, $vgpr8, $vgpr9, $vgpr10
@@ -390,7 +384,6 @@ define amdgpu_ps <4 x float> @sample_c_d_cl_o_3d(<8 x i32> inreg %rsrc, <4 x i32
   ; GFX10-NEXT:   $vgpr2 = COPY [[UV2]](s32)
   ; GFX10-NEXT:   $vgpr3 = COPY [[UV3]](s32)
   ; GFX10-NEXT:   SI_RETURN_TO_EPILOG implicit $vgpr0, implicit $vgpr1, implicit $vgpr2, implicit $vgpr3
-  ;
   ; GFX11-LABEL: name: sample_c_d_cl_o_3d
   ; GFX11: bb.1.main_body:
   ; GFX11-NEXT:   liveins: $sgpr2, $sgpr3, $sgpr4, $sgpr5, $sgpr6, $sgpr7, $sgpr8, $sgpr9, $sgpr10, $sgpr11, $sgpr12, $sgpr13, $vgpr0, $vgpr1, $vgpr2, $vgpr3, $vgpr4, $vgpr5, $vgpr6, $vgpr7, $vgpr8, $vgpr9, $vgpr10, $vgpr11
@@ -429,7 +422,6 @@ define amdgpu_ps <4 x float> @sample_c_d_cl_o_3d(<8 x i32> inreg %rsrc, <4 x i32
   ; GFX11-NEXT:   $vgpr2 = COPY [[UV2]](s32)
   ; GFX11-NEXT:   $vgpr3 = COPY [[UV3]](s32)
   ; GFX11-NEXT:   SI_RETURN_TO_EPILOG implicit $vgpr0, implicit $vgpr1, implicit $vgpr2, implicit $vgpr3
-  ;
   ; GFX12-LABEL: name: sample_c_d_cl_o_3d
   ; GFX12: bb.1.main_body:
   ; GFX12-NEXT:   liveins: $sgpr2, $sgpr3, $sgpr4, $sgpr5, $sgpr6, $sgpr7, $sgpr8, $sgpr9, $sgpr10, $sgpr11, $sgpr12, $sgpr13, $vgpr0, $vgpr1, $vgpr2, $vgpr3, $vgpr4, $vgpr5, $vgpr6, $vgpr7, $vgpr8, $vgpr9, $vgpr10, $vgpr11

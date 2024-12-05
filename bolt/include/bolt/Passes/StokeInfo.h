@@ -87,10 +87,10 @@ struct StokeFuncInfo {
               << "," << NumBlocks << "," << IsLoopFree << "," << NumLoops << ","
               << MaxLoopDepth << "," << HotSize << "," << TotalSize << ","
               << Score << "," << HasCall << ",\"{ ";
-      for (const std::string &S : DefIn)
+      for (std::string S : DefIn)
         Outfile << "%" << S << " ";
       Outfile << "}\",\"{ ";
-      for (const std::string &S : LiveOut)
+      for (std::string S : LiveOut)
         Outfile << "%" << S << " ";
       Outfile << "}\"," << HeapOut << "," << StackOut << "," << HasRipAddr
               << "," << Omitted << "\n";
@@ -120,7 +120,7 @@ public:
   bool checkFunction(BinaryFunction &BF, DataflowInfoManager &DInfo,
                      RegAnalysis &RA, StokeFuncInfo &FuncInfo);
 
-  Error runOnFunctions(BinaryContext &BC) override;
+  void runOnFunctions(BinaryContext &BC) override;
 };
 
 } // namespace bolt

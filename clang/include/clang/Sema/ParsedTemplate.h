@@ -159,7 +159,7 @@ namespace clang {
     SourceLocation TemplateNameLoc;
 
     /// FIXME: Temporarily stores the name of a specialization
-    const IdentifierInfo *Name;
+    IdentifierInfo *Name;
 
     /// FIXME: Temporarily stores the overloaded operator kind.
     OverloadedOperatorKind Operator;
@@ -197,7 +197,7 @@ namespace clang {
     /// appends it to List.
     static TemplateIdAnnotation *
     Create(SourceLocation TemplateKWLoc, SourceLocation TemplateNameLoc,
-           const IdentifierInfo *Name, OverloadedOperatorKind OperatorKind,
+           IdentifierInfo *Name, OverloadedOperatorKind OperatorKind,
            ParsedTemplateTy OpaqueTemplateName, TemplateNameKind TemplateKind,
            SourceLocation LAngleLoc, SourceLocation RAngleLoc,
            ArrayRef<ParsedTemplateArgument> TemplateArgs, bool ArgsInvalid,
@@ -236,8 +236,7 @@ namespace clang {
     TemplateIdAnnotation(const TemplateIdAnnotation &) = delete;
 
     TemplateIdAnnotation(SourceLocation TemplateKWLoc,
-                         SourceLocation TemplateNameLoc,
-                         const IdentifierInfo *Name,
+                         SourceLocation TemplateNameLoc, IdentifierInfo *Name,
                          OverloadedOperatorKind OperatorKind,
                          ParsedTemplateTy OpaqueTemplateName,
                          TemplateNameKind TemplateKind,

@@ -195,7 +195,7 @@ def jumptarget : Operand<OtherVT> {
   let ParserMatchClass = XtensaPCRelTargetAsmOperand;
 }
 
-def L32Rtarget : Operand<i32> {
+def L32Rtarget : Operand<OtherVT> {
   let PrintMethod = "printL32RTarget";
   let EncoderMethod = "getL32RTargetEncoding";
   let DecoderMethod = "decodeL32ROperand";

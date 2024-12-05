@@ -46,6 +46,7 @@
 // backends, this means that the EmitFoo function is the only thing not in
 // the anonymous namespace.
 
+
 // FIXME: Reorganize TableGen so that build dependencies can be more
 // accurately expressed. Currently, touching any of the emitters (or
 // anything that they transitively depend on) causes everything dependent
@@ -55,6 +56,7 @@
 // module, and all the modules would have a common dependency on the
 // TableGen binary with as few dependencies as possible on the rest of
 // LLVM.
+
 
 namespace llvm {
 

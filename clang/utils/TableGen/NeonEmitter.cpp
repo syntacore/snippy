@@ -735,15 +735,20 @@ Type Type::fromTypedefName(StringRef Name) {
   Type T;
   T.Kind = SInt;
 
-  if (Name.consume_front("u"))
+  if (Name.front() == 'u') {
     T.Kind = UInt;
+    Name = Name.drop_front();
+  }
 
-  if (Name.consume_front("float")) {
+  if (Name.starts_with("float")) {
     T.Kind = Float;
-  } else if (Name.consume_front("poly")) {
+    Name = Name.drop_front(5);
+  } else if (Name.starts_with("poly")) {
     T.Kind = Poly;
-  } else if (Name.consume_front("bfloat")) {
+    Name = Name.drop_front(4);
+  } else if (Name.starts_with("bfloat")) {
     T.Kind = BFloat16;
+    Name = Name.drop_front(6);
   } else {
     assert(Name.starts_with("int"));
     Name = Name.drop_front(3);
@@ -760,7 +765,8 @@ Type Type::fromTypedefName(StringRef Name) {
   T.Bitwidth = T.ElementBitwidth;
   T.NumVectors = 1;
 
-  if (Name.consume_front("x")) {
+  if (Name.front() == 'x') {
+    Name = Name.drop_front();
     unsigned I = 0;
     for (I = 0; I < Name.size(); ++I) {
       if (!isdigit(Name[I]))
@@ -774,7 +780,8 @@ Type Type::fromTypedefName(StringRef Name) {
     // Was scalar.
     T.NumVectors = 0;
   }
-  if (Name.consume_front("x")) {
+  if (Name.front() == 'x') {
+    Name = Name.drop_front();
     unsigned I = 0;
     for (I = 0; I < Name.size(); ++I) {
       if (!isdigit(Name[I]))
@@ -952,7 +959,7 @@ std::string Intrinsic::getInstTypeCode(Type T, ClassKind CK) const {
   char typeCode = '\0';
   bool printNumber = true;
 
-  if (CK == ClassB && TargetGuard == "neon")
+  if (CK == ClassB && TargetGuard == "")
     return "";
 
   if (T.isBFloat16())
@@ -976,7 +983,7 @@ std::string Intrinsic::getInstTypeCode(Type T, ClassKind CK) const {
       break;
     }
   }
-  if (CK == ClassB && TargetGuard == "neon") {
+  if (CK == ClassB && TargetGuard == "") {
     typeCode = '\0';
   }
 
@@ -1078,7 +1085,7 @@ std::string Intrinsic::mangleName(std::string Name, ClassKind LocalCK) const {
     S += "_" + getInstTypeCode(InBaseType, LocalCK);
   }
 
-  if (LocalCK == ClassB && TargetGuard == "neon")
+  if (LocalCK == ClassB && TargetGuard == "")
     S += "_v";
 
   // Insert a 'q' before the first '_' character so that it ends up before
@@ -2266,7 +2273,7 @@ static void emitNeonTypeDefs(const std::string& types, raw_ostream &OS) {
       InIfdef = false;
     }
     if (!InIfdef && IsA64) {
-      OS << "#if defined(__aarch64__) || defined(__arm64ec__)\n";
+      OS << "#ifdef __aarch64__\n";
       InIfdef = true;
     }
 
@@ -2299,7 +2306,7 @@ static void emitNeonTypeDefs(const std::string& types, raw_ostream &OS) {
         InIfdef = false;
       }
       if (!InIfdef && IsA64) {
-        OS << "#if defined(__aarch64__) || defined(__arm64ec__)\n";
+        OS << "#ifdef __aarch64__\n";
         InIfdef = true;
       }
 
@@ -2370,6 +2377,10 @@ void NeonEmitter::run(raw_ostream &OS) {
         "Please use -mfloat-abi=softfp or -mfloat-abi=hard\"\n";
   OS << "#else\n\n";
 
+  OS << "#if !defined(__ARM_NEON)\n";
+  OS << "#error \"NEON support not enabled\"\n";
+  OS << "#else\n\n";
+
   OS << "#include <stdint.h>\n\n";
 
   OS << "#include <arm_bf16.h>\n";
@@ -2377,7 +2388,7 @@ void NeonEmitter::run(raw_ostream &OS) {
   OS << "#include <arm_vector_types.h>\n";
 
   // For now, signedness of polynomial types depends on target
-  OS << "#if defined(__aarch64__) || defined(__arm64ec__)\n";
+  OS << "#ifdef __aarch64__\n";
   OS << "typedef uint8_t poly8_t;\n";
   OS << "typedef uint16_t poly16_t;\n";
   OS << "typedef uint64_t poly64_t;\n";
@@ -2446,6 +2457,7 @@ void NeonEmitter::run(raw_ostream &OS) {
   OS << "#undef __ai\n\n";
   OS << "#endif /* if !defined(__ARM_NEON) */\n";
   OS << "#endif /* ifndef __ARM_FP */\n";
+  OS << "#endif /* __ARM_NEON_H */\n";
 }
 
 /// run - Read the records in arm_fp16.td and output arm_fp16.h.  arm_fp16.h
@@ -2577,7 +2589,7 @@ void NeonEmitter::runVectorTypes(raw_ostream &OS) {
   OS << "typedef float float32_t;\n";
   OS << "typedef __fp16 float16_t;\n";
 
-  OS << "#if defined(__aarch64__) || defined(__arm64ec__)\n";
+  OS << "#ifdef __aarch64__\n";
   OS << "typedef double float64_t;\n";
   OS << "#endif\n\n";
 

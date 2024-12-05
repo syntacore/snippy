@@ -311,7 +311,7 @@ void wholeprogramdevirt::setAfterReturnValues(
 
 VirtualCallTarget::VirtualCallTarget(GlobalValue *Fn, const TypeMemberInfo *TM)
     : Fn(Fn), TM(TM),
-      IsBigEndian(Fn->getDataLayout().isBigEndian()),
+      IsBigEndian(Fn->getParent()->getDataLayout().isBigEndian()),
       WasDevirt(false) {}
 
 namespace {
@@ -434,7 +434,7 @@ struct VirtualCallSite {
       emitRemark(OptName, TargetName, OREGetter);
     CB.replaceAllUsesWith(New);
     if (auto *II = dyn_cast<InvokeInst>(&CB)) {
-      BranchInst::Create(II->getNormalDest(), CB.getIterator());
+      BranchInst::Create(II->getNormalDest(), &CB);
       II->getUnwindDest()->removePredecessor(II->getParent());
     }
     CB.eraseFromParent();
@@ -861,7 +861,7 @@ void llvm::updatePublicTypeTestCalls(Module &M,
       auto *CI = cast<CallInst>(U.getUser());
       auto *NewCI = CallInst::Create(
           TypeTestFunc, {CI->getArgOperand(0), CI->getArgOperand(1)},
-          std::nullopt, "", CI->getIterator());
+          std::nullopt, "", CI);
       CI->replaceAllUsesWith(NewCI);
       CI->eraseFromParent();
     }
@@ -1066,10 +1066,17 @@ bool DevirtModule::tryFindVirtualCallTargets(
         GlobalObject::VCallVisibilityPublic)
       return false;
 
-    Function *Fn = nullptr;
-    Constant *C = nullptr;
-    std::tie(Fn, C) =
-        getFunctionAtVTableOffset(TM.Bits->GV, TM.Offset + ByteOffset, M);
+    Constant *Ptr = getPointerAtOffset(TM.Bits->GV->getInitializer(),
+                                       TM.Offset + ByteOffset, M, TM.Bits->GV);
+    if (!Ptr)
+      return false;
+
+    auto C = Ptr->stripPointerCasts();
+    // Make sure this is a function or alias to a function.
+    auto Fn = dyn_cast<Function>(C);
+    auto A = dyn_cast<GlobalAlias>(C);
+    if (!Fn && A)
+      Fn = dyn_cast<Function>(A->getAliasee());
 
     if (!Fn)
       return false;
@@ -1196,7 +1203,8 @@ void DevirtModule::applySingleImplDevirt(VTableSlotInfo &SlotInfo,
       // function pointer to the devirtualized target. In case of a mismatch,
       // fall back to indirect call.
       if (DevirtCheckMode == WPDCheckMode::Fallback) {
-        MDNode *Weights = MDBuilder(M.getContext()).createLikelyBranchWeights();
+        MDNode *Weights =
+            MDBuilder(M.getContext()).createBranchWeights((1U << 20) - 1, 1);
         // Version the indirect call site. If the called value is equal to the
         // given callee, 'NewInst' will be executed, otherwise the original call
         // site will be executed.
@@ -1224,8 +1232,8 @@ void DevirtModule::applySingleImplDevirt(VTableSlotInfo &SlotInfo,
         CB.setMetadata(LLVMContext::MD_callees, nullptr);
         if (CB.getCalledOperand() &&
             CB.getOperandBundle(LLVMContext::OB_ptrauth)) {
-          auto *NewCS = CallBase::removeOperandBundle(
-              &CB, LLVMContext::OB_ptrauth, CB.getIterator());
+          auto *NewCS =
+              CallBase::removeOperandBundle(&CB, LLVMContext::OB_ptrauth, &CB);
           CB.replaceAllUsesWith(NewCS);
           // Schedule for deletion at the end of pass run.
           CallsWithPtrAuthBundleRemoved.push_back(&CB);
@@ -1616,7 +1624,7 @@ std::string DevirtModule::getGlobalName(VTableSlot Slot,
   for (uint64_t Arg : Args)
     OS << '_' << Arg;
   OS << '_' << Name;
-  return FullName;
+  return OS.str();
 }
 
 bool DevirtModule::shouldExportConstantsAsAbsoluteSymbols() {
@@ -1927,7 +1935,7 @@ void DevirtModule::rebuildGlobal(VTableBits &B) {
   // element (the original initializer).
   auto Alias = GlobalAlias::create(
       B.GV->getInitializer()->getType(), 0, B.GV->getLinkage(), "",
-      ConstantExpr::getInBoundsGetElementPtr(
+      ConstantExpr::getGetElementPtr(
           NewInit->getType(), NewGV,
           ArrayRef<Constant *>{ConstantInt::get(Int32Ty, 0),
                                ConstantInt::get(Int32Ty, 1)}),

@@ -497,14 +497,9 @@ void MutableOperandRange::clear() {
   }
 }
 
-/// Explicit conversion to an OperandRange.
-OperandRange MutableOperandRange::getAsOperandRange() const {
-  return owner->getOperands().slice(start, length);
-}
-
 /// Allow implicit conversion to an OperandRange.
 MutableOperandRange::operator OperandRange() const {
-  return getAsOperandRange();
+  return owner->getOperands().slice(start, length);
 }
 
 MutableOperandRange::operator MutableArrayRef<OpOperand>() const {
@@ -916,12 +911,11 @@ static void addDataToHash(llvm::SHA1 &hasher, const T &data) {
       ArrayRef<uint8_t>(reinterpret_cast<const uint8_t *>(&data), sizeof(T)));
 }
 
-OperationFingerPrint::OperationFingerPrint(Operation *topOp,
-                                           bool includeNested) {
+OperationFingerPrint::OperationFingerPrint(Operation *topOp) {
   llvm::SHA1 hasher;
 
-  // Helper function that hashes an operation based on its mutable bits:
-  auto addOperationToHash = [&](Operation *op) {
+  // Hash each of the operations based upon their mutable bits:
+  topOp->walk([&](Operation *op) {
     //   - Operation pointer
     addDataToHash(hasher, op);
     //   - Parent operation pointer (to take into account the nesting structure)
@@ -950,12 +944,6 @@ OperationFingerPrint::OperationFingerPrint(Operation *topOp,
     //   - Result types
     for (Type t : op->getResultTypes())
       addDataToHash(hasher, t);
-  };
-
-  if (includeNested)
-    topOp->walk(addOperationToHash);
-  else
-    addOperationToHash(topOp);
-
+  });
   hash = hasher.result();
 }

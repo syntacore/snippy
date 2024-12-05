@@ -19,8 +19,10 @@ class TestSTTYBeforeAndAfter(TestBase):
         cls.RemoveTempFile("child_send2.txt")
         cls.RemoveTempFile("child_read2.txt")
 
-    @skipIf(macos_version=["<", "14.0"], asan=True)
-    @add_test_categories(["pexpect"])
+    @expectedFailureAll(
+        hostoslist=["windows"],
+        bugnumber="llvm.org/pr22274: need a pexpect replacement for windows",
+    )
     @no_debug_info_test
     def test_stty_dash_a_before_and_afetr_invoking_lldb_command(self):
         """Test that 'stty -a' displays the same output before and after running the lldb command."""
@@ -35,7 +37,7 @@ class TestSTTYBeforeAndAfter(TestBase):
         lldb_prompt = "(lldb) "
 
         # So that the child gets torn down after the test.
-        self.child = pexpect.spawn("expect", encoding="utf-8")
+        self.child = pexpect.spawnu("expect")
         child = self.child
 
         child.expect(expect_prompt)

@@ -51,15 +51,6 @@ struct A { ~A(); };
 }
 
 namespace test5 {
-  struct A { ~A(); };
-  [[clang::always_destroy]] A a; // no warning
-
-  void func() {
-    [[clang::always_destroy]] static A a; // no warning
-  }
-}
-
-namespace test6 {
 #if __cplusplus >= 202002L
 #define CPP20_CONSTEXPR constexpr
 #else
@@ -77,4 +68,3 @@ namespace test6 {
   T t; // expected-warning {{exit-time destructor}}
 #undef CPP20_CONSTEXPR
 }
-

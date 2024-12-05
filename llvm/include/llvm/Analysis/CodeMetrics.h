@@ -20,14 +20,11 @@
 namespace llvm {
 class AssumptionCache;
 class BasicBlock;
-class Instruction;
 class Loop;
 class Function;
 template <class T> class SmallPtrSetImpl;
 class TargetTransformInfo;
 class Value;
-
-enum struct ConvergenceKind { None, Controlled, ExtendedLoop, Uncontrolled };
 
 /// Utility to calculate the size and a few similar metrics for a set
 /// of basic blocks.
@@ -45,8 +42,8 @@ struct CodeMetrics {
   /// one or more 'noduplicate' instructions.
   bool notDuplicatable = false;
 
-  /// The kind of convergence specified in this function.
-  ConvergenceKind Convergence = ConvergenceKind::None;
+  /// True if this function contains a call to a convergent function.
+  bool convergent = false;
 
   /// True if this function calls alloca (in the C sense).
   bool usesDynamicAlloca = false;
@@ -80,7 +77,7 @@ struct CodeMetrics {
   /// Add information about a block to the current state.
   void analyzeBasicBlock(const BasicBlock *BB, const TargetTransformInfo &TTI,
                          const SmallPtrSetImpl<const Value *> &EphValues,
-                         bool PrepareForLTO = false, const Loop *L = nullptr);
+                         bool PrepareForLTO = false);
 
   /// Collect a loop's ephemeral values (those used only by an assume
   /// or similar intrinsics in the loop).

@@ -1,12 +1,9 @@
-; Tests that coro-split will convert coro.await.suspend.handle to a musttail call if the target is
-; Wasm64 or Wasm32 with tail-call support.
-; REQUIRES: webassembly-registered-target
+; Tests that we would convert coro.resume to a musttail call if the target is
+; Wasm64 with tail-call support.
+; RUN: opt < %s -passes='cgscc(coro-split),simplifycfg,early-cse' -S | FileCheck %s
+; RUN: opt < %s -passes='pgo-instr-gen,cgscc(coro-split),simplifycfg,early-cse' -S | FileCheck %s
 
-; RUN: opt -mtriple=wasm64-unknown-unknown < %s -passes='cgscc(coro-split),simplifycfg,early-cse' -S | FileCheck %s
-; RUN: opt -mtriple=wasm64-unknown-unknown < %s -passes='pgo-instr-gen,cgscc(coro-split),simplifycfg,early-cse' -S | FileCheck %s
-
-; RUN: opt -mtriple=wasm32-unknown-unknown < %s -passes='cgscc(coro-split),simplifycfg,early-cse' -S | FileCheck %s
-; RUN: opt -mtriple=wasm32-unknown-unknown < %s -passes='pgo-instr-gen,cgscc(coro-split),simplifycfg,early-cse' -S | FileCheck %s
+target triple = "wasm64-unknown-unknown"
 
 define void @f() #0 {
 entry:
@@ -25,7 +22,8 @@ entry:
   ]
 await.ready:
   %save2 = call token @llvm.coro.save(ptr null)
-  call void @llvm.coro.await.suspend.handle(ptr null, ptr null, ptr @await_suspend_function)
+  %addr2 = call ptr @llvm.coro.subfn.addr(ptr null, i8 0)
+  call fastcc void %addr2(ptr null)
 
   %suspend2 = call i8 @llvm.coro.suspend(token %save2, i1 false)
   switch i8 %suspend2, label %exit [
@@ -50,7 +48,6 @@ declare ptr @llvm.coro.free(token, ptr nocapture readonly) #1
 declare i1 @llvm.coro.end(ptr, i1, token) #2
 declare ptr @llvm.coro.subfn.addr(ptr nocapture readonly, i8) #1
 declare ptr @malloc(i64)
-declare ptr @await_suspend_function(ptr %awaiter, ptr %hdl)
 
 attributes #0 = { presplitcoroutine "target-features"="+tail-call" }
 attributes #1 = { argmemonly nounwind readonly }

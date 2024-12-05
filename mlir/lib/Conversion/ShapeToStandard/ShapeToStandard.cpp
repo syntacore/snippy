@@ -147,7 +147,9 @@ LogicalResult BroadcastOpConverter::matchAndRewrite(
   // Find the maximum rank
   Value maxRank = ranks.front();
   for (Value v : llvm::drop_begin(ranks, 1)) {
-    maxRank = lb.create<arith::MaxUIOp>(v, maxRank);
+    Value rankIsGreater =
+        lb.create<arith::CmpIOp>(arith::CmpIPredicate::ugt, v, maxRank);
+    maxRank = lb.create<arith::SelectOp>(rankIsGreater, v, maxRank);
   }
 
   // Calculate the difference of ranks and the maximum rank for later offsets.
@@ -260,7 +262,9 @@ LogicalResult IsBroadcastableOpConverter::matchAndRewrite(
   // Find the maximum rank
   Value maxRank = ranks.front();
   for (Value v : llvm::drop_begin(ranks, 1)) {
-    maxRank = lb.create<arith::MaxUIOp>(v, maxRank);
+    Value rankIsGreater =
+        lb.create<arith::CmpIOp>(arith::CmpIPredicate::ugt, v, maxRank);
+    maxRank = lb.create<arith::SelectOp>(rankIsGreater, v, maxRank);
   }
 
   // Calculate the difference of ranks and the maximum rank for later offsets.

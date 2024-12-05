@@ -1,4 +1,4 @@
-import unittest
+import unittest2
 import os
 import lldb
 from lldbsuite.test.decorators import *
@@ -24,7 +24,7 @@ class UniversalTestCase(TestBase):
 
     @add_test_categories(["pyapi"])
     @skipUnlessDarwin
-    @unittest.skipUnless(
+    @unittest2.skipUnless(
         hasattr(os, "uname") and os.uname()[4] in ["x86_64"], "requires x86_64"
     )
     @skipIfDarwinEmbedded  # this test file assumes we're targetting an x86 system
@@ -50,7 +50,7 @@ class UniversalTestCase(TestBase):
         self.assertTrue(process, PROCESS_IS_VALID)
 
     @skipUnlessDarwin
-    @unittest.skipUnless(
+    @unittest2.skipUnless(
         hasattr(os, "uname") and os.uname()[4] in ["x86_64"], "requires x86_64"
     )
     @skipIfDarwinEmbedded  # this test file assumes we're targetting an x86 system
@@ -115,7 +115,7 @@ class UniversalTestCase(TestBase):
         self.runCmd("continue")
 
     @skipUnlessDarwin
-    @unittest.skipUnless(
+    @unittest2.skipUnless(
         hasattr(os, "uname") and os.uname()[4] in ["x86_64"], "requires x86_64"
     )
     @skipIfDarwinEmbedded  # this test file assumes we're targetting an x86 system
@@ -144,8 +144,8 @@ class UniversalTestCase(TestBase):
 
         bkpt = target.BreakpointCreateBySourceRegex("sleep", lldb.SBFileSpec("main.c"))
         self.assertTrue(bkpt.IsValid(), "Valid breakpoint")
-        self.assertGreaterEqual(
-            bkpt.GetNumLocations(), 1, "Our main breakpoint has locations."
+        self.assertTrue(
+            bkpt.GetNumLocations() >= 1, "Our main breakpoint has locations."
         )
 
         popen = self.spawnSubprocess(exe, ["keep_waiting"])
@@ -165,6 +165,6 @@ class UniversalTestCase(TestBase):
         # backtracing failed.
 
         threads = lldbutil.continue_to_breakpoint(process, bkpt)
-        self.assertEqual(len(threads), 1)
+        self.assertEquals(len(threads), 1)
         thread = threads[0]
-        self.assertGreater(thread.GetNumFrames(), 1, "We were able to backtrace.")
+        self.assertTrue(thread.GetNumFrames() > 1, "We were able to backtrace.")

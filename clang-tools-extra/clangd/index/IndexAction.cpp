@@ -89,8 +89,7 @@ public:
                           llvm::StringRef FileName, bool IsAngled,
                           CharSourceRange FilenameRange,
                           OptionalFileEntryRef File, llvm::StringRef SearchPath,
-                          llvm::StringRef RelativePath,
-                          const Module *SuggestedModule, bool ModuleImported,
+                          llvm::StringRef RelativePath, const Module *Imported,
                           SrcMgr::CharacteristicKind FileType) override {
     auto IncludeURI = toURI(File);
     if (!IncludeURI)

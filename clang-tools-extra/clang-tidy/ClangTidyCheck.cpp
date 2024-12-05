@@ -139,12 +139,6 @@ void ClangTidyCheck::OptionsView::storeInt(ClangTidyOptions::OptionMap &Options,
   store(Options, LocalName, llvm::itostr(Value));
 }
 
-void ClangTidyCheck::OptionsView::storeUnsigned(
-    ClangTidyOptions::OptionMap &Options, StringRef LocalName,
-    uint64_t Value) const {
-  store(Options, LocalName, llvm::utostr(Value));
-}
-
 template <>
 void ClangTidyCheck::OptionsView::store<bool>(
     ClangTidyOptions::OptionMap &Options, StringRef LocalName,
@@ -171,7 +165,7 @@ std::optional<int64_t> ClangTidyCheck::OptionsView::getEnumInt(
     if (IgnoreCase) {
       if (Value.equals_insensitive(NameAndEnum.second))
         return NameAndEnum.first;
-    } else if (Value == NameAndEnum.second) {
+    } else if (Value.equals(NameAndEnum.second)) {
       return NameAndEnum.first;
     } else if (Value.equals_insensitive(NameAndEnum.second)) {
       Closest = NameAndEnum.second;

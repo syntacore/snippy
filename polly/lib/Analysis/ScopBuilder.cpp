@@ -60,7 +60,6 @@
 using namespace llvm;
 using namespace polly;
 
-#include "polly/Support/PollyDebug.h"
 #define DEBUG_TYPE "polly-scops"
 
 STATISTIC(ScopFound, "Number of valid Scops");
@@ -2517,19 +2516,15 @@ bool hasIntersectingAccesses(isl::set AllAccs, MemoryAccess *LoadMA,
                              MemoryAccess *StoreMA, isl::set Domain,
                              SmallVector<MemoryAccess *, 8> &MemAccs) {
   bool HasIntersectingAccs = false;
-  auto AllAccsNoParams = AllAccs.project_out_all_params();
-
   for (MemoryAccess *MA : MemAccs) {
     if (MA == LoadMA || MA == StoreMA)
       continue;
-    auto AccRel = MA->getAccessRelation().intersect_domain(Domain);
-    auto Accs = AccRel.range();
-    auto AccsNoParams = Accs.project_out_all_params();
 
-    bool CompatibleSpace = AllAccsNoParams.has_equal_space(AccsNoParams);
+    isl::map AccRel = MA->getAccessRelation().intersect_domain(Domain);
+    isl::set Accs = AccRel.range();
 
-    if (CompatibleSpace) {
-      auto OverlapAccs = Accs.intersect(AllAccs);
+    if (AllAccs.has_equal_space(Accs)) {
+      isl::set OverlapAccs = Accs.intersect(AllAccs);
       bool DoesIntersect = !OverlapAccs.is_empty();
       HasIntersectingAccs |= DoesIntersect;
     }
@@ -2541,39 +2536,18 @@ bool hasIntersectingAccesses(isl::set AllAccs, MemoryAccess *LoadMA,
 bool checkCandidatePairAccesses(MemoryAccess *LoadMA, MemoryAccess *StoreMA,
                                 isl::set Domain,
                                 SmallVector<MemoryAccess *, 8> &MemAccs) {
-  // First check if the base value is the same.
   isl::map LoadAccs = LoadMA->getAccessRelation();
   isl::map StoreAccs = StoreMA->getAccessRelation();
+
+  // Skip those with obviously unequal base addresses.
   bool Valid = LoadAccs.has_equal_space(StoreAccs);
-  POLLY_DEBUG(dbgs() << " == The accessed space below is "
-                     << (Valid ? "" : "not ") << "equal!\n");
-  POLLY_DEBUG(LoadMA->dump(); StoreMA->dump());
 
+  // And check if the remaining for overlap with other memory accesses.
   if (Valid) {
-    // Then check if they actually access the same memory.
-    isl::map R = isl::manage(LoadAccs.copy())
-                     .intersect_domain(isl::manage(Domain.copy()));
-    isl::map W = isl::manage(StoreAccs.copy())
-                     .intersect_domain(isl::manage(Domain.copy()));
-    isl::set RS = R.range();
-    isl::set WS = W.range();
-
-    isl::set InterAccs =
-        isl::manage(RS.copy()).intersect(isl::manage(WS.copy()));
-    Valid = !InterAccs.is_empty();
-    POLLY_DEBUG(dbgs() << " == The accessed memory is " << (Valid ? "" : "not ")
-                       << "overlapping!\n");
-  }
-
-  if (Valid) {
-    // Finally, check if they are no other instructions accessing this memory
     isl::map AllAccsRel = LoadAccs.unite(StoreAccs);
     AllAccsRel = AllAccsRel.intersect_domain(Domain);
     isl::set AllAccs = AllAccsRel.range();
     Valid = !hasIntersectingAccesses(AllAccs, LoadMA, StoreMA, Domain, MemAccs);
-
-    POLLY_DEBUG(dbgs() << " == The accessed memory is " << (Valid ? "not " : "")
-                       << "accessed by other instructions!\n");
   }
   return Valid;
 }
@@ -2715,10 +2689,9 @@ void ScopBuilder::addUserContext() {
     if (NameContext != NameUserContext) {
       std::string SpaceStr = stringFromIslObj(Space, "null");
       errs() << "Error: the name of dimension " << i
-             << " provided in -polly-context "
-             << "is '" << NameUserContext << "', but the name in the computed "
-             << "context is '" << NameContext
-             << "'. Due to this name mismatch, "
+             << " provided in -polly-context " << "is '" << NameUserContext
+             << "', but the name in the computed " << "context is '"
+             << NameContext << "'. Due to this name mismatch, "
              << "the -polly-context option is ignored. Please provide "
              << "the context in the parameter space: " << SpaceStr << ".\n";
       return;
@@ -2768,7 +2741,7 @@ isl::set ScopBuilder::getNonHoistableCtx(MemoryAccess *Access,
   AccessRelation = AccessRelation.intersect_domain(Stmt.getDomain());
   isl::set SafeToLoad;
 
-  auto &DL = scop->getFunction().getDataLayout();
+  auto &DL = scop->getFunction().getParent()->getDataLayout();
   if (isSafeToLoadUnconditionally(LI->getPointerOperand(), LI->getType(),
                                   LI->getAlign(), DL)) {
     SafeToLoad = isl::set::universe(AccessRelation.get_space().range());
@@ -2814,7 +2787,7 @@ bool ScopBuilder::canAlwaysBeHoisted(MemoryAccess *MA,
                                      bool MAInvalidCtxIsEmpty,
                                      bool NonHoistableCtxIsEmpty) {
   LoadInst *LInst = cast<LoadInst>(MA->getAccessInstruction());
-  const DataLayout &DL = LInst->getDataLayout();
+  const DataLayout &DL = LInst->getParent()->getModule()->getDataLayout();
   if (PollyAllowDereferenceOfAllFunctionParams &&
       isAParameter(LInst->getPointerOperand(), scop->getFunction()))
     return true;
@@ -3242,8 +3215,8 @@ bool ScopBuilder::buildAliasChecks() {
   // we make the assumed context infeasible.
   scop->invalidate(ALIASING, DebugLoc());
 
-  POLLY_DEBUG(dbgs() << "\n\nNOTE: Run time checks for " << scop->getNameStr()
-                     << " could not be created. This SCoP has been dismissed.");
+  LLVM_DEBUG(dbgs() << "\n\nNOTE: Run time checks for " << scop->getNameStr()
+                    << " could not be created. This SCoP has been dismissed.");
   return false;
 }
 
@@ -3564,7 +3537,7 @@ void ScopBuilder::buildScop(Region &R, AssumptionCache &AC) {
   DenseMap<BasicBlock *, isl::set> InvalidDomainMap;
 
   if (!buildDomains(&R, InvalidDomainMap)) {
-    POLLY_DEBUG(
+    LLVM_DEBUG(
         dbgs() << "Bailing-out because buildDomains encountered problems\n");
     return;
   }
@@ -3584,7 +3557,7 @@ void ScopBuilder::buildScop(Region &R, AssumptionCache &AC) {
   scop->removeStmtNotInDomainMap();
   scop->simplifySCoP(false);
   if (scop->isEmpty()) {
-    POLLY_DEBUG(dbgs() << "Bailing-out because SCoP is empty\n");
+    LLVM_DEBUG(dbgs() << "Bailing-out because SCoP is empty\n");
     return;
   }
 
@@ -3601,8 +3574,7 @@ void ScopBuilder::buildScop(Region &R, AssumptionCache &AC) {
 
   // Check early for a feasible runtime context.
   if (!scop->hasFeasibleRuntimeContext()) {
-    POLLY_DEBUG(
-        dbgs() << "Bailing-out because of unfeasible context (early)\n");
+    LLVM_DEBUG(dbgs() << "Bailing-out because of unfeasible context (early)\n");
     return;
   }
 
@@ -3610,7 +3582,7 @@ void ScopBuilder::buildScop(Region &R, AssumptionCache &AC) {
   // only the runtime context could become infeasible.
   if (!scop->isProfitable(UnprofitableScalarAccs)) {
     scop->invalidate(PROFITABLE, DebugLoc());
-    POLLY_DEBUG(
+    LLVM_DEBUG(
         dbgs() << "Bailing-out because SCoP is not considered profitable\n");
     return;
   }
@@ -3629,7 +3601,7 @@ void ScopBuilder::buildScop(Region &R, AssumptionCache &AC) {
 
   scop->simplifyContexts();
   if (!buildAliasChecks()) {
-    POLLY_DEBUG(dbgs() << "Bailing-out because could not build alias checks\n");
+    LLVM_DEBUG(dbgs() << "Bailing-out because could not build alias checks\n");
     return;
   }
 
@@ -3641,7 +3613,7 @@ void ScopBuilder::buildScop(Region &R, AssumptionCache &AC) {
   // Check late for a feasible runtime context because profitability did not
   // change.
   if (!scop->hasFeasibleRuntimeContext()) {
-    POLLY_DEBUG(dbgs() << "Bailing-out because of unfeasible context (late)\n");
+    LLVM_DEBUG(dbgs() << "Bailing-out because of unfeasible context (late)\n");
     return;
   }
 
@@ -3665,12 +3637,12 @@ ScopBuilder::ScopBuilder(Region *R, AssumptionCache &AC, AAResults &AA,
 
   buildScop(*R, AC);
 
-  POLLY_DEBUG(dbgs() << *scop);
+  LLVM_DEBUG(dbgs() << *scop);
 
   if (!scop->hasFeasibleRuntimeContext()) {
     InfeasibleScops++;
     Msg = "SCoP ends here but was dismissed.";
-    POLLY_DEBUG(dbgs() << "SCoP detected but dismissed\n");
+    LLVM_DEBUG(dbgs() << "SCoP detected but dismissed\n");
     RecordedAssumptions.clear();
     scop.reset();
   } else {

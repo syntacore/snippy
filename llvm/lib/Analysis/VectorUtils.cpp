@@ -23,7 +23,6 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/MemoryModelRelaxationAnnotations.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/CommandLine.h"
@@ -68,7 +67,6 @@ bool llvm::isTriviallyVectorizable(Intrinsic::ID ID) {
   case Intrinsic::sqrt: // Begin floating-point.
   case Intrinsic::sin:
   case Intrinsic::cos:
-  case Intrinsic::tan:
   case Intrinsic::exp:
   case Intrinsic::exp2:
   case Intrinsic::log:
@@ -165,11 +163,11 @@ Intrinsic::ID llvm::getVectorIntrinsicIDForCall(const CallInst *CI,
 Value *llvm::findScalarElement(Value *V, unsigned EltNo) {
   assert(V->getType()->isVectorTy() && "Not looking at a vector?");
   VectorType *VTy = cast<VectorType>(V->getType());
-  // For fixed-length vector, return poison for out of range access.
+  // For fixed-length vector, return undef for out of range access.
   if (auto *FVTy = dyn_cast<FixedVectorType>(VTy)) {
     unsigned Width = FVTy->getNumElements();
     if (EltNo >= Width)
-      return PoisonValue::get(FVTy->getElementType());
+      return UndefValue::get(FVTy->getElementType());
   }
 
   if (Constant *C = dyn_cast<Constant>(V))
@@ -202,7 +200,7 @@ Value *llvm::findScalarElement(Value *V, unsigned EltNo) {
         cast<FixedVectorType>(SVI->getOperand(0)->getType())->getNumElements();
     int InEl = SVI->getMaskValue(EltNo);
     if (InEl < 0)
-      return PoisonValue::get(VTy->getElementType());
+      return UndefValue::get(VTy->getElementType());
     if (InEl < (int)LHSWidth)
       return findScalarElement(SVI->getOperand(0), InEl);
     return findScalarElement(SVI->getOperand(1), InEl - LHSWidth);
@@ -418,31 +416,6 @@ bool llvm::widenShuffleMaskElts(int Scale, ArrayRef<int> Mask,
   return true;
 }
 
-bool llvm::scaleShuffleMaskElts(unsigned NumDstElts, ArrayRef<int> Mask,
-                                SmallVectorImpl<int> &ScaledMask) {
-  unsigned NumSrcElts = Mask.size();
-  assert(NumSrcElts > 0 && NumDstElts > 0 && "Unexpected scaling factor");
-
-  // Fast-path: if no scaling, then it is just a copy.
-  if (NumSrcElts == NumDstElts) {
-    ScaledMask.assign(Mask.begin(), Mask.end());
-    return true;
-  }
-
-  // Ensure we can find a whole scale factor.
-  assert(((NumSrcElts % NumDstElts) == 0 || (NumDstElts % NumSrcElts) == 0) &&
-         "Unexpected scaling factor");
-
-  if (NumSrcElts > NumDstElts) {
-    int Scale = NumSrcElts / NumDstElts;
-    return widenShuffleMaskElts(Scale, Mask, ScaledMask);
-  }
-
-  int Scale = NumDstElts / NumSrcElts;
-  narrowShuffleMaskElts(Scale, Mask, ScaledMask);
-  return true;
-}
-
 void llvm::getShuffleMaskWithWidestElts(ArrayRef<int> Mask,
                                         SmallVectorImpl<int> &ScaledMask) {
   std::array<SmallVector<int, 16>, 2> TmpMasks;
@@ -563,34 +536,6 @@ void llvm::processShuffleMasks(
       } while (SecondIdx >= 0);
       break;
     }
-    }
-  }
-}
-
-void llvm::getHorizDemandedEltsForFirstOperand(unsigned VectorBitWidth,
-                                               const APInt &DemandedElts,
-                                               APInt &DemandedLHS,
-                                               APInt &DemandedRHS) {
-  assert(VectorBitWidth >= 128 && "Vectors smaller than 128 bit not supported");
-  int NumLanes = VectorBitWidth / 128;
-  int NumElts = DemandedElts.getBitWidth();
-  int NumEltsPerLane = NumElts / NumLanes;
-  int HalfEltsPerLane = NumEltsPerLane / 2;
-
-  DemandedLHS = APInt::getZero(NumElts);
-  DemandedRHS = APInt::getZero(NumElts);
-
-  // Map DemandedElts to the horizontal operands.
-  for (int Idx = 0; Idx != NumElts; ++Idx) {
-    if (!DemandedElts[Idx])
-      continue;
-    int LaneIdx = (Idx / NumEltsPerLane) * NumEltsPerLane;
-    int LocalIdx = Idx % NumEltsPerLane;
-    if (LocalIdx < HalfEltsPerLane) {
-      DemandedLHS.setBit(LaneIdx + 2 * LocalIdx);
-    } else {
-      LocalIdx -= HalfEltsPerLane;
-      DemandedRHS.setBit(LaneIdx + 2 * LocalIdx);
     }
   }
 }
@@ -848,17 +793,13 @@ Instruction *llvm::propagateMetadata(Instruction *Inst, ArrayRef<Value *> VL) {
   for (auto Kind : {LLVMContext::MD_tbaa, LLVMContext::MD_alias_scope,
                     LLVMContext::MD_noalias, LLVMContext::MD_fpmath,
                     LLVMContext::MD_nontemporal, LLVMContext::MD_invariant_load,
-                    LLVMContext::MD_access_group, LLVMContext::MD_mmra}) {
+                    LLVMContext::MD_access_group}) {
     MDNode *MD = I0->getMetadata(Kind);
+
     for (int J = 1, E = VL.size(); MD && J != E; ++J) {
       const Instruction *IJ = cast<Instruction>(VL[J]);
       MDNode *IMD = IJ->getMetadata(Kind);
-
       switch (Kind) {
-      case LLVMContext::MD_mmra: {
-        MD = MMRAMetadata::combine(Inst->getContext(), MD, IMD);
-        break;
-      }
       case LLVMContext::MD_tbaa:
         MD = MDNode::getMostGenericTBAA(MD, IMD);
         break;
@@ -1123,7 +1064,7 @@ bool InterleavedAccessInfo::isStrided(int Stride) {
 void InterleavedAccessInfo::collectConstStrideAccesses(
     MapVector<Instruction *, StrideDescriptor> &AccessStrideInfo,
     const DenseMap<Value*, const SCEV*> &Strides) {
-  auto &DL = TheLoop->getHeader()->getDataLayout();
+  auto &DL = TheLoop->getHeader()->getModule()->getDataLayout();
 
   // Since it's desired that the load/store instructions be maintained in
   // "program order" for the interleaved access analysis, we have to visit the
@@ -1509,19 +1450,20 @@ void InterleavedAccessInfo::invalidateGroupsRequiringScalarEpilogue() {
   if (!requiresScalarEpilogue())
     return;
 
+  bool ReleasedGroup = false;
   // Release groups requiring scalar epilogues. Note that this also removes them
   // from InterleaveGroups.
-  bool ReleasedGroup = InterleaveGroups.remove_if([&](auto *Group) {
+  for (auto *Group : make_early_inc_range(InterleaveGroups)) {
     if (!Group->requiresScalarEpilogue())
-      return false;
+      continue;
     LLVM_DEBUG(
         dbgs()
         << "LV: Invalidate candidate interleaved group due to gaps that "
            "require a scalar epilogue (not allowed under optsize) and cannot "
            "be masked (not enabled). \n");
-    releaseGroupWithoutRemovingFromSet(Group);
-    return true;
-  });
+    releaseGroup(Group);
+    ReleasedGroup = true;
+  }
   assert(ReleasedGroup && "At least one group must be invalidated, as a "
                           "scalar epilogue was required");
   (void)ReleasedGroup;

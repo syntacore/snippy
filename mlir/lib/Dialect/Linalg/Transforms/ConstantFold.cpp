@@ -23,21 +23,21 @@ using namespace mlir;
 using namespace mlir::linalg;
 
 namespace {
-/// Base class for constant folding linalg structured ops with N inputs, 1
-/// output, and permutation indexing maps.
+/// Base class for constant folding linalg.generic ops with N inputs, 1 output,
+/// and permutation indexing maps.
 ///
 /// `ConcreteType` should provide methods with signatures
 ///
 /// ```c++
-///   bool matchIndexingMaps(LinalgOp linalgOp) const;
-///   RegionComputationFn getRegionComputeFn(LinalgOp) const;
+///   bool matchIndexingMaps(GenericOp genericOp) const;
+///   RegionComputationFn getRegionComputeFn(GenericOp) const;
 /// ```
 ///
 /// The latter inspects the region and returns the computation inside as a
 /// functor. The functor will be invoked with constant elements for all inputs
 /// and should return the corresponding computed constant element for output.
 template <typename ConcreteType>
-class FoldConstantBase : public OpInterfaceRewritePattern<LinalgOp> {
+class FoldConstantBase : public OpRewritePattern<GenericOp> {
 public:
   struct APIntOrFloat {
     std::optional<APInt> apInt;
@@ -52,26 +52,25 @@ public:
 
   FoldConstantBase(MLIRContext *context, const ControlFusionFn &controlFn,
                    PatternBenefit benefit = 1)
-      : OpInterfaceRewritePattern<LinalgOp>(context, benefit),
-        controlFn(controlFn) {}
+      : OpRewritePattern<GenericOp>(context, benefit), controlFn(controlFn) {}
 
-  LogicalResult matchAndRewrite(LinalgOp linalgOp,
+  LogicalResult matchAndRewrite(GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
     // Mixed and buffer sematics aren't supported.
-    if (!linalgOp.hasPureTensorSemantics())
+    if (!genericOp.hasPureTensorSemantics())
       return failure();
 
     // Only support ops generating one output for now.
-    if (linalgOp.getNumDpsInits() != 1)
+    if (genericOp.getNumDpsInits() != 1)
       return failure();
 
-    auto outputType = dyn_cast<ShapedType>(linalgOp->getResultTypes().front());
+    auto outputType = dyn_cast<ShapedType>(genericOp.getResultTypes().front());
     // Require the output types to be static given that we are generating
     // constants.
     if (!outputType || !outputType.hasStaticShape())
       return failure();
 
-    if (!llvm::all_of(linalgOp.getDpsInputs(), [](Value input) {
+    if (!llvm::all_of(genericOp.getInputs(), [](Value input) {
           return isa<ShapedType>(input.getType());
         }))
       return failure();
@@ -81,7 +80,7 @@ public:
       return cast<ShapedType>(value.getType()).getElementType();
     };
     if (!llvm::all_equal(
-            llvm::map_range(linalgOp->getOperands(), getOperandElementType)))
+            llvm::map_range(genericOp->getOperands(), getOperandElementType)))
       return failure();
 
     // We can only handle the case where we have int/float elements.
@@ -94,30 +93,30 @@ public:
     // entirely in the compiler, without needing to turn all indices into
     // Values, and then do affine apply on them, and then match back the
     // constant again.
-    if (!llvm::all_of(linalgOp.getIndexingMapsArray(),
+    if (!llvm::all_of(genericOp.getIndexingMapsArray(),
                       [](AffineMap map) { return map.isPermutation(); }))
       return failure();
 
-    for (OpOperand &operand : linalgOp.getDpsInitsMutable()) {
-      if (linalgOp.payloadUsesValueFromOperand(&operand))
+    for (OpOperand &operand : genericOp.getDpsInitsMutable()) {
+      if (genericOp.payloadUsesValueFromOperand(&operand))
         return failure();
     }
 
     // Further check the indexing maps are okay for the ConcreteType.
-    if (!static_cast<const ConcreteType *>(this)->matchIndexingMaps(linalgOp))
+    if (!static_cast<const ConcreteType *>(this)->matchIndexingMaps(genericOp))
       return failure();
 
     // Defer to the concrete type to check the region and discover the
     // computation inside.
     RegionComputationFn computeFn =
-        static_cast<const ConcreteType *>(this)->getRegionComputeFn(linalgOp);
+        static_cast<const ConcreteType *>(this)->getRegionComputeFn(genericOp);
     if (!computeFn)
       return failure();
 
     // All inputs should be constants.
-    int numInputs = linalgOp.getNumDpsInputs();
+    int numInputs = genericOp.getNumDpsInputs();
     SmallVector<DenseIntOrFPElementsAttr> inputValues(numInputs);
-    for (const auto &en : llvm::enumerate(linalgOp.getDpsInputOperands())) {
+    for (const auto &en : llvm::enumerate(genericOp.getDpsInputOperands())) {
       if (!matchPattern(en.value()->get(),
                         m_Constant(&inputValues[en.index()])))
         return failure();
@@ -125,11 +124,12 @@ public:
 
     // Identified this as a potential candidate for folding. Now check the
     // policy to see whether we are allowed to proceed.
-    for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
+    for (OpOperand *operand : genericOp.getDpsInputOperands()) {
       if (!controlFn(operand))
         return failure();
     }
 
+    auto linalgOp = cast<LinalgOp>(genericOp.getOperation());
     SmallVector<int64_t, 4> loopBounds = linalgOp.computeStaticLoopSizes();
     int64_t numElements = outputType.getNumElements();
 
@@ -155,8 +155,8 @@ public:
 
     SmallVector<SmallVector<unsigned>> inputDims;
     for (int i = 0; i < numInputs; ++i)
-      inputDims.push_back(getDimPositions(linalgOp.getIndexingMapsArray()[i]));
-    auto outputDims = getDimPositions(linalgOp.getIndexingMapsArray().back());
+      inputDims.push_back(getDimPositions(genericOp.getIndexingMapsArray()[i]));
+    auto outputDims = getDimPositions(genericOp.getIndexingMapsArray().back());
     auto outputShape = outputType.getShape();
 
     // Allocate small vectors for index delinearization. Initial values do not
@@ -173,7 +173,7 @@ public:
     APIntOrFloatArray computeFnInputs;
 
     auto inputShapes = llvm::to_vector<4>(
-        llvm::map_range(linalgOp.getDpsInputs(), [](Value value) {
+        llvm::map_range(genericOp.getInputs(), [](Value value) {
           return cast<ShapedType>(value.getType()).getShape();
         }));
 
@@ -254,7 +254,7 @@ public:
         isFloat ? DenseElementsAttr::get(outputType, fpOutputValues)
                 : DenseElementsAttr::get(outputType, intOutputValues);
 
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(linalgOp, outputAttr);
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(genericOp, outputAttr);
     return success();
   }
 
@@ -262,20 +262,18 @@ private:
   ControlFusionFn controlFn;
 };
 
-// Folds linalg.transpose (and linalg.generic ops that are actually transposes)
-// on constant values.
+// Folds linalg.generic ops that are actually transposes on constant values.
 struct FoldConstantTranspose : public FoldConstantBase<FoldConstantTranspose> {
-
   using FoldConstantBase::FoldConstantBase;
 
-  bool matchIndexingMaps(LinalgOp linalgOp) const {
+  bool matchIndexingMaps(GenericOp genericOp) const {
     // We should have one input and one output.
-    return linalgOp.getIndexingMapsArray().size() == 2;
+    return genericOp.getIndexingMapsArray().size() == 2;
   }
 
-  RegionComputationFn getRegionComputeFn(LinalgOp linalgOp) const {
+  RegionComputationFn getRegionComputeFn(GenericOp genericOp) const {
     // Make sure the region only contains a yield op.
-    Block &body = linalgOp->getRegion(0).front();
+    Block &body = genericOp.getRegion().front();
     if (!llvm::hasSingleElement(body))
       return nullptr;
     auto yieldOp = dyn_cast<linalg::YieldOp>(body.getTerminator());

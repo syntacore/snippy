@@ -956,8 +956,7 @@ struct NVGPUMBarrierTryWaitParityLowering
         getMbarrierPtr(b, op.getBarriers().getType(), adaptor.getBarriers(),
                        adaptor.getMbarId(), rewriter);
     Value ticks = truncToI32(b, adaptor.getTicks());
-    Value phase =
-        b.create<LLVM::ZExtOp>(b.getI32Type(), adaptor.getPhaseParity());
+    Value phase = truncToI32(b, adaptor.getPhase());
 
     if (isMbarrierShared(op.getBarriers().getType())) {
       rewriter.replaceOpWithNewOp<NVVM::MBarrierTryWaitParitySharedOp>(
@@ -1408,7 +1407,7 @@ struct NVGPUWarpgroupMmaOpLowering
       NVVM::WGMMAScaleOutAttr scaleOut = generateScaleOut();
       NVVM::WGMMAScaleInAttr scaleIn = generateScaleIn();
       NVVM::MMALayoutAttr layoutA = generateWgmmaLayout(op.getTransposeA());
-      NVVM::MMALayoutAttr layoutB = generateWgmmaLayout(!op.getTransposeB());
+      NVVM::MMALayoutAttr layoutB = generateWgmmaLayout(op.getTransposeB());
 
       auto overflow = NVVM::MMAIntOverflowAttr::get(
           op->getContext(), NVVM::MMAIntOverflow::wrapped);
@@ -1579,7 +1578,7 @@ struct NVGPUWarpgroupMmaStoreOpLowering
     if (offset)
       ti = makeAdd(ti, makeConst(offset));
 
-    auto structType = cast<LLVM::LLVMStructType>(matrixD.getType());
+    auto structType = matrixD.getType().cast<LLVM::LLVMStructType>();
 
     // Number of 32-bit registers owns per thread
     constexpr unsigned numAdjacentRegisters = 2;
@@ -1606,9 +1605,9 @@ struct NVGPUWarpgroupMmaStoreOpLowering
     int offset = 0;
     ImplicitLocOpBuilder b(op->getLoc(), rewriter);
     Value matriDValue = adaptor.getMatrixD();
-    auto stype = cast<LLVM::LLVMStructType>(matriDValue.getType());
+    auto stype = matriDValue.getType().cast<LLVM::LLVMStructType>();
     for (auto [idx, matrixD] : llvm::enumerate(stype.getBody())) {
-      auto structType = cast<LLVM::LLVMStructType>(matrixD);
+      auto structType = matrixD.cast<LLVM::LLVMStructType>();
       Value innerStructValue = b.create<LLVM::ExtractValueOp>(matriDValue, idx);
       storeFragmentedMatrix(b, innerStructValue, op.getDstMemref(), offset);
       offset += structType.getBody().size();
@@ -1626,9 +1625,13 @@ struct NVGPUWarpgroupMmaInitAccumulatorOpLowering
   matchAndRewrite(nvgpu::WarpgroupMmaInitAccumulatorOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     ImplicitLocOpBuilder b(op->getLoc(), rewriter);
-    LLVM::LLVMStructType packStructType = cast<LLVM::LLVMStructType>(
-        getTypeConverter()->convertType(op.getMatrixC().getType()));
-    Type elemType = cast<LLVM::LLVMStructType>(packStructType.getBody().front())
+    LLVM::LLVMStructType packStructType =
+        getTypeConverter()
+            ->convertType(op.getMatrixC().getType())
+            .cast<LLVM::LLVMStructType>();
+    Type elemType = packStructType.getBody()
+                        .front()
+                        .cast<LLVM::LLVMStructType>()
                         .getBody()
                         .front();
     Value zero = b.create<LLVM::ConstantOp>(elemType, b.getZeroAttr(elemType));
@@ -1636,7 +1639,7 @@ struct NVGPUWarpgroupMmaInitAccumulatorOpLowering
     SmallVector<Value> innerStructs;
     // Unpack the structs and set all values to zero
     for (auto [idx, s] : llvm::enumerate(packStructType.getBody())) {
-      auto structType = cast<LLVM::LLVMStructType>(s);
+      auto structType = s.cast<LLVM::LLVMStructType>();
       Value structValue = b.create<LLVM::ExtractValueOp>(packStruct, idx);
       for (unsigned i = 0; i < structType.getBody().size(); ++i) {
         structValue = b.create<LLVM::InsertValueOp>(

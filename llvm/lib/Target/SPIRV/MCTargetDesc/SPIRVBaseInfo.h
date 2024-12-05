@@ -17,7 +17,6 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/VersionTuple.h"
 #include <string>
 
 namespace llvm {
@@ -197,11 +196,6 @@ namespace GLSLExtInst {
 #include "SPIRVGenTables.inc"
 } // namespace GLSLExtInst
 
-namespace NonSemanticExtInst {
-#define GET_NonSemanticExtInst_DECL
-#include "SPIRVGenTables.inc"
-} // namespace NonSemanticExtInst
-
 namespace Opcode {
 #define GET_Opcode_DECL
 #include "SPIRVGenTables.inc"
@@ -220,10 +214,10 @@ using ExtensionList = SmallVector<SPIRV::Extension::Extension, 8>;
 std::string
 getSymbolicOperandMnemonic(SPIRV::OperandCategory::OperandCategory Category,
                            int32_t Value);
-VersionTuple
+uint32_t
 getSymbolicOperandMinVersion(SPIRV::OperandCategory::OperandCategory Category,
                              uint32_t Value);
-VersionTuple
+uint32_t
 getSymbolicOperandMaxVersion(SPIRV::OperandCategory::OperandCategory Category,
                              uint32_t Value);
 CapabilityList

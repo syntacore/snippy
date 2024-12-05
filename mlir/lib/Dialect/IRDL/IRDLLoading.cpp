@@ -13,12 +13,12 @@
 #include "mlir/Dialect/IRDL/IRDLLoading.h"
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
 #include "mlir/Dialect/IRDL/IR/IRDLInterfaces.h"
-#include "mlir/Dialect/IRDL/IRDLSymbols.h"
 #include "mlir/Dialect/IRDL/IRDLVerifiers.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/ExtensibleDialect.h"
 #include "mlir/IR/OperationSupport.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/SMLoc.h"
@@ -270,30 +270,26 @@ static LogicalResult irdlRegionVerifier(
   return success();
 }
 
-llvm::unique_function<LogicalResult(Operation *) const>
-mlir::irdl::createVerifier(
-    OperationOp op,
-    const DenseMap<irdl::TypeOp, std::unique_ptr<DynamicTypeDefinition>> &types,
-    const DenseMap<irdl::AttributeOp, std::unique_ptr<DynamicAttrDefinition>>
-        &attrs) {
+/// Define and load an operation represented by a `irdl.operation`
+/// operation.
+static WalkResult loadOperation(
+    OperationOp op, ExtensibleDialect *dialect,
+    DenseMap<TypeOp, std::unique_ptr<DynamicTypeDefinition>> &types,
+    DenseMap<AttributeOp, std::unique_ptr<DynamicAttrDefinition>> &attrs) {
   // Resolve SSA values to verifier constraint slots
   SmallVector<Value> constrToValue;
   SmallVector<Value> regionToValue;
   for (Operation &op : op->getRegion(0).getOps()) {
     if (isa<VerifyConstraintInterface>(op)) {
-      if (op.getNumResults() != 1) {
-        op.emitError()
-            << "IRDL constraint operations must have exactly one result";
-        return nullptr;
-      }
+      if (op.getNumResults() != 1)
+        return op.emitError()
+               << "IRDL constraint operations must have exactly one result";
       constrToValue.push_back(op.getResult(0));
     }
     if (isa<VerifyRegionInterface>(op)) {
-      if (op.getNumResults() != 1) {
-        op.emitError()
-            << "IRDL constraint operations must have exactly one result";
-        return nullptr;
-      }
+      if (op.getNumResults() != 1)
+        return op.emitError()
+               << "IRDL constraint operations must have exactly one result";
       regionToValue.push_back(op.getResult(0));
     }
   }
@@ -306,7 +302,7 @@ mlir::irdl::createVerifier(
     std::unique_ptr<Constraint> verifier =
         op.getVerifier(constrToValue, types, attrs);
     if (!verifier)
-      return nullptr;
+      return WalkResult::interrupt();
     constraints.push_back(std::move(verifier));
   }
 
@@ -358,11 +354,11 @@ mlir::irdl::createVerifier(
 
     // Gather the variadicities of each result
     for (Attribute attr : resultsOp->getVariadicity())
-      resultVariadicity.push_back(cast<VariadicityAttr>(attr).getValue());
+      resultVariadicity.push_back(attr.cast<VariadicityAttr>().getValue());
   }
 
   // Gather which constraint slots correspond to attributes constraints
-  DenseMap<StringAttr, size_t> attributeConstraints;
+  DenseMap<StringAttr, size_t> attributesContraints;
   auto attributesOp = op.getOp<AttributesOp>();
   if (attributesOp.has_value()) {
     const Operation::operand_range values = attributesOp->getAttributeValues();
@@ -371,39 +367,12 @@ mlir::irdl::createVerifier(
     for (const auto &[name, value] : llvm::zip(names, values)) {
       for (auto [i, constr] : enumerate(constrToValue)) {
         if (constr == value) {
-          attributeConstraints[cast<StringAttr>(name)] = i;
+          attributesContraints[name.cast<StringAttr>()] = i;
           break;
         }
       }
     }
   }
-
-  return
-      [constraints{std::move(constraints)},
-       regionConstraints{std::move(regionConstraints)},
-       operandConstraints{std::move(operandConstraints)},
-       operandVariadicity{std::move(operandVariadicity)},
-       resultConstraints{std::move(resultConstraints)},
-       resultVariadicity{std::move(resultVariadicity)},
-       attributeConstraints{std::move(attributeConstraints)}](Operation *op) {
-        ConstraintVerifier verifier(constraints);
-        const LogicalResult opVerifierResult = irdlOpVerifier(
-            op, verifier, operandConstraints, operandVariadicity,
-            resultConstraints, resultVariadicity, attributeConstraints);
-        const LogicalResult opRegionVerifierResult =
-            irdlRegionVerifier(op, verifier, regionConstraints);
-        return LogicalResult::success(opVerifierResult.succeeded() &&
-                                      opRegionVerifierResult.succeeded());
-      };
-}
-
-/// Define and load an operation represented by a `irdl.operation`
-/// operation.
-static WalkResult loadOperation(
-    OperationOp op, ExtensibleDialect *dialect,
-    const DenseMap<TypeOp, std::unique_ptr<DynamicTypeDefinition>> &types,
-    const DenseMap<AttributeOp, std::unique_ptr<DynamicAttrDefinition>>
-        &attrs) {
 
   // IRDL does not support defining custom parsers or printers.
   auto parser = [](OpAsmParser &parser, OperationState &result) {
@@ -413,11 +382,25 @@ static WalkResult loadOperation(
     printer.printGenericOp(op);
   };
 
-  auto verifier = createVerifier(op, types, attrs);
-  if (!verifier)
-    return WalkResult::interrupt();
+  auto verifier =
+      [constraints{std::move(constraints)},
+       regionConstraints{std::move(regionConstraints)},
+       operandConstraints{std::move(operandConstraints)},
+       operandVariadicity{std::move(operandVariadicity)},
+       resultConstraints{std::move(resultConstraints)},
+       resultVariadicity{std::move(resultVariadicity)},
+       attributesContraints{std::move(attributesContraints)}](Operation *op) {
+        ConstraintVerifier verifier(constraints);
+        const LogicalResult opVerifierResult = irdlOpVerifier(
+            op, verifier, operandConstraints, operandVariadicity,
+            resultConstraints, resultVariadicity, attributesContraints);
+        const LogicalResult opRegionVerifierResult =
+            irdlRegionVerifier(op, verifier, regionConstraints);
+        return LogicalResult::success(opVerifierResult.succeeded() &&
+                                      opRegionVerifierResult.succeeded());
+      };
 
-  // IRDL supports only checking number of blocks and argument constraints
+  // IRDL supports only checking number of blocks and argument contraints
   // It is done in the main verifier to reuse `ConstraintVerifier` context
   auto regionVerifier = [](Operation *op) { return LogicalResult::success(); };
 
@@ -523,7 +506,7 @@ static bool getBases(Operation *op, SmallPtrSet<TypeID, 4> &paramIds,
   // For `irdl.parametric`, we get directly the base from the operation.
   if (auto params = dyn_cast<ParametricOp>(op)) {
     SymbolRefAttr symRef = params.getBaseType();
-    Operation *defOp = irdl::lookupSymbolNearDialect(op, symRef);
+    Operation *defOp = SymbolTable::lookupNearestSymbolFrom(op, symRef);
     assert(defOp && "symbol reference should refer to an existing operation");
     paramIrdlOps.insert(defOp);
     return false;

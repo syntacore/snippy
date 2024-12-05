@@ -17,6 +17,7 @@
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
+#include <numeric>
 
 #define DEBUG_TYPE "cmov"
 
@@ -167,14 +168,14 @@ int calculateConditionBias(const BinaryBasicBlock &BB,
   return -1;
 }
 
-void CMOVConversion::Stats::dumpTo(raw_ostream &OS) {
-  OS << "converted static " << StaticPerformed << "/" << StaticPossible
-     << formatv(" ({0:P}) ", getStaticRatio())
-     << "hammock(s) into CMOV sequences, with dynamic execution count "
-     << DynamicPerformed << "/" << DynamicPossible
-     << formatv(" ({0:P}), ", getDynamicRatio()) << "saving " << RemovedMP
-     << "/" << PossibleMP << formatv(" ({0:P}) ", getMPRatio())
-     << "mispredictions\n";
+void CMOVConversion::Stats::dump() {
+  outs() << "converted static " << StaticPerformed << "/" << StaticPossible
+         << formatv(" ({0:P}) ", getStaticRatio())
+         << "hammock(s) into CMOV sequences, with dynamic execution count "
+         << DynamicPerformed << "/" << DynamicPossible
+         << formatv(" ({0:P}), ", getDynamicRatio()) << "saving " << RemovedMP
+         << "/" << PossibleMP << formatv(" ({0:P}) ", getMPRatio())
+         << "mispredictions\n";
 }
 
 void CMOVConversion::runOnFunction(BinaryFunction &Function) {
@@ -264,13 +265,13 @@ void CMOVConversion::runOnFunction(BinaryFunction &Function) {
   if (Modified)
     Function.eraseInvalidBBs();
   if (opts::Verbosity > 1) {
-    BC.outs() << "BOLT-INFO: CMOVConversion: " << Function << ", ";
-    Local.dumpTo(BC.outs());
+    outs() << "BOLT-INFO: CMOVConversion: " << Function << ", ";
+    Local.dump();
   }
   Global = Global + Local;
 }
 
-Error CMOVConversion::runOnFunctions(BinaryContext &BC) {
+void CMOVConversion::runOnFunctions(BinaryContext &BC) {
   for (auto &It : BC.getBinaryFunctions()) {
     BinaryFunction &Function = It.second;
     if (!shouldOptimize(Function))
@@ -278,9 +279,8 @@ Error CMOVConversion::runOnFunctions(BinaryContext &BC) {
     runOnFunction(Function);
   }
 
-  BC.outs() << "BOLT-INFO: CMOVConversion total: ";
-  Global.dumpTo(BC.outs());
-  return Error::success();
+  outs() << "BOLT-INFO: CMOVConversion total: ";
+  Global.dump();
 }
 
 } // end namespace bolt

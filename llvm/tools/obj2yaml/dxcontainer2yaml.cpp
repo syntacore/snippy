@@ -58,8 +58,8 @@ dumpDXContainer(MemoryBufferRef Source) {
       assert(DXIL && "Since we are iterating and found a DXIL part, "
                      "this should never not have a value");
       NewPart.Program = DXContainerYAML::DXILProgram{
-          DXIL->first.getMajorVersion(),
-          DXIL->first.getMinorVersion(),
+          DXIL->first.MajorVersion,
+          DXIL->first.MinorVersion,
           DXIL->first.ShaderKind,
           DXIL->first.Size,
           DXIL->first.Bitcode.MajorVersion,
@@ -71,10 +71,10 @@ dumpDXContainer(MemoryBufferRef Source) {
       break;
     }
     case dxbc::PartType::SFI0: {
-      std::optional<uint64_t> Flags = Container.getShaderFeatureFlags();
+      std::optional<uint64_t> Flags = Container.getShaderFlags();
       // Omit the flags in the YAML if they are missing or zero.
       if (Flags && *Flags > 0)
-        NewPart.Flags = DXContainerYAML::ShaderFeatureFlags(*Flags);
+        NewPart.Flags = DXContainerYAML::ShaderFlags(*Flags);
       break;
     }
     case dxbc::PartType::HASH: {
@@ -99,9 +99,6 @@ dumpDXContainer(MemoryBufferRef Source) {
       else if (const auto *P =
                    std::get_if<dxbc::PSV::v2::RuntimeInfo>(&PSVInfo->getInfo()))
         NewPart.Info = DXContainerYAML::PSVInfo(P);
-      else if (const auto *P =
-                   std::get_if<dxbc::PSV::v3::RuntimeInfo>(&PSVInfo->getInfo()))
-        NewPart.Info = DXContainerYAML::PSVInfo(P, PSVInfo->getStringTable());
       NewPart.Info->ResourceStride = PSVInfo->getResourceStride();
       for (auto Res : PSVInfo->getResources())
         NewPart.Info->Resources.push_back(Res);

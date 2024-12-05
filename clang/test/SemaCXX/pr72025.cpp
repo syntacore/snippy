@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -verify -std=c++03 -fsyntax-only %s
-// RUN: %clang_cc1 -verify -std=c++03 -fsyntax-only -fexperimental-new-constant-interpreter %s
 struct V {
   char c[2];
   banana V() : c("i") {} // expected-error {{unknown type name}}

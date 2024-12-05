@@ -10,8 +10,12 @@ define <vscale x 4 x i32> @and_or_nxv4i32(<vscale x 4 x i32> %A) {
 ; CHECK-NEXT:    vsetvli a0, zero, e32, m2, ta, ma
 ; CHECK-NEXT:    vmv.v.i v8, 8
 ; CHECK-NEXT:    ret
-  %v1 = or <vscale x 4 x i32> %A, splat (i32 255)
-  %v2 = and <vscale x 4 x i32> %v1, splat (i32 8)
+  %ins1 = insertelement <vscale x 4 x i32> poison, i32 255, i32 0
+  %splat1 = shufflevector <vscale x 4 x i32> %ins1, <vscale x 4 x i32> poison, <vscale x 4 x i32> zeroinitializer
+  %ins2 = insertelement <vscale x 4 x i32> poison, i32 8, i32 0
+  %splat2 = shufflevector <vscale x 4 x i32> %ins2, <vscale x 4 x i32> poison, <vscale x 4 x i32> zeroinitializer
+  %v1 = or <vscale x 4 x i32> %A, %splat1
+  %v2 = and <vscale x 4 x i32> %v1, %splat2
   ret <vscale x 4 x i32> %v2
 }
 
@@ -24,8 +28,12 @@ define <vscale x 2 x i64> @or_and_nxv2i64(<vscale x 2 x i64> %a0) {
 ; CHECK-NEXT:    vor.vi v8, v8, 3
 ; CHECK-NEXT:    vand.vi v8, v8, 7
 ; CHECK-NEXT:    ret
-  %v1 = and <vscale x 2 x i64> %a0, splat (i64 7)
-  %v2 = or <vscale x 2 x i64> %v1, splat (i64 3)
+  %ins1 = insertelement <vscale x 2 x i64> poison, i64 7, i32 0
+  %splat1 = shufflevector <vscale x 2 x i64> %ins1, <vscale x 2 x i64> poison, <vscale x 2 x i32> zeroinitializer
+  %ins2 = insertelement <vscale x 2 x i64> poison, i64 3, i32 0
+  %splat2 = shufflevector <vscale x 2 x i64> %ins2, <vscale x 2 x i64> poison, <vscale x 2 x i32> zeroinitializer
+  %v1 = and <vscale x 2 x i64> %a0, %splat1
+  %v2 = or <vscale x 2 x i64> %v1, %splat2
   ret <vscale x 2 x i64> %v2
 }
 
@@ -37,8 +45,12 @@ define <vscale x 2 x i64> @or_and_nxv2i64_fold(<vscale x 2 x i64> %a0) {
 ; CHECK-NEXT:    vsetvli a0, zero, e64, m2, ta, ma
 ; CHECK-NEXT:    vmv.v.i v8, 3
 ; CHECK-NEXT:    ret
-  %v1 = and <vscale x 2 x i64> %a0, splat (i64 1)
-  %v2 = or <vscale x 2 x i64> %v1, splat (i64 3)
+  %ins1 = insertelement <vscale x 2 x i64> poison, i64 1, i32 0
+  %splat1 = shufflevector <vscale x 2 x i64> %ins1, <vscale x 2 x i64> poison, <vscale x 2 x i32> zeroinitializer
+  %ins2 = insertelement <vscale x 2 x i64> poison, i64 3, i32 0
+  %splat2 = shufflevector <vscale x 2 x i64> %ins2, <vscale x 2 x i64> poison, <vscale x 2 x i32> zeroinitializer
+  %v1 = and <vscale x 2 x i64> %a0, %splat1
+  %v2 = or <vscale x 2 x i64> %v1, %splat2
   ret <vscale x 2 x i64> %v2
 }
 
@@ -50,8 +62,12 @@ define <vscale x 4 x i32> @combine_vec_shl_shl(<vscale x 4 x i32> %x) {
 ; CHECK-NEXT:    vsetvli a0, zero, e32, m2, ta, ma
 ; CHECK-NEXT:    vsll.vi v8, v8, 6
 ; CHECK-NEXT:    ret
-  %v1 = shl <vscale x 4 x i32> %x, splat (i32 2)
-  %v2 = shl <vscale x 4 x i32> %v1, splat (i32 4)
+  %ins1 = insertelement <vscale x 4 x i32> poison, i32 2, i32 0
+  %splat1 = shufflevector <vscale x 4 x i32> %ins1, <vscale x 4 x i32> poison, <vscale x 4 x i32> zeroinitializer
+  %ins2 = insertelement <vscale x 4 x i32> poison, i32 4, i32 0
+  %splat2 = shufflevector <vscale x 4 x i32> %ins2, <vscale x 4 x i32> poison, <vscale x 4 x i32> zeroinitializer
+  %v1 = shl <vscale x 4 x i32> %x, %splat1
+  %v2 = shl <vscale x 4 x i32> %v1, %splat2
   ret <vscale x 4 x i32> %v2
 }
 
@@ -63,8 +79,12 @@ define <vscale x 2 x i32> @combine_vec_ashr_ashr(<vscale x 2 x i32> %x) {
 ; CHECK-NEXT:    vsetvli a0, zero, e32, m1, ta, ma
 ; CHECK-NEXT:    vsra.vi v8, v8, 6
 ; CHECK-NEXT:    ret
-  %v1 = ashr <vscale x 2 x i32> %x, splat (i32 2)
-  %v2 = ashr <vscale x 2 x i32> %v1, splat (i32 4)
+  %ins1 = insertelement <vscale x 2 x i32> poison, i32 2, i32 0
+  %splat1 = shufflevector <vscale x 2 x i32> %ins1, <vscale x 2 x i32> poison, <vscale x 2 x i32> zeroinitializer
+  %ins2 = insertelement <vscale x 2 x i32> poison, i32 4, i32 0
+  %splat2 = shufflevector <vscale x 2 x i32> %ins2, <vscale x 2 x i32> poison, <vscale x 2 x i32> zeroinitializer
+  %v1 = ashr <vscale x 2 x i32> %x, %splat1
+  %v2 = ashr <vscale x 2 x i32> %v1, %splat2
   ret <vscale x 2 x i32> %v2
 }
 
@@ -76,8 +96,12 @@ define <vscale x 8 x i16> @combine_vec_lshr_lshr(<vscale x 8 x i16> %x) {
 ; CHECK-NEXT:    vsetvli a0, zero, e16, m2, ta, ma
 ; CHECK-NEXT:    vsrl.vi v8, v8, 8
 ; CHECK-NEXT:    ret
-  %v1 = lshr <vscale x 8 x i16> %x, splat (i16 4)
-  %v2 = lshr <vscale x 8 x i16> %v1, splat (i16 4)
+  %ins1 = insertelement <vscale x 8 x i16> poison, i16 2, i32 0
+  %splat1 = shufflevector <vscale x 8 x i16> %ins1, <vscale x 8 x i16> poison, <vscale x 8 x i32> zeroinitializer
+  %ins2 = insertelement <vscale x 8 x i16> poison, i16 4, i32 0
+  %splat2 = shufflevector <vscale x 8 x i16> %ins2, <vscale x 8 x i16> poison, <vscale x 8 x i32> zeroinitializer
+  %v1 = lshr <vscale x 8 x i16> %x, %splat2
+  %v2 = lshr <vscale x 8 x i16> %v1, %splat2
   ret <vscale x 8 x i16> %v2
 }
 
@@ -86,7 +110,9 @@ define <vscale x 2 x float> @combine_fmul_one(<vscale x 2 x float> %x) {
 ; CHECK-LABEL: combine_fmul_one:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    ret
-  %v = fmul <vscale x 2 x float> %x, splat (float 1.0)
+  %ins = insertelement <vscale x 2 x float> poison, float 1.0, i32 0
+  %splat = shufflevector <vscale x 2 x float> %ins, <vscale x 2 x float> poison, <vscale x 2 x i32> zeroinitializer
+  %v = fmul <vscale x 2 x float> %x, %splat
   ret <vscale x 2 x float> %v
 }
 
@@ -95,6 +121,8 @@ define <vscale x 2 x float> @combine_fmul_one_commuted(<vscale x 2 x float> %x) 
 ; CHECK-LABEL: combine_fmul_one_commuted:
 ; CHECK:       # %bb.0:
 ; CHECK-NEXT:    ret
-  %v = fmul <vscale x 2 x float> splat (float 1.0), %x
+  %ins = insertelement <vscale x 2 x float> poison, float 1.0, i32 0
+  %splat = shufflevector <vscale x 2 x float> %ins, <vscale x 2 x float> poison, <vscale x 2 x i32> zeroinitializer
+  %v = fmul <vscale x 2 x float> %splat, %x
   ret <vscale x 2 x float> %v
 }

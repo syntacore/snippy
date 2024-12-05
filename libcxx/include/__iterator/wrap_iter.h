@@ -10,8 +10,6 @@
 #ifndef _LIBCPP___ITERATOR_WRAP_ITER_H
 #define _LIBCPP___ITERATOR_WRAP_ITER_H
 
-#include <__compare/ordering.h>
-#include <__compare/three_way_comparable.h>
 #include <__config>
 #include <__iterator/iterator_traits.h>
 #include <__memory/addressof.h>
@@ -99,14 +97,10 @@ private:
   friend class __wrap_iter;
   template <class _CharT, class _Traits, class _Alloc>
   friend class basic_string;
-  template <class _CharT, class _Traits>
-  friend class basic_string_view;
   template <class _Tp, class _Alloc>
   friend class _LIBCPP_TEMPLATE_VIS vector;
   template <class _Tp, size_t>
   friend class _LIBCPP_TEMPLATE_VIS span;
-  template <class _Tp, size_t _Size>
-  friend struct array;
 };
 
 template <class _Iter1>
@@ -133,7 +127,6 @@ operator<(const __wrap_iter<_Iter1>& __x, const __wrap_iter<_Iter2>& __y) _NOEXC
   return __x.base() < __y.base();
 }
 
-#if _LIBCPP_STD_VER <= 17
 template <class _Iter1>
 _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool
 operator!=(const __wrap_iter<_Iter1>& __x, const __wrap_iter<_Iter1>& __y) _NOEXCEPT {
@@ -145,9 +138,7 @@ _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool
 operator!=(const __wrap_iter<_Iter1>& __x, const __wrap_iter<_Iter2>& __y) _NOEXCEPT {
   return !(__x == __y);
 }
-#endif
 
-// TODO(mordante) disable these overloads in the LLVM 20 release.
 template <class _Iter1>
 _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR bool
 operator>(const __wrap_iter<_Iter1>& __x, const __wrap_iter<_Iter1>& __y) _NOEXCEPT {
@@ -184,24 +175,6 @@ operator<=(const __wrap_iter<_Iter1>& __x, const __wrap_iter<_Iter2>& __y) _NOEX
   return !(__y < __x);
 }
 
-#if _LIBCPP_STD_VER >= 20
-template <class _Iter1, class _Iter2>
-_LIBCPP_HIDE_FROM_ABI constexpr strong_ordering
-operator<=>(const __wrap_iter<_Iter1>& __x, const __wrap_iter<_Iter2>& __y) noexcept {
-  if constexpr (three_way_comparable_with<_Iter1, _Iter2, strong_ordering>) {
-    return __x.base() <=> __y.base();
-  } else {
-    if (__x.base() < __y.base())
-      return strong_ordering::less;
-
-    if (__x.base() == __y.base())
-      return strong_ordering::equal;
-
-    return strong_ordering::greater;
-  }
-}
-#endif // _LIBCPP_STD_VER >= 20
-
 template <class _Iter1, class _Iter2>
 _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX14
 #ifndef _LIBCPP_CXX03_LANG
@@ -209,8 +182,8 @@ _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX14
     operator-(const __wrap_iter<_Iter1>& __x,
               const __wrap_iter<_Iter2>& __y) _NOEXCEPT->decltype(__x.base() - __y.base())
 #else
-typename __wrap_iter<_Iter1>::difference_type
-operator-(const __wrap_iter<_Iter1>& __x, const __wrap_iter<_Iter2>& __y) _NOEXCEPT
+    typename __wrap_iter<_Iter1>::difference_type
+    operator-(const __wrap_iter<_Iter1>& __x, const __wrap_iter<_Iter2>& __y) _NOEXCEPT
 #endif // C++03
 {
   return __x.base() - __y.base();

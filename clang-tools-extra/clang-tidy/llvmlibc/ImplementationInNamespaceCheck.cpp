@@ -30,35 +30,20 @@ void ImplementationInNamespaceCheck::check(
   const auto *MatchedDecl =
       Result.Nodes.getNodeAs<Decl>("child_of_translation_unit");
   const auto *NS = dyn_cast<NamespaceDecl>(MatchedDecl);
-
-  // LLVM libc declarations should be inside of a non-anonymous namespace.
   if (NS == nullptr || NS->isAnonymousNamespace()) {
     diag(MatchedDecl->getLocation(),
          "declaration must be enclosed within the '%0' namespace")
-        << RequiredNamespaceDeclMacroName;
+        << RequiredNamespaceMacroName;
     return;
   }
-
-  // Enforce that the namespace is the result of macro expansion
   if (Result.SourceManager->isMacroBodyExpansion(NS->getLocation()) == false) {
     diag(NS->getLocation(), "the outermost namespace should be the '%0' macro")
-        << RequiredNamespaceDeclMacroName;
+        << RequiredNamespaceMacroName;
     return;
   }
-
-  // We want the macro to have [[gnu::visibility("hidden")]] as a prefix, but
-  // visibility is just an attribute in the AST construct, so we check that
-  // instead.
-  if (NS->getVisibility() != Visibility::HiddenVisibility) {
+  if (NS->getName().starts_with(RequiredNamespaceStart) == false) {
     diag(NS->getLocation(), "the '%0' macro should start with '%1'")
-        << RequiredNamespaceDeclMacroName << RequiredNamespaceDeclStart;
-    return;
-  }
-
-  // Lastly, make sure the namespace name actually has the __llvm_libc prefix
-  if (NS->getName().starts_with(RequiredNamespaceRefStart) == false) {
-    diag(NS->getLocation(), "the '%0' macro expansion should start with '%1'")
-        << RequiredNamespaceDeclMacroName << RequiredNamespaceRefStart;
+        << RequiredNamespaceMacroName << RequiredNamespaceStart;
     return;
   }
 }

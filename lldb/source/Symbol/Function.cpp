@@ -220,18 +220,17 @@ Function *IndirectCallEdge::GetCallee(ModuleList &images,
                                       ExecutionContext &exe_ctx) {
   Log *log = GetLog(LLDBLog::Step);
   Status error;
-  llvm::Expected<Value> callee_addr_val = call_target.Evaluate(
-      &exe_ctx, exe_ctx.GetRegisterContext(), LLDB_INVALID_ADDRESS,
-      /*initial_value_ptr=*/nullptr,
-      /*object_address_ptr=*/nullptr);
-  if (!callee_addr_val) {
-    LLDB_LOG_ERROR(log, callee_addr_val.takeError(),
-                   "IndirectCallEdge: Could not evaluate expression: {0}");
+  Value callee_addr_val;
+  if (!call_target.Evaluate(
+          &exe_ctx, exe_ctx.GetRegisterContext(), LLDB_INVALID_ADDRESS,
+          /*initial_value_ptr=*/nullptr,
+          /*object_address_ptr=*/nullptr, callee_addr_val, &error)) {
+    LLDB_LOGF(log, "IndirectCallEdge: Could not evaluate expression: %s",
+              error.AsCString());
     return nullptr;
   }
 
-  addr_t raw_addr =
-      callee_addr_val->GetScalar().ULongLong(LLDB_INVALID_ADDRESS);
+  addr_t raw_addr = callee_addr_val.GetScalar().ULongLong(LLDB_INVALID_ADDRESS);
   if (raw_addr == LLDB_INVALID_ADDRESS) {
     LLDB_LOG(log, "IndirectCallEdge: Could not extract address from scalar");
     return nullptr;
@@ -290,7 +289,7 @@ void Function::GetStartLineSourceInfo(FileSpec &source_file,
     if (line_table->FindLineEntryByAddress(GetAddressRange().GetBaseAddress(),
                                            line_entry, nullptr)) {
       line_no = line_entry.line;
-      source_file = line_entry.GetFile();
+      source_file = line_entry.file;
     }
   }
 }
@@ -312,7 +311,7 @@ void Function::GetEndLineSourceInfo(FileSpec &source_file, uint32_t &line_no) {
   LineEntry line_entry;
   if (line_table->FindLineEntryByAddress(scratch_addr, line_entry, nullptr)) {
     line_no = line_entry.line;
-    source_file = line_entry.GetFile();
+    source_file = line_entry.file;
   }
 }
 

@@ -106,10 +106,6 @@ bool Dialect::usePropertiesForAttributes() const {
   return def->getValueAsBit("usePropertiesForAttributes");
 }
 
-llvm::DagInit *Dialect::getDiscardableAttributes() const {
-  return def->getValueAsDag("discardableAttrs");
-}
-
 bool Dialect::operator==(const Dialect &other) const {
   return def == other.def;
 }

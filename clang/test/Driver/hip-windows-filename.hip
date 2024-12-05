@@ -1,4 +1,4 @@
-// REQUIRES: system-windows
+// REQUIRES: system-windows, amdgpu-registered-target
 
 // RUN: %clang -### --target=x86_64-pc-windows-msvc \
 // RUN:   -x hip \

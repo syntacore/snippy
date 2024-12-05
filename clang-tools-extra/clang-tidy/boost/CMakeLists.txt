@@ -5,7 +5,6 @@ set(LLVM_LINK_COMPONENTS
 
 add_clang_library(clangTidyBoostModule
   BoostTidyModule.cpp
-  UseRangesCheck.cpp
   UseToStringCheck.cpp
 
   LINK_LIBS

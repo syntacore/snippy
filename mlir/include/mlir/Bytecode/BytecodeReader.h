@@ -15,6 +15,7 @@
 
 #include "mlir/IR/AsmState.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 #include <functional>
 #include <memory>
 

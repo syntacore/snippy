@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Utils/HelloWorld.h"
-#include "llvm/IR/Function.h"
 
 using namespace llvm;
 

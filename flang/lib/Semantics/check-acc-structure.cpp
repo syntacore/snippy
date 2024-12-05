@@ -22,33 +22,33 @@
   }
 
 using ReductionOpsSet =
-    Fortran::common::EnumSet<Fortran::parser::ReductionOperator::Operator,
-        Fortran::parser::ReductionOperator::Operator_enumSize>;
+    Fortran::common::EnumSet<Fortran::parser::AccReductionOperator::Operator,
+        Fortran::parser::AccReductionOperator::Operator_enumSize>;
 
 static ReductionOpsSet reductionIntegerSet{
-    Fortran::parser::ReductionOperator::Operator::Plus,
-    Fortran::parser::ReductionOperator::Operator::Multiply,
-    Fortran::parser::ReductionOperator::Operator::Max,
-    Fortran::parser::ReductionOperator::Operator::Min,
-    Fortran::parser::ReductionOperator::Operator::Iand,
-    Fortran::parser::ReductionOperator::Operator::Ior,
-    Fortran::parser::ReductionOperator::Operator::Ieor};
+    Fortran::parser::AccReductionOperator::Operator::Plus,
+    Fortran::parser::AccReductionOperator::Operator::Multiply,
+    Fortran::parser::AccReductionOperator::Operator::Max,
+    Fortran::parser::AccReductionOperator::Operator::Min,
+    Fortran::parser::AccReductionOperator::Operator::Iand,
+    Fortran::parser::AccReductionOperator::Operator::Ior,
+    Fortran::parser::AccReductionOperator::Operator::Ieor};
 
 static ReductionOpsSet reductionRealSet{
-    Fortran::parser::ReductionOperator::Operator::Plus,
-    Fortran::parser::ReductionOperator::Operator::Multiply,
-    Fortran::parser::ReductionOperator::Operator::Max,
-    Fortran::parser::ReductionOperator::Operator::Min};
+    Fortran::parser::AccReductionOperator::Operator::Plus,
+    Fortran::parser::AccReductionOperator::Operator::Multiply,
+    Fortran::parser::AccReductionOperator::Operator::Max,
+    Fortran::parser::AccReductionOperator::Operator::Min};
 
 static ReductionOpsSet reductionComplexSet{
-    Fortran::parser::ReductionOperator::Operator::Plus,
-    Fortran::parser::ReductionOperator::Operator::Multiply};
+    Fortran::parser::AccReductionOperator::Operator::Plus,
+    Fortran::parser::AccReductionOperator::Operator::Multiply};
 
 static ReductionOpsSet reductionLogicalSet{
-    Fortran::parser::ReductionOperator::Operator::And,
-    Fortran::parser::ReductionOperator::Operator::Or,
-    Fortran::parser::ReductionOperator::Operator::Eqv,
-    Fortran::parser::ReductionOperator::Operator::Neqv};
+    Fortran::parser::AccReductionOperator::Operator::And,
+    Fortran::parser::AccReductionOperator::Operator::Or,
+    Fortran::parser::AccReductionOperator::Operator::Eqv,
+    Fortran::parser::AccReductionOperator::Operator::Neqv};
 
 namespace Fortran::semantics {
 
@@ -403,22 +403,18 @@ void AccStructureChecker::CheckMultipleOccurrenceInDeclare(
   if (GetContext().directive != llvm::acc::Directive::ACCD_declare)
     return;
   for (const auto &object : list.v) {
-    common::visit(
-        common::visitors{
-            [&](const parser::Designator &designator) {
+    std::visit(
+        Fortran::common::visitors{
+            [&](const Fortran::parser::Designator &designator) {
               if (const auto *name = getDesignatorNameIfDataRef(designator)) {
                 if (declareSymbols.contains(&name->symbol->GetUltimate())) {
                   if (declareSymbols[&name->symbol->GetUltimate()] == clause) {
-                    if (context_.languageFeatures().ShouldWarn(
-                            common::UsageWarning::OpenAccUsage)) {
-                      context_.Say(GetContext().clauseSource,
-                          "'%s' in the %s clause is already present in the "
-                          "same "
-                          "clause in this module"_warn_en_US,
-                          name->symbol->name(),
-                          parser::ToUpperCaseLetters(
-                              llvm::acc::getOpenACCClauseName(clause).str()));
-                    }
+                    context_.Say(GetContext().clauseSource,
+                        "'%s' in the %s clause is already present in the same "
+                        "clause in this module"_warn_en_US,
+                        name->symbol->name(),
+                        parser::ToUpperCaseLetters(
+                            llvm::acc::getOpenACCClauseName(clause).str()));
                   } else {
                     context_.Say(GetContext().clauseSource,
                         "'%s' in the %s clause is already present in another "
@@ -435,7 +431,7 @@ void AccStructureChecker::CheckMultipleOccurrenceInDeclare(
                 declareSymbols.insert({&name->symbol->GetUltimate(), clause});
               }
             },
-            [&](const parser::Name &name) {
+            [&](const Fortran::parser::Name &name) {
               // TODO: check common block
             }},
         object.u);
@@ -670,13 +666,13 @@ void AccStructureChecker::Enter(const parser::AccClause::Reduction &reduction) {
   // The following check that the reduction operator is supported with the given
   // type.
   const parser::AccObjectListWithReduction &list{reduction.v};
-  const auto &op{std::get<parser::ReductionOperator>(list.t)};
+  const auto &op{std::get<parser::AccReductionOperator>(list.t)};
   const auto &objects{std::get<parser::AccObjectList>(list.t)};
 
   for (const auto &object : objects.v) {
-    common::visit(
-        common::visitors{
-            [&](const parser::Designator &designator) {
+    std::visit(
+        Fortran::common::visitors{
+            [&](const Fortran::parser::Designator &designator) {
               if (const auto *name = getDesignatorNameIfDataRef(designator)) {
                 const auto *type{name->symbol->GetType()};
                 if (type->IsNumeric(TypeCategory::Integer) &&
@@ -784,10 +780,7 @@ void AccStructureChecker::Enter(const parser::AccClause::If &x) {
 }
 
 void AccStructureChecker::Enter(const parser::OpenACCEndConstruct &x) {
-  if (context_.languageFeatures().ShouldWarn(
-          common::UsageWarning::OpenAccUsage)) {
-    context_.Say(x.source, "Misplaced OpenACC end directive"_warn_en_US);
-  }
+  context_.Say(x.source, "Misplaced OpenACC end directive"_warn_en_US);
 }
 
 void AccStructureChecker::Enter(const parser::Module &) {

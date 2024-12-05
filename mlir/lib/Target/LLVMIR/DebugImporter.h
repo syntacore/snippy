@@ -17,8 +17,6 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/Support/CyclicReplacerCache.h"
-#include "llvm/ADT/MapVector.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 
 namespace mlir {
@@ -31,7 +29,8 @@ namespace detail {
 
 class DebugImporter {
 public:
-  DebugImporter(ModuleOp mlirModule, bool dropDICompositeTypeElements);
+  DebugImporter(ModuleOp mlirModule)
+      : context(mlirModule.getContext()), mlirModule(mlirModule) {}
 
   /// Translates the given LLVM debug location to an MLIR location.
   Location translateLoc(llvm::DILocation *loc);
@@ -65,14 +64,12 @@ private:
   DICompileUnitAttr translateImpl(llvm::DICompileUnit *node);
   DICompositeTypeAttr translateImpl(llvm::DICompositeType *node);
   DIDerivedTypeAttr translateImpl(llvm::DIDerivedType *node);
-  DIStringTypeAttr translateImpl(llvm::DIStringType *node);
   DIFileAttr translateImpl(llvm::DIFile *node);
   DILabelAttr translateImpl(llvm::DILabel *node);
   DILexicalBlockAttr translateImpl(llvm::DILexicalBlock *node);
   DILexicalBlockFileAttr translateImpl(llvm::DILexicalBlockFile *node);
   DIGlobalVariableAttr translateImpl(llvm::DIGlobalVariable *node);
   DILocalVariableAttr translateImpl(llvm::DILocalVariable *node);
-  DIVariableAttr translateImpl(llvm::DIVariable *node);
   DIModuleAttr translateImpl(llvm::DIModule *node);
   DINamespaceAttr translateImpl(llvm::DINamespace *node);
   DIScopeAttr translateImpl(llvm::DIScope *node);
@@ -85,31 +82,15 @@ private:
   /// null attribute otherwise.
   StringAttr getStringAttrOrNull(llvm::MDString *stringNode);
 
-  /// Get the DistinctAttr used to represent `node` if one was already created
-  /// for it, or create a new one if not.
-  DistinctAttr getOrCreateDistinctID(llvm::DINode *node);
+  /// A mapping between LLVM debug metadata and the corresponding attribute.
+  DenseMap<llvm::DINode *, DINodeAttr> nodeToAttr;
 
-  std::optional<DINodeAttr> createRecSelf(llvm::DINode *node);
-
-  /// A mapping between distinct LLVM debug metadata nodes and the corresponding
-  /// distinct id attribute.
-  DenseMap<llvm::DINode *, DistinctAttr> nodeToDistinctAttr;
-
-  /// A mapping between DINodes that are recursive, and their assigned recId.
-  /// This is kept so that repeated occurrences of the same node can reuse the
-  /// same ID and be deduplicated.
-  DenseMap<llvm::DINode *, DistinctAttr> nodeToRecId;
-
-  CyclicReplacerCache<llvm::DINode *, DINodeAttr> cache;
+  /// A stack that stores the metadata nodes that are being traversed. The stack
+  /// is used to detect cyclic dependencies during the metadata translation.
+  SetVector<llvm::DINode *> translationStack;
 
   MLIRContext *context;
   ModuleOp mlirModule;
-
-  /// An option to control if DICompositeTypes should always be imported without
-  /// converting their elements. If set, the option avoids the recursive
-  /// traversal of composite type debug information, which can be expensive for
-  /// adversarial inputs.
-  bool dropDICompositeTypeElements;
 };
 
 } // namespace detail

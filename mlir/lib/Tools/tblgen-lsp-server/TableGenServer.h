@@ -12,9 +12,8 @@
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 #include <memory>
-#include <optional>
 #include <string>
-#include <vector>
+#include <optional>
 
 namespace mlir {
 namespace lsp {

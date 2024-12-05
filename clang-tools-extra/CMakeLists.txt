@@ -1,5 +1,3 @@
-set(LLVM_SUBPROJECT_TITLE "Clang Tools Extra")
-
 include(CMakeDependentOption)
 include(GNUInstallDirs)
 

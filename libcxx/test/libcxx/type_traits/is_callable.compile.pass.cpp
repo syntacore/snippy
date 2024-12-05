@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <__type_traits/is_callable.h>
+#include <type_traits>
 
 struct Functor {
   void operator()();

@@ -52,7 +52,6 @@
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicInst.h"
-#include "llvm/IR/Module.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -122,13 +121,12 @@ static void eliminateGuard(Instruction *GuardInst, MemorySSAUpdater *MSSAU) {
 /// condition should stay invariant. Otherwise there can be a miscompile, like
 /// the one described at https://github.com/llvm/llvm-project/issues/60234. The
 /// safest way to do it is to expand the new condition at WC's block.
-static std::optional<BasicBlock::iterator>
-findInsertionPointForWideCondition(Instruction *WCOrGuard) {
+static Instruction *findInsertionPointForWideCondition(Instruction *WCOrGuard) {
   if (isGuard(WCOrGuard))
-    return WCOrGuard->getIterator();
+    return WCOrGuard;
   if (auto WC = extractWidenableCondition(WCOrGuard))
-    return cast<Instruction>(WC)->getIterator();
-  return std::nullopt;
+    return cast<Instruction>(WC);
+  return nullptr;
 }
 
 class GuardWideningImpl {
@@ -184,30 +182,30 @@ class GuardWideningImpl {
   /// into \p WideningPoint.
   WideningScore computeWideningScore(Instruction *DominatedInstr,
                                      Instruction *ToWiden,
-                                     BasicBlock::iterator WideningPoint,
+                                     Instruction *WideningPoint,
                                      SmallVectorImpl<Value *> &ChecksToHoist,
                                      SmallVectorImpl<Value *> &ChecksToWiden);
 
   /// Helper to check if \p V can be hoisted to \p InsertPos.
-  bool canBeHoistedTo(const Value *V, BasicBlock::iterator InsertPos) const {
+  bool canBeHoistedTo(const Value *V, const Instruction *InsertPos) const {
     SmallPtrSet<const Instruction *, 8> Visited;
     return canBeHoistedTo(V, InsertPos, Visited);
   }
 
-  bool canBeHoistedTo(const Value *V, BasicBlock::iterator InsertPos,
+  bool canBeHoistedTo(const Value *V, const Instruction *InsertPos,
                       SmallPtrSetImpl<const Instruction *> &Visited) const;
 
   bool canBeHoistedTo(const SmallVectorImpl<Value *> &Checks,
-                      BasicBlock::iterator InsertPos) const {
+                      const Instruction *InsertPos) const {
     return all_of(Checks,
                   [&](const Value *V) { return canBeHoistedTo(V, InsertPos); });
   }
   /// Helper to hoist \p V to \p InsertPos.  Guaranteed to succeed if \c
   /// canBeHoistedTo returned true.
-  void makeAvailableAt(Value *V, BasicBlock::iterator InsertPos) const;
+  void makeAvailableAt(Value *V, Instruction *InsertPos) const;
 
   void makeAvailableAt(const SmallVectorImpl<Value *> &Checks,
-                       BasicBlock::iterator InsertPos) const {
+                       Instruction *InsertPos) const {
     for (Value *V : Checks)
       makeAvailableAt(V, InsertPos);
   }
@@ -219,19 +217,18 @@ class GuardWideningImpl {
   /// InsertPt is true then actually generate the resulting expression, make it
   /// available at \p InsertPt and return it in \p Result (else no change to the
   /// IR is made).
-  std::optional<Value *>
-  mergeChecks(SmallVectorImpl<Value *> &ChecksToHoist,
-              SmallVectorImpl<Value *> &ChecksToWiden,
-              std::optional<BasicBlock::iterator> InsertPt);
+  std::optional<Value *> mergeChecks(SmallVectorImpl<Value *> &ChecksToHoist,
+                                     SmallVectorImpl<Value *> &ChecksToWiden,
+                                     Instruction *InsertPt);
 
   /// Generate the logical AND of \p ChecksToHoist and \p OldCondition and make
   /// it available at InsertPt
   Value *hoistChecks(SmallVectorImpl<Value *> &ChecksToHoist,
-                     Value *OldCondition, BasicBlock::iterator InsertPt);
+                     Value *OldCondition, Instruction *InsertPt);
 
   /// Adds freeze to Orig and push it as far as possible very aggressively.
   /// Also replaces all uses of frozen instruction with frozen version.
-  Value *freezeAndPush(Value *Orig, BasicBlock::iterator InsertPt);
+  Value *freezeAndPush(Value *Orig, Instruction *InsertPt);
 
   /// Represents a range check of the form \c Base + \c Offset u< \c Length,
   /// with the constraint that \c Length is not negative.  \c CheckInst is the
@@ -297,7 +294,7 @@ class GuardWideningImpl {
   /// for the price of computing only one of the set of expressions?
   bool isWideningCondProfitable(SmallVectorImpl<Value *> &ChecksToHoist,
                                 SmallVectorImpl<Value *> &ChecksToWiden) {
-    return mergeChecks(ChecksToHoist, ChecksToWiden, /*InsertPt=*/std::nullopt)
+    return mergeChecks(ChecksToHoist, ChecksToWiden, /*InsertPt=*/nullptr)
         .has_value();
   }
 
@@ -305,11 +302,11 @@ class GuardWideningImpl {
   void widenGuard(SmallVectorImpl<Value *> &ChecksToHoist,
                   SmallVectorImpl<Value *> &ChecksToWiden,
                   Instruction *ToWiden) {
-    auto InsertPt = findInsertionPointForWideCondition(ToWiden);
+    Instruction *InsertPt = findInsertionPointForWideCondition(ToWiden);
     auto MergedCheck = mergeChecks(ChecksToHoist, ChecksToWiden, InsertPt);
     Value *Result = MergedCheck ? *MergedCheck
                                 : hoistChecks(ChecksToHoist,
-                                              getCondition(ToWiden), *InsertPt);
+                                              getCondition(ToWiden), InsertPt);
 
     if (isGuardAsWidenableBranch(ToWiden)) {
       setWidenableBranchCond(cast<BranchInst>(ToWiden), Result);
@@ -420,12 +417,12 @@ bool GuardWideningImpl::eliminateInstrViaWidening(
     assert((i == (e - 1)) == (Instr->getParent() == CurBB) && "Bad DFS?");
 
     for (auto *Candidate : make_range(I, E)) {
-      auto WideningPoint = findInsertionPointForWideCondition(Candidate);
+      auto *WideningPoint = findInsertionPointForWideCondition(Candidate);
       if (!WideningPoint)
         continue;
       SmallVector<Value *> CandidateChecks;
       parseWidenableGuard(Candidate, CandidateChecks);
-      auto Score = computeWideningScore(Instr, Candidate, *WideningPoint,
+      auto Score = computeWideningScore(Instr, Candidate, WideningPoint,
                                         ChecksToHoist, CandidateChecks);
       LLVM_DEBUG(dbgs() << "Score between " << *Instr << " and " << *Candidate
                         << " is " << scoreTypeToString(Score) << "\n");
@@ -459,7 +456,7 @@ bool GuardWideningImpl::eliminateInstrViaWidening(
 
 GuardWideningImpl::WideningScore GuardWideningImpl::computeWideningScore(
     Instruction *DominatedInstr, Instruction *ToWiden,
-    BasicBlock::iterator WideningPoint, SmallVectorImpl<Value *> &ChecksToHoist,
+    Instruction *WideningPoint, SmallVectorImpl<Value *> &ChecksToHoist,
     SmallVectorImpl<Value *> &ChecksToWiden) {
   Loop *DominatedInstrLoop = LI.getLoopFor(DominatedInstr->getParent());
   Loop *DominatingGuardLoop = LI.getLoopFor(WideningPoint->getParent());
@@ -562,7 +559,7 @@ GuardWideningImpl::WideningScore GuardWideningImpl::computeWideningScore(
 }
 
 bool GuardWideningImpl::canBeHoistedTo(
-    const Value *V, BasicBlock::iterator Loc,
+    const Value *V, const Instruction *Loc,
     SmallPtrSetImpl<const Instruction *> &Visited) const {
   auto *Inst = dyn_cast<Instruction>(V);
   if (!Inst || DT.dominates(Inst, Loc) || Visited.count(Inst))
@@ -583,8 +580,7 @@ bool GuardWideningImpl::canBeHoistedTo(
                 [&](Value *Op) { return canBeHoistedTo(Op, Loc, Visited); });
 }
 
-void GuardWideningImpl::makeAvailableAt(Value *V,
-                                        BasicBlock::iterator Loc) const {
+void GuardWideningImpl::makeAvailableAt(Value *V, Instruction *Loc) const {
   auto *Inst = dyn_cast<Instruction>(V);
   if (!Inst || DT.dominates(Inst, Loc))
     return;
@@ -596,7 +592,7 @@ void GuardWideningImpl::makeAvailableAt(Value *V,
   for (Value *Op : Inst->operands())
     makeAvailableAt(Op, Loc);
 
-  Inst->moveBefore(*Loc->getParent(), Loc);
+  Inst->moveBefore(Loc);
 }
 
 // Return Instruction before which we can insert freeze for the value V as close
@@ -625,15 +621,14 @@ getFreezeInsertPt(Value *V, const DominatorTree &DT) {
   return Res;
 }
 
-Value *GuardWideningImpl::freezeAndPush(Value *Orig,
-                                        BasicBlock::iterator InsertPt) {
+Value *GuardWideningImpl::freezeAndPush(Value *Orig, Instruction *InsertPt) {
   if (isGuaranteedNotToBePoison(Orig, nullptr, InsertPt, &DT))
     return Orig;
   std::optional<BasicBlock::iterator> InsertPtAtDef =
       getFreezeInsertPt(Orig, DT);
   if (!InsertPtAtDef) {
     FreezeInst *FI = new FreezeInst(Orig, "gw.freeze");
-    FI->insertBefore(*InsertPt->getParent(), InsertPt);
+    FI->insertBefore(InsertPt);
     return FI;
   }
   if (isa<Constant>(Orig) || isa<GlobalValue>(Orig)) {
@@ -700,7 +695,7 @@ Value *GuardWideningImpl::freezeAndPush(Value *Orig,
         Worklist.push_back(U.get());
   }
   for (Instruction *I : DropPoisonFlags)
-    I->dropPoisonGeneratingAnnotations();
+    I->dropPoisonGeneratingFlagsAndMetadata();
 
   Value *Result = Orig;
   for (Value *V : NeedFreeze) {
@@ -720,7 +715,7 @@ Value *GuardWideningImpl::freezeAndPush(Value *Orig,
 std::optional<Value *>
 GuardWideningImpl::mergeChecks(SmallVectorImpl<Value *> &ChecksToHoist,
                                SmallVectorImpl<Value *> &ChecksToWiden,
-                               std::optional<BasicBlock::iterator> InsertPt) {
+                               Instruction *InsertPt) {
   using namespace llvm::PatternMatch;
 
   Value *Result = nullptr;
@@ -752,10 +747,10 @@ GuardWideningImpl::mergeChecks(SmallVectorImpl<Value *> &ChecksToHoist,
         if (Intersect->getEquivalentICmp(Pred, NewRHSAP)) {
           if (InsertPt) {
             ConstantInt *NewRHS =
-                ConstantInt::get((*InsertPt)->getContext(), NewRHSAP);
-            assert(canBeHoistedTo(LHS, *InsertPt) && "must be");
-            makeAvailableAt(LHS, *InsertPt);
-            Result = new ICmpInst(*InsertPt, Pred, LHS, NewRHS, "wide.chk");
+                ConstantInt::get(InsertPt->getContext(), NewRHSAP);
+            assert(canBeHoistedTo(LHS, InsertPt) && "must be");
+            makeAvailableAt(LHS, InsertPt);
+            Result = new ICmpInst(InsertPt, Pred, LHS, NewRHS, "wide.chk");
           }
           return Result;
         }
@@ -770,16 +765,16 @@ GuardWideningImpl::mergeChecks(SmallVectorImpl<Value *> &ChecksToHoist,
         combineRangeChecks(Checks, CombinedChecks)) {
       if (InsertPt) {
         for (auto &RC : CombinedChecks) {
-          makeAvailableAt(RC.getCheckInst(), *InsertPt);
+          makeAvailableAt(RC.getCheckInst(), InsertPt);
           if (Result)
             Result = BinaryOperator::CreateAnd(RC.getCheckInst(), Result, "",
-                                               *InsertPt);
+                                               InsertPt);
           else
             Result = RC.getCheckInst();
         }
         assert(Result && "Failed to find result value");
         Result->setName("wide.chk");
-        Result = freezeAndPush(Result, *InsertPt);
+        Result = freezeAndPush(Result, InsertPt);
       }
       return Result;
     }
@@ -791,9 +786,9 @@ GuardWideningImpl::mergeChecks(SmallVectorImpl<Value *> &ChecksToHoist,
 
 Value *GuardWideningImpl::hoistChecks(SmallVectorImpl<Value *> &ChecksToHoist,
                                       Value *OldCondition,
-                                      BasicBlock::iterator InsertPt) {
+                                      Instruction *InsertPt) {
   assert(!ChecksToHoist.empty());
-  IRBuilder<> Builder(InsertPt->getParent(), InsertPt);
+  IRBuilder<> Builder(InsertPt);
   makeAvailableAt(ChecksToHoist, InsertPt);
   makeAvailableAt(OldCondition, InsertPt);
   Value *Result = Builder.CreateAnd(ChecksToHoist);
@@ -817,7 +812,7 @@ bool GuardWideningImpl::parseRangeChecks(
   if (IC->getPredicate() == ICmpInst::ICMP_UGT)
     std::swap(CmpLHS, CmpRHS);
 
-  auto &DL = IC->getDataLayout();
+  auto &DL = IC->getModule()->getDataLayout();
 
   GuardWideningImpl::RangeCheck Check(
       CmpLHS, cast<ConstantInt>(ConstantInt::getNullValue(CmpRHS->getType())),

@@ -10,7 +10,6 @@ executable("clang-tblgen") {
     "ClangASTNodesEmitter.cpp",
     "ClangASTPropertiesEmitter.cpp",
     "ClangAttrEmitter.cpp",
-    "ClangBuiltinsEmitter.cpp",
     "ClangCommentCommandInfoEmitter.cpp",
     "ClangCommentHTMLNamedCharacterReferenceEmitter.cpp",
     "ClangCommentHTMLTagsEmitter.cpp",

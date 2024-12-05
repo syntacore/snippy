@@ -27,17 +27,14 @@ class ExprCommandWithTimeoutsTestCase(TestBase):
             self, "stop here in main.", self.main_source_spec
         )
 
-        short_time = 5000
-        long_time = short_time * 1000
-
         # First set the timeout too short, and make sure we fail.
         options = lldb.SBExpressionOptions()
-        options.SetTimeoutInMicroSeconds(short_time)
+        options.SetTimeoutInMicroSeconds(10)
         options.SetUnwindOnError(True)
 
         frame = thread.GetFrameAtIndex(0)
 
-        value = frame.EvaluateExpression(f"wait_a_while({long_time})", options)
+        value = frame.EvaluateExpression("wait_a_while(1000000)", options)
         self.assertTrue(value.IsValid())
         self.assertFalse(value.GetError().Success())
 
@@ -47,14 +44,14 @@ class ExprCommandWithTimeoutsTestCase(TestBase):
 
         result = lldb.SBCommandReturnObject()
         return_value = interp.HandleCommand(
-            f"expr -t {short_time} -u true -- wait_a_while({long_time})", result
+            "expr -t 100 -u true -- wait_a_while(1000000)", result
         )
-        self.assertEqual(return_value, lldb.eReturnStatusFailed)
+        self.assertEquals(return_value, lldb.eReturnStatusFailed)
 
         # Okay, now do it again with long enough time outs:
 
-        options.SetTimeoutInMicroSeconds(long_time)
-        value = frame.EvaluateExpression(f"wait_a_while({short_time})", options)
+        options.SetTimeoutInMicroSeconds(1000000)
+        value = frame.EvaluateExpression("wait_a_while (1000)", options)
         self.assertTrue(value.IsValid())
         self.assertSuccess(value.GetError())
 
@@ -64,15 +61,15 @@ class ExprCommandWithTimeoutsTestCase(TestBase):
 
         result = lldb.SBCommandReturnObject()
         return_value = interp.HandleCommand(
-            f"expr -t {long_time} -u true -- wait_a_while({short_time})", result
+            "expr -t 1000000 -u true -- wait_a_while(1000)", result
         )
-        self.assertEqual(return_value, lldb.eReturnStatusSuccessFinishResult)
+        self.assertEquals(return_value, lldb.eReturnStatusSuccessFinishResult)
 
         # Finally set the one thread timeout and make sure that doesn't change
         # things much:
 
-        options.SetTimeoutInMicroSeconds(long_time)
-        options.SetOneThreadTimeoutInMicroSeconds(1000000)
-        value = frame.EvaluateExpression(f"wait_a_while({short_time})", options)
+        options.SetTimeoutInMicroSeconds(1000000)
+        options.SetOneThreadTimeoutInMicroSeconds(500000)
+        value = frame.EvaluateExpression("wait_a_while (1000)", options)
         self.assertTrue(value.IsValid())
         self.assertSuccess(value.GetError())

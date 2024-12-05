@@ -198,21 +198,18 @@ static bool castMismatchedIntegerTypes(const CallExpr *Call, bool StrictMode) {
 FormatStringConverter::FormatStringConverter(ASTContext *ContextIn,
                                              const CallExpr *Call,
                                              unsigned FormatArgOffset,
-                                             const Configuration ConfigIn,
+                                             bool StrictMode,
                                              const LangOptions &LO)
-    : Context(ContextIn), Config(ConfigIn),
-      CastMismatchedIntegerTypes(
-          castMismatchedIntegerTypes(Call, ConfigIn.StrictMode)),
+    : Context(ContextIn),
+      CastMismatchedIntegerTypes(castMismatchedIntegerTypes(Call, StrictMode)),
       Args(Call->getArgs()), NumArgs(Call->getNumArgs()),
       ArgsOffset(FormatArgOffset + 1), LangOpts(LO) {
   assert(ArgsOffset <= NumArgs);
   FormatExpr = llvm::dyn_cast<StringLiteral>(
       Args[FormatArgOffset]->IgnoreImplicitAsWritten());
-  if (!FormatExpr || !FormatExpr->isOrdinary()) {
-    // Function must have a narrow string literal as its first argument.
-    conversionNotPossible("first argument is not a narrow string literal");
-    return;
-  }
+  assert(FormatExpr);
+  if (!FormatExpr->isOrdinary())
+    return; // No wide string support yet
   PrintfFormatString = FormatExpr->getString();
 
   // Assume that the output will be approximately the same size as the input,
@@ -630,12 +627,9 @@ void FormatStringConverter::finalizeFormatText() {
 
   // It's clearer to convert printf("Hello\r\n"); to std::print("Hello\r\n")
   // than to std::println("Hello\r");
-  // Use StringRef until C++20 std::string::ends_with() is available.
-  const auto StandardFormatStringRef = StringRef(StandardFormatString);
-  if (Config.AllowTrailingNewlineRemoval &&
-      StandardFormatStringRef.ends_with("\\n") &&
-      !StandardFormatStringRef.ends_with("\\\\n") &&
-      !StandardFormatStringRef.ends_with("\\r\\n")) {
+  if (StringRef(StandardFormatString).ends_with("\\n") &&
+      !StringRef(StandardFormatString).ends_with("\\\\n") &&
+      !StringRef(StandardFormatString).ends_with("\\r\\n")) {
     UsePrintNewlineFunction = true;
     FormatStringNeededRewriting = true;
     StandardFormatString.erase(StandardFormatString.end() - 2,

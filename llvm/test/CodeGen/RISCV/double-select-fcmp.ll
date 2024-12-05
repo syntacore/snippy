@@ -41,12 +41,26 @@ define double @select_fcmp_oeq(double %a, double %b) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_oeq:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    feq.d a4, a0, a2
 ; CHECKRV32ZDINX-NEXT:    bnez a4, .LBB1_2
 ; CHECKRV32ZDINX-NEXT:  # %bb.1:
 ; CHECKRV32ZDINX-NEXT:    mv a0, a2
 ; CHECKRV32ZDINX-NEXT:    mv a1, a3
 ; CHECKRV32ZDINX-NEXT:  .LBB1_2:
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_oeq:
@@ -74,12 +88,26 @@ define double @select_fcmp_ogt(double %a, double %b) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_ogt:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    flt.d a4, a2, a0
 ; CHECKRV32ZDINX-NEXT:    bnez a4, .LBB2_2
 ; CHECKRV32ZDINX-NEXT:  # %bb.1:
 ; CHECKRV32ZDINX-NEXT:    mv a0, a2
 ; CHECKRV32ZDINX-NEXT:    mv a1, a3
 ; CHECKRV32ZDINX-NEXT:  .LBB2_2:
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_ogt:
@@ -107,12 +135,26 @@ define double @select_fcmp_oge(double %a, double %b) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_oge:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    fle.d a4, a2, a0
 ; CHECKRV32ZDINX-NEXT:    bnez a4, .LBB3_2
 ; CHECKRV32ZDINX-NEXT:  # %bb.1:
 ; CHECKRV32ZDINX-NEXT:    mv a0, a2
 ; CHECKRV32ZDINX-NEXT:    mv a1, a3
 ; CHECKRV32ZDINX-NEXT:  .LBB3_2:
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_oge:
@@ -140,12 +182,26 @@ define double @select_fcmp_olt(double %a, double %b) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_olt:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    flt.d a4, a0, a2
 ; CHECKRV32ZDINX-NEXT:    bnez a4, .LBB4_2
 ; CHECKRV32ZDINX-NEXT:  # %bb.1:
 ; CHECKRV32ZDINX-NEXT:    mv a0, a2
 ; CHECKRV32ZDINX-NEXT:    mv a1, a3
 ; CHECKRV32ZDINX-NEXT:  .LBB4_2:
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_olt:
@@ -173,12 +229,26 @@ define double @select_fcmp_ole(double %a, double %b) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_ole:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    fle.d a4, a0, a2
 ; CHECKRV32ZDINX-NEXT:    bnez a4, .LBB5_2
 ; CHECKRV32ZDINX-NEXT:  # %bb.1:
 ; CHECKRV32ZDINX-NEXT:    mv a0, a2
 ; CHECKRV32ZDINX-NEXT:    mv a1, a3
 ; CHECKRV32ZDINX-NEXT:  .LBB5_2:
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_ole:
@@ -208,6 +278,15 @@ define double @select_fcmp_one(double %a, double %b) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_one:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    flt.d a4, a0, a2
 ; CHECKRV32ZDINX-NEXT:    flt.d a5, a2, a0
 ; CHECKRV32ZDINX-NEXT:    or a4, a5, a4
@@ -216,6 +295,11 @@ define double @select_fcmp_one(double %a, double %b) nounwind {
 ; CHECKRV32ZDINX-NEXT:    mv a0, a2
 ; CHECKRV32ZDINX-NEXT:    mv a1, a3
 ; CHECKRV32ZDINX-NEXT:  .LBB6_2:
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_one:
@@ -247,6 +331,15 @@ define double @select_fcmp_ord(double %a, double %b) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_ord:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    feq.d a4, a2, a2
 ; CHECKRV32ZDINX-NEXT:    feq.d a5, a0, a0
 ; CHECKRV32ZDINX-NEXT:    and a4, a5, a4
@@ -255,6 +348,11 @@ define double @select_fcmp_ord(double %a, double %b) nounwind {
 ; CHECKRV32ZDINX-NEXT:    mv a0, a2
 ; CHECKRV32ZDINX-NEXT:    mv a1, a3
 ; CHECKRV32ZDINX-NEXT:  .LBB7_2:
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_ord:
@@ -286,6 +384,15 @@ define double @select_fcmp_ueq(double %a, double %b) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_ueq:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    flt.d a4, a0, a2
 ; CHECKRV32ZDINX-NEXT:    flt.d a5, a2, a0
 ; CHECKRV32ZDINX-NEXT:    or a4, a5, a4
@@ -294,6 +401,11 @@ define double @select_fcmp_ueq(double %a, double %b) nounwind {
 ; CHECKRV32ZDINX-NEXT:    mv a0, a2
 ; CHECKRV32ZDINX-NEXT:    mv a1, a3
 ; CHECKRV32ZDINX-NEXT:  .LBB8_2:
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_ueq:
@@ -323,12 +435,26 @@ define double @select_fcmp_ugt(double %a, double %b) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_ugt:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    fle.d a4, a0, a2
 ; CHECKRV32ZDINX-NEXT:    beqz a4, .LBB9_2
 ; CHECKRV32ZDINX-NEXT:  # %bb.1:
 ; CHECKRV32ZDINX-NEXT:    mv a0, a2
 ; CHECKRV32ZDINX-NEXT:    mv a1, a3
 ; CHECKRV32ZDINX-NEXT:  .LBB9_2:
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_ugt:
@@ -356,12 +482,26 @@ define double @select_fcmp_uge(double %a, double %b) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_uge:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    flt.d a4, a0, a2
 ; CHECKRV32ZDINX-NEXT:    beqz a4, .LBB10_2
 ; CHECKRV32ZDINX-NEXT:  # %bb.1:
 ; CHECKRV32ZDINX-NEXT:    mv a0, a2
 ; CHECKRV32ZDINX-NEXT:    mv a1, a3
 ; CHECKRV32ZDINX-NEXT:  .LBB10_2:
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_uge:
@@ -389,12 +529,26 @@ define double @select_fcmp_ult(double %a, double %b) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_ult:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    fle.d a4, a2, a0
 ; CHECKRV32ZDINX-NEXT:    beqz a4, .LBB11_2
 ; CHECKRV32ZDINX-NEXT:  # %bb.1:
 ; CHECKRV32ZDINX-NEXT:    mv a0, a2
 ; CHECKRV32ZDINX-NEXT:    mv a1, a3
 ; CHECKRV32ZDINX-NEXT:  .LBB11_2:
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_ult:
@@ -422,12 +576,26 @@ define double @select_fcmp_ule(double %a, double %b) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_ule:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    flt.d a4, a2, a0
 ; CHECKRV32ZDINX-NEXT:    beqz a4, .LBB12_2
 ; CHECKRV32ZDINX-NEXT:  # %bb.1:
 ; CHECKRV32ZDINX-NEXT:    mv a0, a2
 ; CHECKRV32ZDINX-NEXT:    mv a1, a3
 ; CHECKRV32ZDINX-NEXT:  .LBB12_2:
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_ule:
@@ -455,12 +623,26 @@ define double @select_fcmp_une(double %a, double %b) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_une:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    feq.d a4, a0, a2
 ; CHECKRV32ZDINX-NEXT:    beqz a4, .LBB13_2
 ; CHECKRV32ZDINX-NEXT:  # %bb.1:
 ; CHECKRV32ZDINX-NEXT:    mv a0, a2
 ; CHECKRV32ZDINX-NEXT:    mv a1, a3
 ; CHECKRV32ZDINX-NEXT:  .LBB13_2:
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_une:
@@ -490,6 +672,15 @@ define double @select_fcmp_uno(double %a, double %b) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_uno:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    feq.d a4, a2, a2
 ; CHECKRV32ZDINX-NEXT:    feq.d a5, a0, a0
 ; CHECKRV32ZDINX-NEXT:    and a4, a5, a4
@@ -498,6 +689,11 @@ define double @select_fcmp_uno(double %a, double %b) nounwind {
 ; CHECKRV32ZDINX-NEXT:    mv a0, a2
 ; CHECKRV32ZDINX-NEXT:    mv a1, a3
 ; CHECKRV32ZDINX-NEXT:  .LBB14_2:
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_uno:
@@ -545,12 +741,22 @@ define i32 @i32_select_fcmp_oeq(double %a, double %b, i32 %c, i32 %d) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: i32_select_fcmp_oeq:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    feq.d a1, a0, a2
 ; CHECKRV32ZDINX-NEXT:    mv a0, a4
 ; CHECKRV32ZDINX-NEXT:    bnez a1, .LBB16_2
 ; CHECKRV32ZDINX-NEXT:  # %bb.1:
 ; CHECKRV32ZDINX-NEXT:    mv a0, a5
 ; CHECKRV32ZDINX-NEXT:  .LBB16_2:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: i32_select_fcmp_oeq:
@@ -577,9 +783,20 @@ define i32 @select_fcmp_oeq_1_2(double %a, double %b) {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_oeq_1_2:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    .cfi_def_cfa_offset 16
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    feq.d a0, a0, a2
 ; CHECKRV32ZDINX-NEXT:    li a1, 2
 ; CHECKRV32ZDINX-NEXT:    sub a0, a1, a0
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_oeq_1_2:
@@ -602,8 +819,18 @@ define signext i32 @select_fcmp_uge_negone_zero(double %a, double %b) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_uge_negone_zero:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    fle.d a0, a0, a2
 ; CHECKRV32ZDINX-NEXT:    addi a0, a0, -1
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_uge_negone_zero:
@@ -625,8 +852,18 @@ define signext i32 @select_fcmp_uge_1_2(double %a, double %b) nounwind {
 ;
 ; CHECKRV32ZDINX-LABEL: select_fcmp_uge_1_2:
 ; CHECKRV32ZDINX:       # %bb.0:
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, -16
+; CHECKRV32ZDINX-NEXT:    sw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a2, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a3, 12(sp)
+; CHECKRV32ZDINX-NEXT:    sw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    sw a1, 12(sp)
+; CHECKRV32ZDINX-NEXT:    lw a0, 8(sp)
+; CHECKRV32ZDINX-NEXT:    lw a1, 12(sp)
 ; CHECKRV32ZDINX-NEXT:    fle.d a0, a0, a2
 ; CHECKRV32ZDINX-NEXT:    addi a0, a0, 1
+; CHECKRV32ZDINX-NEXT:    addi sp, sp, 16
 ; CHECKRV32ZDINX-NEXT:    ret
 ;
 ; CHECKRV64ZDINX-LABEL: select_fcmp_uge_1_2:

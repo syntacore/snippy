@@ -14,11 +14,10 @@
 #include "src/__support/macros/attributes.h"
 #include "src/__support/macros/config.h"
 
-namespace LIBC_NAMESPACE_DECL {
-namespace cpp {
+namespace LIBC_NAMESPACE::cpp {
 
 // is_lvalue_reference
-#if __has_builtin(__is_lvalue_reference)
+#if LIBC_HAS_BUILTIN(__is_lvalue_reference)
 template <typename T>
 struct is_lvalue_reference : bool_constant<__is_lvalue_reference(T)> {};
 #else
@@ -29,7 +28,6 @@ template <class T>
 LIBC_INLINE_VAR constexpr bool is_lvalue_reference_v =
     is_lvalue_reference<T>::value;
 
-} // namespace cpp
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE::cpp
 
 #endif // LLVM_LIBC_SRC___SUPPORT_CPP_TYPE_TRAITS_IS_LVALUE_REFERENCE_H

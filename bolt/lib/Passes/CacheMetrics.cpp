@@ -67,20 +67,7 @@ calcTSPScore(const std::vector<BinaryFunction *> &BinaryFunctions,
       for (BinaryBasicBlock *DstBB : SrcBB->successors()) {
         if (SrcBB != DstBB && BI->Count != BinaryBasicBlock::COUNT_NO_PROFILE) {
           JumpCount += BI->Count;
-
-          auto BBAddrIt = BBAddr.find(SrcBB);
-          assert(BBAddrIt != BBAddr.end());
-          uint64_t SrcBBAddr = BBAddrIt->second;
-
-          auto BBSizeIt = BBSize.find(SrcBB);
-          assert(BBSizeIt != BBSize.end());
-          uint64_t SrcBBSize = BBSizeIt->second;
-
-          BBAddrIt = BBAddr.find(DstBB);
-          assert(BBAddrIt != BBAddr.end());
-          uint64_t DstBBAddr = BBAddrIt->second;
-
-          if (SrcBBAddr + SrcBBSize == DstBBAddr)
+          if (BBAddr.at(SrcBB) + BBSize.at(SrcBB) == BBAddr.at(DstBB))
             Score += BI->Count;
         }
         ++BI;
@@ -162,28 +149,20 @@ double expectedCacheHitRatio(
   for (BinaryFunction *BF : BinaryFunctions) {
     if (BF->getLayout().block_empty())
       continue;
-    auto BBAddrIt = BBAddr.find(BF->getLayout().block_front());
-    assert(BBAddrIt != BBAddr.end());
-    const uint64_t Page = BBAddrIt->second / ITLBPageSize;
-
-    auto FunctionSamplesIt = FunctionSamples.find(BF);
-    assert(FunctionSamplesIt != FunctionSamples.end());
-    PageSamples[Page] += FunctionSamplesIt->second;
+    const uint64_t Page =
+        BBAddr.at(BF->getLayout().block_front()) / ITLBPageSize;
+    PageSamples[Page] += FunctionSamples.at(BF);
   }
 
   // Computing the expected number of misses for every function
   double Misses = 0;
   for (BinaryFunction *BF : BinaryFunctions) {
     // Skip the function if it has no samples
-    auto FunctionSamplesIt = FunctionSamples.find(BF);
-    assert(FunctionSamplesIt != FunctionSamples.end());
-    double Samples = FunctionSamplesIt->second;
-    if (BF->getLayout().block_empty() || Samples == 0.0)
+    if (BF->getLayout().block_empty() || FunctionSamples.at(BF) == 0.0)
       continue;
-
-    auto BBAddrIt = BBAddr.find(BF->getLayout().block_front());
-    assert(BBAddrIt != BBAddr.end());
-    const uint64_t Page = BBAddrIt->second / ITLBPageSize;
+    double Samples = FunctionSamples.at(BF);
+    const uint64_t Page =
+        BBAddr.at(BF->getLayout().block_front()) / ITLBPageSize;
     // The probability that the page is not present in the cache
     const double MissProb =
         pow(1.0 - PageSamples[Page] / TotalSamples, ITLBEntries);
@@ -191,10 +170,8 @@ double expectedCacheHitRatio(
     // Processing all callers of the function
     for (std::pair<BinaryFunction *, uint64_t> Pair : Calls[BF]) {
       BinaryFunction *SrcFunction = Pair.first;
-
-      BBAddrIt = BBAddr.find(SrcFunction->getLayout().block_front());
-      assert(BBAddrIt != BBAddr.end());
-      const uint64_t SrcPage = BBAddrIt->second / ITLBPageSize;
+      const uint64_t SrcPage =
+          BBAddr.at(SrcFunction->getLayout().block_front()) / ITLBPageSize;
       // Is this a 'long' or a 'short' call?
       if (Page != SrcPage) {
         // This is a miss
@@ -212,8 +189,7 @@ double expectedCacheHitRatio(
 
 } // namespace
 
-void CacheMetrics::printAll(raw_ostream &OS,
-                            const std::vector<BinaryFunction *> &BFs) {
+void CacheMetrics::printAll(const std::vector<BinaryFunction *> &BFs) {
   // Stats related to hot-cold code splitting
   size_t NumFunctions = 0;
   size_t NumProfiledFunctions = 0;
@@ -246,36 +222,36 @@ void CacheMetrics::printAll(raw_ostream &OS,
     }
   }
 
-  OS << format("  There are %zu functions;", NumFunctions)
-     << format(" %zu (%.2lf%%) are in the hot section,", NumHotFunctions,
-               100.0 * NumHotFunctions / NumFunctions)
-     << format(" %zu (%.2lf%%) have profile\n", NumProfiledFunctions,
-               100.0 * NumProfiledFunctions / NumFunctions);
-  OS << format("  There are %zu basic blocks;", NumBlocks)
-     << format(" %zu (%.2lf%%) are in the hot section\n", NumHotBlocks,
-               100.0 * NumHotBlocks / NumBlocks);
+  outs() << format("  There are %zu functions;", NumFunctions)
+         << format(" %zu (%.2lf%%) are in the hot section,", NumHotFunctions,
+                   100.0 * NumHotFunctions / NumFunctions)
+         << format(" %zu (%.2lf%%) have profile\n", NumProfiledFunctions,
+                   100.0 * NumProfiledFunctions / NumFunctions);
+  outs() << format("  There are %zu basic blocks;", NumBlocks)
+         << format(" %zu (%.2lf%%) are in the hot section\n", NumHotBlocks,
+                   100.0 * NumHotBlocks / NumBlocks);
 
   assert(TotalCodeMinAddr <= TotalCodeMaxAddr && "incorrect output addresses");
   size_t HotCodeSize = HotCodeMaxAddr - HotCodeMinAddr;
   size_t TotalCodeSize = TotalCodeMaxAddr - TotalCodeMinAddr;
 
   size_t HugePage2MB = 2 << 20;
-  OS << format("  Hot code takes %.2lf%% of binary (%zu bytes out of %zu, "
-               "%.2lf huge pages)\n",
-               100.0 * HotCodeSize / TotalCodeSize, HotCodeSize, TotalCodeSize,
-               double(HotCodeSize) / HugePage2MB);
+  outs() << format("  Hot code takes %.2lf%% of binary (%zu bytes out of %zu, "
+                   "%.2lf huge pages)\n",
+                   100.0 * HotCodeSize / TotalCodeSize, HotCodeSize,
+                   TotalCodeSize, double(HotCodeSize) / HugePage2MB);
 
   // Stats related to expected cache performance
   std::unordered_map<BinaryBasicBlock *, uint64_t> BBAddr;
   std::unordered_map<BinaryBasicBlock *, uint64_t> BBSize;
   extractBasicBlockInfo(BFs, BBAddr, BBSize);
 
-  OS << "  Expected i-TLB cache hit ratio: "
-     << format("%.2lf%%\n", expectedCacheHitRatio(BFs, BBAddr, BBSize));
+  outs() << "  Expected i-TLB cache hit ratio: "
+         << format("%.2lf%%\n", expectedCacheHitRatio(BFs, BBAddr, BBSize));
 
   auto Stats = calcTSPScore(BFs, BBAddr, BBSize);
-  OS << "  TSP score: "
-     << format("%.2lf%% (%zu out of %zu)\n",
-               100.0 * Stats.first / std::max<uint64_t>(Stats.second, 1),
-               Stats.first, Stats.second);
+  outs() << "  TSP score: "
+         << format("%.2lf%% (%zu out of %zu)\n",
+                   100.0 * Stats.first / std::max<uint64_t>(Stats.second, 1),
+                   Stats.first, Stats.second);
 }

@@ -6,10 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_MACROS_CONTAINEROF_MACRO_H
-#define LLVM_LIBC_MACROS_CONTAINEROF_MACRO_H
+#ifndef __LLVM_LIBC_MACROS_CONTAINEROF_MACRO_H
+#define __LLVM_LIBC_MACROS_CONTAINEROF_MACRO_H
 
-#include "llvm-libc-macros/offsetof-macro.h"
+#include <llvm-libc-macros/offsetof-macro.h>
 
 #define __containerof(ptr, type, member)                                       \
   ({                                                                           \
@@ -17,4 +17,4 @@
     (type *)(void *)((const char *)__ptr - offsetof(type, member));            \
   })
 
-#endif // LLVM_LIBC_MACROS_CONTAINEROF_MACRO_H
+#endif // __LLVM_LIBC_MACROS_CONTAINEROF_MACRO_H

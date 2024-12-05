@@ -9,7 +9,7 @@
 #ifndef BOLT_PASSES_REORDER_FUNCTIONS_H
 #define BOLT_PASSES_REORDER_FUNCTIONS_H
 
-#include "bolt/Core/BinaryFunctionCallGraph.h"
+#include "bolt/Passes/BinaryFunctionCallGraph.h"
 #include "bolt/Passes/BinaryPasses.h"
 
 namespace llvm {
@@ -20,10 +20,10 @@ class Cluster;
 class ReorderFunctions : public BinaryFunctionPass {
   BinaryFunctionCallGraph Cg;
 
-  void reorder(BinaryContext &BC, std::vector<Cluster> &&Clusters,
+  void reorder(std::vector<Cluster> &&Clusters,
                std::map<uint64_t, BinaryFunction> &BFs);
 
-  void printStats(BinaryContext &BC, const std::vector<Cluster> &Clusters,
+  void printStats(const std::vector<Cluster> &Clusters,
                   const std::vector<uint64_t> &FuncAddr);
 
 public:
@@ -42,9 +42,9 @@ public:
       : BinaryFunctionPass(PrintPass) {}
 
   const char *getName() const override { return "reorder-functions"; }
-  Error runOnFunctions(BinaryContext &BC) override;
+  void runOnFunctions(BinaryContext &BC) override;
 
-  static Error readFunctionOrderFile(std::vector<std::string> &FunctionNames);
+  static std::vector<std::string> readFunctionOrderFile();
 };
 
 } // namespace bolt

@@ -10,6 +10,7 @@ import lldbdap_testcase
 
 class TestDAP_threads(lldbdap_testcase.DAPTestCaseBase):
     @skipIfWindows
+    @skipIfRemote
     def test_correct_thread(self):
         """
         Tests that the correct thread is selected if we continue from
@@ -44,6 +45,7 @@ class TestDAP_threads(lldbdap_testcase.DAPTestCaseBase):
         self.assertTrue(stopped_event[0]["body"]["threadCausedFocus"])
 
     @skipIfWindows
+    @skipIfRemote
     def test_thread_format(self):
         """
         Tests the support for custom thread formats.
@@ -63,5 +65,5 @@ class TestDAP_threads(lldbdap_testcase.DAPTestCaseBase):
         self.continue_to_breakpoints(breakpoint_ids)
         # We are stopped at the second thread
         threads = self.dap_server.get_threads()
-        self.assertEqual(threads[0]["name"], "This is thread index #1")
-        self.assertEqual(threads[1]["name"], "This is thread index #2")
+        self.assertEquals(threads[0]["name"], "This is thread index #1")
+        self.assertEquals(threads[1]["name"], "This is thread index #2")

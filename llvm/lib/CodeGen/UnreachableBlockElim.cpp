@@ -89,8 +89,8 @@ INITIALIZE_PASS(UnreachableMachineBlockElim, "unreachable-mbb-elimination",
 char &llvm::UnreachableMachineBlockElimID = UnreachableMachineBlockElim::ID;
 
 void UnreachableMachineBlockElim::getAnalysisUsage(AnalysisUsage &AU) const {
-  AU.addPreserved<MachineLoopInfoWrapperPass>();
-  AU.addPreserved<MachineDominatorTreeWrapperPass>();
+  AU.addPreserved<MachineLoopInfo>();
+  AU.addPreserved<MachineDominatorTree>();
   MachineFunctionPass::getAnalysisUsage(AU);
 }
 
@@ -98,12 +98,8 @@ bool UnreachableMachineBlockElim::runOnMachineFunction(MachineFunction &F) {
   df_iterator_default_set<MachineBasicBlock*> Reachable;
   bool ModifiedPHI = false;
 
-  MachineDominatorTreeWrapperPass *MDTWrapper =
-      getAnalysisIfAvailable<MachineDominatorTreeWrapperPass>();
-  MachineDominatorTree *MDT = MDTWrapper ? &MDTWrapper->getDomTree() : nullptr;
-  MachineLoopInfoWrapperPass *MLIWrapper =
-      getAnalysisIfAvailable<MachineLoopInfoWrapperPass>();
-  MachineLoopInfo *MLI = MLIWrapper ? &MLIWrapper->getLI() : nullptr;
+  MachineDominatorTree *MDT = getAnalysisIfAvailable<MachineDominatorTree>();
+  MachineLoopInfo *MLI = getAnalysisIfAvailable<MachineLoopInfo>();
 
   // Mark all reachable blocks.
   for (MachineBasicBlock *BB : depth_first_ext(&F, Reachable))

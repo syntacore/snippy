@@ -23,7 +23,6 @@
 #include "llvm/CodeGen/Spiller.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
 #include "llvm/CodeGen/VirtRegMap.h"
-#include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -62,7 +61,7 @@ void RegAllocBase::init(VirtRegMap &vrm, LiveIntervals &lis,
   VRM = &vrm;
   LIS = &lis;
   Matrix = &mat;
-  MRI->freezeReservedRegs();
+  MRI->freezeReservedRegs(vrm.getMachineFunction());
   RegClassInfo.runOnMachineFunction(vrm.getMachineFunction());
 }
 
@@ -116,8 +115,11 @@ void RegAllocBase::allocatePhysRegs() {
       // selectOrSplit failed to find a register!
       // Probably caused by an inline asm.
       MachineInstr *MI = nullptr;
-      for (MachineInstr &MIR : MRI->reg_instructions(VirtReg->reg())) {
-        MI = &MIR;
+      for (MachineRegisterInfo::reg_instr_iterator
+               I = MRI->reg_instr_begin(VirtReg->reg()),
+               E = MRI->reg_instr_end();
+           I != E;) {
+        MI = &*(I++);
         if (MI->isInlineAsm())
           break;
       }
@@ -130,7 +132,7 @@ void RegAllocBase::allocatePhysRegs() {
         MI->emitError("inline assembly requires more registers than available");
       } else if (MI) {
         LLVMContext &Context =
-            MI->getParent()->getParent()->getFunction().getContext();
+            MI->getParent()->getParent()->getMMI().getModule()->getContext();
         Context.emitError("ran out of registers during register allocation");
       } else {
         report_fatal_error("ran out of registers during register allocation");
@@ -179,7 +181,8 @@ void RegAllocBase::enqueue(const LiveInterval *LI) {
   if (VRM->hasPhys(Reg))
     return;
 
-  if (shouldAllocateRegister(Reg)) {
+  const TargetRegisterClass &RC = *MRI->getRegClass(Reg);
+  if (ShouldAllocateClass(*TRI, RC)) {
     LLVM_DEBUG(dbgs() << "Enqueuing " << printReg(Reg, TRI) << '\n');
     enqueueImpl(LI);
   } else {

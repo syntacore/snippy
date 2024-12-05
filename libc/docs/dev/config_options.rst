@@ -11,14 +11,15 @@ hierarchical JSON files. At the top of the hierarchy is a JSON file by name
 options which affect all platforms. The default value for the option and a short
 description about it listed against each option. For example:
 
-.. code-block:: json
+.. code-block::
 
    {
      "printf": {
        "LIBC_CONF_PRINTF_DISABLE_FLOAT": {
          "value": false,
          "doc": "Disable printing floating point values in printf and friends."
-       }
+       },
+       ...
      }
    }
 
@@ -27,7 +28,7 @@ has a value of ``false``. A platform, say the baremetal platform, can choose
 to override this value in its ``config.json`` file in the ``config/baremetal``
 directory with the following contents:
 
-.. code-block:: json
+.. code-block::
 
    {
      "printf": {
@@ -60,13 +61,14 @@ The value corresponding to each grouping tag is also a dictionary called the
 options belonging to that grouping tag. For the ``printf`` tag in the above
 example, the option-dictionary is:
 
-.. code-block:: json
+.. code-block::
 
    {
      "LIBC_CONF_PRINTF_DISABLE_FLOAT": {
        "value": false,
-       "doc":
-     }
+       "doc": 
+     },
+     ...
    }
 
 The value corresponding to an option key in the option-dictionary is another
@@ -84,7 +86,7 @@ Option name format
 
 The option names, or the keys of a option-dictionary, have the following format:
 
-.. code-block:: none
+.. code-block::
 
    LIBC_CONF_<UPPER_CASE_TAG_NAME>_<ACTION_INDICATING_THE_INTENDED_SEMANTICS>
 
@@ -121,7 +123,7 @@ should convert the CMake config options to appropriate compiler and/or linker
 flags. Those compile/link flags can be used in listing the affected targets as
 follows:
 
-.. code-block:: cmake
+.. code-block::
 
    add_object_library(
     ...

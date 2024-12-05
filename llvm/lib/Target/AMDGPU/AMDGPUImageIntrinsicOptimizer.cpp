@@ -293,7 +293,7 @@ static bool imageIntrinsicOptimizerImpl(Function &F, const TargetMachine *TM) {
   Module *M = F.getParent();
 
   // Early test to determine if the intrinsics are used.
-  if (llvm::none_of(*M, [](Function &F) {
+  if (std::none_of(M->begin(), M->end(), [](Function &F) {
         return !F.users().empty() &&
                (F.getIntrinsicID() == Intrinsic::amdgcn_image_load_2dmsaa ||
                 F.getIntrinsicID() == Intrinsic::amdgcn_image_load_2darraymsaa);

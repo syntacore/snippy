@@ -1,11 +1,11 @@
-; RUN: opt < %s -O0 -S | FileCheck %s --check-prefixes=CHECK,NOOPT
-; RUN: opt < %s -O1 -S | FileCheck %s --check-prefixes=CHECK,OPT
-; RUN: opt < %s -O2 -S | FileCheck %s --check-prefixes=CHECK,OPT
-; RUN: opt < %s -O3 -S | FileCheck %s --check-prefixes=CHECK,OPT
-; RUN: opt < %s -passes='default<O0>' -S | FileCheck %s --check-prefixes=CHECK,NOOPT
-; RUN: opt < %s -passes='default<O1>' -S | FileCheck %s --check-prefixes=CHECK,OPT
-; RUN: opt < %s -passes='default<O2>' -S | FileCheck %s --check-prefixes=CHECK,OPT
-; RUN: opt < %s -passes='default<O3>' -S | FileCheck %s --check-prefixes=CHECK,OPT
+; RUN: opt < %s -O0 -S | FileCheck %s
+; RUN: opt < %s -O1 -S | FileCheck %s
+; RUN: opt < %s -O2 -S | FileCheck %s
+; RUN: opt < %s -O3 -S | FileCheck %s
+; RUN: opt < %s -passes='default<O0>' -S | FileCheck %s
+; RUN: opt < %s -passes='default<O1>' -S | FileCheck %s
+; RUN: opt < %s -passes='default<O2>' -S | FileCheck %s
+; RUN: opt < %s -passes='default<O3>' -S | FileCheck %s
 
 declare void @llvm.lifetime.start.p0(i64, ptr nocapture)
 declare void @llvm.lifetime.end.p0(i64, ptr nocapture)
@@ -63,9 +63,7 @@ entry:
 
   call void @llvm.lifetime.start.p0(i64 1, ptr %text)
   call void @llvm.lifetime.end.p0(i64 1, ptr %text)
-  ; OPT-NOT:    call void @llvm.lifetime
-  ; NOOPT:      call void @llvm.lifetime.start
-  ; NOOPT-NEXT: call void @llvm.lifetime.end
+  ; CHECK-NO: call void @llvm.lifetime
 
   call void @foo(ptr %text) ; Keep alloca alive
 

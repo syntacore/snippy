@@ -6,7 +6,6 @@ add_llvm_component_library(LLVMGlobalISel
   GlobalISel.cpp
   Combiner.cpp
   CombinerHelper.cpp
-  CombinerHelperVectorOps.cpp
   GIMatchTableExecutor.cpp
   GISelChangeObserver.cpp
   IRTranslator.cpp

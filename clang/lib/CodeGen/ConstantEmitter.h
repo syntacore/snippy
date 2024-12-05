@@ -103,9 +103,8 @@ public:
   /// expression is known to be a constant expression with either a fairly
   /// simple type or a known simple form.
   llvm::Constant *emitAbstract(const Expr *E, QualType T);
-  llvm::Constant *
-  emitAbstract(SourceLocation loc, const APValue &value, QualType T,
-               bool EnablePtrAuthFunctionTypeDiscrimination = true);
+  llvm::Constant *emitAbstract(SourceLocation loc, const APValue &value,
+                               QualType T);
 
   /// Try to emit the result of the given expression as an abstract constant.
   llvm::Constant *tryEmitAbstract(const Expr *E, QualType T);
@@ -113,9 +112,6 @@ public:
 
   llvm::Constant *tryEmitAbstract(const APValue &value, QualType T);
   llvm::Constant *tryEmitAbstractForMemory(const APValue &value, QualType T);
-
-  llvm::Constant *tryEmitConstantSignedPointer(llvm::Constant *Ptr,
-                                               PointerAuthQualifier Auth);
 
   llvm::Constant *tryEmitConstantExpr(const ConstantExpr *CE);
 
@@ -139,9 +135,7 @@ public:
   llvm::Constant *tryEmitPrivate(const Expr *E, QualType T);
   llvm::Constant *tryEmitPrivateForMemory(const Expr *E, QualType T);
 
-  llvm::Constant *
-  tryEmitPrivate(const APValue &value, QualType T,
-                 bool EnablePtrAuthFunctionTypeDiscrimination = true);
+  llvm::Constant *tryEmitPrivate(const APValue &value, QualType T);
   llvm::Constant *tryEmitPrivateForMemory(const APValue &value, QualType T);
 
   /// Get the address of the current location.  This is a constant

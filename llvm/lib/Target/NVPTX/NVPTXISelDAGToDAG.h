@@ -36,9 +36,11 @@ class LLVM_LIBRARY_VISIBILITY NVPTXDAGToDAGISel : public SelectionDAGISel {
   bool useF32FTZ() const;
   bool allowFMA() const;
   bool allowUnsafeFPMath() const;
-  bool doRsqrtOpt() const;
+  bool useShortPointers() const;
 
 public:
+  static char ID;
+
   NVPTXDAGToDAGISel() = delete;
 
   explicit NVPTXDAGToDAGISel(NVPTXTargetMachine &tm, CodeGenOptLevel OptLevel);
@@ -74,8 +76,7 @@ private:
   bool SelectSETP_F16X2(SDNode *N);
   bool SelectSETP_BF16X2(SDNode *N);
   bool tryEXTRACT_VECTOR_ELEMENT(SDNode *N);
-  void SelectV2I64toI128(SDNode *N);
-  void SelectI128toV2I64(SDNode *N);
+
   inline SDValue getI32Imm(unsigned Imm, const SDLoc &DL) {
     return CurDAG->getTargetConstant(Imm, DL, MVT::i32);
   }
@@ -99,13 +100,6 @@ private:
   bool ChkMemSDNodeAddressSpace(SDNode *N, unsigned int spN) const;
 
   static unsigned GetConvertOpcode(MVT DestTy, MVT SrcTy, LoadSDNode *N);
-};
-
-class NVPTXDAGToDAGISelLegacy : public SelectionDAGISelLegacy {
-public:
-  static char ID;
-  explicit NVPTXDAGToDAGISelLegacy(NVPTXTargetMachine &tm,
-                                   CodeGenOptLevel OptLevel);
 };
 } // end namespace llvm
 

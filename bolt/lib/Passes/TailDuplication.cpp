@@ -13,9 +13,9 @@
 #include "bolt/Passes/TailDuplication.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/MC/MCRegisterInfo.h"
+#include <queue>
 
 #include <numeric>
-#include <queue>
 
 #define DEBUG_TYPE "taildup"
 
@@ -633,9 +633,9 @@ void TailDuplication::runOnFunction(BinaryFunction &Function) {
     ModifiedFunctions++;
 }
 
-Error TailDuplication::runOnFunctions(BinaryContext &BC) {
+void TailDuplication::runOnFunctions(BinaryContext &BC) {
   if (opts::TailDuplicationMode == TailDuplication::TD_NONE)
-    return Error::success();
+    return;
 
   for (auto &It : BC.getBinaryFunctions()) {
     BinaryFunction &Function = It.second;
@@ -644,26 +644,23 @@ Error TailDuplication::runOnFunctions(BinaryContext &BC) {
     runOnFunction(Function);
   }
 
-  BC.outs()
-      << "BOLT-INFO: tail duplication"
-      << format(" modified %zu (%.2f%%) functions;", ModifiedFunctions,
-                100.0 * ModifiedFunctions / BC.getBinaryFunctions().size())
-      << format(" duplicated %zu blocks (%zu bytes) responsible for",
-                DuplicatedBlockCount, DuplicatedByteCount)
-      << format(" %zu dynamic executions (%.2f%% of all block executions)",
-                DuplicationsDynamicCount,
-                100.0 * DuplicationsDynamicCount / AllDynamicCount)
-      << "\n";
+  outs() << "BOLT-INFO: tail duplication"
+         << format(" modified %zu (%.2f%%) functions;", ModifiedFunctions,
+                   100.0 * ModifiedFunctions / BC.getBinaryFunctions().size())
+         << format(" duplicated %zu blocks (%zu bytes) responsible for",
+                   DuplicatedBlockCount, DuplicatedByteCount)
+         << format(" %zu dynamic executions (%.2f%% of all block executions)",
+                   DuplicationsDynamicCount,
+                   100.0 * DuplicationsDynamicCount / AllDynamicCount)
+         << "\n";
 
   if (opts::TailDuplicationConstCopyPropagation) {
-    BC.outs() << "BOLT-INFO: tail duplication "
-              << format(
-                     "applied %zu static and %zu dynamic propagation deletions",
+    outs() << "BOLT-INFO: tail duplication "
+           << format("applied %zu static and %zu dynamic propagation deletions",
                      StaticInstructionDeletionCount,
                      DynamicInstructionDeletionCount)
-              << "\n";
+           << "\n";
   }
-  return Error::success();
 }
 
 } // end namespace bolt

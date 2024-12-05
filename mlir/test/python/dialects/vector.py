@@ -51,16 +51,10 @@ def testTransferReadOp():
         with InsertionPoint(f.add_entry_block()):
             A, zero, padding, mask = f.arguments
             vector.TransferReadOp(
-                vector_type,
-                A,
-                [zero, zero],
-                identity_map_attr,
-                padding,
-                [False, False],
-                mask=mask,
+                vector_type, A, [zero, zero], identity_map_attr, padding, mask=mask
             )
             vector.TransferReadOp(
-                vector_type, A, [zero, zero], identity_map_attr, padding, [False, False]
+                vector_type, A, [zero, zero], identity_map_attr, padding
             )
             func.ReturnOp([])
 

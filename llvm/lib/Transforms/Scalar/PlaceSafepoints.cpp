@@ -60,7 +60,6 @@
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LegacyPassManager.h"
-#include "llvm/IR/Module.h"
 #include "llvm/IR/Statepoint.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -191,7 +190,7 @@ static bool enableBackedgeSafepoints(Function &F);
 static bool enableCallSafepoints(Function &F);
 
 static void
-InsertSafepointPoll(BasicBlock::iterator InsertBefore,
+InsertSafepointPoll(Instruction *InsertBefore,
                     std::vector<CallBase *> &ParsePointsNeeded /*rval*/,
                     const TargetLibraryInfo &TLI);
 
@@ -289,8 +288,6 @@ bool PlaceSafepointsPass::runImpl(Function &F, const TargetLibraryInfo &TLI) {
     // with for the moment.
     legacy::FunctionPassManager FPM(F.getParent());
     bool CanAssumeCallSafepoints = enableCallSafepoints(F);
-
-    FPM.add(new TargetLibraryInfoWrapperPass(TLI));
     auto *PBS = new PlaceBackedgeSafepointsLegacyPass(CanAssumeCallSafepoints);
     FPM.add(PBS);
     FPM.run(F);
@@ -311,7 +308,8 @@ bool PlaceSafepointsPass::runImpl(Function &F, const TargetLibraryInfo &TLI) {
     // We can sometimes end up with duplicate poll locations.  This happens if
     // a single loop is visited more than once.   The fact this happens seems
     // wrong, but it does happen for the split-backedge.ll test case.
-    PollLocations.erase(llvm::unique(PollLocations), PollLocations.end());
+    PollLocations.erase(std::unique(PollLocations.begin(), PollLocations.end()),
+                        PollLocations.end());
 
     // Insert a poll at each point the analysis pass identified
     // The poll location must be the terminator of a loop latch block.
@@ -370,7 +368,7 @@ bool PlaceSafepointsPass::runImpl(Function &F, const TargetLibraryInfo &TLI) {
   // safepoint polls themselves.
   for (Instruction *PollLocation : PollsNeeded) {
     std::vector<CallBase *> RuntimeCalls;
-    InsertSafepointPoll(PollLocation->getIterator(), RuntimeCalls, TLI);
+    InsertSafepointPoll(PollLocation, RuntimeCalls, TLI);
     llvm::append_range(ParsePointNeeded, RuntimeCalls);
   }
 
@@ -519,7 +517,7 @@ static bool doesNotRequireEntrySafepointBefore(CallBase *Call) {
     switch (II->getIntrinsicID()) {
     case Intrinsic::experimental_gc_statepoint:
     case Intrinsic::experimental_patchpoint_void:
-    case Intrinsic::experimental_patchpoint:
+    case Intrinsic::experimental_patchpoint_i64:
       // The can wrap an actual call which may grow the stack by an unbounded
       // amount or run forever.
       return false;
@@ -593,7 +591,7 @@ static Instruction *findLocationForEntrySafepoint(Function &F,
 const char GCSafepointPollName[] = "gc.safepoint_poll";
 
 static bool isGCSafepointPoll(Function &F) {
-  return F.getName() == GCSafepointPollName;
+  return F.getName().equals(GCSafepointPollName);
 }
 
 /// Returns true if this function should be rewritten to include safepoint
@@ -621,7 +619,7 @@ static bool enableCallSafepoints(Function &F) { return !NoCall; }
 // not handle the parsability of state at the runtime call, that's the
 // callers job.
 static void
-InsertSafepointPoll(BasicBlock::iterator InsertBefore,
+InsertSafepointPoll(Instruction *InsertBefore,
                     std::vector<CallBase *> &ParsePointsNeeded /*rval*/,
                     const TargetLibraryInfo &TLI) {
   BasicBlock *OrigBB = InsertBefore->getParent();

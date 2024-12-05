@@ -10,11 +10,10 @@
 #define LLVM_LIBC_SRC_PTHREAD_PTHREAD_MUTEXATTR_H
 
 #include "src/__support/common.h"
-#include "src/__support/macros/config.h"
 
 #include <pthread.h>
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 
 enum class PThreadMutexAttrPos : unsigned int {
   TYPE_SHIFT = 0,
@@ -44,11 +43,6 @@ LIBC_INLINE int get_mutexattr_robust(pthread_mutexattr_t attr) {
          unsigned(PThreadMutexAttrPos::ROBUST_SHIFT);
 }
 
-LIBC_INLINE int get_mutexattr_pshared(pthread_mutexattr_t attr) {
-  return (attr & unsigned(PThreadMutexAttrPos::PSHARED_MASK)) >>
-         unsigned(PThreadMutexAttrPos::PSHARED_SHIFT);
-}
-
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE
 
 #endif // LLVM_LIBC_SRC_PTHREAD_PTHREAD_MUTEXATTR_H

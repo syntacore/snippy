@@ -29,6 +29,6 @@ void check() {
 
 void test() {
   check<char>();
-  check<int>();
+  check<char const>();
   check<void>();
 }

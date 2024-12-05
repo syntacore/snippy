@@ -45,10 +45,15 @@ class Boolean final {
   Boolean operator-(const Boolean &Other) const { return Boolean(V - Other.V); }
   Boolean operator~() const { return Boolean(true); }
 
-  template <typename Ty, typename = std::enable_if_t<std::is_integral_v<Ty>>>
-  explicit operator Ty() const {
-    return V;
-  }
+  explicit operator int8_t() const { return V; }
+  explicit operator uint8_t() const { return V; }
+  explicit operator int16_t() const { return V; }
+  explicit operator uint16_t() const { return V; }
+  explicit operator int32_t() const { return V; }
+  explicit operator uint32_t() const { return V; }
+  explicit operator int64_t() const { return V; }
+  explicit operator uint64_t() const { return V; }
+  explicit operator bool() const { return V; }
 
   APSInt toAPSInt() const {
     return APSInt(APInt(1, static_cast<uint64_t>(V), false), true);
@@ -56,7 +61,7 @@ class Boolean final {
   APSInt toAPSInt(unsigned NumBits) const {
     return APSInt(toAPSInt().zextOrTrunc(NumBits), true);
   }
-  APValue toAPValue(const ASTContext &) const { return APValue(toAPSInt()); }
+  APValue toAPValue() const { return APValue(toAPSInt()); }
 
   Boolean toUnsigned() const { return *this; }
 

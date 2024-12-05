@@ -214,17 +214,16 @@ void PresburgerSpace::swapVar(VarKind kindA, VarKind kindB, unsigned posA,
     return;
 
   if (kindA == VarKind::Local) {
-    setId(kindB, posB, Identifier());
+    getId(kindB, posB) = Identifier();
     return;
   }
 
   if (kindB == VarKind::Local) {
-    setId(kindA, posA, Identifier());
+    getId(kindA, posA) = Identifier();
     return;
   }
 
-  std::swap(identifiers[getVarKindOffset(kindA) + posA],
-            identifiers[getVarKindOffset(kindB) + posB]);
+  std::swap(getId(kindA, posA), getId(kindB, posB));
 }
 
 bool PresburgerSpace::isCompatible(const PresburgerSpace &other) const {
@@ -286,7 +285,7 @@ bool PresburgerSpace::isAligned(const PresburgerSpace &other,
   return getNumVarKind(kind) == other.getNumVarKind(kind);
 }
 
-void PresburgerSpace::setVarSymbolSeparation(unsigned newSymbolCount) {
+void PresburgerSpace::setVarSymbolSeperation(unsigned newSymbolCount) {
   assert(newSymbolCount <= getNumDimAndSymbolVars() &&
          "invalid separation position");
   numRange = numRange + numSymbols - newSymbolCount;
@@ -312,7 +311,7 @@ void PresburgerSpace::mergeAndAlignSymbols(PresburgerSpace &other) {
       std::swap(findBegin, itr);
     } else {
       other.insertVar(VarKind::Symbol, i);
-      other.setId(VarKind::Symbol, i, identifier);
+      other.getId(VarKind::Symbol, i) = identifier;
     }
     ++i;
   }
@@ -320,7 +319,7 @@ void PresburgerSpace::mergeAndAlignSymbols(PresburgerSpace &other) {
   // Finally add identifiers that are in `other`, but not in `this` to `this`.
   for (unsigned e = other.getNumVarKind(VarKind::Symbol); i < e; ++i) {
     insertVar(VarKind::Symbol, i);
-    setId(VarKind::Symbol, i, other.getId(VarKind::Symbol, i));
+    getId(VarKind::Symbol, i) = other.getId(VarKind::Symbol, i);
   }
 }
 

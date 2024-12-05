@@ -12,7 +12,6 @@ static_library("boost") {
   ]
   sources = [
     "BoostTidyModule.cpp",
-    "UseRangesCheck.cpp",
     "UseToStringCheck.cpp",
   ]
 }

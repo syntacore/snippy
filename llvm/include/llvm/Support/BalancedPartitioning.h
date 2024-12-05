@@ -50,7 +50,7 @@
 
 namespace llvm {
 
-class ThreadPoolInterface;
+class ThreadPool;
 /// A function with a set of utility nodes where it is beneficial to order two
 /// functions close together if they have similar utility nodes
 class BPFunctionNode {
@@ -115,7 +115,7 @@ private:
   /// threads, so we need to track how many active threads that could spawn more
   /// threads.
   struct BPThreadPool {
-    ThreadPoolInterface &TheThreadPool;
+    ThreadPool &TheThreadPool;
     std::mutex mtx;
     std::condition_variable cv;
     /// The number of threads that could spawn more threads
@@ -128,8 +128,7 @@ private:
     /// acceptable for other threads to add more tasks while blocking on this
     /// call.
     void wait();
-    BPThreadPool(ThreadPoolInterface &TheThreadPool)
-        : TheThreadPool(TheThreadPool) {}
+    BPThreadPool(ThreadPool &TheThreadPool) : TheThreadPool(TheThreadPool) {}
   };
 
   /// Run a recursive bisection of a given list of FunctionNodes
@@ -142,8 +141,9 @@ private:
               std::optional<BPThreadPool> &TP) const;
 
   /// Run bisection iterations
-  void runIterations(const FunctionNodeRange Nodes, unsigned LeftBucket,
-                     unsigned RightBucket, std::mt19937 &RNG) const;
+  void runIterations(const FunctionNodeRange Nodes, unsigned RecDepth,
+                     unsigned LeftBucket, unsigned RightBucket,
+                     std::mt19937 &RNG) const;
 
   /// Run a bisection iteration to improve the optimization goal
   /// \returns the total number of moved FunctionNodes

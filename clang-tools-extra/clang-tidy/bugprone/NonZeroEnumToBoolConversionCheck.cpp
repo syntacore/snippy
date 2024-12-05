@@ -64,7 +64,7 @@ void NonZeroEnumToBoolConversionCheck::registerMatchers(MatchFinder *Finder) {
                                          EnumIgnoreList)))
                                 .bind("enum"))))),
                         unless(declRefExpr(to(enumConstantDecl()))),
-                        unless(ignoringParenImpCasts(ExcludedOperators)))),
+                        unless(ignoringImplicit(ExcludedOperators)))),
                unless(hasAncestor(staticAssertDecl())))
           .bind("cast"),
       this);

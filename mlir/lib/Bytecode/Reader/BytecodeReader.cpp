@@ -17,6 +17,7 @@
 #include "mlir/IR/Verifier.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/StringExtras.h"
@@ -375,7 +376,7 @@ public:
 
   /// Parse a shared string from the string section. The shared string is
   /// encoded using an index to a corresponding string in the string section.
-  LogicalResult parseString(EncodingReader &reader, StringRef &result) const {
+  LogicalResult parseString(EncodingReader &reader, StringRef &result) {
     return parseEntry(reader, strings, result, "string");
   }
 
@@ -383,7 +384,7 @@ public:
   /// encoded using an index to a corresponding string in the string section.
   /// This variant parses a flag compressed with the index.
   LogicalResult parseStringWithFlag(EncodingReader &reader, StringRef &result,
-                                    bool &flag) const {
+                                    bool &flag) {
     uint64_t entryIdx;
     if (failed(reader.parseVarIntWithFlag(entryIdx, flag)))
       return failure();
@@ -393,7 +394,7 @@ public:
   /// Parse a shared string from the string section. The shared string is
   /// encoded using an index to a corresponding string in the string section.
   LogicalResult parseStringAtIndex(EncodingReader &reader, uint64_t index,
-                                   StringRef &result) const {
+                                   StringRef &result) {
     return resolveEntry(reader, strings, index, result, "string");
   }
 
@@ -544,7 +545,7 @@ public:
 
   /// Parse a dialect resource handle from the resource section.
   LogicalResult parseResourceHandle(EncodingReader &reader,
-                                    AsmDialectResourceHandle &result) const {
+                                    AsmDialectResourceHandle &result) {
     return parseEntry(reader, dialectResources, result, "resource handle");
   }
 
@@ -706,7 +707,7 @@ LogicalResult ResourceSectionReader::initialize(
     auto resolveKey = [&](StringRef key) -> StringRef {
       auto it = dialectResourceHandleRenamingMap.find(key);
       if (it == dialectResourceHandleRenamingMap.end())
-        return key;
+        return "";
       return it->second;
     };
 
@@ -800,8 +801,8 @@ class AttrTypeReader {
   using TypeEntry = Entry<Type>;
 
 public:
-  AttrTypeReader(const StringSectionReader &stringReader,
-                 const ResourceSectionReader &resourceReader,
+  AttrTypeReader(StringSectionReader &stringReader,
+                 ResourceSectionReader &resourceReader,
                  const llvm::StringMap<BytecodeDialect *> &dialectsMap,
                  uint64_t &bytecodeVersion, Location fileLoc,
                  const ParserConfig &config)
@@ -881,11 +882,11 @@ private:
 
   /// The string section reader used to resolve string references when parsing
   /// custom encoded attribute/type entries.
-  const StringSectionReader &stringReader;
+  StringSectionReader &stringReader;
 
   /// The resource section reader used to resolve resource references when
   /// parsing custom encoded attribute/type entries.
-  const ResourceSectionReader &resourceReader;
+  ResourceSectionReader &resourceReader;
 
   /// The map of the loaded dialects used to retrieve dialect information, such
   /// as the dialect version.
@@ -908,8 +909,8 @@ private:
 class DialectReader : public DialectBytecodeReader {
 public:
   DialectReader(AttrTypeReader &attrTypeReader,
-                const StringSectionReader &stringReader,
-                const ResourceSectionReader &resourceReader,
+                StringSectionReader &stringReader,
+                ResourceSectionReader &resourceReader,
                 const llvm::StringMap<BytecodeDialect *> &dialectsMap,
                 EncodingReader &reader, uint64_t &bytecodeVersion)
       : attrTypeReader(attrTypeReader), stringReader(stringReader),
@@ -1042,8 +1043,8 @@ public:
 
 private:
   AttrTypeReader &attrTypeReader;
-  const StringSectionReader &stringReader;
-  const ResourceSectionReader &resourceReader;
+  StringSectionReader &stringReader;
+  ResourceSectionReader &resourceReader;
   const llvm::StringMap<BytecodeDialect *> &dialectsMap;
   EncodingReader &reader;
   uint64_t &bytecodeVersion;
@@ -1082,7 +1083,7 @@ public:
   }
 
   LogicalResult read(Location fileLoc, DialectReader &dialectReader,
-                     OperationName *opName, OperationState &opState) const {
+                     OperationName *opName, OperationState &opState) {
     uint64_t propertiesIdx;
     if (failed(dialectReader.readVarInt(propertiesIdx)))
       return failure();
@@ -1853,18 +1854,22 @@ BytecodeReader::Impl::parseOpName(EncodingReader &reader,
   // Check to see if this operation name has already been resolved. If we
   // haven't, load the dialect and build the operation name.
   if (!opName->opName) {
+    // Load the dialect and its version.
+    DialectReader dialectReader(attrTypeReader, stringReader, resourceReader,
+                                dialectsMap, reader, version);
+    if (failed(opName->dialect->load(dialectReader, getContext())))
+      return failure();
     // If the opName is empty, this is because we use to accept names such as
     // `foo` without any `.` separator. We shouldn't tolerate this in textual
     // format anymore but for now we'll be backward compatible. This can only
     // happen with unregistered dialects.
     if (opName->name.empty()) {
+      if (opName->dialect->getLoadedDialect())
+        return emitError(fileLoc) << "has an empty opname for dialect '"
+                                  << opName->dialect->name << "'\n";
+
       opName->opName.emplace(opName->dialect->name, getContext());
     } else {
-      // Load the dialect and its version.
-      DialectReader dialectReader(attrTypeReader, stringReader, resourceReader,
-                                  dialectsMap, reader, version);
-      if (failed(opName->dialect->load(dialectReader, getContext())))
-        return failure();
       opName->opName.emplace((opName->dialect->name + "." + opName->name).str(),
                              getContext());
     }
@@ -2329,11 +2334,8 @@ BytecodeReader::Impl::parseOpWithoutRegions(EncodingReader &reader,
   Operation *op = Operation::create(opState);
   readState.curBlock->push_back(op);
 
-  // If the operation had results, update the value references. We don't need to
-  // do this if the current value scope is empty. That is, the op was not
-  // encoded within a parent region.
-  if (readState.numValues && op->getNumResults() &&
-      failed(defineValues(reader, op->getResults())))
+  // If the operation had results, update the value references.
+  if (op->getNumResults() && failed(defineValues(reader, op->getResults())))
     return failure();
 
   /// Store a map for every value that received a custom use-list order from the

@@ -1,3 +1,4 @@
+// REQUIRES: mips-registered-target
 // -mindirect-jump=hazard -mips32
 // RUN: not %clang --target=mips-unknown-linux-gnu -mips32 -### -c %s \
 // RUN:        -mindirect-jump=hazard 2>&1 | FileCheck %s --check-prefix=MIPS32

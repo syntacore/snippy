@@ -11,7 +11,7 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%arg1 : !transform.any_op {transform.readonly}) {
     %matmul = transform.structured.match ops{["linalg.matmul"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
-    %a, %b, %c = transform.structured.tile_using_for %matmul tile_sizes [10, 20]
+    %a, %b, %c = transform.structured.tile_using_for %matmul [10, 20]
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
@@ -30,10 +30,10 @@ module attributes {transform.with_named_sequence} {
 //  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //      CHECK:   %[[OUTER:[a-zA-Z0-9]+]] = scf.for %[[IV0:[a-zA-Z0-9]+]] = %[[C0]] to %[[M]] step %[[C10]]
 // CHECK-SAME:       iter_args(%[[INIT0:.+]] = %[[ARG2]])
+//  CHECK-DAG:     %[[TS_Y:.+]] = affine.min #[[$MAP0]](%[[IV0]])[%[[M]]]
 //  CHECK-DAG:     %[[C20:.+]] = arith.constant 20 : index
 //      CHECK:     %[[INNER:[a-zA-Z0-9]+]] = scf.for %[[IV1:[a-zA-Z0-9]+]] = %[[C0]] to %[[N]] step %[[C20]]
 // CHECK-SAME:         iter_args(%[[INIT1:.+]] = %[[INIT0]])
-//  CHECK-DAG:       %[[TS_Y:.+]] = affine.min #[[$MAP0]](%[[IV0]])[%[[M]]]
 //      CHECK:       %[[TS_X:.+]] = affine.min #[[$MAP1]](%[[IV1]])[%[[N]]]
 //  CHECK-DAG:       %[[LHS_TILE:.+]] = tensor.extract_slice %[[ARG0]]
 // CHECK-SAME:           [%[[IV0]], 0] [%[[TS_Y]], %[[K]]] [1, 1]
@@ -63,7 +63,7 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%arg1 : !transform.any_op {transform.readonly}) {
     %matmul = transform.structured.match ops{["linalg.matmul"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
-    %a, %b, %c, %d = transform.structured.tile_using_for %matmul tile_sizes [10, 20, 30]
+    %a, %b, %c, %d = transform.structured.tile_using_for %matmul [10, 20, 30]
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
@@ -82,13 +82,13 @@ module attributes {transform.with_named_sequence} {
 //  CHECK-DAG:   %[[K:.+]] = memref.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG:   %[[N:.+]] = memref.dim %[[ARG1]], %[[C1]]
 //      CHECK:   scf.for %[[IV0:[a-zA-Z0-9]+]] = %[[C0]] to %[[M]] step %[[C10]]
+//  CHECK-DAG:     %[[TS_M:.+]] = affine.min #[[$MAP0]](%[[IV0]])[%[[M]]]
 //  CHECK-DAG:     %[[C20:.+]] = arith.constant 20 : index
 //      CHECK:     scf.for %[[IV1:[a-zA-Z0-9]+]] = %[[C0]] to %[[N]] step %[[C20]]
+//  CHECK-DAG:       %[[TS_N:.+]] = affine.min #[[$MAP1]](%[[IV1]])[%[[N]]]
 //  CHECK-DAG:       %[[C30:.+]] = arith.constant 30 : index
 //      CHECK:       scf.for %[[IV2:[a-zA-Z0-9]+]] = %[[C0]] to %[[K]] step %[[C30]]
-//  CHECK-DAG:         %[[TS_M:.+]] = affine.min #[[$MAP0]](%[[IV0]])[%[[M]]]
-//  CHECK-DAG:         %[[TS_N:.+]] = affine.min #[[$MAP1]](%[[IV1]])[%[[N]]]
-//  CHECK-DAG:         %[[TS_K:.+]] = affine.min #[[$MAP2]](%[[IV2]])[%[[K]]]
+//      CHECK:         %[[TS_K:.+]] = affine.min #[[$MAP2]](%[[IV2]])[%[[K]]]
 //  CHECK-DAG:         %[[LHS_TILE:.+]] = memref.subview %[[ARG0]]
 // CHECK-SAME:             [%[[IV0]], %[[IV2]]] [%[[TS_M]], %[[TS_K]]] [1, 1]
 //  CHECK-DAG:         %[[RHS_TILE:.+]] = memref.subview %[[ARG1]]
@@ -122,7 +122,7 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%arg1 : !transform.any_op {transform.readonly}) {
     %generic = transform.structured.match ops{["linalg.generic"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
-    %a, %b, %c = transform.structured.tile_using_for %generic tile_sizes [10, 0, 20]
+    %a, %b, %c = transform.structured.tile_using_for %generic [10, 0, 20]
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
@@ -137,11 +137,11 @@ module attributes {transform.with_named_sequence} {
 //   CHECK-DAG:   %[[INIT1:.+]] = tensor.empty()
 //       CHECK:   %[[OUTER:[a-zA-Z0-9]+]]:2 = scf.for %[[IV0:[a-zA-Z0-9]+]] = %[[C0]] to %[[C128]] step %[[C10]]
 //  CHECK-SAME:       iter_args(%[[ARG1:[a-zA-Z0-9]+]] = %[[INIT0]], %[[ARG2:[a-zA-Z0-9]+]] = %[[INIT1]])
+//   CHECK-DAG:     %[[TS_Y:.+]] = affine.min #[[$MAP0]](%[[IV0]])
 //   CHECK-DAG:     %[[C300:.+]] = arith.constant 300 : index
 //   CHECK-DAG:     %[[C20:.+]] = arith.constant 20 : index
 //       CHECK:     %[[INNER:[a-zA-Z0-9]+]]:2 = scf.for %[[IV1:[a-zA-Z0-9]+]] = %[[C0]] to %[[C300]] step %[[C20]]
 //  CHECK-SAME:         iter_args(%[[ARG3:[a-zA-Z0-9]+]] = %[[ARG1]], %[[ARG4:[a-zA-Z0-9]+]] = %[[ARG2]])
-//   CHECK-DAG:       %[[TS_Y:.+]] = affine.min #[[$MAP0]](%[[IV0]])
 //   CHECK-DAG:       %[[ARG_TILE:.+]] = tensor.extract_slice %[[ARG0]]
 //  CHECK-SAME:           [%[[IV0]], 0, %[[IV1]]] [%[[TS_Y]], 200, 20] [1, 1, 1]
 //   CHECK-DAG:       %[[INIT0_TILE:.+]] = tensor.extract_slice %[[ARG3]]
@@ -175,7 +175,7 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%arg1 : !transform.any_op {transform.readonly}) {
     %conv = transform.structured.match ops{["linalg.conv_2d_nhwc_hwcf"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
-    %a, %b, %c, %d = transform.structured.tile_using_for %conv tile_sizes [0, 0, 0, 0, 10, 20, 30]
+    %a, %b, %c, %d = transform.structured.tile_using_for %conv [0, 0, 0, 0, 10, 20, 30]
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
@@ -203,14 +203,14 @@ module attributes {transform.with_named_sequence} {
 //  CHECK-DAG:   %[[S:.+]] = tensor.dim %[[INIT]], %[[C2]]
 //      CHECK:   scf.for %[[IV0:[a-zA-Z0-9]+]] = %[[C0]] to %[[P]] step %[[C10]]
 // CHECK-SAME:       iter_args(%[[INIT0:.+]] = %[[INIT]])
+//  CHECK-DAG:     %[[TS_P:.+]] = affine.min #[[$MAP0]](%[[IV0]])[%[[P]]]
 //  CHECK-DAG:     %[[C20:.+]] = arith.constant 20 : index
 //      CHECK:     scf.for %[[IV1:[a-zA-Z0-9]+]] = %[[C0]] to %[[Q]] step %[[C20]]
 // CHECK-SAME:         iter_args(%[[INIT1:.+]] = %[[INIT0]])
+//  CHECK-DAG:       %[[TS_Q:.+]] = affine.min #[[$MAP1]](%[[IV1]])[%[[Q]]]
 //  CHECK-DAG:       %[[C30:.+]] = arith.constant 30 : index
 //      CHECK:       scf.for %[[IV2:[a-zA-Z0-9]+]] = %[[C0]] to %[[C]] step %[[C30]]
 // CHECK-SAME:           iter_args(%[[INIT2:.+]] = %[[INIT1]])
-//  CHECK-DAG:         %[[TS_P:.+]] = affine.min #[[$MAP0]](%[[IV0]])[%[[P]]]
-//  CHECK-DAG:         %[[TS_Q:.+]] = affine.min #[[$MAP1]](%[[IV1]])[%[[Q]]]
 //  CHECK-DAG:         %[[TS_C:.+]] = affine.min #[[$MAP2]](%[[IV2]])[%[[C]]]
 //  CHECK-DAG:         %[[TS_H:.+]] = affine.apply #[[$MAP3]](%[[TS_P]])[%[[R]]]
 //  CHECK-DAG:         %[[TS_W:.+]] = affine.apply #[[$MAP4]](%[[TS_Q]])[%[[S]]]
@@ -254,7 +254,7 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%arg1 : !transform.any_op {transform.readonly}) {
     %generic = transform.structured.match ops{["linalg.generic"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
-    %a, %b, %c = transform.structured.tile_using_for %generic tile_sizes [10, 20]
+    %a, %b, %c = transform.structured.tile_using_for %generic [10, 20]
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
@@ -282,7 +282,7 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%arg1 : !transform.any_op {transform.readonly}) {
     %matmul = transform.structured.match ops{["linalg.matmul"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
-    %a, %b, %c, %d = transform.structured.tile_using_for %matmul tile_sizes [10, 20, 30] interchange = [1, 2, 0]
+    %a, %b, %c, %d = transform.structured.tile_using_for %matmul [10, 20, 30] interchange = [1, 2, 0]
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
@@ -302,14 +302,14 @@ module attributes {transform.with_named_sequence} {
 //  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //      CHECK:   %[[OUTER:[a-zA-Z0-9]+]] = scf.for %[[IV0:[a-zA-Z0-9]+]] = %[[C0]] to %[[N]] step %[[C20]]
 // CHECK-SAME:       iter_args(%[[INIT0:.+]] = %[[ARG2]])
+//  CHECK-DAG:     %[[TS_N:.+]] = affine.min #[[$MAP0]](%[[IV0]])[%[[N]]]
 //  CHECK-DAG:     %[[C30:.+]] = arith.constant 30 : index
 //      CHECK:     %[[INNER1:[a-zA-Z0-9]+]] = scf.for %[[IV1:[a-zA-Z0-9]+]] = %[[C0]] to %[[K]] step %[[C30]]
 // CHECK-SAME:         iter_args(%[[INIT1:.+]] = %[[INIT0]])
+//  CHECK-DAG:       %[[TS_K:.+]] = affine.min #[[$MAP1]](%[[IV1]])[%[[K]]]
 //  CHECK-DAG:       %[[C10:.+]] = arith.constant 10 : index
 //      CHECK:       %[[INNER2:[a-zA-Z0-9]+]] = scf.for %[[IV2:[a-zA-Z0-9]+]] = %[[C0]] to %[[M]] step %[[C10]]
 // CHECK-SAME:           iter_args(%[[INIT2:.+]] = %[[INIT1]])
-//  CHECK-DAG:         %[[TS_N:.+]] = affine.min #[[$MAP0]](%[[IV0]])[%[[N]]]
-//  CHECK-DAG:         %[[TS_K:.+]] = affine.min #[[$MAP1]](%[[IV1]])[%[[K]]]
 //  CHECK-DAG:         %[[TS_M:.+]] = affine.min #[[$MAP2]](%[[IV2]])[%[[M]]]
 //  CHECK-DAG:         %[[LHS_TILE:.+]] = tensor.extract_slice %[[ARG0]]
 // CHECK-SAME:             [%[[IV2]], %[[IV1]]] [%[[TS_M]], %[[TS_K]]] [1, 1]
@@ -338,7 +338,7 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%arg1 : !transform.any_op {transform.readonly}) {
     %copy = transform.structured.match ops{["linalg.copy"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
-    %a, %b, %c = transform.structured.tile_using_for %copy tile_sizes [10, 20]
+    %a, %b, %c = transform.structured.tile_using_for %copy [10, 20]
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
@@ -369,7 +369,7 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%arg1 : !transform.any_op {transform.readonly}) {
     %generic = transform.structured.match ops{["linalg.generic"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
-    %a = transform.structured.tile_using_for %generic tile_sizes []
+    %a = transform.structured.tile_using_for %generic []
       : (!transform.any_op) -> (!transform.any_op)
     transform.yield
   }
@@ -396,7 +396,7 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%arg1 : !transform.any_op {transform.readonly}) {
     %generic = transform.structured.match ops{["linalg.generic"]} in %arg1
       : (!transform.any_op) -> !transform.any_op
-    %a = transform.structured.tile_using_for %generic tile_sizes []
+    %a = transform.structured.tile_using_for %generic []
       : (!transform.any_op) -> (!transform.any_op)
     transform.yield
   }

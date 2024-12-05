@@ -606,7 +606,8 @@ bool MigrationProcess::applyTransform(TransformFn trans,
     llvm::raw_svector_ostream vecOS(newText);
     buf.write(vecOS);
     std::unique_ptr<llvm::MemoryBuffer> memBuf(
-        llvm::MemoryBuffer::getMemBufferCopy(newText.str(), newFname));
+        llvm::MemoryBuffer::getMemBufferCopy(
+            StringRef(newText.data(), newText.size()), newFname));
     SmallString<64> filePath(file->getName());
     Unit->getFileManager().FixupRelativePath(filePath);
     Remapper.remap(filePath.str(), std::move(memBuf));

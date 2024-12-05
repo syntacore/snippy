@@ -1,3 +1,4 @@
+// REQUIRES: x86-registered-target
 // UNSUPPORTED: system-windows
 
 // RUN: not %clang -### -x hip --target=x86_64-linux-gnu --offload= \

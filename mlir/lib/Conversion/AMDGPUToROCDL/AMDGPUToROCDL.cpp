@@ -38,7 +38,7 @@ static Value createI32Constant(ConversionPatternRewriter &rewriter,
 static Value createI1Constant(ConversionPatternRewriter &rewriter, Location loc,
                               bool value) {
   Type llvmI1 = rewriter.getI1Type();
-  return rewriter.create<LLVM::ConstantOp>(loc, llvmI1, value);
+  return rewriter.createOrFold<LLVM::ConstantOp>(loc, llvmI1, value);
 }
 
 namespace {
@@ -163,7 +163,7 @@ struct RawBufferOpLowering : public ConvertOpToLLVMPattern<GpuOp> {
     Value ptr = memrefDescriptor.alignedPtr(rewriter, loc);
     // The stride value is always 0 for raw buffers. This also disables
     // swizling.
-    Value stride = rewriter.create<LLVM::ConstantOp>(
+    Value stride = rewriter.createOrFold<LLVM::ConstantOp>(
         loc, llvmI16, rewriter.getI16IntegerAttr(0));
     Value numRecords;
     if (memrefType.hasStaticShape()) {
@@ -270,54 +270,21 @@ struct RawBufferOpLowering : public ConvertOpToLLVMPattern<GpuOp> {
 };
 
 struct LDSBarrierOpLowering : public ConvertOpToLLVMPattern<LDSBarrierOp> {
-  LDSBarrierOpLowering(LLVMTypeConverter &converter, Chipset chipset)
-      : ConvertOpToLLVMPattern<LDSBarrierOp>(converter), chipset(chipset) {}
-
-  Chipset chipset;
+  using ConvertOpToLLVMPattern<LDSBarrierOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
   matchAndRewrite(LDSBarrierOp op, LDSBarrierOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    bool requiresInlineAsm =
-        chipset.majorVersion < 9 ||
-        (chipset.majorVersion == 9 && chipset.minorVersion < 0x0a) ||
-        (chipset.majorVersion == 11);
-
-    if (requiresInlineAsm) {
-      auto asmDialectAttr = LLVM::AsmDialectAttr::get(rewriter.getContext(),
-                                                      LLVM::AsmDialect::AD_ATT);
-      const char *asmStr =
-          ";;;WARNING: BREAKS DEBUG WATCHES\ns_waitcnt lgkmcnt(0)\ns_barrier";
-      const char *constraints = "";
-      rewriter.replaceOpWithNewOp<LLVM::InlineAsmOp>(
-          op,
-          /*resultTypes=*/TypeRange(), /*operands=*/ValueRange(),
-          /*asm_string=*/asmStr, constraints, /*has_side_effects=*/true,
-          /*is_align_stack=*/false, /*asm_dialect=*/asmDialectAttr,
-          /*operand_attrs=*/ArrayAttr());
-      return success();
-    }
-    constexpr int32_t ldsOnlyBitsGfx6789 = ~(0x1f << 8);
-    constexpr int32_t ldsOnlyBitsGfx10 = ~(0x3f << 8);
-    // Left in place in case someone disables the inline ASM path or future
-    // chipsets use the same bit pattern.
-    constexpr int32_t ldsOnlyBitsGfx11 = ~(0x3f << 4);
-
-    int32_t ldsOnlyBits;
-    if (chipset.majorVersion == 11)
-      ldsOnlyBits = ldsOnlyBitsGfx11;
-    else if (chipset.majorVersion == 10)
-      ldsOnlyBits = ldsOnlyBitsGfx10;
-    else if (chipset.majorVersion <= 9)
-      ldsOnlyBits = ldsOnlyBitsGfx6789;
-    else
-      return op.emitOpError(
-                 "don't know how to lower this for chipset major version")
-             << chipset.majorVersion;
-
-    Location loc = op->getLoc();
-    rewriter.create<ROCDL::WaitcntOp>(loc, ldsOnlyBits);
-    rewriter.replaceOpWithNewOp<ROCDL::SBarrierOp>(op);
+    auto asmDialectAttr = LLVM::AsmDialectAttr::get(rewriter.getContext(),
+                                                    LLVM::AsmDialect::AD_ATT);
+    const char *asmStr = "s_waitcnt lgkmcnt(0)\ns_barrier";
+    const char *constraints = "";
+    rewriter.replaceOpWithNewOp<LLVM::InlineAsmOp>(
+        op,
+        /*resultTypes=*/TypeRange(), /*operands=*/ValueRange(),
+        /*asm_string=*/asmStr, constraints, /*has_side_effects=*/true,
+        /*is_align_stack=*/false, /*asm_dialect=*/asmDialectAttr,
+        /*operand_attrs=*/ArrayAttr());
     return success();
   }
 };
@@ -371,7 +338,7 @@ static void wmmaPushInputOperand(ConversionPatternRewriter &rewriter,
                                  bool isUnsigned, Value llvmInput,
                                  SmallVector<Value, 4> &operands) {
   Type inputType = llvmInput.getType();
-  auto vectorType = dyn_cast<VectorType>(inputType);
+  auto vectorType = inputType.dyn_cast<VectorType>();
   Type elemType = vectorType.getElementType();
 
   if (elemType.isBF16())
@@ -414,7 +381,7 @@ static void wmmaPushOutputOperand(ConversionPatternRewriter &rewriter,
                                   Value output, int32_t subwordOffset,
                                   bool clamp, SmallVector<Value, 4> &operands) {
   Type inputType = output.getType();
-  auto vectorType = dyn_cast<VectorType>(inputType);
+  auto vectorType = inputType.dyn_cast<VectorType>();
   Type elemType = vectorType.getElementType();
   if (elemType.isBF16())
     output = rewriter.create<LLVM::BitcastOp>(
@@ -569,8 +536,9 @@ static std::optional<StringRef> mfmaOpToIntrinsic(MFMAOp mfma,
 /// on the architecture you are compiling for.
 static std::optional<StringRef> wmmaOpToIntrinsic(WMMAOp wmma,
                                                   Chipset chipset) {
-  auto sourceVectorType = dyn_cast<VectorType>(wmma.getSourceA().getType());
-  auto destVectorType = dyn_cast<VectorType>(wmma.getDestC().getType());
+
+  auto sourceVectorType = wmma.getSourceA().getType().dyn_cast<VectorType>();
+  auto destVectorType = wmma.getDestC().getType().dyn_cast<VectorType>();
   auto elemSourceType = sourceVectorType.getElementType();
   auto elemDestType = destVectorType.getElementType();
 
@@ -726,7 +694,7 @@ LogicalResult ExtPackedFp8OpLowering::matchAndRewrite(
   Type f32 = getTypeConverter()->convertType(op.getResult().getType());
 
   Value source = adaptor.getSource();
-  auto sourceVecType = dyn_cast<VectorType>(op.getSource().getType());
+  auto sourceVecType = op.getSource().getType().dyn_cast<VectorType>();
   Type sourceElemType = getElementTypeOrSelf(op.getSource());
   // Extend to a v4i8
   if (!sourceVecType || sourceVecType.getNumElements() < 4) {
@@ -866,6 +834,7 @@ void mlir::populateAMDGPUToROCDLConversionPatterns(LLVMTypeConverter &converter,
     return converter.convertType(t.clone(IntegerType::get(t.getContext(), 16)));
   });
 
+  patterns.add<LDSBarrierOpLowering>(converter);
   patterns
       .add<RawBufferOpLowering<RawBufferLoadOp, ROCDL::RawPtrBufferLoadOp>,
            RawBufferOpLowering<RawBufferStoreOp, ROCDL::RawPtrBufferStoreOp>,
@@ -879,9 +848,9 @@ void mlir::populateAMDGPUToROCDLConversionPatterns(LLVMTypeConverter &converter,
                                ROCDL::RawPtrBufferAtomicUminOp>,
            RawBufferOpLowering<RawBufferAtomicCmpswapOp,
                                ROCDL::RawPtrBufferAtomicCmpSwap>,
-           LDSBarrierOpLowering, MFMAOpLowering, WMMAOpLowering,
-           ExtPackedFp8OpLowering, PackedTrunc2xFp8OpLowering,
-           PackedStochRoundFp8OpLowering>(converter, chipset);
+           MFMAOpLowering, WMMAOpLowering, ExtPackedFp8OpLowering,
+           PackedTrunc2xFp8OpLowering, PackedStochRoundFp8OpLowering>(converter,
+                                                                      chipset);
 }
 
 std::unique_ptr<Pass> mlir::createConvertAMDGPUToROCDLPass() {

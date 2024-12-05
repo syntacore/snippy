@@ -341,7 +341,7 @@ typedef std::unordered_map<BinaryFunction *, std::vector<BinaryFunction *>,
 namespace llvm {
 namespace bolt {
 
-Error IdenticalCodeFolding::runOnFunctions(BinaryContext &BC) {
+void IdenticalCodeFolding::runOnFunctions(BinaryContext &BC) {
   const size_t OriginalFunctionCount = BC.getBinaryFunctions().size();
   uint64_t NumFunctionsFolded = 0;
   std::atomic<uint64_t> NumJTFunctionsFolded{0};
@@ -356,10 +356,7 @@ Error IdenticalCodeFolding::runOnFunctions(BinaryContext &BC) {
                                         "ICF breakdown", opts::TimeICF);
     ParallelUtilities::WorkFuncTy WorkFun = [&](BinaryFunction &BF) {
       // Make sure indices are in-order.
-      if (opts::ICFUseDFS)
-        BF.getLayout().updateLayoutIndices(BF.dfs());
-      else
-        BF.getLayout().updateLayoutIndices();
+      BF.getLayout().updateLayoutIndices();
 
       // Pre-compute hash before pushing into hashtable.
       // Hash instruction operands to minimize hash collisions.
@@ -400,7 +397,7 @@ Error IdenticalCodeFolding::runOnFunctions(BinaryContext &BC) {
     Timer SinglePass("single fold pass", "single fold pass");
     LLVM_DEBUG(SinglePass.startTimer());
 
-    ThreadPoolInterface *ThPool;
+    ThreadPool *ThPool;
     if (!opts::NoThreads)
       ThPool = &ParallelUtilities::getThreadPool();
 
@@ -511,16 +508,14 @@ Error IdenticalCodeFolding::runOnFunctions(BinaryContext &BC) {
   });
 
   if (NumFunctionsFolded)
-    BC.outs() << "BOLT-INFO: ICF folded " << NumFunctionsFolded << " out of "
-              << OriginalFunctionCount << " functions in " << Iteration
-              << " passes. " << NumJTFunctionsFolded
-              << " functions had jump tables.\n"
-              << "BOLT-INFO: Removing all identical functions will save "
-              << format("%.2lf", (double)BytesSavedEstimate / 1024)
-              << " KB of code space. Folded functions were called " << NumCalled
-              << " times based on profile.\n";
-
-  return Error::success();
+    outs() << "BOLT-INFO: ICF folded " << NumFunctionsFolded << " out of "
+           << OriginalFunctionCount << " functions in " << Iteration
+           << " passes. " << NumJTFunctionsFolded
+           << " functions had jump tables.\n"
+           << "BOLT-INFO: Removing all identical functions will save "
+           << format("%.2lf", (double)BytesSavedEstimate / 1024)
+           << " KB of code space. Folded functions were called " << NumCalled
+           << " times based on profile.\n";
 }
 
 } // namespace bolt

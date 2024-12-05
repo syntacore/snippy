@@ -13,7 +13,6 @@
 
 #include "MCTargetDesc/PPCMCExpr.h"
 #include "PPC.h"
-#include "PPCMachineFunctionInfo.h"
 #include "PPCSubtarget.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
@@ -24,7 +23,6 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Mangler.h"
-#include "llvm/IR/Module.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCInst.h"
@@ -83,8 +81,6 @@ static MCOperand GetSymbolRef(const MachineOperand &MO, const MCSymbol *Symbol,
   }
 
   const TargetMachine &TM = Printer.TM;
-  const MachineInstr *MI = MO.getParent();
-  const MachineFunction *MF = MI->getMF();
 
   if (MO.getTargetFlags() == PPCII::MO_PLT)
     RefKind = MCSymbolRefExpr::VK_PLT;
@@ -100,26 +96,19 @@ static MCOperand GetSymbolRef(const MachineOperand &MO, const MCSymbol *Symbol,
     RefKind = MCSymbolRefExpr::VK_PPC_GOT_TLSLD_PCREL;
   else if (MO.getTargetFlags() == PPCII::MO_GOT_TPREL_PCREL_FLAG)
     RefKind = MCSymbolRefExpr::VK_PPC_GOT_TPREL_PCREL;
-  else if (MO.getTargetFlags() == PPCII::MO_TPREL_FLAG ||
-           MO.getTargetFlags() == PPCII::MO_TLSLD_FLAG) {
+  else if (MO.getTargetFlags() == PPCII::MO_TPREL_FLAG) {
     assert(MO.isGlobal() && "Only expecting a global MachineOperand here!");
     TLSModel::Model Model = TM.getTLSModel(MO.getGlobal());
-    const PPCFunctionInfo *FuncInfo = MF->getInfo<PPCFunctionInfo>();
-    // For the local-[exec|dynamic] TLS model, we may generate the offset from
-    // the TLS base as an immediate operand (instead of using a TOC entry). Set
-    // the relocation type in case the result is used for purposes other than a
-    // TOC reference. In TOC reference cases, this result is discarded.
+    // For the local-exec TLS model, we may generate the offset from the TLS
+    // base as an immediate operand (instead of using a TOC entry).
+    // Set the relocation type in case the result is used for purposes other
+    // than a TOC reference. In TOC reference cases, this result is discarded.
     if (Model == TLSModel::LocalExec)
       RefKind = MCSymbolRefExpr::VK_PPC_AIX_TLSLE;
-    else if (Model == TLSModel::LocalDynamic &&
-             FuncInfo->isAIXFuncUseTLSIEForLD())
-      // On AIX, TLS model opt may have turned local-dynamic accesses into
-      // initial-exec accesses.
-      RefKind = MCSymbolRefExpr::VK_PPC_AIX_TLSIE;
-    else if (Model == TLSModel::LocalDynamic)
-      RefKind = MCSymbolRefExpr::VK_PPC_AIX_TLSLD;
   }
 
+  const MachineInstr *MI = MO.getParent();
+  const MachineFunction *MF = MI->getMF();
   const Module *M = MF->getFunction().getParent();
   const PPCSubtarget *Subtarget = &(MF->getSubtarget<PPCSubtarget>());
 

@@ -20,7 +20,6 @@ unittest("AArch64Tests") {
     "AArch64SVESchedPseudoTest.cpp",
     "AddressingModes.cpp",
     "DecomposeStackOffsetTest.cpp",
-    "Immediates.cpp",
     "InstSizes.cpp",
     "MatrixRegisterAliasing.cpp",
     "SMEAttributesTest.cpp",

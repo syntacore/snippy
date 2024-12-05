@@ -1,5 +1,3 @@
-set(LLVM_SUBPROJECT_TITLE "BOLT")
-
 include(ExternalProject)
 
 set(BOLT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
@@ -47,9 +45,9 @@ if (BOLT_ENABLE_RUNTIME)
   execute_process(COMMAND ls /proc/self/map_files
     RESULT_VARIABLE LS OUTPUT_QUIET ERROR_QUIET)
   if (LS)
+    set(BOLT_ENABLE_RUNTIME OFF)
     message(WARNING
-      "BOLT runtime may not be able to read /proc/self/map_files. Please use
-      `--instrumentation-binpath <path-to-instrumented-binary>` option.")
+      "BOLT runtime is disabled as /proc/self/map_files is unreadable.")
   endif()
 endif()
 
@@ -123,7 +121,7 @@ option(BOLT_BUILD_TOOLS
   "Build the BOLT tools. If OFF, just generate build targets." ON)
 
 add_custom_target(bolt)
-set_target_properties(bolt PROPERTIES FOLDER "BOLT/Metatargets")
+set_target_properties(bolt PROPERTIES FOLDER "BOLT")
 add_llvm_install_targets(install-bolt DEPENDS bolt COMPONENT bolt)
 
 include_directories(

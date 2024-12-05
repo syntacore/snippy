@@ -128,10 +128,8 @@ public:
                              const DIScope *Context) = 0;
 
   /// Add a new global type to the compile unit.
-  virtual void addGlobalTypeImpl(const DIType *Ty, const DIE &Die,
-                                 const DIScope *Context) = 0;
-
-  void addGlobalType(const DIType *Ty, const DIE &Die, const DIScope *Context);
+  virtual void addGlobalType(const DIType *Ty, const DIE &Die,
+                             const DIScope *Context) = 0;
 
   /// Returns the DIE map slot for the specified debug variable.
   ///
@@ -399,8 +397,8 @@ public:
   }
   void addGlobalName(StringRef Name, const DIE &Die,
                      const DIScope *Context) override;
-  void addGlobalTypeImpl(const DIType *Ty, const DIE &Die,
-                         const DIScope *Context) override;
+  void addGlobalType(const DIType *Ty, const DIE &Die,
+                     const DIScope *Context) override;
   DwarfCompileUnit &getCU() override { return CU; }
 };
 } // end llvm namespace

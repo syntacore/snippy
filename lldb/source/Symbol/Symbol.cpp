@@ -101,15 +101,18 @@ const Symbol &Symbol::operator=(const Symbol &rhs) {
 llvm::Expected<Symbol> Symbol::FromJSON(const JSONSymbol &symbol,
                                         SectionList *section_list) {
   if (!section_list)
-    return llvm::createStringError("no section list provided");
+    return llvm::make_error<llvm::StringError>("no section list provided",
+                                               llvm::inconvertibleErrorCode());
 
   if (!symbol.value && !symbol.address)
-    return llvm::createStringError(
-        "symbol must contain either a value or an address");
+    return llvm::make_error<llvm::StringError>(
+        "symbol must contain either a value or an address",
+        llvm::inconvertibleErrorCode());
 
   if (symbol.value && symbol.address)
-    return llvm::createStringError(
-        "symbol cannot contain both a value and an address");
+    return llvm::make_error<llvm::StringError>(
+        "symbol cannot contain both a value and an address",
+        llvm::inconvertibleErrorCode());
 
   const uint64_t size = symbol.size.value_or(0);
   const bool is_artificial = false;
@@ -130,8 +133,9 @@ llvm::Expected<Symbol> Symbol::FromJSON(const JSONSymbol &symbol,
                     AddressRange(section_sp, offset, size), size_is_valid,
                     contains_linker_annotations, flags);
     }
-    return llvm::createStringError(
-        llvm::formatv("no section found for address: {0:x}", *symbol.address));
+    return llvm::make_error<llvm::StringError>(
+        llvm::formatv("no section found for address: {0:x}", *symbol.address),
+        llvm::inconvertibleErrorCode());
   }
 
   // Absolute symbols encode the integer value in the m_offset of the

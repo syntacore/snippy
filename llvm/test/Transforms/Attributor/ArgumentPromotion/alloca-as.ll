@@ -51,7 +51,5 @@ entry:
 
 declare void @use(i32)
 ;.
-; TUNIT: attributes #[[ATTR0]] = { memory(readwrite, argmem: none) }
-;.
-; CGSCC: attributes #[[ATTR0]] = { memory(readwrite, argmem: none) }
+; CHECK: attributes #[[ATTR0]] = { memory(readwrite, argmem: none) }
 ;.

@@ -44,7 +44,7 @@ import time
 import traceback
 
 # Third-party modules
-import unittest
+import unittest2
 
 # LLDB modules
 import lldb
@@ -229,7 +229,7 @@ def pointer_size():
 
 def is_exe(fpath):
     """Returns true if fpath is an executable."""
-    if fpath is None:
+    if fpath == None:
         return False
     if sys.platform == "win32":
         if not fpath.endswith(".exe"):
@@ -517,7 +517,7 @@ def builder_module():
     return lldbplatformutil.builder_module()
 
 
-class Base(unittest.TestCase):
+class Base(unittest2.TestCase):
     """
     Abstract base for performing lldb (see TestBase) or other generic tests (see
     BenchBase for one example).  lldbtest.Base works with the test driver to
@@ -530,14 +530,6 @@ class Base(unittest.TestCase):
 
     # Keep track of the old current working directory.
     oldcwd = None
-
-    # Maximum allowed attempts when launching the inferior process.
-    # Can be overridden by the LLDB_MAX_LAUNCH_COUNT environment variable.
-    maxLaunchCount = 1
-
-    # Time to wait before the next launching attempt in second(s).
-    # Can be overridden by the LLDB_TIME_WAIT_NEXT_LAUNCH environment variable.
-    timeWaitNextLaunch = 1.0
 
     @staticmethod
     def compute_mydir(test_file):
@@ -759,8 +751,6 @@ class Base(unittest.TestCase):
             "settings set symbols.enable-external-lookup false",
             # Inherit the TCC permissions from the inferior's parent.
             "settings set target.inherit-tcc true",
-            # Based on https://discourse.llvm.org/t/running-lldb-in-a-container/76801/4
-            "settings set target.disable-aslr false",
             # Kill rather than detach from the inferior if something goes wrong.
             "settings set target.detach-on-error false",
             # Disable fix-its by default so that incorrect expressions in tests don't
@@ -803,12 +793,6 @@ class Base(unittest.TestCase):
         initializations."""
         # import traceback
         # traceback.print_stack()
-
-        if "LLDB_MAX_LAUNCH_COUNT" in os.environ:
-            self.maxLaunchCount = int(os.environ["LLDB_MAX_LAUNCH_COUNT"])
-
-        if "LLDB_TIME_WAIT_NEXT_LAUNCH" in os.environ:
-            self.timeWaitNextLaunch = float(os.environ["LLDB_TIME_WAIT_NEXT_LAUNCH"])
 
         if "LIBCXX_PATH" in os.environ:
             self.libcxxPath = os.environ["LIBCXX_PATH"]
@@ -951,57 +935,6 @@ class Base(unittest.TestCase):
         self.subprocesses.append(proc)
         return proc
 
-    def runCmd(self, cmd, msg=None, check=True, trace=False, inHistory=False):
-        """
-        Ask the command interpreter to handle the command and then check its
-        return status.
-        """
-        # Fail fast if 'cmd' is not meaningful.
-        if cmd is None:
-            raise Exception("Bad 'cmd' parameter encountered")
-
-        trace = True if traceAlways else trace
-
-        if cmd.startswith("target create "):
-            cmd = cmd.replace("target create ", "file ")
-
-        running = cmd.startswith("run") or cmd.startswith("process launch")
-
-        for i in range(self.maxLaunchCount if running else 1):
-            with recording(self, trace) as sbuf:
-                print("runCmd:", cmd, file=sbuf)
-                if not check:
-                    print("check of return status not required", file=sbuf)
-
-            self.ci.HandleCommand(cmd, self.res, inHistory)
-
-            with recording(self, trace) as sbuf:
-                if self.res.Succeeded():
-                    print("output:", self.res.GetOutput(), file=sbuf)
-                else:
-                    print("runCmd failed!", file=sbuf)
-                    print(self.res.GetError(), file=sbuf)
-
-            if self.res.Succeeded():
-                break
-            elif running:
-                # For process launch, wait some time before possible next try.
-                time.sleep(self.timeWaitNextLaunch)
-                with recording(self, trace) as sbuf:
-                    print("Command '" + cmd + "' failed!", file=sbuf)
-
-        if check:
-            output = ""
-            if self.res.GetOutput():
-                output += "\nCommand output:\n" + self.res.GetOutput()
-            if self.res.GetError():
-                output += "\nError output:\n" + self.res.GetError()
-            if msg:
-                msg += output
-            if cmd:
-                cmd += output
-            self.assertTrue(self.res.Succeeded(), msg if (msg) else CMD_MSG(cmd))
-
     def HideStdout(self):
         """Hide output to stdout from the user.
 
@@ -1127,9 +1060,7 @@ class Base(unittest.TestCase):
         lldb.SBModule.GarbageCollectAllocatedModules()
 
         # Assert that the global module cache is empty.
-        # FIXME: This assert fails on Windows.
-        if self.getPlatform() != "windows":
-            self.assertEqual(lldb.SBModule.GetNumberAllocatedModules(), 0)
+        self.assertEqual(lldb.SBModule.GetNumberAllocatedModules(), 0)
 
     # =========================================================
     # Various callbacks to allow introspection of test progress
@@ -1159,14 +1090,17 @@ class Base(unittest.TestCase):
             # Once by the Python unittest framework, and a second time by us.
             print("FAIL", file=sbuf)
 
-    def markExpectedFailure(self, err):
+    def markExpectedFailure(self, err, bugnumber):
         """Callback invoked when an expected failure/error occurred."""
         self.__expected__ = True
         with recording(self, False) as sbuf:
             # False because there's no need to write "expected failure" to the
             # stderr twice.
             # Once by the Python unittest framework, and a second time by us.
-            print("expected failure", file=sbuf)
+            if bugnumber is None:
+                print("expected failure", file=sbuf)
+            else:
+                print("expected failure (problem id:" + str(bugnumber) + ")", file=sbuf)
 
     def markSkippedTest(self):
         """Callback invoked when a test is skipped."""
@@ -1177,14 +1111,19 @@ class Base(unittest.TestCase):
             # Once by the Python unittest framework, and a second time by us.
             print("skipped test", file=sbuf)
 
-    def markUnexpectedSuccess(self):
+    def markUnexpectedSuccess(self, bugnumber):
         """Callback invoked when an unexpected success occurred."""
         self.__unexpected__ = True
         with recording(self, False) as sbuf:
             # False because there's no need to write "unexpected success" to the
             # stderr twice.
             # Once by the Python unittest framework, and a second time by us.
-            print("unexpected success", file=sbuf)
+            if bugnumber is None:
+                print("unexpected success", file=sbuf)
+            else:
+                print(
+                    "unexpected success (problem id:" + str(bugnumber) + ")", file=sbuf
+                )
 
     def getRerunArgs(self):
         return " -f %s.%s" % (self.__class__.__name__, self._testMethodName)
@@ -1538,12 +1477,11 @@ class Base(unittest.TestCase):
             d = {
                 "CXX_SOURCES": sources,
                 "EXE": exe_name,
-                "CFLAGS_EXTRAS": "%s %s -I%s -I%s"
+                "CFLAGS_EXTRAS": "%s %s -I%s"
                 % (
                     stdflag,
                     stdlibflag,
                     os.path.join(os.environ["LLDB_SRC"], "include"),
-                    os.path.join(configuration.lldb_obj_root, "include"),
                 ),
                 "LD_EXTRAS": "-L%s -lliblldb" % lib_dir,
             }
@@ -1551,12 +1489,11 @@ class Base(unittest.TestCase):
             d = {
                 "CXX_SOURCES": sources,
                 "EXE": exe_name,
-                "CFLAGS_EXTRAS": "%s %s -I%s -I%s"
+                "CFLAGS_EXTRAS": "%s %s -I%s"
                 % (
                     stdflag,
                     stdlibflag,
                     os.path.join(os.environ["LLDB_SRC"], "include"),
-                    os.path.join(configuration.lldb_obj_root, "include"),
                 ),
                 "LD_EXTRAS": "-L%s -llldb -Wl,-rpath,%s" % (lib_dir, lib_dir),
             }
@@ -1575,8 +1512,7 @@ class Base(unittest.TestCase):
             d = {
                 "DYLIB_CXX_SOURCES": sources,
                 "DYLIB_NAME": lib_name,
-                "CFLAGS_EXTRAS": "%s -stdlib=libc++ -I%s"
-                % (stdflag, os.path.join(configuration.lldb_obj_root, "include")),
+                "CFLAGS_EXTRAS": "%s -stdlib=libc++" % stdflag,
                 "FRAMEWORK_INCLUDES": "-F%s" % self.framework_dir,
                 "LD_EXTRAS": "%s -Wl,-rpath,%s -dynamiclib"
                 % (self.lib_lldb, self.framework_dir),
@@ -1585,24 +1521,16 @@ class Base(unittest.TestCase):
             d = {
                 "DYLIB_CXX_SOURCES": sources,
                 "DYLIB_NAME": lib_name,
-                "CFLAGS_EXTRAS": "%s -I%s -I%s"
-                % (
-                    stdflag,
-                    os.path.join(os.environ["LLDB_SRC"], "include"),
-                    os.path.join(configuration.lldb_obj_root, "include"),
-                ),
-                "LD_EXTRAS": "-shared -l%s\\liblldb.lib" % lib_dir,
+                "CFLAGS_EXTRAS": "%s -I%s "
+                % (stdflag, os.path.join(os.environ["LLDB_SRC"], "include")),
+                "LD_EXTRAS": "-shared -l%s\liblldb.lib" % lib_dir,
             }
         else:
             d = {
                 "DYLIB_CXX_SOURCES": sources,
                 "DYLIB_NAME": lib_name,
-                "CFLAGS_EXTRAS": "%s -I%s -I%s -fPIC"
-                % (
-                    stdflag,
-                    os.path.join(os.environ["LLDB_SRC"], "include"),
-                    os.path.join(configuration.lldb_obj_root, "include"),
-                ),
+                "CFLAGS_EXTRAS": "%s -I%s -fPIC"
+                % (stdflag, os.path.join(os.environ["LLDB_SRC"], "include")),
                 "LD_EXTRAS": "-shared -L%s -llldb -Wl,-rpath,%s" % (lib_dir, lib_dir),
             }
         if self.TraceOn():
@@ -1614,6 +1542,14 @@ class Base(unittest.TestCase):
         """Platform specific way to build an executable from C/C++ sources."""
         d = {"CXX_SOURCES": sources, "EXE": exe_name}
         self.build(dictionary=d)
+
+    def signBinary(self, binary_path):
+        if sys.platform.startswith("darwin"):
+            codesign_cmd = 'codesign --force --sign "%s" %s' % (
+                lldbtest_config.codesign_identity,
+                binary_path,
+            )
+            call(codesign_cmd, shell=True)
 
     def findBuiltClang(self):
         """Tries to find and use Clang from the build directory as the compiler (instead of the system compiler)."""
@@ -1673,6 +1609,21 @@ class Base(unittest.TestCase):
         with recording(self, trace) as sbuf:
             print(str(method) + ":", result, file=sbuf)
         return result
+
+    def getLLDBLibraryEnvVal(self):
+        """Returns the path that the OS-specific library search environment variable
+        (self.dylibPath) should be set to in order for a program to find the LLDB
+        library. If an environment variable named self.dylibPath is already set,
+        the new path is appended to it and returned.
+        """
+        existing_library_path = (
+            os.environ[self.dylibPath] if self.dylibPath in os.environ else None
+        )
+        if existing_library_path:
+            return "%s:%s" % (existing_library_path, configuration.lldb_libs_dir)
+        if sys.platform.startswith("darwin") and configuration.lldb_framework_path:
+            return configuration.lldb_framework_path
+        return configuration.lldb_libs_dir
 
     def getLibcPlusPlusLibs(self):
         if self.getPlatform() in ("freebsd", "linux", "netbsd", "openbsd"):
@@ -1761,11 +1712,13 @@ class LLDBTestCaseFactory(type):
 
                     xfail_reason = xfail_for_debug_info_cat_fn(cat)
                     if xfail_reason:
-                        test_method = unittest.expectedFailure(test_method)
+                        test_method = unittest2.expectedFailure(xfail_reason)(
+                            test_method
+                        )
 
                     skip_reason = skip_for_debug_info_cat_fn(cat)
                     if skip_reason:
-                        test_method = unittest.skip(skip_reason)(test_method)
+                        test_method = unittest2.skip(skip_reason)(test_method)
 
                     newattrs[method_name] = test_method
 
@@ -1829,6 +1782,14 @@ class TestBase(Base, metaclass=LLDBTestCaseFactory):
     # test multiple times with various debug info types.
     NO_DEBUG_INFO_TESTCASE = False
 
+    # Maximum allowed attempts when launching the inferior process.
+    # Can be overridden by the LLDB_MAX_LAUNCH_COUNT environment variable.
+    maxLaunchCount = 1
+
+    # Time to wait before the next launching attempt in second(s).
+    # Can be overridden by the LLDB_TIME_WAIT_NEXT_LAUNCH environment variable.
+    timeWaitNextLaunch = 1.0
+
     def generateSource(self, source):
         template = source + ".template"
         temp = os.path.join(self.getSourceDir(), template)
@@ -1868,6 +1829,12 @@ class TestBase(Base, metaclass=LLDBTestCaseFactory):
 
         for s in self.setUpCommands():
             self.runCmd(s)
+
+        if "LLDB_MAX_LAUNCH_COUNT" in os.environ:
+            self.maxLaunchCount = int(os.environ["LLDB_MAX_LAUNCH_COUNT"])
+
+        if "LLDB_TIME_WAIT_NEXT_LAUNCH" in os.environ:
+            self.timeWaitNextLaunch = float(os.environ["LLDB_TIME_WAIT_NEXT_LAUNCH"])
 
         # We want our debugger to be synchronous.
         self.dbg.SetAsync(False)
@@ -2034,6 +2001,57 @@ class TestBase(Base, metaclass=LLDBTestCaseFactory):
             if matched:
                 self.runCmd("thread select %s" % matched.group(1))
 
+    def runCmd(self, cmd, msg=None, check=True, trace=False, inHistory=False):
+        """
+        Ask the command interpreter to handle the command and then check its
+        return status.
+        """
+        # Fail fast if 'cmd' is not meaningful.
+        if cmd is None:
+            raise Exception("Bad 'cmd' parameter encountered")
+
+        trace = True if traceAlways else trace
+
+        if cmd.startswith("target create "):
+            cmd = cmd.replace("target create ", "file ")
+
+        running = cmd.startswith("run") or cmd.startswith("process launch")
+
+        for i in range(self.maxLaunchCount if running else 1):
+            with recording(self, trace) as sbuf:
+                print("runCmd:", cmd, file=sbuf)
+                if not check:
+                    print("check of return status not required", file=sbuf)
+
+            self.ci.HandleCommand(cmd, self.res, inHistory)
+
+            with recording(self, trace) as sbuf:
+                if self.res.Succeeded():
+                    print("output:", self.res.GetOutput(), file=sbuf)
+                else:
+                    print("runCmd failed!", file=sbuf)
+                    print(self.res.GetError(), file=sbuf)
+
+            if self.res.Succeeded():
+                break
+            elif running:
+                # For process launch, wait some time before possible next try.
+                time.sleep(self.timeWaitNextLaunch)
+                with recording(self, trace) as sbuf:
+                    print("Command '" + cmd + "' failed!", file=sbuf)
+
+        if check:
+            output = ""
+            if self.res.GetOutput():
+                output += "\nCommand output:\n" + self.res.GetOutput()
+            if self.res.GetError():
+                output += "\nError output:\n" + self.res.GetError()
+            if msg:
+                msg += output
+            if cmd:
+                cmd += output
+            self.assertTrue(self.res.Succeeded(), msg if (msg) else CMD_MSG(cmd))
+
     def match(
         self, str, patterns, msg=None, trace=False, error=False, matching=True, exe=True
     ):
@@ -2191,7 +2209,7 @@ class TestBase(Base, metaclass=LLDBTestCaseFactory):
         if num_matches == 0:
             compare_string = str_input
         else:
-            if common_match is not None and len(common_match) > 0:
+            if common_match != None and len(common_match) > 0:
                 compare_string = str_input + common_match
             else:
                 compare_string = ""
@@ -2216,7 +2234,7 @@ class TestBase(Base, metaclass=LLDBTestCaseFactory):
         match_strings = lldb.SBStringList()
         interp.HandleCompletion(command, len(command), 0, -1, match_strings)
         # match_strings is a 1-indexed list, so we have to slice...
-        self.assertCountEqual(
+        self.assertItemsEqual(
             completions, list(match_strings)[1:], "List of returned completion is wrong"
         )
 
@@ -2446,7 +2464,7 @@ FileCheck output:
                 log_lines.append(pattern_line)
 
                 # Convert to bool because match objects
-                # are True-ish but is not True itself
+                # are True-ish but != True itself
                 matched = bool(matched)
                 if matched != matching:
                     break
@@ -2552,7 +2570,7 @@ FileCheck output:
         if obj.Success():
             self.fail(self._formatMessage(msg, "Error not in a fail state"))
 
-        if error_str is None:
+        if error_str == None:
             return
 
         error = obj.GetCString()

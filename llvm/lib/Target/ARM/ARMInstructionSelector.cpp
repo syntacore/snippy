@@ -142,8 +142,6 @@ private:
                        int OpIdx = -1) const;
   void renderVFPF64Imm(MachineInstrBuilder &New, const MachineInstr &Old,
                        int OpIdx = -1) const;
-  void renderInvertedImm(MachineInstrBuilder &MIB, const MachineInstr &MI,
-                         int OpIdx = -1) const;
 
 #define GET_GLOBALISEL_PREDICATES_DECL
 #include "ARMGenGlobalISel.inc"
@@ -835,15 +833,6 @@ void ARMInstructionSelector::renderVFPF64Imm(
   assert(FPImmEncoding != -1 && "Invalid immediate value");
 
   NewInstBuilder.addImm(FPImmEncoding);
-}
-
-void ARMInstructionSelector::renderInvertedImm(MachineInstrBuilder &MIB,
-                                               const MachineInstr &MI,
-                                               int OpIdx) const {
-  assert(MI.getOpcode() == TargetOpcode::G_CONSTANT && OpIdx == -1 &&
-         "Expected G_CONSTANT");
-  int64_t CVal = MI.getOperand(1).getCImm()->getSExtValue();
-  MIB.addImm(~CVal);
 }
 
 bool ARMInstructionSelector::select(MachineInstr &I) {

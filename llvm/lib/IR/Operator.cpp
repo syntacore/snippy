@@ -27,11 +27,6 @@ bool Operator::hasPoisonGeneratingFlags() const {
     auto *OBO = cast<OverflowingBinaryOperator>(this);
     return OBO->hasNoUnsignedWrap() || OBO->hasNoSignedWrap();
   }
-  case Instruction::Trunc: {
-    if (auto *TI = dyn_cast<TruncInst>(this))
-      return TI->hasNoUnsignedWrap() || TI->hasNoSignedWrap();
-    return false;
-  }
   case Instruction::UDiv:
   case Instruction::SDiv:
   case Instruction::AShr:
@@ -42,10 +37,8 @@ bool Operator::hasPoisonGeneratingFlags() const {
   case Instruction::GetElementPtr: {
     auto *GEP = cast<GEPOperator>(this);
     // Note: inrange exists on constexpr only
-    return GEP->getNoWrapFlags() != GEPNoWrapFlags::none() ||
-           GEP->getInRange() != std::nullopt;
+    return GEP->isInBounds() || GEP->getInRangeIndex() != std::nullopt;
   }
-  case Instruction::UIToFP:
   case Instruction::ZExt:
     if (auto *NNI = dyn_cast<PossiblyNonNegInst>(this))
       return NNI->hasNonNeg();
@@ -57,12 +50,11 @@ bool Operator::hasPoisonGeneratingFlags() const {
   }
 }
 
-bool Operator::hasPoisonGeneratingAnnotations() const {
+bool Operator::hasPoisonGeneratingFlagsOrMetadata() const {
   if (hasPoisonGeneratingFlags())
     return true;
   auto *I = dyn_cast<Instruction>(this);
-  return I && (I->hasPoisonGeneratingReturnAttributes() ||
-               I->hasPoisonGeneratingMetadata());
+  return I && I->hasPoisonGeneratingMetadata();
 }
 
 Type *GEPOperator::getSourceElementType() const {
@@ -75,12 +67,6 @@ Type *GEPOperator::getResultElementType() const {
   if (auto *I = dyn_cast<GetElementPtrInst>(this))
     return I->getResultElementType();
   return cast<GetElementPtrConstantExpr>(this)->getResultElementType();
-}
-
-std::optional<ConstantRange> GEPOperator::getInRange() const {
-  if (auto *CE = dyn_cast<GetElementPtrConstantExpr>(this))
-    return CE->getInRange();
-  return std::nullopt;
 }
 
 Align GEPOperator::getMaxPreservedAlignment(const DataLayout &DL) const {
@@ -122,15 +108,6 @@ bool GEPOperator::accumulateConstantOffset(
 bool GEPOperator::accumulateConstantOffset(
     Type *SourceType, ArrayRef<const Value *> Index, const DataLayout &DL,
     APInt &Offset, function_ref<bool(Value &, APInt &)> ExternalAnalysis) {
-  // Fast path for canonical getelementptr i8 form.
-  if (SourceType->isIntegerTy(8) && !ExternalAnalysis) {
-    if (auto *CI = dyn_cast<ConstantInt>(Index.front())) {
-      Offset += CI->getValue().sextOrTrunc(Offset.getBitWidth());
-      return true;
-    }
-    return false;
-  }
-
   bool UsedExternalAnalysis = false;
   auto AccumulateOffset = [&](APInt Index, uint64_t Size) -> bool {
     Index = Index.sextOrTrunc(Offset.getBitWidth());

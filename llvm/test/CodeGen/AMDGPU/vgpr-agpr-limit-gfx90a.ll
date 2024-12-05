@@ -540,7 +540,6 @@ define internal void @use512vgprs() {
 }
 
 define void @foo() #0 {
-  call void asm sideeffect "; use $0", "a"(i32 0)
   ret void
 }
 

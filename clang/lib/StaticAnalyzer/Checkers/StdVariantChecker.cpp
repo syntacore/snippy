@@ -129,11 +129,9 @@ static llvm::StringRef indefiniteArticleBasedOnVowel(char a) {
 
 class StdVariantChecker : public Checker<eval::Call, check::RegionChanges> {
   // Call descriptors to find relevant calls
-  CallDescription VariantConstructor{CDM::CXXMethod,
-                                     {"std", "variant", "variant"}};
-  CallDescription VariantAssignmentOperator{CDM::CXXMethod,
-                                            {"std", "variant", "operator="}};
-  CallDescription StdGet{CDM::SimpleFunc, {"std", "get"}, 1, 1};
+  CallDescription VariantConstructor{{"std", "variant", "variant"}};
+  CallDescription VariantAssignmentOperator{{"std", "variant", "operator="}};
+  CallDescription StdGet{{"std", "get"}, 1, 1};
 
   BugType BadVariantType{this, "BadVariantType", "BadVariantType"};
 

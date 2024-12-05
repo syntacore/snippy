@@ -24,7 +24,6 @@
 #endif
 
 #include "enum-class.h"
-#include "variant.h"
 #include "visit.h"
 #include <array>
 #include <functional>
@@ -34,6 +33,7 @@
 #include <string>
 #include <tuple>
 #include <type_traits>
+#include <variant>
 
 #if __GNUC__ == 7
 // Avoid a deduction bug in GNU 7.x headers by forcing the answer.
@@ -87,8 +87,6 @@ template <typename... LAMBDAS> visitors(LAMBDAS... x) -> visitors<LAMBDAS...>;
 // To disable, compile with '-DCHECK=(void)'
 #ifndef CHECK
 #define CHECK(x) ((x) || (DIE("CHECK(" #x ") failed"), false))
-// Same as above, but with a custom error message.
-#define CHECK_MSG(x, y) ((x) || (DIE("CHECK(" #x ") failed: " #y), false))
 #endif
 
 // User-defined type traits that default to false:

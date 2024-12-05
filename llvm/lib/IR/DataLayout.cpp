@@ -898,7 +898,7 @@ Type *DataLayout::getSmallestLegalIntType(LLVMContext &C, unsigned Width) const 
 }
 
 unsigned DataLayout::getLargestLegalIntTypeSizeInBits() const {
-  auto Max = llvm::max_element(LegalIntWidths);
+  auto Max = std::max_element(LegalIntWidths.begin(), LegalIntWidths.end());
   return Max != LegalIntWidths.end() ? *Max : 0;
 }
 

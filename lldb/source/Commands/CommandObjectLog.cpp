@@ -288,7 +288,19 @@ public:
                             "List the log categories for one or more log "
                             "channels.  If none specified, lists them all.",
                             nullptr) {
-    AddSimpleArgumentList(eArgTypeLogChannel, eArgRepeatStar);
+    CommandArgumentEntry arg;
+    CommandArgumentData channel_arg;
+
+    // Define the first (and only) variant of this arg.
+    channel_arg.arg_type = eArgTypeLogChannel;
+    channel_arg.arg_repetition = eArgRepeatStar;
+
+    // There is only one variant this argument could be; put it into the
+    // argument entry.
+    arg.push_back(channel_arg);
+
+    // Push the data for the first argument into the m_arguments vector.
+    m_arguments.push_back(arg);
   }
 
   ~CommandObjectLogList() override = default;
@@ -323,7 +335,19 @@ public:
   CommandObjectLogDump(CommandInterpreter &interpreter)
       : CommandObjectParsed(interpreter, "log dump",
                             "dump circular buffer logs", nullptr) {
-    AddSimpleArgumentList(eArgTypeLogChannel);
+    CommandArgumentEntry arg1;
+    CommandArgumentData channel_arg;
+
+    // Define the first (and only) variant of this arg.
+    channel_arg.arg_type = eArgTypeLogChannel;
+    channel_arg.arg_repetition = eArgRepeatPlain;
+
+    // There is only one variant this argument could be; put it into the
+    // argument entry.
+    arg1.push_back(channel_arg);
+
+    // Push the data for the first argument into the m_arguments vector.
+    m_arguments.push_back(arg1);
   }
 
   ~CommandObjectLogDump() override = default;
@@ -420,7 +444,19 @@ public:
       : CommandObjectParsed(interpreter, "log timers enable",
                             "enable LLDB internal performance timers",
                             "log timers enable <depth>") {
-    AddSimpleArgumentList(eArgTypeCount, eArgRepeatOptional);
+    CommandArgumentEntry arg;
+    CommandArgumentData depth_arg;
+
+    // Define the first (and only) variant of this arg.
+    depth_arg.arg_type = eArgTypeCount;
+    depth_arg.arg_repetition = eArgRepeatOptional;
+
+    // There is only one variant this argument could be; put it into the
+    // argument entry.
+    arg.push_back(depth_arg);
+
+    // Push the data for the first argument into the m_arguments vector.
+    m_arguments.push_back(arg);
   }
 
   ~CommandObjectLogTimerEnable() override = default;
@@ -523,7 +559,19 @@ public:
       : CommandObjectParsed(interpreter, "log timers increment",
                             "increment LLDB internal performance timers",
                             "log timers increment <bool>") {
-    AddSimpleArgumentList(eArgTypeBoolean);
+    CommandArgumentEntry arg;
+    CommandArgumentData bool_arg;
+
+    // Define the first (and only) variant of this arg.
+    bool_arg.arg_type = eArgTypeBoolean;
+    bool_arg.arg_repetition = eArgRepeatPlain;
+
+    // There is only one variant this argument could be; put it into the
+    // argument entry.
+    arg.push_back(bool_arg);
+
+    // Push the data for the first argument into the m_arguments vector.
+    m_arguments.push_back(arg);
   }
 
   ~CommandObjectLogTimerIncrement() override = default;

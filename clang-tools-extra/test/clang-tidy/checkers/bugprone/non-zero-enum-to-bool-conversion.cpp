@@ -122,8 +122,6 @@ CustomOperatorEnum operator&(CustomOperatorEnum a, CustomOperatorEnum b) { retur
 
 void testCustomOperator(CustomOperatorEnum e) {
     if (e & E1) {}
-    if ((e & E1)) {}
-    if (!(e & E1)) {}
 }
 
 }

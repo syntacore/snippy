@@ -108,6 +108,7 @@ struct DsymutilOptions {
   bool Flat = false;
   bool InputIsYAMLDebugMap = false;
   bool ForceKeepFunctionForStatic = false;
+  std::string SymbolMap;
   std::string OutputFile;
   std::string Toolchain;
   std::string ReproducerPath;
@@ -169,12 +170,6 @@ static Expected<std::vector<std::string>> getInputs(opt::InputArgList &Args,
 
 // Verify that the given combination of options makes sense.
 static Error verifyOptions(const DsymutilOptions &Options) {
-  if (Options.LinkOpts.Verbose && Options.LinkOpts.Quiet) {
-    return make_error<StringError>(
-        "--quiet and --verbose cannot be specified together",
-        errc::invalid_argument);
-  }
-
   if (Options.InputFiles.empty()) {
     return make_error<StringError>("no input files specified",
                                    errc::invalid_argument);
@@ -317,7 +312,6 @@ static Expected<DsymutilOptions> getOptions(opt::InputArgList &Args) {
   Options.LinkOpts.NoTimestamp = Args.hasArg(OPT_no_swiftmodule_timestamp);
   Options.LinkOpts.Update = Args.hasArg(OPT_update);
   Options.LinkOpts.Verbose = Args.hasArg(OPT_verbose);
-  Options.LinkOpts.Quiet = Args.hasArg(OPT_quiet);
   Options.LinkOpts.Statistics = Args.hasArg(OPT_statistics);
   Options.LinkOpts.Fat64 = Args.hasArg(OPT_fat64);
   Options.LinkOpts.KeepFunctionForStatic =
@@ -346,6 +340,12 @@ static Expected<DsymutilOptions> getOptions(opt::InputArgList &Args) {
   } else {
     return DWARFLinkerType.takeError();
   }
+
+  if (opt::Arg *SymbolMap = Args.getLastArg(OPT_symbolmap))
+    Options.SymbolMap = SymbolMap->getValue();
+
+  if (Args.hasArg(OPT_symbolmap))
+    Options.LinkOpts.Update = true;
 
   if (Expected<std::vector<std::string>> InputFiles =
           getInputs(Args, Options.LinkOpts.Update)) {
@@ -490,20 +490,16 @@ static bool verifyOutput(StringRef OutputFile, StringRef Arch,
                          DsymutilOptions Options, std::mutex &Mutex) {
 
   if (OutputFile == "-") {
-    if (!Options.LinkOpts.Quiet) {
-      std::lock_guard<std::mutex> Guard(Mutex);
-      WithColor::warning() << "verification skipped for " << Arch
-                           << " because writing to stdout.\n";
-    }
+    std::lock_guard<std::mutex> Guard(Mutex);
+    WithColor::warning() << "verification skipped for " << Arch
+                         << " because writing to stdout.\n";
     return true;
   }
 
   if (Options.LinkOpts.NoOutput) {
-    if (!Options.LinkOpts.Quiet) {
-      std::lock_guard<std::mutex> Guard(Mutex);
-      WithColor::warning() << "verification skipped for " << Arch
-                           << " because --no-output was passed.\n";
-    }
+    std::lock_guard<std::mutex> Guard(Mutex);
+    WithColor::warning() << "verification skipped for " << Arch
+                         << " because --no-output was passed.\n";
     return true;
   }
 
@@ -518,12 +514,10 @@ static bool verifyOutput(StringRef OutputFile, StringRef Arch,
   if (auto *Obj = dyn_cast<MachOObjectFile>(&Binary)) {
     std::unique_ptr<DWARFContext> DICtx = DWARFContext::create(*Obj);
     if (DICtx->getMaxVersion() > 5) {
-      if (!Options.LinkOpts.Quiet) {
-        std::lock_guard<std::mutex> Guard(Mutex);
-        WithColor::warning() << "verification skipped for " << Arch
-                             << " because DWARF standard greater than v5 is "
-                                "not supported yet.\n";
-      }
+      std::lock_guard<std::mutex> Guard(Mutex);
+      WithColor::warning()
+          << "verification skipped for " << Arch
+          << " because DWARF standard greater than v5 is not supported yet.\n";
       return true;
     }
 
@@ -566,7 +560,8 @@ getOutputFileName(StringRef InputFile, const DsymutilOptions &Options) {
     return OutputLocation(Options.OutputFile);
 
   // When updating, do in place replacement.
-  if (Options.OutputFile.empty() && Options.LinkOpts.Update)
+  if (Options.OutputFile.empty() &&
+      (Options.LinkOpts.Update || !Options.SymbolMap.empty()))
     return OutputLocation(std::string(InputFile));
 
   // When dumping the debug map, just return an empty output location. This
@@ -673,6 +668,8 @@ int dsymutil_main(int argc, char **argv, const llvm::ToolContext &) {
       return EXIT_FAILURE;
     }
 
+  SymbolMapLoader SymMapLoader(Options.SymbolMap);
+
   for (auto &InputFile : Options.InputFiles) {
     // Dump the symbol table for each input file and requested arch
     if (Options.DumpStab) {
@@ -737,7 +734,7 @@ int dsymutil_main(int argc, char **argv, const llvm::ToolContext &) {
       S.ThreadsRequested = DebugMapPtrsOrErr->size();
       S.Limit = true;
     }
-    DefaultThreadPool Threads(S);
+    ThreadPool Threads(S);
 
     // If there is more than one link to execute, we need to generate
     // temporary files.
@@ -763,14 +760,15 @@ int dsymutil_main(int argc, char **argv, const llvm::ToolContext &) {
         if (Options.DumpDebugMap)
           continue;
 
+        if (!Options.SymbolMap.empty())
+          Options.LinkOpts.Translator = SymMapLoader.Load(InputFile, *Map);
+
         if (Map->begin() == Map->end()) {
-          if (!Options.LinkOpts.Quiet) {
-            std::lock_guard<std::mutex> Guard(ErrorHandlerMutex);
-            WithColor::warning()
-                << "no debug symbols in executable (-arch "
-                << MachOUtils::getArchName(Map->getTriple().getArchName())
-                << ")\n";
-          }
+          std::lock_guard<std::mutex> Guard(ErrorHandlerMutex);
+          WithColor::warning()
+              << "no debug symbols in executable (-arch "
+              << MachOUtils::getArchName(Map->getTriple().getArchName())
+              << ")\n";
         }
 
         // Using a std::shared_ptr rather than std::unique_ptr because move-only

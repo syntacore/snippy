@@ -130,9 +130,9 @@ class GdbRemoteTestCaseBase(Base, metaclass=GdbRemoteTestCaseFactory):
         self.stub_sends_two_stop_notifications_on_kill = False
         if configuration.lldb_platform_url:
             if configuration.lldb_platform_url.startswith("unix-"):
-                url_pattern = r"(.+)://\[?(.+?)\]?/.*"
+                url_pattern = "(.+)://\[?(.+?)\]?/.*"
             else:
-                url_pattern = r"(.+)://(.+):\d+"
+                url_pattern = "(.+)://(.+):\d+"
             scheme, host = re.match(
                 url_pattern, configuration.lldb_platform_url
             ).groups()
@@ -921,8 +921,6 @@ class GdbRemoteTestCaseBase(Base, metaclass=GdbRemoteTestCaseFactory):
         "qSaveCore",
         "native-signals",
         "QNonStop",
-        "SupportedWatchpointTypes",
-        "SupportedCompressions",
     ]
 
     def parse_qSupported_response(self, context):

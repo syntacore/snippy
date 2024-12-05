@@ -9,14 +9,13 @@
 #define LLVM_LIBC_SRC_STRING_MEMORY_UTILS_X86_64_INLINE_BCMP_H
 
 #include "src/__support/macros/attributes.h" // LIBC_INLINE
-#include "src/__support/macros/config.h"
 #include "src/string/memory_utils/op_generic.h"
 #include "src/string/memory_utils/op_x86.h"
 #include "src/string/memory_utils/utils.h" // Ptr, CPtr
 
 #include <stddef.h> // size_t
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 
 [[maybe_unused]] LIBC_INLINE BcmpReturnType
 inline_bcmp_generic_gt16(CPtr p1, CPtr p2, size_t count) {
@@ -59,7 +58,7 @@ inline_bcmp_x86_avx512bw_gt16(CPtr p1, CPtr p2, size_t count) {
 [[maybe_unused]] LIBC_INLINE BcmpReturnType inline_bcmp_x86(CPtr p1, CPtr p2,
                                                             size_t count) {
   if (count == 0)
-    return BcmpReturnType::zero();
+    return BcmpReturnType::ZERO();
   if (count == 1)
     return generic::Bcmp<uint8_t>::block(p1, p2);
   if (count == 2)
@@ -89,6 +88,6 @@ inline_bcmp_x86_avx512bw_gt16(CPtr p1, CPtr p2, size_t count) {
 #endif
 }
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE
 
 #endif // LLVM_LIBC_SRC_STRING_MEMORY_UTILS_X86_64_INLINE_BCMP_H

@@ -21,6 +21,7 @@ class TestDAP_restart_runInTerminal(lldbdap_testcase.DAPTestCaseBase):
             return False
 
     @skipIfWindows
+    @skipIfRemote
     @skipIf(archs=["arm"])  # Always times out on buildbot
     def test_basic_functionality(self):
         """
@@ -43,7 +44,7 @@ class TestDAP_restart_runInTerminal(lldbdap_testcase.DAPTestCaseBase):
         self.verify_breakpoint_hit([bp_B])
 
         # Make sure i has been modified from its initial value of 0.
-        self.assertEqual(
+        self.assertEquals(
             int(self.dap_server.get_local_variable_value("i")),
             1234,
             "i != 1234 after hitting breakpoint B",
@@ -54,13 +55,14 @@ class TestDAP_restart_runInTerminal(lldbdap_testcase.DAPTestCaseBase):
 
         # Finally, check we stop back at A and program state has been reset.
         self.verify_breakpoint_hit([bp_A])
-        self.assertEqual(
+        self.assertEquals(
             int(self.dap_server.get_local_variable_value("i")),
             0,
             "i != 0 after hitting breakpoint A on restart",
         )
 
     @skipIfWindows
+    @skipIfRemote
     @skipIf(archs=["arm"])  # Always times out on buildbot
     def test_stopOnEntry(self):
         """

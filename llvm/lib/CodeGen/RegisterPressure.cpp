@@ -64,7 +64,7 @@ static void increaseSetPressure(std::vector<unsigned> &CurrSetPressure,
 static void decreaseSetPressure(std::vector<unsigned> &CurrSetPressure,
                                 const MachineRegisterInfo &MRI, Register Reg,
                                 LaneBitmask PrevMask, LaneBitmask NewMask) {
-  assert((NewMask & ~PrevMask).none() && "Must not add bits");
+  //assert((NewMask & !PrevMask) == 0 && "Must not add bits");
   if (NewMask.any() || PrevMask.none())
     return;
 
@@ -617,11 +617,17 @@ void RegisterOperands::adjustLaneLiveness(const LiveIntervals &LIS,
       ++I;
     }
   }
-
-  // For uses just copy the information from LIS.
-  for (auto &[RegUnit, LaneMask] : Uses)
-    LaneMask = getLiveLanesAt(LIS, MRI, true, RegUnit, Pos.getBaseIndex());
-
+  for (auto *I = Uses.begin(); I != Uses.end();) {
+    LaneBitmask LiveBefore = getLiveLanesAt(LIS, MRI, true, I->RegUnit,
+                                            Pos.getBaseIndex());
+    LaneBitmask LaneMask = I->LaneMask & LiveBefore;
+    if (LaneMask.none()) {
+      I = Uses.erase(I);
+    } else {
+      I->LaneMask = LaneMask;
+      ++I;
+    }
+  }
   if (AddFlagsMI != nullptr) {
     for (const RegisterMaskPair &P : DeadDefs) {
       Register RegUnit = P.RegUnit;
@@ -873,7 +879,7 @@ void RegPressureTracker::recede(SmallVectorImpl<RegisterMaskPair> *LiveUses) {
 
   const MachineInstr &MI = *CurrPos;
   RegisterOperands RegOpers;
-  RegOpers.collect(MI, *TRI, *MRI, TrackLaneMasks, /*IgnoreDead=*/false);
+  RegOpers.collect(MI, *TRI, *MRI, TrackLaneMasks, false);
   if (TrackLaneMasks) {
     SlotIndex SlotIdx = LIS->getInstructionIndex(*CurrPos).getRegSlot();
     RegOpers.adjustLaneLiveness(*LIS, *MRI, SlotIdx);
@@ -1041,7 +1047,7 @@ void RegPressureTracker::bumpUpwardPressure(const MachineInstr *MI) {
   // Account for register pressure similar to RegPressureTracker::recede().
   RegisterOperands RegOpers;
   RegOpers.collect(*MI, *TRI, *MRI, TrackLaneMasks, /*IgnoreDead=*/true);
-  assert(RegOpers.DeadDefs.empty());
+  assert(RegOpers.DeadDefs.size() == 0);
   if (TrackLaneMasks)
     RegOpers.adjustLaneLiveness(*LIS, *MRI, SlotIdx);
   else if (RequireIntervals)
@@ -1054,27 +1060,18 @@ void RegPressureTracker::bumpUpwardPressure(const MachineInstr *MI) {
   // Kill liveness at live defs.
   for (const RegisterMaskPair &P : RegOpers.Defs) {
     Register Reg = P.RegUnit;
-    LaneBitmask LiveAfter = LiveRegs.contains(Reg);
+    LaneBitmask LiveLanes = LiveRegs.contains(Reg);
     LaneBitmask UseLanes = getRegLanes(RegOpers.Uses, Reg);
     LaneBitmask DefLanes = P.LaneMask;
-    LaneBitmask LiveBefore = (LiveAfter & ~DefLanes) | UseLanes;
-
-    // There may be parts of the register that were dead before the
-    // instruction, but became live afterwards. Similarly, some parts
-    // may have been killed in this instruction.
-    decreaseRegPressure(Reg, LiveAfter, LiveAfter & LiveBefore);
-    increaseRegPressure(Reg, LiveAfter, ~LiveAfter & LiveBefore);
+    LaneBitmask LiveAfter = (LiveLanes & ~DefLanes) | UseLanes;
+    decreaseRegPressure(Reg, LiveLanes, LiveAfter);
   }
   // Generate liveness for uses.
   for (const RegisterMaskPair &P : RegOpers.Uses) {
     Register Reg = P.RegUnit;
-    // If this register was also in a def operand, we've handled it
-    // with defs.
-    if (getRegLanes(RegOpers.Defs, Reg).any())
-      continue;
-    LaneBitmask LiveAfter = LiveRegs.contains(Reg);
-    LaneBitmask LiveBefore = LiveAfter | P.LaneMask;
-    increaseRegPressure(Reg, LiveAfter, LiveBefore);
+    LaneBitmask LiveLanes = LiveRegs.contains(Reg);
+    LaneBitmask LiveAfter = LiveLanes | P.LaneMask;
+    increaseRegPressure(Reg, LiveLanes, LiveAfter);
   }
 }
 
@@ -1288,9 +1285,9 @@ void RegPressureTracker::bumpDownwardPressure(const MachineInstr *MI) {
   if (RequireIntervals)
     SlotIdx = LIS->getInstructionIndex(*MI).getRegSlot();
 
-  // Account for register pressure similar to RegPressureTracker::advance().
+  // Account for register pressure similar to RegPressureTracker::recede().
   RegisterOperands RegOpers;
-  RegOpers.collect(*MI, *TRI, *MRI, TrackLaneMasks, /*IgnoreDead=*/false);
+  RegOpers.collect(*MI, *TRI, *MRI, TrackLaneMasks, false);
   if (TrackLaneMasks)
     RegOpers.adjustLaneLiveness(*LIS, *MRI, SlotIdx);
 

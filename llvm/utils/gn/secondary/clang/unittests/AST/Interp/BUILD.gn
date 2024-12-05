@@ -9,8 +9,5 @@ unittest("InterpTests") {
     "//clang/lib/Testing",
     "//clang/lib/Tooling",
   ]
-  sources = [
-    "Descriptor.cpp",
-    "toAPValue.cpp",
-  ]
+  sources = [ "Descriptor.cpp" ]
 }

@@ -29,7 +29,7 @@ namespace {
 SpinMutex GlobalMutex;
 struct ThreadTrie {
   tid_t TId;
-  alignas(FunctionCallTrie) std::byte TrieStorage[sizeof(FunctionCallTrie)];
+  typename std::aligned_storage<sizeof(FunctionCallTrie)>::type TrieStorage;
 };
 
 struct ProfileBuffer {
@@ -71,13 +71,16 @@ using ThreadDataAllocator = ThreadDataArray::AllocatorType;
 // by the ThreadData array. This lets us host the buffers, allocators, and tries
 // associated with a thread by moving the data into the array instead of
 // attempting to copy the data to a separately backed set of tries.
-alignas(BufferQueue) static std::byte BufferQueueStorage[sizeof(BufferQueue)];
+static typename std::aligned_storage<
+    sizeof(BufferQueue), alignof(BufferQueue)>::type BufferQueueStorage;
 static BufferQueue *BQ = nullptr;
 static BufferQueue::Buffer Buffer;
-alignas(ThreadDataAllocator) static std::byte
-    ThreadDataAllocatorStorage[sizeof(ThreadDataAllocator)];
-alignas(ThreadDataArray) static std::byte
-    ThreadDataArrayStorage[sizeof(ThreadDataArray)];
+static typename std::aligned_storage<sizeof(ThreadDataAllocator),
+                                     alignof(ThreadDataAllocator)>::type
+    ThreadDataAllocatorStorage;
+static typename std::aligned_storage<sizeof(ThreadDataArray),
+                                     alignof(ThreadDataArray)>::type
+    ThreadDataArrayStorage;
 
 static ThreadDataAllocator *TDAllocator = nullptr;
 static ThreadDataArray *TDArray = nullptr;
@@ -88,10 +91,10 @@ using ProfileBufferArrayAllocator = typename ProfileBufferArray::AllocatorType;
 // These need to be global aligned storage to avoid dynamic initialization. We
 // need these to be aligned to allow us to placement new objects into the
 // storage, and have pointers to those objects be appropriately aligned.
-alignas(ProfileBufferArray) static std::byte
-    ProfileBuffersStorage[sizeof(ProfileBufferArray)];
-alignas(ProfileBufferArrayAllocator) static std::byte
-    ProfileBufferArrayAllocatorStorage[sizeof(ProfileBufferArrayAllocator)];
+static typename std::aligned_storage<sizeof(ProfileBufferArray)>::type
+    ProfileBuffersStorage;
+static typename std::aligned_storage<sizeof(ProfileBufferArrayAllocator)>::type
+    ProfileBufferArrayAllocatorStorage;
 
 static ProfileBufferArrayAllocator *ProfileBuffersAllocator = nullptr;
 static ProfileBufferArray *ProfileBuffers = nullptr;
@@ -379,8 +382,8 @@ XRayBuffer nextBuffer(XRayBuffer B) XRAY_NEVER_INSTRUMENT {
     return {nullptr, 0};
 
   static pthread_once_t Once = PTHREAD_ONCE_INIT;
-  alignas(XRayProfilingFileHeader) static std::byte
-      FileHeaderStorage[sizeof(XRayProfilingFileHeader)];
+  static typename std::aligned_storage<sizeof(XRayProfilingFileHeader)>::type
+      FileHeaderStorage;
   pthread_once(
       &Once, +[]() XRAY_NEVER_INSTRUMENT {
         new (&FileHeaderStorage) XRayProfilingFileHeader{};

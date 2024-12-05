@@ -17,6 +17,7 @@
 #include "CodeGenModule.h"
 #include "clang/AST/Decl.h"
 #include "clang/Basic/TargetOptions.h"
+#include "llvm/IR/IntrinsicsDirectX.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -114,10 +115,6 @@ GlobalVariable *replaceBuffer(CGHLSLRuntime::Buffer &Buf) {
 }
 
 } // namespace
-
-llvm::Triple::ArchType CGHLSLRuntime::getArch() {
-  return CGM.getTarget().getTriple().getArch();
-}
 
 void CGHLSLRuntime::addConstant(VarDecl *D, Buffer &CB) {
   if (D->getStorageClass() == SC_Static) {
@@ -280,14 +277,13 @@ void CGHLSLRuntime::annotateHLSLResource(const VarDecl *D, GlobalVariable *GV) {
   const auto *RD = Ty->getAsCXXRecordDecl();
   if (!RD)
     return;
-  const auto *HLSLResAttr = RD->getAttr<HLSLResourceAttr>();
-  const auto *HLSLResClassAttr = RD->getAttr<HLSLResourceClassAttr>();
-  if (!HLSLResAttr || !HLSLResClassAttr)
+  const auto *Attr = RD->getAttr<HLSLResourceAttr>();
+  if (!Attr)
     return;
 
-  llvm::hlsl::ResourceClass RC = HLSLResClassAttr->getResourceClass();
-  llvm::hlsl::ResourceKind RK = HLSLResAttr->getResourceKind();
-  bool IsROV = HLSLResAttr->getIsROV();
+  llvm::hlsl::ResourceClass RC = Attr->getResourceClass();
+  llvm::hlsl::ResourceKind RK = Attr->getResourceKind();
+  bool IsROV = Attr->getIsROV();
   llvm::hlsl::ElementType ET = calculateElementType(CGM.getContext(), Ty);
 
   BufferResBinding Binding(D->getAttr<HLSLResourceBindingAttr>());
@@ -314,7 +310,7 @@ void clang::CodeGen::CGHLSLRuntime::setHLSLEntryAttributes(
   assert(ShaderAttr && "All entry functions must have a HLSLShaderAttr");
   const StringRef ShaderAttrKindStr = "hlsl.shader";
   Fn->addFnAttr(ShaderAttrKindStr,
-                llvm::Triple::getEnvironmentTypeName(ShaderAttr->getType()));
+                ShaderAttr->ConvertShaderTypeToStr(ShaderAttr->getType()));
   if (HLSLNumThreadsAttr *NumThreadsAttr = FD->getAttr<HLSLNumThreadsAttr>()) {
     const StringRef NumThreadsKindStr = "hlsl.numthreads";
     std::string NumThreadsStr =
@@ -346,9 +342,8 @@ llvm::Value *CGHLSLRuntime::emitInputSemantic(IRBuilder<> &B,
     return B.CreateCall(FunctionCallee(DxGroupIndex));
   }
   if (D.hasAttr<HLSLSV_DispatchThreadIDAttr>()) {
-    llvm::Function *ThreadIDIntrinsic =
-        CGM.getIntrinsic(getThreadIdIntrinsic());
-    return buildVectorInput(B, ThreadIDIntrinsic, Ty);
+    llvm::Function *DxThreadID = CGM.getIntrinsic(Intrinsic::dx_thread_id);
+    return buildVectorInput(B, DxThreadID, Ty);
   }
   assert(false && "Unhandled parameter attribute");
   return nullptr;

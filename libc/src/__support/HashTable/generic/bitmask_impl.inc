@@ -8,9 +8,8 @@
 
 #include "src/__support/common.h"
 #include "src/__support/endian.h"
-#include "src/__support/macros/config.h"
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 namespace internal {
 
 // GPU architectures are 64-bit but use 32-bit general purpose registers.
@@ -35,11 +34,10 @@ LIBC_INLINE constexpr bitmask_t repeat_byte(bitmask_t byte) {
   return byte;
 }
 
-using BitMask = BitMaskAdaptor<bitmask_t, 0x8ul>;
+using BitMask = BitMaskAdaptor<bitmask_t, 0x8ull>;
 using IteratableBitMask = IteratableBitMaskAdaptor<BitMask>;
 
 struct Group {
-  LIBC_INLINE_VAR static constexpr bitmask_t MASK = repeat_byte(0x80ul);
   bitmask_t data;
 
   // Load a group of control words from an arbitary address.
@@ -102,24 +100,22 @@ struct Group {
     //  - The check for key equality will catch these.
     //  - This only happens if there is at least 1 true match.
     //  - The chance of this happening is very low (< 1% chance per byte).
-    static constexpr bitmask_t ONES = repeat_byte(0x01ul);
-    auto cmp = data ^ repeat_byte(static_cast<bitmask_t>(byte) & 0xFFul);
-    auto result =
-        LIBC_NAMESPACE::Endian::to_little_endian((cmp - ONES) & ~cmp & MASK);
+    auto cmp = data ^ repeat_byte(byte);
+    auto result = LIBC_NAMESPACE::Endian::to_little_endian(
+        (cmp - repeat_byte(0x01)) & ~cmp & repeat_byte(0x80));
     return {BitMask{result}};
   }
 
   // Find out the lanes equal to EMPTY or DELETE (highest bit set) and
   // return the bitmask with corresponding bits set.
   LIBC_INLINE BitMask mask_available() const {
-    bitmask_t le_data = LIBC_NAMESPACE::Endian::to_little_endian(data);
-    return {le_data & MASK};
+    return {LIBC_NAMESPACE::Endian::to_little_endian(data) & repeat_byte(0x80)};
   }
 
   LIBC_INLINE IteratableBitMask occupied() const {
-    bitmask_t available = mask_available().word;
-    return {BitMask{available ^ MASK}};
+    return {
+        {static_cast<bitmask_t>(mask_available().word ^ repeat_byte(0x80))}};
   }
 };
 } // namespace internal
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE

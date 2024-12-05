@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 // RUN: sed -e "s@INPUT_DIR@%{/t:regex_replacement}@g" \
 // RUN: %t/reference.output.json.in >> %t/reference.output.json
-// RUN: %clang_cc1 -extract-api --pretty-sgf -triple arm64-apple-macosx \
+// RUN: %clang_cc1 -extract-api -triple arm64-apple-macosx \
 // RUN:   -x c++-header %t/input.h -o %t/output.json -verify
 
 // Generator version is not consistent across test runs, normalize it.
@@ -63,7 +63,11 @@ void getFooBar() noexcept(false);
         },
         {
           "kind": "text",
-          "spelling": "() "
+          "spelling": "()"
+        },
+        {
+          "kind": "text",
+          "spelling": " "
         },
         {
           "kind": "keyword",
@@ -135,7 +139,11 @@ void getFooBar() noexcept(false);
         },
         {
           "kind": "text",
-          "spelling": "() "
+          "spelling": "()"
+        },
+        {
+          "kind": "text",
+          "spelling": " "
         },
         {
           "kind": "keyword",
@@ -215,7 +223,11 @@ void getFooBar() noexcept(false);
         },
         {
           "kind": "text",
-          "spelling": "() "
+          "spelling": "()"
+        },
+        {
+          "kind": "text",
+          "spelling": " "
         },
         {
           "kind": "keyword",

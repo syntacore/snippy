@@ -31,9 +31,7 @@
 #include "flang/Lower/Support/Utils.h"
 #include "flang/Optimizer/Builder/BoxValue.h"
 #include "flang/Optimizer/Builder/FIRBuilder.h"
-#include "flang/Optimizer/Builder/HLFIRTools.h"
 #include "flang/Optimizer/Builder/Todo.h"
-#include "flang/Optimizer/Dialect/FIRType.h"
 #include "flang/Optimizer/HLFIR/HLFIROps.h"
 #include "flang/Parser/parse-tree.h"
 #include "flang/Semantics/openmp-directive-sets.h"
@@ -53,13 +51,10 @@ namespace lower {
 /// operations.
 struct AddrAndBoundsInfo {
   explicit AddrAndBoundsInfo() {}
-  explicit AddrAndBoundsInfo(mlir::Value addr, mlir::Value rawInput)
-      : addr(addr), rawInput(rawInput) {}
-  explicit AddrAndBoundsInfo(mlir::Value addr, mlir::Value rawInput,
-                             mlir::Value isPresent)
-      : addr(addr), rawInput(rawInput), isPresent(isPresent) {}
+  explicit AddrAndBoundsInfo(mlir::Value addr) : addr(addr) {}
+  explicit AddrAndBoundsInfo(mlir::Value addr, mlir::Value isPresent)
+      : addr(addr), isPresent(isPresent) {}
   mlir::Value addr = nullptr;
-  mlir::Value rawInput = nullptr;
   mlir::Value isPresent = nullptr;
 };
 
@@ -136,22 +131,6 @@ static inline void genOmpAtomicHintAndMemoryOrderClauses(
   }
 }
 
-template <typename AtomicListT>
-static void processOmpAtomicTODO(mlir::Type elementType, mlir::Location loc) {
-  if (!elementType)
-    return;
-  if constexpr (std::is_same<AtomicListT,
-                             Fortran::parser::OmpAtomicClauseList>()) {
-    // Based on assertion for supported element types in OMPIRBuilder.cpp
-    // createAtomicRead
-    mlir::Type unwrappedEleTy = fir::unwrapRefType(elementType);
-    bool supportedAtomicType =
-        (!fir::isa_complex(unwrappedEleTy) && fir::isa_trivial(unwrappedEleTy));
-    if (!supportedAtomicType)
-      TODO(loc, "Unsupported atomic type");
-  }
-}
-
 /// Used to generate atomic.read operation which is created in existing
 /// location set by builder.
 template <typename AtomicListT>
@@ -163,8 +142,6 @@ static inline void genOmpAccAtomicCaptureStatement(
     mlir::Type elementType, mlir::Location loc) {
   // Generate `atomic.read` operation for atomic assigment statements
   fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
-
-  processOmpAtomicTODO<AtomicListT>(elementType, loc);
 
   if constexpr (std::is_same<AtomicListT,
                              Fortran::parser::OmpAtomicClauseList>()) {
@@ -198,11 +175,6 @@ static inline void genOmpAccAtomicWriteStatement(
     mlir::Value *evaluatedExprValue = nullptr) {
   // Generate `atomic.write` operation for atomic assignment statements
   fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
-
-  mlir::Type varType = fir::unwrapRefType(lhsAddr.getType());
-  rhsExpr = firOpBuilder.createConvert(loc, varType, rhsExpr);
-
-  processOmpAtomicTODO<AtomicListT>(varType, loc);
 
   if constexpr (std::is_same<AtomicListT,
                              Fortran::parser::OmpAtomicClauseList>()) {
@@ -343,8 +315,6 @@ static inline void genOmpAccAtomicUpdateStatement(
     atomicUpdateOp = firOpBuilder.create<mlir::acc::AtomicUpdateOp>(
         currentLocation, lhsAddr);
   }
-
-  processOmpAtomicTODO<AtomicListT>(varType, loc);
 
   llvm::SmallVector<mlir::Type> varTys = {varType};
   llvm::SmallVector<mlir::Location> locs = {currentLocation};
@@ -644,39 +614,27 @@ getDataOperandBaseAddr(Fortran::lower::AbstractConverter &converter,
                        fir::FirOpBuilder &builder,
                        Fortran::lower::SymbolRef sym, mlir::Location loc) {
   mlir::Value symAddr = converter.getSymbolAddress(sym);
-  mlir::Value rawInput = symAddr;
-  if (auto declareOp =
-          mlir::dyn_cast_or_null<hlfir::DeclareOp>(symAddr.getDefiningOp())) {
-    symAddr = declareOp.getResults()[0];
-    rawInput = declareOp.getResults()[1];
-  }
-
   // TODO: Might need revisiting to handle for non-shared clauses
   if (!symAddr) {
     if (const auto *details =
-            sym->detailsIf<Fortran::semantics::HostAssocDetails>()) {
+            sym->detailsIf<Fortran::semantics::HostAssocDetails>())
       symAddr = converter.getSymbolAddress(details->symbol());
-      rawInput = symAddr;
-    }
   }
 
   if (!symAddr)
     llvm::report_fatal_error("could not retrieve symbol address");
 
-  mlir::Value isPresent;
-  if (Fortran::semantics::IsOptional(sym))
-    isPresent =
-        builder.create<fir::IsPresentOp>(loc, builder.getI1Type(), rawInput);
-
-  if (auto boxTy = mlir::dyn_cast<fir::BaseBoxType>(
-          fir::unwrapRefType(symAddr.getType()))) {
-    if (mlir::isa<fir::RecordType>(boxTy.getEleTy()))
+  if (auto boxTy =
+          fir::unwrapRefType(symAddr.getType()).dyn_cast<fir::BaseBoxType>()) {
+    if (boxTy.getEleTy().isa<fir::RecordType>())
       TODO(loc, "derived type");
 
     // Load the box when baseAddr is a `fir.ref<fir.box<T>>` or a
     // `fir.ref<fir.class<T>>` type.
-    if (mlir::isa<fir::ReferenceType>(symAddr.getType())) {
+    if (symAddr.getType().isa<fir::ReferenceType>()) {
       if (Fortran::semantics::IsOptional(sym)) {
+        mlir::Value isPresent =
+            builder.create<fir::IsPresentOp>(loc, builder.getI1Type(), symAddr);
         mlir::Value addr =
             builder.genIfOp(loc, {boxTy}, isPresent, /*withElseRegion=*/true)
                 .genThen([&]() {
@@ -689,13 +647,14 @@ getDataOperandBaseAddr(Fortran::lower::AbstractConverter &converter,
                   builder.create<fir::ResultOp>(loc, mlir::ValueRange{absent});
                 })
                 .getResults()[0];
-        return AddrAndBoundsInfo(addr, rawInput, isPresent);
+        return AddrAndBoundsInfo(addr, isPresent);
       }
       mlir::Value addr = builder.create<fir::LoadOp>(loc, symAddr);
-      return AddrAndBoundsInfo(addr, rawInput, isPresent);
+      return AddrAndBoundsInfo(addr);
+      ;
     }
   }
-  return AddrAndBoundsInfo(symAddr, rawInput, isPresent);
+  return AddrAndBoundsInfo(symAddr);
 }
 
 template <typename BoundsOp, typename BoundsType>
@@ -741,13 +700,14 @@ gatherBoundsOrBoundValues(fir::FirOpBuilder &builder, mlir::Location loc,
 template <typename BoundsOp, typename BoundsType>
 llvm::SmallVector<mlir::Value>
 genBoundsOpsFromBox(fir::FirOpBuilder &builder, mlir::Location loc,
+                    Fortran::lower::AbstractConverter &converter,
                     fir::ExtendedValue dataExv,
                     Fortran::lower::AddrAndBoundsInfo &info) {
   llvm::SmallVector<mlir::Value> bounds;
   mlir::Type idxTy = builder.getIndexType();
   mlir::Type boundTy = builder.getType<BoundsType>();
 
-  assert(mlir::isa<fir::BaseBoxType>(info.addr.getType()) &&
+  assert(info.addr.getType().isa<fir::BaseBoxType>() &&
          "expect fir.box or fir.class");
 
   if (info.isPresent) {
@@ -769,7 +729,7 @@ genBoundsOpsFromBox(fir::FirOpBuilder &builder, mlir::Location loc,
               // Box is not present. Populate bound values with default values.
               llvm::SmallVector<mlir::Value> boundValues;
               mlir::Value zero = builder.createIntegerConstant(loc, idxTy, 0);
-              mlir::Value mOne = builder.createMinusOneInteger(loc, idxTy);
+              mlir::Value mOne = builder.createIntegerConstant(loc, idxTy, -1);
               for (unsigned dim = 0; dim < dataExv.rank(); ++dim) {
                 boundValues.push_back(zero); // lb
                 boundValues.push_back(mOne); // ub
@@ -800,7 +760,8 @@ genBoundsOpsFromBox(fir::FirOpBuilder &builder, mlir::Location loc,
 template <typename BoundsOp, typename BoundsType>
 llvm::SmallVector<mlir::Value>
 genBaseBoundsOps(fir::FirOpBuilder &builder, mlir::Location loc,
-                 fir::ExtendedValue dataExv, bool isAssumedSize) {
+                 Fortran::lower::AbstractConverter &converter,
+                 fir::ExtendedValue dataExv) {
   mlir::Type idxTy = builder.getIndexType();
   mlir::Type boundTy = builder.getType<BoundsType>();
   llvm::SmallVector<mlir::Value> bounds;
@@ -809,15 +770,14 @@ genBaseBoundsOps(fir::FirOpBuilder &builder, mlir::Location loc,
     return bounds;
 
   mlir::Value one = builder.createIntegerConstant(loc, idxTy, 1);
-  const unsigned rank = dataExv.rank();
-  for (unsigned dim = 0; dim < rank; ++dim) {
+  for (std::size_t dim = 0; dim < dataExv.rank(); ++dim) {
     mlir::Value baseLb =
         fir::factory::readLowerBound(builder, loc, dataExv, dim, one);
     mlir::Value zero = builder.createIntegerConstant(loc, idxTy, 0);
     mlir::Value ub;
     mlir::Value lb = zero;
     mlir::Value ext = fir::factory::readExtent(builder, loc, dataExv, dim);
-    if (isAssumedSize && dim + 1 == rank) {
+    if (mlir::isa<fir::UndefOp>(ext.getDefiningOp())) {
       ext = zero;
       ub = lb;
     } else {
@@ -832,75 +792,6 @@ genBaseBoundsOps(fir::FirOpBuilder &builder, mlir::Location loc,
   return bounds;
 }
 
-namespace detail {
-template <typename T> //
-static T &&AsRvalueRef(T &&t) {
-  return std::move(t);
-}
-template <typename T> //
-static T AsRvalueRef(T &t) {
-  return t;
-}
-template <typename T> //
-static T AsRvalueRef(const T &t) {
-  return t;
-}
-
-// Helper class for stripping enclosing parentheses and a conversion that
-// preserves type category. This is used for triplet elements, which are
-// always of type integer(kind=8). The lower/upper bounds are converted to
-// an "index" type, which is 64-bit, so the explicit conversion to kind=8
-// (if present) is not needed. When it's present, though, it causes generated
-// names to contain "int(..., kind=8)".
-struct PeelConvert {
-  template <Fortran::common::TypeCategory Category, int Kind>
-  static Fortran::semantics::MaybeExpr visit_with_category(
-      const Fortran::evaluate::Expr<Fortran::evaluate::Type<Category, Kind>>
-          &expr) {
-    return Fortran::common::visit(
-        [](auto &&s) { return visit_with_category<Category, Kind>(s); },
-        expr.u);
-  }
-  template <Fortran::common::TypeCategory Category, int Kind>
-  static Fortran::semantics::MaybeExpr visit_with_category(
-      const Fortran::evaluate::Convert<Fortran::evaluate::Type<Category, Kind>,
-                                       Category> &expr) {
-    return AsGenericExpr(AsRvalueRef(expr.left()));
-  }
-  template <Fortran::common::TypeCategory Category, int Kind, typename T>
-  static Fortran::semantics::MaybeExpr visit_with_category(const T &) {
-    return std::nullopt; //
-  }
-  template <Fortran::common::TypeCategory Category, typename T>
-  static Fortran::semantics::MaybeExpr visit_with_category(const T &) {
-    return std::nullopt; //
-  }
-
-  template <Fortran::common::TypeCategory Category>
-  static Fortran::semantics::MaybeExpr
-  visit(const Fortran::evaluate::Expr<Fortran::evaluate::SomeKind<Category>>
-            &expr) {
-    return Fortran::common::visit(
-        [](auto &&s) { return visit_with_category<Category>(s); }, expr.u);
-  }
-  static Fortran::semantics::MaybeExpr
-  visit(const Fortran::evaluate::Expr<Fortran::evaluate::SomeType> &expr) {
-    return Fortran::common::visit([](auto &&s) { return visit(s); }, expr.u);
-  }
-  template <typename T> //
-  static Fortran::semantics::MaybeExpr visit(const T &) {
-    return std::nullopt;
-  }
-};
-
-static Fortran::semantics::SomeExpr
-peelOuterConvert(Fortran::semantics::SomeExpr &expr) {
-  if (auto peeled = PeelConvert::visit(expr))
-    return *peeled;
-  return expr;
-}
-} // namespace detail
-
 /// Generate bounds operations for an array section when subscripts are
 /// provided.
 template <typename BoundsOp, typename BoundsType>
@@ -908,10 +799,9 @@ llvm::SmallVector<mlir::Value>
 genBoundsOps(fir::FirOpBuilder &builder, mlir::Location loc,
              Fortran::lower::AbstractConverter &converter,
              Fortran::lower::StatementContext &stmtCtx,
-             const std::vector<Fortran::evaluate::Subscript> &subscripts,
+             const std::list<Fortran::parser::SectionSubscript> &subscripts,
              std::stringstream &asFortran, fir::ExtendedValue &dataExv,
-             bool dataExvIsAssumedSize, AddrAndBoundsInfo &info,
-             bool treatIndexAsSection = false) {
+             mlir::Value baseAddr, bool treatIndexAsSection = false) {
   int dimension = 0;
   mlir::Type idxTy = builder.getIndexType();
   mlir::Type boundTy = builder.getType<BoundsType>();
@@ -919,9 +809,9 @@ genBoundsOps(fir::FirOpBuilder &builder, mlir::Location loc,
 
   mlir::Value zero = builder.createIntegerConstant(loc, idxTy, 0);
   mlir::Value one = builder.createIntegerConstant(loc, idxTy, 1);
-  const int dataExvRank = static_cast<int>(dataExv.rank());
   for (const auto &subscript : subscripts) {
-    const auto *triplet{std::get_if<Fortran::evaluate::Triplet>(&subscript.u)};
+    const auto *triplet{
+        std::get_if<Fortran::parser::SubscriptTriplet>(&subscript.u)};
     if (triplet || treatIndexAsSection) {
       if (dimension != 0)
         asFortran << ',';
@@ -933,45 +823,21 @@ genBoundsOps(fir::FirOpBuilder &builder, mlir::Location loc,
       mlir::Value stride = one;
       bool strideInBytes = false;
 
-      if (mlir::isa<fir::BaseBoxType>(
-              fir::unwrapRefType(info.addr.getType()))) {
-        if (info.isPresent) {
-          stride =
-              builder
-                  .genIfOp(loc, idxTy, info.isPresent, /*withElseRegion=*/true)
-                  .genThen([&]() {
-                    mlir::Value d =
-                        builder.createIntegerConstant(loc, idxTy, dimension);
-                    auto dimInfo = builder.create<fir::BoxDimsOp>(
-                        loc, idxTy, idxTy, idxTy, info.addr, d);
-                    builder.create<fir::ResultOp>(loc, dimInfo.getByteStride());
-                  })
-                  .genElse([&] {
-                    mlir::Value zero =
-                        builder.createIntegerConstant(loc, idxTy, 0);
-                    builder.create<fir::ResultOp>(loc, zero);
-                  })
-                  .getResults()[0];
-        } else {
-          mlir::Value d = builder.createIntegerConstant(loc, idxTy, dimension);
-          auto dimInfo = builder.create<fir::BoxDimsOp>(loc, idxTy, idxTy,
-                                                        idxTy, info.addr, d);
-          stride = dimInfo.getByteStride();
-        }
+      if (fir::unwrapRefType(baseAddr.getType()).isa<fir::BaseBoxType>()) {
+        mlir::Value d = builder.createIntegerConstant(loc, idxTy, dimension);
+        auto dimInfo = builder.create<fir::BoxDimsOp>(loc, idxTy, idxTy, idxTy,
+                                                      baseAddr, d);
+        stride = dimInfo.getByteStride();
         strideInBytes = true;
       }
 
-      Fortran::semantics::MaybeExpr lower;
+      const Fortran::lower::SomeExpr *lower{nullptr};
       if (triplet) {
-        lower = Fortran::evaluate::AsGenericExpr(triplet->lower());
+        if (const auto &tripletLb{std::get<0>(triplet->t)})
+          lower = Fortran::semantics::GetExpr(*tripletLb);
       } else {
-        // Case of IndirectSubscriptIntegerExpr
-        using IndirectSubscriptIntegerExpr =
-            Fortran::evaluate::IndirectSubscriptIntegerExpr;
-        using SubscriptInteger = Fortran::evaluate::SubscriptInteger;
-        Fortran::evaluate::Expr<SubscriptInteger> oneInt =
-            std::get<IndirectSubscriptIntegerExpr>(subscript.u).value();
-        lower = Fortran::evaluate::AsGenericExpr(std::move(oneInt));
+        const auto &index{std::get<Fortran::parser::IntExpr>(subscript.u)};
+        lower = Fortran::semantics::GetExpr(index);
         if (lower->Rank() > 0) {
           mlir::emitError(
               loc, "vector subscript cannot be used for an array section");
@@ -993,7 +859,7 @@ genBoundsOps(fir::FirOpBuilder &builder, mlir::Location loc,
               fir::getBase(converter.genExprValue(loc, *lower, stmtCtx));
           lb = builder.createConvert(loc, baseLb.getType(), lb);
           lbound = builder.create<mlir::arith::SubIOp>(loc, lb, baseLb);
-          asFortran << detail::peelOuterConvert(*lower).AsFortran();
+          asFortran << lower->AsFortran();
         }
       } else {
         // If the lower bound is not specified, then the section
@@ -1009,11 +875,10 @@ genBoundsOps(fir::FirOpBuilder &builder, mlir::Location loc,
         extent = one;
       } else {
         asFortran << ':';
-        Fortran::semantics::MaybeExpr upper =
-            Fortran::evaluate::AsGenericExpr(triplet->upper());
+        const auto &upper{std::get<1>(triplet->t)};
 
         if (upper) {
-          uval = Fortran::evaluate::ToInt64(*upper);
+          uval = Fortran::semantics::GetIntValue(upper);
           if (uval) {
             if (defaultLb) {
               ubound = builder.createIntegerConstant(loc, idxTy, *uval - 1);
@@ -1023,21 +888,22 @@ genBoundsOps(fir::FirOpBuilder &builder, mlir::Location loc,
             }
             asFortran << *uval;
           } else {
+            const Fortran::lower::SomeExpr *uexpr =
+                Fortran::semantics::GetExpr(*upper);
             mlir::Value ub =
-                fir::getBase(converter.genExprValue(loc, *upper, stmtCtx));
+                fir::getBase(converter.genExprValue(loc, *uexpr, stmtCtx));
             ub = builder.createConvert(loc, baseLb.getType(), ub);
             ubound = builder.create<mlir::arith::SubIOp>(loc, ub, baseLb);
-            asFortran << detail::peelOuterConvert(*upper).AsFortran();
+            asFortran << uexpr->AsFortran();
           }
         }
         if (lower && upper) {
           if (lval && uval && *uval < *lval) {
             mlir::emitError(loc, "zero sized array section");
             break;
-          } else {
-            // Stride is mandatory in evaluate::Triplet. Make sure it's 1.
-            auto val = Fortran::evaluate::ToInt64(triplet->GetStride());
-            if (!val || *val != 1) {
+          } else if (std::get<2>(triplet->t)) {
+            const auto &strideExpr{std::get<2>(triplet->t)};
+            if (strideExpr) {
               mlir::emitError(loc, "stride cannot be specified on "
                                    "an array section");
               break;
@@ -1045,27 +911,8 @@ genBoundsOps(fir::FirOpBuilder &builder, mlir::Location loc,
           }
         }
 
-        if (info.isPresent && mlir::isa<fir::BaseBoxType>(
-                                  fir::unwrapRefType(info.addr.getType()))) {
-          extent =
-              builder
-                  .genIfOp(loc, idxTy, info.isPresent, /*withElseRegion=*/true)
-                  .genThen([&]() {
-                    mlir::Value ext = fir::factory::readExtent(
-                        builder, loc, dataExv, dimension);
-                    builder.create<fir::ResultOp>(loc, ext);
-                  })
-                  .genElse([&] {
-                    mlir::Value zero =
-                        builder.createIntegerConstant(loc, idxTy, 0);
-                    builder.create<fir::ResultOp>(loc, zero);
-                  })
-                  .getResults()[0];
-        } else {
-          extent = fir::factory::readExtent(builder, loc, dataExv, dimension);
-        }
-
-        if (dataExvIsAssumedSize && dimension + 1 == dataExvRank) {
+        extent = fir::factory::readExtent(builder, loc, dataExv, dimension);
+        if (mlir::isa<fir::UndefOp>(extent.getDefiningOp())) {
           extent = zero;
           if (ubound && lbound) {
             mlir::Value diff =
@@ -1090,158 +937,137 @@ genBoundsOps(fir::FirOpBuilder &builder, mlir::Location loc,
   return bounds;
 }
 
-namespace detail {
-template <typename Ref, typename Expr> //
-std::optional<Ref> getRef(Expr &&expr) {
-  if constexpr (std::is_same_v<llvm::remove_cvref_t<Expr>,
-                               Fortran::evaluate::DataRef>) {
-    if (auto *ref = std::get_if<Ref>(&expr.u))
-      return *ref;
-    return std::nullopt;
-  } else {
-    auto maybeRef = Fortran::evaluate::ExtractDataRef(expr);
-    if (!maybeRef || !std::holds_alternative<Ref>(maybeRef->u))
-      return std::nullopt;
-    return std::get<Ref>(maybeRef->u);
-  }
-}
-} // namespace detail
-
-template <typename BoundsOp, typename BoundsType>
+template <typename ObjectType, typename BoundsOp, typename BoundsType>
 AddrAndBoundsInfo gatherDataOperandAddrAndBounds(
     Fortran::lower::AbstractConverter &converter, fir::FirOpBuilder &builder,
-    semantics::SemanticsContext &semaCtx,
-    Fortran::lower::StatementContext &stmtCtx,
-    Fortran::semantics::SymbolRef symbol,
-    const Fortran::semantics::MaybeExpr &maybeDesignator,
+    Fortran::semantics::SemanticsContext &semanticsContext,
+    Fortran::lower::StatementContext &stmtCtx, const ObjectType &object,
     mlir::Location operandLocation, std::stringstream &asFortran,
     llvm::SmallVector<mlir::Value> &bounds, bool treatIndexAsSection = false) {
-  using namespace Fortran;
-
   AddrAndBoundsInfo info;
+  std::visit(
+      Fortran::common::visitors{
+          [&](const Fortran::parser::Designator &designator) {
+            if (auto expr{Fortran::semantics::AnalyzeExpr(semanticsContext,
+                                                          designator)}) {
+              if (((*expr).Rank() > 0 || treatIndexAsSection) &&
+                  Fortran::parser::Unwrap<Fortran::parser::ArrayElement>(
+                      designator)) {
+                const auto *arrayElement =
+                    Fortran::parser::Unwrap<Fortran::parser::ArrayElement>(
+                        designator);
+                const auto *dataRef =
+                    std::get_if<Fortran::parser::DataRef>(&designator.u);
+                fir::ExtendedValue dataExv;
+                if (Fortran::parser::Unwrap<
+                        Fortran::parser::StructureComponent>(
+                        arrayElement->base)) {
+                  auto exprBase = Fortran::semantics::AnalyzeExpr(
+                      semanticsContext, arrayElement->base);
+                  dataExv = converter.genExprAddr(operandLocation, *exprBase,
+                                                  stmtCtx);
+                  info.addr = fir::getBase(dataExv);
+                  asFortran << (*exprBase).AsFortran();
+                } else {
+                  const Fortran::parser::Name &name =
+                      Fortran::parser::GetLastName(*dataRef);
+                  info = getDataOperandBaseAddr(converter, builder,
+                                                *name.symbol, operandLocation);
+                  dataExv = converter.getSymbolExtendedValue(*name.symbol);
+                  asFortran << name.ToString();
+                }
 
-  if (!maybeDesignator) {
-    info = getDataOperandBaseAddr(converter, builder, symbol, operandLocation);
-    asFortran << symbol->name().ToString();
-    return info;
-  }
+                if (!arrayElement->subscripts.empty()) {
+                  asFortran << '(';
+                  bounds = genBoundsOps<BoundsOp, BoundsType>(
+                      builder, operandLocation, converter, stmtCtx,
+                      arrayElement->subscripts, asFortran, dataExv, info.addr,
+                      treatIndexAsSection);
+                }
+                asFortran << ')';
+              } else if (auto structComp = Fortran::parser::Unwrap<
+                             Fortran::parser::StructureComponent>(designator)) {
+                fir::ExtendedValue compExv =
+                    converter.genExprAddr(operandLocation, *expr, stmtCtx);
+                info.addr = fir::getBase(compExv);
+                if (fir::unwrapRefType(info.addr.getType())
+                        .isa<fir::SequenceType>())
+                  bounds = genBaseBoundsOps<BoundsOp, BoundsType>(
+                      builder, operandLocation, converter, compExv);
+                asFortran << (*expr).AsFortran();
 
-  semantics::SomeExpr designator = *maybeDesignator;
+                bool isOptional = Fortran::semantics::IsOptional(
+                    *Fortran::parser::GetLastName(*structComp).symbol);
+                if (isOptional)
+                  info.isPresent = builder.create<fir::IsPresentOp>(
+                      operandLocation, builder.getI1Type(), info.addr);
 
-  if ((designator.Rank() > 0 || treatIndexAsSection) &&
-      IsArrayElement(designator)) {
-    auto arrayRef = detail::getRef<evaluate::ArrayRef>(designator);
-    // This shouldn't fail after IsArrayElement(designator).
-    assert(arrayRef && "Expecting ArrayRef");
+                if (auto loadOp = mlir::dyn_cast_or_null<fir::LoadOp>(
+                        info.addr.getDefiningOp())) {
+                  if (fir::isAllocatableType(loadOp.getType()) ||
+                      fir::isPointerType(loadOp.getType()))
+                    info.addr = builder.create<fir::BoxAddrOp>(operandLocation,
+                                                               info.addr);
+                }
 
-    fir::ExtendedValue dataExv;
-    bool dataExvIsAssumedSize = false;
-
-    auto toMaybeExpr = [&](auto &&base) {
-      using BaseType = llvm::remove_cvref_t<decltype(base)>;
-      evaluate::ExpressionAnalyzer ea{semaCtx};
-
-      if constexpr (std::is_same_v<evaluate::NamedEntity, BaseType>) {
-        if (auto *ref = base.UnwrapSymbolRef())
-          return ea.Designate(evaluate::DataRef{*ref});
-        if (auto *ref = base.UnwrapComponent())
-          return ea.Designate(evaluate::DataRef{*ref});
-        llvm_unreachable("Unexpected NamedEntity");
-      } else {
-        static_assert(std::is_same_v<semantics::SymbolRef, BaseType>);
-        return ea.Designate(evaluate::DataRef{base});
-      }
-    };
-
-    auto arrayBase = toMaybeExpr(arrayRef->base());
-    assert(arrayBase);
-
-    if (detail::getRef<evaluate::Component>(*arrayBase)) {
-      dataExv = converter.genExprAddr(operandLocation, *arrayBase, stmtCtx);
-      info.addr = fir::getBase(dataExv);
-      info.rawInput = info.addr;
-      asFortran << arrayBase->AsFortran();
-    } else {
-      const semantics::Symbol &sym = arrayRef->GetLastSymbol();
-      dataExvIsAssumedSize =
-          Fortran::semantics::IsAssumedSizeArray(sym.GetUltimate());
-      info = getDataOperandBaseAddr(converter, builder, sym, operandLocation);
-      dataExv = converter.getSymbolExtendedValue(sym);
-      asFortran << sym.name().ToString();
-    }
-
-    if (!arrayRef->subscript().empty()) {
-      asFortran << '(';
-      bounds = genBoundsOps<BoundsOp, BoundsType>(
-          builder, operandLocation, converter, stmtCtx, arrayRef->subscript(),
-          asFortran, dataExv, dataExvIsAssumedSize, info, treatIndexAsSection);
-    }
-    asFortran << ')';
-  } else if (auto compRef = detail::getRef<evaluate::Component>(designator)) {
-    fir::ExtendedValue compExv =
-        converter.genExprAddr(operandLocation, designator, stmtCtx);
-    info.addr = fir::getBase(compExv);
-    info.rawInput = info.addr;
-    if (mlir::isa<fir::SequenceType>(fir::unwrapRefType(info.addr.getType())))
-      bounds = genBaseBoundsOps<BoundsOp, BoundsType>(builder, operandLocation,
-                                                      compExv,
-                                                      /*isAssumedSize=*/false);
-    asFortran << designator.AsFortran();
-
-    if (semantics::IsOptional(compRef->GetLastSymbol())) {
-      info.isPresent = builder.create<fir::IsPresentOp>(
-          operandLocation, builder.getI1Type(), info.rawInput);
-    }
-
-    if (auto loadOp =
-            mlir::dyn_cast_or_null<fir::LoadOp>(info.addr.getDefiningOp())) {
-      if (fir::isAllocatableType(loadOp.getType()) ||
-          fir::isPointerType(loadOp.getType()))
-        info.addr = builder.create<fir::BoxAddrOp>(operandLocation, info.addr);
-      info.rawInput = info.addr;
-    }
-
-    // If the component is an allocatable or pointer the result of
-    // genExprAddr will be the result of a fir.box_addr operation or
-    // a fir.box_addr has been inserted just before.
-    // Retrieve the box so we handle it like other descriptor.
-    if (auto boxAddrOp =
-            mlir::dyn_cast_or_null<fir::BoxAddrOp>(info.addr.getDefiningOp())) {
-      info.addr = boxAddrOp.getVal();
-      info.rawInput = info.addr;
-      bounds = genBoundsOpsFromBox<BoundsOp, BoundsType>(
-          builder, operandLocation, compExv, info);
-    }
-  } else {
-    if (detail::getRef<evaluate::ArrayRef>(designator)) {
-      fir::ExtendedValue compExv =
-          converter.genExprAddr(operandLocation, designator, stmtCtx);
-      info.addr = fir::getBase(compExv);
-      info.rawInput = info.addr;
-      asFortran << designator.AsFortran();
-    } else if (auto symRef = detail::getRef<semantics::SymbolRef>(designator)) {
-      // Scalar or full array.
-      fir::ExtendedValue dataExv = converter.getSymbolExtendedValue(*symRef);
-      info =
-          getDataOperandBaseAddr(converter, builder, *symRef, operandLocation);
-      if (mlir::isa<fir::BaseBoxType>(
-              fir::unwrapRefType(info.addr.getType()))) {
-        bounds = genBoundsOpsFromBox<BoundsOp, BoundsType>(
-            builder, operandLocation, dataExv, info);
-      }
-      bool dataExvIsAssumedSize =
-          Fortran::semantics::IsAssumedSizeArray(symRef->get().GetUltimate());
-      if (mlir::isa<fir::SequenceType>(fir::unwrapRefType(info.addr.getType())))
-        bounds = genBaseBoundsOps<BoundsOp, BoundsType>(
-            builder, operandLocation, dataExv, dataExvIsAssumedSize);
-      asFortran << symRef->get().name().ToString();
-    } else { // Unsupported
-      llvm::report_fatal_error("Unsupported type of OpenACC operand");
-    }
-  }
-
+                // If the component is an allocatable or pointer the result of
+                // genExprAddr will be the result of a fir.box_addr operation or
+                // a fir.box_addr has been inserted just before.
+                // Retrieve the box so we handle it like other descriptor.
+                if (auto boxAddrOp = mlir::dyn_cast_or_null<fir::BoxAddrOp>(
+                        info.addr.getDefiningOp())) {
+                  info.addr = boxAddrOp.getVal();
+                  bounds = genBoundsOpsFromBox<BoundsOp, BoundsType>(
+                      builder, operandLocation, converter, compExv, info);
+                }
+              } else {
+                if (Fortran::parser::Unwrap<Fortran::parser::ArrayElement>(
+                        designator)) {
+                  // Single array element.
+                  const auto *arrayElement =
+                      Fortran::parser::Unwrap<Fortran::parser::ArrayElement>(
+                          designator);
+                  (void)arrayElement;
+                  fir::ExtendedValue compExv =
+                      converter.genExprAddr(operandLocation, *expr, stmtCtx);
+                  info.addr = fir::getBase(compExv);
+                  asFortran << (*expr).AsFortran();
+                } else if (const auto *dataRef{
+                               std::get_if<Fortran::parser::DataRef>(
+                                   &designator.u)}) {
+                  // Scalar or full array.
+                  const Fortran::parser::Name &name =
+                      Fortran::parser::GetLastName(*dataRef);
+                  fir::ExtendedValue dataExv =
+                      converter.getSymbolExtendedValue(*name.symbol);
+                  info = getDataOperandBaseAddr(converter, builder,
+                                                *name.symbol, operandLocation);
+                  if (fir::unwrapRefType(info.addr.getType())
+                          .isa<fir::BaseBoxType>()) {
+                    bounds = genBoundsOpsFromBox<BoundsOp, BoundsType>(
+                        builder, operandLocation, converter, dataExv, info);
+                  }
+                  if (fir::unwrapRefType(info.addr.getType())
+                          .isa<fir::SequenceType>())
+                    bounds = genBaseBoundsOps<BoundsOp, BoundsType>(
+                        builder, operandLocation, converter, dataExv);
+                  asFortran << name.ToString();
+                } else { // Unsupported
+                  llvm::report_fatal_error(
+                      "Unsupported type of OpenACC operand");
+                }
+              }
+            }
+          },
+          [&](const Fortran::parser::Name &name) {
+            info = getDataOperandBaseAddr(converter, builder, *name.symbol,
+                                          operandLocation);
+            asFortran << name.ToString();
+          }},
+      object.u);
   return info;
 }
+
 } // namespace lower
 } // namespace Fortran
 

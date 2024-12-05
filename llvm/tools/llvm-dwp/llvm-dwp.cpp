@@ -91,7 +91,7 @@ getDWOFilenames(StringRef ExecFilename) {
     std::string DWOCompDir =
         dwarf::toString(Die.find(dwarf::DW_AT_comp_dir), "");
     if (!DWOCompDir.empty()) {
-      SmallString<16> DWOPath(DWOName);
+      SmallString<16> DWOPath(std::move(DWOName));
       sys::fs::make_absolute(DWOCompDir, DWOPath);
       if (!sys::fs::exists(DWOPath) && sys::fs::exists(DWOName))
         DWOPaths.push_back(std::move(DWOName));
@@ -188,11 +188,8 @@ int llvm_dwp_main(int argc, char **argv, const llvm::ToolContext &) {
                         std::make_move_iterator(DWOs->end()));
   }
 
-  if (DWOFilenames.empty()) {
-    WithColor::defaultWarningHandler(make_error<DWPError>(
-        "executable file does not contain any references to dwo files"));
+  if (DWOFilenames.empty())
     return 0;
-  }
 
   std::string ErrorStr;
   StringRef Context = "dwarf streamer init";
@@ -266,8 +263,9 @@ int llvm_dwp_main(int argc, char **argv, const llvm::ToolContext &) {
 
   std::unique_ptr<MCStreamer> MS(TheTarget->createMCObjectStreamer(
       *ErrOrTriple, MC, std::unique_ptr<MCAsmBackend>(MAB),
-      MAB->createObjectWriter(*OS), std::unique_ptr<MCCodeEmitter>(MCE),
-      *MSTI));
+      MAB->createObjectWriter(*OS), std::unique_ptr<MCCodeEmitter>(MCE), *MSTI,
+      MCOptions.MCRelaxAll, MCOptions.MCIncrementalLinkerCompatible,
+      /*DWARFMustBeAtTheEnd*/ false));
   if (!MS)
     return error("no object streamer for target " + TripleName, Context);
 

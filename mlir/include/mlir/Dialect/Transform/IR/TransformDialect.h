@@ -252,21 +252,21 @@ private:
 
 template <typename OpTy>
 void TransformDialect::addOperationIfNotRegistered() {
+  StringRef name = OpTy::getOperationName();
   std::optional<RegisteredOperationName> opName =
-      RegisteredOperationName::lookup(TypeID::get<OpTy>(), getContext());
+      RegisteredOperationName::lookup(name, getContext());
   if (!opName) {
     addOperations<OpTy>();
 #ifndef NDEBUG
-    StringRef name = OpTy::getOperationName();
     detail::checkImplementsTransformOpInterface(name, getContext());
 #endif // NDEBUG
     return;
   }
 
-  if (LLVM_LIKELY(opName->getTypeID() == TypeID::get<OpTy>()))
+  if (opName->getTypeID() == TypeID::get<OpTy>())
     return;
 
-  reportDuplicateOpRegistration(OpTy::getOperationName());
+  reportDuplicateOpRegistration(name);
 }
 
 template <typename Type>

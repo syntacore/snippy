@@ -173,7 +173,6 @@ public:
   /// function prologue/epilogue.
   bool canUseAsPrologue(const MachineBasicBlock &MBB) const override;
   bool canUseAsEpilogue(const MachineBasicBlock &MBB) const override;
-  void updateCalleeSaves(const MachineFunction &MF, BitVector &SavedRegs) const;
 
   uint64_t getStackThreshold() const override;
 };

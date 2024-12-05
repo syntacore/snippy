@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_TIME_T_H
-#define LLVM_LIBC_TYPES_TIME_T_H
+#ifndef __LLVM_LIBC_TYPES_TIME_T_H__
+#define __LLVM_LIBC_TYPES_TIME_T_H__
 
 #if (defined(__arm__) || defined(_M_ARM))
 typedef __INTPTR_TYPE__ time_t;
@@ -15,4 +15,4 @@ typedef __INTPTR_TYPE__ time_t;
 typedef __INT64_TYPE__ time_t;
 #endif
 
-#endif // LLVM_LIBC_TYPES_TIME_T_H
+#endif // __LLVM_LIBC_TYPES_TIME_T_H__

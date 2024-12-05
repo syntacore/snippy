@@ -40,7 +40,7 @@ void complex::ComplexDialect::initialize() {
 #define GET_ATTRDEF_LIST
 #include "mlir/Dialect/Complex/IR/ComplexAttributes.cpp.inc"
       >();
-  declarePromisedInterface<ConvertToLLVMPatternInterface, ComplexDialect>();
+  declarePromisedInterface<ComplexDialect, ConvertToLLVMPatternInterface>();
   addInterfaces<ComplexInlinerInterface>();
 }
 

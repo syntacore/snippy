@@ -114,10 +114,7 @@ public:
   CostBenefitPriority(const CallBase *CB, FunctionAnalysisManager &FAM,
                       const InlineParams &Params) {
     auto IC = getInlineCostWrapper(const_cast<CallBase &>(*CB), FAM, Params);
-    if (IC.isVariable())
-      Cost = IC.getCost();
-    else
-      Cost = IC.isNever() ? INT_MAX : INT_MIN;
+    Cost = IC.getCost();
     StaticBonusApplied = IC.getStaticBonusApplied();
     CostBenefit = IC.getCostBenefit();
   }

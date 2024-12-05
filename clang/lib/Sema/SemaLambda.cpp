@@ -9,20 +9,17 @@
 //  This file implements semantic analysis for C++ lambda expressions.
 //
 //===----------------------------------------------------------------------===//
-#include "clang/Sema/SemaLambda.h"
+#include "clang/Sema/DeclSpec.h"
 #include "TypeLocBuilder.h"
 #include "clang/AST/ASTLambda.h"
-#include "clang/AST/CXXInheritance.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/Basic/TargetInfo.h"
-#include "clang/Sema/DeclSpec.h"
 #include "clang/Sema/Initialization.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Scope.h"
 #include "clang/Sema/ScopeInfo.h"
-#include "clang/Sema/SemaCUDA.h"
 #include "clang/Sema/SemaInternal.h"
-#include "clang/Sema/SemaOpenMP.h"
+#include "clang/Sema/SemaLambda.h"
 #include "clang/Sema/Template.h"
 #include "llvm/ADT/STLExtras.h"
 #include <optional>
@@ -387,69 +384,30 @@ buildTypeForLambdaCallOperator(Sema &S, clang::CXXRecordDecl *Class,
 //  parameter, if any, of the lambda's function call operator (possibly
 //  instantiated from a function call operator template) shall be either:
 //  - the closure type,
-//  - class type publicly and unambiguously derived from the closure type, or
+//  - class type derived from the closure type, or
 //  - a reference to a possibly cv-qualified such type.
-bool Sema::DiagnoseInvalidExplicitObjectParameterInLambda(
-    CXXMethodDecl *Method, SourceLocation CallLoc) {
+void Sema::DiagnoseInvalidExplicitObjectParameterInLambda(
+    CXXMethodDecl *Method) {
   if (!isLambdaCallWithExplicitObjectParameter(Method))
-    return false;
+    return;
   CXXRecordDecl *RD = Method->getParent();
   if (Method->getType()->isDependentType())
-    return false;
+    return;
   if (RD->isCapturelessLambda())
-    return false;
-
-  ParmVarDecl *Param = Method->getParamDecl(0);
-  QualType ExplicitObjectParameterType = Param->getType()
+    return;
+  QualType ExplicitObjectParameterType = Method->getParamDecl(0)
+                                             ->getType()
                                              .getNonReferenceType()
                                              .getUnqualifiedType()
                                              .getDesugaredType(getASTContext());
   QualType LambdaType = getASTContext().getRecordType(RD);
   if (LambdaType == ExplicitObjectParameterType)
-    return false;
-
-  // Don't check the same instantiation twice.
-  //
-  // If this call operator is ill-formed, there is no point in issuing
-  // a diagnostic every time it is called because the problem is in the
-  // definition of the derived type, not at the call site.
-  //
-  // FIXME: Move this check to where we instantiate the method? This should
-  // be possible, but the naive approach of just marking the method as invalid
-  // leads to us emitting more diagnostics than we should have to for this case
-  // (1 error here *and* 1 error about there being no matching overload at the
-  // call site). It might be possible to avoid that by also checking if there
-  // is an empty cast path for the method stored in the context (signalling that
-  // we've already diagnosed it) and then just not building the call, but that
-  // doesn't really seem any simpler than diagnosing it at the call site...
-  if (auto It = Context.LambdaCastPaths.find(Method);
-      It != Context.LambdaCastPaths.end())
-    return It->second.empty();
-
-  CXXCastPath &Path = Context.LambdaCastPaths[Method];
-  CXXBasePaths Paths(/*FindAmbiguities=*/true, /*RecordPaths=*/true,
-                     /*DetectVirtual=*/false);
-  if (!IsDerivedFrom(RD->getLocation(), ExplicitObjectParameterType, LambdaType,
-                     Paths)) {
-    Diag(Param->getLocation(), diag::err_invalid_explicit_object_type_in_lambda)
-        << ExplicitObjectParameterType;
-    return true;
-  }
-
-  if (Paths.isAmbiguous(LambdaType->getCanonicalTypeUnqualified())) {
-    std::string PathsDisplay = getAmbiguousPathsDisplayString(Paths);
-    Diag(CallLoc, diag::err_explicit_object_lambda_ambiguous_base)
-        << LambdaType << PathsDisplay;
-    return true;
-  }
-
-  if (CheckBaseClassAccess(CallLoc, LambdaType, ExplicitObjectParameterType,
-                           Paths.front(),
-                           diag::err_explicit_object_lambda_inaccessible_base))
-    return true;
-
-  BuildBasePathArray(Paths, Path);
-  return false;
+    return;
+  if (IsDerivedFrom(RD->getLocation(), ExplicitObjectParameterType, LambdaType))
+    return;
+  Diag(Method->getParamDecl(0)->getLocation(),
+       diag::err_invalid_explicit_object_type_in_lambda)
+      << ExplicitObjectParameterType;
 }
 
 void Sema::handleLambdaNumbering(
@@ -1076,27 +1034,16 @@ void Sema::ActOnLambdaExpressionAfterIntroducer(LambdaIntroducer &Intro,
   // be dependent, because there are template parameters in scope.
   CXXRecordDecl::LambdaDependencyKind LambdaDependencyKind =
       CXXRecordDecl::LDK_Unknown;
-  if (CurScope->getTemplateParamParent() != nullptr) {
-    LambdaDependencyKind = CXXRecordDecl::LDK_AlwaysDependent;
-  } else if (Scope *P = CurScope->getParent()) {
-    // Given a lambda defined inside a requires expression,
-    //
-    // struct S {
-    //   S(auto var) requires requires { [&] -> decltype(var) { }; }
-    //   {}
-    // };
-    //
-    // The parameter var is not injected into the function Decl at the point of
-    // parsing lambda. In such scenarios, perceiving it as dependent could
-    // result in the constraint being evaluated, which matches what GCC does.
-    while (P->getEntity() && P->getEntity()->isRequiresExprBody())
-      P = P->getParent();
-    if (P->isFunctionDeclarationScope() &&
-        llvm::any_of(P->decls(), [](Decl *D) {
-          return isa<ParmVarDecl>(D) &&
-                 cast<ParmVarDecl>(D)->getType()->isTemplateTypeParmType();
-        }))
+  if (LSI->NumExplicitTemplateParams > 0) {
+    Scope *TemplateParamScope = CurScope->getTemplateParamParent();
+    assert(TemplateParamScope &&
+           "Lambda with explicit template param list should establish a "
+           "template param scope");
+    assert(TemplateParamScope->getParent());
+    if (TemplateParamScope->getParent()->getTemplateParamParent() != nullptr)
       LambdaDependencyKind = CXXRecordDecl::LDK_AlwaysDependent;
+  } else if (CurScope->getTemplateParamParent() != nullptr) {
+    LambdaDependencyKind = CXXRecordDecl::LDK_AlwaysDependent;
   }
 
   CXXRecordDecl *Class = createLambdaClosureType(
@@ -1246,11 +1193,7 @@ void Sema::ActOnLambdaExpressionAfterIntroducer(LambdaIntroducer &Intro,
 
       if (auto *BD = R.getAsSingle<BindingDecl>())
         Var = BD;
-      else if (R.getAsSingle<FieldDecl>()) {
-        Diag(C->Loc, diag::err_capture_class_member_does_not_name_variable)
-            << C->Id;
-        continue;
-      } else
+      else
         Var = R.getAsSingle<VarDecl>();
       if (Var && DiagnoseUseOfDecl(Var, C->Loc))
         continue;
@@ -1318,6 +1261,7 @@ void Sema::ActOnLambdaExpressionAfterIntroducer(LambdaIntroducer &Intro,
 
     if (C->Init.isUsable()) {
       addInitCapture(LSI, cast<VarDecl>(Var), C->Kind == LCK_ByRef);
+      PushOnScopeChains(Var, CurScope, false);
     } else {
       TryCaptureKind Kind = C->Kind == LCK_ByRef ? TryCapture_ExplicitByRef
                                                  : TryCapture_ExplicitByVal;
@@ -1379,8 +1323,6 @@ void Sema::ActOnLambdaClosureParameters(
     AddTemplateParametersToLambdaCallOperator(LSI->CallOperator, LSI->Lambda,
                                               TemplateParams);
     LSI->Lambda->setLambdaIsGeneric(true);
-    LSI->ContainsUnexpandedParameterPack |=
-        TemplateParams->containsUnexpandedParameterPack();
   }
   LSI->AfterParameterList = true;
 }
@@ -1451,11 +1393,11 @@ void Sema::ActOnStartOfLambdaDefinition(LambdaIntroducer &Intro,
 
   // CUDA lambdas get implicit host and device attributes.
   if (getLangOpts().CUDA)
-    CUDA().SetLambdaAttrs(Method);
+    CUDASetLambdaAttrs(Method);
 
   // OpenMP lambdas might get assumumption attributes.
   if (LangOpts.OpenMP)
-    OpenMP().ActOnFinishedFunctionDefinitionInOpenMPAssumeScope(Method);
+    ActOnFinishedFunctionDefinitionInOpenMPAssumeScope(Method);
 
   handleLambdaNumbering(Class, Method);
 
@@ -2194,7 +2136,7 @@ ExprResult Sema::BuildLambdaExpr(SourceLocation StartLoc, SourceLocation EndLoc,
       CaptureInits.push_back(Init.get());
 
       if (LangOpts.CUDA)
-        CUDA().CheckLambdaCapture(CallOperator, From);
+        CUDACheckLambdaCapture(CallOperator, From);
     }
 
     Class->setCaptures(Context, Captures);
@@ -2384,37 +2326,23 @@ Sema::LambdaScopeForCallOperatorInstantiationRAII::
 
   SemaRef.RebuildLambdaScopeInfo(cast<CXXMethodDecl>(FD));
 
-  FunctionDecl *FDPattern = getPatternFunctionDecl(FD);
-  if (!FDPattern)
-    return;
+  FunctionDecl *Pattern = getPatternFunctionDecl(FD);
+  if (Pattern) {
+    SemaRef.addInstantiatedCapturesToScope(FD, Pattern, Scope, MLTAL);
 
-  SemaRef.addInstantiatedCapturesToScope(FD, FDPattern, Scope, MLTAL);
+    FunctionDecl *ParentFD = FD;
+    while (ShouldAddDeclsFromParentScope) {
 
-  if (!ShouldAddDeclsFromParentScope)
-    return;
+      ParentFD =
+          dyn_cast<FunctionDecl>(getLambdaAwareParentOfDeclContext(ParentFD));
+      Pattern =
+          dyn_cast<FunctionDecl>(getLambdaAwareParentOfDeclContext(Pattern));
 
-  llvm::SmallVector<std::pair<FunctionDecl *, FunctionDecl *>, 4>
-      ParentInstantiations;
-  while (true) {
-    FDPattern =
-        dyn_cast<FunctionDecl>(getLambdaAwareParentOfDeclContext(FDPattern));
-    FD = dyn_cast<FunctionDecl>(getLambdaAwareParentOfDeclContext(FD));
+      if (!FD || !Pattern)
+        break;
 
-    if (!FDPattern || !FD)
-      break;
-
-    ParentInstantiations.emplace_back(FDPattern, FD);
-  }
-
-  // Add instantiated parameters and local vars to scopes, starting from the
-  // outermost lambda to the innermost lambda. This ordering ensures that
-  // parameters in inner lambdas can correctly depend on those defined
-  // in outer lambdas, e.g. auto L = [](auto... x) {
-  //   return [](decltype(x)... y) { }; // `y` depends on `x`
-  // };
-
-  for (const auto &[FDPattern, FD] : llvm::reverse(ParentInstantiations)) {
-    SemaRef.addInstantiatedParametersToScope(FD, FDPattern, Scope, MLTAL);
-    SemaRef.addInstantiatedLocalVarsToScope(FD, FDPattern, Scope);
+      SemaRef.addInstantiatedParametersToScope(ParentFD, Pattern, Scope, MLTAL);
+      SemaRef.addInstantiatedLocalVarsToScope(ParentFD, Pattern, Scope);
+    }
   }
 }

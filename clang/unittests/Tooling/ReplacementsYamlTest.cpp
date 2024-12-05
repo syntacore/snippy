@@ -43,7 +43,7 @@ TEST(ReplacementsYamlTest, serializesReplacements) {
                "    Length:          2\n"
                "    ReplacementText: 'replacement #2'\n"
                "...\n",
-               YamlContent.c_str());
+               YamlContentStream.str().c_str());
 }
 
 TEST(ReplacementsYamlTest, serializesNewLines) {
@@ -67,7 +67,7 @@ TEST(ReplacementsYamlTest, serializesNewLines) {
                "    Length:          0\n"
                "    ReplacementText: \"#include <utility>\\n\"\n"
                "...\n",
-               YamlContent.c_str());
+               YamlContentStream.str().c_str());
 }
 
 TEST(ReplacementsYamlTest, deserializesReplacements) {

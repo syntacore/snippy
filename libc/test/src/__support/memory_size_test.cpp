@@ -6,11 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "src/__support/macros/config.h"
 #include "src/__support/memory_size.h"
 #include "test/UnitTest/Test.h"
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 namespace internal {
 static inline constexpr size_t SAFE_MEM_SIZE_TEST_LIMIT =
     static_cast<size_t>(cpp::numeric_limits<cpp::make_signed_t<size_t>>::max());
@@ -50,13 +49,6 @@ TEST(LlvmLibcMemSizeTest, Addition) {
   ASSERT_FALSE((max + SafeMemSize{static_cast<size_t>(1)}).valid());
   ASSERT_FALSE((third + third + third + third).valid());
   ASSERT_FALSE((half + half + half).valid());
-
-  ASSERT_FALSE((SafeMemSize{static_cast<size_t>(-1)} +
-                SafeMemSize{static_cast<size_t>(2)})
-                   .valid());
-  ASSERT_FALSE((SafeMemSize{static_cast<size_t>(2)} +
-                SafeMemSize{static_cast<size_t>(-1)})
-                   .valid());
 }
 
 TEST(LlvmLibcMemSizeTest, Multiplication) {
@@ -101,4 +93,4 @@ TEST(LlvmLibcBlockBitTest, OffsetTo) {
   }
 }
 } // namespace internal
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE

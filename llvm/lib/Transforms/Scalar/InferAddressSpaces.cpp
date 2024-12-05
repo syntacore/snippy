@@ -642,7 +642,6 @@ Value *InferAddressSpacesImpl::cloneInstructionWithNewAddressSpace(
     Type *NewPtrTy = getPtrOrVecOfPtrsWithNewAS(I->getType(), AS);
     auto *NewI = new AddrSpaceCastInst(I, NewPtrTy);
     NewI->insertAfter(I);
-    NewI->setDebugLoc(I->getDebugLoc());
     return NewI;
   }
 
@@ -822,7 +821,7 @@ unsigned InferAddressSpacesImpl::joinAddressSpaces(unsigned AS1,
 }
 
 bool InferAddressSpacesImpl::run(Function &F) {
-  DL = &F.getDataLayout();
+  DL = &F.getParent()->getDataLayout();
 
   if (AssumeDefaultIsFlatAddressSpace)
     FlatAddrSpace = 0;
@@ -1222,7 +1221,6 @@ bool InferAddressSpacesImpl::rewriteWithNewAddressSpaces(
     Value::use_iterator I, E, Next;
     for (I = V->use_begin(), E = V->use_end(); I != E;) {
       Use &U = *I;
-      User *CurUser = U.getUser();
 
       // Some users may see the same pointer operand in multiple operands. Skip
       // to the next instruction.
@@ -1237,6 +1235,7 @@ bool InferAddressSpacesImpl::rewriteWithNewAddressSpaces(
         continue;
       }
 
+      User *CurUser = U.getUser();
       // Skip if the current user is the new value itself.
       if (CurUser == NewV)
         continue;
@@ -1312,13 +1311,10 @@ bool InferAddressSpacesImpl::rewriteWithNewAddressSpaces(
 
           while (isa<PHINode>(InsertPos))
             ++InsertPos;
-          // This instruction may contain multiple uses of V, update them all.
-          CurUser->replaceUsesOfWith(
-              V, new AddrSpaceCastInst(NewV, V->getType(), "", InsertPos));
+          U.set(new AddrSpaceCastInst(NewV, V->getType(), "", &*InsertPos));
         } else {
-          CurUser->replaceUsesOfWith(
-              V, ConstantExpr::getAddrSpaceCast(cast<Constant>(NewV),
-                                                V->getType()));
+          U.set(ConstantExpr::getAddrSpaceCast(cast<Constant>(NewV),
+                                               V->getType()));
         }
       }
     }

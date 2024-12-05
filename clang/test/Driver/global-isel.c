@@ -1,3 +1,5 @@
+// REQUIRES: x86-registered-target,aarch64-registered-target
+
 // RUN: %clang -fglobal-isel -S -### %s 2>&1 | FileCheck --check-prefix=ENABLED %s
 // RUN: %clang -fno-global-isel -S -### %s 2>&1 | FileCheck --check-prefix=DISABLED %s
 

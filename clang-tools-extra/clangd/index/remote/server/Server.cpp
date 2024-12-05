@@ -499,6 +499,8 @@ int main(int argc, char *argv[]) {
   }
 
   llvm::errs().SetBuffered();
+  // Don't flush stdout when logging for thread safety.
+  llvm::errs().tie(nullptr);
   auto Logger = makeLogger(LogPrefix.getValue(), llvm::errs());
   clang::clangd::LoggingSession LoggingSession(*Logger);
 

@@ -56,23 +56,23 @@ public:
 
 private:
   // These are known in the LLVM project. The pairs are in the following form:
-  // {{match-mode, {namespace, call}, argument-count}, {callback, kind}}
+  // {{{namespace, call}, argument-count}, {callback, kind}}
   const CallDescriptionMap<std::pair<CastCheck, CallKind>> CDM = {
-      {{CDM::SimpleFunc, {"llvm", "cast"}, 1},
+      {{{"llvm", "cast"}, 1},
        {&CastValueChecker::evalCast, CallKind::Function}},
-      {{CDM::SimpleFunc, {"llvm", "dyn_cast"}, 1},
+      {{{"llvm", "dyn_cast"}, 1},
        {&CastValueChecker::evalDynCast, CallKind::Function}},
-      {{CDM::SimpleFunc, {"llvm", "cast_or_null"}, 1},
+      {{{"llvm", "cast_or_null"}, 1},
        {&CastValueChecker::evalCastOrNull, CallKind::Function}},
-      {{CDM::SimpleFunc, {"llvm", "dyn_cast_or_null"}, 1},
+      {{{"llvm", "dyn_cast_or_null"}, 1},
        {&CastValueChecker::evalDynCastOrNull, CallKind::Function}},
-      {{CDM::CXXMethod, {"clang", "castAs"}, 0},
+      {{{"clang", "castAs"}, 0},
        {&CastValueChecker::evalCastAs, CallKind::Method}},
-      {{CDM::CXXMethod, {"clang", "getAs"}, 0},
+      {{{"clang", "getAs"}, 0},
        {&CastValueChecker::evalGetAs, CallKind::Method}},
-      {{CDM::SimpleFunc, {"llvm", "isa"}, 1},
+      {{{"llvm", "isa"}, 1},
        {&CastValueChecker::evalIsa, CallKind::InstanceOf}},
-      {{CDM::SimpleFunc, {"llvm", "isa_and_nonnull"}, 1},
+      {{{"llvm", "isa_and_nonnull"}, 1},
        {&CastValueChecker::evalIsaAndNonNull, CallKind::InstanceOf}}};
 
   void evalCast(const CallEvent &Call, DefinedOrUnknownSVal DV,

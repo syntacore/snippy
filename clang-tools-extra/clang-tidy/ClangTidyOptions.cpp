@@ -170,8 +170,6 @@ template <> struct MappingTraits<ClangTidyOptions> {
     IO.mapOptional("ImplementationFileExtensions",
                    Options.ImplementationFileExtensions);
     IO.mapOptional("HeaderFilterRegex", Options.HeaderFilterRegex);
-    IO.mapOptional("ExcludeHeaderFilterRegex",
-                   Options.ExcludeHeaderFilterRegex);
     IO.mapOptional("FormatStyle", Options.FormatStyle);
     IO.mapOptional("User", Options.User);
     IO.mapOptional("CheckOptions", Options.CheckOptions);
@@ -193,8 +191,7 @@ ClangTidyOptions ClangTidyOptions::getDefaults() {
   Options.WarningsAsErrors = "";
   Options.HeaderFileExtensions = {"", "h", "hh", "hpp", "hxx"};
   Options.ImplementationFileExtensions = {"c", "cc", "cpp", "cxx"};
-  Options.HeaderFilterRegex = std::nullopt;
-  Options.ExcludeHeaderFilterRegex = std::nullopt;
+  Options.HeaderFilterRegex = "";
   Options.SystemHeaders = false;
   Options.FormatStyle = "none";
   Options.User = std::nullopt;
@@ -234,7 +231,6 @@ ClangTidyOptions &ClangTidyOptions::mergeWith(const ClangTidyOptions &Other,
   overrideValue(ImplementationFileExtensions,
                 Other.ImplementationFileExtensions);
   overrideValue(HeaderFilterRegex, Other.HeaderFilterRegex);
-  overrideValue(ExcludeHeaderFilterRegex, Other.ExcludeHeaderFilterRegex);
   overrideValue(SystemHeaders, Other.SystemHeaders);
   overrideValue(FormatStyle, Other.FormatStyle);
   overrideValue(User, Other.User);

@@ -9,7 +9,7 @@ namespace format {
 
 namespace {
 
-class MacroExpanderTest : public testing::Test {
+class MacroExpanderTest : public ::testing::Test {
 public:
   MacroExpanderTest() : Lex(Allocator, Buffers) {}
   std::unique_ptr<MacroExpander>
@@ -19,32 +19,33 @@ public:
                                            Lex.Allocator, Lex.IdentTable);
   }
 
-  std::string expand(MacroExpander &Macros, StringRef Name) {
+  std::string expand(MacroExpander &Macros, llvm::StringRef Name) {
     EXPECT_TRUE(Macros.defined(Name))
         << "Macro not defined: \"" << Name << "\"";
     return text(Macros.expand(Lex.id(Name), {}));
   }
 
-  std::string expand(MacroExpander &Macros, StringRef Name,
+  std::string expand(MacroExpander &Macros, llvm::StringRef Name,
                      const std::vector<std::string> &Args) {
     EXPECT_TRUE(Macros.defined(Name))
         << "Macro not defined: \"" << Name << "\"";
     return text(Macros.expand(Lex.id(Name), lexArgs(Args)));
   }
 
-  SmallVector<TokenList, 1> lexArgs(const std::vector<std::string> &Args) {
-    SmallVector<TokenList, 1> Result;
+  llvm::SmallVector<TokenList, 1>
+  lexArgs(const std::vector<std::string> &Args) {
+    llvm::SmallVector<TokenList, 1> Result;
     for (const auto &Arg : Args)
       Result.push_back(uneof(Lex.lex(Arg)));
     return Result;
   }
 
   struct MacroAttributes {
-    tok::TokenKind Kind;
+    clang::tok::TokenKind Kind;
     MacroRole Role;
     unsigned Start;
     unsigned End;
-    SmallVector<FormatToken *, 1> ExpandedFrom;
+    llvm::SmallVector<FormatToken *, 1> ExpandedFrom;
   };
 
   void expectAttributes(const TokenList &Tokens,
@@ -55,8 +56,8 @@ public:
       if (I >= Attributes.size())
         continue;
       std::string Context =
-          ("for token " + Twine(I) + ": " + Tokens[I]->Tok.getName() + " / " +
-           Tokens[I]->TokenText)
+          ("for token " + llvm::Twine(I) + ": " + Tokens[I]->Tok.getName() +
+           " / " + Tokens[I]->TokenText)
               .str();
       EXPECT_TRUE(Tokens[I]->is(Attributes[I].Kind))
           << Context << " in " << text(Tokens) << " at " << File << ":" << Line;

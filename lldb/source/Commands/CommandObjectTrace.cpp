@@ -89,7 +89,8 @@ public:
             eCommandRequiresProcess | eCommandTryTargetAPILock |
                 eCommandProcessMustBeLaunched | eCommandProcessMustBePaused |
                 eCommandProcessMustBeTraced) {
-    AddSimpleArgumentList(eArgTypeDirectoryName);
+    CommandArgumentData bundle_dir{eArgTypeDirectoryName, eArgRepeatPlain};
+    m_arguments.push_back({bundle_dir});
   }
 
   void
@@ -175,7 +176,8 @@ public:
             interpreter, "trace load",
             "Load a post-mortem processor trace session from a trace bundle.",
             "trace load <trace_description_file>") {
-    AddSimpleArgumentList(eArgTypeFilename);
+    CommandArgumentData session_file_arg{eArgTypeFilename, eArgRepeatPlain};
+    m_arguments.push_back({session_file_arg});
   }
 
   void
@@ -330,7 +332,8 @@ public:
                             "Show the schema of the given trace plugin.",
                             "trace schema <plug-in>. Use the plug-in name "
                             "\"all\" to see all schemas.\n") {
-    AddSimpleArgumentList(eArgTypeNone);
+    CommandArgumentData plugin_arg{eArgTypeNone, eArgRepeatPlain};
+    m_arguments.push_back({plugin_arg});
   }
 
   ~CommandObjectTraceSchema() override = default;

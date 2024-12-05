@@ -23,11 +23,7 @@ size_t get_rss_kb() {
   char buf[256];
   while (fgets(buf, sizeof(buf), f) != NULL) {
     int64_t rss;
-    // DFSan's sscanf is broken and doesn't check for ordinary characters in
-    // the format string, hence we use strstr as a secondary check
-    // (https://github.com/llvm/llvm-project/issues/94769).
-    if ((sscanf(buf, "Rss: %ld kB", &rss) == 1) &&
-        (strstr(buf, "Rss: ") != NULL))
+    if (sscanf(buf, "Rss: %ld kB", &rss) == 1)
       ret += rss;
   }
   assert(feof(f));
@@ -73,11 +69,6 @@ int main(int argc, char **argv) {
       "fixed map: %zu, after another mmap+set label: %zu, after munmap: %zu\n",
       before, after_mmap, after_mmap_and_set_label, after_fixed_mmap,
       after_mmap_and_set_label2, after_munmap);
-
-  // This is orders of magnitude larger than we expect (typically < 10,000KB).
-  // It is a quick check to ensure that the RSS calculation function isn't
-  // egregriously wrong.
-  assert(before < 1000000);
 
   const size_t mmap_cost_kb = map_size >> 10;
   // Shadow space (1:1 with application memory)

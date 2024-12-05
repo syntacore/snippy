@@ -4,7 +4,6 @@ if (NOT DEFINED LLVM_MAIN_SRC_DIR)
   cmake_minimum_required(VERSION 3.20.0)
   set(POLLY_STANDALONE_BUILD TRUE)
 endif()
-set(LLVM_SUBPROJECT_TITLE "Polly")
 
 # Must go below project(..)
 include(GNUInstallDirs)
@@ -158,7 +157,8 @@ foreach (file IN LISTS files)
 endforeach ()
 
 add_custom_target(polly-check-format DEPENDS ${check_format_depends})
-set_target_properties(polly-check-format PROPERTIES FOLDER "Polly/Metatargets")
+set_target_properties(polly-check-format PROPERTIES FOLDER "Polly")
 
 add_custom_target(polly-update-format DEPENDS ${update_format_depends})
-set_target_properties(polly-update-format PROPERTIES FOLDER "Polly/Metatargets")
+set_target_properties(polly-update-format PROPERTIES FOLDER "Polly")
+

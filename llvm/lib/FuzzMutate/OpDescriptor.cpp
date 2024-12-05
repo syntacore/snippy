@@ -8,14 +8,9 @@
 
 #include "llvm/FuzzMutate/OpDescriptor.h"
 #include "llvm/IR/Constants.h"
-#include "llvm/Support/CommandLine.h"
 
 using namespace llvm;
 using namespace fuzzerop;
-
-static cl::opt<bool> UseUndef("use-undef",
-                              cl::desc("Use undef when generating programs."),
-                              cl::init(false));
 
 void fuzzerop::makeConstantsWithType(Type *T, std::vector<Constant *> &Cs) {
   if (auto *IntTy = dyn_cast<IntegerType>(T)) {
@@ -47,8 +42,7 @@ void fuzzerop::makeConstantsWithType(Type *T, std::vector<Constant *> &Cs) {
       Cs.push_back(ConstantVector::getSplat(EC, Elt));
     }
   } else {
-    if (UseUndef)
-      Cs.push_back(UndefValue::get(T));
+    Cs.push_back(UndefValue::get(T));
     Cs.push_back(PoisonValue::get(T));
   }
 }

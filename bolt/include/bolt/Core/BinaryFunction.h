@@ -27,7 +27,6 @@
 
 #include "bolt/Core/BinaryBasicBlock.h"
 #include "bolt/Core/BinaryContext.h"
-#include "bolt/Core/BinaryDomTree.h"
 #include "bolt/Core/BinaryLoop.h"
 #include "bolt/Core/BinarySection.h"
 #include "bolt/Core/DebugData.h"
@@ -52,6 +51,7 @@
 #include <iterator>
 #include <limits>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -266,7 +266,6 @@ private:
   BinaryContext &BC;
 
   std::unique_ptr<BinaryLoopInfo> BLI;
-  std::unique_ptr<BinaryDominatorTree> BDT;
 
   /// All labels in the function that are referenced via relocations from
   /// data objects. Typically these are jump table destinations and computed
@@ -415,9 +414,6 @@ private:
   /// Last computed hash value. Note that the value could be recomputed using
   /// different parameters by every pass.
   mutable uint64_t Hash{0};
-
-  /// Function GUID assigned externally.
-  uint64_t GUID{0};
 
   /// For PLT functions it contains a symbol associated with a function
   /// reference. It is nullptr for non-PLT functions.
@@ -838,13 +834,9 @@ public:
   /// them.
   void calculateLoopInfo();
 
-  /// Returns if BinaryDominatorTree has been constructed for this function.
-  bool hasDomTree() const { return BDT != nullptr; }
-
-  BinaryDominatorTree &getDomTree() { return *BDT.get(); }
-
-  /// Constructs DomTree for this function.
-  void constructDomTree();
+  /// Calculate missed macro-fusion opportunities and update BinaryContext
+  /// stats.
+  void calculateMacroOpFusionStats();
 
   /// Returns if loop detection has been run for this function.
   bool hasLoopInfo() const { return BLI != nullptr; }
@@ -928,12 +920,6 @@ public:
   const MCInst *getInstructionAtOffset(uint64_t Offset) const {
     return const_cast<BinaryFunction *>(this)->getInstructionAtOffset(Offset);
   }
-
-  /// When the function is in disassembled state, return an instruction that
-  /// contains the \p Offset.
-  MCInst *getInstructionContainingOffset(uint64_t Offset);
-
-  std::optional<MCInst> disassembleInstructionAtOffset(uint64_t Offset) const;
 
   /// Return offset for the first instruction. If there is data at the
   /// beginning of a function then offset of the first instruction could
@@ -1173,7 +1159,7 @@ public:
   /// Pass an offset of the entry point in the input binary and a corresponding
   /// global symbol to the callback function.
   ///
-  /// Return true if all callbacks returned true, false otherwise.
+  /// Return true of all callbacks returned true, false otherwise.
   bool forEachEntryPoint(EntryPointCallbackTy Callback) const;
 
   /// Return MC symbol associated with the end of the function.
@@ -1407,8 +1393,7 @@ public:
 
   /// Return true if the function has CFI instructions
   bool hasCFI() const {
-    return !FrameInstructions.empty() || !CIEFrameInstructions.empty() ||
-           IsInjected;
+    return !FrameInstructions.empty() || !CIEFrameInstructions.empty();
   }
 
   /// Return unique number associated with the function.
@@ -1925,11 +1910,12 @@ public:
 
   /// Support dynamic relocations in constant islands, which may happen if
   /// binary is linked with -z notext option.
-  Error markIslandDynamicRelocationAtAddress(uint64_t Address) {
-    if (!isInConstantIsland(Address))
-      return createFatalBOLTError(
-          Twine("dynamic relocation found for text section at 0x") +
-          Twine::utohexstr(Address) + Twine("\n"));
+  void markIslandDynamicRelocationAtAddress(uint64_t Address) {
+    if (!isInConstantIsland(Address)) {
+      errs() << "BOLT-ERROR: dynamic relocation found for text section at 0x"
+             << Twine::utohexstr(Address) << "\n";
+      exit(1);
+    }
 
     // Mark island to have dynamic relocation
     Islands->HasDynamicRelocations = true;
@@ -1938,7 +1924,6 @@ public:
     // move binary data during updateOutputValues, making us emit
     // dynamic relocation with the right offset value.
     getOrCreateIslandAccess(Address);
-    return Error::success();
   }
 
   bool hasDynamicRelocationAtIsland() const {
@@ -2069,18 +2054,9 @@ public:
   /// state to State:Disassembled.
   ///
   /// Returns false if disassembly failed.
-  Error disassemble();
+  bool disassemble();
 
-  /// An external interface to register a branch while the function is in
-  /// disassembled state. Allows to make custom modifications to the
-  /// disassembler. E.g., a pre-CFG pass can add an instruction and register
-  /// a branch that will later be used during the CFG construction.
-  ///
-  /// Return a label at the branch destination.
-  MCSymbol *registerBranch(uint64_t Src, uint64_t Dst);
-
-  Error handlePCRelOperand(MCInst &Instruction, uint64_t Address,
-                           uint64_t Size);
+  void handlePCRelOperand(MCInst &Instruction, uint64_t Address, uint64_t Size);
 
   MCSymbol *handleExternalReference(MCInst &Instruction, uint64_t Size,
                                     uint64_t Offset, uint64_t TargetAddress,
@@ -2124,7 +2100,7 @@ public:
   ///
   /// Returns true on success and update the current function state to
   /// State::CFG. Returns false if CFG cannot be built.
-  Error buildCFG(MCPlusBuilder::AllocatorIdTy);
+  bool buildCFG(MCPlusBuilder::AllocatorIdTy);
 
   /// Perform post-processing of the CFG.
   void postProcessCFG();
@@ -2241,7 +2217,7 @@ public:
   }
 
   /// Process LSDA information for the function.
-  Error parseLSDA(ArrayRef<uint8_t> LSDAData, uint64_t LSDAAddress);
+  void parseLSDA(ArrayRef<uint8_t> LSDAData, uint64_t LSDAAddress);
 
   /// Update exception handling ranges for the function.
   void updateEHRanges();
@@ -2258,11 +2234,6 @@ public:
 
   /// Returns the last computed hash value of the function.
   size_t getHash() const { return Hash; }
-
-  /// Returns the function GUID.
-  uint64_t getGUID() const { return GUID; }
-
-  void setGUID(uint64_t Id) { GUID = Id; }
 
   using OperandHashFuncTy =
       function_ref<typename std::string(const MCOperand &)>;

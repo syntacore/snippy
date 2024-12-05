@@ -32,7 +32,6 @@
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/RegisterClassInfo.h"
 #include "llvm/CodeGen/VirtRegMap.h"
-#include "llvm/IR/Module.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
 #include "llvm/PassRegistry.h"
@@ -110,7 +109,7 @@ public:
     AU.setPreservesAll();
     AU.addRequired<RegAllocEvictionAdvisorAnalysis>();
     AU.addRequired<RegAllocPriorityAdvisorAnalysis>();
-    AU.addRequired<MachineBlockFrequencyInfoWrapperPass>();
+    AU.addRequired<MachineBlockFrequencyInfo>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 
@@ -213,7 +212,7 @@ static const std::vector<int64_t> PerLiveRangeShape{1, NumberOfInterferences};
   M(float, mbb_frequencies, MBBFrequencyShape,                                 \
     "A vector of machine basic block frequencies")                             \
   M(int64_t, mbb_mapping, InstructionsShape,                                   \
-    "A vector of indices mapping instructions to MBBs")
+    "A vector of indicies mapping instructions to MBBs")
 #else
 #define RA_EVICT_FIRST_DEVELOPMENT_FEATURE(M)
 #define RA_EVICT_REST_DEVELOPMENT_FEATURES(M)
@@ -388,8 +387,8 @@ private:
   std::vector<TensorSpec> InputFeatures;
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<MachineBlockFrequencyInfoWrapperPass>();
-    AU.addRequired<MachineLoopInfoWrapperPass>();
+    AU.addRequired<MachineBlockFrequencyInfo>();
+    AU.addRequired<MachineLoopInfo>();
     RegAllocEvictionAdvisorAnalysis::getAnalysisUsage(AU);
   }
 
@@ -406,9 +405,8 @@ private:
             InteractiveChannelBaseName + ".in");
     }
     return std::make_unique<MLEvictAdvisor>(
-        MF, RA, Runner.get(),
-        getAnalysis<MachineBlockFrequencyInfoWrapperPass>().getMBFI(),
-        getAnalysis<MachineLoopInfoWrapperPass>().getLI());
+        MF, RA, Runner.get(), getAnalysis<MachineBlockFrequencyInfo>(),
+        getAnalysis<MachineLoopInfo>());
   }
   std::unique_ptr<MLModelRunner> Runner;
 };
@@ -496,8 +494,8 @@ private:
   std::vector<TensorSpec> TrainingInputFeatures;
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<MachineBlockFrequencyInfoWrapperPass>();
-    AU.addRequired<MachineLoopInfoWrapperPass>();
+    AU.addRequired<MachineBlockFrequencyInfo>();
+    AU.addRequired<MachineLoopInfo>();
     RegAllocEvictionAdvisorAnalysis::getAnalysisUsage(AU);
   }
 
@@ -545,9 +543,8 @@ private:
     if (Log)
       Log->switchContext(MF.getName());
     return std::make_unique<DevelopmentModeEvictAdvisor>(
-        MF, RA, Runner.get(),
-        getAnalysis<MachineBlockFrequencyInfoWrapperPass>().getMBFI(),
-        getAnalysis<MachineLoopInfoWrapperPass>().getLI(), Log.get());
+        MF, RA, Runner.get(), getAnalysis<MachineBlockFrequencyInfo>(),
+        getAnalysis<MachineLoopInfo>(), Log.get());
   }
 
   std::unique_ptr<MLModelRunner> Runner;
@@ -1141,8 +1138,7 @@ bool RegAllocScoring::runOnMachineFunction(MachineFunction &MF) {
   auto GetReward = [&]() {
     if (!CachedReward)
       CachedReward = static_cast<float>(
-          calculateRegAllocScore(
-              MF, getAnalysis<MachineBlockFrequencyInfoWrapperPass>().getMBFI())
+          calculateRegAllocScore(MF, getAnalysis<MachineBlockFrequencyInfo>())
               .getScore());
     return *CachedReward;
   };

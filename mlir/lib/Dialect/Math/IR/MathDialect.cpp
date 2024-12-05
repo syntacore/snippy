@@ -35,5 +35,5 @@ void mlir::math::MathDialect::initialize() {
 #include "mlir/Dialect/Math/IR/MathOps.cpp.inc"
       >();
   addInterfaces<MathInlinerInterface>();
-  declarePromisedInterface<ConvertToLLVMPatternInterface, MathDialect>();
+  declarePromisedInterface<MathDialect, ConvertToLLVMPatternInterface>();
 }

@@ -9,13 +9,12 @@
 #ifndef LLVM_LIBC_SRC_STDIO_FCLOSE_H
 #define LLVM_LIBC_SRC_STDIO_FCLOSE_H
 
-#include "hdr/types/FILE.h"
-#include "src/__support/macros/config.h"
+#include <stdio.h>
 
-namespace LIBC_NAMESPACE_DECL {
+namespace LIBC_NAMESPACE {
 
 int fclose(::FILE *stream);
 
-} // namespace LIBC_NAMESPACE_DECL
+} // namespace LIBC_NAMESPACE
 
 #endif // LLVM_LIBC_SRC_STDIO_FCLOSE_H

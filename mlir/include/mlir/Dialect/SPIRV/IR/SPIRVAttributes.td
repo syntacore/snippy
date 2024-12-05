@@ -32,12 +32,10 @@ class SPIRV_Attr<string attrName, string attrMnemonic>
 // points in the generated SPIR-V module:
 // 1) [optional] Requested workgroup size.
 // 2) [optional] Requested subgroup size.
-// 3) [optional] Requested target width.
 def SPIRV_EntryPointABIAttr : SPIRV_Attr<"EntryPointABI", "entry_point_abi"> {
   let parameters = (ins
     OptionalParameter<"DenseI32ArrayAttr">:$workgroup_size,
-    OptionalParameter<"std::optional<int>">:$subgroup_size,
-    OptionalParameter<"std::optional<int>">:$target_width
+    OptionalParameter<"std::optional<int>">:$subgroup_size
   );
   let assemblyFormat = "`<` struct(params) `>`";
 }
@@ -50,7 +48,7 @@ def SPIRV_CapabilityArrayAttr : TypedArrayAttrBase<
 
 def SPIRV_LinkageAttributesAttr : SPIRV_Attr<"LinkageAttributes", "linkage_attributes"> {
   let parameters = (ins
-    "StringAttr":$linkage_name,
+    "std::string":$linkage_name,
     "mlir::spirv::LinkageTypeAttr":$linkage_type
   );
   let assemblyFormat = "`<` struct(params) `>`";

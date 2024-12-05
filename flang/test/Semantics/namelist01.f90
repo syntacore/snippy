@@ -11,7 +11,6 @@ subroutine C8103a(x)
   integer :: x
   !ERROR: 'dupname' is already declared in this scoping unit
   namelist /dupName/ x, x
-  namelist /nl/ uniquename ! ok
 end subroutine C8103a
 
 subroutine C8103b(y)

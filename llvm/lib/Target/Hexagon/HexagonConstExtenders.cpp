@@ -218,8 +218,8 @@ namespace {
     HexagonConstExtenders() : MachineFunctionPass(ID) {}
 
     void getAnalysisUsage(AnalysisUsage &AU) const override {
-      AU.addRequired<MachineDominatorTreeWrapperPass>();
-      AU.addPreserved<MachineDominatorTreeWrapperPass>();
+      AU.addRequired<MachineDominatorTree>();
+      AU.addPreserved<MachineDominatorTree>();
       MachineFunctionPass::getAnalysisUsage(AU);
     }
 
@@ -569,7 +569,7 @@ namespace {
 
 INITIALIZE_PASS_BEGIN(HexagonConstExtenders, "hexagon-cext-opt",
       "Hexagon constant-extender optimization", false, false)
-INITIALIZE_PASS_DEPENDENCY(MachineDominatorTreeWrapperPass)
+INITIALIZE_PASS_DEPENDENCY(MachineDominatorTree)
 INITIALIZE_PASS_END(HexagonConstExtenders, "hexagon-cext-opt",
       "Hexagon constant-extender optimization", false, false)
 
@@ -1223,10 +1223,6 @@ void HCE::recordExtender(MachineInstr &MI, unsigned OpNum) {
   if (ER.Kind == MachineOperand::MO_GlobalAddress)
     if (ER.V.GV->getName().empty())
       return;
-  // Ignore block address that points to block in another function
-  if (ER.Kind == MachineOperand::MO_BlockAddress)
-    if (ER.V.BA->getFunction() != &(MI.getMF()->getFunction()))
-      return;
   Extenders.push_back(ED);
 }
 
@@ -1392,10 +1388,11 @@ void HCE::assignInits(const ExtRoot &ER, unsigned Begin, unsigned End,
       break;
 
     // Find the best candidate with respect to the number of extenders covered.
-    auto BestIt = llvm::max_element(
-        Counts, [](const CMap::value_type &A, const CMap::value_type &B) {
-          return A.second < B.second || (A.second == B.second && A < B);
-        });
+    auto BestIt = std::max_element(Counts.begin(), Counts.end(),
+                    [](const CMap::value_type &A, const CMap::value_type &B) {
+                      return A.second < B.second ||
+                             (A.second == B.second && A < B);
+                    });
     int32_t Best = BestIt->first;
     ExtValue BestV(ER, Best);
     for (RangeTree::Node *N : Tree.nodesWith(Best)) {
@@ -1977,7 +1974,7 @@ bool HCE::runOnMachineFunction(MachineFunction &MF) {
   HST = &MF.getSubtarget<HexagonSubtarget>();
   HII = HST->getInstrInfo();
   HRI = HST->getRegisterInfo();
-  MDT = &getAnalysis<MachineDominatorTreeWrapperPass>().getDomTree();
+  MDT = &getAnalysis<MachineDominatorTree>();
   MRI = &MF.getRegInfo();
   AssignmentMap IMap;
 

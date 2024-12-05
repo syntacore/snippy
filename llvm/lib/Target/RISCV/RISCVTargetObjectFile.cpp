@@ -10,7 +10,6 @@
 #include "MCTargetDesc/RISCVMCObjectFileInfo.h"
 #include "RISCVTargetMachine.h"
 #include "llvm/BinaryFormat/ELF.h"
-#include "llvm/IR/Module.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCSectionELF.h"
 #include "llvm/MC/MCValue.h"
@@ -33,16 +32,6 @@ void RISCVELFTargetObjectFile::Initialize(MCContext &Ctx,
       ".sdata", ELF::SHT_PROGBITS, ELF::SHF_WRITE | ELF::SHF_ALLOC);
   SmallBSSSection = getContext().getELFSection(".sbss", ELF::SHT_NOBITS,
                                                ELF::SHF_WRITE | ELF::SHF_ALLOC);
-  SmallRODataSection =
-      getContext().getELFSection(".srodata", ELF::SHT_PROGBITS, ELF::SHF_ALLOC);
-  SmallROData4Section = getContext().getELFSection(
-      ".srodata.cst4", ELF::SHT_PROGBITS, ELF::SHF_ALLOC | ELF::SHF_MERGE, 4);
-  SmallROData8Section = getContext().getELFSection(
-      ".srodata.cst8", ELF::SHT_PROGBITS, ELF::SHF_ALLOC | ELF::SHF_MERGE, 8);
-  SmallROData16Section = getContext().getELFSection(
-      ".srodata.cst16", ELF::SHT_PROGBITS, ELF::SHF_ALLOC | ELF::SHF_MERGE, 16);
-  SmallROData32Section = getContext().getELFSection(
-      ".srodata.cst32", ELF::SHT_PROGBITS, ELF::SHF_ALLOC | ELF::SHF_MERGE, 32);
 }
 
 const MCExpr *RISCVELFTargetObjectFile::getIndirectSymViaGOTPCRel(
@@ -99,7 +88,7 @@ bool RISCVELFTargetObjectFile::isGlobalInSmallSection(
     return false;
 
   return isInSmallSection(
-      GVA->getDataLayout().getTypeAllocSize(Ty));
+      GVA->getParent()->getDataLayout().getTypeAllocSize(Ty));
 }
 
 MCSection *RISCVELFTargetObjectFile::SelectSectionForGlobal(
@@ -137,19 +126,8 @@ bool RISCVELFTargetObjectFile::isConstantInSmallSection(
 MCSection *RISCVELFTargetObjectFile::getSectionForConstant(
     const DataLayout &DL, SectionKind Kind, const Constant *C,
     Align &Alignment) const {
-  if (isConstantInSmallSection(DL, C)) {
-    if (Kind.isMergeableConst4())
-      return SmallROData4Section;
-    if (Kind.isMergeableConst8())
-      return SmallROData8Section;
-    if (Kind.isMergeableConst16())
-      return SmallROData16Section;
-    if (Kind.isMergeableConst32())
-      return SmallROData32Section;
-    // LLVM only generate up to .rodata.cst32, and use .rodata section if more
-    // than 32 bytes, so just use .srodata here.
-    return SmallRODataSection;
-  }
+  if (isConstantInSmallSection(DL, C))
+    return SmallDataSection;
 
   // Otherwise, we work the same as ELF.
   return TargetLoweringObjectFileELF::getSectionForConstant(DL, Kind, C,

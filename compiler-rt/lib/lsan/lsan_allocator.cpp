@@ -31,7 +31,7 @@ static const uptr kMaxAllowedMallocSize = 1ULL << 30;
 #elif defined(__mips64) || defined(__aarch64__)
 static const uptr kMaxAllowedMallocSize = 4ULL << 30;
 #else
-static const uptr kMaxAllowedMallocSize = 1ULL << 40;
+static const uptr kMaxAllowedMallocSize = 8ULL << 30;
 #endif
 
 static Allocator allocator;

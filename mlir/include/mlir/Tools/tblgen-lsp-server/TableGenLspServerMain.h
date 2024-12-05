@@ -13,13 +13,12 @@
 #ifndef MLIR_TOOLS_TBLGENLSPSERVER_TABLEGENLSPSERVERMAIN_H
 #define MLIR_TOOLS_TBLGENLSPSERVER_TABLEGENLSPSERVERMAIN_H
 
-namespace llvm {
-struct LogicalResult;
-} // namespace llvm
-
 namespace mlir {
+struct LogicalResult;
+
 /// Implementation for tools like `tblgen-lsp-server`.
-llvm::LogicalResult TableGenLspServerMain(int argc, char **argv);
+LogicalResult TableGenLspServerMain(int argc, char **argv);
+
 } // namespace mlir
 
 #endif // MLIR_TOOLS_TBLGENLSPSERVER_TABLEGENLSPSERVERMAIN_H

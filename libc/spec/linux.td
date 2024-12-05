@@ -1,8 +1,3 @@
-def StructEpollEvent : NamedType<"struct epoll_event">;
-def StructEpollEventPtr : PtrType<StructEpollEvent>;
-
-def StructEpollData : NamedType<"struct epoll_data">;
-
 def Linux : StandardSpec<"Linux"> {
   HeaderSpec Errno = HeaderSpec<
       "errno.h",
@@ -81,29 +76,7 @@ def Linux : StandardSpec<"Linux"> {
 
   HeaderSpec SysMMan = HeaderSpec<
       "sys/mman.h",
-      [Macro<"MAP_ANONYMOUS">],
-      [], // Types
-      [], // Enumerations
-      [
-        FunctionSpec<
-            "mincore",
-            RetValSpec<IntType>,
-            [
-              ArgSpec<VoidPtr>,
-              ArgSpec<SizeTType>,
-              ArgSpec<UnsignedCharPtr>,
-            ]
-        >,
-        FunctionSpec<
-          "mlock2",
-          RetValSpec<IntType>,
-          [
-            ArgSpec<VoidPtr>,
-            ArgSpec<SizeTType>,
-            ArgSpec<UnsignedIntType>,
-          ]
-        >,
-      ]  // Functions
+      [Macro<"MAP_ANONYMOUS">]
   >;
 
 
@@ -112,19 +85,7 @@ def Linux : StandardSpec<"Linux"> {
       [], // Macros
       [], // Types
       [], // Enumerations
-      [
-        FunctionSpec<
-          "prctl",
-          RetValSpec<IntType>,
-          [
-            ArgSpec<IntType>,
-            ArgSpec<UnsignedLongType>,
-            ArgSpec<UnsignedLongType>,
-            ArgSpec<UnsignedLongType>,
-            ArgSpec<UnsignedLongType>,
-          ]
-        >,
-      ]  // Functions
+      []  // Functions
   >;
 
   HeaderSpec SysRandom = HeaderSpec<
@@ -161,77 +122,6 @@ def Linux : StandardSpec<"Linux"> {
       [StructTimevalType], // Types
       [], // Enumerations
       []  // Functions
-  >;
-
-
-  HeaderSpec SysEpoll = HeaderSpec<
-      "sys/epoll.h",
-      [], // Macros
-      [
-        StructEpollEvent,
-        StructEpollData,
-        SigSetType,
-        StructTimeSpec,
-      ], // Types
-      [], // Enumerations
-      [
-        FunctionSpec<
-          "epoll_create",
-          RetValSpec<IntType>,
-          [
-            ArgSpec<IntType>
-          ]
-        >,
-        FunctionSpec<
-          "epoll_create1",
-          RetValSpec<IntType>,
-          [
-            ArgSpec<IntType>
-          ]
-        >,
-        FunctionSpec<
-          "epoll_ctl",
-          RetValSpec<IntType>,
-          [
-            ArgSpec<IntType>,
-            ArgSpec<IntType>,
-            ArgSpec<IntType>,
-            ArgSpec<StructEpollEventPtr>
-          ]
-        >,
-        FunctionSpec<
-          "epoll_wait",
-          RetValSpec<IntType>,
-          [
-            ArgSpec<IntType>,
-            ArgSpec<StructEpollEventPtr>,
-            ArgSpec<IntType>,
-            ArgSpec<IntType>
-          ]
-        >,
-        FunctionSpec<
-          "epoll_pwait",
-          RetValSpec<IntType>,
-          [
-            ArgSpec<IntType>,
-            ArgSpec<StructEpollEventPtr>,
-            ArgSpec<IntType>,
-            ArgSpec<IntType>,
-            ArgSpec<ConstSigSetPtrType>
-          ]
-        >,
-        FunctionSpec<
-          "epoll_pwait2",
-          RetValSpec<IntType>,
-          [
-            ArgSpec<IntType>,
-            ArgSpec<StructEpollEventPtr>,
-            ArgSpec<IntType>,
-            ArgSpec<ConstStructTimeSpecPtr>,
-            ArgSpec<ConstSigSetPtrType>
-          ]
-        >,
-      ]  // Functions
   >;
 
   HeaderSpec Signal = HeaderSpec<
@@ -278,7 +168,6 @@ def Linux : StandardSpec<"Linux"> {
 
   let Headers = [
     Errno,
-    SysEpoll,
     SysMMan,
     SysPrctl,
     SysRandom,

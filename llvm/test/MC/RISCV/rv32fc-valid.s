@@ -12,6 +12,9 @@
 # RUN: not llvm-mc -triple riscv32 -mattr=+c \
 # RUN:     -riscv-no-aliases -show-encoding < %s 2>&1 \
 # RUN:     | FileCheck -check-prefixes=CHECK-NO-EXT-F %s
+# RUN: not llvm-mc -triple riscv32 -mattr=+zcf \
+# RUN:     -riscv-no-aliases -show-encoding < %s 2>&1 \
+# RUN:     | FileCheck -check-prefixes=CHECK-NO-EXT-F %s
 # RUN: not llvm-mc -triple riscv32 \
 # RUN:     -riscv-no-aliases -show-encoding < %s 2>&1 \
 # RUN:     | FileCheck -check-prefixes=CHECK-NO-EXT-FC %s

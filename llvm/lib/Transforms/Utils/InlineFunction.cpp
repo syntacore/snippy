@@ -23,7 +23,6 @@
 #include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/CaptureTracking.h"
-#include "llvm/Analysis/IndirectCallVisitor.h"
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/MemoryProfileInfo.h"
 #include "llvm/Analysis/ObjCARCAnalysisUtils.h"
@@ -31,12 +30,11 @@
 #include "llvm/Analysis/ProfileSummaryInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Analysis/VectorUtils.h"
-#include "llvm/IR/Argument.h"
 #include "llvm/IR/AttributeMask.h"
+#include "llvm/IR/Argument.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Constant.h"
-#include "llvm/IR/ConstantRange.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DebugInfo.h"
@@ -57,7 +55,6 @@
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/ProfDataUtils.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/User.h"
 #include "llvm/IR/Value.h"
@@ -692,7 +689,7 @@ static void HandleInlinedEHPad(InvokeInst *II, BasicBlock *FirstNewBlock,
     if (auto *CRI = dyn_cast<CleanupReturnInst>(BB->getTerminator())) {
       if (CRI->unwindsToCaller()) {
         auto *CleanupPad = CRI->getCleanupPad();
-        CleanupReturnInst::Create(CleanupPad, UnwindDest, CRI->getIterator());
+        CleanupReturnInst::Create(CleanupPad, UnwindDest, CRI);
         CRI->eraseFromParent();
         UpdatePHINodes(&*BB);
         // Finding a cleanupret with an unwind destination would confuse
@@ -740,7 +737,7 @@ static void HandleInlinedEHPad(InvokeInst *II, BasicBlock *FirstNewBlock,
         auto *NewCatchSwitch = CatchSwitchInst::Create(
             CatchSwitch->getParentPad(), UnwindDest,
             CatchSwitch->getNumHandlers(), CatchSwitch->getName(),
-            CatchSwitch->getIterator());
+            CatchSwitch);
         for (BasicBlock *PadBB : CatchSwitch->handlers())
           NewCatchSwitch->addHandler(PadBB);
         // Propagate info for the old catchswitch over to the new one in
@@ -975,7 +972,7 @@ static void PropagateOperandBundles(Function::iterator InlinedBB,
     I->getOperandBundlesAsDefs(OpBundles);
     OpBundles.emplace_back("funclet", CallSiteEHPad);
 
-    Instruction *NewInst = CallBase::Create(I, OpBundles, I->getIterator());
+    Instruction *NewInst = CallBase::Create(I, OpBundles, I);
     NewInst->takeName(I);
     I->replaceAllUsesWith(NewInst);
     I->eraseFromParent();
@@ -1223,6 +1220,7 @@ static void AddAliasScopeMetadata(CallBase &CB, ValueToValueMapTy &VMap,
       SmallPtrSet<const Value *, 4> ObjSet;
       SmallVector<Metadata *, 4> Scopes, NoAliases;
 
+      SmallSetVector<const Argument *, 4> NAPtrArgs;
       for (const Value *V : PtrArgs) {
         SmallVector<const Value *, 4> Objects;
         getUnderlyingObjects(V, Objects, /* LI = */ nullptr);
@@ -1346,89 +1344,6 @@ static bool MayContainThrowingOrExitingCallAfterCB(CallBase *Begin,
       ++BeginIt, End->getIterator(), InlinerAttributeWindow + 1);
 }
 
-// Add attributes from CB params and Fn attributes that can always be propagated
-// to the corresponding argument / inner callbases.
-static void AddParamAndFnBasicAttributes(const CallBase &CB,
-                                         ValueToValueMapTy &VMap,
-                                         ClonedCodeInfo &InlinedFunctionInfo) {
-  auto *CalledFunction = CB.getCalledFunction();
-  auto &Context = CalledFunction->getContext();
-
-  // Collect valid attributes for all params.
-  SmallVector<AttrBuilder> ValidParamAttrs;
-  bool HasAttrToPropagate = false;
-
-  for (unsigned I = 0, E = CB.arg_size(); I < E; ++I) {
-    ValidParamAttrs.emplace_back(AttrBuilder{CB.getContext()});
-    // Access attributes can be propagated to any param with the same underlying
-    // object as the argument.
-    if (CB.paramHasAttr(I, Attribute::ReadNone))
-      ValidParamAttrs.back().addAttribute(Attribute::ReadNone);
-    if (CB.paramHasAttr(I, Attribute::ReadOnly))
-      ValidParamAttrs.back().addAttribute(Attribute::ReadOnly);
-    HasAttrToPropagate |= ValidParamAttrs.back().hasAttributes();
-  }
-
-  // Won't be able to propagate anything.
-  if (!HasAttrToPropagate)
-    return;
-
-  for (BasicBlock &BB : *CalledFunction) {
-    for (Instruction &Ins : BB) {
-      const auto *InnerCB = dyn_cast<CallBase>(&Ins);
-      if (!InnerCB)
-        continue;
-      auto *NewInnerCB = dyn_cast_or_null<CallBase>(VMap.lookup(InnerCB));
-      if (!NewInnerCB)
-        continue;
-      // The InnerCB might have be simplified during the inlining
-      // process which can make propagation incorrect.
-      if (InlinedFunctionInfo.isSimplified(InnerCB, NewInnerCB))
-        continue;
-
-      AttributeList AL = NewInnerCB->getAttributes();
-      for (unsigned I = 0, E = InnerCB->arg_size(); I < E; ++I) {
-        // Check if the underlying value for the parameter is an argument.
-        const Value *UnderlyingV =
-            getUnderlyingObject(InnerCB->getArgOperand(I));
-        const Argument *Arg = dyn_cast<Argument>(UnderlyingV);
-        if (!Arg)
-          continue;
-
-        if (AL.hasParamAttr(I, Attribute::ByVal))
-          // It's unsound to propagate memory attributes to byval arguments.
-          // Even if CalledFunction doesn't e.g. write to the argument,
-          // the call to NewInnerCB may write to its by-value copy.
-          continue;
-
-        unsigned ArgNo = Arg->getArgNo();
-        // If so, propagate its access attributes.
-        AL = AL.addParamAttributes(Context, I, ValidParamAttrs[ArgNo]);
-        // We can have conflicting attributes from the inner callsite and
-        // to-be-inlined callsite. In that case, choose the most
-        // restrictive.
-
-        // readonly + writeonly means we can never deref so make readnone.
-        if (AL.hasParamAttr(I, Attribute::ReadOnly) &&
-            AL.hasParamAttr(I, Attribute::WriteOnly))
-          AL = AL.addParamAttribute(Context, I, Attribute::ReadNone);
-
-        // If have readnone, need to clear readonly/writeonly
-        if (AL.hasParamAttr(I, Attribute::ReadNone)) {
-          AL = AL.removeParamAttribute(Context, I, Attribute::ReadOnly);
-          AL = AL.removeParamAttribute(Context, I, Attribute::WriteOnly);
-        }
-
-        // Writable cannot exist in conjunction w/ readonly/readnone
-        if (AL.hasParamAttr(I, Attribute::ReadOnly) ||
-            AL.hasParamAttr(I, Attribute::ReadNone))
-          AL = AL.removeParamAttribute(Context, I, Attribute::Writable);
-      }
-      NewInnerCB->setAttributes(AL);
-    }
-  }
-}
-
 // Only allow these white listed attributes to be propagated back to the
 // callee. This is because other attributes may only be valid on the call
 // itself, i.e. attributes such as signext and zeroext.
@@ -1456,13 +1371,10 @@ static AttrBuilder IdentifyValidPoisonGeneratingAttributes(CallBase &CB) {
     Valid.addAttribute(Attribute::NonNull);
   if (CB.hasRetAttr(Attribute::Alignment))
     Valid.addAlignmentAttr(CB.getRetAlign());
-  if (std::optional<ConstantRange> Range = CB.getRange())
-    Valid.addRangeAttr(*Range);
   return Valid;
 }
 
-static void AddReturnAttributes(CallBase &CB, ValueToValueMapTy &VMap,
-                                ClonedCodeInfo &InlinedFunctionInfo) {
+static void AddReturnAttributes(CallBase &CB, ValueToValueMapTy &VMap) {
   AttrBuilder ValidUB = IdentifyValidUBGeneratingAttributes(CB);
   AttrBuilder ValidPG = IdentifyValidPoisonGeneratingAttributes(CB);
   if (!ValidUB.hasAttributes() && !ValidPG.hasAttributes())
@@ -1480,11 +1392,6 @@ static void AddReturnAttributes(CallBase &CB, ValueToValueMapTy &VMap,
     // could have transformed the cloned instruction.
     auto *NewRetVal = dyn_cast_or_null<CallBase>(VMap.lookup(RetVal));
     if (!NewRetVal)
-      continue;
-
-    // The RetVal might have be simplified during the inlining
-    // process which can make propagation incorrect.
-    if (InlinedFunctionInfo.isSimplified(RetVal, NewRetVal))
       continue;
     // Backward propagation of attributes to the returned value may be incorrect
     // if it is control flow dependent.
@@ -1555,14 +1462,6 @@ static void AddReturnAttributes(CallBase &CB, ValueToValueMapTy &VMap,
     if (ValidPG.getAlignment().valueOrOne() < AL.getRetAlignment().valueOrOne())
       ValidPG.removeAttribute(Attribute::Alignment);
     if (ValidPG.hasAttributes()) {
-      Attribute CBRange = ValidPG.getAttribute(Attribute::Range);
-      if (CBRange.isValid()) {
-        Attribute NewRange = AL.getRetAttr(Attribute::Range);
-        if (NewRange.isValid()) {
-          ValidPG.addRangeAttr(
-              CBRange.getRange().intersectWith(NewRange.getRange()));
-        }
-      }
       // Three checks.
       // If the callsite has `noundef`, then a poison due to violating the
       // return attribute will create UB anyways so we can always propagate.
@@ -1589,7 +1488,7 @@ static void AddAlignmentAssumptions(CallBase &CB, InlineFunctionInfo &IFI) {
     return;
 
   AssumptionCache *AC = &IFI.GetAssumptionCache(*CB.getCaller());
-  auto &DL = CB.getDataLayout();
+  auto &DL = CB.getCaller()->getParent()->getDataLayout();
 
   // To avoid inserting redundant assumptions, we should check for assumptions
   // already in the caller. To do this, we might need a DT of the caller.
@@ -1652,7 +1551,7 @@ static Value *HandleByValArgument(Type *ByValType, Value *Arg,
                                   InlineFunctionInfo &IFI,
                                   MaybeAlign ByValAlignment) {
   Function *Caller = TheCall->getFunction();
-  const DataLayout &DL = Caller->getDataLayout();
+  const DataLayout &DL = Caller->getParent()->getDataLayout();
 
   // If the called function is readonly, then it could not mutate the caller's
   // copy of the byval'd memory.  In this case, it is safe to elide the copy and
@@ -1686,9 +1585,8 @@ static Value *HandleByValArgument(Type *ByValType, Value *Arg,
   if (ByValAlignment)
     Alignment = std::max(Alignment, *ByValAlignment);
 
-  AllocaInst *NewAlloca =
-      new AllocaInst(ByValType, Arg->getType()->getPointerAddressSpace(),
-                     nullptr, Alignment, Arg->getName());
+  AllocaInst *NewAlloca = new AllocaInst(ByValType, DL.getAllocaAddrSpace(),
+                                         nullptr, Alignment, Arg->getName());
   NewAlloca->insertBefore(Caller->begin()->begin());
   IFI.StaticAllocas.push_back(NewAlloca);
 
@@ -1812,25 +1710,26 @@ static void fixupLineNumbers(Function *Fn, Function::iterator FI,
   };
 
   // Helper-util for updating debug-info records attached to instructions.
-  auto UpdateDVR = [&](DbgRecord *DVR) {
-    assert(DVR->getDebugLoc() && "Debug Value must have debug loc");
+  auto UpdateDPV = [&](DPValue *DPV) {
+    assert(DPV->getDebugLoc() && "Debug Value must have debug loc");
     if (NoInlineLineTables) {
-      DVR->setDebugLoc(TheCallDL);
+      DPV->setDebugLoc(TheCallDL);
       return;
     }
-    DebugLoc DL = DVR->getDebugLoc();
+    DebugLoc DL = DPV->getDebugLoc();
     DebugLoc IDL =
         inlineDebugLoc(DL, InlinedAtNode,
-                       DVR->getMarker()->getParent()->getContext(), IANodes);
-    DVR->setDebugLoc(IDL);
+                       DPV->getMarker()->getParent()->getContext(), IANodes);
+    DPV->setDebugLoc(IDL);
   };
 
   // Iterate over all instructions, updating metadata and debug-info records.
   for (; FI != Fn->end(); ++FI) {
-    for (Instruction &I : *FI) {
-      UpdateInst(I);
-      for (DbgRecord &DVR : I.getDbgRecordRange()) {
-        UpdateDVR(&DVR);
+    for (BasicBlock::iterator BI = FI->begin(), BE = FI->end(); BI != BE;
+         ++BI) {
+      UpdateInst(*BI);
+      for (DPValue &DPV : BI->getDbgValueRange()) {
+        UpdateDPV(&DPV);
       }
     }
 
@@ -1842,7 +1741,7 @@ static void fixupLineNumbers(Function *Fn, Function::iterator FI,
           BI = BI->eraseFromParent();
           continue;
         } else {
-          BI->dropDbgRecords();
+          BI->dropDbgValues();
         }
         ++BI;
       }
@@ -1898,7 +1797,7 @@ static at::StorageToVarsMap collectEscapedLocals(const DataLayout &DL,
       EscapedLocals[Base].insert(at::VarRecord(DbgAssign));
     };
     for_each(at::getAssignmentMarkers(Base), CollectAssignsForStorage);
-    for_each(at::getDVRAssignmentMarkers(Base), CollectAssignsForStorage);
+    for_each(at::getDPVAssignmentMarkers(Base), CollectAssignsForStorage);
   }
   return EscapedLocals;
 }
@@ -1916,12 +1815,29 @@ static void trackInlinedStores(Function::iterator Start, Function::iterator End,
 /// otherwise a function inlined more than once into the same function
 /// will cause DIAssignID to be shared by many instructions.
 static void fixupAssignments(Function::iterator Start, Function::iterator End) {
+  // Map {Old, New} metadata. Not used directly - use GetNewID.
   DenseMap<DIAssignID *, DIAssignID *> Map;
+  auto GetNewID = [&Map](Metadata *Old) {
+    DIAssignID *OldID = cast<DIAssignID>(Old);
+    if (DIAssignID *NewID = Map.lookup(OldID))
+      return NewID;
+    DIAssignID *NewID = DIAssignID::getDistinct(OldID->getContext());
+    Map[OldID] = NewID;
+    return NewID;
+  };
   // Loop over all the inlined instructions. If we find a DIAssignID
   // attachment or use, replace it with a new version.
   for (auto BBI = Start; BBI != End; ++BBI) {
-    for (Instruction &I : *BBI)
-      at::remapAssignID(Map, I);
+    for (Instruction &I : *BBI) {
+      for (DPValue &DPV : I.getDbgValueRange()) {
+        if (DPV.isDbgAssign())
+          DPV.setAssignId(GetNewID(DPV.getAssignID()));
+      }
+      if (auto *ID = I.getMetadata(LLVMContext::MD_DIAssignID))
+        I.setMetadata(LLVMContext::MD_DIAssignID, GetNewID(ID));
+      else if (auto *DAI = dyn_cast<DbgAssignIntrinsic>(&I))
+        DAI->setAssignId(GetNewID(DAI->getAssignID()));
+    }
   }
 }
 #undef DEBUG_TYPE
@@ -1990,29 +1906,13 @@ void llvm::updateProfileCallee(
           ? 0
           : PriorEntryCount + EntryDelta;
 
-  auto updateVTableProfWeight = [](CallBase *CB, const uint64_t NewEntryCount,
-                                   const uint64_t PriorEntryCount) {
-    Instruction *VPtr = PGOIndirectCallVisitor::tryGetVTableInstruction(CB);
-    if (VPtr)
-      scaleProfData(*VPtr, NewEntryCount, PriorEntryCount);
-  };
-
   // During inlining ?
   if (VMap) {
     uint64_t CloneEntryCount = PriorEntryCount - NewEntryCount;
-    for (auto Entry : *VMap) {
+    for (auto Entry : *VMap)
       if (isa<CallInst>(Entry.first))
-        if (auto *CI = dyn_cast_or_null<CallInst>(Entry.second)) {
+        if (auto *CI = dyn_cast_or_null<CallInst>(Entry.second))
           CI->updateProfWeight(CloneEntryCount, PriorEntryCount);
-          updateVTableProfWeight(CI, CloneEntryCount, PriorEntryCount);
-        }
-
-      if (isa<InvokeInst>(Entry.first))
-        if (auto *II = dyn_cast_or_null<InvokeInst>(Entry.second)) {
-          II->updateProfWeight(CloneEntryCount, PriorEntryCount);
-          updateVTableProfWeight(II, CloneEntryCount, PriorEntryCount);
-        }
-    }
   }
 
   if (EntryDelta) {
@@ -2021,16 +1921,9 @@ void llvm::updateProfileCallee(
     for (BasicBlock &BB : *Callee)
       // No need to update the callsite if it is pruned during inlining.
       if (!VMap || VMap->count(&BB))
-        for (Instruction &I : BB) {
-          if (CallInst *CI = dyn_cast<CallInst>(&I)) {
+        for (Instruction &I : BB)
+          if (CallInst *CI = dyn_cast<CallInst>(&I))
             CI->updateProfWeight(NewEntryCount, PriorEntryCount);
-            updateVTableProfWeight(CI, NewEntryCount, PriorEntryCount);
-          }
-          if (InvokeInst *II = dyn_cast<InvokeInst>(&I)) {
-            II->updateProfWeight(NewEntryCount, PriorEntryCount);
-            updateVTableProfWeight(II, NewEntryCount, PriorEntryCount);
-          }
-        }
   }
 }
 
@@ -2109,7 +2002,7 @@ inlineRetainOrClaimRVCalls(CallBase &CB, objcarc::ARCInstKind RVCallKind,
       Value *BundleArgs[] = {*objcarc::getAttachedARCFunction(&CB)};
       OperandBundleDef OB("clang.arc.attachedcall", BundleArgs);
       auto *NewCall = CallBase::addOperandBundle(
-          CI, LLVMContext::OB_clang_arc_attachedcall, OB, CI->getIterator());
+          CI, LLVMContext::OB_clang_arc_attachedcall, OB, CI);
       NewCall->copyMetadata(*CI);
       CI->replaceAllUsesWith(NewCall);
       CI->eraseFromParent();
@@ -2209,6 +2102,13 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
 
   BasicBlock *OrigBB = CB.getParent();
   Function *Caller = OrigBB->getParent();
+
+  // Do not inline strictfp function into non-strictfp one. It would require
+  // conversion of all FP operations in host function to constrained intrinsics.
+  if (CalledFunc->getAttributes().hasFnAttr(Attribute::StrictFP) &&
+      !Caller->getAttributes().hasFnAttr(Attribute::StrictFP)) {
+    return InlineResult::failure("incompatible strictfp attributes");
+  }
 
   // GC poses two hazards to inlining, which only occur when the callee has GC:
   //  1. If the caller has no GC, then the callee's GC must be propagated to the
@@ -2323,7 +2223,7 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
     // callee.
     ScopedAliasMetadataDeepCloner SAMetadataCloner(CB.getCalledFunction());
 
-    auto &DL = Caller->getDataLayout();
+    auto &DL = Caller->getParent()->getDataLayout();
 
     // Calculate the vector of arguments to pass into the function cloner, which
     // matches up the formal to the actual argument values.
@@ -2433,7 +2333,7 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
           OpDefs.emplace_back("deopt", std::move(MergedDeoptArgs));
         }
 
-        Instruction *NewI = CallBase::Create(ICS, OpDefs, ICS->getIterator());
+        Instruction *NewI = CallBase::Create(ICS, OpDefs, ICS);
 
         // Note: the RAUW does the appropriate fixup in VMap, so we need to do
         // this even if the call returns void.
@@ -2468,11 +2368,7 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
 
     // Clone return attributes on the callsite into the calls within the inlined
     // function which feed into its return value.
-    AddReturnAttributes(CB, VMap, InlinedFunctionInfo);
-
-    // Clone attributes on the params of the callsite to calls within the
-    // inlined function which use the same param.
-    AddParamAndFnBasicAttributes(CB, VMap, InlinedFunctionInfo);
+    AddReturnAttributes(CB, VMap);
 
     propagateMemProfMetadata(CalledFunc, CB,
                              InlinedFunctionInfo.ContainsMemProfMetadata, VMap);
@@ -2590,7 +2486,7 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
           SmallVector<Value *, 6> Params(CI->args());
           Params.append(VarArgsToForward.begin(), VarArgsToForward.end());
           CallInst *NewCI = CallInst::Create(
-              CI->getFunctionType(), CI->getCalledOperand(), Params, "", CI->getIterator());
+              CI->getFunctionType(), CI->getCalledOperand(), Params, "", CI);
           NewCI->setDebugLoc(CI->getDebugLoc());
           NewCI->setAttributes(Attrs);
           NewCI->setCallingConv(CI->getCallingConv());
@@ -2642,7 +2538,8 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
   if ((InsertLifetime || Caller->isPresplitCoroutine()) &&
       !IFI.StaticAllocas.empty()) {
     IRBuilder<> builder(&*FirstNewBlock, FirstNewBlock->begin());
-    for (AllocaInst *AI : IFI.StaticAllocas) {
+    for (unsigned ai = 0, ae = IFI.StaticAllocas.size(); ai != ae; ++ai) {
+      AllocaInst *AI = IFI.StaticAllocas[ai];
       // Don't mark swifterror allocas. They can't have bitcast uses.
       if (AI->isSwiftError())
         continue;
@@ -2656,7 +2553,7 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
       ConstantInt *AllocaSize = nullptr;
       if (ConstantInt *AIArraySize =
           dyn_cast<ConstantInt>(AI->getArraySize())) {
-        auto &DL = Caller->getDataLayout();
+        auto &DL = Caller->getParent()->getDataLayout();
         Type *AllocaType = AI->getAllocatedType();
         TypeSize AllocaTypeSize = DL.getTypeAllocSize(AllocaType);
         uint64_t AllocaArraySize = AIArraySize->getLimitedValue();
@@ -2886,7 +2783,7 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
     // If the call site was an invoke instruction, add a branch to the normal
     // destination.
     if (InvokeInst *II = dyn_cast<InvokeInst>(&CB)) {
-      BranchInst *NewBr = BranchInst::Create(II->getNormalDest(), CB.getIterator());
+      BranchInst *NewBr = BranchInst::Create(II->getNormalDest(), &CB);
       NewBr->setDebugLoc(Returns[0]->getDebugLoc());
     }
 
@@ -2923,7 +2820,7 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
   if (InvokeInst *II = dyn_cast<InvokeInst>(&CB)) {
 
     // Add an unconditional branch to make this look like the CallInst case...
-    CreatedBranchToNormalDest = BranchInst::Create(II->getNormalDest(), CB.getIterator());
+    CreatedBranchToNormalDest = BranchInst::Create(II->getNormalDest(), &CB);
 
     // Split the basic block.  This guarantees that no PHI nodes will have to be
     // updated due to new incoming edges, and make the invoke case more
@@ -2979,7 +2876,8 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
     // Loop over all of the return instructions adding entries to the PHI node
     // as appropriate.
     if (PHI) {
-      for (ReturnInst *RI : Returns) {
+      for (unsigned i = 0, e = Returns.size(); i != e; ++i) {
+        ReturnInst *RI = Returns[i];
         assert(RI->getReturnValue()->getType() == PHI->getType() &&
                "Ret value not consistent in function!");
         PHI->addIncoming(RI->getReturnValue(), RI->getParent());
@@ -2988,8 +2886,9 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
 
     // Add a branch to the merge points and remove return instructions.
     DebugLoc Loc;
-    for (ReturnInst *RI : Returns) {
-      BranchInst *BI = BranchInst::Create(AfterCallBB, RI->getIterator());
+    for (unsigned i = 0, e = Returns.size(); i != e; ++i) {
+      ReturnInst *RI = Returns[i];
+      BranchInst* BI = BranchInst::Create(AfterCallBB, RI);
       Loc = RI->getDebugLoc();
       BI->setDebugLoc(Loc);
       RI->eraseFromParent();
@@ -3060,7 +2959,7 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
   if (PHI) {
     AssumptionCache *AC =
         IFI.GetAssumptionCache ? &IFI.GetAssumptionCache(*Caller) : nullptr;
-    auto &DL = Caller->getDataLayout();
+    auto &DL = Caller->getParent()->getDataLayout();
     if (Value *V = simplifyInstruction(PHI, {DL, nullptr, nullptr, AC})) {
       PHI->replaceAllUsesWith(V);
       PHI->eraseFromParent();

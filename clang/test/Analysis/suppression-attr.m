@@ -168,15 +168,17 @@ void malloc_leak_suppression_2_1() {
   *x = 42;
 }
 
-void malloc_leak_suppression_2_2() SUPPRESS {
+// TODO: reassess when we decide what to do with declaration annotations
+void malloc_leak_suppression_2_2() /* SUPPRESS */ {
   int *x = (int *)malloc(sizeof(int));
   *x = 42;
-} // no-warning
+} // expected-warning{{Potential leak of memory pointed to by 'x'}}
 
-SUPPRESS void malloc_leak_suppression_2_3() {
+// TODO: reassess when we decide what to do with declaration annotations
+/* SUPPRESS */ void malloc_leak_suppression_2_3() {
   int *x = (int *)malloc(sizeof(int));
   *x = 42;
-} // no-warning
+} // expected-warning{{Potential leak of memory pointed to by 'x'}}
 
 void malloc_leak_suppression_2_4(int cond) {
   int *x = (int *)malloc(sizeof(int));
@@ -231,15 +233,20 @@ void retain_release_leak__suppression_2(int cond) {
 
 @interface TestSuppress : UIResponder {
 }
-@property(copy) SUPPRESS NSMutableString *mutableStr; // no-warning
+// TODO: reassess when we decide what to do with declaration annotations
+@property(copy) /* SUPPRESS */ NSMutableString *mutableStr;
+// expected-warning@-1 {{Property of mutable type 'NSMutableString' has 'copy' attribute; an immutable object will be stored instead}}
 @end
 @implementation TestSuppress
 
-- (BOOL)resignFirstResponder SUPPRESS { // no-warning
+// TODO: reassess when we decide what to do with declaration annotations
+- (BOOL)resignFirstResponder /* SUPPRESS */ {
   return 0;
-}
+} // expected-warning {{The 'resignFirstResponder' instance method in UIResponder subclass 'TestSuppress' is missing a [super resignFirstResponder] call}}
 
-- (void)methodWhichMayFail:(NSError **)error SUPPRESS { // no-warning
+// TODO: reassess when we decide what to do with declaration annotations
+- (void)methodWhichMayFail:(NSError **)error /* SUPPRESS */ {
+  // expected-warning@-1 {{Method accepting NSError** should have a non-void return value to indicate whether or not an error occurred}}
 }
 @end
 
@@ -262,40 +269,3 @@ void ast_checker_suppress_1() {
   struct ABC *Abc;
   SUPPRESS { Abc = (struct ABC *)&Ab; }
 }
-
-SUPPRESS int suppressed_function() {
-  int *x = 0;
-  return *x; // no-warning
-}
-
-SUPPRESS int suppressed_function_forward();
-int suppressed_function_forward() {
-  int *x = 0;
-  return *x; // expected-warning{{Dereference of null pointer (loaded from variable 'x')}}
-}
-
-int suppressed_function_backward();
-SUPPRESS int suppressed_function_backward() {
-  int *x = 0;
-  return *x; // no-warning
-}
-
-SUPPRESS
-@interface SuppressedInterface
--(int)suppressedMethod;
--(int)regularMethod SUPPRESS;
-@end
-
-@implementation SuppressedInterface
--(int)suppressedMethod SUPPRESS {
-  int *x = 0;
-  return *x; // no-warning
-}
-
-// This one is NOT suppressed by the attribute on the forward declaration,
-// and it's also NOT suppressed by the attribute on the entire interface.
--(int)regularMethod {
-  int *x = 0;
-  return *x; // expected-warning{{Dereference of null pointer (loaded from variable 'x')}}
-}
-@end

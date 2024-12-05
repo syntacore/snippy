@@ -14,6 +14,7 @@
 #ifndef BOLT_CORE_ADDRESS_MAP_H
 #define BOLT_CORE_ADDRESS_MAP_H
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/MC/MCSymbol.h"
 
 #include <optional>

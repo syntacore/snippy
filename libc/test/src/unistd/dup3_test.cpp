@@ -25,16 +25,15 @@
 
 TEST(LlvmLibcdupTest, ReadAndWriteViaDup) {
   constexpr int DUPFD = 0xD0;
-  LIBC_NAMESPACE::libc_errno = 0;
+  libc_errno = 0;
   using LIBC_NAMESPACE::testing::ErrnoSetterMatcher::Fails;
   using LIBC_NAMESPACE::testing::ErrnoSetterMatcher::Succeeds;
-  constexpr const char *FILENAME = "dup3.test";
-  auto TEST_FILE = libc_make_test_file_path(FILENAME);
+  constexpr const char *TEST_FILE = "testdata/dup3.test";
   int fd = LIBC_NAMESPACE::open(TEST_FILE, O_WRONLY | O_CREAT, S_IRWXU);
-  ASSERT_ERRNO_SUCCESS();
+  ASSERT_EQ(libc_errno, 0);
   ASSERT_GT(fd, 0);
   int dupfd = LIBC_NAMESPACE::dup3(fd, DUPFD, 0);
-  ASSERT_ERRNO_SUCCESS();
+  ASSERT_EQ(libc_errno, 0);
   ASSERT_EQ(dupfd, DUPFD);
 
   // Write something via the dup
@@ -46,10 +45,10 @@ TEST(LlvmLibcdupTest, ReadAndWriteViaDup) {
 
   // Reopen the file for reading and create a dup.
   fd = LIBC_NAMESPACE::open(TEST_FILE, O_RDONLY);
-  ASSERT_ERRNO_SUCCESS();
+  ASSERT_EQ(libc_errno, 0);
   ASSERT_GT(fd, 0);
   dupfd = LIBC_NAMESPACE::dup3(fd, DUPFD, 0);
-  ASSERT_ERRNO_SUCCESS();
+  ASSERT_EQ(libc_errno, 0);
   ASSERT_EQ(dupfd, DUPFD);
 
   // Read the file content via the dup.

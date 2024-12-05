@@ -60,9 +60,8 @@ class MultipleBreakpointTestCase(TestBase):
         num_threads = process.GetNumThreads()
 
         # Make sure we see all three threads
-        self.assertGreaterEqual(
-            num_threads,
-            3,
+        self.assertTrue(
+            num_threads >= 3,
             "Number of expected threads and actual threads do not match.",
         )
 

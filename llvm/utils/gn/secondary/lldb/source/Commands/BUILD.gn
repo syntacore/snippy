@@ -52,7 +52,7 @@ static_library("Commands") {
     "CommandObjectQuit.cpp",
     "CommandObjectRegexCommand.cpp",
     "CommandObjectRegister.cpp",
-    "CommandObjectScripting.cpp",
+    "CommandObjectScript.cpp",
     "CommandObjectSession.cpp",
     "CommandObjectSettings.cpp",
     "CommandObjectSource.cpp",

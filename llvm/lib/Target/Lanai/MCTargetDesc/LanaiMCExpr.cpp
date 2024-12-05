@@ -47,9 +47,9 @@ void LanaiMCExpr::visitUsedExpr(MCStreamer &Streamer) const {
 }
 
 bool LanaiMCExpr::evaluateAsRelocatableImpl(MCValue &Res,
-                                            const MCAssembler *Asm,
+                                            const MCAsmLayout *Layout,
                                             const MCFixup *Fixup) const {
-  if (!getSubExpr()->evaluateAsRelocatable(Res, Asm, Fixup))
+  if (!getSubExpr()->evaluateAsRelocatable(Res, Layout, Fixup))
     return false;
 
   Res =

@@ -13,7 +13,6 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/Support/Casting.h"
 
-#include <functional>
 #include <string>
 #include <utility>
 
@@ -49,12 +48,10 @@ class Expr;
 /// represents ref-counted object during the traversal we return relevant
 /// sub-expression and true.
 ///
-/// Calls \p callback with the subexpression that we traversed to and if \p
-/// StopAtFirstRefCountedObj is true we also specify whether we stopped early.
-/// Returns false if any of calls to callbacks returned false. Otherwise true.
-bool tryToFindPtrOrigin(
-    const clang::Expr *E, bool StopAtFirstRefCountedObj,
-    std::function<bool(const clang::Expr *, bool)> callback);
+/// \returns subexpression that we traversed to and if \p
+/// StopAtFirstRefCountedObj is true we also return whether we stopped early.
+std::pair<const clang::Expr *, bool>
+tryToFindPtrOrigin(const clang::Expr *E, bool StopAtFirstRefCountedObj);
 
 /// For \p E referring to a ref-countable/-counted pointer/reference we return
 /// whether it's a safe call argument. Examples: function parameter or

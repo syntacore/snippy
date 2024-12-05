@@ -70,15 +70,13 @@ private:
 
   using EvalFn = std::function<void(CheckerContext &, const CallEvent &)>;
   const CallDescriptionMap<EvalFn> TestCalls{
-      {{CDM::SimpleFunc, {"ErrnoTesterChecker_setErrno"}, 1},
-       &ErrnoTesterChecker::evalSetErrno},
-      {{CDM::SimpleFunc, {"ErrnoTesterChecker_getErrno"}, 0},
-       &ErrnoTesterChecker::evalGetErrno},
-      {{CDM::SimpleFunc, {"ErrnoTesterChecker_setErrnoIfError"}, 0},
+      {{{"ErrnoTesterChecker_setErrno"}, 1}, &ErrnoTesterChecker::evalSetErrno},
+      {{{"ErrnoTesterChecker_getErrno"}, 0}, &ErrnoTesterChecker::evalGetErrno},
+      {{{"ErrnoTesterChecker_setErrnoIfError"}, 0},
        &ErrnoTesterChecker::evalSetErrnoIfError},
-      {{CDM::SimpleFunc, {"ErrnoTesterChecker_setErrnoIfErrorRange"}, 0},
+      {{{"ErrnoTesterChecker_setErrnoIfErrorRange"}, 0},
        &ErrnoTesterChecker::evalSetErrnoIfErrorRange},
-      {{CDM::SimpleFunc, {"ErrnoTesterChecker_setErrnoCheckState"}, 0},
+      {{{"ErrnoTesterChecker_setErrnoCheckState"}, 0},
        &ErrnoTesterChecker::evalSetErrnoCheckState}};
 };
 

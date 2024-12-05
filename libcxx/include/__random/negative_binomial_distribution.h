@@ -9,7 +9,6 @@
 #ifndef _LIBCPP___RANDOM_NEGATIVE_BINOMIAL_DISTRIBUTION_H
 #define _LIBCPP___RANDOM_NEGATIVE_BINOMIAL_DISTRIBUTION_H
 
-#include <__assert>
 #include <__config>
 #include <__random/bernoulli_distribution.h>
 #include <__random/gamma_distribution.h>

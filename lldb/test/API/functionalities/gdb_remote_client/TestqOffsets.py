@@ -14,7 +14,7 @@ class TestqOffsets(GDBRemoteTestBase):
         self.server.responder = TestqOffsets.Responder()
         target = self.createTarget("qOffsets.yaml")
         text = target.modules[0].FindSection(".text")
-        self.assertEqual(text.GetLoadAddress(target), lldb.LLDB_INVALID_ADDRESS)
+        self.assertEquals(text.GetLoadAddress(target), lldb.LLDB_INVALID_ADDRESS)
 
         process = self.connect(target)
-        self.assertEqual(text.GetLoadAddress(target), 0x471000)
+        self.assertEquals(text.GetLoadAddress(target), 0x471000)

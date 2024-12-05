@@ -14,7 +14,6 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Analysis/CaptureTracking.h"
@@ -131,7 +130,7 @@ public:
                           std::unique_ptr<SpecialCaseList> Ignorelist)
       : Mod(M), Options(transformOptionsFromCl(std::move(Opts))),
         Ignorelist(std::move(Ignorelist)), TargetTriple(M.getTargetTriple()),
-        VersionStr(utostr(getVersion())), IRB(M.getContext()) {
+        IRB(M.getContext()) {
     // FIXME: Make it work with other formats.
     assert(TargetTriple.isOSBinFormatELF() && "ELF only");
     assert(!(TargetTriple.isNVPTX() || TargetTriple.isAMDGPU()) &&
@@ -168,10 +167,10 @@ private:
   StringRef getSectionName(StringRef SectionSuffix);
 
   // Returns the section start marker name.
-  StringRef getSectionStart(StringRef SectionSuffix);
+  Twine getSectionStart(StringRef SectionSuffix);
 
   // Returns the section end marker name.
-  StringRef getSectionEnd(StringRef SectionSuffix);
+  Twine getSectionEnd(StringRef SectionSuffix);
 
   // Returns true if the access to the address should be considered "atomic".
   bool pretendAtomicAccess(const Value *Addr);
@@ -180,7 +179,6 @@ private:
   const SanitizerBinaryMetadataOptions Options;
   std::unique_ptr<SpecialCaseList> Ignorelist;
   const Triple TargetTriple;
-  const std::string VersionStr;
   IRBuilder<> IRB;
   BumpPtrAllocator Alloc;
   UniqueStringSaver StringPool{Alloc};
@@ -211,25 +209,19 @@ bool SanitizerBinaryMetadata::run() {
         getSectionMarker(getSectionStart(MI->SectionSuffix), PtrTy),
         getSectionMarker(getSectionEnd(MI->SectionSuffix), PtrTy),
     };
-
-    // Calls to the initialization functions with different versions cannot be
-    // merged. Give the structors unique names based on the version, which will
-    // also be used as the COMDAT key.
-    const std::string StructorPrefix = (MI->FunctionPrefix + VersionStr).str();
-
     // We declare the _add and _del functions as weak, and only call them if
     // there is a valid symbol linked. This allows building binaries with
     // semantic metadata, but without having callbacks. When a tool that wants
     // the metadata is linked which provides the callbacks, they will be called.
     Function *Ctor =
         createSanitizerCtorAndInitFunctions(
-            Mod, StructorPrefix + ".module_ctor",
+            Mod, (MI->FunctionPrefix + ".module_ctor").str(),
             (MI->FunctionPrefix + "_add").str(), InitTypes, InitArgs,
             /*VersionCheckName=*/StringRef(), /*Weak=*/ClWeakCallbacks)
             .first;
     Function *Dtor =
         createSanitizerCtorAndInitFunctions(
-            Mod, StructorPrefix + ".module_dtor",
+            Mod, (MI->FunctionPrefix + ".module_dtor").str(),
             (MI->FunctionPrefix + "_del").str(), InitTypes, InitArgs,
             /*VersionCheckName=*/StringRef(), /*Weak=*/ClWeakCallbacks)
             .first;
@@ -462,19 +454,15 @@ SanitizerBinaryMetadata::getSectionMarker(const Twine &MarkerName, Type *Ty) {
 StringRef SanitizerBinaryMetadata::getSectionName(StringRef SectionSuffix) {
   // FIXME: Other TargetTriples.
   // Request ULEB128 encoding for all integer constants.
-  return StringPool.save(SectionSuffix + VersionStr + "!C");
+  return StringPool.save(SectionSuffix + "!C");
 }
 
-StringRef SanitizerBinaryMetadata::getSectionStart(StringRef SectionSuffix) {
-  // Twine only concatenates 2 strings; with >2 strings, concatenating them
-  // creates Twine temporaries, and returning the final Twine no longer works
-  // because we'd end up with a stack-use-after-return. So here we also use the
-  // StringPool to store the new string.
-  return StringPool.save("__start_" + SectionSuffix + VersionStr);
+Twine SanitizerBinaryMetadata::getSectionStart(StringRef SectionSuffix) {
+  return "__start_" + SectionSuffix;
 }
 
-StringRef SanitizerBinaryMetadata::getSectionEnd(StringRef SectionSuffix) {
-  return StringPool.save("__stop_" + SectionSuffix + VersionStr);
+Twine SanitizerBinaryMetadata::getSectionEnd(StringRef SectionSuffix) {
+  return "__stop_" + SectionSuffix;
 }
 
 } // namespace

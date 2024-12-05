@@ -180,20 +180,20 @@ bgeu a0, a1, foo
 .L5:
 auipc a0, %tlsdesc_hi(a_symbol)
 # RELOC: R_RISCV_TLSDESC_HI20
-# INSTR: auipc a0, %tlsdesc_hi(a_symbol)
+# INST: auipc a0, 0x0
 # FIXUP: fixup A - offset: 0, value: %tlsdesc_hi(a_symbol), kind: fixup_riscv_tlsdesc_hi20
 
 lw a1, %tlsdesc_load_lo(.L5)(a0)
 # RELOC: R_RISCV_TLSDESC_LOAD_LO12
-# INSTR: lw a1, %tlsdesc_load_lo(.L5)(a0)
+# INST: lw a1, 0x0(a0)
 # FIXUP: fixup A - offset: 0, value: %tlsdesc_load_lo(.L5), kind: fixup_riscv_tlsdesc_load_lo12
 
 addi a0, a0, %tlsdesc_add_lo(.L5)
 # RELOC: R_RISCV_TLSDESC_ADD_LO12
-# INSTR: addi a0, a0, %tlsdesc_add_lo(.L5)
+# INST: addi a0, a0, 0x0
 # FIXUP: fixup A - offset: 0, value: %tlsdesc_add_lo(.L5), kind: fixup_riscv_tlsdesc_add_lo12
 
 jalr t0, 0(a1), %tlsdesc_call(.L5)
 # RELOC: R_RISCV_TLSDESC_CALL
-# INSTR: jalr t0, 0(a1), %tlsdesc_call(.L5)
+# INST: jalr t0, 0x0(a1)
 # FIXUP: fixup A - offset: 0, value: %tlsdesc_call(.L5), kind: fixup_riscv_tlsdesc_call

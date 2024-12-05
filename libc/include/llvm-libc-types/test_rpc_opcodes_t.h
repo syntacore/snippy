@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_TEST_RPC_OPCODES_T_H
-#define LLVM_LIBC_TYPES_TEST_RPC_OPCODES_T_H
+#ifndef __LLVM_LIBC_TYPES_TEST_RPC_OPCODE_H__
+#define __LLVM_LIBC_TYPES_TEST_RPC_OPCODE_H__
 
 // We consider the first 32768 opcodes as reserved for libc purposes. We allow
 // extensions to use any other number without conflicting with anything else.
@@ -18,4 +18,4 @@ typedef enum : unsigned short {
   RPC_TEST_STREAM,
 } rpc_test_opcode_t;
 
-#endif // LLVM_LIBC_TYPES_TEST_RPC_OPCODES_T_H
+#endif // __LLVM_LIBC_TYPES_TEST_RPC_OPCODE_H__

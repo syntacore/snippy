@@ -147,6 +147,7 @@ body:             |
   ; CHECK-NEXT: bb.1.cond.false:
   ; CHECK-NEXT:   successors: %bb.2(0x80000000)
   ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.2.cond.end:
   ; CHECK-NEXT:   [[PHI:%[0-9]+]]:_(s64) = G_PHI [[COPY2]](s64), %bb.1, [[COPY1]](s64), %bb.0
   ; CHECK-NEXT:   $x10 = COPY [[PHI]](s64)
@@ -206,6 +207,7 @@ body:             |
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.1.cond.false:
   ; CHECK-NEXT:   successors: %bb.2(0x80000000)
+  ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.2.cond.end:
   ; CHECK-NEXT:   [[PHI:%[0-9]+]]:_(s64) = G_PHI [[COPY2]](s64), %bb.1, [[COPY1]](s64), %bb.0
@@ -267,6 +269,7 @@ body:             |
   ; CHECK-NEXT: bb.1.cond.false:
   ; CHECK-NEXT:   successors: %bb.2(0x80000000)
   ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.2.cond.end:
   ; CHECK-NEXT:   [[PHI:%[0-9]+]]:_(s64) = G_PHI [[COPY2]](s64), %bb.1, [[COPY1]](s64), %bb.0
   ; CHECK-NEXT:   $x10 = COPY [[PHI]](s64)
@@ -327,6 +330,7 @@ body:             |
   ; CHECK-NEXT: bb.1.cond.false:
   ; CHECK-NEXT:   successors: %bb.2(0x80000000)
   ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.2.cond.end:
   ; CHECK-NEXT:   [[PHI:%[0-9]+]]:_(s64) = G_PHI [[COPY2]](s64), %bb.1, [[COPY1]](s64), %bb.0
   ; CHECK-NEXT:   $x10 = COPY [[PHI]](s64)
@@ -384,6 +388,7 @@ body:             |
   ; CHECK-NEXT: bb.1.cond.false:
   ; CHECK-NEXT:   successors: %bb.2(0x80000000)
   ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.2.cond.end:
   ; CHECK-NEXT:   [[PHI:%[0-9]+]]:_(s64) = G_PHI [[COPY2]](s64), %bb.1, [[COPY1]](s64), %bb.0
   ; CHECK-NEXT:   $x10 = COPY [[PHI]](s64)
@@ -437,6 +442,7 @@ body:             |
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.1.cond.false:
   ; CHECK-NEXT:   successors: %bb.2(0x80000000)
+  ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.2.cond.end:
   ; CHECK-NEXT:   [[PHI:%[0-9]+]]:_(p0) = G_PHI [[COPY2]](p0), %bb.1, [[COPY1]](p0), %bb.0
@@ -502,6 +508,7 @@ body:             |
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.1.cond.false:
   ; CHECK-NEXT:   successors: %bb.2(0x80000000)
+  ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.2.cond.end:
   ; CHECK-NEXT:   [[PHI:%[0-9]+]]:_(s64) = G_PHI [[COPY3]](s64), %bb.1, [[COPY1]](s64), %bb.0
@@ -575,6 +582,7 @@ body:             |
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.1.cond.false:
   ; CHECK-NEXT:   successors: %bb.2(0x80000000)
+  ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.2.cond.end:
   ; CHECK-NEXT:   [[PHI:%[0-9]+]]:_(s64) = G_PHI [[COPY3]](s64), %bb.1, [[COPY1]](s64), %bb.0
@@ -650,6 +658,7 @@ body:             |
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.1.cond.false:
   ; CHECK-NEXT:   successors: %bb.2(0x80000000)
+  ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT: bb.2.cond.end:
   ; CHECK-NEXT:   [[PHI:%[0-9]+]]:_(s64) = G_PHI [[COPY4]](s64), %bb.1, [[COPY1]](s64), %bb.0

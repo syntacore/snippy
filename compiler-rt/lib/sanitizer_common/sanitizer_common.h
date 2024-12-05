@@ -60,10 +60,14 @@ inline int Verbosity() {
   return atomic_load(&current_verbosity, memory_order_relaxed);
 }
 
-#if SANITIZER_ANDROID && !defined(__aarch64__)
-// 32-bit Android only has 4k pages.
-inline uptr GetPageSize() { return 4096; }
-inline uptr GetPageSizeCached() { return 4096; }
+#if SANITIZER_ANDROID
+inline uptr GetPageSize() {
+// Android post-M sysconf(_SC_PAGESIZE) crashes if called from .preinit_array.
+  return 4096;
+}
+inline uptr GetPageSizeCached() {
+  return 4096;
+}
 #else
 uptr GetPageSize();
 extern uptr PageSizeCached;
@@ -73,7 +77,6 @@ inline uptr GetPageSizeCached() {
   return PageSizeCached;
 }
 #endif
-
 uptr GetMmapGranularity();
 uptr GetMaxVirtualAddress();
 uptr GetMaxUserVirtualAddress();
@@ -88,11 +91,10 @@ void GetThreadStackAndTls(bool main, uptr *stk_addr, uptr *stk_size,
 
 // Memory management
 void *MmapOrDie(uptr size, const char *mem_type, bool raw_report = false);
-
 inline void *MmapOrDieQuietly(uptr size, const char *mem_type) {
   return MmapOrDie(size, mem_type, /*raw_report*/ true);
 }
-void UnmapOrDie(void *addr, uptr size, bool raw_report = false);
+void UnmapOrDie(void *addr, uptr size);
 // Behaves just like MmapOrDie, but tolerates out of memory condition, in that
 // case returns nullptr.
 void *MmapOrDieOnFatalError(uptr size, const char *mem_type);
@@ -137,8 +139,7 @@ void UnmapFromTo(uptr from, uptr to);
 // shadow_size_bytes bytes on the right, which on linux is mapped no access.
 // The high_mem_end may be updated if the original shadow size doesn't fit.
 uptr MapDynamicShadow(uptr shadow_size_bytes, uptr shadow_scale,
-                      uptr min_shadow_base_alignment, uptr &high_mem_end,
-                      uptr granularity);
+                      uptr min_shadow_base_alignment, uptr &high_mem_end);
 
 // Let S = max(shadow_size, num_aliases * alias_size, ring_buffer_size).
 // Reserves 2*S bytes of address space to the right of the returned address and
@@ -177,7 +178,7 @@ bool DontDumpShadowMemory(uptr addr, uptr length);
 // Check if the built VMA size matches the runtime one.
 void CheckVMASize();
 void RunMallocHooks(void *ptr, uptr size);
-int RunFreeHooks(void *ptr);
+void RunFreeHooks(void *ptr);
 
 class ReservedAddressRange {
  public:
@@ -509,7 +510,7 @@ inline int ToLower(int c) {
 // A low-level vector based on mmap. May incur a significant memory overhead for
 // small vectors.
 // WARNING: The current implementation supports only POD types.
-template <typename T, bool raw_report = false>
+template<typename T>
 class InternalMmapVectorNoCtor {
  public:
   using value_type = T;
@@ -519,7 +520,7 @@ class InternalMmapVectorNoCtor {
     data_ = 0;
     reserve(initial_capacity);
   }
-  void Destroy() { UnmapOrDie(data_, capacity_bytes_, raw_report); }
+  void Destroy() { UnmapOrDie(data_, capacity_bytes_); }
   T &operator[](uptr i) {
     CHECK_LT(i, size_);
     return data_[i];
@@ -595,10 +596,9 @@ class InternalMmapVectorNoCtor {
     CHECK_LE(size_, new_capacity);
     uptr new_capacity_bytes =
         RoundUpTo(new_capacity * sizeof(T), GetPageSizeCached());
-    T *new_data =
-        (T *)MmapOrDie(new_capacity_bytes, "InternalMmapVector", raw_report);
+    T *new_data = (T *)MmapOrDie(new_capacity_bytes, "InternalMmapVector");
     internal_memcpy(new_data, data_, size_ * sizeof(T));
-    UnmapOrDie(data_, capacity_bytes_, raw_report);
+    UnmapOrDie(data_, capacity_bytes_);
     data_ = new_data;
     capacity_bytes_ = new_capacity_bytes;
   }
@@ -1097,7 +1097,7 @@ inline u32 GetNumberOfCPUsCached() {
 
 }  // namespace __sanitizer
 
-inline void *operator new(__sanitizer::usize size,
+inline void *operator new(__sanitizer::operator_new_size_type size,
                           __sanitizer::LowLevelAllocator &alloc) {
   return alloc.Allocate(size);
 }

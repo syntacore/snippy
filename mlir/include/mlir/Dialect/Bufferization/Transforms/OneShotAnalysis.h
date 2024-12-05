@@ -24,12 +24,7 @@ class OneShotAnalysisState;
 
 /// Options for analysis-enabled bufferization.
 struct OneShotBufferizationOptions : public BufferizationOptions {
-  enum class AnalysisHeuristic {
-    BottomUp,
-    TopDown,
-    BottomUpFromTerminators,
-    Fuzzer
-  };
+  enum class AnalysisHeuristic { BottomUp, TopDown };
 
   OneShotBufferizationOptions() = default;
 
@@ -47,11 +42,6 @@ struct OneShotBufferizationOptions : public BufferizationOptions {
   /// Specify the functions that should not be analyzed. copyBeforeWrite will be
   /// set to true when bufferizing them.
   llvm::ArrayRef<std::string> noAnalysisFuncFilter;
-
-  /// Seed for the analysis fuzzer. Used only if the heuristic is set to
-  /// `AnalysisHeuristic::Fuzzer`. The fuzzer should be used only with
-  /// `testAnalysisOnly = true`.
-  unsigned analysisFuzzerSeed = 0;
 };
 
 /// State for analysis-enabled bufferization. This class keeps track of alias

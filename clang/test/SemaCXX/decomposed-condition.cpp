@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -std=c++1z -Wno-binding-in-condition -verify %s
-// RUN: %clang_cc1 -std=c++1z -Wno-binding-in-condition -verify %s -fexperimental-new-constant-interpreter
 
 struct X {
   bool flag;

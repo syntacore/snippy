@@ -27,7 +27,6 @@
 #include <tuple>
 
 #include "test_iterators.h"
-#include "test_range.h"
 
 constexpr void compareOperatorTest(const auto& iter1, const auto& iter2) {
   assert(!(iter1 < iter1));
@@ -140,7 +139,8 @@ constexpr bool test() {
     auto it = ev.begin();
 
     using ElemIter = decltype(it);
-    static_assert(!weakly_equality_comparable_with<ElemIter, ElemIter>);
+    static_assert(!std::invocable<std::equal_to<>, ElemIter, ElemIter>);
+    static_assert(!std::invocable<std::not_equal_to<>, ElemIter, ElemIter>);
     inequalityOperatorsDoNotExistTest(it, it);
   }
 

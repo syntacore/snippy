@@ -34,7 +34,8 @@ struct TestDecomposeAffineOps
     return "Tests affine ops decomposition utility functions.";
   }
   TestDecomposeAffineOps() = default;
-  TestDecomposeAffineOps(const TestDecomposeAffineOps &pass) = default;
+  TestDecomposeAffineOps(const TestDecomposeAffineOps &pass)
+      : PassWrapper(pass){};
 
   void runOnOperation() override;
 };

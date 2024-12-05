@@ -177,7 +177,10 @@ public:
   MemOPSizeOpt(Function &Func, BlockFrequencyInfo &BFI,
                OptimizationRemarkEmitter &ORE, DominatorTree *DT,
                TargetLibraryInfo &TLI)
-      : Func(Func), BFI(BFI), ORE(ORE), DT(DT), TLI(TLI), Changed(false) {}
+      : Func(Func), BFI(BFI), ORE(ORE), DT(DT), TLI(TLI), Changed(false) {
+    ValueDataArray =
+        std::make_unique<InstrProfValueData[]>(INSTR_PROF_NUM_BUCKETS);
+  }
   bool isChanged() const { return Changed; }
   void perform() {
     WorkList.clear();
@@ -219,6 +222,8 @@ private:
   TargetLibraryInfo &TLI;
   bool Changed;
   std::vector<MemOp> WorkList;
+  // The space to read the profile annotation.
+  std::unique_ptr<InstrProfValueData[]> ValueDataArray;
   bool perform(MemOp MO);
 };
 
@@ -247,11 +252,10 @@ bool MemOPSizeOpt::perform(MemOp MO) {
   if (!MemOPOptMemcmpBcmp && (MO.isMemcmp(TLI) || MO.isBcmp(TLI)))
     return false;
 
-  uint32_t MaxNumVals = INSTR_PROF_NUM_BUCKETS;
+  uint32_t NumVals, MaxNumVals = INSTR_PROF_NUM_BUCKETS;
   uint64_t TotalCount;
-  auto VDs =
-      getValueProfDataFromInst(*MO.I, IPVK_MemOPSize, MaxNumVals, TotalCount);
-  if (VDs.empty())
+  if (!getValueProfDataFromInst(*MO.I, IPVK_MemOPSize, MaxNumVals,
+                                ValueDataArray.get(), NumVals, TotalCount))
     return false;
 
   uint64_t ActualCount = TotalCount;
@@ -263,6 +267,7 @@ bool MemOPSizeOpt::perform(MemOp MO) {
     ActualCount = *BBEdgeCount;
   }
 
+  ArrayRef<InstrProfValueData> VDs(ValueDataArray.get(), NumVals);
   LLVM_DEBUG(dbgs() << "Read one memory intrinsic profile with count "
                     << ActualCount << "\n");
   LLVM_DEBUG(
@@ -395,10 +400,11 @@ bool MemOPSizeOpt::perform(MemOp MO) {
   // Clear the value profile data.
   MO.I->setMetadata(LLVMContext::MD_prof, nullptr);
   // If all promoted, we don't need the MD.prof metadata.
-  if (SavedRemainCount > 0 || Version != VDs.size()) {
+  if (SavedRemainCount > 0 || Version != NumVals) {
     // Otherwise we need update with the un-promoted records back.
-    annotateValueSite(*Func.getParent(), *MO.I, RemainingVDs, SavedRemainCount,
-                      IPVK_MemOPSize, VDs.size());
+    ArrayRef<InstrProfValueData> RemVDs(RemainingVDs);
+    annotateValueSite(*Func.getParent(), *MO.I, RemVDs, SavedRemainCount,
+                      IPVK_MemOPSize, NumVals);
   }
 
   LLVM_DEBUG(dbgs() << "\n\n== Basic Block After==\n");

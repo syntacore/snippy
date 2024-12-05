@@ -17,7 +17,6 @@ struct Program;
 class Messages;
 struct Name;
 class CharBlock;
-struct AssignmentStmt;
 struct ExecutionPartConstruct;
 struct ExecutableConstruct;
 struct ActionStmt;
@@ -39,7 +38,6 @@ public:
   void Enter(const parser::FunctionSubprogram &);
   void Enter(const parser::SeparateModuleSubprogram &);
   void Enter(const parser::CUFKernelDoConstruct &);
-  void Enter(const parser::AssignmentStmt &);
 
 private:
   SemanticsContext &context_;

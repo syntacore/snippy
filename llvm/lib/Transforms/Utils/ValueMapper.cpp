@@ -146,7 +146,7 @@ public:
   Value *mapValue(const Value *V);
   void remapInstruction(Instruction *I);
   void remapFunction(Function &F);
-  void remapDbgRecord(DbgRecord &DVR);
+  void remapDPValue(DPValue &DPV);
 
   Constant *mapConstant(const Constant *C) {
     return cast_or_null<Constant>(mapValue(C));
@@ -537,21 +537,12 @@ Value *Mapper::mapValue(const Value *V) {
   return getVM()[V] = ConstantPointerNull::get(cast<PointerType>(NewTy));
 }
 
-void Mapper::remapDbgRecord(DbgRecord &DR) {
-  // Remap DILocations.
-  auto *MappedDILoc = mapMetadata(DR.getDebugLoc());
-  DR.setDebugLoc(DebugLoc(cast<DILocation>(MappedDILoc)));
-
-  if (DbgLabelRecord *DLR = dyn_cast<DbgLabelRecord>(&DR)) {
-    // Remap labels.
-    DLR->setLabel(cast<DILabel>(mapMetadata(DLR->getLabel())));
-    return;
-  }
-
-  DbgVariableRecord &V = cast<DbgVariableRecord>(DR);
-  // Remap variables.
+void Mapper::remapDPValue(DPValue &V) {
+  // Remap variables and DILocations.
   auto *MappedVar = mapMetadata(V.getVariable());
+  auto *MappedDILoc = mapMetadata(V.getDebugLoc());
   V.setVariable(cast<DILocalVariable>(MappedVar));
+  V.setDebugLoc(DebugLoc(cast<DILocation>(MappedDILoc)));
 
   bool IgnoreMissingLocals = Flags & RF_IgnoreMissingLocals;
 
@@ -561,7 +552,6 @@ void Mapper::remapDbgRecord(DbgRecord &DR) {
       V.setKillAddress();
     else if (NewAddr)
       V.setAddress(NewAddr);
-    V.setAssignId(cast<DIAssignID>(mapMetadata(V.getAssignID())));
   }
 
   // Find Value operands and remap those.
@@ -1066,13 +1056,9 @@ void Mapper::remapFunction(Function &F) {
       A.mutateType(TypeMapper->remapType(A.getType()));
 
   // Remap the instructions.
-  for (BasicBlock &BB : F) {
-    for (Instruction &I : BB) {
+  for (BasicBlock &BB : F)
+    for (Instruction &I : BB)
       remapInstruction(&I);
-      for (DbgRecord &DR : I.getDbgRecordRange())
-        remapDbgRecord(DR);
-    }
-  }
 }
 
 void Mapper::mapAppendingVariable(GlobalVariable &GV, Constant *InitPrefix,
@@ -1236,14 +1222,14 @@ void ValueMapper::remapInstruction(Instruction &I) {
   FlushingMapper(pImpl)->remapInstruction(&I);
 }
 
-void ValueMapper::remapDbgRecord(Module *M, DbgRecord &DR) {
-  FlushingMapper(pImpl)->remapDbgRecord(DR);
+void ValueMapper::remapDPValue(Module *M, DPValue &V) {
+  FlushingMapper(pImpl)->remapDPValue(V);
 }
 
-void ValueMapper::remapDbgRecordRange(
-    Module *M, iterator_range<DbgRecord::self_iterator> Range) {
-  for (DbgRecord &DR : Range) {
-    remapDbgRecord(M, DR);
+void ValueMapper::remapDPValueRange(
+    Module *M, iterator_range<DPValue::self_iterator> Range) {
+  for (DPValue &DPV : Range) {
+    remapDPValue(M, DPV);
   }
 }
 

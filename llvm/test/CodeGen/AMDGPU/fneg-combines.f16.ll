@@ -951,6 +951,8 @@ define half @v_fneg_minnum_f16_ieee(half %a, half %b) #0 {
 ; SI-NEXT:    v_cvt_f16_f32_e64 v0, -v0
 ; SI-NEXT:    v_cvt_f32_f16_e32 v1, v1
 ; SI-NEXT:    v_cvt_f32_f16_e32 v0, v0
+; SI-NEXT:    v_mul_f32_e32 v1, 1.0, v1
+; SI-NEXT:    v_mul_f32_e32 v0, 1.0, v0
 ; SI-NEXT:    v_max_f32_e32 v0, v0, v1
 ; SI-NEXT:    s_setpc_b64 s[30:31]
 ;
@@ -1054,6 +1056,7 @@ define half @v_fneg_posk_minnum_f16_ieee(half %a) #0 {
 ; SI-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; SI-NEXT:    v_cvt_f16_f32_e64 v0, -v0
 ; SI-NEXT:    v_cvt_f32_f16_e32 v0, v0
+; SI-NEXT:    v_mul_f32_e32 v0, 1.0, v0
 ; SI-NEXT:    v_max_f32_e32 v0, -4.0, v0
 ; SI-NEXT:    s_setpc_b64 s[30:31]
 ;
@@ -1107,6 +1110,7 @@ define half @v_fneg_negk_minnum_f16_ieee(half %a) #0 {
 ; SI-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; SI-NEXT:    v_cvt_f16_f32_e64 v0, -v0
 ; SI-NEXT:    v_cvt_f32_f16_e32 v0, v0
+; SI-NEXT:    v_mul_f32_e32 v0, 1.0, v0
 ; SI-NEXT:    v_max_f32_e32 v0, 4.0, v0
 ; SI-NEXT:    s_setpc_b64 s[30:31]
 ;
@@ -1189,6 +1193,7 @@ define half @v_fneg_neg0_minnum_f16_ieee(half %a) #0 {
 ; SI-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; SI-NEXT:    v_cvt_f16_f32_e64 v0, -v0
 ; SI-NEXT:    v_cvt_f32_f16_e32 v0, v0
+; SI-NEXT:    v_mul_f32_e32 v0, 1.0, v0
 ; SI-NEXT:    v_max_f32_e32 v0, 0, v0
 ; SI-NEXT:    s_setpc_b64 s[30:31]
 ;
@@ -1217,6 +1222,7 @@ define half @v_fneg_inv2pi_minnum_f16(half %a) #0 {
 ; SI-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; SI-NEXT:    v_cvt_f16_f32_e64 v0, -v0
 ; SI-NEXT:    v_cvt_f32_f16_e32 v0, v0
+; SI-NEXT:    v_mul_f32_e32 v0, 1.0, v0
 ; SI-NEXT:    v_max_f32_e32 v0, 0xbe230000, v0
 ; SI-NEXT:    s_setpc_b64 s[30:31]
 ;
@@ -1247,6 +1253,7 @@ define half @v_fneg_neg_inv2pi_minnum_f16(half %a) #0 {
 ; SI-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; SI-NEXT:    v_cvt_f16_f32_e64 v0, -v0
 ; SI-NEXT:    v_cvt_f32_f16_e32 v0, v0
+; SI-NEXT:    v_mul_f32_e32 v0, 1.0, v0
 ; SI-NEXT:    v_max_f32_e32 v0, 0xbe230000, v0
 ; SI-NEXT:    s_setpc_b64 s[30:31]
 ;
@@ -1304,6 +1311,7 @@ define half @v_fneg_0_minnum_foldable_use_f16_ieee(half %a, half %b) #0 {
 ; SI-NEXT:    v_cvt_f16_f32_e32 v1, v1
 ; SI-NEXT:    v_cvt_f32_f16_e32 v0, v0
 ; SI-NEXT:    v_cvt_f32_f16_e32 v1, v1
+; SI-NEXT:    v_mul_f32_e32 v0, 1.0, v0
 ; SI-NEXT:    v_min_f32_e32 v0, 0, v0
 ; SI-NEXT:    v_mul_f32_e64 v0, -v0, v1
 ; SI-NEXT:    s_setpc_b64 s[30:31]
@@ -1338,6 +1346,7 @@ define half @v_fneg_inv2pi_minnum_foldable_use_f16(half %a, half %b) #0 {
 ; SI-NEXT:    v_cvt_f16_f32_e32 v1, v1
 ; SI-NEXT:    v_cvt_f32_f16_e32 v0, v0
 ; SI-NEXT:    v_cvt_f32_f16_e32 v1, v1
+; SI-NEXT:    v_mul_f32_e32 v0, 1.0, v0
 ; SI-NEXT:    v_max_f32_e32 v0, 0xbe230000, v0
 ; SI-NEXT:    v_mul_f32_e32 v0, v0, v1
 ; SI-NEXT:    s_setpc_b64 s[30:31]
@@ -1404,6 +1413,8 @@ define { half, half } @v_fneg_minnum_multi_use_minnum_f16_ieee(half %a, half %b)
 ; SI-NEXT:    v_cvt_f16_f32_e32 v0, v0
 ; SI-NEXT:    v_cvt_f32_f16_e64 v1, -v1
 ; SI-NEXT:    v_cvt_f32_f16_e64 v0, -v0
+; SI-NEXT:    v_mul_f32_e32 v1, 1.0, v1
+; SI-NEXT:    v_mul_f32_e32 v0, 1.0, v0
 ; SI-NEXT:    v_max_f32_e32 v0, v0, v1
 ; SI-NEXT:    v_mul_f32_e32 v1, -4.0, v0
 ; SI-NEXT:    s_setpc_b64 s[30:31]
@@ -1483,6 +1494,8 @@ define half @v_fneg_maxnum_f16_ieee(half %a, half %b) #0 {
 ; SI-NEXT:    v_cvt_f16_f32_e64 v0, -v0
 ; SI-NEXT:    v_cvt_f32_f16_e32 v1, v1
 ; SI-NEXT:    v_cvt_f32_f16_e32 v0, v0
+; SI-NEXT:    v_mul_f32_e32 v1, 1.0, v1
+; SI-NEXT:    v_mul_f32_e32 v0, 1.0, v0
 ; SI-NEXT:    v_min_f32_e32 v0, v0, v1
 ; SI-NEXT:    s_setpc_b64 s[30:31]
 ;
@@ -1586,6 +1599,7 @@ define half @v_fneg_posk_maxnum_f16_ieee(half %a) #0 {
 ; SI-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; SI-NEXT:    v_cvt_f16_f32_e64 v0, -v0
 ; SI-NEXT:    v_cvt_f32_f16_e32 v0, v0
+; SI-NEXT:    v_mul_f32_e32 v0, 1.0, v0
 ; SI-NEXT:    v_min_f32_e32 v0, -4.0, v0
 ; SI-NEXT:    s_setpc_b64 s[30:31]
 ;
@@ -1639,6 +1653,7 @@ define half @v_fneg_negk_maxnum_f16_ieee(half %a) #0 {
 ; SI-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; SI-NEXT:    v_cvt_f16_f32_e64 v0, -v0
 ; SI-NEXT:    v_cvt_f32_f16_e32 v0, v0
+; SI-NEXT:    v_mul_f32_e32 v0, 1.0, v0
 ; SI-NEXT:    v_min_f32_e32 v0, 4.0, v0
 ; SI-NEXT:    s_setpc_b64 s[30:31]
 ;
@@ -1721,6 +1736,7 @@ define half @v_fneg_neg0_maxnum_f16_ieee(half %a) #0 {
 ; SI-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; SI-NEXT:    v_cvt_f16_f32_e64 v0, -v0
 ; SI-NEXT:    v_cvt_f32_f16_e32 v0, v0
+; SI-NEXT:    v_mul_f32_e32 v0, 1.0, v0
 ; SI-NEXT:    v_min_f32_e32 v0, 0, v0
 ; SI-NEXT:    s_setpc_b64 s[30:31]
 ;
@@ -1776,6 +1792,7 @@ define half @v_fneg_0_maxnum_foldable_use_f16_ieee(half %a, half %b) #0 {
 ; SI-NEXT:    v_cvt_f16_f32_e32 v1, v1
 ; SI-NEXT:    v_cvt_f32_f16_e32 v0, v0
 ; SI-NEXT:    v_cvt_f32_f16_e32 v1, v1
+; SI-NEXT:    v_mul_f32_e32 v0, 1.0, v0
 ; SI-NEXT:    v_max_f32_e32 v0, 0, v0
 ; SI-NEXT:    v_mul_f32_e64 v0, -v0, v1
 ; SI-NEXT:    s_setpc_b64 s[30:31]
@@ -1842,6 +1859,8 @@ define { half, half } @v_fneg_maxnum_multi_use_maxnum_f16_ieee(half %a, half %b)
 ; SI-NEXT:    v_cvt_f16_f32_e32 v0, v0
 ; SI-NEXT:    v_cvt_f32_f16_e64 v1, -v1
 ; SI-NEXT:    v_cvt_f32_f16_e64 v0, -v0
+; SI-NEXT:    v_mul_f32_e32 v1, 1.0, v1
+; SI-NEXT:    v_mul_f32_e32 v0, 1.0, v0
 ; SI-NEXT:    v_min_f32_e32 v0, v0, v1
 ; SI-NEXT:    v_mul_f32_e32 v1, -4.0, v0
 ; SI-NEXT:    s_setpc_b64 s[30:31]
@@ -3961,8 +3980,7 @@ define half @v_fneg_canonicalize_f16(half %a) #0 {
 ; SI-LABEL: v_fneg_canonicalize_f16:
 ; SI:       ; %bb.0:
 ; SI-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
-; SI-NEXT:    v_cvt_f16_f32_e64 v0, -v0
-; SI-NEXT:    v_cvt_f32_f16_e32 v0, v0
+; SI-NEXT:    v_xor_b32_e32 v0, 0x80000000, v0
 ; SI-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; VI-LABEL: v_fneg_canonicalize_f16:

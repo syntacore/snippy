@@ -4,7 +4,7 @@ set(STATS_HEADERS
 include_directories(..)
 
 add_custom_target(stats)
-set_target_properties(stats PROPERTIES FOLDER "Compiler-RT/Metatargets")
+set_target_properties(stats PROPERTIES FOLDER "Compiler-RT Misc")
 
 if(APPLE)
   set(STATS_LIB_FLAVOR SHARED)

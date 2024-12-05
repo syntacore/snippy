@@ -23,19 +23,19 @@ using namespace clang;
 using namespace ento;
 
 namespace {
-class BoolAssignmentChecker : public Checker<check::Bind> {
-  const BugType BT{this, "Assignment of a non-Boolean value"};
-  void emitReport(ProgramStateRef State, CheckerContext &C,
-                  bool IsTainted = false) const;
+  class BoolAssignmentChecker : public Checker< check::Bind > {
+    const BugType BT{this, "Assignment of a non-Boolean value"};
+    void emitReport(ProgramStateRef state, CheckerContext &C,
+                    bool IsTainted = false) const;
 
-public:
-  void checkBind(SVal Loc, SVal Val, const Stmt *S, CheckerContext &C) const;
-};
+  public:
+    void checkBind(SVal loc, SVal val, const Stmt *S, CheckerContext &C) const;
+  };
 } // end anonymous namespace
 
-void BoolAssignmentChecker::emitReport(ProgramStateRef State, CheckerContext &C,
+void BoolAssignmentChecker::emitReport(ProgramStateRef state, CheckerContext &C,
                                        bool IsTainted) const {
-  if (ExplodedNode *N = C.generateNonFatalErrorNode(State)) {
+  if (ExplodedNode *N = C.generateNonFatalErrorNode(state)) {
     StringRef Msg = IsTainted ? "Might assign a tainted non-Boolean value"
                               : "Assignment of a non-Boolean value";
     C.emitReport(std::make_unique<PathSensitiveBugReport>(BT, Msg, N));
@@ -47,58 +47,59 @@ static bool isBooleanType(QualType Ty) {
     return true;
 
   if (const TypedefType *TT = Ty->getAs<TypedefType>())
-    return TT->getDecl()->getName() == "BOOL" ||  // Objective-C
-           TT->getDecl()->getName() == "_Bool" || // stdbool.h < C99
-           TT->getDecl()->getName() == "Boolean"; // MacTypes.h
+    return TT->getDecl()->getName() == "BOOL"   || // Objective-C
+           TT->getDecl()->getName() == "_Bool"  || // stdbool.h < C99
+           TT->getDecl()->getName() == "Boolean";  // MacTypes.h
 
   return false;
 }
 
-void BoolAssignmentChecker::checkBind(SVal Loc, SVal Val, const Stmt *S,
+void BoolAssignmentChecker::checkBind(SVal loc, SVal val, const Stmt *S,
                                       CheckerContext &C) const {
 
   // We are only interested in stores into Booleans.
   const TypedValueRegion *TR =
-      dyn_cast_or_null<TypedValueRegion>(Loc.getAsRegion());
+    dyn_cast_or_null<TypedValueRegion>(loc.getAsRegion());
 
   if (!TR)
     return;
 
-  QualType RegTy = TR->getValueType();
+  QualType valTy = TR->getValueType();
 
-  if (!isBooleanType(RegTy))
+  if (!isBooleanType(valTy))
     return;
 
   // Get the value of the right-hand side.  We only care about values
   // that are defined (UnknownVals and UndefinedVals are handled by other
   // checkers).
-  std::optional<NonLoc> NV = Val.getAs<NonLoc>();
+  std::optional<NonLoc> NV = val.getAs<NonLoc>();
   if (!NV)
     return;
 
   // Check if the assigned value meets our criteria for correctness.  It must
   // be a value that is either 0 or 1.  One way to check this is to see if
   // the value is possibly < 0 (for a negative value) or greater than 1.
-  ProgramStateRef State = C.getState();
-  BasicValueFactory &BVF = C.getSValBuilder().getBasicValueFactory();
+  ProgramStateRef state = C.getState();
+  SValBuilder &svalBuilder = C.getSValBuilder();
+  BasicValueFactory &BVF = svalBuilder.getBasicValueFactory();
   ConstraintManager &CM = C.getConstraintManager();
 
-  llvm::APSInt Zero = BVF.getValue(0, RegTy);
-  llvm::APSInt One = BVF.getValue(1, RegTy);
+  llvm::APSInt Zero = BVF.getValue(0, valTy);
+  llvm::APSInt One = BVF.getValue(1, valTy);
 
   ProgramStateRef StIn, StOut;
-  std::tie(StIn, StOut) = CM.assumeInclusiveRangeDual(State, *NV, Zero, One);
+  std::tie(StIn, StOut) = CM.assumeInclusiveRangeDual(state, *NV, Zero, One);
 
   if (!StIn)
     emitReport(StOut, C);
-  if (StIn && StOut && taint::isTainted(State, *NV))
+  if (StIn && StOut && taint::isTainted(state, *NV))
     emitReport(StOut, C, /*IsTainted=*/true);
 }
 
-void ento::registerBoolAssignmentChecker(CheckerManager &Mgr) {
-  Mgr.registerChecker<BoolAssignmentChecker>();
+void ento::registerBoolAssignmentChecker(CheckerManager &mgr) {
+    mgr.registerChecker<BoolAssignmentChecker>();
 }
 
-bool ento::shouldRegisterBoolAssignmentChecker(const CheckerManager &Mgr) {
+bool ento::shouldRegisterBoolAssignmentChecker(const CheckerManager &mgr) {
   return true;
 }

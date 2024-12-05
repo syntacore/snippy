@@ -8,6 +8,7 @@ add_header_library(
   darwin_util
   HDRS
     io.h
+    quick_exit.h
     syscall.h
   DEPENDS
     .${LIBC_TARGET_ARCHITECTURE}.darwin_util

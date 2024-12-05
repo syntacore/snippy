@@ -38,17 +38,15 @@ void addTosaToLinalgPasses(
     const TosaToLinalgNamedOptions &tosaToLinalgNamedOptions =
         TosaToLinalgNamedOptions(),
     // Note: Default to 'none' level unless otherwise specified.
-    std::optional<tosa::TosaValidationOptions> validationOptions =
-        tosa::TosaValidationOptions{tosa::TosaProfileEnum::Undefined, false,
-                                    tosa::TosaLevelEnum::None});
+    tosa::TosaValidationOptions const &validationOptions = {
+        tosa::TosaProfileEnum::Undefined, false, tosa::TosaLevelEnum::None});
 
 /// Populates TOSA to linalg pipelines
 /// Currently, this includes only the "tosa-to-linalg-pipeline".
 void registerTosaToLinalgPipelines();
 
 /// Populates conversion passes from TOSA dialect to Linalg dialect.
-void populateTosaToLinalgConversionPatterns(TypeConverter &converter,
-                                            RewritePatternSet *patterns);
+void populateTosaToLinalgConversionPatterns(RewritePatternSet *patterns);
 
 /// Populates conversion passes from TOSA dialect to Linalg named operations.
 void populateTosaToLinalgNamedConversionPatterns(

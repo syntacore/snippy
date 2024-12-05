@@ -15,38 +15,36 @@
 
 namespace Fortran::runtime::io {
 
-RT_API_ATTRS bool EditIntegerInput(
-    IoStatementState &, const DataEdit &, void *, int kind);
+bool EditIntegerInput(IoStatementState &, const DataEdit &, void *, int kind);
 
 template <int KIND>
-RT_API_ATTRS bool EditRealInput(IoStatementState &, const DataEdit &, void *);
+bool EditRealInput(IoStatementState &, const DataEdit &, void *);
 
-RT_API_ATTRS bool EditLogicalInput(
-    IoStatementState &, const DataEdit &, bool &);
+bool EditLogicalInput(IoStatementState &, const DataEdit &, bool &);
 
 template <typename CHAR>
-RT_API_ATTRS bool EditCharacterInput(
+bool EditCharacterInput(
     IoStatementState &, const DataEdit &, CHAR *, std::size_t);
 
-extern template RT_API_ATTRS bool EditRealInput<2>(
+extern template bool EditRealInput<2>(
     IoStatementState &, const DataEdit &, void *);
-extern template RT_API_ATTRS bool EditRealInput<3>(
+extern template bool EditRealInput<3>(
     IoStatementState &, const DataEdit &, void *);
-extern template RT_API_ATTRS bool EditRealInput<4>(
+extern template bool EditRealInput<4>(
     IoStatementState &, const DataEdit &, void *);
-extern template RT_API_ATTRS bool EditRealInput<8>(
+extern template bool EditRealInput<8>(
     IoStatementState &, const DataEdit &, void *);
-extern template RT_API_ATTRS bool EditRealInput<10>(
+extern template bool EditRealInput<10>(
     IoStatementState &, const DataEdit &, void *);
 // TODO: double/double
-extern template RT_API_ATTRS bool EditRealInput<16>(
+extern template bool EditRealInput<16>(
     IoStatementState &, const DataEdit &, void *);
 
-extern template RT_API_ATTRS bool EditCharacterInput(
+extern template bool EditCharacterInput(
     IoStatementState &, const DataEdit &, char *, std::size_t);
-extern template RT_API_ATTRS bool EditCharacterInput(
+extern template bool EditCharacterInput(
     IoStatementState &, const DataEdit &, char16_t *, std::size_t);
-extern template RT_API_ATTRS bool EditCharacterInput(
+extern template bool EditCharacterInput(
     IoStatementState &, const DataEdit &, char32_t *, std::size_t);
 
 } // namespace Fortran::runtime::io

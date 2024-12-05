@@ -84,11 +84,11 @@ bool LoopInversionPass::runOnFunction(BinaryFunction &BF) {
   return IsChanged;
 }
 
-Error LoopInversionPass::runOnFunctions(BinaryContext &BC) {
+void LoopInversionPass::runOnFunctions(BinaryContext &BC) {
   std::atomic<uint64_t> ModifiedFuncCount{0};
   if (opts::ReorderBlocks == ReorderBasicBlocks::LT_NONE ||
       opts::LoopReorder == false)
-    return Error::success();
+    return;
 
   ParallelUtilities::WorkFuncTy WorkFun = [&](BinaryFunction &BF) {
     if (runOnFunction(BF))
@@ -103,9 +103,8 @@ Error LoopInversionPass::runOnFunctions(BinaryContext &BC) {
       BC, ParallelUtilities::SchedulingPolicy::SP_TRIVIAL, WorkFun, SkipFunc,
       "LoopInversionPass");
 
-  BC.outs() << "BOLT-INFO: " << ModifiedFuncCount
-            << " Functions were reordered by LoopInversionPass\n";
-  return Error::success();
+  outs() << "BOLT-INFO: " << ModifiedFuncCount
+         << " Functions were reordered by LoopInversionPass\n";
 }
 
 } // end namespace bolt

@@ -11,7 +11,6 @@
 #define _LIBCPP___CHARCONV_TO_CHARS_INTEGRAL_H
 
 #include <__algorithm/copy_n.h>
-#include <__assert>
 #include <__bit/countl.h>
 #include <__charconv/tables.h>
 #include <__charconv/to_chars_base_10.h>

@@ -277,7 +277,7 @@ json::Array renderFiles(const coverage::CoverageMapping &Coverage,
     S = heavyweight_hardware_concurrency(SourceFiles.size());
     S.Limit = true;
   }
-  DefaultThreadPool Pool(S);
+  ThreadPool Pool(S);
   json::Array FileArray;
   std::mutex FileArrayMutex;
 

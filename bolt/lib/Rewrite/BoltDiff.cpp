@@ -292,11 +292,11 @@ class RewriteInstanceDiff {
         }
       }
     }
-    PrintProgramStats PPS;
+    PrintProgramStats PPS(opts::NeverPrint);
     outs() << "* BOLT-DIFF: Starting print program stats pass for binary 1\n";
-    RI1.BC->logBOLTErrorsAndQuitOnFatal(PPS.runOnFunctions(*RI1.BC));
+    PPS.runOnFunctions(*RI1.BC);
     outs() << "* BOLT-DIFF: Starting print program stats pass for binary 2\n";
-    RI1.BC->logBOLTErrorsAndQuitOnFatal(PPS.runOnFunctions(*RI2.BC));
+    PPS.runOnFunctions(*RI2.BC);
     outs() << "=====\n";
     outs() << "Inputs share " << BothHaveProfile
            << " functions with valid profile.\n";
@@ -700,9 +700,9 @@ void RewriteInstance::compare(RewriteInstance &RI2) {
   if (opts::ICF) {
     IdenticalCodeFolding ICF(opts::NeverPrint);
     outs() << "BOLT-DIFF: Starting ICF pass for binary 1";
-    BC->logBOLTErrorsAndQuitOnFatal(ICF.runOnFunctions(*BC));
+    ICF.runOnFunctions(*BC);
     outs() << "BOLT-DIFF: Starting ICF pass for binary 2";
-    BC->logBOLTErrorsAndQuitOnFatal(ICF.runOnFunctions(*RI2.BC));
+    ICF.runOnFunctions(*RI2.BC);
   }
 
   RewriteInstanceDiff RID(*this, RI2);

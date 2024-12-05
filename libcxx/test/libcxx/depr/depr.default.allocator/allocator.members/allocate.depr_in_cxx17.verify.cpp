@@ -13,7 +13,9 @@
 
 // Deprecated in C++17
 
-// REQUIRES: c++17
+// UNSUPPORTED: c++03, c++11, c++14
+
+// ADDITIONAL_COMPILE_FLAGS: -D_LIBCPP_ENABLE_CXX20_REMOVED_ALLOCATOR_MEMBERS -Wno-deprecated-pragma
 
 #include <memory>
 

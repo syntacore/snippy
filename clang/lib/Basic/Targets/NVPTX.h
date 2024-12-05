@@ -62,7 +62,7 @@ static const int NVPTXDWARFAddrSpaceMap[] = {
 
 class LLVM_LIBRARY_VISIBILITY NVPTXTargetInfo : public TargetInfo {
   static const char *const GCCRegNames[];
-  OffloadArch GPU;
+  CudaArch GPU;
   uint32_t PTXVersion;
   std::unique_ptr<TargetInfo> HostTarget;
 
@@ -75,14 +75,11 @@ public:
 
   ArrayRef<Builtin::Info> getTargetBuiltins() const override;
 
-  bool useFP16ConversionIntrinsics() const override { return false; }
-
   bool
   initFeatureMap(llvm::StringMap<bool> &Features, DiagnosticsEngine &Diags,
                  StringRef CPU,
                  const std::vector<std::string> &FeaturesVec) const override {
-    if (GPU != OffloadArch::UNUSED)
-      Features[OffloadArchToString(GPU)] = true;
+    Features[CudaArchToString(GPU)] = true;
     Features["ptx" + std::to_string(PTXVersion)] = true;
     return TargetInfo::initFeatureMap(Features, Diags, CPU, FeaturesVec);
   }
@@ -107,7 +104,6 @@ public:
     case 'l':
     case 'f':
     case 'd':
-    case 'q':
       Info.setAllowsRegister();
       return true;
     }
@@ -119,22 +115,23 @@ public:
   }
 
   BuiltinVaListKind getBuiltinVaListKind() const override {
-    return TargetInfo::VoidPtrBuiltinVaList;
+    // FIXME: implement
+    return TargetInfo::CharPtrBuiltinVaList;
   }
 
   bool isValidCPUName(StringRef Name) const override {
-    return StringToOffloadArch(Name) != OffloadArch::UNKNOWN;
+    return StringToCudaArch(Name) != CudaArch::UNKNOWN;
   }
 
   void fillValidCPUList(SmallVectorImpl<StringRef> &Values) const override {
-    for (int i = static_cast<int>(OffloadArch::SM_20);
-         i < static_cast<int>(OffloadArch::Generic); ++i)
-      Values.emplace_back(OffloadArchToString(static_cast<OffloadArch>(i)));
+    for (int i = static_cast<int>(CudaArch::SM_20);
+         i < static_cast<int>(CudaArch::Generic); ++i)
+      Values.emplace_back(CudaArchToString(static_cast<CudaArch>(i)));
   }
 
   bool setCPU(const std::string &Name) override {
-    GPU = StringToOffloadArch(Name);
-    return GPU != OffloadArch::UNKNOWN;
+    GPU = StringToCudaArch(Name);
+    return GPU != CudaArch::UNKNOWN;
   }
 
   void setSupportedOpenCLOpts() override {
@@ -185,7 +182,7 @@ public:
   bool hasBitIntType() const override { return true; }
   bool hasBFloat16Type() const override { return true; }
 
-  OffloadArch getGPU() const { return GPU; }
+  CudaArch getGPU() const { return GPU; }
 };
 } // namespace targets
 } // namespace clang

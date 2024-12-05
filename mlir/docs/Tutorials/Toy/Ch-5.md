@@ -113,7 +113,7 @@ struct TransposeOpLowering : public mlir::ConversionPattern {
 
   /// Match and rewrite the given `toy.transpose` operation, with the given
   /// operands that have been remapped from `tensor<...>` to `memref<...>`.
-  llvm::LogicalResult
+  mlir::LogicalResult
   matchAndRewrite(mlir::Operation *op, ArrayRef<mlir::Value> operands,
                   mlir::ConversionPatternRewriter &rewriter) const final {
     auto loc = op->getLoc();

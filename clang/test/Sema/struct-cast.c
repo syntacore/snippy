@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -fsyntax-only %s -verify
-// RUN: %clang_cc1 -fsyntax-only %s -fexperimental-new-constant-interpreter -verify
 // expected-no-diagnostics
 
 struct S {

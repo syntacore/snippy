@@ -52,10 +52,10 @@ class SBTypeMemberFunctionsTest(TestBase):
         Derived = variable.GetType()
         Base = Derived.GetDirectBaseClassAtIndex(0).GetType()
 
-        self.assertEqual(
+        self.assertEquals(
             2, Derived.GetNumberOfMemberFunctions(), "Derived declares two methods"
         )
-        self.assertEqual(
+        self.assertEquals(
             "int",
             Derived.GetMemberFunctionAtIndex(0)
             .GetType()
@@ -64,10 +64,10 @@ class SBTypeMemberFunctionsTest(TestBase):
             "Derived::dImpl returns int",
         )
 
-        self.assertEqual(
+        self.assertEquals(
             4, Base.GetNumberOfMemberFunctions(), "Base declares three methods"
         )
-        self.assertEqual(
+        self.assertEquals(
             3,
             Base.GetMemberFunctionAtIndex(3)
             .GetType()
@@ -75,15 +75,15 @@ class SBTypeMemberFunctionsTest(TestBase):
             .GetSize(),
             "Base::sfunc takes three arguments",
         )
-        self.assertEqual(
+        self.assertEquals(
             "sfunc", Base.GetMemberFunctionAtIndex(3).GetName(), "Base::sfunc not found"
         )
-        self.assertEqual(
+        self.assertEquals(
             lldb.eMemberFunctionKindStaticMethod,
             Base.GetMemberFunctionAtIndex(3).GetKind(),
             "Base::sfunc is a static",
         )
-        self.assertEqual(
+        self.assertEquals(
             0,
             Base.GetMemberFunctionAtIndex(2)
             .GetType()
@@ -91,7 +91,7 @@ class SBTypeMemberFunctionsTest(TestBase):
             .GetSize(),
             "Base::dat takes no arguments",
         )
-        self.assertEqual(
+        self.assertEquals(
             "char",
             Base.GetMemberFunctionAtIndex(1)
             .GetType()
@@ -100,69 +100,69 @@ class SBTypeMemberFunctionsTest(TestBase):
             .GetName(),
             "Base::bar takes a second 'char' argument",
         )
-        self.assertEqual(
+        self.assertEquals(
             "bar", Base.GetMemberFunctionAtIndex(1).GetName(), "Base::bar not found"
         )
 
         variable = frame0.FindVariable("thingy")
         Thingy = variable.GetType()
 
-        self.assertEqual(
+        self.assertEquals(
             2, Thingy.GetNumberOfMemberFunctions(), "Thingy declares two methods"
         )
 
-        self.assertEqual(
+        self.assertEquals(
             "id",
             Thingy.GetMemberFunctionAtIndex(0).GetReturnType().GetName(),
             "Thingy::init returns an id",
         )
-        self.assertEqual(
+        self.assertEquals(
             2,
             Thingy.GetMemberFunctionAtIndex(1).GetNumberOfArguments(),
             "Thingy::foo takes two arguments",
         )
-        self.assertEqual(
+        self.assertEquals(
             "int",
             Thingy.GetMemberFunctionAtIndex(1).GetArgumentTypeAtIndex(0).GetName(),
             "Thingy::foo takes an int",
         )
 
-        self.assertEqual(
+        self.assertEquals(
             "Derived::dImpl()", Derived.GetMemberFunctionAtIndex(0).GetDemangledName()
         )
-        self.assertEqual(
+        self.assertEquals(
             "Derived::baz(float)",
             Derived.GetMemberFunctionAtIndex(1).GetDemangledName(),
         )
-        self.assertEqual(
+        self.assertEquals(
             "Base::foo(int, int)", Base.GetMemberFunctionAtIndex(0).GetDemangledName()
         )
-        self.assertEqual(
+        self.assertEquals(
             "Base::bar(int, char)", Base.GetMemberFunctionAtIndex(1).GetDemangledName()
         )
-        self.assertEqual(
+        self.assertEquals(
             "Base::dat()", Base.GetMemberFunctionAtIndex(2).GetDemangledName()
         )
-        self.assertEqual(
+        self.assertEquals(
             "Base::sfunc(char, int, float)",
             Base.GetMemberFunctionAtIndex(3).GetDemangledName(),
         )
 
-        self.assertEqual(
+        self.assertEquals(
             "_ZN7Derived5dImplEv", Derived.GetMemberFunctionAtIndex(0).GetMangledName()
         )
-        self.assertEqual(
+        self.assertEquals(
             "_ZN7Derived3bazEf", Derived.GetMemberFunctionAtIndex(1).GetMangledName()
         )
-        self.assertEqual(
+        self.assertEquals(
             "_ZN4Base3fooEii", Base.GetMemberFunctionAtIndex(0).GetMangledName()
         )
-        self.assertEqual(
+        self.assertEquals(
             "_ZN4Base3barEic", Base.GetMemberFunctionAtIndex(1).GetMangledName()
         )
-        self.assertEqual(
+        self.assertEquals(
             "_ZN4Base3datEv", Base.GetMemberFunctionAtIndex(2).GetMangledName()
         )
-        self.assertEqual(
+        self.assertEquals(
             "_ZN4Base5sfuncEcif", Base.GetMemberFunctionAtIndex(3).GetMangledName()
         )

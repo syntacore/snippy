@@ -38,10 +38,6 @@
 //          Called before fork syscall.
 //   COMMON_SYSCALL_POST_FORK(long res)
 //          Called after fork syscall.
-//   COMMON_SYSCALL_BLOCKING_START()
-//         Called before blocking syscall.
-//   COMMON_SYSCALL_BLOCKING_END()
-//         Called after blocking syscall.
 //===----------------------------------------------------------------------===//
 
 #include "sanitizer_platform.h"
@@ -86,16 +82,6 @@
 
 #  ifndef COMMON_SYSCALL_POST_FORK
 #    define COMMON_SYSCALL_POST_FORK(res) \
-      {}
-#  endif
-
-#  ifndef COMMON_SYSCALL_BLOCKING_START
-#    define COMMON_SYSCALL_BLOCKING_START() \
-      {}
-#  endif
-
-#  ifndef COMMON_SYSCALL_BLOCKING_END
-#    define COMMON_SYSCALL_BLOCKING_END() \
       {}
 #  endif
 
@@ -2822,15 +2808,6 @@ PRE_SYSCALL(fchownat)
 POST_SYSCALL(fchownat)
 (long res, long dfd, const void *filename, long user, long group, long flag) {}
 
-PRE_SYSCALL(fchmodat2)(long dfd, const void *filename, long mode, long flag) {
-  if (filename)
-    PRE_READ(filename,
-             __sanitizer::internal_strlen((const char *)filename) + 1);
-}
-
-POST_SYSCALL(fchmodat2)
-(long res, long dfd, const void *filename, long mode, long flag) {}
-
 PRE_SYSCALL(openat)(long dfd, const void *filename, long flags, long mode) {
   if (filename)
     PRE_READ(filename,
@@ -3190,18 +3167,6 @@ POST_SYSCALL(sigaltstack)(long res, void *ss, void *oss) {
     }
   }
 }
-
-PRE_SYSCALL(futex)
-(void *uaddr, long futex_op, long val, void *timeout, void *uaddr2, long val3) {
-  COMMON_SYSCALL_BLOCKING_START();
-}
-
-POST_SYSCALL(futex)
-(long res, void *uaddr, long futex_op, long val, void *timeout, void *uaddr2,
- long val3) {
-  COMMON_SYSCALL_BLOCKING_END();
-}
-
 }  // extern "C"
 
 #  undef PRE_SYSCALL

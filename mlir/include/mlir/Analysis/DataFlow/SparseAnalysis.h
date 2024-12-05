@@ -132,15 +132,14 @@ public:
   /// analysis, lattices will only have a `join`, no `meet`, but we want to use
   /// the same `Lattice` class for both directions.
   template <typename T, typename... Args>
-  using has_meet = decltype(&T::meet);
+  using has_meet = decltype(std::declval<T>().meet());
   template <typename T>
   using lattice_has_meet = llvm::is_detected<has_meet, T>;
 
   /// Meet (intersect) the information contained in the 'rhs' value with this
   /// lattice. Returns if the state of the current lattice changed.  If the
   /// lattice elements don't have a `meet` method, this is a no-op (see below.)
-  template <typename VT,
-            std::enable_if_t<lattice_has_meet<VT>::value> * = nullptr>
+  template <typename VT, std::enable_if_t<lattice_has_meet<VT>::value>>
   ChangeResult meet(const VT &rhs) {
     ValueT newValue = ValueT::meet(value, rhs);
     assert(ValueT::meet(newValue, value) == newValue &&
@@ -156,8 +155,7 @@ public:
     return ChangeResult::Change;
   }
 
-  template <typename VT,
-            std::enable_if_t<!lattice_has_meet<VT>::value> * = nullptr>
+  template <typename VT>
   ChangeResult meet(const VT &rhs) {
     return ChangeResult::NoChange;
   }

@@ -9,7 +9,7 @@
 
 #if __INCLUDE_LEVEL__ == 0
 
-#if __cpluscplus > 202002L && __cpp_implicit_move < 202207L
+#if __cpluscplus > 202002L && __cpp_implicit_move < 202011L
 #error "__cpp_implicit_move not defined correctly"
 #endif
 

@@ -149,9 +149,6 @@ declare !callback !0 void @callback_broker(ptr, ptr)
 !1 = !{i64 0, i64 1, i1 false}
 !0 = !{!1}
 ;.
-; TUNIT: [[META0:![0-9]+]] = !{[[META1:![0-9]+]]}
-; TUNIT: [[META1]] = !{i64 0, i64 1, i1 false}
-;.
-; CGSCC: [[META0:![0-9]+]] = !{[[META1:![0-9]+]]}
-; CGSCC: [[META1]] = !{i64 0, i64 1, i1 false}
+; CHECK: [[META0:![0-9]+]] = !{!1}
+; CHECK: [[META1:![0-9]+]] = !{i64 0, i64 1, i1 false}
 ;.

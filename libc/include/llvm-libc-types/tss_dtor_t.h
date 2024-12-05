@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIBC_TYPES_TSS_DTOR_T_H
-#define LLVM_LIBC_TYPES_TSS_DTOR_T_H
+#ifndef __LLVM_LIBC_TYPES_TSS_DTOR_T_H__
+#define __LLVM_LIBC_TYPES_TSS_DTOR_T_H__
 
 typedef void (*tss_dtor_t)(void *);
 
-#endif // LLVM_LIBC_TYPES_TSS_DTOR_T_H
+#endif // __LLVM_LIBC_TYPES_TSS_DTOR_T_H__

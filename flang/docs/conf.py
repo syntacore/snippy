@@ -22,23 +22,12 @@ from datetime import date
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = [
+    "myst_parser",
     "sphinx.ext.todo",
     "sphinx.ext.mathjax",
     "sphinx.ext.intersphinx",
     "sphinx.ext.autodoc",
 ]
-
-# When building man pages, we do not use the markdown pages,
-# So, we can continue without the myst_parser dependencies.
-# Doing so reduces dependencies of some packaged llvm distributions.
-try:
-    import myst_parser
-
-    extensions.append("myst_parser")
-except ImportError:
-    if not tags.has("builder-man"):
-        raise
-
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -106,12 +95,15 @@ pygments_style = "friendly"
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = "haiku"
+html_theme = "llvm-theme"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-# html_theme_options = {}
+html_theme_options = {"nosidebar": False}
+
+# Add any paths that contain custom themes here, relative to this directory.
+html_theme_path = ["_themes"]
 
 # Add any paths that contain custom themes here, relative to this directory.
 # html_theme_path = []
@@ -135,7 +127,11 @@ html_title = "The Flang Compiler"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-# html_static_path = []
+html_static_path = ["_static"]
+
+html_context = {
+    "css_files": ["_static/llvm.css"],
+}
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -146,7 +142,13 @@ html_last_updated_fmt = "%b %d, %Y"
 # html_use_smartypants = True
 
 # Custom sidebar templates, maps document names to template names.
-# html_sidebars = {}
+html_sidebars = {
+    "**": [
+        "indexsidebar.html",
+        "searchbox.html",
+    ]
+}
+
 
 # Additional templates that should be rendered to pages, maps page names to
 # template names.

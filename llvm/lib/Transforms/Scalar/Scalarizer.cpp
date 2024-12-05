@@ -523,8 +523,8 @@ void ScalarizerVisitor::transferMetadataAndIRFlags(Instruction *Op,
                                                    const ValueVector &CV) {
   SmallVector<std::pair<unsigned, MDNode *>, 4> MDs;
   Op->getAllMetadataOtherThanDebugLoc(MDs);
-  for (Value *V : CV) {
-    if (Instruction *New = dyn_cast<Instruction>(V)) {
+  for (unsigned I = 0, E = CV.size(); I != E; ++I) {
+    if (Instruction *New = dyn_cast<Instruction>(CV[I])) {
       for (const auto &MD : MDs)
         if (canTransferMetadata(MD.first))
           New->setMetadata(MD.first, MD.second);
@@ -1107,7 +1107,7 @@ bool ScalarizerVisitor::visitLoadInst(LoadInst &LI) {
     return false;
 
   std::optional<VectorLayout> Layout = getVectorLayout(
-      LI.getType(), LI.getAlign(), LI.getDataLayout());
+      LI.getType(), LI.getAlign(), LI.getModule()->getDataLayout());
   if (!Layout)
     return false;
 
@@ -1133,7 +1133,7 @@ bool ScalarizerVisitor::visitStoreInst(StoreInst &SI) {
 
   Value *FullValue = SI.getValueOperand();
   std::optional<VectorLayout> Layout = getVectorLayout(
-      FullValue->getType(), SI.getAlign(), SI.getDataLayout());
+      FullValue->getType(), SI.getAlign(), SI.getModule()->getDataLayout());
   if (!Layout)
     return false;
 

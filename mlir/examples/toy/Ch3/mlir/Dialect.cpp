@@ -22,6 +22,7 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
@@ -141,7 +142,7 @@ void ConstantOp::print(mlir::OpAsmPrinter &printer) {
 
 /// Verifier for the constant operation. This corresponds to the
 /// `let hasVerifier = 1` in the op definition.
-llvm::LogicalResult ConstantOp::verify() {
+mlir::LogicalResult ConstantOp::verify() {
   // If the return type of the constant is not an unranked tensor, the shape
   // must match the shape of the attribute holding the data.
   auto resultType = llvm::dyn_cast<mlir::RankedTensorType>(getResult().getType());
@@ -256,7 +257,7 @@ void MulOp::print(mlir::OpAsmPrinter &p) { printBinaryOp(p, *this); }
 // ReturnOp
 //===----------------------------------------------------------------------===//
 
-llvm::LogicalResult ReturnOp::verify() {
+mlir::LogicalResult ReturnOp::verify() {
   // We know that the parent operation is a function, because of the 'HasParent'
   // trait attached to the operation definition.
   auto function = cast<FuncOp>((*this)->getParentOp());
@@ -299,7 +300,7 @@ void TransposeOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
   state.addOperands(value);
 }
 
-llvm::LogicalResult TransposeOp::verify() {
+mlir::LogicalResult TransposeOp::verify() {
   auto inputType = llvm::dyn_cast<RankedTensorType>(getOperand().getType());
   auto resultType = llvm::dyn_cast<RankedTensorType>(getType());
   if (!inputType || !resultType)

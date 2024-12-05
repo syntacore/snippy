@@ -35,7 +35,7 @@ public:
       : BinaryFunctionPass(PrintPass) {}
 
   const char *getName() const override { return "identical-code-folding"; }
-  Error runOnFunctions(BinaryContext &BC) override;
+  void runOnFunctions(BinaryContext &BC) override;
 };
 
 } // namespace bolt

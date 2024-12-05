@@ -25,11 +25,11 @@ public:
 
   ~LibcxxStdVectorSyntheticFrontEnd() override;
 
-  llvm::Expected<uint32_t> CalculateNumChildren() override;
+  size_t CalculateNumChildren() override;
 
-  lldb::ValueObjectSP GetChildAtIndex(uint32_t idx) override;
+  lldb::ValueObjectSP GetChildAtIndex(size_t idx) override;
 
-  lldb::ChildCacheState Update() override;
+  bool Update() override;
 
   bool MightHaveChildren() override;
 
@@ -46,11 +46,11 @@ class LibcxxVectorBoolSyntheticFrontEnd : public SyntheticChildrenFrontEnd {
 public:
   LibcxxVectorBoolSyntheticFrontEnd(lldb::ValueObjectSP valobj_sp);
 
-  llvm::Expected<uint32_t> CalculateNumChildren() override;
+  size_t CalculateNumChildren() override;
 
-  lldb::ValueObjectSP GetChildAtIndex(uint32_t idx) override;
+  lldb::ValueObjectSP GetChildAtIndex(size_t idx) override;
 
-  lldb::ChildCacheState Update() override;
+  bool Update() override;
 
   bool MightHaveChildren() override { return true; }
 
@@ -82,8 +82,8 @@ lldb_private::formatters::LibcxxStdVectorSyntheticFrontEnd::
   // delete m_finish;
 }
 
-llvm::Expected<uint32_t> lldb_private::formatters::
-    LibcxxStdVectorSyntheticFrontEnd::CalculateNumChildren() {
+size_t lldb_private::formatters::LibcxxStdVectorSyntheticFrontEnd::
+    CalculateNumChildren() {
   if (!m_start || !m_finish)
     return 0;
   uint64_t start_val = m_start->GetValueAsUnsigned(0);
@@ -103,7 +103,7 @@ llvm::Expected<uint32_t> lldb_private::formatters::
 
 lldb::ValueObjectSP
 lldb_private::formatters::LibcxxStdVectorSyntheticFrontEnd::GetChildAtIndex(
-    uint32_t idx) {
+    size_t idx) {
   if (!m_start || !m_finish)
     return lldb::ValueObjectSP();
 
@@ -116,19 +116,33 @@ lldb_private::formatters::LibcxxStdVectorSyntheticFrontEnd::GetChildAtIndex(
                                       m_element_type);
 }
 
-lldb::ChildCacheState
-lldb_private::formatters::LibcxxStdVectorSyntheticFrontEnd::Update() {
+bool lldb_private::formatters::LibcxxStdVectorSyntheticFrontEnd::Update() {
   m_start = m_finish = nullptr;
   ValueObjectSP data_type_finder_sp(
       m_backend.GetChildMemberWithName("__end_cap_"));
   if (!data_type_finder_sp)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
 
-  data_type_finder_sp =
-      GetFirstValueOfLibCXXCompressedPair(*data_type_finder_sp);
+  switch (data_type_finder_sp->GetCompilerType().GetNumDirectBaseClasses()) {
+  case 1:
+    // Assume a pre llvm r300140 __compressed_pair implementation:
+    data_type_finder_sp =
+        data_type_finder_sp->GetChildMemberWithName("__first_");
+    break;
+  case 2: {
+    // Assume a post llvm r300140 __compressed_pair implementation:
+    ValueObjectSP first_elem_parent_sp =
+      data_type_finder_sp->GetChildAtIndex(0);
+    data_type_finder_sp =
+        first_elem_parent_sp->GetChildMemberWithName("__value_");
+    break;
+  }
+  default:
+    return false;
+  }
+
   if (!data_type_finder_sp)
-    return lldb::ChildCacheState::eRefetch;
-
+    return false;
   m_element_type = data_type_finder_sp->GetCompilerType().GetPointeeType();
   if (std::optional<uint64_t> size = m_element_type.GetByteSize(nullptr)) {
     m_element_size = *size;
@@ -139,7 +153,7 @@ lldb_private::formatters::LibcxxStdVectorSyntheticFrontEnd::Update() {
       m_finish = m_backend.GetChildMemberWithName("__end_").get();
     }
   }
-  return lldb::ChildCacheState::eRefetch;
+  return false;
 }
 
 bool lldb_private::formatters::LibcxxStdVectorSyntheticFrontEnd::
@@ -165,14 +179,14 @@ lldb_private::formatters::LibcxxVectorBoolSyntheticFrontEnd::
   }
 }
 
-llvm::Expected<uint32_t> lldb_private::formatters::
-    LibcxxVectorBoolSyntheticFrontEnd::CalculateNumChildren() {
+size_t lldb_private::formatters::LibcxxVectorBoolSyntheticFrontEnd::
+    CalculateNumChildren() {
   return m_count;
 }
 
 lldb::ValueObjectSP
 lldb_private::formatters::LibcxxVectorBoolSyntheticFrontEnd::GetChildAtIndex(
-    uint32_t idx) {
+    size_t idx) {
   auto iter = m_children.find(idx), end = m_children.end();
   if (iter != end)
     return iter->second;
@@ -227,30 +241,29 @@ lldb_private::formatters::LibcxxVectorBoolSyntheticFrontEnd::GetChildAtIndex(
  }
  }*/
 
-lldb::ChildCacheState
-lldb_private::formatters::LibcxxVectorBoolSyntheticFrontEnd::Update() {
+bool lldb_private::formatters::LibcxxVectorBoolSyntheticFrontEnd::Update() {
   m_children.clear();
   ValueObjectSP valobj_sp = m_backend.GetSP();
   if (!valobj_sp)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
   m_exe_ctx_ref = valobj_sp->GetExecutionContextRef();
   ValueObjectSP size_sp(valobj_sp->GetChildMemberWithName("__size_"));
   if (!size_sp)
-    return lldb::ChildCacheState::eRefetch;
+    return false;
   m_count = size_sp->GetValueAsUnsigned(0);
   if (!m_count)
-    return lldb::ChildCacheState::eReuse;
+    return true;
   ValueObjectSP begin_sp(valobj_sp->GetChildMemberWithName("__begin_"));
   if (!begin_sp) {
     m_count = 0;
-    return lldb::ChildCacheState::eRefetch;
+    return false;
   }
   m_base_data_address = begin_sp->GetValueAsUnsigned(0);
   if (!m_base_data_address) {
     m_count = 0;
-    return lldb::ChildCacheState::eRefetch;
+    return false;
   }
-  return lldb::ChildCacheState::eRefetch;
+  return false;
 }
 
 size_t lldb_private::formatters::LibcxxVectorBoolSyntheticFrontEnd::
@@ -259,7 +272,7 @@ size_t lldb_private::formatters::LibcxxVectorBoolSyntheticFrontEnd::
     return UINT32_MAX;
   const char *item_name = name.GetCString();
   uint32_t idx = ExtractIndexFromString(item_name);
-  if (idx < UINT32_MAX && idx >= CalculateNumChildrenIgnoringErrors())
+  if (idx < UINT32_MAX && idx >= CalculateNumChildren())
     return UINT32_MAX;
   return idx;
 }

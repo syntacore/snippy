@@ -167,7 +167,7 @@ public:
   Value *createKernelArgArray(mlir::gpu::LaunchFuncOp op);
 
   // Create the full kernel launch.
-  llvm::LogicalResult createKernelLaunch(mlir::gpu::LaunchFuncOp op,
+  mlir::LogicalResult createKernelLaunch(mlir::gpu::LaunchFuncOp op,
                                          mlir::gpu::ObjectAttr object);
 
 private:
@@ -345,7 +345,7 @@ llvm::LaunchKernel::createKernelArgArray(mlir::gpu::LaunchFuncOp op) {
 // call %streamSynchronize(%4)
 // call %streamDestroy(%4)
 // call %moduleUnload(%1)
-llvm::LogicalResult
+mlir::LogicalResult
 llvm::LaunchKernel::createKernelLaunch(mlir::gpu::LaunchFuncOp op,
                                        mlir::gpu::ObjectAttr object) {
   auto llvmValue = [&](mlir::Value value) -> Value * {

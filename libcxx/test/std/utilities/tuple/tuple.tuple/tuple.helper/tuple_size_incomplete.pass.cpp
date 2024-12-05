@@ -16,10 +16,9 @@
 
 // UNSUPPORTED: c++03
 
-#include <array>
 #include <tuple>
+#include <array>
 #include <type_traits>
-#include <utility>
 
 #include "test_macros.h"
 

@@ -18,9 +18,6 @@ add_llvm_component_library(LLVMDebugInfoGSYM
   DEPENDS
   LLVMMC
 
-  LINK_LIBS
-  ${LLVM_PTHREAD_LIB}
-
   LINK_COMPONENTS
   MC
   Object

@@ -14,6 +14,7 @@
 #include "MCTargetDesc/HexagonMCShuffler.h"
 #include "MCTargetDesc/HexagonMCTargetDesc.h"
 #include "llvm/MC/MCAsmBackend.h"
+#include "llvm/MC/MCAsmLayout.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCELFObjectWriter.h"
@@ -567,10 +568,10 @@ public:
 
   /// fixupNeedsRelaxation - Target specific predicate for whether a given
   /// fixup requires the associated instruction to be relaxed.
-  bool fixupNeedsRelaxationAdvanced(const MCAssembler &Asm,
-                                    const MCFixup &Fixup, bool Resolved,
+  bool fixupNeedsRelaxationAdvanced(const MCFixup &Fixup, bool Resolved,
                                     uint64_t Value,
                                     const MCRelaxableFragment *DF,
+                                    const MCAsmLayout &Layout,
                                     const bool WasForced) const override {
     MCInst const &MCB = DF->getInst();
     assert(HexagonMCInstrInfo::isBundle(MCB));
@@ -597,7 +598,7 @@ public:
         if (HexagonMCInstrInfo::bundleSize(MCB) < HEXAGON_PACKET_SIZE) {
           ++relaxedCnt;
           *RelaxTarget = &MCI;
-          setExtender(Asm.getContext());
+          setExtender(Layout.getAssembler().getContext());
           return true;
         } else {
           return false;
@@ -635,12 +636,19 @@ public:
       if (HexagonMCInstrInfo::bundleSize(MCB) < HEXAGON_PACKET_SIZE) {
         ++relaxedCnt;
         *RelaxTarget = &MCI;
-        setExtender(Asm.getContext());
+        setExtender(Layout.getAssembler().getContext());
         return true;
       }
     }
 
     return false;
+  }
+
+  /// Simple predicate for targets where !Resolved implies requiring relaxation
+  bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
+                            const MCRelaxableFragment *DF,
+                            const MCAsmLayout &Layout) const override {
+    llvm_unreachable("Handled by fixupNeedsRelaxationAdvanced");
   }
 
   void relaxInstruction(MCInst &Inst,
@@ -702,21 +710,20 @@ public:
     return true;
   }
 
-  void finishLayout(MCAssembler const &Asm) const override {
-    SmallVector<MCFragment *> Frags;
-    for (MCSection &Sec : Asm) {
-      Frags.clear();
-      for (MCFragment &F : Sec)
-        Frags.push_back(&F);
-      for (size_t J = 0, E = Frags.size(); J != E; ++J) {
-        switch (Frags[J]->getKind()) {
+  void finishLayout(MCAssembler const &Asm,
+                    MCAsmLayout &Layout) const override {
+    for (auto *I : Layout.getSectionOrder()) {
+      auto &Fragments = I->getFragmentList();
+      for (auto &J : Fragments) {
+        switch (J.getKind()) {
         default:
           break;
         case MCFragment::FT_Align: {
-          auto Size = Asm.computeFragmentSize(*Frags[J]);
-          for (auto K = J; K != 0 && Size >= HEXAGON_PACKET_SIZE;) {
+          auto Size = Asm.computeFragmentSize(Layout, J);
+          for (auto K = J.getIterator();
+               K != Fragments.begin() && Size >= HEXAGON_PACKET_SIZE;) {
             --K;
-            switch (Frags[K]->getKind()) {
+            switch (K->getKind()) {
             default:
               break;
             case MCFragment::FT_Align: {
@@ -726,7 +733,7 @@ public:
             }
             case MCFragment::FT_Relaxable: {
               MCContext &Context = Asm.getContext();
-              auto &RF = cast<MCRelaxableFragment>(*Frags[K]);
+              auto &RF = cast<MCRelaxableFragment>(*K);
               auto &Inst = const_cast<MCInst &>(RF.getInst());
               while (Size > 0 &&
                      HexagonMCInstrInfo::bundleSize(Inst) < MaxPacketSize) {
@@ -747,7 +754,7 @@ public:
               //assert(!Error);
               (void)Error;
               ReplaceInstruction(Asm.getEmitter(), RF, Inst);
-              Sec.setHasLayout(false);
+              Layout.invalidateFragmentsFrom(&RF);
               Size = 0; // Only look back one instruction
               break;
             }
