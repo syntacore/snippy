@@ -301,82 +301,92 @@ public:
 
 struct SimulatorIsaInfo {
   bool Is64Bit;
-  uint64_t MisaBits;
-  uint64_t Zext;
+  RVMExtDescriptor Ext;
 };
 
 // TODO: auto-generate this?
-static uint64_t deriveMisaBits(const RISCVSubtarget &Subtarget) {
-  uint64_t MisaBits = 0u;
+static void addMisaBits(RVMExtDescriptor &Ext,
+                        const RISCVSubtarget &Subtarget) {
+  auto &MisaBits = Ext.MisaExt;
   if (Subtarget.hasStdExtA())
-    MisaBits |= RVM_MISA_A;
+    MisaBits[RVM_MISA_A] = true;
   if (Subtarget.hasStdExtC())
-    MisaBits |= RVM_MISA_C;
+    MisaBits[RVM_MISA_C] = true;
   if (Subtarget.hasStdExtD())
-    MisaBits |= RVM_MISA_D;
+    MisaBits[RVM_MISA_D] = true;
   if (Subtarget.hasStdExtF())
-    MisaBits |= RVM_MISA_F;
+    MisaBits[RVM_MISA_F] = true;
   if (Subtarget.hasStdExtM())
-    MisaBits |= RVM_MISA_M;
+    MisaBits[RVM_MISA_M] = true;
   if (Subtarget.hasStdExtV())
-    MisaBits |= RVM_MISA_V;
-  return MisaBits;
+    MisaBits[RVM_MISA_V] = true;
 }
 
 // TODO: auto-generate this?
-static uint64_t deriveZextBits(const RISCVSubtarget &Subtarget) {
-  uint64_t ZextBits = 0u;
+static void addZextBits(RVMExtDescriptor &Ext,
+                        const RISCVSubtarget &Subtarget) {
+  auto &ZextBits = Ext.ZExt;
   if (Subtarget.hasStdExtZba())
-    ZextBits |= RVM_ZEXT_BA;
+    ZextBits[RVM_ZEXT_BA] = true;
   if (Subtarget.hasStdExtZbb())
-    ZextBits |= RVM_ZEXT_BB;
+    ZextBits[RVM_ZEXT_BB] = true;
   if (Subtarget.hasStdExtZbc())
-    ZextBits |= RVM_ZEXT_BC;
+    ZextBits[RVM_ZEXT_BC] = true;
   if (Subtarget.hasStdExtZbs())
-    ZextBits |= RVM_ZEXT_BS;
+    ZextBits[RVM_ZEXT_BS] = true;
   if (Subtarget.hasStdExtZfh())
-    ZextBits |= RVM_ZEXT_FH;
+    ZextBits[RVM_ZEXT_FH] = true;
   if (Subtarget.hasStdExtZfhmin())
-    ZextBits |= RVM_ZEXT_FHMIN;
+    ZextBits[RVM_ZEXT_FHMIN] = true;
   if (Subtarget.hasStdExtZbkb())
-    ZextBits |= RVM_ZEXT_BKB;
+    ZextBits[RVM_ZEXT_BKB] = true;
   if (Subtarget.hasStdExtZbkc())
-    ZextBits |= RVM_ZEXT_BKC;
+    ZextBits[RVM_ZEXT_BKC] = true;
   if (Subtarget.hasStdExtZbkx())
-    ZextBits |= RVM_ZEXT_BKX;
+    ZextBits[RVM_ZEXT_BKX] = true;
   if (Subtarget.hasStdExtZknd())
-    ZextBits |= RVM_ZEXT_KND;
+    ZextBits[RVM_ZEXT_KND] = true;
   if (Subtarget.hasStdExtZkne())
-    ZextBits |= RVM_ZEXT_KNE;
+    ZextBits[RVM_ZEXT_KNE] = true;
   if (Subtarget.hasStdExtZknh())
-    ZextBits |= RVM_ZEXT_KNH;
+    ZextBits[RVM_ZEXT_KNH] = true;
   if (Subtarget.hasStdExtZksed())
-    ZextBits |= RVM_ZEXT_KSED;
+    ZextBits[RVM_ZEXT_KSED] = true;
   if (Subtarget.hasStdExtZksh())
-    ZextBits |= RVM_ZEXT_KSH;
+    ZextBits[RVM_ZEXT_KSH] = true;
   if (Subtarget.hasStdExtZkr())
-    ZextBits |= RVM_ZEXT_KR;
+    ZextBits[RVM_ZEXT_KR] = true;
   if (Subtarget.hasStdExtZkn())
-    ZextBits |= RVM_ZEXT_KN;
+    ZextBits[RVM_ZEXT_KN] = true;
   if (Subtarget.hasStdExtZks())
-    ZextBits |= RVM_ZEXT_KS;
+    ZextBits[RVM_ZEXT_KS] = true;
   if (Subtarget.hasStdExtZk())
-    ZextBits |= RVM_ZEXT_K;
+    ZextBits[RVM_ZEXT_K] = true;
   if (Subtarget.hasStdExtZkt())
-    ZextBits |= RVM_ZEXT_KT;
+    ZextBits[RVM_ZEXT_KT] = true;
   if (Subtarget.hasStdExtZvbb())
-    ZextBits |= RVM_ZEXT_VBB;
+    ZextBits[RVM_ZEXT_VBB] = true;
   if (Subtarget.hasStdExtZvbc())
-    ZextBits |= RVM_ZEXT_VBC;
+    ZextBits[RVM_ZEXT_VBC] = true;
   // zvkb is subset of zvbb. Do not set this flag
   // when zvbb is already set.
   if (Subtarget.hasStdExtZvkb() && !Subtarget.hasStdExtZvbb())
-    ZextBits |= RVM_ZEXT_VKB;
-  return ZextBits;
+    ZextBits[RVM_ZEXT_VKB] = true;
+}
+
+static void addXextBits(RVMExtDescriptor &Ext, const RISCVSubtarget &ST) {
+  [[maybe_unused]] auto &XExt = Ext.XExt;
 }
 
 static SimulatorIsaInfo deriveSimulatorIsaInfo(const RISCVSubtarget &ST) {
-  return {ST.is64Bit(), deriveMisaBits(ST), deriveZextBits(ST)};
+  SimulatorIsaInfo IsaInfo = {};
+  IsaInfo.Ext.ZExtSize = sizeof(IsaInfo.Ext.ZExt);
+  IsaInfo.Ext.XExtSize = sizeof(IsaInfo.Ext.XExt);
+  addMisaBits(IsaInfo.Ext, ST);
+  addZextBits(IsaInfo.Ext, ST);
+  addXextBits(IsaInfo.Ext, ST);
+  IsaInfo.Is64Bit = ST.is64Bit();
+  return IsaInfo;
 }
 
 static void auxSimInit(const RISCVSubtarget &Subtarget,
@@ -474,12 +484,6 @@ void PCUpdateCallback(RVMCallbackHandler *H, uint64_t PC) {
     Observer->PCUpdateNotification(PC);
 }
 
-unsigned getCustomExtensionsBits(const RISCVSubtarget &ST) {
-  unsigned Res = 0;
-
-  return Res;
-}
-
 std::unique_ptr<SimulatorInterface> createRISCVSimulator(
     llvm::snippy::DynamicLibrary &ModelLib, const SimulationConfig &Cfg,
     RVMCallbackHandler *CallbackHandler, const RISCVSubtarget &Subtarget,
@@ -500,10 +504,9 @@ std::unique_ptr<SimulatorInterface> createRISCVSimulator(
   auto RomEnd =
       LastSection == Ends.end() ? CfgRomEnd : std::max(CfgRomEnd, *LastSection);
   auto SimInfo = deriveSimulatorIsaInfo(Subtarget);
-  LLVM_DEBUG(dbgs() << "Model::RV64 = " << SimInfo.Is64Bit << "\n");
-  LLVM_DEBUG(dbgs() << "Model::MISA = 0x" << utohexstr(SimInfo.MisaBits)
+  LLVM_DEBUG(dbgs() << "Model::isa_string: "
+                    << rvm::create_isa_string(SimInfo.Ext, SimInfo.Is64Bit)
                     << "\n");
-  LLVM_DEBUG(dbgs() << "Model::Zext = 0x" << utohexstr(SimInfo.Zext) << "\n");
 
   auto StateBuilder = rvm::State::Builder(&VTable);
 
@@ -521,8 +524,7 @@ std::unique_ptr<SimulatorInterface> createRISCVSimulator(
   else
     StateBuilder.setRV32Isa();
 
-  StateBuilder.setMisa(SimInfo.MisaBits);
-  StateBuilder.setZext(SimInfo.Zext);
+  StateBuilder.setExtensions(SimInfo.Ext);
 
   if (VLENB)
     StateBuilder.setVLEN(VLENB);
@@ -537,8 +539,6 @@ std::unique_ptr<SimulatorInterface> createRISCVSimulator(
     StateBuilder.registerVRegUpdateCallback(VRegUpdateCallback);
     StateBuilder.registerPCUpdateCallback(PCUpdateCallback);
   }
-
-  StateBuilder.setXext(getCustomExtensionsBits(Subtarget));
 
   auto ModelState = StateBuilder.build();
   auto Sim = std::make_unique<SnippyRISCVSimulator>(std::move(ModelState));
