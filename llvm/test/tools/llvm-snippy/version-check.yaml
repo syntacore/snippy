@@ -1,0 +1,5 @@
+# RUN: llvm-snippy %s --version | FileCheck %s --dump-input always
+# CHECK: Snippy version: {{[[:digit:]]+}}.{{[[:digit:]]+}}.{{[[:digit:]]+}}
+
+options:
+  march: riscv64-unknown-elf
