@@ -9,3 +9,6 @@ target_include_directories(SnippyHeaders
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}
   )
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/snippy/Version/Version.inc.in
+               ${CMAKE_CURRENT_BINARY_DIR}/snippy/Version/Version.inc)
