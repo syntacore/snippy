@@ -31,17 +31,18 @@
 #include "snippy/Support/YAMLUtils.h"
 #include "snippy/Target/Target.h"
 #include "snippy/Target/TargetSelect.h"
-#include "llvm/MC/MCRegister.h"
-#include "llvm/MC/MCRegisterInfo.h"
-#include "llvm/Support/raw_ostream.h"
+#include "snippy/Version/Version.inc"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/MC/MCRegister.h"
+#include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/VCSRevision.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Host.h"
 
 #include <algorithm>
@@ -1194,6 +1195,9 @@ int main(int Argc, char **Argv) {
   using namespace llvm;
   if (Argc)
     llvm::snippy::ARGV0 = Argv[0];
+  cl::AddExtraVersionPrinter([](raw_ostream &OS) {
+    OS << "Snippy version: " LLVM_SNIPPY_VERSION_STRING "\n";
+  });
 #if defined(LLVM_REVISION)
   cl::AddExtraVersionPrinter(
       [](raw_ostream &OS) { OS << "Revision: " LLVM_REVISION "\n\n"; });
