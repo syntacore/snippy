@@ -16,71 +16,120 @@ extern "C" {
 
 #define RVMAPI_ENTRY_POINT_SYMBOL RVMVTable
 #define RVMAPI_VERSION_SYMBOL RVMInterfaceVersion
-#define RVMAPI_CURRENT_INTERFACE_VERSION 16u
+#define RVMAPI_CURRENT_INTERFACE_VERSION 20u
 
 typedef uint64_t RVMRegT;
 
 typedef struct RVMState RVMState;
 typedef struct RVMCallbackHandler RVMCallbackHandler;
 
-#define RVM_API_INTERNAL_STDEXT_FLAG(EXT_LITERAL)                              \
-  (1ull << ((EXT_LITERAL) - 'A'))
+#ifdef RVM_FOR_EACH_MISA_EXT
+#error RVM_FOR_EACH_MISA_EXT should not be defined at this point
+#else
+// Order is important here. See "36.11 Subset Naming Convention"
+#define RVM_FOR_EACH_MISA_EXT(MACRO)                                           \
+  MACRO(RVM_MISA_M, M)                                                         \
+  MACRO(RVM_MISA_A, A)                                                         \
+  MACRO(RVM_MISA_F, F)                                                         \
+  MACRO(RVM_MISA_D, D)                                                         \
+  MACRO(RVM_MISA_Q, Q)                                                         \
+  MACRO(RVM_MISA_L, L)                                                         \
+  MACRO(RVM_MISA_C, C)                                                         \
+  MACRO(RVM_MISA_B, B)                                                         \
+  MACRO(RVM_MISA_T, T)                                                         \
+  MACRO(RVM_MISA_P, P)                                                         \
+  MACRO(RVM_MISA_V, V)                                                         \
+  MACRO(RVM_MISA_H, H)                                                         \
+  MACRO(RVM_MISA_E, E)                                                         \
+  MACRO(RVM_MISA_G, G)                                                         \
+  MACRO(RVM_MISA_I, I)                                                         \
+  MACRO(RVM_MISA_J, J)                                                         \
+  MACRO(RVM_MISA_K, K)                                                         \
+  MACRO(RVM_MISA_N, N)                                                         \
+  MACRO(RVM_MISA_O, O)                                                         \
+  MACRO(RVM_MISA_R, R)                                                         \
+  MACRO(RVM_MISA_S, S)                                                         \
+  MACRO(RVM_MISA_U, U)                                                         \
+  MACRO(RVM_MISA_W, W)                                                         \
+  MACRO(RVM_MISA_X, X)                                                         \
+  MACRO(RVM_MISA_Y, Y)                                                         \
+  MACRO(RVM_MISA_Z, Z)
+#endif
+#ifdef RVM_DEFINE_ENUM_CASE
+#error RVM_DEFINE_ENUM_CASE should not be defined at this point
+#else
+#define RVM_DEFINE_ENUM_CASE(Name, name) Name,
+#endif
 typedef enum {
-  RVM_MISA_A = RVM_API_INTERNAL_STDEXT_FLAG('A'),
-  RVM_MISA_B = RVM_API_INTERNAL_STDEXT_FLAG('B'),
-  RVM_MISA_C = RVM_API_INTERNAL_STDEXT_FLAG('C'),
-  RVM_MISA_D = RVM_API_INTERNAL_STDEXT_FLAG('D'),
-  RVM_MISA_E = RVM_API_INTERNAL_STDEXT_FLAG('E'),
-  RVM_MISA_F = RVM_API_INTERNAL_STDEXT_FLAG('F'),
-  RVM_MISA_G = RVM_API_INTERNAL_STDEXT_FLAG('G'),
-  RVM_MISA_H = RVM_API_INTERNAL_STDEXT_FLAG('H'),
-  RVM_MISA_I = RVM_API_INTERNAL_STDEXT_FLAG('I'),
-  RVM_MISA_J = RVM_API_INTERNAL_STDEXT_FLAG('J'),
-  RVM_MISA_K = RVM_API_INTERNAL_STDEXT_FLAG('K'),
-  RVM_MISA_L = RVM_API_INTERNAL_STDEXT_FLAG('L'),
-  RVM_MISA_M = RVM_API_INTERNAL_STDEXT_FLAG('M'),
-  RVM_MISA_N = RVM_API_INTERNAL_STDEXT_FLAG('N'),
-  RVM_MISA_O = RVM_API_INTERNAL_STDEXT_FLAG('O'),
-  RVM_MISA_P = RVM_API_INTERNAL_STDEXT_FLAG('P'),
-  RVM_MISA_Q = RVM_API_INTERNAL_STDEXT_FLAG('Q'),
-  RVM_MISA_R = RVM_API_INTERNAL_STDEXT_FLAG('R'),
-  RVM_MISA_S = RVM_API_INTERNAL_STDEXT_FLAG('S'),
-  RVM_MISA_T = RVM_API_INTERNAL_STDEXT_FLAG('T'),
-  RVM_MISA_U = RVM_API_INTERNAL_STDEXT_FLAG('U'),
-  RVM_MISA_V = RVM_API_INTERNAL_STDEXT_FLAG('V'),
-  RVM_MISA_W = RVM_API_INTERNAL_STDEXT_FLAG('W'),
-  RVM_MISA_X = RVM_API_INTERNAL_STDEXT_FLAG('X'),
-  RVM_MISA_Y = RVM_API_INTERNAL_STDEXT_FLAG('Y'),
-  RVM_MISA_Z = RVM_API_INTERNAL_STDEXT_FLAG('Z'),
+  RVM_FOR_EACH_MISA_EXT(RVM_DEFINE_ENUM_CASE) RVM_MISA_NUMBER
 } RVMMisaExt;
-#undef RVM_API_INTERNAL_STDEXT_FLAG
+
+#ifdef RVM_FOR_EACH_ZEXT
+#error RVM_FOR_EACH_ZEXT should not be defined at this point
+#else
+#define RVM_FOR_EACH_ZEXT(MACRO)                                               \
+  MACRO(RVM_ZEXT_ICSR, icsr)                                                   \
+  MACRO(RVM_ZEXT_IFENCEI, ifencei)                                             \
+  MACRO(RVM_ZEXT_FH, fh)                                                       \
+  MACRO(RVM_ZEXT_FHMIN, fhmin)                                                 \
+  MACRO(RVM_ZEXT_BA, ba)                                                       \
+  MACRO(RVM_ZEXT_BB, bb)                                                       \
+  MACRO(RVM_ZEXT_BC, bc)                                                       \
+  MACRO(RVM_ZEXT_BS, bs)                                                       \
+  MACRO(RVM_ZEXT_BITMANIP, bitmanip)                                           \
+  MACRO(RVM_ZEXT_BKB, bkb)                                                     \
+  MACRO(RVM_ZEXT_BKC, bkc)                                                     \
+  MACRO(RVM_ZEXT_BKX, bkx)                                                     \
+  MACRO(RVM_ZEXT_VKB, vkb)                                                     \
+  MACRO(RVM_ZEXT_VBB, vbb)                                                     \
+  MACRO(RVM_ZEXT_VBC, vbc)                                                     \
+  MACRO(RVM_ZEXT_VKNED, vkned)                                                 \
+  MACRO(RVM_ZEXT_VKNHA, vknha)                                                 \
+  MACRO(RVM_ZEXT_VKNHB, vknhb)                                                 \
+  MACRO(RVM_ZEXT_VKG, vkg)                                                     \
+  MACRO(RVM_ZEXT_VKSED, vksed)                                                 \
+  MACRO(RVM_ZEXT_VKSH, vksh)                                                   \
+  MACRO(RVM_ZEXT_VKT, vkt)                                                     \
+  MACRO(RVM_ZEXT_VKN, vkn)                                                     \
+  MACRO(RVM_ZEXT_VKNC, vknc)                                                   \
+  MACRO(RVM_ZEXT_VKNG, vkng)                                                   \
+  MACRO(RVM_ZEXT_VKS, vks)                                                     \
+  MACRO(RVM_ZEXT_VKSC, vksc)                                                   \
+  MACRO(RVM_ZEXT_VKSG, vksg)                                                   \
+  MACRO(RVM_ZEXT_KND, knd)                                                     \
+  MACRO(RVM_ZEXT_KNE, kne)                                                     \
+  MACRO(RVM_ZEXT_KNH, knh)                                                     \
+  MACRO(RVM_ZEXT_KSED, ksed)                                                   \
+  MACRO(RVM_ZEXT_KSH, ksh)                                                     \
+  MACRO(RVM_ZEXT_KR, kr)                                                       \
+  MACRO(RVM_ZEXT_KN, kn)                                                       \
+  MACRO(RVM_ZEXT_KS, ks)                                                       \
+  MACRO(RVM_ZEXT_K, k)                                                         \
+  MACRO(RVM_ZEXT_KT, kt)
+#endif
 
 typedef enum {
-  RVM_ZEXT_FH = 1ull << 0,
-  RVM_ZEXT_BA = 1ull << 1,
-  RVM_ZEXT_BB = 1ull << 2,
-  RVM_ZEXT_BC = 1ull << 3,
-  RVM_ZEXT_BS = 1ull << 4,
-  RVM_ZEXT_BITMANIP = RVM_ZEXT_BA | RVM_ZEXT_BB | RVM_ZEXT_BC | RVM_ZEXT_BS,
-  RVM_ZEXT_BKB = 1ull << 5,
-  RVM_ZEXT_BKC = 1ull << 6,
-  RVM_ZEXT_BKX = 1ull << 7,
-  RVM_ZEXT_KND = 1ull << 8,
-  RVM_ZEXT_KNE = 1ull << 9,
-  RVM_ZEXT_KNH = 1ull << 10,
-  RVM_ZEXT_KSED = 1ull << 11,
-  RVM_ZEXT_KSH = 1ull << 12,
-  RVM_ZEXT_KR = 1ull << 13,
-  RVM_ZEXT_KN = 1ull << 14,
-  RVM_ZEXT_KS = 1ull << 15,
-  RVM_ZEXT_K = 1ull << 16,
-  RVM_ZEXT_KT = 1ull << 17,
-  RVM_ZEXT_FHMIN = 1ull << 21,
-  // Vector crypto
-  RVM_ZEXT_VKB = 1ull << 22,
-  RVM_ZEXT_VBB = 1ull << 23,
-  RVM_ZEXT_VBC = 1ull << 24,
+  RVM_FOR_EACH_ZEXT(RVM_DEFINE_ENUM_CASE) RVM_ZEXT_NUMBER
 } RVMZExt;
+
+#ifdef RVM_FOR_EACH_XEXT
+#error RVM_FOR_EACH_XEXT should not be defined at this point
+#else
+#define RVM_FOR_EACH_XEXT(MACRO)
+#endif
+
+typedef enum {
+  RVM_FOR_EACH_XEXT(RVM_DEFINE_ENUM_CASE) RVM_XEXT_NUMBER
+} RVMXExt;
+#undef RVM_DEFINE_ENUM_CASE
+
+typedef struct RVMExtDescriptior {
+  size_t ZExtSize; // Set this to sizeof(ZExt)
+  size_t XExtSize; // Set this to sizeof(XExt)
+  char ZExt[RVM_ZEXT_NUMBER];
+  char XExt[RVM_XEXT_NUMBER];
+  char MisaExt[RVM_MISA_NUMBER];
+} RVMExtDescriptor;
 
 typedef enum {
   RVM_MSTATUS_VS_FIELD_OFFSET = 9,
@@ -287,9 +336,6 @@ struct RVMConfig {
   uint64_t RamStart;
   uint64_t RamSize;
   int RV64;
-  uint64_t MisaExt;
-  uint64_t ZExt;
-  uint64_t XExt;
   unsigned VLEN;
   int EnableMisalignedAccess;
   RVMStopMode Mode;
@@ -304,6 +350,7 @@ struct RVMConfig {
   PCUpdateCallbackTy PCUpdateCallback;
   int ChangeMaskAgnosticElems;
   int ChangeTailAgnosticElems;
+  RVMExtDescriptor Extensions;
 };
 
 typedef RVMState *(*rvm_modelCreate_t)(const RVMConfig *);
