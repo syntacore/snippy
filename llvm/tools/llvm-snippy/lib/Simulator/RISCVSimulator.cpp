@@ -326,6 +326,54 @@ static void addMisaBits(RVMExtDescriptor &Ext,
 static void addZextBits(RVMExtDescriptor &Ext,
                         const RISCVSubtarget &Subtarget) {
   auto &ZextBits = Ext.ZExt;
+  if (Subtarget.hasStdExtZicsr())
+    ZextBits[RVM_ZEXT_ICSR] = true;
+  if (Subtarget.hasStdExtZifencei())
+    ZextBits[RVM_ZEXT_IFENCEI] = true;
+  if (Subtarget.hasStdExtZicond())
+    ZextBits[RVM_ZEXT_ICOND] = true;
+  if (Subtarget.hasStdExtZicbom())
+    ZextBits[RVM_ZEXT_ICBOM] = true;
+  if (Subtarget.hasStdExtZicboz())
+    ZextBits[RVM_ZEXT_ICBOZ] = true;
+  if (Subtarget.hasStdExtZicntr())
+    ZextBits[RVM_ZEXT_ICNTR] = true;
+  if (Subtarget.hasStdExtZicbop())
+    ZextBits[RVM_ZEXT_ICBOP] = true;
+  if (Subtarget.hasStdExtZimop())
+    ZextBits[RVM_ZEXT_IMOP] = true;
+  if (Subtarget.hasStdExtZihpm())
+    ZextBits[RVM_ZEXT_IHPM] = true;
+  if (Subtarget.hasStdExtZihintntl())
+    ZextBits[RVM_ZEXT_IHINTNTL] = true;
+  if (Subtarget.hasStdExtZihintpause())
+    ZextBits[RVM_ZEXT_IHINTPAUSE] = true;
+  if (Subtarget.hasStdExtZicfiss())
+    ZextBits[RVM_ZEXT_ICFISS] = true;
+  if (Subtarget.hasStdExtZicfilp())
+    ZextBits[RVM_ZEXT_ICFILP] = true;
+  if (Subtarget.hasStdExtZaamo())
+    ZextBits[RVM_ZEXT_AAMO] = true;
+  if (Subtarget.hasStdExtZabha())
+    ZextBits[RVM_ZEXT_ABHA] = true;
+  if (Subtarget.hasStdExtZacas())
+    ZextBits[RVM_ZEXT_ACAS] = true;
+  if (Subtarget.hasStdExtZcmp())
+    ZextBits[RVM_ZEXT_CMP] = true;
+  if (Subtarget.hasStdExtZcmt())
+    ZextBits[RVM_ZEXT_CMT] = true;
+  if (Subtarget.hasStdExtZfa())
+    ZextBits[RVM_ZEXT_FA] = true;
+  if (Subtarget.hasStdExtZfbfmin())
+    ZextBits[RVM_ZEXT_FBFMIN] = true;
+  if (Subtarget.hasStdExtZfinx())
+    ZextBits[RVM_ZEXT_FINX] = true;
+  if (Subtarget.hasStdExtZdinx())
+    ZextBits[RVM_ZEXT_DINX] = true;
+  if (Subtarget.hasStdExtZhinx())
+    ZextBits[RVM_ZEXT_HINX] = true;
+  if (Subtarget.hasStdExtZhinxmin())
+    ZextBits[RVM_ZEXT_HINXMIN] = true;
   if (Subtarget.hasStdExtZba())
     ZextBits[RVM_ZEXT_BA] = true;
   if (Subtarget.hasStdExtZbb())
@@ -372,6 +420,14 @@ static void addZextBits(RVMExtDescriptor &Ext,
   // when zvbb is already set.
   if (Subtarget.hasStdExtZvkb() && !Subtarget.hasStdExtZvbb())
     ZextBits[RVM_ZEXT_VKB] = true;
+  if (Subtarget.hasStdExtZvfbfmin())
+    ZextBits[RVM_ZEXT_VFBFMIN] = true;
+  if (Subtarget.hasStdExtZvfbfwma())
+    ZextBits[RVM_ZEXT_VFBFWMA] = true;
+  if (Subtarget.hasStdExtZvfh())
+    ZextBits[RVM_ZEXT_VFH] = true;
+  if (Subtarget.hasStdExtZvfhmin())
+    ZextBits[RVM_ZEXT_VFHMIN] = true;
 }
 
 static void addXextBits(RVMExtDescriptor &Ext, const RISCVSubtarget &ST) {
