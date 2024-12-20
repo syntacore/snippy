@@ -48,6 +48,9 @@ struct RVVConfigInterface {
 
 namespace snippy {
 
+class LLVMState;
+class GeneratorSettings;
+
 std::unique_ptr<RVVConfigInterface> createRVVConfig();
 
 // Compute EMUL = EEW / SEW * LMUL
@@ -209,11 +212,11 @@ struct RVVConfigurationInfo final {
     APInt VM;
   };
 
-  static RVVConfigurationInfo createDefault(const GeneratorContext &GenCtx,
-                                            unsigned VLEN);
+  static RVVConfigurationInfo
+  createDefault(const GeneratorSettings &GenSettings, unsigned VLEN);
 
   static RVVConfigurationInfo
-  buildConfiguration(const GeneratorContext &GenCtx, unsigned VLEN,
+  buildConfiguration(const GeneratorSettings &GenSettings, unsigned VLEN,
                      std::unique_ptr<RVVConfigInterface> &&VU);
 
   unsigned getVLEN() const;
@@ -284,7 +287,8 @@ class RISCVConfigurationInfo final {
 
 public:
   static RISCVConfigurationInfo
-  constructConfiguration(const GeneratorContext &GenCtx);
+  constructConfiguration(LLVMState &State,
+                         const GeneratorSettings &GenSettings);
   const RVVConfigurationInfo &getVUConfig() const { return RVVCfgInfo; }
   const BaseConfigurationInfo &getBaseConfig() const { return BaseCfgInfo; }
 };

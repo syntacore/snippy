@@ -88,17 +88,21 @@ static snippy::opt<unsigned> SizeErrorThreshold(
 // FIXME: The only reason to change policy is if some instructions in the group
 // require some initialization first. We switch to default policy that has these
 // special instructions (overrides).
-static void switchPolicyIfNeeded(planning::InstructionGroupRequest &IG,
-                                 unsigned Opcode, MachineBasicBlock &MBB,
-                                 GeneratorContext &GC) {
-  auto &Tgt = GC.getLLVMState().getSnippyTarget();
+static void switchPolicyIfNeeded(planning::InstructionGenerationContext &IGC,
+                                 planning::InstructionGroupRequest &IG,
+                                 unsigned Opcode) {
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &GenSettings = IGC.GenSettings;
+  auto &MBB = IGC.MBB;
+  auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
   if (Tgt.needsGenerationPolicySwitch(Opcode))
-    IG.changePolicy(GC.createGenPolicy(MBB));
+    IG.changePolicy(planning::createGenPolicy(ProgCtx, GenSettings, MBB));
 }
 
 static void generateInsertionPointHint(
     planning::InstructionGenerationContext &InstrGenCtx) {
-  auto &State = InstrGenCtx.GC.getLLVMState();
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   SnippyTgt.generateNop(InstrGenCtx);
 }
@@ -137,9 +141,9 @@ GenerationStatus interpretInstrs(InstrIt Begin, InstrIt End, LLVMState &State,
 // TODO: We need other ways of this function implemetation
 template <typename InstrIt>
 std::vector<InstrIt> collectSelfcheckCandidates(
-    InstrIt Begin, InstrIt End, GeneratorContext &GC,
+    InstrIt Begin, InstrIt End, SnippyProgramContext &ProgCtx,
     AsOneGenerator<bool, true, false> &SelfcheckPeriodTracker) {
-  const auto &ST = GC.getLLVMState().getSnippyTarget();
+  const auto &ST = ProgCtx.getLLVMState().getSnippyTarget();
   std::vector<InstrIt> FilteredCandidates;
   std::copy_if(Begin, End, std::back_inserter(FilteredCandidates),
                [](const auto &MI) { return !checkSupportMetadata(MI); });
@@ -173,8 +177,9 @@ void reportGeneratorRollback(InstrIt ItBegin, InstrIt ItEnd) {
 
 void storeRefValue(InstructionGenerationContext &InstrGenCtx, MemAddr Addr,
                    APInt Val) {
-  auto &GC = InstrGenCtx.GC;
-  GC.getLLVMState().getSnippyTarget().storeValueToAddr(InstrGenCtx, Addr, Val);
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  ProgCtx.getLLVMState().getSnippyTarget().storeValueToAddr(InstrGenCtx, Addr,
+                                                            Val);
 }
 
 void selfcheckOverflowGuard(const SectionDesc &SelfcheckSection,
@@ -192,12 +197,12 @@ SelfcheckIntermediateInfo<MachineBasicBlock::iterator>
 storeRefAndActualValueForSelfcheck(
     Register DestReg, planning::InstructionGenerationContext &InstrGenCtx) {
   auto InsertPos = InstrGenCtx.Ins;
-  auto &GC = InstrGenCtx.GC;
   auto &MBB = InstrGenCtx.MBB;
   auto &SimCtx = InstrGenCtx.SimCtx;
   assert(SimCtx.SCI);
   auto &SCAddress = SimCtx.SCI->CurrentAddress;
-  const auto &ST = GC.getLLVMState().getSnippyTarget();
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  const auto &ST = ProgCtx.getLLVMState().getSnippyTarget();
   auto &I = SimCtx.getInterpreter();
   auto RegValue = I.readReg(DestReg);
 
@@ -210,11 +215,11 @@ storeRefAndActualValueForSelfcheck(
                     /* store the whole register */ 0);
   SelfcheckFirstStoreInfo<MachineBasicBlock::iterator> FirstStoreInfo{
       std::prev(InsertPos), SCAddress};
-  SCAddress += GC.getProgramContext().getSCStride();
-  auto &SelfcheckSection = GC.getSelfcheckSection();
+  SCAddress += ProgCtx.getSCStride();
+  auto &SelfcheckSection = ProgCtx.getSelfcheckSection();
   selfcheckOverflowGuard(SelfcheckSection, SCAddress);
   storeRefValue(InstrGenCtx, SCAddress, RegValue);
-  SCAddress += GC.getProgramContext().getSCStride();
+  SCAddress += ProgCtx.getSCStride();
   selfcheckOverflowGuard(SelfcheckSection, SCAddress);
 
 
@@ -261,25 +266,27 @@ getFloatSemanticsForReg(const MCRegisterInfo &RegInfo, MCRegister Reg) {
 
 static void unNaNRegister(planning::InstructionGenerationContext &InstrGenCtx,
                           MCRegister Reg) {
-  auto &GC = InstrGenCtx.GC;
-  const auto &Tgt = GC.getLLVMState().getSnippyTarget();
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  const auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
 
-  auto &Cfg = GC.getConfig();
+  auto &Cfg = InstrGenCtx.GenSettings.Cfg;
   assert(Cfg.FPUConfig);
   auto &OverwriteCfg = Cfg.FPUConfig->Overwrite;
   assert(OverwriteCfg);
 
   auto SelectedSemantics =
-      getFloatSemanticsForReg(GC.getLLVMState().getRegInfo(), Reg);
+      getFloatSemanticsForReg(ProgCtx.getLLVMState().getRegInfo(), Reg);
   if (auto Err = SelectedSemantics.takeError())
     snippy::fatal(
         "Internal error",
         Twine("Cannot unNaNRegister: ").concat(toString(std::move(Err))));
   Expected<APInt> ValueToWriteOrErr =
-      GC.getOrCreateFloatOverwriteValueSampler(*SelectedSemantics).sample();
+      InstrGenCtx.getOrCreateFloatOverwriteValueSampler(*SelectedSemantics)
+          .sample();
 
   if (auto Err = ValueToWriteOrErr.takeError())
-    snippy::fatal(GC.getLLVMState().getCtx(), "Internal error", std::move(Err));
+    snippy::fatal(ProgCtx.getLLVMState().getCtx(), "Internal error",
+                  std::move(Err));
 
   auto RP = InstrGenCtx.pushRegPool();
   Tgt.writeValueToReg(InstrGenCtx, *ValueToWriteOrErr, Reg);
@@ -349,7 +356,7 @@ static bool hasFRegDestination(const MachineInstr &MI,
 static bool shouldRewriteRegValue(
     const MachineInstr &MI,
     const planning::InstructionGenerationContext &InstrGenCtx) {
-  auto &Cfg = InstrGenCtx.GC.getConfig();
+  auto &Cfg = InstrGenCtx.GenSettings.Cfg;
   if (!Cfg.FPUConfig)
     return false;
   auto &OverwriteCfg = Cfg.FPUConfig->Overwrite;
@@ -360,12 +367,12 @@ static bool shouldRewriteRegValue(
   case FloatOverwriteMode::IF_ANY_OPERAND:
     return anyOfInputOperandsIsPotentiallyNaN(MI, InstrGenCtx);
   case FloatOverwriteMode::IF_MODEL_DETECTED_NAN: {
-    auto &GC = InstrGenCtx.GC;
     auto &SimCtx = InstrGenCtx.SimCtx;
     assert(SimCtx.hasTrackingMode());
     auto Reg = getDestinationRegister(MI);
+    auto &ProgCtx = InstrGenCtx.ProgCtx;
     auto SelectedSemantics =
-        getFloatSemanticsForReg(GC.getLLVMState().getRegInfo(), Reg);
+        getFloatSemanticsForReg(ProgCtx.getLLVMState().getRegInfo(), Reg);
     if (auto Err = SelectedSemantics.takeError())
       snippy::fatal("Internal error", Twine("Cannot check if register is NaN: ")
                                           .concat(toString(std::move(Err))));
@@ -385,10 +392,10 @@ void controlNaNPropagation(
     planning::InstructionGenerationContext &InstrGenCtx) {
   if (Begin == End)
     return;
-  auto &GC = InstrGenCtx.GC;
   auto &SimCtx = InstrGenCtx.SimCtx;
-  auto &State = GC.getLLVMState();
-  auto &FPUConfig = GC.getConfig().FPUConfig;
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
+  auto &FPUConfig = InstrGenCtx.GenSettings.Cfg.FPUConfig;
   if (!FPUConfig || !FPUConfig->Overwrite)
     return;
   auto &Tgt = State.getSnippyTarget();
@@ -421,10 +428,11 @@ handleGeneratedInstructions(InstrIt ItBegin,
                             planning::InstructionGenerationContext &InstrGenCtx,
                             const planning::RequestLimit &Limit) {
   auto &MBB = InstrGenCtx.MBB;
-  auto &GC = InstrGenCtx.GC;
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   auto ItEnd = InstrGenCtx.Ins;
   auto &SimCtx = InstrGenCtx.SimCtx;
-  auto GeneratedCodeSize = GC.getCodeBlockSize(ItBegin, ItEnd);
+  auto GeneratedCodeSize = State.getCodeBlockSize(ItBegin, ItEnd);
   auto PrimaryInstrCount = countPrimaryInstructions(ItBegin, ItEnd);
   auto ReportGenerationResult =
       [ItBegin, ItEnd, &GeneratedCodeSize, PrimaryInstrCount,
@@ -449,7 +457,7 @@ handleGeneratedInstructions(InstrIt ItBegin,
   }
 
   auto InterpretInstrsResult =
-      interpretInstrs(ItBegin, ItEnd, GC.getLLVMState(), SimCtx);
+      interpretInstrs(ItBegin, ItEnd, ProgCtx.getLLVMState(), SimCtx);
   if (InterpretInstrsResult != GenerationStatus::Ok)
     return ReportGenerationResult(InterpretInstrsResult);
 
@@ -469,20 +477,19 @@ handleGeneratedInstructions(InstrIt ItBegin,
   assert(SimCtx.SCI);
 
   // Collect instructions that can and should be selfchecked.
-  auto SelfcheckCandidates =
-      collectSelfcheckCandidates(ItBegin, ItEnd, GC, SimCtx.SCI->PeriodTracker);
+  auto SelfcheckCandidates = collectSelfcheckCandidates(
+      ItBegin, ItEnd, ProgCtx, SimCtx.SCI->PeriodTracker);
 
   // Collect def registers from the candidates.
   // Use SetVector as we want to preserve order of insertion.
   SetVector<SelfcheckAnnotationInfo<InstrIt>> Defs;
-  auto &State = GC.getLLVMState();
   const auto &ST = State.getSnippyTarget();
   // Reverse traversal as we need to sort definitions by their last use.
   for (auto Inst : reverse(SelfcheckCandidates)) {
     // TODO: Add self-check for instructions without definitions
     if (Inst->getDesc().getNumDefs() == 0)
       continue;
-    auto Regs = ST.getRegsForSelfcheck(*Inst, MBB, GC);
+    auto Regs = ST.getRegsForSelfcheck(*Inst, InstrGenCtx);
     for (auto &Reg : Regs)
       Defs.insert({Inst, Reg});
   }
@@ -533,9 +540,11 @@ handleGeneratedInstructions(InstrIt ItBegin,
   // Add collected information about generated selfcheck stores for selfcheck
   // annotation
   for (const auto &[Def, StoreInfo] : zip(Defs, StoresInfo))
-    GC.getMainModule().getOrAddResult<SelfCheckMap>().addToSelfcheckMap(
-        StoreInfo.Address,
-        std::distance(Def.Inst, std::next(StoreInfo.FirstStoreInstrPos)));
+    InstrGenCtx.getSnippyModule()
+        .getOrAddResult<SelfCheckMap>()
+        .addToSelfcheckMap(
+            StoreInfo.Address,
+            std::distance(Def.Inst, std::next(StoreInfo.FirstStoreInstrPos)));
   // Execute self-check instructions
   auto &I = SimCtx.getInterpreter();
   if (!I.executeChainOfInstrs(State, InsPoint, ItEnd))
@@ -543,7 +552,7 @@ handleGeneratedInstructions(InstrIt ItBegin,
         "Failed to execute chain of instructions in tracking mode");
 
   // Check size requirements after selfcheck addition.
-  GeneratedCodeSize = GC.getCodeBlockSize(ItBegin, ItEnd);
+  GeneratedCodeSize = State.getCodeBlockSize(ItBegin, ItEnd);
   if (sizeLimitIsExceeded(Limit, InstrGenCtx.Stats, GeneratedCodeSize))
     return ReportGenerationResult(GenerationStatus::SizeFailed);
   return ReportGenerationResult(GenerationStatus::Ok);
@@ -568,11 +577,12 @@ std::optional<MachineOperand> pregenerateOneOperand(
 
   auto &RP = InstrGenCtx.getRegPool();
   auto &MBB = InstrGenCtx.MBB;
-  auto &GC = InstrGenCtx.GC;
-  const auto &State = GC.getLLVMState();
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  const auto &State = ProgCtx.getLLVMState();
   const auto &RegInfo = State.getRegInfo();
   const auto &SnippyTgt = State.getSnippyTarget();
-  auto &RegGen = GC.getProgramContext().getRegGen();
+  auto &RegGen = ProgCtx.getRegGen();
+  auto &GenSettings = InstrGenCtx.GenSettings;
   auto Operand = InstrDesc.operands()[OpIndex];
   auto OperandRegClassID = Operand.RegClass;
   if (OpType == MCOI::OperandType::OPERAND_REGISTER) {
@@ -587,13 +597,13 @@ std::optional<MachineOperand> pregenerateOneOperand(
       auto RegClass =
           SnippyTgt.getRegClass(InstrGenCtx, OperandRegClassID, OpIndex,
                                 InstrDesc.getOpcode(), RegInfo);
-      auto Exclude =
-          SnippyTgt.excludeRegsForOperand(RegClass, GC, InstrDesc, OpIndex);
+      auto Exclude = SnippyTgt.excludeRegsForOperand(InstrGenCtx, RegClass,
+                                                     InstrDesc, OpIndex);
       auto Include = SnippyTgt.includeRegs(RegClass);
       AccessMaskBit Mask = IsDst ? AccessMaskBit::W : AccessMaskBit::R;
 
       auto CustomMask =
-          SnippyTgt.getCustomAccessMaskForOperand(GC, InstrDesc, OpIndex);
+          SnippyTgt.getCustomAccessMaskForOperand(InstrDesc, OpIndex);
       // TODO: add checks that target-specific and generic restrictions are
       // not conflicting.
       if (CustomMask != AccessMaskBit::None)
@@ -606,9 +616,9 @@ std::optional<MachineOperand> pregenerateOneOperand(
       if (SnippyTgt.isPhysRegClass(OperandRegClassID, RegInfo))
         Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
     }
-    SnippyTgt.reserveRegsIfNeeded(InstrDesc.getOpcode(),
+    SnippyTgt.reserveRegsIfNeeded(InstrGenCtx, InstrDesc.getOpcode(),
                                   /* isDst */ IsDst,
-                                  /* isMem */ false, Reg, RP, GC, MBB);
+                                  /* isMem */ false, Reg);
     return createRegAsOperand(Reg, Preselected.getFlags());
   }
   if (OpType == MCOI::OperandType::OPERAND_MEMORY) {
@@ -632,10 +642,10 @@ std::optional<MachineOperand> pregenerateOneOperand(
         Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
     }
     // FIXME: RW mask is too restrictive for the majority of instructions.
-    SnippyTgt.reserveRegsIfNeeded(InstrDesc.getOpcode(),
+    SnippyTgt.reserveRegsIfNeeded(InstrGenCtx, InstrDesc.getOpcode(),
                                   /* isDst */ Preselected.getFlags() &
                                       RegState::Define,
-                                  /* isMem */ true, Reg, RP, GC, MBB);
+                                  /* isMem */ true, Reg);
     return createRegAsOperand(Reg, Preselected.getFlags());
   }
 
@@ -647,8 +657,8 @@ std::optional<MachineOperand> pregenerateOneOperand(
     if (StridedImm.isInitialized() &&
         StridedImm.getMin() == StridedImm.getMax())
       return MachineOperand::CreateImm(StridedImm.getMax());
-    return SnippyTgt.generateTargetOperand(GC, InstrDesc.getOpcode(), OpType,
-                                           StridedImm);
+    return SnippyTgt.generateTargetOperand(
+        ProgCtx, GenSettings, InstrDesc.getOpcode(), OpType, StridedImm);
   }
   llvm_unreachable("this operand type unsupported");
 }
@@ -675,9 +685,9 @@ SmallVector<MachineOperand, 8> pregenerateOperands(
     InstructionGenerationContext &InstrGenCtx, const MCInstrDesc &InstrDesc,
     const std::vector<planning::PreselectedOpInfo> &Preselected) {
   auto &RP = InstrGenCtx.getRegPool();
-  auto &GC = InstrGenCtx.GC;
-  auto &RegGenerator = GC.getProgramContext().getRegGen();
-  auto &State = GC.getLLVMState();
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &RegGenerator = ProgCtx.getRegGen();
+  auto &State = ProgCtx.getLLVMState();
   auto &InstrInfo = State.getInstrInfo();
   const auto &Tgt = State.getSnippyTarget();
   const auto &RI = State.getRegInfo();
@@ -737,15 +747,16 @@ generateNopsToSizeLimit(const planning::RequestLimit &Limit,
                         planning::InstructionGenerationContext &InstrGenCtx) {
   assert(Limit.isSizeLimit());
 
-  auto &GC = InstrGenCtx.GC;
   auto &MBB = InstrGenCtx.MBB;
-  auto &State = GC.getLLVMState();
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   auto &SnpTgt = State.getSnippyTarget();
   auto ItBegin = InstrGenCtx.Ins == MBB.begin() ? InstrGenCtx.Ins
                                                 : std::prev(InstrGenCtx.Ins);
 
   // assume nop size is the lowest possible instruction size
-  size_t NopSize = *SnpTgt.getPossibleInstrsSize(GC).begin();
+  size_t NopSize =
+      *SnpTgt.getPossibleInstrsSize(InstrGenCtx.getSubtargetImpl()).begin();
   size_t GeneratedNopsSize = 0;
 
   while (Limit.getSizeLeft(InstrGenCtx.Stats) >=
@@ -753,7 +764,7 @@ generateNopsToSizeLimit(const planning::RequestLimit &Limit,
     auto *MI = SnpTgt.generateNop(InstrGenCtx);
     assert(MI && "Nop generation failed");
 
-    assert(NopSize == SnpTgt.getInstrSize(*MI, GC));
+    assert(NopSize == SnpTgt.getInstrSize(*MI, State));
     GeneratedNopsSize += NopSize;
   }
 
@@ -782,18 +793,18 @@ AddressGenInfo chooseAddrGenInfoForInstrCallback(
   return AddressGenInfo::singleAccess(AccessSize, Alignment, false /* Burst */);
 }
 
-AccessSampleResult chooseAddrInfoForInstr(MachineInstr &MI,
-                                          GeneratorContext &SGCtx,
-                                          const MachineLoop *ML,
-                                          const SnippyLoopInfo *SLI) {
+static AccessSampleResult
+chooseAddrInfoForInstr(MachineInstr &MI, InstructionGenerationContext &IGC,
+                       const MachineLoop *ML, const SnippyLoopInfo *SLI) {
   assert(!ML || SLI);
-  auto &State = SGCtx.getLLVMState();
-  auto &MS = SGCtx.getMemoryAccessSampler();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
+  auto &MS = IGC.getMemoryAccessSampler();
   const auto &SnippyTgt = State.getSnippyTarget();
   auto Opcode = MI.getDesc().getOpcode();
 
   auto [AccessSize, Alignment] =
-      SnippyTgt.getAccessSizeAndAlignment(Opcode, SGCtx, *MI.getParent());
+      SnippyTgt.getAccessSizeAndAlignment(ProgCtx, Opcode, *MI.getParent());
 
   auto CurLoopGenInfo =
       ML ? SLI->getLoopsGenerationInfoForMBB(ML->getHeader()) : std::nullopt;
@@ -851,10 +862,12 @@ SmallVector<unsigned, 4> pickRecentDefs(MachineInstr &MI,
   return Picked;
 }
 
-unsigned chooseAddressRegister(MachineInstr &MI, const AddressPart &AP,
-                               RegPoolWrapper &RP, GeneratorContext &GC,
-                               const SimulatorContext &SimCtx) {
-  auto &State = GC.getLLVMState();
+unsigned chooseAddressRegister(InstructionGenerationContext &IGC,
+                               MachineInstr &MI, const AddressPart &AP) {
+  auto &RP = IGC.getRegPool();
+  auto &SimCtx = IGC.SimCtx;
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
   if (AP.RegClass == nullptr)
@@ -886,8 +899,8 @@ unsigned chooseAddressRegister(MachineInstr &MI, const AddressPart &AP,
   auto AddrValue = AP.Value;
 
   auto GetMatCost = [&](auto Reg) {
-    return SnippyTgt.getTransformSequenceLength(I.readReg(Reg), AddrValue, Reg,
-                                                GC);
+    return SnippyTgt.getTransformSequenceLength(IGC, I.readReg(Reg), AddrValue,
+                                                Reg);
   };
   auto ChosenRegIt =
       std::min_element(PickedRegisters.begin(), PickedRegisters.end(),
@@ -913,8 +926,8 @@ void postprocessMemoryOperands(MachineInstr &MI,
   auto &RP = IGC.getRegPool();
   const auto *SLI = IGC.SLI;
   auto &SimCtx = IGC.SimCtx;
-  auto &GC = IGC.GC;
-  auto &State = GC.getLLVMState();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   auto Opcode = MI.getDesc().getOpcode();
   auto NumAddrsToGen = SnippyTgt.countAddrsToGenerate(Opcode);
@@ -923,7 +936,7 @@ void postprocessMemoryOperands(MachineInstr &MI,
   assert(!ML || SLI);
 
   for (size_t i = 0; i < NumAddrsToGen; ++i) {
-    auto [AddrInfo, AddrGenInfo] = chooseAddrInfoForInstr(MI, GC, ML, SLI);
+    auto [AddrInfo, AddrGenInfo] = chooseAddrInfoForInstr(MI, IGC, ML, SLI);
     bool GenerateStridedLoad = !AddrGenInfo.isSingleElement();
     auto AccessSize = AddrInfo.AccessSize;
 
@@ -933,7 +946,7 @@ void postprocessMemoryOperands(MachineInstr &MI,
                     "tracking mode enabled");
 
     auto &&[RegToValue, ChosenAddresses] =
-        SnippyTgt.breakDownAddr(AddrInfo, MI, i, GC);
+        SnippyTgt.breakDownAddr(IGC, AddrInfo, MI, i);
 
     for (unsigned j = 0; j < AddrGenInfo.NumElements; ++j) {
       if (MAI)
@@ -948,9 +961,9 @@ void postprocessMemoryOperands(MachineInstr &MI,
     for (auto &AP : RegToValue) {
       MCRegister Reg = AP.FixedReg;
       if (SimCtx.hasTrackingMode() &&
-          GC.getGenSettings().TrackingConfig.AddressVH) {
+          IGC.GenSettings.TrackingConfig.AddressVH) {
         auto &I = SimCtx.getInterpreter();
-        Reg = chooseAddressRegister(MI, AP, RP, GC, SimCtx);
+        Reg = chooseAddressRegister(IGC, MI, AP);
         SnippyTgt.transformValueInReg(IGC, I.readReg(Reg), AP.Value, Reg);
       } else {
         SnippyTgt.writeValueToReg(IGC, AP.Value, Reg);
@@ -964,12 +977,11 @@ void postprocessMemoryOperands(MachineInstr &MI,
 }
 
 static void reloadGlobalRegsFromMemory(InstructionGenerationContext &IGC) {
-  auto &GC = IGC.GC;
-  auto &Tgt = GC.getLLVMState().getSnippyTarget();
-  auto &SpilledToMem = GC.getGenSettings().RegistersConfig.SpilledToMem;
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
+  auto &SpilledToMem = IGC.GenSettings.RegistersConfig.SpilledToMem;
   if (SpilledToMem.empty())
     return;
-  auto &ProgCtx = GC.getProgramContext();
   assert(ProgCtx.hasProgramStateSaveSpace());
   auto &SaveLocs = ProgCtx.getProgramStateSaveSpace();
   for (auto &Reg : SpilledToMem) {
@@ -983,12 +995,11 @@ static void reloadGlobalRegsFromMemory(InstructionGenerationContext &IGC) {
 }
 
 static void reloadLocallySpilledRegs(InstructionGenerationContext &IGC) {
-  auto &GC = IGC.GC;
-  auto &Tgt = GC.getLLVMState().getSnippyTarget();
-  auto &SpilledToMem = GC.getGenSettings().RegistersConfig.SpilledToMem;
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
+  auto &SpilledToMem = IGC.GenSettings.RegistersConfig.SpilledToMem;
   if (SpilledToMem.empty())
     return;
-  auto &ProgCtx = GC.getProgramContext();
   assert(ProgCtx.hasProgramStateSaveSpace());
   auto &SaveLocs = ProgCtx.getProgramStateSaveSpace();
   for (auto &Reg : SpilledToMem) {
@@ -1000,9 +1011,10 @@ static void reloadLocallySpilledRegs(InstructionGenerationContext &IGC) {
 MachineInstr *
 generateCall(unsigned OpCode,
              planning::InstructionGenerationContext &InstrGenCtx) {
-  auto &GC = InstrGenCtx.GC;
   auto &MBB = InstrGenCtx.MBB;
-  auto &State = GC.getLLVMState();
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  const auto &GenSettings = InstrGenCtx.GenSettings;
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   assert(InstrGenCtx.CGS);
   auto &CGS = *InstrGenCtx.CGS;
@@ -1016,11 +1028,11 @@ generateCall(unsigned OpCode,
 
   auto &CallTarget = *(CalleeNode->functions()[FunctionIdx]);
   assert(CallTarget.hasName());
-  if (CalleeNode->isExternal() && GC.getConfig().hasSectionToSpillGlobalRegs())
+  if (CalleeNode->isExternal() && GenSettings.Cfg.hasSectionToSpillGlobalRegs())
     reloadGlobalRegsFromMemory(InstrGenCtx);
 
   auto TargetStackPointer = SnippyTgt.getStackPointer();
-  auto RealStackPointer = GC.getProgramContext().getStackPointer();
+  auto RealStackPointer = ProgCtx.getStackPointer();
 
   // If we redefined stack pointer register, before generating external function
   // call we need to copy stack pointer value to target default stack pointer
@@ -1031,11 +1043,11 @@ generateCall(unsigned OpCode,
   auto *Call = SnippyTgt.generateCall(InstrGenCtx, CallTarget,
                                       /* AsSupport */ false, OpCode);
 
-  if (!GC.isRegSpilledToMem(RealStackPointer) && CalleeNode->isExternal() &&
-      (RealStackPointer != TargetStackPointer))
+  if (!GenSettings.isRegSpilledToMem(RealStackPointer) &&
+      CalleeNode->isExternal() && (RealStackPointer != TargetStackPointer))
     SnippyTgt.copyRegToReg(InstrGenCtx, TargetStackPointer, RealStackPointer);
 
-  if (CalleeNode->isExternal() && GC.getConfig().hasSectionToSpillGlobalRegs())
+  if (CalleeNode->isExternal() && GenSettings.Cfg.hasSectionToSpillGlobalRegs())
     reloadLocallySpilledRegs(InstrGenCtx);
 
   Node->markAsCommitted(CalleeNode);
@@ -1045,10 +1057,10 @@ generateCall(unsigned OpCode,
 static bool
 isPostprocessNeeded(const MCInstrDesc &InstrDesc,
                     const std::vector<planning::PreselectedOpInfo> &Preselected,
-                    const GeneratorContext &GC) {
+                    const GeneratorSettings &GenSettings) {
   // 1. If any information about operands is provided from the caller, we won't
   //    do any postprocessing.
-  if (!GC.isApplyValuegramEachInstr())
+  if (!GenSettings.isApplyValuegramEachInstr())
     return Preselected.empty();
   // 2. In the case of the option -valuegram-operands-regs, we do partial
   //    initialization in the case of memory instructions. We initialize only
@@ -1064,15 +1076,16 @@ randomInstruction(const MCInstrDesc &InstrDesc,
                   std::vector<planning::PreselectedOpInfo> Preselected,
                   planning::InstructionGenerationContext &InstrGenCtx) {
   auto &MBB = InstrGenCtx.MBB;
-  auto &GC = InstrGenCtx.GC;
-  auto &State = GC.getLLVMState();
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
+  const auto &GenSettings = InstrGenCtx.GenSettings;
   const auto &SnippyTgt = State.getSnippyTarget();
 
   auto MIB = getMainInstBuilder(SnippyTgt, MBB, InstrGenCtx.Ins,
                                 MBB.getParent()->getFunction().getContext(),
                                 InstrDesc);
 
-  bool DoPostprocess = isPostprocessNeeded(InstrDesc, Preselected, GC);
+  bool DoPostprocess = isPostprocessNeeded(InstrDesc, Preselected, GenSettings);
 
   auto NumDefs = InstrDesc.getNumDefs();
   auto TotalNum = InstrDesc.getNumOperands();
@@ -1107,12 +1120,11 @@ randomInstruction(const MCInstrDesc &InstrDesc,
 
 void spillPseudoInstImplicitReg(MachineInstr &MI, Register Reg,
                                 InstructionGenerationContext &IGC) {
-  auto &GC = IGC.GC;
-  auto &SnpTgt = GC.getLLVMState().getSnippyTarget();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &SnpTgt = ProgCtx.getLLVMState().getSnippyTarget();
   auto *MBBPtr = MI.getParent();
   assert(MBBPtr);
-  auto &MBB = *MBBPtr;
-  auto RealStackPointer = GC.getProgramContext().getStackPointer();
+  auto RealStackPointer = ProgCtx.getStackPointer();
 
   auto OldIns = IGC.Ins;
 
@@ -1143,7 +1155,8 @@ void generateRealInstruction(
     const MCInstrDesc &InstrDesc,
     planning::InstructionGenerationContext &InstrGenCtx,
     std::vector<planning::PreselectedOpInfo> Preselected) {
-  auto &State = InstrGenCtx.GC.getLLVMState();
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   auto Opc = InstrDesc.getOpcode();
   const auto &SnippyTgt = State.getSnippyTarget();
 
@@ -1225,16 +1238,17 @@ findNextBlock(MachineBasicBlock *MBB,
 template <typename RegsSnapshotTy>
 void writeRegsSnapshot(RegsSnapshotTy RegsSnapshot, MachineBasicBlock &MBB,
                        RegStorageType Storage, GeneratorContext &GC) {
-  const auto &SnippyTgt = GC.getLLVMState().getSnippyTarget();
+  auto &ProgCtx = GC.getProgramContext();
+  const auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
   InstructionGenerationContext IGC{MBB, MBB.getFirstTerminator(), GC};
   auto RP = IGC.pushRegPool();
   for (auto &&[RegIdx, Value] : RegsSnapshot) {
-    auto Reg = SnippyTgt.regIndexToMCReg(RegIdx, Storage, GC);
+    auto Reg = SnippyTgt.regIndexToMCReg(IGC, RegIdx, Storage);
     // FIXME: we expect that writeValueToReg won't corrupt other registers of
     // the same class even if they were not reserved. Also we expect that
     // writing to FP/V register may use only non-reserved GPR registers.
     SnippyTgt.writeValueToReg(
-        IGC, toAPInt(Value, SnippyTgt.getRegBitWidth(Reg, GC)), Reg);
+        IGC, toAPInt(Value, SnippyTgt.getRegBitWidth(Reg, IGC)), Reg);
   }
 }
 
@@ -1244,7 +1258,8 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
   assert(SimCtx.hasTrackingMode());
 
   InstructionGenerationContext IGC{MBB, MBB.getFirstTerminator(), GC};
-  auto &State = GC.getLLVMState();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
   auto &I = SimCtx.getInterpreter();
@@ -1257,8 +1272,8 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
   // So, open a new one.
   I.openTransaction();
   if (!MemSnapshot.empty()) {
-    auto StackSec = GC.getProgramContext().getStackSection();
-    auto SelfcheckSec = GC.getSelfcheckSection();
+    auto StackSec = ProgCtx.getStackSection();
+    auto SelfcheckSec = ProgCtx.getSelfcheckSection();
     for (auto [Addr, Data] : MemSnapshot) {
       assert(StackSec.Size > 0 && "Stack section cannot have zero size");
       // Skip stack and selfcheck memory. None of them can be rolled back.
@@ -1377,17 +1392,18 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
   writeRegsSnapshot(WholeXRegsSnapshot, MBB, RegStorageType::XReg, GC);
 
   return GenerationStatistics(
-      0, GC.getCodeBlockSize(MBB.begin(), MBB.getFirstTerminator()));
+      0, State.getCodeBlockSize(MBB.begin(), MBB.getFirstTerminator()));
 }
 
 void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
                       const GenerationStatistics &MFStats, GeneratorContext &GC,
                       const SimulatorContext &SimCtx, const CallGraphState &CGS,
                       MemAccessInfo *MAI) {
-  auto &State = GC.getLLVMState();
+  auto &ProgCtx = GC.getProgramContext();
+  auto &State = ProgCtx.getLLVMState();
   auto &MBB = MF.back();
 
-  auto LastInstr = GC.getLastInstr();
+  auto LastInstr = GC.getGenSettings().getLastInstr();
   bool NopLastInstr = LastInstr.empty();
   planning::InstructionGenerationContext InstrGenCtx{MBB, MF.back().end(), GC,
                                                      SimCtx};
@@ -1410,7 +1426,7 @@ void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
       MF.getContext().getOrCreateSymbol(Linker::getExitSymbolName());
 
   // User may ask for last instruction to be return.
-  if (GC.useRetAsLastInstr()) {
+  if (GC.getGenSettings().useRetAsLastInstr()) {
     State.getSnippyTarget()
         .generateReturn(InstrGenCtx)
         ->setPreInstrSymbol(MF, ExitSym);
@@ -1507,7 +1523,8 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
                  std::inserter(NotVisited, NotVisited.begin()),
                  [](auto &MBB) { return &MBB; });
   auto *MBB = &MF.front();
-  auto &State = GC.getLLVMState();
+  auto &ProgCtx = GC.getProgramContext();
+  auto &State = ProgCtx.getLLVMState();
   if (SimCtx.hasTrackingMode()) {
     // Explicitly prepare interpreter PC.
     assert(SimCtx.Runner);
@@ -1624,7 +1641,7 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
 void generate(planning::InstructionGroupRequest &IG,
               planning::InstructionGenerationContext &InstrGenCtx) {
   LLVM_DEBUG(dbgs() << "Generating IG:\n"; IG.print(dbgs(), 2););
-  auto &GC = InstrGenCtx.GC;
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &MBB = InstrGenCtx.MBB;
   auto OldStats = InstrGenCtx.Stats;
   InstrGenCtx.Stats = GenerationStatistics();
@@ -1634,7 +1651,7 @@ void generate(planning::InstructionGroupRequest &IG,
   auto ItBegin = ItEnd == MBB.begin() ? ItEnd : std::prev(ItEnd);
   {
     auto RP = InstrGenCtx.pushRegPool();
-    auto &InstrInfo = GC.getLLVMState().getInstrInfo();
+    auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
     planning::InstrGroupGenerationRAIIWrapper InitAndFinish(IG, InstrGenCtx);
     auto ItBegin = ItEnd == MBB.begin() ? ItEnd : std::prev(ItEnd);
     planning::InstrRequestRange Range(IG, InstrGenCtx.Stats);
@@ -1643,7 +1660,7 @@ void generate(planning::InstructionGroupRequest &IG,
         generateInsertionPointHint(InstrGenCtx);
       generateInstruction(InstrInfo.get(IR.Opcode), InstrGenCtx,
                           std::move(IR.Preselected));
-      switchPolicyIfNeeded(IG, IR.Opcode, MBB, GC);
+      switchPolicyIfNeeded(InstrGenCtx, IG, IR.Opcode);
       if (!IG.isInseparableBundle())
         ItBegin =
             processGeneratedInstructions(ItBegin, InstrGenCtx, IG.limit());
@@ -1653,7 +1670,7 @@ void generate(planning::InstructionGroupRequest &IG,
   if (IG.isInseparableBundle())
     processGeneratedInstructions(ItBegin, InstrGenCtx, IG.limit());
   if (!IG.isLimitReached(InstrGenCtx.Stats)) {
-    auto &Ctx = GC.getLLVMState().getCtx();
+    auto &Ctx = ProgCtx.getLLVMState().getCtx();
     snippy::fatal(Ctx, "Generation failure",
                   "No more instructions to request but group limit still "
                   "hasn't been reached.");
@@ -1682,8 +1699,8 @@ generate(planning::BasicBlockRequest &BB,
   for (auto &&IG : BB)
     generate(IG, InstrGenCtx);
 
-  auto &GC = InstrGenCtx.GC;
-  auto &State = GC.getLLVMState();
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   auto &SimCtx = InstrGenCtx.SimCtx;
   const auto &MBB = BB.getMBB();
   // In the register block we start interpretation from the beginning

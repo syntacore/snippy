@@ -13,6 +13,9 @@
 
 namespace llvm {
 namespace snippy {
+
+class SnippyProgramContext;
+
 class TopLevelMemoryAccessSampler : public IMemoryAccessSampler {
   std::vector<std::unique_ptr<IMemoryAccessSampler>> Samplers;
 
