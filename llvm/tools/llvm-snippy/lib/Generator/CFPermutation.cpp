@@ -148,10 +148,12 @@ llvm::snippy::CFPermutationContext::CFPermutationContext(
     ConsecutiveLoopInfo &CLI, const SimulatorContext &SimCtx)
     : BlocksInfo(), CurrMF(MF), GC(GC), FG(FG), CLI(CLI), SimCtx(SimCtx),
       BranchSettings(GC.getConfig().Branches) {
+  auto &ProgCtx = GC.getProgramContext();
 
-  if (SimCtx.hasTrackingMode() && GC.isLoopGenerationPossible() &&
+  if (SimCtx.hasTrackingMode() &&
+      GC.getGenSettings().isLoopGenerationPossible(ProgCtx.getOpcodeCache()) &&
       !SimCtx.getSimRunner().getPrimaryInterpreter().modelSupportCallbacks())
-    fatal(GC.getLLVMState().getCtx(),
+    fatal(ProgCtx.getLLVMState().getCtx(),
           "Loops cannot be generated in selfcheck/backtrack/hazard modes",
           "Selected model does not support it.");
 
@@ -162,7 +164,10 @@ llvm::snippy::CFPermutationContext::CFPermutationContext(
 size_t llvm::snippy::CFPermutationContext::getCFInstrNumFor(
     const MachineFunction &MF) const {
   auto TotalInstrNum = FG.get().getRequestedInstrsNum(MF);
-  return GC.get().getCFInstrsNum(TotalInstrNum);
+  auto &GenSettings = GC.get().getGenSettings();
+  auto &ProgCtx = GC.get().getProgramContext();
+  auto &OpCC = ProgCtx.getOpcodeCache();
+  return GenSettings.getCFInstrsNum(OpCC, TotalInstrNum);
 }
 
 bool llvm::snippy::CFPermutationContext::makePermutationAndUpdateBranches() {
@@ -199,7 +204,8 @@ unsigned calcMaxBBDst(unsigned BB, unsigned NBlocks,
                     << " blocks\n");
   LLVM_DEBUG(dbgs() << (DoAutoMaxBBDistance ? "" : "don't ")
                     << "calculate max distance adaptively\n");
-  auto &State = GC.getLLVMState();
+  auto &ProgCtx = GC.getProgramContext();
+  auto &State = ProgCtx.getLLVMState();
   auto MaxDstMod = State.getSnippyTarget().getMaxBranchDstMod(Opcode);
   auto AutoMaxDistance = CFPermutationContext::calculateMaxDistance(
       BB, NBlocks, RequestedInstrsNum, MaxDstMod, GC);
@@ -318,12 +324,13 @@ unsigned llvm::snippy::CFPermutationContext::calculateMaxDistance(
   auto &BS = GC.getConfig().Branches;
   if (BS.anyConsecutiveLoops())
     return 0;
-  const auto &SnippyTgt = GC.getLLVMState().getSnippyTarget();
+  auto &ProgCtx = GC.getProgramContext();
+  const auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
   auto PCDist = BS.getPCDistance();
   MaxBranchDstMod = PCDist.Max.value_or(MaxBranchDstMod);
   auto MaxInstrSize = SnippyTgt.getMaxInstrSize();
   if (MaxBranchDstMod < MaxInstrSize)
-    snippy::fatal(GC.getLLVMState().getCtx(),
+    snippy::fatal(ProgCtx.getLLVMState().getCtx(),
                   "Max PC distance (" + Twine(MaxBranchDstMod) +
                       ") is less than max instruction size",
                   Twine(MaxInstrSize));
@@ -539,7 +546,8 @@ llvm::snippy::CFPermutationContext::findMaxLoopDepthReached(
 }
 
 bool llvm::snippy::CFPermutationContext::updateBranches() {
-  const auto &SnippyTgt = GC.get().getLLVMState().getSnippyTarget();
+  const auto &ProgCtx = GC.get().getProgramContext();
+  const auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
   bool Changed = false;
   for (auto BBNum : seq<unsigned>(0, BlocksInfo.size())) {
     auto *BB = getBlockNumbered(BBNum);

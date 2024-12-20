@@ -167,14 +167,15 @@ static void transferPredecessorsExceptLatches(MachineBasicBlock &Preheader,
 void LoopCanonicalization::createPreheader(MachineBasicBlock &Header,
                                            bool TransferPreds) {
   auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
-  const auto &State = GC.getLLVMState();
+  auto &ProgCtx = GC.getProgramContext();
+  const auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   const auto &MLI = getAnalysis<MachineLoopInfoWrapperPass>().getLI();
   const auto *ML = MLI[&Header];
   assert(ML);
   assert(ML->getHeader() == &Header && "Loop header expected");
   auto &MF = *Header.getParent();
-  auto *Preheader = createMachineBasicBlock(MF, GC);
+  auto *Preheader = createMachineBasicBlock(MF);
   assert(Preheader);
   MF.insert(MachineFunction::iterator(&Header), Preheader);
   if (TransferPreds)
@@ -305,13 +306,14 @@ bool LoopCanonicalization::splitExitEdge(MachineLoop &ML) {
 MachineBasicBlock *LoopCanonicalization::splitEdge(MachineBasicBlock &From,
                                                    MachineBasicBlock &To) {
   auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
-  const auto &State = GC.getLLVMState();
+  auto &ProgCtx = GC.getProgramContext();
+  const auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
   assert(From.isSuccessor(&To) && "From -> To is not an edge");
 
   auto &MF = *From.getParent();
-  auto *NewBB = createMachineBasicBlock(MF, GC);
+  auto *NewBB = createMachineBasicBlock(MF);
   assert(NewBB);
   MF.insert(std::next(MachineFunction::iterator(&From)), NewBB);
 

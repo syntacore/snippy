@@ -46,7 +46,8 @@ public:
   }
 
   std::unique_ptr<TargetGenContextInterface>
-  createTargetContext(const GeneratorContext &Ctx) const override {
+  createTargetContext(LLVMState &State, const GeneratorSettings &GenSettings,
+                      const TargetSubtargetInfo *STI) const override {
     reportUnimplementedError();
   }
 
@@ -63,8 +64,8 @@ public:
   }
 
   std::vector<Register>
-  getRegsForSelfcheck(const MachineInstr &MI, const MachineBasicBlock &MBB,
-                      const GeneratorContext &GenCtx) const override {
+  getRegsForSelfcheck(const MachineInstr &MI,
+                      InstructionGenerationContext &IGC) const override {
     reportUnimplementedError();
   }
 
@@ -130,12 +131,13 @@ public:
     reportUnimplementedError();
   }
 
-  unsigned getRegBitWidth(MCRegister Reg, GeneratorContext &GC) const override {
+  unsigned getRegBitWidth(MCRegister Reg,
+                          InstructionGenerationContext &IGC) const override {
     reportUnimplementedError();
   }
 
-  MCRegister regIndexToMCReg(unsigned RegIdx, RegStorageType Storage,
-                             GeneratorContext &GC) const override {
+  MCRegister regIndexToMCReg(InstructionGenerationContext &IGC, unsigned RegIdx,
+                             RegStorageType Storage) const override {
     reportUnimplementedError();
   }
 
@@ -152,8 +154,9 @@ public:
     reportUnimplementedError();
   }
 
-  unsigned getSpillSizeInBytes(MCRegister Reg,
-                               GeneratorContext &GC) const override {
+  unsigned
+  getSpillSizeInBytes(MCRegister Reg,
+                      InstructionGenerationContext &IGC) const override {
     reportUnimplementedError();
   }
 
@@ -188,9 +191,9 @@ public:
     reportUnimplementedError();
   }
 
-  unsigned getTransformSequenceLength(APInt OldValue, APInt NewValue,
-                                      MCRegister Register,
-                                      GeneratorContext &GC) const override {
+  unsigned getTransformSequenceLength(InstructionGenerationContext &IGC,
+                                      APInt OldValue, APInt NewValue,
+                                      MCRegister Register) const override {
     reportUnimplementedError();
   }
   void transformValueInReg(InstructionGenerationContext &IGC, APInt OldValue,
@@ -206,7 +209,8 @@ public:
   }
 
   virtual MachineOperand
-  generateTargetOperand(GeneratorContext &SGCtx, unsigned OpCode,
+  generateTargetOperand(SnippyProgramContext &ProgCtx,
+                        const GeneratorSettings &GenSettings, unsigned OpCode,
                         unsigned OpType,
                         const StridedImmediate &StridedImm) const override {
     reportUnimplementedError();
@@ -215,7 +219,7 @@ public:
   unsigned getMaxInstrSize() const override { reportUnimplementedError(); }
 
   std::set<unsigned>
-  getPossibleInstrsSize(const GeneratorContext &GC) const override {
+  getPossibleInstrsSize(const TargetSubtargetInfo &STI) const override {
     reportUnimplementedError();
   }
 
@@ -258,14 +262,14 @@ public:
     reportUnimplementedError();
   }
 
-  MachineBasicBlock *generateBranch(const MCInstrDesc &InstrDesc,
-                                    MachineBasicBlock &MBB,
-                                    GeneratorContext &GC) const override {
+  MachineBasicBlock *
+  generateBranch(InstructionGenerationContext &IGC,
+                 const MCInstrDesc &InstrDesc) const override {
     reportUnimplementedError();
   }
 
   bool relaxBranch(MachineInstr &Branch, unsigned Distance,
-                   GeneratorContext &GC) const override {
+                   SnippyProgramContext &ProgCtx) const override {
     reportUnimplementedError();
   }
 
@@ -317,8 +321,8 @@ public:
   }
 
   const MCRegisterClass &
-  getMCRegClassForBranch(const MachineInstr &Instr,
-                         GeneratorContext &GC) const override {
+  getMCRegClassForBranch(SnippyProgramContext &ProgCtx,
+                         const MachineInstr &Instr) const override {
     reportUnimplementedError();
   }
 
@@ -336,7 +340,7 @@ public:
   unsigned getLoopOverhead() const override { reportUnimplementedError(); }
 
   unsigned getInstrSize(const MachineInstr &Inst,
-                        const GeneratorContext &GC) const override {
+                        LLVMState &State) const override {
     reportUnimplementedError();
   }
 
@@ -351,9 +355,9 @@ public:
   }
 
   LoopCounterInsertionResult
-  insertLoopCounter(MachineBasicBlock::iterator Pos, MachineInstr &Branch,
+  insertLoopCounter(InstructionGenerationContext &IGC, MachineInstr &Branch,
                     ArrayRef<Register> ReservedRegs, unsigned NIter,
-                    GeneratorContext &GC, RegToValueType &ExitingValues,
+                    RegToValueType &ExitingValues,
                     unsigned RegCounterOffset) const override {
     reportUnimplementedError();
   }
@@ -367,13 +371,14 @@ public:
   }
 
   std::pair<AddressParts, MemAddresses>
-  breakDownAddr(AddressInfo AddrInfo, const MachineInstr &MI, unsigned AddrIdx,
-                GeneratorContext &GC) const override {
+  breakDownAddr(InstructionGenerationContext &IGC, AddressInfo AddrInfo,
+                const MachineInstr &MI, unsigned AddrIdx) const override {
     reportUnimplementedError();
   }
 
-  unsigned getWriteValueSequenceLength(APInt Value, MCRegister Register,
-                                       GeneratorContext &GC) const override {
+  unsigned getWriteValueSequenceLength(InstructionGenerationContext &IGC,
+                                       APInt Value,
+                                       MCRegister Register) const override {
     reportUnimplementedError();
   }
   void writeValueToReg(InstructionGenerationContext &IGC, APInt Value,
@@ -402,7 +407,7 @@ public:
   }
 
   std::tuple<size_t, size_t>
-  getAccessSizeAndAlignment(unsigned Opcode, GeneratorContext &GC,
+  getAccessSizeAndAlignment(SnippyProgramContext &ProgCtx, unsigned Opcode,
                             const MachineBasicBlock &MBB) const override {
     reportUnimplementedError();
   }
@@ -412,8 +417,8 @@ public:
     reportUnimplementedError();
   }
 
-  std::vector<Register> excludeRegsForOperand(const MCRegisterClass &RC,
-                                              const GeneratorContext &GC,
+  std::vector<Register> excludeRegsForOperand(InstructionGenerationContext &IGC,
+                                              const MCRegisterClass &RC,
                                               const MCInstrDesc &InstrDesc,
                                               unsigned Operand) const override {
     reportUnimplementedError();
@@ -423,10 +428,9 @@ public:
     reportUnimplementedError();
   }
 
-  void reserveRegsIfNeeded(unsigned Opcode, bool isDst, bool isMem,
-                           Register Reg, RegPoolWrapper &RP,
-                           GeneratorContext &GC,
-                           const MachineBasicBlock &MBB) const override {
+  void reserveRegsIfNeeded(InstructionGenerationContext &IGC, unsigned Opcode,
+                           bool isDst, bool isMem,
+                           Register Reg) const override {
     reportUnimplementedError();
   }
 
@@ -459,18 +463,18 @@ public:
   bool isCall(unsigned Opcode) const override { reportUnimplementedError(); }
 
   std::vector<OpcodeHistogramEntry>
-  getPolicyOverrides(const MachineBasicBlock &MBB,
-                     const GeneratorContext &GC) const override {
+  getPolicyOverrides(const SnippyProgramContext &ProgCtx,
+                     const MachineBasicBlock &MBB) const override {
     reportUnimplementedError();
   }
 
-  bool groupMustHavePrimaryInstr(const MachineBasicBlock &MBB,
-                                 const GeneratorContext &GC) const override {
+  bool groupMustHavePrimaryInstr(const SnippyProgramContext &ProgCtx,
+                                 const MachineBasicBlock &MBB) const override {
     reportUnimplementedError();
   }
   std::function<bool(unsigned)>
-  getDefaultPolicyFilter(const MachineBasicBlock &MBB,
-                         const GeneratorContext &GC) const override {
+  getDefaultPolicyFilter(const SnippyProgramContext &ProgCtx,
+                         const MachineBasicBlock &MBB) const override {
     reportUnimplementedError();
   }
 
@@ -496,7 +500,7 @@ public:
     reportUnimplementedError();
   }
 
-  uint8_t getCodeAlignment(const GeneratorContext &GC) const override {
+  uint8_t getCodeAlignment(const TargetSubtargetInfo &STI) const override {
     reportUnimplementedError();
   }
 

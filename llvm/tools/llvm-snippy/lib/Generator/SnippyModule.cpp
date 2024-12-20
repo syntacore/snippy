@@ -24,7 +24,7 @@ template class GenResultT<ObjectFile>;
 template class GenResultT<ObjectMetadata>;
 
 SnippyModule::SnippyModule(LLVMState &State, StringRef Name)
-    : State(State), M(Name, State.getCtx()), Context([&]() {
+    : Module(Name, State.getCtx()), State(State), Context([&]() {
         auto &LLVMTM = State.getTargetMachine();
         // Previously, AsmPrinter was created using Context from MMI
         // MMI is captured by PM, so in order to avoid potential invalid ref,
@@ -39,7 +39,7 @@ SnippyModule::SnippyModule(LLVMState &State, StringRef Name)
       MMIWP(std::make_unique<MachineModuleInfoWrapperPass>(
           &State.getTargetMachine(), Context.get())),
       MMI(MMIWP->getMMI()) {
-  M.setDataLayout(State.getTargetMachine().createDataLayout());
+  setDataLayout(State.getTargetMachine().createDataLayout());
 }
 
 void SnippyModule::generateObject(const PassInserter &BeforePrinter,
@@ -72,7 +72,7 @@ void SnippyModule::generateObject(const PassInserter &BeforePrinter,
       State.getTargetMachine(), std::move(ObjStreamer));
   PPM->add(AsmPrinter.release());
   std::invoke(AfterPrinter, *PPM);
-  PPM->run(M);
+  PPM->run(getModule());
   addGenResult<ObjectFile>(std::move(GeneratedObject));
 
   outs().flush(); // FIXME: this is currently needed because
@@ -267,6 +267,17 @@ SnippyProgramContext::SnippyProgramContext(
   initializeSelfcheckSection(Settings);
   initializeUtilitySection(Settings);
   initializeROMSection(Settings);
+}
+
+void SnippyProgramContext::createTargetContext(
+    const GeneratorSettings &GenSettings) {
+  assert(!TargetContext && "Double context insertion");
+  // FIXME: currently there is not way to pass TargetSubtargetInfo
+  // because TargetContext is expected to be initialized before any
+  // function is created. This should not cause much trouble now,
+  // because STI is unused most of the time.
+  TargetContext = State->getSnippyTarget().createTargetContext(
+      *State, GenSettings, /* TargetSubtargetInfo */ nullptr);
 }
 
 SnippyProgramContext::~SnippyProgramContext() = default;

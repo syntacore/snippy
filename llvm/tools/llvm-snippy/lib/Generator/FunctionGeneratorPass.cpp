@@ -167,21 +167,25 @@ MachineFunction &FunctionGenerator::createFunction(
     GeneratorContext &SGCtx, Module &M, StringRef Name, StringRef SectionName,
     Function::LinkageTypes Linkage, size_t NumInstr) {
 
-  auto &State = SGCtx.getLLVMState();
+  auto &ProgCtx = SGCtx.getProgramContext();
+  auto &State = ProgCtx.getLLVMState();
   std::string FinalName =
       SectionName.empty() || Linkage != Function::InternalLinkage
           ? std::string(Name)
           : (Twine(SectionName) + "." + Name).str();
   auto &MF = State.createMachineFunctionFor(
       State.createFunction(M, FinalName, SectionName, Linkage),
-      SGCtx.getMainModule().getMMI()
-  );
+      SnippyModule::fromModule(M).getMMI());
   auto &Props = MF.getProperties();
+  auto &SnippyTgt = State.getSnippyTarget();
+  auto &GenSettings = SGCtx.getGenSettings();
+  auto &OpCC = ProgCtx.getOpcodeCache();
   // FIXME: currently we don't keep liveness when creating and filling new BB
-  auto IsRegsInit = SGCtx.getGenSettings().RegistersConfig.InitializeRegs;
-  if (SGCtx.hasCFInstrs() || SGCtx.hasCallInstrs() || IsRegsInit)
+  auto IsRegsInit = GenSettings.RegistersConfig.InitializeRegs;
+  if (GenSettings.hasCFInstrs(OpCC) ||
+      GenSettings.hasCallInstrs(OpCC, SnippyTgt) || IsRegsInit)
     Props.reset(MachineFunctionProperties::Property::TracksLiveness);
-  auto *MBB = createMachineBasicBlock(MF, SGCtx);
+  auto *MBB = createMachineBasicBlock(MF);
   assert(MBB);
   MF.push_back(MBB);
   setRequestedInstrNum(MF, NumInstr);
@@ -236,17 +240,19 @@ void FunctionGenerator::initRootFunctions(Module &M, StringRef EntryPointName) {
 std::vector<FunctionGenerator::RootFnPlacement>
 FunctionGenerator::distributeRootFunctions() {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &Linker = SGCtx.getLinker();
-  if (!SGCtx.getGenSettings().InstrsGenerationConfig.ChainedRXSectionsFill)
-    return {RootFnPlacement(std::string{""},
-                            SGCtx.getRequestedInstrsNumForMainFunction())};
+  auto &ProgCtx = SGCtx.getProgramContext();
+  auto &Linker = ProgCtx.getLinker();
+  auto &GenSettings = SGCtx.getGenSettings();
+  if (!GenSettings.InstrsGenerationConfig.ChainedRXSectionsFill)
+    return {RootFnPlacement(
+        std::string{""}, GenSettings.getRequestedInstrsNumForMainFunction())};
 
   auto Sections = prepareRXSections();
 
   std::vector<RootFnPlacement> Ret;
-  auto GetInstrNum = [&SGCtx](auto SectionSize) {
+  auto GetInstrNum = [&SGCtx, &GenSettings](auto SectionSize) {
     return static_cast<size_t>(std::llround(
-        (double)SGCtx.getRequestedInstrsNumForMainFunction() *
+        (double)GenSettings.getRequestedInstrsNumForMainFunction() *
         ((double)SectionSize /
          (double)SGCtx.getGenSettings().Cfg.Sections.getSectionsSize(Acc::X))));
   };
@@ -312,7 +318,8 @@ void FunctionGenerator::initExecutionPath() {
   auto &ExecutionPath = get<GlobalCodeFlowInfo>().ExecutionPath;
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &Settings = SGCtx.getGenSettings();
-  auto &State = SGCtx.getLLVMState();
+  auto &ProgCtx = SGCtx.getProgramContext();
+  auto &State = ProgCtx.getLLVMState();
   auto &L = SGCtx.getProgramContext().getLinker();
   assert(L.sections().hasOutputSectionFor(Linker::kDefaultTextSectionName));
   auto DefaultCodeSection =
@@ -349,10 +356,11 @@ void FunctionGenerator::initExecutionPath() {
 
 bool FunctionGenerator::runOnModule(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &State = SGCtx.getLLVMState();
+  auto &ProgCtx = SGCtx.getProgramContext();
+  auto &State = ProgCtx.getLLVMState();
   auto &Ctx = State.getCtx();
   auto &LLVMTM = State.getTargetMachine();
-  StringRef ABIName = SGCtx.getABIName();
+  StringRef ABIName = SGCtx.getGenSettings().getABIName();
   initExecutionPath();
   if (ABIName.size()) {
     auto *ABINameMD = MDString::get(Ctx, ABIName);
@@ -373,7 +381,8 @@ bool FunctionGenerator::runOnModule(Module &M) {
 
 bool FunctionGenerator::readFromYaml(Module &M, const FunctionDescs &FDs) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &State = SGCtx.getLLVMState();
+  auto &ProgCtx = SGCtx.getProgramContext();
+  auto &State = ProgCtx.getLLVMState();
   auto &CGS = get<GlobalCodeFlowInfo>().CGS;
   auto &Descs = FDs.Descs;
 
@@ -432,8 +441,9 @@ bool FunctionGenerator::readFromYaml(Module &M, const FunctionDescs &FDs) {
 bool FunctionGenerator::generateDefault(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &CGS = get<GlobalCodeFlowInfo>().CGS;
+  const auto &CGL = SGCtx.getGenSettings().getCallGraphLayout();
   // Create functions.
-  auto NumF = SGCtx.getCallGraphLayout().FunctionNumber;
+  auto NumF = CGL.FunctionNumber;
 
   assert(NumF && "Expected NumF >= 1");
 
@@ -466,10 +476,9 @@ bool FunctionGenerator::generateDefault(Module &M) {
   //      unreachable from root node after previous steps will get connected
   //      with a randomly selected reachable node accoring to rule in step 2.
 
-  auto MaxLayer = SGCtx.getCallGraphLayout().MaxLayers;
+  auto MaxLayer = CGL.MaxLayers;
   assert(MaxLayer && "MaxLayer must be at least 1");
-  auto FunctionPerLayer =
-      divideCeil(SGCtx.getCallGraphLayout().FunctionNumber - 1u, MaxLayer);
+  auto FunctionPerLayer = divideCeil(CGL.FunctionNumber - 1u, MaxLayer);
   if (FunctionPerLayer == 0)
     return true;
 

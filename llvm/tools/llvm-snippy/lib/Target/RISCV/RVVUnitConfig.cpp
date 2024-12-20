@@ -1135,7 +1135,7 @@ auto constructGeneratorsFromWeightedIds(
 }
 
 RVVConfigurationInfo
-RVVConfigurationInfo::createDefault(const GeneratorContext &GenCtx,
+RVVConfigurationInfo::createDefault(const GeneratorSettings &GenSettings,
                                     unsigned VLEN) {
   std::vector<RVVConfiguration> Configurations = {{}};
 
@@ -1145,9 +1145,9 @@ RVVConfigurationInfo::createDefault(const GeneratorContext &GenCtx,
   std::vector<VMGeneratorHolder> VMGen;
   VMGen.push_back(std::make_unique<UnmaskedVMGenerator>());
 
-  auto ModeSwitchInfo = deriveModeSwitchingProbability(
-      GenCtx.getConfig(), /* mode switch bias*/ 0.0,
-      /* set vill bit bias*/ 0.0);
+  auto ModeSwitchInfo =
+      deriveModeSwitchingProbability(GenSettings.Cfg, /* mode switch bias*/ 0.0,
+                                     /* set vill bit bias*/ 0.0);
   if (ModeSwitchInfo.RVVPresentInHistogram &&
       !ModeSwitchInfo.VSETPresentInHistogram) {
     snippy::fatal("No VSET instruction detected in histogram");
@@ -1162,12 +1162,11 @@ RVVConfigurationInfo::createDefault(const GeneratorContext &GenCtx,
 }
 
 RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
-    const GeneratorContext &GenCtx, unsigned VLEN,
+    const GeneratorSettings &GenSettings, unsigned VLEN,
     std::unique_ptr<RVVConfigInterface> &&Iface) {
   const RVVConfigurationSpace CS =
       Iface ? Iface->getImpl<RVVConfig>().getRVVConfigurationSpace().value()
-            : GenCtx.getGenSettings()
-                  .Cfg.TargetConfig->getImpl<RISCVConfigInterface>()
+            : GenSettings.Cfg.TargetConfig->getImpl<RISCVConfigInterface>()
                   .RVVConfig->getImpl<RVVConfig>()
                   .getRVVConfigurationSpace()
                   .value();
@@ -1184,7 +1183,7 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
       constructGeneratorsFromWeightedIds<VMGeneratorHolder>(VLVMRules.VM);
 
   auto ModeSwitchInfo = deriveModeSwitchingProbability(
-      GenCtx.getConfig(), CS.Guides.ModeChangeP, CS.Guides.SetVillP);
+      GenSettings.Cfg, CS.Guides.ModeChangeP, CS.Guides.SetVillP);
 
   if (!CS.Guides.Enabled && !ModeSwitchInfo.VSETPresentInHistogram)
     snippy::fatal("No VSET instruction detected in histogram");
@@ -1319,22 +1318,21 @@ RVVConfigurationInfo::RVVConfigurationInfo(
       VMGen(std::move(VMGen)), SwitchInfo(SwitchInfo),
       ArtificialModeChange(EnableGuides) {}
 
-RISCVConfigurationInfo
-RISCVConfigurationInfo::constructConfiguration(const GeneratorContext &GenCtx) {
-  auto &Ctx = GenCtx.getLLVMState().getCtx();
-  const auto &TM = GenCtx.getLLVMState().getTargetMachine();
+RISCVConfigurationInfo RISCVConfigurationInfo::constructConfiguration(
+    LLVMState &State, const GeneratorSettings &GenSettings) {
+  auto &Ctx = State.getCtx();
+  const auto &TM = State.getTargetMachine();
   auto ArchInfo =
       RISCVConfigurationInfo::deriveArchitecturalInformation(Ctx, TM);
   auto BaseCfg = BaseConfigurationInfo(ArchInfo.XLEN);
   auto RVVCfg =
-      GenCtx.getGenSettings()
-              .Cfg.TargetConfig->getImpl<RISCVConfigInterface>()
+      GenSettings.Cfg.TargetConfig->getImpl<RISCVConfigInterface>()
               .RVVConfig->getImpl<RVVConfig>()
               .getRVVConfigurationSpace()
               .has_value()
-          ? RVVConfigurationInfo::buildConfiguration(GenCtx, ArchInfo.VLEN,
+          ? RVVConfigurationInfo::buildConfiguration(GenSettings, ArchInfo.VLEN,
                                                      nullptr)
-          : RVVConfigurationInfo::createDefault(GenCtx, ArchInfo.VLEN);
+          : RVVConfigurationInfo::createDefault(GenSettings, ArchInfo.VLEN);
   return RISCVConfigurationInfo(std::move(BaseCfg), std::move(RVVCfg));
 }
 

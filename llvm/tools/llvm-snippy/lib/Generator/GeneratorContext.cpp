@@ -167,13 +167,6 @@ SectionDesc allocateRWSection(SectionsDescriptions &Sections,
 }
 } // namespace
 
-bool GeneratorContext::hasCallInstrs() const {
-  auto &State = getProgramContext().getLLVMState();
-  auto &SnippyTgt = State.getSnippyTarget();
-  return GenSettings->Cfg.Histogram.hasCallInstrs(
-      getProgramContext().getOpcodeCache(), SnippyTgt);
-}
-
 void GeneratorContext::diagnoseSelfcheckSection(size_t MinSize) const {
   auto &State = getProgramContext().getLLVMState();
   auto &SelfcheckSection = getProgramContext().getSelfcheckSection();
@@ -316,8 +309,7 @@ GeneratorSettings::getCompleteSectionList(LLVMState &State) const {
 
 GeneratorContext::GeneratorContext(SnippyProgramContext &ProgContext,
                                    GeneratorSettings &Settings)
-    : ProgContext(ProgContext), MainModule(ProgContext.getLLVMState(), "main"),
-      GenSettings(&Settings), MemAccSampler([&] {
+    : ProgContext(ProgContext), GenSettings(&Settings), MemAccSampler([&] {
         std::vector<SectionDesc> RWSections;
         llvm::copy_if(Settings.Cfg.Sections, std::back_inserter(RWSections),
                       [](auto &Desc) { return Desc.M.W() && Desc.M.R(); });
@@ -339,18 +331,12 @@ GeneratorContext::GeneratorContext(SnippyProgramContext &ProgContext,
         Samplers.emplace_back(std::move(PluginSampler));
         Samplers.emplace_back(std::move(RandSampler));
         return TopLevelMemoryAccessSampler(Samplers.begin(), Samplers.end());
-      }()),
-      FloatOverwriteSamplers(
-          [&]() -> std::optional<FloatSemanticsSamplerHolder> {
-            if (const auto &FPUConfig = GenSettings->Cfg.FPUConfig;
-                FPUConfig.has_value() && FPUConfig->Overwrite.has_value())
-              return FloatSemanticsSamplerHolder(*FPUConfig->Overwrite);
-            return std::nullopt;
-          }()) {
+      }()) {
   auto &State = ProgContext.getLLVMState();
+  auto &SnippyTgt = State.getSnippyTarget();
   auto &Ctx = State.getCtx();
-
-  if (hasCallInstrs()) {
+  auto &OpCC = ProgContext.getOpcodeCache();
+  if (GenSettings->hasCallInstrs(OpCC, SnippyTgt)) {
     const auto &RI = State.getRegInfo();
     auto RA = RI.getRARegister();
     if (ProgContext.getRegisterPool().isReserved(RA))
@@ -370,7 +356,8 @@ GeneratorContext::GeneratorContext(SnippyProgramContext &ProgContext,
       snippy::fatal(Ctx, "Cannot spill requested registers",
                     "no stack space allocated.");
 
-    if (hasCallInstrs() && GenSettings->Cfg.CGLayout.MaxLayers > 1u)
+    if (GenSettings->hasCallInstrs(OpCC, SnippyTgt) &&
+        GenSettings->Cfg.CGLayout.MaxLayers > 1u)
       snippy::fatal(
           State.getCtx(), "Cannot generate requested call instructions",
           "layout allows calls with depth>=1 but stack space is not provided.");
@@ -397,27 +384,7 @@ GeneratorContext::GeneratorContext(SnippyProgramContext &ProgContext,
           SectionsDescriptions::SelfcheckSectionName) &&
       Settings.TrackingConfig.SelfCheckPeriod)
     diagnoseSelfcheckSection(getMinimumSelfcheckSize(*GenSettings));
-}
-
-void GeneratorContext::attachTargetContext(
-    std::unique_ptr<TargetGenContextInterface> TgtContext) {
-  TargetContext = std::move(TgtContext);
-}
-
-planning::GenPolicy GeneratorContext::createGenPolicy(
-    const MachineBasicBlock &MBB,
-    std::unordered_map<unsigned, double> WeightOverrides) const {
-  auto &Tgt = getLLVMState().getSnippyTarget();
-  auto Filter = Tgt.getDefaultPolicyFilter(MBB, *this);
-  auto MustHavePrimaryInstrs = Tgt.groupMustHavePrimaryInstr(MBB, *this);
-  auto Overrides = Tgt.getPolicyOverrides(MBB, *this);
-  if (isApplyValuegramEachInstr())
-    return planning::ValuegramGenPolicy(*this, std::move(Filter),
-                                        MustHavePrimaryInstrs,
-                                        std::move(Overrides), WeightOverrides);
-  return planning::DefaultGenPolicy(*this, std::move(Filter),
-                                    MustHavePrimaryInstrs, std::move(Overrides),
-                                    WeightOverrides);
+  ProgContext.createTargetContext(Settings);
 }
 
 } // namespace snippy

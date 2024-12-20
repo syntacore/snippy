@@ -110,14 +110,15 @@ void writeMIRFile(StringRef Data) {
 
 } // namespace
 
-static void dumpVerificationIntervalsIfNeeeded(StringRef Output,
+static void dumpVerificationIntervalsIfNeeeded(SnippyModule &SM,
                                                const GeneratorContext &GenCtx) {
   if (!RegionsToVerify.isSpecified())
     return;
 
-  auto &State = GenCtx.getLLVMState();
+  StringRef Output = SM.getGeneratedObject();
+  auto &ProgCtx = GenCtx.getProgramContext();
+  auto &State = ProgCtx.getLLVMState();
   auto &Ctx = State.getCtx();
-  auto &SM = GenCtx.getMainModule();
   ObjectMetadata NullObjMeta{};
   auto &Meta = SM.hasGenResult<ObjectMetadata>()
                    ? SM.getGenResult<ObjectMetadata>()
@@ -125,7 +126,7 @@ static void dumpVerificationIntervalsIfNeeeded(StringRef Output,
   auto VerificationIntervals = IntervalsToVerify::createFromObject(
       State.getDisassembler(), Output,
       GenCtx.getProgramContext().getEntryPointName(),
-      GenCtx.getLinker().sections().getOutputSectionFor(".text").Desc.VMA,
+      ProgCtx.getLinker().sections().getOutputSectionFor(".text").Desc.VMA,
       Meta.EntryPrologueInstrCnt, Meta.EntryEpilogueInstrCnt);
 
   if (!VerificationIntervals)
@@ -162,14 +163,12 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
                                    GenSettings.getSnippyProgramSettings(State));
 
   const auto &SnippyTgt = State.getSnippyTarget();
+  auto MainModule = SnippyModule(ProgContext.getLLVMState(), "main");
 
   GeneratorContext GenCtx(ProgContext, GenSettings);
-  GenCtx.attachTargetContext(SnippyTgt.createTargetContext(GenCtx));
 
   std::string MIR;
   raw_string_ostream MIROS(MIR);
-
-  auto &MainModule = GenCtx.getMainModule();
 
   MainModule.generateObject(
       [&](PassManagerWrapper &PM) {
@@ -190,7 +189,6 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
         PM.add(createRegsInitInsertionPass(
             GenSettings.RegistersConfig.InitializeRegs));
         SnippyTgt.addTargetSpecificPasses(PM);
-
         // Pre backtrack end
 
         PM.add(createBlockGenPlanWrapperPass());
@@ -232,11 +230,10 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
 
   if (DumpMIR.isSpecified())
     writeMIRFile(MIR);
-  std::vector<const SnippyModule *> Modules{&GenCtx.getMainModule()};
+  std::vector<const SnippyModule *> Modules{&MainModule};
   auto Result = ProgContext.generateELF(Modules);
 
-  dumpVerificationIntervalsIfNeeeded(
-      GenCtx.getMainModule().getGeneratedObject(), GenCtx);
+  dumpVerificationIntervalsIfNeeeded(MainModule, GenCtx);
 
   if (GenSettings.ModelPluginConfig.RunOnModel) {
     auto SnippetImageForModelExecution =
@@ -245,7 +242,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
     auto RI = SimulatorContext::RunInfo{
         SnippetImageForModelExecution,
         ProgContext,
-        GenCtx.getMainModule(),
+        MainModule,
         GenSettings.RegistersConfig.InitialStateOutputYaml,
         GenSettings.RegistersConfig.FinalStateOutputYaml,
         SelfCheckMem,
@@ -253,8 +250,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
         MemorySectionFile.getValue(),
         GenSettings.BaseFileName};
 
-    auto &SimCtx =
-        GenCtx.getMainModule().getGenResult<OwningSimulatorContext>();
+    auto &SimCtx = MainModule.getGenResult<OwningSimulatorContext>();
     SimCtx.runSimulator(RI);
 
   } else {

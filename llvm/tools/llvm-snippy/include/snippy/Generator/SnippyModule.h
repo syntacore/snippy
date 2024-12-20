@@ -50,11 +50,15 @@ struct ObjectFile final {
 extern template class GenResultT<ObjectFile>;
 extern template class GenResultT<ObjectMetadata>;
 
-class SnippyModule final {
+class SnippyModule final : private Module {
 public:
   SnippyModule(LLVMState &State, StringRef Name);
 
-  const auto &getModule() const { return M; }
+  const auto &getModule() const { return static_cast<const Module &>(*this); }
+  auto &getModule() { return static_cast<Module &>(*this); }
+  static SnippyModule &fromModule(Module &M) {
+    return static_cast<SnippyModule &>(M);
+  }
 
   template <typename T> bool hasGenResult() const {
     return llvm::any_of(Results,
@@ -88,8 +92,6 @@ public:
     return addGenResult<T>(std::forward<Types>(Args)...);
   }
 
-  auto &getModule() { return M; }
-
   auto &getMMI() const { return MMI; }
 
   const auto &getLLVMState() const { return State; }
@@ -107,7 +109,6 @@ public:
 
 private:
   LLVMState &State;
-  Module M;
   std::unique_ptr<MCContext> Context;
   std::unique_ptr<MachineModuleInfoWrapperPass> MMIWP;
   MachineModuleInfo &MMI;
@@ -212,6 +213,15 @@ public:
   const auto &getProgramStateSaveSpace() const { return *PGSK; }
   auto &getProgramStateSaveSpace() { return *PGSK; }
 
+  TargetGenContextInterface &getTargetContext() const {
+    assert(TargetContext && "no target context");
+    return *TargetContext;
+  }
+
+  // TODO: We should define a subset of GeneratorSettings that is enough for
+  // TargetContext initialization.
+  void createTargetContext(const GeneratorSettings &GenSettings);
+
 private:
   friend RootRegPoolWrapper;
   void initializeStackSection(const SnippyProgramSettings &Settings);
@@ -236,6 +246,8 @@ private:
   std::optional<SectionDesc> UtilitySection;
   std::unique_ptr<ProgramGlobalStateKeeper> PGSK;
   std::map<Module *, std::unique_ptr<GlobalsPool>> PerModuleGPs;
+  std::unique_ptr<TargetGenContextInterface> TargetContext;
+
   MCRegister StackPointer;
   bool MangleExportedNames;
   std::string EntryPointName;
