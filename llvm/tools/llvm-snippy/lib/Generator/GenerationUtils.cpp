@@ -52,9 +52,9 @@ static snippy::opt<unsigned> BurstAddressRandomizationThreshold(
 // AddressRestrictions: base address = 10, min offset = -5 , max offset = 5 -->
 // effective addresses were shrinked to [5, 15]
 AddressInfo
-selectAddressForSingleInstrFromBurstGroup(AddressInfo OrigAI,
-                                          const AddressRestriction &OpcodeAR,
-                                          GeneratorContext &GC) {
+selectAddressForSingleInstrFromBurstGroup(InstructionGenerationContext &IGC,
+                                          AddressInfo OrigAI,
+                                          const AddressRestriction &OpcodeAR) {
   if (OrigAI.MinOffset != 0 || OrigAI.MaxOffset != 0 ||
       (OpcodeAR.ImmOffsetRange.getMin() == 0 &&
        OpcodeAR.ImmOffsetRange.getMax() == 0)) {
@@ -64,7 +64,7 @@ selectAddressForSingleInstrFromBurstGroup(AddressInfo OrigAI,
     return OrigAI;
   }
 
-  auto &MS = GC.getMemoryAccessSampler();
+  auto &MS = IGC.getMemoryAccessSampler();
   auto OrigAddr = OrigAI.Address;
   assert(OpcodeAR.Opcodes.size() == 1 &&
          "Expected AddressRestriction only for one opcode");
@@ -178,24 +178,25 @@ static Register pregenerateRegister(InstructionGenerationContext &InstrGenCtx,
                                     const MCInstrDesc &InstrDesc,
                                     const MCOperandInfo &MCOpInfo,
                                     unsigned OpIndex) {
-  auto &GC = InstrGenCtx.GC;
   auto &MBB = InstrGenCtx.MBB;
   auto &RP = InstrGenCtx.getRegPool();
-  const auto &State = GC.getLLVMState();
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  const auto &State = ProgCtx.getLLVMState();
   const auto &RegInfo = State.getRegInfo();
   const auto &Tgt = State.getSnippyTarget();
   auto OperandRegClassID = InstrDesc.operands()[OpIndex].RegClass;
   auto RegClass = Tgt.getRegClass(InstrGenCtx, OperandRegClassID, OpIndex,
                                   InstrDesc.getOpcode(), RegInfo);
-  auto Exclude = Tgt.excludeRegsForOperand(RegClass, GC, InstrDesc, OpIndex);
+  auto Exclude =
+      Tgt.excludeRegsForOperand(InstrGenCtx, RegClass, InstrDesc, OpIndex);
   auto Include = Tgt.includeRegs(RegClass);
   AccessMaskBit Mask = AccessMaskBit::RW;
-  auto CustomMask = Tgt.getCustomAccessMaskForOperand(GC, InstrDesc, OpIndex);
+  auto CustomMask = Tgt.getCustomAccessMaskForOperand(InstrDesc, OpIndex);
   if (CustomMask != AccessMaskBit::None)
     Mask = CustomMask;
-  auto RegOpt = GC.getProgramContext().getRegGen().generate(
-      RegClass, OperandRegClassID, RegInfo, RP, MBB, Tgt, Exclude, Include,
-      Mask);
+  auto RegOpt =
+      ProgCtx.getRegGen().generate(RegClass, OperandRegClassID, RegInfo, RP,
+                                   MBB, Tgt, Exclude, Include, Mask);
   assert(RegOpt.has_value());
   return RegOpt.value();
 }
@@ -205,10 +206,10 @@ selectInitializableOperandsRegisters(InstructionGenerationContext &InstrGenCtx,
                                      const MCInstrDesc &InstrDesc) {
   std::vector<planning::PreselectedOpInfo> Preselected;
   Preselected.reserve(InstrDesc.getNumOperands());
-  auto &GC = InstrGenCtx.GC;
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
   llvm::transform(
       llvm::enumerate(InstrDesc.operands()), std::back_inserter(Preselected),
-      [&, &Tgt = GC.getLLVMState().getSnippyTarget()](
+      [&, &Tgt = ProgCtx.getLLVMState().getSnippyTarget()](
           const auto &&Args) -> planning::PreselectedOpInfo {
         const auto &[OpIndex, MCOpInfo] = Args;
         // If it is TIED_TO, this register is already selected.
@@ -266,16 +267,18 @@ selectOperands(const MCInstrDesc &InstrDesc, unsigned BaseReg,
 }
 
 std::vector<planning::PreselectedOpInfo> selectConcreteOffsets(
-    const MCInstrDesc &InstrDesc,
-    const std::vector<planning::PreselectedOpInfo> &Preselected,
-    GeneratorContext &GC) {
+    InstructionGenerationContext &IGC, const MCInstrDesc &InstrDesc,
+    const std::vector<planning::PreselectedOpInfo> &Preselected) {
   auto MappedRange = map_range(
       enumerate(Preselected), [&](auto &&Args) -> planning::PreselectedOpInfo {
         auto &[Idx, Operand] = Args;
         if (Operand.isImm()) {
           auto OpType = InstrDesc.operands()[Idx].OperandType;
-          auto &Tgt = GC.getLLVMState().getSnippyTarget();
-          auto Concrete = Tgt.generateTargetOperand(GC, InstrDesc.getOpcode(),
+          auto &ProgCtx = IGC.ProgCtx;
+          auto &GenSettings = IGC.GenSettings;
+          auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
+          auto Concrete = Tgt.generateTargetOperand(ProgCtx, GenSettings,
+                                                    InstrDesc.getOpcode(),
                                                     OpType, Operand.getImm());
           return StridedImmediate(Concrete.getImm(), Concrete.getImm(),
                                   Operand.getImm().getStride());
@@ -420,10 +423,11 @@ std::map<unsigned, AddressRestriction> deduceStrongestRestrictions(
 }
 
 std::map<unsigned, AddressRestriction>
-collectAddressRestrictions(ArrayRef<unsigned> Opcodes, GeneratorContext &GC,
+collectAddressRestrictions(ArrayRef<unsigned> Opcodes,
+                           SnippyProgramContext &ProgCtx,
                            const MachineBasicBlock &MBB) {
   std::map<unsigned, AddressRestriction> OpcodeToAR;
-  const auto &State = GC.getLLVMState();
+  const auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   const auto &InstrInfo = State.getInstrInfo();
   for (auto Opcode : Opcodes) {
@@ -435,7 +439,7 @@ collectAddressRestrictions(ArrayRef<unsigned> Opcodes, GeneratorContext &GC,
     AddressRestriction AR;
     AR.Opcodes.insert(Opcode);
     std::tie(AR.AccessSize, AR.AccessAlignment) =
-        SnippyTgt.getAccessSizeAndAlignment(Opcode, GC, MBB);
+        SnippyTgt.getAccessSizeAndAlignment(ProgCtx, Opcode, MBB);
     AR.ImmOffsetRange = SnippyTgt.getImmOffsetRangeForMemAccessInst(InstrDesc);
 
     assert(!OpcodeToAR.count(Opcode) ||
@@ -452,8 +456,9 @@ generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
     return {};
   auto &MBB = InstrGenCtx.MBB;
   auto &RP = InstrGenCtx.getRegPool();
-  auto &SGCtx = InstrGenCtx.GC;
-  auto &State = SGCtx.getLLVMState();
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &GenSettings = InstrGenCtx.GenSettings;
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   const auto &InstrInfo = State.getInstrInfo();
   // Compute set of registers compatible with all opcodes
@@ -474,7 +479,7 @@ generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
   // FIXME: normalization does not account restrictions from memory schemes:
   // choosen number of base registers might not be enough.
   auto NumAvailRegs = RP.getNumAvailableInSet(Include, MBB);
-  if (NumAvailRegs > 0 && SGCtx.getGenSettings().TrackingConfig.AddressVH) {
+  if (NumAvailRegs > 0 && GenSettings.TrackingConfig.AddressVH) {
     // When hazard mode is enabled we'll likely need a register to transform
     // existing addresses.
     --NumAvailRegs;
@@ -482,7 +487,8 @@ generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
   if (NumAvailRegs == 0)
     snippy::fatal(
         "No available registers to generate addresses for the burst group.");
-  const auto &RegInfo = *SGCtx.getSubtargetImpl().getRegisterInfo();
+  auto &Fn = InstrGenCtx.MBB.getParent()->getFunction();
+  const auto &RegInfo = *State.getSubtargetImpl(Fn).getRegisterInfo();
   // Get number of def and addr regs to use in the burst group. These values
   // can be bigger than the number of available registers.
   auto NumDefs = countDefsHavingRC(Opcodes, RegInfo, AddrRegClass, InstrInfo);
@@ -538,15 +544,16 @@ generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
 // randomize addresses in a way that not only primary addresses are accessed
 // (see selectAddressForSingleInstrFromBurstGroup), but base register is always
 // taken suitable for the primary address.
-std::map<unsigned, AddressInfo> collectPrimaryAddresses(
-    const std::map<unsigned, AddressRestriction> &BaseRegToStrongestAR,
-    GeneratorContext &GC) {
-  auto &MS = GC.getMemoryAccessSampler();
-  auto &SnpTgt = GC.getLLVMState().getSnippyTarget();
+static std::map<unsigned, AddressInfo> collectPrimaryAddresses(
+    InstructionGenerationContext &IGC,
+    const std::map<unsigned, AddressRestriction> &BaseRegToStrongestAR) {
+  auto &MS = IGC.getMemoryAccessSampler();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &SnpTgt = ProgCtx.getLLVMState().getSnippyTarget();
   auto ARRange = make_second_range(BaseRegToStrongestAR);
   std::vector<AddressRestriction> ARs(ARRange.begin(), ARRange.end());
-  std::vector<AddressInfo> PrimaryAddresses = MS.randomBurstGroupAddresses(
-      ARs, GC.getProgramContext().getOpcodeCache(), SnpTgt);
+  std::vector<AddressInfo> PrimaryAddresses =
+      MS.randomBurstGroupAddresses(ARs, ProgCtx.getOpcodeCache(), SnpTgt);
   assert(PrimaryAddresses.size() == BaseRegToStrongestAR.size());
   std::map<unsigned, AddressInfo> BaseRegToPrimaryAddress;
   transform(
@@ -576,10 +583,10 @@ std::map<unsigned, AddressInfo> collectPrimaryAddresses(
 void initializeBaseRegs(
     InstructionGenerationContext &InstrGenCtx,
     std::map<unsigned, AddressInfo> &BaseRegToPrimaryAddress) {
-  auto &GC = InstrGenCtx.GC;
   auto &SimCtx = InstrGenCtx.SimCtx;
   auto &RP = InstrGenCtx.getRegPool();
-  auto &State = GC.getLLVMState();
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   for (auto &[BaseReg, AI] : BaseRegToPrimaryAddress) {
     auto NewValue =
@@ -601,8 +608,8 @@ mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
                  ArrayRef<unsigned> Opcodes) {
   assert(OpcodeIdxToBaseReg.size() == Opcodes.size());
   auto &MBB = InstrGenCtx.MBB;
-  auto &SGCtx = InstrGenCtx.GC;
   auto *MAI = InstrGenCtx.MAI;
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
   if (Opcodes.empty())
     return {};
 
@@ -613,7 +620,7 @@ mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
 
   std::vector<AddressInfo> OpcodeIdxToAI;
   // Collect address restrictions for each opcode
-  auto OpcodeToAR = collectAddressRestrictions(Opcodes, SGCtx, MBB);
+  auto OpcodeToAR = collectAddressRestrictions(Opcodes, ProgCtx, MBB);
   // For each base register we have a set of opcodes. Join address restrictions
   // for these set of opcodes by choosing the strongest ones and map the
   // resulting address restriction to the base register.
@@ -622,7 +629,7 @@ mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
   // For the selected strongest restrictions get addresses. Thus, we'll have a
   // mapping from base register to a legal address in memory to use.
   auto BaseRegToPrimaryAddress =
-      collectPrimaryAddresses(BaseRegToStrongestAR, SGCtx);
+      collectPrimaryAddresses(InstrGenCtx, BaseRegToStrongestAR);
   // We've chosen addresses for each base register. Initialize base registers
   // with these addresses.
   initializeBaseRegs(InstrGenCtx, BaseRegToPrimaryAddress);
@@ -637,8 +644,8 @@ mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
     auto BaseReg = OpcodeIdxToBaseReg[OpcodeIdx];
     assert(BaseRegToPrimaryAddress.count(BaseReg));
     const auto &OrigAI = BaseRegToPrimaryAddress[BaseReg];
-    auto AI =
-        selectAddressForSingleInstrFromBurstGroup(OrigAI, OpcodeAR, SGCtx);
+    auto AI = selectAddressForSingleInstrFromBurstGroup(InstrGenCtx, OrigAI,
+                                                        OpcodeAR);
     OpcodeIdxToAI.push_back(AI);
   }
 
@@ -648,9 +655,9 @@ mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
   return OpcodeIdxToAI;
 }
 
-void markMemAccessAsUsed(const MCInstrDesc &InstrDesc, const AddressInfo &AI,
-                         MemAccessKind Kind, GeneratorContext &GC,
-                         MemAccessInfo *MAI) {
+void markMemAccessAsUsed(InstructionGenerationContext &IGC,
+                         const MCInstrDesc &InstrDesc, const AddressInfo &AI,
+                         MemAccessKind Kind, MemAccessInfo *MAI) {
   auto EffectiveAddr = AI.Address;
   auto AccessSize = AI.AccessSize;
   if (MAI) {
@@ -667,8 +674,7 @@ void addMemAccessToDump(const MemAddresses &ChosenAddresses, MemAccessInfo &MAI,
     MAI.addMemAccess(Addr, AccessSize);
 }
 
-MachineBasicBlock *createMachineBasicBlock(MachineFunction &MF,
-                                           GeneratorContext &GC) {
+MachineBasicBlock *createMachineBasicBlock(MachineFunction &MF) {
   auto *MBB = MF.CreateMachineBasicBlock();
   assert(MBB);
   return MBB;
@@ -680,7 +686,9 @@ std::string getMBBSectionName(const MachineBasicBlock &MBB) {
   auto FunctionSectionName = MF->getFunction().getSection();
   auto *Symb = MBB.getSymbol();
   assert(Symb);
-  return llvm::formatv("{0}.{1}", FunctionSectionName, Symb->getName()).str();
+  auto ret =
+      llvm::formatv("{0}.{1}", FunctionSectionName, Symb->getName()).str();
+  return ret;
 }
 
 } // namespace snippy

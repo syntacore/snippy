@@ -86,6 +86,15 @@ struct SnippyProgramSettings {
         InitialRegYamlFile(InitialRegYamlFile){};
 };
 
+enum class GenerationMode {
+  // Ignore Size requirements, only num Instrs
+  NumInstrs,
+  // Ignore num instrs, try to meet size requirements
+  Size,
+  // Try to satisfy both num instrs and size requirements
+  Mixed
+};
+
 class GeneratorSettings {
 public:
   std::string ABIName;
@@ -126,6 +135,90 @@ public:
         ModelPluginConfig(std::move(ModelPluginConfig)),
         InstrsGenerationConfig(std::move(InstrsGenerationConfig)),
         RegistersConfig(std::move(RegsConfig)), Cfg(std::move(Cfg)) {}
+
+  StringRef getLastInstr() const { return InstrsGenerationConfig.LastInstr; }
+  bool useRetAsLastInstr() const {
+    return StringRef{"RET"}.equals_insensitive(
+        InstrsGenerationConfig.LastInstr);
+  }
+  StringRef getABIName() const { return ABIName; }
+
+  auto getRequestedInstrsNumForMainFunction() const {
+    return InstrsGenerationConfig.NumInstrs.value_or(0);
+  }
+
+  bool isLoopGenerationPossible(const OpcodeCache &OpCC) const {
+    const auto &Branches = Cfg.Branches;
+    const auto &Histogram = Cfg.Histogram;
+    return Branches.LoopRatio > std::numeric_limits<double>::epsilon() &&
+           Branches.PermuteCF && Branches.MaxDepth.Loop > 0 &&
+           Histogram.hasCFInstrs(OpCC);
+  }
+
+  bool isInstrsNumKnown() const {
+    return InstrsGenerationConfig.NumInstrs.has_value();
+  }
+  const BurstGramData &getBurstGram() const { return *Cfg.Burst.Data; }
+
+  ArrayRef<MCRegister> getRegsSpilledToStack() const {
+    return RegistersConfig.SpilledToStack;
+  }
+
+  ArrayRef<MCRegister> getRegsSpilledToMem() const {
+    return RegistersConfig.SpilledToMem;
+  }
+
+  bool isRegSpilledToMem(MCRegister Reg) const {
+    return llvm::is_contained(getRegsSpilledToMem(), Reg);
+  }
+
+  OpcGenHolder createCFOpcodeGenerator(const OpcodeCache &OpCC) const {
+    return Cfg.createCFOpcodeGenerator(OpCC);
+  }
+
+  using OpcodeFilter = std::function<bool(unsigned)>;
+  OpcGenHolder createFlowOpcodeGenerator(
+      const OpcodeCache &OpCC, OpcodeFilter OpcMask, bool MustHavePrimaryInstrs,
+      ArrayRef<OpcodeHistogramEntry> Overrides,
+      const std::unordered_map<unsigned, double> &WeightOverrides) const {
+    return Cfg.createDFOpcodeGenerator(OpCC, OpcMask, Overrides,
+                                       MustHavePrimaryInstrs, WeightOverrides);
+  }
+
+  auto getCFInstrsNum(const OpcodeCache &OpCC, size_t TotalInstructions) const {
+    return Cfg.Histogram.getCFInstrsNum(TotalInstructions, OpCC);
+  }
+
+  bool hasCallInstrs(const OpcodeCache &OpCC, const SnippyTarget &Tgt) const {
+    return Cfg.Histogram.hasCallInstrs(OpCC, Tgt);
+  }
+
+  bool hasCFInstrs(const OpcodeCache &OpCC) const {
+    return Cfg.Histogram.hasCFInstrs(OpCC);
+  }
+
+  bool isApplyValuegramEachInstr() const {
+    return Cfg.RegsHistograms.has_value();
+  }
+
+  GenerationMode getGenerationMode() const {
+    assert((!isApplyValuegramEachInstr() || isInstrsNumKnown()) &&
+           "Initialization of registers before each instruction is supported "
+           "only if a number of instructions are generated.");
+    if (isApplyValuegramEachInstr())
+      return GenerationMode::NumInstrs;
+    if (!isInstrsNumKnown())
+      return GenerationMode::Size;
+    bool PCDistanceRequested = Cfg.Branches.isPCDistanceRequested();
+    return PCDistanceRequested ? GenerationMode::Mixed
+                               : GenerationMode::NumInstrs;
+  }
+
+  const auto &getCallGraphLayout() const { return Cfg.CGLayout; }
+
+  std::unique_ptr<DefaultOpcodeGenerator> createDefaultOpcodeGenerator() const {
+    return Cfg.createDefaultOpcodeGenerator();
+  }
 
 private:
   SectionsDescriptions getCompleteSectionList(LLVMState &State) const;

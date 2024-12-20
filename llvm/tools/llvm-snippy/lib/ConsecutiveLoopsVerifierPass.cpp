@@ -67,7 +67,8 @@ namespace snippy {
 
 bool ConsecutiveLoopsVerifier::runOnMachineFunction(MachineFunction &MF) {
   auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &Ctx = GC.getLLVMState().getCtx();
+  auto &ProgCtx = GC.getProgramContext();
+  auto &Ctx = ProgCtx.getLLVMState().getCtx();
   auto &CLI = getAnalysis<CFPermutation>().get<ConsecutiveLoopInfo>(MF);
   auto &ConsLoops = CLI.getConsecutiveLoops();
   auto &BranchSettings = GC.getGenSettings().Cfg.Branches;

@@ -14,6 +14,7 @@
 #include "snippy/Generator/RegReservForLoop.h"
 #include "snippy/Generator/RegisterPool.h"
 #include "snippy/Generator/SimulatorContext.h"
+#include "snippy/Generator/SnippyLoopInfo.h"
 
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/OpcodeHistogram.h"
@@ -234,10 +235,10 @@ struct ElemWidthAndGapForVectorLoad {
 ElemWidthAndGapForVectorLoad
 getElemWidthAndGapForVectorLoad(unsigned Opcode, unsigned EEW,
                                 const MachineBasicBlock &MBB,
-                                const GeneratorContext &GenCtx) {
+                                const SnippyProgramContext &ProgCtx) {
   assert(EEW && "Effective element width can not be zero");
   const auto &RISCVCtx =
-      GenCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+      ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
 
   if (isRVVUnitStrideSegLoadStore(Opcode) || isRVVStridedSegLoadStore(Opcode)) {
     // segment and non-indexed loads
@@ -272,7 +273,7 @@ bool isDefaultSelfcheckEnough(unsigned Opcode) {
 std::vector<SelfcheckDestRegistersInfo>
 getInfoAboutRegsForSelfcheck(unsigned Opcode, Register FirstDestReg,
                              const MachineBasicBlock &MBB,
-                             const GeneratorContext &GenCtx) {
+                             const SnippyProgramContext &ProgCtx) {
   // Not RVV instruction isn't target specific fot selfcheck,
   // so we provide only one destination register to store
   std::vector<SelfcheckDestRegistersInfo> SelfcheckSegsInfo;
@@ -294,7 +295,7 @@ getInfoAboutRegsForSelfcheck(unsigned Opcode, Register FirstDestReg,
   }
 
   const auto &RISCVCtx =
-      GenCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+      ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
   auto SEW = static_cast<unsigned>(RISCVCtx.getSEW(MBB));
   auto EEW = getDataElementWidth(Opcode, SEW) * CHAR_BIT;
   assert(RISCVVType::isValidSEW(EEW));
@@ -311,7 +312,7 @@ getInfoAboutRegsForSelfcheck(unsigned Opcode, Register FirstDestReg,
       };
 
   auto &&[ElemWidth, Gap] =
-      getElemWidthAndGapForVectorLoad(Opcode, EEW, MBB, GenCtx);
+      getElemWidthAndGapForVectorLoad(Opcode, EEW, MBB, ProgCtx);
 
   // Gap == 0 --> non-segment instruction
   if (!Gap) {
@@ -373,8 +374,9 @@ static MCRegister regIndexToMCReg(unsigned RegIdx, RegStorageType Storage,
   llvm_unreachable("Unknown storage type");
 }
 
-static inline unsigned getIncOpcodeForLoopCounter(const GeneratorContext &GC) {
-  if (!GC.getSubtarget<RISCVSubtarget>().hasStdExtC())
+static inline unsigned
+getIncOpcodeForLoopCounter(const InstructionGenerationContext &IGC) {
+  if (!IGC.getSubtarget<RISCVSubtarget>().hasStdExtC())
     return RISCV::ADDI;
 
   if (LoopControlLogicCompression.getValue() ==
@@ -401,7 +403,7 @@ static RegStorageType regToStorage(Register Reg) {
 
 static bool isLegalRVVInstr(unsigned Opcode, const RVVConfiguration &Cfg,
                             unsigned VL, unsigned VLEN,
-                            const GeneratorContext &GC) {
+                            const RISCVSubtarget *ST) {
   if (!isRVV(Opcode))
     return false;
   auto SEW = Cfg.SEW;
@@ -534,13 +536,15 @@ void takeVSETPrefIntoAccount(VSETWeightOverrides &Overrides) {
   }
 }
 
-RISCVMatInt::InstSeq getIntMatInstrSeq(APInt Value, GeneratorContext &GC) {
-  [[maybe_unused]] const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+RISCVMatInt::InstSeq getIntMatInstrSeq(APInt Value,
+                                       InstructionGenerationContext &IGC) {
+  [[maybe_unused]] const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
   assert((ST.getXLen() == 64 && Value.getBitWidth() == 64) ||
          (ST.getXLen() == 32 && isInt<32>(Value.getSExtValue())));
 
-  return RISCVMatInt::generateInstSeq(Value.getSExtValue(),
-                                      GC.getLLVMState().getSubtargetInfo());
+  auto &ProgCtx = IGC.ProgCtx;
+  return RISCVMatInt::generateInstSeq(
+      Value.getSExtValue(), ProgCtx.getLLVMState().getSubtargetInfo());
 }
 
 void generateRVVMaskReset(const MCInstrInfo &InstrInfo, MachineBasicBlock &MBB,
@@ -610,12 +614,13 @@ static MemAddresses generateStridedMemAccesses(MemAddr Base,
 
 static std::pair<AddressParts, MemAddresses>
 breakDownAddrForRVVStrided(AddressInfo AddrInfo, const MachineInstr &MI,
-                           GeneratorContext &GC, bool Is64Bit) {
+                           InstructionGenerationContext &IGC, bool Is64Bit) {
   auto Opcode = MI.getOpcode();
   assert(isRVVStridedLoadStore(Opcode) || isRVVStridedSegLoadStore(Opcode));
 
-  const auto &ST = GC.getSubtarget<RISCVSubtarget>();
-  auto &TgtCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
+  const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
   auto VL = TgtCtx.getVL(*MI.getParent());
   const auto &AddrReg = getMemOperand(MI);
   auto AddrRegIdx = MI.getOperandNo(&AddrReg);
@@ -624,7 +629,7 @@ breakDownAddrForRVVStrided(AddressInfo AddrInfo, const MachineInstr &MI,
     // When VL is zero, we may leave any values in address base and stride
     // registers.
     return std::make_pair(AddressParts{}, MemAddresses{});
-  auto &State = GC.getLLVMState();
+  auto &State = ProgCtx.getLLVMState();
   auto &RI = State.getRegInfo();
   AddressPart MainPart{AddrReg, APInt(ST.getXLen(), AddrValue), RI};
 
@@ -685,12 +690,13 @@ breakDownAddrForRVVStrided(AddressInfo AddrInfo, const MachineInstr &MI,
 
 static std::pair<AddressParts, MemAddresses>
 breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
-                           GeneratorContext &GC, bool Is64Bit) {
+                           InstructionGenerationContext &IGC, bool Is64Bit) {
   auto Opcode = MI.getOpcode();
   assert(isRVVIndexedLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode));
 
-  auto &TgtCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
-  const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+  const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
   unsigned VL = TgtCtx.getVL(*MI.getParent());
   if (VL == 0)
     // When VL is zero we may leave any values in address base and index
@@ -782,14 +788,16 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
 
 static std::pair<AddressParts, MemAddresses>
 breakDownAddrForInstrWithImmOffset(AddressInfo AddrInfo, const MachineInstr &MI,
-                                   GeneratorContext &GC, bool Is64Bit) {
+                                   InstructionGenerationContext &IGC,
+                                   bool Is64Bit) {
   auto Opcode = MI.getOpcode();
   assert(isLoadStore(Opcode) || isCLoadStore(Opcode) || isFPLoadStore(Opcode) ||
          isCFPLoadStore(Opcode));
 
-  auto &State = GC.getLLVMState();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   auto &RI = State.getRegInfo();
-  const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+  const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
   const auto &AddrReg = getMemOperand(MI);
   auto AddrRegIdx = MI.getOperandNo(&AddrReg);
   // Offset operand must be the next after the addr reg.
@@ -803,21 +811,23 @@ breakDownAddrForInstrWithImmOffset(AddressInfo AddrInfo, const MachineInstr &MI,
       {std::move(Part)}, {uintToTargetXLen(Is64Bit, AddrInfo.Address)});
 }
 
-using OpcodeFilter = GeneratorContext::OpcodeFilter;
+using OpcodeFilter = GeneratorSettings::OpcodeFilter;
 
 static OpcodeFilter getRVVDefaultPolicyFilterImpl(const RVVConfiguration &Cfg,
                                                   unsigned VL, unsigned VLEN,
-                                                  const GeneratorContext &GC) {
-  return [&Cfg, VL, VLEN, &GC](unsigned Opcode) {
+                                                  const RISCVSubtarget *ST) {
+  return [&Cfg, VL, VLEN, ST](unsigned Opcode) {
     if (!isRVV(Opcode))
       return true;
-    return isLegalRVVInstr(Opcode, Cfg, VL, VLEN, GC);
+    return isLegalRVVInstr(Opcode, Cfg, VL, VLEN, ST);
   };
 }
 
-static OpcodeFilter getDefaultPolicyFilterImpl(const MachineBasicBlock &MBB,
-                                               const GeneratorContext &GC) {
-  auto &RISCVCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
+static OpcodeFilter
+getDefaultPolicyFilterImpl(const SnippyProgramContext &ProgCtx,
+                           const MachineBasicBlock &MBB) {
+  auto &State = ProgCtx.getLLVMState();
+  auto &RISCVCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
   if (!RISCVCtx.hasActiveRVVMode(MBB))
     return [](unsigned Opcode) {
       if (isRVV(Opcode) && !isRVVModeSwitch(Opcode))
@@ -829,7 +839,8 @@ static OpcodeFilter getDefaultPolicyFilterImpl(const MachineBasicBlock &MBB,
   auto VL = RISCVCtx.getVL(MBB);
   auto VLEN = RISCVCtx.getVLEN();
 
-  return getRVVDefaultPolicyFilterImpl(Cfg, VL, VLEN, GC);
+  const auto &ST = State.getSubtarget<RISCVSubtarget>(*MBB.getParent());
+  return getRVVDefaultPolicyFilterImpl(Cfg, VL, VLEN, &ST);
 }
 
 inline bool checkSupportedOrdering(const OpcodeHistogram &H) {
@@ -868,8 +879,8 @@ static void addGeneratedInstrsToBB(InstructionGenerationContext &IGC,
                                    const SnippyTarget &Tgt) {
   auto &MBB = IGC.MBB;
   auto &Ins = IGC.Ins;
-  auto &GC = IGC.GC;
-  auto &State = GC.getLLVMState();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   const auto &InstrInfo = State.getInstrInfo();
 
   for (const auto &Inst : Insts) {
@@ -894,9 +905,8 @@ class SnippyRISCVTarget final : public SnippyTarget {
   void generateWriteValueSeq(InstructionGenerationContext &IGC, APInt Value,
                              MCRegister DestReg,
                              SmallVectorImpl<MCInst> &Insts) const override {
-    auto &GC = IGC.GC;
     if (RISCV::VRRegClass.contains(DestReg))
-      snippy::fatal(GC.getLLVMState().getCtx(),
+      snippy::fatal(IGC.ProgCtx.getLLVMState().getCtx(),
                     "Generation register write sequence error",
                     "Writing to register is not implemented for RVV");
 
@@ -906,7 +916,7 @@ class SnippyRISCVTarget final : public SnippyTarget {
       generateWriteValueFP(IGC, Value, DestReg, Insts);
       return;
     }
-    const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+    const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
     assert((ST.getXLen() == 64 && Value.getBitWidth() == 64) ||
            (ST.getXLen() == 32 && isInt<32>(Value.getSExtValue())));
 
@@ -944,7 +954,8 @@ public:
   }
 
   std::unique_ptr<TargetGenContextInterface>
-  createTargetContext(const GeneratorContext &Ctx) const override;
+  createTargetContext(LLVMState &State, const GeneratorSettings &GenSettings,
+                      const TargetSubtargetInfo *STI) const override;
 
   std::unique_ptr<TargetConfigInterface> createTargetConfig() const override;
 
@@ -997,13 +1008,14 @@ public:
   }
 
   std::vector<Register>
-  getRegsForSelfcheck(const MachineInstr &MI, const MachineBasicBlock &MBB,
-                      const GeneratorContext &GenCtx) const override {
+  getRegsForSelfcheck(const MachineInstr &MI,
+                      InstructionGenerationContext &IGC) const override {
+    auto &MBB = IGC.MBB;
     const auto &FirstDestOperand = MI.getOperand(0);
     assert(FirstDestOperand.isReg());
 
     auto &&SelfcheckSegsInfo = getInfoAboutRegsForSelfcheck(
-        MI.getOpcode(), FirstDestOperand.getReg(), MBB, GenCtx);
+        MI.getOpcode(), FirstDestOperand.getReg(), MBB, IGC.ProgCtx);
 
     std::vector<Register> Regs;
     for (const auto &SelfcheckRegInfo : SelfcheckSegsInfo) {
@@ -1016,25 +1028,27 @@ public:
   }
 
   std::vector<OpcodeHistogramEntry>
-  getPolicyOverrides(const MachineBasicBlock &MBB,
-                     const GeneratorContext &GC) const override {
-    auto &RISCVCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
+  getPolicyOverrides(const SnippyProgramContext &ProgCtx,
+                     const MachineBasicBlock &MBB) const override {
+    auto &RISCVCtx =
+        ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
     auto Overrides = RISCVCtx.getVSETOverrides(MBB);
     takeVSETPrefIntoAccount(Overrides);
     auto Entries = Overrides.getEntries();
     return {Entries.begin(), Entries.end()};
   }
 
-  bool groupMustHavePrimaryInstr(const MachineBasicBlock &MBB,
-                                 const GeneratorContext &GC) const override {
-    auto &RISCVCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
+  bool groupMustHavePrimaryInstr(const SnippyProgramContext &ProgCtx,
+                                 const MachineBasicBlock &MBB) const override {
+    auto &RISCVCtx =
+        ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
     return RISCVCtx.hasActiveRVVMode(MBB);
   }
 
-  GeneratorContext::OpcodeFilter
-  getDefaultPolicyFilter(const MachineBasicBlock &MBB,
-                         const GeneratorContext &GC) const override {
-    return getDefaultPolicyFilterImpl(MBB, GC);
+  GeneratorSettings::OpcodeFilter
+  getDefaultPolicyFilter(const SnippyProgramContext &ProgCtx,
+                         const MachineBasicBlock &MBB) const override {
+    return getDefaultPolicyFilterImpl(ProgCtx, MBB);
   }
 
   void checkInstrTargetDependency(const OpcodeHistogram &H) const override {
@@ -1064,13 +1078,12 @@ public:
                        const RISCVRegisterState &Regs) const {
     auto &MBB = IGC.MBB;
     auto RP = IGC.pushRegPool();
-    auto &GC = IGC.GC;
     // Initialize registers (except X0) before taking a branch
     assert(Regs.XRegs[0] == 0);
     for (auto [RegIdx, Value] : drop_begin(enumerate(Regs.XRegs))) {
-      auto Reg = regIndexToMCReg(RegIdx, RegStorageType::XReg, GC);
+      auto Reg = regIndexToMCReg(IGC, RegIdx, RegStorageType::XReg);
       if (!RP->isReserved(Reg, MBB))
-        writeValueToReg(IGC, APInt(getRegBitWidth(Reg, GC), Value), Reg);
+        writeValueToReg(IGC, APInt(getRegBitWidth(Reg, IGC), Value), Reg);
     }
   }
 
@@ -1078,22 +1091,21 @@ public:
                        const RISCVRegisterState &Regs) const {
     auto &MBB = IGC.MBB;
     auto RP = IGC.pushRegPool();
-    auto &GC = IGC.GC;
     // Initialize registers before taking a branch
     for (auto [RegIdx, Value] : enumerate(Regs.FRegs)) {
-      auto FPReg = regIndexToMCReg(RegIdx, RegStorageType::FReg, GC);
+      auto FPReg = regIndexToMCReg(IGC, RegIdx, RegStorageType::FReg);
       if (!RP->isReserved(FPReg, MBB))
-        writeValueToReg(IGC, APInt(getRegBitWidth(FPReg, GC), Value), FPReg);
+        writeValueToReg(IGC, APInt(getRegBitWidth(FPReg, IGC), Value), FPReg);
     }
   }
 
   void generateVRegsInit(InstructionGenerationContext &IGC,
                          const RISCVRegisterState &Regs) const {
-    auto &GC = IGC.GC;
-    const auto &State = GC.getLLVMState();
+    auto &ProgCtx = IGC.ProgCtx;
+    const auto &State = ProgCtx.getLLVMState();
     auto RP = IGC.pushRegPool();
 
-    const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+    const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
     const auto &InstrInfo = State.getInstrInfo();
 
     assert(ST.hasStdExtV());
@@ -1113,12 +1125,11 @@ public:
   void generateNonMaskVRegsInit(InstructionGenerationContext &IGC,
                                 const RISCVRegisterState &Regs,
                                 const T &Filter) const {
-    auto &GC = IGC.GC;
     auto &MBB = IGC.MBB;
     auto &RP = IGC.getRegPool();
     // V0 is the mask register, skip it
     for (auto [RegIdx, Value] : drop_begin(enumerate(Regs.VRegs))) {
-      auto Reg = regIndexToMCReg(RegIdx, RegStorageType::VReg, GC);
+      auto Reg = regIndexToMCReg(IGC, RegIdx, RegStorageType::VReg);
       // Skip reserved registers
       if (RP.isReserved(Reg, MBB) || Filter(Reg))
         continue;
@@ -1129,11 +1140,11 @@ public:
   void generateVRegsInitWithSplats(InstructionGenerationContext &IGC,
                                    const RISCVRegisterState &Regs) const {
     auto &MBB = IGC.MBB;
-    auto &GC = IGC.GC;
-    const auto &State = GC.getLLVMState();
+    auto &ProgCtx = IGC.ProgCtx;
+    const auto &State = ProgCtx.getLLVMState();
     auto RP = IGC.pushRegPool();
 
-    const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+    const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
     const auto &InstrInfo = State.getInstrInfo();
 
     assert(ST.hasStdExtV());
@@ -1152,8 +1163,8 @@ public:
     // Initialize registers before taking a branch
     // V0 is the mask register, skip it.
     for (unsigned RegNo = 1; RegNo < Regs.XRegs.size(); ++RegNo) {
-      auto XReg = regIndexToMCReg(RegNo, RegStorageType::XReg, GC);
-      auto VReg = regIndexToMCReg(RegNo, RegStorageType::VReg, GC);
+      auto XReg = regIndexToMCReg(IGC, RegNo, RegStorageType::XReg);
+      auto VReg = regIndexToMCReg(IGC, RegNo, RegStorageType::VReg);
       if (!RP->isReserved(VReg, MBB))
         getSupportInstBuilder(*this, MBB, InsertPos,
                               MBB.getParent()->getFunction().getContext(),
@@ -1310,8 +1321,8 @@ public:
     assert(requiresCustomGeneration(InstrDesc));
     auto Opcode = InstrDesc.getOpcode();
     assert(isRVVModeSwitch(Opcode));
-    auto &GC = InstrGenCtx.GC;
-    rvvGenerateModeSwitchAndUpdateContext(GC.getLLVMState().getInstrInfo(),
+    auto &ProgCtx = InstrGenCtx.ProgCtx;
+    rvvGenerateModeSwitchAndUpdateContext(ProgCtx.getLLVMState().getInstrInfo(),
                                           InstrGenCtx, Opcode);
   }
 
@@ -1339,8 +1350,8 @@ public:
   unsigned getMaxInstrSize() const override { return kMaxInstrSize; }
 
   std::set<unsigned>
-  getPossibleInstrsSize(const GeneratorContext &GC) const override {
-    const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+  getPossibleInstrsSize(const TargetSubtargetInfo &STI) const override {
+    const auto &ST = static_cast<const RISCVSubtarget &>(STI);
     bool STSupportsCompressed = ST.hasStdExtC() || ST.hasStdExtZca() ||
                                 ST.hasStdExtZcb() || ST.hasStdExtZcd() ||
                                 ST.hasStdExtZce() || ST.hasStdExtZcf();
@@ -1378,13 +1389,15 @@ public:
     }
   }
 
-  MachineBasicBlock *generateBranch(const MCInstrDesc &InstrDesc,
-                                    MachineBasicBlock &MBB,
-                                    GeneratorContext &GC) const override {
-    auto &State = GC.getLLVMState();
-    auto RP = GC.getProgramContext().getRegisterPool();
+  MachineBasicBlock *
+  generateBranch(InstructionGenerationContext &IGC,
+                 const MCInstrDesc &InstrDesc) const override {
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
+    auto RP = IGC.pushRegPool();
+    auto &MBB = IGC.MBB;
     auto *MF = MBB.getParent();
-    auto *NextMBB = createMachineBasicBlock(*MF, GC);
+    auto *NextMBB = createMachineBasicBlock(*MF);
     MF->insert(++MachineFunction::iterator(&MBB), NextMBB);
     NextMBB->transferSuccessorsAndUpdatePHIs(&MBB);
     MBB.addSuccessor(NextMBB);
@@ -1394,7 +1407,7 @@ public:
     const auto &BranchDesc = InstrInfo.get(Opcode);
     if (BranchDesc.isUnconditionalBranch()) {
       const auto *RVInstrInfo =
-          GC.getSubtarget<RISCVSubtarget>().getInstrInfo();
+          State.getSubtarget<RISCVSubtarget>(*MF).getInstrInfo();
       RVInstrInfo->insertUnconditionalBranch(MBB, NextMBB, DebugLoc());
       return NextMBB;
     }
@@ -1405,12 +1418,12 @@ public:
                                   BranchDesc);
     const auto &MCRegClass =
         RegInfo.getRegClass(BranchDesc.operands()[0].RegClass);
-    auto FirstReg = RP.getAvailableRegister("for branch condition", RegInfo,
-                                            MCRegClass, MBB);
+    auto FirstReg = RP->getAvailableRegister("for branch condition", RegInfo,
+                                             MCRegClass, MBB);
     MIB.addReg(FirstReg);
     if (!isCompressedBranch(Opcode)) {
-      unsigned SecondReg = RP.getAvailableRegister("for branch condition",
-                                                   RegInfo, MCRegClass, MBB);
+      unsigned SecondReg = RP->getAvailableRegister("for branch condition",
+                                                    RegInfo, MCRegClass, MBB);
       MIB.addReg(SecondReg);
     }
     MIB.addMBB(NextMBB);
@@ -1430,10 +1443,10 @@ public:
   bool fitsJump(unsigned Distance) const { return Distance <= kMaxJumpDstMod; }
 
   MachineInstr *relaxCompressedBranch(MachineInstr &Branch,
-                                      GeneratorContext &GC) const {
+                                      SnippyProgramContext &ProgCtx) const {
     auto Opcode = Branch.getOpcode();
     assert(isCompressedBranch(Opcode) && "Compressed branch expected");
-    auto &InstrInfo = GC.getLLVMState().getInstrInfo();
+    auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
     auto UncompOpcode = Opcode == RISCV::C_BEQZ ? RISCV::BEQ : RISCV::BNE;
     auto *MBB = Branch.getParent();
     assert(MBB);
@@ -1459,7 +1472,7 @@ public:
   //     PseudoBR %bb.1                     PseudoBR %bb.1000
   //     ...                                ...
   MachineInstr *relaxWithJump(MachineInstr &Branch,
-                              GeneratorContext &GC) const {
+                              SnippyProgramContext &ProgCtx) const {
     auto *ProcessedBranch = &Branch;
     auto *MBB = Branch.getParent();
     assert(MBB);
@@ -1467,7 +1480,7 @@ public:
     // We need to uncompress branch because all actions below don't expect
     // compressed branch
     if (isCompressedBranch(Branch.getOpcode()))
-      ProcessedBranch = relaxCompressedBranch(Branch, GC);
+      ProcessedBranch = relaxCompressedBranch(Branch, ProgCtx);
     assert(ProcessedBranch);
 
     const auto *InstrInfo = MBB->getParent()->getSubtarget().getInstrInfo();
@@ -1488,19 +1501,19 @@ public:
     ProcessedBranch->eraseFromParent();
     FallbackBR->eraseFromParent();
     RVInstrInfo.insertBranch(*MBB, FBB, TBB, Cond, DebugLoc());
-    setAsSupportInstr(MBB->back(), GC.getLLVMState().getCtx());
+    setAsSupportInstr(MBB->back(), ProgCtx.getLLVMState().getCtx());
     return &*MBB->getFirstTerminator();
   }
 
   bool relaxBranch(MachineInstr &Branch, unsigned Distance,
-                   GeneratorContext &GC) const override {
+                   SnippyProgramContext &ProgCtx) const override {
     assert(Branch.isBranch());
     if (fitsCompressedBranch(Distance))
       return true;
     if (fitsBranch(Distance) && isCompressedBranch(Branch.getOpcode()))
-      return relaxCompressedBranch(Branch, GC) != nullptr;
+      return relaxCompressedBranch(Branch, ProgCtx) != nullptr;
     if (fitsJump(Distance))
-      return relaxWithJump(Branch, GC) != nullptr;
+      return relaxWithJump(Branch, ProgCtx) != nullptr;
 
     return false;
   }
@@ -1574,8 +1587,8 @@ public:
 
   /// If target supports compressed instructions return GPRC, use GPR either
   const MCRegisterClass &
-  getMCRegClassForBranch(const MachineInstr &Instr,
-                         GeneratorContext &GC) const override {
+  getMCRegClassForBranch(SnippyProgramContext &ProgCtx,
+                         const MachineInstr &Instr) const override {
     assert(Instr.isBranch() && "Branch expected");
     auto OpsInfo = Instr.getDesc().operands();
     auto *RegOperand =
@@ -1585,10 +1598,12 @@ public:
     assert(RegOperand != OpsInfo.end() &&
            "All supported branches expected to have at least one register "
            "operand");
-    auto &RI = GC.getLLVMState().getRegInfo();
+    auto &State = ProgCtx.getLLVMState();
+    auto &RI = State.getRegInfo();
     auto RCID = RegOperand->RegClass;
     if (RCID == RISCV::GPRCRegClassID ||
-        !GC.getSubtarget<RISCVSubtarget>().hasStdExtC())
+        !State.getSubtarget<RISCVSubtarget>(*Instr.getParent()->getParent())
+             .hasStdExtC())
       return RI.getRegClass(RCID);
 
     auto CompressionMode = LoopControlLogicCompression.getValue();
@@ -1598,7 +1613,7 @@ public:
     constexpr auto MinNumOfBranchGPRC = 2;
     auto *MBB = Instr.getParent();
     assert(MBB);
-    auto RP = GC.getProgramContext().getRegisterPool();
+    auto RP = ProgCtx.getRegisterPool();
     auto NAvailableRegs =
         RP.getNumAvailable(RI.getRegClass(RCID == RISCV::GPRCRegClassID), *MBB);
     if (CompressionMode == LoopControlLogicCompressionMode::On &&
@@ -1702,8 +1717,9 @@ public:
   }
 
   unsigned getInstrSize(const MachineInstr &Inst,
-                        const GeneratorContext &GC) const override {
-    auto &RISCVSTI = GC.getSubtarget<RISCVSubtarget>();
+                        LLVMState &State) const override {
+    auto &RISCVSTI =
+        State.getSubtarget<RISCVSubtarget>(*Inst.getParent()->getParent());
     auto *RISCVII = RISCVSTI.getInstrInfo();
     assert(RISCVII);
     return RISCVII->getInstSizeInBytes(Inst);
@@ -1726,17 +1742,18 @@ public:
     }
   }
 
-  unsigned getRandLoopCounterInitValue(GeneratorContext &GC,
+  unsigned getRandLoopCounterInitValue(InstructionGenerationContext &IGC,
                                        Register CounterReg,
                                        const Branchegram &Branches,
                                        ArrayRef<Register> ReservedRegs) const {
     if (!Branches.isRandomCountersInitRequested())
       return 0u;
 
+    auto &ProgCtx = IGC.ProgCtx;
     auto LimitReg = ReservedRegs[LimitRegIdx];
-    const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+    const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
     auto VLEN =
-        GC.getTargetContext().getImpl<RISCVGeneratorContext>().getVLEN();
+        ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>().getVLEN();
     unsigned MaxCounterRegVal = RISCVRegisterState::getMaxRegValueForSize(
         CounterReg, ST.getXLen(), VLEN);
     unsigned MaxLimitRegVal =
@@ -1753,39 +1770,38 @@ public:
   unsigned insertLoopInit(InstructionGenerationContext &IGC,
                           MachineInstr &Branch, ArrayRef<Register> ReservedRegs,
                           unsigned NIter) const override {
-    auto &GC = IGC.GC;
     assert(Branch.isBranch() && "Branch expected");
     assert((ReservedRegs.size() != MaxNumOfReservRegsForLoop) ||
            (ReservedRegs[CounterRegIdx] != ReservedRegs[LimitRegIdx]) &&
                "Counter and Limit registers expected to be different");
 
     auto CounterReg = ReservedRegs[CounterRegIdx];
-    const auto &Branches = GC.getGenSettings().Cfg.Branches;
+    const auto &Branches = IGC.GenSettings.Cfg.Branches;
     auto RegRandOffset =
-        getRandLoopCounterInitValue(GC, CounterReg, Branches, ReservedRegs);
+        getRandLoopCounterInitValue(IGC, CounterReg, Branches, ReservedRegs);
 
     switch (Branch.getOpcode()) {
     case RISCV::BEQ:
     case RISCV::C_BEQZ: {
-      writeValueToReg(IGC, APInt::getZero(getRegBitWidth(CounterReg, GC)),
+      writeValueToReg(IGC, APInt::getZero(getRegBitWidth(CounterReg, IGC)),
                       CounterReg);
       auto LimitReg = ReservedRegs[LimitRegIdx];
-      writeValueToReg(IGC, APInt::getZero(getRegBitWidth(LimitReg, GC)),
+      writeValueToReg(IGC, APInt::getZero(getRegBitWidth(LimitReg, IGC)),
                       LimitReg);
       RegRandOffset = 0;
       break;
     }
     case RISCV::BNE: {
       writeValueToReg(
-          IGC, APInt(getRegBitWidth(CounterReg, GC), NIter + RegRandOffset),
+          IGC, APInt(getRegBitWidth(CounterReg, IGC), NIter + RegRandOffset),
           CounterReg);
       auto LimitReg = ReservedRegs[LimitRegIdx];
-      writeValueToReg(IGC, APInt(getRegBitWidth(LimitReg, GC), RegRandOffset),
+      writeValueToReg(IGC, APInt(getRegBitWidth(LimitReg, IGC), RegRandOffset),
                       LimitReg);
       break;
     }
     case RISCV::C_BNEZ: {
-      writeValueToReg(IGC, APInt(getRegBitWidth(CounterReg, GC), NIter),
+      writeValueToReg(IGC, APInt(getRegBitWidth(CounterReg, IGC), NIter),
                       CounterReg);
       assert(
           (ReservedRegs.size() == MinNumOfReservRegsForLoop) &&
@@ -1796,22 +1812,23 @@ public:
     }
     case RISCV::BLT:
     case RISCV::BLTU: {
-      writeValueToReg(IGC, APInt(getRegBitWidth(CounterReg, GC), RegRandOffset),
+      writeValueToReg(IGC,
+                      APInt(getRegBitWidth(CounterReg, IGC), RegRandOffset),
                       CounterReg);
       auto LimitReg = ReservedRegs[LimitRegIdx];
       writeValueToReg(
-          IGC, APInt(getRegBitWidth(LimitReg, GC), NIter + RegRandOffset),
+          IGC, APInt(getRegBitWidth(LimitReg, IGC), NIter + RegRandOffset),
           LimitReg);
       break;
     }
     case RISCV::BGE:
     case RISCV::BGEU: {
       writeValueToReg(
-          IGC, APInt(getRegBitWidth(CounterReg, GC), NIter + RegRandOffset),
+          IGC, APInt(getRegBitWidth(CounterReg, IGC), NIter + RegRandOffset),
           CounterReg);
       auto LimitReg = ReservedRegs[LimitRegIdx];
       writeValueToReg(IGC,
-                      APInt(getRegBitWidth(LimitReg, GC), 1 + RegRandOffset),
+                      APInt(getRegBitWidth(LimitReg, IGC), 1 + RegRandOffset),
                       LimitReg);
       break;
     }
@@ -1822,9 +1839,9 @@ public:
   }
 
   LoopCounterInsertionResult
-  insertLoopCounter(MachineBasicBlock::iterator Pos, MachineInstr &Branch,
+  insertLoopCounter(InstructionGenerationContext &IGC, MachineInstr &Branch,
                     ArrayRef<Register> ReservedRegs, unsigned NIter,
-                    GeneratorContext &GC, RegToValueType &ExitingValues,
+                    RegToValueType &ExitingValues,
                     unsigned RegCounterOffset) const override {
     assert(Branch.isBranch() && "Branch expected");
     assert(ReservedRegs.size() != MaxNumOfReservRegsForLoop ||
@@ -1832,11 +1849,13 @@ public:
                "Counter and limit registers expected to be different");
     assert(NIter);
 
-    auto &State = GC.getLLVMState();
+    auto Pos = IGC.Ins;
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
     auto &MBB = *Pos->getParent();
     const auto &InstrInfo = State.getInstrInfo();
     APInt MinCounterVal;
-    auto ADDIOp = getIncOpcodeForLoopCounter(GC);
+    auto ADDIOp = getIncOpcodeForLoopCounter(IGC);
 
     auto CounterReg = ReservedRegs[CounterRegIdx];
 
@@ -1860,9 +1879,9 @@ public:
           .addReg(CounterReg)
           .addImm(Log2_32(NIter));
       ExitingValues[CounterReg] =
-          APInt(getRegBitWidth(CounterReg, GC), bit_floor(NIter));
-      MinCounterVal = APInt(getRegBitWidth(LimitReg, GC), 1);
-      ExitingValues[LimitReg] = APInt(getRegBitWidth(LimitReg, GC), 1);
+          APInt(getRegBitWidth(CounterReg, IGC), bit_floor(NIter));
+      MinCounterVal = APInt(getRegBitWidth(LimitReg, IGC), 1);
+      ExitingValues[LimitReg] = APInt(getRegBitWidth(LimitReg, IGC), 1);
 
       if (!isPowerOf2_32(NIter))
         return {SnippyDiagnosticInfo(
@@ -1885,8 +1904,8 @@ public:
           .addReg(CounterReg)
           .addImm(-1);
       ExitingValues[CounterReg] =
-          APInt(getRegBitWidth(CounterReg, GC), RegCounterOffset);
-      MinCounterVal = APInt(getRegBitWidth(CounterReg, GC), RegCounterOffset);
+          APInt(getRegBitWidth(CounterReg, IGC), RegCounterOffset);
+      MinCounterVal = APInt(getRegBitWidth(CounterReg, IGC), RegCounterOffset);
       break;
     case RISCV::BLT:
     case RISCV::BLTU:
@@ -1897,9 +1916,9 @@ public:
           .addReg(CounterReg)
           .addImm(1);
       ExitingValues[CounterReg] =
-          APInt(getRegBitWidth(CounterReg, GC), RegCounterOffset + NIter);
+          APInt(getRegBitWidth(CounterReg, IGC), RegCounterOffset + NIter);
       MinCounterVal =
-          APInt(getRegBitWidth(CounterReg, GC), RegCounterOffset + 1);
+          APInt(getRegBitWidth(CounterReg, IGC), RegCounterOffset + 1);
       break;
     case RISCV::BGE:
     case RISCV::BGEU:
@@ -1910,8 +1929,8 @@ public:
           .addReg(CounterReg)
           .addImm(-1);
       ExitingValues[CounterReg] =
-          APInt(getRegBitWidth(CounterReg, GC), RegCounterOffset);
-      MinCounterVal = APInt(getRegBitWidth(CounterReg, GC), RegCounterOffset);
+          APInt(getRegBitWidth(CounterReg, IGC), RegCounterOffset);
+      MinCounterVal = APInt(getRegBitWidth(CounterReg, IGC), RegCounterOffset);
       break;
     default:
       llvm_unreachable("Unsupported branch type");
@@ -1929,8 +1948,8 @@ public:
 
   MachineInstr *generateFinalInst(InstructionGenerationContext &IGC,
                                   unsigned LastInstrOpc) const override {
-    auto &GC = IGC.GC;
-    const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
+    auto &ProgCtx = IGC.ProgCtx;
+    const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
     auto MIB =
         getSupportInstBuilder(*this, IGC.MBB, IGC.Ins,
                               IGC.MBB.getParent()->getFunction().getContext(),
@@ -1956,16 +1975,18 @@ public:
     return 16u;
   }
 
-  unsigned getRegBitWidth(MCRegister Reg, GeneratorContext &GC) const override {
-    const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+  unsigned getRegBitWidth(MCRegister Reg,
+                          InstructionGenerationContext &IGC) const override {
+    auto &ProgCtx = IGC.ProgCtx;
+    const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
     auto VLEN =
-        GC.getTargetContext().getImpl<RISCVGeneratorContext>().getVLEN();
+        ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>().getVLEN();
     return snippy::getRegBitWidth(Reg, ST.getXLen(), VLEN);
   }
 
-  MCRegister regIndexToMCReg(unsigned RegIdx, RegStorageType Storage,
-                             GeneratorContext &GC) const override {
-    const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+  MCRegister regIndexToMCReg(InstructionGenerationContext &IGC, unsigned RegIdx,
+                             RegStorageType Storage) const override {
+    const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
     return snippy::regIndexToMCReg(RegIdx, Storage, ST.hasStdExtD());
   }
 
@@ -1991,10 +2012,12 @@ public:
     llvm_unreachable("Unknown storage type");
   }
 
-  unsigned getSpillSizeInBytes(MCRegister Reg,
-                               GeneratorContext &GC) const override {
-    unsigned RegSize = getRegBitWidth(Reg, GC) / RISCV_CHAR_BIT;
-    auto Alignment = getSpillAlignmentInBytes(Reg, GC.getLLVMState());
+  unsigned
+  getSpillSizeInBytes(MCRegister Reg,
+                      InstructionGenerationContext &IGC) const override {
+    unsigned RegSize = getRegBitWidth(Reg, IGC) / RISCV_CHAR_BIT;
+    auto &ProgCtx = IGC.ProgCtx;
+    auto Alignment = getSpillAlignmentInBytes(Reg, ProgCtx.getLLVMState());
     assert(Alignment && "Alignment size can't be zero");
     // Get the least number of alignment sizes that fully fits register.
     return Alignment * divideCeil(RegSize, Alignment);
@@ -2034,30 +2057,30 @@ public:
 
   void generateSpillToStack(InstructionGenerationContext &IGC, MCRegister Reg,
                             MCRegister SP) const override {
-    auto &GC = IGC.GC;
+    auto &ProgCtx = IGC.ProgCtx;
     auto &MBB = IGC.MBB;
     auto &Ins = IGC.Ins;
-    assert(GC.getProgramContext().stackEnabled() &&
+    assert(ProgCtx.stackEnabled() &&
            "An attempt to generate spill but stack was not enabled.");
-    auto &State = GC.getLLVMState();
+    auto &State = ProgCtx.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
     getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
         .addDef(SP)
         .addReg(SP)
-        .addImm(-static_cast<int64_t>(getSpillSizeInBytes(Reg, GC)));
+        .addImm(-static_cast<int64_t>(getSpillSizeInBytes(Reg, IGC)));
 
     storeRegToAddrInReg(IGC, SP, Reg);
   }
 
   void generateReloadFromStack(InstructionGenerationContext &IGC,
                                MCRegister Reg, MCRegister SP) const override {
-    auto &GC = IGC.GC;
+    auto &ProgCtx = IGC.ProgCtx;
     auto &MBB = IGC.MBB;
     auto &Ins = IGC.Ins;
-    assert(GC.getProgramContext().stackEnabled() &&
+    assert(ProgCtx.stackEnabled() &&
            "An attempt to generate reload but stack was not enabled.");
-    auto &State = GC.getLLVMState();
+    auto &State = ProgCtx.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
 
@@ -2065,25 +2088,25 @@ public:
     getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
         .addDef(SP)
         .addReg(SP)
-        .addImm(getSpillSizeInBytes(Reg, GC));
+        .addImm(getSpillSizeInBytes(Reg, IGC));
   }
 
   void generatePopNoReload(InstructionGenerationContext &IGC,
                            MCRegister Reg) const override {
-    auto &GC = IGC.GC;
+    auto &ProgCtx = IGC.ProgCtx;
     auto &MBB = IGC.MBB;
     auto &Ins = IGC.Ins;
-    assert(GC.getProgramContext().stackEnabled() &&
+    assert(ProgCtx.stackEnabled() &&
            "An attempt to generate stack pop but stack was not enabled.");
-    auto &State = GC.getLLVMState();
-    auto SP = GC.getProgramContext().getStackPointer();
+    auto &State = ProgCtx.getLLVMState();
+    auto SP = ProgCtx.getStackPointer();
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
 
     getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
         .addDef(SP)
         .addReg(SP)
-        .addImm(getSpillSizeInBytes(Reg, GC));
+        .addImm(getSpillSizeInBytes(Reg, IGC));
   }
 
   MachineInstr *generateCall(InstructionGenerationContext &IGC,
@@ -2092,12 +2115,14 @@ public:
     return generateCall(IGC, Target, AsSupport, RISCV::JAL);
   }
 
-  MachineInstr *loadSymbolAddress(MachineBasicBlock &MBB,
-                                  MachineBasicBlock::iterator Ins,
-                                  GeneratorContext &GC, unsigned DestReg,
+  MachineInstr *loadSymbolAddress(InstructionGenerationContext &IGC,
+                                  unsigned DestReg,
                                   const GlobalValue *Target) const {
-    const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
-    auto &State = GC.getLLVMState();
+    auto &Ins = IGC.Ins;
+    auto &MBB = IGC.MBB;
+    auto &ProgCtx = IGC.ProgCtx;
+    const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
+    auto &State = ProgCtx.getLLVMState();
     auto &Ctx = State.getCtx();
     MachineFunction *MF = MBB.getParent();
 
@@ -2121,9 +2146,9 @@ public:
 
   MachineInstr *generateJAL(InstructionGenerationContext &IGC,
                             const Function &Target, bool AsSupport) const {
-    auto &GC = IGC.GC;
-    const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
-    auto &State = GC.getLLVMState();
+    auto &ProgCtx = IGC.ProgCtx;
+    const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
+    auto &State = ProgCtx.getLLVMState();
     auto &Ctx = State.getCtx();
     // Despite PseudoCALL gets expanded by RISCVMCCodeEmitter to JALR
     // instruction, it has chance to be relaxed back to JAL by linker.
@@ -2134,16 +2159,16 @@ public:
 
   MachineInstr *generateJALR(InstructionGenerationContext &IGC,
                              const Function &Target, bool AsSupport) const {
-    auto &GC = IGC.GC;
-    const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
-    auto &State = GC.getLLVMState();
+    auto &ProgCtx = IGC.ProgCtx;
+    const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
+    auto &State = ProgCtx.getLLVMState();
     auto &Ctx = State.getCtx();
     const auto &RI = State.getRegInfo();
     const auto &RegClass = RI.getRegClass(RISCV::GPRJALRRegClassID);
     auto RP = IGC.pushRegPool();
     auto Reg = getNonZeroReg("scratch register for storing function address",
                              RI, RegClass, *RP, IGC.MBB);
-    loadSymbolAddress(IGC.MBB, IGC.Ins, GC, Reg, &Target);
+    loadSymbolAddress(IGC, Reg, &Target);
     return getInstBuilder(AsSupport, *this, IGC.MBB, IGC.Ins, Ctx,
                           InstrInfo.get(RISCV::PseudoCALLIndirect))
         .addReg(Reg);
@@ -2165,9 +2190,9 @@ public:
 
   MachineInstr *generateTailCall(InstructionGenerationContext &IGC,
                                  const Function &Target) const override {
-    auto &GC = IGC.GC;
-    const auto &InstrInfo = GC.getLLVMState().getInstrInfo();
-    auto &State = GC.getLLVMState();
+    auto &ProgCtx = IGC.ProgCtx;
+    const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
+    auto &State = ProgCtx.getLLVMState();
     auto &Ctx = State.getCtx();
     return getSupportInstBuilder(*this, IGC.MBB, IGC.Ins, Ctx,
                                  InstrInfo.get(RISCV::PseudoTAIL))
@@ -2176,7 +2201,7 @@ public:
 
   MachineInstr *
   generateReturn(InstructionGenerationContext &IGC) const override {
-    auto &State = IGC.GC.getProgramContext().getLLVMState();
+    auto &State = IGC.ProgCtx.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
     auto MIB =
         getSupportInstBuilder(*this, IGC.MBB, IGC.Ins,
@@ -2186,7 +2211,7 @@ public:
   }
 
   MachineInstr *generateNop(InstructionGenerationContext &IGC) const override {
-    auto &State = IGC.GC.getProgramContext().getLLVMState();
+    auto &State = IGC.ProgCtx.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
     auto MIB =
         getSupportInstBuilder(*this, IGC.MBB, IGC.Ins,
@@ -2197,9 +2222,9 @@ public:
     return MIB;
   }
 
-  unsigned getTransformSequenceLength(APInt OldValue, APInt NewValue,
-                                      MCRegister Register,
-                                      GeneratorContext &GC) const override {
+  unsigned getTransformSequenceLength(InstructionGenerationContext &IGC,
+                                      APInt OldValue, APInt NewValue,
+                                      MCRegister Register) const override {
     if (!RISCV::GPRRegClass.contains(Register))
       snippy::fatal("transform of value in register is supported only for GPR");
 
@@ -2216,7 +2241,7 @@ public:
     // Transform sequence has length of materialization of ValueToWwite in
     // scratch register plus one operation
     // (that is Register = ADD/SUB Register, ScratchReg).
-    return getWriteValueSequenceLength(ValueToWrite, Register, GC) + 1;
+    return getWriteValueSequenceLength(IGC, ValueToWrite, Register) + 1;
   }
 
   void transformValueInReg(InstructionGenerationContext &IGC, APInt OldValue,
@@ -2224,12 +2249,12 @@ public:
     if (!RISCV::GPRRegClass.contains(Register))
       snippy::fatal("transform of value in register is supported only for GPR");
 
-    auto &GC = IGC.GC;
     auto RP = IGC.pushRegPool();
     auto &MBB = IGC.MBB;
     auto &Ins = IGC.Ins;
 
-    auto &State = GC.getLLVMState();
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
     const auto &RI = State.getRegInfo();
     const auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
     const auto &InstrInfo = State.getInstrInfo();
@@ -2259,8 +2284,8 @@ public:
     writeValueToReg(IGC, ValueToWrite, ScratchReg);
     assert(!Overflowed && "Expression expect to not overflow");
     assert(
-        getTransformSequenceLength(OldValue, NewValue, Register, GC) ==
-            (getWriteValueSequenceLength(ValueToWrite, ScratchReg, GC) + 1) &&
+        getTransformSequenceLength(IGC, OldValue, NewValue, Register) ==
+            (getWriteValueSequenceLength(IGC, ValueToWrite, ScratchReg) + 1) &&
         "Generated sequence length does not match expected one");
     getSupportInstBuilder(*this, MBB, Ins, State.getCtx(),
                           InstrInfo.get(WillUseAdd ? RISCV::ADD : RISCV::SUB),
@@ -2273,19 +2298,19 @@ public:
                                  MCRegister Register, uint64_t BaseAddr,
                                  uint64_t Stride,
                                  MCRegister IndexReg) const override {
-    auto &GC = IGC.GC;
     auto RP = IGC.pushRegPool();
     auto &MBB = IGC.MBB;
     auto &Ins = IGC.Ins;
     assert(RISCV::GPRRegClass.contains(Register, IndexReg) &&
            "Only GPR registers are supported");
 
-    auto &State = GC.getLLVMState();
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
     const auto &RI = State.getRegInfo();
     const auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
     const auto &InstrInfo = State.getInstrInfo();
 
-    auto XRegBitSize = getRegBitWidth(Register, GC);
+    auto XRegBitSize = getRegBitWidth(Register, IGC);
     writeValueToReg(IGC, APInt(XRegBitSize, Stride), Register);
     getSupportInstBuilder(*this, MBB, Ins, State.getCtx(),
                           InstrInfo.get(RISCV::MUL), Register)
@@ -2410,13 +2435,14 @@ public:
     }
   }
 
-  MachineOperand genTargetOpForOpcode(unsigned Opcode, unsigned OperandType,
-                                      const StridedImmediate &StridedImm,
-                                      GeneratorContext &GC) const {
-    const auto &TM = GC.getLLVMState().getTargetMachine();
-    const auto &OpcSetting =
-        GC.getGenSettings().Cfg.ImmHistMap.getConfigForOpcode(
-            Opcode, GC.getProgramContext().getOpcodeCache());
+  MachineOperand
+  genTargetOpForOpcode(unsigned Opcode, unsigned OperandType,
+                       const StridedImmediate &StridedImm,
+                       SnippyProgramContext &ProgCtx,
+                       const GeneratorSettings &GenSettings) const {
+    const auto &TM = ProgCtx.getLLVMState().getTargetMachine();
+    const auto &OpcSetting = GenSettings.Cfg.ImmHistMap.getConfigForOpcode(
+        Opcode, ProgCtx.getOpcodeCache());
     if (OpcSetting.isUniform())
       return createOperandForOpType(nullptr, OperandType, StridedImm, TM);
     const auto &Seq = OpcSetting.getSequence();
@@ -2424,12 +2450,14 @@ public:
   }
 
   MachineOperand
-  generateTargetOperand(GeneratorContext &SGCtx, unsigned Opcode,
+  generateTargetOperand(SnippyProgramContext &ProgCtx,
+                        const GeneratorSettings &GenSettings, unsigned Opcode,
                         unsigned OperandType,
                         const StridedImmediate &StridedImm) const override {
-    auto *IHV = &SGCtx.getConfig().ImmHistogram;
+    auto *IHV = &GenSettings.Cfg.ImmHistogram;
     if (IHV && IHV->holdsAlternative<ImmediateHistogramRegEx>())
-      return genTargetOpForOpcode(Opcode, OperandType, StridedImm, SGCtx);
+      return genTargetOpForOpcode(Opcode, OperandType, StridedImm, ProgCtx,
+                                  GenSettings);
     const ImmediateHistogramSequence *IH =
         IHV ? &IHV->get<ImmediateHistogramSequence>() : nullptr;
     if (isSupportedLoadStore(Opcode))
@@ -2438,11 +2466,10 @@ public:
     else if (IH->Values.empty())
       IH = nullptr;
     return createOperandForOpType(IH, OperandType, StridedImm,
-                                  SGCtx.getLLVMState().getTargetMachine());
+                                  ProgCtx.getLLVMState().getTargetMachine());
   }
 
-  AccessMaskBit getCustomAccessMaskForOperand(GeneratorContext &SGCtx,
-                                              const MCInstrDesc &InstrDesc,
+  AccessMaskBit getCustomAccessMaskForOperand(const MCInstrDesc &InstrDesc,
                                               unsigned Operand) const override {
     auto Opcode = InstrDesc.getOpcode();
     if (!isRVVIndexedLoadStore(Opcode) && !isRVVIndexedSegLoadStore(Opcode) &&
@@ -2485,24 +2512,25 @@ public:
   }
 
   std::pair<AddressParts, MemAddresses>
-  breakDownAddr(AddressInfo AddrInfo, const MachineInstr &MI, unsigned AddrIdx,
-                GeneratorContext &GC) const override {
+  breakDownAddr(InstructionGenerationContext &IGC, AddressInfo AddrInfo,
+                const MachineInstr &MI, unsigned AddrIdx) const override {
     auto Opcode = MI.getOpcode();
     assert((isSupportedLoadStore(Opcode) || isAtomicAMO(Opcode) ||
             isLrInstr(Opcode) || isScInstr(Opcode)) &&
            "Requested addr calculation for unsupported instruction");
     assert(AddrIdx == 0 && "RISC-V supports only one address per instruction");
 
-    const auto &TM = GC.getLLVMState().getTargetMachine();
+    auto &ProgCtx = IGC.ProgCtx;
+    const auto &TM = ProgCtx.getLLVMState().getTargetMachine();
     if (isAtomicAMO(Opcode) || isLrInstr(Opcode) || isScInstr(Opcode) ||
         isRVVUnitStrideLoadStore(Opcode) || isRVVUnitStrideFFLoad(Opcode) ||
         isRVVUnitStrideSegLoadStore(Opcode) || isRVVWholeRegLoadStore(Opcode) ||
         isRVVUnitStrideMaskLoadStore(Opcode)) {
-      auto &State = GC.getLLVMState();
+      auto &State = ProgCtx.getLLVMState();
       auto &RI = State.getRegInfo();
       const auto &AddrReg = getMemOperand(MI);
       auto AddrValue = AddrInfo.Address;
-      const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+      const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
       auto Part = AddressPart{AddrReg, APInt(ST.getXLen(), AddrValue), RI};
 
       if (isAtomicAMO(Opcode) || isLrInstr(Opcode) || isScInstr(Opcode) ||
@@ -2511,7 +2539,8 @@ public:
             {std::move(Part)}, {uintToTargetXLen(is64Bit(TM), AddrValue)});
 
       assert(isRVV(Opcode));
-      auto &TgtCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
+      auto &TgtCtx =
+          ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
       auto VL = TgtCtx.getVL(*MI.getParent());
       if (isRVVUnitStrideMaskLoadStore(Opcode))
         // RVV unit-stride mask instructions operate similarly to unmasked
@@ -2526,18 +2555,19 @@ public:
                                                         std::move(Addresses));
     }
     if (isRVVStridedLoadStore(Opcode) || isRVVStridedSegLoadStore(Opcode))
-      return breakDownAddrForRVVStrided(AddrInfo, MI, GC, is64Bit(TM));
+      return breakDownAddrForRVVStrided(AddrInfo, MI, IGC, is64Bit(TM));
     if (isRVVIndexedLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode))
-      return breakDownAddrForRVVIndexed(AddrInfo, MI, GC, is64Bit(TM));
-    return breakDownAddrForInstrWithImmOffset(AddrInfo, MI, GC, is64Bit(TM));
+      return breakDownAddrForRVVIndexed(AddrInfo, MI, IGC, is64Bit(TM));
+    return breakDownAddrForInstrWithImmOffset(AddrInfo, MI, IGC, is64Bit(TM));
   }
 
-  unsigned getWriteValueSequenceLength(APInt Value, MCRegister Register,
-                                       GeneratorContext &GC) const override {
+  unsigned getWriteValueSequenceLength(InstructionGenerationContext &IGC,
+                                       APInt Value,
+                                       MCRegister Register) const override {
     if (RISCV::VRRegClass.contains(Register))
       snippy::fatal("Not implemented for RVV regs yet");
 
-    return getIntMatInstrSeq(Value, GC).size();
+    return getIntMatInstrSeq(Value, IGC).size();
   }
 
   void writeValueToReg(InstructionGenerationContext &IGC, APInt Value,
@@ -2558,10 +2588,10 @@ public:
                     MCRegister Rd) const override {
     assert(RISCV::GPRRegClass.contains(Rs) && RISCV::GPRRegClass.contains(Rd) &&
            "Both src and dst registers must be GPR");
-    auto &GC = IGC.GC;
     auto &MBB = IGC.MBB;
     auto &Ins = IGC.Ins;
-    auto &State = GC.getLLVMState();
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
     getSupportInstBuilder(*this, MBB, Ins,
                           MBB.getParent()->getFunction().getContext(),
@@ -2582,9 +2612,8 @@ public:
     assert(RISCV::GPRRegClass.contains(AddrReg) &&
            "Expected address register be GPR");
 
-    auto &GC = IGC.GC;
     if (RISCV::GPRRegClass.contains(Reg)) {
-      const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+      const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
       auto LoadOp = ST.getXLen() == 32 ? RISCV::LW : RISCV::LD;
       return MCInstBuilder(LoadOp).addReg(Reg).addReg(AddrReg).addImm(0);
     }
@@ -2611,16 +2640,16 @@ public:
   void generateLoadRegFromAddr(InstructionGenerationContext &IGC, uint64_t Addr,
                                MCRegister Reg,
                                SmallVectorImpl<MCInst> &Insts) const {
-    auto &GC = IGC.GC;
     auto &MBB = IGC.MBB;
     auto &RP = IGC.getRegPool();
-    auto &State = GC.getLLVMState();
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
     auto &RI = State.getRegInfo();
     auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
     auto XScratchReg = getNonZeroReg("scratch register for addr", RI, RegClass,
                                      RP, MBB, AccessMaskBit::SRW);
     // Form address in scratch register.
-    generateWriteValueSeq(IGC, APInt(getRegBitWidth(XScratchReg, GC), Addr),
+    generateWriteValueSeq(IGC, APInt(getRegBitWidth(XScratchReg, IGC), Addr),
                           XScratchReg, Insts);
     Insts.push_back(generateLoadRegFromAddrInReg(IGC, XScratchReg, Reg));
   }
@@ -2630,16 +2659,16 @@ public:
                            unsigned BytesToWrite = 0) const {
     assert(RISCV::GPRRegClass.contains(AddrReg) &&
            "Expected address register be GPR");
-    auto &GC = IGC.GC;
     auto &MBB = IGC.MBB;
     auto &Ins = IGC.Ins;
-    auto &State = GC.getLLVMState();
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
     auto &Ctx = State.getCtx();
     const auto &InstrInfo = State.getInstrInfo();
 
     if (RISCV::GPRRegClass.contains(Reg)) {
       auto StoreOp = getStoreOpcode(BytesToWrite ? BytesToWrite * RISCV_CHAR_BIT
-                                                 : getRegBitWidth(Reg, GC));
+                                                 : getRegBitWidth(Reg, IGC));
       getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(StoreOp))
           .addReg(Reg)
           .addReg(AddrReg)
@@ -2647,21 +2676,21 @@ public:
     } else if (RISCV::FPR32RegClass.contains(Reg) ||
                RISCV::FPR16RegClass.contains(Reg)) {
       assert(BytesToWrite == 0 ||
-             BytesToWrite * RISCV_CHAR_BIT == getRegBitWidth(Reg, GC));
+             BytesToWrite * RISCV_CHAR_BIT == getRegBitWidth(Reg, IGC));
       getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::FSW))
           .addReg(Reg)
           .addReg(AddrReg)
           .addImm(0);
     } else if (RISCV::FPR64RegClass.contains(Reg)) {
       assert(BytesToWrite == 0 ||
-             BytesToWrite * RISCV_CHAR_BIT == getRegBitWidth(Reg, GC));
+             BytesToWrite * RISCV_CHAR_BIT == getRegBitWidth(Reg, IGC));
       getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::FSD))
           .addReg(Reg)
           .addReg(AddrReg)
           .addImm(0);
     } else if (RISCV::VRRegClass.contains(Reg)) {
       assert(BytesToWrite == 0 ||
-             BytesToWrite * RISCV_CHAR_BIT == getRegBitWidth(Reg, GC));
+             BytesToWrite * RISCV_CHAR_BIT == getRegBitWidth(Reg, IGC));
       getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::VS1R_V))
           .addReg(Reg)
           .addReg(AddrReg);
@@ -2673,16 +2702,16 @@ public:
 
   void storeRegToAddr(InstructionGenerationContext &IGC, uint64_t Addr,
                       MCRegister Reg, unsigned BytesToWrite) const override {
-    auto &GC = IGC.GC;
     auto &MBB = IGC.MBB;
     auto RP = IGC.pushRegPool();
-    auto &State = GC.getLLVMState();
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
     auto &RI = State.getRegInfo();
     auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
     RP->addReserved(getFirstPhysReg(Reg, RI), MBB);
     auto ScratchReg = getNonZeroReg("scratch register for addr", RI, RegClass,
                                     *RP, MBB, AccessMaskBit::SRW);
-    auto XRegBitSize = getRegBitWidth(ScratchReg, GC);
+    auto XRegBitSize = getRegBitWidth(ScratchReg, IGC);
 
     writeValueToReg(IGC, APInt(XRegBitSize, Addr), ScratchReg);
     storeRegToAddrInReg(IGC, ScratchReg, Reg, BytesToWrite);
@@ -2690,8 +2719,8 @@ public:
 
   void storeValueToAddr(InstructionGenerationContext &IGC, uint64_t Addr,
                         APInt Value) const override {
-    auto &GC = IGC.GC;
-    auto &State = GC.getLLVMState();
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
     auto &MBB = IGC.MBB;
     auto &RP = IGC.getRegPool();
     auto &RI = State.getRegInfo();
@@ -2706,17 +2735,17 @@ public:
       RegForValue = getNonZeroReg("to write value", RI,
                                   RI.getRegClass(RISCV::GPRRegClassID), RP, MBB,
                                   AccessMaskBit::SRW);
-      if (ValueRegBitSize > getRegBitWidth(RegForValue, GC))
+      if (ValueRegBitSize > getRegBitWidth(RegForValue, IGC))
         snippy::fatal(State.getCtx(), "Selfcheck error ",
                       "selfcheck is not implemented for rv32 with D ext");
     }
-    writeValueToReg(IGC, Value.zext(getRegBitWidth(RegForValue, GC)),
+    writeValueToReg(IGC, Value.zext(getRegBitWidth(RegForValue, IGC)),
                     RegForValue);
     assert(ValueRegBitSize % RISCV_CHAR_BIT == 0);
     storeRegToAddr(IGC, Addr, RegForValue, ValueRegBitSize / RISCV_CHAR_BIT);
   }
 
-  size_t getAccessSize(unsigned Opcode, GeneratorContext &GC,
+  size_t getAccessSize(unsigned Opcode, SnippyProgramContext &ProgCtx,
                        const MachineBasicBlock &MBB) const {
     assert(countAddrsToGenerate(Opcode) &&
            "Requested access size calculation, but instruction does not access "
@@ -2725,7 +2754,8 @@ public:
     if (!isRVV(Opcode))
       return getDataElementWidth(Opcode);
 
-    auto &TgtCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
+    auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+
     auto VL = TgtCtx.getVL(MBB);
     if (VL == 0 && !isRVVWholeRegLoadStore(Opcode))
       return 0;
@@ -2756,13 +2786,14 @@ public:
   }
 
   virtual std::tuple<size_t, size_t>
-  getAccessSizeAndAlignment(unsigned Opcode, GeneratorContext &GC,
+  getAccessSizeAndAlignment(SnippyProgramContext &ProgCtx, unsigned Opcode,
                             const MachineBasicBlock &MBB) const override {
     unsigned SEW = 0;
-    const auto &TgtCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
+    auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
     if (TgtCtx.hasActiveRVVMode(MBB))
       SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
-    return {getAccessSize(Opcode, GC, MBB), getLoadStoreAlignment(Opcode, SEW)};
+    return {getAccessSize(Opcode, ProgCtx, MBB),
+            getLoadStoreAlignment(Opcode, SEW)};
   }
 
   std::vector<Register>
@@ -2784,8 +2815,8 @@ public:
     return {RISCV::X0};
   }
 
-  std::vector<Register> excludeRegsForOperand(const MCRegisterClass &RC,
-                                              const GeneratorContext &GC,
+  std::vector<Register> excludeRegsForOperand(InstructionGenerationContext &IGC,
+                                              const MCRegisterClass &RC,
                                               const MCInstrDesc &InstrDesc,
                                               unsigned Operand) const override {
     if (NoMaskModeForRVV)
@@ -2809,10 +2840,11 @@ public:
   // destination or memory if it is needed for the given opcode.
   // (changes in the GeneratorContext may cause problems
   //  in operands pregeneration)
-  void reserveRegsIfNeeded(unsigned Opcode, bool isDst, bool isMem,
-                           Register Reg, RegPoolWrapper &RP,
-                           GeneratorContext &GC,
-                           const MachineBasicBlock &MBB) const override {
+  void reserveRegsIfNeeded(InstructionGenerationContext &IGC, unsigned Opcode,
+                           bool isDst, bool isMem,
+                           Register Reg) const override {
+    auto &MBB = IGC.MBB;
+    auto &RP = IGC.getRegPool();
     // For vector indexed segment loads, the destination vector register groups
     // cannot overlap the source vector register group (specifed by vs2), else
     // the instruction encoding is reserved.
@@ -2820,7 +2852,9 @@ public:
         isDst) {
       assert(RISCV::VRRegClass.contains(Reg) &&
              "Dst reg in rvv indexed load/store instruction must be vreg");
-      auto &TgtCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
+      auto &ProgCtx = IGC.ProgCtx;
+      auto &TgtCtx =
+          ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
 
       auto [Mult, Fractional] = TgtCtx.decodeVLMUL(TgtCtx.getLMUL(MBB));
       // Register group here means a register group formed by LMUL multiplied by
@@ -3022,8 +3056,8 @@ private:
     return std::make_unique<RISCVAsmPrinter>(TM, std::move(Streamer));
   }
 
-  uint8_t getCodeAlignment(const GeneratorContext &GC) const override {
-    const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+  uint8_t getCodeAlignment(const TargetSubtargetInfo &STI) const override {
+    const auto &ST = static_cast<const RISCVSubtarget &>(STI);
     if (ST.hasStdExtC())
       return 2;
     return 4;
@@ -3074,7 +3108,6 @@ static unsigned getOpcodeForGPRToFPRInstr(unsigned DstReg, unsigned XLen,
 void SnippyRISCVTarget::generateWriteValueFP(
     InstructionGenerationContext &IGC, APInt Value, unsigned DstReg,
     SmallVectorImpl<MCInst> &Insts) const {
-  auto &GC = IGC.GC;
   const auto &SimCtx = IGC.SimCtx;
   assert(RISCV::FPR64RegClass.contains(DstReg) ||
          RISCV::FPR32RegClass.contains(DstReg) ||
@@ -3082,9 +3115,9 @@ void SnippyRISCVTarget::generateWriteValueFP(
   auto NumBits = Value.getBitWidth();
 
   if (InitFRegsFromMemory) {
-    auto &ProgCtx = GC.getProgramContext();
+    auto &ProgCtx = IGC.ProgCtx;
     auto &GP = ProgCtx.getOrAddGlobalsPoolFor(
-        GC.getMainModule(),
+        IGC.getSnippyModule(),
         "Failed to allocate global constant for float register value load");
     auto *GV = GP.createGV(
         Value, /* Alignment */ NumBits,
@@ -3099,8 +3132,9 @@ void SnippyRISCVTarget::generateWriteValueFP(
     return;
   }
 
-  auto &State = GC.getLLVMState();
-  const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
+  const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
   auto FMVOpc =
       getOpcodeForGPRToFPRInstr(DstReg, ST.getXLen(), NumBits, State.getCtx());
 
@@ -3121,12 +3155,12 @@ void SnippyRISCVTarget::generateWriteValueFP(
 
 void SnippyRISCVTarget::rvvWriteValueUsingXReg(
     InstructionGenerationContext &IGC, APInt Value, unsigned DstReg) const {
-  auto &GC = IGC.GC;
   auto &Ins = IGC.Ins;
   auto &MBB = IGC.MBB;
   auto &RP = IGC.getRegPool();
-  auto &State = GC.getLLVMState();
-  const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
+  const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
   const auto &InstrInfo = State.getInstrInfo();
   assert(ST.hasStdExtV());
 
@@ -3168,7 +3202,8 @@ void SnippyRISCVTarget::rvvWriteValueUsingXReg(
         .addReg(RISCV::NoRegister);
     RegFlags = 0;
   }
-  const auto &RGC = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
+
+  const auto &RGC = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
   if (RGC.hasActiveRVVMode(MBB)) {
     const auto &CurRVVMode = RGC.getActiveRVVMode(MBB);
     generateRVVModeUpdate(IGC, InstrInfo, *CurRVVMode.Config, CurRVVMode.VLVM);
@@ -3176,18 +3211,18 @@ void SnippyRISCVTarget::rvvWriteValueUsingXReg(
 }
 void SnippyRISCVTarget::rvvWriteValue(InstructionGenerationContext &IGC,
                                       APInt Value, unsigned DstReg) const {
-  auto &GC = IGC.GC;
   const auto &SimCtx = IGC.SimCtx;
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   // FIXME for V0 we can only use global variables for initialization
   if (!InitVRegsFromMemory.getValue() && DstReg != RISCV::V0) {
     rvvWriteValueUsingXReg(IGC, Value, DstReg);
     return;
   }
 
-  assert(GC.getSubtarget<RISCVSubtarget>().hasStdExtV());
-  auto &ProgCtx = GC.getProgramContext();
+  assert(IGC.getSubtarget<RISCVSubtarget>().hasStdExtV());
   auto &GP = ProgCtx.getOrAddGlobalsPoolFor(
-      GC.getMainModule(),
+      IGC.getSnippyModule(),
       "Failed to allocate global constant for RVV register value load");
 
   auto *GV =
@@ -3205,7 +3240,6 @@ void SnippyRISCVTarget::rvvWriteValue(InstructionGenerationContext &IGC,
 void SnippyRISCVTarget::updateRVVConfig(InstructionGenerationContext &IGC,
                                         const MachineInstr &MI) const {
   auto &Ins = IGC.Ins;
-  auto &GC = IGC.GC;
   if (MI.getNumDefs() == 0)
     return;
   if (!isRVV(MI.getDesc().getOpcode()))
@@ -3215,8 +3249,9 @@ void SnippyRISCVTarget::updateRVVConfig(InstructionGenerationContext &IGC,
   // To get changeable MBB, decrease Ins pos by one.
   // This is always valid, as we create at least one instruction MI.
   auto &MBB = *(std::prev(Ins))->getParent();
-  auto &RGC = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
-  auto &State = GC.getLLVMState();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &RGC = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+  auto &State = ProgCtx.getLLVMState();
   const auto &InstrInfo = State.getInstrInfo();
   const auto &VUInfo = RGC.getVUConfigInfo();
   const auto &RVVMode = RGC.getActiveRVVMode(MBB);
@@ -3243,9 +3278,9 @@ void SnippyRISCVTarget::instructionPostProcess(
 void SnippyRISCVTarget::rvvGenerateModeSwitchAndUpdateContext(
     const MCInstrInfo &InstrInfo, InstructionGenerationContext &IGC,
     std::optional<unsigned> DesiredOpcode) const {
-  auto &GC = IGC.GC;
   auto &MBB = IGC.MBB;
-  auto &RGC = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &RGC = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
   const auto &VUInfo = RGC.getVUConfigInfo();
   // TODO: likely, we should return a pair
   const auto &NewRvvCFG = VUInfo.selectConfiguration();
@@ -3312,7 +3347,6 @@ selectDesiredModeChangeInstruction(RVVModeChangeMode Preference, unsigned VL,
 void SnippyRISCVTarget::generateV0MaskUpdate(
     InstructionGenerationContext &IGC, const RVVConfigurationInfo::VLVM &VLVM,
     const MCInstrInfo &InstrInfo, bool IsLegalConfiguration) const {
-  auto &GC = IGC.GC;
   auto &MBB = IGC.MBB;
   auto &Ins = IGC.Ins;
   auto RP = IGC.pushRegPool();
@@ -3333,7 +3367,8 @@ void SnippyRISCVTarget::generateV0MaskUpdate(
 
   // Note: currently used load from memory instruction,
   // So real mask value width should be VLEN.
-  auto &TgtCtx = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
   auto VLEN = TgtCtx.getVLEN();
   auto WidenVM = VLVM.VM.zext(VLEN);
   LLVM_DEBUG(dbgs() << "Mask update with memory instruction for mask:"
@@ -3346,10 +3381,10 @@ void SnippyRISCVTarget::generateVSETIVLI(InstructionGenerationContext &IGC,
                                          const MCInstrInfo &InstrInfo,
                                          unsigned VTYPE, unsigned VL,
                                          bool SupportMarker) const {
-  auto &GC = IGC.GC;
   auto &MBB = IGC.MBB;
   auto &Ins = IGC.Ins;
-  auto &State = GC.getLLVMState();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   const auto &RI = State.getRegInfo();
   auto &RP = IGC.getRegPool();
   auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
@@ -3361,9 +3396,9 @@ void SnippyRISCVTarget::generateVSETIVLI(InstructionGenerationContext &IGC,
     snippy::fatal(formatv("cannot set the desired VL {0} since selected "
                           "VSETIVLI does not support it",
                           VL));
-  auto MIB =
-      getInstBuilder(SupportMarker, *this, MBB, Ins, GC.getLLVMState().getCtx(),
-                     InstrInfo.get(RISCV::VSETIVLI));
+  auto MIB = getInstBuilder(SupportMarker, *this, MBB, Ins,
+                            ProgCtx.getLLVMState().getCtx(),
+                            InstrInfo.get(RISCV::VSETIVLI));
   MIB.addDef(DstReg).addImm(VL).addImm(VTYPE);
 }
 
@@ -3371,24 +3406,25 @@ void SnippyRISCVTarget::generateVSETVLI(InstructionGenerationContext &IGC,
                                         const MCInstrInfo &InstrInfo,
                                         unsigned VTYPE, unsigned VL,
                                         bool SupportMarker) const {
-  auto &GC = IGC.GC;
   auto &RP = IGC.getRegPool();
   auto &MBB = IGC.MBB;
   auto &Ins = IGC.Ins;
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   // TODO 1: if VL is equal to VLMAX we can use X0 if DstReg is not zero
   // TODO 2: if VL is not changed, and DST is zero, scratch VL can be zero
-  const auto &RI = GC.getLLVMState().getRegInfo();
+  const auto &RI = ProgCtx.getLLVMState().getRegInfo();
   auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
   auto DstReg = RP.getAvailableRegister("for VSETVLI dst", RI, RegClass, MBB,
                                         SupportMarker ? AccessMaskBit::SRW
                                                       : AccessMaskBit::GRW);
   auto ScratchRegVL = getNonZeroReg("for VSETVLI VL", RI, RegClass, RP, MBB,
                                     AccessMaskBit::SRW);
-  writeValueToReg(IGC, APInt(GC.getSubtarget<RISCVSubtarget>().getXLen(), VL),
+  writeValueToReg(IGC, APInt(IGC.getSubtarget<RISCVSubtarget>().getXLen(), VL),
                   ScratchRegVL);
-  auto MIB =
-      getInstBuilder(SupportMarker, *this, MBB, Ins, GC.getLLVMState().getCtx(),
-                     InstrInfo.get(RISCV::VSETVLI));
+  auto MIB = getInstBuilder(SupportMarker, *this, MBB, Ins,
+                            ProgCtx.getLLVMState().getCtx(),
+                            InstrInfo.get(RISCV::VSETVLI));
   MIB.addDef(DstReg);
   MIB.addReg(ScratchRegVL);
   MIB.addImm(VTYPE);
@@ -3400,16 +3436,16 @@ void SnippyRISCVTarget::generateVSETVL(InstructionGenerationContext &IGC,
                                        bool SupportMarker) const {
   // TODO 1: if VL is equal to VLMAX we can use X0 if DstReg is not zero
   // TODO 2: if VL is not changed, and DST is zero, scratch VL can be zero
-  auto &GC = IGC.GC;
   auto &MBB = IGC.MBB;
   auto &Ins = IGC.Ins;
-  const auto &RI = GC.getLLVMState().getRegInfo();
+  auto &ProgCtx = IGC.ProgCtx;
+  const auto &RI = ProgCtx.getLLVMState().getRegInfo();
   auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
   auto RP = IGC.pushRegPool();
   auto DstReg = RP->getAvailableRegister("for VSETVL dst", RI, RegClass, MBB,
                                          SupportMarker ? AccessMaskBit::SRW
                                                        : AccessMaskBit::GRW);
-  const auto &ST = GC.getSubtarget<RISCVSubtarget>();
+  const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
   // TODO: maybe just use GPRNoX0RegClassID class?
   auto [ScratchRegVL, ScratchRegVType] = RP->getNAvailableRegisters<2>(
       "registers for VSETVL VL and VType", RI, RegClass, MBB,
@@ -3418,9 +3454,9 @@ void SnippyRISCVTarget::generateVSETVL(InstructionGenerationContext &IGC,
   writeValueToReg(IGC, APInt(ST.getXLen(), VL), ScratchRegVL);
   RP->addReserved(ScratchRegVL);
   writeValueToReg(IGC, APInt(ST.getXLen(), VTYPE), ScratchRegVType);
-  auto MIB =
-      getInstBuilder(SupportMarker, *this, MBB, Ins, GC.getLLVMState().getCtx(),
-                     InstrInfo.get(RISCV::VSETVL));
+  auto MIB = getInstBuilder(SupportMarker, *this, MBB, Ins,
+                            ProgCtx.getLLVMState().getCtx(),
+                            InstrInfo.get(RISCV::VSETVL));
   MIB.addDef(DstReg);
   MIB.addReg(ScratchRegVL);
   MIB.addReg(ScratchRegVType);
@@ -3430,14 +3466,14 @@ void SnippyRISCVTarget::generateRVVModeUpdate(
     InstructionGenerationContext &IGC, const MCInstrInfo &InstrInfo,
     const RVVConfiguration &Config, const RVVConfigurationInfo::VLVM &VLVM,
     std::optional<unsigned> DesiredOpcode) const {
-  auto &GC = IGC.GC;
   unsigned SEW = static_cast<unsigned>(Config.SEW);
   LLVM_DEBUG(dbgs() << "Emit RVV Mode Change: VL = " << VLVM.VL
                     << ", SEW = " << SEW << ", TA = " << Config.TailAgnostic
                     << ", MA = " << Config.MaskAgnostic << "\n");
   auto VTYPE = RISCVVType::encodeVTYPE(Config.LMUL, SEW, Config.TailAgnostic,
                                        Config.MaskAgnostic);
-  auto &RGC = GC.getTargetContext().getImpl<RISCVGeneratorContext>();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &RGC = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
   bool SupportMarker = false;
   if (!DesiredOpcode.has_value()) {
     DesiredOpcode = selectDesiredModeChangeInstruction(
@@ -3491,14 +3527,16 @@ static void dumpRvvConfigurationInfo(StringRef FilePath,
 }
 
 std::unique_ptr<TargetGenContextInterface>
-SnippyRISCVTarget::createTargetContext(const GeneratorContext &Ctx) const {
-  auto RISCVCfg = RISCVConfigurationInfo::constructConfiguration(Ctx);
+SnippyRISCVTarget::createTargetContext(LLVMState &State,
+                                       const GeneratorSettings &GenSettings,
+                                       const TargetSubtargetInfo *STI) const {
+  auto RISCVCfg =
+      RISCVConfigurationInfo::constructConfiguration(State, GenSettings);
   auto RGC = std::make_unique<RISCVGeneratorContext>(std::move(RISCVCfg));
   const auto &VUInfo = RGC->getVUConfigInfo();
   bool IsRVVPresent = VUInfo.getModeChangeInfo().RVVPresent;
   if (IsRVVPresent) {
-    bool IsApplyValuegramEachInst =
-        Ctx.getGenSettings().Cfg.RegsHistograms.has_value();
+    bool IsApplyValuegramEachInst = GenSettings.Cfg.RegsHistograms.has_value();
     if (IsApplyValuegramEachInst)
       snippy::fatal("Not implemented", "vector registers can't be initialized");
   }
@@ -3538,9 +3576,9 @@ SnippyRISCVTarget::createSimulator(llvm::snippy::DynamicLibrary &ModelLib,
 const MCRegisterClass &SnippyRISCVTarget::getRegClass(
     InstructionGenerationContext &IGC, unsigned OperandRegClassID,
     unsigned OpIndex, unsigned Opcode, const MCRegisterInfo &RegInfo) const {
-  auto &Ctx = IGC.GC;
   auto &MBB = IGC.MBB;
-  auto &TgtCtx = Ctx.getTargetContext().getImpl<RISCVGeneratorContext>();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
   if (!isRVV(Opcode) || !TgtCtx.hasActiveRVVMode(MBB) ||
       (OperandRegClassID != RISCV::VRRegClassID))
     return RegInfo.getRegClass(OperandRegClassID);

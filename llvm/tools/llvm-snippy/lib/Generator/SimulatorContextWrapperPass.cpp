@@ -310,11 +310,11 @@ bool SimulatorContextWrapper::runOnModule(Module &M) {
 
   auto &ProgCtx = GC.getProgramContext();
   const auto *EntryFun = CGS.getRootNode()->functions().front();
-  auto &MainModule = GC.getMainModule();
+  auto &MainModule = SnippyModule::fromModule(M);
   const auto &SubTgt =
       MainModule.getMMI().getMachineFunction(*EntryFun)->getSubtarget();
 
-  auto &TargetContext = GC.getTargetContext();
+  auto &TargetContext = ProgCtx.getTargetContext();
   auto &SimCtx = get<OwningSimulatorContext>();
   SimCtx.initialize(ProgCtx, SubTgt, GC.getGenSettings(), TargetContext, GCFI);
 
@@ -360,8 +360,7 @@ void SimulatorContextPreserver::getAnalysisUsage(AnalysisUsage &AU) const {
 bool SimulatorContextPreserver::runOnModule(Module &M) {
   auto &SimCtx =
       getAnalysis<SimulatorContextWrapper>().get<OwningSimulatorContext>();
-  auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &MainModule = GC.getMainModule();
+  auto &MainModule = SnippyModule::fromModule(M);
   MainModule.getOrAddResult<OwningSimulatorContext>() = std::move(SimCtx);
   return false;
 }

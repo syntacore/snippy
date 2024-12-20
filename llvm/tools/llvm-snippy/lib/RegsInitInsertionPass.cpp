@@ -80,12 +80,13 @@ bool RegsInitInsertion::runOnMachineFunction(MachineFunction &MF) {
     MF.getRegInfo().invalidateLiveness();
     return false;
   }
-  auto &State = SGCtx.getLLVMState();
+  auto &ProgCtx = SGCtx.getProgramContext();
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   const auto &SubTgt = MF.getSubtarget();
 
   // new block for registers initialization
-  auto *BlockRegsInit = createMachineBasicBlock(MF, SGCtx);
+  auto *BlockRegsInit = createMachineBasicBlock(MF);
   auto *SuccessorBlockPtr = &MF.front();
   auto InsertIterPos = MF.begin();
   BlockRegsInit->addSuccessor(SuccessorBlockPtr);
