@@ -121,10 +121,12 @@ void FunctionDistribute::verifyFunctionSizes(Module &M,
 }
 void FunctionDistribute::calculateFunctionSizes(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &State = SGCtx.getProgramContext().getLLVMState();
   for (auto &F : M)
     FunctionSizes.emplace(
-        &F, SGCtx.getFunctionSize(
-                SGCtx.getMainModule().getMMI().getOrCreateMachineFunction(F)));
+        &F, State.getFunctionSize(
+                SnippyModule::fromModule(M).getMMI().getOrCreateMachineFunction(
+                    F)));
 }
 
 std::vector<FunctionDistribute::SectionSpaceInfo>
@@ -167,9 +169,10 @@ bool FunctionDistribute::runOnModule(Module &M) {
   llvm::transform(
       llvm::make_filter_range(
           M,
-          [&SGCtx, &FG](auto &F) {
+          [&M, &FG](auto &F) {
             return !FG.isRootFunction(
-                SGCtx.getMainModule().getMMI().getOrCreateMachineFunction(F));
+                SnippyModule::fromModule(M).getMMI().getOrCreateMachineFunction(
+                    F));
           }),
       std::back_inserter(SortedBySize), [](auto &F) { return &F; });
   std::sort(SortedBySize.begin(), SortedBySize.end(),

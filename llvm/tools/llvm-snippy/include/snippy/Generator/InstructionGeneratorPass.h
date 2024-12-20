@@ -29,14 +29,14 @@ class InstructionGenerator final
   void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
                         const GenerationStatistics &MFStats);
 
-  void prepareInterpreterEnv() const;
+  void prepareInterpreterEnv(MachineFunction &MF) const;
 
-  void addGV(const APInt &Value, unsigned long long Stride,
+  void addGV(Module &M, const APInt &Value, unsigned long long Stride,
              GlobalValue::LinkageTypes LType, StringRef Name) const;
 
-  void addSelfcheckSectionPropertiesAsGV() const;
+  void addSelfcheckSectionPropertiesAsGV(Module &M) const;
 
-  void addModelMemoryPropertiesAsGV() const;
+  void addModelMemoryPropertiesAsGV(Module &M) const;
 
   GeneratorContext *SGCtx;
 

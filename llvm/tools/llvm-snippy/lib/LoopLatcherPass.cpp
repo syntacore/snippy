@@ -147,7 +147,7 @@ bool LoopLatcher::runOnMachineFunction(MachineFunction &MF) {
                     .get<OwningSimulatorContext>()
                     .get();
   const auto &ProgCtx = SGCtx.getProgramContext();
-  auto &State = SGCtx.getLLVMState();
+  auto &State = ProgCtx.getLLVMState();
   auto &CLI = getAnalysis<CFPermutation>().get<ConsecutiveLoopInfo>(MF);
   if (UseStackOpt && !ProgCtx.stackEnabled())
     snippy::fatal(State.getCtx(),
@@ -203,7 +203,8 @@ auto LoopLatcher::selectRegsForBranch(const MCInstrDesc &BranchDesc,
   auto SimCtx = getAnalysis<SimulatorContextWrapper>()
                     .get<OwningSimulatorContext>()
                     .get();
-  auto &State = SGCtx.getLLVMState();
+  auto &ProgCtx = SGCtx.getProgramContext();
+  auto &State = ProgCtx.getLLVMState();
   auto &RegInfo = State.getRegInfo();
   const auto &SnippyTgt = State.getSnippyTarget();
   auto &RootPool = getAnalysis<RootRegPoolWrapper>().getPool();
@@ -293,7 +294,8 @@ MachineInstr &LoopLatcher::updateLatchBranch(MachineLoop &ML,
   assert(ML.contains(&Branch) && "Expected this loop branch");
 
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &State = SGCtx.getLLVMState();
+  auto &ProgCtx = SGCtx.getProgramContext();
+  auto &State = ProgCtx.getLLVMState();
   const auto &InstrInfo = State.getInstrInfo();
   const auto &BranchDesc = InstrInfo.get(Branch.getOpcode());
   const auto &SnippyTgt = State.getSnippyTarget();
@@ -312,8 +314,8 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   auto SimCtx = getAnalysis<SimulatorContextWrapper>()
                     .get<OwningSimulatorContext>()
                     .get();
-  const auto &ProgCtx = SGCtx.getProgramContext();
-  auto &State = SGCtx.getLLVMState();
+  auto &ProgCtx = SGCtx.getProgramContext();
+  auto &State = ProgCtx.getLLVMState();
   auto TrackingMode = SimCtx.hasTrackingMode();
 
   auto FirstTerm = ExitingBlock.getFirstTerminator();
@@ -326,7 +328,7 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   const auto &InstrInfo = State.getInstrInfo();
   const auto &BranchDesc = InstrInfo.get(Branch.getOpcode());
   const auto &SnippyTgt = State.getSnippyTarget();
-  const auto &MCRegClass = SnippyTgt.getMCRegClassForBranch(Branch, SGCtx);
+  const auto &MCRegClass = SnippyTgt.getMCRegClassForBranch(ProgCtx, Branch);
 
   auto ReservedRegs =
       selectRegsForBranch(BranchDesc, Preheader, ExitingBlock, MCRegClass);
@@ -397,9 +399,8 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   // fixed to work with non-trivial loops.
 
   RegToValueType ExitingValues;
-  auto CounterInsRes =
-      SnippyTgt.insertLoopCounter(InsPos, NewBranch, ReservedRegs, NIter, SGCtx,
-                                  ExitingValues, MinLoopCountVal);
+  auto CounterInsRes = SnippyTgt.insertLoopCounter(
+      HeadCtx, NewBranch, ReservedRegs, NIter, ExitingValues, MinLoopCountVal);
   auto &Diag = CounterInsRes.Diag;
   auto ActualNumIter = CounterInsRes.NIter;
   unsigned MinCounterVal = CounterInsRes.MinCounterVal.getZExtValue();

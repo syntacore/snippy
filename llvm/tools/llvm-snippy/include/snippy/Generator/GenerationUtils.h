@@ -33,12 +33,12 @@ std::vector<planning::PreselectedOpInfo>
 getPreselectedForInstr(const MCInst &Inst);
 
 std::vector<planning::PreselectedOpInfo> selectConcreteOffsets(
-    const MCInstrDesc &InstrDesc,
-    const std::vector<planning::PreselectedOpInfo> &Preselected,
-    GeneratorContext &GC);
+    InstructionGenerationContext &IGC, const MCInstrDesc &InstrDesc,
+    const std::vector<planning::PreselectedOpInfo> &Preselected);
 
 std::map<unsigned, AddressRestriction>
-collectAddressRestrictions(ArrayRef<unsigned> Opcodes, GeneratorContext &GC,
+collectAddressRestrictions(ArrayRef<unsigned> Opcodes,
+                           SnippyProgramContext &ProgCtx,
                            const MachineBasicBlock &MBB);
 
 std::map<unsigned, AddressRestriction> deduceStrongestRestrictions(
@@ -52,9 +52,9 @@ std::vector<unsigned> generateBaseRegs(InstructionGenerationContext &IGC,
                                        ArrayRef<unsigned> Opcodes);
 
 AddressInfo
-selectAddressForSingleInstrFromBurstGroup(AddressInfo OrigAI,
-                                          const AddressRestriction &OpcodeAR,
-                                          GeneratorContext &GC);
+selectAddressForSingleInstrFromBurstGroup(InstructionGenerationContext &IGC,
+                                          AddressInfo OrigAI,
+                                          const AddressRestriction &OpcodeAR);
 
 AddressGenInfo chooseAddrGenInfoForInstrCallback(
     LLVMContext &Ctx,
@@ -62,9 +62,9 @@ AddressGenInfo chooseAddrGenInfoForInstrCallback(
     size_t AccessSize, size_t Alignment, const MemoryAccess &MemoryScheme);
 
 enum class MemAccessKind { BURST, REGULAR };
-void markMemAccessAsUsed(const MCInstrDesc &InstrDesc, const AddressInfo &AI,
-                         MemAccessKind Kind, GeneratorContext &GC,
-                         MemAccessInfo *MAI);
+void markMemAccessAsUsed(InstructionGenerationContext &IGC,
+                         const MCInstrDesc &InstrDesc, const AddressInfo &AI,
+                         MemAccessKind Kind, MemAccessInfo *MAI);
 
 void addMemAccessToDump(const MemAddresses &ChosenAddresses, MemAccessInfo &MAI,
                         size_t AccessSize);
@@ -85,8 +85,7 @@ MachineBasicBlock::iterator processGeneratedInstructions(
     planning::InstructionGenerationContext &InstrGenCtx,
     const planning::RequestLimit &Limit);
 
-MachineBasicBlock *createMachineBasicBlock(MachineFunction &MF,
-                                           GeneratorContext &GC);
+MachineBasicBlock *createMachineBasicBlock(MachineFunction &MF);
 
 std::string getMBBSectionName(const MachineBasicBlock &MBB);
 

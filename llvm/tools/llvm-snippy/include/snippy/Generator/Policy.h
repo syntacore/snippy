@@ -67,6 +67,7 @@
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/RegisterHistogram.h"
 #include "snippy/Generator/GenerationLimit.h"
+#include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/SelfCheckInfo.h"
 #include "snippy/Generator/SnippyModule.h"
 #include "snippy/Support/OpcodeGenerator.h"
@@ -83,6 +84,7 @@ template <> struct std::hash<llvm::MCRegister> {
 
 namespace llvm {
 class MachineLoopInfo;
+struct fltSemantics;
 
 namespace snippy {
 
@@ -93,7 +95,9 @@ class MemAccessInfo;
 class SnippyLoopInfo;
 struct SimulatorContext;
 struct SnippyFunctionMetadata;
-
+class IAPIntSampler;
+class FloatSemanticsSamplerHolder;
+class TopLevelMemoryAccessSampler;
 namespace planning {
 
 // Helper class to keep additional information about the operand: register
@@ -182,9 +186,11 @@ private:
 public:
   MachineBasicBlock &MBB;
   MachineBasicBlock::iterator Ins;
-  GeneratorContext &GC;
+  SnippyProgramContext &ProgCtx;
+  const GeneratorSettings &GenSettings;
   const SimulatorContext &SimCtx;
   GenerationStatistics Stats;
+  TopLevelMemoryAccessSampler *MAS = nullptr;
   SnippyFunctionMetadata *SFM = nullptr;
   MachineLoopInfo *MLI = nullptr;
   const CallGraphState *CGS = nullptr;
@@ -196,12 +202,28 @@ public:
 
   InstructionGenerationContext(MachineBasicBlock &MBB,
                                MachineBasicBlock::iterator Ins,
+                               SnippyProgramContext &ProgCtx,
+                               const GeneratorSettings &GenSettings,
+                               const SimulatorContext &SimCtx);
+
+  InstructionGenerationContext(MachineBasicBlock &MBB,
+                               MachineBasicBlock::iterator Ins,
+                               SnippyProgramContext &ProgCtx,
+                               const GeneratorSettings &GenSettings);
+
+  InstructionGenerationContext(MachineBasicBlock &MBB,
+                               MachineBasicBlock::iterator Ins,
                                GeneratorContext &GC,
                                const SimulatorContext &SimCtx);
   InstructionGenerationContext(MachineBasicBlock &MBB,
                                MachineBasicBlock::iterator Ins,
                                GeneratorContext &GC);
   ~InstructionGenerationContext();
+
+  InstructionGenerationContext &append(TopLevelMemoryAccessSampler *NewMAS) {
+    MAS = NewMAS;
+    return *this;
+  }
 
   InstructionGenerationContext &append(SnippyFunctionMetadata *NewSFM) {
     SFM = NewSFM;
@@ -228,13 +250,35 @@ public:
     return *this;
   }
 
+  SnippyModule &getSnippyModule() {
+    auto &M = *MBB.getParent()->getFunction().getParent();
+    return SnippyModule::fromModule(M);
+  }
   auto pushRegPool() { return RPS.append(); }
 
   auto &getRegPool() { return RPS.getCurrent(); }
 
+  const TargetSubtargetInfo &getSubtargetImpl() const {
+    return getLLVMStateImpl().getSubtargetImpl(MBB.getParent()->getFunction());
+  }
+
+  template <typename SubtargetType> const SubtargetType &getSubtarget() const {
+    return getLLVMStateImpl().getSubtarget<SubtargetType>(*MBB.getParent());
+  }
+
+  IAPIntSampler &
+  getOrCreateFloatOverwriteValueSampler(const fltSemantics &Semantics);
+
+  auto &getMemoryAccessSampler() {
+    assert(MAS && "memory access sampler is not provided");
+    return *MAS;
+  }
+
 private:
+  LLVMState &getLLVMStateImpl() const;
   std::unique_ptr<RegPoolWrapper> TopRP;
   RegPoolStack RPS;
+  std::unique_ptr<FloatSemanticsSamplerHolder> FloatOverwriteSamplers;
 };
 
 struct InstructionRequest final {
@@ -265,7 +309,8 @@ public:
 
   DefaultGenPolicy &operator=(DefaultGenPolicy &&) = default;
 
-  DefaultGenPolicy(const GeneratorContext &SGCtx,
+  DefaultGenPolicy(SnippyProgramContext &ProgCtx,
+                   const GeneratorSettings &GenSettings,
                    std::function<bool(unsigned)> Filter,
                    bool MustHavePrimaryInstrs,
                    ArrayRef<OpcodeHistogramEntry> Overrides,
@@ -308,8 +353,9 @@ public:
   ValuegramGenPolicy &operator=(ValuegramGenPolicy &&) = default;
 
   ValuegramGenPolicy(
-      const GeneratorContext &SGCtx, std::function<bool(unsigned)> Filter,
-      bool MustHavePrimaryInstrs, ArrayRef<OpcodeHistogramEntry> Overrides,
+      SnippyProgramContext &ProgCtx, const GeneratorSettings &GenSettings,
+      std::function<bool(unsigned)> Filter, bool MustHavePrimaryInstrs,
+      ArrayRef<OpcodeHistogramEntry> Overrides,
       const std::unordered_map<unsigned, double> &WeightOverrides);
 
   std::optional<InstructionRequest> next() {
@@ -335,7 +381,7 @@ public:
                                unsigned Opcode);
 
   APInt getValueFromValuegram(Register Reg, StringRef Prefix,
-                              GeneratorContext &GC) const;
+                              InstructionGenerationContext &IGC) const;
 };
 
 class BurstGenPolicy final : public detail::EmptyFinalizeMixin {
@@ -352,7 +398,8 @@ public:
     return std::nullopt;
   }
 
-  BurstGenPolicy(const GeneratorContext &SGCtx, unsigned BurstGroupID);
+  BurstGenPolicy(SnippyProgramContext &ProgCtx,
+                 const GeneratorSettings &GenSettings, unsigned BurstGroupID);
 
   void initialize(InstructionGenerationContext &InstrGenCtx,
                   const RequestLimit &Limit);
@@ -516,6 +563,10 @@ inline bool isInseparableBundle(const GenPolicy &Pol) {
 inline void print(const GenPolicy &Pol, raw_ostream &OS) {
   Pol.Impl->print(OS);
 }
+GenPolicy createGenPolicy(SnippyProgramContext &ProgCtx,
+                          const GeneratorSettings &GenSettings,
+                          const MachineBasicBlock &MBB,
+                          std::unordered_map<unsigned, double> = {});
 
 } // namespace planning
 } // namespace snippy

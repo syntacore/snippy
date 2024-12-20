@@ -131,7 +131,8 @@ void PostGenVerifier::printData(const MachineFunction &MF) const {
   const GeneratorContext &SGCtx = CtxWrapper.getContext();
   const OpcodeCache &OpCache = SGCtx.getProgramContext().getOpcodeCache();
 
-  auto ExpectedDist = SGCtx.createDefaultOpcodeGenerator()->getProbabilities();
+  auto ExpectedDist =
+      SGCtx.getGenSettings().createDefaultOpcodeGenerator()->getProbabilities();
 
   auto &Output = outs();
   constexpr unsigned OpcodeWidth = 12;
@@ -253,7 +254,8 @@ static VerificationStatus verifyBBWithSizeLimit(
   auto InstrEnd =
       (MBB.getNextNode() == nullptr) ? --MBB.instr_end() : MBB.instr_end();
 
-  size_t Count = SGCtx.getCodeBlockSize(MBB.instr_begin(), InstrEnd);
+  auto &State = SGCtx.getProgramContext().getLLVMState();
+  size_t Count = State.getCodeBlockSize(MBB.instr_begin(), InstrEnd);
   size_t Planned = BBReq.limit().getLimit();
 
   // There are some instructions (like branches) which are not included in
@@ -265,8 +267,11 @@ static VerificationStatus verifyBBWithSizeLimit(
                                return Lhs + Rhs.initialStats().GeneratedSize;
                              });
 
-  const auto &SnippyTgt = SGCtx.getLLVMState().getSnippyTarget();
-  unsigned MinInstrSize = *SnippyTgt.getPossibleInstrsSize(SGCtx).begin();
+  const auto &SnippyTgt = State.getSnippyTarget();
+  unsigned MinInstrSize = *SnippyTgt
+                               .getPossibleInstrsSize(State.getSubtargetImpl(
+                                   MBB.getParent()->getFunction()))
+                               .begin();
   if (Planned > Count && Planned - Count < MinInstrSize) {
     outs() << printMBBReference(MBB) << " :  size -- " << Count
            << ", planned -- " << Planned << "\n";
@@ -325,8 +330,9 @@ void PostGenVerifier::verifyGenPlan(const MachineFunction &MF,
 
 bool PostGenVerifier::runOnMachineFunction(MachineFunction &MF) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  const auto &SnippyTgt = SGCtx.getLLVMState().getSnippyTarget();
-  auto &LLVMCtx = SGCtx.getLLVMState().getCtx();
+  auto &ProgCtx = SGCtx.getProgramContext();
+  const auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
+  auto &LLVMCtx = ProgCtx.getLLVMState().getCtx();
   if (VerifyHistogramGen)
     collectFreq(MF, SnippyTgt);
   if (VerifyGenPlan)
