@@ -339,10 +339,12 @@ public:
       return {};
     std::vector<InstructionGroupRequest> Reqs;
     auto &MBB = MF->back();
-    auto &SnpTgt = GC->getLLVMState().getSnippyTarget();
-    auto &&GP = DefaultGenPolicy(*GC, SnpTgt.getDefaultPolicyFilter(MBB, *GC),
-                                 SnpTgt.groupMustHavePrimaryInstr(MBB, *GC),
-                                 SnpTgt.getPolicyOverrides(MBB, *GC), {});
+    auto &ProgCtx = GC->getProgramContext();
+    auto &SnpTgt = ProgCtx.getLLVMState().getSnippyTarget();
+    auto &&GP = DefaultGenPolicy(ProgCtx, GC->getGenSettings(),
+                                 SnpTgt.getDefaultPolicyFilter(ProgCtx, MBB),
+                                 SnpTgt.groupMustHavePrimaryInstr(ProgCtx, MBB),
+                                 SnpTgt.getPolicyOverrides(ProgCtx, MBB), {});
     if (Limit.isSizeLimit()) {
       auto SizeLeft = Limit.getSizeLeft(MFStats);
       Reqs.emplace_back(RequestLimit::Size{SizeLeft}, std::move(GP));

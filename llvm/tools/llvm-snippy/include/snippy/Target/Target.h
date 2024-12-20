@@ -58,8 +58,10 @@ namespace snippy {
 struct SectionDesc;
 class LLVMState;
 class RegPoolWrapper;
-class GeneratorContext;
+class GeneratorSettings;
+class SnippyProgramContext;
 class StridedImmediate;
+
 enum class LoopType;
 struct TargetGenContextInterface {
   virtual ~TargetGenContextInterface() = 0;
@@ -126,7 +128,8 @@ public:
                                      SmallVectorImpl<MCInst> &Insts) const = 0;
 
   virtual std::unique_ptr<TargetGenContextInterface>
-  createTargetContext(const GeneratorContext &Ctx) const = 0;
+  createTargetContext(LLVMState &State, const GeneratorSettings &GenSettings,
+                      const TargetSubtargetInfo *STI) const = 0;
 
   virtual std::unique_ptr<TargetConfigInterface> createTargetConfig() const = 0;
 
@@ -172,10 +175,11 @@ public:
                                    MCRegister Reg) const = 0;
 
   virtual unsigned getRegBitWidth(MCRegister Reg,
-                                  GeneratorContext &GC) const = 0;
+                                  InstructionGenerationContext &IGC) const = 0;
 
-  virtual MCRegister regIndexToMCReg(unsigned RegIdx, RegStorageType Storage,
-                                     GeneratorContext &GC) const = 0;
+  virtual MCRegister regIndexToMCReg(InstructionGenerationContext &IGC,
+                                     unsigned RegIdx,
+                                     RegStorageType Storage) const = 0;
 
   virtual RegStorageType regToStorage(Register Reg) const = 0;
 
@@ -185,15 +189,16 @@ public:
                               const TargetSubtargetInfo &SubTgt) const = 0;
 
   // Returns size of stack slot for Reg.
-  virtual unsigned getSpillSizeInBytes(MCRegister Reg,
-                                       GeneratorContext &GC) const = 0;
+  virtual unsigned
+  getSpillSizeInBytes(MCRegister Reg,
+                      InstructionGenerationContext &IGC) const = 0;
 
   // Returns minimum address alignment that can be used to generate register
   // spill.
   virtual unsigned getSpillAlignmentInBytes(MCRegister Reg,
                                             LLVMState &State) const = 0;
 
-  virtual uint8_t getCodeAlignment(const GeneratorContext &GC) const = 0;
+  virtual uint8_t getCodeAlignment(const TargetSubtargetInfo &IGC) const = 0;
 
   // Find register by name, std::nullopt if not found.
   virtual std::optional<unsigned>
@@ -232,8 +237,8 @@ public:
   virtual bool needsGenerationPolicySwitch(unsigned Opcode) const = 0;
 
   virtual std::vector<Register>
-  getRegsForSelfcheck(const MachineInstr &MI, const MachineBasicBlock &MBB,
-                      const GeneratorContext &GenCtx) const = 0;
+  getRegsForSelfcheck(const MachineInstr &MI,
+                      InstructionGenerationContext &IGC) const = 0;
 
   virtual std::unique_ptr<IRegisterState>
   createRegisterState(const TargetSubtargetInfo &ST) const = 0;
@@ -262,7 +267,8 @@ public:
   virtual bool isFloatingPoint(const MCInstrDesc &InstrDesc) const = 0;
 
   virtual MachineOperand
-  generateTargetOperand(GeneratorContext &SGCtx, unsigned OpCode,
+  generateTargetOperand(SnippyProgramContext &ProgCtx,
+                        const GeneratorSettings &GenSettings, unsigned OpCode,
                         unsigned OpType,
                         const StridedImmediate &StridedImm) const = 0;
 
@@ -271,15 +277,14 @@ public:
   // Get target-specific access mask requirements for operand in instruction.
   // Returns AccessMaskBit::None if no such.
   virtual AccessMaskBit
-  getCustomAccessMaskForOperand(GeneratorContext &SGCtx,
-                                const MCInstrDesc &InstrDesc,
+  getCustomAccessMaskForOperand(const MCInstrDesc &InstrDesc,
                                 unsigned Operand) const {
     return AccessMaskBit::None;
   }
 
-  virtual unsigned getTransformSequenceLength(APInt OldValue, APInt NewValue,
-                                              MCRegister Register,
-                                              GeneratorContext &GC) const = 0;
+  virtual unsigned getTransformSequenceLength(InstructionGenerationContext &IGC,
+                                              APInt OldValue, APInt NewValue,
+                                              MCRegister Register) const = 0;
 
   virtual void transformValueInReg(InstructionGenerationContext &IGC,
                                    APInt OldValue, APInt NewValue,
@@ -294,7 +299,7 @@ public:
   virtual unsigned getMaxInstrSize() const = 0;
 
   virtual std::set<unsigned>
-  getPossibleInstrsSize(const GeneratorContext &GC) const = 0;
+  getPossibleInstrsSize(const TargetSubtargetInfo &STI) const = 0;
 
   virtual bool isMultipleReg(Register Reg, const MCRegisterInfo &RI) const = 0;
 
@@ -324,12 +329,12 @@ public:
   virtual MachineBasicBlock *
   getBranchDestination(const MachineInstr &Branch) const = 0;
 
-  virtual MachineBasicBlock *generateBranch(const MCInstrDesc &InstrDesc,
-                                            MachineBasicBlock &MBB,
-                                            GeneratorContext &GC) const = 0;
+  virtual MachineBasicBlock *
+  generateBranch(InstructionGenerationContext &IGC,
+                 const MCInstrDesc &InstrDesc) const = 0;
 
   virtual bool relaxBranch(MachineInstr &Branch, unsigned Distance,
-                           GeneratorContext &GC) const = 0;
+                           SnippyProgramContext &ProgCtx) const = 0;
 
   virtual void insertFallbackBranch(MachineBasicBlock &From,
                                     MachineBasicBlock &To,
@@ -378,11 +383,12 @@ public:
   virtual unsigned countAddrsToGenerate(unsigned Opcode) const = 0;
 
   virtual std::pair<AddressParts, MemAddresses>
-  breakDownAddr(AddressInfo AddrInfo, const MachineInstr &MI, unsigned AddrIdx,
-                GeneratorContext &GC) const = 0;
+  breakDownAddr(InstructionGenerationContext &IGC, AddressInfo AddrInfo,
+                const MachineInstr &MI, unsigned AddrIdx) const = 0;
 
-  virtual unsigned getWriteValueSequenceLength(APInt Value, MCRegister Register,
-                                               GeneratorContext &GC) const = 0;
+  virtual unsigned
+  getWriteValueSequenceLength(InstructionGenerationContext &IGC, APInt Value,
+                              MCRegister Register) const = 0;
 
   virtual void writeValueToReg(InstructionGenerationContext &IGC, APInt Value,
                                unsigned DstReg) const = 0;
@@ -394,7 +400,7 @@ public:
                                MCRegister Reg) const = 0;
 
   virtual std::tuple<size_t, size_t>
-  getAccessSizeAndAlignment(unsigned Opcode, GeneratorContext &GC,
+  getAccessSizeAndAlignment(SnippyProgramContext &ProgCtx, unsigned Opcode,
                             const MachineBasicBlock &MBB) const = 0;
 
   virtual std::vector<Register>
@@ -403,17 +409,16 @@ public:
   // FIXME: basically, we should need only MCRegisterClass, but now
   // MCRegisterClass for RISCV does not fully express available regs.
   virtual std::vector<Register>
-  excludeRegsForOperand(const MCRegisterClass &RC, const GeneratorContext &GC,
-                        const MCInstrDesc &InstrDesc,
+  excludeRegsForOperand(InstructionGenerationContext &IGC,
+                        const MCRegisterClass &RC, const MCInstrDesc &InstrDesc,
                         unsigned Operand) const = 0;
 
   virtual std::vector<Register>
   includeRegs(const MCRegisterClass &RC) const = 0;
 
-  virtual void reserveRegsIfNeeded(unsigned Opcode, bool isDst, bool isMem,
-                                   Register Reg, RegPoolWrapper &RP,
-                                   GeneratorContext &GC,
-                                   const MachineBasicBlock &MBB) const = 0;
+  virtual void reserveRegsIfNeeded(InstructionGenerationContext &IGC,
+                                   unsigned Opcode, bool isDst, bool isMem,
+                                   Register Reg) const = 0;
 
   virtual SmallVector<unsigned>
   getImmutableRegs(const MCRegisterClass &MCRegClass) const = 0;
@@ -423,8 +428,8 @@ public:
   virtual unsigned getLoopOverhead() const = 0;
 
   virtual const MCRegisterClass &
-  getMCRegClassForBranch(const MachineInstr &Instr,
-                         GeneratorContext &GC) const = 0;
+  getMCRegClassForBranch(SnippyProgramContext &ProgCtx,
+                         const MachineInstr &Instr) const = 0;
 
   virtual MachineInstr &
   updateLoopBranch(MachineInstr &Branch, const MCInstrDesc &InstrDesc,
@@ -434,7 +439,7 @@ public:
   getNumRegsForLoopBranch(const MCInstrDesc &BranchDesc) const = 0;
 
   virtual unsigned getInstrSize(const MachineInstr &Inst,
-                                const GeneratorContext &GC) const = 0;
+                                LLVMState &State) const = 0;
 
   // returns min loop counter value
   virtual unsigned insertLoopInit(InstructionGenerationContext &IGC,
@@ -451,9 +456,9 @@ public:
   };
 
   virtual LoopCounterInsertionResult
-  insertLoopCounter(MachineBasicBlock::iterator Pos, MachineInstr &MI,
+  insertLoopCounter(InstructionGenerationContext &IGC, MachineInstr &MI,
                     ArrayRef<Register> ReservedRegs, unsigned NIter,
-                    GeneratorContext &GC, RegToValueType &ExitingValues,
+                    RegToValueType &ExitingValues,
                     unsigned RegCounterOffset) const = 0;
 
   virtual ~SnippyTarget();
@@ -480,15 +485,16 @@ public:
   virtual bool isCall(unsigned Opcode) const = 0;
 
   virtual std::vector<OpcodeHistogramEntry>
-  getPolicyOverrides(const MachineBasicBlock &MBB,
-                     const GeneratorContext &GC) const = 0;
+  getPolicyOverrides(const SnippyProgramContext &ProgCtx,
+                     const MachineBasicBlock &MBB) const = 0;
 
   // Currently the result is the same for all groups in BB
-  virtual bool groupMustHavePrimaryInstr(const MachineBasicBlock &MBB,
-                                         const GeneratorContext &GC) const = 0;
+  virtual bool
+  groupMustHavePrimaryInstr(const SnippyProgramContext &ProgCtx,
+                            const MachineBasicBlock &MBB) const = 0;
   virtual std::function<bool(unsigned)>
-  getDefaultPolicyFilter(const MachineBasicBlock &MBB,
-                         const GeneratorContext &GC) const = 0;
+  getDefaultPolicyFilter(const SnippyProgramContext &ProgCtx,
+                         const MachineBasicBlock &MBB) const = 0;
   // Registers that should be valid while calling an external function
   virtual std::vector<MCRegister> getGlobalStateRegs() const = 0;
 

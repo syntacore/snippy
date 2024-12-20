@@ -69,7 +69,8 @@ namespace snippy {
 
 bool FillExternalFunctionsStubs::runOnModule(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &State = SGCtx.getLLVMState();
+  auto &ProgCtx = SGCtx.getProgramContext();
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
   for (auto &F : M) {
@@ -81,8 +82,8 @@ bool FillExternalFunctionsStubs::runOnModule(Module &M) {
       continue;
 
     auto &MF =
-        State.createMachineFunctionFor(F, SGCtx.getMainModule().getMMI());
-    auto *MBB = createMachineBasicBlock(MF, SGCtx);
+        State.createMachineFunctionFor(F, SnippyModule::fromModule(M).getMMI());
+    auto *MBB = createMachineBasicBlock(MF);
     MF.push_back(MBB);
     InstructionGenerationContext IGC{*MBB, MBB->end(), SGCtx};
     SnippyTgt.generateReturn(IGC);
