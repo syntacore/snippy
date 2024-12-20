@@ -9,7 +9,6 @@
 
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
-#include "snippy/Generator/LLVMState.h"
 
 #include <algorithm>
 #include <optional>
@@ -27,6 +26,7 @@ class InstructionGenerationContext;
 class Linker;
 class GeneratorContext;
 class Interpreter;
+class LLVMState;
 
 struct MemorySectionConfig {
   MemAddr Start = 0;

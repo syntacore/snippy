@@ -80,7 +80,8 @@ bool BranchRelaxator::tryRelaxBranch(MachineInstr &Branch,
                                      const MachineRegion &R) const {
   assert(Branch.isBranch() && "Only branches expected");
   auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &State = GC.getLLVMState();
+  auto &ProgCtx = GC.getProgramContext();
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
   const auto *DstMBB = SnippyTgt.getBranchDestination(Branch);
@@ -104,14 +105,14 @@ bool BranchRelaxator::tryRelaxBranch(MachineInstr &Branch,
 
   if (BackwardBranch) {
     // From first instruction to branch inclusively
-    DistanceInBytes += GC.getCodeBlockSize(
+    DistanceInBytes += State.getCodeBlockSize(
         BranchMBB->begin(),
         std::next(MachineBasicBlock::const_iterator(Branch)));
     // if loop consists of only one block then we don't want to count it twice
     if (BranchMBB != DstMBB)
-      DistanceInBytes += GC.getCodeBlockSize(DstMBB->begin(), DstMBB->end());
+      DistanceInBytes += State.getCodeBlockSize(DstMBB->begin(), DstMBB->end());
   } else {
-    DistanceInBytes += GC.getCodeBlockSize(
+    DistanceInBytes += State.getCodeBlockSize(
         MachineBasicBlock::const_iterator(Branch), BranchMBB->end());
   }
 
@@ -122,7 +123,7 @@ bool BranchRelaxator::tryRelaxBranch(MachineInstr &Branch,
         assert(BB);
         bool DontTakeBB = (BB == Entry) || (BB == Exit) || (BB == BranchMBB);
         unsigned BBSize =
-            DontTakeBB ? 0 : GC.getCodeBlockSize(BB->begin(), BB->end());
+            DontTakeBB ? 0 : State.getCodeBlockSize(BB->begin(), BB->end());
         return Dist + BBSize;
       });
 
@@ -138,7 +139,7 @@ bool BranchRelaxator::tryRelaxBranch(MachineInstr &Branch,
                     << BranchMBB->getFullName() << ": ";
              Branch.dump());
 
-  if (NoRelax || !SnippyTgt.relaxBranch(Branch, DistanceInBytes, GC)) {
+  if (NoRelax || !SnippyTgt.relaxBranch(Branch, DistanceInBytes, ProgCtx)) {
     LLVM_DEBUG(Branch.dump());
     LLVM_DEBUG(R.dump());
     LLVM_DEBUG(dbgs() << "Distance = " << DistanceInBytes << '\n');
@@ -150,8 +151,10 @@ bool BranchRelaxator::tryRelaxBranch(MachineInstr &Branch,
 }
 
 bool BranchRelaxator::runOnMachineBasicBlock(MachineBasicBlock &MBB) {
-  auto &State =
-      getAnalysis<GeneratorContextWrapper>().getContext().getLLVMState();
+  auto &State = getAnalysis<GeneratorContextWrapper>()
+                    .getContext()
+                    .getProgramContext()
+                    .getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   const auto &MRI = getAnalysis<MachineRegionInfoPass>().getRegionInfo();
 

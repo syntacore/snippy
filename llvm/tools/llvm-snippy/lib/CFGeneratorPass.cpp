@@ -56,19 +56,28 @@ namespace snippy {
 bool CFGenerator::runOnMachineFunction(MachineFunction &MF) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &FG = getAnalysis<FunctionGenerator>();
-  auto CFInstrsNum = SGCtx.getCFInstrsNum(FG.getRequestedInstrsNum(MF));
+  auto &ProgCtx = SGCtx.getProgramContext();
+  auto &GenSettings = SGCtx.getGenSettings();
+  auto &OpCC = ProgCtx.getOpcodeCache();
+
+  auto CFInstrsNum =
+      GenSettings.getCFInstrsNum(OpCC, FG.getRequestedInstrsNum(MF));
   if (CFInstrsNum == 0)
     return false;
 
-  auto &State = SGCtx.getLLVMState();
+  auto &State = ProgCtx.getLLVMState();
   const auto &InstrInfo = State.getInstrInfo();
   const auto &SnippyTgt = State.getSnippyTarget();
-  auto CFOpcGen = SGCtx.createCFOpcodeGenerator();
+  auto CFOpcGen = GenSettings.createCFOpcodeGenerator(OpCC);
   auto *CurrMBB = &MF.front();
   for (auto NInstr = 0u; NInstr < CFInstrsNum; ++NInstr) {
     auto Opc = CFOpcGen->generate();
     const auto &InstrDesc = InstrInfo.get(Opc);
-    CurrMBB = SnippyTgt.generateBranch(InstrDesc, *CurrMBB, SGCtx);
+    // FIXME: one of current IGC's design flaw does not
+    // allow to re-assign MBB.
+    InstructionGenerationContext IGC{*CurrMBB, CurrMBB->getFirstTerminator(),
+                                     SGCtx};
+    CurrMBB = SnippyTgt.generateBranch(IGC, InstrDesc);
   }
 
   return true;

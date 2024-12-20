@@ -15,6 +15,7 @@
 
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/RandUtil.h"
+#include "snippy/Target/Target.h"
 
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -41,8 +42,6 @@ class MCCodeEmitter;
 class MCDisassembler;
 
 namespace snippy {
-
-class SnippyTarget;
 
 struct SelectedTargetInfo final {
   std::string Triple;
@@ -80,7 +79,9 @@ public:
     return *TheTargetMachine->getMCRegisterInfo();
   }
   const MCSubtargetInfo &getSubtargetInfo() const {
-    return *TheTargetMachine->getMCSubtargetInfo();
+    const auto *Ret = TheTargetMachine->getMCSubtargetInfo();
+    assert(Ret);
+    return *Ret;
   }
 
   Function &createFunction(Module &M, StringRef FunctionName,
@@ -154,6 +155,53 @@ public:
   MCCodeEmitter &getCodeEmitter() const;
   MCDisassembler &getDisassembler() const;
   LLVMContext &getCtx() { return Ctx; }
+
+  const TargetSubtargetInfo &getSubtargetImpl(const Function &Fn) const {
+    return *getTargetMachine().getSubtargetImpl(Fn);
+  }
+
+  template <typename SubtargetType>
+  const SubtargetType &getSubtarget(const Function &Fn) const {
+    return static_cast<const SubtargetType &>(getSubtargetImpl(Fn));
+  }
+
+  template <typename SubtargetType>
+  const SubtargetType &getSubtarget(const MachineFunction &Fn) const {
+    return static_cast<const SubtargetType &>(
+        getSubtargetImpl(Fn.getFunction()));
+  }
+
+  template <typename It> size_t getCodeBlockSize(It Begin, It End) {
+    auto SizeAccumulator = [this](auto CurrSize, auto &MI) {
+      size_t InstrSize = getSnippyTarget().getInstrSize(MI, *this);
+      if (InstrSize == 0)
+        snippy::warn(
+            WarningName::InstructionSizeUnknown, getCtx(),
+            [&MI]() {
+              std::string Ret;
+              llvm::raw_string_ostream OS{Ret};
+              OS << "Instruction '";
+              MI.print(OS, /* IsStandalone */ true, /* SkipOpers */ true,
+                       /* SkipDebugLoc */ true, /* AddNewLine */ false);
+              OS << "' has unknown size";
+              return Ret;
+            }(),
+            "function size estimation may be wrong");
+      return CurrSize + InstrSize;
+    };
+    return std::accumulate(Begin, End, 0u, SizeAccumulator);
+  }
+
+  size_t getMBBSize(const MachineBasicBlock &MBB) {
+    return getCodeBlockSize(MBB.begin(), MBB.end());
+  }
+
+  size_t getFunctionSize(const MachineFunction &MF) {
+    return std::accumulate(MF.begin(), MF.end(), 0ul,
+                           [this](auto CurrentSize, const auto &MBB) {
+                             return CurrentSize + getMBBSize(MBB);
+                           });
+  }
 
 private:
   const SnippyTarget *TheSnippyTarget;

@@ -39,7 +39,8 @@ public:
 
   auto getFunctionSizeInfo(const MachineFunction &MF) const {
     auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-    return std::make_pair(SGCtx.getFunctionSize(MF),
+    auto &State = SGCtx.getProgramContext().getLLVMState();
+    return std::make_pair(State.getFunctionSize(MF),
                           SGCtx.getProgramContext().getOutputSectionFor(MF));
   }
 
@@ -68,7 +69,8 @@ public:
     std::vector<MCRegister> Ret;
 
     if (IsRoot)
-      llvm::copy(SGCtx.getRegsSpilledToStack(), std::back_inserter(Ret));
+      llvm::copy(SGCtx.getGenSettings().getRegsSpilledToStack(),
+                 std::back_inserter(Ret));
     else {
       auto RegSet = getAllMutatedRegs(MF);
       llvm::copy(RegSet, std::back_inserter(Ret));
@@ -131,11 +133,10 @@ PrologueEpilogueInsertion::findPlaceForEpilogue(MachineFunction &MF) {
   return std::make_pair(&MBB, InsertPos);
 }
 
-static MCRegister getRegisterForPreservedSPSpill(GeneratorContext &SGCtx,
+static MCRegister getRegisterForPreservedSPSpill(SnippyProgramContext &ProgCtx,
                                                  MachineBasicBlock &MBB) {
-  auto &State = SGCtx.getLLVMState();
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
-  auto &ProgCtx = SGCtx.getProgramContext();
   // If external stack is specified, we can use target-default stack pointer as
   // auxillary, because it is already initialized
   if (ProgCtx.hasExternalStack())
@@ -150,12 +151,12 @@ static MCRegister getRegisterForPreservedSPSpill(GeneratorContext &SGCtx,
 
 static void setupStackPointer(InstructionGenerationContext &IGC,
                               MCRegister AuxReg) {
-  auto &SGCtx = IGC.GC;
-  auto &State = SGCtx.getLLVMState();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   auto TargetStackPointer = SnippyTgt.getStackPointer();
 
-  if (SGCtx.getProgramContext().hasExternalStack()) {
+  if (ProgCtx.hasExternalStack()) {
     if (AuxReg != TargetStackPointer) // If we use external stack and redefine
                                       // stack pointer register in snippet, we
                                       // need to initialize redefined stack
@@ -171,10 +172,10 @@ static void setupStackPointer(InstructionGenerationContext &IGC,
   // This requires two steps:
   // 1 - save current stack pointer state to top of stack.
   // 2 - set stack pointer to point to next stack slot.
-  auto SPSpillSize = SnippyTgt.getSpillSizeInBytes(AuxReg, SGCtx);
-  auto Addr = SGCtx.getProgramContext().getStackTop() - SPSpillSize;
+  auto SPSpillSize = SnippyTgt.getSpillSizeInBytes(AuxReg, IGC);
+  auto Addr = ProgCtx.getStackTop() - SPSpillSize;
   assert(Addr % SPSpillSize == 0u && "Stack section must be properly aligned");
-  if (!SGCtx.isRegSpilledToMem(AuxReg))
+  if (!IGC.GenSettings.isRegSpilledToMem(AuxReg))
     SnippyTgt.storeRegToAddr(IGC, Addr, AuxReg,
                              /* store the whole register */ 0);
   auto SPInitValue = Addr;
@@ -186,12 +187,12 @@ static void setupStackPointer(InstructionGenerationContext &IGC,
 
 static void restoreStackPointer(InstructionGenerationContext &IGC,
                                 MCRegister AuxReg) {
-  auto &SGCtx = IGC.GC;
 
-  const auto &SnippyTgt = SGCtx.getLLVMState().getSnippyTarget();
+  auto &ProgCtx = IGC.ProgCtx;
+  const auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
   auto TargetStackPointer = SnippyTgt.getStackPointer();
 
-  if (SGCtx.getProgramContext().hasExternalStack()) {
+  if (ProgCtx.hasExternalStack()) {
     if (AuxReg != TargetStackPointer) // Like during stack initialization,
                                       // both `external-stack` and
                                       // `redefine-sp` are specified, copying
@@ -202,18 +203,18 @@ static void restoreStackPointer(InstructionGenerationContext &IGC,
   }
 
   // Restore stack pointer state.
-  auto SPSpillSize = SnippyTgt.getSpillSizeInBytes(AuxReg, SGCtx);
-  auto Addr = SGCtx.getProgramContext().getStackTop() - SPSpillSize;
+  auto SPSpillSize = SnippyTgt.getSpillSizeInBytes(AuxReg, IGC);
+  auto Addr = ProgCtx.getStackTop() - SPSpillSize;
   SnippyTgt.loadRegFromAddr(IGC, Addr, AuxReg);
 }
 
 void PrologueEpilogueInsertion::generateStackInitialization(
     InstructionGenerationContext &IGC) {
-  auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &State = SGCtx.getLLVMState();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
-  auto RealStackPointer = SGCtx.getProgramContext().getStackPointer();
+  auto RealStackPointer = ProgCtx.getStackPointer();
 
   // If honor-target-abi is specified and register, chosen for stack pointer
   // redefinition, is preserved, we:
@@ -223,13 +224,13 @@ void PrologueEpilogueInsertion::generateStackInitialization(
   // 3. spill "preserved stack pointer" relatively to auxillary register
   // 4. copy contents of auxillary register to "preserved stack pointer"
   auto AuxReg = RealStackPointer;
-  if (SGCtx.getProgramContext().shouldSpillStackPointer())
-    AuxReg = getRegisterForPreservedSPSpill(SGCtx, IGC.MBB);
+  if (ProgCtx.shouldSpillStackPointer())
+    AuxReg = getRegisterForPreservedSPSpill(ProgCtx, IGC.MBB);
 
   setupStackPointer(IGC, AuxReg);
 
   // Spilling of preserved register, chosen for stack pointer role
-  if (SGCtx.getProgramContext().shouldSpillStackPointer()) {
+  if (ProgCtx.shouldSpillStackPointer()) {
     IGC.MBB.addLiveIn(RealStackPointer);
     SnippyTgt.generateSpillToStack(IGC, RealStackPointer, AuxReg);
   }
@@ -240,10 +241,10 @@ void PrologueEpilogueInsertion::generateStackInitialization(
 
 void PrologueEpilogueInsertion::generateStackTermination(
     InstructionGenerationContext &IGC) {
-  auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &State = SGCtx.getLLVMState();
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
-  auto RealStackPointer = SGCtx.getProgramContext().getStackPointer();
+  auto RealStackPointer = ProgCtx.getStackPointer();
   auto &MBB = IGC.MBB;
 
   // If honor-target-abi is specified and chosen stack pointer is preserved
@@ -253,8 +254,8 @@ void PrologueEpilogueInsertion::generateStackTermination(
   // 3. copy stack pointer value to this auxillary register
   // 4. reload preserved stack pointer relatively to auxillary register
   auto AuxReg = RealStackPointer;
-  if (SGCtx.getProgramContext().shouldSpillStackPointer()) {
-    AuxReg = getRegisterForPreservedSPSpill(SGCtx, MBB);
+  if (ProgCtx.shouldSpillStackPointer()) {
+    AuxReg = getRegisterForPreservedSPSpill(ProgCtx, MBB);
     SnippyTgt.copyRegToReg(IGC, RealStackPointer, AuxReg);
     SnippyTgt.generateReloadFromStack(IGC, RealStackPointer, AuxReg);
   }
@@ -264,16 +265,15 @@ void PrologueEpilogueInsertion::generateStackTermination(
 
 static void generateSpillToMem(InstructionGenerationContext &IGC,
                                ArrayRef<MCRegister> SpilledToMem) {
-  auto &SGCtx = IGC.GC;
   auto &MBB = IGC.MBB;
   auto RP = IGC.pushRegPool();
-  auto &ProgCtx = SGCtx.getProgramContext();
+  auto &ProgCtx = IGC.ProgCtx;
   if (!ProgCtx.hasProgramStateSaveSpace())
     snippy::fatal(
         "Cannot save global program state: no utility section in layout");
   auto &SaveLocs = ProgCtx.getProgramStateSaveSpace();
   llvm::for_each(SpilledToMem, [&](auto Reg) { RP->addReserved(Reg); });
-  auto &State = SGCtx.getLLVMState();
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   llvm::for_each(SpilledToMem, [&](auto Reg) {
     MBB.addLiveIn(Reg);
@@ -287,7 +287,8 @@ bool PrologueEpilogueInsertion::insertPrologue(
     ArrayRef<MCRegister> SpilledToMem) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &FG = getAnalysis<FunctionGenerator>();
-  auto &State = SGCtx.getLLVMState();
+  auto &ProgCtx = SGCtx.getProgramContext();
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
   bool IsEntry = FG.isEntryFunction(MF);
@@ -321,13 +322,13 @@ bool PrologueEpilogueInsertion::insertPrologue(
 
   if (!IsEntry)
     return true;
-  auto &SM = SGCtx.getMainModule();
+  auto &SM = InstrGenCtx.getSnippyModule();
   SM.getOrAddResult<ObjectMetadata>().EntryPrologueInstrCnt =
       std::distance(MBB->begin(), Ins);
   // For entry also check that function still fits assigned section
   // after prologue insertion
   auto &&[FSize, SectionInfo] = getFunctionSizeInfo(MF);
-  auto PrologueSize = SGCtx.getCodeBlockSize(MBB->begin(), Ins);
+  auto PrologueSize = State.getCodeBlockSize(MBB->begin(), Ins);
 
   // Do not report error here if function doesn't fit even without prologue.
   // That error would be displayed further in FunctionDistributePass.
@@ -348,7 +349,8 @@ bool PrologueEpilogueInsertion::insertEpilogue(
     ArrayRef<MCRegister> SpilledToMem) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &FG = getAnalysis<FunctionGenerator>();
-  auto &State = SGCtx.getLLVMState();
+  auto &ProgCtx = SGCtx.getProgramContext();
+  auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
   bool IsExit = FG.isExitFunction(MF);
@@ -394,13 +396,13 @@ bool PrologueEpilogueInsertion::insertEpilogue(
       BBWasEmptyBeforeEpilogueInsertion ? MBB->begin() : std::next(Prev);
   if (!IsExit)
     return true;
-  auto &SM = SGCtx.getMainModule();
+  auto &SM = InstrGenCtx.getSnippyModule();
   SM.getOrAddResult<ObjectMetadata>().EntryEpilogueInstrCnt =
       std::distance(FirstInserted, MBB->end());
   // For exit also check that function still fits assigned section
   // after epilogue insertion
   auto &&[FSize, SectionInfo] = getFunctionSizeInfo(MF);
-  auto EpilogueSize = SGCtx.getCodeBlockSize(FirstInserted, MBB->end());
+  auto EpilogueSize = State.getCodeBlockSize(FirstInserted, MBB->end());
 
   // Do not report error here if function doesn't fit even without epilogue.
   // That error would be displayed further in FunctionDistributePass.
@@ -423,7 +425,7 @@ bool PrologueEpilogueInsertion::runOnMachineFunction(MachineFunction &MF) {
     return false;
 
   auto SpilledToStack = getSpilledRegs(MF);
-  auto SpilledToMem = SGCtx.getRegsSpilledToMem();
+  auto SpilledToMem = SGCtx.getGenSettings().getRegsSpilledToMem();
   auto PrologueInserted = insertPrologue(MF, SpilledToStack, SpilledToMem);
   auto EpilogueInserted = insertEpilogue(MF, SpilledToStack, SpilledToMem);
 
