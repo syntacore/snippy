@@ -16,7 +16,7 @@ extern "C" {
 
 #define RVMAPI_ENTRY_POINT_SYMBOL RVMVTable
 #define RVMAPI_VERSION_SYMBOL RVMInterfaceVersion
-#define RVMAPI_CURRENT_INTERFACE_VERSION 20u
+#define RVMAPI_CURRENT_INTERFACE_VERSION 21u
 
 typedef uint64_t RVMRegT;
 
@@ -70,8 +70,31 @@ typedef enum {
 #define RVM_FOR_EACH_ZEXT(MACRO)                                               \
   MACRO(RVM_ZEXT_ICSR, icsr)                                                   \
   MACRO(RVM_ZEXT_IFENCEI, ifencei)                                             \
+  MACRO(RVM_ZEXT_ICOND, icond)                                                 \
+  MACRO(RVM_ZEXT_ICBOM, icbom)                                                 \
+  MACRO(RVM_ZEXT_ICBOZ, icboz)                                                 \
+  MACRO(RVM_ZEXT_ICNTR, icntr)                                                 \
+  MACRO(RVM_ZEXT_ICBOP, icbop)                                                 \
+  MACRO(RVM_ZEXT_IMOP, imop)                                                   \
+  MACRO(RVM_ZEXT_ILSD, ilsd)                                                   \
+  MACRO(RVM_ZEXT_IHPM, ihpm)                                                   \
+  MACRO(RVM_ZEXT_IHINTNTL, ihintntl)                                           \
+  MACRO(RVM_ZEXT_IHINTPAUSE, ihintpause)                                       \
+  MACRO(RVM_ZEXT_ICFISS, icfiss)                                               \
+  MACRO(RVM_ZEXT_ICFILP, icfilp)                                               \
+  MACRO(RVM_ZEXT_AAMO, aamo)                                                   \
+  MACRO(RVM_ZEXT_ABHA, abha)                                                   \
+  MACRO(RVM_ZEXT_ACAS, acas)                                                   \
+  MACRO(RVM_ZEXT_CMP, cmp)                                                     \
+  MACRO(RVM_ZEXT_CMT, cmt)                                                     \
+  MACRO(RVM_ZEXT_FA, fa)                                                       \
+  MACRO(RVM_ZEXT_FBFMIN, fbfmin)                                               \
   MACRO(RVM_ZEXT_FH, fh)                                                       \
   MACRO(RVM_ZEXT_FHMIN, fhmin)                                                 \
+  MACRO(RVM_ZEXT_FINX, finx)                                                   \
+  MACRO(RVM_ZEXT_DINX, dinx)                                                   \
+  MACRO(RVM_ZEXT_HINX, hinx)                                                   \
+  MACRO(RVM_ZEXT_HINXMIN, hinxmin)                                             \
   MACRO(RVM_ZEXT_BA, ba)                                                       \
   MACRO(RVM_ZEXT_BB, bb)                                                       \
   MACRO(RVM_ZEXT_BC, bc)                                                       \
@@ -80,6 +103,10 @@ typedef enum {
   MACRO(RVM_ZEXT_BKB, bkb)                                                     \
   MACRO(RVM_ZEXT_BKC, bkc)                                                     \
   MACRO(RVM_ZEXT_BKX, bkx)                                                     \
+  MACRO(RVM_ZEXT_VFBFMIN, vfbfmin)                                             \
+  MACRO(RVM_ZEXT_VFBFWMA, vfbfwma)                                             \
+  MACRO(RVM_ZEXT_VFH, vfh)                                                     \
+  MACRO(RVM_ZEXT_VFHMIN, vfhmin)                                               \
   MACRO(RVM_ZEXT_VKB, vkb)                                                     \
   MACRO(RVM_ZEXT_VBB, vbb)                                                     \
   MACRO(RVM_ZEXT_VBC, vbc)                                                     \
