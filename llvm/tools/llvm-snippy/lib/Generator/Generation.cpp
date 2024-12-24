@@ -1022,9 +1022,10 @@ generateCall(unsigned OpCode,
   auto CalleeCount = Node->callees().size();
   if (!CalleeCount)
     return nullptr;
-  auto CalleeIdx = RandEngine::genInRange(CalleeCount);
+  auto CalleeIdx = RandEngine::genInRangeExclusive(CalleeCount);
   auto *CalleeNode = std::next(Node->callees().begin(), CalleeIdx)->Dest;
-  auto FunctionIdx = RandEngine::genInRange(CalleeNode->functions().size());
+  auto FunctionIdx =
+      RandEngine::genInRangeExclusive(CalleeNode->functions().size());
 
   auto &CallTarget = *(CalleeNode->functions()[FunctionIdx]);
   assert(CallTarget.hasName());

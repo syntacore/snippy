@@ -34,8 +34,8 @@ Expected<APInt> APIntRangeSampler::sample() {
 
 APInt BitPatternAPIntSamler::generate(uint32_t NumBits) {
   auto Result = APInt::getZero(NumBits);
-  auto Stride = RandEngine::genInRange<unsigned>(1, NumBits);
-  auto Idx = RandEngine::genInInterval<unsigned>(0, Stride);
+  auto Stride = RandEngine::genInRangeExclusive<unsigned>(1, NumBits);
+  auto Idx = RandEngine::genInRangeInclusive<unsigned>(0, Stride);
   while (Idx < NumBits) {
     Result.insertBits(1, Idx, 1);
     Idx += Stride;
