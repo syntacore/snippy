@@ -184,42 +184,42 @@ public:
 
   static void reInit() { init(pimpl->Seed); }
 
-  template <typename T> static T genInInterval(T Min, T Max) {
+  template <typename T> static T genInRangeInclusive(T Min, T Max) {
     if (Max < Min)
-      snippy::fatal("Invalid usage of genInInterval");
+      snippy::fatal("Invalid usage of genInRangeInclusive");
     UniformIntDistribution<T> Dist(Min, Max);
     return Dist(pimpl->Engine);
   }
 
-  template <typename T> static T genInInterval(NumericRange<T> Interval) {
-    auto Min = Interval.Min.value_or(0);
-    return genInInterval<T>(Min, Interval.Max.value_or(Min));
+  template <typename T> static T genInRangeInclusive(NumericRange<T> Range) {
+    auto Min = Range.Min.value_or(0);
+    return genInRangeInclusive<T>(Min, Range.Max.value_or(Min));
   }
 
-  template <typename T> static T genInInterval(T Max) {
-    return genInInterval<T>(0, Max);
+  template <typename T> static T genInRangeInclusive(T Max) {
+    return genInRangeInclusive<T>(0, Max);
   }
 
-  template <typename T> static T genInRange(T First, T Last) {
+  template <typename T> static T genInRangeExclusive(T First, T Last) {
     // without <T> there were deduction problems with unsigned types
     //  smaller than int
-    return genInInterval<T>(First, Last - 1);
+    return genInRangeInclusive<T>(First, Last - 1);
   }
 
-  static bool genBool() { return genInRange(0, 1); }
+  static bool genBool() { return genInRangeInclusive(1); }
 
-  template <typename T> static T genInRange(NumericRange<T> Range) {
+  template <typename T> static T genInRangeExclusive(NumericRange<T> Range) {
     if (!Range.Min.has_value())
       Range.Min = 0;
-    return genInRange<T>(Range.Min.value(),
-                         Range.Max.value_or(Range.Min.value()));
+    return genInRangeExclusive<T>(Range.Min.value(),
+                                  Range.Max.value_or(Range.Min.value()));
   }
 
-  template <typename T> static T genInRange(T Last) {
-    return genInRange<T>(0, Last);
+  template <typename T> static T genInRangeExclusive(T Last) {
+    return genInRangeExclusive<T>(0, Last);
   }
 
-  static APInt genInInterval(APInt Last);
+  static APInt genInRangeInclusive(APInt Last);
 
   static APInt genAPInt(unsigned Bits);
 
@@ -414,7 +414,7 @@ public:
     // R = 4 >= 4 -> R++;
     // R = 5 >= 5 -> R++;
     // R = 6 <  8 -> done;
-    auto R = From + RandEngine::genInRange(Size);
+    auto R = From + RandEngine::genInRangeExclusive(Size);
     for (auto P : Picked) {
       if (R < P)
         break;
@@ -440,7 +440,7 @@ void uniformlyFill(MutableArrayRef<T> Out, T Low, T High) {
 
 template <typename... Ts> auto selectFrom(Ts... args) {
   auto Items = details::makeArray(std::forward<Ts>(args)...);
-  return Items[RandEngine::genInInterval(Items.size() - 1)];
+  return Items[RandEngine::genInRangeInclusive(Items.size() - 1)];
 }
 
 } // namespace snippy

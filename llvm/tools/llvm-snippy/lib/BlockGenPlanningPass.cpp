@@ -349,11 +349,11 @@ void BlockGenPlanningImpl::fillReqWithBurstGroups(
       getBurstInstCounts(*GenCtx, NumInstrBurst, NumInstrTotal);
   const auto &BurstSettings = GenSettings.getBurstGram();
   while (NumInstrBurst > 0) {
-    auto BlockId = RandEngine::genInRange(BlocksToProcess.size());
+    auto BlockId = RandEngine::genInRangeExclusive(BlocksToProcess.size());
     const auto *MBB = BlocksToProcess[BlockId];
 
-    auto BurstGroupInstCount =
-        RandEngine::genInInterval(BurstSettings.MinSize, BurstSettings.MaxSize);
+    auto BurstGroupInstCount = RandEngine::genInRangeInclusive(
+        BurstSettings.MinSize, BurstSettings.MaxSize);
     // The last burst group might be smaller than the minimum size requested in
     // the configuration. This matches the behavior we had before. The
     // difference is that this group can be placed in any random basic block,
@@ -382,10 +382,10 @@ void BlockGenPlanningImpl::fillReqWithPlainInstsByNumber(
   const auto &GenSettings = GenCtx->getGenSettings();
   while (NumInstrPlain > 0) {
     auto MaxBlockInstrs = AverageBlockInstrs * 2ull;
-    auto InstrsToAdd = RandEngine::genInInterval(
+    auto InstrsToAdd = RandEngine::genInRangeInclusive(
         1ull, std::min<unsigned long long>(NumInstrPlain, MaxBlockInstrs));
 
-    auto BlockId = RandEngine::genInRange(BlocksToProcess.size());
+    auto BlockId = RandEngine::genInRangeExclusive(BlocksToProcess.size());
     const auto *MBB = BlocksToProcess[BlockId];
 
     auto BlockReqIt = FunReq.find(MBB);
@@ -479,7 +479,8 @@ static void randomize(const planning::FunctionRequest &FunReq,
   Idxs.push_back(0);
   std::generate_n(std::back_inserter(Idxs),
                   std::distance(BB.begin(), InstPackIt), [RegularPackSize] {
-                    return RandEngine::genInRange(0ull, RegularPackSize);
+                    return RandEngine::genInRangeExclusive(0ull,
+                                                           RegularPackSize);
                   });
   std::sort(Idxs.begin(), Idxs.end());
 
@@ -589,7 +590,7 @@ void BlockGenPlanningImpl::fillReqWithPlainInstsBySize(
       seq(0ul, BlocksToProcess.size() - 1),
       std::inserter(RequestedAccumulatedSizes, RequestedAccumulatedSizes.end()),
       [=](auto) {
-        return RandEngine::genInInterval(MFSizeLimit) / MaxInstrSize *
+        return RandEngine::genInRangeInclusive(MFSizeLimit) / MaxInstrSize *
                MaxInstrSize;
       });
   size_t LastAccumulatedSize = 0;
@@ -713,7 +714,7 @@ static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
                   "Min distance is " + Twine(Min) + " , but max distance is " +
                       Twine(Max));
 
-  auto BlockSize = RandEngine::genInInterval(Min, Max);
+  auto BlockSize = RandEngine::genInRangeInclusive(Min, Max);
   BlockSize = alignDown(BlockSize, MinInstrSize);
   auto Limit = planning::RequestLimit::Size{BlockSize};
   // InitialAmount allows to account for any already generated instructions
