@@ -167,7 +167,8 @@ Linker::OutputSection::OutputSection(const SectionDesc &Desc)
     : Desc(Desc), Name(getUniqueSectionName(Desc)) {}
 
 void Linker::calculateMemoryRegion() {
-  assert(!Sections.empty() && "Sections must not be empty here");
+  if (Sections.empty())
+    return;
   MemoryRegion.first = Sections.front().OutputSection.Desc.VMA;
   MemoryRegion.second = Sections.back().OutputSection.Desc.VMA +
                         Sections.back().OutputSection.Desc.Size;
@@ -175,7 +176,7 @@ void Linker::calculateMemoryRegion() {
 
 Linker::Linker(LLVMContext &Ctx, const SectionsDescriptions &Sects,
                StringRef MN)
-    : MangleName(MN) {
+    : MangleName(MN), MemoryRegion{0, 0} {
   std::transform(Sects.begin(), Sects.end(), std::back_inserter(Sections),
                  [](auto &SectionDesc) {
                    return SectionEntry{OutputSection{SectionDesc}, {}};
