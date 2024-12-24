@@ -356,7 +356,7 @@ AddressInfo randomlyShiftAddressOffsetsInImmRange(AddressInfo AI,
 
   if (!(AI.MinOffset < MinImm && MaxImm < AI.MaxOffset)) {
     auto Shift =
-        Stride * RandEngine::genInInterval<int64_t>(
+        Stride * RandEngine::genInRangeInclusive<int64_t>(
                      std::min<int64_t>((MinImm - AI.MinOffset) / Stride, 0),
                      std::max<int64_t>((MaxImm - AI.MaxOffset) / Stride, 0));
     AI.MinOffset += Shift;
@@ -532,7 +532,7 @@ generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
   std::vector<unsigned> OpcodeIdxToBaseReg(Opcodes.size());
   std::generate(OpcodeIdxToBaseReg.begin(), OpcodeIdxToBaseReg.end(),
                 [&AddrRegs]() {
-                  auto N = RandEngine::genInRange(AddrRegs.size());
+                  auto N = RandEngine::genInRangeExclusive(AddrRegs.size());
                   return AddrRegs[N];
                 });
   return OpcodeIdxToBaseReg;

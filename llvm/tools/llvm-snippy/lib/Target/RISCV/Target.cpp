@@ -381,7 +381,7 @@ getIncOpcodeForLoopCounter(const InstructionGenerationContext &IGC) {
 
   if (LoopControlLogicCompression.getValue() ==
       LoopControlLogicCompressionMode::Random) {
-    auto OpcodeChoice = RandEngine::genInInterval(false, true);
+    auto OpcodeChoice = RandEngine::genBool();
     return OpcodeChoice ? RISCV::C_ADDI : RISCV::ADDI;
   }
   return LoopControlLogicCompression.getValue() ==
@@ -666,8 +666,8 @@ breakDownAddrForRVVStrided(AddressInfo AddrInfo, const MachineInstr &MI,
   auto MaxStride = AddrInfo.MaxOffset / (VL - 1);
   // We will randomize the stride multiplier to exclude illegal strides.
   int long long MaxStrideMultiplier = MaxStride / AddrInfo.MinStride;
-  auto StrideMultiplier =
-      RandEngine::genInInterval(-MaxStrideMultiplier, MaxStrideMultiplier);
+  auto StrideMultiplier = RandEngine::genInRangeInclusive(-MaxStrideMultiplier,
+                                                          MaxStrideMultiplier);
   auto Stride =
       StrideMultiplier * static_cast<int long long>(AddrInfo.MinStride);
   if (Stride < 0) {
@@ -735,7 +735,8 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
   // according to the memory scheme.
   int64_t MaxBaseOffset = AddrInfo.MaxOffset;
   // Offset the base address
-  auto BaseOffset = RandEngine::genInInterval(MinBaseOffset, MaxBaseOffset);
+  auto BaseOffset =
+      RandEngine::genInRangeInclusive(MinBaseOffset, MaxBaseOffset);
   uint64_t BaseAddr = AddrInfo.Address + BaseOffset;
   // Align base address
   int64_t NextAlignedOffset = (BaseOffset < 0)
@@ -767,7 +768,7 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
     for (size_t ElemIdx = 0; ElemIdx < NElts; ++ElemIdx) {
       // TODO: for unordered stores, generating indices like this is not
       // correct, since store order for overlapping regions is not defined
-      auto N = RandEngine::genInInterval(MaxN);
+      auto N = RandEngine::genInRangeInclusive(MaxN);
       auto IndexValue = IndexMinValue + AddrInfo.MinStride * N;
       Offsets.insertBits(IndexValue, ElemIdx * EIEW, EIEW);
 
@@ -1764,7 +1765,7 @@ public:
     auto Min = MinRegOpt.value_or(0);
     auto Max = MaxRegOpt.value_or(MaxGenVal);
 
-    return RandEngine::genInInterval(Min, Max);
+    return RandEngine::genInRangeInclusive(Min, Max);
   }
 
   unsigned insertLoopInit(InstructionGenerationContext &IGC,
