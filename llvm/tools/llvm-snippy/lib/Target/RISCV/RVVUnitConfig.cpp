@@ -529,10 +529,11 @@ struct LegalVLGenerator final : VLGeneratorInterface {
     auto PointSEW = static_cast<unsigned>(Cfg.SEW);
     auto MaxVL = computeVLMax(VLEN, PointSEW, Cfg.LMUL);
     if (MaxVL > 0)
-      return RandEngine::genInInterval<unsigned>(0u, MaxVL);
+      return RandEngine::genInRangeInclusive<unsigned>(0u, MaxVL);
     // If MaxVL == 0 this means that RVVConfiguration is illegal
     // and we just return VL from [0, Max Possible VL]
-    return RandEngine::genInInterval<unsigned>(0u, getMaxPossibleVL(VLEN));
+    return RandEngine::genInRangeInclusive<unsigned>(0u,
+                                                     getMaxPossibleVL(VLEN));
   }
 };
 
@@ -545,10 +546,11 @@ struct LegalVLNonZeroGenerator final : VLGeneratorInterface {
     auto PointSEW = static_cast<unsigned>(Cfg.SEW);
     auto MaxVL = computeVLMax(VLEN, PointSEW, Cfg.LMUL);
     if (MaxVL > 0)
-      return RandEngine::genInInterval<unsigned>(1u, MaxVL);
+      return RandEngine::genInRangeInclusive<unsigned>(1u, MaxVL);
     // If MaxVL == 0 this means that RVVConfiguration is illegal
     // and we just return VL from [1, Max Possible VL]
-    return RandEngine::genInInterval<unsigned>(1u, getMaxPossibleVL(VLEN));
+    return RandEngine::genInRangeInclusive<unsigned>(1u,
+                                                     getMaxPossibleVL(VLEN));
   }
 };
 
@@ -569,7 +571,7 @@ struct LegalVMGenerator final : VMGeneratorInterface {
 
   APInt generate(const RVVConfiguration &Cfg, unsigned VL) const override {
     auto MaxValue = APInt::getAllOnes(VL);
-    return APInt(RandEngine::genInInterval(MaxValue));
+    return APInt(RandEngine::genInRangeInclusive(MaxValue));
   }
 };
 

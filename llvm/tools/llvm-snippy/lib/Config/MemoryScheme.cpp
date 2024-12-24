@@ -586,9 +586,9 @@ AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
   // selected. Due to this it's doubtful that the distribution will be uniform
   // for complex scenarios, especially when Stride is not a a multiple of
   // alignment
-  auto LCBlockIdx = snippy::RandEngine::genInInterval(MaxLCBlock);
+  auto LCBlockIdx = snippy::RandEngine::genInRangeInclusive(MaxLCBlock);
   auto LCBlockOffsetIdx =
-      snippy::RandEngine::genInRange(AllowedLCBlockOffsets.size());
+      snippy::RandEngine::genInRangeExclusive(AllowedLCBlockOffsets.size());
   if (PreselectedAddr) {
     LCBlockIdx = PreselectedAddr->MainId % (MaxLCBlock + 1);
     LCBlockOffsetIdx = PreselectedAddr->OffsetId % AllowedLCBlockOffsets.size();
@@ -634,8 +634,8 @@ MemoryAccessEviction::randomAddress(const AddressGenInfo &AddrGenInfo) {
   auto AccessSize = AddrGenInfo.AccessSize;
   auto PreselectedAddr = AddrGenInfo.PreselectedAddr;
 
-  MemAddr Addr =
-      snippy::RandEngine::genInRange(std::numeric_limits<MemAddr>::max());
+  MemAddr Addr = snippy::RandEngine::genInRangeExclusive(
+      std::numeric_limits<MemAddr>::max());
   if (PreselectedAddr)
     Addr = PreselectedAddr->MainId;
   // Account for alignment in mask
@@ -856,7 +856,8 @@ AddressInfo MemoryAccessAddresses::randomAddressForPlainAccess(
             });
     assert(!LegalAddresses.empty() && "At least one address must be legal. "
                                       "We should've already checked it.");
-    auto LegalAddressIdx = RandEngine::genInRange(LegalAddresses.size());
+    auto LegalAddressIdx =
+        RandEngine::genInRangeExclusive(LegalAddresses.size());
     if (PreselectedAddr)
       LegalAddressIdx = PreselectedAddr->MainId % LegalAddresses.size();
     AI.Address = LegalAddresses[LegalAddressIdx].Addr;
@@ -894,7 +895,7 @@ AddressInfo MemoryAccessAddresses::randomAddressForBurstAccess(
           });
   assert(!AIs.empty() && "At least one entry must exist as we've already "
                          "checked the legality of the scheme.");
-  auto AIIdx = RandEngine::genInRange(AIs.size());
+  auto AIIdx = RandEngine::genInRangeExclusive(AIs.size());
   if (PreselectedAddr)
     AIIdx = PreselectedAddr->MainId % AIs.size();
   return AIs[AIIdx];

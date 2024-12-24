@@ -18,13 +18,14 @@ APInt snippy::RandEngine::genAPInt(unsigned Bits) {
   auto Result = APInt::getZero(Bits);
   auto U64Bits = std::numeric_limits<uint64_t>::digits;
   if (auto LeftOverBits = Bits % U64Bits) {
-    auto Value = RandEngine::genInInterval((uint64_t(1) << LeftOverBits) - 1);
+    auto Value =
+        RandEngine::genInRangeInclusive((uint64_t(1) << LeftOverBits) - 1);
     Bits -= LeftOverBits;
     Result.insertBits(Value, Bits, LeftOverBits);
   }
   while (Bits) {
     auto Value =
-        RandEngine::genInInterval(std::numeric_limits<uint64_t>::max());
+        RandEngine::genInRangeInclusive(std::numeric_limits<uint64_t>::max());
     Bits -= U64Bits;
     Result.insertBits(Value, Bits, U64Bits);
   }
@@ -34,7 +35,7 @@ APInt snippy::RandEngine::genAPInt(unsigned Bits) {
 // To get random number [0, Last] we:
 // 1) Generate Random APInt(later called Rand) with appopriate Width
 // 2) Get a Rand % (Last + 1)
-APInt snippy::RandEngine::genInInterval(APInt Last) {
+APInt snippy::RandEngine::genInRangeInclusive(APInt Last) {
   auto OriginalWidth = Last.getBitWidth();
   // This logic needs to prevent Last + 1 from overflow
   // For examle, when OriginalWidth=2  and Last==3, to get
