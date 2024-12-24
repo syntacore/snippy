@@ -347,7 +347,7 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   assert(SGCtx.getConfig().Branches.NLoopIter.Max);
   auto NIterMin = *SGCtx.getConfig().Branches.NLoopIter.Min;
   auto NIterMax = *SGCtx.getConfig().Branches.NLoopIter.Max;
-  auto NIter = RandEngine::genInInterval(NIterMin, NIterMax);
+  auto NIter = RandEngine::genInRangeInclusive(NIterMin, NIterMax);
   LLVM_DEBUG(dbgs() << "Loop counter init inserting: " << NIter
                     << " iterations, ");
   LLVM_DEBUG(printSelectedRegs(dbgs(), ReservedRegs, State.getRegInfo()));

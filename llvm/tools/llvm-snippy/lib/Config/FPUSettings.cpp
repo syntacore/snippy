@@ -176,7 +176,7 @@ public:
 
   Expected<APInt> sample() override {
     auto FPValue = APFloat{TheSemantics};
-    auto SampledIntValue = RandEngine::genInInterval(TheMin, TheMax);
+    auto SampledIntValue = RandEngine::genInRangeInclusive(TheMin, TheMax);
     constexpr auto IsSigned = std::is_signed_v<T>;
     auto SampledAPInt =
         APInt{CHAR_BIT * sizeof(T), static_cast<uint64_t>(SampledIntValue),

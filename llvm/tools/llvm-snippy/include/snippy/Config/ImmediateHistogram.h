@@ -196,7 +196,7 @@ int genImmInInterval(const StridedImmediate &StridedImm) {
   assert((StridedImm.getMax() - Max) % Stride == 0);
 
   auto NMax = (Max - Min) / Stride;
-  auto N = RandEngine::genInInterval(NMax);
+  auto N = RandEngine::genInRangeInclusive(NMax);
   auto Imm = Min + N * Stride;
 
   return Imm;
@@ -262,9 +262,10 @@ auto genImmInInterval() {
   constexpr bool IncludeZero = Zero == ImmediateZero::Include;
   auto Num = [] {
     if (IsSigned)
-      return RandEngine::genInInterval(-(1 << (NumBits - 1)),
-                                       (1 << (NumBits - 1)) - 1 - !IncludeZero);
-    return RandEngine::genInInterval(0, (1 << NumBits) - 1 - !IncludeZero);
+      return RandEngine::genInRangeInclusive(
+          -(1 << (NumBits - 1)), (1 << (NumBits - 1)) - 1 - !IncludeZero);
+    return RandEngine::genInRangeInclusive(0,
+                                           (1 << NumBits) - 1 - !IncludeZero);
   }();
   if (!IncludeZero && Num >= 0)
     Num++;
@@ -278,7 +279,7 @@ unsigned genImmInInterval(const ImmediateHistogramSequence *IH,
     return genImmInInterval<MinValue, MaxValue>(StridedImm);
   if (IH)
     return genImmInInterval<MinValue, MaxValue>(*IH);
-  return RandEngine::genInInterval(MinValue, MaxValue);
+  return RandEngine::genInRangeInclusive(MinValue, MaxValue);
 }
 
 template <unsigned BitWidth, ImmediateSignedness Sign, ImmediateZero Zero,
