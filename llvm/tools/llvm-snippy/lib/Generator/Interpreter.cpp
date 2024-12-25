@@ -183,9 +183,7 @@ SimulationEnvironment Interpreter::createSimulationEnvironment(
   auto &State = SPC.getLLVMState();
   const auto &SnippyTGT = State.getSnippyTarget();
 
-  bool NeedCallbackHandler = Settings.TrackingConfig.BTMode ||
-                             Settings.TrackingConfig.SelfCheckPeriod ||
-                             Settings.TrackingConfig.AddressVH;
+  bool NeedCallbackHandler = Settings.hasTrackingMode();
   auto &L = SPC.getLinker();
 
   SimulationEnvironment Env;

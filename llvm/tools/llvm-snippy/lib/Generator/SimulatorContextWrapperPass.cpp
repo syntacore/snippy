@@ -32,10 +32,7 @@ void OwningSimulatorContext::initialize(SnippyProgramContext &ProgCtx,
   auto &Linker = ProgCtx.getLinker();
   auto &State = ProgCtx.getLLVMState();
   auto &SnippyTgt = State.getSnippyTarget();
-  auto &FPUConfig = Settings.Cfg.FPUConfig;
-  setTrackOptions(Settings.TrackingConfig,
-                  FPUConfig && FPUConfig->needsModel());
-
+  setupTrackingMode(Settings);
   OwnRunner = [&]() -> std::unique_ptr<SimRunner> {
     auto &ModelLibList = Settings.ModelPluginConfig.ModelLibraries;
     if (ModelLibList.empty())
