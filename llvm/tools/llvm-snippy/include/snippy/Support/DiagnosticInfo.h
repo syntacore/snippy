@@ -39,6 +39,7 @@ enum class WarningName {
   TooFarMaxPCDist,
   ModelException,
   UnusedSection,
+  EmptyElfSection,
   GenPlanVerification,
   SeedNotSpecified,
 };

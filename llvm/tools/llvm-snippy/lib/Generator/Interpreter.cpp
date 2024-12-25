@@ -70,55 +70,21 @@ static std::unique_ptr<object::ObjectFile> makeObjectFile(MemoryBufferRef Buf) {
   return std::move(Exp.get());
 }
 
-static auto getSectionIt(object::ObjectFile &Obj, StringRef SectionName) {
-  auto SecIt = std::find_if(Obj.section_begin(), Obj.section_end(),
-                            [&SectionName](const auto &S) {
-                              auto Exp = S.getName();
-                              if (!Exp)
-                                return false;
-                              return Exp.get() == SectionName;
-                            });
-  return SecIt;
-}
-
-static bool hasSection(object::ObjectFile &Obj, StringRef SectionName) {
-  return getSectionIt(Obj, SectionName) != Obj.section_end();
-}
-
-static StringRef getSectionData(object::ObjectFile &Obj,
-                                StringRef SectionName) {
-  auto SectionIt = getSectionIt(Obj, SectionName);
-  assert(SectionIt != Obj.section_end());
-
-  auto Exp = SectionIt->getContents();
-  if (!Exp)
-    snippy::fatal(SectionName + " section is empty");
-  return Exp.get();
-}
-
-static auto getSectionLA(object::ObjectFile &Obj, StringRef SectionName) {
-  auto SectionIt = getSectionIt(Obj, SectionName);
-  assert(SectionIt != Obj.section_end());
-  return SectionIt->getAddress();
-}
-
 } // namespace llvm
 
 namespace llvm {
 namespace snippy {
 
 namespace {
-void applyMemCfgToSimCfg(const MemoryConfig &MemCfg, SimulationConfig &SimCfg) {
-  llvm::transform(MemCfg.ProgSections, std::back_inserter(SimCfg.ProgSections),
-                  [](auto &Section) {
-                    return SimulationConfig::Section{
-                        Section.Start, Section.Size, Section.Name};
+void applyMemCfgToSimCfg(const Linker &L, SimulationEnvironment &Env) {
+  llvm::transform(L.sections(), std::back_inserter(Env.SimCfg.MemoryRegions),
+                  [](auto &SE) {
+                    auto &OutS = SE.OutputSection;
+                    return SimulationConfig::Section{OutS.Desc.VMA,
+                                                     OutS.Desc.Size, OutS.Name};
                   });
-  SimCfg.RomStart = MemCfg.Rom.Start;
-  SimCfg.RomSize = MemCfg.Rom.Size;
-  SimCfg.RomSectionName = MemCfg.Rom.Name;
-  SimCfg.RamStart = MemCfg.Ram.Start;
-  SimCfg.RamSize = MemCfg.Ram.Size;
+  llvm::transform(L.sections(), std::back_inserter(Env.Sections),
+                  [](auto &SE) { return SE.OutputSection.Desc; });
 }
 } // namespace
 
@@ -178,8 +144,7 @@ static void writeSectionToFile(ArrayRef<char> Data,
 
 SimulationEnvironment Interpreter::createSimulationEnvironment(
     SnippyProgramContext &SPC, const TargetSubtargetInfo &ST,
-    const GeneratorSettings &Settings, const MemoryConfig &MemCfg,
-    TargetGenContextInterface &TgtCtx) {
+    const GeneratorSettings &Settings, TargetGenContextInterface &TgtCtx) {
   auto &State = SPC.getLLVMState();
   const auto &SnippyTGT = State.getSnippyTarget();
 
@@ -192,10 +157,7 @@ SimulationEnvironment Interpreter::createSimulationEnvironment(
   Env.SnippyTGT = &SnippyTGT;
   Env.ST = &ST;
 
-  applyMemCfgToSimCfg(MemCfg, Env.SimCfg);
-  std::transform(L.sections().begin(), L.sections().end(),
-                 std::back_inserter(Env.Sections),
-                 [](auto &SE) { return SE.OutputSection.Desc; });
+  applyMemCfgToSimCfg(L, Env);
 
   Env.SimCfg.TraceLogPath = TraceLogPath.getValue();
   Env.TgtGenCtx = &TgtCtx;
@@ -232,14 +194,14 @@ bool Interpreter::compareStates(const Interpreter &Another,
   if (!CheckMemory)
     return true;
 
-  std::vector<char> MI1, MI2;
-
-  MI1.resize(getRamSize());
-  MI2.resize(getRamSize());
-
-  Simulator->readMem(getRamStart(), MI1);
-  Another.Simulator->readMem(getRamStart(), MI2);
-  return MI1 == MI2;
+  return llvm::all_of(Env.SimCfg.MemoryRegions, [&](auto &Region) {
+    std::vector<char> MI1, MI2;
+    MI1.resize(Region.Size);
+    MI2.resize(Region.Size);
+    Simulator->readMem(Region.Start, MI1);
+    Another.Simulator->readMem(Region.Start, MI2);
+    return MI1 == MI2;
+  });
 }
 
 bool Interpreter::endOfProg() const {
@@ -248,14 +210,10 @@ bool Interpreter::endOfProg() const {
 
 void Interpreter::resetMem() {
   const auto &SimCfg = Env.SimCfg;
-  std::vector<char> RAMZeroMem(SimCfg.RamSize, 0);
-  std::vector<char> ROMZeroMem(SimCfg.RomSize, 0);
-
-  Simulator->writeMem(SimCfg.RamStart, RAMZeroMem);
-  Simulator->writeMem(SimCfg.RomStart, ROMZeroMem);
-  for (auto &Section : SimCfg.ProgSections) {
-    std::vector<char> ProgZeroMem(Section.Size, 0);
-    Simulator->writeMem(Section.Start, ProgZeroMem);
+  std::vector<char> Zeros;
+  for (auto &&Region : SimCfg.MemoryRegions) {
+    Zeros.resize(Region.Size, 0);
+    Simulator->writeMem(Region.Start, Zeros);
   }
 }
 
@@ -292,12 +250,51 @@ void Interpreter::reportSimulationFatalError(StringRef PrefixMessage) const {
 
   snippy::fatal(ErrorMessage.c_str());
 }
+bool Interpreter::coveredByMemoryRegion(MemAddr Start, MemAddr Size) const {
+  auto IsInsideOf = [&](auto &&Reg) {
+    return Reg.Start <= Start && Reg.Start + Reg.Size >= Start + Size;
+  };
+  return llvm::any_of(Env.SimCfg.MemoryRegions, IsInsideOf);
+}
+
+static StringRef getSectionName(llvm::object::SectionRef S) {
+  if (auto EName = S.getName())
+    return *EName;
+  else
+    return "";
+}
 
 void Interpreter::loadElfImage(StringRef ElfImage) {
   std::string ProgramText;
   auto MemBuff = MemoryBuffer::getMemBuffer(ElfImage, "", false);
   auto ObjectFile = makeObjectFile(*MemBuff);
-
+  // FIXME: we need to provide more context to error message.
+  // (at least elf name)
+  if (ObjectFile->isRelocatableObject())
+    snippy::fatal("Trying to load relocatable object into model");
+  for (auto &&Section : ObjectFile->sections()) {
+    if (!Section.isText() && !Section.isData() && !Section.isBSS())
+      continue;
+    auto Address = Section.getAddress();
+    auto Size = Section.getSize();
+    if (!coveredByMemoryRegion(Address, Size))
+      snippy::fatal(
+          formatv("Trying to load/allocate section '{0}' at address 0x{1:x} of "
+                  "size 0x{2:x} which is not covered by model memory region",
+                  getSectionName(Section), Address, Size));
+    if (Section.isText() || Section.isData()) {
+      if (auto EContents = Section.getContents())
+        Simulator->writeMem(Address, *EContents);
+      else
+        snippy::warn(
+            WarningName::EmptyElfSection,
+            formatv("ignored LOAD section '{0}'", getSectionName(Section)),
+            "empty contents");
+    } else if (Section.isBSS()) {
+      std::vector<char> Zeroes(Size, 0);
+      Simulator->writeMem(Address, Zeroes);
+    }
+  }
   auto EndOfProgSym = llvm::find_if(ObjectFile->symbols(), [](auto &Sym) {
     auto EName = Sym.getName();
     return EName && EName.get() == Linker::getExitSymbolName();
@@ -308,34 +305,6 @@ void Interpreter::loadElfImage(StringRef ElfImage) {
   auto EAddress = EndOfProgSym->getAddress();
   assert(EAddress && "Expected the address of symbol to be known");
   ProgEnd = EAddress.get();
-
-  for (auto &ProgSection : Env.SimCfg.ProgSections) {
-    assert(hasSection(*ObjectFile, ProgSection.Name));
-
-    ProgramText = getSectionData(*ObjectFile, ProgSection.Name);
-
-    if (ProgSection.Size < ProgramText.size())
-      snippy::fatal(formatv("RX section '{0}' failed to fit code mapped to it: "
-                            "section size is {1} and code size is {2}",
-                            ProgSection.Name, ProgSection.Size,
-                            ProgramText.size()));
-    Simulator->writeMem(ProgSection.Start, ProgramText);
-  }
-  if (!Env.SimCfg.RomSectionName.empty()) {
-    auto RODataName = Env.SimCfg.RomSectionName;
-    // Elf image might not have this section if
-    // .rodata happens to be empty.
-    if (hasSection(*ObjectFile, RODataName)) {
-      auto SnippyData = getSectionData(*ObjectFile, RODataName);
-      Simulator->writeMem(getSectionLA(*ObjectFile, RODataName), SnippyData);
-    }
-  }
-
-  // adding sections with non-zero data
-  for (auto &It : Env.SimCfg.AdditionalSectionsNames) {
-    auto Data = getSectionData(*ObjectFile, It);
-    Simulator->writeMem(getSectionLA(*ObjectFile, It), Data);
-  }
 }
 
 void Interpreter::addInstr(const MachineInstr &MI, const LLVMState &State) {
@@ -426,12 +395,7 @@ void Interpreter::initTransactionMechanism() {
       Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
   assert(Transactions.empty());
 
-  SmallVector<std::pair<uint64_t, uint64_t>, 3> MemoryConfig = {
-      std::pair{getRomStart(), getRomSize()},
-      std::pair{getRamStart(), getRamSize()}};
-  for (auto &Section : Env.SimCfg.ProgSections)
-    MemoryConfig.emplace_back(std::make_pair(Section.Start, Section.Size));
-  for (auto [Start, Size] : MemoryConfig) {
+  for (auto [Start, Size, _] : Env.SimCfg.MemoryRegions) {
     if (Size == 0)
       continue;
     std::vector<char> Snapshot(Size);

@@ -11,7 +11,7 @@ sections:
       ACCESS:    rw
     - no:        3
       VMA:       0x80000000
-      SIZE:      0x400000
+      SIZE:      0x10c8
       LMA:       0x80000000
       ACCESS:    rw
 
