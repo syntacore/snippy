@@ -16,7 +16,7 @@ extern "C" {
 
 #define RVMAPI_ENTRY_POINT_SYMBOL RVMVTable
 #define RVMAPI_VERSION_SYMBOL RVMInterfaceVersion
-#define RVMAPI_CURRENT_INTERFACE_VERSION 21u
+#define RVMAPI_CURRENT_INTERFACE_VERSION 22u
 
 typedef uint64_t RVMRegT;
 
@@ -357,11 +357,15 @@ typedef void (*VRegUpdateCallbackTy)(RVMCallbackHandler *, RVMVReg Reg,
                                      const char *Data, size_t Size);
 typedef void (*PCUpdateCallbackTy)(RVMCallbackHandler *, uint64_t PC);
 
+struct RVMMemoryRegion {
+  uint64_t Start;
+  uint64_t Size;
+  const char *Name;
+};
+
 struct RVMConfig {
-  uint64_t RomStart;
-  uint64_t RomSize;
-  uint64_t RamStart;
-  uint64_t RamSize;
+  const struct RVMMemoryRegion *MemoryRegions;
+  unsigned MemoryRegionCount;
   int RV64;
   unsigned VLEN;
   int EnableMisalignedAccess;
