@@ -16,6 +16,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace rvm {
 namespace detail {
@@ -190,6 +191,8 @@ public:
     RVMConfig Config = {};
     const RVM_FunctionPointers *VTable;
 
+    std::vector<RVMMemoryRegion> MemoryRegions;
+    std::vector<std::string> MemoryRegionNames;
     std::string LogFilePath;
     std::string PluginInfo;
 
@@ -204,23 +207,16 @@ public:
     Builder &operator=(Builder &&OldBuild) = default;
     ~Builder() = default;
 
-    Builder &setRomStart(uint64_t Start) {
-      Config.RomStart = Start;
-      return *this;
-    }
-
-    Builder &setRomSize(uint64_t Size) {
-      Config.RomSize = Size;
-      return *this;
-    }
-
-    Builder &setRamStart(uint64_t Start) {
-      Config.RamStart = Start;
-      return *this;
-    }
-
-    Builder &setRamSize(uint64_t Size) {
-      Config.RamSize = Size;
+    Builder &addMemoryRegion(uint64_t Start, uint64_t Size, const char *Name) {
+      RVMMemoryRegion Region{Start, Size, nullptr};
+      if (Name) {
+        MemoryRegionNames.emplace_back(Name);
+        auto &NameStr = MemoryRegionNames.back();
+        Region.Name = NameStr.c_str();
+      }
+      MemoryRegions.push_back(Region);
+      Config.MemoryRegions = &MemoryRegions.front();
+      Config.MemoryRegionCount = MemoryRegions.size();
       return *this;
     }
 
