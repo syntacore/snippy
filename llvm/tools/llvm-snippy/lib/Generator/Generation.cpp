@@ -1273,15 +1273,19 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
   // So, open a new one.
   I.openTransaction();
   if (!MemSnapshot.empty()) {
+    assert(ProgCtx.hasStackSection());
     auto StackSec = ProgCtx.getStackSection();
-    auto SelfcheckSec = ProgCtx.getSelfcheckSection();
+    std::optional<SectionDesc> SelfcheckSec = std::nullopt;
+    if (ProgCtx.hasSelfcheckSections())
+      SelfcheckSec = ProgCtx.getSelfcheckSection();
     for (auto [Addr, Data] : MemSnapshot) {
       assert(StackSec.Size > 0 && "Stack section cannot have zero size");
       // Skip stack and selfcheck memory. None of them can be rolled back.
       if (std::clamp<size_t>(Addr, StackSec.VMA,
                              StackSec.VMA + StackSec.Size) == Addr ||
-          std::clamp<size_t>(Addr, SelfcheckSec.VMA,
-                             SelfcheckSec.VMA + SelfcheckSec.Size) == Addr)
+          (SelfcheckSec &&
+           std::clamp<size_t>(Addr, SelfcheckSec->VMA,
+                              SelfcheckSec->VMA + SelfcheckSec->Size) == Addr))
         continue;
       auto RP = IGC.pushRegPool();
       SnippyTgt.storeValueToAddr(

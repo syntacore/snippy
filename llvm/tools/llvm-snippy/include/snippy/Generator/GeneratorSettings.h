@@ -220,6 +220,12 @@ public:
     return Cfg.createDefaultOpcodeGenerator();
   }
 
+  bool hasTrackingMode() const {
+    return TrackingConfig.BTMode || TrackingConfig.SelfCheckPeriod ||
+           TrackingConfig.AddressVH ||
+           (Cfg.FPUConfig && Cfg.FPUConfig->needsModel());
+  }
+
 private:
   SectionsDescriptions getCompleteSectionList(LLVMState &State) const;
 };
