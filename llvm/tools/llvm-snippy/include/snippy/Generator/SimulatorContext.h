@@ -27,12 +27,11 @@ struct SimulatorContext {
   SimulatorContext() = default;
   virtual ~SimulatorContext() = default;
 
-  void setTrackOptions(const TrackingOptions &TrackOptions,
-                       bool ForceTrack = false) {
-    TrackOpts = TrackOptions;
-    HasTrackingMode = TrackOpts.BTMode || TrackOpts.SelfCheckPeriod ||
-                      TrackOpts.AddressVH || ForceTrack;
+  void setupTrackingMode(const GeneratorSettings &Settings) {
+    TrackOpts = Settings.TrackingConfig;
+    HasTrackingMode = Settings.hasTrackingMode();
   }
+
   Interpreter &getInterpreter() const {
     assert(Runner);
     return Runner->getPrimaryInterpreter();
