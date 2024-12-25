@@ -42,20 +42,9 @@ public:
 
   // Preform co-simulation run.
   // Each interpreter state will be reset before run.
-  void run(StringRef Programm, const IRegisterState &InitialRegState,
-           ProgramCounterType StartPC);
-
-  // Adds output section name to the sim config
-  //  in order to load it later to the model before execution.
-  void addNewEnvSection(const std::string &NewSectOutputName) {
-    auto &AdditionalSectionsNames = Env->SimCfg.AdditionalSectionsNames;
-    if (std::count(AdditionalSectionsNames.begin(),
-                   AdditionalSectionsNames.end(), NewSectOutputName) != 0)
-      snippy::fatal(formatv("Section {0} has already been added to sim env.",
-                            NewSectOutputName));
-    AdditionalSectionsNames.push_back(NewSectOutputName);
-  }
-
+  void run(const IRegisterState &InitialRegState, ProgramCounterType StartPC);
+  // Loads image of program into each interpreter.
+  void loadElf(StringRef Image);
   auto &getSimConfig() & {
     assert(Env);
     return Env->SimCfg;

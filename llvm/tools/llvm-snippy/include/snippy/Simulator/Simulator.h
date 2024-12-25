@@ -53,19 +53,7 @@ struct SimulationConfig {
     ProgramCounterType Size = 0;
     std::string Name;
   };
-  std::vector<Section> ProgSections;
-
-  ProgramCounterType RomStart = 0;
-  ProgramCounterType RomSize = 0;
-  std::string RomSectionName;
-
-  // Additional sections are the sections that need to be loaded in model
-  // e.g. RW sections filled with constants should be loaded to the model
-  // (these are mangled names)
-  std::vector<std::string> AdditionalSectionsNames;
-
-  ProgramCounterType RamStart = 0;
-  ProgramCounterType RamSize = 0;
+  std::vector<Section> MemoryRegions;
 
   std::string TraceLogPath;
 };
@@ -130,4 +118,10 @@ template <> struct yaml::MappingTraits<snippy::SimulationConfig> {
   static void mapping(yaml::IO &IO, snippy::SimulationConfig &Cfg);
 };
 
+template <> struct yaml::MappingTraits<snippy::SimulationConfig::Section> {
+  static void mapping(yaml::IO &IO, snippy::SimulationConfig::Section &S);
+};
 } // namespace llvm
+
+LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(llvm::snippy::SimulationConfig::Section,
+                                     /* flow */ false);

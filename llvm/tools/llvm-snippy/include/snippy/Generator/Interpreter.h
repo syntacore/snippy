@@ -95,24 +95,15 @@ class Interpreter final {
 
   void initTransactionMechanism();
   void dumpOneRange(NamedMemoryRange Range, raw_fd_ostream &OS) const;
+  bool coveredByMemoryRegion(MemAddr Start, MemAddr Size) const;
 
 public:
   uint64_t getProgEnd() const { return ProgEnd; }
-  uint64_t getRomStart() const { return Env.SimCfg.RomStart; }
-  uint64_t getRamStart() const { return Env.SimCfg.RamStart; }
-
-  uint64_t getRomSize() const { return Env.SimCfg.RomSize; }
-  uint64_t getRamSize() const { return Env.SimCfg.RamSize; }
-
-  uint64_t getRomEnd() const { return getRomStart() + getRomSize(); }
-  uint64_t getRamEnd() const { return getRamStart() + getRamSize(); }
-
   bool endOfProg() const;
 
   static SimulationEnvironment createSimulationEnvironment(
       SnippyProgramContext &SPC, const TargetSubtargetInfo &ST,
-      const GeneratorSettings &Settings, const MemoryConfig &MemCfg,
-      TargetGenContextInterface &TgtCtx);
+      const GeneratorSettings &Settings, TargetGenContextInterface &TgtCtx);
 
   static std::unique_ptr<SimulatorInterface> createSimulatorForTarget(
       const SnippyTarget &TGT, const TargetSubtargetInfo &Subtarget,

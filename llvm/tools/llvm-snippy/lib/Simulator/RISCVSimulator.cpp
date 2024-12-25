@@ -546,19 +546,6 @@ std::unique_ptr<SimulatorInterface> createRISCVSimulator(
     unsigned VLENB, bool EnableMisalignedAccess) {
   const auto &VTable = getSimulatorEntryPoint(ModelLib);
 
-  assert(!Cfg.ProgSections.empty());
-  auto Starts =
-      llvm::map_range(Cfg.ProgSections, [](auto &S) { return S.Start; });
-  auto Ends = llvm::map_range(Cfg.ProgSections,
-                              [](auto &S) { return S.Start + S.Size; });
-  auto FirstSection = std::min_element(Starts.begin(), Starts.end());
-  auto LastSection = std::max_element(Ends.begin(), Ends.end());
-  auto RomStart = FirstSection == Starts.end()
-                      ? Cfg.RomStart
-                      : std::min(Cfg.RomStart, *FirstSection);
-  auto CfgRomEnd = Cfg.RomStart + Cfg.RomSize;
-  auto RomEnd =
-      LastSection == Ends.end() ? CfgRomEnd : std::max(CfgRomEnd, *LastSection);
   auto SimInfo = deriveSimulatorIsaInfo(Subtarget);
   LLVM_DEBUG(dbgs() << "Model::isa_string: "
                     << rvm::create_isa_string(SimInfo.Ext, SimInfo.Is64Bit)
@@ -569,11 +556,14 @@ std::unique_ptr<SimulatorInterface> createRISCVSimulator(
   if (EnableMisalignedAccess)
     StateBuilder.enableMisalignedAccess();
 
-  StateBuilder.setRomStart(RomStart);
-  StateBuilder.setRomSize(RomEnd - RomStart);
-
-  StateBuilder.setRamStart(Cfg.RamStart);
-  StateBuilder.setRamSize(Cfg.RamSize);
+  // For legacy reasons, we allow to configure zero-size
+  // regions. However model implementation is allowed to raise
+  // an error for such regions, so filter them out here.
+  auto NonEmptyRegions = llvm::make_filter_range(
+      Cfg.MemoryRegions, [](auto &&Region) { return Region.Size; });
+  for (auto &&Region : NonEmptyRegions)
+    StateBuilder.addMemoryRegion(Region.Start, Region.Size,
+                                 Region.Name.c_str());
 
   if (SimInfo.Is64Bit)
     StateBuilder.setRV64Isa();
