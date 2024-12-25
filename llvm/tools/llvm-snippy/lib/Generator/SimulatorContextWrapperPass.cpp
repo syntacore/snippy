@@ -37,10 +37,9 @@ void OwningSimulatorContext::initialize(SnippyProgramContext &ProgCtx,
     auto &ModelLibList = Settings.ModelPluginConfig.ModelLibraries;
     if (ModelLibList.empty())
       return nullptr;
-    auto MemCfg = MemoryConfig::getMemoryConfig(Linker, GCFI);
 
-    auto Env = Interpreter::createSimulationEnvironment(
-        ProgCtx, SubTgt, Settings, MemCfg, TargetCtx);
+    auto Env = Interpreter::createSimulationEnvironment(ProgCtx, SubTgt,
+                                                        Settings, TargetCtx);
 
     return std::make_unique<SimRunner>(State.getCtx(), SnippyTgt, SubTgt,
                                        std::move(Env), ModelLibList);
@@ -223,8 +222,9 @@ void SimulatorContext::runSimulator(const RunInfo &RI) {
   }
 
   auto &SimRunner = getSimRunner();
+  SimRunner.loadElf(ImageToRun);
 
-  SimRunner.run(ImageToRun, InitRegState, StartPC);
+  SimRunner.run(InitRegState, StartPC);
 
   I.dumpCurrentRegState(FinalStateOutputYaml);
   auto RangesToDump = getMemoryRangesToDump(I, DumpMemorySection);
