@@ -100,7 +100,7 @@ char TransactionStack::getMemPrevValue(
       MemSnapshot.begin(), MemSnapshot.end(), [Addr](const auto &S) {
         auto Start = S.first;
         auto Size = S.second.size();
-        return Start <= Addr && Addr <= Start + Size;
+        return Start <= Addr && (Addr < Start + Size || Start + Size == 0ull);
       });
   assert(MemSnapshotIt != MemSnapshot.end() &&
          "Memory snapshot must contain whole memory.");

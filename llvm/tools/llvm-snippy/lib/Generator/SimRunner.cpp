@@ -11,33 +11,6 @@
 
 namespace llvm {
 namespace snippy {
-namespace {
-Expected<uint64_t> getAddressOfSymbolInImage(StringRef Image,
-                                             StringRef SymbolName) {
-  auto MemBuf = MemoryBuffer::getMemBuffer(Image, "", false);
-
-  auto &&Bin = object::ObjectFile::createObjectFile(*MemBuf);
-  if (!Bin)
-    return Bin.takeError();
-  auto &&Obj = *Bin;
-
-  auto ExitSimIt = std::find_if(Obj->symbols().begin(), Obj->symbols().end(),
-                                [SymbolName](const auto &Sym) {
-                                  if (auto Name = Sym.getName())
-                                    return *Name == SymbolName;
-                                  return false;
-                                });
-  if (ExitSimIt == Obj->symbols().end())
-    return {make_error<Failure>(Twine("no symbol ") + Twine(SymbolName) +
-                                Twine(" in image"))};
-
-  auto ExpectedAddress = ExitSimIt->getAddress();
-  if (!ExpectedAddress)
-    return ExpectedAddress.takeError();
-
-  return *ExpectedAddress;
-}
-} // namespace
 
 SimRunner::SimRunner(LLVMContext &Ctx, const SnippyTarget &TGT,
                      const TargetSubtargetInfo &Subtarget,
@@ -61,18 +34,16 @@ SimRunner::SimRunner(LLVMContext &Ctx, const SnippyTarget &TGT,
   }
 }
 
-void SimRunner::run(StringRef Program, const IRegisterState &InitialRegState,
+void SimRunner::loadElf(StringRef Image) {
+  for (auto &I : CoInterp)
+    I->loadElfImage(Image);
+}
+void SimRunner::run(const IRegisterState &InitialRegState,
                     ProgramCounterType StartPC) {
-  auto StopPC = getAddressOfSymbolInImage(Program, Linker::getExitSymbolName());
-  if (auto E = StopPC.takeError()) {
-    auto Err = toString(std::move(E));
-    snippy::fatal("[Internal error]: unable to get last instruction PC: " +
-                  Twine(Err) + Twine("\nPlease, report a bug"));
-  }
+
   for (auto &I : CoInterp) {
     I->setInitialState(InitialRegState);
-    I->loadElfImage(Program);
-    I->setStopModeByPC(*StopPC);
+    I->setStopModeByPC(I->getProgEnd());
     I->setPC(StartPC);
   }
 
