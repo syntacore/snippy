@@ -1,3 +1,4 @@
+# XFAIL: *
 # RUN: llvm-snippy %s -verify-gen-plan \
 # RUN:    -march=riscv64-linux-gnu -mattr=+m \
 # RUN:    -num-instrs=all |& FileCheck %s

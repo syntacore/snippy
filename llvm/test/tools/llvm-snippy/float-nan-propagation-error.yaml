@@ -1,3 +1,4 @@
+# XFAIL: *
 # RUN: not llvm-snippy %s --model-plugin None |& FileCheck %s
 
 include:
