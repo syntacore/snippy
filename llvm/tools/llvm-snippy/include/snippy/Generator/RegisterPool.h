@@ -685,10 +685,9 @@ RegPool::getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
 template <typename... IsReservedTys>
 unsigned RegPoolWrapper::getNumAvailable(const MCRegisterClass &RegClass,
                                          IsReservedTys &&...Args) const {
-  return std::count_if(
-      RegClass.begin(), RegClass.end(), [&Args..., this](auto Reg) {
-        return !isReserved(Reg, std::forward<IsReservedTys>(Args)...);
-      });
+  return std::count_if(RegClass.begin(), RegClass.end(), [&](auto Reg) {
+    return !isReserved(Reg, std::forward<IsReservedTys>(Args)...);
+  });
 }
 
 template <typename Pred, typename... IsReservedTys,
