@@ -938,9 +938,8 @@ class SnippyRISCVTarget final : public SnippyTarget {
                         return InstBuilder.addReg(SrcReg).addReg(SrcReg);
                       case RISCVMatInt::RegImm:
                         return InstBuilder.addReg(SrcReg).addImm(Inst.getImm());
-                      default:
-                        llvm_unreachable("Unsupported register type");
                       }
+                      llvm_unreachable("Unsupported register type");
                     });
   }
 
@@ -3214,7 +3213,6 @@ void SnippyRISCVTarget::rvvWriteValue(InstructionGenerationContext &IGC,
                                       APInt Value, unsigned DstReg) const {
   const auto &SimCtx = IGC.SimCtx;
   auto &ProgCtx = IGC.ProgCtx;
-  auto &State = ProgCtx.getLLVMState();
   // FIXME for V0 we can only use global variables for initialization
   if (!InitVRegsFromMemory.getValue() && DstReg != RISCV::V0) {
     rvvWriteValueUsingXReg(IGC, Value, DstReg);
@@ -3411,7 +3409,6 @@ void SnippyRISCVTarget::generateVSETVLI(InstructionGenerationContext &IGC,
   auto &MBB = IGC.MBB;
   auto &Ins = IGC.Ins;
   auto &ProgCtx = IGC.ProgCtx;
-  auto &State = ProgCtx.getLLVMState();
   // TODO 1: if VL is equal to VLMAX we can use X0 if DstReg is not zero
   // TODO 2: if VL is not changed, and DST is zero, scratch VL can be zero
   const auto &RI = ProgCtx.getLLVMState().getRegInfo();

@@ -146,8 +146,9 @@ findMaxDepthReachedImpl(CFPermBIIter Beg, CFPermBIIter End,
 llvm::snippy::CFPermutationContext::CFPermutationContext(
     MachineFunction &MF, GeneratorContext &GC, FunctionGenerator &FG,
     ConsecutiveLoopInfo &CLI, const SimulatorContext &SimCtx)
-    : BlocksInfo(), CurrMF(MF), GC(GC), FG(FG), CLI(CLI), SimCtx(SimCtx),
-      BranchSettings(GC.getConfig().Branches) {
+    : BlocksInfo(), CurrMF(MF), GC(GC), FG(FG), CLI(CLI),
+      BranchSettings(GC.getConfig().Branches), SimCtx(SimCtx) {
+
   auto &ProgCtx = GC.getProgramContext();
 
   if (SimCtx.hasTrackingMode() &&
