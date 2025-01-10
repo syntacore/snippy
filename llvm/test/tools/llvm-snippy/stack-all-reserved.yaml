@@ -1,6 +1,0 @@
-# XFAIL: *
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
-# RUN:    %S/Inputs/stack-all-reserved-layout.yaml \
-# RUN:   -num-instrs=10000 -stack-size=1024  \
-# RUN:   --reserved-regs-list=X1,X3,X4,X8,X9,X10,X11,X12,X13,X14,X15,X16,X17,X18,X19,X20,X21,X22,X23,X24,X25,X26,X27,X29,X30,X31 \
-# RUN:   --spilled-regs-list=X5,X6,X7,X28 -init-regs-in-elf -verify-mi
