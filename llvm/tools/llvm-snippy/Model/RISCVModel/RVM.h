@@ -142,7 +142,8 @@ typedef enum {
 #ifdef RVM_FOR_EACH_XEXT
 #error RVM_FOR_EACH_XEXT should not be defined at this point
 #else
-#define RVM_FOR_EACH_XEXT(MACRO)
+#define RVM_FOR_EACH_XEXT(MACRO)                                               \
+  MACRO(RVM_XEXT_EMPTY, empty)
 #endif
 
 typedef enum {
