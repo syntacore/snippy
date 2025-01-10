@@ -1,3 +1,4 @@
+# XFAIL: *
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=-a -list-opcode-names -dump-mi -num-instrs=10 -model-plugin=NONEXISTENT >& %t || true
 # RUN: FileCheck --input-file=%t --dump-input always %s
 

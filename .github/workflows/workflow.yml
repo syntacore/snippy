@@ -1,0 +1,25 @@
+name: Snippy pre-commit and post-push
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - name: Install required compiler to be sure
+      run: sudo apt-get install clang-14 ninja-build ccache lld
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    - name: CMake release config
+      run: cmake -S llvm -B release/build -G Ninja -DCMAKE_C_COMPILER=clang-14 -DCMAKE_CXX_COMPILER=clang++-14 -C .syntacore/release.cmake
+    - name: CMake release build
+      run: cmake --build release/build --target llvm-snippy
+    - name: CMake release test
+      run: env CTEST_OUTPUT_ON_FAILURE=1 cmake --build release/build --target check-llvm-tools-llvm-snippy
