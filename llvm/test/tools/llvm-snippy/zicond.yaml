@@ -1,0 +1,31 @@
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  mattr: +zicond
+  num-instrs: 10000
+  dump-mf: true
+
+sections:
+  - no: 1
+    VMA: 0x10000
+    LMA: 0x10000
+    SIZE: 0x10000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x20000
+    LMA: 0x20000
+    SIZE: 0x10000
+    ACCESS: rw
+
+histogram:
+  - [ADD, 1.0]
+  - [SUB, 1.0]
+  - [OR, 1.0]
+  - [XOR, 1.0]
+  - [AND, 1.0]
+  - [CZERO_EQZ, 2.5]
+  - [CZERO_NEZ, 2.5]
+
+# CHECK-COUNT-1000: CZERO_EQZ
+# CHECK-COUNT-1000: CZERO_NEZ
