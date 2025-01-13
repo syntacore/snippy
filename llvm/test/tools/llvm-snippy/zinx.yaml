@@ -1,0 +1,100 @@
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  mattr: +zfinx,+zdinx,+zhinx
+  num-instrs: 10000
+  dump-mf: true
+
+sections:
+  - no: 1
+    VMA: 0x10000
+    LMA: 0x10000
+    SIZE: 0x10000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x20000
+    LMA: 0x20000
+    SIZE: 0x10000
+    ACCESS: rw
+
+histogram:
+  - [FADD_D_INX, 1.0]
+  - [FADD_S_INX, 1.0]
+  - [FADD_H_INX, 1.0]
+  - [FSUB_D_INX, 1.0]
+  - [FSUB_S_INX, 1.0]
+  - [FSUB_H_INX, 1.0]
+  - [FMUL_D_INX, 1.0]
+  - [FMUL_S_INX, 1.0]
+  - [FMUL_H_INX, 1.0]
+  - [FDIV_D_INX, 1.0]
+  - [FDIV_S_INX, 1.0]
+  - [FDIV_H_INX, 1.0]
+  - [FSQRT_D_INX, 1.0]
+  - [FSQRT_S_INX, 1.0]
+  - [FSQRT_H_INX, 1.0]
+  - [FMIN_D_INX, 1.0]
+  - [FMIN_S_INX, 1.0]
+  - [FMIN_H_INX, 1.0]
+  - [FMAX_D_INX, 1.0]
+  - [FMAX_S_INX, 1.0]
+  - [FMAX_H_INX, 1.0]
+  - [FMADD_D_INX, 1.0]
+  - [FMADD_S_INX, 1.0]
+  - [FMADD_H_INX, 1.0]
+  - [FCVT_D_H_INX, 1.0]
+  - [FCVT_D_S_INX, 1.0]
+  - [FCVT_D_W_INX, 1.0]
+  - [FSGNJ_D_INX, 1.0]
+  - [FSGNJ_S_INX, 1.0]
+  - [FSGNJ_H_INX, 1.0]
+  - [FEQ_D_INX, 1.0]
+  - [FEQ_S_INX, 1.0]
+  - [FEQ_H_INX, 1.0]
+  - [FLT_D_INX, 1.0]
+  - [FLT_S_INX, 1.0]
+  - [FLT_H_INX, 1.0]
+  - [FLE_D_INX, 1.0]
+  - [FLE_S_INX, 1.0]
+  - [FLE_H_INX, 1.0]
+
+# CHECK-DAG: FADD_D_INX
+# CHECK-DAG: FADD_S_INX
+# CHECK-DAG: FADD_H_INX
+# CHECK-DAG: FSUB_D_INX
+# CHECK-DAG: FSUB_S_INX
+# CHECK-DAG: FSUB_H_INX
+# CHECK-DAG: FMUL_D_INX
+# CHECK-DAG: FMUL_S_INX
+# CHECK-DAG: FMUL_H_INX
+# CHECK-DAG: FDIV_D_INX
+# CHECK-DAG: FDIV_S_INX
+# CHECK-DAG: FDIV_H_INX
+# CHECK-DAG: FSQRT_D_INX
+# CHECK-DAG: FSQRT_S_INX
+# CHECK-DAG: FSQRT_H_INX
+# CHECK-DAG: FMIN_D_INX
+# CHECK-DAG: FMIN_S_INX
+# CHECK-DAG: FMIN_H_INX
+# CHECK-DAG: FMAX_D_INX
+# CHECK-DAG: FMAX_S_INX
+# CHECK-DAG: FMAX_H_INX
+# CHECK-DAG: FMADD_D_INX
+# CHECK-DAG: FMADD_S_INX
+# CHECK-DAG: FMADD_H_INX
+# CHECK-DAG: FCVT_D_H_INX
+# CHECK-DAG: FCVT_D_S_INX
+# CHECK-DAG: FCVT_D_W_INX
+# CHECK-DAG: FSGNJ_D_INX
+# CHECK-DAG: FSGNJ_S_INX
+# CHECK-DAG: FSGNJ_H_INX
+# CHECK-DAG: FEQ_D_INX
+# CHECK-DAG: FEQ_S_INX
+# CHECK-DAG: FEQ_H_INX
+# CHECK-DAG: FLT_D_INX
+# CHECK-DAG: FLT_S_INX
+# CHECK-DAG: FLT_H_INX
+# CHECK-DAG: FLE_D_INX
+# CHECK-DAG: FLE_S_INX
+# CHECK-DAG: FLE_H_INX

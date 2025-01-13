@@ -1,0 +1,46 @@
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  mattr: +zaamo
+  num-instrs: 1000
+  dump-mf: true
+
+sections:
+  - no: 1
+    VMA: 0x10000
+    LMA: 0x10000
+    SIZE: 0x10000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x20000
+    LMA: 0x20000
+    SIZE: 0x10000
+    ACCESS: rw
+
+histogram:
+  - [AMOSWAP_D, 1.0]
+  - [AMOSWAP_W, 1.0]
+  - [AMOAND_D, 1.0]
+  - [AMOAND_W, 1.0]
+  - [AMOOR_D, 1.0]
+  - [AMOOR_W, 1.0]
+  - [AMOXOR_D, 1.0]
+  - [AMOXOR_W, 1.0]
+  - [AMOMAX_D, 1.0]
+  - [AMOMAX_W, 1.0]
+  - [AMOMIN_D, 1.0]
+  - [AMOMIN_W, 1.0]
+
+# CHECK: AMOSWAP_D
+# CHECK: AMOSWAP_W
+# CHECK: AMOAND_D
+# CHECK: AMOAND_W
+# CHECK: AMOXOR_D
+# CHECK: AMOXOR_W
+# CHECK: AMOOR_D
+# CHECK: AMOOR_W
+# CHECK: AMOMAX_D
+# CHECK: AMOMAX_W
+# CHECK: AMOMIN_D
+# CHECK: AMOMIN_W

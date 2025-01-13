@@ -1,0 +1,58 @@
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  mattr: +zfa,+d,+zfh
+  num-instrs: 1000
+  dump-mf: true
+
+sections:
+  - no: 1
+    VMA: 0x10000
+    LMA: 0x10000
+    SIZE: 0x10000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x20000
+    LMA: 0x20000
+    SIZE: 0x10000
+    ACCESS: rw
+
+histogram:
+  - [FMINM_D, 1.0]
+  - [FMINM_S, 1.0]
+  - [FMINM_H, 1.0]
+  - [FMAXM_D, 1.0]
+  - [FMAXM_S, 1.0]
+  - [FMAXM_H, 1.0]
+  - [FROUNDNX_D, 1.0]
+  - [FROUNDNX_S, 1.0]
+  - [FROUNDNX_H, 1.0]
+  - [FROUND_D, 1.0]
+  - [FROUND_S, 1.0]
+  - [FROUND_H, 1.0]
+  - [FLEQ_D, 1.0]
+  - [FLEQ_S, 1.0]
+  - [FLEQ_H, 1.0]
+  - [FLTQ_D, 1.0]
+  - [FLTQ_S, 1.0]
+  - [FLTQ_H, 1.0]
+
+# CHECK: FMINM_D
+# CHECK: FMINM_S
+# CHECK: FMINM_H
+# CHECK: FMAXM_D
+# CHECK: FMAXM_S
+# CHECK: FMAXM_H
+# CHECK: FROUNDNX_D
+# CHECK: FROUNDNX_S
+# CHECK: FROUNDNX_H
+# CHECK: FROUND_D
+# CHECK: FROUND_S
+# CHECK: FROUND_H
+# CHECK: FLEQ_D
+# CHECK: FLEQ_S
+# CHECK: FLEQ_H
+# CHECK: FLTQ_D
+# CHECK: FLTQ_S
+# CHECK: FLTQ_H
