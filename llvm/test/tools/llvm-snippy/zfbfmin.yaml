@@ -1,0 +1,30 @@
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  mattr: +f,+zfh,+zfbfmin
+  num-instrs: 1000
+  dump-mf: true
+
+sections:
+  - no: 1
+    VMA: 0x10000
+    LMA: 0x10000
+    SIZE: 0x10000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x20000
+    LMA: 0x20000
+    SIZE: 0x10000
+    ACCESS: rw
+
+histogram:
+  - [FCVT_BF16_S, 1.0]
+  - [FCVT_S_BF16, 1.0]
+  - [FMV_H_X, 1.0]
+  - [FMV_X_H, 1.0]
+
+# CHECK-DAG: FCVT_BF16_S
+# CHECK-DAG: FCVT_S_BF16
+# CHECK-DAG: FMV_H_X
+# CHECK-DAG: FMV_X_H
