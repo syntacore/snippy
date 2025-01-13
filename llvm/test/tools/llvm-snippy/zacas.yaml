@@ -1,0 +1,37 @@
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  mattr: +a,+experimental-zacas
+  num-instrs: 1000
+  dump-mf: true
+
+sections:
+  - no: 1
+    VMA: 0x10000
+    LMA: 0x10000
+    SIZE: 0x10000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x20000
+    LMA: 0x20000
+    SIZE: 0x10000
+    ACCESS: rw
+
+histogram:
+  - [ AMOCAS_D_RV64, 1.0]
+  - [ AMOCAS_D_RV64_AQ, 1.0]
+  - [ AMOCAS_D_RV64_AQ_RL, 1.0]
+  - [ AMOCAS_D_RV64_RL, 1.0]
+  - [ AMOCAS_Q, 1.0]
+  - [ AMOCAS_Q_AQ, 1.0]
+  - [ AMOCAS_Q_AQ_RL, 1.0]
+  - [ AMOCAS_Q_RL, 1.0]
+  - [ AMOCAS_W, 1.0]
+  - [ AMOCAS_W_AQ, 1.0]
+  - [ AMOCAS_W_AQ_RL, 1.0]
+  - [ AMOCAS_W_RL, 1.0]
+
+# CHECK-DAG: AMOCAS_D
+# CHECK-DAG: AMOCAS_W
+# CHECK-DAG: AMOCAS_Q
