@@ -85,6 +85,7 @@ typedef enum {
   MACRO(RVM_ZEXT_AAMO, aamo)                                                   \
   MACRO(RVM_ZEXT_ABHA, abha)                                                   \
   MACRO(RVM_ZEXT_ACAS, acas)                                                   \
+  MACRO(RVM_ZEXT_CMOP, cmop)                                                   \
   MACRO(RVM_ZEXT_CMP, cmp)                                                     \
   MACRO(RVM_ZEXT_CMT, cmt)                                                     \
   MACRO(RVM_ZEXT_FA, fa)                                                       \
