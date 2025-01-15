@@ -51,6 +51,7 @@
 #include "llvm/MC/MCInstrDesc.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -59,6 +60,7 @@
 #include <cstdint>
 
 #include <functional>
+#include <limits>
 #include <numeric>
 #include <variant>
 
@@ -716,12 +718,12 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
   // Check that MinOffset and MaxOffset are already aligned to MinStride
   assert(AddrInfo.MinOffset % AddrInfo.MinStride == 0);
   assert(AddrInfo.MaxOffset % AddrInfo.MinStride == 0);
-
   // For indexed loads/stores, only base address + index must be legal according
   // to the memory scheme, but base address by itself doesn't have to be. So the
   // base address can be offset by some amount, as long as the final access is
   // still legal.
-
+  LLVM_DEBUG(dbgs() << "breakDownAddrForRVVIndexed Instruction\n";
+             MI.print(dbgs()););
   uint64_t IndexMaxValue = APInt::getMaxValue(EIEW).getZExtValue();
 
   // Start by generating an offset for the base address.
@@ -729,29 +731,73 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
   // the maximum possible offset that can stored in the index register to the
   // final base address, the access is still legal according to the memory
   // scheme
-  int64_t MinBaseOffset = AddrInfo.MinOffset - IndexMaxValue;
-  // The maximum value is such that after adding an offset of 0 stored in the
-  // index register to the final base address, the access is still legal
-  // according to the memory scheme.
-  int64_t MaxBaseOffset = AddrInfo.MaxOffset;
-  // Offset the base address
-  auto BaseOffset =
-      RandEngine::genInRangeInclusive(MinBaseOffset, MaxBaseOffset);
-  uint64_t BaseAddr = AddrInfo.Address + BaseOffset;
-  // Align base address
-  int64_t NextAlignedOffset = (BaseOffset < 0)
-                                  ? -alignDown(-BaseOffset, AddrInfo.MinStride)
-                                  : alignTo(BaseOffset, AddrInfo.MinStride);
-  // Take into account that it might be less then the minimum allowed offset
-  NextAlignedOffset = std::max<int64_t>(NextAlignedOffset, AddrInfo.MinOffset);
-  // Calculate the minimum value that the index register must hold so that the
-  // final access is properly aligned
-  uint64_t IndexMinValue = NextAlignedOffset - BaseOffset;
-  assert((BaseOffset + IndexMinValue) % AddrInfo.MinStride == 0);
-  // Add a multiple of stride
-  IndexMaxValue = std::min<uint64_t>(IndexMaxValue, MaxBaseOffset - BaseOffset);
-  assert(IndexMaxValue >= IndexMinValue);
-  auto MaxN = (IndexMaxValue - IndexMinValue) / AddrInfo.MinStride;
+  //
+  // We have the following legal range (note: MinOffset <= 0):
+  // --|Base + MinOffset ... Base + MaxOffset|--
+  // Let Base' be some randomly chosen base address. Let Index' be a random
+  // value. in the picked index register. The idea is that Base' + Index' for
+  // any Index satisfies the following condition:
+  // Base + MinOffset <= Base' + Index' <= Base + MaxOffset
+  assert(AddrInfo.MinOffset <= 0);
+  assert(AddrInfo.MaxOffset >= 0);
+  // Get the legal range
+  uint64_t MinBaseOffset = AddrInfo.Address + AddrInfo.MinOffset;
+  uint64_t MaxBaseOffset =
+      AddrInfo.Address + static_cast<uint64_t>(AddrInfo.MaxOffset);
+
+  // MinBaseOffset and MaxBaseOffset must be reachable from AddrInfo.Address
+  // with AddrInfo.MinStride
+  [[maybe_unused]] uint64_t AddrStrideReminder =
+      AddrInfo.Address % AddrInfo.MinStride;
+  assert(AddrStrideReminder == (MinBaseOffset % AddrInfo.MinStride) &&
+         AddrStrideReminder == (MaxBaseOffset % AddrInfo.MinStride));
+
+  // Pick the legal random Base' value with the index constraints for current
+  // instruction. So, from the equation above:
+  // MinBaseOffset <= Base' + IndexMaxValue <= MaxBaseOffset
+  // MinBaseOffset - IndexMaxValue  <= Base' <= MaxBaseOffset - IndexMaxValue
+  uint64_t MinBase = MinBaseOffset - IndexMaxValue;
+  uint64_t MaxBase = MaxBaseOffset - IndexMaxValue;
+
+  // This range can be presented in two types:
+  // --|MinBase ... MaxBase|-- and |0 ... MaxBase|--|MinBase ... 2^{64} - 1|
+  // The second case is valid and can be legal in case of overflow. In such
+  // case Index' must wrap Base' around zero
+
+  uint64_t BaseAddr;
+
+  if (MinBase <= MaxBase)
+    BaseAddr = RandEngine::genInRangeInclusive(MinBase, MaxBase);
+  else {
+    // This is the logic for the case when the valid base address is either
+    // in the range from 0 to MaxBase or from MinBase to 2^{64} - 1.
+    // To ensure a uniform distribution, we first generate a random number
+    // within the total length of the valid range.
+    //
+    // Note: In this case, MaxBase < MinBase.
+    // AddrRangeLength = MaxBase + ((2^{64} - 1) - MinBase),
+    // which is equivalent to:
+    // AddrRangeLength = (MaxBase - MinBase) % 2^{64}.
+
+    uint64_t AddrRangeLength =
+        (MaxBase - MinBase) % std::numeric_limits<uint64_t>::max();
+    BaseAddr = RandEngine::genInRangeInclusive(AddrRangeLength);
+
+    // If randomly generated BaseAddr suits to the first range -> nothing to do
+    // Otherwise, we pick the value from the second range as
+    // BaseAddr = (2^{64} - 1) - (BaseAddr - MaxBase),
+    // which is equivalent to:
+    // BaseAddr = MaxBase - BaseAddr
+    if (BaseAddr > MaxBase)
+      BaseAddr = MaxBase - BaseAddr;
+  }
+  LLVM_DEBUG(dbgs().indent(2) << Twine("Generated BaseAddress 0x")
+                                     .concat(Twine(utohexstr(BaseAddr)))
+                                     .concat("\n"));
+
+  uint64_t IndexMinValue = MinBaseOffset - BaseAddr;
+  assert(AddrInfo.MinStride != 0);
+  uint64_t MaxN = (IndexMaxValue - IndexMinValue) / AddrInfo.MinStride;
 
   AddressPart MainPart{AddrReg, APInt(ST.getXLen(), BaseAddr)};
 
@@ -760,6 +806,8 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
   auto VLEN = TgtCtx.getVLEN();
   unsigned NIdxsPerVReg = VLEN / EIEW;
   while (VL > 0) {
+    LLVM_DEBUG(dbgs().indent(2)
+               << Twine("Current VL : ").concat(Twine(VL)).concat("\n"));
     // Get the number of indices we can write into one VReg. One VReg can hold
     // no more than NIdxsPerVReg. So, we might need to write not a single
     // register but a group.
@@ -769,14 +817,22 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
       // TODO: for unordered stores, generating indices like this is not
       // correct, since store order for overlapping regions is not defined
       auto N = RandEngine::genInRangeInclusive(MaxN);
-      auto IndexValue = IndexMinValue + AddrInfo.MinStride * N;
+      uint64_t IndexValue = IndexMinValue + AddrInfo.MinStride * N;
+
       Offsets.insertBits(IndexValue, ElemIdx * EIEW, EIEW);
+      LLVM_DEBUG(APInt Index(EIEW, IndexValue);
+                 dbgs().indent(4)
+                 << "Generated IndexValue [" + Twine(ElemIdx) + "] : 0x" +
+                        Twine(utohexstr(Index.getZExtValue())) + "\n");
 
       // Verify that generated address is legal according to memory scheme
-      [[maybe_unused]] int64_t FinalOffset =
-          BaseAddr + IndexValue - AddrInfo.Address;
-      assert(FinalOffset >= AddrInfo.MinOffset);
-      assert(FinalOffset <= AddrInfo.MaxOffset);
+      [[maybe_unused]] uint64_t FinalAddress = BaseAddr + IndexValue;
+      LLVM_DEBUG(dbgs().indent(4) << ("Generated FinalAddress 0x" +
+                                      Twine(utohexstr(FinalAddress))) +
+                                         "\n");
+      assert(FinalAddress >= MinBaseOffset);
+      assert(FinalAddress <= MaxBaseOffset);
+      [[maybe_unused]] uint64_t FinalOffset = FinalAddress - AddrInfo.Address;
       assert(FinalOffset % AddrInfo.MinStride == 0);
       Addresses.push_back(uintToTargetXLen(Is64Bit, BaseAddr + IndexValue));
     }
