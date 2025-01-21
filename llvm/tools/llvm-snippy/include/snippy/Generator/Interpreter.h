@@ -127,7 +127,7 @@ public:
 
   void disableTransactionsTracking();
 
-  void loadElfImage(StringRef ElfImage);
+  void loadElfImage(StringRef ElfImage, bool InitBSS);
 
   void dumpCurrentRegState(StringRef Filename) const;
 
