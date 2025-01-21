@@ -245,7 +245,7 @@ checkOutOfRangeValuegram(uint32_t SemanticsSize, const IValuegramEntry &Entry) {
   return TypeSwitch<const IValuegramEntry *, std::optional<APInt>>(&Entry)
       .Case([&](const ValuegramBitValueEntry *BitValueEntry) {
         assert(BitValueEntry);
-        return CheckAPInts(BitValueEntry->ValWithSign.Value);
+        return CheckAPInts(BitValueEntry->ValWithSign.getVal());
       })
       .Case([&](const ValuegramBitRangeEntry *BitRangeEntry) {
         assert(BitRangeEntry);
@@ -299,7 +299,7 @@ createSamplerForEntry(const ValuegramEntry &Entry, uint32_t BitWidth) {
       })
       .Case([&](const ValuegramBitValueEntry *BitValueEntry)
                 -> Expected<std::unique_ptr<IAPIntSampler>> {
-        const auto &Val = BitValueEntry->ValWithSign.Value;
+        const auto &Val = BitValueEntry->ValWithSign.getVal();
         if (Val.getActiveBits() > BitWidth) {
           SmallString<sizeof(uint64_t) * CHAR_BIT / 4> ValStr;
           Val.toString(ValStr, /*Radix=*/16, /*Signed=*/false,

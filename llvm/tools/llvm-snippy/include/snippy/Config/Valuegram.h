@@ -32,13 +32,23 @@ struct ValuegramEntryScalarMapper final {};
 
 } // namespace detail
 
+enum class InputFormat { Regular, Unsupported };
+
 struct APIntWithSign {
   APInt Value;
   bool IsSigned;
-  static Expected<APIntWithSign> fromString(StringRef StrView);
   static Expected<APInt> parseAPInt(StringRef StrView, bool HasNegativeSign,
                                     unsigned Radix, StringRef OriginalStr);
   static Error reportError(Twine Msg);
+};
+
+struct FormattedAPIntWithSign {
+  APIntWithSign Number;
+  InputFormat Format = InputFormat::Regular;
+  static Expected<FormattedAPIntWithSign> fromString(StringRef StrView);
+  Expected<std::string> toString() const;
+  const APInt &getVal() const & { return Number.Value; }
+  bool isSigned() const { return Number.IsSigned; }
 };
 
 // Valuegram is an ordered collection of arbitrary weighted types.
@@ -178,14 +188,17 @@ struct ValuegramUniformEntry final : public IValuegramMapEntry {
 };
 
 struct ValuegramBitValueEntry final : public IValuegramMapEntry {
-  APIntWithSign ValWithSign;
+  FormattedAPIntWithSign ValWithSign;
 
   ValuegramBitValueEntry() = default;
-  ValuegramBitValueEntry(APIntWithSign Val) : ValWithSign{std::move(Val)} {}
+  ValuegramBitValueEntry(FormattedAPIntWithSign Val)
+      : ValWithSign{std::move(Val)} {}
   EntryKind getKind() const override { return EntryKind::BitValue; }
 
-  bool isSigned() const { return ValWithSign.IsSigned; };
-  APInt getVal() const { return ValWithSign.Value; }
+  bool isSigned() const { return ValWithSign.Number.IsSigned; };
+  InputFormat getFormat() const { return ValWithSign.Format; }
+
+  const APInt &getVal() const & { return ValWithSign.Number.Value; }
 
   static bool classof(const IValuegramEntry *Entry) {
     assert(Entry);
@@ -424,7 +437,7 @@ template <> struct llvm::yaml::PolymorphicTraits<snippy::ValuegramEntry> {
   getAsSequence(snippy::ValuegramEntry &);
 };
 
-LLVM_SNIPPY_YAML_DECLARE_SCALAR_TRAITS(snippy::APIntWithSign);
+LLVM_SNIPPY_YAML_DECLARE_SCALAR_TRAITS_NG(snippy::FormattedAPIntWithSign);
 
 LLVM_SNIPPY_YAML_DECLARE_IS_HISTOGRAM_DENORM_ENTRY(
     std::unique_ptr<snippy::IValuegramEntry>)
