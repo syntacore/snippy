@@ -8,6 +8,7 @@
 
 #include "snippy/Config/Valuegram.h"
 #include "snippy/Support/DiagnosticInfo.h"
+#include "snippy/Support/YAMLExtras.h"
 #include "snippy/Support/YAMLHistogram.h"
 #include "snippy/Support/YAMLUtils.h"
 
@@ -112,30 +113,27 @@ snippy::ValuegramEntry &yaml::SequenceTraits<snippy::Valuegram>::element(
   return List[Index];
 }
 
-StringRef
-yaml::ScalarTraits<snippy::APIntWithSign>::input(StringRef Input, void *,
-                                                 snippy::APIntWithSign &Val) {
+std::string yaml::ScalarTraits<snippy::FormattedAPIntWithSign>::input(
+    StringRef Input, void *, snippy::FormattedAPIntWithSign &Val) {
   if (auto E = Val.fromString(Input).moveInto(Val)) {
-    // NOTE: Unfortunately here we can't diagnose the exact error message,
-    // without reimplementing fromString logic completely. ::input method
-    // return a non-owning StringRef, which can't take the error message.
-    snippy::burrowError(std::move(E));
-    return "Invalid number";
+    return toString(std::move(E));
   }
-  return {};
+  return "";
 }
 
-void yaml::ScalarTraits<snippy::APIntWithSign>::output(
-    const snippy::APIntWithSign &ValWithSign, void *, raw_ostream &OS) {
+void yaml::ScalarTraits<snippy::FormattedAPIntWithSign>::output(
+    const snippy::FormattedAPIntWithSign &ValWithSign, void *,
+    raw_ostream &OS) {
   SmallString<16> SmallStr;
-  ValWithSign.Value.toString(SmallStr, /*Radix=*/16, ValWithSign.IsSigned,
-                             /*formatAsCLiteral=*/true,
-                             /*UpperCase=*/false);
+  ValWithSign.Number.Value.toString(SmallStr, /*Radix=*/16,
+                                    ValWithSign.Number.IsSigned,
+                                    /*formatAsCLiteral=*/true,
+                                    /*UpperCase=*/false);
   OS << SmallStr;
 }
 
 yaml::QuotingType
-yaml::ScalarTraits<snippy::APIntWithSign>::mustQuote(StringRef) {
+yaml::ScalarTraits<snippy::FormattedAPIntWithSign>::mustQuote(StringRef) {
   return QuotingType::None;
 }
 
@@ -171,14 +169,15 @@ Expected<APInt> APIntWithSign::parseAPInt(StringRef StrView,
   return Value;
 }
 
-Expected<APIntWithSign> APIntWithSign::fromString(StringRef StrView) {
+Expected<FormattedAPIntWithSign>
+FormattedAPIntWithSign::fromString(StringRef StrView) {
   StringRef OriginalStr = StrView;
-  APIntWithSign ValueWithSign;
-  APInt &Value = ValueWithSign.Value;
-  bool &HasNegativeSign = ValueWithSign.IsSigned;
+  FormattedAPIntWithSign ValueWithSign;
+  APInt &Value = ValueWithSign.Number.Value;
+  bool &HasNegativeSign = ValueWithSign.Number.IsSigned;
 
   if (StrView.empty())
-    return reportError("Empty string is not a valid number");
+    return APIntWithSign::reportError("Empty string is not a valid number");
 
   // We remove minus because StringRef::getAsInteger method overload for APInt
   // doesn't handle the minus.
@@ -187,12 +186,20 @@ Expected<APIntWithSign> APIntWithSign::fromString(StringRef StrView) {
   auto Radix = getAutoSenseRadix(StrView);
 
   Expected<APInt> ExpectedValue =
-      parseAPInt(StrView, HasNegativeSign, Radix, OriginalStr);
+      APIntWithSign::parseAPInt(StrView, HasNegativeSign, Radix, OriginalStr);
   if (auto E = ExpectedValue.takeError())
-    return reportError(toString(std::move(E)));
+    return APIntWithSign::reportError(llvm::toString(std::move(E)));
 
   Value = *ExpectedValue;
   return ValueWithSign;
+}
+
+Expected<std::string> FormattedAPIntWithSign::toString() const {
+  SmallString<16> Str;
+  Number.Value.toString(Str, /*Radix*/ 16, Number.IsSigned,
+                        /*formatAsCLiteral=*/true,
+                        /*UpperCase=*/false);
+  return std::string(Str);
 }
 
 void ValuegramBitValueEntry::mapYamlImpl(yaml::IO &Io) {
@@ -204,13 +211,13 @@ void ValuegramBitRangeEntry::mapYamlImpl(yaml::IO &Io) {
     struct APIntBitsMapperHelper {
       APIntBitsMapperHelper(yaml::IO &Io) {}
       APIntBitsMapperHelper(yaml::IO &Io, APInt Val)
-          : ValWithSign{std::move(Val), /*IsSigned=*/false} {}
+          : ValWithSign{{std::move(Val), /*IsSigned=*/false}} {}
       APInt denormalize(yaml::IO &Io) {
-        if (ValWithSign.IsSigned)
+        if (ValWithSign.isSigned())
           Io.setError("Value can't be negative");
-        return ValWithSign.Value;
+        return ValWithSign.Number.Value;
       }
-      APIntWithSign ValWithSign;
+      FormattedAPIntWithSign ValWithSign;
     };
 
     yaml::MappingNormalization<APIntBitsMapperHelper, APInt> NormAPInt(Io, Val);
@@ -275,7 +282,8 @@ std::unique_ptr<IValuegramEntry> createValuegramSeqEntry(yaml::IO &Io,
     return {};
   };
 
-  Expected<APIntWithSign> ExpectedValue = APIntWithSign::fromString(ParseStr);
+  Expected<FormattedAPIntWithSign> ExpectedValue =
+      FormattedAPIntWithSign::fromString(ParseStr);
   if (auto E = ExpectedValue.takeError())
     return ReportError(toString(std::move(E)));
 
@@ -303,12 +311,12 @@ void YAMLHistogramTraits<std::unique_ptr<IValuegramEntry>>::normalizeEntry(
     switch (Kind) {
     case EntryKind::BitValue: {
       auto &BitValueEntry = cast<ValuegramBitValueEntry>(E);
-      SmallString<16> SmallStr;
-      BitValueEntry.getVal().toString(SmallStr, /*Radix=*/16,
-                                      BitValueEntry.isSigned(),
-                                      /*formatAsCLiteral=*/true,
-                                      /*UpperCase=*/false);
-      return SmallStr.str().str();
+      auto ExpectedValue = BitValueEntry.ValWithSign.toString();
+      if (auto E = ExpectedValue.takeError()) {
+        Io.setError(toString(std::move(E)));
+        return std::string("");
+      }
+      return *ExpectedValue;
     }
     case ValuegramPattern::BitPattern:
     case ValuegramPattern::Uniform:
