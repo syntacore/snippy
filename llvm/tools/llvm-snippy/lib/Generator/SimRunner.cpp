@@ -34,9 +34,9 @@ SimRunner::SimRunner(LLVMContext &Ctx, const SnippyTarget &TGT,
   }
 }
 
-void SimRunner::loadElf(StringRef Image) {
+void SimRunner::loadElf(StringRef Image, bool InitBSS) {
   for (auto &I : CoInterp)
-    I->loadElfImage(Image);
+    I->loadElfImage(Image, InitBSS);
 }
 void SimRunner::run(const IRegisterState &InitialRegState,
                     ProgramCounterType StartPC) {
