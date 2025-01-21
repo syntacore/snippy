@@ -262,7 +262,7 @@ static StringRef getSectionName(llvm::object::SectionRef S) {
     return "";
 }
 
-void Interpreter::loadElfImage(StringRef ElfImage) {
+void Interpreter::loadElfImage(StringRef ElfImage, bool InitBSS) {
   std::string ProgramText;
   auto MemBuff = MemoryBuffer::getMemBuffer(ElfImage, "", false);
   auto ObjectFile = makeObjectFile(*MemBuff);
@@ -288,7 +288,7 @@ void Interpreter::loadElfImage(StringRef ElfImage) {
             WarningName::EmptyElfSection,
             formatv("ignored LOAD section '{0}'", getSectionName(Section)),
             "empty contents");
-    } else if (Section.isBSS()) {
+    } else if (Section.isBSS() && InitBSS) {
       std::vector<char> Zeroes(Size, 0);
       Simulator->writeMem(Address, Zeroes);
     }
