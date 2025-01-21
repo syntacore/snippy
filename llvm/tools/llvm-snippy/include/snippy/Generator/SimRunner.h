@@ -44,7 +44,7 @@ public:
   // Each interpreter state will be reset before run.
   void run(const IRegisterState &InitialRegState, ProgramCounterType StartPC);
   // Loads image of program into each interpreter.
-  void loadElf(StringRef Image);
+  void loadElf(StringRef Image, bool InitBSS);
   auto &getSimConfig() & {
     assert(Env);
     return Env->SimCfg;
