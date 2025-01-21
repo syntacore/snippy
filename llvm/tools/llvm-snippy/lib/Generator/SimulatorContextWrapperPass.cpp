@@ -222,7 +222,9 @@ void SimulatorContext::runSimulator(const RunInfo &RI) {
   }
 
   auto &SimRunner = getSimRunner();
-  SimRunner.loadElf(ImageToRun);
+  // FIXME: currently it does not initialize .bss sections with
+  // zeroes, to comply with legacy behaviour.
+  SimRunner.loadElf(ImageToRun, /* InitBSS */ false);
 
   SimRunner.run(InitRegState, StartPC);
 
