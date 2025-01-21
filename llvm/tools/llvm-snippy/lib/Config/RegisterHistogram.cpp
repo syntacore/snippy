@@ -91,25 +91,29 @@ APInt sampleValuegramForOneReg(const Valuegram &Valuegram, StringRef Prefix,
   switch (Kind) {
   case EntryKind::BitValue: {
     auto &ValueWithSign = cast<ValuegramBitValueEntry>(Entry.get()).ValWithSign;
-    auto &Value = ValueWithSign.Value;
+    auto &Value = ValueWithSign.getVal();
 
-    if (Value.getActiveBits() > NumBits) {
+    auto Width = Value.getActiveBits();
+    if (Width > NumBits) {
       SmallVector<char> Str;
-      Value.toString(Str, /*Radix=*/16, /*Signed=*/ValueWithSign.IsSigned,
+      Value.toString(Str, /*Radix=*/16,
+                     /*Signed=*/ValueWithSign.Number.IsSigned,
                      /*formatAsCLiteral=*/true, /*UpperCase=*/false);
       LLVMContext Ctx;
       snippy::fatal(Ctx, "Failed to sample register histogram",
                     Twine("Histogram entry ")
                         .concat(Str)
-                        .concat(" for register type ")
+                        .concat(" with ")
+                        .concat(std::to_string(Value.getBitWidth()))
+                        .concat(" bit width for register type ")
                         .concat(Prefix)
                         .concat(" is wider than requested bit width ")
                         .concat(Twine(NumBits)));
     }
 
-    if (ValueWithSign.IsSigned)
-      return Value.sextOrTrunc(NumBits);
-    return Value.zextOrTrunc(NumBits);
+    if (!ValueWithSign.isSigned())
+      return Value.zextOrTrunc(NumBits);
+    return Value.sextOrTrunc(NumBits);
   }
   case EntryKind::BitPattern:
   case EntryKind::Uniform: {
