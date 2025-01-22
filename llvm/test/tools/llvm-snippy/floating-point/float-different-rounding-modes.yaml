@@ -1,0 +1,24 @@
+# RUN: llvm-snippy %s | FileCheck %s
+
+include:
+  - ../Inputs/sections.yaml
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  mattr: "+f"
+  num-instrs: 200
+  dump-mf: true
+histogram:
+  - [FADD_S, 1.0]
+
+# COM: RNE - 0b000
+# COM: RTZ - 0b001
+# COM: RDN - 0b010
+# COM: RUP - 0b011
+# COM: RMM - 0b100
+
+# CHECK-DAG: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 0
+# CHECK-DAG: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 1
+# CHECK-DAG: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 2
+# CHECK-DAG: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 3
+# CHECK-DAG: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 4
