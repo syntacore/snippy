@@ -2486,8 +2486,21 @@ public:
       snippy::fatal("AVL operand generation is not supported. Probably "
                     "snippy still does "
                     "not support vector instructions generation.");
-    case RISCVOp::OPERAND_FRMARG:
-      return MachineOperand::CreateImm(0);
+    case RISCVOp::OPERAND_FRMARG: {
+      // Floating-point operations use either a static rounding mode encoded in
+      // the instruction, or a dynamic rounding mode held in frm.
+      // 000 - RNE (Round to Nearest, ties to Even)
+      // 001 - RTZ (Round towards Zero)
+      // 010 - RDN (Round Down)
+      // 011 - RUP (Round Up)
+      // 100 - RMM (Round to Nearest, ties to Max Magnitude)
+      // 101 - <reserved>
+      // 110 - <reserved>
+      // 111 - DYN (In instruction’s rm field, selects dynamic rounding mode)
+      using namespace RISCVFPRndMode;
+      return MachineOperand::CreateImm(
+          snippy::selectFrom(RNE, RTZ, RDN, RUP, RMM));
+    }
     }
   }
 
