@@ -1188,6 +1188,10 @@ def : InstAlias<"fence", (FENCE 0xF, 0xF)>; // 0xF == iorw
 
 // pause is always available in the assembler and disassembler, even without
 // enabling Zihintpause, per psABI decision (riscv-non-isa/riscv-elf-psabi-doc#474).
+let hasSideEffects = 1, mayLoad = 0, mayStore = 0 in
+def PAUSE : Pseudo<(outs), (ins), []>,
+            PseudoInstExpansion<(FENCE 0x1, 0x0)>; // 0x1 == w
+
 def : InstAlias<"pause", (FENCE 0x1, 0x0)>; // 0x1 == w
 
 def : InstAlias<"rdinstret $rd", (CSRRS GPR:$rd, INSTRET.Encoding, X0), 2>;
