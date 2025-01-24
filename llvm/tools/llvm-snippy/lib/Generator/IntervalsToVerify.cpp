@@ -258,7 +258,8 @@ Error IntervalsToVerifyFinder::fillIntervals(StringRef ObjectBytes,
     if (auto DisasErr = writeInstructionAddresses(FuncAddr))
       return DisasErr;
 
-    auto Interval = getEnclosedInterval(FirstInstrNum, LastInstrNum);
+    // Do not check last instruction as we don't execute it on model
+    auto Interval = getEnclosedInterval(FirstInstrNum, LastInstrNum + 1);
     if (!Interval)
       return Interval.takeError();
 

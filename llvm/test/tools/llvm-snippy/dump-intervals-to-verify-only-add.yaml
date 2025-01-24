@@ -4,7 +4,7 @@
 # RUN: FileCheck -input-file=%t.layout.elf.intervals-to-verify.yaml %s
 
 # CHECK: intervals-to-verify:
-# CHECK-NEXT: [ 0x500000, 0x500050 ]
+# CHECK-NEXT: [ 0x500000, 0x50004C ]
 
 sections:
     - no:        1
