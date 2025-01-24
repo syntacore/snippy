@@ -951,8 +951,13 @@ def : InstAlias<"jalr $rd, (${rs})",      (JALR GPR:$rd, GPR:$rs, 0), 0>;
 
 def : InstAlias<"fence", (FENCE 0xF, 0xF)>; // 0xF == iorw
 
-let Predicates = [HasStdExtZihintpause] in
+let Predicates = [HasStdExtZihintpause] in {
+let hasSideEffects = 1, mayLoad = 0, mayStore = 0 in
+def PAUSE : Pseudo<(outs), (ins), []>,
+            PseudoInstExpansion<(FENCE 0x1, 0x0)>; // 0x1 == w
+
 def : InstAlias<"pause", (FENCE 0x1, 0x0)>; // 0x1 == w
+} // Predicates = [HasStdExtZihintpause]
 
 def : InstAlias<"rdinstret $rd", (CSRRS GPR:$rd, INSTRET.Encoding, X0)>;
 def : InstAlias<"rdcycle $rd",   (CSRRS GPR:$rd, CYCLE.Encoding, X0)>;
