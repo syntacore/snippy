@@ -106,7 +106,12 @@ void InstructionGenerator::prepareInterpreterEnv(MachineFunction &MF) const {
   const auto &SnippyTgt = State.getSnippyTarget();
   auto &I = SimCtx.getInterpreter();
 
-  I.setInitialState(ProgCtx.getInitialRegisterState(I.getSubTarget()));
+  // FIXME: it is too late to prepare interpreter env here. Some passes may
+  // have already modified memory. Better to do that before all that passes.
+  // Currently DoMemReset == false is introduced to fix current issues with it.
+  I.resetState(ProgCtx,
+               /*DoMemReset*/ false);
+
   if (!ProgCtx.hasStackSection())
     return;
 

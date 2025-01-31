@@ -86,6 +86,7 @@ void applyMemCfgToSimCfg(const Linker &L, SimulationEnvironment &Env) {
   llvm::transform(L.sections(), std::back_inserter(Env.Sections),
                   [](auto &SE) { return SE.OutputSection.Desc; });
 }
+
 } // namespace
 
 std::unique_ptr<SimulatorInterface> Interpreter::createSimulatorForTarget(
@@ -262,8 +263,8 @@ static StringRef getSectionName(llvm::object::SectionRef S) {
     return "";
 }
 
-void Interpreter::loadElfImage(StringRef ElfImage, bool InitBSS) {
-  std::string ProgramText;
+void Interpreter::loadElfImage(StringRef ElfImage, bool InitBSS,
+                               StringRef EntryPointSymbol) {
   auto MemBuff = MemoryBuffer::getMemBuffer(ElfImage, "", false);
   auto ObjectFile = makeObjectFile(*MemBuff);
   // FIXME: we need to provide more context to error message.
@@ -293,16 +294,56 @@ void Interpreter::loadElfImage(StringRef ElfImage, bool InitBSS) {
       Simulator->writeMem(Address, Zeroes);
     }
   }
+  auto FindEntryPoint = [&]() {
+    assert(!EntryPointSymbol.empty());
+    auto EntryPointSym = llvm::find_if(ObjectFile->symbols(), [&](auto &Sym) {
+      auto EName = Sym.getName();
+      return EName && EName.get() == EntryPointSymbol;
+    });
+    if (EntryPointSym == ObjectFile->symbols().end())
+      snippy::fatal(
+          formatv("Elf does not have specified entry point name '{0}'",
+                  EntryPointSymbol));
+    auto EEntryAddress = EntryPointSym->getAddress();
+    if (!EEntryAddress)
+      snippy::fatal(
+          formatv("Elf entry point name '{0}' does not have defined address",
+                  EntryPointSymbol));
+    return *EEntryAddress;
+  };
+
+  auto GetDefaultEntryPoint = [&]() {
+    auto EEntryAddress = ObjectFile->getStartAddress();
+    if (!EEntryAddress)
+      snippy::fatal("Elf does not have entry point");
+    return *EEntryAddress;
+  };
+
+  auto StartPC =
+      !EntryPointSymbol.empty() ? FindEntryPoint() : GetDefaultEntryPoint();
+  setPC(StartPC);
+
   auto EndOfProgSym = llvm::find_if(ObjectFile->symbols(), [](auto &Sym) {
     auto EName = Sym.getName();
     return EName && EName.get() == Linker::getExitSymbolName();
   });
 
-  assert(EndOfProgSym != ObjectFile->symbols().end() &&
-         "expected to have one of these");
+  if (EndOfProgSym == ObjectFile->symbols().end()) {
+    ProgEnd = 0;
+    return;
+  }
   auto EAddress = EndOfProgSym->getAddress();
   assert(EAddress && "Expected the address of symbol to be known");
+
   ProgEnd = EAddress.get();
+}
+
+void Interpreter::resetState(const SnippyProgramContext &ProgCtx,
+                             bool DoMemReset) {
+  if (DoMemReset)
+    resetMem();
+  auto &Regs = ProgCtx.getInitialRegisterState(getSubTarget());
+  setRegisterState(Regs);
 }
 
 void Interpreter::addInstr(const MachineInstr &MI, const LLVMState &State) {
@@ -369,6 +410,8 @@ void Interpreter::dumpRanges(ArrayRef<NamedMemoryRange> Ranges,
 
 void Interpreter::setReg(llvm::Register Reg, const APInt &NewValue) {
   Simulator->setReg(Reg, NewValue);
+  if (!TransactionsObserverHandle)
+    return;
   auto RegIdx = Env.SnippyTGT->regToIndex(Reg);
   auto &Transactions =
       Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
