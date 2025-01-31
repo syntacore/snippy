@@ -52,9 +52,11 @@ struct SimulatorContext {
     StringRef ImageToRun;
     SnippyProgramContext &ProgCtx;
     SnippyModule &MainModule;
+    StringRef EntryPointName;
     StringRef InitialRegStateOutputYaml;
     StringRef FinalRegStateOutputYaml;
     bool SelfcheckCheckMem;
+    bool NeedMemoryReset;
     snippy::opt_list<std::string> &DumpMemorySection;
     StringRef MemorySectionFile;
     StringRef BaseFilename;
