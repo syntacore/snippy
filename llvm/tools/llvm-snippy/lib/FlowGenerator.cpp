@@ -240,15 +240,14 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
         ProgContext.generateLinkedImage(Modules);
 
     auto RI = SimulatorContext::RunInfo{
-        SnippetImageForModelExecution,
-        ProgContext,
-        MainModule,
+        SnippetImageForModelExecution, ProgContext, MainModule,
+        GenSettings.LinkerConfig.EntryPointName,
         GenSettings.RegistersConfig.InitialStateOutputYaml,
-        GenSettings.RegistersConfig.FinalStateOutputYaml,
-        SelfCheckMem,
-        DumpMemorySection,
-        MemorySectionFile.getValue(),
-        GenSettings.BaseFileName};
+        GenSettings.RegistersConfig.FinalStateOutputYaml, SelfCheckMem,
+        // Memory reset only needed if interpreter may have executed
+        // during generation process.
+        /* NeedMemoryReset */ GenSettings.hasTrackingMode(), DumpMemorySection,
+        MemorySectionFile.getValue(), GenSettings.BaseFileName};
 
     auto &SimCtx = MainModule.getGenResult<OwningSimulatorContext>();
     SimCtx.runSimulator(RI);
