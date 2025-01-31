@@ -123,11 +123,17 @@ public:
 
   [[nodiscard]] ExecutionResult step() { return Simulator->executeInstr(); }
 
+  void resetState(const SnippyProgramContext &ProgCtx, bool DoMemReset = true);
   void resetMem();
 
   void disableTransactionsTracking();
 
-  void loadElfImage(StringRef ElfImage, bool InitBSS);
+  // Loads elf image into simulator and sets PC to
+  // entry point address. Passing empty string to EntryPointSymbol searches for
+  // default entry point defined in elf.
+  // InitBSS controls whether bss sections should be zeroed out.
+  void loadElfImage(StringRef ElfImage, bool InitBSS,
+                    StringRef EntryPointSymbol = "");
 
   void dumpCurrentRegState(StringRef Filename) const;
 
@@ -137,7 +143,7 @@ public:
 
   [[noreturn]] void reportSimulationFatalError(StringRef PrefixMessage) const;
 
-  void setInitialState(const IRegisterState &Regs) {
+  void setRegisterState(const IRegisterState &Regs) {
     Simulator->setState(Regs);
   }
 
