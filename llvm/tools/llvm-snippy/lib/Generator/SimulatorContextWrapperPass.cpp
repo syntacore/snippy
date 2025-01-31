@@ -206,7 +206,7 @@ void SimulatorContext::runSimulator(const RunInfo &RI) {
   auto &I = getInterpreter();
   auto &L = ProgCtx.getLinker();
   auto &InitRegState = ProgCtx.getInitialRegisterState(I.getSubTarget());
-  I.setInitialState(InitRegState);
+  I.setRegisterState(InitRegState);
   // StartPC location may be updated since last time it was configured.
   auto StartPC = *L.getStartPC();
   I.setPC(StartPC);
@@ -222,11 +222,12 @@ void SimulatorContext::runSimulator(const RunInfo &RI) {
   }
 
   auto &SimRunner = getSimRunner();
+  SimRunner.resetState(ProgCtx, RI.NeedMemoryReset);
   // FIXME: currently it does not initialize .bss sections with
   // zeroes, to comply with legacy behaviour.
-  SimRunner.loadElf(ImageToRun, /* InitBSS */ false);
+  SimRunner.loadElf(ImageToRun, /* InitBSS */ false, RI.EntryPointName);
 
-  SimRunner.run(InitRegState, StartPC);
+  SimRunner.run(StartPC);
 
   I.dumpCurrentRegState(FinalStateOutputYaml);
   auto RangesToDump = getMemoryRangesToDump(I, DumpMemorySection);

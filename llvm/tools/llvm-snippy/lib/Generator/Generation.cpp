@@ -1615,7 +1615,6 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
     SimCtx.disableTrackingMode();
     auto &I = SimCtx.getInterpreter();
     I.disableTransactionsTracking();
-    I.resetMem();
   }
 
   MBB = findNextBlock(nullptr, NotVisited, nullptr, State, SimCtx);

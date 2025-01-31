@@ -41,10 +41,14 @@ public:
   }
 
   // Preform co-simulation run.
-  // Each interpreter state will be reset before run.
-  void run(const IRegisterState &InitialRegState, ProgramCounterType StartPC);
+  void run(ProgramCounterType StartPC);
   // Loads image of program into each interpreter.
-  void loadElf(StringRef Image, bool InitBSS);
+  void loadElf(StringRef Image, bool InitBSS, StringRef EntryPointSymbol);
+
+  void resetState(const SnippyProgramContext &ProgCtx, bool DoMemReset) {
+    for (auto &&PI : CoInterp)
+      PI->resetState(ProgCtx, DoMemReset);
+  }
   auto &getSimConfig() & {
     assert(Env);
     return Env->SimCfg;
