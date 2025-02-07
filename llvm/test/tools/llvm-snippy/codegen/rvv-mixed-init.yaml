@@ -1,9 +1,13 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
-# RUN:  -model-plugin=None --num-instrs=10000 -o %t \
-# RUN:  --riscv-use-splats-for-rvv-init=true \
-# RUN:  -verify-gen-histogram  -histogram-must-succeed=true \
-# RUN:  -dump-mf \
-# RUN:  |& FileCheck %s
+# RUN: llvm-snippy %s --model-plugin None | FileCheck %s
+
+options:
+  march: riscv64-linux-gnu
+  mcpu: generic-rv64
+  mattr: +v
+  dump-mf: on
+  init-regs-in-elf: on
+  num-instrs: 10000
+  rvv-init-mode: mixed
 
 include:
 - Inputs/rvv-unit-all.yaml
@@ -27,9 +31,6 @@ sections:
 histogram:
     - [VADD_VV, 1.0]
 
+# CHECK: $v0 = VL1RE8_V
+# CHECK: VSLIDE1DOWN_VX
 # CHECK: VADD
-# CHECK: $v0 = VMXNOR_MM
-# CHECK: $v0 = VMV_V_V
-# CHECK: VADD
-# CHECK: EBREAK
-# CHECK: Start Verification for function:

@@ -39,6 +39,7 @@ histogram:
     - [SW, 10.0]
 
 # CHECK: bb.1:
+# CHECK: $v0 = VMXNOR_MM undef $v0, undef $v0
 # CHECK: {{(\$v1 = .*$[[:space:]]+)+}}
 # CHECK: {{(\$v2 = .*$[[:space:]]+)+}}
 # CHECK: {{(\$v3 = .*$[[:space:]]+)+}}
@@ -70,4 +71,4 @@ histogram:
 # CHECK: {{(\$v29 = .*$[[:space:]]+)+}}
 # CHECK: {{(\$v30 = .*$[[:space:]]+)+}}
 # CHECK: {{(\$v31 = .*$[[:space:]]+)+}}
-# CHECK: $v0 = VMXNOR_MM undef $v0, undef $v0
+
