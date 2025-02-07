@@ -1,0 +1,37 @@
+# COM: this test checks that option --rvv-init-mode=splats does not require r section
+
+# RUN: llvm-snippy %s --model-plugin None | FileCheck %s
+
+options:
+  march: riscv64-linux-gnu
+  mcpu: generic-rv64
+  mattr: +v
+  dump-mf: on
+  init-regs-in-elf: on
+  num-instrs: 10000
+  rvv-init-mode: splats
+
+include:
+- Inputs/rvv-unit-all.yaml
+
+sections:
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+    - [VADD_VV, 1.0]
+
+# CHECK: $v0 = VMXNOR_MM
+# CHECK: $v{{[1-9]+}} = VMV_V_X
+# CHECK: $v0 = VMXNOR_MM
+# CHECK: VSLIDE1DOWN_VX
+# CHECK: $v0 = VMV_V_V
+# CHECK: VADD
+# CHECK: EBREAK

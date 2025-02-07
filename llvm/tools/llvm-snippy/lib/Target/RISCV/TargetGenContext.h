@@ -24,6 +24,21 @@ struct RVVModeInfo {
   RVVConfigurationInfo::VLVM VLVM;
   const RVVConfiguration *Config = nullptr;
   const MachineBasicBlock *MBBGuard = nullptr;
+
+  RVVModeInfo() = default;
+
+  RVVModeInfo(RVVConfigurationInfo::VLVM RVV_VLVM,
+              const RVVConfiguration &RVVCfg, const MachineBasicBlock &MBB)
+      : VLVM{std::move(RVV_VLVM)}, Config{&RVVCfg}, MBBGuard{&MBB} {}
+
+  bool operator==(const RVVModeInfo &Other) const {
+    return VLVM == Other.VLVM && MBBGuard == Other.MBBGuard &&
+           ((Config != nullptr && Other.Config != nullptr &&
+             *Config == *Other.Config) ||
+            (Config == nullptr && Other.Config == nullptr));
+  }
+
+  bool operator!=(const RVVModeInfo &Other) const { return !(*this == Other); }
 };
 
 struct VSETWeightOverrides {
@@ -249,12 +264,10 @@ public:
     return getActiveRVVMode(MBB).VLVM.VL;
   }
 
-  void updateActiveRVVMode(RVVConfigurationInfo::VLVM VLVM,
-                           const RVVConfiguration &RVVCfg,
-                           const MachineBasicBlock &MBB) {
-    CurrentRVVMode.VLVM = std::move(VLVM);
-    CurrentRVVMode.Config = &RVVCfg;
-    CurrentRVVMode.MBBGuard = &MBB;
+  void updateActiveRVVMode(const RVVModeInfo NewRVVMode) {
+    CurrentRVVMode.VLVM = std::move(NewRVVMode.VLVM);
+    CurrentRVVMode.Config = NewRVVMode.Config;
+    CurrentRVVMode.MBBGuard = NewRVVMode.MBBGuard;
   }
 
 private:
