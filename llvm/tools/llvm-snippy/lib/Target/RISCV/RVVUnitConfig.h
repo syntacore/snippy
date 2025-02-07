@@ -105,6 +105,13 @@ struct RVVConfiguration final {
 
   void print(raw_ostream &OS) const;
   void dump() const;
+
+  bool operator==(const RVVConfiguration &Other) const {
+    return LMUL == Other.LMUL && SEW == Other.SEW &&
+           MaskAgnostic == Other.MaskAgnostic &&
+           TailAgnostic == Other.TailAgnostic && VXRM == Other.VXRM &&
+           VxsatEnable == Other.VxsatEnable;
+  }
 };
 
 inline static bool isLegalSEW(unsigned SEW) {
@@ -210,6 +217,11 @@ struct RVVConfigurationInfo final {
   struct VLVM {
     unsigned VL;
     APInt VM;
+
+    bool operator==(const VLVM &Other) const {
+      return VL == Other.VL && VM.getBitWidth() == Other.VM.getBitWidth() &&
+             VM == Other.VM;
+    }
   };
 
   static RVVConfigurationInfo
