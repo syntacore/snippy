@@ -30,6 +30,10 @@ namespace snippy {
 template <typename T> struct NumericRange final {
   std::optional<T> Min;
   std::optional<T> Max;
+
+  bool isMinAndMaxSet() const { return Min.has_value() && Max.has_value(); }
+
+  bool isMinOrMaxSet() const { return Min.has_value() || Max.has_value(); }
 };
 
 namespace detail {
