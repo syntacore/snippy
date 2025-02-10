@@ -348,9 +348,10 @@ public:
     reportUnimplementedError();
   }
 
-  unsigned insertLoopInit(InstructionGenerationContext &IGC,
-                          MachineInstr &Branch, ArrayRef<Register> ReservedRegs,
-                          unsigned NIter) const override {
+  LoopCounterInitResult insertLoopInit(InstructionGenerationContext &IGC,
+                                       MachineInstr &Branch,
+                                       ArrayRef<Register> ReservedRegs,
+                                       unsigned NIter) const override {
     reportUnimplementedError();
   }
 
