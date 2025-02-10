@@ -355,7 +355,7 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   auto PreheaderInsertPt = Preheader.getFirstTerminator();
   InstructionGenerationContext PHCtx{Preheader, PreheaderInsertPt, SGCtx,
                                      SimCtx};
-  auto MinLoopCountVal =
+  auto [LoopInitDiag, MinLoopCountVal] =
       SnippyTgt.insertLoopInit(PHCtx, NewBranch, ReservedRegs, NIter);
 
   auto SP = ProgCtx.getStackPointer();
@@ -400,7 +400,8 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
 
   RegToValueType ExitingValues;
   auto CounterInsRes = SnippyTgt.insertLoopCounter(
-      HeadCtx, NewBranch, ReservedRegs, NIter, ExitingValues, MinLoopCountVal);
+      HeadCtx, NewBranch, ReservedRegs, NIter, ExitingValues,
+      MinLoopCountVal.getZExtValue());
   auto &Diag = CounterInsRes.Diag;
   auto ActualNumIter = CounterInsRes.NIter;
   unsigned MinCounterVal = CounterInsRes.MinCounterVal.getZExtValue();
@@ -423,13 +424,20 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
       SnippyTgt.generatePopNoReload(ExitCtx, Reg);
   }
 
-  if (Diag.has_value() &&
-      (Diag.value().getName() != WarningName::LoopIterationNumber ||
-       !NIterWarned)) {
-    State.getCtx().diagnose(Diag.value());
-    if (Diag.value().getName() == WarningName::LoopIterationNumber)
-      NIterWarned = true;
-  }
+  // Perform only a one-time diagnostics for the given warning and a continuous
+  // diagnostics for others
+  auto MakeDiagnosticsIfNeed = [&](auto &DiagOpt, WarningName Warn,
+                                   bool &Flag) {
+    if (DiagOpt.has_value() && (DiagOpt.value().getName() != Warn || !Flag)) {
+      State.getCtx().diagnose(DiagOpt.value());
+      if (DiagOpt.value().getName() == Warn)
+        Flag = true;
+    }
+  };
+
+  MakeDiagnosticsIfNeed(LoopInitDiag, WarningName::LoopCounterOutOfRange,
+                        LoopCounterWarned);
+  MakeDiagnosticsIfNeed(Diag, WarningName::LoopIterationNumber, NIterWarned);
 
   LLVM_DEBUG(dbgs() << "Loop counter inserted: "; ExitingBlock.dump());
 }

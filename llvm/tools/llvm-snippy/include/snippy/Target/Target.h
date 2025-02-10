@@ -441,11 +441,14 @@ public:
   virtual unsigned getInstrSize(const MachineInstr &Inst,
                                 LLVMState &State) const = 0;
 
-  // returns min loop counter value
-  virtual unsigned insertLoopInit(InstructionGenerationContext &IGC,
-                                  MachineInstr &Branch,
-                                  ArrayRef<Register> ReservedRegs,
-                                  unsigned NIter) const = 0;
+  struct LoopCounterInitResult {
+    std::optional<SnippyDiagnosticInfo> Diag;
+    APInt MinCounterVal;
+  };
+
+  virtual LoopCounterInitResult
+  insertLoopInit(InstructionGenerationContext &IGC, MachineInstr &Branch,
+                 ArrayRef<Register> ReservedRegs, unsigned NIter) const = 0;
 
   virtual LoopType getLoopType(MachineInstr &Branch) const = 0;
 
