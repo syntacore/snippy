@@ -31,6 +31,7 @@ enum class WarningName {
   RelocatableGenerated,
   InconsistentOptions,
   LoopIterationNumber,
+  LoopCounterOutOfRange,
   BurstMode,
   InstructionCount,
   BranchegramOverride,
