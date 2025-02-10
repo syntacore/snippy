@@ -41,6 +41,7 @@ private:
                                   ArrayRef<Register> ReservedRegs);
 
   bool NIterWarned = false;
+  bool LoopCounterWarned = false;
 };
 
 } // namespace snippy
