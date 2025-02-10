@@ -1743,7 +1743,7 @@ public:
 
   /// RISCV Loops:
   ///
-  /// If loop-counters-random-init is setted, we have an Offset for register
+  /// If loop-counters: random-init is set, we have an Offset for register
   /// values. Only zero Offset is supported for BEQ, C_BEQZ and C_BNEZ.
   /// * BEQ, C_BEQZ:
   ///   -- Init --
@@ -1860,12 +1860,13 @@ public:
     }
   }
 
-  unsigned getRandLoopCounterInitValue(InstructionGenerationContext &IGC,
-                                       Register CounterReg,
-                                       const Branchegram &Branches,
-                                       ArrayRef<Register> ReservedRegs) const {
+  std::pair<std::optional<SnippyDiagnosticInfo>, unsigned>
+  getRandLoopCounterInitValue(InstructionGenerationContext &IGC, unsigned NIter,
+                              const Branchegram &Branches,
+                              ArrayRef<Register> ReservedRegs) const {
+    auto CounterReg = ReservedRegs[CounterRegIdx];
     if (!Branches.isRandomCountersInitRequested())
-      return 0u;
+      return {std::nullopt, 0u};
 
     auto &ProgCtx = IGC.ProgCtx;
     auto LimitReg = ReservedRegs[LimitRegIdx];
@@ -1878,16 +1879,31 @@ public:
         RISCVRegisterState::getMaxRegValueForSize(LimitReg, ST.getXLen(), VLEN);
     auto MaxGenVal = std::min(MaxCounterRegVal, MaxLimitRegVal);
 
-    auto [MinRegOpt, MaxRegOpt] = Branches.LoopCounterOffset.value();
+    auto [MinRegOpt, MaxRegOpt] = Branches.LoopCounters.InitRange.value();
     auto Min = MinRegOpt.value_or(0);
-    auto Max = MaxRegOpt.value_or(MaxGenVal);
+    // We need to handle the case when our counter may overflows during the
+    // iteration.
+    auto BoundaryVal = MaxGenVal - NIter;
+    auto UnsafeMax = MaxRegOpt.value_or(MaxGenVal);
+    auto Max = std::min(UnsafeMax, BoundaryVal);
+    if (Max < Min)
+      return {
+          SnippyDiagnosticInfo(
+              "The range of values for initializing loop "
+              "counters conflicts with the number of iterations (overflow is "
+              "possible.)",
+              "The loop counters will be initialized with the closest possible "
+              "number to the specified minimum value of the range.",
+              llvm::DS_Warning, WarningName::LoopCounterOutOfRange),
+          Max};
 
-    return RandEngine::genInRangeInclusive(Min, Max);
+    return {std::nullopt, RandEngine::genInRangeInclusive(Min, Max)};
   }
 
-  unsigned insertLoopInit(InstructionGenerationContext &IGC,
-                          MachineInstr &Branch, ArrayRef<Register> ReservedRegs,
-                          unsigned NIter) const override {
+  LoopCounterInitResult insertLoopInit(InstructionGenerationContext &IGC,
+                                       MachineInstr &Branch,
+                                       ArrayRef<Register> ReservedRegs,
+                                       unsigned NIter) const override {
     assert(Branch.isBranch() && "Branch expected");
     assert((ReservedRegs.size() != MaxNumOfReservRegsForLoop) ||
            (ReservedRegs[CounterRegIdx] != ReservedRegs[LimitRegIdx]) &&
@@ -1895,8 +1911,8 @@ public:
 
     auto CounterReg = ReservedRegs[CounterRegIdx];
     const auto &Branches = IGC.GenSettings.Cfg.Branches;
-    auto RegRandOffset =
-        getRandLoopCounterInitValue(IGC, CounterReg, Branches, ReservedRegs);
+    auto [Diag, RegRandOffset] =
+        getRandLoopCounterInitValue(IGC, NIter, Branches, ReservedRegs);
 
     switch (Branch.getOpcode()) {
     case RISCV::BEQ:
@@ -1953,7 +1969,7 @@ public:
     default:
       llvm_unreachable("Unsupported branch type");
     }
-    return RegRandOffset;
+    return {Diag, APInt(getRegBitWidth(CounterReg, IGC), RegRandOffset)};
   }
 
   LoopCounterInsertionResult

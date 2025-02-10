@@ -91,33 +91,75 @@ template <> struct yaml::ScalarTraits<Branchegram::ConsecutiveLoops> {
   static QuotingType mustQuote(StringRef) { return QuotingType::None; }
 };
 
-struct LoopCounterInitMap final {
-  NumericRange<unsigned> LoopCounterOffset;
-  // optional for checking that at least one of the params should be setted
+using LoopCountersInfo = snippy::Branchegram::LoopCountersInfo;
+using OptRange = LoopCountersInfo::OptRange;
+
+// Support structure for mapping
+struct LoopCountersSupportMap {
+  snippy::NumericRange<unsigned> Range;
   std::optional<bool> IsEnabled;
 
-  bool isOffsetRequested() const {
-    bool MinOrMaxSetted = LoopCounterOffset.Min || LoopCounterOffset.Max;
+  bool isOptionRequested() const {
     bool CheckEnabled = IsEnabled.has_value() && IsEnabled.value();
-    return CheckEnabled || (!IsEnabled.has_value() && MinOrMaxSetted);
+    return CheckEnabled || (!IsEnabled.has_value() && Range.isMinOrMaxSet());
   }
 };
 
-template <> struct yaml::MappingTraits<LoopCounterInitMap> {
-  static void mapping(yaml::IO &IO, LoopCounterInitMap &LoopMap) {
-    IO.mapOptional("enabled", LoopMap.IsEnabled);
-    IO.mapOptional("min", LoopMap.LoopCounterOffset.Min);
-    IO.mapOptional("max", LoopMap.LoopCounterOffset.Max);
+template <> struct yaml::MappingTraits<LoopCountersSupportMap> {
+
+  struct NormalizedGroupings {
+    LoopCountersSupportMap InfoMap;
+
+    NormalizedGroupings(yaml::IO &) {}
+
+    NormalizedGroupings(yaml::IO &IO, const OptRange &Denorm) {
+      if (Denorm.has_value()) {
+        if (Denorm->isMinOrMaxSet())
+          InfoMap.Range = Denorm.value();
+        else
+          InfoMap.IsEnabled = true;
+      } else {
+        InfoMap.IsEnabled = false;
+      }
+    }
+
+    OptRange denormalize(yaml::IO &IO) {
+      if (InfoMap.isOptionRequested())
+        return {InfoMap.Range};
+      return {};
+    }
+  };
+
+  static void mapping(yaml::IO &IO, LoopCountersSupportMap &InfoMap) {
+    IO.mapOptional("enabled", InfoMap.IsEnabled);
+    IO.mapOptional("min", InfoMap.Range.Min);
+    IO.mapOptional("max", InfoMap.Range.Max);
   }
 
-  static std::string validate(yaml::IO &IO, LoopCounterInitMap &LoopMap) {
-    if (!IO.outputting() && !LoopMap.IsEnabled &&
-        !LoopMap.LoopCounterOffset.Min && !LoopMap.LoopCounterOffset.Max)
-      return std::string("loop-counter-random-init option requires at least "
+  static std::string validate(yaml::IO &IO,
+                              LoopCountersSupportMap &LoopCountInfo) {
+    if (!IO.outputting() && !LoopCountInfo.IsEnabled &&
+        !LoopCountInfo.Range.isMinOrMaxSet())
+      return std::string("loop-counters: random-init option requires at least "
                          "one of the following attributes: enabled, min, max. "
                          "But none of them was provided.");
 
+    auto MinOpt = LoopCountInfo.Range.Min;
+    auto MaxOpt = LoopCountInfo.Range.Max;
+    if (MinOpt && MaxOpt && MinOpt.value() > MaxOpt.value())
+      return std::string("'min' expected to be less or equal 'max'");
+
     return std::string("");
+  }
+};
+
+template <> struct yaml::MappingTraits<LoopCountersInfo> {
+  static void mapping(yaml::IO &IO, LoopCountersInfo &LoopMap) {
+    yaml::MappingNormalization<
+        yaml::MappingTraits<LoopCountersSupportMap>::NormalizedGroupings,
+        OptRange>
+        InitRangeMap(IO, LoopMap.InitRange);
+    IO.mapOptional("random-init", InitRangeMap->InfoMap);
   }
 };
 
@@ -130,12 +172,7 @@ void yaml::MappingTraits<Branchegram>::mapping(yaml::IO &IO,
   IO.mapOptional("number-of-loop-iterations", Branches.NLoopIter);
   IO.mapOptional("max-depth", Branches.MaxDepth);
   IO.mapOptional("distance", Branches.Dist);
-
-  LoopCounterInitMap LoopCounterMap;
-  IO.mapOptional("loop-counters-random-init", LoopCounterMap);
-  if (LoopCounterMap.isOffsetRequested())
-    Branches.LoopCounterOffset.emplace(
-        std::move(LoopCounterMap.LoopCounterOffset));
+  IO.mapOptional("loop-counters", Branches.LoopCounters);
 }
 
 std::string yaml::MappingTraits<Branchegram>::validate(yaml::IO &IO,
