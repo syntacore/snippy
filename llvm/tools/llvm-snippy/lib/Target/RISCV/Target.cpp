@@ -1270,13 +1270,7 @@ public:
     auto [RVVConfig, VLVM] =
         constructRVVModeWithVMReset(RISCVII::VLMUL::LMUL_1, VLen, SEW, TA, MA);
     const RVVModeInfo NewRVVMode{VLVM, RVVConfig, MBB};
-
-    const auto &RGC =
-        ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
-
-    if (!RGC.hasActiveRVVMode(MBB) || RGC.getActiveRVVMode(MBB) != NewRVVMode) {
-      generateRVVModeUpdate(IGC, InstrInfo, NewRVVMode);
-    }
+    generateRVVModeUpdate(IGC, InstrInfo, NewRVVMode);
 
     // Initialize registers before taking a branch
     // V0 is the mask register, skip it.
@@ -3322,12 +3316,7 @@ void SnippyRISCVTarget::rvvUnsafeWriteValueUsingXReg(
   auto [RVVConfig, VLVM] =
       constructRVVModeWithVMReset(RISCVII::VLMUL::LMUL_1, VL, SEW, TA, MA);
   const RVVModeInfo NewRVVMode{VLVM, RVVConfig, MBB};
-  const auto &RGC = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
-
-  // We might already have needed RVVMode
-  if (!RGC.hasActiveRVVMode(MBB) || RGC.getActiveRVVMode(MBB) != NewRVVMode) {
-    generateRVVModeUpdate(IGC, InstrInfo, NewRVVMode);
-  }
+  generateRVVModeUpdate(IGC, InstrInfo, NewRVVMode);
 
   // Use non-reserved reg as scratch.
   auto &RI = State.getRegInfo();
