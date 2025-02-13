@@ -30,15 +30,6 @@ struct RVVModeInfo {
   RVVModeInfo(RVVConfigurationInfo::VLVM RVV_VLVM,
               const RVVConfiguration &RVVCfg, const MachineBasicBlock &MBB)
       : VLVM{std::move(RVV_VLVM)}, Config{&RVVCfg}, MBBGuard{&MBB} {}
-
-  bool operator==(const RVVModeInfo &Other) const {
-    return VLVM == Other.VLVM && MBBGuard == Other.MBBGuard &&
-           ((Config != nullptr && Other.Config != nullptr &&
-             *Config == *Other.Config) ||
-            (Config == nullptr && Other.Config == nullptr));
-  }
-
-  bool operator!=(const RVVModeInfo &Other) const { return !(*this == Other); }
 };
 
 struct VSETWeightOverrides {
