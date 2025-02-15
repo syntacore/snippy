@@ -16,7 +16,7 @@ jobs:
     - name: Install required compiler to be sure
       run: sudo apt-get install clang-14 ninja-build ccache lld
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: CMake release config
       run: cmake -S llvm -B release/build -G Ninja -DCMAKE_C_COMPILER=clang-14 -DCMAKE_CXX_COMPILER=clang++-14 -C .syntacore/release.cmake
     - name: CMake release build
