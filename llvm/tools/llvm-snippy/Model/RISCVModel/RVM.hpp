@@ -378,7 +378,7 @@ public:
   }
 
   void logMessage(const char *Message) const {
-    return getVTable()->logMessage(Message);
+    return getVTable()->logMessage(get(), Message);
   }
 };
 

@@ -295,7 +295,8 @@ public:
   }
 
   bool supportsCallbacks() const override {
-    return ModelState.getVTable()->queryCallbackSupportPresent();
+    return ModelState.getVTable()->queryCallbackSupportPresent(
+        ModelState.get());
   }
 };
 
