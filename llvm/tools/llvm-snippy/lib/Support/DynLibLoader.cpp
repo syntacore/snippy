@@ -12,6 +12,8 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/FormatVariadic.h"
 
+#include <filesystem>
+
 #include <dlfcn.h>
 
 namespace llvm {
@@ -20,7 +22,30 @@ namespace snippy {
 namespace {
 
 void *getPermanentLibrary(const char *Filename, std::string *errMsg = nullptr) {
-  void *Handle = ::dlopen(Filename, RTLD_LAZY | RTLD_GLOBAL | RTLD_DEEPBIND);
+  // Canonicalize path before loading the plugin. This has the effect of
+  // resolving any symlinks, such that RUNPATH that refers to $ORIGIN is
+  // relative to the shared object location and NOT relative to the location of
+  // the symlink.
+  //
+  // For example: if llvm-snippy binary is located at
+  // path/to/package/llvm-snippy, and a symlink to plugin is placed in the same
+  // directory: path/to/package/plugin.so pointing to the plugin DSO located in
+  // a subdirectory path/to/package/subdir/plugin.so.SONAME.
+  // Suppose this plugin has to have RUNPATH set to $ORIGIN to resolve its
+  // dynamic library dependencies. Then when calling
+  // ::dlopen(path/to/package/plugin.so) the plugin.so.SONAME DSO will have its
+  // RUNPATH set to path/to/package and not to path/to/package/subdir as one
+  // would expect if the linker were to locate the shared object.
+
+  auto Path = std::filesystem::path(Filename);
+  auto EC = std::error_code{};
+  auto Canonical = canonical(Path, EC);
+
+  if (EC)
+    snippy::fatal(createStringError(EC, Path.c_str()));
+
+  void *Handle =
+      ::dlopen(Canonical.c_str(), RTLD_LAZY | RTLD_GLOBAL | RTLD_DEEPBIND);
   if (!Handle) {
     if (errMsg)
       *errMsg = ::dlerror();

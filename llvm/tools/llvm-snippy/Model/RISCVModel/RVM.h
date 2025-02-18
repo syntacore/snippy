@@ -16,7 +16,7 @@ extern "C" {
 
 #define RVMAPI_ENTRY_POINT_SYMBOL RVMVTable
 #define RVMAPI_VERSION_SYMBOL RVMInterfaceVersion
-#define RVMAPI_CURRENT_INTERFACE_VERSION 22u
+#define RVMAPI_CURRENT_INTERFACE_VERSION 24u
 
 typedef uint64_t RVMRegT;
 
@@ -152,7 +152,7 @@ typedef enum {
 } RVMXExt;
 #undef RVM_DEFINE_ENUM_CASE
 
-typedef struct RVMExtDescriptior {
+typedef struct RVMExtDescriptor {
   size_t ZExtSize; // Set this to sizeof(ZExt)
   size_t XExtSize; // Set this to sizeof(XExt)
   char ZExt[RVM_ZEXT_NUMBER];
@@ -171,7 +171,7 @@ typedef struct RVMConfig RVMConfig;
 typedef enum { NON_STOP = 0, STOP_BY_PC } RVMStopMode;
 
 typedef enum {
-  // Simulator stepped successully, no additional event happened.
+  // Simulator stepped successfully, no additional event happened.
   MODEL_SUCCESS,
   // Simulator got ebreak or instruction with "StopPC".
   MODEL_FINISH,
@@ -345,9 +345,9 @@ int rvm_readVReg(const RVMState *State, RVMVReg Reg, char *Data,
 int rvm_setVReg(RVMState *State, RVMVReg Reg, const char *Data,
                 size_t DataSize);
 
-void rvm_logMessage(const char *Message);
+void rvm_logMessage(const RVMState *State, const char *Message);
 
-int rvm_queryCallbackSupportPresent(void);
+int rvm_queryCallbackSupportPresent(const RVMState *State);
 
 typedef void (*MemUpdateCallbackTy)(RVMCallbackHandler *, uint64_t Addr,
                                     const char *Data, size_t Size);
@@ -404,8 +404,8 @@ typedef RVMRegT (*rvm_readCSRReg_t)(const RVMState *, unsigned);
 typedef void (*rvm_setCSRReg_t)(RVMState *, unsigned, RVMRegT);
 typedef int (*rvm_readVReg_t)(const RVMState *, RVMVReg, char *, size_t);
 typedef int (*rvm_setVReg_t)(RVMState *, RVMVReg, const char *, size_t);
-typedef void (*rvm_logMessage_t)(const char *);
-typedef int (*rvm_queryCallbackSupportPresent_t)(void);
+typedef void (*rvm_logMessage_t)(const RVMState *, const char *);
+typedef int (*rvm_queryCallbackSupportPresent_t)(const RVMState *);
 
 #ifdef __cplusplus
 }
