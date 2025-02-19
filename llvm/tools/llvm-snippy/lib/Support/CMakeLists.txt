@@ -11,3 +11,7 @@ add_llvm_library(
   Utils.cpp
   YAMLUtils.cpp
   APIntSampler.cpp)
+
+if(LLVM_SNIPPY_NEEDS_LIBSTDCPP_FS)
+  target_link_libraries(LLVMSnippySupport PRIVATE stdc++fs)
+endif()
