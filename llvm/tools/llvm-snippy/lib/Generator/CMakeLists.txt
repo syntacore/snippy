@@ -36,5 +36,9 @@ add_llvm_library(LLVMSnippyGenerator
   ${LLVMSnippyGeneratorSources}
 )
 
+if(LLVM_SNIPPY_NEEDS_LIBSTDCPP_FS)
+  target_link_libraries(LLVMSnippyGenerator PRIVATE stdc++fs)
+endif()
+
 target_link_libraries(LLVMSnippyGenerator
   PRIVATE LLVMSnippyTarget)
