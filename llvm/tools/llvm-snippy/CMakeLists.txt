@@ -76,6 +76,32 @@ add_llvm_tool(llvm-snippy
 
 add_subdirectory(include)
 
+include(CheckCXXSourceCompiles)
+set(LLVM_SNIPPY_NEEDS_LIBSTDCPP_FS OFF)
+check_cxx_source_compiles(
+  "
+#include <filesystem>
+int main(int argc, char **argv) { canonical(std::filesystem::path(argv[0])); }
+"
+  LLVM_SNIPPY_FILESYSTEM_WORKS_BY_DEFAULT)
+
+if(NOT LLVM_SNIPPY_FILESYSTEM_WORKS_BY_DEFAULT)
+  set(CMAKE_REQUIRED_LIBRARIES "stdc++fs")
+  check_cxx_source_compiles(
+    "
+#include <filesystem>
+int main(int argc, char **argv) { canonical(std::filesystem::path(argv[0])); }
+"
+    LLVM_SNIPPY_FILESYSTEM_WORKS_WITH_LIBSTDCPP_FS)
+  if(NOT LLVM_SNIPPY_FILESYSTEM_WORKS_WITH_LIBSTDCPP_FS)
+    message(
+      FATAL_ERROR
+        "Snippy requires std::filesystem, but it doesn't work with the provided toolchain"
+    )
+  endif()
+  set(LLVM_SNIPPY_NEEDS_LIBSTDCPP_FS ON)
+endif()
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_subdirectory(lib)
 
