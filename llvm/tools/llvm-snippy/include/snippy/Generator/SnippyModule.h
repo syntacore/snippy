@@ -51,6 +51,8 @@ extern template class GenResultT<ObjectFile>;
 extern template class GenResultT<ObjectMetadata>;
 
 class SnippyModule final : private Module {
+  using Module::setTargetTriple;
+
 public:
   SnippyModule(LLVMState &State, StringRef Name);
 
