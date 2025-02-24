@@ -1,0 +1,22 @@
+# RUN: llvm-snippy %s -model-plugin=None -dump-mir=- |& FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+
+histogram:
+  - [ADD, 1.0]
+
+sections:
+  - no: 1
+    VMA: 0x10000
+    LMA: 0x10000
+    SIZE: 0x10000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x20000
+    LMA: 0x20000
+    SIZE: 0x10000
+    ACCESS: rw
+
+#CHECK: ModuleID = 'main'
+#CHECK: target triple = "riscv64-unknown-elf"
