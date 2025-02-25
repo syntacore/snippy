@@ -1140,6 +1140,7 @@ void checkOptions(LLVMContext &Ctx) {
   if (ParseWithPlugin && !GenerateWithPluginMode)
     snippy::fatal(Ctx, "-plugin-parser option was specified,",
                   "but no generator plugin file was passed");
+  checkWarningOptions();
 }
 
 static void printNoLayoutHint(LLVMContext &Ctx) {

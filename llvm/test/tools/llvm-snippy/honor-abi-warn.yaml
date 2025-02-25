@@ -17,4 +17,4 @@ histogram:
     - [DIV, 1.0]
     - [ADD, 1.0]
 
-# CHECK: warning: --spilled-regs-list is ignored: --honor-target-abi is enabled.
+# CHECK: warning: (inconsistent-options) --spilled-regs-list is ignored: --honor-target-abi is enabled.

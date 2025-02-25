@@ -60,4 +60,4 @@ histogram:
 # WRONG-SEED1: error: Provided instructions seed is not convertible to numeric value.
 # WRONG-SEED2: error: Provided instructions seed is not convertible to numeric value.
 # WRONG-SEED3: error: Provided instructions seed is not convertible to numeric value.
-# RAND-SEED: warning: no instructions seed specified, using auto-generated one: {{[0-9]+$}}
+# RAND-SEED: warning: (seed-not-specified) no instructions seed specified, using auto-generated one: {{[0-9]+$}}

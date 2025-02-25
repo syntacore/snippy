@@ -43,7 +43,7 @@ histogram:
      - [JAL, 1.0]
      - [ADDIW, 1.0]
 
-# CHECK: warning: External callees were found in call-graph but neither "utility" nor "stack" sections were found: Implicitly reserving registers: [X3, X4] 
+# CHECK: warning: (inconsistent-options) External callees were found in call-graph but neither "utility" nor "stack" sections were found: Implicitly reserving registers: [X3, X4]
 
 # CHECK-NOT: {{\$x3[[:space:],]}}
 # CHECK-NOT: {{\$x4[[:space:],]}}
