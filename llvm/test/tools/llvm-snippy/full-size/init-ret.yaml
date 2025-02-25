@@ -33,6 +33,6 @@ histogram:
     - [ADD, 1.0]
     - [ADDI, 1.0]
 
-# SIZE_FAIL: warning: It seems that the last instruction can not be inserted because of size restrictions:
+# SIZE_FAIL: warning: (instruction-count) It seems that the last instruction can not be inserted because of size restrictions:
 # SIZE_FAIL-SAME: Likely, you need to increase RX section.
 # SIZE_FAIL: error: RX section '1' (size {{[0-9]+}}) failed to fit code mapped to it. Total code size: {{[0-9]+}}

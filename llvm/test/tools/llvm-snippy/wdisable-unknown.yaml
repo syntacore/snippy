@@ -1,0 +1,43 @@
+# RUN: not llvm-snippy %s --model-plugin None \
+# RUN:   -wdisable=no-model-exec,alien-invasions,no-coffee \
+# RUN:   |& FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  num-instrs: 100
+
+sections:
+  - no: 1
+    VMA: 0x1000
+    LMA: 0x1000
+    SIZE: 0x1000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x2000
+    LMA: 0x2000
+    SIZE: 0x1000
+    ACCESS: rw
+  - no: 3
+    VMA: 0x3000
+    LMA: 0x3000
+    SIZE: 0x1000
+    ACCESS: rx
+
+histogram:
+  - [LD, 1.0]
+  - [SD, 1.0]
+
+access-ranges:
+  - start: 0x2000
+    size: 0x1000
+    stride: 32
+    first-offset: 0
+    last-offset: 31
+  - start: 0xffffff
+    size: 0x1000
+    stride: 32
+    first-offset: 0
+    last-offset: 0
+
+# CHECK: error: Unknown warning category specified for -wdisable option:
+# CHECK-SAME: List of unknown warning categories: "alien-invasions", "no-coffee"
