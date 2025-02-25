@@ -23,27 +23,50 @@ class DiagnosticPrinter;
 
 namespace snippy {
 
-enum class WarningName {
-  NotAWarning,
-  MemoryAccess,
-  NoModelExec,
-  InstructionHistogram,
-  RelocatableGenerated,
-  InconsistentOptions,
-  LoopIterationNumber,
-  LoopCounterOutOfRange,
-  BurstMode,
-  InstructionCount,
-  BranchegramOverride,
-  RegState,
-  InstructionSizeUnknown,
-  TooFarMaxPCDist,
-  ModelException,
-  UnusedSection,
-  EmptyElfSection,
-  GenPlanVerification,
-  SeedNotSpecified,
-};
+#define FOR_ALL_WARNINGS(WARN_CASE)                                            \
+  WARN_CASE(NotAWarning, "not-a-warning")                                      \
+  WARN_CASE(MemoryAccess, "memory-access")                                     \
+  WARN_CASE(NoModelExec, "no-model-exec")                                      \
+  WARN_CASE(InstructionHistogram, "instruction-histogram")                     \
+  WARN_CASE(RelocatableGenerated, "relocatable-generated")                     \
+  WARN_CASE(InconsistentOptions, "inconsistent-options")                       \
+  WARN_CASE(LoopIterationNumber, "loop-iteration-number")                      \
+  WARN_CASE(LoopCounterOutOfRange, "loop-counter-out-of-range")                \
+  WARN_CASE(BurstMode, "burst-mode")                                           \
+  WARN_CASE(InstructionCount, "instruction-count")                             \
+  WARN_CASE(RegState, "register-state")                                        \
+  WARN_CASE(InstructionSizeUnknown, "instruction-size-unknown")                \
+  WARN_CASE(TooFarMaxPCDist, "too-long-max-pc-dist")                           \
+  WARN_CASE(ModelException, "model-exception")                                 \
+  WARN_CASE(UnusedSection, "unused-section")                                   \
+  WARN_CASE(EmptyElfSection, "empty-elf-section")                              \
+  WARN_CASE(GenPlanVerification, "gen-plan-verification")                      \
+  WARN_CASE(SeedNotSpecified, "seed-not-specified")
+
+#ifdef WARN_CASE
+#error WARN_CASE should not be defined at this point
+#else
+#define WARN_CASE(NAME, STR) NAME,
+#endif
+enum class WarningName { FOR_ALL_WARNINGS(WARN_CASE) };
+#undef WARN_CASE
+
+template <WarningName W> constexpr inline StringLiteral WarningNameOf = "";
+#ifdef WARN_CASE
+#error WARN_CASE should not be defined at this point
+#else
+#define WARN_CASE(NAME, STR)                                                   \
+  template <>                                                                  \
+  constexpr inline StringLiteral WarningNameOf<WarningName::NAME> = STR;
+#endif
+FOR_ALL_WARNINGS(WARN_CASE)
+#undef WARN_CASE
+
+std::optional<WarningName> getWarningName(StringRef Warn);
+
+StringLiteral getWarningNameStr(WarningName Warn);
+
+void checkWarningOptions();
 
 struct WarningCounters {
   size_t EncounteredOrder;
@@ -54,7 +77,6 @@ class SnippyDiagnosticInfo : public llvm::DiagnosticInfo {
 
   static const int KindID;
   std::string Description;
-  llvm::DiagnosticSeverity Severity;
   WarningName WName;
 
   static int getKindID() { return KindID; }
@@ -64,7 +86,7 @@ public:
   SnippyDiagnosticInfo(const llvm::Twine &Desc,
                        llvm::DiagnosticSeverity SeverityIn, WarningName WNameIn)
       : llvm::DiagnosticInfo(getKindID(), SeverityIn), Description(Desc.str()),
-        Severity(SeverityIn), WName(WNameIn) {}
+        WName(WNameIn) {}
 
   SnippyDiagnosticInfo(const llvm::Twine &Prefix, const llvm::Twine &Desc,
                        llvm::DiagnosticSeverity SeverityIn, WarningName WNameIn)

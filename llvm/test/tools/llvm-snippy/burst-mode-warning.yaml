@@ -26,4 +26,4 @@ histogram:
     - [ADD, 1.0]
     - [XOR, 1.0]
 
-# CHECK: warning: Opcode VLSE8_V is not supported in memory burst mode: generator will generate it but not in a burst group.
+# CHECK: warning: (burst-mode) Opcode VLSE8_V is not supported in memory burst mode: generator will generate it but not in a burst group.

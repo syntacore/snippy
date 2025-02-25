@@ -56,7 +56,7 @@ histogram:
 # FENCE-NEXT: FENCE
 # FENCE-NEXT: FENCE
 
-# WARN: warning: Instruction "AMOADD_W" was specified in burst grouping but not in histogram: Instruction won't be generated
+# WARN: warning: (burst-mode) Instruction "AMOADD_W" was specified in burst grouping but not in histogram: Instruction won't be generated
 
 # There we want to see burst group full of loads and fences and after some unrelated instruction - group of stores and fences.
 # Regex to match 3 line with either LW or FENCE inside. Cannot use 3 different checks here. It may start matching wrong group.

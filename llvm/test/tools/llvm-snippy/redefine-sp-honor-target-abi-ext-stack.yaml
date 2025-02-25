@@ -17,7 +17,7 @@ histogram:
     - [DIV, 1.0]
     - [ADD, 1.0]
 
-# CHECK: warning: When using --honor-target-abi and --redefine-sp=reg::X4 options together, target ABI may not be preserved in case of traps: use these options in combination only for valid code generation
+# CHECK: warning: (inconsistent-options) When using --honor-target-abi and --redefine-sp=reg::X4 options together, target ABI may not be preserved in case of traps: use these options in combination only for valid code generation
 
 # CHECK:      $x2 = ADDI $x2, -16
 # CHECK-NEXT: SD $x4, $x2, 0
