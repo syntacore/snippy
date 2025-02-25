@@ -55,4 +55,4 @@ histogram:
 #
 # ERR1: error: Cannot use 'chained-rx-chunk-size' option: num-instr is set to 'all'
 # ERR2: error: Cannot set 'chained-rx-chunk-size' to 0: expected >=1
-# WARN: warning: 'chained-rx-chunk-size' is ignored: pass 'chained-rx-sections-fill' to enable it
+# WARN: warning: (inconsistent-options) 'chained-rx-chunk-size' is ignored: pass 'chained-rx-sections-fill' to enable it

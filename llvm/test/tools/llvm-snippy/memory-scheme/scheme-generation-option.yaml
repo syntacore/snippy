@@ -17,4 +17,4 @@
 # TO-STDOUT-NEXT:      - addr: 0x80000000
 # TO-STDOUT-NEXT:      - addr: 0x80000300
 
-# NO-MEM: warning: Cannot dump memory accesses: No accesses were generated, file won't be created.
+# NO-MEM: warning: (memory-access) Cannot dump memory accesses: No accesses were generated, file won't be created.

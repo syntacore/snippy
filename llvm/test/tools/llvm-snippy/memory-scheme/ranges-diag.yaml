@@ -16,6 +16,6 @@ access-ranges:
       first-offset: 5
       last-offset: 5
 
-# CHECK: warning: Invalid memory access range: 'first-offset' (3) > 'last-offset' (1)
-# CHECK: warning: Invalid memory access range: 'last-offset' (5) >= 'stride' (5)
+# CHECK: warning: (memory-access) Invalid memory access range: 'first-offset' (3) > 'last-offset' (1)
+# CHECK: warning: (memory-access) Invalid memory access range: 'last-offset' (5) >= 'stride' (5)
 # CHECK: error: Cannot sample memory access for instruction
