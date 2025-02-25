@@ -20,7 +20,7 @@
 
 # PARSE-FAIL: error: Failed to parse file
 
-# SIZE-WARN: remark: Specified max PC Distance is more than max distance for generated branch: Specified: 9876543210, max distance for BEQ: 4095
+# SIZE-WARN: remark: (too-long-max-pc-dist) Specified max PC Distance is more than max distance for generated branch: Specified: 9876543210, max distance for BEQ: 4095
 
 sections:
   - no:        1

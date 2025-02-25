@@ -21,4 +21,4 @@ histogram:
     - [JALR, 0.1]
     - [BLT, 0.1]
 
-# CHECK-NOT: warning: request for {{[a-zA-Z0-9]+}} contains limits not only on the number of generated instructions: number of instructions in some blocks can differ from plan
+# CHECK-NOT: warning: (gen-plan-verification) request for {{[a-zA-Z0-9]+}} contains limits not only on the number of generated instructions: number of instructions in some blocks can differ from plan

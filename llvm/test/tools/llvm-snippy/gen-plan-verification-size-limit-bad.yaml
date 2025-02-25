@@ -19,7 +19,7 @@ histogram:
     - [LW, 1.0]
 
 
-# CHECK: warning: request for {{[a-zA-Z0-9]+}} contains size limits which are impossible to satisfy: size of some blocks can differ from plan
+# CHECK: warning: (gen-plan-verification) request for {{[a-zA-Z0-9]+}} contains size limits which are impossible to satisfy: size of some blocks can differ from plan
 
 
 
