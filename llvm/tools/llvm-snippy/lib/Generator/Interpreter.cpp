@@ -353,6 +353,15 @@ void Interpreter::addInstr(const MachineInstr &MI, const LLVMState &State) {
   SnippyTgt.getEncodedMCInstr(&MI, State.getCodeEmitter(),
                               State.getOrCreateAsmPrinter(),
                               State.getSubtargetInfo(), EncodedMI);
+  auto CurrentPC = Simulator->readPC();
+  if (!coveredByMemoryRegion(CurrentPC, EncodedMI.size()))
+    snippy::fatal(
+        "Model execution failed",
+        "snippy emitted " + Twine(EncodedMI.size()) +
+            " byte instruction at address 0x" +
+            Twine(llvm::utohexstr(CurrentPC)) +
+            " that is not fully covered by allocated sections. Probably rx "
+            "section overflow. Try reducing number of instructions.");
   Simulator->writeMem(Simulator->readPC(), EncodedMI);
 }
 
