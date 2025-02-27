@@ -44,6 +44,11 @@ struct RegisterHistograms {
 };
 
 struct AllRegisters final {
+  static constexpr StringRef GPRPrefix = "X";
+  static constexpr StringRef FPRPrefix = "F";
+  static constexpr StringRef RVVPrefix = "V";
+  static constexpr StringRef PCRegName = "PC";
+
   SmallVector<RegisterClassValues, 3> ClassValues;
   std::map<std::string, APInt> SpecialRegs;
   AllRegisters &addRegisterGroup(StringRef Prefix, ArrayRef<uint64_t> Values);
