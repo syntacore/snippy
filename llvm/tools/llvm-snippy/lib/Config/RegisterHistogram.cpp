@@ -230,6 +230,10 @@ void checkRegisterClasses(const RegisterHistograms &Histograms,
 }
 
 struct RegisterValuesEntry {
+  RegisterValuesEntry() = default;
+  RegisterValuesEntry(const std::string &RegName, APInt Val)
+      : RegName(RegName), Value(Val) {}
+
   std::string RegName;
   APInt Value;
 };
@@ -311,13 +315,18 @@ template <> struct YAMLHistogramTraits<RegisterValuesEntry> {
     MapType Registers;
     std::map<std::string, std::map<unsigned, APInt>> RegClassToRegValues;
     for (auto &[RegName, Val] : Entries) {
-      if (isRegWithClass(RegName)) {
+      if (RegName == AllRegisters::PCRegName) {
+        auto [ValuesIt, IsInsert] = RegClassToRegValues.try_emplace(RegName);
+        assert(IsInsert);
+        [[maybe_unused]] auto [ValIt, Inserted] =
+            ValuesIt->second.try_emplace(0, Val);
+        assert(Inserted);
+      } else if (isRegWithClass(RegName)) {
         auto ExpectedClassIdx = getRegTypeAndIndex(RegName);
         if (auto Err = ExpectedClassIdx.takeError(); Err)
           Io.setError(toString(std::move(Err)));
         auto [RegClass, Idx] = *ExpectedClassIdx;
-        auto [ValuesIt, ClassInserted] =
-            RegClassToRegValues.try_emplace(RegClass.str());
+        auto [ValuesIt, _] = RegClassToRegValues.try_emplace(RegClass.str());
         [[maybe_unused]] auto [ValIt, Inserted] =
             ValuesIt->second.try_emplace(Idx, Val);
         assert(Inserted);
@@ -339,9 +348,12 @@ template <> struct YAMLHistogramTraits<RegisterValuesEntry> {
   static void normalizeMap(yaml::IO &Io, const MapType &Registers,
                            std::vector<DenormEntry> &Entries) {
     for (const auto &[RegType, Values] : Registers.ClassValues)
-      for (const auto &[Idx, Value] : enumerate(Values))
-        Entries.push_back(
-            RegisterValuesEntry{RegType + std::to_string(Idx), Value});
+      for (const auto &[Idx, Value] : enumerate(Values)) {
+        auto RegName = RegType;
+        if (RegType != AllRegisters::PCRegName)
+          RegName += std::to_string(Idx);
+        Entries.emplace_back(RegName, Value);
+      }
     llvm::transform(Registers.SpecialRegs, std::back_inserter(Entries),
                     [](auto &RegVal) {
                       return RegisterValuesEntry{RegVal.first, RegVal.second};
