@@ -49,12 +49,12 @@ ContainerType applyMask(const ContainerType &Vect, IntegerType Mask) {
 }
 
 static bool hasPCInRH(const RegistersWithHistograms &RH) {
-  constexpr auto PCRegClassPrefix = "P";
   const auto &ClassValues = RH.Registers.ClassValues;
-  auto PCRegClassIt = std::find_if(ClassValues.begin(), ClassValues.end(),
-                                   [](const RegisterClassValues &CV) {
-                                     return CV.RegType == PCRegClassPrefix;
-                                   });
+  auto PCRegClassIt =
+      std::find_if(ClassValues.begin(), ClassValues.end(),
+                   [](const RegisterClassValues &CV) {
+                     return CV.RegType == AllRegisters::PCRegName;
+                   });
   if (PCRegClassIt == ClassValues.end())
     return false;
 
@@ -78,12 +78,15 @@ void RISCVRegisterState::loadFromYamlFile(StringRef YamlFile,
   if (hasPCInRH(RH))
     WarningsArr.emplace_back("PC value from YAML has been ignored");
 
-  std::array<StringRef, 4> AllowedRegClasses = {"X", "F", "V", "P"};
+  std::array<StringRef, 4> AllowedRegClasses = {
+      AllRegisters::GPRPrefix, AllRegisters::FPRPrefix, AllRegisters::RVVPrefix,
+      AllRegisters::PCRegName};
   checkRegisterClasses(RH.Registers, AllowedRegClasses, Tgt);
   checkRegisterClasses(RH.Histograms, AllowedRegClasses);
 
   auto NumXRegs = XRegs.size();
-  getRegisterGroup(RH, NumXRegs, "X", XRegSize * RISCV_CHAR_BIT, XRegs);
+  getRegisterGroup(RH, NumXRegs, AllRegisters::GPRPrefix,
+                   XRegSize * RISCV_CHAR_BIT, XRegs);
   if (XRegs.size() != NumXRegs) {
     XRegs.resize(NumXRegs);
     uniformlyFillXRegs();
@@ -91,14 +94,15 @@ void RISCVRegisterState::loadFromYamlFile(StringRef YamlFile,
   XRegs[0] = 0;
 
   auto NumFRegs = FRegs.size();
-  getRegisterGroup(RH, NumFRegs, "F", FRegSize * RISCV_CHAR_BIT, FRegs);
+  getRegisterGroup(RH, NumFRegs, AllRegisters::FPRPrefix,
+                   FRegSize * RISCV_CHAR_BIT, FRegs);
   if (FRegs.size() != NumFRegs) {
     FRegs.resize(NumFRegs);
     uniformlyFillFRegs();
   }
 
   auto NumVRegs = VRegs.size();
-  getRegisterGroup(RH, NumVRegs, "V", VLEN, VRegs);
+  getRegisterGroup(RH, NumVRegs, AllRegisters::RVVPrefix, VLEN, VRegs);
   if (VRegs.size() != NumVRegs) {
     VRegs.resize(NumVRegs);
     uniformlyFillVRegs();
@@ -117,11 +121,11 @@ void RISCVRegisterState::saveAsYAMLFile(raw_ostream &OS) const {
   if (FRegSize == Reg4Bytes)
     FRegsMasked = applyMask(FRegsMasked, std::numeric_limits<uint32_t>::max());
   auto RegSerObj = AllRegisters()
-                       .addRegisterGroup("X", XRegsMasked)
-                       .addRegisterGroup("F", FRegsMasked)
-                       .addRegisterGroup("V", VLEN, VRegs);
+                       .addRegisterGroup(AllRegisters::GPRPrefix, XRegsMasked)
+                       .addRegisterGroup(AllRegisters::FPRPrefix, FRegsMasked)
+                       .addRegisterGroup(AllRegisters::RVVPrefix, VLEN, VRegs);
   if (!DumpRegsWithoutPC)
-    RegSerObj.addRegisterGroup("P", PC);
+    RegSerObj.addRegisterGroup(AllRegisters::PCRegName, PC);
   RegSerObj.saveAsYAML(OS);
 }
 
