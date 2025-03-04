@@ -2985,6 +2985,8 @@ public:
                            bool isDst, bool isMem,
                            Register Reg) const override {
     auto &MBB = IGC.MBB;
+    const auto &TgtCtx =
+        IGC.ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
     auto &RP = IGC.getRegPool();
     // For vector indexed segment loads, the destination vector register groups
     // cannot overlap the source vector register group (specifed by vs2), else
@@ -2993,9 +2995,6 @@ public:
         isDst) {
       assert(RISCV::VRRegClass.contains(Reg) &&
              "Dst reg in rvv indexed load/store instruction must be vreg");
-      auto &ProgCtx = IGC.ProgCtx;
-      auto &TgtCtx =
-          ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
 
       auto [Mult, Fractional] = TgtCtx.decodeVLMUL(TgtCtx.getLMUL(MBB));
       // Register group here means a register group formed by LMUL multiplied by
@@ -3023,9 +3022,14 @@ public:
       RP.addReserved(Reg);
     if ((isRVVSlide1Up(Opcode) || isRVVSlideUp(Opcode)) && isDst)
       RP.addReserved(Reg);
+    // FIXME: The vector integer extension instructions (zero- or sign-extend)
+    // need special handling. Overlaps in the highest-numbered part of the
+    // destination register group are allowed. For example, when LMUL=8,
+    // vzext.vf4 v0, v6 is legal, but a source of v0, v2, or v4 is not.
+    // (riscv-v-spec-1.0, "Vector Operands" section)
     if (isRVVExt(Opcode) && isDst)
       RP.addReserved(Reg);
-    if ((isRVVIntegerWidening(Opcode) || isRVVFPWidening(Opcode)) && isDst)
+    if (isRVVWidening(Opcode) && isDst)
       RP.addReserved(Reg);
     if ((isRVVGather(Opcode) || isRVVGather16(Opcode)) && isDst)
       RP.addReserved(Reg);
@@ -3850,6 +3854,16 @@ const MCRegisterClass &SnippyRISCVTarget::getRegClass(
     return getRVVSegLoadStoreRegClassForVd(
         Opcode, std::pair(Multiplier, IsFractional), RegInfo);
 
+  // FIXME: The vector integer extension instructions (zero- or sign-extend)
+  // also need special handling. The EEW of the source is 1/2, 1/4, or 1/8 of
+  // SEW => EMUL is 1/2, 1/4, or 1/8 of LMUL. The destination has EEW equal to
+  // SEW and EMUL equal to LMUL. Now, it's believed that EMUL_source ==
+  // EMUL_destination == LMUL. That means we're missing a lot of source
+  // registers. For example, we'll never generate with LMUL=8, vzext.vf4 v0, v6
+  // (now, we can only use registers that divide by 8), even though we should.
+  // But the thing to keep in mind here is that overlaps are only allowed in the
+  // highest-numbered part of the destination register group (a source of v0,
+  // v2, or v4 is not allowed). (riscv-v-spec-1.0, "Vector Operands" section)
   if (IsFractional)
     return RegInfo.getRegClass(OperandRegClassID);
   switch (Multiplier) {
