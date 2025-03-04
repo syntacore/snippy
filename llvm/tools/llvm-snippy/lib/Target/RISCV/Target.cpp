@@ -1103,7 +1103,11 @@ public:
         (AvailableFeatures & RequiredFeatures) ^ RequiredFeatures;
     return MissingFeatures.none();
   }
-  bool isPseudoAllowed(unsigned Opcode) const override { return false; }
+  bool isPseudoAllowed(unsigned Opcode) const override {
+    if (Opcode == RISCV::PAUSE)
+      return true;
+    return false;
+  }
 
   std::unique_ptr<IRegisterState>
   createRegisterState(const TargetSubtargetInfo &ST) const override {
