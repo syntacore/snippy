@@ -10,3 +10,9 @@ add_subdirectory(
 add_subdirectory(llvm-profdata)
 add_subdirectory(llvm-profgen)
 add_subdirectory(llvm-mca)
+
+if(LLVM_BUILD_SNIPPY)
+  add_subdirectory(
+    llvm-snippy
+  )
+endif()
