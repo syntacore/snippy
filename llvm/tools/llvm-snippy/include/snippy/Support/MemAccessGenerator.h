@@ -105,9 +105,8 @@ public:
     MemTable.clear();
   }
 
-  Expected<size_t>
-  generate(size_t AccessSize, size_t Alignment, bool BurstMode,
-           std::optional<size_t> PreselectedSchemeId = std::nullopt) {
+  Expected<size_t> generate(size_t AccessSize, size_t Alignment,
+                            bool BurstMode) {
     MemKey Key{AccessSize, Alignment, BurstMode};
     auto FindIter = MemTable.find(Key);
     if (FindIter == MemTable.end()) {
@@ -116,8 +115,6 @@ public:
         return std::move(Err);
       FindIter = *FindIterExp;
     }
-    if (PreselectedSchemeId)
-      return FindIter->second.getSchemeIdx(*PreselectedSchemeId);
     return FindIter->second.generate();
   }
 
@@ -158,10 +155,8 @@ public:
   }
 
   Expected<const typename ContT::value_type &>
-  getValidAccesses(size_t AccessSize, size_t Alignment, bool BurstMode,
-                   std::optional<size_t> InstrClassId) {
-    auto PickedScheme =
-        MAG.generate(AccessSize, Alignment, BurstMode, InstrClassId);
+  getValidAccesses(size_t AccessSize, size_t Alignment, bool BurstMode) {
+    auto PickedScheme = MAG.generate(AccessSize, Alignment, BurstMode);
     if (auto Err = PickedScheme.takeError())
       return std::move(Err);
     assert(*PickedScheme < Accesses.size());

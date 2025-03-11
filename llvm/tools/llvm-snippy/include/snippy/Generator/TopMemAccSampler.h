@@ -40,22 +40,17 @@ public:
                     std::make_move_iterator(Finish));
   }
 
-
   Expected<AccessSampleResult>
   sample(size_t AccessSize, size_t Alignment,
          std::function<AddressGenInfo(MemoryAccess &)> ChooseAddrGenInfo,
-         std::optional<::AddressGlobalId> Preselected = std::nullopt,
          bool BurstMode = false) override;
 
-  Expected<AccessSampleResult>
-  sample(size_t AccessSize, size_t Alignment,
-         bool BurstMode = false,
-         std::optional<::AddressGlobalId> Preselected = std::nullopt) {
+  Expected<AccessSampleResult> sample(size_t AccessSize, size_t Alignment,
+                                      bool BurstMode = false) {
     auto ChooseGenInfo = [&](auto &&Scheme) {
       return AddressGenInfo::singleAccess(AccessSize, Alignment, BurstMode);
     };
-    return sample(AccessSize, Alignment, ChooseGenInfo,
-                  Preselected, BurstMode);
+    return sample(AccessSize, Alignment, ChooseGenInfo, BurstMode);
   }
 
   std::vector<AddressInfo>
