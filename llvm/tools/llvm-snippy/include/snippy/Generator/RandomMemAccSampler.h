@@ -89,7 +89,6 @@ public:
   sample(size_t AccessSize, size_t Alignment,
          std::function<AddressGenInfo(MemoryAccess &)> ChooseAddrGenInfo,
 
-         std::optional<::AddressGlobalId> PreselectedId = std::nullopt,
          bool BurstMode = false) override;
 
   MemoryAccessesGenerator &getMAG();
