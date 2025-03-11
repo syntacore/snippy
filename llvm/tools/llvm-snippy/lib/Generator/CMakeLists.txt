@@ -25,7 +25,6 @@ set(LLVMSnippyGeneratorSources
   MemoryManager.cpp
   ImmediateHistogram.cpp
   TopMemAccSampler.cpp
-  PluginMemAccSampler.cpp
   RandomMemAccSampler.cpp
 )
 
