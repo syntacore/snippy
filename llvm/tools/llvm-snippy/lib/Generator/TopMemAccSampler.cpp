@@ -15,13 +15,12 @@ namespace snippy {
 Expected<AccessSampleResult> TopLevelMemoryAccessSampler::sample(
     size_t AccessSize, size_t Alignment,
     std::function<AddressGenInfo(MemoryAccess &)> ChooseAddrGenInfo,
-    std::optional<::AddressGlobalId> Preselected, bool BurstMode) {
+    bool BurstMode) {
   SmallVector<std::string, 3> Errs(Samplers.size());
   for (auto &&[Idx, S] : enumerate(Samplers)) {
-    auto Access = S->sample(AccessSize, Alignment, ChooseAddrGenInfo,
-                            Preselected, BurstMode);
+    auto Access =
+        S->sample(AccessSize, Alignment, ChooseAddrGenInfo, BurstMode);
     if (auto Err = Access.takeError()) {
-      Preselected = S->getPreselectedAddressId();
       Errs[Idx] = toString(std::move(Err));
       continue;
     }

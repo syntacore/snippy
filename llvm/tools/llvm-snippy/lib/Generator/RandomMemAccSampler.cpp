@@ -51,26 +51,18 @@ void RandomMemoryAccessSampler::reserve(MemRange R) {
   updateSplit();
 }
 
-Expected<AccessSampleResult> RandomMemoryAccessSampler::sample(
-    size_t AccessSize, size_t Alignment,
-    std::function<AddressGenInfo(MemoryAccess &)>
-        ChooseAddrGenInfo, // FIXME: const?
-    std::optional<::AddressGlobalId> PreselectedId, bool BurstMode) {
+Expected<AccessSampleResult>
+RandomMemoryAccessSampler::sample(size_t AccessSize, size_t Alignment,
+                                  std::function<AddressGenInfo(MemoryAccess &)>
+                                      ChooseAddrGenInfo, // FIXME: const?
+                                  bool BurstMode) {
   auto &MAGWithSchemes = getMAG();
-  auto PreselectedSchemeId = std::optional<size_t>{};
-  auto PreselectedAddrId = std::optional<::AddressId>{};
-  if (PreselectedId) {
-    PreselectedSchemeId = PreselectedId->MemSchemeId;
-    PreselectedAddrId = PreselectedId->AddrId;
-  }
-
-  auto SchemeExp = MAGWithSchemes.getValidAccesses(
-      AccessSize, Alignment, BurstMode, PreselectedSchemeId);
+  auto SchemeExp =
+      MAGWithSchemes.getValidAccesses(AccessSize, Alignment, BurstMode);
   if (auto Err = SchemeExp.takeError())
     return Expected<AccessSampleResult>(std::move(Err));
   auto &Scheme = *SchemeExp;
   auto AddrGenInfo = ChooseAddrGenInfo(*Scheme);
-  AddrGenInfo.PreselectedAddr = PreselectedAddrId;
   auto AI = Scheme->randomAddress(AddrGenInfo);
   assert(MB.contained(AI) && "Address Info potentially out of memory bank");
   return AccessSampleResult{AI, AddrGenInfo};
