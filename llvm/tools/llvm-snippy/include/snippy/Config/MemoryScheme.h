@@ -23,7 +23,6 @@
 
 #include "ImmediateHistogram.h"
 
-#include "snippy/Plugins/MemorySchemePluginCInterface.h"
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/YAMLUtils.h"
 
@@ -201,7 +200,6 @@ struct AddressGenInfo {
 
   // Whether burst mode is enabled. In this case some magic needs to happen.
   bool BurstMode;
-  std::optional<::AddressId> PreselectedAddr = std::nullopt;
 
   // In order to generate addresses for multiple sequential/strided accesses
   // MinStride needs to be set. NumElements in the necessary amount of elements
@@ -404,13 +402,9 @@ struct MemoryAccessAddresses final : MemoryAccess {
     return std::make_unique<MemoryAccessAddresses>(*this);
   }
 
-  AddressInfo randomAddressForPlainAccess(
-      size_t AccessSize, size_t Alignment,
-      std::optional<::AddressId> PreselectedAddr = std::nullopt);
+  AddressInfo randomAddressForPlainAccess(size_t AccessSize, size_t Alignment);
 
-  AddressInfo randomAddressForBurstAccess(
-      size_t AccessSize, size_t Alignment,
-      std::optional<::AddressId> PreselectedAddr = std::nullopt);
+  AddressInfo randomAddressForBurstAccess(size_t AccessSize, size_t Alignment);
 
   bool isLegal(const AddressGenInfo &Info) const override;
 

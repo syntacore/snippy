@@ -566,7 +566,6 @@ AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
   auto AccessSize = Params.AccessSize;
   auto LCStride = getLCStride(Alignment);
   auto NumElements = Params.NumElements;
-  auto PreselectedAddr = Params.PreselectedAddr;
 
   auto AllowedLCBlockOffsets = getAllowedOffsets(Alignment);
   assert(!AllowedLCBlockOffsets.empty());
@@ -589,10 +588,6 @@ AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
   auto LCBlockIdx = snippy::RandEngine::genInRangeInclusive(MaxLCBlock);
   auto LCBlockOffsetIdx =
       snippy::RandEngine::genInRangeExclusive(AllowedLCBlockOffsets.size());
-  if (PreselectedAddr) {
-    LCBlockIdx = PreselectedAddr->MainId % (MaxLCBlock + 1);
-    LCBlockOffsetIdx = PreselectedAddr->OffsetId % AllowedLCBlockOffsets.size();
-  }
 
   // FIXME: Maybe LCBlockOffsetIdx could be randomly sampled so this fixup would
   // not be necessary?
@@ -632,12 +627,9 @@ MemoryAccessEviction::randomAddress(const AddressGenInfo &AddrGenInfo) {
 
   auto Alignment = AddrGenInfo.Alignment;
   auto AccessSize = AddrGenInfo.AccessSize;
-  auto PreselectedAddr = AddrGenInfo.PreselectedAddr;
 
   MemAddr Addr = snippy::RandEngine::genInRangeExclusive(
       std::numeric_limits<MemAddr>::max());
-  if (PreselectedAddr)
-    Addr = PreselectedAddr->MainId;
   // Account for alignment in mask
   auto Mask = this->Mask & ~(Alignment - 1);
   Addr &= Mask;
@@ -837,14 +829,10 @@ static bool isLegalAddress(const AddressInfo &AI, size_t AccessSize,
                                   0;
 }
 
-AddressInfo MemoryAccessAddresses::randomAddressForPlainAccess(
-    size_t AccessSize, size_t Alignment,
-    std::optional<::AddressId> PreselectedAddr) {
+AddressInfo
+MemoryAccessAddresses::randomAddressForPlainAccess(size_t AccessSize,
+                                                   size_t Alignment) {
   AddressInfo AI;
-  if (NextAddressIdx && PreselectedAddr)
-    snippy::fatal("Can't generate preselected address "
-                  "for ordered memory scheme");
-
   if (NextAddressIdx) {
     AI.Address = Addresses[*NextAddressIdx].Addr;
     NextAddressIdx = (*NextAddressIdx + 1) % Addresses.size();
@@ -858,8 +846,6 @@ AddressInfo MemoryAccessAddresses::randomAddressForPlainAccess(
                                       "We should've already checked it.");
     auto LegalAddressIdx =
         RandEngine::genInRangeExclusive(LegalAddresses.size());
-    if (PreselectedAddr)
-      LegalAddressIdx = PreselectedAddr->MainId % LegalAddresses.size();
     AI.Address = LegalAddresses[LegalAddressIdx].Addr;
   }
   AI.MaxOffset = 0;
@@ -869,13 +855,9 @@ AddressInfo MemoryAccessAddresses::randomAddressForPlainAccess(
   return AI;
 }
 
-AddressInfo MemoryAccessAddresses::randomAddressForBurstAccess(
-    size_t AccessSize, size_t Alignment,
-    std::optional<::AddressId> PreselectedAddr) {
-  if (NextBurstIdx && PreselectedAddr)
-    snippy::fatal("Can't generate preselected address "
-                  "for ordered memory scheme");
-
+AddressInfo
+MemoryAccessAddresses::randomAddressForBurstAccess(size_t AccessSize,
+                                                   size_t Alignment) {
   if (NextBurstIdx) {
     for (size_t i = 0; i < Burst.size(); ++i) {
       auto Idx = (i + *NextBurstIdx) % Burst.size();
@@ -896,8 +878,6 @@ AddressInfo MemoryAccessAddresses::randomAddressForBurstAccess(
   assert(!AIs.empty() && "At least one entry must exist as we've already "
                          "checked the legality of the scheme.");
   auto AIIdx = RandEngine::genInRangeExclusive(AIs.size());
-  if (PreselectedAddr)
-    AIIdx = PreselectedAddr->MainId % AIs.size();
   return AIs[AIIdx];
 }
 
@@ -909,10 +889,8 @@ MemoryAccessAddresses::randomAddress(const AddressGenInfo &AddrGenInfo) {
   auto Alignment = AddrGenInfo.Alignment;
 
   if (!AddrGenInfo.BurstMode)
-    return randomAddressForPlainAccess(AccessSize, Alignment,
-                                       AddrGenInfo.PreselectedAddr);
-  auto AI = randomAddressForBurstAccess(AccessSize, Alignment,
-                                        AddrGenInfo.PreselectedAddr);
+    return randomAddressForPlainAccess(AccessSize, Alignment);
+  auto AI = randomAddressForBurstAccess(AccessSize, Alignment);
   assert(static_cast<unsigned long long>(AI.MaxOffset) >= AccessSize);
   AI.MaxOffset -= AccessSize;
   AI.AccessSize = AccessSize;
@@ -969,7 +947,7 @@ MemoryAccessAddresses::splitPlainAccesses(const MemoryBank &MB) const {
   struct EnumeratedAddr {
     size_t Idx;
     AccessAddress Value;
-    EnumeratedAddr(size_t Idx, AccessAddress Value) : Idx(Idx), Value(Value){};
+    EnumeratedAddr(size_t Idx, AccessAddress Value) : Idx(Idx), Value(Value) {};
   };
   std::vector<EnumeratedAddr> SortedAddresses;
   for (auto &&[Idx, Addr] : llvm::enumerate(Addresses))
