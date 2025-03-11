@@ -73,14 +73,10 @@ yaml::PolymorphicTraits<snippy::ValuegramEntry>::getAsScalar(
   // NOTE: We can't diagnose properly via yaml::IO, since we dont' have it in
   // polymorphic traits. It could be worked around by saving the error inside
   // ValuegramEntry, but that would utterly break SRP and be too much hassle.
-  LLVMContext Ctx;
   snippy::fatal(
-      Ctx, "Invalid valuegram",
+      "Invalid valuegram",
       createStringError((std::make_error_code(std::errc::invalid_argument)),
                         "Valuegram entry of scalar type is not supported"));
-  // Just in case snippy::fatal does not actually call std::exit. TODO: Mark
-  // snippy::fatal as [[noreturn]] to silence compiler warnings in such cases.
-  llvm_unreachable("Valuegram entry of scalar type is not supported");
 }
 
 const snippy::detail::ValuegramEntryMapMapper
@@ -213,8 +209,10 @@ void ValuegramBitRangeEntry::mapYamlImpl(yaml::IO &Io) {
       APIntBitsMapperHelper(yaml::IO &Io, APInt Val)
           : ValWithSign{{std::move(Val), /*IsSigned=*/false}} {}
       APInt denormalize(yaml::IO &Io) {
-        if (ValWithSign.isSigned())
+        if (ValWithSign.isSigned()) {
           Io.setError("Value can't be negative");
+          return APInt();
+        }
         return ValWithSign.Number.Value;
       }
       FormattedAPIntWithSign ValWithSign;
@@ -226,6 +224,15 @@ void ValuegramBitRangeEntry::mapYamlImpl(yaml::IO &Io) {
 
   MapUnsignedAPInt("min", Min);
   MapUnsignedAPInt("max", Max);
+}
+
+std::string ValuegramBitRangeEntry::validate(yaml::IO &Io) const {
+  auto CommonWidth = std::max(Min.getBitWidth(), Max.getBitWidth());
+  // NOTE: bitrange values should always be positive, so we are using unsigned
+  // comparisons.
+  if (Min.zext(CommonWidth).ugt(Max.zext(CommonWidth)))
+    return "'min' should be less than or equal to 'max'";
+  return "";
 }
 
 static std::optional<EntryKind>
@@ -270,8 +277,8 @@ createValuegramSequenceEntry(IValuegramEntry::EntryKind Kind) {
   }
 }
 
-std::unique_ptr<IValuegramEntry> createValuegramSeqEntry(yaml::IO &Io,
-                                                         StringRef ParseStr) {
+static std::unique_ptr<IValuegramEntry>
+createValuegramSeqEntry(yaml::IO &Io, StringRef ParseStr) {
   auto Pattern = getValuegramSequenceEntryKind(ParseStr);
 
   if (Pattern)
