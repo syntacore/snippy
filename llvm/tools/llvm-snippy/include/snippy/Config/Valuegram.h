@@ -239,6 +239,7 @@ struct ValuegramBitRangeEntry final : public IValuegramMapEntry {
 
 protected:
   void mapYamlImpl(yaml::IO &Io) override;
+  virtual std::string validate(yaml::IO &Io) const override;
 };
 
 Expected<std::unique_ptr<IValuegramEntry>>
