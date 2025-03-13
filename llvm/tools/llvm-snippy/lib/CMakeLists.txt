@@ -25,7 +25,6 @@ set(LLVM_LINK_COMPONENTS
   SnippyConfig
   SnippySupport
   SnippyTarget
-  SnippyGenerator
   )
 set(LLVMSnippySources
   BranchRelaxatorPass.cpp
@@ -59,4 +58,6 @@ add_llvm_library(LLVMSnippy
   ${LLVMSnippySources}
   DEPENDS
   intrinsics_gen
+  LINK_LIBS PRIVATE
+    $<BUILD_LOCAL_INTERFACE:LLVMSnippyGenerator>
   )

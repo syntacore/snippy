@@ -29,11 +29,15 @@ set(LLVMSnippyGeneratorSources
 )
 
 
-add_llvm_library(LLVMSnippyGenerator
-  DISABLE_LLVM_LINK_LLVM_DYLIB
-  STATIC
+# FIXME: we make this an object library to fix several internal circular
+# dependencies and linkage issues. This is a workaround and should be removed
+# after we refactor our libraries structure
+add_library(LLVMSnippyGenerator
+  OBJECT
+  EXCLUDE_FROM_ALL
   ${LLVMSnippyGeneratorSources}
 )
+llvm_update_compile_flags(LLVMSnippyGenerator)
 
 if(LLVM_SNIPPY_NEEDS_LIBSTDCPP_FS)
   target_link_libraries(LLVMSnippyGenerator PRIVATE stdc++fs)
