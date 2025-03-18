@@ -27,6 +27,7 @@ class Linker;
 class GeneratorContext;
 class Interpreter;
 class LLVMState;
+class SnippyProgramContext;
 
 struct MemorySectionConfig {
   MemAddr Start = 0;

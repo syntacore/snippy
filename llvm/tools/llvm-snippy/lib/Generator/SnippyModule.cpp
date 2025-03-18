@@ -89,6 +89,8 @@ void SnippyProgramContext::initializeROMSection(
                    .sections()
                    .getOutputSectionFor(Linker::kDefaultRODataSectionName)
                    .Desc;
+  if (ROMSection)
+    ROMSectionManager = std::make_unique<MonoAllocatableSection>(*ROMSection);
 }
 
 void SnippyProgramContext::initializeUtilitySection(
@@ -111,14 +113,12 @@ SnippyProgramContext::getOrAddGlobalsPoolFor(SnippyModule &M) {
   auto *Key = &M.getModule();
   if (PerModuleGPs.count(Key))
     return *PerModuleGPs.at(Key);
-  if (!PerModuleGPs.empty())
-    snippy::fatal("multiple global pools are not supported for now");
   if (!ROMSection)
     return make_error<Failure>("ROM section is not configured");
 
   return *PerModuleGPs
               .emplace(Key, std::make_unique<GlobalsPool>(
-                                *State, M.getModule(), *ROMSection,
+                                *State, M.getModule(), *ROMSectionManager,
                                 exportedNamesMangled()
                                     ? ("__snippy_" +
                                        Twine(getEntryPointName()) + "_")

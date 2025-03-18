@@ -38,6 +38,7 @@ struct ObjectMetadata {
 
 class RegisterGenerator;
 class GlobalsPool;
+class MonoAllocatableSection;
 class OpcodeCache;
 class MemoryManager;
 struct SnippyProgramSettings;
@@ -215,6 +216,11 @@ public:
   const auto &getProgramStateSaveSpace() const { return *PGSK; }
   auto &getProgramStateSaveSpace() { return *PGSK; }
 
+  const MonoAllocatableSection &getROMSectionManager() const {
+    return *ROMSectionManager;
+  }
+  MonoAllocatableSection &getROMSectionManager() { return *ROMSectionManager; }
+
   TargetGenContextInterface &getTargetContext() const {
     assert(TargetContext && "no target context");
     return *TargetContext;
@@ -246,6 +252,7 @@ private:
   std::optional<SectionDesc> SelfcheckSection;
   std::optional<SectionDesc> StackSection;
   std::optional<SectionDesc> UtilitySection;
+  std::unique_ptr<MonoAllocatableSection> ROMSectionManager;
   std::unique_ptr<ProgramGlobalStateKeeper> PGSK;
   std::map<Module *, std::unique_ptr<GlobalsPool>> PerModuleGPs;
   std::unique_ptr<TargetGenContextInterface> TargetContext;
