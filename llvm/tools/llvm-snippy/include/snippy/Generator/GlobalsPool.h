@@ -55,12 +55,12 @@ protected:
   auto &section() const { return Desc; }
 };
 
-class GlobalsPool : private MonoAllocatableSection {
+class GlobalsPool {
 public:
-  GlobalsPool(LLVMState &State, Module &M, const SectionDesc &Section,
+  GlobalsPool(LLVMState &State, Module &M, MonoAllocatableSection &ROMManager,
               StringRef Prep, StringRef InputName = "")
-      : MonoAllocatableSection(Section), State(State), SectionName(InputName),
-        M(M), Prepend(Prep.data()){};
+      : ROMManager(ROMManager), State(State), SectionName(InputName), M(M),
+        Prepend(Prep.data()) {};
 
   GlobalVariable *getGV(StringRef Name) {
     return M.getNamedGlobal(Prepend + Name.str());
@@ -73,7 +73,7 @@ public:
            bool IsConstant = true) {
 
     auto Size = Init.getBitWidth() / 8u;
-    auto EOffset = getNext(Size, Alignment);
+    auto EOffset = ROMManager.getNext(Size, Alignment);
     if (!EOffset) {
       auto E = EOffset.takeError();
       snippy::fatal(
@@ -111,6 +111,7 @@ public:
 private:
   // Map GV to their address offset
   std::unordered_map<GlobalVariable *, uint64_t> GVs;
+  MonoAllocatableSection &ROMManager;
   LLVMState &State;
   std::string SectionName;
   Module &M;
