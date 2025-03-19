@@ -71,6 +71,9 @@ public:
   }
 
 private:
+  unsigned long long calculateEntryFnInstrsNum(Module &M,
+                                               const CallGraphState &CGS);
+
   bool readFromYaml(Module &M, const FunctionDescs &FDs);
 
   bool generateDefault(Module &M);

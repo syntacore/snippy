@@ -67,7 +67,7 @@ public:
     bool IsRoot = FG.isRootFunction(MF);
 
     std::vector<MCRegister> Ret;
-
+    auto &ProgCtx = SGCtx.getProgramContext();
     if (IsRoot)
       llvm::copy(SGCtx.getGenSettings().getRegsSpilledToStack(),
                  std::back_inserter(Ret));
