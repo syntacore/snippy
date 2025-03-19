@@ -224,6 +224,18 @@ public:
   static APInt genAPInt(unsigned Bits);
 
   template <typename T>
+  static Expected<std::vector<T>> getNInRangeInclusive(T Min, T Max, size_t N) {
+    if (Max < Min)
+      return make_error<Failure>(
+          "Invalid usage of genNUniqInInterval: Max cannot be less than Min.");
+    std::vector<T> Vals(Max - Min + 1);
+    std::generate(Vals.begin(), Vals.end(),
+                  [Min, Max]() { return genInRangeInclusive(Min, Max); });
+    Vals.resize(N);
+    return Vals;
+  }
+
+  template <typename T>
   static Expected<std::vector<T>> genNUniqInInterval(T Min, T Max, size_t N) {
     if (Max < Min)
       return make_error<Failure>(

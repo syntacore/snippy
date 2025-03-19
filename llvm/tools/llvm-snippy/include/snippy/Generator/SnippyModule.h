@@ -57,6 +57,7 @@ class SnippyModule final : private Module {
 public:
   SnippyModule(LLVMState &State, StringRef Name);
 
+  using Module::getName;
   const auto &getModule() const { return static_cast<const Module &>(*this); }
   auto &getModule() { return static_cast<Module &>(*this); }
   static SnippyModule &fromModule(Module &M) {
@@ -160,10 +161,16 @@ public:
 
   // May fail if no appropriate section found or if all suitable section
   // are already taken. In such case Failure is returned.
+  Expected<GlobalsPool &> getOrAddGlobalsPoolFor(Module &M);
+
+  // Wrapper helper for method above. Get llvm::Module from SnippyModule
   Expected<GlobalsPool &> getOrAddGlobalsPoolFor(SnippyModule &M);
 
-  // Wrapper helper for method above. Terminates on error printing 'OnError'
+  // Terminates on error printing 'OnError'
   // message.
+  GlobalsPool &getOrAddGlobalsPoolFor(Module &M, StringRef OnError);
+
+  // Wrapper helper for method above.
   GlobalsPool &getOrAddGlobalsPoolFor(SnippyModule &M, StringRef OnError);
 
   GeneratorResult generateELF(ArrayRef<const SnippyModule *> Modules) const;

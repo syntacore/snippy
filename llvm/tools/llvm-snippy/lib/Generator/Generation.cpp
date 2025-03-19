@@ -770,7 +770,8 @@ generateNopsToSizeLimit(const planning::RequestLimit &Limit,
 
   InstrGenCtx.Stats.UnableToFitAnymore = true;
 
-  if (ItBegin != std::prev(InstrGenCtx.Ins)) {
+  assert(InstrGenCtx.Ins != MBB.begin());
+  if (ItBegin != InstrGenCtx.Ins) {
     ItBegin++;
   }
   return handleGeneratedInstructions(ItBegin, InstrGenCtx, Limit);
@@ -1016,9 +1017,12 @@ generateCall(unsigned OpCode,
   const auto &GenSettings = InstrGenCtx.GenSettings;
   auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
-  assert(InstrGenCtx.CGS);
+  if (!InstrGenCtx.CGS)
+    return nullptr;
   auto &CGS = *InstrGenCtx.CGS;
   auto *Node = CGS.getNode(&(MBB.getParent()->getFunction()));
+  if (!Node)
+    return nullptr;
   auto CalleeCount = Node->callees().size();
   if (!CalleeCount)
     return nullptr;
@@ -1402,7 +1406,7 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
 
 void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
                       const GenerationStatistics &MFStats, GeneratorContext &GC,
-                      const SimulatorContext &SimCtx, const CallGraphState &CGS,
+                      const SimulatorContext &SimCtx, const CallGraphState *CGS,
                       MemAccessInfo *MAI) {
   auto &ProgCtx = GC.getProgramContext();
   auto &State = ProgCtx.getLLVMState();
@@ -1415,15 +1419,15 @@ void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
   auto RP = InstrGenCtx.pushRegPool();
 
   // Secondary functions always return.
-  if (!CGS.isRootFunction(MF)) {
+  if (!CGS || !CGS->isRootFunction(MF)) {
     State.getSnippyTarget().generateReturn(InstrGenCtx);
     return;
   }
 
   // Root functions are connected via tail calls.
-  if (!CGS.isExitFunction(MF)) {
+  if (!CGS->isExitFunction(MF)) {
     State.getSnippyTarget().generateTailCall(InstrGenCtx,
-                                             *CGS.nextRootFunction(MF));
+                                             *CGS->nextRootFunction(MF));
     return;
   }
 
@@ -1519,7 +1523,7 @@ static void printDebugBrief(raw_ostream &OS, const Twine &Brief,
 void generate(planning::FunctionRequest &FunctionGenRequest,
               MachineFunction &MF, GeneratorContext &GC,
               const SimulatorContext &SimCtx, MachineLoopInfo *MLI,
-              const CallGraphState &CGS, MemAccessInfo *MAI,
+              const CallGraphState *CGS, MemAccessInfo *MAI,
               const SnippyLoopInfo *SLI, SnippyFunctionMetadata *SFM) {
   GenerationStatistics CurrMFGenStats;
   SNIPPY_DEBUG_BRIEF("request for function", FunctionGenRequest);
@@ -1574,7 +1578,7 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
       planning::InstructionGenerationContext InstrGenCtx{*MBB, MBB->begin(), GC,
                                                          SimCtx};
       auto RP = InstrGenCtx.pushRegPool();
-      InstrGenCtx.append(MLI).append(&CGS).append(MAI).append(SLI).append(SFM);
+      InstrGenCtx.append(MLI).append(CGS).append(MAI).append(SLI).append(SFM);
       snippy::generate(BBReq, InstrGenCtx);
       CurrMFGenStats.merge(InstrGenCtx.Stats);
     }
@@ -1629,7 +1633,7 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
 
     planning::InstructionGenerationContext InstrGenCtx{*MBB, MBB->begin(), GC,
                                                        SimCtx};
-    InstrGenCtx.append(&CGS).append(MAI).append(SFM);
+    InstrGenCtx.append(CGS).append(MAI).append(SFM);
     auto RP = InstrGenCtx.pushRegPool();
     snippy::generate(BBReq, InstrGenCtx);
 

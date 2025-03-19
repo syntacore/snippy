@@ -112,6 +112,8 @@ static snippy::opt_list<std::string> ReservedRegisterList(
     cl::desc("list of registers that shall not be used in snippet code"),
     cl::cat(Options));
 
+extern snippy::opt<size_t> StackSize;
+
 static snippy::opt_list<std::string>
     SpilledRegisterList("spilled-regs-list", cl::CommaSeparated,
                         cl::desc("list of registers that shall be spilled "
@@ -1039,7 +1041,8 @@ static void checkGlobalRegsSpillSettings(const SnippyTarget &Tgt,
 
 GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
                                         RegPool &RP,
-                                        ArrayRef<std::string> Models) {
+                                        ArrayRef<std::string> Models,
+                                        const OpcodeCache &OpCC) {
   auto &Ctx = State.getCtx();
   auto OutputFilename = getOutputFileBasename();
   auto SelfCheckPeriod = getSelfcheckPeriod();
@@ -1085,10 +1088,12 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
                                       FillCodeSectionMode, SelfCheckPeriod);
   bool RunOnModel = !Models.empty();
 
+  auto TrackingConfig =
+      TrackingOptions{Backtrack, SelfCheckPeriod, AddressVHOpt};
+
   return GeneratorSettings(
       ABI, OutputFilename, LayoutFile.getValue(), AdditionalLayoutFiles,
-      TrackingOptions{Backtrack, SelfCheckPeriod, AddressVHOpt},
-      DebugOptions{DumpMI, DumpMF, DumpCFG, ViewCFG},
+      std::move(TrackingConfig), DebugOptions{DumpMI, DumpMF, DumpCFG, ViewCFG},
       LinkerOptions{ExternalStackOpt, MangleExportedNames,
                     std::move(EntryPointName.getValue())},
       ModelPluginOptions{RunOnModel, std::move(Models)},
@@ -1110,7 +1115,8 @@ static FlowGenerator createFlowGenerator(Config &&Cfg, LLVMState &State,
                                          const OpcodeCache &OpCC,
                                          ArrayRef<std::string> Models) {
   RegPool RP;
-  auto GenSettings = createGeneratorConfig(State, std::move(Cfg), RP, Models);
+  auto GenSettings =
+      createGeneratorConfig(State, std::move(Cfg), RP, Models, OpCC);
   return FlowGenerator(std::move(GenSettings), OpCC, std::move(RP));
 }
 

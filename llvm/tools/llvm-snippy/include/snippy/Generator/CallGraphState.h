@@ -130,8 +130,9 @@ public:
   using value_type = const Function *;
   void push_back(value_type F) { emplaceNode(F); }
 
-  auto *getNode(const Function *F) const {
-    assert(registered(F) && "Machine Function is unregistered");
+  Node *getNode(const Function *F) const {
+    if (!registered(F))
+      return nullptr;
     return FunToNodeMap.lookup(F);
   }
 
