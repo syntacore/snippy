@@ -148,6 +148,16 @@ public:
     return GV;
   }
 
+  GlobalVariable *createGlobalConstantDecl(
+      Module &M, unsigned BitWidth,
+      GlobalValue::LinkageTypes Linkage = GlobalValue::ExternalLinkage,
+      StringRef Name = "global_decl", bool IsConstant = true) {
+    auto *VarType = Type::getIntNTy(Ctx, BitWidth);
+    auto *GV =
+        new GlobalVariable(M, VarType, IsConstant, Linkage, nullptr, Name);
+    return GV;
+  }
+
   std::unique_ptr<MCStreamer> createObjStreamer(raw_pwrite_stream &OS,
                                                 MCContext &Ctx);
 

@@ -160,6 +160,8 @@ private:
 
 public:
   RegPoolStack(SnippyProgramContext &ProgCtx) : ProgCtx(ProgCtx) {}
+  RegPoolStack(SnippyProgramContext &ProgCtx, RegPoolWrapper &RWP)
+      : ProgCtx(ProgCtx), Current(&RWP) {}
 
   auto append() {
     auto Ret = std::unique_ptr<RegPoolWrapper, PopDeleter>(
@@ -218,6 +220,10 @@ public:
   InstructionGenerationContext(MachineBasicBlock &MBB,
                                MachineBasicBlock::iterator Ins,
                                GeneratorContext &GC);
+  InstructionGenerationContext(MachineBasicBlock &MBB,
+                               MachineBasicBlock::iterator Ins,
+                               GeneratorContext &GC, RegPoolWrapper &RPW);
+
   ~InstructionGenerationContext();
 
   InstructionGenerationContext &append(TopLevelMemoryAccessSampler *NewMAS) {
