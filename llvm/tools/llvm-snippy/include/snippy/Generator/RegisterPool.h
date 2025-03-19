@@ -433,6 +433,18 @@ public:
 
   std::vector<unsigned>
   getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
+                         const MCRegisterClass &RegClass, unsigned NumRegs,
+                         AccessMaskBit AccessMask = AccessMaskBit::RW) const;
+
+  template <typename Pred>
+  std::vector<unsigned>
+  getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
+                         const MCRegisterClass &RegClass, Pred Filter,
+                         unsigned NumRegs,
+                         AccessMaskBit AccessMask = AccessMaskBit::RW) const;
+
+  std::vector<unsigned>
+  getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
                          const MCRegisterClass &RegClass, const MachineLoop &ML,
                          unsigned NumRegs,
                          AccessMaskBit AccessMask = AccessMaskBit::RW) const;
@@ -740,6 +752,15 @@ std::vector<unsigned> RegPoolWrapper::getNAvailableRegisters(
     unsigned NumRegs, Pred Filter, AccessMaskBit AccessMask) const {
   return AvailableRegisterImpl::get(Desc, RI, *this, Filter, NumRegs, RegClass,
                                     MBB, AccessMask);
+}
+
+template <typename Pred>
+std::vector<unsigned> RegPoolWrapper::getNAvailableRegisters(
+    const Twine &Desc, const MCRegisterInfo &RI,
+    const MCRegisterClass &RegClass, Pred Filter, unsigned NumRegs,
+    AccessMaskBit AccessMask) const {
+  return AvailableRegisterImpl::get(Desc, RI, *this, Filter, NumRegs, RegClass,
+                                    AccessMask);
 }
 
 template <typename Pred>

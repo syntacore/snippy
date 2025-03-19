@@ -255,7 +255,7 @@ bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
   auto FunctionGenRequest = createMFGenerationRequest(MF);
   generate(FunctionGenRequest, MF, *SGCtx, SimCtx,
            &getAnalysis<MachineLoopInfoWrapperPass>().getLI(),
-           getAnalysis<FunctionGenerator>().getCallGraphState(),
+           &getAnalysis<FunctionGenerator>().getCallGraphState(),
            &get<MemAccessInfo>(MF),
            &getAnalysis<LoopLatcher>().get<SnippyLoopInfo>(MF),
            &getAnalysis<SnippyFunctionMetadataWrapper>().get(MF));

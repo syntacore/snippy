@@ -165,6 +165,11 @@ public:
     reportUnimplementedError();
   }
 
+  MachineInstr *
+  generateMemoryBarrier(InstructionGenerationContext &IGC) const override {
+    reportUnimplementedError();
+  }
+
   MachineInstr *generateCall(InstructionGenerationContext &IGC,
                              const Function &Target,
                              bool AsSupport) const override {
@@ -392,8 +397,19 @@ public:
     reportUnimplementedError();
   }
 
+  MachineInstr *loadSymbolAddress(InstructionGenerationContext &IGC,
+                                  unsigned DestReg,
+                                  const GlobalValue *Target) const override {
+    reportUnimplementedError();
+  }
+
   void loadRegFromAddr(InstructionGenerationContext &IGC, uint64_t Addr,
                        MCRegister Reg) const override {
+    reportUnimplementedError();
+  }
+
+  void loadRegFromAddrInReg(InstructionGenerationContext &IGC,
+                            MCRegister AddrReg, MCRegister Reg) const override {
     reportUnimplementedError();
   }
 

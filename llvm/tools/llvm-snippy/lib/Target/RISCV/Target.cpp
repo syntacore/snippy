@@ -2249,7 +2249,7 @@ public:
 
   MachineInstr *loadSymbolAddress(InstructionGenerationContext &IGC,
                                   unsigned DestReg,
-                                  const GlobalValue *Target) const {
+                                  const GlobalValue *Target) const override {
     auto &Ins = IGC.Ins;
     auto &MBB = IGC.MBB;
     auto &ProgCtx = IGC.ProgCtx;
@@ -2274,6 +2274,20 @@ public:
         .addDef(DestReg)
         .addReg(DestReg)
         .addSym(AUIPCSymbol, RISCVII::MO_PCREL_LO);
+  }
+
+  MachineInstr *generateFenceI(InstructionGenerationContext &IGC) const {
+    auto &ProgCtx = IGC.ProgCtx;
+    const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
+    auto &State = ProgCtx.getLLVMState();
+    auto &Ctx = State.getCtx();
+    return getSupportInstBuilder(*this, IGC.MBB, IGC.Ins, Ctx,
+                                 InstrInfo.get(RISCV::FENCE_I));
+  }
+
+  MachineInstr *
+  generateMemoryBarrier(InstructionGenerationContext &IGC) const override {
+    return generateFenceI(IGC);
   }
 
   MachineInstr *generateJAL(InstructionGenerationContext &IGC,
@@ -2746,7 +2760,7 @@ public:
   }
 
   void loadRegFromAddrInReg(InstructionGenerationContext &IGC,
-                            MCRegister AddrReg, MCRegister Reg) const {
+                            MCRegister AddrReg, MCRegister Reg) const override {
     const auto LoadInstr = generateLoadRegFromAddrInReg(IGC, AddrReg, Reg);
     addGeneratedInstrsToBB(IGC, {LoadInstr}, *this);
   }

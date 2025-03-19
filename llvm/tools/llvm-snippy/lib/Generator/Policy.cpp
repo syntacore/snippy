@@ -54,6 +54,14 @@ InstructionGenerationContext::InstructionGenerationContext(
                                    GC.getGenSettings()) {
   append(&GC.getMemoryAccessSampler());
 }
+
+InstructionGenerationContext::InstructionGenerationContext(
+    MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
+    GeneratorContext &GC, RegPoolWrapper &RPW)
+    : NullSimCtx(std::make_unique<SimulatorContext>()), MBB(MBB), Ins(Ins),
+      ProgCtx(GC.getProgramContext()), GenSettings(GC.getGenSettings()),
+      SimCtx(*NullSimCtx), RPS(ProgCtx, RPW) {}
+
 InstructionGenerationContext::~InstructionGenerationContext() = default;
 
 IAPIntSampler &

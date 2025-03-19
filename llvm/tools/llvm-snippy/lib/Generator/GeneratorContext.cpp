@@ -34,9 +34,10 @@ template class GenResultT<SelfCheckMap>;
 
 extern cl::OptionCategory Options;
 
-static snippy::opt<size_t> StackSize("stack-size",
-                                     cl::desc("size of snippy stack space"),
-                                     cl::cat(Options), cl::init(0u));
+// FIXME: Please, move it to llvm-snippy.cpp after config refactoring
+snippy::opt<size_t> StackSize("stack-size",
+                              cl::desc("size of snippy stack space"),
+                              cl::cat(Options), cl::init(0u));
 
 static snippy::opt<bool> ForceEmitLinkerScript(
     "force-emit-linker-script",

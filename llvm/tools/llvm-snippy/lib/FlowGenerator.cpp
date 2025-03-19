@@ -166,6 +166,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
   auto MainModule = SnippyModule(ProgContext.getLLVMState(), "main");
 
   GeneratorContext GenCtx(ProgContext, GenSettings);
+  auto &InstrsGenConfig = GenSettings.InstrsGenerationConfig;
 
   std::string MIR;
   raw_string_ostream MIROS(MIR);
@@ -213,7 +214,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
         PM.add(createInstructionsPostProcessPass());
         PM.add(createFunctionDistributePass());
 
-        if (GenSettings.InstrsGenerationConfig.RunMachineInstrVerifier)
+        if (InstrsGenConfig.RunMachineInstrVerifier)
           PM.add(createMachineVerifierPass("Machine Verifier Pass report"));
 
         if (GenSettings.DebugConfig.PrintControlFlowGraph)
