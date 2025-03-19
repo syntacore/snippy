@@ -109,8 +109,8 @@ void SnippyProgramContext::initializeUtilitySection(
 }
 
 Expected<GlobalsPool &>
-SnippyProgramContext::getOrAddGlobalsPoolFor(SnippyModule &M) {
-  auto *Key = &M.getModule();
+SnippyProgramContext::getOrAddGlobalsPoolFor(Module &M) {
+  auto *Key = &M;
   if (PerModuleGPs.count(Key))
     return *PerModuleGPs.at(Key);
   if (!ROMSection)
@@ -118,7 +118,7 @@ SnippyProgramContext::getOrAddGlobalsPoolFor(SnippyModule &M) {
 
   return *PerModuleGPs
               .emplace(Key, std::make_unique<GlobalsPool>(
-                                *State, M.getModule(), *ROMSectionManager,
+                                *State, M, *ROMSectionManager,
                                 exportedNamesMangled()
                                     ? ("__snippy_" +
                                        Twine(getEntryPointName()) + "_")
@@ -127,7 +127,12 @@ SnippyProgramContext::getOrAddGlobalsPoolFor(SnippyModule &M) {
               .first->second;
 }
 
-GlobalsPool &SnippyProgramContext::getOrAddGlobalsPoolFor(SnippyModule &M,
+Expected<GlobalsPool &>
+SnippyProgramContext::getOrAddGlobalsPoolFor(SnippyModule &M) {
+  return getOrAddGlobalsPoolFor(M.getModule());
+}
+
+GlobalsPool &SnippyProgramContext::getOrAddGlobalsPoolFor(Module &M,
                                                           StringRef OnError) {
   auto EPool = getOrAddGlobalsPoolFor(M);
   if (EPool)
@@ -139,6 +144,11 @@ GlobalsPool &SnippyProgramContext::getOrAddGlobalsPoolFor(SnippyModule &M,
     OS << E;
     return Msg;
   }());
+}
+
+GlobalsPool &SnippyProgramContext::getOrAddGlobalsPoolFor(SnippyModule &M,
+                                                          StringRef OnError) {
+  return getOrAddGlobalsPoolFor(M.getModule(), OnError);
 }
 
 void SnippyProgramContext::initializeSelfcheckSection(

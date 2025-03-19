@@ -89,6 +89,9 @@ MachineBasicBlock *createMachineBasicBlock(MachineFunction &MF);
 
 std::string getMBBSectionName(const MachineBasicBlock &MBB);
 
+GlobalVariable *getGVForMBB(const MachineBasicBlock &MBB, GlobalsPool &GP,
+                            SnippyProgramContext &ProgCtx);
+
 template <typename... DstArgs>
 MachineInstrBuilder
 getInstBuilder(bool IsSupport, const SnippyTarget &Tgt, MachineBasicBlock &MBB,

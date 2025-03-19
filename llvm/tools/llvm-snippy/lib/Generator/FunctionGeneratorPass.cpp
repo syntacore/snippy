@@ -379,6 +379,19 @@ bool FunctionGenerator::runOnModule(Module &M) {
   return Ret;
 }
 
+unsigned long long
+FunctionGenerator::calculateEntryFnInstrsNum(Module &M,
+                                             const CallGraphState &CGS) {
+  auto *RootNode = CGS.getRootNode();
+  return std::accumulate(
+      RootNode->functions().begin(), RootNode->functions().end(), 0ull,
+      [&M, this](auto Acc, const auto *F) {
+        const auto &MF =
+            *SnippyModule::fromModule(M).getMMI().getMachineFunction(*F);
+        return Acc + getRequestedInstrsNum(MF);
+      });
+}
+
 bool FunctionGenerator::readFromYaml(Module &M, const FunctionDescs &FDs) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &ProgCtx = SGCtx.getProgramContext();

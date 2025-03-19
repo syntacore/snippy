@@ -57,6 +57,10 @@ public:
                                                     Histogram.end());
   }
 
+  bool hasInternalStackSection() const {
+    return Sections.hasSection(SectionsDescriptions::StackSectionName);
+  }
+
   void setupImmHistMap(const OpcodeCache &OpCC) {
     if (!ImmHistogram.holdsAlternative<ImmediateHistogramRegEx>())
       return;
