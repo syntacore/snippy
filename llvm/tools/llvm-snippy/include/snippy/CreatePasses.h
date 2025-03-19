@@ -82,7 +82,6 @@ MachineFunctionPass *createPrologueEpilogueInsertionPass();
 
 MachineFunctionPass *createPrintMachineInstrsPass(raw_ostream &OS);
 
-
 MachineFunctionPass *createBlockGenPlanningPass();
 ImmutablePass *createBlockGenPlanWrapperPass();
 

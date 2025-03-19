@@ -103,6 +103,18 @@ public:
     return GVs.emplace(NewGV, Offset).first->first;
   }
 
+  GlobalVariable *
+  createGVDecl(unsigned BitWidth, unsigned Alignment = 1u,
+               GlobalValue::LinkageTypes Linkage = GlobalValue::ExternalLinkage,
+               StringRef Name = "global_decl", StringRef Purpose = "",
+               bool IsConstant = true) {
+    std::string FinalName = (Prepend + Name).str();
+    auto *NewGV = State.createGlobalConstantDecl(M, BitWidth, Linkage,
+                                                 FinalName, IsConstant);
+    NewGV->setSection(SectionName);
+    return NewGV;
+  }
+
   uint64_t getGVAddress(GlobalVariable *GV) const {
     assert(GVs.count(GV) && "GV is unregistered");
     return GVs.at(GV);

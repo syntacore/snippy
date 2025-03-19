@@ -350,6 +350,9 @@ public:
   virtual MachineInstr *generateFinalInst(InstructionGenerationContext &IGC,
                                           unsigned LastInstrOpc) const = 0;
 
+  virtual MachineInstr *
+  generateMemoryBarrier(InstructionGenerationContext &IGC) const = 0;
+
   virtual MachineInstr *generateCall(InstructionGenerationContext &IGC,
                                      const Function &Target,
                                      bool AsSupport) const = 0;
@@ -396,8 +399,16 @@ public:
   virtual void copyRegToReg(InstructionGenerationContext &IGC, MCRegister Rs,
                             MCRegister Rd) const = 0;
 
+  virtual MachineInstr *loadSymbolAddress(InstructionGenerationContext &IGC,
+                                          unsigned DestReg,
+                                          const GlobalValue *Target) const = 0;
+
   virtual void loadRegFromAddr(InstructionGenerationContext &IGC, uint64_t Addr,
                                MCRegister Reg) const = 0;
+
+  virtual void loadRegFromAddrInReg(InstructionGenerationContext &IGC,
+                                    MCRegister AddrReg,
+                                    MCRegister Reg) const = 0;
 
   virtual std::tuple<size_t, size_t>
   getAccessSizeAndAlignment(SnippyProgramContext &ProgCtx, unsigned Opcode,

@@ -691,5 +691,23 @@ std::string getMBBSectionName(const MachineBasicBlock &MBB) {
   return ret;
 }
 
+GlobalVariable *getGVForMBB(const MachineBasicBlock &MBB, GlobalsPool &GP,
+                            SnippyProgramContext &ProgCtx) {
+
+  auto &State = ProgCtx.getLLVMState();
+  auto &Tgt = State.getSnippyTarget();
+
+  auto AddrLen = Tgt.getAddrRegLen(State.getTargetMachine());
+
+  auto ToName = getMBBSectionName(MBB);
+  auto *GV = GP.getGV(ToName);
+  if (!GV)
+    GV = GP.createGV(APInt::getZero(AddrLen), /*Alignment*/ 1,
+                     GlobalValue::ExternalLinkage, ToName,
+                     /*Reason*/ "Relocation for BB address",
+                     /* IsConst */ true);
+  return GV;
+}
+
 } // namespace snippy
 } // namespace llvm

@@ -38,9 +38,10 @@ generate(planning::BasicBlockRequest &BB,
 
 void generate(planning::FunctionRequest &FunctionGenRequest,
               MachineFunction &MF, GeneratorContext &GC,
-              const SimulatorContext &SimCtx, MachineLoopInfo *MLI,
-              const CallGraphState &CGS, MemAccessInfo *MAI,
-              const SnippyLoopInfo *SLI, SnippyFunctionMetadata *SFM);
+              const SimulatorContext &SimCtx, MachineLoopInfo *MLI = nullptr,
+              const CallGraphState *CGS = nullptr, MemAccessInfo *MAI = nullptr,
+              const SnippyLoopInfo *SLI = nullptr,
+              SnippyFunctionMetadata *SFM = nullptr);
 
 } // namespace snippy
 } // namespace llvm
