@@ -1,0 +1,30 @@
+# COM: This test checks that -valuegram-operands-regs-init-outputs available 
+#      only if -valuegram-operands-regs specified
+
+# RUN: not llvm-snippy %s -valuegram-operands-regs-init-outputs \
+# RUN: |& FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  mattr: +zfhmin,+d
+  dump-mf: on
+  num-instrs: 100
+
+sections:
+  - no: 1
+    VMA: 0x210000
+    SIZE: 0x100000
+    LMA: 0x210000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x100000
+    SIZE: 0x100000
+    LMA: 0x100000
+    ACCESS: rw
+
+histogram:
+  - [FCVT_H_D, 1.0]
+
+# CHECK: Incompatible options: -valuegram-operands-regs-init-outputs available 
+#        only if -valuegram-operands-regs specified
+

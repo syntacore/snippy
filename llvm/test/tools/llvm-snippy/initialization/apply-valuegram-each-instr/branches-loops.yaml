@@ -10,6 +10,7 @@
 options:
   dump-mf: on
   num-instrs: 100
+  valuegram-operands-regs-init-outputs: on
 
 branches:
   number-of-loop-iterations:
