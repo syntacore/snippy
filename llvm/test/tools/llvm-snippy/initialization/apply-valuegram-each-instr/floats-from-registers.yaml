@@ -9,6 +9,7 @@ options:
   num-instrs: 1000
   mattr: +zfh,+d
   dump-mf: on
+  valuegram-operands-regs-init-outputs: on
 
 sections:
     - no:        1

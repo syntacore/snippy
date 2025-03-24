@@ -14,6 +14,7 @@ options:
   mattr: +v
   dump-mf: true
   num-instrs: 1000
+  valuegram-operands-regs-init-outputs: on
 
 sections:
     - no:        0
