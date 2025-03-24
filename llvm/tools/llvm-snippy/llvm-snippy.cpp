@@ -107,6 +107,13 @@ static snippy::opt<std::string> ValuegramRegsDataFile(
              "instructions are generated."),
     cl::cat(Options), cl::init(""));
 
+static snippy::opt<bool> ValuegramOperandsRegsInitOutputs(
+    "valuegram-operands-regs-init-outputs",
+    cl::desc("turning on initialization of destination registers before "
+             "each non-service instruction. Available only if specified "
+             "-valuegram-operands-regs."),
+    cl::Hidden, cl::init(false));
+
 static snippy::opt_list<std::string> ReservedRegisterList(
     "reserved-regs-list", cl::CommaSeparated,
     cl::desc("list of registers that shall not be used in snippet code"),
@@ -850,6 +857,11 @@ static void checkBurstGram(LLVMContext &Ctx, const OpcodeHistogram &Histogram,
 
 static void checkCompatibilityWithValuegramPolicy(const Config &Cfg,
                                                   LLVMContext &Ctx) {
+  if (!ValuegramRegsDataFile.isSpecified() &&
+      ValuegramOperandsRegsInitOutputs.isSpecified())
+    snippy::fatal(Ctx, "Incompatible options",
+                  "-valuegram-operands-regs-init-outputs available only if "
+                  "-valuegram-operands-regs specified");
   if (!ValuegramRegsDataFile.isSpecified())
     return;
   bool FillCodeSectionMode = !getExpectedNumInstrs(NumInstrs.getValue());
@@ -1097,9 +1109,10 @@ GeneratorSettings createGeneratorConfig(LLVMState &State, Config &&Cfg,
       LinkerOptions{ExternalStackOpt, MangleExportedNames,
                     std::move(EntryPointName.getValue())},
       ModelPluginOptions{RunOnModel, std::move(Models)},
-      InstrsGenerationOptions{VerifyMachineInstrs, ChainedRXSectionsFill,
-                              ChainedRXSorted, ChunkSize, NumPrimaryInstrs,
-                              std::move(LastInstr)},
+      InstrsGenerationOptions{
+          VerifyMachineInstrs, ChainedRXSectionsFill, ChainedRXSorted,
+          ValuegramOperandsRegsInitOutputs.getValue(), ChunkSize,
+          NumPrimaryInstrs, std::move(LastInstr)},
       RegistersOptions{
           InitRegsInElf, FollowTargetABI, InitialRegisterDataFile.getValue(),
           std::move(DumpPathInitialState), std::move(DumpPathFinalState),
