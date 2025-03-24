@@ -7,6 +7,7 @@ set(LLVMSnippyConfigSources
     PluginWrapper.cpp
     FPUSettings.cpp
     CallGraphLayout.cpp
+    ImmediateHistogram.cpp
     Valuegram.cpp
     )
 
