@@ -23,7 +23,6 @@ set(LLVMSnippyGeneratorSources
   SnippyFunctionMetadata.cpp
   SnippyModule.cpp
   MemoryManager.cpp
-  ImmediateHistogram.cpp
   TopMemAccSampler.cpp
   RandomMemAccSampler.cpp
 )
