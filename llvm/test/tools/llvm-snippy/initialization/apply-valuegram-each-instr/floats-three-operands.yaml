@@ -13,6 +13,7 @@
 options:
   num-instrs: 1000
   dump-mf: on
+  valuegram-operands-regs-init-outputs: on
 
 sections:
     - no:        1
