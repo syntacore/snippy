@@ -1,0 +1,62 @@
+# COM: This test checks that before each instruction only the source registers
+#      (without destination) are initialized.
+
+# RUN: llvm-snippy %s \
+# RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN:    -valuegram-operands-regs-init-outputs=false \
+# RUN: |& FileCheck %s --check-prefix NO_DEST
+
+# RUN: llvm-snippy %s \
+# RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN:    -valuegram-operands-regs-init-outputs=true \
+# RUN: |& FileCheck %s --check-prefix WITH_DEST
+
+
+options:
+  mattr: +zfh,+d
+  march: riscv64
+  num-instrs: 100
+  dump-mf: on
+
+sections:
+    - no:        1
+      VMA:       0x70000000
+      SIZE:      0x10000000
+      LMA:       0x70000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x9000000
+      SIZE:      0x40000
+      LMA:       0x9000000
+      ACCESS:    rw
+
+histogram:
+    - [FEQ_D, 1.0]
+    - [FLT_D, 1.0]
+    - [FLE_D, 1.0]
+    - [FCVT_W_D, 1.0]
+    - [FCVT_WU_D, 1.0]
+    - [FCLASS_D, 1.0]
+
+#          Valuegram values:
+#
+#                     X: 0, 1, 255.
+#                     F: 83, 170.
+#                     We want to see only F initialization.
+#
+#          An example of what we're matching:
+#
+#                     $x29 = ADDI $x0, 170
+#                     $f13_d = FMV_D_X $x29
+#                     $x20 = FCVT_W_D $f13_d, 2
+
+
+# NO_DEST-COUNT-10: [[XREG:\$x[0-9]+]] = ADDI {{.*}}, {{(83|170).*[[:space:]].*}}[[FREG:\$f[0-9]+_d]] = FMV_D_X [[XREG]]{{.*[[:space:]].*\$x[0-9]+ = .*}}[[FREG]]
+
+# X registers are destination for histogram instructions. We don't want to see
+# them initialization.
+# NO_DEST-NOT: {{\$x[0-9]+}} = ADDI $x0, {{(1 |0|255)}}
+
+
+# WITH_DEST-COUNT-10: [[REG0:\$x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}[[REG1:\$x[0-9]+]] = ADDI {{.*}}, {{(83|170).*[[:space:]].*}}[[FREG1:\$f[0-9]+_d]] = FMV_D_X [[REG1]]{{.*[[:space:]].*}}[[REG0]] = {{.*}}[[FREG1]]
+

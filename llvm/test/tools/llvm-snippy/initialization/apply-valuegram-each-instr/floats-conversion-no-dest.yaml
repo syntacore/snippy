@@ -1,0 +1,44 @@
+# COM: This test checks that only source registers (without destination) are
+#      initialized before each conversion instruction.
+
+# RUN: llvm-snippy %s \
+# RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN: |& FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  mattr: +zfhmin,+d
+  dump-mf: on
+  num-instrs: 100
+
+sections:
+  - no: 1
+    VMA: 0x210000
+    SIZE: 0x100000
+    LMA: 0x210000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x100000
+    SIZE: 0x100000
+    LMA: 0x100000
+    ACCESS: rw
+
+histogram:
+  - [FCVT_H_D, 1.0]
+  - [FCVT_S_D, 1.0]
+
+#          Valuegram values:
+#
+#                     X: 0, 1, 255.
+#                     F: 83, 170.
+#                     We want to see them in initialization
+#
+#          An example of what we're matching:
+#
+#                     $x18 = ADDI $x0, 83
+#                     $f20_d = FMV_D_X $x18
+#                     $f27_h = FCVT_H_D $f20_d, 1
+
+# CHECK-COUNT-10: [[XREG:\$x[0-9]+]] = ADDI {{.*}}, {{(83|170).*[[:space:]].*}}[[FREG:\$f[0-9]+_d]] = FMV_D_X [[XREG]]{{.*[[:space:]].*\$f[0-9]+_(h|f) = (FCVT_S_D|FCVT_H_D)}} [[FREG]]
+

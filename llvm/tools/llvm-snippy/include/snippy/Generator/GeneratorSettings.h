@@ -38,6 +38,7 @@ struct InstrsGenerationOptions {
   bool RunMachineInstrVerifier;
   bool ChainedRXSectionsFill;
   bool ChainedRXSorted;
+  bool ValuegramOperandsRegsInitOutputs;
   std::optional<unsigned> ChainedRXChunkSize;
   std::optional<unsigned> NumInstrs;
   std::string LastInstr;

@@ -21,6 +21,7 @@
 options:
   dump-mf: on
   num-instrs: 1000
+  valuegram-operands-regs-init-outputs: on
 
 sections:
     - no:        0

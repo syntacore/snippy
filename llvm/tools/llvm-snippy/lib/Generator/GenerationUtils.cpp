@@ -201,19 +201,34 @@ static Register pregenerateRegister(InstructionGenerationContext &InstrGenCtx,
   return RegOpt.value();
 }
 
+static bool isDestinationRegister(unsigned OpIndex, unsigned NumDefs) {
+  // NumDefs - number of MachineOperands that are register definitions.
+  // Register definitions always occur at the start of the machine operand list.
+  return OpIndex < NumDefs;
+}
+
 std::vector<planning::PreselectedOpInfo>
 selectInitializableOperandsRegisters(InstructionGenerationContext &InstrGenCtx,
                                      const MCInstrDesc &InstrDesc) {
   std::vector<planning::PreselectedOpInfo> Preselected;
   Preselected.reserve(InstrDesc.getNumOperands());
   auto &ProgCtx = InstrGenCtx.ProgCtx;
+  // If the register is a destination register and we don't want to initialize
+  // the outputs, we skip it.
+  auto NeedsInit = [&InstrDesc, &InstrGenCtx](auto OpIndex) {
+    return !isDestinationRegister(OpIndex, InstrDesc.getNumDefs()) ||
+           InstrGenCtx.GenSettings.InstrsGenerationConfig
+               .ValuegramOperandsRegsInitOutputs;
+  };
   llvm::transform(
       llvm::enumerate(InstrDesc.operands()), std::back_inserter(Preselected),
       [&, &Tgt = ProgCtx.getLLVMState().getSnippyTarget()](
           const auto &&Args) -> planning::PreselectedOpInfo {
         const auto &[OpIndex, MCOpInfo] = Args;
-        // If it is TIED_TO, this register is already selected.
-        if (Tgt.canInitializeOperand(InstrDesc, OpIndex) &&
+        // If it is TIED_TO, this register is already
+        // selected.
+        if (NeedsInit(OpIndex) &&
+            Tgt.canInitializeOperand(InstrDesc, OpIndex) &&
             InstrDesc.getOperandConstraint(OpIndex, MCOI::TIED_TO) == -1)
           return pregenerateRegister(InstrGenCtx, InstrDesc, MCOpInfo, OpIndex);
         return {};
