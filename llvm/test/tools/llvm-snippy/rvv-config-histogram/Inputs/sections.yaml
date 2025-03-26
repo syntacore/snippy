@@ -1,0 +1,17 @@
+sections:
+    - no:        0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x1000000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x2100000
+      SIZE:      0x100000
+      LMA:       0x2100000
+      ACCESS:    rw
+

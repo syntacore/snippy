@@ -1,0 +1,53 @@
+# REQUIRES: riscv-rvv
+# COM: This test checks that if not all VLs are suitable for RVV configurations snippy choose suitable one.
+
+# RUN: llvm-snippy %s \ 
+# RUN: |& FileCheck %s 
+
+options:
+  march: riscv64
+  mcpu: generic-rv64
+  mattr: +v
+  dump-mf: true
+  num-instrs: 10000
+
+include:
+- "Inputs/sections.yaml"
+
+riscv-vector-unit:
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [any_legal, 1.0] # VL = 0-8 suitable for RVV Conf
+      - [9, 100500.0]    # unsuitable for RVV Conf
+    VXRM:
+      rnu: 1.0
+    VXSAT:
+      on: 1.0
+    VTYPE:
+      SEW:
+        sew_32: 1.0
+      LMUL:
+        m2: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+ 
+histogram:
+       - [VSETIVLI, 1.0]
+       - [VADD_VV, 1.0]
+         
+# The first operand of the instruction VSETIVLI is VL
+# CHECK:     VSETIVLI 0,
+# CHECK:     VSETIVLI 1,
+# CHECK:     VSETIVLI 2,
+# CHECK:     VSETIVLI 3,
+# CHECK:     VSETIVLI 4,
+# CHECK:     VSETIVLI 5,
+# CHECK:     VSETIVLI 6,
+# CHECK:     VSETIVLI 7,
+# CHECK:     VSETIVLI 8,
+# CHECK-NOT: VSETIVLI 9,
+
