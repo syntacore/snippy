@@ -1,0 +1,44 @@
+# REQUIRES: riscv-rvv
+# COM: This test checks that if all RVV configurations are not compatible with 
+#      all VLs, this is an error.
+
+# RUN: not llvm-snippy %s \ 
+# RUN: |& FileCheck %s 
+
+options:
+  march: riscv64
+  mcpu: generic-rv64
+  mattr: +v
+  num-instrs: 100
+
+include:
+- "Inputs/sections.yaml"
+
+riscv-vector-unit:
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [17, 1.0]   
+    VXRM:
+      rnu: 1.0
+    VXSAT:
+      on: 1.0
+    VTYPE:
+      SEW:
+        sew_64: 1.0
+      LMUL:
+        m8: 1.0
+        m4: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+ 
+histogram:
+       - [VSETIVLI, 1.0]
+       - [VADD_VV, 1.0]
+         
+# CHECK: All RVV configurations from the riscv-vector-unit are incompatible 
+#        with all VLs generators
+

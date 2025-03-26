@@ -10,6 +10,7 @@
 #include "RISCVGenerated.h"
 #include "TargetConfig.h"
 
+#include "snippy/Config/Valuegram.h"
 #include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Support/Options.h"
 #include "snippy/Support/Utils.h"
@@ -71,6 +72,13 @@ static snippy::opt<bool> NoReservedCfgRVV(
     cl::desc(
         "This option disables the generation of reserved SEW and LMUL values"),
     cl::Hidden, cl::init(false), cl::cat(SnippyRISCVOptions));
+
+static snippy::opt<std::string> DumpDiscardedRVVConfigurations(
+    "riscv-dump-discarded-rvv-configurations",
+    cl::desc("Print information about discarded due to incompatibility "
+             "riscv-vector-unit configurations (VL, VM and RVV "
+             "configuration generators"),
+    cl::Hidden, cl::init(""), cl::ValueOptional, cl::cat(SnippyRISCVOptions));
 
 } // namespace snippy
 } // namespace llvm
@@ -559,9 +567,7 @@ struct UnmaskedVMGenerator final : VMGeneratorInterface {
   static constexpr const char *kID = "all_ones";
   std::string identify() const override { return kID; }
 
-  APInt generate(const RVVConfiguration &Cfg, unsigned VL) const override {
-    return APInt::getAllOnes(VL);
-  }
+  APInt generate(unsigned VL) const override { return APInt::getAllOnes(VL); }
 };
 
 struct LegalVMGenerator final : VMGeneratorInterface {
@@ -569,22 +575,56 @@ struct LegalVMGenerator final : VMGeneratorInterface {
   static constexpr const char *kID = "any_legal";
   std::string identify() const override { return kID; }
 
-  APInt generate(const RVVConfiguration &Cfg, unsigned VL) const override {
+  APInt generate(unsigned VL) const override {
     auto MaxValue = APInt::getAllOnes(VL);
     return APInt(RandEngine::genInRangeInclusive(MaxValue));
   }
 };
 
+static APInt getImmVLVM(StringRef Item, StringRef ErrorContext) {
+  // Here we are trying to convert a string Item from the yaml config
+  // to a valid VL or VM value, depending on the context ErrorContext.
+  Expected<FormattedAPIntWithSign> ExpectedValue =
+      FormattedAPIntWithSign::fromString(Item);
+  if (auto E = ExpectedValue.takeError())
+    snippy::fatal(Twine("Illegal IMM-based ") + ErrorContext + ": " + Item);
+
+  // If the converted number is negative, it is an error.
+  // Non-negative VLs and VMs are expected.
+  if (ExpectedValue->Number.IsSigned)
+    snippy::fatal(Twine(ErrorContext) + " can't be negative: " + Item);
+  return ExpectedValue->Number.Value;
+}
+
 struct ImmVLGen : public VLGeneratorInterface {
 
-  ImmVLGen(std::string ID) : Context(std::move(ID)) {
-    snippy::fatal("IMM-based VL generators are not implemented");
+  ImmVLGen(std::string ID) {
+    auto APIntVal = getImmVLVM(ID, "VL");
+    Context = std::string(kID) + "_" + ID;
+    if (APIntVal.getActiveBits() > sizeof(Value) * CHAR_BIT)
+      snippy::fatal(Twine("VL ") + Context +
+                    std::string(" is greater than the maximum possible: ") +
+                    std::to_string(sizeof(Value) * CHAR_BIT));
+    Value = APIntVal.getZExtValue();
   }
 
-  std::string identify() const override { return "imm_" + Context; }
+  static constexpr const char *kID = "imm";
+  std::string identify() const override { return Context; }
+
+  bool isApplicable(unsigned VLEN, bool ReduceVL,
+                    const RVVConfiguration &Cfg) const override {
+    auto PointSEW = static_cast<unsigned>(Cfg.SEW);
+    auto MaxVL = computeVLMax(VLEN, PointSEW, Cfg.LMUL);
+    return (Value <= MaxVL) && (!ReduceVL || (Value <= kMaxVLForVSETIVLI));
+  }
+
   unsigned generate(unsigned VLEN, const RVVConfiguration &Cfg) const override {
+    assert(isApplicable(VLEN, /* ReduceVL */ false, Cfg) &&
+           "Generation request should be made only for valid VLs");
     return Value;
   }
+
+  unsigned getValue() const { return Value; }
 
 private:
   unsigned Value;
@@ -593,13 +633,29 @@ private:
 
 struct ImmVMGen : public VMGeneratorInterface {
 
-  ImmVMGen(std::string ID) : Context(std::move(ID)) {
-    snippy::fatal("IMM-based VM generators are not implemented");
+  ImmVMGen(std::string ID) {
+    Value = getImmVLVM(ID, "VM");
+    Context = std::string(ImmVLGen::kID) + "_" + ID;
   }
-  std::string identify() const override { return "imm_" + Context; }
 
-  APInt generate(const RVVConfiguration &Cfg, unsigned VL) const override {
-    // FIXME: detect illegal combinations
+  std::string identify() const override { return Context; }
+
+  bool isApplicable(unsigned VL) const override {
+    // We can apply a mask only if the number of active bits in it
+    // does not exceed the total number of elements (VL).
+    //
+    // For example,
+    //             active 8 bits/total 11 bits
+    //                <------>
+    //   ImmVM = 0b00010011110 (158)
+    //   APInt(/* numBits */ 11, /* val */ 158).getActiveBits() == 8
+    //   If number of elements (VL) >= 8 this mask is applicable, otherwise not.
+    return Value.getActiveBits() <= VL;
+  }
+
+  APInt generate(unsigned VL) const override {
+    assert(isApplicable(VL) &&
+           "Generation request should be made only for valid VMs");
     return Value;
   }
 
@@ -954,7 +1010,8 @@ extractWeightedGeneratorIDs(const std::vector<SList> &GenInfo) {
   std::transform(GenInfo.begin(), GenInfo.end(), std::back_inserter(Result),
                  [](const auto &Item) {
                    if (Item.size() != 2)
-                     snippy::fatal("incorrect format for genetor descriptions");
+                     snippy::fatal(
+                         "incorrect format for generator descriptions");
                    std::string GeneratorID = Item[0];
                    double Weight;
                    if (StringRef(Item[1]).getAsDouble(Weight))
@@ -983,8 +1040,10 @@ template <typename T> struct WeightedItems {
   }
 };
 
-static std::vector<InternalConfigurationPoint>
-getLegalConfigurationPoints(unsigned VLEN, const RVVUnitInfo &VUInfo) {
+static std::vector<InternalConfigurationPoint> getLegalConfigurationPoints(
+    const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &VLGen,
+    unsigned VLEN, const RVVUnitInfo &VUInfo,
+    std::vector<RVVConfiguration> &DiscardedConfigs) {
   auto SEW = extractElementsWithPropabilities(VUInfo.VTYPE.SEW);
   auto LMUL = extractElementsWithPropabilities(VUInfo.VTYPE.LMUL);
   auto MA = extractElementsWithPropabilities(VUInfo.VTYPE.VMA);
@@ -1020,6 +1079,18 @@ getLegalConfigurationPoints(unsigned VLEN, const RVVUnitInfo &VUInfo) {
         return !Point.Config.IsLegal;
       });
   ConfigPoints.erase(RemoveIt, ConfigPoints.end());
+  // Also erase all ConfigPoints for which there are no valid VLs
+  auto DiscardedIt = std::partition(
+      ConfigPoints.begin(), ConfigPoints.end(),
+      [&VLGen, VLEN](const auto &Point) {
+        return llvm::any_of(VLGen, [VLEN, &Point = Point](const auto &VL) {
+          return VL->isApplicable(VLEN, /* ReduceVL */ false, Point.Config);
+        });
+      });
+  std::transform(DiscardedIt, ConfigPoints.end(),
+                 std::back_inserter(DiscardedConfigs),
+                 [](const auto &Point) { return Point.Config; });
+  ConfigPoints.erase(DiscardedIt, ConfigPoints.end());
   return ConfigPoints;
 }
 
@@ -1057,9 +1128,12 @@ getIllegalConfigurationPoints(unsigned VLEN) {
   return AllConfigPoints;
 }
 
-static std::vector<InternalConfigurationPoint>
-getAllConfigurationPoints(unsigned VLEN, const RVVUnitInfo &VUInfo) {
-  auto ConfigPoints = getLegalConfigurationPoints(VLEN, VUInfo);
+static std::vector<InternalConfigurationPoint> getAllConfigurationPoints(
+    const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &VLGen,
+    unsigned VLEN, const RVVUnitInfo &VUInfo,
+    std::vector<RVVConfiguration> &DiscardedConfigs) {
+  auto ConfigPoints =
+      getLegalConfigurationPoints(VLGen, VLEN, VUInfo, DiscardedConfigs);
   auto IllegalConfigPoints = getIllegalConfigurationPoints(VLEN);
   // Merge two arrays with legal and illegal configurations into one common
   ConfigPoints.insert(ConfigPoints.end(), IllegalConfigPoints.begin(),
@@ -1067,10 +1141,12 @@ getAllConfigurationPoints(unsigned VLEN, const RVVUnitInfo &VUInfo) {
   return ConfigPoints;
 }
 
-static WeightedItems<RVVConfiguration>
-getInternalConfigurationPoints(unsigned VLEN, const RVVUnitInfo &VUInfo,
-                               double ProbSetVill) {
-  auto ConfigPoints = getAllConfigurationPoints(VLEN, VUInfo);
+static WeightedItems<RVVConfiguration> getInternalConfigurationPoints(
+    const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &VLGen,
+    unsigned VLEN, const RVVUnitInfo &VUInfo, double ProbSetVill,
+    std::vector<RVVConfiguration> &DiscardedConfigs) {
+  auto ConfigPoints =
+      getAllConfigurationPoints(VLGen, VLEN, VUInfo, DiscardedConfigs);
   double WeightLegal = std::accumulate(
       ConfigPoints.begin(), ConfigPoints.end(), 0.0,
       [](const double Weight, const auto &Point) {
@@ -1083,7 +1159,9 @@ getInternalConfigurationPoints(unsigned VLEN, const RVVUnitInfo &VUInfo,
       });
   if (WeightLegal == 0 && ProbSetVill != 1)
     snippy::fatal(
-        "RVV Config: no legal configuration detected and Pvill != 1, aborting");
+        "RVV Config: no legal configuration detected and Pvill != 1, aborting. "
+        "All RVV configurations from the riscv-vector-unit are "
+        "incompatible with all VL generators");
   // If LegalWeight is zero that means that there are no legal configurations
   // and LegalWeightCoeff not needed because LegalPoints empty
   double LegalWeightCoeff = WeightLegal ? (1.0 - ProbSetVill) / WeightLegal : 0;
@@ -1136,6 +1214,95 @@ auto constructGeneratorsFromWeightedIds(
   return Result;
 }
 
+static auto getMinVLValue(unsigned MinMaxVL,
+                          const RVVConfigurationInfo::VLGeneratorHolder &VL) {
+  if (VL->identify() == LegalVLGenerator::kID)
+    return 0u;
+  if (VL->identify() == LegalVLNonZeroGenerator::kID)
+    return 1u;
+  if (VL->identify() == MaxVLGenerator::kID)
+    return MinMaxVL;
+  assert((VL->identify().find(ImmVLGen::kID) != std::string::npos) &&
+         "There should have been only ImmVLGens");
+  return static_cast<ImmVLGen *>(VL.get())->getValue();
+}
+
+static WeightedItems<RVVConfigurationInfo::VMGeneratorHolder>
+getVMsCompatibleWithVLs(
+    unsigned MinMaxVL,
+    WeightedItems<RVVConfigurationInfo::VMGeneratorHolder> &VMGensWeights,
+    const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &VLGen,
+    std::vector<RVVConfigurationInfo::VMGeneratorHolder> &DiscardedVMs) {
+  WeightedItems<RVVConfigurationInfo::VMGeneratorHolder> Result;
+  for (auto &&[VMGen, VMWeight] :
+       zip(VMGensWeights.Elements, VMGensWeights.Weights)) {
+    // Keep the VMs that have at least one compatible VL
+    if (llvm::any_of(VLGen, [MinMaxVL, &VMGen = VMGen](auto &VL) {
+          return VMGen->isApplicable(getMinVLValue(MinMaxVL, VL));
+        })) {
+      Result.addWeightedElement(VMWeight, std::move(VMGen));
+      continue;
+    }
+    DiscardedVMs.push_back(std::move(VMGen));
+  }
+  if (Result.Elements.empty())
+    snippy::fatal("All VMs generators from the riscv-vector-unit are "
+                  "incompatible with all VL generators");
+  return Result;
+}
+
+static WeightedItems<RVVConfigurationInfo::VLGeneratorHolder>
+getVLsCompatibleWithVMsAndConfigs(
+    unsigned MinMaxVL, unsigned VLEN,
+    const std::vector<RVVConfiguration> &ConfigPoints,
+    const std::vector<RVVConfigurationInfo::VMGeneratorHolder> &VMGen,
+    WeightedItems<RVVConfigurationInfo::VLGeneratorHolder> &VLGensWeights,
+    std::vector<RVVConfigurationInfo::VLGeneratorHolder> &DiscardedVLs) {
+  WeightedItems<RVVConfigurationInfo::VLGeneratorHolder> Result;
+  for (auto &&[VLGen, VLWeight] :
+       zip(VLGensWeights.Elements, VLGensWeights.Weights)) {
+    // Keep the VLs that have at least one compatible VM and one compatible RVV
+    // Config
+    if (llvm::any_of(VMGen,
+                     [MinMaxVL, &VLGen = VLGen](auto &VM) {
+                       return VM->isApplicable(getMinVLValue(MinMaxVL, VLGen));
+                     }) &&
+        llvm::any_of(ConfigPoints, [VLEN, &VLGen = VLGen](const auto &Config) {
+          return VLGen->isApplicable(VLEN, /* ReduceVL */ false, Config);
+        })) {
+      Result.addWeightedElement(VLWeight, std::move(VLGen));
+      continue;
+    }
+    DiscardedVLs.push_back(std::move(VLGen));
+  }
+  if (Result.Elements.empty())
+    snippy::fatal("All VLs generators from the riscv-vector-unit are "
+                  "incompatible with VM or RVV Config generators");
+  return Result;
+}
+
+static WeightedItems<RVVConfiguration> getConfigsCompatibleWithVLs(
+    const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &VLGen,
+    unsigned VLEN, WeightedItems<RVVConfiguration> &ConfigPointsWeights,
+    std::vector<RVVConfiguration> &DiscardedConfigs) {
+  WeightedItems<RVVConfiguration> Result;
+  for (auto &&[Config, ConfigWeight] :
+       zip(ConfigPointsWeights.Elements, ConfigPointsWeights.Weights)) {
+    // Keep the RVV Configs that have at least one compatible VL
+    if (llvm::any_of(VLGen, [VLEN, &Config = Config](const auto &VL) {
+          return VL->isApplicable(VLEN, /* ReduceVL */ false, Config);
+        })) {
+      Result.addWeightedElement(ConfigWeight, std::move(Config));
+      continue;
+    }
+    DiscardedConfigs.push_back(std::move(Config));
+  }
+  if (Result.Elements.empty())
+    snippy::fatal("All RVV configurations from the riscv-vector-unit are "
+                  "incompatible with all VL generators");
+  return Result;
+}
+
 RVVConfigurationInfo
 RVVConfigurationInfo::createDefault(const GeneratorSettings &GenSettings,
                                     unsigned VLEN) {
@@ -1163,9 +1330,72 @@ RVVConfigurationInfo::createDefault(const GeneratorSettings &GenSettings,
       ModeSwitchInfo.SwitchInfo, !ModeSwitchInfo.VSETPresentInHistogram);
 }
 
+static void printDiscardedRVVConfigurations(
+    raw_ostream &OS,
+    const std::vector<RVVConfigurationInfo::VMGeneratorHolder> &DiscardedVMs,
+    const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &DiscardedVLs,
+    const std::vector<RVVConfiguration> &DiscardedConfigs, bool IsRVVPresent) {
+  OS << "--- RVV Unit Discarded Info ---\n";
+  if (!IsRVVPresent) {
+    OS << "None\n";
+    OS << "--- RVV Unit Discarded End  ---\n";
+    return;
+  }
+  OS << "  - VM Generators:\n";
+  for (const auto &VM : DiscardedVMs)
+    OS << "    <" << VM->identify() << ">\n";
+
+  OS << "  - VL Generators:\n";
+  for (const auto &VL : DiscardedVLs)
+    OS << "    <" << VL->identify() << ">\n";
+
+  OS << "  - Configuration Bag Listing:\n";
+  for (const auto &Point : DiscardedConfigs) {
+    OS << "    Conf: ";
+    Point.print(OS);
+    OS << "\n";
+  }
+
+  OS << "--- RVV Unit Discarded End  ---\n";
+}
+
+static void printDiscardedRVVConfigurations(
+    StringRef FilePath,
+    const std::vector<RVVConfigurationInfo::VMGeneratorHolder> &DiscardedVMs,
+    const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &DiscardedVLs,
+    const std::vector<RVVConfiguration> &DiscardedConfigs, bool IsRVVPresent) {
+  std::string Filename;
+  if (FilePath.empty())
+    Filename = "-";
+  else
+    Filename = FilePath;
+  if (Error Err = checkedWriteToOutput(Filename, [&](raw_ostream &OS) {
+        printDiscardedRVVConfigurations(OS, DiscardedVMs, DiscardedVLs,
+                                        DiscardedConfigs, IsRVVPresent);
+        return Error::success();
+      }))
+    snippy::fatal("riscv-dump-discarded-rvv-configurations error : " +
+                  toString(std::move(Err)));
+}
+
+static unsigned
+extractMinMaxVL(unsigned VLEN,
+                const std::vector<RVVConfiguration> &ConfigPoints) {
+  assert(!ConfigPoints.empty());
+  std::vector<unsigned> MaxVLs;
+  llvm::transform(
+      ConfigPoints, std::back_inserter(MaxVLs), [VLEN](const auto &Point) {
+        return computeVLMax(VLEN, static_cast<unsigned>(Point.SEW), Point.LMUL);
+      });
+  return *llvm::min_element(MaxVLs);
+}
+
 RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
     const GeneratorSettings &GenSettings, unsigned VLEN,
-    std::unique_ptr<RVVConfigInterface> &&Iface) {
+    std::unique_ptr<RVVConfigInterface> &&Iface,
+    std::vector<VMGeneratorHolder> &DiscardedVMs,
+    std::vector<VLGeneratorHolder> &DiscardedVLs,
+    std::vector<RVVConfiguration> &DiscardedConfigs) {
   const RVVConfigurationSpace CS =
       Iface ? Iface->getImpl<RVVConfig>().getRVVConfigurationSpace().value()
             : GenSettings.Cfg.TargetConfig->getImpl<RISCVConfigInterface>()
@@ -1176,13 +1406,36 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
   if (VLEN == 0)
     snippy::fatal("RVV configuration file should not be "
                   "specified for targets without RVV");
+  // The procedure for generating all reachable heaps of VLs, VMs, and RVV
+  // Configs occurs in two views of each heap:
   auto VLVMRules = extractVLVMRules(CS.VUInfo);
-  auto &&[ConfigPoints, ConfigWeights] =
-      getInternalConfigurationPoints(VLEN, CS.VUInfo, CS.Guides.SetVillP);
-  auto &&[VLGen, VLWeights] =
+  // 1. Get all VLs from the rvv-unit-config
+  auto VLGensWeights =
       constructGeneratorsFromWeightedIds<VLGeneratorHolder>(VLVMRules.VL);
-  auto &&[VMGen, VMWeights] =
-      constructGeneratorsFromWeightedIds<VMGeneratorHolder>(VLVMRules.VM);
+  // 2. Get all RVV Configs that are compatible with at least one VL
+  auto ConfigPointsWeights =
+      getInternalConfigurationPoints(VLGensWeights.Elements, VLEN, CS.VUInfo,
+                                     CS.Guides.SetVillP, DiscardedConfigs);
+  auto MinMaxVL = extractMinMaxVL(VLEN, ConfigPointsWeights.Elements);
+  // 3.1 Get all VMs from the rvv-unit-config
+  auto VMGensWeights = constructGeneratorsFromWeightedIds<
+      RVVConfigurationInfo::VMGeneratorHolder>(VLVMRules.VM);
+  // 3.2 Filter out VMs that are incompatible with all VLs
+  auto VMGensWeightsFiltered = getVMsCompatibleWithVLs(
+      MinMaxVL, VMGensWeights, VLGensWeights.Elements, DiscardedVMs);
+  // 4. Filter out VLs that are incompatible with all remaining VLs and/or all
+  // remaining RVV Configs
+  auto &&[VLGen, VLWeights] = getVLsCompatibleWithVMsAndConfigs(
+      MinMaxVL, VLEN, ConfigPointsWeights.Elements,
+      VMGensWeightsFiltered.Elements, VLGensWeights, DiscardedVLs);
+  // 5. Filter out the RVV Configs that were compatible only with the VLs that
+  // were discarded in step 4
+  auto &&[ConfigPoints, ConfigWeights] = getConfigsCompatibleWithVLs(
+      VLGen, VLEN, ConfigPointsWeights, DiscardedConfigs);
+  // 6. Filter out the VMs that were compatible only with the VLs that were
+  // discarded in step 4
+  auto &&[VMGen, VMWeights] = getVMsCompatibleWithVLs(
+      MinMaxVL, VMGensWeightsFiltered, VLGen, DiscardedVMs);
 
   auto ModeSwitchInfo = deriveModeSwitchingProbability(
       GenSettings.Cfg, CS.Guides.ModeChangeP, CS.Guides.SetVillP);
@@ -1202,13 +1455,50 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
 
 unsigned RVVConfigurationInfo::getVLEN() const { return VLEN; }
 
+const RVVConfigurationInfo::VLGeneratorHolder &
+RVVConfigurationInfo::selectVLGen(const RVVConfiguration &Config,
+                                  bool ReduceVL) const {
+  auto Filter = [VLEN = getVLEN(), ReduceVL,
+                 &Config](const VLGeneratorHolder &VLGen) {
+    return VLGen->isApplicable(VLEN, ReduceVL, Config);
+  };
+  const auto &ApplicGen = VLGen.generateIf(Filter);
+  // Generation under a condition can return a nullopt only if all elements
+  // do not satisfy this condition. We have already thrown out all RVV
+  // configurations for which there is no available VL. The only case where no
+  // suitable VL is found is when an instruction VSETIVLI is selected and all
+  // VLs > kMaxVLForVSETIVLI.
+  if (!ApplicGen.has_value())
+    snippy::fatal(
+        Twine("All RVV configuration-compatible VLs exceeds the maximum VL ") +
+        std::to_string(kMaxVLForVSETIVLI) +
+        " for the selected instruction VSETIVLI");
+  assert(ApplicGen.value().get() && "We can't return nullptr");
+  return ApplicGen.value();
+}
+
+const RVVConfigurationInfo::VMGeneratorHolder &
+RVVConfigurationInfo::selectVMGen(unsigned VL) const {
+  auto Filter = [VL](const VMGeneratorHolder &VMGen) {
+    return VMGen->isApplicable(VL);
+  };
+  const auto &ApplicGen = VMGen.generateIf(Filter);
+  // Generation under a condition can return a nullopt only if all elements
+  // do not satisfy this condition. This can't be the case, since we have
+  // already thrown out all VMs for which there is no available VL.
+  assert(ApplicGen.has_value() &&
+         "At least one VM must be found for the selected VL");
+  assert(ApplicGen.value().get() && "We can't return nullptr");
+  return ApplicGen.value();
+}
+
 RVVConfigurationInfo::VLVM
 RVVConfigurationInfo::selectVLVM(const RVVConfiguration &Config,
                                  bool ReduceVL) const {
-  auto VL = VLGen()->generate(VLEN, Config);
+  auto VL = selectVLGen(Config, ReduceVL)->generate(VLEN, Config);
   if (ReduceVL && (VL > kMaxVLForVSETIVLI))
     VL = kMaxVLForVSETIVLI;
-  auto VM = VMGen()->generate(Config, VL);
+  auto VM = selectVMGen(VL)->generate(VL);
   return {VL, VM};
 }
 
@@ -1216,7 +1506,7 @@ RVVConfigurationInfo::VLVM
 RVVConfigurationInfo::updateVM(const RVVConfiguration &Config,
                                const VLVM &OldVLVM) const {
   auto VL = OldVLVM.VL;
-  auto VM = VMGen()->generate(Config, VL);
+  auto VM = VMGen()->generate(VL);
   return {VL, VM};
 }
 
@@ -1327,14 +1617,25 @@ RISCVConfigurationInfo RISCVConfigurationInfo::constructConfiguration(
   auto ArchInfo =
       RISCVConfigurationInfo::deriveArchitecturalInformation(Ctx, TM);
   auto BaseCfg = BaseConfigurationInfo(ArchInfo.XLEN);
+  std::vector<RVVConfigurationInfo::VMGeneratorHolder> DiscardedVMs;
+  std::vector<RVVConfigurationInfo::VLGeneratorHolder> DiscardedVLs;
+  std::vector<RVVConfiguration> DiscardedConfigs;
   auto RVVCfg =
       GenSettings.Cfg.TargetConfig->getImpl<RISCVConfigInterface>()
               .RVVConfig->getImpl<RVVConfig>()
               .getRVVConfigurationSpace()
               .has_value()
-          ? RVVConfigurationInfo::buildConfiguration(GenSettings, ArchInfo.VLEN,
-                                                     nullptr)
+          ? RVVConfigurationInfo::buildConfiguration(
+                GenSettings, ArchInfo.VLEN, nullptr, DiscardedVMs, DiscardedVLs,
+                DiscardedConfigs)
           : RVVConfigurationInfo::createDefault(GenSettings, ArchInfo.VLEN);
+
+  if (DumpDiscardedRVVConfigurations.isSpecified())
+    printDiscardedRVVConfigurations(DumpDiscardedRVVConfigurations.getValue(),
+                                    DiscardedVMs, DiscardedVLs,
+                                    DiscardedConfigs,
+                                    /* IsRVVPresent */ ArchInfo.VLEN != 0);
+
   return RISCVConfigurationInfo(std::move(BaseCfg), std::move(RVVCfg));
 }
 
