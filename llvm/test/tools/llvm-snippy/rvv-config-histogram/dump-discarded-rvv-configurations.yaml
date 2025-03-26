@@ -1,0 +1,87 @@
+# REQUIRES: riscv-rvv
+# COM: This test checks option -riscv-dump-discarded-rvv-configurations.
+
+# RUN: llvm-snippy %s \
+# RUN: |& FileCheck %s
+
+options:
+  march: riscv64
+  mcpu: generic-rv64
+  mattr: +v
+  num-instrs: 1
+  riscv-dump-discarded-rvv-configurations: ""
+  riscv-dump-rvv-config: ""
+
+include:
+- "Inputs/sections.yaml"
+
+riscv-vector-unit:
+  mode-distribution:
+    VM:
+      - [48, 1.0] # 0b110000
+      - [47, 1.0] # 0b101111
+      - [3, 1.0]  #     0b11
+    VL:
+      - [1, 1.0]
+      - [5, 1.0]
+      - [4, 1.0]
+    VXRM:
+      rnu: 1.0
+    VXSAT:
+      on: 1.0
+    VTYPE:
+      SEW:
+        sew_64: 1.0
+        sew_32: 1.0
+        sew_16: 1.0
+        sew_8: 1.0
+      LMUL:
+        m1: 1.0
+        mf2: 1.0
+        mf4: 1.0
+        mf8: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+ 
+histogram:
+       - [VADD_VV, 1.0]
+       - [VSETVL, 1.0]
+         
+# CHECK:      --- RVV Unit Discarded Info ---
+# CHECK-NEXT:   - VM Generators:
+# CHECK-NEXT:     <imm_48>
+# CHECK-NEXT:     <imm_47>
+# CHECK-NEXT:   - VL Generators:
+# CHECK-NEXT:     <imm_1>
+# CHECK-NEXT:   - Configuration Bag Listing:
+# CHECK-NEXT:     Conf: { e64, m1, tu, mu, vxsat: 1, vxrm: rnu }
+# CHECK-NEXT:     Conf: { e32, mf2, tu, mu, vxsat: 1, vxrm: rnu }
+# CHECK-NEXT:     Conf: { e16, mf4, tu, mu, vxsat: 1, vxrm: rnu }
+# CHECK-NEXT:     Conf: { e8, mf8, tu, mu, vxsat: 1, vxrm: rnu }
+# CHECK-NEXT: --- RVV Unit Discarded End  ---
+
+# CHECK: --- RVV Configuration Info ---
+# CHECK-NEXT:   - Derived VLEN: 128 (VLENB = 16)
+# CHECK-NEXT:   - Mode Change Decision Policy: Histogram
+# CHECK-NEXT:   - Mode Change Probability: 0.5 (vsetvl/vsetvli/vsetivli=0.5[w:2]
+#                 /0[w:0]/0[w:0])
+# CHECK-NEXT:     Set Vill Bit Probability: 0
+# CHECK-NEXT:   - VL Selection Rules:
+# CHECK-NEXT:     P: 0.5 <imm_5>
+# CHECK-NEXT:     P: 0.5 <imm_4>
+# CHECK-NEXT:   - VM Selection Rules:
+# CHECK-NEXT:     P: 1 <imm_3>
+# CHECK:        - Configuration Bag Listing:
+# CHECK-NEXT:     P: 0.16667 Conf: { e8, m1, tu, mu, vxsat: 1, vxrm: rnu }/MaxVL: 16
+# CHECK-NEXT:     P: 0.16667 Conf: { e16, m1, tu, mu, vxsat: 1, vxrm: rnu }/MaxVL: 8
+# CHECK-NEXT:     P: 0.16667 Conf: { e32, m1, tu, mu, vxsat: 1, vxrm: rnu }/MaxVL: 4
+# CHECK-NEXT:     P: 0.16667 Conf: { e8, mf2, tu, mu, vxsat: 1, vxrm: rnu }/MaxVL: 8
+# CHECK-NEXT:     P: 0.16667 Conf: { e16, mf2, tu, mu, vxsat: 1, vxrm: rnu }/
+# CHECK-NEXT:     P: 0.16667 Conf: { e8, mf4, tu, mu, vxsat: 1, vxrm: rnu }/MaxVL: 4
+#                 MaxVL: 4
+# CHECK-NEXT:   - Configuration Bag Size: 6
+# CHECK-NEXT:   - State Cardinality: 44 ~ {MASKS} 
+# CHECK-NEXT: --- RVV Configuration End  ---
+
