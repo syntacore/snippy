@@ -1,0 +1,21 @@
+# COM: This test checks that option -riscv-dump-discarded-rvv-configurations 
+#      returns None if RVV is not specified.
+
+# RUN: llvm-snippy %s -model-plugin None \ 
+# RUN: |& FileCheck %s 
+
+options:
+  march: riscv64-linux-gnu
+  mattr: -v
+  num-instrs: 1
+  riscv-dump-discarded-rvv-configurations: ""
+
+include:
+- "Inputs/sections.yaml"
+
+histogram:
+       - [ADD, 1.0]
+         
+# CHECK:      --- RVV Unit Discarded Info ---
+# CHECK-NEXT: None
+# CHECK-NEXT: --- RVV Unit Discarded End  ---
