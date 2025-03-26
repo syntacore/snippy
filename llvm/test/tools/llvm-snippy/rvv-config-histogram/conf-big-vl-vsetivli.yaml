@@ -1,0 +1,46 @@
+# REQUIRES: riscv-rvv
+# COM: This test checks that if all RVV configurations-compatible VLs exceeds 
+#      the maximum VL 31 and VSETIVLI instruction selected, this is an error.
+
+# RUN: not llvm-snippy %s \ 
+# RUN: |& FileCheck %s 
+
+options:
+  march: riscv64
+  mcpu: generic-rv64
+  mattr: +v
+  num-instrs: 100
+
+include:
+- "Inputs/sections.yaml"
+
+riscv-vector-unit:
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [48, 1.0]   
+    VXRM:
+      rnu: 1.0
+    VXSAT:
+      on: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+        sew_32: 1.0
+        sew_64: 1.0
+      LMUL:
+        m8: 1.0
+        m4: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+ 
+histogram:
+       - [VSETIVLI, 1.0]
+       - [VADD_VV, 1.0]
+         
+# CHECK: error: All RVV configuration-compatible VLs exceeds the maximum VL 31 
+#        for the selected instruction VSETIVLI
+

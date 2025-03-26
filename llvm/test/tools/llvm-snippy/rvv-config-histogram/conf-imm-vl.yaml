@@ -1,0 +1,58 @@
+# REQUIRES: riscv-rvv
+# COM: This test checks that only the required immediate VLs are encountered.
+
+# RUN: llvm-snippy %s \ 
+# RUN: |& FileCheck %s 
+
+options:
+  march: riscv64
+  mcpu: generic-rv64
+  mattr: +v
+  dump-mf: true
+  riscv-dump-rvv-config: ""
+  num-instrs: 10000
+
+include:
+- "Inputs/sections.yaml"
+
+riscv-vector-unit:
+  mode-distribution:
+    VM:
+      - [all_ones, 1.0]
+      - [any_legal, 1.0]
+    VL:
+      - [0, 1.0]     # 0
+      - [0b101, 1.0] # 5
+      - [0x8, 1.0]   # 8
+      - [011, 1.0]   # 9
+    VXRM:
+      rnu: 1.0
+    VXSAT:
+      on: 1.0
+    VTYPE:
+      SEW:
+        sew_32: 1.0
+      LMUL:
+        m8: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+ 
+histogram:
+       - [VSETIVLI, 1.0]
+       - [VADD_VV, 1.0]
+         
+# CHECK:      - VL Selection Rules:
+# CHECK-NEXT:   P: 0.25 <imm_0>
+# CHECK-NEXT:   P: 0.25 <imm_0b101>
+# CHECK-NEXT:   P: 0.25 <imm_0x8>
+# CHECK-NEXT:   P: 0.25 <imm_011>
+
+# The first operand of the instruction VSETIVLI is VL
+# CHECK: VSETIVLI 0,
+# CHECK: VSETIVLI 5,
+# CHECK: VSETIVLI 8,
+# CHECK: VSETIVLI 9,
+# CHECK-NOT: VSETIVLI {{[^0|0^,|^5|5^,|^8|8^,|^9|9^,]}}
+

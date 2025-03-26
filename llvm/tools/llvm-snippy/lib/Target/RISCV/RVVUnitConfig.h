@@ -73,7 +73,7 @@ inline static bool canBeEncoded(unsigned SEW) {
 // TODO: consider replacing unsigned `SEW` parameter with typed enum
 unsigned computeVLMax(unsigned VLEN, unsigned SEW, RISCVII::VLMUL LMUL);
 
-enum RVVConstants { kMaxVLForVSETIVLI = 31u };
+enum RVVConstants { kMaxVLForVSETIVLI = 31u, kMaxLMUL = 8u };
 
 struct RVVConfiguration final {
   bool IsLegal = true;
@@ -91,9 +91,7 @@ struct RVVConfiguration final {
   };
 
   unsigned static getMinSEW() { return static_cast<unsigned>(VSEW::SEW8); }
-  unsigned static getMaxLMUL() {
-    return static_cast<unsigned>(RISCVII::VLMUL::LMUL_8);
-  }
+  unsigned static getMaxLMUL() { return RVVConstants::kMaxLMUL; }
 
   RISCVII::VLMUL LMUL = RISCVII::VLMUL::LMUL_1;
   VSEW SEW = VSEW::SEW64;
@@ -145,6 +143,27 @@ struct DiscreteGeneratorInfo final {
     return Elements[ItemIdx];
   }
 
+  // Generates an element that satisfies an unary predicate P.
+  // If there is no such element, returns nullopt.
+  template <typename UnaryPredicate>
+  std::optional<const std::reference_wrapper<const ElementType>>
+  generateIf(UnaryPredicate P) const {
+    std::vector<unsigned> FilteredIndexes;
+    std::vector<double> FilteredProbs;
+    const auto &Probs = probabilities();
+    for (auto [Idx, Elem] : enumerate(Elements)) {
+      if (!P(Elem))
+        continue;
+      FilteredIndexes.emplace_back(Idx);
+      FilteredProbs.emplace_back(Probs[Idx]);
+    }
+    if (FilteredIndexes.empty())
+      return std::nullopt;
+    auto SelectedElemIdx = DiscreteGeneratorInfo<unsigned>(
+        std::move(FilteredIndexes), std::move(FilteredProbs))();
+    return std::cref<const ElementType>(Elements[SelectedElemIdx]);
+  }
+
   const ContainerType &elements() const { return Elements; }
 
   std::vector<double> probabilities() const {
@@ -159,6 +178,10 @@ private:
 
 struct VLGeneratorInterface {
   virtual std::string identify() const = 0;
+  virtual bool isApplicable(unsigned /* VLEN */, bool /* ReduceVL */,
+                            const RVVConfiguration & /* Cfg */) const {
+    return true;
+  };
   virtual unsigned generate(unsigned VLEN,
                             const RVVConfiguration &Cfg) const = 0;
   virtual ~VLGeneratorInterface(){};
@@ -166,7 +189,8 @@ struct VLGeneratorInterface {
 
 struct VMGeneratorInterface {
   virtual std::string identify() const = 0;
-  virtual APInt generate(const RVVConfiguration &Cfg, unsigned VL) const = 0;
+  virtual bool isApplicable(unsigned /* VL */) const { return true; }
+  virtual APInt generate(unsigned VL) const = 0;
   virtual ~VMGeneratorInterface(){};
 };
 
@@ -212,12 +236,18 @@ struct RVVConfigurationInfo final {
     APInt VM;
   };
 
+  using VLGeneratorHolder = std::unique_ptr<VLGeneratorInterface>;
+  using VMGeneratorHolder = std::unique_ptr<VMGeneratorInterface>;
+
   static RVVConfigurationInfo
   createDefault(const GeneratorSettings &GenSettings, unsigned VLEN);
 
   static RVVConfigurationInfo
   buildConfiguration(const GeneratorSettings &GenSettings, unsigned VLEN,
-                     std::unique_ptr<RVVConfigInterface> &&VU);
+                     std::unique_ptr<RVVConfigInterface> &&VU,
+                     std::vector<VMGeneratorHolder> &DiscardedVMs,
+                     std::vector<VLGeneratorHolder> &DiscardedVLs,
+                     std::vector<RVVConfiguration> &DiscardedConfigs);
 
   unsigned getVLEN() const;
   unsigned getVLENB() const { return getVLEN() / 8; }
@@ -240,9 +270,6 @@ struct RVVConfigurationInfo final {
   void print(raw_ostream &OS) const;
   void dump() const;
 
-  using VLGeneratorHolder = std::unique_ptr<VLGeneratorInterface>;
-  using VMGeneratorHolder = std::unique_ptr<VMGeneratorInterface>;
-
 private:
   using ConfigGenerator = DiscreteGeneratorInfo<RVVConfiguration>;
   using VLGenerator = DiscreteGeneratorInfo<VLGeneratorHolder>;
@@ -251,6 +278,10 @@ private:
   RVVConfigurationInfo(unsigned VLEN, ConfigGenerator &&CfgGen,
                        VLGenerator &&VLGen, VMGenerator &&VMGen,
                        const ModeChangeInfo &SwitchInfo, bool EnableGuides);
+
+  const VLGeneratorHolder &selectVLGen(const RVVConfiguration &Config,
+                                       bool ReduceVL) const;
+  const VMGeneratorHolder &selectVMGen(unsigned VL) const;
 
   unsigned VLEN;
   ConfigGenerator CfgGen;
