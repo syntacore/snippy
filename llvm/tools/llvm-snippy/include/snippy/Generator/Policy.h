@@ -116,6 +116,8 @@ public:
   PreselectedOpInfo(llvm::Register R) : Value(R) {}
   PreselectedOpInfo(StridedImmediate Imm) : Value(Imm) {}
   PreselectedOpInfo() = default;
+  static Expected<PreselectedOpInfo> fromMCOperand(const MCOperand &Op);
+
   bool isReg() const { return std::holds_alternative<RegTy>(Value); }
   bool isImm() const { return std::holds_alternative<ImmTy>(Value); }
   bool isUnset() const { return std::holds_alternative<EmptyTy>(Value); }

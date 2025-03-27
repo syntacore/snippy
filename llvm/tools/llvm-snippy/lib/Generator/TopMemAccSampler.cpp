@@ -20,8 +20,8 @@ Expected<AccessSampleResult> TopLevelMemoryAccessSampler::sample(
   for (auto &&[Idx, S] : enumerate(Samplers)) {
     auto Access =
         S->sample(AccessSize, Alignment, ChooseAddrGenInfo, BurstMode);
-    if (auto Err = Access.takeError()) {
-      Errs[Idx] = toString(std::move(Err));
+    if (!Access) {
+      Errs[Idx] = toString(Access.takeError());
       continue;
     }
     return *Access;
@@ -45,9 +45,9 @@ std::vector<AddressInfo> TopLevelMemoryAccessSampler::randomBurstGroupAddresses(
 
     auto Access = sample(AR.AccessSize, AR.AccessAlignment,
                          /*BurstMode*/ true);
-    if (auto Err = Access.takeError())
+    if (!Access)
       snippy::fatal("Failed to sample memory access for burst group",
-                    toString(std::move(Err)));
+                    toString(Access.takeError()));
     auto &AI = Access->AddrInfo;
     Addresses.push_back(std::move(AI));
   }
