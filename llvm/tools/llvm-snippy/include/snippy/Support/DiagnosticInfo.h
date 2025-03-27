@@ -133,6 +133,13 @@ void warn(WarningName WN, const llvm::Twine &Prefix, const llvm::Twine &Desc);
 
 [[noreturn]] void fatal(const llvm::Twine &Desc);
 
+/// \brief Unwrap Expected value or fail with fatal error.
+template <typename T> T unwrapOrFatal(Expected<T> ValOrErr) {
+  if (!ValOrErr)
+    snippy::fatal("Unwrapping 'Expected' value", ValOrErr.takeError());
+  return std::move(*ValOrErr);
+}
+
 } // namespace snippy
 
 } // namespace llvm

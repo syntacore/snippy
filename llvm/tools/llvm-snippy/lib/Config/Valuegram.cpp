@@ -46,7 +46,7 @@ void yaml::MappingTraits<const snippy::detail::ValuegramEntryMapMapper>::
     if (Error E = snippy::ValuegramEntry::create(Kind).moveInto(EntryRef)) {
       // NOTE: Need to consume Error to make error handling happy. We don't
       // actually need this message to give a nice diagnostic.
-      snippy::burrowError(std::move(E));
+      consumeError(std::move(E));
       return;
     }
 
@@ -183,8 +183,9 @@ FormattedAPIntWithSign::fromString(StringRef StrView) {
 
   Expected<APInt> ExpectedValue =
       APIntWithSign::parseAPInt(StrView, HasNegativeSign, Radix, OriginalStr);
-  if (auto E = ExpectedValue.takeError())
-    return APIntWithSign::reportError(llvm::toString(std::move(E)));
+  if (!ExpectedValue)
+    return APIntWithSign::reportError(
+        llvm::toString(ExpectedValue.takeError()));
 
   Value = *ExpectedValue;
   return ValueWithSign;
@@ -291,8 +292,8 @@ createValuegramSeqEntry(yaml::IO &Io, StringRef ParseStr) {
 
   Expected<FormattedAPIntWithSign> ExpectedValue =
       FormattedAPIntWithSign::fromString(ParseStr);
-  if (auto E = ExpectedValue.takeError())
-    return ReportError(toString(std::move(E)));
+  if (!ExpectedValue)
+    return ReportError(toString(ExpectedValue.takeError()));
 
   return std::make_unique<ValuegramBitValueEntry>(*ExpectedValue);
 }
@@ -319,8 +320,8 @@ void YAMLHistogramTraits<std::unique_ptr<IValuegramEntry>>::normalizeEntry(
     case EntryKind::BitValue: {
       auto &BitValueEntry = cast<ValuegramBitValueEntry>(E);
       auto ExpectedValue = BitValueEntry.ValWithSign.toString();
-      if (auto E = ExpectedValue.takeError()) {
-        Io.setError(toString(std::move(E)));
+      if (!ExpectedValue) {
+        Io.setError(toString(ExpectedValue.takeError()));
         return std::string("");
       }
       return *ExpectedValue;
