@@ -315,8 +315,9 @@ createSamplerForEntry(const ValuegramEntry &Entry, uint32_t BitWidth) {
         auto SamplerOrErr =
             APIntRangeSampler::create(BitRangeEntry->Min, BitRangeEntry->Max,
                                       /*IsSigned=*/false);
-        if (Error E = SamplerOrErr.takeError())
-          return Expected<std::unique_ptr<IAPIntSampler>>(std::move(E));
+        if (!SamplerOrErr)
+          return Expected<std::unique_ptr<IAPIntSampler>>(
+              SamplerOrErr.takeError());
         return std::make_unique<APIntRangeSampler>(std::move(*SamplerOrErr));
       })
       .Default([](auto &&) {
@@ -353,7 +354,7 @@ std::string yaml::MappingTraits<FloatOverwriteSettings>::validate(
     if (auto ErrIt = find_if_not(CheckedIntegralOverflowRange,
                                  [](Error Err) {
                                    auto Success = Err.success();
-                                   snippy::burrowError(std::move(Err));
+                                   consumeError(std::move(Err));
                                    return Success;
                                  });
         ErrIt != CheckedIntegralOverflowRange.end())
@@ -461,8 +462,8 @@ createFloatOverwriteValueSampler(const FloatOverwriteSettings &Settings,
   Expected<const FloatOverwriteValues *> CfgOrErr =
       getSettingsForSemantics(Settings, Semantics);
 
-  if (auto Err = CfgOrErr.takeError())
-    return Expected<std::unique_ptr<IAPIntSampler>>(std::move(Err));
+  if (!CfgOrErr)
+    return Expected<std::unique_ptr<IAPIntSampler>>(CfgOrErr.takeError());
 
   // (NOTE): Fallback case. The most reasonable choice for default
   // distribution is uniform.
@@ -478,8 +479,8 @@ createFloatOverwriteValueSampler(const FloatOverwriteSettings &Settings,
             IntegralRange->Min, IntegralRange->Max, IntegralRange->RM,
             Semantics);
 
-    if (auto E = SamplerOrErr.takeError())
-      return Expected<std::unique_ptr<IAPIntSampler>>(std::move(E));
+    if (!SamplerOrErr)
+      return Expected<std::unique_ptr<IAPIntSampler>>(SamplerOrErr.takeError());
 
     Builder.addOwned(std::move(*SamplerOrErr), IntegralRange->Weight);
   }
@@ -490,8 +491,8 @@ createFloatOverwriteValueSampler(const FloatOverwriteSettings &Settings,
 
   for (const auto &Entry : Cfg->TheValuegram) {
     auto SamplerOrErr = createSamplerForEntry(Entry, BitWidth);
-    if (Error E = SamplerOrErr.takeError())
-      return Expected<std::unique_ptr<IAPIntSampler>>(std::move(E));
+    if (!SamplerOrErr)
+      return Expected<std::unique_ptr<IAPIntSampler>>(SamplerOrErr.takeError());
     Builder.addOwned(std::move(*SamplerOrErr), Entry.getWeight());
   }
 

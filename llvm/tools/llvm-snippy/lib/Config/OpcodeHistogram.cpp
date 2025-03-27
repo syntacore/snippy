@@ -84,8 +84,8 @@ YAMLHistogramTraits<OpcodeHistogramDecodedEntry>::denormalizeEntry(
     yaml::IO &IO, StringRef OpcodeStr, double Weight) {
   Expected<OpcodeHistogramDecodedEntry> Decoded =
       decodeInstrRegex(IO, OpcodeStr, Weight);
-  if (auto E = Decoded.takeError()) {
-    IO.setError(toString(std::move(E)));
+  if (!Decoded) {
+    IO.setError(toString(Decoded.takeError()));
     return OpcodeHistogramDecodedEntry{};
   }
 

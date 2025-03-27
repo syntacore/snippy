@@ -276,17 +276,17 @@ static void unNaNRegister(planning::InstructionGenerationContext &InstrGenCtx,
 
   auto SelectedSemantics =
       getFloatSemanticsForReg(ProgCtx.getLLVMState().getRegInfo(), Reg);
-  if (auto Err = SelectedSemantics.takeError())
-    snippy::fatal(
-        "Internal error",
-        Twine("Cannot unNaNRegister: ").concat(toString(std::move(Err))));
+  if (!SelectedSemantics)
+    snippy::fatal("Internal error",
+                  Twine("Cannot unNaNRegister: ")
+                      .concat(toString(SelectedSemantics.takeError())));
   Expected<APInt> ValueToWriteOrErr =
       InstrGenCtx.getOrCreateFloatOverwriteValueSampler(*SelectedSemantics)
           .sample();
 
-  if (auto Err = ValueToWriteOrErr.takeError())
+  if (!ValueToWriteOrErr)
     snippy::fatal(ProgCtx.getLLVMState().getCtx(), "Internal error",
-                  std::move(Err));
+                  ValueToWriteOrErr.takeError());
 
   auto RP = InstrGenCtx.pushRegPool();
   Tgt.writeValueToReg(InstrGenCtx, *ValueToWriteOrErr, Reg);
@@ -373,9 +373,10 @@ static bool shouldRewriteRegValue(
     auto &ProgCtx = InstrGenCtx.ProgCtx;
     auto SelectedSemantics =
         getFloatSemanticsForReg(ProgCtx.getLLVMState().getRegInfo(), Reg);
-    if (auto Err = SelectedSemantics.takeError())
-      snippy::fatal("Internal error", Twine("Cannot check if register is NaN: ")
-                                          .concat(toString(std::move(Err))));
+    if (!SelectedSemantics)
+      snippy::fatal("Internal error",
+                    Twine("Cannot check if register is NaN: ")
+                        .concat(toString(SelectedSemantics.takeError())));
     auto &I = SimCtx.getInterpreter();
     APFloat Val(*SelectedSemantics, I.readReg(Reg));
     return Val.isNaN();
@@ -822,13 +823,13 @@ chooseAddrInfoForInstr(MachineInstr &MI, InstructionGenerationContext &IGC,
   };
 
   auto Result = MS.sample(AccessSize, Alignment, ChooseAddrGenInfo);
-  if (auto Err = Result.takeError()) {
+  if (!Result) {
     std::string InstrStr;
     raw_string_ostream OS(InstrStr);
     MI.print(OS);
     snippy::fatal(formatv("Cannot sample memory access for instruction \"{0}\"",
                           StringRef(InstrStr).rtrim()),
-                  Twine("\n").concat(toString(std::move(Err))));
+                  Twine("\n").concat(toString(Result.takeError())));
   }
   const auto &AddrInfo = Result->AddrInfo;
 

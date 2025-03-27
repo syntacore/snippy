@@ -71,12 +71,12 @@ selectAddressForSingleInstrFromBurstGroup(InstructionGenerationContext &IGC,
   for (unsigned i = 0; i < BurstAddressRandomizationThreshold; ++i) {
     auto CandidateAccess =
         MS.sample(OpcodeAR.AccessSize, OpcodeAR.AccessAlignment, false);
-    if (auto Err = CandidateAccess.takeError()) {
+    if (!CandidateAccess) {
       std::string PrefixErr;
       raw_string_ostream OS(PrefixErr);
       OS << "Cannot sample memory access for single instruction from burst "
             "group";
-      snippy::fatal(PrefixErr, toString(std::move(Err)));
+      snippy::fatal(PrefixErr, toString(CandidateAccess.takeError()));
     }
     auto &CandidateAI = CandidateAccess->AddrInfo;
 
@@ -236,23 +236,14 @@ selectInitializableOperandsRegisters(InstructionGenerationContext &InstrGenCtx,
   return Preselected;
 }
 
-static planning::PreselectedOpInfo
-convertToPreselectedOpInfo(const MCOperand &Op) {
-  if (Op.isReg())
-    return Register(Op.getReg());
-  if (Op.isImm())
-    return StridedImmediate(/* MinIn */ Op.getImm(), /* MaxIn */ Op.getImm(),
-                            /* StrideIn */ 0);
-  llvm_unreachable("Unknown MCOperand");
-}
-
 std::vector<planning::PreselectedOpInfo>
 getPreselectedForInstr(const MCInst &Inst) {
-  std::vector<planning::PreselectedOpInfo> Preselected;
+  using planning::PreselectedOpInfo;
+  std::vector<PreselectedOpInfo> Preselected;
   Preselected.reserve(Inst.getNumOperands());
-
   transform(Inst, std::back_inserter(Preselected), [](const auto &Operand) {
-    return convertToPreselectedOpInfo(Operand);
+    auto OpOrErr = PreselectedOpInfo::fromMCOperand(Operand);
+    return unwrapOrFatal(std::move(OpOrErr));
   });
   return Preselected;
 }

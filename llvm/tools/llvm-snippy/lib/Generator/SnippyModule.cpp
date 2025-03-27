@@ -114,7 +114,8 @@ SnippyProgramContext::getOrAddGlobalsPoolFor(Module &M) {
   if (PerModuleGPs.count(Key))
     return *PerModuleGPs.at(Key);
   if (!ROMSection)
-    return make_error<Failure>("ROM section is not configured");
+    return makeFailure(Errc::InvalidConfiguration,
+                       "ROM section is not configured");
 
   return *PerModuleGPs
               .emplace(Key, std::make_unique<GlobalsPool>(
