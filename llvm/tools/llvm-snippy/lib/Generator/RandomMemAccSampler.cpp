@@ -59,8 +59,8 @@ RandomMemoryAccessSampler::sample(size_t AccessSize, size_t Alignment,
   auto &MAGWithSchemes = getMAG();
   auto SchemeExp =
       MAGWithSchemes.getValidAccesses(AccessSize, Alignment, BurstMode);
-  if (auto Err = SchemeExp.takeError())
-    return Expected<AccessSampleResult>(std::move(Err));
+  if (!SchemeExp)
+    return Expected<AccessSampleResult>(SchemeExp.takeError());
   auto &Scheme = *SchemeExp;
   auto AddrGenInfo = ChooseAddrGenInfo(*Scheme);
   auto AI = Scheme->randomAddress(AddrGenInfo);
