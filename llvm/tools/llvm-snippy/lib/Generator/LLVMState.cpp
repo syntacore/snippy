@@ -113,9 +113,9 @@ std::unique_ptr<MCStreamer> LLVMState::createObjStreamer(raw_pwrite_stream &OS,
   assert(TheTargetMachine);
   auto MCStreamerOrErr = TheTargetMachine->createMCStreamer(
       OS, nullptr, CodeGenFileType::ObjectFile, MCCtx);
-  if (auto Err = MCStreamerOrErr.takeError())
+  if (!MCStreamerOrErr)
     snippy::fatal(Ctx, "Internal Error creating MCStreamer",
-                  toString(std::move(Err)));
+                  toString(MCStreamerOrErr.takeError()));
 
   // We explicitly specified ObjectFile type 3 lines above so we can down-cast
   // it safely

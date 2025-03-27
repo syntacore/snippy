@@ -226,7 +226,8 @@ public:
   template <typename T>
   static Expected<std::vector<T>> getNInRangeInclusive(T Min, T Max, size_t N) {
     if (Max < Min)
-      return make_error<Failure>(
+      return makeFailure(
+          Errc::LogicError,
           "Invalid usage of genNUniqInInterval: Max cannot be less than Min.");
     std::vector<T> Vals(Max - Min + 1);
     std::generate(Vals.begin(), Vals.end(),
@@ -238,7 +239,8 @@ public:
   template <typename T>
   static Expected<std::vector<T>> genNUniqInInterval(T Min, T Max, size_t N) {
     if (Max < Min)
-      return make_error<Failure>(
+      return makeFailure(
+          Errc::LogicError,
           "Invalid usage of genNUniqInInterval: Max cannot be less than Min.");
     std::vector<T> Vals(Max - Min + 1);
     std::iota(Vals.begin(), Vals.end(), Min);
@@ -250,7 +252,8 @@ public:
   template <typename T, typename Pred>
   static Expected<size_t> countUniqInInterval(T Min, T Max, Pred Filter) {
     if (Max < Min)
-      return make_error<Failure>(
+      return makeFailure(
+          Errc::LogicError,
           "Invalid usage of countUniqInInterval: Max cannot be less than Min.");
 
     T K = Min;
@@ -269,10 +272,12 @@ public:
   static Expected<std::vector<T>> genNUniqInInterval(T Min, T Max, size_t N,
                                                      Pred Filter) {
     if (Max < Min)
-      return make_error<Failure>(
+      return makeFailure(
+          Errc::LogicError,
           "Invalid usage of genNUniqInInterval: Max cannot be less than Min.");
     if (Max - Min + 1 < N)
-      return make_error<Failure>(
+      return makeFailure(
+          Errc::LogicError,
           "Invalid usage of genNUniqInInterval: The interval has less unique "
           "values than was requested to generate.");
 
@@ -286,7 +291,8 @@ public:
     for (auto Next = G(); Next <= Max; Next = G())
       Vals.push_back(Next);
     if (Vals.size() < N)
-      return make_error<Failure>(
+      return makeFailure(
+          Errc::LogicError,
           "Invalid usage of genNUniqInInterval: The interval has less unique "
           "values than was requested.");
     shuffle(Vals.begin(), Vals.end());

@@ -323,8 +323,8 @@ template <> struct YAMLHistogramTraits<RegisterValuesEntry> {
         assert(Inserted);
       } else if (isRegWithClass(RegName)) {
         auto ExpectedClassIdx = getRegTypeAndIndex(RegName);
-        if (auto Err = ExpectedClassIdx.takeError(); Err)
-          Io.setError(toString(std::move(Err)));
+        if (!ExpectedClassIdx)
+          Io.setError(toString(ExpectedClassIdx.takeError()));
         auto [RegClass, Idx] = *ExpectedClassIdx;
         auto [ValuesIt, _] = RegClassToRegValues.try_emplace(RegClass.str());
         [[maybe_unused]] auto [ValIt, Inserted] =
