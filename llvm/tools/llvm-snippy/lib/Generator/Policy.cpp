@@ -10,6 +10,7 @@
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Generator/SimulatorContext.h"
+#include "snippy/Support/Error.h"
 #include "snippy/Target/Target.h"
 
 #include <random>
@@ -18,6 +19,17 @@ namespace llvm {
 namespace snippy {
 
 namespace planning {
+
+Expected<PreselectedOpInfo>
+PreselectedOpInfo::fromMCOperand(const MCOperand &Op) {
+  if (Op.isReg())
+    return PreselectedOpInfo(Register(Op.getReg()));
+  if (Op.isImm())
+    return PreselectedOpInfo(StridedImmediate(/* MinIn */ Op.getImm(),
+                                              /* MaxIn */ Op.getImm(),
+                                              /* StrideIn */ 0));
+  return snippy::makeFailure(Errc::Unimplemented, "Unknown MCOperand");
+}
 
 static std::unique_ptr<FloatSemanticsSamplerHolder>
 createFloatSemanticsSampler(const GeneratorSettings &GenSettings) {
@@ -74,9 +86,9 @@ InstructionGenerationContext::getOrCreateFloatOverwriteValueSampler(
     FloatOverwriteSamplers = createFloatSemanticsSampler(GenSettings);
   assert(FloatOverwriteSamplers.get());
   auto SamplerRefOrErr = FloatOverwriteSamplers->getSamplerFor(Semantics);
-  if (auto Err = SamplerRefOrErr.takeError())
+  if (!SamplerRefOrErr)
     snippy::fatal(ProgCtx.getLLVMState().getCtx(), "Internal error",
-                  std::move(Err));
+                  SamplerRefOrErr.takeError());
   return *SamplerRefOrErr;
 }
 

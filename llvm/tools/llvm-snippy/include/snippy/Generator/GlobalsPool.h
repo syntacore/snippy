@@ -34,11 +34,12 @@ public:
     CurrentOffset = NextOffset + Size;
     if (CurrentOffset > Desc.VMA + Desc.Size) {
       auto Overflow = CurrentOffset - (Desc.VMA + Desc.Size);
-      return make_error<Failure>("Out of space when allocating " + Twine(Size) +
-                                 " bytes (align " + Twine(Alignment) +
-                                 ") in section '" + Desc.getIDString() +
-                                 "' of size " + Twine(Desc.Size) + ". " +
-                                 Twine(Overflow) + " bytes overflow");
+      return makeFailure(Errc::OutOfSpace,
+                         "Out of space when allocating " + Twine(Size) +
+                             " bytes (align " + Twine(Alignment) +
+                             ") in section '" + Desc.getIDString() +
+                             "' of size " + Twine(Desc.Size) + ". " +
+                             Twine(Overflow) + " bytes overflow");
     }
     return NextOffset;
   }
