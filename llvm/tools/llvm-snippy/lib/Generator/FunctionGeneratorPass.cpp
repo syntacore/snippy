@@ -181,9 +181,8 @@ MachineFunction &FunctionGenerator::createFunction(
   auto &GenSettings = SGCtx.getGenSettings();
   auto &OpCC = ProgCtx.getOpcodeCache();
   // FIXME: currently we don't keep liveness when creating and filling new BB
-  auto IsRegsInit = GenSettings.RegistersConfig.InitializeRegs;
   if (GenSettings.hasCFInstrs(OpCC) ||
-      GenSettings.hasCallInstrs(OpCC, SnippyTgt) || IsRegsInit)
+      GenSettings.hasCallInstrs(OpCC, SnippyTgt))
     Props.reset(MachineFunctionProperties::Property::TracksLiveness);
   auto *MBB = createMachineBasicBlock(MF);
   assert(MBB);
