@@ -1168,6 +1168,24 @@ public:
       snippy::fatal("Lr.rl and Sc.aq are prohibited by RISCV ISA");
   }
 
+  void
+  markAllAvailableRegistersAsLiveIns(InstructionGenerationContext &IGC,
+                                     MachineBasicBlock &MBB,
+                                     const IRegisterState &R) const override {
+    const auto &Regs = static_cast<const RISCVRegisterState &>(R);
+    auto AddLiveInForRegGroup = [&](const auto &Regs, RegStorageType RegType) {
+      for (unsigned RegIdx = 0; RegIdx < Regs.size(); ++RegIdx) {
+        auto MCReg = regIndexToMCReg(IGC, RegIdx, RegType);
+        if (!MBB.isLiveIn(MCReg))
+          MBB.addLiveIn(MCReg);
+      }
+    };
+
+    AddLiveInForRegGroup(Regs.XRegs, RegStorageType::XReg);
+    AddLiveInForRegGroup(Regs.FRegs, RegStorageType::FReg);
+    AddLiveInForRegGroup(Regs.VRegs, RegStorageType::VReg);
+  }
+
   void generateRegsInit(InstructionGenerationContext &IGC,
                         const IRegisterState &R) const override {
     const auto &Regs = static_cast<const RISCVRegisterState &>(R);
