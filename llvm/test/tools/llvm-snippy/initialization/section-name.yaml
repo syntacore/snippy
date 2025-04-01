@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s |& FileCheck %s
+# RUN: llvm-snippy %s | FileCheck %s
 
 options:
   march: riscv64-unknown-elf

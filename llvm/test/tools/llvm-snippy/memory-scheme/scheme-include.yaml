@@ -1,7 +1,7 @@
 # RUN: llvm-snippy %s -march=riscv64-unknown-elf \
-# RUN:   -num-instrs=100 \
+# RUN:   -num-instrs=100 -model-plugin None \
 # RUN:   -dump-layout=true -riscv-disable-misaligned-access \
-# RUN: |& FileCheck %s --dump-input fail
+# RUN:   | FileCheck %s --dump-input fail
 
 include:
   - Inputs/sections.yaml

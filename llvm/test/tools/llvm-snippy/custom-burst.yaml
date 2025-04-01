@@ -1,26 +1,25 @@
-# RUN: llvm-snippy %s %S/Inputs/custom-burst-mixed-memory-fence.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
-# RUN: -num-instrs=200 -dump-layout \
-# RUN: |& FileCheck %s --check-prefix=DUMP
+# RUN: llvm-snippy %s %S/Inputs/custom-burst-mixed-memory-fence.yaml \
+# RUN:   -march=riscv64-linux-gnu -mattr=+a,+f -num-instrs=200 -dump-layout \
+# RUN:   -model-plugin None | FileCheck %s --check-prefix=DUMP
 
-# RUN: llvm-snippy %s %S/Inputs/custom-burst-mixed-memory-fence.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
-# RUN: -num-instrs=200 --dump-mf \
-# RUN: |& FileCheck %s --check-prefix=MEMFENCE
+# RUN: llvm-snippy %s %S/Inputs/custom-burst-mixed-memory-fence.yaml \
+# RUN:   -march=riscv64-linux-gnu -mattr=+a,+f -num-instrs=200 --dump-mf \
+# RUN:   -model-plugin None |& FileCheck %s --check-prefix=MEMFENCE
 
-# RUN: llvm-snippy %s %S/Inputs/fence-only-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
-# RUN: -num-instrs=200 --dump-mf \
-# RUN: |& FileCheck %s --check-prefix=FENCE
+# RUN: llvm-snippy %s %S/Inputs/fence-only-burst.yaml \
+# RUN:   -march=riscv64-linux-gnu -mattr=+a,+f -num-instrs=200 --dump-mf \
+# RUN:   -model-plugin None |& FileCheck %s --check-prefix=FENCE
 
-# RUN: llvm-snippy %s %S/Inputs/custom-burst-amoadd.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
-# RUN: -num-instrs=200 --dump-mf \
-# RUN: |& FileCheck %s --check-prefix=WARN
+# RUN: llvm-snippy %s %S/Inputs/custom-burst-amoadd.yaml \
+# RUN:   -march=riscv64-linux-gnu -mattr=+a,+f -num-instrs=200 --dump-mf \
+# RUN:   -model-plugin None |& FileCheck %s --check-prefix=WARN
 
-
-# RUN: llvm-snippy %s %S/Inputs/custom-burst-fence-in-both-groups.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
-# RUN: -num-instrs=500 --dump-mf \
-# RUN: |& FileCheck %s --check-prefix=FENCEINBOTH
+# RUN: llvm-snippy %s %S/Inputs/custom-burst-fence-in-both-groups.yaml \
+# RUN:   -march=riscv64-linux-gnu -mattr=+a,+f -num-instrs=500 --dump-mf \
+# RUN:   -model-plugin None |& FileCheck %s --check-prefix=FENCEINBOTH
 
 # RUN: llvm-snippy %S/Inputs/options-in-layout-burst.yaml \
-# RUN: |& FileCheck %s --check-prefix=FENCEINBOTH
+# RUN: -model-plugin None |& FileCheck %s --check-prefix=FENCEINBOTH
 
 include:
   - Inputs/sections.yaml
