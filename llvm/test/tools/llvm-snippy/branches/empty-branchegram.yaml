@@ -1,5 +1,5 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
-# RUN:     -num-instrs=1000 -dump-layout |& FileCheck %s
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -model-plugin None \
+# RUN:     -num-instrs=1000 -dump-layout | FileCheck %s
 
 sections:
     - no:        1

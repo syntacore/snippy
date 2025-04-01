@@ -5,9 +5,8 @@
 # COM:    4. Zero weight is handled correctly
 
 # RUN: llvm-snippy %S/Inputs/default-layout.yaml %s -march=riscv64-linux-gnu \
-# RUN:   -num-instrs=100 \
-# RUN:   -dump-layout=true \
-# RUN: |& FileCheck %s --dump-input always
+# RUN:   -num-instrs=100 -dump-layout=true -model-plugin None \
+# RUN:   | FileCheck %s --dump-input always
 
 access-evictions:
   - mask:  0x003c0000
