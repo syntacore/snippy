@@ -1,46 +1,50 @@
 # RUN: sed 's/rm-placeholder/rne/' %s > %t.rne.yaml
-# RUN: llvm-snippy %t.rne.yaml %S/../Inputs/sections.yaml --model-plugin None |& \
-# RUN:   FileCheck %s --check-prefix RNE
+# RUN: llvm-snippy %t.rne.yaml %S/../Inputs/sections.yaml \
+# RUN:   --model-plugin None | FileCheck %s --check-prefix RNE
 
 # RUN: sed 's/rm-placeholder/rmm/' %s > %t.rmm.yaml
-# RUN: llvm-snippy %t.rmm.yaml %S/../Inputs/sections.yaml --model-plugin None |& \
-# RUN:   FileCheck %s --check-prefix RMM
+# RUN: llvm-snippy %t.rmm.yaml %S/../Inputs/sections.yaml \
+# RUN:   --model-plugin None | FileCheck %s --check-prefix RMM
 
 # RUN: sed 's/rm-placeholder/rdn/' %s > %t.rdn.yaml
-# RUN: llvm-snippy %t.rdn.yaml %S/../Inputs/sections.yaml --model-plugin None |& \
-# RUN:   FileCheck %s --check-prefix RDN
+# RUN: llvm-snippy %t.rdn.yaml %S/../Inputs/sections.yaml \
+# RUN:   --model-plugin None | FileCheck %s --check-prefix RDN
 
 # RUN: sed 's/rm-placeholder/rup/' %s > %t.rup.yaml
-# RUN: llvm-snippy %t.rup.yaml %S/../Inputs/sections.yaml --model-plugin None |& \
-# RUN:   FileCheck %s --check-prefix RUP
+# RUN: llvm-snippy %t.rup.yaml %S/../Inputs/sections.yaml \
+# RUN:   --model-plugin None | FileCheck %s --check-prefix RUP
 
 # RUN: sed 's/rm-placeholder/rtz/' %s > %t.rtz.yaml
-# RUN: llvm-snippy %t.rtz.yaml %S/../Inputs/sections.yaml --model-plugin None |& \
-# RUN:   FileCheck %s --check-prefix RTZ
+# RUN: llvm-snippy %t.rtz.yaml %S/../Inputs/sections.yaml \
+# RUN:   --model-plugin None | FileCheck %s --check-prefix RTZ
 
 # RUN: sed 's/rm-placeholder/toward-zero/' %s > %t.toward-zero.yaml
-# RUN: llvm-snippy %t.toward-zero.yaml %S/../Inputs/sections.yaml --model-plugin None |& \
-# RUN:   FileCheck %s --check-prefix RTZ
+# RUN: llvm-snippy %t.toward-zero.yaml %S/../Inputs/sections.yaml \
+# RUN:   --model-plugin None | FileCheck %s --check-prefix RTZ
 
 # RUN: sed 's/rm-placeholder/toward-positive/' %s > %t.toward-positive.yaml
-# RUN: llvm-snippy %t.toward-positive.yaml %S/../Inputs/sections.yaml --model-plugin None |& \
-# RUN:   FileCheck %s --check-prefix RUP
+# RUN: llvm-snippy %t.toward-positive.yaml %S/../Inputs/sections.yaml \
+# RUN:   --model-plugin None | FileCheck %s --check-prefix RUP
 
 # RUN: sed 's/rm-placeholder/toward-negative/' %s > %t.toward-negative.yaml
-# RUN: llvm-snippy %t.toward-negative.yaml %S/../Inputs/sections.yaml --model-plugin None |& \
-# RUN:   FileCheck %s --check-prefix RDN
+# RUN: llvm-snippy %t.toward-negative.yaml %S/../Inputs/sections.yaml \
+# RUN:   --model-plugin None | FileCheck %s --check-prefix RDN
 
-# RUN: sed 's/rm-placeholder/nearest-ties-to-even/' %s > %t.nearest-ties-to-even.yaml
-# RUN: llvm-snippy %t.nearest-ties-to-even.yaml %S/../Inputs/sections.yaml --model-plugin None |& \
-# RUN:   FileCheck %s --check-prefix RNE
+# RUN: sed 's/rm-placeholder/nearest-ties-to-even/' \
+# RUN:   %s > %t.nearest-ties-to-even.yaml
+# RUN: llvm-snippy %t.nearest-ties-to-even.yaml %S/../Inputs/sections.yaml \
+# RUN:   --model-plugin None | FileCheck %s --check-prefix RNE
 
-# RUN: sed 's/rm-placeholder/nearest-ties-to-away/' %s > %t.nearest-ties-to-away.yaml
-# RUN: llvm-snippy %t.nearest-ties-to-away.yaml %S/../Inputs/sections.yaml --model-plugin None |& \
-# RUN:   FileCheck %s --check-prefix RMM
+# RUN: sed 's/rm-placeholder/nearest-ties-to-away/' \
+# RUN:   %s > %t.nearest-ties-to-away.yaml
+# RUN: llvm-snippy %t.nearest-ties-to-away.yaml %S/../Inputs/sections.yaml \
+# RUN:   --model-plugin None | FileCheck %s --check-prefix RMM
 
-# RUN: sed 's/rm-placeholder/totally-not-rounding-mode/' %s > %t.totally-not-rounding-mode.yaml
-# RUN: not llvm-snippy %t.totally-not-rounding-mode.yaml %S/../Inputs/sections.yaml --model-plugin None |& \
-# RUN:   FileCheck %s --check-prefix INVALID
+# RUN: sed 's/rm-placeholder/totally-not-rounding-mode/' \
+# RUN:   %s > %t.totally-not-rounding-mode.yaml
+# RUN: not llvm-snippy %t.totally-not-rounding-mode.yaml \
+# RUN:   %S/../Inputs/sections.yaml --model-plugin None \
+# RUN:   |& FileCheck %s --check-prefix INVALID
 
 options:
   march: riscv64-unknown-elf
