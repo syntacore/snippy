@@ -3109,6 +3109,16 @@ public:
     }
     return true;
   }
+  unsigned getImmOffsetAlignmentForMemAccessInst(
+      const MCInstrDesc &InstrDesc) const override {
+    auto Opcode = InstrDesc.getOpcode();
+    // Compressed instructions' offset is required to be aligned to element
+    // width
+    if (isCLoadStore(Opcode)) {
+      return getDataElementWidth(Opcode);
+    }
+    return 1;
+  }
 
   StridedImmediate getImmOffsetRangeForMemAccessInst(
       const MCInstrDesc &InstrDesc) const override {

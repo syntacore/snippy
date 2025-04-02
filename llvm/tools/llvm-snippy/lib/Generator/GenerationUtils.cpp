@@ -80,8 +80,10 @@ selectAddressForSingleInstrFromBurstGroup(InstructionGenerationContext &IGC,
     }
     auto &CandidateAI = CandidateAccess->AddrInfo;
 
-    auto Stride = std::max<int64_t>(OpcodeAR.ImmOffsetRange.getStride(),
-                                    CandidateAI.MinStride);
+    auto Stride = std::lcm<int64_t, int64_t>(
+        std::max<int64_t>(OpcodeAR.ImmOffsetRange.getStride(),
+                          CandidateAI.MinStride),
+        OpcodeAR.OffsetAlignment);
     CandidateAI.MinStride = std::max<int64_t>(Stride, 1);
 
     if (CandidateAI.Address == OrigAddr && CandidateAI.MinOffset == 0 &&
@@ -263,7 +265,6 @@ selectOperands(const MCInstrDesc &InstrDesc, unsigned BaseReg,
       auto MinStride = AI.MinStride;
       if (MinStride == 0)
         MinStride = 1;
-      assert(isPowerOf2_64(MinStride));
       Preselected.emplace_back(
           StridedImmediate(AI.MinOffset, AI.MaxOffset, MinStride));
     } else
@@ -338,7 +339,8 @@ std::vector<planning::PreselectedOpInfo> selectConcreteOffsets(
 // with some kind of stride.
 
 AddressInfo randomlyShiftAddressOffsetsInImmRange(AddressInfo AI,
-                                                  StridedImmediate ImmRange) {
+                                                  StridedImmediate ImmRange,
+                                                  unsigned OffsetAlignment) {
   auto MinImm = ImmRange.getMin();
   auto MaxImm = ImmRange.getMax();
   assert(MinImm <= 0 && 0 <= MaxImm);
@@ -351,26 +353,30 @@ AddressInfo randomlyShiftAddressOffsetsInImmRange(AddressInfo AI,
          "Unexpected stride for AI");
   auto Stride = std::max<int64_t>(ImmRange.getStride(), AI.MinStride);
   Stride = std::max<int64_t>(Stride, 1);
-
+  auto LCStride = std::lcm<int64_t, int64_t>(Stride, OffsetAlignment);
   // Address info might be less restrictive than the immediate operand. For
   // example, legal final address can be aligned to 4, but the immediate operand
   // must be aligned to 8. So, when choosing legal immediate range, we must
   // account such restrictions.
-  AI.MinOffset = alignTo(AI.MinOffset, Stride);
-  AI.MaxOffset = alignDown(AI.MaxOffset, Stride);
+  AI.MinOffset = alignTo(AI.MinOffset, LCStride);
+  assert(AI.MinOffset % LCStride == 0);
+  AI.MaxOffset = alignDown(AI.MaxOffset, LCStride);
+  assert(AI.MaxOffset % LCStride == 0);
   assert(AI.MinOffset <= 0 && 0 <= AI.MaxOffset);
 
   if (!(AI.MinOffset < MinImm && MaxImm < AI.MaxOffset)) {
-    auto Shift =
-        Stride * RandEngine::genInRangeInclusive<int64_t>(
-                     std::min<int64_t>((MinImm - AI.MinOffset) / Stride, 0),
-                     std::max<int64_t>((MaxImm - AI.MaxOffset) / Stride, 0));
+    auto Shift = LCStride *
+                 RandEngine::genInRangeInclusive<int64_t>(
+                     std::min<int64_t>((MinImm - AI.MinOffset) / LCStride, 0),
+                     std::max<int64_t>((MaxImm - AI.MaxOffset) / LCStride, 0));
     AI.MinOffset += Shift;
     AI.MaxOffset += Shift;
     AI.Address -= Shift;
   }
 
-  AI.MinStride = Stride;
+  AI.MinStride = LCStride;
+  assert(AI.MinOffset % LCStride == 0);
+  assert(AI.MaxOffset % LCStride == 0);
   return AI;
 }
 
@@ -406,6 +412,11 @@ std::map<unsigned, AddressRestriction> deduceStrongestRestrictions(
           return OpcodeToAR.at(LHS).ImmOffsetRange.getStride() <
                  OpcodeToAR.at(RHS).ImmOffsetRange.getStride();
         });
+    auto StrongestOffsetAlignment = std::max_element(
+        Opcodes.begin(), Opcodes.end(), [&OpcodeToAR](auto LHS, auto RHS) {
+          return OpcodeToAR.at(LHS).OffsetAlignment <
+                 OpcodeToAR.at(RHS).OffsetAlignment;
+        });
 
     AddressRestriction StrongestAR;
 
@@ -417,6 +428,8 @@ std::map<unsigned, AddressRestriction> deduceStrongestRestrictions(
         OpcodeToAR.at(*StrongestImmMin).ImmOffsetRange.getMin(),
         OpcodeToAR.at(*StrongestImmMax).ImmOffsetRange.getMax(),
         OpcodeToAR.at(*StrongestImmStride).ImmOffsetRange.getStride());
+    StrongestAR.OffsetAlignment =
+        OpcodeToAR.at(*StrongestOffsetAlignment).OffsetAlignment;
 
     // We insert all opcodes because the address chosen for this restriction
     // will be used as a fallback if we fail to find another one.
@@ -447,6 +460,8 @@ collectAddressRestrictions(ArrayRef<unsigned> Opcodes,
     std::tie(AR.AccessSize, AR.AccessAlignment) =
         SnippyTgt.getAccessSizeAndAlignment(ProgCtx, Opcode, MBB);
     AR.ImmOffsetRange = SnippyTgt.getImmOffsetRangeForMemAccessInst(InstrDesc);
+    AR.OffsetAlignment =
+        SnippyTgt.getImmOffsetAlignmentForMemAccessInst(InstrDesc);
 
     assert(!OpcodeToAR.count(Opcode) ||
            OpcodeToAR[Opcode].ImmOffsetRange == AR.ImmOffsetRange);
@@ -580,7 +595,8 @@ static std::map<unsigned, AddressInfo> collectPrimaryAddresses(
     auto &[BaseReg, AI] = RegToAI;
     assert(BaseReg == Reg);
     (void)BaseReg, (void)Reg;
-    AI = randomlyShiftAddressOffsetsInImmRange(AI, AR.ImmOffsetRange);
+    AI = randomlyShiftAddressOffsetsInImmRange(AI, AR.ImmOffsetRange,
+                                               AR.OffsetAlignment);
   }
   return BaseRegToPrimaryAddress;
 }
