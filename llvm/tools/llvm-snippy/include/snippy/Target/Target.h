@@ -499,6 +499,9 @@ public:
   virtual StridedImmediate
   getImmOffsetRangeForMemAccessInst(const MCInstrDesc &InstrDesc) const = 0;
 
+  virtual unsigned
+  getImmOffsetAlignmentForMemAccessInst(const MCInstrDesc &InstrDesc) const = 0;
+
   virtual size_t getAccessSize(unsigned Opcode) const = 0;
 
   virtual bool isCall(unsigned Opcode) const = 0;

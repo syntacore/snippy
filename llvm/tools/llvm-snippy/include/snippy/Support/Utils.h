@@ -282,6 +282,73 @@ void replaceAllSubstrs(std::string &Str, StringRef What, StringRef With);
 inline unsigned requiredNumOfHexDigits(size_t Val) {
   return llvm::alignTo(Val, 4);
 }
+
+/// Changes Num's module to have the same remainder as Orig.
+/// Rounds Num's module towards RoundTo
+/// \param Orig Number to match remainder of
+/// \param Num Number which remainder has to be changed
+/// \param Div Divisor
+/// \param RoundTo a number to change Num towards
+/// \return A number that has the same remainder with Div as Orig
+///   and which module was changed from Num towards RoundTo
+template <typename T>
+std::enable_if_t<std::is_signed_v<T>, std::optional<T>>
+matchRemainder(T Orig, T Num, T Div, T RoundTo = 0) {
+  assert(Div > 0);
+  auto Sign = Num >= 0 ? 1 : -1;
+  Orig = std::abs(Orig);
+  Num = std::abs(Num);
+  bool RoundDown = std::abs(RoundTo) <= Num;
+  auto OrigRem = Orig % Div;
+  auto Rem = Num % Div;
+  auto Diff = OrigRem - Rem;
+  if (RoundDown) {
+    if (Diff > 0) {
+      if (Div > Num)
+        return std::nullopt;
+      Num -= Div;
+    }
+    if (Diff > 0 && std::numeric_limits<T>::max() - Diff < Num)
+      return std::nullopt;
+    Num += Diff;
+    return Num * Sign;
+  }
+  Num += Diff;
+  if (Diff < 0)
+    Num += Div;
+  return Num * Sign;
+}
+
+/// Changes Num's module to have the same remainder as Orig.
+/// Rounds Num's module towards RoundTo
+/// \param Orig Number to match remainder of
+/// \param Num Number which remainder has to be changed
+/// \param Div Divisor
+/// \param RoundTo a number to change Num towards
+/// \return A number that has the same remainder with Div as Orig
+///   and which module was changed from Num towards RoundTo
+template <typename T>
+std::enable_if_t<std::is_unsigned_v<T>, std::optional<T>>
+matchRemainder(T Orig, T Num, T Div, T RoundTo = 0) {
+  assert(Div);
+  bool RoundDown = RoundTo <= Num;
+  auto OrigRem = Orig % Div;
+  auto Rem = Num % Div;
+  auto Diff = OrigRem - Rem;
+  Num += Diff;
+  if (RoundDown) {
+    if (OrigRem > Rem) {
+      if (Num < Div)
+        return std::nullopt;
+      Num -= Div;
+    }
+    return Num;
+  }
+  if (OrigRem < Rem)
+    Num += Div;
+  return Num;
+}
+
 } // namespace snippy
 } // namespace llvm
 
