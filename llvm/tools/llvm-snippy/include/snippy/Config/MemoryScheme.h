@@ -183,6 +183,7 @@ using MemoryAccessIter = MemoryAccessSeq::iterator;
 struct AddressRestriction {
   size_t AccessSize;
   size_t AccessAlignment;
+  size_t OffsetAlignment;
   StridedImmediate ImmOffsetRange;
   std::unordered_set<unsigned> Opcodes;
 
