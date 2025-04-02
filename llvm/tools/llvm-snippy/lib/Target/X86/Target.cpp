@@ -480,6 +480,11 @@ public:
     reportUnimplementedError();
   }
 
+  unsigned getImmOffsetAlignmentForMemAccessInst(
+      const MCInstrDesc &InstrDesc) const override {
+    reportUnimplementedError();
+  }
+
   size_t getAccessSize(unsigned Opcode) const override {
     reportUnimplementedError();
   }
