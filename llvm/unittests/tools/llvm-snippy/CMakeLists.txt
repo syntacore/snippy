@@ -4,10 +4,13 @@ set(LLVM_LINK_COMPONENTS
 
 set(snippy_sources
   Sanity.cpp
+  Support.cpp
+  ImmediateHistogram.cpp
   )
 
 set(snippy_link_libraries
-  LLVMSnippy
+  LLVMSnippySupport
+  LLVMSnippyConfig
   )
 
 set(snippy_includes)
