@@ -17,6 +17,7 @@
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/OpcodeCache.h"
 #include "snippy/Support/RandUtil.h"
+#include "snippy/Support/Utils.h"
 #include "snippy/Support/YAMLUtils.h"
 
 #include "snippy/Config/OpcodeHistogram.h"
@@ -114,7 +115,6 @@ public:
   StridedImmediate(ValueType MinIn, ValueType MaxIn, StrideType StrideIn)
       : Min(MinIn), Max(MaxIn), Stride(StrideIn), Init(true) {
     assert(Min <= Max);
-    assert(Stride == 0 || isPowerOf2_64(Stride));
   }
   StridedImmediate() = default;
 
@@ -172,28 +172,26 @@ enum class ImmediateZero {
   Exclude,
 };
 
+/// Randomly samples an integer N that satisfies:
+///   * MinValue <= N <= MaxValue && StridedImm.Min <= N <= StridedImm.Max
+///   * N % StridedImm.Stride == StridedImm.Min % StridedImm.Stride
 template <int MinValue, int MaxValue>
 int genImmInInterval(const StridedImmediate &StridedImm) {
+  static_assert(MinValue <= MaxValue, "Invalid range");
   assert(StridedImm.isInitialized());
   using ValueType = StridedImmediate::ValueType;
   auto Min = std::clamp<ValueType>(StridedImm.getMin(), MinValue, MaxValue);
   auto Max = std::clamp<ValueType>(StridedImm.getMax(), MinValue, MaxValue);
-  auto Stride = StridedImm.getStride();
+  using SignedStrideTy = std::make_signed_t<StridedImmediate::StrideType>;
+  assert(StridedImm.getStride() <= std::numeric_limits<SignedStrideTy>::max());
+  auto Stride = static_cast<SignedStrideTy>(StridedImm.getStride());
   assert(Stride != 0);
   assert(Max >= Min);
 
-  // Min may be either MinValue or StridedImm.getMin() depending on which value
-  // is bigger (see a few lines above). However alignments of these values are
-  // not guaranteed to match. Below we make sure that Min is properly aligned,
-  // i.e. Min % Stride == StridedImm.getMin() % Stride. The same must be done
-  // for Max.
-  auto SkewMin = std::abs(StridedImm.getMin());
-  auto SkewMax = std::abs(StridedImm.getMax());
-  Min = (Min < 0 ? -1ll : 1ll) * alignTo(std::abs(Min), Stride, SkewMin);
-  Max = (Max < 0 ? -1ll : 1ll) * alignDown(std::abs(Max), Stride, SkewMax);
-  assert(Max >= Min);
-  assert((StridedImm.getMin() - Min) % Stride == 0);
-  assert((StridedImm.getMax() - Max) % Stride == 0);
+  auto MatchedMin =
+      matchRemainder<SignedStrideTy>(StridedImm.getMin(), Min, Stride, Max);
+  assert(MatchedMin.has_value());
+  Min = *MatchedMin;
 
   auto NMax = (Max - Min) / Stride;
   auto N = RandEngine::genInRangeInclusive(NMax);
@@ -288,10 +286,7 @@ auto genImmInInterval(const ImmediateHistogramSequence *IH,
                       const StridedImmediate &StridedImm) {
   if (StridedImm.isInitialized()) {
     unsigned MinStride = 1 << ZeroBits;
-    assert(isPowerOf2_64(StridedImm.getStride()));
     assert(StridedImm.getStride() >= MinStride);
-    assert(StridedImm.getMin() % MinStride == 0);
-    assert(StridedImm.getMax() % MinStride == 0);
     assert(Zero == ImmediateZero::Include);
     if constexpr (Sign == ImmediateSignedness::Signed) {
       return genImmInInterval<-(1 << (BitWidth - 1)),

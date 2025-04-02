@@ -1,0 +1,96 @@
+# RUN: llvm-snippy %s --model-plugin None
+
+# COM: this tests simply expects snippy not to fail
+sections:
+  - no: 1
+    VMA: 0x100000
+    LMA: 0x100000
+    SIZE: 0x100000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x200000
+    LMA: 0x200000
+    SIZE: 0x10000
+    ACCESS: rw
+
+options:
+  march: riscv64-unknown-elf
+  mattr: "+c"
+  riscv-disable-misaligned-access: atomics-only
+  num-instrs: 10000
+
+burst:
+  mode: custom
+  min-size: 2
+  max-size: 60
+  groupings:
+    - [C_SW, C_LW, C_SD, LB, LHU, SW, SB, LBU, LH, LW, LWU, LD]
+  
+histogram:
+  - [C_LW, 3.0]
+  - [C_LD, 3.0]
+  - [C_SW, 1.0]
+  - [C_SD, 1.0]
+  - [LB, 1.0]
+  - [LBU, 1.0]
+  - [LH, 1.0]
+  - [LHU, 1.0]
+  - [LW, 1.0]
+  - [LWU, 1.0]
+  - [LD, 1.0]
+  - [SB, 1.0]
+  - [SH, 1.0]
+  - [SW, 1.0]
+  - [SD, 1.0]
+
+access-ranges:
+  - start: 0x200000
+    size: 10
+    stride: 10
+    first-offset: 0
+    last-offset: 9
+  - start: 0x200010
+    size: 0xb
+    stride: 11
+    first-offset: 0
+    last-offset: 10
+  - start: 0x200020
+    size: 12
+    stride: 12
+    first-offset: 0
+    last-offset: 11
+  - start: 0x200030
+    size: 13
+    stride: 13
+    first-offset: 0
+    last-offset: 12
+  - start: 0x200040
+    size: 14
+    stride: 14
+    first-offset: 0
+    last-offset: 13
+  - start: 0x200050
+    size: 15
+    stride: 15
+    first-offset: 0
+    last-offset: 14
+  - start: 0x200060
+    size: 0x9
+    stride: 9
+    first-offset: 1
+    last-offset: 8
+  - start: 0x200070
+    size: 0x8
+    stride: 8
+    first-offset: 0
+    last-offset: 7
+  - start: 0x200080
+    size: 0x7
+    stride: 7
+    first-offset: 0
+    last-offset: 6
+  - start: 0x200090
+    size: 0x6
+    stride: 6
+    first-offset: 0
+    last-offset: 5
