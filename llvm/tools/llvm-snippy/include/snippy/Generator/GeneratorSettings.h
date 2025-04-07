@@ -10,7 +10,6 @@
 #define LLVM_TOOLS_SNIPPY_GENERATOR_SETTINGS_H
 
 #include "snippy/Config/Config.h"
-#include "snippy/Generator/BurstMode.h"
 #include "snippy/Generator/Policy.h"
 
 #include "llvm/ADT/ArrayRef.h"
