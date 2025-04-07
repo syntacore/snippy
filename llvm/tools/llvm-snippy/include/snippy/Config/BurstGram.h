@@ -9,7 +9,6 @@
 #pragma once
 
 #include "snippy/Config/ConfigIOContext.h"
-#include "snippy/Generator/BurstMode.h"
 #include "snippy/Support/YAMLUtils.h"
 
 #include <map>
@@ -17,6 +16,14 @@
 
 namespace llvm {
 namespace snippy {
+enum class BurstMode {
+  Basic,
+  StoreBurst,
+  LoadBurst,
+  MixedBurst,
+  LoadStoreBurst,
+  CustomBurst
+};
 
 struct BurstGramData final {
   BurstMode Mode = BurstMode::Basic;
@@ -53,4 +60,5 @@ struct BurstGram final {
 };
 
 } // namespace snippy
+LLVM_SNIPPY_YAML_DECLARE_SCALAR_ENUMERATION_TRAITS(snippy::BurstMode);
 } // namespace llvm
