@@ -11,7 +11,6 @@
 #include "snippy/Config/BurstGram.h"
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
-#include "snippy/Generator/BurstMode.h"
 #include "snippy/Support/Options.h"
 #include "snippy/Support/YAMLHistogram.h"
 #include "snippy/Target/Target.h"

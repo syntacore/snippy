@@ -15,7 +15,6 @@
 
 #pragma once
 
-#include "snippy/Generator/LLVMState.h"
 #include "snippy/Support/YAMLUtils.h"
 
 #include "llvm/ADT/StringRef.h"
