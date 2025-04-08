@@ -284,9 +284,10 @@ static snippy::opt<std::string>
 
 static snippy::opt<std::string> ModelPluginFile(
     "model-plugin",
-    cl::desc("Primary model plugin to use for snippet generation"
-             "Use =None to disable snippet execution on the model."),
-    cl::value_desc("filename"), cl::cat(Options), cl::init("libRISCVModel.so"));
+    cl::desc(
+        "Primary model plugin to use for snippet generation. Use 'None' to "
+        "disable snippet execution on the model."),
+    cl::value_desc("alias|filename"), cl::cat(Options), cl::init("None"));
 
 static snippy::opt_list<std::string>
     CoSimModelPluginFilesList("cosim-model-plugins", cl::CommaSeparated,
