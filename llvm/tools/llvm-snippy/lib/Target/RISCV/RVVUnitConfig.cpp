@@ -193,10 +193,8 @@ enum class SEWTypes : unsigned {
 enum class VXRMTypes : unsigned { RNU, RNE, RDN, RON, ItemsNum };
 enum class VMAMode : unsigned { MU, MA, ItemsNum };
 enum class VTAMode : unsigned { TU, TA, ItemsNum };
-enum class VXSATModes : unsigned { OFF, ON, ItemsNum };
 
 using VXRMInfo = WeightsStorage<VXRMTypes>;
-using VXSATInfo = WeightsStorage<VXSATModes>;
 using SEWInfo = WeightsStorage<SEWTypes>;
 using LMULInfo = WeightsStorage<LMULTypes>;
 using VMAInfo = WeightsStorage<VMAMode>;
@@ -217,7 +215,6 @@ struct VTypeInfo {
 
 struct RVVUnitInfo {
   VXRMInfo VXRM;
-  VXSATInfo VXSAT;
   VTypeInfo VTYPE;
 
   std::vector<SList> VM;
@@ -249,7 +246,6 @@ struct ConfigPoint {
   ConfigurationElement<VMAMode> VMA;
   ConfigurationElement<VTAMode> VTA;
   ConfigurationElement<VXRMTypes> VXRM;
-  ConfigurationElement<VXSATModes> VXSAT;
 };
 
 template <typename SliceType>
@@ -452,17 +448,6 @@ static auto convertVXRMRepresentation(unsigned VXRMInternal) {
   }
 }
 
-static auto convertVXSatRepresentation(unsigned VXSatInternal) {
-  switch (static_cast<VXSATModes>(VXSatInternal)) {
-  case VXSATModes::OFF:
-    return false;
-  case VXSATModes::ON:
-    return true;
-  default:
-    llvm_unreachable("incorrect TAInternal representation");
-  }
-}
-
 static auto convertMARepresentation(unsigned MAInternal) {
   switch (static_cast<VMAMode>(MAInternal)) {
   case VMAMode::MU:
@@ -492,12 +477,11 @@ struct InternalConfigurationPoint {
 
 static auto convertRepresentation(unsigned VLEN, const ConfigPoint &Point) {
   InternalConfigurationPoint Result;
-  Result.Probability = Point.SEW.P * Point.LMUL.P * Point.VMA.P * Point.VTA.P *
-                       Point.VXRM.P * Point.VXSAT.P;
+  Result.Probability =
+      Point.SEW.P * Point.LMUL.P * Point.VMA.P * Point.VTA.P * Point.VXRM.P;
   Result.Config.LMUL = convertLMULRepresentation(Point.LMUL.Value);
   Result.Config.SEW = convertSEWRepresentation(Point.SEW.Value);
   Result.Config.VXRM = convertVXRMRepresentation(Point.VXRM.Value);
-  Result.Config.VxsatEnable = convertVXSatRepresentation(Point.VXSAT.Value);
   Result.Config.MaskAgnostic = convertMARepresentation(Point.VMA.Value);
   Result.Config.TailAgnostic = convertTARepresentation(Point.VTA.Value);
 
@@ -749,15 +733,6 @@ template <> struct yaml::MappingTraits<VXRMInfo> {
   }
 };
 
-template <> struct yaml::MappingTraits<VXSATInfo> {
-  static void mapping(yaml::IO &IO, VXSATInfo &VXSAT) {
-    IO.mapOptional("on", VXSAT[VXSATModes::ON], 0.0);
-    IO.mapOptional("off", VXSAT[VXSATModes::OFF], 0.0);
-
-    checkWeights(VXSAT.W.begin(), VXSAT.W.end(), "VXSAT");
-  }
-};
-
 template <> struct yaml::MappingTraits<SEWInfo> {
   static void mapping(yaml::IO &IO, SEWInfo &SEW) {
     IO.mapOptional("sew_8", SEW[SEWTypes::SEW8], 0.0);
@@ -813,7 +788,6 @@ template <> struct yaml::MappingTraits<VTypeInfo> {
 template <> struct yaml::MappingTraits<RVVUnitInfo> {
   static void mapping(yaml::IO &IO, RVVUnitInfo &VUInfo) {
     IO.mapRequired("VXRM", VUInfo.VXRM);
-    IO.mapRequired("VXSAT", VUInfo.VXSAT);
     IO.mapRequired("VTYPE", VUInfo.VTYPE);
 
     IO.mapOptional("VM", VUInfo.VM);
@@ -972,7 +946,6 @@ void RVVConfiguration::print(raw_ostream &OS) const {
   unsigned EncodedVTYPE = RISCVVType::encodeVTYPE(
       LMUL, static_cast<unsigned>(SEW), TailAgnostic, MaskAgnostic);
   printVType(EncodedVTYPE, OS);
-  OS << ", vxsat: " << VxsatEnable;
   OS << ", vxrm: ";
   switch (VXRM) {
   case VXRMMode::RNU:
@@ -1050,19 +1023,17 @@ static std::vector<InternalConfigurationPoint> getLegalConfigurationPoints(
   auto TA = extractElementsWithPropabilities(VUInfo.VTYPE.VTA);
 
   auto VXRM = extractElementsWithPropabilities(VUInfo.VXRM);
-  auto VXSAT = extractElementsWithPropabilities(VUInfo.VXSAT);
 
   LLVM_DEBUG(dumpRawPropabilities(dbgs(), "SEW", SEW.begin(), SEW.end()));
   LLVM_DEBUG(dumpRawPropabilities(dbgs(), "LMUL", LMUL.begin(), LMUL.end()));
   LLVM_DEBUG(dumpRawPropabilities(dbgs(), "MA", MA.begin(), MA.end()));
   LLVM_DEBUG(dumpRawPropabilities(dbgs(), "TA", TA.begin(), TA.end()));
   LLVM_DEBUG(dumpRawPropabilities(dbgs(), "VXRM", MA.begin(), MA.end()));
-  LLVM_DEBUG(dumpRawPropabilities(dbgs(), "VXSAT", TA.begin(), TA.end()));
 
   std::vector<ConfigPoint> Points;
   cartesianProduct(std::back_inserter(Points), cartesianRange(SEW),
                    cartesianRange(LMUL), cartesianRange(MA), cartesianRange(TA),
-                   cartesianRange(VXRM), cartesianRange(VXSAT));
+                   cartesianRange(VXRM));
   LLVM_DEBUG(dbgs() << "Raw Propabilities Points Count: " << Points.size()
                     << "\n");
   std::vector<InternalConfigurationPoint> ConfigPoints;
@@ -1104,13 +1075,11 @@ getIllegalConfigurationPoints(unsigned VLEN) {
   auto AllTA = extractElementsWithPropabilities(VTAInfo{1.0, 1.0});
 
   auto AllVXRM = extractElementsWithPropabilities(VXRMInfo{1.0, 1.0, 1.0, 1.0});
-  auto AllVXSAT = extractElementsWithPropabilities(VXSATInfo{1.0, 1.0});
 
   std::vector<ConfigPoint> AllPoints;
   cartesianProduct(std::back_inserter(AllPoints), cartesianRange(AllSEW),
                    cartesianRange(AllLMUL), cartesianRange(AllMA),
-                   cartesianRange(AllTA), cartesianRange(AllVXRM),
-                   cartesianRange(AllVXSAT));
+                   cartesianRange(AllTA), cartesianRange(AllVXRM));
   std::vector<InternalConfigurationPoint> AllConfigPoints;
   std::transform(
       AllPoints.begin(), AllPoints.end(), std::back_inserter(AllConfigPoints),

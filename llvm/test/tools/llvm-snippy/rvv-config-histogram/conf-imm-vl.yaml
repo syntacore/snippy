@@ -27,8 +27,6 @@ riscv-vector-unit:
       - [011, 1.0]   # 9
     VXRM:
       rnu: 1.0
-    VXSAT:
-      on: 1.0
     VTYPE:
       SEW:
         sew_32: 1.0

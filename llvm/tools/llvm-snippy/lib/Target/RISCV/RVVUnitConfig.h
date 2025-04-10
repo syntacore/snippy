@@ -99,7 +99,6 @@ struct RVVConfiguration final {
   bool TailAgnostic = false;
 
   VXRMMode VXRM = VXRMMode::RNU;
-  bool VxsatEnable = false;
 
   void print(raw_ostream &OS) const;
   void dump() const;
