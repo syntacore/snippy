@@ -38,6 +38,6 @@ histogram:
 
 # CHECK: --- RVV Configuration Info ---
 # CHECK:  - Configuration Bag Listing:
-# CHECK:    P: 1 Conf: { e64, m1, tu, mu, vxsat: 0, vxrm: rnu }
+# CHECK:    P: 1 Conf: { e64, m1, tu, mu, vxrm: rnu }
 # CHECK:  - Configuration Bag Size: 1
 # CHECK: --- RVV Configuration End  ---
