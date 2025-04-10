@@ -623,8 +623,7 @@ constructRVVModeWithVMReset(RISCVII::VLMUL LMUL, unsigned VL, unsigned SEW,
                           static_cast<RVVConfiguration::VSEW>(SEW),
                           MaskAgnostic,
                           TailAgnostic,
-                          RVVConfiguration::VXRMMode::RNU,
-                          /* VxsatEnable */ false};
+                          RVVConfiguration::VXRMMode::RNU};
 
   RVVConfigurationInfo::VLVM VLVM{VL, APInt::getMaxValue(VL)};
   return {Config, VLVM};
@@ -3807,7 +3806,7 @@ void SnippyRISCVTarget::generateRVVModeUpdate(
                        "--rvv-init-mode=slides/splats while "
                        "an illegal rvv configuration is set",
                        false);
-  // TODO: update VXRM/VXSAT
+  // TODO: update VXRM
 }
 
 static void dumpRvvConfigurationInfo(StringRef FilePath,

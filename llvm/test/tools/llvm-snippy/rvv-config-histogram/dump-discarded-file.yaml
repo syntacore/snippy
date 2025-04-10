@@ -24,8 +24,6 @@ riscv-vector-unit:
       - [4, 1.0] 
     VXRM:
       rnu: 1.0
-    VXSAT:
-      on: 1.0
     VTYPE:
       SEW:
         sew_64: 1.0
@@ -45,7 +43,7 @@ histogram:
 # CHECK-NEXT:   - VM Generators:
 # CHECK-NEXT:   - VL Generators:
 # CHECK-NEXT:   - Configuration Bag Listing:
-# CHECK-NEXT:     Conf: { e64, m1, tu, mu, vxsat: 1, vxrm: rnu }
+# CHECK-NEXT:     Conf: { e64, m1, tu, mu, vxrm: rnu }
 # CHECK-NEXT: --- RVV Unit Discarded End  ---
 
 # RVV-INFO:      --- RVV Configuration Info ---
@@ -59,7 +57,7 @@ histogram:
 # RVV-INFO-NEXT:   - VM Selection Rules:
 # RVV-INFO-NEXT:     P: 1 <imm_3>
 # RVV-INFO:        - Configuration Bag Listing:
-# RVV-INFO-NEXT:     P: 1 Conf: { e32, m1, tu, mu, vxsat: 1, vxrm: rnu }/MaxVL: 4
+# RVV-INFO-NEXT:     P: 1 Conf: { e32, m1, tu, mu, vxrm: rnu }/MaxVL: 4
 # RVV-INFO-NEXT:   - Configuration Bag Size: 1
 # RVV-INFO-NEXT:   - State Cardinality: 4 ~ {MASKS} 
 # RVV-INFO-NEXT: --- RVV Configuration End  ---

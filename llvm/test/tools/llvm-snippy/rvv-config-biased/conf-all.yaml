@@ -53,9 +53,9 @@ histogram:
 # CHECK-FULL-VLMAX1-DISABLED-NEXT:    P: 0.66667 <all_ones>
 # CHECK-FULL-VLMAX1-DISABLED-NEXT:    P: 0.33333 <any_legal>
 # CHECK-FULL-VLMAX1-DISABLED:  - Configuration Bag Listing:
-# CHECK-FULL-VLMAX1-DISABLED-COUNT-704:   /MaxVL
-# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - Configuration Bag Size: 704
-# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - State Cardinality: 15104 ~ {MASKS}
+# CHECK-FULL-VLMAX1-DISABLED-COUNT-352:   /MaxVL
+# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - Configuration Bag Size: 352
+# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - State Cardinality: 7552 ~ {MASKS}
 # CHECK-FULL-VLMAX1-DISABLED-NEXT: --- RVV Configuration End  ---
 
 # CHECK-FULL-VLMAX1-ENABLED:       --- RVV Configuration Info ---
@@ -70,8 +70,8 @@ histogram:
 # CHECK-FULL-VLMAX1-ENABLED-NEXT:    P: 0.66667 <all_ones>
 # CHECK-FULL-VLMAX1-ENABLED-NEXT:    P: 0.33333 <any_legal>
 # CHECK-FULL-VLMAX1-ENABLED:  - Configuration Bag Listing:
-# CHECK-FULL-VLMAX1-ENABLED-COUNT-800:   /MaxVL
-# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - Configuration Bag Size: 800
-# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - State Cardinality: 15200 ~ {MASKS}
+# CHECK-FULL-VLMAX1-ENABLED-COUNT-400:   /MaxVL
+# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - Configuration Bag Size: 400
+# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - State Cardinality: 7600 ~ {MASKS}
 # CHECK-FULL-VLMAX1-ENABLED-NEXT: --- RVV Configuration End  ---
 # CHECK-FULL-VLMAX1-ENABLED: Skipping snippet execution on the model: model was set no 'None'
