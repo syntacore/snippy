@@ -56,11 +56,13 @@ class DynamicLibrary;
 
 namespace snippy {
 struct SectionDesc;
+struct Branchegram;
 class LLVMState;
 class RegPoolWrapper;
-class GeneratorSettings;
 class SnippyProgramContext;
 class StridedImmediate;
+class CommonPolicyConfig;
+class Config;
 
 enum class LoopType;
 struct TargetGenContextInterface {
@@ -128,7 +130,7 @@ public:
                                      SmallVectorImpl<MCInst> &Insts) const = 0;
 
   virtual std::unique_ptr<TargetGenContextInterface>
-  createTargetContext(LLVMState &State, const GeneratorSettings &GenSettings,
+  createTargetContext(LLVMState &State, const Config &Cfg,
                       const TargetSubtargetInfo *STI) const = 0;
 
   virtual std::unique_ptr<TargetConfigInterface> createTargetConfig() const = 0;
@@ -273,7 +275,7 @@ public:
 
   virtual MachineOperand
   generateTargetOperand(SnippyProgramContext &ProgCtx,
-                        const GeneratorSettings &GenSettings, unsigned OpCode,
+                        const CommonPolicyConfig &Cfg, unsigned OpCode,
                         unsigned OpType,
                         const StridedImmediate &StridedImm) const = 0;
 
@@ -464,7 +466,8 @@ public:
 
   virtual LoopCounterInitResult
   insertLoopInit(InstructionGenerationContext &IGC, MachineInstr &Branch,
-                 ArrayRef<Register> ReservedRegs, unsigned NIter) const = 0;
+                 const Branchegram &Branches, ArrayRef<Register> ReservedRegs,
+                 unsigned NIter) const = 0;
 
   virtual LoopType getLoopType(MachineInstr &Branch) const = 0;
 

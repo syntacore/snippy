@@ -9,20 +9,16 @@
 #pragma once
 
 namespace llvm {
-class LLVMContext;
-class MCInstrInfo;
-class LLVMTargetMachine;
 namespace snippy {
 
-class SnippyTarget;
+class LLVMState;
 class OpcodeCache;
+class RegPool;
 
 struct ConfigIOContext {
   const OpcodeCache &OpCC;
-  LLVMContext &Ctx;
-  const SnippyTarget &SnpTgt;
-  const MCInstrInfo &InstrInfo;
-  const LLVMTargetMachine &TargetMachine;
+  RegPool &RP;
+  LLVMState &State;
 };
 
 } // namespace snippy

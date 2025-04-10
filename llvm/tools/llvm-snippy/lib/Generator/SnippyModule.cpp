@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Generator/SnippyModule.h"
-#include "snippy/Generator/GeneratorSettings.h"
+#include "snippy/Config/Config.h"
 #include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/Linker.h"
 #include "snippy/InitializePasses.h"
@@ -80,8 +80,7 @@ void SnippyModule::generateObject(const PassInserter &BeforePrinter,
                   //        MachineFunctionPrinter don't flush
 }
 
-void SnippyProgramContext::initializeROMSection(
-    const SnippyProgramSettings &Settings) {
+void SnippyProgramContext::initializeROMSection(const ProgramConfig &Settings) {
   if (!getLinker().sections().hasOutputSectionFor(
           Linker::kDefaultRODataSectionName))
     return;
@@ -94,7 +93,7 @@ void SnippyProgramContext::initializeROMSection(
 }
 
 void SnippyProgramContext::initializeUtilitySection(
-    const SnippyProgramSettings &Settings) {
+    const ProgramConfig &Settings) {
   auto &Ctx = State->getCtx();
   if (!Settings.Sections.hasSection(SectionsDescriptions::UtilitySectionName))
     return;
@@ -153,7 +152,7 @@ GlobalsPool &SnippyProgramContext::getOrAddGlobalsPoolFor(SnippyModule &M,
 }
 
 void SnippyProgramContext::initializeSelfcheckSection(
-    const SnippyProgramSettings &Settings) {
+    const ProgramConfig &Settings) {
   if (!Settings.Sections.hasSection(SectionsDescriptions::SelfcheckSectionName))
     return;
   // Configure selfcheck from layout.
@@ -202,7 +201,14 @@ bool SnippyProgramContext::shouldSpillStackPointer() const {
 }
 
 void SnippyProgramContext::initializeStackSection(
-    const SnippyProgramSettings &Settings) {
+    const ProgramConfig &Settings) {
+  if (ExternalStack) {
+    if (RegPoolsStorage.front().isReserved(getStackPointer()))
+      snippy::fatal(State->getCtx(), "Cannot configure external stack",
+                    "stack pointer register is "
+                    "explicitly reserved.");
+    return;
+  }
   if (!Settings.Sections.hasSection(SectionsDescriptions::StackSectionName))
     return;
   auto &Ctx = State->getCtx();
@@ -218,12 +224,6 @@ void SnippyProgramContext::initializeStackSection(
     snippy::fatal(Ctx, "Wrong layout file",
                   "\"" + Twine(SectionsDescriptions::StackSectionName) +
                       "\" section must be RW");
-  if (ExternalStack) {
-    if (RegPoolsStorage.front().isReserved(getStackPointer()))
-      snippy::fatal(State->getCtx(), "Cannot configure external stack",
-                    "stack pointer register is "
-                    "explicitly reserved.");
-  }
 
   if (StackSection) {
     if (StackSection->VMA % Align != 0)
@@ -261,10 +261,13 @@ const IRegisterState &SnippyProgramContext::getInitialRegisterState(
   return *InitialMachineState;
 }
 
-SnippyProgramContext::SnippyProgramContext(
-    LLVMState &State, RegisterGenerator &RegGen, RegPool &Pool,
-    const OpcodeCache &OpCc, const SnippyProgramSettings &Settings)
-    : State(&State), RegGen(&RegGen), RegPoolsStorage({Pool}), OpCC(&OpCc),
+SnippyProgramContext::SnippyProgramContext(LLVMState &State,
+                                           RegisterGenerator &RegGen,
+                                           RegPool &Pool,
+                                           const OpcodeCache &OpCc,
+                                           const ProgramConfig &Settings)
+    : Cfg(&Settings), State(&State), RegGen(&RegGen), RegPoolsStorage({Pool}),
+      OpCC(&OpCc),
       PLinker(std::make_unique<Linker>(
           State.getCtx(), Settings.Sections,
           Settings.MangleExportedNames ? Settings.EntryPointName : "")),
@@ -281,15 +284,14 @@ SnippyProgramContext::SnippyProgramContext(
   initializeROMSection(Settings);
 }
 
-void SnippyProgramContext::createTargetContext(
-    const GeneratorSettings &GenSettings) {
+void SnippyProgramContext::createTargetContext(const Config &Cfg) {
   assert(!TargetContext && "Double context insertion");
   // FIXME: currently there is not way to pass TargetSubtargetInfo
   // because TargetContext is expected to be initialized before any
   // function is created. This should not cause much trouble now,
   // because STI is unused most of the time.
   TargetContext = State->getSnippyTarget().createTargetContext(
-      *State, GenSettings, /* TargetSubtargetInfo */ nullptr);
+      *State, Cfg, /* TargetSubtargetInfo */ nullptr);
 }
 
 SnippyProgramContext::~SnippyProgramContext() = default;

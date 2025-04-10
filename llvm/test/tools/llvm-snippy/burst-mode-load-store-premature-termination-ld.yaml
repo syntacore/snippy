@@ -1,8 +1,6 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu  \
-# RUN: -num-instrs=1000 -memory-access-mode=load-store-burst \
-# RUN: --dump-mi \
+# RUN: -num-instrs=1000 --dump-mi \
 # RUN: --histogram-must-succeed=false --verify-gen-histogram \
-# RUN: --memory-access-burst-group-size=1000 \
 # RUN:  |& FileCheck %s
 
 sections:
@@ -20,7 +18,10 @@ sections:
 histogram:
     - [SD, 0.3]
     - [LD, 1.0]
-
+burst:
+  mode: load-store
+  min-size: 1000
+  max-size: 1000
 
 # CHECK: Number of primary instructions: 1000
 # CHECK-COUNT-1000: LD

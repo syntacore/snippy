@@ -9,6 +9,7 @@
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/ConfigIOContext.h"
 #include "snippy/Config/OpcodeHistogram.h"
+#include "snippy/Generator/LLVMState.h"
 #include "snippy/Support/Options.h"
 #include "snippy/Support/RandUtil.h"
 #include "snippy/Support/Utils.h"

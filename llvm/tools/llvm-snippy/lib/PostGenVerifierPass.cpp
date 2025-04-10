@@ -132,7 +132,7 @@ void PostGenVerifier::printData(const MachineFunction &MF) const {
   const OpcodeCache &OpCache = SGCtx.getProgramContext().getOpcodeCache();
 
   auto ExpectedDist =
-      SGCtx.getGenSettings().createDefaultOpcodeGenerator()->getProbabilities();
+      SGCtx.getConfig().createDefaultOpcodeGenerator()->getProbabilities();
 
   auto &Output = outs();
   constexpr unsigned OpcodeWidth = 12;

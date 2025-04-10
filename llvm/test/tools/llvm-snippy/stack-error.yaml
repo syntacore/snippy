@@ -1,29 +1,88 @@
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
-# RUN: %S/Inputs/layout3.yaml -num-instrs=1000 -stack-size=1024  \
+# RUN: split-file %s %t
+# RUN: not llvm-snippy %t/good-stack.yaml -march=riscv64-linux-gnu -mattr=+m,+c \
+# RUN: -num-instrs=1000 \
 # RUN: --reserved-regs-list=X2 -redefine-sp=SP |& FileCheck %s -check-prefix=SPRES
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
-# RUN: %S/Inputs/layout3.yaml -num-instrs=1000 -stack-size=1024  \
+# RUN: not llvm-snippy %t/good-stack.yaml -march=riscv64-linux-gnu -mattr=+m,+c \
+# RUN: -num-instrs=1000 \
 # RUN: --spilled-regs-list=X2 -redefine-sp=SP |& FileCheck %s -check-prefix=SPSPILL
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
-# RUN: %S/Inputs/layout3.yaml -num-instrs=1000 -stack-size=1024  \
+# RUN: not llvm-snippy %t/good-stack.yaml -march=riscv64-linux-gnu -mattr=+m,+c \
+# RUN: -num-instrs=1000 \
 # RUN: --spilled-regs-list=[X1] |& FileCheck %s -check-prefix=ILLSPILL
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
-# RUN: %S/Inputs/layout3.yaml -num-instrs=1000 -stack-size=1024  \
-# RUN: --spilled-regs-list=X1 --reserved-regs-list=X1 |& FileCheck %s -check-prefix=RESSPILL
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
-# RUN: %S/Inputs/layout3.yaml -num-instrs=1000 -stack-size=0  \
+# RUN: not llvm-snippy %t/good-stack.yaml -march=riscv64-linux-gnu -mattr=+m,+c \
+# RUN: -num-instrs=1000 --spilled-regs-list=X1 \
+# RUN: --reserved-regs-list=X1 |& FileCheck %s -check-prefix=RESSPILL
+# RUN: not llvm-snippy %t/no-stack.yaml -march=riscv64-linux-gnu -mattr=+m,+c \
+# RUN: -num-instrs=1000 \
 # RUN: --spilled-regs-list=X1 |& FileCheck %s -check-prefix=NOSTACK
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
-# RUN: %S/Inputs/layout3.yaml -num-instrs=1000 -stack-size=1000 \
+# RUN: not llvm-snippy %t/bad-stack.yaml -march=riscv64-linux-gnu -mattr=+m,+c \
+# RUN: -num-instrs=1000 \
 # RUN: --spilled-regs-list=X1 |& FileCheck %s -check-prefix=UNALIGNED
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
-# RUN: %S/Inputs/layout3.yaml --model-plugin=None -num-instrs=1000 -external-stack -redefine-sp=SP \
+# RUN: not llvm-snippy %t/no-stack.yaml -march=riscv64-linux-gnu -mattr=+m,+c \
+# RUN: --model-plugin=None -num-instrs=1000 -external-stack -redefine-sp=SP \
 # RUN: --spilled-regs-list=X1 -reserved-regs-list=X2 |& FileCheck %s -check-prefix=EXTSTACKSPRES
+#--- good-stack.yaml
+sections:
+    - no:        1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x400000
+      SIZE:      0x100000
+      LMA:       0x400000
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+    - [ADD, 1.0]
+#--- bad-stack.yaml
+sections:
+    - no:        1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x40003
+      SIZE:      0x10003
+      LMA:       0x40003
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+    - [ADD, 1.0]
+#--- no-stack.yaml
+sections:
+    - no:        1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+    - [ADD, 1.0]
 
 # SPRES: error: Failed to initialize stack: stack pointer register is explicitly reserved.
 # SPSPILL: error: Stack pointer cannot be spilled. Remove it from spill register list.
 # ILLSPILL: error: Illegal register name [X1] is specified in --spilled-regs-list
 # RESSPILL: error: Register "X1" cannot be spilled, because it is explicitly reserved.
 # NOSTACK: error: Cannot spill requested registers: no stack space allocated.
-# UNALIGNED: error: Stack configure failed: Stack section size must be 16 bytes aligned.
+# UNALIGNED: error: Stack configure failed: Stack section VMA must be 16 bytes aligned.
 # EXTSTACKSPRES: error: Cannot configure external stack: stack pointer register is explicitly reserved.

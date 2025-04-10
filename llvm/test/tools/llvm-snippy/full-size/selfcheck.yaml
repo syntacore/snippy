@@ -16,6 +16,11 @@ sections:
       SIZE:      0x400000
       LMA:       0x80600000
       ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x80A00000
+      SIZE:      0x400000
+      LMA:       0x80A00000
+      ACCESS:    rw
 
 histogram:
     - [ADD, 1.0]

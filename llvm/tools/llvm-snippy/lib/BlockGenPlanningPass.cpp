@@ -117,17 +117,20 @@ void BlockGenPlanning::getAnalysisUsage(AnalysisUsage &AU) const {
 
 size_t
 BlockGenPlanningImpl::calculateMFSizeLimit(const MachineFunction &MF) const {
-  assert(!GenCtx->getGenSettings().isInstrsNumKnown());
+  assert(
+      !GenCtx->getConfig().PassCfg.InstrsGenerationConfig.isInstrsNumKnown());
   auto OutSectionDesc = GenCtx->getProgramContext().getOutputSectionFor(MF);
   auto MaxSize = OutSectionDesc.Size;
   auto &ProgCtx = GenCtx->getProgramContext();
   auto &State = ProgCtx.getLLVMState();
   const auto &SnpTgt = State.getSnippyTarget();
   auto CurrentCodeSize = State.getFunctionSize(MF);
-  const auto &GenSettings = GenCtx->getGenSettings();
+  const auto &Cfg = GenCtx->getConfig();
+  const auto &ProgCfg = *Cfg.ProgramCfg;
+  auto &PassCfg = Cfg.PassCfg;
   // last instruction in the trace might be target dependent: EBREAK or
   // int 3, etc.
-  auto LastInstr = GenSettings.getLastInstr();
+  StringRef LastInstr = PassCfg.InstrsGenerationConfig.LastInstr;
   // If not entry function, we generate ret anyway.
   bool EmptyLastInstr = FG->isEntryFunction(MF) && LastInstr.empty();
   auto SizeOfOpc = SnpTgt.getMaxInstrSize();
@@ -135,8 +138,8 @@ BlockGenPlanningImpl::calculateMFSizeLimit(const MachineFunction &MF) const {
   // FIXME: lastInstructions == we reserve space to put final instruction
   // and any additional instructions that will be placed after random
   // instructions generation. This should be replaced as we have BlockInfo
-  auto RegsSpilledToStack = GenSettings.getRegsSpilledToStack();
-  auto RegsSpilledToMem = GenSettings.getRegsSpilledToMem();
+  auto RegsSpilledToStack = ProgCfg.getRegsSpilledToStack();
+  auto RegsSpilledToMem = ProgCfg.getRegsSpilledToMem();
   auto NumOfSpilledRegs = RegsSpilledToStack.size() + RegsSpilledToMem.size();
   // FIXME: may need to generic algorithm.
   size_t SizeForSpilledRegs = NumOfSpilledRegs * 5u * SizeOfOpc;
@@ -202,13 +205,15 @@ using NumInstrToGroupIdTy = std::multimap<size_t, size_t>;
 static NumInstrToGroupIdTy
 getBurstInstCounts(GeneratorContext &GenCtx, unsigned long long NumInstrBurst,
                    unsigned long long NumInstrTotal) {
-  const auto &BGram = GenCtx.getGenSettings().getBurstGram();
+  const auto &Cfg = GenCtx.getConfig();
+  if (!Cfg.BurstConfig)
+    return {};
+  const auto &BGram = Cfg.BurstConfig->Burst;
   if (!BGram.Groupings)
     return {};
   assert(BGram.Groupings->size() > 0);
 
   auto OpcodeToNumOfGroups = BGram.getOpcodeToNumBurstGroups();
-  const auto &Cfg = GenCtx.getConfig();
   NumInstrToGroupIdTy NumInstrToGroupId;
   auto InstrLeft = NumInstrBurst;
   for (const auto &[Idx, Group] : enumerate(drop_end(*BGram.Groupings))) {
@@ -343,11 +348,14 @@ static size_t extractBurstGroup(NumInstrToGroupIdTy &NumInstrToGroupId,
 void BlockGenPlanningImpl::fillReqWithBurstGroups(
     planning::FunctionRequest &FunReq, size_t NumInstrBurst,
     size_t NumInstrTotal, size_t AverageBlockInstrs) {
+  if (NumInstrBurst == 0)
+    return;
   auto &ProgCtx = GenCtx->getProgramContext();
-  auto &GenSettings = GenCtx->getGenSettings();
+  auto &Cfg = GenCtx->getConfig();
   auto NumInstrToGroupId =
       getBurstInstCounts(*GenCtx, NumInstrBurst, NumInstrTotal);
-  const auto &BurstSettings = GenSettings.getBurstGram();
+  assert(Cfg.BurstConfig);
+  const auto &BurstSettings = Cfg.BurstConfig->Burst;
   while (NumInstrBurst > 0) {
     auto BlockId = RandEngine::genInRangeExclusive(BlocksToProcess.size());
     const auto *MBB = BlocksToProcess[BlockId];
@@ -367,7 +375,7 @@ void BlockGenPlanningImpl::fillReqWithBurstGroups(
     FunReq.addToBlock(
         MBB, planning::InstructionGroupRequest(
                  planning::RequestLimit::NumInstrs{BurstGroupInstCount},
-                 planning::BurstGenPolicy(ProgCtx, GenSettings, GroupId)));
+                 planning::BurstGenPolicy(ProgCtx, *Cfg.BurstConfig, GroupId)));
     NumInstrBurst -= BurstGroupInstCount;
 
     auto &BlockReq = FunReq.at(MBB);
@@ -379,7 +387,7 @@ void BlockGenPlanningImpl::fillReqWithPlainInstsByNumber(
     planning::FunctionRequest &FunReq, size_t NumInstrPlain,
     size_t AverageBlockInstrs) {
   auto &ProgCtx = GenCtx->getProgramContext();
-  const auto &GenSettings = GenCtx->getGenSettings();
+  const auto &Cfg = GenCtx->getConfig();
   while (NumInstrPlain > 0) {
     auto MaxBlockInstrs = AverageBlockInstrs * 2ull;
     auto InstrsToAdd = RandEngine::genInRangeInclusive(
@@ -400,7 +408,7 @@ void BlockGenPlanningImpl::fillReqWithPlainInstsByNumber(
     auto Lim = planning::RequestLimit::NumInstrs{InstrsToAdd};
     FunReq.addToBlock(MBB, planning::InstructionGroupRequest(
                                Lim, planning::createGenPolicy(
-                                        ProgCtx, GenSettings, *MBB,
+                                        ProgCtx, Cfg.DefFlowConfig, *MBB,
                                         FunReq.getOpcodeWeightOverrides())));
     NumInstrPlain -= InstrsToAdd;
     auto &BlockReq = FunReq.at(MBB);
@@ -439,7 +447,7 @@ static void randomize(const planning::FunctionRequest &FunReq,
   if (InstPackIt == BB.end())
     return;
   auto &ProgCtx = GC.getProgramContext();
-  auto &GenSettings = GC.getGenSettings();
+  auto &Cfg = GC.getConfig();
 
   assert(std::all_of(InstPackIt, BB.end(), IsRegular) &&
          "Before randomization all 'plain' packs must be at the end.");
@@ -492,7 +500,7 @@ static void randomize(const planning::FunctionRequest &FunReq,
     if (FirstIdx != SecondIdx)
       NewPacks.add(planning::InstructionGroupRequest(
           planning::RequestLimit::NumInstrs{SecondIdx - FirstIdx},
-          planning::createGenPolicy(ProgCtx, GenSettings, MBB,
+          planning::createGenPolicy(ProgCtx, Cfg.DefFlowConfig, MBB,
                                     FunReq.getOpcodeWeightOverrides())));
     // FIXME: should be enum or llvm rtti
     assert(NonRegularPacksIt->isInseparableBundle());
@@ -503,7 +511,7 @@ static void randomize(const planning::FunctionRequest &FunReq,
   if (Idxs.back() != RegularPackSize)
     NewPacks.add(planning::InstructionGroupRequest(
         planning::RequestLimit::NumInstrs{RegularPackSize - Idxs.back()},
-        planning::createGenPolicy(ProgCtx, GenSettings, MBB,
+        planning::createGenPolicy(ProgCtx, Cfg.DefFlowConfig, MBB,
                                   FunReq.getOpcodeWeightOverrides())));
   std::swap(NewPacks, BB);
 }
@@ -519,7 +527,7 @@ void BlockGenPlanningImpl::fillBlocksToProcess(
     MapRange = drop_begin(MapRange);
   };
 
-  auto IsRegsInit = GenCtx->getGenSettings().RegistersConfig.InitializeRegs;
+  auto IsRegsInit = GenCtx->getConfig().PassCfg.RegistersConfig.InitializeRegs;
   if (IsRegsInit && FG->isEntryFunction(MF))
     DropBlock();
   copy_if(std::move(MapRange), std::back_inserter(BlocksToProcess),
@@ -528,8 +536,7 @@ void BlockGenPlanningImpl::fillBlocksToProcess(
 
 planning::FunctionRequest
 BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
-  assert(GenCtx->getGenSettings().getGenerationMode() ==
-         GenerationMode::NumInstrs);
+  assert(GenCtx->getConfig().getGenerationMode() == GenerationMode::NumInstrs);
 
   auto LatchBlocks = collectLatchBlocks(*GenCtx, *MLI, MF, SimCtx);
   planning::FunctionRequest FunReq(MF, *GenCtx);
@@ -541,12 +548,11 @@ BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
 
   auto NumInstrTotal = FG->getRequestedInstrsNum(MF);
   auto &ProgCtx = GenCtx->getProgramContext();
-  const auto &GenSettings = GenCtx->getGenSettings();
-  const auto &OpCC = ProgCtx.getOpcodeCache();
-  assert(NumInstrTotal >= GenSettings.getCFInstrsNum(OpCC, NumInstrTotal));
-  NumInstrTotal -= GenSettings.getCFInstrsNum(OpCC, NumInstrTotal);
-
   const auto &Cfg = GenCtx->getConfig();
+  const auto &OpCC = ProgCtx.getOpcodeCache();
+  assert(NumInstrTotal >= Cfg.getCFInstrsNum(OpCC, NumInstrTotal));
+  NumInstrTotal -= Cfg.getCFInstrsNum(OpCC, NumInstrTotal);
+
   // FIXME: NumInstrBurst should be somehow randomized. But we must be careful
   // as in some cases there are no instructions outside burst groups and then
   // the number must be exact.
@@ -579,7 +585,7 @@ BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
 void BlockGenPlanningImpl::fillReqWithPlainInstsBySize(
     planning::FunctionRequest &FunReq, size_t MFSizeLimit) {
   auto &ProgCtx = GenCtx->getProgramContext();
-  const auto &GenSettings = GenCtx->getGenSettings();
+  const auto &Cfg = GenCtx->getConfig();
   auto MaxInstrSize =
       ProgCtx.getLLVMState().getSnippyTarget().getMaxInstrSize();
   // Multiset instead of vector because we generate accumulated size of first k
@@ -600,7 +606,7 @@ void BlockGenPlanningImpl::fillReqWithPlainInstsBySize(
     auto Limit = planning::RequestLimit::Size{BlockSize};
     FunReq.addToBlock(MBB, planning::InstructionGroupRequest(
                                Limit, planning::createGenPolicy(
-                                          ProgCtx, GenSettings, *MBB,
+                                          ProgCtx, Cfg.DefFlowConfig, *MBB,
                                           FunReq.getOpcodeWeightOverrides())));
     LastAccumulatedSize = AccumulatedSize;
   }
@@ -608,7 +614,7 @@ void BlockGenPlanningImpl::fillReqWithPlainInstsBySize(
 
 planning::FunctionRequest
 BlockGenPlanningImpl::processFunctionWithSize(const MachineFunction &MF) {
-  assert(GenCtx->getGenSettings().getGenerationMode() == GenerationMode::Size);
+  assert(GenCtx->getConfig().getGenerationMode() == GenerationMode::Size);
 
   planning::FunctionRequest FunReq(MF, *GenCtx);
   fillBlocksToProcess(MF, FunReq, [](auto *MBB) { return true; });
@@ -643,7 +649,7 @@ static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
                                 bool IsLatch, GeneratorContext &SGCtx) {
   assert(!FunReq.count(&SelectedMBB));
   auto &ProgCtx = SGCtx.getProgramContext();
-  const auto &GenSettings = SGCtx.getGenSettings();
+  const auto &Cfg = SGCtx.getConfig();
   auto &State = ProgCtx.getLLVMState();
   auto &SnpTgt = State.getSnippyTarget();
   auto BrOpc = SelectedMBB.getFirstTerminator()->getOpcode();
@@ -678,7 +684,7 @@ static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
     std::string Desc = formatv("Loop is already filled with {0}"
                                " bytes, but max pc distance is {1}.",
                                FilledSize, PCDist.Max.value());
-    const auto &Branches = SGCtx.getGenSettings().Cfg.Branches;
+    const auto &Branches = SGCtx.getConfig().PassCfg.Branches;
     if (Branches.isRandomCountersInitRequested() &&
         Branches.isPCDistanceRequested())
       Desc +=
@@ -720,12 +726,13 @@ static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
   // InitialAmount allows to account for any already generated instructions
   auto InitialAmount =
       GenerationStatistics{NumOfPrimaryInstrs, /*GeneratedSize*/ MBBSize};
-  FunReq.addToBlock(&SelectedMBB, planning::InstructionGroupRequest(
-                                      Limit,
-                                      planning::createGenPolicy(
-                                          ProgCtx, GenSettings, SelectedMBB,
-                                          FunReq.getOpcodeWeightOverrides()),
-                                      InitialAmount));
+  FunReq.addToBlock(
+      &SelectedMBB,
+      planning::InstructionGroupRequest(
+          Limit,
+          planning::createGenPolicy(ProgCtx, Cfg.DefFlowConfig, SelectedMBB,
+                                    FunReq.getOpcodeWeightOverrides()),
+          InitialAmount));
 }
 
 void BlockGenPlanningImpl::fillReqForTopLoopBySize(
@@ -736,7 +743,7 @@ void BlockGenPlanningImpl::fillReqForTopLoopBySize(
     fatal(ProgCtx.getLLVMState().getCtx(), "Block generation planning failed",
           "PC distance is now supported with max loop depth 1");
 
-  auto PCDist = GenCtx->getConfig().Branches.getPCDistance();
+  auto PCDist = GenCtx->getConfig().PassCfg.Branches.getPCDistance();
 
   auto LoopBlocks = ML.getBlocks();
   for (auto *MBB : LoopBlocks)
@@ -746,8 +753,8 @@ void BlockGenPlanningImpl::fillReqForTopLoopBySize(
 
 planning::FunctionRequest
 BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
-  const auto &GenSettings = GenCtx->getGenSettings();
-  assert(GenSettings.getGenerationMode() == GenerationMode::Mixed);
+  const auto &Cfg = GenCtx->getConfig();
+  assert(Cfg.getGenerationMode() == GenerationMode::Mixed);
 
   planning::FunctionRequest FunReq(MF, *GenCtx);
   // Process blocks out of loops
@@ -771,8 +778,8 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
   }
 
   auto NumInstrTotal = FG->getRequestedInstrsNum(MF);
-  assert(NumInstrTotal >= GenSettings.getCFInstrsNum(OpCC, NumInstrTotal));
-  NumInstrTotal -= GenSettings.getCFInstrsNum(OpCC, NumInstrTotal);
+  assert(NumInstrTotal >= Cfg.getCFInstrsNum(OpCC, NumInstrTotal));
+  NumInstrTotal -= Cfg.getCFInstrsNum(OpCC, NumInstrTotal);
   // If number of instructions in size-requested blocks is already enough for
   // the whole function, skipping num instrs planning for other blocks
   if (NumInstrTotal <= SupposedNumInstr) {
@@ -783,7 +790,6 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
 
   NumInstrTotal -= SupposedNumInstr;
 
-  const auto &Cfg = GenCtx->getConfig();
   // FIXME: NumInstrBurst should be somehow randomized. But we must be careful
   // as in some cases there are no instructions outside burst groups and then
   // the number must be exact.
@@ -812,7 +818,7 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
 static void checkGenModeCompatibility(GeneratorContext &GenCtx,
                                       const MachineLoopInfo &MLI,
                                       SimulatorContext &SimCtx) {
-  auto GM = GenCtx.getGenSettings().getGenerationMode();
+  auto GM = GenCtx.getConfig().getGenerationMode();
   if (GM == GenerationMode::NumInstrs)
     return;
 
@@ -827,7 +833,7 @@ planning::FunctionRequest
 BlockGenPlanningImpl::processFunction(const MachineFunction &MF) {
   assert(GenCtx && MLI && FG);
   checkGenModeCompatibility(*GenCtx, *MLI, SimCtx);
-  switch (GenCtx->getGenSettings().getGenerationMode()) {
+  switch (GenCtx->getConfig().getGenerationMode()) {
   case GenerationMode::NumInstrs:
     return processFunctionWithNumInstr(MF);
   case GenerationMode::Size:

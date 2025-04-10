@@ -2,6 +2,7 @@ set(LLVMSnippyConfigSources
     Config.cpp
     OpcodeHistogram.cpp
     Branchegram.cpp
+    BurstGram.cpp
     MemoryScheme.cpp
     RegisterHistogram.cpp
     PluginWrapper.cpp
