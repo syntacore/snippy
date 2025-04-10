@@ -1,5 +1,5 @@
 # RUN:  llvm-snippy %S/../Inputs/jal-layout.yaml %s -march=riscv64-linux-gnu -num-instrs=100 \
-# RUN:      -o %t -num-instr-ancil=10 --dump-mf -verify-mi -stack-size=1024 -init-regs-in-elf \
+# RUN:      -o %t -num-instr-ancil=10 --dump-mf -verify-mi -init-regs-in-elf \
 # RUN:  |& FileCheck %s
 # RUN:  llvm-objdump -t %t.elf | FileCheck %s --check-prefix=SYMBOL-TABLE
 call-graph:

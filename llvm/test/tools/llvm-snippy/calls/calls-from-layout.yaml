@@ -1,5 +1,5 @@
 # RUN: llvm-snippy %S/../Inputs/jal-layout.yaml %s -march=riscv64-linux-gnu -num-instrs=100 \
-# RUN: -num-instr-ancil=10 --dump-mf -verify-mi -stack-size=1024 |& FileCheck %s
+# RUN: -num-instr-ancil=10 --dump-mf -verify-mi |& FileCheck %s
 
 call-graph:
   entry-point: SnippyFunction

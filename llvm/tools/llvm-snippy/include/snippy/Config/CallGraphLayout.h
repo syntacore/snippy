@@ -40,6 +40,8 @@ struct CallGraphLayout {
     if (FunctionNumber == 0)
       fatal(Ctx, "Invalid number of functions", "expected >=1");
   }
+
+  unsigned getDepth() const { return MaxLayers; }
 };
 } // namespace snippy
 

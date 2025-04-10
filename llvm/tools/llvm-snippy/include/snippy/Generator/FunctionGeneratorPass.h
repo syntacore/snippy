@@ -73,10 +73,8 @@ public:
 private:
   unsigned long long calculateEntryFnInstrsNum(Module &M,
                                                const CallGraphState &CGS);
-
-  bool readFromYaml(Module &M, const FunctionDescs &FDs);
-
-  bool generateDefault(Module &M);
+  bool generateFunctions(Module &M, const FunctionDescs &FDs);
+  bool generateFunctions(Module &M, const CallGraphLayout &CGL);
 
   MachineFunction &createFunction(GeneratorContext &SGCtx, Module &M,
                                   StringRef Name, StringRef SectionName,

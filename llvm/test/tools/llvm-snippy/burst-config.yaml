@@ -3,10 +3,6 @@
 # RUN: llvm-snippy %s %S/Inputs/mixed-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
 # RUN: -num-instrs=200 -dump-layout |& FileCheck %s
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
-# RUN: -num-instrs=200 -memory-access-mode=mixed-burst \
-# RUN: -memory-access-burst-group-size=3 -dump-layout |& FileCheck %s 
-
 # RUN: llvm-snippy %S/Inputs/layout-include-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
 # RUN: -num-instrs=200 -dump-layout |& FileCheck %s
 
@@ -20,12 +16,6 @@
 
 # RUN: not llvm-snippy %S/Inputs/layout-include-burst.yaml %S/Inputs/mixed-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
 # RUN: -num-instrs=200 |& FileCheck %s --check-prefix=DOUBLESPEC
-
-# RUN: not llvm-snippy %s %S/Inputs/mixed-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
-# RUN:  -num-instrs=200 -memory-access-mode=mixed-burst |& FileCheck %s --check-prefix=CLCONFCLBURST
-
-# RUN: not llvm-snippy %s %S/Inputs/mixed-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
-# RUN: -num-instrs=200 -memory-access-burst-group-size=3 |& FileCheck %s --check-prefix=CLCONFCLSIZE
 
 # RUN: not llvm-snippy %S/Inputs/error-layout-with-burst-and-include.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
 # RUN: -num-instrs=200 |& FileCheck %s --check-prefix=DOUBLESPEC
@@ -52,5 +42,3 @@ histogram:
 # CHECK:  mode: custom
 
 # DOUBLESPEC: error: duplicated mapping key 'burst
-# CLCONFCLBURST: error: Attempt to specify burst config through the command line options: burst configuration was already found in config file
-# CLCONFCLSIZE: error: Attempt to specify burst config through the command line options: burst configuration was already found in config file

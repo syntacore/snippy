@@ -20,6 +20,7 @@
 #include "snippy/Generator/CFPermutationPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/LoopLatcherPass.h"
+#include "snippy/Generator/Policy.h"
 #include "snippy/Generator/RegReservForLoop.h"
 #include "snippy/Generator/RootRegPoolWrapperPass.h"
 #include "snippy/Generator/SimulatorContextWrapperPass.h"
@@ -343,10 +344,12 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   auto &NewBranch = updateLatchBranch(ML, Branch, Preheader, ReservedRegs);
   Branch.removeFromParent();
 
-  assert(SGCtx.getConfig().Branches.NLoopIter.Min);
-  assert(SGCtx.getConfig().Branches.NLoopIter.Max);
-  auto NIterMin = *SGCtx.getConfig().Branches.NLoopIter.Min;
-  auto NIterMax = *SGCtx.getConfig().Branches.NLoopIter.Max;
+  auto &Branches = SGCtx.getConfig().PassCfg.Branches;
+  assert(Branches.NLoopIter.Min);
+  assert(Branches.NLoopIter.Max);
+
+  auto NIterMin = *Branches.NLoopIter.Min;
+  auto NIterMax = *Branches.NLoopIter.Max;
   auto NIter = RandEngine::genInRangeInclusive(NIterMin, NIterMax);
   LLVM_DEBUG(dbgs() << "Loop counter init inserting: " << NIter
                     << " iterations, ");
@@ -356,7 +359,7 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   InstructionGenerationContext PHCtx{Preheader, PreheaderInsertPt, SGCtx,
                                      SimCtx};
   auto [LoopInitDiag, MinLoopCountVal] =
-      SnippyTgt.insertLoopInit(PHCtx, NewBranch, ReservedRegs, NIter);
+      SnippyTgt.insertLoopInit(PHCtx, NewBranch, Branches, ReservedRegs, NIter);
 
   auto SP = ProgCtx.getStackPointer();
   if (UseStackOpt || TrackingMode) {

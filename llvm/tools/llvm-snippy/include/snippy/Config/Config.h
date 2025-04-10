@@ -30,133 +30,214 @@ namespace snippy {
 
 class SnippyTarget;
 
-class Config final {
+// Basic snippy configuration.
+class ProgramConfig {
 public:
-  std::vector<std::string> Includes;
-  MemoryScheme MS;
+  constexpr static auto SCStride = 16u;
+  constexpr static auto kPageSize = 0x1000u;
+
   SectionsDescriptions Sections;
-  OpcodeHistogram Histogram;
-  Branchegram Branches;
-  BurstGram Burst;
-  ImmediateHistogram ImmHistogram;
-  CallGraphLayout CGLayout;
-  std::optional<FunctionDescs> FuncDescs;
-  std::unique_ptr<PluginManager> PluginManagerImpl;
   std::unique_ptr<TargetConfigInterface> TargetConfig;
-  std::optional<FPUSettings> FPUConfig;
-  std::optional<RegistersWithHistograms> RegsHistograms;
-  OpcodeToImmHistSequenceMap ImmHistMap;
+  std::unique_ptr<PluginManager> PluginManagerImpl;
 
-  Config(const SnippyTarget &Tgt, StringRef PluginFilename,
-         StringRef PluginInfoFilename, OpcodeCache OpCC, bool ParseWithPlugin,
-         LLVMContext &Ctx, ArrayRef<std::string> IncludedFiles);
+  // stack frame specific.
+  std::string ABIName;
+  MCRegister StackPointer;
+  bool FollowTargetABI;
+  SmallVector<MCRegister> SpilledToStack;
+  SmallVector<MCRegister> SpilledToMem;
+  bool ExternalStack;
 
-  // FIXME: this should return OpcGenHolder
-  std::unique_ptr<DefaultOpcodeGenerator> createDefaultOpcodeGenerator() const {
-    return std::make_unique<DefaultOpcodeGenerator>(Histogram.begin(),
-                                                    Histogram.end());
+  // linker options.
+  bool MangleExportedNames;
+  std::string EntryPointName;
+
+  // TODO: rethink if it is needed here.
+  std::string InitialRegYamlFile;
+
+  ArrayRef<MCRegister> getRegsSpilledToStack() const { return SpilledToStack; }
+
+  ArrayRef<MCRegister> getRegsSpilledToMem() const { return SpilledToMem; }
+
+  bool isRegSpilledToMem(MCRegister Reg) const {
+    return llvm::is_contained(SpilledToMem, Reg);
   }
+
+  static constexpr unsigned getSCStride() { return SCStride; }
+  static constexpr unsigned getPageSize() { return kPageSize; }
+
+  ProgramConfig(const SnippyTarget &Tgt, StringRef PluginFilename);
 
   bool hasInternalStackSection() const {
     return Sections.hasSection(SectionsDescriptions::StackSectionName);
   }
 
-  void setupImmHistMap(const OpcodeCache &OpCC) {
+  bool hasSectionToSpillGlobalRegs() const {
+    return Sections.hasSection(SectionsDescriptions::UtilitySectionName);
+  }
+  bool stackEnabled() const {
+    return ExternalStack ||
+           Sections.hasSection(SectionsDescriptions::StackSectionName);
+  }
+};
+
+struct TrackingOptions {
+  bool BTMode;
+  unsigned SelfCheckPeriod;
+  bool AddressVH;
+};
+
+// Settings common for all policies there are.
+class CommonPolicyConfig {
+public:
+  const ProgramConfig &ProgramCfg;
+  MemoryScheme MS;
+  ImmediateHistogram ImmHistogram;
+  FPUSettings FPUConfig;
+  OpcodeToImmHistSequenceMap ImmHistMap;
+  TrackingOptions TrackCfg;
+
+  CommonPolicyConfig(const ProgramConfig &ProgramCfg)
+      : ProgramCfg(ProgramCfg) {}
+
+  void setupImmHistMap(const OpcodeCache &OpCC, const OpcodeHistogram &OpHist) {
     if (!ImmHistogram.holdsAlternative<ImmediateHistogramRegEx>())
       return;
     ImmHistMap = OpcodeToImmHistSequenceMap(
-        ImmHistogram.get<ImmediateHistogramRegEx>(), Histogram, OpCC);
+        ImmHistogram.get<ImmediateHistogramRegEx>(), OpHist, OpCC);
   }
-  double getBurstOpcodesWeight() const {
-    assert(Burst.Data.has_value());
-    auto BurstOpcodes = Burst.Data.value().getAllBurstOpcodes();
-    return Histogram.getOpcodesWeight([&BurstOpcodes](unsigned Opcode) {
-      return BurstOpcodes.count(Opcode);
-    });
-  }
+};
 
-  // Create opcode generator for only data flow instructions excluding ones
-  // which are in burst groups
-  OpcGenHolder createDFOpcodeGenerator(
+class DefaultPolicyConfig {
+public:
+  const CommonPolicyConfig &Common;
+  OpcodeHistogram DataFlowHistogram;
+  struct ValuegramOpt {
+    RegistersWithHistograms RegsHistograms;
+    bool ValuegramOperandsRegsInitOutputs;
+  };
+  std::optional<ValuegramOpt> Valuegram;
+
+  DefaultPolicyConfig(const CommonPolicyConfig &Common) : Common(Common) {}
+
+  OpcGenHolder createOpcodeGenerator(
       const OpcodeCache &OpCC, std::function<bool(unsigned)> OpcMask,
       ArrayRef<OpcodeHistogramEntry> Overrides, bool MustHavePrimaryInstrs,
       std::unordered_map<unsigned, double> OpcWeightOverrides = {}) const {
-    // TODO: we should have an option to re-scale Override set
-    // proportionally to the weight of deleted elements
-    auto UsedInBurst = [&](auto Opc) -> bool {
-      if (!Burst.Data.has_value())
-        return false;
-      auto BurstOpcodes = Burst.Data.value().getAllBurstOpcodes();
-      return BurstOpcodes.count(Opc);
-    };
-    std::map<unsigned, double> DFHistogram;
-    std::copy_if(Histogram.begin(), Histogram.end(),
-                 std::inserter(DFHistogram, DFHistogram.end()),
-                 [&](const auto &Hist) {
-                   auto *Desc = OpCC.desc(Hist.first);
-                   assert(Desc);
-                   return Desc->isBranch() == false && OpcMask(Hist.first) &&
-                          !UsedInBurst(Hist.first);
-                 });
-    // overriding previous weights
-    if (!OpcWeightOverrides.empty()) {
-      for (auto &&[Opcode, Weight] : OpcWeightOverrides) {
-        if (DFHistogram.count(Opcode))
-          DFHistogram[Opcode] = Weight;
-      }
-    }
-    if (MustHavePrimaryInstrs && DFHistogram.size() == 0)
+
+    std::map<unsigned, double> DFHCopy;
+    llvm::copy_if(DataFlowHistogram, std::inserter(DFHCopy, DFHCopy.end()),
+                  [&](auto &&Entry) { return OpcMask(Entry.first); });
+    if (MustHavePrimaryInstrs && DFHCopy.size() == 0)
       snippy::fatal(
           "We can not create any primary instruction in this context.\nUsually "
           "this may happen when in some context snippy can not find any "
           "instruction that could be created in current context.\nTry to "
           "increase instruction number by one or add more instructions to "
           "histogram.");
+    // overriding previous weights
+    if (!OpcWeightOverrides.empty()) {
+      for (auto &&[Opcode, Weight] : OpcWeightOverrides) {
+        if (DFHCopy.count(Opcode))
+          DFHCopy[Opcode] = Weight;
+      }
+    }
 
     for (const auto &Entry : Overrides)
       if (!Entry.deactivated())
-        DFHistogram[Entry.Opcode] = Entry.Weight;
-    if (PluginManagerImpl->pluginHasBeenLoaded())
-      return PluginManagerImpl->createPlugin(DFHistogram.begin(),
-                                             DFHistogram.end());
-    return std::make_unique<DefaultOpcodeGenerator>(DFHistogram.begin(),
-                                                    DFHistogram.end());
+        DFHCopy[Entry.Opcode] = Entry.Weight;
+    auto &PluginManager = *Common.ProgramCfg.PluginManagerImpl;
+    if (PluginManager.pluginHasBeenLoaded())
+      return PluginManager.createPlugin(DFHCopy.begin(), DFHCopy.end());
+    return std::make_unique<DefaultOpcodeGenerator>(DFHCopy.begin(),
+                                                    DFHCopy.end());
   }
 
-  // Create opcode generator for only control flow instructions
+  bool isApplyValuegramEachInstr() const { return Valuegram.has_value(); }
+};
+
+class BurstPolicyConfig {
+public:
+  const CommonPolicyConfig &Common;
+  BurstGramData Burst;
+  std::unordered_map<unsigned, double> BurstOpcodeWeights;
+
+  BurstPolicyConfig(const CommonPolicyConfig &Common) : Common(Common) {}
+};
+
+struct ModelPluginOptions {
+  std::vector<std::string> ModelLibraries;
+
+  bool runOnModel() const { return !ModelLibraries.empty(); }
+};
+
+struct InstrsGenerationOptions {
+  bool RunMachineInstrVerifier;
+  bool ChainedRXSectionsFill;
+  bool ChainedRXSorted;
+  std::optional<unsigned> ChainedRXChunkSize;
+  std::optional<unsigned> NumInstrs;
+  std::string LastInstr;
+  bool useRetAsLastInstr() const {
+    return StringRef{"RET"}.equals_insensitive(LastInstr);
+  }
+  auto getRequestedInstrsNumForMainFunction() const {
+    return NumInstrs.value_or(0);
+  }
+  bool isInstrsNumKnown() const { return NumInstrs.has_value(); }
+};
+
+struct RegistersOptions {
+  bool InitializeRegs;
+  // TODO: discuss these to be Interpreter-only options
+  std::string InitialStateOutputYaml;
+  std::string FinalStateOutputYaml;
+};
+
+// Settings specific for pass behaviour.
+class PassConfig {
+public:
+  const ProgramConfig &ProgramCfg;
+
+  // CF generator passes configuration.
+  Branchegram Branches;
+  OpcodeHistogram BranchOpcodes;
+  ModelPluginOptions ModelPluginConfig;
+  InstrsGenerationOptions InstrsGenerationConfig;
+  RegistersOptions RegistersConfig;
+
+  // Function generator pass config.
+  std::variant<CallGraphLayout, FunctionDescs> CGLayout;
+
+  PassConfig(const ProgramConfig &ProgramCfg) : ProgramCfg(ProgramCfg) {}
+
   OpcGenHolder createCFOpcodeGenerator(const OpcodeCache &OpCC) const {
-    std::map<unsigned, double> CFHistogram;
-    std::copy_if(Histogram.begin(), Histogram.end(),
-                 std::inserter(CFHistogram, CFHistogram.end()),
-                 [&OpCC](const auto &Hist) {
-                   auto *Desc = OpCC.desc(Hist.first);
-                   assert(Desc);
-                   return Desc->isBranch();
-                 });
-    if (PluginManagerImpl->pluginHasBeenLoaded())
-      return PluginManagerImpl->createPlugin(CFHistogram.begin(),
-                                             CFHistogram.end());
-    return std::make_unique<DefaultOpcodeGenerator>(CFHistogram.begin(),
-                                                    CFHistogram.end());
-  }
-
-  void dump(raw_ostream &OS, const ConfigIOContext &Ctx) const;
-
-  bool hasSectionToSpillGlobalRegs() const {
-    return Sections.hasSection(SectionsDescriptions::UtilitySectionName) ||
-           Sections.hasSection(SectionsDescriptions::StackSectionName);
+    auto &PluginManager = *ProgramCfg.PluginManagerImpl;
+    if (PluginManager.pluginHasBeenLoaded())
+      return PluginManager.createPlugin(BranchOpcodes.begin(),
+                                        BranchOpcodes.end());
+    return std::make_unique<DefaultOpcodeGenerator>(BranchOpcodes.begin(),
+                                                    BranchOpcodes.end());
   }
 
   bool hasExternalCallees() const {
-    if (!FuncDescs)
+    if (!std::holds_alternative<FunctionDescs>(CGLayout))
       return false;
-    return llvm::any_of(FuncDescs->Descs, [&](auto &Func) {
-      return hasExternalCallee(*FuncDescs, Func);
+    auto &FuncDescs = std::get<FunctionDescs>(CGLayout);
+    return llvm::any_of(FuncDescs.Descs, [&](auto &Func) {
+      return hasExternalCallee(FuncDescs, Func);
     });
   }
 };
 
-bool shouldSpillGlobalRegs(const Config &Cfg);
+enum class GenerationMode {
+  // Ignore Size requirements, only num Instrs
+  NumInstrs,
+  // Ignore num instrs, try to meet size requirements
+  Size,
+  // Try to satisfy both num instrs and size requirements
+  Mixed
+};
 
 class IncludePreprocessor final {
 public:
@@ -169,6 +250,7 @@ public:
   };
 
 private:
+  std::string PrimaryFilename;
   std::string Text;
   std::vector<LineID> Lines;
   SmallSet<std::string, 8> IncludedFiles;
@@ -188,8 +270,108 @@ public:
   auto getIncludes() const & {
     return llvm::make_range(IncludedFiles.begin(), IncludedFiles.end());
   }
+  StringRef getPrimaryFilename() const & { return PrimaryFilename; }
 };
+
+// legacy config
+class Config final {
+public:
+  using OpcodeFilter = std::function<bool(unsigned)>;
+
+  // legacy specific.
+  std::vector<std::string> Includes;
+  std::unique_ptr<ProgramConfig> ProgramCfg;
+
+  // Top-level histogram.
+  OpcodeHistogram Histogram;
+
+  // Policies.
+  std::unique_ptr<CommonPolicyConfig> CommonPolicyCfg;
+  DefaultPolicyConfig DefFlowConfig;
+  std::optional<BurstPolicyConfig> BurstConfig;
+  // std::optional<ValuegramPolicyConfig> ValuegramConfig;
+  PassConfig PassCfg;
+
+  Config(IncludePreprocessor &IPP, RegPool &RP, LLVMState &State
+
+         ,
+         StringRef PluginFilename, StringRef PluginInfoFilename,
+         const OpcodeCache &OpCC, bool ParseWithPlugin);
+
+  // FIXME: legacy that must be removed
+  // FIXME: this should return OpcGenHolder
+  std::unique_ptr<DefaultOpcodeGenerator> createDefaultOpcodeGenerator() const {
+    return std::make_unique<DefaultOpcodeGenerator>(Histogram.begin(),
+                                                    Histogram.end());
+  }
+
+  double getBurstOpcodesWeight() const {
+    if (!BurstConfig)
+      return 0.0;
+    auto &BCfg = *BurstConfig;
+    auto BurstOpcodes = BCfg.Burst.getAllBurstOpcodes();
+    return Histogram.getOpcodesWeight([&BurstOpcodes](unsigned Opcode) {
+      return BurstOpcodes.count(Opcode);
+    });
+  }
+
+  bool isLoopGenerationPossible(const OpcodeCache &OpCC) const {
+    const auto &Branches = PassCfg.Branches;
+    return Branches.LoopRatio > std::numeric_limits<double>::epsilon() &&
+           Branches.PermuteCF && Branches.MaxDepth.Loop > 0 &&
+           Histogram.hasCFInstrs(OpCC);
+  }
+
+  GenerationMode getGenerationMode() const {
+    assert((!DefFlowConfig.isApplyValuegramEachInstr() ||
+            PassCfg.InstrsGenerationConfig.isInstrsNumKnown()) &&
+           "Initialization of registers before each instruction is supported "
+           "only if a number of instructions are generated.");
+    if (DefFlowConfig.isApplyValuegramEachInstr())
+      return GenerationMode::NumInstrs;
+    if (!PassCfg.InstrsGenerationConfig.isInstrsNumKnown())
+      return GenerationMode::Size;
+    bool PCDistanceRequested = PassCfg.Branches.isPCDistanceRequested();
+    return PCDistanceRequested ? GenerationMode::Mixed
+                               : GenerationMode::NumInstrs;
+  }
+
+  auto getCFInstrsNum(const OpcodeCache &OpCC, size_t TotalInstructions) const {
+    return Histogram.getCFInstrsNum(TotalInstructions, OpCC);
+  }
+
+  bool hasCallInstrs(const OpcodeCache &OpCC, const SnippyTarget &Tgt) const {
+    return Histogram.hasCallInstrs(OpCC, Tgt);
+  }
+
+  bool hasCFInstrs(const OpcodeCache &OpCC) const {
+    return Histogram.hasCFInstrs(OpCC);
+  }
+
+  auto &getTrackCfg() const { return CommonPolicyCfg->TrackCfg; }
+
+  bool hasTrackingMode() const {
+    return getTrackCfg().BTMode || getTrackCfg().SelfCheckPeriod ||
+           getTrackCfg().AddressVH ||
+
+           CommonPolicyCfg->FPUConfig.needsModel();
+  }
+
+  void dump(raw_ostream &OS, const ConfigIOContext &Ctx) const;
+
+private:
+  void complete(LLVMState &State, const OpcodeCache &OpCC);
+  void validateAll(LLVMState &State, const OpcodeCache &cache,
+                   const RegPool &RP);
+};
+
+struct ConfigCLOptionsMapper {
+  Config &Cfg;
+};
+
+bool shouldSpillGlobalRegs(const Config &Cfg);
 
 } // namespace snippy
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(snippy::Config);
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::ConfigCLOptionsMapper);
 } // namespace llvm

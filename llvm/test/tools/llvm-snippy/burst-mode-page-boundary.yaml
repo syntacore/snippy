@@ -1,7 +1,10 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+a,+f \
-# RUN: -num-instrs=1000 -memory-access-mode=mixed-burst \
-# RUN: -memory-access-burst-group-size=30
+# RUN: -num-instrs=1000
 
+burst:
+  mode: mixed
+  min-size: 30
+  max-size: 30
 sections:
     - no:        1
       VMA:       0x80000000

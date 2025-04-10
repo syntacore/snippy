@@ -13,10 +13,11 @@
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/Interpreter.h"
 #include "snippy/Generator/IntervalsToVerify.h"
-#include "snippy/Generator/RegisterPool.h"
+#include "snippy/Generator/SelfCheckInfo.h"
 #include "snippy/Generator/SimulatorContextWrapperPass.h"
 #include "snippy/InitializePasses.h"
 #include "snippy/PassManagerWrapper.h"
+#include "snippy/Simulator/SelfcheckObserver.h"
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/Options.h"
 #include "snippy/Support/Utils.h"
@@ -32,9 +33,12 @@
 #include "llvm/CodeGen/MachineOperand.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/InitializePasses.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
+
+#define DEBUG_TYPE "snippy-flow-generation"
 
 namespace llvm {
 
@@ -110,8 +114,60 @@ void writeMIRFile(StringRef Data) {
 
 } // namespace
 
+static void dumpSelfCheck(const std::vector<char> &Data, size_t ChunkSize,
+                          size_t ChunksNum, raw_ostream &OS) {
+  for (size_t Offset = 0; Offset < Data.size();
+       Offset += ChunkSize * ChunksNum) {
+    for (size_t Idx = 0; Idx < ChunkSize * ChunksNum; Idx++) {
+      if (Idx % ChunkSize == 0)
+        OS << "\n";
+      OS.write_hex(static_cast<unsigned char>(Data[Offset + Idx]));
+      OS << " ";
+    }
+    OS << "\n------\n";
+  }
+}
+
+static void checkMemStateAfterSelfcheck(SnippyProgramContext &ProgCtx,
+                                        const TrackingOptions &TrackOpts,
+                                        Interpreter &I) {
+  auto &SelfcheckSection = ProgCtx.getSelfcheckSection();
+  std::vector<char> Data(SelfcheckSection.Size);
+  I.readMem(SelfcheckSection.VMA, Data);
+
+  const auto SCStride = ProgramConfig::getSCStride();
+  auto ResultOffset = 0;
+  auto ReferenceOffset = SCStride;
+  auto ChunksNum = 2;
+
+  size_t BlockSize = ChunksNum * SCStride;
+
+  auto DataSize = Data.size() - Data.size() % BlockSize;
+  for (size_t Offset = 0; Offset < DataSize; Offset += BlockSize) {
+    auto It = Data.begin() + Offset;
+    auto ResultIt = It + ResultOffset;
+    auto ReferenceIt = It + ReferenceOffset;
+    for (size_t ByteIdx = 0; ByteIdx < SCStride; ++ByteIdx) {
+      auto Result = ResultIt[ByteIdx];
+      auto Reference = ReferenceIt[ByteIdx];
+      auto DefMaskByte = 0xFF;
+      if ((Result & DefMaskByte) != (Reference & DefMaskByte)) {
+        auto FaultAddr = SelfcheckSection.VMA + Offset + ByteIdx;
+        LLVM_DEBUG(
+            dumpSelfCheck(Data, BlockSize / ChunksNum, ChunksNum, dbgs()));
+        snippy::fatal(formatv(
+            "Incorrect memory state after interpretation in "
+            "self-check mode. Error is in block @ 0x{0}{{1} + {2} + {3}}\n",
+            Twine::utohexstr(FaultAddr), Twine::utohexstr(SelfcheckSection.VMA),
+            Twine::utohexstr(Offset), Twine::utohexstr(ByteIdx)));
+      }
+    }
+  }
+}
+
 static void dumpVerificationIntervalsIfNeeeded(SnippyModule &SM,
-                                               const GeneratorContext &GenCtx) {
+                                               const GeneratorContext &GenCtx,
+                                               StringRef BaseFileName) {
   if (!RegionsToVerify.isSpecified())
     return;
 
@@ -133,11 +189,9 @@ static void dumpVerificationIntervalsIfNeeeded(SnippyModule &SM,
     snippy::fatal(Ctx, "Failed to extract pc intervals to verify",
                   VerificationIntervals.takeError());
 
-  const auto &GenSettings = GenCtx.getGenSettings();
   auto RegionsToVerifyFilename =
       RegionsToVerify.isSpecified() && RegionsToVerify.getValue().empty()
-          ? addExtensionIfRequired(GenSettings.BaseFileName,
-                                   ".intervals-to-verify.yaml")
+          ? addExtensionIfRequired(BaseFileName, ".intervals-to-verify.yaml")
           : RegionsToVerify.getValue();
 
   if (auto E = VerificationIntervals->dumpAsYaml(RegionsToVerifyFilename))
@@ -154,19 +208,19 @@ static RegisterGenerator createRegGen(std::string PluginFileName,
   return RegisterGenerator{PluginFileName, InfoFileName};
 }
 
-GeneratorResult FlowGenerator::generate(LLVMState &State) {
+GeneratorResult FlowGenerator::generate(LLVMState &State,
+                                        const DebugOptions &DebugCfg) {
 
   auto RegGen =
       createRegGen(RegGeneratorFile.getValue(), RegInfoFile.getValue());
 
-  SnippyProgramContext ProgContext(State, RegGen, RP, OpCC,
-                                   GenSettings.getSnippyProgramSettings(State));
+  SnippyProgramContext ProgContext(State, RegGen, RP, OpCC, *Cfg.ProgramCfg);
 
   const auto &SnippyTgt = State.getSnippyTarget();
   auto MainModule = SnippyModule(ProgContext.getLLVMState(), "main");
 
-  GeneratorContext GenCtx(ProgContext, GenSettings);
-  auto &InstrsGenConfig = GenSettings.InstrsGenerationConfig;
+  GeneratorContext GenCtx(ProgContext, Cfg);
+  auto &PassCfg = Cfg.PassCfg;
 
   std::string MIR;
   raw_string_ostream MIROS(MIR);
@@ -188,7 +242,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
         PM.add(createLoopLatcherPass());
 
         PM.add(createRegsInitInsertionPass(
-            GenSettings.RegistersConfig.InitializeRegs));
+            PassCfg.RegistersConfig.InitializeRegs));
         SnippyTgt.addTargetSpecificPasses(PM);
         // Pre backtrack end
 
@@ -199,10 +253,10 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
         // Post backtrack
         PM.add(createPrologueEpilogueInsertionPass());
         PM.add(createFillExternalFunctionsStubsPass({}));
-        if (GenSettings.DebugConfig.PrintMachineFunctions)
+        if (DebugCfg.PrintMachineFunctions)
           PM.add(createMachineFunctionPrinterPass(outs()));
 
-        if (GenSettings.DebugConfig.PrintInstrs)
+        if (DebugCfg.PrintInstrs)
           PM.add(createPrintMachineInstrsPass(outs()));
 
         SnippyTgt.addTargetLegalizationPasses(PM);
@@ -214,12 +268,11 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
         PM.add(createInstructionsPostProcessPass());
         PM.add(createFunctionDistributePass());
 
-        if (InstrsGenConfig.RunMachineInstrVerifier)
+        if (PassCfg.InstrsGenerationConfig.RunMachineInstrVerifier)
           PM.add(createMachineVerifierPass("Machine Verifier Pass report"));
 
-        if (GenSettings.DebugConfig.PrintControlFlowGraph)
-          PM.add(createCFGPrinterPass(
-              GenSettings.DebugConfig.ViewControlFlowGraph));
+        if (DebugCfg.PrintControlFlowGraph)
+          PM.add(createCFGPrinterPass(DebugCfg.ViewControlFlowGraph));
 
         if (DumpMIR.isSpecified())
           PM.add(createPrintMIRPass(MIROS));
@@ -234,24 +287,47 @@ GeneratorResult FlowGenerator::generate(LLVMState &State) {
   std::vector<const SnippyModule *> Modules{&MainModule};
   auto Result = ProgContext.generateELF(Modules);
 
-  dumpVerificationIntervalsIfNeeeded(MainModule, GenCtx);
+  dumpVerificationIntervalsIfNeeeded(MainModule, GenCtx, BaseFileName);
 
-  if (GenSettings.ModelPluginConfig.RunOnModel) {
+  if (PassCfg.ModelPluginConfig.runOnModel()) {
     auto SnippetImageForModelExecution =
         ProgContext.generateLinkedImage(Modules);
 
     auto RI = SimulatorContext::RunInfo{
         SnippetImageForModelExecution, ProgContext, MainModule,
-        GenSettings.LinkerConfig.EntryPointName,
-        GenSettings.RegistersConfig.InitialStateOutputYaml,
-        GenSettings.RegistersConfig.FinalStateOutputYaml, SelfCheckMem,
+        PassCfg.ProgramCfg.EntryPointName,
+        PassCfg.RegistersConfig.InitialStateOutputYaml,
+        PassCfg.RegistersConfig.FinalStateOutputYaml, SelfCheckMem,
         // Memory reset only needed if interpreter may have executed
         // during generation process.
-        /* NeedMemoryReset */ GenSettings.hasTrackingMode(), DumpMemorySection,
-        MemorySectionFile.getValue(), GenSettings.BaseFileName};
+        /* NeedMemoryReset */ Cfg.hasTrackingMode(), DumpMemorySection,
+        MemorySectionFile.getValue(), BaseFileName};
 
     auto &SimCtx = MainModule.getGenResult<OwningSimulatorContext>();
+
+    // TODO: move this all to some more simulator-related place
+    auto &I = SimCtx.getInterpreter();
+    std::unique_ptr<RVMCallbackHandler::ObserverHandle<SelfcheckObserver>>
+        SelfcheckObserverHandle;
+    auto &TrackCfg = Cfg.getTrackCfg();
+    if (TrackCfg.SelfCheckPeriod) {
+      auto &Map = MainModule.getOrAddResult<SelfCheckMap>().Map;
+      // TODO: merge all infos from all modules.
+      SelfcheckObserverHandle =
+          I.setObserver<SelfcheckObserver>(Map.begin(), Map.end(), I.getPC());
+    }
+
     SimCtx.runSimulator(RI);
+
+    if (TrackCfg.SelfCheckPeriod) {
+      if (SelfCheckMem)
+        checkMemStateAfterSelfcheck(ProgContext, TrackCfg, I);
+
+      auto AnnotationFilename =
+          addExtensionIfRequired(BaseFileName, ".selfcheck.yaml");
+      I.getObserverByHandle(*SelfcheckObserverHandle)
+          .dumpAsYaml(AnnotationFilename);
+    }
 
   } else {
 

@@ -1,5 +1,5 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m \
-# RUN: -redefine-sp=any -honor-target-abi   --model-plugin=None -num-instrs=10 -stack-size=1024 \
+# RUN: -redefine-sp=any-not-SP -honor-target-abi   --model-plugin=None -num-instrs=10 \
 # RUN: -init-regs-in-elf -verify-mi |& FileCheck %s 
 sections:
     - no:        1
@@ -12,9 +12,14 @@ sections:
       SIZE:      0x700000
       LMA:       0x600000
       ACCESS:    rw
+    - name:      stack
+      VMA:       0x400000
+      SIZE:      0x100000
+      LMA:       0x400000
+      ACCESS:    rw
 
 histogram:
     - [DIV, 1.0]
     - [ADD, 1.0]
   
-# CHECK: warning: (inconsistent-options) When using --honor-target-abi and --redefine-sp=any options together, target ABI may not be preserved in case of traps: use these options in combination only for valid code generation
+# CHECK: warning: (inconsistent-options) When using --honor-target-abi and --redefine-sp=any-not-SP options together, target ABI may not be preserved in case of traps: use these options in combination only for valid code generation

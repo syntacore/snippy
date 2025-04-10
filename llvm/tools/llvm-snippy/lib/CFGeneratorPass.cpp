@@ -11,6 +11,7 @@
 #include "snippy/CreatePasses.h"
 #include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
+#include "snippy/Generator/Policy.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/PassRegistry.h"
 
@@ -57,18 +58,18 @@ bool CFGenerator::runOnMachineFunction(MachineFunction &MF) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &FG = getAnalysis<FunctionGenerator>();
   auto &ProgCtx = SGCtx.getProgramContext();
-  auto &GenSettings = SGCtx.getGenSettings();
+  const auto &Cfg = SGCtx.getConfig();
+  const auto &PassCfg = Cfg.PassCfg;
   auto &OpCC = ProgCtx.getOpcodeCache();
 
-  auto CFInstrsNum =
-      GenSettings.getCFInstrsNum(OpCC, FG.getRequestedInstrsNum(MF));
+  auto CFInstrsNum = Cfg.getCFInstrsNum(OpCC, FG.getRequestedInstrsNum(MF));
   if (CFInstrsNum == 0)
     return false;
 
   auto &State = ProgCtx.getLLVMState();
   const auto &InstrInfo = State.getInstrInfo();
   const auto &SnippyTgt = State.getSnippyTarget();
-  auto CFOpcGen = GenSettings.createCFOpcodeGenerator(OpCC);
+  auto CFOpcGen = PassCfg.createCFOpcodeGenerator(OpCC);
   auto *CurrMBB = &MF.front();
   for (auto NInstr = 0u; NInstr < CFInstrsNum; ++NInstr) {
     auto Opc = CFOpcGen->generate();

@@ -1,14 +1,14 @@
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m \
-# RUN: -redefine-sp=reg::X0 --model-plugin=None -num-instrs=10 -stack-size=1024 \
+# RUN: -redefine-sp=reg::X0 --model-plugin=None -num-instrs=10 \
 # RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=X0-CHECK
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m -reserved-regs-list=X7 \
-# RUN: -redefine-sp=reg::X7 --model-plugin=None -num-instrs=10 -stack-size=1024 \
+# RUN: -redefine-sp=reg::X7 --model-plugin=None -num-instrs=10 \
 # RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=RES-CHECK
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m \
-# RUN: -redefine-sp=reg::X32 --model-plugin=None -num-instrs=10 -stack-size=1024 \
+# RUN: -redefine-sp=reg::X32 --model-plugin=None -num-instrs=10 \
 # RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=ILL-CHECK
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m \
-# RUN: -redefine-sp=any-no-SP --model-plugin=None -num-instrs=10 -stack-size=1024 \
+# RUN: -redefine-sp=any-no-SP --model-plugin=None -num-instrs=10 \
 # RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=NO-OPT-CHECK
 sections:
     - no:        1
@@ -20,6 +20,11 @@ sections:
       VMA:       0x600000
       SIZE:      0x700000
       LMA:       0x600000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
       ACCESS:    rw
 
 histogram:

@@ -5,7 +5,6 @@
 options:
   march: "riscv64-linux-gnu"
   num-instrs: 50
-  stack-size: 32768
   last-instr: "RET"
   function-number: 32
   function-layers: 4
@@ -49,6 +48,11 @@ sections:
     VMA:       0x100000
     SIZE:      0x100000
     LMA:       0x100000
+    ACCESS:    rw
+  - name:      stack
+    VMA:       0x310000
+    SIZE:      0x100000
+    LMA:       0x310000
     ACCESS:    rw
 
 histogram:

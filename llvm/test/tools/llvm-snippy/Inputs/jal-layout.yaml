@@ -9,6 +9,16 @@ sections:
     SIZE:      0x100000
     LMA:       0x100000
     ACCESS:    rw
+  - name:      stack
+    VMA:       0x0
+    SIZE:      0x100000
+    LMA:       0x0
+    ACCESS:    rw
+  - name:      utility
+    VMA:       0x310000
+    SIZE:      0x1000
+    LMA:       0x310000
+    ACCESS:    rw
 
 histogram:
     - [ADD, 1.0]

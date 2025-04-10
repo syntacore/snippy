@@ -1,6 +1,5 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -dump-mf \
-# RUN:   -num-instrs=1000 -memory-access-mode=mixed-burst \
-# RUN:   -memory-access-burst-group-size=100 >& %t
+# RUN:   -num-instrs=1000  >& %t
 # RUN: FileCheck %s --input-file=%t --check-prefix=LD
 # RUN: FileCheck %s --input-file=%t --check-prefix=SW
 
@@ -19,6 +18,9 @@ sections:
 histogram:
     - [LD, 9.0]
     - [SW, 1.0]
-
+burst:
+  mode: mixed
+  min-size: 100
+  max-size: 100
 # LD-COUNT-700: LD
 # SW-COUNT-50: SW

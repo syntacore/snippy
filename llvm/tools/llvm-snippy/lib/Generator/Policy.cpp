@@ -32,58 +32,55 @@ PreselectedOpInfo::fromMCOperand(const MCOperand &Op) {
 }
 
 static std::unique_ptr<FloatSemanticsSamplerHolder>
-createFloatSemanticsSampler(const GeneratorSettings &GenSettings) {
-  if (const auto &FPUConfig = GenSettings.Cfg.FPUConfig;
-      FPUConfig.has_value() && FPUConfig->Overwrite.has_value())
-    return std::make_unique<FloatSemanticsSamplerHolder>(*FPUConfig->Overwrite);
-  return nullptr;
+createFloatSemanticsSampler(const CommonPolicyConfig &Cfg) {
+  return std::make_unique<FloatSemanticsSamplerHolder>(Cfg.FPUConfig.Overwrite);
 }
-InstructionGenerationContext::InstructionGenerationContext(
-    MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-    SnippyProgramContext &ProgCtx, const GeneratorSettings &GenSettings,
-    const SimulatorContext &SimCtx)
-    : MBB(MBB), Ins(Ins), ProgCtx(ProgCtx), GenSettings(GenSettings),
-      SimCtx(SimCtx), RPS(ProgCtx) {}
 
 InstructionGenerationContext::InstructionGenerationContext(
     MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
-    SnippyProgramContext &ProgCtx, const GeneratorSettings &GenSettings)
+    SnippyProgramContext &ProgCtx, const SimulatorContext &SimCtx)
+    : MBB(MBB), Ins(Ins), ProgCtx(ProgCtx), SimCtx(SimCtx), RPS(ProgCtx) {
+  switchConfig();
+}
+
+InstructionGenerationContext::InstructionGenerationContext(
+    MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
+    SnippyProgramContext &ProgCtx)
     : NullSimCtx(std::make_unique<SimulatorContext>()), MBB(MBB), Ins(Ins),
-      ProgCtx(ProgCtx), GenSettings(GenSettings), SimCtx(*NullSimCtx),
-      RPS(ProgCtx) {}
+      ProgCtx(ProgCtx), SimCtx(*NullSimCtx), RPS(ProgCtx) {
+  switchConfig();
+}
+
 InstructionGenerationContext::InstructionGenerationContext(
     MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
     GeneratorContext &GC, const SimulatorContext &SimCtx)
-    : InstructionGenerationContext(MBB, Ins, GC.getProgramContext(),
-                                   GC.getGenSettings(), SimCtx) {
+    : InstructionGenerationContext(MBB, Ins, GC.getProgramContext(), SimCtx) {
   append(&GC.getMemoryAccessSampler());
+  switchConfig(*GC.getConfig().CommonPolicyCfg);
 }
-
 InstructionGenerationContext::InstructionGenerationContext(
     MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
     GeneratorContext &GC)
-    : InstructionGenerationContext(MBB, Ins, GC.getProgramContext(),
-                                   GC.getGenSettings()) {
+    : InstructionGenerationContext(MBB, Ins, GC.getProgramContext()) {
   append(&GC.getMemoryAccessSampler());
+  switchConfig(*GC.getConfig().CommonPolicyCfg);
 }
 
 InstructionGenerationContext::InstructionGenerationContext(
     MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
     GeneratorContext &GC, RegPoolWrapper &RPW)
     : NullSimCtx(std::make_unique<SimulatorContext>()), MBB(MBB), Ins(Ins),
-      ProgCtx(GC.getProgramContext()), GenSettings(GC.getGenSettings()),
-      SimCtx(*NullSimCtx), RPS(ProgCtx, RPW) {}
+      ProgCtx(GC.getProgramContext()), SimCtx(*NullSimCtx), RPS(ProgCtx, RPW) {}
 
 InstructionGenerationContext::~InstructionGenerationContext() = default;
 
 IAPIntSampler &
 InstructionGenerationContext::getOrCreateFloatOverwriteValueSampler(
     const fltSemantics &Semantics) {
-  auto &FPUCfg = GenSettings.Cfg.FPUConfig;
-  assert(FPUCfg && FPUCfg->Overwrite);
+  const auto &Cfg = getCommonCfg();
   // lazy construction.
   if (!FloatOverwriteSamplers)
-    FloatOverwriteSamplers = createFloatSemanticsSampler(GenSettings);
+    FloatOverwriteSamplers = createFloatSemanticsSampler(Cfg);
   assert(FloatOverwriteSamplers.get());
   auto SamplerRefOrErr = FloatOverwriteSamplers->getSamplerFor(Semantics);
   if (!SamplerRefOrErr)
@@ -93,26 +90,28 @@ InstructionGenerationContext::getOrCreateFloatOverwriteValueSampler(
 }
 
 DefaultGenPolicy::DefaultGenPolicy(
-    SnippyProgramContext &ProgCtx, const GeneratorSettings &GenSettings,
+    SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
     std::function<bool(unsigned)> Filter, bool MustHavePrimaryInstrs,
     ArrayRef<OpcodeHistogramEntry> Overrides,
     const std::unordered_map<unsigned, double> &WeightOverrides = {})
-    : OpcGen(GenSettings.createFlowOpcodeGenerator(
-          ProgCtx.getOpcodeCache(), Filter, MustHavePrimaryInstrs, Overrides,
-          WeightOverrides)) {
-  assert(!GenSettings.isApplyValuegramEachInstr() &&
+    : OpcGen(Cfg.createOpcodeGenerator(ProgCtx.getOpcodeCache(), Filter,
+                                       Overrides, MustHavePrimaryInstrs,
+                                       WeightOverrides)),
+      Cfg(&Cfg) {
+  assert(!Cfg.isApplyValuegramEachInstr() &&
          "In this case you must use ValuegramGenPolicy");
 }
 
 ValuegramGenPolicy::ValuegramGenPolicy(
-    SnippyProgramContext &ProgCtx, const GeneratorSettings &GenSettings,
+    SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
     std::function<bool(unsigned)> Filter, bool MustHavePrimaryInstrs,
     ArrayRef<OpcodeHistogramEntry> Overrides,
     const std::unordered_map<unsigned, double> &WeightOverrides = {})
-    : OpcGen(GenSettings.createFlowOpcodeGenerator(
-          ProgCtx.getOpcodeCache(), Filter, MustHavePrimaryInstrs, Overrides,
-          WeightOverrides)) {
-  assert(GenSettings.isApplyValuegramEachInstr() &&
+    : OpcGen(Cfg.createOpcodeGenerator(ProgCtx.getOpcodeCache(), Filter,
+                                       Overrides, MustHavePrimaryInstrs,
+                                       WeightOverrides)),
+      Cfg(&Cfg) {
+  assert(Cfg.isApplyValuegramEachInstr() &&
          "This policy can only be used when the "
          "-valuegram-operands-regs file provided");
 }
@@ -166,6 +165,7 @@ ValuegramGenPolicy::generateOneInstrWithInitRegs(
 
 void ValuegramGenPolicy::initialize(InstructionGenerationContext &InstGenCtx,
                                     const RequestLimit &Limit) {
+  InstGenCtx.switchConfig(*Cfg);
   assert(Limit.isNumLimit());
   assert(Instructions.empty() && Idx == 0 && "Is expected to be called once");
 
@@ -180,9 +180,9 @@ APInt ValuegramGenPolicy::getValueFromValuegram(
   auto &ProgCtx = IGC.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   const auto &Tgt = State.getSnippyTarget();
-  auto &Cfg = IGC.GenSettings.Cfg;
-  assert(Cfg.RegsHistograms);
-  const auto &RegsHistograms = Cfg.RegsHistograms.value();
+  auto &Cfg = IGC.getCfg<DefaultPolicyConfig>();
+  assert(Cfg.Valuegram);
+  const auto &RegsHistograms = Cfg.Valuegram->RegsHistograms;
   const auto &ClassHistograms = RegsHistograms.Histograms.ClassHistograms;
   auto It = std::find_if(ClassHistograms.begin(), ClassHistograms.end(),
                          [Prefix](const RegisterClassHistogram &CH) {
@@ -254,11 +254,12 @@ ValuegramGenPolicy::generateRegInit(InstructionGenerationContext &InstrGenCtx,
 }
 
 BurstGenPolicy::BurstGenPolicy(SnippyProgramContext &ProgCtx,
-                               const GeneratorSettings &GenSettings,
-                               unsigned BurstGroupID) {
+                               const BurstPolicyConfig &Cfg,
+                               unsigned BurstGroupID)
+    : Cfg(&Cfg) {
   auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
-  const auto &BGram = GenSettings.getBurstGram();
+  const auto &BGram = Cfg.Burst;
 
   assert(BGram.Mode != BurstMode::Basic);
   assert(BGram.Mode == BurstMode::CustomBurst &&
@@ -286,12 +287,11 @@ BurstGenPolicy::BurstGenPolicy(SnippyProgramContext &ProgCtx,
                });
 
   std::vector<double> Weights;
-  const auto &Cfg = GenSettings.Cfg;
   auto OpcodeToNumOfGroups = BGram.getOpcodeToNumBurstGroups();
   std::transform(Opcodes.begin(), Opcodes.end(), std::back_inserter(Weights),
                  [&Cfg, &OpcodeToNumOfGroups](unsigned Opcode) {
                    assert(OpcodeToNumOfGroups.count(Opcode));
-                   return Cfg.Histogram.weight(Opcode) /
+                   return Cfg.BurstOpcodeWeights.at(Opcode) /
                           OpcodeToNumOfGroups[Opcode];
                  });
   Dist = std::discrete_distribution<size_t>(Weights.begin(), Weights.end());
@@ -307,9 +307,14 @@ getOffsetImmediate(ArrayRef<PreselectedOpInfo> Preselected) {
   assert(Imm.getMax() == Imm.getMin());
   return Imm.getMax();
 }
+void DefaultGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
+                                  const RequestLimit &Limit) const {
+  InstrGenCtx.switchConfig(*Cfg);
+}
 
 void BurstGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
                                 const RequestLimit &Limit) {
+  InstrGenCtx.switchConfig(*Cfg);
   assert(Limit.isNumLimit());
   auto &State = InstrGenCtx.ProgCtx.getLLVMState();
   const auto &Tgt = State.getSnippyTarget();
@@ -352,19 +357,18 @@ LLVMState &InstructionGenerationContext::getLLVMStateImpl() const {
 }
 
 GenPolicy
-createGenPolicy(SnippyProgramContext &ProgCtx,
-                const GeneratorSettings &GenSettings,
+createGenPolicy(SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
                 const MachineBasicBlock &MBB,
                 std::unordered_map<unsigned, double> WeightOverrides) {
   auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
   auto Filter = Tgt.getDefaultPolicyFilter(ProgCtx, MBB);
   auto MustHavePrimaryInstrs = Tgt.groupMustHavePrimaryInstr(ProgCtx, MBB);
   auto Overrides = Tgt.getPolicyOverrides(ProgCtx, MBB);
-  if (GenSettings.isApplyValuegramEachInstr())
-    return planning::ValuegramGenPolicy(ProgCtx, GenSettings, std::move(Filter),
+  if (Cfg.isApplyValuegramEachInstr())
+    return planning::ValuegramGenPolicy(ProgCtx, Cfg, std::move(Filter),
                                         MustHavePrimaryInstrs,
                                         std::move(Overrides), WeightOverrides);
-  return planning::DefaultGenPolicy(ProgCtx, GenSettings, std::move(Filter),
+  return planning::DefaultGenPolicy(ProgCtx, Cfg, std::move(Filter),
                                     MustHavePrimaryInstrs, std::move(Overrides),
                                     WeightOverrides);
 }
