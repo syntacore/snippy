@@ -67,8 +67,8 @@ namespace snippy {
 bool LoopAlignment::runOnMachineFunction(MachineFunction &MF) {
   Align Alignment(getAnalysis<GeneratorContextWrapper>()
                       .getContext()
-                      .getGenSettings()
-                      .Cfg.Branches.Alignment);
+                      .getConfig()
+                      .PassCfg.Branches.Alignment);
 
   auto &MLI = getAnalysis<MachineLoopInfoWrapperPass>().getLI();
   for (auto *ML : MLI) {

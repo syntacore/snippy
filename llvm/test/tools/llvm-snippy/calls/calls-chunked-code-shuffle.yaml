@@ -8,9 +8,6 @@
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=all \
 # RUN: --chained-rx-sections-fill --chained-rx-chunk-size=10  \
 # RUN: --chained-rx-sorted -o %t |& FileCheck %s --check-prefix=ERR1
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=1000 \
-# RUN: --chained-rx-sections-fill --chained-rx-chunk-size=0  \
-# RUN: --chained-rx-sorted -o %t |& FileCheck %s --check-prefix=ERR2
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=1000 \
 # RUN: --chained-rx-chunk-size=10 -o %t |& FileCheck %s --check-prefix=WARN
 
@@ -54,5 +51,4 @@ histogram:
 # SORTED: ebreak
 #
 # ERR1: error: Cannot use 'chained-rx-chunk-size' option: num-instr is set to 'all'
-# ERR2: error: Cannot set 'chained-rx-chunk-size' to 0: expected >=1
 # WARN: warning: (inconsistent-options) 'chained-rx-chunk-size' is ignored: pass 'chained-rx-sections-fill' to enable it

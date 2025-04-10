@@ -1,5 +1,5 @@
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -redefine-sp=any-not-SP \
-# RUN: -num-instrs=10000 -stack-size=1024  \
+# RUN: -num-instrs=10000 \
 # RUN: -reserved-regs-list=X0,X1,X3,X4,X5,X6,X7,X8,X9,X10,X11,X12,X13,X14,X15,X16,X17,X18,X19,X20,X21,X22,X23,X24,X25,X26,X27,X28,X29,X30,X31 |& FileCheck %s
 sections:
     - no:        1
@@ -11,6 +11,11 @@ sections:
       VMA:       0x600000
       SIZE:      0x700000
       LMA:       0x600000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
       ACCESS:    rw
 
 histogram:

@@ -26,20 +26,21 @@ template class GenResultT<OwningSimulatorContext>;
 
 void OwningSimulatorContext::initialize(SnippyProgramContext &ProgCtx,
                                         const TargetSubtargetInfo &SubTgt,
-                                        const GeneratorSettings &Settings,
+                                        const Config &Cfg,
                                         TargetGenContextInterface &TargetCtx,
                                         GlobalCodeFlowInfo &GCFI) {
   auto &Linker = ProgCtx.getLinker();
   auto &State = ProgCtx.getLLVMState();
   auto &SnippyTgt = State.getSnippyTarget();
-  setupTrackingMode(Settings);
+  if (Cfg.hasTrackingMode())
+    enableTrackingMode();
   OwnRunner = [&]() -> std::unique_ptr<SimRunner> {
-    auto &ModelLibList = Settings.ModelPluginConfig.ModelLibraries;
+    auto &ModelLibList = Cfg.PassCfg.ModelPluginConfig.ModelLibraries;
     if (ModelLibList.empty())
       return nullptr;
 
-    auto Env = Interpreter::createSimulationEnvironment(ProgCtx, SubTgt,
-                                                        Settings, TargetCtx);
+    auto Env = Interpreter::createSimulationEnvironment(ProgCtx, SubTgt, Cfg,
+                                                        TargetCtx);
 
     return std::make_unique<SimRunner>(State.getCtx(), SnippyTgt, SubTgt,
                                        std::move(Env), ModelLibList);
@@ -53,7 +54,7 @@ void OwningSimulatorContext::initialize(SnippyProgramContext &ProgCtx,
                     "but no model plugin provided.");
     return;
   }
-  if (Settings.InstrsGenerationConfig.ChainedRXSectionsFill &&
+  if (Cfg.PassCfg.InstrsGenerationConfig.ChainedRXSectionsFill &&
       std::count_if(
           Linker.sections().begin(), Linker.sections().end(),
           [](auto &Section) { return Section.OutputSection.Desc.M.X(); }) > 1 &&
@@ -61,35 +62,20 @@ void OwningSimulatorContext::initialize(SnippyProgramContext &ProgCtx,
     snippy::fatal(State.getCtx(), "Cannot generate chained code routine",
                   "backtrack, selfcheck and address hazard mode do not work "
                   "with it yet.");
-  if (Settings.Cfg.Histogram.hasCallInstrs(ProgCtx.getOpcodeCache(),
-                                           SnippyTgt) &&
+  if (Cfg.hasCallInstrs(ProgCtx.getOpcodeCache(), SnippyTgt) &&
       hasTrackingMode()) {
     snippy::fatal(State.getCtx(), "Cannot generate requested call instructions",
                   "backtrack and selfcheck do not work with calls yet.");
   }
-  OwnBT = Settings.TrackingConfig.BTMode
+  auto &TrackCfg = Cfg.getTrackCfg();
+  OwnBT = TrackCfg.BTMode
               ? std::make_unique<Backtrack>(Runner->getPrimaryInterpreter())
               : nullptr;
   BT = OwnBT.get();
 
-  OwnSCI = Settings.TrackingConfig.SelfCheckPeriod
-               ? std::make_unique<SelfCheckInfo>()
-               : nullptr;
+  OwnSCI =
+      TrackCfg.SelfCheckPeriod ? std::make_unique<SelfCheckInfo>() : nullptr;
   SCI = OwnSCI.get();
-}
-
-static void dumpSelfCheck(const std::vector<char> &Data, size_t ChunkSize,
-                          size_t ChunksNum, raw_ostream &OS) {
-  for (size_t Offset = 0; Offset < Data.size();
-       Offset += ChunkSize * ChunksNum) {
-    for (size_t Idx = 0; Idx < ChunkSize * ChunksNum; Idx++) {
-      if (Idx % ChunkSize == 0)
-        OS << "\n";
-      OS.write_hex(static_cast<unsigned char>(Data[Offset + Idx]));
-      OS << " ";
-    }
-    OS << "\n------\n";
-  }
 }
 
 template <typename InsertIt>
@@ -186,13 +172,10 @@ getMemoryRangesToDump(Interpreter &I,
 void SimulatorContext::runSimulator(const RunInfo &RI) {
   auto &ImageToRun = RI.ImageToRun;
   auto &ProgCtx = RI.ProgCtx;
-  auto &MainModule = RI.MainModule;
   auto &InitialStateOutputYaml = RI.InitialRegStateOutputYaml;
   auto &FinalStateOutputYaml = RI.FinalRegStateOutputYaml;
-  auto &SelfCheckMem = RI.SelfcheckCheckMem;
   auto &DumpMemorySection = RI.DumpMemorySection;
   auto &MemorySectionFile = RI.MemorySectionFile;
-  auto &BaseFilename = RI.BaseFilename;
 
   // FIXME: unfortunately, it is not possible to implement interpretation as an
   // llvm pass (without creating a separate pass manager) due to peculiarities
@@ -212,15 +195,6 @@ void SimulatorContext::runSimulator(const RunInfo &RI) {
   I.setPC(StartPC);
   I.dumpCurrentRegState(InitialStateOutputYaml);
 
-  std::unique_ptr<RVMCallbackHandler::ObserverHandle<SelfcheckObserver>>
-      SelfcheckObserverHandle;
-  if (TrackOpts.SelfCheckPeriod) {
-    auto &Map = MainModule.getOrAddResult<SelfCheckMap>().Map;
-    // TODO: merge all infos from all modules.
-    SelfcheckObserverHandle =
-        I.setObserver<SelfcheckObserver>(Map.begin(), Map.end(), I.getPC());
-  }
-
   auto &SimRunner = getSimRunner();
   SimRunner.resetState(ProgCtx, RI.NeedMemoryReset);
   // FIXME: currently it does not initialize .bss sections with
@@ -237,53 +211,6 @@ void SimulatorContext::runSimulator(const RunInfo &RI) {
   // Force flush stdout buffer written by Simulator.
   // It helps to avoid mixing it with stderr if redirected to same file.
   fflush(stdout);
-  if (TrackOpts.SelfCheckPeriod) {
-    if (SelfCheckMem)
-      checkMemStateAfterSelfcheck(ProgCtx);
-
-    auto AnnotationFilename =
-        addExtensionIfRequired(BaseFilename, ".selfcheck.yaml");
-    I.getObserverByHandle(*SelfcheckObserverHandle)
-        .dumpAsYaml(AnnotationFilename);
-  }
-}
-
-void SimulatorContext::checkMemStateAfterSelfcheck(
-    SnippyProgramContext &ProgCtx) const {
-  auto &SelfcheckSection = ProgCtx.getSelfcheckSection();
-  std::vector<char> Data(SelfcheckSection.Size);
-  auto &I = getInterpreter();
-  I.readMem(SelfcheckSection.VMA, Data);
-
-  const auto SCStride = ProgCtx.getSCStride();
-  auto ResultOffset = 0;
-  auto ReferenceOffset = SCStride;
-  auto ChunksNum = 2;
-
-
-  size_t BlockSize = ChunksNum * SCStride;
-
-  auto DataSize = Data.size() - Data.size() % BlockSize;
-  for (size_t Offset = 0; Offset < DataSize; Offset += BlockSize) {
-    auto It = Data.begin() + Offset;
-    auto ResultIt = It + ResultOffset;
-    auto ReferenceIt = It + ReferenceOffset;
-    for (size_t ByteIdx = 0; ByteIdx < SCStride; ++ByteIdx) {
-      auto Result = ResultIt[ByteIdx];
-      auto Reference = ReferenceIt[ByteIdx];
-      auto DefMaskByte = 0xFF;
-      if ((Result & DefMaskByte) != (Reference & DefMaskByte)) {
-        auto FaultAddr = SelfcheckSection.VMA + Offset + ByteIdx;
-        LLVM_DEBUG(
-            dumpSelfCheck(Data, BlockSize / ChunksNum, ChunksNum, dbgs()));
-        snippy::fatal(formatv(
-            "Incorrect memory state after interpretation in "
-            "self-check mode. Error is in block @ 0x{0}{{1} + {2} + {3}}\n",
-            Twine::utohexstr(FaultAddr), Twine::utohexstr(SelfcheckSection.VMA),
-            Twine::utohexstr(Offset), Twine::utohexstr(ByteIdx)));
-      }
-    }
-  }
 }
 
 char SimulatorContextWrapper::ID = 0;
@@ -316,7 +243,7 @@ bool SimulatorContextWrapper::runOnModule(Module &M) {
 
   auto &TargetContext = ProgCtx.getTargetContext();
   auto &SimCtx = get<OwningSimulatorContext>();
-  SimCtx.initialize(ProgCtx, SubTgt, GC.getGenSettings(), TargetContext, GCFI);
+  SimCtx.initialize(ProgCtx, SubTgt, GC.getConfig(), TargetContext, GCFI);
 
   return false;
 }

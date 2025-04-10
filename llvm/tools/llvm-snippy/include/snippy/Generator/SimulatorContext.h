@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 #pragma once
-#include "snippy/Generator/GeneratorSettings.h"
+#include "snippy/Config/Config.h"
 #include "snippy/Generator/MemoryManager.h"
 #include "snippy/Generator/SimRunner.h"
 
@@ -23,15 +23,10 @@ struct SimulatorContext {
   SimRunner *Runner = nullptr;
   SelfCheckInfo *SCI = nullptr;
   Backtrack *BT = nullptr;
-  TrackingOptions TrackOpts{};
   SimulatorContext() = default;
   virtual ~SimulatorContext() = default;
 
-  void setupTrackingMode(const GeneratorSettings &Settings) {
-    TrackOpts = Settings.TrackingConfig;
-    HasTrackingMode = Settings.hasTrackingMode();
-  }
-
+  void enableTrackingMode() { HasTrackingMode = true; }
   Interpreter &getInterpreter() const {
     assert(Runner);
     return Runner->getPrimaryInterpreter();

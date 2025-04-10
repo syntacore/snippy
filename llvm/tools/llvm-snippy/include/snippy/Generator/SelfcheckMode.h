@@ -6,12 +6,30 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "snippy/Support/Options.h"
+#include "snippy/Support/YAMLUtils.h"
+
 #pragma once
 
-namespace llvm::snippy {
+namespace llvm {
+namespace snippy {
 
 enum class SelfcheckRefValueStorageType {
   Code,
 };
 
-} // namespace llvm::snippy
+struct SelfcheckRefValueStorageEnumOption
+    : public snippy::EnumOptionMixin<SelfcheckRefValueStorageEnumOption> {
+  static void doMapping(EnumMapper &Mapper) {
+    Mapper.enumCase(
+        SelfcheckRefValueStorageType::Code, "code",
+        "selfcheck reference values are materialized during runtime");
+  }
+};
+
+} // namespace snippy
+
+LLVM_SNIPPY_YAML_DECLARE_SCALAR_ENUMERATION_TRAITS(
+    snippy::SelfcheckRefValueStorageType);
+
+} // namespace llvm

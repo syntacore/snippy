@@ -1,0 +1,4 @@
+burst:
+  mode: load
+  min-size: 3
+  max-size: 3

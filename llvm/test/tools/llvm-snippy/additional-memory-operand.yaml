@@ -10,7 +10,7 @@
 #  and last instruction(ebreak) will not be reached.
 #
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
-# RUN:  -stack-size=1024  -honor-target-abi \
+# RUN:  -honor-target-abi \
 # RUN:  -model-plugin=None --num-instrs=3000 -o %t
 
 include:
@@ -26,6 +26,11 @@ sections:
     VMA:       0x80600000
     SIZE:      0x400000
     LMA:       0x80600000
+    ACCESS:    rw
+  - name:      stack
+    VMA:       0x80A00000
+    SIZE:      0x400000
+    LMA:       0x80A00000
     ACCESS:    rw
 histogram:
 

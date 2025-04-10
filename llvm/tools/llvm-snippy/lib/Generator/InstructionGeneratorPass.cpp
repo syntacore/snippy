@@ -85,11 +85,11 @@ static size_t calcMainFuncInitialSpillSize(InstructionGenerationContext &IGC) {
   if (ProgCtx.shouldSpillStackPointer())
     SpillSize += SnippyTgt.getSpillSizeInBytes(StackPointer, IGC);
 
-  auto &GenSettings = IGC.GenSettings;
-  auto SpilledRef = GenSettings.getRegsSpilledToStack();
+  const auto &Cfg = IGC.getCommonCfg();
+  const auto &ProgCfg = Cfg.ProgramCfg;
+  auto SpilledRef = ProgCfg.getRegsSpilledToStack();
   std::vector SpilledRegs(SpilledRef.begin(), SpilledRef.end());
-  llvm::copy(GenSettings.getRegsSpilledToMem(),
-             std::back_inserter(SpilledRegs));
+  llvm::copy(ProgCfg.getRegsSpilledToMem(), std::back_inserter(SpilledRegs));
   return std::accumulate(SpilledRegs.begin(), SpilledRegs.end(), SpillSize,
                          [&IGC, &SnippyTgt](auto Init, auto Reg) {
                            return Init +
@@ -177,7 +177,7 @@ void InstructionGenerator::addSelfcheckSectionPropertiesAsGV(Module &M) const {
 
   auto VMA = APInt{64, SelfcheckSection.VMA};
   auto Size = APInt{64, SelfcheckSection.Size};
-  auto Stride = APInt{64, SGCtx->getProgramContext().getSCStride()};
+  auto Stride = APInt{64, ProgramConfig::getSCStride()};
 
   addGV(M, VMA, 1, GlobalValue::ExternalLinkage, "selfcheck_section_address");
   addGV(M, Size, 1, GlobalValue::ExternalLinkage, "selfcheck_section_size");
@@ -190,8 +190,10 @@ planning::FunctionRequest InstructionGenerator::createMFGenerationRequest(
   auto &FunReq = getAnalysis<BlockGenPlanWrapper>().getFunctionRequest(&MF);
   const auto &ProgCtx = SGCtx->getProgramContext();
   const MCInstrDesc *FinalInstDesc = nullptr;
-  auto LastInstrStr = SGCtx->getGenSettings().getLastInstr();
-  if (!LastInstrStr.empty() && !SGCtx->getGenSettings().useRetAsLastInstr()) {
+  const auto &PassCfg = SGCtx->getConfig().PassCfg;
+  StringRef LastInstrStr = PassCfg.InstrsGenerationConfig.LastInstr;
+  if (!LastInstrStr.empty() &&
+      !PassCfg.InstrsGenerationConfig.useRetAsLastInstr()) {
     auto Opc = ProgCtx.getOpcodeCache().code(LastInstrStr.str());
     if (!Opc.has_value())
       snippy::fatal("unknown opcode \"" + Twine(LastInstrStr) +
@@ -227,10 +229,10 @@ bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
   auto &SimCtx = getAnalysis<SimulatorContextWrapper>()
                      .get<OwningSimulatorContext>()
                      .get();
-  const auto &GenSettings = SGCtx->getGenSettings();
-  if (SGCtx->getConfig().hasSectionToSpillGlobalRegs())
-    reserveAddressesForRegSpills(GenSettings.RegistersConfig.SpilledToMem,
-                                 *SGCtx, MF);
+  const auto &Cfg = SGCtx->getConfig();
+  auto &ProgCfg = *Cfg.ProgramCfg;
+  if (ProgCfg.hasSectionToSpillGlobalRegs())
+    reserveAddressesForRegSpills(ProgCfg.SpilledToMem, *SGCtx, MF);
   if (SimCtx.hasTrackingMode())
     prepareInterpreterEnv(MF);
 
@@ -241,7 +243,7 @@ bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
   auto *SCI = SimCtx.SCI;
   if (SCI) {
     // TODO: move it to initializer:
-    SCI->PeriodTracker = {GenSettings.TrackingConfig.SelfCheckPeriod};
+    SCI->PeriodTracker = {Cfg.getTrackCfg().SelfCheckPeriod};
     const auto &SCSection = SGCtx->getProgramContext().getSelfcheckSection();
     SCI->CurrentAddress = SCSection.VMA;
     // FIXME: make SelfCheckGV a deprecated option

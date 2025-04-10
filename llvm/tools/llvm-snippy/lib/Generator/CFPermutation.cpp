@@ -147,12 +147,11 @@ llvm::snippy::CFPermutationContext::CFPermutationContext(
     MachineFunction &MF, GeneratorContext &GC, FunctionGenerator &FG,
     ConsecutiveLoopInfo &CLI, const SimulatorContext &SimCtx)
     : BlocksInfo(), CurrMF(MF), GC(GC), FG(FG), CLI(CLI),
-      BranchSettings(GC.getConfig().Branches), SimCtx(SimCtx) {
-
+      BranchSettings(GC.getConfig().PassCfg.Branches), SimCtx(SimCtx) {
   auto &ProgCtx = GC.getProgramContext();
 
   if (SimCtx.hasTrackingMode() &&
-      GC.getGenSettings().isLoopGenerationPossible(ProgCtx.getOpcodeCache()) &&
+      GC.getConfig().isLoopGenerationPossible(ProgCtx.getOpcodeCache()) &&
       !SimCtx.getSimRunner().getPrimaryInterpreter().modelSupportCallbacks())
     fatal(ProgCtx.getLLVMState().getCtx(),
           "Loops cannot be generated in selfcheck/backtrack/hazard modes",
@@ -165,10 +164,10 @@ llvm::snippy::CFPermutationContext::CFPermutationContext(
 size_t llvm::snippy::CFPermutationContext::getCFInstrNumFor(
     const MachineFunction &MF) const {
   auto TotalInstrNum = FG.get().getRequestedInstrsNum(MF);
-  auto &GenSettings = GC.get().getGenSettings();
+  const auto &Cfg = GC.get().getConfig();
   auto &ProgCtx = GC.get().getProgramContext();
   auto &OpCC = ProgCtx.getOpcodeCache();
-  return GenSettings.getCFInstrsNum(OpCC, TotalInstrNum);
+  return Cfg.getCFInstrsNum(OpCC, TotalInstrNum);
 }
 
 bool llvm::snippy::CFPermutationContext::makePermutationAndUpdateBranches() {
@@ -322,7 +321,7 @@ unsigned llvm::snippy::CFPermutationContext::calculateMaxDistance(
     unsigned BBNum, unsigned Size, unsigned RequestedInstrsNum,
     unsigned MaxBranchDstMod, GeneratorContext &GC) {
   LLVM_DEBUG(dbgs() << "Calculating max distance for BB#" << BBNum << '\n');
-  auto &BS = GC.getConfig().Branches;
+  auto &BS = GC.getConfig().PassCfg.Branches;
   if (BS.anyConsecutiveLoops())
     return 0;
   auto &ProgCtx = GC.getProgramContext();

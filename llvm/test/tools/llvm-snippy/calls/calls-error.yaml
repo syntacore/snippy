@@ -1,13 +1,41 @@
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -function-number=20 -function-layers=5 -num-instrs=100 \
-# RUN: --dump-mf -stack-size=0 -num-instr-ancil=50 -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=NOSTACK
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -function-number=20 -function-layers=0 -num-instrs=100 \
-# RUN: --dump-mf -stack-size=1024 -num-instr-ancil=50 -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=ZERO-LAYER
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -function-number=0 -function-layers=5 -num-instrs=100 \
-# RUN: --dump-mf -stack-size=1024 -num-instr-ancil=50 -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=ZERO-FUN
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -function-number=20 -function-layers=5 -num-instrs=100 \
-# RUN: --dump-mf -stack-size=1024 -num-instr-ancil=50 -reserved-regs-list=X1 -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=RA-RES
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -function-number=20 -function-layers=5 -num-instrs=all \
-# RUN: --dump-mf -stack-size=1024 -num-instr-ancil=50 -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=ALL
+# RUN: split-file %s %t
+# RUN: not llvm-snippy %t/no-stack.yaml -march=riscv64-linux-gnu -function-number=20 -function-layers=5 -num-instrs=100 \
+# RUN: --dump-mf -num-instr-ancil=50 -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=NOSTACK
+# RUN: not llvm-snippy %t/good.yaml -march=riscv64-linux-gnu -function-number=20 -function-layers=0 -num-instrs=100 \
+# RUN: --dump-mf -num-instr-ancil=50 -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=ZERO-LAYER
+# RUN: not llvm-snippy %t/good.yaml -march=riscv64-linux-gnu -function-number=0 -function-layers=5 -num-instrs=100 \
+# RUN: --dump-mf -num-instr-ancil=50 -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=ZERO-FUN
+# RUN: not llvm-snippy %t/good.yaml -march=riscv64-linux-gnu -function-number=20 -function-layers=5 -num-instrs=100 \
+# RUN: --dump-mf -num-instr-ancil=50 -reserved-regs-list=X1 -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=RA-RES
+# RUN: not llvm-snippy %t/good.yaml -march=riscv64-linux-gnu -function-number=20 -function-layers=5 -num-instrs=all \
+# RUN: --dump-mf -num-instr-ancil=50 -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=ALL
+
+#--- good.yaml
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      stack
+    VMA:       0x310000
+    SIZE:      0x100000
+    LMA:       0x310000
+    ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [JAL, 0.2]
+
+#--- no-stack.yaml
 
 sections:
   - no:        1

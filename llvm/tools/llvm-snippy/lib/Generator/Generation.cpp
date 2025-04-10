@@ -90,13 +90,18 @@ static snippy::opt<unsigned> SizeErrorThreshold(
 // special instructions (overrides).
 static void switchPolicyIfNeeded(planning::InstructionGenerationContext &IGC,
                                  planning::InstructionGroupRequest &IG,
-                                 unsigned Opcode) {
+                                 unsigned Opcode,
+                                 const DefaultPolicyConfig *FallBackCfg) {
   auto &ProgCtx = IGC.ProgCtx;
-  auto &GenSettings = IGC.GenSettings;
   auto &MBB = IGC.MBB;
   auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
-  if (Tgt.needsGenerationPolicySwitch(Opcode))
-    IG.changePolicy(planning::createGenPolicy(ProgCtx, GenSettings, MBB));
+  if (Tgt.needsGenerationPolicySwitch(Opcode)) {
+    if (!FallBackCfg)
+      snippy::fatal(
+          "No fallback policy provided when policy change requested.");
+    IG.changePolicy(planning::createGenPolicy(ProgCtx, *FallBackCfg, MBB));
+    IGC.switchConfig(*FallBackCfg);
+  }
 }
 
 static void generateInsertionPointHint(
@@ -215,11 +220,11 @@ storeRefAndActualValueForSelfcheck(
                     /* store the whole register */ 0);
   SelfcheckFirstStoreInfo<MachineBasicBlock::iterator> FirstStoreInfo{
       std::prev(InsertPos), SCAddress};
-  SCAddress += ProgCtx.getSCStride();
+  SCAddress += ProgramConfig::getSCStride();
   auto &SelfcheckSection = ProgCtx.getSelfcheckSection();
   selfcheckOverflowGuard(SelfcheckSection, SCAddress);
   storeRefValue(InstrGenCtx, SCAddress, RegValue);
-  SCAddress += ProgCtx.getSCStride();
+  SCAddress += ProgramConfig::getSCStride();
   selfcheckOverflowGuard(SelfcheckSection, SCAddress);
 
 
@@ -268,11 +273,6 @@ static void unNaNRegister(planning::InstructionGenerationContext &InstrGenCtx,
                           MCRegister Reg) {
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   const auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
-
-  auto &Cfg = InstrGenCtx.GenSettings.Cfg;
-  assert(Cfg.FPUConfig);
-  auto &OverwriteCfg = Cfg.FPUConfig->Overwrite;
-  assert(OverwriteCfg);
 
   auto SelectedSemantics =
       getFloatSemanticsForReg(ProgCtx.getLLVMState().getRegInfo(), Reg);
@@ -356,12 +356,9 @@ static bool hasFRegDestination(const MachineInstr &MI,
 static bool shouldRewriteRegValue(
     const MachineInstr &MI,
     const planning::InstructionGenerationContext &InstrGenCtx) {
-  auto &Cfg = InstrGenCtx.GenSettings.Cfg;
-  if (!Cfg.FPUConfig)
-    return false;
-  auto &OverwriteCfg = Cfg.FPUConfig->Overwrite;
-  assert(OverwriteCfg);
-  switch (OverwriteCfg->Mode) {
+  auto &Cfg = InstrGenCtx.getCommonCfg();
+  auto &OverwriteCfg = Cfg.FPUConfig.Overwrite;
+  switch (OverwriteCfg.Mode) {
   case FloatOverwriteMode::IF_ALL_OPERANDS:
     return allInputOperandsArePotentialNaNs(MI, InstrGenCtx);
   case FloatOverwriteMode::IF_ANY_OPERAND:
@@ -396,9 +393,6 @@ void controlNaNPropagation(
   auto &SimCtx = InstrGenCtx.SimCtx;
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
-  auto &FPUConfig = InstrGenCtx.GenSettings.Cfg.FPUConfig;
-  if (!FPUConfig || !FPUConfig->Overwrite)
-    return;
   auto &Tgt = State.getSnippyTarget();
   auto Filtered =
       llvm::make_filter_range(llvm::make_range(Begin, End), [&](auto &MI) {
@@ -583,7 +577,7 @@ std::optional<MachineOperand> pregenerateOneOperand(
   const auto &RegInfo = State.getRegInfo();
   const auto &SnippyTgt = State.getSnippyTarget();
   auto &RegGen = ProgCtx.getRegGen();
-  auto &GenSettings = InstrGenCtx.GenSettings;
+  auto &Cfg = InstrGenCtx.getCommonCfg();
   auto Operand = InstrDesc.operands()[OpIndex];
   auto OperandRegClassID = Operand.RegClass;
   if (OpType == MCOI::OperandType::OPERAND_REGISTER) {
@@ -658,8 +652,8 @@ std::optional<MachineOperand> pregenerateOneOperand(
     if (StridedImm.isInitialized() &&
         StridedImm.getMin() == StridedImm.getMax())
       return MachineOperand::CreateImm(StridedImm.getMax());
-    return SnippyTgt.generateTargetOperand(
-        ProgCtx, GenSettings, InstrDesc.getOpcode(), OpType, StridedImm);
+    return SnippyTgt.generateTargetOperand(ProgCtx, Cfg, InstrDesc.getOpcode(),
+                                           OpType, StridedImm);
   }
   llvm_unreachable("this operand type unsupported");
 }
@@ -962,8 +956,7 @@ void postprocessMemoryOperands(MachineInstr &MI,
     IGC.Ins = MI.getIterator();
     for (auto &AP : RegToValue) {
       MCRegister Reg = AP.FixedReg;
-      if (SimCtx.hasTrackingMode() &&
-          IGC.GenSettings.TrackingConfig.AddressVH) {
+      if (SimCtx.hasTrackingMode() && IGC.getCommonCfg().TrackCfg.AddressVH) {
         auto &I = SimCtx.getInterpreter();
         Reg = chooseAddressRegister(IGC, MI, AP);
         SnippyTgt.transformValueInReg(IGC, I.readReg(Reg), AP.Value, Reg);
@@ -981,7 +974,8 @@ void postprocessMemoryOperands(MachineInstr &MI,
 static void reloadGlobalRegsFromMemory(InstructionGenerationContext &IGC) {
   auto &ProgCtx = IGC.ProgCtx;
   auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
-  auto &SpilledToMem = IGC.GenSettings.RegistersConfig.SpilledToMem;
+  auto &ProgCfg = IGC.getCommonCfg().ProgramCfg;
+  auto &SpilledToMem = ProgCfg.SpilledToMem;
   if (SpilledToMem.empty())
     return;
   assert(ProgCtx.hasProgramStateSaveSpace());
@@ -999,7 +993,8 @@ static void reloadGlobalRegsFromMemory(InstructionGenerationContext &IGC) {
 static void reloadLocallySpilledRegs(InstructionGenerationContext &IGC) {
   auto &ProgCtx = IGC.ProgCtx;
   auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
-  auto &SpilledToMem = IGC.GenSettings.RegistersConfig.SpilledToMem;
+  auto &ProgCfg = IGC.getCommonCfg().ProgramCfg;
+  auto &SpilledToMem = ProgCfg.SpilledToMem;
   if (SpilledToMem.empty())
     return;
   assert(ProgCtx.hasProgramStateSaveSpace());
@@ -1015,7 +1010,7 @@ generateCall(unsigned OpCode,
              planning::InstructionGenerationContext &InstrGenCtx) {
   auto &MBB = InstrGenCtx.MBB;
   auto &ProgCtx = InstrGenCtx.ProgCtx;
-  const auto &GenSettings = InstrGenCtx.GenSettings;
+  const auto &ProgramCfg = InstrGenCtx.getCommonCfg().ProgramCfg;
   auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   if (!InstrGenCtx.CGS)
@@ -1034,7 +1029,7 @@ generateCall(unsigned OpCode,
 
   auto &CallTarget = *(CalleeNode->functions()[FunctionIdx]);
   assert(CallTarget.hasName());
-  if (CalleeNode->isExternal() && GenSettings.Cfg.hasSectionToSpillGlobalRegs())
+  if (CalleeNode->isExternal() && ProgramCfg.hasSectionToSpillGlobalRegs())
     reloadGlobalRegsFromMemory(InstrGenCtx);
 
   auto TargetStackPointer = SnippyTgt.getStackPointer();
@@ -1049,11 +1044,11 @@ generateCall(unsigned OpCode,
   auto *Call = SnippyTgt.generateCall(InstrGenCtx, CallTarget,
                                       /* AsSupport */ false, OpCode);
 
-  if (!GenSettings.isRegSpilledToMem(RealStackPointer) &&
+  if (!ProgramCfg.isRegSpilledToMem(RealStackPointer) &&
       CalleeNode->isExternal() && (RealStackPointer != TargetStackPointer))
     SnippyTgt.copyRegToReg(InstrGenCtx, TargetStackPointer, RealStackPointer);
 
-  if (CalleeNode->isExternal() && GenSettings.Cfg.hasSectionToSpillGlobalRegs())
+  if (CalleeNode->isExternal() && ProgramCfg.hasSectionToSpillGlobalRegs())
     reloadLocallySpilledRegs(InstrGenCtx);
 
   Node->markAsCommitted(CalleeNode);
@@ -1063,10 +1058,11 @@ generateCall(unsigned OpCode,
 static bool
 isPostprocessNeeded(const MCInstrDesc &InstrDesc,
                     const std::vector<planning::PreselectedOpInfo> &Preselected,
-                    const GeneratorSettings &GenSettings) {
+                    InstructionGenerationContext &IGC) {
   // 1. If any information about operands is provided from the caller, we won't
   //    do any postprocessing.
-  if (!GenSettings.isApplyValuegramEachInstr())
+  if (!IGC.hasCfg<DefaultPolicyConfig>() ||
+      !IGC.getCfg<DefaultPolicyConfig>().isApplyValuegramEachInstr())
     return Preselected.empty();
   // 2. In the case of the option -valuegram-operands-regs, we do partial
   //    initialization in the case of memory instructions. We initialize only
@@ -1084,14 +1080,13 @@ randomInstruction(const MCInstrDesc &InstrDesc,
   auto &MBB = InstrGenCtx.MBB;
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
-  const auto &GenSettings = InstrGenCtx.GenSettings;
   const auto &SnippyTgt = State.getSnippyTarget();
 
   auto MIB = getMainInstBuilder(SnippyTgt, MBB, InstrGenCtx.Ins,
                                 MBB.getParent()->getFunction().getContext(),
                                 InstrDesc);
 
-  bool DoPostprocess = isPostprocessNeeded(InstrDesc, Preselected, GenSettings);
+  bool DoPostprocess = isPostprocessNeeded(InstrDesc, Preselected, InstrGenCtx);
 
   auto NumDefs = InstrDesc.getNumDefs();
   auto TotalNum = InstrDesc.getNumOperands();
@@ -1412,8 +1407,8 @@ void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
   auto &ProgCtx = GC.getProgramContext();
   auto &State = ProgCtx.getLLVMState();
   auto &MBB = MF.back();
-
-  auto LastInstr = GC.getGenSettings().getLastInstr();
+  auto &PassCfg = GC.getConfig().PassCfg;
+  StringRef LastInstr = PassCfg.InstrsGenerationConfig.LastInstr;
   bool NopLastInstr = LastInstr.empty();
   planning::InstructionGenerationContext InstrGenCtx{MBB, MF.back().end(), GC,
                                                      SimCtx};
@@ -1436,7 +1431,7 @@ void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
       MF.getContext().getOrCreateSymbol(Linker::getExitSymbolName());
 
   // User may ask for last instruction to be return.
-  if (GC.getGenSettings().useRetAsLastInstr()) {
+  if (PassCfg.InstrsGenerationConfig.useRetAsLastInstr()) {
     State.getSnippyTarget()
         .generateReturn(InstrGenCtx)
         ->setPreInstrSymbol(MF, ExitSym);
@@ -1453,7 +1448,7 @@ void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
     assert((!FinalReq.limit().isNumLimit() || FinalReq.limit().getLimit()) &&
            "FinalReq is empty!");
     InstrGenCtx.append(MAI);
-    snippy::generate(FinalReq, InstrGenCtx);
+    snippy::generate(FinalReq, InstrGenCtx, /*Fallback config */ nullptr);
   }
 
   // Mark last generated instruction as support one.
@@ -1580,7 +1575,7 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
                                                          SimCtx};
       auto RP = InstrGenCtx.pushRegPool();
       InstrGenCtx.append(MLI).append(CGS).append(MAI).append(SLI).append(SFM);
-      snippy::generate(BBReq, InstrGenCtx);
+      snippy::generate(BBReq, InstrGenCtx, &GC.getConfig().DefFlowConfig);
       CurrMFGenStats.merge(InstrGenCtx.Stats);
     }
     SNIPPY_DEBUG_BRIEF("Function codegen", CurrMFGenStats);
@@ -1636,7 +1631,7 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
                                                        SimCtx};
     InstrGenCtx.append(CGS).append(MAI).append(SFM);
     auto RP = InstrGenCtx.pushRegPool();
-    snippy::generate(BBReq, InstrGenCtx);
+    snippy::generate(BBReq, InstrGenCtx, nullptr /* Fallback config*/);
 
     CurrMFGenStats.merge(InstrGenCtx.Stats);
     SNIPPY_DEBUG_BRIEF("Function codegen", CurrMFGenStats);
@@ -1648,7 +1643,8 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
 }
 
 void generate(planning::InstructionGroupRequest &IG,
-              planning::InstructionGenerationContext &InstrGenCtx) {
+              planning::InstructionGenerationContext &InstrGenCtx,
+              const DefaultPolicyConfig *FallBackCfg) {
   LLVM_DEBUG(dbgs() << "Generating IG:\n"; IG.print(dbgs(), 2););
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &MBB = InstrGenCtx.MBB;
@@ -1669,7 +1665,7 @@ void generate(planning::InstructionGroupRequest &IG,
         generateInsertionPointHint(InstrGenCtx);
       generateInstruction(InstrInfo.get(IR.Opcode), InstrGenCtx,
                           std::move(IR.Preselected));
-      switchPolicyIfNeeded(InstrGenCtx, IG, IR.Opcode);
+      switchPolicyIfNeeded(InstrGenCtx, IG, IR.Opcode, FallBackCfg);
       if (!IG.isInseparableBundle())
         ItBegin =
             processGeneratedInstructions(ItBegin, InstrGenCtx, IG.limit());
@@ -1704,9 +1700,10 @@ void interpretMBBInstrs(LLVMState &State, const SimulatorContext &SimCtx,
 
 GenerationStatistics
 generate(planning::BasicBlockRequest &BB,
-         planning::InstructionGenerationContext &InstrGenCtx) {
+         planning::InstructionGenerationContext &InstrGenCtx,
+         const DefaultPolicyConfig *FBC) {
   for (auto &&IG : BB)
-    generate(IG, InstrGenCtx);
+    generate(IG, InstrGenCtx, FBC);
 
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();

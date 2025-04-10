@@ -15,6 +15,9 @@
 #include <set>
 
 namespace llvm {
+
+class MCInstrInfo;
+
 namespace snippy {
 enum class BurstMode {
   Basic,
@@ -24,6 +27,8 @@ enum class BurstMode {
   LoadStoreBurst,
   CustomBurst
 };
+
+class OpcodeHistogram;
 
 struct BurstGramData final {
   BurstMode Mode = BurstMode::Basic;
@@ -51,12 +56,9 @@ struct BurstGramData final {
       Opcodes.insert(GroupOpcodes.begin(), GroupOpcodes.end());
     return Opcodes;
   }
-};
 
-struct BurstGram final {
-  std::optional<BurstGramData> Data;
-
-  operator bool() const { return Data.has_value(); }
+  void convertToCustomMode(const OpcodeHistogram &Histogram,
+                           const MCInstrInfo &II);
 };
 
 } // namespace snippy

@@ -215,12 +215,16 @@ selectInitializableOperandsRegisters(InstructionGenerationContext &InstrGenCtx,
   std::vector<planning::PreselectedOpInfo> Preselected;
   Preselected.reserve(InstrDesc.getNumOperands());
   auto &ProgCtx = InstrGenCtx.ProgCtx;
+  bool ValuegramOperandsRegsInitOutputs =
+      InstrGenCtx.hasCfg<DefaultPolicyConfig>() &&
+      InstrGenCtx.getCfg<DefaultPolicyConfig>().Valuegram &&
+      InstrGenCtx.getCfg<DefaultPolicyConfig>()
+          .Valuegram->ValuegramOperandsRegsInitOutputs;
   // If the register is a destination register and we don't want to initialize
   // the outputs, we skip it.
-  auto NeedsInit = [&InstrDesc, &InstrGenCtx](auto OpIndex) {
+  auto NeedsInit = [&](auto OpIndex) {
     return !isDestinationRegister(OpIndex, InstrDesc.getNumDefs()) ||
-           InstrGenCtx.GenSettings.InstrsGenerationConfig
-               .ValuegramOperandsRegsInitOutputs;
+           ValuegramOperandsRegsInitOutputs;
   };
   llvm::transform(
       llvm::enumerate(InstrDesc.operands()), std::back_inserter(Preselected),
@@ -282,11 +286,10 @@ std::vector<planning::PreselectedOpInfo> selectConcreteOffsets(
         if (Operand.isImm()) {
           auto OpType = InstrDesc.operands()[Idx].OperandType;
           auto &ProgCtx = IGC.ProgCtx;
-          auto &GenSettings = IGC.GenSettings;
+          auto &Cfg = IGC.getCommonCfg();
           auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
-          auto Concrete = Tgt.generateTargetOperand(ProgCtx, GenSettings,
-                                                    InstrDesc.getOpcode(),
-                                                    OpType, Operand.getImm());
+          auto Concrete = Tgt.generateTargetOperand(
+              ProgCtx, Cfg, InstrDesc.getOpcode(), OpType, Operand.getImm());
           return StridedImmediate(Concrete.getImm(), Concrete.getImm(),
                                   Operand.getImm().getStride());
         }
@@ -478,7 +481,7 @@ generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
   auto &MBB = InstrGenCtx.MBB;
   auto &RP = InstrGenCtx.getRegPool();
   auto &ProgCtx = InstrGenCtx.ProgCtx;
-  auto &GenSettings = InstrGenCtx.GenSettings;
+  auto &Cfg = InstrGenCtx.getCommonCfg();
   auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   const auto &InstrInfo = State.getInstrInfo();
@@ -500,7 +503,7 @@ generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
   // FIXME: normalization does not account restrictions from memory schemes:
   // choosen number of base registers might not be enough.
   auto NumAvailRegs = RP.getNumAvailableInSet(Include, MBB);
-  if (NumAvailRegs > 0 && GenSettings.TrackingConfig.AddressVH) {
+  if (NumAvailRegs > 0 && Cfg.TrackCfg.AddressVH) {
     // When hazard mode is enabled we'll likely need a register to transform
     // existing addresses.
     --NumAvailRegs;
@@ -614,7 +617,7 @@ void initializeBaseRegs(
     auto NewValue =
         APInt(SnippyTgt.getAddrRegLen(State.getTargetMachine()), AI.Address);
     assert(RP.isReserved(BaseReg, AccessMaskBit::W));
-    if (SimCtx.TrackOpts.AddressVH) {
+    if (InstrGenCtx.getCommonCfg().TrackCfg.AddressVH) {
       auto &I = SimCtx.getInterpreter();
       auto OldValue = I.readReg(BaseReg);
       SnippyTgt.transformValueInReg(InstrGenCtx, OldValue, NewValue, BaseReg);

@@ -71,7 +71,7 @@ bool ConsecutiveLoopsVerifier::runOnMachineFunction(MachineFunction &MF) {
   auto &Ctx = ProgCtx.getLLVMState().getCtx();
   auto &CLI = getAnalysis<CFPermutation>().get<ConsecutiveLoopInfo>(MF);
   auto &ConsLoops = CLI.getConsecutiveLoops();
-  auto &BranchSettings = GC.getGenSettings().Cfg.Branches;
+  auto &BranchSettings = GC.getConfig().PassCfg.Branches;
   auto AnyConsLoops = BranchSettings.anyConsecutiveLoops();
   if (!AnyConsLoops) {
     // Check that no consecutive loops were generated if they were not requested

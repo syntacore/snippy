@@ -1,0 +1,4 @@
+burst:
+  mode: BURST_MODE
+  min-size: BURST_SIZE
+  max-size: BURST_SIZE
