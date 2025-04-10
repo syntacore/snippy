@@ -13,8 +13,6 @@ riscv-vector-unit:
       rne: 0.0
       rdn: 0.0
       rod: 0.0
-    VXSAT:
-      off: 1.0
     VTYPE:
       SEW:
         sew_8: 1.0
