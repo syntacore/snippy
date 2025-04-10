@@ -41,7 +41,7 @@ class GlobalsPool;
 class MonoAllocatableSection;
 class OpcodeCache;
 class MemoryManager;
-struct SnippyProgramSettings;
+class ProgramConfig;
 class RootRegPoolWrapper;
 
 struct ObjectFile final {
@@ -124,13 +124,14 @@ class SnippyProgramContext final {
 public:
   SnippyProgramContext(LLVMState &State, RegisterGenerator &RegGen,
                        RegPool &Pool, const OpcodeCache &OpCc,
-                       const SnippyProgramSettings &Settings);
+                       const ProgramConfig &Settings);
 
   SnippyProgramContext(SnippyProgramContext &&) = default;
   SnippyProgramContext &operator=(SnippyProgramContext &&) = default;
 
   ~SnippyProgramContext();
 
+  const auto &getConfig() const { return *Cfg; }
   auto &getLLVMState() const { return *State; }
 
   StringRef getOutputSectionName(const Function &F) const {
@@ -179,9 +180,6 @@ public:
   Linker &getLinker() const { return *PLinker; }
   RegisterGenerator &getRegGen() const { return *RegGen; }
   const auto &getOpcodeCache() const { return *OpCC; }
-
-  static constexpr unsigned getSCStride() { return SCStride; }
-  static constexpr unsigned getPageSize() { return kPageSize; }
 
   bool hasUtilitySection() const { return UtilitySection.has_value(); }
 
@@ -233,17 +231,18 @@ public:
     return *TargetContext;
   }
 
-  // TODO: We should define a subset of GeneratorSettings that is enough for
+  // TODO: We should define a subset of Config that is enough for
   // TargetContext initialization.
-  void createTargetContext(const GeneratorSettings &GenSettings);
+  void createTargetContext(const Config &Cfg);
 
 private:
   friend RootRegPoolWrapper;
-  void initializeStackSection(const SnippyProgramSettings &Settings);
-  void initializeSelfcheckSection(const SnippyProgramSettings &Settings);
-  void initializeUtilitySection(const SnippyProgramSettings &Settings);
-  void initializeROMSection(const SnippyProgramSettings &Settings);
+  void initializeStackSection(const ProgramConfig &Settings);
+  void initializeSelfcheckSection(const ProgramConfig &Settings);
+  void initializeUtilitySection(const ProgramConfig &Settings);
+  void initializeROMSection(const ProgramConfig &Settings);
 
+  const ProgramConfig *Cfg;
   LLVMState *State = nullptr;
   RegisterGenerator *RegGen = nullptr;
   std::vector<RegPool> RegPoolsStorage;
@@ -252,8 +251,6 @@ private:
   std::unique_ptr<Linker> PLinker;
 
   constexpr static auto SmallStringDefaultSize = 16;
-  constexpr static auto SCStride = 16u;
-  constexpr static auto kPageSize = 0x1000u;
 
   std::optional<SectionDesc> ROMSection;
   std::optional<SectionDesc> SelfcheckSection;

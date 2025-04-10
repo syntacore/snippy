@@ -1272,9 +1272,8 @@ static WeightedItems<RVVConfiguration> getConfigsCompatibleWithVLs(
   return Result;
 }
 
-RVVConfigurationInfo
-RVVConfigurationInfo::createDefault(const GeneratorSettings &GenSettings,
-                                    unsigned VLEN) {
+RVVConfigurationInfo RVVConfigurationInfo::createDefault(const Config &Cfg,
+                                                         unsigned VLEN) {
   std::vector<RVVConfiguration> Configurations = {{}};
 
   std::vector<VLGeneratorHolder> VLGen;
@@ -1284,7 +1283,7 @@ RVVConfigurationInfo::createDefault(const GeneratorSettings &GenSettings,
   VMGen.push_back(std::make_unique<UnmaskedVMGenerator>());
 
   auto ModeSwitchInfo =
-      deriveModeSwitchingProbability(GenSettings.Cfg, /* mode switch bias*/ 0.0,
+      deriveModeSwitchingProbability(Cfg, /* mode switch bias*/ 0.0,
                                      /* set vill bit bias*/ 0.0);
   if (ModeSwitchInfo.RVVPresentInHistogram &&
       !ModeSwitchInfo.VSETPresentInHistogram) {
@@ -1360,14 +1359,14 @@ extractMinMaxVL(unsigned VLEN,
 }
 
 RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
-    const GeneratorSettings &GenSettings, unsigned VLEN,
+    const Config &Cfg, unsigned VLEN,
     std::unique_ptr<RVVConfigInterface> &&Iface,
     std::vector<VMGeneratorHolder> &DiscardedVMs,
     std::vector<VLGeneratorHolder> &DiscardedVLs,
     std::vector<RVVConfiguration> &DiscardedConfigs) {
   const RVVConfigurationSpace CS =
       Iface ? Iface->getImpl<RVVConfig>().getRVVConfigurationSpace().value()
-            : GenSettings.Cfg.TargetConfig->getImpl<RISCVConfigInterface>()
+            : Cfg.ProgramCfg->TargetConfig->getImpl<RISCVConfigInterface>()
                   .RVVConfig->getImpl<RVVConfig>()
                   .getRVVConfigurationSpace()
                   .value();
@@ -1407,7 +1406,7 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
       MinMaxVL, VMGensWeightsFiltered, VLGen, DiscardedVMs);
 
   auto ModeSwitchInfo = deriveModeSwitchingProbability(
-      GenSettings.Cfg, CS.Guides.ModeChangeP, CS.Guides.SetVillP);
+      Cfg, CS.Guides.ModeChangeP, CS.Guides.SetVillP);
 
   if (!CS.Guides.Enabled && !ModeSwitchInfo.VSETPresentInHistogram)
     snippy::fatal("No VSET instruction detected in histogram");
@@ -1579,8 +1578,9 @@ RVVConfigurationInfo::RVVConfigurationInfo(
       VMGen(std::move(VMGen)), SwitchInfo(SwitchInfo),
       ArtificialModeChange(EnableGuides) {}
 
-RISCVConfigurationInfo RISCVConfigurationInfo::constructConfiguration(
-    LLVMState &State, const GeneratorSettings &GenSettings) {
+RISCVConfigurationInfo
+RISCVConfigurationInfo::constructConfiguration(LLVMState &State,
+                                               const Config &Cfg) {
   auto &Ctx = State.getCtx();
   const auto &TM = State.getTargetMachine();
   auto ArchInfo =
@@ -1589,15 +1589,14 @@ RISCVConfigurationInfo RISCVConfigurationInfo::constructConfiguration(
   std::vector<RVVConfigurationInfo::VMGeneratorHolder> DiscardedVMs;
   std::vector<RVVConfigurationInfo::VLGeneratorHolder> DiscardedVLs;
   std::vector<RVVConfiguration> DiscardedConfigs;
-  auto RVVCfg =
-      GenSettings.Cfg.TargetConfig->getImpl<RISCVConfigInterface>()
-              .RVVConfig->getImpl<RVVConfig>()
-              .getRVVConfigurationSpace()
-              .has_value()
-          ? RVVConfigurationInfo::buildConfiguration(
-                GenSettings, ArchInfo.VLEN, nullptr, DiscardedVMs, DiscardedVLs,
-                DiscardedConfigs)
-          : RVVConfigurationInfo::createDefault(GenSettings, ArchInfo.VLEN);
+  auto RVVCfg = Cfg.ProgramCfg->TargetConfig->getImpl<RISCVConfigInterface>()
+                        .RVVConfig->getImpl<RVVConfig>()
+                        .getRVVConfigurationSpace()
+                        .has_value()
+                    ? RVVConfigurationInfo::buildConfiguration(
+                          Cfg, ArchInfo.VLEN, nullptr, DiscardedVMs,
+                          DiscardedVLs, DiscardedConfigs)
+                    : RVVConfigurationInfo::createDefault(Cfg, ArchInfo.VLEN);
 
   if (DumpDiscardedRVVConfigurations.isSpecified())
     printDiscardedRVVConfigurations(DumpDiscardedRVVConfigurations.getValue(),

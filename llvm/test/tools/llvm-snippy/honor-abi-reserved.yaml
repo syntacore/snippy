@@ -1,5 +1,5 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
-# RUN: -num-instrs=1000 -stack-size=1024 -dump-mf -redefine-sp=SP \
+# RUN: -num-instrs=1000 -dump-mf -redefine-sp=SP \
 # RUN: -honor-target-abi --reserved-regs-list=ra,s4 -init-regs-in-elf -verify-mi |& FileCheck %s
 sections:
     - no:        1
@@ -11,6 +11,11 @@ sections:
       VMA:       0x600000
       SIZE:      0x700000
       LMA:       0x600000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
       ACCESS:    rw
 
 histogram:

@@ -49,7 +49,7 @@ struct RVVConfigInterface {
 namespace snippy {
 
 class LLVMState;
-class GeneratorSettings;
+class Config;
 
 std::unique_ptr<RVVConfigInterface> createRVVConfig();
 
@@ -238,11 +238,10 @@ struct RVVConfigurationInfo final {
   using VLGeneratorHolder = std::unique_ptr<VLGeneratorInterface>;
   using VMGeneratorHolder = std::unique_ptr<VMGeneratorInterface>;
 
-  static RVVConfigurationInfo
-  createDefault(const GeneratorSettings &GenSettings, unsigned VLEN);
+  static RVVConfigurationInfo createDefault(const Config &Cfg, unsigned VLEN);
 
   static RVVConfigurationInfo
-  buildConfiguration(const GeneratorSettings &GenSettings, unsigned VLEN,
+  buildConfiguration(const Config &Cfg, unsigned VLEN,
                      std::unique_ptr<RVVConfigInterface> &&VU,
                      std::vector<VMGeneratorHolder> &DiscardedVMs,
                      std::vector<VLGeneratorHolder> &DiscardedVLs,
@@ -316,9 +315,8 @@ class RISCVConfigurationInfo final {
   deriveArchitecturalInformation(LLVMContext &Ctx, const TargetMachine &TM);
 
 public:
-  static RISCVConfigurationInfo
-  constructConfiguration(LLVMState &State,
-                         const GeneratorSettings &GenSettings);
+  static RISCVConfigurationInfo constructConfiguration(LLVMState &State,
+                                                       const Config &Cfg);
   const RVVConfigurationInfo &getVUConfig() const { return RVVCfgInfo; }
   const BaseConfigurationInfo &getBaseConfig() const { return BaseCfgInfo; }
 };

@@ -1,7 +1,5 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
-# RUN: -num-instrs=100 -memory-access-mode=mixed-burst \
-# RUN: -model-plugin=None \
-# RUN: -memory-access-burst-group-size=5 |& FileCheck %s
+# RUN: -num-instrs=100 -model-plugin=None  |& FileCheck %s
 
 include:
 - Inputs/memory.yaml
@@ -25,5 +23,9 @@ histogram:
     - [VSETVL, 1.0]
     - [ADD, 1.0]
     - [XOR, 1.0]
+burst:
+  mode: mixed
+  min-size: 5
+  max-size: 5
 
 # CHECK: warning: (burst-mode) Opcode VLSE8_V is not supported in memory burst mode: generator will generate it but not in a burst group.

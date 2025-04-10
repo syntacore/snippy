@@ -14,31 +14,36 @@
 
 #pragma once
 
-// TODO: remove this dependency
-#include "snippy/Generator/GeneratorContext.h"
+#include "snippy/Config/Config.h"
+#include "snippy/Generator/RegisterPool.h"
+#include "snippy/Generator/SnippyModule.h"
 
 namespace llvm {
 namespace snippy {
 
-class MemoryScheme;
 class OpcodeCache;
 class LLVMState;
-class RegPool;
-struct RegisterState;
-class GeneratorSettings;
-class ImmediateHistogram;
+
+struct DebugOptions {
+  bool PrintInstrs;
+  bool PrintMachineFunctions;
+  bool PrintControlFlowGraph;
+  bool ViewControlFlowGraph;
+};
 
 class FlowGenerator {
   const OpcodeCache &OpCC;
-  GeneratorSettings GenSettings;
+  Config Cfg;
   RegPool RP;
+  std::string BaseFileName;
 
 public:
-  FlowGenerator(GeneratorSettings &&Cfg, const OpcodeCache &OpCache,
-                RegPool Pool)
-      : OpCC(OpCache), GenSettings(std::move(Cfg)), RP(std::move(Pool)) {}
+  FlowGenerator(Config &&Cfg, const OpcodeCache &OpCache, RegPool Pool,
+                StringRef BaseFileName)
+      : OpCC(OpCache), Cfg(std::move(Cfg)), RP(std::move(Pool)),
+        BaseFileName(BaseFileName) {}
 
-  GeneratorResult generate(LLVMState &State);
+  GeneratorResult generate(LLVMState &State, const DebugOptions &DebugCfg);
 };
 
 } // namespace snippy

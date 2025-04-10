@@ -25,10 +25,17 @@ struct FunctionDesc {
 struct FunctionDescs {
   std::string EntryPoint;
   std::vector<FunctionDesc> Descs;
+  unsigned InstrNumAncil = 10;
   auto getEntryPointDesc() const {
     return std::find_if(Descs.begin(), Descs.end(),
                         [this](auto &Desc) { return Desc.Name == EntryPoint; });
   }
+  FunctionDescs() = default;
+  // Calculate depth of call graph.
+  unsigned getDepth() const;
+
+private:
+  mutable std::optional<unsigned> Layers;
 };
 
 bool hasExternalCallee(const FunctionDescs &FuncDescs,

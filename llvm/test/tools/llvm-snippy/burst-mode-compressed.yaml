@@ -1,48 +1,29 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+c -dump-mf \
-# RUN: -num-instrs=200 -memory-access-mode=store-burst \
-# RUN: -memory-access-burst-group-size=3 |& FileCheck %s \
-# RUN: -check-prefix=STORE
+# RUN: llvm-snippy %s %S/Inputs/burst-store.yaml -march=riscv64-linux-gnu -mattr=+c -dump-mf \
+# RUN: -num-instrs=200 |& FileCheck %s -check-prefix=STORE
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+c -dump-mf \
-# RUN: -num-instrs=200 -memory-access-mode=store-burst \
-# RUN: -model-plugin=None \
-# RUN: -memory-access-burst-group-size=3 |& FileCheck %s \
-# RUN: -check-prefix=STORE-ERR
+# RUN: llvm-snippy %s %S/Inputs/burst-store.yaml -march=riscv64-linux-gnu -mattr=+c -dump-mf \
+# RUN: -num-instrs=200 -model-plugin=None |& FileCheck %s -check-prefix=STORE-ERR
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+c -dump-mf \
-# RUN: -num-instrs=200 -memory-access-mode=load-burst \
-# RUN: -memory-access-burst-group-size=3 |& FileCheck %s \
-# RUN: -check-prefix=LOAD
+# RUN: llvm-snippy %s %S/Inputs/burst-load.yaml -march=riscv64-linux-gnu -mattr=+c -dump-mf \
+# RUN: -num-instrs=200 |& FileCheck %s -check-prefix=LOAD
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+c -dump-mf \
-# RUN: -num-instrs=200 -memory-access-mode=load-burst \
-# RUN: -model-plugin=None \
-# RUN: -memory-access-burst-group-size=3 |& FileCheck %s \
-# RUN: -check-prefix=LOAD-ERR
+# RUN: llvm-snippy %s %S/Inputs/burst-load.yaml -march=riscv64-linux-gnu -mattr=+c -dump-mf \
+# RUN: -num-instrs=200 -model-plugin=None |& FileCheck %s -check-prefix=LOAD-ERR
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+c -dump-mf \
-# RUN: -num-instrs=200 -memory-access-mode=mixed-burst \
-# RUN: -memory-access-burst-group-size=3 |& FileCheck %s \
-# RUN: -check-prefix=MIXED
+# RUN: llvm-snippy %s %S/Inputs/burst-mixed.yaml -march=riscv64-linux-gnu -mattr=+c -dump-mf \
+# RUN: -num-instrs=200 |& FileCheck %s -check-prefix=MIXED
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+c -dump-mf \
-# RUN: -num-instrs=200 -memory-access-mode=load-store-burst \
-# RUN: -memory-access-burst-group-size=3 |& FileCheck %s \
-# RUN: -check-prefix=LOADSTORE
+# RUN: llvm-snippy %s %S/Inputs/burst-load-store.yaml -march=riscv64-linux-gnu -mattr=+c -dump-mf \
+# RUN: -num-instrs=200  |& FileCheck %s -check-prefix=LOADSTORE
 
 # Generate many instructions to have extremely high probability that desired
 # pattern wasn't met because it cannot be emitted. It's not the most robust test
 # case. Please, improve it if you have better ideas.
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+c -dump-mf \
-# RUN: -num-instrs=1000 -memory-access-mode=load-store-burst \
-# RUN: -model-plugin=None \
-# RUN: -memory-access-burst-group-size=3 |& FileCheck %s \
-# RUN: -check-prefix=LOADSTORE-ERR
+# RUN: llvm-snippy %s %S/Inputs/burst-load-store.yaml -march=riscv64-linux-gnu -mattr=+c -dump-mf \
+# RUN: -num-instrs=1000 -model-plugin=None |& FileCheck %s -check-prefix=LOADSTORE-ERR
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+c -dump-mf \
-# RUN: -num-instrs=500 -memory-access-mode=mixed-burst \
-# RUN: -memory-access-burst-group-size=100 |& FileCheck %s \
-# RUN: -check-prefix=MIXED-HUGEGROUP
+# RUN: llvm-snippy %s %S/Inputs/burst-mixed-huge.yaml -march=riscv64-linux-gnu -mattr=+c -dump-mf \
+# RUN: -num-instrs=500 |& FileCheck %s -check-prefix=MIXED-HUGEGROUP
 
 sections:
     - no:        1

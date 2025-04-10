@@ -145,12 +145,11 @@ static void writeSectionToFile(ArrayRef<char> Data,
 }
 
 SimulationEnvironment Interpreter::createSimulationEnvironment(
-    SnippyProgramContext &SPC, const TargetSubtargetInfo &ST,
-    const GeneratorSettings &Settings, TargetGenContextInterface &TgtCtx) {
+    SnippyProgramContext &SPC, const TargetSubtargetInfo &ST, const Config &Cfg,
+    TargetGenContextInterface &TgtCtx) {
   auto &State = SPC.getLLVMState();
   const auto &SnippyTGT = State.getSnippyTarget();
-
-  bool NeedCallbackHandler = Settings.hasTrackingMode();
+  bool NeedCallbackHandler = Cfg.hasTrackingMode();
   auto &L = SPC.getLinker();
 
   SimulationEnvironment Env;

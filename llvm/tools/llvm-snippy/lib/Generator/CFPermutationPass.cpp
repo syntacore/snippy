@@ -72,11 +72,11 @@ namespace snippy {
 
 bool CFPermutation::runOnMachineFunction(MachineFunction &MF) {
   auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &GenSettings = GC.getGenSettings();
+  auto &Cfg = GC.getConfig();
   auto SimCtx = getAnalysis<SimulatorContextWrapper>()
                     .get<OwningSimulatorContext>()
                     .get();
-  if (!GenSettings.Cfg.Branches.PermuteCF)
+  if (!Cfg.PassCfg.Branches.PermuteCF)
     return false;
   LLVM_DEBUG(
       dbgs() << "CFPermutation::runOnMachineFunction runs on function:\n");

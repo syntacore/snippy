@@ -35,7 +35,7 @@ struct TargetGenContextInterface;
 struct SectionData;
 class MemoryAccessSampler;
 class SnippyProgramContext;
-class GeneratorSettings;
+class Config;
 struct MemoryConfig;
 
 using SectionDescVect = std::vector<SectionDesc>;
@@ -103,7 +103,7 @@ public:
 
   static SimulationEnvironment createSimulationEnvironment(
       SnippyProgramContext &SPC, const TargetSubtargetInfo &ST,
-      const GeneratorSettings &Settings, TargetGenContextInterface &TgtCtx);
+      const Config &Settings, TargetGenContextInterface &TgtCtx);
 
   static std::unique_ptr<SimulatorInterface> createSimulatorForTarget(
       const SnippyTarget &TGT, const TargetSubtargetInfo &Subtarget,

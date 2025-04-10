@@ -9,6 +9,7 @@
 #include "InitializePasses.h"
 
 #include "snippy/Generator/GenerationUtils.h"
+#include "snippy/Generator/Policy.h"
 
 #include "snippy/CreatePasses.h"
 #include "snippy/Generator/GeneratorContextPass.h"

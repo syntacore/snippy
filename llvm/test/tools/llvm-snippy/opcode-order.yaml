@@ -20,11 +20,13 @@ sections:
       SIZE:     0x9000
       LMA:      0x2a20000
       ACCESS:   rw
-
+burst:
+  mode: mixed
+  min-size: 31
+  max-size: 31
 options:
   march: "riscv64-linux-gnu" 
   init-regs-in-elf: true
-  memory-access-burst-group-size: 31
   num-instrs: 400
   mattr: "+c"
 

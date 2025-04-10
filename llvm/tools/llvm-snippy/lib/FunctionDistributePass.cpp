@@ -152,7 +152,7 @@ bool FunctionDistribute::runOnModule(Module &M) {
   calculateFunctionSizes(M);
 
   // Don't do anything if singular section is used anyway.
-  if (!SGCtx.getGenSettings().InstrsGenerationConfig.ChainedRXSectionsFill) {
+  if (!SGCtx.getConfig().PassCfg.InstrsGenerationConfig.ChainedRXSectionsFill) {
     verifyFunctionSizes(M, /* OnlyRootOnes */ false);
     return false;
   }

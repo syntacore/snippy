@@ -63,6 +63,7 @@
 
 #pragma once
 
+#include "snippy/Config/Config.h"
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/RegisterHistogram.h"
@@ -186,12 +187,42 @@ private:
 class InstructionGenerationContext final {
 private:
   std::unique_ptr<SimulatorContext> NullSimCtx;
+  std::variant<std::monostate, const CommonPolicyConfig *,
+               const DefaultPolicyConfig *, const BurstPolicyConfig *>
+      Cfg;
 
 public:
+  template <typename T> void switchConfig(const T &NewCfg) { Cfg = &NewCfg; }
+
+  void switchConfig() { Cfg = std::monostate{}; }
+
+  template <typename T> bool hasCfg() const {
+    return std::holds_alternative<const T *>(Cfg);
+  }
+  template <typename T> const auto &getCfg() const {
+    return *std::get<const T *>(Cfg);
+  }
+  const auto &getCommonCfg() const {
+    return *std::visit(
+        [](auto &PolicyCfg) -> const CommonPolicyConfig * {
+          if constexpr (std::is_same_v<std::decay_t<decltype(PolicyCfg)>,
+                                       std::monostate>) {
+            snippy::fatal("No configuration have been passed to IGC");
+            return nullptr;
+          } else if constexpr (std::is_same_v<std::decay_t<decltype(PolicyCfg)>,
+                                              const CommonPolicyConfig *>) {
+            return PolicyCfg;
+          } else {
+            return &PolicyCfg->Common;
+          }
+        },
+        Cfg);
+  }
+
   MachineBasicBlock &MBB;
   MachineBasicBlock::iterator Ins;
   SnippyProgramContext &ProgCtx;
-  const GeneratorSettings &GenSettings;
+
   const SimulatorContext &SimCtx;
   GenerationStatistics Stats;
   TopLevelMemoryAccessSampler *MAS = nullptr;
@@ -207,13 +238,11 @@ public:
   InstructionGenerationContext(MachineBasicBlock &MBB,
                                MachineBasicBlock::iterator Ins,
                                SnippyProgramContext &ProgCtx,
-                               const GeneratorSettings &GenSettings,
                                const SimulatorContext &SimCtx);
 
   InstructionGenerationContext(MachineBasicBlock &MBB,
                                MachineBasicBlock::iterator Ins,
-                               SnippyProgramContext &ProgCtx,
-                               const GeneratorSettings &GenSettings);
+                               SnippyProgramContext &ProgCtx);
 
   InstructionGenerationContext(MachineBasicBlock &MBB,
                                MachineBasicBlock::iterator Ins,
@@ -302,10 +331,11 @@ struct EmptyFinalizeMixin {
 
 class DefaultGenPolicy final : public detail::EmptyFinalizeMixin {
   OpcGenHolder OpcGen;
+  const DefaultPolicyConfig *Cfg;
 
 public:
   DefaultGenPolicy(const DefaultGenPolicy &Other)
-      : OpcGen(Other.OpcGen->copy()) {}
+      : OpcGen(Other.OpcGen->copy()), Cfg(Other.Cfg) {}
 
   DefaultGenPolicy(DefaultGenPolicy &&) = default;
 
@@ -318,7 +348,7 @@ public:
   DefaultGenPolicy &operator=(DefaultGenPolicy &&) = default;
 
   DefaultGenPolicy(SnippyProgramContext &ProgCtx,
-                   const GeneratorSettings &GenSettings,
+                   const DefaultPolicyConfig &Cfg,
                    std::function<bool(unsigned)> Filter,
                    bool MustHavePrimaryInstrs,
                    ArrayRef<OpcodeHistogramEntry> Overrides,
@@ -328,7 +358,7 @@ public:
     return InstructionRequest{OpcGen->generate(), {}};
   }
   void initialize(InstructionGenerationContext &InstrGenCtx,
-                  const RequestLimit &Limit) const {}
+                  const RequestLimit &Limit) const;
 
   bool isInseparableBundle() const { return false; }
 
@@ -342,13 +372,14 @@ public:
 // in the planning instructions.
 class ValuegramGenPolicy final : public detail::EmptyFinalizeMixin {
   OpcGenHolder OpcGen;
+  const DefaultPolicyConfig *Cfg;
 
   std::vector<InstructionRequest> Instructions;
   unsigned Idx = 0;
 
 public:
   ValuegramGenPolicy(const ValuegramGenPolicy &Other)
-      : OpcGen(Other.OpcGen->copy()) {}
+      : OpcGen(Other.OpcGen->copy()), Cfg(Other.Cfg) {}
 
   ValuegramGenPolicy(ValuegramGenPolicy &&) = default;
 
@@ -361,7 +392,7 @@ public:
   ValuegramGenPolicy &operator=(ValuegramGenPolicy &&) = default;
 
   ValuegramGenPolicy(
-      SnippyProgramContext &ProgCtx, const GeneratorSettings &GenSettings,
+      SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
       std::function<bool(unsigned)> Filter, bool MustHavePrimaryInstrs,
       ArrayRef<OpcodeHistogramEntry> Overrides,
       const std::unordered_map<unsigned, double> &WeightOverrides);
@@ -396,6 +427,7 @@ class BurstGenPolicy final : public detail::EmptyFinalizeMixin {
   std::vector<unsigned> Opcodes;
   std::discrete_distribution<size_t> Dist;
   std::vector<InstructionRequest> Instructions;
+  const BurstPolicyConfig *Cfg;
   unsigned Idx = 0;
   unsigned genOpc() { return Opcodes.at(Dist(RandEngine::engine())); }
 
@@ -406,8 +438,8 @@ public:
     return std::nullopt;
   }
 
-  BurstGenPolicy(SnippyProgramContext &ProgCtx,
-                 const GeneratorSettings &GenSettings, unsigned BurstGroupID);
+  BurstGenPolicy(SnippyProgramContext &ProgCtx, const BurstPolicyConfig &Cfg,
+                 unsigned BurstGroupID);
 
   void initialize(InstructionGenerationContext &InstrGenCtx,
                   const RequestLimit &Limit);
@@ -425,9 +457,11 @@ public:
 
 class FinalInstPolicy final : public detail::EmptyFinalizeMixin {
   unsigned Opcode;
+  const CommonPolicyConfig *Cfg;
 
 public:
-  FinalInstPolicy(unsigned Opc) : Opcode(Opc) {}
+  FinalInstPolicy(const CommonPolicyConfig &Cfg, unsigned Opc)
+      : Opcode(Opc), Cfg(&Cfg) {}
 
   bool isInseparableBundle() const { return false; }
 
@@ -436,7 +470,9 @@ public:
   }
 
   void initialize(InstructionGenerationContext &InstrGenCtx,
-                  const RequestLimit &Limit) const {}
+                  const RequestLimit &Limit) const {
+    InstrGenCtx.switchConfig(*Cfg);
+  }
 
   void print(raw_ostream &OS) const {
     OS << "Final Instruction Policy (" << Opcode << ")\n";
@@ -572,7 +608,7 @@ inline void print(const GenPolicy &Pol, raw_ostream &OS) {
   Pol.Impl->print(OS);
 }
 GenPolicy createGenPolicy(SnippyProgramContext &ProgCtx,
-                          const GeneratorSettings &GenSettings,
+                          const DefaultPolicyConfig &Cfg,
                           const MachineBasicBlock &MBB,
                           std::unordered_map<unsigned, double> = {});
 

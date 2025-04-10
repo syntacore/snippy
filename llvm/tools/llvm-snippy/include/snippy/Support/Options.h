@@ -344,12 +344,15 @@ template <typename DerivedT> struct EnumOptionMixin {
   }
 };
 
-#define LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(Enum, OptionClass)          \
-  LLVM_SNIPPY_YAML_DECLARE_SCALAR_ENUMERATION_TRAITS(Enum);                    \
+#define LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML_NO_DECL(Enum, OptionClass)  \
   void yaml::ScalarEnumerationTraits<Enum>::enumeration(yaml::IO &IO,          \
                                                         Enum &Val) {           \
     OptionClass::mapYAML(IO, Val);                                             \
   }
+
+#define LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(Enum, OptionClass)          \
+  LLVM_SNIPPY_YAML_DECLARE_SCALAR_ENUMERATION_TRAITS(Enum);                    \
+  LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML_NO_DECL(Enum, OptionClass)
 
 } // namespace snippy
 

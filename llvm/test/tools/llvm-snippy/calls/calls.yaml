@@ -1,5 +1,5 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -function-number=20 -function-layers=5 -num-instrs=100 \
-# RUN: --dump-mf -stack-size=10240 -num-instr-ancil=50 -verify-mi |& FileCheck %s
+# RUN: --dump-mf -num-instr-ancil=50 -verify-mi |& FileCheck %s
 
 sections:
   - no:        1
@@ -11,6 +11,11 @@ sections:
     VMA:       0x100000
     SIZE:      0x100000
     LMA:       0x100000
+    ACCESS:    rw
+  - name:      stack
+    VMA:       0x310000
+    SIZE:      0x100000
+    LMA:       0x310000
     ACCESS:    rw
 
 histogram:

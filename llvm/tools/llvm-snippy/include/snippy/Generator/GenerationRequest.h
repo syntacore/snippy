@@ -327,7 +327,8 @@ public:
     auto Reqs = getSpecificFinalGenReqs(MFStats);
     if (FinalInstrDesc)
       Reqs.emplace_back(RequestLimit::NumInstrs{1},
-                        FinalInstPolicy(FinalInstrDesc->getOpcode()));
+                        FinalInstPolicy(*GC->getConfig().CommonPolicyCfg,
+                                        FinalInstrDesc->getOpcode()));
     return Reqs;
   }
 
@@ -341,7 +342,7 @@ public:
     auto &MBB = MF->back();
     auto &ProgCtx = GC->getProgramContext();
     auto &SnpTgt = ProgCtx.getLLVMState().getSnippyTarget();
-    auto &&GP = DefaultGenPolicy(ProgCtx, GC->getGenSettings(),
+    auto &&GP = DefaultGenPolicy(ProgCtx, GC->getConfig().DefFlowConfig,
                                  SnpTgt.getDefaultPolicyFilter(ProgCtx, MBB),
                                  SnpTgt.groupMustHavePrimaryInstr(ProgCtx, MBB),
                                  SnpTgt.getPolicyOverrides(ProgCtx, MBB), {});

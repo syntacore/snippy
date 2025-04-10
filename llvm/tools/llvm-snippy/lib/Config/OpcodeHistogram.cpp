@@ -8,8 +8,10 @@
 
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/ConfigIOContext.h"
+#include "snippy/Generator/LLVMState.h"
 #include "snippy/Support/Options.h"
 #include "snippy/Support/YAMLHistogram.h"
+
 // FIXME: remove this dependency (an interface should be introduced)
 #include "snippy/Config/PluginWrapper.h"
 
@@ -116,7 +118,7 @@ OpcodeHistogram
 YAMLHistogramTraits<OpcodeHistogramDecodedEntry>::denormalizeMap(
     yaml::IO &IO, ArrayRef<DenormEntry> Entries) {
   auto &ParserCtx = getContext(IO);
-  auto &Ctx = ParserCtx.Ctx;
+  auto &Ctx = ParserCtx.State.getCtx();
   const auto &OpCC = ParserCtx.OpCC;
 
   MapType Histogram;

@@ -919,7 +919,7 @@ breakDownAddrForInstrWithImmOffset(AddressInfo AddrInfo, const MachineInstr &MI,
       {std::move(Part)}, {uintToTargetXLen(Is64Bit, AddrInfo.Address)});
 }
 
-using OpcodeFilter = GeneratorSettings::OpcodeFilter;
+using OpcodeFilter = Config::OpcodeFilter;
 
 static OpcodeFilter getRVVDefaultPolicyFilterImpl(const RVVConfiguration &Cfg,
                                                   unsigned VL, unsigned VLEN,
@@ -1061,7 +1061,7 @@ public:
   }
 
   std::unique_ptr<TargetGenContextInterface>
-  createTargetContext(LLVMState &State, const GeneratorSettings &GenSettings,
+  createTargetContext(LLVMState &State, const Config &Cfg,
                       const TargetSubtargetInfo *STI) const override;
 
   std::unique_ptr<TargetConfigInterface> createTargetConfig() const override;
@@ -1156,7 +1156,7 @@ public:
     return RISCVCtx.hasActiveRVVMode(MBB);
   }
 
-  GeneratorSettings::OpcodeFilter
+  Config::OpcodeFilter
   getDefaultPolicyFilter(const SnippyProgramContext &ProgCtx,
                          const MachineBasicBlock &MBB) const override {
     return getDefaultPolicyFilterImpl(ProgCtx, MBB);
@@ -1917,6 +1917,7 @@ public:
 
   LoopCounterInitResult insertLoopInit(InstructionGenerationContext &IGC,
                                        MachineInstr &Branch,
+                                       const Branchegram &Branches,
                                        ArrayRef<Register> ReservedRegs,
                                        unsigned NIter) const override {
     assert(Branch.isBranch() && "Branch expected");
@@ -1925,7 +1926,6 @@ public:
                "Counter and Limit registers expected to be different");
 
     auto CounterReg = ReservedRegs[CounterRegIdx];
-    const auto &Branches = IGC.GenSettings.Cfg.Branches;
     auto [Diag, RegRandOffset] =
         getRandLoopCounterInitValue(IGC, NIter, Branches, ReservedRegs);
 
@@ -2611,14 +2611,13 @@ public:
     }
   }
 
-  MachineOperand
-  genTargetOpForOpcode(unsigned Opcode, unsigned OperandType,
-                       const StridedImmediate &StridedImm,
-                       SnippyProgramContext &ProgCtx,
-                       const GeneratorSettings &GenSettings) const {
+  MachineOperand genTargetOpForOpcode(unsigned Opcode, unsigned OperandType,
+                                      const StridedImmediate &StridedImm,
+                                      SnippyProgramContext &ProgCtx,
+                                      const CommonPolicyConfig &Cfg) const {
     const auto &TM = ProgCtx.getLLVMState().getTargetMachine();
-    const auto &OpcSetting = GenSettings.Cfg.ImmHistMap.getConfigForOpcode(
-        Opcode, ProgCtx.getOpcodeCache());
+    const auto &OpcSetting =
+        Cfg.ImmHistMap.getConfigForOpcode(Opcode, ProgCtx.getOpcodeCache());
     if (OpcSetting.isUniform())
       return createOperandForOpType(nullptr, OperandType, StridedImm, TM);
     const auto &Seq = OpcSetting.getSequence();
@@ -2627,13 +2626,13 @@ public:
 
   MachineOperand
   generateTargetOperand(SnippyProgramContext &ProgCtx,
-                        const GeneratorSettings &GenSettings, unsigned Opcode,
+                        const CommonPolicyConfig &Cfg, unsigned Opcode,
                         unsigned OperandType,
                         const StridedImmediate &StridedImm) const override {
-    auto *IHV = &GenSettings.Cfg.ImmHistogram;
+    auto *IHV = &Cfg.ImmHistogram;
     if (IHV && IHV->holdsAlternative<ImmediateHistogramRegEx>())
       return genTargetOpForOpcode(Opcode, OperandType, StridedImm, ProgCtx,
-                                  GenSettings);
+                                  Cfg);
     const ImmediateHistogramSequence *IH =
         IHV ? &IHV->get<ImmediateHistogramSequence>() : nullptr;
     if (isSupportedLoadStore(Opcode))
@@ -3834,16 +3833,15 @@ static void dumpRvvConfigurationInfo(StringRef FilePath,
 }
 
 std::unique_ptr<TargetGenContextInterface>
-SnippyRISCVTarget::createTargetContext(LLVMState &State,
-                                       const GeneratorSettings &GenSettings,
+SnippyRISCVTarget::createTargetContext(LLVMState &State, const Config &Cfg,
                                        const TargetSubtargetInfo *STI) const {
-  auto RISCVCfg =
-      RISCVConfigurationInfo::constructConfiguration(State, GenSettings);
+  auto RISCVCfg = RISCVConfigurationInfo::constructConfiguration(State, Cfg);
   auto RGC = std::make_unique<RISCVGeneratorContext>(std::move(RISCVCfg));
   const auto &VUInfo = RGC->getVUConfigInfo();
   bool IsRVVPresent = VUInfo.getModeChangeInfo().RVVPresent;
   if (IsRVVPresent) {
-    bool IsApplyValuegramEachInst = GenSettings.Cfg.RegsHistograms.has_value();
+    // TODO: This should be checked in some other way.
+    bool IsApplyValuegramEachInst = Cfg.DefFlowConfig.Valuegram.has_value();
     if (IsApplyValuegramEachInst)
       snippy::fatal("Not implemented", "vector registers can't be initialized");
   }
