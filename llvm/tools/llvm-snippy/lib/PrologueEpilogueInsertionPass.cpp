@@ -11,6 +11,7 @@
 #include "snippy/CreatePasses.h"
 #include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
+#include "snippy/Generator/Policy.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
@@ -67,9 +68,8 @@ public:
     bool IsRoot = FG.isRootFunction(MF);
 
     std::vector<MCRegister> Ret;
-    auto &ProgCtx = SGCtx.getProgramContext();
     if (IsRoot)
-      llvm::copy(SGCtx.getGenSettings().getRegsSpilledToStack(),
+      llvm::copy(SGCtx.getConfig().ProgramCfg->getRegsSpilledToStack(),
                  std::back_inserter(Ret));
     else {
       auto RegSet = getAllMutatedRegs(MF);
@@ -152,6 +152,7 @@ static MCRegister getRegisterForPreservedSPSpill(SnippyProgramContext &ProgCtx,
 static void setupStackPointer(InstructionGenerationContext &IGC,
                               MCRegister AuxReg) {
   auto &ProgCtx = IGC.ProgCtx;
+  const auto &ProgramCfg = IGC.getCommonCfg().ProgramCfg;
   auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   auto TargetStackPointer = SnippyTgt.getStackPointer();
@@ -175,7 +176,7 @@ static void setupStackPointer(InstructionGenerationContext &IGC,
   auto SPSpillSize = SnippyTgt.getSpillSizeInBytes(AuxReg, IGC);
   auto Addr = ProgCtx.getStackTop() - SPSpillSize;
   assert(Addr % SPSpillSize == 0u && "Stack section must be properly aligned");
-  if (!IGC.GenSettings.isRegSpilledToMem(AuxReg))
+  if (!ProgramCfg.isRegSpilledToMem(AuxReg))
     SnippyTgt.storeRegToAddr(IGC, Addr, AuxReg,
                              /* store the whole register */ 0);
   auto SPInitValue = Addr;
@@ -425,7 +426,7 @@ bool PrologueEpilogueInsertion::runOnMachineFunction(MachineFunction &MF) {
     return false;
 
   auto SpilledToStack = getSpilledRegs(MF);
-  auto SpilledToMem = SGCtx.getGenSettings().getRegsSpilledToMem();
+  auto SpilledToMem = SGCtx.getConfig().ProgramCfg->getRegsSpilledToMem();
   auto PrologueInserted = insertPrologue(MF, SpilledToStack, SpilledToMem);
   auto EpilogueInserted = insertEpilogue(MF, SpilledToStack, SpilledToMem);
 

@@ -1,25 +1,21 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu  \
-# RUN: -num-instrs=97 -memory-access-mode=mixed-burst \
+# RUN: -num-instrs=97  \
 # RUN: --histogram-must-succeed=false --verify-gen-histogram \
-# RUN: --memory-access-burst-group-size=100 \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-TWO-OFF
 
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu  \
-# RUN: -num-instrs=98 -memory-access-mode=mixed-burst \
+# RUN: -num-instrs=98 \
 # RUN: --histogram-must-succeed=false --verify-gen-histogram \
-# RUN: --memory-access-burst-group-size=100 \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-ONE-OFF
 
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu  \
-# RUN: -num-instrs=99 -memory-access-mode=mixed-burst \
+# RUN: -num-instrs=99 \
 # RUN: --histogram-must-succeed=false --verify-gen-histogram \
-# RUN: --memory-access-burst-group-size=100 \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-MATCH
 
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu  \
-# RUN: -num-instrs=100 -memory-access-mode=mixed-burst \
+# RUN: -num-instrs=100 \
 # RUN: --histogram-must-succeed=false --verify-gen-histogram \
-# RUN: --memory-access-burst-group-size=100 \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-ONE-PLUS
 
 sections:
@@ -37,7 +33,10 @@ sections:
 histogram:
     - [ADDI, 1.0]
     - [LD, 1.0]
-
+burst:
+  mode: mixed
+  min-size: 100
+  max-size: 100
 # CHECK-TWO-OFF: Number of primary instructions: 97
 
 # CHECK-ONE-OFF: Number of primary instructions: 98

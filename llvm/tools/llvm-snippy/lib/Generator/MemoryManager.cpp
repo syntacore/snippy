@@ -13,6 +13,7 @@
 #include "snippy/Generator/GlobalsPool.h"
 #include "snippy/Generator/Interpreter.h"
 #include "snippy/Generator/Linker.h"
+#include "snippy/Generator/Policy.h"
 #include "snippy/Support/Utils.h"
 #include "snippy/Target/Target.h"
 

@@ -11,7 +11,9 @@ sections:
       SIZE:      0x700000
       LMA:       0x600000
       ACCESS:    rw
-
+histogram: 
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
 
 options:
   mcpu: generic-rv64

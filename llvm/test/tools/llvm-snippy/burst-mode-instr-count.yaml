@@ -2,8 +2,7 @@
 # COM: burst group
 
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -dump-mf \
-# RUN: -num-instrs=500 -memory-access-mode=mixed-burst \
-# RUN: -memory-access-burst-group-size=100 \
+# RUN: -num-instrs=500 \
 # RUN: --histogram-must-succeed=false --verify-gen-histogram \
 # RUN:    |& FileCheck %s --check-prefix=CHECK-MIXED-HUGEGROUP
 
@@ -21,6 +20,9 @@ sections:
 
 histogram:
     - [LD, 1.0]
-
+burst:
+  mode: mixed
+  min-size: 100
+  max-size: 100
 # CHECK-MIXED-HUGEGROUP-COUNT-500: LD
 # CHECK-MIXED-HUGEGROUP: Number of primary instructions: 500

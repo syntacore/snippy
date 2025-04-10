@@ -616,7 +616,8 @@ struct SectionsDescriptions : private std::vector<SectionDesc> {
   static constexpr const auto ImplicitSectionSize = 0x1000;
 
   static bool isSpecializedSectionName(StringRef Name) {
-    return Name == StackSectionName || Name == SelfcheckSectionName;
+    return Name == StackSectionName || Name == SelfcheckSectionName ||
+           Name == UtilitySectionName;
   }
   bool hasSection(StringRef Name) const {
     return std::any_of(begin(), end(), [Name](auto &S) {

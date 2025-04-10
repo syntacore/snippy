@@ -1,23 +1,20 @@
-# RUN: llvm-snippy %S/Inputs/loadstore-layout.yaml %s -march=riscv64-linux-gnu \
+# RUN: sed -e s/BURST_MODE/mixed/ %s >%t.mixed.yaml
+# RUN: llvm-snippy %S/Inputs/loadstore-layout.yaml %t.mixed.yaml -march=riscv64-linux-gnu \
 # RUN:  -num-instrs=1000 \
-# RUN:  -memory-access-mode=mixed-burst \
-# RUN:  -memory-access-burst-group-size=100 \
 # RUN:  -dump-memory-accesses-restricted=%t-1.yaml
 
 # RUN: FileCheck --input-file=%t-1.yaml %s --check-prefix=STRUCTURE
 
-# RUN: llvm-snippy %S/Inputs/loadstore-layout.yaml %s -march=riscv64-linux-gnu \
+# RUN: sed -e s/BURST_MODE/store/ %s >%t.store.yaml
+# RUN: llvm-snippy %S/Inputs/loadstore-layout.yaml %t.store.yaml -march=riscv64-linux-gnu \
 # RUN:  -num-instrs=1000 \
-# RUN:  -memory-access-mode=store-burst \
-# RUN:  -memory-access-burst-group-size=100 \
 # RUN:  -dump-memory-accesses-restricted=%t-2.yaml
 
 # RUN: FileCheck --input-file=%t-2.yaml %s --check-prefix=STRUCTURE
 
-# RUN: llvm-snippy %S/Inputs/loadstore-layout.yaml %s -march=riscv64-linux-gnu \
+# RUN: sed -e s/BURST_MODE/load/ %s >%t.load.yaml
+# RUN: llvm-snippy %S/Inputs/loadstore-layout.yaml %t.load.yaml -march=riscv64-linux-gnu \
 # RUN:  -num-instrs=1000 \
-# RUN:  -memory-access-mode=load-burst \
-# RUN:  -memory-access-burst-group-size=100 \
 # RUN:  -dump-memory-accesses-restricted=%t-3.yaml
 
 # RUN: FileCheck --input-file=%t-3.yaml %s --check-prefix=STRUCTURE
@@ -38,7 +35,10 @@ access-ranges:
       stride: 4
       first-offset: 0
       last-offset: 0
-
+burst:
+  mode: BURST_MODE
+  min-size: 100
+  max-size: 100
 # STRUCTURE: restricted-addresses:
 # STRUCTURE:   - plain:
 # STRUCTURE-NOT: plain
