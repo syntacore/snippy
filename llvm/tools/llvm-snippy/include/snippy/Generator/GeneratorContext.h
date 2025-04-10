@@ -8,7 +8,8 @@
 
 #pragma once
 
-#include "snippy/Generator/GeneratorSettings.h"
+#include "snippy/Config/Config.h"
+#include "snippy/Generator/SnippyModule.h"
 #include "snippy/Generator/TopMemAccSampler.h"
 
 namespace llvm {
@@ -18,15 +19,12 @@ class GeneratorContext {
 private:
   SnippyProgramContext &ProgContext;
 
-  GeneratorSettings *GenSettings = nullptr;
+  Config *Cfg = nullptr;
 
   TopLevelMemoryAccessSampler MemAccSampler;
 
-  void diagnoseSelfcheckSection(size_t MinSize) const;
-
 public:
-  GeneratorContext(SnippyProgramContext &ProgContext,
-                   GeneratorSettings &GenSettings);
+  GeneratorContext(SnippyProgramContext &ProgContext, Config &Cfg);
   ~GeneratorContext();
 
   const auto &getProgramContext() const { return ProgContext; }
@@ -35,13 +33,8 @@ public:
   auto &getMemoryAccessSampler() { return MemAccSampler; }
 
   auto &getConfig() const {
-    assert(GenSettings);
-    return GenSettings->Cfg;
-  }
-
-  const auto &getGenSettings() const {
-    assert(GenSettings);
-    return *GenSettings;
+    assert(Cfg);
+    return *Cfg;
   }
 };
 

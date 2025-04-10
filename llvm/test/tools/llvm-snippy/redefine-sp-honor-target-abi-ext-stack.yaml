@@ -1,5 +1,5 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m -honor-target-abi \
-# RUN: -redefine-sp=reg::X4 -num-instrs=10 -stack-size=1024 -external-stack \
+# RUN: -redefine-sp=reg::X4 -num-instrs=10 -external-stack \
 # RUN: -init-regs-in-elf -verify-mi -dump-mi --model-plugin=None |& FileCheck %s
 sections:
     - no:        1

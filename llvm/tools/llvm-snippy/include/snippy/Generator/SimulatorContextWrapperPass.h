@@ -26,8 +26,7 @@ public:
   OwningSimulatorContext &operator=(OwningSimulatorContext &&Another) = default;
 
   void initialize(SnippyProgramContext &ProgCtx,
-                  const TargetSubtargetInfo &SubTgt,
-                  const GeneratorSettings &Settings,
+                  const TargetSubtargetInfo &SubTgt, const Config &Cfg,
                   TargetGenContextInterface &TargetCtx,
                   GlobalCodeFlowInfo &GCFI);
 

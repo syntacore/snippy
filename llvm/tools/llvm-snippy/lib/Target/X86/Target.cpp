@@ -46,7 +46,7 @@ public:
   }
 
   std::unique_ptr<TargetGenContextInterface>
-  createTargetContext(LLVMState &State, const GeneratorSettings &GenSettings,
+  createTargetContext(LLVMState &State, const Config &Cfg,
                       const TargetSubtargetInfo *STI) const override {
     reportUnimplementedError();
   }
@@ -222,7 +222,7 @@ public:
 
   virtual MachineOperand
   generateTargetOperand(SnippyProgramContext &ProgCtx,
-                        const GeneratorSettings &GenSettings, unsigned OpCode,
+                        const CommonPolicyConfig &Cfg, unsigned OpCode,
                         unsigned OpType,
                         const StridedImmediate &StridedImm) const override {
     reportUnimplementedError();
@@ -362,6 +362,7 @@ public:
 
   LoopCounterInitResult insertLoopInit(InstructionGenerationContext &IGC,
                                        MachineInstr &Branch,
+                                       const Branchegram &Branches,
                                        ArrayRef<Register> ReservedRegs,
                                        unsigned NIter) const override {
     reportUnimplementedError();

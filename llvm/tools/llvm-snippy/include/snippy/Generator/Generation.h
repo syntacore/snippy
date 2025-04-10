@@ -20,6 +20,7 @@ class BasicBlockRequest;
 class FunctionRequest;
 class InstructionGenerationContext;
 } // namespace planning
+
 class GeneratorContext;
 struct GenerationStatistics;
 struct SelfCheckInfo;
@@ -28,13 +29,16 @@ class CallGraphState;
 class MemAccessInfo;
 class SnippyLoopInfo;
 struct SnippyFunctionMetadata;
+class DefaultPolicyConfig;
 
 void generate(planning::InstructionGroupRequest &IG,
-              planning::InstructionGenerationContext &InstrGenCtx);
+              planning::InstructionGenerationContext &InstrGenCtx,
+              const DefaultPolicyConfig *FBC);
 
 GenerationStatistics
 generate(planning::BasicBlockRequest &BB,
-         planning::InstructionGenerationContext &InstrGenCtx);
+         planning::InstructionGenerationContext &InstrGenCtx,
+         const DefaultPolicyConfig *FBC);
 
 void generate(planning::FunctionRequest &FunctionGenRequest,
               MachineFunction &MF, GeneratorContext &GC,

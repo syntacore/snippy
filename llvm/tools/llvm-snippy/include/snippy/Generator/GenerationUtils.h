@@ -12,6 +12,7 @@
 #include "snippy/Generator/GenerationLimit.h"
 #include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Generator/LoopLatcherPass.h"
+#include "snippy/Generator/MemAccessInfo.h"
 
 namespace llvm {
 namespace snippy {

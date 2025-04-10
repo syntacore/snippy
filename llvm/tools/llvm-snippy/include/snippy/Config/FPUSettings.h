@@ -72,8 +72,8 @@ struct FloatOverwriteSettings final {
 };
 
 struct FPUSettings final {
-  std::optional<FloatOverwriteSettings> Overwrite;
-  bool needsModel() const { return Overwrite && Overwrite->needsModel(); }
+  FloatOverwriteSettings Overwrite;
+  bool needsModel() const { return Overwrite.needsModel(); }
 };
 
 LLVM_SNIPPY_YAML_STRONG_TYPEDEF(RoundingMode, FPURoundingMode);

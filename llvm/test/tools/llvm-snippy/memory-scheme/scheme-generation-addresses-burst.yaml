@@ -1,8 +1,6 @@
 # RUN: llvm-snippy %S/Inputs/loadstore-layout-4b.yaml %s -march=riscv64-linux-gnu \
 # RUN:  -num-instrs=1000 \
 # RUN:  --riscv-disable-misaligned-access \
-# RUN:  -memory-access-mode=mixed-burst \
-# RUN:  -memory-access-burst-group-size=5 \
 # RUN:  -dump-memory-accesses=%t.accesses >& %t.dump
 # RUN: FileCheck --input-file=%t.accesses %s --check-prefix=SCHEME
 
@@ -15,6 +13,10 @@ access-ranges:
       stride: 4
       first-offset: 0
       last-offset: 3
+burst:
+  mode: mixed
+  min-size: 5
+  max-size: 5
 
 # We expect some dedicated schemes to be generated. Find at least one entry of
 # each such a scheme.
