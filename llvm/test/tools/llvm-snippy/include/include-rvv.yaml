@@ -42,6 +42,6 @@ histogram:
 # CHECK-NEXT:    - VM Selection Rules:
 # CHECK-NEXT:      P: 0.66667 <all_ones>
 # CHECK-NEXT:      P: 0.33333 <any_legal>
-# CHECK:         - Configuration Bag Size: 704
-# CHECK-NEXT:    - State Cardinality: 15104 ~ {MASKS}
+# CHECK:         - Configuration Bag Size: 352
+# CHECK-NEXT:    - State Cardinality: 7552 ~ {MASKS}
 # CHECK-NEXT:  --- RVV Configuration End  ---
