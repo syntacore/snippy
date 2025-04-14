@@ -8,18 +8,42 @@ on:
       - main
 jobs:
   main:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         shell: bash
     steps:
-    - name: Install required compiler to be sure
-      run: sudo apt-get install clang-14 ninja-build ccache lld
-    - name: Checkout repository
-      uses: actions/checkout@v3
-    - name: CMake release config
-      run: cmake -S llvm -B release/build -G Ninja -DCMAKE_C_COMPILER=clang-14 -DCMAKE_CXX_COMPILER=clang++-14 -C .syntacore/release.cmake
-    - name: CMake release build
-      run: cmake --build release/build --target llvm-snippy
-    - name: CMake release test
-      run: env CTEST_OUTPUT_ON_FAILURE=1 cmake --build release/build --target check-llvm-tools-llvm-snippy
+      - name: Install required compiler to be sure
+        run: sudo apt-get update && sudo apt-get install -y clang-14 ninja-build ccache lld cmake
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+            .syntacore
+            cmake
+            libunwind
+            lld
+            llvm
+            third-party
+      - name: Prepare ccache
+        id: prepare_ccache
+        run: |
+          echo "timestamp=$(TZ=UTC date "+%Y-%m-%d-T%H:%M:%S")" >> $GITHUB_OUTPUT
+          echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> $GITHUB_ENV
+      - name: Set up ccache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-${{ github.job }}-${{ steps.prepare_ccache.outputs.timestamp }}
+          restore-keys: ccache-${{ github.job }}-
+      - name: CMake release config
+        run: cmake -S llvm -B release/build -G Ninja -DCMAKE_C_COMPILER=clang-14 -DCMAKE_CXX_COMPILER=clang++-14 -C .syntacore/release.cmake
+      - name: CMake release build
+        run: cmake --build release/build --target llvm-snippy
+      - name: CMake release test
+        run: env CTEST_OUTPUT_ON_FAILURE=1 cmake --build release/build --target check-llvm-tools-llvm-snippy
+      - name: Show ccache statistics
+        run: |
+          ccache -s
+          ccache -z
