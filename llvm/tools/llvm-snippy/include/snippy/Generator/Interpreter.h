@@ -36,7 +36,6 @@ struct SectionData;
 class MemoryAccessSampler;
 class SnippyProgramContext;
 class Config;
-struct MemoryConfig;
 
 using SectionDescVect = std::vector<SectionDesc>;
 struct SimulationEnvironment {
