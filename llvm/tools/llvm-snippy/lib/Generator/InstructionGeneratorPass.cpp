@@ -32,12 +32,6 @@ static snippy::opt<bool> SelfCheckGV(
     cl::desc("add selfcheck section properties such as VMA, size and stride as "
              "a global constants with an external linkage"),
     cl::Hidden, cl::init(false));
-static snippy::opt<bool> ExportGV(
-    "export-gv",
-    cl::desc(
-        "add sections properties such as VMA, size and stride as "
-        "a global constants with an external linkage. Requires a model plugin"),
-    cl::cat(Options), cl::init(false));
 
 char InstructionGenerator::ID = 0;
 StringRef InstructionGenerator::getPassName() const {
@@ -144,33 +138,6 @@ void InstructionGenerator::addGV(
     SimCtx.getInterpreter().writeMem(GP.getGVAddress(GV), Value);
 }
 
-void InstructionGenerator::addModelMemoryPropertiesAsGV(Module &M) const {
-  auto &GCFI = getAnalysis<FunctionGenerator>().get<GlobalCodeFlowInfo>();
-  auto MemCfg = MemoryConfig::getMemoryConfig(
-      SGCtx->getProgramContext().getLinker(), GCFI);
-  // Below we add all the model memory properties as global constants
-  constexpr auto ConstantSizeInBits = 64u; // Constants size in bits
-  constexpr auto Alignment = 1u;           // Without special alignment
-
-  auto DataSectionVMA = APInt{ConstantSizeInBits, MemCfg.Ram.Start};
-  addGV(M, DataSectionVMA, Alignment, GlobalValue::ExternalLinkage,
-        "data_section_address");
-
-  auto DataSectionSize = APInt{ConstantSizeInBits, MemCfg.Ram.Size};
-  addGV(M, DataSectionSize, Alignment, GlobalValue::ExternalLinkage,
-        "data_section_size");
-
-  auto ExecSectionVMA =
-      APInt{ConstantSizeInBits, MemCfg.ProgSections.front().Start};
-  addGV(M, ExecSectionVMA, Alignment, GlobalValue::ExternalLinkage,
-        "exec_section_address");
-
-  auto ExecSectionSize =
-      APInt{ConstantSizeInBits, MemCfg.ProgSections.front().Size};
-  addGV(M, ExecSectionSize, Alignment, GlobalValue::ExternalLinkage,
-        "exec_section_size");
-}
-
 void InstructionGenerator::addSelfcheckSectionPropertiesAsGV(Module &M) const {
   const auto &SelfcheckSection =
       SGCtx->getProgramContext().getSelfcheckSection();
@@ -237,8 +204,6 @@ bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
     prepareInterpreterEnv(MF);
 
   auto &M = *MF.getFunction().getParent();
-  if (ExportGV)
-    addModelMemoryPropertiesAsGV(M);
 
   auto *SCI = SimCtx.SCI;
   if (SCI) {
@@ -247,11 +212,8 @@ bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
     const auto &SCSection = SGCtx->getProgramContext().getSelfcheckSection();
     SCI->CurrentAddress = SCSection.VMA;
     // FIXME: make SelfCheckGV a deprecated option
-    if (SelfCheckGV || ExportGV) {
-      if (!ExportGV)
-        addModelMemoryPropertiesAsGV(M);
+    if (SelfCheckGV)
       addSelfcheckSectionPropertiesAsGV(M);
-    }
   }
 
   auto FunctionGenRequest = createMFGenerationRequest(MF);
