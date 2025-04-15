@@ -51,33 +51,47 @@ struct SelectedTargetInfo final {
 
 // An object to initialize LLVM and prepare objects needed to run the
 // measurements.
-class LLVMState {
-public:
-  // uses specified triple
-  LLVMState(const SelectedTargetInfo &TargetInfo);
+class LLVMState final {
+private:
+  LLVMState(const SnippyTarget *SnippyTarget,
+            std::unique_ptr<LLVMTargetMachine> TargetMachine,
+            std::unique_ptr<MCContext> Context,
+            std::unique_ptr<MCCodeEmitter> CodeEmitter,
+            std::unique_ptr<MCDisassembler> Disassembler);
 
+public:
+  /// \brief Failable constructor from the triple, cpu + features.
+  /// An invalid cpu string results in an Error.
+  static Expected<LLVMState> create(const SelectedTargetInfo &TargetInfo);
+  LLVMState(LLVMState &&) = default;
+  LLVMState &operator=(LLVMState &&Rhs) = default;
+  LLVMState(const LLVMState &) = delete;
+  LLVMState &operator=(const LLVMState &) = delete;
   ~LLVMState();
 
   LLVMTargetMachine &getTargetMachine() const {
     assert(TheTargetMachine);
     return *TheTargetMachine;
   }
-  std::unique_ptr<LLVMTargetMachine> createLLVMTargetMachine() const;
 
   const SnippyTarget &getSnippyTarget() const {
     assert(TheSnippyTarget);
     return *TheSnippyTarget;
   }
 
-  bool canAssemble(const MCInst &mc_inst) const;
-
   // For convenience:
   const MCInstrInfo &getInstrInfo() const {
-    return *TheTargetMachine->getMCInstrInfo();
+    auto *InstrInfo = getTargetMachine().getMCInstrInfo();
+    assert(InstrInfo);
+    return *InstrInfo;
   }
+
   const MCRegisterInfo &getRegInfo() const {
-    return *TheTargetMachine->getMCRegisterInfo();
+    auto *RegInfo = getTargetMachine().getMCRegisterInfo();
+    assert(RegInfo);
+    return *RegInfo;
   }
+
   const MCSubtargetInfo &getSubtargetInfo() const {
     const auto *Ret = TheTargetMachine->getMCSubtargetInfo();
     assert(Ret);
@@ -101,7 +115,7 @@ public:
   Function &createFunction(Module &M, StringRef FunctionName,
                            StringRef SectionName,
                            Function::LinkageTypes Linkage) {
-    return createFunction(M, FunctionName, SectionName, Linkage, Ctx);
+    return createFunction(M, FunctionName, SectionName, Linkage, getCtx());
   }
 
   MachineFunction &createMachineFunctionFor(Function &F, MachineModuleInfo &MMI,
@@ -122,7 +136,7 @@ public:
 
   MachineFunction &createMachineFunctionFor(Function &F, MachineModuleInfo &MMI,
                                             bool SetSection = false) {
-    return createMachineFunctionFor(F, MMI, Ctx, SetSection);
+    return createMachineFunctionFor(F, MMI, getCtx(), SetSection);
   }
 
   MachineFunction &createMachineFunction(Module &M, MachineModuleInfo &MMI,
@@ -141,8 +155,8 @@ public:
       Module &M, APInt const &Init,
       GlobalValue::LinkageTypes Linkage = GlobalValue::InternalLinkage,
       StringRef Name = "global", bool IsConstant = true) {
-    auto *VarType = Type::getIntNTy(Ctx, Init.getBitWidth());
-    Constant *VarInit = ConstantInt::get(Ctx, Init);
+    auto *VarType = Type::getIntNTy(getCtx(), Init.getBitWidth());
+    Constant *VarInit = ConstantInt::get(getCtx(), Init);
     auto *GV =
         new GlobalVariable(M, VarType, IsConstant, Linkage, VarInit, Name);
     return GV;
@@ -152,7 +166,7 @@ public:
       Module &M, unsigned BitWidth,
       GlobalValue::LinkageTypes Linkage = GlobalValue::ExternalLinkage,
       StringRef Name = "global_decl", bool IsConstant = true) {
-    auto *VarType = Type::getIntNTy(Ctx, BitWidth);
+    auto *VarType = Type::getIntNTy(getCtx(), BitWidth);
     auto *GV =
         new GlobalVariable(M, VarType, IsConstant, Linkage, nullptr, Name);
     return GV;
@@ -164,7 +178,10 @@ public:
   AsmPrinter &getOrCreateAsmPrinter() const;
   MCCodeEmitter &getCodeEmitter() const;
   MCDisassembler &getDisassembler() const;
-  LLVMContext &getCtx() { return Ctx; }
+  LLVMContext &getCtx() {
+    assert(Ctx);
+    return *Ctx;
+  }
 
   const TargetSubtargetInfo &getSubtargetImpl(const Function &Fn) const {
     return *getTargetMachine().getSubtargetImpl(Fn);
@@ -179,6 +196,11 @@ public:
   const SubtargetType &getSubtarget(const MachineFunction &Fn) const {
     return static_cast<const SubtargetType &>(
         getSubtargetImpl(Fn.getFunction()));
+  }
+
+  auto &getMCContext() {
+    assert(TheContext);
+    return *TheContext;
   }
 
   template <typename It> size_t getCodeBlockSize(It Begin, It End) {
@@ -214,13 +236,13 @@ public:
   }
 
 private:
+  std::unique_ptr<LLVMContext> Ctx;
   const SnippyTarget *TheSnippyTarget;
   std::unique_ptr<LLVMTargetMachine> TheTargetMachine;
   std::unique_ptr<MCContext> TheContext;
   mutable std::unique_ptr<AsmPrinter> TheAsmPrinter;
   std::unique_ptr<MCCodeEmitter> TheCodeEmitter;
   std::unique_ptr<MCDisassembler> TheDisassembler;
-  LLVMContext Ctx;
 };
 
 } // namespace snippy
