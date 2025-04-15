@@ -38,7 +38,12 @@ jobs:
           key: ccache-${{ github.job }}-${{ steps.prepare_ccache.outputs.timestamp }}
           restore-keys: ccache-${{ github.job }}-
       - name: CMake release config
-        run: cmake -S llvm -B release/build -G Ninja -DCMAKE_C_COMPILER=clang-14 -DCMAKE_CXX_COMPILER=clang++-14 -C .syntacore/release.cmake
+        run: >-
+          cmake -S llvm -B release/build -G Ninja
+          -DCMAKE_C_COMPILER=clang-14 -DCMAKE_CXX_COMPILER=clang++-14
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DLLVM_EXTERNAL_PROJECT_PASSTHROUGH="CMAKE_C_COMPILER_LAUNCHER;CMAKE_CXX_COMPILER_LAUNCHER"
+          -C .syntacore/release.cmake
       - name: CMake release build
         run: cmake --build release/build --target llvm-snippy
       - name: CMake release test
