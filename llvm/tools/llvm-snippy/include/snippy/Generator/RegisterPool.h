@@ -509,7 +509,7 @@ public:
 
   template <typename... ArgsTys>
   void addReserved(unsigned Reg, ArgsTys &&...Args) {
-    assert(!SnippyTgt.isMultipleReg(Reg, RegInfo) &&
+    assert(Register::isPhysicalRegister(Reg) &&
            "Only physical registers can be reserved. If you want to reserve a "
            "multiple register, then you must first divide it into physical "
            "registers and then reserve each of them.");
