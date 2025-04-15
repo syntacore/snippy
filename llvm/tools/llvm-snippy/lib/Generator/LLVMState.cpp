@@ -10,12 +10,10 @@
 
 #include "snippy/Target/Target.h"
 
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/MC/MCCodeEmitter.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCDisassembler/MCDisassembler.h"
-#include "llvm/MC/MCFixup.h"
 #include "llvm/MC/MCObjectFileInfo.h"
 #include "llvm/MC/MCObjectStreamer.h"
 #include "llvm/MC/MCStreamer.h"
@@ -28,12 +26,24 @@
 namespace llvm {
 namespace snippy {
 
-LLVMState::LLVMState(const SelectedTargetInfo &TargetInfo) {
+LLVMState::LLVMState(const SnippyTarget *SnippyTarget,
+                     std::unique_ptr<LLVMTargetMachine> TargetMachine,
+                     std::unique_ptr<MCContext> Context,
+                     std::unique_ptr<MCCodeEmitter> CodeEmitter,
+                     std::unique_ptr<MCDisassembler> Disassembler)
+    : Ctx(std::make_unique<LLVMContext>()), TheSnippyTarget(SnippyTarget),
+      TheTargetMachine(std::move(TargetMachine)),
+      TheContext(std::move(Context)), TheCodeEmitter(std::move(CodeEmitter)),
+      TheDisassembler(std::move(Disassembler)) {}
+
+Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
   std::string Error;
-  const Target *const TheTarget =
+  const Target *const Tgt =
       TargetRegistry::lookupTarget(TargetInfo.Triple, Error);
-  if (!TheTarget)
-    snippy::fatal(Twine(Error));
+
+  if (!Tgt)
+    return makeFailure(Errc::InvalidConfiguration, Twine(Error));
+
   const TargetOptions Options;
   auto TargetFeatures = TargetInfo.Features;
   // Relax feature is enabled by default to enable desired
@@ -41,38 +51,43 @@ LLVMState::LLVMState(const SelectedTargetInfo &TargetInfo) {
   // cannot do by itself on some targets.
   // E.G.: RISCV AsmPrinter cannot emit JAL directly.
   TargetFeatures += ",+relax";
-  TheTargetMachine.reset(static_cast<LLVMTargetMachine *>(
-      TheTarget->createTargetMachine(TargetInfo.Triple, TargetInfo.CPU,
-                                     TargetFeatures, Options,
-                                     Reloc::Model::Static)));
-  assert(TheTargetMachine && "unable to create target machine");
-  auto TT = TheTargetMachine->getTargetTriple();
-  TheSnippyTarget = SnippyTarget::lookup(TT);
-  if (!TheSnippyTarget) {
-    errs() << "error: no snippy target for " << TargetInfo.Triple << "\n";
-    snippy::fatal("sorry, target is not implemented");
-  }
-  const Target &T = TheTargetMachine->getTarget();
-  const auto *STI = TheTargetMachine->getMCSubtargetInfo();
-  TheContext =
-      std::make_unique<MCContext>(TT, TheTargetMachine->getMCAsmInfo(),
-                                  TheTargetMachine->getMCRegisterInfo(), STI);
-  TheCodeEmitter = std::unique_ptr<MCCodeEmitter>(
-      T.createMCCodeEmitter(*TheTargetMachine->getMCInstrInfo(), *TheContext));
-  TheDisassembler = std::unique_ptr<MCDisassembler>(
-      T.createMCDisassembler(*STI, *TheContext));
+  auto TM = std::unique_ptr<LLVMTargetMachine>(static_cast<LLVMTargetMachine *>(
+      Tgt->createTargetMachine(TargetInfo.Triple, TargetInfo.CPU,
+                               TargetFeatures, Options, Reloc::Model::Static)));
+
+  if (!TM)
+    return makeFailure(Errc::Failure, "Unable to create target machine");
+
+  auto TT = TM->getTargetTriple();
+  const auto *SnippyTgt = SnippyTarget::lookup(TT);
+  if (!SnippyTgt)
+    return makeFailure(
+        Errc::InvalidConfiguration,
+        llvm::formatv("No snippy target for {0}", TargetInfo.Triple));
+
+  const Target &T = TM->getTarget();
+  const auto *STI = TM->getMCSubtargetInfo();
+
+  if (auto &CPU = TargetInfo.CPU; !CPU.empty() && !STI->isCPUStringValid(CPU))
+    return makeFailure(
+        Errc::InvalidConfiguration,
+        llvm::formatv("cpu '{0}' is not valid for the specified subtarget",
+                      TargetInfo.CPU));
+
+  auto MCCtx = std::make_unique<MCContext>(TT, TM->getMCAsmInfo(),
+                                           TM->getMCRegisterInfo(), STI);
+  auto *MCII = TM->getMCInstrInfo();
+  assert(MCII);
+  auto CodeEmitter =
+      std::unique_ptr<MCCodeEmitter>(T.createMCCodeEmitter(*MCII, *MCCtx));
+  auto Disassembler =
+      std::unique_ptr<MCDisassembler>(T.createMCDisassembler(*STI, *MCCtx));
+
+  return LLVMState(SnippyTgt, std::move(TM), std::move(MCCtx),
+                   std::move(CodeEmitter), std::move(Disassembler));
 }
 
 LLVMState::~LLVMState() {}
-
-std::unique_ptr<LLVMTargetMachine> LLVMState::createLLVMTargetMachine() const {
-  return std::unique_ptr<LLVMTargetMachine>(static_cast<LLVMTargetMachine *>(
-      TheTargetMachine->getTarget().createTargetMachine(
-          TheTargetMachine->getTargetTriple().normalize(),
-          TheTargetMachine->getTargetCPU(),
-          TheTargetMachine->getTargetFeatureString(), TheTargetMachine->Options,
-          Reloc::Model::Static)));
-}
 
 AsmPrinter &LLVMState::getOrCreateAsmPrinter() const {
   if (TheAsmPrinter)
@@ -96,25 +111,15 @@ MCDisassembler &LLVMState::getDisassembler() const {
   return *TheDisassembler;
 }
 
-bool LLVMState::canAssemble(const MCInst &Inst) const {
-  std::unique_ptr<const MCCodeEmitter> CodeEmitter(
-      TheTargetMachine->getTarget().createMCCodeEmitter(
-          *TheTargetMachine->getMCInstrInfo(), *TheContext));
-  assert(CodeEmitter && "unable to create code emitter");
-  SmallVector<char, 16> Tmp;
-  SmallVector<MCFixup, 4> Fixups;
-  CodeEmitter->encodeInstruction(Inst, Tmp, Fixups,
-                                 *TheTargetMachine->getMCSubtargetInfo());
-  return Tmp.size() > 0;
-}
-
 std::unique_ptr<MCStreamer> LLVMState::createObjStreamer(raw_pwrite_stream &OS,
                                                          MCContext &MCCtx) {
   assert(TheTargetMachine);
   auto MCStreamerOrErr = TheTargetMachine->createMCStreamer(
       OS, nullptr, CodeGenFileType::ObjectFile, MCCtx);
   if (!MCStreamerOrErr)
-    snippy::fatal(Ctx, "Internal Error creating MCStreamer",
+    // FIXME: Make failable and return Expected<std::unique_ptr<MCStreamer>>
+    // instead.
+    snippy::fatal(getCtx(), "Internal Error creating MCStreamer",
                   toString(MCStreamerOrErr.takeError()));
 
   // We explicitly specified ObjectFile type 3 lines above so we can down-cast
