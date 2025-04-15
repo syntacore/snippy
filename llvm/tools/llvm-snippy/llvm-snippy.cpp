@@ -350,7 +350,10 @@ static DebugOptions getDebugOptions() {
 void generateMain() {
   initializeLLVMAll();
   readSnippyOptionsIfNeeded();
-  auto State = LLVMState(getSelectedTargetInfo());
+  auto ExpectedState = LLVMState::create(getSelectedTargetInfo());
+  if (!ExpectedState)
+    snippy::fatal(ExpectedState.takeError());
+  auto &State = ExpectedState.get();
   checkOptions(State.getCtx());
   OpcodeCache OpCC(State.getSnippyTarget(), State.getInstrInfo(),
                    State.getSubtargetInfo());
