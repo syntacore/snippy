@@ -36,8 +36,6 @@ class InstructionGenerator final
 
   void addSelfcheckSectionPropertiesAsGV(Module &M) const;
 
-  void addModelMemoryPropertiesAsGV(Module &M) const;
-
   GeneratorContext *SGCtx;
 
 public:

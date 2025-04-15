@@ -29,24 +29,7 @@ class Interpreter;
 class LLVMState;
 class SnippyProgramContext;
 
-struct MemorySectionConfig {
-  MemAddr Start = 0;
-  MemAddr Size = 0;
-  std::string Name;
-  MemorySectionConfig() = default;
-  MemorySectionConfig(MemAddr Start, MemAddr Size, StringRef Name)
-      : Start{Start}, Size{Size}, Name{Name} {};
-};
-
 struct GlobalCodeFlowInfo;
-
-struct MemoryConfig {
-  std::vector<MemorySectionConfig> ProgSections;
-  MemorySectionConfig Rom;
-  MemorySectionConfig Ram;
-
-  static MemoryConfig getMemoryConfig(Linker &L, GlobalCodeFlowInfo &GCFI);
-};
 
 } // namespace snippy
 } // namespace llvm
