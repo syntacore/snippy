@@ -3,7 +3,6 @@ set(LLVM_LINK_COMPONENTS
   )
 
 set(snippy_sources
-  Sanity.cpp
   Support.cpp
   ImmediateHistogram.cpp
   )
