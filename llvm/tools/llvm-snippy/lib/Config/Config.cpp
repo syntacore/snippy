@@ -11,7 +11,9 @@
 #include "snippy/Config/BurstGram.h"
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
+// FIXME: remove dependency on Generator library
 #include "snippy/Generator/LLVMState.h"
+#include "snippy/Generator/MemoryManager.h"
 #include "snippy/Generator/RegisterPool.h"
 #include "snippy/Generator/SelfcheckMode.h"
 #include "snippy/Support/Options.h"

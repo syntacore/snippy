@@ -6,7 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 #include "snippy/Target/Target.h"
-#include "snippy/Generator/GeneratorContext.h"
 
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Error.h"
