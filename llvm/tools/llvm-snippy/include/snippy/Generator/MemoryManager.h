@@ -9,6 +9,7 @@
 
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
+#include "snippy/Target/Target.h"
 
 #include <algorithm>
 #include <optional>
