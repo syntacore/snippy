@@ -15,6 +15,7 @@
 
 #include "snippy/Config/Config.h"
 #include "snippy/Generator/LLVMState.h"
+#include "snippy/Generator/MemoryManager.h"
 #include "snippy/Generator/RegisterPool.h"
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/OpcodeCache.h"

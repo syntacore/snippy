@@ -9,6 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "snippy/Generator/Policy.h"
 #include "snippy/Target/Target.h"
 
 #include "RVVUnitConfig.h"
