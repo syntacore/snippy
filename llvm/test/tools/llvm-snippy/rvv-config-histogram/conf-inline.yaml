@@ -1,6 +1,6 @@
 # COM: this is the test for checking possibility to put rvv-config in the body of main config
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v -model-plugin=None \
-# RUN:  --num-instrs=10 --snippy-riscv-dump-rvv-config -o %t \
+# RUN:  --num-instrs=10 -riscv-dump-rvv-config -o %t \
 # RUN:  |& FileCheck %s
 
 sections:
@@ -60,7 +60,7 @@ riscv-vector-unit:
       VTA:
         tu: 1.0
         ta: 1.0
-          
+
 # CHECK:       --- RVV Configuration Info ---
 # CHECK-NEXT:    - Derived VLEN: 128 (VLENB = 16)
 # CHECK-NEXT:    - Mode Change Decision Policy: Histogram

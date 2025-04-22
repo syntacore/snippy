@@ -1,22 +1,22 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
 # RUN:  -model-plugin=None --num-instrs=10 -o %t \
-# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  -riscv-dump-rvv-config \
 # RUN:  |& FileCheck %s
 
 # COM: this just ensures that we still have proper execution
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
 # RUN:  -model-plugin=None --num-instrs=10 -o %t \
-# RUN:  --snippy-riscv-dump-rvv-config
+# RUN:  -riscv-dump-rvv-config
 
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
 # RUN:  -model-plugin=None --num-instrs=10 -o %t \
-# RUN:  --snippy-riscv-dump-rvv-config=%t.rvv.config.info
+# RUN:  -riscv-dump-rvv-config=%t.rvv.config.info
 # RUN: FileCheck --input-file=%t.rvv.config.info %s
 
 # COM: this just ensures that we still have proper execution
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
 # RUN:  -model-plugin=None --num-instrs=10 -o %t \
-# RUN:  --snippy-riscv-dump-rvv-config=%t.rvv.config.info
+# RUN:  -riscv-dump-rvv-config=%t.rvv.config.info
 
 sections:
   - no:        1

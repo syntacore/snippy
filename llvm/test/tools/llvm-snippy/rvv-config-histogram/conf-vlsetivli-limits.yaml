@@ -4,7 +4,7 @@
 # COM: Currently, snippy does not implement such checks
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
 # RUN:  -model-plugin=None --num-instrs=10 -o %t \
-# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  -riscv-dump-rvv-config \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-SEW8
 
 include:

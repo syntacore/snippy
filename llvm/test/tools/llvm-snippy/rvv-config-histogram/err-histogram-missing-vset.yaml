@@ -3,13 +3,13 @@
 # RUN: not llvm-snippy %s %S/Inputs/rvv-unit-all.yaml -march=riscv64-linux-gnu -mattr=+v \
 # RUN:  --model-plugin None \
 # RUN:  --num-instrs=10 -o %t \
-# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  -riscv-dump-rvv-config \
 # RUN:  |& FileCheck %s
 
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
 # RUN:  --model-plugin None \
 # RUN:  --num-instrs=10 -o %t \
-# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  -riscv-dump-rvv-config \
 # RUN:  |& FileCheck %s
 
 sections:
