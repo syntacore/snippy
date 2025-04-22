@@ -1,6 +1,6 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
 # RUN:  -model-plugin=None --num-instrs=10000 -o %t \
-# RUN:  --riscv-use-splats-for-rvv-init=true \
+# RUN:  -rvv-init-mode=splats \
 # RUN:  -verify-gen-histogram  -histogram-must-succeed=true \
 # RUN:  -dump-mf \
 # RUN:  |& FileCheck %s
