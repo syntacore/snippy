@@ -52,7 +52,8 @@ static void checkError(const std::error_code &ECode, StringRef What = "") {
 }
 
 static std::string link(StringRef LLD, StringRef LinkerScript, bool Relocatable,
-                        std::vector<FilePathT> ObjectFilesPaths) {
+                        std::vector<FilePathT> ObjectFilesPaths,
+                        bool DisableRelaxations) {
   int FD;
   FilePathT OutPath;
 
@@ -67,6 +68,8 @@ static std::string link(StringRef LLD, StringRef LinkerScript, bool Relocatable,
 
   LLDCommands.insert(LLDCommands.end(),
                      {"-o", OutPath, "--script", LinkerScript});
+  if (DisableRelaxations)
+    LLDCommands.push_back("--no-relax");
 
   auto RetCode = sys::ExecuteAndWait(LLD, LLDCommands);
   if (RetCode)
@@ -322,8 +325,8 @@ std::string Linker::generateLinkerScript() const {
   return createLinkerScript(/*Export*/ true);
 }
 
-std::string Linker::run(ObjectFilesList ObjectFilesToLink,
-                        bool Relocatable) const {
+std::string Linker::run(ObjectFilesList ObjectFilesToLink, bool Relocatable,
+                        bool DisableRelaxations) const {
   assert(ObjectFilesToLink.size() > 0 && "Linker needs at least one image");
   auto ObjectFilesPaths = std::vector<FilePathT>{};
   for (auto &Objectfile : ObjectFilesToLink)
@@ -332,8 +335,8 @@ std::string Linker::run(ObjectFilesList ObjectFilesToLink,
   auto LinkerScriptPath = writeDataToDisk(InternalLinkerScript);
 
   auto LLDExe = findLLD();
-  auto FinalImage =
-      link(LLDExe, LinkerScriptPath, Relocatable, ObjectFilesPaths);
+  auto FinalImage = link(LLDExe, LinkerScriptPath, Relocatable,
+                         ObjectFilesPaths, DisableRelaxations);
 
   sys::fs::remove(LinkerScriptPath);
   std::for_each(ObjectFilesPaths.begin(), ObjectFilesPaths.end(),

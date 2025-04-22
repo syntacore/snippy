@@ -174,8 +174,10 @@ public:
   // Wrapper helper for method above.
   GlobalsPool &getOrAddGlobalsPoolFor(SnippyModule &M, StringRef OnError);
 
-  GeneratorResult generateELF(ArrayRef<const SnippyModule *> Modules) const;
-  std::string generateLinkedImage(ArrayRef<const SnippyModule *> Modules) const;
+  GeneratorResult generateELF(ArrayRef<const SnippyModule *> Modules,
+                              bool DisableRelaxations = false) const;
+  std::string generateLinkedImage(ArrayRef<const SnippyModule *> Modules,
+                                  bool DisableRelaxations = false) const;
 
   Linker &getLinker() const { return *PLinker; }
   RegisterGenerator &getRegGen() const { return *RegGen; }
