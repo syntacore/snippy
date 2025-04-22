@@ -205,13 +205,6 @@ MachineFunction &FunctionGenerator::createFunction(
   auto &MF = State.createMachineFunctionFor(
       State.createFunction(M, FinalName, SectionName, Linkage),
       SnippyModule::fromModule(M).getMMI());
-  auto &Props = MF.getProperties();
-  auto &SnippyTgt = State.getSnippyTarget();
-  auto &Cfg = SGCtx.getConfig();
-  auto &OpCC = ProgCtx.getOpcodeCache();
-  // FIXME: currently we don't keep liveness when creating and filling new BB
-  if (Cfg.hasCFInstrs(OpCC) || Cfg.hasCallInstrs(OpCC, SnippyTgt))
-    Props.reset(MachineFunctionProperties::Property::TracksLiveness);
   auto *MBB = createMachineBasicBlock(MF);
   assert(MBB);
   MF.push_back(MBB);

@@ -275,11 +275,6 @@ public:
   virtual void generateRegsInit(InstructionGenerationContext &IGC,
                                 const IRegisterState &R) const = 0;
 
-  virtual void
-  markAllAvailableRegistersAsLiveIns(InstructionGenerationContext &IGC,
-                                     MachineBasicBlock &MBB,
-                                     const IRegisterState &R) const = 0;
-
   virtual void generateCustomInst(
       const MCInstrDesc &InstrDesc,
       planning::InstructionGenerationContext &InstrGenCtx) const = 0;

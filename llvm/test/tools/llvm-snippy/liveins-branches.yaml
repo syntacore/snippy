@@ -1,0 +1,39 @@
+# RUN: llvm-snippy %s -model-plugin None -verify-mi -dump-mir=- \
+# RUN: | FileCheck %s
+
+# COM: Check that we tracks the liveness and 'verify-mi' finishes without errors.
+
+options:
+  march: riscv64-unknown-elf
+  num-instrs: 500
+  init-regs-in-elf: true
+
+sections:
+  - no: 1
+    VMA: 0x2000
+    SIZE: 0x1000000
+    LMA: 0x2000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x400000000
+    SIZE: 0x2000
+    LMA: 0x400000000
+    ACCESS: rw
+  - name: stack
+    VMA: 0x400100000
+    SIZE: 0x1000
+    LMA: 0x400100000
+    ACCESS: rw
+
+histogram:
+  - [BNE, 1.0]
+  - [BGE, 1.0]
+  - [BEQ, 1.0]
+  - [BLT, 1.0]
+  - [BLTU, 1.0]
+  - [BGEU, 1.0]
+  - [ADD, 1.0]
+  - [SUB, 1.0]
+  - [OR, 1.0]
+
+# CHECK: tracksRegLiveness: true
