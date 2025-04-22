@@ -1,5 +1,7 @@
 # RUN: llvm-snippy %s -model-plugin=None -verify-mi -dump-mir=- | FileCheck %s
 
+# COM: Check that we tracks the liveness and 'verify-mi' finishes without errors.
+
 options:
   march: riscv64-unknown-elf
   init-regs-in-elf: true
@@ -24,11 +26,4 @@ histogram:
     - [FADD_S, 1.0]
     - [FSUB_S, 1.0]
 
-#CHECK: bb.0:
-#CHECK-NEXT: liveins: $x0, $x1, $x2, $x3, $x4, $x5, $x6, $x7, $x8, $x9, $x10,
-#CHECK-SAME: $x11, $x12, $x13, $x14, $x15, $x16, $x17, $x18, $x19, $x20, $x21,
-#CHECK-SAME: $x22, $x23, $x24, $x25, $x26, $x27, $x28, $x29, $x30, $x31, $f0_f,
-#CHECK-SAME: $f1_f, $f2_f, $f3_f, $f4_f, $f5_f, $f6_f, $f7_f, $f8_f, $f9_f,
-#CHECK-SAME: $f10_f, $f11_f, $f12_f, $f13_f, $f14_f, $f15_f, $f16_f, $f17_f,
-#CHECK-SAME: $f18_f, $f19_f, $f20_f, $f21_f, $f22_f, $f23_f, $f24_f, $f25_f,
-#CHECK-SAME: $f26_f, $f27_f, $f28_f, $f29_f, $f30_f, $f31_f
+# CHECK: tracksRegLiveness: true

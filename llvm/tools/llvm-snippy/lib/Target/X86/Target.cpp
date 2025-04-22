@@ -59,13 +59,6 @@ public:
     reportUnimplementedError();
   }
 
-  void
-  markAllAvailableRegistersAsLiveIns(InstructionGenerationContext &IGC,
-                                     MachineBasicBlock &MBB,
-                                     const IRegisterState &R) const override {
-    reportUnimplementedError();
-  }
-
   bool needsGenerationPolicySwitch(unsigned Opcode) const override {
     reportUnimplementedError();
   }
