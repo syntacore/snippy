@@ -1,6 +1,6 @@
 # COM: this is the test for checking the possibility to include rvv-config
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
-# RUN:  --num-instrs=10 --snippy-riscv-dump-rvv-config -o %t \
+# RUN:  --num-instrs=10 -riscv-dump-rvv-config -o %t \
 # RUN:  -model-plugin=None \
 # RUN:  |& FileCheck %s
 

@@ -3,7 +3,7 @@
 # RUN:  --init-regs-in-elf --verify-mi \
 # RUN:  -model-plugin=None --entry-point=start \
 # RUN:  -verify-gen-histogram  -histogram-must-succeed=true \
-# RUN:  --riscv-init-vregs-from-memory \
+# RUN:  -rvv-init-mode=loads \
 # RUN:  -histogram-must-succeed=false \
 # RUN:  |& FileCheck %s
 
