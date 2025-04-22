@@ -1,7 +1,7 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
 # RUN:  --num-instrs=1000 -o %t \
 # RUN:  -model-plugin=None --init-regs-in-elf \
-# RUN:  --snippy-riscv-dump-rvv-config
+# RUN:  -riscv-dump-rvv-config
 
 include:
 - rvv-config-biased/Inputs/rvv-unit-sew64-lmulX.yaml
