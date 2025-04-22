@@ -29,6 +29,7 @@ void initializeInstructionGeneratorPass(PassRegistry &);
 void initializeRegsInitInsertionPass(PassRegistry &);
 void initializePrologueEpilogueInsertionPass(PassRegistry &);
 void initializePrintMachineInstrsPass(PassRegistry &);
+void initializeTrackLivenessPass(PassRegistry &);
 void initializeInstructionsPostProcessPass(PassRegistry &);
 void initializePostGenVerifierPass(PassRegistry &);
 void initializeBranchRelaxatorPass(PassRegistry &);

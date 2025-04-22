@@ -49,6 +49,7 @@ ModulePass *createReserveRegsPass();
 ModulePass *createFillExternalFunctionsStubsPass(
     const std::vector<std::string> &FunctionsToAvoid);
 
+MachineFunctionPass *createTrackLivenessPass();
 
 MachineFunctionPass *createCFGeneratorPass();
 
