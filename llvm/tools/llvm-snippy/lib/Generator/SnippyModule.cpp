@@ -160,8 +160,9 @@ void SnippyProgramContext::initializeSelfcheckSection(
       Settings.Sections.getSection(SectionsDescriptions::SelfcheckSectionName);
 }
 
-GeneratorResult SnippyProgramContext::generateELF(
-    ArrayRef<const SnippyModule *> Modules) const {
+GeneratorResult
+SnippyProgramContext::generateELF(ArrayRef<const SnippyModule *> Modules,
+                                  bool DisableRelaxations) const {
   GeneratorResult Result;
   assert(llvm::all_of(
       Modules, [](auto &Mapped) { return Mapped->haveGeneratedObject(); }));
@@ -170,14 +171,15 @@ GeneratorResult SnippyProgramContext::generateELF(
   std::transform(Modules.begin(), Modules.end(), std::back_inserter(Objects),
                  [](auto &Mapped) { return Mapped->getGeneratedObject(); });
 
-  Result.SnippetImage = PLinker->run(Objects, /*Relocatable*/ true);
+  Result.SnippetImage =
+      PLinker->run(Objects, /*Relocatable*/ true, DisableRelaxations);
   Result.LinkerScript = PLinker->generateLinkerScript();
 
   return Result;
 }
 
 std::string SnippyProgramContext::generateLinkedImage(
-    ArrayRef<const SnippyModule *> Modules) const {
+    ArrayRef<const SnippyModule *> Modules, bool DisableRelaxations) const {
   assert(llvm::all_of(
       Modules, [](auto &Mapped) { return Mapped->haveGeneratedObject(); }));
 
@@ -185,7 +187,7 @@ std::string SnippyProgramContext::generateLinkedImage(
   std::transform(Modules.begin(), Modules.end(), std::back_inserter(Objects),
                  [](auto &Mapped) { return Mapped->getGeneratedObject(); });
 
-  return PLinker->run(Objects, /*Relocatable*/ false);
+  return PLinker->run(Objects, /*Relocatable*/ false, DisableRelaxations);
 }
 
 bool SnippyProgramContext::shouldSpillStackPointer() const {

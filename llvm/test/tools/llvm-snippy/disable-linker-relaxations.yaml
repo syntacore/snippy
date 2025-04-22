@@ -1,0 +1,41 @@
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+c \
+# RUN:    -num-instrs=1000 -o %t_1 \
+# RUN:    -function-number=5 -function-layers=2
+#
+# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+c \
+# RUN:    -num-instrs=1000 -disable-linker-relaxations -o %t_2 \
+# RUN:    -function-number=5 -function-layers=2
+
+# RUN: not diff %t_1 %t_2
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x81000000
+      SIZE:      0x1000
+      LMA:       0x81000000
+      ACCESS:    rw
+
+histogram:
+    - [BLT, 0.5]
+    - [BGE, 0.5]
+    - [BGEU, 0.5]
+    - [BLTU, 0.5]
+    - [BNE, 0.5]
+    - [JAL, 10.0]
+    - [C.ADD, 1.0]
+    - [C.ADDI, 1.0]
+    - [C.SLLI, 1.0]
+    - [C.SRLI, 1.0]
+    - [C.AND, 1.0]
+    - [C.OR, 1.0]
+
