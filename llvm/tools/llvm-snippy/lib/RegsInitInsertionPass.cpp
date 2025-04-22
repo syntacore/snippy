@@ -98,8 +98,6 @@ bool RegsInitInsertion::runOnMachineFunction(MachineFunction &MF) {
   planning::InstructionGenerationContext IGC{
       *BlockRegsInit, BlockRegsInit->getFirstTerminator(), SGCtx, SimCtx};
 
-  SnippyTgt.markAllAvailableRegistersAsLiveIns(IGC, *SuccessorBlockPtr,
-                                               RegState);
   SnippyTgt.generateRegsInit(IGC, RegState);
   return true;
 }
