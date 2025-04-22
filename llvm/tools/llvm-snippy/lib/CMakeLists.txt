@@ -43,6 +43,7 @@ set(LLVMSnippySources
   LoopAlignmentPass.cpp
   LoopCanonicalizationPass.cpp
   LoopLatcherPass.cpp
+  TrackLivenessPass.cpp
   MemAccessDumperPass.cpp
   PassManagerWrapper.cpp
   PrintMachineInstrsPass.cpp

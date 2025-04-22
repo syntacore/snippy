@@ -268,6 +268,8 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         PM.add(createInstructionsPostProcessPass());
         PM.add(createFunctionDistributePass());
 
+        PM.add(createTrackLivenessPass());
+
         if (PassCfg.InstrsGenerationConfig.RunMachineInstrVerifier)
           PM.add(createMachineVerifierPass("Machine Verifier Pass report"));
 
