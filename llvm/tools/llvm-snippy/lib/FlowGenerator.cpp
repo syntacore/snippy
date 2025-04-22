@@ -94,6 +94,11 @@ snippy::opt<bool> VerifyConsecutiveLoops(
         "Check that consecutive loops generated accordingly to branchegram."),
     cl::cat(Options), cl::init(false), cl::Hidden);
 
+static snippy::opt<bool> DisableLinkerRelaxations(
+    "disable-linker-relaxations",
+    cl::desc("Disable linker relaxations for the final image"),
+    cl::cat(Options), cl::init(false), cl::Hidden);
+
 } // namespace snippy
 
 namespace snippy {
@@ -285,13 +290,13 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
   if (DumpMIR.isSpecified())
     writeMIRFile(MIR);
   std::vector<const SnippyModule *> Modules{&MainModule};
-  auto Result = ProgContext.generateELF(Modules);
+  auto Result = ProgContext.generateELF(Modules, DisableLinkerRelaxations);
 
   dumpVerificationIntervalsIfNeeeded(MainModule, GenCtx, BaseFileName);
 
   if (PassCfg.ModelPluginConfig.runOnModel()) {
     auto SnippetImageForModelExecution =
-        ProgContext.generateLinkedImage(Modules);
+        ProgContext.generateLinkedImage(Modules, DisableLinkerRelaxations);
 
     auto RI = SimulatorContext::RunInfo{
         SnippetImageForModelExecution, ProgContext, MainModule,

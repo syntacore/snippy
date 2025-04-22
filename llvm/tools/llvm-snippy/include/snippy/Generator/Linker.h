@@ -146,7 +146,8 @@ public:
   std::string generateLinkerScript() const;
 
   // Generates image using internally generated linker script.
-  std::string run(ObjectFilesList ObjectFilesToLink, bool Relocatable) const;
+  std::string run(ObjectFilesList ObjectFilesToLink, bool Relocatable,
+                  bool DisableRelaxations = false) const;
 
   // Returns start and end address of minimal memory region that covers
   // all sections provided in layout file.
