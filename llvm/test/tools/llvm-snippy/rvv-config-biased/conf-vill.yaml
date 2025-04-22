@@ -1,19 +1,19 @@
 # COM: This is the test for if Pvill == 0.5 then there are both legal and illegal RVVConfigurations
 # RUN: llvm-snippy %s %S/Inputs/rvv-unit-pvill-05.yaml -march=riscv64-linux-gnu -mattr=+v \
 # RUN:  -model-plugin=None --num-instrs=10 -o %t \
-# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  -riscv-dump-rvv-config \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-BOTH-CONFIGS
 
 # COM: This is the test for if Pvill == 1.0 then there are no legal RVVConfigurations
 # RUN: llvm-snippy %s %S/Inputs/rvv-unit-pvill-1.yaml -march=riscv64-linux-gnu -mattr=+v \
 # RUN:  -model-plugin=None --num-instrs=10 -o %t \
-# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  -riscv-dump-rvv-config \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-ILLEGAL-ONLY
 
 # COM: This is the test for if Pvill == 0.0 then there are no illegal RVVConfigurations
 # RUN: llvm-snippy %s %S/Inputs/rvv-unit-pvill-0.yaml -march=riscv64-linux-gnu -mattr=+v \
 # RUN:  -model-plugin=None --num-instrs=10 -o %t \
-# RUN:  --snippy-riscv-dump-rvv-config \
+# RUN:  -riscv-dump-rvv-config \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-LEGAL-ONLY
 
 sections:

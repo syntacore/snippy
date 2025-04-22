@@ -1,5 +1,5 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v,+c,+f,+d \
-# RUN:    -num-instrs=100 -dump-mf -init-regs-in-elf --riscv-init-vregs-from-memory --verify-mi \
+# RUN:    -num-instrs=100 -dump-mf -init-regs-in-elf -rvv-init-mode=loads --verify-mi \
 # RUN:    -verify-gen-histogram  -histogram-must-succeed=true --histogram-max-deviation=2.5 \
 # RUN:    -model-plugin=None --lld-dir=%llvm_tools \
 # RUN:    |& FileCheck %s --dump-input always

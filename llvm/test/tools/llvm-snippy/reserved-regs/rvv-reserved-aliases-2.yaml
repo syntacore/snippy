@@ -1,4 +1,4 @@
-# COM: This test checks that if register aliases are reserved, 
+# COM: This test checks that if register aliases are reserved,
 # COM: then all their sub-register are not found in the machine function dump.
 
 # RUN: llvm-snippy %s -model-plugin=None \
@@ -9,7 +9,7 @@ options:
   mcpu: generic-rv64
   mattr: +v
   dump-mf: on
-  riscv-init-vregs-from-memory: on
+  rvv-init-mode: loads
   reserved-regs-list: [V0M8,V8M8,V16_V17_V18_V19_V20_V21_V22_V23]
   num-instrs: 10000
 

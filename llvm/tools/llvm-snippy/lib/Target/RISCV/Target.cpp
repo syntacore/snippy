@@ -125,39 +125,6 @@ static snippy::opt<RVVInitMode>
                    RVVInitModeEnumOption::getClValues(),
                    cl::init(RVVInitMode::Mixed), cl::cat(SnippyRISCVOptions));
 
-// These aliases should be removed in the next major version.
-// Workaround with a callback as there is no way to make such alias with
-// snippy::alias
-static snippy::opt<bool> RVVInitSplatsAliasDeprecated1(
-    "snippy-riscv-use-splats-for-rvv-init",
-    cl::desc("[Deprecated] Alias for -rvv-init-mode=splats"),
-    cl::cat(SnippyRISCVOptions), cl::callback([](const bool &) {
-      RVVInitModeOpt = RVVInitMode::Splats;
-      snippy::warn(WarningName::NotAWarning, "Deprecated option specified",
-                   "Use -rvv-init-mode=splats instead of "
-                   "-snippy-riscv-use-splats-for-rvv-init");
-    }));
-
-static snippy::opt<bool> RVVInitSplatsAliasDeprecated2(
-    "riscv-use-splats-for-rvv-init",
-    cl::desc("[Deprecated] Alias for -rvv-init-mode=splats"),
-    cl::cat(SnippyRISCVOptions), cl::callback([](const bool &) {
-      RVVInitModeOpt = RVVInitMode::Splats;
-      snippy::warn(WarningName::NotAWarning, "Deprecated option specified",
-                   "Use -rvv-init-mode=splats instead of "
-                   "-riscv-use-splats-for-rvv-init");
-    }));
-
-static snippy::opt<bool> RVVInitLoadsAliasDeprecated(
-    "riscv-init-vregs-from-memory",
-    cl::desc("[Deprecated] Alias for -rvv-init-mode=loads"),
-    cl::cat(SnippyRISCVOptions), cl::callback([](const bool &) {
-      RVVInitModeOpt = RVVInitMode::Loads;
-      snippy::warn(
-          WarningName::NotAWarning, "Deprecated option specified",
-          "Use -rvv-init-mode=loads instead of -riscv-init-vregs-from-memory");
-    }));
-
 static snippy::opt<std::string> DumpRVVConfigurationInfo(
     "riscv-dump-rvv-config",
     cl::desc("Print verbose information about selected RVV configurations"),
@@ -185,11 +152,6 @@ static snippy::opt<DisableMisalignedAccessMode>
                            cl::desc("disable misaligned load/store generation"),
                            cl::cat(SnippyRISCVOptions), cl::ValueOptional,
                            cl::init(DisableMisalignedAccessMode::All));
-
-snippy::alias
-    DumpConfigurationInfoAlias("snippy-riscv-dump-rvv-config",
-                               cl::desc("Alias for -riscv-dump-rvv-config"),
-                               snippy::aliasopt(DumpRVVConfigurationInfo));
 
 struct LoopControlLogicCompressionEnumOption
     : public snippy::EnumOptionMixin<LoopControlLogicCompressionEnumOption> {

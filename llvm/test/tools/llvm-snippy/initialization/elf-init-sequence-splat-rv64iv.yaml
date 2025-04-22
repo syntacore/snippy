@@ -1,6 +1,6 @@
 # RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
 # RUN:    -num-instrs=10 -dump-mf -init-regs-in-elf \
-# RUN:    --snippy-riscv-use-splats-for-rvv-init --verify-mi \
+# RUN:    -rvv-init-mode=splats --verify-mi \
 # RUN:    |& FileCheck %s --dump-input always
 
 sections:
