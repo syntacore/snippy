@@ -149,4 +149,20 @@ endforeach()
 
 add_dependencies(llvm-snippy lld)
 
+include(GNUInstallDirs)
+set(SNIPPY_INSTALL_DOCDIR ${CMAKE_INSTALL_DOCDIR}/llvm-snippy)
+
+install(TARGETS llvm-snippy
+        COMPONENT llvm-snippy
+        )
+install(FILES $<TARGET_FILE:lld>
+        DESTINATION ${CMAKE_INSTALL_BINDIR}
+        RENAME ld.lld
+        PERMISSIONS
+          OWNER_READ OWNER_WRITE OWNER_EXECUTE
+          GROUP_READ GROUP_EXECUTE
+          WORLD_READ WORLD_EXECUTE
+        COMPONENT llvm-snippy
+        )
+
 
