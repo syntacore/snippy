@@ -54,17 +54,26 @@ void *getPermanentLibrary(const char *Filename, std::string *errMsg = nullptr) {
   return Handle;
 }
 
-} // namespace
-
-std::string makeAltPathForDynLib(StringRef Name) {
+std::vector<std::string> getAltLibraryPaths(StringRef Name) {
+  std::vector<std::string> Paths;
   static int Dummy = 0;
   const char *ptr = nullptr;
   auto MainExec = sys::fs::getMainExecutable(ptr, &Dummy);
   auto ParentDir = sys::path::parent_path(MainExec);
+  auto RootPath = sys::path::parent_path(ParentDir);
   SmallString<128> LibPath(ParentDir);
+  // Near the executable.
   sys::path::append(LibPath, Name);
-  return LibPath.str().str();
+  Paths.push_back(LibPath.str().str());
+  LibPath = RootPath;
+  sys::path::append(LibPath, "lib", Name);
+  Paths.push_back(LibPath.str().str());
+  LibPath = RootPath;
+  sys::path::append(LibPath, "lib", "models", Name);
+  Paths.push_back(LibPath.str().str());
+  return Paths;
 }
+} // namespace
 
 std::optional<std::string> findLibraryPath(StringRef BaseLibName) {
   if (sys::path::has_parent_path(BaseLibName)) {
@@ -72,13 +81,13 @@ std::optional<std::string> findLibraryPath(StringRef BaseLibName) {
                                       << ">, no need to check others\n");
     return BaseLibName.str();
   }
-  // Check near executable.
-  auto NearExecLibFile = makeAltPathForDynLib(BaseLibName);
-  DEBUG_WITH_TYPE("plugins", dbgs() << "Try to find <" << BaseLibName
-                                    << "> near executable, with path <"
-                                    << NearExecLibFile << ">\n");
-  if (sys::fs::exists(NearExecLibFile))
-    return NearExecLibFile;
+  auto PossiblePaths = getAltLibraryPaths(BaseLibName);
+  for (StringRef P : PossiblePaths) {
+    DEBUG_WITH_TYPE("plugins", dbgs() << "Try to find <" << BaseLibName
+                                      << "> with path <" << P << ">\n");
+    if (sys::fs::exists(P))
+      return P.str();
+  }
   DEBUG_WITH_TYPE("plugins",
                   dbgs() << "BaseLibName <" << BaseLibName << "> not found\n");
   return {};
