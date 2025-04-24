@@ -42,6 +42,21 @@
 
 namespace llvm {
 
+struct ObjectTypeEnumOption
+    : public snippy::EnumOptionMixin<ObjectTypeEnumOption> {
+  static void doMapping(snippy::EnumMapper &Mapper) {
+    Mapper.enumCase(snippy::GeneratorResult::Type::RELOC, "reloc",
+                    "generate relocatable elf + linker script");
+    Mapper.enumCase(snippy::GeneratorResult::Type::EXEC, "exec",
+                    "generate executable elf");
+    Mapper.enumCase(snippy::GeneratorResult::Type::DYN, "shared",
+                    "generate shared object");
+  }
+};
+
+LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML(snippy::GeneratorResult::Type,
+                                           ObjectTypeEnumOption)
+
 namespace snippy {
 
 extern cl::OptionCategory Options;
@@ -59,6 +74,12 @@ static snippy::opt<bool> SelfCheckMem(
     "selfcheck-mem",
     cl::desc("check a memory state after execution in selfcheck mode"),
     cl::Hidden, cl::init(true));
+
+static snippy::opt<snippy::GeneratorResult::Type>
+    ObjectType("object-type", cl::desc("type of generated object"),
+               ObjectTypeEnumOption::getClValues(),
+               cl::init(snippy::GeneratorResult::Type::RELOC),
+               cl::cat(Options));
 
 static snippy::opt_list<std::string>
     DumpMemorySection("dump-memory-section", cl::CommaSeparated,
@@ -292,16 +313,23 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
   if (DumpMIR.isSpecified())
     writeMIRFile(MIR);
   std::vector<const SnippyModule *> Modules{&MainModule};
-  auto Result = ProgContext.generateELF(Modules, DisableLinkerRelaxations);
+  bool NoRelax = DisableLinkerRelaxations;
+  auto EResult = ProgContext.generateELF(Modules, ObjectType, NoRelax);
+  if (!EResult)
+    snippy::fatal(EResult.takeError());
 
   dumpVerificationIntervalsIfNeeeded(MainModule, GenCtx, BaseFileName);
 
   if (PassCfg.ModelPluginConfig.runOnModel()) {
-    auto SnippetImageForModelExecution =
-        ProgContext.generateLinkedImage(Modules, DisableLinkerRelaxations);
-
+    auto GenType = ObjectType == GeneratorResult::Type::RELOC
+                       ? GeneratorResult::Type::LEGACY_EXEC
+                       : ObjectType;
+    auto ESnippetImageForModelExecution =
+        ProgContext.generateELF(Modules, GenType, NoRelax);
+    if (!ESnippetImageForModelExecution)
+      snippy::fatal(ESnippetImageForModelExecution.takeError());
     auto RI = SimulatorContext::RunInfo{
-        SnippetImageForModelExecution, ProgContext, MainModule,
+        ESnippetImageForModelExecution->SnippetImage, ProgContext, MainModule,
         PassCfg.ProgramCfg.EntryPointName,
         PassCfg.RegistersConfig.InitialStateOutputYaml,
         PassCfg.RegistersConfig.FinalStateOutputYaml, SelfCheckMem,
@@ -342,13 +370,13 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
                  "Skipping snippet execution on the model",
                  "model was set no 'None'.");
   }
-  if (!Result.LinkerScript.empty())
+  if (EResult->GenType == GeneratorResult::Type::RELOC)
     snippy::notice(
         WarningName::RelocatableGenerated, State.getCtx(),
         "Snippet generator generated relocatable image",
         "please, use linker with provided script to generate final image");
 
-  return Result;
+  return *EResult;
 }
 
 } // namespace snippy

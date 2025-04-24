@@ -160,34 +160,33 @@ void SnippyProgramContext::initializeSelfcheckSection(
       Settings.Sections.getSection(SectionsDescriptions::SelfcheckSectionName);
 }
 
-GeneratorResult
+Expected<GeneratorResult>
 SnippyProgramContext::generateELF(ArrayRef<const SnippyModule *> Modules,
-                                  bool DisableRelaxations) const {
+                                  GeneratorResult::Type GenType,
+                                  bool NoRelax) const {
   GeneratorResult Result;
+
   assert(llvm::all_of(
       Modules, [](auto &Mapped) { return Mapped->haveGeneratedObject(); }));
 
   ObjectFilesList Objects;
   std::transform(Modules.begin(), Modules.end(), std::back_inserter(Objects),
                  [](auto &Mapped) { return Mapped->getGeneratedObject(); });
-
-  Result.SnippetImage =
-      PLinker->run(Objects, /*Relocatable*/ true, DisableRelaxations);
-  Result.LinkerScript = PLinker->generateLinkerScript();
-
+  auto UseLegacy = GenType == GeneratorResult::Type::RELOC ||
+                   GenType == GeneratorResult::Type::LEGACY_EXEC;
+  if (UseLegacy)
+    Result.SnippetImage = PLinker->runLegacy(
+        Objects, GenType == GeneratorResult::Type::RELOC, NoRelax);
+  else {
+    auto EImage = PLinker->run(Objects, GenType == GeneratorResult::Type::DYN);
+    if (!EImage)
+      return EImage.takeError();
+    Result.SnippetImage = *EImage;
+  }
+  if (GenType == GeneratorResult::Type::RELOC)
+    Result.LinkerScript = PLinker->generateLinkerScript();
+  Result.GenType = GenType;
   return Result;
-}
-
-std::string SnippyProgramContext::generateLinkedImage(
-    ArrayRef<const SnippyModule *> Modules, bool DisableRelaxations) const {
-  assert(llvm::all_of(
-      Modules, [](auto &Mapped) { return Mapped->haveGeneratedObject(); }));
-
-  ObjectFilesList Objects;
-  std::transform(Modules.begin(), Modules.end(), std::back_inserter(Objects),
-                 [](auto &Mapped) { return Mapped->getGeneratedObject(); });
-
-  return PLinker->run(Objects, /*Relocatable*/ false, DisableRelaxations);
 }
 
 bool SnippyProgramContext::shouldSpillStackPointer() const {
