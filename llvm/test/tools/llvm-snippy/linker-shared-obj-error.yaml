@@ -1,0 +1,29 @@
+# RUN: llvm-snippy %s -model-plugin=None
+# RUN: not llvm-snippy %s -model-plugin=None --object-type=shared |& FileCheck %s
+
+options:
+  march: "riscv64-linux-gnu"
+  num-instrs: 10
+sections:
+    - no:        1
+      VMA:       0x0
+      SIZE:      0x200
+      LMA:       0x0
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x10200
+      SIZE:      0x200
+      LMA:       0x10200
+      ACCESS:    rw
+    - name:      named
+      VMA:       0xFFFFFFFFFFF00000
+      SIZE:      0x00000000000FFFFF
+      LMA:       0xFFFFFFFFFFF00000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SW, 5.0]
+
+# CHECK: error: failed to allocate extra space for dynamic sections - please reconfigure sections
