@@ -142,12 +142,18 @@ public:
 
   std::string getMangledFunctionName(StringRef FuncName) const;
 
-  // Generates linker script for external usage.
+  // Generates linker script for external usage / legacy /.
   std::string generateLinkerScript() const;
 
-  // Generates image using internally generated linker script.
-  std::string run(ObjectFilesList ObjectFilesToLink, bool Relocatable,
-                  bool DisableRelaxations = false) const;
+  // Generates executable image or shared object using internally generated
+  // linker script. Relaxations are always disabled.
+  Expected<std::string> run(ObjectFilesList ObjectFilesToLink,
+                            bool Shared) const;
+
+  // Generates executable or relocatable image using internally generated
+  // linker script. Relaxations are optionally disabled / legacy /.
+  std::string runLegacy(ObjectFilesList ObjectFilesToLink, bool Relocatable,
+                        bool DisableRelaxations = false) const;
 
   // Returns start and end address of minimal memory region that covers
   // all sections provided in layout file.
@@ -159,7 +165,10 @@ public:
 
 private:
   std::vector<std::string> collectPhdrInfo() const;
-  std::string createLinkerScript(bool Export) const;
+
+  std::string createLinkerScriptImplLegacy(bool Export) const;
+  Expected<std::string> createLinkerScriptImpl(bool Shared) const;
+
   void calculateMemoryRegion();
 
   std::string MangleName;

@@ -53,7 +53,7 @@ static void checkError(const std::error_code &ECode, StringRef What = "") {
 
 static std::string link(StringRef LLD, StringRef LinkerScript, bool Relocatable,
                         std::vector<FilePathT> ObjectFilesPaths,
-                        bool DisableRelaxations) {
+                        bool DisableRelaxations, bool Shared) {
   int FD;
   FilePathT OutPath;
 
@@ -63,8 +63,11 @@ static std::string link(StringRef LLD, StringRef LinkerScript, bool Relocatable,
   auto LLDCommands = std::vector<StringRef>{LLD};
   std::copy(ObjectFilesPaths.begin(), ObjectFilesPaths.end(),
             std::back_inserter(LLDCommands));
+  assert(!Relocatable || !Shared);
   if (Relocatable)
     LLDCommands.push_back("-r");
+  if (Shared)
+    LLDCommands.push_back("-shared");
 
   LLDCommands.insert(LLDCommands.end(),
                      {"-o", OutPath, "--script", LinkerScript});
@@ -265,7 +268,109 @@ static std::string utostr(uint64_t Val) {
   return std::to_string(Val);
 }
 
-std::string Linker::createLinkerScript(bool Export) const {
+Expected<std::string> Linker::createLinkerScriptImpl(bool Shared) const {
+  std::string ScriptText;
+  llvm::raw_string_ostream STS{ScriptText};
+
+  auto ConvertToPhdrFlags = [](const auto &Mask) {
+    auto MInt = static_cast<int>(Mask);
+    // Convert snippy access flag into elf's segment flag:
+    // 012    012
+    // RWX -> XWR
+    return ((MInt & 0x1) << 2u) | (MInt & 0x2) | ((MInt & 0x4) >> 2u);
+  };
+  auto FindExtraAvailableAddressRegion =
+      [](auto &&MainRegion,
+         size_t Size) -> Expected<std::pair<size_t, size_t>> {
+    using AddrT = decltype(MainRegion.first);
+    auto MakeNoSpaceError = []() {
+      return makeFailure(Errc::InvalidConfiguration,
+                         "failed to allocate extra space for dynamic sections "
+                         "- please reconfigure sections");
+    };
+    if (MainRegion.first == 0x0 &&
+        MainRegion.second == std::numeric_limits<AddrT>::max()) {
+      return MakeNoSpaceError();
+    }
+    if (std::numeric_limits<AddrT>::max() - MainRegion.second >= Size)
+      return std::make_pair(MainRegion.second, MainRegion.second + Size);
+    if (MainRegion.first >= Size)
+      return std::make_pair(MainRegion.first - Size, MainRegion.first);
+    return MakeNoSpaceError();
+  };
+  STS << "MEMORY {\n";
+  for (auto &&I : iota_range(1u, 8u, /* Inclusive */ false)) {
+    auto AccStr = AccMask(I).toString();
+    STS << "  RAM_" << AccStr << " (" << AccStr
+        << ") : ORIGIN = " << utostr(MemoryRegion.first)
+        << ", LENGTH = " << utostr(MemoryRegion.second - MemoryRegion.first);
+  }
+  if (Shared) {
+    auto ExtraRegion =
+        FindExtraAvailableAddressRegion(MemoryRegion, /* Size */ 0x10000);
+    if (ExtraRegion)
+      STS << " EXTRA_RAM (rwx) : ORIGIN = " << utostr(ExtraRegion->first)
+          << ", LENGTH = " << utostr(ExtraRegion->second - ExtraRegion->first);
+    else
+      return ExtraRegion.takeError();
+  }
+  STS << "}\n\n";
+  STS << "PHDRS\n";
+  STS << "{\n";
+  for (auto &SE : Sections) {
+    auto OutSectionName = getMangledName(SE.OutputSection.Name);
+    STS << OutSectionName << " PT_LOAD FLAGS ("
+        << ConvertToPhdrFlags(SE.OutputSection.Desc.M) << ");\n";
+  }
+  if (Shared) {
+    STS << "EXTRA_SEG PT_LOAD ;\n";
+    STS << "EXTRA_SEG_DYN PT_DYNAMIC ;\n";
+  }
+  STS << "}\n";
+
+  STS << "SECTIONS {\n";
+  for (auto &SE : Sections) {
+    auto OutSectionName = getMangledName(SE.OutputSection.Name);
+
+    STS << "  " << OutSectionName << " " << utostr(SE.OutputSection.Desc.VMA);
+
+    if (SE.InputSections.empty())
+      STS << " (NOLOAD) ";
+
+    STS << ": {\n";
+    if (SE.InputSections.empty()) {
+      STS << "  PROVIDE(" << OutSectionName << "_start_ = .);\n";
+      STS << "  . +=" << utostr(SE.OutputSection.Desc.Size) << ";\n";
+      STS << "  PROVIDE(" << OutSectionName << "_end_ = .);\n";
+    } else {
+      for (auto &&InputSection : SE.InputSections) {
+        STS << "  KEEP(*(" << InputSection.Name << "))\n";
+      }
+    }
+
+    STS << "} >RAM_" << SE.OutputSection.Desc.M.toString() << " :"
+        << OutSectionName;
+    STS << "\n";
+  }
+  // These sections are impliciltly added if shared object is linked.
+  if (Shared) {
+    constexpr std::array<const char *, 4> ExtraSections{".dynsym", ".hash",
+                                                        ".gnu.hash", ".dynstr"};
+    for (auto &&ExtraSec : ExtraSections) {
+      STS << "  " << ExtraSec << " : {\n";
+      STS << "  *(" << ExtraSec << ")\n";
+      STS << "  } >EXTRA_RAM :EXTRA_SEG\n";
+    }
+    // .dynamic section is special - it must be put in DYNAMIC segment.
+    STS << "  .dynamic : {\n";
+    STS << "  *(.dynamic)\n";
+    STS << "  } >EXTRA_RAM :EXTRA_SEG_DYN\n";
+  }
+  STS << "}\n";
+  return ScriptText;
+}
+
+std::string Linker::createLinkerScriptImplLegacy(bool Export) const {
   std::string ScriptText;
   llvm::raw_string_ostream STS{ScriptText};
   std::string MemoryRegionName =
@@ -322,21 +427,42 @@ std::string Linker::createLinkerScript(bool Export) const {
 }
 
 std::string Linker::generateLinkerScript() const {
-  return createLinkerScript(/*Export*/ true);
+  return createLinkerScriptImplLegacy(/* Export */ true);
 }
-
-std::string Linker::run(ObjectFilesList ObjectFilesToLink, bool Relocatable,
-                        bool DisableRelaxations) const {
+Expected<std::string> Linker::run(ObjectFilesList ObjectFilesToLink,
+                                  bool Shared) const {
   assert(ObjectFilesToLink.size() > 0 && "Linker needs at least one image");
   auto ObjectFilesPaths = std::vector<FilePathT>{};
   for (auto &Objectfile : ObjectFilesToLink)
     ObjectFilesPaths.push_back(writeDataToDisk(Objectfile));
-  auto InternalLinkerScript = createLinkerScript(/*Export*/ false);
+  auto EInternalLinkerScript = createLinkerScriptImpl(Shared);
+  if (!EInternalLinkerScript)
+    return EInternalLinkerScript.takeError();
+  auto LinkerScriptPath = writeDataToDisk(*EInternalLinkerScript);
+
+  auto LLDExe = findLLD();
+  auto FinalImage = link(LLDExe, LinkerScriptPath, /* Relocatable */ false,
+                         ObjectFilesPaths, /* NoRelax */ true, Shared);
+
+  sys::fs::remove(LinkerScriptPath);
+  std::for_each(ObjectFilesPaths.begin(), ObjectFilesPaths.end(),
+                [](const FilePathT &ImagePath) { sys::fs::remove(ImagePath); });
+
+  return FinalImage;
+}
+std::string Linker::runLegacy(ObjectFilesList ObjectFilesToLink,
+                              bool Relocatable, bool DisableRelaxations) const {
+  assert(ObjectFilesToLink.size() > 0 && "Linker needs at least one image");
+  auto ObjectFilesPaths = std::vector<FilePathT>{};
+  for (auto &Objectfile : ObjectFilesToLink)
+    ObjectFilesPaths.push_back(writeDataToDisk(Objectfile));
+  auto InternalLinkerScript = createLinkerScriptImplLegacy(/*Export*/ false);
   auto LinkerScriptPath = writeDataToDisk(InternalLinkerScript);
 
   auto LLDExe = findLLD();
-  auto FinalImage = link(LLDExe, LinkerScriptPath, Relocatable,
-                         ObjectFilesPaths, DisableRelaxations);
+  auto FinalImage =
+      link(LLDExe, LinkerScriptPath, Relocatable, ObjectFilesPaths,
+           DisableRelaxations, /* shared */ false);
 
   sys::fs::remove(LinkerScriptPath);
   std::for_each(ObjectFilesPaths.begin(), ObjectFilesPaths.end(),

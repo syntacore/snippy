@@ -27,6 +27,12 @@ namespace llvm {
 namespace snippy {
 
 struct GeneratorResult {
+  enum class Type {
+    RELOC,       // relocatable elf image
+    LEGACY_EXEC, // executable with legacy header layout
+    EXEC,        // executable elf image
+    DYN          // dynamic (shared object) elf image
+  } GenType;
   std::string SnippetImage;
   std::string LinkerScript;
 };
@@ -174,10 +180,9 @@ public:
   // Wrapper helper for method above.
   GlobalsPool &getOrAddGlobalsPoolFor(SnippyModule &M, StringRef OnError);
 
-  GeneratorResult generateELF(ArrayRef<const SnippyModule *> Modules,
-                              bool DisableRelaxations = false) const;
-  std::string generateLinkedImage(ArrayRef<const SnippyModule *> Modules,
-                                  bool DisableRelaxations = false) const;
+  Expected<GeneratorResult> generateELF(ArrayRef<const SnippyModule *> Modules,
+                                        GeneratorResult::Type GenType,
+                                        bool NoRelax) const;
 
   Linker &getLinker() const { return *PLinker; }
   RegisterGenerator &getRegGen() const { return *RegGen; }
