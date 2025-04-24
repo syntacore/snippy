@@ -1,0 +1,65 @@
+# RUN: llvm-snippy %s -model-plugin=None -o %t --object-type=reloc
+# RUN: llvm-readelf -hl %t.elf | FileCheck %s --check-prefix=RELOC
+# RUN: llvm-snippy %s -model-plugin=None -o %t --object-type=exec
+# RUN: llvm-readelf -hl %t.elf | FileCheck %s --check-prefix=EXEC
+# RUN: llvm-snippy %s -model-plugin=None -o %t --object-type=shared
+# RUN: llvm-readelf -hl %t.elf | FileCheck %s --check-prefix=SHARED
+
+options:
+  march: "riscv64-linux-gnu"
+  num-instrs: 10
+sections:
+    - no:        1
+      VMA:       0x10000
+      SIZE:      0x200
+      LMA:       0x10000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x10200
+      SIZE:      0x200
+      LMA:       0x10200
+      ACCESS:    rw
+    - name:      named
+      VMA:       0x10400
+      SIZE:      0x200
+      LMA:       0x10400
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SW, 5.0]
+
+# RELOC: ELF Header:
+# RELOC: Type:                              REL (Relocatable file)
+# RELOC: There are no program headers in this file. 
+
+# EXEC: ELF Header:
+# EXEC: Type:                              EXEC (Executable file)
+# EXEC: There are 4 program headers, starting at offset {{[0-9]+}} 
+# EXEC-DAG:  LOAD           0x{{[a-f0-9]+}} 0x0000000000010000 0x0000000000010000 0x{{[a-f0-9]+}} 0x{{[a-f0-9]+}} R E
+# EXEC-DAG:  LOAD           0x{{[a-f0-9]+}} 0x0000000000010200 0x0000000000010200 0x000000 0x000200 RW
+# EXEC-DAG:  LOAD           0x{{[a-f0-9]+}} 0x0000000000010400 0x0000000000010400 0x000000 0x000200 RW
+# EXEC-DAG:  ATTRIBUTES     0x{{[a-f0-9]+}} 0x0000000000000000 0x0000000000000000 0x00001c 0x00001c R
+# EXEC: Section to Segment mapping:
+# EXEC-DAG:   {{[0-9]+}}     .snippy.1.rx 
+# EXEC-DAG:   {{[0-9]+}}     .snippy.2.rw 
+# EXEC-DAG:   {{[0-9]+}}     .snippy.named.rw 
+# EXEC-DAG:   {{[0-9]+}}     .riscv.attributes 
+
+# SHARED: ELF Header:
+# SHARED: Type:                              DYN (Shared object file)
+# SHARED: There are 6 program headers, starting at offset {{[0-9]+}}
+# SHARED-DAG:  LOAD       0x{{[a-f0-9]+}} 0x0000000000010000 0x0000000000010000 0x{{[a-f0-9]+}} 0x{{[a-f0-9]+}} R E
+# SHARED-DAG:  LOAD       0x{{[a-f0-9]+}} 0x0000000000010200 0x0000000000010200 0x000000 0x000200 RW  
+# SHARED-DAG:  LOAD       0x{{[a-f0-9]+}} 0x0000000000010400 0x0000000000010400 0x000000 0x000200 RW  
+# SHARED-DAG:  LOAD       0x{{[a-f0-9]+}} 0x0000000000010600 0x0000000000010600 0x{{[a-f0-9]+}} 0x{{[a-f0-9]+}} R   
+# SHARED-DAG:  DYNAMIC    0x{{[a-f0-9]+}} 0x0000000000010678 0x0000000000010678 0x{{[a-f0-9]+}} 0x{{[a-f0-9]+}} RW  
+# SHARED-DAG:  ATTRIBUTES 0x{{[a-f0-9]+}} 0x0000000000000000 0x0000000000000000 0x{{[a-f0-9]+}} 0x{{[a-f0-9]+}} R   
+# SHARED: Section to Segment mapping:
+# SHARED-DAG:   {{[0-9]+}}     .snippy.1.rx 
+# SHARED-DAG:   {{[0-9]+}}     .snippy.2.rw 
+# SHARED-DAG:   {{[0-9]+}}     .snippy.named.rw 
+# SHARED-DAG:   {{[0-9]+}}     .dynsym .hash .gnu.hash .dynstr 
+# SHARED-DAG:   {{[0-9]+}}     .dynamic 
+# SHARED-DAG:   {{[0-9]+}}     .riscv.attributes 
