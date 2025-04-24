@@ -507,6 +507,12 @@ struct AccMask {
     if (X())
       Stream << "x";
   }
+
+  StringRef toString() const {
+    static constexpr std::array<const char *, 8> MaskStrs{
+        "", "r", "w", "rw", "x", "rx", "wx", "rwx"};
+    return MaskStrs[M];
+  }
 };
 
 struct SectionDesc {
