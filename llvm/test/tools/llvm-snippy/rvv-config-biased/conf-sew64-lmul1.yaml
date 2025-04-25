@@ -44,7 +44,7 @@ histogram:
 # CHECK-SEW64-NEXT:  - Mode Change Probability: 0.333
 # CHECK-SEW64-NEXT:    Set Vill Bit Probability: 0
 # CHECK-SEW64-NEXT:  - VL Selection Rules:
-# CHECK-SEW64-NEXT:    P: 0.66667 <vlmax>
+# CHECK-SEW64-NEXT:    P: 0.66667 <max_encodable>
 # CHECK-SEW64-NEXT:    P: 0.33333 <any_legal>
 # CHECK-SEW64-NEXT:  - VM Selection Rules:
 # CHECK-SEW64-NEXT:    P: 0.66667 <all_ones>

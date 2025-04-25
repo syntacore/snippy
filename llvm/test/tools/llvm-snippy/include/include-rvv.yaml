@@ -37,7 +37,7 @@ histogram:
 # CHECK-NEXT:    - Mode Change Probability: 0.75
 # CHECK-NEXT:      Set Vill Bit Probability: 0
 # CHECK-NEXT:    - VL Selection Rules:
-# CHECK-NEXT:      P: 0.66667 <vlmax>
+# CHECK-NEXT:      P: 0.66667 <max_encodable>
 # CHECK-NEXT:      P: 0.33333 <any_legal>
 # CHECK-NEXT:    - VM Selection Rules:
 # CHECK-NEXT:      P: 0.66667 <all_ones>
