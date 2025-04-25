@@ -1,18 +1,18 @@
 riscv-vector-unit:
+  mode-change-bias:
+    P: 1.0
   mode-distribution:
     VM:
-      - [all_ones, 2.0]
-      - [any_legal, 1.0]
+      - [all_ones, 1.0]
     VL:
-      - [max_encodable, 2.0]
-      - [any_legal, 1.0]
+      - [max_encodable, 1.0]
     VXRM:
       rnu: 1.0
     VTYPE:
       SEW:
         sew_64: 1.0
       LMUL:
-        m2: 1.0
+        m1: 1.0
       VMA:
         mu: 1.0
       VTA:

@@ -1,8 +1,3 @@
-# Notes on implementation:
-#   VLMAX = LMUL*VLEN/SEW
-#   AVL:
-#     (avl <= vlmax) vl_next = avl;
-#     else  vl_next = vlmax;
 riscv-vector-unit:
   mode-change-bias:
     P: 0.2
@@ -11,7 +6,7 @@ riscv-vector-unit:
       - [all_ones, 2.0]
       - [any_legal, 1.0]
     VL:
-      - [vlmax, 2.0]
+      - [max_encodable, 2.0]
       - [any_legal_non_zero, 1.0]
     VXRM:
       rnu: 1.0
