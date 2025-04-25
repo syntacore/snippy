@@ -5,7 +5,7 @@ riscv-vector-unit:
     VM:
       - [all_ones, 1.0]
     VL:
-      - [vlmax, 1.0]
+      - [max_encodable, 1.0]
     VXRM:
       rnu: 1.0
     VTYPE:
