@@ -1,8 +1,13 @@
 # Notes on implementation:
 #   VLMAX = LMUL*VLEN/SEW
+#   kMaxVLForVSETIVLI = 31
+#   max_encodable:
+#     (DesiredOpcode == VSETIVLI && VLMAX > kMaxVLForVSETIVLI)
+#         max_encodable = kMaxVLForVSETIVLI;
+#     else max_encodable = VLMAX;
 #   AVL:
-#     (avl <= vlmax) vl_next = avl;
-#     else  vl_next = vlmax;
+#     (avl <= max_encodable) vl_next = avl;
+#     else  vl_next = max_encodable;
 riscv-vector-unit:
   mode-change-bias:
     P: 0.2
@@ -11,7 +16,7 @@ riscv-vector-unit:
       - [all_ones, 2.0]
       - [any_legal, 1.0]
     VL:
-      - [vlmax, 2.0]
+      - [max_encodable, 2.0]
       - [any_legal, 1.0]
     VXRM:
       rnu: 1.0

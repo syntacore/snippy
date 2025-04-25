@@ -4,7 +4,7 @@
 
 include:
 - Inputs/memory-unaligned.yaml
-- rvv-config-histogram/Inputs/rvv-unit-sew_32-m1-vlmax.yaml
+- rvv-config-histogram/Inputs/rvv-unit-sew_32-m1-max_encodable.yaml
 sections:
   - no:        0
     VMA:       0x8000

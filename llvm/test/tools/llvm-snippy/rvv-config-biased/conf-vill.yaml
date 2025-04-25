@@ -80,7 +80,7 @@ histogram:
 # CHECK-BOTH-CONFIGS-NEXT:  - Mode Change Probability: 0.333
 # CHECK-BOTH-CONFIGS-NEXT:    Set Vill Bit Probability: 0.5
 # CHECK-BOTH-CONFIGS-NEXT:  - VL Selection Rules:
-# CHECK-BOTH-CONFIGS-NEXT:    P: 0.5 <vlmax>
+# CHECK-BOTH-CONFIGS-NEXT:    P: 0.5 <max_encodable>
 # CHECK-BOTH-CONFIGS-NEXT:    P: 0.5 <any_legal>
 # CHECK-BOTH-CONFIGS-NEXT:  - VM Selection Rules:
 # CHECK-BOTH-CONFIGS-NEXT:    P: 0.5 <all_ones>
@@ -98,7 +98,7 @@ histogram:
 # CHECK-ILLEGAL-ONLY-NEXT:  - Mode Change Probability: 0.333
 # CHECK-ILLEGAL-ONLY-NEXT:    Set Vill Bit Probability: 1
 # CHECK-ILLEGAL-ONLY-NEXT:  - VL Selection Rules:
-# CHECK-ILLEGAL-ONLY-NEXT:    P: 0.5 <vlmax>
+# CHECK-ILLEGAL-ONLY-NEXT:    P: 0.5 <max_encodable>
 # CHECK-ILLEGAL-ONLY-NEXT:    P: 0.5 <any_legal>
 # CHECK-ILLEGAL-ONLY-NEXT:  - VM Selection Rules:
 # CHECK-ILLEGAL-ONLY-NEXT:    P: 0.5 <all_ones>
@@ -115,7 +115,7 @@ histogram:
 # CHECK-LEGAL-ONLY-NEXT:  - Mode Change Probability: 0.333
 # CHECK-LEGAL-ONLY-NEXT:    Set Vill Bit Probability: 0
 # CHECK-LEGAL-ONLY-NEXT:  - VL Selection Rules:
-# CHECK-LEGAL-ONLY-NEXT:    P: 0.5 <vlmax>
+# CHECK-LEGAL-ONLY-NEXT:    P: 0.5 <max_encodable>
 # CHECK-LEGAL-ONLY-NEXT:    P: 0.5 <any_legal>
 # CHECK-LEGAL-ONLY-NEXT:  - VM Selection Rules:
 # CHECK-LEGAL-ONLY-NEXT:    P: 0.5 <all_ones>

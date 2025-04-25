@@ -42,7 +42,7 @@ histogram:
 # CHECK-DEFAULT-NEXT:   - Mode Change Probability: 0.0909
 # CHECK-DEFAULT-NEXT:     Set Vill Bit Probability: 0
 # CHECK-DEFAULT-NEXT:   - VL Selection Rules:
-# CHECK-DEFAULT-NEXT:     P: 0.66667 <vlmax>
+# CHECK-DEFAULT-NEXT:     P: 0.66667 <max_encodable>
 # CHECK-DEFAULT-NEXT:     P: 0.33333 <any_legal>
 # CHECK-DEFAULT-NEXT:   - VM Selection Rules:
 # CHECK-DEFAULT-NEXT:     P: 0.66667 <all_ones>
@@ -60,7 +60,7 @@ histogram:
 # CHECK-VLEN512-NEXT:  - Mode Change Probability: 0.0909
 # CHECK-VLEN512-NEXT:    Set Vill Bit Probability: 0
 # CHECK-VLEN512-NEXT:  - VL Selection Rules:
-# CHECK-VLEN512-NEXT:    P: 0.66667 <vlmax>
+# CHECK-VLEN512-NEXT:    P: 0.66667 <max_encodable>
 # CHECK-VLEN512-NEXT:    P: 0.33333 <any_legal>
 # CHECK-VLEN512-NEXT:  - VM Selection Rules:
 # CHECK-VLEN512-NEXT:    P: 0.66667 <all_ones>
