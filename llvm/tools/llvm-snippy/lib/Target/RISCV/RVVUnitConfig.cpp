@@ -498,7 +498,7 @@ static unsigned getMaxPossibleVL(unsigned VLEN) {
 
 struct MaxVLGenerator final : VLGeneratorInterface {
 
-  static constexpr const char *kID = "vlmax";
+  static constexpr const char *kID = "max_encodable";
   std::string identify() const override { return kID; }
 
   unsigned generate(unsigned VLEN, const RVVConfiguration &Cfg) const override {

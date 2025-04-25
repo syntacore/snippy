@@ -37,7 +37,7 @@ histogram:
 # CHECK-SEW8-NEXT:  - Mode Change Probability: 0
 # CHECK-SEW8-NEXT:    Set Vill Bit Probability: 0
 # CHECK-SEW8-NEXT:  - VL Selection Rules:
-# CHECK-SEW8-NEXT:    P: 0.66667 <vlmax>
+# CHECK-SEW8-NEXT:    P: 0.66667 <max_encodable>
 # CHECK-SEW8-NEXT:    P: 0.33333 <any_legal>
 # CHECK-SEW8-NEXT:  - VM Selection Rules:
 # CHECK-SEW8-NEXT:    P: 0.66667 <all_ones>
