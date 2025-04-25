@@ -22,5 +22,5 @@ sections:
 histogram:
     - [VADD_VV, 1.0]
 
-# CHECK: rvv-unit-all.yaml:6:1: error: duplicated mapping key 'riscv-vector-unit'
+# CHECK: rvv-unit-all.yaml:11:1: error: duplicated mapping key 'riscv-vector-unit'
 # CHECK: riscv-vector-unit:

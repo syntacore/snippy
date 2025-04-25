@@ -33,7 +33,7 @@ riscv-vector-unit:
       - [all_ones, 2.0]
       - [any_legal, 1.0]
     VL:
-      - [vlmax, 2.0]
+      - [max_encodable, 2.0]
       - [any_legal, 1.0]
     VXRM:
       rnu: 1.0
@@ -67,7 +67,7 @@ riscv-vector-unit:
 # CHECK-NEXT:    - Mode Change Probability: 0.75
 # CHECK-NEXT:      Set Vill Bit Probability: 0
 # CHECK-NEXT:    - VL Selection Rules:
-# CHECK-NEXT:      P: 0.66667 <vlmax>
+# CHECK-NEXT:      P: 0.66667 <max_encodable>
 # CHECK-NEXT:      P: 0.33333 <any_legal>
 # CHECK-NEXT:    - VM Selection Rules:
 # CHECK-NEXT:      P: 0.66667 <all_ones>
