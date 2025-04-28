@@ -56,9 +56,15 @@ struct Branchegram final {
   };
 
   struct LoopCountersInfo {
+    // const char * instead of StringRef because we want to easily pass this to
+    // functions that require const char*, such as mapOptional.
+    static constexpr const char *InitRangeOptName = "random-init";
+    static constexpr const char *UseStackOptName = "place-on-stack";
+
     using OptRange = std::optional<NumericRange<unsigned>>;
     // Range of values for loop counter initialization
     OptRange InitRange;
+    std::optional<bool> UseStack;
   };
 
   bool PermuteCF = true;
@@ -81,6 +87,10 @@ struct Branchegram final {
 
   bool isRandomCountersInitRequested() const {
     return LoopCounters.InitRange.has_value();
+  }
+
+  bool isStackLoopCountersRequested() const {
+    return LoopCounters.UseStack.has_value() && LoopCounters.UseStack.value();
   }
 
   unsigned getMaxLoopDepth() const { return MaxDepth.Loop; }
