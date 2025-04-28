@@ -936,11 +936,6 @@ void postprocessMemoryOperands(MachineInstr &MI,
     bool GenerateStridedLoad = !AddrGenInfo.isSingleElement();
     auto AccessSize = AddrInfo.AccessSize;
 
-    if (GenerateStridedLoad && SimCtx.hasTrackingMode())
-      snippy::fatal(State.getCtx(), "Incompatible features",
-                    "Can't use generate strided accesses in loops with "
-                    "tracking mode enabled");
-
     auto &&[RegToValue, ChosenAddresses] =
         SnippyTgt.breakDownAddr(IGC, AddrInfo, MI, i);
 
