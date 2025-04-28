@@ -45,11 +45,6 @@ extern cl::OptionCategory Options;
 #define DEBUG_TYPE "snippy-loop-latcher"
 #define PASS_DESC "Snippy Loop Latcher"
 
-static snippy::opt<bool>
-    UseStackOpt("use-stack-for-IV",
-                cl::desc("Place induction variables on stack."),
-                cl::cat(Options), cl::Hidden);
-
 void SnippyLoopInfo::addIncomingValues(const MachineBasicBlock *MBB,
                                        RegToValueType RegToValue) {
   assert(MBB);
@@ -150,14 +145,27 @@ bool LoopLatcher::runOnMachineFunction(MachineFunction &MF) {
   const auto &ProgCtx = SGCtx.getProgramContext();
   auto &State = ProgCtx.getLLVMState();
   auto &CLI = getAnalysis<CFPermutation>().get<ConsecutiveLoopInfo>(MF);
-  if (UseStackOpt && !ProgCtx.stackEnabled())
-    snippy::fatal(State.getCtx(),
-                  "Cannot place IVs on the stack:", " stack was not enabled.");
+  auto &Cfg = SGCtx.getConfig();
+  const auto &Branches = Cfg.PassCfg.Branches;
+  if (Branches.isStackLoopCountersRequested()) {
+    if (!ProgCtx.stackEnabled())
+      snippy::fatal(State.getCtx(), "Cannot place loop counters on the stack",
+                    "stack was not enabled.");
+  }
 
-  if (SimCtx.hasTrackingMode() && !ProgCtx.stackEnabled())
-    snippy::fatal(
-        State.getCtx(), "Wrong snippy configuration:",
-        "loops generation in selfcheck and backtracking modes requires stack.");
+  if (SimCtx.hasTrackingMode()) {
+    if (!ProgCtx.stackEnabled())
+      snippy::fatal(State.getCtx(), "Wrong snippy configuration",
+                    "loops generation in selfcheck and backtracking modes "
+                    "requires stack.");
+    if (auto UseStack = Branches.LoopCounters.UseStack;
+        UseStack.has_value() && !UseStack.value())
+      snippy::fatal(
+          State.getCtx(), "Wrong snippy configuration",
+          llvm::formatv("loop counters: {0} must be enabled when "
+                        "selfcheck and backtracking modes are used.",
+                        Branchegram::LoopCountersInfo::UseStackOptName));
+  }
 
   for (auto *ML : MLI) {
     assert(ML);
@@ -242,7 +250,8 @@ auto LoopLatcher::selectRegsForBranch(const MCInstrDesc &BranchDesc,
     RootPool.addReserved(Reg, Preheader, AccessMaskBit::W);
 
   auto TrackingMode = SimCtx.hasTrackingMode();
-  if (UseStackOpt || TrackingMode) {
+  auto &Branches = SGCtx.getConfig().PassCfg.Branches;
+  if (Branches.isStackLoopCountersRequested() || TrackingMode) {
     // We still have to reserve counter register even when using the stack.
     // Otherwise, this register might be later reserved for other purposes in
     // flow generator (or any other part of snippy) and we'll corrupt the data
@@ -362,7 +371,8 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
       SnippyTgt.insertLoopInit(PHCtx, NewBranch, Branches, ReservedRegs, NIter);
 
   auto SP = ProgCtx.getStackPointer();
-  if (UseStackOpt || TrackingMode) {
+  auto IsStackLoopCountersRequested = Branches.isStackLoopCountersRequested();
+  if (IsStackLoopCountersRequested || TrackingMode) {
     for (auto &&Reg : ReservedRegs)
       SnippyTgt.generateSpillToStack(PHCtx, Reg, SP);
   }
@@ -374,18 +384,19 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
 
   // Currently this is a workaround specifically for selfcheck and placing IV's
   // on the stack. Ind-var schemes assume that the IV value is stored in the
-  // register, which is not true when UseStackOpt is set. In case of non-trivial
-  // loops IV value should be read from the stack so that only one register is
-  // used for deeply nested loops. This is currently not implemented so
-  // UseStackOpt should not be used together with IV addressing schemes.
+  // register, which is not true when place-on-stack is set. In case of
+  // non-trivial loops IV value should be read from the stack so that only one
+  // register is used for deeply nested loops. This is currently not implemented
+  // so place-on-stack should not be used together with IV addressing schemes.
   MachineBasicBlock::iterator InsPos =
-      UseStackOpt || TrackingMode ? NewBranch : Header->getFirstNonPHI();
+      IsStackLoopCountersRequested || TrackingMode ? NewBranch
+                                                   : Header->getFirstNonPHI();
 
   auto *InsMBB = InsPos->getParent();
   assert(InsMBB);
   InstructionGenerationContext HeadCtx{*InsMBB, InsPos, SGCtx, SimCtx};
 
-  if (UseStackOpt || TrackingMode) {
+  if (IsStackLoopCountersRequested || TrackingMode) {
     for (auto &&Reg : reverse(ReservedRegs))
       SnippyTgt.generateReloadFromStack(HeadCtx, Reg, SP);
   }
@@ -415,7 +426,7 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
       SnippyTgt.getLoopType(NewBranch)};
   SLI.addLoopGenerationInfoForMBB(ML.getHeader(), TheLoopGenInfo);
 
-  if (UseStackOpt || TrackingMode) {
+  if (IsStackLoopCountersRequested || TrackingMode) {
     auto *Exit = ML.getExitBlock();
     assert(Exit);
     SLI.addIncomingValues(Exit, std::move(ExitingValues));
