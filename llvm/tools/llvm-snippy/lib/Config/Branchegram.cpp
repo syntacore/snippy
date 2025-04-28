@@ -11,7 +11,9 @@
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/YAMLNumericRange.h"
 
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/YAMLTraits.h"
+
 namespace llvm {
 namespace snippy {
 
@@ -140,9 +142,11 @@ template <> struct yaml::MappingTraits<LoopCountersSupportMap> {
                               LoopCountersSupportMap &LoopCountInfo) {
     if (!IO.outputting() && !LoopCountInfo.IsEnabled &&
         !LoopCountInfo.Range.isMinOrMaxSet())
-      return std::string("loop-counters: random-init option requires at least "
-                         "one of the following attributes: enabled, min, max. "
-                         "But none of them was provided.");
+      return llvm::formatv(
+          "loop-counters: {0} option requires at least "
+          "one of the following attributes: enabled, min, max. "
+          "But none of them was provided.",
+          LoopCountersInfo::InitRangeOptName);
 
     auto MinOpt = LoopCountInfo.Range.Min;
     auto MaxOpt = LoopCountInfo.Range.Max;
@@ -159,7 +163,8 @@ template <> struct yaml::MappingTraits<LoopCountersInfo> {
         yaml::MappingTraits<LoopCountersSupportMap>::NormalizedGroupings,
         OptRange>
         InitRangeMap(IO, LoopMap.InitRange);
-    IO.mapOptional("random-init", InitRangeMap->InfoMap);
+    IO.mapOptional(LoopCountersInfo::InitRangeOptName, InitRangeMap->InfoMap);
+    IO.mapOptional(LoopCountersInfo::UseStackOptName, LoopMap.UseStack);
   }
 };
 

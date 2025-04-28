@@ -125,10 +125,14 @@ bool LoopCanonicalization::runOnMachineFunction(MachineFunction &MF) {
   SmallVector<MachineLoop *> Loops;
   copy(MLI, std::back_inserter(Loops));
   bool Changed = false;
+  auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto IsStackLoopCountersRequested =
+      SGCtx.getConfig().PassCfg.Branches.isStackLoopCountersRequested();
   while (!Loops.empty()) {
     auto &ML = *Loops.back();
     Changed |= insertPreheaderIfNeeded(ML);
-    if (ForceLatchTransform || SimCtx.hasTrackingMode()) {
+    if (ForceLatchTransform || SimCtx.hasTrackingMode() ||
+        IsStackLoopCountersRequested) {
       Changed |= splitExitEdge(ML);
       Changed |= makeLatchUnconditional(ML, MLI);
     }
