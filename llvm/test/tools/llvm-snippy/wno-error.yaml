@@ -1,0 +1,52 @@
+# COM: llvm-snippy is not used directly, because substitutions here will
+# COM: mess up default options.
+
+# RUN: not %llvm_tools/llvm-snippy %s -march=riscv64-linux-gnu  \
+# RUN:   -Werror=memory-access,no-model-exec \
+# RUN:   --model-plugin=None -Wno-error=memory-access -num-instrs=10 \
+# RUN:   |& FileCheck %s
+
+# RUN: %llvm_tools/llvm-snippy %s -march=riscv64-linux-gnu --model-plugin=None \
+# RUN:   -Werror=memory-access,no-model-exec -o %t  \
+# RUN:   -Wno-error=no-model-exec,memory-access -num-instrs=10 \
+# RUN:   |& FileCheck %s --check-prefix=PASS
+ 
+# RUN: %llvm_tools/llvm-snippy %s -march=riscv64-linux-gnu --model-plugin=None \
+# RUN:   -Werror=memory-access,no-model-exec \
+# RUN:   -Wno-error -num-instrs=10 -o %t \
+# RUN:   |& FileCheck %s --check-prefix=PASS
+
+# RUN: not %llvm_tools/llvm-snippy %s -march=riscv64-linux-gnu  -Werror --model-plugin=None \
+# RUN:   -Wno-error=foo,bar -num-instrs=10 \
+# RUN:   |& FileCheck %s --check-prefix=UNKNOWN
+
+sections:
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x800000
+      SIZE:      0x400000
+      LMA:       0x800000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+
+access-ranges:
+  - start: 0x1000
+    size: 0x100
+    stride: 0x10
+    first-offset: 0
+    last-offset: 10
+
+# CHECK: warning: (memory-access) Possibly wrong memory scheme
+# CHECK: error: (no-model-exec) Skipping snippet execution on the model: model was set no 'None'.
+
+# PASS: warning: (memory-access) Possibly wrong memory scheme
+# PASS: warning: (no-model-exec) Skipping snippet execution on the model: model was set no 'None'.
+
+# UNKNOWN: error: Unknown warning category specified for "Wno-error" option
+# UNKNOWN-SAME: List of unknown warning categories: "foo", "bar"

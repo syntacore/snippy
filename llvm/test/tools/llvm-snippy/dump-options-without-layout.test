@@ -5,6 +5,7 @@
 # COM: Check that the stderr is not cluttered.
 # RUN: [ ! -s %t.stderr ]
 
-# CHECK-DAG: werror:
+# CHECK-DAG: Werror:
+# CHECK-DAG: Wno-error:
 # CHECK-DAG: seed:
 # CHECK-DAG: num-instrs:
