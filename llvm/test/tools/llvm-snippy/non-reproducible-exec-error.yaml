@@ -1,0 +1,26 @@
+# COM: llvm-snippy is not used directly, because substitutions here will
+# COM: mess up default options.
+
+# RUN: not %llvm_tools/llvm-snippy %s -march=riscv64-unknown-elf -model-plugin=some/path \
+# RUN:   |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x800000
+      SIZE:      0x400000
+      LMA:       0x800000
+      ACCESS:    rw
+
+histogram:
+    - [LD, 1.0]
+
+# CHECK: error: (non-reproducible-execution) Execution on model without
+# CHECK-SAME: "init-regs-in-elf" option enabled
+# CHECK-SAME: Enable explicit register initialization
+
+
