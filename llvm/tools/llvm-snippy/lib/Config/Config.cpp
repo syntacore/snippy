@@ -21,6 +21,7 @@
 #include "snippy/Target/Target.h"
 
 #include "llvm/Support/Errc.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLTraits.h"
 #include <istream>
@@ -1152,6 +1153,19 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
   auto &Tgt = State.getSnippyTarget();
   auto &TM = State.getTargetMachine();
   auto &CGLayout = PassCfg.CGLayout;
+  if (PassCfg.ModelPluginConfig.runOnModel() && !InitRegsInElf)
+    snippy::warn(
+        WarningName::NonReproducibleExecution,
+        formatv("Execution on model without \"{0}\" option enabled will lead "
+                "to non-reproducible execution as register will be assumed to "
+                "be initialized with random values",
+                InitRegsInElf.ArgStr),
+        formatv("Enable explicit register initialization with option \"{0}\" "
+                "or dump random initial values with option \"{1}\" and suppres "
+                "with \"-Wno-error\" option",
+                InitRegsInElf.ArgStr, DumpInitialRegisters.ArgStr)
+
+    );
   if (std::holds_alternative<CallGraphLayout>(CGLayout))
     std::get<CallGraphLayout>(CGLayout).validate(Ctx);
   const auto &Sections = ProgramCfg->Sections;
