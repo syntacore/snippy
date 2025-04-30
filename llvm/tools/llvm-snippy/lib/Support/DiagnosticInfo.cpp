@@ -13,6 +13,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/WithColor.h"
 
+#include <unordered_set>
+
 namespace llvm {
 
 // The unique option because it used not only in snippy
@@ -20,12 +22,20 @@ cl::OptionCategory DiagnosticOptions("llvm-diagnostic");
 
 namespace snippy {
 
-static snippy::opt<bool>
-    WError("werror", cl::desc("All warnings would be treated as errors"),
-           cl::cat(llvm::DiagnosticOptions), cl::init(false));
+static snippy::opt_list<std::string>
+    WError("Werror", cl::CommaSeparated,
+           cl::desc("Comma separated list of warnig types that should be "
+                    "treated as errors"),
+           cl::cat(llvm::DiagnosticOptions), cl::ValueOptional);
 
 static snippy::opt_list<std::string>
-    WDisable("wdisable", cl::CommaSeparated,
+    WNoError("Wno-error", cl::CommaSeparated,
+             cl::desc("Comma separated list of warning types that should be "
+                      "excluded from WError option"),
+             cl::cat(llvm::DiagnosticOptions), cl::ValueOptional);
+
+static snippy::opt_list<std::string>
+    WDisable("Wdisable", cl::CommaSeparated,
              cl::desc("Comma-separated list of warning types to suppress"),
              cl::cat(DiagnosticOptions));
 
@@ -60,22 +70,6 @@ std::optional<WarningName> getWarningName(StringRef Warn) {
 const int SnippyDiagnosticInfo::KindID = getNextAvailablePluginDiagnosticKind();
 std::map<std::string, WarningCounters> SnippyDiagnosticInfo::ReportedWarnings;
 
-void checkWarningOptions() {
-  auto Unknown = make_filter_range(WDisable, [](StringRef WName) {
-    return !getWarningName(WName).has_value();
-  });
-  std::vector<StringRef> UnknownNames(Unknown.begin(), Unknown.end());
-  if (!UnknownNames.empty()) {
-    std::string Msg;
-    raw_string_ostream OS(Msg);
-    OS << "List of unknown warning categories: ";
-    llvm::interleaveComma(UnknownNames, OS,
-                          [&](StringRef N) { OS << "\"" << N << "\""; });
-    snippy::fatal("Unknown warning category specified for -wdisable option",
-                  Msg);
-  }
-}
-
 std::vector<std::pair<std::string, size_t>>
 SnippyDiagnosticInfo::fetchReportedWarnings() {
   std::vector<std::pair<std::string, size_t>> Result;
@@ -91,6 +85,67 @@ SnippyDiagnosticInfo::fetchReportedWarnings() {
   });
   return Result;
 }
+
+static void checkDiagnosticsTypesAreValid(const opt_list<std::string> &Types) {
+  auto Unknown = make_filter_range(
+      Types, [](StringRef Name) { return !getWarningName(Name).has_value(); });
+  std::vector<StringRef> UnknownNames(Unknown.begin(), Unknown.end());
+  if (!UnknownNames.empty()) {
+    std::string Msg;
+    raw_string_ostream OS(Msg);
+    OS << "List of unknown warning categories: ";
+    llvm::interleaveComma(UnknownNames, OS,
+                          [&](StringRef N) { OS << "\"" << N << "\""; });
+    snippy::fatal(Twine("Unknown warning category specified for \"")
+                      .concat(Types.ArgStr)
+                      .concat("\" option"),
+                  Msg);
+  }
+}
+
+class WErrorCategories final {
+public:
+  static auto &instance() {
+    static std::unordered_set<WarningName> Impl = {
+        WarningName::NonReproducibleExecution};
+    return Impl;
+  }
+};
+
+static bool isOptListEmpty(const opt_list<std::string> &List) {
+  // FIXME: Option parser considers option list without arguments to have single
+  // entity (which is empty string) I.e. -opt and -opt="" are the same for opt
+  // list
+  return (List.size() == 0) || (List.size() == 1 && *List.begin() == "");
+}
+
+#define WARN_CASE(NAME, STR) WErrorCat.insert(WarningName::NAME);
+void checkWarningOptions() {
+  checkDiagnosticsTypesAreValid(WDisable);
+  auto &WErrorCat = WErrorCategories::instance();
+  if (!isOptListEmpty(WError)) {
+    checkDiagnosticsTypesAreValid(WError);
+    transform(WError, std::inserter(WErrorCat, WErrorCat.end()),
+              [](StringRef WN) {
+                auto Category = getWarningName(WN);
+                assert(Category);
+                return *Category;
+              });
+  } else if (WError.getNumOccurrences()) {
+    // Empty -Werror means all warning are considered errors
+    FOR_ALL_WARNINGS(WARN_CASE)
+  }
+
+  if (!isOptListEmpty(WNoError)) {
+    checkDiagnosticsTypesAreValid(WNoError);
+    for (StringRef WN : WNoError)
+      WErrorCat.erase(*getWarningName(WN));
+  } else if (WNoError.getNumOccurrences()) {
+    // Empty -Wno-error means none of the warnings should be considered error
+    WErrorCat.clear();
+  }
+}
+#undef WARN_CASE
 
 void SnippyDiagnosticInfo::print(llvm::DiagnosticPrinter &DP) const {
   if (getName() != WarningName::NotAWarning) {
@@ -179,13 +234,15 @@ void notice(WarningName WN, llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
 
 void warn(WarningName WN, llvm::LLVMContext &Ctx, const llvm::Twine &Prefix,
           const llvm::Twine &Desc) {
-  auto MsgCategory = WError ? llvm::DS_Error : llvm::DS_Warning;
+  bool IsErr = is_contained(WErrorCategories::instance(), WN);
+  auto MsgCategory = IsErr ? llvm::DS_Error : llvm::DS_Warning;
   SnippyDiagnosticInfo Diag(Prefix, Desc, MsgCategory, WN);
   handleDiagnostic(Ctx, Diag);
 }
 
 void warn(WarningName WN, const llvm::Twine &Prefix, const llvm::Twine &Desc) {
-  auto MsgCategory = WError ? llvm::DS_Error : llvm::DS_Warning;
+  bool IsErr = is_contained(WErrorCategories::instance(), WN);
+  auto MsgCategory = IsErr ? llvm::DS_Error : llvm::DS_Warning;
   SnippyDiagnosticInfo Diag(Prefix, Desc, MsgCategory, WN);
   handleDiagnostic(Diag);
 }
