@@ -39,6 +39,7 @@ public:
   SectionsDescriptions Sections;
   std::unique_ptr<TargetConfigInterface> TargetConfig;
   std::unique_ptr<PluginManager> PluginManagerImpl;
+  uint64_t Seed;
 
   // stack frame specific.
   std::string ABIName;
