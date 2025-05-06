@@ -188,24 +188,6 @@ static bool isParsingWithPluginEnabled() {
   return GeneratorPluginParserFile != "None";
 }
 
-static unsigned long long
-seedOptToValue(StringRef SeedStr, StringRef SeedType = "instructions seed",
-               StringRef Warning =
-                   "no instructions seed specified, using auto-generated one") {
-  if (SeedStr.empty()) {
-    auto SeedValue =
-        std::chrono::system_clock::now().time_since_epoch().count();
-    snippy::warn(WarningName::SeedNotSpecified, Warning, Twine(SeedValue));
-    return SeedValue;
-  }
-
-  unsigned long long SeedValue;
-  if (getAsUnsignedInteger(SeedStr, /* Radix */ 10, SeedValue))
-    snippy::fatal(
-        formatv("Provided {0} is not convertible to numeric value.", SeedType));
-  return SeedValue;
-}
-
 static void reportWarningsSummary() {
   const auto &Warnings = snippy::SnippyDiagnosticInfo::fetchReportedWarnings();
   if (Warnings.empty())
@@ -284,13 +266,6 @@ static SelectedTargetInfo getSelectedTargetInfo() {
   return TargetInfo;
 }
 
-unsigned long long initializeRandomEngine(unsigned long long SeedValue) {
-  if (Verbose)
-    outs() << "Used seed: " << SeedValue << "\n";
-  RandEngine::init(SeedValue);
-  return SeedValue;
-}
-
 static void saveToFile(const GeneratorResult &Result) {
   auto OutputFilename = getOutputFileBasename();
   auto ElfFile = addExtensionIfRequired(OutputFilename, ".elf");
@@ -365,12 +340,12 @@ void generateMain() {
     return;
   }
 
-  // init random engine before everything else.
-  auto SeedValue = seedOptToValue(Seed.getValue());
-  initializeRandomEngine(SeedValue);
   RegPool RP;
 
   auto Cfg = readSnippyConfig(State, RP, OpCC);
+  if (Verbose)
+    outs() << "Used seed: " << Cfg.ProgramCfg->Seed << '\n';
+
   dumpConfigIfNeeded(Cfg, ConfigIOContext{OpCC, RP, State}, outs());
   FlowGenerator Flow{std::move(Cfg), OpCC, std::move(RP),
                      getOutputFileBasename()};
