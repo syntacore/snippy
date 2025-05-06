@@ -653,6 +653,24 @@ static std::vector<std::string> parseModelPluginList(yaml::IO &IO) {
   return Ret;
 }
 
+static unsigned long long
+seedOptToValue(StringRef SeedStr, StringRef SeedType = "instructions seed",
+               StringRef Warning =
+                   "no instructions seed specified, using auto-generated one") {
+  if (SeedStr.empty()) {
+    auto SeedValue =
+        std::chrono::system_clock::now().time_since_epoch().count();
+    snippy::warn(WarningName::SeedNotSpecified, Warning, Twine(SeedValue));
+    return SeedValue;
+  }
+
+  unsigned long long SeedValue;
+  if (getAsUnsignedInteger(SeedStr, /* Radix */ 10, SeedValue))
+    snippy::fatal(
+        formatv("Provided {0} is not convertible to numeric value.", SeedType));
+  return SeedValue;
+}
+
 static std::optional<unsigned> getExpectedNumInstrs(StringRef NumAsString) {
   if (NumAsString == "all")
     return {};
@@ -678,6 +696,10 @@ static unsigned getSelfcheckPeriod(StringRef SelfCheck) {
   assert(isUInt<sizeof(unsigned) * CHAR_BIT>(SelfCheckPeriod));
   return SelfCheckPeriod;
 }
+unsigned long long initializeRandomEngine(uint64_t SeedValue) {
+  RandEngine::init(SeedValue);
+  return SeedValue;
+}
 
 void yaml::MappingTraits<ConfigCLOptionsMapper>::mapping(
     yaml::IO &IO, ConfigCLOptionsMapper &Mapper) {
@@ -694,6 +716,16 @@ void yaml::MappingTraits<ConfigCLOptionsMapper>::mapping(
   IO.mapRequired("entry-point", ProgCfg.EntryPointName);
   IO.mapRequired("external-stack", ProgCfg.ExternalStack);
   IO.mapRequired("initial-regs", ProgCfg.InitialRegYamlFile);
+  std::string Seed, MemorySeed, MemoryFile;
+  SelfcheckRefValueStorageType SelfcheckRefValueStorage;
+
+  IO.mapRequired("seed", Seed);
+  if (!IO.outputting()) {
+    ProgCfg.Seed = seedOptToValue(Seed);
+    // FIXME: RandomEngine initialization should be moved out of Config as well
+    // as most of the stuff below
+    initializeRandomEngine(ProgCfg.Seed);
+  }
   if (!ProgCfg.hasSectionToSpillGlobalRegs() &&
       Mapper.Cfg.PassCfg.hasExternalCallees())
     reserveGlobalStateRegisters(RP, State.getSnippyTarget());

@@ -286,7 +286,7 @@ struct EnumMapper {
   }
 
   virtual void enumCase(int Value, const char *Name,
-                        const char *Description) const = 0;
+                        const char *Description) = 0;
 
   virtual ~EnumMapper() {}
 };
@@ -308,8 +308,7 @@ namespace detail {
 struct EnumClMapper : public EnumMapper {
   EnumClMapper(ClEnumValues &Vals) : ClValues(Vals) {}
 
-  void enumCase(int Value, const char *Name,
-                const char *Description) const override {
+  void enumCase(int Value, const char *Name, const char *Description) override {
     ClValues.push_back(clEnumValN(Value, Name, Description));
   }
 
@@ -320,13 +319,24 @@ template <typename T, typename YIO = yaml::IO>
 struct EnumYAMLMapper : public EnumMapper {
   EnumYAMLMapper(YIO &Io, T &EnumVal) : TheIo(Io), TheEnumVal(EnumVal) {}
 
-  void enumCase(int Value, const char *Name,
-                const char *Description) const override {
+  void enumCase(int Value, const char *Name, const char *Description) override {
     TheIo.enumCase(TheEnumVal, Name, static_cast<T>(Value));
   }
 
   YIO &TheIo;
   T &TheEnumVal;
+};
+
+template <typename T> struct ToStringMapper : public EnumMapper {
+  ToStringMapper(const T &Val) : Val(Val) {}
+
+  void enumCase(int Value, const char *Name, const char *) override {
+    if (Val == static_cast<T>(Value))
+      Result = StringRef(Name);
+  }
+
+  std::optional<StringRef> Result;
+  const T &Val;
 };
 } // namespace detail
 
@@ -341,6 +351,11 @@ template <typename DerivedT> struct EnumOptionMixin {
   template <typename YIO, typename T> static void mapYAML(YIO &Io, T &Val) {
     detail::EnumYAMLMapper<T> M(Io, Val);
     DerivedT::doMapping(M);
+  }
+  template <typename T> static std::optional<StringRef> toString(T &Val) {
+    detail::ToStringMapper<T> M(Val);
+    DerivedT::doMapping(M);
+    return M.Result;
   }
 };
 
