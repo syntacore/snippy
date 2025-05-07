@@ -62,3 +62,9 @@ add_llvm_library(LLVMSnippy
   LINK_LIBS PRIVATE
     $<BUILD_LOCAL_INTERFACE:LLVMSnippyGenerator>
   )
+
+set(LLVM_TARGET_DEFINITIONS Options.td)
+tablegen(SNIPPY SnippyDriverOptions.inc -gen-options -I
+         ${LLVM_SNIPPY_HEADERS_DIR})
+add_public_tablegen_target(LLVMSnippyDriverOptionsTableGen)
+target_include_directories(llvm-snippy PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
