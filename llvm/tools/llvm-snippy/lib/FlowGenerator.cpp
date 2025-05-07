@@ -328,6 +328,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         ProgContext.generateELF(Modules, GenType, NoRelax);
     if (!ESnippetImageForModelExecution)
       snippy::fatal(ESnippetImageForModelExecution.takeError());
+
     auto RI = SimulatorContext::RunInfo{
         ESnippetImageForModelExecution->SnippetImage, ProgContext, MainModule,
         PassCfg.ProgramCfg.EntryPointName,
@@ -335,7 +336,9 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         PassCfg.RegistersConfig.FinalStateOutputYaml, SelfCheckMem,
         // Memory reset only needed if interpreter may have executed
         // during generation process.
-        /* NeedMemoryReset */ Cfg.hasTrackingMode(), DumpMemorySection,
+        /* NeedMemoryReset */ Cfg.hasTrackingMode(),
+        std::vector<std::string>(DumpMemorySection.begin(),
+                                 DumpMemorySection.end()),
         MemorySectionFile.getValue(), BaseFileName};
 
     auto &SimCtx = MainModule.getGenResult<OwningSimulatorContext>();
