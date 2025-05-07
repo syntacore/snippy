@@ -78,9 +78,8 @@ void OwningSimulatorContext::initialize(SnippyProgramContext &ProgCtx,
   SCI = OwnSCI.get();
 }
 
-template <typename InsertIt>
-static void collectSectionsWithAccess(Interpreter &I, InsertIt Inserter,
-                                      StringRef Selector) {
+static std::vector<NamedMemoryRange>
+collectSectionsWithAccess(Interpreter &I, StringRef Selector) {
   auto AccessMask = AccMask{Selector};
   auto &Sects = I.getSections();
   std::vector<SectionDesc> SuitableSectDesc;
@@ -88,12 +87,11 @@ static void collectSectionsWithAccess(Interpreter &I, InsertIt Inserter,
                [&AccessMask](const SectionDesc &SectDesc) {
                  return SectDesc.M == AccessMask;
                });
-  std::transform(SuitableSectDesc.begin(), SuitableSectDesc.end(), Inserter,
-                 [](const SectionDesc &SectDesc) {
-                   return NamedMemoryRange{SectDesc.VMA,
-                                           SectDesc.VMA + SectDesc.Size,
-                                           SectDesc.getIDString()};
-                 });
+  auto Mapped = map_range(SuitableSectDesc, [](const SectionDesc &SectDesc) {
+    return NamedMemoryRange{SectDesc.VMA, SectDesc.VMA + SectDesc.Size,
+                            SectDesc.getIDString()};
+  });
+  return {Mapped.begin(), Mapped.end()};
 }
 
 static void reportParsingError(Twine Msg) {
@@ -130,39 +128,49 @@ getRangeFromSelector(StringRef Selector) {
   return FinalRange;
 }
 
-template <typename InsertIt>
-static void collectRangesByExpr(Interpreter &I, InsertIt Inserter,
-                                StringRef Selector) {
+static std::vector<NamedMemoryRange> collectRangesByExpr(Interpreter &I,
+                                                         StringRef Selector) {
   auto ErrorRet = Selector.consume_front("{") && Selector.consume_back("}");
   assert(ErrorRet && "Wrong opt formating");
   auto RangeOpt = getRangeFromSelector(Selector);
   if (!RangeOpt) {
-    collectSectionsWithAccess(I, Inserter, Selector);
-    return;
+    return collectSectionsWithAccess(I, Selector);
   }
-  Inserter = *RangeOpt;
+  return {*RangeOpt};
 }
 
-template <typename InsertIt>
-static void getRangesFromSelector(Interpreter &I, InsertIt Inserter,
-                                  StringRef Selector) {
-  if (Selector.front() == '{' && Selector.back() == '}') {
-    collectRangesByExpr(I, Inserter, Selector);
-    return;
+static bool isExprSelector(StringRef S) {
+  return S.starts_with('{') && S.ends_with('}');
+}
+
+static std::vector<NamedMemoryRange> getRangesFromSelector(Interpreter &I,
+                                                           StringRef Selector) {
+  if (isExprSelector(Selector)) {
+    return collectRangesByExpr(I, Selector);
   }
   auto RangeOpt = I.getSectionPosition(Selector);
   if (!RangeOpt)
-    snippy::fatal(formatv("failed to find a section {{0}}", Selector));
-  Inserter = *RangeOpt;
+    return {};
+  return {*RangeOpt};
 }
 
 static std::vector<NamedMemoryRange>
-getMemoryRangesToDump(Interpreter &I,
-                      snippy::opt_list<std::string> &RangesSelectors) {
+getMemoryRangesToDump(Interpreter &I, ArrayRef<std::string> RangesSelectors) {
+  std::vector<StringRef> Unknown;
   std::vector<NamedMemoryRange> RangesToDump;
-  for (const auto &RangeSelector : RangesSelectors)
-    getRangesFromSelector(I, std::back_inserter(RangesToDump), RangeSelector);
-
+  for (StringRef RangeSelector : RangesSelectors) {
+    auto MemRanges = getRangesFromSelector(I, RangeSelector);
+    copy(MemRanges, std::back_inserter(RangesToDump));
+    if (MemRanges.empty() && !isExprSelector(RangeSelector))
+      Unknown.push_back(RangeSelector);
+  }
+  if (!Unknown.empty()) {
+    std::string Msg;
+    raw_string_ostream OS(Msg);
+    OS << "List of non-existent sections: ";
+    interleaveComma(Unknown, OS, [&](StringRef S) { OS << '"' << S << '"'; });
+    snippy::fatal("dump of unknown sections requested", Msg);
+  }
   std::sort(RangesToDump.begin(), RangesToDump.end());
   RangesToDump.erase(std::unique(RangesToDump.begin(), RangesToDump.end()),
                      RangesToDump.end());
