@@ -55,6 +55,9 @@ message(STATUS "LLVM_SNIPPY_VERSION_MAJOR: ${LLVM_SNIPPY_VERSION_MAJOR}")
 message(STATUS "LLVM_SNIPPY_VERSION_MINOR: ${LLVM_SNIPPY_VERSION_MINOR}")
 message(STATUS "LLVM_SNIPPY_VERSION_PATCH: ${LLVM_SNIPPY_VERSION_PATCH}")
 
+# Add `snippy-tblgen` before everything else.
+add_subdirectory(utils)
+
 set(LLVM_LINK_COMPONENTS
   ${LLVM_TARGETS_TO_BUILD}
   Object
@@ -105,6 +108,8 @@ endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_subdirectory(lib)
 
+# Add dependency on the dummy tablegen target.
+add_dependencies(llvm-snippy LLVMSnippyDriverOptionsTableGen)
 
 target_include_directories(LLVMSnippyConfig PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 target_include_directories(LLVMSnippySupport PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)

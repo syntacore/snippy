@@ -4,9 +4,12 @@
 
 add_library(SnippyHeaders INTERFACE)
 
+# Convenience variable for snippy-tblgen.
+set(LLVM_SNIPPY_HEADERS_DIR ${CMAKE_CURRENT_SOURCE_DIR} PARENT_SCOPE)
+
 target_include_directories(SnippyHeaders
   INTERFACE
-  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${LLVM_SNIPPY_HEADERS_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}
   )
 
