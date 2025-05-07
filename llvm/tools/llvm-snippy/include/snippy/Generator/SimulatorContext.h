@@ -52,7 +52,7 @@ struct SimulatorContext {
     StringRef FinalRegStateOutputYaml;
     bool SelfcheckCheckMem;
     bool NeedMemoryReset;
-    snippy::opt_list<std::string> &DumpMemorySection;
+    std::vector<std::string> DumpMemorySection;
     StringRef MemorySectionFile;
     StringRef BaseFilename;
   };
