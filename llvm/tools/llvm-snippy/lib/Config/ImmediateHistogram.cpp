@@ -66,6 +66,7 @@ OpcodeToImmHistSequenceMap::OpcodeToImmHistSequenceMap(
     const ImmediateHistogramRegEx &ImmHist, const OpcodeHistogram &OpcHist,
     const OpcodeCache &OpCC) {
   unsigned NMatched = 0;
+  SmallVector<StringRef> Matches;
   for (auto Opc : make_first_range(OpcHist)) {
     for (auto &&Conf : ImmHist.Exprs) {
       if (NMatched == OpcHist.size()) {
@@ -78,8 +79,9 @@ OpcodeToImmHistSequenceMap::OpcodeToImmHistSequenceMap(
         break;
       }
       Regex RX(Conf.Expr);
-      auto Name = OpCC.name(Opc);
-      if (RX.match(Name)) {
+      StringRef Name = OpCC.name(Opc);
+      auto Res = RX.match(Name, &Matches);
+      if (Res && Matches.size() == 1 && Matches[0] == Name) {
         auto Inserted = Data.emplace(Opc, Conf.Data);
         if (Inserted.second) {
           ++NMatched;
