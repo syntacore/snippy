@@ -16,7 +16,7 @@ extern "C" {
 
 #define RVMAPI_ENTRY_POINT_SYMBOL RVMVTable
 #define RVMAPI_VERSION_SYMBOL RVMInterfaceVersion
-#define RVMAPI_CURRENT_INTERFACE_VERSION 24u
+#define RVMAPI_CURRENT_INTERFACE_VERSION 25u
 
 typedef uint64_t RVMRegT;
 
@@ -88,6 +88,11 @@ typedef enum {
   MACRO(RVM_ZEXT_CMOP, cmop)                                                   \
   MACRO(RVM_ZEXT_CMP, cmp)                                                     \
   MACRO(RVM_ZEXT_CMT, cmt)                                                     \
+  MACRO(RVM_ZEXT_CE, ce)                                                       \
+  MACRO(RVM_ZEXT_CA, ca)                                                       \
+  MACRO(RVM_ZEXT_CB, cb)                                                       \
+  MACRO(RVM_ZEXT_CF, cf)                                                       \
+  MACRO(RVM_ZEXT_CD, cd)                                                       \
   MACRO(RVM_ZEXT_FA, fa)                                                       \
   MACRO(RVM_ZEXT_FBFMIN, fbfmin)                                               \
   MACRO(RVM_ZEXT_FH, fh)                                                       \

@@ -21,7 +21,8 @@
 namespace rvm {
 namespace detail {
 // replace composite extensions with their components
-inline RVMExtDescriptor normalize_extensions(const RVMExtDescriptor &Ext) {
+inline RVMExtDescriptor normalize_extensions(const RVMExtDescriptor &Ext,
+                                             bool RV64 = true) {
   RVMExtDescriptor Norm;
   std::copy(std::begin(Ext.ZExt), std::end(Ext.ZExt), Norm.ZExt);
   std::copy(std::begin(Ext.XExt), std::end(Ext.XExt), Norm.XExt);
@@ -103,6 +104,25 @@ inline RVMExtDescriptor normalize_extensions(const RVMExtDescriptor &Ext) {
     ZExt[RVM_ZEXT_VKG] = true;
     ZExt[RVM_ZEXT_VKSG] = false;
   }
+  // Zc* v1.0.4-2 spec 1.5
+  // MISA.C is set if the following extensions are selected:
+  // - Zca and not F
+  if (ZExt[RVM_ZEXT_CA] && !MisaExt[RVM_MISA_F]) {
+    MisaExt[RVM_MISA_C] = true;
+  }
+  // - Zca, Zcf and F is specified (RV32 only)
+  if (ZExt[RVM_ZEXT_CA] && ZExt[RVM_ZEXT_CF] && MisaExt[RVM_MISA_F] && !RV64) {
+    MisaExt[RVM_MISA_C] = true;
+  }
+  // - Zca, Zcf and Zcd if D is specified (RV32 only)
+  if (ZExt[RVM_ZEXT_CA] && ZExt[RVM_ZEXT_CF] && ZExt[RVM_ZEXT_CD] &&
+      MisaExt[RVM_MISA_D] && !RV64) {
+    MisaExt[RVM_MISA_C] = true;
+  }
+  // - Zca, Zcd if D is specified (RV64 only)
+  if (ZExt[RVM_ZEXT_CA] && ZExt[RVM_ZEXT_CD] && MisaExt[RVM_MISA_D] && RV64) {
+    MisaExt[RVM_MISA_C] = true;
+  }
   return Norm;
 }
 #ifdef ADD_MISA_CASE
@@ -152,7 +172,7 @@ inline std::string create_isa_string(const RVMExtDescriptor &Ext, bool RV64,
                                      bool Lowercase = false) {
   assert(sizeof(Ext.ZExt) == Ext.ZExtSize);
   assert(sizeof(Ext.XExt) == Ext.XExtSize);
-  auto Norm = detail::normalize_extensions(Ext);
+  auto Norm = detail::normalize_extensions(Ext, RV64);
   std::stringstream SS;
   SS << (RV64 ? "RV64I" : "RV32I");
   detail::add_misa(SS, Norm);
