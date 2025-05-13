@@ -15,14 +15,14 @@ histogram:
 
 imm-hist:
   opcodes:
-    - 'ADD?':
+    - 'ADD.?':
       - [1, 1.0]
       - [2, 1.0]
       - [3, 1.0]
     - '.*ORI':
       - [5, 1.0]
 
-# There ADDI should be matched by 'ADD?'
+# There ADDI should be matched by 'ADD.?'
 # We check that ADDI appears only with immediates: 1, 2 or 3
 # CHECK-NOT: ADDI $x{{[[:digit:]]+}}, {{[0,4-9]}}
 
