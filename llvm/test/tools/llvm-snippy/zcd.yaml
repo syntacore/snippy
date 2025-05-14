@@ -1,0 +1,27 @@
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s
+options:
+  march: riscv32-unknown-elf
+  num-instrs: 100
+  mattr: -a,-m,-c,+f,+d,+zca,+zcd
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+  dump-mf: true
+
+sections:
+- no: 1
+  VMA: 0x1000
+  LMA: 0x1000
+  SIZE: 0x1000
+  ACCESS: rx
+- no: 2
+  VMA: 0x2000
+  LMA: 0x2000
+  SIZE: 0x1000
+  ACCESS: rw
+
+histogram:
+  - [C_FLD, 1.0]
+  - [C_FSD, 1.0]
+
+# CHECK-DAG: C_FLD
+# CHECK-DAG: C_FSD
