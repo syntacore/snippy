@@ -1,0 +1,49 @@
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s
+options:
+  march: riscv64-unknown-elf
+  num-instrs: 100
+  mattr: -a,+m,-c,+zca,+zcb,+zba,+zbb
+  init-regs-in-elf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+
+  dump-mf: true
+
+sections:
+- no: 1
+  VMA: 0x1000
+  LMA: 0x1000
+  SIZE: 0x1000
+  ACCESS: rx
+- no: 2
+  VMA: 0x2000
+  LMA: 0x2000
+  SIZE: 0x1000
+  ACCESS: rw
+
+histogram:
+  - [C_LBU, 1.0]
+  - [C_LHU, 1.0]
+  - [C_LH, 1.0]
+  - [C_SB, 1.0]
+  - [C_SH, 1.0]
+  - [C_ZEXT_B, 1.0]
+  - [C_SEXT_B, 1.0]
+  - [C_ZEXT_H, 1.0]
+  - [C_SEXT_H, 1.0]
+  - [C_ZEXT_W, 1.0]
+  - [C_NOT, 1.0]
+  - [C_MUL, 1.0]
+
+# CHECK-DAG: C_LBU
+# CHECK-DAG: C_LHU
+# CHECK-DAG: C_LH
+# CHECK-DAG: C_SB
+# CHECK-DAG: C_SH
+# CHECK-DAG: C_ZEXT_B
+# CHECK-DAG: C_SEXT_B
+# CHECK-DAG: C_ZEXT_H
+# CHECK-DAG: C_SEXT_H
+# CHECK-DAG: C_ZEXT_W
+# CHECK-DAG: C_NOT
+# CHECK-DAG: C_MUL
