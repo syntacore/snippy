@@ -220,10 +220,15 @@ inline size_t getDataElementWidth(unsigned Opcode, unsigned SEW = 0,
   case RISCV::SH:
   case RISCV::FLH:
   case RISCV::FSH:
+  case RISCV::C_LHU:
+  case RISCV::C_LH:
+  case RISCV::C_SH:
     return 2;
   case RISCV::LB:
   case RISCV::LBU:
   case RISCV::SB:
+  case RISCV::C_LBU:
+  case RISCV::C_SB:
     return 1;
   default:
     // For vector instructions return one element size.
@@ -721,6 +726,11 @@ inline bool isCLoadStore(unsigned Opcode) {
   case RISCV::C_SD:
   case RISCV::C_SWSP:
   case RISCV::C_SDSP:
+  case RISCV::C_LBU:
+  case RISCV::C_LH:
+  case RISCV::C_LHU:
+  case RISCV::C_SB:
+  case RISCV::C_SH:
     return true;
   }
 }
