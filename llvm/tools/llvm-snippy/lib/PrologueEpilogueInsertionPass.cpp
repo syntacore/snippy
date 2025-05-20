@@ -64,6 +64,9 @@ public:
 
   auto getSpilledRegs(MachineFunction &MF) {
     auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+    auto &ProgCtx = SGCtx.getProgramContext();
+    auto &State = ProgCtx.getLLVMState();
+    const auto &SnippyTgt = State.getSnippyTarget();
     auto &FG = getAnalysis<FunctionGenerator>();
     bool IsRoot = FG.isRootFunction(MF);
 
@@ -75,6 +78,9 @@ public:
       auto RegSet = getAllMutatedRegs(MF);
       llvm::copy(RegSet, std::back_inserter(Ret));
     }
+
+    llvm::erase_if(
+        Ret, [&](auto &&Reg) { return !SnippyTgt.isRegClassSupported(Reg); });
 
     return Ret;
   }

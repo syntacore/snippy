@@ -2148,6 +2148,14 @@ public:
 
   MCRegister getStackPointer() const override { return RISCV::X2; }
 
+  bool isRegClassSupported(MCRegister Reg) const override {
+    return RISCV::GPRRegClass.contains(Reg) ||
+           RISCV::FPR16RegClass.contains(Reg) ||
+           RISCV::FPR32RegClass.contains(Reg) ||
+           RISCV::FPR64RegClass.contains(Reg) ||
+           RISCV::VRRegClass.contains(Reg);
+  }
+
   void generateSpillToStack(InstructionGenerationContext &IGC, MCRegister Reg,
                             MCRegister SP) const override {
     auto &ProgCtx = IGC.ProgCtx;
