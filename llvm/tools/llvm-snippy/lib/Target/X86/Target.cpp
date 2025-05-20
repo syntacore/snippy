@@ -116,6 +116,10 @@ public:
 
   MCRegister getStackPointer() const override { reportUnimplementedError(); }
 
+  bool isRegClassSupported(MCRegister Reg) const override {
+    reportUnimplementedError();
+  }
+
   void generateSpillToStack(InstructionGenerationContext &IGC, MCRegister Reg,
                             MCRegister SP) const override {
     reportUnimplementedError();
