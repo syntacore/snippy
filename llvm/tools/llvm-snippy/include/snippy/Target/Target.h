@@ -188,6 +188,9 @@ public:
   // NOTE: this list do not include stack pointer.
   virtual std::vector<MCRegister> getRegsPreservedByABI() const = 0;
 
+  // Checks if the given register belongs to a supported register class.
+  virtual bool isRegClassSupported(MCRegister Reg) const = 0;
+
   void generateSpillToAddr(InstructionGenerationContext &IGC, MCRegister Reg,
                            MemAddr Addr) const;
 
