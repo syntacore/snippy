@@ -74,6 +74,10 @@ public:
     reportUnimplementedError();
   }
 
+  unsigned getFPRegsCount(const TargetSubtargetInfo &ST) const override {
+    reportUnimplementedError();
+  }
+
   bool requiresCustomGeneration(const MCInstrDesc &InstrDesc) const override {
     reportUnimplementedError();
   }
@@ -510,6 +514,12 @@ public:
   }
 
   bool canProduceNaN(const MCInstrDesc &InstrDesc) const override {
+    reportUnimplementedError();
+  }
+
+  std::optional<std::pair<MCRegister, const MCRegisterClass *>>
+  tryGetNaNRegisterAndClass(InstructionGenerationContext &InstrGenCtx,
+                            MCRegister Reg) const override {
     reportUnimplementedError();
   }
 

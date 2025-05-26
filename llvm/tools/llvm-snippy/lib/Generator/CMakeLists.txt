@@ -4,6 +4,7 @@ set(LLVMSnippyGeneratorSources
   CFPermutation.cpp
   CFPermutationPass.cpp
   FunctionGeneratorPass.cpp
+  FPRNaNIdentifier.cpp
   GeneratorContext.cpp
   GeneratorContextPass.cpp
   GenerationLimit.cpp

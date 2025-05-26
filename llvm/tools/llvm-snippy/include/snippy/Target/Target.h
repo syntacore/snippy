@@ -278,6 +278,9 @@ public:
   virtual void generateRegsInit(InstructionGenerationContext &IGC,
                                 const IRegisterState &R) const = 0;
 
+  // Returns the number of available floating point registers in the program.
+  virtual unsigned getFPRegsCount(const TargetSubtargetInfo &ST) const = 0;
+
   virtual void generateCustomInst(
       const MCInstrDesc &InstrDesc,
       planning::InstructionGenerationContext &InstrGenCtx) const = 0;
@@ -305,6 +308,14 @@ public:
                         const StridedImmediate &StridedImm) const = 0;
 
   virtual bool canProduceNaN(const MCInstrDesc &InstrDesc) const = 0;
+
+  // Checks if there is an MCRegister associated with the provided `Reg` that
+  // can be marked as NaN. Returns an optional pair containing the associated
+  // MCRegister and its class if the associated register is NaN-markable.
+  // Returns nullopt if no such register exists.
+  virtual std::optional<std::pair<MCRegister, const MCRegisterClass *>>
+  tryGetNaNRegisterAndClass(InstructionGenerationContext &InstrGenCtx,
+                            MCRegister Reg) const = 0;
 
   // Get target-specific access mask requirements for operand in instruction.
   // Returns AccessMaskBit::None if no such.
