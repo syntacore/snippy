@@ -1150,6 +1150,19 @@ public:
       generateVRegsInitWithSplats(IGC, Regs);
   }
 
+  unsigned getFPRegsCount(const TargetSubtargetInfo &ST) const override {
+    const auto &RST = static_cast<const RISCVSubtarget &>(ST);
+    unsigned RegsCount = 0;
+    if (RST.hasStdExtZfh() || RST.hasStdExtZfhmin())
+      RegsCount += RISCV::FPR16RegClass.getNumRegs();
+    if (RST.hasStdExtF())
+      RegsCount += RISCV::FPR32RegClass.getNumRegs();
+    if (RST.hasStdExtD())
+      RegsCount += RISCV::FPR64RegClass.getNumRegs();
+
+    return RegsCount;
+  }
+
   void generateGPRInit(InstructionGenerationContext &IGC,
                        const RISCVRegisterState &Regs) const {
     auto &MBB = IGC.MBB;
@@ -3201,6 +3214,66 @@ private:
 
   bool canProduceNaN(const MCInstrDesc &InstrDesc) const override {
     return snippy::canProduceNaN(InstrDesc);
+  }
+
+  // Get the most superregister and its class id. For example, for F1_H, the
+  // pair <F1_D, RISCV::FPR64RegClassID> will be returned, if +d extension is
+  // enabled, otherwise it will return <F1_F, RISCV::FPR32RegClassID>
+  std::optional<std::pair<MCRegister, unsigned>>
+  getMostSuperFPRegWithClassID(const InstructionGenerationContext &InstrGenCtx,
+                               const MCRegisterInfo &RI, MCRegister Reg) const {
+    assert(isFloatingPoint(Reg));
+    static constexpr std::array<unsigned, 3> FPRClassesID{
+        RISCV::FPR16RegClassID, RISCV::FPR32RegClassID, RISCV::FPR64RegClassID};
+
+    auto &ST = InstrGenCtx.getSubtarget<RISCVSubtarget>();
+    SmallVector<MCRegister, 2> SupRegs(RI.superregs(Reg));
+    // When any of the zfh, zfhmin, or f extensions are enabled, we can only
+    // unNaN FPR32 registers. UnNaN operations on FPR64 registers require
+    // instructions from the d extension, which is not present in these
+    // configurations. Also handle the case when we have 32-bit GPR registers
+    // and can only overwrite single precision FP registers.
+    llvm::erase_if(SupRegs, [&](auto SupReg) {
+      return RI.getRegClass(RISCV::FPR64RegClassID).contains(SupReg) &&
+             (!ST.hasStdExtD() || ST.getXLen() == 32);
+    });
+    if (SupRegs.empty())
+      return std::nullopt;
+    // When the +d extension is enabled, the FPR64 register must be obtained. It
+    // is a superregister of FPR32
+    if (SupRegs.size() == 2)
+      llvm::erase_if(SupRegs, [&](auto &&SupReg) {
+        return !RI.getRegClass(RISCV::FPR64RegClassID).contains(SupReg);
+      });
+    assert(SupRegs.size() == 1);
+    auto SuperReg = SupRegs.front();
+    auto ClassIDIter = llvm::find_if(FPRClassesID, [&](auto ID) {
+      return RI.getRegClass(ID).contains(SuperReg);
+    });
+    assert(ClassIDIter != FPRClassesID.end());
+    return std::make_pair(SuperReg, *ClassIDIter);
+  }
+
+  // Returns an optional pair of the most super-register for the provided `Reg`
+  // and its class. Returns nullopt if a super-register does not exist for the
+  // `Reg`.
+  std::optional<std::pair<MCRegister, const MCRegisterClass *>>
+  tryGetNaNRegisterAndClass(InstructionGenerationContext &InstrGenCtx,
+                            MCRegister Reg) const override {
+    assert(isFloatingPoint(Reg));
+
+    auto &ProgCtx = InstrGenCtx.ProgCtx;
+    auto &RI = ProgCtx.getLLVMState().getRegInfo();
+    // We only keeps the most superregister because there's no point in
+    // flagging the single-precision register as NaN if we're going to
+    // overwrite the double-precision register later.
+    if (auto OptPair = getMostSuperFPRegWithClassID(InstrGenCtx, RI, Reg);
+        OptPair.has_value()) {
+      auto [SuperReg, RegClassID] = OptPair.value();
+      // If we write to subreg then super register will become NaN
+      return std::make_pair(SuperReg, &RI.getRegClass(RegClassID));
+    }
+    return std::nullopt;
   }
 
   std::unique_ptr<AsmPrinter>
