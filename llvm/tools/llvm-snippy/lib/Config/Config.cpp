@@ -1185,7 +1185,8 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
   auto &Tgt = State.getSnippyTarget();
   auto &TM = State.getTargetMachine();
   auto &CGLayout = PassCfg.CGLayout;
-  if (PassCfg.ModelPluginConfig.runOnModel() && !InitRegsInElf)
+  if (PassCfg.ModelPluginConfig.runOnModel() &&
+      (ProgramCfg->InitialRegYamlFile.empty() && !InitRegsInElf))
     snippy::warn(
         WarningName::NonReproducibleExecution,
         formatv("Execution on model without \"{0}\" option enabled will lead "
