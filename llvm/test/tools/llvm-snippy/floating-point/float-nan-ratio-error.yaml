@@ -1,0 +1,17 @@
+# RUN: not llvm-snippy %s --model-plugin None |& FileCheck %s
+
+include:
+  - ../Inputs/sections.yaml
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  mattr: "+d"
+  num-instrs: 10
+fpu-config:
+  overwrite:
+    nan-rewrite-ratio: 1.1
+histogram:
+  - [FDIV_D, 1.0]
+
+# CHECK: error: 'nan-rewrite-ratio' is expected
+# CHECK-SAME: to be in the range of 0 to 1, got 1.1

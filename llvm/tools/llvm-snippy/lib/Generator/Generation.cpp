@@ -247,14 +247,8 @@ static const auto &getAvailableFloatSemantics() {
 }
 
 static Expected<const fltSemantics &>
-getFloatSemanticsForReg(const MCRegisterInfo &RegInfo, MCRegister Reg) {
-  auto RegClass = llvm::find_if(RegInfo.regclasses(),
-                                [Reg](auto &C) { return C.contains(Reg); });
-  if (RegClass == RegInfo.regclass_end())
-    return createStringError(inconvertibleErrorCode(),
-                             "Could not find register register class that "
-                             "contains the requested register");
-  auto RegWidth = RegClass->getSizeInBits();
+getFloatSemanticsForRegClass(const MCRegisterClass &MCRegClass) {
+  auto RegWidth = MCRegClass.getSizeInBits();
   assert(RegWidth);
   auto &AvailableSemantics = getAvailableFloatSemantics();
   auto Found =
@@ -269,16 +263,17 @@ getFloatSemanticsForReg(const MCRegisterInfo &RegInfo, MCRegister Reg) {
   return *Sem;
 }
 
-static void unNaNRegister(planning::InstructionGenerationContext &InstrGenCtx,
-                          MCRegister Reg) {
+static void
+overwriteFPRegValue(planning::InstructionGenerationContext &InstrGenCtx,
+                    MCRegister Reg, const MCRegisterClass &MCRegClass) {
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   const auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
+  assert(Tgt.isFloatingPoint(Reg));
 
-  auto SelectedSemantics =
-      getFloatSemanticsForReg(ProgCtx.getLLVMState().getRegInfo(), Reg);
+  auto SelectedSemantics = getFloatSemanticsForRegClass(MCRegClass);
   if (!SelectedSemantics)
     snippy::fatal("Internal error",
-                  Twine("Cannot unNaNRegister: ")
+                  Twine("Cannot overwriteFPRegValue: ")
                       .concat(toString(SelectedSemantics.takeError())));
   Expected<APInt> ValueToWriteOrErr =
       InstrGenCtx.getOrCreateFloatOverwriteValueSampler(*SelectedSemantics)
@@ -287,11 +282,17 @@ static void unNaNRegister(planning::InstructionGenerationContext &InstrGenCtx,
   if (!ValueToWriteOrErr)
     snippy::fatal(ProgCtx.getLLVMState().getCtx(), "Internal error",
                   ValueToWriteOrErr.takeError());
+  assert(ValueToWriteOrErr->getBitWidth() ==
+         APFloat::semanticsSizeInBits(*SelectedSemantics));
 
+  auto ValueToWrite = *ValueToWriteOrErr;
   auto RP = InstrGenCtx.pushRegPool();
-  Tgt.writeValueToReg(InstrGenCtx, *ValueToWriteOrErr, Reg);
+  Tgt.writeValueToReg(InstrGenCtx, ValueToWrite, Reg);
 
-  InstrGenCtx.PotentialNaNs.erase(Reg);
+  APFloat SupportVal(*SelectedSemantics, ValueToWrite);
+  auto RegState =
+      SupportVal.isNaN() ? FPRNaNState::DEFINITELY_NAN : FPRNaNState::NOT_NAN;
+  InstrGenCtx.NaNIdent.markRegisterWithNaNState(Reg, MCRegClass, RegState);
 }
 
 static bool isDestinationRegister(const MachineOperand &Op) {
@@ -301,25 +302,35 @@ static bool isDestinationRegister(const MachineOperand &Op) {
 static bool hasDestinationRegister(const MachineInstr &MI) {
   if (!MI.getNumDefs())
     return false;
-  auto Operands = MI.operands();
-  return llvm::find_if(Operands, isDestinationRegister) != Operands.end();
+  auto Defs = MI.defs();
+  return llvm::find_if(Defs, isDestinationRegister) != Defs.end();
+}
+
+static const MachineOperand &getDestinationOperand(const MachineInstr &MI) {
+  assert(MI.getNumDefs());
+  auto Found = llvm::find_if(MI.defs(), isDestinationRegister);
+  assert(Found != MI.defs().end() && "MI has no destination registers");
+  return *Found;
+}
+
+static const MCRegisterClass &getRegClassForDestReg(const MachineInstr &MI,
+                                                    const MCRegisterInfo &RI) {
+  auto &Operand = getDestinationOperand(MI);
+  auto OperandId = Operand.getOperandNo();
+  assert(OperandId < MI.getNumOperands() && "Operand index is out of range");
+
+  auto &OperandInfo = MI.getDesc().operands()[OperandId];
+  return RI.getRegClass(OperandInfo.RegClass);
 }
 
 static MCRegister getFirstDestinationRegister(const MachineInstr &MI) {
-  assert(MI.getNumDefs());
-  auto Found = llvm::find_if(MI.operands(), isDestinationRegister);
-  assert(Found != MI.operands().end() && "MI has no destination registers");
-  return Found->getReg().asMCReg();
+  auto &Operand = getDestinationOperand(MI);
+  return Operand.getReg().asMCReg();
 }
 
 static MCRegister getDestinationRegister(const MachineInstr &MI) {
   assert(MI.getNumDefs() == 1);
   return getFirstDestinationRegister(MI);
-}
-
-static void markRegisterAsPotentialNaN(
-    MCRegister Reg, planning::InstructionGenerationContext &InstrGenCtx) {
-  InstrGenCtx.PotentialNaNs.insert(Reg);
 }
 
 static auto getInputRegisters(const MachineInstr &MI) {
@@ -332,7 +343,7 @@ static bool anyOfInputOperandsIsPotentiallyNaN(
     const planning::InstructionGenerationContext &InstrGenCtx) {
   auto InputRegisters = getInputRegisters(MI);
   return llvm::any_of(InputRegisters, [&](auto &Op) {
-    return InstrGenCtx.PotentialNaNs.count(Op.getReg().asMCReg());
+    return InstrGenCtx.NaNIdent.isPotentiallyNaN(Op.getReg().asMCReg());
   });
 }
 
@@ -341,7 +352,7 @@ static bool allInputOperandsArePotentialNaNs(
     const planning::InstructionGenerationContext &InstrGenCtx) {
   auto InputRegisters = getInputRegisters(MI);
   return llvm::all_of(InputRegisters, [&](auto &Op) {
-    return InstrGenCtx.PotentialNaNs.count(Op.getReg().asMCReg());
+    return InstrGenCtx.NaNIdent.isPotentiallyNaN(Op.getReg().asMCReg());
   });
 }
 
@@ -351,6 +362,18 @@ static bool hasFRegDestination(const MachineInstr &MI,
     return false;
   return hasDestinationRegister(MI) &&
          Tgt.isFloatingPoint(getDestinationRegister(MI));
+}
+
+static bool isNaNThresholdReached(const FPUSettings &FPUConfig,
+                                  NaNIdentifier &NaNIdent,
+                                  const MCRegisterClass &RegClass) {
+  assert(FPUConfig.isNaNRatioSet());
+
+  auto NaNRatio = FPUConfig.Overwrite.NaNRatio.value();
+  auto NaNRegsCount =
+      NaNIdent.getNaNStateRegistersCount(RegClass, FPRNaNState::DEFINITELY_NAN);
+  auto CurrRatio = static_cast<double>(NaNRegsCount) / RegClass.getNumRegs();
+  return CurrRatio >= NaNRatio;
 }
 
 static bool shouldRewriteRegValue(
@@ -368,8 +391,9 @@ static bool shouldRewriteRegValue(
     assert(SimCtx.hasTrackingMode());
     auto Reg = getDestinationRegister(MI);
     auto &ProgCtx = InstrGenCtx.ProgCtx;
+    auto &RI = ProgCtx.getLLVMState().getRegInfo();
     auto SelectedSemantics =
-        getFloatSemanticsForReg(ProgCtx.getLLVMState().getRegInfo(), Reg);
+        getFloatSemanticsForRegClass(getRegClassForDestReg(MI, RI));
     if (!SelectedSemantics)
       snippy::fatal("Internal error",
                     Twine("Cannot check if register is NaN: ")
@@ -390,26 +414,63 @@ void controlNaNPropagation(
     planning::InstructionGenerationContext &InstrGenCtx) {
   if (Begin == End)
     return;
+
   auto &SimCtx = InstrGenCtx.SimCtx;
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
+  auto &NaNIdent = InstrGenCtx.NaNIdent;
+  auto &FPUConfig = InstrGenCtx.getCommonCfg().FPUConfig;
   auto &Tgt = State.getSnippyTarget();
   auto Filtered =
       llvm::make_filter_range(llvm::make_range(Begin, End), [&](auto &MI) {
         return (MI.getNumDefs() == 1) && hasFRegDestination(MI, Tgt);
       });
 
-  SmallVector<MCRegister, 8> RegsToUnNaN;
+  auto RI = ProgCtx.getLLVMState().getRegInfo();
+  // Here we add register classes whose registers will be unnaned
+  SmallPtrSet<const MCRegisterClass *, 3> RegClassesToUnNaN;
   llvm::for_each(Filtered, [&](auto &MI) {
-    if (Tgt.canProduceNaN(MI.getDesc()) ||
-        anyOfInputOperandsIsPotentiallyNaN(MI, InstrGenCtx))
-      markRegisterAsPotentialNaN(getDestinationRegister(MI), InstrGenCtx);
-    if (shouldRewriteRegValue(MI, InstrGenCtx))
-      RegsToUnNaN.push_back(getDestinationRegister(MI));
+    auto DestReg = getDestinationRegister(MI);
+    auto &RegClass = getRegClassForDestReg(MI, RI);
+    // Marking a register as a possible NaN only if it has not been marked as a
+    // definitely NaN before
+    if ((Tgt.canProduceNaN(MI.getDesc()) ||
+         anyOfInputOperandsIsPotentiallyNaN(MI, InstrGenCtx)) &&
+        !NaNIdent.isDefinitelyNaN(DestReg)) {
+      NaNIdent.markRegisterWithNaNState(DestReg, RegClass,
+                                        FPRNaNState::POSSIBLY_NAN);
+    }
+
+    if (shouldRewriteRegValue(MI, InstrGenCtx)) {
+      RegClassesToUnNaN.insert(&RegClass);
+      // Marking the rewritable register as NaN
+      NaNIdent.markRegisterWithNaNState(DestReg, RegClass,
+                                        FPRNaNState::DEFINITELY_NAN);
+    }
+    // If it is possible to mark the register associated with DestReg as NaN,
+    // add its class to the storage for future unnaning
+    if (FPUConfig.isNaNRatioSet())
+      if (auto UnNaNOpt = Tgt.tryGetNaNRegisterAndClass(InstrGenCtx, DestReg)) {
+        auto [Reg, RegClassToUnNaN] = UnNaNOpt.value();
+        assert(RegClassToUnNaN);
+        assert(RegClassToUnNaN->contains(Reg));
+        NaNIdent.markRegisterWithNaNState(Reg, *RegClassToUnNaN,
+                                          FPRNaNState::DEFINITELY_NAN);
+        RegClassesToUnNaN.insert(RegClassToUnNaN);
+      }
   });
   auto Beg = std::prev(End);
-  for (auto Reg : RegsToUnNaN)
-    unNaNRegister(InstrGenCtx, Reg);
+  for (const auto *RegClass : RegClassesToUnNaN) {
+    assert(RegClass);
+    auto ShouldRewrite =
+        FPUConfig.isNaNRatioSet()
+            ? isNaNThresholdReached(FPUConfig, NaNIdent, *RegClass)
+            : true;
+    if (ShouldRewrite)
+      for (auto &&Reg :
+           NaNIdent.getRegsInState(*RegClass, FPRNaNState::DEFINITELY_NAN))
+        overwriteFPRegValue(InstrGenCtx, Reg, *RegClass);
+  }
   if (!SimCtx.hasTrackingMode())
     return;
   if (interpretInstrs(++Beg, End, State, SimCtx) != GenerationStatus::Ok)

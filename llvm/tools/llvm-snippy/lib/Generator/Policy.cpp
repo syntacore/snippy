@@ -39,7 +39,10 @@ createFloatSemanticsSampler(const CommonPolicyConfig &Cfg) {
 InstructionGenerationContext::InstructionGenerationContext(
     MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
     SnippyProgramContext &ProgCtx, const SimulatorContext &SimCtx)
-    : MBB(MBB), Ins(Ins), ProgCtx(ProgCtx), SimCtx(SimCtx), RPS(ProgCtx) {
+    : MBB(MBB), Ins(Ins), ProgCtx(ProgCtx), SimCtx(SimCtx),
+      NaNIdent(ProgCtx.getLLVMState().getSnippyTarget().getFPRegsCount(
+          MBB.getParent()->getSubtarget())),
+      RPS(ProgCtx) {
   switchConfig();
 }
 
@@ -47,7 +50,10 @@ InstructionGenerationContext::InstructionGenerationContext(
     MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
     SnippyProgramContext &ProgCtx)
     : NullSimCtx(std::make_unique<SimulatorContext>()), MBB(MBB), Ins(Ins),
-      ProgCtx(ProgCtx), SimCtx(*NullSimCtx), RPS(ProgCtx) {
+      ProgCtx(ProgCtx), SimCtx(*NullSimCtx),
+      NaNIdent(ProgCtx.getLLVMState().getSnippyTarget().getFPRegsCount(
+          MBB.getParent()->getSubtarget())),
+      RPS(ProgCtx) {
   switchConfig();
 }
 
@@ -70,7 +76,10 @@ InstructionGenerationContext::InstructionGenerationContext(
     MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
     GeneratorContext &GC, RegPoolWrapper &RPW)
     : NullSimCtx(std::make_unique<SimulatorContext>()), MBB(MBB), Ins(Ins),
-      ProgCtx(GC.getProgramContext()), SimCtx(*NullSimCtx), RPS(ProgCtx, RPW) {}
+      ProgCtx(GC.getProgramContext()), SimCtx(*NullSimCtx),
+      NaNIdent(ProgCtx.getLLVMState().getSnippyTarget().getFPRegsCount(
+          MBB.getParent()->getSubtarget())),
+      RPS(ProgCtx, RPW) {}
 
 InstructionGenerationContext::~InstructionGenerationContext() = default;
 
