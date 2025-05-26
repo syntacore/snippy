@@ -67,6 +67,7 @@
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/RegisterHistogram.h"
+#include "snippy/Generator/FPRNaNIdentifier.h"
 #include "snippy/Generator/GenerationLimit.h"
 #include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/SelfCheckInfo.h"
@@ -75,7 +76,6 @@
 
 #include <functional>
 #include <memory>
-#include <unordered_set>
 
 template <> struct std::hash<llvm::MCRegister> {
   std::size_t operator()(const llvm::MCRegister &Reg) const {
@@ -224,6 +224,7 @@ public:
   SnippyProgramContext &ProgCtx;
 
   const SimulatorContext &SimCtx;
+  NaNIdentifier NaNIdent;
   GenerationStatistics Stats;
   TopLevelMemoryAccessSampler *MAS = nullptr;
   SnippyFunctionMetadata *SFM = nullptr;
@@ -231,7 +232,6 @@ public:
   const CallGraphState *CGS = nullptr;
   MemAccessInfo *MAI = nullptr;
   const SnippyLoopInfo *SLI = nullptr;
-  std::unordered_set<MCRegister> PotentialNaNs{};
   unsigned SizeErrorCount = 0;
   unsigned BacktrackCount = 0;
 
