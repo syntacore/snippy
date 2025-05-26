@@ -60,6 +60,9 @@ struct FloatOverwriteValues final {
 };
 
 struct FloatOverwriteSettings final {
+  // Triggers a rewrite of registers containing NaN values when their ratio
+  // exceeds the specified threshold
+  std::optional<double> NaNRatio;
   std::optional<FloatOverwriteRange> IntegralRange;
   std::optional<FloatOverwriteValues> HalfValues;
   std::optional<FloatOverwriteValues> SingleValues;
@@ -74,6 +77,7 @@ struct FloatOverwriteSettings final {
 struct FPUSettings final {
   FloatOverwriteSettings Overwrite;
   bool needsModel() const { return Overwrite.needsModel(); }
+  bool isNaNRatioSet() const { return Overwrite.NaNRatio.has_value(); }
 };
 
 LLVM_SNIPPY_YAML_STRONG_TYPEDEF(RoundingMode, FPURoundingMode);
