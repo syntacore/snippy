@@ -12,6 +12,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/ADT/identity.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/YAMLTraits.h"
 
 namespace llvm {
@@ -148,6 +149,7 @@ void yaml::MappingTraits<FloatOverwriteSettings>::mapping(
   IO.mapOptional("ieee-half", Cfg.HalfValues);
   IO.mapOptional("ieee-single", Cfg.SingleValues);
   IO.mapOptional("ieee-double", Cfg.DoubleValues);
+  IO.mapOptional("nan-rewrite-ratio", Cfg.NaNRatio);
 }
 
 namespace snippy {
@@ -313,7 +315,8 @@ createSamplerForEntry(const ValuegramEntry &Entry, uint32_t BitWidth) {
                 -> Expected<std::unique_ptr<IAPIntSampler>> {
         assert(BitRangeEntry);
         auto SamplerOrErr =
-            APIntRangeSampler::create(BitRangeEntry->Min, BitRangeEntry->Max,
+            APIntRangeSampler::create(BitRangeEntry->Min.zextOrTrunc(BitWidth),
+                                      BitRangeEntry->Max.zextOrTrunc(BitWidth),
                                       /*IsSigned=*/false);
         if (!SamplerOrErr)
           return Expected<std::unique_ptr<IAPIntSampler>>(
@@ -375,6 +378,12 @@ std::string yaml::MappingTraits<FloatOverwriteSettings>::validate(
         return ErrMsg;
     }
   }
+
+  if (auto Ratio = Cfg.NaNRatio;
+      Ratio.has_value() && (Ratio.value() < 0 || Ratio.value() > 1))
+    return formatv(
+        "'nan-rewrite-ratio' is expected to be in the range of 0 to 1, got {0}",
+        Ratio.value());
 
   return "";
 }
