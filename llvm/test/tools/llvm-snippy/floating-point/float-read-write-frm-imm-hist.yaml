@@ -1,0 +1,38 @@
+# RUN: llvm-snippy %s -mattr +f,-d -model-plugin None -o %t
+# RUN: llvm-objdump %t.elf -d |& FileCheck %s -dump-input fail
+# RUN: llvm-snippy %s -mattr +d -model-plugin None -o %t
+# RUN: llvm-objdump %t.elf -d |& FileCheck %s -dump-input fail
+include:
+  - ../Inputs/sections.yaml
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  num-instrs: 2000
+histogram:
+  - [WriteFRMImm, 1.0]
+  - [SwapFRMImm, 1.0]
+  - [ReadFRM, 1.0]
+imm-hist:
+  opcodes:
+    - "WriteFRMImm|SwapFRMImm":
+        - [0, 1.0] # RNE
+        - [1, 1.0] # RTZ
+        - [2, 1.0] # RDN
+        - [3, 1.0] # RUP
+        - [4, 1.0] # RMM
+
+# CHECK-DAG: fsrmi {{[sat][[:digit:]]+,}} 0x0
+# CHECK-DAG: fsrmi 0x0
+# CHECK-DAG: fsrmi {{[sat][[:digit:]]+,}} 0x1
+# CHECK-DAG: fsrmi 0x1
+# CHECK-DAG: fsrmi {{[sat][[:digit:]]+,}} 0x2
+# CHECK-DAG: fsrmi 0x2
+# CHECK-DAG: fsrmi {{[sat][[:digit:]]+,}} 0x3
+# CHECK-DAG: fsrmi 0x3
+# CHECK-DAG: fsrmi {{[sat][[:digit:]]+,}} 0x4
+# CHECK-DAG: fsrmi 0x4
+# CHECK-DAG: frrm {{[sat][[:digit:]]+}}
+
+# CHECK-NOT: fsrmi 0x5
+# CHECK-NOT: fsrmi 0x6
+# CHECK-NOT: fsrmi 0x7

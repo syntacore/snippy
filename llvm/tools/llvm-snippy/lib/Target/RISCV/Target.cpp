@@ -1065,9 +1065,21 @@ public:
     return MissingFeatures.none();
   }
   bool isPseudoAllowed(unsigned Opcode) const override {
-    if (Opcode == RISCV::PAUSE)
+    switch (Opcode) {
+    case RISCV::PAUSE:
+    // Floating-point CSR control.
+    case RISCV::ReadFFLAGS:
+    // For clearing and reading fflags when used with per-opcode `imm-hist`.
+    case RISCV::WriteFFLAGSImm:
+    case RISCV::SwapFFLAGSImm:
+    case RISCV::ReadFRM:
+    // Allows setting rounding mode when combined with per-opcode `imm-hist`.
+    case RISCV::WriteFRMImm:
+    case RISCV::SwapFRMImm:
       return true;
-    return false;
+    default:
+      return false;
+    }
   }
 
   std::unique_ptr<IRegisterState>
@@ -2569,9 +2581,16 @@ public:
       // 101 - <reserved>
       // 110 - <reserved>
       // 111 - DYN (In instruction’s rm field, selects dynamic rounding mode)
-      using namespace RISCVFPRndMode;
-      return MachineOperand::CreateImm(
-          snippy::selectFrom(RNE, RTZ, RDN, RUP, RMM));
+      return MachineOperand::CreateImm([&]() -> int {
+        using namespace RISCVFPRndMode;
+        // If the immediate histogram is specified then sample it.
+        if (IH)
+          return genImmInInterval<RNE, DYN>(*IH);
+        // Otherwise generate only valid static rounding modes or use dynamic
+        // one.
+        return static_cast<int>(
+            snippy::selectFrom(RNE, RTZ, RDN, RUP, RMM, DYN));
+      }());
     }
     }
   }
