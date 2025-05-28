@@ -1,0 +1,45 @@
+# RUN: llvm-snippy %s | FileCheck %s
+
+include:
+  - ../Inputs/sections.yaml
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  mattr: "+f"
+  num-instrs: 1000
+  dump-mf: true
+histogram:
+  - [FADD_S, 1.0]
+  - [FSUB_S, 1.0]
+imm-hist:
+  opcodes:
+    - "FADD_S":
+        - [7, 1.0] # DYN
+    - "FSUB_S":
+        - [0, 1.0] # RNE
+
+# COM: RNE - 0b000
+# COM: RTZ - 0b001
+# COM: RDN - 0b010
+# COM: RUP - 0b011
+# COM: RMM - 0b100
+# COM: DYN - 0b111
+
+# CHECK-DAG: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 7
+# CHECK-DAG: [[REG:\$f[[:digit:]]+_f]] = FSUB_S {{.*}}, 0
+
+# CHECK-NOT: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 0
+# CHECK-NOT: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 1
+# CHECK-NOT: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 2
+# CHECK-NOT: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 3
+# CHECK-NOT: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 4
+# CHECK-NOT: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 5
+# CHECK-NOT: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 6
+
+# CHECK-NOT: [[REG:\$f[[:digit:]]+_f]] = FSUB_S {{.*}}, 1
+# CHECK-NOT: [[REG:\$f[[:digit:]]+_f]] = FSUB_S {{.*}}, 2
+# CHECK-NOT: [[REG:\$f[[:digit:]]+_f]] = FSUB_S {{.*}}, 3
+# CHECK-NOT: [[REG:\$f[[:digit:]]+_f]] = FSUB_S {{.*}}, 4
+# CHECK-NOT: [[REG:\$f[[:digit:]]+_f]] = FSUB_S {{.*}}, 5
+# CHECK-NOT: [[REG:\$f[[:digit:]]+_f]] = FSUB_S {{.*}}, 6
+# CHECK-NOT: [[REG:\$f[[:digit:]]+_f]] = FSUB_S {{.*}}, 7
