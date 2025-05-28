@@ -1800,6 +1800,9 @@ def WriteVXRMImm : WriteSysRegImm<SysRegVXRM, [VXRM]>;
 let hasSideEffects = true in {
 def ReadFFLAGS : ReadSysReg<SysRegFFLAGS, [FFLAGS]>;
 def WriteFFLAGS : WriteSysReg<SysRegFFLAGS, [FFLAGS]>;
+// Needed only for llvm-snippy.
+def WriteFFLAGSImm : WriteSysRegImm<SysRegFFLAGS, [FFLAGS]>;
+def SwapFFLAGSImm : SwapSysRegImm<SysRegFFLAGS, [FFLAGS]>;
 }
 /// Other pseudo-instructions
 
