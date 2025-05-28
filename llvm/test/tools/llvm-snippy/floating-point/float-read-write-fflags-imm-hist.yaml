@@ -1,0 +1,22 @@
+# RUN: llvm-snippy %s -mattr +f,-d -model-plugin None -o %t
+# RUN: llvm-objdump %t.elf -d |& FileCheck %s -dump-input fail
+# RUN: llvm-snippy %s -mattr +d -model-plugin None -o %t
+# RUN: llvm-objdump %t.elf -d |& FileCheck %s -dump-input fail
+include:
+  - ../Inputs/sections.yaml
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  num-instrs: 1000
+histogram:
+  - [ReadFFLAGS, 1.0]
+  - [WriteFFLAGSImm, 1.0]
+  - [SwapFFLAGSImm, 1.0]
+imm-hist:
+  opcodes:
+    - "WriteFFLAGSImm|SwapFFLAGSImm":
+        - [0, 1.0] # Clear flags
+
+# CHECK-DAG: frflags {{[sat][[:digit:]]+}}
+# CHECK-DAG: fsflagsi {{[sat][[:digit:]]+}}, 0x0
+# CHECK-DAG: fsflagsi 0x0
