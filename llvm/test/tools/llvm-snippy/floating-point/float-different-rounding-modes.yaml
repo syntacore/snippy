@@ -16,9 +16,11 @@ histogram:
 # COM: RDN - 0b010
 # COM: RUP - 0b011
 # COM: RMM - 0b100
+# COM: DYN - 0b111
 
 # CHECK-DAG: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 0
 # CHECK-DAG: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 1
 # CHECK-DAG: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 2
 # CHECK-DAG: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 3
 # CHECK-DAG: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 4
+# CHECK-DAG: [[REG:\$f[[:digit:]]+_f]] = FADD_S {{.*}}, 7
