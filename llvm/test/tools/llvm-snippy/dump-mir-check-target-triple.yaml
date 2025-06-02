@@ -19,4 +19,4 @@ sections:
     ACCESS: rw
 
 #CHECK: ModuleID = 'main'
-#CHECK: target triple = "riscv64-unknown-elf"
+#CHECK: target triple = "riscv64-unknown-unknown-elf"

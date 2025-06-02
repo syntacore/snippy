@@ -1,0 +1,23 @@
+# REQUIRES: x86-registered-target
+# RUN: not llvm-snippy %s |& FileCheck %s
+options:
+  mtriple: x86_64
+  march: tigerlake
+  init-regs-in-elf: on
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram: 
+    - [ADD, 1.0]
+
+# CHECK: error: Invalid march: march is not implemented for this target
