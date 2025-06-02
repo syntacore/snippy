@@ -35,6 +35,7 @@
 #include "llvm/Support/VCSRevision.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Host.h"
+#include "llvm/TargetParser/Triple.h"
 
 #include <algorithm>
 #include <sstream>
@@ -180,16 +181,17 @@ static void initializeLLVMAll() {
 
 static SelectedTargetInfo getSelectedTargetInfo() {
   SelectedTargetInfo TargetInfo;
-  if (MArch.getValue().empty()) {
-    // select current target
-    TargetInfo.Triple = sys::getProcessTriple();
-    TargetInfo.CPU = CpuName.getValue().empty() ? sys::getHostCPUName().str()
-                                                : CpuName.getValue();
-  } else {
-    TargetInfo.Triple = MArch.getValue();
-    TargetInfo.CPU = CpuName.getValue();
-  }
+  TargetInfo.Triple = MTargetTriple.getValue();
+  TargetInfo.MArch = MArch.getValue();
+  TargetInfo.CPU = CpuName.getValue();
   TargetInfo.Features = MAttr.getValue();
+
+  if (!MTargetTriple.isSpecified() && !MArch.isSpecified()) {
+    TargetInfo.Triple = sys::getProcessTriple();
+    if (!CpuName.isSpecified())
+      TargetInfo.CPU = sys::getHostCPUName();
+  }
+
   return TargetInfo;
 }
 
