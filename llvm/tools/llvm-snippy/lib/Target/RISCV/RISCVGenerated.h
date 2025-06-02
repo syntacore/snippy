@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "MCTargetDesc/RISCVMCTargetDesc.h"
 #include "snippy/Support/DiagnosticInfo.h"
 
 #include "RISCV.h"
@@ -229,6 +230,13 @@ inline size_t getDataElementWidth(unsigned Opcode, unsigned SEW = 0,
   case RISCV::SB:
   case RISCV::C_LBU:
   case RISCV::C_SB:
+  case RISCV::CBO_CLEAN:
+  case RISCV::CBO_FLUSH:
+  case RISCV::CBO_INVAL:
+  case RISCV::CBO_ZERO:
+  case RISCV::PREFETCH_I:
+  case RISCV::PREFETCH_W:
+  case RISCV::PREFETCH_R:
     return 1;
   default:
     // For vector instructions return one element size.
@@ -699,6 +707,21 @@ inline bool isLoadStore(unsigned Opcode) {
   case RISCV::SH:
   case RISCV::SW:
   case RISCV::SD:
+    return true;
+  }
+}
+
+inline bool isZicbo(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RISCV::CBO_CLEAN:
+  case RISCV::CBO_FLUSH:
+  case RISCV::CBO_INVAL:
+  case RISCV::CBO_ZERO:
+  case RISCV::PREFETCH_I:
+  case RISCV::PREFETCH_R:
+  case RISCV::PREFETCH_W:
     return true;
   }
 }
