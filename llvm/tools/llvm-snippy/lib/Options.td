@@ -2,12 +2,17 @@ include "snippy/Support/Options.td"
 
 def Options : OptionGroup<"options", true>;
 
-// FIXME: Unlike clang, march here is not something like rv64gc (provided by
-// attrs and CPU). Instead it is something like target (try riscv64-linux-gnu).
+// Deprecated for setting up target triple. Replaced with toolchain conventional
+// march (like rv32gc)
 def MArch : StringOption<"march">,
             Description<"Target architecture">,
-            ValueDescription<"triple">,
+            ValueDescription<"one of suppported archs: RISCV, etc..">,
             Group<Options>;
+
+def MTargetTriple : StringOption<"mtriple">,
+                    Description<"Target triple">,
+                    ValueDescription<"one of suppported triple: riscv64-linux-gnu, etc..">,
+                    Group<Options>;
 
 def CpuName : StringOption<"mcpu">,
               Description<"CPU name to use, leave empty to autodetect">,

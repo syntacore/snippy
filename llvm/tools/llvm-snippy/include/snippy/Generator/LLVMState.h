@@ -45,6 +45,7 @@ namespace snippy {
 
 struct SelectedTargetInfo final {
   std::string Triple;
+  std::string MArch;
   std::string CPU;
   std::string Features;
 };

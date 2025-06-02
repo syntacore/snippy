@@ -22,9 +22,11 @@ sections:
 histogram:
     - [LD, 1.0]
 
+# CHECK: warning: (march-is-triple) 'march' with triple value is deprecated: use 'mtriple' option instead
 # CHECK: warning: (inconsistent-options) Section 'stack' will not be used: external stack was enabled.
 # CHECK: warning: (no-model-exec) Skipping snippet execution on the model: model was set no 'None'.
 # CHECK: _______
 # CHECK-NEXT: Test Generation resulted in the following warnings:
+# CHECK-NEXT: * 'march' with triple value is deprecated: use 'mtriple' option instead
 # CHECK-NEXT: * Section 'stack' will not be used: external stack was enabled. (x1)
 # CHECK-NEXT: * Skipping snippet execution on the model: model was set no 'None'. (x1)

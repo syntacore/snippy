@@ -1,6 +1,6 @@
 # RUN: llvm-snippy %s --model-plugin None |& FileCheck %s --check-prefix=WARN
 # RUN: llvm-snippy %s --model-plugin None \
-# RUN:   -Wdisable=memory-access,unused-section,no-model-exec \
+# RUN:   -Wdisable=memory-access,unused-section,no-model-exec,march-is-triple \
 # RUN:   |& FileCheck %s --check-prefix=NOWARN
 # RUN: llvm-snippy %s --model-plugin None \
 # RUN:   -Wdisable=memory-access,unused-section \
@@ -45,9 +45,11 @@ access-ranges:
 # WARN-DAG: warning: (unused-section) Following RX sections are unused during generation: '3'
 # WARN-DAG: warning: (memory-access) Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout:
 # WARN-DAG: warning: (no-model-exec) Skipping snippet execution on the model: model was set no 'None'
+# WARN-DAG: warning: (march-is-triple) 'march' with triple value is deprecated: use 'mtriple' option instead
 
 # NOWARN-NOT: warning
 
+# SOMEWARN: warning: (march-is-triple) 'march' with triple value is deprecated: use 'mtriple' option instead
 # SOMEWARN: warning: (no-model-exec) Skipping snippet execution on the model: model was set no 'None'
 # SOMEWARN-NOT: Possibly wrong memory scheme
 # SOMEWARN-NOT: Following RX sections are unused during deneration

@@ -8,6 +8,7 @@
 
 #include "snippy/Generator/LLVMState.h"
 
+#include "snippy/Support/Error.h"
 #include "snippy/Target/Target.h"
 
 #include "llvm/CodeGen/AsmPrinter.h"
@@ -22,6 +23,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
+#include "llvm/TargetParser/RISCVISAInfo.h"
 
 namespace llvm {
 namespace snippy {
@@ -36,34 +38,111 @@ LLVMState::LLVMState(const SnippyTarget *SnippyTarget,
       TheContext(std::move(Context)), TheCodeEmitter(std::move(CodeEmitter)),
       TheDisassembler(std::move(Disassembler)) {}
 
+static Expected<std::string> getRISCVFeaturesFromMArch(StringRef MArch) {
+  auto ISAInfo = RISCVISAInfo::parseArchString(
+      MArch, /*EnableExperimentalExtension=*/true);
+  if (!ISAInfo)
+    return ISAInfo.takeError();
+  assert(ISAInfo->get());
+  auto ISAFeatures = ISAInfo->get()->toFeatures();
+  std::string Buffer;
+  raw_string_ostream FeatOS(Buffer);
+  ListSeparator LS(",");
+  for (const auto &Feat : ISAFeatures)
+    FeatOS << LS << Feat;
+
+  return FeatOS.str();
+}
+
+static Expected<std::string>
+getTargetFeaturesFromMArch(Triple::ArchType ArchType, StringRef MArch) {
+  assert(ArchType != Triple::ArchType::UnknownArch);
+  switch (ArchType) {
+  case Triple::ArchType::riscv32:
+  case Triple::ArchType::riscv64:
+    return getRISCVFeaturesFromMArch(MArch);
+  default:
+    return makeFailure(Errc::Unimplemented,
+                       "march is not implemented for this target");
+  }
+}
+
+static bool checkTriple(const Triple &TheTriple) {
+  return !TheTriple.getTriple().empty() &&
+         TheTriple.getArch() != Triple::ArchType::UnknownArch;
+}
+
+struct DeducedTriple {
+  Triple TheTriple;
+  bool MArchIsTriple;
+};
+
+static auto deduceTriple(StringRef MTriple, StringRef MArch) {
+  bool MArchIsTriple = false;
+  Triple TheTriple(MTriple);
+  if (!MTriple.empty() || MArch.empty())
+    return DeducedTriple{TheTriple, MArchIsTriple};
+
+  assert(!checkTriple(TheTriple));
+  Triple TripleFromMArch(MArch);
+  if (!checkTriple(TripleFromMArch))
+    return DeducedTriple{TheTriple, MArchIsTriple};
+
+  MArchIsTriple = true;
+  return DeducedTriple{TripleFromMArch, MArchIsTriple};
+}
+
 Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
+  auto [TheTriple, MArchIsTriple] =
+      deduceTriple(TargetInfo.Triple, TargetInfo.MArch);
+  if (!checkTriple(TheTriple))
+    return makeFailure(Errc::InvalidArgument,
+                       TheTriple.getTriple().empty()
+                           ? "target triple is not specified"
+                           : "unknown target specified");
+
+  if (MArchIsTriple)
+    snippy::warn(WarningName::MArchIsTriple,
+                 "'march' with triple value is deprecated",
+                 "use 'mtriple' option instead");
+
+  auto TripleStr = TheTriple.normalize();
   std::string Error;
-  const Target *const Tgt =
-      TargetRegistry::lookupTarget(TargetInfo.Triple, Error);
+  const Target *Tgt = TargetRegistry::lookupTarget(TripleStr, Error);
 
   if (!Tgt)
     return makeFailure(Errc::InvalidConfiguration, Twine(Error));
 
-  const TargetOptions Options;
-  auto TargetFeatures = TargetInfo.Features;
+  std::string TargetFeatures;
+  if (!MArchIsTriple && !TargetInfo.MArch.empty()) {
+    auto ExpectedFeatures =
+        getTargetFeaturesFromMArch(TheTriple.getArch(), TargetInfo.MArch);
+    if (!ExpectedFeatures)
+      return makeFailure(Errc::InvalidArgument,
+                         formatv("Invalid march: {0}",
+                                 toString(ExpectedFeatures.takeError())));
+    TargetFeatures = std::move(ExpectedFeatures.get());
+  }
+
+  TargetFeatures += ",";
+  TargetFeatures += TargetInfo.Features;
   // Relax feature is enabled by default to enable desired
   // type of relocations be produced by linker that AsmPrinter
   // cannot do by itself on some targets.
   // E.G.: RISCV AsmPrinter cannot emit JAL directly.
   TargetFeatures += ",+relax";
+  const TargetOptions Options;
   auto TM = std::unique_ptr<LLVMTargetMachine>(static_cast<LLVMTargetMachine *>(
-      Tgt->createTargetMachine(TargetInfo.Triple, TargetInfo.CPU,
-                               TargetFeatures, Options, Reloc::Model::Static)));
-
+      Tgt->createTargetMachine(TripleStr, TargetInfo.CPU, TargetFeatures,
+                               Options, Reloc::Model::Static)));
   if (!TM)
     return makeFailure(Errc::Failure, "Unable to create target machine");
 
   auto TT = TM->getTargetTriple();
   const auto *SnippyTgt = SnippyTarget::lookup(TT);
   if (!SnippyTgt)
-    return makeFailure(
-        Errc::InvalidConfiguration,
-        llvm::formatv("No snippy target for {0}", TargetInfo.Triple));
+    return makeFailure(Errc::InvalidConfiguration,
+                       llvm::formatv("No snippy target for {0}", TripleStr));
 
   const Target &T = TM->getTarget();
   const auto *STI = TM->getMCSubtargetInfo();
@@ -74,7 +153,7 @@ Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
         llvm::formatv("cpu '{0}' is not valid for the specified subtarget",
                       TargetInfo.CPU));
 
-  auto MCCtx = std::make_unique<MCContext>(TT, TM->getMCAsmInfo(),
+  auto MCCtx = std::make_unique<MCContext>(TheTriple, TM->getMCAsmInfo(),
                                            TM->getMCRegisterInfo(), STI);
   auto *MCII = TM->getMCInstrInfo();
   assert(MCII);
