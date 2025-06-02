@@ -42,7 +42,8 @@ namespace snippy {
   WARN_CASE(EmptyElfSection, "empty-elf-section")                              \
   WARN_CASE(GenPlanVerification, "gen-plan-verification")                      \
   WARN_CASE(SeedNotSpecified, "seed-not-specified")                            \
-  WARN_CASE(NonReproducibleExecution, "non-reproducible-execution")
+  WARN_CASE(NonReproducibleExecution, "non-reproducible-execution")            \
+  WARN_CASE(MArchIsTriple, "march-is-triple")
 
 #ifdef WARN_CASE
 #error WARN_CASE should not be defined at this point
