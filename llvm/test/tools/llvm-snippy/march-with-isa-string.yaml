@@ -1,0 +1,150 @@
+# RUN: llvm-snippy %s -march=rv64gc -init-regs-in-elf -dump-mf |& FileCheck %s
+# RUN: llvm-snippy %s -march=rv64gc -init-regs-in-elf -dump-mf -mattr=-d \
+# RUN:     |& FileCheck %s --check-prefix=NO-DOUBLE
+options:
+  mtriple: riscv64
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram: 
+    - [ADD, 1.0]
+
+# CHECK-DAG: $x1
+# CHECK-DAG: $x2
+# CHECK-DAG: $x3
+# CHECK-DAG: $x4
+# CHECK-DAG: $x5
+# CHECK-DAG: $x6
+# CHECK-DAG: $x7
+# CHECK-DAG: $x8
+# CHECK-DAG: $x9
+# CHECK-DAG: $x10
+# CHECK-DAG: $x11
+# CHECK-DAG: $x12
+# CHECK-DAG: $x13
+# CHECK-DAG: $x14
+# CHECK-DAG: $x15
+# CHECK-DAG: $x16
+# CHECK-DAG: $x17
+# CHECK-DAG: $x18
+# CHECK-DAG: $x19
+# CHECK-DAG: $x20
+# CHECK-DAG: $x21
+# CHECK-DAG: $x22
+# CHECK-DAG: $x23
+# CHECK-DAG: $x24
+# CHECK-DAG: $x25
+# CHECK-DAG: $x26
+# CHECK-DAG: $x27
+# CHECK-DAG: $x28
+# CHECK-DAG: $x29
+# CHECK-DAG: $x30
+# CHECK-DAG: $x31
+
+# CHECK-DAG: $f0_d
+# CHECK-DAG: $f1_d
+# CHECK-DAG: $f2_d
+# CHECK-DAG: $f3_d
+# CHECK-DAG: $f4_d
+# CHECK-DAG: $f5_d
+# CHECK-DAG: $f6_d
+# CHECK-DAG: $f7_d
+# CHECK-DAG: $f8_d
+# CHECK-DAG: $f9_d
+# CHECK-DAG: $f10_d
+# CHECK-DAG: $f11_d
+# CHECK-DAG: $f12_d
+# CHECK-DAG: $f13_d
+# CHECK-DAG: $f14_d
+# CHECK-DAG: $f15_d
+# CHECK-DAG: $f16_d
+# CHECK-DAG: $f17_d
+# CHECK-DAG: $f18_d
+# CHECK-DAG: $f19_d
+# CHECK-DAG: $f20_d
+# CHECK-DAG: $f21_d
+# CHECK-DAG: $f22_d
+# CHECK-DAG: $f23_d
+# CHECK-DAG: $f24_d
+# CHECK-DAG: $f25_d
+# CHECK-DAG: $f26_d
+# CHECK-DAG: $f27_d
+# CHECK-DAG: $f28_d
+# CHECK-DAG: $f29_d
+# CHECK-DAG: $f30_d
+# CHECK-DAG: $f31_d
+
+# NO-DOUBLE-DAG: $x1
+# NO-DOUBLE-DAG: $x2
+# NO-DOUBLE-DAG: $x3
+# NO-DOUBLE-DAG: $x4
+# NO-DOUBLE-DAG: $x5
+# NO-DOUBLE-DAG: $x6
+# NO-DOUBLE-DAG: $x7
+# NO-DOUBLE-DAG: $x8
+# NO-DOUBLE-DAG: $x9
+# NO-DOUBLE-DAG: $x10
+# NO-DOUBLE-DAG: $x11
+# NO-DOUBLE-DAG: $x12
+# NO-DOUBLE-DAG: $x13
+# NO-DOUBLE-DAG: $x14
+# NO-DOUBLE-DAG: $x15
+# NO-DOUBLE-DAG: $x16
+# NO-DOUBLE-DAG: $x17
+# NO-DOUBLE-DAG: $x18
+# NO-DOUBLE-DAG: $x19
+# NO-DOUBLE-DAG: $x20
+# NO-DOUBLE-DAG: $x21
+# NO-DOUBLE-DAG: $x22
+# NO-DOUBLE-DAG: $x23
+# NO-DOUBLE-DAG: $x24
+# NO-DOUBLE-DAG: $x25
+# NO-DOUBLE-DAG: $x26
+# NO-DOUBLE-DAG: $x27
+# NO-DOUBLE-DAG: $x28
+# NO-DOUBLE-DAG: $x29
+# NO-DOUBLE-DAG: $x30
+# NO-DOUBLE-DAG: $x31
+
+# NO-DOUBLE-DAG: $f0_f
+# NO-DOUBLE-DAG: $f1_f
+# NO-DOUBLE-DAG: $f2_f
+# NO-DOUBLE-DAG: $f3_f
+# NO-DOUBLE-DAG: $f4_f
+# NO-DOUBLE-DAG: $f5_f
+# NO-DOUBLE-DAG: $f6_f
+# NO-DOUBLE-DAG: $f7_f
+# NO-DOUBLE-DAG: $f8_f
+# NO-DOUBLE-DAG: $f9_f
+# NO-DOUBLE-DAG: $f10_f
+# NO-DOUBLE-DAG: $f11_f
+# NO-DOUBLE-DAG: $f12_f
+# NO-DOUBLE-DAG: $f13_f
+# NO-DOUBLE-DAG: $f14_f
+# NO-DOUBLE-DAG: $f15_f
+# NO-DOUBLE-DAG: $f16_f
+# NO-DOUBLE-DAG: $f17_f
+# NO-DOUBLE-DAG: $f18_f
+# NO-DOUBLE-DAG: $f19_f
+# NO-DOUBLE-DAG: $f20_f
+# NO-DOUBLE-DAG: $f21_f
+# NO-DOUBLE-DAG: $f22_f
+# NO-DOUBLE-DAG: $f23_f
+# NO-DOUBLE-DAG: $f24_f
+# NO-DOUBLE-DAG: $f25_f
+# NO-DOUBLE-DAG: $f26_f
+# NO-DOUBLE-DAG: $f27_f
+# NO-DOUBLE-DAG: $f28_f
+# NO-DOUBLE-DAG: $f29_f
+# NO-DOUBLE-DAG: $f30_f
+# NO-DOUBLE-DAG: $f31_f
