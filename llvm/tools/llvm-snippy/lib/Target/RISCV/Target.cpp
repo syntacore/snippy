@@ -373,7 +373,8 @@ static bool isSupportedLoadStore(unsigned Opcode) {
          isRVVStridedLoadStore(Opcode) || isRVVUnitStrideFFLoad(Opcode) ||
          isRVVIndexedLoadStore(Opcode) || isRVVUnitStrideSegLoadStore(Opcode) ||
          isRVVStridedSegLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode) ||
-         isRVVWholeRegLoadStore(Opcode) || isRVVUnitStrideMaskLoadStore(Opcode);
+         isRVVWholeRegLoadStore(Opcode) ||
+         isRVVUnitStrideMaskLoadStore(Opcode) || isZicbo(Opcode);
 }
 
 static MCRegister regIndexToMCReg(unsigned RegIdx, RegStorageType Storage,
@@ -862,7 +863,7 @@ breakDownAddrForInstrWithImmOffset(AddressInfo AddrInfo, const MachineInstr &MI,
                                    bool Is64Bit) {
   auto Opcode = MI.getOpcode();
   assert(isLoadStore(Opcode) || isCLoadStore(Opcode) || isFPLoadStore(Opcode) ||
-         isCFPLoadStore(Opcode));
+         isCFPLoadStore(Opcode) || isZicbo(Opcode));
 
   auto &ProgCtx = IGC.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
@@ -2684,7 +2685,7 @@ public:
     if (isAtomicAMO(Opcode) || isLrInstr(Opcode) || isScInstr(Opcode) ||
         isRVVUnitStrideLoadStore(Opcode) || isRVVUnitStrideFFLoad(Opcode) ||
         isRVVUnitStrideSegLoadStore(Opcode) || isRVVWholeRegLoadStore(Opcode) ||
-        isRVVUnitStrideMaskLoadStore(Opcode)) {
+        isRVVUnitStrideMaskLoadStore(Opcode) || isZicbo(Opcode)) {
       auto &State = ProgCtx.getLLVMState();
       auto &RI = State.getRegInfo();
       const auto &AddrReg = getMemOperand(MI);
@@ -2693,7 +2694,7 @@ public:
       auto Part = AddressPart{AddrReg, APInt(ST.getXLen(), AddrValue), RI};
 
       if (isAtomicAMO(Opcode) || isLrInstr(Opcode) || isScInstr(Opcode) ||
-          isRVVWholeRegLoadStore(Opcode))
+          isRVVWholeRegLoadStore(Opcode) || isZicbo(Opcode))
         return std::make_pair<AddressParts, MemAddresses>(
             {std::move(Part)}, {uintToTargetXLen(is64Bit(TM), AddrValue)});
 
@@ -3063,7 +3064,7 @@ public:
 
   bool canUseInMemoryBurstMode(unsigned Opcode) const override {
     return isLoadStore(Opcode) || isFPLoadStore(Opcode) ||
-           isAtomicAMO(Opcode) || isCLoadStore(Opcode) ||
+           isAtomicAMO(Opcode) || isCLoadStore(Opcode) || isZicbo(Opcode) ||
            isCFPLoadStore(Opcode) || isFence(Opcode);
   }
 
