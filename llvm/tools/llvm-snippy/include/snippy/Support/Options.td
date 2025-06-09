@@ -29,6 +29,7 @@ class OptionGroup<string name, bit external> {
   bit External = external;
   string Description = ?;
   OptionGroup Group = ?;
+  string StructName = ?;
 }
 
 // Define option types.
