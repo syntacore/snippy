@@ -1718,7 +1718,7 @@ public:
     assert(MBB);
     auto RP = ProgCtx.getRegisterPool();
     auto NAvailableRegs =
-        RP.getNumAvailable(RI.getRegClass(RCID == RISCV::GPRCRegClassID), *MBB);
+        RP.getNumAvailable(RI.getRegClass(RISCV::GPRCRegClassID), *MBB);
     if (CompressionMode == LoopControlLogicCompressionMode::On &&
         NAvailableRegs >= MinNumOfBranchGPRC)
       return RI.getRegClass(RISCV::GPRCRegClassID);
