@@ -1,6 +1,12 @@
 include "snippy/Support/Options.td"
 
-def Options : OptionGroup<"options", true>;
+def Options : OptionGroup<"options", true> {
+  let StructName = "DriverOptions";
+}
+
+def DebugOptionsCategory : OptionGroup<"debug options", true> {
+  let StructName = "DebugOptions";
+}
 
 // Deprecated for setting up target triple. Replaced with toolchain conventional
 // march (like rv32gc)
@@ -38,15 +44,15 @@ def ListOpcodeNames : Flag<"list-opcode-names">,
 
 def DumpMF : Flag<"dump-mf">,
              Description<"Dump final generated machine function in Machine IR">,
-             Group<Options>;
+             Group<DebugOptionsCategory>;
 
 def DumpMI : Flag<"dump-mi">,
              Description<"Dump generated machine instructions in Machine IR">,
-             Group<Options>;
+             Group<DebugOptionsCategory>;
 
 def DumpCFG : Flag<"dump-cfg">,
               Description<"Dump generated CFG">,
-              Group<Options>;
+              Group<DebugOptionsCategory>;
 
 def Seed
     : StringOption<"seed">,
@@ -88,3 +94,18 @@ def DumpPreprocessedConfig
     : Flag<"E">,
       Description<"Dump snippy config after preprocessing it">,
       Group<Options>;
+
+def Verbose : Flag<"verbose">,
+              Description<"Show verbose output">,
+              Group<DebugOptionsCategory> {
+  let Callback = [{
+    if (Verbose)
+      DumpLayout = DumpMF = DumpMI = true;
+  }];
+}
+
+def ViewCFG : Flag<"view-cfg">,
+              Description<"View generated CFG">,
+              Group<DebugOptionsCategory> {
+  let Callback = "if(ViewCFG) DumpCFG = true;";
+}
