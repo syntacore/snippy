@@ -16,6 +16,7 @@ class raw_ostream;
 namespace snippy {
 
 bool emitSnippyOptions(llvm::raw_ostream &OS, llvm::RecordKeeper &Records);
+bool emitSnippyOptionsStruct(raw_ostream &OS, RecordKeeper &Records);
 
 } // namespace snippy
 } // namespace llvm

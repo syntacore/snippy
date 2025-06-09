@@ -45,6 +45,7 @@ namespace llvm {
 namespace snippy {
 
 extern cl::OptionCategory Options;
+cl::OptionCategory DebugOptionsCategory("Snippy debug options");
 
 // TODO: All options should be read into a struct all passed around through
 // config. There are some options that are necessary to bootstrap the config so
@@ -71,23 +72,6 @@ std::optional<unsigned> getExpectedNumInstrs(StringRef NumAsString) {
     snippy::fatal("num-instrs get negative number");
   return Value;
 }
-
-static snippy::opt<bool> ViewCFG("view-cfg", cl::desc("View generated CFG"),
-                                 cl::cat(Options),
-                                 cl::callback([](const bool &V) {
-                                   if (V)
-                                     DumpCFG = true;
-                                 }));
-
-static snippy::opt<bool> Verbose("verbose", cl::desc("Show verbose output."),
-                                 cl::init(false), cl::cat(Options),
-                                 cl::callback([](const bool &V) {
-                                   if (V) {
-                                     DumpLayout = true;
-                                     DumpMF = true;
-                                     DumpMI = true;
-                                   }
-                                 }));
 
 // Used to construct search paths for dynamically-loaded plugins
 static std::string ARGV0;
@@ -243,15 +227,6 @@ static void printNoLayoutHint(LLVMContext &Ctx) {
       "instruction generation");
 }
 
-static DebugOptions getDebugOptions() {
-  DebugOptions DbgCfg;
-  DbgCfg.PrintInstrs = DumpMI;
-  DbgCfg.PrintMachineFunctions = DumpMF;
-  DbgCfg.PrintControlFlowGraph = DumpCFG;
-  DbgCfg.ViewControlFlowGraph = ViewCFG;
-  return DbgCfg;
-}
-
 void generateMain() {
   initializeLLVMAll();
   readSnippyOptionsIfNeeded();
@@ -272,13 +247,14 @@ void generateMain() {
   RegPool RP;
 
   auto Cfg = readSnippyConfig(State, RP, OpCC);
-  if (Verbose)
+  auto DebugOpts = copyOptionsToDebugOptions();
+  if (DebugOpts.Verbose)
     outs() << "Used seed: " << Cfg.ProgramCfg->Seed << '\n';
 
   dumpConfigIfNeeded(Cfg, ConfigIOContext{OpCC, RP, State}, outs());
   FlowGenerator Flow{std::move(Cfg), OpCC, std::move(RP),
                      getOutputFileBasename()};
-  auto Result = Flow.generate(State, getDebugOptions());
+  auto Result = Flow.generate(State, DebugOpts);
   saveToFile(Result);
 }
 

@@ -21,6 +21,7 @@ enum ActionType {
   PrintRecords,
   DumpJSON,
   GenOptions,
+  GenOptionsStruct,
 };
 
 static cl::opt<ActionType>
@@ -29,6 +30,8 @@ static cl::opt<ActionType>
                                  "Print all records to stdout (default)"),
                       clEnumValN(DumpJSON, "dump-json",
                                  "Dump all records as machine-readable JSON"),
+                      clEnumValN(GenOptionsStruct, "gen-options-struct",
+                                 "Generate option struct definition"),
                       clEnumValN(GenOptions, "gen-options",
                                  "Generate option definitions")));
 
@@ -42,6 +45,9 @@ static bool snippyTableGenMain(raw_ostream &OS, RecordKeeper &Records) {
     break;
   case GenOptions:
     emitSnippyOptions(OS, Records);
+    break;
+  case GenOptionsStruct:
+    emitSnippyOptionsStruct(OS, Records);
     break;
   }
 

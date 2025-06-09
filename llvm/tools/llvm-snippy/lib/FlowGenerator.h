@@ -17,19 +17,16 @@
 #include "snippy/Config/Config.h"
 #include "snippy/Generator/RegisterPool.h"
 #include "snippy/Generator/SnippyModule.h"
+#include "snippy/Support/Options.h"
 
 namespace llvm {
 namespace snippy {
+#define GEN_SNIPPY_OPTIONS_STRUCT_DEF
+#include "SnippyDriverOptionsStruct.inc"
+#undef GEN_SNIPPY_OPTIONS_STRUCT_DEF
 
 class OpcodeCache;
 class LLVMState;
-
-struct DebugOptions {
-  bool PrintInstrs;
-  bool PrintMachineFunctions;
-  bool PrintControlFlowGraph;
-  bool ViewControlFlowGraph;
-};
 
 class FlowGenerator {
   const OpcodeCache &OpCC;
