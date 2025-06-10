@@ -59,6 +59,7 @@ add_llvm_library(LLVMSnippy
   ${LLVMSnippySources}
   DEPENDS
   intrinsics_gen
+  LLVMSnippyDriverOptionsTableGen
   LINK_LIBS PRIVATE
     $<BUILD_LOCAL_INTERFACE:LLVMSnippyGenerator>
   )
