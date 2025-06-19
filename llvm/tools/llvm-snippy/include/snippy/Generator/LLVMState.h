@@ -184,6 +184,8 @@ public:
     return *Ctx;
   }
 
+  MCInstPrinter &getInstPrinter() const;
+
   const TargetSubtargetInfo &getSubtargetImpl(const Function &Fn) const {
     return *getTargetMachine().getSubtargetImpl(Fn);
   }
@@ -244,6 +246,7 @@ private:
   mutable std::unique_ptr<AsmPrinter> TheAsmPrinter;
   std::unique_ptr<MCCodeEmitter> TheCodeEmitter;
   std::unique_ptr<MCDisassembler> TheDisassembler;
+  mutable std::unique_ptr<MCInstPrinter> TheInstPrinter;
 };
 
 } // namespace snippy
