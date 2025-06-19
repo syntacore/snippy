@@ -15,6 +15,7 @@
 #include "llvm/MC/MCCodeEmitter.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCDisassembler/MCDisassembler.h"
+#include "llvm/MC/MCInstPrinter.h"
 #include "llvm/MC/MCObjectFileInfo.h"
 #include "llvm/MC/MCObjectStreamer.h"
 #include "llvm/MC/MCStreamer.h"
@@ -188,6 +189,20 @@ MCCodeEmitter &LLVMState::getCodeEmitter() const {
 MCDisassembler &LLVMState::getDisassembler() const {
   assert(TheDisassembler && "Unexpected nullptr");
   return *TheDisassembler;
+}
+
+MCInstPrinter &LLVMState::getInstPrinter() const {
+  if (TheInstPrinter)
+    return *TheInstPrinter;
+  assert(TheTargetMachine);
+  auto &TM = *TheTargetMachine;
+  const Target &T = TM.getTarget();
+  auto &AsmInfo = *TM.getMCAsmInfo();
+
+  TheInstPrinter.reset(
+      T.createMCInstPrinter(TM.getTargetTriple(), AsmInfo.getAssemblerDialect(),
+                            AsmInfo, getInstrInfo(), getRegInfo()));
+  return *TheInstPrinter;
 }
 
 std::unique_ptr<MCStreamer> LLVMState::createObjStreamer(raw_pwrite_stream &OS,
