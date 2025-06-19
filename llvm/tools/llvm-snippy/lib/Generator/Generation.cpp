@@ -19,6 +19,8 @@
 #include "snippy/Support/Options.h"
 
 #include "llvm/CodeGen/MachineBasicBlock.h"
+#include "llvm/MC/MCDisassembler/MCDisassembler.h"
+#include "llvm/MC/MCInstPrinter.h"
 #include "llvm/Support/FormatVariadic.h"
 
 namespace llvm {
