@@ -142,9 +142,9 @@ public:
   }
 };
 
-template <int MinValue, int MaxValue>
-int genImmInInterval(const ImmediateHistogramSequence &IH) {
-  static_assert(MinValue <= MaxValue);
+inline int genImmInInterval(const ImmediateHistogramSequence &IH, int MinValue,
+                            int MaxValue) {
+  assert(MinValue <= MaxValue);
   assert(std::is_sorted(IH.Values.begin(), IH.Values.end()));
   assert(IH.Values.size() == IH.Weights.size());
   auto First = std::lower_bound(IH.Values.begin(), IH.Values.end(), MinValue);
@@ -160,6 +160,12 @@ int genImmInInterval(const ImmediateHistogramSequence &IH) {
                                             IH.Weights.begin() + LastIdx);
   auto Offset = Dist(RandEngine::engine());
   return IH.Values[FirstIdx + Offset];
+}
+
+template <int MinValue, int MaxValue>
+int genImmInInterval(const ImmediateHistogramSequence &IH) {
+  static_assert(MinValue <= MaxValue);
+  return genImmInInterval(IH, MinValue, MaxValue);
 }
 
 enum class ImmediateSignedness {
@@ -277,6 +283,13 @@ unsigned genImmInInterval(const ImmediateHistogramSequence *IH,
     return genImmInInterval<MinValue, MaxValue>(StridedImm);
   if (IH)
     return genImmInInterval<MinValue, MaxValue>(*IH);
+  return RandEngine::genInRangeInclusive(MinValue, MaxValue);
+}
+
+inline int genImmInInterval(const ImmHistOpcodeSettings &IH, int MinValue,
+                            int MaxValue) {
+  if (IH.isSequence())
+    return genImmInInterval(IH.getSequence(), MinValue, MaxValue);
   return RandEngine::genInRangeInclusive(MinValue, MaxValue);
 }
 
