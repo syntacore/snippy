@@ -450,7 +450,8 @@ public:
     reportUnimplementedError();
   }
 
-  std::vector<Register> includeRegs(const MCRegisterClass &RC) const override {
+  std::vector<Register> includeRegs(unsigned Opcode,
+                                    const MCRegisterClass &RC) const override {
     reportUnimplementedError();
   }
 
