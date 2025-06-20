@@ -468,7 +468,7 @@ public:
                         unsigned Operand) const = 0;
 
   virtual std::vector<Register>
-  includeRegs(const MCRegisterClass &RC) const = 0;
+  includeRegs(unsigned Opcode, const MCRegisterClass &RC) const = 0;
 
   virtual void reserveRegsIfNeeded(InstructionGenerationContext &IGC,
                                    unsigned Opcode, bool isDst, bool isMem,
