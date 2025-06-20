@@ -657,7 +657,7 @@ std::optional<MachineOperand> pregenerateOneOperand(
                                 InstrDesc.getOpcode(), RegInfo);
       auto Exclude = SnippyTgt.excludeRegsForOperand(InstrGenCtx, RegClass,
                                                      InstrDesc, OpIndex);
-      auto Include = SnippyTgt.includeRegs(RegClass);
+      auto Include = SnippyTgt.includeRegs(InstrDesc.getOpcode(), RegClass);
       AccessMaskBit Mask = IsDst ? AccessMaskBit::W : AccessMaskBit::R;
 
       auto CustomMask =
