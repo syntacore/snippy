@@ -2990,8 +2990,10 @@ public:
     return {RISCV::V0, RISCV::V0M8, RISCV::V0M4, RISCV::V0M2};
   }
 
-  std::vector<Register> includeRegs(const MCRegisterClass &RC) const override {
-    if (RC.getID() == RISCV::VMV0RegClass.getID())
+  std::vector<Register> includeRegs(unsigned Opcode,
+                                    const MCRegisterClass &RC) const override {
+    if (RC.getID() == RISCV::VMV0RegClass.getID() &&
+        !isRVVuseV0RegExplicitly(Opcode))
       return {RISCV::NoRegister};
     return {};
   }
