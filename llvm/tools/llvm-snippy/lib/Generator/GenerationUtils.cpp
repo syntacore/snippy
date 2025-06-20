@@ -191,7 +191,7 @@ static Register pregenerateRegister(InstructionGenerationContext &InstrGenCtx,
                                   InstrDesc.getOpcode(), RegInfo);
   auto Exclude =
       Tgt.excludeRegsForOperand(InstrGenCtx, RegClass, InstrDesc, OpIndex);
-  auto Include = Tgt.includeRegs(RegClass);
+  auto Include = Tgt.includeRegs(InstrDesc.getOpcode(), RegClass);
   AccessMaskBit Mask = AccessMaskBit::RW;
   auto CustomMask = Tgt.getCustomAccessMaskForOperand(InstrDesc, OpIndex);
   if (CustomMask != AccessMaskBit::None)
