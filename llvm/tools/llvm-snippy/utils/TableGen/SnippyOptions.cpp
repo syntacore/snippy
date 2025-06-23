@@ -132,11 +132,18 @@ class SnippyOptionsEmitter {
     if (R.getValueAsBit("Hidden"))
       OS << ", cl::Hidden";
 
+    if (R.getValueAsBit("ValueOptional"))
+      OS << ", cl::ValueOptional";
+
+    if (auto Callback = R.getValueAsOptionalString("AdditionalArgs"))
+      OS << ", " << StringRef(*Callback).trim('"');
+
     // Use constant reference because cl::callback requires function
     // that has lvalue reference as an argument
     if (auto Callback = R.getValueAsOptionalString("Callback")) {
       OS << ", cl::callback([](const " << getPrimitiveTypeName(R) << " &"
-         << R.getName() << ") { " << StringRef(*Callback).trim('"') << " })";
+         << R.getName() << "Value) { " << StringRef(*Callback).trim('"')
+         << " })";
     }
 
     OS << ");" << "\n\n";

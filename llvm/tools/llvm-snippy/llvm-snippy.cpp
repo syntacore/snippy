@@ -45,7 +45,6 @@ namespace llvm {
 namespace snippy {
 
 extern cl::OptionCategory Options;
-cl::OptionCategory DebugOptionsCategory("Snippy debug options");
 
 // TODO: All options should be read into a struct all passed around through
 // config. There are some options that are necessary to bootstrap the config so
@@ -132,14 +131,15 @@ static void mergeFiles(IncludePreprocessor &IPP, LLVMContext &Ctx) {
   }
 }
 static Config readSnippyConfig(LLVMState &State, RegPool &RP,
-                               const OpcodeCache &OpCC) {
+                               const OpcodeCache &OpCC,
+                               const DebugOptions &DebugOpts) {
   auto &Ctx = State.getCtx();
   auto ParseWithPlugin = isParsingWithPluginEnabled();
 
   IncludePreprocessor IPP(LayoutFile.getValue(), getExtraIncludeDirsForLayout(),
                           Ctx);
   mergeFiles(IPP, Ctx);
-  if (DumpPreprocessedConfig)
+  if (DebugOpts.DumpPreprocessedConfig)
     outs() << IPP.getPreprocessed() << "\n";
 
   return Config(IPP, RP, State, GeneratorPluginFile.getValue(),
@@ -148,8 +148,8 @@ static Config readSnippyConfig(LLVMState &State, RegPool &RP,
 
 static void dumpConfigIfNeeded(const Config &Cfg,
                                const ConfigIOContext &CfgParsingCtx,
-                               raw_ostream &OS) {
-  if (DumpLayout)
+                               raw_ostream &OS, const DebugOptions &Opts) {
+  if (Opts.DumpLayout)
     Cfg.dump(OS, CfgParsingCtx);
 }
 
@@ -163,19 +163,17 @@ static void initializeLLVMAll() {
   InitializeAllSnippyTargets();
 }
 
-static SelectedTargetInfo getSelectedTargetInfo() {
+static SelectedTargetInfo getSelectedTargetInfo(const ProgramOptions &Opts) {
   SelectedTargetInfo TargetInfo;
-  TargetInfo.Triple = MTargetTriple.getValue();
-  TargetInfo.MArch = MArch.getValue();
-  TargetInfo.CPU = CpuName.getValue();
-  TargetInfo.Features = MAttr.getValue();
-
-  if (!MTargetTriple.isSpecified() && !MArch.isSpecified()) {
+  TargetInfo.MArch = Opts.MArch;
+  TargetInfo.Triple = Opts.MTargetTriple;
+  TargetInfo.CPU = Opts.CpuName;
+  TargetInfo.Features = Opts.MAttr;
+  if (!Opts.MTargetTripleSpecified && !Opts.MArchSpecified) {
     TargetInfo.Triple = sys::getProcessTriple();
-    if (!CpuName.isSpecified())
+    if (!Opts.CpuNameSpecified)
       TargetInfo.CPU = sys::getHostCPUName();
   }
-
   return TargetInfo;
 }
 
@@ -190,8 +188,8 @@ static void saveToFile(const GeneratorResult &Result) {
 }
 
 // Function to place call of every "dump" method that does not need Config
-void dumpIfNecessary(const OpcodeCache &OpCC) {
-  if (DumpOptions) {
+void dumpIfNecessary(const OpcodeCache &OpCC, const DebugOptions &DebugOpts) {
+  if (DebugOpts.DumpOptions) {
     OptionsMappingWrapper OMWP;
     outputYAMLToStream(OMWP, outs());
   }
@@ -208,7 +206,7 @@ void checkOptions(LLVMContext &Ctx) {
   checkWarningOptions();
 }
 
-static void printNoLayoutHint(LLVMContext &Ctx) {
+static void printNoLayoutHint(LLVMContext &Ctx, const DebugOptions &Opts) {
   // NOTE: Some options like list-opcode-names are useful on their own
   // and unnecessary notices just clutter the output. It's reasonable to just
   // skip the notice hint altogether for those.
@@ -216,7 +214,7 @@ static void printNoLayoutHint(LLVMContext &Ctx) {
   // Dumping options is really helpful to see the YAML format for them, so
   // we skip printing the hint as well.
   auto ShouldSkipHint =
-      ListOpcodeNames.getNumOccurrences() || DumpOptions.getNumOccurrences();
+      ListOpcodeNames.getNumOccurrences() || Opts.DumpOptionsSpecified;
 
   if (ShouldSkipHint)
     return;
@@ -230,28 +228,29 @@ static void printNoLayoutHint(LLVMContext &Ctx) {
 void generateMain() {
   initializeLLVMAll();
   readSnippyOptionsIfNeeded();
-  auto ExpectedState = LLVMState::create(getSelectedTargetInfo());
+  auto ProgramOpts = copyOptionsToProgramOptions();
+  auto ExpectedState = LLVMState::create(getSelectedTargetInfo(ProgramOpts));
   if (!ExpectedState)
     snippy::fatal(ExpectedState.takeError());
   auto &State = ExpectedState.get();
   checkOptions(State.getCtx());
   OpcodeCache OpCC(State.getSnippyTarget(), State.getInstrInfo(),
                    State.getSubtargetInfo());
-  dumpIfNecessary(OpCC);
+  auto DebugOpts = copyOptionsToDebugOptions();
+  dumpIfNecessary(OpCC, DebugOpts);
 
   if (!LayoutFile.getNumOccurrences()) {
-    printNoLayoutHint(State.getCtx());
+    printNoLayoutHint(State.getCtx(), DebugOpts);
     return;
   }
 
   RegPool RP;
 
-  auto Cfg = readSnippyConfig(State, RP, OpCC);
-  auto DebugOpts = copyOptionsToDebugOptions();
+  auto Cfg = readSnippyConfig(State, RP, OpCC, DebugOpts);
   if (DebugOpts.Verbose)
     outs() << "Used seed: " << Cfg.ProgramCfg->Seed << '\n';
 
-  dumpConfigIfNeeded(Cfg, ConfigIOContext{OpCC, RP, State}, outs());
+  dumpConfigIfNeeded(Cfg, ConfigIOContext{OpCC, RP, State}, outs(), DebugOpts);
   FlowGenerator Flow{std::move(Cfg), OpCC, std::move(RP),
                      getOutputFileBasename()};
   auto Result = Flow.generate(State, DebugOpts);
