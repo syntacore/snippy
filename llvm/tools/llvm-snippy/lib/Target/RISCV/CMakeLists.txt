@@ -20,6 +20,8 @@ add_llvm_library(LLVMSnippyRISCV
   RISCVCommonTableGen
   )
 
-# Why do we need LLVMSnippyConfig{Support/Target}?
-target_link_libraries(LLVMSnippyRISCV PRIVATE
-  LLVMSnippyConfig LLVMSnippySupport LLVMSnippyTarget)
+target_link_libraries(
+  LLVMSnippyRISCV
+  PRIVATE LLVMSnippyConfig LLVMSnippySupport LLVMSnippyTarget
+  PUBLIC SnippyHeaders
+  )
