@@ -17,6 +17,18 @@ add_llvm_library(LLVMSnippyConfig
   DISABLE_LLVM_LINK_LLVM_DYLIB
   STATIC
   ${LLVMSnippyConfigSources}
+  LINK_LIBS PRIVATE LLVMSnippySupport LLVMSnippyOptionCategory
+  PUBLIC SnippyHeaders
     )
 
-  target_link_libraries(LLVMSnippyConfig PRIVATE LLVMSnippySupport LLVMSnippyOptionCategory)
+set(LLVM_TARGET_DEFINITIONS Options.td)
+tablegen(SNIPPY SnippyConfigOptions.inc -gen-options -I
+         ${LLVM_SNIPPY_HEADERS_DIR})
+tablegen(SNIPPY SnippyConfigOptionsStruct.inc -gen-options-struct -I
+         ${LLVM_SNIPPY_HEADERS_DIR})
+add_public_tablegen_target(LLVMSnippyConfigOptionsTableGen)
+add_dependencies(SnippyHeaders LLVMSnippyConfigOptionsTableGen)
+target_include_directories(LLVMSnippyConfig
+  PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+  )

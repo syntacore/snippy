@@ -15,7 +15,6 @@
 #include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/MemoryManager.h"
 #include "snippy/Generator/RegisterPool.h"
-#include "snippy/Generator/SelfcheckMode.h"
 #include "snippy/Support/Options.h"
 #include "snippy/Support/YAMLHistogram.h"
 #include "snippy/Target/Target.h"
@@ -31,10 +30,6 @@
 #define DEBUG_TYPE "snippy-layout-config"
 
 namespace llvm {
-
-LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML_NO_DECL(
-    snippy::SelfcheckRefValueStorageType,
-    snippy::SelfcheckRefValueStorageEnumOption)
 
 using namespace snippy;
 
@@ -137,165 +132,20 @@ LLVM_SNIPPY_YAML_IS_HISTOGRAM_DENORM_ENTRY(snippy::OpcodeHistogramDecodedEntry)
 namespace snippy {
 
 extern cl::OptionCategory Options;
+cl::OptionCategory ProgramOptionsCategory("Snippy Program Level Options");
+cl::OptionCategory
+    RegInitOptionsCategory("Snippy Registers Initialization options");
 
-// Legacy options
+cl::OptionCategory DebugOptionsCategory("Snippy debug options");
 
-static snippy::opt<std::string> LastInstr(
-    "last-instr",
-    cl::desc(
-        "custom choice of the last instruction. Use 'RET' to emit return."),
-    cl::cat(Options), cl::init("EBREAK"));
+cl::OptionCategory ModelOptionsCategory("Snippy Model Options");
 
-static snippy::opt<std::string>
-    InitialRegisterDataFile("initial-regs",
-                            cl::desc("file for initial registers state"),
-                            cl::cat(Options), cl::init(""));
-snippy::alias
-    InitialRegisterYamlFile("initial-regs-yaml",
-                            cl::desc("Alias for -initial-regs"),
-                            snippy::aliasopt(InitialRegisterDataFile));
+cl::OptionCategory
+    InstrGenOptionsCategory("Snippy Instruction Generation Options");
 
-static snippy::opt<std::string> ValuegramRegsDataFile(
-    "valuegram-operands-regs",
-    cl::desc("Set values in operands registers before each instruction "
-             "according to the file. It supported only if a number of "
-             "instructions are generated."),
-    cl::cat(Options), cl::init(""));
-
-static snippy::opt<bool> ValuegramOperandsRegsInitOutputs(
-    "valuegram-operands-regs-init-outputs",
-    cl::desc("turning on initialization of destination registers before "
-             "each non-service instruction. Available only if specified "
-             "-valuegram-operands-regs."),
-    cl::Hidden, cl::init(false));
-
-static snippy::opt_list<std::string> ReservedRegisterList(
-    "reserved-regs-list", cl::CommaSeparated,
-    cl::desc("list of registers that shall not be used in snippet code"),
-    cl::cat(Options));
-
-static snippy::opt_list<std::string>
-    SpilledRegisterList("spilled-regs-list", cl::CommaSeparated,
-                        cl::desc("list of registers that shall be spilled "
-                                 "before snippet execution and restored after"),
-                        cl::cat(Options));
-
-static snippy::opt<std::string>
-    RedefineSP("redefine-sp",
-               cl::desc("Specify the reg to use as a stack pointer"),
-               cl::cat(Options), cl::init("any"));
-
-static snippy::opt<bool> FollowTargetABI(
-    "honor-target-abi",
-    cl::desc("Automatically spill registers that are required to be preserved "
-             "by snippet execution to follow ABI calling conventions."),
-    cl::cat(Options), cl::init(false));
-
-static snippy::opt<bool> ChainedRXSectionsFill(
-    "chained-rx-sections-fill",
-    cl::desc("Span the generated code across all provided RX sections. "
-             "When disabled only one of all provided RX section is used to "
-             "generate code to."),
-    cl::cat(Options), cl::init(false));
-
-static snippy::opt<size_t> ChainedRXChunkSize(
-    "chained-rx-chunk-size",
-    cl::desc("Slice main function in blocks of specified size, distribute over "
-             "rx sections and randomly link them in list."),
-    cl::cat(Options), cl::init(0u));
-
-static snippy::opt<bool>
-    ChainedRXSorted("chained-rx-sorted",
-                    cl::desc("Sort RX sections by their ID alphabetically when "
-                             "generating chain execution routine."),
-                    cl::cat(Options), cl::init(false));
-
-static snippy::opt<bool> ExternalStackOpt(
-    "external-stack",
-    cl::desc(
-        "Snippy will assume that stack pointer is pre-initialized externally"),
-    cl::cat(Options), cl::init(false));
-
-static snippy::opt<bool> InitRegsInElf(
-    "init-regs-in-elf",
-    cl::desc("include registers initialization in final elf file"),
-    cl::cat(Options));
-
-static snippy::opt<bool> MangleExportedNames(
-    "mangle-exported-names",
-    cl::desc("Enable mangling of exported symbols and section names using "
-             "snippet main function name."),
-    cl::cat(Options), cl::init(false));
-
-static snippy::opt<std::string> DumpInitialRegisters(
-    "dump-initial-registers-yaml", cl::ValueOptional,
-    cl::desc("Request dump of an initial register file state"),
-    cl::value_desc("filename"), cl::init("none"), cl::cat(Options),
-    cl::callback([](const std::string &Str) {
-      if (Str.empty())
-        DumpInitialRegisters = Str;
-    }));
-
-static snippy::opt<std::string> DumpResultingRegisters(
-    "dump-registers-yaml", cl::ValueOptional,
-    cl::desc("Request dump of the file register file state"),
-    cl::value_desc("filename"), cl::init("none"), cl::cat(Options),
-    cl::callback([](const std::string &Str) {
-      if (Str.empty())
-        DumpResultingRegisters = Str;
-    }));
-
-static snippy::opt<std::string>
-    NumInstrs("num-instrs", cl::desc("number of generating instructions"),
-              cl::cat(Options), cl::init("10"));
-
-static snippy::opt<bool>
-    Backtrack("backtrack",
-              cl::desc("Enable backtracking facilities so as not to generate "
-                       "erroneous code, e.g. division by zero"),
-              cl::cat(Options), cl::init(false));
-
-static snippy::opt<std::string>
-    SelfCheck("selfcheck",
-              cl::desc("Enable full selfcheck or partial selfcheck with "
-                       "number N (means each N instructions)"),
-              cl::cat(Options), cl::ValueOptional, cl::init("none"));
-
-static snippy::opt<SelfcheckRefValueStorageType>
-    SelfcheckRefValueStorage("selfcheck-ref-value-storage",
-                             cl::desc("Option to define "
-                                      "how to get reference selfcheck values"),
-                             SelfcheckRefValueStorageEnumOption::getClValues(),
-                             cl::init(SelfcheckRefValueStorageType::Code),
-                             cl::cat(Options));
-
-static snippy::opt<std::string>
-    EntryPointName("entry-point", cl::desc("Override entry point name"),
-                   cl::value_desc("label name"), cl::cat(Options),
-                   cl::init("SnippyFunction"));
-
-static snippy::opt<std::string> ModelPluginFile(
-    "model-plugin",
-    cl::desc("Primary model plugin to use for snippet generation"
-             "Use 'None' to disable snippet execution on the model."),
-    cl::value_desc("alias|filename"), cl::cat(Options), cl::init("None"));
-
-static snippy::opt_list<std::string>
-    CoSimModelPluginFilesList("cosim-model-plugins", cl::CommaSeparated,
-                              cl::desc("Comma separated list of hardware model "
-                                       "plugins to use for co-simulation"),
-                              cl::cat(Options));
-
-static snippy::opt<bool> VerifyMachineInstrs(
-    "verify-mi",
-    cl::desc("Enables verification of generated machine instructions."),
-    cl::cat(Options), cl::init(false));
-
-static snippy::opt<bool>
-    AddressVHOpt("enable-address-value-hazards",
-                 cl::desc("form address values based on dynamic register "
-                          "values(backtracking needs to be enabled)"),
-                 cl::cat(Options), cl::init(false));
+#define GEN_SNIPPY_OPTIONS_DEF
+#include "SnippyConfigOptions.inc"
+#undef GEN_SNIPPY_OPTIONS_DEF
 
 bool isExternal(const FunctionDescs &Funcs, StringRef Name) {
   auto &Descs = Funcs.Descs;
@@ -502,10 +352,8 @@ static std::optional<unsigned> findRegisterByName(const SnippyTarget &SnippyTgt,
 
 static void parseReservedRegistersOption(RegPool &RP, const SnippyTarget &Tgt,
                                          const MCRegisterInfo &RI,
-                                         yaml::IO &IO) {
-  std::vector<std::string> ReservedRegisterList;
-  IO.mapRequired("reserved-regs-list", ReservedRegisterList);
-  for (auto &&RegName : ReservedRegisterList) {
+                                         const ProgramOptions &Opts) {
+  for (auto &&RegName : Opts.ReservedRegsList) {
     auto Reg = findRegisterByName(Tgt, RI, RegName);
     if (!Reg)
       snippy::fatal(formatv("Illegal register name {0}"
@@ -535,12 +383,9 @@ static std::vector<MCRegister> getRegsToSpillToMem(const SnippyTarget &Tgt,
 static std::vector<MCRegister>
 parseSpilledRegistersOption(const RegPool &RP, const SnippyTarget &Tgt,
                             const MCRegisterInfo &RI, LLVMContext &Ctx,
-                            yaml::IO &IO) {
-  std::vector<std::string> SpilledRegisterList;
-  IO.mapRequired("spilled-regs-list", SpilledRegisterList);
+                            const ProgramOptions &Opts) {
   std::vector<MCRegister> SpilledRegs;
-
-  for (auto &&RegName : SpilledRegisterList) {
+  for (auto &&RegName : Opts.SpilledRegisterList) {
     auto Reg = findRegisterByName(Tgt, RI, RegName);
     if (!Reg)
       snippy::fatal(formatv("Illegal register name {0}"
@@ -553,7 +398,6 @@ parseSpilledRegistersOption(const RegPool &RP, const SnippyTarget &Tgt,
                             RegName));
     SpilledRegs.push_back(Reg.value());
   }
-
   return SpilledRegs;
 }
 
@@ -562,11 +406,10 @@ static MCRegister getRealStackPointer(const RegPool &RP,
                                       const MCRegisterInfo &RI,
                                       std::vector<MCRegister> &SpilledToStack,
                                       LLVMContext &Ctx, Config &Cfg,
-                                      yaml::IO &IO) {
+                                      const ProgramOptions &Opts) {
   auto SP = Tgt.getStackPointer();
-  std::string RedefineSP;
   bool FollowTargetABI = Cfg.ProgramCfg->FollowTargetABI;
-  IO.mapRequired("redefine-sp", RedefineSP);
+  std::string RedefineSP = Opts.RedefineSP;
   if (FollowTargetABI) {
     if (RedefineSP != "any" && RedefineSP != "SP")
       snippy::warn(
@@ -637,17 +480,14 @@ static MCRegister getRealStackPointer(const RegPool &RP,
   return RealSP;
 }
 
-static std::vector<std::string> parseModelPluginList(yaml::IO &IO) {
-  std::string ModelPluginFile;
+static std::vector<std::string> parseModelPluginList(const ModelOptions &Opts) {
   std::vector<std::string> CoSimModelPluginFilesList;
-  IO.mapRequired("model-plugin", ModelPluginFile);
-  IO.mapRequired("cosim-model-plugins", CoSimModelPluginFilesList);
-  if (ModelPluginFile == "None" && !CoSimModelPluginFilesList.empty())
+  if (Opts.ModelPluginFile == "None" && !Opts.CoSimModelPluginFilesList.empty())
     snippy::fatal(formatv("--cosim-model-plugins"
                           " can only be used when --model-plugin"
                           " is provided and is not None"));
-  std::vector<std::string> Ret{ModelPluginFile};
-  copy(CoSimModelPluginFilesList, std::back_inserter(Ret));
+  std::vector<std::string> Ret{Opts.ModelPluginFile};
+  copy(Opts.CoSimModelPluginFilesList, std::back_inserter(Ret));
   erase(Ret, "None");
 
   return Ret;
@@ -701,42 +541,28 @@ unsigned long long initializeRandomEngine(uint64_t SeedValue) {
   return SeedValue;
 }
 
-void yaml::MappingTraits<ConfigCLOptionsMapper>::mapping(
-    yaml::IO &IO, ConfigCLOptionsMapper &Mapper) {
-  void *Ctx = IO.getContext();
-  assert(Ctx && "To parse or output Config provide ConfigIOContext as "
-                "context for yaml::IO");
-  auto &ConfigIOCtx = *static_cast<ConfigIOContext *>(Ctx);
-  auto &State = ConfigIOCtx.State;
-  auto &RP = ConfigIOCtx.RP;
-  auto &ProgCfg = *Mapper.Cfg.ProgramCfg;
-  IO.mapRequired("mabi", ProgCfg.ABIName);
-  IO.mapRequired("honor-target-abi", ProgCfg.FollowTargetABI);
-  IO.mapRequired("mangle-exported-names", ProgCfg.MangleExportedNames);
-  IO.mapRequired("entry-point", ProgCfg.EntryPointName);
-  IO.mapRequired("external-stack", ProgCfg.ExternalStack);
-  IO.mapRequired("initial-regs", ProgCfg.InitialRegYamlFile);
-  std::string Seed, MemorySeed, MemoryFile;
-  SelfcheckRefValueStorageType SelfcheckRefValueStorage;
-
-  IO.mapRequired("seed", Seed);
-  if (!IO.outputting()) {
-    ProgCfg.Seed = seedOptToValue(Seed);
-    // FIXME: RandomEngine initialization should be moved out of Config as well
-    // as most of the stuff below
-    initializeRandomEngine(ProgCfg.Seed);
-  }
+static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
+                                         RegPool &RP,
+                                         const ProgramOptions &Opts) {
+  auto &ProgCfg = *Cfg.ProgramCfg;
+  ProgCfg.ABIName = Opts.ABI;
+  ProgCfg.FollowTargetABI = Opts.FollowTargetABI;
+  ProgCfg.MangleExportedNames = Opts.MangleExportedNames;
+  ProgCfg.EntryPointName = Opts.EntryPointName;
+  ProgCfg.ExternalStack = Opts.ExternalStack;
+  ProgCfg.InitialRegYamlFile = Opts.InitialRegisterDataFile;
+  ProgCfg.Seed = seedOptToValue(Opts.Seed);
+  // FIXME: RandomEngine initialization should be moved out of Config as well
+  // as most of the stuff below
+  initializeRandomEngine(ProgCfg.Seed);
   if (!ProgCfg.hasSectionToSpillGlobalRegs() &&
-      Mapper.Cfg.PassCfg.hasExternalCallees())
+      Cfg.PassCfg.hasExternalCallees())
     reserveGlobalStateRegisters(RP, State.getSnippyTarget());
   parseReservedRegistersOption(RP, State.getSnippyTarget(), State.getRegInfo(),
-                               IO);
-
+                               Opts);
   auto RegsSpilledToStack = parseSpilledRegistersOption(
-      RP, State.getSnippyTarget(), State.getRegInfo(), State.getCtx(), IO);
-  auto RegsSpilledToMem =
-      getRegsToSpillToMem(State.getSnippyTarget(), Mapper.Cfg);
-
+      RP, State.getSnippyTarget(), State.getRegInfo(), State.getCtx(), Opts);
+  auto RegsSpilledToMem = getRegsToSpillToMem(State.getSnippyTarget(), Cfg);
   if (ProgCfg.FollowTargetABI) {
     if (!RegsSpilledToStack.empty())
       snippy::warn(WarningName::InconsistentOptions, State.getCtx(),
@@ -751,90 +577,82 @@ void yaml::MappingTraits<ConfigCLOptionsMapper>::mapping(
         [&](auto Reg) { return !llvm::is_contained(RegsSpilledToMem, Reg); });
   }
 
-  auto StackPointer =
+  ProgCfg.StackPointer =
       getRealStackPointer(RP, State.getSnippyTarget(), State.getRegInfo(),
-                          RegsSpilledToStack, State.getCtx(), Mapper.Cfg, IO);
-  ProgCfg.StackPointer = StackPointer;
+                          RegsSpilledToStack, State.getCtx(), Cfg, Opts);
   llvm::copy(RegsSpilledToStack, std::back_inserter(ProgCfg.SpilledToStack));
   llvm::copy(RegsSpilledToMem, std::back_inserter(ProgCfg.SpilledToMem));
+}
 
-  auto &PassCfg = Mapper.Cfg.PassCfg;
-
-  auto &ModelCfg = PassCfg.ModelPluginConfig;
-  auto Models = parseModelPluginList(IO);
-  ModelCfg.ModelLibraries = std::move(Models);
-  auto &InstrsCfg = PassCfg.InstrsGenerationConfig;
-  std::string NumInstrs;
-  IO.mapRequired("num-instrs", NumInstrs);
-  auto NumPrimaryInstrs = getExpectedNumInstrs(NumInstrs);
-  IO.mapRequired("verify-mi", InstrsCfg.RunMachineInstrVerifier);
-  IO.mapRequired("chained-rx-sorted", InstrsCfg.ChainedRXSorted);
-  IO.mapRequired("chained-rx-sections-fill", InstrsCfg.ChainedRXSectionsFill);
-  IO.mapRequired("chained-rx-sections-fill", InstrsCfg.ChainedRXSectionsFill);
-  size_t ChunkSize;
-  static const char *ChunkOptName = "chained-rx-chunk-size";
-  IO.mapRequired(ChunkOptName, ChunkSize);
-  if (ChunkSize)
-    InstrsCfg.ChainedRXChunkSize = ChunkSize;
-
-  if (ChunkSize && !NumPrimaryInstrs)
-    snippy::fatal(State.getCtx(),
-                  "Cannot use '" + Twine(ChunkOptName) + "' option",
-                  "num-instr is set to 'all'");
-  if (ChunkSize && !InstrsCfg.ChainedRXSectionsFill)
-    snippy::warn(WarningName::InconsistentOptions, State.getCtx(),
-                 "'" + Twine(ChunkOptName) + "' is ignored",
-                 "pass 'chained-rx-sections-fill' to enable it");
-  InstrsCfg.NumInstrs = NumPrimaryInstrs;
-  IO.mapRequired("last-instr", InstrsCfg.LastInstr);
-
-  bool Verbose = false;
-  IO.mapRequired("verbose", Verbose);
-
-  auto &RegsCfg = PassCfg.RegistersConfig;
-  IO.mapRequired("init-regs-in-elf", RegsCfg.InitializeRegs);
-  std::string DumpRegsInit, DumpRegsFinal;
-  IO.mapRequired("dump-initial-registers-yaml", DumpRegsInit);
-  IO.mapRequired("dump-registers-yaml", DumpRegsFinal);
-  if ((DumpRegsInit == "none" && Verbose) || DumpRegsInit.empty()) {
+static void normalizeRegInitOptions(Config &Cfg, LLVMState &State,
+                                    const RegInitOptions &Opts) {
+  auto &RegsCfg = Cfg.PassCfg.RegistersConfig;
+  RegsCfg.InitializeRegs = Opts.InitRegsInElf;
+  if ((Opts.DumpInitialRegisters == "none" && Verbose) ||
+      Opts.DumpInitialRegisters.empty()) {
     // if verbose, but no file was specified - use hardcoded default path
     RegsCfg.InitialStateOutputYaml = "initial_registers_state.yml";
-  } else if (DumpRegsInit != "none") {
-    RegsCfg.InitialStateOutputYaml = DumpRegsInit;
+  } else if (Opts.DumpInitialRegisters != "none") {
+    RegsCfg.InitialStateOutputYaml = Opts.DumpInitialRegisters;
   }
 
-  if ((DumpRegsFinal == "none" && (Verbose && ModelCfg.runOnModel())) ||
-      DumpRegsFinal.empty()) {
+  if ((Opts.DumpResultingRegisters == "none" &&
+       (Verbose && Cfg.PassCfg.ModelPluginConfig.runOnModel())) ||
+      Opts.DumpResultingRegisters.empty()) {
     // if verbose, but no file was specified - use hardcoded default path
     RegsCfg.FinalStateOutputYaml = "registers_state.yml";
-  } else if (DumpRegsFinal != "none") {
-    RegsCfg.FinalStateOutputYaml = DumpRegsFinal;
+  } else if (Opts.DumpResultingRegisters != "none") {
+    RegsCfg.FinalStateOutputYaml = Opts.DumpResultingRegisters;
   }
-
-  auto &TrackCfg = Mapper.Cfg.CommonPolicyCfg->TrackCfg;
-  IO.mapRequired("backtrack", TrackCfg.BTMode);
-  IO.mapRequired("enable-address-value-hazards", TrackCfg.AddressVH);
-  std::string SelfCheck;
-  IO.mapRequired("selfcheck", SelfCheck);
-  TrackCfg.SelfCheckPeriod = getSelfcheckPeriod(SelfCheck);
-  std::string ValuegramRegsDataFile;
-  bool ValuegramOperandsRegsInitOutputs;
-  IO.mapRequired("valuegram-operands-regs", ValuegramRegsDataFile);
-  IO.mapRequired("valuegram-operands-regs-init-outputs",
-                 ValuegramOperandsRegsInitOutputs);
   // TODO: move this check away.
-  if (ValuegramOperandsRegsInitOutputs && ValuegramRegsDataFile.empty())
+  if (Opts.ValuegramOperandsRegsInitOutputsSpecified &&
+      !Opts.ValueGramRegsDataFileSpecified)
     snippy::fatal("Incompatible options",
                   "-valuegram-operands-regs-init-outputs available only if "
                   "-valuegram-operands-regs specified");
 
-  if (!ValuegramRegsDataFile.empty()) {
-    Mapper.Cfg.DefFlowConfig.Valuegram.emplace();
-    Mapper.Cfg.DefFlowConfig.Valuegram->RegsHistograms =
-        loadRegistersFromYaml(ValuegramRegsDataFile);
-    Mapper.Cfg.DefFlowConfig.Valuegram->ValuegramOperandsRegsInitOutputs =
+  if (Opts.ValueGramRegsDataFileSpecified) {
+    Cfg.DefFlowConfig.Valuegram.emplace();
+    Cfg.DefFlowConfig.Valuegram->RegsHistograms =
+        loadRegistersFromYaml(Opts.ValueGramRegsDataFile);
+    Cfg.DefFlowConfig.Valuegram->ValuegramOperandsRegsInitOutputs =
         ValuegramOperandsRegsInitOutputs;
   }
+}
+
+static void normalizeInstrGenOptions(Config &Cfg, LLVMState &State,
+                                     const InstrGenOptions &Opts) {
+  auto &PassCfg = Cfg.PassCfg;
+  auto &InstrsCfg = PassCfg.InstrsGenerationConfig;
+  auto NumPrimaryInstrs = getExpectedNumInstrs(Opts.NumInstrs);
+  InstrsCfg.RunMachineInstrVerifier = Opts.VerifyMachineInstrs;
+  InstrsCfg.ChainedRXSorted = Opts.ChainedRXSorted;
+  InstrsCfg.ChainedRXSectionsFill = Opts.ChainedRXSectionsFill;
+  if (Opts.ChainedRXChunkSize)
+    InstrsCfg.ChainedRXChunkSize = Opts.ChainedRXChunkSize;
+
+  if (Opts.ChainedRXChunkSize && !NumPrimaryInstrs)
+    snippy::fatal(State.getCtx(),
+                  "Cannot use '" + Twine(ChainedRXChunkSize.ArgStr) +
+                      "' option",
+                  "num-instr is set to 'all'");
+  if (Opts.ChainedRXChunkSize && !InstrsCfg.ChainedRXSectionsFill)
+    snippy::warn(WarningName::InconsistentOptions, State.getCtx(),
+                 "'" + Twine(ChainedRXChunkSize.ArgStr) + "' is ignored",
+                 "pass 'chained-rx-sections-fill' to enable it");
+  InstrsCfg.NumInstrs = NumPrimaryInstrs;
+  InstrsCfg.LastInstr = Opts.LastInstr;
+
+  auto &TrackCfg = Cfg.CommonPolicyCfg->TrackCfg;
+  TrackCfg.BTMode = Opts.Backtrack;
+  TrackCfg.AddressVH = Opts.AddressVHOpt;
+  TrackCfg.SelfCheckPeriod = getSelfcheckPeriod(Opts.SelfCheck);
+}
+
+static void normalizeModelOptions(Config &Cfg, LLVMState &State,
+                                  const ModelOptions &Opts) {
+  auto &ModelCfg = Cfg.PassCfg.ModelPluginConfig;
+  ModelCfg.ModelLibraries = parseModelPluginList(Opts);
 }
 
 void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
@@ -981,26 +799,11 @@ Config::Config(IncludePreprocessor &IPP, RegPool &RP, LLVMState &State
     snippy::fatal(Ctx,
                   "Failed to parse file \"" + IPP.getPrimaryFilename() + "\"",
                   toString(std::move(Err)));
-  // Append command line options.
-  // Due to legacy some config parameters were fetched externally from options.
-  // ConfigCLOptionsMapper is made to replace that.
-  std::string CLOptYaml;
-  raw_string_ostream OS{CLOptYaml};
-  outputYAMLToStream(OptionsStorage::instance(), OS);
-  ConfigCLOptionsMapper OptMapper{*this};
-  Err = loadYAMLFromBuffer(
-      OptMapper, CLOptYaml,
-      [&CfgParsingCtx](auto &Yin) {
-        Yin.setAllowUnknownKeys(true);
-        Yin.setContext(&CfgParsingCtx);
-      },
-      [](const auto &Diag, void *Ctx) {
-        // No diagnostics.
-      },
-      IPP);
-  if (Err)
-    snippy::fatal(toString(std::move(Err)));
 
+  normalizeProgramLevelOptions(*this, State, RP, copyOptionsToProgramOptions());
+  normalizeRegInitOptions(*this, State, copyOptionsToRegInitOptions());
+  normalizeModelOptions(*this, State, copyOptionsToModelOptions());
+  normalizeInstrGenOptions(*this, State, copyOptionsToInstrGenOptions());
   complete(State, OpCC);
   validateAll(State, OpCC, RP);
 }
