@@ -44,4 +44,7 @@ if(LLVM_SNIPPY_NEEDS_LIBSTDCPP_FS)
 endif()
 
 target_link_libraries(LLVMSnippyGenerator
-  PRIVATE LLVMSnippyTarget)
+  PRIVATE LLVMSnippyTarget
+  PUBLIC LLVMSnippyConfig
+  SnippyHeaders
+  )

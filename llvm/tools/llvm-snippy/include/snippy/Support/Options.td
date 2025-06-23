@@ -52,7 +52,9 @@ class Option<string name, OptionKind kind, OptionType type> {
   string ValueDescription = ?;
   code DefaultValue = ?;
   bit CommaSeparated = ?;
+  bit ValueOptional = false;
   code Callback = ?;
+  code AdditionalArgs = ?;
 }
 
 // Helpers for defining options.
@@ -66,6 +68,13 @@ class List<string name, OptionType type> : Option<name, KindList, type>;
 class Alias<string name, Option aliasto> : Option<name, KindAlias, ?> {
   let Alias = aliasto;
 }
+
+class EnumOption<string name, code type>
+    : Option<name, KindPlain, OptionType<type>>;
+
+class IntegerOption<string name, code type>
+    : Option<name, KindPlain, OptionType<type>>;
+
 
 // Mix-ins for adding optional attributes.
 
