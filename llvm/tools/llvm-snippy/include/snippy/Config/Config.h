@@ -18,13 +18,16 @@
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/PluginWrapper.h"
+#include "snippy/Config/SelfcheckMode.h"
 #include "snippy/Support/YAMLUtils.h"
 #include "snippy/Target/TargetConfigIface.h"
 
 #include <unordered_map>
 namespace llvm {
 namespace snippy {
-
+#define GEN_SNIPPY_OPTIONS_STRUCT_DEF
+#include "SnippyConfigOptionsStruct.inc"
+#undef GEN_SNIPPY_OPTIONS_STRUCT_DEF
 class SnippyTarget;
 
 // Basic snippy configuration.
@@ -363,13 +366,8 @@ private:
                    const RegPool &RP);
 };
 
-struct ConfigCLOptionsMapper {
-  Config &Cfg;
-};
-
 bool shouldSpillGlobalRegs(const Config &Cfg);
 
 } // namespace snippy
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(snippy::Config);
-LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::ConfigCLOptionsMapper);
 } // namespace llvm
