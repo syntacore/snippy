@@ -22,22 +22,9 @@ cl::OptionCategory DiagnosticOptions("llvm-diagnostic");
 
 namespace snippy {
 
-static snippy::opt_list<std::string>
-    WError("Werror", cl::CommaSeparated,
-           cl::desc("Comma separated list of warnig types that should be "
-                    "treated as errors"),
-           cl::cat(llvm::DiagnosticOptions), cl::ValueOptional);
-
-static snippy::opt_list<std::string>
-    WNoError("Wno-error", cl::CommaSeparated,
-             cl::desc("Comma separated list of warning types that should be "
-                      "excluded from WError option"),
-             cl::cat(llvm::DiagnosticOptions), cl::ValueOptional);
-
-static snippy::opt_list<std::string>
-    WDisable("Wdisable", cl::CommaSeparated,
-             cl::desc("Comma-separated list of warning types to suppress"),
-             cl::cat(DiagnosticOptions));
+#define GEN_SNIPPY_OPTIONS_DEF
+#include "SnippySupportOptions.inc"
+#undef GEN_SNIPPY_OPTIONS_DEF
 
 #ifdef WARN_CASE
 #error WARN_CASE should not be defined at this point
