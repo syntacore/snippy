@@ -1,3 +1,7 @@
+set(LLVM_TARGET_DEFINITIONS SupportOptions.td)
+tablegen(SNIPPY SnippySupportOptions.inc -gen-options -I
+         ${LLVM_SNIPPY_HEADERS_DIR})
+add_public_tablegen_target(LLVMSnippySupportOptionsTableGen)
 add_llvm_library(
   LLVMSnippySupport
   DISABLE_LLVM_LINK_LLVM_DYLIB
@@ -16,3 +20,6 @@ add_llvm_library(
 if(LLVM_SNIPPY_NEEDS_LIBSTDCPP_FS)
   target_link_libraries(LLVMSnippySupport PRIVATE stdc++fs)
 endif()
+
+target_include_directories(LLVMSnippySupport PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+add_dependencies(LLVMSnippySupport LLVMSnippySupportOptionsTableGen)
