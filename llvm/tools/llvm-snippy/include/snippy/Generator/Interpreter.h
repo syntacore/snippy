@@ -126,13 +126,15 @@ public:
   void resetMem();
 
   void disableTransactionsTracking();
-
+  using SectionFilterPFN = std::function<bool(llvm::object::SectionRef)>;
   // Loads elf image into simulator and sets PC to
   // entry point address. Passing empty string to EntryPointSymbol searches for
   // default entry point defined in elf.
   // InitBSS controls whether bss sections should be zeroed out.
+  // SectionFilter is optional filter of sections that will be loaded.
   void loadElfImage(StringRef ElfImage, bool InitBSS,
-                    StringRef EntryPointSymbol = "");
+                    StringRef EntryPointSymbol = "",
+                    SectionFilterPFN SectionFilter = nullptr);
 
   void dumpCurrentRegState(StringRef Filename) const;
 

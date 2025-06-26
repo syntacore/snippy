@@ -264,22 +264,26 @@ static StringRef getSectionName(llvm::object::SectionRef S) {
 }
 
 void Interpreter::loadElfImage(StringRef ElfImage, bool InitBSS,
-                               StringRef EntryPointSymbol) {
+                               StringRef EntryPointSymbol,
+                               SectionFilterPFN SectionFilter) {
   auto MemBuff = MemoryBuffer::getMemBuffer(ElfImage, "", false);
   auto ObjectFile = makeObjectFile(*MemBuff);
   // FIXME: we need to provide more context to error message.
   // (at least elf name)
   if (ObjectFile->isRelocatableObject())
     snippy::fatal("Trying to load relocatable object into model");
+
   for (auto &&Section : ObjectFile->sections()) {
-    if (!Section.isText() && !Section.isData() && !Section.isBSS())
+    if ((SectionFilter && !SectionFilter(Section)) ||
+        !(Section.isText() || Section.isData() || Section.isBSS()))
       continue;
     auto Address = Section.getAddress();
     auto Size = Section.getSize();
+
     if (!coveredByMemoryRegion(Address, Size))
       snippy::fatal(
-          formatv("Trying to load/allocate section '{0}' at address 0x{1:x} of "
-                  "size 0x{2:x} which is not covered by model memory region",
+          formatv("Trying to load/allocate section '{0}' at address {1:x} of "
+                  "size {2:x} which is not covered by model memory region",
                   getSectionName(Section), Address, Size));
     if (Section.isText() || Section.isData()) {
       if (auto EContents = Section.getContents())
