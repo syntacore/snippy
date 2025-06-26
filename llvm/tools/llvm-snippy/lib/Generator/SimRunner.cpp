@@ -37,7 +37,12 @@ SimRunner::SimRunner(LLVMContext &Ctx, const SnippyTarget &TGT,
 void SimRunner::loadElf(StringRef Image, bool InitBSS,
                         StringRef EntryPointSymbol) {
   for (auto &I : CoInterp)
-    I->loadElfImage(Image, InitBSS, EntryPointSymbol);
+    I->loadElfImage(Image, InitBSS, EntryPointSymbol,
+                    [](llvm::object::SectionRef Section) {
+                      if (auto EName = Section.getName())
+                        return EName->starts_with(".snippy");
+                      return false;
+                    });
 }
 void SimRunner::run(ProgramCounterType StartPC) {
 
