@@ -537,7 +537,8 @@ void Interpreter::discardTransaction() {
 
   Simulator->setPC(getPCBeforeTransaction());
   for (auto [Addr, Value] : getMemBeforeTransaction())
-    Simulator->writeMem(Addr, APInt(sizeof(Value) * CHAR_BIT, Value));
+    Simulator->writeMem(
+        Addr, APInt(sizeof(Value) * CHAR_BIT, Value, /* signed */ true));
   for (auto [RegID, Value] : getXRegsBeforeTransaction())
     Simulator->setGPR(RegID, Value);
   for (auto [RegID, Value] : getFRegsBeforeTransaction())
