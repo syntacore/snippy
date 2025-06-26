@@ -738,7 +738,11 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
   // still legal.
   LLVM_DEBUG(dbgs() << "breakDownAddrForRVVIndexed Instruction\n";
              MI.print(dbgs()););
-  uint64_t IndexMaxValue = APInt::getMaxValue(EIEW).getZExtValue();
+  // From the specification: All Zve* extensions support all vector load and
+  // store instructions (Section Section 31.7), except Zve64* extensions do not
+  // support EEW=64 for index values when XLEN=32.
+  assert(EIEW <= ST.getXLen());
+  APInt IndexMaxValue = APInt::getMaxValue(EIEW).zext(ST.getXLen());
 
   // Start by generating an offset for the base address.
   // The minimum value of the base address's offset is such that after adding
@@ -754,66 +758,85 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
   // Base + MinOffset <= Base' + Index' <= Base + MaxOffset
   assert(AddrInfo.MinOffset <= 0);
   assert(AddrInfo.MaxOffset >= 0);
+
+  // Originally we need to create just (xlen + 1)-bit signed immediates, but
+  // initial values might be near uint64_t::max (sign bit equals `1`). If xlen
+  // is 64-bit, APInt ctor in such cases will create sign extended 65-bit (xlen
+  // + 1) immediate that is not the value we need.
+  auto Address = APInt(ST.getXLen(), AddrInfo.Address, /* signed */ false)
+                     .zext(ST.getXLen() + 1);
+  auto MinOffset = APInt(ST.getXLen(), AddrInfo.MinOffset, /* signed */ true)
+                       .sext(ST.getXLen() + 1);
+  auto MaxOffset = APInt(ST.getXLen(), AddrInfo.MaxOffset, /* signed */ true)
+                       .zext(ST.getXLen() + 1);
+
   // Get the legal range
-  uint64_t MinBaseOffset = AddrInfo.Address + AddrInfo.MinOffset;
-  uint64_t MaxBaseOffset =
-      AddrInfo.Address + static_cast<uint64_t>(AddrInfo.MaxOffset);
+  bool OV = false;
+  auto MinBaseOffset = Address.sadd_ov(MinOffset, OV);
+  assert(!OV && "Must not overflow");
+  assert(MinBaseOffset.sge(0) && "Cannot be negative");
+  MinBaseOffset = MinBaseOffset.trunc(ST.getXLen());
+  auto MaxBaseOffset = Address.sadd_ov(MaxOffset, OV).trunc(ST.getXLen());
+  assert(!OV && "Must not overflow");
 
   // MinBaseOffset and MaxBaseOffset must be reachable from AddrInfo.Address
   // with AddrInfo.MinStride
   [[maybe_unused]] uint64_t AddrStrideReminder =
       AddrInfo.Address % AddrInfo.MinStride;
-  assert(AddrStrideReminder == (MinBaseOffset % AddrInfo.MinStride) &&
-         AddrStrideReminder == (MaxBaseOffset % AddrInfo.MinStride));
+  assert(AddrStrideReminder ==
+             (MinBaseOffset.getZExtValue() % AddrInfo.MinStride) &&
+         AddrStrideReminder ==
+             (MaxBaseOffset.getZExtValue() % AddrInfo.MinStride));
 
   // Pick the legal random Base' value with the index constraints for current
   // instruction. So, from the equation above:
   // MinBaseOffset <= Base' + IndexMaxValue <= MaxBaseOffset
   // MinBaseOffset - IndexMaxValue  <= Base' <= MaxBaseOffset - IndexMaxValue
-  uint64_t MinBase = MinBaseOffset - IndexMaxValue;
-  uint64_t MaxBase = MaxBaseOffset - IndexMaxValue;
+  auto MinBase = MinBaseOffset - IndexMaxValue;
+  auto MaxBase = MaxBaseOffset - IndexMaxValue;
 
   // This range can be presented in two types:
-  // --|MinBase ... MaxBase|-- and |0 ... MaxBase|--|MinBase ... 2^{64} - 1|
+  // --|MinBase ... MaxBase|-- and |0 ... MaxBase|--|MinBase ... 2^{xlen} - 1|
   // The second case is valid and can be legal in case of overflow. In such
   // case Index' must wrap Base' around zero
 
-  uint64_t BaseAddr;
+  APInt BaseAddr(ST.getXLen(), 0);
 
-  if (MinBase <= MaxBase)
-    BaseAddr = RandEngine::genInRangeInclusive(MinBase, MaxBase);
+  if (MinBase.ule(MaxBase))
+    BaseAddr = RandEngine::genInRangeInclusive(MinBase.getZExtValue(),
+                                               MaxBase.getZExtValue());
   else {
     // This is the logic for the case when the valid base address is either
-    // in the range from 0 to MaxBase or from MinBase to 2^{64} - 1.
+    // in the range from 0 to MaxBase or from MinBase to 2^{xlen} - 1.
     // To ensure a uniform distribution, we first generate a random number
     // within the total length of the valid range.
     //
-    // Note: In this case, MaxBase < MinBase.
-    // AddrRangeLength = MaxBase + ((2^{64} - 1) - MinBase),
-    // which is equivalent to:
-    // AddrRangeLength = (MaxBase - MinBase) % 2^{64}.
+    // Note: In this case, MaxBase < MinBase, MinBase is included, MaxBase is
+    // excluded from the range. AddrRangeLength = (MaxBase - 0) + ((2^{xlen} -
+    // 1) - MinBase + 1).
 
-    uint64_t AddrRangeLength =
-        (MaxBase - MinBase) % std::numeric_limits<uint64_t>::max();
+    auto AddrRangeLength =
+        APInt::getMaxValue(ST.getXLen()) - MinBase + 1 + MaxBase;
     BaseAddr = RandEngine::genInRangeInclusive(AddrRangeLength);
 
     // If randomly generated BaseAddr suits to the first range -> nothing to do
     // Otherwise, we pick the value from the second range as
-    // BaseAddr = (2^{64} - 1) - (BaseAddr - MaxBase),
+    // BaseAddr = (2^{xlen} - 1) - (BaseAddr - MaxBase),
     // which is equivalent to:
     // BaseAddr = MaxBase - BaseAddr
-    if (BaseAddr > MaxBase)
+    if (BaseAddr.ugt(MaxBase))
       BaseAddr = MaxBase - BaseAddr;
   }
-  LLVM_DEBUG(dbgs().indent(2) << Twine("Generated BaseAddress 0x")
-                                     .concat(Twine(utohexstr(BaseAddr)))
-                                     .concat("\n"));
+  LLVM_DEBUG(dbgs().indent(2)
+             << Twine("Generated BaseAddress 0x")
+                    .concat(Twine(utohexstr(BaseAddr.getZExtValue())))
+                    .concat("\n"));
 
-  uint64_t IndexMinValue = MinBaseOffset - BaseAddr;
+  auto IndexMinValue = MinBaseOffset - BaseAddr;
   assert(AddrInfo.MinStride != 0);
-  uint64_t MaxN = (IndexMaxValue - IndexMinValue) / AddrInfo.MinStride;
+  auto MaxN = (IndexMaxValue - IndexMinValue).udiv(AddrInfo.MinStride);
 
-  AddressPart MainPart{AddrReg, APInt(ST.getXLen(), BaseAddr)};
+  AddressPart MainPart{AddrReg, BaseAddr};
 
   AddressParts ValueToReg = {MainPart};
   MemAddresses Addresses;
@@ -831,24 +854,25 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
       // TODO: for unordered stores, generating indices like this is not
       // correct, since store order for overlapping regions is not defined
       auto N = RandEngine::genInRangeInclusive(MaxN);
-      uint64_t IndexValue = IndexMinValue + AddrInfo.MinStride * N;
+      auto IndexValue = IndexMinValue + AddrInfo.MinStride * N;
 
-      Offsets.insertBits(IndexValue, ElemIdx * EIEW, EIEW);
-      LLVM_DEBUG(APInt Index(EIEW, IndexValue);
+      Offsets.insertBits(IndexValue.getZExtValue(), ElemIdx * EIEW, EIEW);
+      LLVM_DEBUG(APInt Index(EIEW, IndexValue.getZExtValue());
                  dbgs().indent(4)
                  << "Generated IndexValue [" + Twine(ElemIdx) + "] : 0x" +
                         Twine(utohexstr(Index.getZExtValue())) + "\n");
 
       // Verify that generated address is legal according to memory scheme
-      [[maybe_unused]] uint64_t FinalAddress = BaseAddr + IndexValue;
-      LLVM_DEBUG(dbgs().indent(4) << ("Generated FinalAddress 0x" +
-                                      Twine(utohexstr(FinalAddress))) +
-                                         "\n");
-      assert(FinalAddress >= MinBaseOffset);
-      assert(FinalAddress <= MaxBaseOffset);
-      [[maybe_unused]] uint64_t FinalOffset = FinalAddress - AddrInfo.Address;
-      assert(FinalOffset % AddrInfo.MinStride == 0);
-      Addresses.push_back(uintToTargetXLen(Is64Bit, BaseAddr + IndexValue));
+      [[maybe_unused]] auto FinalAddress = BaseAddr + IndexValue;
+      LLVM_DEBUG(dbgs().indent(4)
+                 << ("Generated FinalAddress 0x" +
+                     Twine(utohexstr(FinalAddress.getZExtValue()))) +
+                        "\n");
+      assert(FinalAddress.uge(MinBaseOffset));
+      assert(FinalAddress.ule(MaxBaseOffset));
+      [[maybe_unused]] auto FinalOffset = FinalAddress - AddrInfo.Address;
+      assert(FinalOffset.urem(AddrInfo.MinStride) == 0);
+      Addresses.push_back((BaseAddr + IndexValue).getZExtValue());
     }
     VL -= NElts;
     ValueToReg.emplace_back(IdxReg++, Offsets);
