@@ -16,10 +16,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "LLVMState.h"
-#include "Linker.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 
+#include "snippy/Generator/ParsedElf.h"
 #include "snippy/Simulator/Simulator.h"
 #include "snippy/Simulator/Transactions.h"
 
@@ -90,16 +90,43 @@ class Interpreter final {
   const SimulationEnvironment &Env;
   std::unique_ptr<RVMCallbackHandler::ObserverHandle<TransactionStack>>
       TransactionsObserverHandle;
-  uint64_t ProgEnd;
-
   void initTransactionMechanism();
   void dumpOneRange(NamedMemoryRange Range, raw_fd_ostream &OS) const;
   bool coveredByMemoryRegion(MemAddr Start, MemAddr Size) const;
 
-public:
-  uint64_t getProgEnd() const { return ProgEnd; }
-  bool endOfProg() const;
+  static StringRef getStringNameOrUnknown(Expected<StringRef> Str) {
+    static constexpr StringRef UnknownData = "<<UNKNOWN>>";
+    return Str.takeError() ? UnknownData : *Str;
+  };
 
+  template <typename SectionRangeT>
+  Error checkSectionsCoveredByMemoryRegion(SectionRangeT &&Sections) const {
+    auto NotCovered = llvm::find_if(Sections, [this](auto &&Section) {
+      auto Address = Section.getAddress();
+      auto Size = Section.getSize();
+
+      return !coveredByMemoryRegion(Address, Size);
+    });
+
+    if (NotCovered == Sections.end())
+      return Error::success();
+
+    auto SectionName = NotCovered->getName();
+
+    auto Address = NotCovered->getAddress();
+
+    auto Size = NotCovered->getSize();
+
+    auto Err = createStringError(
+        makeErrorCode(Errc::CorruptedElfImage),
+        formatv("Trying to load/allocate section '{0}' at address 0x{1:x} of "
+                "size 0x{2:x} which is not covered by model memory region",
+                getStringNameOrUnknown(std::move(SectionName)), Address, Size));
+
+    return joinErrors(std::move(Err), SectionName.takeError());
+  }
+
+public:
   static SimulationEnvironment createSimulationEnvironment(
       SnippyProgramContext &SPC, const TargetSubtargetInfo &ST,
       const Config &Settings, TargetGenContextInterface &TgtCtx);
@@ -131,10 +158,37 @@ public:
   // entry point address. Passing empty string to EntryPointSymbol searches for
   // default entry point defined in elf.
   // InitBSS controls whether bss sections should be zeroed out.
-  // SectionFilter is optional filter of sections that will be loaded.
-  void loadElfImage(StringRef ElfImage, bool InitBSS,
-                    StringRef EntryPointSymbol = "",
-                    SectionFilterPFN SectionFilter = nullptr);
+  Error loadElfImage(const ParsedElf &ElfData, bool InitBSS) {
+    if (auto Err =
+            checkSectionsCoveredByMemoryRegion(ElfData.TextAndDataSections))
+      return Err;
+
+    if (auto Err = checkSectionsCoveredByMemoryRegion(ElfData.BSSSections))
+      return Err;
+
+    for (auto &&Section : ElfData.TextAndDataSections) {
+      if (auto EContents = Section.getContents()) {
+        snippy::warn(WarningName::EmptyElfSection,
+                     formatv("ignored LOAD section '{0}'",
+                             getStringNameOrUnknown(Section.getName())),
+                     "empty contents");
+        auto Address = Section.getAddress();
+        Simulator->writeMem(Address, *EContents);
+      }
+    }
+
+    if (!InitBSS)
+      return Error::success();
+
+    for (auto &&Section : ElfData.BSSSections) {
+      auto Size = Section.getSize();
+      auto Address = Section.getAddress();
+      std::vector<char> Zeroes(Size, 0);
+      Simulator->writeMem(Address, Zeroes);
+    }
+
+    return Error::success();
+  }
 
   void dumpCurrentRegState(StringRef Filename) const;
 

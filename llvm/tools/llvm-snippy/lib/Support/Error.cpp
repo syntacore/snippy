@@ -32,6 +32,8 @@ std::string SnippyErrorCategory::message(int ErrorValue) const {
     return "Failure";
   case Errc::OutOfSpace:
     return "Out of available space";
+  case Errc::CorruptedElfImage:
+    return "Corrupted ELF image";
   }
 
   return "Unrecognized error code";

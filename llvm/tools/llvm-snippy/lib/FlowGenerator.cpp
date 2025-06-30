@@ -355,7 +355,9 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
           I.setObserver<SelfcheckObserver>(Map.begin(), Map.end(), I.getPC());
     }
 
-    SimCtx.runSimulator(RI);
+    if (auto Err = SimCtx.runSimulator(RI))
+      snippy::fatal(GenCtx.getProgramContext().getLLVMState().getCtx(),
+                    "Error during the simulation run", std::move(Err));
 
     if (TrackCfg.SelfCheckPeriod) {
       if (SelfCheckMem)
