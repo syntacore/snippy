@@ -25,6 +25,7 @@ enum class Errc {
   LogicError,
   Failure,
   OutOfSpace,
+  CorruptedElfImage,
 };
 
 std::error_code makeErrorCode(Errc Code);
