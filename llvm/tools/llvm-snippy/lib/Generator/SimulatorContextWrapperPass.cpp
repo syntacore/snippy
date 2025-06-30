@@ -177,7 +177,7 @@ getMemoryRangesToDump(Interpreter &I, ArrayRef<std::string> RangesSelectors) {
   return RangesToDump;
 }
 
-void SimulatorContext::runSimulator(const RunInfo &RI) {
+Error SimulatorContext::runSimulator(const RunInfo &RI) {
   auto &ImageToRun = RI.ImageToRun;
   auto &ProgCtx = RI.ProgCtx;
   auto &InitialStateOutputYaml = RI.InitialRegStateOutputYaml;
@@ -195,21 +195,39 @@ void SimulatorContext::runSimulator(const RunInfo &RI) {
   // runs after all passes have been run and the order of execution is not
   // Interpreters memory is set to the zero state after generation.
   auto &I = getInterpreter();
-  auto &L = ProgCtx.getLinker();
   auto &InitRegState = ProgCtx.getInitialRegisterState(I.getSubTarget());
-  I.setRegisterState(InitRegState);
-  // StartPC location may be updated since last time it was configured.
-  auto StartPC = *L.getStartPC();
-  I.setPC(StartPC);
-  I.dumpCurrentRegState(InitialStateOutputYaml);
 
   auto &SimRunner = getSimRunner();
   SimRunner.resetState(ProgCtx, RI.NeedMemoryReset);
+
+  auto ElfData = ParsedElf::createParsedElf(
+      ImageToRun, RI.EntryPointName, [](llvm::object::SectionRef Section) {
+        if (auto EName = Section.getName())
+          return EName->starts_with(".snippy");
+        return false;
+      });
+  if (!ElfData)
+    return ElfData.takeError();
+
   // FIXME: currently it does not initialize .bss sections with
   // zeroes, to comply with legacy behaviour.
-  SimRunner.loadElf(ImageToRun, /* InitBSS */ false, RI.EntryPointName);
+  if (auto Err =
+          SimRunner.loadElfSectionsToModel(*ElfData, /* InitBSS */ false))
+    return Err;
 
-  SimRunner.run(StartPC);
+  I.setRegisterState(InitRegState);
+  // StartPC location may be updated since last time it was configured.
+
+  I.setPC(ElfData->ProgStart);
+  I.dumpCurrentRegState(InitialStateOutputYaml);
+
+  if (ElfData->ProgEnd == std::nullopt)
+    return createStringError(
+        makeErrorCode(Errc::CorruptedElfImage),
+        formatv("Elf does not have specified exit symbol"));
+
+  auto ProgEnd = *ElfData->ProgEnd;
+  SimRunner.run(ElfData->ProgStart, ProgEnd);
 
   I.dumpCurrentRegState(FinalStateOutputYaml);
   auto RangesToDump = getMemoryRangesToDump(I, DumpMemorySection);
@@ -219,6 +237,7 @@ void SimulatorContext::runSimulator(const RunInfo &RI) {
   // Force flush stdout buffer written by Simulator.
   // It helps to avoid mixing it with stderr if redirected to same file.
   fflush(stdout);
+  return Error::success();
 }
 
 char SimulatorContextWrapper::ID = 0;
