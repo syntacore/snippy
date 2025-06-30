@@ -64,13 +64,6 @@ static std::string makeModelNameFromPartialName(StringRef PartialName) {
   return (Twine(ARCH_PREFIX) + "-" + PartialName + "-plugin.so").str();
 }
 
-static std::unique_ptr<object::ObjectFile> makeObjectFile(MemoryBufferRef Buf) {
-  auto Exp = object::ObjectFile::createObjectFile(Buf);
-  if (!Exp)
-    snippy::fatal("Failed to constuct object file from memory buffer");
-  return std::move(Exp.get());
-}
-
 } // namespace llvm
 
 namespace llvm {
@@ -203,10 +196,6 @@ bool Interpreter::compareStates(const Interpreter &Another,
   });
 }
 
-bool Interpreter::endOfProg() const {
-  return Simulator->readPC() == getProgEnd();
-}
-
 void Interpreter::resetMem() {
   const auto &SimCfg = Env.SimCfg;
   std::vector<char> Zeros;
@@ -254,92 +243,6 @@ bool Interpreter::coveredByMemoryRegion(MemAddr Start, MemAddr Size) const {
     return Reg.Start <= Start && Reg.Start + Reg.Size >= Start + Size;
   };
   return llvm::any_of(Env.SimCfg.MemoryRegions, IsInsideOf);
-}
-
-static StringRef getSectionName(llvm::object::SectionRef S) {
-  if (auto EName = S.getName())
-    return *EName;
-  else
-    return "";
-}
-
-void Interpreter::loadElfImage(StringRef ElfImage, bool InitBSS,
-                               StringRef EntryPointSymbol,
-                               SectionFilterPFN SectionFilter) {
-  auto MemBuff = MemoryBuffer::getMemBuffer(ElfImage, "", false);
-  auto ObjectFile = makeObjectFile(*MemBuff);
-  // FIXME: we need to provide more context to error message.
-  // (at least elf name)
-  if (ObjectFile->isRelocatableObject())
-    snippy::fatal("Trying to load relocatable object into model");
-
-  for (auto &&Section : ObjectFile->sections()) {
-    if ((SectionFilter && !SectionFilter(Section)) ||
-        !(Section.isText() || Section.isData() || Section.isBSS()))
-      continue;
-    auto Address = Section.getAddress();
-    auto Size = Section.getSize();
-
-    if (!coveredByMemoryRegion(Address, Size))
-      snippy::fatal(
-          formatv("Trying to load/allocate section '{0}' at address {1:x} of "
-                  "size {2:x} which is not covered by model memory region",
-                  getSectionName(Section), Address, Size));
-    if (Section.isText() || Section.isData()) {
-      if (auto EContents = Section.getContents())
-        Simulator->writeMem(Address, *EContents);
-      else
-        snippy::warn(
-            WarningName::EmptyElfSection,
-            formatv("ignored LOAD section '{0}'", getSectionName(Section)),
-            "empty contents");
-    } else if (Section.isBSS() && InitBSS) {
-      std::vector<char> Zeroes(Size, 0);
-      Simulator->writeMem(Address, Zeroes);
-    }
-  }
-  auto FindEntryPoint = [&]() {
-    assert(!EntryPointSymbol.empty());
-    auto EntryPointSym = llvm::find_if(ObjectFile->symbols(), [&](auto &Sym) {
-      auto EName = Sym.getName();
-      return EName && EName.get() == EntryPointSymbol;
-    });
-    if (EntryPointSym == ObjectFile->symbols().end())
-      snippy::fatal(
-          formatv("Elf does not have specified entry point name '{0}'",
-                  EntryPointSymbol));
-    auto EEntryAddress = EntryPointSym->getAddress();
-    if (!EEntryAddress)
-      snippy::fatal(
-          formatv("Elf entry point name '{0}' does not have defined address",
-                  EntryPointSymbol));
-    return *EEntryAddress;
-  };
-
-  auto GetDefaultEntryPoint = [&]() {
-    auto EEntryAddress = ObjectFile->getStartAddress();
-    if (!EEntryAddress)
-      snippy::fatal("Elf does not have entry point");
-    return *EEntryAddress;
-  };
-
-  auto StartPC =
-      !EntryPointSymbol.empty() ? FindEntryPoint() : GetDefaultEntryPoint();
-  setPC(StartPC);
-
-  auto EndOfProgSym = llvm::find_if(ObjectFile->symbols(), [](auto &Sym) {
-    auto EName = Sym.getName();
-    return EName && EName.get() == Linker::getExitSymbolName();
-  });
-
-  if (EndOfProgSym == ObjectFile->symbols().end()) {
-    ProgEnd = 0;
-    return;
-  }
-  auto EAddress = EndOfProgSym->getAddress();
-  assert(EAddress && "Expected the address of symbol to be known");
-
-  ProgEnd = EAddress.get();
 }
 
 void Interpreter::resetState(const SnippyProgramContext &ProgCtx,

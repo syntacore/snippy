@@ -57,7 +57,7 @@ struct SimulatorContext {
     StringRef BaseFilename;
   };
 
-  void runSimulator(const RunInfo &RI);
+  Error runSimulator(const RunInfo &RI);
 
 private:
   void checkMemStateAfterSelfcheck(SnippyProgramContext &ProgCtx) const;
