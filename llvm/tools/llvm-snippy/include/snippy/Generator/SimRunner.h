@@ -41,9 +41,16 @@ public:
   }
 
   // Preform co-simulation run.
-  void run(ProgramCounterType StartPC);
+  void run(ProgramCounterType StartPC, ProgramCounterType EndPC);
   // Loads image of program into each interpreter.
-  void loadElf(StringRef Image, bool InitBSS, StringRef EntryPointSymbol);
+
+  Error loadElfSectionsToModel(const ParsedElf &ElfData, bool InitBSS) {
+    for (auto &I : CoInterp)
+      if (auto Err = I->loadElfImage(ElfData, InitBSS))
+        return Err;
+
+    return Error::success();
+  }
 
   void resetState(const SnippyProgramContext &ProgCtx, bool DoMemReset) {
     for (auto &&PI : CoInterp)

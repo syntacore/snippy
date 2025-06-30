@@ -34,20 +34,10 @@ SimRunner::SimRunner(LLVMContext &Ctx, const SnippyTarget &TGT,
   }
 }
 
-void SimRunner::loadElf(StringRef Image, bool InitBSS,
-                        StringRef EntryPointSymbol) {
-  for (auto &I : CoInterp)
-    I->loadElfImage(Image, InitBSS, EntryPointSymbol,
-                    [](llvm::object::SectionRef Section) {
-                      if (auto EName = Section.getName())
-                        return EName->starts_with(".snippy");
-                      return false;
-                    });
-}
-void SimRunner::run(ProgramCounterType StartPC) {
+void SimRunner::run(ProgramCounterType StartPC, ProgramCounterType EndPC) {
 
   for (auto &I : CoInterp) {
-    I->setStopModeByPC(I->getProgEnd());
+    I->setStopModeByPC(EndPC);
     I->setPC(StartPC);
   }
 
@@ -56,7 +46,7 @@ void SimRunner::run(ProgramCounterType StartPC) {
   auto &PrimI = getPrimaryInterpreter();
   PrimI.logMessage("#===Simulation Start===\n");
 
-  while (!PrimI.endOfProg()) {
+  while (PrimI.getPC() != EndPC) {
     auto ExecRes = PrimI.step();
     if (ExecRes == ExecutionResult::FatalError)
       PrimI.reportSimulationFatalError("Primary interpreter step failed");
