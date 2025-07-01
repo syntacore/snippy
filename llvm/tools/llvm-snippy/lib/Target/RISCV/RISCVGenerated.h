@@ -17,6 +17,8 @@
 #include "MCTargetDesc/RISCVMCTargetDesc.h"
 #include "snippy/Support/DiagnosticInfo.h"
 
+#include "llvm/Support/FormatVariadic.h"
+
 #include "RISCV.h"
 #include "RISCVInstrInfo.h"
 #include "RISCVRegisterInfo.h"
@@ -560,6 +562,68 @@ inline size_t getNumFields(unsigned Opcode) {
     return 8;
   default:
     llvm_unreachable("Invalid segment load/store instruction opcode");
+  }
+}
+
+inline size_t getImmSizeInBits(unsigned Opcode) {
+  switch (Opcode) {
+  case RISCV::ADDI:
+  case RISCV::ADDIW:
+  case RISCV::SLTI:
+  case RISCV::SLTIU:
+  case RISCV::XORI:
+  case RISCV::ORI:
+  case RISCV::ANDI:
+  case RISCV::SLLI:
+  case RISCV::SRLI:
+  case RISCV::SRAI:
+  case RISCV::FLD:
+  case RISCV::FSD:
+  case RISCV::FLW:
+  case RISCV::FSW:
+  case RISCV::LB:
+  case RISCV::LH:
+  case RISCV::LW:
+  case RISCV::LBU:
+  case RISCV::LHU:
+  case RISCV::SB:
+  case RISCV::SH:
+  case RISCV::SW:
+  case RISCV::JALR:
+  case RISCV::BEQ:
+  case RISCV::BNE:
+  case RISCV::BLT:
+  case RISCV::BLTU:
+  case RISCV::BGE:
+  case RISCV::BGEU:
+    return 12;
+  case RISCV::LUI:
+  case RISCV::AUIPC:
+  case RISCV::JAL:
+    return 20;
+  case RISCV::C_ADDI:
+  case RISCV::C_ADDIW:
+  case RISCV::C_ADDI16SP:
+  case RISCV::C_LI:
+  case RISCV::C_LUI:
+  case RISCV::C_SRLI:
+  case RISCV::C_SRAI:
+  case RISCV::C_ANDI:
+  case RISCV::C_NOP:
+    return 6;
+  case RISCV::C_J:
+  case RISCV::C_JAL:
+    return 11;
+  case RISCV::C_BEQZ:
+  case RISCV::C_BNEZ:
+  case RISCV::C_ADDI4SPN:
+    return 8;
+  default:
+    llvm_unreachable(llvm::formatv("Invalid opcode: {0}. There is no immediate "
+                                   "operand for such an instruction",
+                                   Opcode)
+                         .str()
+                         .data());
   }
 }
 

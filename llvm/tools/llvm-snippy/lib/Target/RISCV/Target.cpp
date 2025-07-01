@@ -1752,13 +1752,16 @@ public:
 
   /// RISCV Loops:
   ///
-  /// If loop-counters: random-init is set, we have an Offset for register
-  /// values. Only zero Offset is supported for BEQ, C_BEQZ and C_BNEZ.
+  /// If loop-counters: random-init is set, we have an Offset for
+  /// register values. Only zero Offset is supported for BEQ, C_BEQZ and C_BNEZ.
+  /// If loop-counters: random-stride is set, we have a StrideOffset for
+  /// register values. For BEQ and C_BEQZ only a stride of 1 is supported.
   /// * BEQ, C_BEQZ:
   ///   -- Init --
+  ///     Stride = 1
   ///     CounterReg = 0
   ///   -- Latch --
-  ///     CounterReg += 1
+  ///     CounterReg += Stride
   ///     LimitReg = CounterReg >> log2(NIter)
   ///   -- Branch --
   ///     BEQ LimitReg, X0
@@ -1766,30 +1769,33 @@ public:
   ///
   /// * BNE, C_BNEZ:
   ///   -- Init --
+  ///     Stride = 1 (= StrideOffset)
   ///     LimitReg = 0 (= Offset)
-  ///     CounterReg = NIter (= NIter + Offset)
+  ///     CounterReg = NIter (= NIter * Stride + Offset)
   ///   -- Latch --
-  ///     CounterReg -= 1
+  ///     CounterReg -= Stride
   ///   -- Branch --
   ///     BNE CounterReg, LimitReg
   ///     C_BNEZ CounterReg
   ///
   /// * BLT, BLTU:
   ///   -- Init --
-  ///     LimitReg = NIter (= NIter + Offset)
+  ///     Stride = 1 (= StrideOffset)
+  ///     LimitReg = NIter (= NIter * Stride + Offset)
   ///     CounterReg = 0 (= Offset)
   ///   -- Latch --
-  ///     CounterReg += 1
+  ///     CounterReg += Stride
   ///   -- Branch --
   ///     BLT CounterReg, LimitReg
   ///     BLTU CounterReg, LimitReg
   ///
   /// * BGE, BGEU:
   ///   -- Init --
+  ///     Stride = 1 (= StrideOffset)
   ///     LimitReg = 0 (= Offset)
-  ///     CounterReg = NIter (= NIter + Offset)
+  ///     CounterReg = NIter (= NIter * Stride + Offset)
   ///   -- Latch --
-  ///     CounterReg -= 1
+  ///     CounterReg -= Stride
   ///   -- Branch --
   ///     BGE CounterReg, LimitReg
   ///     BGEU CounterReg, LimitReg
@@ -1869,43 +1875,93 @@ public:
     }
   }
 
-  std::pair<std::optional<SnippyDiagnosticInfo>, unsigned>
-  getRandLoopCounterInitValue(InstructionGenerationContext &IGC, unsigned NIter,
-                              const Branchegram &Branches,
-                              ArrayRef<Register> ReservedRegs) const {
-    auto CounterReg = ReservedRegs[CounterRegIdx];
-    if (!Branches.isRandomCountersInitRequested())
-      return {std::nullopt, 0u};
-
+  static unsigned getMaxGenValueForRegs(InstructionGenerationContext &IGC,
+                                        const Branchegram &Branches,
+                                        ArrayRef<Register> ReservedRegs) {
     auto &ProgCtx = IGC.ProgCtx;
-    auto LimitReg = ReservedRegs[LimitRegIdx];
     const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
     auto VLEN =
         ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>().getVLEN();
+    auto CounterReg = ReservedRegs[CounterRegIdx];
     unsigned MaxCounterRegVal = RISCVRegisterState::getMaxRegValueForSize(
         CounterReg, ST.getXLen(), VLEN);
+    if (ReservedRegs.size() == 1)
+      return MaxCounterRegVal;
+
+    auto LimitReg = ReservedRegs[LimitRegIdx];
     unsigned MaxLimitRegVal =
         RISCVRegisterState::getMaxRegValueForSize(LimitReg, ST.getXLen(), VLEN);
-    auto MaxGenVal = std::min(MaxCounterRegVal, MaxLimitRegVal);
+    return std::min(MaxCounterRegVal, MaxLimitRegVal);
+  }
+
+  using WarnDataPair = std::pair<std::optional<SnippyDiagnosticInfo>, unsigned>;
+
+  static WarnDataPair
+  getRandLoopCounterInitValue(InstructionGenerationContext &IGC, unsigned NIter,
+                              const Branchegram &Branches,
+                              ArrayRef<Register> ReservedRegs,
+                              unsigned MaxCounterVal) {
+    if (!Branches.isRandomCountersInitRequested())
+      return {std::nullopt, 0u};
 
     auto [MinRegOpt, MaxRegOpt] = Branches.LoopCounters.InitRange.value();
     auto Min = MinRegOpt.value_or(0);
     // We need to handle the case when our counter may overflows during the
     // iteration.
-    auto BoundaryVal = MaxGenVal - NIter;
-    auto UnsafeMax = MaxRegOpt.value_or(MaxGenVal);
+    auto BoundaryVal = MaxCounterVal - NIter;
+    auto UnsafeMax = MaxRegOpt.value_or(MaxCounterVal);
     auto Max = std::min(UnsafeMax, BoundaryVal);
     if (Max < Min)
       return {
           SnippyDiagnosticInfo(
               "The range of values for initializing loop "
               "counters conflicts with the number of iterations (overflow is "
-              "possible.)",
+              "possible)",
               "The loop counters will be initialized with the closest possible "
               "number to the specified minimum value of the range.",
               llvm::DS_Warning, WarningName::LoopCounterOutOfRange),
           Max};
+    return {std::nullopt, RandEngine::genInRangeInclusive(Min, Max)};
+  }
 
+  static WarnDataPair getRandLoopCounterStrideValue(
+      InstructionGenerationContext &IGC, const Branchegram &Branches,
+      ArrayRef<Register> ReservedRegs, unsigned RegRandOffset, unsigned NIter,
+      unsigned MaxCounterVal) {
+    if (!Branches.isRandomCountersStrideRequested())
+      return {std::nullopt, 1u};
+
+    auto IncOpcode = getIncOpcodeForLoopCounter(IGC);
+    unsigned MaxImmVal = maxIntN(getImmSizeInBits(IncOpcode));
+    auto [MinStrideOpt, MaxStrideOpt] =
+        Branches.LoopCounters.StrideRange.value();
+    unsigned Min = std::min(MinStrideOpt.value_or(1), MaxImmVal);
+    unsigned Max = std::min(MaxStrideOpt.value_or(MaxImmVal), MaxImmVal);
+    // We need to handle the case where the specified range is outside the valid
+    // range for the immediate of a loop counter increment instruction. We also
+    // need to handle the case when our counter may overflows during the
+    // iteration.
+    auto BoundaryVal = MaxCounterVal - RegRandOffset;
+    auto IsOverflowPossible = Max * NIter > BoundaryVal;
+    if ((MinStrideOpt.has_value() && MinStrideOpt.value() > MaxImmVal) ||
+        (MaxStrideOpt.has_value() && MaxStrideOpt.value() > MaxImmVal) ||
+        IsOverflowPossible) {
+      if (IsOverflowPossible)
+        Max = std::max(1u, BoundaryVal / NIter);
+      if (Max < Min)
+        Min = 1;
+      return {SnippyDiagnosticInfo(
+                  llvm::formatv(
+                      "The stride range is now limited to '[{0}, {1}]' to "
+                      "prevent overflow errors. Try reducing one of the "
+                      "following: the value "
+                      "range for loop counter initialization, the value range "
+                      "for the stride, or the number of iterations.",
+                      Min, Max),
+                  llvm::DS_Warning, WarningName::LoopStrideOutOfRange),
+              RandEngine::genInRangeInclusive(Min, Max)};
+    }
+    assert(Max >= Min);
     return {std::nullopt, RandEngine::genInRangeInclusive(Min, Max)};
   }
 
@@ -1920,9 +1976,11 @@ public:
                "Counter and Limit registers expected to be different");
 
     auto CounterReg = ReservedRegs[CounterRegIdx];
-    auto [Diag, RegRandOffset] =
-        getRandLoopCounterInitValue(IGC, NIter, Branches, ReservedRegs);
-
+    auto MaxCounterVal = getMaxGenValueForRegs(IGC, Branches, ReservedRegs);
+    auto [InitDiag, RegRandOffset] = getRandLoopCounterInitValue(
+        IGC, NIter, Branches, ReservedRegs, MaxCounterVal);
+    auto [StrideDiag, RegRandStride] = getRandLoopCounterStrideValue(
+        IGC, Branches, ReservedRegs, RegRandOffset, NIter, MaxCounterVal);
     switch (Branch.getOpcode()) {
     case RISCV::BEQ:
     case RISCV::C_BEQZ: {
@@ -1931,21 +1989,28 @@ public:
       auto LimitReg = ReservedRegs[LimitRegIdx];
       writeValueToReg(IGC, APInt::getZero(getRegBitWidth(LimitReg, IGC)),
                       LimitReg);
+      // So far, the algorithm for constructing a loop with BEQ and C_BEQZ
+      // requires initializing the counter to 0 and the its stride to 1
       RegRandOffset = 0;
+      RegRandStride = 1;
       break;
     }
     case RISCV::BNE: {
+      auto StartCounterRegVal = NIter * RegRandStride + RegRandOffset;
       writeValueToReg(
-          IGC, APInt(getRegBitWidth(CounterReg, IGC), NIter + RegRandOffset),
+          IGC, APInt(getRegBitWidth(CounterReg, IGC), StartCounterRegVal),
           CounterReg);
       auto LimitReg = ReservedRegs[LimitRegIdx];
-      writeValueToReg(IGC, APInt(getRegBitWidth(LimitReg, IGC), RegRandOffset),
+      auto LimitRegVal = RegRandOffset;
+      writeValueToReg(IGC, APInt(getRegBitWidth(LimitReg, IGC), LimitRegVal),
                       LimitReg);
       break;
     }
     case RISCV::C_BNEZ: {
-      writeValueToReg(IGC, APInt(getRegBitWidth(CounterReg, IGC), NIter),
-                      CounterReg);
+      auto StartCounterRegVal = NIter * RegRandStride;
+      writeValueToReg(
+          IGC, APInt(getRegBitWidth(CounterReg, IGC), StartCounterRegVal),
+          CounterReg);
       assert(
           (ReservedRegs.size() == MinNumOfReservRegsForLoop) &&
           "In RISC-V for compressed branch C_BNEZ only one register CounterReg "
@@ -1955,37 +2020,41 @@ public:
     }
     case RISCV::BLT:
     case RISCV::BLTU: {
-      writeValueToReg(IGC,
-                      APInt(getRegBitWidth(CounterReg, IGC), RegRandOffset),
-                      CounterReg);
-      auto LimitReg = ReservedRegs[LimitRegIdx];
+      auto StartCounterRegVal = RegRandOffset;
       writeValueToReg(
-          IGC, APInt(getRegBitWidth(LimitReg, IGC), NIter + RegRandOffset),
-          LimitReg);
+          IGC, APInt(getRegBitWidth(CounterReg, IGC), StartCounterRegVal),
+          CounterReg);
+      auto LimitReg = ReservedRegs[LimitRegIdx];
+      auto LimitRegVal = NIter * RegRandStride + RegRandOffset;
+      writeValueToReg(IGC, APInt(getRegBitWidth(LimitReg, IGC), LimitRegVal),
+                      LimitReg);
       break;
     }
     case RISCV::BGE:
     case RISCV::BGEU: {
+      auto StartCounterRegVal = NIter * RegRandStride + RegRandOffset;
       writeValueToReg(
-          IGC, APInt(getRegBitWidth(CounterReg, IGC), NIter + RegRandOffset),
+          IGC, APInt(getRegBitWidth(CounterReg, IGC), StartCounterRegVal),
           CounterReg);
       auto LimitReg = ReservedRegs[LimitRegIdx];
-      writeValueToReg(IGC,
-                      APInt(getRegBitWidth(LimitReg, IGC), 1 + RegRandOffset),
+      auto LimitRegVal = RegRandOffset + 1;
+      writeValueToReg(IGC, APInt(getRegBitWidth(LimitReg, IGC), LimitRegVal),
                       LimitReg);
       break;
     }
     default:
       llvm_unreachable("Unsupported branch type");
     }
-    return {Diag, APInt(getRegBitWidth(CounterReg, IGC), RegRandOffset)};
+    return {InitDiag, StrideDiag,
+            APInt(getRegBitWidth(CounterReg, IGC), RegRandOffset),
+            APInt(getRegBitWidth(CounterReg, IGC), RegRandStride)};
   }
 
-  LoopCounterInsertionResult
-  insertLoopCounter(InstructionGenerationContext &IGC, MachineInstr &Branch,
-                    ArrayRef<Register> ReservedRegs, unsigned NIter,
-                    RegToValueType &ExitingValues,
-                    unsigned RegCounterOffset) const override {
+  LoopCounterInsertionResult insertLoopCounter(
+      InstructionGenerationContext &IGC, MachineInstr &Branch,
+      ArrayRef<Register> ReservedRegs, unsigned NIter,
+      RegToValueType &ExitingValues,
+      const LoopCounterInitResult &CounterInitInfo) const override {
     assert(Branch.isBranch() && "Branch expected");
     assert(ReservedRegs.size() != MaxNumOfReservRegsForLoop ||
            ReservedRegs[CounterRegIdx] != ReservedRegs[LimitRegIdx] &&
@@ -2000,6 +2069,7 @@ public:
     APInt MinCounterVal;
     auto ADDIOp = getIncOpcodeForLoopCounter(IGC);
 
+    auto RegCounterOffset = CounterInitInfo.MinCounterVal.getZExtValue();
     auto CounterReg = ReservedRegs[CounterRegIdx];
 
     switch (Branch.getOpcode()) {
@@ -2013,7 +2083,7 @@ public:
                             InstrInfo.get(ADDIOp))
           .addReg(CounterReg, RegState::Define)
           .addReg(CounterReg)
-          .addImm(1);
+          .addImm(CounterInitInfo.StrideVal.getZExtValue());
       // SRLI can't be compressed because rd and rs1 are different regs
       getSupportInstBuilder(*this, MBB, Pos,
                             MBB.getParent()->getFunction().getContext(),
@@ -2045,7 +2115,7 @@ public:
                             InstrInfo.get(ADDIOp))
           .addReg(CounterReg, RegState::Define)
           .addReg(CounterReg)
-          .addImm(-1);
+          .addImm(-CounterInitInfo.StrideVal.getSExtValue());
       ExitingValues[CounterReg] =
           APInt(getRegBitWidth(CounterReg, IGC), RegCounterOffset);
       MinCounterVal = APInt(getRegBitWidth(CounterReg, IGC), RegCounterOffset);
@@ -2057,7 +2127,7 @@ public:
                             InstrInfo.get(ADDIOp))
           .addReg(CounterReg, RegState::Define)
           .addReg(CounterReg)
-          .addImm(1);
+          .addImm(CounterInitInfo.StrideVal.getZExtValue());
       ExitingValues[CounterReg] =
           APInt(getRegBitWidth(CounterReg, IGC), RegCounterOffset + NIter);
       MinCounterVal =
@@ -2070,7 +2140,7 @@ public:
                             InstrInfo.get(ADDIOp))
           .addReg(CounterReg, RegState::Define)
           .addReg(CounterReg)
-          .addImm(-1);
+          .addImm(-CounterInitInfo.StrideVal.getSExtValue());
       ExitingValues[CounterReg] =
           APInt(getRegBitWidth(CounterReg, IGC), RegCounterOffset);
       MinCounterVal = APInt(getRegBitWidth(CounterReg, IGC), RegCounterOffset);
