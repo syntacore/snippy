@@ -2496,7 +2496,8 @@ public:
         .addReg(AddrReg);
   }
 
-  MachineOperand createOperandForOpType(const ImmediateHistogramSequence *IH,
+  MachineOperand createOperandForOpType(unsigned Opcode,
+                                        const ImmediateHistogramSequence *IH,
                                         unsigned OperandType,
                                         const StridedImmediate &StridedImm,
                                         const TargetMachine &TM) const {
@@ -2518,8 +2519,23 @@ public:
       return MachineOperand::CreateImm(genImmUINT<3>(IH, StridedImm));
     case RISCVOp::OPERAND_UIMM4:
       return MachineOperand::CreateImm(genImmUINT<4>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM5:
+    case RISCVOp::OPERAND_UIMM5: {
+      // Has to be in sync with llvm/lib/Target/RISCV/RISCVInstrInfo.td
+      // Specifically with WriteSysRegImm and SwapSysRegImm classes.
+      bool IsFRMSysRegWrite =
+          (Opcode == RISCV::WriteFRMImm || Opcode == RISCV::SwapFRMImm);
+      // When the immediate histogram is not specified and the operation writes
+      // to FRM only generate non-reserved values.
+      if (!IH && IsFRMSysRegWrite) {
+        using namespace RISCVFPRndMode;
+        // When generating immediates for operations that modify the FRM
+        // we should generate only valid rounding modes and not use the dynamic
+        // mode, since that value is reserved.
+        return MachineOperand::CreateImm(
+            static_cast<int>(snippy::selectFrom(RNE, RTZ, RDN, RUP, RMM)));
+      }
       return MachineOperand::CreateImm(genImmUINT<5>(IH, StridedImm));
+    }
     case RISCVOp::OPERAND_UIMM5_NONZERO:
       return MachineOperand::CreateImm(genImmNonZeroUINT<5>(IH, StridedImm));
     case RISCVOp::OPERAND_UIMM6:
@@ -2628,9 +2644,10 @@ public:
     const auto &OpcSetting =
         Cfg.ImmHistMap.getConfigForOpcode(Opcode, ProgCtx.getOpcodeCache());
     if (OpcSetting.isUniform())
-      return createOperandForOpType(nullptr, OperandType, StridedImm, TM);
+      return createOperandForOpType(Opcode, /*IH=*/nullptr, OperandType,
+                                    StridedImm, TM);
     const auto &Seq = OpcSetting.getSequence();
-    return createOperandForOpType(&Seq, OperandType, StridedImm, TM);
+    return createOperandForOpType(Opcode, &Seq, OperandType, StridedImm, TM);
   }
 
   MachineOperand
@@ -2638,18 +2655,22 @@ public:
                         const CommonPolicyConfig &Cfg, unsigned Opcode,
                         unsigned OperandType,
                         const StridedImmediate &StridedImm) const override {
-    auto *IHV = &Cfg.ImmHistogram;
-    if (IHV && IHV->holdsAlternative<ImmediateHistogramRegEx>())
+    const auto &IHV = Cfg.ImmHistogram;
+    if (IHV.holdsAlternative<ImmediateHistogramRegEx>())
       return genTargetOpForOpcode(Opcode, OperandType, StridedImm, ProgCtx,
                                   Cfg);
-    const ImmediateHistogramSequence *IH =
-        IHV ? &IHV->get<ImmediateHistogramSequence>() : nullptr;
-    if (isSupportedLoadStore(Opcode))
+
+    const auto *IH = [&]() -> const ImmediateHistogramSequence * {
       // Disable histogram for loads and stores
-      IH = nullptr;
-    else if (IH->Values.empty())
-      IH = nullptr;
-    return createOperandForOpType(IH, OperandType, StridedImm,
+      if (isSupportedLoadStore(Opcode))
+        return nullptr;
+      const auto *Sequence = &IHV.get<ImmediateHistogramSequence>();
+      // Fallback case for empty immediate histogram -> generate immediates
+      // uniformly.
+      return Sequence->empty() ? nullptr : Sequence;
+    }();
+
+    return createOperandForOpType(Opcode, IH, OperandType, StridedImm,
                                   ProgCtx.getLLVMState().getTargetMachine());
   }
 
