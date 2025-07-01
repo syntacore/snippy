@@ -40,6 +40,8 @@ struct ImmediateHistogramEntry final {
 struct ImmediateHistogramSequence final {
   std::vector<int> Values;
   std::vector<double> Weights;
+
+  bool empty() const { return Values.empty(); }
 };
 
 class ImmHistOpcodeSettings final {
