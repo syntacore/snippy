@@ -495,9 +495,11 @@ public:
   virtual unsigned getInstrSize(const MachineInstr &Inst,
                                 LLVMState &State) const = 0;
 
-  struct LoopCounterInitResult {
-    std::optional<SnippyDiagnosticInfo> Diag;
+  struct LoopCounterInitResult final {
+    std::optional<SnippyDiagnosticInfo> InitValueDiag;
+    std::optional<SnippyDiagnosticInfo> StrideValueDiag;
     APInt MinCounterVal;
+    APInt StrideVal;
   };
 
   virtual LoopCounterInitResult
@@ -507,7 +509,7 @@ public:
 
   virtual LoopType getLoopType(MachineInstr &Branch) const = 0;
 
-  struct LoopCounterInsertionResult {
+  struct LoopCounterInsertionResult final {
     std::optional<SnippyDiagnosticInfo> Diag;
     unsigned NIter;
     APInt MinCounterVal;
@@ -517,7 +519,7 @@ public:
   insertLoopCounter(InstructionGenerationContext &IGC, MachineInstr &MI,
                     ArrayRef<Register> ReservedRegs, unsigned NIter,
                     RegToValueType &ExitingValues,
-                    unsigned RegCounterOffset) const = 0;
+                    const LoopCounterInitResult &CounterInitInfo) const = 0;
 
   virtual ~SnippyTarget();
 

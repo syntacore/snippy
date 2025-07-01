@@ -367,8 +367,10 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   auto PreheaderInsertPt = Preheader.getFirstTerminator();
   InstructionGenerationContext PHCtx{Preheader, PreheaderInsertPt, SGCtx,
                                      SimCtx};
-  auto [LoopInitDiag, MinLoopCountVal] =
+  auto LoopCounterInfo =
       SnippyTgt.insertLoopInit(PHCtx, NewBranch, Branches, ReservedRegs, NIter);
+  auto &[LoopInitDiag, LoopStrideDiag, MinLoopCountVal, StrideVal] =
+      LoopCounterInfo;
 
   auto SP = ProgCtx.getStackPointer();
   auto IsStackLoopCountersRequested = Branches.isStackLoopCountersRequested();
@@ -414,8 +416,7 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
 
   RegToValueType ExitingValues;
   auto CounterInsRes = SnippyTgt.insertLoopCounter(
-      HeadCtx, NewBranch, ReservedRegs, NIter, ExitingValues,
-      MinLoopCountVal.getZExtValue());
+      HeadCtx, NewBranch, ReservedRegs, NIter, ExitingValues, LoopCounterInfo);
   auto &Diag = CounterInsRes.Diag;
   auto ActualNumIter = CounterInsRes.NIter;
   unsigned MinCounterVal = CounterInsRes.MinCounterVal.getZExtValue();
@@ -449,8 +450,11 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
     }
   };
 
+  MakeDiagnosticsIfNeed(LoopCounterInfo.StrideValueDiag,
+                        WarningName::LoopStrideOutOfRange,
+                        LoopCounterStrideWarned);
   MakeDiagnosticsIfNeed(LoopInitDiag, WarningName::LoopCounterOutOfRange,
-                        LoopCounterWarned);
+                        LoopCounterInitWarned);
   MakeDiagnosticsIfNeed(Diag, WarningName::LoopIterationNumber, NIterWarned);
 
   LLVM_DEBUG(dbgs() << "Loop counter inserted: "; ExitingBlock.dump());
