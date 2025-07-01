@@ -32,6 +32,7 @@ namespace snippy {
   WARN_CASE(InconsistentOptions, "inconsistent-options")                       \
   WARN_CASE(LoopIterationNumber, "loop-iteration-number")                      \
   WARN_CASE(LoopCounterOutOfRange, "loop-counter-out-of-range")                \
+  WARN_CASE(LoopStrideOutOfRange, "loop-stride-out-of-range")                  \
   WARN_CASE(BurstMode, "burst-mode")                                           \
   WARN_CASE(InstructionCount, "instruction-count")                             \
   WARN_CASE(RegState, "register-state")                                        \

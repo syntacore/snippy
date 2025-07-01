@@ -59,11 +59,14 @@ struct Branchegram final {
     // const char * instead of StringRef because we want to easily pass this to
     // functions that require const char*, such as mapOptional.
     static constexpr const char *InitRangeOptName = "random-init";
+    static constexpr const char *StrideRangeOptName = "random-stride";
     static constexpr const char *UseStackOptName = "place-on-stack";
 
     using OptRange = std::optional<NumericRange<unsigned>>;
-    // Range of values for loop counter initialization
+    // Range of values for loop counters initialization
     OptRange InitRange;
+    // Range of values for selecting stride for loop counters
+    OptRange StrideRange;
     std::optional<bool> UseStack;
   };
 
@@ -91,6 +94,10 @@ struct Branchegram final {
 
   bool isStackLoopCountersRequested() const {
     return LoopCounters.UseStack.has_value() && LoopCounters.UseStack.value();
+  }
+
+  bool isRandomCountersStrideRequested() const {
+    return LoopCounters.StrideRange.has_value();
   }
 
   unsigned getMaxLoopDepth() const { return MaxDepth.Loop; }

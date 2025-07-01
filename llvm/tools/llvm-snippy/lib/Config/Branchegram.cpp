@@ -98,8 +98,12 @@ using OptRange = LoopCountersInfo::OptRange;
 
 // Support structure for mapping
 struct LoopCountersSupportMap {
+  StringRef OptName;
   snippy::NumericRange<unsigned> Range;
   std::optional<bool> IsEnabled;
+
+  void setName(StringRef Name) { OptName = Name; }
+  StringRef getName() { return OptName; }
 
   bool isOptionRequested() const {
     bool CheckEnabled = IsEnabled.has_value() && IsEnabled.value();
@@ -146,7 +150,7 @@ template <> struct yaml::MappingTraits<LoopCountersSupportMap> {
           "loop-counters: {0} option requires at least "
           "one of the following attributes: enabled, min, max. "
           "But none of them was provided.",
-          LoopCountersInfo::InitRangeOptName);
+          LoopCountInfo.OptName);
 
     auto MinOpt = LoopCountInfo.Range.Min;
     auto MaxOpt = LoopCountInfo.Range.Max;
@@ -163,8 +167,32 @@ template <> struct yaml::MappingTraits<LoopCountersInfo> {
         yaml::MappingTraits<LoopCountersSupportMap>::NormalizedGroupings,
         OptRange>
         InitRangeMap(IO, LoopMap.InitRange);
+    yaml::MappingNormalization<
+        yaml::MappingTraits<LoopCountersSupportMap>::NormalizedGroupings,
+        OptRange>
+        StrideRangeMap(IO, LoopMap.StrideRange);
+    InitRangeMap->InfoMap.setName(LoopCountersInfo::InitRangeOptName);
+    StrideRangeMap->InfoMap.setName(LoopCountersInfo::StrideRangeOptName);
     IO.mapOptional(LoopCountersInfo::InitRangeOptName, InitRangeMap->InfoMap);
+    IO.mapOptional(LoopCountersInfo::StrideRangeOptName,
+                   StrideRangeMap->InfoMap);
     IO.mapOptional(LoopCountersInfo::UseStackOptName, LoopMap.UseStack);
+  }
+
+  static std::string validate(yaml::IO &IO, LoopCountersInfo &LoopMap) {
+    auto &StrideRange = LoopMap.StrideRange;
+    if (!StrideRange.has_value())
+      return "";
+
+    if (StrideRange->Min.has_value() && StrideRange->Min.value() < 1)
+      return llvm::formatv(
+          "min: the stride for loop counters must be >= 1, got {0}.",
+          StrideRange->Min.value());
+    if (StrideRange->Max.has_value() && StrideRange->Max.value() < 1)
+      return llvm::formatv(
+          "max: the stride for loop counters must be >= 1, got {0}.",
+          StrideRange->Max.value());
+    return "";
   }
 };
 
