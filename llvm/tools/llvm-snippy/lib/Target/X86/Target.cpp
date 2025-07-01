@@ -369,11 +369,11 @@ public:
     reportUnimplementedError();
   }
 
-  LoopCounterInsertionResult
-  insertLoopCounter(InstructionGenerationContext &IGC, MachineInstr &Branch,
-                    ArrayRef<Register> ReservedRegs, unsigned NIter,
-                    RegToValueType &ExitingValues,
-                    unsigned RegCounterOffset) const override {
+  LoopCounterInsertionResult insertLoopCounter(
+      InstructionGenerationContext &IGC, MachineInstr &Branch,
+      ArrayRef<Register> ReservedRegs, unsigned NIter,
+      RegToValueType &ExitingValues,
+      const LoopCounterInitResult &CounterInitInfo) const override {
     reportUnimplementedError();
   }
 
