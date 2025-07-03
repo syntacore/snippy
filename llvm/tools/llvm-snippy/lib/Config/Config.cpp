@@ -767,6 +767,14 @@ Config::Config(IncludePreprocessor &IPP, RegPool &RP, LLVMState &State
     diagnoseHistogram(Ctx, OpCC, Histogram);
   }
   ConfigIOContext CfgParsingCtx{OpCC, RP, State};
+
+  struct DiagnosticContext {
+    IncludePreprocessor &IPP;
+    Error ExtraError;
+  };
+
+  DiagnosticContext DiagCtx{IPP, Error::success()};
+
   auto Err = loadYAMLFromBuffer(
       *this, IPP.getPreprocessed(),
       [&CfgParsingCtx](auto &Yin) {
@@ -784,21 +792,41 @@ Config::Config(IncludePreprocessor &IPP, RegPool &RP, LLVMState &State
         };
         if (!IsDiagAllowed(Diag.getMessage())) {
           assert(Ctx);
-          auto &IPP = *static_cast<IncludePreprocessor *>(Ctx);
+          auto &DiagCtx = *static_cast<DiagnosticContext *>(Ctx);
+          auto &IPP = DiagCtx.IPP;
+          auto DiagMsg = Diag.getMessage();
+          // All diagnostics about unknown keys that are not explicitly allowed
+          // should be fatal to prevent silently accepting broken
+          // configurations. NOTE: Don't overwrite existing errors because
+          // otherwise Error will die with an assertion in the destructor.
+          bool IsDisallowedKey =
+              DiagMsg.starts_with(detail::YAMLUnknownKeyStartString);
+          if (IsDisallowedKey && !DiagCtx.ExtraError)
+            DiagCtx.ExtraError = makeFailure(Errc::InvalidArgument, DiagMsg);
+
           SMDiagnostic NewDiag(
               *Diag.getSourceMgr(), Diag.getLoc(),
               IPP.getCorrespondingLineID(Diag.getLineNo()).FileName,
               IPP.getCorrespondingLineID(Diag.getLineNo()).N,
-              Diag.getColumnNo(), Diag.getKind(), Diag.getMessage(),
-              Diag.getLineContents(), Diag.getRanges());
+              Diag.getColumnNo(),
+              IsDisallowedKey ? SourceMgr::DK_Error : Diag.getKind(),
+              Diag.getMessage(), Diag.getLineContents(), Diag.getRanges());
           NewDiag.print(nullptr, errs());
         }
       },
-      IPP);
-  if (Err)
+      DiagCtx);
+
+  auto ReportError = [&Ctx, &IPP](auto Err) {
     snippy::fatal(Ctx,
                   "Failed to parse file \"" + IPP.getPrimaryFilename() + "\"",
                   toString(std::move(Err)));
+  };
+
+  if (Err)
+    ReportError(std::move(Err));
+
+  if (DiagCtx.ExtraError)
+    ReportError(std::move(DiagCtx.ExtraError));
 
   normalizeProgramLevelOptions(*this, State, RP, copyOptionsToProgramOptions());
   normalizeRegInitOptions(*this, State, copyOptionsToRegInitOptions());
