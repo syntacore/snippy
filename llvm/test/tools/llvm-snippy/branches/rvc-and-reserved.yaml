@@ -16,7 +16,7 @@ sections:
 histogram:
     - [BEQ, 1.0]
 
-branchegram:
+branches:
   loop-ratio: 1
 
 options:
