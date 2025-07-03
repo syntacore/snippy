@@ -204,7 +204,7 @@ bool SnippyProgramContext::shouldSpillStackPointer() const {
 void SnippyProgramContext::initializeStackSection(
     const ProgramConfig &Settings) {
   if (ExternalStack) {
-    if (RegPoolsStorage.front().isReserved(getStackPointer()))
+    if (getRegisterPool().isReserved(getStackPointer()))
       snippy::fatal(State->getCtx(), "Cannot configure external stack",
                     "stack pointer register is "
                     "explicitly reserved.");
@@ -236,7 +236,7 @@ void SnippyProgramContext::initializeStackSection(
                     "Stack section size must be " + Twine(Align) +
                         " bytes aligned.");
 
-    if (RegPoolsStorage.front().isReserved(SP))
+    if (getRegisterPool().isReserved(SP))
       snippy::fatal(Ctx, "Failed to initialize stack",
                     "stack pointer register is "
                     "explicitly reserved.");
