@@ -16,6 +16,6 @@ sections:
       ACCESS:    rw
 
 histogram:
-    - [C_ADDI_NOP, 1.0]
+    - [C_NOP, 1.0]
 
 # CHECK: error: There is a section in the layout file that has both 'no' and 'name' keys.
