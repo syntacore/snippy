@@ -136,7 +136,7 @@ histogram:
   - [C_ADDI, 4.66]
   - [C_ADDIW, 4.66]
   - [C_ADDI_HINT_IMM_ZERO, 4.66]
-  - [C_ADDI_NOP, 4.66]
+  - [C_NOP, 4.66]
   - [C_ADDW, 4.66]
   - [C_ADD_HINT, 4.66]
   - [C_AND, 4.66]
