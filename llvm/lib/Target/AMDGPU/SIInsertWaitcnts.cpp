@@ -1778,12 +1778,11 @@ bool SIInsertWaitcnts::generateWaitcntInstBefore(MachineInstr &MI,
           if (IsVGPR) {
             // RAW always needs an s_waitcnt. WAW needs an s_waitcnt unless the
             // previous write and this write are the same type of VMEM
-            // instruction, in which case they are (in some architectures)
-            // guaranteed to write their results in order anyway.
+            // instruction, in which case they're guaranteed to write their
+            // results in order anyway.
             if (Op.isUse() || !updateVMCntOnly(MI) ||
                 ScoreBrackets.hasOtherPendingVmemTypes(RegNo,
-                                                       getVmemType(MI)) ||
-                !ST->hasVmemWriteVgprInOrder()) {
+                                                       getVmemType(MI))) {
               ScoreBrackets.determineWait(LOAD_CNT, RegNo, Wait);
               ScoreBrackets.determineWait(SAMPLE_CNT, RegNo, Wait);
               ScoreBrackets.determineWait(BVH_CNT, RegNo, Wait);
@@ -2390,7 +2389,7 @@ bool SIInsertWaitcnts::shouldFlushVmCnt(MachineLoop *ML,
   }
   if (!ST->hasVscnt() && HasVMemStore && !HasVMemLoad && UsesVgprLoadedOutside)
     return true;
-  return HasVMemLoad && UsesVgprLoadedOutside && ST->hasVmemWriteVgprInOrder();
+  return HasVMemLoad && UsesVgprLoadedOutside;
 }
 
 bool SIInsertWaitcnts::runOnMachineFunction(MachineFunction &MF) {

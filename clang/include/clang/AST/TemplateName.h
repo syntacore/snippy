@@ -347,7 +347,9 @@ public:
   /// error.
   void dump() const;
 
-  void Profile(llvm::FoldingSetNodeID &ID);
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    ID.AddPointer(Storage.getOpaqueValue());
+  }
 
   /// Retrieve the template name as a void pointer.
   void *getAsVoidPointer() const { return Storage.getOpaqueValue(); }

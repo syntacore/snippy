@@ -210,10 +210,6 @@ static cl::opt<bool> FailOnIncompleteFormat(
     cl::desc("If set, fail with exit code 1 on incomplete format."),
     cl::init(false), cl::cat(ClangFormatCategory));
 
-static cl::opt<bool> ListIgnored("list-ignored",
-                                 cl::desc("List ignored files."),
-                                 cl::cat(ClangFormatCategory), cl::Hidden);
-
 namespace clang {
 namespace format {
 
@@ -719,13 +715,7 @@ int main(int argc, const char **argv) {
   unsigned FileNo = 1;
   bool Error = false;
   for (const auto &FileName : FileNames) {
-    const bool Ignored = isIgnored(FileName);
-    if (ListIgnored) {
-      if (Ignored)
-        outs() << FileName << '\n';
-      continue;
-    }
-    if (Ignored)
+    if (isIgnored(FileName))
       continue;
     if (Verbose) {
       errs() << "Formatting [" << FileNo++ << "/" << FileNames.size() << "] "

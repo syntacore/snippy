@@ -380,13 +380,14 @@ void FastISel::updateValueMap(const Value *I, Register Reg, unsigned NumRegs) {
   }
 }
 
-Register FastISel::getRegForGEPIndex(MVT PtrVT, const Value *Idx) {
+Register FastISel::getRegForGEPIndex(const Value *Idx) {
   Register IdxN = getRegForValue(Idx);
   if (!IdxN)
     // Unhandled operand. Halt "fast" selection and bail.
     return Register();
 
   // If the index is smaller or larger than intptr_t, truncate or extend it.
+  MVT PtrVT = TLI.getPointerTy(DL);
   EVT IdxVT = EVT::getEVT(Idx->getType(), /*HandleUnknown=*/false);
   if (IdxVT.bitsLT(PtrVT)) {
     IdxN = fastEmit_r(IdxVT.getSimpleVT(), PtrVT, ISD::SIGN_EXTEND, IdxN);
@@ -395,10 +396,6 @@ Register FastISel::getRegForGEPIndex(MVT PtrVT, const Value *Idx) {
         fastEmit_r(IdxVT.getSimpleVT(), PtrVT, ISD::TRUNCATE, IdxN);
   }
   return IdxN;
-}
-
-Register FastISel::getRegForGEPIndex(const Value *Idx) {
-  return getRegForGEPIndex(TLI.getPointerTy(DL), Idx);
 }
 
 void FastISel::recomputeInsertPt() {
@@ -546,8 +543,7 @@ bool FastISel::selectGetElementPtr(const User *I) {
   uint64_t TotalOffs = 0;
   // FIXME: What's a good SWAG number for MaxOffs?
   uint64_t MaxOffs = 2048;
-  MVT VT = TLI.getValueType(DL, I->getType()).getSimpleVT();
-
+  MVT VT = TLI.getPointerTy(DL);
   for (gep_type_iterator GTI = gep_type_begin(I), E = gep_type_end(I);
        GTI != E; ++GTI) {
     const Value *Idx = GTI.getOperand();
@@ -588,7 +584,7 @@ bool FastISel::selectGetElementPtr(const User *I) {
 
       // N = N + Idx * ElementSize;
       uint64_t ElementSize = GTI.getSequentialElementStride(DL);
-      Register IdxN = getRegForGEPIndex(VT, Idx);
+      Register IdxN = getRegForGEPIndex(Idx);
       if (!IdxN) // Unhandled operand. Halt "fast" selection and bail.
         return false;
 

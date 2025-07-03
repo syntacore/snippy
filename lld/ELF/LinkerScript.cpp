@@ -61,8 +61,6 @@ static StringRef getOutputSectionName(const InputSectionBase *s) {
         assert(config->relocatable && (rel->flags & SHF_LINK_ORDER));
         return s->name;
       }
-      if (s->type == SHT_CREL)
-        return saver().save(".crel" + out->name);
       if (s->type == SHT_RELA)
         return saver().save(".rela" + out->name);
       return saver().save(".rel" + out->name);

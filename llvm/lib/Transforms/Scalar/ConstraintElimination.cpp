@@ -1464,7 +1464,7 @@ static bool checkAndReplaceCmp(CmpIntrinsic *I, ConstraintInfo &Info,
     ToRemove.push_back(I);
     return true;
   }
-  if (checkCondition(ICmpInst::ICMP_EQ, LHS, RHS, I, Info).value_or(false)) {
+  if (checkCondition(ICmpInst::ICMP_EQ, LHS, RHS, I, Info)) {
     I->replaceAllUsesWith(ConstantInt::get(I->getType(), 0));
     ToRemove.push_back(I);
     return true;

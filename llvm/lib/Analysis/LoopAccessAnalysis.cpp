@@ -728,6 +728,11 @@ public:
 
   MemAccessInfoList &getDependenciesToCheck() { return CheckDeps; }
 
+  const DenseMap<Value *, SmallVector<const Value *, 16>> &
+  getUnderlyingObjects() {
+    return UnderlyingObjects;
+  }
+
 private:
   typedef MapVector<MemAccessInfo, SmallSetVector<Type *, 1>> PtrAccessMap;
 
@@ -1454,22 +1459,21 @@ static bool isNoWrapAddRec(Value *Ptr, const SCEVAddRecExpr *AR,
 }
 
 /// Check whether the access through \p Ptr has a constant stride.
-std::optional<int64_t>
-llvm::getPtrStride(PredicatedScalarEvolution &PSE, Type *AccessTy, Value *Ptr,
-                   const Loop *Lp,
-                   const DenseMap<Value *, const SCEV *> &StridesMap,
-                   bool Assume, bool ShouldCheckWrap) {
-  const SCEV *PtrScev = replaceSymbolicStrideSCEV(PSE, StridesMap, Ptr);
-  if (PSE.getSE()->isLoopInvariant(PtrScev, Lp))
-    return {0};
-
+std::optional<int64_t> llvm::getPtrStride(PredicatedScalarEvolution &PSE,
+                                          Type *AccessTy, Value *Ptr,
+                                          const Loop *Lp,
+                                          const DenseMap<Value *, const SCEV *> &StridesMap,
+                                          bool Assume, bool ShouldCheckWrap) {
   Type *Ty = Ptr->getType();
   assert(Ty->isPointerTy() && "Unexpected non-ptr");
+
   if (isa<ScalableVectorType>(AccessTy)) {
     LLVM_DEBUG(dbgs() << "LAA: Bad stride - Scalable object: " << *AccessTy
                       << "\n");
     return std::nullopt;
   }
+
+  const SCEV *PtrScev = replaceSymbolicStrideSCEV(PSE, StridesMap, Ptr);
 
   const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(PtrScev);
   if (Assume && !AR)
@@ -1895,12 +1899,24 @@ static bool areStridedAccessesIndependent(uint64_t Distance, uint64_t Stride,
   return ScaledDist % Stride;
 }
 
+/// Returns true if any of the underlying objects has a loop varying address,
+/// i.e. may change in \p L.
+static bool
+isLoopVariantIndirectAddress(ArrayRef<const Value *> UnderlyingObjects,
+                             ScalarEvolution &SE, const Loop *L) {
+  return any_of(UnderlyingObjects, [&SE, L](const Value *UO) {
+    return !SE.isLoopInvariant(SE.getSCEV(const_cast<Value *>(UO)), L);
+  });
+}
+
 std::variant<MemoryDepChecker::Dependence::DepType,
              MemoryDepChecker::DepDistanceStrideAndSizeInfo>
 MemoryDepChecker::getDependenceDistanceStrideAndSize(
     const AccessAnalysis::MemAccessInfo &A, Instruction *AInst,
-    const AccessAnalysis::MemAccessInfo &B, Instruction *BInst) {
-  const auto &DL = InnermostLoop->getHeader()->getDataLayout();
+    const AccessAnalysis::MemAccessInfo &B, Instruction *BInst,
+    const DenseMap<Value *, SmallVector<const Value *, 16>>
+        &UnderlyingObjects) {
+  auto &DL = InnermostLoop->getHeader()->getDataLayout();
   auto &SE = *PSE.getSE();
   auto [APtr, AIsWrite] = A;
   auto [BPtr, BIsWrite] = B;
@@ -1917,10 +1933,12 @@ MemoryDepChecker::getDependenceDistanceStrideAndSize(
       BPtr->getType()->getPointerAddressSpace())
     return MemoryDepChecker::Dependence::Unknown;
 
-  std::optional<int64_t> StrideAPtr =
-      getPtrStride(PSE, ATy, APtr, InnermostLoop, SymbolicStrides, true, true);
-  std::optional<int64_t> StrideBPtr =
-      getPtrStride(PSE, BTy, BPtr, InnermostLoop, SymbolicStrides, true, true);
+  int64_t StrideAPtr =
+      getPtrStride(PSE, ATy, APtr, InnermostLoop, SymbolicStrides, true)
+          .value_or(0);
+  int64_t StrideBPtr =
+      getPtrStride(PSE, BTy, BPtr, InnermostLoop, SymbolicStrides, true)
+          .value_or(0);
 
   const SCEV *Src = PSE.getSCEV(APtr);
   const SCEV *Sink = PSE.getSCEV(BPtr);
@@ -1928,18 +1946,25 @@ MemoryDepChecker::getDependenceDistanceStrideAndSize(
   // If the induction step is negative we have to invert source and sink of the
   // dependence when measuring the distance between them. We should not swap
   // AIsWrite with BIsWrite, as their uses expect them in program order.
-  if (StrideAPtr && *StrideAPtr < 0) {
+  if (StrideAPtr < 0) {
     std::swap(Src, Sink);
     std::swap(AInst, BInst);
-    std::swap(StrideAPtr, StrideBPtr);
   }
 
   const SCEV *Dist = SE.getMinusSCEV(Sink, Src);
 
   LLVM_DEBUG(dbgs() << "LAA: Src Scev: " << *Src << "Sink Scev: " << *Sink
-                    << "\n");
+                    << "(Induction step: " << StrideAPtr << ")\n");
   LLVM_DEBUG(dbgs() << "LAA: Distance for " << *AInst << " to " << *BInst
                     << ": " << *Dist << "\n");
+
+  // Needs accesses where the addresses of the accessed underlying objects do
+  // not change within the loop.
+  if (isLoopVariantIndirectAddress(UnderlyingObjects.find(APtr)->second, SE,
+                                   InnermostLoop) ||
+      isLoopVariantIndirectAddress(UnderlyingObjects.find(BPtr)->second, SE,
+                                   InnermostLoop))
+    return MemoryDepChecker::Dependence::IndirectUnsafe;
 
   // Check if we can prove that Sink only accesses memory after Src's end or
   // vice versa. At the moment this is limited to cases where either source or
@@ -1962,33 +1987,12 @@ MemoryDepChecker::getDependenceDistanceStrideAndSize(
     }
   }
 
-  // Need accesses with constant strides and the same direction for further
-  // dependence analysis. We don't want to vectorize "A[B[i]] += ..." and
-  // similar code or pointer arithmetic that could wrap in the address space.
-
-  // If either Src or Sink are not strided (i.e. not a non-wrapping AddRec) and
-  // not loop-invariant (stride will be 0 in that case), we cannot analyze the
-  // dependence further and also cannot generate runtime checks.
-  if (!StrideAPtr || !StrideBPtr) {
+  // Need accesses with constant strides and the same direction. We don't want
+  // to vectorize "A[B[i]] += ..." and similar code or pointer arithmetic that
+  // could wrap in the address space.
+  if (!StrideAPtr || !StrideBPtr || (StrideAPtr > 0 && StrideBPtr < 0) ||
+      (StrideAPtr < 0 && StrideBPtr > 0)) {
     LLVM_DEBUG(dbgs() << "Pointer access with non-constant stride\n");
-    return MemoryDepChecker::Dependence::IndirectUnsafe;
-  }
-
-  int64_t StrideAPtrInt = *StrideAPtr;
-  int64_t StrideBPtrInt = *StrideBPtr;
-  LLVM_DEBUG(dbgs() << "LAA:  Src induction step: " << StrideAPtrInt
-                    << " Sink induction step: " << StrideBPtrInt << "\n");
-  // At least Src or Sink are loop invariant and the other is strided or
-  // invariant. We can generate a runtime check to disambiguate the accesses.
-  if (StrideAPtrInt == 0 || StrideBPtrInt == 0)
-    return MemoryDepChecker::Dependence::Unknown;
-
-  // Both Src and Sink have a constant stride, check if they are in the same
-  // direction.
-  if ((StrideAPtrInt > 0 && StrideBPtrInt < 0) ||
-      (StrideAPtrInt < 0 && StrideBPtrInt > 0)) {
-    LLVM_DEBUG(
-        dbgs() << "Pointer access with strides in different directions\n");
     return MemoryDepChecker::Dependence::Unknown;
   }
 
@@ -1997,20 +2001,22 @@ MemoryDepChecker::getDependenceDistanceStrideAndSize(
       DL.getTypeStoreSizeInBits(ATy) == DL.getTypeStoreSizeInBits(BTy);
   if (!HasSameSize)
     TypeByteSize = 0;
-  return DepDistanceStrideAndSizeInfo(Dist, std::abs(StrideAPtrInt),
-                                      std::abs(StrideBPtrInt), TypeByteSize,
+  return DepDistanceStrideAndSizeInfo(Dist, std::abs(StrideAPtr),
+                                      std::abs(StrideBPtr), TypeByteSize,
                                       AIsWrite, BIsWrite);
 }
 
-MemoryDepChecker::Dependence::DepType
-MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
-                              const MemAccessInfo &B, unsigned BIdx) {
+MemoryDepChecker::Dependence::DepType MemoryDepChecker::isDependent(
+    const MemAccessInfo &A, unsigned AIdx, const MemAccessInfo &B,
+    unsigned BIdx,
+    const DenseMap<Value *, SmallVector<const Value *, 16>>
+        &UnderlyingObjects) {
   assert(AIdx < BIdx && "Must pass arguments in program order");
 
   // Get the dependence distance, stride, type size and what access writes for
   // the dependence between A and B.
-  auto Res =
-      getDependenceDistanceStrideAndSize(A, InstMap[AIdx], B, InstMap[BIdx]);
+  auto Res = getDependenceDistanceStrideAndSize(
+      A, InstMap[AIdx], B, InstMap[BIdx], UnderlyingObjects);
   if (std::holds_alternative<Dependence::DepType>(Res))
     return std::get<Dependence::DepType>(Res);
 
@@ -2244,8 +2250,10 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
   return Dependence::BackwardVectorizable;
 }
 
-bool MemoryDepChecker::areDepsSafe(const DepCandidates &AccessSets,
-                                   const MemAccessInfoList &CheckDeps) {
+bool MemoryDepChecker::areDepsSafe(
+    DepCandidates &AccessSets, MemAccessInfoList &CheckDeps,
+    const DenseMap<Value *, SmallVector<const Value *, 16>>
+        &UnderlyingObjects) {
 
   MinDepDistBytes = -1;
   SmallPtrSet<MemAccessInfo, 8> Visited;
@@ -2288,8 +2296,8 @@ bool MemoryDepChecker::areDepsSafe(const DepCandidates &AccessSets,
             if (*I1 > *I2)
               std::swap(A, B);
 
-            Dependence::DepType Type =
-                isDependent(*A.first, A.second, *B.first, B.second);
+            Dependence::DepType Type = isDependent(*A.first, A.second, *B.first,
+                                                   B.second, UnderlyingObjects);
             mergeInStatus(Dependence::isSafeForVectorization(Type));
 
             // Gather dependences unless we accumulated MaxDependences
@@ -2644,7 +2652,8 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
   if (Accesses.isDependencyCheckNeeded()) {
     LLVM_DEBUG(dbgs() << "LAA: Checking memory dependencies\n");
     DepsAreSafe = DepChecker->areDepsSafe(DependentAccesses,
-                                          Accesses.getDependenciesToCheck());
+                                          Accesses.getDependenciesToCheck(),
+                                          Accesses.getUnderlyingObjects());
 
     if (!DepsAreSafe && DepChecker->shouldRetryWithRuntimeCheck()) {
       LLVM_DEBUG(dbgs() << "LAA: Retrying with memory checks\n");

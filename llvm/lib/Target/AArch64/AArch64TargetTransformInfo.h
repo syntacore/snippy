@@ -381,7 +381,7 @@ public:
     return ST->isSVEorStreamingSVEAvailable();
   }
 
-  bool enableScalableVectorization() const;
+  bool enableScalableVectorization() const { return ST->isSVEAvailable(); }
 
   bool isLegalToVectorizeReduction(const RecurrenceDescriptor &RdxDesc,
                                    ElementCount VF) const;

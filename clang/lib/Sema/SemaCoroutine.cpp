@@ -820,8 +820,7 @@ ExprResult Sema::BuildOperatorCoawaitLookupExpr(Scope *S, SourceLocation Loc) {
   Expr *CoawaitOp = UnresolvedLookupExpr::Create(
       Context, /*NamingClass*/ nullptr, NestedNameSpecifierLoc(),
       DeclarationNameInfo(OpName, Loc), /*RequiresADL*/ true, Functions.begin(),
-      Functions.end(), /*KnownDependent=*/false,
-      /*KnownInstantiationDependent=*/false);
+      Functions.end(), /*KnownDependent=*/false);
   assert(CoawaitOp);
   return CoawaitOp;
 }

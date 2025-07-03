@@ -1625,17 +1625,11 @@ void PGOUseFunc::setBranchWeights() {
       continue;
 
     // We have a non-zero Branch BB.
-
-    // SuccessorCount can be greater than OutEdgesCount, because
-    // removed edges don't appear in OutEdges.
-    unsigned OutEdgesCount = BBCountInfo.OutEdges.size();
-    unsigned SuccessorCount = BB.getTerminator()->getNumSuccessors();
-    assert(OutEdgesCount <= SuccessorCount);
-
-    SmallVector<uint64_t, 2> EdgeCounts(SuccessorCount, 0);
+    unsigned Size = BBCountInfo.OutEdges.size();
+    SmallVector<uint64_t, 2> EdgeCounts(Size, 0);
     uint64_t MaxCount = 0;
-    for (unsigned It = 0; It < OutEdgesCount; It++) {
-      const PGOUseEdge *E = BBCountInfo.OutEdges[It];
+    for (unsigned s = 0; s < Size; s++) {
+      const PGOUseEdge *E = BBCountInfo.OutEdges[s];
       const BasicBlock *SrcBB = E->SrcBB;
       const BasicBlock *DestBB = E->DestBB;
       if (DestBB == nullptr)

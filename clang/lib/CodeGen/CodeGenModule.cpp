@@ -343,11 +343,10 @@ CodeGenModule::CodeGenModule(ASTContext &C,
     : Context(C), LangOpts(C.getLangOpts()), FS(FS), HeaderSearchOpts(HSO),
       PreprocessorOpts(PPO), CodeGenOpts(CGO), TheModule(M), Diags(diags),
       Target(C.getTargetInfo()), ABI(createCXXABI(*this)),
-      VMContext(M.getContext()), VTables(*this),
+      VMContext(M.getContext()), Types(*this), VTables(*this),
       SanitizerMD(new SanitizerMetadata(*this)) {
 
   // Initialize the type cache.
-  Types.reset(new CodeGenTypes(*this));
   llvm::LLVMContext &LLVMContext = M.getContext();
   VoidTy = llvm::Type::getVoidTy(LLVMContext);
   Int8Ty = llvm::Type::getInt8Ty(LLVMContext);
@@ -406,7 +405,7 @@ CodeGenModule::CodeGenModule(ASTContext &C,
   if (LangOpts.Sanitize.has(SanitizerKind::Thread) ||
       (!CodeGenOpts.RelaxedAliasing && CodeGenOpts.OptimizationLevel > 0))
     TBAA.reset(new CodeGenTBAA(Context, getTypes(), TheModule, CodeGenOpts,
-                               getLangOpts()));
+                               getLangOpts(), getCXXABI().getMangleContext()));
 
   // If debug info or coverage generation is enabled, create the CGDebugInfo
   // object.
@@ -1453,12 +1452,12 @@ void CodeGenModule::EmitBackendOptionsMetadata(
 
 void CodeGenModule::UpdateCompletedType(const TagDecl *TD) {
   // Make sure that this type is translated.
-  getTypes().UpdateCompletedType(TD);
+  Types.UpdateCompletedType(TD);
 }
 
 void CodeGenModule::RefreshTypeCacheForClass(const CXXRecordDecl *RD) {
   // Make sure that this type is translated.
-  getTypes().RefreshTypeCacheForClass(RD);
+  Types.RefreshTypeCacheForClass(RD);
 }
 
 llvm::MDNode *CodeGenModule::getTBAATypeInfo(QualType QTy) {
@@ -5377,10 +5376,6 @@ void CodeGenModule::maybeSetTrivialComdat(const Decl &D,
   GO.setComdat(TheModule.getOrInsertComdat(GO.getName()));
 }
 
-const ABIInfo &CodeGenModule::getABIInfo() {
-  return getTargetCodeGenInfo().getABIInfo();
-}
-
 /// Pass IsTentative as true if you want to create a tentative definition.
 void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
                                             bool IsTentative) {
@@ -7788,6 +7783,8 @@ void CodeGenModule::moveLazyEmissionStates(CodeGenModule *NewBuilder) {
   NewBuilder->Manglings = std::move(Manglings);
 
   NewBuilder->WeakRefReferences = std::move(WeakRefReferences);
+
+  NewBuilder->TBAA = std::move(TBAA);
 
   NewBuilder->ABI->MangleCtx = std::move(ABI->MangleCtx);
 }

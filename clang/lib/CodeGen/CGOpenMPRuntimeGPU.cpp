@@ -1695,8 +1695,7 @@ void CGOpenMPRuntimeGPU::emitReduction(
                          CGF.AllocaInsertPt->getIterator());
   InsertPointTy CodeGenIP(CGF.Builder.GetInsertBlock(),
                           CGF.Builder.GetInsertPoint());
-  llvm::OpenMPIRBuilder::LocationDescription OmpLoc(
-      CodeGenIP, CGF.SourceLocToDebugLoc(Loc));
+  llvm::OpenMPIRBuilder::LocationDescription OmpLoc(CodeGenIP);
   llvm::SmallVector<llvm::OpenMPIRBuilder::ReductionInfo> ReductionInfos;
 
   CodeGenFunction::OMPPrivateScope Scope(CGF);

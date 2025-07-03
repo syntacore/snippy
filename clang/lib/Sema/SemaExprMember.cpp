@@ -331,8 +331,7 @@ ExprResult Sema::BuildPossibleImplicitMemberExpr(
     return UnresolvedLookupExpr::Create(
         Context, R.getNamingClass(), SS.getWithLocInContext(Context),
         TemplateKWLoc, R.getLookupNameInfo(), /*RequiresADL=*/false,
-        TemplateArgs, R.begin(), R.end(), /*KnownDependent=*/true,
-        /*KnownInstantiationDependent=*/true);
+        TemplateArgs, R.begin(), R.end(), /*KnownDependent=*/true);
 
   case IMA_Error_StaticOrExplicitContext:
   case IMA_Error_Unrelated:

@@ -1081,12 +1081,14 @@ define dso_local double @v2f64_fast(<2 x double> %a) local_unnamed_addr #0 {
 ; PWR9LE-NEXT:    xxswapd vs0, v2
 ; PWR9LE-NEXT:    xvadddp vs0, v2, vs0
 ; PWR9LE-NEXT:    xxswapd vs1, vs0
+; PWR9LE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR9LE-NEXT:    blr
 ;
 ; PWR9BE-LABEL: v2f64_fast:
 ; PWR9BE:       # %bb.0: # %entry
 ; PWR9BE-NEXT:    xxswapd vs0, v2
 ; PWR9BE-NEXT:    xvadddp vs1, v2, vs0
+; PWR9BE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR9BE-NEXT:    blr
 ;
 ; PWR10LE-LABEL: v2f64_fast:
@@ -1094,12 +1096,14 @@ define dso_local double @v2f64_fast(<2 x double> %a) local_unnamed_addr #0 {
 ; PWR10LE-NEXT:    xxswapd vs0, v2
 ; PWR10LE-NEXT:    xvadddp vs0, v2, vs0
 ; PWR10LE-NEXT:    xxswapd vs1, vs0
+; PWR10LE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR10LE-NEXT:    blr
 ;
 ; PWR10BE-LABEL: v2f64_fast:
 ; PWR10BE:       # %bb.0: # %entry
 ; PWR10BE-NEXT:    xxswapd vs0, v2
 ; PWR10BE-NEXT:    xvadddp vs1, v2, vs0
+; PWR10BE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR10BE-NEXT:    blr
 entry:
   %0 = call fast double @llvm.vector.reduce.fadd.v2f64(double -0.000000e+00, <2 x double> %a)
@@ -1199,6 +1203,7 @@ define dso_local double @v4f64_fast(<4 x double> %a) local_unnamed_addr #0 {
 ; PWR9LE-NEXT:    xxswapd vs1, vs0
 ; PWR9LE-NEXT:    xvadddp vs0, vs0, vs1
 ; PWR9LE-NEXT:    xxswapd vs1, vs0
+; PWR9LE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR9LE-NEXT:    blr
 ;
 ; PWR9BE-LABEL: v4f64_fast:
@@ -1206,6 +1211,7 @@ define dso_local double @v4f64_fast(<4 x double> %a) local_unnamed_addr #0 {
 ; PWR9BE-NEXT:    xvadddp vs0, v2, v3
 ; PWR9BE-NEXT:    xxswapd vs1, vs0
 ; PWR9BE-NEXT:    xvadddp vs1, vs0, vs1
+; PWR9BE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR9BE-NEXT:    blr
 ;
 ; PWR10LE-LABEL: v4f64_fast:
@@ -1214,6 +1220,7 @@ define dso_local double @v4f64_fast(<4 x double> %a) local_unnamed_addr #0 {
 ; PWR10LE-NEXT:    xxswapd vs1, vs0
 ; PWR10LE-NEXT:    xvadddp vs0, vs0, vs1
 ; PWR10LE-NEXT:    xxswapd vs1, vs0
+; PWR10LE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR10LE-NEXT:    blr
 ;
 ; PWR10BE-LABEL: v4f64_fast:
@@ -1221,6 +1228,7 @@ define dso_local double @v4f64_fast(<4 x double> %a) local_unnamed_addr #0 {
 ; PWR10BE-NEXT:    xvadddp vs0, v2, v3
 ; PWR10BE-NEXT:    xxswapd vs1, vs0
 ; PWR10BE-NEXT:    xvadddp vs1, vs0, vs1
+; PWR10BE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR10BE-NEXT:    blr
 entry:
   %0 = call fast double @llvm.vector.reduce.fadd.v4f64(double -0.000000e+00, <4 x double> %a)
@@ -1370,6 +1378,7 @@ define dso_local double @v8f64_fast(<8 x double> %a) local_unnamed_addr #0 {
 ; PWR9LE-NEXT:    xxswapd vs1, vs0
 ; PWR9LE-NEXT:    xvadddp vs0, vs0, vs1
 ; PWR9LE-NEXT:    xxswapd vs1, vs0
+; PWR9LE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR9LE-NEXT:    blr
 ;
 ; PWR9BE-LABEL: v8f64_fast:
@@ -1379,6 +1388,7 @@ define dso_local double @v8f64_fast(<8 x double> %a) local_unnamed_addr #0 {
 ; PWR9BE-NEXT:    xvadddp vs0, vs1, vs0
 ; PWR9BE-NEXT:    xxswapd vs1, vs0
 ; PWR9BE-NEXT:    xvadddp vs1, vs0, vs1
+; PWR9BE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR9BE-NEXT:    blr
 ;
 ; PWR10LE-LABEL: v8f64_fast:
@@ -1389,6 +1399,7 @@ define dso_local double @v8f64_fast(<8 x double> %a) local_unnamed_addr #0 {
 ; PWR10LE-NEXT:    xxswapd vs1, vs0
 ; PWR10LE-NEXT:    xvadddp vs0, vs0, vs1
 ; PWR10LE-NEXT:    xxswapd vs1, vs0
+; PWR10LE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR10LE-NEXT:    blr
 ;
 ; PWR10BE-LABEL: v8f64_fast:
@@ -1398,6 +1409,7 @@ define dso_local double @v8f64_fast(<8 x double> %a) local_unnamed_addr #0 {
 ; PWR10BE-NEXT:    xvadddp vs0, vs1, vs0
 ; PWR10BE-NEXT:    xxswapd vs1, vs0
 ; PWR10BE-NEXT:    xvadddp vs1, vs0, vs1
+; PWR10BE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR10BE-NEXT:    blr
 entry:
   %0 = call fast double @llvm.vector.reduce.fadd.v8f64(double -0.000000e+00, <8 x double> %a)
@@ -1647,6 +1659,7 @@ define dso_local double @v16f64_fast(<16 x double> %a) local_unnamed_addr #0 {
 ; PWR9LE-NEXT:    xxswapd vs1, vs0
 ; PWR9LE-NEXT:    xvadddp vs0, vs0, vs1
 ; PWR9LE-NEXT:    xxswapd vs1, vs0
+; PWR9LE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR9LE-NEXT:    blr
 ;
 ; PWR9BE-LABEL: v16f64_fast:
@@ -1660,6 +1673,7 @@ define dso_local double @v16f64_fast(<16 x double> %a) local_unnamed_addr #0 {
 ; PWR9BE-NEXT:    xvadddp vs0, vs0, vs2
 ; PWR9BE-NEXT:    xxswapd vs1, vs0
 ; PWR9BE-NEXT:    xvadddp vs1, vs0, vs1
+; PWR9BE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR9BE-NEXT:    blr
 ;
 ; PWR10LE-LABEL: v16f64_fast:
@@ -1674,6 +1688,7 @@ define dso_local double @v16f64_fast(<16 x double> %a) local_unnamed_addr #0 {
 ; PWR10LE-NEXT:    xxswapd vs1, vs0
 ; PWR10LE-NEXT:    xvadddp vs0, vs0, vs1
 ; PWR10LE-NEXT:    xxswapd vs1, vs0
+; PWR10LE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR10LE-NEXT:    blr
 ;
 ; PWR10BE-LABEL: v16f64_fast:
@@ -1687,6 +1702,7 @@ define dso_local double @v16f64_fast(<16 x double> %a) local_unnamed_addr #0 {
 ; PWR10BE-NEXT:    xvadddp vs0, vs0, vs2
 ; PWR10BE-NEXT:    xxswapd vs1, vs0
 ; PWR10BE-NEXT:    xvadddp vs1, vs0, vs1
+; PWR10BE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR10BE-NEXT:    blr
 entry:
   %0 = call fast double @llvm.vector.reduce.fadd.v16f64(double -0.000000e+00, <16 x double> %a)
@@ -2172,6 +2188,7 @@ define dso_local double @v32f64_fast(<32 x double> %a) local_unnamed_addr #0 {
 ; PWR9LE-NEXT:    xxswapd vs1, vs0
 ; PWR9LE-NEXT:    xvadddp vs0, vs0, vs1
 ; PWR9LE-NEXT:    xxswapd vs1, vs0
+; PWR9LE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR9LE-NEXT:    blr
 ;
 ; PWR9BE-LABEL: v32f64_fast:
@@ -2197,6 +2214,7 @@ define dso_local double @v32f64_fast(<32 x double> %a) local_unnamed_addr #0 {
 ; PWR9BE-NEXT:    xvadddp vs0, vs0, vs2
 ; PWR9BE-NEXT:    xxswapd vs1, vs0
 ; PWR9BE-NEXT:    xvadddp vs1, vs0, vs1
+; PWR9BE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR9BE-NEXT:    blr
 ;
 ; PWR10LE-LABEL: v32f64_fast:
@@ -2223,6 +2241,7 @@ define dso_local double @v32f64_fast(<32 x double> %a) local_unnamed_addr #0 {
 ; PWR10LE-NEXT:    xxswapd vs1, vs0
 ; PWR10LE-NEXT:    xvadddp vs0, vs0, vs1
 ; PWR10LE-NEXT:    xxswapd vs1, vs0
+; PWR10LE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR10LE-NEXT:    blr
 ;
 ; PWR10BE-LABEL: v32f64_fast:
@@ -2248,6 +2267,7 @@ define dso_local double @v32f64_fast(<32 x double> %a) local_unnamed_addr #0 {
 ; PWR10BE-NEXT:    xvadddp vs0, vs0, vs2
 ; PWR10BE-NEXT:    xxswapd vs1, vs0
 ; PWR10BE-NEXT:    xvadddp vs1, vs0, vs1
+; PWR10BE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR10BE-NEXT:    blr
 entry:
   %0 = call fast double @llvm.vector.reduce.fadd.v32f64(double -0.000000e+00, <32 x double> %a)
@@ -3277,6 +3297,7 @@ define dso_local double @v64f64_fast(<64 x double> %a) local_unnamed_addr #0 {
 ; PWR9LE-NEXT:    xxswapd vs1, vs0
 ; PWR9LE-NEXT:    xvadddp vs0, vs0, vs1
 ; PWR9LE-NEXT:    xxswapd vs1, vs0
+; PWR9LE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR9LE-NEXT:    blr
 ;
 ; PWR9BE-LABEL: v64f64_fast:
@@ -3334,6 +3355,7 @@ define dso_local double @v64f64_fast(<64 x double> %a) local_unnamed_addr #0 {
 ; PWR9BE-NEXT:    xvadddp vs0, vs1, vs0
 ; PWR9BE-NEXT:    xxswapd vs1, vs0
 ; PWR9BE-NEXT:    xvadddp vs1, vs0, vs1
+; PWR9BE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR9BE-NEXT:    blr
 ;
 ; PWR10LE-LABEL: v64f64_fast:
@@ -3392,6 +3414,7 @@ define dso_local double @v64f64_fast(<64 x double> %a) local_unnamed_addr #0 {
 ; PWR10LE-NEXT:    xxswapd vs1, vs0
 ; PWR10LE-NEXT:    xvadddp vs0, vs0, vs1
 ; PWR10LE-NEXT:    xxswapd vs1, vs0
+; PWR10LE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR10LE-NEXT:    blr
 ;
 ; PWR10BE-LABEL: v64f64_fast:
@@ -3449,6 +3472,7 @@ define dso_local double @v64f64_fast(<64 x double> %a) local_unnamed_addr #0 {
 ; PWR10BE-NEXT:    xvadddp vs0, vs1, vs0
 ; PWR10BE-NEXT:    xxswapd vs1, vs0
 ; PWR10BE-NEXT:    xvadddp vs1, vs0, vs1
+; PWR10BE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
 ; PWR10BE-NEXT:    blr
 entry:
   %0 = call fast double @llvm.vector.reduce.fadd.v64f64(double -0.000000e+00, <64 x double> %a)
@@ -3636,6 +3660,8 @@ define dso_local ppc_fp128 @v2ppcf128_fast(<2 x ppc_fp128> %a) local_unnamed_add
 ; PWR9LE-NEXT:    stfd f1, 32(r1)
 ; PWR9LE-NEXT:    lxv vs1, 32(r1)
 ; PWR9LE-NEXT:    xxswapd vs2, vs1
+; PWR9LE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
+; PWR9LE-NEXT:    # kill: def $f2 killed $f2 killed $vsl2
 ; PWR9LE-NEXT:    addi r1, r1, 64
 ; PWR9LE-NEXT:    ld r0, 16(r1)
 ; PWR9LE-NEXT:    mtlr r0
@@ -3652,6 +3678,8 @@ define dso_local ppc_fp128 @v2ppcf128_fast(<2 x ppc_fp128> %a) local_unnamed_add
 ; PWR9BE-NEXT:    stfd f1, 112(r1)
 ; PWR9BE-NEXT:    lxv vs1, 112(r1)
 ; PWR9BE-NEXT:    xxswapd vs2, vs1
+; PWR9BE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
+; PWR9BE-NEXT:    # kill: def $f2 killed $f2 killed $vsl2
 ; PWR9BE-NEXT:    addi r1, r1, 144
 ; PWR9BE-NEXT:    ld r0, 16(r1)
 ; PWR9BE-NEXT:    mtlr r0
@@ -3667,6 +3695,8 @@ define dso_local ppc_fp128 @v2ppcf128_fast(<2 x ppc_fp128> %a) local_unnamed_add
 ; PWR10LE-NEXT:    stfd f1, 32(r1)
 ; PWR10LE-NEXT:    lxv vs1, 32(r1)
 ; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
+; PWR10LE-NEXT:    # kill: def $f2 killed $f2 killed $vsl2
 ; PWR10LE-NEXT:    addi r1, r1, 64
 ; PWR10LE-NEXT:    ld r0, 16(r1)
 ; PWR10LE-NEXT:    mtlr r0
@@ -3683,6 +3713,8 @@ define dso_local ppc_fp128 @v2ppcf128_fast(<2 x ppc_fp128> %a) local_unnamed_add
 ; PWR10BE-NEXT:    stfd f1, 112(r1)
 ; PWR10BE-NEXT:    lxv vs1, 112(r1)
 ; PWR10BE-NEXT:    xxswapd vs2, vs1
+; PWR10BE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
+; PWR10BE-NEXT:    # kill: def $f2 killed $f2 killed $vsl2
 ; PWR10BE-NEXT:    addi r1, r1, 144
 ; PWR10BE-NEXT:    ld r0, 16(r1)
 ; PWR10BE-NEXT:    mtlr r0
@@ -4045,6 +4077,8 @@ define dso_local ppc_fp128 @v4ppcf128_fast(<4 x ppc_fp128> %a) local_unnamed_add
 ; PWR9LE-NEXT:    stfd f1, 32(r1)
 ; PWR9LE-NEXT:    lxv vs1, 32(r1)
 ; PWR9LE-NEXT:    xxswapd vs2, vs1
+; PWR9LE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
+; PWR9LE-NEXT:    # kill: def $f2 killed $f2 killed $vsl2
 ; PWR9LE-NEXT:    addi r1, r1, 96
 ; PWR9LE-NEXT:    ld r0, 16(r1)
 ; PWR9LE-NEXT:    lfd f31, -8(r1) # 8-byte Folded Reload
@@ -4099,6 +4133,8 @@ define dso_local ppc_fp128 @v4ppcf128_fast(<4 x ppc_fp128> %a) local_unnamed_add
 ; PWR9BE-NEXT:    lfd f28, 144(r1) # 8-byte Folded Reload
 ; PWR9BE-NEXT:    lfd f27, 136(r1) # 8-byte Folded Reload
 ; PWR9BE-NEXT:    lfd f26, 128(r1) # 8-byte Folded Reload
+; PWR9BE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
+; PWR9BE-NEXT:    # kill: def $f2 killed $f2 killed $vsl2
 ; PWR9BE-NEXT:    addi r1, r1, 176
 ; PWR9BE-NEXT:    ld r0, 16(r1)
 ; PWR9BE-NEXT:    mtlr r0
@@ -4138,6 +4174,8 @@ define dso_local ppc_fp128 @v4ppcf128_fast(<4 x ppc_fp128> %a) local_unnamed_add
 ; PWR10LE-NEXT:    stfd f1, 32(r1)
 ; PWR10LE-NEXT:    lxv vs1, 32(r1)
 ; PWR10LE-NEXT:    xxswapd vs2, vs1
+; PWR10LE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
+; PWR10LE-NEXT:    # kill: def $f2 killed $f2 killed $vsl2
 ; PWR10LE-NEXT:    addi r1, r1, 96
 ; PWR10LE-NEXT:    ld r0, 16(r1)
 ; PWR10LE-NEXT:    lfd f31, -8(r1) # 8-byte Folded Reload
@@ -4192,6 +4230,8 @@ define dso_local ppc_fp128 @v4ppcf128_fast(<4 x ppc_fp128> %a) local_unnamed_add
 ; PWR10BE-NEXT:    lfd f26, 128(r1) # 8-byte Folded Reload
 ; PWR10BE-NEXT:    lxv vs1, 112(r1)
 ; PWR10BE-NEXT:    xxswapd vs2, vs1
+; PWR10BE-NEXT:    # kill: def $f1 killed $f1 killed $vsl1
+; PWR10BE-NEXT:    # kill: def $f2 killed $f2 killed $vsl2
 ; PWR10BE-NEXT:    addi r1, r1, 176
 ; PWR10BE-NEXT:    ld r0, 16(r1)
 ; PWR10BE-NEXT:    mtlr r0

@@ -16,7 +16,6 @@
 
 #include "CodeGenTBAA.h"
 #include "ABIInfoImpl.h"
-#include "CGCXXABI.h"
 #include "CGRecordLayout.h"
 #include "CodeGenTypes.h"
 #include "clang/AST/ASTContext.h"
@@ -37,10 +36,10 @@ using namespace CodeGen;
 
 CodeGenTBAA::CodeGenTBAA(ASTContext &Ctx, CodeGenTypes &CGTypes,
                          llvm::Module &M, const CodeGenOptions &CGO,
-                         const LangOptions &Features)
+                         const LangOptions &Features, MangleContext &MContext)
     : Context(Ctx), CGTypes(CGTypes), Module(M), CodeGenOpts(CGO),
-      Features(Features), MDHelper(M.getContext()), Root(nullptr),
-      Char(nullptr) {}
+      Features(Features), MContext(MContext), MDHelper(M.getContext()),
+      Root(nullptr), Char(nullptr) {}
 
 CodeGenTBAA::~CodeGenTBAA() {
 }
@@ -257,8 +256,7 @@ llvm::MDNode *CodeGenTBAA::getTypeInfoHelper(const Type *Ty) {
 
     SmallString<256> OutName;
     llvm::raw_svector_ostream Out(OutName);
-    CGTypes.getCXXABI().getMangleContext().mangleCanonicalTypeName(
-        QualType(ETy, 0), Out);
+    MContext.mangleCanonicalTypeName(QualType(ETy, 0), Out);
     return createScalarTypeNode(OutName, getChar(), Size);
   }
 
@@ -483,8 +481,7 @@ llvm::MDNode *CodeGenTBAA::getBaseTypeInfoHelper(const Type *Ty) {
     if (Features.CPlusPlus) {
       // Don't use the mangler for C code.
       llvm::raw_svector_ostream Out(OutName);
-      CGTypes.getCXXABI().getMangleContext().mangleCanonicalTypeName(
-          QualType(Ty, 0), Out);
+      MContext.mangleCanonicalTypeName(QualType(Ty, 0), Out);
     } else {
       OutName = RD->getName();
     }

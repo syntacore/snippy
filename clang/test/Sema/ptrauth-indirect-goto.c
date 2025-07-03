@@ -1,5 +1,4 @@
 // RUN: %clang_cc1 -triple arm64e-apple-darwin -fsyntax-only -verify %s -fptrauth-indirect-gotos
-// RUN: %clang_cc1 -triple aarch64-linux-gnu   -fsyntax-only -verify %s -fptrauth-indirect-gotos
 
 int f() {
   static void *addrs[] = { &&l1, &&l2 };

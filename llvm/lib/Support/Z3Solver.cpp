@@ -19,7 +19,6 @@ using namespace llvm;
 #include "llvm/ADT/Twine.h"
 
 #include <set>
-#include <unordered_map>
 
 #include <z3.h>
 

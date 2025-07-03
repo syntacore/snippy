@@ -402,11 +402,10 @@ UnresolvedLookupExpr::UnresolvedLookupExpr(
     NestedNameSpecifierLoc QualifierLoc, SourceLocation TemplateKWLoc,
     const DeclarationNameInfo &NameInfo, bool RequiresADL,
     const TemplateArgumentListInfo *TemplateArgs, UnresolvedSetIterator Begin,
-    UnresolvedSetIterator End, bool KnownDependent,
-    bool KnownInstantiationDependent)
+    UnresolvedSetIterator End, bool KnownDependent)
     : OverloadExpr(UnresolvedLookupExprClass, Context, QualifierLoc,
                    TemplateKWLoc, NameInfo, TemplateArgs, Begin, End,
-                   KnownDependent, KnownInstantiationDependent, false),
+                   KnownDependent, false, false),
       NamingClass(NamingClass) {
   UnresolvedLookupExprBits.RequiresADL = RequiresADL;
 }
@@ -421,7 +420,7 @@ UnresolvedLookupExpr *UnresolvedLookupExpr::Create(
     const ASTContext &Context, CXXRecordDecl *NamingClass,
     NestedNameSpecifierLoc QualifierLoc, const DeclarationNameInfo &NameInfo,
     bool RequiresADL, UnresolvedSetIterator Begin, UnresolvedSetIterator End,
-    bool KnownDependent, bool KnownInstantiationDependent) {
+    bool KnownDependent) {
   unsigned NumResults = End - Begin;
   unsigned Size = totalSizeToAlloc<DeclAccessPair, ASTTemplateKWAndArgsInfo,
                                    TemplateArgumentLoc>(NumResults, 0, 0);
@@ -429,8 +428,7 @@ UnresolvedLookupExpr *UnresolvedLookupExpr::Create(
   return new (Mem) UnresolvedLookupExpr(
       Context, NamingClass, QualifierLoc,
       /*TemplateKWLoc=*/SourceLocation(), NameInfo, RequiresADL,
-      /*TemplateArgs=*/nullptr, Begin, End, KnownDependent,
-      KnownInstantiationDependent);
+      /*TemplateArgs=*/nullptr, Begin, End, KnownDependent);
 }
 
 UnresolvedLookupExpr *UnresolvedLookupExpr::Create(
@@ -438,8 +436,7 @@ UnresolvedLookupExpr *UnresolvedLookupExpr::Create(
     NestedNameSpecifierLoc QualifierLoc, SourceLocation TemplateKWLoc,
     const DeclarationNameInfo &NameInfo, bool RequiresADL,
     const TemplateArgumentListInfo *Args, UnresolvedSetIterator Begin,
-    UnresolvedSetIterator End, bool KnownDependent,
-    bool KnownInstantiationDependent) {
+    UnresolvedSetIterator End, bool KnownDependent) {
   unsigned NumResults = End - Begin;
   bool HasTemplateKWAndArgsInfo = Args || TemplateKWLoc.isValid();
   unsigned NumTemplateArgs = Args ? Args->size() : 0;
@@ -447,9 +444,9 @@ UnresolvedLookupExpr *UnresolvedLookupExpr::Create(
                                    TemplateArgumentLoc>(
       NumResults, HasTemplateKWAndArgsInfo, NumTemplateArgs);
   void *Mem = Context.Allocate(Size, alignof(UnresolvedLookupExpr));
-  return new (Mem) UnresolvedLookupExpr(
-      Context, NamingClass, QualifierLoc, TemplateKWLoc, NameInfo, RequiresADL,
-      Args, Begin, End, KnownDependent, KnownInstantiationDependent);
+  return new (Mem) UnresolvedLookupExpr(Context, NamingClass, QualifierLoc,
+                                        TemplateKWLoc, NameInfo, RequiresADL,
+                                        Args, Begin, End, KnownDependent);
 }
 
 UnresolvedLookupExpr *UnresolvedLookupExpr::CreateEmpty(

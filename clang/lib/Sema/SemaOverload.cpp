@@ -6857,7 +6857,10 @@ void Sema::AddOverloadCandidate(
   Candidate.Viable = true;
   Candidate.RewriteKind =
       CandidateSet.getRewriteInfo().getRewriteKind(Function, PO);
+  Candidate.IsSurrogate = false;
   Candidate.IsADLCandidate = IsADLCandidate;
+  Candidate.IgnoreObjectArgument = false;
+  Candidate.TookAddressOfOverload = false;
   Candidate.ExplicitCallArguments = Args.size();
 
   // Explicit functions are not actually candidates at all if we're not
@@ -7419,6 +7422,8 @@ Sema::AddMethodCandidate(CXXMethodDecl *Method, DeclAccessPair FoundDecl,
   Candidate.Function = Method;
   Candidate.RewriteKind =
       CandidateSet.getRewriteInfo().getRewriteKind(Method, PO);
+  Candidate.IsSurrogate = false;
+  Candidate.IgnoreObjectArgument = false;
   Candidate.TookAddressOfOverload =
       CandidateSet.getKind() == OverloadCandidateSet::CSK_AddressOfOverloadSet;
   Candidate.ExplicitCallArguments = Args.size();
@@ -7612,6 +7617,7 @@ void Sema::AddMethodTemplateCandidate(
     Candidate.IgnoreObjectArgument =
         cast<CXXMethodDecl>(Candidate.Function)->isStatic() ||
         ObjectType.isNull();
+    Candidate.TookAddressOfOverload = false;
     Candidate.ExplicitCallArguments = Args.size();
     if (Result == TemplateDeductionResult::NonDependentConversionFailure)
       Candidate.FailureKind = ovl_fail_bad_conversion;
@@ -7699,6 +7705,7 @@ void Sema::AddTemplateOverloadCandidate(
     Candidate.IgnoreObjectArgument =
         isa<CXXMethodDecl>(Candidate.Function) &&
         !isa<CXXConstructorDecl>(Candidate.Function);
+    Candidate.TookAddressOfOverload = false;
     Candidate.ExplicitCallArguments = Args.size();
     if (Result == TemplateDeductionResult::NonDependentConversionFailure)
       Candidate.FailureKind = ovl_fail_bad_conversion;
@@ -7879,6 +7886,9 @@ void Sema::AddConversionCandidate(
   OverloadCandidate &Candidate = CandidateSet.addCandidate(1);
   Candidate.FoundDecl = FoundDecl;
   Candidate.Function = Conversion;
+  Candidate.IsSurrogate = false;
+  Candidate.IgnoreObjectArgument = false;
+  Candidate.TookAddressOfOverload = false;
   Candidate.FinalConversion.setAsIdentityConversion();
   Candidate.FinalConversion.setFromType(ConvType);
   Candidate.FinalConversion.setAllToTypes(ToType);
@@ -8074,6 +8084,9 @@ void Sema::AddTemplateConversionCandidate(
     Candidate.Function = FunctionTemplate->getTemplatedDecl();
     Candidate.Viable = false;
     Candidate.FailureKind = ovl_fail_bad_deduction;
+    Candidate.IsSurrogate = false;
+    Candidate.IgnoreObjectArgument = false;
+    Candidate.TookAddressOfOverload = false;
     Candidate.ExplicitCallArguments = 1;
     Candidate.DeductionFailure = MakeDeductionFailureInfo(Context, Result,
                                                           Info);
@@ -8106,8 +8119,10 @@ void Sema::AddSurrogateCandidate(CXXConversionDecl *Conversion,
   Candidate.FoundDecl = FoundDecl;
   Candidate.Function = nullptr;
   Candidate.Surrogate = Conversion;
-  Candidate.IsSurrogate = true;
   Candidate.Viable = true;
+  Candidate.IsSurrogate = true;
+  Candidate.IgnoreObjectArgument = false;
+  Candidate.TookAddressOfOverload = false;
   Candidate.ExplicitCallArguments = Args.size();
 
   // Determine the implicit conversion sequence for the implicit
@@ -8313,6 +8328,9 @@ void Sema::AddBuiltinCandidate(QualType *ParamTys, ArrayRef<Expr *> Args,
   OverloadCandidate &Candidate = CandidateSet.addCandidate(Args.size());
   Candidate.FoundDecl = DeclAccessPair::make(nullptr, AS_none);
   Candidate.Function = nullptr;
+  Candidate.IsSurrogate = false;
+  Candidate.IgnoreObjectArgument = false;
+  Candidate.TookAddressOfOverload = false;
   std::copy(ParamTys, ParamTys + Args.size(), Candidate.BuiltinParamTypes);
 
   // Determine the implicit conversion sequences for each of the
@@ -14083,9 +14101,9 @@ ExprResult Sema::CreateUnresolvedLookupExpr(CXXRecordDecl *NamingClass,
                                             DeclarationNameInfo DNI,
                                             const UnresolvedSetImpl &Fns,
                                             bool PerformADL) {
-  return UnresolvedLookupExpr::Create(
-      Context, NamingClass, NNSLoc, DNI, PerformADL, Fns.begin(), Fns.end(),
-      /*KnownDependent=*/false, /*KnownInstantiationDependent=*/false);
+  return UnresolvedLookupExpr::Create(Context, NamingClass, NNSLoc, DNI,
+                                      PerformADL, Fns.begin(), Fns.end(),
+                                      /*KnownDependent=*/false);
 }
 
 ExprResult Sema::BuildCXXMemberCallExpr(Expr *E, NamedDecl *FoundDecl,

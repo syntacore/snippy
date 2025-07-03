@@ -745,7 +745,7 @@ void CodeGenFunction::EmitAttributedStmt(const AttributedStmt &S) {
     } break;
     case attr::CXXAssume: {
       const Expr *Assumption = cast<CXXAssumeAttr>(A)->getAssumption();
-      if (getLangOpts().CXXAssumptions && Builder.GetInsertBlock() &&
+      if (getLangOpts().CXXAssumptions &&
           !Assumption->HasSideEffects(getContext())) {
         llvm::Value *AssumptionVal = EvaluateExprAsBool(Assumption);
         Builder.CreateAssumption(AssumptionVal);

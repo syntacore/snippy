@@ -61,7 +61,6 @@ enum {
   DIR_PWR8,
   DIR_PWR9,
   DIR_PWR10,
-  DIR_PWR11,
   DIR_PWR_FUTURE,
   DIR_64
 };

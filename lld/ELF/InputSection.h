@@ -35,25 +35,12 @@ class OutputSection;
 
 LLVM_LIBRARY_VISIBILITY extern std::vector<Partition> partitions;
 
-// Returned by InputSectionBase::relsOrRelas. At most one member is empty.
+// Returned by InputSectionBase::relsOrRelas. At least one member is empty.
 template <class ELFT> struct RelsOrRelas {
-  Relocs<typename ELFT::Rel> rels;
-  Relocs<typename ELFT::Rela> relas;
-  Relocs<typename ELFT::Crel> crels;
+  ArrayRef<typename ELFT::Rel> rels;
+  ArrayRef<typename ELFT::Rela> relas;
   bool areRelocsRel() const { return rels.size(); }
-  bool areRelocsCrel() const { return crels.size(); }
 };
-
-#define invokeOnRelocs(sec, f, ...)                                            \
-  {                                                                            \
-    const RelsOrRelas<ELFT> rs = (sec).template relsOrRelas<ELFT>();           \
-    if (rs.areRelocsCrel())                                                    \
-      f(__VA_ARGS__, rs.crels);                                                \
-    else if (rs.areRelocsRel())                                                \
-      f(__VA_ARGS__, rs.rels);                                                 \
-    else                                                                       \
-      f(__VA_ARGS__, rs.relas);                                                \
-  }
 
 // This is the base class of all sections that lld handles. Some are sections in
 // input files, some are sections in the produced output file and some exist
@@ -176,10 +163,6 @@ public:
 
   mutable bool compressed = false;
 
-  // Whether this section is SHT_CREL and has been decoded to RELA by
-  // relsOrRelas.
-  bool decodedCrel = false;
-
   // Whether the section needs to be padded with a NOP filler due to
   // deleteFallThruJmpInsn.
   bool nopFiller = false;
@@ -217,8 +200,7 @@ public:
   // used by --gc-sections.
   InputSectionBase *nextInSectionGroup = nullptr;
 
-  template <class ELFT>
-  RelsOrRelas<ELFT> relsOrRelas(bool supportsCrel = true) const;
+  template <class ELFT> RelsOrRelas<ELFT> relsOrRelas() const;
 
   // InputSections that are dependent on us (reverse dependency for GC)
   llvm::TinyPtrVector<InputSection *> dependentSections;
@@ -425,7 +407,7 @@ public:
   InputSectionBase *getRelocatedSection() const;
 
   template <class ELFT, class RelTy>
-  void relocateNonAlloc(uint8_t *buf, Relocs<RelTy> rels);
+  void relocateNonAlloc(uint8_t *buf, llvm::ArrayRef<RelTy> rels);
 
   // Points to the canonical section. If ICF folds two sections, repl pointer of
   // one section points to the other.
@@ -492,8 +474,7 @@ public:
 };
 
 inline bool isStaticRelSecType(uint32_t type) {
-  return type == llvm::ELF::SHT_RELA || type == llvm::ELF::SHT_CREL ||
-         type == llvm::ELF::SHT_REL;
+  return type == llvm::ELF::SHT_RELA || type == llvm::ELF::SHT_REL;
 }
 
 inline bool isDebugSection(const InputSectionBase &sec) {

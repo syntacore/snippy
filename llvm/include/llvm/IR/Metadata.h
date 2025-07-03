@@ -846,10 +846,8 @@ struct AAMDNodes {
   AAMDNodes concat(const AAMDNodes &Other) const;
 
   /// Create a new AAMDNode for accessing \p AccessSize bytes of this AAMDNode.
-  /// If this AAMDNode has !tbaa.struct and \p AccessSize matches the size of
-  /// the field at offset 0, get the TBAA tag describing the accessed field.
-  /// If such an AAMDNode already embeds !tbaa, the existing one is retrieved.
-  /// Finally, !tbaa.struct is zeroed out.
+  /// If his AAMDNode has !tbaa.struct and \p AccessSize matches the size of the
+  /// field at offset 0, get the TBAA tag describing the accessed field.
   AAMDNodes adjustForAccess(unsigned AccessSize);
   AAMDNodes adjustForAccess(size_t Offset, Type *AccessTy,
                             const DataLayout &DL);

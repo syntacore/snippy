@@ -341,8 +341,7 @@ bool AArch64PointerAuth::checkAuthenticatedLR(
   AArch64PACKey::ID KeyId =
       MFnI->shouldSignWithBKey() ? AArch64PACKey::IB : AArch64PACKey::IA;
 
-  AuthCheckMethod Method =
-      Subtarget->getAuthenticatedLRCheckMethod(*TI->getMF());
+  AuthCheckMethod Method = Subtarget->getAuthenticatedLRCheckMethod();
 
   if (Method == AuthCheckMethod::None)
     return false;

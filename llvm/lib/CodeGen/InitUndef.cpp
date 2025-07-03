@@ -272,7 +272,6 @@ bool InitUndef::runOnMachineFunction(MachineFunction &MF) {
   for (auto *DeadMI : DeadInsts)
     DeadMI->eraseFromParent();
   DeadInsts.clear();
-  NewRegs.clear();
 
   return Changed;
 }

@@ -4838,10 +4838,9 @@ public:
   void EmitAggFinalDestCopy(QualType Type, AggValueSlot Dest, const LValue &Src,
                             ExprValueKind SrcKind);
 
-  /// Create a store to \arg DstPtr from \arg Src, truncating the stored value
-  /// to at most \arg DstSize bytes.
-  void CreateCoercedStore(llvm::Value *Src, Address Dst, llvm::TypeSize DstSize,
-                          bool DstIsVolatile);
+  /// Build all the stores needed to initialize an aggregate at Dest with the
+  /// value Val.
+  void EmitAggregateStore(llvm::Value *Val, Address Dest, bool DestIsVolatile);
 
   /// EmitExtendGCLifetime - Given a pointer to an Objective-C object,
   /// make sure it survives garbage collection until this point.

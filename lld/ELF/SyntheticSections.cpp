@@ -455,8 +455,7 @@ template <class ELFT>
 void EhFrameSection::addSectionAux(EhInputSection *sec) {
   if (!sec->isLive())
     return;
-  const RelsOrRelas<ELFT> rels =
-      sec->template relsOrRelas<ELFT>(/*supportsCrel=*/false);
+  const RelsOrRelas<ELFT> rels = sec->template relsOrRelas<ELFT>();
   if (rels.areRelocsRel())
     addRecords<ELFT>(sec, rels.rels);
   else
@@ -490,8 +489,7 @@ void EhFrameSection::iterateFDEWithLSDA(
   DenseSet<size_t> ciesWithLSDA;
   for (EhInputSection *sec : sections) {
     ciesWithLSDA.clear();
-    const RelsOrRelas<ELFT> rels =
-        sec->template relsOrRelas<ELFT>(/*supportsCrel=*/false);
+    const RelsOrRelas<ELFT> rels = sec->template relsOrRelas<ELFT>();
     if (rels.areRelocsRel())
       iterateFDEWithLSDAAux<ELFT>(*sec, rels.rels, ciesWithLSDA, fn);
     else
@@ -3205,10 +3203,10 @@ template <class ELFT> DebugNamesSection<ELFT>::DebugNamesSection() {
 template <class ELFT>
 template <class RelTy>
 void DebugNamesSection<ELFT>::getNameRelocs(
-    const InputFile &file, DenseMap<uint32_t, uint32_t> &relocs,
-    Relocs<RelTy> rels) {
+    InputSection *sec, ArrayRef<RelTy> rels,
+    DenseMap<uint32_t, uint32_t> &relocs) {
   for (const RelTy &rel : rels) {
-    Symbol &sym = file.getRelocTargetSym(rel);
+    Symbol &sym = sec->file->getRelocTargetSym(rel);
     relocs[rel.r_offset] = sym.getVA(getAddend<ELFT>(rel));
   }
 }
@@ -3218,7 +3216,11 @@ template <class ELFT> void DebugNamesSection<ELFT>::finalizeContents() {
   auto relocs = std::make_unique<DenseMap<uint32_t, uint32_t>[]>(numChunks);
   parallelFor(0, numChunks, [&](size_t i) {
     InputSection *sec = inputSections[i];
-    invokeOnRelocs(*sec, getNameRelocs, *sec->file, relocs.get()[i]);
+    auto rels = sec->template relsOrRelas<ELFT>();
+    if (rels.areRelocsRel())
+      getNameRelocs(sec, rels.rels, relocs.get()[i]);
+    else
+      getNameRelocs(sec, rels.relas, relocs.get()[i]);
 
     // Relocate CU offsets with .debug_info + X relocations.
     OutputChunk &chunk = chunks.get()[i];

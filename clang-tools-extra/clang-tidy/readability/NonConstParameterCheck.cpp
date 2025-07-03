@@ -157,12 +157,9 @@ void NonConstParameterCheck::diagnoseNonConstParameters() {
     if (!Function)
       continue;
     unsigned Index = Par->getFunctionScopeIndex();
-    for (FunctionDecl *FnDecl : Function->redecls()) {
-      if (FnDecl->getNumParams() <= Index)
-        continue;
+    for (FunctionDecl *FnDecl : Function->redecls())
       Fixes.push_back(FixItHint::CreateInsertion(
           FnDecl->getParamDecl(Index)->getBeginLoc(), "const "));
-    }
 
     diag(Par->getLocation(), "pointer parameter '%0' can be pointer to const")
         << Par->getName() << Fixes;

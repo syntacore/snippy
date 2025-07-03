@@ -15,6 +15,7 @@
 #ifndef LLVM_IR_VECTORBUILDER_H
 #define LLVM_IR_VECTORBUILDER_H
 
+#include <llvm/Analysis/IVDescriptors.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Instruction.h>
@@ -99,11 +100,11 @@ public:
                                  const Twine &Name = Twine());
 
   /// Emit a VP reduction intrinsic call for recurrence kind.
-  /// \param RdxID       The intrinsic ID of llvm.vector.reduce.*
+  /// \param Kind        The kind of recurrence
   /// \param ValTy       The type of operand which the reduction operation is
   ///                    performed.
   /// \param VecOpArray  The operand list.
-  Value *createSimpleTargetReduction(Intrinsic::ID RdxID, Type *ValTy,
+  Value *createSimpleTargetReduction(RecurKind Kind, Type *ValTy,
                                      ArrayRef<Value *> VecOpArray,
                                      const Twine &Name = Twine());
 };

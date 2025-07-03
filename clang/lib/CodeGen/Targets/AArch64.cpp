@@ -840,13 +840,12 @@ static bool isStreamingCompatible(const FunctionDecl *F) {
 static void diagnoseIfNeedsFPReg(DiagnosticsEngine &Diags,
                                  const StringRef ABIName,
                                  const AArch64ABIInfo &ABIInfo,
-                                 const QualType &Ty, const NamedDecl *D,
-                                 SourceLocation loc) {
+                                 const QualType &Ty, const NamedDecl *D) {
   const Type *HABase = nullptr;
   uint64_t HAMembers = 0;
   if (Ty->isFloatingType() || Ty->isVectorType() ||
       ABIInfo.isHomogeneousAggregate(Ty, HABase, HAMembers)) {
-    Diags.Report(loc, diag::err_target_unsupported_type_for_abi)
+    Diags.Report(D->getLocation(), diag::err_target_unsupported_type_for_abi)
         << D->getDeclName() << Ty << ABIName;
   }
 }
@@ -861,11 +860,10 @@ void AArch64TargetCodeGenInfo::checkFunctionABI(
 
   if (!TI.hasFeature("fp") && !ABIInfo.isSoftFloat()) {
     diagnoseIfNeedsFPReg(CGM.getDiags(), TI.getABI(), ABIInfo,
-                         FuncDecl->getReturnType(), FuncDecl,
-                         FuncDecl->getLocation());
+                         FuncDecl->getReturnType(), FuncDecl);
     for (ParmVarDecl *PVD : FuncDecl->parameters()) {
       diagnoseIfNeedsFPReg(CGM.getDiags(), TI.getABI(), ABIInfo, PVD->getType(),
-                           PVD, FuncDecl->getLocation());
+                           PVD);
     }
   }
 }
@@ -885,10 +883,8 @@ void AArch64TargetCodeGenInfo::checkFunctionCallABIStreaming(
 
   if (!CalleeIsStreamingCompatible &&
       (CallerIsStreaming != CalleeIsStreaming || CallerIsStreamingCompatible))
-    CGM.getDiags().Report(
-        CallLoc, CalleeIsStreaming
-                     ? diag::err_function_always_inline_attribute_mismatch
-                     : diag::warn_function_always_inline_attribute_mismatch)
+    CGM.getDiags().Report(CallLoc,
+                          diag::err_function_always_inline_attribute_mismatch)
         << Caller->getDeclName() << Callee->getDeclName() << "streaming";
   if (auto *NewAttr = Callee->getAttr<ArmNewAttr>())
     if (NewAttr->isNewZA())
@@ -910,11 +906,11 @@ void AArch64TargetCodeGenInfo::checkFunctionCallABISoftFloat(
     return;
 
   diagnoseIfNeedsFPReg(CGM.getDiags(), TI.getABI(), ABIInfo, ReturnType,
-                       Callee ? Callee : Caller, CallLoc);
+                       Caller);
 
   for (const CallArg &Arg : Args)
     diagnoseIfNeedsFPReg(CGM.getDiags(), TI.getABI(), ABIInfo, Arg.getType(),
-                         Callee ? Callee : Caller, CallLoc);
+                         Caller);
 }
 
 void AArch64TargetCodeGenInfo::checkFunctionCallABI(CodeGenModule &CGM,

@@ -413,8 +413,7 @@ public:
   }
 
   /// Choose a method of checking LR before performing a tail call.
-  AArch64PAuth::AuthCheckMethod
-  getAuthenticatedLRCheckMethod(const MachineFunction &MF) const;
+  AArch64PAuth::AuthCheckMethod getAuthenticatedLRCheckMethod() const;
 
   /// Compute the integer discriminator for a given BlockAddress constant, if
   /// blockaddress signing is enabled, or std::nullopt otherwise.

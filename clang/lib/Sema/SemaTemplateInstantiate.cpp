@@ -20,7 +20,6 @@
 #include "clang/AST/Expr.h"
 #include "clang/AST/ExprConcepts.h"
 #include "clang/AST/PrettyDeclStackTrace.h"
-#include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/Type.h"
 #include "clang/AST/TypeLoc.h"
 #include "clang/AST/TypeVisitor.h"
@@ -88,19 +87,12 @@ struct Response {
 // than lambda classes.
 const FunctionDecl *
 getPrimaryTemplateOfGenericLambda(const FunctionDecl *LambdaCallOperator) {
-  if (!isLambdaCallOperator(LambdaCallOperator))
-    return LambdaCallOperator;
   while (true) {
     if (auto *FTD = dyn_cast_if_present<FunctionTemplateDecl>(
             LambdaCallOperator->getDescribedTemplate());
         FTD && FTD->getInstantiatedFromMemberTemplate()) {
       LambdaCallOperator =
           FTD->getInstantiatedFromMemberTemplate()->getTemplatedDecl();
-    } else if (LambdaCallOperator->getPrimaryTemplate()) {
-      // Cases where the lambda operator is instantiated in
-      // TemplateDeclInstantiator::VisitCXXMethodDecl.
-      LambdaCallOperator =
-          LambdaCallOperator->getPrimaryTemplate()->getTemplatedDecl();
     } else if (auto *Prev = cast<CXXMethodDecl>(LambdaCallOperator)
                                 ->getInstantiatedFromMemberFunction())
       LambdaCallOperator = Prev;
@@ -146,28 +138,22 @@ getEnclosingTypeAliasTemplateDecl(Sema &SemaRef) {
 // Check if we are currently inside of a lambda expression that is
 // surrounded by a using alias declaration. e.g.
 //   template <class> using type = decltype([](auto) { ^ }());
+// By checking if:
+//  1. The lambda expression and the using alias declaration share the
+//  same declaration context.
+//  2. They have the same template depth.
 // We have to do so since a TypeAliasTemplateDecl (or a TypeAliasDecl) is never
 // a DeclContext, nor does it have an associated specialization Decl from which
 // we could collect these template arguments.
 bool isLambdaEnclosedByTypeAliasDecl(
-    const FunctionDecl *LambdaCallOperator,
+    const FunctionDecl *PrimaryLambdaCallOperator,
     const TypeAliasTemplateDecl *PrimaryTypeAliasDecl) {
-  struct Visitor : RecursiveASTVisitor<Visitor> {
-    Visitor(const FunctionDecl *CallOperator) : CallOperator(CallOperator) {}
-    bool VisitLambdaExpr(const LambdaExpr *LE) {
-      // Return true to bail out of the traversal, implying the Decl contains
-      // the lambda.
-      return getPrimaryTemplateOfGenericLambda(LE->getCallOperator()) !=
-             CallOperator;
-    }
-    const FunctionDecl *CallOperator;
-  };
-
-  QualType Underlying =
-      PrimaryTypeAliasDecl->getTemplatedDecl()->getUnderlyingType();
-
-  return !Visitor(getPrimaryTemplateOfGenericLambda(LambdaCallOperator))
-              .TraverseType(Underlying);
+  return cast<CXXRecordDecl>(PrimaryLambdaCallOperator->getDeclContext())
+                 ->getTemplateDepth() ==
+             PrimaryTypeAliasDecl->getTemplateDepth() &&
+         getLambdaAwareParentOfDeclContext(
+             const_cast<FunctionDecl *>(PrimaryLambdaCallOperator)) ==
+             PrimaryTypeAliasDecl->getDeclContext();
 }
 
 // Add template arguments from a variable template instantiation.
@@ -304,8 +290,23 @@ Response HandleFunction(Sema &SemaRef, const FunctionDecl *Function,
 
     // If this function is a generic lambda specialization, we are done.
     if (!ForConstraintInstantiation &&
-        isGenericLambdaCallOperatorOrStaticInvokerSpecialization(Function))
+        isGenericLambdaCallOperatorOrStaticInvokerSpecialization(Function)) {
+      // TypeAliasTemplateDecls should be taken into account, e.g.
+      // when we're deducing the return type of a lambda.
+      //
+      // template <class> int Value = 0;
+      // template <class T>
+      // using T = decltype([]<int U = 0>() { return Value<T>; }());
+      //
+      if (auto TypeAlias = getEnclosingTypeAliasTemplateDecl(SemaRef)) {
+        if (isLambdaEnclosedByTypeAliasDecl(
+                /*PrimaryLambdaCallOperator=*/getPrimaryTemplateOfGenericLambda(
+                    Function),
+                /*PrimaryTypeAliasDecl=*/TypeAlias.PrimaryTypeAliasDecl))
+          return Response::UseNextDecl(Function);
+      }
       return Response::Done();
+    }
 
   } else if (Function->getDescribedFunctionTemplate()) {
     assert(
@@ -417,9 +418,10 @@ Response HandleRecordDecl(Sema &SemaRef, const CXXRecordDecl *Rec,
     // Retrieve the template arguments for a using alias declaration.
     // This is necessary for constraint checking, since we always keep
     // constraints relative to the primary template.
-    if (auto TypeAlias = getEnclosingTypeAliasTemplateDecl(SemaRef);
-        ForConstraintInstantiation && TypeAlias) {
-      if (isLambdaEnclosedByTypeAliasDecl(Rec->getLambdaCallOperator(),
+    if (auto TypeAlias = getEnclosingTypeAliasTemplateDecl(SemaRef)) {
+      const FunctionDecl *PrimaryLambdaCallOperator =
+          getPrimaryTemplateOfGenericLambda(Rec->getLambdaCallOperator());
+      if (isLambdaEnclosedByTypeAliasDecl(PrimaryLambdaCallOperator,
                                           TypeAlias.PrimaryTypeAliasDecl)) {
         Result.addOuterTemplateArguments(TypeAlias.Template,
                                          TypeAlias.AssociatedTemplateArguments,
@@ -1640,17 +1642,12 @@ namespace {
 
     CXXRecordDecl::LambdaDependencyKind
     ComputeLambdaDependency(LambdaScopeInfo *LSI) {
-      if (auto TypeAlias =
-              TemplateInstArgsHelpers::getEnclosingTypeAliasTemplateDecl(
-                  getSema());
-          TypeAlias && TemplateInstArgsHelpers::isLambdaEnclosedByTypeAliasDecl(
-                           LSI->CallOperator, TypeAlias.PrimaryTypeAliasDecl)) {
-        unsigned TypeAliasDeclDepth = TypeAlias.Template->getTemplateDepth();
+      auto &CCS = SemaRef.CodeSynthesisContexts.back();
+      if (CCS.Kind ==
+          Sema::CodeSynthesisContext::TypeAliasTemplateInstantiation) {
+        unsigned TypeAliasDeclDepth = CCS.Entity->getTemplateDepth();
         if (TypeAliasDeclDepth >= TemplateArgs.getNumSubstitutedLevels())
           return CXXRecordDecl::LambdaDependencyKind::LDK_AlwaysDependent;
-        for (const TemplateArgument &TA : TypeAlias.AssociatedTemplateArguments)
-          if (TA.isDependent())
-            return CXXRecordDecl::LambdaDependencyKind::LDK_AlwaysDependent;
       }
       return inherited::ComputeLambdaDependency(LSI);
     }

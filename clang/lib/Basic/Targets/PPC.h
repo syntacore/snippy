@@ -44,9 +44,8 @@ class LLVM_LIBRARY_VISIBILITY PPCTargetInfo : public TargetInfo {
     ArchDefinePwr8 = 1 << 12,
     ArchDefinePwr9 = 1 << 13,
     ArchDefinePwr10 = 1 << 14,
-    ArchDefinePwr11 = 1 << 15,
-    ArchDefineFuture = 1 << 16,
-    ArchDefineA2 = 1 << 17,
+    ArchDefineFuture = 1 << 15,
+    ArchDefineA2 = 1 << 16,
     ArchDefineE500 = 1 << 18
   } ArchDefineTypes;
 
@@ -167,16 +166,11 @@ public:
                          ArchDefinePwr7 | ArchDefinePwr6 | ArchDefinePwr5x |
                          ArchDefinePwr5 | ArchDefinePwr4 | ArchDefinePpcgr |
                          ArchDefinePpcsq)
-              .Cases("power11", "pwr11",
-                     ArchDefinePwr11 | ArchDefinePwr10 | ArchDefinePwr9 |
-                         ArchDefinePwr8 | ArchDefinePwr7 | ArchDefinePwr6 |
-                         ArchDefinePwr5x | ArchDefinePwr5 | ArchDefinePwr4 |
-                         ArchDefinePpcgr | ArchDefinePpcsq)
               .Case("future",
-                    ArchDefineFuture | ArchDefinePwr11 | ArchDefinePwr10 |
-                        ArchDefinePwr9 | ArchDefinePwr8 | ArchDefinePwr7 |
-                        ArchDefinePwr6 | ArchDefinePwr5x | ArchDefinePwr5 |
-                        ArchDefinePwr4 | ArchDefinePpcgr | ArchDefinePpcsq)
+                    ArchDefineFuture | ArchDefinePwr10 | ArchDefinePwr9 |
+                        ArchDefinePwr8 | ArchDefinePwr7 | ArchDefinePwr6 |
+                        ArchDefinePwr5x | ArchDefinePwr5 | ArchDefinePwr4 |
+                        ArchDefinePpcgr | ArchDefinePpcsq)
               .Cases("8548", "e500", ArchDefineE500)
               .Default(ArchDefineNone);
     }
@@ -198,7 +192,6 @@ public:
                  const std::vector<std::string> &FeaturesVec) const override;
 
   void addP10SpecificFeatures(llvm::StringMap<bool> &Features) const;
-  void addP11SpecificFeatures(llvm::StringMap<bool> &Features) const;
   void addFutureSpecificFeatures(llvm::StringMap<bool> &Features) const;
 
   bool handleTargetFeatures(std::vector<std::string> &Features,

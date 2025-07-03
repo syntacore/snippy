@@ -50,13 +50,6 @@
 
 using namespace llvm;
 
-// Whether Big-endian GISel is enabled, defaults to off, can be enabled for
-// testing.
-static cl::opt<bool>
-    EnableGISelBigEndian("enable-arm-gisel-bigendian", cl::Hidden,
-                         cl::init(false),
-                         cl::desc("Enable Global-ISel Big Endian Lowering"));
-
 ARMCallLowering::ARMCallLowering(const ARMTargetLowering &TLI)
     : CallLowering(&TLI) {}
 
@@ -546,5 +539,3 @@ bool ARMCallLowering::lowerCall(MachineIRBuilder &MIRBuilder, CallLoweringInfo &
 
   return true;
 }
-
-bool ARMCallLowering::enableBigEndian() const { return EnableGISelBigEndian; }

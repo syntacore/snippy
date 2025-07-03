@@ -232,11 +232,8 @@ bool WindowScheduler::initialize() {
       return false;
     }
     for (auto &Def : MI.all_defs())
-      if (Def.isReg() && Def.getReg().isPhysical()) {
-        LLVM_DEBUG(dbgs() << "Physical registers are not supported in "
-                             "window scheduling!\n");
+      if (Def.isReg() && Def.getReg().isPhysical())
         return false;
-      }
   }
   if (SchedInstrNum <= WindowRegionLimit) {
     LLVM_DEBUG(dbgs() << "There are too few MIs in the window region!\n");
@@ -440,17 +437,14 @@ int WindowScheduler::calculateMaxCycle(ScheduleDAGInstrs &DAG,
       int PredCycle = getOriCycle(PredMI);
       ExpectCycle = std::max(ExpectCycle, PredCycle + (int)Pred.getLatency());
     }
-    // Zero cost instructions do not need to check resource.
-    if (!TII->isZeroCost(MI.getOpcode())) {
-      // ResourceManager can be used to detect resource conflicts between the
-      // current MI and the previously inserted MIs.
-      while (!RM.canReserveResources(*SU, CurCycle) || CurCycle < ExpectCycle) {
-        ++CurCycle;
-        if (CurCycle == (int)WindowIILimit)
-          return CurCycle;
-      }
-      RM.reserveResources(*SU, CurCycle);
+    // ResourceManager can be used to detect resource conflicts between the
+    // current MI and the previously inserted MIs.
+    while (!RM.canReserveResources(*SU, CurCycle) || CurCycle < ExpectCycle) {
+      ++CurCycle;
+      if (CurCycle == (int)WindowIILimit)
+        return CurCycle;
     }
+    RM.reserveResources(*SU, CurCycle);
     OriToCycle[getOriMI(&MI)] = CurCycle;
     LLVM_DEBUG(dbgs() << "\tCycle " << CurCycle << " [S."
                       << getOriStage(getOriMI(&MI), Offset) << "]: " << MI);
@@ -491,7 +485,6 @@ int WindowScheduler::calculateMaxCycle(ScheduleDAGInstrs &DAG,
 // ========================================
 int WindowScheduler::calculateStallCycle(unsigned Offset, int MaxCycle) {
   int MaxStallCycle = 0;
-  int CurrentII = MaxCycle + 1;
   auto Range = getScheduleRange(Offset, SchedInstrNum);
   for (auto &MI : Range) {
     auto *SU = TripleDAG->getSUnit(&MI);
@@ -499,8 +492,8 @@ int WindowScheduler::calculateStallCycle(unsigned Offset, int MaxCycle) {
     for (auto &Succ : SU->Succs) {
       if (Succ.isWeak() || Succ.getSUnit() == &TripleDAG->ExitSU)
         continue;
-      // If the expected cycle does not exceed CurrentII, no check is needed.
-      if (DefCycle + (int)Succ.getLatency() <= CurrentII)
+      // If the expected cycle does not exceed MaxCycle, no check is needed.
+      if (DefCycle + (int)Succ.getLatency() <= MaxCycle)
         continue;
       // If the cycle of the scheduled MI A is less than that of the scheduled
       // MI B, the scheduling will fail because the lifetime of the
@@ -510,7 +503,7 @@ int WindowScheduler::calculateStallCycle(unsigned Offset, int MaxCycle) {
       if (DefCycle < UseCycle)
         return WindowIILimit;
       // Get the stall cycle introduced by the register between two trips.
-      int StallCycle = DefCycle + (int)Succ.getLatency() - CurrentII - UseCycle;
+      int StallCycle = DefCycle + (int)Succ.getLatency() - MaxCycle - UseCycle;
       MaxStallCycle = std::max(MaxStallCycle, StallCycle);
     }
   }
