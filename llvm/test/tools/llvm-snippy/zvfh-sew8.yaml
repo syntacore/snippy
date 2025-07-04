@@ -1,0 +1,61 @@
+# No filecheck, only checking histogram
+# RUN: llvm-snippy %s -model-plugin None
+
+options:
+  mtriple: riscv64-unknown-elf
+  mattr: +v,+zvfh
+  num-instrs: 1000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+
+sections:
+  - no: 1
+    VMA: 0x10000
+    LMA: 0x10000
+    SIZE: 0x10000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x20000
+    LMA: 0x20000
+    SIZE: 0x10000
+    ACCESS: rw
+  - no: 3
+    VMA: 0x30000
+    LMA: 0x30000
+    SIZE: 0x2000
+    ACCESS: r
+
+histogram:
+  - [VFNCVT_X_F_W, 1.0]
+  - [VFNCVT_XU_F_W, 1.0]
+  - [VFNCVT_RTZ_XU_F_W, 1.0]
+  - [VFWCVT_F_X_V, 1.0]
+  - [VFWCVT_F_XU_V, 1.0]
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: 1.0
+  mode-distribution:
+    VM:
+      - [all_ones, 2.0]
+      - [any_legal, 1.0]
+    VL:
+      - [max_encodable, 2.0]
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+      rne: 1.0
+      rdn: 1.0
+      ron: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+      LMUL:
+        m1: 1.0
+      VMA:
+        mu: 1.0
+        ma: 1.0
+      VTA:
+        tu: 1.0
+        ta: 1.0
