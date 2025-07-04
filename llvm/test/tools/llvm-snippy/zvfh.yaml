@@ -1,0 +1,170 @@
+# No filecheck, only checking histogram
+# RUN: llvm-snippy %s -model-plugin None
+
+options:
+  mtriple: riscv64-unknown-elf
+  mattr: +v,+zvfh
+  num-instrs: 3000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+
+sections:
+  - no: 1
+    VMA: 0x10000
+    LMA: 0x10000
+    SIZE: 0x10000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x20000
+    LMA: 0x20000
+    SIZE: 0x10000
+    ACCESS: rw
+  - no: 3
+    VMA: 0x30000
+    LMA: 0x30000
+    SIZE: 0x10000
+    ACCESS: r
+
+histogram:
+  - [VFWCVT_F_F_V, 1.0]
+  - [VFNCVT_F_F_W, 1.0]
+  - [VFWCVT_F_X_V, 1.0]
+  - [VFNCVT_XU_F_W, 1.0]
+  - [VFWCVT_F_XU_V, 1.0]
+  - [VFNCVT_X_F_W, 1.0]
+  - [VFNCVT_RTZ_X_F_W, 1.0]
+  - [VFNCVT_RTZ_XU_F_W, 1.0]
+
+  - [VFADD_VV, 1.0]
+  - [VFADD_VF, 1.0]
+  - [VFSUB_VV, 1.0]
+  - [VFSUB_VF, 1.0]
+  - [VFRSUB_VF, 1.0]
+
+  - [VFWADD_VV, 1.0]
+  - [VFWADD_VF, 1.0]
+  - [VFWSUB_VV, 1.0]
+  - [VFWSUB_VF, 1.0]
+
+  - [VFWADD_WV, 1.0]
+  - [VFWADD_WF, 1.0]
+  - [VFWSUB_WV, 1.0]
+  - [VFWSUB_WF, 1.0]
+
+  - [VFMUL_VV, 1.0]
+  - [VFMUL_VF, 1.0]
+  - [VFDIV_VV, 1.0]
+  - [VFDIV_VF, 1.0]
+  - [VFRDIV_VF, 1.0]
+
+  - [VFWMUL_VV, 1.0]
+  - [VFWMUL_VF, 1.0]
+
+  - [VFMACC_VV, 1.0]
+  - [VFMACC_VF, 1.0]
+  - [VFNMACC_VV, 1.0]
+  - [VFNMACC_VF, 1.0]
+  - [VFMSAC_VV, 1.0]
+  - [VFMSAC_VF, 1.0]
+  - [VFNMSAC_VV, 1.0]
+  - [VFNMSAC_VF, 1.0]
+
+  - [VFMADD_VV, 1.0]
+  - [VFMADD_VF, 1.0]
+  - [VFNMADD_VV, 1.0]
+  - [VFNMADD_VF, 1.0]
+  - [VFMSUB_VV, 1.0]
+  - [VFMSUB_VF, 1.0]
+  - [VFNMSUB_VV, 1.0]
+  - [VFNMSUB_VF, 1.0]
+
+  - [VFWMACC_VV, 1.0]
+  - [VFWMACC_VF, 1.0]
+  - [VFWNMACC_VV, 1.0]
+  - [VFWNMACC_VF, 1.0]
+  - [VFWMSAC_VV, 1.0]
+  - [VFWMSAC_VF, 1.0]
+  - [VFWNMSAC_VV, 1.0]
+  - [VFWNMSAC_VF, 1.0]
+
+  - [VFSQRT_V, 1.0]
+  - [VFRSQRT7_V, 1.0]
+  - [VFREC7_V, 1.0]
+
+  - [VFMIN_VV, 1.0]
+  - [VFMIN_VF, 1.0]
+  - [VFMAX_VV, 1.0]
+  - [VFMAX_VF, 1.0]
+  - [VFSGNJ_VV, 1.0]
+  - [VFSGNJ_VF, 1.0]
+  - [VFSGNJN_VV, 1.0]
+  - [VFSGNJN_VF, 1.0]
+  - [VFSGNJX_VV, 1.0]
+  - [VFSGNJX_VF, 1.0]
+
+  - [VMFEQ_VV, 1.0]
+  - [VMFEQ_VF, 1.0]
+  - [VMFNE_VV, 1.0]
+  - [VMFNE_VF, 1.0]
+  - [VMFLT_VV, 1.0]
+  - [VMFLT_VF, 1.0]
+  - [VMFLE_VV, 1.0]
+  - [VMFLE_VF, 1.0]
+
+  - [VMFGT_VF, 1.0]
+  - [VMFGE_VF, 1.0]
+
+  - [VFCLASS_V, 1.0]
+  - [VFMERGE_VFM, 1.0]
+  - [VFMV_V_F, 1.0]
+
+  - [VFCVT_XU_F_V, 1.0]
+  - [VFCVT_X_F_V, 1.0]
+  - [VFCVT_RTZ_XU_F_V, 1.0]
+  - [VFCVT_RTZ_X_F_V, 1.0]
+  - [VFCVT_F_XU_V, 1.0]
+  - [VFCVT_F_X_V, 1.0]
+
+  - [VFWCVT_XU_F_V, 1.0]
+  - [VFWCVT_X_F_V, 1.0]
+  - [VFWCVT_RTZ_XU_F_V, 1.0]
+  - [VFWCVT_RTZ_X_F_V, 1.0]
+
+  - [VFREDOSUM_VS, 1.0]
+  - [VFREDUSUM_VS, 1.0]
+  - [VFREDMAX_VS, 1.0]
+  - [VFREDMIN_VS, 1.0]
+
+  - [VFMV_F_S, 1.0]
+  - [VFMV_S_F, 1.0]
+
+  - [VFSLIDE1UP_VF, 1.0]
+  - [VFSLIDE1DOWN_VF, 1.0]
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: 1.0
+  mode-distribution:
+    VM:
+      - [all_ones, 2.0]
+      - [any_legal, 1.0]
+    VL:
+      - [max_encodable, 2.0]
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+      rne: 1.0
+      rdn: 1.0
+      ron: 1.0
+    VTYPE:
+      SEW:
+        sew_16: 1.0
+      LMUL:
+        m1: 1.0
+      VMA:
+        mu: 1.0
+        ma: 1.0
+      VTA:
+        tu: 1.0
+        ta: 1.0

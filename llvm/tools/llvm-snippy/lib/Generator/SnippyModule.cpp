@@ -11,6 +11,7 @@
 #include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/Linker.h"
 #include "snippy/InitializePasses.h"
+#include "llvm/CodeGen/TargetSubtargetInfo.h"
 
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/Passes.h"
@@ -285,14 +286,11 @@ SnippyProgramContext::SnippyProgramContext(LLVMState &State,
   initializeROMSection(Settings);
 }
 
-void SnippyProgramContext::createTargetContext(const Config &Cfg) {
+void SnippyProgramContext::createTargetContext(const Config &Cfg,
+                                               const TargetSubtargetInfo &STI) {
   assert(!TargetContext && "Double context insertion");
-  // FIXME: currently there is not way to pass TargetSubtargetInfo
-  // because TargetContext is expected to be initialized before any
-  // function is created. This should not cause much trouble now,
-  // because STI is unused most of the time.
-  TargetContext = State->getSnippyTarget().createTargetContext(
-      *State, Cfg, /* TargetSubtargetInfo */ nullptr);
+  TargetContext =
+      State->getSnippyTarget().createTargetContext(*State, Cfg, &STI);
 }
 
 SnippyProgramContext::~SnippyProgramContext() = default;
