@@ -422,7 +422,7 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVConfiguration &Cfg,
                             const RISCVSubtarget *ST) {
   if (!isRVV(Opcode))
     return false;
-  auto SEW = Cfg.SEW;
+  auto SEW = static_cast<unsigned>(Cfg.SEW);
   auto LMUL = Cfg.LMUL;
 
   if (!Cfg.IsLegal) {
@@ -445,12 +445,12 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVConfiguration &Cfg,
       isRVVStridedLoadStore(Opcode)) {
     // EEW is a data element width.
     auto EEW = getDataElementWidth(Opcode) * CHAR_BIT;
-    return isValidEMUL(static_cast<unsigned>(SEW), EEW, LMUL);
+    return isValidEMUL(SEW, EEW, LMUL);
   }
   if (isRVVIndexedLoadStore(Opcode)) {
     // EEW is an index element width.
     auto EEW = getIndexElementWidth(Opcode);
-    return isValidEMUL(static_cast<unsigned>(SEW), EEW, LMUL);
+    return isValidEMUL(SEW, EEW, LMUL);
   }
   // RVV segment loads/stores encodes not only EEW in the opcode, but number of
   // fields (NFIELDS) as well. This introduces one more restriction in addition
@@ -464,9 +464,9 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVConfiguration &Cfg,
   if (isRVVUnitStrideSegLoadStore(Opcode) || isRVVStridedSegLoadStore(Opcode)) {
     // EEW is a data element width.
     auto EEW = getDataElementWidth(Opcode) * CHAR_BIT;
-    if (!isValidEMUL(static_cast<unsigned>(SEW), EEW, LMUL))
+    if (!isValidEMUL(SEW, EEW, LMUL))
       return false;
-    auto EMUL = computeEMUL(static_cast<unsigned>(SEW), EEW, LMUL);
+    auto EMUL = computeEMUL(SEW, EEW, LMUL);
     auto [Multiplier, IsFractional] = RISCVVType::decodeVLMUL(EMUL);
     if (IsFractional)
       return true;
@@ -474,49 +474,56 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVConfiguration &Cfg,
   }
   if (isRVVIndexedSegLoadStore(Opcode)) {
     auto EEW = getIndexElementWidth(Opcode);
-    if (!isValidEMUL(static_cast<unsigned>(SEW), EEW, LMUL))
+    if (!isValidEMUL(SEW, EEW, LMUL))
       return false;
     auto [Multiplier, IsFractional] = RISCVVType::decodeVLMUL(LMUL);
     if (IsFractional)
       return true;
     return Multiplier * getNumFields(Opcode) <= 8u;
   }
-  if (isRVVFloatingPoint(Opcode) && static_cast<unsigned>(SEW) < 32u) {
-    // If the EEW of a vector floating-point operand does not correspond to a
-    // supported IEEE floating-point type, the instruction encoding is reserved.
-    // Half-precision is unsupported now.
-    return false;
+  if (isRVVFloatingPoint(Opcode)) {
+    assert(ST);
+    if (SEW < 16u &&
+        !(mayBeZvfh8BitIntConversion(Opcode) && ST->hasStdExtZvfh()))
+      return false;
+    if (SEW < 32u && !((isZvfh(Opcode) && ST->hasStdExtZvfh()) ||
+                       (isZvfhmin(Opcode) && ST->hasStdExtZvfhmin()))) {
+      // If the EEW of a vector floating-point operand does not correspond to a
+      // supported IEEE floating-point type, the instruction encoding is
+      // reserved.
+      return false;
+    }
   }
   if (isRVVExt(Opcode)) {
     // If the source EEW is not a supported width, or source EMUL would be below
     // the minimum legal LMUL, the instruction encoding is reserved.
     auto Factor = getRVVExtFactor(Opcode);
-    assert(Factor <= static_cast<unsigned>(SEW));
-    assert(static_cast<unsigned>(SEW) % Factor == 0);
-    auto EEW = static_cast<unsigned>(SEW) / Factor;
+    assert(Factor <= SEW);
+    assert(SEW % Factor == 0);
+    auto EEW = SEW / Factor;
     if (!isLegalSEW(EEW))
       return false;
-    return isValidEMUL(static_cast<unsigned>(SEW), EEW, LMUL);
+    return isValidEMUL(SEW, EEW, LMUL);
   }
   if (isRVVIntegerWidening(Opcode) || isRVVFPWidening(Opcode) ||
       isRVVIntegerNarrowing(Opcode) || isRVVFPNarrowing(Opcode)) {
     // Both widening and narrowing instructions use operands with EEW = SEW * 2.
-    auto EEW = static_cast<unsigned>(SEW) * 2u;
+    auto EEW = SEW * 2u;
     if (!isLegalSEW(EEW))
       return false;
     // Check that LMUL * 2 is also legal.
-    return isValidEMUL(static_cast<unsigned>(SEW), EEW, LMUL);
+    return isValidEMUL(SEW, EEW, LMUL);
   }
   if (isRVVGather16(Opcode)) {
     // The vrgatherei16.vv form uses SEW/LMUL for the data in vs2 but EEW=16 and
     // EMUL = (16/SEW)*LMUL for the indices in vs1.
     auto EEW = 16u;
-    return isValidEMUL(static_cast<unsigned>(SEW), EEW, LMUL);
+    return isValidEMUL(SEW, EEW, LMUL);
   }
 
   // Instructions from zvbc (carryless multiplication) extension
   // are defined only for SEW = 64.
-  if (isZvbc(Opcode) && static_cast<unsigned>(SEW) != 64u)
+  if (isZvbc(Opcode) && SEW != 64u)
     return false;
   return true;
 }

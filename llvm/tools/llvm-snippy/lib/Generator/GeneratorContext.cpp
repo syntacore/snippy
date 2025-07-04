@@ -69,7 +69,15 @@ GeneratorContext::GeneratorContext(SnippyProgramContext &ProgContext,
         Samplers.emplace_back(std::move(RandSampler));
         return TopLevelMemoryAccessSampler(Samplers.begin(), Samplers.end());
       }()) {
-  ProgContext.createTargetContext(Settings);
+  // HACK: Here we create dummy module and function to create a
+  // TargetSubtargetInfo. These are destroyed right after createTargetContext
+  // call
+  auto &State = ProgContext.getLLVMState();
+  auto DummyModule = Module("__snippy_dummy_module", State.getCtx());
+  auto &Dummy = State.createFunction(DummyModule, "__dummy", "",
+                                     Function::LinkageTypes::InternalLinkage);
+  ProgContext.createTargetContext(Settings, State.getSubtargetImpl(Dummy));
+  Dummy.eraseFromParent();
 }
 
 } // namespace snippy
