@@ -187,7 +187,9 @@ public:
   MCInstPrinter &getInstPrinter() const;
 
   const TargetSubtargetInfo &getSubtargetImpl(const Function &Fn) const {
-    return *getTargetMachine().getSubtargetImpl(Fn);
+    auto *STI = getTargetMachine().getSubtargetImpl(Fn);
+    assert(STI);
+    return *STI;
   }
 
   template <typename SubtargetType>
