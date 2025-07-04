@@ -1134,6 +1134,151 @@ inline bool isRVVExt(unsigned Opcode) {
   }
 }
 
+inline bool isZvfhmin(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RISCV::VFWCVT_F_F_V:
+  case RISCV::VFNCVT_F_F_W:
+    return true;
+  }
+}
+
+inline bool isZvfh(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RISCV::VFWCVT_F_F_V:
+  case RISCV::VFNCVT_F_F_W:
+  case RISCV::VFWCVT_F_X_V:
+  case RISCV::VFWCVT_F_XU_V:
+  case RISCV::VFNCVT_X_F_W:
+  case RISCV::VFNCVT_XU_F_W:
+  case RISCV::VFNCVT_RTZ_X_F_W:
+  case RISCV::VFNCVT_RTZ_XU_F_W:
+
+  case RISCV::VFADD_VV:
+  case RISCV::VFADD_VF:
+  case RISCV::VFSUB_VV:
+  case RISCV::VFSUB_VF:
+  case RISCV::VFRSUB_VF:
+
+  case RISCV::VFWADD_VV:
+  case RISCV::VFWADD_VF:
+  case RISCV::VFWSUB_VV:
+  case RISCV::VFWSUB_VF:
+
+  case RISCV::VFWADD_WV:
+  case RISCV::VFWADD_WF:
+  case RISCV::VFWSUB_WV:
+  case RISCV::VFWSUB_WF:
+
+  case RISCV::VFMUL_VV:
+  case RISCV::VFMUL_VF:
+  case RISCV::VFDIV_VV:
+  case RISCV::VFDIV_VF:
+  case RISCV::VFRDIV_VF:
+
+  case RISCV::VFWMUL_VV:
+  case RISCV::VFWMUL_VF:
+
+  case RISCV::VFMACC_VV:
+  case RISCV::VFMACC_VF:
+  case RISCV::VFNMACC_VV:
+  case RISCV::VFNMACC_VF:
+  case RISCV::VFMSAC_VV:
+  case RISCV::VFMSAC_VF:
+  case RISCV::VFNMSAC_VV:
+  case RISCV::VFNMSAC_VF:
+
+  case RISCV::VFMADD_VV:
+  case RISCV::VFMADD_VF:
+  case RISCV::VFNMADD_VV:
+  case RISCV::VFNMADD_VF:
+  case RISCV::VFMSUB_VV:
+  case RISCV::VFMSUB_VF:
+  case RISCV::VFNMSUB_VV:
+  case RISCV::VFNMSUB_VF:
+
+  case RISCV::VFWMACC_VV:
+  case RISCV::VFWMACC_VF:
+  case RISCV::VFWNMACC_VV:
+  case RISCV::VFWNMACC_VF:
+  case RISCV::VFWMSAC_VV:
+  case RISCV::VFWMSAC_VF:
+  case RISCV::VFWNMSAC_VV:
+  case RISCV::VFWNMSAC_VF:
+
+  case RISCV::VFSQRT_V:
+  case RISCV::VFRSQRT7_V:
+  case RISCV::VFREC7_V:
+
+  case RISCV::VFMIN_VV:
+  case RISCV::VFMIN_VF:
+  case RISCV::VFMAX_VV:
+  case RISCV::VFMAX_VF:
+  case RISCV::VFSGNJ_VV:
+  case RISCV::VFSGNJ_VF:
+  case RISCV::VFSGNJN_VV:
+  case RISCV::VFSGNJN_VF:
+  case RISCV::VFSGNJX_VV:
+  case RISCV::VFSGNJX_VF:
+
+  case RISCV::VMFEQ_VV:
+  case RISCV::VMFEQ_VF:
+  case RISCV::VMFNE_VV:
+  case RISCV::VMFNE_VF:
+  case RISCV::VMFLT_VV:
+  case RISCV::VMFLT_VF:
+  case RISCV::VMFLE_VV:
+  case RISCV::VMFLE_VF:
+
+  case RISCV::VMFGT_VF:
+  case RISCV::VMFGE_VF:
+
+  case RISCV::VFCLASS_V:
+  case RISCV::VFMERGE_VFM:
+  case RISCV::VFMV_V_F:
+
+  case RISCV::VFCVT_XU_F_V:
+  case RISCV::VFCVT_X_F_V:
+  case RISCV::VFCVT_RTZ_XU_F_V:
+  case RISCV::VFCVT_RTZ_X_F_V:
+  case RISCV::VFCVT_F_XU_V:
+  case RISCV::VFCVT_F_X_V:
+
+  case RISCV::VFWCVT_XU_F_V:
+  case RISCV::VFWCVT_X_F_V:
+  case RISCV::VFWCVT_RTZ_XU_F_V:
+  case RISCV::VFWCVT_RTZ_X_F_V:
+
+  case RISCV::VFREDOSUM_VS:
+  case RISCV::VFREDUSUM_VS:
+  case RISCV::VFREDMAX_VS:
+  case RISCV::VFREDMIN_VS:
+
+  case RISCV::VFMV_F_S:
+  case RISCV::VFMV_S_F:
+
+  case RISCV::VFSLIDE1UP_VF:
+  case RISCV::VFSLIDE1DOWN_VF:
+    return true;
+  }
+}
+
+inline bool mayBeZvfh8BitIntConversion(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RISCV::VFNCVT_X_F_W:
+  case RISCV::VFNCVT_XU_F_W:
+  case RISCV::VFNCVT_RTZ_XU_F_W:
+  case RISCV::VFWCVT_F_X_V:
+  case RISCV::VFWCVT_F_XU_V:
+    return true;
+  }
+}
+
 inline bool isZvbc(unsigned Opcode) {
   switch (Opcode) {
   default:
