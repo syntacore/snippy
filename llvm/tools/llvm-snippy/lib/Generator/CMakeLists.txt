@@ -22,8 +22,10 @@ set(LLVMSnippyGeneratorSources
   SimRunner.cpp
   SimulatorContextWrapperPass.cpp
   SnippyFunctionMetadata.cpp
-  SnippyModule.cpp
   MemoryManager.cpp
+  OperandsReinitializationPolicy.cpp
+  OperandsReinitializationValueSource.cpp
+  SnippyModule.cpp
   TopMemAccSampler.cpp
   RandomMemAccSampler.cpp
 )
