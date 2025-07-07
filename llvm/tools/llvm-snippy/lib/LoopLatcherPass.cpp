@@ -216,7 +216,7 @@ auto LoopLatcher::selectRegsForBranch(const MCInstrDesc &BranchDesc,
   auto &State = ProgCtx.getLLVMState();
   auto &RegInfo = State.getRegInfo();
   const auto &SnippyTgt = State.getSnippyTarget();
-  auto &RootPool = getAnalysis<RootRegPoolWrapper>().getPool();
+  auto RootPool = getAnalysis<RootRegPoolWrapper>().getPool();
 
   auto ImmutableReg = SnippyTgt.getImmutableRegs(RegClass);
   auto Filter = [&ImmutableReg](unsigned Reg) {
