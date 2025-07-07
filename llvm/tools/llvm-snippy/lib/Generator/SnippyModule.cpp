@@ -265,11 +265,11 @@ const IRegisterState &SnippyProgramContext::getInitialRegisterState(
 
 SnippyProgramContext::SnippyProgramContext(LLVMState &State,
                                            RegisterGenerator &RegGen,
-                                           RegPool &Pool,
+                                           std::vector<RegPool> Pools,
                                            const OpcodeCache &OpCc,
                                            const ProgramConfig &Settings)
-    : Cfg(&Settings), State(&State), RegGen(&RegGen), RegPoolsStorage({Pool}),
-      OpCC(&OpCc),
+    : Cfg(&Settings), State(&State), RegGen(&RegGen),
+      RegPoolsStorage(std::move(Pools)), OpCC(&OpCc),
       PLinker(std::make_unique<Linker>(
           State.getCtx(), Settings.Sections,
           Settings.MangleExportedNames ? Settings.EntryPointName : "")),
