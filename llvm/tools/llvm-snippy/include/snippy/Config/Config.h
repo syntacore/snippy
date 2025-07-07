@@ -296,7 +296,7 @@ public:
   // std::optional<ValuegramPolicyConfig> ValuegramConfig;
   PassConfig PassCfg;
 
-  Config(IncludePreprocessor &IPP, RegPool &RP, LLVMState &State
+  Config(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State
 
          ,
          StringRef PluginFilename, StringRef PluginInfoFilename,
@@ -366,7 +366,7 @@ public:
 private:
   void complete(LLVMState &State, const OpcodeCache &OpCC);
   void validateAll(LLVMState &State, const OpcodeCache &cache,
-                   const RegPool &RP);
+                   const RegPoolWrapper &RP);
 };
 
 bool shouldSpillGlobalRegs(const Config &Cfg);

@@ -31,13 +31,13 @@ class LLVMState;
 class FlowGenerator {
   const OpcodeCache &OpCC;
   Config Cfg;
-  RegPool RP;
+  std::vector<RegPool> RegPools;
   std::string BaseFileName;
 
 public:
-  FlowGenerator(Config &&Cfg, const OpcodeCache &OpCache, RegPool Pool,
-                StringRef BaseFileName)
-      : OpCC(OpCache), Cfg(std::move(Cfg)), RP(std::move(Pool)),
+  FlowGenerator(Config &&Cfg, const OpcodeCache &OpCache,
+                std::vector<RegPool> Pools, StringRef BaseFileName)
+      : OpCC(OpCache), Cfg(std::move(Cfg)), RegPools(std::move(Pools)),
         BaseFileName(BaseFileName) {}
 
   GeneratorResult generate(LLVMState &State, const DebugOptions &DebugCfg);
