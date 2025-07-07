@@ -70,7 +70,7 @@ bool ReserveRegs::runOnModule(Module &M) {
     return false;
 
   auto StackPointer = ProgCtx.getStackPointer();
-  auto &RootPool = getAnalysis<RootRegPoolWrapper>().getPool();
+  auto RootPool = getAnalysis<RootRegPoolWrapper>().getPool();
 
   // When stack enabled, it is not allow to modify stack pointer in any way.
   // Additionally, if we use model during instructions generation, we must

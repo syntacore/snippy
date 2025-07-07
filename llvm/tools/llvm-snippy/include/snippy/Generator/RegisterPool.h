@@ -55,6 +55,7 @@ namespace snippy {
 
 class GeneratorContext;
 class RootRegPoolWrapper;
+class SnippyProgramContext;
 
 namespace detail {
 template <typename T>
@@ -72,6 +73,9 @@ public:
 
   // Append current reserved set.
   void addReserved(unsigned Reg, AccessMaskBit AccessMask = AccessMaskBit::RW);
+
+  // FIXME: this should be removed and all `get...Available...` methods should
+  // be only in RegPoolWrapper class
 
   // Pick N random non-reserved registers in specified register class with
   // required access mask.
@@ -105,6 +109,20 @@ public:
                        AccessMaskBit AccessMask = AccessMaskBit::RW) const;
 
   void print(raw_ostream &OS) const;
+
+  LocalRegPool splitToUnits(const SnippyTarget &SnippyTgt,
+                            const MCRegisterInfo &RI) const {
+    LocalRegPool SplittedUnits;
+
+    for (auto &&[Reg, ReservMode] : Reserved) {
+      auto PhRegs = SnippyTgt.getPhysRegsFromUnit(Reg, RI);
+      for (auto &&PhReg : PhRegs) {
+        SplittedUnits.addReserved(PhReg, ReservMode);
+      }
+    }
+
+    return SplittedUnits;
+  }
 
   LLVM_DUMP_METHOD void dump() const { print(dbgs()); }
 };
@@ -155,174 +173,6 @@ public:
                   [=](auto *MBB) { return isReserved(Reg, *MBB, AccessMask); });
   }
 
-  // Pick random non-reserved register in specified register class with required
-  // access mask and filter.
-  template <typename Pred>
-  unsigned
-  getAvailableRegister(const Twine &Desc, Pred Filter, const MCRegisterInfo &RI,
-                       const MCRegisterClass &RegClass,
-                       AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  // Pick random non-reserved register in specified register class with required
-  // access mask.
-  template <typename R>
-  unsigned
-  getAvailableRegister(const Twine &Desc, const MCRegisterInfo &RI,
-                       const MCRegisterClass &RegClass, R &&MBBs,
-                       AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  // Pick random non-reserved register in specified register class with required
-  // access mask.
-  unsigned
-  getAvailableRegister(const Twine &Desc, const MCRegisterInfo &RI,
-                       const MCRegisterClass &RegClass,
-                       const MachineBasicBlock &MBB,
-                       AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  // Pick random non-reserved register in specified register class in a loop
-  // with required access mask.
-  unsigned
-  getAvailableRegister(const Twine &Desc, const MCRegisterInfo &RI,
-                       const MCRegisterClass &RegClass, const MachineLoop &ML,
-                       AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  // Pick random non-reserved register in specified register class in a block
-  // with required access mask and filter.
-  template <typename R, typename Pred>
-  unsigned
-  getAvailableRegister(const Twine &Desc, const MCRegisterInfo &RI,
-                       const MCRegisterClass &RegClass, R &&MBBs, Pred Filter,
-                       AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  // Pick random non-reserved register in specified register class in a block
-  // with required access mask and filter.
-  template <typename Pred>
-  unsigned
-  getAvailableRegister(const Twine &Desc, const MCRegisterInfo &RI,
-                       const MCRegisterClass &RegClass,
-                       const MachineBasicBlock &MBB, Pred Filter,
-                       AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  // Pick random non-reserved register in specified register class in a loop
-  // with required access mask and filter.
-  template <typename Pred>
-  unsigned
-  getAvailableRegister(const Twine &Desc, const MCRegisterInfo &RI,
-                       const MCRegisterClass &RegClass, const MachineLoop &ML,
-                       Pred Filter,
-                       AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  // Pick N random non-reserved registers in specified register class in a loop
-  // with required access mask.
-  std::vector<unsigned>
-  getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                         const MCRegisterClass &RegClass, const MachineLoop &ML,
-                         unsigned NumRegs,
-                         AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  // Pick N random non-reserved registers in specified register class in a block
-  // with required access mask.
-  std::vector<unsigned>
-  getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                         const MCRegisterClass &RegClass,
-                         const MachineBasicBlock &MBB, unsigned NumRegs,
-                         AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  // Pick N random non-reserved registers in specified register class in a block
-  // with required access mask.
-  template <typename R>
-  std::vector<unsigned>
-  getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                         const MCRegisterClass &RegClass, R &&MBBs,
-                         unsigned NumRegs,
-                         AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  template <size_t N>
-  std::array<unsigned, N>
-  getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                         const MCRegisterClass &RegClass, const MachineLoop &ML,
-                         AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  template <size_t N>
-  std::array<unsigned, N>
-  getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                         const MCRegisterClass &RegClass,
-                         const MachineBasicBlock &MBB,
-                         AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  template <size_t N, typename R>
-  std::array<unsigned, N>
-  getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                         const MCRegisterClass &RegClass, R &&MBBs,
-                         AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  // Pick N random non-reserved registers in specified register class in a loop
-  // with required access mask and filter.
-  template <typename Pred>
-  std::vector<unsigned>
-  getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                         const MCRegisterClass &RegClass, const MachineLoop &ML,
-                         unsigned NumRegs, Pred Filter,
-                         AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  // Pick N random non-reserved registers in specified register class in a block
-  // with required access mask and filter.
-  template <typename Pred>
-  std::vector<unsigned>
-  getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                         const MCRegisterClass &RegClass,
-                         const MachineBasicBlock &MBB, unsigned NumRegs,
-                         Pred Filter,
-                         AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  // Pick N random non-reserved registers in specified register class in a block
-  // with required access mask and filter.
-  template <typename R, typename Pred>
-  std::vector<unsigned>
-  getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                         const MCRegisterClass &RegClass, R &&MBBs,
-                         unsigned NumRegs, Pred Filter,
-                         AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  template <size_t N, typename Pred>
-  std::array<unsigned, N>
-  getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                         const MCRegisterClass &RegClass, const MachineLoop &ML,
-                         Pred Filter,
-                         AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  template <size_t N, typename Pred>
-  std::array<unsigned, N>
-  getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                         const MCRegisterClass &RegClass,
-                         const MachineBasicBlock &MBB, Pred Filter,
-                         AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  template <size_t N, typename R, typename Pred>
-  std::array<unsigned, N>
-  getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                         const MCRegisterClass &RegClass, R &&MBBs, Pred Filter,
-                         AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  std::vector<unsigned>
-  getAllAvailableRegisters(const MCRegisterClass &RegClass,
-                           AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  std::vector<unsigned>
-  getAllAvailableRegisters(const MCRegisterClass &RegClass,
-                           const MachineFunction &MF,
-                           AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  std::vector<unsigned>
-  getAllAvailableRegisters(const MCRegisterClass &RegClass,
-                           const MachineBasicBlock &MBB,
-                           AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
-  template <typename R>
-  std::vector<unsigned>
-  getAllAvailableRegisters(const MCRegisterClass &RegClass, R &&MBBs,
-                           AccessMaskBit AccessMask = AccessMaskBit::RW) const;
-
   // Append reserved set application-wide.
   void addReserved(unsigned Reg, AccessMaskBit AccessMask = AccessMaskBit::RW);
   // Append reserved set for a function.
@@ -354,12 +204,33 @@ public:
   }
 
   LLVM_DUMP_METHOD void dump() const { print(dbgs()); }
+
+  RegPool splitToUnits(const SnippyTarget &SnippyTgt,
+                       const MCRegisterInfo &RI) const {
+    RegPool SplittedUnits;
+    SplittedUnits.ReservedForApp = ReservedForApp.splitToUnits(SnippyTgt, RI);
+    auto SplitRegMap = [&](const auto &From, auto &To) {
+      transform(From, std::inserter(To, To.end()),
+                [&](auto &El) ->
+                typename std::remove_reference_t<decltype(To)>::value_type {
+                  return {El.first, El.second.splitToUnits(SnippyTgt, RI)};
+                });
+    };
+
+    SplitRegMap(ReservedForFunction, SplittedUnits.ReservedForFunction);
+    SplitRegMap(ReservedForBlock, SplittedUnits.ReservedForBlock);
+
+    return SplittedUnits;
+  }
 };
 
 class RegPoolWrapper final {
   const SnippyTarget &SnippyTgt;
   const MCRegisterInfo &RegInfo;
   std::vector<RegPool> &Pools;
+
+  RegPoolWrapper(SnippyProgramContext &PC);
+  friend RootRegPoolWrapper;
 
 public:
   RegPoolWrapper(const SnippyTarget &SnippyTgt, const MCRegisterInfo &RegInfo,
@@ -378,7 +249,10 @@ public:
   RegPoolWrapper push() { return {SnippyTgt, RegInfo, Pools}; }
 
   // Pop wrapper on delete
-  ~RegPoolWrapper() noexcept { Pools.pop_back(); }
+  ~RegPoolWrapper() noexcept {
+    if (Pools.size() > 1)
+      Pools.pop_back();
+  }
 
   void reset() { Pools.back() = RegPool{}; }
 
@@ -387,10 +261,31 @@ public:
     // Only physical registers can be reserved.
     // Therefore, we must identify the physical register
     // of this alias and check it.
-    Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
     return any_of(Pools, [&](auto &Pool) {
-      return Pool.isReserved(Reg, std::forward<ArgsTys>(Args)...);
+      return any_of(
+          SnippyTgt.getPhysRegsFromUnit(Reg, RegInfo), [&](auto &PhReg) {
+            return Pool.isReserved(PhReg, std::forward<ArgsTys>(Args)...);
+          });
     });
+  }
+
+  template <typename... ArgsTys>
+  void addReserved(unsigned Reg, ArgsTys &&...Args) {
+    assert(Register::isPhysicalRegister(Reg) &&
+           "Only physical registers can be reserved. If you want to reserve a "
+           "multiple register, then you must first divide it into physical "
+           "registers and then reserve each of them.");
+    DEBUG_WITH_TYPE("snippy-regpool",
+                    (dbgs() << "Reserving: " << RegInfo.getName(Reg)
+                            << "\nBefore reservation: ",
+                     dump()));
+
+    auto PhRegs = SnippyTgt.getPhysRegsFromUnit(Reg, RegInfo);
+    for (auto &&PhReg : PhRegs)
+      Pools.back().addReserved(PhReg, std::forward<ArgsTys>(Args)...);
+
+    DEBUG_WITH_TYPE("snippy-regpool",
+                    (dbgs() << "After reservation: ", dump()));
   }
 
   template <typename... IsReservedTys>
@@ -415,6 +310,12 @@ public:
   unsigned
   getAvailableRegister(const Twine &Desc, const MCRegisterInfo &RI,
                        const MCRegisterClass &RegClass, const MachineLoop &ML,
+                       AccessMaskBit AccessMask = AccessMaskBit::RW) const;
+
+  template <typename Pred>
+  unsigned
+  getAvailableRegister(const Twine &Desc, const MCRegisterInfo &RI,
+                       const MCRegisterClass &RegClass, Pred Filter,
                        AccessMaskBit AccessMask = AccessMaskBit::RW) const;
 
   template <typename Pred>
@@ -475,6 +376,15 @@ public:
                          unsigned NumRegs, Pred Filter,
                          AccessMaskBit AccessMask = AccessMaskBit::RW) const;
 
+  // Pick N random non-reserved registers in specified register class in a range
+  // of blocks with required access mask and filter.
+  template <typename R, typename Pred>
+  std::vector<unsigned>
+  getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
+                         const MCRegisterClass &RegClass, R &&MBBs,
+                         unsigned NumRegs, Pred Filter,
+                         AccessMaskBit AccessMask = AccessMaskBit::RW) const;
+
   template <typename Pred>
   std::vector<unsigned>
   getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
@@ -507,19 +417,6 @@ public:
                            const MachineBasicBlock &MBB,
                            AccessMaskBit AccessMask = AccessMaskBit::RW) const;
 
-  template <typename... ArgsTys>
-  void addReserved(unsigned Reg, ArgsTys &&...Args) {
-    assert(Register::isPhysicalRegister(Reg) &&
-           "Only physical registers can be reserved. If you want to reserve a "
-           "multiple register, then you must first divide it into physical "
-           "registers and then reserve each of them.");
-    DEBUG_WITH_TYPE("snippy-regpool",
-                    (dbgs() << "Before reservation: ", dump()));
-    Pools.back().addReserved(Reg, std::forward<ArgsTys>(Args)...);
-    DEBUG_WITH_TYPE("snippy-regpool",
-                    (dbgs() << "After reservation: ", dump()));
-  }
-
   void print(raw_ostream &OS) const {
     OS << "RegPoolWrapper's pools:\n";
     for (auto &&[Idx, Value] : enumerate(Pools)) {
@@ -530,169 +427,6 @@ public:
 
   LLVM_DUMP_METHOD void dump() const { print(dbgs()); }
 };
-
-template <typename Pred>
-unsigned
-LocalRegPool::getAvailableRegister(const Twine &Desc, const MCRegisterInfo &RI,
-                                   const MCRegisterClass &RegClass, Pred Filter,
-                                   AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::getOne(Desc, RI, *this, Filter, RegClass,
-                                       AccessMask);
-}
-
-template <typename Pred>
-std::vector<unsigned> LocalRegPool::getNAvailableRegisters(
-    const Twine &Desc, const MCRegisterInfo &RI,
-    const MCRegisterClass &RegClass, Pred Filter, unsigned NumRegs,
-    AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::get(Desc, RI, *this, Filter, NumRegs, RegClass,
-                                    AccessMask);
-}
-
-template <typename Pred>
-unsigned RegPool::getAvailableRegister(const Twine &Desc, Pred Filter,
-                                       const MCRegisterInfo &RI,
-                                       const MCRegisterClass &RegClass,
-                                       AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::getOne(Desc, RI, *this, Filter, RegClass,
-                                       AccessMask);
-}
-
-template <typename R>
-unsigned
-RegPool::getAvailableRegister(const Twine &Desc, const MCRegisterInfo &RI,
-                              const MCRegisterClass &RegClass, R &&MBBs,
-                              AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::getOne(Desc, RI, *this, RegClass, MBBs,
-                                       AccessMask);
-}
-
-template <typename R, typename Pred>
-unsigned
-RegPool::getAvailableRegister(const Twine &Desc, const MCRegisterInfo &RI,
-                              const MCRegisterClass &RegClass, R &&MBBs,
-                              Pred Filter, AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::getOne(Desc, RI, *this, Filter, RegClass, MBBs,
-                                       AccessMask);
-}
-
-template <typename Pred>
-unsigned
-RegPool::getAvailableRegister(const Twine &Desc, const MCRegisterInfo &RI,
-                              const MCRegisterClass &RegClass,
-                              const MachineBasicBlock &MBB, Pred Filter,
-                              AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::getOne(Desc, RI, *this, Filter, RegClass, MBB,
-                                       AccessMask);
-}
-
-template <typename Pred>
-unsigned RegPool::getAvailableRegister(const Twine &Desc,
-                                       const MCRegisterInfo &RI,
-                                       const MCRegisterClass &RegClass,
-                                       const MachineLoop &ML, Pred Filter,
-                                       AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::getOne(Desc, RI, *this, Filter, RegClass, ML,
-                                       AccessMask);
-}
-
-template <typename R>
-std::vector<unsigned>
-RegPool::getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                                const MCRegisterClass &RegClass, R &&MBBs,
-                                unsigned NumRegs,
-                                AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::get(Desc, RI, *this, NumRegs, RegClass, MBBs,
-                                    AccessMask);
-}
-
-template <typename R, typename Pred>
-std::vector<unsigned>
-RegPool::getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                                const MCRegisterClass &RegClass, R &&MBBs,
-                                unsigned NumRegs, Pred Filter,
-                                AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::get(Desc, RI, *this, Filter, NumRegs, RegClass,
-                                    MBBs, AccessMask);
-}
-
-template <typename Pred>
-std::vector<unsigned>
-RegPool::getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                                const MCRegisterClass &RegClass,
-                                const MachineBasicBlock &MBB, unsigned NumRegs,
-                                Pred Filter, AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::get(Desc, RI, *this, Filter, NumRegs, RegClass,
-                                    MBB, AccessMask);
-}
-
-template <typename Pred>
-std::vector<unsigned>
-RegPool::getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                                const MCRegisterClass &RegClass,
-                                const MachineLoop &ML, unsigned NumRegs,
-                                Pred Filter, AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::get(Desc, RI, *this, Filter, NumRegs, RegClass,
-                                    ML, AccessMask);
-}
-
-template <size_t N, typename R>
-std::array<unsigned, N>
-RegPool::getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                                const MCRegisterClass &RegClass, R &&MBBs,
-                                AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::get<N>(Desc, RI, *this, RegClass, MBBs,
-                                       AccessMask);
-}
-
-template <size_t N>
-std::array<unsigned, N>
-RegPool::getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                                const MCRegisterClass &RegClass,
-                                const MachineBasicBlock &MBB,
-                                AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::get<N>(Desc, RI, *this, RegClass, MBB,
-                                       AccessMask);
-}
-
-template <size_t N>
-std::array<unsigned, N>
-RegPool::getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                                const MCRegisterClass &RegClass,
-                                const MachineLoop &ML,
-                                AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::get<N>(Desc, RI, *this, RegClass, ML,
-                                       AccessMask);
-}
-
-template <size_t N, typename R, typename Pred>
-std::array<unsigned, N>
-RegPool::getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                                const MCRegisterClass &RegClass, R &&MBBs,
-                                Pred Filter, AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::get<N>(Desc, RI, *this, std::move(Filter),
-                                       RegClass, MBBs, AccessMask);
-}
-
-template <size_t N, typename Pred>
-std::array<unsigned, N>
-RegPool::getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                                const MCRegisterClass &RegClass,
-                                const MachineBasicBlock &MBB, Pred Filter,
-                                AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::get<N>(Desc, RI, *this, std::move(Filter),
-                                       RegClass, MBB, AccessMask);
-}
-
-template <size_t N, typename Pred>
-std::array<unsigned, N>
-RegPool::getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                                const MCRegisterClass &RegClass,
-                                const MachineLoop &ML, Pred Filter,
-                                AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::get<N>(Desc, RI, *this, std::move(Filter),
-                                       RegClass, ML, AccessMask);
-}
 
 template <typename... IsReservedTys>
 unsigned RegPoolWrapper::getNumAvailable(const MCRegisterClass &RegClass,
@@ -721,6 +455,16 @@ unsigned RegPoolWrapper::getNumAvailableInSet(ArrayRef<Register> Registers,
         const auto *Pool = this; // silence erroneous warning
         return !Pool->isReserved(Reg, std::forward<IsReservedTys>(Args)...);
       });
+}
+
+template <typename Pred>
+unsigned RegPoolWrapper::getAvailableRegister(const Twine &Desc,
+                                              const MCRegisterInfo &RI,
+                                              const MCRegisterClass &RegClass,
+                                              Pred Filter,
+                                              AccessMaskBit AccessMask) const {
+  return AvailableRegisterImpl::getOne(Desc, RI, *this, Filter, RegClass,
+                                       AccessMask);
 }
 
 template <typename Pred>
@@ -807,5 +551,15 @@ std::array<unsigned, N> RegPoolWrapper::getNAvailableRegisters(
   return AvailableRegisterImpl::get<N>(Desc, RI, *this, std::move(Filter),
                                        RegClass, ML, AccessMask);
 }
+
+template <typename R, typename Pred>
+std::vector<unsigned> RegPoolWrapper::getNAvailableRegisters(
+    const Twine &Desc, const MCRegisterInfo &RI,
+    const MCRegisterClass &RegClass, R &&MBBs, unsigned NumRegs, Pred Filter,
+    AccessMaskBit AccessMask) const {
+  return AvailableRegisterImpl::get(Desc, RI, *this, Filter, NumRegs, RegClass,
+                                    MBBs, AccessMask);
+}
+
 } // namespace snippy
 } // namespace llvm

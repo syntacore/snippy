@@ -240,7 +240,8 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
   auto RegGen =
       createRegGen(RegGeneratorFile.getValue(), RegInfoFile.getValue());
 
-  SnippyProgramContext ProgContext(State, RegGen, RP, OpCC, *Cfg.ProgramCfg);
+  SnippyProgramContext ProgContext(State, RegGen, RegPools, OpCC,
+                                   *Cfg.ProgramCfg);
 
   const auto &SnippyTgt = State.getSnippyTarget();
   auto MainModule = SnippyModule(ProgContext.getLLVMState(), "main");

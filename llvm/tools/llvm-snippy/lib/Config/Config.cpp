@@ -327,7 +327,8 @@ template <> struct yaml::PolymorphicTraits<ImmediateHistogramNorm> {
 
 // Reserve global state registers so they won't be corrupted when we call
 // external function.
-static void reserveGlobalStateRegisters(RegPool &RP, const SnippyTarget &Tgt) {
+static void reserveGlobalStateRegisters(RegPoolWrapper &RP,
+                                        const SnippyTarget &Tgt) {
   auto Regs = Tgt.getGlobalStateRegs();
   for (auto Reg : Regs) {
     RP.addReserved(Reg, AccessMaskBit::RW);
@@ -350,7 +351,8 @@ static std::optional<unsigned> findRegisterByName(const SnippyTarget &SnippyTgt,
   return SnippyTgt.findRegisterByName(Name);
 }
 
-static void parseReservedRegistersOption(RegPool &RP, const SnippyTarget &Tgt,
+static void parseReservedRegistersOption(RegPoolWrapper &RP,
+                                         const SnippyTarget &Tgt,
                                          const MCRegisterInfo &RI,
                                          const ProgramOptions &Opts) {
   for (auto &&RegName : Opts.ReservedRegsList) {
@@ -381,7 +383,7 @@ static std::vector<MCRegister> getRegsToSpillToMem(const SnippyTarget &Tgt,
 }
 
 static std::vector<MCRegister>
-parseSpilledRegistersOption(const RegPool &RP, const SnippyTarget &Tgt,
+parseSpilledRegistersOption(const RegPoolWrapper &RP, const SnippyTarget &Tgt,
                             const MCRegisterInfo &RI, LLVMContext &Ctx,
                             const ProgramOptions &Opts) {
   std::vector<MCRegister> SpilledRegs;
@@ -401,7 +403,7 @@ parseSpilledRegistersOption(const RegPool &RP, const SnippyTarget &Tgt,
   return SpilledRegs;
 }
 
-static MCRegister getRealStackPointer(const RegPool &RP,
+static MCRegister getRealStackPointer(const RegPoolWrapper &RP,
                                       const SnippyTarget &Tgt,
                                       const MCRegisterInfo &RI,
                                       std::vector<MCRegister> &SpilledToStack,
@@ -462,7 +464,7 @@ static MCRegister getRealStackPointer(const RegPool &RP,
     RealSP = Reg.value();
   } else if (RedefineSP == "any" || RedefineSP == "any-not-SP") {
     RealSP =
-        RP.getAvailableRegister("stack pointer", FullFilter, RI, SPRegClass);
+        RP.getAvailableRegister("stack pointer", RI, SPRegClass, FullFilter);
   } else {
     snippy::fatal(
         formatv("\"{0}\", passed to --redefine-sp is not valid option value",
@@ -542,7 +544,7 @@ unsigned long long initializeRandomEngine(uint64_t SeedValue) {
 }
 
 static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
-                                         RegPool &RP,
+                                         RegPoolWrapper &RP,
                                          const ProgramOptions &Opts) {
   auto &ProgCfg = *Cfg.ProgramCfg;
   ProgCfg.ABIName = Opts.ABI;
@@ -744,7 +746,7 @@ static void diagnoseHistogram(LLVMContext &Ctx, const OpcodeCache &OpCC,
 ProgramConfig::ProgramConfig(const SnippyTarget &Tgt, StringRef PluginFilename)
     : TargetConfig(Tgt.createTargetConfig()),
       PluginManagerImpl(std::make_unique<PluginManager>()) {}
-Config::Config(IncludePreprocessor &IPP, RegPool &RP, LLVMState &State
+Config::Config(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State
 
                ,
                StringRef PluginFilename, StringRef PluginInfoFilename,
@@ -1011,7 +1013,7 @@ static void diagnoseSelfcheckSection(LLVMState &State, const Config &Cfg,
 }
 
 void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
-                         const RegPool &RP) {
+                         const RegPoolWrapper &RP) {
   auto &Ctx = State.getCtx();
   auto &Tgt = State.getSnippyTarget();
   auto &TM = State.getTargetMachine();

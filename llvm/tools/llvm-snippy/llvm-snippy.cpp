@@ -130,7 +130,7 @@ static void mergeFiles(IncludePreprocessor &IPP, LLVMContext &Ctx) {
     IPP.mergeFile(AdditionalLayout, readFile(AdditionalLayout, Ctx));
   }
 }
-static Config readSnippyConfig(LLVMState &State, RegPool &RP,
+static Config readSnippyConfig(LLVMState &State, RegPoolWrapper &RP,
                                const OpcodeCache &OpCC,
                                const DebugOptions &DebugOpts) {
   auto &Ctx = State.getCtx();
@@ -244,14 +244,15 @@ void generateMain() {
     return;
   }
 
-  RegPool RP;
+  std::vector<RegPool> RegPools;
+  RegPoolWrapper RPW(State.getSnippyTarget(), State.getRegInfo(), RegPools);
 
-  auto Cfg = readSnippyConfig(State, RP, OpCC, DebugOpts);
+  auto Cfg = readSnippyConfig(State, RPW, OpCC, DebugOpts);
   if (DebugOpts.Verbose)
     outs() << "Used seed: " << Cfg.ProgramCfg->Seed << '\n';
 
-  dumpConfigIfNeeded(Cfg, ConfigIOContext{OpCC, RP, State}, outs(), DebugOpts);
-  FlowGenerator Flow{std::move(Cfg), OpCC, std::move(RP),
+  dumpConfigIfNeeded(Cfg, ConfigIOContext{OpCC, RPW, State}, outs(), DebugOpts);
+  FlowGenerator Flow{std::move(Cfg), OpCC, std::move(RegPools),
                      getOutputFileBasename()};
   auto Result = Flow.generate(State, DebugOpts);
   saveToFile(Result);
