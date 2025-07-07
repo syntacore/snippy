@@ -34,18 +34,10 @@ public:
     ImmutablePass::getAnalysisUsage(AU);
   }
 
-  RegPool &getPool() {
-    return getAnalysis<GeneratorContextWrapper>()
-        .getContext()
-        .getProgramContext()
-        .RegPoolsStorage.front();
-  }
-
-  const RegPool &getPool() const {
-    return getAnalysis<GeneratorContextWrapper>()
-        .getContext()
-        .getProgramContext()
-        .RegPoolsStorage.front();
+  RegPoolWrapper getPool() const {
+    return RegPoolWrapper(getAnalysis<GeneratorContextWrapper>()
+                              .getContext()
+                              .getProgramContext());
   }
 };
 

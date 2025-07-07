@@ -8,6 +8,7 @@
 
 #include "snippy/Generator/RegisterPool.h"
 #include "snippy/Generator/RegisterPoolImpl.h"
+#include "snippy/Generator/SnippyModule.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
@@ -60,6 +61,32 @@ auto accessMaskToStr(AccessMaskBit Mask) {
 
 } // namespace
 
+bool LocalRegPool::isReserved(unsigned Reg, AccessMaskBit AccessMask) const {
+  return Reserved.count(Reg) && checkAccessMask(Reserved.at(Reg), AccessMask);
+}
+
+void LocalRegPool::addReserved(unsigned Reg, AccessMaskBit AccessMask) {
+  auto Entry = Reserved.try_emplace(Reg, AccessMask);
+  // Amend access mask restriction if entry exists.
+  if (!Entry.second)
+    addToAccessMask(Entry.first->second, AccessMask);
+}
+
+unsigned LocalRegPool::getAvailableRegister(const Twine &Desc,
+                                            const MCRegisterInfo &RI,
+                                            const MCRegisterClass &RegClass,
+                                            AccessMaskBit AccessMask) const {
+  return AvailableRegisterImpl::getOne(Desc, RI, *this, RegClass, AccessMask);
+}
+
+std::vector<unsigned> LocalRegPool::getNAvailableRegisters(
+    const Twine &Desc, const MCRegisterInfo &RI,
+    const MCRegisterClass &RegClass, unsigned NumRegs,
+    AccessMaskBit AccessMask) const {
+  return AvailableRegisterImpl::get(Desc, RI, *this, NumRegs, RegClass,
+                                    AccessMask);
+}
+
 void LocalRegPool::print(raw_ostream &OS) const {
   for (auto [Reg, Access] : Reserved)
     OS << Reg << ":" << accessMaskToStr(Access) << " ";
@@ -110,62 +137,6 @@ bool RegPool::isReserved(unsigned Reg, const MachineBasicBlock &MBB,
          isReservedForMBB(Reg, MBB, AccessMask);
 }
 
-unsigned RegPool::getAvailableRegister(const Twine &Desc,
-                                       const MCRegisterInfo &RI,
-                                       const MCRegisterClass &RegClass,
-                                       const MachineLoop &ML,
-                                       AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::getOne(Desc, RI, *this, RegClass, ML,
-                                       AccessMask);
-}
-
-unsigned RegPool::getAvailableRegister(const Twine &Desc,
-                                       const MCRegisterInfo &RI,
-                                       const MCRegisterClass &RegClass,
-                                       const MachineBasicBlock &MBB,
-                                       AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::getOne(Desc, RI, *this, RegClass, MBB,
-                                       AccessMask);
-}
-
-std::vector<unsigned>
-RegPool::getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                                const MCRegisterClass &RegClass,
-                                const MachineLoop &ML, unsigned NumRegs,
-                                AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::get(Desc, RI, *this, NumRegs, RegClass, ML,
-                                    AccessMask);
-}
-
-std::vector<unsigned>
-RegPool::getNAvailableRegisters(const Twine &Desc, const MCRegisterInfo &RI,
-                                const MCRegisterClass &RegClass,
-                                const MachineBasicBlock &MBB, unsigned NumRegs,
-                                AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::get(Desc, RI, *this, NumRegs, RegClass, MBB,
-                                    AccessMask);
-}
-
-std::vector<unsigned>
-RegPool::getAllAvailableRegisters(const MCRegisterClass &RegClass,
-                                  AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::getAll(*this, RegClass, AccessMask);
-}
-
-std::vector<unsigned>
-RegPool::getAllAvailableRegisters(const MCRegisterClass &RegClass,
-                                  const MachineFunction &MF,
-                                  AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::getAll(*this, RegClass, MF, AccessMask);
-}
-
-std::vector<unsigned>
-RegPool::getAllAvailableRegisters(const MCRegisterClass &RegClass,
-                                  const MachineBasicBlock &MBB,
-                                  AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::getAll(*this, RegClass, MBB, AccessMask);
-}
-
 void RegPool::addReserved(unsigned Reg, AccessMaskBit AccessMask) {
   ReservedForApp.addReserved(Reg, AccessMask);
   LLVM_DEBUG(
@@ -209,30 +180,10 @@ void RegPool::addReserved(unsigned Reg, const MachineBasicBlock &MBB,
              << "\n");
 }
 
-bool LocalRegPool::isReserved(unsigned Reg, AccessMaskBit AccessMask) const {
-  return Reserved.count(Reg) && checkAccessMask(Reserved.at(Reg), AccessMask);
-}
-
-void LocalRegPool::addReserved(unsigned Reg, AccessMaskBit AccessMask) {
-  auto Entry = Reserved.try_emplace(Reg, AccessMask);
-  // Amend access mask restriction if entry exists.
-  if (!Entry.second)
-    addToAccessMask(Entry.first->second, AccessMask);
-}
-
-unsigned LocalRegPool::getAvailableRegister(const Twine &Desc,
-                                            const MCRegisterInfo &RI,
-                                            const MCRegisterClass &RegClass,
-                                            AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::getOne(Desc, RI, *this, RegClass, AccessMask);
-}
-
-std::vector<unsigned> LocalRegPool::getNAvailableRegisters(
-    const Twine &Desc, const MCRegisterInfo &RI,
-    const MCRegisterClass &RegClass, unsigned NumRegs,
-    AccessMaskBit AccessMask) const {
-  return AvailableRegisterImpl::get(Desc, RI, *this, NumRegs, RegClass,
-                                    AccessMask);
+RegPoolWrapper::RegPoolWrapper(SnippyProgramContext &PC)
+    : SnippyTgt(PC.getLLVMState().getSnippyTarget()),
+      RegInfo(PC.getLLVMState().getRegInfo()), Pools(PC.RegPoolsStorage) {
+  assert(PC.RegPoolsStorage.size() == 1);
 }
 
 unsigned RegPoolWrapper::getAvailableRegister(const Twine &Desc,

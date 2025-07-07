@@ -129,13 +129,15 @@ private:
 class SnippyProgramContext final {
 public:
   SnippyProgramContext(LLVMState &State, RegisterGenerator &RegGen,
-                       RegPool &Pool, const OpcodeCache &OpCc,
+                       std::vector<RegPool> Pools, const OpcodeCache &OpCc,
                        const ProgramConfig &Settings);
 
   SnippyProgramContext(SnippyProgramContext &&) = default;
   SnippyProgramContext &operator=(SnippyProgramContext &&) = default;
 
   ~SnippyProgramContext();
+
+  friend RegPoolWrapper;
 
   const auto &getConfig() const { return *Cfg; }
   auto &getLLVMState() const { return *State; }
