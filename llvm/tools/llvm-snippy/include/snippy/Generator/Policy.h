@@ -77,6 +77,8 @@
 #include <functional>
 #include <memory>
 
+// FIXME: This looks very illegal and potentially breaks ODR.
+// Better to just define a custom hash functor.
 template <> struct std::hash<llvm::MCRegister> {
   std::size_t operator()(const llvm::MCRegister &Reg) const {
     return std::hash<unsigned>{}(Reg);
@@ -363,64 +365,6 @@ public:
   bool isInseparableBundle() const { return false; }
 
   void print(raw_ostream &OS) const { OS << "Default Generation Policy\n"; }
-};
-
-// This generation policy initializes the registers according to the
-// valuegram-operands-regs option. That is, it inserts additional initializing
-// instructions before each instruction for registers used in it that are not
-// memory addresses. These initializing instructions are not taken into account
-// in the planning instructions.
-class ValuegramGenPolicy final : public detail::EmptyFinalizeMixin {
-  OpcGenHolder OpcGen;
-  const DefaultPolicyConfig *Cfg;
-
-  std::vector<InstructionRequest> Instructions;
-  unsigned Idx = 0;
-
-public:
-  ValuegramGenPolicy(const ValuegramGenPolicy &Other)
-      : OpcGen(Other.OpcGen->copy()), Cfg(Other.Cfg) {}
-
-  ValuegramGenPolicy(ValuegramGenPolicy &&) = default;
-
-  ValuegramGenPolicy &operator=(const ValuegramGenPolicy &Other) {
-    ValuegramGenPolicy Tmp = Other;
-    std::swap(*this, Tmp);
-    return *this;
-  }
-
-  ValuegramGenPolicy &operator=(ValuegramGenPolicy &&) = default;
-
-  ValuegramGenPolicy(
-      SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
-      std::function<bool(unsigned)> Filter, bool MustHavePrimaryInstrs,
-      ArrayRef<OpcodeHistogramEntry> Overrides,
-      const std::unordered_map<unsigned, double> &WeightOverrides);
-
-  std::optional<InstructionRequest> next() {
-    assert(Idx <= Instructions.size());
-    if (Idx < Instructions.size())
-      return Instructions[Idx++];
-    return std::nullopt;
-  }
-
-  void initialize(InstructionGenerationContext &InstrGenCtx,
-                  const RequestLimit &Limit);
-
-  bool isInseparableBundle() const { return true; }
-
-  void print(raw_ostream &OS) const { OS << "Valuegram Generation Policy\n"; }
-
-  std::vector<InstructionRequest>
-  generateRegInit(InstructionGenerationContext &IGC, Register Reg,
-                  const MCInstrDesc &InstrDesc);
-
-  std::vector<InstructionRequest>
-  generateOneInstrWithInitRegs(InstructionGenerationContext &IGC,
-                               unsigned Opcode);
-
-  APInt getValueFromValuegram(Register Reg, StringRef Prefix,
-                              InstructionGenerationContext &IGC) const;
 };
 
 class BurstGenPolicy final : public detail::EmptyFinalizeMixin {
