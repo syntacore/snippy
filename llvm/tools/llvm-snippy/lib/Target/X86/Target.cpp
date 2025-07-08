@@ -439,7 +439,8 @@ public:
   }
 
   std::vector<Register>
-  excludeFromMemRegsForOpcode(unsigned Opcode) const override {
+  excludeFromMemRegsForOpcode(unsigned Opcode,
+                              const MachineRegisterInfo &RI) const override {
     reportUnimplementedError();
   }
 
