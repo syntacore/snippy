@@ -3079,7 +3079,8 @@ public:
   }
 
   std::vector<Register>
-  excludeFromMemRegsForOpcode(unsigned Opcode) const override {
+  excludeFromMemRegsForOpcode(unsigned Opcode,
+                              const MCRegisterInfo &RI) const override {
     if (isCLoadStore(Opcode) || isCFPLoadStore(Opcode)) {
       std::vector<Register> Result;
       Result.reserve(32);
@@ -3092,9 +3093,17 @@ public:
                   return !is_contained(RISCV::GPRCRegClass, Reg);
                 });
       }
-      return Result;
+      std::vector<Register> ResUnits;
+      transform(Result, std::back_inserter(ResUnits),
+                [&RI, this](Register Reg) {
+                  auto Units = getPhysRegsFromUnit(Reg, RI);
+                  assert(Units.size() == 1 &&
+                         "Expect only one reg unit for RISC-V addr reg class");
+                  return Units.front();
+                });
+      return ResUnits;
     }
-    return {RISCV::X0};
+    return getPhysRegsFromUnit(RISCV::X0, RI);
   }
 
   std::vector<Register> excludeRegsForOperand(InstructionGenerationContext &IGC,
