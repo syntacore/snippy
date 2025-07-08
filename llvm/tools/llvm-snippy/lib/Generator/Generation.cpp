@@ -690,7 +690,7 @@ std::optional<MachineOperand> pregenerateOneOperand(
     else {
       auto RegClass = RegInfo.getRegClass(MCOpInfo.RegClass);
       auto Exclude =
-          SnippyTgt.excludeFromMemRegsForOpcode(InstrDesc.getOpcode());
+          SnippyTgt.excludeFromMemRegsForOpcode(InstrDesc.getOpcode(), RegInfo);
       auto RegOpt = RegGen.generate(RegClass, OperandRegClassID, RegInfo, RP,
                                     MBB, SnippyTgt, Exclude);
       if (!RegOpt)
@@ -928,6 +928,7 @@ unsigned chooseAddressRegister(InstructionGenerationContext &IGC,
   auto &ProgCtx = IGC.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
+  const auto &RI = State.getRegInfo();
 
   if (AP.RegClass == nullptr)
     // It is not allowed to pick another register if RegClass is null.
@@ -935,10 +936,13 @@ unsigned chooseAddressRegister(InstructionGenerationContext &IGC,
 
   auto AllRegisters =
       RP.getAllAvailableRegisters(*AP.RegClass, *MI.getParent());
-  auto Exclude = SnippyTgt.excludeFromMemRegsForOpcode(MI.getOpcode());
+  auto Exclude = SnippyTgt.excludeFromMemRegsForOpcode(MI.getOpcode(), RI);
 
-  erase_if(AllRegisters,
-           [&](Register Reg) { return is_contained(Exclude, Reg); });
+  erase_if(AllRegisters, [&](Register Reg) {
+    auto PhysRegs = SnippyTgt.getPhysRegsFromUnit(Reg, RI);
+    assert(PhysRegs.size() == 1);
+    return is_contained(Exclude, PhysRegs.front());
+  });
 
   if (AllRegisters.empty())
     // Sometimes all registers may happen to be reserved (Even AP.FixedReg).
