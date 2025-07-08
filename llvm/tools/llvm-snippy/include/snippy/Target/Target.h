@@ -458,7 +458,8 @@ public:
                             const MachineBasicBlock &MBB) const = 0;
 
   virtual std::vector<Register>
-  excludeFromMemRegsForOpcode(unsigned Opcode) const = 0;
+  excludeFromMemRegsForOpcode(unsigned Opcode,
+                              const MCRegisterInfo &RI) const = 0;
 
   // FIXME: basically, we should need only MCRegisterClass, but now
   // MCRegisterClass for RISCV does not fully express available regs.
