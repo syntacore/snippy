@@ -11,8 +11,8 @@
 #include "snippy/Generator/GlobalsPool.h"
 #include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/Policy.h"
-#include "snippy/Generator/RegReservForLoop.h"
 #include "snippy/Generator/RegisterPool.h"
+#include "snippy/Generator/RegsReservedForLoop.h"
 #include "snippy/Generator/SimulatorContext.h"
 #include "snippy/Generator/SnippyLoopInfo.h"
 
@@ -1760,16 +1760,17 @@ public:
   /// RISCV Loops:
   ///
   /// If loop-counters: random-init is set, we have an Offset for
-  /// register values. Only zero Offset is supported for BEQ, C_BEQZ and C_BNEZ.
+  /// register values. Only zero Offset is supported for C_BNEZ.
   /// If loop-counters: random-stride is set, we have a StrideOffset for
-  /// register values. For BEQ and C_BEQZ only a stride of 1 is supported.
+  /// register values.
   /// * BEQ, C_BEQZ:
   ///   -- Init --
-  ///     Stride = 1
-  ///     CounterReg = 0
+  ///     Stride = 1 (= StrideOffset)
+  ///     CounterReg = 0 (Offset)
   ///   -- Latch --
   ///     CounterReg += Stride
-  ///     LimitReg = CounterReg >> log2(NIter)
+  ///     LimitReg = Offset + StrideOffset * NIter - 1
+  ///     LimitReg = SLT LimitReg, CounterReg
   ///   -- Branch --
   ///     BEQ LimitReg, X0
   ///     C_BEQZ LimitReg
@@ -1816,7 +1817,7 @@ public:
     auto Opcode = Branch.getOpcode();
     bool EqBranch = isEqBranch(Opcode);
     assert(!EqBranch ||
-           ReservedRegs.size() == MaxNumOfReservRegsForLoop &&
+           ReservedRegs.size() == MaxNumOfReservedRegsForLoop &&
                "Equal branches expected to have two reserved registers");
 
     auto FirstReg =
@@ -1845,11 +1846,11 @@ public:
       return OpInfo.OperandType == MCOI::OperandType::OPERAND_REGISTER;
     };
     unsigned NumRegsToReserv =
-        EqBranch ? MaxNumOfReservRegsForLoop
+        EqBranch ? MaxNumOfReservedRegsForLoop
                  : count_if(BranchDesc.operands(), FilterOpReg);
 
-    assert((NumRegsToReserv >= MinNumOfReservRegsForLoop) &&
-           (NumRegsToReserv <= MaxNumOfReservRegsForLoop) &&
+    assert((NumRegsToReserv >= MinNumOfReservedRegsForLoop) &&
+           (NumRegsToReserv <= MaxNumOfReservedRegsForLoop) &&
            "Only branches with one or two register operands are expected for "
            "RISC-V");
 
@@ -1978,7 +1979,7 @@ public:
                                        ArrayRef<Register> ReservedRegs,
                                        unsigned NIter) const override {
     assert(Branch.isBranch() && "Branch expected");
-    assert((ReservedRegs.size() != MaxNumOfReservRegsForLoop) ||
+    assert((ReservedRegs.size() != MaxNumOfReservedRegsForLoop) ||
            (ReservedRegs[CounterRegIdx] != ReservedRegs[LimitRegIdx]) &&
                "Counter and Limit registers expected to be different");
 
@@ -1991,15 +1992,10 @@ public:
     switch (Branch.getOpcode()) {
     case RISCV::BEQ:
     case RISCV::C_BEQZ: {
-      writeValueToReg(IGC, APInt::getZero(getRegBitWidth(CounterReg, IGC)),
-                      CounterReg);
-      auto LimitReg = ReservedRegs[LimitRegIdx];
-      writeValueToReg(IGC, APInt::getZero(getRegBitWidth(LimitReg, IGC)),
-                      LimitReg);
-      // So far, the algorithm for constructing a loop with BEQ and C_BEQZ
-      // requires initializing the counter to 0 and the its stride to 1
-      RegRandOffset = 0;
-      RegRandStride = 1;
+      auto StartCounterRegVal = RegRandOffset;
+      writeValueToReg(
+          IGC, APInt(getRegBitWidth(CounterReg, IGC), StartCounterRegVal),
+          CounterReg);
       break;
     }
     case RISCV::BNE: {
@@ -2019,7 +2015,7 @@ public:
           IGC, APInt(getRegBitWidth(CounterReg, IGC), StartCounterRegVal),
           CounterReg);
       assert(
-          (ReservedRegs.size() == MinNumOfReservRegsForLoop) &&
+          (ReservedRegs.size() == MinNumOfReservedRegsForLoop) &&
           "In RISC-V for compressed branch C_BNEZ only one register CounterReg "
           "expected to be reserved for loop");
       RegRandOffset = 0;
@@ -2063,7 +2059,7 @@ public:
       RegToValueType &ExitingValues,
       const LoopCounterInitResult &CounterInitInfo) const override {
     assert(Branch.isBranch() && "Branch expected");
-    assert(ReservedRegs.size() != MaxNumOfReservRegsForLoop ||
+    assert(ReservedRegs.size() != MaxNumOfReservedRegsForLoop ||
            ReservedRegs[CounterRegIdx] != ReservedRegs[LimitRegIdx] &&
                "Counter and limit registers expected to be different");
     assert(NIter);
@@ -2083,33 +2079,34 @@ public:
     case RISCV::BEQ:
     case RISCV::C_BEQZ: {
       auto LimitReg = ReservedRegs[LimitRegIdx];
-      // Closest power of two (floor)
-      NIter = bit_floor(NIter);
       getSupportInstBuilder(*this, MBB, Pos,
                             MBB.getParent()->getFunction().getContext(),
                             InstrInfo.get(ADDIOp))
           .addReg(CounterReg, RegState::Define)
           .addReg(CounterReg)
           .addImm(CounterInitInfo.StrideVal.getZExtValue());
-      // SRLI can't be compressed because rd and rs1 are different regs
+      // Since we have only two reserved registers for the loop, we have to
+      // update the boundary value for the CounterReg at each iteration, which
+      // we write into the LimitReg.
+      writeValueToReg(
+          IGC,
+          APInt(getRegBitWidth(CounterReg, IGC),
+                RegCounterOffset +
+                    CounterInitInfo.StrideVal.getZExtValue() * NIter - 1),
+          LimitReg);
+
       getSupportInstBuilder(*this, MBB, Pos,
                             MBB.getParent()->getFunction().getContext(),
-                            InstrInfo.get(RISCV::SRLI))
+                            InstrInfo.get(RISCV::SLT))
           .addReg(LimitReg, RegState::Define)
-          .addReg(CounterReg)
-          .addImm(Log2_32(NIter));
-      ExitingValues[CounterReg] =
-          APInt(getRegBitWidth(CounterReg, IGC), bit_floor(NIter));
-      MinCounterVal = APInt(getRegBitWidth(LimitReg, IGC), 1);
+          .addReg(LimitReg)
+          .addReg(CounterReg);
+      ExitingValues[CounterReg] = APInt(
+          getRegBitWidth(CounterReg, IGC),
+          RegCounterOffset + CounterInitInfo.StrideVal.getZExtValue() * NIter);
+      MinCounterVal =
+          APInt(getRegBitWidth(LimitReg, IGC), RegCounterOffset + 1);
       ExitingValues[LimitReg] = APInt(getRegBitWidth(LimitReg, IGC), 1);
-
-      if (!isPowerOf2_32(NIter))
-        return {SnippyDiagnosticInfo(
-                    "Number of iterations is not power of 2",
-                    "Number of iterations for BEQ and C_BEQZ "
-                    "will be reduced to the nearest power of 2",
-                    llvm::DS_Warning, WarningName::LoopIterationNumber),
-                NIter, MinCounterVal};
       break;
     }
     case RISCV::C_BNEZ:

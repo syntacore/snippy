@@ -21,7 +21,7 @@
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/LoopLatcherPass.h"
 #include "snippy/Generator/Policy.h"
-#include "snippy/Generator/RegReservForLoop.h"
+#include "snippy/Generator/RegsReservedForLoop.h"
 #include "snippy/Generator/RootRegPoolWrapperPass.h"
 #include "snippy/Generator/SimulatorContextWrapperPass.h"
 #include "snippy/Support/Options.h"
@@ -281,13 +281,13 @@ static void printSelectedRegs(
   if (MCRegClass.has_value()) {
     OS << "Selected regs: " << RegInfo.getRegClassName(MCRegClass.value())
        << ": " << RegInfo.getName(CounterReg) << "[CounterReg]";
-    if (ReservedRegs.size() == MaxNumOfReservRegsForLoop) {
+    if (ReservedRegs.size() == MaxNumOfReservedRegsForLoop) {
       auto LimitReg = ReservedRegs[LimitRegIdx];
       OS << " & " << RegInfo.getName(LimitReg) << "[LimitReg]";
     }
   } else {
     OS << RegInfo.getName(CounterReg) << "(" << CounterReg << ")[CounterReg]";
-    if (ReservedRegs.size() == MaxNumOfReservRegsForLoop) {
+    if (ReservedRegs.size() == MaxNumOfReservedRegsForLoop) {
       auto LimitReg = ReservedRegs[LimitRegIdx];
       OS << ", " << RegInfo.getName(LimitReg) << "(" << LimitReg
          << ")[LimitReg]";
@@ -343,8 +343,8 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   auto ReservedRegs =
       selectRegsForBranch(BranchDesc, Preheader, ExitingBlock, MCRegClass);
 
-  assert((ReservedRegs.size() >= MinNumOfReservRegsForLoop) &&
-         (ReservedRegs.size() <= MaxNumOfReservRegsForLoop) &&
+  assert((ReservedRegs.size() >= MinNumOfReservedRegsForLoop) &&
+         (ReservedRegs.size() <= MaxNumOfReservedRegsForLoop) &&
          "One or Two Registers expected to be reserved for branch");
 
   LLVM_DEBUG(
@@ -417,7 +417,6 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   RegToValueType ExitingValues;
   auto CounterInsRes = SnippyTgt.insertLoopCounter(
       HeadCtx, NewBranch, ReservedRegs, NIter, ExitingValues, LoopCounterInfo);
-  auto &Diag = CounterInsRes.Diag;
   auto ActualNumIter = CounterInsRes.NIter;
   unsigned MinCounterVal = CounterInsRes.MinCounterVal.getZExtValue();
   auto CounterReg = ReservedRegs[CounterRegIdx];
@@ -455,7 +454,6 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
                         LoopCounterStrideWarned);
   MakeDiagnosticsIfNeed(LoopInitDiag, WarningName::LoopCounterOutOfRange,
                         LoopCounterInitWarned);
-  MakeDiagnosticsIfNeed(Diag, WarningName::LoopIterationNumber, NIterWarned);
 
   LLVM_DEBUG(dbgs() << "Loop counter inserted: "; ExitingBlock.dump());
 }
