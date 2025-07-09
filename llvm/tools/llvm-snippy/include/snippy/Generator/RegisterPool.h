@@ -256,16 +256,19 @@ public:
 
   void reset() { Pools.back() = RegPool{}; }
 
+  std::vector<Register> getPhysRegsFromUnit(Register RegUnit) const {
+    return SnippyTgt.getPhysRegsFromUnit(RegUnit, RegInfo);
+  }
+
   template <typename... ArgsTys>
   bool isReserved(unsigned Reg, ArgsTys &&...Args) const {
     // Only physical registers can be reserved.
     // Therefore, we must identify the physical register
     // of this alias and check it.
     return any_of(Pools, [&](auto &Pool) {
-      return any_of(
-          SnippyTgt.getPhysRegsFromUnit(Reg, RegInfo), [&](auto &PhReg) {
-            return Pool.isReserved(PhReg, std::forward<ArgsTys>(Args)...);
-          });
+      return any_of(getPhysRegsFromUnit(Reg), [&](auto PhReg) {
+        return Pool.isReserved(PhReg, std::forward<ArgsTys>(Args)...);
+      });
     });
   }
 
@@ -280,7 +283,7 @@ public:
                             << "\nBefore reservation: ",
                      dump()));
 
-    auto PhRegs = SnippyTgt.getPhysRegsFromUnit(Reg, RegInfo);
+    auto PhRegs = getPhysRegsFromUnit(Reg);
     for (auto &&PhReg : PhRegs)
       Pools.back().addReserved(PhReg, std::forward<ArgsTys>(Args)...);
 
