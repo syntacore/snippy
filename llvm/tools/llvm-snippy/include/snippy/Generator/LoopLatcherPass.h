@@ -40,7 +40,6 @@ private:
                                   MachineBasicBlock &Preheader,
                                   ArrayRef<Register> ReservedRegs);
 
-  bool NIterWarned = false;
   bool LoopCounterInitWarned = false;
   bool LoopCounterStrideWarned = false;
 };
