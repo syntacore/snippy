@@ -1,0 +1,49 @@
+# RUN: timeout 300 llvm-snippy %s -mtriple=riscv64-unknown-elf \
+# RUN: -model-plugin=None | FileCheck %s
+
+# RUN: timeout 300 llvm-snippy %s -mtriple=riscv32-unknown-elf \
+# RUN: -model-plugin=None | FileCheck %s
+
+options:
+  num-instrs: 10
+  dump-mf: true
+
+sections:
+  - name: 1
+    VMA:  0x10000
+    SIZE: 0x1000
+    LMA:  0x10000
+    ACCESS: rx
+  - name: 2
+    VMA:  0x11000
+    SIZE: 0x1000
+    LMA:  0x11000
+    ACCESS: rw
+
+histogram:
+  - [SUB, 1.0]
+  - [BEQ, 1.0]
+
+branches:
+  loop-ratio: 1.0
+  loop-counters:
+    random-init:
+      min: 10
+      max: 10
+    random-stride:
+      min: 5
+      max: 5
+  number-of-loop-iterations:
+    min: 5
+    max: 5
+
+# COM: Increment CounterReg with the given stride range
+# CHECK: [[CounterReg:\$[a-z0-9]+]] = ADDI [[CounterReg]], 5
+
+# COM: Write to LimitReg max CounterReg value (10 + 5 * 5 - 1)
+# CHECK-NEXT: [[LimitReg:\$[a-z0-9]+]] = ADDI $x0, 34
+
+# COM: Compare CounterReg with LimitReg
+# CHECK-NEXT: [[LimitReg]] = SLT [[LimitReg]], [[CounterReg]]
+
+# CHECK: BEQ [[LimitReg]], $x0

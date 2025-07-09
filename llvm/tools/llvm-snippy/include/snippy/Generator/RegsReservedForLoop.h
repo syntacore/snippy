@@ -1,4 +1,4 @@
-//===-- RegReservForLoop.h --------------------------------------*- C++ -*-===//
+//===-- RegsReservedForLoop.h -----------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -23,5 +23,5 @@
 constexpr unsigned CounterRegIdx = 0;
 constexpr unsigned LimitRegIdx = 1;
 
-constexpr unsigned MinNumOfReservRegsForLoop = 1;
-constexpr unsigned MaxNumOfReservRegsForLoop = 2;
+constexpr unsigned MinNumOfReservedRegsForLoop = 1;
+constexpr unsigned MaxNumOfReservedRegsForLoop = 2;
