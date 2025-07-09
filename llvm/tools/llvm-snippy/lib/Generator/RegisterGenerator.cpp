@@ -46,9 +46,11 @@ static bool regIsReserved(unsigned RegIdx, ArrayRef<Register> Exclude,
                           const MCRegisterClass &RC,
                           ArrayRef<Register> Include) {
   Register Reg = getRegFromIdx(RC, Include, RegIdx);
+  auto PhysRegs = RP.getPhysRegsFromUnit(Reg);
   return RP.isReserved(Reg, MBB, Mask) ||
-         any_of(Exclude,
-                [Reg](unsigned ExcludeReg) { return ExcludeReg == Reg; });
+         any_of(Exclude, [&PhysRegs](unsigned ExcludeReg) {
+           return is_contained(PhysRegs, ExcludeReg);
+         });
 }
 
 unsigned RegTranslatorHandle::getRegFromStr(
