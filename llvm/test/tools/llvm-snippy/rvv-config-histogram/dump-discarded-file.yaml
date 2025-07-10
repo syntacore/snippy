@@ -2,10 +2,10 @@
 # COM: This test checks option -riscv-dump-discarded-rvv-configurations when 
 #      it's given a filename.
 
-# RUN: llvm-snippy %s -riscv-dump-discarded-rvv-configurations=rvv.discarded \
-# RUN:   -riscv-dump-rvv-config=rvv.info 
-# RUN: FileCheck --input-file=rvv.discarded %s 
-# RUN: FileCheck --input-file=rvv.info --check-prefix=RVV-INFO %s
+# RUN: llvm-snippy %s -riscv-dump-discarded-rvv-configurations=%t.rvv.discarded \
+# RUN:   -riscv-dump-rvv-config=%t.rvv.info
+# RUN: FileCheck --input-file=%t.rvv.discarded %s
+# RUN: FileCheck --input-file=%t.rvv.info --check-prefix=RVV-INFO %s
 
 options:
   march: riscv64
