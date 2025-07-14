@@ -168,13 +168,14 @@ public:
 
     for (auto &&Section : ElfData.TextAndDataSections) {
       if (auto EContents = Section.getContents()) {
-        snippy::warn(WarningName::EmptyElfSection,
-                     formatv("ignored LOAD section '{0}'",
-                             getStringNameOrUnknown(Section.getName())),
-                     "empty contents");
         auto Address = Section.getAddress();
         Simulator->writeMem(Address, *EContents);
+        continue;
       }
+      snippy::warn(WarningName::EmptyElfSection,
+                   formatv("ignored LOAD section '{0}'",
+                           getStringNameOrUnknown(Section.getName())),
+                   "empty contents");
     }
 
     if (!InitBSS)
