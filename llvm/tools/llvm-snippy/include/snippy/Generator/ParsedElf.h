@@ -51,8 +51,9 @@ public:
 
     llvm::copy_if(ObjectFile.sections(),
                   std::back_inserter(AllocatableSections), [&](auto &&Section) {
-                    return (SectionFilter && SectionFilter(Section)) ||
-                           Section.isText() || Section.isData();
+                    return (!SectionFilter || SectionFilter(Section)) &&
+                           (Section.isText() || Section.isData() ||
+                            Section.isBSS());
                   });
 
     return AllocatableSections;
