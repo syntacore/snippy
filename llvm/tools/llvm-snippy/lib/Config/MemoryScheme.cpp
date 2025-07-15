@@ -138,6 +138,8 @@ template <> struct yaml::MappingTraits<snippy::AccessAddress> {
     Io.mapRequired("addr", NormAddr->Value);
     Io.mapOptional("access-size", AA.AccessSize, 16);
   }
+
+  static std::string validate(yaml::IO &, snippy::AccessAddress &);
 };
 
 template <> struct yaml::MappingTraits<snippy::AddressInfo> {
@@ -167,11 +169,48 @@ void yaml::MappingTraits<snippy::MemoryAccessRange>::mapping(
   Io.mapOptional("access-size", Range.AccessSize);
 }
 
-bool shouldSkipValidation(yaml::IO &Io) {
+static bool shouldSkipValidation(yaml::IO &Io) {
   // This is necessary because we sometimes want to output this range before
   // yaml parsing is finished. To avoid being crashed with assertion failure we
   // ignore errors on outputting. The errors will still be reported.
   return Io.outputting();
+}
+
+static bool shouldSkipAddrSizeValidation(yaml::IO &Io) {
+  return !Io.getContext();
+}
+
+static unsigned getPointerSize(const snippy::ConfigIOContext &Ctx) {
+  const auto &TM = Ctx.State.getTargetMachine();
+  return TM.getProgramPointerSize() * CHAR_BIT;
+}
+
+/// Check if Addr fits into PtrSizeInBits bits.
+static bool isAddressOutOfRange(snippy::MemAddr Addr, unsigned PtrSzInBits) {
+  unsigned NumberOfActiveBits = llvm::bit_width(Addr);
+  return NumberOfActiveBits > PtrSzInBits;
+}
+
+std::string yaml::MappingTraits<snippy::AccessAddress>::validate(
+    yaml::IO &Io, snippy::AccessAddress &Addr) {
+  if (shouldSkipValidation(Io) || shouldSkipAddrSizeValidation(Io))
+    return "";
+
+  const auto *CtxPtr =
+      static_cast<const snippy::ConfigIOContext *>(Io.getContext());
+  assert(CtxPtr);
+  unsigned ProgramPointerSizeInBits = getPointerSize(*CtxPtr);
+
+  if (isAddressOutOfRange(Addr.Addr, ProgramPointerSizeInBits))
+    return llvm::formatv(
+        "'addr' is too large. Selected target supports only {0} bit addresses",
+        ProgramPointerSizeInBits);
+  if (isAddressOutOfRange(Addr.Addr + Addr.AccessSize,
+                          ProgramPointerSizeInBits))
+    return llvm::formatv("'access-size' is too large. Selected target supports "
+                         "only {0} bit addresses",
+                         ProgramPointerSizeInBits);
+  return "";
 }
 
 std::string yaml::MappingTraits<snippy::MemoryAccessRange>::validate(
@@ -205,6 +244,23 @@ std::string yaml::MappingTraits<snippy::MemoryAccessRange>::validate(
     return "Stride cannot be equal to 0";
   if (Range.Weight < 0)
     return "Range access weight can not be less than 0";
+
+  if (shouldSkipAddrSizeValidation(Io))
+    return "";
+  const auto *CtxPtr =
+      static_cast<const snippy::ConfigIOContext *>(Io.getContext());
+  assert(CtxPtr);
+  unsigned ProgramPointerSizeInBits = getPointerSize(*CtxPtr);
+
+  if (isAddressOutOfRange(Range.Start, ProgramPointerSizeInBits))
+    return llvm::formatv(
+        "'start' is too large. Selected target supports only {0} bit addresses",
+        ProgramPointerSizeInBits);
+  if (isAddressOutOfRange(Range.Start + Range.Size, ProgramPointerSizeInBits))
+    return llvm::formatv(
+        "'size' is too large. Selected target supports only {0} bit addresses. "
+        "'start' + 'size' does not fit into {0} bits",
+        ProgramPointerSizeInBits);
   return "";
 }
 
@@ -226,6 +282,22 @@ std::string yaml::MappingTraits<snippy::MemoryAccessEviction>::validate(
     return "Bits in mask and fixed fields for eviction overlap";
   if (Eviction.Weight < 0)
     return "Eviction access weight can not be less than 0";
+
+  if (shouldSkipAddrSizeValidation(Io))
+    return "";
+  const auto *CtxPtr =
+      static_cast<const snippy::ConfigIOContext *>(Io.getContext());
+  assert(CtxPtr);
+  unsigned ProgramPointerSizeInBits = getPointerSize(*CtxPtr);
+
+  if (isAddressOutOfRange(Eviction.Mask, ProgramPointerSizeInBits))
+    return llvm::formatv(
+        "'mask' is too large. Selected target supports only {0} bit addresses",
+        ProgramPointerSizeInBits);
+  if (isAddressOutOfRange(Eviction.Fixed, ProgramPointerSizeInBits))
+    return llvm::formatv("'fixed' is too large. Selected target supports only "
+                         "{0} bit addresses.",
+                         ProgramPointerSizeInBits);
   return "";
 }
 
@@ -1184,6 +1256,29 @@ void yaml::MappingTraits<snippy::SectionDesc>::mapping(
   Io.mapRequired("LMA", NormLMA->Value);
   Io.mapRequired("ACCESS", Info.M);
   Io.mapOptional("PHDR", Info.Phdr);
+}
+
+std::string
+yaml::MappingTraits<snippy::SectionDesc>::validate(yaml::IO &Io,
+                                                   snippy::SectionDesc &Desc) {
+  if (shouldSkipValidation(Io) || shouldSkipAddrSizeValidation(Io))
+    return "";
+
+  const auto *CtxPtr =
+      static_cast<const snippy::ConfigIOContext *>(Io.getContext());
+  assert(CtxPtr);
+  const unsigned ProgramPointerSizeInBits = getPointerSize(*CtxPtr);
+
+  if (isAddressOutOfRange(Desc.VMA, ProgramPointerSizeInBits))
+    return llvm::formatv(
+        "'VMA' is too large. Selected target supports only {0} bit addresses",
+        ProgramPointerSizeInBits);
+  if (isAddressOutOfRange(Desc.VMA + Desc.Size, ProgramPointerSizeInBits))
+    return llvm::formatv(
+        "'SIZE' is too large. Selected target supports only {0} bit addresses. "
+        "'VMA' + 'SIZE' does not fit into {0} bits",
+        ProgramPointerSizeInBits);
+  return "";
 }
 
 #undef CREATE_HEX_NORMALIZATION

@@ -1,0 +1,25 @@
+# RUN: not llvm-snippy -model-plugin=None %s |& FileCheck %s
+
+options:
+  mtriple: riscv32-unknown-elf
+  num-instrs: 10
+
+include:
+  - Inputs/sections.yaml
+
+histogram:
+  - [LW, 1.0]
+
+access-ranges:
+  - start: 0x400000000
+    size: 64
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+  - start: 0x400001000
+    size: 8
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+
+# CHECK: error: 'start' is too large. Selected target supports only 32 bit addresses
