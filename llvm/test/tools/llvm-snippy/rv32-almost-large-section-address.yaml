@@ -1,0 +1,22 @@
+# RUN: llvm-snippy -model-plugin=None %s |& FileCheck %s
+
+options:
+  mtriple: riscv32-unknown-elf
+  num-instrs: 10
+
+sections:
+    - name:      text
+      VMA:       0x11111111
+      SIZE:      0x10000000
+      LMA:       0x11111111
+      ACCESS:    rx
+    - name:      data
+      VMA:       0x90000000
+      SIZE:      0x40000
+      LMA:       0x90000000
+      ACCESS:    rw
+
+histogram:
+  - [BLT, 1.0]
+
+# CHECK-NOT: 'VMA' is too large. Selected target supports only 32 bit addresses
