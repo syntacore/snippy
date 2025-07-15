@@ -740,7 +740,7 @@ LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::MemoryAccessesGroup,
                                      /* not flow */ false);
 
 LLVM_SNIPPY_YAML_DECLARE_SCALAR_TRAITS_NG(snippy::AccMask);
-LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::SectionDesc);
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(snippy::SectionDesc);
 LLVM_SNIPPY_YAML_DECLARE_SEQUENCE_TRAITS(snippy::SectionsDescriptions,
                                          snippy::SectionDesc);
 

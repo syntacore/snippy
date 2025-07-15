@@ -1,0 +1,27 @@
+# RUN: not llvm-snippy -model-plugin=None %s |& FileCheck %s
+
+options:
+  mtriple: riscv32-unknown-elf
+  num-instrs: 10
+
+include:
+  - Inputs/sections.yaml
+
+histogram:
+  - [LW, 1.0]
+
+access-addresses:
+  - ordered: true
+    plain:
+      - addr: 0x80002001
+      - addr: 0x80000000
+  - ordered: true
+    plain:
+      - addr: 0x80001234
+        access-size: 0xffffffffff
+      - addr: 0x80000000
+  - ordered: true
+    plain:
+      - addr: 0x80000300
+
+# CHECK: error: 'access-size' is too large. Selected target supports only 32 bit addresses
