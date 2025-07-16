@@ -255,6 +255,11 @@ public:
       return *this;
     }
 
+    Builder &registerMemReadCallback(MemReadCallbackTy Callback) {
+      Config.MemReadCallback = Callback;
+      return *this;
+    }
+
     Builder &registerMemUpdateCallback(MemUpdateCallbackTy Callback) {
       Config.MemUpdateCallback = Callback;
       return *this;
@@ -345,6 +350,8 @@ public:
     return *Config;
   }
 
+  void reset() { getVTable()->modelReset(get()); }
+
   RVMSimExecStatus executeInstr() { return getVTable()->executeInstr(get()); }
 
   template <typename T>
@@ -403,3 +410,4 @@ public:
 };
 
 } // namespace rvm
+

@@ -17,6 +17,7 @@ namespace rvm {
 struct RVM_FunctionPointers {
   rvm_modelCreate_t modelCreate;
   rvm_modelDestroy_t modelDestroy;
+  rvm_modelReset_t modelReset;
 
   rvm_getModelConfig_t getModelConfig;
 
@@ -51,3 +52,4 @@ struct RVM_FunctionPointers {
 }
 } // namespace rvm
 #endif // __cplusplus
+
