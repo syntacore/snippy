@@ -16,7 +16,7 @@ extern "C" {
 
 #define RVMAPI_ENTRY_POINT_SYMBOL RVMVTable
 #define RVMAPI_VERSION_SYMBOL RVMInterfaceVersion
-#define RVMAPI_CURRENT_INTERFACE_VERSION 25u
+#define RVMAPI_CURRENT_INTERFACE_VERSION 28u
 
 typedef uint64_t RVMRegT;
 
@@ -105,10 +105,13 @@ typedef enum {
   MACRO(RVM_ZEXT_BB, bb)                                                       \
   MACRO(RVM_ZEXT_BC, bc)                                                       \
   MACRO(RVM_ZEXT_BS, bs)                                                       \
+  MACRO(RVM_ZEXT_BPBO, bpbo)                                                   \
   MACRO(RVM_ZEXT_BITMANIP, bitmanip)                                           \
   MACRO(RVM_ZEXT_BKB, bkb)                                                     \
   MACRO(RVM_ZEXT_BKC, bkc)                                                     \
   MACRO(RVM_ZEXT_BKX, bkx)                                                     \
+  MACRO(RVM_ZEXT_PN, pn)                                                       \
+  MACRO(RVM_ZEXT_PSFOPERAND, psfoperand)                                       \
   MACRO(RVM_ZEXT_VFBFMIN, vfbfmin)                                             \
   MACRO(RVM_ZEXT_VFBFWMA, vfbfwma)                                             \
   MACRO(RVM_ZEXT_VFH, vfh)                                                     \
@@ -186,6 +189,7 @@ typedef enum {
 
 RVMState *rvm_modelCreate(const RVMConfig *config);
 void rvm_modelDestroy(RVMState *State);
+void rvm_modelReset(RVMState *State);
 
 const RVMConfig *rvm_getModelConfig(const RVMState *State);
 
@@ -354,6 +358,8 @@ void rvm_logMessage(const RVMState *State, const char *Message);
 
 int rvm_queryCallbackSupportPresent(const RVMState *State);
 
+typedef void (*MemReadCallbackTy)(RVMCallbackHandler *, uint64_t Addr,
+                                  const char *Data, size_t Size);
 typedef void (*MemUpdateCallbackTy)(RVMCallbackHandler *, uint64_t Addr,
                                     const char *Data, size_t Size);
 typedef void (*XRegUpdateCallbackTy)(RVMCallbackHandler *, RVMXReg Reg,
@@ -381,6 +387,7 @@ struct RVMConfig {
   const char *LogFilePath;
   const char *PluginInfo;
   RVMCallbackHandler *CallbackHandler;
+  MemReadCallbackTy MemReadCallback;
   MemUpdateCallbackTy MemUpdateCallback;
   XRegUpdateCallbackTy XRegUpdateCallback;
   FRegUpdateCallbackTy FRegUpdateCallback;
@@ -393,6 +400,7 @@ struct RVMConfig {
 
 typedef RVMState *(*rvm_modelCreate_t)(const RVMConfig *);
 typedef void (*rvm_modelDestroy_t)(RVMState *);
+typedef void (*rvm_modelReset_t)(RVMState *);
 typedef const RVMConfig *(*rvm_getModelConfig_t)(const RVMState *);
 typedef RVMSimExecStatus (*rvm_executeInstr_t)(RVMState *);
 typedef void (*rvm_readMem_t)(const RVMState *, uint64_t, size_t, char *);
@@ -415,3 +423,4 @@ typedef int (*rvm_queryCallbackSupportPresent_t)(const RVMState *);
 #ifdef __cplusplus
 }
 #endif // __cplusplus
+
