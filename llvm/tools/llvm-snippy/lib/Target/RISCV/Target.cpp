@@ -1326,8 +1326,8 @@ public:
                       const MCRegisterInfo &RI) const override {
     if (RegClassID == RISCV::VMV0RegClassID)
       return false;
-    auto RC = RI.getRegClass(RegClassID);
-    return std::all_of(RC.begin(), RC.end(), [this, RI](unsigned Reg) {
+    const auto &RC = RI.getRegClass(RegClassID);
+    return std::all_of(RC.begin(), RC.end(), [this, &RI](unsigned Reg) {
       return !isMultipleReg(Reg, RI);
     });
   }
