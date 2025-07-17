@@ -323,6 +323,9 @@ private:
 struct InstructionRequest final {
   unsigned Opcode;
   std::vector<PreselectedOpInfo> Preselected;
+
+  // TODO: Replace this flag with MDNode (Metadata Node)
+  bool IsSupport = false;
 };
 
 namespace detail {
@@ -402,14 +405,18 @@ public:
 class FinalInstPolicy final : public detail::EmptyFinalizeMixin {
   unsigned Opcode;
   const CommonPolicyConfig *Cfg;
+  bool WasUsed = false;
 
 public:
   FinalInstPolicy(const CommonPolicyConfig &Cfg, unsigned Opc)
       : Opcode(Opc), Cfg(&Cfg) {}
 
-  bool isInseparableBundle() const { return false; }
+  bool isInseparableBundle() const { return true; }
 
-  std::optional<InstructionRequest> next() const {
+  std::optional<InstructionRequest> next() {
+    if (WasUsed)
+      return std::nullopt;
+    WasUsed = true;
     return InstructionRequest{Opcode, {}};
   }
 
