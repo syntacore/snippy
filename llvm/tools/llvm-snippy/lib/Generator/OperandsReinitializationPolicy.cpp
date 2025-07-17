@@ -220,11 +220,11 @@ ValuegramGenPolicy::generateRegInit(InstructionGenerationContext &InstrGenCtx,
         SmallVector<MCInst> InstrsForWrite;
         Tgt.generateWriteValueSeq(InstrGenCtx, *ValueToWrite,
                                   SimpleReg.asMCReg(), InstrsForWrite);
-        llvm::transform(InstrsForWrite, std::back_inserter(InitInstrs),
-                        [&](const auto &I) {
-                          return InstructionRequest{I.getOpcode(),
-                                                    getPreselectedForInstr(I)};
-                        });
+        llvm::transform(
+            InstrsForWrite, std::back_inserter(InitInstrs), [&](const auto &I) {
+              return InstructionRequest{
+                  I.getOpcode(), getPreselectedForInstr(I), /*IsSupport=*/true};
+            });
       });
   return InitInstrs;
 }
