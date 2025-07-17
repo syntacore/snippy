@@ -64,7 +64,7 @@ public:
   void initialize(InstructionGenerationContext &InstrGenCtx,
                   const RequestLimit &Limit);
 
-  bool isInseparableBundle() const { return true; }
+  bool isInseparableBundle() const { return false; }
 
   void print(raw_ostream &OS) const { OS << "Valuegram Generation Policy\n"; }
 
