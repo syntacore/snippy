@@ -1,0 +1,39 @@
+# COM: This test checks the correctness of the hint insertion generation behavior 
+# COM: with the valuegram policy. Hints can only be inserted between sets of instructions 
+# COM: (target and support, for generating values ​​in registers).
+
+# RUN: llvm-snippy %s \
+# RUN:    -model-plugin=None \
+# RUN:    -generate-insertion-point-hints \
+# RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: "riscv64-linux-gnu"
+  num-instrs: 100
+  dump-mf: on
+
+sections:
+    - no:        0
+      VMA:       0x2000000
+      SIZE:      0x1000000
+      LMA:       0x2000000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x0400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [SUB, 1.0]
+    - [LW, 1.0]
+    - [SW, 2.0]
+
+# CHECK-COUNT-102: $x0 = ADDI $x0, 0
