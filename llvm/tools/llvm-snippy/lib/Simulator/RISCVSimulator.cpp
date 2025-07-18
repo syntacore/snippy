@@ -274,6 +274,8 @@ public:
       setVPR(VRegNo, Regs.VRegs[VRegNo]);
   }
 
+  void resetState(const TargetSubtargetInfo &SubTgt) override;
+
   VectorRegisterType readVPR(unsigned RegID) const override {
     SmallVector<uint64_t, 2> Data(VLEN / RISCV_CHAR_BIT);
     ModelState.readVReg(static_cast<RVMVReg>(RegID),
@@ -607,6 +609,12 @@ std::unique_ptr<SimulatorInterface> createRISCVSimulator(
   auto Sim = std::make_unique<SnippyRISCVSimulator>(std::move(ModelState));
   auxSimInit(Subtarget, *Sim);
   return Sim;
+}
+
+void SnippyRISCVSimulator::resetState(const TargetSubtargetInfo &SubTgt) {
+  ModelState.reset();
+  const auto &Subtarget = static_cast<const RISCVSubtarget &>(SubTgt);
+  auxSimInit(Subtarget, *this);
 }
 
 } // namespace snippy
