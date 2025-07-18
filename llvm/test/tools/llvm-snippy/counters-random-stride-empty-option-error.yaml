@@ -1,0 +1,40 @@
+# RUN: not llvm-snippy -model-plugin None %s |& FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  num-instrs: 100
+
+histogram:
+  - [LD, 10.0]
+
+branches:
+  loop-counters:
+    random-stride:
+
+sections:
+  - no: 1
+    VMA: 0x2000
+    SIZE: 0x1000000
+    LMA: 0x2000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x400000000
+    SIZE: 0x2000
+    LMA: 0x400000000
+    ACCESS: rw
+
+access-ranges:
+  - start: 0x400000000
+    size: 64
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+  - start: 0x400001000
+    size: 8
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+
+# CHECK: error: loop-counters: random-stride option requires at least one of the
+# CHECK-SAME: following attributes: enabled, min, max. But none of them was
+# CHECK-SAME: provided.
