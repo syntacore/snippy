@@ -1,0 +1,40 @@
+# RUN: timeout 300 not llvm-snippy -model-plugin None %s |& FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  num-instrs: 100
+
+histogram:
+  - [BLT, 1.0]
+
+branches:
+  loop-counters:
+    random-stride:
+      max: 0
+  loop-ratio: 1
+
+sections:
+  - no: 1
+    VMA: 0x2000
+    SIZE: 0x1000000
+    LMA: 0x2000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x400000000
+    SIZE: 0x2000
+    LMA: 0x400000000
+    ACCESS: rw
+
+access-ranges:
+  - start: 0x400000000
+    size: 64
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+  - start: 0x400001000
+    size: 8
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+
+# CHECK: error: max: the stride for loop counters must be >= 1, got 0.
