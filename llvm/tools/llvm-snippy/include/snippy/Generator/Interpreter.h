@@ -149,7 +149,7 @@ public:
 
   [[nodiscard]] ExecutionResult step() { return Simulator->executeInstr(); }
 
-  void resetState(const SnippyProgramContext &ProgCtx, bool DoMemReset = true);
+  void resetState(const SnippyProgramContext &ProgCtx, bool FullReset = true);
   void resetMem();
 
   void disableTransactionsTracking();

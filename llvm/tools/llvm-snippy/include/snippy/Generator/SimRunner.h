@@ -52,9 +52,9 @@ public:
     return Error::success();
   }
 
-  void resetState(const SnippyProgramContext &ProgCtx, bool DoMemReset) {
+  void resetState(const SnippyProgramContext &ProgCtx, bool FullReset) {
     for (auto &&PI : CoInterp)
-      PI->resetState(ProgCtx, DoMemReset);
+      PI->resetState(ProgCtx, FullReset);
   }
   auto &getSimConfig() & {
     assert(Env);
