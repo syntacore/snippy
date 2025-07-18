@@ -1,0 +1,47 @@
+# RUN: timeout 300 llvm-snippy -model-plugin None %s |& FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  num-instrs: 100
+
+histogram:
+  - [BLT, 1.0]
+  - [BGE, 1.0]
+  - [BNE, 1.0]
+
+branches:
+  loop-ratio: 1.0
+  loop-counters:
+    random-init:
+      min: 4294967292
+      max: 4294967295
+
+sections:
+  - no: 1
+    VMA: 0x2000
+    SIZE: 0x1000000
+    LMA: 0x2000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x400000000
+    SIZE: 0x2000
+    LMA: 0x400000000
+    ACCESS: rw
+
+access-ranges:
+  - start: 0x400000000
+    size: 64
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+  - start: 0x400001000
+    size: 8
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+
+# CHECK-COUNT-1: warning: (loop-counter-out-of-range) The range of values for
+# CHECK-SAME: initializing loop counters conflicts with the number of iterations
+# CHECK-SAME: (overflow is possible): The loop counters will be initialized
+# CHECK-SAME: with the closest possible number to the specified minimum value of
+# CHECK-SAME: the range.
