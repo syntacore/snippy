@@ -1,0 +1,47 @@
+# RUN: timeout 300 llvm-snippy -model-plugin None %s |& FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  num-instrs: 100
+
+histogram:
+  - [BLT, 1.0]
+  - [BGE, 1.0]
+  - [BNE, 1.0]
+
+branches:
+  loop-ratio: 1.0
+  loop-counters:
+    random-stride:
+      # max immediate for ADDI is 2047, so we'll give a warning
+      max: 2048
+
+sections:
+  - no: 1
+    VMA: 0x2000
+    SIZE: 0x1000000
+    LMA: 0x2000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x400000000
+    SIZE: 0x2000
+    LMA: 0x400000000
+    ACCESS: rw
+
+access-ranges:
+  - start: 0x400000000
+    size: 64
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+  - start: 0x400001000
+    size: 8
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+
+# CHECK-COUNT-1: warning: (loop-stride-out-of-range) The stride range is now
+# CHECK-SAME: limited to '[1, 2047]' to prevent overflow errors. Try reducing
+# CHECK-SAME: one of the following: the value range for loop counter
+# CHECK-SAME: initialization, the value range for the stride, or the number of
+# CHECK-SAME: iterations.

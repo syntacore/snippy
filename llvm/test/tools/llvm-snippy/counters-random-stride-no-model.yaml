@@ -1,0 +1,53 @@
+# RUN: timeout 300 llvm-snippy %s -model-plugin None | FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  dump-mf: true
+  num-instrs: 200
+
+histogram:
+  - [BLT, 1.0]
+  - [BGE, 1.0]
+
+branches:
+  loop-ratio: 1.0
+  max-depth:
+    loop: 1
+  loop-counters:
+    random-init:
+      enabled: on
+      max: 100000000
+    random-stride:
+      enabled: on
+      min: 1111
+      max: 1111
+
+sections:
+  - no: 1
+    VMA: 0x2000
+    SIZE: 0x1000000
+    LMA: 0x2000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x400000000
+    SIZE: 0x2000
+    LMA: 0x400000000
+    ACCESS: rw
+
+access-ranges:
+  - start: 0x400000000
+    size: 64
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+  - start: 0x400001000
+    size: 8
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+
+# CHECK: [[CounterReg:\$[a-z0-9]+]] = ADDI [[CounterReg]], 1111
+# CHECK: BLT [[CounterReg]]
+
+# CHECK: [[CounterReg:\$[a-z0-9]+]] = ADDI [[CounterReg]], -1111
+# CHECK: BGE [[CounterReg]]
