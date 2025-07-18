@@ -102,6 +102,7 @@ public:
 
   virtual void saveState(IRegisterState &Regs) const = 0;
   virtual void setState(const IRegisterState &Regs) = 0;
+  virtual void resetState(const TargetSubtargetInfo &SubTgt) = 0;
 
   virtual void logMessage(const Twine &Message) const = 0;
 

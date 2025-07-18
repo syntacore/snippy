@@ -246,9 +246,11 @@ bool Interpreter::coveredByMemoryRegion(MemAddr Start, MemAddr Size) const {
 }
 
 void Interpreter::resetState(const SnippyProgramContext &ProgCtx,
-                             bool DoMemReset) {
-  if (DoMemReset)
+                             bool FullReset) {
+  if (FullReset) {
     resetMem();
+    Simulator->resetState(getSubTarget());
+  }
   auto &Regs = ProgCtx.getInitialRegisterState(getSubTarget());
   setRegisterState(Regs);
 }
