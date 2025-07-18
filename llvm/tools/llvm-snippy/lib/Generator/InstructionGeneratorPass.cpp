@@ -102,9 +102,9 @@ void InstructionGenerator::prepareInterpreterEnv(MachineFunction &MF) const {
 
   // FIXME: it is too late to prepare interpreter env here. Some passes may
   // have already modified memory. Better to do that before all that passes.
-  // Currently DoMemReset == false is introduced to fix current issues with it.
+  // Currently FullReset == false is introduced to fix current issues with it.
   I.resetState(ProgCtx,
-               /*DoMemReset*/ false);
+               /*FullReset*/ false);
 
   if (!ProgCtx.hasStackSection())
     return;
