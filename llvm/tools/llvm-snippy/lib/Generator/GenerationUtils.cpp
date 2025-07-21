@@ -318,49 +318,36 @@ std::map<unsigned, AddressRestriction> deduceStrongestRestrictions(
 
   std::map<unsigned, AddressRestriction> BaseRegToAR;
   for (const auto &[BaseReg, Opcodes] : BaseRegToOpcodes) {
-    auto StrongestAccessSize = std::max_element(
-        Opcodes.begin(), Opcodes.end(), [&OpcodeToAR](auto LHS, auto RHS) {
-          return OpcodeToAR.at(LHS).AccessSize < OpcodeToAR.at(RHS).AccessSize;
-        });
-    auto StrongestImmMin = std::max_element(
-        Opcodes.begin(), Opcodes.end(), [&OpcodeToAR](auto LHS, auto RHS) {
-          return OpcodeToAR.at(LHS).ImmOffsetRange.getMin() <
-                 OpcodeToAR.at(RHS).ImmOffsetRange.getMin();
-        });
-    auto StrongestImmMax = std::min_element(
-        Opcodes.begin(), Opcodes.end(), [&OpcodeToAR](auto LHS, auto RHS) {
-          return OpcodeToAR.at(LHS).ImmOffsetRange.getMax() <
-                 OpcodeToAR.at(RHS).ImmOffsetRange.getMax();
-        });
-    auto StrongestImmStride = std::max_element(
-        Opcodes.begin(), Opcodes.end(), [&OpcodeToAR](auto LHS, auto RHS) {
-          return OpcodeToAR.at(LHS).ImmOffsetRange.getStride() <
-                 OpcodeToAR.at(RHS).ImmOffsetRange.getStride();
-        });
-    auto StrongestOffsetAlignment = std::max_element(
-        Opcodes.begin(), Opcodes.end(), [&OpcodeToAR](auto LHS, auto RHS) {
-          return OpcodeToAR.at(LHS).OffsetAlignment <
-                 OpcodeToAR.at(RHS).OffsetAlignment;
-        });
+    auto ARsRange =
+        map_range(Opcodes, [&](unsigned Opc) { return OpcodeToAR.at(Opc); });
+    SmallVector<AddressRestriction, 8> ARs(ARsRange.begin(), ARsRange.end());
 
-    AddressRestriction StrongestAR;
+#define SNIPPY_ARS_GET_MAX_FIELD(FIELD, COMPARE)                               \
+  std::max_element(ARs.begin(), ARs.end(),                                     \
+                   [](const auto &LHS, const auto &RHS) {                      \
+                     return COMPARE(LHS.FIELD, RHS.FIELD);                     \
+                   })                                                          \
+      ->FIELD
 
-    StrongestAR.AccessSize = OpcodeToAR.at(*StrongestAccessSize).AccessSize;
-    StrongestAR.AccessAlignment =
-        OpcodeToAR.at(*StrongestAccessSize).AccessAlignment;
-
-    StrongestAR.ImmOffsetRange = StridedImmediate(
-        OpcodeToAR.at(*StrongestImmMin).ImmOffsetRange.getMin(),
-        OpcodeToAR.at(*StrongestImmMax).ImmOffsetRange.getMax(),
-        OpcodeToAR.at(*StrongestImmStride).ImmOffsetRange.getStride());
-    StrongestAR.OffsetAlignment =
-        OpcodeToAR.at(*StrongestOffsetAlignment).OffsetAlignment;
-
-    // We insert all opcodes because the address chosen for this restriction
-    // will be used as a fallback if we fail to find another one.
-    StrongestAR.Opcodes.insert(Opcodes.begin(), Opcodes.end());
-
-    BaseRegToAR[BaseReg] = std::move(StrongestAR);
+    BaseRegToAR[BaseReg] = AddressRestriction{
+        // Max size
+        SNIPPY_ARS_GET_MAX_FIELD(AccessSize, std::less<>{}),
+        // Max alignment
+        SNIPPY_ARS_GET_MAX_FIELD(AccessAlignment, std::less<>{}),
+        // Max alignment
+        SNIPPY_ARS_GET_MAX_FIELD(OffsetAlignment, std::less<>{}),
+        {
+            // Largest min
+            SNIPPY_ARS_GET_MAX_FIELD(ImmOffsetRange.getMin(), std::less<>{}),
+            // Smallest max
+            SNIPPY_ARS_GET_MAX_FIELD(ImmOffsetRange.getMax(), std::greater<>{}),
+            // Max stride
+            SNIPPY_ARS_GET_MAX_FIELD(ImmOffsetRange.getStride(), std::less<>{}),
+        },
+        // We insert all opcodes because the address chosen for this restriction
+        // will be used as a fallback if we fail to find another one.
+        decltype(AddressRestriction::Opcodes)(Opcodes.begin(), Opcodes.end())};
+#undef SNIPPY_ARS_GET_MAX_FIELD
   }
 
   return BaseRegToAR;
