@@ -1,0 +1,25 @@
+# RUN: llvm-snippy %s -mattr +f,-d -model-plugin None -o %t
+# RUN: llvm-objdump %t.elf -d |& FileCheck %s -dump-input fail
+# RUN: llvm-snippy %s -mattr +d -model-plugin None -o %t
+# RUN: llvm-objdump %t.elf -d |& FileCheck %s -dump-input fail
+include:
+  - ../Inputs/sections.yaml
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  num-instrs: 2000
+histogram:
+  - [WriteFCSRImm, 1.0]
+  - [SwapFCSRImm, 1.0]
+  - [ReadFCSR, 0.2]
+imm-hist:
+  opcodes:
+    - "WriteFCSRImm|SwapFCSRImm": uniform
+
+
+# CHECK-DAG: csrwi fcsr, {{([[:digit:]][[:digit:]])|([[:digit:]])}}
+# CHECK-DAG: frcsr {{[sat][[:digit:]]+}}
+# CHECK-DAG: csrrwi {{[sat][[:digit:]]+}}, fcsr, {{[[:digit:]][[:digit:]]?}}
+
+# CHECK-NOT: csrwi fcsr, {{(3[2-9])|([4-9][[:digit:]])|([[:digit:]][[:digit:]][[:digit:]]+)}}
+# CHECK-NOT: csrwi {{[sat][[:digit:]]+}}, fcsr, {{(3[2-9])|([4-9][[:digit:]])|([[:digit:]][[:digit:]][[:digit:]]+)}}
