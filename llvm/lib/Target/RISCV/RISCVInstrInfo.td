@@ -2205,6 +2205,10 @@ def WriteFFLAGS : WriteSysReg<SysRegFFLAGS, [FFLAGS]>;
 // Needed only for llvm-snippy.
 def WriteFFLAGSImm : WriteSysRegImm<SysRegFFLAGS, [FFLAGS]>;
 def SwapFFLAGSImm : SwapSysRegImm<SysRegFFLAGS, [FFLAGS]>;
+
+def ReadFCSR : ReadSysReg<SysRegFCSR, [FRM, FFLAGS]>;
+def WriteFCSRImm : WriteSysRegImm<SysRegFCSR, [FRM, FFLAGS]>;
+def SwapFCSRImm : SwapSysRegImm<SysRegFCSR, [FRM, FFLAGS]>;
 }
 
 let hasPostISelHook = 1 in {

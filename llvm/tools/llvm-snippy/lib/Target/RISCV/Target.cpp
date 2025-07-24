@@ -1108,6 +1108,10 @@ public:
     // Allows setting rounding mode when combined with per-opcode `imm-hist`.
     case RISCV::WriteFRMImm:
     case RISCV::SwapFRMImm:
+
+    case RISCV::ReadFCSR:
+    case RISCV::WriteFCSRImm:
+    case RISCV::SwapFCSRImm:
       return true;
     default:
       return false;
