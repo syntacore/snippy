@@ -352,8 +352,9 @@ public:
   virtual Register getFirstPhysReg(Register Reg,
                                    const MCRegisterInfo &RI) const = 0;
 
-  virtual std::vector<Register>
-  getPhysRegsFromUnit(Register RegUnit, const MCRegisterInfo &RI) const = 0;
+  virtual void
+  getPhysRegsFromUnit(Register RegUnit, const MCRegisterInfo &RI,
+                      SmallVectorImpl<Register> &OutPhysRegs) const = 0;
 
   // This function is different from getPhysRegsFromUnit in that
   // it returns physical registers without overlaps.
@@ -361,9 +362,9 @@ public:
   // 2. If RegUnit is part of a physical register, we will return that part.
   // 3. Otherwise, we will return the physical register referenced by this
   // alias.
-  virtual std::vector<Register>
-  getPhysRegsWithoutOverlaps(Register RegUnit,
-                             const MCRegisterInfo &RI) const = 0;
+  virtual void
+  getPhysRegsWithoutOverlaps(Register RegUnit, const MCRegisterInfo &RI,
+                             SmallVectorImpl<Register> &OutPhysRegs) const = 0;
 
   virtual unsigned getMaxBranchDstMod(unsigned Opcode) const = 0;
 
@@ -457,9 +458,9 @@ public:
   getAccessSizeAndAlignment(SnippyProgramContext &ProgCtx, unsigned Opcode,
                             const MachineBasicBlock &MBB) const = 0;
 
-  virtual std::vector<Register>
-  excludeFromMemRegsForOpcode(unsigned Opcode,
-                              const MCRegisterInfo &RI) const = 0;
+  virtual void
+  excludeFromMemRegsForOpcode(unsigned Opcode, const MCRegisterInfo &RI,
+                              SmallVectorImpl<Register> &Regs) const = 0;
 
   // FIXME: basically, we should need only MCRegisterClass, but now
   // MCRegisterClass for RISCV does not fully express available regs.
