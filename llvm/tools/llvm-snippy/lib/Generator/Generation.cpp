@@ -428,7 +428,7 @@ void controlNaNPropagation(
         return (MI.getNumDefs() == 1) && hasFRegDestination(MI, Tgt);
       });
 
-  auto RI = ProgCtx.getLLVMState().getRegInfo();
+  const auto &RI = ProgCtx.getLLVMState().getRegInfo();
   // Here we add register classes whose registers will be unnaned
   SmallPtrSet<const MCRegisterClass *, 3> RegClassesToUnNaN;
   llvm::for_each(Filtered, [&](auto &MI) {
