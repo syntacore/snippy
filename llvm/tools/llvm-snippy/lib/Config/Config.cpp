@@ -361,10 +361,11 @@ static void parseReservedRegistersOption(RegPoolWrapper &RP,
       snippy::fatal(formatv("Illegal register name {0}"
                             " is specified in --reserved-regs-list",
                             RegName));
-    llvm::for_each(Tgt.getPhysRegsFromUnit(Reg.value(), RI),
-                   [&RP](auto SimpleReg) {
-                     RP.addReserved(SimpleReg, AccessMaskBit::GRW);
-                   });
+    SmallVector<Register> PhysRegs;
+    Tgt.getPhysRegsFromUnit(Reg.value(), RI, PhysRegs);
+    llvm::for_each(PhysRegs, [&RP](auto SimpleReg) {
+      RP.addReserved(SimpleReg, AccessMaskBit::GRW);
+    });
     DEBUG_WITH_TYPE("snippy-regpool",
                     (dbgs() << "Reserved with option:\n", RP.print(dbgs())));
   }

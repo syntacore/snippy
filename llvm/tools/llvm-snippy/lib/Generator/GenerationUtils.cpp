@@ -398,16 +398,18 @@ generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
   // Compute set of registers compatible with all opcodes
   std::unordered_set<unsigned> Exclude;
   for (auto Opcode : Opcodes) {
-    copy(SnippyTgt.excludeFromMemRegsForOpcode(Opcode, RI),
-         std::inserter(Exclude, Exclude.begin()));
+    SmallVector<Register> ExcludedRegs;
+    SnippyTgt.excludeFromMemRegsForOpcode(Opcode, RI, ExcludedRegs);
+    copy(ExcludedRegs, std::inserter(Exclude, Exclude.begin()));
   }
   // Current implementation expects that each target has only one addr reg
   // class.
   const auto &AddrRegClass = SnippyTgt.getAddrRegClass();
   SmallVector<Register, 32> Include;
   copy_if(AddrRegClass, std::back_inserter(Include), [&](Register Reg) {
-    return none_of(SnippyTgt.getPhysRegsFromUnit(Reg, RI),
-                   [&Exclude](auto R) { return Exclude.count(R); });
+    SmallVector<Register> Units;
+    SnippyTgt.getPhysRegsFromUnit(Reg, RI, Units);
+    return none_of(Units, [&Exclude](auto R) { return Exclude.count(R); });
   });
 
   // Normalize the number of addr registers to use. It's possible that we'll
@@ -453,7 +455,9 @@ generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
   auto AddrRegs = RP.getNAvailableRegisters(
       "for memory access burst", RegInfo, *AddrRegClass.MC, MBB, NumAddrs,
       [&](Register R) {
-        return any_of(SnippyTgt.getPhysRegsFromUnit(R, RI),
+        SmallVector<Register> Units;
+        SnippyTgt.getPhysRegsFromUnit(R, RI, Units);
+        return any_of(Units,
                       [&Exclude](auto Reg) { return Exclude.count(Reg); });
       });
 

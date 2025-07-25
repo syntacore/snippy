@@ -581,8 +581,12 @@ handleGeneratedInstructions(InstrIt ItBegin,
   auto RP = InstrGenCtx.pushRegPool();
   std::vector<SelfcheckFirstStoreInfo<InstrIt>> StoresInfo;
   for (const auto &Def : Defs) {
-    llvm::for_each(ST.getPhysRegsFromUnit(Def.DestReg, State.getRegInfo()),
-                   [&RP](auto SimpleReg) { RP->addReserved(SimpleReg); });
+    {
+      SmallVector<Register> DstPhysRegs;
+      ST.getPhysRegsFromUnit(Def.DestReg, State.getRegInfo(), DstPhysRegs);
+      llvm::for_each(DstPhysRegs,
+                     [&RP](auto SimpleReg) { RP->addReserved(SimpleReg); });
+    }
     // This is done for backward compatibility.
     auto TmpRP = InstrGenCtx.pushRegPool();
     auto SelfcheckInterInfo =
@@ -689,8 +693,9 @@ std::optional<MachineOperand> pregenerateOneOperand(
       Reg = Preselected.getReg();
     else {
       auto RegClass = RegInfo.getRegClass(MCOpInfo.RegClass);
-      auto Exclude =
-          SnippyTgt.excludeFromMemRegsForOpcode(InstrDesc.getOpcode(), RegInfo);
+      SmallVector<Register> Exclude;
+      SnippyTgt.excludeFromMemRegsForOpcode(InstrDesc.getOpcode(), RegInfo,
+                                            Exclude);
       auto RegOpt = RegGen.generate(RegClass, OperandRegClassID, RegInfo, RP,
                                     MBB, SnippyTgt, Exclude);
       if (!RegOpt)
@@ -760,10 +765,11 @@ SmallVector<MachineOperand, 8> pregenerateOperands(
     llvm::for_each(Preselected, [&](const auto &Op) {
       if (!Op.isReg())
         return;
-      llvm::for_each(Tgt.getPhysRegsFromUnit(Op.getReg(), RI),
-                     [&RP](auto SimpleReg) {
-                       RP.addReserved(SimpleReg, AccessMaskBit::W);
-                     });
+      SmallVector<Register> PhysRegs;
+      Tgt.getPhysRegsFromUnit(Op.getReg(), RI, PhysRegs);
+      llvm::for_each(PhysRegs, [&RP](auto SimpleReg) {
+        RP.addReserved(SimpleReg, AccessMaskBit::W);
+      });
     });
     RegGenerator.setRegContextForPlugin();
     auto PregeneratedOperandsOpt =
@@ -936,10 +942,12 @@ unsigned chooseAddressRegister(InstructionGenerationContext &IGC,
 
   auto AllRegisters =
       RP.getAllAvailableRegisters(*AP.RegClass, *MI.getParent());
-  auto Exclude = SnippyTgt.excludeFromMemRegsForOpcode(MI.getOpcode(), RI);
+  SmallVector<Register> Exclude;
+  SnippyTgt.excludeFromMemRegsForOpcode(MI.getOpcode(), RI, Exclude);
 
   erase_if(AllRegisters, [&](Register Reg) {
-    auto PhysRegs = SnippyTgt.getPhysRegsFromUnit(Reg, RI);
+    SmallVector<Register> PhysRegs;
+    SnippyTgt.getPhysRegsFromUnit(Reg, RI, PhysRegs);
     assert(PhysRegs.size() == 1);
     return is_contained(Exclude, PhysRegs.front());
   });

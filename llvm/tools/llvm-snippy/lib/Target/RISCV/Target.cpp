@@ -1363,19 +1363,20 @@ public:
     return *std::min_element(Subregs.begin(), Subregs.end());
   }
 
-  std::vector<Register>
-  getPhysRegsFromUnit(Register RegUnit,
-                      const MCRegisterInfo &RI) const override {
+  void
+  getPhysRegsFromUnit(Register RegUnit, const MCRegisterInfo &RI,
+                      SmallVectorImpl<Register> &OutPhysRegs) const override {
+    OutPhysRegs.clear();
     if (RegUnit == RISCV::NoRegister)
-      return {};
-    if (!isMultipleReg(RegUnit, RI))
-      return {RegUnit};
+      return;
+    if (!isMultipleReg(RegUnit, RI)) {
+      OutPhysRegs.push_back(RegUnit);
+      return;
+    }
 
-    std::vector<Register> PhysRegs;
     auto Subregs = RI.subregs_inclusive(RegUnit);
-    copy_if(Subregs, std::back_inserter(PhysRegs),
+    copy_if(Subregs, std::back_inserter(OutPhysRegs),
             [this, &RI](auto &SubReg) { return !isMultipleReg(SubReg, RI); });
-    return PhysRegs;
   }
 
   // This function is different from getPhysRegsFromUnit in that
@@ -1384,19 +1385,22 @@ public:
   // E.G.:
   //         getPhysRegsWithoutOverlaps(F0_D) -> F0_D
   //         getPhysRegsFromUnit(F0_D)        -> F0_D, F0_F, F0_H
-  std::vector<Register>
-  getPhysRegsWithoutOverlaps(Register RegUnit,
-                             const MCRegisterInfo &RI) const override {
+  void getPhysRegsWithoutOverlaps(
+      Register RegUnit, const MCRegisterInfo &RI,
+      SmallVectorImpl<Register> &OutPhysRegs) const override {
     static_assert(
         RISCV::F0_D < RISCV::F31_D && RISCV::F0_F < RISCV::F31_F &&
         RISCV::F0_H < RISCV::F31_H &&
         "The value of enum is expected to increase with increasing number of "
         "FP register");
+    OutPhysRegs.clear();
     if ((RISCV::F0_D <= RegUnit && RegUnit <= RISCV::F31_D) ||
         (RISCV::F0_F <= RegUnit && RegUnit <= RISCV::F31_F) ||
-        (RISCV::F0_H <= RegUnit && RegUnit <= RISCV::F31_H))
-      return {RegUnit};
-    return getPhysRegsFromUnit(RegUnit, RI);
+        (RISCV::F0_H <= RegUnit && RegUnit <= RISCV::F31_H)) {
+      OutPhysRegs.push_back(RegUnit);
+      return;
+    }
+    getPhysRegsFromUnit(RegUnit, RI, OutPhysRegs);
   }
 
   bool isSelfcheckAllowed(unsigned Opcode) const override {
@@ -3079,32 +3083,32 @@ public:
             getLoadStoreAlignment(Opcode, SEW)};
   }
 
-  std::vector<Register>
-  excludeFromMemRegsForOpcode(unsigned Opcode,
-                              const MCRegisterInfo &RI) const override {
-    if (isCLoadStore(Opcode) || isCFPLoadStore(Opcode)) {
-      std::vector<Register> Result;
-      Result.reserve(32);
-      if (isCSPRelativeLoadStore(Opcode) || isCFPSPRelativeLoadStore(Opcode)) {
-        copy_if(getAddrRegClass(), std::back_inserter(Result),
-                [](Register Reg) { return Reg != RISCV::X2; });
-      } else {
-        copy_if(getAddrRegClass(), std::back_inserter(Result),
-                [](Register Reg) {
-                  return !is_contained(RISCV::GPRCRegClass, Reg);
-                });
-      }
-      std::vector<Register> ResUnits;
-      transform(Result, std::back_inserter(ResUnits),
-                [&RI, this](Register Reg) {
-                  auto Units = getPhysRegsFromUnit(Reg, RI);
-                  assert(Units.size() == 1 &&
-                         "Expect only one reg unit for RISC-V addr reg class");
-                  return Units.front();
-                });
-      return ResUnits;
+  void
+  excludeFromMemRegsForOpcode(unsigned Opcode, const MCRegisterInfo &RI,
+                              SmallVectorImpl<Register> &Regs) const override {
+    if (!isCLoadStore(Opcode) && !isCFPLoadStore(Opcode)) {
+      getPhysRegsFromUnit(RISCV::X0, RI, Regs);
+      return;
     }
-    return getPhysRegsFromUnit(RISCV::X0, RI);
+
+    SmallVector<Register, 32> Result;
+    if (isCSPRelativeLoadStore(Opcode) || isCFPSPRelativeLoadStore(Opcode)) {
+      copy_if(getAddrRegClass(), std::back_inserter(Result),
+              [](Register Reg) { return Reg != RISCV::X2; });
+    } else {
+      copy_if(getAddrRegClass(), std::back_inserter(Result), [](Register Reg) {
+        return !is_contained(RISCV::GPRCRegClass, Reg);
+      });
+    }
+
+    Regs.clear();
+    transform(Result, std::back_inserter(Regs), [&RI, this](Register Reg) {
+      SmallVector<Register> PhRegs;
+      getPhysRegsFromUnit(Reg, RI, PhRegs);
+      assert(PhRegs.size() == 1 &&
+             "Expect only one reg unit for RISC-V addr reg class");
+      return PhRegs.front();
+    });
   }
 
   std::vector<Register> excludeRegsForOperand(InstructionGenerationContext &IGC,
