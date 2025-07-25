@@ -250,15 +250,15 @@ public:
     reportUnimplementedError();
   }
 
-  std::vector<Register>
-  getPhysRegsFromUnit(Register RegUnit,
-                      const MCRegisterInfo &RI) const override {
+  void
+  getPhysRegsFromUnit(Register RegUnit, const MCRegisterInfo &RI,
+                      SmallVectorImpl<Register> &OutPhysRegs) const override {
     reportUnimplementedError();
   }
 
-  std::vector<Register>
-  getPhysRegsWithoutOverlaps(Register RegUnit,
-                             const MCRegisterInfo &RI) const override {
+  void getPhysRegsWithoutOverlaps(
+      Register RegUnit, const MCRegisterInfo &RI,
+      SmallVectorImpl<Register> &OutPhysRegs) const override {
     reportUnimplementedError();
   }
 
@@ -438,9 +438,9 @@ public:
     reportUnimplementedError();
   }
 
-  std::vector<Register>
-  excludeFromMemRegsForOpcode(unsigned Opcode,
-                              const MCRegisterInfo &RI) const override {
+  void
+  excludeFromMemRegsForOpcode(unsigned Opcode, const MCRegisterInfo &RI,
+                              SmallVectorImpl<Register> &Regs) const override {
     reportUnimplementedError();
   }
 

@@ -158,7 +158,9 @@ ValuegramGenPolicy::generateOneInstrWithInitRegs(
 
     // To avoid using registers that have already been initialized during
     // initialization.
-    llvm::for_each(Tgt.getPhysRegsFromUnit(Reg, RI), [&RP](auto SimpleReg) {
+    SmallVector<Register> PhysRegs;
+    Tgt.getPhysRegsFromUnit(Reg, RI, PhysRegs);
+    llvm::for_each(PhysRegs, [&RP](auto SimpleReg) {
       RP->addReserved(SimpleReg, AccessMaskBit::W);
     });
     // Added initialization instructions
@@ -204,28 +206,28 @@ ValuegramGenPolicy::generateRegInit(InstructionGenerationContext &InstrGenCtx,
   std::vector<InstructionRequest> InitInstrs;
   // We are operating a register group and must write a value
   // to all simple registers in the group.
-  llvm::for_each(
-      Tgt.getPhysRegsWithoutOverlaps(Reg, RI), [&](Register SimpleReg) {
-        auto ValueToWriteOrError =
-            getValueFromValuegram(MCOperand::createReg(SimpleReg), OperandIndex,
-                                  InstrDesc, InstrGenCtx);
+  SmallVector<Register> PhysRegs;
+  Tgt.getPhysRegsWithoutOverlaps(Reg, RI, PhysRegs);
+  llvm::for_each(PhysRegs, [&](Register SimpleReg) {
+    auto ValueToWriteOrError = getValueFromValuegram(
+        MCOperand::createReg(SimpleReg), OperandIndex, InstrDesc, InstrGenCtx);
 
-        // TODO: Better error handling.
-        if (!ValueToWriteOrError)
-          snippy::fatal(ValueToWriteOrError.takeError());
+    // TODO: Better error handling.
+    if (!ValueToWriteOrError)
+      snippy::fatal(ValueToWriteOrError.takeError());
 
-        auto &ValueToWrite = *ValueToWriteOrError;
-        if (!ValueToWrite.has_value())
-          return;
-        SmallVector<MCInst> InstrsForWrite;
-        Tgt.generateWriteValueSeq(InstrGenCtx, *ValueToWrite,
-                                  SimpleReg.asMCReg(), InstrsForWrite);
-        llvm::transform(
-            InstrsForWrite, std::back_inserter(InitInstrs), [&](const auto &I) {
-              return InstructionRequest{
-                  I.getOpcode(), getPreselectedForInstr(I), /*IsSupport=*/true};
-            });
-      });
+    auto &ValueToWrite = *ValueToWriteOrError;
+    if (!ValueToWrite.has_value())
+      return;
+    SmallVector<MCInst> InstrsForWrite;
+    Tgt.generateWriteValueSeq(InstrGenCtx, *ValueToWrite, SimpleReg.asMCReg(),
+                              InstrsForWrite);
+    llvm::transform(
+        InstrsForWrite, std::back_inserter(InitInstrs), [&](const auto &I) {
+          return InstructionRequest{I.getOpcode(), getPreselectedForInstr(I),
+                                    /*IsSupport=*/true};
+        });
+  });
   return InitInstrs;
 }
 
