@@ -112,16 +112,17 @@ public:
 
   LocalRegPool splitToUnits(const SnippyTarget &SnippyTgt,
                             const MCRegisterInfo &RI) const {
-    LocalRegPool SplittedUnits;
+    LocalRegPool SplitUnits;
 
-    for (auto &&[Reg, ReservMode] : Reserved) {
-      auto PhRegs = SnippyTgt.getPhysRegsFromUnit(Reg, RI);
+    for (auto &&[Reg, ReservationMode] : Reserved) {
+      SmallVector<Register> PhRegs;
+      SnippyTgt.getPhysRegsFromUnit(Reg, RI, PhRegs);
       for (auto &&PhReg : PhRegs) {
-        SplittedUnits.addReserved(PhReg, ReservMode);
+        SplitUnits.addReserved(PhReg, ReservationMode);
       }
     }
 
-    return SplittedUnits;
+    return SplitUnits;
   }
 
   LLVM_DUMP_METHOD void dump() const { print(dbgs()); }
@@ -256,8 +257,9 @@ public:
 
   void reset() { Pools.back() = RegPool{}; }
 
-  std::vector<Register> getPhysRegsFromUnit(Register RegUnit) const {
-    return SnippyTgt.getPhysRegsFromUnit(RegUnit, RegInfo);
+  void getPhysRegsFromUnit(Register RegUnit,
+                           SmallVectorImpl<Register> &OutPhysRegs) const {
+    SnippyTgt.getPhysRegsFromUnit(RegUnit, RegInfo, OutPhysRegs);
   }
 
   template <typename... ArgsTys>
@@ -266,7 +268,9 @@ public:
     // Therefore, we must identify the physical register
     // of this alias and check it.
     return any_of(Pools, [&](auto &Pool) {
-      return any_of(getPhysRegsFromUnit(Reg), [&](auto PhReg) {
+      SmallVector<Register> PhysRegs;
+      getPhysRegsFromUnit(Reg, PhysRegs);
+      return any_of(PhysRegs, [&](auto PhReg) {
         return Pool.isReserved(PhReg, std::forward<ArgsTys>(Args)...);
       });
     });
@@ -283,7 +287,8 @@ public:
                             << "\nBefore reservation: ",
                      dump()));
 
-    auto PhRegs = getPhysRegsFromUnit(Reg);
+    SmallVector<Register> PhRegs;
+    getPhysRegsFromUnit(Reg, PhRegs);
     for (auto &&PhReg : PhRegs)
       Pools.back().addReserved(PhReg, std::forward<ArgsTys>(Args)...);
 
