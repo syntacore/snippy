@@ -48,6 +48,7 @@ public:
   std::string ABIName;
   MCRegister StackPointer;
   bool FollowTargetABI;
+  std::vector<std::string> PreserveCallerSavedGroups;
   SmallVector<MCRegister> SpilledToStack;
   SmallVector<MCRegister> SpilledToMem;
   bool ExternalStack;
@@ -368,8 +369,6 @@ private:
   void validateAll(LLVMState &State, const OpcodeCache &cache,
                    const RegPoolWrapper &RP);
 };
-
-bool shouldSpillGlobalRegs(const Config &Cfg);
 
 } // namespace snippy
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(snippy::Config);

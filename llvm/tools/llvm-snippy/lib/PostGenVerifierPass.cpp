@@ -112,7 +112,7 @@ void PostGenVerifier::collectFreq(const MachineFunction &MF,
       if (Instr.isPseudo() && !SnippyTgt.isPseudoAllowed(Instr.getOpcode())) {
         continue;
       }
-      if (!checkSupportMetadata(Instr)) {
+      if (!checkMetadata(Instr, SnippyMetadata::Support)) {
         ++PrimaryInstrs[Instr.getOpcode()];
       }
       ++TotalInstrs[Instr.getOpcode()];
@@ -235,7 +235,8 @@ verifyBBWithNumLimit(const MachineBasicBlock &MBB,
   // are not mentioned in gen plan
   size_t Count =
       std::count_if(MBB.instr_begin(), MBB.instr_end(), [](const auto &Instr) {
-        return !checkSupportMetadata(Instr) && !Instr.isBranch();
+        return !checkMetadata(Instr, SnippyMetadata::Support) &&
+               !Instr.isBranch();
       });
   size_t Planned = BBReq.limit().getLimit();
   if (Planned != Count) {

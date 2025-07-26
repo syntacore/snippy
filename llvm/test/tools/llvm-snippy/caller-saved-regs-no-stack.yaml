@@ -1,0 +1,33 @@
+# RUN:  not llvm-snippy %s -mtriple=riscv64-unknown-elf -mcpu=generic-rv64 \
+# RUN:  -model-plugin=None |& FileCheck %s
+ 
+options:
+  preserve-caller-saved-regs: [X]
+  num-instrs: 10
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rw
+  - no:        2
+    VMA:       0x500000
+    SIZE:      0x100000
+    LMA:       0x500000
+    ACCESS:    rx
+
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - myfunc
+    - name: myfunc
+      external: true
+
+histogram:
+    - [ADD, 1.0]
+    - [JALR, 0.5]
+
+# CHECK: error: Cannot preserve requested caller-saved registers: no stack
+# CHECK-SAME: space allocated.

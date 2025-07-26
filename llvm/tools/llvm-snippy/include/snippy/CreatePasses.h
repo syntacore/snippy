@@ -51,6 +51,8 @@ ModulePass *createFillExternalFunctionsStubsPass(
 
 MachineFunctionPass *createTrackLivenessPass();
 
+MachineFunctionPass *createPreserveRegsInsertionPass();
+
 MachineFunctionPass *createCFGeneratorPass();
 
 snippy::ActiveImmutablePassInterface *createCFPermutationPass();
