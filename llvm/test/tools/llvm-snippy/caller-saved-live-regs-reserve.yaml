@@ -1,14 +1,11 @@
-# RUN: llvm-snippy %s -model-plugin None -dump-mir=- |& FileCheck %s
-
-# COM: Check that we tracks the liveness and 'verify-mi' finishes without errors.
+# RUN: llvm-snippy %s -model-plugin None --dump-mir=- |& FileCheck %s
 
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64-unknown-elf
   num-instrs: 200
-  init-regs-in-elf: true
-  function-number: 20
-  function-layers: 5
-  verify-mi: true
+  init-regs-in-elf: on
+  honor-target-abi: on
+  verify-mi: on 
 
 sections:
   - no:        1
@@ -32,17 +29,14 @@ call-graph:
   function-list:
     - name: SnippyFunction
       callees:
-        - myfunc
-    - name: myfunc
+        - IamExternalFunc
+    - name: IamExternalFunc
       external: true
 
 histogram:
     - [ADD, 1.0]
-    - [SUB, 1.0]
-    - [AND, 1.0]
-    - [XOR, 1.0]
-    - [JAL, 0.5]
-    - [JALR, 0.5]
+    - [JAL, 0.1]
+    - [JALR, 0.1]
 
 # COM: We check that SnippyFunction has tracksRegLiveness
 # CHECK: name: SnippyFunction

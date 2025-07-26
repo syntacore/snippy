@@ -280,6 +280,9 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         // Post backtrack
         PM.add(createPrologueEpilogueInsertionPass());
         PM.add(createFillExternalFunctionsStubsPass({}));
+        PM.add(createTrackLivenessPass());
+        PM.add(createPreserveRegsInsertionPass());
+
         if (DebugCfg.DumpMF)
           PM.add(createMachineFunctionPrinterPass(outs()));
 
@@ -291,11 +294,12 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         if (VerifyConsecutiveLoops)
           PM.add(createConsecutiveLoopsVerifierPass());
 
+        // Update liveness information
+        PM.add(createTrackLivenessPass());
+
         PM.add(createPostGenVerifierPass());
         PM.add(createInstructionsPostProcessPass());
         PM.add(createFunctionDistributePass());
-
-        PM.add(createTrackLivenessPass());
 
         if (PassCfg.InstrsGenerationConfig.RunMachineInstrVerifier)
           PM.add(createMachineVerifierPass("Machine Verifier Pass report"));

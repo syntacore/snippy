@@ -153,7 +153,9 @@ std::vector<InstrIt> collectSelfcheckCandidates(
   const auto &ST = ProgCtx.getLLVMState().getSnippyTarget();
   std::vector<InstrIt> FilteredCandidates;
   std::copy_if(Begin, End, std::back_inserter(FilteredCandidates),
-               [](const auto &MI) { return !checkSupportMetadata(MI); });
+               [](const auto &MI) {
+                 return !checkMetadata(MI, SnippyMetadata::Support);
+               });
   std::vector<InstrIt> Candidates;
 
   for (auto &PrimInstrIt : FilteredCandidates) {
@@ -1041,46 +1043,11 @@ void postprocessMemoryOperands(MachineInstr &MI,
   }
 }
 
-static void reloadGlobalRegsFromMemory(InstructionGenerationContext &IGC) {
-  auto &ProgCtx = IGC.ProgCtx;
-  auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
-  auto &ProgCfg = IGC.getCommonCfg().ProgramCfg;
-  auto &SpilledToMem = ProgCfg.SpilledToMem;
-  if (SpilledToMem.empty())
-    return;
-  assert(ProgCtx.hasProgramStateSaveSpace());
-  auto &SaveLocs = ProgCtx.getProgramStateSaveSpace();
-  for (auto &Reg : SpilledToMem) {
-    auto &Addr = SaveLocs.getSaveLocation(Reg);
-    Tgt.generateSpillToAddr(IGC, Reg, Addr.Local);
-  }
-  for (auto &Reg : SpilledToMem) {
-    auto &Addr = SaveLocs.getSaveLocation(Reg);
-    Tgt.generateReloadFromAddr(IGC, Reg, Addr.Global);
-  }
-}
-
-static void reloadLocallySpilledRegs(InstructionGenerationContext &IGC) {
-  auto &ProgCtx = IGC.ProgCtx;
-  auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
-  auto &ProgCfg = IGC.getCommonCfg().ProgramCfg;
-  auto &SpilledToMem = ProgCfg.SpilledToMem;
-  if (SpilledToMem.empty())
-    return;
-  assert(ProgCtx.hasProgramStateSaveSpace());
-  auto &SaveLocs = ProgCtx.getProgramStateSaveSpace();
-  for (auto &Reg : SpilledToMem) {
-    auto &Addr = SaveLocs.getSaveLocation(Reg);
-    Tgt.generateReloadFromAddr(IGC, Reg, Addr.Local);
-  }
-}
-
 MachineInstr *generateCall(unsigned OpCode,
                            planning::InstructionGenerationContext &InstrGenCtx,
                            bool IsSupport) {
   auto &MBB = InstrGenCtx.MBB;
   auto &ProgCtx = InstrGenCtx.ProgCtx;
-  const auto &ProgramCfg = InstrGenCtx.getCommonCfg().ProgramCfg;
   auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   if (!InstrGenCtx.CGS)
@@ -1099,27 +1066,13 @@ MachineInstr *generateCall(unsigned OpCode,
 
   auto &CallTarget = *(CalleeNode->functions()[FunctionIdx]);
   assert(CallTarget.hasName());
-  if (CalleeNode->isExternal() && ProgramCfg.hasSectionToSpillGlobalRegs())
-    reloadGlobalRegsFromMemory(InstrGenCtx);
-
-  auto TargetStackPointer = SnippyTgt.getStackPointer();
-  auto RealStackPointer = ProgCtx.getStackPointer();
-
-  // If we redefined stack pointer register, before generating external function
-  // call we need to copy stack pointer value to target default stack pointer
-  // and do reverse after returning from external call
-  if (CalleeNode->isExternal() && (RealStackPointer != TargetStackPointer))
-    SnippyTgt.copyRegToReg(InstrGenCtx, RealStackPointer, TargetStackPointer);
 
   auto *Call =
       SnippyTgt.generateCall(InstrGenCtx, CallTarget, IsSupport, OpCode);
-
-  if (!ProgramCfg.isRegSpilledToMem(RealStackPointer) &&
-      CalleeNode->isExternal() && (RealStackPointer != TargetStackPointer))
-    SnippyTgt.copyRegToReg(InstrGenCtx, TargetStackPointer, RealStackPointer);
-
-  if (CalleeNode->isExternal() && ProgramCfg.hasSectionToSpillGlobalRegs())
-    reloadLocallySpilledRegs(InstrGenCtx);
+  assert(Call);
+  if (CalleeNode->isExternal())
+    addSnippyMetadata(*Call, *MBB.getParent(), State.getCtx(),
+                      SnippyMetadata::ExternalCall);
 
   Node->markAsCommitted(CalleeNode);
   return Call;

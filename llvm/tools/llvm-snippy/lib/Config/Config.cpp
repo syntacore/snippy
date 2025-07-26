@@ -550,6 +550,7 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
   auto &ProgCfg = *Cfg.ProgramCfg;
   ProgCfg.ABIName = Opts.ABI;
   ProgCfg.FollowTargetABI = Opts.FollowTargetABI;
+  ProgCfg.PreserveCallerSavedGroups = Opts.PreserveCallerSavedRegs;
   ProgCfg.MangleExportedNames = Opts.MangleExportedNames;
   ProgCfg.EntryPointName = Opts.EntryPointName;
   ProgCfg.ExternalStack = Opts.ExternalStack;
@@ -572,7 +573,8 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
                    "--spilled-regs-list is ignored",
                    "--honor-target-abi is enabled.");
     RegsSpilledToStack.clear();
-    auto ABIPreserved = State.getSnippyTarget().getRegsPreservedByABI();
+    auto ABIPreserved =
+        State.getSnippyTarget().getRegsPreservedByABI(State.getSubtargetInfo());
     // Global Regs will be spilled separately as we need to spill them to
     // Memory, not stack.
     llvm::copy_if(
@@ -1128,6 +1130,38 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
       snippy::fatal(State.getCtx(),
                     "Cannot generate requested call instructions",
                     "return address register is explicitly reserved.");
+  }
+
+  if (auto &PreserveGroups = ProgramCfg->PreserveCallerSavedGroups;
+      !PreserveGroups.empty()) {
+    if (!ProgramCfg->stackEnabled())
+      snippy::fatal(Ctx, "Cannot preserve requested caller-saved registers",
+                    "no stack space allocated.");
+
+    auto StrClasses = Tgt.getCallerSavedRegGroups();
+    SmallVector<std::string, 3> WrongGroups;
+    // std::set_difference requires sorted ranges
+    llvm::sort(StrClasses);
+    llvm::sort(PreserveGroups);
+    // erase duplicates
+    PreserveGroups.erase(llvm::unique(PreserveGroups), PreserveGroups.end());
+    std::set_difference(PreserveGroups.begin(), PreserveGroups.end(),
+                        StrClasses.begin(), StrClasses.end(),
+                        std::back_inserter(WrongGroups));
+    if (!WrongGroups.empty()) {
+      StringRef ErrorDesc = WrongGroups.size() == 1
+                                ? "is an invalid register group name"
+                                : "are invalid register group names";
+      snippy::fatal(llvm::formatv("'{0}' {1}. "
+                                  "Choose one of the following: [{2}]",
+                                  llvm::join(WrongGroups, ", "), ErrorDesc,
+                                  llvm::join(StrClasses, ", ")));
+    }
+    if (!PassCfg.hasExternalCallees())
+      snippy::warn(
+          WarningName::InconsistentOptions, State.getCtx(),
+          llvm::formatv("--{0} is ignored", PreserveCallerSavedRegs.ArgStr),
+          "no external callee functions were specified.");
   }
 
   auto SP = ProgramCfg->StackPointer;

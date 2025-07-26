@@ -11,6 +11,7 @@
 #include <RISCVModel/RVM.hpp>
 
 #include "snippy/Config/RegisterHistogram.h"
+#include "snippy/Simulator/RISCVRegTypes.h"
 #include "snippy/Simulator/Targets/RISCV.h"
 #include "snippy/Simulator/Transactions.h"
 #include "snippy/Support/DiagnosticInfo.h"
@@ -79,13 +80,13 @@ void RISCVRegisterState::loadFromYamlFile(StringRef YamlFile,
     WarningsArr.emplace_back("PC value from YAML has been ignored");
 
   std::array<StringRef, 4> AllowedRegClasses = {
-      AllRegisters::GPRPrefix, AllRegisters::FPRPrefix, AllRegisters::RVVPrefix,
-      AllRegisters::PCRegName};
+      regTypeToString(RegType::X), regTypeToString(RegType::F),
+      regTypeToString(RegType::V), AllRegisters::PCRegName};
   checkRegisterClasses(RH.Registers, AllowedRegClasses, Tgt);
   checkRegisterClasses(RH.Histograms, AllowedRegClasses);
 
   auto NumXRegs = XRegs.size();
-  getRegisterGroup(RH, NumXRegs, AllRegisters::GPRPrefix,
+  getRegisterGroup(RH, NumXRegs, regTypeToString(RegType::X),
                    XRegSize * RISCV_CHAR_BIT, XRegs);
   if (XRegs.size() != NumXRegs) {
     XRegs.resize(NumXRegs);
@@ -94,7 +95,7 @@ void RISCVRegisterState::loadFromYamlFile(StringRef YamlFile,
   XRegs[0] = 0;
 
   auto NumFRegs = FRegs.size();
-  getRegisterGroup(RH, NumFRegs, AllRegisters::FPRPrefix,
+  getRegisterGroup(RH, NumFRegs, regTypeToString(RegType::F),
                    FRegSize * RISCV_CHAR_BIT, FRegs);
   if (FRegs.size() != NumFRegs) {
     FRegs.resize(NumFRegs);
@@ -102,7 +103,7 @@ void RISCVRegisterState::loadFromYamlFile(StringRef YamlFile,
   }
 
   auto NumVRegs = VRegs.size();
-  getRegisterGroup(RH, NumVRegs, AllRegisters::RVVPrefix, VLEN, VRegs);
+  getRegisterGroup(RH, NumVRegs, regTypeToString(RegType::V), VLEN, VRegs);
   if (VRegs.size() != NumVRegs) {
     VRegs.resize(NumVRegs);
     uniformlyFillVRegs();
@@ -120,10 +121,11 @@ void RISCVRegisterState::saveAsYAMLFile(raw_ostream &OS) const {
   auto FRegsMasked = FRegs;
   if (FRegSize == Reg4Bytes)
     FRegsMasked = applyMask(FRegsMasked, std::numeric_limits<uint32_t>::max());
-  auto RegSerObj = AllRegisters()
-                       .addRegisterGroup(AllRegisters::GPRPrefix, XRegsMasked)
-                       .addRegisterGroup(AllRegisters::FPRPrefix, FRegsMasked)
-                       .addRegisterGroup(AllRegisters::RVVPrefix, VLEN, VRegs);
+  auto RegSerObj =
+      AllRegisters()
+          .addRegisterGroup(regTypeToString(RegType::X), XRegsMasked)
+          .addRegisterGroup(regTypeToString(RegType::F), FRegsMasked)
+          .addRegisterGroup(regTypeToString(RegType::V), VLEN, VRegs);
   if (!DumpRegsWithoutPC)
     RegSerObj.addRegisterGroup(AllRegisters::PCRegName, PC);
   RegSerObj.saveAsYAML(OS);

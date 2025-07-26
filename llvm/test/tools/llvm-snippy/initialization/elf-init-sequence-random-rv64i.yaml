@@ -33,8 +33,7 @@ histogram:
 
 # CHECK: bb.1:
 # CHECK-NEXT: successors:
-# CHECK-EMPTY:
-# CHECK-NEXT: {{(\$x1 = .*$[[:space:]]+)+}}
+# CHECK: {{(\$x1 = .*$[[:space:]]+)+}}
 # CHECK-SAME: {{(\$x2 = .*$[[:space:]]+)+}}
 # CHECK-SAME: {{(\$x3 = .*$[[:space:]]+)+}}
 # CHECK-SAME: {{(\$x4 = .*$[[:space:]]+)+}}
