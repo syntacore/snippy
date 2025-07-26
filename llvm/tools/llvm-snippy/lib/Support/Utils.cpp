@@ -16,22 +16,18 @@
 
 namespace llvm {
 namespace snippy {
-namespace detail {
 
-bool checkMetadata(const MachineInstr &MI, StringRef MetaStr) {
+bool checkMetadata(const MachineInstr &MI, SnippyMetadata M) {
   // FIXME: we do not have appropriate way to check metadata.
   MDNode *Node = MI.getPCSections();
   if (!Node)
     return false;
-  // FIXME: this should be loop for all metadata, but as we place only one
-  // Metadata...
-  MDString *S = dyn_cast<MDString>(Node->getOperand(0));
-  if (!S)
-    return false;
-  return MetaStr == S->getString();
+  auto *I = llvm::find_if(Node->operands(), [M](auto &&Oper) {
+    auto *MDStr = dyn_cast<MDString>(Oper);
+    return MDStr && MDStr->getString() == detail::getStrMetadata(M);
+  });
+  return I != Node->operands().end();
 }
-
-} // namespace detail
 
 void writeFile(StringRef Path, StringRef Data) {
   std::error_code EC;
@@ -80,12 +76,13 @@ std::string addExtensionIfRequired(StringRef StrRef, std::string Ext) {
 }
 
 void setAsSupportInstr(MachineInstr &MI, LLVMContext &Ctx) {
-  if (checkSupportMetadata(MI))
+  if (checkMetadata(MI, SnippyMetadata::Support))
     return;
 
   // FIXME: we shouldn't overwrite PC sections here but now we have only one
   // Metadata ...
-  MI.setPCSections(*MI.getParent()->getParent(), getSupportMark(Ctx));
+  addSnippyMetadata(MI, *MI.getParent()->getParent(), Ctx,
+                    SnippyMetadata::Support);
 }
 
 std::string floatToString(APFloat F, unsigned Precision) {

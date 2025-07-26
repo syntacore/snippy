@@ -36,24 +36,41 @@ template <typename T> struct NumericRange final {
   bool isMinOrMaxSet() const { return Min.has_value() || Max.has_value(); }
 };
 
+enum class SnippyMetadata { Support, ExternalCall };
+
 namespace detail {
 constexpr static const char *SupportMetadataValue = "llvm.snippy.support";
-bool checkMetadata(const MachineInstr &MI, StringRef MetaStr);
+constexpr static const char *ExternalCallMetadataValue =
+    "llvm.snippy.call.external";
+
+inline StringRef getStrMetadata(SnippyMetadata M) {
+  switch (M) {
+  case SnippyMetadata::Support:
+    return SupportMetadataValue;
+  case SnippyMetadata::ExternalCall:
+    return ExternalCallMetadataValue;
+  }
+  llvm_unreachable("unknown metadata value");
+}
 } // namespace detail
 
-inline bool checkSupportMetadata(const MachineInstr &MI) {
-  return detail::checkMetadata(MI, detail::SupportMetadataValue);
-}
+bool checkMetadata(const MachineInstr &MI, SnippyMetadata M);
 
 template <typename IteratorType>
 size_t countPrimaryInstructions(IteratorType Begin, IteratorType End) {
-  return std::count_if(
-      Begin, End, [](const auto &MI) { return !checkSupportMetadata(MI); });
+  return std::count_if(Begin, End, [](const auto &MI) {
+    return !checkMetadata(MI, SnippyMetadata::Support);
+  });
 }
 
-inline MDNode *getSupportMark(LLVMContext &Context) {
+inline MDNode *getMetadataMark(LLVMContext &Context, SnippyMetadata M) {
   return MDNode::get(Context,
-                     MDString::get(Context, detail::SupportMetadataValue));
+                     MDString::get(Context, detail::getStrMetadata(M)));
+}
+
+inline void addSnippyMetadata(MachineInstr &MI, MachineFunction &MF,
+                              LLVMContext &Ctx, SnippyMetadata M) {
+  MI.setPCSections(MF, getMetadataMark(Ctx, M));
 }
 
 void setAsSupportInstr(MachineInstr &MI, LLVMContext &Ctx);

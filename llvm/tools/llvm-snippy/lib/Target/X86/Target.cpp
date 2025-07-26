@@ -97,7 +97,22 @@ public:
     reportUnimplementedError();
   }
 
-  std::vector<MCRegister> getRegsPreservedByABI() const override {
+  std::vector<std::string> getCallerSavedRegGroups() const override {
+    reportUnimplementedError();
+  }
+
+  std::vector<std::string> getCallerSavedLiveRegGroups() const override {
+    reportUnimplementedError();
+  }
+
+  std::vector<MCRegister>
+  getCallerSavedRegs(const MachineFunction &MF,
+                     ArrayRef<std::string> RegGroups) const override {
+    reportUnimplementedError();
+  }
+
+  std::vector<MCRegister>
+  getRegsPreservedByABI(const MCSubtargetInfo &SubTgt) const override {
     reportUnimplementedError();
   }
 

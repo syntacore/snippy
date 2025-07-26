@@ -35,6 +35,12 @@ let Group = ProgramOptionsCategory in {
   def RedefineSP : StringOption<"redefine-sp">,
                    Description<"Specify the reg to use as a stack pointer">,
                    DefaultValue<"any">;
+  
+  def PreserveCallerSavedRegs
+      : CommaSeparatedList<"preserve-caller-saved-regs", StringType>,
+        Description<
+            "Preserves caller-saved registers on the stack around calls to "
+             "external functions">;
 
   def FollowTargetABI
       : Flag<"honor-target-abi">,

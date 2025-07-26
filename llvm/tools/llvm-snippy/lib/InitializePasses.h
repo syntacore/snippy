@@ -19,6 +19,7 @@ void initializeFunctionGeneratorPass(PassRegistry &);
 void initializeSimulatorContextWrapperPass(PassRegistry &);
 void initializeSimulatorContextPreserverPass(PassRegistry &);
 void initializeFunctionDistributePass(PassRegistry &);
+void initializePreserveRegsInsertionPass(PassRegistry &);
 void initializeCFGeneratorPass(PassRegistry &);
 void initializeCFPermutationPass(llvm::PassRegistry &);
 void initializeLoopCanonicalizationPass(llvm::PassRegistry &);
