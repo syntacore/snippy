@@ -1,0 +1,25 @@
+# RUN:  llvm-snippy %s -mtriple=riscv64-unknown-elf -mcpu=generic-rv64 \
+# RUN:  --model-plugin=None |& FileCheck %s
+ 
+options:
+  preserve-caller-saved-regs: [X]
+  num-instrs: 10
+  external-stack: on
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rw
+  - no:        2
+    VMA:       0x500000
+    SIZE:      0x100000
+    LMA:       0x500000
+    ACCESS:    rx
+
+histogram:
+     - [ADD, 1.0]
+
+# CHECK: warning: (inconsistent-options) --preserve-caller-saved-regs is
+# CHECK-SAME: ignored: no external callee functions were specified.

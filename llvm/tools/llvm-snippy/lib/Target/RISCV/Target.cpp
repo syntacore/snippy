@@ -24,6 +24,7 @@
 #include "snippy/Support/Utils.h"
 #include "snippy/Target/Target.h"
 
+#include "snippy/Simulator/RISCVRegTypes.h"
 #include "snippy/Simulator/Targets/RISCV.h"
 
 #include "TargetConfig.h"
@@ -1639,7 +1640,7 @@ public:
     auto *FallbackBR = ProcessedBranch->getNextNode();
     assert(FallbackBR && "Fallback branch expected");
     assert(*FallbackBR != MBB->end() && "Fallback branch expected");
-    assert(checkSupportMetadata(*FallbackBR));
+    assert(checkMetadata(*FallbackBR, SnippyMetadata::Support));
     ProcessedBranch->eraseFromParent();
     FallbackBR->eraseFromParent();
     RVInstrInfo.insertBranch(*MBB, FBB, TBB, Cond, DebugLoc());
@@ -2248,13 +2249,93 @@ public:
     return Alignment * divideCeil(RegSize, Alignment);
   }
 
-  std::vector<MCRegister> getRegsPreservedByABI() const override {
-    return {RISCV::X1 /* Return address */, RISCV::X3 /* Global pointer */,
-            RISCV::X4 /* Thread pointer */, RISCV::X8 /* Frame pointer */,
-            /* Saved registers (s1-s11) */
-            RISCV::X9, RISCV::X18, RISCV::X19, RISCV::X20, RISCV::X21,
-            RISCV::X22, RISCV::X23, RISCV::X24, RISCV::X25, RISCV::X26,
-            RISCV::X27};
+  std::vector<std::string> getCallerSavedRegGroups() const override {
+    return {regTypeToString(RegType::X).str(),
+            regTypeToString(RegType::F).str(),
+            regTypeToString(RegType::V).str()};
+  }
+
+  std::vector<std::string> getCallerSavedLiveRegGroups() const override {
+    return {regTypeToString(RegType::X).str(),
+            regTypeToString(RegType::F).str()};
+  }
+
+  std::vector<MCRegister>
+  getCallerSavedRegs(const MachineFunction &MF,
+                     ArrayRef<std::string> RegGroups) const override {
+    using namespace ::RISCV;
+
+    if (RegGroups.empty())
+      return {};
+
+    const auto &SubTgt = MF.getSubtarget();
+    std::vector<MCRegister> CallerRegs;
+    if (llvm::is_contained(RegGroups, regTypeToString(RegType::X)))
+      CallerRegs.insert(CallerRegs.end(),
+                        {X1,                             /* Return address */
+                         X5, X6, X7, X28, X29, X30, X31, /* Temporaries */
+                         X10, X11, /* Function arguments/return values */
+                         X12, X13, X14, X15, X16,
+                         X17 /* Function arguments */});
+
+    if (llvm::is_contained(RegGroups, regTypeToString(RegType::F))) {
+      if (SubTgt.hasFeature(FeatureStdExtD))
+        CallerRegs.insert(CallerRegs.end(),
+                          {F0_D,  F1_D,  F2_D,  F3_D,  F4_D,  F5_D,  F6_D,
+                           F7_D,  F28_D, F29_D, F30_D, F31_D, /* Temporaries */
+                           F10_D, F11_D, /* Arguments / return values */
+                           F12_D, F13_D, F14_D, F15_D, F16_D, F17_D,
+                           /* Arguments */});
+      else if (SubTgt.hasFeature(FeatureStdExtF))
+        CallerRegs.insert(CallerRegs.end(),
+                          {F0_F,  F1_F,  F2_F,  F3_F,  F4_F,  F5_F,  F6_F,
+                           F7_F,  F28_F, F29_F, F30_F, F31_F, /* Temporaries */
+                           F10_F, F11_F, /* Arguments / return values */
+                           F12_F, F13_F, F14_F, F15_F, F16_F, F17_F,
+                           /* Arguments */});
+    }
+
+    auto HasVectorRegs = [&MF] {
+      return llvm::any_of(MF, [](auto &&MBB) {
+        return llvm::any_of(MBB,
+                            [](auto &&MI) { return isRVV(MI.getOpcode()); });
+      });
+    };
+    if (llvm::is_contained(RegGroups, regTypeToString(RegType::V))) {
+      if (SubTgt.hasFeature(FeatureStdExtV) && HasVectorRegs())
+        CallerRegs.insert(CallerRegs.end(),
+                          {
+                              V0,  V1,  V2,  V3,  V4,  V5,  V6,  V7,
+                              V8,  V9,  V10, V11, V12, V13, V14, V15,
+                              V16, V17, V18, V19, V20, V21, V22, V23,
+                              V24, V25, V26, V27, V28, V29, V30, V31,
+                          });
+    }
+    return CallerRegs;
+  }
+
+  std::vector<MCRegister>
+  getRegsPreservedByABI(const MCSubtargetInfo &SubTgt) const override {
+    using namespace ::RISCV;
+
+    std::vector<MCRegister> PreservedRegs{
+        X1 /* Return address */, X3 /* Global pointer */,
+        X4 /* Thread pointer */, X8 /* Frame pointer */,
+        /* Saved registers (s1-s11) */
+        X9, X18, X19, X20, X21, X22, X23, X24, X25, X26, X27};
+
+    if (SubTgt.hasFeature(FeatureStdExtD))
+      PreservedRegs.insert(PreservedRegs.end(),
+                           {/* Saved registers (fs0, fs1, fs2-fs11) */ F8_D,
+                            F9_D, F18_D, F19_D, F20_D, F21_D, F22_D, F23_D,
+                            F24_D, F25_D, F26_D, F27_D});
+    else if (SubTgt.hasFeature(FeatureStdExtF))
+      PreservedRegs.insert(PreservedRegs.end(),
+                           {/* Saved registers (fs0, fs1, fs2-fs11) */ F8_F,
+                            F9_F, F18_F, F19_F, F20_F, F21_F, F22_F, F23_F,
+                            F24_F, F25_F, F26_F, F27_F});
+
+    return PreservedRegs;
   }
 
   // X3 is a thread pointer and X4 is a global pointer. We must preserve them so
@@ -3462,7 +3543,7 @@ private:
     // Add DoNotCompress flags only to main instructions as they must correspond
     // to the given histogram. On the other hand, we'd like to compress support
     // instructions as much as possible to reduce total overhead.
-    if (!checkSupportMetadata(MI))
+    if (!checkMetadata(MI, SnippyMetadata::Support))
       MI.setAsmPrinterFlag(RISCV::DoNotCompress);
   }
 };

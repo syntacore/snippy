@@ -30,6 +30,7 @@ set(LLVMSnippySources
   BranchRelaxatorPass.cpp
   BlockGenPlanningPass.cpp
   BlockGenPlanWrapperPass.cpp
+  PreserveRegsInsertionPass.cpp
   CFGeneratorPass.cpp
   CFGPrinter.cpp
   ConsecutiveLoopsVerifierPass.cpp
