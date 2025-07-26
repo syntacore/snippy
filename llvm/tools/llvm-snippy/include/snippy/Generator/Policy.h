@@ -165,8 +165,8 @@ private:
 
 public:
   RegPoolStack(SnippyProgramContext &ProgCtx) : ProgCtx(ProgCtx) {}
-  RegPoolStack(SnippyProgramContext &ProgCtx, RegPoolWrapper &RWP)
-      : ProgCtx(ProgCtx), Current(&RWP) {}
+  RegPoolStack(SnippyProgramContext &ProgCtx, RegPoolWrapper &RPW)
+      : ProgCtx(ProgCtx), Current(&RPW) {}
 
   auto append() {
     auto Ret = std::unique_ptr<RegPoolWrapper, PopDeleter>(

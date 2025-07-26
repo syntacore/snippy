@@ -80,7 +80,10 @@ InstructionGenerationContext::InstructionGenerationContext(
       ProgCtx(GC.getProgramContext()), SimCtx(*NullSimCtx),
       NaNIdent(ProgCtx.getLLVMState().getSnippyTarget().getFPRegsCount(
           MBB.getParent()->getSubtarget())),
-      RPS(ProgCtx, RPW) {}
+      RPS(ProgCtx, RPW) {
+  append(&GC.getMemoryAccessSampler());
+  switchConfig(*GC.getConfig().CommonPolicyCfg);
+}
 
 InstructionGenerationContext::~InstructionGenerationContext() = default;
 

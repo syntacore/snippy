@@ -92,7 +92,9 @@ getInstBuilder(bool IsSupport, const SnippyTarget &Tgt, MachineBasicBlock &MBB,
                MachineBasicBlock::iterator Ins, LLVMContext &Context,
                const MCInstrDesc &Desc, DstArgs... DstReg) {
   static_assert(sizeof...(DstReg) <= 1, "Only 0 or 1 dst regs supported");
-  MIMetadata MD({}, IsSupport ? getSupportMark(Context) : nullptr);
+  MIMetadata MD({}, IsSupport
+                        ? getMetadataMark(Context, SnippyMetadata::Support)
+                        : nullptr);
   auto MIB = BuildMI(MBB, Ins, MD, Desc, DstReg...);
   Tgt.addAsmPrinterFlags(*MIB.getInstr());
   return MIB;

@@ -185,8 +185,22 @@ public:
 
   virtual MCRegister getStackPointer() const = 0;
 
+  // Returns a list of string register groups whose registers can be preserved
+  // as caller-saved.
+  virtual std::vector<std::string> getCallerSavedRegGroups() const = 0;
+
+  // Returns a list of string register groups whose registers can be preserved
+  // as caller-saved and and are correctly computed using live analysis.
+  virtual std::vector<std::string> getCallerSavedLiveRegGroups() const = 0;
+
+  // Returns a list of registers according to the requested register groups.
+  virtual std::vector<MCRegister>
+  getCallerSavedRegs(const MachineFunction &MF,
+                     ArrayRef<std::string> RegGroups) const = 0;
+
   // NOTE: this list do not include stack pointer.
-  virtual std::vector<MCRegister> getRegsPreservedByABI() const = 0;
+  virtual std::vector<MCRegister>
+  getRegsPreservedByABI(const MCSubtargetInfo &SubTgt) const = 0;
 
   // Checks if the given register belongs to a supported register class.
   virtual bool isRegClassSupported(MCRegister Reg) const = 0;

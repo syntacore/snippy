@@ -218,6 +218,8 @@ public:
 
   bool followTargetABI() const { return FollowTargetABI; }
 
+  auto &preserveCallerSavedGroups() const { return PreserveCallerSavedGroups; }
+
   // When an arbitrary register is used as a stack pointer and this register
   // must be preserved across snippy function call (callee-saved), we have to
   // save it to the stack before start using it.
@@ -275,6 +277,7 @@ private:
   std::string EntryPointName;
   bool ExternalStack;
   bool FollowTargetABI;
+  std::vector<std::string> PreserveCallerSavedGroups;
 
   // TODO: it would be nice to be able to initialize it right away, but
   // currently it depends on TargetSubtargetInfo which is diffucult to get
