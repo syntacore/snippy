@@ -1,0 +1,35 @@
+# RUN: not llvm-snippy %s -mtriple=riscv64-unknown-elf -mcpu=generic-rv64 \
+# RUN: -preserve-caller-saved-regs=X,G,P |& FileCheck %s --check-prefix=CHECK1
+
+# RUN: not llvm-snippy %s -mtriple=riscv64-unknown-elf -mcpu=generic-rv64 \
+# RUN: -preserve-caller-saved-regs=f,X,V |& FileCheck %s --check-prefix=CHECK2
+ 
+options:
+  num-instrs: 10
+  verify-mi: on
+sections:
+  - name:      stack
+    VMA:       0x200000
+    SIZE:      0x10000
+    LMA:       0x200000
+    ACCESS:    rw
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rw
+  - no:        2
+    VMA:       0x500000
+    SIZE:      0x100000
+    LMA:       0x500000
+    ACCESS:    rx
+
+histogram:
+     - [JAL, 1.0]
+     - [ADD, 1.0]
+
+# CHECK1: 'G, P' are invalid register group names.
+# CHECK1-SAME: Choose one of the following: [F, V, X]
+
+# CHECK2: 'f' is an invalid register group name.
+# CHECK2-SAME: Choose one of the following: [F, V, X]

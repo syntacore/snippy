@@ -44,10 +44,6 @@ struct RegisterHistograms {
 };
 
 struct AllRegisters final {
-  // FIXME: This looks target-specific and should be handled more portably.
-  static constexpr StringRef GPRPrefix = "X";
-  static constexpr StringRef FPRPrefix = "F";
-  static constexpr StringRef RVVPrefix = "V";
   static constexpr StringRef PCRegName = "PC";
 
   SmallVector<RegisterClassValues, 3> ClassValues;

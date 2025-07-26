@@ -195,7 +195,8 @@ bool SnippyProgramContext::shouldSpillStackPointer() const {
     return false;
   auto RealStackPointer = getStackPointer();
   const auto &SnippyTgt = getLLVMState().getSnippyTarget();
-  auto ABIPreservedRegs = SnippyTgt.getRegsPreservedByABI();
+  auto ABIPreservedRegs =
+      SnippyTgt.getRegsPreservedByABI(State->getSubtargetInfo());
   return std::any_of(ABIPreservedRegs.begin(), ABIPreservedRegs.end(),
                      [RealStackPointer](auto PreservedReg) {
                        return PreservedReg == RealStackPointer;
@@ -278,6 +279,7 @@ SnippyProgramContext::SnippyProgramContext(LLVMState &State,
       EntryPointName(Settings.EntryPointName),
       ExternalStack(Settings.ExternalStack),
       FollowTargetABI(Settings.FollowTargetABI),
+      PreserveCallerSavedGroups(Settings.PreserveCallerSavedGroups),
       InitialRegYamlFile(Settings.InitialRegYamlFile) {
 
   initializeStackSection(Settings);
