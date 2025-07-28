@@ -701,8 +701,8 @@ static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
     BlockRange.Min =
         (PCDist.Min.value() > FilledSize) ? PCDist.Min.value() - FilledSize : 0;
 
-  auto InstrsSizes = SnpTgt.getPossibleInstrsSize(
-      State.getSubtargetImpl(SelectedMBB.getParent()->getFunction()));
+  auto InstrsSizes =
+      SnpTgt.getPossibleInstrsSize(SelectedMBB.getParent()->getSubtarget());
   assert(InstrsSizes.size() > 0 &&
          "Target must have at least one variant of instruction size");
   auto MinInstrSize = *InstrsSizes.begin();

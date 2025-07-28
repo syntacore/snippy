@@ -298,11 +298,11 @@ public:
   auto &getRegPool() { return RPS.getCurrent(); }
 
   const TargetSubtargetInfo &getSubtargetImpl() const {
-    return getLLVMStateImpl().getSubtargetImpl(MBB.getParent()->getFunction());
+    return MBB.getParent()->getSubtarget();
   }
 
   template <typename SubtargetType> const SubtargetType &getSubtarget() const {
-    return getLLVMStateImpl().getSubtarget<SubtargetType>(*MBB.getParent());
+    return static_cast<const SubtargetType &>(getSubtargetImpl());
   }
 
   IAPIntSampler &
