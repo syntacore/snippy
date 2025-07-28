@@ -198,9 +198,8 @@ public:
   }
 
   template <typename SubtargetType>
-  const SubtargetType &getSubtarget(const MachineFunction &Fn) const {
-    return static_cast<const SubtargetType &>(
-        getSubtargetImpl(Fn.getFunction()));
+  static const SubtargetType &getSubtarget(const MachineFunction &Fn) {
+    return static_cast<const SubtargetType &>(Fn.getSubtarget());
   }
 
   auto &getMCContext() {
