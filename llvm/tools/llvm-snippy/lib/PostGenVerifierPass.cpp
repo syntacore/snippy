@@ -269,10 +269,8 @@ static VerificationStatus verifyBBWithSizeLimit(
                              });
 
   const auto &SnippyTgt = State.getSnippyTarget();
-  unsigned MinInstrSize = *SnippyTgt
-                               .getPossibleInstrsSize(State.getSubtargetImpl(
-                                   MBB.getParent()->getFunction()))
-                               .begin();
+  unsigned MinInstrSize =
+      *SnippyTgt.getPossibleInstrsSize(MBB.getParent()->getSubtarget()).begin();
   if (Planned > Count && Planned - Count < MinInstrSize) {
     outs() << printMBBReference(MBB) << " :  size -- " << Count
            << ", planned -- " << Planned << "\n";
