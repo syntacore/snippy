@@ -425,8 +425,8 @@ generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
   if (NumAvailRegs == 0)
     snippy::fatal(
         "No available registers to generate addresses for the burst group.");
-  auto &Fn = InstrGenCtx.MBB.getParent()->getFunction();
-  const auto &RegInfo = *State.getSubtargetImpl(Fn).getRegisterInfo();
+  const auto *MF = InstrGenCtx.MBB.getParent();
+  const auto &RegInfo = *MF->getSubtarget().getRegisterInfo();
   // Get number of def and addr regs to use in the burst group. These values
   // can be bigger than the number of available registers.
   auto NumDefs = countDefsHavingRC(Opcodes, RegInfo, AddrRegClass, InstrInfo);
