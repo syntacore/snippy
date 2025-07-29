@@ -1,0 +1,25 @@
+# RUN: not llvm-snippy %s -mtriple=riscv64-linux-gnu -num-instrs=100 \
+# RUN:     -mattr=+c -model-plugin None
+
+branches:
+  consecutive-loops: all
+  loop-ratio: 1
+  max-depth:
+    loop: 1
+
+sections:
+- ACCESS: rx
+  LMA: 0x80040000
+  SIZE: 0x40000
+  VMA: 0x80040000
+  name: 1
+- ACCESS: rw
+  LMA: 0x80080000
+  SIZE: 0x1000
+  VMA: 0x80080000
+  name: 2
+
+histogram:
+  - [C_J, 1.0]
+
+# CHECK: error: Consecutive loops are not supported with unconditional branches.
