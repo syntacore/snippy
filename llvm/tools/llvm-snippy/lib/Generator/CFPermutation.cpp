@@ -294,6 +294,15 @@ void llvm::snippy::CFPermutationContext::initOneBlockInfo(
 
 void llvm::snippy::CFPermutationContext::initBlocksInfo(unsigned Size) {
   auto &BS = BranchSettings.get();
+  auto &GenCtx = GC.get();
+  auto &Cfg = GenCtx.getConfig();
+  auto &ProgCtx = GenCtx.getProgramContext();
+
+  if (BS.anyConsecutiveLoops() &&
+      Cfg.hasUncondBranches(ProgCtx.getOpcodeCache()))
+    snippy::fatal(
+        "Consecutive loops are not supported with unconditional branches.");
+
   BlocksInfo.reserve(Size);
   assert(checkBranchSettings(BS) && "unsupported branch settings");
   if (BS.onlyConsecutiveLoops()) {
