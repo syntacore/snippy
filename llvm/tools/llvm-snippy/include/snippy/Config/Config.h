@@ -350,6 +350,10 @@ public:
     return Histogram.hasCFInstrs(OpCC);
   }
 
+  bool hasUncondBranches(const OpcodeCache &OpCC) const {
+    return Histogram.hasUncondBranches(OpCC);
+  }
+
   auto &getTrackCfg() const { return CommonPolicyCfg->TrackCfg; }
 
   bool hasTrackingMode() const {
