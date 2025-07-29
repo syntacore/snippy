@@ -123,6 +123,18 @@ public:
   static Expected<ParsedElf>
   createParsedElf(StringRef ElfImage, StringRef EntryPointSymbol = "",
                   SectionFilterPFN SectionFilter = nullptr) {
+    SectionFilterPFN FullSectionFilter =
+        [SectionFilter](llvm::object::SectionRef Sect) {
+          return Sect.getSize() && (!SectionFilter || SectionFilter(Sect));
+        };
+    return createParsedElfWithFilter(ElfImage, EntryPointSymbol,
+                                     FullSectionFilter);
+  }
+
+private:
+  static Expected<ParsedElf>
+  createParsedElfWithFilter(StringRef ElfImage, StringRef EntryPointSymbol,
+                            SectionFilterPFN SectionFilter) {
     auto MemBuf = MemoryBuffer::getMemBuffer(ElfImage, "", false);
     auto ObjectFile = object::ObjectFile::createObjectFile(*MemBuf);
     if (!ObjectFile)
@@ -150,6 +162,7 @@ public:
                      *ProgStart, *ProgEnd);
   }
 
+public:
   const SmallVector<object::SectionRef> AllocatableSections;
   const SmallVector<object::SectionRef> TextAndDataSections;
   const SmallVector<object::SectionRef> BSSSections;
