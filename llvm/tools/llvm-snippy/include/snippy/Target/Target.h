@@ -578,7 +578,7 @@ public:
   virtual std::vector<MCRegister> getGlobalStateRegs() const = 0;
 
   virtual std::unique_ptr<AsmPrinter>
-  createAsmPrinter(LLVMTargetMachine &TM,
+  createAsmPrinter(TargetMachine &TM,
                    std::unique_ptr<MCStreamer> Streamer) const = 0;
 
   virtual MachineBasicBlock::iterator

@@ -55,7 +55,7 @@ struct SelectedTargetInfo final {
 class LLVMState final {
 private:
   LLVMState(const SnippyTarget *SnippyTarget,
-            std::unique_ptr<LLVMTargetMachine> TargetMachine,
+            std::unique_ptr<TargetMachine> TargetMachine,
             std::unique_ptr<MCContext> Context,
             std::unique_ptr<MCCodeEmitter> CodeEmitter,
             std::unique_ptr<MCDisassembler> Disassembler);
@@ -70,7 +70,7 @@ public:
   LLVMState &operator=(const LLVMState &) = delete;
   ~LLVMState();
 
-  LLVMTargetMachine &getTargetMachine() const {
+  TargetMachine &getTargetMachine() const {
     assert(TheTargetMachine);
     return *TheTargetMachine;
   }
@@ -242,7 +242,7 @@ public:
 private:
   std::unique_ptr<LLVMContext> Ctx;
   const SnippyTarget *TheSnippyTarget;
-  std::unique_ptr<LLVMTargetMachine> TheTargetMachine;
+  std::unique_ptr<TargetMachine> TheTargetMachine;
   std::unique_ptr<MCContext> TheContext;
   mutable std::unique_ptr<AsmPrinter> TheAsmPrinter;
   std::unique_ptr<MCCodeEmitter> TheCodeEmitter;
