@@ -253,9 +253,17 @@ bool AArch64TargetInfo::validateGlobalRegisterVariable(
 
 bool AArch64TargetInfo::validateBranchProtection(StringRef Spec, StringRef,
                                                  BranchProtectionInfo &BPI,
+                                                 const LangOptions &LO,
                                                  StringRef &Err) const {
   llvm::ARM::ParsedBranchProtection PBP;
   if (!llvm::ARM::parseBranchProtection(Spec, PBP, Err, HasPAuthLR))
+    return false;
+
+  // GCS is currently untested with ptrauth-returns, but enabling this could be
+  // allowed in future after testing with a suitable system.
+  if (LO.PointerAuthReturns &&
+      (PBP.Scope != "none" || PBP.BranchProtectionPAuthLR ||
+       PBP.GuardedControlStack))
     return false;
 
   BPI.SignReturnAddr =
@@ -703,12 +711,13 @@ ArrayRef<Builtin::Info> AArch64TargetInfo::getTargetBuiltins() const {
 }
 
 std::optional<std::pair<unsigned, unsigned>>
-AArch64TargetInfo::getVScaleRange(const LangOptions &LangOpts) const {
+AArch64TargetInfo::getVScaleRange(const LangOptions &LangOpts,
+                                  bool IsArmStreamingFunction) const {
   if (LangOpts.VScaleMin || LangOpts.VScaleMax)
     return std::pair<unsigned, unsigned>(
         LangOpts.VScaleMin ? LangOpts.VScaleMin : 1, LangOpts.VScaleMax);
 
-  if (hasFeature("sve"))
+  if (hasFeature("sve") || (IsArmStreamingFunction && hasFeature("sme")))
     return std::pair<unsigned, unsigned>(1, 16);
 
   return std::nullopt;

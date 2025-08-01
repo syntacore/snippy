@@ -1055,7 +1055,8 @@ void ASTContext::PrintStats() const {
 void ASTContext::mergeDefinitionIntoModule(NamedDecl *ND, Module *M,
                                            bool NotifyListeners) {
   if (NotifyListeners)
-    if (auto *Listener = getASTMutationListener())
+    if (auto *Listener = getASTMutationListener();
+        Listener && !ND->isUnconditionallyVisible())
       Listener->RedefinedHiddenDefinition(ND, M);
 
   MergedDefModules[cast<NamedDecl>(ND->getCanonicalDecl())].push_back(M);
@@ -10363,7 +10364,8 @@ bool ASTContext::areLaxCompatibleSveTypes(QualType FirstType,
 /// getRVVTypeSize - Return RVV vector register size.
 static uint64_t getRVVTypeSize(ASTContext &Context, const BuiltinType *Ty) {
   assert(Ty->isRVVVLSBuiltinType() && "Invalid RVV Type");
-  auto VScale = Context.getTargetInfo().getVScaleRange(Context.getLangOpts());
+  auto VScale =
+      Context.getTargetInfo().getVScaleRange(Context.getLangOpts(), false);
   if (!VScale)
     return 0;
 

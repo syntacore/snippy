@@ -1773,7 +1773,12 @@ def : InstAlias<"xpaclri", (XPACLRI), 0>;
 
 let Uses = [LR, SP], Defs = [LR] in {
 // Insertion point of LR signing code.
-def PAUTH_PROLOGUE : Pseudo<(outs), (ins), []>, Sched<[]>;
+def PAUTH_PROLOGUE : Pseudo<(outs), (ins), []>, Sched<[]> {
+  // When using PAuthLR, the address of one of the instructions this expands
+  // into is used as an input to the signature calculation, so this must not be
+  // duplicated.
+  let isNotDuplicable = 1;
+}
 // Insertion point of LR authentication code.
 // The RET terminator of the containing machine basic block may be replaced
 // with a combined RETA(A|B) instruction when rewriting this Pseudo.
@@ -2662,21 +2667,11 @@ defm CASLT  : CompareAndSwapUnprivileged<0b11, 0, 1, "l">;
 defm CASAT  : CompareAndSwapUnprivileged<0b11, 1, 0, "a">;
 defm CASALT : CompareAndSwapUnprivileged<0b11, 1, 1, "al">;
 
-def : MnemonicAlias<"cas", "cast">;
-def : MnemonicAlias<"casl", "caslt">;
-def : MnemonicAlias<"casa", "casat">;
-def : MnemonicAlias<"casal", "casalt">;
-
 // v9.6-a atomic CASPT
 defm CASPT   : CompareAndSwapPairUnprivileged<0b01, 0, 0, "">;
 defm CASPLT  : CompareAndSwapPairUnprivileged<0b01, 0, 1, "l">;
 defm CASPAT  : CompareAndSwapPairUnprivileged<0b01, 1, 0, "a">;
 defm CASPALT : CompareAndSwapPairUnprivileged<0b01, 1, 1, "al">;
-
-def : MnemonicAlias<"casp", "caspt">;
-def : MnemonicAlias<"caspl", "casplt">;
-def : MnemonicAlias<"caspa", "caspat">;
-def : MnemonicAlias<"caspal", "caspalt">;
 }
 
 // v8.1 atomic SWP
@@ -2691,11 +2686,6 @@ let Predicates = [HasLSUI] in {
   defm SWPTA  : SwapLSUI<1, 0, "a">;
   defm SWPTL  : SwapLSUI<0, 1, "l">;
   defm SWPTAL : SwapLSUI<1, 1, "al">;
-
-  def : MnemonicAlias<"swp", "swpt">;
-  def : MnemonicAlias<"swpa", "swpta">;
-  def : MnemonicAlias<"swpl", "swptl">;
-  def : MnemonicAlias<"swpal", "swptal">;
 }
 
 // v9.6-a unprivileged atomic LD<OP> (FEAT_LSUI)
@@ -4860,22 +4850,14 @@ let Predicates = [HasLSUI] in {
 defm LDTXRW : LoadUnprivilegedLSUI<0b10, GPR32, "ldtxr">;
 defm LDTXRX : LoadUnprivilegedLSUI<0b11, GPR64, "ldtxr">;
 
-def : MnemonicAlias<"ldxr", "ldtxr">;
-
 def LDATXRW : LoadExclusiveLSUI <0b10, 1, 1, GPR32, "ldatxr">;
 def LDATXRX : LoadExclusiveLSUI <0b11, 1, 1, GPR64, "ldatxr">;
-
-def : MnemonicAlias<"ldaxr", "ldatxr">;
 
 defm STTXRW : StoreUnprivilegedLSUI<0b10, GPR32, "sttxr">;
 defm STTXRX : StoreUnprivilegedLSUI<0b11, GPR64, "sttxr">;
 
-def : MnemonicAlias<"stxr", "sttxr">;
-
 def STLTXRW : StoreExclusiveLSUI<0b10, 0, 1, GPR32, "stltxr">;
 def STLTXRX : StoreExclusiveLSUI<0b11, 0, 1, GPR64, "stltxr">;
-
-def : MnemonicAlias<"stlxr", "stltxr">;
 }
 
 //===----------------------------------------------------------------------===//

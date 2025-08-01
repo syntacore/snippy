@@ -12258,12 +12258,18 @@ InstructionCost BoUpSLP::getSpillCost() const {
         if (auto *II = dyn_cast<IntrinsicInst>(I)) {
           if (II->isAssumeLikeIntrinsic())
             return true;
-          IntrinsicCostAttributes ICA(II->getIntrinsicID(), *II);
+          FastMathFlags FMF;
+          SmallVector<Type *, 4> Tys;
+          for (auto &ArgOp : II->args())
+            Tys.push_back(ArgOp->getType());
+          if (auto *FPMO = dyn_cast<FPMathOperator>(II))
+            FMF = FPMO->getFastMathFlags();
+          IntrinsicCostAttributes ICA(II->getIntrinsicID(), II->getType(), Tys,
+                                      FMF);
           InstructionCost IntrCost =
               TTI->getIntrinsicInstrCost(ICA, TTI::TCK_RecipThroughput);
-          InstructionCost CallCost =
-              TTI->getCallInstrCost(nullptr, II->getType(), ICA.getArgTypes(),
-                                    TTI::TCK_RecipThroughput);
+          InstructionCost CallCost = TTI->getCallInstrCost(
+              nullptr, II->getType(), Tys, TTI::TCK_RecipThroughput);
           if (IntrCost < CallCost)
             return true;
         }
@@ -13175,8 +13181,16 @@ BoUpSLP::isGatherShuffledSingleRegisterEntry(
           continue;
         // If the user instruction is used for some reason in different
         // vectorized nodes - make it depend on index.
+        // If any vector node is PHI node, this dependency might not work
+        // because of cycle dependencies, so disable it.
         if (TEUseEI.UserTE != UseEI.UserTE &&
-            TEUseEI.UserTE->Idx < UseEI.UserTE->Idx)
+            (TEUseEI.UserTE->Idx < UseEI.UserTE->Idx ||
+             any_of(
+                 VectorizableTree,
+                 [](const std::unique_ptr<TreeEntry> &TE) {
+                   return TE->State == TreeEntry::Vectorize &&
+                          TE->getOpcode() == Instruction::PHI;
+                 })))
           continue;
       }
 

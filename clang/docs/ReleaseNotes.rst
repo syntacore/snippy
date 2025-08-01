@@ -252,7 +252,7 @@ ABI Changes in This Version
 
 - Fixed Microsoft name mangling of placeholder, auto and decltype(auto), return types for MSVC 1920+. This change resolves incompatibilities with code compiled by MSVC 1920+ but will introduce incompatibilities with code compiled by earlier versions of Clang unless such code is built with the compiler option -fms-compatibility-version=19.14 to imitate the MSVC 1914 mangling behavior.
 - Fixed the Itanium mangling of the construction vtable name. This change will introduce incompatibilities with code compiled by Clang 19 and earlier versions, unless the -fclang-abi-compat=19 option is used. (#GH108015)
-- Mangle member-like friend function templates as members of the enclosing class. (#GH110247, #GH110503)
+- Mangle member-like friend function templates as members of the enclosing class. This can be disabled using -fclang-abi-compat=19. (#GH110247, #GH110503)
 
 AST Dumping Potentially Breaking Changes
 ----------------------------------------
@@ -313,6 +313,9 @@ C++2c Feature Support
   `P2641R4 Checking if a union alternative is active <https://wg21.link/p2641r4>`_
 
 - Implemented `P3176R1 The Oxford variadic comma <https://wg21.link/P3176R1>`_
+
+- The error produced when doing arithmetic operations on enums of different types
+  can be disabled with ``-Wno-enum-enum-conversion``. (#GH92340)
 
 C++23 Feature Support
 ^^^^^^^^^^^^^^^^^^^^^
@@ -397,6 +400,8 @@ Resolutions to C++ Defect Reports
 C Language Changes
 ------------------
 
+- Clang now allows an ``inline`` specifier on a typedef declaration of a
+  function type in Microsoft compatibility mode. #GH124869
 - Extend clang's ``<limits.h>`` to define ``LONG_LONG_*`` macros for Android's bionic.
 - Macro ``__STDC_NO_THREADS__`` is no longer necessary for MSVC 2022 1939 and later.
 - Exposed the the ``__nullptr`` keyword as an alias for ``nullptr`` in all C language modes.
@@ -543,6 +548,11 @@ New Compiler Flags
 - The ``-Warray-compare-cxx26`` warning has been added to warn about array comparison
   starting from C++26, this warning is enabled as an error by default.
 
+- The ``-Wnontrivial-memcall`` warning has been added to warn about
+  passing non-trivially-copyable destination parameter to ``memcpy``,
+  ``memset`` and similar functions for which it is a documented undefined
+  behavior. It is implied by ``-Wnontrivial-memaccess``
+
 - clang-cl and clang-dxc now support ``-fdiagnostics-color=[auto|never|always]``
   in addition to ``-f[no-]color-diagnostics``.
 
@@ -573,11 +583,6 @@ Modified Compiler Flags
   ``-fveclib=ArmPL`` and ``-fveclib=SLEEF``. This gives Clang more opportunities
   to utilize these vector libraries. The behavior for all other vector function
   libraries remains unchanged.
-
-- The ``-Wnontrivial-memcall`` warning has been added to warn about
-  passing non-trivially-copyable destination parameter to ``memcpy``,
-  ``memset`` and similar functions for which it is a documented undefined
-  behavior. It is implied by ``-Wnontrivial-memaccess``
 
 - Added ``-fmodules-reduced-bmi`` flag corresponding to
   ``-fexperimental-modules-reduced-bmi`` flag. The ``-fmodules-reduced-bmi`` flag
@@ -652,6 +657,10 @@ Attribute Changes in Clang
 
 - The ``target_version`` attribute is now only supported for AArch64 and RISC-V architectures.
 
+- When targeting AArch64, a function declaration annotated with ``target_version("default")``
+  now generates a mangled default version of the function, whereas before at least one more
+  version other than the default was required to trigger Function Multi Versioning.
+
 - Clang now permits the usage of the placement new operator in ``[[msvc::constexpr]]``
   context outside of the std namespace. (#GH74924)
 
@@ -687,6 +696,16 @@ Improvements to Clang's diagnostics
 - Clang now properly explains the reason a template template argument failed to
   match a template template parameter, in terms of the C++17 relaxed matching rules
   instead of the old ones.
+
+- No longer diagnosing idiomatic function pointer casts on Windows under
+  ``-Wcast-function-type-mismatch`` (which is enabled by ``-Wextra``). Clang
+  would previously warn on this construct, but will no longer do so on Windows:
+
+  .. code-block:: c
+
+    typedef void (WINAPI *PGNSI)(LPSYSTEM_INFO);
+    HMODULE Lib = LoadLibrary("kernel32");
+    PGNSI FnPtr = (PGNSI)GetProcAddress(Lib, "GetNativeSystemInfo");
 
 - Don't emit duplicated dangling diagnostics. (#GH93386).
 
@@ -891,6 +910,10 @@ Bug Fixes in This Version
 - No longer return ``false`` for ``noexcept`` expressions involving a
   ``delete`` which resolves to a destroying delete but the type of the object
   being deleted has a potentially throwing destructor (#GH118660).
+- Clang now outputs correct values when #embed data contains bytes with negative
+  signed char values (#GH102798).
+- Fix crash due to unknown references and pointer implementation and handling of
+  base classes. (GH139452)
 
 Bug Fixes to Compiler Builtins
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -905,6 +928,8 @@ Bug Fixes to Compiler Builtins
 - Fix ``__has_builtin`` incorrectly returning ``false`` for some C++ type traits. (#GH111477)
 
 - Fix ``__builtin_source_location`` incorrectly returning wrong column for method chains. (#GH119129)
+
+- The behvaiour of ``__add_pointer`` and ``__remove_pointer`` for Objective-C++'s ``id`` and interfaces has been fixed.
 
 Bug Fixes to Attribute Support
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1045,6 +1070,16 @@ Bug Fixes to C++ Support
   template parameter. Now, such expression can be used with ``static_assert`` and ``constexpr``. (#GH123498)
 - Correctly determine the implicit constexprness of lambdas in dependent contexts. (#GH97958) (#GH114234)
 - Fix that some dependent immediate expressions did not cause immediate escalation (#GH119046)
+- Fixed a substitution bug in transforming CTAD aliases when the type alias contains a non-pack template argument
+  corresponding to a pack parameter (#GH124715)
+- Clang is now better at keeping track of friend function template instance contexts. (#GH55509)
+- Fixes matching of nested template template parameters. (#GH130362)
+- Correctly diagnoses template template paramters which have a pack parameter
+  not in the last position.
+- Fixed an integer overflow bug in computing template parameter depths when synthesizing CTAD guides. (#GH128691)
+- Fixed an incorrect pointer access when checking access-control on concepts. (#GH131530)
+- Fixed various alias CTAD bugs involving variadic template arguments. (#GH123591), (#GH127539), (#GH129077),
+  (#GH129620), and (#GH129998).
 
 Bug Fixes to AST Handling
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1083,6 +1118,7 @@ Miscellaneous Clang Crashes Fixed
 
 - Fixed a crash when an unscoped enumeration declared by an opaque-enum-declaration within a class template
   with a dependent underlying type is subject to integral promotion. (#GH117960)
+- Fix code completion crash involving PCH serialzied templates. (#GH139019)
 
 OpenACC Specific Changes
 ------------------------
@@ -1159,6 +1195,10 @@ X86 Support
 - Support ISA of ``MOVRS``.
 
 - Supported ``-march/tune=diamondrapids``
+- Disable ``-m[no-]avx10.1`` and switch ``-m[no-]avx10.2`` to alias of 512 bit
+  options.
+- Change ``-mno-avx10.1-512`` to alias of ``-mno-avx10.1-256`` to disable both
+  256 and 512 bit instructions.
 
 Arm and AArch64 Support
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -1185,6 +1225,14 @@ Arm and AArch64 Support
   For AArch64:
 
   * FUJITSU-MONAKA (fujitsu-monaka)
+
+- Runtime detection of depended-on Function Multi Versioning features has been added
+  in accordance with the Arm C Language Extensions (ACLE).
+
+- The ARM calling convention for empty structs in C++ mode was changed to pass
+  them as if they have a size of 1 byte, matching the AAPCS32 specification and
+  GCC's implementation. The previous behaviour of ignoring the argument can be
+  restored using the -fclang-abi-compat=19 (or earlier) option.
 
 Android Support
 ^^^^^^^^^^^^^^^
@@ -1225,6 +1273,8 @@ RISC-V Support
 - The option ``-mcmodel=large`` for the large code model is supported.
 - Bump RVV intrinsic to version 1.0, the spec: https://github.com/riscv-non-isa/rvv-intrinsic-doc/releases/tag/v1.0.0-rc4
 
+- `Zicsr` / `Zifencei` are allowed to be duplicated in the presence of `g` in `-march`.
+
 CUDA/HIP Language Changes
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 - Fixed a bug about overriding a constexpr pure-virtual member function with a non-constexpr virtual member function which causes compilation failure when including standard C++ header `format`.
@@ -1244,6 +1294,8 @@ CUDA Support
 
 AIX Support
 ^^^^^^^^^^^
+- Fixed the ``-print-runtime-dir`` option.
+- Enable continuous profile syncing feature on AIX.
 
 NetBSD Support
 ^^^^^^^^^^^^^^
@@ -1270,6 +1322,11 @@ AVR Support
 ^^^^^^^^^^^
 
 - Reject C/C++ compilation for avr1 devices which have no SRAM.
+
+BPF Support
+^^^^^^^^^^^
+
+- Make ``-mcpu=v3`` as the default.
 
 DWARF Support in Clang
 ----------------------
@@ -1331,6 +1388,10 @@ clang-format
 - Adds ``WrapNamespaceBodyWithEmptyLines`` option.
 - Adds the ``IndentExportBlock`` option.
 - Adds ``PenaltyBreakBeforeMemberAccess`` option.
+- Add the C language instead of treating it like C++.
+- Allow specifying the language (C, C++, or Objective-C) for a ``.h`` file by
+  adding a special comment (e.g. ``// clang-format Language: ObjC``) near the
+  top of the file.
 
 libclang
 --------
@@ -1356,30 +1417,64 @@ Static Analyzer
 New features
 ^^^^^^^^^^^^
 
-- Now CSA models `__builtin_*_overflow` functions. (#GH102602)
+- The ``__builtin_*_overflow`` functions are now properly modeled. (#GH102602)
 
-- MallocChecker now checks for ``ownership_returns(class, idx)`` and ``ownership_takes(class, idx)``
-  attributes with class names different from "malloc". Clang static analyzer now reports an error
-  if class of allocation and deallocation function mismatches.
+- ``unix.Malloc`` now checks for ``ownership_returns(class, idx)`` and ``ownership_takes(class, idx)``
+  attributes with class names different from "malloc". It now reports an error
+  if the class of allocation and deallocation function mismatches.
   `Documentation <https://clang.llvm.org/docs/analyzer/checkers.html#unix-mismatcheddeallocator-c-c>`__.
 
 - Function effects, e.g. the ``nonblocking`` and ``nonallocating`` "performance constraint"
   attributes, are now verified. For example, for functions declared with the ``nonblocking``
-  attribute, the compiler can generate warnings about the use of any language features, or calls to
+  attribute, the compiler can generate warnings about the use of any language features or calls to
   other functions, which may block.
 
 - Introduced ``-warning-suppression-mappings`` flag to control diagnostic
-  suppressions per file. See `documentation <https://clang.llvm.org/docs/WarningSuppressionMappings.html>_` for details.
+  suppressions per file. See `documentation <https://clang.llvm.org/docs/WarningSuppressionMappings.html>`__ for details.
+
+- Started to model GCC asm statements in some basic way. (#GH103714, #GH109838)
 
 Crash and bug fixes
 ^^^^^^^^^^^^^^^^^^^
 
 - In loops where the loop condition is opaque (i.e. the analyzer cannot
   determine whether it's true or false), the analyzer will no longer assume
-  execution paths that perform more that two iterations. These unjustified
+  execution paths that perform more than two iterations. These unjustified
   assumptions caused false positive reports (e.g. 100+ out-of-bounds reports in
   the FFMPEG codebase) in loops where the programmer intended only two or three
   steps but the analyzer wasn't able to understand that the loop is limited.
+  (#GH119388)
+
+- In clang-19, the ``crosscheck-with-z3-timeout-threshold`` was set to 300ms,
+  but it is now reset back to 15000, aka. 15 seconds. This is to reduce the
+  number of flaky diagnostics due to Z3 query timeouts.
+  If you are affected, read the details at #GH118291 carefully.
+
+- Same as the previous point, but for ``crosscheck-with-z3-rlimit-threshold``
+  and ``crosscheck-with-z3-eqclass-timeout-threshold``.
+  This option is now set to zero, aka. disabled by default. (#GH118291)
+
+- Fixed a crash in the ``unix.Stream`` checker when modeling ``fread``. (#GH108393)
+
+- Fixed a crash in the ``core.StackAddressEscape`` checker related to ``alloca``.
+  Fixes (#GH107852).
+
+- Fixed a crash when invoking a function pointer cast from some non-function pointer. (#GH111390)
+
+- Fixed a crash when modeling some ``ArrayInitLoopExpr``. Fixes (#GH112813).
+
+- Fixed a crash in loop unrolling. Fixes (#GH121201).
+
+- The iteration orders of some internal representations of symbols were changed
+  to make their internal ordering more stable. This should improve determinism.
+  This also reduces the number of flaky reports exposed by the Z3 query timeouts.
+  (#GH121749)
+
+- The ``unix.BlockInCriticalSection`` now recognizes the ``lock()`` member function
+  as expected, even if it's inherited from a base class. Fixes (#GH104241).
+
+- Fixed a crash when C++20 parenthesized initializer lists are used. This issue
+  was causing a crash in clang-tidy. (#GH136041)
 
 Improvements
 ^^^^^^^^^^^^
@@ -1387,6 +1482,40 @@ Improvements
 - Improved the handling of the ``ownership_returns`` attribute. Now, Clang reports an
   error if the attribute is attached to a function that returns a non-pointer value.
   Fixes (#GH99501)
+
+- Improved the escape heuristics of member variables of non-trivial std types. (#GH100405)
+  Also when invoking an opaque member function. (#GH111138)
+
+- Improved the ``nullability.NullReturnedFromNonnull`` checker by reporting
+  more violations of the ``returns_nonnull`` attribute.
+  `Documentation <https://clang.llvm.org/docs/analyzer/checkers.html#nullability-nullreturnedfromnonnull-c-c-objc>`_.
+  (#GH106048)
+
+- The ``unix.Stream`` checker now notes the last ``fclose`` call in the diagnostics. (#GH109112)
+
+- The ``core.StackAddressEscape`` checker now detects more leak issues through output
+  parameters and global variables. (#GH105653, #GH105648, #GH107003) Fixes (#GH106834).
+
+- The ``unix.Malloc`` checker was made more consistent with the
+  `ownership attributes <https://clang.llvm.org/docs/AttributeReference.html#analyzer-ownership-attrs>`_.
+  (#GH104599, #GH110115) This also fixed #GH104229.
+
+- The number of false-positive reports of ``alpha.core.FixedAddr`` checker was slightly reduced.
+  (#GH108993, #GH110458)
+
+- Improved the default (range-based) solver by reasoning about more commutative
+  operations, and better deducing some concrete values from their known ranges.
+  (#GH112583, #GH112887, #GH115579)
+
+- A new option ``crosscheck-with-z3-max-attempts-per-query`` should help
+  reducing the number of flaky reports if Z3 query timeouts are used.
+  By default, Z3 queries are attempted at most 3 times, giving it more chances,
+  thus reducing number of flaky issues on timeouts. Read the details in this
+  `RFC <https://discourse.llvm.org/t/analyzer-rfc-retry-z3-crosscheck-queries-on-timeout/83711>`__.
+  (#GH120239)
+
+- The resulting pointer of ``fread`` is now known to never alias with the
+  pointers of ``stdin``, ``stdout`` or ``stderr``. (#GH100085)
 
 Moved checkers
 ^^^^^^^^^^^^^^
@@ -1400,21 +1529,35 @@ Moved checkers
   To detect too large arguments passed to malloc, consider using the checker
   ``alpha.taint.TaintedAlloc``.
 
-- The checkers ``alpha.nondeterministic.PointerSorting`` and
+- Both ``alpha.nondeterministic.PointerSorting`` and
   ``alpha.nondeterministic.PointerIteration`` were moved to a new bugprone
   checker named ``bugprone-nondeterministic-pointer-iteration-order``. The
   original checkers were implemented only using AST matching and make more
   sense as a single clang-tidy check.
 
-- The checker ``alpha.unix.Chroot`` was modernized, improved and moved to
-  ``unix.Chroot``. Testing was done on open source projects that use chroot(),
-  and false issues addressed in the improvements based on real use cases. Open
-  source projects used for testing include nsjail, lxroot, dive and ruri.
+- The checker ``alpha.unix.Chroot`` was modernized, improved, and moved to
+  ``unix.Chroot``. Testing was done on open-source projects that use chroot(),
+  and false issues addressed in the improvements based on real use cases.
+  Open-source projects used for testing include ``nsjail``, ``lxroot``, ``dive`` and ``ruri``.
   This checker conforms to SEI Cert C recommendation `POS05-C. Limit access to
   files by creating a jail
   <https://wiki.sei.cmu.edu/confluence/display/c/POS05-C.+Limit+access+to+files+by+creating+a+jail>`_.
   Fixes (#GH34697).
-  (#GH117791) [Documentation](https://clang.llvm.org/docs/analyzer/checkers.html#unix-chroot-c).
+  (#GH117791) `Documentation <https://clang.llvm.org/docs/analyzer/checkers.html#unix-chroot-c>`__.
+
+- The checker ``alpha.core.PointerSub`` was moved to ``security.PointerSub``
+  after it was significantly improved in #GH96501, #GH102580, #GH111846.
+
+- The checker ``alpha.security.MmapWriteExec`` was moved to ``security.MmapWriteExec``.
+
+- The checker ``alpha.unix.cstring.NotNullTerminated`` was moved to ``unix.cstring.NotNullTerminated``.
+
+- The division by tainted value diagnostic was split from the checker ``core.DivideZero``
+  into a separate checker ``optin.taint.TaintedDiv``. (#GH106389)
+
+- Both ``alpha.security.taint.TaintPropagation`` and ``alpha.security.taint.GenericTaint``
+  were moved to ``optin.taint.TaintPropagation`` and ``optin.taint.GenericTaint`` respectively.
+  (#GH67352)
 
 .. _release-notes-sanitizers:
 

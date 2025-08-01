@@ -702,52 +702,6 @@ bool Sema::CheckConstraintSatisfaction(const Expr *ConstraintExpr,
       .isInvalid();
 }
 
-bool Sema::addInstantiatedCapturesToScope(
-    FunctionDecl *Function, const FunctionDecl *PatternDecl,
-    LocalInstantiationScope &Scope,
-    const MultiLevelTemplateArgumentList &TemplateArgs) {
-  const auto *LambdaClass = cast<CXXMethodDecl>(Function)->getParent();
-  const auto *LambdaPattern = cast<CXXMethodDecl>(PatternDecl)->getParent();
-
-  unsigned Instantiated = 0;
-
-  auto AddSingleCapture = [&](const ValueDecl *CapturedPattern,
-                              unsigned Index) {
-    ValueDecl *CapturedVar = LambdaClass->getCapture(Index)->getCapturedVar();
-    assert(CapturedVar->isInitCapture());
-    Scope.InstantiatedLocal(CapturedPattern, CapturedVar);
-  };
-
-  for (const LambdaCapture &CapturePattern : LambdaPattern->captures()) {
-    if (!CapturePattern.capturesVariable()) {
-      Instantiated++;
-      continue;
-    }
-    ValueDecl *CapturedPattern = CapturePattern.getCapturedVar();
-
-    if (!CapturedPattern->isInitCapture()) {
-      Instantiated++;
-      continue;
-    }
-
-    if (!CapturedPattern->isParameterPack()) {
-      AddSingleCapture(CapturedPattern, Instantiated++);
-    } else {
-      Scope.MakeInstantiatedLocalArgPack(CapturedPattern);
-      SmallVector<UnexpandedParameterPack, 2> Unexpanded;
-      SemaRef.collectUnexpandedParameterPacks(
-          dyn_cast<VarDecl>(CapturedPattern)->getInit(), Unexpanded);
-      auto NumArgumentsInExpansion =
-          getNumArgumentsInExpansionFromUnexpanded(Unexpanded, TemplateArgs);
-      if (!NumArgumentsInExpansion)
-        continue;
-      for (unsigned Arg = 0; Arg < *NumArgumentsInExpansion; ++Arg)
-        AddSingleCapture(CapturedPattern, Instantiated++);
-    }
-  }
-  return false;
-}
-
 bool Sema::SetupConstraintScope(
     FunctionDecl *FD, std::optional<ArrayRef<TemplateArgument>> TemplateArgs,
     const MultiLevelTemplateArgumentList &MLTAL,

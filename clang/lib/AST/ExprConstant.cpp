@@ -2419,6 +2419,16 @@ static bool CheckLValueConstantExpression(EvalInfo &Info, SourceLocation Loc,
           LVal.getLValueCallIndex() == 0) &&
          "have call index for global lvalue");
 
+  if (LVal.allowConstexprUnknown()) {
+    if (BaseVD) {
+      Info.FFDiag(Loc, diag::note_constexpr_var_init_non_constant, 1) << BaseVD;
+      NoteLValueLocation(Info, Base);
+    } else {
+      Info.FFDiag(Loc);
+    }
+    return false;
+  }
+
   if (Base.is<DynamicAllocLValue>()) {
     Info.FFDiag(Loc, diag::note_constexpr_dynamic_alloc)
         << IsReferenceType << !Designator.Entries.empty();
@@ -3301,7 +3311,11 @@ static bool HandleLValueBase(EvalInfo &Info, const Expr *E, LValue &Obj,
     return false;
 
   // Extract most-derived object and corresponding type.
-  DerivedDecl = D.MostDerivedType->getAsCXXRecordDecl();
+  // FIXME: After implementing P2280R4 it became possible to get references
+  // here. We do MostDerivedType->getAsCXXRecordDecl() in several other
+  // locations and if we see crashes in those locations in the future
+  // it may make more sense to move this fix into Lvalue::set.
+  DerivedDecl = D.MostDerivedType.getNonReferenceType()->getAsCXXRecordDecl();
   if (!CastToDerivedClass(Info, E, Obj, DerivedDecl, D.MostDerivedPathLength))
     return false;
 
@@ -3511,7 +3525,12 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
   // should begin within the evaluation of E
   // Used to be C++20 [expr.const]p5.12.2:
   // ... its lifetime began within the evaluation of E;
-  if (isa<ParmVarDecl>(VD) && !AllowConstexprUnknown) {
+  if (isa<ParmVarDecl>(VD)) {
+    if (AllowConstexprUnknown) {
+      Result = &Info.CurrentCall->createConstexprUnknownAPValues(VD, Base);
+      return true;
+    }
+
     // Assume parameters of a potential constant expression are usable in
     // constant expressions.
     if (!Info.checkingPotentialConstantExpression() ||
@@ -3597,7 +3616,8 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
   // expressions here; doing so would regress diagnostics for things like
   // reading from a volatile constexpr variable.
   if ((Info.getLangOpts().CPlusPlus && !VD->hasConstantInitialization() &&
-       VD->mightBeUsableInConstantExpressions(Info.Ctx)) ||
+       VD->mightBeUsableInConstantExpressions(Info.Ctx) &&
+       !AllowConstexprUnknown) ||
       ((Info.getLangOpts().CPlusPlus || Info.getLangOpts().OpenCL) &&
        !Info.getLangOpts().CPlusPlus11 && !VD->hasICEInitializer(Info.Ctx))) {
     if (Init) {
@@ -3628,8 +3648,6 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
   if (AllowConstexprUnknown) {
     if (!Result)
       Result = &Info.CurrentCall->createConstexprUnknownAPValues(VD, Base);
-    else
-      Result->setConstexprUnknown();
   }
   return true;
 }
@@ -12701,11 +12719,13 @@ static bool determineEndOffset(EvalInfo &Info, SourceLocation ExprLoc,
   bool DetermineForCompleteObject = refersToCompleteObject(LVal);
 
   auto CheckedHandleSizeof = [&](QualType Ty, CharUnits &Result) {
-    if (Ty.isNull() || Ty->isIncompleteType() || Ty->isFunctionType())
+    if (Ty.isNull())
       return false;
 
-    if (Ty->isReferenceType())
-      Ty = Ty.getNonReferenceType();
+    Ty = Ty.getNonReferenceType();
+
+    if (Ty->isIncompleteType() || Ty->isFunctionType())
+      return false;
 
     return HandleSizeof(Info, ExprLoc, Ty, Result);
   };

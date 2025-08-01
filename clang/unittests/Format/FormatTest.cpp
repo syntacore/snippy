@@ -9614,6 +9614,10 @@ TEST_F(FormatTest, AlignsAfterOpenBracket) {
                "        auto aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
                "    ) {};",
                Style);
+  verifyFormat("aaaaaaaaaaaaaaaaaaaaaaaa(\n"
+               "    &bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n"
+               ");",
+               Style);
 }
 
 TEST_F(FormatTest, ParenthesesAndOperandAlignment) {
@@ -12415,6 +12419,13 @@ TEST_F(FormatTest, UnderstandsAttributes) {
   verifyFormat("SomeType s __unused{InitValue};", CustomAttrs);
   verifyFormat("SomeType *__capability s(InitValue);", CustomAttrs);
   verifyFormat("SomeType *__capability s{InitValue};", CustomAttrs);
+
+  auto Style = getLLVMStyleWithColumns(60);
+  Style.AttributeMacros.push_back("my_fancy_attr");
+  Style.PointerAlignment = FormatStyle::PAS_Left;
+  verifyFormat("void foo(const MyLongTypeNameeeeeeeeeeeee* my_fancy_attr\n"
+               "             testttttttttt);",
+               Style);
 }
 
 TEST_F(FormatTest, UnderstandsPointerQualifiersInCast) {
@@ -13958,6 +13969,8 @@ TEST_F(FormatTest, IncorrectCodeUnbalancedBraces) {
   verifyNoCrash("struct Foo {\n"
                 "  operator foo(bar\n"
                 "};");
+  verifyNoCrash("decltype( {\n"
+                "  {");
 }
 
 TEST_F(FormatTest, IncorrectUnbalancedBracesInMacrosWithUnicode) {
@@ -17784,9 +17797,11 @@ TEST_F(FormatTest, ConfigurableSpaceBeforeAssignmentOperators) {
   verifyFormat("int a = 5;");
   verifyFormat("a += 42;");
   verifyFormat("a or_eq 8;");
-  verifyFormat("xor = foo;");
 
-  FormatStyle Spaces = getLLVMStyle();
+  auto Spaces = getLLVMStyle(FormatStyle::LK_C);
+  verifyFormat("xor = foo;", Spaces);
+
+  Spaces.Language = FormatStyle::LK_Cpp;
   Spaces.SpaceBeforeAssignmentOperators = false;
   verifyFormat("int a= 5;", Spaces);
   verifyFormat("a+= 42;", Spaces);
@@ -24683,6 +24698,7 @@ TEST_F(FormatTest, StructuredBindings) {
 }
 
 TEST_F(FormatTest, FileAndCode) {
+  EXPECT_EQ(FormatStyle::LK_C, guessLanguage("foo.c", ""));
   EXPECT_EQ(FormatStyle::LK_Cpp, guessLanguage("foo.cc", ""));
   EXPECT_EQ(FormatStyle::LK_ObjC, guessLanguage("foo.m", ""));
   EXPECT_EQ(FormatStyle::LK_ObjC, guessLanguage("foo.mm", ""));
@@ -24846,6 +24862,18 @@ TEST_F(FormatTest, GuessLanguageWithChildLines) {
   EXPECT_EQ(
       FormatStyle::LK_ObjC,
       guessLanguage("foo.h", "#define FOO ({ foo(); ({ NSString *s; }) })"));
+}
+
+TEST_F(FormatTest, GetLanguageByComment) {
+  EXPECT_EQ(FormatStyle::LK_C,
+            guessLanguage("foo.h", "// clang-format Language: C\n"
+                                   "int i;"));
+  EXPECT_EQ(FormatStyle::LK_Cpp,
+            guessLanguage("foo.h", "// clang-format Language: Cpp\n"
+                                   "int DoStuff(CGRect rect);"));
+  EXPECT_EQ(FormatStyle::LK_ObjC,
+            guessLanguage("foo.h", "// clang-format Language: ObjC\n"
+                                   "int i;"));
 }
 
 TEST_F(FormatTest, TypenameMacros) {
@@ -25052,8 +25080,10 @@ TEST_F(FormatTest, AlternativeOperators) {
   verifyFormat("%:define ABC abc"); // #define ABC abc
   verifyFormat("%:%:");             // ##
 
+  verifyFormat("return not ::f();");
+  verifyFormat("return not *foo;");
+
   verifyFormat("a = v(not;);\n"
-               "b = v(not+);\n"
                "c = v(not x);\n"
                "d = v(not 1);\n"
                "e = v(not 123.f);");
@@ -25061,7 +25091,6 @@ TEST_F(FormatTest, AlternativeOperators) {
   verifyNoChange("#define ASSEMBLER_INSTRUCTION_LIST(V)  \\\n"
                  "  V(and)                               \\\n"
                  "  V(not)                               \\\n"
-                 "  V(not!)                              \\\n"
                  "  V(other)",
                  getLLVMStyleWithColumns(40));
 }
@@ -26478,6 +26507,9 @@ TEST_F(FormatTest, RequiresClauses) {
                "foo();\n"
                "#endif\n"
                "bar(requires);");
+
+  verifyNoCrash("template <class T>\n"
+                "    requires(requires { std::declval<T>()");
 }
 
 TEST_F(FormatTest, RequiresExpressionIndentation) {
@@ -27863,11 +27895,17 @@ TEST_F(FormatTest, RemoveParentheses) {
   verifyFormat("foo((a, b));", "foo(((a), b));", Style);
   verifyFormat("foo((a, b));", "foo((a, (b)));", Style);
   verifyFormat("foo((a, b, c));", "foo((a, ((b)), c));", Style);
+  verifyFormat("(..., (hash_a = hash_combine(hash_a, hash_b)));",
+               "(..., ((hash_a = hash_combine(hash_a, hash_b))));", Style);
+  verifyFormat("((hash_a = hash_combine(hash_a, hash_b)), ...);",
+               "(((hash_a = hash_combine(hash_a, hash_b))), ...);", Style);
   verifyFormat("return (0);", "return (((0)));", Style);
   verifyFormat("return (({ 0; }));", "return ((({ 0; })));", Style);
   verifyFormat("return ((... && std::is_convertible_v<TArgsLocal, TArgs>));",
                "return (((... && std::is_convertible_v<TArgsLocal, TArgs>)));",
                Style);
+  verifyFormat("MOCK_METHOD(void, Function, (), override);",
+               "MOCK_METHOD(void, Function, (), (override));", Style);
 
   Style.RemoveParentheses = FormatStyle::RPS_ReturnStatement;
   verifyFormat("#define Return0 return (0);", Style);
@@ -28715,6 +28753,11 @@ TEST_F(FormatTest, WrapNamespaceBodyWithEmptyLinesAlways) {
                "int a = 1;\n"
                "}}",
                Style);
+}
+
+TEST_F(FormatTest, BreakBeforeClassName) {
+  verifyFormat("class ABSL_ATTRIBUTE_TRIVIAL_ABI ABSL_NULLABILITY_COMPATIBLE\n"
+               "    ArenaSafeUniquePtr {};");
 }
 
 } // namespace

@@ -105,6 +105,7 @@ static StringInitFailureKind IsStringInit(Expr *Init, const ArrayType *AT,
       return SIF_None;
     [[fallthrough]];
   case StringLiteralKind::Ordinary:
+  case StringLiteralKind::Binary:
     // char array can be initialized with a narrow string.
     // Only allow char x[] = "foo";  not char x[] = L"foo";
     if (ElemTy->isCharType())
@@ -4573,8 +4574,12 @@ static void TryConstructorInitialization(Sema &S,
 
   CXXConstructorDecl *CtorDecl = cast<CXXConstructorDecl>(Best->Function);
   if (Result != OR_Deleted) {
-    if (!IsListInit && Kind.getKind() == InitializationKind::IK_Default &&
-        DestRecordDecl != nullptr && DestRecordDecl->isAggregate() &&
+    if (!IsListInit &&
+        (Kind.getKind() == InitializationKind::IK_Default ||
+         Kind.getKind() == InitializationKind::IK_Direct) &&
+        DestRecordDecl != nullptr &&
+        !(CtorDecl->isCopyOrMoveConstructor() && CtorDecl->isImplicit()) &&
+        DestRecordDecl->isAggregate() &&
         DestRecordDecl->hasUninitializedExplicitInitFields()) {
       S.Diag(Kind.getLocation(), diag::warn_field_requires_explicit_init)
           << /* Var-in-Record */ 1 << DestRecordDecl;

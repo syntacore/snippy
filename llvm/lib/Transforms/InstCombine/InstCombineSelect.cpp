@@ -2838,7 +2838,14 @@ static Instruction *foldSelectWithFCmpToFabs(SelectInst &SI,
 
     // fold (X <= +/-0.0) ? (0.0 - X) : X to fabs(X), when 'Swap' is false
     // fold (X >  +/-0.0) ? X : (0.0 - X) to fabs(X), when 'Swap' is true
-    if (match(TrueVal, m_FSub(m_PosZeroFP(), m_Specific(X)))) {
+    // Note: We require "nnan" for this fold because fcmp ignores the signbit
+    //       of NAN, but IEEE-754 specifies the signbit of NAN values with
+    //       fneg/fabs operations.
+    if (match(TrueVal, m_FSub(m_PosZeroFP(), m_Specific(X))) &&
+        (cast<FPMathOperator>(CondVal)->hasNoNaNs() || SI.hasNoNaNs() ||
+         isKnownNeverNaN(X, /*Depth=*/0,
+                         IC.getSimplifyQuery().getWithInstruction(
+                             cast<Instruction>(CondVal))))) {
       if (!Swap && (Pred == FCmpInst::FCMP_OLE || Pred == FCmpInst::FCMP_ULE)) {
         Value *Fabs = IC.Builder.CreateUnaryIntrinsic(Intrinsic::fabs, X, &SI);
         return IC.replaceInstUsesWith(SI, Fabs);
@@ -2852,16 +2859,23 @@ static Instruction *foldSelectWithFCmpToFabs(SelectInst &SI,
     if (!match(TrueVal, m_FNeg(m_Specific(X))))
       return nullptr;
 
-    // Forward-propagate nnan and ninf from the fneg to the select.
+    // Forward-propagate nnan and ninf from the fcmp to the select.
     // If all inputs are not those values, then the select is not either.
     // Note: nsz is defined differently, so it may not be correct to propagate.
-    FastMathFlags FMF = cast<FPMathOperator>(TrueVal)->getFastMathFlags();
+    FastMathFlags FMF = cast<FPMathOperator>(CondVal)->getFastMathFlags();
     if (FMF.noNaNs() && !SI.hasNoNaNs()) {
       SI.setHasNoNaNs(true);
       ChangedFMF = true;
     }
     if (FMF.noInfs() && !SI.hasNoInfs()) {
       SI.setHasNoInfs(true);
+      ChangedFMF = true;
+    }
+    // Forward-propagate nnan from the fneg to the select.
+    // The nnan flag can be propagated iff fneg is selected when X is NaN.
+    if (!SI.hasNoNaNs() && cast<FPMathOperator>(TrueVal)->hasNoNaNs() &&
+        (Swap ? FCmpInst::isOrdered(Pred) : FCmpInst::isUnordered(Pred))) {
+      SI.setHasNoNaNs(true);
       ChangedFMF = true;
     }
 

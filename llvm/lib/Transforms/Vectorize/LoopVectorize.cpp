@@ -2888,10 +2888,6 @@ void InnerLoopVectorizer::fixVectorizedLoop(VPTransformState &State) {
   if (EnableVPlanNativePath)
     fixNonInductionPHIs(State);
 
-  // Forget the original basic block.
-  PSE.getSE()->forgetLoop(OrigLoop);
-  PSE.getSE()->forgetBlockAndLoopDispositions();
-
   // After vectorization, the exit blocks of the original loop will have
   // additional predecessors. Invalidate SCEVs for the exit phis in case SE
   // looked through single-entry phis.
@@ -2900,6 +2896,10 @@ void InnerLoopVectorizer::fixVectorizedLoop(VPTransformState &State) {
   for (BasicBlock *Exit : ExitBlocks)
     for (PHINode &PN : Exit->phis())
       PSE.getSE()->forgetLcssaPhiWithNewPredecessor(OrigLoop, &PN);
+
+  // Forget the original basic block.
+  PSE.getSE()->forgetLoop(OrigLoop);
+  PSE.getSE()->forgetBlockAndLoopDispositions();
 
   // Don't apply optimizations below when no vector region remains, as they all
   // require a vector loop at the moment.
@@ -4626,6 +4626,16 @@ bool LoopVectorizationPlanner::isCandidateForEpilogueVectorization(
         return false;
   }
 
+  // Don't vectorize the epilogue, if there are FindLastIV recurrences with a
+  // start value may be undef or poison. Such start values would need freezing.
+  if (any_of(Legal->getReductionVars(), [](const auto &P) {
+        return RecurrenceDescriptor::isFindLastIVRecurrenceKind(
+                   P.second.getRecurrenceKind()) &&
+               !isGuaranteedNotToBeUndefOrPoison(
+                   P.second.getRecurrenceStartValue());
+      }))
+    return false;
+
   // Epilogue vectorization code has not been auditted to ensure it handles
   // non-latch exits properly.  It may be fine, but it needs auditted and
   // tested.
@@ -6262,7 +6272,6 @@ void LoopVectorizationCostModel::setVectorizedCallDecision(ElementCount VF) {
 
       // Find the cost of vectorizing the call, if we can find a suitable
       // vector variant of the function.
-      bool UsesMask = false;
       VFInfo FuncInfo;
       Function *VecFunc = nullptr;
       // Search through any available variants for one we can use at this VF.
@@ -6314,7 +6323,6 @@ void LoopVectorizationCostModel::setVectorizedCallDecision(ElementCount VF) {
             break;
           }
           case VFParamKind::GlobalPredicate:
-            UsesMask = true;
             break;
           default:
             ParamsOk = false;
@@ -6331,19 +6339,8 @@ void LoopVectorizationCostModel::setVectorizedCallDecision(ElementCount VF) {
         break;
       }
 
-      // Add in the cost of synthesizing a mask if one wasn't required.
-      InstructionCost MaskCost = 0;
-      if (VecFunc && UsesMask && !MaskRequired)
-        MaskCost = TTI.getShuffleCost(
-            TargetTransformInfo::SK_Broadcast,
-            VectorType::get(IntegerType::getInt1Ty(
-                                VecFunc->getFunctionType()->getContext()),
-                            VF),
-            {}, CostKind);
-
       if (TLI && VecFunc && !CI->isNoBuiltin())
-        VectorCost =
-            TTI.getCallInstrCost(nullptr, RetTy, Tys, CostKind) + MaskCost;
+        VectorCost = TTI.getCallInstrCost(nullptr, RetTy, Tys, CostKind);
 
       // Find the cost of an intrinsic; some targets may have instructions that
       // perform the operation without needing an actual call.
@@ -6615,8 +6612,10 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I,
     // fold away.  We can generalize this for all operations using the notion
     // of neutral elements.  (TODO)
     if (I->getOpcode() == Instruction::Mul &&
-        (PSE.getSCEV(I->getOperand(0))->isOne() ||
-         PSE.getSCEV(I->getOperand(1))->isOne()))
+        ((TheLoop->isLoopInvariant(I->getOperand(0)) &&
+          PSE.getSCEV(I->getOperand(0))->isOne()) ||
+         (TheLoop->isLoopInvariant(I->getOperand(1)) &&
+          PSE.getSCEV(I->getOperand(1))->isOne())))
       return 0;
 
     // Detect reduction patterns
@@ -7250,7 +7249,7 @@ LoopVectorizationPlanner::precomputeCosts(VPlan &Plan, ElementCount VF,
   // Collect all exit conditions.
   for (BasicBlock *EB : Exiting) {
     auto *Term = dyn_cast<BranchInst>(EB->getTerminator());
-    if (!Term)
+    if (!Term || CostCtx.skipCostComputation(Term, VF.isVector()))
       continue;
     if (auto *CondI = dyn_cast<Instruction>(Term->getOperand(0))) {
       ExitInstrs.insert(CondI);
@@ -7270,7 +7269,8 @@ LoopVectorizationPlanner::precomputeCosts(VPlan &Plan, ElementCount VF,
     Cost += CondICost;
     for (Value *Op : CondI->operands()) {
       auto *OpI = dyn_cast<Instruction>(Op);
-      if (!OpI || any_of(OpI->users(), [&ExitInstrs, this](User *U) {
+      if (!OpI || CostCtx.skipCostComputation(OpI, VF.isVector()) ||
+          any_of(OpI->users(), [&ExitInstrs, this](User *U) {
             return OrigLoop->contains(cast<Instruction>(U)->getParent()) &&
                    !ExitInstrs.contains(cast<Instruction>(U));
           }))
@@ -8566,6 +8566,8 @@ VPWidenRecipe *VPRecipeBuilder::tryToWiden(Instruction *I,
       // to replace operands with constants.
       ScalarEvolution &SE = *PSE.getSE();
       auto GetConstantViaSCEV = [this, &SE](VPValue *Op) {
+        if (!Op->isLiveIn())
+          return Op;
         Value *V = Op->getUnderlyingValue();
         if (isa<Constant>(V) || !SE.isSCEVable(V->getType()))
           return Op;

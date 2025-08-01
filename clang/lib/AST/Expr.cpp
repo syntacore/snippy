@@ -1104,6 +1104,7 @@ unsigned StringLiteral::mapCharByteWidth(TargetInfo const &Target,
   switch (SK) {
   case StringLiteralKind::Ordinary:
   case StringLiteralKind::UTF8:
+  case StringLiteralKind::Binary:
     CharByteWidth = Target.getCharWidth();
     break;
   case StringLiteralKind::Wide:
@@ -1216,6 +1217,7 @@ void StringLiteral::outputString(raw_ostream &OS) const {
   switch (getKind()) {
   case StringLiteralKind::Unevaluated:
   case StringLiteralKind::Ordinary:
+  case StringLiteralKind::Binary:
     break; // no prefix.
   case StringLiteralKind::Wide:
     OS << 'L';
@@ -1332,6 +1334,11 @@ StringLiteral::getLocationOfByte(unsigned ByteNo, const SourceManager &SM,
                                  const LangOptions &Features,
                                  const TargetInfo &Target, unsigned *StartToken,
                                  unsigned *StartTokenByteOffset) const {
+  // No source location of bytes for binary literals since they don't come from
+  // source.
+  if (getKind() == StringLiteralKind::Binary)
+    return getStrTokenLoc(0);
+
   assert((getKind() == StringLiteralKind::Ordinary ||
           getKind() == StringLiteralKind::UTF8 ||
           getKind() == StringLiteralKind::Unevaluated) &&
@@ -1645,11 +1652,25 @@ SourceLocation CallExpr::getBeginLoc() const {
   if (const auto *OCE = dyn_cast<CXXOperatorCallExpr>(this))
     return OCE->getBeginLoc();
 
-  if (const auto *Method =
-          dyn_cast_if_present<const CXXMethodDecl>(getCalleeDecl());
-      Method && Method->isExplicitObjectMemberFunction()) {
-    assert(getNumArgs() > 0 && getArg(0));
-    return getArg(0)->getBeginLoc();
+  // A non-dependent call to a member function with an explicit object parameter
+  // is modelled with the object expression being the first argument, e.g. in
+  // `o.f(x)`, the callee will be just `f`, and `o` will be the first argument.
+  // Since the first argument is written before the callee, the expression's
+  // begin location should come from the first argument.
+  // This does not apply to dependent calls, which are modelled with `o.f`
+  // being the callee.
+  if (!isTypeDependent()) {
+    if (const auto *Method =
+            dyn_cast_if_present<const CXXMethodDecl>(getCalleeDecl());
+        Method && Method->isExplicitObjectMemberFunction()) {
+      bool HasFirstArg = getNumArgs() > 0 && getArg(0);
+      assert(HasFirstArg);
+      if (HasFirstArg) {
+        if (auto FirstArgLoc = getArg(0)->getBeginLoc(); FirstArgLoc.isValid()) {
+          return FirstArgLoc;
+        }
+      }
+    }
   }
 
   SourceLocation begin = getCallee()->getBeginLoc();

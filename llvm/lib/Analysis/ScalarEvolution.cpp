@@ -5917,20 +5917,18 @@ const SCEV *ScalarEvolution::createAddRecFromPHI(PHINode *PN) {
     //   PHI(f(0), f({1,+,1})) --> f({0,+,1})
 
     // Do not allow refinement in rewriting of BEValue.
-    if (isGuaranteedNotToCauseUB(BEValue)) {
-      const SCEV *Shifted = SCEVShiftRewriter::rewrite(BEValue, L, *this);
-      const SCEV *Start = SCEVInitRewriter::rewrite(Shifted, L, *this, false);
-      if (Shifted != getCouldNotCompute() && Start != getCouldNotCompute() &&
-          ::impliesPoison(BEValue, Start)) {
-        const SCEV *StartVal = getSCEV(StartValueV);
-        if (Start == StartVal) {
-          // Okay, for the entire analysis of this edge we assumed the PHI
-          // to be symbolic.  We now need to go back and purge all of the
-          // entries for the scalars that use the symbolic expression.
-          forgetMemoizedResults(SymbolicName);
-          insertValueToMap(PN, Shifted);
-          return Shifted;
-        }
+    const SCEV *Shifted = SCEVShiftRewriter::rewrite(BEValue, L, *this);
+    const SCEV *Start = SCEVInitRewriter::rewrite(Shifted, L, *this, false);
+    if (Shifted != getCouldNotCompute() && Start != getCouldNotCompute() &&
+        isGuaranteedNotToCauseUB(Shifted) && ::impliesPoison(Shifted, Start)) {
+      const SCEV *StartVal = getSCEV(StartValueV);
+      if (Start == StartVal) {
+        // Okay, for the entire analysis of this edge we assumed the PHI
+        // to be symbolic.  We now need to go back and purge all of the
+        // entries for the scalars that use the symbolic expression.
+        forgetMemoizedResults(SymbolicName);
+        insertValueToMap(PN, Shifted);
+        return Shifted;
       }
     }
   }
@@ -7856,7 +7854,7 @@ const SCEV *ScalarEvolution::createSCEV(Value *V) {
               unsigned GCD = std::min(MulZeros, TZ);
               APInt DivAmt = APInt::getOneBitSet(BitWidth, TZ - GCD);
               SmallVector<const SCEV*, 4> MulOps;
-              MulOps.push_back(getConstant(OpC->getAPInt().lshr(GCD)));
+              MulOps.push_back(getConstant(OpC->getAPInt().ashr(GCD)));
               append_range(MulOps, LHSMul->operands().drop_front());
               auto *NewMul = getMulExpr(MulOps, LHSMul->getNoWrapFlags());
               ShiftedLHS = getUDivExpr(NewMul, getConstant(DivAmt));
@@ -10637,10 +10635,11 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
   if (ControlsOnlyExit && AddRec->hasNoSelfWrap() &&
       loopHasNoAbnormalExits(AddRec->getLoop())) {
 
-    // If the stride is zero, the loop must be infinite.  In C++, most loops
-    // are finite by assumption, in which case the step being zero implies
-    // UB must execute if the loop is entered.
-    if (!loopIsFiniteByAssumption(L) && !isKnownNonZero(StepWLG))
+    // If the stride is zero and the start is non-zero, the loop must be
+    // infinite. In C++, most loops are finite by assumption, in which case the
+    // step being zero implies UB must execute if the loop is entered.
+    if (!(loopIsFiniteByAssumption(L) && isKnownNonZero(Start)) &&
+        !isKnownNonZero(StepWLG))
       return getCouldNotCompute();
 
     const SCEV *Exact =
@@ -12404,6 +12403,12 @@ bool ScalarEvolution::isImpliedViaMerge(CmpPredicate Pred, const SCEV *LHS,
       // iteration of a loop.
       if (!properlyDominates(L, LBB))
         return false;
+      // Addrecs are considered to properly dominate their loop, so are missed
+      // by the previous check. Discard any values that have computable
+      // evolution in this loop.
+      if (auto *Loop = LI.getLoopFor(LBB))
+        if (hasComputableLoopEvolution(L, Loop))
+          return false;
       if (!ProvedEasily(L, RHS))
         return false;
     }

@@ -292,7 +292,6 @@ struct Config {
   bool gdbIndex;
   bool gnuHash = false;
   bool gnuUnique;
-  bool hasDynSymTab;
   bool ignoreDataAddressEquality;
   bool ignoreFunctionAddressEquality;
   bool ltoCSProfileGenerate;
@@ -306,7 +305,6 @@ struct Config {
   bool mipsN32Abi = false;
   bool mmapOutputFile;
   bool nmagic;
-  bool noDynamicLinker = false;
   bool noinhibitExec;
   bool nostdlib;
   bool oFormatBinary;
@@ -407,7 +405,7 @@ struct Config {
   StringRef thinLTOJobs;
   unsigned timeTraceGranularity;
   int32_t splitStackAdjustSize;
-  StringRef packageMetadata;
+  SmallVector<uint8_t, 0> packageMetadata;
 
   // The following config options do not directly correspond to any
   // particular command line options.

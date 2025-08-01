@@ -781,11 +781,8 @@ static StringRef getDynamicLinker(Ctx &ctx, opt::InputArgList &args) {
   auto *arg = args.getLastArg(OPT_dynamic_linker, OPT_no_dynamic_linker);
   if (!arg)
     return "";
-  if (arg->getOption().getID() == OPT_no_dynamic_linker) {
-    // --no-dynamic-linker suppresses undefined weak symbols in .dynsym
-    ctx.arg.noDynamicLinker = true;
+  if (arg->getOption().getID() == OPT_no_dynamic_linker)
     return "";
-  }
   return arg->getValue();
 }
 
@@ -820,6 +817,26 @@ static ICFLevel getICF(opt::InputArgList &args) {
   if (arg->getOption().getID() == OPT_icf_safe)
     return ICFLevel::Safe;
   return ICFLevel::All;
+}
+
+static void parsePackageMetadata(Ctx &ctx, const opt::Arg &arg) {
+  unsigned c0, c1;
+  SmallVector<uint8_t, 0> decoded;
+  StringRef s = arg.getValue();
+  for (size_t i = 0, e = s.size(); i != e; ++i) {
+    if (s[i] != '%') {
+      decoded.push_back(s[i]);
+    } else if (i + 2 < e && (c1 = hexDigitValue(s[i + 1])) != -1u &&
+               (c0 = hexDigitValue(s[i + 2])) != -1u) {
+      decoded.push_back(uint8_t(c1 * 16 + c0));
+      i += 2;
+    } else {
+      ErrAlways(ctx) << arg.getSpelling() << ": invalid % escape at byte " << i
+                     << "; supports only %[0-9a-fA-F][0-9a-fA-F]";
+      return;
+    }
+  }
+  ctx.arg.packageMetadata = std::move(decoded);
 }
 
 static StripPolicy getStrip(Ctx &ctx, opt::InputArgList &args) {
@@ -1383,7 +1400,8 @@ static void readConfigs(Ctx &ctx, opt::InputArgList &args) {
   ctx.arg.optimize = args::getInteger(args, OPT_O, 1);
   ctx.arg.orphanHandling = getOrphanHandling(ctx, args);
   ctx.arg.outputFile = args.getLastArgValue(OPT_o);
-  ctx.arg.packageMetadata = args.getLastArgValue(OPT_package_metadata);
+  if (auto *arg = args.getLastArg(OPT_package_metadata))
+    parsePackageMetadata(ctx, *arg);
   ctx.arg.pie = args.hasFlag(OPT_pie, OPT_no_pie, false);
   ctx.arg.printIcfSections =
       args.hasFlag(OPT_print_icf_sections, OPT_no_print_icf_sections, false);
@@ -2413,7 +2431,7 @@ static void findKeepUniqueSections(Ctx &ctx, opt::InputArgList &args) {
   // or DSOs, so we conservatively mark them as address-significant.
   bool icfSafe = ctx.arg.icf == ICFLevel::Safe;
   for (Symbol *sym : ctx.symtab->getSymbols())
-    if (sym->includeInDynsym(ctx))
+    if (sym->isExported)
       markAddrsig(icfSafe, sym);
 
   // Visit the address-significance table in each object file and mark each
@@ -2554,7 +2572,8 @@ void LinkerDriver::compileBitcodeFiles(bool skipLinkedOutput) {
       for (Symbol *sym : obj->getGlobalSymbols()) {
         if (!sym->isDefined())
           continue;
-        if (ctx.hasDynsym && sym->includeInDynsym(ctx))
+        if (ctx.hasDynsym && ctx.arg.exportDynamic &&
+            sym->computeBinding(ctx) != STB_LOCAL)
           sym->isExported = true;
         if (sym->hasVersionSuffix)
           sym->parseSymbolVersion(ctx);
@@ -2899,12 +2918,8 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
 
   parseFiles(ctx, files);
 
-  // Dynamic linking is used if there is an input DSO,
-  // or -shared or non-static pie is specified.
-  ctx.hasDynsym = !ctx.sharedFiles.empty() || ctx.arg.shared ||
-                  (ctx.arg.pie && !ctx.arg.noDynamicLinker);
   // Create dynamic sections for dynamic linking and static PIE.
-  ctx.arg.hasDynSymTab = ctx.hasDynsym || ctx.arg.isPic;
+  ctx.hasDynsym = !ctx.sharedFiles.empty() || ctx.arg.isPic;
 
   // If an entry symbol is in a static archive, pull out that file now.
   if (Symbol *sym = ctx.symtab->find(ctx.arg.entry))

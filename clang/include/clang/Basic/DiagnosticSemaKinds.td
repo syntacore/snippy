@@ -482,6 +482,8 @@ def ext_use_out_of_scope_declaration : ExtWarn<
   InGroup<DiagGroup<"out-of-scope-function">>;
 def err_inline_non_function : Error<
   "'inline' can only appear on functions%select{| and non-local variables}0">;
+def warn_ms_inline_non_function : ExtWarn<err_inline_non_function.Summary>,
+  InGroup<MicrosoftInlineOnNonFunction>;
 def err_noreturn_non_function : Error<
   "'_Noreturn' can only appear on functions">;
 def warn_qual_return_type : Warning<
@@ -7565,9 +7567,13 @@ def warn_arith_conv_mixed_enum_types_cxx20 : Warning<
   "%sub{select_arith_conv_kind}0 "
   "different enumeration types%diff{ ($ and $)|}1,2 is deprecated">,
   InGroup<DeprecatedEnumEnumConversion>;
-def err_conv_mixed_enum_types_cxx26 : Error<
+
+def err_conv_mixed_enum_types: Error <
   "invalid %sub{select_arith_conv_kind}0 "
   "different enumeration types%diff{ ($ and $)|}1,2">;
+def zzzz_warn_conv_mixed_enum_types_cxx26 : Warning <
+  err_conv_mixed_enum_types.Summary>,
+  InGroup<EnumEnumConversion>, DefaultError;
 
 def warn_arith_conv_mixed_anon_enum_types : Warning<
   warn_arith_conv_mixed_enum_types.Summary>,
