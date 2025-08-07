@@ -549,7 +549,7 @@ public:
   }
 
   std::unique_ptr<AsmPrinter>
-  createAsmPrinter(LLVMTargetMachine &TM,
+  createAsmPrinter(TargetMachine &TM,
                    std::unique_ptr<MCStreamer> Streamer) const override {
     reportUnimplementedError();
   }

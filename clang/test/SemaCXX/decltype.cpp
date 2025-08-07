@@ -139,6 +139,14 @@ namespace GH58674 {
   }
 }
 
+namespace GH97646 {
+  template<bool B>
+  void f() {
+    decltype(B) x = false;
+    !x;
+  }
+}
+
 namespace GH99873 {
 struct B {
   int x;

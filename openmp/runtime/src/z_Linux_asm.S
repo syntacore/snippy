@@ -19,6 +19,16 @@
 
 #if KMP_ARCH_X86 || KMP_ARCH_X86_64
 
+# if defined(__ELF__) && defined(__CET__) && defined(__has_include)
+# if __has_include(<cet.h>)
+# include <cet.h>
+# endif
+# endif
+
+# if !defined(_CET_ENDBR)
+# define _CET_ENDBR
+# endif
+
 # if KMP_MIC
 // the 'delay r16/r32/r64' should be used instead of the 'pause'.
 // The delay operation has the effect of removing the current thread from
@@ -66,6 +76,7 @@
 	ALIGN  4
 	.globl KMP_PREFIX_UNDERSCORE($0)
 KMP_PREFIX_UNDERSCORE($0):
+	_CET_ENDBR
 .endmacro
 # else // KMP_OS_DARWIN
 #  define KMP_PREFIX_UNDERSCORE(x) x //no extra underscore for Linux* OS symbols
@@ -92,6 +103,7 @@ KMP_PREFIX_UNDERSCORE($0):
         .globl KMP_PREFIX_UNDERSCORE(\proc)
 KMP_PREFIX_UNDERSCORE(\proc):
 	.cfi_startproc
+	_CET_ENDBR
 .endm
 .macro KMP_CFI_DEF_OFFSET sz
 	.cfi_def_cfa_offset	\sz
@@ -2500,26 +2512,6 @@ KMP_PREFIX_UNDERSCORE(__kmp_unnamed_critical_addr):
 # elif !KMP_ARCH_WASM
 .section .note.GNU-stack,"",@progbits
 # endif
-#endif
-
-#if KMP_ARCH_WASM
-.data
-.global .gomp_critical_user_
-.global .gomp_critical_user_.var
-.global .gomp_critical_user_.reduction.var
-.global __kmp_unnamed_critical_addr
-.gomp_critical_user_:
-.zero 4
-.size .gomp_critical_user_, 4
-.gomp_critical_user_.var:
-.zero 4
-.size .gomp_critical_user_.var, 4
-.gomp_critical_user_.reduction.var:
-.zero 4
-.size .gomp_critical_user_.reduction.var, 4
-__kmp_unnamed_critical_addr:
-    .4byte .gomp_critical_user_
-    .size __kmp_unnamed_critical_addr, 4
 #endif
 
 #if KMP_OS_LINUX && (KMP_ARCH_AARCH64 || KMP_ARCH_AARCH64_32)

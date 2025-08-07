@@ -40,14 +40,14 @@ and C++26 features.
 
 Experimental support for the time zone database has progressed.
 
-Work on the ranges support has progressed. See
-:ref:`ranges-status` for the current status.
+Work on the ranges support has progressed.
 
 Work on the experimental C++17 Parallel STL has progressed. See
 :ref:`pstl-status` for the current status.
 
 Work on the C++17 mathematical special functions has started. See
-:ref:`special-math-status` for the current status.
+`this issue <https://github.com/llvm/llvm-project/issues/99939>`__
+for the current status.
 
 Implemented Papers
 ------------------
@@ -74,9 +74,10 @@ Implemented Papers
 - P0019R8 - ``std::atomic_ref``
 - P2389R2 - Alias template ``dims`` for the ``extents`` of ``mdspan``
 - P1223R5 - ``ranges::find_last()``, ``ranges::find_last_if()``, and ``ranges::find_last_if_not()``
-- P2602R2 - Poison Pills are Too Toxic (as DR against C++20)
+- P2602R2 - Poison Pills are Too Toxic
 - P1981R0 - Rename ``leap`` to ``leap_second``
 - P1982R0 - Rename ``link`` to ``time_zone_link``
+- P2602R2 - Poison Pills are Too Toxic (as DR against C++20)
 
 
 Improvements and New Features
@@ -125,6 +126,8 @@ Improvements and New Features
 
 - In C++23 and C++26 the number of transitive includes in several headers has been reduced, improving the compilation speed.
 
+- ``std::stable_sort`` uses radix sort for integral types now, which can improve the performance up to 10 times, depending
+  on type of sorted elements and the initial state of the sorted array.
 
 Deprecations and Removals
 -------------------------
@@ -176,8 +179,8 @@ Deprecations and Removals
 - libc++ no longer supports ``std::allocator<const T>`` and containers of ``const``-qualified element type, such
   as ``std::vector<const T>`` and ``std::list<const T>``. This used to be supported as an undocumented extension.
   If you were using ``std::vector<const T>``, replace it with ``std::vector<T>`` instead. The
-  ``_LIBCPP_ENABLE_REMOVED_ALLOCATOR_CONST`` macro can be defined
-  to temporarily re-enable this extension to make it easier to update user code.
+  ``_LIBCPP_ENABLE_REMOVED_ALLOCATOR_CONST`` macro can be defined to temporarily re-enable this extension.
+  to temporarily re-enable this extension to make it easier to update user code
   This macro will be honored for one released and ignored starting in LLVM 20.
   To assist with the clean-up process, consider running your code through Clang Tidy, with
   `std-allocator-const <https://clang.llvm.org/extra/clang-tidy/checks/portability/std-allocator-const.html>`_

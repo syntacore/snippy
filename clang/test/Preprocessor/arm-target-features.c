@@ -902,6 +902,11 @@
 // CHECK-V95A: #define __ARM_ARCH_9_5A__ 1
 // CHECK-V95A: #define __ARM_ARCH_PROFILE 'A'
 
+// RUN: %clang -target armv9.6a-none-none-eabi -x c -E -dM %s -o - | FileCheck -match-full-lines --check-prefix=CHECK-V96A %s
+// CHECK-V96A: #define __ARM_ARCH 9
+// CHECK-V96A: #define __ARM_ARCH_9_6A__ 1
+// CHECK-V96A: #define __ARM_ARCH_PROFILE 'A'
+
 // RUN: %clang -target arm-none-none-eabi -march=armv7-m -mfpu=softvfp -x c -E -dM %s -o - | FileCheck --check-prefix=CHECK-SOFTVFP %s
 // CHECK-SOFTVFP-NOT: #define __ARM_FP 0x
 
@@ -973,3 +978,11 @@
 // CHECK-V83-OR-LATER: __ARM_FEATURE_COMPLEX 1
 // CHECK-V81-OR-LATER: __ARM_FEATURE_QRDMX 1
 // CHECK-BEFORE-V83-NOT: __ARM_FEATURE_COMPLEX 1
+
+// Check if MVE floating-point feature is disabled (-mve.fp) during explicit fpv5-d16 or fpv5-sp-d16
+// RUN: %clang -target arm-arm-none-eabi -march=armv8.1-m.main+mve.fp -mfpu=fpv5-d16 -x c -E -dM %s -o - | FileCheck -check-prefix=CHECK-MVE1 %s
+// CHECK-MVE1: #define __ARM_FEATURE_MVE 1
+// RUN: %clang -target arm-arm-none-eabi -march=armv8.1-m.main+mve.fp -mfpu=fpv5-sp-d16 -x c -E -dM %s -o - | FileCheck -check-prefix=CHECK-MVE1_2 %s
+// CHECK-MVE1_2: #define __ARM_FEATURE_MVE 1
+// RUN: %clang -target arm-arm-none-eabi -march=armv8.1-m.main+mve.fp -x c -E -dM %s -o - | FileCheck -check-prefix=CHECK-MVE3 %s
+// CHECK-MVE3: #define __ARM_FEATURE_MVE 3

@@ -123,6 +123,7 @@ void BinaryContext::logBOLTErrorsAndQuitOnFatal(Error E) {
 BinaryContext::BinaryContext(std::unique_ptr<MCContext> Ctx,
                              std::unique_ptr<DWARFContext> DwCtx,
                              std::unique_ptr<Triple> TheTriple,
+                             std::shared_ptr<orc::SymbolStringPool> SSP,
                              const Target *TheTarget, std::string TripleName,
                              std::unique_ptr<MCCodeEmitter> MCE,
                              std::unique_ptr<MCObjectFileInfo> MOFI,
@@ -136,13 +137,12 @@ BinaryContext::BinaryContext(std::unique_ptr<MCContext> Ctx,
                              std::unique_ptr<MCDisassembler> DisAsm,
                              JournalingStreams Logger)
     : Ctx(std::move(Ctx)), DwCtx(std::move(DwCtx)),
-      TheTriple(std::move(TheTriple)), TheTarget(TheTarget),
-      TripleName(TripleName), MCE(std::move(MCE)), MOFI(std::move(MOFI)),
-      AsmInfo(std::move(AsmInfo)), MII(std::move(MII)), STI(std::move(STI)),
-      InstPrinter(std::move(InstPrinter)), MIA(std::move(MIA)),
-      MIB(std::move(MIB)), MRI(std::move(MRI)), DisAsm(std::move(DisAsm)),
-      Logger(Logger), InitialDynoStats(isAArch64()) {
-  Relocation::Arch = this->TheTriple->getArch();
+      TheTriple(std::move(TheTriple)), SSP(std::move(SSP)),
+      TheTarget(TheTarget), TripleName(TripleName), MCE(std::move(MCE)),
+      MOFI(std::move(MOFI)), AsmInfo(std::move(AsmInfo)), MII(std::move(MII)),
+      STI(std::move(STI)), InstPrinter(std::move(InstPrinter)),
+      MIA(std::move(MIA)), MIB(std::move(MIB)), MRI(std::move(MRI)),
+      DisAsm(std::move(DisAsm)), Logger(Logger), InitialDynoStats(isAArch64()) {
   RegularPageSize = isAArch64() ? RegularPageSizeAArch64 : RegularPageSizeX86;
   PageAlign = opts::NoHugePages ? RegularPageSize : HugePageSize;
 }
@@ -160,8 +160,9 @@ BinaryContext::~BinaryContext() {
 /// Create BinaryContext for a given architecture \p ArchName and
 /// triple \p TripleName.
 Expected<std::unique_ptr<BinaryContext>> BinaryContext::createBinaryContext(
-    Triple TheTriple, StringRef InputFileName, SubtargetFeatures *Features,
-    bool IsPIC, std::unique_ptr<DWARFContext> DwCtx, JournalingStreams Logger) {
+    Triple TheTriple, std::shared_ptr<orc::SymbolStringPool> SSP,
+    StringRef InputFileName, SubtargetFeatures *Features, bool IsPIC,
+    std::unique_ptr<DWARFContext> DwCtx, JournalingStreams Logger) {
   StringRef ArchName = "";
   std::string FeaturesStr = "";
   switch (TheTriple.getArch()) {
@@ -284,8 +285,8 @@ Expected<std::unique_ptr<BinaryContext>> BinaryContext::createBinaryContext(
 
   auto BC = std::make_unique<BinaryContext>(
       std::move(Ctx), std::move(DwCtx), std::make_unique<Triple>(TheTriple),
-      TheTarget, std::string(TripleName), std::move(MCE), std::move(MOFI),
-      std::move(AsmInfo), std::move(MII), std::move(STI),
+      std::move(SSP), TheTarget, std::string(TripleName), std::move(MCE),
+      std::move(MOFI), std::move(AsmInfo), std::move(MII), std::move(STI),
       std::move(InstructionPrinter), std::move(MIA), nullptr, std::move(MRI),
       std::move(DisAsm), Logger);
 
@@ -646,7 +647,7 @@ bool BinaryContext::analyzeJumpTable(const uint64_t Address,
     const BinaryFunction *TargetBF = getBinaryFunctionContainingAddress(Value);
     const bool DoesBelongToFunction =
         BF.containsAddress(Value) ||
-        (TargetBF && TargetBF->isParentOrChildOf(BF));
+        (TargetBF && areRelatedFragments(TargetBF, &BF));
     if (!DoesBelongToFunction) {
       LLVM_DEBUG({
         if (!BF.containsAddress(Value)) {
@@ -839,9 +840,11 @@ BinaryContext::getOrCreateJumpTable(BinaryFunction &Function, uint64_t Address,
     assert(Address == JT->getAddress() && "unexpected non-empty jump table");
 
     // Prevent associating a jump table to a specific fragment twice.
-    // This simple check arises from the assumption: no more than 2 fragments.
-    if (JT->Parents.size() == 1 && JT->Parents[0] != &Function) {
-      assert(JT->Parents[0]->isParentOrChildOf(Function) &&
+    if (!llvm::is_contained(JT->Parents, &Function)) {
+      assert(llvm::all_of(JT->Parents,
+                          [&](const BinaryFunction *BF) {
+                            return areRelatedFragments(&Function, BF);
+                          }) &&
              "cannot re-use jump table of a different function");
       // Duplicate the entry for the parent function for easy access
       JT->Parents.push_back(&Function);
@@ -852,8 +855,8 @@ BinaryContext::getOrCreateJumpTable(BinaryFunction &Function, uint64_t Address,
         JT->print(this->outs());
       }
       Function.JumpTables.emplace(Address, JT);
-      JT->Parents[0]->setHasIndirectTargetToSplitFragment(true);
-      JT->Parents[1]->setHasIndirectTargetToSplitFragment(true);
+      for (BinaryFunction *Parent : JT->Parents)
+        Parent->setHasIndirectTargetToSplitFragment(true);
     }
 
     bool IsJumpTableParent = false;
@@ -1073,6 +1076,7 @@ MCSymbol *BinaryContext::registerNameAtAddress(StringRef Name, uint64_t Address,
     BD = GAI->second;
     if (!BD->hasName(Name)) {
       GlobalSymbols[Name] = BD;
+      BD->updateSize(Size);
       BD->Symbols.push_back(Symbol);
     }
   }
@@ -1209,12 +1213,13 @@ void BinaryContext::generateSymbolHashes() {
 }
 
 bool BinaryContext::registerFragment(BinaryFunction &TargetFunction,
-                                     BinaryFunction &Function) const {
+                                     BinaryFunction &Function) {
   assert(TargetFunction.isFragment() && "TargetFunction must be a fragment");
   if (TargetFunction.isChildOf(Function))
     return true;
   TargetFunction.addParentFragment(Function);
   Function.addFragment(TargetFunction);
+  FragmentClasses.unionSets(&TargetFunction, &Function);
   if (!HasRelocations) {
     TargetFunction.setSimple(false);
     Function.setSimple(false);
@@ -1292,8 +1297,8 @@ bool BinaryContext::handleAArch64Veneer(uint64_t Address, bool MatchOnly) {
     Veneer->getOrCreateLocalLabel(Address);
     Veneer->setMaxSize(TotalSize);
     Veneer->updateState(BinaryFunction::State::Disassembled);
-    LLVM_DEBUG(dbgs() << "BOLT-DEBUG: handling veneer function at 0x" << Address
-                      << "\n");
+    LLVM_DEBUG(dbgs() << "BOLT-DEBUG: handling veneer function at 0x"
+                      << Twine::utohexstr(Address) << "\n");
     return true;
   };
 
@@ -1336,7 +1341,7 @@ void BinaryContext::processInterproceduralReferences() {
 
     if (TargetFunction) {
       if (TargetFunction->isFragment() &&
-          !TargetFunction->isChildOf(Function)) {
+          !areRelatedFragments(TargetFunction, &Function)) {
         this->errs()
             << "BOLT-WARNING: interprocedural reference between unrelated "
                "fragments: "
@@ -1605,13 +1610,7 @@ std::vector<BinaryFunction *> BinaryContext::getSortedFunctions() {
                   SortedFunctions.begin(),
                   [](BinaryFunction &BF) { return &BF; });
 
-  llvm::stable_sort(SortedFunctions,
-                    [](const BinaryFunction *A, const BinaryFunction *B) {
-                      if (A->hasValidIndex() && B->hasValidIndex()) {
-                        return A->getIndex() < B->getIndex();
-                      }
-                      return A->hasValidIndex();
-                    });
+  llvm::stable_sort(SortedFunctions, compareBinaryFunctionByIndex);
   return SortedFunctions;
 }
 
@@ -1963,7 +1962,15 @@ void BinaryContext::printInstruction(raw_ostream &OS, const MCInst &Instruction,
     OS << "\tjit\t" << MIB->getTargetSymbol(Instruction)->getName()
        << " # ID: " << DynamicID;
   } else {
-    InstPrinter->printInst(&Instruction, 0, "", *STI, OS);
+    // If there are annotations on the instruction, the MCInstPrinter will fail
+    // to print the preferred alias as it only does so when the number of
+    // operands is as expected. See
+    // https://github.com/llvm/llvm-project/blob/782f1a0d895646c364a53f9dcdd6d4ec1f3e5ea0/llvm/lib/MC/MCInstPrinter.cpp#L142
+    // Therefore, create a temporary copy of the Inst from which the annotations
+    // are removed, and print that Inst.
+    MCInst InstNoAnnot = Instruction;
+    MIB->stripAnnotations(InstNoAnnot);
+    InstPrinter->printInst(&InstNoAnnot, 0, "", *STI, OS);
   }
   if (MIB->isCall(Instruction)) {
     if (MIB->isTailCall(Instruction))
@@ -2019,6 +2026,9 @@ BinaryContext::getBaseAddressForMapping(uint64_t MMapAddress,
   // Find a segment with a matching file offset.
   for (auto &KV : SegmentMapInfo) {
     const SegmentInfo &SegInfo = KV.second;
+    // Only consider executable segments.
+    if (!SegInfo.IsExecutable)
+      continue;
     // FileOffset is got from perf event,
     // and it is equal to alignDown(SegInfo.FileOffset, pagesize).
     // If the pagesize is not equal to SegInfo.Alignment.

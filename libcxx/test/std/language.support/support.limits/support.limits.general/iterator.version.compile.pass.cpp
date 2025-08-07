@@ -24,7 +24,7 @@
     __cpp_lib_nonmember_container_access    201411L [C++17]
     __cpp_lib_null_iterators                201304L [C++14]
     __cpp_lib_ranges                        202110L [C++20]
-                                            202211L [C++23]
+                                            202406L [C++23]
     __cpp_lib_ssize                         201902L [C++20]
 */
 
@@ -256,8 +256,8 @@
 # ifndef __cpp_lib_ranges
 #   error "__cpp_lib_ranges should be defined in c++23"
 # endif
-# if __cpp_lib_ranges != 202211L
-#   error "__cpp_lib_ranges should have the value 202211L in c++23"
+# if __cpp_lib_ranges != 202406L
+#   error "__cpp_lib_ranges should have the value 202406L in c++23"
 # endif
 
 # ifndef __cpp_lib_ssize
@@ -314,8 +314,8 @@
 # ifndef __cpp_lib_ranges
 #   error "__cpp_lib_ranges should be defined in c++26"
 # endif
-# if __cpp_lib_ranges != 202211L
-#   error "__cpp_lib_ranges should have the value 202211L in c++26"
+# if __cpp_lib_ranges != 202406L
+#   error "__cpp_lib_ranges should have the value 202406L in c++26"
 # endif
 
 # ifndef __cpp_lib_ssize

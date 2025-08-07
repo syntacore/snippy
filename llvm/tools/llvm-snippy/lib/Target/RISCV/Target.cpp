@@ -408,7 +408,9 @@ getIncOpcodeForLoopCounter(const InstructionGenerationContext &IGC) {
 }
 
 static RegStorageType regToStorage(Register Reg) {
-  if (RISCV::X0 <= Reg && Reg <= RISCV::X31)
+  if ((RISCV::X0 <= Reg && Reg <= RISCV::X31) ||
+      (RISCV::X0_W <= Reg && Reg <= RISCV::X31_W) ||
+      (RISCV::X0_H <= Reg && Reg <= RISCV::X31_H))
     return RegStorageType::XReg;
   if ((RISCV::F0_D <= Reg && Reg <= RISCV::F31_D) ||
       (RISCV::F0_F <= Reg && Reg <= RISCV::F31_F) ||
@@ -1398,6 +1400,12 @@ public:
     if ((RISCV::F0_D <= RegUnit && RegUnit <= RISCV::F31_D) ||
         (RISCV::F0_F <= RegUnit && RegUnit <= RISCV::F31_F) ||
         (RISCV::F0_H <= RegUnit && RegUnit <= RISCV::F31_H)) {
+      OutPhysRegs.push_back(RegUnit);
+      return;
+    }
+    if ((RISCV::X0 <= RegUnit && RegUnit <= RISCV::X31) ||
+        (RISCV::X0_W <= RegUnit && RegUnit <= RISCV::X31_W) ||
+        (RISCV::X0_H <= RegUnit && RegUnit <= RISCV::X31_H)) {
       OutPhysRegs.push_back(RegUnit);
       return;
     }
@@ -3516,7 +3524,7 @@ private:
   }
 
   std::unique_ptr<AsmPrinter>
-  createAsmPrinter(LLVMTargetMachine &TM,
+  createAsmPrinter(TargetMachine &TM,
                    std::unique_ptr<MCStreamer> Streamer) const override {
     return std::make_unique<RISCVAsmPrinter>(TM, std::move(Streamer));
   }

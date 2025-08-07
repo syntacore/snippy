@@ -475,7 +475,7 @@ protected:
 
     // Function DI
     auto *File = DBuilder.createFile("filename.c", "/file/dir/");
-    DITypeRefArray ParamTypes = DBuilder.getOrCreateTypeArray(std::nullopt);
+    DITypeRefArray ParamTypes = DBuilder.getOrCreateTypeArray({});
     DISubroutineType *FuncType =
         DBuilder.createSubroutineType(ParamTypes);
     auto *CU = DBuilder.createCompileUnit(dwarf::DW_LANG_C99,
@@ -507,7 +507,7 @@ protected:
     auto *Variable =
         DBuilder.createAutoVariable(Subprogram, "x", File, 5, IntType, true);
     auto *DL = DILocation::get(Subprogram->getContext(), 5, 0, Subprogram);
-    DBuilder.insertDeclare(Alloca, Variable, E, DL, Store);
+    DBuilder.insertDeclare(Alloca, Variable, E, DL, Store->getIterator());
     DBuilder.insertDbgValueIntrinsic(AllocaContent, Variable, E, DL, Entry);
     // Also create an inlined variable.
     // Create a distinct struct type that we should not duplicate during
@@ -526,7 +526,8 @@ protected:
         Subprogram->getContext(), 9, 4, Scope,
         DILocation::get(Subprogram->getContext(), 5, 2, Subprogram));
     IBuilder.SetCurrentDebugLocation(InlinedDL);
-    DBuilder.insertDeclare(Alloca, InlinedVar, E, InlinedDL, Store);
+    DBuilder.insertDeclare(Alloca, InlinedVar, E, InlinedDL,
+                           Store->getIterator());
     IBuilder.CreateStore(IBuilder.getInt32(2), Alloca);
     // Finalize the debug info.
     DBuilder.finalize();
@@ -965,7 +966,7 @@ protected:
 
     // Create debug info
     auto *File = DBuilder.createFile("filename.c", "/file/dir/");
-    DITypeRefArray ParamTypes = DBuilder.getOrCreateTypeArray(std::nullopt);
+    DITypeRefArray ParamTypes = DBuilder.getOrCreateTypeArray({});
     DISubroutineType *DFuncType = DBuilder.createSubroutineType(ParamTypes);
     auto *CU = DBuilder.createCompileUnit(dwarf::DW_LANG_C99,
                                           DBuilder.createFile("filename.c",

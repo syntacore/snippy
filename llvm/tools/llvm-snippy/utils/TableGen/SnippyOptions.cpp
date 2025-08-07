@@ -76,7 +76,7 @@ void emitSnippyOptType(raw_ostream &OS, const Record &R) {
 
 class SnippyOptionsEmitter {
   raw_ostream &OS;
-  RecordKeeper &Records;
+  const RecordKeeper &Records;
 
   void emitSnippyOptionDeclaration(const Record &R) {
     OS << "extern ";
@@ -150,7 +150,7 @@ class SnippyOptionsEmitter {
   }
 
 public:
-  SnippyOptionsEmitter(raw_ostream &OS, RecordKeeper &Records)
+  SnippyOptionsEmitter(raw_ostream &OS, const RecordKeeper &Records)
       : OS(OS), Records(Records) {}
 
   void emitOptions() {
@@ -168,7 +168,7 @@ public:
 
 class SnippyOptionStructEmitter {
   raw_ostream &OS;
-  RecordKeeper &Records;
+  const RecordKeeper &Records;
   MapVector<StringRef, const Record *> Groups;
 
   void emitSnippyOption(const Record &R) {
@@ -191,7 +191,7 @@ public:
     return "Struct" + Group.getName().str();
   }
 
-  SnippyOptionStructEmitter(raw_ostream &OS, RecordKeeper &Records)
+  SnippyOptionStructEmitter(raw_ostream &OS, const RecordKeeper &Records)
       : OS(OS), Records(Records) {
     collectAllOptionGroups();
   }
@@ -246,7 +246,7 @@ public:
 };
 } // namespace
 
-bool emitSnippyOptions(raw_ostream &OS, RecordKeeper &Records) {
+bool emitSnippyOptions(raw_ostream &OS, const RecordKeeper &Records) {
   SnippyOptionsEmitter Emitter(OS, Records);
 
   emitSourceFileHeader("Snippy options", OS, Records);
@@ -261,7 +261,7 @@ bool emitSnippyOptions(raw_ostream &OS, RecordKeeper &Records) {
   return false;
 }
 
-bool emitSnippyOptionsStruct(raw_ostream &OS, RecordKeeper &Records) {
+bool emitSnippyOptionsStruct(raw_ostream &OS, const RecordKeeper &Records) {
   SnippyOptionStructEmitter Emitter(OS, Records);
   emitSourceFileHeader("Snippy options struct", OS, Records);
   OS << "\n#ifdef GEN_SNIPPY_OPTIONS_STRUCT_DEF\n";

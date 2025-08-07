@@ -36,6 +36,8 @@ module m
     end subroutine
   end interface
 
+  real :: moduleVar = 1.
+
  contains
 
   subroutine impure(x)
@@ -78,7 +80,7 @@ module m
     class(t), allocatable :: f07
   end function
   pure function f08() ! C1585
-    !ERROR: Result of pure function may not have polymorphic ALLOCATABLE ultimate component '%a'
+    !ERROR: Result of pure function may not have polymorphic ALLOCATABLE potential component '%a'
     type(polyAlloc) :: f08
   end function
 
@@ -117,6 +119,8 @@ module m
     !ERROR: A pure subprogram may not initialize a variable
       real :: v6 = 0.
     end block
+    associate (x => moduleVar) ! ok
+    end associate
   end subroutine
   pure subroutine s06 ! C1589
     !ERROR: A pure subprogram may not have a variable with the VOLATILE attribute

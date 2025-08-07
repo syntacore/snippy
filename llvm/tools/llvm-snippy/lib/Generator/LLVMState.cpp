@@ -30,7 +30,7 @@ namespace llvm {
 namespace snippy {
 
 LLVMState::LLVMState(const SnippyTarget *SnippyTarget,
-                     std::unique_ptr<LLVMTargetMachine> TargetMachine,
+                     std::unique_ptr<TargetMachine> TargetMachine,
                      std::unique_ptr<MCContext> Context,
                      std::unique_ptr<MCCodeEmitter> CodeEmitter,
                      std::unique_ptr<MCDisassembler> Disassembler)
@@ -133,7 +133,7 @@ Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
   // E.G.: RISCV AsmPrinter cannot emit JAL directly.
   TargetFeatures += ",+relax";
   const TargetOptions Options;
-  auto TM = std::unique_ptr<LLVMTargetMachine>(static_cast<LLVMTargetMachine *>(
+  auto TM = std::unique_ptr<TargetMachine>(static_cast<TargetMachine *>(
       Tgt->createTargetMachine(TripleStr, TargetInfo.CPU, TargetFeatures,
                                Options, Reloc::Model::Static)));
   if (!TM)

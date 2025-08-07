@@ -35,7 +35,7 @@ static cl::opt<ActionType>
                       clEnumValN(GenOptions, "gen-options",
                                  "Generate option definitions")));
 
-static bool snippyTableGenMain(raw_ostream &OS, RecordKeeper &Records) {
+static bool snippyTableGenMain(raw_ostream &OS, const RecordKeeper &Records) {
   switch (Action) {
   case PrintRecords:
     OS << Records; // No argument, dump all contents

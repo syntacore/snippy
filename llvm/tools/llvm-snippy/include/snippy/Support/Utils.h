@@ -274,11 +274,14 @@ public:
   }
 };
 
-template <typename ValTy> APInt toAPInt(ValTy Val, unsigned Width) {
-  return APInt(Width, Val);
+template <typename ValTy>
+APInt toAPInt(ValTy Val, unsigned Width, bool ImplicitTrunc) {
+  return APInt(Width, Val, /* signed */ false, ImplicitTrunc);
 }
 
-template <> inline APInt toAPInt<APInt>(APInt Val, unsigned Width) {
+template <>
+inline APInt toAPInt<APInt>(APInt Val, unsigned Width,
+                            [[maybe_unused]] bool ImplicitTrunc) {
   assert(Width >= Val.getBitWidth() && "Value is too long");
   return Val;
 }

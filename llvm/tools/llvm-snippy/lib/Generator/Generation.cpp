@@ -1275,8 +1275,10 @@ void writeRegsSnapshot(RegsSnapshotTy RegsSnapshot, MachineBasicBlock &MBB,
     // FIXME: we expect that writeValueToReg won't corrupt other registers of
     // the same class even if they were not reserved. Also we expect that
     // writing to FP/V register may use only non-reserved GPR registers.
-    SnippyTgt.writeValueToReg(
-        IGC, toAPInt(Value, SnippyTgt.getRegBitWidth(Reg, IGC)), Reg);
+    SnippyTgt.writeValueToReg(IGC,
+                              toAPInt(Value, SnippyTgt.getRegBitWidth(Reg, IGC),
+                                      /* ImplicitTrunc */ true),
+                              Reg);
   }
 }
 
