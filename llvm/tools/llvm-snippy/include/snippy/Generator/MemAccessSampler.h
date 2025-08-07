@@ -23,7 +23,7 @@ class IMemoryAccessSampler {
 public:
   virtual ~IMemoryAccessSampler() = default;
   virtual Expected<AccessSampleResult>
-  sample(size_t AccessSize, size_t Alignment,
+  sample(size_t AccessSize, size_t Alignment, bool AllowMisalign,
          std::function<AddressGenInfo(MemoryAccess &)> ChooseAddrGenInfo,
          bool BurstMode = false) = 0;
 

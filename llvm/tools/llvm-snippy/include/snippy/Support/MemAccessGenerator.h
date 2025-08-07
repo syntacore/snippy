@@ -39,11 +39,13 @@ struct AddressInfo;
 struct MemKey {
   size_t AccessSize;
   size_t Alignment;
+  bool AllowMisalign;
   bool BurstMode;
 };
 inline bool operator<(const MemKey &Lhs, const MemKey &Rhs) {
-  return std::tie(Lhs.AccessSize, Lhs.Alignment, Lhs.BurstMode) <
-         std::tie(Rhs.AccessSize, Rhs.Alignment, Rhs.BurstMode);
+  return std::tie(Lhs.AccessSize, Lhs.Alignment, Lhs.AllowMisalign,
+                  Lhs.BurstMode) < std::tie(Rhs.AccessSize, Rhs.Alignment,
+                                            Rhs.AllowMisalign, Rhs.BurstMode);
 }
 
 struct MemValue {
@@ -76,7 +78,8 @@ template <typename Iter> class MemoryAccessGenerator final {
     MemVal.MapToReaIdx.reserve(Count);
     for (auto [Index, Value] : enumerate(make_range(First, Last))) {
       auto Weight = Value->Weight;
-      if (Value->isLegal({Key.AccessSize, Key.Alignment, Key.BurstMode}) &&
+      if (Value->isLegal({Key.AccessSize, Key.Alignment, Key.AllowMisalign,
+                          Key.BurstMode}) &&
           Weight > 0) {
         MemWeights.push_back(Weight);
         MemVal.MapToReaIdx.push_back(Index);
@@ -87,7 +90,7 @@ template <typename Iter> class MemoryAccessGenerator final {
       return make_error<MemoryAccessSampleError>(
           formatv("Memory schemes are to restrictive to generate access (size: "
                   "{0}, alignment: {1})",
-                  Key.AccessSize, Key.Alignment));
+                  Key.AccessSize, Key.AllowMisalign ? 1 : Key.Alignment));
     }
 
     MemVal.MemDist = std::discrete_distribution<size_t>(MemWeights.begin(),
@@ -106,8 +109,8 @@ public:
   }
 
   Expected<size_t> generate(size_t AccessSize, size_t Alignment,
-                            bool BurstMode) {
-    MemKey Key{AccessSize, Alignment, BurstMode};
+                            bool AllowMisalign, bool BurstMode) {
+    MemKey Key{AccessSize, Alignment, AllowMisalign, BurstMode};
     auto FindIter = MemTable.find(Key);
     if (FindIter == MemTable.end()) {
       auto FindIterExp = updateTable(Key);
@@ -123,7 +126,8 @@ public:
     OS << "Cached " << MemTable.size() << " tables.\n";
     for (const auto &MemElem : MemTable)
       OS << "AccessSize:\t" << MemElem.first.AccessSize << "\tAlignment:\t"
-         << MemElem.first.Alignment << "\tBurstMode:\t"
+         << MemElem.first.Alignment << "\tAllowMisalign:\t"
+         << MemElem.first.AllowMisalign << "\tBurstMode:\t"
          << MemElem.first.BurstMode << "\tAvailable schemes:\t"
          << MemElem.second.MapToReaIdx.size() << "\n";
   }
@@ -155,8 +159,10 @@ public:
   }
 
   Expected<const typename ContT::value_type &>
-  getValidAccesses(size_t AccessSize, size_t Alignment, bool BurstMode) {
-    auto PickedScheme = MAG.generate(AccessSize, Alignment, BurstMode);
+  getValidAccesses(size_t AccessSize, size_t Alignment, bool AllowMisalign,
+                   bool BurstMode) {
+    auto PickedScheme =
+        MAG.generate(AccessSize, Alignment, AllowMisalign, BurstMode);
     if (auto Err = PickedScheme.takeError())
       return std::move(Err);
     assert(*PickedScheme < Accesses.size());
