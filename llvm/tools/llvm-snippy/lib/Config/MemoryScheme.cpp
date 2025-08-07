@@ -167,6 +167,7 @@ void yaml::MappingTraits<snippy::MemoryAccessRange>::mapping(
   Io.mapRequired("first-offset", NormFirstOffset->Value);
   Io.mapRequired("last-offset", NormLastOffset->Value);
   Io.mapOptional("access-size", Range.AccessSize);
+  Io.mapOptional("misaligned-access", Range.AllowMisalignedAccess);
 }
 
 static bool shouldSkipValidation(yaml::IO &Io) {
@@ -560,6 +561,7 @@ MemoryAccessSeq MemoryAccessRange::split(const MemoryBank &MB) const {
     NewMemAccess->LastOffset = LastOffset;
     NewMemAccess->Size = Intersected.End - NewMemAccess->Start;
     NewMemAccess->AccessSize = AccessSize;
+    NewMemAccess->AllowMisalignedAccess = AllowMisalignedAccess;
 
     NewMemAccess->Weight = Size != 0 ? Weight * NewMemAccess->Size / Size : 0;
     Ret.emplace_back(std::move(NewMemAccess));
@@ -568,7 +570,7 @@ MemoryAccessSeq MemoryAccessRange::split(const MemoryBank &MB) const {
 }
 
 bool MemoryAccessRange::isLegal(const AddressGenInfo &AddrGenInfo) const {
-  auto Alignment = AddrGenInfo.Alignment;
+  size_t Alignment = AddrGenInfo.getRequiredAlignment(AllowMisalignedAccess);
   auto AddrInfoAccessSize = AddrGenInfo.AccessSize;
   auto MinStride = AddrGenInfo.MinStride;
   auto LCStride = getLCStride(Alignment);
@@ -635,7 +637,7 @@ ArrayRef<size_t> MemoryAccessRange::getAllowedOffsets(size_t Alignment) const {
 AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
   assert(isLegal(Params));
 
-  auto Alignment = Params.Alignment;
+  size_t Alignment = Params.getRequiredAlignment(AllowMisalignedAccess);
   auto AccessSize = Params.AccessSize;
   auto LCStride = getLCStride(Alignment);
   auto NumElements = Params.NumElements;
@@ -698,7 +700,7 @@ AddressInfo
 MemoryAccessEviction::randomAddress(const AddressGenInfo &AddrGenInfo) {
   assert(isLegal(AddrGenInfo));
 
-  auto Alignment = AddrGenInfo.Alignment;
+  auto Alignment = AddrGenInfo.getMinAlignment();
   auto AccessSize = AddrGenInfo.AccessSize;
 
   MemAddr Addr = snippy::RandEngine::genInRangeExclusive(
@@ -959,7 +961,7 @@ MemoryAccessAddresses::randomAddress(const AddressGenInfo &AddrGenInfo) {
   assert(isLegal(AddrGenInfo));
 
   auto AccessSize = AddrGenInfo.AccessSize;
-  auto Alignment = AddrGenInfo.Alignment;
+  auto Alignment = AddrGenInfo.getMinAlignment();
 
   if (!AddrGenInfo.BurstMode)
     return randomAddressForPlainAccess(AccessSize, Alignment);
@@ -972,7 +974,7 @@ MemoryAccessAddresses::randomAddress(const AddressGenInfo &AddrGenInfo) {
 
 bool MemoryAccessAddresses::isLegal(const AddressGenInfo &AddrGenInfo) const {
   auto AccessSize = AddrGenInfo.AccessSize;
-  auto Alignment = AddrGenInfo.Alignment;
+  auto Alignment = AddrGenInfo.getMinAlignment();
 
   assert(isPowerOf2_64(Alignment));
 

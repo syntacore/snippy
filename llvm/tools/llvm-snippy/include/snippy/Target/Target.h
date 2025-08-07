@@ -468,7 +468,13 @@ public:
                                     MCRegister AddrReg,
                                     MCRegister Reg) const = 0;
 
-  virtual std::tuple<size_t, size_t>
+  struct InstrMemAccessInfo {
+    size_t AccessSize;
+    size_t NaturalAlignment;
+    bool AllowMisalign;
+  };
+
+  virtual InstrMemAccessInfo
   getAccessSizeAndAlignment(SnippyProgramContext &ProgCtx, unsigned Opcode,
                             const MachineBasicBlock &MBB) const = 0;
 

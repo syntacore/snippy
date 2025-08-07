@@ -41,16 +41,19 @@ public:
   }
 
   Expected<AccessSampleResult>
-  sample(size_t AccessSize, size_t Alignment,
+  sample(size_t AccessSize, size_t Alignment, bool AllowMisalign,
          std::function<AddressGenInfo(MemoryAccess &)> ChooseAddrGenInfo,
          bool BurstMode = false) override;
 
   Expected<AccessSampleResult> sample(size_t AccessSize, size_t Alignment,
+                                      bool AllowMisalign,
                                       bool BurstMode = false) {
     auto ChooseGenInfo = [&](auto &&Scheme) {
-      return AddressGenInfo::singleAccess(AccessSize, Alignment, BurstMode);
+      return AddressGenInfo::singleAccess(AccessSize, Alignment, AllowMisalign,
+                                          BurstMode);
     };
-    return sample(AccessSize, Alignment, ChooseGenInfo, BurstMode);
+    return sample(AccessSize, Alignment, AllowMisalign, ChooseGenInfo,
+                  BurstMode);
   }
 
   std::vector<AddressInfo>

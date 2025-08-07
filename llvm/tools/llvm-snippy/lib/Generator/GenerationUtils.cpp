@@ -70,7 +70,8 @@ selectAddressForSingleInstrFromBurstGroup(InstructionGenerationContext &IGC,
          "Expected AddressRestriction only for one opcode");
   for (unsigned i = 0; i < BurstAddressRandomizationThreshold; ++i) {
     auto CandidateAccess =
-        MS.sample(OpcodeAR.AccessSize, OpcodeAR.AccessAlignment, false);
+        MS.sample(OpcodeAR.AccessSize, OpcodeAR.AccessAlignment,
+                  OpcodeAR.AllowMisalign, false);
     if (!CandidateAccess) {
       std::string PrefixErr;
       raw_string_ostream OS(PrefixErr);
@@ -336,6 +337,8 @@ std::map<unsigned, AddressRestriction> deduceStrongestRestrictions(
         SNIPPY_ARS_GET_MAX_FIELD(AccessAlignment, std::less<>{}),
         // Max alignment
         SNIPPY_ARS_GET_MAX_FIELD(OffsetAlignment, std::less<>{}),
+        // AllowMisalign only if all ARs allow it
+        SNIPPY_ARS_GET_MAX_FIELD(AllowMisalign, std::greater<>{}),
         {
             // Largest min
             SNIPPY_ARS_GET_MAX_FIELD(ImmOffsetRange.getMin(), std::less<>{}),
@@ -369,8 +372,11 @@ collectAddressRestrictions(ArrayRef<unsigned> Opcodes,
     // Get address restrictions for the current opcode.
     AddressRestriction AR;
     AR.Opcodes.insert(Opcode);
-    std::tie(AR.AccessSize, AR.AccessAlignment) =
+    const auto AccessSizeAlignment =
         SnippyTgt.getAccessSizeAndAlignment(ProgCtx, Opcode, MBB);
+    AR.AccessSize = AccessSizeAlignment.AccessSize;
+    AR.AccessAlignment = AccessSizeAlignment.NaturalAlignment;
+    AR.AllowMisalign = AccessSizeAlignment.AllowMisalign;
     AR.ImmOffsetRange = SnippyTgt.getImmOffsetRangeForMemAccessInst(InstrDesc);
     AR.OffsetAlignment =
         SnippyTgt.getImmOffsetAlignmentForMemAccessInst(InstrDesc);
