@@ -1,0 +1,45 @@
+# RUN: llvm-snippy %s -dump-memory-accesses=%t -model-plugin=None
+# RUN: FileCheck %s --input-file=%t
+
+options:
+  march: riscv64-linux-gnu
+  num-instrs: 100
+  riscv-disable-misaligned-access: all
+
+sections:
+  - no:        1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+
+access-ranges:
+  - start: 0x80600000
+    size: 0x20
+    stride: 32
+    first-offset: 0
+    last-offset: 31
+
+  - start: 0x80700000
+    size: 0x40
+    stride: 64
+    first-offset: 0
+    last-offset: 63
+    misaligned-access: true
+
+histogram:
+  - [LD, 1.0]
+  - [SD, 1.0]
+
+# COM: In 0x80600000 range only aligned accesses are allowed:
+# CHECK-NOT: {{0x806[0-f]{4}[1-7]}}
+# CHECK-NOT: {{0x806[0-f]{4}[9-f]}}
+
+# COM: In 0x80700000 range misaligned accesses are allowed too:
+# CHECK: {{0x807[0-f]{4}[1-7]}}
+# CHECK: {{0x807[0-f]{4}[9-f]}}

@@ -40,7 +40,11 @@ namespace snippy {
 class SnippyTarget;
 class OpcodeCache;
 
-enum class MemoryAccessMode { Range, Eviction, Addresses };
+enum class MemoryAccessMode {
+  Range,
+  Eviction,
+  Addresses,
+};
 
 using MemAddr = uint64_t;
 using MemAddresses = SmallVector<MemAddr>;
@@ -184,12 +188,15 @@ struct AddressRestriction {
   size_t AccessSize;
   size_t AccessAlignment;
   size_t OffsetAlignment;
+  bool AllowMisalign;
   StridedImmediate ImmOffsetRange;
   std::unordered_set<unsigned> Opcodes;
 
   bool operator==(const AddressRestriction &AR) const {
     return AccessSize == AR.AccessSize &&
            AccessAlignment == AR.AccessAlignment &&
+           OffsetAlignment == AR.OffsetAlignment &&
+           AllowMisalign == AR.AllowMisalign &&
            ImmOffsetRange == AR.ImmOffsetRange && Opcodes == AR.Opcodes;
   }
 };
@@ -197,7 +204,8 @@ struct AddressRestriction {
 // Parameters that define requirements for the randomly generated address.
 struct AddressGenInfo {
   size_t AccessSize; //< Single element width
-  size_t Alignment;  //< Required alignment
+  size_t Alignment;  //< Natural alignment
+  bool AllowMisalign;
 
   // Whether burst mode is enabled. In this case some magic needs to happen.
   bool BurstMode;
@@ -209,27 +217,40 @@ struct AddressGenInfo {
   size_t NumElements = 1; //< Initializer to have single element by default
   size_t MinStride = 0;   //< Does not matter for non-strided access
 
+  AddressGenInfo(size_t AccessSize, size_t Alignment, bool AllowMisalign,
+                 bool Burst, size_t NumElements = 1, size_t MinStride = 0)
+      : AccessSize{AccessSize}, Alignment{Alignment},
+        AllowMisalign{AllowMisalign}, BurstMode{Burst},
+        NumElements{NumElements}, MinStride{MinStride} {}
+
   // Some utility functions for readability
   bool isSingleElement() const { return NumElements == 1u; }
 
+  size_t getMinAlignment() const { return AllowMisalign ? 1 : Alignment; }
+
+  // AllowMisalignedAccess has priority over AddrGenInfo.AllowMisalign
+  size_t getRequiredAlignment(std::optional<bool> AllowMisalignedAccess) const {
+    if (!AllowMisalignedAccess.has_value())
+      return getMinAlignment();
+    if (*AllowMisalignedAccess)
+      return 1;
+    return Alignment;
+  }
+
   static AddressGenInfo multiAccess(size_t AccessSize, size_t Alignment,
-                                    bool Burst, size_t NumElements,
-                                    size_t MinStride) {
+                                    bool AllowMisalign, bool Burst,
+                                    size_t NumElements, size_t MinStride) {
     assert(NumElements >= 1 && "NumElements can't be 0");
     assert(isPowerOf2_64(Alignment) && "Alignment should be a power of 2");
 
-    AddressGenInfo Params;
-    Params.AccessSize = AccessSize;
-    Params.Alignment = Alignment;
-    Params.BurstMode = Burst;
-    Params.NumElements = NumElements;
-    Params.MinStride = MinStride;
-    return Params;
+    return AddressGenInfo(AccessSize, Alignment, AllowMisalign, Burst,
+                          NumElements, MinStride);
   }
 
   static AddressGenInfo singleAccess(size_t AccessSize, size_t Alignment,
-                                     bool Burst) {
-    return multiAccess(AccessSize, Alignment, Burst, /* Num Elements */ 1,
+                                     bool AllowMisalign, bool Burst) {
+    return multiAccess(AccessSize, Alignment, AllowMisalign, Burst,
+                       /* Num Elements */ 1,
                        /* No Stride */ 0);
   }
 };
@@ -264,6 +285,7 @@ struct MemoryAccessRange final : MemoryAccess {
   size_t FirstOffset = 0;
   size_t LastOffset = 0;
   std::optional<size_t> AccessSize = std::nullopt;
+  std::optional<bool> AllowMisalignedAccess = std::nullopt;
 
 private:
   // When alignment must be accounted for, offsets that are aligned in one
@@ -353,7 +375,7 @@ struct MemoryAccessEviction final : MemoryAccess {
   }
 
   bool isLegal(const AddressGenInfo &Info) const override {
-    auto Alignment = Info.Alignment;
+    auto Alignment = Info.getRequiredAlignment(std::nullopt);
     assert(isPowerOf2_64(Alignment));
     if ((Alignment - 1) & Fixed)
       // If alignment requires some Fixed bits to be 0, then this alignment is
