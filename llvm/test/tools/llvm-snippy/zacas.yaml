@@ -2,7 +2,7 @@
 
 options:
   march: riscv64-unknown-elf
-  mattr: +a,+experimental-zacas
+  mattr: +a,+zacas
   num-instrs: 1000
   dump-mf: true
 

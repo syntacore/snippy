@@ -212,7 +212,8 @@ public:
         (Reg >= RISCV::F0_F && Reg <= RISCV::F31_F) ||
         (Reg >= RISCV::F0_H && Reg <= RISCV::F31_H))
       return llvm::APInt(RegSize,
-                         ModelState.readFReg(static_cast<RVMFReg>(RegIdx)));
+                         ModelState.readFReg(static_cast<RVMFReg>(RegIdx)),
+                         /* signed */ false, /* implicitTrunc */ true);
     if (Reg >= RISCV::V0 && Reg <= RISCV::V31) {
       llvm::SmallVector<uint64_t> Val(RegSize / 64);
       ModelState.readVReg(static_cast<RVMVReg>(RegIdx),
