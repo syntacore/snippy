@@ -181,9 +181,8 @@ void BurstGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
   auto &State = InstrGenCtx.ProgCtx.getLLVMState();
   const auto &Tgt = State.getSnippyTarget();
   const auto &InstrInfo = State.getInstrInfo();
-  std::generate_n(std::back_inserter(Instructions), Limit.getLimit(), [this] {
-    return InstructionRequest{genOpc(), {}};
-  });
+  std::generate_n(std::back_inserter(Instructions), Limit.getLimit(),
+                  [this] { return InstructionRequest{genOpc(), {}}; });
   auto IsMemUser = [&Tgt](auto Opc) -> bool {
     return Tgt.countAddrsToGenerate(Opc);
   };

@@ -53,12 +53,13 @@ void RandomMemoryAccessSampler::reserve(MemRange R) {
 
 Expected<AccessSampleResult>
 RandomMemoryAccessSampler::sample(size_t AccessSize, size_t Alignment,
+                                  bool AllowMisalign,
                                   std::function<AddressGenInfo(MemoryAccess &)>
                                       ChooseAddrGenInfo, // FIXME: const?
                                   bool BurstMode) {
   auto &MAGWithSchemes = getMAG();
-  auto SchemeExp =
-      MAGWithSchemes.getValidAccesses(AccessSize, Alignment, BurstMode);
+  auto SchemeExp = MAGWithSchemes.getValidAccesses(AccessSize, Alignment,
+                                                   AllowMisalign, BurstMode);
   if (!SchemeExp)
     return Expected<AccessSampleResult>(SchemeExp.takeError());
   auto &Scheme = *SchemeExp;
