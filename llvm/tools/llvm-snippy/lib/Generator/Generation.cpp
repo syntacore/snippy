@@ -854,10 +854,12 @@ bool sizeLimitIsExceeded(const planning::RequestLimit &Lim,
 AddressGenInfo chooseAddrGenInfoForInstrCallback(
     LLVMContext &Ctx,
     std::optional<SnippyLoopInfo::LoopGenerationInfo> CurLoopGenInfo,
-    size_t AccessSize, size_t Alignment, const MemoryAccess &MemoryScheme) {
+    size_t AccessSize, size_t Alignment, bool AllowMisalign,
+    const MemoryAccess &MemoryScheme) {
   (void)CurLoopGenInfo; // for future extensibility
   // AddressGenInfo for one element access.
-  return AddressGenInfo::singleAccess(AccessSize, Alignment, false /* Burst */);
+  return AddressGenInfo::singleAccess(AccessSize, Alignment, AllowMisalign,
+                                      false /* Burst */);
 }
 
 static AccessSampleResult
@@ -870,7 +872,7 @@ chooseAddrInfoForInstr(MachineInstr &MI, InstructionGenerationContext &IGC,
   const auto &SnippyTgt = State.getSnippyTarget();
   auto Opcode = MI.getDesc().getOpcode();
 
-  auto [AccessSize, Alignment] =
+  auto [AccessSize, Alignment, AllowMisalign] =
       SnippyTgt.getAccessSizeAndAlignment(ProgCtx, Opcode, *MI.getParent());
 
   auto CurLoopGenInfo =
@@ -881,13 +883,15 @@ chooseAddrInfoForInstr(MachineInstr &MI, InstructionGenerationContext &IGC,
   // regular single address access
   auto ChooseAddrGenInfo =
       [&Ctx = State.getCtx(), CurLoopGenInfo, AccessSize = AccessSize,
-       Alignment =
-           Alignment](const MemoryAccess &MemoryScheme) -> AddressGenInfo {
+       Alignment = Alignment, AllowMisalign = AllowMisalign](
+          const MemoryAccess &MemoryScheme) -> AddressGenInfo {
     return chooseAddrGenInfoForInstrCallback(Ctx, CurLoopGenInfo, AccessSize,
-                                             Alignment, MemoryScheme);
+                                             Alignment, AllowMisalign,
+                                             MemoryScheme);
   };
 
-  auto Result = MS.sample(AccessSize, Alignment, ChooseAddrGenInfo);
+  auto Result =
+      MS.sample(AccessSize, Alignment, AllowMisalign, ChooseAddrGenInfo);
   if (!Result) {
     std::string InstrStr;
     raw_string_ostream OS(InstrStr);

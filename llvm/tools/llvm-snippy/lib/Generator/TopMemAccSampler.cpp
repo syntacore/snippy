@@ -13,13 +13,13 @@ namespace llvm {
 namespace snippy {
 
 Expected<AccessSampleResult> TopLevelMemoryAccessSampler::sample(
-    size_t AccessSize, size_t Alignment,
+    size_t AccessSize, size_t Alignment, bool AllowMisalign,
     std::function<AddressGenInfo(MemoryAccess &)> ChooseAddrGenInfo,
     bool BurstMode) {
   SmallVector<std::string, 3> Errs(Samplers.size());
   for (auto &&[Idx, S] : enumerate(Samplers)) {
-    auto Access =
-        S->sample(AccessSize, Alignment, ChooseAddrGenInfo, BurstMode);
+    auto Access = S->sample(AccessSize, Alignment, AllowMisalign,
+                            ChooseAddrGenInfo, BurstMode);
     if (!Access) {
       Errs[Idx] = toString(Access.takeError());
       continue;
@@ -43,7 +43,7 @@ std::vector<AddressInfo> TopLevelMemoryAccessSampler::randomBurstGroupAddresses(
   std::vector<AddressInfo> Addresses;
   for (auto &AR : ARRange) {
 
-    auto Access = sample(AR.AccessSize, AR.AccessAlignment,
+    auto Access = sample(AR.AccessSize, AR.AccessAlignment, AR.AllowMisalign,
                          /*BurstMode*/ true);
     if (!Access)
       snippy::fatal("Failed to sample memory access for burst group",
