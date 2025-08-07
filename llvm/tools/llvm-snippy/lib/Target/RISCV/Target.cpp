@@ -962,17 +962,6 @@ static DisableMisalignedAccessMode getMisalignedAccessMode() {
   return RISCVDisableMisaligned.getValue();
 }
 
-/// Helper function to calculate load/store alignment based on whether
-/// misaligned access is enabled or not
-static size_t getLoadStoreAlignment(unsigned Opcode, unsigned SEW = 0) {
-  auto MisalignedAccessMode = getMisalignedAccessMode();
-  if (MisalignedAccessMode == DisableMisalignedAccessMode::All ||
-      (MisalignedAccessMode == DisableMisalignedAccessMode::AtomicsOnly &&
-       (isAtomicAMO(Opcode) || isScInstr(Opcode) || isLrInstr(Opcode))))
-    return getLoadStoreNaturalAlignment(Opcode, SEW);
-  return 1;
-}
-
 template <typename It> static void storeWordToMem(It MemIt, uint32_t Value) {
   auto RegAsBytes = std::vector<uint8_t>{};
   convertNumberToBytesArray(Value, std::back_inserter(RegAsBytes));
@@ -3161,15 +3150,27 @@ public:
     return AccessSize * NFields + Stride * (VL - 1);
   }
 
-  virtual std::tuple<size_t, size_t>
+  InstrMemAccessInfo
   getAccessSizeAndAlignment(SnippyProgramContext &ProgCtx, unsigned Opcode,
                             const MachineBasicBlock &MBB) const override {
     unsigned SEW = 0;
     auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
     if (TgtCtx.hasActiveRVVMode(MBB))
       SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
-    return {getAccessSize(Opcode, ProgCtx, MBB),
-            getLoadStoreAlignment(Opcode, SEW)};
+
+    auto MisalignedAccessMode = getMisalignedAccessMode();
+    bool DisableMisalign =
+        (MisalignedAccessMode == DisableMisalignedAccessMode::All ||
+         (MisalignedAccessMode == DisableMisalignedAccessMode::AtomicsOnly &&
+          (isAtomicAMO(Opcode) || isScInstr(Opcode) || isLrInstr(Opcode))));
+
+    auto NaturalAlignment = getLoadStoreNaturalAlignment(Opcode, SEW);
+    if (!DisableMisalign &&
+        NaturalAlignment == 0) // happens for atomic instructions for example
+      NaturalAlignment = 1;
+
+    return {getAccessSize(Opcode, ProgCtx, MBB), NaturalAlignment,
+            !DisableMisalign};
   }
 
   void

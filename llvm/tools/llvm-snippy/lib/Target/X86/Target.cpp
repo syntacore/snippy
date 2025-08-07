@@ -447,7 +447,7 @@ public:
     reportUnimplementedError();
   }
 
-  std::tuple<size_t, size_t>
+  InstrMemAccessInfo
   getAccessSizeAndAlignment(SnippyProgramContext &ProgCtx, unsigned Opcode,
                             const MachineBasicBlock &MBB) const override {
     reportUnimplementedError();

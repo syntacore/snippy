@@ -53,7 +53,8 @@ selectAddressForSingleInstrFromBurstGroup(InstructionGenerationContext &IGC,
 AddressGenInfo chooseAddrGenInfoForInstrCallback(
     LLVMContext &Ctx,
     std::optional<SnippyLoopInfo::LoopGenerationInfo> CurLoopGenInfo,
-    size_t AccessSize, size_t Alignment, const MemoryAccess &MemoryScheme);
+    size_t AccessSize, size_t Alignment, bool AllowMisalign,
+    const MemoryAccess &MemoryScheme);
 
 enum class MemAccessKind { BURST, REGULAR };
 void markMemAccessAsUsed(InstructionGenerationContext &IGC,
