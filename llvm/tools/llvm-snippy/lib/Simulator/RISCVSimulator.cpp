@@ -488,7 +488,7 @@ static void auxSimInit(const RISCVSubtarget &Subtarget,
   }
 
   errs() << "NOTE: adjusting MSTATUS: 0x" << Twine::utohexstr(DEFAULT_MSTATUS)
-         << "->" << Twine::utohexstr(MSTATUS_CSR) << "\n";
+         << "->0x" << Twine::utohexstr(MSTATUS_CSR) << "\n";
 
   LLSim.setCSRReg(RVM_CSR_MSTATUS, MSTATUS_CSR);
 }
