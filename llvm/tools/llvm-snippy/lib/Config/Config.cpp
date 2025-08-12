@@ -525,19 +525,19 @@ static std::optional<unsigned> getExpectedNumInstrs(StringRef NumAsString) {
   return Value;
 }
 
-static unsigned getSelfcheckPeriod(StringRef SelfCheck) {
-  if (SelfCheck == "none")
+static unsigned getSelfcheckPeriod(StringRef Selfcheck) {
+  if (Selfcheck == "none")
     return 0;
 
-  if (SelfCheck.empty())
+  if (Selfcheck.empty())
     return 1;
 
-  unsigned long long SelfCheckPeriod = 0;
-  if (getAsUnsignedInteger(SelfCheck, /* Radix */ 10, SelfCheckPeriod))
+  unsigned long long SelfcheckPeriod = 0;
+  if (getAsUnsignedInteger(Selfcheck, /* Radix */ 10, SelfcheckPeriod))
     snippy::fatal(
         "Value of selfcheck option is not convertible to numeric one.");
-  assert(isUInt<sizeof(unsigned) * CHAR_BIT>(SelfCheckPeriod));
-  return SelfCheckPeriod;
+  assert(isUInt<sizeof(unsigned) * CHAR_BIT>(SelfcheckPeriod));
+  return SelfcheckPeriod;
 }
 unsigned long long initializeRandomEngine(uint64_t SeedValue) {
   RandEngine::init(SeedValue);
@@ -651,7 +651,7 @@ static void normalizeInstrGenOptions(Config &Cfg, LLVMState &State,
   auto &TrackCfg = Cfg.CommonPolicyCfg->TrackCfg;
   TrackCfg.BTMode = Opts.Backtrack;
   TrackCfg.AddressVH = Opts.AddressVHOpt;
-  TrackCfg.SelfCheckPeriod = getSelfcheckPeriod(Opts.SelfCheck);
+  TrackCfg.SelfcheckPeriod = getSelfcheckPeriod(Opts.Selfcheck);
 }
 
 static void normalizeModelOptions(Config &Cfg, LLVMState &State,
@@ -948,7 +948,7 @@ static void checkFullSizeGenerationRequirements(const MCInstrInfo &II,
                                                 const SnippyTarget &Tgt,
                                                 const Config &Cfg) {
   bool FillCodeSectionMode = !Cfg.PassCfg.InstrsGenerationConfig.NumInstrs;
-  unsigned SelfCheckPeriod = Cfg.CommonPolicyCfg->TrackCfg.SelfCheckPeriod;
+  unsigned SelfcheckPeriod = Cfg.CommonPolicyCfg->TrackCfg.SelfcheckPeriod;
   if (FillCodeSectionMode &&
       Cfg.Histogram.getOpcodesWeight([&II](unsigned Opcode) {
         auto &Desc = II.get(Opcode);
@@ -961,7 +961,7 @@ static void checkFullSizeGenerationRequirements(const MCInstrInfo &II,
           [&Tgt](unsigned Opcode) { return Tgt.isCall(Opcode); }) > 0.0)
     snippy::fatal("when -num-instr=all is specified, calls are not supported");
 
-  if (FillCodeSectionMode && SelfCheckPeriod)
+  if (FillCodeSectionMode && SelfcheckPeriod)
     snippy::fatal(
         "when -num-instr=all is specified, selfcheck is not supported");
   if (FillCodeSectionMode && Cfg.BurstConfig &&
@@ -972,7 +972,7 @@ static void checkFullSizeGenerationRequirements(const MCInstrInfo &II,
 
 static size_t getMinimumSelfcheckSize(const Config &Cfg) {
   auto &TrackCfg = Cfg.CommonPolicyCfg->TrackCfg;
-  assert(TrackCfg.SelfCheckPeriod);
+  assert(TrackCfg.SelfcheckPeriod);
 
   size_t BlockSize = 2 * ProgramConfig::getSCStride();
   // Note: There are cases when we have some problems for accurate calculating
@@ -981,7 +981,7 @@ static size_t getMinimumSelfcheckSize(const Config &Cfg) {
   //       section, So it's better to provide selfcheck section in Layout
   //       explicitly
   return alignTo(Cfg.PassCfg.InstrsGenerationConfig.NumInstrs.value_or(0) *
-                     BlockSize / TrackCfg.SelfCheckPeriod,
+                     BlockSize / TrackCfg.SelfcheckPeriod,
                  ProgramConfig::getPageSize());
 }
 
@@ -1097,7 +1097,7 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
       }
     }
   if (!Sections.hasSection(SectionsDescriptions::SelfcheckSectionName) &&
-      CommonPolicyCfg->TrackCfg.SelfCheckPeriod)
+      CommonPolicyCfg->TrackCfg.SelfcheckPeriod)
     snippy::fatal(Twine("Missing '") +
                       SectionsDescriptions::SelfcheckSectionName +
                       Twine("' section"),
@@ -1195,7 +1195,7 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
   }
   if (ProgramCfg->Sections.hasSection(
           SectionsDescriptions::SelfcheckSectionName) &&
-      CommonPolicyCfg->TrackCfg.SelfCheckPeriod)
+      CommonPolicyCfg->TrackCfg.SelfcheckPeriod)
     diagnoseSelfcheckSection(State, *this, getMinimumSelfcheckSize(*this));
 }
 
