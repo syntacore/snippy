@@ -30,7 +30,7 @@
 namespace llvm {
 namespace snippy {
 
-template class GenResultT<SelfCheckMap>;
+template class GenResultT<SelfcheckMap>;
 
 extern cl::OptionCategory Options;
 

@@ -35,7 +35,7 @@ public:
 
 private:
   std::unique_ptr<SimRunner> OwnRunner;
-  std::unique_ptr<SelfCheckInfo> OwnSCI;
+  std::unique_ptr<SelfcheckInfo> OwnSCI;
   std::unique_ptr<Backtrack> OwnBT;
 };
 

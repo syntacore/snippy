@@ -187,7 +187,7 @@ static snippy::opt<bool>
                      cl::Hidden, cl::cat(SnippyRISCVOptions), cl::init(false));
 
 static snippy::opt<bool>
-    SelfCheckRVV("enable-selfcheck-rvv",
+    SelfcheckRVV("enable-selfcheck-rvv",
                  cl::desc("turning on selfcheck for rvv instructions"),
                  cl::Hidden, cl::init(false));
 
@@ -1402,7 +1402,7 @@ public:
   }
 
   bool isSelfcheckAllowed(unsigned Opcode) const override {
-    if (isRVV(Opcode) && !SelfCheckRVV) {
+    if (isRVV(Opcode) && !SelfcheckRVV) {
       return false;
     }
     /*TODO: maybe need more conditions */

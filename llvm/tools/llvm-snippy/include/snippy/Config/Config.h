@@ -88,7 +88,7 @@ public:
 
 struct TrackingOptions {
   bool BTMode;
-  unsigned SelfCheckPeriod;
+  unsigned SelfcheckPeriod;
   bool AddressVH;
 };
 
@@ -360,7 +360,7 @@ public:
   auto &getTrackCfg() const { return CommonPolicyCfg->TrackCfg; }
 
   bool hasTrackingMode() const {
-    return getTrackCfg().BTMode || getTrackCfg().SelfCheckPeriod ||
+    return getTrackCfg().BTMode || getTrackCfg().SelfcheckPeriod ||
            getTrackCfg().AddressVH ||
 
            CommonPolicyCfg->FPUConfig.needsModel();
