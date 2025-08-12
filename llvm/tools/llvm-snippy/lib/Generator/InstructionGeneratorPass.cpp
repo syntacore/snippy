@@ -27,7 +27,7 @@ namespace snippy {
 
 extern cl::OptionCategory Options;
 
-static snippy::opt<bool> SelfCheckGV(
+static snippy::opt<bool> SelfcheckGV(
     "selfcheck-gv",
     cl::desc("add selfcheck section properties such as VMA, size and stride as "
              "a global constants with an external linkage"),
@@ -208,11 +208,11 @@ bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
   auto *SCI = SimCtx.SCI;
   if (SCI) {
     // TODO: move it to initializer:
-    SCI->PeriodTracker = {Cfg.getTrackCfg().SelfCheckPeriod};
+    SCI->PeriodTracker = {Cfg.getTrackCfg().SelfcheckPeriod};
     const auto &SCSection = SGCtx->getProgramContext().getSelfcheckSection();
     SCI->CurrentAddress = SCSection.VMA;
-    // FIXME: make SelfCheckGV a deprecated option
-    if (SelfCheckGV)
+    // FIXME: make SelfcheckGV a deprecated option
+    if (SelfcheckGV)
       addSelfcheckSectionPropertiesAsGV(M);
   }
 

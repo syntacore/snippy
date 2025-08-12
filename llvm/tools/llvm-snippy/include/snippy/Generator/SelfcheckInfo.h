@@ -15,13 +15,13 @@
 
 namespace llvm {
 namespace snippy {
-struct SelfCheckInfo final {
+struct SelfcheckInfo final {
   unsigned long long CurrentAddress;
   AsOneGenerator<bool, true, false> PeriodTracker;
 };
 
-struct SelfCheckMap {
-  SelfCheckMap() : Map(){};
+struct SelfcheckMap {
+  SelfcheckMap() : Map() {};
 
   DenseMap<MemAddr, MemAddr> Map;
 
@@ -31,8 +31,8 @@ struct SelfCheckMap {
            "This address has been already inserterd to map.");
   }
 
-  template <typename SelfRange> static SelfCheckMap merge(SelfRange &&SR) {
-    SelfCheckMap Ret;
+  template <typename SelfRange> static SelfcheckMap merge(SelfRange &&SR) {
+    SelfcheckMap Ret;
     for (auto &&Map : SR)
       for (auto &&[Address, Distance] : Map)
         Ret.addToSelfcheckMap(Address, Distance);
@@ -40,7 +40,7 @@ struct SelfCheckMap {
   }
 };
 
-extern template class GenResultT<SelfCheckMap>;
+extern template class GenResultT<SelfcheckMap>;
 
 } // namespace snippy
 } // namespace llvm

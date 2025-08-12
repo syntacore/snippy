@@ -4,7 +4,7 @@
 #include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/Linker.h"
-#include "snippy/Generator/SelfCheckInfo.h"
+#include "snippy/Generator/SelfcheckInfo.h"
 #include "snippy/Generator/SnippyModule.h"
 
 #include "snippy/Simulator/SelfcheckObserver.h"
@@ -74,7 +74,7 @@ void OwningSimulatorContext::initialize(SnippyProgramContext &ProgCtx,
   BT = OwnBT.get();
 
   OwnSCI =
-      TrackCfg.SelfCheckPeriod ? std::make_unique<SelfCheckInfo>() : nullptr;
+      TrackCfg.SelfcheckPeriod ? std::make_unique<SelfcheckInfo>() : nullptr;
   SCI = OwnSCI.get();
 }
 

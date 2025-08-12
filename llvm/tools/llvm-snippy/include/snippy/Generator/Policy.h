@@ -52,7 +52,7 @@
 /// The "isInseparableBundle" function indicates whether generated
 /// instructions must be executed one by one (on the simulator) instead of
 /// executing the entire group when generation is complete. This functionality
-/// is useful for SelfCheck and other tracking modes.
+/// is useful for Selfcheck and other tracking modes.
 ///
 /// 5.
 /// void print(MyPolicy &, raw_ostream &);
@@ -70,7 +70,7 @@
 #include "snippy/Generator/FPRNaNIdentifier.h"
 #include "snippy/Generator/GenerationLimit.h"
 #include "snippy/Generator/LLVMState.h"
-#include "snippy/Generator/SelfCheckInfo.h"
+#include "snippy/Generator/SelfcheckInfo.h"
 #include "snippy/Generator/SnippyModule.h"
 #include "snippy/Support/OpcodeGenerator.h"
 
