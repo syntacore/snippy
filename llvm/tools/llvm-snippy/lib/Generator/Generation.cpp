@@ -605,7 +605,7 @@ handleGeneratedInstructions(InstrIt ItBegin,
   // annotation
   for (const auto &[Def, StoreInfo] : zip(Defs, StoresInfo))
     InstrGenCtx.getSnippyModule()
-        .getOrAddResult<SelfCheckMap>()
+        .getOrAddResult<SelfcheckMap>()
         .addToSelfcheckMap(
             StoreInfo.Address,
             std::distance(Def.Inst, std::next(StoreInfo.FirstStoreInstrPos)));
