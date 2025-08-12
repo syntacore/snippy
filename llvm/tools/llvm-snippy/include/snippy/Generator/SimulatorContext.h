@@ -16,12 +16,12 @@ namespace llvm {
 namespace snippy {
 
 class Backtrack;
-struct SelfCheckInfo;
+struct SelfcheckInfo;
 class SnippyProgramContext;
 
 struct SimulatorContext {
   SimRunner *Runner = nullptr;
-  SelfCheckInfo *SCI = nullptr;
+  SelfcheckInfo *SCI = nullptr;
   Backtrack *BT = nullptr;
   SimulatorContext() = default;
   virtual ~SimulatorContext() = default;

@@ -23,7 +23,7 @@ class InstructionGenerationContext;
 
 class GeneratorContext;
 struct GenerationStatistics;
-struct SelfCheckInfo;
+struct SelfcheckInfo;
 struct SimulatorContext;
 class CallGraphState;
 class MemAccessInfo;

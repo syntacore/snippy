@@ -185,7 +185,7 @@ let Group = InstrGenOptionsCategory in {
         Description<"Enable backtracking facilities so as not to generate "
                     "errorneous code (e.g. division by zero)">;
 
-  def SelfCheck : StringOption<"selfcheck">,
+  def Selfcheck : StringOption<"selfcheck">,
                   Description<"Enable full or partial selfcheck with step N "
                               "(means each N instructions)">,
                   ValueDescription<"N">,
