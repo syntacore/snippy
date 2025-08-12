@@ -13,7 +13,7 @@
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/Interpreter.h"
 #include "snippy/Generator/IntervalsToVerify.h"
-#include "snippy/Generator/SelfCheckInfo.h"
+#include "snippy/Generator/SelfcheckInfo.h"
 #include "snippy/Generator/SimulatorContextWrapperPass.h"
 #include "snippy/InitializePasses.h"
 #include "snippy/PassManagerWrapper.h"
@@ -70,7 +70,7 @@ static snippy::opt<std::string>
                      cl::value_desc("filename"), cl::cat(Options),
                      cl::init("None"));
 
-static snippy::opt<bool> SelfCheckMem(
+static snippy::opt<bool> SelfcheckMem(
     "selfcheck-mem",
     cl::desc("check a memory state after execution in selfcheck mode"),
     cl::Hidden, cl::init(true));
@@ -140,7 +140,7 @@ void writeMIRFile(StringRef Data) {
 
 } // namespace
 
-static void dumpSelfCheck(const std::vector<char> &Data, size_t ChunkSize,
+static void dumpSelfcheck(const std::vector<char> &Data, size_t ChunkSize,
                           size_t ChunksNum, raw_ostream &OS) {
   for (size_t Offset = 0; Offset < Data.size();
        Offset += ChunkSize * ChunksNum) {
@@ -180,7 +180,7 @@ static void checkMemStateAfterSelfcheck(SnippyProgramContext &ProgCtx,
       if ((Result & DefMaskByte) != (Reference & DefMaskByte)) {
         auto FaultAddr = SelfcheckSection.VMA + Offset + ByteIdx;
         LLVM_DEBUG(
-            dumpSelfCheck(Data, BlockSize / ChunksNum, ChunksNum, dbgs()));
+            dumpSelfcheck(Data, BlockSize / ChunksNum, ChunksNum, dbgs()));
         snippy::fatal(formatv(
             "Incorrect memory state after interpretation in "
             "self-check mode. Error is in block @ 0x{0}{{1} + {2} + {3}}\n",
@@ -338,7 +338,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         ESnippetImageForModelExecution->SnippetImage, ProgContext, MainModule,
         PassCfg.ProgramCfg.EntryPointName,
         PassCfg.RegistersConfig.InitialStateOutputYaml,
-        PassCfg.RegistersConfig.FinalStateOutputYaml, SelfCheckMem,
+        PassCfg.RegistersConfig.FinalStateOutputYaml, SelfcheckMem,
         // Memory reset only needed if interpreter may have executed
         // during generation process.
         /* NeedMemoryReset */ Cfg.hasTrackingMode(),
@@ -353,8 +353,8 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
     std::unique_ptr<RVMCallbackHandler::ObserverHandle<SelfcheckObserver>>
         SelfcheckObserverHandle;
     auto &TrackCfg = Cfg.getTrackCfg();
-    if (TrackCfg.SelfCheckPeriod) {
-      auto &Map = MainModule.getOrAddResult<SelfCheckMap>().Map;
+    if (TrackCfg.SelfcheckPeriod) {
+      auto &Map = MainModule.getOrAddResult<SelfcheckMap>().Map;
       // TODO: merge all infos from all modules.
       SelfcheckObserverHandle =
           I.setObserver<SelfcheckObserver>(Map.begin(), Map.end(), I.getPC());
@@ -364,8 +364,8 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
       snippy::fatal(GenCtx.getProgramContext().getLLVMState().getCtx(),
                     "Error during the simulation run", std::move(Err));
 
-    if (TrackCfg.SelfCheckPeriod) {
-      if (SelfCheckMem)
+    if (TrackCfg.SelfcheckPeriod) {
+      if (SelfcheckMem)
         checkMemStateAfterSelfcheck(ProgContext, TrackCfg, I);
 
       auto AnnotationFilename =
