@@ -76,7 +76,6 @@ unsigned computeVLMax(unsigned VLEN, unsigned SEW, RISCVII::VLMUL LMUL);
 enum RVVConstants { kMaxVLForVSETIVLI = 31u, kMaxLMUL = 8u };
 
 struct RVVConfiguration final {
-  bool IsLegal = true;
   // Note: integer values are in-sync with RVV spec 1.0
   enum class VXRMMode : unsigned { RNU = 0, RNE = 1, RDN = 2, RON = 3 };
   enum class VSEW : unsigned {
@@ -93,6 +92,7 @@ struct RVVConfiguration final {
   unsigned static getMinSEW() { return static_cast<unsigned>(VSEW::SEW8); }
   unsigned static getMaxLMUL() { return RVVConstants::kMaxLMUL; }
 
+  bool IsLegal = true;
   RISCVII::VLMUL LMUL = RISCVII::VLMUL::LMUL_1;
   VSEW SEW = VSEW::SEW64;
   bool MaskAgnostic = false;
@@ -102,6 +102,21 @@ struct RVVConfiguration final {
 
   void print(raw_ostream &OS) const;
   void dump() const;
+
+  // TODO: Typically RVVConfigurations are equal if and only if their addresses
+  // are equal (i.e. they are the same object). However, there is a rare case
+  // when we are comparing SupportConfig and config from the main pool, they
+  // have different addresses, but might have the same content.
+  // Is it worth it to optimize this and keep this operator?
+  bool operator==(const RVVConfiguration &Other) const {
+    return IsLegal == Other.IsLegal && LMUL == Other.LMUL && SEW == Other.SEW &&
+           MaskAgnostic == Other.MaskAgnostic &&
+           TailAgnostic == Other.TailAgnostic && VXRM == Other.VXRM;
+  }
+
+  bool operator!=(const RVVConfiguration &Other) const {
+    return !(*this == Other);
+  }
 };
 
 inline static bool isLegalSEW(unsigned SEW) {
@@ -233,6 +248,10 @@ struct RVVConfigurationInfo final {
   struct VLVM {
     unsigned VL;
     APInt VM;
+
+    bool operator==(const VLVM &Other) const {
+      return VL == Other.VL && APInt::isSameValue(VM, Other.VM);
+    }
   };
 
   using VLGeneratorHolder = std::unique_ptr<VLGeneratorInterface>;
@@ -287,6 +306,14 @@ private:
   VMGenerator VMGen;
   ModeChangeInfo SwitchInfo;
   bool ArtificialModeChange;
+
+public:
+  // Support configuration can be temporarily used for support sequences, like
+  // writing to a register. After that the previous configuration is restored.
+  constexpr static RVVConfiguration SupportCfgSew64{
+      true /*IsLegal*/, RISCVII::VLMUL::LMUL_1, RVVConfiguration::VSEW::SEW64};
+  constexpr static RVVConfiguration SupportCfgSew32{
+      true /*IsLegal*/, RISCVII::VLMUL::LMUL_1, RVVConfiguration::VSEW::SEW32};
 };
 
 class BaseConfigurationInfo final {
