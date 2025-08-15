@@ -30,7 +30,30 @@ struct RVVModeInfo {
 
   RVVModeInfo(RVVConfigurationInfo::VLVM RVV_VLVM,
               const RVVConfiguration &RVVCfg, const MachineBasicBlock &MBB)
-      : VLVM{std::move(RVV_VLVM)}, Config{&RVVCfg}, MBBGuard{&MBB} {}
+      : VLVM(RVV_VLVM), Config(&RVVCfg), MBBGuard(&MBB) {}
+
+  bool operator==(const RVVModeInfo &Other) const {
+    return VLVM == Other.VLVM && MBBGuard == Other.MBBGuard &&
+           (Config == Other.Config ||
+            (Config != nullptr && Other.Config != nullptr &&
+             *Config == *Other.Config));
+  }
+
+  bool operator!=(const RVVModeInfo &Other) const { return !(*this == Other); }
+
+  void print(raw_ostream &OS) const {
+    OS << "--- RVV Mode Info ---\n";
+    OS << "  - VL: " << VLVM.VL << "\n";
+    OS << "  - VM: 0x" << toString(VLVM.VM, /* Radix */ 16, /* Signed */ false)
+       << "\n";
+    OS << "  - Config: ";
+    assert(Config);
+    Config->print(OS);
+    OS << "\n";
+    assert(MBBGuard);
+    OS << "  - MBB: " << MBBGuard->getNumber() << "\n";
+    OS << "--- RVV Mode Info End ---\n";
+  }
 };
 
 struct VSETWeightOverrides {
@@ -67,6 +90,15 @@ public:
     // issue in case if RISCVGeneratorContext is reused)
     assert(hasActiveRVVMode(MBB));
     return CurrentRVVMode;
+  }
+
+  const std::optional<RVVModeInfo>
+  getRVVModeIfActive(const MachineBasicBlock &MBB) const {
+    // FIXME: this is kind of non re-entrant (meaning we have a potential
+    // issue in case if RISCVGeneratorContext is reused)
+    if (hasActiveRVVMode(MBB))
+      return CurrentRVVMode;
+    return std::nullopt;
   }
 
   VSETWeightOverrides getVSETOverrides(const MachineBasicBlock &MBB) const {
@@ -249,6 +281,7 @@ public:
   }
 
   const RVVConfiguration &getCurrentRVVCfg(const MachineBasicBlock &MBB) const {
+    assert(getActiveRVVMode(MBB).Config);
     return *getActiveRVVMode(MBB).Config;
   }
 
@@ -256,10 +289,18 @@ public:
     return getActiveRVVMode(MBB).VLVM.VL;
   }
 
-  void updateActiveRVVMode(const RVVModeInfo NewRVVMode) {
-    CurrentRVVMode.VLVM = std::move(NewRVVMode.VLVM);
-    CurrentRVVMode.Config = NewRVVMode.Config;
-    CurrentRVVMode.MBBGuard = NewRVVMode.MBBGuard;
+  void updateActiveRVVModeVM(const MachineBasicBlock *NewMBBGuard,
+                             const APInt &NewVM) {
+    CurrentRVVMode.MBBGuard = NewMBBGuard;
+    CurrentRVVMode.VLVM.VM = NewVM;
+  }
+
+  void updateActiveRVVModeConfigAndVL(const MachineBasicBlock *NewMBBGuard,
+                                      const RVVConfiguration *NewConfig,
+                                      unsigned VL) {
+    CurrentRVVMode.MBBGuard = NewMBBGuard;
+    CurrentRVVMode.Config = NewConfig;
+    CurrentRVVMode.VLVM.VL = VL;
   }
 
 private:
