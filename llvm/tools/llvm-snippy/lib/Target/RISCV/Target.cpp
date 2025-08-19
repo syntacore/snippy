@@ -1452,7 +1452,9 @@ public:
                          AsmPrinter &AP, const MCSubtargetInfo &STI,
                          SmallVector<char> &OutBuf) const override {
     MCInst OutInst;
-    static_cast<RISCVAsmPrinter &>(AP).lowerToMCInst(MI, OutInst);
+    auto &RVAP = static_cast<RISCVAsmPrinter &>(AP);
+    if (!RVAP.lowerPseudoInstExpansion(MI, OutInst))
+      RVAP.lowerToMCInst(MI, OutInst);
 
     SmallVector<MCFixup> Fixups;
     MCCE.encodeInstruction(OutInst, OutBuf, Fixups, STI);
