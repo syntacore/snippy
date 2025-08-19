@@ -183,7 +183,7 @@ static void checkMemStateAfterSelfcheck(SnippyProgramContext &ProgCtx,
             dumpSelfcheck(Data, BlockSize / ChunksNum, ChunksNum, dbgs()));
         snippy::fatal(formatv(
             "Incorrect memory state after interpretation in "
-            "self-check mode. Error is in block @ 0x{0}{{1} + {2} + {3}}\n",
+            "self-check mode. Error is in block @ 0x{0}{{{1} + {2} + {3}}\n",
             Twine::utohexstr(FaultAddr), Twine::utohexstr(SelfcheckSection.VMA),
             Twine::utohexstr(Offset), Twine::utohexstr(ByteIdx)));
       }
