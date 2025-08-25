@@ -72,10 +72,10 @@
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/TargetRegistry.h"
 
-// include computeAvailableFeatures and computeRequiredFeatures.
-#define GET_COMPUTE_FEATURES
+// include isOpcodeAvailable.
+#define GET_AVAILABLE_OPCODE_CHECKER
 #include "RISCVGenInstrInfo.inc"
-#undef GET_COMPUTE_FEATURES
+#undef GET_AVAILABLE_OPCODE_CHECKER
 
 namespace llvm {
 #define GET_REGISTER_MATCHER
@@ -1097,14 +1097,8 @@ public:
       return nullptr;
   }
   bool checkOpcodeSupported(int Opcode,
-                            const MCSubtargetInfo &SI) const override {
-    auto Features = SI.getFeatureBits();
-    FeatureBitset AvailableFeatures =
-        RISCV_MC::computeAvailableFeatures(Features);
-    FeatureBitset RequiredFeatures = RISCV_MC::computeRequiredFeatures(Opcode);
-    FeatureBitset MissingFeatures =
-        (AvailableFeatures & RequiredFeatures) ^ RequiredFeatures;
-    return MissingFeatures.none();
+                            const FeatureBitset &Features) const override {
+    return RISCV_MC::isOpcodeAvailable(Opcode, Features);
   }
   bool isPseudoAllowed(unsigned Opcode) const override {
     switch (Opcode) {
