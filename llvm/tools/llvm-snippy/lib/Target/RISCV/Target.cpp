@@ -77,6 +77,10 @@
 #include "RISCVGenInstrInfo.inc"
 #undef GET_AVAILABLE_OPCODE_CHECKER
 
+#define SNIPPY_RISCV_EXCLUDED_OPCODES_DEF
+#include "RISCVGenerated.inc"
+#undef SNIPPY_RISCV_EXCLUDED_OPCODES_DEF
+
 namespace llvm {
 #define GET_REGISTER_MATCHER
 #include "RISCVGenAsmMatcher.inc"
@@ -1098,7 +1102,8 @@ public:
   }
   bool checkOpcodeSupported(int Opcode,
                             const FeatureBitset &Features) const override {
-    return RISCV_MC::isOpcodeAvailable(Opcode, Features);
+    return RISCV_MC::isOpcodeAvailable(Opcode, Features) &&
+           !snippyRISCVIsOpcodeExcluded(Opcode);
   }
   bool isPseudoAllowed(unsigned Opcode) const override {
     switch (Opcode) {

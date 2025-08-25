@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Emitters.h"
 #include "SnippyOptions.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ManagedStatic.h"
@@ -22,6 +23,7 @@ enum ActionType {
   DumpJSON,
   GenOptions,
   GenOptionsStruct,
+  GenRISCV,
 };
 
 static cl::opt<ActionType>
@@ -33,7 +35,9 @@ static cl::opt<ActionType>
                       clEnumValN(GenOptionsStruct, "gen-options-struct",
                                  "Generate option struct definition"),
                       clEnumValN(GenOptions, "gen-options",
-                                 "Generate option definitions")));
+                                 "Generate option definitions"),
+                      clEnumValN(GenRISCV, "gen-riscv",
+                                 "Generate RISCV Target definitions")));
 
 static bool snippyTableGenMain(raw_ostream &OS, const RecordKeeper &Records) {
   switch (Action) {
@@ -48,6 +52,9 @@ static bool snippyTableGenMain(raw_ostream &OS, const RecordKeeper &Records) {
     break;
   case GenOptionsStruct:
     emitSnippyOptionsStruct(OS, Records);
+    break;
+  case GenRISCV:
+    emitRISCVGenerated(OS, Records);
     break;
   }
 
