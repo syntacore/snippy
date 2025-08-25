@@ -253,8 +253,7 @@ public:
   }
 
   // default behavior is enabled
-  virtual bool checkOpcodeSupported(int Opcode,
-                                    const MCSubtargetInfo &SI) const {
+  virtual bool checkOpcodeSupported(int Opcode, const FeatureBitset &SI) const {
     return true;
   }
 

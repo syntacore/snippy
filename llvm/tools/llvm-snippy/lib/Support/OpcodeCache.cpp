@@ -20,7 +20,7 @@ OpcodeCache::OpcodeCache(const SnippyTarget &Tgt, const MCInstrInfo &II,
     const MCInstrDesc &InstrDesc = II.get(Opcode);
     if (InstrDesc.isPseudo() && !Tgt.isPseudoAllowed(Opcode))
       continue;
-    if (!Tgt.checkOpcodeSupported(Opcode, SI))
+    if (!Tgt.checkOpcodeSupported(Opcode, SI.getFeatureBits()))
       continue;
 
     // support all mappings
