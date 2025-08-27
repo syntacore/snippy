@@ -3609,7 +3609,7 @@ void SnippyRISCVTarget::generateWriteValueFP(
         IGC.getSnippyModule(),
         "Failed to allocate global constant for float register value load");
     auto *GV = GP.createGV(
-        Value, /* Alignment */ NumBits,
+        Value, /* Alignment */ NumBits / RISCV_CHAR_BIT,
         /* Linkage */ GlobalValue::InternalLinkage,
         /* Name */ "global",
         /* Reason */ "This is needed for updating of float register");
