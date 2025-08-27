@@ -1,0 +1,30 @@
+# RUN: llvm-snippy %s -model-plugin=None
+
+options:
+  mtriple: riscv64-unknown-elf
+  riscv-init-fregs-from-memory: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+  mattr: +f,+d
+  init-regs-in-elf: true
+  num-instrs: 500
+
+sections:
+  - no: 1
+    VMA: 0x1000
+    LMA: 0x1000
+    SIZE: 0x1000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x2000
+    LMA: 0x2000
+    SIZE: 0x100 # exactly 32 * 8
+    ACCESS: r
+  - no: 3
+    VMA: 0x3000
+    LMA: 0x3000
+    SIZE: 0x1000
+    ACCESS: rw
+
+histogram:
+  - [FADD_D, 1.0]
