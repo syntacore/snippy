@@ -1,6 +1,13 @@
 include(TableGen)
 set(LLVM_LINK_COMPONENTS Support)
-add_tablegen(snippy-tblgen SNIPPY TableGen.cpp SnippyOptions.cpp)
+
+add_tablegen(snippy-tblgen SNIPPY
+  RISCVGenerated.cpp
+  SnippyOptions.cpp
+  TableGen.cpp
+  )
+
+target_link_libraries(snippy-tblgen PRIVATE LLVMTableGenCommon)
 
 # TODO: Fix cross-compilation. Because snippy is a part of the LLVM (cmake)
 # project its tablegen depends on build_native_tool. That means that llvm-snippy
