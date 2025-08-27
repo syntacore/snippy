@@ -73,8 +73,7 @@ void OwningSimulatorContext::initialize(SnippyProgramContext &ProgCtx,
               : nullptr;
   BT = OwnBT.get();
 
-  OwnSCI =
-      TrackCfg.SelfcheckPeriod ? std::make_unique<SelfcheckInfo>() : nullptr;
+  OwnSCI = TrackCfg.Selfcheck ? std::make_unique<SelfcheckInfo>() : nullptr;
   SCI = OwnSCI.get();
 }
 

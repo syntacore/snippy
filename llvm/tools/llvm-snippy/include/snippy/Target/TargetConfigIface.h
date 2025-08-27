@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "snippy/Support/YAMLUtils.h"
 namespace llvm {
 
 namespace yaml {
@@ -32,5 +33,16 @@ public:
   virtual void mapConfig(yaml::IO &IO) = 0;
 };
 
+struct SelfcheckTargetConfigInterface {
+  virtual ~SelfcheckTargetConfigInterface() {}
+
+  virtual std::unique_ptr<SelfcheckTargetConfigInterface> clone() const = 0;
+
+  virtual void mapConfig(yaml::IO &IO) = 0;
+};
+
 } // namespace snippy
+
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::SelfcheckTargetConfigInterface);
+
 } // namespace llvm

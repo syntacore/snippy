@@ -10,6 +10,7 @@ set(LLVMSnippyConfigSources
     CallGraphLayout.cpp
     ImmediateHistogram.cpp
     Valuegram.cpp
+    Selfcheck.cpp
     )
 
 

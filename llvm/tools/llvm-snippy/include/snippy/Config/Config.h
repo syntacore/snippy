@@ -18,7 +18,7 @@
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/PluginWrapper.h"
-#include "snippy/Config/SelfcheckMode.h"
+#include "snippy/Config/Selfcheck.h"
 #include "snippy/Support/YAMLUtils.h"
 #include "snippy/Target/TargetConfigIface.h"
 
@@ -88,7 +88,7 @@ public:
 
 struct TrackingOptions {
   bool BTMode;
-  unsigned SelfcheckPeriod;
+  std::optional<SelfcheckConfig> Selfcheck;
   bool AddressVH;
 };
 
@@ -360,7 +360,7 @@ public:
   auto &getTrackCfg() const { return CommonPolicyCfg->TrackCfg; }
 
   bool hasTrackingMode() const {
-    return getTrackCfg().BTMode || getTrackCfg().SelfcheckPeriod ||
+    return getTrackCfg().BTMode || getTrackCfg().Selfcheck ||
            getTrackCfg().AddressVH ||
 
            CommonPolicyCfg->FPUConfig.needsModel();

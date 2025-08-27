@@ -15,6 +15,7 @@
 #include "snippy/Generator/RegsReservedForLoop.h"
 #include "snippy/Generator/SimulatorContext.h"
 #include "snippy/Generator/SnippyLoopInfo.h"
+#include <memory>
 
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/OpcodeHistogram.h"
@@ -1157,6 +1158,31 @@ public:
     return Regs;
   }
 
+  std::unique_ptr<SelfcheckTargetConfigInterface>
+  createSelfcheckTargetConfig() const override {
+    return std::make_unique<RISCVSelfcheckTargetConfig>();
+  }
+
+  std::string
+  validateSelfcheckConfig(const SelfcheckConfig &SelfcheckCfg) const override {
+    const auto *RVSelfcheckTgtCfg =
+        static_cast<const RISCVSelfcheckTargetConfig *>(SelfcheckCfg.STC.get());
+    if (!RVSelfcheckTgtCfg)
+      return std::string();
+
+    if (auto Err = diagnoseIfOptionAndOptionalAreBothSet(
+            RVSelfcheckTgtCfg->SelfcheckRVVEnabled, SelfcheckRVV,
+            "enable-selfcheck-rvv"))
+      return toString(std::move(Err));
+
+    if (SelfcheckCfg.isCheckSumSelfcheckModeEnabled() &&
+        RVSelfcheckTgtCfg->SelfcheckRVVEnabled)
+      return std::string(
+          "selfcheck checksum mode is unsupported with RVV selfcheck enabled");
+
+    return std::string();
+  }
+
   std::vector<OpcodeHistogramEntry>
   getPolicyOverrides(const SnippyProgramContext &ProgCtx,
                      const MachineBasicBlock &MBB) const override {
@@ -1411,12 +1437,32 @@ public:
     getPhysRegsFromUnit(RegUnit, RI, OutPhysRegs);
   }
 
-  bool isSelfcheckAllowed(unsigned Opcode) const override {
-    if (isRVV(Opcode) && !SelfcheckRVV) {
-      return false;
-    }
-    /*TODO: maybe need more conditions */
-    return true;
+  bool isSelfcheckAllowed(const SnippyProgramContext &ProgCtx,
+                          const SelfcheckConfig &SelfcheckCfg,
+                          const MachineInstr &MI) const override {
+    auto Opcode = MI.getOpcode();
+    auto IsSelfcheckAllowed = [&](unsigned Opcode,
+                                  bool SelfcheckRVVEnabled) -> bool {
+      if (isRVV(Opcode) && !SelfcheckRVVEnabled) {
+        errs() << "Selfcheck is not supported for this instruction\n";
+        MI.print(errs());
+        errs() << "NOTE: for RVV instructions you need to use "
+                  "--enable-selfcheck-rvv option\n";
+        return false;
+      }
+      /*TODO: maybe need more conditions */
+      return true;
+    };
+
+    if (!SelfcheckCfg.STC.get())
+      return IsSelfcheckAllowed(Opcode, SelfcheckRVV);
+
+    const auto *RVSelfcheckTgtCfg =
+        static_cast<const RISCVSelfcheckTargetConfig *>(SelfcheckCfg.STC.get());
+
+    bool SelfcheckRVVEnabled = RVSelfcheckTgtCfg->SelfcheckRVVEnabled.value_or(
+        SelfcheckRVV.getValue());
+    return IsSelfcheckAllowed(Opcode, SelfcheckRVVEnabled);
   }
 
   bool isAtomicMemInstr(const MCInstrDesc &InstrDesc) const override {
@@ -3075,6 +3121,87 @@ public:
       snippy::fatal(
           formatv("Cannot generate store to memory for register {0}", Reg));
     }
+  }
+
+  MCRegister
+  getTmpRegisterForCheckSumSelfcheck(InstructionGenerationContext &IGC,
+                                     const RegPoolWrapper &RP) const override {
+    auto &State = IGC.ProgCtx.getLLVMState();
+    auto &RI = State.getRegInfo();
+    return RP.getAvailableRegister("for accumulating check-sum", RI,
+                                   RI.getRegClass(RISCV::GPRNoX0RegClassID),
+                                   IGC.MBB);
+  }
+
+  void generateRegMove(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
+                       LLVMContext &Context, const MCInstrInfo &InstrInfo,
+                       MCRegister SrcReg, MCRegister DstReg) const override {
+    // FIXME: There is no any limits to support any other MOV kinds, but
+    // currently snippy requires only FPR to GPR one
+    if (!is_contained(RISCV::GPRRegClass, DstReg))
+      snippy::fatal("currently MOV to not GPR register is unsupported");
+
+    unsigned FMVOpc;
+    if (RISCV::FPR64RegClass.contains(SrcReg)) {
+      FMVOpc = RISCV::FMV_X_D;
+    } else if (RISCV::FPR32RegClass.contains(SrcReg)) {
+      FMVOpc = RISCV::FMV_X_W;
+    } else if (RISCV::FPR16RegClass.contains(SrcReg)) {
+      FMVOpc = RISCV::FMV_X_H;
+    } else {
+      snippy::fatal("unsupported register pair for MOV generation");
+    }
+
+    getSupportInstBuilder(*this, MBB, Ins, Context, InstrInfo.get(FMVOpc),
+                          DstReg)
+        .addReg(SrcReg);
+  }
+
+  void generateCheckSumForSelfcheck(
+      InstructionGenerationContext &IGC, MCRegister DstReg, MCRegister SrcReg,
+      std::optional<MCRegister> TmpReg) const override {
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
+    auto &Tgt = State.getSnippyTarget();
+    auto &MBB = IGC.MBB;
+    auto &InsertPos = IGC.Ins;
+    auto &Ctx = State.getCtx();
+    auto &InstrInfo = State.getInstrInfo();
+    if (isFloatingPointReg(SrcReg)) {
+      assert(TmpReg.has_value());
+      generateRegMove(MBB, InsertPos, Ctx, InstrInfo, SrcReg, *TmpReg);
+      SrcReg = *TmpReg;
+    }
+
+    getSupportInstBuilder(Tgt, MBB, InsertPos, Ctx, InstrInfo.get(RISCV::XOR),
+                          DstReg)
+        .addReg(DstReg)
+        .addReg(SrcReg);
+  }
+
+  void generateCheckForCheckSumSelfcheck(InstructionGenerationContext &IGC,
+                                         MCRegister AccReg,
+                                         MCRegister RefReg) const override {
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
+    auto &Tgt = State.getSnippyTarget();
+    auto &MBB = IGC.MBB;
+    auto &InsertPos = IGC.Ins;
+    auto &Ctx = State.getCtx();
+    auto &InstrInfo = State.getInstrInfo();
+
+    unsigned TrapOpcode = !IGC.getSubtarget<RISCVSubtarget>().hasStdExtC()
+                              ? RISCV::EBREAK
+                              : RISCV::C_EBREAK;
+
+    getSupportInstBuilder(Tgt, MBB, InsertPos, Ctx, InstrInfo.get(RISCV::BEQ))
+        .addReg(AccReg)
+        .addReg(RefReg)
+        .addImm(kMaxInstrSize + (TrapOpcode == RISCV::EBREAK
+                                     ? kMaxInstrSize
+                                     : kCompressedInstrSize));
+
+    getSupportInstBuilder(Tgt, MBB, InsertPos, Ctx, InstrInfo.get(TrapOpcode));
   }
 
   void storeRegToAddr(InstructionGenerationContext &IGC, uint64_t Addr,
