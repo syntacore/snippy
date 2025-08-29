@@ -5,6 +5,7 @@ if (NOT LLVM_BUILD_SNIPPY)
 endif()
 message(STATUS "Enable llvm-snippy")
 
+set(SNIPPY_VERSION "2.0.0")
 function(get_snippy_version path version)
   set(snippy_version_json_file "${path}/version.json")
   cmake_path(NORMAL_PATH snippy_version_json_file)
@@ -15,7 +16,7 @@ function(get_snippy_version path version)
         "Can't read llvm-snippy version from ${snippy_version_json_file}, using default"
     )
     set(${version}
-        "1.0.0"
+        ${SNIPPY_VERSION}
         PARENT_SCOPE)
     return()
   endif()
