@@ -9,6 +9,7 @@
 #include "snippy/Generator/Generation.h"
 #include "snippy/Config/FPUSettings.h"
 #include "snippy/Config/FunctionDescriptions.h"
+#include "snippy/Config/Selfcheck.h"
 #include "snippy/Generator/Backtrack.h"
 #include "snippy/Generator/CallGraphState.h"
 #include "snippy/Generator/GenerationRequest.h"
@@ -148,7 +149,8 @@ GenerationStatus interpretInstrs(InstrIt Begin, InstrIt End, LLVMState &State,
 // TODO: We need other ways of this function implemetation
 template <typename InstrIt>
 std::vector<InstrIt> collectSelfcheckCandidates(
-    InstrIt Begin, InstrIt End, SnippyProgramContext &ProgCtx,
+    InstrIt Begin, InstrIt End, const CommonPolicyConfig &CommonCfg,
+    SnippyProgramContext &ProgCtx,
     AsOneGenerator<bool, true, false> &SelfcheckPeriodTracker) {
   const auto &ST = ProgCtx.getLLVMState().getSnippyTarget();
   std::vector<InstrIt> FilteredCandidates;
@@ -161,14 +163,10 @@ std::vector<InstrIt> collectSelfcheckCandidates(
   for (auto &PrimInstrIt : FilteredCandidates) {
     if (!SelfcheckPeriodTracker())
       continue;
-    if (!ST.isSelfcheckAllowed(PrimInstrIt->getOpcode())) {
-      errs() << "Selfcheck is not supported for this instruction\n";
-      PrimInstrIt->print(errs());
-      errs() << "NOTE: for RVV instructions you need to use "
-                "--enable-selfcheck-rvv option\n";
-      continue;
-    }
-    Candidates.push_back(PrimInstrIt);
+    assert(CommonCfg.TrackCfg.Selfcheck);
+    if (ST.isSelfcheckAllowed(ProgCtx, *CommonCfg.TrackCfg.Selfcheck,
+                              *PrimInstrIt))
+      Candidates.push_back(PrimInstrIt);
   }
   return Candidates;
 }
@@ -206,19 +204,17 @@ SelfcheckIntermediateInfo<MachineBasicBlock::iterator>
 storeRefAndActualValueForSelfcheck(
     Register DestReg, planning::InstructionGenerationContext &InstrGenCtx) {
   auto InsertPos = InstrGenCtx.Ins;
-  auto &MBB = InstrGenCtx.MBB;
   auto &SimCtx = InstrGenCtx.SimCtx;
   assert(SimCtx.SCI);
-  auto &SCAddress = SimCtx.SCI->CurrentAddress;
+  assert(SimCtx.SCI->CurrentAddress);
+  auto &SCAddress = *SimCtx.SCI->CurrentAddress;
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   const auto &ST = ProgCtx.getLLVMState().getSnippyTarget();
   auto &I = SimCtx.getInterpreter();
   auto RegValue = I.readReg(DestReg);
 
-  bool IsBegin = MBB.begin() == InsertPos;
-  auto FirstInserted = InsertPos;
-  if (!IsBegin)
-    FirstInserted = std::prev(InsertPos);
+  assert(InstrGenCtx.MBB.begin() != InsertPos);
+  auto FirstInserted = std::prev(InsertPos);
 
   ST.storeRegToAddr(InstrGenCtx, SCAddress, DestReg,
                     /* store the whole register */ 0);
@@ -231,10 +227,150 @@ storeRefAndActualValueForSelfcheck(
   SCAddress += ProgramConfig::getSCStride();
   selfcheckOverflowGuard(SelfcheckSection, SCAddress);
 
-
-  if (IsBegin)
-    return {MBB.begin(), FirstStoreInfo};
   return {std::next(FirstInserted), FirstStoreInfo};
+}
+
+void generateCheckSumForDefReg(
+    Register SelfcheckReg, planning::InstructionGenerationContext &InstrGenCtx,
+    MCRegister AccReg, std::optional<MCRegister> TmpReg) {
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  const auto &ST = ProgCtx.getLLVMState().getSnippyTarget();
+
+  ST.generateCheckSumForSelfcheck(InstrGenCtx, AccReg, SelfcheckReg, TmpReg);
+}
+
+template <typename CheckRegsRangeT>
+void generateRegisterBasedSelfcheckRoutine(
+    CheckRegsRangeT SelfcheckRegsRange,
+    planning::InstructionGenerationContext &InstrGenCtx) {
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
+  auto ItEnd = InstrGenCtx.Ins;
+  const auto &ST = State.getSnippyTarget();
+  auto InsPoint = InstrGenCtx.Ins;
+  auto RP = InstrGenCtx.pushRegPool();
+  auto &SimCtx = InstrGenCtx.SimCtx;
+
+  assert(range_size(SelfcheckRegsRange));
+  std::vector SelfcheckRegs(SelfcheckRegsRange.begin(),
+                            SelfcheckRegsRange.end());
+  // make a partition with GPR and FPR registers
+  auto PartIt = std::stable_partition(
+      SelfcheckRegs.begin(), SelfcheckRegs.end(),
+      [&ST](auto &&Def) { return !ST.isFloatingPoint(Def.DestReg); });
+
+  MCRegister AccReg;
+  auto FirstInserted = std::prev(InsPoint);
+  if (SelfcheckRegs.begin() != PartIt) {
+    AccReg = SelfcheckRegs.front().DestReg;
+  } else {
+    AccReg = ST.getTmpRegisterForCheckSumSelfcheck(InstrGenCtx, *RP);
+    ST.generateRegMove(InstrGenCtx.MBB, InsPoint, State.getCtx(),
+                       State.getInstrInfo(), SelfcheckRegs.front().DestReg,
+                       AccReg);
+  }
+  RP->addReserved(AccReg);
+
+  if (PartIt != SelfcheckRegs.begin())
+    for (auto DefIt = std::next(SelfcheckRegs.begin()); DefIt != PartIt;
+         ++DefIt)
+      generateCheckSumForDefReg(DefIt->DestReg, InstrGenCtx, AccReg,
+                                std::nullopt);
+
+  auto TmpReg = ST.getTmpRegisterForCheckSumSelfcheck(InstrGenCtx, *RP);
+
+  if (PartIt != SelfcheckRegs.end())
+    for (auto DefIt = std::next(PartIt); DefIt != SelfcheckRegs.end(); ++DefIt)
+      generateCheckSumForDefReg(DefIt->DestReg, InstrGenCtx, AccReg, TmpReg);
+
+  // Execute self-check instructions
+  auto &I = SimCtx.getInterpreter();
+  if (!I.executeChainOfInstrs(State, std::next(FirstInserted), ItEnd))
+    I.reportSimulationFatalError(
+        "Failed to execute chain of instructions in tracking mode");
+
+  auto Imm = I.readReg(AccReg);
+
+  FirstInserted = std::prev(InsPoint);
+
+  ST.writeValueToReg(InstrGenCtx, Imm, TmpReg);
+
+  ST.generateCheckForCheckSumSelfcheck(InstrGenCtx, AccReg, TmpReg);
+
+  if (!I.executeChainOfInstrs(State, std::next(FirstInserted),
+                              std::prev(ItEnd)))
+    I.reportSimulationFatalError(
+        "Failed to execute chain of instructions in tracking mode");
+}
+
+template <typename CheckRegsRangeT>
+void generateMemoryBasedSelfcheckRoutine(
+    CheckRegsRangeT SelfcheckRegsRange,
+    planning::InstructionGenerationContext &InstrGenCtx) {
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
+  auto ItEnd = InstrGenCtx.Ins;
+  const auto &ST = State.getSnippyTarget();
+  auto &SimCtx = InstrGenCtx.SimCtx;
+  // Insert self-check instructions after current batch of instructions. This
+  // allows the result of the primary instruction to be first postprocessed,
+  // and then stored.
+  // For example, this is useful in cases when it is known that the result of
+  // the primary instructions is an undefined value which mustn't be committed
+  // to memory.
+  // We'll insert selfcheck for registers in reverse order starting from the
+  // last recently used register. Each insertion will happen right before the
+  // previous one. This simplifies registers reservation as we don't have (and
+  // shouldn't) 'unreserve' mechanism for a given register. Small example:
+  //   Definitions to be selfchecked:
+  //     r1 = ...
+  //     r2 = ...
+  //     r3 = ...
+  //     some possible postprocessing
+  //   After selfcheck insertion:
+  //     r1 = ...
+  //     r2 = ...
+  //     r3 = ...
+  //     some possible postprocessing
+  //     r1 selfcheck  <---- inserted third, support instructions cannot use r2
+  //                         and r3.
+  //     r2 selfcheck  <---- inserted second, support instructions cannot use
+  //                         r3, but can use r1.
+  //     r3 selfcheck  <---- inserted first, support instruction can use r1, r2.
+  auto InsPoint = ItEnd;
+  auto RP = InstrGenCtx.pushRegPool();
+  std::vector<SelfcheckFirstStoreInfo<decltype(ItEnd)>> StoresInfo;
+
+  for (const auto &Def : SelfcheckRegsRange) {
+    SmallVector<Register> PhRegs;
+    ST.getPhysRegsFromUnit(Def.DestReg, State.getRegInfo(), PhRegs);
+    llvm::for_each(PhRegs,
+                   [&RP](auto SimpleReg) { RP->addReserved(SimpleReg); });
+    // This is done for backward compatibility.
+    auto TmpRP = InstrGenCtx.pushRegPool();
+    auto SelfcheckInterInfo =
+        storeRefAndActualValueForSelfcheck(Def.DestReg, InstrGenCtx);
+    InsPoint = InstrGenCtx.Ins = SelfcheckInterInfo.NextInsertPos;
+    // Collect information about first generated selfcheck store for a primary
+    // instr
+    StoresInfo.push_back(SelfcheckInterInfo.FirstStoreInfo);
+  }
+  InstrGenCtx.Ins = ItEnd;
+
+  assert(SelfcheckRegsRange.size() == StoresInfo.size());
+  // Add collected information about generated selfcheck stores for selfcheck
+  // annotation
+  for (const auto &[Def, StoreInfo] : zip(SelfcheckRegsRange, StoresInfo))
+    InstrGenCtx.getSnippyModule()
+        .getOrAddResult<SelfcheckMap>()
+        .addToSelfcheckMap(
+            StoreInfo.Address,
+            std::distance(Def.Inst, std::next(StoreInfo.FirstStoreInstrPos)));
+
+  auto &I = SimCtx.getInterpreter();
+  if (!I.executeChainOfInstrs(State, InsPoint, ItEnd))
+    I.reportSimulationFatalError(
+        "Failed to execute chain of instructions in tracking mode");
 }
 
 struct GenerationResult {
@@ -537,83 +673,29 @@ handleGeneratedInstructions(InstrIt ItBegin,
   assert(SimCtx.SCI);
 
   // Collect instructions that can and should be selfchecked.
-  auto SelfcheckCandidates = collectSelfcheckCandidates(
-      ItBegin, ItEnd, ProgCtx, SimCtx.SCI->PeriodTracker);
+  auto SelfcheckCandidates =
+      collectSelfcheckCandidates(ItBegin, ItEnd, InstrGenCtx.getCommonCfg(),
+                                 ProgCtx, SimCtx.SCI->PeriodTracker);
 
   // Collect def registers from the candidates.
   // Use SetVector as we want to preserve order of insertion.
-  SetVector<SelfcheckAnnotationInfo<InstrIt>> Defs;
+  SetVector<SelfcheckAnnotationInfo<InstrIt>> OpsToCheck;
   const auto &ST = State.getSnippyTarget();
+  const auto &SelfcheckCfg = InstrGenCtx.getCommonCfg().TrackCfg.Selfcheck;
   // Reverse traversal as we need to sort definitions by their last use.
   for (auto Inst : reverse(SelfcheckCandidates)) {
-    // TODO: Add self-check for instructions without definitions
-    if (Inst->getDesc().getNumDefs() == 0)
+    if (SelfcheckCfg->isMemoryBasedSelfcheckModeEnabled() &&
+        Inst->getDesc().getNumDefs() == 0)
       continue;
     auto Regs = ST.getRegsForSelfcheck(*Inst, InstrGenCtx);
     for (auto &Reg : Regs)
-      Defs.insert({Inst, Reg});
+      OpsToCheck.insert({Inst, Reg});
   }
 
-  // Insert self-check instructions after current batch of instructions. This
-  // allows the result of the primary instruction to be first postprocessed,
-  // and then stored.
-  // For example, this is useful in cases when it is known that the result of
-  // the primary instructions is an undefined value which mustn't be committed
-  // to memory.
-  // We'll insert selfcheck for registers in reverse order starting from the
-  // last recently used register. Each insertion will happen right before the
-  // previous one. This simplifies registers reservation as we don't have (and
-  // shouldn't) 'unreserve' mechanism for a given register. Small example:
-  //   Definitions to be selfchecked:
-  //     r1 = ...
-  //     r2 = ...
-  //     r3 = ...
-  //     some possible postprocessing
-  //   After selfcheck insertion:
-  //     r1 = ...
-  //     r2 = ...
-  //     r3 = ...
-  //     some possible postprocessing
-  //     r1 selfcheck  <---- inserted third, support instructions cannot use r2
-  //                         and r3.
-  //     r2 selfcheck  <---- inserted second, support instructions cannot use
-  //                         r3, but can use r1.
-  //     r3 selfcheck  <---- inserted first, support instruction can use r1, r2.
-  auto InsPoint = ItEnd;
-  auto RP = InstrGenCtx.pushRegPool();
-  std::vector<SelfcheckFirstStoreInfo<InstrIt>> StoresInfo;
-  for (const auto &Def : Defs) {
-    {
-      SmallVector<Register> DstPhysRegs;
-      ST.getPhysRegsFromUnit(Def.DestReg, State.getRegInfo(), DstPhysRegs);
-      llvm::for_each(DstPhysRegs,
-                     [&RP](auto SimpleReg) { RP->addReserved(SimpleReg); });
-    }
-    // This is done for backward compatibility.
-    auto TmpRP = InstrGenCtx.pushRegPool();
-    auto SelfcheckInterInfo =
-        storeRefAndActualValueForSelfcheck(Def.DestReg, InstrGenCtx);
-    InsPoint = InstrGenCtx.Ins = SelfcheckInterInfo.NextInsertPos;
-    // Collect information about first generated selfcehck store for a primary
-    // instr
-    StoresInfo.push_back(SelfcheckInterInfo.FirstStoreInfo);
-  }
-  InstrGenCtx.Ins = ItEnd;
-
-  assert(Defs.size() == StoresInfo.size());
-  // Add collected information about generated selfcheck stores for selfcheck
-  // annotation
-  for (const auto &[Def, StoreInfo] : zip(Defs, StoresInfo))
-    InstrGenCtx.getSnippyModule()
-        .getOrAddResult<SelfcheckMap>()
-        .addToSelfcheckMap(
-            StoreInfo.Address,
-            std::distance(Def.Inst, std::next(StoreInfo.FirstStoreInstrPos)));
-  // Execute self-check instructions
-  auto &I = SimCtx.getInterpreter();
-  if (!I.executeChainOfInstrs(State, InsPoint, ItEnd))
-    I.reportSimulationFatalError(
-        "Failed to execute chain of instructions in tracking mode");
+  if (SelfcheckCfg->isCheckSumSelfcheckModeEnabled())
+    generateRegisterBasedSelfcheckRoutine(OpsToCheck, InstrGenCtx);
+  else
+    generateMemoryBasedSelfcheckRoutine(OpsToCheck, InstrGenCtx);
 
   // Check size requirements after selfcheck addition.
   GeneratedCodeSize = State.getCodeBlockSize(ItBegin, ItEnd);

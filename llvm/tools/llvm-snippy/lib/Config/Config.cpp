@@ -11,6 +11,7 @@
 #include "snippy/Config/BurstGram.h"
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
+#include "snippy/Config/Selfcheck.h"
 // FIXME: remove dependency on Generator library
 #include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/MemoryManager.h"
@@ -30,6 +31,9 @@
 #define DEBUG_TYPE "snippy-layout-config"
 
 namespace llvm {
+
+LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML_NO_DECL(
+    snippy::SelfcheckMode, snippy::SelfcheckModeEnumOption)
 
 using namespace snippy;
 
@@ -625,8 +629,8 @@ static void normalizeRegInitOptions(Config &Cfg, LLVMState &State,
   }
 }
 
-static void normalizeInstrGenOptions(Config &Cfg, LLVMState &State,
-                                     const InstrGenOptions &Opts) {
+static Error normalizeInstrGenOptions(Config &Cfg, LLVMState &State,
+                                      const InstrGenOptions &Opts) {
   auto &PassCfg = Cfg.PassCfg;
   auto &InstrsCfg = PassCfg.InstrsGenerationConfig;
   auto NumPrimaryInstrs = getExpectedNumInstrs(Opts.NumInstrs);
@@ -651,7 +655,21 @@ static void normalizeInstrGenOptions(Config &Cfg, LLVMState &State,
   auto &TrackCfg = Cfg.CommonPolicyCfg->TrackCfg;
   TrackCfg.BTMode = Opts.Backtrack;
   TrackCfg.AddressVH = Opts.AddressVHOpt;
-  TrackCfg.SelfcheckPeriod = getSelfcheckPeriod(Opts.Selfcheck);
+
+  // FIXME: we should create a special routine for tracking duplicates
+  if (TrackCfg.Selfcheck && Opts.SelfcheckSpecified)
+    return createStringError(inconvertibleErrorCode(),
+                             "'selfcheck' has been specified both as an option "
+                             "and as a configuration field");
+
+  if (TrackCfg.Selfcheck)
+    return Error::success();
+
+  if (auto Period = getSelfcheckPeriod(Opts.Selfcheck)) {
+    auto Mode = Opts.SelfcheckRefValueStorage;
+    TrackCfg.Selfcheck = SelfcheckConfig{Mode, Period};
+  }
+  return Error::success();
 }
 
 static void normalizeModelOptions(Config &Cfg, LLVMState &State,
@@ -666,6 +684,7 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
   // This could be changed in the future but it'd be a breaking change.
   yaml::MappingTraits<MemoryScheme>::mapping(IO, Info.CommonPolicyCfg->MS);
   IO.mapOptional("branches", Info.PassCfg.Branches);
+  IO.mapOptional("selfcheck", Info.CommonPolicyCfg->TrackCfg.Selfcheck);
   // TODO: get rid of this.
   if (!IO.outputting()) {
     std::optional<BurstGramData> BurstData;
@@ -836,7 +855,9 @@ Config::Config(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State
   normalizeProgramLevelOptions(*this, State, RP, copyOptionsToProgramOptions());
   normalizeRegInitOptions(*this, State, copyOptionsToRegInitOptions());
   normalizeModelOptions(*this, State, copyOptionsToModelOptions());
-  normalizeInstrGenOptions(*this, State, copyOptionsToInstrGenOptions());
+  if ((Err = normalizeInstrGenOptions(*this, State,
+                                      copyOptionsToInstrGenOptions())))
+    snippy::fatal(std::move(Err));
   complete(State, OpCC);
   validateAll(State, OpCC, RP);
 }
@@ -948,7 +969,6 @@ static void checkFullSizeGenerationRequirements(const MCInstrInfo &II,
                                                 const SnippyTarget &Tgt,
                                                 const Config &Cfg) {
   bool FillCodeSectionMode = !Cfg.PassCfg.InstrsGenerationConfig.NumInstrs;
-  unsigned SelfcheckPeriod = Cfg.CommonPolicyCfg->TrackCfg.SelfcheckPeriod;
   if (FillCodeSectionMode &&
       Cfg.Histogram.getOpcodesWeight([&II](unsigned Opcode) {
         auto &Desc = II.get(Opcode);
@@ -961,7 +981,7 @@ static void checkFullSizeGenerationRequirements(const MCInstrInfo &II,
           [&Tgt](unsigned Opcode) { return Tgt.isCall(Opcode); }) > 0.0)
     snippy::fatal("when -num-instr=all is specified, calls are not supported");
 
-  if (FillCodeSectionMode && SelfcheckPeriod)
+  if (FillCodeSectionMode && Cfg.CommonPolicyCfg->TrackCfg.Selfcheck)
     snippy::fatal(
         "when -num-instr=all is specified, selfcheck is not supported");
   if (FillCodeSectionMode && Cfg.BurstConfig &&
@@ -972,7 +992,7 @@ static void checkFullSizeGenerationRequirements(const MCInstrInfo &II,
 
 static size_t getMinimumSelfcheckSize(const Config &Cfg) {
   auto &TrackCfg = Cfg.CommonPolicyCfg->TrackCfg;
-  assert(TrackCfg.SelfcheckPeriod);
+  assert(TrackCfg.Selfcheck);
 
   size_t BlockSize = 2 * ProgramConfig::getSCStride();
   // Note: There are cases when we have some problems for accurate calculating
@@ -981,7 +1001,7 @@ static size_t getMinimumSelfcheckSize(const Config &Cfg) {
   //       section, So it's better to provide selfcheck section in Layout
   //       explicitly
   return alignTo(Cfg.PassCfg.InstrsGenerationConfig.NumInstrs.value_or(0) *
-                     BlockSize / TrackCfg.SelfcheckPeriod,
+                     BlockSize / TrackCfg.Selfcheck->Period,
                  ProgramConfig::getPageSize());
 }
 
@@ -1097,7 +1117,8 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
       }
     }
   if (!Sections.hasSection(SectionsDescriptions::SelfcheckSectionName) &&
-      CommonPolicyCfg->TrackCfg.SelfcheckPeriod)
+      (CommonPolicyCfg->TrackCfg.Selfcheck &&
+       CommonPolicyCfg->TrackCfg.Selfcheck->isSelfcheckSectionRequired()))
     snippy::fatal(Twine("Missing '") +
                       SectionsDescriptions::SelfcheckSectionName +
                       Twine("' section"),
@@ -1195,7 +1216,7 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
   }
   if (ProgramCfg->Sections.hasSection(
           SectionsDescriptions::SelfcheckSectionName) &&
-      CommonPolicyCfg->TrackCfg.SelfcheckPeriod)
+      CommonPolicyCfg->TrackCfg.Selfcheck)
     diagnoseSelfcheckSection(State, *this, getMinimumSelfcheckSize(*this));
 }
 

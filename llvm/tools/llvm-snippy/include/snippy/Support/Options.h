@@ -369,6 +369,26 @@ template <typename DerivedT> struct EnumOptionMixin {
   LLVM_SNIPPY_YAML_DECLARE_SCALAR_ENUMERATION_TRAITS(Enum);                    \
   LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML_NO_DECL(Enum, OptionClass)
 
+/// @brief Helper function to check whether an option has been set and a
+/// std::optional of the same type holds a value. Use for unified handling of
+/// YAML options that depend both on the snippy::opt and the Config.
+template <typename T>
+Error diagnoseIfOptionAndOptionalAreBothSet(const std::optional<T> &Val,
+                                            const snippy::opt<T> &Opt,
+                                            StringRef Name,
+                                            StringRef QuoteSep = "'") {
+  if (Val.has_value() && Opt.isSpecified())
+    return createStringError(inconvertibleErrorCode(),
+                             Twine(QuoteSep)
+                                 .concat(Opt.ArgStr)
+                                 .concat(QuoteSep)
+                                 .concat(" has been specified both as an "
+                                         "option and as a configuration field ")
+                                 .concat(QuoteSep)
+                                 .concat(Name)
+                                 .concat(QuoteSep));
+  return Error::success();
+}
 } // namespace snippy
 
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::OptionsMappingWrapper);
