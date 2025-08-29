@@ -2843,6 +2843,9 @@ public:
             snippy::selectFrom(RNE, RTZ, RDN, RUP, RMM, DYN));
       }());
     }
+    case RISCVOp::OPERAND_RTZARG: {
+      return MachineOperand::CreateImm(RISCVFPRndMode::RTZ);
+    }
     }
   }
 
