@@ -58,7 +58,9 @@ struct Branchegram;
 class LLVMState;
 class RegPoolWrapper;
 class SnippyProgramContext;
+struct SelfcheckTargetConfigInterface;
 class StridedImmediate;
+struct SelfcheckConfig;
 class CommonPolicyConfig;
 class Config;
 
@@ -285,6 +287,12 @@ public:
   getRegsForSelfcheck(const MachineInstr &MI,
                       InstructionGenerationContext &IGC) const = 0;
 
+  virtual std::unique_ptr<SelfcheckTargetConfigInterface>
+  createSelfcheckTargetConfig() const = 0;
+
+  virtual std::string
+  validateSelfcheckConfig(const SelfcheckConfig &SelfcheckCfg) const = 0;
+
   virtual std::unique_ptr<IRegisterState>
   createRegisterState(const TargetSubtargetInfo &ST) const = 0;
 
@@ -302,6 +310,26 @@ public:
 
   virtual void instructionPostProcess(InstructionGenerationContext &IGC,
                                       MachineInstr &MI) const = 0;
+
+  virtual MCRegister
+  getTmpRegisterForCheckSumSelfcheck(InstructionGenerationContext &IGC,
+                                     const RegPoolWrapper &RP) const = 0;
+
+  virtual void generateRegMove(MachineBasicBlock &MBB,
+                               MachineBasicBlock::iterator Ins,
+                               LLVMContext &Context,
+                               const MCInstrInfo &InstrInfo, MCRegister SrcReg,
+                               MCRegister DstReg) const = 0;
+
+  virtual void
+  generateCheckSumForSelfcheck(InstructionGenerationContext &IGC,
+                               MCRegister DstReg, MCRegister SrcReg,
+                               std::optional<MCRegister> TmpReg) const = 0;
+
+  virtual void
+  generateCheckForCheckSumSelfcheck(InstructionGenerationContext &IGC,
+                                    MCRegister AccReg,
+                                    MCRegister RefReg) const = 0;
 
   // If BytesToWrite is zero, the whole register will be stored.
   virtual void storeRegToAddr(InstructionGenerationContext &IGC, uint64_t Addr,
@@ -436,7 +464,9 @@ public:
 
   virtual bool isDivOpcode(unsigned Opcode) const { return false; }
 
-  virtual bool isSelfcheckAllowed(unsigned Opcode) const = 0;
+  virtual bool isSelfcheckAllowed(const SnippyProgramContext &ProgCtx,
+                                  const SelfcheckConfig &SelfcheckCfg,
+                                  const MachineInstr &MI) const = 0;
 
   virtual bool isAtomicMemInstr(const MCInstrDesc &InstrDesc) const = 0;
 

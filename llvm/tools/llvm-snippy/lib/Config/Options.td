@@ -201,6 +201,14 @@ let Group = InstrGenOptionsCategory in {
                      Description<"Form address values based on dynamic "
                                  "register values (requires backtracking)">;
 
+  def SelfcheckRefValueStorage
+      : EnumOption<"selfcheck-ref-value-storage",
+                   "SelfcheckMode">,
+        Description<"Option to define how to get reference selfcheck values">,
+        DefaultValue<"SelfcheckMode::Code"> {
+
+    let AdditionalArgs = "SelfcheckModeEnumOption::getClValues()";
+  }
 }
 
 def DebugOptionsCategory : OptionGroup<"debug options", true> {

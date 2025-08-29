@@ -12,6 +12,7 @@
 #include "snippy/Target/Target.h"
 
 #include "RVVUnitConfig.h"
+#include <memory>
 
 namespace llvm::snippy {
 
@@ -32,6 +33,19 @@ public:
   }
 
   std::unique_ptr<RVVConfigInterface> RVVConfig;
+};
+
+struct RISCVSelfcheckTargetConfig final
+    : public SelfcheckTargetConfigInterface {
+  std::optional<bool> SelfcheckRVVEnabled;
+
+  std::unique_ptr<SelfcheckTargetConfigInterface> clone() const override {
+    return std::make_unique<RISCVSelfcheckTargetConfig>(*this);
+  }
+
+  void mapConfig(yaml::IO &IO) override {
+    IO.mapOptional("enable-selfcheck-rvv", SelfcheckRVVEnabled);
+  }
 };
 
 } // namespace llvm::snippy

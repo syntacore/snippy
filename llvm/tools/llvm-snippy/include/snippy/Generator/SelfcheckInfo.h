@@ -16,7 +16,7 @@
 namespace llvm {
 namespace snippy {
 struct SelfcheckInfo final {
-  unsigned long long CurrentAddress;
+  std::optional<unsigned long long> CurrentAddress;
   AsOneGenerator<bool, true, false> PeriodTracker;
 };
 

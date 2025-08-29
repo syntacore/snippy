@@ -1,0 +1,26 @@
+# RUN: llvm-snippy %s \
+# RUN:    -march=riscv64-linux-gnu -mattr=-c \
+# RUN:    -dump-mf >& %t || true 
+# RUN: FileCheck --input-file=%t --dump-input always %s  
+
+sections:
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+
+histogram: 
+    - [ADD, 1.0]
+
+
+selfcheck:
+  mode: code 
+  period: qwerty
+
+# CHECK: error: invalid number 
