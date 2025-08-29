@@ -8,6 +8,7 @@
 
 #include "snippy/Target/Target.h"
 
+#include "snippy/Config/Selfcheck.h"
 #include "snippy/Simulator/Targets/X86.h"
 
 #include "MCTargetDesc/X86BaseInfo.h"
@@ -66,6 +67,16 @@ public:
   std::vector<Register>
   getRegsForSelfcheck(const MachineInstr &MI,
                       InstructionGenerationContext &IGC) const override {
+    reportUnimplementedError();
+  }
+
+  std::unique_ptr<SelfcheckTargetConfigInterface>
+  createSelfcheckTargetConfig() const override {
+    reportUnimplementedError();
+  }
+
+  std::string
+  validateSelfcheckConfig(const SelfcheckConfig &SelfcheckCfg) const override {
     reportUnimplementedError();
   }
 
@@ -329,7 +340,9 @@ public:
     reportUnimplementedError();
   }
 
-  bool isSelfcheckAllowed(unsigned Opcode) const override {
+  bool isSelfcheckAllowed(const SnippyProgramContext &ProgCtx,
+                          const SelfcheckConfig &SelfcheckCfg,
+                          const MachineInstr &MI) const override {
     reportUnimplementedError();
   }
 
@@ -434,6 +447,29 @@ public:
 
   void loadRegFromAddrInReg(InstructionGenerationContext &IGC,
                             MCRegister AddrReg, MCRegister Reg) const override {
+    reportUnimplementedError();
+  }
+
+  MCRegister
+  getTmpRegisterForCheckSumSelfcheck(InstructionGenerationContext &IGC,
+                                     const RegPoolWrapper &RP) const override {
+    reportUnimplementedError();
+  }
+
+  void generateRegMove(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
+                       LLVMContext &Context, const MCInstrInfo &InstrInfo,
+                       MCRegister SrcReg, MCRegister DstReg) const override {
+    reportUnimplementedError();
+  }
+  void generateCheckSumForSelfcheck(
+      InstructionGenerationContext &IGC, MCRegister DstReg, MCRegister SrcReg,
+      std::optional<MCRegister> TmpReg) const override {
+    reportUnimplementedError();
+  }
+
+  void generateCheckForCheckSumSelfcheck(InstructionGenerationContext &IGC,
+                                         MCRegister AccReg,
+                                         MCRegister RefReg) const override {
     reportUnimplementedError();
   }
 

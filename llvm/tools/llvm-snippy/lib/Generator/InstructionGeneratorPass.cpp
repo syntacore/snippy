@@ -208,11 +208,20 @@ bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
   auto *SCI = SimCtx.SCI;
   if (SCI) {
     // TODO: move it to initializer:
-    SCI->PeriodTracker = {Cfg.getTrackCfg().SelfcheckPeriod};
-    const auto &SCSection = SGCtx->getProgramContext().getSelfcheckSection();
-    SCI->CurrentAddress = SCSection.VMA;
-    // FIXME: make SelfcheckGV a deprecated option
-    if (SelfcheckGV)
+    assert(Cfg.getTrackCfg().Selfcheck);
+    const auto &SelfcheckCfg = *Cfg.getTrackCfg().Selfcheck;
+    SCI->PeriodTracker = SelfcheckCfg.Period;
+    if (SelfcheckCfg.isSelfcheckSectionRequired()) {
+      const auto &SCSection = SGCtx->getProgramContext().getSelfcheckSection();
+      SCI->CurrentAddress = SCSection.VMA;
+    }
+    // FIXME: we should create a special routine for tracking duplicates
+    if (SelfcheckCfg.SelfcheckGV && SelfcheckGV.isSpecified())
+      snippy::fatal(createStringError(
+          inconvertibleErrorCode(), "'selfcheck-gv' has been specified both as "
+                                    "an option and as a configuration field"));
+
+    if (SelfcheckCfg.SelfcheckGV || SelfcheckGV)
       addSelfcheckSectionPropertiesAsGV(M);
   }
 

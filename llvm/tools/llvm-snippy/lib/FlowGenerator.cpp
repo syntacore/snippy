@@ -9,6 +9,7 @@
 #include "FlowGenerator.h"
 #include "InitializePasses.h"
 
+#include "snippy/Config/Selfcheck.h"
 #include "snippy/CreatePasses.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/Interpreter.h"
@@ -353,7 +354,8 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
     std::unique_ptr<RVMCallbackHandler::ObserverHandle<SelfcheckObserver>>
         SelfcheckObserverHandle;
     auto &TrackCfg = Cfg.getTrackCfg();
-    if (TrackCfg.SelfcheckPeriod) {
+    if (TrackCfg.Selfcheck &&
+        (TrackCfg.Selfcheck->isMemoryBasedSelfcheckModeEnabled())) {
       auto &Map = MainModule.getOrAddResult<SelfcheckMap>().Map;
       // TODO: merge all infos from all modules.
       SelfcheckObserverHandle =
@@ -364,7 +366,8 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
       snippy::fatal(GenCtx.getProgramContext().getLLVMState().getCtx(),
                     "Error during the simulation run", std::move(Err));
 
-    if (TrackCfg.SelfcheckPeriod) {
+    if (TrackCfg.Selfcheck &&
+        (TrackCfg.Selfcheck->isMemoryBasedSelfcheckModeEnabled())) {
       if (SelfcheckMem)
         checkMemStateAfterSelfcheck(ProgContext, TrackCfg, I);
 
