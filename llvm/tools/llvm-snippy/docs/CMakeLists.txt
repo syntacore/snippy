@@ -1,0 +1,23 @@
+  message(STATUS "Building Snippy Documentation")
+  include(GNUInstallDirs)
+  if (LLVM_ENABLE_SPHINX)
+    include(AddSphinxTarget)
+    set(DOCS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+    if (NOT SPHINX_FOUND)
+      message(FATAL_ERROR "Cannot build snippy documentation because sphinx was not found")
+    endif()
+    set(PACKAGE_VERSION ${LLVM_SNIPPY_VERSION})
+    if (${SPHINX_OUTPUT_HTML})
+      add_sphinx_target(html llvm-snippy SOURCE_DIR ${DOCS_SOURCE_DIR})
+    endif()
+    add_sphinx_target(latex llvm-snippy SOURCE_DIR ${DOCS_SOURCE_DIR})
+    if (${SPHINX_OUTPUT_MAN})
+      add_sphinx_target(man llvm-snippy SOURCE_DIR ${DOCS_SOURCE_DIR})
+      install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/man/.
+        COMPONENT llvm-snippy-man-pages
+        DESTINATION ${CMAKE_INSTALL_MANDIR}/man1
+        )
+    endif()
+  else()
+    message(WARNING "Skipping snippy documentation generation because LLVM_ENABLE_SPHINX is OFF")
+  endif()
