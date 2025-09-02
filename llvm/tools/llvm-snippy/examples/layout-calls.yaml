@@ -1,0 +1,48 @@
+sections:
+  - name:      utility
+    VMA:       0x0
+    SIZE:      0x1000
+    LMA:       0x0
+    ACCESS:    rw
+  - name:      stack
+    VMA:       0x1000
+    SIZE:      0x10000
+    LMA:       0x1000
+    ACCESS:    rw
+  - name:      code
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      data
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [SRA, 1.0]
+    - [SRAI, 1.0]
+    - [SRL, 1.0]
+    - [SRLI, 1.0]
+    - [SLL, 1.0]
+    - [SLLI, 1.0]
+    - [AND, 1.0]
+    - [ANDI, 1.0]
+    - [OR, 1.0]
+    - [ORI, 1.0]
+    - [XOR, 1.0]
+    - [XORI, 1.0]
+    - [LW, 10.0]
+    - [SW, 10.0]
+    - [JAL, 1.0]
+
+options:
+    mtriple: "riscv64-unknown-elf"
+    mcpu: generic-rv64
+    march: "rv64gc"
+    model-plugin: None
+
