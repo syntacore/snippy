@@ -1,0 +1,14 @@
+branches:
+  permutation: on # enable CF permutation, on by default
+  alignment: 32   # in bytes, 1 by default
+  loop-ratio: 0.5 # loop/all branches probability, 0.5 by default
+  number-of-loop-iterations:
+      min: 2  # 4 by default
+      max: 32 # 4 by default
+  max-depth:
+    if: 500 # unlimited by default
+    loop: 4 # 4 by default
+  distance:
+    blocks:
+      min: 1  # 0 by default
+      max: 20 # by default calculated, depending on max branch distance

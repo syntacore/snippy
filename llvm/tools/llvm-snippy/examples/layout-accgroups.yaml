@@ -1,0 +1,22 @@
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80000000
+    SIZE:      0x10000000
+    LMA:       0x80000000
+    ACCESS:    rw
+
+options:
+  mtriple: "riscv64-linux-gnu"
+  mcpu: "generic-rv64"
+  mattr: "+a,+f"
+  model-plugin: None
+
+histogram:
+  - [LD, 1.0]
+  - [ADD, 1.0]
+

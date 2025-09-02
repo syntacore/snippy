@@ -1,0 +1,40 @@
+sections:
+  - no:        0
+    VMA:       0x200000
+    SIZE:      0x10000
+    LMA:       0x200000
+    ACCESS:    r
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+
+histogram:
+    - [VADC_VIM, 1.0]
+    - [VADD_VI, 1.0]
+    - [VAND_VI, 1.0]
+    - [VMERGE_VIM, 1.0]
+    - [VMSEQ_VI, 1.0]
+    - [VMSGTU_VI, 1.0]
+    - [VMSGT_VI, 1.0]
+    - [VMSLEU_VI, 1.0]
+    - [VMSLE_VI, 1.0]
+    - [VMSNE_VI, 1.0]
+    - [VOR_VI, 1.0]
+    - [VRSUB_VI, 1.0]
+    - [VSADDU_VI, 1.0]
+    - [VSADD_VI, 1.0]
+    - [VSLIDEDOWN_VI, 1.0]
+    - [VSLL_VI, 1.0]
+    - [VSRA_VI, 1.0]
+    - [VSRL_VI, 1.0]
+    - [VSSRA_VI, 1.0]
+    - [VSSRL_VI, 1.0]
+    - [VXOR_VI, 1.0]
+    - [VSETVLI, 1.0]

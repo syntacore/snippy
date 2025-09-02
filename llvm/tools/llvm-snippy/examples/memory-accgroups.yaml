@@ -1,0 +1,74 @@
+access-evictions:
+  - mask:  0x003c0000
+    fixed: 0x80000000
+  - mask:  0x000be000
+    fixed: 0x80001000
+    weight: 2
+  - mask:  0x003c0000
+    fixed: 0x80000000
+
+access-groups:
+  - weight: 3
+    access-ranges:
+      - start: 0x80002000
+        size: 0x1000
+        stride: 16
+        first-offset: 1
+        last-offset: 2
+        weight: 1.5
+      - start: 0x80004000
+        size: 0x200
+        stride: 8
+        first-offset: 4
+        last-offset: 6
+        weight: 4
+    access-addresses:
+      - ordered: true
+        plain:
+            - addr: 0x80200000
+            - addr: 0x80201234
+            - addr: 0x802020BC
+        weight: 2.5
+      - ordered: false
+        plain:
+            - addr: 0x80200050
+              access-size: 12
+      - plain:
+            - addr: 0x80200F00
+        weight: 3
+
+  - weight: 5
+    access-addresses:
+      - ordered: true
+        plain:
+            - addr: 0x80200000
+            - addr: 0x80201234
+            - addr: 0x802020BC
+        weight: 2
+      - ordered: false
+        plain:
+            - addr: 0x80200050
+              access-size: 12
+        weight: 3.5
+      - plain:
+            - addr: 0x80200F00
+    access-evictions:
+      - mask:  0x003c0000
+        fixed: 0x80000000
+      - mask:  0x000be000
+        fixed: 0x80001000
+        weight: 2
+      - mask:  0x003c0000
+        fixed: 0x80000000
+
+  - weight: 0
+    access-ranges:
+      - start: 0x80002000
+        size: 0x1000
+        stride: 16
+        first-offset: 1
+        last-offset: 2
+        weight: 4
+
+
+
