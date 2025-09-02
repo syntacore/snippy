@@ -58,6 +58,7 @@ message(STATUS "LLVM_SNIPPY_VERSION_PATCH: ${LLVM_SNIPPY_VERSION_PATCH}")
 
 # Add `snippy-tblgen` before everything else.
 add_subdirectory(utils)
+add_subdirectory(docs)
 
 set(LLVM_LINK_COMPONENTS
   ${LLVM_TARGETS_TO_BUILD}
