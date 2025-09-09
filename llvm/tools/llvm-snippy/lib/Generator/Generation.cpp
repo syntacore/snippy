@@ -1354,7 +1354,7 @@ void writeRegsSnapshot(RegsSnapshotTy RegsSnapshot, MachineBasicBlock &MBB,
                        RegStorageType Storage, GeneratorContext &GC) {
   auto &ProgCtx = GC.getProgramContext();
   const auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
-  InstructionGenerationContext IGC{MBB, MBB.getFirstTerminator(), GC};
+  InstructionGenerationContext IGC(MBB, MBB.getFirstTerminator(), GC);
   auto RP = IGC.pushRegPool();
   for (auto &&[RegIdx, Value] : RegsSnapshot) {
     auto Reg = SnippyTgt.regIndexToMCReg(IGC, RegIdx, Storage);
@@ -1362,6 +1362,20 @@ void writeRegsSnapshot(RegsSnapshotTy RegsSnapshot, MachineBasicBlock &MBB,
     // the same class even if they were not reserved. Also we expect that
     // writing to FP/V register may use only non-reserved GPR registers.
     SnippyTgt.writeValueToReg(IGC,
+                              toAPInt(Value, SnippyTgt.getRegBitWidth(Reg, IGC),
+                                      /* ImplicitTrunc */ true),
+                              Reg);
+  }
+}
+
+void writeCSRsSnapshot(const TransactionStack::RegIdToValueType &RegsSnapshot,
+                       MachineBasicBlock &MBB, GeneratorContext &GC) {
+  auto &ProgCtx = GC.getProgramContext();
+  const auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
+  InstructionGenerationContext IGC(MBB, MBB.getFirstTerminator(), GC);
+  auto RP = IGC.pushRegPool();
+  for (auto &&[Reg, Value] : RegsSnapshot) {
+    SnippyTgt.writeValueToCSR(IGC,
                               toAPInt(Value, SnippyTgt.getRegBitWidth(Reg, IGC),
                                       /* ImplicitTrunc */ true),
                               Reg);
@@ -1382,6 +1396,7 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
   auto MemSnapshot = I.getMemBeforeTransaction();
   auto FRegsSnapshot = I.getFRegsBeforeTransaction();
   auto VRegsSnapshot = I.getVRegsBeforeTransaction();
+  auto CSRSnapshot = I.getCSRsBeforeTransaction();
   // Restoring memory requires GPR registers to prepare address and value to
   // write, so we need know which registers were changed. We cannot do it in the
   // current opened transaction as we'll mess up exiting from the loop state.
@@ -1411,6 +1426,8 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
 
   writeRegsSnapshot(FRegsSnapshot, MBB, RegStorageType::FReg, GC);
   writeRegsSnapshot(VRegsSnapshot, MBB, RegStorageType::VReg, GC);
+  writeCSRsSnapshot(CSRSnapshot, MBB, GC);
+
   // Execute inserted instructions to get a change made by the opened
   // transaction.
   if (snippy::interpretInstrs(MBB.begin(), MBB.getFirstTerminator(), State,

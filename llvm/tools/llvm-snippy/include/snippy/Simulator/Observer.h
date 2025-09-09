@@ -26,6 +26,7 @@ struct Observer {
   virtual void xregUpdateNotification(unsigned RegID, RegisterType Value) {}
   virtual void fregUpdateNotification(unsigned RegID, RegisterType Value) {}
   virtual void vregUpdateNotification(unsigned RegID, ArrayRef<char> Data) {}
+  virtual void csrUpdateNotification(unsigned RegID, RegisterType Value) {}
   virtual void PCUpdateNotification(ProgramCounterType PC) {}
 
   virtual ~Observer() {}

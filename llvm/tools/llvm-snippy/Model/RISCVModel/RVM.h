@@ -16,7 +16,7 @@ extern "C" {
 
 #define RVMAPI_ENTRY_POINT_SYMBOL RVMVTable
 #define RVMAPI_VERSION_SYMBOL RVMInterfaceVersion
-#define RVMAPI_CURRENT_INTERFACE_VERSION 28u
+#define RVMAPI_CURRENT_INTERFACE_VERSION 29u
 
 typedef uint64_t RVMRegT;
 
@@ -311,8 +311,8 @@ typedef enum {
   RVM_CSR_VLENB = 0xC22,
 } RVMCSR;
 
-RVMRegT rvm_readCSRReg(const RVMState *State, unsigned Reg);
-void rvm_setCSRReg(RVMState *State, unsigned Reg, RVMRegT Value);
+RVMRegT rvm_readCSR(const RVMState *State, unsigned Reg);
+void rvm_setCSR(RVMState *State, unsigned Reg, RVMRegT Value);
 
 typedef enum {
   RVM_V_REG_0 = 0,
@@ -368,6 +368,8 @@ typedef void (*FRegUpdateCallbackTy)(RVMCallbackHandler *, RVMFReg Reg,
                                      RVMRegT Value);
 typedef void (*VRegUpdateCallbackTy)(RVMCallbackHandler *, RVMVReg Reg,
                                      const char *Data, size_t Size);
+typedef void (*CSRUpdateCallbackTy)(RVMCallbackHandler *, RVMCSR CSR,
+                                    uint64_t Value);
 typedef void (*PCUpdateCallbackTy)(RVMCallbackHandler *, uint64_t PC);
 
 struct RVMMemoryRegion {
@@ -392,6 +394,7 @@ struct RVMConfig {
   XRegUpdateCallbackTy XRegUpdateCallback;
   FRegUpdateCallbackTy FRegUpdateCallback;
   VRegUpdateCallbackTy VRegUpdateCallback;
+  CSRUpdateCallbackTy CSRUpdateCallback;
   PCUpdateCallbackTy PCUpdateCallback;
   int ChangeMaskAgnosticElems;
   int ChangeTailAgnosticElems;
@@ -413,8 +416,8 @@ typedef RVMRegT (*rvm_readFReg_t)(const RVMState *, RVMFReg);
 typedef void (*rvm_setFReg_t)(RVMState *, RVMFReg, RVMRegT);
 typedef void (*rvm_setStopMode_t)(RVMState *, RVMStopMode);
 typedef void (*rvm_setStopPC_t)(RVMState *, uint64_t);
-typedef RVMRegT (*rvm_readCSRReg_t)(const RVMState *, unsigned);
-typedef void (*rvm_setCSRReg_t)(RVMState *, unsigned, RVMRegT);
+typedef RVMRegT (*rvm_readCSR_t)(const RVMState *, unsigned);
+typedef void (*rvm_setCSR_t)(RVMState *, unsigned, RVMRegT);
 typedef int (*rvm_readVReg_t)(const RVMState *, RVMVReg, char *, size_t);
 typedef int (*rvm_setVReg_t)(RVMState *, RVMVReg, const char *, size_t);
 typedef void (*rvm_logMessage_t)(const RVMState *, const char *);
