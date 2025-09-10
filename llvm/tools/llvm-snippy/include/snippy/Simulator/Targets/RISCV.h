@@ -26,6 +26,25 @@ enum RegSizeInBytes {
   Reg16Bytes = 16
 };
 
+/// Numeric values correspond to the CSR encoding specified by
+/// the RISC-V ISA spec.
+namespace RISCVSimulatorSysRegs {
+enum RISCVSimulatorSysReg : uint16_t {
+  FFLAGS = 0x001,
+  FRM = 0x002,
+  FCSR = 0x003,
+};
+
+/// Lookup SysReg by its encoding.
+const RISCVSysReg::SysReg *lookupSysReg(RISCVSimulatorSysReg Reg);
+
+/// Get system register used bit width as defined in the ISA spec.
+unsigned getBitWidth(RISCVSimulatorSysReg Reg);
+} // namespace RISCVSimulatorSysRegs
+
+/// \brief Get list of all supported system registers.
+ArrayRef<RISCVSimulatorSysRegs::RISCVSimulatorSysReg> supportedSysRegs();
+
 static inline unsigned getRegBitWidth(MCRegister Reg, unsigned XLen,
                                       unsigned VLEN = 0) {
   if (RISCV::GPRRegClass.contains(Reg))
@@ -36,6 +55,10 @@ static inline unsigned getRegBitWidth(MCRegister Reg, unsigned XLen,
     return Reg4Bytes * RISCV_CHAR_BIT;
   if (RISCV::FPR64RegClass.contains(Reg))
     return Reg8Bytes * RISCV_CHAR_BIT;
+  auto RegID = Reg.id();
+  if (is_contained(supportedSysRegs(), RegID))
+    return RISCVSimulatorSysRegs::getBitWidth(
+        static_cast<RISCVSimulatorSysRegs::RISCVSimulatorSysReg>(Reg.id()));
   assert(RISCV::VRRegClass.contains(Reg) && "unknown register class");
   return VLEN;
 }
@@ -52,6 +75,8 @@ static inline unsigned regToIndex(Register Reg) {
   assert(RISCV::V0 <= Reg && Reg <= RISCV::V31 && "unknown register");
   return Reg - RISCV::V0;
 }
+
+using RISCVSimulatorSysRegs::RISCVSimulatorSysReg;
 
 struct RISCVRegisterState : public IRegisterState {
   // FIXME: VLEN should be dynamic and derived from target configuration

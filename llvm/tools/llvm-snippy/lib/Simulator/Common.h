@@ -36,8 +36,17 @@ public:
   RegisterType readFPR(unsigned RegID) const override {
     return ModelState.readFReg(static_cast<FPRType>(RegID));
   }
+
   void setFPR(unsigned RegID, RegisterType NewValue) override {
     ModelState.setFReg(static_cast<FPRType>(RegID), NewValue);
+  }
+
+  RegisterType readCSR(unsigned RegID) const override {
+    return ModelState.readCSR(RegID);
+  }
+
+  void setCSR(unsigned RegID, RegisterType NewValue) override {
+    ModelState.setCSR(RegID, NewValue);
   }
 
   void readMem(MemoryAddressType Addr,
