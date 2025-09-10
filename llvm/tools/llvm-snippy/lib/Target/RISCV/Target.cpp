@@ -3010,6 +3010,24 @@ public:
     addGeneratedInstrsToBB(IGC, InstrsForWrite, *this);
   }
 
+  void writeValueToCSR(InstructionGenerationContext &IGC, APInt Value,
+                       unsigned CSR) const override {
+    auto &MBB = IGC.MBB;
+    auto &Ins = IGC.Ins;
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
+    auto &InstrInfo = State.getInstrInfo();
+    auto &Ctx = MBB.getParent()->getFunction().getContext();
+
+    using namespace RISCVSimulatorSysRegs;
+    using namespace RISCVFPRndMode;
+
+    getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::CSRRWI),
+                          RISCV::X0)
+        .addImm(lookupSysReg(static_cast<RISCVSimulatorSysReg>(CSR))->Encoding)
+        .addImm(Value.getZExtValue());
+  }
+
   void copyRegToReg(InstructionGenerationContext &IGC, MCRegister Rs,
                     MCRegister Rd) const override {
     assert(RISCV::GPRRegClass.contains(Rs) && RISCV::GPRRegClass.contains(Rd) &&

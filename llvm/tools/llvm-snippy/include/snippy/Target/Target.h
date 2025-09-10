@@ -483,6 +483,9 @@ public:
   virtual void writeValueToReg(InstructionGenerationContext &IGC, APInt Value,
                                unsigned DstReg) const = 0;
 
+  virtual void writeValueToCSR(InstructionGenerationContext &IGC, APInt Value,
+                               unsigned DstReg) const = 0;
+
   virtual void copyRegToReg(InstructionGenerationContext &IGC, MCRegister Rs,
                             MCRegister Rd) const = 0;
 

@@ -38,8 +38,8 @@ struct RVM_FunctionPointers {
   rvm_readFReg_t readFReg;
   rvm_setFReg_t setFReg;
 
-  rvm_readCSRReg_t readCSRReg;
-  rvm_setCSRReg_t setCSRReg;
+  rvm_readCSR_t readCSR;
+  rvm_setCSR_t setCSR;
 
   rvm_readVReg_t readVReg;
   rvm_setVReg_t setVReg;

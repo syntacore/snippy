@@ -173,6 +173,36 @@ void RISCVRegisterState::uniformlyFillVRegs() {
     VReg = RandEngine::genAPInt(VLEN);
 }
 
+const RISCVSysReg::SysReg *
+RISCVSimulatorSysRegs::lookupSysReg(RISCVSimulatorSysReg Reg) {
+  auto EqualRange =
+      RISCVSysReg::lookupSysRegByEncoding(static_cast<uint16_t>(Reg));
+  if (EqualRange.empty())
+    return nullptr;
+  return EqualRange.begin();
+}
+
+ArrayRef<RISCVSimulatorSysReg> supportedSysRegs() {
+  constexpr static const RISCVSimulatorSysReg List[] = {
+      RISCVSimulatorSysReg::FCSR,
+      RISCVSimulatorSysReg::FFLAGS,
+      RISCVSimulatorSysReg::FRM,
+  };
+  return List;
+}
+
+unsigned RISCVSimulatorSysRegs::getBitWidth(RISCVSimulatorSysReg Reg) {
+  switch (Reg) {
+  case RISCVSimulatorSysReg::FFLAGS:
+    return 5;
+  case RISCVSimulatorSysReg::FRM:
+    return 3;
+  case RISCVSimulatorSysReg::FCSR:
+    return 32;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
 class SnippyRISCVSimulator final
     : public CommonSimulatorImpl<rvm::State, SnippyRISCVSimulator, RVMXReg,
                                  RVMFReg> {
@@ -279,6 +309,16 @@ public:
 
   void resetState(const TargetSubtargetInfo &SubTgt) override;
 
+  std::vector<std::pair<unsigned, RegisterType>> getCSRValues() const override {
+    auto CSRs = supportedSysRegs();
+    std::vector<std::pair<unsigned, RegisterType>> Values;
+    transform(CSRs, std::back_inserter(Values), [this](auto CSR) {
+      auto Val = readCSR(CSR);
+      return std::make_pair(CSR, Val);
+    });
+    return Values;
+  }
+
   VectorRegisterType readVPR(unsigned RegID) const override {
     SmallVector<uint64_t, 2> Data(VLEN / RISCV_CHAR_BIT);
     ModelState.readVReg(static_cast<RVMVReg>(RegID),
@@ -295,12 +335,9 @@ public:
   }
 
   void dumpSystemRegistersState(raw_ostream &OS) const override {
-    OS << "MEPC:   0x" << utohexstr(ModelState.readCSRReg(RVM_CSR_MEPC))
-       << "\n";
-    OS << "MCAUSE: 0x" << utohexstr(ModelState.readCSRReg(RVM_CSR_MCAUSE))
-       << "\n";
-    OS << "MTVAL:  0x" << utohexstr(ModelState.readCSRReg(RVM_CSR_MTVAL))
-       << "\n";
+    OS << "MEPC:   0x" << utohexstr(ModelState.readCSR(RVM_CSR_MEPC)) << "\n";
+    OS << "MCAUSE: 0x" << utohexstr(ModelState.readCSR(RVM_CSR_MCAUSE)) << "\n";
+    OS << "MTVAL:  0x" << utohexstr(ModelState.readCSR(RVM_CSR_MTVAL)) << "\n";
   }
 
   bool supportsCallbacks() const override {
@@ -470,7 +507,7 @@ static SimulatorIsaInfo deriveSimulatorIsaInfo(const RISCVSubtarget &ST) {
 static void auxSimInit(const RISCVSubtarget &Subtarget,
                        SnippyRISCVSimulator &Simulator) {
   auto &LLSim = Simulator.getLLImpl();
-  auto MSTATUS_CSR = LLSim.readCSRReg(RVM_CSR_MSTATUS);
+  auto MSTATUS_CSR = LLSim.readCSR(RVM_CSR_MSTATUS);
   auto DEFAULT_MSTATUS = MSTATUS_CSR;
   // NOTE: our generator focuses on creating snippets that can be run in
   // user mode. Some extensions (like F), require some CSRs
@@ -490,7 +527,7 @@ static void auxSimInit(const RISCVSubtarget &Subtarget,
   errs() << "NOTE: adjusting MSTATUS: 0x" << Twine::utohexstr(DEFAULT_MSTATUS)
          << "->0x" << Twine::utohexstr(MSTATUS_CSR) << "\n";
 
-  LLSim.setCSRReg(RVM_CSR_MSTATUS, MSTATUS_CSR);
+  LLSim.setCSR(RVM_CSR_MSTATUS, MSTATUS_CSR);
 }
 
 #define D_STRINGIFY(S) #S
@@ -541,6 +578,12 @@ void XRegUpdateCallback(RVMCallbackHandler *H, RVMXReg Reg, RVMRegT Value) {
   assert(H);
   for (auto &&Observer : H->getObservers())
     Observer->xregUpdateNotification(Reg, Value);
+}
+
+void CSRUpdateCallback(RVMCallbackHandler *H, RVMCSR Reg, RVMRegT Value) {
+  assert(H);
+  for (auto &&Observer : H->getObservers())
+    Observer->csrUpdateNotification(Reg, Value);
 }
 
 void FRegUpdateCallback(RVMCallbackHandler *H, RVMFReg Reg, RVMRegT Value) {
@@ -603,6 +646,7 @@ std::unique_ptr<SimulatorInterface> createRISCVSimulator(
     StateBuilder.registerCallbackHandler(CallbackHandler);
     StateBuilder.registerMemUpdateCallback(MemUpdateCallback);
     StateBuilder.registerXRegUpdateCallback(XRegUpdateCallback);
+    StateBuilder.registerCSRUpdateCallback(CSRUpdateCallback);
     StateBuilder.registerFRegUpdateCallback(FRegUpdateCallback);
     StateBuilder.registerVRegUpdateCallback(VRegUpdateCallback);
     StateBuilder.registerPCUpdateCallback(PCUpdateCallback);
