@@ -78,6 +78,9 @@ public:
 
   virtual void setGPR(unsigned RegID, RegisterType NewValue) = 0;
 
+  virtual RegisterType readCSR(unsigned RegID) const = 0;
+  virtual void setCSR(unsigned RegID, RegisterType NewValue) = 0;
+
   virtual RegisterType readFPR(unsigned RegID) const = 0;
   virtual void setFPR(unsigned RegID, RegisterType NewValue) = 0;
 
@@ -109,6 +112,9 @@ public:
   virtual void dumpSystemRegistersState(raw_ostream &OS) const = 0;
 
   virtual bool supportsCallbacks() const = 0;
+
+  virtual std::vector<std::pair<unsigned, RegisterType>>
+  getCSRValues() const = 0;
 
   virtual ~SimulatorInterface() {}
 };

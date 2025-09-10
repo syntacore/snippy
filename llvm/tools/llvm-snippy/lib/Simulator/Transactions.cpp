@@ -9,6 +9,7 @@
 #include "snippy/Simulator/Transactions.h"
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
 
 #define DEBUG_TYPE "snippy-transactions"
 
@@ -31,6 +32,15 @@ TransactionStack::getXRegsBeforeTransaction() const {
   for (auto [RegId, _] : Transactions.back().XRegs)
     XRegsChange[RegId] = getXRegPrevValue(RegId, Transactions.rbegin());
   return XRegsChange;
+}
+
+TransactionStack::RegIdToValueType
+TransactionStack::getCSRsBeforeTransaction() const {
+  assert(!empty());
+  RegIdToValueType CSRsChange;
+  for (auto [RegId, _] : Transactions.back().CSRs)
+    CSRsChange[RegId] = getCSRPrevValue(RegId, Transactions.rbegin());
+  return CSRsChange;
 }
 
 TransactionStack::RegIdToValueType
@@ -66,6 +76,12 @@ const TransactionStack::RegIdToValueType &
 TransactionStack::getXRegsChangedByTransaction() const {
   assert(!empty());
   return Transactions.back().XRegs;
+}
+
+const TransactionStack::RegIdToValueType &
+TransactionStack::getCSRsChangedByTransaction() const {
+  assert(!empty());
+  return Transactions.back().CSRs;
 }
 
 const TransactionStack::RegIdToValueType &
@@ -120,6 +136,19 @@ RegisterType TransactionStack::getXRegPrevValue(
   return InitialSnapshot.XRegs.lookup(RegID);
 }
 
+RegisterType TransactionStack::getCSRPrevValue(
+    unsigned RegID, TransactionsType::const_reverse_iterator I) const {
+  assert(!empty());
+  assert(I != Transactions.rend());
+  assert(InitialSnapshot.CSRs.count(RegID));
+  auto PrevEntryIt =
+      std::find_if(std::next(I), Transactions.rend(),
+                   [RegID](const auto &P) { return P.CSRs.count(RegID); });
+  if (PrevEntryIt != Transactions.rend())
+    return PrevEntryIt->CSRs.lookup(RegID);
+  return InitialSnapshot.CSRs.lookup(RegID);
+}
+
 RegisterType TransactionStack::getFRegPrevValue(
     unsigned RegID, TransactionsType::const_reverse_iterator I) const {
   assert(!empty());
@@ -172,6 +201,13 @@ void TransactionStack::addXRegToSnapshot(unsigned RegID, RegisterType Value) {
   XRegsSnapshot[RegID] = Value;
 }
 
+void TransactionStack::addCSRToSnapshot(unsigned RegID, RegisterType Value) {
+  auto &CSRsSnapshot = InitialSnapshot.CSRs;
+  assert(CSRsSnapshot.count(RegID) == 0 &&
+         "Attempt to add already existing CSR to snapshot.");
+  CSRsSnapshot[RegID] = Value;
+}
+
 void TransactionStack::addFRegToSnapshot(unsigned RegID, RegisterType Value) {
   auto &FRegsSnapshot = InitialSnapshot.FRegs;
   assert(FRegsSnapshot.count(RegID) == 0 &&
@@ -200,6 +236,7 @@ void TransactionStack::clearLastTransaction() {
   Transactions.back().PC.reset();
   Transactions.back().Mem.clear();
   Transactions.back().XRegs.clear();
+  Transactions.back().CSRs.clear();
   Transactions.back().FRegs.clear();
   Transactions.back().VRegs.clear();
   LLVM_DEBUG(dbgs() << "Clear last transaction\n");
@@ -218,6 +255,7 @@ void TransactionStack::pop() {
     return;
   InitialSnapshot.Mem.clear();
   InitialSnapshot.XRegs.clear();
+  InitialSnapshot.CSRs.clear();
   InitialSnapshot.FRegs.clear();
   InitialSnapshot.VRegs.clear();
 }
@@ -255,6 +293,15 @@ void TransactionStack::xregUpdateNotification(unsigned RegID,
     return;
   Transactions.back().XRegs[RegID] = Value;
   LLVM_DEBUG(dbgs() << "xreg update notification: id " << RegID << ", data "
+                    << Value << "\n");
+}
+
+void TransactionStack::csrUpdateNotification(unsigned RegID,
+                                             RegisterType Value) {
+  if (empty())
+    return;
+  Transactions.back().CSRs[RegID] = Value;
+  LLVM_DEBUG(dbgs() << "csr update notification: id " << RegID << ", data "
                     << Value << "\n");
 }
 
@@ -304,6 +351,10 @@ void TransactionStack::print(raw_ostream &OS) const {
     for (auto [Id, Value] : I->XRegs)
       OS << "    XReg change at index " << Id << ": (Old) "
          << getXRegPrevValue(Id, I) << " -> " << Value << " (New)\n";
+    for (auto [Id, Value] : I->CSRs)
+      OS << "    CSR change 0x" << utohexstr(Id) << ": (Old) "
+         << getCSRPrevValue(Id, I) << " -> " << Value << " (New)\n";
+
     for (auto [Id, Value] : I->FRegs)
       OS << "    FReg change at index " << Id << ": (Old) "
          << getFRegPrevValue(Id, I) << " -> " << Value << " (New)\n";
