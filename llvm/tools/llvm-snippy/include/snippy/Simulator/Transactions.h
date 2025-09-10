@@ -31,6 +31,7 @@ public:
     // we shouldn't use any dedicated types. Looks like one more
     // target-dependent layer of abstraction is required.
     RegIdToValueType XRegs;
+    RegIdToValueType CSRs;
     RegIdToValueType FRegs;
     VRegIdToValueType VRegs;
     std::optional<ProgramCounterType> PC;
@@ -43,6 +44,7 @@ public:
   struct Snapshot {
     MemSnapshotType Mem;
     RegSnapshotType XRegs;
+    RegSnapshotType CSRs;
     RegSnapshotType FRegs;
     VRegSnapshotType VRegs;
     ProgramCounterType PC;
@@ -57,12 +59,14 @@ public:
   void memUpdateNotification(MemoryAddressType Addr, const char *Data,
                              size_t Size) override;
   void xregUpdateNotification(unsigned RegID, RegisterType Value) override;
+  void csrUpdateNotification(unsigned RegID, RegisterType Value) override;
   void fregUpdateNotification(unsigned RegID, RegisterType Value) override;
   void vregUpdateNotification(unsigned RegID, ArrayRef<char> Data) override;
   void PCUpdateNotification(ProgramCounterType PC) override;
 
   void addMemSnapshot(MemoryAddressType Addr, std::vector<char> Snapshot);
   void addXRegToSnapshot(unsigned RegID, RegisterType Value);
+  void addCSRToSnapshot(unsigned RegID, RegisterType Value);
   void addFRegToSnapshot(unsigned RegID, RegisterType Value);
   void addVRegToSnapshot(unsigned RegID, VectorRegisterType Value);
   void addPCToSnapshot(ProgramCounterType PC);
@@ -71,12 +75,14 @@ public:
   // transaction.
   AddrToDataType getMemBeforeTransaction() const;
   RegIdToValueType getXRegsBeforeTransaction() const;
+  RegIdToValueType getCSRsBeforeTransaction() const;
   RegIdToValueType getFRegsBeforeTransaction() const;
   VRegIdToValueType getVRegsBeforeTransaction() const;
   ProgramCounterType getPCBeforeTransaction() const;
 
   const AddrToDataType &getMemChangedByTransaction() const;
   const RegIdToValueType &getXRegsChangedByTransaction() const;
+  const RegIdToValueType &getCSRsChangedByTransaction() const;
   const RegIdToValueType &getFRegsChangedByTransaction() const;
   const VRegIdToValueType &getVRegsChangedByTransaction() const;
   ProgramCounterType getPC() const;
@@ -96,6 +102,9 @@ private:
   RegisterType
   getXRegPrevValue(unsigned RegID,
                    TransactionsType::const_reverse_iterator I) const;
+  RegisterType
+  getCSRPrevValue(unsigned RegID,
+                  TransactionsType::const_reverse_iterator I) const;
   RegisterType
   getFRegPrevValue(unsigned RegID,
                    TransactionsType::const_reverse_iterator I) const;

@@ -428,6 +428,10 @@ public:
                        unsigned DstReg) const override {
     reportUnimplementedError();
   }
+  void writeValueToCSR(InstructionGenerationContext &IGC, APInt Value,
+                       unsigned DstReg) const override {
+    reportUnimplementedError();
+  }
 
   void copyRegToReg(InstructionGenerationContext &IGC, MCRegister Rs,
                     MCRegister Rd) const override {

@@ -278,6 +278,7 @@ public:
   // transaction.
   TransactionStack::AddrToDataType getMemBeforeTransaction() const;
   TransactionStack::RegIdToValueType getXRegsBeforeTransaction() const;
+  TransactionStack::RegIdToValueType getCSRsBeforeTransaction() const;
   TransactionStack::RegIdToValueType getFRegsBeforeTransaction() const;
   TransactionStack::VRegIdToValueType getVRegsBeforeTransaction() const;
   ProgramCounterType getPCBeforeTransaction() const;

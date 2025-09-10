@@ -379,6 +379,9 @@ void Interpreter::initTransactionMechanism() {
     auto Value = Simulator->readVPR(i);
     Transactions.addVRegToSnapshot(i, std::move(Value));
   }
+  auto CSRs = Simulator->getCSRValues();
+  for (auto &&[CSR, Val] : CSRs)
+    Transactions.addCSRToSnapshot(CSR, Val);
 }
 
 void Interpreter::openTransaction() {
@@ -413,11 +416,13 @@ void Interpreter::commitTransaction() {
   TransactionStack::AddrToDataType CurMemChange;
   TransactionStack::RegIdToValueType CurXRegsChange;
   TransactionStack::RegIdToValueType CurFRegsChange;
+  TransactionStack::RegIdToValueType CurCSRChange;
   TransactionStack::VRegIdToValueType CurVRegsChange;
   auto CurPCChange = Transactions.getPC();
   if (Transactions.size() > 1) {
     CurMemChange = Transactions.getMemChangedByTransaction();
     CurXRegsChange = Transactions.getXRegsChangedByTransaction();
+    CurCSRChange = Transactions.getCSRsChangedByTransaction();
     CurFRegsChange = Transactions.getFRegsChangedByTransaction();
     CurVRegsChange = Transactions.getVRegsChangedByTransaction();
   }
@@ -428,6 +433,8 @@ void Interpreter::commitTransaction() {
     Transactions.memUpdateNotification(Addr, &Data, sizeof(Data));
   for (const auto &[RegId, Value] : CurXRegsChange)
     Transactions.xregUpdateNotification(RegId, Value);
+  for (const auto &[RegId, Value] : CurCSRChange)
+    Transactions.csrUpdateNotification(RegId, Value);
   for (const auto &[RegId, Value] : CurFRegsChange)
     Transactions.fregUpdateNotification(RegId, Value);
   for (const auto &[RegId, Value] : CurVRegsChange) {
@@ -450,6 +457,8 @@ void Interpreter::discardTransaction() {
         Addr, APInt(sizeof(Value) * CHAR_BIT, Value, /* signed */ true));
   for (auto [RegID, Value] : getXRegsBeforeTransaction())
     Simulator->setGPR(RegID, Value);
+  for (auto [RegID, Value] : getCSRsBeforeTransaction())
+    Simulator->setCSR(RegID, Value);
   for (auto [RegID, Value] : getFRegsBeforeTransaction())
     Simulator->setFPR(RegID, Value);
   for (auto [RegID, Value] : getVRegsBeforeTransaction())
@@ -473,6 +482,15 @@ Interpreter::getXRegsBeforeTransaction() const {
 
   assert(!Transactions.empty());
   return Transactions.getXRegsBeforeTransaction();
+}
+
+TransactionStack::RegIdToValueType
+Interpreter::getCSRsBeforeTransaction() const {
+  auto &Transactions =
+      Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
+
+  assert(!Transactions.empty());
+  return Transactions.getCSRsBeforeTransaction();
 }
 
 TransactionStack::RegIdToValueType

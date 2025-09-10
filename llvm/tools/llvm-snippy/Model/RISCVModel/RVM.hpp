@@ -280,6 +280,11 @@ public:
       return *this;
     }
 
+    Builder &registerCSRUpdateCallback(CSRUpdateCallbackTy Callback) {
+      Config.CSRUpdateCallback = Callback;
+      return *this;
+    }
+
     Builder &registerPCUpdateCallback(PCUpdateCallbackTy Callback) {
       Config.PCUpdateCallback = Callback;
       return *this;
@@ -388,12 +393,12 @@ public:
     return getVTable()->setFReg(get(), Reg, Value);
   }
 
-  RVMRegT readCSRReg(unsigned Reg) const {
-    return getVTable()->readCSRReg(get(), Reg);
+  RVMRegT readCSR(unsigned Reg) const {
+    return getVTable()->readCSR(get(), Reg);
   }
 
-  void setCSRReg(unsigned Reg, RVMRegT Value) {
-    return getVTable()->setCSRReg(get(), Reg, Value);
+  void setCSR(unsigned Reg, RVMRegT Value) {
+    return getVTable()->setCSR(get(), Reg, Value);
   }
 
   int readVReg(RVMVReg Reg, char *Data, size_t MaxSize) const {
