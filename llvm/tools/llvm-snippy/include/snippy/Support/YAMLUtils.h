@@ -337,7 +337,7 @@ template <typename T> struct NormalizedYAMLStrongTypedef {
   NormalizedYAMLStrongTypedef(yaml::IO &Io) {}
   NormalizedYAMLStrongTypedef(yaml::IO &Io, ValueType &Val) : Value{Val} {}
   auto denormalize(yaml::IO &Io) { return Value.value; }
-  T Value;
+  T Value{};
 };
 
 LLVM_SNIPPY_YAML_STRONG_TYPEDEF(std::string, SValue);
