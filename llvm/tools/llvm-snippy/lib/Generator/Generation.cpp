@@ -243,6 +243,9 @@ template <typename CheckRegsRangeT>
 void generateRegisterBasedSelfcheckRoutine(
     CheckRegsRangeT SelfcheckRegsRange,
     planning::InstructionGenerationContext &InstrGenCtx) {
+  if (!range_size(SelfcheckRegsRange))
+    return;
+
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   auto ItEnd = InstrGenCtx.Ins;
@@ -251,7 +254,6 @@ void generateRegisterBasedSelfcheckRoutine(
   auto RP = InstrGenCtx.pushRegPool();
   auto &SimCtx = InstrGenCtx.SimCtx;
 
-  assert(range_size(SelfcheckRegsRange));
   std::vector SelfcheckRegs(SelfcheckRegsRange.begin(),
                             SelfcheckRegsRange.end());
   // make a partition with GPR and FPR registers
@@ -307,6 +309,9 @@ template <typename CheckRegsRangeT>
 void generateMemoryBasedSelfcheckRoutine(
     CheckRegsRangeT SelfcheckRegsRange,
     planning::InstructionGenerationContext &InstrGenCtx) {
+  if (!range_size(SelfcheckRegsRange))
+    return;
+
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   auto ItEnd = InstrGenCtx.Ins;
