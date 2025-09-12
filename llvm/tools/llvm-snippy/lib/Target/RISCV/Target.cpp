@@ -1947,7 +1947,7 @@ public:
     }
   }
 
-  static unsigned getMaxGenValueForRegs(InstructionGenerationContext &IGC,
+  static uint64_t getMaxGenValueForRegs(InstructionGenerationContext &IGC,
                                         const Branchegram &Branches,
                                         ArrayRef<Register> ReservedRegs) {
     auto &ProgCtx = IGC.ProgCtx;
@@ -1955,13 +1955,13 @@ public:
     auto VLEN =
         ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>().getVLEN();
     auto CounterReg = ReservedRegs[CounterRegIdx];
-    unsigned MaxCounterRegVal = RISCVRegisterState::getMaxRegValueForSize(
+    auto MaxCounterRegVal = RISCVRegisterState::getMaxRegValueForSize(
         CounterReg, ST.getXLen(), VLEN);
     if (ReservedRegs.size() == 1)
       return MaxCounterRegVal;
 
     auto LimitReg = ReservedRegs[LimitRegIdx];
-    unsigned MaxLimitRegVal =
+    auto MaxLimitRegVal =
         RISCVRegisterState::getMaxRegValueForSize(LimitReg, ST.getXLen(), VLEN);
     return std::min(MaxCounterRegVal, MaxLimitRegVal);
   }
