@@ -460,6 +460,12 @@ public:
     reportUnimplementedError();
   }
 
+  MCRegister generateInitRegisterValueForCheckSumSelfcheck(
+      InstructionGenerationContext &IGC, MachineBasicBlock::iterator Ins,
+      const RegPoolWrapper &RP, MCRegister Reg) const override {
+    reportUnimplementedError();
+  }
+
   void generateRegMove(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
                        LLVMContext &Context, const MCInstrInfo &InstrInfo,
                        MCRegister SrcReg, MCRegister DstReg) const override {
