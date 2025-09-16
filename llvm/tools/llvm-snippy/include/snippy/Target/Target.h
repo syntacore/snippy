@@ -315,6 +315,10 @@ public:
   getTmpRegisterForCheckSumSelfcheck(InstructionGenerationContext &IGC,
                                      const RegPoolWrapper &RP) const = 0;
 
+  virtual MCRegister generateInitRegisterValueForCheckSumSelfcheck(
+      InstructionGenerationContext &IGC, MachineBasicBlock::iterator Ins,
+      const RegPoolWrapper &RP, MCRegister Reg) const = 0;
+
   virtual void generateRegMove(MachineBasicBlock &MBB,
                                MachineBasicBlock::iterator Ins,
                                LLVMContext &Context,

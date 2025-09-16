@@ -264,7 +264,8 @@ void generateRegisterBasedSelfcheckRoutine(
   MCRegister AccReg;
   auto FirstInserted = std::prev(InsPoint);
   if (SelfcheckRegs.begin() != PartIt) {
-    AccReg = SelfcheckRegs.front().DestReg;
+    AccReg = ST.generateInitRegisterValueForCheckSumSelfcheck(
+        InstrGenCtx, InsPoint, *RP, SelfcheckRegs.front().DestReg);
   } else {
     AccReg = ST.getTmpRegisterForCheckSumSelfcheck(InstrGenCtx, *RP);
     ST.generateRegMove(InstrGenCtx.MBB, InsPoint, State.getCtx(),
@@ -297,7 +298,7 @@ void generateRegisterBasedSelfcheckRoutine(
 
   ST.writeValueToReg(InstrGenCtx, Imm, TmpReg);
 
-  ST.generateCheckForCheckSumSelfcheck(InstrGenCtx, AccReg, TmpReg);
+  ST.generateCheckForCheckSumSelfcheck(InstrGenCtx, TmpReg, AccReg);
 
   if (!I.executeChainOfInstrs(State, std::next(FirstInserted),
                               std::prev(ItEnd)))
