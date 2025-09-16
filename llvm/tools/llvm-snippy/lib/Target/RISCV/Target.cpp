@@ -3154,6 +3154,24 @@ public:
                                    IGC.MBB);
   }
 
+  MCRegister generateInitRegisterValueForCheckSumSelfcheck(
+      InstructionGenerationContext &IGC, MachineBasicBlock::iterator Ins,
+      const RegPoolWrapper &RP, MCRegister Reg) const override {
+    assert(is_contained(RISCV::GPRRegClass, Reg));
+    if (Reg != RISCV::X0)
+      return Reg;
+
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
+
+    auto TmpReg = getTmpRegisterForCheckSumSelfcheck(IGC, RP);
+
+    generateRegMove(IGC.MBB, Ins, State.getCtx(), State.getInstrInfo(), Reg,
+                    TmpReg);
+
+    return TmpReg;
+  }
+
   void generateRegMove(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
                        LLVMContext &Context, const MCInstrInfo &InstrInfo,
                        MCRegister SrcReg, MCRegister DstReg) const override {
@@ -3161,6 +3179,14 @@ public:
     // currently snippy requires only FPR to GPR one
     if (!is_contained(RISCV::GPRRegClass, DstReg))
       snippy::fatal("currently MOV to not GPR register is unsupported");
+
+    if (is_contained(RISCV::GPRRegClass, SrcReg)) {
+      getSupportInstBuilder(*this, MBB, Ins, Context, InstrInfo.get(RISCV::ADD),
+                            DstReg)
+          .addReg(SrcReg)
+          .addReg(RISCV::X0);
+      return;
+    }
 
     unsigned FMVOpc;
     if (RISCV::FPR64RegClass.contains(SrcReg)) {
