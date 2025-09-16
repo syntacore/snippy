@@ -22,6 +22,7 @@
 #include "Common.h"
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormatVariadic.h"
 
 #define DEBUG_TYPE "snippy-riscv-sim"
@@ -139,21 +140,29 @@ bool RISCVRegisterState::operator==(const IRegisterState &Another) const {
 }
 
 RegSizeInBytes RISCVRegisterState::getRegSizeInBytes(Register Reg,
-                                                     unsigned XLen,
+                                                     unsigned XLenBits,
                                                      unsigned VLEN) {
-  return static_cast<RegSizeInBytes>(
-      getRegBitWidth(Reg, XLen * RISCV_CHAR_BIT, VLEN) / RISCV_CHAR_BIT);
+  return static_cast<RegSizeInBytes>(getRegBitWidth(Reg, XLenBits, VLEN) /
+                                     RISCV_CHAR_BIT);
 }
 
 uint64_t RISCVRegisterState::getMaxRegValueForSize(RegSizeInBytes Size) {
-  if (Size == RegSizeInBytes::Reg4Bytes)
+  switch (Size) {
+  case RegSizeInBytes::Reg2Bytes:
+    return std::numeric_limits<uint16_t>::max();
+  case RegSizeInBytes::Reg4Bytes:
     return std::numeric_limits<uint32_t>::max();
-  return std::numeric_limits<uint64_t>::max();
+  case RegSizeInBytes::Reg8Bytes:
+    return std::numeric_limits<uint64_t>::max();
+  case RegSizeInBytes::Reg16Bytes:
+    llvm_unreachable("Cannot get max value for 16 byte wide register");
+  }
 }
 
-uint64_t RISCVRegisterState::getMaxRegValueForSize(Register Reg, unsigned XLen,
+uint64_t RISCVRegisterState::getMaxRegValueForSize(Register Reg,
+                                                   unsigned XLenBits,
                                                    unsigned VLEN) {
-  auto SizeInBytes = getRegSizeInBytes(Reg, XLen, VLEN);
+  auto SizeInBytes = getRegSizeInBytes(Reg, XLenBits, VLEN);
   return getMaxRegValueForSize(SizeInBytes);
 }
 
