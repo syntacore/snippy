@@ -120,10 +120,10 @@ struct RISCVRegisterState : public IRegisterState {
 
   static uint64_t getMaxRegValueForSize(RegSizeInBytes Size);
 
-  static uint64_t getMaxRegValueForSize(Register Reg, unsigned XLen,
+  static uint64_t getMaxRegValueForSize(Register Reg, unsigned XLenBits,
                                         unsigned VLen);
 
-  static RegSizeInBytes getRegSizeInBytes(Register Reg, unsigned XLen,
+  static RegSizeInBytes getRegSizeInBytes(Register Reg, unsigned XLenBits,
                                           unsigned VLen);
 
 private:
