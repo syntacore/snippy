@@ -56,6 +56,8 @@ message(STATUS "LLVM_SNIPPY_VERSION_MAJOR: ${LLVM_SNIPPY_VERSION_MAJOR}")
 message(STATUS "LLVM_SNIPPY_VERSION_MINOR: ${LLVM_SNIPPY_VERSION_MINOR}")
 message(STATUS "LLVM_SNIPPY_VERSION_PATCH: ${LLVM_SNIPPY_VERSION_PATCH}")
 
+add_subdirectory(llvm-ie)
+
 # Add `snippy-tblgen` before everything else.
 add_subdirectory(utils)
 add_subdirectory(docs)
@@ -160,6 +162,9 @@ include(GNUInstallDirs)
 set(SNIPPY_INSTALL_DOCDIR ${CMAKE_INSTALL_DOCDIR}/llvm-snippy)
 
 install(TARGETS llvm-snippy
+        COMPONENT llvm-snippy
+        )
+install(TARGETS llvm-ie
         COMPONENT llvm-snippy
         )
 install(FILES $<TARGET_FILE:lld>
