@@ -75,7 +75,7 @@ struct LayerMapEntry {
   CallGraphState::Node *Node;
   int Layer;
   LayerMapEntry(CallGraphState::Node *Node, int Layer)
-      : Node(Node), Layer(Layer){};
+      : Node(Node), Layer(Layer) {};
 };
 
 void fillReachableNodes(CallGraphState::Node *Root,
@@ -320,7 +320,7 @@ static void reportUnusedRXSectionWarning(LLVMContext &Ctx, R &&Names) {
 
 static void
 checkForUnusedRXSections(const Linker::LinkedSections &Sections,
-                         const Linker::OutputSection &DefaultCodeSection,
+                         const Linker::NamedOutputSection &DefaultCodeSection,
                          LLVMContext &Ctx) {
   auto UnusedRXSections =
       llvm::make_filter_range(Sections, [&DefaultCodeSection](auto &S) {
