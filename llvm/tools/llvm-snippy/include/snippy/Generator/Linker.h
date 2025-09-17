@@ -32,8 +32,8 @@ public:
   constexpr static const char *kDefaultTextSectionName = ".text";
   constexpr static const char *kDefaultRODataSectionName = ".rodata";
 
-  struct OutputSection final {
-    explicit OutputSection(const SectionDesc &Desc);
+  struct NamedOutputSection final {
+    explicit NamedOutputSection(const SectionDesc &Desc);
     SectionDesc Desc;
     // almost final section name (before mangling)
     std::string Name;
@@ -46,7 +46,7 @@ public:
   struct SectionEntry {
     // parameters of the section in the linked file
     // (before mangling)
-    OutputSection OutputSection;
+    NamedOutputSection OutputSection;
     // Sections from initial object file(s) that are
     // placed in OutputSection during linking.
     std::vector<InputSection> InputSections;
@@ -98,7 +98,7 @@ public:
     std::string getOutputNameForDesc(const SectionDesc &Desc) const;
 
     bool hasOutputSectionFor(StringRef InSectName) const;
-    const OutputSection &getOutputSectionFor(StringRef InSectName) const;
+    const NamedOutputSection &getOutputSectionFor(StringRef InSectName) const;
 
     auto &getSection(StringRef Name) {
       auto Section = getSectionImpl(Name);
