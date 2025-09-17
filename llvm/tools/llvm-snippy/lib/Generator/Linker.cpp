@@ -169,7 +169,7 @@ static auto findFirstSection(SecT &&Sections, PredT &&Pred) {
 
 } // namespace
 
-Linker::OutputSection::OutputSection(const SectionDesc &Desc)
+Linker::NamedOutputSection::NamedOutputSection(const SectionDesc &Desc)
     : Desc(Desc), Name(getUniqueSectionName(Desc)) {}
 
 void Linker::calculateMemoryRegion() {
@@ -185,7 +185,7 @@ Linker::Linker(LLVMContext &Ctx, const SectionsDescriptions &Sects,
     : MangleName(MN), MemoryRegion{0, 0} {
   std::transform(Sects.begin(), Sects.end(), std::back_inserter(Sections),
                  [](auto &SectionDesc) {
-                   return SectionEntry{OutputSection{SectionDesc}, {}};
+                   return SectionEntry{NamedOutputSection{SectionDesc}, {}};
                  });
   std::sort(Sections.begin(), Sections.end(), [](auto &LSE, auto &RSE) {
     return LSE.OutputSection.Desc.VMA < RSE.OutputSection.Desc.VMA;
@@ -212,7 +212,7 @@ bool Linker::LinkedSections::hasOutputSectionFor(StringRef SectionName) const {
   });
 }
 
-const Linker::OutputSection &
+const Linker::NamedOutputSection &
 Linker::LinkedSections::getOutputSectionFor(StringRef SectionName) const {
   auto S = std::find_if(begin(), end(), [SectionName](auto &Section) {
     return llvm::any_of(Section.InputSections, [SectionName](auto &S) {
