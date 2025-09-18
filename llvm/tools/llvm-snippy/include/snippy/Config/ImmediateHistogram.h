@@ -262,20 +262,19 @@ auto genImmInInterval(const ImmediateHistogramSequence &IH) {
 
 template <unsigned BitWidth, ImmediateSignedness Sign, ImmediateZero Zero,
           unsigned ZeroBits>
-auto genImmInInterval() {
+int genImmInInterval() {
+  static_assert(BitWidth <= sizeof(int) * CHAR_BIT,
+                "Bit width is too big to fit in integer");
   constexpr unsigned NumBits = BitWidth - ZeroBits;
   constexpr bool IsSigned = Sign == ImmediateSignedness::Signed;
   constexpr bool IncludeZero = Zero == ImmediateZero::Include;
-  auto Num = [] {
-    if (IsSigned)
-      return RandEngine::genInRangeInclusive(
-          -(1 << (NumBits - 1)), (1 << (NumBits - 1)) - 1 - !IncludeZero);
-    return RandEngine::genInRangeInclusive(0,
-                                           (1 << NumBits) - 1 - !IncludeZero);
-  }();
-  if (!IncludeZero && Num >= 0)
-    Num++;
-  return Num << ZeroBits;
+  // We cannot generate shifted signed integer so we generate positive integers
+  // of required bit width and interpret them as signed via SignExtend32
+  auto Num =
+      RandEngine::genInRangeInclusive(0 + !IncludeZero, (1 << NumBits) - 1);
+  auto Shifted = Num << ZeroBits;
+  auto Res = IsSigned ? SignExtend32<BitWidth>(Shifted) : Shifted;
+  return Res;
 }
 
 template <int MinValue, int MaxValue>
