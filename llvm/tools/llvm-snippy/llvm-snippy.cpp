@@ -251,7 +251,12 @@ void generateMain() {
   if (DebugOpts.Verbose)
     outs() << "Used seed: " << Cfg.ProgramCfg->Seed << '\n';
 
-  dumpConfigIfNeeded(Cfg, ConfigIOContext{OpCC, RPW, State}, outs(), DebugOpts);
+  ConfigIOContext CfgParsingContext{
+      OpCC,
+      RPW,
+      State,
+  };
+  dumpConfigIfNeeded(Cfg, CfgParsingContext, outs(), DebugOpts);
   FlowGenerator Flow{std::move(Cfg), OpCC, std::move(RegPools),
                      getOutputFileBasename()};
   auto Result = Flow.generate(State, DebugOpts);

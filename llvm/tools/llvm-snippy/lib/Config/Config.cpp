@@ -790,7 +790,11 @@ Config::Config(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State
                                std::inserter(Histogram, Histogram.begin()));
     diagnoseHistogram(Ctx, OpCC, Histogram);
   }
-  ConfigIOContext CfgParsingCtx{OpCC, RP, State};
+  ConfigIOContext CfgParsingCtx{
+      OpCC,
+      RP,
+      State,
+  };
 
   struct DiagnosticContext {
     IncludePreprocessor &IPP;
