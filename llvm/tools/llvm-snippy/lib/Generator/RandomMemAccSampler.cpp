@@ -14,8 +14,6 @@
 namespace llvm {
 namespace snippy {
 
-
-
 void RandomMemoryAccessSampler::add(std::unique_ptr<MemoryAccess> Acc) {
   auto Allowed = Acc->getPossibleAddresses();
   RestrictedMB = RestrictedMB.diff(Allowed);
@@ -33,12 +31,10 @@ void RandomMemoryAccessSampler::print(raw_ostream &OS) const {
 }
 
 void RandomMemoryAccessSampler::updateMAG() {
-  static auto MagCount = 0ull;
-  MagCount++;
   std::vector<MemoryAccess *> Schemes;
   for (auto &Scheme : make_range(SplitAccesses.begin(), SplitAccesses.end()))
     Schemes.emplace_back(std::addressof(*Scheme));
-  MAG = MemAccGenerator{std::move(Schemes), MagCount};
+  MAG = MemAccGenerator{std::move(Schemes)};
 }
 
 MemoryAccessesGenerator &RandomMemoryAccessSampler::getMAG() {
