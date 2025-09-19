@@ -138,23 +138,19 @@ public:
 template <typename ContT> class MemAccGenerator final {
   ContT Accesses;
   MemoryAccessGenerator<typename ContT::iterator> MAG;
-  size_t MAGId;
 
 public:
-  // Id field should be unique only if this MAG is used in plugin interface
-  MemAccGenerator(ContT Container, size_t Id = 0)
-      : Accesses{std::move(Container)}, MAG{Accesses.begin(), Accesses.end()},
-        MAGId{Id} {}
+  MemAccGenerator(ContT Container)
+      : Accesses{std::move(Container)}, MAG{Accesses.begin(), Accesses.end()} {}
 
   MemAccGenerator(MemAccGenerator<ContT> &&OldMAG)
       : Accesses{std::move(OldMAG.Accesses)},
-        MAG{Accesses.begin(), Accesses.end()}, MAGId{OldMAG.MAGId} {}
+        MAG{Accesses.begin(), Accesses.end()} {}
 
   MemAccGenerator<ContT> &operator=(MemAccGenerator<ContT> &&Rhs) {
     Accesses = std::move(Rhs.Accesses);
     MAG = MemoryAccessGenerator<typename ContT::iterator>{Accesses.begin(),
                                                           Accesses.end()};
-    MAGId = Rhs.MAGId;
     return *this;
   }
 
@@ -168,8 +164,6 @@ public:
     assert(*PickedScheme < Accesses.size());
     return Accesses[*PickedScheme];
   }
-
-  size_t getId() const { return MAGId; }
 };
 
 // deduction guide for ContT
