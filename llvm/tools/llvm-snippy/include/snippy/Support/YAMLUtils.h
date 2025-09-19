@@ -143,6 +143,8 @@ template <typename> struct PolymorphicTraits;
 template <typename> struct has_ScalarTraits;
 template <typename, typename> struct missingTraits;
 
+enum class NodeKind : uint8_t;
+
 } // namespace yaml
 
 namespace snippy {
