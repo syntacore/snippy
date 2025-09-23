@@ -1102,7 +1102,16 @@ public:
       return nullptr;
   }
   bool checkOpcodeSupported(int Opcode,
-                            const FeatureBitset &Features) const override {
+                            const MCSubtargetInfo &SI) const override {
+    // FIXME: This check is required because currently basic
+    // ISA configuration is enough for FENCE_I generation. However, starting
+    // with ISA version 2.1 FENCE_I is a part of Zifencei extension
+    if (Opcode == RISCV::FENCE_I &&
+        !SI.hasFeature(RISCV::FeatureStdExtZifencei))
+      return false;
+
+    const auto &Features = SI.getFeatureBits();
+
     return RISCV_MC::isOpcodeAvailable(Opcode, Features) &&
            !snippyRISCVIsOpcodeExcluded(Opcode);
   }
