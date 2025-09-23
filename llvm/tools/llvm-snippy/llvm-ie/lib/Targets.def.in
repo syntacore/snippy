@@ -1,0 +1,7 @@
+#ifndef LLVM_IE_TARGET
+#  error Please define the macro LLVM_IE_TARGET(TargetName)
+#endif
+
+@LLVM_IE_ENUM_TARGETS@
+
+#undef LLVM_IE_TARGET 

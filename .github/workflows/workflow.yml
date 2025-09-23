@@ -45,7 +45,7 @@ jobs:
           -DLLVM_EXTERNAL_PROJECT_PASSTHROUGH="CMAKE_C_COMPILER_LAUNCHER;CMAKE_CXX_COMPILER_LAUNCHER"
           -C .syntacore/release.cmake
       - name: CMake release build
-        run: cmake --build release/build --target llvm-snippy docs-llvm-snippy-man docs-llvm-snippy-html
+        run: cmake --build release/build --target llvm-snippy llvm-ie docs-llvm-snippy-man docs-llvm-snippy-html
       - name: CMake release test
         run: env CTEST_OUTPUT_ON_FAILURE=1 cmake --build release/build --target check-llvm-tools-llvm-snippy
       - name: Upload html docs artifacts
