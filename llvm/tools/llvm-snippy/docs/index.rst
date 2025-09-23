@@ -2419,6 +2419,23 @@ The options are:
 
 This setting has the same value in all functions in the call graph.
 
+.. _`_section_names_prefix`:
+
+Section names prefix
+--------------
+
+You can override section names prefix in the output file using ``--sections-prefix=<string>``.
+
+By default, snippy uses ``.snippy`` as a section names prefix. For example:
+
+::
+
+   .snippy.text.rx
+   .snippy.data.rw
+   .snippy.stack.rw
+
+etc.
+
 .. _`_target_specific_configurationrisc_v`:
 
 Target-Specific Configuration -- RISC-V
