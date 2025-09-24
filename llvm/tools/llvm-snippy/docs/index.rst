@@ -2422,7 +2422,7 @@ This setting has the same value in all functions in the call graph.
 .. _`_section_names_prefix`:
 
 Section names prefix
---------------
+--------------------
 
 You can override section names prefix in the output file using ``--sections-prefix=<string>``.
 
