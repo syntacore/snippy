@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/MC/MCInstBuilder.h"
 #include "llvm/MC/MCObjectFileInfo.h"
@@ -31,29 +32,24 @@ namespace snippy {
 class SnippyTarget;
 
 class OpcodeCache {
-  // mapping opcode -> name
-  std::unordered_map<unsigned, std::string> Opnames;
+public:
+  using OpcodeType = unsigned;
 
-  // mapping opcode -> desc
-  std::unordered_map<unsigned, const MCInstrDesc *> Opdescs;
-
-  // mapping name -> opcode
-  std::unordered_map<std::string, unsigned> Opcodes;
+private:
+  MapVector<OpcodeType, StringRef> Opnames;
+  MapVector<OpcodeType, const MCInstrDesc *> Opdescs;
+  MapVector<StringRef, OpcodeType> Opcodes;
 
 public:
   OpcodeCache(const SnippyTarget &Tgt, const MCInstrInfo &II,
               const MCSubtargetInfo &SI);
 
-  const MCInstrDesc *desc(unsigned Opcode) const {
+  const MCInstrDesc *desc(OpcodeType Opcode) const {
     auto Iter = Opdescs.find(Opcode);
     return Iter != Opdescs.end() ? Iter->second : nullptr;
   }
 
-  std::string_view name(unsigned Opcode) const {
-    auto Iter = Opnames.find(Opcode);
-    assert(Iter != Opnames.end());
-    return Iter->second;
-  }
+  StringRef name(OpcodeType Opcode) const { return Opnames.lookup(Opcode); }
 
   void code(const Regex &OpcodeRegexp,
             SmallVectorImpl<unsigned> &Matches) const {
@@ -65,20 +61,16 @@ public:
     std::sort(Matches.begin(), Matches.end());
   }
 
-  std::optional<unsigned> code(const std::string &Name) const {
+  unsigned size() const { return Opcodes.size(); }
+
+  std::optional<unsigned> code(StringRef Name) const {
     auto Iter = Opcodes.find(Name);
     return Iter != Opcodes.end() ? std::optional(Iter->second) : std::nullopt;
   }
 
-  void dump() const {
-    std::vector<unsigned> VOp;
-    VOp.reserve(Opnames.size());
-    std::transform(Opnames.begin(), Opnames.end(), std::back_inserter(VOp),
-                   [](auto Pair) { return Pair.first; });
-    std::sort(VOp.begin(), VOp.end());
-
-    for (const auto &Opn : VOp)
-      outs() << format("%10d ", Opn) << Opnames.find(Opn)->second << "\n";
+  void dump(raw_ostream &OS) const {
+    for (const auto &[OpName, Opc] : Opcodes)
+      OS << format("%10d ", Opc) << OpName << "\n";
   }
 };
 
