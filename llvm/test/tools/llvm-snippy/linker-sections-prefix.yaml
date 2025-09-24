@@ -1,0 +1,53 @@
+# RUN: llvm-snippy %s -mtriple=riscv64-unknown-gnu -model-plugin=None \
+# RUN:    -num-instrs=10 -o %t
+# RUN: llvm-readelf -S %t.elf |& FileCheck %s --check-prefix=DEFAULT_ELF
+# RUN: FileCheck %s --input-file=%t.ld --check-prefix=DEFAULT_LS
+# RUN: llvm-snippy %s -mtriple=riscv64-unknown-gnu -model-plugin=None \
+# RUN:    -num-instrs=10 -sections-prefix=snippy_sections -o %t
+# RUN: llvm-readelf -S %t.elf |& FileCheck %s --check-prefix=ELF
+# RUN: FileCheck %s --input-file=%t.ld --check-prefix=LINKER_SCRIPT
+
+sections:
+    - name:      text
+      VMA:       0x100000
+      SIZE:      0x200000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      data
+      VMA:       0x4000000
+      SIZE:      0x20000
+      LMA:       0x4000000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x5000000
+      SIZE:      0x20000
+      LMA:       0x5000000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x7000000
+      SIZE:      0x20000
+      LMA:       0x7000000
+      ACCESS:    rw
+
+histogram:
+    - [ADDI, 1.0]
+
+# DEFAULT_LS: .snippy.text.rx
+# DEFAULT_LS: .snippy.data.rw
+# DEFAULT_LS: .snippy.stack.rw
+# DEFAULT_LS: .snippy.selfcheck.rw
+
+# DEFAULT_ELF: .snippy.text.rx
+# DEFAULT_ELF: .snippy.data.rw
+# DEFAULT_ELF: .snippy.stack.rw
+# DEFAULT_ELF: .snippy.selfcheck.rw
+
+# LINKER_SCRIPT: snippy_sections.text.rx
+# LINKER_SCRIPT: snippy_sections.data.rw
+# LINKER_SCRIPT: snippy_sections.stack.rw
+# LINKER_SCRIPT: snippy_sections.selfcheck.rw
+
+# ELF: snippy_sections.text.rx
+# ELF: snippy_sections.data.rw
+# ELF: snippy_sections.stack.rw
+# ELF: snippy_sections.selfcheck.rw
