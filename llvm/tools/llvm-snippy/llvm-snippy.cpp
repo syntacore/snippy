@@ -194,7 +194,7 @@ void dumpIfNecessary(const OpcodeCache &OpCC, const DebugOptions &DebugOpts) {
     outputYAMLToStream(OMWP, outs());
   }
   if (ListOpcodeNames)
-    OpCC.dump();
+    OpCC.dump(outs());
 }
 
 void checkOptions(LLVMContext &Ctx) {

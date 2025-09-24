@@ -23,10 +23,11 @@ OpcodeCache::OpcodeCache(const SnippyTarget &Tgt, const MCInstrInfo &II,
     if (!Tgt.checkOpcodeSupported(Opcode, SI.getFeatureBits()))
       continue;
 
+    StringRef OpName = II.getName(Opcode);
     // support all mappings
-    Opnames[Opcode] = II.getName(Opcode).str();
+    Opnames[Opcode] = OpName;
     Opdescs[Opcode] = &II.get(Opcode);
-    Opcodes[Opnames[Opcode]] = Opcode;
+    Opcodes[OpName] = Opcode;
   }
 }
 
