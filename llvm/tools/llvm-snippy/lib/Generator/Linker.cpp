@@ -42,6 +42,11 @@ static snippy::opt<bool>
                           "linker script for better readability"),
                  cl::cat(Options), cl::init(false));
 
+static snippy::opt<std::string>
+    SectionNamesPrefix("sections-prefix",
+                       cl::desc("Override section names prefix."),
+                       cl::cat(Options), cl::init(".snippy"));
+
 namespace {
 
 using FilePathT = SmallString<20>;
@@ -240,8 +245,8 @@ void Linker::LinkedSections::addInputSectionFor(const SectionDesc &Desc,
 }
 
 std::string Linker::getMangledName(StringRef SectionName) const {
-  return (".snippy" + Twine(MangleName.empty() ? "" : ".") + MangleName +
-          SectionName)
+  return (SectionNamesPrefix.getValue() + Twine(MangleName.empty() ? "" : ".") +
+          MangleName + SectionName)
       .str();
 }
 
