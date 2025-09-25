@@ -1,0 +1,20 @@
+# RUN: not llvm-snippy %s \
+# RUN:    -mtriple=riscv32-linux-gnu \
+# RUN:  |& FileCheck %s
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x100000
+    SIZE:      0x50000
+    LMA:       0x100000
+    ACCESS:    rw
+
+histogram:
+    - [FENCE_I, 2.0]
+
+# CHECK: error: Illegal opcode for specified cpu: FENCE_I
