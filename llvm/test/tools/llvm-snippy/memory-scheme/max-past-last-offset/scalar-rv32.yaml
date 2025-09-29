@@ -1,0 +1,36 @@
+# COM: This test checks that the 32-bit addresses are generated according to the
+#      memory scheme.
+
+# RUN: llvm-snippy %s %S/Inputs/hist-lw.yaml -dump-memory-accesses=%t.mem
+# RUN: FileCheck %s --input-file %t.mem --check-prefix LW-POSITIVE
+# RUN: FileCheck %s --input-file %t.mem --check-prefix LW-NEGATIVE
+
+# RUN: llvm-snippy %s %S/Inputs/hist-lb.yaml -dump-memory-accesses=%t.mem2
+# RUN: FileCheck %s --input-file %t.mem2 --check-prefix LB
+
+options:
+  mtriple: riscv32-unknown-elf
+  num-instrs: 1000
+
+include:
+  - Inputs/sections.yaml
+
+access-ranges:
+  - start: 0x80000000
+    size: 0x7
+    stride: 3
+    first-offset: 0
+    last-offset: 1
+    max-past-last-offset: 2
+
+# COM: Valid addresses for instruction LW: 0x8...0, 0x8...3
+# LW-POSITIVE-COUNT-10: 0x80000000
+# LW-POSITIVE-COUNT-10: 0x80000003
+# LW-NEGATIVE-NOT: 0x80000001
+# LW-NEGATIVE-NOT: 0x80000004
+
+# COM: Valid addresses for instruction LB: 0x8...0, 0x8...1, 0x8...3, 0x8...4
+# LB-COUNT-10: 0x80000000
+# LB-COUNT-10: 0x80000001
+# LB-COUNT-10: 0x80000003
+# LB-COUNT-10: 0x80000004
