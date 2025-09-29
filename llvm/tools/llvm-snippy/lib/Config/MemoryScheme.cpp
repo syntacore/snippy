@@ -167,6 +167,7 @@ void yaml::MappingTraits<snippy::MemoryAccessRange>::mapping(
   Io.mapRequired("first-offset", NormFirstOffset->Value);
   Io.mapRequired("last-offset", NormLastOffset->Value);
   Io.mapOptional("access-size", Range.AccessSize);
+  Io.mapOptional("max-past-last-offset", Range.MaxPastLastOffset);
   Io.mapOptional("misaligned-access", Range.AllowMisalignedAccess);
 }
 
@@ -243,6 +244,20 @@ std::string yaml::MappingTraits<snippy::MemoryAccessRange>::validate(
 
   if (Range.Stride == 0)
     return "Stride cannot be equal to 0";
+  if (Range.MaxPastLastOffset && Range.AccessSize &&
+      (Range.LastOffset - Range.FirstOffset + 1 + *Range.MaxPastLastOffset) <
+          *Range.AccessSize)
+    snippy::warn(snippy::WarningName::MemoryAccess,
+                 "Invalid memory access range",
+                 Twine("'access-size' (")
+                     .concat(Twine(*Range.AccessSize))
+                     .concat(") can't be generated because it exceeds the "
+                             "'max-past-last-offset' (")
+                     .concat(Twine(*Range.MaxPastLastOffset))
+                     .concat(") for any offsets from 'first-offset' (")
+                     .concat(Twine(Range.FirstOffset))
+                     .concat(") to 'last-offset' (")
+                     .concat(Twine(Range.LastOffset).concat(")")));
   if (Range.Weight < 0)
     return "Range access weight can not be less than 0";
 
@@ -561,6 +576,7 @@ MemoryAccessSeq MemoryAccessRange::split(const MemoryBank &MB) const {
     NewMemAccess->LastOffset = LastOffset;
     NewMemAccess->Size = Intersected.End - NewMemAccess->Start;
     NewMemAccess->AccessSize = AccessSize;
+    NewMemAccess->MaxPastLastOffset = MaxPastLastOffset;
     NewMemAccess->AllowMisalignedAccess = AllowMisalignedAccess;
 
     NewMemAccess->Weight = Size != 0 ? Weight * NewMemAccess->Size / Size : 0;
@@ -582,7 +598,7 @@ bool MemoryAccessRange::isLegal(const AddressGenInfo &AddrGenInfo) const {
     return false;
 
   auto MaxOffset = Size - AddrInfoAccessSize;
-  auto AllowedLCBlockOffsets = getAllowedOffsets(Alignment);
+  auto AllowedLCBlockOffsets = getAllowedOffsets(Alignment, AddrInfoAccessSize);
 
   if (AllowedLCBlockOffsets.empty() ||
       // FIXME: Is it actually possible? Seems like this
@@ -610,7 +626,7 @@ bool MemoryAccessRange::isLegal(const AddressGenInfo &AddrGenInfo) const {
 }
 
 void MemoryAccessRange::getAllowedOffsetsImpl(
-    size_t Alignment, SmallVectorImpl<size_t> &Out) const {
+    size_t Alignment, size_t AccessSize, SmallVectorImpl<size_t> &Out) const {
   // An offset into this memory section is valid if
   // it's properly aligned and its offset in a Stride-wide block
   // is within [FirstOffset; LastOffset]
@@ -620,17 +636,24 @@ void MemoryAccessRange::getAllowedOffsetsImpl(
   for (size_t Offset = FirstAlignedOffset; Offset < LCStride;
        Offset += Alignment) {
     auto BlockOffset = Offset % Stride;
-    if (FirstOffset <= BlockOffset && BlockOffset <= LastOffset)
+    bool InRange = FirstOffset <= BlockOffset && BlockOffset <= LastOffset;
+    bool IsValid = InRange && (!MaxPastLastOffset
+                                   ? true
+                                   : BlockOffset + AccessSize <=
+                                         LastOffset + 1 + *MaxPastLastOffset);
+    if (IsValid)
       Out.push_back(Offset);
   }
 }
 
-ArrayRef<size_t> MemoryAccessRange::getAllowedOffsets(size_t Alignment) const {
-  auto &Offsets = AlignmentAllowedLCBlockOffsets[Log2_64(Alignment)];
+ArrayRef<size_t> MemoryAccessRange::getAllowedOffsets(size_t Alignment,
+                                                      size_t AccessSize) const {
+  auto &Offsets =
+      AlignmentAllowedLCBlockOffsets[AccessSize][Log2_64(Alignment)];
   if (Offsets)
     return *Offsets;
   auto &OffsetsVec = Offsets.emplace();
-  getAllowedOffsetsImpl(Alignment, OffsetsVec);
+  getAllowedOffsetsImpl(Alignment, AccessSize, OffsetsVec);
   return OffsetsVec;
 }
 
@@ -642,7 +665,7 @@ AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
   auto LCStride = getLCStride(Alignment);
   auto NumElements = Params.NumElements;
 
-  auto AllowedLCBlockOffsets = getAllowedOffsets(Alignment);
+  auto AllowedLCBlockOffsets = getAllowedOffsets(Alignment, AccessSize);
   assert(!AllowedLCBlockOffsets.empty());
 
   auto MaxOffset = Size - AccessSize;
@@ -677,6 +700,7 @@ AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
     assert(LCBlockOffsetIt < Slice.rend());
     Offset = LCBlockIdx * LCStride + *LCBlockOffsetIt;
   }
+  assert(Offset <= MaxOffset);
 
   auto MinOffAligned = alignDown(Offset, LCStride);
 

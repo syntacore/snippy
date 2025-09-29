@@ -1,0 +1,42 @@
+# REQUIRES: riscv-rvv
+# COM: This test checks that only addresses with 16 bytes available (for vs1r.v)
+#      are selected.
+
+# RUN: llvm-snippy %s -dump-memory-accesses=%t.mem
+# RUN: FileCheck %s --input-file %t.mem --check-prefix POSITIVE-CHECK
+# RUN: FileCheck %s --input-file %t.mem --check-prefix NEGATIVE-CHECK
+
+options:
+  mtriple: riscv64-unknown-elf
+  mattr: +v
+  num-instrs: 100
+  riscv-disable-misaligned-access: true
+
+include:
+  - Inputs/rvv-sew32-lmul1.yaml
+  - Inputs/sections.yaml
+
+histogram:
+  - [VS1R_V, 1.0]
+  - [VSETIVLI, 1.0]
+
+access-ranges:
+  - start: 0x80003000
+    size: 0x20
+    stride: 0x18
+    first-offset: 0
+    last-offset: 3
+    max-past-last-offset: 11
+  - start: 0x80005000
+    size: 0x20
+    stride: 0x18
+    first-offset: 0
+    last-offset: 3
+    max-past-last-offset: 13
+
+# POSITIVE-CHECK-COUNT-5: 0x80005000
+# POSITIVE-CHECK-COUNT-5: 0x80005001
+
+# NEGATIVE-CHECK-NOT: 0x80003
+# NEGATIVE-CHECK-NOT: 0x80005002
+# NEGATIVE-CHECK-NOT: 0x80005003
