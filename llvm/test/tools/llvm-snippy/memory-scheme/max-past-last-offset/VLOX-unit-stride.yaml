@@ -1,0 +1,51 @@
+# REQUIRES: riscv-rvv
+# COM: This test checks that only sutable memory scheme is selected.
+
+# RUN: llvm-snippy %s -dump-memory-accesses=%t.mem
+# RUN: FileCheck %s --input-file %t.mem --check-prefix POSITIVE-CHECK
+# RUN: FileCheck %s --input-file %t.mem --check-prefix NEGATIVE-CHECK
+
+options:
+  mtriple: riscv64-unknown-elf
+  mattr: +v
+  num-instrs: 100
+
+include:
+  - Inputs/rvv-sew32-lmul1.yaml
+  - Inputs/sections.yaml
+
+histogram:
+  - [VLOXSEG3EI32_V, 1.0]
+  - [VSETIVLI, 1.0]
+
+access-ranges:
+  - start: 0x80003000
+    size: 0x10
+    stride: 0x10
+    first-offset: 0
+    last-offset: 5
+    max-past-last-offset: 5
+  - start: 0x80004000
+    size: 0x10
+    stride: 0x10
+    first-offset: 5
+    last-offset: 6
+    max-past-last-offset: 8
+# VLOX instruction accesses 3 sequential elements. Each element is 4 bytes long,
+# therefore, there is only one scheme which is suitable.
+  - start: 0x80005000
+    size: 0x10
+    stride: 0x10
+    first-offset: 0
+    last-offset: 5
+    max-past-last-offset: 8
+
+# POSITIVE-CHECK-COUNT-5: 0x80005000
+# POSITIVE-CHECK-COUNT-5: 0x80005001
+# POSITIVE-CHECK-COUNT-5: 0x80005002
+
+# NEGATIVE-CHECK-NOT: 0x80003
+# NEGATIVE-CHECK-NOT: 0x80004
+# NEGATIVE-CHECK-NOT: 0x80005003
+# NEGATIVE-CHECK-NOT: 0x80005004
+# NEGATIVE-CHECK-NOT: 0x80005005

@@ -26,6 +26,7 @@
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/YAMLUtils.h"
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
 
@@ -285,6 +286,7 @@ struct MemoryAccessRange final : MemoryAccess {
   size_t FirstOffset = 0;
   size_t LastOffset = 0;
   std::optional<size_t> AccessSize = std::nullopt;
+  std::optional<size_t> MaxPastLastOffset = std::nullopt;
   std::optional<bool> AllowMisalignedAccess = std::nullopt;
 
 private:
@@ -300,16 +302,31 @@ private:
   // small.
   // NOTE: mutable here because we are caching calculated offsets. Won't work
   // well if we'll want to parallel it.
-  mutable std::array<std::optional<SmallVector<size_t>>, 4>
+  // NOTE: This is a hash table of the instruction access size (unsigned) in the
+  // array for each of the alignments. This is necessary because each access
+  // size and alignment has it's own allowed offsets.
+  mutable SmallDenseMap<
+      unsigned, std::array<std::optional<SmallVector<size_t>>, 4>,
+      // NOTE: The most popular access sizes are byte, halfword, word and
+      // doubleword. Therefore, we guarantee that a place for at least four
+      // elements will be allocated in the hash table.
+      /* InlineBuckets */ 4>
       AlignmentAllowedLCBlockOffsets;
 
 public:
-  MemoryAccessRange() : MemoryAccess(MemoryAccessMode::Range) {}
+  MemoryAccessRange()
+      : MemoryAccess(MemoryAccessMode::Range),
+        AlignmentAllowedLCBlockOffsets() {}
 
   MemoryAccessRange(MemAddr StartAddr, size_t Size, unsigned Stride,
-                    unsigned FirstOffset, unsigned LastOffset)
+                    unsigned FirstOffset, unsigned LastOffset,
+                    std::optional<size_t> AccessSize = std::nullopt,
+                    std::optional<size_t> MaxPastLastOffset = std::nullopt,
+                    std::optional<bool> AllowMisalignedAccess = std::nullopt)
       : MemoryAccess(MemoryAccessMode::Range), Start(StartAddr), Size(Size),
-        Stride(Stride), FirstOffset(FirstOffset), LastOffset(LastOffset) {}
+        Stride(Stride), FirstOffset(FirstOffset), LastOffset(LastOffset),
+        AccessSize(AccessSize), MaxPastLastOffset(MaxPastLastOffset),
+        AllowMisalignedAccess(AllowMisalignedAccess) {}
 
   MemoryAccessRange(const SectionDesc &S, unsigned Alignment);
 
@@ -336,10 +353,10 @@ private:
     return std::lcm(Stride, Alignment);
   }
 
-  void getAllowedOffsetsImpl(size_t Alignment,
+  void getAllowedOffsetsImpl(size_t Alignment, size_t AccessSize,
                              SmallVectorImpl<size_t> &Out) const;
 
-  ArrayRef<size_t> getAllowedOffsets(size_t Alignment) const;
+  ArrayRef<size_t> getAllowedOffsets(size_t Alignment, size_t AccessSize) const;
 
   // Find the last LCStride-wide block that can fit AccessSize-wide element with
   // the specified alignment.

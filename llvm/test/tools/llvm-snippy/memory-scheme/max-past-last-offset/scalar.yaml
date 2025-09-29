@@ -1,0 +1,64 @@
+# COM: This test checks that the addresses are generated according to the memory
+#      scheme.
+
+# RUN: llvm-snippy %s %S/Inputs/hist-lw.yaml -dump-memory-accesses=%t.mem
+# RUN: FileCheck %s --input-file %t.mem --check-prefix LW-POSITIVE
+# RUN: FileCheck %s --input-file %t.mem --check-prefix LW-NEGATIVE
+
+# RUN: llvm-snippy %s %S/Inputs/hist-lb.yaml -dump-memory-accesses=%t.mem2
+# RUN: FileCheck %s --input-file %t.mem2 --check-prefix LB
+
+options:
+  mtriple: riscv64-unknown-elf
+  num-instrs: 1000
+
+sections:
+  - name: 1
+    VMA: 0x430000000
+    SIZE: 0x2400000
+    LMA: 0x430000000
+    ACCESS: rx
+  - name: 2
+    VMA: 0x460000000
+    SIZE: 0x1000
+    LMA: 0x460000000
+    ACCESS: r
+  - name: 3
+    VMA: 0x400000000
+    SIZE: 0x1000
+    LMA: 0x400000000
+    ACCESS: rw
+
+access-ranges:
+  - start: 0x400000000
+    size: 0x7
+    stride: 3
+    first-offset: 0
+    last-offset: 1
+    max-past-last-offset: 2
+
+#              last
+#              offset=1
+#                 |
+#       |first    |
+#       |offset=0 |    max-past-last-offset=2
+#       V         V    |<----------------->|
+#  |_________|_________|_________|_________|_________|_________|
+#  0x4...0   0x4...1   0x4...2   0x4...3   0x4...4   0x4...5   0x4...6
+#  |<--------------------------->|<--------------------------->|
+#             stride=3                      stride=3
+#
+#  Addresses offsets that are being accessed should not exceed the limit of
+#  last-offset + max-past-last-offset
+
+# COM: Valid addresses for instruction LW: 0x4...0, 0x4...3
+# LW-POSITIVE-COUNT-10: 0x400000000
+# LW-POSITIVE-COUNT-10: 0x400000003
+# LW-NEGATIVE-NOT: 0x400000001
+# LW-NEGATIVE-NOT: 0x400000004
+
+# COM: Valid addresses for instruction LB: 0x4...0, 0x4...1, 0x4...3, 0x4...4
+# LB-COUNT-10: 0x400000000
+# LB-COUNT-10: 0x400000001
+# LB-COUNT-10: 0x400000003
+# LB-COUNT-10: 0x400000004
