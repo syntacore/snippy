@@ -29,7 +29,7 @@ riscv-vector-unit:
       LMUL:
         m8: 1.0
 
-# vlsseg3e8 is actually strided, so it has access size 3 
+# vlsseg3e8 is actually strided, so it has access size 3
 access-ranges:
 # This scheme has too small size
     - start: 0x80002000
@@ -44,7 +44,7 @@ access-ranges:
       stride: 16
       first-offset: 0
       last-offset: 0
-# This scheme has propper access size
+# This scheme has proper access size
     - start: 0x80006000
       size: 0x200
       stride: 16

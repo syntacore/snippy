@@ -1,0 +1,49 @@
+# REQUIRES: riscv-rvv
+# COM: This test checks that selected only addresses where 16 bytes (for vs1r.v)
+#      are available.
+
+# RUN: llvm-snippy %s -dump-memory-accesses=%t.mem
+# RUN: FileCheck %s --input-file %t.mem --check-prefix POSITIVE-CHECK
+# RUN: FileCheck %s --input-file %t.mem --check-prefix NEGATIVE-CHECK
+
+options:
+  mtriple: riscv64-unknown-elf
+  mattr: +v
+  num-instrs: 100
+  riscv-disable-misaligned-access: true
+
+include:
+  - Inputs/rvv-sew32-lmul1.yaml
+  - Inputs/sections.yaml
+
+histogram:
+    - [VLSSEG5E8_V, 1.0]
+    - [VSETIVLI, 1.0]
+
+# vlsseg5e8 has access size 5
+access-ranges:
+# This scheme has too small available offset: 2 + 1 + 1 < 5
+  - start: 0x80002000
+    size: 0x1000
+    stride: 0x100
+    first-offset: 0
+    last-offset: 2
+    max-past-last-offset: 1
+# This scheme doesn't have max-past-last-offset, which means it is valid
+  - start: 0x80003000
+    size: 0x1000
+    stride: 0x100
+    first-offset: 0
+    last-offset: 2
+# This scheme has sutable available offset: 2 + 2 + 1 >= 5
+  - start: 0x80005000
+    size: 0x1000
+    stride: 0x100
+    first-offset: 0
+    last-offset: 2
+    max-past-last-offset: 2
+
+# POSITIVE-CHECK-COUNT-10: 0x80003
+# POSITIVE-CHECK-COUNT-10: 0x80005
+
+# NEGATIVE-CHECK-NOT: 0x80002

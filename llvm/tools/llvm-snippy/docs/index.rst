@@ -992,12 +992,15 @@ Use ``memory.yaml`` for a reference on a memory scheme with strides:
          stride: 16
          first-offset: 1
          last-offset: 2
+         max-past-last-offset: 2
+         access-size: 4
          weight: 1
        - start: 0x80008000
          size: 0x1000
          stride: 8
          first-offset: 1
          last-offset: 2
+         max-past-last-offset: 4
          weight: 2
 
 where:
@@ -1008,9 +1011,13 @@ where:
 
 -  ``stride`` |nbsp| -- |nbsp| Stride size
 
--  ``first offset`` |nbsp| -- |nbsp| Number of the first available bit in a stride
+-  ``first offset`` |nbsp| -- |nbsp| Number of the first available bit in a stride, which access can start from
 
--  ``last offset`` |nbsp| -- |nbsp| Number of the last available bit in a stride
+-  ``last offset`` |nbsp| -- |nbsp| Number of the last available bit in a stride, which access can start from
+
+-  ``max-past-last-offset`` |nbsp| -- |nbsp| Maximum number of bits after `last-offset` that can be accessed (optional).
+
+-  ``access-size`` |nbsp| -- |nbsp| Access size (optional). If it is specified than this range can only be used for accesses not exceeding `access-size` bytes per one memory access.
 
 
 -  ``weight`` |nbsp| -- |nbsp| Optional value, relative probability of this access range. If you omit it, snippy considers it as ``1``.
@@ -1018,15 +1025,65 @@ where:
 If a stride’s memory scheme is supplied, then the address is calculated
 as:
 
-``start + stride * rand(0 .. size/stride) + rand(first-offset .. last-offset)``
+ **start + stride * rand(0 .. size/stride) + rand(first-offset .. last-offset)**
 
-See the memory scheme and address examples for different offsets in
-`figure 1 <#MEMORY_SCHEME>`__.
+This formula shows which addresses can be generated as operands of memory instructions, but it does not take into account how many bytes the instruction touches. By default, the instruction can affect any number of bytes so that the `start` + `size` of `access-ranges` is not exceeded.
+
+In order to regulate all bytes that are accessed, there are two optional fields `access-size` and `max-past-last-offset`. The first ensures that this memory scheme will not be used for instructions with an access size greater than `access-size`. The second allows you to controll how far access can exceed `last-offset`, the offset of the last byte to which access is allowed is `last-offset` + `max-past-last-offset`. This way you can generate accesses of `access-size` bytes without accessing bytes after `last-offset` + `max-past-last-offset`.
+
+.. note::
+   In order to be able to start accessing memory from the byte with `last-offset`,
+   the parameter `max-past-last-offset` must be greater than or equal to 1.
+
+.. note::
+
+   It makes no sense to set a `max-past-last-offset` greater than `access-size`,
+   because access will never exceed `access-size` anyway.
+
+.. important::
+
+   No matter how large the `max-past-last-offset` and `access-size` values are,
+   the start of access must always be in the interval [`first-offset`, `last-offset`].
+
+See the memory scheme examples for different offsets in
+`figure 1 <#MEMORY_SCHEME>`__. Here, the bytes that can be accessed are indicated in red. The yellow color indicates the bytes accessed by the memory instruction.
 
 .. figure:: ./_static/snippy-mem.png
    :alt: Memory scheme
+   :scale: 80%
 
    Memory scheme
+
+
+Address examples:
+
++---------------+-----------------+-----------------+------------------+-------------------+---------------------------+--------------------------------------------------------------------------------------+
+|  **start**    |    **end**      |    **stride**   | **first-offset** |  **last-offset**  | **max-past-last-offset**  |       **addr = start + k * stride + [first-offset, ... last-offset]**                |
++---------------+-----------------+-----------------+------------------+-------------------+---------------------------+--------------------------------------------------------------------------------------+
+|     0         |     1024        |        8        |        0         |        0          |          \-               | [0, 1024), [8, 1024), [16, 1024), [24, 1024), [32, 1024), ...                        |
++---------------+-----------------+-----------------+------------------+-------------------+---------------------------+--------------------------------------------------------------------------------------+
+|     0         |     1024        |        8        |        1         |        1          |          \-               | [1, 1024), [9, 1024), [17, 1024), [25, 1024), [33, 1024), ...                        |
++---------------+-----------------+-----------------+------------------+-------------------+---------------------------+--------------------------------------------------------------------------------------+
+|     0         |     1024        |        8        |        1         |        2          |          \-               | [1, 1024), [2, 1024), [9, 1024), [10, 1024), [17, 1024), [18, 1024), ...             |
++---------------+-----------------+-----------------+------------------+-------------------+---------------------------+--------------------------------------------------------------------------------------+
+|     0         |     1024        |        4        |        0         |        2          |          \-               | [0, 1024), [1, 1024), [2, 1024), [4, 1024), [5, 1024), [6, 1024), ...                |
++---------------+-----------------+-----------------+------------------+-------------------+---------------------------+--------------------------------------------------------------------------------------+
+|     0         |     1024        |        8        |        0         |        0          |           2               | [0, 1], [8, 9], [16, 17], ...                                                        |
++---------------+-----------------+-----------------+------------------+-------------------+---------------------------+--------------------------------------------------------------------------------------+
+|     0         |     1024        |        8        |        0         |        1          |           2               | [0, 2], [1, 2], [8, 10], [9, 10], ...                                                |
++---------------+-----------------+-----------------+------------------+-------------------+---------------------------+--------------------------------------------------------------------------------------+
+|     0         |     1024        |        4        |        0         |        1          |           3               | [0, 3], [1, 3], [4, 7], [5, 7], ...                                                  |
++---------------+-----------------+-----------------+------------------+-------------------+---------------------------+--------------------------------------------------------------------------------------+
+|     0         |     1024        |        4        |        0         |        0          |          10               | [0, 9], [4, 13], [8, 17], ...                                                        |
++---------------+-----------------+-----------------+------------------+-------------------+---------------------------+--------------------------------------------------------------------------------------+
+|     0         |     1024        |        4        |        1         |        2          |           5               | [1, 6], [2, 6], [5, 10], [6, 10], ...                                                |
++---------------+-----------------+-----------------+------------------+-------------------+---------------------------+--------------------------------------------------------------------------------------+
+|     0         |     1024        |      1000       |        7         |        8          |          \-               | [7, 1024), [8, 1024), [1007, 1024), [1008, 1024)                                     |
++---------------+-----------------+-----------------+------------------+-------------------+---------------------------+--------------------------------------------------------------------------------------+
+|     0         |     1024        |      1000       |        7         |        8          |          100              | [7, 107], [8, 107], [1007, 1024), [1008, 1024)                                       |
++---------------+-----------------+-----------------+------------------+-------------------+---------------------------+--------------------------------------------------------------------------------------+
+
+
 
 Memory Eviction
 ~~~~~~~~~~~~~~~

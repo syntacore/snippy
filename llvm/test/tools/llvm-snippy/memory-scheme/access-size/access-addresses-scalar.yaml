@@ -14,7 +14,7 @@ access-addresses:
 # This address has too small size
     - addr: 0x80002000
       access-size: 1
-# This address has a defaukt access size 16 
+# This address has a default access size 16
     - addr: 0x80003000
 # This address has propper access size
     - addr: 0x80005000

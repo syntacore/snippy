@@ -1,0 +1,24 @@
+# COM: This test checks that a warning is emitted for an incorrect combination
+#      of memory scheme parameters.
+
+# RUN: llvm-snippy %s \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64-unknown-elf
+  num-instrs: 10
+
+include:
+  - Inputs/sections.yaml
+  - Inputs/hist-lb.yaml
+
+access-ranges:
+  - start: 0x80000000
+    size: 0x6
+    stride: 3
+    first-offset: 0
+    last-offset: 1
+    max-past-last-offset: 1
+    access-size: 4
+
+# CHECK: Invalid memory access range: 'access-size' (4) can't be generated because it exceeds the 'max-past-last-offset' (1) for any offsets from 'first-offset' (0) to 'last-offset' (1)
