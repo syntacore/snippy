@@ -5,6 +5,7 @@ set(LLVM_LINK_COMPONENTS
 set(snippy_sources
   Support.cpp
   ImmediateHistogram.cpp
+  MemoryAccessRange.cpp
   )
 
 set(snippy_link_libraries
