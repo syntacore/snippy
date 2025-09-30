@@ -9,9 +9,7 @@
 #pragma once
 
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/CodeGen/MachineLoopInfo.h"
 
-#include <optional>
 #include <unordered_map>
 
 namespace llvm {
@@ -37,12 +35,11 @@ public:
     assert(Inserted);
   }
 
-  std::optional<LoopGenerationInfo>
+  const LoopGenerationInfo *
   getLoopsGenerationInfoForMBB(const MachineBasicBlock *Header) const {
     assert(Header);
     auto Found = LoopInfoMap.find(Header);
-    return Found == LoopInfoMap.end() ? std::nullopt
-                                      : std::optional(Found->second);
+    return Found == LoopInfoMap.end() ? nullptr : &(Found->second);
   }
 
   // See description for `IncomingValues`.

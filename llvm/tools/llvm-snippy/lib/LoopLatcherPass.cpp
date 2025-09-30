@@ -384,12 +384,6 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   auto *Header = ML.getHeader();
   assert(Header);
 
-  // Currently this is a workaround specifically for selfcheck and placing IV's
-  // on the stack. Ind-var schemes assume that the IV value is stored in the
-  // register, which is not true when place-on-stack is set. In case of
-  // non-trivial loops IV value should be read from the stack so that only one
-  // register is used for deeply nested loops. This is currently not implemented
-  // so place-on-stack should not be used together with IV addressing schemes.
   MachineBasicBlock::iterator InsPos =
       IsStackLoopCountersRequested || TrackingMode ? NewBranch
                                                    : Header->getFirstNonPHI();
@@ -407,7 +401,7 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   // counter gets incremented at the beginning of the header. However, ideally
   // increment needs to either precede or happen after all of the instructions
   // in the loop body. Otherwise it's not obvious how to generate strided
-  // accesses. If the increment happends somewhere in the middle of the loop
+  // accesses. If the increment happens somewhere in the middle of the loop
   // body (as it does now with selfcheck) off-by-one errors are possible. So,
   // when using indvars for addressing increment should be moved to the top of
   // the header.

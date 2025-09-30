@@ -51,8 +51,7 @@ selectAddressForSingleInstrFromBurstGroup(InstructionGenerationContext &IGC,
                                           const AddressRestriction &OpcodeAR);
 
 AddressGenInfo chooseAddrGenInfoForInstrCallback(
-    LLVMContext &Ctx,
-    std::optional<SnippyLoopInfo::LoopGenerationInfo> CurLoopGenInfo,
+    LLVMContext &Ctx, const SnippyLoopInfo::LoopGenerationInfo *CurLoopGenInfo,
     size_t AccessSize, size_t Alignment, bool AllowMisalign,
     const MemoryAccess &MemoryScheme);
 
