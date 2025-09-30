@@ -940,8 +940,7 @@ bool sizeLimitIsExceeded(const planning::RequestLimit &Lim,
 }
 
 AddressGenInfo chooseAddrGenInfoForInstrCallback(
-    LLVMContext &Ctx,
-    std::optional<SnippyLoopInfo::LoopGenerationInfo> CurLoopGenInfo,
+    LLVMContext &Ctx, const SnippyLoopInfo::LoopGenerationInfo *CurLoopGenInfo,
     size_t AccessSize, size_t Alignment, bool AllowMisalign,
     const MemoryAccess &MemoryScheme) {
   (void)CurLoopGenInfo; // for future extensibility
@@ -963,12 +962,11 @@ chooseAddrInfoForInstr(MachineInstr &MI, InstructionGenerationContext &IGC,
   auto [AccessSize, Alignment, AllowMisalign] =
       SnippyTgt.getAccessSizeAndAlignment(ProgCtx, Opcode, *MI.getParent());
 
-  auto CurLoopGenInfo =
-      ML ? SLI->getLoopsGenerationInfoForMBB(ML->getHeader()) : std::nullopt;
+  auto *CurLoopGenInfo =
+      ML ? SLI->getLoopsGenerationInfoForMBB(ML->getHeader()) : nullptr;
 
-  // Depending on which memory scheme is chosen we either try to generate a
-  // strided access if the scheme has [ind-var] attribute or fallback to
-  // regular single address access
+  // CurLoopGenInfo will be passed by pointer
+  // so that in the future it can be modified during the generation process.
   auto ChooseAddrGenInfo =
       [&Ctx = State.getCtx(), CurLoopGenInfo, AccessSize = AccessSize,
        Alignment = Alignment, AllowMisalign = AllowMisalign](
