@@ -1,0 +1,59 @@
+# COM: This test checks that an error occurs if the options are incompatible
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_ADDI4SPN/ %s > %t.1.yaml
+# RUN: not llvm-snippy %t.1.yaml --model-plugin=None \
+# RUN: |& FileCheck %s
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_ADDI16SP/ %s > %t.2.yaml
+# RUN: not llvm-snippy %t.2.yaml --model-plugin=None \
+# RUN: |& FileCheck %s
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FLDSP/ %s > %t.3.yaml
+# RUN: not llvm-snippy %t.3.yaml --model-plugin=None \
+# RUN: |& FileCheck %s
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FSDSP/ %s > %t.4.yaml
+# RUN: not llvm-snippy %t.4.yaml --model-plugin=None \
+# RUN: |& FileCheck %s
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_LWSP/ %s > %t.5.yaml
+# RUN: not llvm-snippy %t.5.yaml --model-plugin=None \
+# RUN: |& FileCheck %s
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_LDSP/ %s > %t.6.yaml
+# RUN: not llvm-snippy %t.6.yaml --model-plugin=None \
+# RUN: |& FileCheck %s
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_SWSP/ %s > %t.7.yaml
+# RUN: not llvm-snippy %t.7.yaml --model-plugin=None \
+# RUN: |& FileCheck %s
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_SDSP/ %s > %t.8.yaml
+# RUN: not llvm-snippy %t.8.yaml --model-plugin=None \
+# RUN: |& FileCheck %s
+
+
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  mattr: "+c,+f,+d"
+  num-instrs: 100
+  honor-target-abi: on
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x400000
+    SIZE:      0x100000
+    LMA:       0x400000
+    ACCESS:    rw
+
+histogram:
+    - [SP_RELATIVE_INSTR, 1.0]
+    - [ADDI, 1.0]
+
+# CHECK: error: Incompatible options: When --honor-target-abi is enabled, generation of SP-relative instructions is not supported.
