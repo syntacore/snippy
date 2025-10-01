@@ -3369,7 +3369,7 @@ public:
     }
 
     SmallVector<Register, 32> Result;
-    if (isCSPRelativeLoadStore(Opcode) || isCFPSPRelativeLoadStore(Opcode)) {
+    if (isSPRelative(Opcode)) {
       copy_if(getAddrRegClass(), std::back_inserter(Result),
               [](Register Reg) { return Reg != RISCV::X2; });
     } else {
@@ -3576,6 +3576,9 @@ public:
   }
 
   bool isCall(unsigned Opcode) const override { return snippy::isCall(Opcode); }
+  bool isSPRelative(unsigned Opcode) const override {
+    return snippy::isSPRelative(Opcode);
+  }
 
 private:
   SmallVector<SectionDesc, 3> ReservedRanges;

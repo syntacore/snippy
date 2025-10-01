@@ -605,6 +605,7 @@ public:
   virtual size_t getAccessSize(unsigned Opcode) const = 0;
 
   virtual bool isCall(unsigned Opcode) const = 0;
+  virtual bool isSPRelative(unsigned Opcode) const = 0;
 
   virtual std::vector<OpcodeHistogramEntry>
   getPolicyOverrides(const SnippyProgramContext &ProgCtx,
