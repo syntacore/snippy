@@ -1,0 +1,132 @@
+# COM: This test checks that an error occurs if the options are incompatible
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_ADDI4SPN/ %s > %t.1.yaml
+# RUN: not llvm-snippy %t.1.yaml -redefine-sp=SP --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix SP
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_ADDI16SP/ %s > %t.2.yaml
+# RUN: not llvm-snippy %t.2.yaml -redefine-sp=SP --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix SP
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FLDSP/ %s > %t.3.yaml
+# RUN: not llvm-snippy %t.3.yaml -redefine-sp=SP --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix SP
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FSDSP/ %s > %t.4.yaml
+# RUN: not llvm-snippy %t.4.yaml -redefine-sp=SP --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix SP
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_LWSP/ %s > %t.5.yaml
+# RUN: not llvm-snippy %t.5.yaml -redefine-sp=SP --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix SP
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_LDSP/ %s > %t.6.yaml
+# RUN: not llvm-snippy %t.6.yaml -redefine-sp=SP --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix SP
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_SWSP/ %s > %t.7.yaml
+# RUN: not llvm-snippy %t.7.yaml -redefine-sp=SP --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix SP
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_SDSP/ %s > %t.8.yaml
+# RUN: not llvm-snippy %t.8.yaml -redefine-sp=SP --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix SP
+
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_ADDI4SPN/ %s > %t.1.yaml2
+# RUN: not llvm-snippy %t.1.yaml2 -redefine-sp=any --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_ADDI16SP/ %s > %t.2.yaml2
+# RUN: not llvm-snippy %t.2.yaml2 -redefine-sp=any --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FLDSP/ %s > %t.3.yaml2
+# RUN: not llvm-snippy %t.3.yaml2 -redefine-sp=any --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FSDSP/ %s > %t.4.yaml2
+# RUN: not llvm-snippy %t.4.yaml2 -redefine-sp=any --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_LWSP/ %s > %t.5.yaml2
+# RUN: not llvm-snippy %t.5.yaml2 -redefine-sp=any --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_LDSP/ %s > %t.6.yaml2
+# RUN: not llvm-snippy %t.6.yaml2 -redefine-sp=any --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_SWSP/ %s > %t.7.yaml2
+# RUN: not llvm-snippy %t.7.yaml2 -redefine-sp=any --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_SDSP/ %s > %t.8.yaml2
+# RUN: not llvm-snippy %t.8.yaml2 -redefine-sp=any --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY
+
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_ADDI4SPN/ %s > %t.1.yaml3
+# RUN: not llvm-snippy %t.1.yaml3 -redefine-sp=reg::X2 --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X2
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_ADDI16SP/ %s > %t.2.yaml3
+# RUN: not llvm-snippy %t.2.yaml3 -redefine-sp=reg::X2 --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X2
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FLDSP/ %s > %t.3.yaml3
+# RUN: not llvm-snippy %t.3.yaml3 -redefine-sp=reg::X2 --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X2
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FSDSP/ %s > %t.4.yaml3
+# RUN: not llvm-snippy %t.4.yaml3 -redefine-sp=reg::X2 --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X2
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_LWSP/ %s > %t.5.yaml3
+# RUN: not llvm-snippy %t.5.yaml3 -redefine-sp=reg::X2 --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X2
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_LDSP/ %s > %t.6.yaml3
+# RUN: not llvm-snippy %t.6.yaml3 -redefine-sp=reg::X2 --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X2
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_SWSP/ %s > %t.7.yaml3
+# RUN: not llvm-snippy %t.7.yaml3 -redefine-sp=reg::X2 --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X2
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_SDSP/ %s > %t.8.yaml3
+# RUN: not llvm-snippy %t.8.yaml3 -redefine-sp=reg::X2 --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X2
+
+
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  mattr: "+c,+f,+d"
+  num-instrs: 100
+
+sections:
+    - no:        1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x400000
+      SIZE:      0x100000
+      LMA:       0x400000
+      ACCESS:    rw
+
+histogram:
+    - [SP_RELATIVE_INSTR, 1.0]
+    - [ADDI, 1.0]
+
+# X2: error: Incompatible options: When the stack pointer is redefined to 'reg::X2', generation of SP-relative instructions is not supported. Redefine it to 'any-not-SP' or remove SP-relative instructions from the histogram.
+# SP: error: Incompatible options: When the stack pointer is redefined to 'SP', generation of SP-relative instructions is not supported. Redefine it to 'any-not-SP' or remove SP-relative instructions from the histogram.
+# ANY: error: Incompatible options: When the stack pointer is redefined to 'any', generation of SP-relative instructions is not supported. Redefine it to 'any-not-SP' or remove SP-relative instructions from the histogram.
+
