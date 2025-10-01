@@ -1,0 +1,65 @@
+# COM: This test checks that an error occurs if the options are incompatible
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FLWSP/ %s > %t.1.yaml
+# RUN: not llvm-snippy %t.1.yaml -honor-target-abi --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ABI
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FSWSP/ %s > %t.2.yaml
+# RUN: not llvm-snippy %t.2.yaml -honor-target-abi --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ABI
+
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FLWSP/ %s > %t.1.yaml1
+# RUN: not llvm-snippy %t.1.yaml1 -redefine-sp=SP --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix SP
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FSWSP/ %s > %t.2.yaml1
+# RUN: not llvm-snippy %t.2.yaml1 -redefine-sp=SP --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix SP
+
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FLWSP/ %s > %t.1.yaml2
+# RUN: not llvm-snippy %t.1.yaml2 -redefine-sp=any --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FSWSP/ %s > %t.2.yaml2
+# RUN: not llvm-snippy %t.2.yaml2 -redefine-sp=any --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY
+
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FLWSP/ %s > %t.1.yaml3
+# RUN: not llvm-snippy %t.1.yaml3 -redefine-sp=reg::X2 --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X2
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FSWSP/ %s > %t.2.yaml3
+# RUN: not llvm-snippy %t.2.yaml3 -redefine-sp=reg::X2 --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X2
+
+
+options:
+  march: riscv32-unknown-elf
+  mcpu: generic-rv32
+  mattr: "+c,+f"
+  num-instrs: 100
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x400000
+    SIZE:      0x100000
+    LMA:       0x400000
+    ACCESS:    rw
+
+histogram:
+    - [SP_RELATIVE_INSTR, 1.0]
+    - [ADDI, 1.0]
+
+# ABI: error: Incompatible options: When --honor-target-abi is enabled, generation of SP-relative instructions is not supported.
+# X2: error: Incompatible options: When the stack pointer is redefined to 'reg::X2', generation of SP-relative instructions is not supported. Redefine it to 'any-not-SP' or remove SP-relative instructions from the histogram.
+# SP: error: Incompatible options: When the stack pointer is redefined to 'SP', generation of SP-relative instructions is not supported. Redefine it to 'any-not-SP' or remove SP-relative instructions from the histogram.
+# ANY: error: Incompatible options: When the stack pointer is redefined to 'any', generation of SP-relative instructions is not supported. Redefine it to 'any-not-SP' or remove SP-relative instructions from the histogram.
+

@@ -408,17 +408,29 @@ parseSpilledRegistersOption(const RegPoolWrapper &RP, const SnippyTarget &Tgt,
   return SpilledRegs;
 }
 
-static MCRegister getRealStackPointer(const RegPoolWrapper &RP,
-                                      const SnippyTarget &Tgt,
-                                      const MCRegisterInfo &RI,
-                                      std::vector<MCRegister> &SpilledToStack,
-                                      LLVMContext &Ctx, Config &Cfg,
-                                      const ProgramOptions &Opts) {
+static void generateSPRelativeInstrsError(StringRef RedefineSP) {
+  snippy::fatal("Incompatible options",
+                "When the stack pointer is redefined to '" + Twine(RedefineSP) +
+                    "', generation of "
+                    "SP-relative instructions is not supported. Redefine it to "
+                    "'any-not-SP' or remove SP-relative instructions from the "
+                    "histogram.");
+}
+
+static MCRegister getRealStackPointer(
+    const RegPoolWrapper &RP, const SnippyTarget &Tgt, const MCRegisterInfo &RI,
+    std::vector<MCRegister> &SpilledToStack, LLVMContext &Ctx, Config &Cfg,
+    const ProgramOptions &Opts, bool HasSPRelativeInstrs) {
   auto SP = Tgt.getStackPointer();
   bool FollowTargetABI = Cfg.ProgramCfg->FollowTargetABI;
   std::string RedefineSP = Opts.RedefineSP;
+
+  bool NotSPAndNotAny = RedefineSP != "SP" && RedefineSP != "any";
+  if (HasSPRelativeInstrs && Opts.RedefineSPSpecified && !NotSPAndNotAny)
+    generateSPRelativeInstrsError(RedefineSP);
+
   if (FollowTargetABI) {
-    if (RedefineSP != "any" && RedefineSP != "SP")
+    if (NotSPAndNotAny)
       snippy::warn(
           WarningName::InconsistentOptions, Ctx,
           "When using --honor-target-abi and --redefine-sp=" +
@@ -434,7 +446,7 @@ static MCRegister getRealStackPointer(const RegPoolWrapper &RP,
     return SP;
 
   MCRegister RealSP = MCRegister::NoRegister;
-  bool CanUseSP = !(RedefineSP == "any-not-SP");
+  bool CanUseSP = RedefineSP != "any-not-SP" && !HasSPRelativeInstrs;
   const auto &SPRegClass = Tgt.getRegClassSuitableForSP(RI);
   auto BasicFilter = Tgt.filterSuitableRegsForStackPointer();
 
@@ -459,6 +471,9 @@ static MCRegister getRealStackPointer(const RegPoolWrapper &RP,
           formatv("Register {0} cannot redefine stack pointer, because it is "
                   "explicitly reserved.\n",
                   RegStr));
+
+    if (Reg.value() == SP && HasSPRelativeInstrs)
+      generateSPRelativeInstrsError(RedefineSP);
 
     if (FullFilter(Reg.value()))
       snippy::fatal(
@@ -550,6 +565,7 @@ unsigned long long initializeRandomEngine(uint64_t SeedValue) {
 
 static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
                                          RegPoolWrapper &RP,
+                                         const OpcodeCache &OpCC,
                                          const ProgramOptions &Opts) {
   auto &ProgCfg = *Cfg.ProgramCfg;
   ProgCfg.ABIName = Opts.ABI;
@@ -563,22 +579,29 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
   // FIXME: RandomEngine initialization should be moved out of Config as well
   // as most of the stuff below
   initializeRandomEngine(ProgCfg.Seed);
+
+  auto &Ctx = State.getCtx();
+  const auto &Tgt = State.getSnippyTarget();
+  const auto &RI = State.getRegInfo();
   if (!ProgCfg.hasSectionToSpillGlobalRegs() &&
       Cfg.PassCfg.hasExternalCallees())
-    reserveGlobalStateRegisters(RP, State.getSnippyTarget());
-  parseReservedRegistersOption(RP, State.getSnippyTarget(), State.getRegInfo(),
-                               Opts);
-  auto RegsSpilledToStack = parseSpilledRegistersOption(
-      RP, State.getSnippyTarget(), State.getRegInfo(), State.getCtx(), Opts);
-  auto RegsSpilledToMem = getRegsToSpillToMem(State.getSnippyTarget(), Cfg);
+    reserveGlobalStateRegisters(RP, Tgt);
+  parseReservedRegistersOption(RP, Tgt, RI, Opts);
+  auto RegsSpilledToStack = parseSpilledRegistersOption(RP, Tgt, RI, Ctx, Opts);
+  auto RegsSpilledToMem = getRegsToSpillToMem(Tgt, Cfg);
+  bool HasSPRelativeInstrs = Cfg.Histogram.hasSPRelativeInstrs(OpCC, Tgt);
   if (ProgCfg.FollowTargetABI) {
+    if (HasSPRelativeInstrs)
+      snippy::fatal("Incompatible options",
+                    "When --honor-target-abi is enabled, generation of "
+                    "SP-relative instructions is not supported.");
+
     if (!RegsSpilledToStack.empty())
-      snippy::warn(WarningName::InconsistentOptions, State.getCtx(),
+      snippy::warn(WarningName::InconsistentOptions, Ctx,
                    "--spilled-regs-list is ignored",
                    "--honor-target-abi is enabled.");
     RegsSpilledToStack.clear();
-    auto ABIPreserved =
-        State.getSnippyTarget().getRegsPreservedByABI(State.getSubtargetInfo());
+    auto ABIPreserved = Tgt.getRegsPreservedByABI(State.getSubtargetInfo());
     // Global Regs will be spilled separately as we need to spill them to
     // Memory, not stack.
     llvm::copy_if(
@@ -586,9 +609,8 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
         [&](auto Reg) { return !llvm::is_contained(RegsSpilledToMem, Reg); });
   }
 
-  ProgCfg.StackPointer =
-      getRealStackPointer(RP, State.getSnippyTarget(), State.getRegInfo(),
-                          RegsSpilledToStack, State.getCtx(), Cfg, Opts);
+  ProgCfg.StackPointer = getRealStackPointer(
+      RP, Tgt, RI, RegsSpilledToStack, Ctx, Cfg, Opts, HasSPRelativeInstrs);
   llvm::copy(RegsSpilledToStack, std::back_inserter(ProgCfg.SpilledToStack));
   llvm::copy(RegsSpilledToMem, std::back_inserter(ProgCfg.SpilledToMem));
 }
@@ -856,7 +878,8 @@ Config::Config(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State
   if (DiagCtx.ExtraError)
     ReportError(std::move(DiagCtx.ExtraError));
 
-  normalizeProgramLevelOptions(*this, State, RP, copyOptionsToProgramOptions());
+  normalizeProgramLevelOptions(*this, State, RP, OpCC,
+                               copyOptionsToProgramOptions());
   normalizeRegInitOptions(*this, State, copyOptionsToRegInitOptions());
   normalizeModelOptions(*this, State, copyOptionsToModelOptions());
   if ((Err = normalizeInstrGenOptions(*this, State,

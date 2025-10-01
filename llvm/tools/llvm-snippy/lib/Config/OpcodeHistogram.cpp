@@ -191,5 +191,13 @@ bool OpcodeHistogram::hasCallInstrs(const OpcodeCache &OpCC,
   });
 }
 
+bool OpcodeHistogram::hasSPRelativeInstrs(const OpcodeCache &OpCC,
+                                          const SnippyTarget &Tgt) const {
+  return std::any_of(begin(), end(), [&OpCC, &Tgt](auto &Hist) {
+    auto *Desc = OpCC.desc(Hist.first);
+    return Desc && Tgt.isSPRelative(Desc->getOpcode());
+  });
+}
+
 } // namespace snippy
 } // namespace llvm

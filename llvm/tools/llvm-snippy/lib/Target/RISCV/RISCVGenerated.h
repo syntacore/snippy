@@ -876,6 +876,11 @@ inline bool isCFPSPRelativeLoadStore(unsigned Opcode) {
   }
 }
 
+inline bool isSPRelative(unsigned Opcode) {
+  return isCSPRelativeLoadStore(Opcode) || isCFPSPRelativeLoadStore(Opcode) ||
+         Opcode == RISCV::C_ADDI16SP || Opcode == RISCV::C_ADDI4SPN;
+}
+
 inline bool isRVVUnitStrideLoadStore(unsigned Opcode) {
   switch (Opcode) {
   default:
