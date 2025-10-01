@@ -555,6 +555,9 @@ public:
   }
 
   bool isCall(unsigned Opcode) const override { reportUnimplementedError(); }
+  bool isSPRelative(unsigned Opcode) const override {
+    reportUnimplementedError();
+  }
 
   std::vector<OpcodeHistogramEntry>
   getPolicyOverrides(const SnippyProgramContext &ProgCtx,

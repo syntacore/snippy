@@ -1934,6 +1934,19 @@ or warning will be raised.
 
       "warning: --spilled-regs-list is ignored: --honor-target-abi is enabled"
 
+
+.. important::
+
+   If you use this option, you cannot specify in the histogram opcodes that
+   require a stack pointer. (For example, for RISC-V, this is ``C_LWSP``,
+   ``C_LDSP``, ``C_SWSP``, ``C_SDSP``, ``C_FLWSP``, ``C_FLDSP``, ``C_FSWSP``,
+   ``C_FSDSP``, ``C_ADDI16SP``, ``C_ADDI4SPN``.) You get the following error:
+
+   ::
+
+      "error: Incompatible options: When --honor-target-abi is enabled, generation of SP-relative instructions is not supported."
+
+
 .. important::
 
    You must also specify the snippy `stack section <#stack-section>`__.
@@ -2475,6 +2488,19 @@ The options are:
 -  ``any-not-SP`` |nbsp| -- |nbsp| Any random suitable register except for SP.
 
 This setting has the same value in all functions in the call graph.
+
+.. important::
+
+   If you use this option with "any", "SP" or register which is a stack pointer
+   (for example, "reg::X2" for RISC-V), you cannot specify in the histogram opcodes
+   that require a stack pointer. (For example, for RISC-V, this is ``C_LWSP``,
+   ``C_LDSP``, ``C_SWSP``, ``C_SDSP``, ``C_FLWSP``, ``C_FLDSP``, ``C_FSWSP``,
+   ``C_FSDSP``, ``C_ADDI16SP``, ``C_ADDI4SPN``.) You get the following error:
+
+   ::
+
+      "error: Incompatible options: When the stack pointer is redefined to 'SP', generation of SP-relative instructions is not supported. Redefine it to 'any-not-SP' or remove SP-relative instructions from the histogram."
+
 
 .. _`_section_names_prefix`:
 
