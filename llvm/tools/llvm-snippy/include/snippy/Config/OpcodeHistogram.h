@@ -88,6 +88,8 @@ public:
   }
 
   bool hasCallInstrs(const OpcodeCache &OpCC, const SnippyTarget &Tgt) const;
+  bool hasSPRelativeInstrs(const OpcodeCache &OpCC,
+                           const SnippyTarget &Tgt) const;
 
   unsigned getCFInstrsNum(unsigned InstrsNum, const OpcodeCache &OpCC) const {
     double CFInstrsWeight =
