@@ -16,7 +16,7 @@ jobs:
       - name: Install required compiler to be sure
         run: sudo apt-get update && sudo apt-get install -y clang-14 ninja-build ccache lld cmake && pip install sphinx myst-parser
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5.0.0
         with:
           sparse-checkout: |
             .github
@@ -49,7 +49,7 @@ jobs:
       - name: CMake release test
         run: env CTEST_OUTPUT_ON_FAILURE=1 cmake --build release/build --target check-llvm-tools-llvm-snippy
       - name: Upload html docs artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: snippy-doc-html
           path: release/build/tools/llvm-snippy/docs/html

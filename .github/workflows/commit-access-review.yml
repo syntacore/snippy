@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Fetch LLVM sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5.0.0
       
       - name: Install dependencies
         run: |
@@ -28,7 +28,7 @@ jobs:
           python3 .github/workflows/commit-access-review.py $GITHUB_TOKEN
 
       - name: Upload Triage List
-        uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8 #v4.3.0
+        uses: actions/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50 #v4.3.0
         with:
           name: triagers
           path: triagers.log
