@@ -546,6 +546,17 @@ def C_JR : RVInst16CR<0b1000, 0b10, (outs), (ins GPRNoX0:$rs1),
   let rs2 = 0;
 }
 
+let isBarrier = 1, isTerminator = 1, isBranch = 1,
+    isIndirectBranch = 1, hasSideEffects = 0, mayLoad = 0,
+    mayStore = 0 in
+def PseudoC_JRB : Pseudo<(outs), (ins GPRNoX0X1:$rs1), []>,
+            PseudoInstExpansion<(C_JR GPRNoX0:$rs1)>;
+
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 1,
+    isAsmParserOnly = 0, Size = 10, isTerminator = 1, isBranch = 1,
+    isIndirectBranch = 1, isBarrier = 1 in
+def PseudoSnippyC_JRB : Pseudo<(outs), (ins bare_symbol:$src), []>;
+
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isMoveReg = 1,
     isAsCheapAsAMove = 1 in
 def C_MV : RVInst16CR<0b1000, 0b10, (outs GPRNoX0:$rs1), (ins GPRNoX0:$rs2),

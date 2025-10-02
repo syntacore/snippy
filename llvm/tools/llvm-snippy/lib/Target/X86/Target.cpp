@@ -307,6 +307,12 @@ public:
     reportUnimplementedError();
   }
 
+  MachineInstr &insertIndirectJump(InstructionGenerationContext &IGC,
+                                   MachineBasicBlock &TBB,
+                                   unsigned Opcode) const override {
+    reportUnimplementedError();
+  }
+
   bool relaxBranch(MachineInstr &Branch, unsigned Distance,
                    SnippyProgramContext &ProgCtx) const override {
     reportUnimplementedError();
