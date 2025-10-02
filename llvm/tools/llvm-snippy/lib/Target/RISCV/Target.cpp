@@ -1064,9 +1064,11 @@ public:
     // TODO: use model interface to fetch restricted sections
 
     // htif
-    ReservedRanges.emplace_back(0, 0xFFF1001000, 8, 0xFFF1001000, "rw");
+    ReservedRanges.emplace_back(0, 0xFFF1001000, 8, 0xFFF1001000,
+                                Permissions::R | Permissions::W);
     // clint
-    ReservedRanges.emplace_back(0, 0xFFF1000000, 8, 0xFFF1000000, "rwx");
+    ReservedRanges.emplace_back(0, 0xFFF1000000, 8, 0xFFF1000000,
+                                Permissions::RWX);
   }
 
   std::unique_ptr<TargetGenContextInterface>

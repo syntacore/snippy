@@ -74,8 +74,8 @@ void applyMemCfgToSimCfg(const Linker &L, SimulationEnvironment &Env) {
   llvm::transform(L.sections(), std::back_inserter(Env.SimCfg.MemoryRegions),
                   [](auto &SE) {
                     auto &OutS = SE.OutputSection;
-                    return SimulationConfig::Section{OutS.Desc.VMA,
-                                                     OutS.Desc.Size, OutS.Name};
+                    return SimulationConfig::Section{
+                        OutS.Desc.VMA, OutS.Desc.Size, OutS.Name, OutS.Desc.M};
                   });
   llvm::transform(L.sections(), std::back_inserter(Env.Sections),
                   [](auto &SE) { return SE.OutputSection.Desc; });
@@ -238,11 +238,20 @@ void Interpreter::reportSimulationFatalError(StringRef PrefixMessage) const {
 
   snippy::fatal(ErrorMessage.c_str());
 }
-bool Interpreter::coveredByMemoryRegion(MemAddr Start, MemAddr Size) const {
+
+bool Interpreter::coveredByMemoryRegion(MemAddr Start, MemAddr Size,
+                                        AccMask Mode) const {
   auto IsInsideOf = [&](auto &&Reg) {
     return Reg.Start <= Start && Reg.Start + Reg.Size >= Start + Size;
   };
-  return llvm::any_of(Env.SimCfg.MemoryRegions, IsInsideOf);
+
+  return llvm::any_of(Env.SimCfg.MemoryRegions, [&](const auto &Section) {
+    // If Mode access rights are not included in Section access rights, then
+    // this section is not suitable.
+    if (!(Mode <= Section.M))
+      return false;
+    return IsInsideOf(Section);
+  });
 }
 
 void Interpreter::resetState(const SnippyProgramContext &ProgCtx,
@@ -263,7 +272,7 @@ void Interpreter::addInstr(const MachineInstr &MI, const LLVMState &State) {
                               State.getOrCreateAsmPrinter(),
                               State.getSubtargetInfo(), EncodedMI);
   auto CurrentPC = Simulator->readPC();
-  if (!coveredByMemoryRegion(CurrentPC, EncodedMI.size()))
+  if (!coveredByMemoryRegion(CurrentPC, EncodedMI.size(), Permissions::X))
     snippy::fatal(
         "Model execution failed",
         "snippy emitted " + Twine(EncodedMI.size()) +
@@ -354,7 +363,7 @@ void Interpreter::initTransactionMechanism() {
       Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
   assert(Transactions.empty());
 
-  for (auto [Start, Size, _] : Env.SimCfg.MemoryRegions) {
+  for (auto [Start, Size, Name, _] : Env.SimCfg.MemoryRegions) {
     if (Size == 0)
       continue;
     std::vector<char> Snapshot(Size);
