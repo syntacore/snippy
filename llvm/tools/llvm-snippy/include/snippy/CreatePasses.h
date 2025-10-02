@@ -91,5 +91,6 @@ MachineFunctionPass *createMemAccessDumperPass();
 
 MachineFunctionPass *createConsecutiveLoopsVerifierPass();
 
+MachineFunctionPass *createRISCVExpandSnippyPseudoPass();
 
 } // namespace llvm

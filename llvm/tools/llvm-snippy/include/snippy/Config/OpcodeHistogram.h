@@ -87,6 +87,13 @@ public:
     });
   }
 
+  bool hasIndirectBranches(const OpcodeCache &OpCC) const {
+    return std::any_of(begin(), end(), [&OpCC](auto &Hist) {
+      auto *Desc = OpCC.desc(Hist.first);
+      return Desc && Desc->isIndirectBranch();
+    });
+  }
+
   bool hasCallInstrs(const OpcodeCache &OpCC, const SnippyTarget &Tgt) const;
   bool hasSPRelativeInstrs(const OpcodeCache &OpCC,
                            const SnippyTarget &Tgt) const;

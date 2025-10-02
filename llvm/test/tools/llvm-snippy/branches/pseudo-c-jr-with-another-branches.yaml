@@ -1,0 +1,27 @@
+# RUN: llvm-snippy -model-plugin=None                                \
+# RUN:      -mtriple=riscv64-unknown-elf -mattr=+c                   \
+# RUN:      -num-instrs=500 %s
+
+sections:
+    - name:      text
+      VMA:       0x100000
+      SIZE:      0x200000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      data
+      VMA:       0x4000000
+      SIZE:      0x20000
+      LMA:       0x4000000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x5000000
+      SIZE:      0x20000
+      LMA:       0x5000000
+      ACCESS:    rw
+
+histogram:
+    - [PseudoC_JRB, 1.0]
+    - [BNE, 1.0]
+    - [BEQ, 1.0]
+    - [C_J, 1.0]
+    - [BLT, 1.0]

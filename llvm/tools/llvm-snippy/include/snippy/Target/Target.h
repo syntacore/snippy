@@ -423,6 +423,11 @@ public:
   generateBranch(InstructionGenerationContext &IGC,
                  const MCInstrDesc &InstrDesc) const = 0;
 
+  // Insert indirect jump to TBB by opcode.
+  virtual MachineInstr &insertIndirectJump(InstructionGenerationContext &IGC,
+                                           MachineBasicBlock &TBB,
+                                           unsigned Opcode) const = 0;
+
   virtual bool relaxBranch(MachineInstr &Branch, unsigned Distance,
                            SnippyProgramContext &ProgCtx) const = 0;
 
