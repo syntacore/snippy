@@ -357,6 +357,10 @@ public:
     return Histogram.hasUncondBranches(OpCC);
   }
 
+  bool hasIndirectBranches(const OpcodeCache &OpCC) const {
+    return Histogram.hasIndirectBranches(OpCC);
+  }
+
   auto &getTrackCfg() const { return CommonPolicyCfg->TrackCfg; }
 
   bool hasTrackingMode() const {

@@ -252,6 +252,8 @@ def GPRX5 : GPRRegisterClass<(add X5)>;
 
 def GPRNoX0 : GPRRegisterClass<(sub GPR, X0)>;
 
+def GPRNoX0X1 : GPRRegisterClass<(sub GPRNoX0, X1)>;
+
 def GPRNoX0X2 : GPRRegisterClass<(sub GPR, X0, X2)>;
 
 def GPRX7 : GPRRegisterClass<(add X7)>;

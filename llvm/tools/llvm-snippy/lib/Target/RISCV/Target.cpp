@@ -19,6 +19,7 @@
 
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/OpcodeHistogram.h"
+#include "snippy/CreatePasses.h"
 #include "snippy/Support/DynLibLoader.h"
 #include "snippy/Support/Options.h"
 #include "snippy/Support/RandUtil.h"
@@ -978,6 +979,10 @@ inline bool checkSupportedOrdering(const OpcodeHistogram &H) {
   return true;
 }
 
+inline bool checkSupportedJumps(const OpcodeHistogram &H) {
+  return H.weight(RISCV::C_JR) == 0;
+}
+
 static DisableMisalignedAccessMode getMisalignedAccessMode() {
   if (!RISCVDisableMisaligned.isSpecified())
     return DisableMisalignedAccessMode::None;
@@ -1131,6 +1136,8 @@ public:
     case RISCV::ReadFCSR:
     case RISCV::WriteFCSRImm:
     case RISCV::SwapFCSRImm:
+    case RISCV::PseudoC_JRB:
+
       return true;
     default:
       return false;
@@ -1219,6 +1226,8 @@ public:
   void checkInstrTargetDependency(const OpcodeHistogram &H) const override {
     if (!checkSupportedOrdering(H))
       snippy::fatal("Lr.rl and Sc.aq are prohibited by RISCV ISA");
+    if (!checkSupportedJumps(H))
+      snippy::fatal("C_JR currently is not supported. Use PseudoC_JRB instead");
   }
 
   void generateRegsInit(InstructionGenerationContext &IGC,
@@ -1596,6 +1605,29 @@ public:
     }
   }
 
+  MachineInstr &insertIndirectJump(InstructionGenerationContext &IGC,
+                                   MachineBasicBlock &TBB,
+                                   unsigned Opcode) const override {
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
+    const auto &InstrInfo = State.getInstrInfo();
+    auto &BranchDesc = InstrInfo.get(Opcode);
+    auto &MBB = IGC.MBB;
+    assert(BranchDesc.operands()[0].OperandType == MCOI::OPERAND_REGISTER);
+    switch (Opcode) {
+    case RISCV::PseudoC_JRB:
+      return *getMainInstBuilder(*this, MBB, IGC.Ins,
+                                 MBB.getParent()->getFunction().getContext(),
+                                 InstrInfo.get(RISCV::PseudoSnippyC_JRB))
+                  .addMBB(&TBB)
+                  .getInstr();
+      break;
+    default:
+      snippy::fatal("Indirect branch with opcode '" + Twine(Opcode) +
+                    "' is not supported");
+    }
+  }
+
   MachineBasicBlock *
   generateBranch(InstructionGenerationContext &IGC,
                  const MCInstrDesc &InstrDesc) const override {
@@ -1616,6 +1648,10 @@ public:
       const auto *RVInstrInfo =
           State.getSubtarget<RISCVSubtarget>(*MF).getInstrInfo();
       RVInstrInfo->insertUnconditionalBranch(MBB, NextMBB, DebugLoc());
+      return NextMBB;
+    }
+    if (BranchDesc.isIndirectBranch()) {
+      insertIndirectJump(IGC, *NextMBB, Opcode);
       return NextMBB;
     }
 
@@ -2929,6 +2965,7 @@ public:
   void addTargetSpecificPasses(PassManagerWrapper &PM) const override {}
 
   void addTargetLegalizationPasses(PassManagerWrapper &PM) const override {
+    PM.add(createRISCVExpandSnippyPseudoPass());
     PM.add(createRISCVExpandPseudoPass());
     PM.add(createRISCVExpandAtomicPseudoPass());
   }
