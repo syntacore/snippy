@@ -245,8 +245,9 @@ void llvm::snippy::CFPermutationContext::initOneBlockInfo(
   assert(BBPtr);
   auto Branch = BBPtr->getFirstTerminator();
   assert(Branch != BBPtr->end());
-  // We don't want want to permute unconditional branches
-  if (Branch->isUnconditionalBranch()) {
+  // We don't want want to permute unconditional branches and temporarily
+  // indirect branches.
+  if (Branch->isUnconditionalBranch() || Branch->isIndirectBranch()) {
     BlocksInfo.emplace_back(BB + 1, BlockInfo::SetT());
     return;
   }
@@ -302,6 +303,10 @@ void llvm::snippy::CFPermutationContext::initBlocksInfo(unsigned Size) {
       Cfg.hasUncondBranches(ProgCtx.getOpcodeCache()))
     snippy::fatal(
         "Consecutive loops are not supported with unconditional branches.");
+  if (BS.anyConsecutiveLoops() &&
+      Cfg.hasIndirectBranches(ProgCtx.getOpcodeCache()))
+    snippy::fatal(
+        "Consecutive loops are not supported with indirect branches.");
 
   BlocksInfo.reserve(Size);
   assert(checkBranchSettings(BS) && "unsupported branch settings");

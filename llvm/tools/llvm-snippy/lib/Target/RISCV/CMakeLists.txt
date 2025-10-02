@@ -19,6 +19,7 @@ add_llvm_library(LLVMSnippyRISCV
   RVVUnitConfig.cpp
   Target.cpp
   TargetGenContext.cpp
+  RISCVExpandSnippyPseudoInsts.cpp
   DEPENDS
   intrinsics_gen
   RISCVCommonTableGen
