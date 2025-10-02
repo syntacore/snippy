@@ -1315,9 +1315,12 @@ MachineBasicBlock *findNextBlockOnModel(MachineBasicBlock &MBB,
     if (Branch.isUnconditionalBranch())
       return SnippyTgt.getBranchDestination(Branch);
 
-    assert(!Branch.isIndirectBranch() &&
-           "Indirect branches are not supported for execution on the model "
-           "during code generation.");
+    if (Branch.isIndirectBranch()) {
+      // We only support indirect branches that jump to the next basic block.
+      assert(MBB.getNextNode() == SnippyTgt.getBranchDestination(Branch));
+      return SnippyTgt.getBranchDestination(Branch);
+    }
+
     assert(Branch.isConditionalBranch());
     I.addInstr(Branch, State);
 
