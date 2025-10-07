@@ -2475,10 +2475,9 @@ setting:
 
 The options are:
 
--  ``any`` |nbsp| -- |nbsp| Any random suitable register (default). Suitable registers
+-  ``any`` |nbsp| -- |nbsp| Any random suitable register. Suitable registers
    are not reserved and not spilled; registers ``X0``, ``X1``, ``X6``
-   are excluded. When used along with the ``--honor-target-abi`` option,
-   it selects ``SP`` as specified by RISC-V ABI.
+   are excluded. 
 
 -  ``reg::R`` |nbsp| -- |nbsp| Any register, for example: ``reg::X7``, ``reg::X12``,
    etc.
@@ -2486,6 +2485,16 @@ The options are:
 -  ``SP`` |nbsp| -- |nbsp| Stack pointer register specified by the ABI.
 
 -  ``any-not-SP`` |nbsp| -- |nbsp| Any random suitable register except for SP.
+
+**Default** is:
+
+-  ``SP`` |nbsp| -- |nbsp| When the option ``--honor-target-abi`` is set to ``true``.
+
+-  ``any-not-SP`` |nbsp| -- |nbsp| When the histogram contains SP-based instructions
+   (For example, for RISC-V, this is ``C_LWSP``, ``C_LDSP``, ``C_SWSP``, ``C_SDSP``,
+   ``C_FLWSP``, ``C_FLDSP``, ``C_FSWSP``, ``C_FSDSP``, ``C_ADDI16SP``, ``C_ADDI4SPN``.).
+
+-  ``any`` |nbsp| -- |nbsp| In all other cases.
 
 This setting has the same value in all functions in the call graph.
 
