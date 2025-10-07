@@ -274,9 +274,9 @@ FunctionGenerator::distributeRootFunctions() {
   std::vector<RootFnPlacement> Ret;
   auto GetInstrNum = [&Cfg, &InstrGenCfg](auto SectionSize) {
     return static_cast<size_t>(std::llround(
-        (double)InstrGenCfg.getRequestedInstrsNumForMainFunction() *
-        ((double)SectionSize /
-         (double)Cfg.ProgramCfg->Sections.getSectionsSize(Acc::X))));
+        InstrGenCfg.getRequestedInstrsNumForMainFunction() *
+        (static_cast<double>(SectionSize) /
+         Cfg.ProgramCfg->Sections.getSectionsSize(Permissions::X))));
   };
 
   std::transform(
