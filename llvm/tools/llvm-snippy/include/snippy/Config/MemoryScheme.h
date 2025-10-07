@@ -464,31 +464,54 @@ using MemoryAccessesGroupSeq = SmallVector<MemoryAccessesGroup>;
 
 struct SectionsDescriptions;
 
-enum class Acc {
+enum class Permissions : unsigned {
+  DontCare = 0,
   R = 1,
   W = 2,
   X = 4,
+  RWX = R | W | X,
 };
 
+inline Permissions operator|(Permissions Lhs, Permissions Rhs) {
+  return static_cast<Permissions>(
+      static_cast<std::underlying_type_t<Permissions>>(Lhs) |
+      static_cast<std::underlying_type_t<Permissions>>(Rhs));
+}
+
+// This is an operator of the inclusion of Lhs access permissions in Rhs.
+// Any bottom-up connections return true:
+//      RWX
+//     / | \
+//   RW RX WX
+//   | X  X |
+//   R   W  X
+//    \  | /
+//   DontCare
+//
+// FIXME: models std::partial_ordering, replace it when there is C++20
+inline bool operator<=(Permissions Lhs, Permissions Rhs) {
+  return (Lhs | Rhs) == Rhs;
+}
+
 struct AccMask {
-  int M = 0;
+  unsigned M = 0;
   AccMask() = default;
-  AccMask(int M) : M(M) {}
-  AccMask(Acc T) : M(static_cast<int>(T)) {}
+  AccMask(unsigned M) : M(M) {}
+  AccMask(Permissions T) : M(static_cast<unsigned>(T)) {}
 
   static Expected<AccMask> fromString(StringRef Mode) {
-    int M = 0;
+    unsigned M = 0;
 
     for (auto C : Mode)
       switch (tolower(C)) {
       case 'r':
-        M |= static_cast<int>(Acc::R);
+        M |= static_cast<unsigned>(Permissions::R);
         break;
       case 'w':
-        M |= static_cast<int>(Acc::W);
+        M |= static_cast<unsigned>(Permissions::W);
         break;
       case 'x':
-        M |= static_cast<int>(Acc::X);
+        M |= static_cast<unsigned>(Permissions::X);
         break;
       default:
         return createStringError(
@@ -508,35 +531,37 @@ struct AccMask {
 
   AccMask(const char *Mode) : AccMask(StringRef(Mode)) {}
 
-  operator int() const { return M; }
+  operator unsigned() const { return M; }
 
-  AccMask &operator|=(Acc T) {
-    M |= static_cast<int>(T);
+  AccMask &operator|=(Permissions T) {
+    M |= static_cast<unsigned>(T);
     return *this;
   }
 
-  AccMask operator|(Acc T) const {
+  AccMask operator|(Permissions T) const {
     AccMask Tmp = M;
     Tmp |= T;
     return Tmp;
   }
 
-  AccMask &operator&=(const Acc T) {
-    M &= static_cast<int>(T);
+  AccMask &operator&=(const Permissions T) {
+    M &= static_cast<unsigned>(T);
     return *this;
   }
 
-  AccMask operator&(const Acc T) const {
+  AccMask operator&(const Permissions T) const {
     AccMask Tmp = M;
     Tmp &= T;
     return Tmp;
   }
 
-  bool operator==(const Acc &T) const { return M == static_cast<int>(T); }
+  bool operator==(const Permissions &T) const {
+    return M == static_cast<unsigned>(T);
+  }
 
-  bool R() const { return (M & static_cast<int>(Acc::R)) != 0; }
-  bool W() const { return (M & static_cast<int>(Acc::W)) != 0; }
-  bool X() const { return (M & static_cast<int>(Acc::X)) != 0; }
+  bool R() const { return (M & static_cast<unsigned>(Permissions::R)) != 0; }
+  bool W() const { return (M & static_cast<unsigned>(Permissions::W)) != 0; }
+  bool X() const { return (M & static_cast<unsigned>(Permissions::X)) != 0; }
 
   void dump(llvm::raw_ostream &Stream) const {
     if (R())
@@ -563,19 +588,20 @@ struct SectionDesc {
   std::optional<std::string> Phdr;
 
   SectionDesc(int Num = 0, size_t VMAIn = 0, size_t SizeIn = 0,
-              size_t LMAIn = 0, AccMask Mask = "rwx",
+              size_t LMAIn = 0, AccMask Mask = Permissions::RWX,
               std::optional<std::string> Phdr = std::nullopt)
       : ID(Num), VMA(VMAIn), Size(SizeIn), LMA(LMAIn), M(Mask),
         Phdr{std::move(Phdr)} {}
 
   SectionDesc(StringRef Name, size_t VMAIn = 0, size_t SizeIn = 0,
-              size_t LMAIn = 0, AccMask Mask = "rwx",
+              size_t LMAIn = 0, AccMask Mask = Permissions::RWX,
               std::optional<std::string> Phdr = std::nullopt)
       : ID(std::string(Name)), VMA(VMAIn), Size(SizeIn), LMA(LMAIn), M(Mask),
         Phdr{std::move(Phdr)} {}
 
   SectionDesc(std::variant<int, std::string> ID, size_t VMAIn = 0,
-              size_t SizeIn = 0, size_t LMAIn = 0, AccMask Mask = "rwx",
+              size_t SizeIn = 0, size_t LMAIn = 0,
+              AccMask Mask = Permissions::RWX,
               std::optional<std::string> Phdr = std::nullopt)
       : ID(ID), VMA(VMAIn), Size(SizeIn), LMA(LMAIn), M(Mask),
         Phdr{std::move(Phdr)} {}
@@ -612,7 +638,7 @@ struct SectionDesc {
     return Phdr.value();
   }
 
-  bool hasAccess(Acc Type) const { return (M & Type) != 0; }
+  bool hasAccess(Permissions Type) const { return (M & Type) != 0; }
   size_t getSize() const { return Size; }
 };
 
@@ -686,7 +712,7 @@ struct SectionsDescriptions : private std::vector<SectionDesc> {
     return *Found;
   }
 
-  auto getSectionsSize(Acc AccType) const {
+  auto getSectionsSize(Permissions AccType) const {
     return std::accumulate(
         begin(), end(), 0ull,
         [AccType](const size_t CurrentSize, const auto &Section) {
