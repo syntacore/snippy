@@ -923,6 +923,18 @@ def PseudoLD  : PseudoLoad<"ld">;
 def PseudoSD  : PseudoStore<"sd">;
 } // Predicates = [IsRV64]
 
+let Predicates = [HasStdExtZihintntl], isPseudo = 1, mayLoad = 0, mayStore = 0,
+    hasSideEffects = 1 in {
+def NTL_P1 : Pseudo<(outs), (ins), []>,
+                  PseudoInstExpansion<(ADD X0, X0, X2)>;
+def NTL_PALL : Pseudo<(outs), (ins), []>,
+                  PseudoInstExpansion<(ADD X0, X0, X3)>;
+def NTL_S1 : Pseudo<(outs), (ins), []>,
+                  PseudoInstExpansion<(ADD X0, X0, X4)>;
+def NTL_ALL : Pseudo<(outs), (ins), []>,
+                  PseudoInstExpansion<(ADD X0, X0, X5)>;
+} // Predicates = [HasStdExtZihintntl]
+
 def : InstAlias<"nop",           (ADDI      X0,      X0,           0), 3>;
 def : InstAlias<"li $rd, $imm",  (ADDI GPR:$rd,      X0, simm12:$imm), 2>;
 def : InstAlias<"mv $rd, $rs",   (ADDI GPR:$rd, GPR:$rs,           0)>;
