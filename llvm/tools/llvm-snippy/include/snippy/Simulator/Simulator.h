@@ -11,6 +11,7 @@
 #include "Observer.h"
 #include "Types.h"
 
+#include "snippy/Config/MemoryScheme.h"
 #include "snippy/Support/YAMLUtils.h"
 
 #include "llvm/ADT/ArrayRef.h"
@@ -52,6 +53,7 @@ struct SimulationConfig {
     ProgramCounterType Start = 0;
     ProgramCounterType Size = 0;
     std::string Name;
+    AccMask M;
   };
   std::vector<Section> MemoryRegions;
 

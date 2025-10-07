@@ -92,7 +92,7 @@ class Interpreter final {
       TransactionsObserverHandle;
   void initTransactionMechanism();
   void dumpOneRange(NamedMemoryRange Range, raw_fd_ostream &OS) const;
-  bool coveredByMemoryRegion(MemAddr Start, MemAddr Size) const;
+  bool coveredByMemoryRegion(MemAddr Start, MemAddr Size, AccMask Mode) const;
 
   static StringRef getStringNameOrUnknown(Expected<StringRef> Str) {
     static constexpr StringRef UnknownData = "<<UNKNOWN>>";
@@ -100,12 +100,13 @@ class Interpreter final {
   };
 
   template <typename SectionRangeT>
-  Error checkSectionsCoveredByMemoryRegion(SectionRangeT &&Sections) const {
-    auto NotCovered = llvm::find_if(Sections, [this](auto &&Section) {
+  Error checkSectionsCoveredByMemoryRegion(SectionRangeT &&Sections,
+                                           AccMask Mode) const {
+    auto NotCovered = llvm::find_if(Sections, [&](auto &&Section) {
       auto Address = Section.getAddress();
       auto Size = Section.getSize();
 
-      return !coveredByMemoryRegion(Address, Size);
+      return !coveredByMemoryRegion(Address, Size, Mode);
     });
 
     if (NotCovered == Sections.end())
@@ -159,11 +160,12 @@ public:
   // default entry point defined in elf.
   // InitBSS controls whether bss sections should be zeroed out.
   Error loadElfImage(const ParsedElf &ElfData, bool InitBSS) {
-    if (auto Err =
-            checkSectionsCoveredByMemoryRegion(ElfData.TextAndDataSections))
+    if (auto Err = checkSectionsCoveredByMemoryRegion(
+            ElfData.TextAndDataSections, Permissions::DontCare))
       return Err;
 
-    if (auto Err = checkSectionsCoveredByMemoryRegion(ElfData.BSSSections))
+    if (auto Err = checkSectionsCoveredByMemoryRegion(ElfData.BSSSections,
+                                                      Permissions::DontCare))
       return Err;
 
     for (auto &&Section : ElfData.TextAndDataSections) {
