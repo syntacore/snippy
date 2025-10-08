@@ -172,7 +172,7 @@ static void setupStackPointer(InstructionGenerationContext &IGC,
     return;
   }
 
-  // Stack ponter is considered live on entry.
+  // Stack pointer is considered live on entry.
   IGC.MBB.addLiveIn(AuxReg);
 
   // Initialize stack.
@@ -182,7 +182,8 @@ static void setupStackPointer(InstructionGenerationContext &IGC,
   auto SPSpillSize = SnippyTgt.getSpillSizeInBytes(AuxReg, IGC);
   auto Addr = ProgCtx.getStackTop() - SPSpillSize;
   assert(Addr % SPSpillSize == 0u && "Stack section must be properly aligned");
-  if (!ProgramCfg.isRegSpilledToMem(AuxReg))
+
+  if (!ProgramCfg.isRegSpilledToMem(AuxReg) && !ProgramCfg.SkipLegacySPSpill)
     SnippyTgt.storeRegToAddr(IGC, Addr, AuxReg,
                              /* store the whole register */ 0);
   auto SPInitValue = Addr;
@@ -196,6 +197,7 @@ static void restoreStackPointer(InstructionGenerationContext &IGC,
                                 MCRegister AuxReg) {
 
   auto &ProgCtx = IGC.ProgCtx;
+  const auto &ProgramCfg = IGC.getCommonCfg().ProgramCfg;
   const auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
   auto TargetStackPointer = SnippyTgt.getStackPointer();
 
@@ -206,6 +208,11 @@ static void restoreStackPointer(InstructionGenerationContext &IGC,
                                       // stack pointer value to target-default
                                       // stack pointer is necessary on exit
       SnippyTgt.copyRegToReg(IGC, AuxReg, TargetStackPointer);
+    return;
+  }
+
+  if (ProgramCfg.SkipLegacySPSpill) {
+    assert(!ProgCtx.shouldSpillStackPointer());
     return;
   }
 
@@ -225,11 +232,11 @@ void PrologueEpilogueInsertion::generateStackInitialization(
 
   // If honor-target-abi is specified and register, chosen for stack pointer
   // redefinition, is preserved, we:
-  // 1. choose auxillary register, relatively to which we spill this redefined
+  // 1. choose auxiliary register, relatively to which we spill this redefined
   // stack pointer
-  // 2. initialize stack with auxillary register as stack pointer
-  // 3. spill "preserved stack pointer" relatively to auxillary register
-  // 4. copy contents of auxillary register to "preserved stack pointer"
+  // 2. initialize stack with auxiliary register as stack pointer
+  // 3. spill "preserved stack pointer" relatively to auxiliary register
+  // 4. copy contents of auxiliary register to "preserved stack pointer"
   auto AuxReg = RealStackPointer;
   if (ProgCtx.shouldSpillStackPointer())
     AuxReg = getRegisterForPreservedSPSpill(ProgCtx, IGC.MBB);
@@ -256,10 +263,10 @@ void PrologueEpilogueInsertion::generateStackTermination(
 
   // If honor-target-abi is specified and chosen stack pointer is preserved
   // we:
-  // 1. choose auxillary register to generate reload of preserved stack
+  // 1. choose auxiliary register to generate reload of preserved stack
   // pointer relative to it
-  // 3. copy stack pointer value to this auxillary register
-  // 4. reload preserved stack pointer relatively to auxillary register
+  // 3. copy stack pointer value to this auxiliary register
+  // 4. reload preserved stack pointer relatively to auxiliary register
   auto AuxReg = RealStackPointer;
   if (ProgCtx.shouldSpillStackPointer()) {
     AuxReg = getRegisterForPreservedSPSpill(ProgCtx, MBB);

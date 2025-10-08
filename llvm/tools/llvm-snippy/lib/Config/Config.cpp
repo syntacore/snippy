@@ -574,6 +574,7 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
   ProgCfg.MangleExportedNames = Opts.MangleExportedNames;
   ProgCfg.EntryPointName = Opts.EntryPointName;
   ProgCfg.ExternalStack = Opts.ExternalStack;
+  ProgCfg.SkipLegacySPSpill = Opts.SkipLegacySPSpill;
   ProgCfg.InitialRegYamlFile = Opts.InitialRegisterDataFile;
   ProgCfg.Seed = seedOptToValue(Opts.Seed);
   // FIXME: RandomEngine initialization should be moved out of Config as well
@@ -595,6 +596,11 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
       snippy::fatal("Incompatible options",
                     "When --honor-target-abi is enabled, generation of "
                     "SP-relative instructions is not supported.");
+
+    if (Opts.SkipLegacySPSpill)
+      snippy::fatal("Incompatible options",
+                    "--skip-legacy-sp-spill option is incompatible with "
+                    "--honor-target-abi");
 
     if (!RegsSpilledToStack.empty())
       snippy::warn(WarningName::InconsistentOptions, Ctx,

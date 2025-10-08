@@ -77,6 +77,10 @@ let Group = ProgramOptionsCategory in {
       : CommaSeparatedList<"reserved-regs-list", StringType>,
         Description<"List of registers that shall not be used om snippet code">;
 
+  def SkipLegacySPSpill
+      : Flag<"skip-legacy-sp-spill">,
+        Description<"Skips legacy stack pointer spill when 'honor-target-abi' is disabled">,
+        Hidden;
 }
 
 def ModelOptionsCategory : OptionGroup<"Snippy Model Options", true> {
