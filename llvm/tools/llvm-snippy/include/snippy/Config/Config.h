@@ -49,6 +49,7 @@ public:
   SmallVector<MCRegister> SpilledToStack;
   SmallVector<MCRegister> SpilledToMem;
   bool ExternalStack;
+  bool SkipLegacySPSpill;
 
   // linker options.
   bool MangleExportedNames;
