@@ -6,12 +6,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "snippy/Config/Config.h"
+#include <algorithm>
+
 #include "snippy/Config/Branchegram.h"
 #include "snippy/Config/BurstGram.h"
+#include "snippy/Config/CallGraphLayout.h"
+#include "snippy/Config/Config.h"
+#include "snippy/Config/FunctionDescriptions.h"
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/Selfcheck.h"
+#include "snippy/Support/DiagnosticInfo.h"
+#include "snippy/Support/Utils.h"
 // FIXME: remove dependency on Generator library
 #include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/MemoryManager.h"
@@ -905,17 +911,44 @@ static void checkMemoryRegions(const SnippyTarget &SnippyTgt,
   snippy::fatal(ErrBuf.c_str());
 }
 
-static void checkCallRequirements(const SnippyTarget &Tgt,
-                                  const OpcodeHistogram &Histogram) {
-  bool hasCalls = Histogram.getOpcodesWeight([&Tgt](unsigned Opcode) {
+static bool hasCallees(const FunctionDesc &FuncDesc) {
+  return FuncDesc.Callees.size();
+}
+
+static void checkCallRequirements(
+    const SnippyTarget &Tgt, const OpcodeHistogram &Histogram,
+    const std::variant<CallGraphLayout, FunctionDescs> &CGLayout) {
+  bool HasCalls = Histogram.getOpcodesWeight([&Tgt](unsigned Opcode) {
     return Tgt.isCall(Opcode);
   }) > 0.0;
-  bool hasNonCalls = Histogram.getOpcodesWeight([&Tgt](unsigned Opcode) {
+  bool HasNonCalls = Histogram.getOpcodesWeight([&Tgt](unsigned Opcode) {
     return !Tgt.isCall(Opcode);
   }) > 0.0;
-  if (hasCalls && !hasNonCalls)
+  if (HasCalls && !HasNonCalls)
     snippy::fatal(
         "for using calls you need to add to histogram non-call instructions");
+
+  if (!HasCalls)
+    return;
+
+  std::visit(OverloadedCallable(
+                 [](const FunctionDescs &Descs) -> void {
+                   if (!std::any_of(Descs.Descs.begin(), Descs.Descs.end(),
+                                    hasCallees))
+                     snippy::warn(
+                         WarningName::CannotGenerateCalls,
+                         "Provided call-graph doesn't allow generation of "
+                         "calls as no callees were found",
+                         "no calls will be generated");
+                 },
+                 [](const CallGraphLayout &CGLayout) -> void {
+                   if (auto NumFunc = CGLayout.FunctionNumber; NumFunc < 2)
+                     snippy::warn(WarningName::CannotGenerateCalls,
+                                  "Not enough functions specified to generate "
+                                  "calls (required at least 2)",
+                                  "-function-number is " + Twine(NumFunc));
+                 }),
+             CGLayout);
 }
 
 static void checkBurstGram(LLVMContext &Ctx, const OpcodeHistogram &Histogram,
@@ -1152,7 +1185,7 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
                   "it is required to enable selfcheck");
   if (BurstConfig)
     checkBurstGram(Ctx, Histogram, OpCC, BurstConfig->Burst);
-  checkCallRequirements(Tgt, Histogram);
+  checkCallRequirements(Tgt, Histogram, CGLayout);
   checkMemoryRegions(Tgt, *this);
   Tgt.checkInstrTargetDependency(Histogram);
   checkCompatibilityWithValuegramPolicy(*this, Ctx);
