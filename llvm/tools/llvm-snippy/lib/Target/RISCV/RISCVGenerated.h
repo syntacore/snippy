@@ -790,6 +790,22 @@ inline bool isZicbo(unsigned Opcode) {
   }
 }
 
+inline bool isNTLHint(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RISCV::NTL_ALL:
+  case RISCV::NTL_P1:
+  case RISCV::NTL_PALL:
+  case RISCV::NTL_S1:
+  case RISCV::C_NTL_ALL:
+  case RISCV::C_NTL_P1:
+  case RISCV::C_NTL_PALL:
+  case RISCV::C_NTL_S1:
+    return true;
+  }
+}
+
 inline bool isFence(unsigned Opcode) {
   switch (Opcode) {
   default:
