@@ -1139,7 +1139,14 @@ public:
     case RISCV::WriteFCSRImm:
     case RISCV::SwapFCSRImm:
     case RISCV::PseudoC_JRB:
-
+    case RISCV::NTL_ALL:
+    case RISCV::NTL_P1:
+    case RISCV::NTL_PALL:
+    case RISCV::NTL_S1:
+    case RISCV::C_NTL_ALL:
+    case RISCV::C_NTL_P1:
+    case RISCV::C_NTL_PALL:
+    case RISCV::C_NTL_S1:
       return true;
     default:
       return false;
@@ -3527,7 +3534,7 @@ public:
   bool canUseInMemoryBurstMode(unsigned Opcode) const override {
     return isLoadStore(Opcode) || isFPLoadStore(Opcode) ||
            isAtomicAMO(Opcode) || isCLoadStore(Opcode) || isZicbo(Opcode) ||
-           isCFPLoadStore(Opcode) || isFence(Opcode);
+           isCFPLoadStore(Opcode) || isFence(Opcode) || isNTLHint(Opcode);
   }
 
   bool canInitializeOperand(const MCInstrDesc &InstrDesc,
