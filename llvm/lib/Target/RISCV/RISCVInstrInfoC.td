@@ -703,6 +703,18 @@ def : InstAlias<".insn_cj $opcode, $funct3, $imm11",
 
 // Zca Instructions
 
+let Predicates = [HasStdExtZihintntl], isPseudo = 1, mayLoad = 0, mayStore = 0,
+    hasSideEffects = 1 in {
+def C_NTL_P1 : Pseudo<(outs), (ins), []>,
+                  PseudoInstExpansion<(C_ADD X0, X0, X2)>;
+def C_NTL_PALL : Pseudo<(outs), (ins), []>,
+                  PseudoInstExpansion<(C_ADD X0, X0, X3)>;
+def C_NTL_S1 : Pseudo<(outs), (ins), []>,
+                  PseudoInstExpansion<(C_ADD X0, X0, X4)>;
+def C_NTL_ALL : Pseudo<(outs), (ins), []>,
+                  PseudoInstExpansion<(C_ADD X0, X0, X5)>;
+} // Predicates = [HasStdExtZihintntl]
+
 // Quadrant 0
 let Predicates = [HasStdExtZca] in {
 def : CompressPat<(ADDI GPRC:$rd, SP:$rs1, uimm10_lsb00nonzero:$imm),

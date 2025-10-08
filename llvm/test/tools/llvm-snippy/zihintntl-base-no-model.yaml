@@ -1,0 +1,35 @@
+# RUN: llvm-snippy %s -model-plugin=None | FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu
+  num-instrs: 1000
+  mattr: "+zihintntl"
+  dump-mf: on
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [NTL_P1, 3.0]
+    - [NTL_PALL, 3.0]
+    - [NTL_S1, 3.0]
+    - [NTL_ALL, 3.0]
+    - [BEQ, 1.0]
+    - [BNE, 1.0]
+    - [SD, 1.0]
+    - [LD, 1.0]
+    - [ADDI, 1.0]
+
+# CHECK-COUNT-5: NTL_P1
+# CHECK-COUNT-5: NTL_PALL
+# CHECK-COUNT-5: NTL_S1
+# CHECK-COUNT-5: NTL_ALL
