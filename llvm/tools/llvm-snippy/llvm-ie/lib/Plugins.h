@@ -40,7 +40,8 @@ void registerPlugin(typename Plugin::PluginID plugin_id,
     return;
   }
 
-  if (Plugin::s_registered_plugins.contains(plugin_id)) {
+  if (auto it = Plugin::s_registered_plugins.find(plugin_id);
+      it != Plugin::s_registered_plugins.end()) {
     llvm::WithColor::error()
         << "Plugin with id " << plugin_id << " already exists!\n";
     return;

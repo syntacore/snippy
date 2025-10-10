@@ -11,12 +11,12 @@
 
 #include "TargetEnum.h"
 
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
 
 #include <functional>
 #include <memory>
 #include <set>
+#include <unordered_map>
 
 namespace llvm_ie {
 
@@ -30,7 +30,7 @@ public:
     auto it = InstructionEnumerator::s_registered_plugins.find(plugin_id);
     if (it == InstructionEnumerator::s_registered_plugins.end())
       return nullptr;
-    auto callback = it->getSecond();
+    auto callback = it->second;
     return callback();
   }
 
@@ -40,8 +40,8 @@ public:
 
   virtual ~InstructionEnumerator() = default;
 
-  static llvm::DenseMap<InstructionEnumerator::PluginID,
-                        InstructionEnumerator::PluginCreateCallback>
+  static std::unordered_map<InstructionEnumerator::PluginID,
+                            InstructionEnumerator::PluginCreateCallback>
       s_registered_plugins;
 };
 
