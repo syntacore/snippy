@@ -728,12 +728,11 @@ breakDownAddrForRVVStrided(AddressInfo AddrInfo, const MachineInstr &MI,
     AddrValue += (VL - 1) * (-Stride);
     MainPart.Value = APInt(ST.getXLen(), AddrValue);
   }
+  auto Addresses = generateStridedMemAccesses(MainPart.Value.getZExtValue(),
+                                              Stride, VL, Is64Bit);
 
   AddressPart StridePart{StrideReg, APInt(ST.getXLen(), Stride), RI};
   AddressParts Parts = {std::move(MainPart), std::move(StridePart)};
-
-  auto Addresses = generateStridedMemAccesses(MainPart.Value.getZExtValue(),
-                                              Stride, VL, Is64Bit);
 
   return std::make_pair(std::move(Parts), std::move(Addresses));
 }
