@@ -114,7 +114,7 @@ struct AddressPart {
   SmallVector<unsigned, 2> operands;
   // Value to write.
   APInt Value;
-  // RegIster class to pick reg from.
+  // Register class to pick reg from.
   // Is null if random register pick is not allowed.
   const MCRegisterClass *RegClass;
   // Default bound register. Must use it if register pick fails
