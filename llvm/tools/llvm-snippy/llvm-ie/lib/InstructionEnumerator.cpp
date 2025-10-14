@@ -10,6 +10,6 @@
 
 using namespace llvm_ie;
 
-llvm::DenseMap<InstructionEnumerator::PluginID,
-               InstructionEnumerator::PluginCreateCallback>
-    InstructionEnumerator::s_registered_plugins{};
+std::unordered_map<InstructionEnumerator::PluginID,
+                   InstructionEnumerator::PluginCreateCallback>
+    InstructionEnumerator::s_registered_plugins;
