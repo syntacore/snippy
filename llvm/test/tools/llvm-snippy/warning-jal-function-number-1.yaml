@@ -1,0 +1,24 @@
+# RUN: llvm-snippy %s -model-plugin=None  |& FileCheck %s
+
+options:
+  mtriple: riscv64-unknown-elf
+  num-instrs: 50
+  function-number: 1
+
+histogram:
+  - [ADDI, 10.0]
+  - [JAL, 1.0]
+
+sections:
+  - no: 1
+    VMA: 0x1000000
+    LMA: 0x1000000
+    SIZE: 0x40000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x2000000
+    LMA: 0x2000000
+    SIZE: 0x40000
+    ACCESS: rw
+
+# CHECK: warning: (cannot-generate-calls) Not enough functions specified to generate calls (required at least 2): -function-number is 1
