@@ -1,0 +1,32 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64-unknown-elf
+  num-instrs: 50
+
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+    - name: AnotherFunc
+    - name: YetAnotherFunc
+
+
+histogram:
+  - [ADDI, 1.0]
+  - [JAL, 10.0]
+
+sections:
+  - no: 1
+    VMA: 0x1000000
+    LMA: 0x1000000
+    SIZE: 0x40000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x2000000
+    LMA: 0x2000000
+    SIZE: 0x40000
+    ACCESS: rw
+
+
+# CHECK: warning: (cannot-generate-calls) Provided call-graph doesn't allow generation of calls as no callees were found: no calls will be generated
