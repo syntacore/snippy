@@ -1086,7 +1086,6 @@ void postprocessMemoryOperands(MachineInstr &MI,
                                planning::InstructionGenerationContext &IGC) {
   auto *MAI = IGC.MAI;
   auto *MLI = IGC.MLI;
-  auto &RP = IGC.getRegPool();
   const auto *SLI = IGC.SLI;
   auto &SimCtx = IGC.SimCtx;
   auto &ProgCtx = IGC.ProgCtx;
@@ -1116,18 +1115,27 @@ void postprocessMemoryOperands(MachineInstr &MI,
 
     auto OldIns = IGC.Ins;
     IGC.Ins = MI.getIterator();
+    // FIXME:
+    // We get an AddressPart from breakDownAddr, where AP.RegClass != nullptr.
+    // This means that even if we have already selected the register for the
+    // address, we are selecting it again in chooseAddressRegister. Why is
+    // that?
+    auto &RP = IGC.getRegPool();
+    for (auto &AP : RegToValue) {
+      if (SimCtx.hasTrackingMode() && IGC.getCommonCfg().TrackCfg.AddressVH)
+        AP.FixedReg = chooseAddressRegister(IGC, MI, AP);
+      // Address registers must not be overwritten during other memory operands
+      // preparation.
+      RP.addReserved(AP.FixedReg);
+    }
     for (auto &AP : RegToValue) {
       MCRegister Reg = AP.FixedReg;
       if (SimCtx.hasTrackingMode() && IGC.getCommonCfg().TrackCfg.AddressVH) {
         auto &I = SimCtx.getInterpreter();
-        Reg = chooseAddressRegister(IGC, MI, AP);
         SnippyTgt.transformValueInReg(IGC, I.readReg(Reg), AP.Value, Reg);
       } else {
         SnippyTgt.writeValueToReg(IGC, AP.Value, Reg);
       }
-      // Address registers must not be overwritten during other memory operands
-      // preparation.
-      RP.addReserved(Reg, AccessMaskBit::W);
     }
     IGC.Ins = OldIns;
   }
