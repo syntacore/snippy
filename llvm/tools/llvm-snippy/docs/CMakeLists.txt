@@ -17,6 +17,9 @@
         COMPONENT llvm-snippy-man-pages
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1
         )
+      # include these targets into "all" because our build configurations are too
+      # complex to track dependencies between snippy and its documentation
+      set_target_properties(docs-llvm-snippy-man docs-llvm-snippy-html PROPERTIES EXCLUDE_FROM_ALL FALSE)
     endif()
   else()
     message(WARNING "Skipping snippy documentation generation because LLVM_ENABLE_SPHINX is OFF")
