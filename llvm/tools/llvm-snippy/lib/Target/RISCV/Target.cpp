@@ -2682,29 +2682,27 @@ public:
 
   void transformValueInReg(InstructionGenerationContext &IGC, APInt OldValue,
                            APInt NewValue, MCRegister Register) const override {
-    if (!RISCV::GPRRegClass.contains(Register))
-      snippy::fatal("transform of value in register is supported only for GPR");
+    if (NewValue.eq(OldValue))
+      return;
 
     auto RP = IGC.pushRegPool();
     auto &MBB = IGC.MBB;
     auto &Ins = IGC.Ins;
-
     auto &ProgCtx = IGC.ProgCtx;
     auto &State = ProgCtx.getLLVMState();
     const auto &RI = State.getRegInfo();
     const auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
     const auto &InstrInfo = State.getInstrInfo();
 
-    if (NewValue.eq(OldValue))
-      return;
-
-    // Materialization sequence should not touch Register.
-    RP->addReserved(Register, AccessMaskBit::W);
-
-    if (!hasNonZeroRegAvailable(RegClass, *RP, AccessMaskBit::W)) {
+    if (!RISCV::GPRRegClass.contains(Register) ||
+        !hasNonZeroRegAvailable(RegClass, *RP, AccessMaskBit::W)) {
       writeValueToReg(IGC, NewValue, Register);
       return;
     }
+    // Materialization sequence should not touch Register.
+    // Float and vector registers does not need to be reserved, the sequence of
+    // their initializations does not touch float and vector registers.
+    RP->addReserved(Register, AccessMaskBit::W);
 
     // First need to choose another not X0 reg to materialize
     // difference value in.
