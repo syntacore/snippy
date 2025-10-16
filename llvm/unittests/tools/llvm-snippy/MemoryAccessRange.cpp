@@ -4,29 +4,6 @@
 
 using namespace llvm::snippy;
 
-static bool IsValidAddress(AddressInfo Res, const MemoryAccessRange &MR) {
-  auto Start = MR.Start;
-  auto Size = MR.Size;
-  auto Stride = MR.Stride;
-  auto FirstOff = MR.FirstOffset;
-  auto LastOff = MR.LastOffset;
-  auto MaxAccSize = MR.AccessSize;
-  auto MaxOffset = MR.MaxPastLastOffset;
-
-  auto Addr = Res.Address;
-  auto Offset = (Addr - Start) % Stride;
-  auto AISize = Res.AccessSize;
-
-  bool Cond = Offset >= FirstOff && Offset <= LastOff;
-  Cond &= (Addr >= Start) && (Addr + AISize < Start + Size);
-
-  if (MaxAccSize)
-    Cond &= AISize <= *MaxAccSize;
-  if (MaxOffset)
-    Cond &= (Offset + AISize) <= (LastOff + 1 + *MaxOffset);
-  return Cond;
-}
-
 struct MemoryRangeTestCase {
   MemoryAccessRange MR;
 
@@ -35,6 +12,31 @@ struct MemoryRangeTestCase {
 };
 
 class MemoryRangesTest : public ::testing::TestWithParam<MemoryRangeTestCase> {
+protected:
+  void assertValidAddress(AddressInfo Res, const MemoryAccessRange &MR) const {
+    auto Start = MR.Start;
+    auto Size = MR.Size;
+    auto Stride = MR.Stride;
+    ASSERT_EQ(Res.MinStride % Stride, 0u);
+    auto FirstOff = MR.FirstOffset;
+    auto LastOff = MR.LastOffset;
+    auto MaxAccSize = MR.AccessSize;
+    auto MaxOffset = MR.MaxPastLastOffset;
+
+    auto Addr = Res.Address;
+    auto Offset = (Addr - Start) % Stride;
+    auto AISize = Res.AccessSize;
+
+    ASSERT_GE(Offset, FirstOff);
+    ASSERT_LE(Offset, LastOff);
+    ASSERT_GE(Addr, Start);
+    ASSERT_LE(Addr + AISize, Start + Size);
+
+    if (MaxAccSize)
+      ASSERT_LE(AISize, *MaxAccSize);
+    if (MaxOffset)
+      ASSERT_LE(Offset + AISize, LastOff + 1 + *MaxOffset);
+  }
 };
 
 TEST_P(MemoryRangesTest, GetRandomAddressTest) {
@@ -78,7 +80,35 @@ TEST_P(MemoryRangesTest, GetRandomAddressTest) {
   RandEngine::init(1);
   llvm::for_each(InstrAccesses, [&](const auto &Access) {
     const auto &Res = MR.randomAddress(Access);
-    EXPECT_PRED2(IsValidAddress, Res, MR);
+    assertValidAddress(Res, MR);
+  });
+}
+
+TEST_P(MemoryRangesTest, MultipleDoesntExceedSize) {
+  static const std::vector<AddressGenInfo> InstrAccesses = {
+      {/* AccessSize */ 2u, /* Alignment */ 1u, /* AllowMisalign */ true,
+       /* BurstMode */ false, /* NumElements */ 16},
+      {/* AccessSize */ 4u, /* Alignment */ 1u, /* AllowMisalign */ true,
+       /* BurstMode */ false, /* NumElements */ 16},
+      {/* AccessSize */ 8u, /* Alignment */ 1u, /* AllowMisalign */ true,
+       /* BurstMode */ false, /* NumElements */ 16},
+  };
+
+  auto TestCase = GetParam();
+  auto &MR = TestCase.MR;
+
+  RandEngine::init(::testing::GTEST_FLAG(random_seed));
+
+  llvm::for_each(InstrAccesses, [&](const AddressGenInfo &Access) {
+    if (!MR.isLegal(Access))
+      return;
+    for (unsigned I = 0; I < 1024; ++I) {
+      auto Res = MR.randomAddress(Access);
+      for (size_t I = 0; I < Access.NumElements; ++I) {
+        assertValidAddress(Res, MR);
+        Res.Address += Res.MinStride;
+      }
+    }
   });
 }
 
