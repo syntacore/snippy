@@ -673,9 +673,10 @@ AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
   // Special care needs to be taken to select an address in the appropriate
   // block so that all NumElements values can fit. Note: beware off-by-one
   // errors. If NumElements == 1, then maxLCBlock = getMaxLCBlock();
+  auto LastElementIdx = (NumElements - 1);
   auto MaxLCBlock =
       getMaxLCBlock(Alignment, AccessSize, AllowedLCBlockOffsets) -
-      (NumElements - 1);
+      LastElementIdx;
   LLVM_DEBUG(dbgs() << "Numelements: " << NumElements
                     << ", MaxLCBlock: " << MaxLCBlock << "\n");
   // NOTE: The way that addresses are sampled is two-step. First select any
@@ -683,22 +684,24 @@ AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
   // selected. Due to this it's doubtful that the distribution will be uniform
   // for complex scenarios, especially when Stride is not a a multiple of
   // alignment
-  auto LCBlockIdx = snippy::RandEngine::genInRangeInclusive(MaxLCBlock);
+  auto FirstLCBlockIdx = snippy::RandEngine::genInRangeInclusive(MaxLCBlock);
+  auto LastLCBlockIdx = FirstLCBlockIdx + LastElementIdx;
   auto LCBlockOffsetIdx =
       snippy::RandEngine::genInRangeExclusive(AllowedLCBlockOffsets.size());
 
   // FIXME: Maybe LCBlockOffsetIdx could be randomly sampled so this fixup would
   // not be necessary?
-  auto Offset = LCBlockIdx * LCStride + AllowedLCBlockOffsets[LCBlockOffsetIdx];
-  if (Offset > MaxOffset) {
+  auto Offset =
+      FirstLCBlockIdx * LCStride + AllowedLCBlockOffsets[LCBlockOffsetIdx];
+  if (Offset + (LCStride * LastElementIdx) > MaxOffset) {
     auto Slice =
         ArrayRef<size_t>(AllowedLCBlockOffsets).take_front(LCBlockOffsetIdx);
     auto LCBlockOffsetIt =
         std::find_if(Slice.rbegin(), Slice.rend(), [&](size_t AllowedOffset) {
-          return LCBlockIdx * LCStride + AllowedOffset <= MaxOffset;
+          return LastLCBlockIdx * LCStride + AllowedOffset <= MaxOffset;
         });
     assert(LCBlockOffsetIt < Slice.rend());
-    Offset = LCBlockIdx * LCStride + *LCBlockOffsetIt;
+    Offset = FirstLCBlockIdx * LCStride + *LCBlockOffsetIt;
   }
   assert(Offset <= MaxOffset);
 
@@ -711,8 +714,8 @@ AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
   AI.MinStride = LCStride;
   AI.AccessSize = AccessSize;
 
-  LLVM_DEBUG(dbgs() << "Offset: " << Offset << ", LCBlockIdx: " << LCBlockIdx
-                    << "\n");
+  LLVM_DEBUG(dbgs() << "Offset: " << Offset
+                    << ", LCBlockIdx: " << FirstLCBlockIdx << "\n");
 
   assert(AI.MaxOffset >= 0);
   assert(AI.MinOffset <= 0);
