@@ -1,7 +1,7 @@
-; RUN: llvm-ie -arch=riscv -riscv-ext "i" -memory-access | FileCheck -check-prefix=I_EXT_MEMORY_ACCESS %s
-; RUN: llvm-ie -arch=riscv -riscv-ext "all" -control-flow | FileCheck -check-prefix=ALL_CONTROL_FLOW %s
-; RUN: llvm-ie -arch=riscv -riscv-ext "i" -rv32 | FileCheck -check-prefix=I_EXT_RV32 %s
-; RUN: llvm-ie -arch=riscv -riscv-ext "i" -rv64 | FileCheck -check-prefix=I_EXT_RV64 %s
+; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "i" -memory-access | FileCheck -check-prefix=I_EXT_MEMORY_ACCESS %s
+; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "i + c + zcmp" -control-flow | FileCheck -check-prefix=ALL_CONTROL_FLOW %s
+; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "i" -rv32 | FileCheck -check-prefix=I_EXT_RV32 %s
+; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "i" -rv64 | FileCheck -check-prefix=I_EXT_RV64 %s
 
 ; I_EXT_MEMORY_ACCESS: LB
 ; I_EXT_MEMORY_ACCESS-NEXT: LBU
