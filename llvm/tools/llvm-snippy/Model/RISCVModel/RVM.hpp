@@ -13,6 +13,7 @@
 #include <cassert>
 #include <cctype>
 #include <cstdint>
+#include <list>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -212,7 +213,8 @@ public:
     const RVM_FunctionPointers *VTable;
 
     std::vector<RVMMemoryRegion> MemoryRegions;
-    std::vector<std::string> MemoryRegionNames;
+    // NOTE: Use std::list because we need pointer stability for .c_str().
+    std::list<std::string> MemoryRegionNames;
     std::string LogFilePath;
     std::string PluginInfo;
 
