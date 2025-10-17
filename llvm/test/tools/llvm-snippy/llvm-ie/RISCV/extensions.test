@@ -1,10 +1,12 @@
-; RUN: llvm-ie -arch=riscv -riscv-ext "i" | FileCheck -check-prefix=I_EXT %s
-; RUN: llvm-ie -arch=riscv -riscv-ext "d" | FileCheck -check-prefix=D_EXT %s
-; RUN: llvm-ie -arch=riscv -riscv-ext "all&a" | FileCheck -check-prefix=A_EXT %s
-; RUN: llvm-ie -arch=riscv -riscv-ext "a + b" | FileCheck -check-prefix=A_AND_B_EXT %s
-; RUN: llvm-ie -arch=riscv -riscv-ext "d&c" | FileCheck -check-prefix=DC_EXT %s
-; RUN: llvm-ie -arch=riscv -riscv-ext "d - c" | FileCheck -check-prefix=D_EXT_EXCLUDED_C %s
-; RUN: llvm-ie -arch=riscv -riscv-ext "v - d - f" | FileCheck -check-prefix=V_EXT_EXCLUDED_D_F %s
+; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "i" | FileCheck -check-prefix=I_EXT %s
+; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "d" | FileCheck -check-prefix=D_EXT %s
+; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "all&a" | FileCheck -check-prefix=A_EXT %s
+; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "a + b" | FileCheck -check-prefix=A_AND_B_EXT %s
+; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "d&c" | FileCheck -check-prefix=DC_EXT %s
+; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "d - c" | FileCheck -check-prefix=D_EXT_EXCLUDED_C %s
+; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "v - d - f" | FileCheck -check-prefix=V_EXT_EXCLUDED_D_F %s
+
+; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "XTHeadFMemIdx" | FileCheck -check-prefix=XTHeadFMemIdx_EXT %s
 
 ; I_EXT: ADD
 ; I_EXT-NEXT: ADDI
@@ -336,9 +338,7 @@
 ; A_AND_B_EXT-NEXT: LR_W_AQ
 ; A_AND_B_EXT-NEXT: LR_W_AQ_RL
 ; A_AND_B_EXT-NEXT: LR_W_RL
-; A_AND_B_EXT-NEXT: MAX
 ; A_AND_B_EXT-NEXT: MAXU
-; A_AND_B_EXT-NEXT: MIN
 ; A_AND_B_EXT-NEXT: MINU
 ; A_AND_B_EXT-NEXT: ORC_B
 ; A_AND_B_EXT-NEXT: ORN
@@ -1086,3 +1086,13 @@
 ; V_EXT_EXCLUDED_D_F-NEXT: VZEXT_VF4
 ; V_EXT_EXCLUDED_D_F-NEXT: VZEXT_VF8
 ; V_EXT_EXCLUDED_D_F-EMPTY:
+
+; XTHeadFMemIdx_EXT: TH_FLRD
+; XTHeadFMemIdx_EXT-NEXT: TH_FLRW
+; XTHeadFMemIdx_EXT-NEXT: TH_FLURD
+; XTHeadFMemIdx_EXT-NEXT: TH_FLURW
+; XTHeadFMemIdx_EXT-NEXT: TH_FSRD
+; XTHeadFMemIdx_EXT-NEXT: TH_FSRW
+; XTHeadFMemIdx_EXT-NEXT: TH_FSURD
+; XTHeadFMemIdx_EXT-NEXT: TH_FSURW
+; XTHeadFMemIdx_EXT-EMPTY:
