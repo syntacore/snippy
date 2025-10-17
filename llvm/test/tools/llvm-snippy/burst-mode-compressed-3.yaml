@@ -1,0 +1,64 @@
+# RUN: sed -e s/EXTENSIONS/"+zcb"/g %s | sed -e s/OPCODE/C_LBU/g > %t.C_LBU.yaml
+# RUN: llvm-snippy %t.C_LBU.yaml -mtriple=riscv64-unknown-elf \
+# RUN: |& FileCheck %t.C_LBU.yaml --check-prefix=C_LBU
+
+# RUN: sed -e s/EXTENSIONS/"+zcb"/g %s | sed -e s/OPCODE/C_LH/g > %t.C_LH.yaml
+# RUN: llvm-snippy %t.C_LH.yaml -mtriple=riscv64-unknown-elf \
+# RUN: |& FileCheck %t.C_LH.yaml --check-prefix=C_LH
+
+# RUN: sed -e s/EXTENSIONS/"+zcb"/g %s | sed -e s/OPCODE/C_LHU/g > %t.C_LHU.yaml
+# RUN: llvm-snippy %t.C_LHU.yaml -mtriple=riscv64-unknown-elf \
+# RUN: |& FileCheck %t.C_LHU.yaml --check-prefix=C_LHU
+
+# RUN: sed -e s/EXTENSIONS/"+zcb"/g %s | sed -e s/OPCODE/C_SB/g > %t.C_SB.yaml
+# RUN: llvm-snippy %t.C_SB.yaml -mtriple=riscv64-unknown-elf \
+# RUN: |& FileCheck %t.C_SB.yaml --check-prefix=C_SB
+
+# RUN: sed -e s/EXTENSIONS/"+zcb"/g %s | sed -e s/OPCODE/C_SH/g > %t.C_SH.yaml
+# RUN: llvm-snippy %t.C_SH.yaml -mtriple=riscv64-unknown-elf \
+# RUN: |& FileCheck %t.C_SH.yaml --check-prefix=C_SH
+
+# RUN: sed -e s/EXTENSIONS/"+zcf"/g %s | sed -e s/OPCODE/C_FLW/g > %t.C_FLW.yaml
+# RUN: llvm-snippy %t.C_FLW.yaml -mtriple=riscv32-unknown-elf \
+# RUN: |& FileCheck %t.C_FLW.yaml --check-prefix=C_FLW
+
+# RUN: sed -e s/EXTENSIONS/"+zcf"/g %s | sed -e s/OPCODE/C_FSW/g > %t.C_FSW.yaml
+# RUN: llvm-snippy %t.C_FSW.yaml -mtriple=riscv32-unknown-elf \
+# RUN: |& FileCheck %t.C_FSW.yaml --check-prefix=C_FSW
+
+# RUN: sed -e s/EXTENSIONS/"+zcd"/g %s | sed -e s/OPCODE/C_FLD/g > %t.C_FLD.yaml
+# RUN: llvm-snippy %t.C_FLD.yaml -mtriple=riscv64-unknown-elf \
+# RUN: |& FileCheck %t.C_FLD.yaml --check-prefix=C_FLD
+
+# RUN: sed -e s/EXTENSIONS/"+zcd"/g %s | sed -e s/OPCODE/C_FSD/g > %t.C_FSD.yaml
+# RUN: llvm-snippy %t.C_FSD.yaml -mtriple=riscv64-unknown-elf \
+# RUN: |& FileCheck %t.C_FSD.yaml --check-prefix=C_FSD
+
+options:
+  mattr: EXTENSIONS
+  num-instrs: 10
+  dump-mf: true
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80000000
+    SIZE:      0x10
+    LMA:       0x80000000
+    ACCESS:    rw
+
+burst:
+  mode: custom
+  min-size: 32
+  max-size: 32
+  groupings:
+    - [OPCODE]
+
+histogram:
+  - [OPCODE, 1.0]
+
+# OPCODE-COUNT-10: OPCODE
