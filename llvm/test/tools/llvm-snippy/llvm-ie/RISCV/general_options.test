@@ -1,0 +1,35 @@
+; RUN: llvm-ie -arch=riscv -riscv-ext "c" -memory-access --verbose | FileCheck %s
+
+; CHECK: C_FLD
+; CHECK-NEXT: 	Categories: c zcd d 
+; CHECK-NEXT: C_FLDSP
+; CHECK-NEXT: 	Categories: c zcd d 
+; CHECK-NEXT: C_FLW
+; CHECK-NEXT: 	Categories: c zcf zce f 
+; CHECK-NEXT: C_FLWSP
+; CHECK-NEXT: 	Categories: c zcf zce f 
+; CHECK-NEXT: C_FSD
+; CHECK-NEXT: 	Categories: c zcd d 
+; CHECK-NEXT: C_FSDSP
+; CHECK-NEXT: 	Categories: c zcd d 
+; CHECK-NEXT: C_FSW
+; CHECK-NEXT: 	Categories: c zcf zce f 
+; CHECK-NEXT: C_FSWSP
+; CHECK-NEXT: 	Categories: c zcf zce f 
+; CHECK-NEXT: C_LD
+; CHECK-NEXT: 	Categories: c zca 
+; CHECK-NEXT: C_LDSP
+; CHECK-NEXT: 	Categories: c zca 
+; CHECK-NEXT: C_LW
+; CHECK-NEXT: 	Categories: c zca 
+; CHECK-NEXT: C_LWSP
+; CHECK-NEXT: 	Categories: c zca 
+; CHECK-NEXT: C_SD
+; CHECK-NEXT: 	Categories: c zca 
+; CHECK-NEXT: C_SDSP
+; CHECK-NEXT: 	Categories: c zca 
+; CHECK-NEXT: C_SW
+; CHECK-NEXT: 	Categories: c zca 
+; CHECK-NEXT: C_SWSP
+; CHECK-NEXT: 	Categories: c zca 
+; CHECK-EMPTY:

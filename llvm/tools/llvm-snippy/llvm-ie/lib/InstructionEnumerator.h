@@ -12,6 +12,7 @@
 #include "TargetEnum.h"
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Error.h"
 
 #include <functional>
 #include <memory>
@@ -37,6 +38,9 @@ public:
   InstructionEnumerator() = default;
 
   virtual std::set<llvm::StringRef> enumerateInstructions() const = 0;
+
+  virtual llvm::Expected<std::vector<llvm::StringRef> &>
+  obtainInstructionCategories(llvm::StringRef Instr) const = 0;
 
   virtual ~InstructionEnumerator() = default;
 

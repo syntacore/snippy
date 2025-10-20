@@ -66,4 +66,8 @@ bool controlFlowFeatureFilter(const llvm::Record *Instr) {
          Instr->getValueAsBit("isIndirectBranch");
 }
 
+bool pseudoFeatureFilter(const llvm::Record *Instr) {
+  return !Instr->getValueAsBit("isPseudo");
+}
+
 } // namespace instr_enumerator_tblgen
