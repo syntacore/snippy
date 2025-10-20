@@ -158,16 +158,15 @@ static void emitRISCVExtensions(const llvm::RecordKeeper &Records,
   OS << "};\n\n";
 }
 
-/// Obtains all RISC-V instruction records from TableGen, except of privelleged,
-/// vendor-specific and some special ones.
+/// Obtains all RISC-V instruction records from TableGen, except of the
+/// privelleged ones.
 static std::vector<const llvm::Record *>
 getRISCVInstructions(const llvm::RecordKeeper &RK) {
   std::vector<const llvm::Record *> NonPseudoInstructions{};
   llvm::copy_if(RK.getAllDerivedDefinitions("RVInstCommon"),
                 std::back_inserter(NonPseudoInstructions),
                 [](const llvm::Record *Instr) {
-                  return !Instr->getValueAsBit("isPseudo") &&
-                         !Instr->getValueAsBit("isCodeGenOnly");
+                  return !Instr->getValueAsBit("isCodeGenOnly");
                 });
 
   std::vector<const llvm::Record *> ExcludedInstructions =
@@ -179,16 +178,6 @@ getRISCVInstructions(const llvm::RecordKeeper &RK) {
   llvm::copy(RK.getAllDerivedDefinitions("CSR_ii"),
              std::back_inserter(ExcludedInstructions));
   ExcludedInstructions.push_back(RK.getDef("UNIMP"));
-
-  llvm::copy_if(RK.getAllDerivedDefinitions("RVInstCommon"),
-                std::back_inserter(ExcludedInstructions),
-                [](const llvm::Record *Instr) {
-                  return llvm::any_of(Instr->getValueAsListOfDefs("Predicates"),
-                                      [](const llvm::Record *Predicate) {
-                                        return Predicate->getName().starts_with(
-                                            "HasVendor");
-                                      });
-                });
 
   std::vector<const llvm::Record *> RISCVInstructions{};
 
@@ -265,6 +254,8 @@ static const std::vector<InstructionFeature> gRISCVInstrFeatures = {
     InstructionFeature{"control-flow"}
         .specifyFilter(controlFlowFeatureFilter)
         .addInstrs("JAL", "JALR"),
+
+    InstructionFeature{"disable-pseudo"}.specifyFilter(pseudoFeatureFilter),
 
     InstructionFeature{"rv32"}.specifyFilter(RISCV32bitFeatureFilter),
 
