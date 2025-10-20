@@ -537,7 +537,7 @@ public:
     reportUnimplementedError();
   }
 
-  bool canUseInMemoryBurstMode(unsigned Opcode) const override {
+  bool canUseInBurstMode(unsigned Opcode) const override {
     reportUnimplementedError();
   }
 
