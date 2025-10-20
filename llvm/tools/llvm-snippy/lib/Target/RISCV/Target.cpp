@@ -3590,6 +3590,19 @@ public:
       switch (ImmOpType) {
       default:
         llvm_unreachable("Unknown ImmOpType");
+        // c.lhu, c.sh
+      case RISCVOp::OPERAND_UIMM1: {
+        BitWidth = 1;
+      } break;
+        // c.lbu, c.sb
+      case RISCVOp::OPERAND_UIMM2: {
+        BitWidth = 2;
+      } break;
+        // c.lh
+      case RISCVOp::OPERAND_UIMM2_LSB0: {
+        BitWidth = 2;
+        ZeroBits = 1;
+      } break;
         // Base load/store variants
       case RISCVOp::OPERAND_UIMM7_LSB00: {
         BitWidth = 7;
