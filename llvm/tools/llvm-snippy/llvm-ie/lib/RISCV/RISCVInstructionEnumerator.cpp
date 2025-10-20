@@ -59,6 +59,10 @@ getAllImpliedExtensions(llvm::StringRef Extension) {
   return AllImpliedExtensions;
 }
 
+static bool isVendorExtension(llvm::StringRef Extension) {
+  return Extension.starts_with("x");
+}
+
 /// This function finds extension's implied extensions.
 /// \param [in] Extension
 ///     Extension name.
@@ -97,6 +101,13 @@ getInstructionsFromExtension(llvm::StringRef Extension) {
                         return llvm::is_contained(ExtensionGroup, Extension);
                       });
                 });
+
+  if (!isVendorExtension(Extension))
+    llvm::erase_if(InstrInfos, [](auto &&InstrInfo) {
+      return llvm::any_of(InstrInfo.second, [](auto &&Extension) {
+        return isVendorExtension(Extension);
+      });
+    });
 
   std::set<llvm::StringRef> Instrs{};
   llvm::transform(
@@ -165,4 +176,16 @@ RISCVInstructionEnumerator::enumerateInstructions() const {
   std::set<llvm::StringRef> SuitableInstrs = filterByExtensions(ExtensionOpt);
   SuitableInstrs = filterByFeatures(SuitableInstrs, FeatureTable);
   return SuitableInstrs;
+}
+
+llvm::Expected<std::vector<llvm::StringRef> &>
+RISCVInstructionEnumerator::obtainInstructionCategories(
+    llvm::StringRef Instr) const {
+  auto It = llvm::find_if(InstructionTable, [Instr](auto &&InstrInfo) {
+    return InstrInfo.first == Instr;
+  });
+  if (It == std::end(InstructionTable))
+    return llvm::createStringError(
+        llvm::formatv("{0} is not a valid RISC-V instruction!\n", Instr));
+  return It->second;
 }

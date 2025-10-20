@@ -46,6 +46,8 @@ bool memoryAccessFeatureFilter(const llvm::Record *Instr);
 
 bool controlFlowFeatureFilter(const llvm::Record *Instr);
 
+bool pseudoFeatureFilter(const llvm::Record *Instr);
+
 } // namespace instr_enumerator_tblgen
 
 #endif

@@ -12,8 +12,6 @@
 #include "InstructionEnumerator.h"
 #include "TargetEnum.h"
 
-#include "llvm/Support/Error.h"
-
 namespace llvm_ie {
 
 class RISCVInstructionEnumerator : public InstructionEnumerator {
@@ -25,6 +23,9 @@ public:
   static void terminate();
 
   std::set<llvm::StringRef> enumerateInstructions() const override;
+
+  llvm::Expected<std::vector<llvm::StringRef> &>
+  obtainInstructionCategories(llvm::StringRef Instr) const override;
 
   static InstructionEnumerator::PluginID getPluginID() {
     return TargetEnum::eTargetRISCV;

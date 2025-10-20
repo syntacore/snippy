@@ -6,10 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <iostream>
-
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/WithColor.h"
 
 #include "InstructionEnumerator.h"
@@ -33,7 +33,30 @@ cl::opt<bool> MemoryAccessOpt("memory-access",
 cl::opt<bool> ControlFlowOpt("control-flow",
                              cl::desc("Only control flow instructions"),
                              cl::cat(FeatureOptionsCategory));
+
+cl::opt<bool> Verbose("verbose",
+                      cl::desc("For each filtered instruction, displays the "
+                               "categories it belongs to"));
+cl::alias VerboseA("v", cl::desc("Alias for --verbose"), cl::aliasopt(Verbose));
+cl::opt<bool>
+    DisablePseudoOpt("disable-pseudo",
+                     cl::desc("Excludes pseudo-instructions from the output"),
+                     cl::cat(FeatureOptionsCategory));
 } // namespace opts
+
+static std::string formatInstruction(const InstructionEnumerator &IE,
+                                     llvm::StringRef Instr) {
+  if (!opts::Verbose)
+    return Instr.str();
+
+  auto CategoriesOrErr = IE.obtainInstructionCategories(Instr);
+  if (auto Error = CategoriesOrErr.takeError())
+    return std::string(
+        llvm::formatv("{0}:\n\t{1}", Instr, llvm::toString(std::move(Error))));
+
+  auto &Categories = *CategoriesOrErr;
+  return Instr.str() + "\n\tCategories: " + llvm::join(Categories, " ");
+}
 
 int main(int argc, char **argv) {
   cl::ParseCommandLineOptions(argc, argv);
@@ -48,9 +71,8 @@ int main(int argc, char **argv) {
   }
 
   auto Instrs = InstrEnumeratorUP->enumerateInstructions();
-  for (auto &&Instr : Instrs) {
-    std::cout << Instr.str() << "\n";
-  }
+  for (auto &&Instr : Instrs)
+    llvm::outs() << formatInstruction(*InstrEnumeratorUP.get(), Instr) << "\n";
 
   terminate();
 }
