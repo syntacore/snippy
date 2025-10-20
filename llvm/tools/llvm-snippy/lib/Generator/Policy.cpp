@@ -137,7 +137,7 @@ BurstGenPolicy::BurstGenPolicy(SnippyProgramContext &ProgCtx,
   std::copy_if(Group.begin(), Group.end(), std::back_inserter(Opcodes),
                [&SnippyTgt, &State,
                 &OpcCache = ProgCtx.getOpcodeCache()](unsigned Opcode) {
-                 if (!SnippyTgt.canUseInMemoryBurstMode(Opcode)) {
+                 if (!SnippyTgt.canUseInBurstMode(Opcode)) {
                    snippy::warn(
                        WarningName::BurstMode, State.getCtx(),
                        Twine("Opcode ") + OpcCache.name(Opcode) +

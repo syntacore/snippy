@@ -817,6 +817,16 @@ inline bool isFence(unsigned Opcode) {
   }
 }
 
+inline bool isNOP(unsigned Opcode) {
+  switch (Opcode) {
+  case RISCV::C_NOP:
+  case RISCV::PseudoNOP:
+    return true;
+  default:
+    return false;
+  }
+}
+
 inline bool isCLoadStore(unsigned Opcode) {
   switch (Opcode) {
   default:
