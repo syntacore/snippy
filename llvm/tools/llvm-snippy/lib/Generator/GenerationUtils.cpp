@@ -366,7 +366,7 @@ collectAddressRestrictions(ArrayRef<unsigned> Opcodes,
   const auto &InstrInfo = State.getInstrInfo();
   for (auto Opcode : Opcodes) {
     const auto &InstrDesc = InstrInfo.get(Opcode);
-    if (!SnippyTgt.canUseInMemoryBurstMode(Opcode))
+    if (!SnippyTgt.canUseInBurstMode(Opcode))
       continue;
 
     // Get address restrictions for the current opcode.
