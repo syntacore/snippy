@@ -248,7 +248,8 @@ const IRegisterState &SnippyProgramContext::getInitialRegisterState(
     const TargetSubtargetInfo &ST) const {
   if (InitialMachineState)
     return *InitialMachineState;
-  InitialMachineState = State->getSnippyTarget().createRegisterState(ST);
+  InitialMachineState =
+      State->getSnippyTarget().createRegisterState(getTargetContext(), ST);
 
   if (!InitialRegYamlFile.empty()) {
     WarningsT YamlWarnings;

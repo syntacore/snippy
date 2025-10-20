@@ -23,7 +23,6 @@ enum RegSizeInBytes {
   Reg2Bytes = 2,
   Reg4Bytes = 4,
   Reg8Bytes = 8,
-  Reg16Bytes = 16
 };
 
 /// Numeric values correspond to the CSR encoding specified by
@@ -79,9 +78,8 @@ static inline unsigned regToIndex(Register Reg) {
 using RISCVSimulatorSysRegs::RISCVSimulatorSysReg;
 
 struct RISCVRegisterState : public IRegisterState {
-  // FIXME: VLEN should be dynamic and derived from target configuration
-  unsigned VLEN = Reg16Bytes * RISCV_CHAR_BIT;
-  unsigned VLENB = VLEN / RISCV_CHAR_BIT;
+  unsigned VLEN;
+  unsigned VLENB;
   static constexpr unsigned NRegs = 32;
   RegSizeInBytes XRegSize = Reg4Bytes;
   RegSizeInBytes FRegSize = Reg4Bytes;
@@ -91,7 +89,9 @@ struct RISCVRegisterState : public IRegisterState {
   std::vector<uint64_t> FRegs;
   std::vector<APInt> VRegs;
 
-  RISCVRegisterState(const RISCVSubtarget &ST) : XRegs(NRegs) {
+  RISCVRegisterState(const RISCVSubtarget &ST,
+                     unsigned VLEN = 16 * RISCV_CHAR_BIT)
+      : VLEN(VLEN), VLENB(VLEN / RISCV_CHAR_BIT), XRegs(NRegs) {
     if (ST.is64Bit())
       XRegSize = RegSizeInBytes::Reg8Bytes;
 
