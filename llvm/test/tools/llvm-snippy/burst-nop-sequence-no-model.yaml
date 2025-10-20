@@ -1,0 +1,46 @@
+# RUN: llvm-snippy %s -model-plugin=None | FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu
+  num-instrs: 1000
+  dump-mf: on
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [LD, 1.0]
+    - [SD, 1.0]
+    - [PseudoNOP, 1.0]
+
+burst:
+  mode: custom
+  min-size: 5
+  max-size: 5
+  groupings:
+    - [ PseudoNOP ]
+
+# COM: Check 5 PseudoNOP burst groups of size 5
+# CHECK: PseudoNOP
+# CHECK-NEXT: {{PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP}}
+
+# CHECK: PseudoNOP
+# CHECK-NEXT: {{PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP}}
+
+# CHECK: PseudoNOP
+# CHECK-NEXT: {{PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP}}
+
+# CHECK: PseudoNOP
+# CHECK-NEXT: {{PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP}}
+
+# CHECK: PseudoNOP
+# CHECK-NEXT: {{PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP}}
