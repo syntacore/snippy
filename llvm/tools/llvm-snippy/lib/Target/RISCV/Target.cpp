@@ -1121,6 +1121,7 @@ public:
     return RISCV_MC::isOpcodeAvailable(Opcode, Features) &&
            !snippyRISCVIsOpcodeExcluded(Opcode);
   }
+
   bool isPseudoAllowed(unsigned Opcode) const override {
     switch (Opcode) {
     case RISCV::PAUSE:
@@ -1146,6 +1147,7 @@ public:
     case RISCV::C_NTL_P1:
     case RISCV::C_NTL_PALL:
     case RISCV::C_NTL_S1:
+    case RISCV::PseudoNOP:
       return true;
     default:
       return false;
@@ -3528,10 +3530,11 @@ public:
     return is64Bit(TM) ? 64u : 32u;
   }
 
-  bool canUseInMemoryBurstMode(unsigned Opcode) const override {
+  bool canUseInBurstMode(unsigned Opcode) const override {
     return isLoadStore(Opcode) || isFPLoadStore(Opcode) ||
            isAtomicAMO(Opcode) || isCLoadStore(Opcode) || isZicbo(Opcode) ||
-           isCFPLoadStore(Opcode) || isFence(Opcode) || isNTLHint(Opcode);
+           isCFPLoadStore(Opcode) || isFence(Opcode) || isNTLHint(Opcode) ||
+           isNOP(Opcode);
   }
 
   bool canInitializeOperand(const MCInstrDesc &InstrDesc,

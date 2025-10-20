@@ -939,6 +939,11 @@ def : InstAlias<"nop",           (ADDI      X0,      X0,           0), 3>;
 def : InstAlias<"li $rd, $imm",  (ADDI GPR:$rd,      X0, simm12:$imm), 2>;
 def : InstAlias<"mv $rd, $rs",   (ADDI GPR:$rd, GPR:$rs,           0)>;
 
+let isPseudo = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0 in {
+def PseudoNOP : Pseudo<(outs), (ins), []>,
+                  PseudoInstExpansion<(ADDI X0, X0, 10)>;
+}
+
 def : InstAlias<"not $rd, $rs",  (XORI GPR:$rd, GPR:$rs,      -1)>;
 def : InstAlias<"neg $rd, $rs",  (SUB  GPR:$rd,      X0, GPR:$rs)>;
 
