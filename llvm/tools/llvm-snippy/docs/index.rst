@@ -3263,3 +3263,5 @@ where you use:
 -  ``"<filename>.yaml"`` |nbsp| -- |nbsp| To dump the output to ``<filename>.yaml``.
 
 
+
+.. include:: llvm-ie.rst
