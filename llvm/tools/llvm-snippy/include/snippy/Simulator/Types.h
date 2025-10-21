@@ -17,6 +17,8 @@ using ProgramCounterType = uint64_t;
 using MemoryAddressType = uint64_t;
 using RegisterType = uint64_t;
 using VectorRegisterType = APInt;
+// Currently only instructions up to 32 bits are supported.
+using MaxInstrBitsType = uint32_t;
 
 } // namespace snippy
 } // namespace llvm

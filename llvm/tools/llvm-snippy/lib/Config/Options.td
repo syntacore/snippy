@@ -100,6 +100,13 @@ let Group = ModelOptionsCategory in {
         Description<"Comma separated list of hardware model plugins to use for "
                     "co-simulation">;
 
+  def ModelLogPath
+      : StringOption<"trace-log">,
+        Description<"execution log file. Execution logs are written to the "
+                    "standard output if not specified">,
+        ValueDescription<"filename">,
+        DefaultValue<"">;
+
 }
 
 

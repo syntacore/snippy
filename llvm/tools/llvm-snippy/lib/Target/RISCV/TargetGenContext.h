@@ -75,8 +75,7 @@ private:
 
 class RISCVGeneratorContext : public TargetGenContextInterface {
 public:
-  RISCVGeneratorContext(RISCVConfigurationInfo &&RISCVConfigIn)
-      : RISCVConfig(std::move(RISCVConfigIn)) {}
+  RISCVGeneratorContext(RISCVConfigurationInfo &&RISCVConfigIn);
 
   const RVVConfigurationInfo &getVUConfigInfo() const {
     return RISCVConfig.getVUConfig();
