@@ -710,6 +710,7 @@ static void normalizeModelOptions(Config &Cfg, LLVMState &State,
                                   const ModelOptions &Opts) {
   auto &ModelCfg = Cfg.PassCfg.ModelPluginConfig;
   ModelCfg.ModelLibraries = parseModelPluginList(Opts);
+  ModelCfg.ModelLogPath = Opts.ModelLogPath;
 }
 
 void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {

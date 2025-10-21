@@ -1490,7 +1490,8 @@ static std::string vsetProbInfoToString(double Prob, double InitWeight) {
 
 void RVVConfigurationInfo::print(raw_ostream &OS) const {
   OS << "--- RVV Configuration Info ---\n";
-  OS << "  - Derived VLEN: " << VLEN << " (VLENB = " << VLEN / 8u << ")\n";
+  OS << "  - Derived VLEN: " << VLEN << " (VLENB = " << VLEN / RISCV_CHAR_BIT
+     << ")\n";
   OS << "  - Mode Change Decision Policy: ";
 
   if (!SwitchInfo.RVVPresent) {

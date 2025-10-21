@@ -26,6 +26,7 @@ add_llvm_library(LLVMSnippyRISCV
   SnippyRISCVTableGen
   )
 
+
 target_link_libraries(
   LLVMSnippyRISCV
   PRIVATE LLVMSnippyConfig LLVMSnippySupport LLVMSnippyTarget

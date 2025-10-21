@@ -18,6 +18,8 @@ namespace llvm {
 namespace snippy {
 
 constexpr static auto RISCV_CHAR_BIT = 8u;
+constexpr static auto kMaxSupportedInstrSize = 4u;
+constexpr static auto kCompressedInstrSize = 2u;
 
 enum RegSizeInBytes {
   Reg2Bytes = 2,

@@ -9,4 +9,10 @@
 #include "TargetGenContext.h"
 #include "RISCVSubtarget.h"
 
-namespace llvm::snippy {} // namespace llvm::snippy
+namespace llvm::snippy {
+
+RISCVGeneratorContext::RISCVGeneratorContext(
+    RISCVConfigurationInfo &&RISCVConfigIn)
+    : RISCVConfig(std::move(RISCVConfigIn)) {}
+
+} // namespace llvm::snippy
