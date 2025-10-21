@@ -15,6 +15,7 @@
 #pragma once
 
 #include "MCTargetDesc/RISCVMCTargetDesc.h"
+#include "snippy/Simulator/Targets/RISCV.h"
 #include "snippy/Support/DiagnosticInfo.h"
 
 #include "llvm/Support/FormatVariadic.h"
@@ -1555,43 +1556,6 @@ inline bool isCall(unsigned Opcode) {
   }
 }
 
-inline bool isRVVReadsVd(unsigned Opcode) {
-  switch (Opcode) {
-  default:
-    return false;
-  case RISCV::VFMACC_VV:
-  case RISCV::VFNMACC_VV:
-  case RISCV::VFNMSAC_VV:
-  case RISCV::VFMADD_VV:
-  case RISCV::VFNMADD_VV:
-  case RISCV::VFMSUB_VV:
-  case RISCV::VFNMSUB_VV:
-  case RISCV::VFMACC_VF:
-  case RISCV::VFNMACC_VF:
-  case RISCV::VFNMSAC_VF:
-  case RISCV::VFMADD_VF:
-  case RISCV::VFNMADD_VF:
-  case RISCV::VFMSUB_VF:
-  case RISCV::VFNMSUB_VF:
-  case RISCV::VWMACCU_VV:
-  case RISCV::VWMACC_VV:
-  case RISCV::VWMACCSU_VV:
-  case RISCV::VFWMACC_VV:
-  case RISCV::VFWNMACC_VV:
-  case RISCV::VFWMSAC_VV:
-  case RISCV::VFWNMSAC_VV:
-  case RISCV::VWMACCU_VX:
-  case RISCV::VWMACC_VX:
-  case RISCV::VWMACCSU_VX:
-  case RISCV::VWMACCUS_VX:
-  case RISCV::VFWMACC_VF:
-  case RISCV::VFWNMACC_VF:
-  case RISCV::VFWMSAC_VF:
-  case RISCV::VFWNMSAC_VF:
-    return true;
-  }
-}
-
 inline bool isRVVReduction(unsigned Opcode) {
   switch (Opcode) {
   default:
@@ -1685,16 +1649,6 @@ inline bool isRVVMaskProducing(unsigned Opcode) {
 
 std::pair<unsigned, bool> computeDecodedEMUL(unsigned SEW, unsigned EEW,
                                              RISCVII::VLMUL LMUL);
-
-inline unsigned getRVVRegGroupSize(unsigned SEW, unsigned EEW,
-                                   RISCVII::VLMUL LMUL) {
-  if (EEW == 1)
-    return 1;
-  auto [EMUL, EMULIsFractional] = computeDecodedEMUL(SEW, EEW, LMUL);
-  if (EMULIsFractional)
-    return 1;
-  return EMUL;
-}
 
 inline unsigned getStoreOpcode(unsigned ValueSizeInBits) {
   switch (ValueSizeInBits) {

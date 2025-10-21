@@ -10,6 +10,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCTargetDesc/RISCVBaseInfo.h"
+#include "snippy/Simulator/Targets/RISCV.h"
 #include "snippy/Support/RandUtil.h"
 
 #include <iterator>
@@ -267,7 +268,7 @@ struct RVVConfigurationInfo final {
                      std::vector<RVVConfiguration> &DiscardedConfigs);
 
   unsigned getVLEN() const;
-  unsigned getVLENB() const { return getVLEN() / 8; }
+  unsigned getVLENB() const { return getVLEN() / RISCV_CHAR_BIT; }
 
   // Randomly choose VL and VM from rvv config.
   VLVM selectVLVM(const RVVConfiguration &Config, bool ReducedVL) const;
