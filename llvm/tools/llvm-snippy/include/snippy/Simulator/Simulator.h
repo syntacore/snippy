@@ -99,7 +99,7 @@ public:
   void writeMem(MemoryAddressType Addr, const llvm::APInt &Val) {
     writeMem(Addr,
              ArrayRef<char>{reinterpret_cast<const char *>(Val.getRawData()),
-                            Val.getBitWidth() / 8});
+                            Val.getBitWidth() / CHAR_BIT});
     ;
   };
 
