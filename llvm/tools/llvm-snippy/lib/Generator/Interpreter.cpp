@@ -42,12 +42,6 @@ namespace snippy {
 
 extern cl::OptionCategory Options;
 
-static snippy::opt<std::string> TraceLogPath(
-    "trace-log",
-    cl::desc("execution log file. Execution logs are written to the standard "
-             "output if not specified"),
-    cl::cat(Options), cl::init(""));
-
 static snippy::opt<bool>
     DumpAsASCII("dump-memory-as-ascii",
                 cl::desc("Memory dump will be in ASCII format"),
@@ -151,7 +145,7 @@ SimulationEnvironment Interpreter::createSimulationEnvironment(
 
   applyMemCfgToSimCfg(L, Env);
 
-  Env.SimCfg.TraceLogPath = TraceLogPath.getValue();
+  Env.SimCfg.TraceLogPath = Cfg.PassCfg.ModelPluginConfig.ModelLogPath;
   Env.TgtGenCtx = &TgtCtx;
 
   if (NeedCallbackHandler)

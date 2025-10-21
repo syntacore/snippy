@@ -172,6 +172,7 @@ public:
 };
 
 struct ModelPluginOptions {
+  std::string ModelLogPath;
   std::vector<std::string> ModelLibraries;
 
   bool runOnModel() const { return !ModelLibraries.empty(); }
