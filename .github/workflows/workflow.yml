@@ -12,6 +12,8 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      BUILD_DIR: "release/build"
     steps:
       - name: Install required compiler to be sure
         run: sudo apt-get update && sudo apt-get install -y clang-14 ninja-build ccache lld cmake && pip install sphinx myst-parser
@@ -39,20 +41,20 @@ jobs:
           restore-keys: ccache-${{ github.job }}-
       - name: CMake release config
         run: >-
-          cmake -S llvm -B release/build -G Ninja
+          cmake -S llvm -B "$BUILD_DIR" -G Ninja
           -DCMAKE_C_COMPILER=clang-14 -DCMAKE_CXX_COMPILER=clang++-14
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           -DLLVM_EXTERNAL_PROJECT_PASSTHROUGH="CMAKE_C_COMPILER_LAUNCHER;CMAKE_CXX_COMPILER_LAUNCHER"
           -C .syntacore/release.cmake
       - name: CMake release build
-        run: cmake --build release/build --target llvm-snippy llvm-ie docs-llvm-snippy-man docs-llvm-snippy-html
+        run: cmake --build "$BUILD_DIR" --target llvm-snippy llvm-ie docs-llvm-snippy-man docs-llvm-snippy-html
       - name: CMake release test
-        run: env CTEST_OUTPUT_ON_FAILURE=1 cmake --build release/build --target check-llvm-tools-llvm-snippy
+        run: env CTEST_OUTPUT_ON_FAILURE=1 cmake --build "$BUILD_DIR" --target check-llvm-tools-llvm-snippy
       - name: Upload html docs artifacts
         uses: actions/upload-artifact@v4
         with:
           name: snippy-doc-html
-          path: release/build/tools/llvm-snippy/docs/html
+          path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/html
       - name: Show ccache statistics
         run: |
           ccache -s
