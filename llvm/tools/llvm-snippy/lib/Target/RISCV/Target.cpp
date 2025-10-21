@@ -1570,10 +1570,7 @@ public:
   // Max branch destination modulo
   static constexpr unsigned kMaxJumpDstMod = (kMaxJumpDst - 2) / 2;
 
-  static constexpr unsigned kMaxInstrSize = 4;
-  static constexpr unsigned kCompressedInstrSize = 2;
-
-  unsigned getMaxInstrSize() const override { return kMaxInstrSize; }
+  unsigned getMaxInstrSize() const override { return kMaxSupportedInstrSize; }
 
   std::set<unsigned>
   getPossibleInstrsSize(const TargetSubtargetInfo &STI) const override {
@@ -1582,8 +1579,8 @@ public:
                                 ST.hasStdExtZcb() || ST.hasStdExtZcd() ||
                                 ST.hasStdExtZce() || ST.hasStdExtZcf();
     if (STSupportsCompressed)
-      return {kCompressedInstrSize, kMaxInstrSize};
-    return {kMaxInstrSize};
+      return {kCompressedInstrSize, kMaxSupportedInstrSize};
+    return {kMaxSupportedInstrSize};
   }
 
   unsigned getMaxBranchDstMod(unsigned Opcode) const override {
@@ -3298,9 +3295,9 @@ public:
     getSupportInstBuilder(Tgt, MBB, InsertPos, Ctx, InstrInfo.get(RISCV::BEQ))
         .addReg(AccReg)
         .addReg(RefReg)
-        .addImm(kMaxInstrSize + (TrapOpcode == RISCV::EBREAK
-                                     ? kMaxInstrSize
-                                     : kCompressedInstrSize));
+        .addImm(kMaxSupportedInstrSize + (TrapOpcode == RISCV::EBREAK
+                                              ? kMaxSupportedInstrSize
+                                              : kCompressedInstrSize));
 
     getSupportInstBuilder(Tgt, MBB, InsertPos, Ctx, InstrInfo.get(TrapOpcode));
   }
@@ -4044,9 +4041,7 @@ void SnippyRISCVTarget::rvvWriteValueUsingLoad(
 
 void SnippyRISCVTarget::rvvWriteValue(InstructionGenerationContext &IGC,
                                       APInt Value, unsigned DstReg) const {
-
   assert(IGC.getSubtarget<RISCVSubtarget>().hasStdExtV());
-
   auto RVVInitMode = RVVInitModeOpt.getValue();
 
   if (DstReg == RISCV::V0) {
