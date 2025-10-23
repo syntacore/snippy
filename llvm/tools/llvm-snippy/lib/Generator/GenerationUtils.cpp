@@ -479,11 +479,9 @@ generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
   // register). Gathered information gives us restriction on the offset
   // immediate for each base register for each opcode.
   std::vector<unsigned> OpcodeIdxToBaseReg(Opcodes.size());
-  std::generate(OpcodeIdxToBaseReg.begin(), OpcodeIdxToBaseReg.end(),
-                [&AddrRegs]() {
-                  auto N = RandEngine::genInRangeExclusive(AddrRegs.size());
-                  return AddrRegs[N];
-                });
+  std::generate(
+      OpcodeIdxToBaseReg.begin(), OpcodeIdxToBaseReg.end(),
+      [&AddrRegs]() { return RandEngine::selectFromContainer(AddrRegs); });
   return OpcodeIdxToBaseReg;
 }
 

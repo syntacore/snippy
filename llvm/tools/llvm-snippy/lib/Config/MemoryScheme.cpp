@@ -946,9 +946,8 @@ MemoryAccessAddresses::randomAddressForPlainAccess(size_t AccessSize,
             });
     assert(!LegalAddresses.empty() && "At least one address must be legal. "
                                       "We should've already checked it.");
-    auto LegalAddressIdx =
-        RandEngine::genInRangeExclusive(LegalAddresses.size());
-    AI.Address = LegalAddresses[LegalAddressIdx].Addr;
+    auto LegalAddress = RandEngine::selectFromContainer(LegalAddresses);
+    AI.Address = LegalAddress.Addr;
   }
   AI.MaxOffset = 0;
   AI.MinOffset = 0;
@@ -979,8 +978,7 @@ MemoryAccessAddresses::randomAddressForBurstAccess(size_t AccessSize,
           });
   assert(!AIs.empty() && "At least one entry must exist as we've already "
                          "checked the legality of the scheme.");
-  auto AIIdx = RandEngine::genInRangeExclusive(AIs.size());
-  return AIs[AIIdx];
+  return RandEngine::selectFromContainer(AIs);
 }
 
 AddressInfo

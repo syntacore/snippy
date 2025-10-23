@@ -357,8 +357,7 @@ void BlockGenPlanningImpl::fillReqWithBurstGroups(
   assert(Cfg.BurstConfig);
   const auto &BurstSettings = Cfg.BurstConfig->Burst;
   while (NumInstrBurst > 0) {
-    auto BlockId = RandEngine::genInRangeExclusive(BlocksToProcess.size());
-    const auto *MBB = BlocksToProcess[BlockId];
+    const auto *MBB = RandEngine::selectFromContainer(BlocksToProcess);
 
     auto BurstGroupInstCount = RandEngine::genInRangeInclusive(
         BurstSettings.MinSize, BurstSettings.MaxSize);
