@@ -171,8 +171,9 @@ Interpreter::Interpreter(LLVMContext &Ctx, const SimulationEnvironment &Env,
 
 bool Interpreter::compareStates(const Interpreter &Another,
                                 bool CheckMemory) const {
-  auto RS1 = Env.SnippyTGT->createRegisterState(*Env.ST);
-  auto RS2 = Env.SnippyTGT->createRegisterState(*Env.ST);
+  assert(Env.TgtGenCtx);
+  auto RS1 = Env.SnippyTGT->createRegisterState(*Env.TgtGenCtx, *Env.ST);
+  auto RS2 = Env.SnippyTGT->createRegisterState(*Env.TgtGenCtx, *Env.ST);
   Simulator->saveState(*RS1);
   Another.Simulator->saveState(*RS2);
   if (*RS1 != *RS2)
@@ -206,13 +207,17 @@ void Interpreter::disableTransactionsTracking() {
 }
 
 void Interpreter::dumpCurrentRegState(StringRef Filename) const {
-  auto RegisterState = Env.SnippyTGT->createRegisterState(*Env.ST);
+  assert(Env.TgtGenCtx);
+  auto RegisterState =
+      Env.SnippyTGT->createRegisterState(*Env.TgtGenCtx, *Env.ST);
   Simulator->saveState(*RegisterState);
   dumpRegs(*RegisterState, Filename);
 }
 
 void Interpreter::dumpCurrentRegStateToStream(raw_ostream &OS) const {
-  auto RegisterState = Env.SnippyTGT->createRegisterState(*Env.ST);
+  assert(Env.TgtGenCtx);
+  auto RegisterState =
+      Env.SnippyTGT->createRegisterState(*Env.TgtGenCtx, *Env.ST);
   Simulator->saveState(*RegisterState);
   dumpRegsAsYAML(*RegisterState, OS);
 }

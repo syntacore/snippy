@@ -295,7 +295,8 @@ public:
   validateSelfcheckConfig(const SelfcheckConfig &SelfcheckCfg) const = 0;
 
   virtual std::unique_ptr<IRegisterState>
-  createRegisterState(const TargetSubtargetInfo &ST) const = 0;
+  createRegisterState(const TargetGenContextInterface &TgtGenCtx,
+                      const TargetSubtargetInfo &ST) const = 0;
 
   virtual void generateRegsInit(InstructionGenerationContext &IGC,
                                 const IRegisterState &R) const = 0;

@@ -154,8 +154,6 @@ uint64_t RISCVRegisterState::getMaxRegValueForSize(RegSizeInBytes Size) {
     return std::numeric_limits<uint32_t>::max();
   case RegSizeInBytes::Reg8Bytes:
     return std::numeric_limits<uint64_t>::max();
-  case RegSizeInBytes::Reg16Bytes:
-    llvm_unreachable("Cannot get max value for 16 byte wide register");
   }
 }
 
