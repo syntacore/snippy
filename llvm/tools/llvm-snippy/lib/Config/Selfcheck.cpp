@@ -44,9 +44,10 @@ std::string yaml::MappingTraits<snippy::SelfcheckConfig>::validate(
 
   // Target dependent validation part
   auto *Ctx = IO.getContext();
-  const auto &Tgt = static_cast<const snippy::ConfigIOContext *>(Ctx)
-                        ->State.getSnippyTarget();
-  return Tgt.validateSelfcheckConfig(Selfcheck);
+  assert(Ctx);
+  const auto *IOCtx = static_cast<const snippy::ConfigIOContext *>(Ctx);
+  const auto &Tgt = IOCtx->State.getSnippyTarget();
+  return Tgt.validateSelfcheckConfig(Selfcheck, IOCtx->Histogram);
 }
 
 void yaml::MappingTraits<snippy::SelfcheckTargetConfigInterface>::mapping(

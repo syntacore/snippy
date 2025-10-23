@@ -77,7 +77,8 @@ public:
   }
 
   std::string
-  validateSelfcheckConfig(const SelfcheckConfig &SelfcheckCfg) const override {
+  validateSelfcheckConfig(const SelfcheckConfig &SelfcheckCfg,
+                          const OpcodeHistogram &Histogram) const override {
     reportUnimplementedError();
   }
 

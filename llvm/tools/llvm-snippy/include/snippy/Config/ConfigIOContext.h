@@ -13,9 +13,11 @@ namespace snippy {
 
 class LLVMState;
 class OpcodeCache;
+class OpcodeHistogram;
 class RegPoolWrapper;
 
 struct ConfigIOContext {
+  const OpcodeHistogram &Histogram;
   const OpcodeCache &OpCC;
   RegPoolWrapper &RP;
   LLVMState &State;
