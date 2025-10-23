@@ -1156,10 +1156,8 @@ MachineInstr *generateCall(unsigned OpCode,
     return nullptr;
   auto CalleeIdx = RandEngine::genInRangeExclusive(CalleeCount);
   auto *CalleeNode = std::next(Node->callees().begin(), CalleeIdx)->Dest;
-  auto FunctionIdx =
-      RandEngine::genInRangeExclusive(CalleeNode->functions().size());
 
-  auto &CallTarget = *(CalleeNode->functions()[FunctionIdx]);
+  auto &CallTarget = *RandEngine::selectFromContainer(CalleeNode->functions());
   assert(CallTarget.hasName());
 
   auto *Call =

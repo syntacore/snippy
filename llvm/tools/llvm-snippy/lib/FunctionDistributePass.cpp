@@ -183,21 +183,20 @@ bool FunctionDistribute::runOnModule(Module &M) {
   // Then try to insert them one by one in specified order.
   for (auto *F : SortedBySize) {
     auto FSize = FunctionSizes.at(F);
-    auto HasNoSpaceFor = [&](size_t Index) {
-      auto &SpaceInfo = AvailableSpace.at(Index);
+    auto HasNoSpaceFor = [&](SectionSpaceInfo &SpaceInfo) {
       return SpaceInfo.Capacity < SpaceInfo.Used + FSize;
     };
 
     // Pick random section that may fit this function.
-    auto PlaceE = RandEngine::genNUniqInInterval(
-        0ul, AvailableSpace.size() - 1ul, 1ul, HasNoSpaceFor);
-    if (!PlaceE || PlaceE.get().empty())
+    auto SectionE =
+        RandEngine::selectFromContainerFiltered(AvailableSpace, HasNoSpaceFor);
+    if (!SectionE)
       snippy::fatal(
           "Failed to fit secondary code in specified RX "
           "sections: not enough contiguos space found. Please, provide more "
           "space in RX sections or reduce instruction count.");
 
-    auto &Section = AvailableSpace.at(PlaceE.get().front());
+    auto &Section = *SectionE;
     F->setSection(Section.Name);
 
     // Update information about available space.

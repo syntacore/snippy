@@ -23,6 +23,7 @@ enum class Errc {
   OutOfRegisters,
   InvalidConfiguration,
   LogicError,
+  NoElements,
   Failure,
   OutOfSpace,
   CorruptedElfImage,

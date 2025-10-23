@@ -224,24 +224,28 @@ public:
   static APInt genAPInt(unsigned Bits);
 
   template <typename T>
-  static Expected<std::vector<T>> getNInRangeInclusive(T Min, T Max, size_t N) {
+  static Expected<std::vector<T>> genNInRangeInclusive(T Min, T Max, size_t N) {
     if (Max < Min)
-      return makeFailure(
-          Errc::LogicError,
-          "Invalid usage of genNUniqInInterval: Max cannot be less than Min.");
-    std::vector<T> Vals(Max - Min + 1);
+      return makeFailure(Errc::LogicError,
+                         "Invalid usage of genNInRangeInclusive: Max cannot be "
+                         "less than Min.");
+    std::vector<T> Vals(N);
     std::generate(Vals.begin(), Vals.end(),
                   [Min, Max]() { return genInRangeInclusive(Min, Max); });
-    Vals.resize(N);
     return Vals;
   }
 
   template <typename T>
   static Expected<std::vector<T>> genNUniqInInterval(T Min, T Max, size_t N) {
+    static_assert(std::is_integral_v<T>, "T must be an integer type.");
     if (Max < Min)
       return makeFailure(
           Errc::LogicError,
           "Invalid usage of genNUniqInInterval: Max cannot be less than Min.");
+    if (N > Max - Min + 1)
+      return makeFailure(Errc::LogicError,
+                         "Invalid usage of genNUniqInInterval: impossible to "
+                         "generate this many unique values.");
     std::vector<T> Vals(Max - Min + 1);
     std::iota(Vals.begin(), Vals.end(), Min);
     shuffle(Vals.begin(), Vals.end());
@@ -250,80 +254,94 @@ public:
   }
 
   template <typename T, typename Pred>
-  static Expected<size_t> countUniqInInterval(T Min, T Max, Pred Filter) {
-    if (Max < Min)
-      return makeFailure(
-          Errc::LogicError,
-          "Invalid usage of countUniqInInterval: Max cannot be less than Min.");
-
-    T K = Min;
-    auto G = [&K, Max, &Filter]() {
-      for (; K <= Max && Filter(K); ++K)
-        ;
-      return K++;
-    };
-    size_t Ret = 0u;
-    for (auto Next = G(); Next <= Max; Next = G())
-      ++Ret;
-    return Ret;
-  }
-
-  template <typename T, typename Pred>
   static Expected<std::vector<T>> genNUniqInInterval(T Min, T Max, size_t N,
-                                                     Pred Filter) {
+                                                     Pred FilterOut) {
+    static_assert(std::is_invocable_r_v<bool, Pred, T>,
+                  "Filter must be callable with T and return bool");
     if (Max < Min)
       return makeFailure(
           Errc::LogicError,
           "Invalid usage of genNUniqInInterval: Max cannot be less than Min.");
-    if (Max - Min + 1 < N)
+    if (Max - Min + 1 < static_cast<T>(N))
       return makeFailure(
           Errc::LogicError,
           "Invalid usage of genNUniqInInterval: The interval has less unique "
           "values than was requested to generate.");
 
-    T K = Min;
-    auto G = [&K, Max, &Filter]() {
-      for (; K <= Max && Filter(K); ++K)
-        ;
-      return K++;
-    };
     std::vector<T> Vals;
-    for (auto Next = G(); Next <= Max; Next = G())
-      Vals.push_back(Next);
+    const auto IotaRange = llvm::iota_range<T>(Min, Max, /*Inclusive*/ true);
+    const auto FilteredRange =
+        llvm::make_filter_range(IotaRange, std::not_fn(FilterOut));
+    llvm::copy(FilteredRange, std::back_inserter(Vals));
+
     if (Vals.size() < N)
-      return makeFailure(
-          Errc::LogicError,
-          "Invalid usage of genNUniqInInterval: The interval has less unique "
-          "values than was requested.");
+      return makeFailure(Errc::NoElements,
+                         "Error in genNUniqInInterval: The filtered "
+                         "interval has less unique "
+                         "values than was requested .");
     shuffle(Vals.begin(), Vals.end());
     Vals.resize(N);
     return Vals;
   }
 
-  template <size_t N, typename T, typename Pred>
-  static Expected<std::array<T, N>> genNUniqInInterval(T Min, T Max,
-                                                       Pred Filter) {
-    std::array<T, N> Result;
-    auto IntermResults = genNUniqInInterval(Min, Max, N, std::move(Filter));
-    if (!IntermResults)
-      return IntermResults.takeError();
-    assert(IntermResults->size() == Result.size());
-    std::copy(IntermResults->begin(), IntermResults->end(), Result.begin());
-    return Result;
+  template <typename T, typename Pred>
+  static size_t countIndicesPassingFilter(T Min, T Max, Pred FilterOut) {
+    static_assert(std::is_invocable_r_v<bool, Pred, T>,
+                  "Filter must be callable with T and return bool");
+    assert(Max >= Min);
+
+    const auto IotaRange = llvm::iota_range<T>(Min, Max, /*Inclusive*/ true);
+    const auto FilteredRange =
+        llvm::make_filter_range(IotaRange, std::not_fn(FilterOut));
+    return std::distance(FilteredRange.begin(), FilteredRange.end());
   }
 
-  /// Select random element from container that doesn't meet requirements of
-  /// random access iterator.
+  // Doesn't require container to be random access,
+  // still O(1) for random access containers
   template <typename ContainerT>
-  static decltype(auto)
-  selectFromContainer(const ContainerT &Container,
-                      std::discrete_distribution<unsigned> &DD) {
-    auto Size = Container.size();
-    auto SelectedIdx = DD(pimpl->Engine);
-    assert(SelectedIdx < Size && "Selected element in set is out of range");
+  static auto
+  selectFromContainer(ContainerT &Container) -> decltype(*Container.begin()) {
+    size_t ContainerSize = std::distance(Container.begin(), Container.end());
+    assert(ContainerSize > 0);
+
+    auto SelectedIdx = genInRangeExclusive<unsigned>(0, ContainerSize);
     auto SelectedPos = Container.begin();
     std::advance(SelectedPos, SelectedIdx);
     return *SelectedPos;
+  }
+
+  // Doesn't require container to be random access,
+  // still O(1) for random access containers
+  template <typename ContainerT>
+  static auto
+  selectFromContainerWeighted(ContainerT &Container,
+                              std::discrete_distribution<unsigned> &DD)
+      -> decltype(*Container.begin()) {
+    size_t ContainerSize = std::distance(Container.begin(), Container.end());
+    assert(ContainerSize > 0);
+    assert(DD.probabilities().size() == ContainerSize);
+
+    auto SelectedIdx = DD(pimpl->Engine);
+    auto SelectedPos = Container.begin();
+    std::advance(SelectedPos, SelectedIdx);
+    return *SelectedPos;
+  }
+
+  // Doesn't require container to be random access
+  template <typename ContainerT, typename Pred>
+  static auto selectFromContainerFiltered(ContainerT &Container, Pred FilterOut)
+      -> Expected<decltype(*Container.begin())> {
+    static_assert(
+        std::is_invocable_r_v<bool, Pred, const decltype(*Container.begin())>,
+        "Filter must be callable with const T and return bool");
+    auto Candidates =
+        llvm::make_filter_range(Container, std::not_fn(FilterOut));
+
+    if (Candidates.empty())
+      return makeFailure(Errc::NoElements,
+                         "Error in selectFromContainerFiltered: No candidates "
+                         "left after filtering.");
+    return selectFromContainer(Candidates);
   }
 
   static auto &engine() { return pimpl->Engine; }

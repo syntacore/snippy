@@ -102,7 +102,7 @@ unsigned selectBB(const CFPermutationContext::BlockInfo::SetT &Available,
   auto ForwardCount = Available.size() - BackwardCount;
 
   auto DD = calcCandidatesDistribution(BackwardCount, ForwardCount, LoopRatio);
-  return RandEngine::selectFromContainer(Available, DD);
+  return RandEngine::selectFromContainerWeighted(Available, DD);
 }
 
 using CFPermSetT = CFPermutationContext::BlockInfo::SetT;
