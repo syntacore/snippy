@@ -252,6 +252,7 @@ void generateMain() {
     outs() << "Used seed: " << Cfg.ProgramCfg->Seed << '\n';
 
   ConfigIOContext CfgParsingContext{
+      Cfg.getOpcodeHistogram(),
       OpCC,
       RPW,
       State,
