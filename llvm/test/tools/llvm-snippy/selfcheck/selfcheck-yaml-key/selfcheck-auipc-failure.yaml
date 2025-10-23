@@ -1,0 +1,39 @@
+# RUN: sed -e s/MODE/code/ %s >%t.code.yaml
+# RUN: not llvm-snippy %t.code.yaml -model-plugin=None \
+# RUN: |& FileCheck --dump-input always %s
+
+# RUN: sed -e s/MODE/memory/ %s >%t.memory.yaml
+# RUN: not llvm-snippy %t.memory.yaml -model-plugin=None \
+# RUN: |& FileCheck --dump-input always %s
+
+# RUN: sed -e s/MODE/checksum/ %s >%t.checksum.yaml
+# RUN: not llvm-snippy %t.checksum.yaml -model-plugin=None \
+# RUN: |& FileCheck --dump-input always %s
+
+sections:
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+
+histogram:
+    - [AUIPC, 1.0]
+
+selfcheck:
+  mode: MODE
+
+options:
+  mtriple: riscv64-linux-gnu
+
+# CHECK: error: AUIPC is not supported for selfcheck
