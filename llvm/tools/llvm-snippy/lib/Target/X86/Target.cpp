@@ -42,7 +42,8 @@ public:
   bool matchesArch(Triple::ArchType Arch) const override;
 
   std::unique_ptr<IRegisterState>
-  createRegisterState(const TargetSubtargetInfo &ST) const override {
+  createRegisterState(const TargetGenContextInterface &TgtGenCtx,
+                      const TargetSubtargetInfo &ST) const override {
     reportUnimplementedError();
   }
 
