@@ -12,6 +12,9 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      BUILD_DIR: "release/build"
+      INSTALL_DIR: "release/install"
     steps:
       - name: Install required compiler to be sure
         run: sudo apt-get update && sudo apt-get install -y clang-14 ninja-build ccache lld cmake && pip install sphinx myst-parser
@@ -39,20 +42,41 @@ jobs:
           restore-keys: ccache-${{ github.job }}-
       - name: CMake release config
         run: >-
-          cmake -S llvm -B release/build -G Ninja
+          cmake -S llvm -B "$BUILD_DIR" -G Ninja
           -DCMAKE_C_COMPILER=clang-14 -DCMAKE_CXX_COMPILER=clang++-14
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           -DLLVM_EXTERNAL_PROJECT_PASSTHROUGH="CMAKE_C_COMPILER_LAUNCHER;CMAKE_CXX_COMPILER_LAUNCHER"
           -C .syntacore/release.cmake
       - name: CMake release build
-        run: cmake --build release/build --target llvm-snippy llvm-ie docs-llvm-snippy-man docs-llvm-snippy-html
+        run: cmake --build "$BUILD_DIR" --target llvm-snippy llvm-ie docs-llvm-snippy-man docs-llvm-snippy-html
       - name: CMake release test
-        run: env CTEST_OUTPUT_ON_FAILURE=1 cmake --build release/build --target check-llvm-tools-llvm-snippy
+        run: env CTEST_OUTPUT_ON_FAILURE=1 cmake --build "$BUILD_DIR" --target check-llvm-tools-llvm-snippy
+      - name: CMake install
+        id: install_release
+        run: |
+          release_os="${RUNNER_OS@L}" # Lowercase OS (linux)
+          release_arch="$(uname -m)" # Arch (x86_64, aarch64)
+          release_basename="snippy-$release_arch-$release_os"
+          release_tarball_filename="$release_basename.tar.xz" # snippy-x86_64-linux.tar.xz
+          echo "release_basename=$release_basename" >> $GITHUB_OUTPUT
+          echo "release_tarball_filename=$release_tarball_filename" >> $GITHUB_OUTPUT
+
+          for component in llvm-snippy llvm-snippy-man-pages; do
+            cmake --install "$BUILD_DIR" --prefix "$INSTALL_DIR" --component "$component"
+          done
+
+          tar --xz -C "$INSTALL_DIR" -cvf "$release_tarball_filename" .
+      - name: Upload binary install artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.install_release.outputs.release_basename }}
+          path: ${{ steps.install_release.outputs.release_tarball_filename }}
+          compression-level: 0 # Artifact is already compressed
       - name: Upload html docs artifacts
         uses: actions/upload-artifact@v4
         with:
           name: snippy-doc-html
-          path: release/build/tools/llvm-snippy/docs/html
+          path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/html
       - name: Show ccache statistics
         run: |
           ccache -s
