@@ -1,0 +1,30 @@
+# RUN: not llvm-snippy %s -model-plugin=None \
+# RUN: |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+
+histogram:
+  - [AUIPC, 1.0]
+
+options:
+  num-instrs: 10
+  init-regs-in-elf: true
+  mtriple: riscv64-linux-gnu
+  selfcheck: 1
+
+# CHECK: error: AUIPC is not supported for selfcheck

@@ -702,7 +702,15 @@ static Error normalizeInstrGenOptions(Config &Cfg, LLVMState &State,
   if (auto Period = getSelfcheckPeriod(Opts.Selfcheck)) {
     auto Mode = Opts.SelfcheckRefValueStorage;
     TrackCfg.Selfcheck = SelfcheckConfig{Mode, Period};
+
+    const auto &Tgt = State.getSnippyTarget();
+    assert(TrackCfg.Selfcheck);
+    auto Err = Tgt.validateSelfcheckConfig(*TrackCfg.Selfcheck,
+                                           Cfg.getOpcodeHistogram());
+    if (!Err.empty())
+      return createStringError(inconvertibleErrorCode(), Err);
   }
+
   return Error::success();
 }
 
@@ -719,7 +727,7 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
   // This could be changed in the future but it'd be a breaking change.
   yaml::MappingTraits<MemoryScheme>::mapping(IO, Info.CommonPolicyCfg->MS);
   IO.mapOptional("branches", Info.PassCfg.Branches);
-  IO.mapOptional("selfcheck", Info.CommonPolicyCfg->TrackCfg.Selfcheck);
+
   // TODO: get rid of this.
   if (!IO.outputting()) {
     std::optional<BurstGramData> BurstData;
@@ -735,6 +743,7 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
 
   YAMLHistogramIO<OpcodeHistogramDecodedEntry> HistIO(Info.Histogram);
   IO.mapOptional("histogram", HistIO);
+  IO.mapOptional("selfcheck", Info.CommonPolicyCfg->TrackCfg.Selfcheck);
 
   yaml::MappingNormalization<ImmediateHistogramNormalization,
                              ImmediateHistogram>
@@ -826,6 +835,7 @@ Config::Config(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State
     diagnoseHistogram(Ctx, OpCC, Histogram);
   }
   ConfigIOContext CfgParsingCtx{
+      Histogram,
       OpCC,
       RP,
       State,
