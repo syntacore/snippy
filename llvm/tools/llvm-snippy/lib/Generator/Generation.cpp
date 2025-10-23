@@ -690,9 +690,6 @@ handleGeneratedInstructions(InstrIt ItBegin,
   const auto &SelfcheckCfg = InstrGenCtx.getCommonCfg().TrackCfg.Selfcheck;
   // Reverse traversal as we need to sort definitions by their last use.
   for (auto Inst : reverse(SelfcheckCandidates)) {
-    if (SelfcheckCfg->isMemoryBasedSelfcheckModeEnabled() &&
-        Inst->getDesc().getNumDefs() == 0)
-      continue;
     auto Regs = ST.getRegsForSelfcheck(*Inst, InstrGenCtx);
     for (auto &Reg : Regs)
       OpsToCheck.insert({Inst, Reg});

@@ -1192,7 +1192,11 @@ public:
   }
 
   std::string
-  validateSelfcheckConfig(const SelfcheckConfig &SelfcheckCfg) const override {
+  validateSelfcheckConfig(const SelfcheckConfig &SelfcheckCfg,
+                          const OpcodeHistogram &Histogram) const override {
+    if (Histogram.count(RISCV::AUIPC))
+      return std::string("AUIPC is not supported for selfcheck");
+
     const auto *RVSelfcheckTgtCfg =
         static_cast<const RISCVSelfcheckTargetConfig *>(SelfcheckCfg.STC.get());
     if (!RVSelfcheckTgtCfg)
@@ -1473,15 +1477,30 @@ public:
     auto Opcode = MI.getOpcode();
     auto IsSelfcheckAllowed = [&](unsigned Opcode,
                                   bool SelfcheckRVVEnabled) -> bool {
+      static constexpr StringRef SelfcheckDisabledMessage =
+          "Selfcheck is disabled for this instruction\n";
       if (isRVV(Opcode) && !SelfcheckRVVEnabled) {
-        errs() << "Selfcheck is not supported for this instruction\n";
-        MI.print(errs());
-        errs() << "NOTE: for RVV instructions you need to use "
-                  "--enable-selfcheck-rvv option\n";
+        LLVM_DEBUG(dbgs() << SelfcheckDisabledMessage; MI.print(dbgs());
+                   dbgs() << "NOTE: for RVV instructions you need to use "
+                             "--enable-selfcheck-rvv option\n";);
         return false;
       }
-      /*TODO: maybe need more conditions */
-      return true;
+
+      if (MI.getDesc().getNumDefs())
+        return true;
+
+      if (SelfcheckCfg.isMemoryBasedSelfcheckModeEnabled()) {
+        LLVM_DEBUG(dbgs() << SelfcheckDisabledMessage; MI.print(dbgs()););
+        return false;
+      }
+
+      if (isStore(Opcode) || isCStore(Opcode) || isFPStore(Opcode) ||
+          isCFPStore(Opcode))
+        return true;
+
+      LLVM_DEBUG(dbgs() << SelfcheckDisabledMessage; MI.print(dbgs()););
+
+      return false;
     };
 
     if (!SelfcheckCfg.STC.get())

@@ -292,7 +292,8 @@ public:
   createSelfcheckTargetConfig() const = 0;
 
   virtual std::string
-  validateSelfcheckConfig(const SelfcheckConfig &SelfcheckCfg) const = 0;
+  validateSelfcheckConfig(const SelfcheckConfig &SelfcheckCfg,
+                          const OpcodeHistogram &Histogram) const = 0;
 
   virtual std::unique_ptr<IRegisterState>
   createRegisterState(const TargetGenContextInterface &TgtGenCtx,

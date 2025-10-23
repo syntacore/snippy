@@ -757,7 +757,7 @@ inline bool isBaseCFInstr(unsigned Opcode) {
   }
 }
 
-inline bool isLoadStore(unsigned Opcode) {
+inline bool isLoad(unsigned Opcode) {
   switch (Opcode) {
   default:
     return false;
@@ -768,12 +768,24 @@ inline bool isLoadStore(unsigned Opcode) {
   case RISCV::LW:
   case RISCV::LWU:
   case RISCV::LD:
+    return true;
+  }
+}
+
+inline bool isStore(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
   case RISCV::SB:
   case RISCV::SH:
   case RISCV::SW:
   case RISCV::SD:
     return true;
   }
+}
+
+inline bool isLoadStore(unsigned Opcode) {
+  return isLoad(Opcode) || isStore(Opcode);
 }
 
 inline bool isZicbo(unsigned Opcode) {
@@ -828,7 +840,7 @@ inline bool isNOP(unsigned Opcode) {
   }
 }
 
-inline bool isCLoadStore(unsigned Opcode) {
+inline bool isCLoad(unsigned Opcode) {
   switch (Opcode) {
   default:
     return false;
@@ -836,17 +848,29 @@ inline bool isCLoadStore(unsigned Opcode) {
   case RISCV::C_LD:
   case RISCV::C_LWSP:
   case RISCV::C_LDSP:
+  case RISCV::C_LBU:
+  case RISCV::C_LH:
+  case RISCV::C_LHU:
+    return true;
+  }
+}
+
+inline bool isCStore(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
   case RISCV::C_SW:
   case RISCV::C_SD:
   case RISCV::C_SWSP:
   case RISCV::C_SDSP:
-  case RISCV::C_LBU:
-  case RISCV::C_LH:
-  case RISCV::C_LHU:
   case RISCV::C_SB:
   case RISCV::C_SH:
     return true;
   }
+}
+
+inline bool isCLoadStore(unsigned Opcode) {
+  return isCLoad(Opcode) || isCStore(Opcode);
 }
 
 inline bool isCSPRelativeLoadStore(unsigned Opcode) {
@@ -861,21 +885,33 @@ inline bool isCSPRelativeLoadStore(unsigned Opcode) {
   }
 }
 
-inline bool isFPLoadStore(unsigned Opcode) {
+inline bool isFPLoad(unsigned Opcode) {
   switch (Opcode) {
   default:
     return false;
   case RISCV::FLH:
-  case RISCV::FSH:
   case RISCV::FLW:
-  case RISCV::FSW:
   case RISCV::FLD:
+    return true;
+  }
+}
+
+inline bool isFPStore(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RISCV::FSH:
+  case RISCV::FSW:
   case RISCV::FSD:
     return true;
   }
 }
 
-inline bool isCFPLoadStore(unsigned Opcode) {
+inline bool isFPLoadStore(unsigned Opcode) {
+  return isFPLoad(Opcode) || isFPStore(Opcode);
+}
+
+inline bool isCFPLoad(unsigned Opcode) {
   switch (Opcode) {
   default:
     return false;
@@ -883,12 +919,24 @@ inline bool isCFPLoadStore(unsigned Opcode) {
   case RISCV::C_FLD:
   case RISCV::C_FLWSP:
   case RISCV::C_FLDSP:
+    return true;
+  }
+}
+
+inline bool isCFPStore(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
   case RISCV::C_FSW:
   case RISCV::C_FSD:
   case RISCV::C_FSWSP:
   case RISCV::C_FSDSP:
     return true;
   }
+}
+
+inline bool isCFPLoadStore(unsigned Opcode) {
+  return isCFPLoad(Opcode) || isCFPStore(Opcode);
 }
 
 inline bool isCFPSPRelativeLoadStore(unsigned Opcode) {

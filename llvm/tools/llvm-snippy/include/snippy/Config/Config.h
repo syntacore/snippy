@@ -312,6 +312,8 @@ public:
                                                     Histogram.end());
   }
 
+  const OpcodeHistogram &getOpcodeHistogram() const { return Histogram; }
+
   double getBurstOpcodesWeight() const {
     if (!BurstConfig)
       return 0.0;
