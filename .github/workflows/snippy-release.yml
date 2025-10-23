@@ -1,0 +1,44 @@
+name: Snippy release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        # The release needs to be manually tagged before-hand.
+        description: 'Tag to make a release from'
+        required: true
+        type: string
+permissions:
+  contents: read # Default everything to read-only
+jobs:
+  upload-release:
+    name: Upload release
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      ARTIFACTS_DIR: dist
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    permissions:
+      contents: write # To make releases
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ inputs.tag }}
+      - name: Prepare artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO_NAME: ${{ github.repository }}
+        run: |
+          release_commit_sha=$(git rev-list HEAD)
+          echo "::notice ::Will create release from tag '$RELEASE_TAG' (https://github.com/$REPO_NAME/commit/$release_commit_sha)"
+          workflow_id=$(gh run list --workflow snippy-ci.yml --commit "$release_commit_sha" --status success --json databaseId --jq ".[0].databaseId")
+          echo "::notice ::Releasing artifacts from workflow run (https://github.com/$REPO_NAME/actions/runs/$workflow_id)"
+          gh run download "$workflow_id" -D "$ARTIFACTS_DIR"
+          tar --xz -cvf "$ARTIFACTS_DIR/snippy-doc-html.tar.xz" -C "$ARTIFACTS_DIR/snippy-doc-html" .
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG" --generate-notes "$ARTIFACTS_DIR/**/*.tar.xz" "$ARTIFACTS_DIR/*.tar.xz" --draft
