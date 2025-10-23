@@ -304,7 +304,7 @@ Expected<std::string> Linker::createLinkerScriptImpl(bool Shared) const {
     return MakeNoSpaceError();
   };
   STS << "MEMORY {\n";
-  for (auto &&I : iota_range(1u, 8u, /* Inclusive */ false)) {
+  for (auto &&I : iota_range<unsigned>(1u, 8u, /* Inclusive */ false)) {
     auto AccStr = AccMask(I).toString();
     STS << "  RAM_" << AccStr << " (" << AccStr
         << ") : ORIGIN = " << utostr(MemoryRegion.first)
