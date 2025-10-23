@@ -1155,9 +1155,11 @@ public:
   }
 
   std::unique_ptr<IRegisterState>
-  createRegisterState(const TargetSubtargetInfo &ST) const override {
+  createRegisterState(const TargetGenContextInterface &TgtGenCtx,
+                      const TargetSubtargetInfo &ST) const override {
     const auto &RST = static_cast<const RISCVSubtarget &>(ST);
-    return std::make_unique<RISCVRegisterState>(RST);
+    const auto &RGC = static_cast<const RISCVGeneratorContext &>(TgtGenCtx);
+    return std::make_unique<RISCVRegisterState>(RST, RGC.getVLEN());
   }
 
   bool needsGenerationPolicySwitch(unsigned Opcode) const override {
@@ -4021,11 +4023,10 @@ void SnippyRISCVTarget::rvvWriteValueUsingLoad(
       IGC.getSnippyModule(),
       "Failed to allocate global constant for RVV register value load");
 
-  auto *GV =
-      GP.createGV(Value, /* Alignment */ Reg16Bytes,
-                  /* Linkage */ GlobalValue::InternalLinkage,
-                  /* Name */ "global",
-                  /* Reason */ "This is needed for updating of RVV register");
+  auto *GV = GP.createGV(
+      Value, /* Alignment */ Value.getBitWidth() / CHAR_BIT,
+      /* Linkage */ GlobalValue::InternalLinkage, /* Name */ "global",
+      /* Reason */ "This is needed for updating of RVV register");
 
   auto GVAddr = GP.getGVAddress(GV);
   loadRegFromAddr(IGC, GVAddr, DstReg);
