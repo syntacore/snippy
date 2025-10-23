@@ -85,12 +85,11 @@ class AvailableRegisterImpl {
              std::invoke(Filter, R);
     };
 
-    auto NumRegs = RandEngine::countUniqInInterval(
+    auto NumRegs = RandEngine::countIndicesPassingFilter(
         0u, RegClass.getNumRegs() - 1, CombinedFilter);
-    assert(NumRegs && "countUniqInInterval must always succeed");
 
     auto RegIdxs = RandEngine::genNUniqInInterval(0u, RegClass.getNumRegs() - 1,
-                                                  *NumRegs, CombinedFilter);
+                                                  NumRegs, CombinedFilter);
     assert(RegIdxs && "can't get all available unique values");
 
     transform(*RegIdxs, OutputIt,

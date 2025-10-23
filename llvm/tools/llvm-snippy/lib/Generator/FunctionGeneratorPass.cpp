@@ -562,17 +562,15 @@ bool FunctionGenerator::generateFunctions(Module &M,
                                       });
       assert(Unreachable != LayerMap.end() &&
              "Must be at least one unreachable");
-      auto EConnectTo = RandEngine::genNUniqInInterval(
-          0ull, LayerMap.size() - 1ull, 1ull,
-          [&LayerMap, &Unreachable, &Reachables](auto Index) {
+      auto ConnectToE = RandEngine::selectFromContainerFiltered(
+          LayerMap, [&Unreachable, &Reachables](auto LayerMapEntry) {
             // Filter out Nodes of higher or equal layer and unreachable nodes.
-            return LayerMap[Index].Layer >= Unreachable->Layer ||
-                   !Reachables.count(LayerMap[Index].Node);
+            return LayerMapEntry.Layer >= Unreachable->Layer ||
+                   !Reachables.count(LayerMapEntry.Node);
           });
-      assert(EConnectTo && "Cannot create connection");
-      auto ConnectTo = EConnectTo->front();
+      assert(ConnectToE && "Cannot create connection");
 
-      LayerMap[ConnectTo].Node->addCallee(Unreachable->Node);
+      ConnectToE->Node->addCallee(Unreachable->Node);
       fillReachableNodes(Unreachable->Node, Reachables);
     }
   }
