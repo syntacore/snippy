@@ -5,7 +5,7 @@ if (NOT LLVM_BUILD_SNIPPY)
 endif()
 message(STATUS "Enable llvm-snippy")
 
-set(SNIPPY_VERSION "2.0.0")
+set(SNIPPY_VERSION "2.1.0")
 function(get_snippy_version path version)
   set(snippy_version_json_file "${path}/version.json")
   cmake_path(NORMAL_PATH snippy_version_json_file)
@@ -177,4 +177,9 @@ install(FILES $<TARGET_FILE:lld>
         COMPONENT llvm-snippy
         )
 
+
+  install(DIRECTORY examples/
+          DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/examples
+          COMPONENT llvm-snippy
+          )
 
