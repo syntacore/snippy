@@ -48,7 +48,7 @@ jobs:
           -DLLVM_EXTERNAL_PROJECT_PASSTHROUGH="CMAKE_C_COMPILER_LAUNCHER;CMAKE_CXX_COMPILER_LAUNCHER"
           -C .syntacore/release.cmake
       - name: CMake release build
-        run: cmake --build "$BUILD_DIR" --target llvm-snippy llvm-ie docs-llvm-snippy-man docs-llvm-snippy-html
+        run: cmake --build "$BUILD_DIR" --target llvm-snippy llvm-ie docs-llvm-snippy-man docs-llvm-snippy-latex docs-llvm-snippy-html
       - name: CMake release test
         run: env CTEST_OUTPUT_ON_FAILURE=1 cmake --build "$BUILD_DIR" --target check-llvm-tools-llvm-snippy
       - name: CMake install
@@ -77,6 +77,11 @@ jobs:
         with:
           name: snippy-doc-html
           path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/html
+      - name: Upload latex docs artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: snippy-doc-latex
+          path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/latex
       - name: Upload github pages artifact
         if: github.event_name == 'push' && github.ref_name == 'main' && github.repository_owner == 'syntacore'
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
