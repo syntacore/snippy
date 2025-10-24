@@ -22,6 +22,11 @@ jobs:
     permissions:
       contents: write # To make releases
     steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          # For building .pdf docs from latex
+          sudo apt-get install -y texlive-xetex latexmk texlive-latex-extra
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
@@ -37,8 +42,16 @@ jobs:
           echo "::notice ::Releasing artifacts from workflow run (https://github.com/$REPO_NAME/actions/runs/$workflow_id)"
           gh run download "$workflow_id" -D "$ARTIFACTS_DIR"
           tar --xz -cvf "$ARTIFACTS_DIR/snippy-doc-html.tar.xz" -C "$ARTIFACTS_DIR/snippy-doc-html" .
+      - name: Build PDF documentation
+        run: |
+          # Build .pdf documentation
+          pushd "$ARTIFACTS_DIR/snippy-doc-latex"
+          make
+          popd
+          mv "$ARTIFACTS_DIR/snippy-doc-latex/LLVMSnippy.pdf" "snippy_guide.pdf"
+          rm -rf "$ARTIFACTS_DIR/snippy-doc-latex"
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$RELEASE_TAG" --generate-notes "$ARTIFACTS_DIR/**/*.tar.xz" "$ARTIFACTS_DIR/*.tar.xz" --draft
+          gh release create "$RELEASE_TAG" --generate-notes "$ARTIFACTS_DIR/**/*.tar.xz" "$ARTIFACTS_DIR/*.tar.xz" "snippy_guide.pdf" --draft
