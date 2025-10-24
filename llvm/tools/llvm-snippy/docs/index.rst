@@ -7,8 +7,8 @@
 
   .. contents::
 
-Snippy Documentation
-####################
+Snippy Documentation (|release|)
+################################
 
 Overview
 ========
@@ -283,7 +283,7 @@ Following is an example of the configuration layout that contains:
        march: "rv64ifc_zifencei"
        model-plugin: None
 
-You may try layout-example.yaml from examples on github or from yml folder in this release as follows and disassemble to see generated snippet.
+You may try layout-example.yaml from examples on github or from yml/ and share/examples/ folder in this release as follows and disassemble to see generated snippet.
 
 ::
 
@@ -2227,15 +2227,6 @@ where ``type`` options include:
    formats:
 
    -  In the ordinary format of ``(-)(radix)num``
-
-   -  In the format similar to System Verilog with "'":
-      "(-)(width)'(signed)(radix)num". If you do not provide the
-      width, it equals 32 bit. If you do not provide the radix, it
-      equals 10 (decimal). For example:
-
-      ::
-
-         "12'shF0F" = 12bit signed hexademical integer 111100001111
 
 -  ``bitpattern`` |nbsp| -- |nbsp| Regular randomly generated bit pattern
    (evenly-spaced 1-s)
