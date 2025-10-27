@@ -977,10 +977,10 @@ static void checkBurstGram(LLVMContext &Ctx, const OpcodeHistogram &Histogram,
   for (auto &&Group : *Burst.Groupings) {
     for (auto Opc : Group) {
       if (!Histogram.count(Opc))
-        warn(WarningName::BurstMode, Ctx,
-             "Instruction \"" + OpCC.name(Opc) +
-                 "\" was specified in burst grouping but not in histogram",
-             "Instruction won't be generated");
+        snippy::fatal(
+            Ctx, "Bad burst config",
+            "instruction \"" + OpCC.name(Opc) +
+                "\" was specified in burst grouping but not in histogram");
     }
   }
 }
