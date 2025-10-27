@@ -10,9 +10,9 @@
 # RUN:   -march=riscv64-linux-gnu -mattr=+a,+f -num-instrs=200 --dump-mf \
 # RUN:   -model-plugin None |& FileCheck %s --check-prefix=FENCE
 
-# RUN: llvm-snippy %s %S/Inputs/custom-burst-amoadd.yaml \
+# RUN: not llvm-snippy %s %S/Inputs/custom-burst-amoadd.yaml \
 # RUN:   -march=riscv64-linux-gnu -mattr=+a,+f -num-instrs=200 --dump-mf \
-# RUN:   -model-plugin None |& FileCheck %s --check-prefix=WARN
+# RUN:   -model-plugin None |& FileCheck %s --check-prefix=ERROR
 
 # RUN: llvm-snippy %s %S/Inputs/custom-burst-fence-in-both-groups.yaml \
 # RUN:   -march=riscv64-linux-gnu -mattr=+a,+f -num-instrs=500 --dump-mf \
@@ -55,7 +55,7 @@ histogram:
 # FENCE-NEXT: FENCE
 # FENCE-NEXT: FENCE
 
-# WARN: warning: (burst-mode) Instruction "AMOADD_W" was specified in burst grouping but not in histogram: Instruction won't be generated
+# ERROR: error: Bad burst config: instruction "AMOADD_W" was specified in burst grouping but not in histogram
 
 # There we want to see burst group full of loads and fences and after some unrelated instruction - group of stores and fences.
 # Regex to match 3 line with either LW or FENCE inside. Cannot use 3 different checks here. It may start matching wrong group.
