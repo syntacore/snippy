@@ -28,6 +28,8 @@ std::string SnippyErrorCategory::message(int ErrorValue) const {
     return "Invalid configuration";
   case Errc::LogicError:
     return "Logic error";
+  case Errc::NoElements:
+    return "Not enough elements to select random values";
   case Errc::Failure:
     return "Failure";
   case Errc::OutOfSpace:
