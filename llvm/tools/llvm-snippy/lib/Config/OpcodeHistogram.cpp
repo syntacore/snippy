@@ -8,7 +8,7 @@
 
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/ConfigIOContext.h"
-#include "snippy/Generator/LLVMState.h"
+#include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/Support/Options.h"
 #include "snippy/Support/YAMLHistogram.h"
 

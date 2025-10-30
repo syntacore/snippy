@@ -8,7 +8,7 @@
 
 #include "snippy/Config/Selfcheck.h"
 #include "snippy/Config/ConfigIOContext.h"
-#include "snippy/Generator/LLVMState.h"
+#include "snippy/GeneratorUtils/LLVMState.h"
 
 #include "llvm/Support/YAMLTraits.h"
 

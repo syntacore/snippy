@@ -16,8 +16,8 @@
 #include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GenerationRequest.h"
 #include "snippy/Generator/GeneratorContextPass.h"
-#include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/Policy.h"
+#include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/Support/Utils.h"
 #include "snippy/Target/Target.h"
 

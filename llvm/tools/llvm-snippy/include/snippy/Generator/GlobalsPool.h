@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "LLVMState.h"
 #include "snippy/Config/MemoryScheme.h"
+#include "snippy/GeneratorUtils/LLVMState.h"
 #include "llvm/IR/Module.h"
 
 namespace llvm {

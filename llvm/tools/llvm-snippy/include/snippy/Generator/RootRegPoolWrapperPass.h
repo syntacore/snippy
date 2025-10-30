@@ -9,8 +9,8 @@
 #pragma once
 
 #include "snippy/Generator/GeneratorContextPass.h"
-#include "snippy/Generator/RegisterPool.h"
 #include "snippy/Generator/SnippyModule.h"
+#include "snippy/GeneratorUtils/RegisterPool.h"
 
 namespace llvm {
 
@@ -35,9 +35,11 @@ public:
   }
 
   RegPoolWrapper getPool() const {
-    return RegPoolWrapper(getAnalysis<GeneratorContextWrapper>()
-                              .getContext()
-                              .getProgramContext());
+    auto &PC =
+        getAnalysis<GeneratorContextWrapper>().getContext().getProgramContext();
+    auto &State = PC.getLLVMState();
+    return RegPoolWrapper(RegPoolWrapper::CreateRoot{}, State.getSnippyTarget(),
+                          State.getRegInfo(), PC.RegPoolsStorage);
   }
 };
 

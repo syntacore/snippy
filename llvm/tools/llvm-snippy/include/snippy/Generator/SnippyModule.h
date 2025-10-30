@@ -10,10 +10,10 @@
 
 #include "snippy/Generator/GenResult.h"
 #include "snippy/Generator/GlobalsPool.h"
-#include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/Linker.h"
 #include "snippy/Generator/RegisterGenerator.h"
-#include "snippy/Generator/RegisterPool.h"
+#include "snippy/GeneratorUtils/LLVMState.h"
+#include "snippy/GeneratorUtils/RegisterPool.h"
 #include "snippy/Target/Target.h"
 
 #include "llvm/CodeGen/MachineModuleInfo.h"
@@ -137,7 +137,7 @@ public:
 
   ~SnippyProgramContext();
 
-  friend RegPoolWrapper;
+  friend RootRegPoolWrapper;
 
   const auto &getConfig() const { return *Cfg; }
   auto &getLLVMState() const { return *State; }

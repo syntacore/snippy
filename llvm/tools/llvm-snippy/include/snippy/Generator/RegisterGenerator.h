@@ -13,7 +13,7 @@
 
 #pragma once
 
-#include "snippy/Generator/RegisterPool.h"
+#include "snippy/GeneratorUtils/RegisterPool.h"
 #include "snippy/Plugins/RegisterPluginCInterface.h"
 #include "snippy/Target/Target.h"
 

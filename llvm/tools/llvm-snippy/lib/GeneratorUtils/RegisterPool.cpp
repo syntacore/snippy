@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "snippy/Generator/RegisterPool.h"
-#include "snippy/Generator/RegisterPoolImpl.h"
-#include "snippy/Generator/SnippyModule.h"
+#include "snippy/GeneratorUtils/RegisterPool.h"
+#include "snippy/GeneratorUtils/LLVMState.h"
+#include "snippy/GeneratorUtils/RegisterPoolImpl.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
@@ -178,12 +178,6 @@ void RegPool::addReserved(unsigned Reg, const MachineBasicBlock &MBB,
              << (checkAccessMask(AccessMask, AccessMaskBit::R) ? "R" : "")
              << (checkAccessMask(AccessMask, AccessMaskBit::W) ? "W" : "")
              << "\n");
-}
-
-RegPoolWrapper::RegPoolWrapper(SnippyProgramContext &PC)
-    : SnippyTgt(PC.getLLVMState().getSnippyTarget()),
-      RegInfo(PC.getLLVMState().getRegInfo()), Pools(PC.RegPoolsStorage) {
-  assert(PC.RegPoolsStorage.size() == 1);
 }
 
 unsigned RegPoolWrapper::getAvailableRegister(const Twine &Desc,
