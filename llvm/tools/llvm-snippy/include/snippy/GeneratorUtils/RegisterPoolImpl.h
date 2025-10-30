@@ -35,16 +35,16 @@ class AvailableRegisterImpl {
   template <class Pool, typename... Args>
   static unsigned getOne(const Twine &Desc, const MCRegisterInfo &RI,
                          const Pool &P, const MCRegisterClass &RegClass,
-                         Args &&...OtherArgs) {
+                         Args &&... OtherArgs) {
     return get(Desc, RI, P, /* NumRegs */ 1, RegClass,
                std::forward<Args>(OtherArgs)...)
         .front();
   }
 
   template <class Pool, typename Pred, typename... Args>
-  static unsigned getOne(const Twine &Desc, const MCRegisterInfo &RI,
-                         const Pool &P, Pred Filter,
-                         const MCRegisterClass &RegClass, Args &&...OtherArgs) {
+  static unsigned
+  getOne(const Twine &Desc, const MCRegisterInfo &RI, const Pool &P,
+         Pred Filter, const MCRegisterClass &RegClass, Args &&... OtherArgs) {
     return get(Desc, RI, P, Filter, /* NumRegs */ 1, RegClass,
                std::forward<Args>(OtherArgs)...)
         .front();
@@ -53,7 +53,7 @@ class AvailableRegisterImpl {
   template <class Pool, typename... Args>
   static auto get(const Twine &Desc, const MCRegisterInfo &RI, const Pool &P,
                   unsigned NumRegs, const MCRegisterClass &RegClass,
-                  Args &&...OtherArgs) {
+                  Args &&... OtherArgs) {
     return get(
         Desc, RI, P, [](unsigned Reg) { return false; }, NumRegs, RegClass,
         std::forward<Args>(OtherArgs)...);
@@ -61,7 +61,7 @@ class AvailableRegisterImpl {
 
   template <class Pool, typename... Args>
   static auto getAll(const Pool &P, const MCRegisterClass &RegClass,
-                     Args &&...OtherArgs) {
+                     Args &&... OtherArgs) {
     return getAll(
         P, [](unsigned Reg) { return false; }, RegClass,
         std::forward<Args>(OtherArgs)...);
@@ -69,7 +69,7 @@ class AvailableRegisterImpl {
 
   template <size_t N, class Pool, typename... Args>
   static auto get(const Twine &Desc, const MCRegisterInfo &RI, const Pool &P,
-                  const MCRegisterClass &RegClass, Args &&...OtherArgs) {
+                  const MCRegisterClass &RegClass, Args &&... OtherArgs) {
     return get<N>(
         Desc, RI, P, [](unsigned Reg) { return false; }, RegClass,
         std::forward<Args>(OtherArgs)...);
@@ -77,7 +77,8 @@ class AvailableRegisterImpl {
 
   template <class Pool, typename Pred, typename OutItType, typename... Args>
   static auto getAllImpl(const Pool &P, Pred Filter, OutItType OutputIt,
-                         const MCRegisterClass &RegClass, Args &&...OtherArgs) {
+                         const MCRegisterClass &RegClass,
+                         Args &&... OtherArgs) {
 
     auto CombinedFilter = [&](unsigned Idx) {
       auto R = RegClass.getRegister(Idx);
@@ -100,7 +101,7 @@ class AvailableRegisterImpl {
   static auto getImpl(const Twine &Desc, const MCRegisterInfo &RI,
                       const Pool &P, Pred Filter, unsigned NumRegs,
                       OutItType OutputIt, const MCRegisterClass &RegClass,
-                      Args &&...OtherArgs) {
+                      Args &&... OtherArgs) {
 
     auto RegIdxs = RandEngine::genNUniqInInterval(
         0u, RegClass.getNumRegs() - 1, NumRegs, [&](unsigned Idx) {
@@ -119,7 +120,7 @@ class AvailableRegisterImpl {
   template <class Pool, typename Pred, typename... Args>
   static std::vector<unsigned>
   get(const Twine &Desc, const MCRegisterInfo &RI, const Pool &P, Pred Filter,
-      unsigned NumRegs, const MCRegisterClass &RegClass, Args &&...OtherArgs) {
+      unsigned NumRegs, const MCRegisterClass &RegClass, Args &&... OtherArgs) {
     std::vector<unsigned> Regs;
     // NOTE: we could reserve space and use Regs.begin(), but we don't :)
     getImpl(Desc, RI, P, std::move(Filter), NumRegs, std::back_inserter(Regs),
@@ -131,7 +132,7 @@ class AvailableRegisterImpl {
   template <class Pool, typename Pred, typename... Args>
   static std::vector<unsigned> getAll(const Pool &P, Pred Filter,
                                       const MCRegisterClass &RegClass,
-                                      Args &&...OtherArgs) {
+                                      Args &&... OtherArgs) {
     std::vector<unsigned> Regs;
     // NOTE: we could reserve space and use Regs.begin(), but we don't :)
     getAllImpl(P, std::move(Filter), std::back_inserter(Regs), RegClass,
@@ -142,7 +143,7 @@ class AvailableRegisterImpl {
   template <size_t N, class Pool, typename Pred, typename... Args>
   static std::array<unsigned, N>
   get(const Twine &Desc, const MCRegisterInfo &RI, const Pool &P, Pred Filter,
-      const MCRegisterClass &RegClass, Args &&...OtherArgs) {
+      const MCRegisterClass &RegClass, Args &&... OtherArgs) {
     std::array<unsigned, N> Regs;
     getImpl(Desc, RI, P, std::move(Filter), N, Regs.begin(), RegClass,
             std::forward<Args>(OtherArgs)...);
