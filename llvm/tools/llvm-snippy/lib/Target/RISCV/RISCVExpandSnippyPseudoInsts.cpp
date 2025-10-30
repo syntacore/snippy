@@ -16,8 +16,8 @@
 #include "snippy/CreatePasses.h"
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContextPass.h"
-#include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/Policy.h"
+#include "snippy/GeneratorUtils/LLVMState.h"
 
 #include "MCTargetDesc/RISCVBaseInfo.h"
 #include "RISCVInstrInfo.h"

@@ -32,7 +32,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "snippy/Generator/RegisterPoolImpl.h"
+#include "snippy/GeneratorUtils/RegisterPoolImpl.h"
 #include "snippy/Support/Error.h"
 #include "snippy/Support/Utils.h"
 #include "snippy/Target/Target.h"
@@ -53,7 +53,6 @@ class MCRegisterClass;
 namespace llvm {
 namespace snippy {
 
-class GeneratorContext;
 class RootRegPoolWrapper;
 class SnippyProgramContext;
 
@@ -230,14 +229,19 @@ class RegPoolWrapper final {
   const MCRegisterInfo &RegInfo;
   std::vector<RegPool> &Pools;
 
-  RegPoolWrapper(SnippyProgramContext &PC);
-  friend RootRegPoolWrapper;
-
 public:
   RegPoolWrapper(const SnippyTarget &SnippyTgt, const MCRegisterInfo &RegInfo,
                  std::vector<RegPool> &Pools)
       : SnippyTgt(SnippyTgt), RegInfo(RegInfo), Pools(Pools) {
     Pools.emplace_back();
+  }
+
+  struct CreateRoot {};
+
+  RegPoolWrapper(CreateRoot, const SnippyTarget &SnippyTgt,
+                 const MCRegisterInfo &RegInfo, std::vector<RegPool> &Pools)
+      : SnippyTgt(SnippyTgt), RegInfo(RegInfo), Pools(Pools) {
+    assert(Pools.size() == 1);
   }
 
   RegPoolWrapper(const RegPoolWrapper &Other) = delete;

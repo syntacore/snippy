@@ -4,6 +4,7 @@ add_subdirectory(Simulator)
 add_subdirectory(Support)
 add_subdirectory(Target)
 add_subdirectory(Generator)
+add_subdirectory(GeneratorUtils)
 
 set(LLVM_SNIPPY_TARGETS "${LLVM_SNIPPY_TARGETS} ${TARGETS_TO_APPEND}" PARENT_SCOPE)
 
@@ -25,6 +26,7 @@ set(LLVM_LINK_COMPONENTS
   SnippyConfig
   SnippySupport
   SnippyTarget
+  SnippyGenerator
   )
 set(LLVMSnippySources
   BranchRelaxatorPass.cpp
@@ -61,8 +63,6 @@ add_llvm_library(LLVMSnippy
   DEPENDS
   intrinsics_gen
   LLVMSnippyDriverOptionsTableGen
-  LINK_LIBS PRIVATE
-    $<BUILD_LOCAL_INTERFACE:LLVMSnippyGenerator>
   )
 
 set(LLVM_TARGET_DEFINITIONS Options.td)

@@ -69,9 +69,9 @@
 #include "snippy/Config/RegisterHistogram.h"
 #include "snippy/Generator/FPRNaNIdentifier.h"
 #include "snippy/Generator/GenerationLimit.h"
-#include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/SelfcheckInfo.h"
 #include "snippy/Generator/SnippyModule.h"
+#include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/Support/OpcodeGenerator.h"
 
 #include <functional>
