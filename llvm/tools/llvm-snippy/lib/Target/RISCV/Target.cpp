@@ -9,12 +9,12 @@
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Generator/GlobalsPool.h"
-#include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/Policy.h"
-#include "snippy/Generator/RegisterPool.h"
 #include "snippy/Generator/RegsReservedForLoop.h"
 #include "snippy/Generator/SimulatorContext.h"
 #include "snippy/Generator/SnippyLoopInfo.h"
+#include "snippy/GeneratorUtils/LLVMState.h"
+#include "snippy/GeneratorUtils/RegisterPool.h"
 #include <memory>
 
 #include "snippy/Config/ImmediateHistogram.h"

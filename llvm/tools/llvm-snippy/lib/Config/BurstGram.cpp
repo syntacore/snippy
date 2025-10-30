@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 #include "snippy/Config/BurstGram.h"
 #include "snippy/Config/OpcodeHistogram.h"
-#include "snippy/Generator/LLVMState.h"
+#include "snippy/GeneratorUtils/LLVMState.h"
 
 namespace llvm {
 namespace snippy {

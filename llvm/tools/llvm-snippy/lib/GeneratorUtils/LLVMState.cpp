@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "snippy/Generator/LLVMState.h"
+#include "snippy/GeneratorUtils/LLVMState.h"
 
 #include "snippy/Support/Error.h"
 #include "snippy/Target/Target.h"

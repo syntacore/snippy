@@ -15,8 +15,8 @@
 #pragma once
 
 #include "snippy/Config/Config.h"
-#include "snippy/Generator/RegisterPool.h"
 #include "snippy/Generator/SnippyModule.h"
+#include "snippy/GeneratorUtils/RegisterPool.h"
 #include "snippy/Support/Options.h"
 
 namespace llvm {
