@@ -15,11 +15,11 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "LLVMState.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 
 #include "snippy/Generator/ParsedElf.h"
+#include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/Simulator/Simulator.h"
 #include "snippy/Simulator/Transactions.h"
 

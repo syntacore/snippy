@@ -8,8 +8,8 @@
 
 #include "snippy/Generator/SnippyModule.h"
 #include "snippy/Config/Config.h"
-#include "snippy/Generator/LLVMState.h"
 #include "snippy/Generator/Linker.h"
+#include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/InitializePasses.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 

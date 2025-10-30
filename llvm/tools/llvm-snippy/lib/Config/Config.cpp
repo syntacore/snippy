@@ -16,13 +16,11 @@
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/Selfcheck.h"
+#include "snippy/GeneratorUtils/LLVMState.h"
+#include "snippy/GeneratorUtils/RegisterPool.h"
 #include "snippy/Support/DiagnosticInfo.h"
-#include "snippy/Support/Utils.h"
-// FIXME: remove dependency on Generator library
-#include "snippy/Generator/LLVMState.h"
-#include "snippy/Generator/MemoryManager.h"
-#include "snippy/Generator/RegisterPool.h"
 #include "snippy/Support/Options.h"
+#include "snippy/Support/Utils.h"
 #include "snippy/Support/YAMLHistogram.h"
 #include "snippy/Target/Target.h"
 
