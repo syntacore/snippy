@@ -23,6 +23,7 @@
 #include "snippy/Support/Utils.h"
 #include "snippy/Support/YAMLHistogram.h"
 #include "snippy/Target/Target.h"
+#include "llvm/MC/MCRegisterInfo.h"
 
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -359,18 +360,55 @@ static std::optional<unsigned> findRegisterByName(const SnippyTarget &SnippyTgt,
   return SnippyTgt.findRegisterByName(Name);
 }
 
-static void parseReservedRegistersOption(RegPoolWrapper &RP,
-                                         const SnippyTarget &Tgt,
-                                         const MCRegisterInfo &RI,
-                                         const ProgramOptions &Opts) {
-  for (auto &&RegName : Opts.ReservedRegsList) {
-    auto Reg = findRegisterByName(Tgt, RI, RegName);
-    if (!Reg)
-      snippy::fatal(formatv("Illegal register name {0}"
-                            " is specified in --reserved-regs-list",
-                            RegName));
+static std::unordered_set<unsigned>
+getRegistersMatchedByRegex(Regex &RegEx, const MCRegisterInfo &MRI) {
+  std::unordered_set<unsigned> MatchedRegs;
+  for (auto &RC : MRI.regclasses()) {
+    auto Matched = llvm::make_filter_range(
+        RC, [&RegEx, &MRI](auto &R) { return RegEx.match(MRI.getName(R)); });
+    llvm::copy(Matched, std::inserter(MatchedRegs, MatchedRegs.end()));
+  }
+  return MatchedRegs;
+}
+
+static std::unordered_set<unsigned>
+parseReservedRegisters(const SnippyTarget &Tgt, const MCRegisterInfo &MRI,
+                       ArrayRef<std::string> RegList) {
+  std::unordered_set<unsigned> Reserved;
+  for (StringRef RegName : RegList) {
+    if (Regex::isLiteralERE(RegName)) {
+      // Not a RegEx
+      auto Reg = findRegisterByName(Tgt, MRI, RegName);
+      if (!Reg)
+        snippy::fatal(formatv("Illegal register name {0}"
+                              " is specified in --reserved-regs-list",
+                              RegName));
+      Reserved.insert(*Reg);
+      continue;
+    }
+    // RegName is a RegEx
+    auto RegisterRegEx = createWholeWordMatchRegex(RegName);
+    if (auto Err = RegisterRegEx.takeError())
+      snippy::fatal(formatv("Illegal register regex: \"{0}\": {1}", RegName,
+                            toString(std::move(Err))));
+
+    auto MatchedRegs = getRegistersMatchedByRegex(*RegisterRegEx, MRI);
+    if (MatchedRegs.empty())
+      snippy::fatal(
+          formatv("No registers were matched by regex \"{0}\"", RegName));
+    Reserved.merge(std::move(MatchedRegs));
+  }
+  return Reserved;
+}
+
+static void reserveRegistersFromReservedList(RegPoolWrapper &RP,
+                                             const SnippyTarget &Tgt,
+                                             const MCRegisterInfo &RI,
+                                             const ProgramOptions &Opts) {
+  auto Reserved = parseReservedRegisters(Tgt, RI, Opts.ReservedRegsList);
+  for (auto Reg : Reserved) {
     SmallVector<Register> PhysRegs;
-    Tgt.getPhysRegsFromUnit(Reg.value(), RI, PhysRegs);
+    Tgt.getPhysRegsFromUnit(Reg, RI, PhysRegs);
     llvm::for_each(PhysRegs, [&RP](auto SimpleReg) {
       RP.addReserved(SimpleReg, AccessMaskBit::GRW);
     });
@@ -591,7 +629,7 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
   if (!ProgCfg.hasSectionToSpillGlobalRegs() &&
       Cfg.PassCfg.hasExternalCallees())
     reserveGlobalStateRegisters(RP, Tgt);
-  parseReservedRegistersOption(RP, Tgt, RI, Opts);
+  reserveRegistersFromReservedList(RP, Tgt, RI, Opts);
   auto RegsSpilledToStack = parseSpilledRegistersOption(RP, Tgt, RI, Ctx, Opts);
   auto RegsSpilledToMem = getRegsToSpillToMem(Tgt, Cfg);
   bool HasSPRelativeInstrs = Cfg.Histogram.hasSPRelativeInstrs(OpCC, Tgt);

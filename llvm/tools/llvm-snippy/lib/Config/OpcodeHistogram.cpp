@@ -60,16 +60,13 @@ decodeInstrRegex(yaml::IO &IO, StringRef OpcodeStr, double Weight) {
   }
 
   OpcodeHistogramDecodedEntry Result(OpcodeStr);
-  SmallString<32> NameStorage;
-  (Twine("^(") + OpcodeStr + ")$").toVector(NameStorage);
-  Regex OpcodeRegexp(NameStorage);
-  std::string Error;
-  if (!OpcodeRegexp.isValid(Error))
+  auto OpcodeRegexp = createWholeWordMatchRegex(OpcodeStr);
+  if (auto Err = OpcodeRegexp.takeError())
     return ReportError("Illegal opcode regular expression \"" + OpcodeStr +
-                       "\": " + Twine(Error));
+                       "\": " + Twine(toString(std::move(Err))));
 
   SmallVector<unsigned, 16> MatchedOpcodes;
-  OpCC.code(OpcodeRegexp, MatchedOpcodes);
+  OpCC.code(*OpcodeRegexp, MatchedOpcodes);
   transform(
       MatchedOpcodes, std::back_inserter(Result.Decoded),
       [IndividualWeight = Weight / MatchedOpcodes.size()](unsigned Opcode) {
