@@ -2024,14 +2024,43 @@ reserve and not use in the snippet code.
    registers in the whole snippet for the main instructions. However,
    ancillary instructions can still use these reserved registers.
 
-Example for ``options``:
+Example for command line:
+
+::
+
+  ./llvm-snippy ./layout.yaml -seed=1 --reserved-regs-list=X1,X2,X3
+
+Here ``reserved-regs-list`` is specified as a comma-separated list of
+register names.
+
+Alternatively it can be specified in YAML config under ``options`` key:
 
 .. code:: yaml
 
-   reserved-regs-list: [<string>]
+  options:
+    reserved-regs-list: [<REGLIST>]
 
-where ``<string>`` is a list of registers to reserve, for example,
-``X1,X2,X3`` (comma-delimited, no spaces).
+where ``<REGLIST>`` is a list of registers to reserve, for example,
+``X1, X2, X3``.
+
+Or using non-flow sequence:
+
+.. code:: yaml
+
+  options:
+    reserved-regs-list:
+      - X1
+      - X2
+      - F10_D
+
+This option also accepts regular expressions. For example:
+
+.. code:: yaml
+
+  options:
+    reserved-regs-list: [X10, "X2[0-9]"]
+
+This code will reserve X10 as well as X20-X29 registers.
 
 .. _`_float_registers`:
 

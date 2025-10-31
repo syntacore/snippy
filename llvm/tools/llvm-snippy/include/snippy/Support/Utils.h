@@ -18,6 +18,7 @@
 
 namespace llvm {
 
+class Regex;
 class Error;
 
 namespace yaml {
@@ -365,6 +366,8 @@ matchRemainder(T Orig, T Num, T Div, T RoundTo = 0) {
     Num += Div;
   return Num;
 }
+
+Expected<Regex> createWholeWordMatchRegex(StringRef RegEx);
 
 } // namespace snippy
 } // namespace llvm
