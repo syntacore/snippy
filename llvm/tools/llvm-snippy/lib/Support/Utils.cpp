@@ -13,6 +13,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Regex.h"
 
 namespace llvm {
 namespace snippy {
@@ -116,6 +117,15 @@ void replaceAllSubstrs(std::string &Str, StringRef What, StringRef With) {
   for (auto Pos = Str.find(What); std::string::npos != Pos;
        Pos = Str.find(What, Pos + With.size()))
     Str.replace(Pos, What.size(), With);
+}
+
+Expected<Regex> createWholeWordMatchRegex(StringRef Orig) {
+  SmallString<32> NameStorage = formatv("^({0})$", Orig);
+  Regex RegEx(NameStorage);
+  std::string Error;
+  if (!RegEx.isValid(Error))
+    return makeFailure(Errc::InvalidArgument, Error);
+  return RegEx;
 }
 
 } // namespace snippy
