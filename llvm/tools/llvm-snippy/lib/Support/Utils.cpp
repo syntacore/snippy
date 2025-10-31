@@ -79,9 +79,16 @@ std::string addExtensionIfRequired(StringRef StrRef, std::string Ext) {
 void setAsSupportInstr(MachineInstr &MI, LLVMContext &Ctx) {
   if (checkMetadata(MI, SnippyMetadata::Support))
     return;
-
-  // FIXME: we shouldn't overwrite PC sections here but now we have only one
-  // Metadata ...
+  if (checkMetadata(MI, SnippyMetadata::ExternalCall)) {
+    addSnippyMetadata(MI, *MI.getParent()->getParent(), Ctx,
+                      SnippyMetadata::Support, SnippyMetadata::ExternalCall);
+    return;
+  }
+  if (checkMetadata(MI, SnippyMetadata::FormAddrForCall)) {
+    addSnippyMetadata(MI, *MI.getParent()->getParent(), Ctx,
+                      SnippyMetadata::Support, SnippyMetadata::FormAddrForCall);
+    return;
+  }
   addSnippyMetadata(MI, *MI.getParent()->getParent(), Ctx,
                     SnippyMetadata::Support);
 }
@@ -126,6 +133,24 @@ Expected<Regex> createWholeWordMatchRegex(StringRef Orig) {
   if (!RegEx.isValid(Error))
     return makeFailure(Errc::InvalidArgument, Error);
   return RegEx;
+}
+
+// TODO: Add unit-tests for this function.
+DenseSet<unsigned> getAllMutatedRegs(MachineFunction &MF) {
+  DenseSet<unsigned> MutatedRegs;
+  for (auto &MBB : MF)
+    for (auto &MI : MBB) {
+      for (auto &Def : MI.defs()) {
+        assert(Def.isReg() && "Expected register operand");
+        MutatedRegs.insert(Def.getReg());
+      }
+      for (auto &Imp : MI.implicit_operands())
+        if (Imp.isDef()) {
+          assert(Imp.isReg() && "Expected register operand");
+          MutatedRegs.insert(Imp.getReg());
+        }
+    }
+  return MutatedRegs;
 }
 
 } // namespace snippy

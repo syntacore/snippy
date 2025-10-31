@@ -186,6 +186,7 @@ public:
   filterSuitableRegsForStackPointer() const = 0;
 
   virtual MCRegister getStackPointer() const = 0;
+  virtual MCRegister getReturnAddress() const = 0;
 
   // Returns a list of string register groups whose registers can be preserved
   // as caller-saved.
@@ -340,7 +341,8 @@ public:
 
   // If BytesToWrite is zero, the whole register will be stored.
   virtual void storeRegToAddr(InstructionGenerationContext &IGC, uint64_t Addr,
-                              MCRegister Reg, unsigned BytesToWrite) const = 0;
+                              MCRegister Reg,
+                              unsigned BytesToWrite = 0) const = 0;
 
   virtual void storeValueToAddr(InstructionGenerationContext &IGC,
                                 uint64_t Addr, APInt Value) const = 0;

@@ -2488,6 +2488,7 @@ public:
   }
 
   MCRegister getStackPointer() const override { return RISCV::X2; }
+  MCRegister getReturnAddress() const override { return RISCV::X1; }
 
   bool isRegClassSupported(MCRegister Reg) const override {
     return RISCV::GPRRegClass.contains(Reg) ||
@@ -2497,20 +2498,50 @@ public:
            RISCV::VRRegClass.contains(Reg);
   }
 
+  void initRegWithSPAddr(InstructionGenerationContext &IGC,
+                         MCRegister Reg) const {
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
+    auto RP = IGC.pushRegPool();
+    auto &RI = State.getRegInfo();
+    auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
+    auto &MBB = IGC.MBB;
+    RP->addReserved(getFirstPhysReg(Reg, RI), MBB);
+    auto ScratchReg = getNonZeroReg("scratch register for stack addr", RI,
+                                    RegClass, *RP, MBB, AccessMaskBit::SRW);
+    auto XRegBitSize = getRegBitWidth(ScratchReg, IGC);
+    auto &StaticStackCtx = ProgCtx.getStaticStack();
+    writeValueToReg(IGC, APInt(XRegBitSize, StaticStackCtx.getSPAddrLocal()),
+                    ScratchReg);
+    StaticStackCtx.setRegWithSPAddrLocal(ScratchReg);
+  }
+
   void generateSpillToStack(InstructionGenerationContext &IGC, MCRegister Reg,
                             MCRegister SP) const override {
     auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
     auto &MBB = IGC.MBB;
-    auto &Ins = IGC.Ins;
     assert(ProgCtx.stackEnabled() &&
            "An attempt to generate spill but stack was not enabled.");
-    auto &State = ProgCtx.getLLVMState();
+    auto SpillSize = static_cast<int64_t>(getSpillSizeInBytes(Reg, IGC));
+
+    if (ProgCtx.getConfig().StaticStack) {
+      // When we don't have a stack pointer, we spill registers in
+      // a statically allocated stack area for each function.
+      auto &StaticStackCtx = ProgCtx.getStaticStack();
+      if (!StaticStackCtx.isSPInReg())
+        initRegWithSPAddr(IGC, Reg);
+      StaticStackCtx.setSPAddrLocal(StaticStackCtx.getSPAddrLocal() -
+                                    SpillSize);
+      SP = StaticStackCtx.getRegWithSPAddrLocal();
+    }
+    auto &Ins = IGC.Ins;
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
     getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
         .addDef(SP)
         .addReg(SP)
-        .addImm(-static_cast<int64_t>(getSpillSizeInBytes(Reg, IGC)));
+        .addImm(-SpillSize);
 
     storeRegToAddrInReg(IGC, SP, Reg);
   }
@@ -2518,19 +2549,30 @@ public:
   void generateReloadFromStack(InstructionGenerationContext &IGC,
                                MCRegister Reg, MCRegister SP) const override {
     auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
     auto &MBB = IGC.MBB;
-    auto &Ins = IGC.Ins;
     assert(ProgCtx.stackEnabled() &&
            "An attempt to generate reload but stack was not enabled.");
-    auto &State = ProgCtx.getLLVMState();
+    auto SpillSize = static_cast<int64_t>(getSpillSizeInBytes(Reg, IGC));
+
+    if (ProgCtx.getConfig().StaticStack) {
+      // When we don't have a stack pointer, we spill registers in
+      // a statically allocated stack area for each function.
+      auto &StaticStackCtx = ProgCtx.getStaticStack();
+      if (!StaticStackCtx.isSPInReg())
+        initRegWithSPAddr(IGC, Reg);
+      StaticStackCtx.setSPAddrLocal(StaticStackCtx.getSPAddrLocal() +
+                                    SpillSize);
+      SP = StaticStackCtx.getRegWithSPAddrLocal();
+    }
+    auto &Ins = IGC.Ins;
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
-
     loadRegFromAddrInReg(IGC, SP, Reg);
     getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
         .addDef(SP)
         .addReg(SP)
-        .addImm(getSpillSizeInBytes(Reg, IGC));
+        .addImm(SpillSize);
   }
 
   void generatePopNoReload(InstructionGenerationContext &IGC,
@@ -2573,14 +2615,15 @@ public:
     // That's why create auipc + addi pair manually.
 
     MachineInstr *MIAUIPC =
-        getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::AUIPC))
+        getFormAddrInstBuilder(*this, MBB, Ins, Ctx,
+                               InstrInfo.get(RISCV::AUIPC))
             .addDef(DestReg)
             .addGlobalAddress(Target, 0, RISCVII::MO_PCREL_HI);
     MCSymbol *AUIPCSymbol = MF->getContext().createNamedTempSymbol("pcrel_hi");
     MIAUIPC->setPreInstrSymbol(*MF, AUIPCSymbol);
 
-    return getSupportInstBuilder(*this, MBB, Ins, Ctx,
-                                 InstrInfo.get(RISCV::ADDI))
+    return getFormAddrInstBuilder(*this, MBB, Ins, Ctx,
+                                  InstrInfo.get(RISCV::ADDI))
         .addDef(DestReg)
         .addReg(DestReg)
         .addSym(AUIPCSymbol, RISCVII::MO_PCREL_LO);
@@ -3324,7 +3367,8 @@ public:
   }
 
   void storeRegToAddr(InstructionGenerationContext &IGC, uint64_t Addr,
-                      MCRegister Reg, unsigned BytesToWrite) const override {
+                      MCRegister Reg,
+                      unsigned BytesToWrite = 0) const override {
     auto &MBB = IGC.MBB;
     auto RP = IGC.pushRegPool();
     auto &ProgCtx = IGC.ProgCtx;

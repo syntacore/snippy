@@ -50,5 +50,5 @@ histogram:
 # SORTED-NOT: jr
 # SORTED: ebreak
 #
-# ERR1: error: Cannot use 'chained-rx-chunk-size' option: num-instr is set to 'all'
+# ERR1: error: Cannot use 'chained-rx-chunk-size' option: num-instrs is set to 'all'
 # WARN: warning: (inconsistent-options) 'chained-rx-chunk-size' is ignored: pass 'chained-rx-sections-fill' to enable it
