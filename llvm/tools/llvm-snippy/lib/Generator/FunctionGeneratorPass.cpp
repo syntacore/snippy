@@ -276,7 +276,7 @@ FunctionGenerator::distributeRootFunctions() {
     return static_cast<size_t>(std::llround(
         InstrGenCfg.getRequestedInstrsNumForMainFunction() *
         (static_cast<double>(SectionSize) /
-         Cfg.ProgramCfg->Sections.getSectionsSize(Permissions::X))));
+         Cfg.ProgramCfg.Sections.getSectionsSize(Permissions::X))));
   };
 
   std::transform(
@@ -384,7 +384,7 @@ bool FunctionGenerator::runOnModule(Module &M) {
   auto &State = ProgCtx.getLLVMState();
   auto &Ctx = State.getCtx();
   auto &LLVMTM = State.getTargetMachine();
-  StringRef ABIName = SGCtx.getConfig().ProgramCfg->ABIName;
+  StringRef ABIName = SGCtx.getConfig().ProgramCfg.ABIName;
   initExecutionPath();
   if (ABIName.size()) {
     auto *ABINameMD = MDString::get(Ctx, ABIName);

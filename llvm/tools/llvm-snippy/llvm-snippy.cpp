@@ -131,10 +131,9 @@ static void mergeFiles(IncludePreprocessor &IPP, LLVMContext &Ctx) {
   }
 }
 static Config readSnippyConfig(LLVMState &State, RegPoolWrapper &RP,
-                               const OpcodeCache &OpCC,
+                               const OpcodeCache &OpCC, ProgramConfig &ProgCfg,
                                const DebugOptions &DebugOpts) {
   auto &Ctx = State.getCtx();
-  auto ParseWithPlugin = isParsingWithPluginEnabled();
 
   IncludePreprocessor IPP(LayoutFile.getValue(), getExtraIncludeDirsForLayout(),
                           Ctx);
@@ -142,8 +141,14 @@ static Config readSnippyConfig(LLVMState &State, RegPoolWrapper &RP,
   if (DebugOpts.DumpPreprocessedConfig)
     outs() << IPP.getPreprocessed() << "\n";
 
-  return Config(IPP, RP, State, GeneratorPluginFile.getValue(),
-                GeneratorPluginParserFile.getValue(), OpCC, ParseWithPlugin);
+  auto ParseWithPlugin = isParsingWithPluginEnabled();
+  auto ConfigOrErr =
+      Config::create(IPP, RP, State, ProgCfg, OpCC, ParseWithPlugin);
+  if (auto Err = ConfigOrErr.takeError())
+    snippy::fatal(
+        Ctx, "Failed to parse file \"" + Twine(IPP.getPrimaryFilename()) + "\'",
+        toString(std::move(Err)));
+  return std::move(*ConfigOrErr);
 }
 
 static void dumpConfigIfNeeded(const Config &Cfg,
@@ -247,9 +252,12 @@ void generateMain() {
   std::vector<RegPool> RegPools;
   RegPoolWrapper RPW(State.getSnippyTarget(), State.getRegInfo(), RegPools);
 
-  auto Cfg = readSnippyConfig(State, RPW, OpCC, DebugOpts);
+  auto ProgCfg = std::make_unique<ProgramConfig>(
+      State.getSnippyTarget(), GeneratorPluginFile.getValue(),
+      GeneratorPluginParserFile.getValue(), OpCC);
+  auto Cfg = readSnippyConfig(State, RPW, OpCC, *ProgCfg, DebugOpts);
   if (DebugOpts.Verbose)
-    outs() << "Used seed: " << Cfg.ProgramCfg->Seed << '\n';
+    outs() << "Used seed: " << Cfg.ProgramCfg.Seed << '\n';
 
   ConfigIOContext CfgParsingContext{
       Cfg.getOpcodeHistogram(),
@@ -258,8 +266,8 @@ void generateMain() {
       State,
   };
   dumpConfigIfNeeded(Cfg, CfgParsingContext, outs(), DebugOpts);
-  FlowGenerator Flow{std::move(Cfg), OpCC, std::move(RegPools),
-                     getOutputFileBasename()};
+  FlowGenerator Flow{std::move(ProgCfg), std::move(Cfg), OpCC,
+                     std::move(RegPools), getOutputFileBasename()};
   auto Result = Flow.generate(State, DebugOpts);
   saveToFile(Result);
 }

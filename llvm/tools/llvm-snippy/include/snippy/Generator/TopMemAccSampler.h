@@ -31,6 +31,12 @@ public:
       S->add(A->copy());
     Samplers.back()->add(std::move(A));
   }
+  TopLevelMemoryAccessSampler(TopLevelMemoryAccessSampler &&) = default;
+  TopLevelMemoryAccessSampler(const TopLevelMemoryAccessSampler &) = delete;
+  TopLevelMemoryAccessSampler &
+  operator=(TopLevelMemoryAccessSampler &&) = default;
+  TopLevelMemoryAccessSampler &
+  operator=(const TopLevelMemoryAccessSampler &) = delete;
 
   template <typename SamplerIter>
   TopLevelMemoryAccessSampler(SamplerIter Start, SamplerIter Finish

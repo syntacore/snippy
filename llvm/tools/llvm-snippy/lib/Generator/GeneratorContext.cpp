@@ -44,17 +44,15 @@ static snippy::opt<bool>
                         cl::desc("Dump random memory accesses"),
                         cl::cat(Options), cl::Hidden);
 
-GeneratorContext::~GeneratorContext() {}
-
-GeneratorContext::GeneratorContext(SnippyProgramContext &ProgContext,
+GeneratorContext::GeneratorContext(SnippyProgramContext &ProgCtx,
                                    Config &Settings)
-    : ProgContext(ProgContext), Cfg(&Settings), MemAccSampler([&] {
+    : ProgContext(&ProgCtx), Cfg(&Settings), MemAccSampler([&] {
         std::vector<SectionDesc> RWSections;
-        llvm::copy_if(Settings.ProgramCfg->Sections,
+        llvm::copy_if(Settings.ProgramCfg.Sections,
                       std::back_inserter(RWSections),
                       [](auto &Desc) { return Desc.M.W() && Desc.M.R(); });
         auto &MS = Settings.CommonPolicyCfg->MS;
-        auto &TM = ProgContext.getLLVMState().getTargetMachine();
+        auto &TM = ProgContext->getLLVMState().getTargetMachine();
         auto Alignment =
             TM.createDataLayout().getPointerABIAlignment(/* Address Space */ 0);
         auto BaseAccesses = llvm::map_range(
@@ -72,11 +70,11 @@ GeneratorContext::GeneratorContext(SnippyProgramContext &ProgContext,
   // HACK: Here we create dummy module and function to create a
   // TargetSubtargetInfo. These are destroyed right after createTargetContext
   // call
-  auto &State = ProgContext.getLLVMState();
+  auto &State = ProgContext->getLLVMState();
   auto DummyModule = Module("__snippy_dummy_module", State.getCtx());
   auto &Dummy = State.createFunction(DummyModule, "__dummy", "",
                                      Function::LinkageTypes::InternalLinkage);
-  ProgContext.createTargetContext(Settings, State.getSubtargetImpl(Dummy));
+  ProgContext->createTargetContext(Settings, State.getSubtargetImpl(Dummy));
   Dummy.eraseFromParent();
 }
 
