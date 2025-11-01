@@ -147,6 +147,7 @@ public:
   }
 
   MCRegister getStackPointer() const override { reportUnimplementedError(); }
+  MCRegister getReturnAddress() const override { reportUnimplementedError(); }
 
   bool isRegClassSupported(MCRegister Reg) const override {
     reportUnimplementedError();

@@ -88,13 +88,12 @@ GlobalVariable *getGVForMBB(const MachineBasicBlock &MBB, GlobalsPool &GP,
 
 template <typename... DstArgs>
 MachineInstrBuilder
-getInstBuilder(bool IsSupport, const SnippyTarget &Tgt, MachineBasicBlock &MBB,
-               MachineBasicBlock::iterator Ins, LLVMContext &Context,
-               const MCInstrDesc &Desc, DstArgs... DstReg) {
+getInstBuilder(MDNode *MetadataMark, const SnippyTarget &Tgt,
+               MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
+               LLVMContext &Context, const MCInstrDesc &Desc,
+               DstArgs... DstReg) {
   static_assert(sizeof...(DstReg) <= 1, "Only 0 or 1 dst regs supported");
-  MIMetadata MD({}, IsSupport
-                        ? getMetadataMark(Context, SnippyMetadata::Support)
-                        : nullptr);
+  MIMetadata MD({}, MetadataMark);
   auto MIB = BuildMI(MBB, Ins, MD, Desc, DstReg...);
   Tgt.addAsmPrinterFlags(*MIB.getInstr());
   return MIB;
@@ -105,8 +104,19 @@ MachineInstrBuilder
 getSupportInstBuilder(const SnippyTarget &Tgt, MachineBasicBlock &MBB,
                       MachineBasicBlock::iterator Ins, LLVMContext &Context,
                       const MCInstrDesc &Desc, DstArgs... DstReg) {
-  return getInstBuilder(/* IsSupport */ true, Tgt, MBB, Ins, Context, Desc,
-                        DstReg...);
+  return getInstBuilder(getMetadataMark(Context, SnippyMetadata::Support), Tgt,
+                        MBB, Ins, Context, Desc, DstReg...);
+}
+
+template <typename... DstArgs>
+MachineInstrBuilder
+getFormAddrInstBuilder(const SnippyTarget &Tgt, MachineBasicBlock &MBB,
+                       MachineBasicBlock::iterator Ins, LLVMContext &Context,
+                       const MCInstrDesc &Desc, DstArgs... DstReg) {
+  return getInstBuilder(getMetadataMark(Context,
+                                        SnippyMetadata::FormAddrForCall,
+                                        SnippyMetadata::Support),
+                        Tgt, MBB, Ins, Context, Desc, DstReg...);
 }
 
 template <typename... DstArgs>
@@ -114,8 +124,18 @@ MachineInstrBuilder
 getMainInstBuilder(const SnippyTarget &Tgt, MachineBasicBlock &MBB,
                    MachineBasicBlock::iterator Ins, LLVMContext &Context,
                    const MCInstrDesc &Desc, DstArgs... DstReg) {
-  return getInstBuilder(/* IsSupport */ false, Tgt, MBB, Ins, Context, Desc,
-                        DstReg...);
+  return getInstBuilder(/* MetadataMark */ nullptr, Tgt, MBB, Ins, Context,
+                        Desc, DstReg...);
+}
+
+template <typename... DstArgs>
+MachineInstrBuilder
+getInstBuilder(bool IsSupport, const SnippyTarget &Tgt, MachineBasicBlock &MBB,
+               MachineBasicBlock::iterator Ins, LLVMContext &Context,
+               const MCInstrDesc &Desc, DstArgs... DstReg) {
+  if (IsSupport)
+    return getSupportInstBuilder(Tgt, MBB, Ins, Context, Desc, DstReg...);
+  return getMainInstBuilder(Tgt, MBB, Ins, Context, Desc, DstReg...);
 }
 
 } // namespace snippy

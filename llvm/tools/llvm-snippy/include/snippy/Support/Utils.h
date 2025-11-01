@@ -37,12 +37,14 @@ template <typename T> struct NumericRange final {
   bool isMinOrMaxSet() const { return Min.has_value() || Max.has_value(); }
 };
 
-enum class SnippyMetadata { Support, ExternalCall };
+enum class SnippyMetadata { Support, ExternalCall, FormAddrForCall };
 
 namespace detail {
 constexpr static const char *SupportMetadataValue = "llvm.snippy.support";
 constexpr static const char *ExternalCallMetadataValue =
     "llvm.snippy.call.external";
+constexpr static const char *FormAddrForCallMetadataValue =
+    "llvm.snippy.forming.address";
 
 inline StringRef getStrMetadata(SnippyMetadata M) {
   switch (M) {
@@ -50,6 +52,8 @@ inline StringRef getStrMetadata(SnippyMetadata M) {
     return SupportMetadataValue;
   case SnippyMetadata::ExternalCall:
     return ExternalCallMetadataValue;
+  case SnippyMetadata::FormAddrForCall:
+    return FormAddrForCallMetadataValue;
   }
   llvm_unreachable("unknown metadata value");
 }
@@ -64,14 +68,17 @@ size_t countPrimaryInstructions(IteratorType Begin, IteratorType End) {
   });
 }
 
-inline MDNode *getMetadataMark(LLVMContext &Context, SnippyMetadata M) {
-  return MDNode::get(Context,
-                     MDString::get(Context, detail::getStrMetadata(M)));
+template <typename... MDArgs>
+inline MDNode *getMetadataMark(LLVMContext &Context, MDArgs... MDs) {
+  SmallVector<Metadata *> Metadatas{
+      MDString::get(Context, detail::getStrMetadata(MDs))...};
+  return MDNode::get(Context, Metadatas);
 }
 
+template <typename... MDArgs>
 inline void addSnippyMetadata(MachineInstr &MI, MachineFunction &MF,
-                              LLVMContext &Ctx, SnippyMetadata M) {
-  MI.setPCSections(MF, getMetadataMark(Ctx, M));
+                              LLVMContext &Ctx, MDArgs... MDs) {
+  MI.setPCSections(MF, getMetadataMark(Ctx, MDs...));
 }
 
 void setAsSupportInstr(MachineInstr &MI, LLVMContext &Ctx);
@@ -371,6 +378,7 @@ matchRemainder(T Orig, T Num, T Div, T RoundTo = 0) {
 }
 
 Expected<Regex> createWholeWordMatchRegex(StringRef RegEx);
+DenseSet<unsigned> getAllMutatedRegs(MachineFunction &MF);
 
 } // namespace snippy
 } // namespace llvm

@@ -101,6 +101,7 @@
 
 options:
   march: riscv64-unknown-elf
+  enable-static-stack: false
   mcpu: generic-rv64
   mattr: "+c,+f,+d"
   num-instrs: 100

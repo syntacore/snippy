@@ -45,21 +45,28 @@ public:
                           SGCtx.getProgramContext().getOutputSectionFor(MF));
   }
 
-  auto getAllMutatedRegs(MachineFunction &MF) {
-    DenseSet<unsigned> MutatedRegs;
-    for (auto &MBB : MF)
-      for (auto &MI : MBB) {
-        for (auto &Def : MI.defs()) {
-          assert(Def.isReg() && "Expected register operand");
-          MutatedRegs.insert(Def.getReg());
-        }
-        for (auto &Imp : MI.implicit_operands())
-          if (Imp.isDef()) {
-            assert(Imp.isReg() && "Expected register operand");
-            MutatedRegs.insert(Imp.getReg());
-          }
-      }
-    return MutatedRegs;
+  auto leaveOnlyCalleeSaved(MachineFunction &MF, std::vector<MCRegister> Res) {
+    auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+    auto &ProgCtx = SGCtx.getProgramContext();
+    auto &State = ProgCtx.getLLVMState();
+    const auto &SnippyTgt = State.getSnippyTarget();
+    // Here we leave only the callee-saved registers, which should be preserved
+    // in the prologue. The remaining registers (set_intersect) are caller-saved
+    // and we will save them before call.
+
+    auto CallerSaved =
+        SnippyTgt.getCallerSavedRegs(MF, SnippyTgt.getCallerSavedRegGroups());
+    // Works only with sorted containers.
+    llvm::sort(Res);
+    llvm::sort(CallerSaved);
+    std::vector<MCRegister> Result;
+    std::set_difference(Res.begin(), Res.end(), CallerSaved.begin(),
+                        CallerSaved.end(), std::back_inserter(Result));
+    Result.push_back(SnippyTgt.getReturnAddress());
+    llvm::erase_if(Result, [&](auto &&Reg) {
+      return !SnippyTgt.isRegClassSupported(Reg);
+    });
+    return Result;
   }
 
   auto getSpilledRegs(MachineFunction &MF) {
@@ -68,13 +75,12 @@ public:
     auto &State = ProgCtx.getLLVMState();
     const auto &SnippyTgt = State.getSnippyTarget();
     auto &FG = getAnalysis<FunctionGenerator>();
-    bool IsRoot = FG.isRootFunction(MF);
 
     std::vector<MCRegister> Ret;
-    if (IsRoot)
+    if (FG.isRootFunction(MF)) {
       llvm::copy(SGCtx.getConfig().ProgramCfg->getRegsSpilledToStack(),
                  std::back_inserter(Ret));
-    else {
+    } else {
       auto RegSet = getAllMutatedRegs(MF);
       llvm::copy(RegSet, std::back_inserter(Ret));
     }
@@ -225,6 +231,11 @@ static void restoreStackPointer(InstructionGenerationContext &IGC,
 void PrologueEpilogueInsertion::generateStackInitialization(
     InstructionGenerationContext &IGC) {
   auto &ProgCtx = IGC.ProgCtx;
+
+  if (ProgCtx.getConfig().StaticStack) {
+    ProgCtx.getStaticStack().setSPAddrGlobal(ProgCtx.getStackTop());
+    return;
+  }
   auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
@@ -327,12 +338,20 @@ bool PrologueEpilogueInsertion::insertPrologue(
   if (IsEntry)
     generateStackInitialization(InstrGenCtx);
 
+  bool StaticStack = ProgCtx.getConfig().StaticStack;
+  if (StaticStack) {
+    auto &StaticStackCtx = ProgCtx.getStaticStack();
+    StaticStackCtx.reset();
+    StaticStackCtx.setSPAddrLocal(StaticStackCtx.getSPAddrGlobal());
+  }
   auto SP = SGCtx.getProgramContext().getStackPointer();
   // Spill requested registers. Also mark them as live-in.
   for (auto SpillReg : SpilledToStack) {
     MBB->addLiveIn(SpillReg);
     SnippyTgt.generateSpillToStack(InstrGenCtx, SpillReg, SP);
   }
+  if (StaticStack)
+    ProgCtx.getStaticStack().passSPAddr();
 
   if (!IsEntry)
     return true;
@@ -384,13 +403,13 @@ bool PrologueEpilogueInsertion::insertEpilogue(
   bool BBWasEmptyBeforeEpilogueInsertion = MBB->empty();
   auto Prev = BBWasEmptyBeforeEpilogueInsertion ? MBB->end() : std::prev(Ins);
 
-  auto SP = SGCtx.getProgramContext().getStackPointer();
   // Reload spilled registers. Reverse order because of a stack.
   llvm::for_each(llvm::reverse(SpilledToStack), [&](auto Reg) {
-    SnippyTgt.generateReloadFromStack(InstrGenCtx, Reg, SP);
+    SnippyTgt.generateReloadFromStack(
+        InstrGenCtx, Reg, SGCtx.getProgramContext().getStackPointer());
   });
 
-  if (IsExit)
+  if (IsExit && !ProgCtx.getConfig().StaticStack)
     generateStackTermination(InstrGenCtx);
 
   if (IsExit && !SpilledToMem.empty()) {
@@ -439,6 +458,9 @@ bool PrologueEpilogueInsertion::runOnMachineFunction(MachineFunction &MF) {
     return false;
 
   auto SpilledToStack = getSpilledRegs(MF);
+  // When we have compiled stack, we spill caller-saved registers before calls.
+  if (SGCtx.getProgramContext().getConfig().StaticStack)
+    SpilledToStack = leaveOnlyCalleeSaved(MF, SpilledToStack);
   auto SpilledToMem = SGCtx.getConfig().ProgramCfg->getRegsSpilledToMem();
   auto PrologueInserted = insertPrologue(MF, SpilledToStack, SpilledToMem);
   auto EpilogueInserted = insertEpilogue(MF, SpilledToStack, SpilledToMem);

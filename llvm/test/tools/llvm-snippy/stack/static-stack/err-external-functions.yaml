@@ -1,0 +1,21 @@
+# RUN: not llvm-snippy %s -model-plugin None \
+# RUN: |& FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  enable-static-stack: on
+
+include:
+  - Inputs/sections-with-stack.yaml
+
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - IamExternalFunc
+    - name: IamExternalFunc
+      external: true
+
+# CHECK: Incompatible options: When external functions are provided, option -enable-static-stack is not supported.
+

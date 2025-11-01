@@ -1,0 +1,25 @@
+# COM: This test checks that SP is not reserved, that is, it can be used as an
+#      operand of a regular instruction SUB.
+
+# RUN: llvm-snippy %s -model-plugin None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64-unknown-elf
+  num-instrs: 100
+  init-regs-in-elf: true
+  function-layers: 5
+  function-number: 10
+  num-instr-ancil: 10
+  redefine-sp: "reg::X11"
+  dump-mf: on
+
+include:
+  - Inputs/sections-with-stack.yaml
+
+histogram:
+    - [SUB, 1.0]
+    - [JAL, 0.1]
+    - [JALR, 0.1]
+
+# CHECK: $x11 = SUB
