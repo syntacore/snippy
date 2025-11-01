@@ -1656,17 +1656,22 @@ public:
     }
   }
 
-  MachineBasicBlock *
-  generateBranch(InstructionGenerationContext &IGC,
-                 const MCInstrDesc &InstrDesc) const override {
+  MachineBasicBlock *generateBranch(InstructionGenerationContext &IGC,
+                                    const MCInstrDesc &InstrDesc,
+                                    MachineBasicBlock *Dst) const override {
     auto &ProgCtx = IGC.ProgCtx;
     auto &State = ProgCtx.getLLVMState();
     auto RP = IGC.pushRegPool();
     auto &MBB = IGC.MBB;
     auto *MF = MBB.getParent();
-    auto *NextMBB = createMachineBasicBlock(*MF);
-    MF->insert(++MachineFunction::iterator(&MBB), NextMBB);
-    NextMBB->transferSuccessorsAndUpdatePHIs(&MBB);
+    auto *NextMBB = [&]() {
+      if (Dst)
+        return Dst;
+      auto *NewMBB = createMachineBasicBlock(*MF);
+      MF->insert(++MachineFunction::iterator(&MBB), NewMBB);
+      NewMBB->transferSuccessorsAndUpdatePHIs(&MBB);
+      return NewMBB;
+    }();
     MBB.addSuccessor(NextMBB);
 
     auto Opcode = InstrDesc.getOpcode();
@@ -1835,7 +1840,7 @@ public:
 
     auto NewDestOperand = MachineOperand::CreateMBB(&NewDestMBB);
     for (auto &Branch : BranchMBB.terminators()) {
-      auto *BranchDestMBB = getBranchDestination(Branch);
+      auto BranchDestMBB = getBranchDestination(Branch);
       if (BranchDestMBB != &OldDestMBB)
         continue;
       auto DestBBOpNum = Branch.getNumExplicitOperands() - 1;

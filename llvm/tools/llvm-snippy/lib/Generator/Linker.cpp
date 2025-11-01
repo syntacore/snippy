@@ -8,6 +8,7 @@
 
 #include "snippy/Generator/Linker.h"
 #include "snippy/Generator/GlobalsPool.h"
+#include "snippy/Support/DynLibLoader.h"
 #include "snippy/Support/Options.h"
 #include "snippy/Support/Utils.h"
 
@@ -130,10 +131,11 @@ static StringRef findLLD() {
     decltype(Found) LLDDir;
     auto PathSpecified = !LLDDirOpt.getValue().empty();
     if (!PathSpecified) {
-      static int Dummy = 0;
-      const char *ptr = nullptr;
-      auto SnippyExec = sys::fs::getMainExecutable(ptr, &Dummy);
-      auto ParentDir = sys::path::parent_path(SnippyExec);
+      auto SelfPath = getCurrentLibExecutablePath();
+      auto ParentDirRef = sys::path::parent_path(SelfPath);
+      ParentDirRef = sys::path::parent_path(ParentDirRef);
+      SmallString<128> ParentDir = ParentDirRef;
+      sys::path::append(ParentDir, "bin");
       LLDDir = ParentDir;
     } else {
       LLDDir = LLDDirOpt.getValue();

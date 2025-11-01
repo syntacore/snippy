@@ -215,7 +215,7 @@ public:
                                               const CommonPolicyConfig *>) {
             return PolicyCfg;
           } else {
-            return &PolicyCfg->Common;
+            return PolicyCfg->Common;
           }
         },
         Cfg);
@@ -333,6 +333,12 @@ struct EmptyFinalizeMixin {
   void finalize(InstructionGenerationContext &) {}
 };
 } // namespace detail
+
+OpcGenHolder createDefaultOpcGenerator(
+    SnippyProgramContext &ProgCtx, const Config &Cfg,
+    std::function<bool(unsigned)> Filter, bool MustHavePrimaryInstrs,
+    ArrayRef<OpcodeHistogramEntry> Overrides,
+    const std::unordered_map<unsigned, double> &WeightOverrides = {});
 
 class DefaultGenPolicy final : public detail::EmptyFinalizeMixin {
   OpcGenHolder OpcGen;

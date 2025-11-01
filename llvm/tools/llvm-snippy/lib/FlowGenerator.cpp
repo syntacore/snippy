@@ -242,7 +242,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
       createRegGen(RegGeneratorFile.getValue(), RegInfoFile.getValue());
 
   SnippyProgramContext ProgContext(State, RegGen, RegPools, OpCC,
-                                   *Cfg.ProgramCfg);
+                                   Cfg.ProgramCfg);
 
   const auto &SnippyTgt = State.getSnippyTarget();
   auto MainModule = SnippyModule(ProgContext.getLLVMState(), "main");
@@ -337,7 +337,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
 
     auto RI = SimulatorContext::RunInfo{
         ESnippetImageForModelExecution->SnippetImage, ProgContext, MainModule,
-        PassCfg.ProgramCfg.EntryPointName,
+        PassCfg.ProgramCfg->EntryPointName,
         PassCfg.RegistersConfig.InitialStateOutputYaml,
         PassCfg.RegistersConfig.FinalStateOutputYaml, SelfcheckMem,
         // Memory reset only needed if interpreter may have executed

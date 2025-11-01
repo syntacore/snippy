@@ -197,7 +197,7 @@ bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
                      .get<OwningSimulatorContext>()
                      .get();
   const auto &Cfg = SGCtx->getConfig();
-  auto &ProgCfg = *Cfg.ProgramCfg;
+  auto &ProgCfg = Cfg.ProgramCfg;
   if (ProgCfg.hasSectionToSpillGlobalRegs())
     reserveAddressesForRegSpills(ProgCfg.SpilledToMem, *SGCtx, MF);
   if (SimCtx.hasTrackingMode())

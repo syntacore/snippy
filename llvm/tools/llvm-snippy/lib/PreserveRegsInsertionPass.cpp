@@ -217,7 +217,7 @@ private:
     auto RequestedPreserveRegs =
         SnippyTgt.getCallerSavedRegs(MF, RequestedCallerSavedGroups);
     auto ShouldPreserveCallerRegs =
-        ProgCfg->FollowTargetABI || !RequestedPreserveRegs.empty();
+        ProgCfg.FollowTargetABI || !RequestedPreserveRegs.empty();
 
     auto *TRI = MF.getSubtarget().getRegisterInfo();
     assert(TRI && "register information must be available");
@@ -247,7 +247,7 @@ private:
       if (ShouldPreserveCallerRegs)
         for (auto &&Reg : RegsToSpill)
           SnippyTgt.generateSpillToStack(InstrGenCtx, Reg, RealStackPointer);
-      if (ProgCfg->hasSectionToSpillGlobalRegs())
+      if (ProgCfg.hasSectionToSpillGlobalRegs())
         reloadGlobalRegsFromMemory(InstrGenCtx);
       // If we redefined stack pointer register, before generating external
       // function call we need to copy stack pointer value to target default
@@ -258,11 +258,11 @@ private:
       // Go through the call instruction.
       InstrGenCtx.Ins++;
 
-      if (!ProgCfg->isRegSpilledToMem(RealStackPointer) &&
+      if (!ProgCfg.isRegSpilledToMem(RealStackPointer) &&
           (RealStackPointer != TargetStackPointer))
         SnippyTgt.copyRegToReg(InstrGenCtx, TargetStackPointer,
                                RealStackPointer);
-      if (ProgCfg->hasSectionToSpillGlobalRegs())
+      if (ProgCfg.hasSectionToSpillGlobalRegs())
         reloadLocallySpilledRegs(InstrGenCtx);
       // Reload caller saved registers from the stack.
       if (ShouldPreserveCallerRegs)

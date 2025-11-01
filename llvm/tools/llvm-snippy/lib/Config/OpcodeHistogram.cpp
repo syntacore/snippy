@@ -157,6 +157,15 @@ void YAMLHistogramTraits<OpcodeHistogramDecodedEntry>::normalizeMap(
   });
 }
 
+LLVM_SNIPPY_YAML_INSTANTIATE_HISTOGRAM_IO(snippy::OpcodeHistogramDecodedEntry);
+LLVM_SNIPPY_YAML_IS_HISTOGRAM_DENORM_ENTRY(snippy::OpcodeHistogramDecodedEntry)
+
+void yaml::MappingTraits<snippy::OpcodeHistogramMappingWrapper>::mapping(
+    yaml::IO &Io, snippy::OpcodeHistogramMappingWrapper &Info) {
+  YAMLHistogramIO<OpcodeHistogramDecodedEntry> HistIo(Info.Histogram);
+  Io.mapRequired("histogram", HistIo);
+}
+
 namespace snippy {
 void diagnoseHistogram(LLVMContext &Ctx, const OpcodeCache &OpCC,
                        std::map<unsigned, double> &Histogram) {
