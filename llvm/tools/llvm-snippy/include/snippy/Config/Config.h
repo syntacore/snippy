@@ -56,6 +56,8 @@ public:
   bool MangleExportedNames;
   std::string EntryPointName;
 
+  std::string PluginInfoFilename;
+
   // TODO: rethink if it is needed here.
   std::string InitialRegYamlFile;
 
@@ -70,7 +72,8 @@ public:
   static constexpr unsigned getSCStride() { return SCStride; }
   static constexpr unsigned getPageSize() { return kPageSize; }
 
-  ProgramConfig(const SnippyTarget &Tgt, StringRef PluginFilename);
+  ProgramConfig(const SnippyTarget &Tgt, StringRef PluginFilename,
+                StringRef PluginInfoFilename, const OpcodeCache &OpCC);
 
   bool hasInternalStackSection() const {
     return Sections.hasSection(SectionsDescriptions::StackSectionName);
@@ -114,7 +117,7 @@ public:
 
 class DefaultPolicyConfig {
 public:
-  const CommonPolicyConfig &Common;
+  const CommonPolicyConfig *Common;
   OpcodeHistogram DataFlowHistogram;
   struct ValuegramOpt {
     RegistersWithHistograms RegsHistograms;
@@ -122,7 +125,7 @@ public:
   };
   std::optional<ValuegramOpt> Valuegram;
 
-  DefaultPolicyConfig(const CommonPolicyConfig &Common) : Common(Common) {}
+  DefaultPolicyConfig(const CommonPolicyConfig &Common) : Common(&Common) {}
 
   OpcGenHolder createOpcodeGenerator(
       const OpcodeCache &OpCC, std::function<bool(unsigned)> OpcMask,
@@ -150,7 +153,7 @@ public:
     for (const auto &Entry : Overrides)
       if (!Entry.deactivated())
         DFHCopy[Entry.Opcode] = Entry.Weight;
-    auto &PluginManager = *Common.ProgramCfg.PluginManagerImpl;
+    auto &PluginManager = *Common->ProgramCfg.PluginManagerImpl;
     if (PluginManager.pluginHasBeenLoaded())
       return PluginManager.createPlugin(DFHCopy.begin(), DFHCopy.end());
     return std::make_unique<DefaultOpcodeGenerator>(DFHCopy.begin(),
@@ -162,11 +165,11 @@ public:
 
 class BurstPolicyConfig {
 public:
-  const CommonPolicyConfig &Common;
+  const CommonPolicyConfig *Common;
   BurstGramData Burst;
   std::unordered_map<unsigned, double> BurstOpcodeWeights;
 
-  BurstPolicyConfig(const CommonPolicyConfig &Common) : Common(Common) {}
+  BurstPolicyConfig(const CommonPolicyConfig &Common) : Common(&Common) {}
 };
 
 struct ModelPluginOptions {
@@ -202,7 +205,7 @@ struct RegistersOptions {
 // Settings specific for pass behaviour.
 class PassConfig {
 public:
-  const ProgramConfig &ProgramCfg;
+  const ProgramConfig *ProgramCfg;
 
   // CF generator passes configuration.
   Branchegram Branches;
@@ -214,10 +217,10 @@ public:
   // Function generator pass config.
   std::variant<CallGraphLayout, FunctionDescs> CGLayout;
 
-  PassConfig(const ProgramConfig &ProgramCfg) : ProgramCfg(ProgramCfg) {}
+  PassConfig(const ProgramConfig &ProgramCfg) : ProgramCfg(&ProgramCfg) {}
 
   OpcGenHolder createCFOpcodeGenerator(const OpcodeCache &OpCC) const {
-    auto &PluginManager = *ProgramCfg.PluginManagerImpl;
+    auto &PluginManager = *ProgramCfg->PluginManagerImpl;
     if (PluginManager.pluginHasBeenLoaded())
       return PluginManager.createPlugin(BranchOpcodes.begin(),
                                         BranchOpcodes.end());
@@ -265,6 +268,8 @@ public:
                       const std::vector<std::string> &IncludeDirs,
                       LLVMContext &Ctx);
 
+  IncludePreprocessor(StringRef YAMLText, LLVMContext &Ctx);
+
   void mergeFile(StringRef FileName, StringRef Contents);
   LineID getCorrespondingLineID(unsigned GlobalID) const & {
     assert(GlobalID > 0 && GlobalID <= Lines.size());
@@ -285,7 +290,7 @@ public:
 
   // legacy specific.
   std::vector<std::string> Includes;
-  std::unique_ptr<ProgramConfig> ProgramCfg;
+  ProgramConfig &ProgramCfg;
 
   // Top-level histogram.
   OpcodeHistogram Histogram;
@@ -297,11 +302,17 @@ public:
   // std::optional<ValuegramPolicyConfig> ValuegramConfig;
   PassConfig PassCfg;
 
-  Config(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State
+private:
+  Config(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State,
+         ProgramConfig &ProgCfg, const OpcodeCache &OpCC, bool ParseWithPlugin);
 
-         ,
-         StringRef PluginFilename, StringRef PluginInfoFilename,
-         const OpcodeCache &OpCC, bool ParseWithPlugin);
+public:
+  static Expected<Config>
+  create(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State,
+         ProgramConfig &ProgCfg, const OpcodeCache &OpCC, bool ParseWithPlugin,
+         std::optional<unsigned long long> Seed = std::nullopt);
+
+  Config(Config &&) = default;
 
   // FIXME: legacy that must be removed
   // FIXME: this should return OpcGenHolder
@@ -374,8 +385,9 @@ public:
 
   void dump(raw_ostream &OS, const ConfigIOContext &Ctx) const;
 
-private:
   void complete(LLVMState &State, const OpcodeCache &OpCC);
+
+private:
   void validateAll(LLVMState &State, const OpcodeCache &cache,
                    const RegPoolWrapper &RP);
 };

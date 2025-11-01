@@ -14,9 +14,11 @@
 #include "InitializePasses.h"
 
 #include "snippy/CreatePasses.h"
+#include "snippy/Generator/CFPermutation.h"
 #include "snippy/Generator/CFPermutationPass.h"
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContextPass.h"
+#include "snippy/Generator/LoopCanonicalization.h"
 #include "snippy/Generator/SimulatorContextWrapperPass.h"
 #include "snippy/Support/Options.h"
 
@@ -26,6 +28,7 @@
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineLoopInfo.h"
+#include "llvm/Frontend/OpenMP/OMPIRBuilder.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/Debug.h"
 
@@ -51,12 +54,6 @@ snippy::opt<bool> ForceLatchTransform(
     cl::cat(Options), cl::Hidden);
 
 class LoopCanonicalization final : public MachineFunctionPass {
-  void createPreheader(MachineBasicBlock &Header, bool TransferPreds);
-  bool insertPreheaderIfNeeded(MachineLoop &ML);
-  MachineBasicBlock *splitEdge(MachineBasicBlock &From, MachineBasicBlock &To);
-  bool makeLatchUnconditional(MachineLoop &ML, MachineLoopInfo &MLI);
-  bool splitExitEdge(MachineLoop &ML);
-
 public:
   static char ID;
 
@@ -122,26 +119,10 @@ bool LoopCanonicalization::runOnMachineFunction(MachineFunction &MF) {
     dbgs() << "\n";
   }));
 
-  SmallVector<MachineLoop *> Loops;
-  copy(MLI, std::back_inserter(Loops));
-  bool Changed = false;
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto IsStackLoopCountersRequested =
-      SGCtx.getConfig().PassCfg.Branches.isStackLoopCountersRequested();
-  while (!Loops.empty()) {
-    auto &ML = *Loops.back();
-    Changed |= insertPreheaderIfNeeded(ML);
-    if (ForceLatchTransform || SimCtx.hasTrackingMode() ||
-        IsStackLoopCountersRequested) {
-      Changed |= splitExitEdge(ML);
-      Changed |= makeLatchUnconditional(ML, MLI);
-    }
-    Loops.pop_back();
-    Loops.append(ML.begin(), ML.end());
-    ML.verifyLoop();
-  }
-
-  return Changed;
+  return canonicalizeLoops(MF, SimCtx, MLI, CLI,
+                           SGCtx.getProgramContext().getLLVMState(),
+                           SGCtx.getConfig().PassCfg.Branches);
 }
 
 static void transferPredecessorsExceptLatches(MachineBasicBlock &Preheader,
@@ -168,13 +149,9 @@ static void transferPredecessorsExceptLatches(MachineBasicBlock &Preheader,
 }
 
 /// If loop header is also a function entry, we need special preheader insertion
-void LoopCanonicalization::createPreheader(MachineBasicBlock &Header,
-                                           bool TransferPreds) {
-  auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &ProgCtx = GC.getProgramContext();
-  const auto &State = ProgCtx.getLLVMState();
+static void createPreheader(MachineBasicBlock &Header, MachineLoopInfo &MLI,
+                            LLVMState &State, bool TransferPreds) {
   const auto &SnippyTgt = State.getSnippyTarget();
-  const auto &MLI = getAnalysis<MachineLoopInfoWrapperPass>().getLI();
   const auto *ML = MLI[&Header];
   assert(ML);
   assert(ML->getHeader() == &Header && "Loop header expected");
@@ -198,13 +175,13 @@ void LoopCanonicalization::createPreheader(MachineBasicBlock &Header,
 ///   * Set header as preheader successor;
 ///
 /// After all that insert loop init instructions in new created preheader
-bool LoopCanonicalization::insertPreheaderIfNeeded(MachineLoop &ML) {
+static bool insertPreheaderIfNeeded(MachineLoop &ML, MachineLoopInfo &MLI,
+                                    ConsecutiveLoopInfo &CLI,
+                                    LLVMState &State) {
   auto *Header = ML.getHeader();
   assert(Header && "Loop expected to have header");
   assert(Header->pred_size() > 0 &&
          "Loop header should have at least one predecessor");
-  auto &CLI = getAnalysis<CFPermutation>().get<ConsecutiveLoopInfo>(
-      *Header->getParent());
   auto HeaderNum = Header->getNumber();
   if (CLI.isNonFirstConsecutiveLoopHeader(HeaderNum)) {
     LLVM_DEBUG(dbgs() << "It's consecutive loop, skip preheader insertion\n");
@@ -223,8 +200,26 @@ bool LoopCanonicalization::insertPreheaderIfNeeded(MachineLoop &ML) {
     assert(Header->pred_size() == 1 &&
            "Header that is entry must have only one predecessor");
   bool TransferPreds = !HeaderIsEntry;
-  createPreheader(*Header, TransferPreds);
+  createPreheader(*Header, MLI, State, TransferPreds);
   return true;
+}
+
+static MachineBasicBlock *splitEdge(MachineBasicBlock &From,
+                                    MachineBasicBlock &To, LLVMState &State) {
+  const auto &SnippyTgt = State.getSnippyTarget();
+
+  assert(From.isSuccessor(&To) && "From -> To is not an edge");
+
+  auto &MF = *From.getParent();
+  auto *NewBB = createMachineBasicBlock(MF);
+  assert(NewBB);
+  MF.insert(std::next(MachineFunction::iterator(&From)), NewBB);
+
+  SnippyTgt.insertFallbackBranch(*NewBB, To, State);
+  NewBB->addSuccessor(&To);
+
+  SnippyTgt.replaceBranchDest(From, To, *NewBB);
+  return NewBB;
 }
 
 /// This function splits one common exiting and latch block such that latch has
@@ -274,8 +269,8 @@ bool LoopCanonicalization::insertPreheaderIfNeeded(MachineLoop &ML) {
 ///  |            |             --------
 ///  +------------+
 ///
-bool LoopCanonicalization::makeLatchUnconditional(MachineLoop &ML,
-                                                  MachineLoopInfo &MLI) {
+static bool makeLatchUnconditional(MachineLoop &ML, MachineLoopInfo &MLI,
+                                   LLVMState &State) {
   auto *Latch = ML.getLoopLatch();
   assert(Latch && "Expected to have only one latch block.");
   if (Latch->succ_size() == 1)
@@ -290,12 +285,12 @@ bool LoopCanonicalization::makeLatchUnconditional(MachineLoop &ML,
   auto *Header = ML.getHeader();
   assert(Header && "Loop is expected to have header");
 
-  auto *NewLatch = splitEdge(*Latch, *Header);
+  auto *NewLatch = splitEdge(*Latch, *Header, State);
   ML.addBasicBlockToLoop(NewLatch, MLI);
   return true;
 }
 
-bool LoopCanonicalization::splitExitEdge(MachineLoop &ML) {
+static bool splitExitEdge(MachineLoop &ML, LLVMState &State) {
   auto *Exit = ML.getExitBlock();
   auto *Exiting = ML.getExitingBlock();
   assert(Exit && "Expected to have only one exit block.");
@@ -303,29 +298,30 @@ bool LoopCanonicalization::splitExitEdge(MachineLoop &ML) {
   if (Exit->pred_size() == 1)
     return false;
 
-  splitEdge(*Exiting, *Exit);
+  splitEdge(*Exiting, *Exit, State);
   return true;
 }
 
-MachineBasicBlock *LoopCanonicalization::splitEdge(MachineBasicBlock &From,
-                                                   MachineBasicBlock &To) {
-  auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &ProgCtx = GC.getProgramContext();
-  const auto &State = ProgCtx.getLLVMState();
-  const auto &SnippyTgt = State.getSnippyTarget();
-
-  assert(From.isSuccessor(&To) && "From -> To is not an edge");
-
-  auto &MF = *From.getParent();
-  auto *NewBB = createMachineBasicBlock(MF);
-  assert(NewBB);
-  MF.insert(std::next(MachineFunction::iterator(&From)), NewBB);
-
-  SnippyTgt.insertFallbackBranch(*NewBB, To, State);
-  NewBB->addSuccessor(&To);
-
-  SnippyTgt.replaceBranchDest(From, To, *NewBB);
-  return NewBB;
+bool canonicalizeLoops(MachineFunction &MF, SimulatorContext &SimCtx,
+                       MachineLoopInfo &MLI, ConsecutiveLoopInfo &CLI,
+                       LLVMState &State, const Branchegram &Branches) {
+  SmallVector<MachineLoop *> Loops;
+  copy(MLI, std::back_inserter(Loops));
+  bool Changed = false;
+  auto IsStackLoopCountersRequested = Branches.isStackLoopCountersRequested();
+  while (!Loops.empty()) {
+    auto &ML = *Loops.back();
+    Changed |= insertPreheaderIfNeeded(ML, MLI, CLI, State);
+    if (ForceLatchTransform || SimCtx.hasTrackingMode() ||
+        IsStackLoopCountersRequested) {
+      Changed |= splitExitEdge(ML, State);
+      Changed |= makeLatchUnconditional(ML, MLI, State);
+    }
+    Loops.pop_back();
+    Loops.append(ML.begin(), ML.end());
+    ML.verifyLoop();
+  }
+  return Changed;
 }
 
 } // namespace snippy

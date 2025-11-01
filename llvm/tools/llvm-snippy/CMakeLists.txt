@@ -155,7 +155,6 @@ foreach(proj ${LLVM_SNIPPY_TARGETS_LIST})
   target_link_libraries(llvm-snippy PRIVATE ${tgt})
 endforeach()
 
-
 add_dependencies(llvm-snippy lld)
 
 include(GNUInstallDirs)

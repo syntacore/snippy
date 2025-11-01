@@ -135,6 +135,7 @@ public:
   virtual void dump() const;
 #endif
 
+  ConsecutiveLoopInfo &getCLI() const { return CLI; }
   virtual bool makePermutationAndUpdateBranches();
 
   static unsigned calculateMaxDistance(unsigned BBNum, unsigned Size,
@@ -143,17 +144,20 @@ public:
                                        GeneratorContext &GC);
 
   static SmallVector<unsigned> generatePermutationOrder(unsigned Size);
+  void initBlocksInfo(unsigned Size);
+  void makePermutation(ArrayRef<unsigned> PermutationOrder);
+  bool updateBranches();
 
 protected:
-  void initBlocksInfo(unsigned Size);
+  static std::pair<unsigned, unsigned>
+  calcBlocksLimit(unsigned BB, unsigned NBlocks, bool DoAutoMaxBBDistance,
+                  unsigned MaxBBDst, const Branchegram &BS);
   MachineBasicBlock *getBlockNumbered(unsigned N);
   const MachineBasicBlock *getBlockNumbered(unsigned N) const;
-  void makePermutation(ArrayRef<unsigned> PermutationOrder);
   void permuteBlock(unsigned BB);
   void updateBlocksInfo(unsigned From, unsigned To);
   void dumpPermutedBranchIfNeeded(unsigned BB, bool IsLoop,
                                   const BlockInfo &BI) const;
-  bool updateBranches();
   void clear();
 
   BlocksInfoIter findMaxIfDepthReached(BlocksInfoIter Beg, BlocksInfoIter End);
