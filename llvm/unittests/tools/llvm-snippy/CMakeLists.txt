@@ -9,15 +9,15 @@ set(snippy_sources
   )
 
 set(snippy_link_libraries
-  LLVMSnippySupport
-  LLVMSnippyConfig
+  LLVMSnippy
   )
+
 
 set(snippy_includes)
 
 add_llvm_target_unittest(LLVMSnippyTests
   ${snippy_sources}
-)
+  )
 
 target_link_libraries(LLVMSnippyTests PUBLIC ${snippy_link_libraries})
 target_include_directories(LLVMSnippyTests PUBLIC ${snippy_includes})

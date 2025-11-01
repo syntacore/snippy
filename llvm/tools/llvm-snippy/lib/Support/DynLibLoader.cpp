@@ -10,6 +10,8 @@
 #include "snippy/Support/DiagnosticInfo.h"
 
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Config/config.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 
 #include <filesystem>
@@ -131,6 +133,20 @@ void *DynamicLibrary::getAddressOfSymbol(const char *symbolName) const {
         formatv("Failed to fetch symbol {0}: {1}", symbolName, ::dlerror));
   }
   return Sym;
+}
+
+/// This function returns the path to the binary this symbol is defined in.
+/// I.e. if DynLibLoader.cpp is linked into llvm-snippy executable it will
+/// produce the path to the executable itself. If Linker.cpp symbols are coming
+/// from snippy shared library it will return the path of the library.
+std::string getCurrentLibExecutablePath() {
+  static int Dummy = 0;
+#if defined(HAVE_DLOPEN)
+  Dl_info DLInfo;
+  if (dladdr(&Dummy, &DLInfo))
+    return DLInfo.dli_fname;
+#endif
+  return sys::fs::getMainExecutable(/* dummy argv */ nullptr, &Dummy);
 }
 
 } // namespace snippy

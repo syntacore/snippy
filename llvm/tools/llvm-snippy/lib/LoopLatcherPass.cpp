@@ -16,18 +16,25 @@
 
 #include "InitializePasses.h"
 
+#include "snippy/Config/Config.h"
 #include "snippy/CreatePasses.h"
 #include "snippy/Generator/CFPermutationPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/LoopLatcherPass.h"
+#include "snippy/Generator/LoopLatching.h"
 #include "snippy/Generator/Policy.h"
 #include "snippy/Generator/RegsReservedForLoop.h"
 #include "snippy/Generator/RootRegPoolWrapperPass.h"
+#include "snippy/Generator/SimulatorContext.h"
 #include "snippy/Generator/SimulatorContextWrapperPass.h"
+#include "snippy/Generator/SnippyLoopInfo.h"
+#include "snippy/Generator/SnippyModule.h"
+#include "snippy/GeneratorUtils/RegisterPool.h"
 #include "snippy/Support/Options.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/CodeGen/MachineDominators.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineLoopInfo.h"
@@ -125,60 +132,6 @@ snippy::ActiveImmutablePassInterface *createLoopLatcherPass() {
 
 namespace llvm {
 namespace snippy {
-bool LoopLatcher::runOnMachineFunction(MachineFunction &MF) {
-  LLVM_DEBUG(
-      dbgs() << "MachineFunction at the start of llvm::snippy::LoopLatcher:\n";
-      MF.dump());
-  auto &MLI = getAnalysis<MachineLoopInfoWrapperPass>().getLI();
-  if (MLI.empty()) {
-    LLVM_DEBUG(dbgs() << "No loops in function, exiting.\n");
-    return false;
-  }
-
-  LLVM_DEBUG(dbgs() << "Machine Loop Info for this function:\n");
-  LLVM_DEBUG(MLI.print(dbgs()));
-
-  auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto SimCtx = getAnalysis<SimulatorContextWrapper>()
-                    .get<OwningSimulatorContext>()
-                    .get();
-  const auto &ProgCtx = SGCtx.getProgramContext();
-  auto &State = ProgCtx.getLLVMState();
-  auto &CLI = getAnalysis<CFPermutation>().get<ConsecutiveLoopInfo>(MF);
-  auto &Cfg = SGCtx.getConfig();
-  const auto &Branches = Cfg.PassCfg.Branches;
-  if (Branches.isStackLoopCountersRequested()) {
-    if (!ProgCtx.stackEnabled())
-      snippy::fatal(State.getCtx(), "Cannot place loop counters on the stack",
-                    "stack was not enabled.");
-  }
-
-  if (SimCtx.hasTrackingMode()) {
-    if (!ProgCtx.stackEnabled())
-      snippy::fatal(State.getCtx(), "Wrong snippy configuration",
-                    "loops generation in selfcheck and backtracking modes "
-                    "requires stack.");
-    if (auto UseStack = Branches.LoopCounters.UseStack;
-        UseStack.has_value() && !UseStack.value())
-      snippy::fatal(
-          State.getCtx(), "Wrong snippy configuration",
-          llvm::formatv("loop counters: {0} must be enabled when "
-                        "selfcheck and backtracking modes are used.",
-                        Branchegram::LoopCountersInfo::UseStackOptName));
-  }
-
-  for (auto *ML : MLI) {
-    assert(ML);
-    auto HeaderNumber = ML->getHeader()->getNumber();
-    if (CLI.isFirstConsecutiveLoopHeader(HeaderNumber))
-      createLoopLatchFor(*ML, CLI.getConsecutiveLoops(HeaderNumber));
-    else if (!CLI.isNonFirstConsecutiveLoopHeader(HeaderNumber))
-      createLoopLatchFor(*ML);
-  }
-
-  bool Changed = !MLI.empty();
-  return Changed;
-}
 
 template <bool IsPostDom>
 void processDomTree(
@@ -204,29 +157,22 @@ void processDomTree(
   }
 }
 
-auto LoopLatcher::selectRegsForBranch(const MCInstrDesc &BranchDesc,
-                                      const MachineBasicBlock &Preheader,
-                                      const MachineBasicBlock &ExitingBlock,
-                                      const MCRegisterClass &RegClass) {
-  auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto SimCtx = getAnalysis<SimulatorContextWrapper>()
-                    .get<OwningSimulatorContext>()
-                    .get();
-  auto &ProgCtx = SGCtx.getProgramContext();
-  auto &State = ProgCtx.getLLVMState();
+static auto
+selectRegsForBranch(const MCInstrDesc &BranchDesc, MachineBasicBlock &Preheader,
+                    MachineBasicBlock &ExitingBlock,
+                    const MCRegisterClass &RegClass, SimulatorContext &SimCtx,
+                    SnippyProgramContext &ProgCtx, LLVMState &State,
+                    const Branchegram &Branches, RegPoolWrapper &RootPool) {
   auto &RegInfo = State.getRegInfo();
   const auto &SnippyTgt = State.getSnippyTarget();
-  auto RootPool = getAnalysis<RootRegPoolWrapper>().getPool();
-
   auto ImmutableReg = SnippyTgt.getImmutableRegs(RegClass);
   auto Filter = [&ImmutableReg](unsigned Reg) {
     auto *Pos = find(ImmutableReg, Reg);
     return Pos != ImmutableReg.end();
   };
 
-  auto &DomTree = getAnalysis<MachineDominatorTreeWrapperPass>().getDomTree();
-  auto &PostDomTree =
-      getAnalysis<MachinePostDominatorTreeWrapperPass>().getPostDomTree();
+  auto DomTree = MachineDominatorTree(*Preheader.getParent());
+  auto PostDomTree = MachinePostDominatorTree(*Preheader.getParent());
 
   assert(DomTree.dominates(&Preheader, &ExitingBlock));
   assert(PostDomTree.dominates(&ExitingBlock, &Preheader));
@@ -250,7 +196,6 @@ auto LoopLatcher::selectRegsForBranch(const MCInstrDesc &BranchDesc,
     RootPool.addReserved(Reg, Preheader, AccessMaskBit::W);
 
   auto TrackingMode = SimCtx.hasTrackingMode();
-  auto &Branches = SGCtx.getConfig().PassCfg.Branches;
   if (Branches.isStackLoopCountersRequested() || TrackingMode) {
     // We still have to reserve counter register even when using the stack.
     // Otherwise, this register might be later reserved for other purposes in
@@ -296,15 +241,13 @@ static void printSelectedRegs(
   OS << "\n";
 }
 
-MachineInstr &LoopLatcher::updateLatchBranch(MachineLoop &ML,
-                                             MachineInstr &Branch,
-                                             MachineBasicBlock &Preheader,
-                                             ArrayRef<Register> ReservedRegs) {
+static MachineInstr &updateLatchBranch(MachineLoop &ML, MachineInstr &Branch,
+                                       MachineBasicBlock &Preheader,
+                                       ArrayRef<Register> ReservedRegs,
+                                       SnippyProgramContext &ProgCtx) {
   assert(Branch.isConditionalBranch() && "Conditional branch expected");
   assert(ML.contains(&Branch) && "Expected this loop branch");
 
-  auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &ProgCtx = SGCtx.getProgramContext();
   auto &State = ProgCtx.getLLVMState();
   const auto &InstrInfo = State.getInstrInfo();
   const auto &BranchDesc = InstrInfo.get(Branch.getOpcode());
@@ -317,13 +260,12 @@ MachineInstr &LoopLatcher::updateLatchBranch(MachineLoop &ML,
   return NewBranch;
 }
 
-void LoopLatcher::processExitingBlock(MachineLoop &ML,
-                                      MachineBasicBlock &ExitingBlock,
-                                      MachineBasicBlock &Preheader) {
-  auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto SimCtx = getAnalysis<SimulatorContextWrapper>()
-                    .get<OwningSimulatorContext>()
-                    .get();
+static void
+processExitingBlock(MachineLoop &ML, MachineBasicBlock &ExitingBlock,
+                    MachineBasicBlock &Preheader, SimulatorContext &SimCtx,
+                    GeneratorContext &SGCtx, const Branchegram &Branches,
+                    SnippyLoopInfo &SLI, bool &LoopCounterStrideWarned,
+                    bool &LoopCounterInitWarned, RegPoolWrapper &RootPool) {
   auto &ProgCtx = SGCtx.getProgramContext();
   auto &State = ProgCtx.getLLVMState();
   auto TrackingMode = SimCtx.hasTrackingMode();
@@ -341,7 +283,8 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   const auto &MCRegClass = SnippyTgt.getMCRegClassForBranch(ProgCtx, Branch);
 
   auto ReservedRegs =
-      selectRegsForBranch(BranchDesc, Preheader, ExitingBlock, MCRegClass);
+      selectRegsForBranch(BranchDesc, Preheader, ExitingBlock, MCRegClass,
+                          SimCtx, ProgCtx, State, Branches, RootPool);
 
   assert((ReservedRegs.size() >= MinNumOfReservedRegsForLoop) &&
          (ReservedRegs.size() <= MaxNumOfReservedRegsForLoop) &&
@@ -350,10 +293,10 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   LLVM_DEBUG(
       printSelectedRegs(dbgs(), ReservedRegs, State.getRegInfo(), &MCRegClass));
 
-  auto &NewBranch = updateLatchBranch(ML, Branch, Preheader, ReservedRegs);
+  auto &NewBranch =
+      updateLatchBranch(ML, Branch, Preheader, ReservedRegs, ProgCtx);
   Branch.removeFromParent();
 
-  auto &Branches = SGCtx.getConfig().PassCfg.Branches;
   assert(Branches.NLoopIter.Min);
   assert(Branches.NLoopIter.Max);
 
@@ -414,7 +357,6 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   auto ActualNumIter = CounterInsRes.NIter;
   unsigned MinCounterVal = CounterInsRes.MinCounterVal.getZExtValue();
   auto CounterReg = ReservedRegs[CounterRegIdx];
-  auto &SLI = get<SnippyLoopInfo>(*ML.getHeader()->getParent());
   SnippyLoopInfo::LoopGenerationInfo TheLoopGenInfo{
       CounterReg, ActualNumIter, MinCounterVal,
       SnippyTgt.getLoopType(NewBranch)};
@@ -437,6 +379,7 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   auto MakeDiagnosticsIfNeed = [&](auto &DiagOpt, WarningName Warn,
                                    bool &Flag) {
     if (DiagOpt.has_value() && (DiagOpt.value().getName() != Warn || !Flag)) {
+      // FIXME: use proper snippy::warn for colorful output
       State.getCtx().diagnose(DiagOpt.value());
       if (DiagOpt.value().getName() == Warn)
         Flag = true;
@@ -452,7 +395,12 @@ void LoopLatcher::processExitingBlock(MachineLoop &ML,
   LLVM_DEBUG(dbgs() << "Loop counter inserted: "; ExitingBlock.dump());
 }
 
-bool LoopLatcher::createLoopLatchFor(MachineLoop &ML) {
+static bool createLoopLatchFor(MachineLoop &ML, SimulatorContext &SimCtx,
+                               GeneratorContext &SGCtx,
+                               const Branchegram &Branches, SnippyLoopInfo &SLI,
+                               bool &LoopCounterStrideWarned,
+                               bool &LoopCounterInitWarned,
+                               RegPoolWrapper &RootPool) {
   LLVM_DEBUG(dbgs() << "Creating latch for "; ML.dump());
   auto *Exiting = ML.getExitingBlock();
   assert(Exiting && "Expected to have only one exiting block.");
@@ -460,18 +408,26 @@ bool LoopLatcher::createLoopLatchFor(MachineLoop &ML) {
 
   auto *Preheader = ML.getLoopPreheader();
   assert(Preheader && "Loop must already have preheader");
-  processExitingBlock(ML, *Exiting, *Preheader);
+  processExitingBlock(ML, *Exiting, *Preheader, SimCtx, SGCtx, Branches, SLI,
+                      LoopCounterStrideWarned, LoopCounterInitWarned, RootPool);
 
-  for_each(ML.getSubLoops(), [this](auto *SubLoop) {
+  for_each(ML.getSubLoops(), [&](auto *SubLoop) {
     assert(SubLoop);
-    createLoopLatchFor(*SubLoop);
+    createLoopLatchFor(*SubLoop, SimCtx, SGCtx, Branches, SLI,
+                       LoopCounterStrideWarned, LoopCounterInitWarned,
+                       RootPool);
   });
 
   return true;
 }
 
 template <typename R>
-bool LoopLatcher::createLoopLatchFor(MachineLoop &ML, R &&ConsecutiveLoops) {
+static bool
+createLoopLatchFor(MachineLoop &ML, MachineLoopInfo &MLI,
+                   SimulatorContext &SimCtx, GeneratorContext &SGCtx,
+                   const Branchegram &Branches, R &&ConsecutiveLoops,
+                   SnippyLoopInfo &SLI, bool &LoopCounterStrideWarned,
+                   bool &LoopCounterInitWarned, RegPoolWrapper &RootPool) {
   LLVM_DEBUG(dbgs() << "Creating latch for "; ML.dump());
   LLVM_DEBUG(dbgs() << "  and it's sequential loops:");
   LLVM_DEBUG(
@@ -482,13 +438,13 @@ bool LoopLatcher::createLoopLatchFor(MachineLoop &ML, R &&ConsecutiveLoops) {
 
   auto *Preheader = ML.getLoopPreheader();
   assert(Preheader && "Loop must already have preheader");
-  processExitingBlock(ML, *Exiting, *Preheader);
+  processExitingBlock(ML, *Exiting, *Preheader, SimCtx, SGCtx, Branches, SLI,
+                      LoopCounterStrideWarned, LoopCounterInitWarned, RootPool);
 
   assert(ML.getSubLoops().empty() &&
          "First consecutive loop must not have sub loop");
 
   auto &MF = *Preheader->getParent();
-  auto &MLI = getAnalysis<MachineLoopInfoWrapperPass>().getLI();
   for (auto &&BBNum : ConsecutiveLoops) {
     auto *ConsLoop = MLI.getLoopFor(MF.getBlockNumbered(BBNum));
     assert(ConsLoop);
@@ -498,10 +454,82 @@ bool LoopLatcher::createLoopLatchFor(MachineLoop &ML, R &&ConsecutiveLoops) {
     assert(ConsLoopExiting);
     auto *ConsLoopPreheader =
         InitConsLoopInPrevLoop ? ConsLoopExiting->getPrevNode() : Preheader;
-    processExitingBlock(*ConsLoop, *ConsLoopExiting, *ConsLoopPreheader);
+    processExitingBlock(*ConsLoop, *ConsLoopExiting, *ConsLoopPreheader, SimCtx,
+                        SGCtx, Branches, SLI, LoopCounterStrideWarned,
+                        LoopCounterInitWarned, RootPool);
   }
 
   return true;
+}
+
+bool latchLoops(MachineFunction &MF, GeneratorContext &SGCtx,
+                SimulatorContext &SimCtx, MachineLoopInfo &MLI,
+                ConsecutiveLoopInfo &CLI, LLVMState &State, const Config &Cfg,
+                SnippyLoopInfo &SLI, RegPoolWrapper &RPW) {
+  auto &ProgCtx = SGCtx.getProgramContext();
+  auto &Branches = Cfg.PassCfg.Branches;
+  assert(Cfg.CommonPolicyCfg);
+  auto &CommonPolCfg = *Cfg.CommonPolicyCfg;
+  LLVM_DEBUG(
+      dbgs() << "MachineFunction at the start of llvm::snippy::LoopLatcher:\n";
+      MF.dump());
+  if (MLI.empty()) {
+    LLVM_DEBUG(dbgs() << "No loops in function, exiting.\n");
+    return false;
+  }
+
+  LLVM_DEBUG(dbgs() << "Machine Loop Info for this function:\n");
+  LLVM_DEBUG(MLI.print(dbgs()));
+
+  if (Branches.isStackLoopCountersRequested()) {
+    if (!ProgCtx.stackEnabled())
+      snippy::fatal(State.getCtx(), "Cannot place loop counters on the stack",
+                    "stack was not enabled.");
+  }
+
+  if (SimCtx.hasTrackingMode()) {
+    if (!ProgCtx.stackEnabled())
+      snippy::fatal(State.getCtx(), "Wrong snippy configuration",
+                    "loops generation in selfcheck and backtracking modes "
+                    "requires stack.");
+    if (auto UseStack = Branches.LoopCounters.UseStack;
+        UseStack.has_value() && !UseStack.value())
+      snippy::fatal(
+          State.getCtx(), "Wrong snippy configuration",
+          llvm::formatv("loop counters: {0} must be enabled when "
+                        "selfcheck and backtracking modes are used.",
+                        Branchegram::LoopCountersInfo::UseStackOptName));
+  }
+  bool LoopCounterStrideWarned = false;
+  bool LoopCounterInitWarned = false;
+  for (auto *ML : MLI) {
+    assert(ML);
+    auto HeaderNumber = ML->getHeader()->getNumber();
+    if (CLI.isFirstConsecutiveLoopHeader(HeaderNumber))
+      createLoopLatchFor(*ML, MLI, SimCtx, SGCtx, Branches,
+                         CLI.getConsecutiveLoops(HeaderNumber), SLI,
+                         LoopCounterStrideWarned, LoopCounterInitWarned, RPW);
+    else if (!CLI.isNonFirstConsecutiveLoopHeader(HeaderNumber))
+      createLoopLatchFor(*ML, SimCtx, SGCtx, Branches, SLI,
+                         LoopCounterStrideWarned, LoopCounterInitWarned, RPW);
+  }
+
+  bool Changed = !MLI.empty();
+  return Changed;
+}
+
+bool LoopLatcher::runOnMachineFunction(MachineFunction &MF) {
+  auto &MLI = getAnalysis<MachineLoopInfoWrapperPass>().getLI();
+  auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto SimCtx = getAnalysis<SimulatorContextWrapper>()
+                    .get<OwningSimulatorContext>()
+                    .get();
+  auto &CLI = getAnalysis<CFPermutation>().get<ConsecutiveLoopInfo>(MF);
+  auto &ProgCtx = SGCtx.getProgramContext();
+  auto &SLI = get<SnippyLoopInfo>(MF);
+  auto RootPool = getAnalysis<RootRegPoolWrapper>().getPool();
+  return latchLoops(MF, SGCtx, SimCtx, MLI, CLI, ProgCtx.getLLVMState(),
+                    SGCtx.getConfig(), SLI, RootPool);
 }
 
 } // namespace snippy
