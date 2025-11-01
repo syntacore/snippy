@@ -304,9 +304,9 @@ public:
     reportUnimplementedError();
   }
 
-  MachineBasicBlock *
-  generateBranch(InstructionGenerationContext &IGC,
-                 const MCInstrDesc &InstrDesc) const override {
+  MachineBasicBlock *generateBranch(InstructionGenerationContext &IGC,
+                                    const MCInstrDesc &InstrDesc,
+                                    MachineBasicBlock *Dst) const override {
     reportUnimplementedError();
   }
 

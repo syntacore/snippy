@@ -126,7 +126,7 @@ BlockGenPlanningImpl::calculateMFSizeLimit(const MachineFunction &MF) const {
   const auto &SnpTgt = State.getSnippyTarget();
   auto CurrentCodeSize = State.getFunctionSize(MF);
   const auto &Cfg = GenCtx->getConfig();
-  const auto &ProgCfg = *Cfg.ProgramCfg;
+  const auto &ProgCfg = Cfg.ProgramCfg;
   auto &PassCfg = Cfg.PassCfg;
   // last instruction in the trace might be target dependent: EBREAK or
   // int 3, etc.
