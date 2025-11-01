@@ -15,7 +15,6 @@
 #include "snippy/Generator/RootRegPoolWrapperPass.h"
 #include "snippy/Generator/TrackLivenessPass.h"
 
-#include <set>
 #include <vector>
 
 namespace llvm {
@@ -31,6 +30,9 @@ namespace {
 // 2) caller-saved registers
 // 3) ensures that the target stack pointer holds the actual stack value.
 
+// If compiled stack optimization is applicable, this pass will also spill the
+// caller-saved registers before the call and reload them after the call.
+
 class PreserveRegsInsertion : public MachineFunctionPass {
   using MBBIterTy = MachineBasicBlock::iterator;
 
@@ -42,23 +44,12 @@ public:
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
   bool runOnMachineFunction(MachineFunction &MF) override {
-    // -- Algorithm for spilling and reloading caller-saved registers before a
-    // call to an external function:
-    // 1) For each MBB, obtain the set of call instructions (those that
-    // call external functions).
-    // 2) For each call instruction:
-    // -- Obtain all registers defined (defs) from the beginning of the MBB up
-    //    to the call instruction.
-    // -- From the call instruction to the end of the MBB, obtain all registers
-    //    used (uses) that occur before their first definition (def).
-    // -- Intersect the two sets of registers obtained and
-    //    add the resulting set to the live-in registers for the MBB.
-    // 3) Preserve only the registers that must be saved according to the
-    // ABI.
-    bool WasModified = false;
-    for (auto &&MBB : MF)
-      preserveRegistersAroundCallInstrs(MBB, WasModified);
-    return WasModified;
+    bool WasModifiedExternal = false, WasModifiedInternal = false;
+    for (auto &&MBB : MF) {
+      preserveRegistersAroundExternalCallInstrs(MBB, WasModifiedExternal);
+      preserveRegistersAroundInternalCallInstrs(MBB, WasModifiedInternal);
+    }
+    return WasModifiedExternal | WasModifiedInternal;
   }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
@@ -104,8 +95,115 @@ private:
     }
   }
 
-  void preserveRegistersAroundCallInstrs(MachineBasicBlock &MBB,
-                                         bool &WasModified) {
+  auto getPreserveRegs(MachineFunction &MF, const SnippyTarget &SnippyTgt) {
+    auto PreserveRegs =
+        SnippyTgt.getCallerSavedRegs(MF, SnippyTgt.getCallerSavedRegGroups());
+    auto MutatedRegs = getAllMutatedRegs(MF);
+    // The remaining mutated registers were saved in the function's prologue.
+    // Works only with sorted containers.
+    llvm::sort(PreserveRegs);
+    std::vector<MCRegister> Result;
+    std::set_intersection(PreserveRegs.begin(), PreserveRegs.end(),
+                          MutatedRegs.begin(), MutatedRegs.end(),
+                          std::back_inserter(Result));
+    auto RAIt = llvm::find(Result, SnippyTgt.getReturnAddress());
+    if (RAIt != Result.end())
+      Result.erase(RAIt);
+    return Result;
+  }
+
+  void preserveRegistersAroundInternalCallInstrs(MachineBasicBlock &MBB,
+                                                 bool &WasModified) {
+    auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+    // When we do not have compiled stack, we spill all registers in prologue.
+    if (!SGCtx.getProgramContext().getConfig().StaticStack)
+      return;
+    auto &ProgCtx = SGCtx.getProgramContext();
+    auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
+    auto &MF = *MBB.getParent();
+    auto PreserveRegs = getPreserveRegs(MF, SnippyTgt);
+
+    auto *TRI = MF.getSubtarget().getRegisterInfo();
+    assert(TRI && "register information must be available");
+
+    // Get only internal call instrs.
+    auto InternalCalls = llvm::make_filter_range(MBB, [&](auto &&Instr) {
+      return Instr.isCall() &&
+             !checkMetadata(Instr, SnippyMetadata::ExternalCall);
+    });
+    auto RPW = getAnalysis<RootRegPoolWrapper>().getPool();
+    auto &StaticStackCtx = ProgCtx.getStaticStack();
+    StaticStackCtx.reset();
+    StaticStackCtx.setSPAddrLocal(StaticStackCtx.getSPAddrGlobal());
+    for (auto &&CallInstr : InternalCalls) {
+      auto CallIt = CallInstr.getIterator();
+      auto InsertTo = CallIt;
+      if (CallIt != MBB.begin()) {
+        // We must insert spills before the address is formed, so as not to
+        // overwrite the register with the address.
+        InsertTo =
+            llvm::find_if_not(make_range((--CallIt)->getReverseIterator(),
+                                         MBB.begin()->getReverseIterator()),
+                              [](const auto &Instr) {
+                                return checkMetadata(
+                                    Instr, SnippyMetadata::FormAddrForCall);
+                              })
+                ->getIterator();
+        if (!checkMetadata(*InsertTo, SnippyMetadata::FormAddrForCall))
+          ++InsertTo;
+        ++CallIt;
+      }
+
+      std::vector<MCRegister> RegsToSpill = [&] {
+        if (MF.getProperties().hasProperty(
+                MachineFunctionProperties::Property::TracksLiveness))
+          return getLiveInPreservedRegsForCall(PreserveRegs, MBB, CallInstr,
+                                               SnippyTgt, ProgCtx, *TRI);
+        return PreserveRegs;
+      }();
+
+      // We must reserve ALL registers first, so as not to overwrite any of them
+      // in the process of forming an address for spilling another register.
+      for (auto SpillReg : RegsToSpill)
+        RPW.addReserved(SpillReg);
+      auto RealStackPointer = ProgCtx.getStackPointer();
+      InstructionGenerationContext InstrGenCtxToSpill{MBB, *InsertTo, SGCtx,
+                                                      RPW};
+      // Spill caller saved registers to stack.
+      for (auto &&Reg : RegsToSpill)
+        SnippyTgt.generateSpillToStack(InstrGenCtxToSpill, Reg,
+                                       RealStackPointer);
+      StaticStackCtx.passSPAddr();
+
+      // Go through call instruction.
+      assert(CallIt->isCall());
+      ++CallIt;
+      InstructionGenerationContext InstrGenCtxToReload{MBB, CallIt, SGCtx, RPW};
+      // Reload caller saved registers from stack.
+      for (auto &&Reg : llvm::reverse(RegsToSpill))
+        SnippyTgt.generateReloadFromStack(InstrGenCtxToReload, Reg,
+                                          RealStackPointer);
+      StaticStackCtx.resetRegWithSPAddrLocal();
+
+      WasModified |= !RegsToSpill.empty();
+    }
+  }
+
+  // -- Algorithm for spilling and reloading caller-saved registers before a
+  // call to an external function:
+  // 1) For each MBB, obtain the set of call instructions (those that
+  // call external functions).
+  // 2) For each call instruction:
+  // -- Obtain all registers defined (defs) from the beginning of the MBB up
+  //    to the call instruction.
+  // -- From the call instruction to the end of the MBB, obtain all registers
+  //    used (uses) that occur before their first definition (def).
+  // -- Intersect the two sets of registers obtained and
+  //    add the resulting set to the live-in registers for the MBB.
+  // 3) Preserve only the registers that must be saved according to the
+  // ABI.
+  void preserveRegistersAroundExternalCallInstrs(MachineBasicBlock &MBB,
+                                                 bool &WasModified) {
     auto RPW = getAnalysis<RootRegPoolWrapper>().getPool();
     auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
     auto &ProgCfg = SGCtx.getConfig().ProgramCfg;
@@ -171,8 +269,7 @@ private:
         for (auto &&Reg : llvm::reverse(RegsToSpill))
           SnippyTgt.generateReloadFromStack(InstrGenCtx, Reg, RealStackPointer);
 
-      if (!WasModified && !RegsToSpill.empty())
-        WasModified = true;
+      WasModified |= !RegsToSpill.empty();
     }
   }
 
@@ -220,6 +317,8 @@ private:
                                 const SnippyTarget &SnippyTgt,
                                 const SnippyProgramContext &ProgCtx,
                                 const TargetRegisterInfo &TRI) const {
+    if (AllCallerRegsToPreserve.empty())
+      return {};
     LivePhysRegs LiveRegs(TRI);
     LiveRegs.addLiveIns(MBB);
     std::set<MCRegister> LiveRegsBeforeCall(LiveRegs.begin(), LiveRegs.end());

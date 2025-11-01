@@ -2531,6 +2531,55 @@ This setting has the same value in all functions in the call graph.
       "error: Incompatible options: When the stack pointer is redefined to 'SP', generation of SP-relative instructions is not supported. Redefine it to 'any-not-SP' or remove SP-relative instructions from the histogram."
 
 
+.. _`_static_stack`:
+
+Static stack
+------------
+Snippy has the ability to use a static stack, meaning that it do not rely on
+stack pointer value, but calculate the stack location for each function statically.
+This functionality reserves part of stack for every function and each of them saves
+values to the predefined addresses in any call.
+
+To enable static stack:
+
+::
+
+   --enable-static-stack=true
+
+If no option is specified, then snippy uses static stack **automatically** whenever possible.
+
+Static stack can be explicitly disabled by ``--enable-static-stack=false``.
+
+The feature is **not supported** (and therefore Snippy does not enable it automatically) when:
+
+- ``--honor-target-abi`` is enabled
+- section ``stack`` is not provided
+- external stack is provided
+- calls to external functions are possible
+- ``SMC`` is enabled
+- ``--num-instrs=all`` is specified
+- loop generation is possible
+
+**Benefits** this feature provides:
+
+- When stack area is specified it becomes possible to generate instructions with SP
+  register operand and stack-pointer specific instructions. (For RISC-V, these
+  include compressed SP-based instructions that implicitly use X2.)
+- There are more registers available, as the SP register is no longer reserved.
+
+**Drawbacks** of this feature:
+
+- Snippets that use static stack may occupy more stack space. The wider the function
+  call graph, the greater the increase of the required stack size. We are going to
+  implement some optimizations that would partially mitigate this effect in the future.
+- Increasing the size of the ancillary code.
+
+  - The size of each function body is getting bigger. Additional ancillary instructions are used to load the address of the functions static stack area to the temporary register. This is done in both prologue and epilogue (for RISC-V, approximately 3 + 3 = 6 instructions).
+
+  - Additional ancillary instructions are generated whenever a function is called. These are necessary to load the address of the callees static stack area (approximately 6 instructions per a function call). This is necessary for spilling registers before a call and reloading them after a call.
+
+  - Lets consider an example -- a snippet that contains three functions, each of which contains one call to another function, and let each function consist of 1000 instructions, i.e. total 3000 instructions. Static stack would add 6 instructions per a function plus 6 instruction per call, total 36 instructions, with represents approximately 1.2% increase.
+
 .. _`_section_names_prefix`:
 
 Section names prefix
