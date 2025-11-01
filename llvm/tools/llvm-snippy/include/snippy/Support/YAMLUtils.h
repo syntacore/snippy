@@ -194,6 +194,21 @@ Error loadYAMLFromBufferIgnoreUnknown(T &ToLoad, StringRef Buf) {
   return Error::success();
 }
 
+template <typename T, typename InT = yaml::Input, typename CallableT>
+Error loadYAMLFromBufferIgnoreUnknown(T &ToLoad, StringRef Buf,
+                                      CallableT &&Tap) {
+  InT Yin(Buf, nullptr, [](const auto &Diag, void *) {
+    if (!detail::AllowDiagnosticsForAllUnknownKeys{}(Diag))
+      Diag.print(nullptr, errs());
+  });
+  Tap(Yin);
+  Yin.setAllowUnknownKeys(true);
+  Yin >> ToLoad;
+  if (auto EC = Yin.error())
+    return createStringError(EC, EC.message());
+  return Error::success();
+}
+
 // This monstrosity is necessary to set the correct filename in the diagnostic
 inline SMDiagnostic getSMDiagWithFilename(StringRef Filename,
                                           const SMDiagnostic &Diag) {

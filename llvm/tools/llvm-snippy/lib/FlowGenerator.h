@@ -30,15 +30,17 @@ class LLVMState;
 
 class FlowGenerator {
   const OpcodeCache &OpCC;
+  std::unique_ptr<ProgramConfig> ProgramCfg;
   Config Cfg;
   std::vector<RegPool> RegPools;
   std::string BaseFileName;
 
 public:
-  FlowGenerator(Config &&Cfg, const OpcodeCache &OpCache,
-                std::vector<RegPool> Pools, StringRef BaseFileName)
-      : OpCC(OpCache), Cfg(std::move(Cfg)), RegPools(std::move(Pools)),
-        BaseFileName(BaseFileName) {}
+  FlowGenerator(std::unique_ptr<ProgramConfig> &&ProgCfg, Config &&Cfg,
+                const OpcodeCache &OpCache, std::vector<RegPool> Pools,
+                StringRef BaseFileName)
+      : OpCC(OpCache), ProgramCfg(std::move(ProgCfg)), Cfg(std::move(Cfg)),
+        RegPools(std::move(Pools)), BaseFileName(BaseFileName) {}
 
   GeneratorResult generate(LLVMState &State, const DebugOptions &DebugCfg);
 };

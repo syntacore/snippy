@@ -78,7 +78,7 @@ public:
 
     std::vector<MCRegister> Ret;
     if (FG.isRootFunction(MF)) {
-      llvm::copy(SGCtx.getConfig().ProgramCfg->getRegsSpilledToStack(),
+      llvm::copy(SGCtx.getConfig().ProgramCfg.getRegsSpilledToStack(),
                  std::back_inserter(Ret));
     } else {
       auto RegSet = getAllMutatedRegs(MF);
@@ -461,7 +461,7 @@ bool PrologueEpilogueInsertion::runOnMachineFunction(MachineFunction &MF) {
   // When we have compiled stack, we spill caller-saved registers before calls.
   if (SGCtx.getProgramContext().getConfig().StaticStack)
     SpilledToStack = leaveOnlyCalleeSaved(MF, SpilledToStack);
-  auto SpilledToMem = SGCtx.getConfig().ProgramCfg->getRegsSpilledToMem();
+  auto SpilledToMem = SGCtx.getConfig().ProgramCfg.getRegsSpilledToMem();
   auto PrologueInserted = insertPrologue(MF, SpilledToStack, SpilledToMem);
   auto EpilogueInserted = insertEpilogue(MF, SpilledToStack, SpilledToMem);
 

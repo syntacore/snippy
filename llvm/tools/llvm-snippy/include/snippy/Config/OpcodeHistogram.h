@@ -45,6 +45,7 @@ public:
   using typename map::value_type;
 
   using map::begin;
+  using map::clear;
   using map::count;
   using map::empty;
   using map::end;
@@ -147,6 +148,10 @@ struct OpcodeHistogramCodedEntry {
   std::string Weight;
 };
 
+struct OpcodeHistogramMappingWrapper final {
+  OpcodeHistogram &Histogram;
+};
+
 } // namespace snippy
 
 template <>
@@ -174,4 +179,9 @@ codeInstrFromOpcode(yaml::IO &IO, const snippy::OpcodeHistogramDecodedEntry &E);
 Expected<snippy::OpcodeHistogramDecodedEntry>
 decodeInstrRegex(yaml::IO &IO, StringRef OpcodeStr, double Weight);
 
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::OpcodeHistogramMappingWrapper);
+namespace yaml {
+void yamlize(yaml::IO &, snippy::OpcodeHistogramDecodedEntry &, bool,
+             EmptyContext &Ctx);
+}
 } // namespace llvm

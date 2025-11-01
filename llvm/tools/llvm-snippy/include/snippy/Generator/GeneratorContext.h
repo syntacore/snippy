@@ -17,7 +17,7 @@ namespace snippy {
 
 class GeneratorContext {
 private:
-  SnippyProgramContext &ProgContext;
+  SnippyProgramContext *ProgContext = nullptr;
 
   Config *Cfg = nullptr;
 
@@ -25,11 +25,10 @@ private:
 
 public:
   GeneratorContext(SnippyProgramContext &ProgContext, Config &Cfg);
-  ~GeneratorContext();
 
-  const auto &getProgramContext() const { return ProgContext; }
+  const auto &getProgramContext() const { return *ProgContext; }
 
-  auto &getProgramContext() { return ProgContext; }
+  auto &getProgramContext() { return *ProgContext; }
   auto &getMemoryAccessSampler() { return MemAccSampler; }
 
   auto &getConfig() const {

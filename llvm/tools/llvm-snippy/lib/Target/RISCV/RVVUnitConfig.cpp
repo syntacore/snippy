@@ -1366,7 +1366,7 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
     std::vector<RVVConfiguration> &DiscardedConfigs) {
   const RVVConfigurationSpace CS =
       Iface ? Iface->getImpl<RVVConfig>().getRVVConfigurationSpace().value()
-            : Cfg.ProgramCfg->TargetConfig->getImpl<RISCVConfigInterface>()
+            : Cfg.ProgramCfg.TargetConfig->getImpl<RISCVConfigInterface>()
                   .RVVConfig->getImpl<RVVConfig>()
                   .getRVVConfigurationSpace()
                   .value();
@@ -1590,7 +1590,7 @@ RISCVConfigurationInfo::constructConfiguration(LLVMState &State,
   std::vector<RVVConfigurationInfo::VMGeneratorHolder> DiscardedVMs;
   std::vector<RVVConfigurationInfo::VLGeneratorHolder> DiscardedVLs;
   std::vector<RVVConfiguration> DiscardedConfigs;
-  auto RVVCfg = Cfg.ProgramCfg->TargetConfig->getImpl<RISCVConfigInterface>()
+  auto RVVCfg = Cfg.ProgramCfg.TargetConfig->getImpl<RISCVConfigInterface>()
                         .RVVConfig->getImpl<RVVConfig>()
                         .getRVVConfigurationSpace()
                         .has_value()

@@ -35,6 +35,8 @@ std::optional<std::string> findLibraryPath(StringRef BaseLibName);
 std::string getDynLibPath(
     StringRef PluginLib,
     std::optional<NameModifier> LibPathModif = std::optional<NameModifier>{});
+
+std::string getCurrentLibExecutablePath();
 } // namespace snippy
 
 } // namespace llvm

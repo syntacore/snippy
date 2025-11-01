@@ -26,6 +26,7 @@
 #include "llvm/MC/MCRegisterInfo.h"
 
 #include "llvm/Support/Errc.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -136,7 +137,6 @@ template <> struct yaml::MappingTraits<BurstGramData> {
 };
 
 LLVM_SNIPPY_YAML_INSTANTIATE_HISTOGRAM_IO(snippy::OpcodeHistogramDecodedEntry);
-LLVM_SNIPPY_YAML_IS_HISTOGRAM_DENORM_ENTRY(snippy::OpcodeHistogramDecodedEntry)
 
 namespace snippy {
 
@@ -424,7 +424,7 @@ static void reserveRegistersFromReservedList(RegPoolWrapper &RP,
 static std::vector<MCRegister> getRegsToSpillToMem(const SnippyTarget &Tgt,
                                                    const Config &Cfg) {
   if (!Cfg.PassCfg.hasExternalCallees() ||
-      !Cfg.ProgramCfg->hasSectionToSpillGlobalRegs())
+      !Cfg.ProgramCfg.hasSectionToSpillGlobalRegs())
     return {};
   return Tgt.getGlobalStateRegs();
 }
@@ -464,8 +464,8 @@ static MCRegister getRealStackPointer(
     std::vector<MCRegister> &SpilledToStack, LLVMContext &Ctx, Config &Cfg,
     const ProgramOptions &Opts, bool HasSPRelativeInstrs) {
   auto SP = Tgt.getStackPointer();
-  bool FollowTargetABI = Cfg.ProgramCfg->FollowTargetABI;
-  bool StaticStack = Cfg.ProgramCfg->StaticStack;
+  bool FollowTargetABI = Cfg.ProgramCfg.FollowTargetABI;
+  bool StaticStack = Cfg.ProgramCfg.StaticStack;
   std::string RedefineSP = Opts.RedefineSP;
 
   bool NotSPAndNotAny = RedefineSP != "SP" && RedefineSP != "any";
@@ -612,7 +612,7 @@ static bool getStaticStackValue(Config &Cfg, const OpcodeCache &OpCC,
                                 const ProgramOptions &Opts) {
   if (Opts.StaticStackSpecified && !Opts.StaticStack)
     return false;
-  auto &ProgCfg = *Cfg.ProgramCfg;
+  auto &ProgCfg = Cfg.ProgramCfg;
   auto NumPrimaryInstrs =
       getExpectedNumInstrs(copyOptionsToInstrGenOptions().NumInstrs);
   auto HasStackSection =
@@ -666,8 +666,9 @@ static bool getStaticStackValue(Config &Cfg, const OpcodeCache &OpCC,
 static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
                                          RegPoolWrapper &RP,
                                          const OpcodeCache &OpCC,
+                                         std::optional<unsigned long long> Seed,
                                          const ProgramOptions &Opts) {
-  auto &ProgCfg = *Cfg.ProgramCfg;
+  auto &ProgCfg = Cfg.ProgramCfg;
   ProgCfg.ABIName = Opts.ABI;
   ProgCfg.FollowTargetABI = Opts.FollowTargetABI;
   ProgCfg.PreserveCallerSavedGroups = Opts.PreserveCallerSavedRegs;
@@ -677,7 +678,9 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
   ProgCfg.SkipLegacySPSpill = Opts.SkipLegacySPSpill;
   ProgCfg.StaticStack = getStaticStackValue(Cfg, OpCC, Opts);
   ProgCfg.InitialRegYamlFile = Opts.InitialRegisterDataFile;
-  ProgCfg.Seed = seedOptToValue(Opts.Seed);
+  // Here we don't use Seed.value_or() because we don't want seedOptToValue to
+  // be called at all if Seed was provided
+  ProgCfg.Seed = Seed.has_value() ? *Seed : seedOptToValue(Opts.Seed);
   // FIXME: RandomEngine initialization should be moved out of Config as well
   // as most of the stuff below
   initializeRandomEngine(ProgCfg.Seed);
@@ -817,7 +820,7 @@ static void normalizeModelOptions(Config &Cfg, LLVMState &State,
 }
 
 void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
-  IO.mapOptional("sections", Info.ProgramCfg->Sections);
+  IO.mapOptional("sections", Info.ProgramCfg.Sections);
   // Here we call yamlize directly since memory scheme has no top-level key.
   // This could be changed in the future but it'd be a breaking change.
   yaml::MappingTraits<MemoryScheme>::mapping(IO, Info.CommonPolicyCfg->MS);
@@ -866,7 +869,7 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
     }
   }
 
-  Info.ProgramCfg->TargetConfig->mapConfig(IO);
+  Info.ProgramCfg.TargetConfig->mapConfig(IO);
   IO.mapOptional("fpu-config", Info.CommonPolicyCfg->FPUConfig);
 }
 
@@ -876,7 +879,7 @@ std::string yaml::MappingTraits<Config>::validate(yaml::IO &Io, Config &Info) {
                 "context for yaml::IO");
   auto &ConfigIOCtx = *static_cast<ConfigIOContext *>(Ctx);
   return Info.CommonPolicyCfg->MS
-      .validateSchemes(ConfigIOCtx.State.getCtx(), Info.ProgramCfg->Sections)
+      .validateSchemes(ConfigIOCtx.State.getCtx(), Info.ProgramCfg.Sections)
       .value_or("");
 }
 
@@ -904,33 +907,40 @@ static void diagnoseHistogram(LLVMContext &Ctx, const OpcodeCache &OpCC,
     snippy::fatal("Plugin filled histogram with negative opcodes weights");
 }
 
-ProgramConfig::ProgramConfig(const SnippyTarget &Tgt, StringRef PluginFilename)
+ProgramConfig::ProgramConfig(const SnippyTarget &Tgt, StringRef PluginFilename,
+                             StringRef PluginInfoFile, const OpcodeCache &OpCC)
     : TargetConfig(Tgt.createTargetConfig()),
-      PluginManagerImpl(std::make_unique<PluginManager>()) {}
-Config::Config(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State
+      PluginManagerImpl(std::make_unique<PluginManager>()),
+      PluginInfoFilename(PluginInfoFile) {
+  PluginManagerImpl->loadPluginLib(PluginFilename.str());
+}
 
-               ,
-               StringRef PluginFilename, StringRef PluginInfoFilename,
-               const OpcodeCache &OpCC, bool ParseWithPlugin)
+Config::Config(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State,
+               ProgramConfig &ProgCfg, const OpcodeCache &OpCC,
+               bool ParseWithPlugin)
     : Includes([&IPP] {
         auto IncludesRange = IPP.getIncludes();
         return std::vector(IncludesRange.begin(), IncludesRange.end());
       }()),
-      ProgramCfg(std::make_unique<ProgramConfig>(State.getSnippyTarget(),
-                                                 PluginFilename)),
-      CommonPolicyCfg(std::make_unique<CommonPolicyConfig>(*ProgramCfg)),
-      DefFlowConfig(*CommonPolicyCfg), PassCfg(*ProgramCfg) {
-  auto &PluginManager = *ProgramCfg->PluginManagerImpl;
-  PluginManager.loadPluginLib(PluginFilename.str());
+      ProgramCfg(ProgCfg),
+      CommonPolicyCfg(std::make_unique<CommonPolicyConfig>(ProgramCfg)),
+      DefFlowConfig(*CommonPolicyCfg), PassCfg(ProgramCfg) {
   auto &Ctx = State.getCtx();
-
   if (ParseWithPlugin) {
-    PluginManager.parseOpcodes(OpCC, PluginInfoFilename.str(),
-                               std::inserter(Histogram, Histogram.begin()));
+    ProgramCfg.PluginManagerImpl->parseOpcodes(
+        OpCC, ProgramCfg.PluginInfoFilename,
+        std::inserter(Histogram, Histogram.begin()));
     diagnoseHistogram(Ctx, OpCC, Histogram);
   }
+}
+
+Expected<Config> Config::create(IncludePreprocessor &IPP, RegPoolWrapper &RP,
+                                LLVMState &State, ProgramConfig &ProgCfg,
+                                const OpcodeCache &OpCC, bool ParseWithPlugin,
+                                std::optional<unsigned long long> Seed) {
+  Config Cfg(IPP, RP, State, ProgCfg, OpCC, ParseWithPlugin);
   ConfigIOContext CfgParsingCtx{
-      Histogram,
+      Cfg.Histogram,
       OpCC,
       RP,
       State,
@@ -944,7 +954,7 @@ Config::Config(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State
   DiagnosticContext DiagCtx{IPP, Error::success()};
 
   auto Err = loadYAMLFromBuffer(
-      *this, IPP.getPreprocessed(),
+      Cfg, IPP.getPreprocessed(),
       [&CfgParsingCtx](auto &Yin) {
         Yin.setAllowUnknownKeys(true);
         Yin.setContext(&CfgParsingCtx);
@@ -984,32 +994,32 @@ Config::Config(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State
       },
       DiagCtx);
 
-  auto ReportError = [&Ctx, &IPP](auto Err) {
-    snippy::fatal(Ctx,
-                  "Failed to parse file \"" + IPP.getPrimaryFilename() + "\"",
-                  toString(std::move(Err)));
-  };
-
-  if (Err)
-    ReportError(std::move(Err));
+  if (Err) {
+    // Explicitly ignore extra error if failed to read YAML.
+    // ExtraError can be appended to the main one and we should probably do so.
+    if (DiagCtx.ExtraError)
+      consumeError(std::move(DiagCtx.ExtraError));
+    return std::move(Err);
+  }
 
   if (DiagCtx.ExtraError)
-    ReportError(std::move(DiagCtx.ExtraError));
+    return std::move(DiagCtx.ExtraError);
 
-  normalizeProgramLevelOptions(*this, State, RP, OpCC,
+  normalizeProgramLevelOptions(Cfg, State, RP, OpCC, Seed,
                                copyOptionsToProgramOptions());
-  normalizeRegInitOptions(*this, State, copyOptionsToRegInitOptions());
-  normalizeModelOptions(*this, State, copyOptionsToModelOptions());
-  if ((Err = normalizeInstrGenOptions(*this, State,
+  normalizeRegInitOptions(Cfg, State, copyOptionsToRegInitOptions());
+  normalizeModelOptions(Cfg, State, copyOptionsToModelOptions());
+  if ((Err = normalizeInstrGenOptions(Cfg, State,
                                       copyOptionsToInstrGenOptions())))
     snippy::fatal(std::move(Err));
-  complete(State, OpCC);
-  validateAll(State, OpCC, RP);
+  Cfg.complete(State, OpCC);
+  Cfg.validateAll(State, OpCC, RP);
+  return Cfg;
 }
 
 static void checkMemoryRegions(const SnippyTarget &SnippyTgt,
                                const Config &Cfg) {
-  auto Sections = llvm::reverse(Cfg.ProgramCfg->Sections);
+  auto Sections = llvm::reverse(Cfg.ProgramCfg.Sections);
   auto ReservedIt = llvm::find_if(Sections, [&SnippyTgt](auto &S) {
     return SnippyTgt.touchesReservedRegion(S);
   });
@@ -1118,7 +1128,7 @@ static void checkGlobalRegsSpillSettings(const SnippyTarget &Tgt,
                                          const MCRegisterInfo &RI,
                                          const Config &Cfg, LLVMContext &Ctx) {
   if (!Cfg.PassCfg.hasExternalCallees() ||
-      Cfg.ProgramCfg->hasSectionToSpillGlobalRegs())
+      Cfg.ProgramCfg.hasSectionToSpillGlobalRegs())
     return;
   auto Globals = Tgt.getGlobalStateRegs();
   auto RegNames =
@@ -1179,7 +1189,7 @@ static size_t getMinimumSelfcheckSize(const Config &Cfg) {
 
 static void diagnoseSelfcheckSection(LLVMState &State, const Config &Cfg,
                                      size_t MinSize) {
-  const auto &Sections = Cfg.ProgramCfg->Sections;
+  const auto &Sections = Cfg.ProgramCfg.Sections;
   if (!Sections.hasSection(SectionsDescriptions::SelfcheckSectionName))
     return;
   auto &SelfcheckSection =
@@ -1214,7 +1224,7 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
   auto &TM = State.getTargetMachine();
   auto &CGLayout = PassCfg.CGLayout;
   if (PassCfg.ModelPluginConfig.runOnModel() &&
-      (ProgramCfg->InitialRegYamlFile.empty() && !InitRegsInElf))
+      (ProgramCfg.InitialRegYamlFile.empty() && !InitRegsInElf))
     snippy::warn(
         WarningName::NonReproducibleExecution,
         formatv("Execution on model without \"{0}\" option enabled will lead "
@@ -1229,7 +1239,7 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
     );
   if (std::holds_alternative<CallGraphLayout>(CGLayout))
     std::get<CallGraphLayout>(CGLayout).validate(Ctx);
-  const auto &Sections = ProgramCfg->Sections;
+  const auto &Sections = ProgramCfg.Sections;
   if (Sections.empty())
     fatal(Ctx, "Incorrect list of sections", "list is empty");
   if (Sections.generalRWSections().empty())
@@ -1325,9 +1335,9 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
                     "return address register is explicitly reserved.");
   }
 
-  if (auto &PreserveGroups = ProgramCfg->PreserveCallerSavedGroups;
+  if (auto &PreserveGroups = ProgramCfg.PreserveCallerSavedGroups;
       !PreserveGroups.empty()) {
-    if (!ProgramCfg->stackEnabled())
+    if (!ProgramCfg.stackEnabled())
       snippy::fatal(Ctx, "Cannot preserve requested caller-saved registers",
                     "no stack space allocated.");
 
@@ -1357,13 +1367,13 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
           "no external callee functions were specified.");
   }
 
-  auto SP = ProgramCfg->StackPointer;
-  if (llvm::any_of(ProgramCfg->SpilledToStack,
+  auto SP = ProgramCfg.StackPointer;
+  if (llvm::any_of(ProgramCfg.SpilledToStack,
                    [SP](auto Reg) { return Reg == SP; }))
     snippy::fatal("Stack pointer cannot be spilled. Remove it from "
                   "spill register list.");
-  if (!ProgramCfg->stackEnabled()) {
-    if (!ProgramCfg->SpilledToStack.empty())
+  if (!ProgramCfg.stackEnabled()) {
+    if (!ProgramCfg.SpilledToStack.empty())
       snippy::fatal(Ctx, "Cannot spill requested registers",
                     "no stack space allocated.");
 
@@ -1375,18 +1385,18 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
           "layout allows calls with depth>=1 but stack space is not provided.");
   }
 
-  if (ProgramCfg->ExternalStack) {
+  if (ProgramCfg.ExternalStack) {
     if (PassCfg.ModelPluginConfig.runOnModel())
       snippy::fatal(Ctx, "Cannot run snippet on model",
                     "external stack was enabled.");
-    if (ProgramCfg->Sections.hasSection(
+    if (ProgramCfg.Sections.hasSection(
             SectionsDescriptions::StackSectionName)) {
       snippy::warn(WarningName::InconsistentOptions, Ctx,
                    "Section 'stack' will not be used",
                    "external stack was enabled.");
     }
   }
-  if (ProgramCfg->Sections.hasSection(
+  if (ProgramCfg.Sections.hasSection(
           SectionsDescriptions::SelfcheckSectionName) &&
       CommonPolicyCfg->TrackCfg.Selfcheck)
     diagnoseSelfcheckSection(State, *this, getMinimumSelfcheckSize(*this));
@@ -1395,7 +1405,7 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
 void Config::complete(LLVMState &State, const OpcodeCache &OpCC) {
   // FIXME: section sorting must be done internally by ProgramConfig yaml
   // parser.
-  std::sort(ProgramCfg->Sections.begin(), ProgramCfg->Sections.end(),
+  std::sort(ProgramCfg.Sections.begin(), ProgramCfg.Sections.end(),
             [](auto &S1, auto &S2) { return S1.VMA < S2.VMA; });
 
   // Distribute information from unified histogram to different config parts.
@@ -1414,6 +1424,7 @@ void Config::complete(LLVMState &State, const OpcodeCache &OpCC) {
     return BurstOpcodes.count(Opc);
   };
   auto &DFHistogram = DefFlowConfig.DataFlowHistogram;
+  DFHistogram.clear();
   std::copy_if(Histogram.begin(), Histogram.end(),
                std::inserter(DFHistogram, DFHistogram.end()),
                [&](const auto &Hist) {
@@ -1597,6 +1608,9 @@ IncludePreprocessor::IncludePreprocessor(
   mergeFile(Filename,
             commentIncludes((*MemBufOrErr)->getBuffer(), SubFiles.size()));
 }
+
+IncludePreprocessor::IncludePreprocessor(StringRef YAMLText, LLVMContext &Ctx)
+    : PrimaryFilename("<in-memory>"), Text(YAMLText.str()) {}
 
 void Config::dump(raw_ostream &OS, const ConfigIOContext &Ctx) const {
   outputYAMLToStream(const_cast<Config &>(*this), OS,

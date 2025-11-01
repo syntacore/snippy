@@ -217,8 +217,9 @@ unsigned calcMaxBBDst(unsigned BB, unsigned NBlocks,
   return MaxBBDst;
 }
 
-auto calcBlocksLimit(unsigned BB, unsigned NBlocks, bool DoAutoMaxBBDistance,
-                     unsigned MaxBBDst, const Branchegram &BS) {
+std::pair<unsigned, unsigned> CFPermutationContext::calcBlocksLimit(
+    unsigned BB, unsigned NBlocks, bool DoAutoMaxBBDistance, unsigned MaxBBDst,
+    const Branchegram &BS) {
   // Loop branch has two more blocks with instructions between source and
   // destination PC comparing with if branch (it is first and last blocks).
   // Thus we need to decrease max distance of backward branch.
