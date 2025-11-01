@@ -1,0 +1,12 @@
+# RUN: not llvm-snippy %s -model-plugin None \
+# RUN: |& FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  honor-target-abi: on
+  enable-static-stack: on
+
+include:
+  - Inputs/sections-with-stack.yaml
+
+# CHECK: error: Incompatible options: When --honor-target-abi is enabled, option -enable-static-stack is not supported.

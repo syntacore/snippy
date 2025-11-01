@@ -1,18 +1,22 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=100 \
+# RUN: llvm-snippy %s -num-instrs=100 \
 # RUN: --num-instr-ancil=5 -o %t
 # RUN: llvm-objdump %t.elf -d |& FileCheck %s --check-prefix=DISABLED
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=1000 \
+# RUN: llvm-snippy %s -num-instrs=1000 \
 # RUN: --chained-rx-sections-fill --num-instr-ancil=50 -o %t
 # RUN: llvm-objdump %t.elf -d |& FileCheck %s --check-prefix=ENABLED
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=1000 \
+# RUN: llvm-snippy %s -num-instrs=1000 \
 # RUN: --chained-rx-sections-fill --chained-rx-sorted --num-instr-ancil=50 -o %t
 # RUN: llvm-objdump %t.elf -d |& FileCheck %s --check-prefix=SORTED
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=2500 \
+# RUN: not llvm-snippy %s -num-instrs=2500 \
 # RUN: --chained-rx-sections-fill --num-instr-ancil=200 |& \
 # RUN: FileCheck %s --check-prefix=SECONDARY-ERROR
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=4000 \
+# RUN: not llvm-snippy %s -num-instrs=4000 \
 # RUN: --chained-rx-sections-fill --num-instr-ancil=200 |& \
 # RUN: FileCheck %s --check-prefix=ROOT-ERROR
+
+options:
+  march: riscv64-linux-gnu
+  enable-static-stack: off
 
 sections:
   - no:        3

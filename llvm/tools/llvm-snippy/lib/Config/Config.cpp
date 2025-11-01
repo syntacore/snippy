@@ -465,10 +465,12 @@ static MCRegister getRealStackPointer(
     const ProgramOptions &Opts, bool HasSPRelativeInstrs) {
   auto SP = Tgt.getStackPointer();
   bool FollowTargetABI = Cfg.ProgramCfg->FollowTargetABI;
+  bool StaticStack = Cfg.ProgramCfg->StaticStack;
   std::string RedefineSP = Opts.RedefineSP;
 
   bool NotSPAndNotAny = RedefineSP != "SP" && RedefineSP != "any";
-  if (HasSPRelativeInstrs && Opts.RedefineSPSpecified && !NotSPAndNotAny)
+  if (!StaticStack && HasSPRelativeInstrs && Opts.RedefineSPSpecified &&
+      !NotSPAndNotAny)
     generateSPRelativeInstrsError(RedefineSP);
 
   if (FollowTargetABI) {
@@ -488,7 +490,8 @@ static MCRegister getRealStackPointer(
     return SP;
 
   MCRegister RealSP = MCRegister::NoRegister;
-  bool CanUseSP = RedefineSP != "any-not-SP" && !HasSPRelativeInstrs;
+  bool CanUseSP =
+      StaticStack || (RedefineSP != "any-not-SP" && !HasSPRelativeInstrs);
   const auto &SPRegClass = Tgt.getRegClassSuitableForSP(RI);
   auto BasicFilter = Tgt.filterSuitableRegsForStackPointer();
 
@@ -514,7 +517,7 @@ static MCRegister getRealStackPointer(
                   "explicitly reserved.\n",
                   RegStr));
 
-    if (Reg.value() == SP && HasSPRelativeInstrs)
+    if (!StaticStack && Reg.value() == SP && HasSPRelativeInstrs)
       generateSPRelativeInstrsError(RedefineSP);
 
     if (FullFilter(Reg.value()))
@@ -605,6 +608,61 @@ unsigned long long initializeRandomEngine(uint64_t SeedValue) {
   return SeedValue;
 }
 
+static bool getStaticStackValue(Config &Cfg, const OpcodeCache &OpCC,
+                                const ProgramOptions &Opts) {
+  if (Opts.StaticStackSpecified && !Opts.StaticStack)
+    return false;
+  auto &ProgCfg = *Cfg.ProgramCfg;
+  auto NumPrimaryInstrs =
+      getExpectedNumInstrs(copyOptionsToInstrGenOptions().NumInstrs);
+  auto HasStackSection =
+      ProgCfg.Sections.hasSection(SectionsDescriptions::StackSectionName);
+  auto StaticStack = !Opts.FollowTargetABI && HasStackSection &&
+                     !ProgCfg.ExternalStack &&
+                     !Cfg.PassCfg.hasExternalCallees() &&
+                     ProgCfg.PreserveCallerSavedGroups.empty() &&
+                     NumPrimaryInstrs && !Cfg.isLoopGenerationPossible(OpCC);
+  // If the option is not provided, then its value is auto-detected.
+  if (!Opts.StaticStackSpecified)
+    return StaticStack;
+  if (Opts.FollowTargetABI)
+    snippy::fatal(
+        "Incompatible options",
+        "When --honor-target-abi is enabled, option -enable-static-stack "
+        "is not supported.");
+  if (!HasStackSection)
+    snippy::fatal(
+        "Incompatible options",
+        "When section 'stack' is not provided, option -enable-static-stack "
+        "is not supported.");
+  if (ProgCfg.ExternalStack)
+    snippy::fatal(
+        "Incompatible options",
+        "When external stack is provided, option -enable-static-stack "
+        "is not supported.");
+  if (Cfg.PassCfg.hasExternalCallees())
+    snippy::fatal(
+        "Incompatible options",
+        "When external functions are provided, option -enable-static-stack "
+        "is not supported.");
+  if (!ProgCfg.PreserveCallerSavedGroups.empty())
+    snippy::fatal("Incompatible options",
+                  "When PreserveCallerSavedGroups is not empty, option "
+                  "-enable-static-stack "
+                  "is not supported.");
+  if (!NumPrimaryInstrs)
+    snippy::fatal(
+        "Incompatible options",
+        "When -num-instrs=all is specified, option -enable-static-stack "
+        "is not supported.");
+  if (Cfg.isLoopGenerationPossible(OpCC))
+    snippy::fatal(
+        "Incompatible options",
+        "When loop generation is possible, option -enable-static-stack "
+        "is not supported.");
+  return true;
+}
+
 static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
                                          RegPoolWrapper &RP,
                                          const OpcodeCache &OpCC,
@@ -617,6 +675,7 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
   ProgCfg.EntryPointName = Opts.EntryPointName;
   ProgCfg.ExternalStack = Opts.ExternalStack;
   ProgCfg.SkipLegacySPSpill = Opts.SkipLegacySPSpill;
+  ProgCfg.StaticStack = getStaticStackValue(Cfg, OpCC, Opts);
   ProgCfg.InitialRegYamlFile = Opts.InitialRegisterDataFile;
   ProgCfg.Seed = seedOptToValue(Opts.Seed);
   // FIXME: RandomEngine initialization should be moved out of Config as well
@@ -714,7 +773,7 @@ static Error normalizeInstrGenOptions(Config &Cfg, LLVMState &State,
     snippy::fatal(State.getCtx(),
                   "Cannot use '" + Twine(ChainedRXChunkSize.ArgStr) +
                       "' option",
-                  "num-instr is set to 'all'");
+                  "num-instrs is set to 'all'");
   if (Opts.ChainedRXChunkSize && !InstrsCfg.ChainedRXSectionsFill)
     snippy::warn(WarningName::InconsistentOptions, State.getCtx(),
                  "'" + Twine(ChainedRXChunkSize.ArgStr) + "' is ignored",
@@ -1028,7 +1087,7 @@ static void checkCompatibilityWithValuegramPolicy(const Config &Cfg,
   bool FillCodeSectionMode = !Cfg.PassCfg.InstrsGenerationConfig.NumInstrs;
   if (FillCodeSectionMode)
     snippy::fatal(Ctx, "Incompatible options",
-                  "When -num-instr=all is specified, initializing "
+                  "When -num-instrs=all is specified, initializing "
                   "registers after each instruction is not supported.");
   if (Cfg.BurstConfig && Cfg.BurstConfig->Burst.Mode != BurstMode::Basic)
     snippy::fatal(
@@ -1088,19 +1147,19 @@ static void checkFullSizeGenerationRequirements(const MCInstrInfo &II,
         return Desc.isBranch();
       }) > 0.0)
     snippy::fatal(
-        "when -num-instr=all is specified, branches are not supported");
+        "when -num-instrs=all is specified, branches are not supported");
   if (FillCodeSectionMode &&
       Cfg.Histogram.getOpcodesWeight(
           [&Tgt](unsigned Opcode) { return Tgt.isCall(Opcode); }) > 0.0)
-    snippy::fatal("when -num-instr=all is specified, calls are not supported");
+    snippy::fatal("when -num-instrs=all is specified, calls are not supported");
 
   if (FillCodeSectionMode && Cfg.CommonPolicyCfg->TrackCfg.Selfcheck)
     snippy::fatal(
-        "when -num-instr=all is specified, selfcheck is not supported");
+        "when -num-instrs=all is specified, selfcheck is not supported");
   if (FillCodeSectionMode && Cfg.BurstConfig &&
       Cfg.BurstConfig->Burst.Mode != BurstMode::Basic)
     snippy::fatal(
-        "when -num-instr=all is specified, burst mode is not supported");
+        "when -num-instrs=all is specified, burst mode is not supported");
 }
 
 static size_t getMinimumSelfcheckSize(const Config &Cfg) {
@@ -1120,7 +1179,7 @@ static size_t getMinimumSelfcheckSize(const Config &Cfg) {
 
 static void diagnoseSelfcheckSection(LLVMState &State, const Config &Cfg,
                                      size_t MinSize) {
-  auto &Sections = Cfg.ProgramCfg->Sections;
+  const auto &Sections = Cfg.ProgramCfg->Sections;
   if (!Sections.hasSection(SectionsDescriptions::SelfcheckSectionName))
     return;
   auto &SelfcheckSection =

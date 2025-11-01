@@ -1,0 +1,36 @@
+# COM: This test checks that caller-saved registers are spilled to stack before
+#      call instruction and reloaded after the call.
+
+# RUN: llvm-snippy %s -model-plugin None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64-unknown-elf
+  num-instrs: 1000
+  init-regs-in-elf: true
+  function-layers: 5
+  function-number: 10
+  num-instr-ancil: 10
+  redefine-sp: "reg::X11"
+  dump-mf: on
+
+include:
+  - Inputs/sections-with-stack.yaml
+
+histogram:
+    - [SUB, 1.0]
+    - [JAL, 0.1]
+    - [JALR, 0.1]
+
+#          An example of what we're matching. Spill and reload caller-saved x31:
+#
+#                     $x12 = ADDI $x12, -16
+#                     SD $x31, $x12, 0
+#                     $x20 = AUIPC target-flags(riscv-pcrel-hi) @fun2
+#                     $x20 = ADDI $x20
+#                     PseudoCALLIndirect $x20, implicit-def $x1
+#                     $x7 = LUI 64
+#                     $x7 = ADDIW $x7, -768
+#                     $x31 = LD $x7, 0
+
+# CHECK: {{ADDI.*[[:space:]].*SD.*[[:space:]].*AUIPC.*[[:space:]].*ADDI.*[[:space:]].*PseudoCALLIndirect.*[[:space:]].*LUI.*[[:space:]].*ADDIW.*[[:space:]].*LD}}

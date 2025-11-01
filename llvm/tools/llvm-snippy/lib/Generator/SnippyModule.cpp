@@ -93,6 +93,12 @@ void SnippyProgramContext::initializeROMSection(const ProgramConfig &Settings) {
     ROMSectionManager = std::make_unique<MonoAllocatableSection>(*ROMSection);
 }
 
+void SnippyProgramContext::initializeStaticStack(
+    const ProgramConfig &Settings) {
+  if (Settings.StaticStack)
+    StaticStack = std::make_unique<StaticStackContext>();
+}
+
 void SnippyProgramContext::initializeUtilitySection(
     const ProgramConfig &Settings) {
   auto &Ctx = State->getCtx();
@@ -287,6 +293,7 @@ SnippyProgramContext::SnippyProgramContext(LLVMState &State,
   initializeSelfcheckSection(Settings);
   initializeUtilitySection(Settings);
   initializeROMSection(Settings);
+  initializeStaticStack(Settings);
 }
 
 void SnippyProgramContext::createTargetContext(const Config &Cfg,
