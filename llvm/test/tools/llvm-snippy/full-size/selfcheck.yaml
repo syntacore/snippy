@@ -26,4 +26,4 @@ histogram:
     - [ADD, 1.0]
     - [ADDI, 1.0]
 
-# CHECK: when -num-instr=all is specified, selfcheck is not supported
+# CHECK: when -num-instrs=all is specified, selfcheck is not supported

@@ -9,7 +9,7 @@
 sections:
   - no:        1
     VMA:       0x210000
-    SIZE:      0x1000
+    SIZE:      0x10000
     LMA:       0x210000
     ACCESS:    rx
   - no:        2

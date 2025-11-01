@@ -66,7 +66,7 @@ bool ReserveRegs::runOnModule(Module &M) {
                     .get();
   const auto &ProgCtx = SGCtx.getProgramContext();
 
-  if (!ProgCtx.stackEnabled())
+  if (!ProgCtx.stackEnabled() || ProgCtx.getConfig().StaticStack)
     return false;
 
   auto StackPointer = ProgCtx.getStackPointer();

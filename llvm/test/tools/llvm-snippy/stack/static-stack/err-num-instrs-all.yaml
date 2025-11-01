@@ -1,0 +1,12 @@
+# RUN: not llvm-snippy %s -model-plugin None \
+# RUN: |& FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  num-instrs: all
+  enable-static-stack: on
+
+include:
+  - Inputs/sections-with-stack.yaml
+
+# CHECK: error: Incompatible options: When -num-instrs=all is specified, option -enable-static-stack is not supported.
