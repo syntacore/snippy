@@ -1,0 +1,16 @@
+sections:
+  - no: 1
+    VMA: 0x10000
+    LMA: 0x10000
+    SIZE: 0x10000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x20000
+    LMA: 0x20000
+    SIZE: 0x10000
+    ACCESS: rw
+  - name: stack
+    ACCESS: rw
+    VMA: 0x30000
+    LMA: 0x30000
+    SIZE: 0x10000

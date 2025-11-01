@@ -23,4 +23,4 @@ burst:
   mode: mixed
   min-size: 3
   max-size: 3
-# CHECK: when -num-instr=all is specified, burst mode is not supported
+# CHECK: when -num-instrs=all is specified, burst mode is not supported

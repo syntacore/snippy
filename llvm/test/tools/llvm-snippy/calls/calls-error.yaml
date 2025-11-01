@@ -59,4 +59,4 @@ histogram:
 # ZERO-LAYER: error: Invalid number of function layers: expected >=1
 # ZERO-FUN: error: Invalid number of functions: expected >=1
 # RA-RES: error: Cannot generate requested call instructions: return address register is explicitly reserved.
-# ALL: error: when -num-instr=all is specified, calls are not supported
+# ALL: error: when -num-instrs=all is specified, calls are not supported

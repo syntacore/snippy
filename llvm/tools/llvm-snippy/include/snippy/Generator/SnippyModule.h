@@ -126,6 +126,84 @@ private:
   std::vector<std::unique_ptr<GenResult>> Results;
 };
 
+// How does the static stack work?
+// It reserves a part of stack for every function and each of them saves values
+// to the predefined addresses in any call.
+//
+// 1. MFi started spilling on stack. The SPAddrLocal is decremented.
+//  ________
+// | MFi-1  |
+// |========|
+// |  MFi   |
+// |________|
+// |________| <- SPAddrLocal
+//
+// 2. MFi finished spilling and SPAddrGlobal was set at SPAddrLocal.
+//  ________
+// | MFi-1  |
+// |========|
+// |  MFi   |
+// |  ...   |
+// |________| <- SPAddrLocal, SPAddrGlobal
+//
+// 3. MFi started reloading from stack
+//  ________
+// | MFi-1  |
+// |========|
+// |  MFi   |
+// |  ...   |
+// |________| <- SPAddrLocal
+// |  ...   |
+// |________| <- SPAddrGlobal
+//
+// 4. MFi+1 started spilling on stack. SPAddrLocal is set to SPAddrGlobal.
+//    Step 1 is repeated.
+//  ________
+// | MFi-1  |
+// |========|
+// |  MFi   |
+// |========| <- SPAddrGlobal, SPAddrLocal
+// | MFi+1  |
+// |________|
+class StaticStackContext final {
+public:
+  void reset() {
+    SPAddrLocal = std::nullopt;
+    RegWithSPAddrLocal = std::nullopt;
+  }
+  void setSPAddrGlobal(size_t Addr) { SPAddrGlobal = Addr; }
+  void passSPAddr() {
+    SPAddrGlobal = getSPAddrLocal();
+    RegWithSPAddrLocal = std::nullopt;
+  }
+  void setSPAddrLocal(size_t SPAddr) { SPAddrLocal = SPAddr; }
+  void setRegWithSPAddrLocal(MCRegister Reg) { RegWithSPAddrLocal = Reg; }
+  void resetRegWithSPAddrLocal() { RegWithSPAddrLocal = std::nullopt; }
+
+  bool isSPInReg() const { return RegWithSPAddrLocal != std::nullopt; }
+  size_t getSPAddrGlobal() const {
+    assert(SPAddrGlobal);
+    return *SPAddrGlobal;
+  }
+  size_t getSPAddrLocal() const {
+    assert(SPAddrLocal);
+    return *SPAddrLocal;
+  }
+  MCRegister getRegWithSPAddrLocal() const {
+    assert(isSPInReg());
+    return *RegWithSPAddrLocal;
+  }
+
+private:
+  std::optional<size_t> SPAddrLocal;
+  std::optional<size_t> SPAddrGlobal;
+
+  // This field is needed to optimize the stack operation. Here is the register
+  // in which SPAddrLocal is written. This register can be used to access the
+  // stack.
+  std::optional<MCRegister> RegWithSPAddrLocal;
+};
+
 class SnippyProgramContext final {
 public:
   SnippyProgramContext(LLVMState &State, RegisterGenerator &RegGen,
@@ -242,6 +320,11 @@ public:
     return *TargetContext;
   }
 
+  StaticStackContext &getStaticStack() const {
+    assert(StaticStack && "no static stack");
+    return *StaticStack;
+  }
+
   // TODO: We should define a subset of Config that is enough for
   // TargetContext initialization.
   void createTargetContext(const Config &Cfg, const TargetSubtargetInfo &STI);
@@ -252,6 +335,7 @@ private:
   void initializeSelfcheckSection(const ProgramConfig &Settings);
   void initializeUtilitySection(const ProgramConfig &Settings);
   void initializeROMSection(const ProgramConfig &Settings);
+  void initializeStaticStack(const ProgramConfig &Settings);
 
   const ProgramConfig *Cfg;
   LLVMState *State = nullptr;
@@ -271,6 +355,7 @@ private:
   std::unique_ptr<ProgramGlobalStateKeeper> PGSK;
   std::map<Module *, std::unique_ptr<GlobalsPool>> PerModuleGPs;
   std::unique_ptr<TargetGenContextInterface> TargetContext;
+  std::unique_ptr<StaticStackContext> StaticStack;
 
   MCRegister StackPointer;
   bool MangleExportedNames;

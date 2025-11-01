@@ -1,0 +1,47 @@
+# COM: This test checks that possible to generate SP-based instructions with
+#      -redefine-sp=<stack_pointer> when static stack is enabled.
+
+# RUN: llvm-snippy %s -redefine-sp=reg::X2 -model-plugin None \
+# RUN: |& FileCheck %s
+#
+# RUN: llvm-snippy %s -redefine-sp=SP -model-plugin None \
+# RUN: |& FileCheck %s
+
+# RUN: llvm-snippy %s -redefine-sp=any -model-plugin None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64-unknown-elf
+  num-instrs: 100
+  init-regs-in-elf: true
+  mattr: "+c,+f,+d"
+  enable-static-stack: on
+  function-layers: 5
+  function-number: 10
+  num-instr-ancil: 10
+  dump-mf: on
+
+include:
+  - Inputs/sections-with-stack.yaml
+
+histogram:
+    - [JAL, 5.0]
+    - [JALR, 5.0]
+    - [C_ADDI16SP, 1.0]
+    - [C_ADDI4SPN, 1.0]
+    - [C_FLDSP, 1.0]
+    - [C_FSDSP, 1.0]
+    - [C_LDSP, 1.0]
+    - [C_LWSP, 1.0]
+    - [C_SDSP, 1.0]
+    - [C_SWSP, 1.0]
+
+# CHECK-COUNT-3: PseudoCALL
+# CHECK: C_ADDI16SP
+# CHECK: C_ADDI4SPN
+# CHECK: C_FLDSP
+# CHECK: C_FSDSP
+# CHECK: C_LDSP
+# CHECK: C_LWSP
+# CHECK: C_SDSP
+# CHECK: C_SWSP

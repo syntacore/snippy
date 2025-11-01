@@ -81,6 +81,10 @@ let Group = ProgramOptionsCategory in {
       : Flag<"skip-legacy-sp-spill">,
         Description<"Skips legacy stack pointer spill when 'honor-target-abi' is disabled">,
         Hidden;
+
+  def StaticStack
+      : Flag<"enable-static-stack">,
+        Description<"Allows to statically calculate stack areas for each function and not use the stack pointer register to get the stack address, leave empty to autodetect">;
 }
 
 def ModelOptionsCategory : OptionGroup<"Snippy Model Options", true> {
