@@ -1,0 +1,107 @@
+# generated with isa-tests-gen.sh, to regenerate run:
+# isa-tests-gen.sh --march rv32i_zhinx_zfinx --mtriple riscv32 --extensions zfinx\ +\ zhinx --include Inputs/no-fpu-overwrite.yaml --ignore-opcode-regex \^FCVT_D\|\^FCVT_H_D
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail
+include:
+  - "Inputs/sections.yaml"
+  - "Inputs/no-fpu-overwrite.yaml"
+options:
+  march: rv32i_zhinx_zfinx
+  mtriple: riscv32
+  num-instrs: 1000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+histogram:
+  - [FADD_H_INX, 1.0]
+  - [FADD_S_INX, 1.0]
+  - [FCLASS_H_INX, 1.0]
+  - [FCLASS_S_INX, 1.0]
+  - [FCVT_H_S_INX, 1.0]
+  - [FCVT_H_WU_INX, 1.0]
+  - [FCVT_H_W_INX, 1.0]
+  - [FCVT_S_H_INX, 1.0]
+  - [FCVT_S_WU_INX, 1.0]
+  - [FCVT_S_W_INX, 1.0]
+  - [FCVT_WU_H_INX, 1.0]
+  - [FCVT_WU_S_INX, 1.0]
+  - [FCVT_W_H_INX, 1.0]
+  - [FCVT_W_S_INX, 1.0]
+  - [FDIV_H_INX, 1.0]
+  - [FDIV_S_INX, 1.0]
+  - [FEQ_H_INX, 1.0]
+  - [FEQ_S_INX, 1.0]
+  - [FLE_H_INX, 1.0]
+  - [FLE_S_INX, 1.0]
+  - [FLT_H_INX, 1.0]
+  - [FLT_S_INX, 1.0]
+  - [FMADD_H_INX, 1.0]
+  - [FMADD_S_INX, 1.0]
+  - [FMAX_H_INX, 1.0]
+  - [FMAX_S_INX, 1.0]
+  - [FMIN_H_INX, 1.0]
+  - [FMIN_S_INX, 1.0]
+  - [FMSUB_H_INX, 1.0]
+  - [FMSUB_S_INX, 1.0]
+  - [FMUL_H_INX, 1.0]
+  - [FMUL_S_INX, 1.0]
+  - [FNMADD_H_INX, 1.0]
+  - [FNMADD_S_INX, 1.0]
+  - [FNMSUB_H_INX, 1.0]
+  - [FNMSUB_S_INX, 1.0]
+  - [FSGNJN_H_INX, 1.0]
+  - [FSGNJN_S_INX, 1.0]
+  - [FSGNJX_H_INX, 1.0]
+  - [FSGNJX_S_INX, 1.0]
+  - [FSGNJ_H_INX, 1.0]
+  - [FSGNJ_S_INX, 1.0]
+  - [FSQRT_H_INX, 1.0]
+  - [FSQRT_S_INX, 1.0]
+  - [FSUB_H_INX, 1.0]
+  - [FSUB_S_INX, 1.0]
+
+# CHECK-DAG: FADD_H_INX
+# CHECK-DAG: FADD_S_INX
+# CHECK-DAG: FCLASS_H_INX
+# CHECK-DAG: FCLASS_S_INX
+# CHECK-DAG: FCVT_H_S_INX
+# CHECK-DAG: FCVT_H_WU_INX
+# CHECK-DAG: FCVT_H_W_INX
+# CHECK-DAG: FCVT_S_H_INX
+# CHECK-DAG: FCVT_S_WU_INX
+# CHECK-DAG: FCVT_S_W_INX
+# CHECK-DAG: FCVT_WU_H_INX
+# CHECK-DAG: FCVT_WU_S_INX
+# CHECK-DAG: FCVT_W_H_INX
+# CHECK-DAG: FCVT_W_S_INX
+# CHECK-DAG: FDIV_H_INX
+# CHECK-DAG: FDIV_S_INX
+# CHECK-DAG: FEQ_H_INX
+# CHECK-DAG: FEQ_S_INX
+# CHECK-DAG: FLE_H_INX
+# CHECK-DAG: FLE_S_INX
+# CHECK-DAG: FLT_H_INX
+# CHECK-DAG: FLT_S_INX
+# CHECK-DAG: FMADD_H_INX
+# CHECK-DAG: FMADD_S_INX
+# CHECK-DAG: FMAX_H_INX
+# CHECK-DAG: FMAX_S_INX
+# CHECK-DAG: FMIN_H_INX
+# CHECK-DAG: FMIN_S_INX
+# CHECK-DAG: FMSUB_H_INX
+# CHECK-DAG: FMSUB_S_INX
+# CHECK-DAG: FMUL_H_INX
+# CHECK-DAG: FMUL_S_INX
+# CHECK-DAG: FNMADD_H_INX
+# CHECK-DAG: FNMADD_S_INX
+# CHECK-DAG: FNMSUB_H_INX
+# CHECK-DAG: FNMSUB_S_INX
+# CHECK-DAG: FSGNJN_H_INX
+# CHECK-DAG: FSGNJN_S_INX
+# CHECK-DAG: FSGNJX_H_INX
+# CHECK-DAG: FSGNJX_S_INX
+# CHECK-DAG: FSGNJ_H_INX
+# CHECK-DAG: FSGNJ_S_INX
+# CHECK-DAG: FSQRT_H_INX
+# CHECK-DAG: FSQRT_S_INX
+# CHECK-DAG: FSUB_H_INX
+# CHECK-DAG: FSUB_S_INX
