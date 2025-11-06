@@ -3005,6 +3005,8 @@ Example snippy run:
 
 
 
+.. _`_rvv_configuration_dump`:
+
 RVV Configuration Dump
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -3191,6 +3193,7 @@ Self-check for RVV is currently in the experimental state. To enable it:
 ::
 
    --enable-selfcheck-rvv
+
 
 Self-check Properties to Global Variables
 -----------------------------------------
