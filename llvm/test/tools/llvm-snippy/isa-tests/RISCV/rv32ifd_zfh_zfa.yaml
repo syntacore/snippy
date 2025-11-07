@@ -1,0 +1,63 @@
+# generated with isa-tests-gen.sh, to regenerate run:
+# isa-tests-gen.sh --march rv32ifd_zfh_zfa --mtriple riscv32 --extensions zfa\ -\ c\ -\ f --include Inputs/no-fpu-overwrite.yaml
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail
+include:
+  - "Inputs/sections.yaml"
+  - "Inputs/no-fpu-overwrite.yaml"
+options:
+  march: rv32ifd_zfh_zfa
+  mtriple: riscv32
+  num-instrs: 1000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+histogram:
+  - [FCVTMOD_W_D, 1.0]
+  - [FLEQ_D, 1.0]
+  - [FLEQ_H, 1.0]
+  - [FLEQ_S, 1.0]
+  - [FLI_D, 1.0]
+  - [FLI_H, 1.0]
+  - [FLI_S, 1.0]
+  - [FLTQ_D, 1.0]
+  - [FLTQ_H, 1.0]
+  - [FLTQ_S, 1.0]
+  - [FMAXM_D, 1.0]
+  - [FMAXM_H, 1.0]
+  - [FMAXM_S, 1.0]
+  - [FMINM_D, 1.0]
+  - [FMINM_H, 1.0]
+  - [FMINM_S, 1.0]
+  - [FMVH_X_D, 1.0]
+  - [FMVP_D_X, 1.0]
+  - [FROUNDNX_D, 1.0]
+  - [FROUNDNX_H, 1.0]
+  - [FROUNDNX_S, 1.0]
+  - [FROUND_D, 1.0]
+  - [FROUND_H, 1.0]
+  - [FROUND_S, 1.0]
+
+# CHECK-DAG: FCVTMOD_W_D
+# CHECK-DAG: FLEQ_D
+# CHECK-DAG: FLEQ_H
+# CHECK-DAG: FLEQ_S
+# CHECK-DAG: FLI_D
+# CHECK-DAG: FLI_H
+# CHECK-DAG: FLI_S
+# CHECK-DAG: FLTQ_D
+# CHECK-DAG: FLTQ_H
+# CHECK-DAG: FLTQ_S
+# CHECK-DAG: FMAXM_D
+# CHECK-DAG: FMAXM_H
+# CHECK-DAG: FMAXM_S
+# CHECK-DAG: FMINM_D
+# CHECK-DAG: FMINM_H
+# CHECK-DAG: FMINM_S
+# CHECK-DAG: FMVH_X_D
+# CHECK-DAG: FMVP_D_X
+# CHECK-DAG: FROUNDNX_D
+# CHECK-DAG: FROUNDNX_H
+# CHECK-DAG: FROUNDNX_S
+# CHECK-DAG: FROUND_D
+# CHECK-DAG: FROUND_H
+# CHECK-DAG: FROUND_S
