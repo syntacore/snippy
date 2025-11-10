@@ -1,0 +1,96 @@
+# generated with isa-tests-gen.sh, to regenerate run:
+# isa-tests-gen.sh --march rv64ifd_zca_zcd --mtriple riscv64 --extensions zca\ +\ zcf\&c\ +\ zcd\&c --ignore-opcode-regex \^C_\(J\|JR\|JALR\|UNIMP\|BEQZ\|BNEZ\|EBREAK\)\$
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail
+include:
+  - "Inputs/sections.yaml"
+options:
+  march: rv64ifd_zca_zcd
+  mtriple: riscv64
+  num-instrs: 1000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+histogram:
+  - [C_ADD, 1.0]
+  - [C_ADDI, 1.0]
+  - [C_ADDI16SP, 1.0]
+  - [C_ADDI4SPN, 1.0]
+  - [C_ADDIW, 1.0]
+  - [C_ADDI_HINT_IMM_ZERO, 1.0]
+  - [C_ADDW, 1.0]
+  - [C_ADD_HINT, 1.0]
+  - [C_AND, 1.0]
+  - [C_ANDI, 1.0]
+  - [C_FLD, 1.0]
+  - [C_FLDSP, 1.0]
+  - [C_FSD, 1.0]
+  - [C_FSDSP, 1.0]
+  - [C_LD, 1.0]
+  - [C_LDSP, 1.0]
+  - [C_LI, 1.0]
+  - [C_LI_HINT, 1.0]
+  - [C_LUI, 1.0]
+  - [C_LUI_HINT, 1.0]
+  - [C_LW, 1.0]
+  - [C_LWSP, 1.0]
+  - [C_MV, 1.0]
+  - [C_MV_HINT, 1.0]
+  - [C_NOP, 1.0]
+  - [C_NOP_HINT, 1.0]
+  - [C_OR, 1.0]
+  - [C_SD, 1.0]
+  - [C_SDSP, 1.0]
+  - [C_SLLI, 1.0]
+  - [C_SLLI64_HINT, 1.0]
+  - [C_SLLI_HINT, 1.0]
+  - [C_SRAI, 1.0]
+  - [C_SRAI64_HINT, 1.0]
+  - [C_SRLI, 1.0]
+  - [C_SRLI64_HINT, 1.0]
+  - [C_SUB, 1.0]
+  - [C_SUBW, 1.0]
+  - [C_SW, 1.0]
+  - [C_SWSP, 1.0]
+  - [C_XOR, 1.0]
+
+# CHECK-DAG: C_ADD
+# CHECK-DAG: C_ADDI
+# CHECK-DAG: C_ADDI16SP
+# CHECK-DAG: C_ADDI4SPN
+# CHECK-DAG: C_ADDIW
+# CHECK-DAG: C_ADDI_HINT_IMM_ZERO
+# CHECK-DAG: C_ADDW
+# CHECK-DAG: C_ADD_HINT
+# CHECK-DAG: C_AND
+# CHECK-DAG: C_ANDI
+# CHECK-DAG: C_FLD
+# CHECK-DAG: C_FLDSP
+# CHECK-DAG: C_FSD
+# CHECK-DAG: C_FSDSP
+# CHECK-DAG: C_LD
+# CHECK-DAG: C_LDSP
+# CHECK-DAG: C_LI
+# CHECK-DAG: C_LI_HINT
+# CHECK-DAG: C_LUI
+# CHECK-DAG: C_LUI_HINT
+# CHECK-DAG: C_LW
+# CHECK-DAG: C_LWSP
+# CHECK-DAG: C_MV
+# CHECK-DAG: C_MV_HINT
+# CHECK-DAG: C_NOP
+# CHECK-DAG: C_NOP_HINT
+# CHECK-DAG: C_OR
+# CHECK-DAG: C_SD
+# CHECK-DAG: C_SDSP
+# CHECK-DAG: C_SLLI
+# CHECK-DAG: C_SLLI64_HINT
+# CHECK-DAG: C_SLLI_HINT
+# CHECK-DAG: C_SRAI
+# CHECK-DAG: C_SRAI64_HINT
+# CHECK-DAG: C_SRLI
+# CHECK-DAG: C_SRLI64_HINT
+# CHECK-DAG: C_SUB
+# CHECK-DAG: C_SUBW
+# CHECK-DAG: C_SW
+# CHECK-DAG: C_SWSP
+# CHECK-DAG: C_XOR

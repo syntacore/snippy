@@ -380,7 +380,7 @@ inline bool isLrInstr(unsigned Opcode) {
 #undef ATOMIC_INST_PLACER
 
 inline bool isAtomicAMO(unsigned Opcode) {
-  return (Opcode >= RISCV::AMOADD_D && Opcode <= RISCV::AMOXOR_W_RL);
+  return (Opcode >= RISCV::AMOADD_B && Opcode <= RISCV::AMOXOR_W_RL);
 }
 
 // TODO: temporary and brittle classifier, re-implement
