@@ -3534,12 +3534,16 @@ RISC-V architecture is supported with the following extensions
 - **Zicas** - Custom Atomic Operations
 - **Zicmop** - Custom Memory Operations
 - **Zimop** - Custom Integer Operations
+- **Zicboz** - Cache-Block Zero Instructions
+- **Zicbom** - Cache-Block Management Instructions
+- **Zicbop** - Cache-Block Prefetch Instructions
 - **Zihintntl** - Non-Temporal Locality Hints
 
 **Za* Extensions**
 
 - **Zaamo** - Custom AMO (Atomic Memory Operations) Extension
 - **Zabha** - Custom Byte-Hostile Atomic Extension
+- **Zacas** - Atomic Compare-and-Swap (CAS) Instructions
 
 **Zba* Extensions**
 

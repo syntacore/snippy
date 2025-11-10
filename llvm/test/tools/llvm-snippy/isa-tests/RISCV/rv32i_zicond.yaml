@@ -1,0 +1,18 @@
+# generated with isa-tests-gen.sh, to regenerate run:
+# isa-tests-gen.sh --march rv32i_zicond --mtriple riscv32 --extensions zicond
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail
+include:
+  - "Inputs/sections.yaml"
+options:
+  march: rv32i_zicond
+  mtriple: riscv32
+  num-instrs: 1000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+histogram:
+  - [CZERO_EQZ, 1.0]
+  - [CZERO_NEZ, 1.0]
+
+# CHECK-DAG: CZERO_EQZ
+# CHECK-DAG: CZERO_NEZ

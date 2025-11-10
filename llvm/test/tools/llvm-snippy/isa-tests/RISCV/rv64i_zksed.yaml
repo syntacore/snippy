@@ -1,0 +1,18 @@
+# generated with isa-tests-gen.sh, to regenerate run:
+# isa-tests-gen.sh --march rv64i_zksed --mtriple riscv64 --extensions zksed
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail
+include:
+  - "Inputs/sections.yaml"
+options:
+  march: rv64i_zksed
+  mtriple: riscv64
+  num-instrs: 1000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+histogram:
+  - [SM4ED, 1.0]
+  - [SM4KS, 1.0]
+
+# CHECK-DAG: SM4ED
+# CHECK-DAG: SM4KS

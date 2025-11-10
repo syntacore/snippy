@@ -1,0 +1,96 @@
+# generated with isa-tests-gen.sh, to regenerate run:
+# isa-tests-gen.sh --march rv64i_zba_zbb_zbc_zbs --mtriple riscv64 --extensions zba\ +\ zbb\ +\ zbc\ +\ zbs\ -\ zcb
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail
+include:
+  - "Inputs/sections.yaml"
+options:
+  march: rv64i_zba_zbb_zbc_zbs
+  mtriple: riscv64
+  num-instrs: 1000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+histogram:
+  - [ADD_UW, 1.0]
+  - [ANDN, 1.0]
+  - [BCLR, 1.0]
+  - [BCLRI, 1.0]
+  - [BEXT, 1.0]
+  - [BEXTI, 1.0]
+  - [BINV, 1.0]
+  - [BINVI, 1.0]
+  - [BSET, 1.0]
+  - [BSETI, 1.0]
+  - [CLMUL, 1.0]
+  - [CLMULH, 1.0]
+  - [CLMULR, 1.0]
+  - [CLZ, 1.0]
+  - [CLZW, 1.0]
+  - [CPOP, 1.0]
+  - [CPOPW, 1.0]
+  - [CTZ, 1.0]
+  - [CTZW, 1.0]
+  - [MAXU, 1.0]
+  - [MINU, 1.0]
+  - [ORC_B, 1.0]
+  - [ORN, 1.0]
+  - [REV8_RV64, 1.0]
+  - [ROL, 1.0]
+  - [ROLW, 1.0]
+  - [ROR, 1.0]
+  - [RORI, 1.0]
+  - [RORIW, 1.0]
+  - [RORW, 1.0]
+  - [SEXT_B, 1.0]
+  - [SEXT_H, 1.0]
+  - [SH1ADD, 1.0]
+  - [SH1ADD_UW, 1.0]
+  - [SH2ADD, 1.0]
+  - [SH2ADD_UW, 1.0]
+  - [SH3ADD, 1.0]
+  - [SH3ADD_UW, 1.0]
+  - [SLLI_UW, 1.0]
+  - [XNOR, 1.0]
+  - [ZEXT_H_RV64, 1.0]
+
+# CHECK-DAG: ADD_UW
+# CHECK-DAG: ANDN
+# CHECK-DAG: BCLR
+# CHECK-DAG: BCLRI
+# CHECK-DAG: BEXT
+# CHECK-DAG: BEXTI
+# CHECK-DAG: BINV
+# CHECK-DAG: BINVI
+# CHECK-DAG: BSET
+# CHECK-DAG: BSETI
+# CHECK-DAG: CLMUL
+# CHECK-DAG: CLMULH
+# CHECK-DAG: CLMULR
+# CHECK-DAG: CLZ
+# CHECK-DAG: CLZW
+# CHECK-DAG: CPOP
+# CHECK-DAG: CPOPW
+# CHECK-DAG: CTZ
+# CHECK-DAG: CTZW
+# CHECK-DAG: MAXU
+# CHECK-DAG: MINU
+# CHECK-DAG: ORC_B
+# CHECK-DAG: ORN
+# CHECK-DAG: REV8_RV64
+# CHECK-DAG: ROL
+# CHECK-DAG: ROLW
+# CHECK-DAG: ROR
+# CHECK-DAG: RORI
+# CHECK-DAG: RORIW
+# CHECK-DAG: RORW
+# CHECK-DAG: SEXT_B
+# CHECK-DAG: SEXT_H
+# CHECK-DAG: SH1ADD
+# CHECK-DAG: SH1ADD_UW
+# CHECK-DAG: SH2ADD
+# CHECK-DAG: SH2ADD_UW
+# CHECK-DAG: SH3ADD
+# CHECK-DAG: SH3ADD_UW
+# CHECK-DAG: SLLI_UW
+# CHECK-DAG: XNOR
+# CHECK-DAG: ZEXT_H_RV64

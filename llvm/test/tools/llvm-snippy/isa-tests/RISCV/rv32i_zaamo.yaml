@@ -1,0 +1,86 @@
+# generated with isa-tests-gen.sh, to regenerate run:
+# isa-tests-gen.sh --march rv32i_zaamo --mtriple riscv32 --extensions zaamo
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail
+include:
+  - "Inputs/sections.yaml"
+options:
+  march: rv32i_zaamo
+  mtriple: riscv32
+  num-instrs: 1000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+histogram:
+  - [AMOADD_W, 1.0]
+  - [AMOADD_W_AQ, 1.0]
+  - [AMOADD_W_AQ_RL, 1.0]
+  - [AMOADD_W_RL, 1.0]
+  - [AMOAND_W, 1.0]
+  - [AMOAND_W_AQ, 1.0]
+  - [AMOAND_W_AQ_RL, 1.0]
+  - [AMOAND_W_RL, 1.0]
+  - [AMOMAXU_W, 1.0]
+  - [AMOMAXU_W_AQ, 1.0]
+  - [AMOMAXU_W_AQ_RL, 1.0]
+  - [AMOMAXU_W_RL, 1.0]
+  - [AMOMAX_W, 1.0]
+  - [AMOMAX_W_AQ, 1.0]
+  - [AMOMAX_W_AQ_RL, 1.0]
+  - [AMOMAX_W_RL, 1.0]
+  - [AMOMINU_W, 1.0]
+  - [AMOMINU_W_AQ, 1.0]
+  - [AMOMINU_W_AQ_RL, 1.0]
+  - [AMOMINU_W_RL, 1.0]
+  - [AMOMIN_W, 1.0]
+  - [AMOMIN_W_AQ, 1.0]
+  - [AMOMIN_W_AQ_RL, 1.0]
+  - [AMOMIN_W_RL, 1.0]
+  - [AMOOR_W, 1.0]
+  - [AMOOR_W_AQ, 1.0]
+  - [AMOOR_W_AQ_RL, 1.0]
+  - [AMOOR_W_RL, 1.0]
+  - [AMOSWAP_W, 1.0]
+  - [AMOSWAP_W_AQ, 1.0]
+  - [AMOSWAP_W_AQ_RL, 1.0]
+  - [AMOSWAP_W_RL, 1.0]
+  - [AMOXOR_W, 1.0]
+  - [AMOXOR_W_AQ, 1.0]
+  - [AMOXOR_W_AQ_RL, 1.0]
+  - [AMOXOR_W_RL, 1.0]
+
+# CHECK-DAG: AMOADD_W
+# CHECK-DAG: AMOADD_W_AQ
+# CHECK-DAG: AMOADD_W_AQ_RL
+# CHECK-DAG: AMOADD_W_RL
+# CHECK-DAG: AMOAND_W
+# CHECK-DAG: AMOAND_W_AQ
+# CHECK-DAG: AMOAND_W_AQ_RL
+# CHECK-DAG: AMOAND_W_RL
+# CHECK-DAG: AMOMAXU_W
+# CHECK-DAG: AMOMAXU_W_AQ
+# CHECK-DAG: AMOMAXU_W_AQ_RL
+# CHECK-DAG: AMOMAXU_W_RL
+# CHECK-DAG: AMOMAX_W
+# CHECK-DAG: AMOMAX_W_AQ
+# CHECK-DAG: AMOMAX_W_AQ_RL
+# CHECK-DAG: AMOMAX_W_RL
+# CHECK-DAG: AMOMINU_W
+# CHECK-DAG: AMOMINU_W_AQ
+# CHECK-DAG: AMOMINU_W_AQ_RL
+# CHECK-DAG: AMOMINU_W_RL
+# CHECK-DAG: AMOMIN_W
+# CHECK-DAG: AMOMIN_W_AQ
+# CHECK-DAG: AMOMIN_W_AQ_RL
+# CHECK-DAG: AMOMIN_W_RL
+# CHECK-DAG: AMOOR_W
+# CHECK-DAG: AMOOR_W_AQ
+# CHECK-DAG: AMOOR_W_AQ_RL
+# CHECK-DAG: AMOOR_W_RL
+# CHECK-DAG: AMOSWAP_W
+# CHECK-DAG: AMOSWAP_W_AQ
+# CHECK-DAG: AMOSWAP_W_AQ_RL
+# CHECK-DAG: AMOSWAP_W_RL
+# CHECK-DAG: AMOXOR_W
+# CHECK-DAG: AMOXOR_W_AQ
+# CHECK-DAG: AMOXOR_W_AQ_RL
+# CHECK-DAG: AMOXOR_W_RL
