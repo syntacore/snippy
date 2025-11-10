@@ -1,0 +1,26 @@
+# generated with isa-tests-gen.sh, to regenerate run:
+# isa-tests-gen.sh --march rv64if_zfh_zfbfmin --mtriple riscv64 --extensions zfbfmin\ -\ f
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail
+include:
+  - "Inputs/sections.yaml"
+options:
+  march: rv64if_zfh_zfbfmin
+  mtriple: riscv64
+  num-instrs: 1000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+histogram:
+  - [FCVT_BF16_S, 1.0]
+  - [FCVT_S_BF16, 1.0]
+  - [FLH, 1.0]
+  - [FMV_H_X, 1.0]
+  - [FMV_X_H, 1.0]
+  - [FSH, 1.0]
+
+# CHECK-DAG: FCVT_BF16_S
+# CHECK-DAG: FCVT_S_BF16
+# CHECK-DAG: FLH
+# CHECK-DAG: FMV_H_X
+# CHECK-DAG: FMV_X_H
+# CHECK-DAG: FSH

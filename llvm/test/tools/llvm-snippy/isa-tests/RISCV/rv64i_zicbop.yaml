@@ -1,0 +1,20 @@
+# generated with isa-tests-gen.sh, to regenerate run:
+# isa-tests-gen.sh --march rv64i_zicbop --mtriple riscv64 --extensions zicbop
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail
+include:
+  - "Inputs/sections.yaml"
+options:
+  march: rv64i_zicbop
+  mtriple: riscv64
+  num-instrs: 1000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+histogram:
+  - [PREFETCH_I, 1.0]
+  - [PREFETCH_R, 1.0]
+  - [PREFETCH_W, 1.0]
+
+# CHECK-DAG: PREFETCH_I
+# CHECK-DAG: PREFETCH_R
+# CHECK-DAG: PREFETCH_W
