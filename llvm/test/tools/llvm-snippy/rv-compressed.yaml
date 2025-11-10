@@ -1,4 +1,0 @@
-# RUN: llvm-snippy %S/Inputs/rv-compressed.yaml \
-# RUN:   -march=riscv64-linux-gnu \
-# RUN:   -num-instrs=10000 -init-regs-in-elf -verify-mi -mattr=+c,+f,+d \
-# RUN:   -verify-gen-histogram -histogram-must-succeed=true

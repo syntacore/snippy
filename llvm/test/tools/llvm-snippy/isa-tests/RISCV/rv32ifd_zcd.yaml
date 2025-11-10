@@ -1,0 +1,22 @@
+# generated with isa-tests-gen.sh, to regenerate run:
+# isa-tests-gen.sh --march rv32ifd_zcd --mtriple riscv32 --extensions zcd\&c\&d\ -\ zcf
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail
+include:
+  - "Inputs/sections.yaml"
+options:
+  march: rv32ifd_zcd
+  mtriple: riscv32
+  num-instrs: 1000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+histogram:
+  - [C_FLD, 1.0]
+  - [C_FLDSP, 1.0]
+  - [C_FSD, 1.0]
+  - [C_FSDSP, 1.0]
+
+# CHECK-DAG: C_FLD
+# CHECK-DAG: C_FLDSP
+# CHECK-DAG: C_FSD
+# CHECK-DAG: C_FSDSP
