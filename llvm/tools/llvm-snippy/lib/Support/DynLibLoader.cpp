@@ -13,6 +13,7 @@
 #include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Program.h"
 
 #include <filesystem>
 
@@ -143,8 +144,17 @@ std::string getCurrentLibExecutablePath() {
   static int Dummy = 0;
 #if defined(HAVE_DLOPEN)
   Dl_info DLInfo;
-  if (dladdr(&Dummy, &DLInfo))
-    return DLInfo.dli_fname;
+  if (dladdr(&Dummy, &DLInfo)) {
+    if (sys::path::is_absolute(DLInfo.dli_fname))
+      return DLInfo.dli_fname;
+    auto PathOrErr = sys::findProgramByName(DLInfo.dli_fname);
+    if (auto Err = PathOrErr.getError())
+      snippy::fatal(Twine("Failed to find program \"")
+                        .concat(DLInfo.dli_fname)
+                        .concat("\""),
+                    Err.message());
+    return *PathOrErr;
+  }
 #endif
   return sys::fs::getMainExecutable(/* dummy argv */ nullptr, &Dummy);
 }
