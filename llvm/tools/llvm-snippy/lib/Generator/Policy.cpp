@@ -119,8 +119,6 @@ BurstGenPolicy::BurstGenPolicy(SnippyProgramContext &ProgCtx,
                                const BurstPolicyConfig &Cfg,
                                unsigned BurstGroupID)
     : Cfg(&Cfg) {
-  auto &State = ProgCtx.getLLVMState();
-  const auto &SnippyTgt = State.getSnippyTarget();
   const auto &BGram = Cfg.Burst;
 
   assert(BGram.Mode != BurstMode::Basic);
@@ -134,19 +132,7 @@ BurstGenPolicy::BurstGenPolicy(SnippyProgramContext &ProgCtx,
   assert(BurstGroupId < Groupings.size());
   const auto &Group = Groupings[BurstGroupId];
 
-  std::copy_if(Group.begin(), Group.end(), std::back_inserter(Opcodes),
-               [&SnippyTgt, &State,
-                &OpcCache = ProgCtx.getOpcodeCache()](unsigned Opcode) {
-                 if (!SnippyTgt.canUseInBurstMode(Opcode)) {
-                   snippy::warn(
-                       WarningName::BurstMode, State.getCtx(),
-                       Twine("Opcode ") + OpcCache.name(Opcode) +
-                           " is not supported in memory burst mode",
-                       "generator will generate it but not in a burst group.");
-                   return false;
-                 }
-                 return true;
-               });
+  std::copy(Group.begin(), Group.end(), std::back_inserter(Opcodes));
 
   std::vector<double> Weights;
   auto OpcodeToNumOfGroups = BGram.getOpcodeToNumBurstGroups();
