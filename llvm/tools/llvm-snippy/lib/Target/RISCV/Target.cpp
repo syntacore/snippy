@@ -978,6 +978,24 @@ inline bool checkSupportedOrdering(const OpcodeHistogram &H) {
   return true;
 }
 
+inline bool hasScInstr(const OpcodeHistogram &H) {
+  return H.weight(RISCV::SC_D) != 0 || H.weight(RISCV::SC_D_AQ) != 0 ||
+         H.weight(RISCV::SC_D_AQ_RL) != 0 || H.weight(RISCV::SC_D_RL) != 0 ||
+         H.weight(RISCV::SC_W) != 0 || H.weight(RISCV::SC_W_AQ) != 0 ||
+         H.weight(RISCV::SC_W_AQ_RL) != 0 || H.weight(RISCV::SC_W_RL) != 0;
+}
+
+inline bool hasLrInstr(const OpcodeHistogram &H) {
+  return H.weight(RISCV::LR_D) != 0 || H.weight(RISCV::LR_D_AQ) != 0 ||
+         H.weight(RISCV::LR_D_AQ_RL) != 0 || H.weight(RISCV::LR_D_RL) != 0 ||
+         H.weight(RISCV::LR_W) != 0 || H.weight(RISCV::LR_W_AQ) != 0 ||
+         H.weight(RISCV::LR_W_AQ_RL) != 0 || H.weight(RISCV::LR_W_RL) != 0;
+}
+
+inline bool checkPairedLrScInstrs(const OpcodeHistogram &H) {
+  return hasScInstr(H) && hasLrInstr(H);
+}
+
 inline bool checkSupportedJumps(const OpcodeHistogram &H) {
   return H.weight(RISCV::C_JR) == 0;
 }
@@ -1240,10 +1258,16 @@ public:
   }
 
   void checkInstrTargetDependency(const OpcodeHistogram &H) const override {
-    if (!checkSupportedOrdering(H))
-      snippy::fatal("Lr.rl and Sc.aq are prohibited by RISCV ISA");
     if (!checkSupportedJumps(H))
       snippy::fatal("C_JR currently is not supported. Use PseudoC_JRB instead");
+  }
+
+  void checkTrackingRestrictions(const OpcodeHistogram &H) const override {
+    // LR/SC pairs have may-fail behaviour on model.
+    // So we don't allow such generation.
+    if (checkPairedLrScInstrs(H))
+      snippy::fatal("selfcheck / backtrack / address-value-hazards execution "
+                    "with both LR/SC is prohibited");
   }
 
   void generateRegsInit(InstructionGenerationContext &IGC,
