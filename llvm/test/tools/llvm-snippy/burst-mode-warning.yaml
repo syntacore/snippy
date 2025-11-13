@@ -28,4 +28,4 @@ burst:
   min-size: 5
   max-size: 5
 
-# CHECK: warning: (burst-mode) Opcode VLSE8_V is not supported in memory burst mode: generator will generate it but not in a burst group.
+# CHECK: warning: (burst-mode) Opcode VLSE8_V is not supported in the burst mode: generator will generate it but not in a burst group.
