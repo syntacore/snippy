@@ -1410,8 +1410,10 @@ void Config::complete(LLVMState &State, const OpcodeCache &OpCC) {
 
   // Distribute information from unified histogram to different config parts.
 
-  if (BurstConfig)
+  if (BurstConfig) {
     BurstConfig->Burst.convertToCustomMode(Histogram, State.getInstrInfo());
+    BurstConfig->Burst.removeUnsupportedOpcodes(State, OpCC);
+  }
   CommonPolicyCfg->setupImmHistMap(OpCC, Histogram);
 
   // Data flow histogram.
