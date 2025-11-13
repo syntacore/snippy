@@ -61,6 +61,10 @@ public:
     reportUnimplementedError();
   }
 
+  void checkTrackingRestrictions(const OpcodeHistogram &H) const override {
+    reportUnimplementedError();
+  }
+
   bool needsGenerationPolicySwitch(unsigned Opcode) const override {
     reportUnimplementedError();
   }

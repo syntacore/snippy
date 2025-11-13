@@ -1,0 +1,34 @@
+# RUN: not llvm-snippy %s -march=riscv64-unknown-elf \
+# RUN:   -init-regs-in-elf -force-emit-linker-script \
+# RUN:   -selfcheck -selfcheck-gv -mattr=+c,+a,+m |& FileCheck %s
+
+# CHECK: error: selfcheck / backtrack / address-value-hazards execution with both LR/SC is prohibited
+
+sections:
+  - no:        0
+    VMA:       0x200000
+    SIZE:      0x1000
+    LMA:       0x200000
+    ACCESS:    r
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80002000
+    SIZE:      0x100000
+    LMA:       0x80002000
+    ACCESS:    rw
+  - name:      selfcheck
+    VMA:       0x310000
+    SIZE:      0x1000000
+    LMA:       0x310000
+    ACCESS:    rw
+
+histogram:
+  - [LR_W, 1]
+  - [LW, 1]
+  - [LWU, 1]
+  - [SD, 1]
+  - [SC_D, 1]

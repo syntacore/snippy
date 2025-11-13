@@ -1310,6 +1310,8 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
   checkCallRequirements(Tgt, Histogram, CGLayout);
   checkMemoryRegions(Tgt, *this);
   Tgt.checkInstrTargetDependency(Histogram);
+  if (hasTrackingMode())
+    Tgt.checkTrackingRestrictions(Histogram);
   checkCompatibilityWithValuegramPolicy(*this, Ctx);
 
   auto *II = TM.getMCInstrInfo();

@@ -1,0 +1,21 @@
+# RUN: not llvm-snippy %s -march=riscv64-linux-gnu  -backtrack -mattr=+a\
+# RUN: -num-instrs=10 |& FileCheck %s
+
+sections:
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x800000
+      SIZE:      0x400000
+      LMA:       0x800000
+      ACCESS:    rw
+
+histogram:
+    - [SC_W, 1.0]
+    - [LR_D, 1.0]
+
+
+# CHECK: error: selfcheck / backtrack / address-value-hazards execution with both LR/SC is prohibited
