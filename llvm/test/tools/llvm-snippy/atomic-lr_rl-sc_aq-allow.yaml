@@ -1,0 +1,24 @@
+# RUN: llvm-snippy -mtriple=riscv64-unknown-elf -mattr=+i,+m,+a,+f,+d,+c,+zba,+zbb,+zbc,+zbs %s
+
+sections:
+    - no: 0
+      VMA:       0x80010000
+      SIZE:      0x10000
+      LMA:       0x80010000
+      ACCESS:    r
+    - no: 1
+      VMA:       0x80040000
+      SIZE:      0x40000
+      LMA:       0x80040000
+      ACCESS:    rx
+    - no: 2
+      VMA:       0x80080000
+      SIZE:      0x1000
+      LMA:       0x80080000
+      ACCESS:    rw
+
+histogram:
+    - [SC_D_AQ, 1.0]
+    - [SC_W_AQ, 1.0]
+    - [LR_D_RL, 1.0]
+    - [LR_W_RL, 1.0]
