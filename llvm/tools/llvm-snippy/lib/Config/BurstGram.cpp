@@ -54,5 +54,26 @@ void BurstGramData::convertToCustomMode(const OpcodeHistogram &Histogram,
   Mode = BurstMode::CustomBurst;
 }
 
+void BurstGramData::removeUnsupportedOpcodes(LLVMState &State,
+                                             const OpcodeCache &OpCC) {
+  assert(Mode == BurstMode::CustomBurst &&
+         "At this point burst mode should be \"custom\"");
+  assert(Groupings);
+  const auto &Tgt = State.getSnippyTarget();
+  for (auto &&Group : *Groupings) {
+    // Can't use std::remove with ordered container
+    for (auto Fst = Group.begin(); Fst != Group.end();) {
+      if (!Tgt.canUseInBurstMode(*Fst)) {
+        snippy::warn(WarningName::BurstMode, State.getCtx(),
+                     Twine("Opcode ") + OpCC.name(*Fst) +
+                         " is not supported in the burst mode",
+                     "generator will generate it but not in a burst group.");
+        Fst = Group.erase(Fst);
+      } else
+        ++Fst;
+    }
+  }
+}
+
 } // namespace snippy
 } // namespace llvm

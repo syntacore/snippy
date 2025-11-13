@@ -59,6 +59,8 @@ struct BurstGramData final {
 
   void convertToCustomMode(const OpcodeHistogram &Histogram,
                            const MCInstrInfo &II);
+
+  void removeUnsupportedOpcodes(LLVMState &State, const OpcodeCache &OpCC);
 };
 
 } // namespace snippy

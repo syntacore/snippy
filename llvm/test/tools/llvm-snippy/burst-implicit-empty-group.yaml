@@ -1,0 +1,44 @@
+# RUN: llvm-snippy %s -seed=1 -model-plugin=None |& FileCheck %s
+
+options:
+    mtriple: riscv64-unknown-elf
+    mattr: +m
+    dump-mf: on
+    num-instrs: 100
+
+
+sections:
+    - no:        1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x90000000
+      SIZE:      0x400000
+      LMA:       0x90000000
+      ACCESS:    rw
+    - no:        3
+      VMA:       0x70000000
+      SIZE:      0x400000
+      LMA:       0x70000000
+      ACCESS:    r
+
+histogram:
+    - [MUL, 1.0]
+    - [DIV, 1.0]
+
+burst:
+    mode: custom
+    min-size: 4
+    max-size: 16
+    groupings:
+      - [DIV, MUL]
+
+# CHECK: warning: (burst-mode) Opcode DIV is not supported in the
+# CHECK-SAME: burst mode: generator will generate it but not in a burst group.
+# CHECK: warning: (burst-mode) Opcode MUL is not supported in the
+# CHECK-SAME: burst mode: generator will generate it but not in a burst group.
+
+# CHECK: MUL
+# CHECK: DIV
