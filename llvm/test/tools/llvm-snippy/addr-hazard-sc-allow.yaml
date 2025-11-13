@@ -1,0 +1,26 @@
+# REQUIRES: embargo
+# RUN: llvm-snippy %s -mattr=+a
+
+options:
+  mcpu: generic-rv64
+  march: riscv64-unknown-elf
+  num-instrs: 10
+  enable-address-value-hazards: true
+  init-memory: full-with-addresses
+  init-regs-in-elf: true
+
+sections:
+    - no:        1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x800000
+      SIZE:      0x400000
+      LMA:       0x800000
+      ACCESS:    rw
+
+histogram:
+  - [SD, 1.0]
+  - [SC_D, 1.0]

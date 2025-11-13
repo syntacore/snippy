@@ -282,6 +282,7 @@ public:
   }
 
   virtual void checkInstrTargetDependency(const OpcodeHistogram &H) const = 0;
+  virtual void checkTrackingRestrictions(const OpcodeHistogram &H) const = 0;
 
   virtual bool needsGenerationPolicySwitch(unsigned Opcode) const = 0;
 
