@@ -3532,7 +3532,7 @@ RISC-V architecture is supported with the following extensions
 - **Zicond** - Integer Conditional Operations
 - **Zifencei** - Instruction-Fetch Fence
 - **Zicas** - Custom Atomic Operations
-- **Zicmop** - Custom Memory Operations
+- **Zcmop** - Custom Memory Operations
 - **Zimop** - Custom Integer Operations
 - **Zicboz** - Cache-Block Zero Instructions
 - **Zicbom** - Cache-Block Management Instructions
