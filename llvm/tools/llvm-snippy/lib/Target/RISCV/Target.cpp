@@ -1140,6 +1140,14 @@ public:
            !snippyRISCVIsOpcodeExcluded(Opcode);
   }
 
+  Error checkOperandsReinitializationSupported(unsigned Opcode) const override {
+    if (isRVV(Opcode))
+      return createStringError(
+          makeErrorCode(Errc::InvalidArgument),
+          "Operands reinitialization is not implemented for RVV");
+    return Error::success();
+  }
+
   bool isPseudoAllowed(unsigned Opcode) const override {
     switch (Opcode) {
     case RISCV::PAUSE:

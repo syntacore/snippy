@@ -2424,6 +2424,77 @@ For example:
    ./llvm-snippy examples/layout-example.yaml -seed=1 --init-regs-in-elf \
       --valuegram-operands-regs="./yml/valuegram.yaml"
 
+.. _`_operands_reinitialization`:
+
+Operands reinitialization
+-------------------------
+
+You can per-opcode reinitialize all initializeable operand registers using
+``operands-reinitialization`` in layout.
+
+.. important::
+
+   Specifying ``operands-reinitialization`` with specified ``--valuegram-operands-regs``
+   option is prohibited.
+
+.. container:: formalpara-title
+
+   **operands-reinitialization.yaml (example):**
+
+.. code:: yaml
+
+   operands-reinitialization:
+      - type: valuegram
+        weight: 2.0
+        opcodes:
+          - "FADD_S":
+              - type: uniform
+              - type: operands
+                weight: 2.0
+                values: [0x1.0p-1f, -inff] # Hex FP literals
+              - type: operands
+                values: [0x7f800001, 0x456] # SNaN and subnormal
+              - type: operands
+                values: [0x123, 0x456] # Encoded single-precision IEEE754 FP
+          - "FADD_D":
+              - type: operands
+                values: [1.0d, 2.0d] # Decimal FP literals
+              - type: operands
+                values: [-nan, -inf] # Negative qNaN and infinity
+
+As you can see in the given example, operands-reinitialization is a list of
+weighted data sources. The weight field is optional (1.0 by default) and
+it determines the probability with which this data source will be selected
+before each primary instruction initialization.
+
+Currently, only ``valuegram`` data source type is supported. It should include:
+
+-  ``opcodes`` |nbsp| -- |nbsp| the list of the weighted valuegram opcode settings,
+   which consist of an opcode regex and a list of weighted value sources.
+
+   Value sources ``type`` includes:
+
+   - ``uniform`` |nbsp| -- |nbsp| all considering operands will be reinitialized with
+     uniformly generated values.
+
+   - ``operands`` |nbsp| -- |nbsp| specific values for each operand.
+
+      - ``values`` |nbsp| -- |nbsp| the ordered list of values. Floating point syntax
+        and uniform are supported. The number of values must be equal to the number of
+        initializeable operands of all instructions that this regex matches.
+
+.. note::
+
+   If any opcodes specified in the histogram do not match any regex in the valuegram,
+   they will not be reinitialized in this valuegram context.
+
+   If some opcode matches multiple regex patterns in a single valuegram, the first
+   matching entry will always be used for its reinitialization.
+
+.. important::
+
+   ``operands-reinitialization`` is not supported with RVV.
+
 .. _`_final_registers_state`:
 
 Final Registers State
