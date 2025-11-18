@@ -17,6 +17,7 @@
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
+#include "snippy/Config/OperandsReinitialization.h"
 #include "snippy/Config/PluginWrapper.h"
 #include "snippy/Config/Selfcheck.h"
 #include "snippy/Support/YAMLUtils.h"
@@ -127,6 +128,16 @@ public:
     bool ValuegramOperandsRegsInitOutputs;
   };
   std::optional<ValuegramOpt> Valuegram;
+  std::optional<OperandsReinitializationConfig> OperandsReinitialization;
+  CommonOpcodeToValuegramMap OROpcodeMap;
+
+  void setupOROpcodeMap(const OpcodeCache &OpCC,
+                        const OpcodeHistogram &OpHist) {
+    if (!OperandsReinitialization.has_value())
+      return;
+    OROpcodeMap =
+        CommonOpcodeToValuegramMap(*OperandsReinitialization, OpHist, OpCC);
+  }
 
   DefaultPolicyConfig(const CommonPolicyConfig &Common) : Common(&Common) {}
 
@@ -163,7 +174,9 @@ public:
                                                     DFHCopy.end());
   }
 
-  bool isApplyValuegramEachInstr() const { return Valuegram.has_value(); }
+  bool isApplyValuegramEachInstr() const {
+    return Valuegram.has_value() || OperandsReinitialization.has_value();
+  }
 };
 
 class BurstPolicyConfig {

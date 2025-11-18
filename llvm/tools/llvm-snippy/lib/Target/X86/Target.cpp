@@ -65,6 +65,10 @@ public:
     reportUnimplementedError();
   }
 
+  Error checkOperandsReinitializationSupported(unsigned Opcode) const override {
+    reportUnimplementedError();
+  }
+
   bool needsGenerationPolicySwitch(unsigned Opcode) const override {
     reportUnimplementedError();
   }
