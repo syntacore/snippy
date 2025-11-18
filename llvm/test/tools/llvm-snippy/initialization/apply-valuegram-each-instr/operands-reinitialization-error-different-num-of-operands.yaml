@@ -1,0 +1,26 @@
+# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+include:
+  - ../../Inputs/sections.yaml
+
+options:
+    mtriple: riscv64-unknown-elf
+    mattr: +f,+c
+    dump-mf: on
+    num-instrs: 100
+
+histogram:
+    - [FADD_S, 1.0]
+    - [PseudoC_JRB, 1.0]
+
+operands-reinitialization:
+    - type: valuegram
+      weight: 1.0
+      opcodes:
+        - ".*":
+            - type: operands
+              values: [0x234, 0x431]
+
+# CHECK: error: Invalid opcode valuegram: The number of values is not
+# CHECK-SAME: equal to the number of initializeable operands for the "PseudoC_JRB" opcode.
+# CHECK-SAME: Expected 1 values but 2 were specified

@@ -86,6 +86,32 @@ OperandsReinitializationValuegramSource::sampleRegisterOperandValueForInstr(
   return ScratchAPInts[NumReg];
 }
 
+Expected<std::optional<APInt>> OperandsReinitializationOpcodeValuegramSource::
+    sampleRegisterOperandValueForInstr(MCOperand Operand, unsigned OperandIndex,
+                                       const MCInstrDesc &InstrDesc,
+                                       InstructionGenerationContext &IGC) {
+  const auto &OpcodeMap = getOpcodeToValuegramMap();
+  auto Opcode = InstrDesc.getOpcode();
+  using ReturnType = Expected<std::optional<APInt>>;
+
+  if (!Operand.isReg())
+    return ReturnType(std::nullopt);
+
+  const auto &ProgCtx = IGC.ProgCtx;
+  const auto &OpCC = ProgCtx.getOpcodeCache();
+  const auto &State = ProgCtx.getLLVMState();
+  const auto &Tgt = State.getSnippyTarget();
+  Register Reg = Operand.getReg();
+  auto MCReg = Reg.asMCReg();
+  auto BitWidth = Tgt.getRegBitWidth(MCReg, IGC);
+  const auto &OpcodeValuegram = OpcodeMap.getConfigForOpcode(Opcode, OpCC);
+  std::discrete_distribution<size_t> Dist(OpcodeValuegram.weightsBegin(),
+                                          OpcodeValuegram.weightsEnd());
+
+  return sampleOpcodeValuegramForOneReg(OpcodeValuegram, OperandIndex, BitWidth,
+                                        Dist, Opcode, State.getInstrInfo());
+}
+
 } // namespace planning
 } // namespace snippy
 } // namespace llvm

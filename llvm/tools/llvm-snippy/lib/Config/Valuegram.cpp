@@ -165,6 +165,82 @@ Expected<APInt> APIntWithSign::parseAPInt(StringRef StrView,
   return Value;
 }
 
+static const fltSemantics &consumeFPSemantics(StringRef &StrView) {
+  if (StrView.consume_back_insensitive("h"))
+    return APFloat::IEEEhalf();
+  if (StrView.consume_back_insensitive("f"))
+    return APFloat::IEEEsingle();
+  if (StrView.consume_back_insensitive("d"))
+    return APFloat::IEEEdouble();
+  return APFloat::IEEEdouble();
+}
+
+static std::optional<APFloat> tryParseSpecialValues(StringRef &StrView,
+                                                    bool HasNegativeSign) {
+  const auto &DefaultSemantics = APFloat::IEEEdouble();
+  // We need to parse inf separately because it ends with 'f'.
+  if (StrView == "inf" || StrView == "+inf")
+    return {APFloat::getInf(DefaultSemantics, HasNegativeSign)};
+
+  StringRef ValStr = StrView;
+  const auto &TheSemantics = consumeFPSemantics(ValStr);
+  if (ValStr == "inf" || ValStr == "+inf")
+    return {APFloat::getInf(TheSemantics, HasNegativeSign)};
+  if (ValStr == "nan" || ValStr == "+nan")
+    return {APFloat::getNaN(TheSemantics, HasNegativeSign)};
+  return std::nullopt;
+}
+
+Expected<APFloat> APIntWithSign::parseFPFmtAPInt(StringRef &StrView,
+                                                 bool HasNegativeSign,
+                                                 StringRef OriginalStr) {
+  if (auto SpecFPValue = tryParseSpecialValues(StrView, HasNegativeSign)) {
+    auto FPValue = SpecFPValue.value();
+    return FPValue;
+  }
+
+  const auto &Semantics = consumeFPSemantics(StrView);
+  if (HasNegativeSign && (StrView.starts_with("-") || StrView.starts_with("+")))
+    return createStringError(
+        makeErrorCode(Errc::InvalidArgument),
+        Twine("Extraneous sign characters: '").concat(StrView).concat("'"));
+  APFloat FPValue{Semantics};
+  if (auto ExpectedOpStatus = FPValue.convertFromString(
+          StrView, llvm::APFloat::rmNearestTiesToEven);
+      !ExpectedOpStatus)
+    return createStringError(
+        makeErrorCode(Errc::InvalidArgument),
+        Twine("Invalid floating-point literal: '")
+            .concat(StrView)
+            .concat("'")
+            .concat(": ")
+            .concat(toString(ExpectedOpStatus.takeError())));
+  if (HasNegativeSign)
+    FPValue = -FPValue;
+  return FPValue;
+}
+
+static bool isSpecialFPValue(StringRef StrView) {
+  return StrView.starts_with("+inf") || StrView.starts_with("-inf") ||
+         StrView.starts_with("inf") || StrView.starts_with("nan") ||
+         StrView.starts_with("+nan") || StrView.starts_with("-nan");
+}
+
+static bool isFloatingPointValue(StringRef StrView) {
+  auto DotIdx = StrView.find(".");
+  return DotIdx != StringRef::npos || isSpecialFPValue(StrView);
+}
+
+static InputFormat getFPFmtFromSemantics(const APFloat &FPValue) {
+  if (&FPValue.getSemantics() == &APFloat::IEEEsingle())
+    return InputFormat::FPSingle;
+  if (&FPValue.getSemantics() == &APFloat::IEEEdouble())
+    return InputFormat::FPDouble;
+  if (&FPValue.getSemantics() == &APFloat::IEEEhalf())
+    return InputFormat::FPHalf;
+  llvm_unreachable("Unexpected floating point value semantics");
+}
+
 Expected<FormattedAPIntWithSign>
 FormattedAPIntWithSign::fromString(StringRef StrView) {
   StringRef OriginalStr = StrView;
@@ -179,8 +255,18 @@ FormattedAPIntWithSign::fromString(StringRef StrView) {
   // doesn't handle the minus.
   HasNegativeSign = StrView.consume_front("-");
 
-  auto Radix = getAutoSenseRadix(StrView);
+  if (isFloatingPointValue(OriginalStr)) {
+    auto ExpectedValue =
+        APIntWithSign::parseFPFmtAPInt(StrView, HasNegativeSign, OriginalStr);
+    if (!ExpectedValue)
+      return APIntWithSign::reportError(
+          llvm::toString(ExpectedValue.takeError()));
+    Value = ExpectedValue->bitcastToAPInt();
+    ValueWithSign.Format = getFPFmtFromSemantics(*ExpectedValue);
+    return ValueWithSign;
+  }
 
+  auto Radix = getAutoSenseRadix(StrView);
   Expected<APInt> ExpectedValue =
       APIntWithSign::parseAPInt(StrView, HasNegativeSign, Radix, OriginalStr);
   if (!ExpectedValue)
@@ -192,10 +278,34 @@ FormattedAPIntWithSign::fromString(StringRef StrView) {
 }
 
 Expected<std::string> FormattedAPIntWithSign::toString() const {
-  SmallString<16> Str;
-  Number.Value.toString(Str, /*Radix*/ 16, Number.IsSigned,
-                        /*formatAsCLiteral=*/true,
-                        /*UpperCase=*/false);
+  SmallString<32> Str;
+  switch (Format) {
+  case InputFormat::FPDouble: {
+    APFloat FPDValue{APFloat::IEEEdouble(), Number.Value};
+    FPDValue.toString(Str);
+    Str.append("d");
+    break;
+  }
+  case InputFormat::FPSingle: {
+    APFloat FPSValue{APFloat::IEEEsingle(), Number.Value};
+    FPSValue.toString(Str);
+    Str.append("f");
+    break;
+  }
+  case InputFormat::FPHalf: {
+    APFloat FPHValue{APFloat::IEEEhalf(), Number.Value};
+    FPHValue.toString(Str);
+    Str.append("h");
+    break;
+  }
+  case InputFormat::Regular:
+    Number.Value.toString(Str, /*Radix*/ 16, Number.IsSigned,
+                          /*formatAsCLiteral=*/true,
+                          /*UpperCase=*/false);
+    break;
+  case InputFormat::Unsupported:
+    llvm_unreachable("Unrecognized FormattedAPIntWithSign input format");
+  }
   return std::string(Str);
 }
 

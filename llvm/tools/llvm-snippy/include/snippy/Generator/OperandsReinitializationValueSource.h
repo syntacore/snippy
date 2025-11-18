@@ -77,6 +77,29 @@ public:
   }
 };
 
+class OperandsReinitializationOpcodeValuegramSource final
+    : public IOperandsReinitializationValueSource {
+  const CommonOpcodeToValuegramMap &OpcodeValuegramMap;
+
+public:
+  OperandsReinitializationOpcodeValuegramSource(
+      const CommonOpcodeToValuegramMap &OpcValuegramMap)
+      : OpcodeValuegramMap(OpcValuegramMap) {}
+
+  Expected<std::optional<APInt>> sampleRegisterOperandValueForInstr(
+      MCOperand Operand, unsigned OperandIndex, const MCInstrDesc &InstrDesc,
+      InstructionGenerationContext &IGC) override;
+
+  const CommonOpcodeToValuegramMap &getOpcodeToValuegramMap() const & {
+    return OpcodeValuegramMap;
+  }
+
+  std::unique_ptr<IOperandsReinitializationValueSource> clone() const override {
+    return std::make_unique<OperandsReinitializationOpcodeValuegramSource>(
+        *this);
+  }
+};
+
 } // namespace planning
 } // namespace snippy
 } // namespace llvm

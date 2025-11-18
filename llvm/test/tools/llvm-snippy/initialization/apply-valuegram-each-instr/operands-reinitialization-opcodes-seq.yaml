@@ -1,0 +1,43 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+include:
+  - ../../Inputs/sections.yaml
+
+options:
+    mtriple: riscv64-unknown-elf
+    mattr: +f
+    dump-mf: on
+    num-instrs: 100
+
+histogram:
+    - [FADD_S, 1.0]
+
+operands-reinitialization:
+    - type: valuegram
+      weight: 1.0
+      opcodes:
+        - "FADD_S":
+            - type: operands
+              values: [0x234, 0x431]
+        - "FADD_S?":
+            - type: operands
+              values: [0x235, 0x432]
+        - ".*":
+            - type: uniform
+
+#          We expect that only [0x234, 0x431] will be loaded.
+#          An example of what we're matching:
+#                   _
+#                  |    $x7 = ADDI $x0, 564, pcsections <0x5584a41a9008>
+#                  |    $f0_f = FMV_W_X $x7, pcsections <0x5584a41a9008>
+#  [0x234, 0x431] <     $x25 = ADDI $x0, 1073, pcsections <0x5584a41a9008>
+#                  |_   $f17_f = FMV_W_X $x25, pcsections <0x5584a41a9008>
+#                       $f29_f = FADD_S $f0_f, $f17_f, 1
+
+# CHECK: warning: (inconsistent-options) Unused regex in opcode valuegram:
+# CHECK-SAME: No opcode has been matched by "FADD_S?"
+# CHECK: warning: (inconsistent-options) Unused regex in opcode valuegram:
+# CHECK-SAME: No opcode has been matched by ".*"
+
+#CHECK: [[XREG1:\$x[0-9]+]] = ADDI{{.*}}, 564{{.*[[:space:]].*}}[[FREG1:\$f[0-9]+_f]] = FMV_W_X [[XREG1]]{{.*[[:space:]].*}}[[XREG2:\$x[0-9]+]] = ADDI{{.*}}, 1073{{.*[[:space:]].*}}[[FREG2:\$f[0-9]+_f]] = FMV_W_X [[XREG2]]{{.*[[:space:]].*}}[[FREG3:\$f[0-9]+_f]] = FADD_S [[FREG1]], [[FREG2]]{{.*}}
+#CHECK-NOT: [[XREG1:\$x[0-9]+]] = ADDI{{.*}}, 565{{.*[[:space:]].*}}[[FREG1:\$f[0-9]+_f]] = FMV_W_X [[XREG1]]{{.*[[:space:]].*}}[[XREG2:\$x[0-9]+]] = ADDI{{.*}}, 1074{{.*[[:space:]].*}}[[FREG2:\$f[0-9]+_f]] = FMV_W_X [[XREG2]]{{.*[[:space:]].*}}[[FREG3:\$f[0-9]+_f]] = FADD_S [[FREG1]], [[FREG2]]{{.*}}

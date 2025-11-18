@@ -72,9 +72,9 @@ selectInitializableOperandsRegisters(InstructionGenerationContext &InstrGenCtx,
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   bool ValuegramOperandsRegsInitOutputs =
       InstrGenCtx.hasCfg<DefaultPolicyConfig>() &&
-      InstrGenCtx.getCfg<DefaultPolicyConfig>().Valuegram &&
-      InstrGenCtx.getCfg<DefaultPolicyConfig>()
-          .Valuegram->ValuegramOperandsRegsInitOutputs;
+      ((InstrGenCtx.getCfg<DefaultPolicyConfig>().Valuegram &&
+        InstrGenCtx.getCfg<DefaultPolicyConfig>()
+            .Valuegram->ValuegramOperandsRegsInitOutputs));
   // If the register is a destination register and we don't want to initialize
   // the outputs, we skip it.
   auto NeedsInit = [&](auto OpIndex) {

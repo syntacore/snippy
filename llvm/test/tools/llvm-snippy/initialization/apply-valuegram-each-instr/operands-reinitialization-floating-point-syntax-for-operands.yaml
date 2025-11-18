@@ -1,0 +1,45 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+include:
+  - ../../Inputs/sections.yaml
+
+options:
+    mtriple: riscv64-unknown-elf
+    mattr: +f
+    dump-mf: on
+    num-instrs: 100
+
+histogram:
+    - [FADD_S, 1.0]
+
+operands-reinitialization:
+    - type: valuegram
+      weight: 1.0
+      opcodes:
+        - "FADD_S":
+            - type: operands
+              values: [+0x1.0p-1f, -0.1h]
+            - type: operands
+              values: [-inf, nan]
+
+#          An example of what we're matching:
+#                       _
+#                      |      $x30 = ADDI $x0, -193, pcsections <0x55d543ea40e8>
+#                      |      $x30 = SLLI $x30, 24, pcsections <0x55d543ea40e8>
+#                      |      $f23_f = FMV_W_X $x30, pcsections <0x55d543ea40e8>
+# [+0x1.0p-1f, -0.1h] <       $x5 = LUI 4095, pcsections <0x55d543ea40e8>
+#                      |      $x5 = SLLI $x5, 39, pcsections <0x55d543ea40e8>
+#                      |_     $f5_f = FMV_W_X $x5, pcsections <0x55d543ea40e8>
+#                             $f10_f = FADD_S $f23_f, $f5_f, 3
+#                       _
+#                      |     $x14 = ADDI $x0, -1, pcsections <0x55d543ea40e8>
+#                      |     $x14 = SLLI $x14, 52, pcsections <0x55d543ea40e8>
+#                      |     $f21_f = FMV_W_X $x14, pcsections <0x55d543ea40e8>
+#         [-inf, nan] <      $x11 = LUI 1048571, pcsections <0x55d543ea40e8>
+#                      |     $x11 = ADDIW $x11, -410, pcsections <0x55d543ea40e8>
+#                      |_    $f31_f = FMV_W_X $x11, pcsections <0x55d543ea40e8>
+#                            $f5_f = FADD_S $f21_f, $f31_f, 0
+
+
+# CHECK: [[XREG1:\$x[0-9]+]] = ADDI{{.*}}, -193{{.*[[:space:]].*}}[[XREG1]] = SLLI [[XREG1]], 24{{.*[[:space:]].*}}[[FREG1:\$f[0-9]+_f]] = FMV_W_X [[XREG1]]{{.*[[:space:]].*}}[[XREG2:\$x[0-9]+]] = LUI 1048571{{.*[[:space:]].*}}[[XREG2]] = ADDIW [[XREG2]], -410{{.*[[:space:]].*}}[[FREG2:\$f[0-9]+_f]] = FMV_W_X [[XREG2]]{{.*[[:space:]].*}}[[FREG3:\$f[0-9]+_f]] = FADD_S [[FREG1]], [[FREG2]]{{.*}}
+# CHECK: [[XREG3:\$x[0-9]+]] = ADDI{{.*}}, -1{{.*[[:space:]].*}}[[XREG3]] = SLLI [[XREG3]], 52{{.*[[:space:]].*}}[[FREG4:\$f[0-9]+_f]] = FMV_W_X [[XREG3]]{{.*[[:space:]].*}}[[XREG2:\$x[0-9]+]] = LUI 4095{{.*[[:space:]].*}}[[XREG2]] = SLLI [[XREG2]], 39{{.*[[:space:]].*}}[[FREG5:\$f[0-9]+_f]] = FMV_W_X [[XREG2]]{{.*[[:space:]].*}}[[FREG6:\$f[0-9]+_f]] = FADD_S [[FREG4]], [[FREG5]]{{.*}}
