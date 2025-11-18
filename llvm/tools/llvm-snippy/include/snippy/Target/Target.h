@@ -261,6 +261,9 @@ public:
     return true;
   }
 
+  virtual Error
+  checkOperandsReinitializationSupported(unsigned Opcode) const = 0;
+
   // pseudo instructions are disallowed by default
   virtual bool isPseudoAllowed(unsigned Opcode) const { return false; }
 

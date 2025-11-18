@@ -203,6 +203,23 @@ LLVMState &InstructionGenerationContext::getLLVMStateImpl() const {
   return ProgCtx.getLLVMState();
 }
 
+static std::unique_ptr<IOperandsReinitializationValueSource>
+getValuegramPolicyValueSource(const DefaultPolicyConfig &Cfg) {
+  if (Cfg.OperandsReinitialization) {
+    assert(!Cfg.Valuegram.has_value() &&
+           "Specifying operands-reinitialization with valuegram-operands-regs "
+           "is prohibited");
+    return std::make_unique<OperandsReinitializationOpcodeValuegramSource>(
+        Cfg.OROpcodeMap);
+  }
+  if (Cfg.Valuegram) {
+    const auto &RegsHistograms = Cfg.Valuegram->RegsHistograms;
+    return std::make_unique<OperandsReinitializationValuegramSource>(
+        RegsHistograms);
+  }
+  llvm_unreachable("Unrecognized operands reinitialization policy");
+}
+
 GenPolicy
 createGenPolicy(SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
                 const MachineBasicBlock &MBB,
@@ -212,15 +229,9 @@ createGenPolicy(SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
   auto MustHavePrimaryInstrs = Tgt.groupMustHavePrimaryInstr(ProgCtx, MBB);
   auto Overrides = Tgt.getPolicyOverrides(ProgCtx, MBB);
   if (Cfg.isApplyValuegramEachInstr()) {
-    // TODO: Make value source more configurable and generalize generation
-    // policy selection. Maybe randomize it as well?
-    assert(Cfg.Valuegram.has_value());
-    // NOTE: isApplyValuegramEachInstr -> has_value. Let's assert it just in
-    // case.
-    const auto &RegsHistograms = Cfg.Valuegram->RegsHistograms;
-    auto ValuegramValueSource =
-        std::make_unique<OperandsReinitializationValuegramSource>(
-            RegsHistograms);
+    assert(Cfg.Valuegram.has_value() ||
+           Cfg.OperandsReinitialization.has_value());
+    auto ValuegramValueSource = getValuegramPolicyValueSource(Cfg);
     return planning::ValuegramGenPolicy(
         ProgCtx, Cfg, std::move(Filter), MustHavePrimaryInstrs,
         std::move(Overrides), WeightOverrides, std::move(ValuegramValueSource));

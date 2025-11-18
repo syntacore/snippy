@@ -9,6 +9,7 @@ set(LLVMSnippyConfigSources
     FPUSettings.cpp
     CallGraphLayout.cpp
     ImmediateHistogram.cpp
+    OperandsReinitialization.cpp
     Valuegram.cpp
     Selfcheck.cpp
     )

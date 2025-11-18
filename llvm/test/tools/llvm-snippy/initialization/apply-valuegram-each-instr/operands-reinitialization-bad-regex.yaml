@@ -1,0 +1,29 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+include:
+  - ../../Inputs/sections.yaml
+
+options:
+    mtriple: riscv64-unknown-elf
+    dump-mf: on
+    num-instrs: 100
+
+histogram:
+    - [ADD, 1.0]
+
+operands-reinitialization:
+    - type: valuegram
+      weight: 1.0
+      opcodes:
+        - "ADD":
+            - [uniform, 1.0]
+        - "FADD_S":
+            - [uniform, 1.0]
+        - "":
+            - [uniform, 1.0]
+
+# CHECK: warning: (inconsistent-options) Unused regex in opcode valuegram:
+# CHECK-SAME: No opcode has been matched by "FADD_S"
+# CHECK: warning: (inconsistent-options) Unused regex in opcode valuegram:
+# CHECK-SAME: No opcode has been matched by ""
+

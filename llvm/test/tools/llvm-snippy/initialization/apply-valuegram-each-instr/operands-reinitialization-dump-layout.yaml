@@ -1,0 +1,65 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+include:
+  - ../../Inputs/sections.yaml
+
+options:
+    mtriple: riscv64-unknown-elf
+    mattr: +f,+d
+    dump-layout: on
+    num-instrs: 100
+
+histogram:
+    - [FADD_S, 1.0]
+    - [FADD_D, 1.0]
+    - [ADDI, 1.0]
+    - [ADD, 1.0]
+
+operands-reinitialization:
+    - type: valuegram
+      weight: 1.0
+      opcodes:
+        - "FADD_S":
+            - type: operands
+              values: [0x234, 0x431]
+            - [uniform, 1.0]
+        - "FADD_D":
+            - type: operands
+              values: [0x235, 0x432]
+            - [uniform, 1.0]
+        - "ADD":
+            - type: operands
+              values: [0x236, 0x433]
+            - [uniform, 1.0]
+        - "ADDI":
+            - type: operands
+              values: [0x237]
+            - [uniform, 1.0]
+
+#CHECK: operands-reinitialization:
+#CHECK-NEXT:   - type:            valuegram
+#CHECK-NEXT:     weight:          1
+#CHECK-NEXT:     opcodes:
+#CHECK-NEXT:       - FADD_S:
+#CHECK-NEXT:           - type:            operands
+#CHECK-NEXT:             values:
+#CHECK-NEXT:               - 0x234
+#CHECK-NEXT:               - 0x431
+#CHECK-NEXT:           - type:            uniform
+#CHECK-NEXT:       - FADD_D:
+#CHECK-NEXT:           - type:            operands
+#CHECK-NEXT:             values:
+#CHECK-NEXT:               - 0x235
+#CHECK-NEXT:               - 0x432
+#CHECK-NEXT:           - type:            uniform
+#CHECK-NEXT:       - ADD:
+#CHECK-NEXT:           - type:            operands
+#CHECK-NEXT:             values:
+#CHECK-NEXT:               - 0x236
+#CHECK-NEXT:               - 0x433
+#CHECK-NEXT:           - type:            uniform
+#CHECK-NEXT:       - ADDI:
+#CHECK-NEXT:           - type:            operands
+#CHECK-NEXT:             values:
+#CHECK-NEXT:               - 0x237
+#CHECK-NEXT:           - type:            uniform
