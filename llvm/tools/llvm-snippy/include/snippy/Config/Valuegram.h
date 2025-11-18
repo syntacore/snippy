@@ -32,7 +32,7 @@ struct ValuegramEntryScalarMapper final {};
 
 } // namespace detail
 
-enum class InputFormat { Regular, Unsupported };
+enum class InputFormat { Regular, FPHalf, FPSingle, FPDouble, Unsupported };
 
 struct APIntWithSign {
   APInt Value;
@@ -40,6 +40,10 @@ struct APIntWithSign {
   static Expected<APInt> parseAPInt(StringRef StrView, bool HasNegativeSign,
                                     unsigned Radix, StringRef OriginalStr);
   static Error reportError(Twine Msg);
+
+  static Expected<APFloat> parseFPFmtAPInt(StringRef &StrView,
+                                           bool HasNegativeSign,
+                                           StringRef OriginalStr);
 };
 
 struct FormattedAPIntWithSign {

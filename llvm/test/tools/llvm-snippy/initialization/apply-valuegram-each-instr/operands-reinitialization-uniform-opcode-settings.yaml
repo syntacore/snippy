@@ -1,0 +1,30 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+include:
+  - ../../Inputs/sections.yaml
+
+options:
+    mtriple: riscv64-unknown-elf
+    mattr: +f,+d
+    dump-mf: on
+    num-instrs: 100
+
+histogram:
+    - [FADD_S, 1.0]
+    - [FADD_D, 1.0]
+
+operands-reinitialization:
+    - type: valuegram
+      weight: 1.0
+      opcodes:
+        - "FADD_S":
+            - type: uniform
+
+# CHECK: remark: No regex that matches "FADD_D" was found in opcode valuegram: This instruction will not be reinitializated.
+
+# CHECK-DAG: [[FREG1:\$f[0-9]+_f]] = FMV_W_X [[XREG1:\$x[0-9]+]]{{.*}}
+# CHECK-DAG: [[FREG2:\$f[0-9]+_f]] = FMV_W_X [[XREG2:\$x[0-9]+]]{{.*}}
+# CHECK-DAG: [[FREG3:\$f[0-9]+_f]] = FADD_S [[FREG1]], [[FREG2]]{{.*}}
+
+# CHECK: FADD_D
+

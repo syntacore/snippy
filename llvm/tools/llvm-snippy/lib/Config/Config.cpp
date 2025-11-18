@@ -871,6 +871,8 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
 
   Info.ProgramCfg.TargetConfig->mapConfig(IO);
   IO.mapOptional("fpu-config", Info.CommonPolicyCfg->FPUConfig);
+  IO.mapOptional("operands-reinitialization",
+                 Info.DefFlowConfig.OperandsReinitialization);
 }
 
 std::string yaml::MappingTraits<Config>::validate(yaml::IO &Io, Config &Info) {
@@ -1217,6 +1219,56 @@ static void diagnoseSelfcheckSection(LLVMState &State, const Config &Cfg,
                   "it has unaligned memory settings");
 }
 
+static void
+checkValuegramOpcodeSettings(const OpcodeValuegramOpcodeSettings &Settings,
+                             unsigned Opcode, const OpcodeCache &OpCC,
+                             const LLVMState &State) {
+  const auto &InstrInfo = State.getInstrInfo();
+  const auto &Tgt = State.getSnippyTarget();
+  for (auto &&Cfg : Settings) {
+    if (Cfg.getKind() != OpcodeValuegramOpcSettingsEntry::EntryKind::Operands)
+      continue;
+    const auto &OpValues = cast<OpcodeValuegramOperandsEntry>(Cfg.get());
+    const auto &InstrDesc = InstrInfo.get(Opcode);
+    auto NumOperands = InstrDesc.getNumOperands(),
+         NumDefs = InstrDesc.getNumDefs();
+
+    size_t Initializeable = llvm::count_if(
+        llvm::seq(NumDefs, NumOperands), [&Tgt, &InstrDesc](auto OpIndx) {
+          return Tgt.canInitializeOperand(InstrDesc, OpIndx);
+        });
+    if (Initializeable != OpValues.Values.size())
+      snippy::fatal(
+          "Invalid opcode valuegram",
+          createStringError(
+              (std::make_error_code(std::errc::invalid_argument)),
+              llvm::formatv(
+                  "The number of values is not equal to the number of "
+                  "initializeable operands for the \"{0}\" opcode. Expected "
+                  "{1} values but {2} were specified",
+                  InstrInfo.getName(Opcode), std::to_string(Initializeable),
+                  std::to_string(OpValues.Values.size()))));
+  }
+}
+
+static void checkOpcodeToValuegramMap(const CommonOpcodeToValuegramMap &Map,
+                                      const OpcodeHistogram &Histogram,
+                                      const OpcodeCache &OpCC,
+                                      const LLVMState &State) {
+  assert(!Map.empty());
+  const auto &Tgt = State.getSnippyTarget();
+  for (auto Opc : make_first_range(Histogram)) {
+    for (auto &&Sampler : make_first_range(Map)) {
+      if (!Sampler.count(Opc))
+        continue;
+      if (auto E = Tgt.checkOperandsReinitializationSupported(Opc))
+        snippy::fatal("Invalid opcode valuegram", std::move(E));
+      const auto &OpcodeSettings = Sampler.getConfigForOpcode(Opc, OpCC);
+      checkValuegramOpcodeSettings(OpcodeSettings, Opc, OpCC, State);
+    }
+  }
+}
+
 void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
                          const RegPoolWrapper &RP) {
   auto &Ctx = State.getCtx();
@@ -1402,6 +1454,13 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
           SectionsDescriptions::SelfcheckSectionName) &&
       CommonPolicyCfg->TrackCfg.Selfcheck)
     diagnoseSelfcheckSection(State, *this, getMinimumSelfcheckSize(*this));
+  if (DefFlowConfig.Valuegram.has_value() &&
+      DefFlowConfig.OperandsReinitialization.has_value())
+    snippy::fatal("Usage of valuegram-operands-regs option with specified "
+                  "operands-reinitialization is prohibited");
+  if (DefFlowConfig.OperandsReinitialization.has_value())
+    checkOpcodeToValuegramMap(DefFlowConfig.OROpcodeMap, Histogram, OpCC,
+                              State);
 }
 
 void Config::complete(LLVMState &State, const OpcodeCache &OpCC) {
@@ -1417,6 +1476,7 @@ void Config::complete(LLVMState &State, const OpcodeCache &OpCC) {
     BurstConfig->Burst.removeUnsupportedOpcodes(State, OpCC);
   }
   CommonPolicyCfg->setupImmHistMap(OpCC, Histogram);
+  DefFlowConfig.setupOROpcodeMap(OpCC, Histogram);
 
   // Data flow histogram.
 
