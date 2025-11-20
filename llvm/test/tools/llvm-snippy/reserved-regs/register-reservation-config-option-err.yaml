@@ -1,0 +1,15 @@
+# RUN: not llvm-snippy %s %S/Inputs/sections.yaml -model-plugin=None \
+# RUN:   |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 10
+  reserved-regs-list: [X11]
+
+histogram:
+    - [ADD, 1.0]
+
+register-reservation:
+  - X10: [SRW]
+
+# CHECK: error: Incompatible options: Cannot use 'register-access' config and 'reserved-regs-list' options at the same time
