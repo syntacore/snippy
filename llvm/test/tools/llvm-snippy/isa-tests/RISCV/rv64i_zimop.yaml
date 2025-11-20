@@ -1,0 +1,94 @@
+# generated with isa-tests-gen.sh, to regenerate run:
+# isa-tests-gen.sh --march rv64i_zimop --mtriple riscv64 --extensions zimop
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail
+include:
+  - "Inputs/sections.yaml"
+options:
+  march: rv64i_zimop
+  mtriple: riscv64
+  num-instrs: 1000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+histogram:
+  - [MOPR0, 1.0]
+  - [MOPR1, 1.0]
+  - [MOPR10, 1.0]
+  - [MOPR11, 1.0]
+  - [MOPR12, 1.0]
+  - [MOPR13, 1.0]
+  - [MOPR14, 1.0]
+  - [MOPR15, 1.0]
+  - [MOPR16, 1.0]
+  - [MOPR17, 1.0]
+  - [MOPR18, 1.0]
+  - [MOPR19, 1.0]
+  - [MOPR2, 1.0]
+  - [MOPR20, 1.0]
+  - [MOPR21, 1.0]
+  - [MOPR22, 1.0]
+  - [MOPR23, 1.0]
+  - [MOPR24, 1.0]
+  - [MOPR25, 1.0]
+  - [MOPR26, 1.0]
+  - [MOPR27, 1.0]
+  - [MOPR28, 1.0]
+  - [MOPR29, 1.0]
+  - [MOPR3, 1.0]
+  - [MOPR30, 1.0]
+  - [MOPR31, 1.0]
+  - [MOPR4, 1.0]
+  - [MOPR5, 1.0]
+  - [MOPR6, 1.0]
+  - [MOPR7, 1.0]
+  - [MOPR8, 1.0]
+  - [MOPR9, 1.0]
+  - [MOPRR0, 1.0]
+  - [MOPRR1, 1.0]
+  - [MOPRR2, 1.0]
+  - [MOPRR3, 1.0]
+  - [MOPRR4, 1.0]
+  - [MOPRR5, 1.0]
+  - [MOPRR6, 1.0]
+  - [MOPRR7, 1.0]
+
+# CHECK-DAG: MOPR0
+# CHECK-DAG: MOPR1
+# CHECK-DAG: MOPR10
+# CHECK-DAG: MOPR11
+# CHECK-DAG: MOPR12
+# CHECK-DAG: MOPR13
+# CHECK-DAG: MOPR14
+# CHECK-DAG: MOPR15
+# CHECK-DAG: MOPR16
+# CHECK-DAG: MOPR17
+# CHECK-DAG: MOPR18
+# CHECK-DAG: MOPR19
+# CHECK-DAG: MOPR2
+# CHECK-DAG: MOPR20
+# CHECK-DAG: MOPR21
+# CHECK-DAG: MOPR22
+# CHECK-DAG: MOPR23
+# CHECK-DAG: MOPR24
+# CHECK-DAG: MOPR25
+# CHECK-DAG: MOPR26
+# CHECK-DAG: MOPR27
+# CHECK-DAG: MOPR28
+# CHECK-DAG: MOPR29
+# CHECK-DAG: MOPR3
+# CHECK-DAG: MOPR30
+# CHECK-DAG: MOPR31
+# CHECK-DAG: MOPR4
+# CHECK-DAG: MOPR5
+# CHECK-DAG: MOPR6
+# CHECK-DAG: MOPR7
+# CHECK-DAG: MOPR8
+# CHECK-DAG: MOPR9
+# CHECK-DAG: MOPRR0
+# CHECK-DAG: MOPRR1
+# CHECK-DAG: MOPRR2
+# CHECK-DAG: MOPRR3
+# CHECK-DAG: MOPRR4
+# CHECK-DAG: MOPRR5
+# CHECK-DAG: MOPRR6
+# CHECK-DAG: MOPRR7
