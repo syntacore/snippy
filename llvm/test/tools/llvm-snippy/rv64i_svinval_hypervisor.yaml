@@ -1,0 +1,48 @@
+# generated with isa-tests-gen.sh, to regenerate run:
+# isa-tests-gen.sh --march rv64i_svinval --mtriple riscv64 --extensions svinval
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail
+include:
+  - "Inputs/sections.yaml"
+options:
+  march: rv64i_svinval
+  mtriple: riscv64
+  num-instrs: 5000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+  reserved-regs-list: ["X[12][0-9]", X30, X31]
+histogram:
+  - [HINVAL_GVMA, 2.0]
+  - [HINVAL_VVMA, 2.0]
+  - ["L[WD]", 1.0]
+  - ["S[WD]", 1.0]
+
+operands-reinitialization:
+  - type: valuegram
+    weight: 1.0
+    opcodes:
+      - "HINVAL_GVMA":
+          - type: operands
+            values: [0, 0]
+          - type: operands
+            values: [0, 1]
+          - type: operands
+            values: [1, 0]
+          - type: operands
+            values: [1, 1]
+      - "HINVAL_VVMA":
+          - type: operands
+            values: [0, 0]
+          - type: operands
+            values: [0, 1]
+          - type: operands
+            values: [1, 0]
+          - type: operands
+            values: [1, 1]
+
+# CHECK-DAG: HINVAL_GVMA $x0, $x0
+# CHECK-DAG: HINVAL_GVMA $x0, $x{{[1-9]+}}
+# CHECK-DAG: HINVAL_GVMA $x{{[1-9]+}}, $x{{[1-9]+}}
+# CHECK-DAG: HINVAL_VVMA $x0, $x0
+# CHECK-DAG: HINVAL_VVMA $x0, $x{{[1-9]+}}
+# CHECK-DAG: HINVAL_VVMA $x{{[1-9]+}}, $x{{[1-9]+}}
