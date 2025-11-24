@@ -3124,6 +3124,7 @@ pseudoinstructions:
 - ``ReadFFLAGS``, ``ReadFRM`` and ``ReadFCSR`` - Read CSR into a GPR.
 - ``WriteFFLAGSImm``, ``WriteFRMImm`` and ``WriteFCSRImm`` - Write an immediate value into CSR.
 - ``SwapFFLAGSImm``, ``SwapFRMImm`` and ``SwapFCSRImm`` - Save previous CSR value into a GPR and write immediate into it.
+- ``WriteFFLAGS``, ``WriteFRM``, ``WriteFCSR`` - Write register to CSR. Best used in combination with `Operands Reinitialization <#operands-reinitialization>`__
 
 These pseudoinstructions in conjuction with
 `Immediate Histograms <#immediate-histograms>`__ provide flexible manipulation
@@ -3165,12 +3166,20 @@ out of 5 available rounding modes:
     - [WriteFRMImm, 1.0]
     - [SwapFRMImm, 1.0]
     - [ReadFRM, 1.0]
+    - [WriteFRM, 1.0]
   imm-hist:
     opcodes:
       - "WriteFRMImm|SwapFRMImm":
           - [0, 1.0] # RNE
           - [1, 1.0] # RTZ
-
+   operands-reinitialization:
+     - type: valuegram
+       opcodes:
+         - "WriteFRM":
+             - type: operands
+               values: [0] # RNE
+             - type: operands
+               values: [1] # RTZ
 
 Example: Read ``fflags`` and write immediate values into it:
 
