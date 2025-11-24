@@ -1,0 +1,40 @@
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s
+
+include:
+  - ../Inputs/sections.yaml
+options:
+  mtriple: riscv64
+  march: rv64ifd
+  num-instrs: 2000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+histogram:
+  - [WriteFRM, 0.25]
+  - [WriteFCSR, 0.25]
+  - [WriteFFLAGS, 0.25]
+  - [FADD_D, 1.0]
+imm-hist:
+  opcodes:
+    - "FADD_D":
+        - [7, 1.0] # DYN
+    - ".*": uniform
+operands-reinitialization:
+  - type: valuegram
+    opcodes:
+      - "WriteFCSR":
+          - type: operands
+            values: [0x60] # RUP, FFLAGS=0b00000
+      - "WriteFFLAGS":
+          - type: operands
+            values: [0x0]
+      - "WriteFRM":
+          - type: operands
+            values: [3] # RUP
+
+# CHECK: [[FRMVALUEREG:[$]x[0-9]+]] = ADDI $x0, 3
+# CHECK-NEXT: WriteFRM [[FRMVALUEREG]]
+# CHECK: [[FCSRVALUEREG:[$]x[0-9]+]] = ADDI $x0, 96
+# CHECK-NEXT: WriteFCSR [[FCSRVALUEREG]]
+# CHECK: [[FFLAGSVALUEREG:[$]x[0-9]+]] = ADDI $x0, 0
+# CHECK-NEXT: WriteFFLAGS [[FFLAGSVALUEREG]]
