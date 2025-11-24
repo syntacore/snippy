@@ -1949,6 +1949,7 @@ def WriteFFLAGS : WriteSysReg<SysRegFFLAGS, [FFLAGS]>;
 def WriteFFLAGSImm : WriteSysRegImm<SysRegFFLAGS, [FFLAGS]>;
 def SwapFFLAGSImm : SwapSysRegImm<SysRegFFLAGS, [FFLAGS]>;
 
+def WriteFCSR : WriteSysReg<SysRegFCSR, [FRM, FFLAGS]>;
 def ReadFCSR : ReadSysReg<SysRegFCSR, [FRM, FFLAGS]>;
 def WriteFCSRImm : WriteSysRegImm<SysRegFCSR, [FRM, FFLAGS]>;
 def SwapFCSRImm : SwapSysRegImm<SysRegFCSR, [FRM, FFLAGS]>;

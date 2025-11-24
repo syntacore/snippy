@@ -1160,6 +1160,11 @@ public:
     // Allows setting rounding mode when combined with per-opcode `imm-hist`.
     case RISCV::WriteFRMImm:
     case RISCV::SwapFRMImm:
+    // Allows setting frm/fflags when combined with per-opcode
+    // `operands-reinitialization`.
+    case RISCV::WriteFRM:
+    case RISCV::WriteFFLAGS:
+    case RISCV::WriteFCSR:
 
     case RISCV::ReadFCSR:
     case RISCV::WriteFCSRImm:
