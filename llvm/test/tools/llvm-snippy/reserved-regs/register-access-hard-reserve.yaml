@@ -1,0 +1,35 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  march: rv64imfd
+  dump-mf: true
+  num-instrs: 2000
+  init-regs-in-elf: true
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x40000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [LW, 1.0]
+    - [SW, 1.0]
+    - [FLD, 1.0]
+    - [FSW, 1.0]
+
+
+register-reservation:
+  # Hard reserve
+  - "X1[0-1]": [RW]
+# CHECK-NOT: x10
+# CHECK-NOT: x11

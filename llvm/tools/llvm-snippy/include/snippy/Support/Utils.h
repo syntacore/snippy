@@ -20,6 +20,7 @@ namespace llvm {
 
 class Regex;
 class Error;
+class MCRegisterInfo;
 
 namespace yaml {
 class Output;
@@ -27,6 +28,8 @@ class Input;
 } // namespace yaml
 
 namespace snippy {
+
+class SnippyTarget;
 
 template <typename T> struct NumericRange final {
   std::optional<T> Min;
