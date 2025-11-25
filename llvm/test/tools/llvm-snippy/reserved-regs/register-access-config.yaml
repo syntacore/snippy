@@ -1,0 +1,25 @@
+# RUN: llvm-snippy %s %S/Inputs/sections.yaml -model-plugin None --dump-layout \
+# RUN:   | FileCheck %s --check-prefix=MYCHECK
+
+options:
+  mtriple: riscv64
+
+histogram:
+  - [ADD, 1.0]
+
+register-reservation:
+  - X4: [SRW]
+  - X5: [RW]
+  - X6: [SW]
+  - X7: [W]
+  - X8: [SW, SR]
+  - X31: [R]
+
+# MYCHECK: register-reservation:
+# MYCHECK-NEXT: - X4: [ PrimaryR, PrimaryW ]
+# MYCHECK-NEXT: - X5: [ PrimaryR, PrimaryW, SupportR, SupportW ]
+# MYCHECK-NEXT: - X6: [ PrimaryW ]
+# MYCHECK-NEXT: - X7: [ PrimaryW, SupportW ]
+# MYCHECK-NEXT: - X8: [ PrimaryR, PrimaryW ]
+# MYCHECK-NEXT: - X31: [ PrimaryR, SupportR ]
+
