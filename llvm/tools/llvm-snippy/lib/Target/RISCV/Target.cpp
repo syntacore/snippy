@@ -2549,8 +2549,9 @@ public:
     auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
     auto &MBB = IGC.MBB;
     RP->addReserved(getFirstPhysReg(Reg, RI), MBB);
-    auto ScratchReg = getNonZeroReg("scratch register for stack addr", RI,
-                                    RegClass, *RP, MBB, AccessMaskBit::SRW);
+    auto ScratchReg =
+        getNonZeroReg("scratch register for stack addr", RI, RegClass, *RP, MBB,
+                      AccessMaskBit::SupportRW);
     auto XRegBitSize = getRegBitWidth(ScratchReg, IGC);
     auto &StaticStackCtx = ProgCtx.getStaticStack();
     writeValueToReg(IGC, APInt(XRegBitSize, StaticStackCtx.getSPAddrLocal()),
@@ -3248,7 +3249,7 @@ public:
     auto &RI = State.getRegInfo();
     auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
     auto XScratchReg = getNonZeroReg("scratch register for addr", RI, RegClass,
-                                     RP, MBB, AccessMaskBit::SRW);
+                                     RP, MBB, AccessMaskBit::SupportRW);
     // Form address in scratch register.
     generateWriteValueSeq(IGC, APInt(getRegBitWidth(XScratchReg, IGC), Addr),
                           XScratchReg, Insts);
@@ -3419,7 +3420,7 @@ public:
     auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
     RP->addReserved(getFirstPhysReg(Reg, RI), MBB);
     auto ScratchReg = getNonZeroReg("scratch register for addr", RI, RegClass,
-                                    *RP, MBB, AccessMaskBit::SRW);
+                                    *RP, MBB, AccessMaskBit::SupportRW);
     auto XRegBitSize = getRegBitWidth(ScratchReg, IGC);
 
     writeValueToReg(IGC, APInt(XRegBitSize, Addr), ScratchReg);
@@ -3439,11 +3440,12 @@ public:
     if (ValueRegBitSize > (Reg8Bytes * RISCV_CHAR_BIT))
       RegForValue = RP.getAvailableRegister(
           "to write value", RI, RI.getRegClass(RISCV::VRRegClassID), MBB,
-          [](unsigned Reg) { return Reg == RISCV::V0; }, AccessMaskBit::SRW);
+          [](unsigned Reg) { return Reg == RISCV::V0; },
+          AccessMaskBit::SupportRW);
     else {
       RegForValue = getNonZeroReg("to write value", RI,
                                   RI.getRegClass(RISCV::GPRRegClassID), RP, MBB,
-                                  AccessMaskBit::SRW);
+                                  AccessMaskBit::SupportRW);
       if (ValueRegBitSize > getRegBitWidth(RegForValue, IGC))
         snippy::fatal(State.getCtx(), "Selfcheck error ",
                       "selfcheck is not implemented for rv32 with D ext");
@@ -3989,7 +3991,7 @@ void SnippyRISCVTarget::generateWriteValueFP(
   auto &RP = IGC.getRegPool();
   auto ScratchReg =
       getNonZeroReg("scratch register for writing FP register", RI, RegClass,
-                    RP, IGC.MBB, AccessMaskBit::SRW);
+                    RP, IGC.MBB, AccessMaskBit::SupportRW);
 
   generateWriteValueSeq(IGC, Value, ScratchReg, Insts);
 
@@ -4016,7 +4018,7 @@ void SnippyRISCVTarget::rvvUnsafeWriteValueUsingXReg(
   auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
   auto XScratchReg = getNonZeroReg("scratch register", RI, RegClass, RP,
                                    MBB, // change getNonZeroReg
-                                   AccessMaskBit::SRW);
+                                   AccessMaskBit::SupportRW);
 
   assert(RISCV::VRRegClass.contains(DstReg));
   const auto SEW = static_cast<unsigned>(RGC.getSEW(MBB));
@@ -4099,7 +4101,7 @@ void SnippyRISCVTarget::rvvWriteValueToV0UsingVReg(
   auto VScratchReg = RP.getAvailableRegister(
       "scratch register to store the mask", RI, RegClass, MBB,
       /*Filter*/ [](unsigned Reg) { return Reg == RISCV::V0; },
-      AccessMaskBit::SRW);
+      AccessMaskBit::SupportRW);
 
   const auto &RVVModeToRestore =
       rvvWriteValueUsingXRegAndGetOldMode(IGC, Value, VScratchReg);
@@ -4332,9 +4334,9 @@ void SnippyRISCVTarget::generateVSETIVLI(InstructionGenerationContext &IGC,
   const auto &RI = State.getRegInfo();
   auto &RP = IGC.getRegPool();
   auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
-  auto DstReg = RP.getAvailableRegister("VSETIVLI dst", RI, RegClass, MBB,
-                                        SupportMarker ? AccessMaskBit::SRW
-                                                      : AccessMaskBit::GRW);
+  auto DstReg = RP.getAvailableRegister(
+      "VSETIVLI dst", RI, RegClass, MBB,
+      SupportMarker ? AccessMaskBit::SupportRW : AccessMaskBit::PrimaryRW);
   // TODO: eventually this should be an assert
   if (VL > kMaxVLForVSETIVLI)
     snippy::fatal(formatv("cannot set the desired VL {0} since selected "
@@ -4358,11 +4360,11 @@ void SnippyRISCVTarget::generateVSETVLI(InstructionGenerationContext &IGC,
   // TODO 2: if VL is not changed, and DST is zero, scratch VL can be zero
   const auto &RI = ProgCtx.getLLVMState().getRegInfo();
   auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
-  auto DstReg = RP.getAvailableRegister("for VSETVLI dst", RI, RegClass, MBB,
-                                        SupportMarker ? AccessMaskBit::SRW
-                                                      : AccessMaskBit::GRW);
+  auto DstReg = RP.getAvailableRegister(
+      "for VSETVLI dst", RI, RegClass, MBB,
+      SupportMarker ? AccessMaskBit::SupportRW : AccessMaskBit::PrimaryRW);
   auto ScratchRegVL = getNonZeroReg("for VSETVLI VL", RI, RegClass, RP, MBB,
-                                    AccessMaskBit::SRW);
+                                    AccessMaskBit::SupportRW);
   writeValueToReg(IGC, APInt(IGC.getSubtarget<RISCVSubtarget>().getXLen(), VL),
                   ScratchRegVL);
   auto MIB = getInstBuilder(SupportMarker, *this, MBB, Ins,
@@ -4385,15 +4387,15 @@ void SnippyRISCVTarget::generateVSETVL(InstructionGenerationContext &IGC,
   const auto &RI = ProgCtx.getLLVMState().getRegInfo();
   auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
   auto RP = IGC.pushRegPool();
-  auto DstReg = RP->getAvailableRegister("for VSETVL dst", RI, RegClass, MBB,
-                                         SupportMarker ? AccessMaskBit::SRW
-                                                       : AccessMaskBit::GRW);
+  auto DstReg = RP->getAvailableRegister(
+      "for VSETVL dst", RI, RegClass, MBB,
+      SupportMarker ? AccessMaskBit::SupportRW : AccessMaskBit::PrimaryRW);
   const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
   // TODO: maybe just use GPRNoX0RegClassID class?
   auto [ScratchRegVL, ScratchRegVType] = RP->getNAvailableRegisters<2>(
       "registers for VSETVL VL and VType", RI, RegClass, MBB,
       /* Filter */ [](unsigned Reg) { return Reg == RISCV::X0; },
-      AccessMaskBit::SRW);
+      AccessMaskBit::SupportRW);
   writeValueToReg(IGC, APInt(ST.getXLen(), VL), ScratchRegVL);
   RP->addReserved(ScratchRegVL);
   writeValueToReg(IGC, APInt(ST.getXLen(), VTYPE), ScratchRegVType);
