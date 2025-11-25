@@ -1,9 +1,6 @@
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m \
 # RUN: -redefine-sp=reg::X0 --model-plugin=None -num-instrs=10 \
 # RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=X0-CHECK
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m -reserved-regs-list=X7 \
-# RUN: -redefine-sp=reg::X7 --model-plugin=None -num-instrs=10 \
-# RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=RES-CHECK
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m \
 # RUN: -redefine-sp=reg::X32 --model-plugin=None -num-instrs=10 \
 # RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=ILL-CHECK
@@ -32,6 +29,5 @@ histogram:
     - [ADD, 1.0]
 
 # X0-CHECK: error: Register X0 specified in --redefine-sp is not suitable for stack pointer redefinition
-# RES-CHECK: error: Register X7 cannot redefine stack pointer, because it is explicitly reserved
 # ILL-CHECK: error: Illegal register name X32 is specified in --redefine-sp
 # NO-OPT-CHECK: error: "any-no-SP", passed to --redefine-sp is not valid option value

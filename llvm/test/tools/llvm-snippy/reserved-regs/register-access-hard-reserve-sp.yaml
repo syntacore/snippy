@@ -1,0 +1,29 @@
+# RUN: llvm-snippy %s %S/Inputs/sections.yaml -model-plugin=None \
+# RUN:   |& FileCheck %s --dump-input=fail
+
+options:
+  mtriple: riscv64
+  march: rv64im
+  # Use dump-mi instead of dump-mf because it causes false match at liveins list
+  dump-mi: true
+  num-instrs: 2000
+  init-regs-in-elf: true
+  external-stack: true
+  honor-target-abi: on
+
+histogram:
+    - [SLL, 1.0]
+    - [REM, 1.0]
+    - [MUL, 1.0]
+    - [DIV, 1.0]
+
+register-reservation:
+  # reserve SP for primary access so it can be used only for stack manipulation
+  - X2: [SRW]
+  - X10: [RW]
+# This RegEx checks that x2 is not used as a source register
+# It matches occurences of x2 as either a first of 2 register operands or rs2
+# (both are not possible in SP use)
+# CHECK-NOT: x2{{(, \$)|($)}}
+# X10 reserved for all uses and no operations can use it
+# CHECK-NOT: x10

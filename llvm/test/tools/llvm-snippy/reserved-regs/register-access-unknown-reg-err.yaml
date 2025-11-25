@@ -1,0 +1,22 @@
+# RUN: not llvm-snippy %s %S/Inputs/sections.yaml -model-plugin=None \
+# RUN:   |& FileCheck %s --dump-input=fail
+
+options:
+  mtriple: riscv64
+  march: rv64im
+  # Use dump-mi instead of dump-mf because it causes false match at liveins list
+  dump-mi: true
+  num-instrs: 2000
+  init-regs-in-elf: true
+  external-stack: true
+  honor-target-abi: on
+
+histogram:
+    - [SLL, 1.0]
+    - [REM, 1.0]
+    - [MUL, 1.0]
+    - [DIV, 1.0]
+
+register-reservation:
+  - "nosuchregexists": [RW]
+# CHECK: error: Invalid register reservation regex: No registers were matched by regex "nosuchregexists"
