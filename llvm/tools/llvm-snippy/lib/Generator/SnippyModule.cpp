@@ -211,13 +211,8 @@ bool SnippyProgramContext::shouldSpillStackPointer() const {
 
 void SnippyProgramContext::initializeStackSection(
     const ProgramConfig &Settings) {
-  if (ExternalStack) {
-    if (getRegisterPool().isReserved(getStackPointer()))
-      snippy::fatal(State->getCtx(), "Cannot configure external stack",
-                    "stack pointer register is "
-                    "explicitly reserved.");
+  if (ExternalStack)
     return;
-  }
   if (!Settings.Sections.hasSection(SectionsDescriptions::StackSectionName))
     return;
   auto &Ctx = State->getCtx();

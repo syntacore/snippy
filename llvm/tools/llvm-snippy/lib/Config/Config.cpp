@@ -15,6 +15,7 @@
 #include "snippy/Config/FunctionDescriptions.h"
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
+#include "snippy/Config/RegisterAccess.h"
 #include "snippy/Config/Selfcheck.h"
 #include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/GeneratorUtils/RegisterPool.h"
@@ -23,6 +24,7 @@
 #include "snippy/Support/Utils.h"
 #include "snippy/Support/YAMLHistogram.h"
 #include "snippy/Target/Target.h"
+#include "llvm/CodeGen/MIRYamlMapping.h"
 #include "llvm/MC/MCRegisterInfo.h"
 
 #include "llvm/Support/Errc.h"
@@ -136,8 +138,10 @@ template <> struct yaml::MappingTraits<BurstGramData> {
   }
 };
 
-LLVM_SNIPPY_YAML_INSTANTIATE_HISTOGRAM_IO(snippy::OpcodeHistogramDecodedEntry);
+} // namespace llvm
 
+namespace llvm {
+LLVM_SNIPPY_YAML_INSTANTIATE_HISTOGRAM_IO(snippy::OpcodeHistogramDecodedEntry);
 namespace snippy {
 
 extern cl::OptionCategory Options;
@@ -176,7 +180,119 @@ bool hasExternalCallee(const FunctionDescs &FuncDescs,
 struct IncludeParsingWrapper final {
   std::vector<std::string> Includes;
 };
+
+static std::optional<unsigned> findRegisterByName(const SnippyTarget &SnippyTgt,
+                                                  const MCRegisterInfo &RI,
+                                                  StringRef Name) {
+  for (auto &RC : RI.regclasses()) {
+    auto RegIdx = std::find_if(RC.begin(), RC.end(), [&Name, &RI](auto &Reg) {
+      return Name == RI.getName(Reg);
+    });
+    if (RegIdx != RC.end())
+      return *RegIdx;
+  }
+  return SnippyTgt.findRegisterByName(Name);
+}
+
+static std::unordered_set<unsigned>
+getRegistersMatchedByRegex(Regex &RegEx, const MCRegisterInfo &MRI) {
+  std::unordered_set<unsigned> MatchedRegs;
+  for (auto &RC : MRI.regclasses()) {
+    auto Matched = llvm::make_filter_range(
+        RC, [&RegEx, &MRI](auto &R) { return RegEx.match(MRI.getName(R)); });
+    llvm::copy(Matched, std::inserter(MatchedRegs, MatchedRegs.end()));
+  }
+  return MatchedRegs;
+}
 } // namespace snippy
+
+struct RegisterAccessNormalization final {
+  struct RegisterAccess final {
+    std::string Name;
+    AccessMaskBits Acc;
+  };
+  std::vector<RegisterAccess> Data;
+  RegisterAccessNormalization(yaml::IO &Io) {}
+  RegisterAccessNormalization(yaml::IO &Io, RegisterAccessConfig &Cfg) {
+    void *Ctx = Io.getContext();
+    assert(Ctx &&
+           "To parse or output RegisterAccessConfig provide ConfigIOContext as "
+           "context for yaml::IO");
+    auto &State = static_cast<const ConfigIOContext *>(Ctx)->State;
+    auto &MRI = State.getRegInfo();
+    llvm::transform(Cfg, std::back_inserter(Data), [&MRI](auto &RegAcc) {
+      auto &&[Reg, Acc] = RegAcc;
+      return RegisterAccess{MRI.getName(Reg), static_cast<uint32_t>(Acc)};
+    });
+  }
+  RegisterAccessConfig denormalize(yaml::IO &Io) {
+    void *Ctx = Io.getContext();
+    assert(Ctx &&
+           "To parse or output RegisterAccessConfig provide ConfigIOContext as "
+           "context for yaml::IO");
+    auto &State = static_cast<const ConfigIOContext *>(Ctx)->State;
+    auto &MRI = State.getRegInfo();
+
+    RegisterAccessConfig Res;
+    for (auto &&Reg : Data) {
+      auto RegisterRegEx = createWholeWordMatchRegex(Reg.Name);
+      if (auto Err = RegisterRegEx.takeError())
+        snippy::fatal(formatv("Illegal register regex: \"{0}\": {1}", Reg.Name,
+                              toString(std::move(Err))));
+      auto MatchedRegs =
+          snippy::getRegistersMatchedByRegex(*RegisterRegEx, MRI);
+      if (MatchedRegs.empty())
+        snippy::fatal(
+            "Invalid register reservation regex",
+            formatv("No registers were matched by regex \"{0}\"", Reg.Name));
+      for (auto R : MatchedRegs)
+        Res.try_emplace(R, static_cast<AccessMaskBit>(Reg.Acc.value));
+    }
+    return Res;
+  }
+};
+
+} // namespace llvm
+LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::RegisterAccessNormalization::RegisterAccess)
+namespace llvm {
+
+template <> struct yaml::ScalarBitSetTraits<AccessMaskBits> {
+#ifdef LLVM_SNIPPY_ACCESS_MASK_DESC
+#error LLVM_SNIPPY_ACCESS_MASK_DESC is already defined
+#endif
+#define LLVM_SNIPPY_ACCESS_MASK_DESC(NAME, VAL)                                \
+  Io.bitSetCase(Val, #NAME, static_cast<uint32_t>(AccessMaskBit::NAME));
+
+  static void bitset(yaml::IO &Io, AccessMaskBits &Val) {
+    if (!Io.outputting()) {
+      LLVM_SNIPPY_ACCESS_MASKS
+    } else {
+      Io.bitSetCase(Val, AccessMaskNameOf<AccessMaskBit::PrimaryR>.data(),
+                    static_cast<uint32_t>(AccessMaskBit::PrimaryR));
+      Io.bitSetCase(Val, AccessMaskNameOf<AccessMaskBit::PrimaryW>.data(),
+                    static_cast<uint32_t>(AccessMaskBit::PrimaryW));
+      Io.bitSetCase(Val, AccessMaskNameOf<AccessMaskBit::SupportR>.data(),
+                    static_cast<uint32_t>(AccessMaskBit::SupportR));
+      Io.bitSetCase(Val, AccessMaskNameOf<AccessMaskBit::SupportW>.data(),
+                    static_cast<uint32_t>(AccessMaskBit::SupportW));
+    }
+  }
+#undef LLVM_SNIPPY_ACCESS_MASK_DESC
+};
+
+template <>
+struct yaml::CustomMappingTraits<RegisterAccessNormalization::RegisterAccess> {
+  static void inputOne(yaml::IO &Io, StringRef Key,
+                       RegisterAccessNormalization::RegisterAccess &Elem) {
+    Elem.Name = Key.str();
+    Io.mapRequired(Key.data(), Elem.Acc);
+  }
+
+  static void output(yaml::IO &Io,
+                     RegisterAccessNormalization::RegisterAccess &Elem) {
+    Io.mapRequired(Elem.Name.data(), Elem.Acc);
+  }
+};
 
 template <> struct yaml::MappingTraits<IncludeParsingWrapper> {
   static void mapping(yaml::IO &IO, snippy::IncludeParsingWrapper &IPW) {
@@ -347,30 +463,6 @@ static void reserveGlobalStateRegisters(RegPoolWrapper &RP,
   }
 }
 
-static std::optional<unsigned> findRegisterByName(const SnippyTarget &SnippyTgt,
-                                                  const MCRegisterInfo &RI,
-                                                  StringRef Name) {
-  for (auto &RC : RI.regclasses()) {
-    auto RegIdx = std::find_if(RC.begin(), RC.end(), [&Name, &RI](auto &Reg) {
-      return Name == RI.getName(Reg);
-    });
-    if (RegIdx != RC.end())
-      return *RegIdx;
-  }
-  return SnippyTgt.findRegisterByName(Name);
-}
-
-static std::unordered_set<unsigned>
-getRegistersMatchedByRegex(Regex &RegEx, const MCRegisterInfo &MRI) {
-  std::unordered_set<unsigned> MatchedRegs;
-  for (auto &RC : MRI.regclasses()) {
-    auto Matched = llvm::make_filter_range(
-        RC, [&RegEx, &MRI](auto &R) { return RegEx.match(MRI.getName(R)); });
-    llvm::copy(Matched, std::inserter(MatchedRegs, MatchedRegs.end()));
-  }
-  return MatchedRegs;
-}
-
 static std::unordered_set<unsigned>
 parseReservedRegisters(const SnippyTarget &Tgt, const MCRegisterInfo &MRI,
                        ArrayRef<std::string> RegList) {
@@ -401,20 +493,20 @@ parseReservedRegisters(const SnippyTarget &Tgt, const MCRegisterInfo &MRI,
   return Reserved;
 }
 
-static void reserveRegistersFromReservedList(RegPoolWrapper &RP,
-                                             const SnippyTarget &Tgt,
-                                             const MCRegisterInfo &RI,
-                                             const ProgramOptions &Opts) {
-  auto Reserved = parseReservedRegisters(Tgt, RI, Opts.ReservedRegsList);
+static RegisterAccessConfig
+deriveRegisterAccessesFromReservedList(const SnippyTarget &Tgt,
+                                       const MCRegisterInfo &MRI,
+                                       const ProgramOptions &Opts) {
+  RegisterAccessConfig Res;
+  auto Reserved = parseReservedRegisters(Tgt, MRI, Opts.ReservedRegsList);
   for (auto Reg : Reserved) {
     SmallVector<Register> PhysRegs;
-    Tgt.getPhysRegsFromUnit(Reg, RI, PhysRegs);
-    llvm::for_each(PhysRegs, [&RP](auto SimpleReg) {
-      RP.addReserved(SimpleReg, AccessMaskBit::GRW);
+    Tgt.getPhysRegsFromUnit(Reg, MRI, PhysRegs);
+    llvm::transform(PhysRegs, std::inserter(Res, Res.end()), [](auto Reg) {
+      return std::make_pair(Reg, AccessMaskBit::PrimaryRW);
     });
-    DEBUG_WITH_TYPE("snippy-regpool",
-                    (dbgs() << "Reserved with option:\n", RP.print(dbgs())));
   }
+  return Res;
 }
 
 // We want to spill certain global register (e.g. Thread Pointer and Global
@@ -510,12 +602,6 @@ static MCRegister getRealStackPointer(
       snippy::fatal(formatv("Illegal register name {0}"
                             " is specified in --redefine-sp",
                             RegStr));
-
-    if (RP.isReserved(Reg.value()))
-      snippy::fatal(
-          formatv("Register {0} cannot redefine stack pointer, because it is "
-                  "explicitly reserved.\n",
-                  RegStr));
 
     if (!StaticStack && Reg.value() == SP && HasSPRelativeInstrs)
       generateSPRelativeInstrsError(RedefineSP);
@@ -691,7 +777,22 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
   if (!ProgCfg.hasSectionToSpillGlobalRegs() &&
       Cfg.PassCfg.hasExternalCallees())
     reserveGlobalStateRegisters(RP, Tgt);
-  reserveRegistersFromReservedList(RP, Tgt, RI, Opts);
+  if (Opts.ReservedRegsListSpecified) {
+    if (!Cfg.PassCfg.RegisterAccess.empty())
+      snippy::fatal("Incompatible options",
+                    "Cannot use 'register-access' config and "
+                    "'reserved-regs-list' options at the same time.");
+    Cfg.PassCfg.RegisterAccess =
+        deriveRegisterAccessesFromReservedList(Tgt, RI, Opts);
+  }
+  if (ProgCfg.FollowTargetABI && ProgCfg.ExternalStack) {
+    Cfg.PassCfg.RegisterAccess[Tgt.getStackPointer()] = AccessMaskBit::RW;
+  }
+  for (auto &[Reg, Acc] : Cfg.PassCfg.RegisterAccess) {
+    RP.addReserved(Reg, Acc);
+    DEBUG_WITH_TYPE("snippy-regpool",
+                    (dbgs() << "Reserved with option:\n", RP.print(dbgs())));
+  }
   auto RegsSpilledToStack = parseSpilledRegistersOption(RP, Tgt, RI, Ctx, Opts);
   auto RegsSpilledToMem = getRegsToSpillToMem(Tgt, Cfg);
   bool HasSPRelativeInstrs = Cfg.Histogram.hasSPRelativeInstrs(OpCC, Tgt);
@@ -873,6 +974,9 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
   IO.mapOptional("fpu-config", Info.CommonPolicyCfg->FPUConfig);
   IO.mapOptional("operands-reinitialization",
                  Info.DefFlowConfig.OperandsReinitialization);
+  MappingNormalization<RegisterAccessNormalization, RegisterAccessConfig>
+      RegAcc(IO, Info.PassCfg.RegisterAccess);
+  IO.mapOptional("register-reservation", RegAcc->Data);
 }
 
 std::string yaml::MappingTraits<Config>::validate(yaml::IO &Io, Config &Info) {

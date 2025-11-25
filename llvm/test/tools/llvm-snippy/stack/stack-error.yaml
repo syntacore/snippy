@@ -17,9 +17,6 @@
 # RUN: not llvm-snippy %t/bad-stack.yaml -march=riscv64-linux-gnu -mattr=+m,+c \
 # RUN: -num-instrs=1000 \
 # RUN: --spilled-regs-list=X1 |& FileCheck %s -check-prefix=UNALIGNED
-# RUN: not llvm-snippy %t/no-stack.yaml -march=riscv64-linux-gnu -mattr=+m,+c \
-# RUN: --model-plugin=None -num-instrs=1000 -external-stack -redefine-sp=SP \
-# RUN: --spilled-regs-list=X1 -reserved-regs-list=X2 |& FileCheck %s -check-prefix=EXTSTACKSPRES
 #--- good-stack.yaml
 sections:
     - no:        1
@@ -85,4 +82,3 @@ histogram:
 # RESSPILL: error: Register "X1" cannot be spilled, because it is explicitly reserved.
 # NOSTACK: error: Cannot spill requested registers: no stack space allocated.
 # UNALIGNED: error: Stack configure failed: Stack section VMA must be 16 bytes aligned.
-# EXTSTACKSPRES: error: Cannot configure external stack: stack pointer register is explicitly reserved.

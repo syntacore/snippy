@@ -52,7 +52,7 @@ auto accessMaskToStr(AccessMaskBit Mask) {
     return #KEY;
 
   switch (Mask) {
-    LLVM_SNIPPY_ACCESS_MASKS
+    LLVM_SNIPPY_ACCESS_MASKS_BASIC
 #undef LLVM_SNIPPY_ACCESS_MASK_DESC
   }
 
