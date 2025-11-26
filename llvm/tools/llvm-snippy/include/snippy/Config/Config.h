@@ -112,6 +112,8 @@ public:
   CommonPolicyConfig(const ProgramConfig &ProgramCfg)
       : ProgramCfg(ProgramCfg) {}
 
+  CommonPolicyConfig(const CommonPolicyConfig &Other) = default;
+
   void setupImmHistMap(const OpcodeCache &OpCC, const OpcodeHistogram &OpHist) {
     if (!ImmHistogram.holdsAlternative<ImmediateHistogramRegEx>())
       return;
@@ -321,6 +323,7 @@ public:
   PassConfig PassCfg;
 
 private:
+  // Constructor with YAML parsing
   Config(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State,
          ProgramConfig &ProgCfg, const OpcodeCache &OpCC, bool ParseWithPlugin);
 
@@ -330,7 +333,22 @@ public:
          ProgramConfig &ProgCfg, const OpcodeCache &OpCC, bool ParseWithPlugin,
          std::optional<unsigned long long> Seed = std::nullopt);
 
+  Config(const Config &Other)
+      : ProgramCfg(Other.ProgramCfg), Histogram(Other.Histogram),
+        CommonPolicyCfg(
+            Other.CommonPolicyCfg
+                ? std::make_unique<CommonPolicyConfig>(*Other.CommonPolicyCfg)
+                : nullptr),
+        DefFlowConfig(Other.DefFlowConfig), BurstConfig(Other.BurstConfig),
+        PassCfg(Other.PassCfg) {}
+
   Config(Config &&) = default;
+
+  // ProgramCfg has reference type and can't be reassigned
+  Config &operator=(const Config &) = delete;
+  Config &operator=(Config &&) = delete;
+
+  ~Config() = default;
 
   // FIXME: legacy that must be removed
   // FIXME: this should return OpcGenHolder
