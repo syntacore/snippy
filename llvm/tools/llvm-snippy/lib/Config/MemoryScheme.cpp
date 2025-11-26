@@ -549,6 +549,17 @@ void MemoryBank::mergeRanges() {
   }
 }
 
+MemoryAccessSeq::MemoryAccessSeq(const MemoryAccessSeq &Other) {
+  for (const auto &MA : Other)
+    push_back(MA->copy());
+}
+
+MemoryAccessSeq &MemoryAccessSeq::operator=(const MemoryAccessSeq &Other) {
+  MemoryAccessSeq Tmp(Other);
+  std::swap(*this, Tmp);
+  return *this;
+}
+
 MemoryAccessRange::MemoryAccessRange(const SectionDesc &S, unsigned Alignment)
     : MemoryAccessRange(S.VMA, S.Size, Alignment, 0, 0) {}
 
