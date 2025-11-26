@@ -182,8 +182,40 @@ private:
 };
 
 class MemoryAccess;
-using MemoryAccessSeq = SmallVector<std::unique_ptr<MemoryAccess>>;
-using MemoryAccessIter = MemoryAccessSeq::iterator;
+
+class MemoryAccessSeq final {
+  SmallVector<std::unique_ptr<MemoryAccess>> Data;
+
+public:
+  MemoryAccessSeq() = default;
+  MemoryAccessSeq(MemoryAccessSeq &&) = default;
+  MemoryAccessSeq &operator=(MemoryAccessSeq &&) = default;
+
+  MemoryAccessSeq(const MemoryAccessSeq &Other);
+  MemoryAccessSeq &operator=(const MemoryAccessSeq &Other);
+
+  ~MemoryAccessSeq() = default;
+
+  using iterator = SmallVector<std::unique_ptr<MemoryAccess>>::iterator;
+  using value_type = std::unique_ptr<MemoryAccess>;
+
+  auto begin() { return Data.begin(); }
+  auto end() { return Data.end(); }
+  auto begin() const { return Data.begin(); }
+  auto end() const { return Data.end(); }
+
+  void push_back(std::unique_ptr<MemoryAccess> &&MA) {
+    Data.push_back(std::move(MA));
+  }
+
+  void emplace_back(std::unique_ptr<MemoryAccess> &&MA) {
+    Data.emplace_back(std::move(MA));
+  }
+
+  auto size() const { return Data.size(); }
+  bool empty() const { return Data.empty(); }
+  void clear() { Data.clear(); }
+};
 
 struct AddressRestriction {
   size_t AccessSize;
