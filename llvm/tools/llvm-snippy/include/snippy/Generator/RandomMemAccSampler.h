@@ -49,8 +49,7 @@ private:
 public:
   template <typename SectIt, typename AccIt>
   RandomMemoryAccessSampler(SectIt SectBegin, SectIt SectEnd, AccIt AccBegin,
-                            AccIt AccEnd,
-                            std::optional<unsigned> Alignment = std::nullopt,
+                            AccIt AccEnd, Align Alignment,
                             MemoryBank Restricted = {})
       : RestrictedMB(std::move(Restricted)) {
     auto Filtered = llvm::make_filter_range(
@@ -64,9 +63,8 @@ public:
     add(Copies.begin(), Copies.end());
     if (!Copies.empty())
       return;
-    assert(Alignment.has_value());
     auto AccRanges = llvm::map_range(Filtered, [Alignment](auto &S) {
-      return std::make_unique<MemoryAccessRange>(S, *Alignment);
+      return std::make_unique<MemoryAccessRange>(S, Alignment.value());
     });
     add(AccRanges.begin(), AccRanges.end());
   }

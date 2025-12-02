@@ -60,7 +60,7 @@ GeneratorContext::GeneratorContext(SnippyProgramContext &ProgCtx,
             [](const auto &A) -> const MemoryAccess & { return *A; });
         auto RandSampler = std::make_unique<RandomMemoryAccessSampler>(
             RWSections.begin(), RWSections.end(), BaseAccesses.begin(),
-            BaseAccesses.end(), Alignment.value(), MS.Restricted);
+            BaseAccesses.end(), Alignment, MS.Restricted);
         if (DumpRandMemAccesses)
           RandSampler->dump();
         std::vector<std::unique_ptr<IMemoryAccessSampler>> Samplers;
