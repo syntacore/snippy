@@ -1324,9 +1324,9 @@ static void diagnoseSelfcheckSection(LLVMState &State, const Config &Cfg,
 }
 
 static void
-checkValuegramOpcodeSettings(const OpcodeValuegramOpcodeSettings &Settings,
-                             unsigned Opcode, const OpcodeCache &OpCC,
-                             const LLVMState &State) {
+checkValuegramSamplerSettings(const OpcodeValuegramSettings &Settings,
+                              unsigned Opcode, const OpcodeCache &OpCC,
+                              const LLVMState &State) {
   const auto &InstrInfo = State.getInstrInfo();
   const auto &Tgt = State.getSnippyTarget();
   for (auto &&Cfg : Settings) {
@@ -1355,20 +1355,20 @@ checkValuegramOpcodeSettings(const OpcodeValuegramOpcodeSettings &Settings,
   }
 }
 
-static void checkOpcodeToValuegramMap(const CommonOpcodeToValuegramMap &Map,
-                                      const OpcodeHistogram &Histogram,
-                                      const OpcodeCache &OpCC,
-                                      const LLVMState &State) {
-  assert(!Map.empty());
+static void checkOpcodeToSettingsMap(const WeightedOpcToSettingsMaps &Map,
+                                     const OpcodeHistogram &Histogram,
+                                     const OpcodeCache &OpCC,
+                                     const LLVMState &State) {
   const auto &Tgt = State.getSnippyTarget();
   for (auto Opc : make_first_range(Histogram)) {
-    for (auto &&Sampler : make_first_range(Map)) {
-      if (!Sampler.count(Opc))
-        continue;
+    for (auto &&DataSourceMapAndWeight : Map) {
+      auto &DataSourceMap = DataSourceMapAndWeight.first;
+      assert(DataSourceMap.count(Opc));
       if (auto E = Tgt.checkOperandsReinitializationSupported(Opc))
         snippy::fatal("Invalid opcode valuegram", std::move(E));
-      const auto &OpcodeSettings = Sampler.getConfigForOpcode(Opc, OpCC);
-      checkValuegramOpcodeSettings(OpcodeSettings, Opc, OpCC, State);
+      auto &OpcodeSettings = DataSourceMap.getSettingsForOpcode(Opc, OpCC);
+      if (!OpcodeSettings.empty())
+        checkValuegramSamplerSettings(OpcodeSettings, Opc, OpCC, State);
     }
   }
 }
@@ -1563,8 +1563,8 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
     snippy::fatal("Usage of valuegram-operands-regs option with specified "
                   "operands-reinitialization is prohibited");
   if (DefFlowConfig.OperandsReinitialization.has_value())
-    checkOpcodeToValuegramMap(DefFlowConfig.OROpcodeMap, Histogram, OpCC,
-                              State);
+    checkOpcodeToSettingsMap(DefFlowConfig.OpcodeToORSettingsMap, Histogram,
+                             OpCC, State);
 }
 
 void Config::complete(LLVMState &State, const OpcodeCache &OpCC) {
