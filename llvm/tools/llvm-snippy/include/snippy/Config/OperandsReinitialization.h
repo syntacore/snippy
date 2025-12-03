@@ -10,11 +10,13 @@
 
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/Valuegram.h"
+#include "snippy/Support/APIntSampler.h"
 #include "snippy/Support/YAMLExtras.h"
 #include "snippy/Support/YAMLHistogram.h"
 #include "snippy/Support/YAMLUtils.h"
 
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #include "snippy/Support/RandUtil.h"
 
@@ -75,32 +77,45 @@ struct OpcodeValuegramUniformEntry final : public IOpcodeValuegramMapEntry {
 
 class OperandsValuesEntry final {
 public:
-  enum class EntryKind { Uniform, Value };
+  enum class EntryKind { Uniform, Value, Valuegram };
 
 private:
   EntryKind Kind = EntryKind::Uniform;
   double Weight = 1.0;
-  std::optional<FormattedAPIntWithSign> Value;
+  std::variant<std::monostate, FormattedAPIntWithSign, Valuegram> Underlying;
 
 public:
   OperandsValuesEntry() = default;
 
   OperandsValuesEntry(const FormattedAPIntWithSign &Val)
-      : Kind(EntryKind::Value), Value(Val) {}
+      : Kind(EntryKind::Value), Underlying(Val) {}
 
-  OperandsValuesEntry(FormattedAPIntWithSign &&Val)
-      : Kind(EntryKind::Value), Value(Val) {}
+  OperandsValuesEntry(const Valuegram &Val)
+      : Kind(EntryKind::Valuegram), Underlying(Val) {}
 
   EntryKind getKind() const { return Kind; }
   double getWeight() const { return Weight; }
+
+  auto get() const & { return Underlying; }
+
   FormattedAPIntWithSign &getValue() & {
-    assert(Value.has_value());
-    return Value.value();
+    assert(std::holds_alternative<FormattedAPIntWithSign>(Underlying));
+    return std::get<FormattedAPIntWithSign>(Underlying);
   }
 
   const FormattedAPIntWithSign &getValue() const & {
-    assert(Value.has_value());
-    return Value.value();
+    assert(std::holds_alternative<FormattedAPIntWithSign>(Underlying));
+    return std::get<FormattedAPIntWithSign>(Underlying);
+  }
+
+  Valuegram &getValuegram() & {
+    assert(std::holds_alternative<Valuegram>(Underlying));
+    return std::get<Valuegram>(Underlying);
+  }
+
+  const Valuegram &getValuegram() const & {
+    assert(std::holds_alternative<Valuegram>(Underlying));
+    return std::get<Valuegram>(Underlying);
   }
 };
 
@@ -119,14 +134,13 @@ struct OperandsValuesEntryScalarMapper final {
       OS << Str.get();
       return;
     }
+    default:
+      llvm_unreachable("Unrecognized OperandsValuesEntry kind");
     }
-    llvm_unreachable("Unrecognized OperandsValuesEntry kind");
   }
 };
 
 struct OperandsValuesEntryMapMapper final {};
-
-struct OperandsValuesEntrySeqMapper final {};
 
 using OperandsValuesSettings = SmallVector<OperandsValuesEntry>;
 
@@ -200,6 +214,7 @@ public:
   }
 
   IOpcodeValuegramEntry::EntryKind getKind() const {
+    assert(UnderlyingEntry);
     return UnderlyingEntry->getKind();
   }
 
@@ -222,10 +237,10 @@ public:
   }
 };
 
-struct OpcodeValuegramOpcodeSettings final
+struct OpcodeValuegramSettings final
     : public SmallVector<OpcodeValuegramOpcSettingsEntry> {
 
-  OpcodeValuegramOpcodeSettings() {}
+  OpcodeValuegramSettings() {}
 
   auto weights() const {
     return map_range(*this, [&](auto &&Entry) { return Entry.getWeight(); });
@@ -241,31 +256,228 @@ struct OpcodeValuegramOpcodeSettings final
   auto weightsEnd() { return weights().end(); }
 };
 
+struct IOperandAPIntSampler {
+  virtual Expected<APInt> sampleByIdx(unsigned Idx, unsigned BitWidth) = 0;
+  virtual std::unique_ptr<IOperandAPIntSampler> copy() const = 0;
+  virtual ~IOperandAPIntSampler() = default;
+};
+
+class WeightedOperandAPIntSamplerSet final : public IOperandAPIntSampler {
+  using Distribution = std::discrete_distribution<unsigned>;
+  using SamplersSetT = std::vector<std::unique_ptr<IOperandAPIntSampler>>;
+
+  Distribution Dist;
+  SamplersSetT Samplers;
+
+  WeightedOperandAPIntSamplerSet() = default;
+
+public:
+  WeightedOperandAPIntSamplerSet(const Distribution &D, SamplersSetT &&Set)
+      : Dist(D), Samplers(std::move(Set)) {}
+
+  template <typename T>
+  WeightedOperandAPIntSamplerSet(T &&WeightedSamplers)
+      : Dist([&]() {
+          auto Weights = map_range(WeightedSamplers,
+                                   [](const auto &Elt) { return Elt.Weight; });
+          return Distribution{Weights.begin(), Weights.end()};
+        }()) {
+    llvm::copy(map_range(WeightedSamplers,
+                         [](auto &&Elt) { return std::move(Elt.Sampler); }),
+               std::back_inserter(Samplers));
+  }
+
+  Expected<APInt> sampleByIdx(unsigned Idx, unsigned BitWidth) override {
+    auto SamplerIdx = Dist(RandEngine::engine());
+    assert(Samplers.size() > SamplerIdx);
+    return Samplers[SamplerIdx]->sampleByIdx(Idx, BitWidth);
+  }
+
+  std::unique_ptr<IOperandAPIntSampler> copy() const override {
+    SamplersSetT SamplersCopy;
+    SamplersCopy.reserve(Samplers.size());
+    transform(Samplers, std::back_inserter(SamplersCopy),
+              [](const auto &S) { return S->copy(); });
+    return std::make_unique<WeightedOperandAPIntSamplerSet>(
+        Dist, std::move(SamplersCopy));
+  }
+};
+
+struct OpcodeValuegramUniformSampler final : public IOperandAPIntSampler {
+  Expected<APInt> sampleByIdx(unsigned, unsigned BitWidth) override {
+    return UniformAPIntSamler::generate(BitWidth);
+  }
+  std::unique_ptr<IOperandAPIntSampler> copy() const override {
+    return std::make_unique<OpcodeValuegramUniformSampler>();
+  }
+};
+
+struct OpcodeValuegramBitpatternSampler final : public IOperandAPIntSampler {
+  Expected<APInt> sampleByIdx(unsigned, unsigned BitWidth) override {
+    return BitPatternAPIntSamler::generate(BitWidth);
+  }
+  std::unique_ptr<IOperandAPIntSampler> copy() const override {
+    return std::make_unique<OpcodeValuegramBitpatternSampler>();
+  }
+};
+
+class OpcodeValuegramConstantSampler final : public IOperandAPIntSampler {
+  APInt Val;
+
+public:
+  OpcodeValuegramConstantSampler(APInt Val) : Val(Val) {}
+
+  Expected<APInt> sampleByIdx(unsigned, unsigned) override { return Val; }
+
+  std::unique_ptr<IOperandAPIntSampler> copy() const override {
+    return std::make_unique<OpcodeValuegramConstantSampler>(Val);
+  }
+};
+
+class OpcodeValuegramRangeSampler final : public IOperandAPIntSampler {
+  APIntRangeSampler OwnedSampler;
+
+public:
+  OpcodeValuegramRangeSampler(APInt Min, APInt Max, bool IsSigned = false)
+      : OwnedSampler([&]() {
+          auto SamplerOrErr = APIntRangeSampler::create(Min, Max, IsSigned);
+          if (!SamplerOrErr)
+            snippy::fatal("Internal error", SamplerOrErr.takeError());
+          return *SamplerOrErr;
+        }()) {}
+
+  Expected<APInt> sampleByIdx(unsigned, unsigned) override {
+    return OwnedSampler.sample();
+  }
+
+  std::unique_ptr<IOperandAPIntSampler> copy() const override {
+    return std::make_unique<OpcodeValuegramRangeSampler>(*this);
+  }
+};
+
+class OpcodeValuegramValuegramSampler final : public IOperandAPIntSampler {
+  Valuegram Cfg;
+  // Even though we already know an operand index here and it seems
+  // like we could just use IAPIntSampler, we need to
+  // pass a BitWidth as sampleByIdx() argument, so we can't
+  std::unique_ptr<IOperandAPIntSampler> OwnedSampler;
+
+public:
+  OpcodeValuegramValuegramSampler(const Valuegram &Valuegram,
+                                  std::unique_ptr<IOperandAPIntSampler> Owned)
+      : Cfg(Valuegram), OwnedSampler(std::move(Owned)) {}
+  OpcodeValuegramValuegramSampler(const Valuegram &Valuegram);
+  Expected<APInt> sampleByIdx(unsigned Idx, unsigned BitWidth) override {
+    assert(OwnedSampler);
+    return OwnedSampler->sampleByIdx(Idx, BitWidth);
+  }
+  std::unique_ptr<IOperandAPIntSampler> copy() const override {
+    assert(OwnedSampler);
+    return std::make_unique<OpcodeValuegramValuegramSampler>(
+        Cfg, OwnedSampler->copy());
+  }
+};
+
+class OpcodeValuegramOperandsSampler final : public IOperandAPIntSampler {
+  using OpSampler = std::unique_ptr<IOperandAPIntSampler>;
+  std::vector<OpSampler> ValSamplers;
+
+public:
+  OpcodeValuegramOperandsSampler(std::vector<OpSampler> &&Samplers)
+      : ValSamplers(std::move(Samplers)) {}
+
+  OpcodeValuegramOperandsSampler(const OpcodeValuegramOperandsEntry &Entry);
+
+  Expected<APInt> sampleByIdx(unsigned OpIdx, unsigned BitWidth) override {
+    auto ValSamplersSize = ValSamplers.size();
+    if (OpIdx >= ValSamplersSize)
+      return createStringError(
+          makeErrorCode(Errc::InvalidArgument),
+          formatv("Incorrect operand index for opcode valuegram operands "
+                  "sampler. Expected {0} operands but {1} index provided",
+                  ValSamplersSize, OpIdx));
+    return ValSamplers[OpIdx]->sampleByIdx(OpIdx, BitWidth);
+  }
+
+  std::unique_ptr<IOperandAPIntSampler> copy() const override {
+    std::vector<OpSampler> SamplersCopy;
+    SamplersCopy.reserve(ValSamplers.size());
+    transform(ValSamplers, std::back_inserter(SamplersCopy),
+              [](const auto &S) { return S->copy(); });
+    return std::make_unique<OpcodeValuegramOperandsSampler>(
+        std::move(SamplersCopy));
+  }
+};
+
+template <>
+std::unique_ptr<IOperandAPIntSampler>
+WeightedAPIntSamplerSetBuilder<IOperandAPIntSampler>::build();
+
+class OpcodeSettingsSampler final : public IOperandAPIntSampler {
+  std::unique_ptr<IOperandAPIntSampler> ContainedSampler;
+  OpcodeValuegramSettings Cfg;
+
+public:
+  OpcodeSettingsSampler(const OpcodeValuegramSettings &Settings);
+
+  Expected<APInt> sampleByIdx(unsigned Idx, unsigned BitWidth) override {
+    assert(ContainedSampler);
+    return ContainedSampler->sampleByIdx(Idx, BitWidth);
+  }
+
+  std::unique_ptr<IOperandAPIntSampler> copy() const override {
+    return std::make_unique<OpcodeSettingsSampler>(*this);
+  }
+
+  const OpcodeValuegramSettings getSamplerSettings() const { return Cfg; }
+
+public:
+  OpcodeSettingsSampler(const OpcodeSettingsSampler &Oth) : Cfg(Oth.Cfg) {
+    assert(Oth.ContainedSampler);
+    ContainedSampler = Oth.ContainedSampler->copy();
+  }
+
+  OpcodeSettingsSampler &operator=(const OpcodeSettingsSampler &Oth) {
+    OpcodeSettingsSampler Tmp(Oth);
+    std::swap(Tmp, *this);
+    return *this;
+  }
+
+  OpcodeSettingsSampler(OpcodeSettingsSampler &&Oth) = default;
+  OpcodeSettingsSampler &operator=(OpcodeSettingsSampler &&Oth) = default;
+  ~OpcodeSettingsSampler() = default;
+};
+
 struct OpcodeValuegramRegEx final {
   std::string Expr;
-  OpcodeValuegramOpcodeSettings Data;
+  OpcodeValuegramSettings Data;
 };
 
 using OpcodesValuegram = std::vector<OpcodeValuegramRegEx>;
 
-class OpcodeToValuegramMap final {
-  using MapTy = std::unordered_map<unsigned, OpcodeValuegramOpcodeSettings>;
+class OpcodeToSettingsMap final {
+  using MapTy = std::unordered_map<unsigned, OpcodeValuegramSettings>;
 
   MapTy Data;
 
 public:
-  OpcodeToValuegramMap(const OpcodesValuegram &OpcVal,
-                       const OpcodeHistogram &OpcHist, const OpcodeCache &OpCC);
+  OpcodeToSettingsMap(const OpcodesValuegram &OpcVal,
+                      const OpcodeHistogram &OpcHist, const OpcodeCache &OpCC);
 
-  OpcodeToValuegramMap() = default;
+  OpcodeToSettingsMap() = default;
 
   bool count(unsigned Opc) const { return Data.count(Opc); }
 
-  const OpcodeValuegramOpcodeSettings &
-  getConfigForOpcode(unsigned Opc, const OpcodeCache &OpCC) const {
+  const OpcodeValuegramSettings &
+  getSettingsForOpcode(unsigned Opc, const OpcodeCache &OpCC) const {
     assert(Data.count(Opc) && "Opcode was not found in opcode valuegram");
     return Data.at(Opc);
   }
+
+  auto begin() { return Data.begin(); }
+  auto begin() const { return Data.begin(); }
+  auto end() { return Data.end(); }
+  auto end() const { return Data.end(); }
 };
 
 class OperandsReinitDataSource final {
@@ -300,31 +512,77 @@ public:
 
 using OperandsReinitializationConfig = std::vector<OperandsReinitDataSource>;
 
-class CommonOpcodeToValuegramMap final {
-  using Distribution = std::discrete_distribution<size_t>;
-  using WeightedValuegramMaps =
-      SmallVector<std::pair<OpcodeToValuegramMap, double>>;
+class WeightedOpcToSettingsMaps final {
+  using WeightedMap = std::pair<OpcodeToSettingsMap, double>;
+  using WeightedSettingsMaps = SmallVector<WeightedMap>;
 
-  WeightedValuegramMaps MapsAndWeights;
-
-private:
-  SmallVector<double> createContainingMapsWeightsRange(unsigned Opcode) const;
+  WeightedSettingsMaps Maps;
 
 public:
-  CommonOpcodeToValuegramMap(const OperandsReinitializationConfig &ORConfig,
-                             const OpcodeHistogram &OpcHist,
-                             const OpcodeCache &OpCC);
+  WeightedOpcToSettingsMaps(const OperandsReinitializationConfig &ORConfig,
+                            const OpcodeHistogram &OpcHist,
+                            const OpcodeCache &OpCC);
 
-  CommonOpcodeToValuegramMap() = default;
+  WeightedOpcToSettingsMaps() = default;
 
-  const OpcodeValuegramOpcodeSettings &
-  getConfigForOpcode(unsigned Opc, const OpcodeCache &OpCC) const;
+  auto begin() { return Maps.begin(); }
+  auto begin() const { return Maps.begin(); }
+  auto end() { return Maps.end(); }
+  auto end() const { return Maps.end(); }
+  auto empty() const { return Maps.empty(); }
+};
 
-  auto begin() { return MapsAndWeights.begin(); }
-  auto begin() const { return MapsAndWeights.begin(); }
-  auto end() { return MapsAndWeights.end(); }
-  auto end() const { return MapsAndWeights.end(); }
-  auto empty() const { return MapsAndWeights.empty(); }
+class OpcodeValuegramSampler final {
+  // OptSampler will be std::nullopt if no regex matches the opcode
+  using OptSampler = std::optional<OpcodeSettingsSampler>;
+  using MapTy = std::unordered_map<unsigned, OptSampler>;
+
+  MapTy Map;
+
+public:
+  OpcodeValuegramSampler(const OpcodeToSettingsMap &SettingsMap) {
+    for (auto &&OpcAndSett : SettingsMap) {
+      const auto &Settings = OpcAndSett.second;
+      OptSampler Sampler;
+      if (!Settings.empty())
+        Sampler = OpcodeSettingsSampler(Settings);
+      Map.emplace(OpcAndSett.first, Sampler);
+    }
+  }
+
+  Expected<std::optional<APInt>>
+  sampleForOpcode(unsigned Opcode, unsigned OpIdx, unsigned BitWidth) {
+    assert(Map.count(Opcode));
+    auto &Sampler = Map.at(Opcode);
+    if (!Sampler.has_value())
+      return std::nullopt;
+    return Sampler->sampleByIdx(OpIdx, BitWidth);
+  }
+};
+
+class OperandsReinitializationSampler final {
+  using Distribution = std::discrete_distribution<size_t>;
+  using DataSourceSampler = OpcodeValuegramSampler;
+  using DataSourceSamplers = SmallVector<DataSourceSampler>;
+
+  DataSourceSamplers Samplers;
+  Distribution Dist;
+
+public:
+  OperandsReinitializationSampler(
+      const WeightedOpcToSettingsMaps &WeightedMaps) {
+    auto Weights = make_second_range(WeightedMaps);
+    Dist = Distribution(Weights.begin(), Weights.end());
+    transform(make_first_range(WeightedMaps), std::back_inserter(Samplers),
+              [](const auto &Map) { return DataSourceSampler{Map}; });
+  }
+
+  Expected<std::optional<APInt>>
+  sampleForOpcode(unsigned Opcode, unsigned OpIdx, unsigned BitWidth) {
+    auto SamplerIdx = Dist(RandEngine::engine());
+    assert(SamplerIdx < Samplers.size());
+    return Samplers[SamplerIdx].sampleForOpcode(Opcode, OpIdx, BitWidth);
+  }
 };
 
 struct OpcodeValuegramEntryScalarMapper final {};
@@ -338,10 +596,6 @@ struct HistogramSubsetForOpcodeValuegram final {};
 LLVM_SNIPPY_YAML_DECLARE_HISTOGRAM_TRAITS(
     std::unique_ptr<IOpcodeValuegramEntry>, HistogramSubsetForOpcodeValuegram);
 
-std::optional<APInt> sampleOpcodeValuegramForOneReg(
-    const OpcodeValuegramOpcodeSettings &OpcValuegram, unsigned OperandIndex,
-    unsigned NumBits, std::discrete_distribution<size_t> &Dist, unsigned Opcode,
-    [[maybe_unused]] const MCInstrInfo &II);
 } // namespace snippy
 
 LLVM_SNIPPY_YAML_DECLARE_IS_HISTOGRAM_DENORM_ENTRY(
@@ -353,9 +607,6 @@ void yamlize(IO &IO, const snippy::OpcodeValuegramEntryScalarMapper &Seq, bool,
              EmptyContext &Ctx);
 
 void yamlize(IO &IO, const snippy::OperandsValuesEntryMapMapper &Seq, bool,
-             EmptyContext &Ctx);
-
-void yamlize(IO &IO, const snippy::OperandsValuesEntrySeqMapper &Seq, bool,
              EmptyContext &Ctx);
 
 } // namespace yaml
@@ -414,7 +665,9 @@ struct yaml::PolymorphicTraits<snippy::OpcodeValuegramOpcSettingsEntry> {
 
 template <> struct yaml::PolymorphicTraits<snippy::OperandsValuesEntry> {
   static NodeKind getKind(const snippy::OperandsValuesEntry &Entry) {
-    return NodeKind::Scalar;
+    return Entry.getKind() == snippy::OperandsValuesEntry::EntryKind::Valuegram
+               ? NodeKind::Sequence
+               : NodeKind::Scalar;
   }
 
   static const snippy::OperandsValuesEntryScalarMapper
@@ -427,9 +680,10 @@ template <> struct yaml::PolymorphicTraits<snippy::OperandsValuesEntry> {
     return snippy::OperandsValuesEntryMapMapper{};
   }
 
-  static const snippy::OperandsValuesEntrySeqMapper
-  getAsSequence(snippy::OperandsValuesEntry &Entry) {
-    return snippy::OperandsValuesEntrySeqMapper{};
+  static snippy::Valuegram &getAsSequence(snippy::OperandsValuesEntry &Entry) {
+    if (Entry.getKind() != snippy::OperandsValuesEntry::EntryKind::Valuegram)
+      Entry = snippy::OperandsValuesEntry{snippy::Valuegram{}};
+    return Entry.getValuegram();
   }
 };
 
@@ -447,7 +701,6 @@ LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(
 LLVM_SNIPPY_YAML_DECLARE_SCALAR_ENUMERATION_TRAITS(
     snippy::OperandsReinitDataSource::Kind);
 LLVM_SNIPPY_YAML_DECLARE_SEQUENCE_TRAITS(
-    snippy::OpcodeValuegramOpcodeSettings,
-    snippy::OpcodeValuegramOpcSettingsEntry);
+    snippy::OpcodeValuegramSettings, snippy::OpcodeValuegramOpcSettingsEntry);
 
 } // namespace llvm

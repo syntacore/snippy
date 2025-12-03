@@ -76,7 +76,9 @@ struct WeightedAPIntSamplerSet final : public IAPIntSampler {
 
 } // namespace
 
-std::unique_ptr<IAPIntSampler> WeightedAPIntSamplerSetBuilder::build() {
+template <>
+std::unique_ptr<IAPIntSampler>
+WeightedAPIntSamplerSetBuilder<IAPIntSampler>::build() {
   return std::make_unique<WeightedAPIntSamplerSet>(WeightedSamplers);
 }
 
