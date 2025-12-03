@@ -1,0 +1,49 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+include:
+  - ../../Inputs/sections.yaml
+
+options:
+    mtriple: riscv64-unknown-elf
+    mattr: +f
+    dump-mf: on
+    num-instrs: 200
+
+histogram:
+    - [FADD_S, 1.0]
+
+operands-reinitialization:
+    - type: valuegram
+      weight: 1.0
+      opcodes:
+        - "FADD_S":
+            - type: operands
+              values:
+                - - [0x234, 1.0]
+                  - [0x235, 1.0]
+                  - type: bitvalue
+                    value: 0x236
+                  - [bitpattern, 1.0]
+                  - type: bitrange
+                    min: 0x237
+                    max: 0x238
+                - 0x431
+
+# The list of value pairs that we expect:
+#   (0x234, 0x431), (0x235, 0x431), (0x236, 0x431),
+#   (0x237, 0x431), (0x238, 0x431), (bitpattern, 0x431)
+
+#          An example of what we're matching:
+#               _
+#              |    $x7 = ADDI $x0, 564, pcsections <0x5584a41a9008>
+#              |    $f0_f = FMV_W_X $x7, pcsections <0x5584a41a9008>
+#      Reinit <     $x25 = ADDI $x0, 1073, pcsections <0x5584a41a9008>
+#              |_   $f17_f = FMV_W_X $x25, pcsections <0x5584a41a9008>
+#                   $f29_f = FADD_S $f0_f, $f17_f, 1
+
+
+# CHECK: [[XREG1:\$x[0-9]+]] = ADDI{{.*}}, 564{{.*[[:space:]].*}}[[FREG1:\$f[0-9]+_f]] = FMV_W_X [[XREG1]]{{.*[[:space:]].*}}[[XREG2:\$x[0-9]+]] = ADDI{{.*}}, 1073,{{.*[[:space:]].*}}[[FREG2:\$f[0-9]+_f]] = FMV_W_X [[XREG2]]{{.*[[:space:]].*}}[[FREG3:\$f[0-9]+_f]] = FADD_S [[FREG1]], [[FREG2]]{{.*}}
+# CHECK: [[XREG3:\$x[0-9]+]] = ADDI{{.*}}, 565{{.*[[:space:]].*}}[[FREG4:\$f[0-9]+_f]] = FMV_W_X [[XREG3]]{{.*[[:space:]].*}}[[XREG4:\$x[0-9]+]] = ADDI{{.*}}, 1073,{{.*[[:space:]].*}}[[FREG5:\$f[0-9]+_f]] = FMV_W_X [[XREG4]]{{.*[[:space:]].*}}[[FREG6:\$f[0-9]+_f]] = FADD_S [[FREG4]], [[FREG5]]{{.*}}
+# CHECK: [[XREG5:\$x[0-9]+]] = ADDI{{.*}}, 566{{.*[[:space:]].*}}[[FREG7:\$f[0-9]+_f]] = FMV_W_X [[XREG5]]{{.*[[:space:]].*}}[[XREG6:\$x[0-9]+]] = ADDI{{.*}}, 1073,{{.*[[:space:]].*}}[[FREG8:\$f[0-9]+_f]] = FMV_W_X [[XREG6]]{{.*[[:space:]].*}}[[FREG9:\$f[0-9]+_f]] = FADD_S [[FREG7]], [[FREG8]]{{.*}}
+# CHECK: [[XREG7:\$x[0-9]+]] = ADDI{{.*}}, 567{{.*[[:space:]].*}}[[FREG10:\$f[0-9]+_f]] = FMV_W_X [[XREG7]]{{.*[[:space:]].*}}[[XREG8:\$x[0-9]+]] = ADDI{{.*}}, 1073,{{.*[[:space:]].*}}[[FREG11:\$f[0-9]+_f]] = FMV_W_X [[XREG8]]{{.*[[:space:]].*}}[[FREG12:\$f[0-9]+_f]] = FADD_S [[FREG10]], [[FREG11]]{{.*}}
+# CHECK: [[XREG9:\$x[0-9]+]] = ADDI{{.*}}, 568{{.*[[:space:]].*}}[[FREG13:\$f[0-9]+_f]] = FMV_W_X [[XREG9]]{{.*[[:space:]].*}}[[XREG10:\$x[0-9]+]] = ADDI{{.*}}, 1073,{{.*[[:space:]].*}}[[FREG14:\$f[0-9]+_f]] = FMV_W_X [[XREG10]]{{.*[[:space:]].*}}[[FREG15:\$f[0-9]+_f]] = FADD_S [[FREG13]], [[FREG14]]{{.*}}

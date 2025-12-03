@@ -79,20 +79,16 @@ public:
 
 class OperandsReinitializationOpcodeValuegramSource final
     : public IOperandsReinitializationValueSource {
-  const CommonOpcodeToValuegramMap &OpcodeValuegramMap;
+  OperandsReinitializationSampler Sampler;
 
 public:
   OperandsReinitializationOpcodeValuegramSource(
-      const CommonOpcodeToValuegramMap &OpcValuegramMap)
-      : OpcodeValuegramMap(OpcValuegramMap) {}
+      const WeightedOpcToSettingsMaps &OpcToSettMap)
+      : Sampler(OpcToSettMap) {}
 
   Expected<std::optional<APInt>> sampleRegisterOperandValueForInstr(
       MCOperand Operand, unsigned OperandIndex, const MCInstrDesc &InstrDesc,
       InstructionGenerationContext &IGC) override;
-
-  const CommonOpcodeToValuegramMap &getOpcodeToValuegramMap() const & {
-    return OpcodeValuegramMap;
-  }
 
   std::unique_ptr<IOperandsReinitializationValueSource> clone() const override {
     return std::make_unique<OperandsReinitializationOpcodeValuegramSource>(
