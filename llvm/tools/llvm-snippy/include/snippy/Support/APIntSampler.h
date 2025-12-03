@@ -81,27 +81,27 @@ private:
   uint32_t TheNumBits;
 };
 
+template <typename ISampler = IAPIntSampler>
 class WeightedAPIntSamplerSetBuilder {
   struct WeightedSamplerT {
-    WeightedSamplerT(std::unique_ptr<IAPIntSampler> SamplerParam,
-                     double WeightParam)
+    WeightedSamplerT(std::unique_ptr<ISampler> SamplerParam, double WeightParam)
         : Sampler(std::move(SamplerParam)), Weight(WeightParam) {}
-    std::unique_ptr<IAPIntSampler> Sampler;
+    std::unique_ptr<ISampler> Sampler;
     double Weight;
   };
 
 public:
   WeightedAPIntSamplerSetBuilder() = default;
 
-  template <typename SamplerT, typename = std::enable_if_t<
-                                   std::is_base_of_v<IAPIntSampler, SamplerT>>>
+  template <typename SamplerT,
+            typename = std::enable_if_t<std::is_base_of_v<ISampler, SamplerT>>>
   void addOwned(SamplerT Sampler, double Weight) {
     WeightedSamplers.emplace_back(
         /*Sampler=*/std::make_unique<SamplerT>(std::move(Sampler)),
         /*Weight=*/Weight);
   }
 
-  void addOwned(std::unique_ptr<IAPIntSampler> Sampler, double Weight) {
+  void addOwned(std::unique_ptr<ISampler> Sampler, double Weight) {
     WeightedSamplers.emplace_back(
         /*Sampler=*/std::move(Sampler),
         /*Weight=*/Weight);
@@ -109,7 +109,7 @@ public:
 
   bool isEmpty() const { return WeightedSamplers.empty(); }
 
-  std::unique_ptr<IAPIntSampler> build();
+  std::unique_ptr<ISampler> build();
 
 private:
   std::vector<WeightedSamplerT> WeightedSamplers;

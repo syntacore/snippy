@@ -465,7 +465,7 @@ namespace snippy {
 Expected<std::unique_ptr<IAPIntSampler>>
 createFloatOverwriteValueSampler(const FloatOverwriteSettings &Settings,
                                  const fltSemantics &Semantics) {
-  snippy::WeightedAPIntSamplerSetBuilder Builder;
+  snippy::WeightedAPIntSamplerSetBuilder<IAPIntSampler> Builder;
   auto BitWidth = APFloat::semanticsSizeInBits(Semantics);
 
   Expected<const FloatOverwriteValues *> CfgOrErr =
