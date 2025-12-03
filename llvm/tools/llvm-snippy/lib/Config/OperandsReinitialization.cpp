@@ -12,6 +12,7 @@
 #include "snippy/Support/YAMLExtras.h"
 #include "snippy/Support/YAMLHistogram.h"
 
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 
 #include <unordered_set>
@@ -173,6 +174,61 @@ StringRef toString(IOpcodeValuegramEntry::EntryKind Kind) {
   return "invalid";
 }
 
+template <>
+std::unique_ptr<IOperandAPIntSampler>
+WeightedAPIntSamplerSetBuilder<IOperandAPIntSampler>::build() {
+  return std::make_unique<WeightedOperandAPIntSamplerSet>(WeightedSamplers);
+}
+
+static std::unique_ptr<IOperandAPIntSampler>
+createSamplerForVal(const OperandsValuesEntry &Val) {
+  return std::visit(
+      OverloadedCallable(
+          [](const std::monostate &) -> std::unique_ptr<IOperandAPIntSampler> {
+            return std::make_unique<OpcodeValuegramUniformSampler>();
+          },
+          [](const FormattedAPIntWithSign &Val)
+              -> std::unique_ptr<IOperandAPIntSampler> {
+            return std::make_unique<OpcodeValuegramConstantSampler>(
+                Val.getVal());
+          },
+          [](const Valuegram &Vgram) -> std::unique_ptr<IOperandAPIntSampler> {
+            return std::make_unique<OpcodeValuegramValuegramSampler>(Vgram);
+          }),
+      Val.get());
+}
+
+OpcodeValuegramOperandsSampler::OpcodeValuegramOperandsSampler(
+    const OpcodeValuegramOperandsEntry &Entry) {
+  transform(Entry.Values, std::back_inserter(ValSamplers),
+            [&](const auto &Val) { return createSamplerForVal(Val); });
+}
+
+static std::unique_ptr<IOperandAPIntSampler>
+createSamplerForOpcSettings(const OpcodeValuegramOpcSettingsEntry &Entry) {
+  return TypeSwitch<const IOpcodeValuegramEntry *,
+                    std::unique_ptr<IOperandAPIntSampler>>(&Entry.get())
+      .Case([](const OpcodeValuegramUniformEntry *) {
+        return std::make_unique<OpcodeValuegramUniformSampler>();
+      })
+      .Case([](const OpcodeValuegramOperandsEntry *Operands) {
+        return std::make_unique<OpcodeValuegramOperandsSampler>(*Operands);
+      })
+      .Default([](auto &&) -> std::unique_ptr<IOperandAPIntSampler> {
+        llvm_unreachable("Unhandled OpcodeValuegramOpcSettingsEntry type");
+      });
+}
+
+OpcodeSettingsSampler::OpcodeSettingsSampler(
+    const OpcodeValuegramSettings &Settings)
+    : Cfg(Settings) {
+  assert(!Settings.empty() && "Can't construct empty weighted sampler set");
+  WeightedAPIntSamplerSetBuilder<IOperandAPIntSampler> Builder;
+  for (auto &&Entry : Settings)
+    Builder.addOwned(createSamplerForOpcSettings(Entry), Entry.getWeight());
+  ContainedSampler = Builder.build();
+}
+
 static void checkMatchedRegExes(
     const OpcodesValuegram &OpcVal,
     const std::unordered_set<const OpcodeValuegramRegEx *> &Matched) {
@@ -185,9 +241,9 @@ static void checkMatchedRegExes(
   });
 }
 
-OpcodeToValuegramMap::OpcodeToValuegramMap(const OpcodesValuegram &OpcVal,
-                                           const OpcodeHistogram &OpcHist,
-                                           const OpcodeCache &OpCC) {
+OpcodeToSettingsMap::OpcodeToSettingsMap(const OpcodesValuegram &OpcVal,
+                                         const OpcodeHistogram &OpcHist,
+                                         const OpcodeCache &OpCC) {
   unsigned NMatched = 0;
   SmallVector<StringRef> Matches;
   // To avoid false unused regex warning
@@ -215,7 +271,8 @@ OpcodeToValuegramMap::OpcodeToValuegramMap(const OpcodesValuegram &OpcVal,
         }
       }
     }
-    auto Inserted = Data.emplace(Opc, OpcodeValuegramOpcodeSettings{});
+    // No regex matches the opcode in this valuegram
+    auto Inserted = Data.emplace(Opc, OpcodeValuegramSettings{});
     if (Inserted.second) {
       LLVMContext Ctx;
       snippy::notice(WarningName::NotAWarning, Ctx,
@@ -227,84 +284,56 @@ OpcodeToValuegramMap::OpcodeToValuegramMap(const OpcodesValuegram &OpcVal,
   checkMatchedRegExes(OpcVal, Matched);
 }
 
-CommonOpcodeToValuegramMap::CommonOpcodeToValuegramMap(
+WeightedOpcToSettingsMaps::WeightedOpcToSettingsMaps(
     const OperandsReinitializationConfig &ORConfig,
     const OpcodeHistogram &OpcHist, const OpcodeCache &OpCC) {
-  for (auto &&Sampler : ORConfig) {
-    assert(Sampler.isValuegram() &&
+  for (auto &&DataSource : ORConfig) {
+    assert(DataSource.isValuegram() &&
            "Unrecognized operands reinitialization data source type");
-    double Weight = Sampler.getWeight();
-    auto Valuegram = Sampler.getValuegram();
-    MapsAndWeights.emplace_back(OpcodeToValuegramMap{Valuegram, OpcHist, OpCC},
-                                Weight);
+    double Weight = DataSource.getWeight();
+    Maps.emplace_back(
+        OpcodeToSettingsMap{DataSource.getValuegram(), OpcHist, OpCC}, Weight);
   }
 }
 
-SmallVector<double>
-CommonOpcodeToValuegramMap::createContainingMapsWeightsRange(
-    unsigned Opcode) const {
-  SmallVector<double> Result;
-  llvm::transform(MapsAndWeights, std::back_inserter(Result),
-                  [&Opcode](const auto &MapAndWeight) {
-                    if (MapAndWeight.first.count(Opcode))
-                      return MapAndWeight.second;
-                    return 0.0;
-                  });
-  return Result;
+static Expected<std::unique_ptr<IOperandAPIntSampler>>
+createSamplerForValuegramEntry(const ValuegramEntry &Entry) {
+  return TypeSwitch<const IValuegramEntry *,
+                    Expected<std::unique_ptr<IOperandAPIntSampler>>>(
+             &Entry.get())
+      .Case([&](const ValuegramBitpatternEntry *) {
+        return std::make_unique<OpcodeValuegramBitpatternSampler>();
+      })
+      .Case([&](const ValuegramUniformEntry *) {
+        return std::make_unique<OpcodeValuegramUniformSampler>();
+      })
+      .Case([&](const ValuegramBitValueEntry *BitValueEntry) {
+        assert(BitValueEntry);
+        const auto &Val = BitValueEntry->ValWithSign.getVal();
+        return std::make_unique<OpcodeValuegramConstantSampler>(Val);
+      })
+      .Case([&](const ValuegramBitRangeEntry *BitRangeEntry) {
+        assert(BitRangeEntry);
+        auto &Min = BitRangeEntry->Min, &Max = BitRangeEntry->Max;
+        return std::make_unique<OpcodeValuegramRangeSampler>(
+            Min, Max, /*IsSigned*/ false);
+      })
+      .Default([](auto &&) -> Expected<std::unique_ptr<IOperandAPIntSampler>> {
+        llvm_unreachable("Unhandled valuegram entry type");
+      });
 }
 
-const OpcodeValuegramOpcodeSettings &
-CommonOpcodeToValuegramMap::getConfigForOpcode(unsigned Opc,
-                                               const OpcodeCache &OpCC) const {
-  SmallVector<double> Weights = createContainingMapsWeightsRange(Opc);
-  Distribution MapsDist{Weights.begin(), Weights.end()};
-  auto MapIdx = MapsDist(RandEngine::engine());
-  assert(MapIdx < MapsAndWeights.size());
-  auto &Map = MapsAndWeights[MapIdx].first;
-  return Map.getConfigForOpcode(Opc, OpCC);
-}
-
-static APInt sampleOperandsValuesFromORConfig(const OperandsValuesEntry &Entry,
-                                              unsigned NumBits) {
-  switch (Entry.getKind()) {
-  case OperandsValuesEntry::EntryKind::Uniform:
-    return UniformAPIntSamler::generate(NumBits);
-  case OperandsValuesEntry::EntryKind::Value:
-    return Entry.getValue().getVal();
+OpcodeValuegramValuegramSampler::OpcodeValuegramValuegramSampler(
+    const Valuegram &Cfg)
+    : Cfg(Cfg) {
+  WeightedAPIntSamplerSetBuilder<IOperandAPIntSampler> Builder;
+  for (auto &&Entry : Cfg) {
+    auto SamplerOrErr = createSamplerForValuegramEntry(Entry);
+    if (!SamplerOrErr)
+      snippy::fatal("Internal error", SamplerOrErr.takeError());
+    Builder.addOwned(std::move(*SamplerOrErr), Entry.getWeight());
   }
-  llvm_unreachable("Unrecognized OperandsValuesEntry kind");
-}
-
-std::optional<APInt> sampleOpcodeValuegramForOneReg(
-    const OpcodeValuegramOpcodeSettings &OpcValuegram, unsigned OperandIndex,
-    unsigned NumBits, std::discrete_distribution<size_t> &Dist, unsigned Opcode,
-    [[maybe_unused]] const MCInstrInfo &InstrInfo) {
-  // That means that opcode wasn't specified in the opcode valuegram so we
-  // don't reinitialize its operands.
-  if (OpcValuegram.empty())
-    return std::nullopt;
-  auto Index = Dist(RandEngine::engine());
-  assert(Index < OpcValuegram.size());
-  const auto &Entry = OpcValuegram[Index];
-  auto Kind = Entry.getKind();
-
-  using EntryKind = IOpcodeValuegramEntry::EntryKind;
-  switch (Kind) {
-  case EntryKind::Uniform:
-    return UniformAPIntSamler::generate(NumBits);
-  case EntryKind::Operands: {
-    const auto &OperandsValues =
-        cast<OpcodeValuegramOperandsEntry>(Entry.get()).Values;
-    if (OperandsValues.size() <= OperandIndex)
-      snippy::fatal("Operands reinitialization error",
-                    "Incorrect number of operands values for \"" +
-                        InstrInfo.getName(Opcode) + "\"");
-    return sampleOperandsValuesFromORConfig(OperandsValues[OperandIndex],
-                                            NumBits);
-  }
-  default:
-    llvm_unreachable("unrecognized OpcodeValuegram entry type");
-  }
+  OwnedSampler = Builder.build();
 }
 
 } // namespace snippy
@@ -319,20 +348,15 @@ void yaml::yamlize(IO &IO, const snippy::OperandsValuesEntryMapMapper &Seq,
   IO.setError("'operands' values cannot be specified as maps");
 }
 
-void yaml::yamlize(IO &IO, const snippy::OperandsValuesEntrySeqMapper &Seq,
-                   bool, EmptyContext &Ctx) {
-  IO.setError("'operands' values cannot be specified as sequences");
-}
-
-using snippy::OpcodeValuegramOpcodeSettings;
-size_t yaml::SequenceTraits<OpcodeValuegramOpcodeSettings, void>::size(
-    yaml::IO &IO, OpcodeValuegramOpcodeSettings &Valuegram) {
+using snippy::OpcodeValuegramSettings;
+size_t yaml::SequenceTraits<OpcodeValuegramSettings, void>::size(
+    yaml::IO &IO, OpcodeValuegramSettings &Valuegram) {
   return Valuegram.size();
 }
 
 snippy::OpcodeValuegramOpcSettingsEntry &
-yaml::SequenceTraits<OpcodeValuegramOpcodeSettings, void>::element(
-    yaml::IO &IO, OpcodeValuegramOpcodeSettings &Valuegram, size_t Index) {
+yaml::SequenceTraits<OpcodeValuegramSettings, void>::element(
+    yaml::IO &IO, OpcodeValuegramSettings &Valuegram, size_t Index) {
   if (Valuegram.size() < Index + 1)
     Valuegram.resize(Index + 1, snippy::OpcodeValuegramOpcSettingsEntry{});
   return Valuegram[Index];

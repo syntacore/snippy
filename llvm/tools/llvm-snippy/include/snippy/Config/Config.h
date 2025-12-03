@@ -132,14 +132,14 @@ public:
   };
   std::optional<ValuegramOpt> Valuegram;
   std::optional<OperandsReinitializationConfig> OperandsReinitialization;
-  CommonOpcodeToValuegramMap OROpcodeMap;
+  WeightedOpcToSettingsMaps OpcodeToORSettingsMap;
 
   void setupOROpcodeMap(const OpcodeCache &OpCC,
                         const OpcodeHistogram &OpHist) {
     if (!OperandsReinitialization.has_value())
       return;
-    OROpcodeMap =
-        CommonOpcodeToValuegramMap(*OperandsReinitialization, OpHist, OpCC);
+    OpcodeToORSettingsMap =
+        WeightedOpcToSettingsMaps(*OperandsReinitialization, OpHist, OpCC);
   }
 
   DefaultPolicyConfig(const CommonPolicyConfig &Common) : Common(&Common) {}

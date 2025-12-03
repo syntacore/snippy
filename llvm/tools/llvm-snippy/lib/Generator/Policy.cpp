@@ -210,7 +210,7 @@ getValuegramPolicyValueSource(const DefaultPolicyConfig &Cfg) {
            "Specifying operands-reinitialization with valuegram-operands-regs "
            "is prohibited");
     return std::make_unique<OperandsReinitializationOpcodeValuegramSource>(
-        Cfg.OROpcodeMap);
+        Cfg.OpcodeToORSettingsMap);
   }
   if (Cfg.Valuegram) {
     const auto &RegsHistograms = Cfg.Valuegram->RegsHistograms;
