@@ -2573,9 +2573,10 @@ You can per-opcode reinitialize all initializeable operand registers using
                 values: [0x123, 0x456] # Encoded single-precision IEEE754 FP
           - "FADD_D":
               - type: operands
-                values: [1.0d, 2.0d] # Decimal FP literals
-              - type: operands
-                values: [-nan, -inf] # Negative qNaN and infinity
+                values: # Each operand value could be specified via valuegram
+                  - - [1.0d, 1.0] # Decimal FP literals
+                    - [-nan, 1.0] # Negative qNaN
+                  - -inf
 
 As you can see in the given example, operands-reinitialization is a list of
 weighted data sources. The weight field is optional (1.0 by default) and
@@ -2596,7 +2597,9 @@ Currently, only ``valuegram`` data source type is supported. It should include:
 
       - ``values`` |nbsp| -- |nbsp| the ordered list of values. Floating point syntax
         and uniform are supported. The number of values must be equal to the number of
-        initializeable operands of all instructions that this regex matches.
+        initializeable operands of all instructions that this regex matches. Also you
+        can specify each value via valuegram, the same way as in the **histograms** and 
+        **imm-hist**.
 
 .. note::
 
