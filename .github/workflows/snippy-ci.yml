@@ -19,7 +19,7 @@ jobs:
       - name: Install required compiler to be sure
         run: sudo apt-get update && sudo apt-get install -y clang-14 ninja-build ccache lld cmake && pip install sphinx myst-parser
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.0
         with:
           sparse-checkout: |
             .github
@@ -67,18 +67,18 @@ jobs:
 
           tar --xz -C "$INSTALL_DIR" -cvf "$release_tarball_filename" .
       - name: Upload binary install artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5.0.0
         with:
           name: ${{ steps.install_release.outputs.release_basename }}
           path: ${{ steps.install_release.outputs.release_tarball_filename }}
           compression-level: 0 # Artifact is already compressed
       - name: Upload html docs artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5.0.0
         with:
           name: snippy-doc-html
           path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/html
       - name: Upload latex docs artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5.0.0
         with:
           name: snippy-doc-latex
           path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/latex
