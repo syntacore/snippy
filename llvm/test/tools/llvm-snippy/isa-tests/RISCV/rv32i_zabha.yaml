@@ -6,7 +6,7 @@ include:
 options:
   march: rv32i_zabha
   mtriple: riscv32
-  num-instrs: 1000
+  num-instrs: 2000
   dump-mf: true
   verify-gen-histogram: true
   histogram-must-succeed: true

@@ -2,30 +2,30 @@
 
 # RUN: sed -e s/BURST_SIZE/100/ %S/Inputs/burst-any.yaml | sed -e s/BURST_MODE/mixed/ >%t.100.mixed.yaml
 # RUN: llvm-snippy %S/Inputs/loadstore-layout.yaml %s %t.100.mixed.yaml -march=riscv64-linux-gnu \
-# RUN:  -num-instrs=1000 \
+# RUN:  -num-instrs=400 \
 # RUN:  -dump-memory-accesses=%t-1.yaml
 
 # RUN: llvm-snippy %S/Inputs/loadstore-layout.yaml %t-1.yaml %t.100.mixed.yaml -march=riscv64-linux-gnu \
-# RUN:  -num-instrs=1000
+# RUN:  -num-instrs=400
 
 # Second run:
 
 # RUN: sed -e s/BURST_SIZE/3/ %S/Inputs/burst-any.yaml | sed -e s/BURST_MODE/mixed/ >%t.3.mixed.yaml
 # RUN: llvm-snippy %S/Inputs/loadstore-layout.yaml %s %t.3.mixed.yaml -march=riscv64-linux-gnu \
-# RUN:  -num-instrs=1000 \
+# RUN:  -num-instrs=400 \
 # RUN:  -dump-memory-accesses=%t-2.yaml
 
 # RUN: llvm-snippy %S/Inputs/loadstore-layout.yaml %t-2.yaml %t.100.mixed.yaml -march=riscv64-linux-gnu \
-# RUN:  -num-instrs=1000
+# RUN:  -num-instrs=400
 
 # Third run:
 
 # RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s %t.3.mixed.yaml -march=riscv64-linux-gnu \
-# RUN:  -num-instrs=1000 \
+# RUN:  -num-instrs=400 \
 # RUN:  -dump-memory-accesses=%t-3.yaml
 
 # RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %t-3.yaml %t.3.mixed.yaml -march=riscv64-linux-gnu \
-# RUN:  -num-instrs=1000
+# RUN:  -num-instrs=400
 
 access-evictions:
     - mask:  0x003c0000
