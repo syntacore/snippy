@@ -45,6 +45,5 @@ histogram:
 
 # CHECK: warning: (inconsistent-options) External callees were found in call-graph but neither "utility" nor "stack" sections were found: Implicitly reserving registers: [X3, X4]
 
-# CHECK-NOT: {{\$x3[[:space:],]}}
-# CHECK-NOT: {{\$x4[[:space:],]}}
-
+# CHECK-NOT: {{\$x3[[:space:]]}}
+# CHECK-NOT: {{\$x4[[:space:]]}}

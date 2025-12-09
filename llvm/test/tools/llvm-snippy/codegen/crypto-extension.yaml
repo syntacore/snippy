@@ -8,7 +8,7 @@ options:
   march: riscv64-unknown-elf
   mcpu: generic-rv64
   mattr: "+zbkb,+zbkc,+zbkx,+zknd,+zkne,+zknh,+zksed,+zksh,+zkr,+zkn,+zks,+zkt"
-  num-instrs: 400
+  num-instrs: 600
   dump-mf: true
   verify-gen-histogram: true
   histogram-must-succeed: true
