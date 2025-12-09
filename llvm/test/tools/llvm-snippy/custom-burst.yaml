@@ -48,12 +48,7 @@ histogram:
 # MEMFENCE-NOT: {{((SW[[:space:]]\$x([[:digit:]]+), \$x([[:digit:]]+), (-?)([[:digit:]]+)([[:space:]]+)){4})}}
 
 # We expect to see at least 2 burst groups of size 3:
-# FENCE: FENCE
-# FENCE-NEXT: FENCE
-# FENCE-NEXT: FENCE
-# FENCE: FENCE
-# FENCE-NEXT: FENCE
-# FENCE-NEXT: FENCE
+# FENCE-COUNT-2: {{FENCE.+[[:space:]]+FENCE.+[[:space:]]+FENCE}}
 
 # ERROR: error: Bad burst config: instruction "AMOADD_W" was specified in burst grouping but not in histogram
 

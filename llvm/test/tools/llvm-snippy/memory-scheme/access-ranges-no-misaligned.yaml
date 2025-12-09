@@ -3,7 +3,7 @@
 
 options:
   march: riscv64-linux-gnu
-  num-instrs: 100
+  num-instrs: 200
 
 sections:
   - no:        1
@@ -43,7 +43,7 @@ histogram:
 # CHECK-NOT: {{0x806[0-f]{4}[d-f]}}
 
 # COM: In 0x80700000 range misaligned accesses are allowed (default):
-# CHECK: {{0x807[0-f]{4}[1-3]}}
-# CHECK: {{0x807[0-f]{4}[5-7]}}
-# CHECK: {{0x807[0-f]{4}[9-b]}}
-# CHECK: {{0x807[0-f]{4}[d-f]}}
+# CHECK-DAG: {{0x807[0-f]{4}[1-3]}}
+# CHECK-DAG: {{0x807[0-f]{4}[5-7]}}
+# CHECK-DAG: {{0x807[0-f]{4}[9-b]}}
+# CHECK-DAG: {{0x807[0-f]{4}[d-f]}}

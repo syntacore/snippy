@@ -3,7 +3,7 @@
 options:
   march: riscv64-unknown-elf
   mattr: +f,+d,+v,+zfh,+zvfbfwma
-  num-instrs: 10
+  num-instrs: 50
   dump-mf: true
 
 sections:

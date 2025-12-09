@@ -6,7 +6,7 @@ include:
 options:
   march: rv64i_zaamo
   mtriple: riscv64
-  num-instrs: 1000
+  num-instrs: 2000
   dump-mf: true
   verify-gen-histogram: true
   histogram-must-succeed: true
