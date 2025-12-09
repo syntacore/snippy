@@ -29,18 +29,6 @@ burst:
   groupings:
     - [ PseudoNOP ]
 
-# COM: Check 5 PseudoNOP burst groups of size 5
-# CHECK: PseudoNOP
-# CHECK-NEXT: {{PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP}}
+# COM: Check that there are at least 5 PseudoNOP burst groups of exact size 5
 
-# CHECK: PseudoNOP
-# CHECK-NEXT: {{PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP}}
-
-# CHECK: PseudoNOP
-# CHECK-NEXT: {{PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP}}
-
-# CHECK: PseudoNOP
-# CHECK-NEXT: {{PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP}}
-
-# CHECK: PseudoNOP
-# CHECK-NEXT: {{PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP}}
+# CHECK-COUNT-5: {{PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP}}
