@@ -578,7 +578,7 @@ public:
 
   virtual unsigned getAddrRegLen(const TargetMachine &TM) const = 0;
 
-  virtual bool canUseInBurstMode(unsigned Opcode) const = 0;
+  virtual bool canUseInBurstMode(const MCInstrDesc &InstrDesc) const = 0;
 
   virtual bool canInitializeOperand(const MCInstrDesc &InstrDesc,
                                     unsigned OpIndex) const = 0;

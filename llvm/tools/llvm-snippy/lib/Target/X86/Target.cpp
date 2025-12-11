@@ -548,7 +548,7 @@ public:
     reportUnimplementedError();
   }
 
-  bool canUseInBurstMode(unsigned Opcode) const override {
+  bool canUseInBurstMode(const MCInstrDesc &InstrDesc) const override {
     reportUnimplementedError();
   }
 

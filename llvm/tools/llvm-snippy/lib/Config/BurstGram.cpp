@@ -60,10 +60,12 @@ void BurstGramData::removeUnsupportedOpcodes(LLVMState &State,
          "At this point burst mode should be \"custom\"");
   assert(Groupings);
   const auto &Tgt = State.getSnippyTarget();
+  const auto &InstrInfo = State.getInstrInfo();
   for (auto &&Group : *Groupings) {
+    bool WasEmpty = Group.empty();
     // Can't use std::remove with ordered container
     for (auto Fst = Group.begin(); Fst != Group.end();) {
-      if (!Tgt.canUseInBurstMode(*Fst)) {
+      if (!Tgt.canUseInBurstMode(InstrInfo.get(*Fst))) {
         snippy::warn(WarningName::BurstMode, State.getCtx(),
                      Twine("Opcode ") + OpCC.name(*Fst) +
                          " is not supported in the burst mode",
@@ -72,6 +74,11 @@ void BurstGramData::removeUnsupportedOpcodes(LLVMState &State,
       } else
         ++Fst;
     }
+
+    if (Group.empty() && !WasEmpty)
+      snippy::warn(
+          WarningName::BurstMode, State.getCtx(), "Empty burst group",
+          "no supported opcodes were specified, this group will be ignored.");
   }
 }
 

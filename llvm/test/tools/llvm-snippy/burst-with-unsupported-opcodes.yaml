@@ -2,7 +2,7 @@
 
 options:
     mtriple: riscv64-unknown-elf
-    mattr: +m,+c
+    mattr: +v,+c
     dump-mf: on
     num-instrs: 100
 
@@ -29,21 +29,22 @@ histogram:
     - [LBU, 1.0]
     - [C_SD, 1.0]
     - [C_LD, 1.0]
-    - [MUL, 1.0]
-    - [OR, 1.0]
+    - [VSETVL, 1.0]
+    - [VLE16_V, 1.0]
+    - [VSE16_V, 1.0]
 
 burst:
     mode: custom
     min-size: 4
     max-size: 16
     groupings:
-      - [LB, LBU, C_LD, MUL]
-      - [C_SD, OR]
+      - [LB, LBU, C_LD, VLE16_V]
+      - [C_SD, VSE16_V]
 
-# CHECK: warning: (burst-mode) Opcode MUL is not supported in the
+# CHECK: warning: (burst-mode) Opcode VLE16_V is not supported in the
 # CHECK-SAME: burst mode: generator will generate it but not in a burst group.
-# CHECK: warning: (burst-mode) Opcode OR is not supported in the
+# CHECK: warning: (burst-mode) Opcode VSE16_V is not supported in the
 # CHECK-SAME: burst mode: generator will generate it but not in a burst group.
 
-# CHECK: MUL
-# CHECK: OR
+# CHECK: VLE16_V
+# CHECK: VSE16_V
