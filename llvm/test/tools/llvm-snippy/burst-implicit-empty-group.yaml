@@ -2,7 +2,7 @@
 
 options:
     mtriple: riscv64-unknown-elf
-    mattr: +m
+    mattr: +v
     dump-mf: on
     num-instrs: 100
 
@@ -25,20 +25,36 @@ sections:
       ACCESS:    r
 
 histogram:
-    - [MUL, 1.0]
-    - [DIV, 1.0]
+    - [VSETVL, 1.0]
+    - [VLE16_V, 1.0]
+    - [VSE16_V, 1.0]
+    - [VLE32_V, 1.0]
+    - [VSE32_V, 1.0]
 
 burst:
     mode: custom
     min-size: 4
     max-size: 16
     groupings:
-      - [DIV, MUL]
+      - [VLE16_V, VSE16_V]
+      - [VLE32_V, VSE32_V]
 
-# CHECK: warning: (burst-mode) Opcode DIV is not supported in the
+# CHECK: warning: (burst-mode) Opcode VLE16_V is not supported in the
 # CHECK-SAME: burst mode: generator will generate it but not in a burst group.
-# CHECK: warning: (burst-mode) Opcode MUL is not supported in the
+# CHECK-NEXT: warning: (burst-mode) Opcode VSE16_V is not supported in the
 # CHECK-SAME: burst mode: generator will generate it but not in a burst group.
+# CHECK-NEXT: warning: (burst-mode) Empty burst group: no supported opcodes were
+# CHECK-SAME: specified, this group will be ignored.
 
-# CHECK: MUL
-# CHECK: DIV
+# CHECK: warning: (burst-mode) Opcode VLE32_V is not supported in the
+# CHECK-SAME: burst mode: generator will generate it but not in a burst group.
+# CHECK-NEXT: warning: (burst-mode) Opcode VSE32_V is not supported in the
+# CHECK-SAME: burst mode: generator will generate it but not in a burst group.
+# CHECK-NEXT: warning: (burst-mode) Empty burst group: no supported opcodes were
+# CHECK-SAME: specified, this group will be ignored.
+
+# CHECK: VSE16_V
+# CHECK: VLE16_V
+
+# CHECK: VSE32_V
+# CHECK: VLE32_V

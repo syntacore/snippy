@@ -1,0 +1,60 @@
+# RUN: sed -e s/OPCODE/MUL/g %s > %t.MUL.yaml
+# RUN: llvm-snippy %t.MUL.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.MUL.yaml --check-prefix=MUL
+
+# RUN: sed -e s/OPCODE/DIV/g %s > %t.DIV.yaml
+# RUN: llvm-snippy %t.DIV.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.DIV.yaml --check-prefix=DIV
+
+# RUN: sed -e s/OPCODE/MULH/g %s > %t.MULH.yaml
+# RUN: llvm-snippy %t.MULH.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.MULH.yaml --check-prefix=MULH
+
+# RUN: sed -e s/OPCODE/MULH/g %s > %t.MULH.yaml
+# RUN: llvm-snippy %t.MULH.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.MULH.yaml --check-prefix=MULH
+
+# RUN: sed -e s/OPCODE/DIVW/g %s > %t.DIVW.yaml
+# RUN: llvm-snippy %t.DIVW.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.DIVW.yaml --check-prefix=DIVW
+
+# RUN: sed -e s/OPCODE/REM/g %s > %t.REM.yaml
+# RUN: llvm-snippy %t.REM.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.REM.yaml --check-prefix=REM
+
+options:
+  mtriple: riscv64-unknown-elf
+  mattr: +m
+  num-instrs: 100
+  dump-mf: true
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80000000
+    SIZE:      0x10
+    LMA:       0x80000000
+    ACCESS:    rw
+
+burst:
+  mode: custom
+  min-size: 6
+  max-size: 6
+  groupings:
+    - [OPCODE]
+
+histogram:
+  - [OPCODE, 1.0]
+  - [ADDI, 1.0]
+
+# OPCODE-NOT: warning: (burst-mode) Opcode OPCODE is not supported
+# OPCODE: OPCODE
+# OPCODE-NEXT: OPCODE
+# OPCODE-NEXT: OPCODE
+# OPCODE-NEXT: OPCODE
+# OPCODE-NEXT: OPCODE
+# OPCODE-NEXT: OPCODE
