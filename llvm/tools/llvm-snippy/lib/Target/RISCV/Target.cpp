@@ -3636,11 +3636,10 @@ public:
     return is64Bit(TM) ? 64u : 32u;
   }
 
-  bool canUseInBurstMode(unsigned Opcode) const override {
-    return isLoadStore(Opcode) || isFPLoadStore(Opcode) ||
-           isAtomicAMO(Opcode) || isCLoadStore(Opcode) || isZicbo(Opcode) ||
-           isCFPLoadStore(Opcode) || isFence(Opcode) || isNTLHint(Opcode) ||
-           isNOP(Opcode);
+  bool canUseInBurstMode(const MCInstrDesc &InstrDesc) const override {
+    auto Opcode = InstrDesc.getOpcode();
+    return !isRVV(Opcode) && !isCall(Opcode) && !InstrDesc.isBranch() &&
+           !InstrDesc.isReturn();
   }
 
   bool canInitializeOperand(const MCInstrDesc &InstrDesc,
