@@ -1,0 +1,26 @@
+# RUN: llvm-snippy %s -model-plugin None |& FileCheck %s
+
+options:
+    mtriple: riscv64-unknown-elf
+    dump-mf: on
+    num-instrs: 100
+
+include:
+  - ./Inputs/sections.yaml
+
+histogram:
+    - [ADD, 1.0]
+    - [SUB, 1.0]
+    - [LD, 1.0]
+    - [SD, 1.0]
+
+burst:
+    mode: custom
+    min-size: 10
+    max-size: 10
+    groupings:
+      - [SUB, LD]
+      - [ADD, SD]
+
+# CHECK: {{(((.+)(SUB|LD)(.+)([[:space:]]+)){10})}}
+# CHECK: {{(((.+)(ADD|SD)(.+)([[:space:]]+)){10})}}

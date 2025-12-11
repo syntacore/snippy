@@ -1413,9 +1413,9 @@ in the ``burst`` key, which you can add:
 
 .. important::
 
-   Not all the opcodes can be specified in burst groups. Currently, only
-   loads, stores, floating point loads/stores, atomics, and fences are
-   supported.
+   Currently, RVV, calls and branches can not be generated in
+   a burst group. If an unsupported opcode is specified in the custom
+   burst group, it will be generated outside this group.
 
 Following is an example of the ``burst`` key:
 

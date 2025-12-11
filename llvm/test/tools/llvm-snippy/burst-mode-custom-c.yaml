@@ -1,0 +1,60 @@
+# RUN: sed -e s/OPCODE/C_ADDI/g %s > %t.C_ADDI.yaml
+# RUN: llvm-snippy %t.C_ADDI.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.C_ADDI.yaml --check-prefix=C_ADDI
+
+# RUN: sed -e s/OPCODE/C_LI/g %s > %t.C_LI.yaml
+# RUN: llvm-snippy %t.C_LI.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.C_LI.yaml --check-prefix=C_LI
+
+# RUN: sed -e s/OPCODE/C_SLLI/g %s > %t.C_SLLI.yaml
+# RUN: llvm-snippy %t.C_SLLI.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.C_SLLI.yaml --check-prefix=C_SLLI
+
+# RUN: sed -e s/OPCODE/C_AND/g %s > %t.C_AND.yaml
+# RUN: llvm-snippy %t.C_AND.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.C_AND.yaml --check-prefix=C_AND
+
+# RUN: sed -e s/OPCODE/C_NOP/g %s > %t.C_NOP.yaml
+# RUN: llvm-snippy %t.C_NOP.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.C_NOP.yaml --check-prefix=C_NOP
+
+# RUN: sed -e s/OPCODE/C_EBREAK/g %s > %t.C_EBREAK.yaml
+# RUN: llvm-snippy %t.C_EBREAK.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.C_EBREAK.yaml --check-prefix=C_EBREAK
+
+options:
+  mtriple: riscv64-unknown-elf
+  mattr: +c
+  num-instrs: 100
+  dump-mf: true
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80000000
+    SIZE:      0x10
+    LMA:       0x80000000
+    ACCESS:    rw
+
+burst:
+  mode: custom
+  min-size: 6
+  max-size: 6
+  groupings:
+    - [OPCODE]
+
+histogram:
+  - [OPCODE, 1.0]
+  - [ADDI, 1.0]
+
+# OPCODE-NOT: warning: (burst-mode) Opcode OPCODE is not supported
+# OPCODE: OPCODE
+# OPCODE-NEXT: OPCODE
+# OPCODE-NEXT: OPCODE
+# OPCODE-NEXT: OPCODE
+# OPCODE-NEXT: OPCODE
+# OPCODE-NEXT: OPCODE
