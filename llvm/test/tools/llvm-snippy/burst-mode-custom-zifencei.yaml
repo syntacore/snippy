@@ -1,0 +1,29 @@
+# RUN: llvm-snippy %s -model-plugin None |& FileCheck %s
+
+options:
+  mtriple: riscv64-unknown-elf
+  mattr: +zifencei
+  num-instrs: 100
+  dump-mf: true
+
+include:
+  - ./Inputs/sections.yaml
+
+burst:
+  mode: custom
+  min-size: 6
+  max-size: 6
+  groupings:
+    - [FENCE_I]
+
+histogram:
+  - [FENCE_I, 1.0]
+  - [ADDI, 1.0]
+
+# CHECK-NOT: warning: (burst-mode) Opcode FENCE_I is not supported
+# CHECK: FENCE_I
+# CHECK-NEXT: FENCE_I
+# CHECK-NEXT: FENCE_I
+# CHECK-NEXT: FENCE_I
+# CHECK-NEXT: FENCE_I
+# CHECK-NEXT: FENCE_I
