@@ -327,6 +327,17 @@ createModeChangeInfoBiasedMode(double WeightOfAllInstructions,
   ModeChangeInfo Result;
   Result.RVVPresent = true;
 
+  // FIXME: Currently there is a quirky behavior that we keep for
+  // backward compatibility reasons:
+  // if [VSET* instructions are not found in the histogram] &&
+  //    [riscv-vector-unit::mode-change-bias not specified] then
+  //    there is an error
+  // but if [VSET* instructions are not found in the histogram] &&
+  //    [riscv-vector-unit::mode-change-bias::P = 0] then
+  //    we must generate 1 VSET* per MBB
+  if (RVVConfigBias < std::numeric_limits<double>::epsilon())
+    RVVConfigBias = std::numeric_limits<double>::epsilon();
+
   auto ModeChangeWeight = WeightOfAllInstructions * RVVConfigBias;
   auto ModeChangeProbability =
       ModeChangeWeight / (WeightOfAllInstructions + ModeChangeWeight);

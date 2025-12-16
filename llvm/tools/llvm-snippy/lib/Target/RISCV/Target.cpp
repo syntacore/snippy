@@ -939,38 +939,6 @@ breakDownAddrForInstrWithImmOffset(AddressInfo AddrInfo, const MachineInstr &MI,
       {std::move(Part)}, {uintToTargetXLen(Is64Bit, AddrInfo.Address)});
 }
 
-using OpcodeFilter = Config::OpcodeFilter;
-
-static OpcodeFilter getRVVDefaultPolicyFilterImpl(const RVVConfiguration &Cfg,
-                                                  unsigned VL, unsigned VLEN,
-                                                  const RISCVSubtarget *ST) {
-  return [&Cfg, VL, VLEN, ST](unsigned Opcode) {
-    if (!isRVV(Opcode))
-      return true;
-    return isLegalRVVInstr(Opcode, Cfg, VL, VLEN, ST);
-  };
-}
-
-static OpcodeFilter
-getDefaultPolicyFilterImpl(const SnippyProgramContext &ProgCtx,
-                           const MachineBasicBlock &MBB) {
-  auto &State = ProgCtx.getLLVMState();
-  auto &RISCVCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
-  if (!RISCVCtx.hasActiveRVVMode(MBB))
-    return [](unsigned Opcode) {
-      if (isRVV(Opcode) && !isRVVModeSwitch(Opcode))
-        return false;
-      return true;
-    };
-
-  const auto &Cfg = RISCVCtx.getCurrentRVVCfg(MBB);
-  auto VL = RISCVCtx.getVL(MBB);
-  auto VLEN = RISCVCtx.getVLEN();
-
-  const auto &ST = State.getSubtarget<RISCVSubtarget>(*MBB.getParent());
-  return getRVVDefaultPolicyFilterImpl(Cfg, VL, VLEN, &ST);
-}
-
 inline bool checkSupportedOrdering(const OpcodeHistogram &H) {
   if (H.weight(RISCV::LR_W_RL) != 0 || H.weight(RISCV::SC_W_AQ) != 0 ||
       H.weight(RISCV::LR_D_RL) != 0 || H.weight(RISCV::SC_D_AQ) != 0)
@@ -1044,10 +1012,10 @@ class SnippyRISCVTarget final : public SnippyTarget {
   void generateWriteValueSeq(InstructionGenerationContext &IGC, APInt Value,
                              MCRegister DestReg,
                              SmallVectorImpl<MCInst> &Insts) const override {
-    if (RISCV::VRRegClass.contains(DestReg))
-      snippy::fatal(IGC.ProgCtx.getLLVMState().getCtx(),
-                    "Generation register write sequence error",
-                    "Writing to register is not implemented for RVV");
+    if (RISCV::VRRegClass.contains(DestReg)) {
+      generateWriteValueV(IGC, Value, DestReg, Insts);
+      return;
+    }
 
     if (RISCV::FPR64RegClass.contains(DestReg) ||
         RISCV::FPR32RegClass.contains(DestReg) ||
@@ -1107,8 +1075,8 @@ public:
                   const TargetSubtargetInfo &Subtarget) const override;
 
   const MCRegisterClass &
-  getRegClass(InstructionGenerationContext &IGC, unsigned OperandRegClassID,
-              unsigned OpIndex, unsigned Opcode,
+  getRegClass(const InstructionGenerationContext &IGC,
+              unsigned OperandRegClassID, unsigned OpIndex, unsigned Opcode,
               const MCRegisterInfo &RegInfo) const override;
 
   bool matchesArch(Triple::ArchType Arch) const override {
@@ -1193,10 +1161,6 @@ public:
     return std::make_unique<RISCVRegisterState>(RST, RGC.getVLEN());
   }
 
-  bool needsGenerationPolicySwitch(unsigned Opcode) const override {
-    return isRVVModeSwitch(Opcode);
-  }
-
   std::vector<Register>
   getRegsForSelfcheck(const MachineInstr &MI,
                       InstructionGenerationContext &IGC) const override {
@@ -1257,22 +1221,87 @@ public:
     return {Entries.begin(), Entries.end()};
   }
 
-  bool groupMustHavePrimaryInstr(const SnippyProgramContext &ProgCtx,
-                                 const MachineBasicBlock &MBB) const override {
-    auto &RISCVCtx =
+  bool isModeSwitchInstr(unsigned Opcode) const override {
+    return isRVVModeSwitch(Opcode);
+  }
+
+  bool needToGenerateModeSwitches(
+      const SnippyProgramContext &ProgCtx) const override {
+    const auto &RGC =
         ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
-    return RISCVCtx.hasActiveRVVMode(MBB);
+    const auto &ModeChangeInfo = RGC.getVUConfigInfo().getModeChangeInfo();
+    return ModeChangeInfo.RVVPresent;
+  }
+
+  bool modeSwitchIsSupport(const SnippyProgramContext &ProgCtx) const override {
+    const auto &RGC =
+        ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+    return RGC.getVUConfigInfo().isModeChangeArtificial();
+  }
+
+  double
+  getModeSwitchProbability(const SnippyProgramContext &ProgCtx) const override {
+    const auto &RGC =
+        ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+    const auto &ModeChangeInfo = RGC.getVUConfigInfo().getModeChangeInfo();
+
+    assert(ModeChangeInfo.RVVPresent);
+
+    return ModeChangeInfo.ProbVSETIVLI + ModeChangeInfo.ProbVSETVLI +
+           ModeChangeInfo.ProbVSETVL;
   }
 
   Config::OpcodeFilter
-  getDefaultPolicyFilter(const SnippyProgramContext &ProgCtx,
-                         const MachineBasicBlock &MBB) const override {
-    return getDefaultPolicyFilterImpl(ProgCtx, MBB);
+  generateModeChangeAndGetFilter(InstructionGenerationContext &IGC,
+                                 bool IsSupport) const override {
+    const auto &ProgCtx = IGC.ProgCtx;
+    const auto &RGC =
+        ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+    const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
+    const auto *Subtarget = &IGC.getSubtarget<RISCVSubtarget>();
+
+    const auto &NewRVVMode =
+        generateRVVModeSwitchAndUpdateContext(InstrInfo, IGC, IsSupport);
+
+    const auto VLEN = RGC.getVLEN();
+    const auto *Cfg = NewRVVMode.Config;
+    const auto VL = NewRVVMode.VLVM.VL;
+
+    auto Filter = [=](unsigned Opcode) {
+      if (!isRVV(Opcode))
+        return true;
+      // Mode switches are always generated using the ModeChangingPolicy and we
+      // are making a filter for all other policies to use
+      if (isRVVModeSwitch(Opcode))
+        return false;
+      return isLegalRVVInstr(Opcode, *Cfg, VL, VLEN, Subtarget);
+    };
+
+    return Filter;
   }
 
-  void checkInstrTargetDependency(const OpcodeHistogram &H) const override {
+  void checkInstrTargetDependency(const OpcodeHistogram &H,
+                                  const OpcodeCache &OpCC) const override {
     if (!checkSupportedJumps(H))
       snippy::fatal("C_JR currently is not supported. Use PseudoC_JRB instead");
+
+    for (const auto &[Opcode, Weight] : H) {
+      // NOTE: these checks are just a safety measure to control that we
+      // process only supported instructions
+      if (isLrInstr(Opcode) || isScInstr(Opcode) || isAtomicAMO(Opcode) ||
+          isSupportedLoadStore(Opcode))
+        continue;
+      if (OpCC.desc(Opcode)->mayLoad() || OpCC.desc(Opcode)->mayStore())
+        snippy::fatal("Memory instruction " + Twine(OpCC.name(Opcode)) +
+                      " is unsupported");
+      // FIXME: here explicitly placed all vector istructions that use V0 mask
+      // explicitly and this can not be changed
+      if (NoMaskModeForRVV &&
+          (isRVVuseV0RegExplicitly(Opcode) || isRVVuseV0RegImplicitly(Opcode)))
+        snippy::fatal("In histogram given a vector opcode with explicit V0 "
+                      "mask usage, but snippy was given option that forbids "
+                      "any masks for vector instructions");
+    }
   }
 
   void checkTrackingRestrictions(const OpcodeHistogram &H) const override {
@@ -1358,7 +1387,7 @@ public:
       auto InitV0 = Regs.VRegs[0];
       writeValueToReg(IGC, InitV0, RISCV::V0);
     }
-    rvvGenerateModeSwitchAndUpdateContext(InstrInfo, IGC);
+    generateRVVModeSwitchAndUpdateContext(InstrInfo, IGC);
 
     generateNonMaskVRegsInit(IGC, Regs, [](Register Reg) { return false; });
   }
@@ -1561,29 +1590,6 @@ public:
   }
 
   bool requiresCustomGeneration(const MCInstrDesc &InstrDesc) const override {
-    auto Opcode = InstrDesc.getOpcode();
-    if (isRVVModeSwitch(Opcode))
-      return true;
-    // NOTE: these checks are just a safety measure to control that we
-    // process only supported instructions
-    if (isLrInstr(Opcode) || isScInstr(Opcode))
-      return false;
-    if (isAtomicAMO(Opcode))
-      return false;
-    if (isSupportedLoadStore(Opcode))
-      return false;
-    // FIXME: all checks with fatal error should be moved to histogram verifier
-    if (InstrDesc.mayLoad() || InstrDesc.mayStore())
-      snippy::fatal("This memory instruction unsupported");
-
-    // FIXME: here explicitly placed all vector istructions that use V0 mask
-    // explicitly and this can not be changed
-    if (NoMaskModeForRVV &&
-        (isRVVuseV0RegExplicitly(Opcode) || isRVVuseV0RegImplicitly(Opcode))) {
-      snippy::fatal("In histogram given a vector opcode with explicit V0 "
-                    "mask usage, but snippy was given option that forbids "
-                    "any masks for vector instructions");
-    }
     return false;
   }
 
@@ -1603,11 +1609,7 @@ public:
       const MCInstrDesc &InstrDesc,
       planning::InstructionGenerationContext &InstrGenCtx) const override {
     assert(requiresCustomGeneration(InstrDesc));
-    auto Opcode = InstrDesc.getOpcode();
-    assert(isRVVModeSwitch(Opcode));
-    auto &ProgCtx = InstrGenCtx.ProgCtx;
-    rvvGenerateModeSwitchAndUpdateContext(ProgCtx.getLLVMState().getInstrInfo(),
-                                          InstrGenCtx, Opcode);
+    llvm_unreachable("Not used at the moment");
   }
 
   void instructionPostProcess(InstructionGenerationContext &IGC,
@@ -3642,8 +3644,9 @@ public:
            !InstrDesc.isReturn();
   }
 
-  bool canInitializeOperand(const MCInstrDesc &InstrDesc,
-                            unsigned OpIndex) const override {
+  bool canInitializeOperand(
+      const MCInstrDesc &InstrDesc, unsigned OpIndex,
+      const InstructionGenerationContext *IGC = nullptr) const override {
     auto Opcode = InstrDesc.getOpcode();
     // We can't initialize registers before control flow instructions
     if (isBaseCFInstr(Opcode) || isCall(Opcode) || Opcode == RISCV::AUIPC)
@@ -3664,8 +3667,18 @@ public:
       if (MemOpIdx + 1 == OpIndex)
         return false;
     }
+    if (isRVV(Opcode) && IGC != nullptr) {
+      const auto &ST = IGC->getSubtarget<RISCVSubtarget>();
+      const auto &RegInfo = *ST.getRegisterInfo();
+      auto RC = getRegClass(*IGC, Operand.RegClass, OpIndex,
+                            InstrDesc.getOpcode(), RegInfo);
+      // Vector mask operand (v0 register) should not be initialized
+      if (RC.getID() == RISCV::VMV0RegClass.getID())
+        return false;
+    }
     return true;
   }
+
   unsigned getImmOffsetAlignmentForMemAccessInst(
       const MCInstrDesc &InstrDesc) const override {
     auto Opcode = InstrDesc.getOpcode();
@@ -3774,33 +3787,43 @@ private:
   void rvvWriteValueUsingLoad(InstructionGenerationContext &IGC, APInt Value,
                               unsigned DstReg) const;
 
+  void generateWriteValueFromMemory(InstructionGenerationContext &IGC,
+                                    APInt Value, unsigned DstReg,
+                                    SmallVectorImpl<MCInst> &Insts) const;
+
   void generateWriteValueFP(InstructionGenerationContext &IGC, APInt Value,
                             unsigned DstReg,
                             SmallVectorImpl<MCInst> &Insts) const;
 
-  // NOTE: DesiredOpcode is expected to be any mode changing opcode
-  // (RISCV::VSETVL, RISCV::VSETVLI, RISCV::VSETIVLI) or
-  // If !DesiredOpcode.has_value() this means that the user does not really care
-  // which instruction to use. In case of the latter the implementaion is free
-  // to chose any suitable opcode
-  void rvvGenerateModeSwitchAndUpdateContext(
-      const MCInstrInfo &InstrInfo, InstructionGenerationContext &IGC,
-      std::optional<unsigned> DesiredOpcode = {}) const;
+  void generateWriteValueV(InstructionGenerationContext &IGC, APInt Value,
+                           unsigned DstReg,
+                           SmallVectorImpl<MCInst> &Insts) const;
+
+  // Randomly pick VSET opcode and a new RVV mode and make a switch.
+  RVVModeInfo
+  generateRVVModeSwitchAndUpdateContext(const MCInstrInfo &InstrInfo,
+                                        InstructionGenerationContext &IGC,
+                                        bool IsSupport = true) const;
+
+  RVVModeInfo createRVVMode(InstructionGenerationContext &IGC,
+                            unsigned DesiredOpcode) const;
 
   void generateVTypeChange(InstructionGenerationContext &IGC,
                            const MCInstrInfo &InstrInfo,
                            const RVVModeInfo &NewRVVMode,
-                           std::optional<unsigned> DesiredOpcode = {}) const;
+                           std::optional<unsigned> DesiredOpcode = std::nullopt,
+                           bool IsSupport = true) const;
 
-  void generateRVVModeUpdate(InstructionGenerationContext &IGC,
-                             const MCInstrInfo &InstrInfo,
-                             const RVVModeInfo &NewRVVMode,
-                             std::optional<unsigned> DesiredOpcode = {}) const;
+  void
+  generateRVVModeUpdate(InstructionGenerationContext &IGC,
+                        const MCInstrInfo &InstrInfo,
+                        const RVVModeInfo &NewRVVMode,
+                        std::optional<unsigned> DesiredOpcode = std::nullopt,
+                        bool IsSupport = true) const;
 
-  bool generateRVVModeUpdateIfNeeded(
-      InstructionGenerationContext &IGC, const MCInstrInfo &InstrInfo,
-      const RVVModeInfo &NewRVVMode,
-      std::optional<unsigned> DesiredOpcode = {}) const;
+  bool generateRVVModeUpdateIfNeeded(InstructionGenerationContext &IGC,
+                                     const MCInstrInfo &InstrInfo,
+                                     const RVVModeInfo &NewRVVMode) const;
 
   void generateV0MaskUpdate(InstructionGenerationContext &IGC, const APInt VM,
                             const MCInstrInfo &InstrInfo) const;
@@ -3925,6 +3948,51 @@ private:
     if (!checkMetadata(MI, SnippyMetadata::Support))
       MI.setAsmPrinterFlag(RISCV::DoNotCompress);
   }
+
+  // Usually we first choose opcode for the mode change instruction and then
+  // choose RVV mode according to the opcode.
+  static unsigned selectDesiredModeChangeInstruction(
+      RVVModeChangeMode Preference, const RISCVGeneratorContext &TargetContext,
+      std::optional<unsigned> VL = std::nullopt) {
+    switch (Preference) {
+    case RVVModeChangeMode::MC_ANY: {
+      const auto &ModeChangeInfo =
+          TargetContext.getVUConfigInfo().getModeChangeInfo();
+      std::array<double, 3> VsetvlProb = {
+          ModeChangeInfo.WeightVSETVL,
+          ModeChangeInfo.WeightVSETVLI,
+          (VL && *VL > kMaxVLForVSETIVLI) ? 0.0 : ModeChangeInfo.WeightVSETIVLI,
+      };
+
+      // NOTE: this, probably, should be an assert. However, we don't have
+      // proper checks at the configuration phase
+      if (std::all_of(VsetvlProb.begin(), VsetvlProb.end(),
+                      [](const auto &P) { return P <= 0.0; })) {
+        if (VL)
+          snippy::fatal(
+              formatv("The specified restrictions on VSET* instructions "
+                      "do not allow to produce VL of {0}. Please, adjust "
+                      "the histogram or change the set of "
+                      "reachable RVV configurations",
+                      *VL));
+        snippy::fatal("Current weights of VSET* instructions do not "
+                      "allow to produce any RVV configuration. Please, adjust "
+                      "the histogram or RVV configuration unit.");
+      }
+
+      DiscreteGeneratorInfo<unsigned, std::array<unsigned, 3>> Gen(
+          {RISCV::VSETVL, RISCV::VSETVLI, RISCV::VSETIVLI}, VsetvlProb);
+      return Gen();
+    }
+    case RVVModeChangeMode::MC_VSETIVLI:
+      return RISCV::VSETIVLI;
+    case RVVModeChangeMode::MC_VSETVLI:
+      return RISCV::VSETVLI;
+    case RVVModeChangeMode::MC_VSETVL:
+      return RISCV::VSETVL;
+    }
+    llvm_unreachable("unexpected RVV mode change preference");
+  }
 };
 
 static unsigned getOpcodeForGPRToFPRInstr(unsigned DstReg, unsigned XLen,
@@ -3949,33 +4017,47 @@ static unsigned getOpcodeForGPRToFPRInstr(unsigned DstReg, unsigned XLen,
   return FMVOpc;
 }
 
+void SnippyRISCVTarget::generateWriteValueFromMemory(
+    InstructionGenerationContext &IGC, APInt Value, unsigned DstReg,
+    SmallVectorImpl<MCInst> &Insts) const {
+  assert((RISCV::VRRegClass.contains(DstReg) ||
+          RISCV::FPR64RegClass.contains(DstReg) ||
+          RISCV::FPR32RegClass.contains(DstReg) ||
+          RISCV::FPR16RegClass.contains(DstReg)) &&
+         "unexpected register class in generateWriteValueFromMemory");
+  std::string RegClassName =
+      RISCV::VRRegClass.contains(DstReg) ? "vector" : "float";
+
+  auto NumBits = Value.getBitWidth();
+  auto &GP = IGC.ProgCtx.getOrAddGlobalsPoolFor(
+      IGC.getSnippyModule(), "Failed to allocate global constant for " +
+                                 RegClassName + " register value load");
+  auto *GV = GP.createGV(Value, /* Alignment */ NumBits / RISCV_CHAR_BIT,
+                         /* Linkage */ GlobalValue::InternalLinkage,
+                         /* Name */ "global",
+                         /* Reason */ "This is needed for updating of " +
+                             RegClassName + " register");
+  auto GVAddr = GP.getGVAddress(GV);
+  generateLoadRegFromAddr(IGC, GVAddr, DstReg, Insts);
+
+  const auto &SimCtx = IGC.SimCtx;
+  if (SimCtx.hasModel())
+    SimCtx.notifyMemUpdate(GVAddr, Value);
+}
+
 void SnippyRISCVTarget::generateWriteValueFP(
     InstructionGenerationContext &IGC, APInt Value, unsigned DstReg,
     SmallVectorImpl<MCInst> &Insts) const {
-  const auto &SimCtx = IGC.SimCtx;
   assert(RISCV::FPR64RegClass.contains(DstReg) ||
          RISCV::FPR32RegClass.contains(DstReg) ||
          RISCV::FPR16RegClass.contains(DstReg));
-  auto NumBits = Value.getBitWidth();
 
   if (InitFRegsFromMemory) {
-    auto &ProgCtx = IGC.ProgCtx;
-    auto &GP = ProgCtx.getOrAddGlobalsPoolFor(
-        IGC.getSnippyModule(),
-        "Failed to allocate global constant for float register value load");
-    auto *GV = GP.createGV(
-        Value, /* Alignment */ NumBits / RISCV_CHAR_BIT,
-        /* Linkage */ GlobalValue::InternalLinkage,
-        /* Name */ "global",
-        /* Reason */ "This is needed for updating of float register");
-
-    auto GVAddr = GP.getGVAddress(GV);
-    generateLoadRegFromAddr(IGC, GVAddr, DstReg, Insts);
-    if (SimCtx.hasModel())
-      SimCtx.notifyMemUpdate(GVAddr, Value);
+    generateWriteValueFromMemory(IGC, Value, DstReg, Insts);
     return;
   }
 
+  auto NumBits = Value.getBitWidth();
   auto &ProgCtx = IGC.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
@@ -3995,6 +4077,19 @@ void SnippyRISCVTarget::generateWriteValueFP(
   generateWriteValueSeq(IGC, Value, ScratchReg, Insts);
 
   Insts.emplace_back(MCInstBuilder(FMVOpc).addReg(DstReg).addReg(ScratchReg));
+}
+
+void SnippyRISCVTarget::generateWriteValueV(
+    InstructionGenerationContext &IGC, APInt Value, unsigned DstReg,
+    SmallVectorImpl<MCInst> &Insts) const {
+  assert(RISCV::VRRegClass.contains(DstReg));
+
+  // TODO: currently this supports only whole register loads, we need to
+  // incorporate functionality of rvvWriteValue in this function so it can be
+  // used with different rvv-init-modes
+  assert(RVVInitModeOpt.getValue() == RVVInitMode::Loads);
+
+  generateWriteValueFromMemory(IGC, Value, DstReg, Insts);
 }
 
 // [Unsafe] This function expects certain RVVMode (SEW == XLEN && VL --> max)
@@ -4215,9 +4310,8 @@ void SnippyRISCVTarget::instructionPostProcess(
   updateRVVConfig(IGC, MI);
 }
 
-void SnippyRISCVTarget::rvvGenerateModeSwitchAndUpdateContext(
-    const MCInstrInfo &InstrInfo, InstructionGenerationContext &IGC,
-    std::optional<unsigned> DesiredOpcode) const {
+RVVModeInfo SnippyRISCVTarget::createRVVMode(InstructionGenerationContext &IGC,
+                                             unsigned DesiredOpcode) const {
   auto &MBB = IGC.MBB;
   auto &ProgCtx = IGC.ProgCtx;
   auto &RGC = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
@@ -4236,49 +4330,19 @@ void SnippyRISCVTarget::rvvGenerateModeSwitchAndUpdateContext(
   assert(!(MustUseReducedVL && NewVLVM.VL > kMaxVLForVSETIVLI) &&
          "VSETIVLI supports only VLs up to specified maximum");
 
-  const RVVModeInfo NewRVVMode{NewVLVM, NewRvvCFG, MBB};
-  generateRVVModeUpdate(IGC, InstrInfo, NewRVVMode, DesiredOpcode);
+  return RVVModeInfo(NewVLVM, NewRvvCFG, MBB);
 }
 
-static unsigned
-selectDesiredModeChangeInstruction(RVVModeChangeMode Preference, unsigned VL,
-                                   const RISCVGeneratorContext &TargetContext) {
-  switch (Preference) {
-  case RVVModeChangeMode::MC_ANY: {
-    const auto &ModeChangeInfo =
-        TargetContext.getVUConfigInfo().getModeChangeInfo();
-    std::array<double, 3> VsetvlProb = {
-        ModeChangeInfo.WeightVSETVL,
-        ModeChangeInfo.WeightVSETVLI,
-        // NOTE: VSETIVLI is limited to VL kMaxVLForVSETIVLI so we exclude
-        // this mode-changing instruction for cases when it can't be used
-        (VL > kMaxVLForVSETIVLI) ? 0.0 : ModeChangeInfo.WeightVSETIVLI,
-    };
-    // NOTE: this, probably, should be an assert. However, we don't have proper
-    // checks at the configuration phase
-    if (std::all_of(VsetvlProb.begin(), VsetvlProb.end(),
-                    [](const auto &P) { return P <= 0.0; }))
-      snippy::fatal(formatv("The specified restrictions on VSET* instructions "
-                            "do not allow to produce VL of {0}. Please, adjust "
-                            "the histogram or change the set of "
-                            "reachable RVV configurations",
-                            VL));
-
-    DiscreteGeneratorInfo<unsigned, std::array<unsigned, 3>> Gen(
-        {RISCV::VSETVL, RISCV::VSETVLI, RISCV::VSETIVLI}, VsetvlProb);
-    return Gen();
-  }
-  case RVVModeChangeMode::MC_VSETIVLI:
-    if (VL > kMaxVLForVSETIVLI)
-      snippy::fatal("cannot select VSETIVLI as mode changing instruction "
-                    " for VL greater than 31");
-    return RISCV::VSETIVLI;
-  case RVVModeChangeMode::MC_VSETVLI:
-    return RISCV::VSETVLI;
-  case RVVModeChangeMode::MC_VSETVL:
-    return RISCV::VSETVL;
-  }
-  llvm_unreachable("unexpected RVV mode change preference");
+RVVModeInfo SnippyRISCVTarget::generateRVVModeSwitchAndUpdateContext(
+    const MCInstrInfo &InstrInfo, InstructionGenerationContext &IGC,
+    bool IsSupport) const {
+  const auto &RGC =
+      IGC.ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+  unsigned DesiredOpcode =
+      selectDesiredModeChangeInstruction(RVVModeChangePreferenceOpt, RGC);
+  const auto &NewRVVMode = createRVVMode(IGC, DesiredOpcode);
+  generateRVVModeUpdate(IGC, InstrInfo, NewRVVMode, DesiredOpcode, IsSupport);
+  return NewRVVMode;
 }
 
 // This function might generate VSET using RVVMode.Config
@@ -4326,6 +4390,7 @@ void SnippyRISCVTarget::generateVSETIVLI(InstructionGenerationContext &IGC,
                                          const MCInstrInfo &InstrInfo,
                                          unsigned VTYPE, unsigned VL,
                                          bool SupportMarker) const {
+  assert(VL <= kMaxVLForVSETIVLI);
   auto &MBB = IGC.MBB;
   auto &Ins = IGC.Ins;
   auto &ProgCtx = IGC.ProgCtx;
@@ -4336,11 +4401,6 @@ void SnippyRISCVTarget::generateVSETIVLI(InstructionGenerationContext &IGC,
   auto DstReg = RP.getAvailableRegister(
       "VSETIVLI dst", RI, RegClass, MBB,
       SupportMarker ? AccessMaskBit::SupportRW : AccessMaskBit::PrimaryRW);
-  // TODO: eventually this should be an assert
-  if (VL > kMaxVLForVSETIVLI)
-    snippy::fatal(formatv("cannot set the desired VL {0} since selected "
-                          "VSETIVLI does not support it",
-                          VL));
   auto MIB = getInstBuilder(SupportMarker, *this, MBB, Ins,
                             ProgCtx.getLLVMState().getCtx(),
                             InstrInfo.get(RISCV::VSETIVLI));
@@ -4409,8 +4469,8 @@ void SnippyRISCVTarget::generateVSETVL(InstructionGenerationContext &IGC,
 // generates VSET{I}VL{I} without V0 update
 void SnippyRISCVTarget::generateVTypeChange(
     InstructionGenerationContext &IGC, const MCInstrInfo &InstrInfo,
-    const RVVModeInfo &NewRVVMode,
-    std::optional<unsigned> DesiredOpcode) const {
+    const RVVModeInfo &NewRVVMode, std::optional<unsigned> DesiredOpcode,
+    bool SupportMarker) const {
   assert(NewRVVMode.Config != nullptr);
   const auto VL = NewRVVMode.VLVM.VL;
   const auto &Config = *NewRVVMode.Config;
@@ -4422,15 +4482,12 @@ void SnippyRISCVTarget::generateVTypeChange(
                                        Config.MaskAgnostic);
   auto &ProgCtx = IGC.ProgCtx;
   auto &RGC = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
-  bool SupportMarker = false;
-  if (!DesiredOpcode.has_value()) {
+
+  if (!DesiredOpcode.has_value())
     DesiredOpcode =
-        selectDesiredModeChangeInstruction(RVVModeChangePreferenceOpt, VL, RGC);
-    SupportMarker = true;
-  } else {
-    const auto &VUInfo = RGC.getVUConfigInfo();
-    SupportMarker = VUInfo.isModeChangeArtificial();
-  }
+        selectDesiredModeChangeInstruction(RVVModeChangePreferenceOpt, RGC, VL);
+
+  assert(DesiredOpcode.value() != RISCV::VSETIVLI || VL <= kMaxVLForVSETIVLI);
 
   switch (DesiredOpcode.value()) {
   case RISCV::VSETIVLI:
@@ -4445,21 +4502,22 @@ void SnippyRISCVTarget::generateVTypeChange(
   default:
     llvm_unreachable("unexpected OpcodeRequested for generateVTypeChange");
   }
+
   RGC.updateActiveRVVModeConfigAndVL(&IGC.MBB, NewRVVMode.Config, VL);
 }
 
 void SnippyRISCVTarget::generateRVVModeUpdate(
     InstructionGenerationContext &IGC, const MCInstrInfo &InstrInfo,
-    const RVVModeInfo &NewRVVMode,
-    std::optional<unsigned> DesiredOpcode) const {
+    const RVVModeInfo &NewRVVMode, std::optional<unsigned> DesiredOpcode,
+    bool SupportMarket) const {
+  const auto &RGC =
+      IGC.ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
 
-  generateVTypeChange(IGC, InstrInfo, NewRVVMode, DesiredOpcode);
+  generateVTypeChange(IGC, InstrInfo, NewRVVMode, DesiredOpcode, SupportMarket);
   generateV0MaskUpdate(IGC, NewRVVMode.VLVM.VM, InstrInfo);
 
   // Check that we got what expected, even if there was a change to temporary
   // RVV mode required for the mask update
-  const auto &RGC =
-      IGC.ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
   const auto ActiveRVVMode = RGC.getActiveRVVMode(IGC.MBB);
 
   assert(APInt::isSameValue(ActiveRVVMode.VLVM.VM, NewRVVMode.VLVM.VM) ||
@@ -4471,17 +4529,17 @@ void SnippyRISCVTarget::generateRVVModeUpdate(
   // TODO: update VXRM
 }
 
-// return false if no update were needed
+// Returns false if no update was needed. Always counts as support.
 bool SnippyRISCVTarget::generateRVVModeUpdateIfNeeded(
     InstructionGenerationContext &IGC, const MCInstrInfo &InstrInfo,
-    const RVVModeInfo &NewRVVMode,
-    std::optional<unsigned> DesiredOpcode) const {
+    const RVVModeInfo &NewRVVMode) const {
   const auto &RGC =
       IGC.ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
   const auto &MBB = IGC.MBB;
   if (RGC.hasActiveRVVMode(MBB) && RGC.getActiveRVVMode(MBB) == NewRVVMode)
     return false;
-  generateRVVModeUpdate(IGC, InstrInfo, NewRVVMode, DesiredOpcode);
+
+  generateRVVModeUpdate(IGC, InstrInfo, NewRVVMode);
   return true;
 }
 
@@ -4509,22 +4567,30 @@ static void dumpRvvConfigurationInfo(StringRef FilePath,
     ReportFileError(OS.error());
 }
 
+static void checkThatRVVInitModeSupportsReinit(const OpcodeHistogram &Hist) {
+  auto IsRVVOpcode = [](const auto &Pair) -> bool { return isRVV(Pair.first); };
+
+  if (none_of(Hist, IsRVVOpcode))
+    return;
+  // Register reinitialization uses generateWriteValueV function, which always
+  // uses loads for writing to a register
+  if (RVVInitModeOpt.getValue() != RVVInitMode::Loads)
+    snippy::fatal("Currently reinitialization of vector registers requires "
+                  "rvv-init-mode=loads. Please specify rvv-init-mode=loads");
+}
+
 std::unique_ptr<TargetGenContextInterface>
 SnippyRISCVTarget::createTargetContext(LLVMState &State, const Config &Cfg,
                                        const TargetSubtargetInfo *STI) const {
   auto RISCVCfg = RISCVConfigurationInfo::constructConfiguration(State, Cfg);
   auto RGC = std::make_unique<RISCVGeneratorContext>(std::move(RISCVCfg));
   const auto &VUInfo = RGC->getVUConfigInfo();
-  bool IsRVVPresent = VUInfo.getModeChangeInfo().RVVPresent;
-  if (IsRVVPresent) {
-    // TODO: This should be checked in some other way.
-    bool IsApplyValuegramEachInst = Cfg.DefFlowConfig.Valuegram.has_value();
-    if (IsApplyValuegramEachInst)
-      snippy::fatal("Not implemented", "vector registers can't be initialized");
-  }
 
   if (DumpRVVConfigurationInfo.isSpecified())
     dumpRvvConfigurationInfo(DumpRVVConfigurationInfo.getValue(), VUInfo);
+
+  if (Cfg.DefFlowConfig.isApplyValuegramEachInstr())
+    checkThatRVVInitModeSupportsReinit(Cfg.Histogram);
 
   return std::move(RGC);
 }
@@ -4556,11 +4622,12 @@ SnippyRISCVTarget::createSimulator(llvm::snippy::DynamicLibrary &ModelLib,
 }
 
 const MCRegisterClass &SnippyRISCVTarget::getRegClass(
-    InstructionGenerationContext &IGC, unsigned OperandRegClassID,
+    const InstructionGenerationContext &IGC, unsigned OperandRegClassID,
     unsigned OpIndex, unsigned Opcode, const MCRegisterInfo &RegInfo) const {
-  auto &MBB = IGC.MBB;
-  auto &ProgCtx = IGC.ProgCtx;
-  auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+  const auto &MBB = IGC.MBB;
+  const auto &ProgCtx = IGC.ProgCtx;
+  const auto &TgtCtx =
+      ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
   if (!isRVV(Opcode) || !TgtCtx.hasActiveRVVMode(MBB) ||
       (OperandRegClassID != RISCV::VRRegClassID))
     return RegInfo.getRegClass(OperandRegClassID);

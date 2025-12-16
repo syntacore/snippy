@@ -57,7 +57,26 @@ public:
     reportUnimplementedError();
   }
 
-  void checkInstrTargetDependency(const OpcodeHistogram &H) const override {
+  void checkInstrTargetDependency(const OpcodeHistogram &H,
+                                  const OpcodeCache &OpCC) const override {
+    reportUnimplementedError();
+  }
+
+  bool isModeSwitchInstr(unsigned Opcode) const override {
+    reportUnimplementedError();
+  }
+
+  bool modeSwitchIsSupport(const SnippyProgramContext &ProgCtx) const override {
+    reportUnimplementedError();
+  }
+
+  bool needToGenerateModeSwitches(
+      const SnippyProgramContext &ProgCtx) const override {
+    reportUnimplementedError();
+  }
+
+  double
+  getModeSwitchProbability(const SnippyProgramContext &ProgCtx) const override {
     reportUnimplementedError();
   }
 
@@ -69,7 +88,9 @@ public:
     reportUnimplementedError();
   }
 
-  bool needsGenerationPolicySwitch(unsigned Opcode) const override {
+  std::function<bool(unsigned)>
+  generateModeChangeAndGetFilter(InstructionGenerationContext &IGC,
+                                 bool IsSupport) const override {
     reportUnimplementedError();
   }
 
@@ -138,8 +159,8 @@ public:
   }
 
   const MCRegisterClass &
-  getRegClass(InstructionGenerationContext &IGC, unsigned OperandRegClassID,
-              unsigned OpIndex, unsigned Opcode,
+  getRegClass(const InstructionGenerationContext &IGC,
+              unsigned OperandRegClassID, unsigned OpIndex, unsigned Opcode,
               const MCRegisterInfo &RegInfo) const override {
     reportUnimplementedError();
   }
@@ -552,8 +573,9 @@ public:
     reportUnimplementedError();
   }
 
-  bool canInitializeOperand(const MCInstrDesc &InstrDesc,
-                            unsigned OpIndex) const override {
+  bool canInitializeOperand(
+      const MCInstrDesc &InstrDesc, unsigned OpIndex,
+      const InstructionGenerationContext *IGC = nullptr) const override {
     reportUnimplementedError();
   }
 
@@ -579,16 +601,6 @@ public:
   std::vector<OpcodeHistogramEntry>
   getPolicyOverrides(const SnippyProgramContext &ProgCtx,
                      const MachineBasicBlock &MBB) const override {
-    reportUnimplementedError();
-  }
-
-  bool groupMustHavePrimaryInstr(const SnippyProgramContext &ProgCtx,
-                                 const MachineBasicBlock &MBB) const override {
-    reportUnimplementedError();
-  }
-  std::function<bool(unsigned)>
-  getDefaultPolicyFilter(const SnippyProgramContext &ProgCtx,
-                         const MachineBasicBlock &MBB) const override {
     reportUnimplementedError();
   }
 
