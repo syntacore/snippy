@@ -739,9 +739,17 @@ breakDownAddrForRVVStrided(AddressInfo AddrInfo, const MachineInstr &MI,
 
 static std::pair<AddressParts, MemAddresses>
 breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
-                           InstructionGenerationContext &IGC, bool Is64Bit) {
+                           const InstructionGenerationContext &IGC,
+                           bool Is64Bit) {
   auto Opcode = MI.getOpcode();
+
   assert(isRVVIndexedLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode));
+  // Validate AddressInfo invariants.
+  assert(AddrInfo.MinStride != 0);
+  assert(AddrInfo.MinOffset <= 0);
+  assert(AddrInfo.MaxOffset >= 0);
+  assert(AddrInfo.MinOffset % static_cast<int64_t>(AddrInfo.MinStride) == 0);
+  assert(AddrInfo.MaxOffset % static_cast<int64_t>(AddrInfo.MinStride) == 0);
 
   auto &ProgCtx = IGC.ProgCtx;
   auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
@@ -762,21 +770,14 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
   // EEW of index element.
   auto EIEW = getIndexElementWidth(Opcode);
 
-  // Check that MinOffset and MaxOffset are already aligned to MinStride
-  assert(AddrInfo.MinOffset % AddrInfo.MinStride == 0);
-  assert(AddrInfo.MaxOffset % AddrInfo.MinStride == 0);
+  LLVM_DEBUG(dbgs() << "breakDownAddrForRVVIndexed\n";
+             dbgs().indent(2) << "Instruction: " << MI);
+
   // For indexed loads/stores, only base address + index must be legal according
   // to the memory scheme, but base address by itself doesn't have to be. So the
   // base address can be offset by some amount, as long as the final access is
   // still legal.
-  LLVM_DEBUG(dbgs() << "breakDownAddrForRVVIndexed Instruction\n";
-             MI.print(dbgs()););
-  // From the specification: All Zve* extensions support all vector load and
-  // store instructions (Section Section 31.7), except Zve64* extensions do not
-  // support EEW=64 for index values when XLEN=32.
-  assert(EIEW <= ST.getXLen());
-  APInt IndexMaxValue = APInt::getMaxValue(EIEW).zext(ST.getXLen());
-
+  //
   // Start by generating an offset for the base address.
   // The minimum value of the base address's offset is such that after adding
   // the maximum possible offset that can stored in the index register to the
@@ -789,8 +790,6 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
   // value. in the picked index register. The idea is that Base' + Index' for
   // any Index satisfies the following condition:
   // Base + MinOffset <= Base' + Index' <= Base + MaxOffset
-  assert(AddrInfo.MinOffset <= 0);
-  assert(AddrInfo.MaxOffset >= 0);
 
   // Originally we need to create just (xlen + 1)-bit signed immediates, but
   // initial values might be near uint64_t::max (sign bit equals `1`). If xlen
@@ -814,19 +813,35 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
 
   // MinBaseOffset and MaxBaseOffset must be reachable from AddrInfo.Address
   // with AddrInfo.MinStride
-  [[maybe_unused]] uint64_t AddrStrideReminder =
+  [[maybe_unused]] uint64_t AddrStrideRemainder =
       AddrInfo.Address % AddrInfo.MinStride;
-  assert(AddrStrideReminder ==
-             (MinBaseOffset.getZExtValue() % AddrInfo.MinStride) &&
-         AddrStrideReminder ==
-             (MaxBaseOffset.getZExtValue() % AddrInfo.MinStride));
+  assert(AddrStrideRemainder ==
+         (MinBaseOffset.getZExtValue() % AddrInfo.MinStride));
+  assert(AddrStrideRemainder ==
+         (MaxBaseOffset.getZExtValue() % AddrInfo.MinStride));
+
+  // From the specification: All Zve* extensions support all vector load and
+  // store instructions (Section Section 31.7), except Zve64* extensions do not
+  // support EEW=64 for index values when XLEN=32.
+  assert(EIEW <= ST.getXLen());
+  APInt IndexMaxValue = APInt::getMaxValue(EIEW).zext(ST.getXLen());
 
   // Pick the legal random Base' value with the index constraints for current
   // instruction. So, from the equation above:
   // MinBaseOffset <= Base' + IndexMaxValue <= MaxBaseOffset
   // MinBaseOffset - IndexMaxValue  <= Base' <= MaxBaseOffset - IndexMaxValue
+  assert(MinBaseOffset.getBitWidth() == ST.getXLen());
+  assert(MaxBaseOffset.getBitWidth() == ST.getXLen());
+
+  // NOTE: All arithmetic is modulo XLen and it's expected that these operations
+  // will overflow. Either both at the same time or just one.
   auto MinBase = MinBaseOffset - IndexMaxValue;
   auto MaxBase = MaxBaseOffset - IndexMaxValue;
+
+  LLVM_DEBUG(dbgs().indent(2)
+             << "MinBase: 0x" << utohexstr(MinBase.getZExtValue()) << "\n");
+  LLVM_DEBUG(dbgs().indent(2)
+             << "MaxBase: 0x" << utohexstr(MaxBase.getZExtValue()) << "\n");
 
   // This range can be presented in two types:
   // --|MinBase ... MaxBase|-- and |0 ... MaxBase|--|MinBase ... 2^{xlen} - 1|
@@ -866,7 +881,6 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
                     .concat("\n"));
 
   auto IndexMinValue = MinBaseOffset - BaseAddr;
-  assert(AddrInfo.MinStride != 0);
   auto MaxN = (IndexMaxValue - IndexMinValue).udiv(AddrInfo.MinStride);
 
   AddressPart MainPart{AddrReg, BaseAddr};
@@ -903,8 +917,8 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
                         "\n");
       assert(FinalAddress.uge(MinBaseOffset));
       assert(FinalAddress.ule(MaxBaseOffset));
-      [[maybe_unused]] auto FinalOffset = FinalAddress - AddrInfo.Address;
-      assert(FinalOffset.urem(AddrInfo.MinStride) == 0);
+      assert(FinalAddress.urem(AddrInfo.MinStride) ==
+             AddrInfo.Address % AddrInfo.MinStride);
       Addresses.push_back((BaseAddr + IndexValue).getZExtValue());
     }
     VL -= NElts;
