@@ -88,25 +88,6 @@ static snippy::opt<unsigned> SizeErrorThreshold(
     cl::desc("the maximal number of attempts to generate code fitting size"),
     cl::Hidden, cl::init(5));
 
-// FIXME: The only reason to change policy is if some instructions in the group
-// require some initialization first. We switch to default policy that has these
-// special instructions (overrides).
-static void switchPolicyIfNeeded(planning::InstructionGenerationContext &IGC,
-                                 planning::InstructionGroupRequest &IG,
-                                 unsigned Opcode,
-                                 const DefaultPolicyConfig *FallBackCfg) {
-  auto &ProgCtx = IGC.ProgCtx;
-  auto &MBB = IGC.MBB;
-  auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
-  if (Tgt.needsGenerationPolicySwitch(Opcode)) {
-    if (!FallBackCfg)
-      snippy::fatal(
-          "No fallback policy provided when policy change requested.");
-    IG.changePolicy(planning::createGenPolicy(ProgCtx, *FallBackCfg, MBB));
-    IGC.switchConfig(*FallBackCfg);
-  }
-}
-
 static void generateInsertionPointHint(
     planning::InstructionGenerationContext &InstrGenCtx) {
   auto &ProgCtx = InstrGenCtx.ProgCtx;
@@ -634,6 +615,14 @@ handleGeneratedInstructions(InstrIt ItBegin,
   auto &State = ProgCtx.getLLVMState();
   auto ItEnd = InstrGenCtx.Ins;
   auto &SimCtx = InstrGenCtx.SimCtx;
+
+  LLVM_DEBUG(dbgs() << "Handling generated instructions:\n");
+  if (ItBegin == ItEnd)
+    LLVM_DEBUG(dbgs() << "[empty]\n");
+  else
+    LLVM_DEBUG(std::for_each(ItBegin, ItEnd,
+                             [](MachineInstr &MI) { MI.print(dbgs()); }));
+
   auto GeneratedCodeSize = State.getCodeBlockSize(ItBegin, ItEnd);
   auto PrimaryInstrCount = countPrimaryInstructions(ItBegin, ItEnd);
   auto ReportGenerationResult =
@@ -1590,7 +1579,7 @@ void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
     assert((!FinalReq.limit().isNumLimit() || FinalReq.limit().getLimit()) &&
            "FinalReq is empty!");
     InstrGenCtx.append(MAI);
-    snippy::generate(FinalReq, InstrGenCtx, /*Fallback config */ nullptr);
+    snippy::generate(FinalReq, InstrGenCtx);
   }
 
   // Mark last generated instruction as support one.
@@ -1602,7 +1591,7 @@ void processGenerationResult(
     const planning::RequestLimit &Limit,
     planning::InstructionGenerationContext &InstrGenCtx,
     const GenerationResult &IntRes) {
-  LLVM_DEBUG(printInterpretResult(dbgs(), "      ", IntRes); dbgs() << "\n");
+  LLVM_DEBUG(printInterpretResult(dbgs(), "", IntRes); dbgs() << "\n\n");
   auto &SimCtx = InstrGenCtx.SimCtx;
   auto &BacktrackCount = InstrGenCtx.BacktrackCount;
   auto &SizeErrorCount = InstrGenCtx.SizeErrorCount;
@@ -1639,10 +1628,9 @@ MachineBasicBlock::iterator processGeneratedInstructions(
     MachineBasicBlock::iterator ItBegin,
     planning::InstructionGenerationContext &InstrGenCtx,
     const planning::RequestLimit &Limit) {
-  auto &MBB = InstrGenCtx.MBB;
   auto ItEnd = InstrGenCtx.Ins;
-  ItBegin = ItBegin == ItEnd ? MBB.begin() : std::next(ItBegin);
-  auto IntRes = handleGeneratedInstructions(ItBegin, InstrGenCtx, Limit);
+  auto IntRes =
+      handleGeneratedInstructions(std::next(ItBegin), InstrGenCtx, Limit);
   processGenerationResult(Limit, InstrGenCtx, IntRes);
   InstrGenCtx.Stats.merge(IntRes.Stats);
   return std::prev(ItEnd);
@@ -1717,7 +1705,7 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
                                                          SimCtx};
       auto RP = InstrGenCtx.pushRegPool();
       InstrGenCtx.append(MLI).append(CGS).append(MAI).append(SLI).append(SFM);
-      snippy::generate(BBReq, InstrGenCtx, &GC.getConfig().DefFlowConfig);
+      snippy::generate(BBReq, InstrGenCtx);
       CurrMFGenStats.merge(InstrGenCtx.Stats);
     }
     SNIPPY_DEBUG_BRIEF("Function codegen", CurrMFGenStats);
@@ -1773,7 +1761,7 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
                                                        SimCtx};
     InstrGenCtx.append(CGS).append(MAI).append(SFM);
     auto RP = InstrGenCtx.pushRegPool();
-    snippy::generate(BBReq, InstrGenCtx, nullptr /* Fallback config*/);
+    snippy::generate(BBReq, InstrGenCtx);
 
     CurrMFGenStats.merge(InstrGenCtx.Stats);
     SNIPPY_DEBUG_BRIEF("Function codegen", CurrMFGenStats);
@@ -1785,27 +1773,48 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
 }
 
 void generate(planning::InstructionGroupRequest &IG,
-              planning::InstructionGenerationContext &InstrGenCtx,
-              const DefaultPolicyConfig *FallBackCfg) {
-  LLVM_DEBUG(dbgs() << "Generating IG:\n"; IG.print(dbgs(), 2););
+              planning::InstructionGenerationContext &InstrGenCtx) {
+  LLVM_DEBUG(dbgs() << "Generating IG:\n");
+  LLVM_DEBUG(IG.print(dbgs(), 2));
+  LLVM_DEBUG(dbgs() << "  IsInseparableBundle: "
+                    << (IG.isInseparableBundle() ? "true\n" : "false\n"));
+
   auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
   auto &MBB = InstrGenCtx.MBB;
   auto OldStats = InstrGenCtx.Stats;
   InstrGenCtx.Stats = GenerationStatistics();
   if (GenerateInsertionPointHints)
     generateInsertionPointHint(InstrGenCtx);
-  auto ItEnd = InstrGenCtx.Ins;
-  auto ItBegin = ItEnd == MBB.begin() ? ItEnd : std::prev(ItEnd);
+
+  // Instructions are stored in a list and new ones are placed just before
+  // InstrGenCtx.Ins
+  auto ItBegin = MBB.empty() ? MBB.begin() : std::prev(InstrGenCtx.Ins);
+
+  // Braces are here to destroy things when needed
   {
+    // We must push a new pool for any policy that reserves registers.
+    // When it is destroyed, the previous pool is restored.
     auto RP = InstrGenCtx.pushRegPool();
-    auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
+    // Instructions can be generated during initialization which is called by
+    // InstrGroupGenerationRAIIWrapper
     planning::InstrGroupGenerationRAIIWrapper InitAndFinish(IG, InstrGenCtx);
-    auto ItBegin = ItEnd == MBB.begin() ? ItEnd : std::prev(ItEnd);
+
+    ItBegin = processGeneratedInstructions(ItBegin, InstrGenCtx, IG.limit());
+
+    if (IG.limit().isReached(InstrGenCtx.Stats)) {
+      LLVM_DEBUG(dbgs() << formatv("IG limit [{0}] reached after policy "
+                                   "initialization, exiting.\n\n",
+                                   IG.limit().getAsString()));
+      InstrGenCtx.Stats.merge(OldStats);
+      return;
+    }
+
     planning::InstrRequestRange Range(IG, InstrGenCtx.Stats);
     for (auto &&IR : Range) {
       generateInstruction(InstrInfo.get(IR.Opcode), InstrGenCtx,
                           std::move(IR.Preselected), IR.IsSupport);
-      switchPolicyIfNeeded(InstrGenCtx, IG, IR.Opcode, FallBackCfg);
+
       if (!IG.isInseparableBundle()) {
         ItBegin =
             processGeneratedInstructions(ItBegin, InstrGenCtx, IG.limit());
@@ -1843,10 +1852,9 @@ void interpretMBBInstrs(LLVMState &State, const SimulatorContext &SimCtx,
 
 GenerationStatistics
 generate(planning::BasicBlockRequest &BB,
-         planning::InstructionGenerationContext &InstrGenCtx,
-         const DefaultPolicyConfig *FBC) {
+         planning::InstructionGenerationContext &InstrGenCtx) {
   for (auto &&IG : BB)
-    generate(IG, InstrGenCtx, FBC);
+    generate(IG, InstrGenCtx);
 
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();

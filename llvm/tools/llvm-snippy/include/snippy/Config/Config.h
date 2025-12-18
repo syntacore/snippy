@@ -144,32 +144,24 @@ public:
 
   DefaultPolicyConfig(const CommonPolicyConfig &Common) : Common(&Common) {}
 
-  OpcGenHolder createOpcodeGenerator(
-      const OpcodeCache &OpCC, std::function<bool(unsigned)> OpcMask,
-      ArrayRef<OpcodeHistogramEntry> Overrides, bool MustHavePrimaryInstrs,
-      std::unordered_map<unsigned, double> OpcWeightOverrides = {}) const {
+  Expected<OpcGenHolder>
+  createOpcodeGenerator(const OpcodeCache &OpCC,
+                        const std::function<bool(unsigned)> &OpcMask) const {
+
+    assert(!DataFlowHistogram.empty());
 
     std::map<unsigned, double> DFHCopy;
     llvm::copy_if(DataFlowHistogram, std::inserter(DFHCopy, DFHCopy.end()),
                   [&](auto &&Entry) { return OpcMask(Entry.first); });
-    if (MustHavePrimaryInstrs && DFHCopy.size() == 0)
-      snippy::fatal(
-          "We can not create any primary instruction in this context.\nUsually "
-          "this may happen when in some context snippy can not find any "
-          "instruction that could be created in current context.\nTry to "
-          "increase instruction number by one or add more instructions to "
-          "histogram.");
-    // overriding previous weights
-    if (!OpcWeightOverrides.empty()) {
-      for (auto &&[Opcode, Weight] : OpcWeightOverrides) {
-        if (DFHCopy.count(Opcode))
-          DFHCopy[Opcode] = Weight;
-      }
-    }
+    if (DFHCopy.size() == 0)
+      return makeFailure(
+          Errc::InvalidConfiguration,
+          "We can not create any primary instruction in this "
+          "context.\nUsually this may happen when in some context "
+          "snippy can not find any instruction that could be created "
+          "in current context.\nTry to increase instruction number by "
+          "one or add more instructions to histogram.");
 
-    for (const auto &Entry : Overrides)
-      if (!Entry.deactivated())
-        DFHCopy[Entry.Opcode] = Entry.Weight;
     auto &PluginManager = *Common->ProgramCfg.PluginManagerImpl;
     if (PluginManager.pluginHasBeenLoaded())
       return PluginManager.createPlugin(DFHCopy.begin(), DFHCopy.end());
