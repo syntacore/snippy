@@ -1,0 +1,57 @@
+# RUN: llvm-snippy %s -model-plugin None
+options:
+  mtriple: riscv64-unknown-elf
+  mattr: +v
+  num-instrs: 100
+  init-regs-in-elf: true
+sections:
+  - no: 0
+    VMA: 0x200000
+    SIZE: 0x50000
+    LMA: 0x200000
+    ACCESS: r
+  - no: 1
+    VMA: 0x250000
+    SIZE: 0x50000
+    LMA: 0x250000
+    ACCESS: rx
+  - no: 2
+    VMA: 0x800000
+    SIZE: 0x500000
+    LMA: 0x800000
+    ACCESS: rw
+access-ranges:
+  - start: 0x800000
+    size: 0x500000
+    stride: 5
+    first-offset: 0
+    last-offset: 0
+histogram:
+  - [VLOXEI32_V, 1.0]
+  - [VSOXEI32_V, 1.0]
+riscv-vector-unit:
+  mode-change-bias:
+    P: 0.2
+  mode-distribution:
+    VM:
+      - [all_ones, 2.0]
+      - [any_legal, 1.0]
+    VL:
+      - [max_encodable, 2.0]
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+      rne: 1.0
+      rdn: 1.0
+      ron: 1.0
+    VTYPE:
+      VMA:
+        mu: 1.0
+        ma: 1.0
+      VTA:
+        tu: 1.0
+        ta: 1.0
+      SEW:
+        sew_16: 1.0
+      LMUL:
+        m2: 1.0
