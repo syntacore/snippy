@@ -7,6 +7,7 @@ set(snippy_sources
   ImmediateHistogram.cpp
   MemoryAccessRange.cpp
   FormattedAPIntWithSign.cpp
+  Random.cpp
   )
 
 set(snippy_link_libraries

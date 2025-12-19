@@ -1465,7 +1465,7 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
     checkBurstGram(Ctx, Histogram, OpCC, BurstConfig->Burst);
   checkCallRequirements(Tgt, Histogram, CGLayout);
   checkMemoryRegions(Tgt, *this);
-  Tgt.checkInstrTargetDependency(Histogram);
+  Tgt.checkInstrTargetDependency(Histogram, OpCC);
   if (hasTrackingMode())
     Tgt.checkTrackingRestrictions(Histogram);
   checkCompatibilityWithValuegramPolicy(*this, Ctx);

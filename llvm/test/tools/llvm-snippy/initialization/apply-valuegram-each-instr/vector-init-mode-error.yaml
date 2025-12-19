@@ -1,17 +1,21 @@
-# COM: This test checks that we print error, because initialization
-# COM: has not yet been implemented for rvv
+# REQUIRES: riscv-rvv
+# COM: This test checks that when using modes other than 'loads' we get an error
 
+# RUN: not llvm-snippy %s -valuegram-operands-regs=%S/Inputs/histograms.yaml -rvv-init-mode=mixed  \
+# RUN: |& FileCheck %s
 
-# RUN: not llvm-snippy %s \
-# RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
-# RUN: |& FileCheck %s 
+# RUN: not llvm-snippy %s -valuegram-operands-regs=%S/Inputs/histograms.yaml -rvv-init-mode=splats \
+# RUN: |& FileCheck %s
+
+# RUN: not llvm-snippy %s -valuegram-operands-regs=%S/Inputs/histograms.yaml -rvv-init-mode=slides \
+# RUN: |& FileCheck %s
 
 options:
   march: riscv64
   mcpu: generic-rv64
   mattr: +v
-  dump-mf: true
-  num-instrs: 1000
+  num-instrs: 1
+  valuegram-operands-regs-init-outputs: on
 
 sections:
     - no:        0
@@ -32,7 +36,7 @@ sections:
 
 riscv-vector-unit:
   mode-change-bias:
-    P: 0.1
+    P: 0.001
   mode-distribution:
     VM:
       - [any_legal, 1.0]
@@ -42,16 +46,15 @@ riscv-vector-unit:
       rnu: 1.0
     VTYPE:
       SEW:
-        sew_8: 1.0
+        sew_32: 1.0
       LMUL:
-          mf2: 1.0
+          m8: 1.0
       VMA:
         mu: 1.0
       VTA:
         tu: 1.0
- 
+
 histogram:
        - [VADD_VV, 1.0]
- 
-# CHECK: Not implemented: vector registers can't be initialized
 
+# CHECK: Currently reinitialization of vector registers requires rvv-init-mode=loads
