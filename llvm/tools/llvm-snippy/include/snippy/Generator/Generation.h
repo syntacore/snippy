@@ -32,13 +32,11 @@ struct SnippyFunctionMetadata;
 class DefaultPolicyConfig;
 
 void generate(planning::InstructionGroupRequest &IG,
-              planning::InstructionGenerationContext &InstrGenCtx,
-              const DefaultPolicyConfig *FBC);
+              planning::InstructionGenerationContext &InstrGenCtx);
 
 GenerationStatistics
 generate(planning::BasicBlockRequest &BB,
-         planning::InstructionGenerationContext &InstrGenCtx,
-         const DefaultPolicyConfig *FBC);
+         planning::InstructionGenerationContext &InstrGenCtx);
 
 void generate(planning::FunctionRequest &FunctionGenRequest,
               MachineFunction &MF, GeneratorContext &GC,

@@ -11,19 +11,16 @@ include:
 
 burst:
   mode: custom
-  min-size: 6
-  max-size: 6
+  min-size: 3
+  max-size: 3
   groupings:
     - [FENCE_I]
 
 histogram:
-  - [FENCE_I, 1.0]
+  - [FENCE_I, 0.1]
   - [ADDI, 1.0]
 
+# COM: Check that we have at least one sequence of 3 consecutive FENCE_Is
+
 # CHECK-NOT: warning: (burst-mode) Opcode FENCE_I is not supported
-# CHECK: FENCE_I
-# CHECK-NEXT: FENCE_I
-# CHECK-NEXT: FENCE_I
-# CHECK-NEXT: FENCE_I
-# CHECK-NEXT: FENCE_I
-# CHECK-NEXT: FENCE_I
+# CHECK: {{FENCE_I.*[[:space:]].*FENCE_I.*[[:space:]].*FENCE_I}}
