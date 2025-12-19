@@ -148,8 +148,8 @@ public:
   }
 
   virtual const MCRegisterClass &
-  getRegClass(InstructionGenerationContext &IGC, unsigned OperandRegClassID,
-              unsigned OpIndex, unsigned Opcode,
+  getRegClass(const InstructionGenerationContext &IGC,
+              unsigned OperandRegClassID, unsigned OpIndex, unsigned Opcode,
               const MCRegisterInfo &RegInfo) const = 0;
 
   virtual const MCRegisterClass &
@@ -257,10 +257,24 @@ public:
     return nullptr;
   }
 
-  virtual void checkInstrTargetDependency(const OpcodeHistogram &H) const = 0;
+  virtual void checkInstrTargetDependency(const OpcodeHistogram &H,
+                                          const OpcodeCache &OpCC) const = 0;
   virtual void checkTrackingRestrictions(const OpcodeHistogram &H) const = 0;
 
-  virtual bool needsGenerationPolicySwitch(unsigned Opcode) const = 0;
+  virtual bool isModeSwitchInstr(unsigned Opcode) const = 0;
+
+  virtual bool
+  needToGenerateModeSwitches(const SnippyProgramContext &ProgCtx) const = 0;
+
+  virtual bool
+  modeSwitchIsSupport(const SnippyProgramContext &ProgCtx) const = 0;
+
+  virtual double
+  getModeSwitchProbability(const SnippyProgramContext &ProgCtx) const = 0;
+
+  virtual std::function<bool(unsigned)>
+  generateModeChangeAndGetFilter(InstructionGenerationContext &IGC,
+                                 bool IsSupport) const = 0;
 
   virtual std::vector<Register>
   getRegsForSelfcheck(const MachineInstr &MI,
@@ -580,8 +594,9 @@ public:
 
   virtual bool canUseInBurstMode(const MCInstrDesc &InstrDesc) const = 0;
 
-  virtual bool canInitializeOperand(const MCInstrDesc &InstrDesc,
-                                    unsigned OpIndex) const = 0;
+  virtual bool canInitializeOperand(
+      const MCInstrDesc &InstrDesc, unsigned OpIndex,
+      const InstructionGenerationContext *IGC = nullptr) const = 0;
 
   virtual StridedImmediate
   getImmOffsetRangeForMemAccessInst(const MCInstrDesc &InstrDesc) const = 0;
@@ -598,13 +613,6 @@ public:
   getPolicyOverrides(const SnippyProgramContext &ProgCtx,
                      const MachineBasicBlock &MBB) const = 0;
 
-  // Currently the result is the same for all groups in BB
-  virtual bool
-  groupMustHavePrimaryInstr(const SnippyProgramContext &ProgCtx,
-                            const MachineBasicBlock &MBB) const = 0;
-  virtual std::function<bool(unsigned)>
-  getDefaultPolicyFilter(const SnippyProgramContext &ProgCtx,
-                         const MachineBasicBlock &MBB) const = 0;
   // Registers that should be valid while calling an external function
   virtual std::vector<MCRegister> getGlobalStateRegs() const = 0;
 

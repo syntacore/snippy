@@ -42,19 +42,16 @@ sections:
 
 burst:
   mode: custom
-  min-size: 6
-  max-size: 6
+  min-size: 3
+  max-size: 3
   groupings:
     - [OPCODE]
 
 histogram:
-  - [OPCODE, 1.0]
+  - [OPCODE, 0.1]
   - [ADDI, 1.0]
 
+# COM: Check that we have at least one sequence of 3 consecutive OPCODEs
+
 # OPCODE-NOT: warning: (burst-mode) Opcode OPCODE is not supported
-# OPCODE: OPCODE
-# OPCODE-NEXT: OPCODE
-# OPCODE-NEXT: OPCODE
-# OPCODE-NEXT: OPCODE
-# OPCODE-NEXT: OPCODE
-# OPCODE-NEXT: OPCODE
+# OPCODE: {{OPCODE.*[[:space:]].*OPCODE.*[[:space:]].*OPCODE}}

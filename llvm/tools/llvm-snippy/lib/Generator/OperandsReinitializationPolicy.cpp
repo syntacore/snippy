@@ -58,10 +58,11 @@ static Register pregenerateRegister(InstructionGenerationContext &InstrGenCtx,
       ProgCtx.getRegGen().generate(RegClass, OperandRegClassID, RegInfo, RP,
                                    MBB, Tgt, Exclude, Include, Mask);
   assert(RegOpt.has_value());
+  assert(RegOpt.value() != MCRegister::NoRegister);
   return RegOpt.value();
 }
 
-/// Pregenarate available register operands.
+/// Pregenerate available register operands.
 /// \return Vector of size InstrDesc.getNumOperands(). Uninitializable operands
 /// have corresponding PreselectedOpInfo::isUnset().
 std::vector<planning::PreselectedOpInfo>
@@ -89,7 +90,7 @@ selectInitializableOperandsRegisters(InstructionGenerationContext &InstrGenCtx,
         // If it is TIED_TO, this register is already
         // selected.
         if (NeedsInit(OpIndex) &&
-            Tgt.canInitializeOperand(InstrDesc, OpIndex) &&
+            Tgt.canInitializeOperand(InstrDesc, OpIndex, &InstrGenCtx) &&
             InstrDesc.getOperandConstraint(OpIndex, MCOI::TIED_TO) == -1)
           return pregenerateRegister(InstrGenCtx, InstrDesc, MCOpInfo, OpIndex);
         return {};
@@ -99,16 +100,10 @@ selectInitializableOperandsRegisters(InstructionGenerationContext &InstrGenCtx,
 
 ValuegramGenPolicy::ValuegramGenPolicy(
     SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
-    std::function<bool(unsigned)> Filter, bool MustHavePrimaryInstrs,
-    ArrayRef<OpcodeHistogramEntry> Overrides,
-    const std::unordered_map<unsigned, double> &WeightOverrides,
-    std::unique_ptr<IOperandsReinitializationValueSource> ValueSource)
-    : OpcGen(Cfg.createOpcodeGenerator(
-          /*OpCC=*/ProgCtx.getOpcodeCache(), /*OpcMask=*/Filter,
-          /*Overrides=*/Overrides,
-          /*MustHavePrimaryInstrs=*/MustHavePrimaryInstrs,
-          /*OpcWeightOverrides=*/WeightOverrides)),
-      Cfg(&Cfg), OperandsValueSource(std::move(ValueSource)) {
+    std::unique_ptr<IOperandsReinitializationValueSource> ValueSource,
+    const ModeChangingInstPolicy *ModeChangingPolicy)
+    : OpcGen(nullptr), Cfg(&Cfg), ModeChangingPolicy(ModeChangingPolicy),
+      OperandsValueSource(std::move(ValueSource)) {
   assert(Cfg.isApplyValuegramEachInstr() &&
          "This policy can only be used when the "
          "-valuegram-operands-regs file provided");
@@ -123,6 +118,10 @@ ValuegramGenPolicy::generateOneInstrWithInitRegs(
   const auto &Tgt = State.getSnippyTarget();
   const auto &RI = State.getRegInfo();
   std::vector<InstructionRequest> InstrWithInitRegs;
+
+  // Make sure this is not a mode switch instruction, as the request for it is
+  // generated beforehand
+  assert(!Tgt.isModeSwitchInstr(Opcode));
 
   // We need to select all operands-registers to insert their
   // initialization according to the valuegram before the main instruction.
@@ -173,16 +172,30 @@ ValuegramGenPolicy::generateOneInstrWithInitRegs(
   return InstrWithInitRegs;
 }
 
-void ValuegramGenPolicy::initialize(InstructionGenerationContext &InstGenCtx,
+void ValuegramGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
                                     const RequestLimit &Limit) {
-  InstGenCtx.switchConfig(*Cfg);
+  InstrGenCtx.switchConfig(*Cfg);
   assert(Limit.isNumLimit());
   assert(Instructions.empty() && Idx == 0 && "Is expected to be called once");
 
-  int PrimaryInstrsLeft = Limit.getLimit() + 1;
-  while (--PrimaryInstrsLeft > 0)
+  if (Limit.isEmpty())
+    return;
+
+  const auto &Tgt = InstrGenCtx.ProgCtx.getLLVMState().getSnippyTarget();
+  const auto &Filter = ModeChangingPolicy
+                           ? ModeChangingPolicy->getOpcodeFilter()
+                           : getDefaultFilter(Tgt);
+  auto Err =
+      Cfg->createOpcodeGenerator(InstrGenCtx.ProgCtx.getOpcodeCache(), Filter)
+          .moveInto(OpcGen);
+  if (Err)
+    snippy::fatal(
+        Twine("Failed to create OpcodeGenerator in ValuegramGenPolicy: ") +
+        toString(std::move(Err)));
+
+  for (size_t I = 0; I < Limit.getLimit(); ++I)
     llvm::append_range(Instructions, generateOneInstrWithInitRegs(
-                                         InstGenCtx, OpcGen->generate()));
+                                         InstrGenCtx, OpcGen->generate()));
 }
 
 Expected<std::optional<APInt>> ValuegramGenPolicy::getValueFromValuegram(

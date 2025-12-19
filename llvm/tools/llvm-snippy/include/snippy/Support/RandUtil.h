@@ -235,6 +235,173 @@ public:
     return Vals;
   }
 
+private:
+  // Algorithm is as follows:
+  // 1. Select M-1 random values in range [0, N]
+  // 2. Add N to them
+  // 3. Sort them
+  //
+  // Number line (M = 9 here):
+  // |------|----|----|--|-------|----|--|----|----|
+  // 0     x1   x2   x3  x4     x5   x6  x7  x8    N
+  // Vector:
+  // {x1, x2, x3, x4, x5, x6, x7, x8, N}
+  //
+  // 4. Compute differences between consecutive values and store
+  // them into the same vector
+  // (For the first difference std::adjacent_difference just copies x1)
+  //
+  // |------|----|----|--|-------|----|--|----|----|
+  // 0     x1   x2   x3  x4     x5   x6  x7  x8    N
+  //      /  \  |                        |  /  \  /
+  //  {x1,   x2-x1,      . . . . .      x8-x7, N-x8}
+  //
+  // The values were sorted, so all differences are non-negative.
+  // The sum of all differences is N:
+  // x1 + (x2-x1) + ... + (x8-x7) + (N-x8) = N
+  template <typename T>
+  static void splitNIntoMPartsImpl(SmallVectorImpl<T> &Result, T N, size_t M) {
+    Result.reserve(M);
+    std::generate_n(std::back_inserter(Result), M - 1,
+                    [N]() { return genInRangeInclusive(N); });
+    Result.emplace_back(N);
+
+    std::sort(Result.begin(), Result.end());
+    std::adjacent_difference(Result.begin(), Result.end(), Result.begin());
+  }
+
+  // The algorithm for the weighted case is as follows:
+  // 1. Split N into TotalWeight parts using algorithm above
+  // 2. For each part in Result, select Weights[i] parts of the split
+  // 3. Compute sum of all selected parts
+  //
+  // The more Weights[i] is, the more parts will be selected and the more
+  // likely it is that the sum will be larger.
+  template <typename T>
+  static void splitNIntoMPartsImpl(SmallVectorImpl<T> &Result, T N,
+                                   const SmallVectorImpl<T> &Weights) {
+    static_assert(std::is_integral_v<T>, "T must be an integer type.");
+    // Split N into TotalWeight parts. Then combine Weights[i] parts of the
+    // split into Result[i].
+    T TotalWeight = std::accumulate(Weights.begin(), Weights.end(), T{0});
+    assert(TotalWeight != 0 && "Cannot split into 0 parts.");
+
+    SmallVector<T> SparseResult;
+    splitNIntoMPartsImpl(SparseResult, N, TotalWeight);
+
+    Result.resize(Weights.size());
+    auto SparseResIter = SparseResult.begin();
+    for (auto [ResVal, Weight] : zip_equal(Result, Weights)) {
+      ResVal = std::accumulate(SparseResIter, SparseResIter + Weight, T{0});
+      std::advance(SparseResIter, Weight);
+    }
+  }
+
+  // Handling Baseline and Uniformity
+  template <typename T>
+  static void splitNIntoMPartsImpl(SmallVectorImpl<T> &Result, T N, size_t M,
+                                   T Baseline, double Uniformity) {
+    Baseline = std::max(Baseline, static_cast<T>(Uniformity * N / M));
+    if (Baseline == 0) {
+      splitNIntoMPartsImpl(Result, N, M);
+      return;
+    }
+    N -= M * Baseline;
+    splitNIntoMPartsImpl(Result, N, M);
+    for (auto &V : Result)
+      V += Baseline;
+  }
+
+  // Handling Baseline and Uniformity for the weighted case
+  template <typename T>
+  static void splitNIntoMPartsImpl(SmallVectorImpl<T> &Result, T N,
+                                   const SmallVectorImpl<T> &Weights,
+                                   T Baseline, double Uniformity) {
+    Baseline =
+        std::max(Baseline, static_cast<T>(Uniformity * N / Weights.size()));
+    if (Baseline == 0) {
+      splitNIntoMPartsImpl(Result, N, Weights);
+      return;
+    }
+    N -= Weights.size() * Baseline;
+    splitNIntoMPartsImpl(Result, N, Weights);
+    for (auto &V : Result)
+      V += Baseline;
+  }
+
+  // Handling Alignment
+  template <typename T, typename MType>
+  static void splitNIntoMPartsImpl(SmallVectorImpl<T> &Result, T N,
+                                   const MType &M, T Baseline,
+                                   double Uniformity, T Alignment) {
+    if (Alignment == 1) {
+      splitNIntoMPartsImpl(Result, N, M, Baseline, Uniformity);
+      return;
+    }
+    N /= Alignment;
+    Baseline = llvm::alignTo(Baseline, Alignment) / Alignment;
+
+    splitNIntoMPartsImpl(Result, N, M, Baseline, Uniformity);
+    for (auto &V : Result)
+      V *= Alignment;
+  }
+
+public:
+  // e.g. splitNIntoMParts(10, 3) -> {4, 3, 3}
+  // Each part is at least Baseline. Uniformity [0-1] pushes the baseline to
+  // the average. Each part is divisible by Alignment. Note that uniformity 1.0
+  // does not guarantee that all parts are 1 Alignment apart or closer.
+  template <typename T>
+  static void splitNIntoMParts(SmallVectorImpl<T> &Result, T N, size_t M,
+                               T Baseline = static_cast<T>(0),
+                               double Uniformity = 0.0,
+                               T Alignment = static_cast<T>(1)) {
+    static_assert(std::is_integral_v<T>, "T must be an integer type.");
+
+    assert(M != 0 && "Cannot split into 0 parts.");
+    assert(N >= M * Baseline && "Cannot satisfy the baseline.");
+    assert(N >= M * llvm::alignTo(Baseline, Alignment) &&
+           "Cannot satisfy the baseline with alignment.");
+    assert(Uniformity >= 0.0 && Uniformity <= 1.0 &&
+           "Uniformity must be between 0 and 1.");
+    assert(N % Alignment == 0 && "N must be divisible by Alignment.");
+
+    if (M == 1) {
+      Result.push_back(N);
+      return;
+    }
+    splitNIntoMPartsImpl(Result, N, M, Baseline, Uniformity, Alignment);
+  }
+
+  // Result is exactly as in the unweighted version if Weights is {1, 1, ... 1}.
+  // Prefer using smaller weights, e.g. Weights = {1, 2, 1} instead
+  // of {100, 200, 100}, as they produce the same result.
+  template <typename T>
+  static void splitNIntoMPartsWeighted(SmallVectorImpl<T> &Result, T N,
+                                       const SmallVectorImpl<T> &Weights,
+                                       T Baseline = static_cast<T>(0),
+                                       double Uniformity = 0.0,
+                                       T Alignment = static_cast<T>(1)) {
+    static_assert(std::is_integral_v<T>, "T must be an integer type.");
+
+    const auto M = Weights.size();
+    assert(M != 0 && "Cannot split into 0 parts.");
+    assert(N >= M * Baseline && "Cannot satisfy the baseline.");
+    assert(N >= M * llvm::alignTo(Baseline, Alignment) &&
+           "Cannot satisfy the baseline with alignment.");
+    assert(Uniformity >= 0.0 && Uniformity <= 1.0 &&
+           "Uniformity must be between 0 and 1.");
+    assert(N % Alignment == 0 && "N must be divisible by Alignment.");
+    assert(all_of(Weights, [](T V) { return V >= 0; }) &&
+           "All weights must be non-negative.");
+
+    if (M == 1) {
+      Result.push_back(N);
+      return;
+    }
+    splitNIntoMPartsImpl(Result, N, Weights, Baseline, Uniformity, Alignment);
+  }
+
   template <typename T>
   static Expected<std::vector<T>> genNUniqInInterval(T Min, T Max, size_t N) {
     static_assert(std::is_integral_v<T>, "T must be an integer type.");

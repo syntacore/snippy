@@ -114,6 +114,9 @@ private:
   bool Init = false;
 
 public:
+  // Use Min = Max, Stride = 0 for a regular immediate. There is no
+  // special constructor for this case because it would cause ambiguity with the
+  // constructor of llvm::Register when PreselectedOpInfo is used.
   StridedImmediate(ValueType MinIn, ValueType MaxIn, StrideType StrideIn)
       : Min(MinIn), Max(MaxIn), Stride(StrideIn), Init(true) {
     assert(Min <= Max);
@@ -141,6 +144,13 @@ public:
       return true;
     return getMin() == Imm.getMin() && getMax() == Imm.getMax() &&
            getStride() == Imm.getStride();
+  }
+
+  void print(raw_ostream &OS) const {
+    if (isInitialized())
+      OS << formatv("[{0}; {1}; {2}]", getMin(), getMax(), getStride());
+    else
+      OS << "unset";
   }
 };
 
@@ -299,7 +309,7 @@ template <unsigned BitWidth, ImmediateSignedness Sign, ImmediateZero Zero,
 auto genImmInInterval(const ImmediateHistogramSequence *IH,
                       const StridedImmediate &StridedImm) {
   if (StridedImm.isInitialized()) {
-    unsigned MinStride = 1 << ZeroBits;
+    [[maybe_unused]] unsigned MinStride = 1 << ZeroBits;
     assert(StridedImm.getStride() >= MinStride);
     assert(Zero == ImmediateZero::Include);
     if constexpr (Sign == ImmediateSignedness::Signed) {

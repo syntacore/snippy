@@ -146,6 +146,18 @@ RequestLimit &RequestLimit::operator+=(const RequestLimit &Other) {
   return *this;
 }
 
+// Returns false if the limits are not the same kind
+bool RequestLimit::operator==(const RequestLimit &Other) const {
+  if (!isSameKindAs(Other))
+    return false;
+
+  if (!isMixedLimit())
+    return getLimit() == Other.getLimit();
+
+  return getMixedLimit().NumInstrs == Other.getMixedLimit().NumInstrs &&
+         getMixedLimit().Size == Other.getMixedLimit().Size;
+}
+
 size_t RequestLimit::getLimit() const {
   return std::visit(
       OverloadedCallable(
