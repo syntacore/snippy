@@ -145,11 +145,13 @@ static void dumpSelfcheck(const std::vector<char> &Data, size_t ChunkSize,
                           size_t ChunksNum, raw_ostream &OS) {
   for (size_t Offset = 0; Offset < Data.size();
        Offset += ChunkSize * ChunksNum) {
+    OS << "\nOffset: 0x" << Twine::utohexstr(Offset);
     for (size_t Idx = 0; Idx < ChunkSize * ChunksNum; Idx++) {
       if (Idx % ChunkSize == 0)
         OS << "\n";
-      OS.write_hex(static_cast<unsigned char>(Data[Offset + Idx]));
-      OS << " ";
+      OS << llvm::format_hex_no_prefix(
+                static_cast<unsigned char>(Data[Offset + Idx]), 2, true)
+         << " ";
     }
     OS << "\n------\n";
   }
