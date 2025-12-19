@@ -35,6 +35,7 @@ namespace snippy {
   WARN_CASE(LoopStrideOutOfRange, "loop-stride-out-of-range")                  \
   WARN_CASE(BurstMode, "burst-mode")                                           \
   WARN_CASE(InstructionCount, "instruction-count")                             \
+  WARN_CASE(IndivisibleSizeLimitSection, "indivisible-size-limit-section")     \
   WARN_CASE(RegState, "register-state")                                        \
   WARN_CASE(InstructionSizeUnknown, "instruction-size-unknown")                \
   WARN_CASE(TooFarMaxPCDist, "too-long-max-pc-dist")                           \

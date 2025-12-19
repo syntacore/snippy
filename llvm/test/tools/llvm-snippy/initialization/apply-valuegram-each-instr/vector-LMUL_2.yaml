@@ -1,9 +1,6 @@
 # REQUIRES: riscv-rvv
-# COM: This test checks that in the case of LMUL == 2, we initialize all registers 
+# COM: This test checks that in the case of LMUL == 2, we initialize all registers
 # COM: from the register group according to the histograms.yaml.
-
-# COM: Because this functionality has not yet been implemented for rvv
-# XFAIL: *
 
 # RUN: llvm-snippy %s \
 # RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
@@ -17,6 +14,7 @@ options:
   num-instrs: 1
   reserved-regs-list: [V2,V4,V6,V8,V10,V12,V14,V16,V18,V20,V22,V24,V26,V28]
   valuegram-operands-regs-init-outputs: on
+  rvv-init-mode: loads
 
 sections:
     - no:        0
@@ -64,29 +62,19 @@ riscv-vector-unit:
       VTA:
         tu: 1.0
         ta: 1.0
- 
+
 histogram:
        - [VADD_VV, 1.0]
 
 #          Valuegram values:
 #
 #                     V: 3, 4.
-#                     We want to see them in initialization 
-#         
-#          An example of what we're matching:
+#                     We want to see them in initialization
 #
-#          v30:       $x14 = ADDI $x0, 4, pcsections <0x5617782a9708>
-#                     $v30 = VSLIDE1DOWN_VX undef $v30, $x14, 
-#                     $x14 = ADDI $x0, 0, pcsections <0x5617782a9708>
-#                     $v30 = VSLIDE1DOWN_VX $v30, $x14, 
-#                       ... vsetvl ...
-#          v31:       $x2 = ADDI $x0, 3, pcsections <0x5617782a9708>
-#                     $v31 = VSLIDE1DOWN_VX undef $v31, $x2, 
-#                     $x2 = ADDI $x0, 0, pcsections <0x5617782a9708>
-#                     $v31 = VSLIDE1DOWN_VX $v31, $x2, 
+#          With these settings, we should only get
+#                     $v30m2 = VADD_VV $v30m2, $v30m2, $v0, implicit $vtype, implicit $vl
+#          So check that v30 and v31 are initialized
 
-
-# Initialization a vector register takes about 50 instructions. We just check that initialization from the histograms.yaml is encountered
-# 
-# CHECK: [[REG:\$x[0-9]+]] = ADDI $x0, {{(3|4), pcsections.*[[:space:]].*}}$v30 = VSLIDE1DOWN_VX undef $v30, [[REG]]{{.*[[:space:]].*}}[[REG]] = ADDI $x0, 0, pcsections{{.*[[:space:]].*}}$v30 = VSLIDE1DOWN_VX $v30, [[REG]]
-# CHECK-DAG: [[REG:\$x[0-9]+]] = ADDI $x0, {{(3|4), pcsections.*[[:space:]].*}}$v31 = VSLIDE1DOWN_VX undef $v31, [[REG]]{{.*[[:space:]].*}}[[REG]] = ADDI $x0, 0, pcsections{{.*[[:space:]].*}}$v31 = VSLIDE1DOWN_VX $v31, [[REG]]
+# CHECK-DAG: $v30 = VL1RE8_V{{.*}}pcsections
+# CHECK-DAG: $v31 = VL1RE8_V{{.*}}pcsections
+# CHECK:     $v30m2 = VADD_VV $v30m2, $v30m2

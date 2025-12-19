@@ -94,11 +94,18 @@ public:
     OS.indent(Indent) << "InstrGroupGenerationRequest<" << Limit.getAsString()
                       << "> -- ";
     planning::print(Policy, OS);
-    OS << "\n";
   }
 
   bool isInseparableBundle() const {
     return planning::isInseparableBundle(Policy);
+  }
+
+  const ModeChangingInstPolicy *getModeChangingPolicy() const {
+    return planning::getModeChangingPolicy(Policy);
+  }
+
+  void setModeChangingPolicy(const ModeChangingInstPolicy *MDP) {
+    planning::setModeChangingPolicy(Policy, MDP);
   }
 };
 
@@ -209,6 +216,42 @@ class BasicBlockRequest final : private std::vector<InstructionGroupRequest> {
   const MachineBasicBlock *MBB = nullptr;
   RequestLimit Limit;
 
+  // Should only be called in the copy constructor/assignment.
+  // Elements in the vector (IG requests, which contain policies) might have
+  // pointers to the other elements in the same vector (policies of other IGs).
+  // We need to update the pointers, so they reference the newly allocated IGs.
+  void setModeChangingPolicies(const BasicBlockRequest &Other) {
+    assert(Other.size() == size());
+
+    // Map old mode-changing policies addresses to their new ones
+    DenseMap<const ModeChangingInstPolicy *, const ModeChangingInstPolicy *>
+        PolicyMap;
+
+    auto IsModeChangingPolicy = [](const auto &IGReq) -> bool {
+      return IGReq.policy().template as<planning::ModeChangingInstPolicy>() !=
+             nullptr;
+    };
+
+    // If the group had no mode-changing policy (getModeChangingPolicy() is
+    // nullptr), it should stay nullptr. Adding nullptr, so that the
+    // PolicyMap.at(nullptr) won't crash.
+    PolicyMap[nullptr] = nullptr;
+
+    // Fill the map
+    for (const auto &[NewIGReq, OldIGReq] : zip_equal(*this, Other))
+      if (auto *ModeChangingPolicy =
+              OldIGReq.policy().as<planning::ModeChangingInstPolicy>()) {
+        assert(IsModeChangingPolicy(NewIGReq));
+        PolicyMap[ModeChangingPolicy] =
+            NewIGReq.policy().as<planning::ModeChangingInstPolicy>();
+      }
+
+    // Change pointers to the according mode-changing policies
+    for (auto &Req : *this)
+      if (!IsModeChangingPolicy(Req))
+        Req.setModeChangingPolicy(PolicyMap.at(Req.getModeChangingPolicy()));
+  }
+
 public:
   BasicBlockRequest(const MachineBasicBlock &MBB)
       : MBB(&MBB), Limit(RequestLimit::NumInstrs{}) {}
@@ -217,6 +260,26 @@ public:
     assert(MBB);
     return *MBB;
   }
+
+  BasicBlockRequest(const BasicBlockRequest &Other)
+      : std::vector<InstructionGroupRequest>(Other), MBB(Other.MBB),
+        Limit(Other.Limit) {
+    setModeChangingPolicies(Other);
+  }
+
+  BasicBlockRequest &operator=(const BasicBlockRequest &Other) {
+    if (this == &Other)
+      return *this;
+    std::vector<InstructionGroupRequest>::operator=(Other);
+    MBB = Other.MBB;
+    Limit = Other.Limit;
+    setModeChangingPolicies(Other);
+    return *this;
+  }
+
+  BasicBlockRequest(BasicBlockRequest &&) = default;
+  BasicBlockRequest &operator=(BasicBlockRequest &&) = default;
+  ~BasicBlockRequest() = default;
 
   RequestLimit &limit() & { return Limit; }
 
@@ -231,6 +294,7 @@ public:
   using vector::cend;
   using vector::end;
 
+  using vector::back;
   using vector::empty;
   using vector::size;
 
@@ -339,13 +403,8 @@ public:
     if (Limit.isNumLimit() || Limit.isReached(MFStats))
       return {};
     std::vector<InstructionGroupRequest> Reqs;
-    auto &MBB = MF->back();
     auto &ProgCtx = GC->getProgramContext();
-    auto &SnpTgt = ProgCtx.getLLVMState().getSnippyTarget();
-    auto &&GP = DefaultGenPolicy(ProgCtx, GC->getConfig().DefFlowConfig,
-                                 SnpTgt.getDefaultPolicyFilter(ProgCtx, MBB),
-                                 SnpTgt.groupMustHavePrimaryInstr(ProgCtx, MBB),
-                                 SnpTgt.getPolicyOverrides(ProgCtx, MBB), {});
+    auto &&GP = DefaultGenPolicy(ProgCtx, GC->getConfig().DefFlowConfig);
     if (Limit.isSizeLimit()) {
       auto SizeLeft = Limit.getSizeLeft(MFStats);
       Reqs.emplace_back(RequestLimit::Size{SizeLeft}, std::move(GP));

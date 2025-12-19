@@ -63,15 +63,27 @@ private:
                               size_t NumInstrBurst, size_t NumInstrTotal,
                               size_t AverageBlockInstrs);
 
-  void fillReqWithPlainInstsByNumber(planning::FunctionRequest &FunReq,
-                                     size_t NumInstrPlain,
-                                     size_t AverageBlockInstrs);
-  void fillReqWithPlainInstsBySize(planning::FunctionRequest &FunReq,
-                                   size_t MFSizeLimit);
+  size_t fillReqWithContextModeChanges(
+      SmallDenseMap<const MachineBasicBlock *, size_t> &OutModeChangeAmounts,
+      planning::FunctionRequest &FunReq, size_t NumInstrPlain);
+
+  void fillReqWithPlainInstsByNumber(
+      const SmallDenseMap<const MachineBasicBlock *, size_t> &ModeChangeAmounts,
+      planning::FunctionRequest &FunReq, size_t NumInstrPlain);
+
+  void fillReqWithPlainInstsBySize(
+      const SmallDenseMap<const MachineBasicBlock *, size_t> &ModeChangeAmounts,
+      planning::FunctionRequest &FunReq, size_t MFSizeLimit);
+
   void fillReqForTopLoopBySize(planning::FunctionRequest &FunReq,
                                const MachineLoop &ML) const;
+
   void updateBlocksToProcess(const planning::BasicBlockRequest &BlockReq,
                              size_t AverageBlockInstrs);
+
+  void shuffleAndFinalizeInstGroups(planning::BasicBlockRequest &BBReq,
+                                    size_t MinInstrSize);
+
   template <typename Predicate>
   void fillBlocksToProcess(const MachineFunction &MF,
                            planning::FunctionRequest &FunReq, Predicate &&Pred);
@@ -382,36 +394,92 @@ void BlockGenPlanningImpl::fillReqWithBurstGroups(
   }
 }
 
-void BlockGenPlanningImpl::fillReqWithPlainInstsByNumber(
-    planning::FunctionRequest &FunReq, size_t NumInstrPlain,
-    size_t AverageBlockInstrs) {
+// Returns the number of primary mode-changing instructions added to
+// this function request
+size_t BlockGenPlanningImpl::fillReqWithContextModeChanges(
+    SmallDenseMap<const MachineBasicBlock *, size_t> &OutModeChangeAmounts,
+    planning::FunctionRequest &FunReq, size_t NumInstrPlain) {
   auto &ProgCtx = GenCtx->getProgramContext();
-  const auto &Cfg = GenCtx->getConfig();
-  while (NumInstrPlain > 0) {
-    auto MaxBlockInstrs = AverageBlockInstrs * 2ull;
-    auto InstrsToAdd = RandEngine::genInRangeInclusive(
-        1ull, std::min<unsigned long long>(NumInstrPlain, MaxBlockInstrs));
+  auto &State = ProgCtx.getLLVMState();
+  const auto &SnippyTgt = State.getSnippyTarget();
 
-    auto BlockId = RandEngine::genInRangeExclusive(BlocksToProcess.size());
-    const auto *MBB = BlocksToProcess[BlockId];
+  if (!SnippyTgt.needToGenerateModeSwitches(ProgCtx))
+    return 0;
 
-    auto BlockReqIt = FunReq.find(MBB);
-    unsigned Limit = 0;
-    if (BlockReqIt != FunReq.end()) {
-      auto &BlockReq = BlockReqIt->second;
-      assert(BlockReq.limit().isNumLimit());
-      Limit = BlockReq.limit().getLimit();
+  double PolicySwitchInstrsProbability =
+      SnippyTgt.getModeSwitchProbability(ProgCtx);
+  size_t ContextModeChangesAmount =
+      std::ceil(NumInstrPlain * PolicySwitchInstrsProbability);
+  assert(ContextModeChangesAmount <= NumInstrPlain);
+
+  auto BlocksAmount = BlocksToProcess.size();
+  // If we have enough mode changes overall, we would prefer to
+  // not have any support ones
+  size_t MinimumChangesPerMBB =
+      ContextModeChangesAmount >= BlocksAmount ? 1 : 0;
+  SmallVector<size_t> ModeChangeAmounts;
+  // Distribute the mode changes between the blocks
+  RandEngine::splitNIntoMParts(ModeChangeAmounts, ContextModeChangesAmount,
+                               BlocksAmount, MinimumChangesPerMBB);
+
+  SmallVector<bool> ModeChangeIsSupport(
+      /*Size=*/ModeChangeAmounts.size(),
+      /*Value=*/SnippyTgt.modeSwitchIsSupport(ProgCtx));
+
+  for (auto &&[SupportMarker, ModeChanges] :
+       zip_equal(ModeChangeIsSupport, ModeChangeAmounts))
+    // If we have no mode changes in a block, add a support one
+    if (ModeChanges == 0) {
+      SupportMarker = true;
+      ModeChanges = 1;
     }
-    InstrsToAdd = std::min(InstrsToAdd, MaxBlockInstrs - Limit);
 
-    auto Lim = planning::RequestLimit::NumInstrs{InstrsToAdd};
-    FunReq.addToBlock(MBB, planning::InstructionGroupRequest(
-                               Lim, planning::createGenPolicy(
-                                        ProgCtx, Cfg.DefFlowConfig, *MBB,
-                                        FunReq.getOpcodeWeightOverrides())));
-    NumInstrPlain -= InstrsToAdd;
-    auto &BlockReq = FunReq.at(MBB);
-    updateBlocksToProcess(BlockReq, AverageBlockInstrs);
+  for (const auto &[MBB, ModeChanges, IsSupport] :
+       zip_equal(BlocksToProcess, ModeChangeAmounts, ModeChangeIsSupport)) {
+    assert(ModeChanges > 0);
+    OutModeChangeAmounts.insert({MBB, ModeChanges});
+    for (size_t I = 0; I < ModeChanges; ++I) {
+      FunReq.addToBlock(MBB, planning::InstructionGroupRequest(
+                                 planning::RequestLimit::NumInstrs{!IsSupport},
+                                 planning::ModeChangingInstPolicy(IsSupport)));
+    }
+  }
+
+  return SnippyTgt.modeSwitchIsSupport(ProgCtx) ? 0 : ContextModeChangesAmount;
+}
+
+void BlockGenPlanningImpl::fillReqWithPlainInstsByNumber(
+    const SmallDenseMap<const MachineBasicBlock *, size_t> &ModeChangeAmounts,
+    planning::FunctionRequest &FunReq, size_t NumInstrPlain) {
+  const auto &Cfg = GenCtx->getConfig();
+  auto &ProgCtx = GenCtx->getProgramContext();
+
+  assert(ModeChangeAmounts.size() == BlocksToProcess.size() ||
+         ModeChangeAmounts.empty());
+  SmallVector<size_t> PlainInstsPerMBB;
+
+  if (ModeChangeAmounts.empty()) {
+    RandEngine::splitNIntoMParts(PlainInstsPerMBB, NumInstrPlain,
+                                 BlocksToProcess.size());
+  } else {
+    // The more context mode changes are in a block, the more plain instructions
+    // we want to be in that block.
+    SmallVector<size_t> ModeChangesPerMBB;
+    for (const auto &MBB : BlocksToProcess) {
+      assert(ModeChangeAmounts.contains(MBB));
+      ModeChangesPerMBB.push_back(ModeChangeAmounts.at(MBB));
+    }
+
+    RandEngine::splitNIntoMPartsWeighted(PlainInstsPerMBB, NumInstrPlain,
+                                         ModeChangesPerMBB);
+  }
+
+  for (auto &&[MBB, PlainInsts] :
+       zip_equal(BlocksToProcess, PlainInstsPerMBB)) {
+    FunReq.addToBlock(
+        MBB, planning::InstructionGroupRequest(
+                 planning::RequestLimit::NumInstrs{PlainInsts},
+                 planning::createGenPolicy(ProgCtx, Cfg.DefFlowConfig)));
   }
 }
 
@@ -426,93 +494,113 @@ void BlockGenPlanningImpl::updateBlocksToProcess(
 }
 
 template <typename T>
-void addEmptyReqForBlocks(planning::FunctionRequest &FunReq, const T &Blocks,
-                          const planning::RequestLimit &Limit) {
+static void addEmptyReqForBlocks(planning::FunctionRequest &FunReq,
+                                 const T &Blocks,
+                                 const planning::RequestLimit &Limit) {
   for (auto *MBB : Blocks)
     FunReq.add(MBB, planning::BasicBlockRequest(*MBB));
 }
 
-static void randomize(const planning::FunctionRequest &FunReq,
-                      planning::BasicBlockRequest &BB, GeneratorContext &GC) {
-  if (BB.empty())
-    return;
+static size_t getMinInstrSize(const MachineBasicBlock &MBB,
+                              const SnippyTarget &Tgt) {
+  const auto &STInfo = MBB.getParent()->getSubtarget();
+  const auto &InstrsSizes = Tgt.getPossibleInstrsSize(STInfo);
+  assert(InstrsSizes.size() > 0 &&
+         "Target must have at least one variant of instruction size");
+  assert(*InstrsSizes.begin() == *min_element(InstrsSizes));
+  return *InstrsSizes.begin();
+}
 
-  auto IsRegular = [](const auto &Req) {
-    return !Req.isInseparableBundle(); // FIXME: some kind of enum
-                                       // or llvm rtti
+void BlockGenPlanningImpl::shuffleAndFinalizeInstGroups(
+    planning::BasicBlockRequest &BBReq, size_t MinInstrSize) {
+  const auto &Cfg = GenCtx->getConfig();
+  auto &ProgCtx = GenCtx->getProgramContext();
+  const auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
+  // We expect that policies are going in this order:
+  // 1. zero or more other policies
+  // 2. zero or more ModeChangingInstPolicies
+  // 3. exactly one DefaultPolicy or ValuegramPolicy
+
+  auto IsModeChanging = [](const auto &IGReq) {
+    return IGReq.policy().template as<planning::ModeChangingInstPolicy>() !=
+           nullptr;
   };
-  // We request all plain packs to be after burst packs.
-  auto InstPackIt = find_if(BB, IsRegular);
-  if (InstPackIt == BB.end())
-    return;
-  auto &ProgCtx = GC.getProgramContext();
-  auto &Cfg = GC.getConfig();
 
-  assert(std::all_of(InstPackIt, BB.end(), IsRegular) &&
-         "Before randomization all 'plain' packs must be at the end.");
+  bool HasModeSwitches = SnippyTgt.needToGenerateModeSwitches(ProgCtx);
+  assert(HasModeSwitches == any_of(BBReq, IsModeChanging));
 
-  // Calculate the number of instructions in all plain packs. Since plain packs
-  // may differ only by instruction count, we can think that only one plain pack
-  // exists with instcount of RegularPackSize.
-  auto RegularPackSize = std::accumulate(InstPackIt, BB.end(), 0ull,
-                                         [](auto Acc, const auto &Pack) {
-                                           auto &Limit = Pack.limit();
-                                           assert(Limit.isNumLimit());
-                                           return Limit.getLimit() + Acc;
-                                         });
+  const auto &DefaultGroupLimit = BBReq.back().limit();
+  assert(!DefaultGroupLimit.isMixedLimit());
+  // Either size limit or num limit
+  size_t NumericalLimit = DefaultGroupLimit.getLimit();
+  size_t Alignment = DefaultGroupLimit.isNumLimit() ? 1 : MinInstrSize;
 
-  // At this point let's say that we have `RegularPackSize` packs of plain
-  // instructions each of size one, e.g.:
-  //   P_0  P_1  P_2  P_3  P_4  P_5
-  // Let's also say that we have N burst packs:
-  //   B_0  B_1  B_2
-  // We generate N indices in [0, RegularPackSize - 1] for plain packs. By these
-  // indices plain packs will be mixed with burst packs:
-  //   Idxs: 0, 1, 1, 4 (generate 3 idxs as there are three burst packs).
-  //   Regular packs with idxs [0, 1) will be added before the first burst pack
-  //   Regular packs with idxs [1, 1) (<--- no packs) will be added before the
-  //   second burst pack and so on. If the last index is smaller than
-  //   RegularPackSize than all plain packs left will be added after the last
-  //   burst pack (in our case they are P_4 and P_5).
-  // If we add more than one plain pack, then they'll be joint into one.
-  // Resulting sequence of packs for our example is:
-  //   { Regular, 1 } -- P_0
-  //   { B_0 }
-  //   { B_1 }
-  //   { Regular, 3 } -- P_1  P_2  P_3
-  //   { B_2 }
-  //   { Regular, 2 } -- P_4  P_5
-  std::vector<size_t> Idxs;
-  Idxs.push_back(0);
-  std::generate_n(std::back_inserter(Idxs),
-                  std::distance(BB.begin(), InstPackIt), [RegularPackSize] {
-                    return RandEngine::genInRangeExclusive(0ull,
-                                                           RegularPackSize);
-                  });
-  std::sort(Idxs.begin(), Idxs.end());
+  // We need to split the default group into several parts and insert each one
+  // of them between two non-default groups
+  SmallVector<size_t> PlainGroupsSizes;
 
-  auto NonRegularPacksIt = BB.begin();
-  auto &MBB = BB.getMBB();
-  planning::BasicBlockRequest NewPacks(MBB);
-  for (auto [FirstIdx, SecondIdx] : zip(Idxs, drop_begin(Idxs))) {
-    assert(FirstIdx <= SecondIdx);
-    if (FirstIdx != SecondIdx)
-      NewPacks.add(planning::InstructionGroupRequest(
-          planning::RequestLimit::NumInstrs{SecondIdx - FirstIdx},
-          planning::createGenPolicy(ProgCtx, Cfg.DefFlowConfig, MBB,
-                                    FunReq.getOpcodeWeightOverrides())));
-    // FIXME: should be enum or llvm rtti
-    assert(NonRegularPacksIt->isInseparableBundle());
-    NewPacks.add(std::move(*NonRegularPacksIt));
-    assert(NonRegularPacksIt != BB.end());
-    ++NonRegularPacksIt;
+  // We can split into N + 1 plain groups if we don't have mode changes, but we
+  // can only split into N groups otherwise, because a mode changing group must
+  // be the first in the block.
+  auto NonPlainGroupsAmount = BBReq.size() - 1;
+  size_t SplitInto =
+      HasModeSwitches ? NonPlainGroupsAmount : NonPlainGroupsAmount + 1;
+  RandEngine::splitNIntoMParts(PlainGroupsSizes, NumericalLimit, SplitInto,
+                               /*Baseline=*/size_t{0},
+                               /*Uniformity=*/0.0, Alignment);
+
+  planning::BasicBlockRequest NewBBReq(BBReq.getMBB());
+
+  auto AddPlainGroup =
+      [&](size_t GroupSize,
+          const planning::ModeChangingInstPolicy *ModeChangingPolicy =
+              nullptr) {
+        auto GenPolicy = planning::createGenPolicy(ProgCtx, Cfg.DefFlowConfig,
+                                                   ModeChangingPolicy);
+        if (DefaultGroupLimit.isNumLimit()) {
+          auto Lim = planning::RequestLimit::NumInstrs{GroupSize};
+          NewBBReq.add(planning::InstructionGroupRequest(std::move(Lim),
+                                                         std::move(GenPolicy)));
+          return;
+        }
+        auto Lim = planning::RequestLimit::Size{GroupSize};
+        NewBBReq.add(planning::InstructionGroupRequest(std::move(Lim),
+                                                       std::move(GenPolicy)));
+      };
+
+  // Shuffle all groups except the default one.
+  auto Groups = drop_end(BBReq);
+  RandEngine::shuffle(Groups.begin(), Groups.end());
+
+  if (HasModeSwitches) {
+    // Make sure the first group is mode changing
+    auto It = find_if(Groups, IsModeChanging);
+    assert(It != Groups.end());
+    std::iter_swap(It, Groups.begin());
+  } else {
+    // add the first plain group, since we have N + 1 plain groups
+    AddPlainGroup(PlainGroupsSizes.front());
   }
-  if (Idxs.back() != RegularPackSize)
-    NewPacks.add(planning::InstructionGroupRequest(
-        planning::RequestLimit::NumInstrs{RegularPackSize - Idxs.back()},
-        planning::createGenPolicy(ProgCtx, Cfg.DefFlowConfig, MBB,
-                                  FunReq.getOpcodeWeightOverrides())));
-  std::swap(NewPacks, BB);
+
+  const auto &PlainSizesRange =
+      HasModeSwitches ? PlainGroupsSizes : drop_begin(PlainGroupsSizes);
+
+  // Add N plain groups interleaving with non-plain groups
+  const planning::ModeChangingInstPolicy *CurrentModeChangingPolicy = nullptr;
+  for (auto &&[PlainGroupSize, Group] : zip_equal(PlainSizesRange, Groups)) {
+    NewBBReq.add(std::move(Group));
+    if (auto *Policy =
+            NewBBReq.back().policy().as<planning::ModeChangingInstPolicy>())
+      CurrentModeChangingPolicy = Policy;
+
+    if (PlainGroupSize != 0 || NewBBReq.empty())
+      AddPlainGroup(PlainGroupSize, CurrentModeChangingPolicy);
+  }
+
+  // New limit must be identical to the old one, otherwise limit in
+  // FunctionRequest will be incorrect
+  assert(NewBBReq.limit() == BBReq.limit());
+  BBReq = std::move(NewBBReq);
 }
 
 template <typename Predicate>
@@ -549,65 +637,91 @@ BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
   auto &ProgCtx = GenCtx->getProgramContext();
   const auto &Cfg = GenCtx->getConfig();
   const auto &OpCC = ProgCtx.getOpcodeCache();
+
+  auto NumInstrsLeft = NumInstrTotal;
   assert(NumInstrTotal >= Cfg.getCFInstrsNum(OpCC, NumInstrTotal));
-  NumInstrTotal -= Cfg.getCFInstrsNum(OpCC, NumInstrTotal);
+  NumInstrsLeft -= Cfg.getCFInstrsNum(OpCC, NumInstrTotal);
+
+  auto AverageBlockInstrs = NumInstrsLeft / BlocksToProcess.size();
+  if (AverageBlockInstrs == 0)
+    AverageBlockInstrs = 1;
 
   // FIXME: NumInstrBurst should be somehow randomized. But we must be careful
   // as in some cases there are no instructions outside burst groups and then
   // the number must be exact.
-  unsigned long long NumInstrBurst = getBurstProb(Cfg, *GenCtx) * NumInstrTotal;
-  auto NumInstrPlain = NumInstrTotal;
-  NumInstrPlain -= NumInstrBurst;
-
-  auto AverageBlockInstrs = NumInstrTotal / BlocksToProcess.size();
-  if (AverageBlockInstrs == 0)
-    AverageBlockInstrs = 1;
-
-  fillReqWithBurstGroups(FunReq, NumInstrBurst, NumInstrTotal,
+  unsigned long long NumInstrBurst = getBurstProb(Cfg, *GenCtx) * NumInstrsLeft;
+  fillReqWithBurstGroups(FunReq, NumInstrBurst, NumInstrsLeft,
                          AverageBlockInstrs);
-  fillReqWithPlainInstsByNumber(FunReq, NumInstrPlain, AverageBlockInstrs);
+  NumInstrsLeft -= NumInstrBurst;
 
-  for (auto &[MBB, BB] : FunReq)
+  const auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
+
+  SmallDenseMap<const MachineBasicBlock *, size_t> ModeChangesPerMBB;
+  NumInstrsLeft -=
+      fillReqWithContextModeChanges(ModeChangesPerMBB, FunReq, NumInstrsLeft);
+  fillReqWithPlainInstsByNumber(ModeChangesPerMBB, FunReq, NumInstrsLeft);
+
+  size_t MinInstrSize = getMinInstrSize(*MF.begin(), SnippyTgt);
+
+  // Randomize generation plan: shuffle plain and non-plain groups in each BB
+  for (const auto &MBB : BlocksToProcess)
+    shuffleAndFinalizeInstGroups(FunReq.at(MBB), MinInstrSize);
+
+  for (auto &[MBB, BBReq] : FunReq)
     erase(BlocksToProcess, MBB);
   // Add default plans for remaining blocks.
   addEmptyReqForBlocks(FunReq, BlocksToProcess,
                        planning::RequestLimit::NumInstrs{});
   addEmptyReqForBlocks(FunReq, LatchBlocks,
                        planning::RequestLimit::NumInstrs{});
-  // Randomize generation plan: shuffle burst groups and plain instructions.
-  for (auto &BlockReq : make_second_range(FunReq))
-    randomize(FunReq, BlockReq, *GenCtx);
 
+  for (auto &[MBB, BBReq] : FunReq) {
+    LLVM_DEBUG(llvm::dbgs() << MBB->getFullName() << ":\n");
+    for (auto &Req : BBReq) {
+      LLVM_DEBUG(Req.print(llvm::dbgs(), /*Indent=*/2));
+    }
+  }
   return FunReq;
 }
 
 void BlockGenPlanningImpl::fillReqWithPlainInstsBySize(
+    const SmallDenseMap<const MachineBasicBlock *, size_t> &ModeChangeAmounts,
     planning::FunctionRequest &FunReq, size_t MFSizeLimit) {
-  auto &ProgCtx = GenCtx->getProgramContext();
   const auto &Cfg = GenCtx->getConfig();
-  auto MaxInstrSize =
-      ProgCtx.getLLVMState().getSnippyTarget().getMaxInstrSize();
-  // Multiset instead of vector because we generate accumulated size of first k
-  // blocks. For example, if RequestedAccumulatedSizes == {2, 4, 4, 25, 37} then
-  // blocks will generated with {2, 2, 0, 21, 12} sizes.
-  std::multiset<size_t> RequestedAccumulatedSizes = {MFSizeLimit};
-  transform(
-      seq(0ul, BlocksToProcess.size() - 1),
-      std::inserter(RequestedAccumulatedSizes, RequestedAccumulatedSizes.end()),
-      [=](auto) {
-        return RandEngine::genInRangeInclusive(MFSizeLimit) / MaxInstrSize *
-               MaxInstrSize;
-      });
-  size_t LastAccumulatedSize = 0;
-  for (auto [MBB, AccumulatedSize] :
-       zip(BlocksToProcess, RequestedAccumulatedSizes)) {
-    size_t BlockSize = AccumulatedSize - LastAccumulatedSize;
-    auto Limit = planning::RequestLimit::Size{BlockSize};
-    FunReq.addToBlock(MBB, planning::InstructionGroupRequest(
-                               Limit, planning::createGenPolicy(
-                                          ProgCtx, Cfg.DefFlowConfig, *MBB,
-                                          FunReq.getOpcodeWeightOverrides())));
-    LastAccumulatedSize = AccumulatedSize;
+  auto &ProgCtx = GenCtx->getProgramContext();
+
+  assert(ModeChangeAmounts.size() == BlocksToProcess.size() ||
+         ModeChangeAmounts.empty());
+
+  SmallVector<size_t> PlainInstsSizePerMBB;
+  assert(!BlocksToProcess.empty());
+  auto &SnpTgt = ProgCtx.getLLVMState().getSnippyTarget();
+  size_t MinInstrSize = getMinInstrSize(**BlocksToProcess.begin(), SnpTgt);
+
+  if (ModeChangeAmounts.empty()) {
+    RandEngine::splitNIntoMParts(PlainInstsSizePerMBB, MFSizeLimit,
+                                 BlocksToProcess.size(), /*Baseline=*/0ul,
+                                 /*Uniformity=*/0.0, MinInstrSize);
+  } else {
+    // The more context mode changes are in a block, the more plain instructions
+    // we want to be in that block.
+    SmallVector<size_t> ModeChangesPerMBB;
+    for (const auto &MBB : BlocksToProcess) {
+      assert(ModeChangeAmounts.contains(MBB));
+      ModeChangesPerMBB.push_back(ModeChangeAmounts.at(MBB));
+    }
+
+    RandEngine::splitNIntoMPartsWeighted(PlainInstsSizePerMBB, MFSizeLimit,
+                                         ModeChangesPerMBB, /*Baseline=*/0ul,
+                                         /*Uniformity=*/0.0, MinInstrSize);
+  }
+
+  for (auto &&[MBB, PlainInstsSize] :
+       zip_equal(BlocksToProcess, PlainInstsSizePerMBB)) {
+    FunReq.addToBlock(
+        MBB, planning::InstructionGroupRequest(
+                 planning::RequestLimit::Size{PlainInstsSize},
+                 planning::createGenPolicy(ProgCtx, Cfg.DefFlowConfig)));
   }
 }
 
@@ -619,10 +733,57 @@ BlockGenPlanningImpl::processFunctionWithSize(const MachineFunction &MF) {
   fillBlocksToProcess(MF, FunReq, [](auto *MBB) { return true; });
   assert(!BlocksToProcess.empty() && "At least one basic block must exist");
 
-  auto MFSizeLimit = calculateMFSizeLimit(MF);
+  const auto &SnippyTgt =
+      GenCtx->getProgramContext().getLLVMState().getSnippyTarget();
+  size_t MinInstrSize = getMinInstrSize(*MF.begin(), SnippyTgt);
 
-  fillReqWithPlainInstsBySize(FunReq, MFSizeLimit);
+  size_t SizeLeft = calculateMFSizeLimit(MF);
+  if (SizeLeft % MinInstrSize != 0) {
+    SizeLeft = llvm::alignDown(SizeLeft, MinInstrSize);
+    warn(WarningName::IndivisibleSizeLimitSection,
+         Twine("The given memory region size is not aligned to the minimum "
+               "instruction size (") +
+             Twine(MinInstrSize) + Twine(")"),
+         "Rounding down to the nearest multiple");
+  }
 
+  // We have to estimate the number of instructions left for plain instructions
+  // and the size of each mode-changing sequence. There is no good way to do
+  // this...
+  constexpr size_t SizeOfModeChangeSeq = 20;
+  constexpr size_t SizeOfPlainInst = 12; // we often have support instructions
+  size_t EstimateNumInstrsLeft = SizeLeft / SizeOfPlainInst;
+
+  SmallDenseMap<const MachineBasicBlock *, size_t> ModeChangesPerMBB;
+  fillReqWithContextModeChanges(ModeChangesPerMBB, FunReq,
+                                EstimateNumInstrsLeft);
+
+  // Count all mode changes, even support ones
+  size_t TotalNumOfModeChanges = std::accumulate(
+      ModeChangesPerMBB.begin(), ModeChangesPerMBB.end(), 0ull,
+      [](size_t Sum, const auto &Lhs) { return Lhs.second + Sum; });
+  size_t SizeOfModeChanges = TotalNumOfModeChanges * SizeOfModeChangeSeq;
+  SizeLeft = SizeLeft > SizeOfModeChanges ? SizeLeft - SizeOfModeChanges : 0;
+
+  assert(SizeLeft % MinInstrSize == 0);
+  fillReqWithPlainInstsBySize(ModeChangesPerMBB, FunReq, SizeLeft);
+
+  // Randomize generation plan: shuffle plain and non-plain groups in each BB
+  for (const auto &MBB : BlocksToProcess)
+    shuffleAndFinalizeInstGroups(FunReq.at(MBB), MinInstrSize);
+
+  for (auto &[MBB, BBReq] : FunReq)
+    erase(BlocksToProcess, MBB);
+  // Add default plans for remaining blocks.
+  addEmptyReqForBlocks(FunReq, BlocksToProcess,
+                       planning::RequestLimit::NumInstrs{});
+
+  for (auto &[MBB, BBReq] : FunReq) {
+    LLVM_DEBUG(llvm::dbgs() << MBB->getFullName() << ":\n");
+    for (auto &Req : BBReq) {
+      LLVM_DEBUG(Req.print(llvm::dbgs(), /*Indent=*/2));
+    }
+  }
   return FunReq;
 }
 
@@ -700,11 +861,7 @@ static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
     BlockRange.Min =
         (PCDist.Min.value() > FilledSize) ? PCDist.Min.value() - FilledSize : 0;
 
-  auto InstrsSizes =
-      SnpTgt.getPossibleInstrsSize(SelectedMBB.getParent()->getSubtarget());
-  assert(InstrsSizes.size() > 0 &&
-         "Target must have at least one variant of instruction size");
-  auto MinInstrSize = *InstrsSizes.begin();
+  auto MinInstrSize = getMinInstrSize(SelectedMBB, SnpTgt);
   auto Min = alignTo(BlockRange.Min.value_or(0), MinInstrSize);
   auto Max = alignDown(BlockRange.Max.value(), MinInstrSize);
   LLVM_DEBUG(dbgs() << "Selected MBB: "; SelectedMBB.dump());
@@ -725,13 +882,10 @@ static void setSizeForLoopBlock(planning::FunctionRequest &FunReq,
   // InitialAmount allows to account for any already generated instructions
   auto InitialAmount =
       GenerationStatistics{NumOfPrimaryInstrs, /*GeneratedSize*/ MBBSize};
-  FunReq.addToBlock(
-      &SelectedMBB,
-      planning::InstructionGroupRequest(
-          Limit,
-          planning::createGenPolicy(ProgCtx, Cfg.DefFlowConfig, SelectedMBB,
-                                    FunReq.getOpcodeWeightOverrides()),
-          InitialAmount));
+  auto GenPolicy = planning::createGenPolicy(ProgCtx, Cfg.DefFlowConfig);
+  FunReq.addToBlock(&SelectedMBB, planning::InstructionGroupRequest(
+                                      std::move(Limit), std::move(GenPolicy),
+                                      std::move(InitialAmount)));
 }
 
 void BlockGenPlanningImpl::fillReqForTopLoopBySize(
@@ -771,8 +925,7 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
       auto &Limit = FunReq.at(MBB).limit();
       assert(Limit.isSizeLimit());
       auto BBSize = Limit.getLimit();
-      SupposedNumInstr += BBSize / MaxInstrSize;
-      SupposedNumInstr += BBSize % MaxInstrSize ? 1 : 0;
+      SupposedNumInstr += llvm::alignTo(BBSize, MaxInstrSize) / MaxInstrSize;
     }
   }
 
@@ -787,30 +940,45 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
     return FunReq;
   }
 
-  NumInstrTotal -= SupposedNumInstr;
+  auto NumInstrsLeft = NumInstrTotal - SupposedNumInstr;
+
+  auto AverageBlockInstrs = NumInstrsLeft / BlocksToProcess.size();
+  if (AverageBlockInstrs == 0)
+    AverageBlockInstrs = 1;
 
   // FIXME: NumInstrBurst should be somehow randomized. But we must be careful
   // as in some cases there are no instructions outside burst groups and then
   // the number must be exact.
-  unsigned long long NumInstrBurst = getBurstProb(Cfg, *GenCtx) * NumInstrTotal;
-
-  auto NumInstrPlain = NumInstrTotal;
-  NumInstrPlain -= NumInstrBurst;
-
-  auto AverageBlockInstrs = NumInstrTotal / BlocksToProcess.size();
-  if (AverageBlockInstrs == 0)
-    AverageBlockInstrs = 1;
-
-  fillReqWithBurstGroups(FunReq, NumInstrBurst, NumInstrTotal,
+  unsigned long long NumInstrBurst = getBurstProb(Cfg, *GenCtx) * NumInstrsLeft;
+  fillReqWithBurstGroups(FunReq, NumInstrBurst, NumInstrsLeft,
                          AverageBlockInstrs);
+  NumInstrsLeft -= NumInstrBurst;
 
-  fillReqWithPlainInstsByNumber(FunReq, NumInstrPlain, AverageBlockInstrs);
-  for (auto &[MBB, BB] : FunReq)
+  const auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
+
+  SmallDenseMap<const MachineBasicBlock *, size_t> ModeChangesPerMBB;
+  NumInstrsLeft -=
+      fillReqWithContextModeChanges(ModeChangesPerMBB, FunReq, NumInstrsLeft);
+  fillReqWithPlainInstsByNumber(ModeChangesPerMBB, FunReq, NumInstrsLeft);
+
+  size_t MinInstrSize = getMinInstrSize(*MF.begin(), SnippyTgt);
+
+  // Randomize generation plan: shuffle plain and non-plain groups in each BB
+  for (const auto &MBB : BlocksToProcess)
+    shuffleAndFinalizeInstGroups(FunReq.at(MBB), MinInstrSize);
+
+  for (auto &[MBB, BBReq] : FunReq)
     erase(BlocksToProcess, MBB);
   // Add default plans for remaining blocks.
   addEmptyReqForBlocks(FunReq, BlocksToProcess,
                        planning::RequestLimit::NumInstrs{});
 
+  for (auto &[MBB, BBReq] : FunReq) {
+    LLVM_DEBUG(llvm::dbgs() << MBB->getFullName() << ":\n");
+    for (auto &Req : BBReq) {
+      LLVM_DEBUG(Req.print(llvm::dbgs(), /*Indent=*/2));
+    }
+  }
   return FunReq;
 }
 

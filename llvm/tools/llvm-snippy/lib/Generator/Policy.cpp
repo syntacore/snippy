@@ -104,13 +104,8 @@ InstructionGenerationContext::getOrCreateFloatOverwriteValueSampler(
 
 DefaultGenPolicy::DefaultGenPolicy(
     SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
-    std::function<bool(unsigned)> Filter, bool MustHavePrimaryInstrs,
-    ArrayRef<OpcodeHistogramEntry> Overrides,
-    const std::unordered_map<unsigned, double> &WeightOverrides = {})
-    : OpcGen(Cfg.createOpcodeGenerator(ProgCtx.getOpcodeCache(), Filter,
-                                       Overrides, MustHavePrimaryInstrs,
-                                       WeightOverrides)),
-      Cfg(&Cfg) {
+    const ModeChangingInstPolicy *ModeChangingPolicy)
+    : OpcGen(nullptr), Cfg(&Cfg), ModeChangingPolicy(ModeChangingPolicy) {
   assert(!Cfg.isApplyValuegramEachInstr() &&
          "In this case you must use ValuegramGenPolicy");
 }
@@ -155,9 +150,25 @@ getOffsetImmediate(ArrayRef<PreselectedOpInfo> Preselected) {
   assert(Imm.getMax() == Imm.getMin());
   return Imm.getMax();
 }
+
 void DefaultGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
-                                  const RequestLimit &Limit) const {
+                                  const RequestLimit &Limit) {
   InstrGenCtx.switchConfig(*Cfg);
+
+  if (Limit.isEmpty())
+    return;
+
+  const auto &Tgt = InstrGenCtx.ProgCtx.getLLVMState().getSnippyTarget();
+  const auto &Filter = ModeChangingPolicy
+                           ? ModeChangingPolicy->getOpcodeFilter()
+                           : getDefaultFilter(Tgt);
+  auto Err =
+      Cfg->createOpcodeGenerator(InstrGenCtx.ProgCtx.getOpcodeCache(), Filter)
+          .moveInto(OpcGen);
+  if (Err)
+    snippy::fatal(
+        Twine("Failed to create OpcodeGenerator in DefaultGenPolicy: ") +
+        toString(std::move(Err)));
 }
 
 void BurstGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
@@ -220,25 +231,25 @@ getValuegramPolicyValueSource(const DefaultPolicyConfig &Cfg) {
   llvm_unreachable("Unrecognized operands reinitialization policy");
 }
 
-GenPolicy
-createGenPolicy(SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
-                const MachineBasicBlock &MBB,
-                std::unordered_map<unsigned, double> WeightOverrides) {
-  auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
-  auto Filter = Tgt.getDefaultPolicyFilter(ProgCtx, MBB);
-  auto MustHavePrimaryInstrs = Tgt.groupMustHavePrimaryInstr(ProgCtx, MBB);
-  auto Overrides = Tgt.getPolicyOverrides(ProgCtx, MBB);
+void ModeChangingInstPolicy::initialize(
+    InstructionGenerationContext &InstrGenCtx, const RequestLimit &Limit) {
+  assert(!OpcodeFilter && "Opcode filter should not be created at this point.");
+
+  const auto &Tgt = InstrGenCtx.ProgCtx.getLLVMState().getSnippyTarget();
+  OpcodeFilter = Tgt.generateModeChangeAndGetFilter(InstrGenCtx, IsSupport);
+}
+
+GenPolicy createGenPolicy(SnippyProgramContext &ProgCtx,
+                          const DefaultPolicyConfig &Cfg,
+                          const ModeChangingInstPolicy *ModeChangingPolicy) {
   if (Cfg.isApplyValuegramEachInstr()) {
     assert(Cfg.Valuegram.has_value() ||
            Cfg.OperandsReinitialization.has_value());
     auto ValuegramValueSource = getValuegramPolicyValueSource(Cfg);
     return planning::ValuegramGenPolicy(
-        ProgCtx, Cfg, std::move(Filter), MustHavePrimaryInstrs,
-        std::move(Overrides), WeightOverrides, std::move(ValuegramValueSource));
+        ProgCtx, Cfg, std::move(ValuegramValueSource), ModeChangingPolicy);
   }
-  return planning::DefaultGenPolicy(ProgCtx, Cfg, std::move(Filter),
-                                    MustHavePrimaryInstrs, std::move(Overrides),
-                                    WeightOverrides);
+  return planning::DefaultGenPolicy(ProgCtx, Cfg, ModeChangingPolicy);
 }
 
 } // namespace planning

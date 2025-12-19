@@ -239,6 +239,11 @@ verifyBBWithNumLimit(const MachineBasicBlock &MBB,
                !Instr.isBranch();
       });
   size_t Planned = BBReq.limit().getLimit();
+
+  LLVM_DEBUG(dbgs() << "Verifying " << printMBBReference(MBB)
+                    << "by num-instrs: Planned: " << Planned
+                    << ", Count: " << Count << "\n");
+
   if (Planned != Count) {
     outs() << printMBBReference(MBB) << " : count -- " << Count
            << ", planned -- " << Planned << "\n";
@@ -268,9 +273,17 @@ static VerificationStatus verifyBBWithSizeLimit(
                                return Lhs + Rhs.initialStats().GeneratedSize;
                              });
 
+  LLVM_DEBUG(dbgs() << "Verifying " << printMBBReference(MBB)
+                    << " by size: Planned: " << Planned << ", Count: " << Count
+                    << "\n");
+
   const auto &SnippyTgt = State.getSnippyTarget();
   unsigned MinInstrSize =
       *SnippyTgt.getPossibleInstrsSize(MBB.getParent()->getSubtarget()).begin();
+
+  // Note: Currently this can never happen. The planned size is always forced to
+  // be aligned to MinInstrSize during planning pass even if the given memory
+  // section is not a multiple of MinInstrSize.
   if (Planned > Count && Planned - Count < MinInstrSize) {
     outs() << printMBBReference(MBB) << " :  size -- " << Count
            << ", planned -- " << Planned << "\n";

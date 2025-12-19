@@ -72,7 +72,7 @@ public:
 
   bool isMixedLimit() const { return std::holds_alternative<Mixed>(Limit); }
 
-  bool isSameKindAs(const RequestLimit &Other) {
+  bool isSameKindAs(const RequestLimit &Other) const {
     return Limit.index() == Other.Limit.index();
   }
 
@@ -81,6 +81,8 @@ public:
   std::string getAsString() const;
 
   RequestLimit &operator+=(const RequestLimit &Other);
+
+  bool operator==(const RequestLimit &Other) const;
 
   size_t getLimit() const;
 

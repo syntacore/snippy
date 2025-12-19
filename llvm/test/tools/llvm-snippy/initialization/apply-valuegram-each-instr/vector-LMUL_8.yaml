@@ -1,9 +1,6 @@
 # REQUIRES: riscv-rvv
-# COM: This test checks that in the case of LMUL == 8, we initialize all registers 
+# COM: This test checks that in the case of LMUL == 8, we initialize all registers
 # COM: from the register group according to the histograms.yaml.
-
-# COM: Because this functionality has not yet been implemented for rvv
-# XFAIL: *
 
 # RUN: llvm-snippy %s \
 # RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
@@ -17,6 +14,7 @@ options:
   num-instrs: 1
   reserved-regs-list: [V16,V24]
   valuegram-operands-regs-init-outputs: on
+  rvv-init-mode: loads
 
 sections:
     - no:        0
@@ -64,42 +62,25 @@ riscv-vector-unit:
       VTA:
         tu: 1.0
         ta: 1.0
- 
+
 histogram:
        - [VADD_VV, 1.0]
 
 #          Valuegram values:
 #
 #                     V: 3, 4.
-#                     We want to see them in initialization 
-#         
-#          An example of what we're matching:
+#                     We want to see them in initialization
 #
-#          v8:        $x14 = ADDI $x0, 4, pcsections <0x5617782a9708>
-#                     $v8 = VSLIDE1DOWN_VX undef $v8, $x14, 
-#                     $x14 = ADDI $x0, 0, pcsections <0x5617782a9708>
-#                     $v8 = VSLIDE1DOWN_VX $v8, $x14, 
-#                       ... vsetvl ...
-#          v9:        $x2 = ADDI $x0, 3, pcsections <0x5617782a9708>
-#                     $v9 = VSLIDE1DOWN_VX undef $v9, $x2, 
-#                     $x2 = ADDI $x0, 0, pcsections <0x5617782a9708>
-#                     $v9 = VSLIDE1DOWN_VX $v9, $x2, 
-#                       ... vsetvl ...
-#          v10:
-#          v11:
-#          v12:
-#          v13:
-#          v14:
-#          v15:
+#          With these settings, we should only get
+#                     $v8m8 = VADD_VV $v8m8, $v8m8, $noreg, implicit $vtype, implicit $vl
+#          So check that v8-v15 are initialized
 
-
-# Initialization a vector register takes about 50 instructions. We just check that initialization from the histograms.yaml is encountered
-# 
-# CHECK: [[REG:\$x[0-9]+]] = ADDI $x0, {{(3|4), pcsections.*[[:space:]].*}}$v8 = VSLIDE1DOWN_VX undef $v8, [[REG]]{{.*[[:space:]].*}}[[REG]] = ADDI $x0, 0, pcsections{{.*[[:space:]].*}}$v8 = VSLIDE1DOWN_VX $v8, [[REG]]
-# CHECK-DAG: [[REG:\$x[0-9]+]] = ADDI $x0, {{(3|4), pcsections.*[[:space:]].*}}$v9 = VSLIDE1DOWN_VX undef $v9, [[REG]]{{.*[[:space:]].*}}[[REG]] = ADDI $x0, 0, pcsections{{.*[[:space:]].*}}$v9 = VSLIDE1DOWN_VX $v9, [[REG]]
-# CHECK-DAG: [[REG:\$x[0-9]+]] = ADDI $x0, {{(3|4), pcsections.*[[:space:]].*}}$v10 = VSLIDE1DOWN_VX undef $v10, [[REG]]{{.*[[:space:]].*}}[[REG]] = ADDI $x0, 0, pcsections{{.*[[:space:]].*}}$v10 = VSLIDE1DOWN_VX $v10, [[REG]]
-# CHECK-DAG: [[REG:\$x[0-9]+]] = ADDI $x0, {{(3|4), pcsections.*[[:space:]].*}}$v11 = VSLIDE1DOWN_VX undef $v11, [[REG]]{{.*[[:space:]].*}}[[REG]] = ADDI $x0, 0, pcsections{{.*[[:space:]].*}}$v11 = VSLIDE1DOWN_VX $v11, [[REG]]
-# CHECK-DAG: [[REG:\$x[0-9]+]] = ADDI $x0, {{(3|4), pcsections.*[[:space:]].*}}$v12 = VSLIDE1DOWN_VX undef $v12, [[REG]]{{.*[[:space:]].*}}[[REG]] = ADDI $x0, 0, pcsections{{.*[[:space:]].*}}$v12 = VSLIDE1DOWN_VX $v12, [[REG]]
-# CHECK-DAG: [[REG:\$x[0-9]+]] = ADDI $x0, {{(3|4), pcsections.*[[:space:]].*}}$v13 = VSLIDE1DOWN_VX undef $v13, [[REG]]{{.*[[:space:]].*}}[[REG]] = ADDI $x0, 0, pcsections{{.*[[:space:]].*}}$v13 = VSLIDE1DOWN_VX $v13, [[REG]]
-# CHECK-DAG: [[REG:\$x[0-9]+]] = ADDI $x0, {{(3|4), pcsections.*[[:space:]].*}}$v14 = VSLIDE1DOWN_VX undef $v14, [[REG]]{{.*[[:space:]].*}}[[REG]] = ADDI $x0, 0, pcsections{{.*[[:space:]].*}}$v14 = VSLIDE1DOWN_VX $v14, [[REG]]
-# CHECK-DAG: [[REG:\$x[0-9]+]] = ADDI $x0, {{(3|4), pcsections.*[[:space:]].*}}$v15 = VSLIDE1DOWN_VX undef $v15, [[REG]]{{.*[[:space:]].*}}[[REG]] = ADDI $x0, 0, pcsections{{.*[[:space:]].*}}$v15 = VSLIDE1DOWN_VX $v15, [[REG]]
+# CHECK-DAG: $v8 = VL1RE8_V{{.*}}pcsections
+# CHECK-DAG: $v9 = VL1RE8_V{{.*}}pcsections
+# CHECK-DAG: $v10 = VL1RE8_V{{.*}}pcsections
+# CHECK-DAG: $v11 = VL1RE8_V{{.*}}pcsections
+# CHECK-DAG: $v12 = VL1RE8_V{{.*}}pcsections
+# CHECK-DAG: $v13 = VL1RE8_V{{.*}}pcsections
+# CHECK-DAG: $v14 = VL1RE8_V{{.*}}pcsections
+# CHECK-DAG: $v15 = VL1RE8_V{{.*}}pcsections
+# CHECK:     $v8m8 = VADD_VV $v8m8, $v8m8
