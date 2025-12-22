@@ -2111,7 +2111,7 @@ example:
 
    warning: (memory-access) Possibly wrong memory scheme: Following scheme may generate accesses outside of all provided RW sections in layout
 
-   warning: (no-model-exec) Skipping snippet execution on the model: model was set no 'None'
+   warning: (no-model-exec) Skipping snippet execution on the model: model was set to 'None'
 
 So, if you do not want to keep getting such warnings, pass:
 
