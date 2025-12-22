@@ -76,4 +76,4 @@ histogram:
 # CHECK-FULL-VLMAX1-ENABLED-NEXT:  - Configuration Bag Size: 400
 # CHECK-FULL-VLMAX1-ENABLED-NEXT:  - State Cardinality: 7600 ~ {MASKS}
 # CHECK-FULL-VLMAX1-ENABLED-NEXT: --- RVV Configuration End  ---
-# CHECK-FULL-VLMAX1-ENABLED: Skipping snippet execution on the model: model was set no 'None'
+# CHECK-FULL-VLMAX1-ENABLED: Skipping snippet execution on the model: model was set to 'None'
