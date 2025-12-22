@@ -18,6 +18,7 @@
 #include "snippy/Generator/SimulatorContextWrapperPass.h"
 #include "snippy/InitializePasses.h"
 #include "snippy/PassManagerWrapper.h"
+#include "snippy/Simulator/RISCVTraceObserver.h"
 #include "snippy/Simulator/SelfcheckObserver.h"
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/Options.h"
@@ -364,6 +365,19 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
           I.setObserver<SelfcheckObserver>(Map.begin(), Map.end(), I.getPC());
     }
 
+    auto &TFCfg = PassCfg.TFOpts;
+    std::unique_ptr<RVMCallbackHandler::ObserverHandle<RISCVTraceObserver>>
+        RISCVTraceObserverHandle;
+    auto XLen = State.getSnippyTarget().getAddrRegLen(State.getTargetMachine());
+    RISCVTraceObserver TraceObserver;
+    if (TFCfg.TraceSNTFPath)
+      TraceObserver.Converters.push_back(std::make_unique<RISCVConverterSNTF>(
+          XLen, *ProgContext.getLinker().getStartPC(), TFCfg.LastPC, I,
+          TFCfg.TraceSNTFPath.value()));
+    if (TFCfg.TraceSNTFPath)
+      RISCVTraceObserverHandle =
+          I.setObserver<RISCVTraceObserver>(std::move(TraceObserver));
+
     if (auto Err = SimCtx.runSimulator(RI))
       snippy::fatal(GenCtx.getProgramContext().getLLVMState().getCtx(),
                     "Error during the simulation run", std::move(Err));
@@ -378,6 +392,10 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
       I.getObserverByHandle(*SelfcheckObserverHandle)
           .dumpAsYaml(AnnotationFilename);
     }
+    // Informing that the end of the trace has been reached.
+    if (TFCfg.TraceSNTFPath)
+      I.getObserverByHandle(*RISCVTraceObserverHandle)
+          .PCUpdateNotification(TFCfg.LastPC);
 
   } else {
 

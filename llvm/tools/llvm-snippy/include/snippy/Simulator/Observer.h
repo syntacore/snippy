@@ -23,6 +23,8 @@ namespace snippy {
 struct Observer {
   virtual void memUpdateNotification(MemoryAddressType Addr, const char *Data,
                                      size_t Size) {}
+  virtual void memReadNotification(MemoryAddressType Addr, const char *Data,
+                                   size_t Size) {}
   virtual void xregUpdateNotification(unsigned RegID, RegisterType Value) {}
   virtual void fregUpdateNotification(unsigned RegID, RegisterType Value) {}
   virtual void vregUpdateNotification(unsigned RegID, ArrayRef<char> Data) {}
