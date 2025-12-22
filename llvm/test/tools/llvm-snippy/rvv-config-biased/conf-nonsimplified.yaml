@@ -52,7 +52,7 @@ histogram:
 # CHECK-DEFAULT-NEXT:  - Configuration Bag Size: 1
 # CHECK-DEFAULT-NEXT:  - State Cardinality: 32768 ~ {MASKS}
 # CHECK-DEFAULT-NEXT: --- RVV Configuration End  ---
-# CHECK-DEFAULT: Skipping snippet execution on the model: model was set no 'None'
+# CHECK-DEFAULT: Skipping snippet execution on the model: model was set to 'None'
 
 # CHECK-VLEN512:      --- RVV Configuration Info ---
 # CHECK-VLEN512-NEXT:  - Derived VLEN: 512 (VLENB = 64)
@@ -70,4 +70,4 @@ histogram:
 # CHECK-VLEN512-NEXT:  - Configuration Bag Size: 1
 # CHECK-VLEN512-NEXT:  - State Cardinality: 256 ~ {MASKS}
 # CHECK-VLEN512-NEXT: --- RVV Configuration End  ---
-# CHECK-VLEN512: Skipping snippet execution on the model: model was set no 'None'
+# CHECK-VLEN512: Skipping snippet execution on the model: model was set to 'None'

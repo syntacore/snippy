@@ -401,7 +401,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
 
     snippy::warn(WarningName::NoModelExec, State.getCtx(),
                  "Skipping snippet execution on the model",
-                 "model was set no 'None'.");
+                 "model was set to 'None'.");
   }
   if (EResult->GenType == GeneratorResult::Type::RELOC)
     snippy::notice(
