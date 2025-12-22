@@ -213,6 +213,11 @@ struct RegistersOptions {
   std::string FinalStateOutputYaml;
 };
 
+struct TraceConvertOptions {
+  ProgramCounterType LastPC;
+  std::optional<std::string> TraceSNTFPath;
+};
+
 // Settings specific for pass behaviour.
 class PassConfig {
 public:
@@ -229,6 +234,7 @@ public:
   // Function generator pass config.
   std::variant<CallGraphLayout, FunctionDescs> CGLayout;
 
+  TraceConvertOptions TFOpts;
   PassConfig(const ProgramConfig &ProgramCfg) : ProgramCfg(&ProgramCfg) {}
 
   OpcGenHolder createCFOpcodeGenerator(const OpcodeCache &OpCC) const {

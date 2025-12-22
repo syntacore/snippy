@@ -918,6 +918,18 @@ static void normalizeModelOptions(Config &Cfg, LLVMState &State,
   auto &ModelCfg = Cfg.PassCfg.ModelPluginConfig;
   ModelCfg.ModelLibraries = parseModelPluginList(Opts);
   ModelCfg.ModelLogPath = Opts.ModelLogPath;
+  auto &TFCfg = Cfg.PassCfg.TFOpts;
+  TFCfg.LastPC = Opts.LastPC;
+  if (Opts.LastPCSpecified && !Opts.TraceSNTFPathSpecified)
+    snippy::fatal("Can't set last pc", "--trace-SNTF not specified");
+  if (!ModelCfg.runOnModel() && (!Opts.TraceSNTFPath.empty()))
+    snippy::fatal("Can't convert trace to "
+                  "SNTF",
+                  "--model-plugin set to None");
+  TFCfg.TraceSNTFPath =
+      !Opts.TraceSNTFPath.empty()
+          ? std::make_optional<std::string>(Opts.TraceSNTFPath)
+          : std::nullopt;
 }
 
 void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {

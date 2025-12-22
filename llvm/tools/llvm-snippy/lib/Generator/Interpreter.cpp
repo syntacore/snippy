@@ -136,7 +136,8 @@ SimulationEnvironment Interpreter::createSimulationEnvironment(
     TargetGenContextInterface &TgtCtx) {
   auto &State = SPC.getLLVMState();
   const auto &SnippyTGT = State.getSnippyTarget();
-  bool NeedCallbackHandler = Cfg.hasTrackingMode();
+  bool NeedCallbackHandler =
+      Cfg.hasTrackingMode() || Cfg.PassCfg.TFOpts.TraceSNTFPath.has_value();
   auto &L = SPC.getLinker();
 
   SimulationEnvironment Env;
