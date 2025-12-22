@@ -3563,6 +3563,125 @@ constants:
        - [VAND_VI, 1.0]
        - [VMERGE_VIM, 1.0]
 
+Converting Traces
+=================
+
+Use the ``--trace-SNTF=<sntf_file_name>`` option to convert traces from the model to the
+**SNippy Trace Format (SNTF)**. The model you convert from must support callbacks.
+If you set model to ``None``, you will get an error.
+
+SNTF file format
+----------------
+
+SNTF file begins with a **header**, in which after **#** (comments), starting from a new line, are followed:
+
+1. Format name (SNTF)
+2. Version
+3. List of enabled features of the current version ``+<feature-name>`` (ex: ``+time``)
+4. List of disabled features of the current version ``-<feature-name>`` (ex: ``-next-pc``)
+
+In total, paragraphs 3 and 4 should list all the features of the version from paragraph 2.
+
+All names of **1.0** version features:
+
+* ``time``
+* ``pc``
+* ``instr-code``
+* ``next-pc``
+* ``registers-changed``
+* ``memory-accesses``
+
+**Header example:**
+
+.. code:: yaml
+
+  # SNTF
+  # 1.0
+  # +time
+  # +pc
+  # +instr-code
+  # +next-pc
+  # +registers-changed
+  # +memory-accesses
+
+After the header, on each line placed entries that were selected in the
+header, separated by a whitespace.
+
+**Entry format:**
+
++-----------+------------+---------------+------------+---------------+-------------------------------+
+|**Time in**|**Program** |**Instruction**|**Next**    |**Register**   |**Memory**                     |
+|**nanosec**|**counter** |**code**       |**program** |**values if**  |**addrs if**                   |
+|           |            |               |**counter** |**changed**    |**changed or read**            |
++-----------+------------+---------------+------------+---------------+-------------------------------+
+|520        |000086d0    |11010093       |000086d4    |f4=017f7ff0    |2ff4fe98:W:fa,2ff4fe99:R:ee    |
++-----------+------------+---------------+------------+---------------+-------------------------------+
+
+* ``time`` is synchronized with when the instruction was fetched from memory. For now it it just a number of instruction.
+* Vector registers are printed element by element, the length of which is 64 bits:
+
+  (``vlen`` = 128) ``v4=[1]:0000000000227c3d[0]:0000000100227c3d``
+
+  (``vlen`` = 256) ``v7=[3]:00000f0000000001[2]:0000000000000a00[1]:0000b00000000000[0]:00000c0000000000``
+* The format of memory accesses: ``<Addr>:<AccessType>:<Value>``.
+
+  Access size is determined by the number of characters in the Value. ``AccessType`` can be either **W** (write) or **R** (read).
+
+**Entry example:**
+
+.. code:: yaml
+
+   520 000086d0 11010093 000086d4 f4=017f7ff0 2ff4fe98:W:fa,2ff4fe99:R:ee
+
+So, for example, you can use the following layout:
+
+.. container:: formalpara-title
+
+   **layout.yaml**
+
+.. code:: yaml
+
+   options:
+     mtriple: riscv64
+     mcpu: generic-rv64
+     num-instrs: 1000
+     model-plugin: <model_with_callbacks>
+
+   branches:
+   ...
+   sections:
+   ...
+   histogram:
+   ...
+
+Then, to convert the traces, run:
+
+::
+
+   llvm-snippy layout.yaml -trace-SNTF <sntf_file_name>
+
+where ``<sntf_file_name>`` is the name of the output SNTF file, for
+example, ``trace.sntf``.
+
+This way, the result of this conversion is the ``trace.sntf`` file.
+
+
+.. _`_trace_end_pc_option`:
+
+``--trace-end-pc`` Option
+-------------------------
+
+Additionally, you can use the ``--trace-end-pc`` option to set a
+specific value of PC, which will be set at the end of the whole trace.
+The default value is ``0``.
+
+The SNTF format contains the ``next-pc`` field.
+If you set the ``--trace-end-pc`` value, when the trace reaches the end,
+it uses this value. If not, the PC value after the last one on which the
+instruction is executed will be set to ``0``.
+
+.. _`_comparing_traces`:
+
 .. _`_co_simulation`:
 
 Co-simulation
