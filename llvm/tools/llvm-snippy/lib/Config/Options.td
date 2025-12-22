@@ -111,6 +111,16 @@ let Group = ModelOptionsCategory in {
         ValueDescription<"filename">,
         DefaultValue<"">;
 
+
+  def TraceSNTFPath
+      : StringOption<"trace-SNTF">,
+        Description<"The file to save model trace in Snippy Trace Format">,
+        ValueDescription<"filename">;
+
+  def LastPC : IntegerOption<"trace-end-pc", "ProgramCounterType">,
+               Description<"The value to be printer in the \'Next PC\' field "
+                           "of the last line of the trace dump in SNTF format">,
+               DefaultValue<"0">;
 }
 
 

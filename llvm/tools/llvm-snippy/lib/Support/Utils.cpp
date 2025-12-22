@@ -153,5 +153,26 @@ DenseSet<unsigned> getAllMutatedRegs(MachineFunction &MF) {
   return MutatedRegs;
 }
 
+// toHexStringTruncate converts Value to a hexadecimal string. The real length
+// of the register is passed as Len, and if length of RegisterType is longer
+// than Len, the Value is truncated. The toString used returns a string without
+// leading zeros, these zeros are added and a HexString with exactly length Len
+// is returned.
+std::string toHexStringTruncate(uint64_t Value, unsigned Len) {
+  return toHexStringTruncate(
+      APInt(Len, Value, /*isSigned*/ false, /*implicitTrunc*/ true), Len);
+}
+
+std::string toHexStringTruncate(APInt AI, unsigned Len) {
+  auto HexString =
+      toString(AI, /*Radix*/ 16, /*Signed*/ false, /*formatAsCLiteral*/ false,
+               /*UpperCase*/ false);
+  const auto Size = HexString.size();
+  constexpr auto kHexBits = 4;
+  const auto Width = Len / kHexBits;
+  assert(Width >= Size);
+  HexString.insert(HexString.begin(), Width - Size, '0');
+  return HexString;
+}
 } // namespace snippy
 } // namespace llvm

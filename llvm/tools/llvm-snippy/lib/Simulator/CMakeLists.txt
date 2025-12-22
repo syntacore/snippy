@@ -4,8 +4,9 @@ set(LLVMSnippySimulatorSources
     RISCVSimulator.cpp
     X86Simulator.cpp
     Transactions.cpp
+    RISCVTraceObserver.cpp
+    RISCVConverterSNTF.cpp
     )
-
 
 add_llvm_library(LLVMSnippySimulator
   DISABLE_LLVM_LINK_LLVM_DYLIB

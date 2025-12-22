@@ -580,6 +580,13 @@ void MemUpdateCallback(RVMCallbackHandler *H, uint64_t Addr, const char *Data,
     Observer->memUpdateNotification(Addr, Data, Size);
 }
 
+void MemReadCallback(RVMCallbackHandler *H, uint64_t Addr, const char *Data,
+                     size_t Size) {
+  assert(H);
+  for (auto &&Observer : H->getObservers())
+    Observer->memReadNotification(Addr, Data, Size);
+}
+
 void XRegUpdateCallback(RVMCallbackHandler *H, RVMXReg Reg, RVMRegT Value) {
   assert(H);
   for (auto &&Observer : H->getObservers())
@@ -650,6 +657,7 @@ std::unique_ptr<SimulatorInterface> createRISCVSimulator(
 
   if (CallbackHandler) {
     StateBuilder.registerCallbackHandler(CallbackHandler);
+    StateBuilder.registerMemReadCallback(MemReadCallback);
     StateBuilder.registerMemUpdateCallback(MemUpdateCallback);
     StateBuilder.registerXRegUpdateCallback(XRegUpdateCallback);
     StateBuilder.registerCSRUpdateCallback(CSRUpdateCallback);
