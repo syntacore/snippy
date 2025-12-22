@@ -2187,6 +2187,38 @@ or warning will be raised.
 
    You must also specify the snippy `stack section <#stack-section>`__.
 
+Preserving caller saved registers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If generated code by snippy can make calls to external functions, you can request
+the preservation of caller-saved registers around those calls.
+
+Setting the option in the configuration file:
+
+.. code:: yaml
+
+  options:
+    preserve-caller-saved-regs: [X, F, V]
+
+Setting the option via the command line:
+
+::
+
+  -preserve-caller-saved-regs=X,F,V
+
+If this option is specified, all caller-saved registers belonging to the passed
+register groups (according to the ABI) are preserved around external function calls.
+The notation uses the following abbreviations for register classes:
+
+-  X stands for GPR (General Purpose Registers)
+
+-  F stands for FPR (Floating-Point Registers)
+
+-  V stands for vector registers
+
+Also, when honor-target-abi is enabled, only live caller-saved registers are
+preserved around external function calls.
+
 .. _`_last_instruction`:
 
 Last Instruction
