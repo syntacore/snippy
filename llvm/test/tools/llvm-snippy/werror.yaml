@@ -19,4 +19,4 @@ histogram:
 # COM: FIXME: It looks like we must categorize our warnings as ones that can
 # COM: evolve to error eventually and ones that cannot. Maybe warnings from the
 # COM: second groups mustn't be warnings at all but something like remarks?
-# CHECK: error: (no-model-exec) Skipping snippet execution on the model: model was set no 'None'.
+# CHECK: error: (no-model-exec) Skipping snippet execution on the model: model was set to 'None'.

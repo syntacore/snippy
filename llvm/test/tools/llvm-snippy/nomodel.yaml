@@ -16,4 +16,4 @@ sections:
 histogram:
     - [ADD, 1.0]
 
-# NO-MODEL: warning: (no-model-exec) Skipping snippet execution on the model: model was set no 'None'.
+# NO-MODEL: warning: (no-model-exec) Skipping snippet execution on the model: model was set to 'None'.
