@@ -43,10 +43,10 @@ access-ranges:
     last-offset: 10
 
 # CHECK: warning: (memory-access) Possibly wrong memory scheme
-# CHECK: error: (no-model-exec) Skipping snippet execution on the model: model was set no 'None'.
+# CHECK: error: (no-model-exec) Skipping snippet execution on the model: model was set to 'None'.
 
 # PASS: warning: (memory-access) Possibly wrong memory scheme
-# PASS: warning: (no-model-exec) Skipping snippet execution on the model: model was set no 'None'.
+# PASS: warning: (no-model-exec) Skipping snippet execution on the model: model was set to 'None'.
 
 # UNKNOWN: error: Unknown warning category specified for "Wno-error" option
 # UNKNOWN-SAME: List of unknown warning categories: "foo", "bar"
