@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.abspath("."))
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ["sphinx.ext.intersphinx", "sphinx.ext.todo"]
+extensions = ["sphinx.ext.intersphinx", "sphinx.ext.todo", "sphinx_simplepdf"]
 
 # When building man pages, we do not use the markdown pages,
 # So, we can continue without the myst_parser dependencies.
@@ -229,6 +229,18 @@ man_pages = [("index", "llvm-snippy", "llvm-snippy Documentation", ["Syntacore"]
 basedir = os.path.dirname(__file__)
 man_page_authors = "Maintained by the Syntacore (https://syntacore.com/)."
 manpages_url = "{page}.html"
+
+simplepdf_file_name = "snippy_guide.pdf"
+simplepdf_vars = {
+    "primary": "#6299C4",
+    "primary-opaque": "#6299C4",
+    "secondary": "#6299C4",
+    "cover": "#ffffff",
+    "white": "#ffffff",
+    "links": "#6299C4",
+    "cover-bg": "#6299C4",
+    "top-left-content": "counter(page)",
+}
 
 # If true, show URL addresses after external links.
 # man_show_urls = False

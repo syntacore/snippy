@@ -7,15 +7,23 @@
       message(FATAL_ERROR "Cannot build snippy documentation because sphinx was not found")
     endif()
     set(PACKAGE_VERSION ${LLVM_SNIPPY_VERSION})
+    # this variable is used inside add_spinx_target function so we change it to
+    # current snippy version in order for simplepdf documentation to be correct
+    set(LLVM_VERSION_MAJOR ${LLVM_SNIPPY_VERSION})
     if (${SPHINX_OUTPUT_HTML})
       add_sphinx_target(html llvm-snippy SOURCE_DIR ${DOCS_SOURCE_DIR})
     endif()
     add_sphinx_target(latex llvm-snippy SOURCE_DIR ${DOCS_SOURCE_DIR})
+    add_sphinx_target(simplepdf llvm-snippy SOURCE_DIR ${DOCS_SOURCE_DIR})
     if (${SPHINX_OUTPUT_MAN})
       add_sphinx_target(man llvm-snippy SOURCE_DIR ${DOCS_SOURCE_DIR})
       install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/man/.
         COMPONENT llvm-snippy-man-pages
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1
+        )
+      install(FILES ${CMAKE_CURRENT_BINARY_DIR}/simplepdf/snippy_guide.pdf
+        COMPONENT llvm-snippy-docs
+        DESTINATION ${CMAKE_INSTALL_DOCDIR}
         )
       # include these targets into "all" because our build configurations are too
       # complex to track dependencies between snippy and its documentation
