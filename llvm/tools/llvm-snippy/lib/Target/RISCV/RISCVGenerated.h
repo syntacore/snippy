@@ -89,6 +89,29 @@ inline bool isRVVIntegerNarrowing(unsigned Opcode);
 inline bool isRVVFPNarrowing(unsigned Opcode);
 inline unsigned getRVVExtFactor(unsigned Opcode);
 
+inline unsigned getInstructionSize(const uint16_t FirstInstrTwoBytes) {
+  // 32-bit sized instructions - start with 11 (in the lowest bit position),
+  //    but they cannot start with 11111.
+  // 16-bit sized instructions - start with 00, 01 or 10.
+  // 48-bit sized instructions - start with 011111.
+  // 64-bit sized instructions - start with 0111111.
+  switch (llvm::countr_one(FirstInstrTwoBytes)) {
+  case 0:
+  case 1:
+    return 16;
+  case 2:
+  case 3:
+  case 4:
+    return 32;
+  case 5:
+    return 48;
+  case 6:
+    return 64;
+  default:
+    snippy::fatal("Unknown instruction size");
+  }
+}
+
 inline size_t getDataElementWidth(unsigned Opcode, unsigned SEW = 0,
                                   unsigned VLENB = 0) {
   if (isRVVIntegerWidening(Opcode) || isRVVFPWidening(Opcode) ||
@@ -1782,6 +1805,37 @@ inline bool canProduceNaN(const MCInstrDesc &InstrDesc) {
       RISCV::FNMSUB_S, RISCV::FNMSUB_H,
   };
   return GeneratingNaNs.count(InstrDesc.getOpcode());
+}
+
+template <typename SimulatorT>
+MaxInstrBitsType readInstrCode(const SimulatorT &Sim, ProgramCounterType PC) {
+  // We first read the first 2 bytes of the instruction (7 bits is enough for
+  // determine the instruction size, but since there are no instructions smaller
+  // than 2 bytes in RISCV, we can read them), recognize the size of the
+  // instruction, and then, if it is not a compressed instruction, read 4 bytes.
+  uint16_t BeginOfInstr;
+  Sim.readMem(PC, MutableArrayRef<char>(reinterpret_cast<char *>(&BeginOfInstr),
+                                        sizeof(BeginOfInstr)));
+  auto InstructionSize = getInstructionSize(BeginOfInstr);
+  if (InstructionSize == kCompressedInstrSize * RISCV_CHAR_BIT)
+    return BeginOfInstr;
+  if (InstructionSize != kMaxSupportedInstrSize * RISCV_CHAR_BIT)
+    snippy::fatal("Currently only instructions up to 32 bits are supported.");
+  uint32_t Instr;
+  // Read the full 32-bit instruction.
+  Sim.readMem(PC, MutableArrayRef<char>(reinterpret_cast<char *>(&Instr),
+                                        sizeof(Instr)));
+  return Instr;
+}
+
+static std::optional<unsigned>
+getRISCVFloatRegLen(const TargetSubtargetInfo &STI) {
+  const auto &ST = static_cast<const RISCVSubtarget &>(STI);
+  if (ST.hasStdExtD())
+    return 64;
+  if (ST.hasStdExtF())
+    return 32;
+  return std::nullopt;
 }
 
 } // namespace snippy

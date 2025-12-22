@@ -382,6 +382,8 @@ matchRemainder(T Orig, T Num, T Div, T RoundTo = 0) {
 
 Expected<Regex> createWholeWordMatchRegex(StringRef RegEx);
 DenseSet<unsigned> getAllMutatedRegs(MachineFunction &MF);
+std::string toHexStringTruncate(uint64_t Value, unsigned Len);
+std::string toHexStringTruncate(APInt AI, unsigned Len);
 
 } // namespace snippy
 } // namespace llvm
