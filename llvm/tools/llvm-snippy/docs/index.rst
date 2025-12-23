@@ -1,11 +1,11 @@
-.. _`_overview`:
-
-.. only:: builder_html
+.. only:: builder_html or builder_simplepdf
 
   .. |nbsp| unicode:: 0xA0
      :trim:
 
   .. contents::
+
+.. rst-class:: break_before
 
 Snippy Documentation (|release|)
 ################################
@@ -755,7 +755,7 @@ See an example below.
 
 where you define the ``overwrite`` settings by the following:
 
--  ``range``:
+-  ``range``
 
    -  ``min``, ``max``, ``weight`` |nbsp| -- |nbsp| Specific range of the values to
       use. ``weight`` is optional and ``1.0`` by default.
@@ -820,12 +820,12 @@ Memory Configuration
 Memory configuration provides extensive features for describing the way
 you want memory to be accessed, and includes keys for:
 
--  `Memory scheme <#memory-scheme>`_
+-  `Memory scheme <#memory-scheme>`__
 
 -  `Burst mode <#burst-mode>`__
 
 
-.. _`_memory_scheme`:
+.. _memory-scheme:
 
 Memory Scheme
 -------------
@@ -911,6 +911,8 @@ Additionally,
 you can find a description of how addressing works for all types of
 instructions mentioned in this chapter.
 
+.. _strided-loadstore:
+
 Strided Load/Store
 ^^^^^^^^^^^^^^^^^^
 
@@ -925,6 +927,8 @@ will be chosen, even a stride equal to zero is possible.
 
 For more details on strided instructions, refer
 `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#75-vector-strided-instructions>`__.
+
+.. _unit-stride-loadstore:
 
 Unit-Stride Load/Store
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -946,6 +950,8 @@ one element (``4``, not ``16``).
 
 For more details on unit-stride instructions, refer
 `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#74-vector-unit-stride-instructions>`__.
+
+.. _indexed-loadstore:
 
 Indexed Load/Store
 ^^^^^^^^^^^^^^^^^^
@@ -1073,8 +1079,9 @@ In order to regulate all bytes that are accessed, there are two optional fields 
    No matter how large the ``max-past-last-offset`` and ``access-size`` values are,
    the start of access must always be in the interval [``first-offset``, ``last-offset``].
 
-See the memory scheme examples for different offsets in
-`figure 1 <#MEMORY_SCHEME>`__. Here, the bytes that can be accessed are indicated in red. The yellow color indicates the bytes accessed by the memory instruction.
+See the memory scheme examples for different offsets in the `example <mem-scheme-image>` . Here, the bytes that can be accessed are indicated in red. The yellow color indicates the bytes accessed by the memory instruction.
+
+.. _mem-scheme-image:
 
 .. figure:: ./_static/snippy-mem.png
    :alt: Memory scheme
@@ -1141,7 +1148,7 @@ where:
 
 -  ``weight`` |nbsp| -- |nbsp| Optional value, relative probability of this access range. If you omit it, snippy considers it as ``1``.
 
-See how memory eviction works in `figure 2 <#MEMORY_EVICTION_SCHEME>`__.
+See how memory eviction works:
 
 .. figure:: ./_static/addrscheme.png
    :alt: Memory eviction
@@ -1853,7 +1860,7 @@ Following is an example of settings for a call graph:
         --function-number=16 -num-instrs=1000 -seed=0 \
        ./yml/memory-aligned.yaml -o calls.elf
 
-See the resulting graph in `figure 3 <#CALL_GRAPH_RESULT>`__.
+See the resulting graph:
 
 .. figure:: ./_static/call_graph.png
    :alt: Call graph
@@ -1866,7 +1873,7 @@ External Call Graph
 ~~~~~~~~~~~~~~~~~~~
 
 You can specify a call graph in contrast to snippy randomly generating
-it. See `figure 4 <#CALL_GRAPH_EXT>`__ as an example:
+it. See example:
 
 .. figure:: ./_static/snippy-cg.png
    :alt: Call graph
@@ -3855,6 +3862,8 @@ snippy supports the following RISC-V configurations:
 - **RV32I** - Base Integer Instruction Set (32-bit)
 - **RV64I** - Base Integer Instruction Set (64-bit)
 
+.. _supported-extensions:
+
 RISC-V Extensions
 ~~~~~~~~~~~~~~~~~
 
@@ -4120,5 +4129,7 @@ will get a random snippet with normal generation of instructions from the second
 config and constrained generation of svinval instructions that increases probability
 of using **X0** as source register.
 
+
+.. rst-class:: break_before
 
 .. include:: llvm-ie.rst
