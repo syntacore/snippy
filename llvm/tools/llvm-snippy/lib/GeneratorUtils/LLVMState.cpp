@@ -68,9 +68,38 @@ getTargetFeaturesFromMArch(Triple::ArchType ArchType, StringRef MArch) {
   }
 }
 
+/// Slightly saner validation of Triple parsing than the default behavior of
+/// "anything goes".
+/// For legacy reasons we accept "riscv64-unknown-elf" or "riscv64-linux-gnu",
+/// so "riscv64-blahblah-blahblahblah" goes too. Ideally that should be
+/// "riscv64-unknown-unknown". Also snippy doesn't really care about anything
+/// other than Arch at the moment (and probably shouldn't, so newer configs
+/// should just use "riscv64" or "riscv32").
 static bool checkTriple(const Triple &TheTriple) {
-  return !TheTriple.getTriple().empty() &&
-         TheTriple.getArch() != Triple::ArchType::UnknownArch;
+  const auto &TripleString = TheTriple.getTriple();
+
+  if (TripleString.empty())
+    return false;
+
+  if (TheTriple.getArch() == Triple::ArchType::UnknownArch)
+    return false;
+
+  auto EnvironmentName = TheTriple.getEnvironmentName();
+
+  auto TrailingDashCount =
+      std::find_if_not(TripleString.rbegin(), TripleString.rend(),
+                       [](char C) { return C == '-'; }) -
+      TripleString.rbegin();
+  // Why doesn't the Triple parser validate this?
+  if (TrailingDashCount)
+    return false;
+
+  if (!EnvironmentName.empty() &&
+      EnvironmentName !=
+          Triple::getEnvironmentTypeName(TheTriple.getEnvironment()))
+    return false;
+
+  return true;
 }
 
 struct DeducedTriple {
@@ -100,7 +129,9 @@ Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
     return makeFailure(Errc::InvalidArgument,
                        TheTriple.getTriple().empty()
                            ? "target triple is not specified"
-                           : "unknown target specified");
+                           : Twine("unknown target specified: '")
+                                 .concat(TheTriple.getTriple())
+                                 .concat("'"));
 
   if (MArchIsTriple)
     snippy::warn(WarningName::MArchIsTriple,
