@@ -60,6 +60,7 @@ add_subdirectory(llvm-ie)
 
 # Add `snippy-tblgen` before everything else.
 add_subdirectory(utils)
+set(SNIPPY_INSTALL_DOCDIR ${CMAKE_INSTALL_DOCDIR}/llvm-snippy)
 add_subdirectory(docs)
 
 set(LLVM_LINK_COMPONENTS
@@ -158,7 +159,6 @@ endforeach()
 add_dependencies(llvm-snippy lld)
 
 include(GNUInstallDirs)
-set(SNIPPY_INSTALL_DOCDIR ${CMAKE_INSTALL_DOCDIR}/llvm-snippy)
 
 install(TARGETS llvm-snippy
         COMPONENT llvm-snippy
