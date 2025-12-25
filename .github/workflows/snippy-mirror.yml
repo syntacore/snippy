@@ -1,0 +1,38 @@
+name: Mirror repo on main updates
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout source (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Ensure we have a commit SHA to mirror
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          if [[ -z "$SHA" ]]; then
+            echo "Warning: No commit SHA – nothing to mirror (likely a tag delete)."
+            exit 0   # gracefully finish without error
+          fi
+      - name: Push mirror to target
+        env:
+          MIRROR_TARGET_PAT: ${{ secrets.MIRROR_TARGET_PAT }}
+        run: |
+          if [[ -z "$MIRROR_TARGET_PAT" ]]; then
+            echo "ERROR: MIRROR_TARGET_PAT secret is not set"
+            exit 1
+          fi
+          git remote add target \
+            https://x-access-token:${MIRROR_TARGET_PAT}@github.com/LLVM-Snippy/llvm-snippy.git
+          git push --mirror target
+          git remote remove target
