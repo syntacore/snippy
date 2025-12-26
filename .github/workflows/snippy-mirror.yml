@@ -25,15 +25,15 @@ jobs:
             echo "Warning: No commit SHA – nothing to mirror (likely a tag delete)."
             exit 0   # gracefully finish without error
           fi
-      - name: Push mirror to target
+      - name: Set up SSH key
         env:
-          MIRROR_TARGET_PAT: ${{ secrets.MIRROR_TARGET_PAT }}
+          TARGET_SSH_KEY: ${{ secrets.TARGET_SSH_KEY }}
         run: |
-          if [[ -z "$MIRROR_TARGET_PAT" ]]; then
-            echo "ERROR: MIRROR_TARGET_PAT secret is not set"
-            exit 1
-          fi
-          git remote add target \
-            https://x-access-token:${MIRROR_TARGET_PAT}@github.com/LLVM-Snippy/llvm-snippy.git
+          mkdir -p ~/.ssh
+          echo "$TARGET_SSH_KEY" >& ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
+      - name: Push mirror to target
+        run: |
+          git remote add target git@github.com:LLVM-Snippy/llvm-snippy.git
           git push --mirror target
-          git remote remove target
