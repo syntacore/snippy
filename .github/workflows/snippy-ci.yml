@@ -24,7 +24,6 @@ jobs:
         with:
           sparse-checkout: |
             .github
-            .syntacore
             cmake
             libunwind
             lld
@@ -84,7 +83,7 @@ jobs:
           name: snippy-doc-latex
           path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/latex
       - name: Upload github pages artifact
-        if: github.event_name == 'push' && github.ref_name == 'main' && github.repository_owner == 'syntacore'
+        if: github.event_name == 'push' && github.ref_name == 'main' && (github.repository_owner == 'syntacore' || github.repository_owner == 'LLVM-Snippy')
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
         with:
           path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/html
@@ -94,7 +93,7 @@ jobs:
           ccache -z
   deploy-pages:
     needs: [main]
-    if: github.event_name == 'push' && github.ref_name == 'main' && github.repository_owner == 'syntacore'
+    if: github.event_name == 'push' && github.ref_name == 'main' && (github.repository_owner == 'syntacore' || github.repository_owner == 'LLVM-Snippy')
     runs-on: ubuntu-24.04
     permissions:
       pages: write
