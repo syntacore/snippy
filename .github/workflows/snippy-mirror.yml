@@ -1,9 +1,10 @@
-name: Mirror repo on main updates
+name: Mirror repo
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
