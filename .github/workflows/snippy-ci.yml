@@ -47,7 +47,7 @@ jobs:
           -DCMAKE_C_COMPILER=clang-14 -DCMAKE_CXX_COMPILER=clang++-14
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           -DLLVM_EXTERNAL_PROJECT_PASSTHROUGH="CMAKE_C_COMPILER_LAUNCHER;CMAKE_CXX_COMPILER_LAUNCHER"
-          -C .syntacore/release.cmake
+          -DCMAKE_BUILD_TYPE=Release --preset snippy_basic
       - name: CMake release build
         run: cmake --build "$BUILD_DIR" --target llvm-snippy llvm-ie docs-llvm-snippy-man docs-llvm-snippy-latex docs-llvm-snippy-html
       - name: CMake release test
