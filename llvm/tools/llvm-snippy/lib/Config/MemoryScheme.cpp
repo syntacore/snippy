@@ -416,7 +416,7 @@ bool MemoryBank::contained(MemRange R) const {
   return CR.Start <= R.Start && CR.End >= R.End;
 }
 
-bool MemoryBank::contained(AddressInfo AI) const {
+bool MemoryBank::contained(const AddressInfo &AI) const {
   MemRange R{AI};
   return contained(R);
 }

@@ -12,4 +12,4 @@ access-evictions:
       weight: 0
 
 # CHECK: error: Cannot sample memory access for instruction
-# CHECK: Memory schemes are to restrictive to generate access (size: 1, alignment: 1)
+# CHECK: Memory schemes are to restrictive to generate access (size: 1, alignment: 1, stride: 0, number of elements: 1)
