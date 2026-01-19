@@ -161,17 +161,8 @@ llvm::snippy::CFPermutationContext::CFPermutationContext(
   LLVM_DEBUG(BranchSettings.get().dump());
 }
 
-size_t llvm::snippy::CFPermutationContext::getCFInstrNumFor(
-    const MachineFunction &MF) const {
-  auto TotalInstrNum = FG.get().getRequestedInstrsNum(MF);
-  const auto &Cfg = GC.get().getConfig();
-  auto &ProgCtx = GC.get().getProgramContext();
-  auto &OpCC = ProgCtx.getOpcodeCache();
-  return Cfg.getCFInstrsNum(OpCC, TotalInstrNum);
-}
-
 bool llvm::snippy::CFPermutationContext::makePermutationAndUpdateBranches() {
-  auto CFInstrsNum = getCFInstrNumFor(CurrMF);
+  auto CFInstrsNum = FG.get().getCFInstrNum(CurrMF);
   if (CFInstrsNum == 0) {
     LLVM_DEBUG(dbgs() << "No CF instructions for " << CurrMF.get().getName()
                       << "\n");
@@ -326,7 +317,7 @@ void llvm::snippy::CFPermutationContext::initBlocksInfo(unsigned Size) {
     return;
   }
 
-  auto RequestedInstrsNum = FG.get().getRequestedInstrsNum(CurrMF);
+  auto RequestedInstrsNum = FG.get().getRequestedInstrNum(CurrMF);
 
   for (auto BB : seq(0u, Size))
     initOneBlockInfo(BB, Size, RequestedInstrsNum);
