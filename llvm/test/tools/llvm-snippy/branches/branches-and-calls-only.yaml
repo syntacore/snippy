@@ -1,0 +1,44 @@
+# COM: This test checks that snippy correctly generates code consisting only of
+#      calls and branches.
+# RUN: llvm-snippy %s --model-plugin=None
+
+options:
+  mtriple: riscv64-linux-gnu
+  num-instrs: 100
+  init-regs-in-elf: true
+  function-number: 5
+  function-layers: 1
+  num-instr-ancil: 10
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x4000000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x100000
+    SIZE:      0x50000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      3
+    VMA:       0x5100000
+    SIZE:      0x50000
+    LMA:       0x510000
+    ACCESS:    r
+  - name:      stack
+    VMA:       0x6500000
+    SIZE:      0x50000
+    LMA:       0x6500000
+    ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+    - [BNE, 1.0]
+    - [BLT, 1.0]
+    - [BGE, 1.0]
+    - [BLTU, 1.0]
+    - [BGEU, 1.0]
+    - [JAL, 1.0]
+    - [JALR, 1.0]
+

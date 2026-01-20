@@ -62,14 +62,28 @@ bool CFGenerator::runOnMachineFunction(MachineFunction &MF) {
   const auto &PassCfg = Cfg.PassCfg;
   auto &OpCC = ProgCtx.getOpcodeCache();
 
-  auto CFInstrsNum = Cfg.getCFInstrsNum(OpCC, FG.getRequestedInstrsNum(MF));
-  if (CFInstrsNum == 0)
+  auto CFInstrsNum =
+      Cfg.getHistogramCFInstrsNum(OpCC, FG.getRequestedInstrNum(MF));
+  if (CFInstrsNum == 0) {
+    FG.setCFInstrNum(MF, CFInstrsNum);
     return false;
-
+  }
+  auto &CGS = FG.get<GlobalCodeFlowInfo>().CGS;
+  auto *Node = CGS.getNode(&MF.getFunction());
   auto &State = ProgCtx.getLLVMState();
-  const auto &InstrInfo = State.getInstrInfo();
   const auto &SnippyTgt = State.getSnippyTarget();
-  auto CFOpcGen = PassCfg.createCFOpcodeGenerator(OpCC);
+  bool IsNoCallees = Node && Node->callees().size() == 0;
+
+  // We need to change the number of CF instructions, under the conditions:
+  //   1. Only the call instructions remain in the histogram (no plain left).
+  //   2. There is no Callees for this function.
+  // In this case, we fill the entire function with CF instructions.
+  if (IsNoCallees && !Cfg.Histogram.hasPlainInstrs(OpCC, SnippyTgt))
+    CFInstrsNum = FG.getRequestedInstrNum(MF);
+  FG.setCFInstrNum(MF, CFInstrsNum);
+
+  const auto &InstrInfo = State.getInstrInfo();
+  auto CFOpcGen = PassCfg.createCFOpcodeGenerator();
   auto *CurrMBB = &MF.front();
   for (auto NInstr = 0u; NInstr < CFInstrsNum; ++NInstr) {
     auto Opc = CFOpcGen->generate();

@@ -412,7 +412,7 @@ FunctionGenerator::calculateEntryFnInstrsNum(Module &M,
       [&M, this](auto Acc, const auto *F) {
         const auto &MF =
             *SnippyModule::fromModule(M).getMMI().getMachineFunction(*F);
-        return Acc + getRequestedInstrsNum(MF);
+        return Acc + getRequestedInstrNum(MF);
       });
 }
 

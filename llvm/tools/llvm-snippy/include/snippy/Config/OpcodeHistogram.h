@@ -98,8 +98,10 @@ public:
   bool hasCallInstrs(const OpcodeCache &OpCC, const SnippyTarget &Tgt) const;
   bool hasSPRelativeInstrs(const OpcodeCache &OpCC,
                            const SnippyTarget &Tgt) const;
+  bool hasPlainInstrs(const OpcodeCache &OpCC, const SnippyTarget &Tgt) const;
 
-  unsigned getCFInstrsNum(unsigned InstrsNum, const OpcodeCache &OpCC) const {
+  unsigned getHistogramCFInstrsNum(unsigned InstrsNum,
+                                   const OpcodeCache &OpCC) const {
     double CFInstrsWeight =
         std::accumulate(begin(), end(), 0.0,
                         [&OpCC](double Accumulation, auto &&Hist) -> double {
