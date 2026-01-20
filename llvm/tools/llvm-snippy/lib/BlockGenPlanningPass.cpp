@@ -633,14 +633,13 @@ BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
   assert(!BlocksToProcess.empty() &&
          "At least one basic block that is not a latch block must exist");
 
-  auto NumInstrTotal = FG->getRequestedInstrsNum(MF);
+  auto NumInstrTotal = FG->getRequestedInstrNum(MF);
   auto &ProgCtx = GenCtx->getProgramContext();
   const auto &Cfg = GenCtx->getConfig();
-  const auto &OpCC = ProgCtx.getOpcodeCache();
 
   auto NumInstrsLeft = NumInstrTotal;
-  assert(NumInstrTotal >= Cfg.getCFInstrsNum(OpCC, NumInstrTotal));
-  NumInstrsLeft -= Cfg.getCFInstrsNum(OpCC, NumInstrTotal);
+  assert(NumInstrTotal >= FG->getCFInstrNum(MF));
+  NumInstrsLeft -= FG->getCFInstrNum(MF);
 
   auto AverageBlockInstrs = NumInstrsLeft / BlocksToProcess.size();
   if (AverageBlockInstrs == 0)
@@ -915,7 +914,6 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
       MF, FunReq, [this](const auto *MBB) { return !MLI->getLoopFor(MBB); });
   unsigned SupposedNumInstr = 0;
   auto &ProgCtx = GenCtx->getProgramContext();
-  const auto &OpCC = ProgCtx.getOpcodeCache();
   auto MaxInstrSize =
       ProgCtx.getLLVMState().getSnippyTarget().getMaxInstrSize();
   for (auto *ML : *MLI) {
@@ -929,9 +927,9 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
     }
   }
 
-  auto NumInstrTotal = FG->getRequestedInstrsNum(MF);
-  assert(NumInstrTotal >= Cfg.getCFInstrsNum(OpCC, NumInstrTotal));
-  NumInstrTotal -= Cfg.getCFInstrsNum(OpCC, NumInstrTotal);
+  auto NumInstrTotal = FG->getRequestedInstrNum(MF);
+  assert(NumInstrTotal >= FG->getCFInstrNum(MF));
+  NumInstrTotal -= FG->getCFInstrNum(MF);
   // If number of instructions in size-requested blocks is already enough for
   // the whole function, skipping num instrs planning for other blocks
   if (NumInstrTotal <= SupposedNumInstr) {
