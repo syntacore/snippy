@@ -61,13 +61,22 @@ public:
     return getCallGraphState().nextRootFunction(MF);
   }
 
-  size_t getRequestedInstrsNum(const MachineFunction &MF) const {
+  size_t getRequestedInstrNum(const MachineFunction &MF) const {
     assert(RequestedInstrNum.count(&MF));
     return RequestedInstrNum.at(&MF);
   }
 
   void setRequestedInstrNum(const MachineFunction &MF, size_t NumInstr) {
     RequestedInstrNum.emplace(&MF, NumInstr);
+  }
+
+  size_t getCFInstrNum(const MachineFunction &MF) const {
+    assert(CFInstrNum.count(&MF));
+    return CFInstrNum.at(&MF);
+  }
+
+  void setCFInstrNum(const MachineFunction &MF, size_t NumInstr) {
+    CFInstrNum.emplace(&MF, NumInstr);
   }
 
 private:
@@ -95,6 +104,7 @@ private:
   void initExecutionPath();
 
   std::unordered_map<const MachineFunction *, size_t> RequestedInstrNum;
+  std::unordered_map<const MachineFunction *, size_t> CFInstrNum;
 };
 
 } // namespace snippy

@@ -163,7 +163,6 @@ protected:
   BlocksInfoIter findMaxIfDepthReached(BlocksInfoIter Beg, BlocksInfoIter End);
   BlocksInfoIter findMaxLoopDepthReached(BlocksInfoIter Beg,
                                          BlocksInfoIter End);
-  size_t getCFInstrNumFor(const MachineFunction &MF) const;
 
 private:
   void initOneBlockInfo(unsigned BB, unsigned NBlocks,
