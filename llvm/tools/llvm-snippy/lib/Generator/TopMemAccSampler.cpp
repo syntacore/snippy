@@ -12,20 +12,8 @@
 namespace llvm {
 namespace snippy {
 
-Expected<AccessSampleResult> TopLevelMemoryAccessSampler::sample(
-    size_t AccessSize, size_t Alignment, bool AllowMisalign,
-    std::function<AddressGenInfo(MemoryAccess &)> ChooseAddrGenInfo,
-    bool BurstMode) {
-  SmallVector<std::string, 3> Errs(Samplers.size());
-  for (auto &&[Idx, S] : enumerate(Samplers)) {
-    auto Access = S->sample(AccessSize, Alignment, AllowMisalign,
-                            ChooseAddrGenInfo, BurstMode);
-    if (!Access) {
-      Errs[Idx] = toString(Access.takeError());
-      continue;
-    }
-    return *Access;
-  }
+Error TopLevelMemoryAccessSampler::reportSamplersError(
+    const SmallVectorImpl<std::string> &Errs) {
   std::string ErrMsg;
   raw_string_ostream OS(ErrMsg);
   for (auto &&[Idx, E] : enumerate(Errs))
@@ -33,6 +21,34 @@ Expected<AccessSampleResult> TopLevelMemoryAccessSampler::sample(
   return make_error<MemoryAccessSampleError>(
       Twine("All samplers failed to generate memory access:\n")
           .concat(StringRef(ErrMsg).rtrim()));
+}
+
+Expected<AddressInfo>
+TopLevelMemoryAccessSampler::sample(const AddressGenInfo &AddrGenInfo) {
+  SmallVector<std::string, 3> Errs(Samplers.size());
+  for (auto &&[Idx, S] : enumerate(Samplers)) {
+    auto Access = S->sample(AddrGenInfo);
+    if (!Access) {
+      Errs[Idx] = toString(Access.takeError());
+      continue;
+    }
+    return *Access;
+  }
+  return reportSamplersError(Errs);
+}
+
+Expected<MemoryAccess &>
+TopLevelMemoryAccessSampler::chooseAccess(const AddressGenInfo &AddrGenInfo) {
+  SmallVector<std::string, 3> Errs(Samplers.size());
+  for (auto &&[Idx, S] : enumerate(Samplers)) {
+    auto Access = S->chooseAccess(AddrGenInfo);
+    if (!Access) {
+      Errs[Idx] = toString(Access.takeError());
+      continue;
+    }
+    return *Access;
+  }
+  return reportSamplersError(Errs);
 }
 
 std::vector<AddressInfo> TopLevelMemoryAccessSampler::randomBurstGroupAddresses(
@@ -43,13 +59,13 @@ std::vector<AddressInfo> TopLevelMemoryAccessSampler::randomBurstGroupAddresses(
   std::vector<AddressInfo> Addresses;
   for (auto &AR : ARRange) {
 
-    auto Access = sample(AR.AccessSize, AR.AccessAlignment, AR.AllowMisalign,
-                         /*BurstMode*/ true);
+    AddressGenInfo AddrGenInfo{AR.AccessSize, AR.AccessAlignment,
+                               AR.AllowMisalign, /*Burst=*/true};
+    auto Access = sample(AddrGenInfo);
     if (!Access)
       snippy::fatal("Failed to sample memory access for burst group",
                     toString(Access.takeError()));
-    auto &AI = Access->AddrInfo;
-    Addresses.push_back(std::move(AI));
+    Addresses.push_back(std::move(*Access));
   }
 
   return Addresses;

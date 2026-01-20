@@ -19,6 +19,7 @@ class SnippyProgramContext;
 class TopLevelMemoryAccessSampler : public IMemoryAccessSampler {
   std::vector<std::unique_ptr<IMemoryAccessSampler>> Samplers;
 
+  Error reportSamplersError(const SmallVectorImpl<std::string> &Errs);
 
 public:
   void reserve(MemRange R) override {
@@ -46,21 +47,10 @@ public:
                     std::make_move_iterator(Finish));
   }
 
-  Expected<AccessSampleResult>
-  sample(size_t AccessSize, size_t Alignment, bool AllowMisalign,
-         std::function<AddressGenInfo(MemoryAccess &)> ChooseAddrGenInfo,
-         bool BurstMode = false) override;
+  Expected<AddressInfo> sample(const AddressGenInfo &AddrGenInfo) override;
 
-  Expected<AccessSampleResult> sample(size_t AccessSize, size_t Alignment,
-                                      bool AllowMisalign,
-                                      bool BurstMode = false) {
-    auto ChooseGenInfo = [&](auto &&Scheme) {
-      return AddressGenInfo::singleAccess(AccessSize, Alignment, AllowMisalign,
-                                          BurstMode);
-    };
-    return sample(AccessSize, Alignment, AllowMisalign, ChooseGenInfo,
-                  BurstMode);
-  }
+  Expected<MemoryAccess &>
+  chooseAccess(const AddressGenInfo &AddrGenInfo) override;
 
   std::vector<AddressInfo>
   randomBurstGroupAddresses(ArrayRef<AddressRestriction> ARRange,

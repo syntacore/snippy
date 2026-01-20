@@ -14,18 +14,14 @@
 namespace llvm {
 namespace snippy {
 
-struct AccessSampleResult final {
-  AddressInfo AddrInfo;
-  AddressGenInfo AddrGenInfo;
-};
-
 class IMemoryAccessSampler {
 public:
   virtual ~IMemoryAccessSampler() = default;
-  virtual Expected<AccessSampleResult>
-  sample(size_t AccessSize, size_t Alignment, bool AllowMisalign,
-         std::function<AddressGenInfo(MemoryAccess &)> ChooseAddrGenInfo,
-         bool BurstMode = false) = 0;
+
+  virtual Expected<AddressInfo> sample(const AddressGenInfo &AddrGenInfo) = 0;
+
+  virtual Expected<MemoryAccess &>
+  chooseAccess(const AddressGenInfo &AddrGenInfo) = 0;
 
   virtual void reserve(MemRange) {}
 

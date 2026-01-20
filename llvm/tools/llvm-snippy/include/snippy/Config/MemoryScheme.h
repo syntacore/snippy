@@ -40,6 +40,7 @@ namespace snippy {
 
 class SnippyTarget;
 class OpcodeCache;
+class MemoryAccess;
 
 enum class MemoryAccessMode {
   Range,
@@ -83,7 +84,7 @@ struct MemRange {
     assert(Start <= End && "Illegal Memory Range");
   }
 
-  explicit MemRange(AddressInfo AI)
+  explicit MemRange(const AddressInfo &AI)
       : MemRange{AI.Address, AI.Address + AI.MaxOffset + AI.AccessSize} {}
 
   bool interfere(const MemRange &Rhs) const {
@@ -157,7 +158,7 @@ public:
 
   // Check if R/AI is fully contained in MemoryBank.
   bool contained(MemRange R) const;
-  bool contained(AddressInfo AI) const;
+  bool contained(const AddressInfo &AI) const;
 
   void addRange(MemRange R);
   void substractRange(MemRange R);
@@ -180,8 +181,6 @@ private:
 
   std::set<MemRange> Ranges;
 };
-
-class MemoryAccess;
 
 class MemoryAccessSeq final {
   SmallVector<std::unique_ptr<MemoryAccess>> Data;
