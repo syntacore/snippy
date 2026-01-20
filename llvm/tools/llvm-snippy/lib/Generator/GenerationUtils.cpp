@@ -69,9 +69,9 @@ selectAddressForSingleInstrFromBurstGroup(InstructionGenerationContext &IGC,
   assert(OpcodeAR.Opcodes.size() == 1 &&
          "Expected AddressRestriction only for one opcode");
   for (unsigned i = 0; i < BurstAddressRandomizationThreshold; ++i) {
-    auto CandidateAccess = MS.sample(
-        OpcodeAR.AccessSize, OpcodeAR.AccessAlignment, OpcodeAR.AllowMisalign,
-        /*BurstMode*/ true);
+    AddressGenInfo AddrGenInfo{OpcodeAR.AccessSize, OpcodeAR.AccessAlignment,
+                               OpcodeAR.AllowMisalign, /*Burst=*/true};
+    auto CandidateAccess = MS.sample(AddrGenInfo);
     if (!CandidateAccess) {
       std::string PrefixErr;
       raw_string_ostream OS(PrefixErr);
@@ -79,7 +79,7 @@ selectAddressForSingleInstrFromBurstGroup(InstructionGenerationContext &IGC,
             "group";
       snippy::fatal(PrefixErr, toString(CandidateAccess.takeError()));
     }
-    auto &CandidateAI = CandidateAccess->AddrInfo;
+    auto &CandidateAI = *CandidateAccess;
 
     auto Stride = std::lcm<int64_t, int64_t>(
         std::max<int64_t>(OpcodeAR.ImmOffsetRange.getStride(),

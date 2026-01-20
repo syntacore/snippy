@@ -925,17 +925,7 @@ bool sizeLimitIsExceeded(const planning::RequestLimit &Lim,
   return NewGeneratedCodeSize > Lim.getSizeLeft(CommitedStats);
 }
 
-AddressGenInfo chooseAddrGenInfoForInstrCallback(
-    LLVMContext &Ctx, const SnippyLoopInfo::LoopGenerationInfo *CurLoopGenInfo,
-    size_t AccessSize, size_t Alignment, bool AllowMisalign,
-    const MemoryAccess &MemoryScheme) {
-  (void)CurLoopGenInfo; // for future extensibility
-  // AddressGenInfo for one element access.
-  return AddressGenInfo::singleAccess(AccessSize, Alignment, AllowMisalign,
-                                      false /* Burst */);
-}
-
-static AccessSampleResult
+static std::pair<AddressInfo, AddressGenInfo>
 chooseAddrInfoForInstr(MachineInstr &MI, InstructionGenerationContext &IGC,
                        const MachineLoop *ML, const SnippyLoopInfo *SLI) {
   assert(!ML || SLI);
@@ -948,36 +938,28 @@ chooseAddrInfoForInstr(MachineInstr &MI, InstructionGenerationContext &IGC,
   auto [AccessSize, Alignment, AllowMisalign] =
       SnippyTgt.getAccessSizeAndAlignment(ProgCtx, Opcode, *MI.getParent());
 
-  auto *CurLoopGenInfo =
-      ML ? SLI->getLoopsGenerationInfoForMBB(ML->getHeader()) : nullptr;
+  auto AddrGenInfo =
+      AddressGenInfo::singleAccess(AccessSize, Alignment, AllowMisalign,
+                                   /*Burst=*/false);
 
-  // CurLoopGenInfo will be passed by pointer
-  // so that in the future it can be modified during the generation process.
-  auto ChooseAddrGenInfo =
-      [&Ctx = State.getCtx(), CurLoopGenInfo, AccessSize = AccessSize,
-       Alignment = Alignment, AllowMisalign = AllowMisalign](
-          const MemoryAccess &MemoryScheme) -> AddressGenInfo {
-    return chooseAddrGenInfoForInstrCallback(Ctx, CurLoopGenInfo, AccessSize,
-                                             Alignment, AllowMisalign,
-                                             MemoryScheme);
-  };
-
-  auto Result =
-      MS.sample(AccessSize, Alignment, AllowMisalign, ChooseAddrGenInfo);
-  if (!Result) {
+  auto ReportError = [&](Error Err) {
     std::string InstrStr;
     raw_string_ostream OS(InstrStr);
     MI.print(OS);
     snippy::fatal(formatv("Cannot sample memory access for instruction \"{0}\"",
                           StringRef(InstrStr).rtrim()),
-                  Twine("\n").concat(toString(Result.takeError())));
-  }
-  const auto &AddrInfo = Result->AddrInfo;
+                  Twine("\n").concat(toString(std::move(Err))));
+  };
+
+  auto ChosenAccess = MS.chooseAccess(AddrGenInfo);
+  if (!ChosenAccess)
+    ReportError(ChosenAccess.takeError());
+  auto AddrInfo = ChosenAccess->randomAddress(AddrGenInfo);
 
   assert(AddrInfo.MaxOffset >= 0);
   assert(AddrInfo.MinOffset <= 0);
 
-  return *Result;
+  return {AddrInfo, AddrGenInfo};
 }
 
 SmallVector<unsigned, 4> pickRecentDefs(MachineInstr &MI,
@@ -1085,7 +1067,6 @@ void postprocessMemoryOperands(MachineInstr &MI,
 
   for (size_t i = 0; i < NumAddrsToGen; ++i) {
     auto [AddrInfo, AddrGenInfo] = chooseAddrInfoForInstr(MI, IGC, ML, SLI);
-    bool GenerateStridedLoad = !AddrGenInfo.isSingleElement();
     auto AccessSize = AddrInfo.AccessSize;
 
     auto &&[RegToValue, ChosenAddresses] =

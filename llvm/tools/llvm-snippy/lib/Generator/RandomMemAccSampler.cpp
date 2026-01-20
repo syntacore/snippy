@@ -47,22 +47,26 @@ void RandomMemoryAccessSampler::reserve(MemRange R) {
   updateSplit();
 }
 
-Expected<AccessSampleResult>
-RandomMemoryAccessSampler::sample(size_t AccessSize, size_t Alignment,
-                                  bool AllowMisalign,
-                                  std::function<AddressGenInfo(MemoryAccess &)>
-                                      ChooseAddrGenInfo, // FIXME: const?
-                                  bool BurstMode) {
+Expected<AddressInfo>
+RandomMemoryAccessSampler::sample(const AddressGenInfo &AddrGenInfo) {
   auto &MAGWithSchemes = getMAG();
-  auto SchemeExp = MAGWithSchemes.getValidAccesses(AccessSize, Alignment,
-                                                   AllowMisalign, BurstMode);
+  auto SchemeExp = MAGWithSchemes.getValidAccesses(AddrGenInfo);
   if (!SchemeExp)
-    return Expected<AccessSampleResult>(SchemeExp.takeError());
+    return Expected<AddressInfo>(SchemeExp.takeError());
   auto &Scheme = *SchemeExp;
-  auto AddrGenInfo = ChooseAddrGenInfo(*Scheme);
   auto AI = Scheme->randomAddress(AddrGenInfo);
   assert(MB.contained(AI) && "Address Info potentially out of memory bank");
-  return AccessSampleResult{AI, AddrGenInfo};
+  return AI;
+}
+
+Expected<MemoryAccess &>
+RandomMemoryAccessSampler::chooseAccess(const AddressGenInfo &AddrGenInfo) {
+  auto &MAGWithSchemes = getMAG();
+  auto SchemeExp = MAGWithSchemes.getValidAccesses(AddrGenInfo);
+  if (!SchemeExp)
+    return Expected<MemoryAccess &>(SchemeExp.takeError());
+  assert(*SchemeExp);
+  return **SchemeExp;
 }
 
 } // namespace snippy
