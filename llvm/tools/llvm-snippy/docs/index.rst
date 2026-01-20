@@ -1807,6 +1807,8 @@ it is JAL and JALR.
    the histogram. It is a limitation of the current implementation and
    will be improved in the future releases.
 
+.. _generated-call-graph:
+
 Generated Call Graph
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -2225,6 +2227,29 @@ The notation uses the following abbreviations for register classes:
 
 Also, when honor-target-abi is enabled, only live caller-saved registers are
 preserved around external function calls.
+
+Generated Function Naming
+-------------------------
+
+The default name of the function produced by llvm-snippy is "SnippyFunction".
+
+This can be changed using ``--entry-point`` option. It allows you to specify
+a custom name for the generated function, which is useful when you want to call
+it from a generic startup code. In case of generating several functions (like
+with `generated-call-graph`_) this option renames the main (entry) function.
+
+For example if we want entry function to be named "test_code":
+
+.. code:: yaml
+
+   options:
+     entry-point: test_code
+
+Or the same via command line:
+
+::
+
+  -entry-point=test_code
 
 .. _`_last_instruction`:
 
