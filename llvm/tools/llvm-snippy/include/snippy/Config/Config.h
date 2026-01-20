@@ -237,7 +237,7 @@ public:
   TraceConvertOptions TFOpts;
   PassConfig(const ProgramConfig &ProgramCfg) : ProgramCfg(&ProgramCfg) {}
 
-  OpcGenHolder createCFOpcodeGenerator(const OpcodeCache &OpCC) const {
+  OpcGenHolder createCFOpcodeGenerator() const {
     auto &PluginManager = *ProgramCfg->PluginManagerImpl;
     if (PluginManager.pluginHasBeenLoaded())
       return PluginManager.createPlugin(BranchOpcodes.begin(),
@@ -388,8 +388,9 @@ public:
                                : GenerationMode::NumInstrs;
   }
 
-  auto getCFInstrsNum(const OpcodeCache &OpCC, size_t TotalInstructions) const {
-    return Histogram.getCFInstrsNum(TotalInstructions, OpCC);
+  auto getHistogramCFInstrsNum(const OpcodeCache &OpCC,
+                               size_t TotalInstructions) const {
+    return Histogram.getHistogramCFInstrsNum(TotalInstructions, OpCC);
   }
 
   bool hasCallInstrs(const OpcodeCache &OpCC, const SnippyTarget &Tgt) const {
