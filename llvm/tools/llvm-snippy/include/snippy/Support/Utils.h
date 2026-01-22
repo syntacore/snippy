@@ -385,6 +385,13 @@ DenseSet<unsigned> getAllMutatedRegs(MachineFunction &MF);
 std::string toHexStringTruncate(uint64_t Value, unsigned Len);
 std::string toHexStringTruncate(APInt AI, unsigned Len);
 
+// Returns canonicalized absolute path or error
+// During conversion:
+// * relative paths are converted to absolute ones (using the current working
+//   directory)
+// * all . .. and ~ symbolls are expanded
+Expected<std::string> canonicalizePath(StringRef Path);
+
 } // namespace snippy
 } // namespace llvm
 
