@@ -146,10 +146,10 @@ static StringRef findLLD() {
       snippy::fatal(
           Twine("Could not find ld.lld: ") +
           (PathSpecified
-               ? StringRef("Please, specify it's path via "
+               ? StringRef("Could not find it in the specified path.")
+               : StringRef("Please, specify it's path via "
                            "--lld-path=<path to ld.lld> or copy it to "
-                           "llvm-snippy installation directory.")
-               : StringRef("Could not find it in the specified path.")));
+                           "llvm-snippy installation directory.")));
     }
     Found = LLDExeE.get();
   }

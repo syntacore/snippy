@@ -30,7 +30,6 @@
 #include "llvm/Support/Path.h"
 
 #include <algorithm>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>

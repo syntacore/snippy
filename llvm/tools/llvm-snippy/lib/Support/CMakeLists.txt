@@ -17,9 +17,5 @@ add_llvm_library(
   Utils.cpp
   YAMLUtils.cpp)
 
-if(LLVM_SNIPPY_NEEDS_LIBSTDCPP_FS)
-  target_link_libraries(LLVMSnippySupport PRIVATE stdc++fs)
-endif()
-
 target_include_directories(LLVMSnippySupport PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 add_dependencies(LLVMSnippySupport LLVMSnippySupportOptionsTableGen)
