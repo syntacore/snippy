@@ -8,14 +8,13 @@
 
 #include "snippy/Support/DynLibLoader.h"
 #include "snippy/Support/DiagnosticInfo.h"
+#include "snippy/Support/Utils.h"
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Program.h"
-
-#include <filesystem>
 
 #include <dlfcn.h>
 
@@ -40,12 +39,11 @@ void *getPermanentLibrary(const char *Filename, std::string *errMsg = nullptr) {
   // RUNPATH set to path/to/package and not to path/to/package/subdir as one
   // would expect if the linker were to locate the shared object.
 
-  auto Path = std::filesystem::path(Filename);
-  auto EC = std::error_code{};
-  auto Canonical = canonical(Path, EC);
+  auto CanonicalOrErr = canonicalizePath(Filename);
 
-  if (EC)
-    snippy::fatal(createStringError(EC, Path.c_str()));
+  if (auto Err = CanonicalOrErr.takeError())
+    snippy::fatal(toString(std::move(Err)));
+  auto Canonical = *CanonicalOrErr;
 
   void *Handle =
       ::dlopen(Canonical.c_str(), RTLD_LAZY | RTLD_GLOBAL | RTLD_DEEPBIND);
@@ -153,7 +151,12 @@ std::string getCurrentLibExecutablePath() {
                         .concat(DLInfo.dli_fname)
                         .concat("\""),
                     Err.message());
-    return *PathOrErr;
+    auto CanonicalPath = canonicalizePath(*PathOrErr);
+    if (auto Err = CanonicalPath.takeError())
+      snippy::fatal(
+          Twine("While computing current lib/executable path canonicalization",
+                toString(std::move(Err))));
+    return *CanonicalPath;
   }
 #endif
   return sys::fs::getMainExecutable(/* dummy argv */ nullptr, &Dummy);

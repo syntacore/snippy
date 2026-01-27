@@ -1,0 +1,8 @@
+# RUN: cd %llvm_tools
+# RUN: ./llvm-snippy %s %S/Inputs/sections.yaml -model-plugin None
+
+options:
+  mtriple: riscv64
+  num-instrs: 10
+histogram:
+  - [ADD, 1.0]

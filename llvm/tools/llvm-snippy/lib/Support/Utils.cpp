@@ -13,6 +13,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/Regex.h"
 
 namespace llvm {
@@ -174,5 +175,22 @@ std::string toHexStringTruncate(APInt AI, unsigned Len) {
   HexString.insert(HexString.begin(), Width - Size, '0');
   return HexString;
 }
+
+Expected<std::string> canonicalizePath(StringRef Path) {
+  SmallString<32> PathVec = Path;
+  if (!sys::path::is_absolute(Path)) {
+    auto Err = sys::fs::make_absolute(PathVec);
+    if (Err)
+      return makeFailure(Err, Twine("Failed to get absolute path for \"") +
+                                  Path + "\"");
+  }
+  SmallString<32> RealPath;
+  auto Err = sys::fs::real_path(PathVec, RealPath, /*expand_tilde=*/true);
+  if (Err)
+    return makeFailure(Err, Twine("Failed to get real path for \"") + PathVec +
+                                "\"");
+  return std::string(RealPath);
+}
+
 } // namespace snippy
 } // namespace llvm
