@@ -14,7 +14,6 @@
 #pragma once
 
 #include "snippy/Support/DiagnosticInfo.h"
-#include "snippy/Support/RandUtil.h"
 #include "snippy/Target/Target.h"
 
 #include "llvm/CodeGen/AsmPrinter.h"
