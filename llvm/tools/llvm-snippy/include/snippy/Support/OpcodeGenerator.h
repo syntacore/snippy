@@ -12,8 +12,6 @@
 
 #include "llvm/Support/raw_ostream.h"
 
-#include "RandUtil.h"
-
 #include <map>
 #include <random>
 #include <vector>
@@ -62,11 +60,8 @@ public:
                                                     OpcodeWeights.end());
   }
 
-  unsigned generate() override {
-    auto Idx = OpcodeDist(RandEngine::engine());
-    assert(Idx < Opcodes.size());
-    return Opcodes[Idx];
-  }
+  unsigned generate() override;
+
   std::unique_ptr<OpcodeGeneratorInterface> copy() const override {
     return std::make_unique<DefaultOpcodeGenerator>(*this);
   }

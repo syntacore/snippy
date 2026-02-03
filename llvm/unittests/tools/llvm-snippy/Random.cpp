@@ -176,7 +176,8 @@ TEST_P(GenNUniqInIntervalTest, CheckInvariats) {
     RandEngine::init(seed);
 
     auto ResultExp =
-        RandEngine::genNUniqInInterval<int>(Min, Max, N, FilterOut);
+        FilterOut ? RandEngine::genNUniqInInterval<int>(Min, Max, N, FilterOut)
+                  : RandEngine::genNUniqInInterval<int>(Min, Max, N);
     ASSERT_TRUE(static_cast<bool>(ResultExp));
 
     auto &Result = *ResultExp;
@@ -185,7 +186,8 @@ TEST_P(GenNUniqInIntervalTest, CheckInvariats) {
     for (const auto &Val : Result) {
       EXPECT_GE(Val, Min);
       EXPECT_LE(Val, Max);
-      EXPECT_FALSE(FilterOut(Val));
+      if (FilterOut)
+        EXPECT_FALSE(FilterOut(Val));
     }
 
     EXPECT_FALSE(sortAndCheckForDuplicates(Result));
@@ -210,4 +212,9 @@ INSTANTIATE_TEST_SUITE_P(
         // Small range
         genNUniqInIntervalParams<int>{5, 5, 1},
         // Negative
-        genNUniqInIntervalParams<int>{-100, -90, 2}));
+        genNUniqInIntervalParams<int>{-100, -90, 2},
+        // No filter
+        genNUniqInIntervalParams<int>{-100, -90, 2, /*FilterOut=*/nullptr},
+        // Big range with no filter
+        genNUniqInIntervalParams<int>{100, 1000000000, 10000,
+                                      /*FilterOut=*/nullptr}));

@@ -409,15 +409,29 @@ public:
       return makeFailure(
           Errc::LogicError,
           "Invalid usage of genNUniqInInterval: Max cannot be less than Min.");
-    if (N > Max - Min + 1)
+
+    size_t M = Max - Min + 1;
+    if (N > M)
       return makeFailure(Errc::LogicError,
                          "Invalid usage of genNUniqInInterval: impossible to "
                          "generate this many unique values.");
-    std::vector<T> Vals(Max - Min + 1);
-    std::iota(Vals.begin(), Vals.end(), Min);
-    shuffle(Vals.begin(), Vals.end());
-    Vals.resize(N);
-    return Vals;
+
+    // Linear time and space unique number sampler via Bob Floyd's
+    // "Sample of brilliance": https://dl.acm.org/doi/10.1145/30401.315746
+    SmallDenseSet<T, 64> ResSet;
+    ResSet.reserve(N);
+    for (T J = Max - N + 1; J <= Max; ++J) {
+      auto Val = genInRangeInclusive(Min, J);
+      if (!ResSet.insert(Val).second) {
+        auto [It, Inserted] = ResSet.insert(J);
+        assert(Inserted);
+      }
+    }
+
+    assert(ResSet.size() == N);
+    std::vector<T> Res(ResSet.begin(), ResSet.end());
+    shuffle(Res.begin(), Res.end());
+    return Res;
   }
 
   template <typename T, typename Pred>
