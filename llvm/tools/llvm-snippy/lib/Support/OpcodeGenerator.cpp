@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Support/OpcodeGenerator.h"
+#include "snippy/Support/RandUtil.h"
 #include "snippy/Support/Utils.h"
 
 namespace llvm {
@@ -17,6 +18,12 @@ void DefaultOpcodeGenerator::print(llvm::raw_ostream &OS) const {
   auto Prob = getProbabilities();
   for (const auto &[Opcode, P] : Prob)
     OS << "     Opcode: " << Opcode << ": " << floatToString(P, 3) << "\n";
+}
+
+unsigned DefaultOpcodeGenerator::generate() {
+  auto Idx = OpcodeDist(RandEngine::engine());
+  assert(Idx < Opcodes.size());
+  return Opcodes[Idx];
 }
 
 } // namespace snippy
