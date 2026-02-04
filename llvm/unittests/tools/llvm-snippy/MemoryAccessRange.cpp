@@ -13,11 +13,14 @@ struct MemoryRangeTestCase {
 
 class MemoryRangesTest : public ::testing::TestWithParam<MemoryRangeTestCase> {
 protected:
-  void assertValidAddress(AddressInfo Res, const MemoryAccessRange &MR) const {
+  void assertValidAddress(AddressInfo Res, const MemoryAccessRange &MR,
+                          const AddressGenInfo &GenInfo) const {
     auto Start = MR.Start;
     auto Size = MR.Size;
     auto Stride = MR.Stride;
     ASSERT_EQ(Res.MinStride % Stride, 0u);
+    if (GenInfo.MinStride)
+      ASSERT_EQ(Res.MinStride % GenInfo.MinStride, 0u);
     auto FirstOff = MR.FirstOffset;
     auto LastOff = MR.LastOffset;
     auto MaxAccSize = MR.AccessSize;
@@ -78,20 +81,28 @@ TEST_P(MemoryRangesTest, GetRandomAddressTest) {
   auto &MR = TestCase.MR;
 
   RandEngine::init(1);
-  llvm::for_each(InstrAccesses, [&](const auto &Access) {
-    const auto &Res = MR.randomAddress(Access);
-    assertValidAddress(Res, MR);
+  llvm::for_each(InstrAccesses, [&](const auto &GenInfo) {
+    const auto &Res = MR.randomAddress(GenInfo);
+    assertValidAddress(Res, MR, GenInfo);
   });
 }
 
 TEST_P(MemoryRangesTest, MultipleDoesntExceedSize) {
   static const std::vector<AddressGenInfo> InstrAccesses = {
       {/* AccessSize */ 2u, /* Alignment */ 1u, /* AllowMisalign */ true,
-       /* BurstMode */ false, /* NumElements */ 16},
+       /* BurstMode */ false, /* NumElements */ 16, /* MinStride */ 1u},
       {/* AccessSize */ 4u, /* Alignment */ 1u, /* AllowMisalign */ true,
-       /* BurstMode */ false, /* NumElements */ 16},
+       /* BurstMode */ false, /* NumElements */ 16, /* MinStride */ 1u},
       {/* AccessSize */ 8u, /* Alignment */ 1u, /* AllowMisalign */ true,
-       /* BurstMode */ false, /* NumElements */ 16},
+       /* BurstMode */ false, /* NumElements */ 16, /* MinStride */ 1u},
+      {/* AccessSize */ 8u, /* Alignment */ 8u, /* AllowMisalign */ false,
+       /* BurstMode */ false, /* NumElements */ 16, /* MinStride */ 8u},
+      {/* AccessSize */ 8u, /* Alignment */ 1u, /* AllowMisalign */ true,
+       /* BurstMode */ false, /* NumElements */ 16, /* MinStride */ 3u},
+      {/* AccessSize */ 7u, /* Alignment */ 1u, /* AllowMisalign */ true,
+       /* BurstMode */ false, /* NumElements */ 13, /* MinStride */ 5u},
+      {/* AccessSize */ 3u, /* Alignment */ 4u, /* AllowMisalign */ false,
+       /* BurstMode */ false, /* NumElements */ 17, /* MinStride */ 7u},
   };
 
   auto TestCase = GetParam();
@@ -99,13 +110,13 @@ TEST_P(MemoryRangesTest, MultipleDoesntExceedSize) {
 
   RandEngine::init(::testing::GTEST_FLAG(random_seed));
 
-  llvm::for_each(InstrAccesses, [&](const AddressGenInfo &Access) {
-    if (!MR.isLegal(Access))
+  llvm::for_each(InstrAccesses, [&](const AddressGenInfo &GenInfo) {
+    if (!MR.isLegal(GenInfo))
       return;
     for (unsigned I = 0; I < 1024; ++I) {
-      auto Res = MR.randomAddress(Access);
-      for (size_t I = 0; I < Access.NumElements; ++I) {
-        assertValidAddress(Res, MR);
+      auto Res = MR.randomAddress(GenInfo);
+      for (size_t I = 0; I < GenInfo.NumElements; ++I) {
+        assertValidAddress(Res, MR, GenInfo);
         Res.Address += Res.MinStride;
       }
     }
@@ -151,4 +162,8 @@ INSTANTIATE_TEST_SUITE_P(
                             /* AccessSize */ 10u, /* MaxPastLastOffset */ 6u),
         MemoryRangeTestCase(/* Start */ 0u, /* Size */ 1024u, /* Stride */ 8u,
                             /* FirstOffset */ 3u, /* LastOffset */ 5u,
-                            /* AccessSize */ 10u, /* MaxPastLastOffset */ 7u)));
+                            /* AccessSize */ 10u, /* MaxPastLastOffset */ 7u),
+        MemoryRangeTestCase(/* Start */ 0u, /* Size */ 1024u, /* Stride */ 1u,
+                            /* FirstOffset */ 0u, /* LastOffset */ 0u),
+        MemoryRangeTestCase(/* Start */ 0u, /* Size */ 513u, /* Stride */ 7u,
+                            /* FirstOffset */ 0u, /* LastOffset */ 0u)));
