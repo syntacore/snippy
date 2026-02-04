@@ -622,18 +622,20 @@ bool MemoryAccessRange::isLegal(const AddressGenInfo &AddrGenInfo) const {
   if (AddrGenInfo.isSingleElement())
     return true;
 
+  assert(MinStride > 0);
   // Here we check whether it's possible to generate a strided address for
   // multiple elements
   auto NumElements = AddrGenInfo.NumElements;
-  if (LCStride < MinStride)
-    return false;
+  auto RequiredStride = std::lcm(LCStride, MinStride);
+  auto LCBlocksPerStride = RequiredStride / LCStride;
 
   // MaxLCBlock is the last LCStride-wide block that element can fit in. Then
   // the total number of elements that can be addressed with LCStride is
   // MaxLCBlock + 1
   auto MaxLCBlock =
       getMaxLCBlock(Alignment, AddrInfoAccessSize, AllowedLCBlockOffsets);
-  return NumElements <= MaxLCBlock + 1;
+
+  return (NumElements - 1) * LCBlocksPerStride <= MaxLCBlock;
 }
 
 void MemoryAccessRange::getAllowedOffsetsImpl(
@@ -675,6 +677,9 @@ AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
   auto AccessSize = Params.AccessSize;
   auto LCStride = getLCStride(Alignment);
   auto NumElements = Params.NumElements;
+  auto RequiredStride =
+      std::lcm(LCStride, Params.MinStride ? Params.MinStride : 1);
+  auto LCBlocksPerStride = RequiredStride / LCStride;
 
   auto AllowedLCBlockOffsets = getAllowedOffsets(Alignment, AccessSize);
   assert(!AllowedLCBlockOffsets.empty());
@@ -687,7 +692,7 @@ AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
   auto LastElementIdx = (NumElements - 1);
   auto MaxLCBlock =
       getMaxLCBlock(Alignment, AccessSize, AllowedLCBlockOffsets) -
-      LastElementIdx;
+      LastElementIdx * LCBlocksPerStride;
   LLVM_DEBUG(dbgs() << "Numelements: " << NumElements
                     << ", MaxLCBlock: " << MaxLCBlock << "\n");
   // NOTE: The way that addresses are sampled is two-step. First select any
@@ -695,8 +700,10 @@ AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
   // selected. Due to this it's doubtful that the distribution will be uniform
   // for complex scenarios, especially when Stride is not a a multiple of
   // alignment
-  auto FirstLCBlockIdx = snippy::RandEngine::genInRangeInclusive(MaxLCBlock);
-  auto LastLCBlockIdx = FirstLCBlockIdx + LastElementIdx;
+  auto FirstLCBlockIdx =
+      snippy::RandEngine::genInRangeInclusive(MaxLCBlock / LCBlocksPerStride) *
+      LCBlocksPerStride;
+  auto LastLCBlockIdx = FirstLCBlockIdx + LastElementIdx * LCBlocksPerStride;
   auto LCBlockOffsetIdx =
       snippy::RandEngine::genInRangeExclusive(AllowedLCBlockOffsets.size());
 
@@ -704,7 +711,7 @@ AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
   // not be necessary?
   auto Offset =
       FirstLCBlockIdx * LCStride + AllowedLCBlockOffsets[LCBlockOffsetIdx];
-  if (Offset + (LCStride * LastElementIdx) > MaxOffset) {
+  if (Offset + (LCStride * LCBlocksPerStride * LastElementIdx) > MaxOffset) {
     auto Slice =
         ArrayRef<size_t>(AllowedLCBlockOffsets).take_front(LCBlockOffsetIdx);
     auto LCBlockOffsetIt =
@@ -722,7 +729,7 @@ AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
   AI.Address = Start + Offset;
   AI.MaxOffset = alignDown(Size - Offset - AccessSize, LCStride);
   AI.MinOffset = -static_cast<int long long>(MinOffAligned);
-  AI.MinStride = LCStride;
+  AI.MinStride = RequiredStride;
   AI.AccessSize = AccessSize;
 
   LLVM_DEBUG(dbgs() << "Offset: " << Offset
