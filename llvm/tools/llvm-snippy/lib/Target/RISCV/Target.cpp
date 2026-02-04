@@ -284,6 +284,16 @@ getElemWidthAndGapForVectorLoad(unsigned Opcode, unsigned EEW,
 bool isDefaultSelfcheckEnough(unsigned Opcode) {
   if (!isRVV(Opcode) || isRVVModeSwitch(Opcode) || isRVVScalarMove(Opcode))
     return true;
+
+  // From RISCV-V spec 1.0:
+  //   Vector reduction operations perform a reduction using some binary
+  //   operator, to produce a scalar result in element 0 of a vector register.
+  if (isRVVReduction(Opcode))
+    return true;
+  // A vector mask occupies only one vector register regardless of SEW and LMUL.
+  if (isRVVMaskProducing(Opcode))
+    return true;
+
   switch (Opcode) {
   case RISCV::VCPOP_M:
   case RISCV::VFIRST_M:
@@ -296,7 +306,7 @@ std::vector<SelfcheckDestRegistersInfo>
 getInfoAboutRegsForSelfcheck(unsigned Opcode, Register FirstDestReg,
                              const MachineBasicBlock &MBB,
                              const SnippyProgramContext &ProgCtx) {
-  // Not RVV instruction isn't target specific fot selfcheck,
+  // Not RVV instruction isn't target specific for selfcheck,
   // so we provide only one destination register to store
   std::vector<SelfcheckDestRegistersInfo> SelfcheckSegsInfo;
   if (isDefaultSelfcheckEnough(Opcode)) {
