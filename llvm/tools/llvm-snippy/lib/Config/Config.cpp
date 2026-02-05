@@ -543,12 +543,13 @@ parseSpilledRegistersOption(const RegPoolWrapper &RP, const SnippyTarget &Tgt,
 }
 
 static void generateSPRelativeInstrsError(StringRef RedefineSP) {
-  snippy::fatal("Incompatible options",
-                "When the stack pointer is redefined to '" + Twine(RedefineSP) +
-                    "', generation of "
-                    "SP-relative instructions is not supported. Redefine it to "
-                    "'any-not-SP' or remove SP-relative instructions from the "
-                    "histogram.");
+  snippy::fatal(
+      "Incompatible options",
+      "When the stack pointer is redefined to '" + Twine(RedefineSP) +
+          "', generation of "
+          "SP-relative instructions is not supported. Redefine it with "
+          "`redefine-sp` option or remove SP-relative instructions from the "
+          "histogram.");
 }
 
 static MCRegister getRealStackPointer(
@@ -797,10 +798,12 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
   auto RegsSpilledToMem = getRegsToSpillToMem(Tgt, Cfg);
   bool HasSPRelativeInstrs = Cfg.Histogram.hasSPRelativeInstrs(OpCC, Tgt);
   if (ProgCfg.FollowTargetABI) {
-    if (HasSPRelativeInstrs)
-      snippy::fatal("Incompatible options",
-                    "When --honor-target-abi is enabled, generation of "
-                    "SP-relative instructions is not supported.");
+    if (HasSPRelativeInstrs && !Opts.RedefineSPSpecified)
+      snippy::fatal(
+          "Incompatible options",
+          "When --honor-target-abi is enabled, generation of "
+          "SP-relative instructions is not supported. You can provide "
+          "`redefine-sp` option to make a generation process possible");
 
     if (Opts.SkipLegacySPSpill)
       snippy::fatal("Incompatible options",

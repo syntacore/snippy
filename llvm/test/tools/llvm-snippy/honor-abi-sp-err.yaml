@@ -56,4 +56,4 @@ histogram:
     - [SP_RELATIVE_INSTR, 1.0]
     - [ADDI, 1.0]
 
-# CHECK: error: Incompatible options: When --honor-target-abi is enabled, generation of SP-relative instructions is not supported.
+# CHECK: error: Incompatible options: When --honor-target-abi is enabled, generation of SP-relative instructions is not supported. You can provide `redefine-sp` option to make a generation process possible
