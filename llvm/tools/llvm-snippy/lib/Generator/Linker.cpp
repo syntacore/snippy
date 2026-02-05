@@ -16,6 +16,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
+#include <iterator>
 
 namespace llvm {
 namespace snippy {
@@ -57,9 +58,22 @@ static void checkError(const std::error_code &ECode, StringRef What = "") {
     snippy::fatal(Twine(What) + ": " + ECode.message());
 }
 
-static std::string link(StringRef LLD, StringRef LinkerScript, bool Relocatable,
+static std::vector<StringRef>
+getLinkerOptions(bool Relocatable, bool DisableRelaxations, bool Shared) {
+  std::vector<StringRef> Opts;
+  assert(!Relocatable || !Shared);
+  if (Relocatable)
+    Opts.push_back("-r");
+  if (Shared)
+    Opts.push_back("-shared");
+  if (DisableRelaxations)
+    Opts.push_back("--no-relax");
+  return Opts;
+}
+
+static std::string link(StringRef LLD, StringRef LinkerScript,
                         std::vector<FilePathT> ObjectFilesPaths,
-                        bool DisableRelaxations, bool Shared) {
+                        ArrayRef<StringRef> Flags) {
   int FD;
   FilePathT OutPath;
 
@@ -69,17 +83,9 @@ static std::string link(StringRef LLD, StringRef LinkerScript, bool Relocatable,
   auto LLDCommands = std::vector<StringRef>{LLD};
   std::copy(ObjectFilesPaths.begin(), ObjectFilesPaths.end(),
             std::back_inserter(LLDCommands));
-  assert(!Relocatable || !Shared);
-  if (Relocatable)
-    LLDCommands.push_back("-r");
-  if (Shared)
-    LLDCommands.push_back("-shared");
-
+  LLDCommands.insert(LLDCommands.end(), Flags.begin(), Flags.end());
   LLDCommands.insert(LLDCommands.end(),
                      {"-o", OutPath, "--script", LinkerScript});
-  if (DisableRelaxations)
-    LLDCommands.push_back("--no-relax");
-
   auto RetCode = sys::ExecuteAndWait(LLD, LLDCommands);
   if (RetCode)
     snippy::fatal("lld returned non-zero status");
@@ -436,8 +442,8 @@ std::string Linker::createLinkerScriptImplLegacy(bool Export) const {
 std::string Linker::generateLinkerScript() const {
   return createLinkerScriptImplLegacy(/* Export */ true);
 }
-Expected<std::string> Linker::run(ObjectFilesList ObjectFilesToLink,
-                                  bool Shared) const {
+Expected<Linker::Result> Linker::run(ObjectFilesList ObjectFilesToLink,
+                                     bool Shared) const {
   assert(ObjectFilesToLink.size() > 0 && "Linker needs at least one image");
   auto ObjectFilesPaths = std::vector<FilePathT>{};
   for (auto &Objectfile : ObjectFilesToLink)
@@ -448,17 +454,23 @@ Expected<std::string> Linker::run(ObjectFilesList ObjectFilesToLink,
   auto LinkerScriptPath = writeDataToDisk(*EInternalLinkerScript);
 
   auto LLDExe = findLLD();
-  auto FinalImage = link(LLDExe, LinkerScriptPath, /* Relocatable */ false,
-                         ObjectFilesPaths, /* NoRelax */ true, Shared);
+  auto LinkerFlags = getLinkerOptions(/*Relocatable=*/false,
+                                      /*DisableRelaxations=*/true, Shared);
+  auto FinalImage =
+      link(LLDExe, LinkerScriptPath, ObjectFilesPaths, LinkerFlags);
 
   sys::fs::remove(LinkerScriptPath);
   std::for_each(ObjectFilesPaths.begin(), ObjectFilesPaths.end(),
                 [](const FilePathT &ImagePath) { sys::fs::remove(ImagePath); });
 
-  return FinalImage;
+  std::string FlagsStr;
+  raw_string_ostream SS(FlagsStr);
+  llvm::interleave(LinkerFlags, SS, " ");
+  return Result{FinalImage, generateLinkerScript(), FlagsStr};
 }
-std::string Linker::runLegacy(ObjectFilesList ObjectFilesToLink,
-                              bool Relocatable, bool DisableRelaxations) const {
+Linker::Result Linker::runLegacy(ObjectFilesList ObjectFilesToLink,
+                                 bool Relocatable,
+                                 bool DisableRelaxations) const {
   assert(ObjectFilesToLink.size() > 0 && "Linker needs at least one image");
   auto ObjectFilesPaths = std::vector<FilePathT>{};
   for (auto &Objectfile : ObjectFilesToLink)
@@ -467,15 +479,19 @@ std::string Linker::runLegacy(ObjectFilesList ObjectFilesToLink,
   auto LinkerScriptPath = writeDataToDisk(InternalLinkerScript);
 
   auto LLDExe = findLLD();
+  auto LinkerFlags =
+      getLinkerOptions(Relocatable, DisableRelaxations, /*Shared=*/false);
   auto FinalImage =
-      link(LLDExe, LinkerScriptPath, Relocatable, ObjectFilesPaths,
-           DisableRelaxations, /* shared */ false);
+      link(LLDExe, LinkerScriptPath, ObjectFilesPaths, LinkerFlags);
 
   sys::fs::remove(LinkerScriptPath);
   std::for_each(ObjectFilesPaths.begin(), ObjectFilesPaths.end(),
                 [](const FilePathT &ImagePath) { sys::fs::remove(ImagePath); });
+  std::string FlagsStr;
+  raw_string_ostream SS(FlagsStr);
+  llvm::interleave(LinkerFlags, SS, " ");
 
-  return FinalImage;
+  return {FinalImage, generateLinkerScript(), FlagsStr};
 }
 
 StringRef Linker::getExitSymbolName() { return "__snippy_exit"; }

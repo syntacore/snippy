@@ -1,0 +1,25 @@
+# RUN: llvm-snippy %s %S/Inputs/sections.yaml \
+# RUN:   --disable-linker-relaxations -model-plugin None -o %t
+# RUN: FileCheck %s --input-file %t.ldargs --check-prefix=NORELAX
+# RUN: ld.lld %t.elf -T %t.ld @%t.ldargs -o %t.final.elf
+# RUN: llvm-snippy %s %S/Inputs/sections.yaml --model-plugin None \
+# RUN:   -o %t --object-type=shared
+# RUN: FileCheck %s --input-file %t.ldargs --check-prefix=SHARED
+# RUN: ld.lld %t.elf -T %t.ld @%t.ldargs -o %t.final.elf
+# RUN: llvm-snippy %s %S/Inputs/sections.yaml --model-plugin None \
+# RUN:   -o %t --object-type=shared --disable-linker-relaxations
+# RUN: FileCheck %s --input-file %t.ldargs --check-prefix=NORELAXSHARED
+# RUN: ld.lld %t.elf -T %t.ld @%t.ldargs -o %t.final.elf
+
+options:
+  mtriple: riscv64
+  num-instrs: 10
+
+histogram:
+  - [ADD, 1.0]
+  - [BNE, 1.0]
+
+# NORELAX: -no-relax
+# SHARED: -shared
+# NORELAXSHARED: -shared
+# NORELAXSHARED-SAME: -no-relax
