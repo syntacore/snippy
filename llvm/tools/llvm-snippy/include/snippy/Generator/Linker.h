@@ -145,15 +145,20 @@ public:
   // Generates linker script for external usage / legacy /.
   std::string generateLinkerScript() const;
 
+  struct Result {
+    std::string Image;
+    std::string Script;
+    std::string Flags;
+  };
+
   // Generates executable image or shared object using internally generated
   // linker script. Relaxations are always disabled.
-  Expected<std::string> run(ObjectFilesList ObjectFilesToLink,
-                            bool Shared) const;
+  Expected<Result> run(ObjectFilesList ObjectFilesToLink, bool Shared) const;
 
   // Generates executable or relocatable image using internally generated
   // linker script. Relaxations are optionally disabled / legacy /.
-  std::string runLegacy(ObjectFilesList ObjectFilesToLink, bool Relocatable,
-                        bool DisableRelaxations = false) const;
+  Result runLegacy(ObjectFilesList ObjectFilesToLink, bool Relocatable,
+                   bool DisableRelaxations = false) const;
 
   // Returns start and end address of minimal memory region that covers
   // all sections provided in layout file.

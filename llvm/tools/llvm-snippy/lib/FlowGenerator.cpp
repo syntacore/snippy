@@ -338,6 +338,11 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
     if (!ESnippetImageForModelExecution)
       snippy::fatal(ESnippetImageForModelExecution.takeError());
 
+    // We should report to the user linker flags from execution on model.
+    // Not from final linking
+    EResult.get().LinkerFlags =
+        ESnippetImageForModelExecution.get().LinkerFlags;
+
     auto RI = SimulatorContext::RunInfo{
         ESnippetImageForModelExecution->SnippetImage, ProgContext, MainModule,
         PassCfg.ProgramCfg->EntryPointName,

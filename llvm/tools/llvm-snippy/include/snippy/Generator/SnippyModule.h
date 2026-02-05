@@ -35,6 +35,9 @@ struct GeneratorResult {
   } GenType;
   std::string SnippetImage;
   std::string LinkerScript;
+  // Linker flags that need to be specified in order to match internal linker
+  // behavior.
+  std::string LinkerFlags;
 };
 
 struct ObjectMetadata {
