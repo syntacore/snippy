@@ -1,5 +1,3 @@
-# COM: This test checks that an error occurs if the options are incompatible
-
 # RUN: sed -e s/SP_RELATIVE_INSTR/C_ADDI4SPN/ %s > %t.1.yaml
 # RUN: not llvm-snippy %t.1.yaml -redefine-sp=SP --model-plugin=None \
 # RUN: |& FileCheck %s --check-prefix SP
@@ -99,12 +97,78 @@
 # RUN: |& FileCheck %s --check-prefix X2
 
 
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_ADDI4SPN/ %s > %t.1.yaml4
+# RUN: llvm-snippy %t.1.yaml4 -redefine-sp=any-not-SP --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY-NOT-SP
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_ADDI16SP/ %s > %t.2.yaml4
+# RUN: llvm-snippy %t.2.yaml4 -redefine-sp=any-not-SP --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY-NOT-SP
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FLDSP/ %s > %t.3.yaml4
+# RUN: llvm-snippy %t.3.yaml4 -redefine-sp=any-not-SP  --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY-NOT-SP
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FSDSP/ %s > %t.4.yaml4
+# RUN: llvm-snippy %t.4.yaml4 -redefine-sp=any-not-SP  --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY-NOT-SP
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_LWSP/ %s > %t.5.yaml4
+# RUN: llvm-snippy %t.5.yaml4 -redefine-sp=any-not-SP --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY-NOT-SP
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_LDSP/ %s > %t.6.yaml4
+# RUN: llvm-snippy %t.6.yaml4 -redefine-sp=any-not-SP --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY-NOT-SP
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_SWSP/ %s > %t.7.yaml4
+# RUN: llvm-snippy %t.7.yaml4 -redefine-sp=any-not-SP --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY-NOT-SP
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_SDSP/ %s > %t.8.yaml4
+# RUN: llvm-snippy %t.8.yaml4 -redefine-sp=any-not-SP --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix ANY-NOT-SP
+
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_ADDI4SPN/ %s > %t.1.yaml5
+# RUN: llvm-snippy %t.1.yaml5 -redefine-sp=reg::x4 --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X4
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_ADDI16SP/ %s > %t.2.yaml5
+# RUN: llvm-snippy %t.2.yaml5 -redefine-sp=reg::x4 --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X4
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FLDSP/ %s > %t.3.yaml5
+# RUN: llvm-snippy %t.3.yaml5 -redefine-sp=reg::x4  --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X4
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_FSDSP/ %s > %t.4.yaml5
+# RUN: llvm-snippy %t.4.yaml5 -redefine-sp=reg::x4  --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X4
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_LWSP/ %s > %t.5.yaml5
+# RUN: llvm-snippy %t.5.yaml5 -redefine-sp=reg::x4 --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X4
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_LDSP/ %s > %t.6.yaml5
+# RUN: llvm-snippy %t.6.yaml5 -redefine-sp=reg::x4 --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X4
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_SWSP/ %s > %t.7.yaml5
+# RUN: llvm-snippy %t.7.yaml5 -redefine-sp=reg::x4 --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X4
+
+# RUN: sed -e s/SP_RELATIVE_INSTR/C_SDSP/ %s > %t.8.yaml5
+# RUN: llvm-snippy %t.8.yaml5 -redefine-sp=reg::x4 --model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix X4
+
 options:
   march: riscv64-unknown-elf
   enable-static-stack: false
   mcpu: generic-rv64
   mattr: "+c,+f,+d"
   num-instrs: 100
+  honor-target-abi: true
 
 sections:
     - no:        1
@@ -128,6 +192,11 @@ histogram:
     - [ADDI, 1.0]
 
 # X2: error: Incompatible options: When the stack pointer is redefined to 'reg::X2', generation of SP-relative instructions is not supported. Redefine it with `redefine-sp` option or remove SP-relative instructions from the histogram.
+# X2-NOT: error: Incompatible options: When --honor-target-abi is enabled, generation of SP-relative instructions is not supported. You can provide `redefine-sp` option to make a generation process possible
+# X2-NOT: error: Incompatible options: When the stack pointer is redefined to 'reg::X2', generation of SP-relative instructions is not supported. Redefine it with `redefine-sp` option or remove SP-relative instructions from the histogram.
 # SP: error: Incompatible options: When the stack pointer is redefined to 'SP', generation of SP-relative instructions is not supported. Redefine it with `redefine-sp` option or remove SP-relative instructions from the histogram.
+# SP-NOT: error: Incompatible options: When --honor-target-abi is enabled, generation of SP-relative instructions is not supported. You can provide `redefine-sp` option to make a generation process possible
 # ANY: error: Incompatible options: When the stack pointer is redefined to 'any', generation of SP-relative instructions is not supported. Redefine it with `redefine-sp` option or remove SP-relative instructions from the histogram.
-
+# ANY-NOT: error: Incompatible options: When --honor-target-abi is enabled, generation of SP-relative instructions is not supported. You can provide `redefine-sp` option to make a generation process possible
+# ANY-NOT-SP: warning: (inconsistent-options) When using --honor-target-abi and --redefine-sp=any-not-SP options together, target ABI may not be preserved in case of traps: use these options in combination only for valid code generation
+# X4: warning: (inconsistent-options) When using --honor-target-abi and --redefine-sp=reg::x4 options together, target ABI may not be preserved in case of traps: use these options in combination only for valid code generation
