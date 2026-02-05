@@ -190,6 +190,8 @@ static void saveToFile(const GeneratorResult &Result) {
     auto LinkerScriptFilename = addExtensionIfRequired(OutputFilename, ".ld");
     writeFile(LinkerScriptFilename, Result.LinkerScript);
   }
+  auto LinkerFlagsFilename = addExtensionIfRequired(OutputFilename, ".ldargs");
+  writeFile(LinkerFlagsFilename, Result.LinkerFlags);
 }
 
 // Function to place call of every "dump" method that does not need Config

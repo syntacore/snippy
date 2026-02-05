@@ -181,17 +181,22 @@ SnippyProgramContext::generateELF(ArrayRef<const SnippyModule *> Modules,
                  [](auto &Mapped) { return Mapped->getGeneratedObject(); });
   auto UseLegacy = GenType == GeneratorResult::Type::RELOC ||
                    GenType == GeneratorResult::Type::LEGACY_EXEC;
-  if (UseLegacy)
-    Result.SnippetImage = PLinker->runLegacy(
+  if (UseLegacy) {
+    auto Res = PLinker->runLegacy(
         Objects, GenType == GeneratorResult::Type::RELOC, NoRelax);
-  else {
+    Result.SnippetImage = Res.Image;
+    if (!Res.Flags.empty())
+      Result.LinkerFlags = Res.Flags;
+    if (GenType == GeneratorResult::Type::RELOC)
+      Result.LinkerScript = Res.Script;
+  } else {
     auto EImage = PLinker->run(Objects, GenType == GeneratorResult::Type::DYN);
     if (!EImage)
       return EImage.takeError();
-    Result.SnippetImage = *EImage;
+    Result.SnippetImage = EImage->Image;
+    if (!EImage->Flags.empty())
+      Result.LinkerFlags = EImage->Flags;
   }
-  if (GenType == GeneratorResult::Type::RELOC)
-    Result.LinkerScript = PLinker->generateLinkerScript();
   Result.GenType = GenType;
   return Result;
 }
