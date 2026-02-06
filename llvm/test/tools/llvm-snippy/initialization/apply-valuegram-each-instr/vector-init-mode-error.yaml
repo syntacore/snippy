@@ -18,17 +18,17 @@ options:
   valuegram-operands-regs-init-outputs: on
 
 sections:
-    - no:        0
+    - name:      0
       VMA:       0x10000
       SIZE:      0x40000
       LMA:       0x10000
       ACCESS:    r
-    - no:        1
+    - name:      1
       VMA:       0x100000
       SIZE:      0x1000000
       LMA:       0x100000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x2100000
       SIZE:      0x100000
       LMA:       0x2100000

@@ -7,17 +7,17 @@ include:
 - rvv-config-biased/Inputs/rvv-unit-sew64-lmulX.yaml
 
 sections:
-  - no:        0
+  - name:      0
     VMA:       0x100000
     SIZE:      0x400000
     LMA:       0x100000
     ACCESS:    r
-  - no:        1
+  - name:      1
     VMA:       0x80000000
     SIZE:      0x400000
     LMA:       0x80000000
     ACCESS:    rx
-  - no:        2
+  - name:      2
     VMA:       0x80600000
     SIZE:      0x400000
     LMA:       0x80600000

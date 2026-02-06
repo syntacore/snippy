@@ -3,17 +3,17 @@
 # RUN:    -num-instrs=10 |& FileCheck %s --dump-input always
 
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x800000
       SIZE:      0x200
       LMA:       0x800000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x800200
       SIZE:      0x200
       LMA:       0x800200
       ACCESS:    rw
-    - no:        3
+    - name:      3
       VMA:       0x800400
       SIZE:      0x200
       LMA:       0x800400

@@ -5,17 +5,17 @@ options:
   num-instrs: 100
   init-regs-in-elf: true
 sections:
-  - no: 0
+  - name: 0
     VMA: 0x200000
     SIZE: 0x50000
     LMA: 0x200000
     ACCESS: r
-  - no: 1
+  - name: 1
     VMA: 0x250000
     SIZE: 0x50000
     LMA: 0x250000
     ACCESS: rx
-  - no: 2
+  - name: 2
     VMA: 0x800000
     SIZE: 0x500000
     LMA: 0x800000

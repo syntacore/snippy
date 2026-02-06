@@ -1,10 +1,10 @@
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x80010000
       SIZE:      0x10000
       LMA:       0x80010000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x80040000
       SIZE:      0x10000
       LMA:       0x80040000

@@ -14,12 +14,12 @@
 # RUN: |& FileCheck %s --check-prefix=OFF
 
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x2004000
       SIZE:      0x3E0000
       LMA:       0x2004000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x2800000
       SIZE:      0x4000
       LMA:       0x2800000

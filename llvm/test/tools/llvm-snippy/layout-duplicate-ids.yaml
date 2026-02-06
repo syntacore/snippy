@@ -2,17 +2,17 @@
 # RUN: FileCheck --input-file=%t --dump-input always %s
 
 sections:
-    - no:        2
+    - name:      2
       VMA:       0x10000
       SIZE:      0x200
       LMA:       0x10000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x10200
       SIZE:      0x200
       LMA:       0x10200
       ACCESS:    rw
-    - no:        3
+    - name:      3
       VMA:       0x10400
       SIZE:      0x200
       LMA:       0x10400
