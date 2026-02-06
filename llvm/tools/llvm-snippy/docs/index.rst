@@ -83,19 +83,18 @@ Output
 
 The snippy output includes:
 
--  An relocatable ELF file with a generated snippet. File name is specified via
+-  An .elf file with a generated snippet. File name is specified via
    **-o** option (default is the name of your config file with ".elf"
-   suffix appended). To properly use the generated snippet, you must link
-   against it using the generated linker script (see below).
+   suffix appended). For more information, see
+   `The type of output .elf file`_.
 
 -  An optional execution trace of generated snippet. The trace is only
    generated if simulator model was provided. You can specify the file
    to output trace with **-trace-log** option (Default is stdout).
 
--  A `linker script file <#generated-linker-script>`__. The name of
+-  A `generated linker script`_ file. The name of
    file equals to the name of generated ELF file with ".elf" suffix
-   replaced with ".ld". It is required, for example, with `global
-   constants <#global-constants>`__.
+   replaced with ".ld". It is required, for example, for `global constants`_.
 
 -  Dump of the registers state after execution. To produce the register
    state use **--dump-registers-yaml** option. See
@@ -105,6 +104,7 @@ The snippy output includes:
    register state use **--dump-initial-registers-yaml** option.
    See `Dumping Initial
    Registers State <#dumping-initial-registers-state>`__.
+
 
 
 Running Snippy
@@ -245,13 +245,13 @@ Following is an example of the configuration layout that contains:
 .. code:: yaml
 
    sections:
-       - name:        1
+       - name:      1
          VMA:       0x10000
          SIZE:      0x10000
          LMA:       0x10000
          ACCESS:    rx
          PHDR:      'header1'
-       - name:        2
+       - name:      2
          VMA:       0x20000
          SIZE:      0x200
          LMA:       0x20000
@@ -309,9 +309,9 @@ CPU model. If empty, snippy auto-detects it.
 
 **-march**
 
-RISC-V ISA string for which to generate the code. The
-value must be in lowercase. For the list of supported
-extensions, refer to the `Supported Extensions <#supported-extensions>`__ chapter of this guide.
+The *ISA string* that specifies an architecture for which to generate code.
+The value must be in lowercase.
+See `Platform Support`_ for information about supported architectures.
 
 Alternatively, instead of ``march``, you can use the
 ``mattr`` option: in the case with the example above,
@@ -321,9 +321,9 @@ it is ``+f,+c,+zifencei``.
 
 Indicates which attributes to include (``+``) or exclude (``-``). For example:
 
--  If you want to exclude atomics, use ``-mattr=-a``.
+-  If you want to exclude RISC-V atomics, use ``-mattr=-a``.
 
--  If you want to include vector instructions (V extension), use ``-mattr=+v``.
+-  If you want to include RISC-V vector instructions (V extension), use ``-mattr=+v``.
 
 
 **-model-plugin**
@@ -575,7 +575,7 @@ with the following details for each entry:
 
 -  ``LMA`` |nbsp| -- |nbsp| Load memory address
 
--  ``ACCESS`` |nbsp| -- |nbsp| Access type indication (``r``, ``rx``, ``rw``, ``rxw``)
+-  ``ACCESS`` |nbsp| -- |nbsp| Access type indication (``r``, ``rx``, ``rw``, ``rwx``)
 
    Each RW section uses a default memory scheme (aligned): each and
    whole section is addressed aligned by the subtarget information.
@@ -683,12 +683,12 @@ Operation Codes for Specific Architecture
 To obtain opcodes available for a certain architecture machine
 description, run:
 
-::
+.. code:: shell
 
    ./llvm-snippy -mtriple=riscv64-unknown-elf -mcpu=<processor_model> \
       -march=<ISA_string> --list-opcode-names
 
-See the list of supported instructions for ``march`` `here <#supported-extensions>`__.
+For supported values of ``<ISA_string>``, see `Platform Support`_.
 
 .. _`_fpu_configuration`:
 
@@ -1261,7 +1261,7 @@ where:
 Memory Scheme Adjustments
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
+Use the ``--riscv-disable-misaligned-access`` option to disable
 generation of misaligned loads/stores. This option works even if memory
 scheme you select allows such loads/stores.
 
@@ -1500,15 +1500,18 @@ Advanced configuration includes keys for:
 -  `Call graph <#call-graph>`__
 
 
+-  `Register Reservation Config`_
+
+.. _register-reservation:
+
 Register Reservation Config
 ---------------------------
 To control which registers can be read or modified by the generated program
 you can specify ``register-reservation`` top-level YAML key.
 
 .. note::
-   Using `-reserved-regs-list <#reserving-registers>`__ option is also possible
-   but not recomended due to it reserving registers only for use in primary
-   instructions
+   The use of `-reserved-regs-list`_ option is also possible but discouraged
+   because it reserves registers only for use in primary instructions.
 
 This ``register-reservation`` key contains a sequence of register-to-access map.
 Example:
@@ -1529,8 +1532,8 @@ here are:
 - **R** -- reserves registers for all reads
 - **W** -- reserves registers for all writes
 - **RW** == **R & W** -- reserves registers for all reads and writes [#exception]_
-- **SR** -- Soft-reserves register for read (Can not be read by primary instruction but can be read by ancilary)
-- **SW** -- Soft-reserves register for write (Can not be written by primary instruction but can be modified by ancilary)
+- **SR** -- Soft-reserves register for read (Can not be read by primary instruction but can be read by ancillary)
+- **SW** -- Soft-reserves register for write (Can not be written by primary instruction but can be modified by ancillary)
 - **SRW** == **SR & SW**-- Soft-reserves register for reads and writes. I.e. no primary instructions can access it
 
 You can also leave access bits sequence empty which means register is not
@@ -1541,21 +1544,21 @@ reserved at all (default):
    register-reservation:
      - X1: [] # has no effect (can be removed)
 
-
 .. [#exception] Stack Pointer register can still be used for stack access even
    if it is reserved as RW but no other instruction will read or modify it.
    Without this config snippy still will not modify Stack Pointer but can generate
    reads from it in primary instructions.
 
 .. note::
-  Here primary instructions are instructions from histogram (randomly generated)
-  and ancilary instructions are those that are generated to support primary
-  instructions. E.g. address materialization to generate load from memory or
-  instructions that are generated by **-init-regs-in-elf** option.
+  Throughout this manual, *primary instructions* are instructions from
+  histogram (randomly generated), while *ancillary instructions* are generated
+  to support primary instructions. For example, instructions that perform
+  address materialization (needed to emit loads from memory) are the
+  *ancillary* ones. Ditto instructions that initialize registers emitted when
+  the **-init-regs-in-elf** option is specified.
 
 Consider an example where we want to reserve registers X10 and X11 for reads and modification by
 primary instructions:
-
 
 .. _soft-reserve-x1011:
 
@@ -1565,9 +1568,9 @@ primary instructions:
      - X10: [SR, SW]
      - X11: [SRW] # same because SRW is alias to SR and SW
 
-As was already mentioned `-reserved-regs-list <#reserving-registers>`__ option
-does not prevent register from being read and modified by ancilary instructions
-(i.e. soft reserves them for reads and writes). Therefore adding register to
+As mentioned above, the `-reserved-regs-list`_ option
+does not prevent register from being read and modified by ancillary instructions
+(i.e. it performs "soft" reservation of registers). Therefore adding register to
 **--reserved-regs-list** is the same as adding it to **register-reservation**
 config with **SRW**. So the previous :ref:`example <soft-reserve-x1011>` is
 equivalent to adding **-reserved-regs-list=X10,X11** option. And every
@@ -1600,58 +1603,46 @@ the latter regex. For example:
 
 Here **X10** is reserved as **W** by the first entry of the sequence and the
 second regex (that matches it) has no effect on it. So in this program **X10**
-CAN be read by both primary and ancilary instructions.
+CAN be read by both primary and ancillary instructions.
 
-Snippy can implicitly reserve some registers by default. For example on RISC-V:
+Snippy can implicitly reserve some registers by default:
 
-- Stack Pointer register **X2** is reserved as RW if both **-honor-target-abi** and
+- **RISC-V:** Stack Pointer register **X2** is reserved as RW if both **-honor-target-abi** and
   **external-stack** options are enabled. Otherwise snippy could generate reads
   of stack pointer in arithmetic operations from histogram making the program
   execution depend on stack location, which is non-reproducible
   if external stack is used.
 
+Register names are described in the `Register Naming`_ section.
+
 Register Naming
 ~~~~~~~~~~~~~~~
-.. _`_float_registers`:
 
-Float Registers
-^^^^^^^^^^^^^^^
+RISC-V Floating-point Registers (F, D, Zfh extensions)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-To reserve RISC-V float registers, you need to additionally provide the
-register’s extension, otherwise you get an error.
+RISC-V floating-point registers should be specified using the following syntax: ``<register-name>_<precision>``.  *register-name* is the name of one of the 32 floating-point registers (``F0`` ... ``F31``), *precision* is a letter, as specified in the RISC-V Instruction Set:
 
-For RISC-V, the following three types of float registers are available:
+* ``F`` -- Single precision (32 bit registers)
 
--  ``XX_F`` |nbsp| -- |nbsp| Single precision (32 bit registers)
+* ``D`` -- Double precision (64 bit registers)
 
--  ``XX_D`` |nbsp| -- |nbsp| Double precision (64 bit registers)
+* ``H`` -- Half precision (16 bit registers)
 
--  ``XX_H`` |nbsp| -- |nbsp| Half precision (16 bit registers)
+For example, to refer to the ``F4`` register, use one of the following names: ``F4_F``, ``F4_D``, ``F4_H``. ``F4_D`` denotes the whole 64-bit register, ``F4_F`` -- the lower half of the same register (32 bits out of 64), and ``F4_H`` -- the lower quarter of the same register (16 bits out of 64).
 
-where ``XX`` is the register.
+.. note::
+   Reserving a floating-point register for one precision results in reserving the same register for all precisions.
 
-Each of them has 32 registers: ``F0_X`` - ``F31_X``. For example, for
-``F4``, it is ``F4_F``, ``F4_D``, or ``F4_H``.
+Example:
 
-All three register types refer to one of the parts of the register,
-making ``F0_D`` a full register, ``F0_F`` |nbsp| -- |nbsp| half of the same register
-(32 bits out of 64), and ``F0_H`` |nbsp| -- |nbsp| quarter of the same register (16
-bits out of 64). If you reserve any of them, it leads to all of them
-being reserved as well.
-
-This way, in the current implementation, to add ``F4`` to the list of
-reserved registers, pass it with any of the three extensions in the
-``options`` key of your configuration:
-
-.. code:: yaml
+.. code:: shell
 
    ~/snippy-oss/bin/./llvm-snippy examples/layout-calls.yaml -seed=1 \
       -reserved-regs-list=F4_D,F5_D
 
-.. _`_vector_registers`:
-
-Vector Registers
-^^^^^^^^^^^^^^^^
+RISC-V Vector Registers (V extension)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 In snippy’s RISC-V backend, vector registers are named ``V0`` - ``V31``,
 and you reserve them by their names.
@@ -1661,10 +1652,8 @@ vector unit so that vector registers get grouped when executing certain
 instructions. For the details on vector register grouping, refer
 `here <https://github.com/riscvarchive/riscv-v-spec/blob/master/v-spec.adoc#342-vector-register-grouping-vlmul20>`__.
 
-Respectively, for vector groups, the reservation rules are as follows:
-if you reserve at least one register from the vector group, this whole
-particular register group is considered to be reserved
-
+.. note::
+   Even if you reserve only one register from the vector group, the whole register group is reserved for the respective instructions.
 
 
 Control Flow (Branchegrams)
@@ -2053,8 +2042,6 @@ command-line option:
 
    ./llvm-snippy -mtriple=riscv64-unknown-elf --dump-options
 
-.. _`_warning_control_options`:
-
 Warning Control Options
 -----------------------
 
@@ -2163,7 +2150,7 @@ intended to preserve ABI, just to increase registers pressure. This
 means that even reserved register can be used in ancillary instructions.
 
 You can only reserve registers for main instructions. For more details,
-refer to `Reserving Registers <#reserving-registers>`__.
+refer to `Reserving Registers`_.
 
 If one of registers in a spill-list happens to be reserved via the
 ``--reserved-regs-list`` option, it will be spilled anyway, and no error
@@ -2271,9 +2258,9 @@ Registers Management
 
 .. caution::
   If you specify spilled or reserved registers, verify you do not use the
-  same register for both. A register can either be
-  `spilled <#spilling-registers>`__ or
-  `reserved <#reserving-registers>`__, not both at the same time.
+  same register for both. A register can either be `spilled <#spilling-registers>`__
+  or reserved by `register-reservation`_ (or `-reserved-regs-list`_) 
+  but not both at the same time.
 
 .. _`_spilling_registers`:
 
@@ -2311,7 +2298,7 @@ epilogue:
    ./llvm-snippy examples/layout-calls.yaml -seed=1 \
       -spilled-regs-list="X1,X2,X5"
 
-.. _`_reserving_registers`:
+.. _-reserved-regs-list:
 
 Reserving Registers
 ~~~~~~~~~~~~~~~~~~~
@@ -2321,9 +2308,15 @@ reserve and not use in the snippet code.
 
 .. note::
 
-   We do not recommend using this option as it prohibits using these
-   registers in the whole snippet for the main instructions. However,
+   We do not recommend using this option as it reserves
+   registers only for the primary instructions. However,
    ancillary instructions can still use these reserved registers.
+
+.. warning::
+   This option is deprecated and will be removed in the future major release.
+   We recommend replacing it with `register-reservation`_. Adding register to
+   **--reserved-regs-list** is the same as adding it to **register-reservation**
+   config with **SRW**
 
 Example for command line:
 
@@ -2331,20 +2324,17 @@ Example for command line:
 
   ./llvm-snippy ./layout.yaml -seed=1 --reserved-regs-list=X1,X2,X3
 
-Here ``reserved-regs-list`` is specified as a comma-separated list of
-register names.
+The value of ``reserved-regs-list`` should be a comma-separated list of
+register names. In the command line, spaces within the list are disallowed.
 
-Alternatively it can be specified in YAML config under ``options`` key:
+Alternatively it can be specified in YAML config under the ``options`` key (RISC-V, YAML flow format):
 
 .. code:: yaml
 
   options:
-    reserved-regs-list: [<REGLIST>]
+    reserved-regs-list: [X1, X2, F10_D]
 
-where ``<REGLIST>`` is a list of registers to reserve, for example,
-``X1, X2, X3``.
-
-Or using non-flow sequence:
+The same example in YAML block format:
 
 .. code:: yaml
 
@@ -2363,14 +2353,10 @@ This option also accepts regular expressions. For example:
 
 This code will reserve X10 as well as X20-X29 registers.
 
-Register naming is the same as in `Register Naming <#register-naming>`__ section.
+Register names are described in the `Register Naming`_ section.
 
-.. _`_initial_registers`:
-
-Initial Registers
------------------
-
-.. _`_initializing_registers_in_elf`:
+Initialization of Registers
+---------------------------
 
 Initializing Registers in .elf
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2384,13 +2370,13 @@ If you do not explicitly specify both ``init-regs-in-elf`` and
 ``non-reproducible-execution`` warning, which is treated as error by
 default. In this case, snippy fails unless you pass
 ``-Wno-error=non-reproducible-execution``. For the details on how to
-control errors and warnings, refer to the `Warning Control
-Options <#warning-control-options>`__ chapter of this guide.
+control errors and warnings, refer to the `Warning Control Options`_
+chapter of this guide.
 
-.. _`_vector_register_initialization_modes`:
+.. _RISC-V vector register initialization:
 
-Vector Register Initialization Modes
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+RISC-V Vector Register Initialization Modes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Use the ``--rvv-init-mode`` option to control how snippy initializes
 vector registers. The following modes are available:
@@ -2413,8 +2399,8 @@ vector registers. The following modes are available:
 .. important::
 
    In the current implementation, you cannot set illegal configurations
-   for the ``splats`` and ``slides`` modes. This will be fixed in the
-   future releases.
+   for the ``splats`` and ``slides`` modes. It is planned to remove this
+   limitation in future releases.
 
 .. _`_dumping_initial_registers_state`:
 
@@ -2868,7 +2854,6 @@ This setting has the same value in all functions in the call graph.
 
       "error: Incompatible options: When the stack pointer is redefined to 'SP', generation of SP-relative instructions is not supported. Redefine it to 'any-not-SP' or remove SP-relative instructions from the histogram."
 
-
 .. _`_static_stack`:
 
 Static stack
@@ -2894,7 +2879,6 @@ The feature is **not supported** (and therefore Snippy does not enable it automa
 - section ``stack`` is not provided
 - external stack is provided
 - calls to external functions are possible
-- ``SMC`` is enabled
 - ``--num-instrs=all`` is specified
 - loop generation is possible
 
@@ -2934,6 +2918,27 @@ By default, snippy uses ``.snippy`` as a section names prefix. For example:
    .snippy.stack.rw
 
 etc.
+
+.. _the type of output .elf file:
+
+The type of output .elf file
+----------------------------
+
+The type of output .elf file is controlled by the ``--object-type`` option:
+
+.. code:: shell
+
+   --object-type=<type-of-output-file>
+
+Where ``<type-of-output-file>`` should be one of:
+
+* ``reloc`` - Relocatable object file plus `generated linker script`_. This is the default.
+* ``exec`` - Executable .elf. To produce it, snippy uses ld.lld from the snippy pack, and feeds it with commands identical to those written to the `generated linker script`_.
+* ``shared`` - Shared object: the same layout as ``exec`` plus dynamic section.
+
+.. important::
+
+   If ``--model-plugin`` is not ``none``, and the user would like to obtain executable .elf that is identical to the one executed by the model, then the ``--object-type=exec`` option should be specified.
 
 .. _`_target_specific_configurationrisc_v`:
 
@@ -3457,6 +3462,8 @@ Self-check for RVV is currently in the experimental state. To enable it:
    --enable-selfcheck-rvv
 
 
+.. _selfcheck-related global constants:
+
 Self-check Properties to Global Variables
 -----------------------------------------
 
@@ -3467,7 +3474,7 @@ Self-check Properties to Global Variables
 Self-check requires a certain amount of additional memory to be
 available. If you need to learn where the ``selfcheck`` key is after
 generation in other applications, add its properties (such as VMA, size,
-and byte stride) to global constants. This makes it possible to link
+and byte stride) to `global constants`_. This makes it possible to link
 them as external variables.
 
 To add the properties of the ``selfcheck`` key as global constants, use
@@ -3503,79 +3510,97 @@ self-check global variables:
      success_report();
    }
 
-.. _`global-constants`:
+.. _global constants:
 
 Global Constants
 ================
 
-In some scenarios, snippy needs a read-only section to write the
-constant data to. For example, this section can be used to store
-constants for `register
-initialization <#vector-register-initialization-modes>`__, or when
-creating global constants, for example, `selfcheck-related
-ones <#self-check-properties-to-global-variables>`__.
+In some scenarios, snippy produces global constants.
+For example, this is nesassary for
+`RISC-V vector register initialization`_,
+`selfcheck-related global constants`_ and so on.
 
-You provide a read-only section to write the constant data to in the
-``sections`` entry of your snippy configuration. You can see an example
-of such a section in ``layout-vector-init.yaml`` in the ``./yml``
-directory: use this section as is or as a template for your own
-configuration.
+Read-only Sections
+------------------
 
-.. _generated_linker_script:
+When snippet uses global constants,
+a read-only section is required to hold constant data. 
+
+A description of read-only section should be provided in
+the ``sections`` entry of the snippy configuration file.
+Please find an example in the next subsection
+(a copy of ``./yml/layout-vector-init.yaml``;
+you can use this file as a template for your own configuration).
+
+.. _generated linker script:
 
 Generated Linker Script
 =======================
 
-A linker script is generated by default when you run snippy.
+A linker script is generated by default when you run snippy and
+`the type of output .elf file`_ is relocatable.
 
-The generated linker script is used to properly place sections of the
-snippy object file in the resulting executable image. At the link stage
-of an application that uses a snippy object, you need to:
+The linker script is intended to properly place
+sections into the resulting executable image.
+If you would like to use the snippet as a part of some application
+(which is often so), then you have to pass information from
+the linking script to the link stage of the application.
+Use whatever means convenient for you to do this:
+directly insert the contents of generated script
+into the application’s linking script,
+or indirectly insert it there
+(e.g. by means of the linker’s ``INCLUDE()`` command), and so on.
 
-1. Use you own linker script. For example, the one that is default for
-   the environment.
+Let’s consider an example with a read-only section below:
 
-2. Insert the generated linker script there. For example, using the
-   ``INCLUDE()`` statement.
+.. container:: formalpara-title
 
-If a default environment linker script is used, and it cannot be
-modified, then:
+   **Command line:**
 
-1. Create a copy of such a script.
-
-2. Modify it as required.
-
-3. Pass this copy of the script explicitly at the link stage.
-
-.. tip::
-
-   Additional options for GCC-based toolchains:
-
-   -  ``-T script-name`` |nbsp| -- |nbsp| Add this option to the GCC invocation to pass
-      a custom linker script.
-
-   -  ``--script=script-name`` |nbsp| -- |nbsp| Use this option to pass a custom linker
-      script directly to ld.
-
-   -  ``-Wl,--verbose`` |nbsp| -- |nbsp| Run the GCC link step with this option to get
-      the environment default linker script.
-
-This way, when running the following example:
-
-::
+.. code:: shell
 
    ./llvm-snippy -mtriple=riscv64-unknown-elf -mattr=+v \
        ./yml/layout-vector-init.yaml -num-instrs=100 -seed=0 \
        ./yml/memory-aligned.yaml \
        -init-regs-in-elf -o layout.elf
 
-it generates the following linker script:
+Notice the description of read-only section
+(the one with ``ACCESS: r``) in layout-vector-init.yaml:
 
 .. container:: formalpara-title
 
-   **layout.elf.ld:**
+   **layout-vector-init.yaml:**
 
-::
+.. code:: yaml
+
+   sections:
+     - name:      1
+       VMA:       0x310000
+       SIZE:      0x100000
+       LMA:       0x310000
+       ACCESS:    r
+     - name:      2
+       VMA:       0x210000
+       SIZE:      0x100000
+       LMA:       0x210000
+       ACCESS:    rx
+     - name:      3
+       VMA:       0x500000
+       SIZE:      0x100000
+       LMA:       0x500000
+       ACCESS:    rw
+
+   histogram:
+       - [VADC_VIM, 1.0]
+       - [VADD_VI, 1.0]
+       - [VAND_VI, 1.0]
+       - [VMERGE_VIM, 1.0]
+
+.. container:: formalpara-title
+
+   **Generated linker script, layout.elf.ld:**
+
+.. code:: c
 
    MEMORY {
      SNIPPY (rwx) : ORIGIN = 2162688, LENGTH = 4194304
@@ -3592,40 +3617,18 @@ it generates the following linker script:
    } >SNIPPY
    }
 
-Both output files (``layout.elf`` and ``layout.elf.ld``) have the same name,
-but different extensions.
+.. tip::
 
-Also, in your layout, provide a read-only first section to place global
-constants:
+   Additional options for GCC-based toolchains:
 
-.. container:: formalpara-title
+   -  ``-T script-name`` |nbsp| -- |nbsp| Add this option to the GCC invocation to pass
+      a custom linker script.
 
-   **layout-vector-init.yaml:**
+   -  ``--script=script-name`` |nbsp| -- |nbsp| Use this option to pass a custom linker
+      script directly to ld.
 
-.. code:: yaml
-
-   sections:
-     - name:        1
-       VMA:       0x310000
-       SIZE:      0x100000
-       LMA:       0x310000
-       ACCESS:    r
-     - name:        2
-       VMA:       0x210000
-       SIZE:      0x100000
-       LMA:       0x210000
-       ACCESS:    rx
-     - name:        3
-       VMA:       0x500000
-       SIZE:      0x100000
-       LMA:       0x500000
-       ACCESS:    rw
-
-   histogram:
-       - [VADC_VIM, 1.0]
-       - [VADD_VI, 1.0]
-       - [VAND_VI, 1.0]
-       - [VMERGE_VIM, 1.0]
+   -  ``-Wl,--verbose`` |nbsp| -- |nbsp| Run the GCC link step with this option to get
+      the environment default linker script.
 
 .. _generated_linker_options_file:
 
@@ -3968,17 +3971,18 @@ snippy supports the following RISC-V configurations:
 - **RV32I** - Base Integer Instruction Set (32-bit)
 - **RV64I** - Base Integer Instruction Set (64-bit)
 
-.. _supported-extensions:
+.. _RISC-V C extension:
+.. If/when we decide to create a separate section about RISC-V C
+   extension, the hyperlink references to it may remain the same.
 
 RISC-V Extensions
 ~~~~~~~~~~~~~~~~~
 
-RISC-V architecture is supported with the following extensions
+RISC-V architecture is supported with the following extensions. For the details, please refer to the RISC-V specifications.
 
 .. important::
 
-   The list of supported extensions provided in this chapter is not
-   complete and is subject to change.
+   The list of supported extensions provided in this chapter could be incomplete and is subject to change.
 
 
 **Standard Extensions**
@@ -3991,17 +3995,25 @@ RISC-V architecture is supported with the following extensions
 - **C** - Compressed Instructions
 - **V** - Vector Operations
 
+**Zc* Code Size Reduction**
+
+- **Zca** - Compressed non-floating-point
+- **Zcb** - Simple code-size saving instructions
+- **Zcd** - Compressed double precision loads and stores
+- **Zcf** - Compressed single precision loads and stores
+- **Zcmop** - Compressed May-Be-Operations
+
 **Zi* Extensions**
 
+- **Zicas** - Custom Atomic Operations
+- **Zicbom** - Cache-Block Clean/Flush/Invalidate
+- **Zicbop** - Cache-Block Prefetch
+- **Zicboz** - Cache-Block Zero
 - **Zicond** - Integer Conditional Operations
 - **Zifencei** - Instruction-Fetch Fence
-- **Zicas** - Custom Atomic Operations
-- **Zcmop** - Custom Memory Operations
-- **Zimop** - Custom Integer Operations
-- **Zicboz** - Cache-Block Zero Instructions
-- **Zicbom** - Cache-Block Management Instructions
-- **Zicbop** - Cache-Block Prefetch Instructions
 - **Zihintntl** - Non-Temporal Locality Hints
+- **Zihintpause** - Pause hint
+- **Zimop** - May-be operations
 
 **Za* Extensions**
 
@@ -4016,14 +4028,11 @@ RISC-V architecture is supported with the following extensions
 - **Zbc** - Carry-Less Multiplication
 - **Zbs** - Single-Bit Operations
 
-**Zb* Cryptography Extensions**
+**Zbk*, Zk* Cryptography and More**
 
 - **Zbkb** - Bit Manipulation for Cryptography
 - **Zbkc** - Cryptography Carry Operations
 - **Zbkx** - Crossbar Permutation Instructions
-
-**Zk* Scalar Cryptography Extensions**
-
 - **Zkn** - NIST Suite: AES, SHA2, SM4, SM3
 - **Zknd** - NIST AES Decryption
 - **Zkne** - NIST AES Encryption
@@ -4034,28 +4043,28 @@ RISC-V architecture is supported with the following extensions
 - **Zksh** - ShangMi SM3 Hash Function
 - **Zkt** - Data Independent Execution Latency
 
-**Zv* Vector Cryptography Extensions**
+**Zv* Vector Extensions**
 
 - **Zvbb** - Vector Basic Bit-manipulation
 - **Zvbc** - Vector Carry-less Multiplication
 - **Zvfbfmin** - Vector BF16 Minimum Floating-Point
 - **Zvfbfwma** - Vector BF16 Widening Multiply-Accumulate
-- **Zvfhmin** - Vector Minimal Half-Precision Floating-Point
 - **Zvfh** - Vector Minimal Half-Precision Floating-Point
+- **Zvfhmin** - Vector Minimal Half-Precision Floating-Point
 
-**Floating-Point Extensions**
+**Zf*, Zd*, Zh* Floating-Point**
 
+- **Zdinx** - Double-Precision Floating-Point in Integer Registers
 - **Zfa** - Additional Floating-Point Instructions
 - **Zfbfmin** - BF16 Minimum Floating-Point
 - **Zfh** - Half-Precision Floating-Point
 - **Zfhmin** - Minimal Half-Precision Floating-Point
-- **Zdinx** - Double-Precision Floating-Point in Integer Registers
 - **Zfinx** - Single-Precision Floating-Point in Integer Registers
 - **Zhinx** - Half-Precision Floating-Point in Integer Registers
 - **Zhinxmin** - Minimal Half-Precision Floating-Point in Integer Registers
 
 
-**Priviledged extensions**
+**Priviledged Extensions**
 
 - **Svinval** - Fine-Grained Address-Translation Cache Invalidation
 
