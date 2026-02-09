@@ -10,6 +10,7 @@
 #include "snippy/Support/DiagnosticInfo.h"
 
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Regex.h"
 
 namespace llvm {
 using namespace snippy;
@@ -46,4 +47,43 @@ void CommandOptionBase::mapStoredValue(yaml::IO &IO,
   if (!isSpecified() && !IO.outputting())
     markAsSpecified();
 }
+
+bool cl::parser<snippy::RegexOption>::parse(cl::Option &O, StringRef ArgName,
+                                            StringRef Arg,
+                                            snippy::RegexOption &Opt) {
+  auto MaybeValidRegex = Regex{Arg.str()};
+  if (!MaybeValidRegex.isValid())
+    return O.error(Twine("invalid regex: '").concat(Arg.str()).concat("': "));
+  Opt = RegexOption{
+      std::string(Arg),
+      std::make_shared<Regex>(std::move(MaybeValidRegex)),
+  };
+  return false;
+}
+
+std::string
+yaml::ScalarTraits<snippy::RegexOption>::input(StringRef Input, void *,
+                                               snippy::RegexOption &Val) {
+  auto MaybeRegex = Regex{Input};
+  if (!MaybeRegex.isValid())
+    return Twine("invalid regex: '").concat(Input).concat("'").str();
+
+  Val = RegexOption{
+      std::string(Input),
+      std::make_shared<Regex>(std::move(MaybeRegex)),
+  };
+
+  return "";
+}
+
+void yaml::ScalarTraits<snippy::RegexOption>::output(
+    const snippy::RegexOption &Val, void *, raw_ostream &OS) {
+  OS << Val.Str;
+}
+
+yaml::QuotingType
+yaml::ScalarTraits<snippy::RegexOption>::mustQuote(StringRef) {
+  return QuotingType::Double;
+}
+
 } // namespace llvm

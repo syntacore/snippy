@@ -74,7 +74,7 @@ let Group = ProgramOptionsCategory in {
                     "execution and restored after">;
 
   def ReservedRegsList
-      : CommaSeparatedList<"reserved-regs-list", StringType>,
+      : CommaSeparatedList<"reserved-regs-list", RegexType>,
         Description<"List of registers that shall not be used om snippet code">;
 
   def SkipLegacySPSpill

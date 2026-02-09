@@ -38,6 +38,7 @@ class OptionType<code type> { code Type = type; }
 
 def FlagType : OptionType<"bool">;
 def StringType : OptionType<"std::string">;
+def RegexType : OptionType<"snippy::RegexOption">;
 
 // Define the option class.
 
