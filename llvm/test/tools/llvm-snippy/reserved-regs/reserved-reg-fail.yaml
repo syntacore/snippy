@@ -4,7 +4,7 @@
 # RUN:X28,X29,X30,X31 -last-instr= -model-plugin=None >& %t || true
 # RUN: FileCheck --input-file=%t --dump-input always %s
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
-# RUN:    -dump-mi -num-instrs=20000 -reserved-regs-list=X0,X1,X2,XA,X4,\
+# RUN:    -dump-mi -num-instrs=20000 -reserved-regs-list=X0,X1,X2,XA,X4 \
 # RUN: -last-instr= -model-plugin=None |& FileCheck --dump-input always \
 # RUN:  --check-prefix=ILLEGAL %s
 sections:

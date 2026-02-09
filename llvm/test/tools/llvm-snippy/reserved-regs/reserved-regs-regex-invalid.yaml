@@ -1,7 +1,7 @@
 # RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
 
 options:
-  mtriple: riscv64-unknow-elf
+  mtriple: riscv64
   dump-mf: true
   num-instrs: 2000
   reserved-regs-list: [X10, X11, "X2[0-9"]
@@ -24,4 +24,4 @@ histogram:
     - [LW, 1.0]
     - [SW, 1.0]
 
-# CHECK: Illegal register regex:
+# CHECK: error: invalid regex: 'X2[0-9'

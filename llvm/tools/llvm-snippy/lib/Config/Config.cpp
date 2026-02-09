@@ -465,9 +465,9 @@ static void reserveGlobalStateRegisters(RegPoolWrapper &RP,
 
 static std::unordered_set<unsigned>
 parseReservedRegisters(const SnippyTarget &Tgt, const MCRegisterInfo &MRI,
-                       ArrayRef<std::string> RegList) {
+                       ArrayRef<RegexOption> RegList) {
   std::unordered_set<unsigned> Reserved;
-  for (StringRef RegName : RegList) {
+  for (auto [RegName, Regex] : RegList) {
     if (Regex::isLiteralERE(RegName)) {
       // Not a RegEx
       auto Reg = findRegisterByName(Tgt, MRI, RegName);
