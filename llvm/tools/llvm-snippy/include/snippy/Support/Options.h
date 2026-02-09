@@ -20,6 +20,9 @@
 #include <unordered_map>
 
 namespace llvm {
+
+class Regex;
+
 namespace snippy {
 
 /// \class CommandOptionBase
@@ -58,7 +61,7 @@ private:
 /// \brief Stores value of concrete DataType.
 /// Knows how to map its value to yaml and how to clone itself.
 template <typename DataType> struct CommandOption : public CommandOptionBase {
-  DataType Val = DataType();
+  DataType Val{};
 
   CommandOption(StringRef Name) : CommandOptionBase(Name) {}
 
@@ -87,7 +90,7 @@ class OptionsStorage final {
       std::unordered_map<StringRef, std::shared_ptr<CommandOptionBase>,
                          StringRefHasher>;
   StorageType Data;
-  OptionsStorage(){};
+  OptionsStorage() {}
 
   auto find(StringRef Key) { return Data.find(Key); }
 
@@ -389,9 +392,32 @@ Error diagnoseIfOptionAndOptionalAreBothSet(const std::optional<T> &Val,
                                  .concat(QuoteSep));
   return Error::success();
 }
+
+struct RegexOption {
+  std::string Str;
+  std::shared_ptr<Regex> Regex;
+};
+
 } // namespace snippy
 
+template <>
+struct cl::parser<snippy::RegexOption> : cl::basic_parser<snippy::RegexOption> {
+  parser(Option &O) : basic_parser(O) {}
+
+  bool parse(cl::Option &O, StringRef ArgName, StringRef Arg,
+             snippy::RegexOption &Opt);
+
+  StringRef getValueName() const override { return "regex"; }
+
+  void printOptionDiff(const Option &O, const snippy::RegexOption &V,
+                       const OptVal &Default, size_t GlobalWidth) const {
+    printOptionName(O, GlobalWidth);
+  }
+};
+
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::OptionsMappingWrapper);
+LLVM_SNIPPY_YAML_DECLARE_SCALAR_TRAITS_NG(snippy::RegexOption);
 LLVM_SNIPPY_YAML_DECLARE_CUSTOM_MAPPING_TRAITS(snippy::OptionsStorage);
+LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::RegexOption, true);
 
 } // namespace llvm
