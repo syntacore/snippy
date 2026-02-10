@@ -1,17 +1,17 @@
 # RUN: not llvm-snippy %s -march=riscv64-linux-gnu --selfcheck -mattr=-a -num-instrs=10 -model-plugin=NONEXISTENT |& FileCheck --dump-input always %s
 
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x00000
       SIZE:      0x10000
       LMA:       0x00000
       ACCESS:    rw
-    - no:        2
+    - name:      2
       VMA:       0x10000
       SIZE:      0x10000
       LMA:       0x10000
       ACCESS:    rw
-    - no:        3
+    - name:      3
       VMA:       0x20000
       SIZE:      0x10000
       LMA:       0x20000

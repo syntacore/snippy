@@ -5,17 +5,17 @@
 # CHECK: error: selfcheck / backtrack / address-value-hazards execution with both LR/SC is prohibited
 
 sections:
-  - no:        0
+  - name:      0
     VMA:       0x200000
     SIZE:      0x1000
     LMA:       0x200000
     ACCESS:    r
-  - no:        1
+  - name:      1
     VMA:       0x210000
     SIZE:      0x100000
     LMA:       0x210000
     ACCESS:    rx
-  - no:        2
+  - name:      2
     VMA:       0x80002000
     SIZE:      0x100000
     LMA:       0x80002000

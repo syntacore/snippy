@@ -5,12 +5,12 @@
 # RUN: FileCheck %s --input-file=%t.ld --check-prefix=MANGLED
 
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x10000
       SIZE:      0x200
       LMA:       0x10000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x10200
       SIZE:      0x200
       LMA:       0x10200

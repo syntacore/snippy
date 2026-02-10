@@ -7,17 +7,17 @@
 # RUN: -model-plugin=None --dump-mf |& FileCheck %s --check-prefix=FPREC
 
 sections:
-    - no:        0
+    - name:      0
       VMA:       0x70000000
       SIZE:      0x1000
       LMA:       0x70000000
       ACCESS:    r
-    - no:        1
+    - name:      1
       VMA:       0x80000000
       SIZE:      0x400000
       LMA:       0x80000000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x805FFFEF
       SIZE:      0x11
       LMA:       0x805FFFEF

@@ -9,13 +9,13 @@
 # CHECK-NOT: {{[[:xdigit:]]}} 
 
 sections:
-    - no:       1
+    - name:     1
       VMA:      0x2004000
       SIZE:     0x3E0000
       LMA:      0x2004000
       ACCESS:    rx
 
-    - no:       2
+    - name:     2
       VMA:      0x2a20000
       SIZE:     0x9000
       LMA:      0x2a20000

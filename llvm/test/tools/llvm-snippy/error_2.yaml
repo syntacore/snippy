@@ -2,22 +2,22 @@
 # RUN: FileCheck --input-file=%t --dump-input always %s
 
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x80000000
       SIZE:      0x400000
       LMA:       0x80000000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x80600000
       SIZE:      0x400000
       LMA:       0x80600000
       ACCESS:    rx
-    - no:        3
+    - name:      3
       VMA:       0x9000000
       SIZE:      0x400000
       LMA:       0x90000000
       ACCESS:    rx
-    - no:      4
+    - name:    4
       VMA:       0x90600000
       SIZE:      0x400000
       LMA:       0x90600000

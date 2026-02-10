@@ -3,12 +3,12 @@
 # RUN: |& FileCheck %s
 
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x800000
       SIZE:      0x4000
       LMA:       0x800000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       name:      2
       VMA:       0x806000
       SIZE:      0x4000
@@ -18,4 +18,4 @@ sections:
 histogram:
     - [C_NOP, 1.0]
 
-# CHECK: error: There is a section in the layout file that has both 'no' and 'name' keys.
+# CHECK: error: duplicated mapping key 'name'

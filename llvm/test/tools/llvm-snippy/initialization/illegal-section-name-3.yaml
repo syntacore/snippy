@@ -3,7 +3,7 @@
 # RUN: |& FileCheck %s
 
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x800000
       SIZE:      0x4000
       LMA:       0x800000
@@ -17,4 +17,4 @@ sections:
 histogram:
     - [ADDI, 1.0]
 
-# CHECK: error: Incorrect list of sections: List contains both numbered section #1 and named section with same name.
+# CHECK: error: Incorrect list of sections: List contains duplicate section IDs

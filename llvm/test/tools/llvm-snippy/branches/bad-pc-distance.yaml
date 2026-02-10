@@ -23,12 +23,12 @@
 # SIZE-WARN: remark: (too-long-max-pc-dist) Specified max PC Distance is more than max distance for generated branch: Specified: 9876543210, max distance for BEQ: 4095
 
 sections:
-  - no:        1
+  - name:      1
     VMA:       0x210000
     SIZE:      0x100000
     LMA:       0x210000
     ACCESS:    rx
-  - no:        2
+  - name:      2
     VMA:       0x80002000
     SIZE:      0x100000
     LMA:       0x80002000
