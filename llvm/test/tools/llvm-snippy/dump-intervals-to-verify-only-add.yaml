@@ -7,12 +7,12 @@
 # CHECK-NEXT: [ 0x500000, 0x50004C ]
 
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x500000
       SIZE:      0x100000
       LMA:       0x500000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x400200000
       SIZE:      0x1000
       LMA:       0x400200000

@@ -19,12 +19,12 @@ options:
   enable-static-stack: off
 
 sections:
-  - no:        3
+  - name:      3
     VMA:       0x210000
     SIZE:      0x1000
     LMA:       0x210000
     ACCESS:    rx
-  - no:        2
+  - name:      2
     VMA:       0x100000
     SIZE:      0x100000
     LMA:       0x100000
@@ -34,12 +34,12 @@ sections:
     SIZE:      0x10000
     LMA:       0x200000
     ACCESS:    rw
-  - no:        1
+  - name:      1
     VMA:       0x410000
     SIZE:      0x1000
     LMA:       0x410000
     ACCESS:    rx
-  - no:        4
+  - name:      4
     VMA:       0x610000
     SIZE:      0x1000
     LMA:       0x610000

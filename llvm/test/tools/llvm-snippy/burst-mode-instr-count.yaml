@@ -7,12 +7,12 @@
 # RUN:    |& FileCheck %s --check-prefix=CHECK-MIXED-HUGEGROUP
 
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x80000000
       SIZE:      0x400000
       LMA:       0x80000000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x80600000
       SIZE:      0x400000
       LMA:       0x80600000

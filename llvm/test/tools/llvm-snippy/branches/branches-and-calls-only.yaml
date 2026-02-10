@@ -11,12 +11,12 @@ options:
   num-instr-ancil: 10
 
 sections:
-  - no:        1
+  - name:      1
     VMA:       0x210000
     SIZE:      0x4000000
     LMA:       0x210000
     ACCESS:    rx
-  - no:        2
+  - name:      2
     VMA:       0x100000
     SIZE:      0x50000
     LMA:       0x100000

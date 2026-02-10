@@ -19,12 +19,12 @@
 # RUN: --spilled-regs-list=X1 |& FileCheck %s -check-prefix=UNALIGNED
 #--- good-stack.yaml
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x500000
       SIZE:      0x100000
       LMA:       0x500000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x600000
       SIZE:      0x700000
       LMA:       0x600000
@@ -40,12 +40,12 @@ histogram:
     - [ADD, 1.0]
 #--- bad-stack.yaml
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x500000
       SIZE:      0x100000
       LMA:       0x500000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x600000
       SIZE:      0x700000
       LMA:       0x600000
@@ -61,12 +61,12 @@ histogram:
     - [ADD, 1.0]
 #--- no-stack.yaml
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x500000
       SIZE:      0x100000
       LMA:       0x500000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x600000
       SIZE:      0x700000
       LMA:       0x600000

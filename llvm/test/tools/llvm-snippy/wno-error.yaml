@@ -21,12 +21,12 @@
 # RUN:   |& FileCheck %s --check-prefix=UNKNOWN
 
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x100000
       SIZE:      0x100000
       LMA:       0x100000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x800000
       SIZE:      0x400000
       LMA:       0x800000
