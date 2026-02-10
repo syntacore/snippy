@@ -8,12 +8,12 @@
 # RUN:    -o %t.2
 # RUN: diff %t.1.elf %t.2.elf
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x100000
       SIZE:      0x1000000
       LMA:       0x100000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x1100000
       SIZE:      0x100000
       LMA:       0x1100000

@@ -4,12 +4,12 @@
 # RUN:     -verify-mi -dump-mf -mattr=+c -init-regs-in-elf -o %t |& FileCheck %s
 
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x1000
       SIZE:      0x10000
       LMA:       0x1000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x80000000
       SIZE:      0x400000
       LMA:       0x80000000

@@ -36,17 +36,17 @@ riscv-vector-unit:
         ta: 1.0
 
 sections:
-  - no:        0
+  - name:      0
     VMA:       0x70000000
     SIZE:      0x6000000
     LMA:       0x70000000
     ACCESS:    r
-  - no:        1
+  - name:      1
     VMA:       0x80000000
     SIZE:      0x400000
     LMA:       0x80000000
     ACCESS:    rx
-  - no:        2
+  - name:      2
     VMA:       0x80600000
     SIZE:      0x400000
     LMA:       0x80600000

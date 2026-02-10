@@ -2,12 +2,12 @@
 # RUN: -redefine-sp=any-not-SP -honor-target-abi   --model-plugin=None -num-instrs=10 \
 # RUN: -init-regs-in-elf -verify-mi |& FileCheck %s 
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x500000
       SIZE:      0x100000
       LMA:       0x500000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x600000
       SIZE:      0x700000
       LMA:       0x600000
