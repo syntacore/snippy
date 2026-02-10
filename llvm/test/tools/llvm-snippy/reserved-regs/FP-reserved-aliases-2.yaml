@@ -14,12 +14,12 @@ options:
   reserved-regs-list: [F0_F,F1_F,F2_F,F3_F,F4_F,F5_F,F6_F,F7_F,F8_F,F9_F,F10_F,F11_F,F12_F,F13_F,F14_F,F15_F,F16_F,F17_F,F18_F,F19_F,F20_F,F21_F,F22_F,F23_F,F24_F,F25_F,F26_F,F27_F,F28_F,F29_F,F30_F]
 
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x80000000
       SIZE:      0x400000
       LMA:       0x80000000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x80600000
       SIZE:      0x400000
       LMA:       0x80600000

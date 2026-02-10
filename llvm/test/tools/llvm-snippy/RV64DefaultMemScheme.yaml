@@ -5,12 +5,12 @@ options:
   dump-rand-mem-accesses: true
 
 sections:
-    - no:        1
+    - name:      1
       VMA:       0x1000
       SIZE:      0x1000
       LMA:       0x1000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x80000000
       SIZE:      0x400000
       LMA:       0x80000000
