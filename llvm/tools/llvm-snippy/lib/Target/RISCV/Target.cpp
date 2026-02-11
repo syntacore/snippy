@@ -963,13 +963,6 @@ breakDownAddrForInstrWithImmOffset(AddressInfo AddrInfo, const MachineInstr &MI,
       {std::move(Part)}, {uintToTargetXLen(Is64Bit, AddrInfo.Address)});
 }
 
-inline bool checkSupportedOrdering(const OpcodeHistogram &H) {
-  if (H.weight(RISCV::LR_W_RL) != 0 || H.weight(RISCV::SC_W_AQ) != 0 ||
-      H.weight(RISCV::LR_D_RL) != 0 || H.weight(RISCV::SC_D_AQ) != 0)
-    return false;
-  return true;
-}
-
 inline bool hasScInstr(const OpcodeHistogram &H) {
   return H.weight(RISCV::SC_D) != 0 || H.weight(RISCV::SC_D_AQ) != 0 ||
          H.weight(RISCV::SC_D_AQ_RL) != 0 || H.weight(RISCV::SC_D_RL) != 0 ||
