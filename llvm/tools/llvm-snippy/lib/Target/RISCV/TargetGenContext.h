@@ -110,7 +110,7 @@ public:
       return Result;
 
     const auto &ModeChangeInfo = getVUConfigInfo().getModeChangeInfo();
-    if (!ModeChangeInfo.RVVPresent)
+    if (!ModeChangeInfo.RVVPresentInHistogram)
       return Result;
 
     Result.setVSETVLWeight(ModeChangeInfo.WeightVSETVL);
