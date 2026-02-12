@@ -42,11 +42,11 @@ riscv-vector-unit:
         mu: 1.0
       VTA:
         tu: 1.0
- 
+
 histogram:
        - [VADD_VV, 1.0]
        - [VSETVL, 1.0]
-         
+
 # CHECK:      --- RVV Unit Discarded Info ---
 # CHECK-NEXT:   - VM Generators:
 # CHECK-NEXT:     <imm_48>
@@ -63,8 +63,7 @@ histogram:
 # CHECK: --- RVV Configuration Info ---
 # CHECK-NEXT:   - Derived VLEN: 128 (VLENB = 16)
 # CHECK-NEXT:   - Mode Change Decision Policy: Histogram
-# CHECK-NEXT:   - Mode Change Probability: 0.5 (vsetvl/vsetvli/vsetivli=0.5[w:2]
-#                 /0[w:0]/0[w:0])
+# CHECK-NEXT:   - Mode Change Probability: 0.500 (vsetvl/vsetvli/vsetivli=0.500/0.000/0.000)
 # CHECK-NEXT:     Set Vill Bit Probability: 0
 # CHECK-NEXT:   - VL Selection Rules:
 # CHECK-NEXT:     P: 0.5 <imm_5>
@@ -76,10 +75,8 @@ histogram:
 # CHECK-NEXT:     P: 0.16667 Conf: { e16, m1, tu, mu, vxrm: rnu }/MaxVL: 8
 # CHECK-NEXT:     P: 0.16667 Conf: { e32, m1, tu, mu, vxrm: rnu }/MaxVL: 4
 # CHECK-NEXT:     P: 0.16667 Conf: { e8, mf2, tu, mu, vxrm: rnu }/MaxVL: 8
-# CHECK-NEXT:     P: 0.16667 Conf: { e16, mf2, tu, mu, vxrm: rnu }/
+# CHECK-NEXT:     P: 0.16667 Conf: { e16, mf2, tu, mu, vxrm: rnu }/MaxVL: 4
 # CHECK-NEXT:     P: 0.16667 Conf: { e8, mf4, tu, mu, vxrm: rnu }/MaxVL: 4
-#                 MaxVL: 4
 # CHECK-NEXT:   - Configuration Bag Size: 6
-# CHECK-NEXT:   - State Cardinality: 44 ~ {MASKS} 
+# CHECK-NEXT:   - State Cardinality: 44 ~ {MASKS}
 # CHECK-NEXT: --- RVV Configuration End  ---
-

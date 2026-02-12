@@ -278,128 +278,60 @@ static auto extractElementsWithProbabilities(const SliceType &ConfSlice) {
   return Result;
 }
 
-struct RVVModeSwitchingInfo {
-  bool RVVPresentInHistogram;
-  bool VSETPresentInHistogram;
-  ModeChangeInfo SwitchInfo;
-};
-
-static ModeChangeInfo createModeChangeInfoForDisabledRVV() {
-  ModeChangeInfo Result;
-  Result.RVVPresent = false;
-
-  Result.ProbSetVill = 0.0;
-
-  Result.ProbVSETVL = 0.0;
-  Result.ProbVSETVLI = 0.0;
-  Result.ProbVSETIVLI = 0.0;
-
-  // NOTE: we still need weights to be defined for potential initialization of
-  // vector registers
-  Result.WeightVSETVL = 1.0;
-  Result.WeightVSETVLI = 1.0;
-  Result.WeightVSETIVLI = 1.0;
-
-  return Result;
-}
-
-static ModeChangeInfo
-createModeChangeInfoForHistogramMode(double WeightOfAllRVVInstructions,
-                                     double ProbVSETVL, double ProbVSETVLI,
-                                     double ProbVSETIVLI, double ProbVill) {
-  ModeChangeInfo Result;
-
-  Result.RVVPresent = true;
-
-  Result.ProbSetVill = ProbVill;
-
-  Result.ProbVSETVL = ProbVSETVL;
-  Result.ProbVSETVLI = ProbVSETVLI;
-  Result.ProbVSETIVLI = ProbVSETIVLI;
-
-  std::discrete_distribution<int> D = {ProbVSETVL, ProbVSETVLI, ProbVSETIVLI};
-  auto Prob = D.probabilities();
-  // We scale weights proportionally to the relative weight of each
-  // mode-changing instruction
-  Result.WeightVSETVL = WeightOfAllRVVInstructions * Prob[0];
-  Result.WeightVSETVLI = WeightOfAllRVVInstructions * Prob[1];
-  Result.WeightVSETIVLI = WeightOfAllRVVInstructions * Prob[2];
-  return Result;
-}
-
-static ModeChangeInfo
-createModeChangeInfoBiasedMode(double WeightOfAllInstructions,
-                               double RVVConfigBias, double ProbVill) {
-  ModeChangeInfo Result;
-  Result.RVVPresent = true;
-
-  // FIXME: Currently there is a quirky behavior that we keep for
-  // backward compatibility reasons:
-  // if [VSET* instructions are not found in the histogram] &&
-  //    [riscv-vector-unit::mode-change-bias not specified] then
-  //    there is an error
-  // but if [VSET* instructions are not found in the histogram] &&
-  //    [riscv-vector-unit::mode-change-bias::P = 0] then
-  //    we must generate 1 VSET* per MBB
-  if (RVVConfigBias < std::numeric_limits<double>::epsilon())
-    RVVConfigBias = std::numeric_limits<double>::epsilon();
-
-  auto ModeChangeWeight = WeightOfAllInstructions * RVVConfigBias;
-  auto ModeChangeProbability =
-      ModeChangeWeight / (WeightOfAllInstructions + ModeChangeWeight);
-
-  Result.ProbSetVill = ProbVill;
-
-  Result.ProbVSETVL = ModeChangeProbability / 3.0;
-  Result.ProbVSETVLI = ModeChangeProbability / 3.0;
-  Result.ProbVSETIVLI = ModeChangeProbability / 3.0;
-
-  Result.WeightVSETVL = ModeChangeWeight / 3.0;
-  Result.WeightVSETVLI = ModeChangeWeight / 3.0;
-  Result.WeightVSETIVLI = ModeChangeWeight / 3.0;
-
-  return Result;
-}
-
-RVVModeSwitchingInfo deriveModeSwitchingProbability(const Config &Cfg,
-                                                    double ConfigurationBias,
-                                                    double ProbSetVill) {
+ModeChangeInfo deriveModeSwitchingProbability(const Config &Cfg,
+                                              double ConfigurationBias,
+                                              double ProbSetVill) {
   auto OpcGen = Cfg.createDefaultOpcodeGenerator();
   auto ProbInfo = OpcGen->getProbabilities();
-  bool RVVInstructionsFound =
+
+  double TotalWeight = Cfg.Histogram.getTotalWeight();
+  ModeChangeInfo Result;
+  Result.ProbSetVill = ProbSetVill;
+  Result.TotalHistWeight = TotalWeight;
+
+  Result.RVVPresentInHistogram =
       std::any_of(ProbInfo.begin(), ProbInfo.end(), [](const auto &Item) {
         static_assert(std::is_same_v<decltype(Item.first), const unsigned>);
         static_assert(std::is_same_v<decltype(Item.second), double>);
         return isRVV(Item.first) && (Item.second > 0.0);
       });
-  bool VSETPInstructionsFound =
+  Result.VSETPresentInHistogram =
       std::any_of(ProbInfo.begin(), ProbInfo.end(), [](const auto &Item) {
         static_assert(std::is_same_v<decltype(Item.first), const unsigned>);
         static_assert(std::is_same_v<decltype(Item.second), double>);
         return isRVVModeSwitch(Item.first) && (Item.second > 0.0);
       });
 
-  constexpr bool RVVPresentInHistogram = true;
-  constexpr bool RVVMissingInHistogram = false;
+  // If no RVV instructions are found in the histogram we don't generate any
+  // VSETs, even if there is mode-change-bias specified.
+  if (!Result.RVVPresentInHistogram)
+    return Result;
 
-  constexpr bool VSETPresentInHistogram = true;
-  constexpr bool VSETMissingInHistorgram = false;
+  if (!Result.VSETPresentInHistogram) {
+    // FIXME: Currently there is a quirky behavior that we keep for
+    // backward compatibility reasons:
+    // if [VSET* instructions are not found in the histogram] &&
+    //    [riscv-vector-unit::mode-change-bias not specified] then
+    //    there will be an error
+    // but if [VSET* instructions are not found in the histogram] &&
+    //    [riscv-vector-unit::mode-change-bias::P = 0] then
+    //    we must generate 1 VSET* per MBB
+    //
+    // This workaround is not perfect, as if there will be more than 1/epsilon
+    // instructions requested, we might end up with more than 1 VSET* per MBB.
+    if (ConfigurationBias < std::numeric_limits<double>::epsilon())
+      ConfigurationBias = std::numeric_limits<double>::epsilon();
 
-  if (!RVVInstructionsFound)
-    return {RVVMissingInHistogram, VSETMissingInHistorgram,
-            createModeChangeInfoForDisabledRVV()};
+    Result.WeightVSETVL = TotalWeight * ConfigurationBias / 3.0;
+    Result.WeightVSETVLI = TotalWeight * ConfigurationBias / 3.0;
+    Result.WeightVSETIVLI = TotalWeight * ConfigurationBias / 3.0;
+    return Result;
+  }
 
-  if (!VSETPInstructionsFound)
-    return {RVVPresentInHistogram, VSETMissingInHistorgram,
-            createModeChangeInfoBiasedMode(Cfg.Histogram.getTotalWeight(),
-                                           ConfigurationBias, ProbSetVill)};
-
-  double RVVWeight = Cfg.Histogram.getOpcodesWeight(
-      [](unsigned Opcode) { return isRVV(Opcode); });
-  return {RVVPresentInHistogram, VSETPresentInHistogram,
-          createModeChangeInfoForHistogramMode(
-              RVVWeight, ProbInfo[RISCV::VSETVL], ProbInfo[RISCV::VSETVLI],
-              ProbInfo[RISCV::VSETIVLI], ProbSetVill)};
+  Result.WeightVSETVL = TotalWeight * ProbInfo[RISCV::VSETVL];
+  Result.WeightVSETVLI = TotalWeight * ProbInfo[RISCV::VSETVLI];
+  Result.WeightVSETIVLI = TotalWeight * ProbInfo[RISCV::VSETIVLI];
+  return Result;
 }
 
 static auto convertLMULRepresentation(unsigned LMULInternal) {
@@ -1329,7 +1261,7 @@ RVVConfigurationInfo RVVConfigurationInfo::createDefault(const Config &Cfg,
       ConfigGenerator(std::move(Configurations), std::vector<double>(1, 1.0)),
       VLGenerator(std::move(VLGen), std::vector<double>(1, 1.0)),
       VMGenerator(std::move(VMGen), std::vector<double>(1, 1.0)),
-      ModeSwitchInfo.SwitchInfo, !ModeSwitchInfo.VSETPresentInHistogram);
+      ModeSwitchInfo, !ModeSwitchInfo.VSETPresentInHistogram);
 }
 
 static void printDiscardedRVVConfigurations(
@@ -1450,7 +1382,7 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
   return RVVConfigurationInfo(
       VLEN, ConfigGenerator(std::move(ConfigPoints), ConfigWeights),
       VLGenerator(std::move(VLGen), VLWeights),
-      VMGenerator(std::move(VMGen), VMWeights), ModeSwitchInfo.SwitchInfo,
+      VMGenerator(std::move(VMGen), VMWeights), ModeSwitchInfo,
       CS.Guides.Enabled);
 }
 
@@ -1515,19 +1447,13 @@ const RVVConfiguration &RVVConfigurationInfo::selectConfiguration() const {
   return CfgGen();
 }
 
-static std::string vsetProbInfoToString(double Prob, double InitWeight) {
-  return (floatToString(Prob, 3) + Twine("[w:") + floatToString(InitWeight, 3) +
-          "]")
-      .str();
-}
-
 void RVVConfigurationInfo::print(raw_ostream &OS) const {
   OS << "--- RVV Configuration Info ---\n";
   OS << "  - Derived VLEN: " << VLEN << " (VLENB = " << VLEN / RISCV_CHAR_BIT
      << ")\n";
   OS << "  - Mode Change Decision Policy: ";
 
-  if (!SwitchInfo.RVVPresent) {
+  if (!SwitchInfo.RVVPresentInHistogram) {
     OS << "None\n";
     OS << "--- RVV Configuration End  ---\n";
     return;
@@ -1538,17 +1464,14 @@ void RVVConfigurationInfo::print(raw_ostream &OS) const {
   else
     OS << "Histogram\n";
 
-  auto Prob =
-      SwitchInfo.ProbVSETVL + SwitchInfo.ProbVSETVLI + SwitchInfo.ProbVSETIVLI;
-  OS << "  - Mode Change Probability: " << floatToString(Prob, 3)
-     << " (vsetvl/vsetvli/vsetivli="
-     << vsetProbInfoToString(SwitchInfo.ProbVSETVL, SwitchInfo.WeightVSETVL)
-     << "/"
-     << vsetProbInfoToString(SwitchInfo.ProbVSETVLI, SwitchInfo.WeightVSETVLI)
-     << "/"
-     << vsetProbInfoToString(SwitchInfo.ProbVSETIVLI, SwitchInfo.WeightVSETIVLI)
-     << ")"
-     << "\n";
+  auto Mult = SwitchInfo.getWeightToProbabilityMultiplier();
+  auto TotalWeight = SwitchInfo.WeightVSETVL + SwitchInfo.WeightVSETVLI +
+                     SwitchInfo.WeightVSETIVLI;
+  OS << formatv("  - Mode Change Probability: {0:F3} "
+                "(vsetvl/vsetvli/vsetivli={1:F3}/{2:F3}/{3:F3})\n",
+                TotalWeight * Mult, SwitchInfo.WeightVSETVL * Mult,
+                SwitchInfo.WeightVSETVLI * Mult,
+                SwitchInfo.WeightVSETIVLI * Mult);
   OS << "    ";
   OS << "Set Vill Bit Probability: " << floatToString(SwitchInfo.ProbSetVill, 3)
      << "\n";
