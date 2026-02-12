@@ -506,14 +506,10 @@ public:
                                     MCRegister AddrReg,
                                     MCRegister Reg) const = 0;
 
-  struct InstrMemAccessInfo {
-    size_t AccessSize;
-    size_t NaturalAlignment;
-    bool AllowMisalign;
-  };
-
-  virtual InstrMemAccessInfo
-  getAccessSizeAndAlignment(SnippyProgramContext &ProgCtx, unsigned Opcode,
+  // Choose the parameters used to sample the memory scheme for a particular
+  // opcode in the context of \ref MBB and \ref ProgCtx.
+  virtual AddressGenInfo
+  selectAddrGenInfoForInstr(SnippyProgramContext &ProgCtx, unsigned Opcode,
                             const MachineBasicBlock &MBB) const = 0;
 
   virtual void

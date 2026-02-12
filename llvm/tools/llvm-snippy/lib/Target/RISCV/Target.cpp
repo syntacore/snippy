@@ -46,6 +46,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
@@ -213,6 +214,13 @@ static snippy::opt<RVVModeChangeMode> RVVModeChangePreferenceOpt(
     cl::desc("Preferences for RVV mode changing instructions (debug only)"),
     RVVModeChangeEnumOption::getClValues(), cl::Hidden,
     cl::init(RVVModeChangeMode::MC_ANY), cl::cat(SnippyRISCVOptions));
+
+static snippy::opt<RegexOption> RVVDisallowIntersectingMemAccesses(
+    "riscv-disallow-intersecting-mem-accesses",
+    cl::desc(
+        "Regex matching RVV opcodes that shall not access intersecting memory "
+        "regions. Only applicable to strided or indexed operations."),
+    cl::cat(SnippyRISCVOptions));
 
 } // namespace snippy
 
@@ -705,6 +713,7 @@ breakDownAddrForRVVStrided(AddressInfo AddrInfo, const MachineInstr &MI,
   assert(StrideReg.getReg() != AddrReg.getReg() &&
          "Stride and addr regs cannot match");
   assert(AddrInfo.MinStride >= 1);
+
   if (StrideReg.getReg() == RISCV::X0) {
     // We cannot write to X0. No additional randomization is possible.
     MemAddresses Addresses(
@@ -726,10 +735,24 @@ breakDownAddrForRVVStrided(AddressInfo AddrInfo, const MachineInstr &MI,
   auto MaxStride = AddrInfo.MaxOffset / (VL - 1);
   // We will randomize the stride multiplier to exclude illegal strides.
   int long long MaxStrideMultiplier = MaxStride / AddrInfo.MinStride;
-  auto StrideMultiplier = RandEngine::genInRangeInclusive(-MaxStrideMultiplier,
-                                                          MaxStrideMultiplier);
+  long long StrideMultiplier = [&]() {
+    // Avoid using Stride = 0 when intersecting memory accesses are disallowed.
+    if (TgtCtx.disallowIntersectingMemoryAccesses(Opcode)) {
+      assert(MaxStrideMultiplier > 0);
+      auto Res = RandEngine::genInRangeExclusive<decltype(MaxStrideMultiplier)>(
+          -MaxStrideMultiplier, 0);
+      if (RandEngine::genBool())
+        Res *= -1;
+      return Res;
+    }
+
+    return RandEngine::genInRangeInclusive(-MaxStrideMultiplier,
+                                           MaxStrideMultiplier);
+  }();
+
   auto Stride =
       StrideMultiplier * static_cast<int long long>(AddrInfo.MinStride);
+  assert(std::abs(Stride) % AddrInfo.MinStride == 0);
   if (Stride < 0) {
     // When Stride is negative, change starting position such that last read
     // will start at the original AddrValue. It means that we must start
@@ -3479,49 +3502,11 @@ public:
     storeRegToAddr(IGC, Addr, RegForValue, ValueRegBitSize / RISCV_CHAR_BIT);
   }
 
-  size_t getAccessSize(unsigned Opcode, SnippyProgramContext &ProgCtx,
-                       const MachineBasicBlock &MBB) const {
-    assert(countAddrsToGenerate(Opcode) &&
-           "Requested access size calculation, but instruction does not access "
-           "memory");
-
-    if (!isRVV(Opcode))
-      return getDataElementWidth(Opcode);
-
-    auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
-
-    auto VL = TgtCtx.getVL(MBB);
-    if (VL == 0 && !isRVVWholeRegLoadStore(Opcode))
-      return 0;
-
-    if (isRVVUnitStrideMaskLoadStore(Opcode))
-      // RVV unit-stride mask instructions operate similarly to unmasked byte
-      // loads or stores (EEW=8), except that the effective vector length is
-      // evl=ceil(vl/8) (i.e. EMUL=1)
-      VL = divideCeil(VL, 8);
-
-    auto SEW = TgtCtx.getSEW(MBB);
-    auto VLENB = TgtCtx.getVLENB();
-    auto AccessSize =
-        getDataElementWidth(Opcode, static_cast<unsigned>(SEW), VLENB);
-    auto NFields = 1u;
-    if (isRVVUnitStrideSegLoadStore(Opcode) ||
-        isRVVStridedSegLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode))
-      NFields = getNumFields(Opcode);
-
-    unsigned Stride = 0;
-    if (isRVVUnitStrideLoadStore(Opcode) || isRVVUnitStrideFFLoad(Opcode) ||
-        isRVVUnitStrideSegLoadStore(Opcode) ||
-        isRVVUnitStrideMaskLoadStore(Opcode))
-      // We treat RVV unit-stride instructions as one consecutive memory access.
-      Stride = AccessSize * NFields;
-
-    return AccessSize * NFields + Stride * (VL - 1);
-  }
-
-  InstrMemAccessInfo
-  getAccessSizeAndAlignment(SnippyProgramContext &ProgCtx, unsigned Opcode,
+  AddressGenInfo
+  selectAddrGenInfoForInstr(SnippyProgramContext &ProgCtx, unsigned Opcode,
                             const MachineBasicBlock &MBB) const override {
+    assert(countAddrsToGenerate(Opcode) && "Instruction doesn't access memory");
+
     unsigned SEW = 0;
     auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
     if (TgtCtx.hasActiveRVVMode(MBB))
@@ -3538,8 +3523,63 @@ public:
         NaturalAlignment == 0) // happens for atomic instructions for example
       NaturalAlignment = 1;
 
-    return {getAccessSize(Opcode, ProgCtx, MBB), NaturalAlignment,
-            !DisableMisalign};
+    auto MakeGenInfoWithAlignment =
+        [NaturalAlignment, DisableMisalign](
+            size_t AccessSize, size_t NumElements = 1, size_t MinStride = 0) {
+          return AddressGenInfo{AccessSize,
+                                NaturalAlignment,
+                                /*AllowMisalign=*/!DisableMisalign,
+                                /*Burst=*/false,
+                                /*NumElements=*/NumElements,
+                                /*MinStride=*/MinStride};
+        };
+
+    // Simple case for non-RVV instructions.
+    if (!isRVV(Opcode))
+      return MakeGenInfoWithAlignment(getDataElementWidth(Opcode));
+
+    auto VL = TgtCtx.getVL(MBB);
+    if (VL == 0 && !isRVVWholeRegLoadStore(Opcode))
+      return MakeGenInfoWithAlignment(0);
+
+    if (isRVVUnitStrideMaskLoadStore(Opcode))
+      // RVV unit-stride mask instructions operate similarly to unmasked byte
+      // loads or stores (EEW=8), except that the effective vector length is
+      // evl=ceil(vl/8) (i.e. EMUL=1)
+      VL = divideCeil(VL, 8);
+
+    auto VLENB = TgtCtx.getVLENB();
+    auto AccessSize =
+        getDataElementWidth(Opcode, static_cast<unsigned>(SEW), VLENB);
+    auto NFields = 1u;
+    if (isRVVUnitStrideSegLoadStore(Opcode) ||
+        isRVVStridedSegLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode))
+      NFields = getNumFields(Opcode);
+
+    unsigned Stride = 0;
+    if (isRVVUnitStrideLoadStore(Opcode) || isRVVUnitStrideFFLoad(Opcode) ||
+        isRVVUnitStrideSegLoadStore(Opcode) ||
+        isRVVUnitStrideMaskLoadStore(Opcode))
+      // We treat RVV unit-stride instructions as one consecutive memory
+      // access.
+      Stride = AccessSize * NFields;
+
+    if (VL == 0) {
+      assert(isRVVWholeRegLoadStore(Opcode));
+      return MakeGenInfoWithAlignment(AccessSize * NFields);
+    }
+
+    if (TgtCtx.disallowIntersectingMemoryAccesses(Opcode)) {
+      // Minimum stride to ensure non-intersecting accesses. breakDownAddr needs
+      // to exclude strides / indices that would lead to intersecting memory
+      // operations. This ensures that breakDownAddr will be able to fulfil that
+      // requirement.
+      return MakeGenInfoWithAlignment(AccessSize * NFields, VL,
+                                      /*MinStride=*/AccessSize * NFields);
+    }
+
+    assert(VL);
+    return MakeGenInfoWithAlignment(AccessSize * NFields + (VL - 1) * Stride);
   }
 
   void
@@ -3574,14 +3614,28 @@ public:
                                               const MCRegisterClass &RC,
                                               const MCInstrDesc &InstrDesc,
                                               unsigned Operand) const override {
+    auto Opcode = InstrDesc.getOpcode();
+    const auto &TgtCtx =
+        IGC.ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+
+    if (!isRVV(Opcode))
+      return {};
+
     if (NoMaskModeForRVV)
       return {RISCV::V0, RISCV::V0M8, RISCV::V0M4, RISCV::V0M2};
 
-    auto Opcode = InstrDesc.getOpcode();
-    if (!isRVV(Opcode))
-      return {};
     if (RC.getID() == RISCV::VMV0RegClass.getID())
       return {};
+
+    if ((isRVVStridedLoadStore(Opcode) || isRVVStridedSegLoadStore(Opcode)) &&
+        TgtCtx.disallowIntersectingMemoryAccesses(Opcode) &&
+        RC.getID() == RISCV::GPRRegClass.getID()) {
+      SmallVector<Register> Res;
+      getPhysRegsFromUnit(RISCV::X0, IGC.ProgCtx.getLLVMState().getRegInfo(),
+                          Res);
+      return std::vector<Register>(Res.begin(), Res.end());
+    }
+
     return {RISCV::V0, RISCV::V0M8, RISCV::V0M4, RISCV::V0M2};
   }
 
@@ -4597,11 +4651,43 @@ static void checkThatRVVInitModeSupportsReinit(const OpcodeHistogram &Hist) {
                   "rvv-init-mode=loads. Please specify rvv-init-mode=loads");
 }
 
+static DenseSet<unsigned>
+matchRVVOpcodesWithDisallowedIntersectingAccesses(const OpcodeHistogram &OpHist,
+                                                  const MCInstrInfo &MCII) {
+  if (!RVVDisallowIntersectingMemAccesses.isSpecified())
+    return {};
+
+  auto &OpcRegex = *RVVDisallowIntersectingMemAccesses.getValue().Regex;
+  DenseSet<unsigned> MatchedOpcodes;
+  for (auto Opcode :
+       make_filter_range(make_first_range(OpHist), [](unsigned Opc) {
+         // TODO: Support indexed unoredred stores too.
+         return isRVVStridedStore(Opc) || isRVVStridedSegStore(Opc);
+       })) {
+    if (OpcRegex.match(MCII.getName(Opcode)))
+      MatchedOpcodes.insert(Opcode);
+  }
+
+  if (MatchedOpcodes.empty())
+    snippy::warn(
+        WarningName::InconsistentOptions,
+        Twine("option ")
+            .concat(RVVDisallowIntersectingMemAccesses.ArgStr)
+            .concat(" has no effect"),
+        Twine("regex '")
+            .concat(RVVDisallowIntersectingMemAccesses.getValue().Str)
+            .concat("' did not match any relevant opcodes from the histogram"));
+
+  return DenseSet<unsigned>(MatchedOpcodes.begin(), MatchedOpcodes.end());
+}
+
 std::unique_ptr<TargetGenContextInterface>
 SnippyRISCVTarget::createTargetContext(LLVMState &State, const Config &Cfg,
                                        const TargetSubtargetInfo *STI) const {
   auto RISCVCfg = RISCVConfigurationInfo::constructConfiguration(State, Cfg);
-  auto RGC = std::make_unique<RISCVGeneratorContext>(std::move(RISCVCfg));
+  auto RGC = std::make_unique<RISCVGeneratorContext>(
+      std::move(RISCVCfg), matchRVVOpcodesWithDisallowedIntersectingAccesses(
+                               Cfg.Histogram, State.getInstrInfo()));
   const auto &VUInfo = RGC->getVUConfigInfo();
 
   if (DumpRVVConfigurationInfo.isSpecified())
