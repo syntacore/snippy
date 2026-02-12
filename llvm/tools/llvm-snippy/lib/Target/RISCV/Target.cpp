@@ -1080,7 +1080,8 @@ public:
 
   std::unique_ptr<TargetGenContextInterface>
   createTargetContext(LLVMState &State, const Config &Cfg,
-                      const TargetSubtargetInfo *STI) const override;
+                      const TargetSubtargetInfo *STI,
+                      const RegPoolWrapper &RP) const override;
 
   std::unique_ptr<TargetConfigInterface> createTargetConfig() const override;
 
@@ -4598,7 +4599,8 @@ static void checkThatRVVInitModeSupportsReinit(const OpcodeHistogram &Hist) {
 
 std::unique_ptr<TargetGenContextInterface>
 SnippyRISCVTarget::createTargetContext(LLVMState &State, const Config &Cfg,
-                                       const TargetSubtargetInfo *STI) const {
+                                       const TargetSubtargetInfo *STI,
+                                       const RegPoolWrapper &RP) const {
   auto RISCVCfg = RISCVConfigurationInfo::constructConfiguration(State, Cfg);
   auto RGC = std::make_unique<RISCVGeneratorContext>(std::move(RISCVCfg));
   const auto &VUInfo = RGC->getVUConfigInfo();
@@ -4608,6 +4610,9 @@ SnippyRISCVTarget::createTargetContext(LLVMState &State, const Config &Cfg,
 
   if (Cfg.DefFlowConfig.isApplyValuegramEachInstr())
     checkThatRVVInitModeSupportsReinit(Cfg.Histogram);
+
+  if (RP.isReserved(RISCV::V0))
+    NoMaskModeForRVV = true;
 
   return std::move(RGC);
 }
