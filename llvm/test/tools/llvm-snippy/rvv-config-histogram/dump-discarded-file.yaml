@@ -1,5 +1,5 @@
 # REQUIRES: riscv-rvv
-# COM: This test checks option -riscv-dump-discarded-rvv-configurations when 
+# COM: This test checks option -riscv-dump-discarded-rvv-configurations when
 #      it's given a filename.
 
 # RUN: llvm-snippy %s -riscv-dump-discarded-rvv-configurations=%t.rvv.discarded \
@@ -21,7 +21,7 @@ riscv-vector-unit:
     VM:
       - [3, 1.0]  # 0b11
     VL:
-      - [4, 1.0] 
+      - [4, 1.0]
     VXRM:
       rnu: 1.0
     VTYPE:
@@ -34,11 +34,11 @@ riscv-vector-unit:
         mu: 1.0
       VTA:
         tu: 1.0
- 
+
 histogram:
        - [VADD_VV, 1.0]
        - [VSETVL, 1.0]
-         
+
 # CHECK:      --- RVV Unit Discarded Info ---
 # CHECK-NEXT:   - VM Generators:
 # CHECK-NEXT:   - VL Generators:
@@ -49,8 +49,7 @@ histogram:
 # RVV-INFO:      --- RVV Configuration Info ---
 # RVV-INFO-NEXT:   - Derived VLEN: 128 (VLENB = 16)
 # RVV-INFO-NEXT:   - Mode Change Decision Policy: Histogram
-# RVV-INFO-NEXT:   - Mode Change Probability: 0.5 (vsetvl/vsetvli/vsetivli=0.5[w:2]
-#                    /0[w:0]/0[w:0])
+# RVV-INFO-NEXT:   - Mode Change Probability: 0.500 (vsetvl/vsetvli/vsetivli=0.500/0.000/0.000)
 # RVV-INFO-NEXT:     Set Vill Bit Probability: 0
 # RVV-INFO-NEXT:   - VL Selection Rules:
 # RVV-INFO-NEXT:     P: 1 <imm_4>
@@ -59,5 +58,5 @@ histogram:
 # RVV-INFO:        - Configuration Bag Listing:
 # RVV-INFO-NEXT:     P: 1 Conf: { e32, m1, tu, mu, vxrm: rnu }/MaxVL: 4
 # RVV-INFO-NEXT:   - Configuration Bag Size: 1
-# RVV-INFO-NEXT:   - State Cardinality: 4 ~ {MASKS} 
+# RVV-INFO-NEXT:   - State Cardinality: 4 ~ {MASKS}
 # RVV-INFO-NEXT: --- RVV Configuration End  ---

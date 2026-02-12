@@ -1,0 +1,57 @@
+# REQUIRES: riscv-rvv
+# COM: This test checks the amount of vset* instructions generated
+# COM: when using the histogram.
+
+# RUN: llvm-snippy %s \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu
+  mattr: +v
+  num-instrs: 1000
+  dump-mf: true
+  init-regs-in-elf: true
+
+sections:
+    - no:        0
+      VMA:       0x2100000
+      SIZE:      0x110000
+      LMA:       0x2100000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x2000000
+      SIZE:      0x100000
+      LMA:       0x2000000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x2300000
+      SIZE:      0x4000
+      LMA:       0x2300000
+      ACCESS:    rw
+
+riscv-vector-unit:
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_32: 1.0
+      LMUL:
+        m1: 1.0
+      VMA:
+        ma: 1.0
+      VTA:
+        ta: 1.0
+
+histogram:
+    - [VADD_VV, 0.1]
+    - [VSETVL, 0.9]
+
+# COM: We expect to have 900 VSETs generated out of the 1000 primary instructions
+# COM: from the histogram. Checking only 800 to be sure.
+
+# CHECK-COUNT-800: VSETVL
