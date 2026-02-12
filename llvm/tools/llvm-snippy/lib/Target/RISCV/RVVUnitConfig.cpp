@@ -148,19 +148,20 @@ static bool checkNonZeroWeightPresent(ItType Begin, ItType End) {
 }
 
 template <typename ItType>
-void checkWeights(ItType Begin, ItType End, const llvm::Twine &What) {
+std::string checkWeights(ItType Begin, ItType End, const llvm::Twine &What) {
   if (!checkWeightsNonNegative(Begin, End))
-    snippy::fatal(What + ": weights must be non-negative!");
+    return (What + ": weights must be non-negative!").str();
 
   if (!checkNonZeroWeightPresent(Begin, End))
-    snippy::fatal(What + ": at least one weight must be positive!");
+    return (What + ": at least one weight must be positive!").str();
+  return "";
 }
 
 template <typename ItType>
-static void dumpRawPropabilities(llvm::raw_ostream &Stream,
+static void dumpRawProbabilities(llvm::raw_ostream &Stream,
                                  llvm::StringRef What, ItType Begin,
                                  ItType End) {
-  Stream << "Raw Propabilities: <" << What << ">:";
+  Stream << "Raw Probabilities: <" << What << ">:";
   for (auto It = Begin; It != End; ++It) {
     Stream << " " << It->Value << "{" << floatToString(It->P, 5 /*precision*/)
            << "}";
@@ -213,12 +214,17 @@ struct VTypeInfo {
   VTAInfo VTA;
 };
 
+struct VLVMSequence final {
+  using VLVMEntry = std::pair<std::string, double>;
+  std::vector<VLVMEntry> Values;
+};
+
 struct RVVUnitInfo {
   VXRMInfo VXRM;
   VTypeInfo VTYPE;
 
-  std::vector<SList> VM;
-  std::vector<SList> VL;
+  VLVMSequence VM;
+  VLVMSequence VL;
 };
 
 struct RVVConfigurationSpace {
@@ -249,7 +255,7 @@ struct ConfigPoint {
 };
 
 template <typename SliceType>
-static auto extractElementsWithPropabilities(const SliceType &ConfSlice) {
+static auto extractElementsWithProbabilities(const SliceType &ConfSlice) {
   using EnumerationType = typename SliceType::EnumerationType;
   using Element = ConfigurationElement<EnumerationType>;
   std::vector<Element> Result;
@@ -739,8 +745,10 @@ template <> struct yaml::MappingTraits<VXRMInfo> {
     IO.mapOptional("rne", VXRM[VXRMTypes::RNE], 0.0);
     IO.mapOptional("rdn", VXRM[VXRMTypes::RDN], 0.0);
     IO.mapOptional("ron", VXRM[VXRMTypes::RON], 0.0);
+  }
 
-    checkWeights(VXRM.W.begin(), VXRM.W.end(), "VXRM");
+  static std::string validate(yaml::IO &IO, VXRMInfo &VXRM) {
+    return checkWeights(VXRM.W.begin(), VXRM.W.end(), "VXRM");
   }
 };
 
@@ -750,8 +758,10 @@ template <> struct yaml::MappingTraits<SEWInfo> {
     IO.mapOptional("sew_16", SEW[SEWTypes::SEW16], 0.0);
     IO.mapOptional("sew_32", SEW[SEWTypes::SEW32], 0.0);
     IO.mapOptional("sew_64", SEW[SEWTypes::SEW64], 0.0);
+  }
 
-    checkWeights(SEW.W.begin(), SEW.W.end(), "SEW");
+  static std::string validate(yaml::IO &IO, SEWInfo &SEW) {
+    return checkWeights(SEW.W.begin(), SEW.W.end(), "SEW");
   }
 };
 
@@ -764,8 +774,10 @@ template <> struct yaml::MappingTraits<LMULInfo> {
     IO.mapOptional("mf2", LMUL[LMULTypes::MF2], 0.0);
     IO.mapOptional("mf4", LMUL[LMULTypes::MF4], 0.0);
     IO.mapOptional("mf8", LMUL[LMULTypes::MF8], 0.0);
+  }
 
-    checkWeights(LMUL.W.begin(), LMUL.W.end(), "LMUL");
+  static std::string validate(yaml::IO &IO, LMULInfo &LMUL) {
+    return checkWeights(LMUL.W.begin(), LMUL.W.end(), "LMUL");
   }
 };
 
@@ -773,8 +785,10 @@ template <> struct yaml::MappingTraits<VMAInfo> {
   static void mapping(yaml::IO &IO, VMAInfo &VMA) {
     IO.mapOptional("mu", VMA[VMAMode::MU], 0.0);
     IO.mapOptional("ma", VMA[VMAMode::MA], 0.0);
+  }
 
-    checkWeights(VMA.W.begin(), VMA.W.end(), "VMA");
+  static std::string validate(yaml::IO &IO, VMAInfo &VMA) {
+    return checkWeights(VMA.W.begin(), VMA.W.end(), "VMA");
   }
 };
 
@@ -782,8 +796,10 @@ template <> struct yaml::MappingTraits<VTAInfo> {
   static void mapping(yaml::IO &IO, VTAInfo &VTA) {
     IO.mapOptional("tu", VTA[VTAMode::TU], 0.0);
     IO.mapOptional("ta", VTA[VTAMode::TA], 0.0);
+  }
 
-    checkWeights(VTA.W.begin(), VTA.W.end(), "VTA");
+  static std::string validate(yaml::IO &IO, VTAInfo &VTA) {
+    return checkWeights(VTA.W.begin(), VTA.W.end(), "VTA");
   }
 };
 
@@ -795,6 +811,50 @@ template <> struct yaml::MappingTraits<VTypeInfo> {
     IO.mapRequired("VTA", VTYPE.VTA);
   }
 };
+
+template <> struct YAMLHistogramTraits<VLVMSequence::VLVMEntry> {
+  using DenormEntry = VLVMSequence::VLVMEntry;
+  using MapType = VLVMSequence;
+
+  static DenormEntry denormalizeEntry(yaml::IO &Io, StringRef ParseStr,
+                                      double Weight) {
+    return {ParseStr.data(), Weight};
+  }
+
+  static void normalizeEntry(yaml::IO &Io, const DenormEntry &E,
+                             SmallVectorImpl<SValue> &RawStrings) {
+    RawStrings.push_back(E.first);
+    RawStrings.push_back(std::to_string(E.second));
+  }
+
+  static MapType denormalizeMap(yaml::IO &Io, ArrayRef<DenormEntry> VLVMs) {
+    return {VLVMs};
+  }
+
+  static void normalizeMap(yaml::IO &Io, const MapType &Entries,
+                           std::vector<DenormEntry> &VLVMs) {
+    VLVMs = Entries.Values;
+  }
+
+  static std::string validate(ArrayRef<DenormEntry> VLVMs) {
+    SmallVector<double> Weights(llvm::make_second_range(VLVMs));
+    return checkWeights(Weights.begin(), Weights.end(), "VL/VM");
+  }
+};
+
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(VLVMSequence);
+LLVM_SNIPPY_YAML_IS_HISTOGRAM_DENORM_ENTRY(VLVMSequence::VLVMEntry)
+
+void yaml::MappingTraits<VLVMSequence>::mapping(yaml::IO &IO,
+                                                VLVMSequence &VLVMs) {
+  EmptyContext Ctx;
+  yaml::yamlize(IO, VLVMs.Values, false, Ctx);
+}
+
+std::string yaml::MappingTraits<VLVMSequence>::validate(yaml::IO &,
+                                                        VLVMSequence &VLVMs) {
+  return YAMLHistogramTraits<VLVMSequence::VLVMEntry>::validate(VLVMs.Values);
+}
 
 template <> struct yaml::MappingTraits<RVVUnitInfo> {
   static void mapping(yaml::IO &IO, RVVUnitInfo &VUInfo) {
@@ -978,42 +1038,6 @@ void RVVConfiguration::print(raw_ostream &OS) const {
 
 void RVVConfiguration::dump() const { print(dbgs()); }
 
-struct WeightedGeneratorID {
-  double Weight;
-  std::string GeneratorName;
-};
-
-struct VLVMRulesDesc {
-  std::vector<WeightedGeneratorID> VL;
-  std::vector<WeightedGeneratorID> VM;
-};
-
-std::vector<WeightedGeneratorID>
-extractWeightedGeneratorIDs(const std::vector<SList> &GenInfo) {
-  std::vector<WeightedGeneratorID> Result;
-  std::transform(GenInfo.begin(), GenInfo.end(), std::back_inserter(Result),
-                 [](const auto &Item) {
-                   if (Item.size() != 2)
-                     snippy::fatal(
-                         "incorrect format for generator descriptions");
-                   std::string GeneratorID = Item[0];
-                   double Weight;
-                   if (StringRef(Item[1]).getAsDouble(Weight))
-                     snippy::fatal(Twine("could not parse weight ") +
-                                   GeneratorID);
-                   // TODO: more error handling
-                   return WeightedGeneratorID{Weight, std::move(GeneratorID)};
-                 });
-  return Result;
-}
-
-static VLVMRulesDesc extractVLVMRules(const RVVUnitInfo &VMVLRules) {
-  VLVMRulesDesc Result;
-  Result.VL = extractWeightedGeneratorIDs(VMVLRules.VL);
-  Result.VM = extractWeightedGeneratorIDs(VMVLRules.VM);
-  return Result;
-}
-
 template <typename T> struct WeightedItems {
   std::vector<T> Elements;
   std::vector<double> Weights;
@@ -1028,24 +1052,24 @@ static std::vector<InternalConfigurationPoint> getLegalConfigurationPoints(
     const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &VLGen,
     unsigned VLEN, const RVVUnitInfo &VUInfo,
     std::vector<RVVConfiguration> &DiscardedConfigs) {
-  auto SEW = extractElementsWithPropabilities(VUInfo.VTYPE.SEW);
-  auto LMUL = extractElementsWithPropabilities(VUInfo.VTYPE.LMUL);
-  auto MA = extractElementsWithPropabilities(VUInfo.VTYPE.VMA);
-  auto TA = extractElementsWithPropabilities(VUInfo.VTYPE.VTA);
+  auto SEW = extractElementsWithProbabilities(VUInfo.VTYPE.SEW);
+  auto LMUL = extractElementsWithProbabilities(VUInfo.VTYPE.LMUL);
+  auto MA = extractElementsWithProbabilities(VUInfo.VTYPE.VMA);
+  auto TA = extractElementsWithProbabilities(VUInfo.VTYPE.VTA);
 
-  auto VXRM = extractElementsWithPropabilities(VUInfo.VXRM);
+  auto VXRM = extractElementsWithProbabilities(VUInfo.VXRM);
 
-  LLVM_DEBUG(dumpRawPropabilities(dbgs(), "SEW", SEW.begin(), SEW.end()));
-  LLVM_DEBUG(dumpRawPropabilities(dbgs(), "LMUL", LMUL.begin(), LMUL.end()));
-  LLVM_DEBUG(dumpRawPropabilities(dbgs(), "MA", MA.begin(), MA.end()));
-  LLVM_DEBUG(dumpRawPropabilities(dbgs(), "TA", TA.begin(), TA.end()));
-  LLVM_DEBUG(dumpRawPropabilities(dbgs(), "VXRM", MA.begin(), MA.end()));
+  LLVM_DEBUG(dumpRawProbabilities(dbgs(), "SEW", SEW.begin(), SEW.end()));
+  LLVM_DEBUG(dumpRawProbabilities(dbgs(), "LMUL", LMUL.begin(), LMUL.end()));
+  LLVM_DEBUG(dumpRawProbabilities(dbgs(), "MA", MA.begin(), MA.end()));
+  LLVM_DEBUG(dumpRawProbabilities(dbgs(), "TA", TA.begin(), TA.end()));
+  LLVM_DEBUG(dumpRawProbabilities(dbgs(), "VXRM", MA.begin(), MA.end()));
 
   std::vector<ConfigPoint> Points;
   cartesianProduct(std::back_inserter(Points), cartesianRange(SEW),
                    cartesianRange(LMUL), cartesianRange(MA), cartesianRange(TA),
                    cartesianRange(VXRM));
-  LLVM_DEBUG(dbgs() << "Raw Propabilities Points Count: " << Points.size()
+  LLVM_DEBUG(dbgs() << "Raw Probabilities Points Count: " << Points.size()
                     << "\n");
   std::vector<InternalConfigurationPoint> ConfigPoints;
   std::transform(
@@ -1078,14 +1102,14 @@ static std::vector<InternalConfigurationPoint> getLegalConfigurationPoints(
 
 static std::vector<InternalConfigurationPoint>
 getIllegalConfigurationPoints(unsigned VLEN) {
-  auto AllSEW = extractElementsWithPropabilities(
+  auto AllSEW = extractElementsWithProbabilities(
       SEWInfo{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
-  auto AllLMUL = extractElementsWithPropabilities(
+  auto AllLMUL = extractElementsWithProbabilities(
       LMULInfo{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
-  auto AllMA = extractElementsWithPropabilities(VMAInfo{1.0, 1.0});
-  auto AllTA = extractElementsWithPropabilities(VTAInfo{1.0, 1.0});
+  auto AllMA = extractElementsWithProbabilities(VMAInfo{1.0, 1.0});
+  auto AllTA = extractElementsWithProbabilities(VTAInfo{1.0, 1.0});
 
-  auto AllVXRM = extractElementsWithPropabilities(VXRMInfo{1.0, 1.0, 1.0, 1.0});
+  auto AllVXRM = extractElementsWithProbabilities(VXRMInfo{1.0, 1.0, 1.0, 1.0});
 
   std::vector<ConfigPoint> AllPoints;
   cartesianProduct(std::back_inserter(AllPoints), cartesianRange(AllSEW),
@@ -1182,14 +1206,13 @@ static WeightedItems<RVVConfiguration> getInternalConfigurationPoints(
 }
 
 template <typename T>
-auto constructGeneratorsFromWeightedIds(
-    const std::vector<WeightedGeneratorID> &IDs) {
+auto constructGeneratorsFromWeightedIds(const VLVMSequence &IDs) {
   WeightedItems<T> Result;
-  for (const auto &GenID : IDs) {
-    auto Gen = GeneratorFactory<T>::create(GenID.GeneratorName);
+  for (const auto &GenID : IDs.Values) {
+    auto Gen = GeneratorFactory<T>::create(GenID.first);
     if (!Gen)
       snippy::fatal("unsupported generator ID specified");
-    Result.addWeightedElement(GenID.Weight, std::move(Gen));
+    Result.addWeightedElement(GenID.second, std::move(Gen));
   }
   return Result;
 }
@@ -1387,10 +1410,9 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
                   "specified for targets without RVV");
   // The procedure for generating all reachable heaps of VLs, VMs, and RVV
   // Configs occurs in two views of each heap:
-  auto VLVMRules = extractVLVMRules(CS.VUInfo);
   // 1. Get all VLs from the rvv-unit-config
   auto VLGensWeights =
-      constructGeneratorsFromWeightedIds<VLGeneratorHolder>(VLVMRules.VL);
+      constructGeneratorsFromWeightedIds<VLGeneratorHolder>(CS.VUInfo.VL);
   // 2. Get all RVV Configs that are compatible with at least one VL
   auto ConfigPointsWeights =
       getInternalConfigurationPoints(VLGensWeights.Elements, VLEN, CS.VUInfo,
@@ -1398,7 +1420,7 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
   auto MinMaxVL = extractMinMaxVL(VLEN, ConfigPointsWeights.Elements);
   // 3.1 Get all VMs from the rvv-unit-config
   auto VMGensWeights = constructGeneratorsFromWeightedIds<
-      RVVConfigurationInfo::VMGeneratorHolder>(VLVMRules.VM);
+      RVVConfigurationInfo::VMGeneratorHolder>(CS.VUInfo.VM);
   // 3.2 Filter out VMs that are incompatible with all VLs
   auto VMGensWeightsFiltered = getVMsCompatibleWithVLs(
       MinMaxVL, VMGensWeights, VLGensWeights.Elements, DiscardedVMs);
