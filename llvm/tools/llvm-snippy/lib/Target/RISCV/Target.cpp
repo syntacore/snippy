@@ -1247,7 +1247,7 @@ public:
     const auto &RGC =
         ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
     const auto &ModeChangeInfo = RGC.getVUConfigInfo().getModeChangeInfo();
-    return ModeChangeInfo.RVVPresent;
+    return ModeChangeInfo.RVVPresentInHistogram;
   }
 
   bool modeSwitchIsSupport(const SnippyProgramContext &ProgCtx) const override {
@@ -1256,16 +1256,20 @@ public:
     return RGC.getVUConfigInfo().isModeChangeArtificial();
   }
 
+  // The return value is the ratio between the number of mode switches
+  // and the total number of primary instructions.
   double
   getModeSwitchProbability(const SnippyProgramContext &ProgCtx) const override {
     const auto &RGC =
         ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
     const auto &ModeChangeInfo = RGC.getVUConfigInfo().getModeChangeInfo();
 
-    assert(ModeChangeInfo.RVVPresent);
+    assert(ModeChangeInfo.RVVPresentInHistogram);
+    auto VSETWeight = ModeChangeInfo.WeightVSETVL +
+                      ModeChangeInfo.WeightVSETVLI +
+                      ModeChangeInfo.WeightVSETIVLI;
 
-    return ModeChangeInfo.ProbVSETIVLI + ModeChangeInfo.ProbVSETVLI +
-           ModeChangeInfo.ProbVSETVL;
+    return VSETWeight / ModeChangeInfo.TotalHistWeight;
   }
 
   Config::OpcodeFilter
@@ -3975,15 +3979,12 @@ private:
     case RVVModeChangeMode::MC_ANY: {
       const auto &ModeChangeInfo =
           TargetContext.getVUConfigInfo().getModeChangeInfo();
-      std::array<double, 3> VsetvlProb = {
-          ModeChangeInfo.WeightVSETVL,
-          ModeChangeInfo.WeightVSETVLI,
-          (VL && *VL > kMaxVLForVSETIVLI) ? 0.0 : ModeChangeInfo.WeightVSETIVLI,
-      };
+      std::array<double, 3> VSETOpcodesP =
+          ModeChangeInfo.getRelativeWeights(VL ? *VL : 0);
 
       // NOTE: this, probably, should be an assert. However, we don't have
       // proper checks at the configuration phase
-      if (std::all_of(VsetvlProb.begin(), VsetvlProb.end(),
+      if (std::all_of(VSETOpcodesP.begin(), VSETOpcodesP.end(),
                       [](const auto &P) { return P <= 0.0; })) {
         if (VL)
           snippy::fatal(
@@ -3998,7 +3999,7 @@ private:
       }
 
       DiscreteGeneratorInfo<unsigned, std::array<unsigned, 3>> Gen(
-          {RISCV::VSETVL, RISCV::VSETVLI, RISCV::VSETIVLI}, VsetvlProb);
+          {RISCV::VSETVL, RISCV::VSETVLI, RISCV::VSETIVLI}, VSETOpcodesP);
       return Gen();
     }
     case RVVModeChangeMode::MC_VSETIVLI:
