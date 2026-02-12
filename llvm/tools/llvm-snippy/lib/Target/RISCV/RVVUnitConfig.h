@@ -212,36 +212,55 @@ struct VMGeneratorInterface {
 class GeneratorContext;
 
 struct ModeChangeInfo {
-  bool RVVPresent = false;
+  bool RVVPresentInHistogram = false;
+  bool VSETPresentInHistogram = false;
 
   // Probability with which an illegal RVVConfiguration will be choosen during
   // RVV Mode Change
   double ProbSetVill = 0.0;
 
-  // ProbVSET* are not expected to be used by external clients
-  // These are only for printing and debugging purposes
-  double ProbVSETVL = 0.0;
-  double ProbVSETVLI = 0.0;
-  double ProbVSETIVLI = 0.0;
-
   // Weights are what our clients are expected to use. llvm-snippy uses
   // weight-based histograms for instruction selection. These weights are later
   // used to calculate probabilities for the discrete distribution.
-  // Depending on the context, weights can represent slightly different
-  // things:
-  //    1. If we use histogram-based RVV mode selection, these weights are used
-  // to construct the probability of the first VSET* instruction for the basic
-  // block. The respected weight is proportional to the number of RVV
-  // instructions in the histogram.
-  //    2. In case of a bias-based mode selection, these weights are used
-  // for a direct initialization of the distribution. The final weight is
-  // calculated as (ALL_INSTR_WEIGHTS * BIAS_COEFF).
-  // For example: if BIAS_COEFF (P) = 1.0, then the expected probability to
-  // generate VSET* is about 50% regardless of the number of instructions in
-  // the histogram.
+  //
+  // The values either come directly from the histogram, or calculated from
+  // BIAS_COEFF, which shows the ratio between support VSET* instructions
+  // and all other instructions. For example, if BIAS_COEFF is 0.8 and
+  // num-instrs=100, there will be 80 support VSET* instructions in addition to
+  // 100 requested instructions.
+  //
+  // Keep in mind that if weights come from the histogram (e.g. VSETs are
+  // primary instructions), they are contributing to the total weight
+  // of the histogram, so we need to account for that when calculating
+  // the amount of VSET* instructions (mode-changing groups).
   double WeightVSETVL = 0.0;
   double WeightVSETVLI = 0.0;
   double WeightVSETIVLI = 0.0;
+
+  double TotalHistWeight = 0.0;
+
+  // Here 'probability' means ratio of VSET* instructions to the union of all
+  // primary instructions and VSET* instructions, so this 'probability' depends
+  // on whether VSET* instructions are primary or not.
+  double getWeightToProbabilityMultiplier() const {
+    assert(TotalHistWeight > 0.0);
+    if (VSETPresentInHistogram)
+      return 1.0 / TotalHistWeight;
+    auto TotalVSETWeight = WeightVSETVL + WeightVSETVLI + WeightVSETIVLI;
+    return 1.0 / (TotalHistWeight + TotalVSETWeight);
+  }
+
+  // Even if all weights are 0.0, we still might need to choose one of VSETs
+  std::array<double, 3> getRelativeWeights(unsigned VL) const {
+    if (WeightVSETVL + WeightVSETVLI + WeightVSETIVLI <=
+        std::numeric_limits<double>::epsilon())
+      return {1.0, 1.0, 1.0};
+
+    // VSETIVLI supports only reduced VL
+    if (VL > kMaxVLForVSETIVLI)
+      return {WeightVSETVL, WeightVSETVLI, 0.0};
+    return {WeightVSETVL, WeightVSETVLI, WeightVSETIVLI};
+  }
 };
 
 struct RVVConfigurationInfo final {

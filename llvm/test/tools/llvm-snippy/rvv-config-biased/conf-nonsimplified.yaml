@@ -39,7 +39,7 @@ histogram:
 # CHECK-DEFAULT:      --- RVV Configuration Info ---
 # CHECK-DEFAULT-NEXT:  - Derived VLEN: 65536 (VLENB = 8192)
 # CHECK-DEFAULT-NEXT:   - Mode Change Decision Policy: Configuration Bias
-# CHECK-DEFAULT-NEXT:   - Mode Change Probability: 0.0909
+# CHECK-DEFAULT-NEXT:   - Mode Change Probability: 0.091
 # CHECK-DEFAULT-NEXT:     Set Vill Bit Probability: 0
 # CHECK-DEFAULT-NEXT:   - VL Selection Rules:
 # CHECK-DEFAULT-NEXT:     P: 0.66667 <max_encodable>
@@ -57,7 +57,7 @@ histogram:
 # CHECK-VLEN512:      --- RVV Configuration Info ---
 # CHECK-VLEN512-NEXT:  - Derived VLEN: 512 (VLENB = 64)
 # CHECK-VLEN512-NEXT:  - Mode Change Decision Policy: Configuration Bias
-# CHECK-VLEN512-NEXT:  - Mode Change Probability: 0.0909
+# CHECK-VLEN512-NEXT:  - Mode Change Probability: 0.091
 # CHECK-VLEN512-NEXT:    Set Vill Bit Probability: 0
 # CHECK-VLEN512-NEXT:  - VL Selection Rules:
 # CHECK-VLEN512-NEXT:    P: 0.66667 <max_encodable>
