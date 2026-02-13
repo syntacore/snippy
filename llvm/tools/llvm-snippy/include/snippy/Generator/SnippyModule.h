@@ -330,7 +330,8 @@ public:
 
   // TODO: We should define a subset of Config that is enough for
   // TargetContext initialization.
-  void createTargetContext(const Config &Cfg, const TargetSubtargetInfo &STI);
+  void createTargetContext(const Config &Cfg, const TargetSubtargetInfo &STI,
+                           const RegPoolWrapper &RP);
 
 private:
   friend RootRegPoolWrapper;
