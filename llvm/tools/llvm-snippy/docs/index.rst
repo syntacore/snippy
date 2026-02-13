@@ -922,8 +922,8 @@ this case, snippy uses the algorithm described in `Selecting Applicable
 Memory Schemes <#selecting-applicable-memory-schemes>`__ as for any
 basic scalar instructions.
 
-Snippy does not guarantee that a stride bigger than the element size
-will be chosen, even a stride equal to zero is possible.
+Snippy does not guarantee that a stride bigger than the element size will
+be chosen, even a stride equal to zero is possible by default. See `Memory Strides <#memory-strides>`__ for more details and how to override this behaviour.
 
 For more details on strided instructions, refer
 `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#75-vector-strided-instructions>`__.
@@ -1011,6 +1011,25 @@ In the basic process, snippy:
 2. Generates a strided instruction |nbsp| -- |nbsp| an instruction that can navigate
    through the selected memory scheme by the stride you specify. Such
    instructions simultaneously access not one address, but several.
+
+.. note::
+   The option ``riscv-disallow-intersecting-mem-accesses`` is specific to the
+   RISC-V RVV backend. It takes a **regex** that matches the desired strided
+   (or strided-segmented) **store** instructions **that appear in the
+   histogram** `Histogram <#histogram>`__. When the option is enabled,
+   Snippy emits those store instructions only if the generated element
+   addresses are guaranteed to be disjoint. If the memory scheme cannot
+   satisfy this non-intersecting requirement, Snippy fails.
+
+   This behaviour applies to instructions described in the
+   `Strided Load/Store <#strided-loadstore>`__ section.
+
+   Currently the option works only with ``access-ranges`` memory schemes.
+   Other access types (e.g., ``access-evictions`` or address-enumeration
+   schemes) cannot guarantee the required disjoint addresses, so they are not
+   supported. Indexed unordered stores are also not supported at the moment.
+   For any other instruction that matches the regex the option simply has no
+   effect.
 
 Use ``memory.yaml`` for a reference on a memory scheme with strides:
 

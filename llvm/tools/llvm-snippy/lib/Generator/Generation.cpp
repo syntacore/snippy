@@ -935,12 +935,8 @@ chooseAddrInfoForInstr(MachineInstr &MI, InstructionGenerationContext &IGC,
   const auto &SnippyTgt = State.getSnippyTarget();
   auto Opcode = MI.getDesc().getOpcode();
 
-  auto [AccessSize, Alignment, AllowMisalign] =
-      SnippyTgt.getAccessSizeAndAlignment(ProgCtx, Opcode, *MI.getParent());
-
   auto AddrGenInfo =
-      AddressGenInfo::singleAccess(AccessSize, Alignment, AllowMisalign,
-                                   /*Burst=*/false);
+      SnippyTgt.selectAddrGenInfoForInstr(ProgCtx, Opcode, *MI.getParent());
 
   auto ReportError = [&](Error Err) {
     std::string InstrStr;
@@ -954,11 +950,11 @@ chooseAddrInfoForInstr(MachineInstr &MI, InstructionGenerationContext &IGC,
   auto ChosenAccess = MS.chooseAccess(AddrGenInfo);
   if (!ChosenAccess)
     ReportError(ChosenAccess.takeError());
+
   auto AddrInfo = ChosenAccess->randomAddress(AddrGenInfo);
 
   assert(AddrInfo.MaxOffset >= 0);
   assert(AddrInfo.MinOffset <= 0);
-
   return {AddrInfo, AddrGenInfo};
 }
 
