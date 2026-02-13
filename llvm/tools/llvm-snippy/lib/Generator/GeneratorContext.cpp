@@ -74,7 +74,8 @@ GeneratorContext::GeneratorContext(SnippyProgramContext &ProgCtx,
   auto DummyModule = Module("__snippy_dummy_module", State.getCtx());
   auto &Dummy = State.createFunction(DummyModule, "__dummy", "",
                                      Function::LinkageTypes::InternalLinkage);
-  ProgContext->createTargetContext(Settings, State.getSubtargetImpl(Dummy));
+  ProgContext->createTargetContext(Settings, State.getSubtargetImpl(Dummy),
+                                   ProgCtx.getRegisterPool());
   Dummy.eraseFromParent();
 }
 
