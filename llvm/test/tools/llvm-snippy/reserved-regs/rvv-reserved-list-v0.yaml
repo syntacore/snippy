@@ -1,0 +1,30 @@
+# COM: This test checks that if register v0 is reserved, it is equivalent to
+#      using option --riscv-nomask-mode-for-rvv.
+
+# RUN: llvm-snippy %s -model-plugin=None -reserved-regs-list=V0 \
+# RUN: |& FileCheck %s
+
+# RUN: llvm-snippy %s -model-plugin=None -reserved-regs-list=V0M2 \
+# RUN: |& FileCheck %s
+
+# RUN: llvm-snippy %s -model-plugin=None -reserved-regs-list=V0M4 \
+# RUN: |& FileCheck %s
+
+# RUN: llvm-snippy %s -model-plugin=None -reserved-regs-list=V0M8 \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  dump-mf: on
+  rvv-init-mode: loads
+  num-instrs: 10000
+
+include:
+  - Inputs/sections.yaml
+  - Inputs/rvv-unit-all.yaml
+
+histogram:
+    - [VADD_VV, 1.0]
+
+# CHECK-NOT: v0
