@@ -12,7 +12,15 @@
 namespace llvm::snippy {
 
 RISCVGeneratorContext::RISCVGeneratorContext(
-    RISCVConfigurationInfo &&RISCVConfigIn)
-    : RISCVConfig(std::move(RISCVConfigIn)) {}
+    RISCVConfigurationInfo &&RISCVConfigIn,
+    DenseSet<unsigned> OpcodesWithNonIntersectingMemAccesses)
+    : RISCVConfig(std::move(RISCVConfigIn)),
+      DisallowedIntersectingMemAccessesForOpcodes(
+          std::move(OpcodesWithNonIntersectingMemAccesses)) {}
+
+bool RISCVGeneratorContext::disallowIntersectingMemoryAccesses(
+    unsigned Opcode) const {
+  return DisallowedIntersectingMemAccessesForOpcodes.contains(Opcode);
+}
 
 } // namespace llvm::snippy

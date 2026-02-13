@@ -369,17 +369,17 @@ collectAddressRestrictions(ArrayRef<unsigned> Opcodes,
     if (!SnippyTgt.canUseInBurstMode(InstrDesc))
       continue;
 
+    const auto AddrGenInfo =
+        SnippyTgt.selectAddrGenInfoForInstr(ProgCtx, Opcode, MBB);
     // Get address restrictions for the current opcode.
-    AddressRestriction AR;
-    AR.Opcodes.insert(Opcode);
-    const auto AccessSizeAlignment =
-        SnippyTgt.getAccessSizeAndAlignment(ProgCtx, Opcode, MBB);
-    AR.AccessSize = AccessSizeAlignment.AccessSize;
-    AR.AccessAlignment = AccessSizeAlignment.NaturalAlignment;
-    AR.AllowMisalign = AccessSizeAlignment.AllowMisalign;
-    AR.ImmOffsetRange = SnippyTgt.getImmOffsetRangeForMemAccessInst(InstrDesc);
-    AR.OffsetAlignment =
-        SnippyTgt.getImmOffsetAlignmentForMemAccessInst(InstrDesc);
+    AddressRestriction AR{
+        AddrGenInfo.AccessSize,
+        AddrGenInfo.Alignment,
+        SnippyTgt.getImmOffsetAlignmentForMemAccessInst(InstrDesc),
+        AddrGenInfo.AllowMisalign,
+        SnippyTgt.getImmOffsetRangeForMemAccessInst(InstrDesc),
+        /*Opcodes=*/{Opcode},
+    };
 
     assert(!OpcodeToAR.count(Opcode) ||
            OpcodeToAR[Opcode].ImmOffsetRange == AR.ImmOffsetRange);

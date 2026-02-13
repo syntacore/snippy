@@ -75,7 +75,9 @@ private:
 
 class RISCVGeneratorContext : public TargetGenContextInterface {
 public:
-  RISCVGeneratorContext(RISCVConfigurationInfo &&RISCVConfigIn);
+  RISCVGeneratorContext(
+      RISCVConfigurationInfo &&RISCVConfigIn,
+      DenseSet<unsigned> OpcodesWithNonIntersectingMemAccesses);
 
   const RVVConfigurationInfo &getVUConfigInfo() const {
     return RISCVConfig.getVUConfig();
@@ -302,9 +304,12 @@ public:
     CurrentRVVMode.VLVM.VL = VL;
   }
 
+  bool disallowIntersectingMemoryAccesses(unsigned Opcode) const;
+
 private:
   RVVModeInfo CurrentRVVMode;
   RISCVConfigurationInfo RISCVConfig;
+  DenseSet<unsigned> DisallowedIntersectingMemAccessesForOpcodes;
 };
 
 } // namespace snippy
