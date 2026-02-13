@@ -133,7 +133,8 @@ public:
 
   virtual std::unique_ptr<TargetGenContextInterface>
   createTargetContext(LLVMState &State, const Config &Cfg,
-                      const TargetSubtargetInfo *STI) const = 0;
+                      const TargetSubtargetInfo *STI,
+                      const RegPoolWrapper &RP) const = 0;
 
   virtual std::unique_ptr<TargetConfigInterface> createTargetConfig() const = 0;
 

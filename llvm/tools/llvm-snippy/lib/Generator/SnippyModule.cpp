@@ -297,10 +297,11 @@ SnippyProgramContext::SnippyProgramContext(LLVMState &State,
 }
 
 void SnippyProgramContext::createTargetContext(const Config &Cfg,
-                                               const TargetSubtargetInfo &STI) {
+                                               const TargetSubtargetInfo &STI,
+                                               const RegPoolWrapper &RP) {
   assert(!TargetContext && "Double context insertion");
   TargetContext =
-      State->getSnippyTarget().createTargetContext(*State, Cfg, &STI);
+      State->getSnippyTarget().createTargetContext(*State, Cfg, &STI, RP);
 }
 
 SnippyProgramContext::~SnippyProgramContext() = default;

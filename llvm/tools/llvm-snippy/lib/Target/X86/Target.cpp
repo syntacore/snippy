@@ -49,7 +49,8 @@ public:
 
   std::unique_ptr<TargetGenContextInterface>
   createTargetContext(LLVMState &State, const Config &Cfg,
-                      const TargetSubtargetInfo *STI) const override {
+                      const TargetSubtargetInfo *STI,
+                      const RegPoolWrapper &RP) const override {
     reportUnimplementedError();
   }
 
