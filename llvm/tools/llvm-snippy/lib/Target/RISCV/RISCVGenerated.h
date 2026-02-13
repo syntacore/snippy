@@ -711,6 +711,28 @@ inline bool isRVVIndexedSegLoadStore(unsigned Opcode) {
     return true;
   }
 }
+
+inline bool isRVVStridedStore(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RISCV::VSSE8_V:
+  case RISCV::VSSE16_V:
+  case RISCV::VSSE32_V:
+  case RISCV::VSSE64_V:
+    return true;
+  }
+}
+
+inline bool isRVVStridedSegStore(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RVV_SEG_EACHNFIELDS_PLACER(VSSSEG, ):
+    return true;
+  }
+}
+
 #undef RVV_SEG_EACHNFIELDS_PLACER
 #undef RVV_INDEX_SEG_EACHNFIELDS_PLACER
 #undef RVV_SEG_EACHEEW_PLACER
