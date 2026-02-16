@@ -532,8 +532,8 @@ public:
     reportUnimplementedError();
   }
 
-  InstrMemAccessInfo
-  getAccessSizeAndAlignment(SnippyProgramContext &ProgCtx, unsigned Opcode,
+  AddressGenInfo
+  selectAddrGenInfoForInstr(SnippyProgramContext &ProgCtx, unsigned Opcode,
                             const MachineBasicBlock &MBB) const override {
     reportUnimplementedError();
   }
