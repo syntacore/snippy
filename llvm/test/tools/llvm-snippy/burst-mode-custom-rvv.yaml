@@ -1,0 +1,78 @@
+# RUN: sed -e s/OPCODE/VLE8_V/g %s > %t.VLE8_V.yaml
+# RUN: llvm-snippy %t.VLE8_V.yaml %S/Inputs/sections.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.VLE8_V.yaml --check-prefix=VLE8_V
+
+# FIXME: Vector Constant-Stride Instructions are not supported yet
+# RUN: sed -e s/OPCODE/VLSE8_V/g %s > %t.VLSE8_V.yaml
+# RUN: llvm-snippy %t.VLSE8_V.yaml %S/Inputs/sections.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.VLSE8_V.yaml --check-prefix=WARN
+
+# RUN: sed -e s/OPCODE/VADD_VV/g %s > %t.VADD_VV.yaml
+# RUN: llvm-snippy %t.VADD_VV.yaml %S/Inputs/sections.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.VADD_VV.yaml --check-prefix=VADD_VV
+
+# RUN: sed -e s/OPCODE/VLSEG2E8_V/g %s > %t.VLSEG2E8_V.yaml
+# RUN: llvm-snippy %t.VLSEG2E8_V.yaml %S/Inputs/sections.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.VLSEG2E8_V.yaml --check-prefix=VLSEG2E8_V
+
+# FIXME: Indexed Loads/Stores are not supported yet
+# RUN: sed -e s/OPCODE/VLUXEI8_V/g %s > %t.VLUXEI8_V.yaml
+# RUN: llvm-snippy %t.VLUXEI8_V.yaml %S/Inputs/sections.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.VLUXEI8_V.yaml --check-prefix=WARN
+
+# FIXME: Indexed Segment Loads/Stores are not supported yet
+# RUN: sed -e s/OPCODE/VLUXSEG2EI8_V/g %s > %t.VLUXSEG2EI8_V.yaml
+# RUN: llvm-snippy %t.VLUXSEG2EI8_V.yaml %S/Inputs/sections.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.VLUXSEG2EI8_V.yaml --check-prefix=WARN
+
+# RUN: sed -e s/OPCODE/VLSEG2E32_V/g %s > %t.VLSEG2E32_V.yaml
+# RUN: llvm-snippy %t.VLSEG2E32_V.yaml %S/Inputs/sections.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.VLSEG2E32_V.yaml --check-prefix=VLSEG2E32_V
+
+# RUN: sed -e s/OPCODE/VLSEG7E8FF_V/g %s > %t.VLSEG7E8FF_V.yaml
+# RUN: llvm-snippy %t.VLSEG7E8FF_V.yaml %S/Inputs/sections.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.VLSEG7E8FF_V.yaml --check-prefix=VLSEG7E8FF_V
+
+# FIXME: Vector Constant-Stride Segment Loads and Stores are not supported yet
+# RUN: sed -e s/OPCODE/VLSSEG6E8_V/g %s > %t.VLSSEG6E8_V.yaml
+# RUN: llvm-snippy %t.VLSSEG6E8_V.yaml %S/Inputs/sections.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.VLSSEG6E8_V.yaml --check-prefix=WARN
+
+# Vector Load/Store Whole Register Instructions
+# RUN: sed -e s/OPCODE/VL1RE8_V/g %s > %t.VL1RE8_V.yaml
+# RUN: llvm-snippy %t.VL1RE8_V.yaml %S/Inputs/sections.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.VL1RE8_V.yaml --check-prefix=VL1RE8_V
+
+# Unit-stride Fault-Only-First Loads
+# RUN: sed -e s/OPCODE/VLE8FF_V/g %s > %t.VLE8FF_V.yaml
+# RUN: llvm-snippy %t.VLE8FF_V.yaml %S/Inputs/sections.yaml -model-plugin=None \
+# RUN: |& FileCheck %t.VLE8FF_V.yaml --check-prefix=VLE8FF_V
+
+options:
+  mtriple: riscv64
+  march: rv64imfdv
+  num-instrs: 1000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+
+burst:
+  mode: custom
+  min-size: 4
+  max-size: 4
+  groupings:
+    - [OPCODE]
+
+histogram:
+  - [OPCODE, 1.0]
+  - [VSETIVLI, 1.0]
+  - [MUL, 2.0]
+  - [DIV, 1.0]
+  - [ADD, 1.0]
+  - [ADDI, 1.0]
+
+
+# OPCODE-NOT: Opcode OPCODE is not supported in the burst mode
+# OPCODE: {{((OPCODE.*[[:space:]].*){4})}}
+
+# WARN: Opcode OPCODE is not supported in the burst mode
