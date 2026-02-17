@@ -4579,6 +4579,38 @@ void SnippyRISCVTarget::generateVTypeChange(
   RGC.updateActiveRVVModeConfigAndVL(&IGC.MBB, NewRVVMode.Config, VL);
 }
 
+void generateVXRMUpdate(InstructionGenerationContext &IGC,
+                        RVVConfiguration::VXRMMode RoundingMode,
+                        const MCInstrInfo &InstrInfo) {
+  auto &MBB = IGC.MBB;
+  const auto &Ins = IGC.Ins;
+  const auto &Tgt = IGC.ProgCtx.getLLVMState().getSnippyTarget();
+  getSupportInstBuilder(Tgt, MBB, Ins,
+                        MBB.getParent()->getFunction().getContext(),
+                        InstrInfo.get(RISCV::WriteVXRMImm))
+      .addImm(static_cast<int64_t>(RoundingMode));
+}
+
+static void generateVXRMUpdateIfNeeded(InstructionGenerationContext &IGC,
+                                       const RVVModeInfo &NewRVVMode,
+                                       const MCInstrInfo &InstrInfo) {
+  const auto &RGC =
+      IGC.ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+  if (!RGC.getVUConfigInfo().isVXRMUpdateNeeded())
+    return;
+
+  auto *RVVCfg = NewRVVMode.Config;
+  assert(RVVCfg);
+  auto NewRoundingMode = RVVCfg->VXRM;
+
+  const RVVConfiguration *PrevRVVCfg;
+  if (RGC.hasActiveRVVMode(IGC.MBB) &&
+      (PrevRVVCfg = RGC.getActiveRVVMode(IGC.MBB).Config) &&
+      (NewRoundingMode == PrevRVVCfg->VXRM))
+    return;
+  return generateVXRMUpdate(IGC, NewRoundingMode, InstrInfo);
+}
+
 void SnippyRISCVTarget::generateRVVModeUpdate(
     InstructionGenerationContext &IGC, const MCInstrInfo &InstrInfo,
     const RVVModeInfo &NewRVVMode, std::optional<unsigned> DesiredOpcode,
@@ -4586,6 +4618,7 @@ void SnippyRISCVTarget::generateRVVModeUpdate(
   const auto &RGC =
       IGC.ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
 
+  generateVXRMUpdateIfNeeded(IGC, NewRVVMode, InstrInfo);
   generateVTypeChange(IGC, InstrInfo, NewRVVMode, DesiredOpcode, SupportMarket);
   generateV0MaskUpdate(IGC, NewRVVMode.VLVM.VM, InstrInfo);
 
@@ -4598,8 +4631,6 @@ void SnippyRISCVTarget::generateRVVModeUpdate(
   assert(ActiveRVVMode.VLVM.VL == NewRVVMode.VLVM.VL);
   assert(*ActiveRVVMode.Config == *NewRVVMode.Config);
   assert(ActiveRVVMode.MBBGuard == NewRVVMode.MBBGuard);
-
-  // TODO: update VXRM
 }
 
 // Returns false if no update was needed. Always counts as support.

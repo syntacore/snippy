@@ -1238,6 +1238,11 @@ static WeightedItems<RVVConfiguration> getConfigsCompatibleWithVLs(
   return Result;
 }
 
+static bool hasVXRMUsers(const OpcodeHistogram &Hist) {
+  return llvm::any_of(llvm::make_first_range(Hist),
+                      [](auto Opcode) { return isRVVuseVXRM(Opcode); });
+}
+
 RVVConfigurationInfo RVVConfigurationInfo::createDefault(const Config &Cfg,
                                                          unsigned VLEN) {
   std::vector<RVVConfiguration> Configurations = {{}};
@@ -1256,12 +1261,14 @@ RVVConfigurationInfo RVVConfigurationInfo::createDefault(const Config &Cfg,
     snippy::fatal("No VSET instruction detected in histogram");
   }
 
+  bool NeedsVXRMUpdate = hasVXRMUsers(Cfg.getOpcodeHistogram());
+
   return RVVConfigurationInfo(
       VLEN,
       ConfigGenerator(std::move(Configurations), std::vector<double>(1, 1.0)),
       VLGenerator(std::move(VLGen), std::vector<double>(1, 1.0)),
       VMGenerator(std::move(VMGen), std::vector<double>(1, 1.0)),
-      ModeSwitchInfo, !ModeSwitchInfo.VSETPresentInHistogram);
+      ModeSwitchInfo, !ModeSwitchInfo.VSETPresentInHistogram, NeedsVXRMUpdate);
 }
 
 static void printDiscardedRVVConfigurations(
@@ -1379,11 +1386,13 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
     snippy::fatal("It is forbidden to specify RVV mode-changing bias and "
                   "VSET* instructions in histogram simultaneously");
 
+  bool NeedsVXRMUpdate = hasVXRMUsers(Cfg.getOpcodeHistogram());
+
   return RVVConfigurationInfo(
       VLEN, ConfigGenerator(std::move(ConfigPoints), ConfigWeights),
       VLGenerator(std::move(VLGen), VLWeights),
       VMGenerator(std::move(VMGen), VMWeights), ModeSwitchInfo,
-      CS.Guides.Enabled);
+      CS.Guides.Enabled, NeedsVXRMUpdate);
 }
 
 unsigned RVVConfigurationInfo::getVLEN() const { return VLEN; }
@@ -1530,10 +1539,11 @@ void RVVConfigurationInfo::dump() const { print(dbgs()); }
 
 RVVConfigurationInfo::RVVConfigurationInfo(
     unsigned VLEN, ConfigGenerator &&CfgGen, VLGenerator &&VLGen,
-    VMGenerator &&VMGen, const ModeChangeInfo &SwitchInfo, bool EnableGuides)
+    VMGenerator &&VMGen, const ModeChangeInfo &SwitchInfo, bool EnableGuides,
+    bool NeedsVXRMUpdate)
     : VLEN(VLEN), CfgGen(std::move(CfgGen)), VLGen(std::move(VLGen)),
       VMGen(std::move(VMGen)), SwitchInfo(SwitchInfo),
-      ArtificialModeChange(EnableGuides) {}
+      ArtificialModeChange(EnableGuides), NeedsVXRMUpdate(NeedsVXRMUpdate) {}
 
 RISCVConfigurationInfo
 RISCVConfigurationInfo::constructConfiguration(LLVMState &State,
