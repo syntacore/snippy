@@ -1,0 +1,16 @@
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: "riscv64-linux-gnu"
+  mattr: "+v"
+  num-instrs: 1000
+  dump-mf: true
+
+include:
+- rvv-config-biased/Inputs/rvv-unit-all.yaml
+- rvv-config-histogram/Inputs/sections.yaml
+
+histogram:
+    - [VADD_VV, 1.0]
+
+# CHECK-NOT: WriteVXRMImm {{[0-3]}}
