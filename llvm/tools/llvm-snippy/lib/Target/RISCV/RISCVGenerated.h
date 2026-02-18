@@ -1245,6 +1245,61 @@ inline bool isRVVFloatingPoint(unsigned Opcode) {
   }
 }
 
+inline bool isRVVAveraging(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RISCV::VAADDU_VV:
+  case RISCV::VAADDU_VX:
+  case RISCV::VAADD_VV:
+  case RISCV::VAADD_VX:
+  case RISCV::VASUBU_VV:
+  case RISCV::VASUBU_VX:
+  case RISCV::VASUB_VV:
+  case RISCV::VASUB_VX:
+    return true;
+  }
+}
+
+inline bool isRVVNarrowingClip(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RISCV::VNCLIPU_WI:
+  case RISCV::VNCLIPU_WV:
+  case RISCV::VNCLIPU_WX:
+  case RISCV::VNCLIP_WI:
+  case RISCV::VNCLIP_WV:
+  case RISCV::VNCLIP_WX:
+    return true;
+  }
+}
+
+inline bool isRVVScalingShift(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RISCV::VSSRL_VI:
+  case RISCV::VSSRL_VV:
+  case RISCV::VSSRL_VX:
+  case RISCV::VSSRA_VI:
+  case RISCV::VSSRA_VV:
+  case RISCV::VSSRA_VX:
+    return true;
+  }
+}
+
+inline bool isRVVuseVXRM(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return isRVVFloatingPoint(Opcode) || isRVVAveraging(Opcode) ||
+           isRVVNarrowingClip(Opcode) || isRVVScalingShift(Opcode);
+  case RISCV::VSMUL_VX:
+  case RISCV::VSMUL_VV:
+    return true;
+  }
+}
+
 inline bool isRVVExt(unsigned Opcode) {
   switch (Opcode) {
   default:
