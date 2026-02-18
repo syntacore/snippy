@@ -28,21 +28,21 @@ histogram:
     - [LD, 1.0]
     - [SD, 1.0]
     - [VSETVL, 1.0]
-    - [VSE64_V, 1.0]
-    - [VLE64_V, 1.0]
+    - [VSSE64_V, 1.0]
+    - [VLSE64_V, 1.0]
 
 burst:
     mode: custom
     min-size: 4
     max-size: 16
     groupings:
-      - [LD, VLE64_V]
-      - [SD, VSE64_V]
+      - [LD, VLSE64_V]
+      - [SD, VSSE64_V]
 
-# CHECK: warning: (burst-mode) Opcode VLE64_V is not supported in the
+# CHECK: warning: (burst-mode) Opcode VLSE64_V is not supported in the
 # CHECK-SAME: burst mode: generator will generate it but not in a burst group.
-# CHECK: warning: (burst-mode) Opcode VSE64_V is not supported in the
+# CHECK: warning: (burst-mode) Opcode VSSE64_V is not supported in the
 # CHECK-SAME: burst mode: generator will generate it but not in a burst group.
 
-# CHECK: VLE64_V
-# CHECK: VSE64_V
+# CHECK: VLSE64_V
+# CHECK: VSSE64_V
