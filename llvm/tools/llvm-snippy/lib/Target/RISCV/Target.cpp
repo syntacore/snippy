@@ -3708,8 +3708,10 @@ public:
 
   bool canUseInBurstMode(const MCInstrDesc &InstrDesc) const override {
     auto Opcode = InstrDesc.getOpcode();
-    return !isRVV(Opcode) && !isCall(Opcode) && !InstrDesc.isBranch() &&
-           !InstrDesc.isReturn();
+    return !isRVVIndexedLoadStore(Opcode) && !isRVVStridedLoadStore(Opcode) &&
+           !isRVVIndexedSegLoadStore(Opcode) &&
+           !isRVVStridedSegLoadStore(Opcode) && !isRVVModeSwitch(Opcode) &&
+           !isCall(Opcode) && !InstrDesc.isBranch() && !InstrDesc.isReturn();
   }
 
   bool canInitializeOperand(

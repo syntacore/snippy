@@ -1,0 +1,37 @@
+# RUN: llvm-snippy %s %S/Inputs/sections.yaml \
+# RUN:   -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  march: rv64imfdv
+  num-instrs: 1000
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+  dump-mf: true
+
+burst:
+  mode: custom
+  min-size: 10
+  max-size: 10
+  groupings:
+    # All are supported in burst
+    - [VLE8_V, VADD_VX, VLSEG2E32_V]
+    # The only supported opcode here is SW
+    - [VSSE8_V, VLSSEG2E32_V, SW, VSETIVLI]
+
+histogram:
+  - [VLE8_V, 1.0]
+  - [VLSE8_V, 1.0]
+  - [VLSEG2E32_V, 1.0]
+  - [VSSE8_V, 1.0]
+  - [VADD_VX, 1.0]
+  - [VLSSEG2E32_V, 1.0]
+  - [VSETIVLI, 1.0]
+  - [SW, 1.0]
+  - [MUL, 2.0]
+  - [DIV, 1.0]
+  - [ADD, 1.0]
+  - [ADDI, 1.0]
+
+# CHECK-DAG: {{((SW.*[[:space:]].*){10})}}
+# CHECK-DAG: {{(((VLE8_V|VADD_VX|VLSEG2E32_V).*[[:space:]].*){10})}}
