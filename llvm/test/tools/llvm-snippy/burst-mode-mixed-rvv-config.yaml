@@ -1,0 +1,53 @@
+# RUN: llvm-snippy %s %S/rvv-config-biased/Inputs/rvv-unit-all.yaml \
+# RUN:   -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  march: rv64imfdv
+  num-instrs: 1000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+
+sections:
+  - no:        1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - no:        2
+    VMA:       0x80000000
+    SIZE:      0x100000
+    LMA:       0x80000000
+    ACCESS:    rw
+  - name:      3
+    VMA:       0x10000
+    LMA:       0x10000
+    SIZE:      0x10000
+    ACCESS:    r
+
+
+burst:
+  mode: custom
+  min-size: 10
+  max-size: 10
+  groupings:
+    - [VLE8_V, VADD_VX,]
+    - [VLE16_V, SW]
+
+histogram:
+  - [VLE8_V, 1.0]
+  - [VLSE8_V, 1.0]
+  - [VLSEG2E32_V, 1.0]
+  - [VSSE8_V, 1.0]
+  - [VLE16_V, 1.0]
+  - [VADD_VX, 1.0]
+  - [VLSSEG2E32_V, 1.0]
+  - [SW, 1.0]
+  - [MUL, 2.0]
+  - [DIV, 1.0]
+  - [ADD, 1.0]
+  - [ADDI, 1.0]
+
+# CHECK-DAG: {{(((VLE16_V|SW).*[[:space:]].*){10})}}
+# CHECK-DAG: {{(((VLE8_V|VADD_VX).*[[:space:]].*){10})}}

@@ -26,35 +26,35 @@ sections:
 
 histogram:
     - [VSETVL, 1.0]
-    - [VLE16_V, 1.0]
-    - [VSE16_V, 1.0]
-    - [VLE32_V, 1.0]
-    - [VSE32_V, 1.0]
+    - [VSETIVLI, 1.0]
+    - [VLSE32_V, 1.0]
+    - [VSSE32_V, 1.0]
+    - [VLSSEG6E8_V, 1.0]
 
 burst:
     mode: custom
     min-size: 4
     max-size: 16
     groupings:
-      - [VLE16_V, VSE16_V]
-      - [VLE32_V, VSE32_V]
+      - [VSETVL, VSETIVLI]
+      - [VLSE32_V, VSSE32_V]
 
-# CHECK: warning: (burst-mode) Opcode VLE16_V is not supported in the
+# CHECK: warning: (burst-mode) Opcode VSETIVLI is not supported in the
 # CHECK-SAME: burst mode: generator will generate it but not in a burst group.
-# CHECK-NEXT: warning: (burst-mode) Opcode VSE16_V is not supported in the
-# CHECK-SAME: burst mode: generator will generate it but not in a burst group.
-# CHECK-NEXT: warning: (burst-mode) Empty burst group: no supported opcodes were
-# CHECK-SAME: specified, this group will be ignored.
-
-# CHECK: warning: (burst-mode) Opcode VLE32_V is not supported in the
-# CHECK-SAME: burst mode: generator will generate it but not in a burst group.
-# CHECK-NEXT: warning: (burst-mode) Opcode VSE32_V is not supported in the
+# CHECK-NEXT: warning: (burst-mode) Opcode VSETVL is not supported in the
 # CHECK-SAME: burst mode: generator will generate it but not in a burst group.
 # CHECK-NEXT: warning: (burst-mode) Empty burst group: no supported opcodes were
 # CHECK-SAME: specified, this group will be ignored.
 
-# CHECK: VSE16_V
-# CHECK: VLE16_V
+# CHECK: warning: (burst-mode) Opcode VLSE32_V is not supported in the
+# CHECK-SAME: burst mode: generator will generate it but not in a burst group.
+# CHECK-NEXT: warning: (burst-mode) Opcode VSSE32_V is not supported in the
+# CHECK-SAME: burst mode: generator will generate it but not in a burst group.
+# CHECK-NEXT: warning: (burst-mode) Empty burst group: no supported opcodes were
+# CHECK-SAME: specified, this group will be ignored.
 
-# CHECK: VSE32_V
-# CHECK: VLE32_V
+# CHECK: VSETVL
+# CHECK: VSETIVLI
+
+# CHECK: VSSE32_V
+# CHECK: VLSE32_V
