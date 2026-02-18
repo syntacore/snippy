@@ -298,6 +298,7 @@ struct RVVConfigurationInfo final {
   const RVVConfiguration &selectConfiguration() const;
 
   bool isModeChangeArtificial() const { return ArtificialModeChange; }
+  bool isVXRMUpdateNeeded() const { return NeedsVXRMUpdate; }
   const ModeChangeInfo &getModeChangeInfo() const { return SwitchInfo; }
 
   const std::vector<RVVConfiguration> &getConfigs() const {
@@ -314,7 +315,8 @@ private:
 
   RVVConfigurationInfo(unsigned VLEN, ConfigGenerator &&CfgGen,
                        VLGenerator &&VLGen, VMGenerator &&VMGen,
-                       const ModeChangeInfo &SwitchInfo, bool EnableGuides);
+                       const ModeChangeInfo &SwitchInfo, bool EnableGuides,
+                       bool NeedsVXRMUpdate);
 
   const VLGeneratorHolder &selectVLGen(const RVVConfiguration &Config,
                                        bool ReduceVL) const;
@@ -326,6 +328,7 @@ private:
   VMGenerator VMGen;
   ModeChangeInfo SwitchInfo;
   bool ArtificialModeChange;
+  bool NeedsVXRMUpdate;
 
 public:
   // Support configuration can be temporarily used for support sequences, like
