@@ -434,6 +434,10 @@ size_t BlockGenPlanningImpl::fillReqWithContextModeChanges(
       ModeChanges = 1;
     }
 
+  auto GetSupportMetadataIfNeed = [&State](bool IsSupport) {
+    return IsSupport ? getMetadataMark(State.getCtx(), SnippyMetadata::Support)
+                     : nullptr;
+  };
   for (const auto &[MBB, ModeChanges, IsSupport] :
        zip_equal(BlocksToProcess, ModeChangeAmounts, ModeChangeIsSupport)) {
     assert(ModeChanges > 0);
@@ -441,7 +445,8 @@ size_t BlockGenPlanningImpl::fillReqWithContextModeChanges(
     for (size_t I = 0; I < ModeChanges; ++I) {
       FunReq.addToBlock(MBB, planning::InstructionGroupRequest(
                                  planning::RequestLimit::NumInstrs{!IsSupport},
-                                 planning::ModeChangingInstPolicy(IsSupport)));
+                                 planning::ModeChangingInstPolicy(
+                                     GetSupportMetadataIfNeed(IsSupport))));
     }
   }
 
