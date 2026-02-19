@@ -236,7 +236,7 @@ void ModeChangingInstPolicy::initialize(
   assert(!OpcodeFilter && "Opcode filter should not be created at this point.");
 
   const auto &Tgt = InstrGenCtx.ProgCtx.getLLVMState().getSnippyTarget();
-  OpcodeFilter = Tgt.generateModeChangeAndGetFilter(InstrGenCtx, IsSupport);
+  OpcodeFilter = Tgt.generateModeChangeAndGetFilter(InstrGenCtx, MetadataMark);
 }
 
 GenPolicy createGenPolicy(SnippyProgramContext &ProgCtx,
