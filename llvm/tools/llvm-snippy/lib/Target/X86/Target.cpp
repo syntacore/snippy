@@ -454,7 +454,9 @@ public:
 
   std::pair<AddressParts, MemAddresses>
   breakDownAddr(InstructionGenerationContext &IGC, AddressInfo AddrInfo,
-                const MachineInstr &MI, unsigned AddrIdx) const override {
+                const MCInstrDesc &InstrDesc,
+                MutableArrayRef<planning::PreselectedOpInfo> Preselected,
+                unsigned AddrIdx) const override {
     reportUnimplementedError();
   }
 

@@ -648,19 +648,19 @@ static unsigned getMemOperandIdx(const MCInstrDesc &InstrDesc) {
   auto Opcode = InstrDesc.getOpcode();
   assert(isSupportedLoadStore(Opcode) || isAtomicAMO(Opcode) ||
          isLrInstr(Opcode) || isScInstr(Opcode));
-  auto MemMCOpInfo = std::find_if(
-      InstrDesc.operands().begin(), InstrDesc.operands().end(),
-      [](const auto &OpInfo) {
-        return OpInfo.OperandType == MCOI::OperandType::OPERAND_MEMORY;
-      });
-  assert(MemMCOpInfo != InstrDesc.operands().end());
-  return std::distance(InstrDesc.operands().begin(), MemMCOpInfo);
+  auto Ops = InstrDesc.operands();
+  auto MemMCOpInfo = llvm::find_if(Ops, [](const auto &OpInfo) {
+    return OpInfo.OperandType == MCOI::OperandType::OPERAND_MEMORY;
+  });
+  assert(MemMCOpInfo != Ops.end());
+  return std::distance(Ops.begin(), MemMCOpInfo);
 }
 
-static const MachineOperand &getMemOperand(const MachineInstr &MI) {
-  const auto &InstrDesc = MI.getDesc();
+static const planning::PreselectedOpInfo &
+getMemOperand(const MCInstrDesc &InstrDesc,
+              MutableArrayRef<planning::PreselectedOpInfo> Preselected) {
   unsigned Idx = getMemOperandIdx(InstrDesc);
-  const auto &MemOp = MI.getOperand(Idx);
+  planning::PreselectedOpInfo &MemOp = Preselected[Idx];
   assert(MemOp.isReg() && "Memory operand is expected to be a register");
   return MemOp;
 }
@@ -680,26 +680,26 @@ static MemAddresses generateStridedMemAccesses(MemAddr Base,
   return Addresses;
 }
 
-static std::pair<AddressParts, MemAddresses>
-breakDownAddrForRVVStrided(AddressInfo AddrInfo, const MachineInstr &MI,
-                           InstructionGenerationContext &IGC, bool Is64Bit) {
-  auto Opcode = MI.getOpcode();
+static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVStrided(
+    AddressInfo AddrInfo, const MCInstrDesc &InstrDesc,
+    MutableArrayRef<planning::PreselectedOpInfo> Preselected,
+    InstructionGenerationContext &IGC, bool Is64Bit) {
+  auto Opcode = InstrDesc.getOpcode();
   assert(isRVVStridedLoadStore(Opcode) || isRVVStridedSegLoadStore(Opcode));
 
   const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
   auto &ProgCtx = IGC.ProgCtx;
   auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
-  auto VL = TgtCtx.getVL(*MI.getParent());
-  const auto &AddrReg = getMemOperand(MI);
-  auto AddrRegIdx = MI.getOperandNo(&AddrReg);
+  auto VL = TgtCtx.getVL(IGC.MBB);
+  unsigned AddrRegIdx = getMemOperandIdx(InstrDesc);
+  const auto &AddrReg = Preselected[AddrRegIdx];
+  assert(AddrReg.isReg());
   auto AddrValue = AddrInfo.Address;
   if (VL == 0)
     // When VL is zero, we may leave any values in address base and stride
     // registers.
     return std::make_pair(AddressParts{}, MemAddresses{});
-  auto &State = ProgCtx.getLLVMState();
-  auto &RI = State.getRegInfo();
-  AddressPart MainPart{AddrReg, APInt(ST.getXLen(), AddrValue), RI};
+  AddressPart MainPart{AddrReg.getReg(), APInt(ST.getXLen(), AddrValue)};
 
   if (VL == 1)
     // When VL is one, we may leave any value in the stride register.
@@ -707,8 +707,8 @@ breakDownAddrForRVVStrided(AddressInfo AddrInfo, const MachineInstr &MI,
                           MemAddresses{uintToTargetXLen(Is64Bit, AddrValue)});
 
   // Stride operand must be the next after the addr reg.
-  assert((MI.getNumOperands() > AddrRegIdx + 1) && "Expected stride operand");
-  const auto &StrideReg = MI.getOperand(AddrRegIdx + 1);
+  assert((Preselected.size() > AddrRegIdx + 1) && "Expected stride operand");
+  const auto &StrideReg = Preselected[AddrRegIdx + 1];
   assert(StrideReg.isReg() && "Stride operand must be reg");
   assert(StrideReg.getReg() != AddrReg.getReg() &&
          "Stride and addr regs cannot match");
@@ -764,17 +764,17 @@ breakDownAddrForRVVStrided(AddressInfo AddrInfo, const MachineInstr &MI,
   auto Addresses = generateStridedMemAccesses(MainPart.Value.getZExtValue(),
                                               Stride, VL, Is64Bit);
 
-  AddressPart StridePart{StrideReg, APInt(ST.getXLen(), Stride), RI};
+  AddressPart StridePart{StrideReg.getReg(), APInt(ST.getXLen(), Stride)};
   AddressParts Parts = {std::move(MainPart), std::move(StridePart)};
 
   return std::make_pair(std::move(Parts), std::move(Addresses));
 }
 
-static std::pair<AddressParts, MemAddresses>
-breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
-                           const InstructionGenerationContext &IGC,
-                           bool Is64Bit) {
-  auto Opcode = MI.getOpcode();
+static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVIndexed(
+    AddressInfo AddrInfo, const MCInstrDesc &InstrDesc,
+    MutableArrayRef<planning::PreselectedOpInfo> Preselected,
+    const InstructionGenerationContext &IGC, bool Is64Bit) {
+  auto Opcode = InstrDesc.getOpcode();
 
   assert(isRVVIndexedLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode));
   // Validate AddressInfo invariants.
@@ -787,24 +787,26 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
   auto &ProgCtx = IGC.ProgCtx;
   auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
   const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
-  unsigned VL = TgtCtx.getVL(*MI.getParent());
+  unsigned VL = TgtCtx.getVL(IGC.MBB);
   if (VL == 0)
     // When VL is zero we may leave any values in address base and index
     // registers.
     return std::make_pair(AddressParts{}, MemAddresses{});
-
-  const auto &AddrReg = getMemOperand(MI);
-  auto AddrRegIdx = MI.getOperandNo(&AddrReg);
-  assert((MI.getNumOperands() > AddrRegIdx + 1) && "Expected index operand");
-  const auto &IdxOp = MI.getOperand(AddrRegIdx + 1);
+  unsigned AddrRegIdx = getMemOperandIdx(InstrDesc);
+  const auto &AddrReg = Preselected[AddrRegIdx];
+  assert(AddrReg.isReg());
+  assert((Preselected.size() > AddrRegIdx + 1) && "Expected index operand");
+  auto &IdxOp = Preselected[AddrRegIdx + 1];
   assert(IdxOp.isReg() && "Index operand must have register type");
-  unsigned IdxReg = IdxOp.getReg();
+  auto IdxReg = IdxOp.getReg().id();
   assert(RISCV::VRRegClass.contains(IdxReg) && "Index operand must be vreg");
   // EEW of index element.
   auto EIEW = getIndexElementWidth(Opcode);
 
   LLVM_DEBUG(dbgs() << "breakDownAddrForRVVIndexed\n";
-             dbgs().indent(2) << "Instruction: " << MI);
+             dbgs().indent(2) << "Instruction: "
+                              << ProgCtx.getLLVMState().getInstrInfo().getName(
+                                     InstrDesc.getOpcode()));
 
   // For indexed loads/stores, only base address + index must be legal according
   // to the memory scheme, but base address by itself doesn't have to be. So the
@@ -916,7 +918,7 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
   auto IndexMinValue = MinBaseOffset - BaseAddr;
   auto MaxN = (IndexMaxValue - IndexMinValue).udiv(AddrInfo.MinStride);
 
-  AddressPart MainPart{AddrReg, BaseAddr};
+  AddressPart MainPart{AddrReg.getReg(), BaseAddr};
 
   AddressParts ValueToReg = {MainPart};
   MemAddresses Addresses;
@@ -961,27 +963,25 @@ breakDownAddrForRVVIndexed(AddressInfo AddrInfo, const MachineInstr &MI,
   return std::make_pair(std::move(ValueToReg), std::move(Addresses));
 }
 
-static std::pair<AddressParts, MemAddresses>
-breakDownAddrForInstrWithImmOffset(AddressInfo AddrInfo, const MachineInstr &MI,
-                                   InstructionGenerationContext &IGC,
-                                   bool Is64Bit) {
-  auto Opcode = MI.getOpcode();
+static std::pair<AddressParts, MemAddresses> breakDownAddrForInstrWithImmOffset(
+    AddressInfo AddrInfo, const MCInstrDesc &InstrDesc,
+    MutableArrayRef<planning::PreselectedOpInfo> Preselected,
+    InstructionGenerationContext &IGC, bool Is64Bit) {
+  auto Opcode = InstrDesc.getOpcode();
   assert(isLoadStore(Opcode) || isCLoadStore(Opcode) || isFPLoadStore(Opcode) ||
          isCFPLoadStore(Opcode) || isZicbo(Opcode));
 
-  auto &ProgCtx = IGC.ProgCtx;
-  auto &State = ProgCtx.getLLVMState();
-  auto &RI = State.getRegInfo();
   const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
-  const auto &AddrReg = getMemOperand(MI);
-  auto AddrRegIdx = MI.getOperandNo(&AddrReg);
+  unsigned AddrRegIdx = getMemOperandIdx(InstrDesc);
+  const auto &AddrReg = Preselected[AddrRegIdx];
+  assert(AddrReg.isReg());
   // Offset operand must be the next after the addr reg.
-  assert((MI.getNumOperands() > AddrRegIdx + 1) && "Expected offset operand");
-  const auto &AddrImm = MI.getOperand(AddrRegIdx + 1);
+  assert((Preselected.size() > AddrRegIdx + 1) && "Expected offset operand");
+  const auto &AddrImm = Preselected[AddrRegIdx + 1];
   assert(AddrImm.isImm() && "Offset operand must be imm");
-  auto AddrValue = AddrInfo.Address - AddrImm.getImm();
+  auto AddrValue = AddrInfo.Address - AddrImm.getImm().getMin();
 
-  auto Part = AddressPart{AddrReg, APInt(ST.getXLen(), AddrValue), RI};
+  auto Part = AddressPart{AddrReg.getReg(), APInt(ST.getXLen(), AddrValue)};
   return std::make_pair<AddressParts, MemAddresses>(
       {std::move(Part)}, {uintToTargetXLen(Is64Bit, AddrInfo.Address)});
 }
@@ -3150,8 +3150,10 @@ public:
 
   std::pair<AddressParts, MemAddresses>
   breakDownAddr(InstructionGenerationContext &IGC, AddressInfo AddrInfo,
-                const MachineInstr &MI, unsigned AddrIdx) const override {
-    auto Opcode = MI.getOpcode();
+                const MCInstrDesc &InstrDesc,
+                MutableArrayRef<planning::PreselectedOpInfo> Preselected,
+                unsigned AddrIdx) const override {
+    auto Opcode = InstrDesc.getOpcode();
     assert((isSupportedLoadStore(Opcode) || isAtomicAMO(Opcode) ||
             isLrInstr(Opcode) || isScInstr(Opcode)) &&
            "Requested addr calculation for unsupported instruction");
@@ -3163,12 +3165,10 @@ public:
         isRVVUnitStrideLoadStore(Opcode) || isRVVUnitStrideFFLoad(Opcode) ||
         isRVVUnitStrideSegLoadStore(Opcode) || isRVVWholeRegLoadStore(Opcode) ||
         isRVVUnitStrideMaskLoadStore(Opcode) || isZicbo(Opcode)) {
-      auto &State = ProgCtx.getLLVMState();
-      auto &RI = State.getRegInfo();
-      const auto &AddrReg = getMemOperand(MI);
+      const auto &AddrReg = getMemOperand(InstrDesc, Preselected);
       auto AddrValue = AddrInfo.Address;
       const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
-      auto Part = AddressPart{AddrReg, APInt(ST.getXLen(), AddrValue), RI};
+      auto Part = AddressPart{AddrReg.getReg(), APInt(ST.getXLen(), AddrValue)};
 
       if (isAtomicAMO(Opcode) || isLrInstr(Opcode) || isScInstr(Opcode) ||
           isRVVWholeRegLoadStore(Opcode) || isZicbo(Opcode))
@@ -3178,7 +3178,7 @@ public:
       assert(isRVV(Opcode));
       auto &TgtCtx =
           ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
-      auto VL = TgtCtx.getVL(*MI.getParent());
+      auto VL = TgtCtx.getVL(IGC.MBB);
       if (isRVVUnitStrideMaskLoadStore(Opcode))
         // RVV unit-stride mask instructions operate similarly to unmasked
         // byte loads or stores (EEW=8), except that the effective vector
@@ -3192,10 +3192,13 @@ public:
                                                         std::move(Addresses));
     }
     if (isRVVStridedLoadStore(Opcode) || isRVVStridedSegLoadStore(Opcode))
-      return breakDownAddrForRVVStrided(AddrInfo, MI, IGC, is64Bit(TM));
+      return breakDownAddrForRVVStrided(AddrInfo, InstrDesc, Preselected, IGC,
+                                        is64Bit(TM));
     if (isRVVIndexedLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode))
-      return breakDownAddrForRVVIndexed(AddrInfo, MI, IGC, is64Bit(TM));
-    return breakDownAddrForInstrWithImmOffset(AddrInfo, MI, IGC, is64Bit(TM));
+      return breakDownAddrForRVVIndexed(AddrInfo, InstrDesc, Preselected, IGC,
+                                        is64Bit(TM));
+    return breakDownAddrForInstrWithImmOffset(AddrInfo, InstrDesc, Preselected,
+                                              IGC, is64Bit(TM));
   }
 
   unsigned getWriteValueSequenceLength(InstructionGenerationContext &IGC,
