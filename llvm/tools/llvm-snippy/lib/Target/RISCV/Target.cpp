@@ -1298,7 +1298,7 @@ public:
 
   Config::OpcodeFilter
   generateModeChangeAndGetFilter(InstructionGenerationContext &IGC,
-                                 bool IsSupport) const override {
+                                 MDNode *MetadataMark) const override {
     const auto &ProgCtx = IGC.ProgCtx;
     const auto &RGC =
         ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
@@ -1306,7 +1306,7 @@ public:
     const auto *Subtarget = &IGC.getSubtarget<RISCVSubtarget>();
 
     const auto &NewRVVMode =
-        generateRVVModeSwitchAndUpdateContext(InstrInfo, IGC, IsSupport);
+        generateRVVModeSwitchAndUpdateContext(InstrInfo, IGC, MetadataMark);
 
     const auto VLEN = RGC.getVLEN();
     const auto *Cfg = NewRVVMode.Config;
@@ -1419,7 +1419,7 @@ public:
   void generateVRegsInit(InstructionGenerationContext &IGC,
                          const RISCVRegisterState &Regs) const {
     auto &ProgCtx = IGC.ProgCtx;
-    const auto &State = ProgCtx.getLLVMState();
+    auto &State = ProgCtx.getLLVMState();
     auto RP = IGC.pushRegPool();
 
     const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
@@ -1432,7 +1432,9 @@ public:
       auto InitV0 = Regs.VRegs[0];
       writeValueToReg(IGC, InitV0, RISCV::V0);
     }
-    generateRVVModeSwitchAndUpdateContext(InstrInfo, IGC);
+    generateRVVModeSwitchAndUpdateContext(
+        InstrInfo, IGC,
+        getMetadataMark(State.getCtx(), SnippyMetadata::Support));
 
     generateNonMaskVRegsInit(IGC, Regs, [](Register Reg) { return false; });
   }
@@ -1458,7 +1460,7 @@ public:
                                    const RISCVRegisterState &Regs) const {
     auto &MBB = IGC.MBB;
     auto &ProgCtx = IGC.ProgCtx;
-    const auto &State = ProgCtx.getLLVMState();
+    auto &State = ProgCtx.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
     const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
     auto &RGC = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
@@ -1468,7 +1470,9 @@ public:
 
     const auto VLEN = RGC.getVLEN();
     const auto &NewRVVMode = getSEWXlenVLMaxSupportRVVMode(IGC, MBB, VLEN);
-    generateRVVModeUpdate(IGC, InstrInfo, NewRVVMode);
+    generateRVVModeUpdate(
+        IGC, InstrInfo, NewRVVMode,
+        getMetadataMark(State.getCtx(), SnippyMetadata::Support));
 
     auto InsertPos = MBB.getFirstTerminator();
     // Initialize registers before taking a branch
@@ -2685,8 +2689,8 @@ public:
 
   MachineInstr *generateCall(InstructionGenerationContext &IGC,
                              const Function &Target,
-                             bool AsSupport) const override {
-    return generateCall(IGC, Target, AsSupport, RISCV::JAL);
+                             MDNode *MetadataMark) const override {
+    return generateCall(IGC, Target, MetadataMark, RISCV::JAL);
   }
 
   MachineInstr *loadSymbolAddress(InstructionGenerationContext &IGC,
@@ -2734,20 +2738,22 @@ public:
   }
 
   MachineInstr *generateJAL(InstructionGenerationContext &IGC,
-                            const Function &Target, bool AsSupport) const {
+                            const Function &Target,
+                            MDNode *MetadataMark) const {
     auto &ProgCtx = IGC.ProgCtx;
     const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
     auto &State = ProgCtx.getLLVMState();
     auto &Ctx = State.getCtx();
     // Despite PseudoCALL gets expanded by RISCVMCCodeEmitter to JALR
     // instruction, it has chance to be relaxed back to JAL by linker.
-    return getInstBuilder(AsSupport, *this, IGC.MBB, IGC.Ins, Ctx,
+    return getInstBuilder(MetadataMark, *this, IGC.MBB, IGC.Ins, Ctx,
                           InstrInfo.get(RISCV::PseudoCALL))
         .addGlobalAddress(&Target, 0, RISCVII::MO_CALL);
   }
 
   MachineInstr *generateJALR(InstructionGenerationContext &IGC,
-                             const Function &Target, bool AsSupport) const {
+                             const Function &Target,
+                             MDNode *MetadataMark) const {
     auto &ProgCtx = IGC.ProgCtx;
     const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
     auto &State = ProgCtx.getLLVMState();
@@ -2758,20 +2764,20 @@ public:
     auto Reg = getNonZeroReg("scratch register for storing function address",
                              RI, RegClass, *RP, IGC.MBB);
     loadSymbolAddress(IGC, Reg, &Target);
-    return getInstBuilder(AsSupport, *this, IGC.MBB, IGC.Ins, Ctx,
+    return getInstBuilder(MetadataMark, *this, IGC.MBB, IGC.Ins, Ctx,
                           InstrInfo.get(RISCV::PseudoCALLIndirect))
         .addReg(Reg);
   }
 
   MachineInstr *generateCall(InstructionGenerationContext &IGC,
-                             const Function &Target, bool AsSupport,
+                             const Function &Target, MDNode *MetadataMark,
                              unsigned PreferredCallOpcode) const override {
     assert(isCall(PreferredCallOpcode) && "Expected call here");
     switch (PreferredCallOpcode) {
     case RISCV::JAL:
-      return generateJAL(IGC, Target, AsSupport);
+      return generateJAL(IGC, Target, MetadataMark);
     case RISCV::JALR:
-      return generateJALR(IGC, Target, AsSupport);
+      return generateJALR(IGC, Target, MetadataMark);
     default:
       snippy::fatal("Unsupported call instruction");
     }
@@ -3881,23 +3887,20 @@ private:
   RVVModeInfo
   generateRVVModeSwitchAndUpdateContext(const MCInstrInfo &InstrInfo,
                                         InstructionGenerationContext &IGC,
-                                        bool IsSupport = true) const;
+                                        MDNode *MetadataMark) const;
 
   RVVModeInfo createRVVMode(InstructionGenerationContext &IGC,
                             unsigned DesiredOpcode) const;
 
-  void generateVTypeChange(InstructionGenerationContext &IGC,
-                           const MCInstrInfo &InstrInfo,
-                           const RVVModeInfo &NewRVVMode,
-                           std::optional<unsigned> DesiredOpcode = std::nullopt,
-                           bool IsSupport = true) const;
+  void generateVTypeChange(
+      InstructionGenerationContext &IGC, const MCInstrInfo &InstrInfo,
+      const RVVModeInfo &NewRVVMode, MDNode *MetadataMark,
+      std::optional<unsigned> DesiredOpcode = std::nullopt) const;
 
-  void
-  generateRVVModeUpdate(InstructionGenerationContext &IGC,
-                        const MCInstrInfo &InstrInfo,
-                        const RVVModeInfo &NewRVVMode,
-                        std::optional<unsigned> DesiredOpcode = std::nullopt,
-                        bool IsSupport = true) const;
+  void generateRVVModeUpdate(
+      InstructionGenerationContext &IGC, const MCInstrInfo &InstrInfo,
+      const RVVModeInfo &NewRVVMode, MDNode *MetadataMark,
+      std::optional<unsigned> DesiredOpcode = std::nullopt) const;
 
   bool generateRVVModeUpdateIfNeeded(InstructionGenerationContext &IGC,
                                      const MCInstrInfo &InstrInfo,
@@ -3913,15 +3916,15 @@ private:
   // generateVTypeChange only
   void generateVSETIVLI(InstructionGenerationContext &IGC,
                         const MCInstrInfo &InstrInfo, unsigned VTYPE,
-                        unsigned VL, bool SupportMarker) const;
+                        unsigned VL, MDNode *MetadataMark) const;
 
   void generateVSETVLI(InstructionGenerationContext &IGC,
                        const MCInstrInfo &InstrInfo, unsigned VTYPE,
-                       unsigned VL, bool SupportMarker) const;
+                       unsigned VL, MDNode *MetadataMark) const;
 
   void generateVSETVL(InstructionGenerationContext &IGC,
                       const MCInstrInfo &InstrInfo, unsigned VTYPE, unsigned VL,
-                      bool SupportMarker) const;
+                      MDNode *MetadataMark) const;
 
   bool isFloatingPoint(MCRegister Reg) const override {
     return snippy::isFloatingPointReg(Reg);
@@ -4241,8 +4244,8 @@ void SnippyRISCVTarget::rvvWriteValueUsingXReg(
     InstructionGenerationContext &IGC, APInt Value, unsigned DstReg) const {
 
   auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
   const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
-  const auto &State = ProgCtx.getLLVMState();
   const auto &InstrInfo = State.getInstrInfo();
   assert(ST.hasStdExtV());
 
@@ -4250,7 +4253,9 @@ void SnippyRISCVTarget::rvvWriteValueUsingXReg(
       rvvWriteValueUsingXRegAndGetOldMode(IGC, Value, DstReg);
 
   if (RVVModeToRestore.has_value())
-    generateRVVModeUpdate(IGC, InstrInfo, RVVModeToRestore.value());
+    generateRVVModeUpdate(
+        IGC, InstrInfo, RVVModeToRestore.value(),
+        getMetadataMark(State.getCtx(), SnippyMetadata::Support));
 }
 
 // In case if there is no active RVV mode, the support RVVMode will be installed
@@ -4286,7 +4291,9 @@ void SnippyRISCVTarget::rvvWriteValueToV0UsingVReg(
 
   // Restore only config, not the mask (v0)
   if (RVVModeToRestore.has_value())
-    generateVTypeChange(IGC, InstrInfo, *RVVModeToRestore);
+    generateVTypeChange(
+        IGC, InstrInfo, *RVVModeToRestore,
+        getMetadataMark(State.getCtx(), SnippyMetadata::Support));
 }
 
 void SnippyRISCVTarget::rvvWriteValueUsingLoad(
@@ -4410,13 +4417,14 @@ RVVModeInfo SnippyRISCVTarget::createRVVMode(InstructionGenerationContext &IGC,
 
 RVVModeInfo SnippyRISCVTarget::generateRVVModeSwitchAndUpdateContext(
     const MCInstrInfo &InstrInfo, InstructionGenerationContext &IGC,
-    bool IsSupport) const {
+    MDNode *MetadataMark) const {
   const auto &RGC =
       IGC.ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
   unsigned DesiredOpcode =
       selectDesiredModeChangeInstruction(RVVModeChangePreferenceOpt, RGC);
   const auto &NewRVVMode = createRVVMode(IGC, DesiredOpcode);
-  generateRVVModeUpdate(IGC, InstrInfo, NewRVVMode, DesiredOpcode, IsSupport);
+  generateRVVModeUpdate(IGC, InstrInfo, NewRVVMode, MetadataMark,
+                        DesiredOpcode);
   return NewRVVMode;
 }
 
@@ -4464,7 +4472,7 @@ void SnippyRISCVTarget::generateV0MaskUpdate(
 void SnippyRISCVTarget::generateVSETIVLI(InstructionGenerationContext &IGC,
                                          const MCInstrInfo &InstrInfo,
                                          unsigned VTYPE, unsigned VL,
-                                         bool SupportMarker) const {
+                                         MDNode *MetadataMark) const {
   assert(VL <= kMaxVLForVSETIVLI);
   auto &MBB = IGC.MBB;
   auto &Ins = IGC.Ins;
@@ -4473,10 +4481,11 @@ void SnippyRISCVTarget::generateVSETIVLI(InstructionGenerationContext &IGC,
   const auto &RI = State.getRegInfo();
   auto &RP = IGC.getRegPool();
   auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
-  auto DstReg = RP.getAvailableRegister(
-      "VSETIVLI dst", RI, RegClass, MBB,
-      SupportMarker ? AccessMaskBit::SupportRW : AccessMaskBit::PrimaryRW);
-  auto MIB = getInstBuilder(SupportMarker, *this, MBB, Ins,
+  auto IsSupport = checkMetadata(MetadataMark, SnippyMetadata::Support);
+  auto DstReg = RP.getAvailableRegister("VSETIVLI dst", RI, RegClass, MBB,
+                                        IsSupport ? AccessMaskBit::SupportRW
+                                                  : AccessMaskBit::PrimaryRW);
+  auto MIB = getInstBuilder(MetadataMark, *this, MBB, Ins,
                             ProgCtx.getLLVMState().getCtx(),
                             InstrInfo.get(RISCV::VSETIVLI));
   MIB.addDef(DstReg).addImm(VL).addImm(VTYPE);
@@ -4485,7 +4494,7 @@ void SnippyRISCVTarget::generateVSETIVLI(InstructionGenerationContext &IGC,
 void SnippyRISCVTarget::generateVSETVLI(InstructionGenerationContext &IGC,
                                         const MCInstrInfo &InstrInfo,
                                         unsigned VTYPE, unsigned VL,
-                                        bool SupportMarker) const {
+                                        MDNode *MetadataMark) const {
   auto &RP = IGC.getRegPool();
   auto &MBB = IGC.MBB;
   auto &Ins = IGC.Ins;
@@ -4494,14 +4503,15 @@ void SnippyRISCVTarget::generateVSETVLI(InstructionGenerationContext &IGC,
   // TODO 2: if VL is not changed, and DST is zero, scratch VL can be zero
   const auto &RI = ProgCtx.getLLVMState().getRegInfo();
   auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
-  auto DstReg = RP.getAvailableRegister(
-      "for VSETVLI dst", RI, RegClass, MBB,
-      SupportMarker ? AccessMaskBit::SupportRW : AccessMaskBit::PrimaryRW);
+  auto IsSupport = checkMetadata(MetadataMark, SnippyMetadata::Support);
+  auto DstReg = RP.getAvailableRegister("for VSETVLI dst", RI, RegClass, MBB,
+                                        IsSupport ? AccessMaskBit::SupportRW
+                                                  : AccessMaskBit::PrimaryRW);
   auto ScratchRegVL = getNonZeroReg("for VSETVLI VL", RI, RegClass, RP, MBB,
                                     AccessMaskBit::SupportRW);
   writeValueToReg(IGC, APInt(IGC.getSubtarget<RISCVSubtarget>().getXLen(), VL),
                   ScratchRegVL);
-  auto MIB = getInstBuilder(SupportMarker, *this, MBB, Ins,
+  auto MIB = getInstBuilder(MetadataMark, *this, MBB, Ins,
                             ProgCtx.getLLVMState().getCtx(),
                             InstrInfo.get(RISCV::VSETVLI));
   MIB.addDef(DstReg);
@@ -4512,7 +4522,7 @@ void SnippyRISCVTarget::generateVSETVLI(InstructionGenerationContext &IGC,
 void SnippyRISCVTarget::generateVSETVL(InstructionGenerationContext &IGC,
                                        const MCInstrInfo &InstrInfo,
                                        unsigned VTYPE, unsigned VL,
-                                       bool SupportMarker) const {
+                                       MDNode *MetadataMark) const {
   // TODO 1: if VL is equal to VLMAX we can use X0 if DstReg is not zero
   // TODO 2: if VL is not changed, and DST is zero, scratch VL can be zero
   auto &MBB = IGC.MBB;
@@ -4521,9 +4531,10 @@ void SnippyRISCVTarget::generateVSETVL(InstructionGenerationContext &IGC,
   const auto &RI = ProgCtx.getLLVMState().getRegInfo();
   auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
   auto RP = IGC.pushRegPool();
-  auto DstReg = RP->getAvailableRegister(
-      "for VSETVL dst", RI, RegClass, MBB,
-      SupportMarker ? AccessMaskBit::SupportRW : AccessMaskBit::PrimaryRW);
+  auto IsSupport = checkMetadata(MetadataMark, SnippyMetadata::Support);
+  auto DstReg = RP->getAvailableRegister("for VSETVL dst", RI, RegClass, MBB,
+                                         IsSupport ? AccessMaskBit::SupportRW
+                                                   : AccessMaskBit::PrimaryRW);
   const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
   // TODO: maybe just use GPRNoX0RegClassID class?
   auto [ScratchRegVL, ScratchRegVType] = RP->getNAvailableRegisters<2>(
@@ -4533,7 +4544,7 @@ void SnippyRISCVTarget::generateVSETVL(InstructionGenerationContext &IGC,
   writeValueToReg(IGC, APInt(ST.getXLen(), VL), ScratchRegVL);
   RP->addReserved(ScratchRegVL);
   writeValueToReg(IGC, APInt(ST.getXLen(), VTYPE), ScratchRegVType);
-  auto MIB = getInstBuilder(SupportMarker, *this, MBB, Ins,
+  auto MIB = getInstBuilder(MetadataMark, *this, MBB, Ins,
                             ProgCtx.getLLVMState().getCtx(),
                             InstrInfo.get(RISCV::VSETVL));
   MIB.addDef(DstReg);
@@ -4544,8 +4555,8 @@ void SnippyRISCVTarget::generateVSETVL(InstructionGenerationContext &IGC,
 // generates VSET{I}VL{I} without V0 update
 void SnippyRISCVTarget::generateVTypeChange(
     InstructionGenerationContext &IGC, const MCInstrInfo &InstrInfo,
-    const RVVModeInfo &NewRVVMode, std::optional<unsigned> DesiredOpcode,
-    bool SupportMarker) const {
+    const RVVModeInfo &NewRVVMode, MDNode *MetadataMark,
+    std::optional<unsigned> DesiredOpcode) const {
   assert(NewRVVMode.Config != nullptr);
   const auto VL = NewRVVMode.VLVM.VL;
   const auto &Config = *NewRVVMode.Config;
@@ -4566,13 +4577,13 @@ void SnippyRISCVTarget::generateVTypeChange(
 
   switch (DesiredOpcode.value()) {
   case RISCV::VSETIVLI:
-    generateVSETIVLI(IGC, InstrInfo, VTYPE, VL, SupportMarker);
+    generateVSETIVLI(IGC, InstrInfo, VTYPE, VL, MetadataMark);
     break;
   case RISCV::VSETVLI:
-    generateVSETVLI(IGC, InstrInfo, VTYPE, VL, SupportMarker);
+    generateVSETVLI(IGC, InstrInfo, VTYPE, VL, MetadataMark);
     break;
   case RISCV::VSETVL:
-    generateVSETVL(IGC, InstrInfo, VTYPE, VL, SupportMarker);
+    generateVSETVL(IGC, InstrInfo, VTYPE, VL, MetadataMark);
     break;
   default:
     llvm_unreachable("unexpected OpcodeRequested for generateVTypeChange");
@@ -4615,13 +4626,13 @@ static void generateVXRMUpdateIfNeeded(InstructionGenerationContext &IGC,
 
 void SnippyRISCVTarget::generateRVVModeUpdate(
     InstructionGenerationContext &IGC, const MCInstrInfo &InstrInfo,
-    const RVVModeInfo &NewRVVMode, std::optional<unsigned> DesiredOpcode,
-    bool SupportMarket) const {
+    const RVVModeInfo &NewRVVMode, MDNode *MetadataMark,
+    std::optional<unsigned> DesiredOpcode) const {
   const auto &RGC =
       IGC.ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
 
   generateVXRMUpdateIfNeeded(IGC, NewRVVMode, InstrInfo);
-  generateVTypeChange(IGC, InstrInfo, NewRVVMode, DesiredOpcode, SupportMarket);
+  generateVTypeChange(IGC, InstrInfo, NewRVVMode, MetadataMark, DesiredOpcode);
   generateV0MaskUpdate(IGC, NewRVVMode.VLVM.VM, InstrInfo);
 
   // Check that we got what expected, even if there was a change to temporary
@@ -4645,7 +4656,9 @@ bool SnippyRISCVTarget::generateRVVModeUpdateIfNeeded(
   if (RGC.hasActiveRVVMode(MBB) && RGC.getActiveRVVMode(MBB) == NewRVVMode)
     return false;
 
-  generateRVVModeUpdate(IGC, InstrInfo, NewRVVMode);
+  auto &Ctx = IGC.ProgCtx.getLLVMState().getCtx();
+  generateRVVModeUpdate(IGC, InstrInfo, NewRVVMode,
+                        getMetadataMark(Ctx, SnippyMetadata::Support));
   return true;
 }
 

@@ -63,6 +63,7 @@ inline StringRef getStrMetadata(SnippyMetadata M) {
 } // namespace detail
 
 bool checkMetadata(const MachineInstr &MI, SnippyMetadata M);
+bool checkMetadata(MDNode *MetadataMark, SnippyMetadata M);
 
 template <typename IteratorType>
 size_t countPrimaryInstructions(IteratorType Begin, IteratorType End) {

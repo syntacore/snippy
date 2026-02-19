@@ -19,16 +19,20 @@
 namespace llvm {
 namespace snippy {
 
-bool checkMetadata(const MachineInstr &MI, SnippyMetadata M) {
+bool checkMetadata(MDNode *MetadataMark, SnippyMetadata M) {
   // FIXME: we do not have appropriate way to check metadata.
-  MDNode *Node = MI.getPCSections();
-  if (!Node)
+  if (!MetadataMark)
     return false;
-  auto *I = llvm::find_if(Node->operands(), [M](auto &&Oper) {
+  auto *I = llvm::find_if(MetadataMark->operands(), [M](auto &&Oper) {
     auto *MDStr = dyn_cast<MDString>(Oper);
     return MDStr && MDStr->getString() == detail::getStrMetadata(M);
   });
-  return I != Node->operands().end();
+  return I != MetadataMark->operands().end();
+}
+
+bool checkMetadata(const MachineInstr &MI, SnippyMetadata M) {
+  // FIXME: we do not have appropriate way to check metadata.
+  return checkMetadata(MI.getPCSections(), M);
 }
 
 void writeFile(StringRef Path, StringRef Data) {

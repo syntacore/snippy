@@ -356,8 +356,7 @@ struct InstructionRequest final {
   unsigned Opcode;
   std::vector<PreselectedOpInfo> Preselected;
 
-  // TODO: Replace this flag with MDNode (Metadata Node)
-  bool IsSupport = false;
+  MDNode *MetadataMark = nullptr;
 };
 
 namespace detail {
@@ -386,10 +385,10 @@ class ModeChangingInstPolicy final : public detail::EmptyFinalizeMixin {
   // | ...
   //
   std::function<bool(unsigned)> OpcodeFilter;
-  bool IsSupport = true;
+  MDNode *MetadataMark = nullptr;
 
 public:
-  ModeChangingInstPolicy(bool IsSupport) : IsSupport(IsSupport) {}
+  ModeChangingInstPolicy(MDNode *MetadataMark) : MetadataMark(MetadataMark) {}
 
   std::optional<InstructionRequest> next() { return std::nullopt; }
 

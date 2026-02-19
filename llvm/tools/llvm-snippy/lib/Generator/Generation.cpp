@@ -1106,7 +1106,7 @@ void postprocessMemoryOperands(MachineInstr &MI,
 
 MachineInstr *generateCall(unsigned OpCode,
                            planning::InstructionGenerationContext &InstrGenCtx,
-                           bool IsSupport) {
+                           MDNode *MetadataMark) {
   auto &MBB = InstrGenCtx.MBB;
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
@@ -1127,7 +1127,7 @@ MachineInstr *generateCall(unsigned OpCode,
   assert(CallTarget.hasName());
 
   auto *Call =
-      SnippyTgt.generateCall(InstrGenCtx, CallTarget, IsSupport, OpCode);
+      SnippyTgt.generateCall(InstrGenCtx, CallTarget, MetadataMark, OpCode);
   assert(Call);
   if (CalleeNode->isExternal())
     addSnippyMetadata(*Call, *MBB.getParent(), State.getCtx(),
@@ -1159,14 +1159,14 @@ MachineInstr *
 randomInstruction(const MCInstrDesc &InstrDesc,
                   std::vector<planning::PreselectedOpInfo> Preselected,
                   planning::InstructionGenerationContext &InstrGenCtx,
-                  bool IsSupport) {
+                  MDNode *MetadataMark) {
   auto &MBB = InstrGenCtx.MBB;
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
 
   auto MIB =
-      getInstBuilder(IsSupport, SnippyTgt, MBB, InstrGenCtx.Ins,
+      getInstBuilder(MetadataMark, SnippyTgt, MBB, InstrGenCtx.Ins,
                      MBB.getParent()->getFunction().getContext(), InstrDesc);
 
   bool DoPostprocess = isPostprocessNeeded(InstrDesc, Preselected, InstrGenCtx);
@@ -1239,7 +1239,7 @@ void generateRealInstruction(
     const MCInstrDesc &InstrDesc,
     planning::InstructionGenerationContext &InstrGenCtx,
     std::vector<planning::PreselectedOpInfo> Preselected,
-    bool IsSupport = false) {
+    MDNode *MetadataMark = nullptr) {
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   auto Opc = InstrDesc.getOpcode();
@@ -1254,9 +1254,9 @@ void generateRealInstruction(
   }
 
   auto *MI = (SnippyTgt.isCall(Opc))
-                 ? generateCall(Opc, InstrGenCtx, IsSupport)
+                 ? generateCall(Opc, InstrGenCtx, MetadataMark)
                  : randomInstruction(InstrDesc, std::move(Preselected),
-                                     InstrGenCtx, IsSupport);
+                                     InstrGenCtx, MetadataMark);
 
   if (!MI || !MI->isPseudo())
     return;
@@ -1267,10 +1267,10 @@ void generateRealInstruction(
 void generateInstruction(const MCInstrDesc &InstrDesc,
                          planning::InstructionGenerationContext &InstrGenCtx,
                          std::vector<planning::PreselectedOpInfo> Preselected,
-                         bool IsSupport) {
+                         MDNode *MetadataMark) {
 
   generateRealInstruction(InstrDesc, InstrGenCtx, std::move(Preselected),
-                          IsSupport);
+                          MetadataMark);
 }
 
 MachineBasicBlock *findNextBlockOnModel(MachineBasicBlock &MBB,
@@ -1790,12 +1790,12 @@ void generate(planning::InstructionGroupRequest &IG,
     planning::InstrRequestRange Range(IG, InstrGenCtx.Stats);
     for (auto &&IR : Range) {
       generateInstruction(InstrInfo.get(IR.Opcode), InstrGenCtx,
-                          std::move(IR.Preselected), IR.IsSupport);
+                          std::move(IR.Preselected), IR.MetadataMark);
 
       if (!IG.isInseparableBundle()) {
         ItBegin =
             processGeneratedInstructions(ItBegin, InstrGenCtx, IG.limit());
-        if (GenerateInsertionPointHints && !IR.IsSupport)
+        if (GenerateInsertionPointHints && !IR.MetadataMark)
           generateInsertionPointHint(InstrGenCtx);
       }
     }

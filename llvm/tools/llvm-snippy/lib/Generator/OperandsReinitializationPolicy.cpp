@@ -237,8 +237,9 @@ ValuegramGenPolicy::generateRegInit(InstructionGenerationContext &InstrGenCtx,
                               InstrsForWrite);
     llvm::transform(
         InstrsForWrite, std::back_inserter(InitInstrs), [&](const auto &I) {
-          return InstructionRequest{I.getOpcode(), getPreselectedForInstr(I),
-                                    /*IsSupport=*/true};
+          return InstructionRequest{
+              I.getOpcode(), getPreselectedForInstr(I),
+              getMetadataMark(State.getCtx(), SnippyMetadata::Support)};
         });
   });
   return InitInstrs;

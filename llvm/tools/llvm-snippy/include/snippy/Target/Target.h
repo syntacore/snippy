@@ -275,7 +275,7 @@ public:
 
   virtual std::function<bool(unsigned)>
   generateModeChangeAndGetFilter(InstructionGenerationContext &IGC,
-                                 bool IsSupport) const = 0;
+                                 MDNode *MetadataMark) const = 0;
 
   virtual std::vector<Register>
   getRegsForSelfcheck(const MachineInstr &MI,
@@ -447,10 +447,11 @@ public:
 
   virtual MachineInstr *generateCall(InstructionGenerationContext &IGC,
                                      const Function &Target,
-                                     bool AsSupport) const = 0;
+                                     MDNode *MetadataMark) const = 0;
 
   virtual MachineInstr *generateCall(InstructionGenerationContext &IGC,
-                                     const Function &Target, bool AsSupport,
+                                     const Function &Target,
+                                     MDNode *MetadataMark,
                                      unsigned PreferredCallOpCode) const = 0;
 
   virtual MachineInstr *generateTailCall(InstructionGenerationContext &IGC,
