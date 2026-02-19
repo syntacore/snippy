@@ -123,16 +123,6 @@ getMainInstBuilder(const SnippyTarget &Tgt, MachineBasicBlock &MBB,
                         Desc, DstReg...);
 }
 
-template <typename... DstArgs>
-MachineInstrBuilder
-getInstBuilder(bool IsSupport, const SnippyTarget &Tgt, MachineBasicBlock &MBB,
-               MachineBasicBlock::iterator Ins, LLVMContext &Context,
-               const MCInstrDesc &Desc, DstArgs... DstReg) {
-  if (IsSupport)
-    return getSupportInstBuilder(Tgt, MBB, Ins, Context, Desc, DstReg...);
-  return getMainInstBuilder(Tgt, MBB, Ins, Context, Desc, DstReg...);
-}
-
 } // namespace snippy
 } // namespace llvm
 #endif
