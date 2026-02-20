@@ -16,7 +16,7 @@ extern "C" {
 
 #define RVMAPI_ENTRY_POINT_SYMBOL RVMVTable
 #define RVMAPI_VERSION_SYMBOL RVMInterfaceVersion
-#define RVMAPI_CURRENT_INTERFACE_VERSION 29u
+#define RVMAPI_CURRENT_INTERFACE_VERSION 30u
 
 typedef uint64_t RVMRegT;
 
@@ -85,6 +85,9 @@ typedef enum {
   MACRO(RVM_ZEXT_AAMO, aamo)                                                   \
   MACRO(RVM_ZEXT_ABHA, abha)                                                   \
   MACRO(RVM_ZEXT_ACAS, acas)                                                   \
+  MACRO(RVM_ZEXT_ALASR, alasr)                                                 \
+  MACRO(RVM_ZEXT_ALRSC, alrsc)                                                 \
+  MACRO(RVM_ZEXT_AWRS, awrs)                                                   \
   MACRO(RVM_ZEXT_CMOP, cmop)                                                   \
   MACRO(RVM_ZEXT_CMP, cmp)                                                     \
   MACRO(RVM_ZEXT_CMT, cmt)                                                     \
@@ -93,6 +96,7 @@ typedef enum {
   MACRO(RVM_ZEXT_CB, cb)                                                       \
   MACRO(RVM_ZEXT_CF, cf)                                                       \
   MACRO(RVM_ZEXT_CD, cd)                                                       \
+  MACRO(RVM_ZEXT_CLSD, clsd)                                                   \
   MACRO(RVM_ZEXT_FA, fa)                                                       \
   MACRO(RVM_ZEXT_FBFMIN, fbfmin)                                               \
   MACRO(RVM_ZEXT_FH, fh)                                                       \
@@ -141,7 +145,8 @@ typedef enum {
   MACRO(RVM_ZEXT_KN, kn)                                                       \
   MACRO(RVM_ZEXT_KS, ks)                                                       \
   MACRO(RVM_ZEXT_K, k)                                                         \
-  MACRO(RVM_ZEXT_KT, kt)
+  MACRO(RVM_ZEXT_KT, kt)                                                       \
+  MACRO(RVM_ZEXT_MMUL, mmul)
 #endif
 
 typedef enum {
@@ -160,11 +165,19 @@ typedef enum {
 } RVMXExt;
 #undef RVM_DEFINE_ENUM_CASE
 
+#define RVM_ZEXT_MAX 512
+#define RVM_XEXT_MAX 128
+
+#ifdef __cplusplus
+static_assert(RVM_ZEXT_MAX > RVM_ZEXT_NUMBER);
+static_assert(RVM_XEXT_MAX > RVM_XEXT_NUMBER);
+#endif // __cplusplus
+
 typedef struct RVMExtDescriptor {
   size_t ZExtSize; // Set this to sizeof(ZExt)
   size_t XExtSize; // Set this to sizeof(XExt)
-  char ZExt[RVM_ZEXT_NUMBER];
-  char XExt[RVM_XEXT_NUMBER];
+  char ZExt[RVM_ZEXT_MAX];
+  char XExt[RVM_XEXT_MAX];
   char MisaExt[RVM_MISA_NUMBER];
 } RVMExtDescriptor;
 
