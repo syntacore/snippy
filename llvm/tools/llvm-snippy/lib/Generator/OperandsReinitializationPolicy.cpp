@@ -16,18 +16,6 @@ namespace snippy {
 
 namespace planning {
 
-std::vector<planning::PreselectedOpInfo>
-getPreselectedForInstr(const MCInst &Inst) {
-  using planning::PreselectedOpInfo;
-  std::vector<PreselectedOpInfo> Preselected;
-  Preselected.reserve(Inst.getNumOperands());
-  transform(Inst, std::back_inserter(Preselected), [](const auto &Operand) {
-    auto OpOrErr = PreselectedOpInfo::fromMCOperand(Operand);
-    return unwrapOrFatal(std::move(OpOrErr));
-  });
-  return Preselected;
-}
-
 static bool isDestinationRegister(unsigned OpIndex, unsigned NumDefs) {
   // NumDefs - number of MachineOperands that are register definitions.
   // Register definitions always occur at the start of the machine operand list.
@@ -237,8 +225,13 @@ ValuegramGenPolicy::generateRegInit(InstructionGenerationContext &InstrGenCtx,
                               InstrsForWrite);
     llvm::transform(
         InstrsForWrite, std::back_inserter(InitInstrs), [&](const auto &I) {
+          auto Preselected = getPreselectedForInstr(I);
+          if (auto Err = Preselected.takeError())
+            snippy::fatal(
+                "While generating reg init for operand reinitialization",
+                toString(std::move(Err)));
           return InstructionRequest{
-              I.getOpcode(), getPreselectedForInstr(I),
+              I.getOpcode(), std::move(*Preselected),
               getMetadataMark(State.getCtx(), SnippyMetadata::Support)};
         });
   });

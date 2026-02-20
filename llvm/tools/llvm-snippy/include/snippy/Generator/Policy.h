@@ -137,7 +137,18 @@ public:
   PreselectedOpInfo(llvm::Register R) : Value(R) {}
   PreselectedOpInfo(StridedImmediate Imm) : Value(Imm) {}
   PreselectedOpInfo() = default;
-  static Expected<PreselectedOpInfo> fromMCOperand(const MCOperand &Op);
+  template <typename OperandTy>
+  static Expected<PreselectedOpInfo> fromOperand(const OperandTy &Op) {
+    if (Op.isReg())
+      return PreselectedOpInfo(Register(Op.getReg()));
+    if (Op.isImm())
+      return PreselectedOpInfo(StridedImmediate(/* MinIn */ Op.getImm(),
+                                                /* MaxIn */ Op.getImm(),
+                                                /* StrideIn */ 0));
+    return snippy::makeFailure(
+        Errc::Unimplemented,
+        "Unknown Operand Type while constructing PreselectedOpInfo");
+  }
 
   bool isReg() const { return std::holds_alternative<RegTy>(Value); }
   bool isImm() const { return std::holds_alternative<ImmTy>(Value); }
@@ -728,6 +739,20 @@ createGenPolicy(SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
 // Filters out mode switch instructions, as they are handled separately
 inline std::function<bool(unsigned)> getDefaultFilter(const SnippyTarget &Tgt) {
   return [&](unsigned Opc) { return !Tgt.isModeSwitchInstr(Opc); };
+}
+
+template <typename OperandsTy>
+Expected<std::vector<PreselectedOpInfo>>
+getPreselectedForInstr(const OperandsTy &Operands) {
+  std::vector<PreselectedOpInfo> Preselected;
+  Preselected.reserve(range_size(Operands));
+  for (auto &Operand : Operands) {
+    auto OpOrErr = PreselectedOpInfo::fromOperand(Operand);
+    if (auto Err = OpOrErr.takeError())
+      return Err;
+    Preselected.push_back(std::move(*OpOrErr));
+  }
+  return Preselected;
 }
 } // namespace planning
 } // namespace snippy

@@ -9,6 +9,7 @@
 #include "snippy/Generator/Generation.h"
 #include "snippy/Config/FPUSettings.h"
 #include "snippy/Config/FunctionDescriptions.h"
+#include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/Selfcheck.h"
 #include "snippy/Generator/Backtrack.h"
 #include "snippy/Generator/CallGraphState.h"
@@ -1046,6 +1047,7 @@ unsigned chooseAddressRegister(InstructionGenerationContext &IGC,
 
   return ChosenReg;
 }
+
 void postprocessMemoryOperands(MachineInstr &MI,
                                planning::InstructionGenerationContext &IGC) {
   auto *MAI = IGC.MAI;
@@ -1055,7 +1057,7 @@ void postprocessMemoryOperands(MachineInstr &MI,
   auto &ProgCtx = IGC.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
-  auto Opcode = MI.getDesc().getOpcode();
+  auto Opcode = MI.getOpcode();
   auto NumAddrsToGen = SnippyTgt.countAddrsToGenerate(Opcode);
   auto *MBB = MI.getParent();
   auto *ML = MLI ? MLI->getLoopFor(MBB) : nullptr;
@@ -1065,8 +1067,13 @@ void postprocessMemoryOperands(MachineInstr &MI,
     auto [AddrInfo, AddrGenInfo] = chooseAddrInfoForInstr(MI, IGC, ML, SLI);
     auto AccessSize = AddrInfo.AccessSize;
 
+    auto &InstrDesc = MI.getDesc();
+    auto Operands = planning::getPreselectedForInstr(MI.operands());
+    if (auto Err = Operands.takeError())
+      snippy::fatal("While postprocessing memory operands",
+                    toString(std::move(Err)));
     auto &&[RegToValue, ChosenAddresses] =
-        SnippyTgt.breakDownAddr(IGC, AddrInfo, MI, i);
+        SnippyTgt.breakDownAddr(IGC, AddrInfo, InstrDesc, *Operands, i);
 
     for (unsigned j = 0; j < AddrGenInfo.NumElements; ++j) {
       if (MAI)
