@@ -21,17 +21,6 @@ namespace snippy {
 
 namespace planning {
 
-Expected<PreselectedOpInfo>
-PreselectedOpInfo::fromMCOperand(const MCOperand &Op) {
-  if (Op.isReg())
-    return PreselectedOpInfo(Register(Op.getReg()));
-  if (Op.isImm())
-    return PreselectedOpInfo(StridedImmediate(/* MinIn */ Op.getImm(),
-                                              /* MaxIn */ Op.getImm(),
-                                              /* StrideIn */ 0));
-  return snippy::makeFailure(Errc::Unimplemented, "Unknown MCOperand");
-}
-
 static std::unique_ptr<FloatSemanticsSamplerHolder>
 createFloatSemanticsSampler(const CommonPolicyConfig &Cfg) {
   return std::make_unique<FloatSemanticsSamplerHolder>(Cfg.FPUConfig.Overwrite);
