@@ -91,7 +91,7 @@ public:
 
   std::function<bool(unsigned)>
   generateModeChangeAndGetFilter(InstructionGenerationContext &IGC,
-                                 bool IsSupport) const override {
+                                 MDNode *MetadataMark) const override {
     reportUnimplementedError();
   }
 
@@ -239,12 +239,12 @@ public:
 
   MachineInstr *generateCall(InstructionGenerationContext &IGC,
                              const Function &Target,
-                             bool AsSupport) const override {
+                             MDNode *MetadataMark) const override {
     reportUnimplementedError();
   }
 
   MachineInstr *generateCall(InstructionGenerationContext &IGC,
-                             const Function &Target, bool AsSupport,
+                             const Function &Target, MDNode *MetadataMark,
                              unsigned PreferredCallOpCode) const override {
     reportUnimplementedError();
   }
