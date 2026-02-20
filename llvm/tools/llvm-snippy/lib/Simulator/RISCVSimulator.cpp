@@ -426,6 +426,8 @@ static void addZextBits(RVMExtDescriptor &Ext,
     ZextBits[RVM_ZEXT_CE] = true;
   if (Subtarget.hasStdExtZcf())
     ZextBits[RVM_ZEXT_CF] = true;
+  if (Subtarget.hasStdExtZmmul())
+    ZextBits[RVM_ZEXT_MMUL] = true;
   if (Subtarget.hasStdExtZcd())
     ZextBits[RVM_ZEXT_CD] = true;
   if (Subtarget.hasStdExtZfa())
