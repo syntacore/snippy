@@ -120,6 +120,7 @@ using MemorySeedTy = uint32_t;
 namespace planning {
 class GenPolicy;
 class InstructionGenerationContext;
+class PreselectedOpInfo;
 } // namespace planning
 using planning::InstructionGenerationContext;
 
@@ -482,7 +483,9 @@ public:
 
   virtual std::pair<AddressParts, MemAddresses>
   breakDownAddr(InstructionGenerationContext &IGC, AddressInfo AddrInfo,
-                const MachineInstr &MI, unsigned AddrIdx) const = 0;
+                const MCInstrDesc &InstrDesc,
+                MutableArrayRef<planning::PreselectedOpInfo> Preselected,
+                unsigned AddrIdx) const = 0;
 
   virtual unsigned
   getWriteValueSequenceLength(InstructionGenerationContext &IGC, APInt Value,
