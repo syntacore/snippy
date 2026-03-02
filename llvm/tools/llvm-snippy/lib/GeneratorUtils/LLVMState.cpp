@@ -138,9 +138,8 @@ Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
                  "'march' with triple value is deprecated",
                  "use 'mtriple' option instead");
 
-  auto TripleStr = TheTriple.normalize();
   std::string Error;
-  const Target *Tgt = TargetRegistry::lookupTarget(TripleStr, Error);
+  const Target *Tgt = TargetRegistry::lookupTarget(TheTriple, Error);
 
   if (!Tgt)
     return makeFailure(Errc::InvalidConfiguration, Twine(Error));
@@ -165,7 +164,7 @@ Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
   TargetFeatures += ",+relax";
   const TargetOptions Options;
   auto TM = std::unique_ptr<TargetMachine>(static_cast<TargetMachine *>(
-      Tgt->createTargetMachine(TripleStr, TargetInfo.CPU, TargetFeatures,
+      Tgt->createTargetMachine(TheTriple, TargetInfo.CPU, TargetFeatures,
                                Options, Reloc::Model::Static)));
   if (!TM)
     return makeFailure(Errc::Failure, "Unable to create target machine");
@@ -173,8 +172,9 @@ Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
   auto TT = TM->getTargetTriple();
   const auto *SnippyTgt = SnippyTarget::lookup(TT);
   if (!SnippyTgt)
-    return makeFailure(Errc::InvalidConfiguration,
-                       llvm::formatv("No snippy target for {0}", TripleStr));
+    return makeFailure(
+        Errc::InvalidConfiguration,
+        llvm::formatv("No snippy target for {0}", TheTriple.normalize()));
 
   const Target &T = TM->getTarget();
   const auto *STI = TM->getMCSubtargetInfo();
