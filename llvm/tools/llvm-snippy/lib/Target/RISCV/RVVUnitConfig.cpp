@@ -281,8 +281,7 @@ static auto extractElementsWithProbabilities(const SliceType &ConfSlice) {
 ModeChangeInfo deriveModeSwitchingProbability(const Config &Cfg,
                                               double ConfigurationBias,
                                               double ProbSetVill) {
-  auto OpcGen = Cfg.createDefaultOpcodeGenerator();
-  auto ProbInfo = OpcGen->getProbabilities();
+  auto ProbInfo = Cfg.getOpcodeProbabilities();
 
   double TotalWeight = Cfg.Histogram.getTotalWeight();
   ModeChangeInfo Result;
@@ -891,7 +890,8 @@ bool isValidEMUL(unsigned SEW, unsigned EEW, RISCVVType::VLMUL LMUL) {
   return RISCVVType::isValidLMUL(EMUL, IsFractional);
 }
 
-RISCVVType::VLMUL computeEMUL(unsigned SEW, unsigned EEW, RISCVVType::VLMUL LMUL) {
+RISCVVType::VLMUL computeEMUL(unsigned SEW, unsigned EEW,
+                              RISCVVType::VLMUL LMUL) {
   auto [EMUL, IsFractional] = computeDecodedEMUL(SEW, EEW, LMUL);
   assert(RISCVVType::isValidLMUL(EMUL, IsFractional));
   return RISCVVType::encodeLMUL(EMUL, IsFractional);
