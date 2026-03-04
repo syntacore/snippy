@@ -376,12 +376,6 @@ struct EmptyFinalizeMixin {
 };
 } // namespace detail
 
-OpcGenHolder createDefaultOpcGenerator(
-    SnippyProgramContext &ProgCtx, const Config &Cfg,
-    std::function<bool(unsigned)> Filter, bool MustHavePrimaryInstrs,
-    ArrayRef<OpcodeHistogramEntry> Overrides,
-    const std::unordered_map<unsigned, double> &WeightOverrides = {});
-
 // This policy is used to insert mode changing instructions and provide context
 // for other policies that follow it.
 class ModeChangingInstPolicy final : public detail::EmptyFinalizeMixin {

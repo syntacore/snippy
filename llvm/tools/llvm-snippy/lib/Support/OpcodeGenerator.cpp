@@ -15,9 +15,8 @@ namespace snippy {
 
 void DefaultOpcodeGenerator::print(llvm::raw_ostream &OS) const {
   OS << "OpcodeGen:\n";
-  auto Prob = getProbabilities();
-  for (const auto &[Opcode, P] : Prob)
-    OS << "     Opcode: " << Opcode << ": " << floatToString(P, 3) << "\n";
+  for (const auto &[Opcode, Prob] : zip(Opcodes, OpcodeDist.probabilities()))
+    OS << "     Opcode: " << Opcode << ": " << floatToString(Prob, 3) << "\n";
 }
 
 unsigned DefaultOpcodeGenerator::generate() {
