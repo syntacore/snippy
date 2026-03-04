@@ -310,10 +310,6 @@ static auto extractElementsWithProbabilities(const SliceType &ConfSlice) {
 
 ModeChangeInfo deriveModeSwitchingProbability(const Config &Cfg,
                                               const ModeChangeBias &Bias) {
-  // FIXME: This is here only to cause fatal errors in case we can't create
-  // OpcGen (e.g. empty histogram)
-  Cfg.createDefaultOpcodeGenerator();
-
   const auto &Hist = Cfg.Histogram;
   double TotalWeight = Hist.getTotalWeight();
   ModeChangeInfo Result;
