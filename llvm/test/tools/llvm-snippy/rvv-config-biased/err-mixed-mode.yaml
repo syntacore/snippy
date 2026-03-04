@@ -1,6 +1,9 @@
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
-# RUN:  --num-instrs=10 -o %t \
-# RUN:  |& FileCheck %s
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu
+  mattr: +v
+  num-instrs: 10
 
 include:
 - Inputs/rvv-unit-all.yaml
@@ -16,9 +19,9 @@ sections:
     SIZE:      0x400000
     LMA:       0x80600000
     ACCESS:    rw
-histogram:
 
+histogram:
     - [VADD_VV, 1.0]
     - [VSETVL, 1.0]
 
-# CHECK: error: It is forbidden to specify RVV mode-changing bias and VSET* instructions in histogram simultaneously
+# CHECK: error: It is forbidden to specify any mode-change-bias P other than "deduced" when VSET* instructions are present in histogram

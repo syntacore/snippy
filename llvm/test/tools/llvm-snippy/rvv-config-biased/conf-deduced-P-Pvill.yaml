@@ -1,0 +1,57 @@
+# REQUIRES: riscv-rvv
+
+# RUN: llvm-snippy %s -model-plugin=None \
+# RUN: |& FileCheck %s -check-prefix=CHECK-POSITIVE
+
+# RUN: llvm-snippy %s -model-plugin=None \
+# RUN: |& FileCheck %s -check-prefix=CHECK-NEGATIVE
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100
+  dump-mf: true
+
+include:
+  - ../rvv-config-histogram/Inputs/sections.yaml
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: deduced
+    Pvill: 1.0
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+      SEW:
+        sew_32: 1.0
+      LMUL:
+        m1: 1.0
+
+histogram:
+      - [VSETIVLI, 1.0]
+# COM: Illegal even when vill bit is set
+      - [VADD_VV, 1.0]
+# COM: Legal even when vill bit is set
+      - [VL1RE8_V, 1.0]
+      - [VL1RE16_V, 1.0]
+      - [VL1RE32_V, 1.0]
+      - [VL1RE64_V, 1.0]
+
+# COM: Make sure that snippy interprets Pvill correctly and VADD_VV is not generated
+
+# CHECK-POSITIVE: VSETIVLI
+# CHECK-POSITIVE: VL1RE8_V
+# CHECK-POSITIVE: VL1RE16_V
+# CHECK-POSITIVE: VL1RE32_V
+# CHECK-POSITIVE: VL1RE64_V
+
+# CHECK-NEGATIVE-NOT: VADD_VV

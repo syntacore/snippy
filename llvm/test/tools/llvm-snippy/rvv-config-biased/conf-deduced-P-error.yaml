@@ -1,0 +1,37 @@
+# REQUIRES: riscv-rvv
+
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100
+
+include:
+  - ../rvv-config-histogram/Inputs/sections.yaml
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: lalala
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+      SEW:
+        sew_32: 1.0
+      LMUL:
+        m1: 1.0
+
+histogram:
+      - [VSETIVLI, 1.0]
+      - [VADD_VV, 1.0]
+
+# CHECK: error: Invalid value for P. Expected "deduced" or a number [0.0;1.0]

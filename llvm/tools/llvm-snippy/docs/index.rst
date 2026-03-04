@@ -2287,7 +2287,7 @@ Registers Management
 .. caution::
   If you specify spilled or reserved registers, verify you do not use the
   same register for both. A register can either be `spilled <#spilling-registers>`__
-  or reserved by `register-reservation`_ (or `-reserved-regs-list`_) 
+  or reserved by `register-reservation`_ (or `-reserved-regs-list`_)
   but not both at the same time.
 
 .. _`_spilling_registers`:
@@ -2676,7 +2676,7 @@ Currently, only ``valuegram`` data source type is supported. It should include:
       - ``values`` |nbsp| -- |nbsp| the ordered list of values. Floating point syntax
         and uniform are supported. The number of values must be equal to the number of
         initializeable operands of all instructions that this regex matches. Also you
-        can specify each value via valuegram, the same way as in the **histograms** and 
+        can specify each value via valuegram, the same way as in the **histograms** and
         **imm-hist**.
 
 .. note::
@@ -3129,7 +3129,7 @@ Following is an example of vector options specific to RISC-V:
 
    ./llvm-snippy -mtriple=riscv64-unknown-elf -seed=0 \
       -mattr=+v ./yml/layout-vector.yaml \
-      ./yml/riscv-vector-unit.yaml 
+      ./yml/riscv-vector-unit.yaml
 
 where:
 
@@ -3198,12 +3198,13 @@ To specify a mode-changing bias, add the ``mode-change-bias`` key to the
 RVV-configuration YAML file. Use this mode to set:
 
 -  ``P`` |nbsp| -- |nbsp| A fixed probability of the RVV mode change regardless of the
-   number and type of instructions in the input histogram.
+   number and type of instructions in the input histogram. Can be either a number from 0.0 to 1.0
+   or ``deduced``, which will deduce probability from the ``vset{i}vl{i}`` instructions in the histogram.
 
--  ``Pvill`` |nbsp| -- |nbsp| A probability that an illegal configuration (SEW, LMUL)
+-  ``Pvill`` (optional) |nbsp| -- |nbsp| A probability that an illegal configuration (SEW, LMUL)
    will be selected when the opcode ``vset{i}vl{i}`` is selected. It is
    equivalent to the probability of setting a ``vill`` bit in a CSR
-   ``vtype``.
+   ``vtype``. Defaults to ``0`` when omitted.
 
    When an illegal configuration is selected, snippy generates only the
    opcodes that are legal for that configuration. These opcodes must be
@@ -3233,7 +3234,8 @@ See an example below.
 .. important::
 
    You cannot use ``VSET*`` instructions in the histogram in the biased
-   mode.
+   mode, unless ``P: deduced`` is specified. That makes it possible to use
+   ``Pvill`` with the `Histogram mode <#vector-unit-configurations>`__.
 
 .. container:: formalpara-title
 
@@ -3552,7 +3554,7 @@ Read-only Sections
 ------------------
 
 When snippet uses global constants,
-a read-only section is required to hold constant data. 
+a read-only section is required to hold constant data.
 
 A description of read-only section should be provided in
 the ``sections`` entry of the snippy configuration file.
