@@ -1,0 +1,21 @@
+# COM: This test checks that when calls can't be generated, they are removed
+#      from the histogram.
+
+# RUN: llvm-snippy %s -model-plugin None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  dump-mf: on
+
+include:
+  - ../Inputs/sections.yaml
+
+histogram:
+  - [ADD, 1.0]
+  - [JALR, 1.0]
+  - [JAL, 1.0]
+
+# CHECK: ADD
+# CHECK-NOT: CALL

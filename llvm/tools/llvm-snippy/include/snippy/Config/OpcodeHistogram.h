@@ -63,6 +63,18 @@ public:
                            });
   }
 
+  // FIXME: We are waiting for C++20.
+  auto erase_if(std::function<bool(unsigned)> Pred) {
+    auto OldSize = size();
+    for (auto Hist = begin(), Last = end(); Hist != Last;) {
+      if (Pred(Hist->first))
+        Hist = erase(Hist, std::next(Hist));
+      else
+        ++Hist;
+    }
+    return OldSize - size();
+  }
+
   double getTotalWeight() const {
     return getOpcodesWeight([](unsigned) { return true; });
   }

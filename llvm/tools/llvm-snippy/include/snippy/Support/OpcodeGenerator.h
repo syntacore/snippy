@@ -70,17 +70,6 @@ public:
 
   const OpcodeList &getOpcodesList() const { return Opcodes; }
 
-  std::map<unsigned /* Opcode */, double /* probability */>
-  getProbabilities() const {
-    std::map<unsigned, double> Output;
-    const auto OpcodeWeight = zip(Opcodes, OpcodeDist.probabilities());
-    for (const auto [Opcode, Weight] : OpcodeWeight) {
-      assert(Output.count(Opcode) == 0);
-      Output[Opcode] = Weight;
-    }
-    return Output;
-  }
-
   void print(llvm::raw_ostream &OS) const override;
 
   void dump() const override { print(dbgs()); }

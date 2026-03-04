@@ -1158,38 +1158,38 @@ static bool hasCallees(const FunctionDesc &FuncDesc) {
   return FuncDesc.Callees.size();
 }
 
-static void checkCallRequirements(
-    const SnippyTarget &Tgt, const OpcodeHistogram &Histogram,
+static void deleteCallsIfNeeded(
+    const SnippyTarget &Tgt, OpcodeHistogram &Histogram,
     const std::variant<CallGraphLayout, FunctionDescs> &CGLayout) {
-  bool HasCalls = Histogram.getOpcodesWeight([&Tgt](unsigned Opcode) {
-    return Tgt.isCall(Opcode);
-  }) > 0.0;
-  bool HasNonCalls = Histogram.getOpcodesWeight([&Tgt](unsigned Opcode) {
-    return !Tgt.isCall(Opcode);
-  }) > 0.0;
-  if (HasCalls && !HasNonCalls)
+  auto IsCall = [&Tgt](unsigned Opcode) { return Tgt.isCall(Opcode); };
+  auto CallsWeight = Histogram.getOpcodesWeight(IsCall);
+  if (CallsWeight < std::numeric_limits<decltype(CallsWeight)>::epsilon())
+    return;
+  if (std::abs(Histogram.getTotalWeight() - CallsWeight) <
+      std::numeric_limits<decltype(CallsWeight)>::epsilon())
     snippy::fatal(
         "for using calls you need to add to histogram non-call instructions");
 
-  if (!HasCalls)
-    return;
-
   std::visit(OverloadedCallable(
-                 [](const FunctionDescs &Descs) -> void {
+                 [&Histogram, IsCall](const FunctionDescs &Descs) -> void {
                    if (!std::any_of(Descs.Descs.begin(), Descs.Descs.end(),
-                                    hasCallees))
+                                    hasCallees)) {
                      snippy::warn(
                          WarningName::CannotGenerateCalls,
                          "Provided call-graph doesn't allow generation of "
                          "calls as no callees were found",
                          "no calls will be generated");
+                     Histogram.erase_if(IsCall);
+                   }
                  },
-                 [](const CallGraphLayout &CGLayout) -> void {
-                   if (auto NumFunc = CGLayout.FunctionNumber; NumFunc < 2)
+                 [&Histogram, IsCall](const CallGraphLayout &CGLayout) -> void {
+                   if (auto NumFunc = CGLayout.FunctionNumber; NumFunc < 2) {
                      snippy::warn(WarningName::CannotGenerateCalls,
                                   "Not enough functions specified to generate "
                                   "calls (required at least 2)",
                                   "-function-number is " + Twine(NumFunc));
+                     Histogram.erase_if(IsCall);
+                   }
                  }),
              CGLayout);
 }
@@ -1478,7 +1478,6 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
                   "it is required to enable selfcheck");
   if (BurstConfig)
     checkBurstGram(Ctx, Histogram, OpCC, BurstConfig->Burst);
-  checkCallRequirements(Tgt, Histogram, CGLayout);
   checkMemoryRegions(Tgt, *this);
   Tgt.checkInstrTargetDependency(Histogram, OpCC);
   if (hasTrackingMode())
@@ -1606,10 +1605,12 @@ void Config::complete(LLVMState &State, const OpcodeCache &OpCC) {
     auto BurstOpcodes = BCfg.Burst.getAllBurstOpcodes();
     return BurstOpcodes.count(Opc);
   };
-  auto &DFHistogram = DefFlowConfig.DataFlowHistogram;
-  DFHistogram.clear();
-  std::copy_if(Histogram.begin(), Histogram.end(),
-               std::inserter(DFHistogram, DFHistogram.end()),
+  auto DFHistogram = Histogram;
+  deleteCallsIfNeeded(State.getSnippyTarget(), DFHistogram, PassCfg.CGLayout);
+  DefFlowConfig.DataFlowHistogram.clear();
+  std::copy_if(DFHistogram.begin(), DFHistogram.end(),
+               std::inserter(DefFlowConfig.DataFlowHistogram,
+                             DefFlowConfig.DataFlowHistogram.end()),
                [&](const auto &Hist) {
                  auto *Desc = OpCC.desc(Hist.first);
                  assert(Desc);
