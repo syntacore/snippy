@@ -201,9 +201,39 @@ using LMULInfo = WeightsStorage<LMULTypes>;
 using VMAInfo = WeightsStorage<VMAMode>;
 using VTAInfo = WeightsStorage<VTAMode>;
 
-struct BiasGuides {
-  bool Enabled = false;
-  double ModeChangeP = 0.0;
+struct ModeChangeP final {
+  // Indicates that ModeChangeP comes from the histogram and
+  // not from the mode-change-bias::P
+  struct ProbIsDeduced final {
+    static constexpr StringLiteral Str = "deduced";
+  };
+
+  ModeChangeP() = default;
+  ModeChangeP(double P) : Value(P) {}
+  ModeChangeP(ProbIsDeduced) : Value(ProbIsDeduced()) {}
+
+  bool isDeduced() const {
+    return std::holds_alternative<ProbIsDeduced>(Value);
+  }
+
+  bool isNumerical() const { return std::holds_alternative<double>(Value); }
+
+  double getAsDouble() const {
+    assert(isNumerical());
+    return std::get<double>(Value);
+  }
+
+private:
+  std::variant<ProbIsDeduced, double> Value;
+};
+
+struct ModeChangeBias final {
+  // Probability of generating a support mode-changing instruction
+  // after a primary instruction
+  ModeChangeP ModeChangeP = ModeChangeP::ProbIsDeduced();
+
+  // Probability of choosing an illegal configuration when a mode-changing
+  // instruction is selected
   double SetVillP = 0.0;
 };
 
@@ -228,7 +258,7 @@ struct RVVUnitInfo {
 };
 
 struct RVVConfigurationSpace {
-  BiasGuides Guides;
+  ModeChangeBias Guides;
   RVVUnitInfo VUInfo;
 
   static constexpr auto kUnitName = "riscv-vector-unit";
@@ -279,35 +309,51 @@ static auto extractElementsWithProbabilities(const SliceType &ConfSlice) {
 }
 
 ModeChangeInfo deriveModeSwitchingProbability(const Config &Cfg,
-                                              double ConfigurationBias,
-                                              double ProbSetVill) {
-  auto OpcGen = Cfg.createDefaultOpcodeGenerator();
-  auto ProbInfo = OpcGen->getProbabilities();
+                                              const ModeChangeBias &Bias) {
+  // FIXME: This is here only to cause fatal errors in case we can't create
+  // OpcGen (e.g. empty histogram)
+  Cfg.createDefaultOpcodeGenerator();
 
-  double TotalWeight = Cfg.Histogram.getTotalWeight();
+  const auto &Hist = Cfg.Histogram;
+  double TotalWeight = Hist.getTotalWeight();
   ModeChangeInfo Result;
-  Result.ProbSetVill = ProbSetVill;
+  Result.ProbSetVill = Bias.SetVillP;
   Result.TotalHistWeight = TotalWeight;
 
-  Result.RVVPresentInHistogram =
-      std::any_of(ProbInfo.begin(), ProbInfo.end(), [](const auto &Item) {
-        static_assert(std::is_same_v<decltype(Item.first), const unsigned>);
-        static_assert(std::is_same_v<decltype(Item.second), double>);
-        return isRVV(Item.first) && (Item.second > 0.0);
-      });
-  Result.VSETPresentInHistogram =
-      std::any_of(ProbInfo.begin(), ProbInfo.end(), [](const auto &Item) {
-        static_assert(std::is_same_v<decltype(Item.first), const unsigned>);
-        static_assert(std::is_same_v<decltype(Item.second), double>);
-        return isRVVModeSwitch(Item.first) && (Item.second > 0.0);
-      });
+  bool RVVPresentInHistogram = Hist.getOpcodesWeight([](unsigned Opcode) {
+    return isRVV(Opcode);
+  }) > 0.0;
+  Result.RVVPresentInHistogram = RVVPresentInHistogram;
 
   // If no RVV instructions are found in the histogram we don't generate any
-  // VSETs, even if there is mode-change-bias specified.
-  if (!Result.RVVPresentInHistogram)
+  // additional VSETs, even if there is mode-change-bias specified.
+  // (VSETs can still appear in register initialization though)
+  if (!RVVPresentInHistogram) {
+    Result.VSETPresentInHistogram = false;
     return Result;
+  }
 
-  if (!Result.VSETPresentInHistogram) {
+  bool VSETPresentInHistogram = Hist.getOpcodesWeight([](unsigned Opcode) {
+    return isRVVModeSwitch(Opcode);
+  }) > 0.0;
+  Result.VSETPresentInHistogram = VSETPresentInHistogram;
+
+  if (Bias.ModeChangeP.isDeduced() && !VSETPresentInHistogram)
+    snippy::fatal(
+        "No VSET instruction detected in histogram. With RVV you must specify "
+        "mode-change-bias P or mode-changing instructions in histogram");
+
+  if (!Bias.ModeChangeP.isDeduced() && VSETPresentInHistogram)
+    snippy::fatal(
+        Twine(
+            "It is forbidden to specify any mode-change-bias P other than \"") +
+        ModeChangeP::ProbIsDeduced::Str +
+        "\" when VSET* instructions are present in histogram");
+
+  assert(Bias.ModeChangeP.isDeduced() == VSETPresentInHistogram);
+
+  if (!VSETPresentInHistogram) {
+    double ModeChangeBiasP = Bias.ModeChangeP.getAsDouble();
     // FIXME: Currently there is a quirky behavior that we keep for
     // backward compatibility reasons:
     // if [VSET* instructions are not found in the histogram] &&
@@ -319,18 +365,18 @@ ModeChangeInfo deriveModeSwitchingProbability(const Config &Cfg,
     //
     // This workaround is not perfect, as if there will be more than 1/epsilon
     // instructions requested, we might end up with more than 1 VSET* per MBB.
-    if (ConfigurationBias < std::numeric_limits<double>::epsilon())
-      ConfigurationBias = std::numeric_limits<double>::epsilon();
+    if (ModeChangeBiasP < std::numeric_limits<double>::epsilon())
+      ModeChangeBiasP = std::numeric_limits<double>::epsilon();
 
-    Result.WeightVSETVL = TotalWeight * ConfigurationBias / 3.0;
-    Result.WeightVSETVLI = TotalWeight * ConfigurationBias / 3.0;
-    Result.WeightVSETIVLI = TotalWeight * ConfigurationBias / 3.0;
+    Result.WeightVSETVL = TotalWeight * ModeChangeBiasP / 3.0;
+    Result.WeightVSETVLI = TotalWeight * ModeChangeBiasP / 3.0;
+    Result.WeightVSETIVLI = TotalWeight * ModeChangeBiasP / 3.0;
     return Result;
   }
 
-  Result.WeightVSETVL = TotalWeight * ProbInfo[RISCV::VSETVL];
-  Result.WeightVSETVLI = TotalWeight * ProbInfo[RISCV::VSETVLI];
-  Result.WeightVSETIVLI = TotalWeight * ProbInfo[RISCV::VSETIVLI];
+  Result.WeightVSETVL = Hist.weight(RISCV::VSETVL);
+  Result.WeightVSETVLI = Hist.weight(RISCV::VSETVLI);
+  Result.WeightVSETIVLI = Hist.weight(RISCV::VSETIVLI);
   return Result;
 }
 
@@ -802,19 +848,50 @@ static bool isCorrectProbability(double Prob) {
   return Prob >= 0.0 && Prob <= 1.0;
 }
 
-template <> struct yaml::MappingTraits<BiasGuides> {
-  static constexpr auto kProbBounds = "probability should be from [0.0;1.0]";
+template <> struct yaml::ScalarTraits<ModeChangeP> {
+  static StringRef input(StringRef Scalar, void *, ModeChangeP &P) {
+    if (Scalar == ModeChangeP::ProbIsDeduced::Str) {
+      P = ModeChangeP::ProbIsDeduced();
+      return {};
+    }
+    double Value = 0.0;
+    if (!Scalar.getAsDouble(Value)) {
+      P = Value;
+      return {};
+    }
 
-  static void mapping(yaml::IO &IO, BiasGuides &Guides) {
-    Guides.Enabled = true;
-    IO.mapRequired("P", Guides.ModeChangeP);
-    IO.mapOptional("Pvill", Guides.SetVillP);
+    // We don't have constexpr string concatenation, but at least check
+    // that ErrStr contains ModeChangeP::ProbIsDeduced::Str;
+    constexpr std::string_view ErrStr =
+        "Invalid value for P. Expected \"deduced\" or a number [0.0;1.0]";
+    static_assert(ErrStr.find(ModeChangeP::ProbIsDeduced::Str) !=
+                  std::string_view::npos);
+    return ErrStr;
   }
 
-  static std::string validate(yaml::IO &IO, BiasGuides &Guides) {
+  static void output(const ModeChangeP &P, void *, raw_ostream &Out) {
+    if (P.isDeduced())
+      Out << ModeChangeP::ProbIsDeduced::Str;
+    else
+      Out << P.getAsDouble();
+  }
+
+  static QuotingType mustQuote(StringRef) { return QuotingType::None; }
+};
+
+template <> struct llvm::yaml::MappingTraits<ModeChangeBias> {
+  static constexpr auto kProbBounds = "probability should be from [0.0;1.0]";
+
+  static void mapping(IO &Io, ModeChangeBias &Guides) {
+    Io.mapRequired("P", Guides.ModeChangeP);
+    Io.mapOptional("Pvill", Guides.SetVillP);
+  }
+
+  static std::string validate(yaml::IO &IO, ModeChangeBias &Guides) {
     // TODO: implemenent alternative mode changing schemes and
     // replace probability with weight
-    if (!isCorrectProbability(Guides.ModeChangeP))
+    if (!Guides.ModeChangeP.isDeduced() &&
+        !isCorrectProbability(Guides.ModeChangeP.getAsDouble()))
       return std::string(RVVConfigurationSpace::kUnitName) + ": P " +
              kProbBounds;
 
@@ -891,7 +968,8 @@ bool isValidEMUL(unsigned SEW, unsigned EEW, RISCVVType::VLMUL LMUL) {
   return RISCVVType::isValidLMUL(EMUL, IsFractional);
 }
 
-RISCVVType::VLMUL computeEMUL(unsigned SEW, unsigned EEW, RISCVVType::VLMUL LMUL) {
+RISCVVType::VLMUL computeEMUL(unsigned SEW, unsigned EEW,
+                              RISCVVType::VLMUL LMUL) {
   auto [EMUL, IsFractional] = computeDecodedEMUL(SEW, EEW, LMUL);
   assert(RISCVVType::isValidLMUL(EMUL, IsFractional));
   return RISCVVType::encodeLMUL(EMUL, IsFractional);
@@ -1261,13 +1339,8 @@ RVVConfigurationInfo RVVConfigurationInfo::createDefault(const Config &Cfg,
   std::vector<VMGeneratorHolder> VMGen;
   VMGen.push_back(std::make_unique<UnmaskedVMGenerator>());
 
-  auto ModeSwitchInfo =
-      deriveModeSwitchingProbability(Cfg, /* mode switch bias*/ 0.0,
-                                     /* set vill bit bias*/ 0.0);
-  if (ModeSwitchInfo.RVVPresentInHistogram &&
-      !ModeSwitchInfo.VSETPresentInHistogram) {
-    snippy::fatal("No VSET instruction detected in histogram");
-  }
+  auto ModeSwitchInfo = deriveModeSwitchingProbability(
+      Cfg, /*no bias, deduce P from histogram*/ ModeChangeBias());
 
   bool NeedsVXRMUpdate = hasVXRMUsers(Cfg.getOpcodeHistogram());
 
@@ -1385,14 +1458,7 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
   auto &&[VMGen, VMWeights] = getVMsCompatibleWithVLs(
       MinMaxVL, VMGensWeightsFiltered, VLGen, DiscardedVMs);
 
-  auto ModeSwitchInfo = deriveModeSwitchingProbability(
-      Cfg, CS.Guides.ModeChangeP, CS.Guides.SetVillP);
-
-  if (!CS.Guides.Enabled && !ModeSwitchInfo.VSETPresentInHistogram)
-    snippy::fatal("No VSET instruction detected in histogram");
-  if (CS.Guides.Enabled && ModeSwitchInfo.VSETPresentInHistogram)
-    snippy::fatal("It is forbidden to specify RVV mode-changing bias and "
-                  "VSET* instructions in histogram simultaneously");
+  auto ModeSwitchInfo = deriveModeSwitchingProbability(Cfg, CS.Guides);
 
   bool NeedsVXRMUpdate = hasVXRMUsers(Cfg.getOpcodeHistogram());
 
@@ -1400,7 +1466,7 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
       VLEN, ConfigGenerator(std::move(ConfigPoints), ConfigWeights),
       VLGenerator(std::move(VLGen), VLWeights),
       VMGenerator(std::move(VMGen), VMWeights), ModeSwitchInfo,
-      CS.Guides.Enabled, NeedsVXRMUpdate);
+      !CS.Guides.ModeChangeP.isDeduced(), NeedsVXRMUpdate);
 }
 
 unsigned RVVConfigurationInfo::getVLEN() const { return VLEN; }
