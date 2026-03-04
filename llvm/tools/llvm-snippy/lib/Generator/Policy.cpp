@@ -151,9 +151,7 @@ void DefaultGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
   const auto &Filter = ModeChangingPolicy
                            ? ModeChangingPolicy->getOpcodeFilter()
                            : getDefaultFilter(Tgt);
-  auto Err =
-      Cfg->createOpcodeGenerator(InstrGenCtx.ProgCtx.getOpcodeCache(), Filter)
-          .moveInto(OpcGen);
+  auto Err = Cfg->createOpcodeGenerator(Filter).moveInto(OpcGen);
   if (Err)
     snippy::fatal(
         Twine("Failed to create OpcodeGenerator in DefaultGenPolicy: ") +

@@ -145,10 +145,11 @@ public:
   DefaultPolicyConfig(const CommonPolicyConfig &Common) : Common(&Common) {}
 
   Expected<OpcGenHolder>
-  createOpcodeGenerator(const OpcodeCache &OpCC,
-                        const std::function<bool(unsigned)> &OpcMask) const {
+  createOpcodeGenerator(const std::function<bool(unsigned)> &OpcMask) const {
 
-    assert(!DataFlowHistogram.empty());
+    if (DataFlowHistogram.empty())
+      snippy::fatal(
+          "OpcodeGenerator initialization failure: empty histogram specified.");
 
     std::map<unsigned, double> DFHCopy;
     llvm::copy_if(DataFlowHistogram, std::inserter(DFHCopy, DFHCopy.end()),
@@ -348,11 +349,14 @@ public:
 
   ~Config() = default;
 
-  // FIXME: legacy that must be removed
-  // FIXME: this should return OpcGenHolder
-  std::unique_ptr<DefaultOpcodeGenerator> createDefaultOpcodeGenerator() const {
-    return std::make_unique<DefaultOpcodeGenerator>(Histogram.begin(),
-                                                    Histogram.end());
+  std::map<unsigned /* Opcode */, double /* probability */>
+  getOpcodeProbabilities() const {
+    std::map<unsigned, double> OpcodeProb;
+    transform(Histogram, std::inserter(OpcodeProb, OpcodeProb.end()),
+              [TotalWeight = Histogram.getTotalWeight()](auto &Elem) {
+                return std::make_pair(Elem.first, Elem.second / TotalWeight);
+              });
+    return OpcodeProb;
   }
 
   const OpcodeHistogram &getOpcodeHistogram() const { return Histogram; }
