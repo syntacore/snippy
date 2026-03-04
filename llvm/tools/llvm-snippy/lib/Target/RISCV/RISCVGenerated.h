@@ -1905,7 +1905,7 @@ MaxInstrBitsType readInstrCode(const SimulatorT &Sim, ProgramCounterType PC) {
   return Instr;
 }
 
-static std::optional<unsigned>
+inline std::optional<unsigned>
 getRISCVFloatRegLen(const TargetSubtargetInfo &STI) {
   const auto &ST = static_cast<const RISCVSubtarget &>(STI);
   if (ST.hasStdExtD())
