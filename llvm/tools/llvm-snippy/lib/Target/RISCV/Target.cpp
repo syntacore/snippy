@@ -1149,11 +1149,17 @@ public:
            !snippyRISCVIsOpcodeExcluded(Opcode);
   }
 
-  Error checkOperandsReinitializationSupported(unsigned Opcode) const override {
-    if (isRVV(Opcode))
+  Error checkOperandsReinitializationSupported(
+      unsigned Opcode, const MCInstrInfo &InstrInfo) const override {
+    if (isRVVModeSwitch(Opcode))
       return createStringError(
           makeErrorCode(Errc::InvalidArgument),
-          "Operands reinitialization is not implemented for RVV");
+          Twine(InstrInfo.getName(Opcode))
+              .concat(" can not be used in 'operands-reinitialization'"));
+    return Error::success();
+  }
+
+  Error checkOperandsReinitializationForbidden(unsigned Opcode) const override {
     return Error::success();
   }
 
@@ -3731,9 +3737,8 @@ public:
            !isCall(Opcode) && !InstrDesc.isBranch() && !InstrDesc.isReturn();
   }
 
-  bool canInitializeOperand(
-      const MCInstrDesc &InstrDesc, unsigned OpIndex,
-      const InstructionGenerationContext *IGC = nullptr) const override {
+  bool canInitializeOperand(const MCInstrDesc &InstrDesc, unsigned OpIndex,
+                            const LLVMState &State) const override {
     auto Opcode = InstrDesc.getOpcode();
     // We can't initialize registers before control flow instructions
     if (isBaseCFInstr(Opcode) || isCall(Opcode) || Opcode == RISCV::AUIPC)
@@ -3754,13 +3759,10 @@ public:
       if (MemOpIdx + 1 == OpIndex)
         return false;
     }
-    if (isRVV(Opcode) && IGC != nullptr) {
-      const auto &ST = IGC->getSubtarget<RISCVSubtarget>();
-      const auto &RegInfo = *ST.getRegisterInfo();
-      auto RC = getRegClass(*IGC, Operand.RegClass, OpIndex,
-                            InstrDesc.getOpcode(), RegInfo);
+    if (isRVV(Opcode)) {
+      auto RC = Operand.RegClass;
       // Vector mask operand (v0 register) should not be initialized
-      if (RC.getID() == RISCV::VMV0RegClass.getID())
+      if (static_cast<unsigned>(RC) == RISCV::VMV0RegClass.getID())
         return false;
     }
     return true;
@@ -4117,7 +4119,7 @@ void SnippyRISCVTarget::generateWriteValueFromMemory(
   std::string RegClassName =
       RISCV::VRRegClass.contains(DstReg) ? "vector" : "float";
 
-  auto NumBits = Value.getBitWidth();
+  auto NumBits = getRegBitWidth(DstReg, IGC);
   auto &GP = IGC.ProgCtx.getOrAddGlobalsPoolFor(
       IGC.getSnippyModule(), "Failed to allocate global constant for " +
                                  RegClassName + " register value load");

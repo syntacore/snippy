@@ -78,8 +78,7 @@ selectInitializableOperandsRegisters(InstructionGenerationContext &InstrGenCtx,
         // If it is TIED_TO, this register is already
         // selected.
         if (NeedsInit(OpIndex) &&
-            Tgt.canInitializeOperand(InstrDesc, OpIndex, &InstrGenCtx) &&
-            InstrDesc.getOperandConstraint(OpIndex, MCOI::TIED_TO) == -1)
+            ProgCtx.getLLVMState().isReinitializableOperand(InstrDesc, OpIndex))
           return pregenerateRegister(InstrGenCtx, InstrDesc, MCOpInfo, OpIndex);
         return {};
       });

@@ -1343,7 +1343,6 @@ checkValuegramSamplerSettings(const OpcodeValuegramSettings &Settings,
                               unsigned Opcode, const OpcodeCache &OpCC,
                               const LLVMState &State) {
   const auto &InstrInfo = State.getInstrInfo();
-  const auto &Tgt = State.getSnippyTarget();
   for (auto &&Cfg : Settings) {
     if (Cfg.getKind() != OpcodeValuegramOpcSettingsEntry::EntryKind::Operands)
       continue;
@@ -1352,20 +1351,20 @@ checkValuegramSamplerSettings(const OpcodeValuegramSettings &Settings,
     auto NumOperands = InstrDesc.getNumOperands(),
          NumDefs = InstrDesc.getNumDefs();
 
-    size_t Initializeable = llvm::count_if(
-        llvm::seq(NumDefs, NumOperands), [&Tgt, &InstrDesc](auto OpIndx) {
-          return Tgt.canInitializeOperand(InstrDesc, OpIndx);
+    size_t Initializable = llvm::count_if(
+        llvm::seq(NumDefs, NumOperands), [&InstrDesc, &State](auto OpIndx) {
+          return State.isReinitializableOperand(InstrDesc, OpIndx);
         });
-    if (Initializeable != OpValues.Values.size())
+    if (Initializable != OpValues.Values.size())
       snippy::fatal(
           "Invalid opcode valuegram",
           createStringError(
               (std::make_error_code(std::errc::invalid_argument)),
               llvm::formatv(
                   "The number of values is not equal to the number of "
-                  "initializeable operands for the \"{0}\" opcode. Expected "
+                  "initializable operands for the \"{0}\" opcode. Expected "
                   "{1} values but {2} were specified",
-                  InstrInfo.getName(Opcode), std::to_string(Initializeable),
+                  InstrInfo.getName(Opcode), std::to_string(Initializable),
                   std::to_string(OpValues.Values.size()))));
   }
 }
@@ -1379,11 +1378,19 @@ static void checkOpcodeToSettingsMap(const WeightedOpcToSettingsMaps &Map,
     for (auto &&DataSourceMapAndWeight : Map) {
       auto &DataSourceMap = DataSourceMapAndWeight.first;
       assert(DataSourceMap.count(Opc));
-      if (auto E = Tgt.checkOperandsReinitializationSupported(Opc))
-        snippy::fatal("Invalid opcode valuegram", std::move(E));
       auto &OpcodeSettings = DataSourceMap.getSettingsForOpcode(Opc, OpCC);
-      if (!OpcodeSettings.empty())
+      if (!OpcodeSettings.empty()) {
+        if (auto E = Tgt.checkOperandsReinitializationForbidden(Opc))
+          snippy::fatal("Invalid opcode valuegram", std::move(E));
+        if (auto E = Tgt.checkOperandsReinitializationSupported(
+                Opc, State.getInstrInfo())) {
+          snippy::warn(WarningName::OperandsReinitialization,
+                       toString(std::move(E)),
+                       "This instruction will be generated as usual.");
+          continue;
+        }
         checkValuegramSamplerSettings(OpcodeSettings, Opc, OpCC, State);
+      }
     }
   }
 }

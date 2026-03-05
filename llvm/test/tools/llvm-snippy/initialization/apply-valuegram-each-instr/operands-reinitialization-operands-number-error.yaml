@@ -25,5 +25,5 @@ operands-reinitialization:
               values: [0x235]
 
 # CHECK: error: Invalid opcode valuegram: The number of values is not
-# CHECK-SAME: equal to the number of initializeable operands for the "FADD_D" opcode.
+# CHECK-SAME: equal to the number of initializable operands for the "FADD_D" opcode.
 # CHECK-SAME: Expected 2 values but 1 were specified
