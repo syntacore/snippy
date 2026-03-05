@@ -1,0 +1,22 @@
+include:
+  - ../../../rvv-config-histogram/Inputs/sections.yaml
+
+options:
+    mtriple: riscv64-unknown-elf
+    mattr: +v
+    dump-mf: on
+    num-instrs: 100
+    rvv-init-mode: loads
+
+histogram:
+    - [VSETVL, 1.0]
+    - [VSETVLI, 1.0]
+    - [VSETIVLI, 1.0]
+
+operands-reinitialization:
+    - type: valuegram
+      weight: 1.0
+      opcodes:
+        - "VSETI?VLI?":
+            - type: operands
+              values: [2]

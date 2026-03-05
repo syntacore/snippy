@@ -2689,7 +2689,11 @@ Currently, only ``valuegram`` data source type is supported. It should include:
 
 .. important::
 
-   ``operands-reinitialization`` is not supported with RVV.
+   RISC-V: Reinitialization of VSET* instructions via ``operands-reinitialization``
+   is not supported. Their operands are already reinitialized each generation.
+   To set values for this reinitialization use
+   `riscv-vector-unit config <#vector-unit-configurations>`__. If VSET* instructions
+   appear in 'operands-reinitialization' they will be generated as usual.
 
 .. _`_final_registers_state`:
 

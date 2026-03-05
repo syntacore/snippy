@@ -236,8 +236,16 @@ public:
     return true;
   }
 
+  // Check whether the instruction is allowed in “operands‑reinitialization”.
+  // Using these instructions in this configuration is a fatal error.
   virtual Error
-  checkOperandsReinitializationSupported(unsigned Opcode) const = 0;
+  checkOperandsReinitializationForbidden(unsigned Opcode) const = 0;
+
+  // Check whether reinitializing instruction operands is supported.
+  // Specifying these instructions in 'operands-reinitialization' is only a
+  // warning.
+  virtual Error checkOperandsReinitializationSupported(
+      unsigned Opcode, const MCInstrInfo &InstrInfo) const = 0;
 
   // pseudo instructions are disallowed by default
   virtual bool isPseudoAllowed(unsigned Opcode) const { return false; }
@@ -595,9 +603,9 @@ public:
 
   virtual bool canUseInBurstMode(const MCInstrDesc &InstrDesc) const = 0;
 
-  virtual bool canInitializeOperand(
-      const MCInstrDesc &InstrDesc, unsigned OpIndex,
-      const InstructionGenerationContext *IGC = nullptr) const = 0;
+  virtual bool canInitializeOperand(const MCInstrDesc &InstrDesc,
+                                    unsigned OpIndex,
+                                    const LLVMState &State) const = 0;
 
   virtual StridedImmediate
   getImmOffsetRangeForMemAccessInst(const MCInstrDesc &InstrDesc) const = 0;

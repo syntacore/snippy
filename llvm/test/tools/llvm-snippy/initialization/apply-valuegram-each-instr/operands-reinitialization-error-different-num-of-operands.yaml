@@ -22,5 +22,5 @@ operands-reinitialization:
               values: [0x234, 0x431]
 
 # CHECK: error: Invalid opcode valuegram: The number of values is not
-# CHECK-SAME: equal to the number of initializeable operands for the "PseudoC_JRB" opcode.
+# CHECK-SAME: equal to the number of initializable operands for the "PseudoC_JRB" opcode.
 # CHECK-SAME: Expected 1 values but 2 were specified

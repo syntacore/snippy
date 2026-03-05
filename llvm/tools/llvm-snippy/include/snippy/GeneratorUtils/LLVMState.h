@@ -240,6 +240,14 @@ public:
                            });
   }
 
+  bool isReinitializableOperand(const MCInstrDesc &InstrDesc,
+                                unsigned OperandIdx) const {
+    assert(TheSnippyTarget);
+    return TheSnippyTarget->canInitializeOperand(InstrDesc, OperandIdx,
+                                                 *this) &&
+           (InstrDesc.getOperandConstraint(OperandIdx, MCOI::TIED_TO) == -1);
+  }
+
 private:
   std::unique_ptr<LLVMContext> Ctx;
   const SnippyTarget *TheSnippyTarget;
