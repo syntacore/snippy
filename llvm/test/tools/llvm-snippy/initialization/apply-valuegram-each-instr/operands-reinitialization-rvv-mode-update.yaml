@@ -1,0 +1,7 @@
+# RUN: llvm-snippy \
+# RUN:   %S/Inputs/operands-reinitialization-rvv-mode-update.yaml -model-plugin=None \
+# RUN: |& FileCheck %s
+
+# CHECK: warning: (operands-reinitialization) VSETIVLI can not be used in 'operands-reinitialization': This instruction will be generated as usual.
+# CHECK: warning: (operands-reinitialization) VSETVL can not be used in 'operands-reinitialization': This instruction will be generated as usual.
+# CHECK: warning: (operands-reinitialization) VSETVLI can not be used in 'operands-reinitialization': This instruction will be generated as usual.
