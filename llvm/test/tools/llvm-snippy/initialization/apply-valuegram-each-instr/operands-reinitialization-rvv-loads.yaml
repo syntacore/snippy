@@ -1,0 +1,27 @@
+# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+include:
+  - ../../rvv-config-histogram/Inputs/sections.yaml
+
+options:
+    mtriple: riscv64-unknown-elf
+    mattr: +v
+    dump-mf: on
+    num-instrs: 100
+    rvv-init-mode: loads
+
+histogram:
+    - [VSETVL, 1.0]
+    - [VLSE8_V, 1.0]
+
+operands-reinitialization:
+    - type: valuegram
+      weight: 1.0
+      opcodes:
+        - "VLSE.+":
+            - type: operands
+              values: [0x1]
+
+# CHECK: error: Invalid opcode valuegram: The number of values is not equal to
+# CHECK-SAME: the number of initializable operands for the "VLSE8_V" opcode.
+# CHECK-SAME: Expected 0 values but 1 were specified
