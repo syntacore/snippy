@@ -60,9 +60,19 @@ public:
     llvm::sort(Res);
     llvm::sort(CallerSaved);
     std::vector<MCRegister> Result;
+    auto HasRAReg = llvm::any_of(Res, [&SnippyTgt](auto Reg) {
+      return Reg == SnippyTgt.getReturnAddress();
+    });
     std::set_difference(Res.begin(), Res.end(), CallerSaved.begin(),
                         CallerSaved.end(), std::back_inserter(Result));
-    Result.push_back(SnippyTgt.getReturnAddress());
+    // RA register is a special one: it may be caller saved, but we still need
+    // to leave it if it has been provided in `Res`
+    // StaticStack is a special case: we need to save/restore RA conservatively
+    // because it can be picked as a scratch one
+    auto &FG = getAnalysis<FunctionGenerator>();
+    if (HasRAReg || !FG.isRootFunction(MF))
+      Result.push_back(SnippyTgt.getReturnAddress());
+
     llvm::erase_if(Result, [&](auto &&Reg) {
       return !SnippyTgt.isRegClassSupported(Reg);
     });

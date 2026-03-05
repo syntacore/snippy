@@ -1,0 +1,20 @@
+# RUN: llvm-snippy %s \
+# RUN:    -last-instr=EBREAK \
+# RUN: |& FileCheck %s --check-prefix=NO-RELOAD
+
+# RUN: llvm-snippy %s \
+# RUN:    -last-instr=RET \
+# RUN: |& FileCheck %s --check-prefix=NO-RELOAD
+
+options:
+  mtriple: riscv64-linux-gnu
+  march: rv64im
+  dump-mf: true
+
+include:
+  - static-stack/Inputs/sections-with-stack.yaml
+
+histogram:
+    - [ADD, 1.0]
+
+# NO-RELOAD-NOT: $x1 = LD
