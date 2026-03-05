@@ -1,0 +1,34 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+include:
+  - ../../rvv-config-histogram/Inputs/sections.yaml
+
+options:
+    mtriple: riscv64-unknown-elf
+    mattr: +v
+    dump-mf: on
+    num-instrs: 100
+    rvv-init-mode: loads
+
+histogram:
+    - [VSETVL, 1.0]
+    - [VADD_VV, 1.0]
+
+operands-reinitialization:
+    - type: valuegram
+      weight: 1.0
+      opcodes:
+        - "VADD_VV":
+            - type: operands
+              values: [0x1, 0x2]
+
+# An example of what we're matching:
+#              _
+#             |    $x17 = <load address>
+# [0x1, 0x2] <     $v18 = VL1RE8_V $x17
+#             |    $x3 = <load address>
+#             |_   $v21 = VL1RE8_V $x3
+#                  $v13 = VADD_VV $v18, $v21
+
+# CHECK: [[VREG1:\$v[0-9]+]] = VL1RE8_V {{\$x[0-9]+}}{{.*[[:space:]].*}}{{.*[[:space:]].*}}{{.*[[:space:]].*}}[[VREG2:\$v[0-9]+]] = VL1RE8_V {{\$x[0-9]+}}{{.*[[:space:]].*}}{{\$v[0-9]+}} = VADD_VV [[VREG1]], [[VREG2]]{{.*}}
+

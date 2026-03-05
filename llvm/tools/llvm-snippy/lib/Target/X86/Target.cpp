@@ -85,7 +85,12 @@ public:
     reportUnimplementedError();
   }
 
-  Error checkOperandsReinitializationSupported(unsigned Opcode) const override {
+  Error checkOperandsReinitializationSupported(
+      unsigned Opcode, const MCInstrInfo &InstrInfo) const override {
+    reportUnimplementedError();
+  }
+
+  Error checkOperandsReinitializationForbidden(unsigned Opcode) const override {
     reportUnimplementedError();
   }
 
@@ -576,9 +581,8 @@ public:
     reportUnimplementedError();
   }
 
-  bool canInitializeOperand(
-      const MCInstrDesc &InstrDesc, unsigned OpIndex,
-      const InstructionGenerationContext *IGC = nullptr) const override {
+  bool canInitializeOperand(const MCInstrDesc &InstrDesc, unsigned OpIndex,
+                            const LLVMState &State) const override {
     reportUnimplementedError();
   }
 
