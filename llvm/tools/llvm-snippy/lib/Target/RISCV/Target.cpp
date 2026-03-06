@@ -66,7 +66,6 @@
 #include <functional>
 #include <limits>
 #include <numeric>
-#include <variant>
 
 #define DEBUG_TYPE "snippy-riscv"
 
@@ -399,7 +398,8 @@ static bool isSupportedLoadStore(unsigned Opcode) {
          isRVVIndexedLoadStore(Opcode) || isRVVUnitStrideSegLoadStore(Opcode) ||
          isRVVStridedSegLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode) ||
          isRVVWholeRegLoadStore(Opcode) ||
-         isRVVUnitStrideMaskLoadStore(Opcode) || isZicbo(Opcode);
+         isRVVUnitStrideMaskLoadStore(Opcode) || isZicbo(Opcode) ||
+         isZcmpPushPop(Opcode);
 }
 
 static MCRegister regIndexToMCReg(unsigned RegIdx, RegStorageType Storage,
@@ -969,7 +969,7 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForInstrWithImmOffset(
     InstructionGenerationContext &IGC, bool Is64Bit) {
   auto Opcode = InstrDesc.getOpcode();
   assert(isLoadStore(Opcode) || isCLoadStore(Opcode) || isFPLoadStore(Opcode) ||
-         isCFPLoadStore(Opcode) || isZicbo(Opcode));
+         isCFPLoadStore(Opcode) || isZicbo(Opcode) || isZcmpPushPop(Opcode));
 
   const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
   unsigned AddrRegIdx = getMemOperandIdx(InstrDesc);
@@ -987,17 +987,15 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForInstrWithImmOffset(
 }
 
 inline bool hasScInstr(const OpcodeHistogram &H) {
-  return H.weight(RISCV::SC_D) != 0 || H.weight(RISCV::SC_D_AQ) != 0 ||
-         H.weight(RISCV::SC_D_AQ_RL) != 0 || H.weight(RISCV::SC_D_RL) != 0 ||
-         H.weight(RISCV::SC_W) != 0 || H.weight(RISCV::SC_W_AQ) != 0 ||
-         H.weight(RISCV::SC_W_AQ_RL) != 0 || H.weight(RISCV::SC_W_RL) != 0;
+  return H.isAnyNonZero(RISCV::SC_D, RISCV::SC_D_AQ, RISCV::SC_D_AQ_RL,
+                        RISCV::SC_D_RL, RISCV::SC_W, RISCV::SC_W_AQ,
+                        RISCV::SC_W_AQ_RL, RISCV::SC_W_RL);
 }
 
 inline bool hasLrInstr(const OpcodeHistogram &H) {
-  return H.weight(RISCV::LR_D) != 0 || H.weight(RISCV::LR_D_AQ) != 0 ||
-         H.weight(RISCV::LR_D_AQ_RL) != 0 || H.weight(RISCV::LR_D_RL) != 0 ||
-         H.weight(RISCV::LR_W) != 0 || H.weight(RISCV::LR_W_AQ) != 0 ||
-         H.weight(RISCV::LR_W_AQ_RL) != 0 || H.weight(RISCV::LR_W_RL) != 0;
+  return H.isAnyNonZero(RISCV::LR_D, RISCV::LR_D_AQ, RISCV::LR_D_AQ_RL,
+                        RISCV::LR_D_RL, RISCV::LR_W, RISCV::LR_W_AQ,
+                        RISCV::LR_W_AQ_RL, RISCV::LR_W_RL);
 }
 
 inline bool checkPairedLrScInstrs(const OpcodeHistogram &H) {
@@ -1005,7 +1003,7 @@ inline bool checkPairedLrScInstrs(const OpcodeHistogram &H) {
 }
 
 inline bool checkSupportedJumps(const OpcodeHistogram &H) {
-  return H.weight(RISCV::C_JR) == 0;
+  return H.isWeightZero(RISCV::C_JR);
 }
 
 static DisableMisalignedAccessMode getMisalignedAccessMode() {
@@ -1336,7 +1334,13 @@ public:
     if (!checkSupportedJumps(H))
       snippy::fatal("C_JR currently is not supported. Use PseudoC_JRB instead");
 
+    auto HasCalls = H.hasCallInstrs(OpCC, *this);
     for (const auto &[Opcode, Weight] : H) {
+      if (HasCalls && (Opcode == RISCV::CM_POP || Opcode == RISCV::CM_POPRET ||
+                       Opcode == RISCV::CM_POPRETZ))
+        snippy::fatal(
+            "The generation of calls with instructions from the Zcmp extension "
+            "that overwrite the return address is not supported.");
       // NOTE: these checks are just a safety measure to control that we
       // process only supported instructions
       if (isLrInstr(Opcode) || isScInstr(Opcode) || isAtomicAMO(Opcode) ||
@@ -2423,7 +2427,7 @@ public:
   }
 
   unsigned getSpillAlignmentInBytes(MCRegister Reg,
-                                    LLVMState &State) const override {
+                                    const LLVMState &State) const override {
     // TODO: return actual minimum alignment of Reg.
     return 16u;
   }
@@ -2934,7 +2938,8 @@ public:
                                         const ImmediateHistogramSequence *IH,
                                         unsigned OperandType,
                                         const StridedImmediate &StridedImm,
-                                        const TargetMachine &TM) const {
+                                        const LLVMState &State) const {
+    const auto &TM = State.getTargetMachine();
     // NOTE: need to be in sync with
     // llvm/lib/Target/RISCV/MCTargetDesc/RISCVBaseInfo.h(RISCVOp)
     // llvm/lib/Target/RISCV/RISCVInstrInfo.cpp
@@ -3067,8 +3072,36 @@ public:
             snippy::selectFrom(RNE, RTZ, RDN, RUP, RMM, DYN));
       }());
     }
-    case RISCVOp::OPERAND_RTZARG: {
+    case RISCVOp::OPERAND_RTZARG:
       return MachineOperand::CreateImm(RISCVFPRndMode::RTZ);
+    case RISCVOp::OPERAND_RLIST: {
+      return MachineOperand::CreateImm([&]() -> int {
+        using namespace RISCVZC;
+        // If the immediate histogram is specified then sample it.
+        if (IH)
+          return genImmInInterval<RA, RA_S0_S11>(*IH);
+        return static_cast<int>(snippy::selectFrom(
+            RA, RA_S0, RA_S0_S1, RA_S0_S2, RA_S0_S3, RA_S0_S4, RA_S0_S5,
+            RA_S0_S6, RA_S0_S7, RA_S0_S8, RA_S0_S9, RA_S0_S11));
+      }());
+    }
+    case RISCVOp::OPERAND_STACKADJ: {
+      // spimm is the 2-bit number of additional 16-byte address increments
+      // allocated for the stack frame. The total stack adjustment represents
+      // the total size of the stack frame, which is stack_adj_base (calculated
+      // depending on how many registers are in the rlist) added to spimm scaled
+      // by 16:
+      // stack_adj = stack_adj_base + spimm * 16
+      return MachineOperand::CreateImm([&]() -> int {
+        // If the immediate histogram is specified then sample it.
+        if (IH)
+          return genImmInInterval<0b00, 0b11>(*IH) *
+                 getSpillAlignmentInBytes(/* any saved register */ RISCV::X1,
+                                          State);
+        return static_cast<int>(snippy::selectFrom(0b00, 0b01, 0b10, 0b11) *
+                                getSpillAlignmentInBytes(
+                                    /* any saved register */ RISCV::X1, State));
+      }());
     }
     }
   }
@@ -3077,14 +3110,14 @@ public:
                                       const StridedImmediate &StridedImm,
                                       SnippyProgramContext &ProgCtx,
                                       const CommonPolicyConfig &Cfg) const {
-    const auto &TM = ProgCtx.getLLVMState().getTargetMachine();
+    const auto &State = ProgCtx.getLLVMState();
     const auto &OpcSetting =
         Cfg.ImmHistMap.getConfigForOpcode(Opcode, ProgCtx.getOpcodeCache());
     if (OpcSetting.isUniform())
       return createOperandForOpType(Opcode, /*IH=*/nullptr, OperandType,
-                                    StridedImm, TM);
+                                    StridedImm, State);
     const auto &Seq = OpcSetting.getSequence();
-    return createOperandForOpType(Opcode, &Seq, OperandType, StridedImm, TM);
+    return createOperandForOpType(Opcode, &Seq, OperandType, StridedImm, State);
   }
 
   MachineOperand
@@ -3108,7 +3141,7 @@ public:
     }();
 
     return createOperandForOpType(Opcode, IH, OperandType, StridedImm,
-                                  ProgCtx.getLLVMState().getTargetMachine());
+                                  ProgCtx.getLLVMState());
   }
 
   AccessMaskBit getCustomAccessMaskForOperand(const MCInstrDesc &InstrDesc,
@@ -3167,6 +3200,20 @@ public:
 
     auto &ProgCtx = IGC.ProgCtx;
     const auto &TM = ProgCtx.getLLVMState().getTargetMachine();
+
+    if (isZcmpPushPop(Opcode)) {
+      auto AddrValue = AddrInfo.Address;
+      // Since the stack grows downwards, the stores in case cm.push will occur
+      // at smaller addresses. Therefore, we must start storing from the largest
+      // address.
+      if (Opcode == RISCV::CM_PUSH)
+        AddrValue += AddrInfo.AccessSize;
+      const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
+      auto Part = AddressPart{RISCV::X2, APInt(ST.getXLen(), AddrValue)};
+
+      return std::make_pair<AddressParts, MemAddresses>(
+          {std::move(Part)}, {uintToTargetXLen(is64Bit(TM), AddrValue)});
+    }
     if (isAtomicAMO(Opcode) || isLrInstr(Opcode) || isScInstr(Opcode) ||
         isRVVUnitStrideLoadStore(Opcode) || isRVVUnitStrideFFLoad(Opcode) ||
         isRVVUnitStrideSegLoadStore(Opcode) || isRVVWholeRegLoadStore(Opcode) ||
@@ -3518,22 +3565,44 @@ public:
     storeRegToAddr(IGC, Addr, RegForValue, ValueRegBitSize / RISCV_CHAR_BIT);
   }
 
+  // There is an optional operand MI, which is initialized when we need select
+  // an address for an instruction with already known operands at the generation
+  // stage. Because, for example, for extension Zcmp, the access size depends on
+  // the values of the operands.
   AddressGenInfo
   selectAddrGenInfoForInstr(SnippyProgramContext &ProgCtx, unsigned Opcode,
-                            const MachineBasicBlock &MBB) const override {
+                            const MachineBasicBlock &MBB,
+                            const MachineInstr *MI = nullptr) const override {
     assert(countAddrsToGenerate(Opcode) && "Instruction doesn't access memory");
-
-    unsigned SEW = 0;
-    auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
-    if (TgtCtx.hasActiveRVVMode(MBB))
-      SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
-
     auto MisalignedAccessMode = getMisalignedAccessMode();
     bool DisableMisalign =
         (MisalignedAccessMode == DisableMisalignedAccessMode::All ||
          (MisalignedAccessMode == DisableMisalignedAccessMode::AtomicsOnly &&
           (isAtomicAMO(Opcode) || isScInstr(Opcode) || isLrInstr(Opcode))));
 
+    if (isZcmpPushPop(Opcode)) {
+      assert(MI && "To calculate the access size of push/pop, the operands "
+                   "must be known");
+      const auto &TM = ProgCtx.getLLVMState().getTargetMachine();
+      auto RListOp = MI->getOperand(0);
+      assert(RListOp.isImm() && "Rlist operand must be immediate");
+      auto StackAdjBase =
+          RISCVZC::getStackAdjBase(RListOp.getImm(), is64Bit(TM));
+      auto Spimm = MI->getOperand(1);
+      assert(Spimm.isImm() && "Spimm operand must be immediate");
+      return AddressGenInfo::singleAccess(
+          /*AccessSize=*/StackAdjBase + Spimm.getImm(),
+          /*Alignment=*/
+          getSpillAlignmentInBytes(/* any saved register */ RISCV::X1,
+                                   ProgCtx.getLLVMState()),
+          /*AllowMisalign=*/!DisableMisalign,
+          /*Burst=*/false);
+    }
+
+    unsigned SEW = 0;
+    auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+    if (TgtCtx.hasActiveRVVMode(MBB))
+      SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
     auto NaturalAlignment = getLoadStoreNaturalAlignment(Opcode, SEW);
     if (!DisableMisalign &&
         NaturalAlignment == 0) // happens for atomic instructions for example
@@ -3719,6 +3788,9 @@ public:
       RP.addReserved(Reg);
     if ((isRVVGather(Opcode) || isRVVGather16(Opcode)) && isDst)
       RP.addReserved(Reg);
+    // cm.mvsa01 (Zcmp): for the encoding to be legal r1s' != r2s'
+    if (Opcode == RISCV::CM_MVSA01)
+      RP.addReserved(Reg);
   }
 
   const TargetRegisterClass &getAddrRegClass() const override {
@@ -3734,7 +3806,8 @@ public:
     return !isRVVIndexedLoadStore(Opcode) && !isRVVStridedLoadStore(Opcode) &&
            !isRVVIndexedSegLoadStore(Opcode) &&
            !isRVVStridedSegLoadStore(Opcode) && !isRVVModeSwitch(Opcode) &&
-           !isCall(Opcode) && !InstrDesc.isBranch() && !InstrDesc.isReturn();
+           !isCall(Opcode) && !InstrDesc.isBranch() && !InstrDesc.isReturn() &&
+           !isZcmpPushPop(Opcode);
   }
 
   bool canInitializeOperand(const MCInstrDesc &InstrDesc, unsigned OpIndex,
@@ -3773,9 +3846,8 @@ public:
     auto Opcode = InstrDesc.getOpcode();
     // Compressed instructions' offset is required to be aligned to element
     // width
-    if (isCLoadStore(Opcode)) {
+    if (isCLoadStore(Opcode))
       return getDataElementWidth(Opcode);
-    }
     return 1;
   }
 

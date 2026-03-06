@@ -233,7 +233,7 @@ public:
   }
 
   unsigned getSpillAlignmentInBytes(MCRegister Reg,
-                                    LLVMState &State) const override {
+                                    const LLVMState &State) const override {
     reportUnimplementedError();
   }
 
@@ -541,7 +541,8 @@ public:
 
   AddressGenInfo
   selectAddrGenInfoForInstr(SnippyProgramContext &ProgCtx, unsigned Opcode,
-                            const MachineBasicBlock &MBB) const override {
+                            const MachineBasicBlock &MBB,
+                            const MachineInstr *MI = nullptr) const override {
     reportUnimplementedError();
   }
 

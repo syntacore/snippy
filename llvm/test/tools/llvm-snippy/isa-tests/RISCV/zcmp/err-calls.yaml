@@ -1,0 +1,28 @@
+# RUN: not llvm-snippy %s -model-plugin None |& FileCheck %s
+
+options:
+  march: riscv64
+  num-instrs: 1000
+  honor-target-abi: on
+  mattr: +zcmp
+  function-number: 2
+  redefine-sp: any-not-SP
+
+include:
+  - ../Inputs/sections-with-stack.yaml
+
+histogram:
+  - [CM_POP, 1.0]
+  - [JAL, 1.0]
+
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - fun1
+    - name: fun1
+
+# CHECK: error: The generation of calls with instructions from the Zcmp extension that overwrite the return address is not supported.
+
+

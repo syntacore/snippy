@@ -934,10 +934,8 @@ chooseAddrInfoForInstr(MachineInstr &MI, InstructionGenerationContext &IGC,
   auto &State = ProgCtx.getLLVMState();
   auto &MS = IGC.getMemoryAccessSampler();
   const auto &SnippyTgt = State.getSnippyTarget();
-  auto Opcode = MI.getDesc().getOpcode();
-
-  auto AddrGenInfo =
-      SnippyTgt.selectAddrGenInfoForInstr(ProgCtx, Opcode, *MI.getParent());
+  auto AddrGenInfo = SnippyTgt.selectAddrGenInfoForInstr(
+      ProgCtx, MI.getOpcode(), *MI.getParent(), &MI);
 
   auto ReportError = [&](Error Err) {
     std::string InstrStr;
