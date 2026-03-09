@@ -1420,7 +1420,18 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
   const auto &Sections = ProgramCfg.Sections;
   if (Sections.empty())
     fatal(Ctx, "Incorrect list of sections", "list is empty");
-  if (Sections.generalRWSections().empty())
+
+  auto *II = TM.getMCInstrInfo();
+  assert(II);
+
+  // General-purpose RW sections are only required when the histogram contains
+  // memory-access instructions. Register-only snippets can be generated with
+  // RX sections only.
+  bool NeedsGeneralRWSection = Histogram.getOpcodesWeight([&](unsigned Opcode) {
+    return isLoadStoreInstr(Opcode, *II);
+  }) > 0.0;
+
+  if (Sections.generalRWSections().empty() && NeedsGeneralRWSection)
     fatal(Ctx, "Incorrect list of sections",
           "there are no general purpose RW sections");
   // Folowing check is for situations like this:
@@ -1491,8 +1502,6 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
     Tgt.checkTrackingRestrictions(Histogram);
   checkCompatibilityWithValuegramPolicy(*this, Ctx);
 
-  auto *II = TM.getMCInstrInfo();
-  assert(II);
   checkFPUSettings(*this, Ctx, Tgt, *II);
   checkGlobalRegsSpillSettings(State.getSnippyTarget(), State.getRegInfo(),
                                *this, Ctx);
