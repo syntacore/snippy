@@ -1,0 +1,9 @@
+# RUN: llvm-snippy -march=riscv64 -mattr=+zcmp -list-opcode-names \
+# RUN: |& FileCheck %s
+
+# CHECK-DAG: CM_MVA01S
+# CHECK-DAG: CM_MVSA01
+# CHECK-DAG: CM_POP
+# CHECK-DAG: CM_POPRET
+# CHECK-DAG: CM_POPRETZ
+# CHECK-DAG: CM_PUSH
