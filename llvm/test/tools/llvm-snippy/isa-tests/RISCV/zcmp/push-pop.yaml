@@ -1,0 +1,55 @@
+# COM: This test checks that all valid rlist and spimm values for push/pop are
+#      generated.
+# RUN: llvm-snippy %s -model-plugin None |& FileCheck %s
+
+options:
+  march: riscv64
+  num-instrs: 10000
+  mattr: +zcmp
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+  dump-mf: true
+
+include:
+  - ../Inputs/sections.yaml
+
+histogram:
+  - [CM_PUSH, 1.0]
+  - [CM_POP, 1.0]
+
+# CHECK: CM_POP {{[4-9]|1[0-5]}}, 0
+# CHECK: CM_POP {{[4-9]|1[0-5]}}, 16
+# CHECK: CM_POP {{[4-9]|1[0-5]}}, 32
+# CHECK: CM_POP {{[4-9]|1[0-5]}}, 48
+
+# CHECK: CM_PUSH {{[4-9]|1[0-5]}}, 0
+# CHECK: CM_PUSH {{[4-9]|1[0-5]}}, 16
+# CHECK: CM_PUSH {{[4-9]|1[0-5]}}, 32
+# CHECK: CM_PUSH {{[4-9]|1[0-5]}}, 48
+
+# CHECK: CM_POP 4, {{0|16|32|48}}
+# CHECK: CM_POP 5, {{0|16|32|48}}
+# CHECK: CM_POP 6, {{0|16|32|48}}
+# CHECK: CM_POP 7, {{0|16|32|48}}
+# CHECK: CM_POP 8, {{0|16|32|48}}
+# CHECK: CM_POP 9, {{0|16|32|48}}
+# CHECK: CM_POP 10, {{0|16|32|48}}
+# CHECK: CM_POP 11, {{0|16|32|48}}
+# CHECK: CM_POP 12, {{0|16|32|48}}
+# CHECK: CM_POP 13, {{0|16|32|48}}
+# CHECK: CM_POP 14, {{0|16|32|48}}
+# CHECK: CM_POP 15, {{0|16|32|48}}
+
+# CHECK: CM_PUSH 4, {{0|16|32|48}}
+# CHECK: CM_PUSH 5, {{0|16|32|48}}
+# CHECK: CM_PUSH 6, {{0|16|32|48}}
+# CHECK: CM_PUSH 7, {{0|16|32|48}}
+# CHECK: CM_PUSH 8, {{0|16|32|48}}
+# CHECK: CM_PUSH 9, {{0|16|32|48}}
+# CHECK: CM_PUSH 10, {{0|16|32|48}}
+# CHECK: CM_PUSH 11, {{0|16|32|48}}
+# CHECK: CM_PUSH 12, {{0|16|32|48}}
+# CHECK: CM_PUSH 13, {{0|16|32|48}}
+# CHECK: CM_PUSH 14, {{0|16|32|48}}
+# CHECK: CM_PUSH 15, {{0|16|32|48}}
+

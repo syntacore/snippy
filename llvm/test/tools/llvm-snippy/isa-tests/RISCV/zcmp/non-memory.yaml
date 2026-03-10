@@ -1,0 +1,55 @@
+# COM: This test checks that all valid operands for non memory instructions are
+#      generated.
+# RUN: llvm-snippy %s -model-plugin None |& FileCheck %s
+
+options:
+  march: riscv64
+  num-instrs: 10000
+  mattr: +zcmp
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+  dump-mf: true
+
+include:
+  - ../Inputs/sections.yaml
+
+histogram:
+  - [CM_MVA01S, 1.0]
+  - [CM_MVSA01, 1.0]
+
+# CHECK: CM_MVA01S $x8,
+# CHECK: CM_MVA01S $x9,
+# CHECK: CM_MVA01S $x18,
+# CHECK: CM_MVA01S $x19,
+# CHECK: CM_MVA01S $x20,
+# CHECK: CM_MVA01S $x21,
+# CHECK: CM_MVA01S $x22,
+# CHECK: CM_MVA01S $x23,
+
+# CHECK: CM_MVA01S $x{{8|9|18|19|2[0-3]}}, $x8
+# CHECK: CM_MVA01S $x{{8|9|18|19|2[0-3]}}, $x9
+# CHECK: CM_MVA01S $x{{8|9|18|19|2[0-3]}}, $x18
+# CHECK: CM_MVA01S $x{{8|9|18|19|2[0-3]}}, $x19
+# CHECK: CM_MVA01S $x{{8|9|18|19|2[0-3]}}, $x20
+# CHECK: CM_MVA01S $x{{8|9|18|19|2[0-3]}}, $x21
+# CHECK: CM_MVA01S $x{{8|9|18|19|2[0-3]}}, $x22
+# CHECK: CM_MVA01S $x{{8|9|18|19|2[0-3]}}, $x23
+
+# CHECK: $x8, $x{{8|9|18|19|2[0-3]}} = CM_MVSA01
+# CHECK: $x9, $x{{8|9|18|19|2[0-3]}} = CM_MVSA01
+# CHECK: $x18, $x{{8|9|18|19|2[0-3]}} = CM_MVSA01
+# CHECK: $x19, $x{{8|9|18|19|2[0-3]}} = CM_MVSA01
+# CHECK: $x20, $x{{8|9|18|19|2[0-3]}} = CM_MVSA01
+# CHECK: $x21, $x{{8|9|18|19|2[0-3]}} = CM_MVSA01
+# CHECK: $x22, $x{{8|9|18|19|2[0-3]}} = CM_MVSA01
+# CHECK: $x23, $x{{8|9|18|19|2[0-3]}} = CM_MVSA01
+
+# CHECK: $x{{8|9|18|19|2[0-3]}}, $x8 = CM_MVSA01
+# CHECK: $x{{8|9|18|19|2[0-3]}}, $x9 = CM_MVSA01
+# CHECK: $x{{8|9|18|19|2[0-3]}}, $x18 = CM_MVSA01
+# CHECK: $x{{8|9|18|19|2[0-3]}}, $x19 = CM_MVSA01
+# CHECK: $x{{8|9|18|19|2[0-3]}}, $x20 = CM_MVSA01
+# CHECK: $x{{8|9|18|19|2[0-3]}}, $x21 = CM_MVSA01
+# CHECK: $x{{8|9|18|19|2[0-3]}}, $x22 = CM_MVSA01
+# CHECK: $x{{8|9|18|19|2[0-3]}}, $x23 = CM_MVSA01
+
