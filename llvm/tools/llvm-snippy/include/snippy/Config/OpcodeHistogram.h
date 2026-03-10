@@ -21,6 +21,7 @@
 #include <numeric>
 #include <optional>
 #include <string>
+#include <type_traits>
 
 namespace llvm {
 namespace snippy {
@@ -144,6 +145,16 @@ public:
     if (HIt == end())
       return 0.0;
     return HIt->second;
+  }
+
+  bool isWeightZero(unsigned Opcode) const {
+    return weight(Opcode) < std::numeric_limits<double>::epsilon();
+  }
+
+  template <typename... OpcodeT> bool isAnyNonZero(OpcodeT... Opcodes) const {
+    static_assert((std::is_convertible_v<OpcodeT, unsigned> && ...) &&
+                  "Opcode types must be convertible to unsigned");
+    return (!isWeightZero(Opcodes) || ...);
   }
 };
 

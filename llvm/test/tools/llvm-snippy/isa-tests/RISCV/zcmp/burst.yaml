@@ -1,0 +1,26 @@
+# RUN: llvm-snippy %s -model-plugin None |& FileCheck %s
+
+options:
+  march: riscv64
+  num-instrs: 1000
+  mattr: +zcmp
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+  dump-mf: true
+
+include:
+  - ../Inputs/sections.yaml
+
+histogram:
+  - [CM_PUSH, 1.0]
+  - [CM_POP, 1.0]
+
+burst:
+  mode: custom
+  min-size: 3
+  max-size: 3
+  groupings:
+    - [CM_PUSH, CM_POP]
+
+# CHECK: warning: (burst-mode) Opcode CM_POP is not supported in the burst mode: generator will generate it but not in a burst group.
+# CHECK: warning: (burst-mode) Opcode CM_PUSH is not supported in the burst mode: generator will generate it but not in a burst group.

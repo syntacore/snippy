@@ -4036,6 +4036,7 @@ RISC-V architecture is supported with the following extensions. For the details,
 - **Zcd** - Compressed double precision loads and stores
 - **Zcf** - Compressed single precision loads and stores
 - **Zcmop** - Compressed May-Be-Operations
+- **Zcmp** - Compressed Multiple‑Register/Stack Operations
 
 **Zi* Extensions**
 

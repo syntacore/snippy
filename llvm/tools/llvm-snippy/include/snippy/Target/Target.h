@@ -220,7 +220,7 @@ public:
   // Returns minimum address alignment that can be used to generate register
   // spill.
   virtual unsigned getSpillAlignmentInBytes(MCRegister Reg,
-                                            LLVMState &State) const = 0;
+                                            const LLVMState &State) const = 0;
 
   virtual uint8_t getCodeAlignment(const TargetSubtargetInfo &IGC) const = 0;
 
@@ -523,7 +523,8 @@ public:
   // opcode in the context of \ref MBB and \ref ProgCtx.
   virtual AddressGenInfo
   selectAddrGenInfoForInstr(SnippyProgramContext &ProgCtx, unsigned Opcode,
-                            const MachineBasicBlock &MBB) const = 0;
+                            const MachineBasicBlock &MBB,
+                            const MachineInstr *MI = nullptr) const = 0;
 
   virtual void
   excludeFromMemRegsForOpcode(unsigned Opcode, const MCRegisterInfo &RI,

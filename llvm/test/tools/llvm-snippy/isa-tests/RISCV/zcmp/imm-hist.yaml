@@ -1,0 +1,32 @@
+# RUN: llvm-snippy %s -model-plugin None |& FileCheck %s
+
+options:
+  march: riscv64
+  num-instrs: 1000
+  mattr: +zcmp
+  dump-mf: on
+
+include:
+  - ../Inputs/sections.yaml
+
+histogram:
+  - [CM_POP, 1.0]
+  - [CM_PUSH, 1.0]
+
+imm-hist:
+  opcodes:
+    - "CM_POP":
+      - [10, 1.0]
+      - [1, 1.0]
+    - "CM_PUSH":
+      - [6, 1.0]
+      - [3, 1.0]
+
+# CHECK: CM_POP 10, 16
+# CHECK: CM_PUSH 6, 48
+
+# CHECK-NOT: CM_POP {{[4-9]|[10-15]}}, {{0|32|48}}
+# CHECK-NOT: CM_POP {{[4-9]|[11-15]}},
+
+# CHECK-NOT: CM_PUSH {{[4-9]|[10-15]}}, {{0|16|32}}
+# CHECK-NOT: CM_PUSH {{[4-5]|[7-9]|[10-15]}},
