@@ -848,6 +848,28 @@ inline bool isZicbo(unsigned Opcode) {
   }
 }
 
+inline bool isZcmpPushPop(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RISCV::CM_PUSH:
+  case RISCV::CM_POP:
+  case RISCV::CM_POPRET:
+  case RISCV::CM_POPRETZ:
+    return true;
+  }
+}
+
+inline bool isZcmp(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return isZcmpPushPop(Opcode);
+  case RISCV::CM_MVA01S:
+  case RISCV::CM_MVSA01:
+    return true;
+  }
+}
+
 inline bool isNTLHint(unsigned Opcode) {
   switch (Opcode) {
   default:
@@ -998,7 +1020,8 @@ inline bool isCFPSPRelativeLoadStore(unsigned Opcode) {
 
 inline bool isSPRelative(unsigned Opcode) {
   return isCSPRelativeLoadStore(Opcode) || isCFPSPRelativeLoadStore(Opcode) ||
-         Opcode == RISCV::C_ADDI16SP || Opcode == RISCV::C_ADDI4SPN;
+         Opcode == RISCV::C_ADDI16SP || Opcode == RISCV::C_ADDI4SPN ||
+         isZcmpPushPop(Opcode);
 }
 
 inline bool isRVVUnitStrideLoadStore(unsigned Opcode) {
