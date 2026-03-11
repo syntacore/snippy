@@ -118,18 +118,14 @@ static void readSnippyOptionsIfNeeded() {
   }
 }
 
-static std::string readFile(StringRef Filename, LLVMContext &Ctx) {
-  auto MemBufOrErr = MemoryBuffer::getFile(Filename);
-  if (auto EC = MemBufOrErr.getError(); !MemBufOrErr)
-    fatal(Ctx, "Failed to open file \"" + Filename + "\"", EC.message());
-  return (*MemBufOrErr)->getBuffer().str();
-}
-
 static void mergeFiles(IncludePreprocessor &IPP, LLVMContext &Ctx) {
   for (const auto &AdditionalLayout : AdditionalLayoutFiles) {
-    IPP.mergeFile(AdditionalLayout, readFile(AdditionalLayout, Ctx));
+    IncludePreprocessor AdditionalIPP(AdditionalLayout,
+                                      getExtraIncludeDirsForLayout(), Ctx);
+    IPP.mergeFile(AdditionalLayout, AdditionalIPP.getPreprocessed());
   }
 }
+
 static Config readSnippyConfig(LLVMState &State, RegPoolWrapper &RP,
                                const OpcodeCache &OpCC, ProgramConfig &ProgCfg,
                                const DebugOptions &DebugOpts) {

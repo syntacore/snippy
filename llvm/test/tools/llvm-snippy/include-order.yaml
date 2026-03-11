@@ -1,0 +1,11 @@
+# RUN: llvm-snippy %S/Inputs/include-order-1.yaml \
+# RUN:   %S/Inputs/include-order-3.yaml \
+# RUN:   -march=riscv64-linux-gnu -num-instrs=10 \
+# RUN:   -model-plugin=None
+# RUN: llvm-snippy %S/Inputs/include-order-3.yaml \
+# RUN:   %S/Inputs/include-order-1.yaml \
+# RUN:   -march=riscv64-linux-gnu -num-instrs=10 \
+# RUN:   -model-plugin=None
+
+# Check that include preprocessing does not depend on the order
+# of layout files passed on the command line.
