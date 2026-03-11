@@ -1,0 +1,5 @@
+include:
+  - include-order-2.yaml
+
+histogram:
+  - [ADD, 1.0]
