@@ -211,8 +211,9 @@ std::vector<planning::PreselectedOpInfo> selectConcreteOffsets(
           auto &ProgCtx = IGC.ProgCtx;
           auto &Cfg = IGC.getCommonCfg();
           auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
-          auto Concrete = Tgt.generateTargetOperand(
-              ProgCtx, Cfg, InstrDesc.getOpcode(), OpType, Operand.getImm());
+          auto Concrete =
+              Tgt.generateTargetOperand(ProgCtx, Cfg, InstrDesc.getOpcode(),
+                                        OpType, Operand.getImm(), Idx);
           return StridedImmediate(Concrete.getImm(), Concrete.getImm(),
                                   Operand.getImm().getStride());
         }

@@ -285,11 +285,15 @@ public:
     reportUnimplementedError();
   }
 
+  size_t getNumImmOperands(const MCInstrDesc &InstrDesc) const override {
+    reportUnimplementedError();
+  }
+
   virtual MachineOperand
   generateTargetOperand(SnippyProgramContext &ProgCtx,
                         const CommonPolicyConfig &Cfg, unsigned OpCode,
-                        unsigned OpType,
-                        const StridedImmediate &StridedImm) const override {
+                        unsigned OpType, const StridedImmediate &StridedImm,
+                        unsigned OperandIdx) const override {
     reportUnimplementedError();
   }
 

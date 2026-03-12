@@ -355,8 +355,8 @@ public:
   virtual MachineOperand
   generateTargetOperand(SnippyProgramContext &ProgCtx,
                         const CommonPolicyConfig &Cfg, unsigned OpCode,
-                        unsigned OpType,
-                        const StridedImmediate &StridedImm) const = 0;
+                        unsigned OpType, const StridedImmediate &StridedImm,
+                        unsigned OperandIdx) const = 0;
 
   virtual bool canProduceNaN(const MCInstrDesc &InstrDesc) const = 0;
 
@@ -375,6 +375,8 @@ public:
                                 unsigned Operand) const {
     return AccessMaskBit::None;
   }
+
+  virtual size_t getNumImmOperands(const MCInstrDesc &InstrDesc) const = 0;
 
   virtual unsigned getTransformSequenceLength(InstructionGenerationContext &IGC,
                                               APInt OldValue, APInt NewValue,

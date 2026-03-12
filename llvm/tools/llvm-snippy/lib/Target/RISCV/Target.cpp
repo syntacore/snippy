@@ -1045,6 +1045,20 @@ static void addGeneratedInstrsToBB(InstructionGenerationContext &IGC,
   }
 }
 
+static unsigned getRelativeImmOperandIdx(unsigned Opcode,
+                                         SnippyProgramContext &ProgCtx,
+                                         unsigned AbsoluteOpIdx) {
+  const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
+  const auto &Operands = InstrInfo.get(Opcode).operands();
+  assert(Operands.size() > AbsoluteOpIdx);
+  assert(isImmediateOperand(Operands[AbsoluteOpIdx].OperandType));
+  return count_if(
+      make_range(Operands.begin(), std::next(Operands.begin(), AbsoluteOpIdx)),
+      [](const auto &OpInfo) {
+        return isImmediateOperand(OpInfo.OperandType);
+      });
+}
+
 class SnippyRISCVTarget final : public SnippyTarget {
 
   void generateWriteValueSeq(InstructionGenerationContext &IGC, APInt Value,
@@ -3106,29 +3120,48 @@ public:
     }
   }
 
+  size_t getNumImmOperands(const MCInstrDesc &InstrDesc) const override {
+    const auto &OpsInfo = InstrDesc.operands();
+    return count_if(OpsInfo, [](const auto &OpInfo) {
+      return isImmediateOperand(OpInfo.OperandType);
+    });
+  }
+
   MachineOperand genTargetOpForOpcode(unsigned Opcode, unsigned OperandType,
                                       const StridedImmediate &StridedImm,
                                       SnippyProgramContext &ProgCtx,
-                                      const CommonPolicyConfig &Cfg) const {
+                                      const CommonPolicyConfig &Cfg,
+                                      unsigned OperandIdx) const {
     const auto &State = ProgCtx.getLLVMState();
-    const auto &OpcSetting =
-        Cfg.ImmHistMap.getConfigForOpcode(Opcode, ProgCtx.getOpcodeCache());
+    const auto &OpcSetting = Cfg.ImmHistMap.getConfigForOpcode(Opcode);
     if (OpcSetting.isUniform())
       return createOperandForOpType(Opcode, /*IH=*/nullptr, OperandType,
                                     StridedImm, State);
-    const auto &Seq = OpcSetting.getSequence();
+    if (OpcSetting.isSequence()) {
+      const auto &Seq = OpcSetting.getSequence();
+      return createOperandForOpType(Opcode, &Seq, OperandType, StridedImm,
+                                    State);
+    }
+    assert(OpcSetting.isPerOperand());
+    unsigned RelativeOpIdx =
+        getRelativeImmOperandIdx(Opcode, ProgCtx, OperandIdx);
+    const auto &OperandsMap = OpcSetting.getOperandsMap();
+    if (OperandsMap.isUniformForOperand(RelativeOpIdx))
+      return createOperandForOpType(Opcode, /*IH=*/nullptr, OperandType,
+                                    StridedImm, State);
+    const auto &Seq = OperandsMap.getIHForOperand(RelativeOpIdx);
     return createOperandForOpType(Opcode, &Seq, OperandType, StridedImm, State);
   }
 
-  MachineOperand
-  generateTargetOperand(SnippyProgramContext &ProgCtx,
-                        const CommonPolicyConfig &Cfg, unsigned Opcode,
-                        unsigned OperandType,
-                        const StridedImmediate &StridedImm) const override {
+  MachineOperand generateTargetOperand(SnippyProgramContext &ProgCtx,
+                                       const CommonPolicyConfig &Cfg,
+                                       unsigned Opcode, unsigned OperandType,
+                                       const StridedImmediate &StridedImm,
+                                       unsigned OperandIdx) const override {
     const auto &IHV = Cfg.ImmHistogram;
     if (IHV.holdsAlternative<ImmediateHistogramRegEx>())
-      return genTargetOpForOpcode(Opcode, OperandType, StridedImm, ProgCtx,
-                                  Cfg);
+      return genTargetOpForOpcode(Opcode, OperandType, StridedImm, ProgCtx, Cfg,
+                                  OperandIdx);
 
     const auto *IH = [&]() -> const ImmediateHistogramSequence * {
       // Disable histogram for loads and stores

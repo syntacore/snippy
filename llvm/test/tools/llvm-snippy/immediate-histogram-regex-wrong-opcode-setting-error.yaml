@@ -15,6 +15,4 @@ imm-hist:
     - "ADDI":
         nonexistent: mapping
 
-# CHECK: error: Immediate histogram opcode setting should be either sequence or scalar.
-# CHECK-SAME: But map was encountered
-# CHECK: nonexistent: mapping
+# CHECK: error: missing required key 'operands'
