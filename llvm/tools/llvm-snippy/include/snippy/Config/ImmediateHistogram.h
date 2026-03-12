@@ -44,30 +44,99 @@ struct ImmediateHistogramSequence final {
   bool empty() const { return Values.empty(); }
 };
 
-class ImmHistOpcodeSettings final {
+class ImmHistOperandsEntry final {
 public:
-  enum class Kind { Uniform, Custom };
+  enum class Kind { Uniform, Sequence };
+
+  ImmHistOperandsEntry() = default;
+
+  ImmHistOperandsEntry(const ImmediateHistogramSequence &Seq)
+      : Underlying(Seq), EntryKind(Kind::Sequence) {}
+
+  bool isSequence() const { return EntryKind == Kind::Sequence; }
+
+  bool isUniform() const { return EntryKind == Kind::Uniform; }
+
+  Kind getKind() const { return EntryKind; }
+
+  const ImmediateHistogramSequence &getSequence() const & {
+    assert(isSequence() &&
+           std::holds_alternative<ImmediateHistogramSequence>(Underlying));
+    return std::get<ImmediateHistogramSequence>(Underlying);
+  }
 
 private:
-  std::optional<ImmediateHistogramSequence> Seq;
+  std::variant<std::monostate, ImmediateHistogramSequence> Underlying;
+  Kind EntryKind = Kind::Uniform;
+};
+
+struct ImmHistOperandsEntryHolder final {
+  ImmHistOperandsEntry Underlying;
+};
+
+class ImmHistOperands final {
+  std::vector<ImmHistOperandsEntryHolder> Operands;
+  friend yaml::MappingTraits<ImmHistOperands>;
+
+public:
+  bool isUniformForOperand(unsigned OperandIdx) const {
+    assert(Operands.size() > OperandIdx);
+    return Operands[OperandIdx].Underlying.isUniform();
+  }
+
+  bool hasIHForOperand(unsigned OperandIdx) const {
+    assert(Operands.size() > OperandIdx);
+    return Operands[OperandIdx].Underlying.isSequence();
+  }
+
+  const ImmediateHistogramSequence &
+  getIHForOperand(unsigned OperandIdx) const & {
+    assert(Operands.size() > OperandIdx);
+    assert(hasIHForOperand(OperandIdx));
+    const auto &Entry = Operands[OperandIdx].Underlying;
+    return Entry.getSequence();
+  }
+
+  auto size() const { return Operands.size(); }
+};
+
+class ImmHistOpcodeSettings final {
+public:
+  enum class Kind { Uniform, Custom, Operands };
+
+private:
+  std::variant<std::monostate, ImmediateHistogramSequence, ImmHistOperands>
+      Underlying;
   Kind SettingsKind = Kind::Uniform;
 
 public:
   ImmHistOpcodeSettings() = default;
 
   ImmHistOpcodeSettings(const ImmediateHistogramSequence &Sequence)
-      : Seq(Sequence), SettingsKind(Kind::Custom) {}
+      : Underlying(Sequence), SettingsKind(Kind::Custom) {}
 
   ImmHistOpcodeSettings(ImmediateHistogramSequence &&Sequence)
-      : Seq(std::move(Sequence)), SettingsKind(Kind::Custom) {}
+      : Underlying(std::move(Sequence)), SettingsKind(Kind::Custom) {}
+
+  ImmHistOpcodeSettings(const ImmHistOperands &Map)
+      : Underlying(Map), SettingsKind(Kind::Operands) {}
 
   bool isUniform() const { return SettingsKind == Kind::Uniform; }
 
   bool isSequence() const { return SettingsKind == Kind::Custom; }
 
-  const ImmediateHistogramSequence &getSequence() const {
-    assert(isSequence() && Seq.has_value());
-    return *Seq;
+  bool isPerOperand() const { return SettingsKind == Kind::Operands; }
+
+  const ImmediateHistogramSequence &getSequence() const & {
+    assert(isSequence() &&
+           std::holds_alternative<ImmediateHistogramSequence>(Underlying));
+    return std::get<ImmediateHistogramSequence>(Underlying);
+  }
+
+  const ImmHistOperands &getOperandsMap() const & {
+    assert(isPerOperand() &&
+           std::holds_alternative<ImmHistOperands>(Underlying));
+    return std::get<ImmHistOperands>(Underlying);
   }
 
   Kind getKind() const { return SettingsKind; }
@@ -395,13 +464,25 @@ public:
 
   OpcodeToImmHistSequenceMap() = default;
 
-  const ImmHistOpcodeSettings &
-  getConfigForOpcode(unsigned Opc, const OpcodeCache &OpCC) const {
+  const ImmHistOpcodeSettings &getConfigForOpcode(unsigned Opc) const & {
     assert(Data.count(Opc) && "Opcode was not found in immediate histogram");
     return Data.at(Opc);
   }
+
+  bool empty() const { return Data.empty(); }
 };
 
+struct ImmHistOperandsEntryMapMapper final {};
+
 } // namespace snippy
+
+namespace yaml {
+void yamlize(IO &IO, const snippy::ImmHistOperandsEntryMapMapper &, bool,
+             EmptyContext &);
+} // namespace yaml
+
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::ImmHistOperands);
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::ImmHistOperandsEntryHolder);
+LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::ImmHistOperandsEntryHolder, false);
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::ImmediateHistogramSequence);
 } // namespace llvm

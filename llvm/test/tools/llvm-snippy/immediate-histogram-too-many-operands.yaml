@@ -1,0 +1,29 @@
+# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+include:
+  - Inputs/sections.yaml
+
+options:
+  mtriple: riscv64-unknown-elf
+  num-instrs: 100
+  dump-mf: on
+  mattr: +Zicsr
+
+histogram:
+    - [CSRRWI, 1.0]
+
+imm-hist:
+  opcodes:
+    - 'CSRRWI':
+        operands:
+          - - [0x2, 1.0] # First operand  (CSR)
+          - - [0x0, 1.0] # Second operand (Value to write)
+            - [0x1, 1.0]
+            - [0x2, 1.0]
+          - - [0x0, 1.0] # Third operand  (nonexistent)
+
+# CHECK: error: Immediate histogram: The number of operands
+# CHECK-SAME: entries is not equal to the number of immediate
+# CHECK-SAME: operands for the "CSRRWI" opcode. Expected 2
+# CHECK-SAME: entries but 3 were specified
+

@@ -112,6 +112,11 @@ inline unsigned getInstructionSize(const uint16_t FirstInstrTwoBytes) {
   }
 }
 
+inline bool isImmediateOperand(unsigned OpType) {
+  return RISCVOp::OPERAND_FIRST_RISCV_IMM <= OpType &&
+         OpType <= RISCVOp::OPERAND_LAST_RISCV_IMM;
+}
+
 inline size_t getDataElementWidth(unsigned Opcode, unsigned SEW = 0,
                                   unsigned VLENB = 0) {
   if (isRVVIntegerWidening(Opcode) || isRVVFPWidening(Opcode) ||
