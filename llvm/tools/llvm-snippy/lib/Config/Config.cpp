@@ -13,6 +13,7 @@
 #include "snippy/Config/CallGraphLayout.h"
 #include "snippy/Config/Config.h"
 #include "snippy/Config/FunctionDescriptions.h"
+#include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/RegisterAccess.h"
@@ -307,8 +308,9 @@ template <> struct yaml::ScalarEnumerationTraits<ImmHistOpcodeSettings::Kind> {
 };
 
 struct ImmHistOpcodeSettingsNorm final {
-  ImmHistOpcodeSettings::Kind Kind = ImmHistOpcodeSettings::Kind::Custom;
+  ImmHistOpcodeSettings::Kind Kind;
   ImmediateHistogramSequence Seq;
+  ImmHistOperands Map;
   yaml::IO &IO;
 
   ImmHistOpcodeSettingsNorm(yaml::IO &IO) : IO(IO) {}
@@ -325,39 +327,53 @@ struct ImmHistOpcodeSettingsNormalization final {
     Data.Kind = Denorm.getKind();
     if (Denorm.isSequence())
       Data.Seq = Denorm.getSequence();
+    else if (Denorm.isPerOperand())
+      Data.Map = Denorm.getOperandsMap();
   }
   ImmHistOpcodeSettings denormalize(yaml::IO &) {
-    if (Data.Kind == ImmHistOpcodeSettings::Kind::Custom)
+    switch (Data.Kind) {
+    case ImmHistOpcodeSettings::Kind::Custom:
       return ImmHistOpcodeSettings(Data.Seq);
-    if (Data.Kind == ImmHistOpcodeSettings::Kind::Uniform)
+    case ImmHistOpcodeSettings::Kind::Uniform:
       return ImmHistOpcodeSettings();
+    case ImmHistOpcodeSettings::Kind::Operands:
+      return ImmHistOpcodeSettings(Data.Map);
+    }
     llvm_unreachable("Unknown opcode settings kind");
   }
 };
 
 template <> struct yaml::PolymorphicTraits<ImmHistOpcodeSettingsNorm> {
   static yaml::NodeKind getKind(const ImmHistOpcodeSettingsNorm &Info) {
-    if (Info.Kind == ImmHistOpcodeSettings::Kind::Uniform)
+    switch (Info.Kind) {
+    case ImmHistOpcodeSettings::Kind::Uniform:
       return NodeKind::Scalar;
-    if (Info.Kind == ImmHistOpcodeSettings::Kind::Custom)
+    case ImmHistOpcodeSettings::Kind::Custom:
       return NodeKind::Sequence;
-    llvm_unreachable("Unknown map value kind in ImmHistOpcodeSettings");
+    case ImmHistOpcodeSettings::Kind::Operands:
+      return NodeKind::Map;
+    }
+    llvm_unreachable("Unknown kind in ImmHistOpcodeSettings");
   }
 
   static ImmHistOpcodeSettings::Kind &
   getAsScalar(ImmHistOpcodeSettingsNorm &Info) {
+    if (!Info.IO.outputting())
+      Info.Kind = snippy::ImmHistOpcodeSettings::Kind::Uniform;
     return Info.Kind;
   }
 
   static ImmediateHistogramSequence &
   getAsSequence(ImmHistOpcodeSettingsNorm &Info) {
+    if (!Info.IO.outputting())
+      Info.Kind = snippy::ImmHistOpcodeSettings::Kind::Custom;
     return Info.Seq;
   }
 
-  static ImmediateHistogramSequence &getAsMap(ImmHistOpcodeSettingsNorm &Info) {
-    Info.IO.setError("Immediate histogram opcode setting should be either "
-                     "sequence or scalar. But map was encountered.");
-    snippy::fatal("Failed to parse configuration file.");
+  static ImmHistOperands &getAsMap(ImmHistOpcodeSettingsNorm &Info) {
+    if (!Info.IO.outputting())
+      Info.Kind = snippy::ImmHistOpcodeSettings::Kind::Operands;
+    return Info.Map;
   }
 };
 
@@ -1395,6 +1411,40 @@ static void checkOpcodeToSettingsMap(const WeightedOpcToSettingsMaps &Map,
   }
 }
 
+static void reportInvalidIHOperandsNumError(const MCInstrInfo &InstrInfo,
+                                            unsigned Opc, size_t ExpectedNum,
+                                            size_t RealNum) {
+  snippy::fatal(
+      "Immediate histogram",
+      createStringError(
+          (std::make_error_code(std::errc::invalid_argument)),
+          llvm::formatv(
+              "The number of operands entries is not equal to the number of "
+              "immediate operands for the \"{0}\" opcode. Expected "
+              "{1} entries but {2} were specified",
+              InstrInfo.getName(Opc), ExpectedNum, RealNum)));
+}
+
+static void validateImmHist(const OpcodeToImmHistSequenceMap &IHMap,
+                            const OpcodeHistogram &H, const OpcodeCache &OpCC,
+                            const LLVMState &State) {
+  if (IHMap.empty())
+    return;
+  const auto &Tgt = State.getSnippyTarget();
+  const auto &InstrInfo = State.getInstrInfo();
+
+  for (auto Opc : make_first_range(H)) {
+    const auto &Settings = IHMap.getConfigForOpcode(Opc);
+    if (!Settings.isPerOperand())
+      continue;
+    const auto &OperandsMap = Settings.getOperandsMap();
+    size_t MapSize = OperandsMap.size();
+    size_t TargetSize = Tgt.getNumImmOperands(InstrInfo.get(Opc));
+    if (MapSize != TargetSize)
+      reportInvalidIHOperandsNumError(InstrInfo, Opc, TargetSize, MapSize);
+  }
+}
+
 void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
                          const RegPoolWrapper &RP) {
   auto &Ctx = State.getCtx();
@@ -1595,6 +1645,7 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
   if (DefFlowConfig.OperandsReinitialization.has_value())
     checkOpcodeToSettingsMap(DefFlowConfig.OpcodeToORSettingsMap, Histogram,
                              OpCC, State);
+  validateImmHist(CommonPolicyCfg->ImmHistMap, Histogram, OpCC, State);
 }
 
 void Config::complete(LLVMState &State, const OpcodeCache &OpCC) {

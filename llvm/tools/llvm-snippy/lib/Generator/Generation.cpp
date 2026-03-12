@@ -798,7 +798,7 @@ std::optional<MachineOperand> pregenerateOneOperand(
         StridedImm.getMin() == StridedImm.getMax())
       return MachineOperand::CreateImm(StridedImm.getMax());
     return SnippyTgt.generateTargetOperand(ProgCtx, Cfg, InstrDesc.getOpcode(),
-                                           OpType, StridedImm);
+                                           OpType, StridedImm, OpIndex);
   }
   llvm_unreachable("this operand type unsupported");
 }

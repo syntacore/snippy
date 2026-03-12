@@ -1,0 +1,24 @@
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+include:
+  - Inputs/sections.yaml
+
+options:
+  mtriple: riscv64-unknown-elf
+  num-instrs: 100
+  dump-mf: on
+  mattr: +Zicsr,+f
+
+histogram:
+    - [CSRRWI, 1.0]
+
+imm-hist:
+  opcodes:
+    - 'CSRRWI':
+        operands:
+          - - [0x2, 1.0] # First operand  (CSR)
+          - nonexistent: mapping
+
+# CHECK: error: Immediate histogram operands entry
+# CHECK-SAME: should be either sequence or scalar
+# CHECK: nonexistent: mapping

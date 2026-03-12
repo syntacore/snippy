@@ -7,6 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Config/ImmediateHistogram.h"
+#include "snippy/Config/ConfigIOContext.h"
+#include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/Support/YAMLHistogram.h"
 
 #include "llvm/Support/Debug.h"
@@ -106,11 +108,94 @@ OpcodeToImmHistSequenceMap::OpcodeToImmHistSequenceMap(
 
 LLVM_SNIPPY_YAML_IS_HISTOGRAM_DENORM_ENTRY(snippy::ImmediateHistogramEntry)
 
-void yaml::MappingTraits<snippy::ImmediateHistogramSequence>::mapping(
+namespace yaml {
+
+void MappingTraits<snippy::ImmHistOperands>::mapping(
+    IO &Io, snippy::ImmHistOperands &Map) {
+  Io.mapRequired("operands", Map.Operands);
+}
+
+void yamlize(IO &Io, const snippy::ImmHistOperandsEntryMapMapper &, bool,
+             EmptyContext &) {
+  Io.setError("Immediate histogram operands entry should be either sequence or "
+              "scalar. But map was encountered");
+}
+
+void MappingTraits<snippy::ImmediateHistogramSequence>::mapping(
     IO &Io, snippy::ImmediateHistogramSequence &ImmHist) {
   snippy::YAMLHistogramIO<snippy::ImmediateHistogramEntry> ImmHistIO(ImmHist);
   EmptyContext Ctx;
   yamlize(Io, ImmHistIO, false, Ctx);
 }
 
+struct ImmHistOperandsEntryNorm final {
+  snippy::ImmHistOperandsEntry::Kind EntryKind =
+      snippy::ImmHistOperandsEntry::Kind::Sequence;
+  snippy::ImmediateHistogramSequence Seq;
+};
+
+struct ImmHistOperandsEntryNormalization final {
+  ImmHistOperandsEntryNorm Data;
+
+  ImmHistOperandsEntryNormalization(IO &Io) {}
+
+  ImmHistOperandsEntryNormalization(
+      IO &Io, const snippy::ImmHistOperandsEntry &Denorm) {
+    Data.EntryKind = Denorm.getKind();
+    if (Denorm.isSequence())
+      Data.Seq = Denorm.getSequence();
+  }
+
+  snippy::ImmHistOperandsEntry denormalize(IO &Io) {
+    if (Data.EntryKind == snippy::ImmHistOperandsEntry::Kind::Sequence)
+      return snippy::ImmHistOperandsEntry(Data.Seq);
+    if (Data.EntryKind == snippy::ImmHistOperandsEntry::Kind::Uniform)
+      return snippy::ImmHistOperandsEntry();
+    llvm_unreachable("Unrecognized ImmHistOperandsEntry kind");
+  }
+};
+
+template <> struct PolymorphicTraits<ImmHistOperandsEntryNorm> {
+  static NodeKind getKind(const ImmHistOperandsEntryNorm &Norm) {
+    if (Norm.EntryKind == snippy::ImmHistOperandsEntry::Kind::Uniform)
+      return NodeKind::Scalar;
+    if (Norm.EntryKind == snippy::ImmHistOperandsEntry::Kind::Sequence)
+      return NodeKind::Sequence;
+    llvm_unreachable("Unrecognized ImmHistOperandsEntry kind");
+  }
+
+  static snippy::ImmHistOperandsEntry::Kind &
+  getAsScalar(ImmHistOperandsEntryNorm &Norm) {
+    return Norm.EntryKind;
+  }
+
+  static snippy::ImmediateHistogramSequence &
+  getAsSequence(ImmHistOperandsEntryNorm &Norm) {
+    return Norm.Seq;
+  }
+
+  static snippy::ImmHistOperandsEntryMapMapper
+  getAsMap(ImmHistOperandsEntryNorm &) {
+    return snippy::ImmHistOperandsEntryMapMapper();
+  }
+};
+
+template <> struct ScalarEnumerationTraits<snippy::ImmHistOperandsEntry::Kind> {
+  static void enumeration(IO &Io,
+                          snippy::ImmHistOperandsEntry::Kind &EntryKind) {
+    Io.enumCase(EntryKind, "uniform",
+                snippy::ImmHistOperandsEntry::Kind::Uniform);
+  }
+};
+
+void MappingTraits<snippy::ImmHistOperandsEntryHolder>::mapping(
+    IO &Io, snippy::ImmHistOperandsEntryHolder &EntryHolder) {
+  MappingNormalization<ImmHistOperandsEntryNormalization,
+                       snippy::ImmHistOperandsEntry>
+      Norm(Io, EntryHolder.Underlying);
+  EmptyContext Ctx;
+  yamlize(Io, Norm->Data, false, Ctx);
+}
+
+} // namespace yaml
 } // namespace llvm
