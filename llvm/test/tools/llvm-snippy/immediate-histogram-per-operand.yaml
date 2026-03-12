@@ -1,0 +1,3 @@
+# RUN: llvm-snippy %S/Inputs/immediate-histogram-per-operand.yaml -model-plugin=None |& FileCheck %s
+
+# CHECK-COUNT-100: CSRRWI 2, {{[0|1]}}
