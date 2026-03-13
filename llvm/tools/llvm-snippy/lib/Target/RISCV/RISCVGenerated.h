@@ -117,6 +117,8 @@ inline bool isImmediateOperand(unsigned OpType) {
          OpType <= RISCVOp::OPERAND_LAST_RISCV_IMM;
 }
 
+inline bool isRVV(unsigned Opcode);
+
 inline size_t getDataElementWidth(unsigned Opcode, unsigned SEW = 0,
                                   unsigned VLENB = 0) {
   if (isRVVIntegerWidening(Opcode) || isRVVFPWidening(Opcode) ||
@@ -198,6 +200,8 @@ inline size_t getDataElementWidth(unsigned Opcode, unsigned SEW = 0,
   case RVV_SEG_EACHFIELD_PLACER(RISCV::VLSSEG, 64):
   case RVV_SEG_EACHFIELD_PLACER(RISCV::VSSSEG, 64):
     return 8;
+  case ATOMIC_INST_PLACER(RISCV::AMOCAS_Q):
+    return 16;
   case RISCV::LD:
   case RISCV::C_LD:
   case RISCV::C_LDSP:
@@ -215,6 +219,8 @@ inline size_t getDataElementWidth(unsigned Opcode, unsigned SEW = 0,
   case ATOMIC_INST_PLACER(RISCV::AMOMAXU_D):
   case ATOMIC_INST_PLACER(RISCV::AMOMIN_D):
   case ATOMIC_INST_PLACER(RISCV::AMOMINU_D):
+  case ATOMIC_INST_PLACER(RISCV::AMOCAS_D_RV32):
+  case ATOMIC_INST_PLACER(RISCV::AMOCAS_D_RV64):
   case RISCV::FLD:
   case RISCV::C_FLD:
   case RISCV::C_FLDSP:
@@ -240,6 +246,7 @@ inline size_t getDataElementWidth(unsigned Opcode, unsigned SEW = 0,
   case ATOMIC_INST_PLACER(RISCV::AMOMAXU_W):
   case ATOMIC_INST_PLACER(RISCV::AMOMIN_W):
   case ATOMIC_INST_PLACER(RISCV::AMOMINU_W):
+  case ATOMIC_INST_PLACER(RISCV::AMOCAS_W):
   case RISCV::FLW:
   case RISCV::C_FLW:
   case RISCV::C_FLWSP:
@@ -255,6 +262,16 @@ inline size_t getDataElementWidth(unsigned Opcode, unsigned SEW = 0,
   case RISCV::C_LHU:
   case RISCV::C_LH:
   case RISCV::C_SH:
+  case ATOMIC_INST_PLACER(RISCV::AMOADD_H):
+  case ATOMIC_INST_PLACER(RISCV::AMOAND_H):
+  case ATOMIC_INST_PLACER(RISCV::AMOOR_H):
+  case ATOMIC_INST_PLACER(RISCV::AMOXOR_H):
+  case ATOMIC_INST_PLACER(RISCV::AMOSWAP_H):
+  case ATOMIC_INST_PLACER(RISCV::AMOMAX_H):
+  case ATOMIC_INST_PLACER(RISCV::AMOMAXU_H):
+  case ATOMIC_INST_PLACER(RISCV::AMOMIN_H):
+  case ATOMIC_INST_PLACER(RISCV::AMOMINU_H):
+  case ATOMIC_INST_PLACER(RISCV::AMOCAS_H):
     return 2;
   case RISCV::LB:
   case RISCV::LBU:
@@ -268,14 +285,23 @@ inline size_t getDataElementWidth(unsigned Opcode, unsigned SEW = 0,
   case RISCV::PREFETCH_I:
   case RISCV::PREFETCH_W:
   case RISCV::PREFETCH_R:
+  case ATOMIC_INST_PLACER(RISCV::AMOADD_B):
+  case ATOMIC_INST_PLACER(RISCV::AMOAND_B):
+  case ATOMIC_INST_PLACER(RISCV::AMOOR_B):
+  case ATOMIC_INST_PLACER(RISCV::AMOXOR_B):
+  case ATOMIC_INST_PLACER(RISCV::AMOSWAP_B):
+  case ATOMIC_INST_PLACER(RISCV::AMOMAX_B):
+  case ATOMIC_INST_PLACER(RISCV::AMOMAXU_B):
+  case ATOMIC_INST_PLACER(RISCV::AMOMIN_B):
+  case ATOMIC_INST_PLACER(RISCV::AMOMINU_B):
+  case ATOMIC_INST_PLACER(RISCV::AMOCAS_B):
     return 1;
   default:
+    assert(isRVV(Opcode));
     // For vector instructions return one element size.
     return SEW / CHAR_BIT;
   }
 }
-
-inline bool isRVV(unsigned Opcode);
 
 inline size_t getLoadStoreNaturalAlignment(unsigned Opcode, unsigned SEW = 0) {
   switch (Opcode) {
