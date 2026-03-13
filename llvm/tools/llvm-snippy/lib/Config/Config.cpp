@@ -792,7 +792,9 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
   ProgCfg.PreserveCallerSavedGroups = Opts.PreserveCallerSavedRegs;
   ProgCfg.MangleExportedNames = Opts.MangleExportedNames;
   ProgCfg.EntryPointName = Opts.EntryPointName;
-  ProgCfg.ExternalStack = Opts.ExternalStack;
+  ProgCfg.ExternalStack =
+      Opts.ExternalStack ||
+      (ProgCfg.FollowTargetABI && !ProgCfg.hasInternalStackSection());
   ProgCfg.SkipLegacySPSpill = Opts.SkipLegacySPSpill;
   ProgCfg.StaticStack = getStaticStackValue(Cfg, OpCC, Opts);
   ProgCfg.InitialRegYamlFile = Opts.InitialRegisterDataFile;
