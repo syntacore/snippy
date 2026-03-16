@@ -13,6 +13,7 @@
 #include "snippy/Generator/SimulatorContext.h"
 #include "snippy/Support/Error.h"
 #include "snippy/Target/Target.h"
+#include "llvm/MC/MCInstrDesc.h"
 
 #include <random>
 
@@ -129,17 +130,6 @@ BurstGenPolicy::BurstGenPolicy(SnippyProgramContext &ProgCtx,
   Dist = std::discrete_distribution<size_t>(Weights.begin(), Weights.end());
 }
 
-static std::optional<int>
-getOffsetImmediate(ArrayRef<PreselectedOpInfo> Preselected) {
-  auto Found =
-      find_if(Preselected, [](auto &OpInfo) { return OpInfo.isImm(); });
-  if (Found == Preselected.end())
-    return std::nullopt;
-  auto Imm = Found->getImm();
-  assert(Imm.getMax() == Imm.getMin());
-  return Imm.getMax();
-}
-
 void DefaultGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
                                   const RequestLimit &Limit) {
   InstrGenCtx.switchConfig(*Cfg);
@@ -164,35 +154,38 @@ void BurstGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
   assert(Limit.isNumLimit());
   auto &State = InstrGenCtx.ProgCtx.getLLVMState();
   const auto &Tgt = State.getSnippyTarget();
-  const auto &InstrInfo = State.getInstrInfo();
   std::generate_n(std::back_inserter(Instructions), Limit.getLimit(),
                   [this] { return InstructionRequest{genOpc(), {}}; });
   auto IsMemUser = [&Tgt](auto Opc) -> bool {
     return Tgt.countAddrsToGenerate(Opc);
   };
   std::vector<unsigned> MemUsers;
+  MemUsers.reserve(Instructions.size());
   copy_if(map_range(Instructions, [](auto &&IR) { return IR.Opcode; }),
           std::back_inserter(MemUsers), IsMemUser);
-  auto OpcodeIdxToBaseReg = generateBaseRegs(InstrGenCtx, MemUsers);
-
   auto RP = InstrGenCtx.pushRegPool();
-  auto OpcodeIdxToAI =
-      mapOpcodeIdxToAI(InstrGenCtx, OpcodeIdxToBaseReg, MemUsers);
+  auto [MemUserIdxToPreselectedOps, RegsToInit] =
+      selectOperandsForMemoryInstructions(InstrGenCtx, MemUsers, *RP);
+  // Here we collected all registers that should be initialized (we don't
+  // initialize registers for non-memory instructions). Initialize them all in
+  // one go.
+  initializeBaseRegs(InstrGenCtx, RegsToInit);
   unsigned MemUsersIdx = 0;
   for (auto &&Instr : Instructions) {
-    const auto &InstrDesc = InstrInfo.get(Instr.Opcode);
     if (IsMemUser(Instr.Opcode)) {
-      auto BaseReg = OpcodeIdxToBaseReg[MemUsersIdx];
-      auto AI = OpcodeIdxToAI[MemUsersIdx];
-      auto Preselected = selectOperands(InstrDesc, BaseReg, AI);
-      Instr.Preselected =
-          selectConcreteOffsets(InstrGenCtx, InstrDesc, Preselected);
-      AddressInfo ActualAI = AI;
-      auto Offset = getOffsetImmediate(Instr.Preselected);
-      ActualAI.Address += Offset.value_or(0);
-      markMemAccessAsUsed(InstrGenCtx, InstrDesc, ActualAI,
-                          MemAccessKind::BURST, InstrGenCtx.MAI);
-      ++MemUsersIdx;
+      Instr.Preselected = MemUserIdxToPreselectedOps[MemUsersIdx++];
+    } else {
+      // For instructions that do not use memory we can simply preselect their
+      // operands.
+      auto &II = State.getInstrInfo();
+      auto &InstrDesc = II.get(Instr.Opcode);
+      Instr.Preselected.resize(InstrDesc.getNumOperands());
+      // To avoid spoling registers used in memory instruction we use same
+      // register pool and mark all initialized registers as excluded
+      DenseSet<Register> Excluded;
+      Excluded.insert_range(make_first_range(RegsToInit));
+      selectNonMemoryOperands(InstrDesc, Instr.Preselected, InstrGenCtx, *RP,
+                              Excluded);
     }
   }
 }

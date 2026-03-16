@@ -7,12 +7,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Generator/GenerationUtils.h"
+#include "snippy/Config/RegisterAccess.h"
 #include "snippy/Generator/MemAccessInfo.h"
 #include "snippy/Generator/Policy.h"
 #include "snippy/Generator/SimulatorContext.h"
+#include "snippy/Generator/TopMemAccSampler.h"
 #include "snippy/Support/Options.h"
-#include "llvm/CodeGen/MachineLoopInfo.h"
 
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/CodeGen/MachineLoopInfo.h"
 #include "llvm/Support/Debug.h"
 
 namespace llvm {
@@ -179,10 +183,10 @@ unsigned countAddrs(ArrayRef<unsigned> Opcodes, const SnippyTarget &SnippyTgt) {
 
 // For the given InstrDesc fill the vector of selected operands to account them
 // in instruction generation procedure.
-std::vector<planning::PreselectedOpInfo>
-selectOperands(const MCInstrDesc &InstrDesc, unsigned BaseReg,
-               const AddressInfo &AI) {
-  std::vector<planning::PreselectedOpInfo> Preselected;
+planning::PreselectedOperands selectMemoryOperands(const MCInstrDesc &InstrDesc,
+                                                   unsigned BaseReg,
+                                                   const AddressInfo &AI) {
+  planning::PreselectedOperands Preselected;
   for (const auto &MCOpInfo : InstrDesc.operands()) {
     if (MCOpInfo.OperandType == MCOI::OperandType::OPERAND_MEMORY)
       Preselected.emplace_back(BaseReg);
@@ -200,9 +204,169 @@ selectOperands(const MCInstrDesc &InstrDesc, unsigned BaseReg,
   return Preselected;
 }
 
-std::vector<planning::PreselectedOpInfo> selectConcreteOffsets(
+void selectNonMemoryOperands(
+    const MCInstrDesc &InstrDesc,
+    SmallVectorImpl<planning::PreselectedOpInfo> &Preselected,
+    planning::InstructionGenerationContext &InstrGenCtx, RegPoolWrapper &RP,
+    const DenseSet<Register> &Excluded,
+    const DenseSet<Register> &Destinations) {
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
+  auto &Tgt = State.getSnippyTarget();
+  auto &RI = State.getRegInfo();
+  auto &II = State.getInstrInfo();
+  auto &RegGen = ProgCtx.getRegGen();
+  assert(Preselected.size() == InstrDesc.getNumOperands());
+  // Temporary reg pool to take implicit register restrictions into account.
+  // E.g. vluxei instructions cannot have overlapping registers with different
+  // element sizes
+  auto TmpRP = InstrGenCtx.pushRegPool();
+  for (auto &&[Idx, OpInfo] : enumerate(InstrDesc.operands())) {
+    if (!Tgt.shouldPreselectOperandInBurstMode(InstrDesc, Idx))
+      continue;
+    auto TiedTo = InstrDesc.getOperandConstraint(Idx, MCOI::TIED_TO);
+    if (TiedTo >= 0) {
+      Preselected[Idx].setTiedTo(TiedTo);
+      continue;
+    }
+    bool IsDst = Idx < InstrDesc.getNumDefs();
+    auto RegClass = Tgt.getRegClass(InstrGenCtx, OpInfo.RegClass, Idx,
+                                    InstrDesc.getOpcode(), RI);
+    AccessMaskBit Mask =
+        IsDst ? AccessMaskBit::PrimaryW : AccessMaskBit::PrimaryR;
+    auto CustomMask = Tgt.getCustomAccessMaskForOperand(InstrDesc, Idx);
+    if (CustomMask != AccessMaskBit::None)
+      Mask = CustomMask;
+    auto ExcludedForOperand =
+        Tgt.excludeRegsForOperand(InstrGenCtx, RegClass, InstrDesc, Idx);
+    copy(Excluded, std::back_inserter(ExcludedForOperand));
+    if (!IsDst)
+      copy(Destinations, std::back_inserter(ExcludedForOperand));
+    auto Include = Tgt.includeRegs(InstrDesc.getOpcode(), RegClass);
+    auto ExpectedRegOpt =
+        RegGen.generate(RegClass, OpInfo.RegClass, RI, *TmpRP, InstrGenCtx.MBB,
+                        Tgt, ExcludedForOperand, Include, Mask);
+    auto ReportCouldNotSelectReg = [&]() {
+      snippy::fatal(
+          formatv("Could not select register for \"{0}\" in burst group",
+                  II.getName(InstrDesc.getOpcode())),
+          "try reducing burst group size and relaxing register reservation");
+    };
+    if (auto Err = ExpectedRegOpt.takeError()) {
+      consumeError(std::move(Err));
+      ReportCouldNotSelectReg();
+    }
+    auto RegOpt = *ExpectedRegOpt;
+    if (!RegOpt.has_value())
+      ReportCouldNotSelectReg();
+    auto SelectedReg = *RegOpt;
+    auto FirstReg = SelectedReg;
+    if (!Tgt.isPhysRegClass(RegClass.getID(), RI))
+      FirstReg = Tgt.getFirstPhysReg(SelectedReg, RI);
+    // This handles situations where selected register cannot be reused as
+    // another operand of the same instruction
+    Tgt.reserveRegsIfNeeded(InstrGenCtx, InstrDesc.getOpcode(), IsDst,
+                            /*isMem=*/false, FirstReg);
+    Preselected[Idx] = Register(SelectedReg);
+  }
+}
+
+static DenseSet<Register> getExcludedRegsForOpcodes(ArrayRef<unsigned> Opcodes,
+                                                    LLVMState &State) {
+  auto &Tgt = State.getSnippyTarget();
+  auto &RI = State.getRegInfo();
+  DenseSet<Register> Exclude;
+  SmallVector<Register> ExcludedRegs;
+  for (auto Opcode : Opcodes) {
+    Tgt.excludeFromMemRegsForOpcode(Opcode, RI, ExcludedRegs);
+    Exclude.insert(ExcludedRegs.begin(), ExcludedRegs.end());
+  }
+  return Exclude;
+}
+
+static std::optional<int>
+getOffsetImmediate(ArrayRef<planning::PreselectedOpInfo> Preselected) {
+  auto Found =
+      find_if(Preselected, [](auto &OpInfo) { return OpInfo.isImm(); });
+  if (Found == Preselected.end())
+    return std::nullopt;
+  auto Imm = Found->getImm();
+  assert(Imm.getMax() == Imm.getMin());
+  return Imm.getMax();
+}
+
+std::pair<std::vector<planning::PreselectedOperands>, std::map<unsigned, APInt>>
+selectOperandsForMemoryInstructions(InstructionGenerationContext &InstrGenCtx,
+                                    ArrayRef<unsigned> Opcodes,
+                                    RegPoolWrapper &RP) {
+  unsigned Count = Opcodes.size();
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
+  const auto &Tgt = State.getSnippyTarget();
+  const auto &InstrInfo = State.getInstrInfo();
+  const auto &RegInfo = State.getRegInfo();
+  auto OpcodeIdxToBaseReg = generateBaseRegs(InstrGenCtx, Opcodes);
+  for (auto R : OpcodeIdxToBaseReg)
+    RP.addReserved(R, AccessMaskBit::RW);
+  auto [RegsToInit, OpcodeIdxToAI] =
+      mapOpcodeIdxToAI(InstrGenCtx, OpcodeIdxToBaseReg, Opcodes);
+  // We already initialized base registers. Now to select other register
+  // operands we must exclude base ones because they can't be modified again.
+  auto Excluded = getExcludedRegsForOpcodes(Opcodes, State);
+  Excluded.insert_range(make_first_range(RegsToInit));
+  assert(OpcodeIdxToBaseReg.size() == Count);
+  assert(OpcodeIdxToAI.size() == Count);
+  std::vector<planning::PreselectedOperands> OpcodeIdxToPreselectedOps(Count);
+  DenseSet<Register> Destinations;
+  for (unsigned Idx = 0; Idx < Count; ++Idx) {
+    auto Opcode = Opcodes[Idx];
+    auto BaseReg = OpcodeIdxToBaseReg[Idx];
+    auto &AI = OpcodeIdxToAI[Idx];
+    auto &Preselected = OpcodeIdxToPreselectedOps[Idx];
+    assert(Tgt.countAddrsToGenerate(Opcode));
+    const auto &InstrDesc = InstrInfo.get(Opcode);
+    // Select memory operands
+    Preselected = selectMemoryOperands(InstrDesc, BaseReg, AI);
+    selectConcreteOffsets(InstrGenCtx, InstrDesc, Preselected);
+    // Now select other operands taking into account registers we already
+    // reserved as memory operands
+    selectNonMemoryOperands(InstrDesc, Preselected, InstrGenCtx, RP,
+                            /*Excluded=*/{}, Destinations);
+    if (auto NumDefs = InstrDesc.getNumDefs()) {
+      assert(NumDefs == 1 && "Multiple destination operands are not supported");
+      assert(Preselected[0].isReg());
+      SmallVector<Register, 8> Dsts;
+      Tgt.getPhysRegsFromUnit(Preselected[0].getReg(), RegInfo, Dsts);
+      Destinations.insert_range(Dsts);
+    }
+
+    // All registers are selected now. Break down the address into parts to
+    // initialize properly.
+    // The only registers with known values to initialize here are address
+    // registers. So we can safely call getZextValue() on their APInt.
+    assert(RegsToInit[BaseReg].getBitWidth() <=
+           Tgt.getAddrRegLen(State.getTargetMachine()));
+    auto &&[RegToValue, ChosenAddresses] =
+        Tgt.breakDownAddr(InstrGenCtx, AI, InstrDesc, Preselected, 0,
+                          RegsToInit[BaseReg].getZExtValue());
+    for (auto &AP : RegToValue) {
+      auto &Reg = AP.FixedReg;
+      auto &Val = AP.Value;
+      RP.addReserved(Reg, AccessMaskBit::SupportW);
+      RegsToInit[Reg] = Val;
+    }
+    AddressInfo ActualAI = AI;
+    auto Offset = getOffsetImmediate(Preselected);
+    ActualAI.Address += Offset.value_or(0);
+    markMemAccessAsUsed(InstrGenCtx, InstrDesc, ActualAI, MemAccessKind::BURST,
+                        InstrGenCtx.MAI);
+  }
+  return {OpcodeIdxToPreselectedOps, RegsToInit};
+}
+
+void selectConcreteOffsets(
     InstructionGenerationContext &IGC, const MCInstrDesc &InstrDesc,
-    const std::vector<planning::PreselectedOpInfo> &Preselected) {
+    SmallVectorImpl<planning::PreselectedOpInfo> &Preselected) {
   auto MappedRange = map_range(
       enumerate(Preselected), [&](auto &&Args) -> planning::PreselectedOpInfo {
         auto &[Idx, Operand] = Args;
@@ -219,8 +383,7 @@ std::vector<planning::PreselectedOpInfo> selectConcreteOffsets(
         }
         return Operand;
       });
-  return std::vector<planning::PreselectedOpInfo>(MappedRange.begin(),
-                                                  MappedRange.end());
+  copy(MappedRange, Preselected.begin());
 }
 
 // Memory schemes return random address with such offsets that they include zero
@@ -529,17 +692,14 @@ static std::map<unsigned, AddressInfo> collectPrimaryAddresses(
 }
 
 // Insert initialization of base addresses before the burst group.
-void initializeBaseRegs(
-    InstructionGenerationContext &InstrGenCtx,
-    std::map<unsigned, AddressInfo> &BaseRegToPrimaryAddress) {
+void initializeBaseRegs(InstructionGenerationContext &InstrGenCtx,
+                        const std::map<unsigned, APInt> &BaseRegToValue) {
   auto &SimCtx = InstrGenCtx.SimCtx;
   auto &RP = InstrGenCtx.getRegPool();
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
-  for (auto &[BaseReg, AI] : BaseRegToPrimaryAddress) {
-    auto NewValue =
-        APInt(SnippyTgt.getAddrRegLen(State.getTargetMachine()), AI.Address);
+  for (auto &[BaseReg, NewValue] : BaseRegToValue) {
     assert(RP.isReserved(BaseReg, AccessMaskBit::W));
     if (InstrGenCtx.getCommonCfg().TrackCfg.AddressVH) {
       auto &I = SimCtx.getInterpreter();
@@ -551,7 +711,7 @@ void initializeBaseRegs(
 }
 
 // This function returns address info to use for each opcode.
-std::vector<AddressInfo>
+std::pair<std::map<unsigned, APInt>, std::vector<AddressInfo>>
 mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
                  ArrayRef<unsigned> OpcodeIdxToBaseReg,
                  ArrayRef<unsigned> Opcodes) {
@@ -559,6 +719,7 @@ mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
   auto &MBB = InstrGenCtx.MBB;
   auto *MAI = InstrGenCtx.MAI;
   auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
   if (Opcodes.empty())
     return {};
 
@@ -579,9 +740,6 @@ mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
   // mapping from base register to a legal address in memory to use.
   auto BaseRegToPrimaryAddress =
       collectPrimaryAddresses(InstrGenCtx, BaseRegToStrongestAR);
-  // We've chosen addresses for each base register. Initialize base registers
-  // with these addresses.
-  initializeBaseRegs(InstrGenCtx, BaseRegToPrimaryAddress);
 
   // Try to find addresses for each opcode that allow better randomization of
   // offsets and effective addresses. If no address is found, we can always use
@@ -600,8 +758,16 @@ mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
 
   if (MAI)
     MAI->addBurstRangeMemAccess(OpcodeIdxToAI);
+  std::map<unsigned, APInt> BaseRegToAddr;
+  transform(BaseRegToPrimaryAddress,
+            std::inserter(BaseRegToAddr, BaseRegToAddr.end()),
+            [&](auto &RegAndAI) {
+              auto &&[Reg, AI] = RegAndAI;
+              return std::make_pair(
+                  Reg, APInt(Tgt.getRegBitWidth(Reg, InstrGenCtx), AI.Address));
+            });
 
-  return OpcodeIdxToAI;
+  return {std::move(BaseRegToAddr), std::move(OpcodeIdxToAI)};
 }
 
 void markMemAccessAsUsed(InstructionGenerationContext &IGC,
