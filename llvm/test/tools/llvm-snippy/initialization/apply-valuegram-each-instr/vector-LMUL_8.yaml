@@ -72,7 +72,7 @@ histogram:
 #                     We want to see them in initialization
 #
 #          With these settings, we should only get
-#                     $v8m8 = VADD_VV $v8m8, $v8m8, $noreg, implicit $vtype, implicit $vl
+#                     $v8 = VADD_VV $v8, $v8, $noreg, implicit $vtype, implicit $vl
 #          So check that v8-v15 are initialized
 
 # CHECK-DAG: $v8 = VL1RE8_V{{.*}}pcsections
@@ -83,4 +83,4 @@ histogram:
 # CHECK-DAG: $v13 = VL1RE8_V{{.*}}pcsections
 # CHECK-DAG: $v14 = VL1RE8_V{{.*}}pcsections
 # CHECK-DAG: $v15 = VL1RE8_V{{.*}}pcsections
-# CHECK:     $v8m8 = VADD_VV $v8m8, $v8m8
+# CHECK:     $v8 = VADD_VV $v8, $v8

@@ -15,7 +15,6 @@
 #include "snippy/Generator/SnippyLoopInfo.h"
 #include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/GeneratorUtils/RegisterPool.h"
-#include <memory>
 
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/OpcodeHistogram.h"
@@ -681,7 +680,8 @@ static MemAddresses generateStridedMemAccesses(MemAddr Base,
 static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVStrided(
     AddressInfo AddrInfo, const MCInstrDesc &InstrDesc,
     MutableArrayRef<planning::PreselectedOpInfo> Preselected,
-    InstructionGenerationContext &IGC, bool Is64Bit) {
+    InstructionGenerationContext &IGC, bool Is64Bit,
+    std::optional<MemAddr> MainPartAddr = std::nullopt) {
   auto Opcode = InstrDesc.getOpcode();
   assert(isRVVStridedLoadStore(Opcode) || isRVVStridedSegLoadStore(Opcode));
 
@@ -750,8 +750,10 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVStrided(
 
   auto Stride =
       StrideMultiplier * static_cast<int long long>(AddrInfo.MinStride);
-  assert(std::abs(Stride) % AddrInfo.MinStride == 0);
-  if (Stride < 0) {
+  if (MainPartAddr) {
+    Stride = AddrValue - MainPartAddr.value();
+    MainPart.Value = *MainPartAddr;
+  } else if (Stride < 0) {
     // When Stride is negative, change starting position such that last read
     // will start at the original AddrValue. It means that we must start
     // reading from the last element. `(VL - 1) * |Stride|`
@@ -768,10 +770,83 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVStrided(
   return std::make_pair(std::move(Parts), std::move(Addresses));
 }
 
+static APInt getMaxPossibleIndexValue(size_t IndexElementWidth, size_t XLen) {
+  // From the specification: All Zve* extensions support all vector load and
+  // store instructions (Section 31.7), except Zve64* extensions do not
+  // support EEW=64 for index values when XLEN=32.
+  assert(IndexElementWidth <= XLen);
+  return APInt::getMaxValue(IndexElementWidth).zext(XLen);
+}
+
+static APInt getMaxPossibleIndexValue(const MCInstrDesc &InstrDesc,
+                                      size_t XLen) {
+  return getMaxPossibleIndexValue(getIndexElementWidth(InstrDesc.getOpcode()),
+                                  XLen);
+}
+
+static APInt
+getBaseAddressForRVVIndexed(size_t XLen, APInt FirstLegalAddr,
+                            APInt LastLegalAddr, const MCInstrDesc &InstrDesc,
+                            std::optional<MemAddr> Preselected = {}) {
+  if (Preselected)
+    return APInt(XLen, *Preselected);
+  auto IndexMaxValue = getMaxPossibleIndexValue(InstrDesc, XLen);
+  // Pick the legal random Base' value with the index constraints for current
+  // instruction. So, from the equation:
+  // FirstLegalAddr <= Base' + IndexMaxValue <= LastLegalAddr
+  // FirstLegalAddr - IndexMaxValue  <= Base' <= LastLegalAddr - IndexMaxValue
+  assert(FirstLegalAddr.getBitWidth() == XLen);
+  assert(LastLegalAddr.getBitWidth() == XLen);
+
+  // NOTE: All arithmetic is modulo XLen and it's expected that these operations
+  // will overflow. Either both at the same time or just one.
+  auto MinBase = FirstLegalAddr - IndexMaxValue;
+  auto MaxBase = LastLegalAddr - IndexMaxValue;
+
+  LLVM_DEBUG(dbgs().indent(2)
+             << "MinBase: 0x" << utohexstr(MinBase.getZExtValue()) << "\n");
+  LLVM_DEBUG(dbgs().indent(2)
+             << "MaxBase: 0x" << utohexstr(MaxBase.getZExtValue()) << "\n");
+
+  // This range can be presented in two types:
+  // --|MinBase ... MaxBase|-- and |0 ... MaxBase|--|MinBase ... 2^{xlen} - 1|
+  // The second case is valid and can be legal in case of overflow. In such
+  // case Index' must wrap Base' around zero
+
+  APInt BaseAddr(XLen, 0);
+
+  if (MinBase.ule(MaxBase)) {
+    BaseAddr = RandEngine::genInRangeInclusive(MinBase.getZExtValue(),
+                                               MaxBase.getZExtValue());
+  } else {
+    // This is the logic for the case when the valid base address is either
+    // in the range from 0 to MaxBase or from MinBase to 2^{xlen} - 1.
+    // To ensure a uniform distribution, we first generate a random number
+    // within the total length of the valid range.
+    //
+    // Note: In this case, MaxBase < MinBase, MinBase is included, MaxBase is
+    // excluded from the range. AddrRangeLength = (MaxBase - 0) + ((2^{xlen} -
+    // 1) - MinBase + 1).
+
+    auto AddrRangeLength = APInt::getMaxValue(XLen) - MinBase + 1 + MaxBase;
+    BaseAddr = RandEngine::genInRangeInclusive(AddrRangeLength);
+
+    // If randomly generated BaseAddr suits to the first range -> nothing to do
+    // Otherwise, we pick the value from the second range as
+    // BaseAddr = (2^{xlen} - 1) - (BaseAddr - MaxBase),
+    // which is equivalent to:
+    // BaseAddr = MaxBase - BaseAddr
+    if (BaseAddr.ugt(MaxBase))
+      BaseAddr = MaxBase - BaseAddr;
+  }
+  return BaseAddr;
+}
+
 static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVIndexed(
     AddressInfo AddrInfo, const MCInstrDesc &InstrDesc,
     MutableArrayRef<planning::PreselectedOpInfo> Preselected,
-    const InstructionGenerationContext &IGC, bool Is64Bit) {
+    const InstructionGenerationContext &IGC, bool Is64Bit,
+    std::optional<MemAddr> MainPartAddr = std::nullopt) {
   auto Opcode = InstrDesc.getOpcode();
 
   assert(isRVVIndexedLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode));
@@ -785,6 +860,7 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVIndexed(
   auto &ProgCtx = IGC.ProgCtx;
   auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
   const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
+  auto XLen = ST.getXLen();
   unsigned VL = TgtCtx.getVL(IGC.MBB);
   if (VL == 0)
     // When VL is zero we may leave any values in address base and index
@@ -828,92 +904,45 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVIndexed(
   // initial values might be near uint64_t::max (sign bit equals `1`). If xlen
   // is 64-bit, APInt ctor in such cases will create sign extended 65-bit (xlen
   // + 1) immediate that is not the value we need.
-  auto Address = APInt(ST.getXLen(), AddrInfo.Address, /* signed */ false)
-                     .zext(ST.getXLen() + 1);
-  auto MinOffset = APInt(ST.getXLen(), AddrInfo.MinOffset, /* signed */ true)
-                       .sext(ST.getXLen() + 1);
-  auto MaxOffset = APInt(ST.getXLen(), AddrInfo.MaxOffset, /* signed */ true)
-                       .zext(ST.getXLen() + 1);
+  auto Address =
+      APInt(XLen, AddrInfo.Address, /* signed */ false).zext(XLen + 1);
+  auto MinOffset =
+      APInt(XLen, AddrInfo.MinOffset, /* signed */ true).sext(XLen + 1);
+  auto MaxOffset =
+      APInt(XLen, AddrInfo.MaxOffset, /* signed */ true).zext(XLen + 1);
 
   // Get the legal range
   bool OV = false;
-  auto MinBaseOffset = Address.sadd_ov(MinOffset, OV);
+  auto FirstLegalAddr = Address.sadd_ov(MinOffset, OV);
   assert(!OV && "Must not overflow");
-  assert(MinBaseOffset.sge(0) && "Cannot be negative");
-  MinBaseOffset = MinBaseOffset.trunc(ST.getXLen());
-  auto MaxBaseOffset = Address.sadd_ov(MaxOffset, OV).trunc(ST.getXLen());
+  assert(FirstLegalAddr.sge(0) && "Cannot be negative");
+  FirstLegalAddr = FirstLegalAddr.trunc(XLen);
+  auto LastLegalAddr = Address.sadd_ov(MaxOffset, OV).trunc(XLen);
   assert(!OV && "Must not overflow");
-
-  // MinBaseOffset and MaxBaseOffset must be reachable from AddrInfo.Address
+  // FirstLegalAddr and LastLegalAddr must be reachable from AddrInfo.Address
   // with AddrInfo.MinStride
   [[maybe_unused]] uint64_t AddrStrideRemainder =
       AddrInfo.Address % AddrInfo.MinStride;
   assert(AddrStrideRemainder ==
-         (MinBaseOffset.getZExtValue() % AddrInfo.MinStride));
+         (FirstLegalAddr.getZExtValue() % AddrInfo.MinStride));
   assert(AddrStrideRemainder ==
-         (MaxBaseOffset.getZExtValue() % AddrInfo.MinStride));
+         (LastLegalAddr.getZExtValue() % AddrInfo.MinStride));
+  APInt IndexMaxValue = getMaxPossibleIndexValue(EIEW, XLen);
 
-  // From the specification: All Zve* extensions support all vector load and
-  // store instructions (Section Section 31.7), except Zve64* extensions do not
-  // support EEW=64 for index values when XLEN=32.
-  assert(EIEW <= ST.getXLen());
-  APInt IndexMaxValue = APInt::getMaxValue(EIEW).zext(ST.getXLen());
-
-  // Pick the legal random Base' value with the index constraints for current
-  // instruction. So, from the equation above:
-  // MinBaseOffset <= Base' + IndexMaxValue <= MaxBaseOffset
-  // MinBaseOffset - IndexMaxValue  <= Base' <= MaxBaseOffset - IndexMaxValue
-  assert(MinBaseOffset.getBitWidth() == ST.getXLen());
-  assert(MaxBaseOffset.getBitWidth() == ST.getXLen());
-
-  // NOTE: All arithmetic is modulo XLen and it's expected that these operations
-  // will overflow. Either both at the same time or just one.
-  auto MinBase = MinBaseOffset - IndexMaxValue;
-  auto MaxBase = MaxBaseOffset - IndexMaxValue;
-
-  LLVM_DEBUG(dbgs().indent(2)
-             << "MinBase: 0x" << utohexstr(MinBase.getZExtValue()) << "\n");
-  LLVM_DEBUG(dbgs().indent(2)
-             << "MaxBase: 0x" << utohexstr(MaxBase.getZExtValue()) << "\n");
-
-  // This range can be presented in two types:
-  // --|MinBase ... MaxBase|-- and |0 ... MaxBase|--|MinBase ... 2^{xlen} - 1|
-  // The second case is valid and can be legal in case of overflow. In such
-  // case Index' must wrap Base' around zero
-
-  APInt BaseAddr(ST.getXLen(), 0);
-
-  if (MinBase.ule(MaxBase))
-    BaseAddr = RandEngine::genInRangeInclusive(MinBase.getZExtValue(),
-                                               MaxBase.getZExtValue());
-  else {
-    // This is the logic for the case when the valid base address is either
-    // in the range from 0 to MaxBase or from MinBase to 2^{xlen} - 1.
-    // To ensure a uniform distribution, we first generate a random number
-    // within the total length of the valid range.
-    //
-    // Note: In this case, MaxBase < MinBase, MinBase is included, MaxBase is
-    // excluded from the range. AddrRangeLength = (MaxBase - 0) + ((2^{xlen} -
-    // 1) - MinBase + 1).
-
-    auto AddrRangeLength =
-        APInt::getMaxValue(ST.getXLen()) - MinBase + 1 + MaxBase;
-    BaseAddr = RandEngine::genInRangeInclusive(AddrRangeLength);
-
-    // If randomly generated BaseAddr suits to the first range -> nothing to do
-    // Otherwise, we pick the value from the second range as
-    // BaseAddr = (2^{xlen} - 1) - (BaseAddr - MaxBase),
-    // which is equivalent to:
-    // BaseAddr = MaxBase - BaseAddr
-    if (BaseAddr.ugt(MaxBase))
-      BaseAddr = MaxBase - BaseAddr;
-  }
+  auto BaseAddr = getBaseAddressForRVVIndexed(
+      ST.getXLen(), FirstLegalAddr, LastLegalAddr, InstrDesc, MainPartAddr);
   LLVM_DEBUG(dbgs().indent(2)
              << Twine("Generated BaseAddress 0x")
                     .concat(Twine(utohexstr(BaseAddr.getZExtValue())))
                     .concat("\n"));
+  auto IndexMinValue = FirstLegalAddr - BaseAddr;
+  if (MainPartAddr) {
+    assert(*MainPartAddr >= FirstLegalAddr.getZExtValue());
+    assert(*MainPartAddr <= LastLegalAddr.getZExtValue());
+    IndexMaxValue = APInt(XLen, LastLegalAddr.getZExtValue() - *MainPartAddr);
+    IndexMinValue = APInt::getZero(XLen);
+  }
 
-  auto IndexMinValue = MinBaseOffset - BaseAddr;
   auto MaxN = (IndexMaxValue - IndexMinValue).udiv(AddrInfo.MinStride);
 
   AddressPart MainPart{AddrReg.getReg(), BaseAddr};
@@ -948,8 +977,8 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVIndexed(
                  << ("Generated FinalAddress 0x" +
                      Twine(utohexstr(FinalAddress.getZExtValue()))) +
                         "\n");
-      assert(FinalAddress.uge(MinBaseOffset));
-      assert(FinalAddress.ule(MaxBaseOffset));
+      assert(FinalAddress.uge(FirstLegalAddr));
+      assert(FinalAddress.ule(LastLegalAddr));
       assert(FinalAddress.urem(AddrInfo.MinStride) ==
              AddrInfo.Address % AddrInfo.MinStride);
       Addresses.push_back((BaseAddr + IndexValue).getZExtValue());
@@ -964,7 +993,8 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVIndexed(
 static std::pair<AddressParts, MemAddresses> breakDownAddrForInstrWithImmOffset(
     AddressInfo AddrInfo, const MCInstrDesc &InstrDesc,
     MutableArrayRef<planning::PreselectedOpInfo> Preselected,
-    InstructionGenerationContext &IGC, bool Is64Bit) {
+    InstructionGenerationContext &IGC, bool Is64Bit,
+    std::optional<MemAddr> MainPart = std::nullopt) {
   auto Opcode = InstrDesc.getOpcode();
   assert(isLoadStore(Opcode) || isCLoadStore(Opcode) || isFPLoadStore(Opcode) ||
          isCFPLoadStore(Opcode) || isZicbo(Opcode) || isZcmpPushPop(Opcode));
@@ -977,7 +1007,8 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForInstrWithImmOffset(
   assert((Preselected.size() > AddrRegIdx + 1) && "Expected offset operand");
   const auto &AddrImm = Preselected[AddrRegIdx + 1];
   assert(AddrImm.isImm() && "Offset operand must be imm");
-  auto AddrValue = AddrInfo.Address - AddrImm.getImm().getMin();
+  auto AddrValue =
+      AddrInfo.Address - (AddrImm.getImm().getMin() * (!MainPart.has_value()));
 
   auto Part = AddressPart{AddrReg.getReg(), APInt(ST.getXLen(), AddrValue)};
   return std::make_pair<AddressParts, MemAddresses>(
@@ -3187,7 +3218,7 @@ public:
     // That operand will be later referenced in breakDownAddr() and should
     // be available for writing despite being source operand for instruction.
     if (MemOpIdx + 1 == Operand)
-      return AccessMaskBit::RW;
+      return AccessMaskBit::PrimaryR | AccessMaskBit::SupportW;
     return AccessMaskBit::None;
   }
 
@@ -3216,7 +3247,8 @@ public:
   breakDownAddr(InstructionGenerationContext &IGC, AddressInfo AddrInfo,
                 const MCInstrDesc &InstrDesc,
                 MutableArrayRef<planning::PreselectedOpInfo> Preselected,
-                unsigned AddrIdx) const override {
+                unsigned AddrIdx,
+                std::optional<MemAddr> MainPart = std::nullopt) const override {
     auto Opcode = InstrDesc.getOpcode();
     assert((isSupportedLoadStore(Opcode) || isAtomicAMO(Opcode) ||
             isLrInstr(Opcode) || isScInstr(Opcode)) &&
@@ -3271,12 +3303,12 @@ public:
     }
     if (isRVVStridedLoadStore(Opcode) || isRVVStridedSegLoadStore(Opcode))
       return breakDownAddrForRVVStrided(AddrInfo, InstrDesc, Preselected, IGC,
-                                        is64Bit(TM));
+                                        is64Bit(TM), MainPart);
     if (isRVVIndexedLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode))
       return breakDownAddrForRVVIndexed(AddrInfo, InstrDesc, Preselected, IGC,
-                                        is64Bit(TM));
+                                        is64Bit(TM), MainPart);
     return breakDownAddrForInstrWithImmOffset(AddrInfo, InstrDesc, Preselected,
-                                              IGC, is64Bit(TM));
+                                              IGC, is64Bit(TM), MainPart);
   }
 
   unsigned getWriteValueSequenceLength(InstructionGenerationContext &IGC,
@@ -3828,11 +3860,28 @@ public:
 
   bool canUseInBurstMode(const MCInstrDesc &InstrDesc) const override {
     auto Opcode = InstrDesc.getOpcode();
-    return !isRVVIndexedLoadStore(Opcode) && !isRVVStridedLoadStore(Opcode) &&
-           !isRVVIndexedSegLoadStore(Opcode) &&
-           !isRVVStridedSegLoadStore(Opcode) && !isRVVModeSwitch(Opcode) &&
-           !isCall(Opcode) && !InstrDesc.isBranch() && !InstrDesc.isReturn() &&
+    return !isRVVModeSwitch(Opcode) && !isCall(Opcode) &&
+           !InstrDesc.isBranch() && !InstrDesc.isReturn() &&
            !isZcmpPushPop(Opcode);
+  }
+
+  bool shouldPreselectOperandInBurstMode(const MCInstrDesc &InstrDesc,
+                                         unsigned OpIdx) const override {
+    assert(OpIdx < InstrDesc.getNumOperands());
+    auto Operands = InstrDesc.operands();
+    if (Operands[OpIdx].OperandType != MCOI::OperandType::OPERAND_REGISTER)
+      return false;
+    if (OpIdx < InstrDesc.getNumDefs())
+      return true;
+    if (!InstrDesc.mayLoad() && !InstrDesc.mayStore())
+      return false;
+    auto AddrRegIdx = getMemOperandIdx(InstrDesc);
+    auto Opcode = InstrDesc.getOpcode();
+    if (!isRVVStridedLoadStore(Opcode) && !isRVVStridedSegLoadStore(Opcode) &&
+        !isRVVIndexedLoadStore(Opcode) && !isRVVIndexedSegLoadStore(Opcode))
+      return OpIdx == AddrRegIdx;
+    unsigned StrideOrIndexRegIdx = AddrRegIdx + 1;
+    return OpIdx == AddrRegIdx || OpIdx == StrideOrIndexRegIdx;
   }
 
   bool canInitializeOperand(const MCInstrDesc &InstrDesc, unsigned OpIndex,

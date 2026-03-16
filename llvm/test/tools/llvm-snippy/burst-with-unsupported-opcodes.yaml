@@ -6,7 +6,6 @@ options:
     dump-mf: on
     num-instrs: 100
 
-
 sections:
     - name:      1
       VMA:       0x80000000
@@ -30,6 +29,7 @@ histogram:
     - [C_SD, 1.0]
     - [C_LD, 1.0]
     - [VSETVL, 1.0]
+    - [VSETVLI, 1.0]
     - [VLSE16_V, 1.0]
     - [VSSE16_V, 1.0]
 
@@ -38,12 +38,12 @@ burst:
     min-size: 4
     max-size: 16
     groupings:
-      - [LB, LBU, C_LD, VLSE16_V]
-      - [C_SD, VSSE16_V]
+      - [LB, LBU, C_LD, VSETVL]
+      - [C_SD, VSETVLI]
 
-# CHECK: warning: (burst-mode) Opcode VLSE16_V is not supported in the
+# CHECK: warning: (burst-mode) Opcode VSETVL is not supported in the
 # CHECK-SAME: burst mode: generator will generate it but not in a burst group.
-# CHECK: warning: (burst-mode) Opcode VSSE16_V is not supported in the
+# CHECK: warning: (burst-mode) Opcode VSETVLI is not supported in the
 # CHECK-SAME: burst mode: generator will generate it but not in a burst group.
 
 # CHECK: VLSE16_V

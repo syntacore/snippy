@@ -1448,9 +1448,9 @@ in the ``burst`` key, which you can add:
 
 .. important::
 
-   Currently, RVV, calls and branches can not be generated in
-   a burst group. If an unsupported opcode is specified in the custom
-   burst group, it will be generated outside this group.
+   Currently, RISC-V VSET instructions, calls and branches can not be
+   generated in a burst group. If an unsupported opcode is specified in the
+   custom burst group, it will be generated outside this group.
 
 Following is an example of the ``burst`` key:
 
