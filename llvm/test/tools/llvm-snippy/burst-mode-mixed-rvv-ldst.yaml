@@ -1,0 +1,42 @@
+# RUN: llvm-snippy %s %S/Inputs/sections.yaml -model-plugin=None
+
+# COM: This test checks that snippy is able to produce burst groups with all
+# types of vector load/store instructions at the same time.
+
+options:
+  mtriple: riscv64
+  march: rv64imfdv
+  num-instrs: 1000
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+  dump-mf: true
+
+burst:
+  mode: custom
+  min-size: 4
+  max-size: 8
+  groupings:
+    - - VLE64_V # unit-stride
+      - VLE64FF_V # unit-stride fault-only-first
+      - VLSE64_V # constant-stride
+      - VLSSEG2E64_V # constant-stride segment
+      - VLUXEI64_V # indexed
+      - VLUXSEG2EI8_V # indexed segment
+      - VL1RE8_V # whole register
+      - VADD_VV # just arithmetics
+
+histogram:
+  - [VLE64_V, 1.0]
+  - [VLE64FF_V, 1.0]
+  - [VLSE64_V, 1.0]
+  - [VLSSEG2E64_V, 1.0]
+  - [VLUXEI64_V, 1.0]
+  - [VLUXSEG2EI8_V, 1.0]
+  - [VL1RE8_V, 1.0]
+  - [VADD_VV, 1.0]
+  - [VSETIVLI, 1.0]
+  - [SW, 1.0]
+  - [MUL, 2.0]
+  - [DIV, 1.0]
+  - [ADD, 1.0]
+  - [ADDI, 1.0]

@@ -90,13 +90,13 @@ class RegisterGenerator final {
   // Calls interface function generate()
   //  with the corresponding  SnippyRegContext.
   // After this call RegVerifier and RegTranslator are zero-initialized.
-  std::optional<Register>
+  Expected<std::optional<Register>>
   generateWithPlugin(const MCRegisterClass &RC, const MCRegisterInfo &RI,
                      const RegPoolWrapper &RP, const MachineBasicBlock &MBB,
                      ArrayRef<Register> Exclude, ArrayRef<Register> Include,
                      AccessMaskBit Mask);
 
-  std::optional<Register>
+  Expected<std::optional<Register>>
   generateRandom(const SnippyTarget &SnippyTgt, const MCRegisterClass &RC,
                  const MCRegisterInfo &RI, const RegPoolWrapper &RP,
                  const MachineBasicBlock &MBB, ArrayRef<Register> Exclude,
@@ -117,7 +117,9 @@ public:
   void setRegContextForPlugin();
 
   // Returns register either from (future)plugin or from random generator.
-  std::optional<Register>
+  // std::nullopt is valid return value if we are using plugins
+  // TODO: remove this optional after removing plugins
+  Expected<std::optional<Register>>
   generate(const MCRegisterClass &RC, unsigned OperandRegClassID,
            const MCRegisterInfo &RI, const RegPoolWrapper &RP,
            const MachineBasicBlock &MBB, const SnippyTarget &SnippyTgt,

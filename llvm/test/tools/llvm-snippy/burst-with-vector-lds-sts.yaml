@@ -1,11 +1,11 @@
-# RUN: llvm-snippy %s -seed=1 -model-plugin=None |& FileCheck %s
+# RUN: llvm-snippy %s -seed=1 -model-plugin=None
 
 options:
-    mtriple: riscv64-unknown-elf
+    mtriple: riscv64
     mattr: +v
-    dump-mf: on
     num-instrs: 100
-
+    verify-gen-histogram: true
+    histogram-must-succeed: true
 
 sections:
     - name:      1
@@ -27,6 +27,7 @@ sections:
 histogram:
     - [LD, 1.0]
     - [SD, 1.0]
+    - [ADD, 1.0]
     - [VSETVL, 1.0]
     - [VSSE64_V, 1.0]
     - [VLSE64_V, 1.0]
@@ -39,10 +40,3 @@ burst:
       - [LD, VLSE64_V]
       - [SD, VSSE64_V]
 
-# CHECK: warning: (burst-mode) Opcode VLSE64_V is not supported in the
-# CHECK-SAME: burst mode: generator will generate it but not in a burst group.
-# CHECK: warning: (burst-mode) Opcode VSSE64_V is not supported in the
-# CHECK-SAME: burst mode: generator will generate it but not in a burst group.
-
-# CHECK: VLSE64_V
-# CHECK: VSSE64_V

@@ -42,9 +42,12 @@ static Register pregenerateRegister(InstructionGenerationContext &InstrGenCtx,
   auto CustomMask = Tgt.getCustomAccessMaskForOperand(InstrDesc, OpIndex);
   if (CustomMask != AccessMaskBit::None)
     Mask = CustomMask;
-  auto RegOpt =
+  auto ExpectedRegOpt =
       ProgCtx.getRegGen().generate(RegClass, OperandRegClassID, RegInfo, RP,
                                    MBB, Tgt, Exclude, Include, Mask);
+  if (auto Err = ExpectedRegOpt.takeError())
+    snippy::fatal(std::move(Err));
+  auto RegOpt = *ExpectedRegOpt;
   assert(RegOpt.has_value());
   assert(RegOpt.value() != MCRegister::NoRegister);
   return RegOpt.value();
@@ -53,10 +56,10 @@ static Register pregenerateRegister(InstructionGenerationContext &InstrGenCtx,
 /// Pregenerate available register operands.
 /// \return Vector of size InstrDesc.getNumOperands(). Uninitializable operands
 /// have corresponding PreselectedOpInfo::isUnset().
-std::vector<planning::PreselectedOpInfo>
+static PreselectedOperands
 selectInitializableOperandsRegisters(InstructionGenerationContext &InstrGenCtx,
                                      const MCInstrDesc &InstrDesc) {
-  std::vector<planning::PreselectedOpInfo> Preselected;
+  PreselectedOperands Preselected;
   Preselected.reserve(InstrDesc.getNumOperands());
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   bool ValuegramOperandsRegsInitOutputs =
@@ -123,7 +126,7 @@ ValuegramGenPolicy::generateOneInstrWithInitRegs(
         return Operand.isReg();
       });
 
-  SmallVector<PreselectedOpInfo> Registers;
+  PreselectedOperands Registers;
   // Simple quadratic unique because PreselectedOpInfo/StridedImmediate
   // don't have an order defined, so std::unique is not applicable.
   for (auto Operand : OpsRegs) {

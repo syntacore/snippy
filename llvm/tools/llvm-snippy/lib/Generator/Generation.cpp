@@ -18,6 +18,7 @@
 #include "snippy/Generator/Policy.h"
 #include "snippy/Generator/SimulatorContext.h"
 #include "snippy/Generator/SnippyFunctionMetadata.h"
+#include "snippy/Generator/SnippyLoopInfo.h"
 #include "snippy/Support/Options.h"
 
 #include "llvm/CodeGen/MachineBasicBlock.h"
@@ -730,9 +731,11 @@ std::optional<MachineOperand> pregenerateOneOperand(
     Register Reg;
     if (Preselected.isTiedTo())
       Reg = PregeneratedOperands[Preselected.getTiedTo()].getReg();
-    else if (Preselected.isReg())
+    else if (Preselected.isReg()) {
       Reg = Preselected.getReg();
-    else {
+      if (SnippyTgt.isPhysRegClass(OperandRegClassID, RegInfo))
+        Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
+    } else {
       auto RegClass =
           SnippyTgt.getRegClass(InstrGenCtx, OperandRegClassID, OpIndex,
                                 InstrDesc.getOpcode(), RegInfo);
@@ -747,8 +750,12 @@ std::optional<MachineOperand> pregenerateOneOperand(
       // not conflicting.
       if (CustomMask != AccessMaskBit::None)
         Mask = CustomMask;
-      auto RegOpt = RegGen.generate(RegClass, OperandRegClassID, RegInfo, RP,
-                                    MBB, SnippyTgt, Exclude, Include, Mask);
+      auto ExpectedRegOpt =
+          RegGen.generate(RegClass, OperandRegClassID, RegInfo, RP, MBB,
+                          SnippyTgt, Exclude, Include, Mask);
+      if (auto Err = ExpectedRegOpt.takeError())
+        snippy::fatal(std::move(Err));
+      auto RegOpt = *ExpectedRegOpt;
       if (!RegOpt)
         return std::nullopt;
       Reg = RegOpt.value();
@@ -773,8 +780,11 @@ std::optional<MachineOperand> pregenerateOneOperand(
       SmallVector<Register> Exclude;
       SnippyTgt.excludeFromMemRegsForOpcode(InstrDesc.getOpcode(), RegInfo,
                                             Exclude);
-      auto RegOpt = RegGen.generate(RegClass, OperandRegClassID, RegInfo, RP,
-                                    MBB, SnippyTgt, Exclude);
+      auto ExpectedRegOpt = RegGen.generate(
+          RegClass, OperandRegClassID, RegInfo, RP, MBB, SnippyTgt, Exclude);
+      if (auto Err = ExpectedRegOpt.takeError())
+        snippy::fatal(std::move(Err));
+      auto RegOpt = *ExpectedRegOpt;
       if (!RegOpt)
         return std::nullopt;
       Reg = RegOpt.value();
@@ -802,9 +812,10 @@ std::optional<MachineOperand> pregenerateOneOperand(
   }
   llvm_unreachable("this operand type unsupported");
 }
-std::optional<SmallVector<MachineOperand, 8>> tryToPregenerateOperands(
-    InstructionGenerationContext &InstrGenCtx, const MCInstrDesc &InstrDesc,
-    const std::vector<planning::PreselectedOpInfo> &Preselected) {
+std::optional<SmallVector<MachineOperand, 8>>
+tryToPregenerateOperands(InstructionGenerationContext &InstrGenCtx,
+                         const MCInstrDesc &InstrDesc,
+                         ArrayRef<planning::PreselectedOpInfo> Preselected) {
   SmallVector<MachineOperand, 8> PregeneratedOperands;
   assert(InstrDesc.getNumOperands() == Preselected.size());
   iota_range<unsigned long> PreIota(0, Preselected.size(),
@@ -821,9 +832,10 @@ std::optional<SmallVector<MachineOperand, 8>> tryToPregenerateOperands(
   return PregeneratedOperands;
 }
 
-SmallVector<MachineOperand, 8> pregenerateOperands(
-    InstructionGenerationContext &InstrGenCtx, const MCInstrDesc &InstrDesc,
-    const std::vector<planning::PreselectedOpInfo> &Preselected) {
+SmallVector<MachineOperand, 8>
+pregenerateOperands(InstructionGenerationContext &InstrGenCtx,
+                    const MCInstrDesc &InstrDesc,
+                    ArrayRef<planning::PreselectedOpInfo> Preselected) {
   auto &RP = InstrGenCtx.getRegPool();
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &RegGenerator = ProgCtx.getRegGen();
@@ -1144,7 +1156,7 @@ MachineInstr *generateCall(unsigned OpCode,
 
 static bool
 isPostprocessNeeded(const MCInstrDesc &InstrDesc,
-                    const std::vector<planning::PreselectedOpInfo> &Preselected,
+                    ArrayRef<planning::PreselectedOpInfo> Preselected,
                     InstructionGenerationContext &IGC) {
   // 1. If any information about operands is provided from the caller, we won't
   //    do any postprocessing.
@@ -1160,11 +1172,9 @@ isPostprocessNeeded(const MCInstrDesc &InstrDesc,
   return llvm::any_of(Preselected, [](const auto &Op) { return Op.isUnset(); });
 }
 
-MachineInstr *
-randomInstruction(const MCInstrDesc &InstrDesc,
-                  std::vector<planning::PreselectedOpInfo> Preselected,
-                  planning::InstructionGenerationContext &InstrGenCtx,
-                  MDNode *MetadataMark) {
+MachineInstr *randomInstruction(
+    const MCInstrDesc &InstrDesc, planning::PreselectedOperands Preselected,
+    planning::InstructionGenerationContext &InstrGenCtx, MDNode *MetadataMark) {
   auto &MBB = InstrGenCtx.MBB;
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
@@ -1243,8 +1253,7 @@ void spillPseudoInstImplicitRegs(
 void generateRealInstruction(
     const MCInstrDesc &InstrDesc,
     planning::InstructionGenerationContext &InstrGenCtx,
-    std::vector<planning::PreselectedOpInfo> Preselected,
-    MDNode *MetadataMark = nullptr) {
+    planning::PreselectedOperands Preselected, MDNode *MetadataMark = nullptr) {
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   auto Opc = InstrDesc.getOpcode();
@@ -1271,7 +1280,7 @@ void generateRealInstruction(
 
 void generateInstruction(const MCInstrDesc &InstrDesc,
                          planning::InstructionGenerationContext &InstrGenCtx,
-                         std::vector<planning::PreselectedOpInfo> Preselected,
+                         planning::PreselectedOperands Preselected,
                          MDNode *MetadataMark) {
 
   generateRealInstruction(InstrDesc, InstrGenCtx, std::move(Preselected),
