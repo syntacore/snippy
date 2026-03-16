@@ -167,7 +167,7 @@ void RegisterGenerator::setRegPluginInfo(
   DLTable->setRegInfoFile(RegPluginInfoFile.c_str());
 }
 
-std::optional<Register> RegisterGenerator::generateWithPlugin(
+Expected<std::optional<Register>> RegisterGenerator::generateWithPlugin(
     const MCRegisterClass &RC, const MCRegisterInfo &RI,
     const RegPoolWrapper &RP, const MachineBasicBlock &MBB,
     ArrayRef<Register> Exclude, ArrayRef<Register> Include,
@@ -220,7 +220,7 @@ void RegisterGenerator::setRegContextForPlugin() {
   DLTable->setContext(RegPluginContext);
 }
 
-std::optional<Register> RegisterGenerator::generateRandom(
+Expected<std::optional<Register>> RegisterGenerator::generateRandom(
     const SnippyTarget &SnippyTgt, const MCRegisterClass &RC,
     const MCRegisterInfo &RI, const RegPoolWrapper &RP,
     const MachineBasicBlock &MBB, ArrayRef<Register> Exclude,
@@ -235,9 +235,10 @@ std::optional<Register> RegisterGenerator::generateRandom(
         return regUnitIsReserved(RegIdx, SnippyTgt, Exclude, RI, RP, MBB, Mask,
                                  RC, Include);
       });
-  if (!ExpectedRegIdx)
-    snippy::fatal(
-        make_error<NoAvailableRegister>(RC, RI, "instruction generation"));
+  if (auto Err = ExpectedRegIdx.takeError()) {
+    consumeError(std::move(Err));
+    return make_error<NoAvailableRegister>(RC, RI, "instruction generation");
+  }
 
   assert(ExpectedRegIdx->size() == 1);
   return getRegFromIdx(RC, Include, ExpectedRegIdx->front());

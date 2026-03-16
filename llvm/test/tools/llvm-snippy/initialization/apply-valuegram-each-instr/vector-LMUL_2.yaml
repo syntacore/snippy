@@ -72,9 +72,9 @@ histogram:
 #                     We want to see them in initialization
 #
 #          With these settings, we should only get
-#                     $v30m2 = VADD_VV $v30m2, $v30m2, $v0, implicit $vtype, implicit $vl
+#                     $v30 = VADD_VV $v30, $v30, $v0, implicit $vtype, implicit $vl
 #          So check that v30 and v31 are initialized
 
 # CHECK-DAG: $v30 = VL1RE8_V{{.*}}pcsections
 # CHECK-DAG: $v31 = VL1RE8_V{{.*}}pcsections
-# CHECK:     $v30m2 = VADD_VV $v30m2, $v30m2
+# CHECK:     $v30 = VADD_VV $v30, $v30

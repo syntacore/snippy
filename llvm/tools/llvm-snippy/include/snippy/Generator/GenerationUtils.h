@@ -10,25 +10,42 @@
 #define LLVM_TOOLS_SNIPPY_GENERATION_UTILS_H
 
 #include "snippy/Generator/GenerationLimit.h"
-#include "snippy/Generator/GeneratorContext.h"
-#include "snippy/Generator/LoopLatcherPass.h"
+#include "snippy/Generator/GlobalsPool.h"
 #include "snippy/Generator/MemAccessInfo.h"
+#include "snippy/Generator/PreselectedOperands.h"
+#include "snippy/GeneratorUtils/RegisterPool.h"
 
 namespace llvm {
 namespace snippy {
-namespace planning {
-class PreselectedOpInfo;
-} // namespace planning
-
 // For the given InstrDesc fill the vector of selected operands to account them
 // in instruction generation procedure.
-std::vector<planning::PreselectedOpInfo>
-selectOperands(const MCInstrDesc &InstrDesc, unsigned BaseReg,
-               const AddressInfo &AI);
+planning::PreselectedOperands selectMemoryOperands(const MCInstrDesc &InstrDesc,
+                                                   unsigned BaseReg,
+                                                   const AddressInfo &AI);
 
-std::vector<planning::PreselectedOpInfo> selectConcreteOffsets(
+/// \brief Select all necessary operands for memory instructions.
+///
+/// Do not select source operands that don't have any restrictions on them. E.g.
+/// stored register is not selected here as we don't care what register will be
+/// used
+///
+/// \return pair of preselected operands for each instruction and a map from
+/// selected registers to values they need to be initialized with
+std::pair<std::vector<planning::PreselectedOperands>, std::map<unsigned, APInt>>
+selectOperandsForMemoryInstructions(InstructionGenerationContext &InstrGenCtx,
+                                    ArrayRef<unsigned> Opcodes,
+                                    RegPoolWrapper &RP);
+/// \brief Select non-memory operands for instruction. Take into account
+/// registers that are reserved as memory operands
+void selectNonMemoryOperands(
+    const MCInstrDesc &InstrDesc,
+    SmallVectorImpl<planning::PreselectedOpInfo> &Preselected,
+    planning::InstructionGenerationContext &InstrGenCtx, RegPoolWrapper &RP,
+    const DenseSet<Register> &Excluded = {},
+    const DenseSet<Register> &ExcludedForDst = {});
+void selectConcreteOffsets(
     InstructionGenerationContext &IGC, const MCInstrDesc &InstrDesc,
-    const std::vector<planning::PreselectedOpInfo> &Preselected);
+    SmallVectorImpl<planning::PreselectedOpInfo> &Preselected);
 
 std::map<unsigned, AddressRestriction>
 collectAddressRestrictions(ArrayRef<unsigned> Opcodes,
@@ -61,10 +78,10 @@ void dumpMemAccessesIfNeeded(const MemAccessInfo &MAI);
 
 void initializeBaseRegs(
     InstructionGenerationContext &InstrGenCtx,
-    std::map<unsigned, AddressInfo> &BaseRegToPrimaryAddress);
+    const std::map<unsigned, APInt> &BaseRegToPrimaryAddress);
 
 // This function returns address info to use for each opcode.
-std::vector<AddressInfo>
+std::pair<std::map<unsigned, APInt>, std::vector<AddressInfo>>
 mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
                  ArrayRef<unsigned> OpcodeIdxToBaseReg,
                  ArrayRef<unsigned> Opcodes);
