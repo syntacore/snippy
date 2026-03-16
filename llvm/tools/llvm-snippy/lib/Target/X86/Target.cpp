@@ -465,7 +465,8 @@ public:
   breakDownAddr(InstructionGenerationContext &IGC, AddressInfo AddrInfo,
                 const MCInstrDesc &InstrDesc,
                 MutableArrayRef<planning::PreselectedOpInfo> Preselected,
-                unsigned AddrIdx) const override {
+                unsigned AddrIdx,
+                std::optional<MemAddr> MainPart) const override {
     reportUnimplementedError();
   }
 
@@ -588,6 +589,11 @@ public:
 
   bool canInitializeOperand(const MCInstrDesc &InstrDesc, unsigned OpIndex,
                             const LLVMState &State) const override {
+    reportUnimplementedError();
+  }
+
+  bool shouldPreselectOperandInBurstMode(const MCInstrDesc &InstrDesc,
+                                         unsigned OpIdx) const override {
     reportUnimplementedError();
   }
 
