@@ -495,7 +495,8 @@ public:
   breakDownAddr(InstructionGenerationContext &IGC, AddressInfo AddrInfo,
                 const MCInstrDesc &InstrDesc,
                 MutableArrayRef<planning::PreselectedOpInfo> Preselected,
-                unsigned AddrIdx) const = 0;
+                unsigned AddrIdx,
+                std::optional<MemAddr> MainPart = std::nullopt) const = 0;
 
   virtual unsigned
   getWriteValueSequenceLength(InstructionGenerationContext &IGC, APInt Value,
@@ -605,6 +606,8 @@ public:
   virtual unsigned getAddrRegLen(const TargetMachine &TM) const = 0;
 
   virtual bool canUseInBurstMode(const MCInstrDesc &InstrDesc) const = 0;
+  virtual bool shouldPreselectOperandInBurstMode(const MCInstrDesc &InstrDesc,
+                                                 unsigned OpIdx) const = 0;
 
   virtual bool canInitializeOperand(const MCInstrDesc &InstrDesc,
                                     unsigned OpIndex,

@@ -37,18 +37,10 @@ burst:
     max-size: 16
     groupings:
       - [VSETVL, VSETIVLI]
-      - [VLSE32_V, VSSE32_V]
 
 # CHECK: warning: (burst-mode) Opcode VSETIVLI is not supported in the
 # CHECK-SAME: burst mode: generator will generate it but not in a burst group.
 # CHECK-NEXT: warning: (burst-mode) Opcode VSETVL is not supported in the
-# CHECK-SAME: burst mode: generator will generate it but not in a burst group.
-# CHECK-NEXT: warning: (burst-mode) Empty burst group: no supported opcodes were
-# CHECK-SAME: specified, this group will be ignored.
-
-# CHECK: warning: (burst-mode) Opcode VLSE32_V is not supported in the
-# CHECK-SAME: burst mode: generator will generate it but not in a burst group.
-# CHECK-NEXT: warning: (burst-mode) Opcode VSSE32_V is not supported in the
 # CHECK-SAME: burst mode: generator will generate it but not in a burst group.
 # CHECK-NEXT: warning: (burst-mode) Empty burst group: no supported opcodes were
 # CHECK-SAME: specified, this group will be ignored.

@@ -55,6 +55,15 @@ enum class AccessMaskBit : uint32_t {
 #undef LLVM_SNIPPY_ACCESS_MASK_DESC
 };
 
+inline AccessMaskBit operator&(AccessMaskBit LHS, AccessMaskBit RHS) {
+  return static_cast<AccessMaskBit>(static_cast<uint32_t>(LHS) &
+                                    static_cast<uint32_t>(RHS));
+}
+
+inline AccessMaskBit operator|(AccessMaskBit LHS, AccessMaskBit RHS) {
+  return static_cast<AccessMaskBit>(static_cast<uint32_t>(LHS) |
+                                    static_cast<uint32_t>(RHS));
+}
 template <AccessMaskBit Acc>
 constexpr inline StringLiteral AccessMaskNameOf = "";
 #define LLVM_SNIPPY_ACCESS_MASK_DESC(NAME, VAL)                                \
