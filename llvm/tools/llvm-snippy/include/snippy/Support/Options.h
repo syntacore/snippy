@@ -25,6 +25,8 @@ class Regex;
 
 namespace snippy {
 
+class OptionsStorage;
+
 /// \class CommandOptionBase
 /// \brief Non-template class for command options of different types.
 /// Manages option's name and tracks whether option was specified in either
@@ -61,8 +63,6 @@ private:
 /// \brief Stores value of concrete DataType.
 /// Knows how to map its value to yaml and how to clone itself.
 template <typename DataType> struct CommandOption : public CommandOptionBase {
-  DataType Val{};
-
   CommandOption(StringRef Name) : CommandOptionBase(Name) {}
 
   void doMappingWithKey(yaml::IO &IO, StringRef Key) override {
@@ -72,6 +72,16 @@ template <typename DataType> struct CommandOption : public CommandOptionBase {
   std::unique_ptr<CommandOptionBase> doClone() const override {
     return std::make_unique<CommandOption<DataType>>(*this);
   }
+
+  const DataType &value() const & { return Val; }
+
+  operator DataType() const & { return Val; }
+
+private:
+  // We must have access to Val in the OptionsStorage class
+  friend class OptionsStorage;
+
+  DataType Val{};
 };
 
 /// \class OptionsStorage
