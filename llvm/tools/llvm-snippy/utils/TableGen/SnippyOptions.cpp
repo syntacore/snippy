@@ -172,8 +172,8 @@ class SnippyOptionStructEmitter {
   MapVector<StringRef, const Record *> Groups;
 
   void emitSnippyOption(const Record &R) {
-    OS.indent(DefaultIndent) << getTypeName(R) << " " << R.getName() << ";\n";
-    OS.indent(DefaultIndent) << "bool " << R.getName() << "Specified;\n";
+    OS.indent(DefaultIndent) << llvm::formatv("CommandOption<{0}> {1};\n",
+                                              getTypeName(R), R.getName());
   }
 
   void collectAllOptionGroups() {
@@ -217,12 +217,9 @@ public:
     if (Kind == OptionKind::KindAlias)
       return;
     OS.indent(DefaultIndent)
-        << formatv("Res.{0} = static_cast<const CommandOption<{1}> "
-                   "&>(Storage.get(\"{2}\")).Val;\n",
-                   R.getName(), getTypeName(R), R.getValueAsString("Name"));
-    OS.indent(DefaultIndent)
-        << formatv("Res.{0}Specified = Storage.get(\"{1}\").isSpecified();\n",
-                   R.getName(), R.getValueAsString("Name"));
+        << formatv("static_cast<const CommandOption<{0}> "
+                   "&>(Storage.get(\"{1}\")),\n",
+                   getTypeName(R), R.getValueAsString("Name"));
   }
   void emitOptionsCopyFunction() {
     auto Opts = Records.getAllDerivedDefinitions("Option");
@@ -230,15 +227,16 @@ public:
       auto StructName = getOptionsStructName(*Group);
       OS << "inline " << StructName << " copyOptionsTo" << StructName
          << "() {\n";
-      OS.indent(DefaultIndent) << StructName << " Res;\n";
       OS.indent(DefaultIndent)
           << "auto &Storage = OptionsStorage::instance();\n";
+      OS.indent(DefaultIndent) << StructName << " Res {\n";
       auto GroupedOpts =
           make_filter_range(Opts, [Name = StringRef(GroupName)](const auto *O) {
             return O->getValueAsDef("Group")->getName() == Name;
           });
       for (const auto *R : GroupedOpts)
         emitCopyOptionIfNeeded(*R);
+      OS.indent(DefaultIndent) << "};\n";
       OS.indent(DefaultIndent) << "return Res;\n";
       OS << "}\n\n";
     }
