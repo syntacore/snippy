@@ -174,9 +174,9 @@ static SelectedTargetInfo getSelectedTargetInfo(const ProgramOptions &Opts) {
   TargetInfo.Triple = Opts.MTargetTriple;
   TargetInfo.CPU = Opts.CpuName;
   TargetInfo.Features = Opts.MAttr;
-  if (!Opts.MTargetTripleSpecified && !Opts.MArchSpecified) {
+  if (!Opts.MTargetTriple.isSpecified() && !Opts.MArch.isSpecified()) {
     TargetInfo.Triple = sys::getProcessTriple();
-    if (!Opts.CpuNameSpecified)
+    if (!Opts.CpuName.isSpecified())
       TargetInfo.CPU = sys::getHostCPUName();
   }
   return TargetInfo;
@@ -221,7 +221,7 @@ static void printNoLayoutHint(LLVMContext &Ctx, const DebugOptions &Opts) {
   // Dumping options is really helpful to see the YAML format for them, so
   // we skip printing the hint as well.
   auto ShouldSkipHint =
-      ListOpcodeNames.getNumOccurrences() || Opts.DumpOptionsSpecified;
+      ListOpcodeNames.getNumOccurrences() || Opts.DumpOptions.isSpecified();
 
   if (ShouldSkipHint)
     return;

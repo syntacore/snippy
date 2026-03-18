@@ -287,10 +287,10 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         PM.add(createTrackLivenessPass());
         PM.add(createPreserveRegsInsertionPass());
 
-        if (DebugCfg.DumpMF)
+        if (DebugCfg.DumpMF.value())
           PM.add(createMachineFunctionPrinterPass(outs()));
 
-        if (DebugCfg.DumpMI)
+        if (DebugCfg.DumpMI.value())
           PM.add(createPrintMachineInstrsPass(outs()));
 
         SnippyTgt.addTargetLegalizationPasses(PM);
@@ -308,8 +308,8 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         if (PassCfg.InstrsGenerationConfig.RunMachineInstrVerifier)
           PM.add(createMachineVerifierPass("Machine Verifier Pass report"));
 
-        if (DebugCfg.DumpCFG)
-          PM.add(createCFGPrinterPass(DebugCfg.ViewCFG));
+        if (DebugCfg.DumpCFG.value())
+          PM.add(createCFGPrinterPass(DebugCfg.ViewCFG.value()));
 
         if (DumpMIR.isSpecified())
           PM.add(createPrintMIRPass(MIROS));

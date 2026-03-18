@@ -514,7 +514,8 @@ deriveRegisterAccessesFromReservedList(const SnippyTarget &Tgt,
                                        const MCRegisterInfo &MRI,
                                        const ProgramOptions &Opts) {
   RegisterAccessConfig Res;
-  auto Reserved = parseReservedRegisters(Tgt, MRI, Opts.ReservedRegsList);
+  auto Reserved =
+      parseReservedRegisters(Tgt, MRI, Opts.ReservedRegsList.value());
   for (auto Reg : Reserved) {
     SmallVector<Register> PhysRegs;
     Tgt.getPhysRegsFromUnit(Reg, MRI, PhysRegs);
@@ -542,7 +543,7 @@ parseSpilledRegistersOption(const RegPoolWrapper &RP, const SnippyTarget &Tgt,
                             const MCRegisterInfo &RI, LLVMContext &Ctx,
                             const ProgramOptions &Opts) {
   std::vector<MCRegister> SpilledRegs;
-  for (auto &&RegName : Opts.SpilledRegisterList) {
+  for (auto &&RegName : Opts.SpilledRegisterList.value()) {
     auto Reg = findRegisterByName(Tgt, RI, RegName);
     if (!Reg)
       snippy::fatal(formatv("Illegal register name {0}"
@@ -578,7 +579,7 @@ static MCRegister getRealStackPointer(
   std::string RedefineSP = Opts.RedefineSP;
 
   bool NotSPAndNotAny = RedefineSP != "SP" && RedefineSP != "any";
-  if (!StaticStack && HasSPRelativeInstrs && Opts.RedefineSPSpecified &&
+  if (!StaticStack && HasSPRelativeInstrs && Opts.RedefineSP.isSpecified() &&
       !NotSPAndNotAny)
     generateSPRelativeInstrsError(RedefineSP);
 
@@ -652,12 +653,13 @@ static MCRegister getRealStackPointer(
 
 static std::vector<std::string> parseModelPluginList(const ModelOptions &Opts) {
   std::vector<std::string> CoSimModelPluginFilesList;
-  if (Opts.ModelPluginFile == "None" && !Opts.CoSimModelPluginFilesList.empty())
+  if (Opts.ModelPluginFile.value() == "None" &&
+      !Opts.CoSimModelPluginFilesList.value().empty())
     snippy::fatal(formatv("--cosim-model-plugins"
                           " can only be used when --model-plugin"
                           " is provided and is not None"));
   std::vector<std::string> Ret{Opts.ModelPluginFile};
-  copy(Opts.CoSimModelPluginFilesList, std::back_inserter(Ret));
+  copy(Opts.CoSimModelPluginFilesList.value(), std::back_inserter(Ret));
   erase(Ret, "None");
 
   return Ret;
@@ -713,11 +715,11 @@ unsigned long long initializeRandomEngine(uint64_t SeedValue) {
 
 static bool getStaticStackValue(Config &Cfg, const OpcodeCache &OpCC,
                                 const ProgramOptions &Opts) {
-  if (Opts.StaticStackSpecified && !Opts.StaticStack)
+  if (Opts.StaticStack.isSpecified() && !Opts.StaticStack)
     return false;
   auto &ProgCfg = Cfg.ProgramCfg;
   auto NumPrimaryInstrs =
-      getExpectedNumInstrs(copyOptionsToInstrGenOptions().NumInstrs);
+      getExpectedNumInstrs(copyOptionsToInstrGenOptions().NumInstrs.value());
   auto HasStackSection =
       ProgCfg.Sections.hasSection(SectionsDescriptions::StackSectionName);
   auto StaticStack = !Opts.FollowTargetABI && HasStackSection &&
@@ -726,7 +728,7 @@ static bool getStaticStackValue(Config &Cfg, const OpcodeCache &OpCC,
                      ProgCfg.PreserveCallerSavedGroups.empty() &&
                      NumPrimaryInstrs && !Cfg.isLoopGenerationPossible(OpCC);
   // If the option is not provided, then its value is auto-detected.
-  if (!Opts.StaticStackSpecified)
+  if (!Opts.StaticStack.isSpecified())
     return StaticStack;
   if (Opts.FollowTargetABI)
     snippy::fatal(
@@ -783,7 +785,7 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
   ProgCfg.InitialRegYamlFile = Opts.InitialRegisterDataFile;
   // Here we don't use Seed.value_or() because we don't want seedOptToValue to
   // be called at all if Seed was provided
-  ProgCfg.Seed = Seed.has_value() ? *Seed : seedOptToValue(Opts.Seed);
+  ProgCfg.Seed = Seed.has_value() ? *Seed : seedOptToValue(Opts.Seed.value());
   // FIXME: RandomEngine initialization should be moved out of Config as well
   // as most of the stuff below
   initializeRandomEngine(ProgCfg.Seed);
@@ -794,7 +796,7 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
   if (!ProgCfg.hasSectionToSpillGlobalRegs() &&
       Cfg.PassCfg.hasExternalCallees())
     reserveGlobalStateRegisters(RP, Tgt);
-  if (Opts.ReservedRegsListSpecified) {
+  if (Opts.ReservedRegsList.isSpecified()) {
     if (!Cfg.PassCfg.RegisterAccess.empty())
       snippy::fatal("Incompatible options",
                     "Cannot use 'register-access' config and "
@@ -814,7 +816,7 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
   auto RegsSpilledToMem = getRegsToSpillToMem(Tgt, Cfg);
   bool HasSPRelativeInstrs = Cfg.Histogram.hasSPRelativeInstrs(OpCC, Tgt);
   if (ProgCfg.FollowTargetABI) {
-    if (HasSPRelativeInstrs && !Opts.RedefineSPSpecified)
+    if (HasSPRelativeInstrs && !Opts.RedefineSP.isSpecified())
       snippy::fatal(
           "Incompatible options",
           "When --honor-target-abi is enabled, generation of "
@@ -849,33 +851,33 @@ static void normalizeRegInitOptions(Config &Cfg, LLVMState &State,
                                     const RegInitOptions &Opts) {
   auto &RegsCfg = Cfg.PassCfg.RegistersConfig;
   RegsCfg.InitializeRegs = Opts.InitRegsInElf;
-  if ((Opts.DumpInitialRegisters == "none" && Verbose) ||
-      Opts.DumpInitialRegisters.empty()) {
+  if ((Opts.DumpInitialRegisters.value() == "none" && Verbose) ||
+      Opts.DumpInitialRegisters.value().empty()) {
     // if verbose, but no file was specified - use hardcoded default path
     RegsCfg.InitialStateOutputYaml = "initial_registers_state.yml";
-  } else if (Opts.DumpInitialRegisters != "none") {
+  } else if (Opts.DumpInitialRegisters.value() != "none") {
     RegsCfg.InitialStateOutputYaml = Opts.DumpInitialRegisters;
   }
 
-  if ((Opts.DumpResultingRegisters == "none" &&
+  if ((Opts.DumpResultingRegisters.value() == "none" &&
        (Verbose && Cfg.PassCfg.ModelPluginConfig.runOnModel())) ||
-      Opts.DumpResultingRegisters.empty()) {
+      Opts.DumpResultingRegisters.value().empty()) {
     // if verbose, but no file was specified - use hardcoded default path
     RegsCfg.FinalStateOutputYaml = "registers_state.yml";
-  } else if (Opts.DumpResultingRegisters != "none") {
+  } else if (Opts.DumpResultingRegisters.value() != "none") {
     RegsCfg.FinalStateOutputYaml = Opts.DumpResultingRegisters;
   }
   // TODO: move this check away.
-  if (Opts.ValuegramOperandsRegsInitOutputsSpecified &&
-      !Opts.ValueGramRegsDataFileSpecified)
+  if (Opts.ValuegramOperandsRegsInitOutputs.isSpecified() &&
+      !Opts.ValueGramRegsDataFile.isSpecified())
     snippy::fatal("Incompatible options",
                   "-valuegram-operands-regs-init-outputs available only if "
                   "-valuegram-operands-regs specified");
 
-  if (Opts.ValueGramRegsDataFileSpecified) {
+  if (Opts.ValueGramRegsDataFile.isSpecified()) {
     Cfg.DefFlowConfig.Valuegram.emplace();
     Cfg.DefFlowConfig.Valuegram->RegsHistograms =
-        loadRegistersFromYaml(Opts.ValueGramRegsDataFile);
+        loadRegistersFromYaml(Opts.ValueGramRegsDataFile.value());
     Cfg.DefFlowConfig.Valuegram->ValuegramOperandsRegsInitOutputs =
         ValuegramOperandsRegsInitOutputs;
   }
@@ -885,7 +887,7 @@ static Error normalizeInstrGenOptions(Config &Cfg, LLVMState &State,
                                       const InstrGenOptions &Opts) {
   auto &PassCfg = Cfg.PassCfg;
   auto &InstrsCfg = PassCfg.InstrsGenerationConfig;
-  auto NumPrimaryInstrs = getExpectedNumInstrs(Opts.NumInstrs);
+  auto NumPrimaryInstrs = getExpectedNumInstrs(Opts.NumInstrs.value());
   InstrsCfg.RunMachineInstrVerifier = Opts.VerifyMachineInstrs;
   InstrsCfg.ChainedRXSorted = Opts.ChainedRXSorted;
   InstrsCfg.ChainedRXSectionsFill = Opts.ChainedRXSectionsFill;
@@ -909,7 +911,7 @@ static Error normalizeInstrGenOptions(Config &Cfg, LLVMState &State,
   TrackCfg.AddressVH = Opts.AddressVHOpt;
 
   // FIXME: we should create a special routine for tracking duplicates
-  if (TrackCfg.Selfcheck && Opts.SelfcheckSpecified)
+  if (TrackCfg.Selfcheck && Opts.Selfcheck.isSpecified())
     return createStringError(inconvertibleErrorCode(),
                              "'selfcheck' has been specified both as an option "
                              "and as a configuration field");
@@ -917,7 +919,7 @@ static Error normalizeInstrGenOptions(Config &Cfg, LLVMState &State,
   if (TrackCfg.Selfcheck)
     return Error::success();
 
-  if (auto Period = getSelfcheckPeriod(Opts.Selfcheck)) {
+  if (auto Period = getSelfcheckPeriod(Opts.Selfcheck.value())) {
     auto Mode = Opts.SelfcheckRefValueStorage;
     TrackCfg.Selfcheck = SelfcheckConfig{Mode, Period};
 
@@ -939,15 +941,15 @@ static void normalizeModelOptions(Config &Cfg, LLVMState &State,
   ModelCfg.ModelLogPath = Opts.ModelLogPath;
   auto &TFCfg = Cfg.PassCfg.TFOpts;
   TFCfg.LastPC = Opts.LastPC;
-  if (Opts.LastPCSpecified && !Opts.TraceSNTFPathSpecified)
+  if (Opts.LastPC.isSpecified() && !Opts.TraceSNTFPath.isSpecified())
     snippy::fatal("Can't set last pc", "--trace-SNTF not specified");
-  if (!ModelCfg.runOnModel() && (!Opts.TraceSNTFPath.empty()))
+  if (!ModelCfg.runOnModel() && (!Opts.TraceSNTFPath.value().empty()))
     snippy::fatal("Can't convert trace to "
                   "SNTF",
                   "--model-plugin set to None");
   TFCfg.TraceSNTFPath =
-      !Opts.TraceSNTFPath.empty()
-          ? std::make_optional<std::string>(Opts.TraceSNTFPath)
+      !Opts.TraceSNTFPath.value().empty()
+          ? std::make_optional<std::string>(Opts.TraceSNTFPath.value())
           : std::nullopt;
 }
 
