@@ -24,6 +24,7 @@
 #include "snippy/Simulator/Simulator.h"
 #include "snippy/Support/DynLibLoader.h"
 #include "snippy/Support/OpcodeGenerator.h"
+#include "snippy/Support/Utils.h"
 
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineInstr.h"
@@ -64,6 +65,7 @@ class StridedImmediate;
 struct SelfcheckConfig;
 class CommonPolicyConfig;
 class Config;
+class ProgramConfig;
 
 enum class LoopType;
 struct TargetGenContextInterface {
@@ -186,14 +188,17 @@ public:
   void generateSpillToAddr(InstructionGenerationContext &IGC, MCRegister Reg,
                            MemAddr Addr) const;
 
-  virtual void generateSpillToStack(InstructionGenerationContext &IGC,
-                                    MCRegister Reg, MCRegister SP) const = 0;
+  virtual void generateSpillToStack(
+      InstructionGenerationContext &IGC, MCRegister Reg, MCRegister SP,
+      SnippyMetadata MetadataMark = SnippyMetadata::Support) const = 0;
 
-  virtual void generateReloadFromStack(InstructionGenerationContext &IGC,
-                                       MCRegister Reg, MCRegister SP) const = 0;
+  virtual void generateReloadFromStack(
+      InstructionGenerationContext &IGC, MCRegister Reg, MCRegister SP,
+      SnippyMetadata MetadataMark = SnippyMetadata::Support) const = 0;
 
-  void generateReloadFromAddr(InstructionGenerationContext &IGC, MCRegister Reg,
-                              MemAddr Addr) const;
+  void generateReloadFromAddr(
+      InstructionGenerationContext &IGC, MCRegister Reg, MemAddr Addr,
+      SnippyMetadata MetadataMark = SnippyMetadata::Support) const;
 
   virtual void generatePopNoReload(InstructionGenerationContext &IGC,
                                    MCRegister Reg) const = 0;
@@ -214,8 +219,8 @@ public:
 
   // Returns size of stack slot for Reg.
   virtual unsigned
-  getSpillSizeInBytes(MCRegister Reg,
-                      InstructionGenerationContext &IGC) const = 0;
+  getSpillSizeInBytes(MCRegister Reg, SnippyProgramContext &ProgCtx,
+                      const TargetSubtargetInfo &SubTgt) const = 0;
 
   // Returns minimum address alignment that can be used to generate register
   // spill.
@@ -267,8 +272,9 @@ public:
     return nullptr;
   }
 
-  virtual void checkInstrTargetDependency(const OpcodeHistogram &H,
-                                          const OpcodeCache &OpCC) const = 0;
+  virtual void
+  checkInstrTargetDependency(const OpcodeHistogram &H, const OpcodeCache &OpCC,
+                             const ProgramConfig &ProgramCfg) const = 0;
   virtual void checkTrackingRestrictions(const OpcodeHistogram &H) const = 0;
 
   virtual bool isModeSwitchInstr(unsigned Opcode) const = 0;
@@ -312,6 +318,8 @@ public:
       planning::InstructionGenerationContext &InstrGenCtx) const = 0;
 
   virtual bool requiresCustomGeneration(const MCInstrDesc &InstrDesc) const = 0;
+  virtual bool
+  canBeGeneratedAsCommonInstr(const MCInstrDesc &InstrDesc) const = 0;
 
   virtual void instructionPostProcess(InstructionGenerationContext &IGC,
                                       MachineInstr &MI) const = 0;
@@ -515,12 +523,13 @@ public:
                                           unsigned DestReg,
                                           const GlobalValue *Target) const = 0;
 
-  virtual void loadRegFromAddr(InstructionGenerationContext &IGC, uint64_t Addr,
-                               MCRegister Reg) const = 0;
+  virtual void loadRegFromAddr(
+      InstructionGenerationContext &IGC, uint64_t Addr, MCRegister Reg,
+      SnippyMetadata MetadataMark = SnippyMetadata::Support) const = 0;
 
-  virtual void loadRegFromAddrInReg(InstructionGenerationContext &IGC,
-                                    MCRegister AddrReg,
-                                    MCRegister Reg) const = 0;
+  virtual void loadRegFromAddrInReg(
+      InstructionGenerationContext &IGC, MCRegister AddrReg, MCRegister Reg,
+      SnippyMetadata MetadataMark = SnippyMetadata::Support) const = 0;
 
   // Choose the parameters used to sample the memory scheme for a particular
   // opcode in the context of \ref MBB and \ref ProgCtx.
