@@ -195,7 +195,8 @@ static void setupStackPointer(InstructionGenerationContext &IGC,
   // This requires two steps:
   // 1 - save current stack pointer state to top of stack.
   // 2 - set stack pointer to point to next stack slot.
-  auto SPSpillSize = SnippyTgt.getSpillSizeInBytes(AuxReg, IGC);
+  auto SPSpillSize =
+      SnippyTgt.getSpillSizeInBytes(AuxReg, ProgCtx, IGC.getSubtargetImpl());
   auto Addr = ProgCtx.getStackTop() - SPSpillSize;
   assert(Addr % SPSpillSize == 0u && "Stack section must be properly aligned");
 
@@ -233,7 +234,8 @@ static void restoreStackPointer(InstructionGenerationContext &IGC,
   }
 
   // Restore stack pointer state.
-  auto SPSpillSize = SnippyTgt.getSpillSizeInBytes(AuxReg, IGC);
+  auto SPSpillSize =
+      SnippyTgt.getSpillSizeInBytes(AuxReg, ProgCtx, IGC.getSubtargetImpl());
   auto Addr = ProgCtx.getStackTop() - SPSpillSize;
   SnippyTgt.loadRegFromAddr(IGC, Addr, AuxReg);
 }
@@ -267,7 +269,8 @@ void PrologueEpilogueInsertion::generateStackInitialization(
   // Spilling of preserved register, chosen for stack pointer role
   if (ProgCtx.shouldSpillStackPointer()) {
     IGC.MBB.addLiveIn(RealStackPointer);
-    SnippyTgt.generateSpillToStack(IGC, RealStackPointer, AuxReg);
+    SnippyTgt.generateSpillToStack(IGC, RealStackPointer, AuxReg,
+                                   SnippyMetadata::Prologue);
   }
 
   if (RealStackPointer != AuxReg)
@@ -358,7 +361,8 @@ bool PrologueEpilogueInsertion::insertPrologue(
   // Spill requested registers. Also mark them as live-in.
   for (auto SpillReg : SpilledToStack) {
     MBB->addLiveIn(SpillReg);
-    SnippyTgt.generateSpillToStack(InstrGenCtx, SpillReg, SP);
+    SnippyTgt.generateSpillToStack(InstrGenCtx, SpillReg, SP,
+                                   SnippyMetadata::Prologue);
   }
   if (StaticStack)
     ProgCtx.getStaticStack().passSPAddr();
@@ -416,7 +420,8 @@ bool PrologueEpilogueInsertion::insertEpilogue(
   // Reload spilled registers. Reverse order because of a stack.
   llvm::for_each(llvm::reverse(SpilledToStack), [&](auto Reg) {
     SnippyTgt.generateReloadFromStack(
-        InstrGenCtx, Reg, SGCtx.getProgramContext().getStackPointer());
+        InstrGenCtx, Reg, SGCtx.getProgramContext().getStackPointer(),
+        SnippyMetadata::Epilogue);
   });
 
   if (IsExit && !ProgCtx.getConfig().StaticStack)
@@ -431,7 +436,8 @@ bool PrologueEpilogueInsertion::insertEpilogue(
     auto &SaveLocs = ProgCtx.getProgramStateSaveSpace();
     llvm::for_each(SpilledToMem, [&](auto Reg) {
       auto Addr = SaveLocs.getSaveLocation(Reg).Global;
-      SnippyTgt.generateReloadFromAddr(InstrGenCtx, Reg, Addr);
+      SnippyTgt.generateReloadFromAddr(InstrGenCtx, Reg, Addr,
+                                       SnippyMetadata::Epilogue);
     });
   }
 

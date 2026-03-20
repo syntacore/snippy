@@ -40,7 +40,13 @@ template <typename T> struct NumericRange final {
   bool isMinOrMaxSet() const { return Min.has_value() || Max.has_value(); }
 };
 
-enum class SnippyMetadata { Support, ExternalCall, FormAddrForCall };
+enum class SnippyMetadata {
+  Support,
+  ExternalCall,
+  FormAddrForCall,
+  Epilogue,
+  Prologue
+};
 
 namespace detail {
 constexpr static const char *SupportMetadataValue = "llvm.snippy.support";
@@ -48,6 +54,8 @@ constexpr static const char *ExternalCallMetadataValue =
     "llvm.snippy.call.external";
 constexpr static const char *FormAddrForCallMetadataValue =
     "llvm.snippy.forming.address";
+constexpr static const char *EpilogueMetadataValue = "llvm.snippy.epilogue";
+constexpr static const char *PrologueMetadataValue = "llvm.snippy.prologue";
 
 inline StringRef getStrMetadata(SnippyMetadata M) {
   switch (M) {
@@ -57,6 +65,10 @@ inline StringRef getStrMetadata(SnippyMetadata M) {
     return ExternalCallMetadataValue;
   case SnippyMetadata::FormAddrForCall:
     return FormAddrForCallMetadataValue;
+  case SnippyMetadata::Epilogue:
+    return EpilogueMetadataValue;
+  case SnippyMetadata::Prologue:
+    return PrologueMetadataValue;
   }
   llvm_unreachable("unknown metadata value");
 }

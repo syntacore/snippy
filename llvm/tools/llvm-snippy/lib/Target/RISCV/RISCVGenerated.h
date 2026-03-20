@@ -885,16 +885,28 @@ inline bool isZcmpPushPop(unsigned Opcode) {
     return false;
   case RISCV::CM_PUSH:
   case RISCV::CM_POP:
+    return true;
+  }
+}
+
+inline bool isZcmpPopret(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
   case RISCV::CM_POPRET:
   case RISCV::CM_POPRETZ:
     return true;
   }
 }
 
+inline bool isZcmpSPRelative(unsigned Opcode) {
+  return isZcmpPopret(Opcode) || isZcmpPushPop(Opcode);
+}
+
 inline bool isZcmp(unsigned Opcode) {
   switch (Opcode) {
   default:
-    return isZcmpPushPop(Opcode);
+    return isZcmpSPRelative(Opcode);
   case RISCV::CM_MVA01S:
   case RISCV::CM_MVSA01:
     return true;
@@ -1967,6 +1979,40 @@ getRISCVFloatRegLen(const TargetSubtargetInfo &STI) {
   if (ST.hasStdExtF())
     return 32;
   return std::nullopt;
+}
+
+inline SmallVector<MCRegister> getSpilledRegsFromRList(uint64_t RList) {
+  using namespace RISCV;
+  using namespace RISCVZC;
+  switch (RList) {
+  case RA:
+    return {X1};
+  case RA_S0:
+    return {X1, X8};
+  case RA_S0_S1:
+    return {X1, X8, X9};
+  case RA_S0_S2:
+    return {X1, X8, X9, X18};
+  case RA_S0_S3:
+    return {X1, X8, X9, X18, X19};
+  case RA_S0_S4:
+    return {X1, X8, X9, X18, X19, X20};
+  case RA_S0_S5:
+    return {X1, X8, X9, X18, X19, X20, X21};
+  case RA_S0_S6:
+    return {X1, X8, X9, X18, X19, X20, X21, X22};
+  case RA_S0_S7:
+    return {X1, X8, X9, X18, X19, X20, X21, X22, X23};
+  case RA_S0_S8:
+    return {X1, X8, X9, X18, X19, X20, X21, X22, X23, X24};
+  case RA_S0_S9:
+    return {X1, X8, X9, X18, X19, X20, X21, X22, X23, X24, X25};
+  case RA_S0_S11:
+    return {X1, X8, X9, X18, X19, X20, X21, X22, X23, X24, X25, X26, X27};
+  default:
+    llvm_unreachable("Unknown RList value");
+  }
+  return {};
 }
 
 } // namespace snippy
