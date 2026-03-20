@@ -1,0 +1,19 @@
+# RUN: not llvm-snippy %s -model-plugin None |& FileCheck %s
+
+options:
+  march: riscv64
+  num-instrs: 1000
+  honor-target-abi: on
+  mattr: +zcmp
+  redefine-sp: reg::X3
+
+include:
+  - ../Inputs/sections-with-stack.yaml
+
+histogram:
+  - [CM_POPRET, 1.0]
+  - [ADD, 1.0]
+  - [JAL, 1.0]
+
+# CHECK: error: With CM_POPRET and CM_POPRETZ instructions please set stack pointer to SP.
+

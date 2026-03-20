@@ -286,14 +286,13 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         PM.add(createFillExternalFunctionsStubsPass({}));
         PM.add(createTrackLivenessPass());
         PM.add(createPreserveRegsInsertionPass());
+        SnippyTgt.addTargetLegalizationPasses(PM);
 
         if (DebugCfg.DumpMF.value())
           PM.add(createMachineFunctionPrinterPass(outs()));
 
         if (DebugCfg.DumpMI.value())
           PM.add(createPrintMachineInstrsPass(outs()));
-
-        SnippyTgt.addTargetLegalizationPasses(PM);
         PM.add(createBranchRelaxatorPass());
         if (VerifyConsecutiveLoops)
           PM.add(createConsecutiveLoopsVerifierPass());

@@ -42,8 +42,9 @@ void SnippyTarget::generateSpillToAddr(InstructionGenerationContext &IGC,
                  /* store the whole register */ 0);
 }
 void SnippyTarget::generateReloadFromAddr(InstructionGenerationContext &IGC,
-                                          MCRegister Reg, MemAddr Addr) const {
-  loadRegFromAddr(IGC, Addr, Reg);
+                                          MCRegister Reg, MemAddr Addr,
+                                          SnippyMetadata MetadataMark) const {
+  loadRegFromAddr(IGC, Addr, Reg, MetadataMark);
 }
 } // namespace snippy
 } // namespace llvm

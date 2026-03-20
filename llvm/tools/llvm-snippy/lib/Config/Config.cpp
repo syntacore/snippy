@@ -1549,7 +1549,7 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
   if (BurstConfig)
     checkBurstGram(Ctx, Histogram, OpCC, BurstConfig->Burst);
   checkMemoryRegions(Tgt, *this);
-  Tgt.checkInstrTargetDependency(Histogram, OpCC);
+  Tgt.checkInstrTargetDependency(Histogram, OpCC, ProgramCfg);
   if (hasTrackingMode())
     Tgt.checkTrackingRestrictions(Histogram);
   checkCompatibilityWithValuegramPolicy(*this, Ctx);
@@ -1682,8 +1682,10 @@ void Config::complete(LLVMState &State, const OpcodeCache &OpCC) {
                              DefFlowConfig.DataFlowHistogram.end()),
                [&](const auto &Hist) {
                  auto *Desc = OpCC.desc(Hist.first);
+                 const auto &Tgt = State.getSnippyTarget();
                  assert(Desc);
-                 return Desc->isBranch() == false && !UsedInBurst(Hist.first);
+                 return Desc->isBranch() == false && !UsedInBurst(Hist.first) &&
+                        Tgt.canBeGeneratedAsCommonInstr(*Desc);
                });
 
   // Control flow histogram:

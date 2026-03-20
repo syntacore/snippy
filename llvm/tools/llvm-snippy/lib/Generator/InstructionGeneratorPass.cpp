@@ -72,12 +72,13 @@ static size_t calcMainFuncInitialSpillSize(InstructionGenerationContext &IGC) {
   auto &ProgCtx = IGC.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
+  const auto &ST = IGC.getSubtargetImpl();
 
   auto StackPointer = ProgCtx.getStackPointer();
   size_t SpillSize = SnippyTgt.getSpillAlignmentInBytes(StackPointer, State);
   // We'll spill a register we use as a stack pointer.
   if (ProgCtx.shouldSpillStackPointer())
-    SpillSize += SnippyTgt.getSpillSizeInBytes(StackPointer, IGC);
+    SpillSize += SnippyTgt.getSpillSizeInBytes(StackPointer, ProgCtx, ST);
 
   const auto &Cfg = IGC.getCommonCfg();
   const auto &ProgCfg = Cfg.ProgramCfg;
@@ -85,9 +86,9 @@ static size_t calcMainFuncInitialSpillSize(InstructionGenerationContext &IGC) {
   std::vector SpilledRegs(SpilledRef.begin(), SpilledRef.end());
   llvm::copy(ProgCfg.getRegsSpilledToMem(), std::back_inserter(SpilledRegs));
   return std::accumulate(SpilledRegs.begin(), SpilledRegs.end(), SpillSize,
-                         [&IGC, &SnippyTgt](auto Init, auto Reg) {
-                           return Init +
-                                  SnippyTgt.getSpillSizeInBytes(Reg, IGC);
+                         [&ProgCtx, &ST, &SnippyTgt](auto Init, auto Reg) {
+                           return Init + SnippyTgt.getSpillSizeInBytes(
+                                             Reg, ProgCtx, ST);
                          });
 }
 
