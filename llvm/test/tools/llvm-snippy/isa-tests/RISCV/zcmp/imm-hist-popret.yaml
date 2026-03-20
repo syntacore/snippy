@@ -1,0 +1,34 @@
+# RUN: llvm-snippy %s -model-plugin None |& FileCheck %s
+
+options:
+  march: riscv64
+  num-instrs: 1000
+  mattr: +zcmp
+  honor-target-abi: on
+  function-number: 20
+  function-layers: 5
+  redefine-sp: SP
+  dump-mf: on
+
+include:
+  - ../Inputs/sections-with-stack.yaml
+
+histogram:
+  - [CM_POPRET, 1.0]
+  - [JAL, 1.0]
+  - [ADD, 1.0]
+
+imm-hist:
+  opcodes:
+    - 'CM_POPRET':
+        operands:
+          - - [10, 1.0]
+          - - [3, 1.0]
+
+# COM: CM_POPRET second operand is a two-bit value 3, which is then multiplied
+#      by 16. LLVM dumps the already multiplied value 48 = 3 * 16
+# CHECK: CM_POPRET 10, 48
+
+# CHECK-NOT: CM_POPRET 10, {{0|16|32}}
+# CHECK-NOT: CM_POPRET {{[4-9]|[11-15]}},
+
