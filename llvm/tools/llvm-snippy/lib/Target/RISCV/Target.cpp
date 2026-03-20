@@ -16,6 +16,7 @@
 #include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/GeneratorUtils/RegisterPool.h"
 
+#include "snippy/Config/Config.h"
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/CreatePasses.h"
@@ -398,7 +399,7 @@ static bool isSupportedLoadStore(unsigned Opcode) {
          isRVVStridedSegLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode) ||
          isRVVWholeRegLoadStore(Opcode) ||
          isRVVUnitStrideMaskLoadStore(Opcode) || isZicbo(Opcode) ||
-         isZcmpPushPop(Opcode);
+         isZcmpSPRelative(Opcode);
 }
 
 static MCRegister regIndexToMCReg(unsigned RegIdx, RegStorageType Storage,
@@ -1048,9 +1049,10 @@ template <typename It> static void storeWordToMem(It MemIt, uint32_t Value) {
   std::copy(RegAsBytes.rbegin(), RegAsBytes.rend(), MemIt);
 }
 
-static void addGeneratedInstrsToBB(InstructionGenerationContext &IGC,
-                                   ArrayRef<MCInst> Insts,
-                                   const SnippyTarget &Tgt) {
+static void
+addGeneratedInstrsToBB(InstructionGenerationContext &IGC,
+                       ArrayRef<MCInst> Insts, const SnippyTarget &Tgt,
+                       SnippyMetadata MetadataMark = SnippyMetadata::Support) {
   auto &MBB = IGC.MBB;
   auto &Ins = IGC.Ins;
   auto &ProgCtx = IGC.ProgCtx;
@@ -1058,8 +1060,9 @@ static void addGeneratedInstrsToBB(InstructionGenerationContext &IGC,
   const auto &InstrInfo = State.getInstrInfo();
 
   for (const auto &Inst : Insts) {
-    auto MIB = getSupportInstBuilder(Tgt, MBB, Ins, State.getCtx(),
-                                     InstrInfo.get(Inst.getOpcode()));
+    auto MIB = getInstBuilder(
+        getMetadataMark(State.getCtx(), MetadataMark, SnippyMetadata::Support),
+        Tgt, MBB, Ins, State.getCtx(), InstrInfo.get(Inst.getOpcode()));
     assert(Inst.begin()->isReg() && "In write instructions, the first operand "
                                     "is always the destination register");
     MIB.addDef(Inst.begin()->getReg());
@@ -1372,18 +1375,28 @@ public:
     return Filter;
   }
 
-  void checkInstrTargetDependency(const OpcodeHistogram &H,
-                                  const OpcodeCache &OpCC) const override {
+  void
+  checkInstrTargetDependency(const OpcodeHistogram &H, const OpcodeCache &OpCC,
+                             const ProgramConfig &ProgramCfg) const override {
     if (!checkSupportedJumps(H))
       snippy::fatal("C_JR currently is not supported. Use PseudoC_JRB instead");
 
     auto HasCalls = H.hasCallInstrs(OpCC, *this);
     for (const auto &[Opcode, Weight] : H) {
-      if (HasCalls && (Opcode == RISCV::CM_POP || Opcode == RISCV::CM_POPRET ||
-                       Opcode == RISCV::CM_POPRETZ))
-        snippy::fatal(
-            "The generation of calls with instructions from the Zcmp extension "
-            "that overwrite the return address is not supported.");
+      if (HasCalls && Opcode == RISCV::CM_POP)
+        snippy::fatal("The generation of calls with CM_POP instruction from "
+                      "the Zcmp extension is not supported.");
+      if (isZcmpPopret(Opcode)) {
+        if (!HasCalls) {
+          snippy::fatal("The generation CM_POPRET and CM_POPRETZ instructions "
+                        "from the Zcmp extension "
+                        "without calls is not possible.");
+        }
+        if (ProgramCfg.StackPointer != RISCV::X2) {
+          snippy::fatal("With CM_POPRET and CM_POPRETZ instructions"
+                        " please set stack pointer to SP.");
+        }
+      }
       // NOTE: these checks are just a safety measure to control that we
       // process only supported instructions
       if (isLrInstr(Opcode) || isScInstr(Opcode) || isAtomicAMO(Opcode) ||
@@ -1687,6 +1700,12 @@ public:
 
   bool requiresCustomGeneration(const MCInstrDesc &InstrDesc) const override {
     return false;
+  }
+
+  bool
+  canBeGeneratedAsCommonInstr(const MCInstrDesc &InstrDesc) const override {
+    // Zcmp poprets generated separately in RISCVZcmpPopretCombine pass
+    return !isZcmpPopret(InstrDesc.getOpcode());
   }
 
   void getEncodedMCInstr(const MachineInstr *MI, const MCCodeEmitter &MCCE,
@@ -2469,13 +2488,17 @@ public:
     return 16u;
   }
 
-  unsigned getRegBitWidth(MCRegister Reg,
-                          InstructionGenerationContext &IGC) const override {
-    auto &ProgCtx = IGC.ProgCtx;
-    const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
+  unsigned getRegBitWidth(MCRegister Reg, SnippyProgramContext &ProgCtx,
+                          const TargetSubtargetInfo &SubTgt) const {
+    const auto &ST = static_cast<const RISCVSubtarget &>(SubTgt);
     auto VLEN =
         ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>().getVLEN();
     return snippy::getRegBitWidth(Reg, ST.getXLen(), VLEN);
+  }
+
+  unsigned getRegBitWidth(MCRegister Reg,
+                          InstructionGenerationContext &IGC) const override {
+    return getRegBitWidth(Reg, IGC.ProgCtx, IGC.getSubtarget<RISCVSubtarget>());
   }
 
   MCRegister regIndexToMCReg(InstructionGenerationContext &IGC, unsigned RegIdx,
@@ -2507,11 +2530,17 @@ public:
   }
 
   unsigned
-  getSpillSizeInBytes(MCRegister Reg,
-                      InstructionGenerationContext &IGC) const override {
-    unsigned RegSize = getRegBitWidth(Reg, IGC) / RISCV_CHAR_BIT;
-    auto &ProgCtx = IGC.ProgCtx;
-    auto Alignment = getSpillAlignmentInBytes(Reg, ProgCtx.getLLVMState());
+  getSpillSizeInBytes(MCRegister Reg, SnippyProgramContext &ProgCtx,
+                      const TargetSubtargetInfo &SubTgt) const override {
+    unsigned RegSize = getRegBitWidth(Reg, ProgCtx, SubTgt) / RISCV_CHAR_BIT;
+    auto &State = ProgCtx.getLLVMState();
+    const auto &ST = static_cast<const RISCVSubtarget &>(SubTgt);
+    // This is due to the fact that CM_POPRET reloads consecutive RegSize bytes
+    // from the stack into callee-saved registers, which means we must spill
+    // them in consecutive RegSize bytes.
+    if (ST.hasStdExtZcmp())
+      return RegSize;
+    auto Alignment = getSpillAlignmentInBytes(Reg, State);
     assert(Alignment && "Alignment size can't be zero");
     // Get the least number of alignment sizes that fully fits register.
     return Alignment * divideCeil(RegSize, Alignment);
@@ -2657,14 +2686,16 @@ public:
     StaticStackCtx.setRegWithSPAddrLocal(ScratchReg);
   }
 
-  void generateSpillToStack(InstructionGenerationContext &IGC, MCRegister Reg,
-                            MCRegister SP) const override {
+  void generateSpillToStack(
+      InstructionGenerationContext &IGC, MCRegister Reg, MCRegister SP,
+      SnippyMetadata MetadataMark = SnippyMetadata::Support) const override {
     auto &ProgCtx = IGC.ProgCtx;
     auto &State = ProgCtx.getLLVMState();
     auto &MBB = IGC.MBB;
     assert(ProgCtx.stackEnabled() &&
            "An attempt to generate spill but stack was not enabled.");
-    auto SpillSize = static_cast<int64_t>(getSpillSizeInBytes(Reg, IGC));
+    auto SpillSize = static_cast<int64_t>(
+        getSpillSizeInBytes(Reg, ProgCtx, IGC.getSubtargetImpl()));
 
     if (ProgCtx.getConfig().StaticStack) {
       // When we don't have a stack pointer, we spill registers in
@@ -2679,22 +2710,26 @@ public:
     auto &Ins = IGC.Ins;
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
-    getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
+    getInstBuilder(
+        getMetadataMark(State.getCtx(), MetadataMark, SnippyMetadata::Support),
+        *this, MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
         .addDef(SP)
         .addReg(SP)
         .addImm(-SpillSize);
 
-    storeRegToAddrInReg(IGC, SP, Reg);
+    storeRegToAddrInReg(IGC, SP, Reg, /*BytesToWrite */ 0, MetadataMark);
   }
 
-  void generateReloadFromStack(InstructionGenerationContext &IGC,
-                               MCRegister Reg, MCRegister SP) const override {
+  void generateReloadFromStack(
+      InstructionGenerationContext &IGC, MCRegister Reg, MCRegister SP,
+      SnippyMetadata MetadataMark = SnippyMetadata::Support) const override {
     auto &ProgCtx = IGC.ProgCtx;
     auto &State = ProgCtx.getLLVMState();
     auto &MBB = IGC.MBB;
     assert(ProgCtx.stackEnabled() &&
            "An attempt to generate reload but stack was not enabled.");
-    auto SpillSize = static_cast<int64_t>(getSpillSizeInBytes(Reg, IGC));
+    auto SpillSize = static_cast<int64_t>(
+        getSpillSizeInBytes(Reg, ProgCtx, IGC.getSubtargetImpl()));
 
     if (ProgCtx.getConfig().StaticStack) {
       // When we don't have a stack pointer, we spill registers in
@@ -2709,8 +2744,10 @@ public:
     auto &Ins = IGC.Ins;
     const auto &InstrInfo = State.getInstrInfo();
     auto &Ctx = State.getCtx();
-    loadRegFromAddrInReg(IGC, SP, Reg);
-    getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
+    loadRegFromAddrInReg(IGC, SP, Reg, MetadataMark);
+    getInstBuilder(
+        getMetadataMark(State.getCtx(), MetadataMark, SnippyMetadata::Support),
+        *this, MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
         .addDef(SP)
         .addReg(SP)
         .addImm(SpillSize);
@@ -2731,7 +2768,7 @@ public:
     getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::ADDI))
         .addDef(SP)
         .addReg(SP)
-        .addImm(getSpillSizeInBytes(Reg, IGC));
+        .addImm(getSpillSizeInBytes(Reg, ProgCtx, IGC.getSubtargetImpl()));
   }
 
   MachineInstr *generateCall(InstructionGenerationContext &IGC,
@@ -3228,6 +3265,7 @@ public:
     PM.add(createRISCVExpandSnippyPseudoPass());
     PM.add(createRISCVExpandPseudoPass());
     PM.add(createRISCVExpandAtomicPseudoPass());
+    PM.add(createRISCVZcmpPopretCombinePass());
   }
 
   void initializeTargetPasses() const override {
@@ -3368,10 +3406,11 @@ public:
         .addReg(RISCV::X0);
   }
 
-  void loadRegFromAddrInReg(InstructionGenerationContext &IGC,
-                            MCRegister AddrReg, MCRegister Reg) const override {
+  void loadRegFromAddrInReg(
+      InstructionGenerationContext &IGC, MCRegister AddrReg, MCRegister Reg,
+      SnippyMetadata MetadataMark = SnippyMetadata::Support) const override {
     const auto LoadInstr = generateLoadRegFromAddrInReg(IGC, AddrReg, Reg);
-    addGeneratedInstrsToBB(IGC, {LoadInstr}, *this);
+    addGeneratedInstrsToBB(IGC, {LoadInstr}, *this, MetadataMark);
   }
 
   MCInst generateLoadRegFromAddrInReg(InstructionGenerationContext &IGC,
@@ -3398,11 +3437,12 @@ public:
     return {};
   }
 
-  void loadRegFromAddr(InstructionGenerationContext &IGC, uint64_t Addr,
-                       MCRegister Reg) const override {
+  void loadRegFromAddr(
+      InstructionGenerationContext &IGC, uint64_t Addr, MCRegister Reg,
+      SnippyMetadata MetadataMark = SnippyMetadata::Support) const override {
     SmallVector<MCInst> InstrsForWrite;
     generateLoadRegFromAddr(IGC, Addr, Reg, InstrsForWrite);
-    addGeneratedInstrsToBB(IGC, InstrsForWrite, *this);
+    addGeneratedInstrsToBB(IGC, InstrsForWrite, *this, MetadataMark);
   }
 
   void generateLoadRegFromAddr(InstructionGenerationContext &IGC, uint64_t Addr,
@@ -3422,9 +3462,10 @@ public:
     Insts.push_back(generateLoadRegFromAddrInReg(IGC, XScratchReg, Reg));
   }
 
-  void storeRegToAddrInReg(InstructionGenerationContext &IGC,
-                           MCRegister AddrReg, MCRegister Reg,
-                           unsigned BytesToWrite = 0) const {
+  void storeRegToAddrInReg(
+      InstructionGenerationContext &IGC, MCRegister AddrReg, MCRegister Reg,
+      unsigned BytesToWrite = 0,
+      SnippyMetadata MetadataMark = SnippyMetadata::Support) const {
     assert(RISCV::GPRRegClass.contains(AddrReg) &&
            "Expected address register be GPR");
     auto &MBB = IGC.MBB;
@@ -3433,11 +3474,12 @@ public:
     auto &State = ProgCtx.getLLVMState();
     auto &Ctx = State.getCtx();
     const auto &InstrInfo = State.getInstrInfo();
-
+    auto MDNode =
+        getMetadataMark(State.getCtx(), MetadataMark, SnippyMetadata::Support);
     if (RISCV::GPRRegClass.contains(Reg)) {
       auto StoreOp = getStoreOpcode(BytesToWrite ? BytesToWrite * RISCV_CHAR_BIT
                                                  : getRegBitWidth(Reg, IGC));
-      getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(StoreOp))
+      getInstBuilder(MDNode, *this, MBB, Ins, Ctx, InstrInfo.get(StoreOp))
           .addReg(Reg)
           .addReg(AddrReg)
           .addImm(0);
@@ -3445,21 +3487,21 @@ public:
                RISCV::FPR16RegClass.contains(Reg)) {
       assert(BytesToWrite == 0 ||
              BytesToWrite * RISCV_CHAR_BIT == getRegBitWidth(Reg, IGC));
-      getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::FSW))
+      getInstBuilder(MDNode, *this, MBB, Ins, Ctx, InstrInfo.get(RISCV::FSW))
           .addReg(Reg)
           .addReg(AddrReg)
           .addImm(0);
     } else if (RISCV::FPR64RegClass.contains(Reg)) {
       assert(BytesToWrite == 0 ||
              BytesToWrite * RISCV_CHAR_BIT == getRegBitWidth(Reg, IGC));
-      getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::FSD))
+      getInstBuilder(MDNode, *this, MBB, Ins, Ctx, InstrInfo.get(RISCV::FSD))
           .addReg(Reg)
           .addReg(AddrReg)
           .addImm(0);
     } else if (RISCV::VRRegClass.contains(Reg)) {
       assert(BytesToWrite == 0 ||
              BytesToWrite * RISCV_CHAR_BIT == getRegBitWidth(Reg, IGC));
-      getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::VS1R_V))
+      getInstBuilder(MDNode, *this, MBB, Ins, Ctx, InstrInfo.get(RISCV::VS1R_V))
           .addReg(Reg)
           .addReg(AddrReg);
     } else {
@@ -3862,7 +3904,7 @@ public:
     auto Opcode = InstrDesc.getOpcode();
     return !isRVVModeSwitch(Opcode) && !isCall(Opcode) &&
            !InstrDesc.isBranch() && !InstrDesc.isReturn() &&
-           !isZcmpPushPop(Opcode);
+           !isZcmpSPRelative(Opcode);
   }
 
   bool shouldPreselectOperandInBurstMode(const MCInstrDesc &InstrDesc,
