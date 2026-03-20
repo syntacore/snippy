@@ -93,4 +93,6 @@ MachineFunctionPass *createConsecutiveLoopsVerifierPass();
 
 MachineFunctionPass *createRISCVExpandSnippyPseudoPass();
 
+MachineFunctionPass *createRISCVZcmpPopretCombinePass();
+
 } // namespace llvm

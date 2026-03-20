@@ -38,6 +38,7 @@ void initializeBlockGenPlanningPass(PassRegistry &);
 void initializeBlockGenPlanWrapperPass(PassRegistry &);
 void initializeMemoryAccessDumperPass(llvm::PassRegistry &);
 void initializeRISCVExpandSnippyPseudoPass(PassRegistry &);
+void initializeRISCVZcmpPopretCombinePass(PassRegistry &);
 void initializeConsecutiveLoopsVerifierPass(PassRegistry &);
 
 } // namespace llvm

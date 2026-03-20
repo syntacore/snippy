@@ -58,8 +58,9 @@ public:
     reportUnimplementedError();
   }
 
-  void checkInstrTargetDependency(const OpcodeHistogram &H,
-                                  const OpcodeCache &OpCC) const override {
+  void
+  checkInstrTargetDependency(const OpcodeHistogram &H, const OpcodeCache &OpCC,
+                             const ProgramConfig &ProgramCfg) const override {
     reportUnimplementedError();
   }
 
@@ -130,6 +131,11 @@ public:
     reportUnimplementedError();
   }
 
+  bool
+  canBeGeneratedAsCommonInstr(const MCInstrDesc &InstrDesc) const override {
+    reportUnimplementedError();
+  }
+
   void generateCustomInst(
       const MCInstrDesc &InstrDesc,
       planning::InstructionGenerationContext &InstrGenCtx) const override {
@@ -188,13 +194,15 @@ public:
     reportUnimplementedError();
   }
 
-  void generateSpillToStack(InstructionGenerationContext &IGC, MCRegister Reg,
-                            MCRegister SP) const override {
+  void generateSpillToStack(
+      InstructionGenerationContext &IGC, MCRegister Reg, MCRegister SP,
+      SnippyMetadata MetadataMark = SnippyMetadata::Support) const override {
     reportUnimplementedError();
   }
 
-  void generateReloadFromStack(InstructionGenerationContext &IGC,
-                               MCRegister Reg, MCRegister SP) const override {
+  void generateReloadFromStack(
+      InstructionGenerationContext &IGC, MCRegister Reg, MCRegister SP,
+      SnippyMetadata MetadataMark = SnippyMetadata::Support) const override {
     reportUnimplementedError();
   }
 
@@ -227,8 +235,8 @@ public:
   }
 
   unsigned
-  getSpillSizeInBytes(MCRegister Reg,
-                      InstructionGenerationContext &IGC) const override {
+  getSpillSizeInBytes(MCRegister Reg, SnippyProgramContext &ProgCtx,
+                      const TargetSubtargetInfo &SubTgt) const override {
     reportUnimplementedError();
   }
 
@@ -495,13 +503,15 @@ public:
     reportUnimplementedError();
   }
 
-  void loadRegFromAddr(InstructionGenerationContext &IGC, uint64_t Addr,
-                       MCRegister Reg) const override {
+  void loadRegFromAddr(
+      InstructionGenerationContext &IGC, uint64_t Addr, MCRegister Reg,
+      SnippyMetadata MetadataMark = SnippyMetadata::Support) const override {
     reportUnimplementedError();
   }
 
-  void loadRegFromAddrInReg(InstructionGenerationContext &IGC,
-                            MCRegister AddrReg, MCRegister Reg) const override {
+  void loadRegFromAddrInReg(
+      InstructionGenerationContext &IGC, MCRegister AddrReg, MCRegister Reg,
+      SnippyMetadata MetadataMark = SnippyMetadata::Support) const override {
     reportUnimplementedError();
   }
 

@@ -23,6 +23,5 @@ call-graph:
         - fun1
     - name: fun1
 
-# CHECK: error: The generation of calls with instructions from the Zcmp extension that overwrite the return address is not supported.
-
+# CHECK: error: The generation of calls with CM_POP instruction from the Zcmp extension is not supported.
 

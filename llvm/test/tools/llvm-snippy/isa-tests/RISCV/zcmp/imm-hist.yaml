@@ -25,8 +25,8 @@ imm-hist:
 # CHECK: CM_POP 10, 16
 # CHECK: CM_PUSH 6, 48
 
-# CHECK-NOT: CM_POP {{[4-9]|[10-15]}}, {{0|32|48}}
+# CHECK-NOT: CM_POP 10, {{0|32|48}}
 # CHECK-NOT: CM_POP {{[4-9]|[11-15]}},
 
-# CHECK-NOT: CM_PUSH {{[4-9]|[10-15]}}, {{0|16|32}}
+# CHECK-NOT: CM_PUSH 6, {{0|16|32}}
 # CHECK-NOT: CM_PUSH {{[4-5]|[7-9]|[10-15]}},

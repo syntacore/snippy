@@ -94,6 +94,16 @@ void setAsSupportInstr(MachineInstr &MI, LLVMContext &Ctx) {
                       SnippyMetadata::Support, SnippyMetadata::FormAddrForCall);
     return;
   }
+  if (checkMetadata(MI, SnippyMetadata::Epilogue)) {
+    addSnippyMetadata(MI, *MI.getParent()->getParent(), Ctx,
+                      SnippyMetadata::Support, SnippyMetadata::Epilogue);
+    return;
+  }
+  if (checkMetadata(MI, SnippyMetadata::Prologue)) {
+    addSnippyMetadata(MI, *MI.getParent()->getParent(), Ctx,
+                      SnippyMetadata::Support, SnippyMetadata::Prologue);
+    return;
+  }
   addSnippyMetadata(MI, *MI.getParent()->getParent(), Ctx,
                     SnippyMetadata::Support);
 }
