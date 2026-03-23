@@ -257,7 +257,8 @@ struct OpcodeValuegramSettings final
 };
 
 struct IOperandAPIntSampler {
-  virtual Expected<APInt> sampleByIdx(unsigned Idx, unsigned BitWidth) = 0;
+  virtual Expected<APIntWithSign> sampleByIdx(unsigned Idx,
+                                              unsigned BitWidth) = 0;
   virtual std::unique_ptr<IOperandAPIntSampler> copy() const = 0;
   virtual ~IOperandAPIntSampler() = default;
 };
@@ -287,7 +288,8 @@ public:
                std::back_inserter(Samplers));
   }
 
-  Expected<APInt> sampleByIdx(unsigned Idx, unsigned BitWidth) override {
+  Expected<APIntWithSign> sampleByIdx(unsigned Idx,
+                                      unsigned BitWidth) override {
     auto SamplerIdx = Dist(RandEngine::engine());
     assert(Samplers.size() > SamplerIdx);
     return Samplers[SamplerIdx]->sampleByIdx(Idx, BitWidth);
@@ -304,8 +306,8 @@ public:
 };
 
 struct OpcodeValuegramUniformSampler final : public IOperandAPIntSampler {
-  Expected<APInt> sampleByIdx(unsigned, unsigned BitWidth) override {
-    return UniformAPIntSamler::generate(BitWidth);
+  Expected<APIntWithSign> sampleByIdx(unsigned, unsigned BitWidth) override {
+    return UniformAPIntSampler::generate(BitWidth);
   }
   std::unique_ptr<IOperandAPIntSampler> copy() const override {
     return std::make_unique<OpcodeValuegramUniformSampler>();
@@ -313,8 +315,8 @@ struct OpcodeValuegramUniformSampler final : public IOperandAPIntSampler {
 };
 
 struct OpcodeValuegramBitpatternSampler final : public IOperandAPIntSampler {
-  Expected<APInt> sampleByIdx(unsigned, unsigned BitWidth) override {
-    return BitPatternAPIntSamler::generate(BitWidth);
+  Expected<APIntWithSign> sampleByIdx(unsigned, unsigned BitWidth) override {
+    return BitPatternAPIntSampler::generate(BitWidth);
   }
   std::unique_ptr<IOperandAPIntSampler> copy() const override {
     return std::make_unique<OpcodeValuegramBitpatternSampler>();
@@ -322,12 +324,14 @@ struct OpcodeValuegramBitpatternSampler final : public IOperandAPIntSampler {
 };
 
 class OpcodeValuegramConstantSampler final : public IOperandAPIntSampler {
-  APInt Val;
+  APIntWithSign Val;
 
 public:
-  OpcodeValuegramConstantSampler(APInt Val) : Val(Val) {}
+  OpcodeValuegramConstantSampler(APIntWithSign Val) : Val(Val) {}
 
-  Expected<APInt> sampleByIdx(unsigned, unsigned) override { return Val; }
+  Expected<APIntWithSign> sampleByIdx(unsigned, unsigned) override {
+    return Val;
+  }
 
   std::unique_ptr<IOperandAPIntSampler> copy() const override {
     return std::make_unique<OpcodeValuegramConstantSampler>(Val);
@@ -346,7 +350,7 @@ public:
           return *SamplerOrErr;
         }()) {}
 
-  Expected<APInt> sampleByIdx(unsigned, unsigned) override {
+  Expected<APIntWithSign> sampleByIdx(unsigned, unsigned) override {
     return OwnedSampler.sample();
   }
 
@@ -367,7 +371,8 @@ public:
                                   std::unique_ptr<IOperandAPIntSampler> Owned)
       : Cfg(Valuegram), OwnedSampler(std::move(Owned)) {}
   OpcodeValuegramValuegramSampler(const Valuegram &Valuegram);
-  Expected<APInt> sampleByIdx(unsigned Idx, unsigned BitWidth) override {
+  Expected<APIntWithSign> sampleByIdx(unsigned Idx,
+                                      unsigned BitWidth) override {
     assert(OwnedSampler);
     return OwnedSampler->sampleByIdx(Idx, BitWidth);
   }
@@ -388,7 +393,8 @@ public:
 
   OpcodeValuegramOperandsSampler(const OpcodeValuegramOperandsEntry &Entry);
 
-  Expected<APInt> sampleByIdx(unsigned OpIdx, unsigned BitWidth) override {
+  Expected<APIntWithSign> sampleByIdx(unsigned OpIdx,
+                                      unsigned BitWidth) override {
     auto ValSamplersSize = ValSamplers.size();
     if (OpIdx >= ValSamplersSize)
       return createStringError(
@@ -420,7 +426,8 @@ class OpcodeSettingsSampler final : public IOperandAPIntSampler {
 public:
   OpcodeSettingsSampler(const OpcodeValuegramSettings &Settings);
 
-  Expected<APInt> sampleByIdx(unsigned Idx, unsigned BitWidth) override {
+  Expected<APIntWithSign> sampleByIdx(unsigned Idx,
+                                      unsigned BitWidth) override {
     assert(ContainedSampler);
     return ContainedSampler->sampleByIdx(Idx, BitWidth);
   }
@@ -550,7 +557,7 @@ public:
     }
   }
 
-  Expected<std::optional<APInt>>
+  Expected<std::optional<APIntWithSign>>
   sampleForOpcode(unsigned Opcode, unsigned OpIdx, unsigned BitWidth) {
     assert(Map.count(Opcode));
     auto &Sampler = Map.at(Opcode);
@@ -577,7 +584,7 @@ public:
               [](const auto &Map) { return DataSourceSampler{Map}; });
   }
 
-  Expected<std::optional<APInt>>
+  Expected<std::optional<APIntWithSign>>
   sampleForOpcode(unsigned Opcode, unsigned OpIdx, unsigned BitWidth) {
     auto SamplerIdx = Dist(RandEngine::engine());
     assert(SamplerIdx < Samplers.size());
