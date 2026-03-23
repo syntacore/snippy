@@ -29,9 +29,9 @@ getValueFromHistogramPattern(ValuegramEntry::EntryKind Pattern,
                              unsigned NumBits) {
   switch (Pattern) {
   case ValuegramEntry::EntryKind::Uniform:
-    return UniformAPIntSamler::generate(NumBits);
+    return UniformAPIntSampler::generate(NumBits).Value;
   case ValuegramEntry::EntryKind::BitPattern:
-    return BitPatternAPIntSamler::generate(NumBits);
+    return BitPatternAPIntSampler::generate(NumBits).Value;
   default:
     return createStringError(std::make_error_code(std::errc::invalid_argument),
                              "Not a histogram pattern");
@@ -111,9 +111,11 @@ APInt sampleValuegramForOneReg(const Valuegram &Valuegram, StringRef Prefix,
                         .concat(Twine(NumBits)));
     }
 
-    if (!ValueWithSign.isSigned())
-      return Value.zextOrTrunc(NumBits);
-    return Value.sextOrTrunc(NumBits);
+    if (ValueWithSign.isSigned() &&
+        ValueWithSign.Format == InputFormat::Regular)
+      return Value.sextOrTrunc(NumBits);
+
+    return Value.zextOrTrunc(NumBits);
   }
   case EntryKind::BitPattern:
   case EntryKind::Uniform: {

@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/Support/Error.h"
 
@@ -18,23 +19,37 @@
 namespace llvm {
 namespace snippy {
 
+struct APIntWithSign {
+  APInt Value;
+  /// Whether the specified value is negative. Useful for callers that need to
+  /// decide when to zero or sign extend the value depending on the context.
+  bool IsSigned;
+  static Expected<APInt> parseAPInt(StringRef StrView, bool HasNegativeSign,
+                                    unsigned Radix, StringRef OriginalStr);
+  static Error reportError(Twine Msg);
+
+  static Expected<APFloat> parseFPFmtAPInt(StringRef &StrView,
+                                           bool HasNegativeSign,
+                                           StringRef OriginalStr);
+};
+
 // (NOTE): Ideally this would not depend on global context and
 // snippy::RandEngine, but alas, it's too deeply ingrained in the current code
 // and ripping it out would be a huge refactor. At some point we really do need
 // to create a separate random engine entity, which is not global.
 class IAPIntSampler {
 public:
-  virtual Expected<APInt> sample() = 0;
+  virtual Expected<APIntWithSign> sample() = 0;
   virtual ~IAPIntSampler() = default;
 };
 
 class ConstantAPIntSampler : public IAPIntSampler {
 public:
-  explicit ConstantAPIntSampler(llvm::APInt Val) : TheValue(std::move(Val)) {}
-  Expected<APInt> sample() override { return TheValue; }
+  explicit ConstantAPIntSampler(APIntWithSign Val) : TheValue(std::move(Val)) {}
+  Expected<APIntWithSign> sample() override { return TheValue; }
 
 private:
-  APInt TheValue;
+  APIntWithSign TheValue;
 };
 
 class APIntRangeSampler : public IAPIntSampler {
@@ -51,7 +66,7 @@ public:
   static Expected<APIntRangeSampler> create(APInt Min, APInt Max,
                                             bool IsSigned = false);
 
-  Expected<APInt> sample() override;
+  Expected<APIntWithSign> sample() override;
 
 private:
   APInt TheMin;
@@ -59,23 +74,23 @@ private:
   bool TheIsSigned;
 };
 
-class BitPatternAPIntSamler : public IAPIntSampler {
+class BitPatternAPIntSampler : public IAPIntSampler {
 public:
-  BitPatternAPIntSamler(uint32_t NumBits) : TheNumBits{NumBits} {}
+  BitPatternAPIntSampler(uint32_t NumBits) : TheNumBits{NumBits} {}
   auto getNumBits() const noexcept { return TheNumBits; }
-  Expected<APInt> sample() override { return generate(getNumBits()); }
-  static APInt generate(uint32_t NumBits);
+  Expected<APIntWithSign> sample() override { return generate(getNumBits()); }
+  static APIntWithSign generate(uint32_t NumBits);
 
 private:
   uint32_t TheNumBits;
 };
 
-class UniformAPIntSamler : public IAPIntSampler {
+class UniformAPIntSampler : public IAPIntSampler {
 public:
-  UniformAPIntSamler(uint32_t NumBits) : TheNumBits{NumBits} {}
+  UniformAPIntSampler(uint32_t NumBits) : TheNumBits{NumBits} {}
   auto getNumBits() const noexcept { return TheNumBits; }
-  Expected<APInt> sample() override { return generate(getNumBits()); }
-  static APInt generate(uint32_t NumBits);
+  Expected<APIntWithSign> sample() override { return generate(getNumBits()); }
+  static APIntWithSign generate(uint32_t NumBits);
 
 private:
   uint32_t TheNumBits;

@@ -103,7 +103,31 @@ Expected<std::optional<APInt>> OperandsReinitializationOpcodeValuegramSource::
   auto MCReg = Reg.asMCReg();
   auto BitWidth = Tgt.getRegBitWidth(MCReg, IGC);
 
-  return Sampler.sampleForOpcode(Opcode, OperandIndex, BitWidth);
+  auto Res = Sampler.sampleForOpcode(Opcode, OperandIndex, BitWidth);
+  if (!Res)
+    return Res.takeError();
+
+  if (!Res->has_value())
+    return Expected<std::optional<APInt>>(std::nullopt);
+
+  const auto &Val = Res->value();
+
+  if (!(Val.IsSigned ? Val.Value.isSignedIntN(BitWidth)
+                     : Val.Value.isIntN(BitWidth))) {
+    SmallString<16> Res;
+    Val.Value.toString(Res, /*Radix=*/16, /*Signed=*/Val.IsSigned,
+                       /*formatAsCLiteral=*/true, /*UpperCase=*/false);
+    return makeFailure(
+        Errc::InvalidConfiguration, "Valuegram error",
+        Twine("Sampled value from valuegram '")
+            .concat(Res)
+            .concat("' is too large to initialise an operand that is ")
+            .concat(Twine(BitWidth))
+            .concat(" bits wide"));
+  }
+
+  return std::optional<APInt>(Val.IsSigned ? Val.Value.sextOrTrunc(BitWidth)
+                                           : Val.Value.zextOrTrunc(BitWidth));
 }
 
 } // namespace planning

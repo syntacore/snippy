@@ -4336,7 +4336,9 @@ void SnippyRISCVTarget::generateWriteValueFP(
       getOpcodeForGPRToFPRInstr(DstReg, ST.getXLen(), NumBits, State.getCtx());
 
   Value = Value.zext(ST.getXLen());
-  Value.setBitsFrom(NumBits);
+  // Note that there's no need to manually NaN-box the argument. FMV
+  // instructions already do this for us. We could randomize them for a bit more
+  // coverage, but that would significantly blow up the code size.
 
   auto &RI = State.getRegInfo();
   auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
