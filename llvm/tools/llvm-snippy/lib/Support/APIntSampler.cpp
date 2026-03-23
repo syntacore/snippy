@@ -13,14 +13,17 @@
 
 namespace llvm::snippy {
 
-Expected<APInt> APIntRangeSampler::sample() {
+Expected<APIntWithSign> APIntRangeSampler::sample() {
   // (FIXME): Rip out global engine.
 
   if (!TheIsSigned) {
     auto Dist = UniformIntDistribution<LargestUnsignedNativeType>(
         TheMin.getZExtValue(), TheMax.getZExtValue());
     auto Val = Dist(RandEngine::engine());
-    return llvm::APInt{getBitWidth(), Val, /*isSigned=*/false};
+    return APIntWithSign{
+        llvm::APInt{getBitWidth(), Val, /*isSigned=*/false},
+        /*IsSigned=*/false,
+    };
   }
 
   auto Dist = UniformIntDistribution<LargestSignedNativeType>(
@@ -28,11 +31,13 @@ Expected<APInt> APIntRangeSampler::sample() {
   auto Val = Dist(RandEngine::engine());
   // (NOTE): APInt constructor accepts a uint64_t and reinterperts it as a
   // signed value.
-  return llvm::APInt{getBitWidth(), static_cast<LargestUnsignedNativeType>(Val),
-                     /*isSigned=*/true};
+  return APIntWithSign{llvm::APInt{getBitWidth(),
+                                   static_cast<LargestUnsignedNativeType>(Val),
+                                   /*isSigned=*/true},
+                       /*IsSigned=*/true};
 }
 
-APInt BitPatternAPIntSamler::generate(uint32_t NumBits) {
+APIntWithSign BitPatternAPIntSampler::generate(uint32_t NumBits) {
   auto Result = APInt::getZero(NumBits);
   auto Stride = RandEngine::genInRangeExclusive<unsigned>(1, NumBits);
   auto Idx = RandEngine::genInRangeInclusive<unsigned>(0, Stride);
@@ -40,13 +45,15 @@ APInt BitPatternAPIntSamler::generate(uint32_t NumBits) {
     Result.insertBits(1, Idx, 1);
     Idx += Stride;
   }
+  // Bitpattern should get treated as an unsigned value.
   if (RandEngine::genBool())
-    return ~Result;
-  return Result;
+    return {~Result, /*IsSigned=*/false};
+  return {Result, /*IsSigned=*/false};
 }
 
-APInt UniformAPIntSamler::generate(uint32_t NumBits) {
-  return RandEngine::genAPInt(NumBits);
+APIntWithSign UniformAPIntSampler::generate(uint32_t NumBits) {
+  // The result should get zero-extended.
+  return {RandEngine::genAPInt(NumBits), /*IsSigned=*/false};
 }
 
 namespace {
@@ -67,7 +74,7 @@ struct WeightedAPIntSamplerSet final : public IAPIntSampler {
          std::back_inserter(OwnedSamplers));
   }
 
-  Expected<APInt> sample() override {
+  Expected<APIntWithSign> sample() override {
     auto Idx = Dist(RandEngine::engine());
     auto &ChosenSampler = *OwnedSamplers[Idx];
     return ChosenSampler.sample();

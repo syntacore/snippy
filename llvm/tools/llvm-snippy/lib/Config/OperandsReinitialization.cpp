@@ -189,8 +189,7 @@ createSamplerForVal(const OperandsValuesEntry &Val) {
           },
           [](const FormattedAPIntWithSign &Val)
               -> std::unique_ptr<IOperandAPIntSampler> {
-            return std::make_unique<OpcodeValuegramConstantSampler>(
-                Val.getVal());
+            return std::make_unique<OpcodeValuegramConstantSampler>(Val.Number);
           },
           [](const Valuegram &Vgram) -> std::unique_ptr<IOperandAPIntSampler> {
             return std::make_unique<OpcodeValuegramValuegramSampler>(Vgram);
@@ -310,7 +309,10 @@ createSamplerForValuegramEntry(const ValuegramEntry &Entry) {
       .Case([&](const ValuegramBitValueEntry *BitValueEntry) {
         assert(BitValueEntry);
         const auto &Val = BitValueEntry->ValWithSign.getVal();
-        return std::make_unique<OpcodeValuegramConstantSampler>(Val);
+        return std::make_unique<OpcodeValuegramConstantSampler>(APIntWithSign{
+            Val,
+            /*IsSigned=*/BitValueEntry->isSigned(),
+        });
       })
       .Case([&](const ValuegramBitRangeEntry *BitRangeEntry) {
         assert(BitRangeEntry);

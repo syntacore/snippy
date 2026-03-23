@@ -262,6 +262,9 @@ FormattedAPIntWithSign::fromString(StringRef StrView) {
       return APIntWithSign::reportError(
           llvm::toString(ExpectedValue.takeError()));
     Value = ExpectedValue->bitcastToAPInt();
+    // Used to decide whether to sign-extend or not. Floats should be zero
+    // extended.
+    HasNegativeSign = false;
     ValueWithSign.Format = getFPFmtFromSemantics(*ExpectedValue);
     return ValueWithSign;
   }
