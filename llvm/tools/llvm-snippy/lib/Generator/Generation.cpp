@@ -404,17 +404,17 @@ overwriteFPRegValue(planning::InstructionGenerationContext &InstrGenCtx,
     snippy::fatal("Internal error",
                   Twine("Cannot overwriteFPRegValue: ")
                       .concat(toString(SelectedSemantics.takeError())));
-  Expected<APInt> ValueToWriteOrErr =
+  Expected<APIntWithSign> ValueToWriteOrErr =
       InstrGenCtx.getOrCreateFloatOverwriteValueSampler(*SelectedSemantics)
           .sample();
 
   if (!ValueToWriteOrErr)
     snippy::fatal(ProgCtx.getLLVMState().getCtx(), "Internal error",
                   ValueToWriteOrErr.takeError());
-  assert(ValueToWriteOrErr->getBitWidth() ==
+  assert(ValueToWriteOrErr->Value.getBitWidth() ==
          APFloat::semanticsSizeInBits(*SelectedSemantics));
 
-  auto ValueToWrite = *ValueToWriteOrErr;
+  auto ValueToWrite = ValueToWriteOrErr->Value;
   auto RP = InstrGenCtx.pushRegPool();
   Tgt.writeValueToReg(InstrGenCtx, ValueToWrite, Reg);
 

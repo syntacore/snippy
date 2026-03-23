@@ -1,0 +1,23 @@
+# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+include:
+  - ../../Inputs/sections.yaml
+
+options:
+    mtriple: riscv64-unknown-elf
+    mattr: +f,+c
+    dump-mf: on
+    num-instrs: 100
+
+histogram:
+    - [FADD_S, 1.0]
+
+operands-reinitialization:
+    - type: valuegram
+      weight: 1.0
+      opcodes:
+        - "FADD_S":
+            - type: operands
+              values: [inf, inf]
+
+# CHECK: value from valuegram '0x7ff0000000000000' is too large to initialise an operand that is 32 bits wide
