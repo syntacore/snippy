@@ -176,7 +176,7 @@ public:
     return IntRangeAsFloatSampler(Min, Max, Mode, Semantics);
   }
 
-  Expected<APInt> sample() override {
+  Expected<APIntWithSign> sample() override {
     auto FPValue = APFloat{TheSemantics};
     auto SampledIntValue = RandEngine::genInRangeInclusive(TheMin, TheMax);
     constexpr auto IsSigned = std::is_signed_v<T>;
@@ -189,9 +189,10 @@ public:
 
     if (auto Err = checkOverflowIntegralConversionError(SampledAPInt, Status,
                                                         IsSigned))
-      return Expected<APInt>(std::move(Err));
+      return Expected<APIntWithSign>(std::move(Err));
 
-    return FPValue.bitcastToAPInt();
+    // Floating-point values must be zero-extended.
+    return APIntWithSign{FPValue.bitcastToAPInt(), /*IsSigned=*/false};
   }
 
 private:
@@ -294,10 +295,10 @@ createSamplerForEntry(const ValuegramEntry &Entry, uint32_t BitWidth) {
   return TypeSwitch<const IValuegramEntry *,
                     Expected<std::unique_ptr<IAPIntSampler>>>(&Entry.get())
       .Case([&](const ValuegramBitpatternEntry *) {
-        return std::make_unique<BitPatternAPIntSamler>(BitWidth);
+        return std::make_unique<BitPatternAPIntSampler>(BitWidth);
       })
       .Case([&](const ValuegramUniformEntry *) {
-        return std::make_unique<UniformAPIntSamler>(BitWidth);
+        return std::make_unique<UniformAPIntSampler>(BitWidth);
       })
       .Case([&](const ValuegramBitValueEntry *BitValueEntry)
                 -> Expected<std::unique_ptr<IAPIntSampler>> {
@@ -308,8 +309,11 @@ createSamplerForEntry(const ValuegramEntry &Entry, uint32_t BitWidth) {
                        /*formatAsCLiteral=*/true, /*UpperCase=*/false);
           return createTooLargeForWidthError(BitWidth, ValStr);
         }
-        return std::make_unique<ConstantAPIntSampler>(
-            Val.zextOrTrunc(BitWidth));
+
+        return std::make_unique<ConstantAPIntSampler>(APIntWithSign{
+            Val.zextOrTrunc(BitWidth),
+            /*IsSigned=*/BitValueEntry->isSigned(),
+        });
       })
       .Case([&](const ValuegramBitRangeEntry *BitRangeEntry)
                 -> Expected<std::unique_ptr<IAPIntSampler>> {
@@ -478,7 +482,7 @@ createFloatOverwriteValueSampler(const FloatOverwriteSettings &Settings,
   // distribution is uniform.
   auto BuildWithFallback = [&]() {
     if (Builder.isEmpty())
-      Builder.addOwned(std::make_unique<UniformAPIntSamler>(BitWidth), 1.0);
+      Builder.addOwned(std::make_unique<UniformAPIntSampler>(BitWidth), 1.0);
     return Builder.build();
   };
 

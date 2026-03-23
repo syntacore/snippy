@@ -8,10 +8,10 @@
 
 #pragma once
 
+#include "snippy/Support/APIntSampler.h"
 #include "snippy/Support/YAMLUtils.h"
 
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/YAMLTraits.h"
 
 namespace llvm {
 namespace snippy {
@@ -33,18 +33,6 @@ struct ValuegramEntryScalarMapper final {};
 } // namespace detail
 
 enum class InputFormat { Regular, FPHalf, FPSingle, FPDouble, Unsupported };
-
-struct APIntWithSign {
-  APInt Value;
-  bool IsSigned;
-  static Expected<APInt> parseAPInt(StringRef StrView, bool HasNegativeSign,
-                                    unsigned Radix, StringRef OriginalStr);
-  static Error reportError(Twine Msg);
-
-  static Expected<APFloat> parseFPFmtAPInt(StringRef &StrView,
-                                           bool HasNegativeSign,
-                                           StringRef OriginalStr);
-};
 
 struct FormattedAPIntWithSign {
   APIntWithSign Number;
@@ -267,7 +255,7 @@ private:
 
   friend struct yaml::PolymorphicTraits<snippy::ValuegramEntry>;
   friend struct yaml::MappingTraits<snippy::RegisterClassHistogram>;
-  friend struct yaml::SequenceTraits<snippy::Valuegram>;
+  friend struct yaml::SequenceTraits<snippy::Valuegram, void>;
   friend struct yaml::MappingTraits<
       const snippy::detail::ValuegramEntryMapMapper>;
   std::unique_ptr<IValuegramEntry> &getOwned() { return UnderlyingEntry; }

@@ -1,0 +1,26 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+include:
+  - ../../Inputs/sections.yaml
+options:
+  mtriple: riscv32-unknown-elf
+  mattr: +m
+  dump-mf: on
+  num-instrs: 100
+histogram:
+  - [REM, 1.0]
+operands-reinitialization:
+  - type: valuegram
+    weight: 1.0
+    opcodes:
+      - "REM":
+          - type: operands
+            # This is the same value in 2's complement.
+            values: [0x80000000, -2147483648]
+
+#          An example of what we're matching:
+#               _
+#              |    $x9 = LUI 524288, pcsections <0x55fa487fa378>
+#      Reinit <     $x7 = LUI 524288, pcsections <0x55fa487fa378>
+#              |_   $x26 = REM $x9, $x7
+#
+# CHECK: [[XREG1:\$x[0-9]+]] = LUI 524288{{.*[[:space:]].*}}[[XREG2:\$x[0-9]+]] = LUI 524288{{.*[[:space:]].*}}[[XREG2:\$x[0-9]+]] = REM [[XREG1]], [[XREG2]]
