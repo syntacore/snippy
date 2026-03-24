@@ -1,0 +1,2 @@
+histogram-patterns:
+  - NegativeArg: "ADD ^ -1"

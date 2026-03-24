@@ -1,0 +1,83 @@
+# RUN: llvm-snippy %s -model-plugin=None \
+# RUN: -define-main-histogram=hist1 | FileCheck %s --check-prefix=HIST1
+
+# RUN: llvm-snippy %s -model-plugin=None \
+# RUN: -define-main-histogram=hist2 | FileCheck %s --check-prefix=HIST2
+
+# RUN: llvm-snippy %s -model-plugin=None \
+# RUN: -define-main-histogram=hist3 | FileCheck %s --check-prefix=HIST3
+
+options:
+  mtriple: riscv64-linux-gnu 
+  mattr: "+m"
+  num-instrs: 1000
+  dump-mf: on
+  verify-gen-histogram: on
+  histogram-must-succeed: on
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - hist1: "XOR ^ 5 | SUB ^ 7"
+  - hist2: "MUL | AND | OR * DIV"
+  - hist3: "AND ^ 3 | AUIPC"
+
+# HIST1: XOR
+# HIST1-NEXT: XOR
+# HIST1-NEXT: XOR
+# HIST1-NEXT: XOR
+# HIST1-NEXT: XOR
+# HIST1: SUB
+# HIST1-NEXT: SUB
+# HIST1-NEXT: SUB
+# HIST1-NEXT: SUB
+# HIST1-NEXT: SUB
+# HIST1-NEXT: SUB
+# HIST1-NEXT: SUB
+# HIST1: XOR
+# HIST1-NEXT: XOR
+# HIST1-NEXT: XOR
+# HIST1-NEXT: XOR
+# HIST1-NEXT: XOR
+# HIST1: SUB
+# HIST1-NEXT: SUB
+# HIST1-NEXT: SUB
+# HIST1-NEXT: SUB
+# HIST1-NEXT: SUB
+# HIST1-NEXT: SUB
+# HIST1-NEXT: SUB
+# HIST1: XOR
+# HIST1-NEXT: XOR
+# HIST1-NEXT: XOR
+# HIST1-NEXT: XOR
+# HIST1-NEXT: XOR
+# HIST1: SUB
+# HIST1-NEXT: SUB
+# HIST1-NEXT: SUB
+# HIST1-NEXT: SUB
+# HIST1-NEXT: SUB
+# HIST1-NEXT: SUB
+# HIST1-NEXT: SUB
+
+# HIST2: MUL
+# HIST2: AND
+# HIST2: OR
+# HIST2-NEXT: DIV
+# HIST2: MUL
+# HIST2: AND
+# HIST2: OR
+# HIST2-NEXT: DIV
+
+# HIST3: AND
+# HIST3-NEXT: AND
+# HIST3-NEXT: AND
+# HIST3: AUIPC
+# HIST3: AND
+# HIST3-NEXT: AND
+# HIST3-NEXT: AND
+# HIST3: AUIPC
+# HIST3: AND
+# HIST3-NEXT: AND
+# HIST3-NEXT: AND
+# HIST3: AUIPC

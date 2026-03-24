@@ -247,7 +247,7 @@ OpcodeToSettingsMap::OpcodeToSettingsMap(const OpcodesValuegram &OpcVal,
   SmallVector<StringRef> Matches;
   // To avoid false unused regex warning
   std::unordered_set<const OpcodeValuegramRegEx *> Matched;
-  for (auto Opc : make_first_range(OpcHist)) {
+  for (auto Opc : make_first_range(OpcHist.topOpcodes())) {
     for (auto &&Conf : OpcVal) {
       assert(NMatched <= OpcHist.size());
       if (NMatched == OpcHist.size()) {

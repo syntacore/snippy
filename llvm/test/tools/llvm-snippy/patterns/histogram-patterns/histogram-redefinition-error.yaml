@@ -1,0 +1,16 @@
+# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu 
+  num-instrs: 10
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - AddHist: "ADD ^ 5"
+  - SubHist: "SUB ^ 5"
+  - AddHist: "ADD | ADDI"
+
+# CHECK: error: redefinition of 'AddHist'
+# CHECK-NEXT: - AddHist: "ADD | ADDI"

@@ -1,0 +1,25 @@
+# RUN: not llvm-snippy %s -model-plugin=None --define-main-histogram=MissingColong \ 
+# RUN: %S/Inputs/invalid-repeat-range-missing-colon.yaml |& FileCheck %s --check-prefix=MISSING_COLON
+
+# RUN: not llvm-snippy %s -model-plugin=None --define-main-histogram=MissingColong \ 
+# RUN: %S/Inputs/invalid-repeat-range-missing-bracket.yaml |& FileCheck %s --check-prefix=MISSING_BRACKET
+
+# RUN: not llvm-snippy %s -model-plugin=None --define-main-histogram=MissingColong \ 
+# RUN: %S/Inputs/invalid-repeat-range-min-max-conflict.yaml |& FileCheck %s --check-prefix=MIN_MAX_CONFLICT
+
+include:
+  - Inputs/sections.yaml
+
+options:
+  mtriple: riscv64-linux-gnu 
+  num-instrs: 15
+
+# MISSING_COLON: error: expected ':' in 'MissingColon' initialization
+# MISSING_COLON-NEXT: - MissingColon: "ADD ^ [1 10]"
+
+# MISSING_BRACKET: error: expected ']' in 'MissingBracket' initialization
+# MISSING_BRACKET-NEXT: - MissingBracket: "ADD ^ [1 : 10"
+
+# MIN_MAX_CONFLICT: error: invalid range for '^' operation. Expected format:
+# MIN_MAX_CONFLICT-SAME: '[min : max]', where min <= max. Provided: '[10 : 5]'
+# MIN_MAX_CONFLICT-NEXT: - MinMaxConflict: "ADD ^ [10 : 5]"

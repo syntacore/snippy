@@ -69,7 +69,7 @@ OpcodeToImmHistSequenceMap::OpcodeToImmHistSequenceMap(
     const OpcodeCache &OpCC) {
   unsigned NMatched = 0;
   SmallVector<StringRef> Matches;
-  for (auto Opc : make_first_range(OpcHist)) {
+  for (auto Opc : make_first_range(OpcHist.opcodeProbabilities())) {
     for (auto &&Conf : ImmHist.Exprs) {
       if (NMatched == OpcHist.size()) {
         LLVMContext Ctx;

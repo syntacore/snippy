@@ -414,6 +414,10 @@ public:
                                    const MCRegisterInfo &RI) const = 0;
 
   virtual void
+  getSubregsInclusive(Register Reg, const MCRegisterInfo &RI,
+                      SmallVectorImpl<Register> &OutPhysRegs) const = 0;
+
+  virtual void
   getPhysRegsFromUnit(Register RegUnit, const MCRegisterInfo &RI,
                       SmallVectorImpl<Register> &OutPhysRegs) const = 0;
 
@@ -496,6 +500,8 @@ public:
                                   const MachineInstr &MI) const = 0;
 
   virtual bool isAtomicMemInstr(const MCInstrDesc &InstrDesc) const = 0;
+
+  virtual bool isVectorInstr(const MCInstrDesc &InstrDesc) const = 0;
 
   virtual unsigned countAddrsToGenerate(unsigned Opcode) const = 0;
 

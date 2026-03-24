@@ -8,13 +8,13 @@
 
 #pragma once
 
+#include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Support/DiagnosticInfo.h"
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <map>
-#include <random>
-#include <vector>
 
 namespace llvm {
 namespace snippy {
@@ -22,7 +22,7 @@ namespace snippy {
 struct OpcodeGeneratorInterface {
   virtual void print(llvm::raw_ostream &OS) const = 0;
   virtual void dump() const = 0;
-  virtual unsigned generate() = 0;
+  virtual void generate(SmallVectorImpl<unsigned> &Opcodes) = 0;
   virtual std::unique_ptr<OpcodeGeneratorInterface> copy() const = 0;
   virtual ~OpcodeGeneratorInterface() {}
 };
@@ -30,16 +30,15 @@ struct OpcodeGeneratorInterface {
 using OpcGenHolder = std::unique_ptr<OpcodeGeneratorInterface>;
 
 class DefaultOpcodeGenerator final : public OpcodeGeneratorInterface {
-  using OpcodeList = std::vector<unsigned>;
-  using Distribution = std::discrete_distribution<size_t>;
+  using OpcodeProbsType = OpcodeProbVisitor::OpcodeProbsType;
 
-  OpcodeList Opcodes;
-  Distribution OpcodeDist;
+  OpcodeHistogram OpcodeHist;
+  OpcodeProbsType OpcodeProbs;
 
 public:
-  template <typename Iter> DefaultOpcodeGenerator(Iter First, Iter Last) {
-    auto Count = std::distance(First, Last);
-    if (Count == 0)
+  DefaultOpcodeGenerator(const OpcodeHistogram &OpcHist)
+      : OpcodeHist(OpcHist), OpcodeProbs(OpcodeHist.opcodeProbabilities()) {
+    if (OpcodeHist.size() == 0)
       snippy::fatal(
           "OpcodeGenerator initialization failure: empty histogram specified.\n"
           "Usually this may happen when in some context snippy can not find "
@@ -47,33 +46,28 @@ public:
           "Try to increase instruction number by one or add more instructions "
           "to "
           "histogram.");
-    std::vector<double> OpcodeWeights(Count);
-    std::transform(First, Last, std::back_inserter(Opcodes),
-                   [](const auto &HEntry) { return HEntry.first; });
-    std::transform(First, Last, OpcodeWeights.begin(),
-                   [](const auto &HEntry) { return HEntry.second; });
-    if (std::all_of(OpcodeWeights.begin(), OpcodeWeights.end(),
-                    [](auto W) { return W == 0; }))
+    auto Probs = llvm::make_second_range(OpcodeProbs);
+    if (llvm::all_of(Probs, [](double W) { return W == 0.0; }))
       snippy::fatal("OpcodeGenerator initialization failure: all given to "
                     "histogram opcodes have zero weight");
-    OpcodeDist = std::discrete_distribution<size_t>(OpcodeWeights.begin(),
-                                                    OpcodeWeights.end());
   }
-
-  unsigned generate() override;
 
   std::unique_ptr<OpcodeGeneratorInterface> copy() const override {
     return std::make_unique<DefaultOpcodeGenerator>(*this);
   }
 
-  const Distribution &getDistribution() const { return OpcodeDist; }
+  void generate(SmallVectorImpl<unsigned> &Opcodes) override;
 
-  const OpcodeList &getOpcodesList() const { return Opcodes; }
+  auto getOpcodesList() const { return llvm::make_first_range(OpcodeProbs); }
 
   void print(llvm::raw_ostream &OS) const override;
 
   void dump() const override { print(dbgs()); }
 };
+
+// We call this function when we are absolutely sure that exactly one opcode
+// will always be generated
+unsigned generateSingleOpcode(OpcodeGeneratorInterface &OpcGen);
 
 } // namespace snippy
 } // namespace llvm

@@ -1,0 +1,19 @@
+# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+# RUN: not llvm-snippy %s -model-plugin=None -define-main-histogram=hist2 \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu 
+  num-instrs: 10
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - hist1: "ADDI | LUI"
+
+histogram:
+    - [pattern: hist2, 2.0]
+
+# CHECK: error: unknown pattern: 'hist2'

@@ -1,0 +1,49 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu 
+  mattr: "+m,+zihintntl"
+  num-instrs: 2500
+  dump-mf: on
+  verify-gen-histogram: on
+  histogram-must-succeed: on
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - LoadStoreWithHints: "(LB | SB | NTL_P1 * LB | NTL_ALL * SB) ^ [10 : 15]"
+  - SimpleOpcodes: "ADD ^ [5 : 5] | XOR ^ [6 : 7]"
+
+histogram:
+  - [pattern: LoadStoreWithHints , 3.0]
+  - [pattern: SimpleOpcodes, 2.0]
+  - [MUL, 1.0]
+  - [DIV, 1.0]
+  - [SLT, 1.0]
+
+# COM: check LoadStoreWithHints pattern
+# CHECK: LB
+# CHECK: SB
+# CHECK: NTL_P1
+# CHECK-NEXT: LB
+# CHECK: NTL_ALL
+# CHECK-NEXT: SB
+
+# COM: check SimpleOpcodes pattern
+# COM: ADD with $x to exclude match with ADDI
+# CHECK: ADD $x
+# CHECK-NEXT: ADD $x
+# CHECK-NEXT: ADD $x
+# CHECK-NEXT: ADD $x
+# CHECK-NEXT: ADD $x
+# CHECK: XOR
+# CHECK-NEXT: XOR
+# CHECK-NEXT: XOR
+# CHECK-NEXT: XOR
+# CHECK-NEXT: XOR
+# CHECK-NEXT: XOR
+
+# CHECK: MUL
+# CHECK: DIV
+# CHECK: SLT

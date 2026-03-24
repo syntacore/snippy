@@ -132,6 +132,12 @@ bitCast(const From &Src) noexcept {
   return Dst;
 }
 
+inline bool isAsciiAlpha(char Symb) {
+  return (Symb >= 'a' && Symb <= 'z') || (Symb >= 'A' && Symb <= 'Z');
+}
+
+inline bool isAsciiDigit(char Symb) { return Symb >= '0' && Symb <= '9'; }
+
 template <typename NumberT, typename It>
 NumberT convertBytesToNumber(It Beg, It End) {
   using InputNonConstT = typename std::remove_const<
