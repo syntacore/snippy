@@ -1,0 +1,67 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu 
+  num-instrs: 5000
+  dump-mf: on
+  verify-gen-histogram: on
+  histogram-must-succeed: on
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+    - ManyLoads: "LD ^ 50 * SW * XOR"
+    - ManyStores: "SD ^ 50 * SLT"
+    - LoadStoresRange: "(LB * SB ^ 3) ^ [15 : 20]"
+
+histogram:
+    - [pattern: ManyLoads, 1.0]
+    - [pattern: ManyStores, 1.0]
+    - [pattern: LoadStoresRange, 1.0]
+
+# COM: check ManyLoads pattern.
+# CHECK: LD
+# CHECK-NEXT: LD
+# CHECK-COUNT-47: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: SW
+# CHECK-NEXT: XOR
+
+# CHECK: LD
+# CHECK-NEXT: LD
+# CHECK-COUNT-47: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: SW
+# CHECK-NEXT: XOR
+
+# CHECK: LD
+# CHECK-NEXT: LD
+# CHECK-COUNT-47: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: SW
+# CHECK-NEXT: XOR
+
+# COM: check ManyStores pattern
+# CHECK: SD
+# CHECK-NEXT: SD
+# CHECK-COUNT-47: SD
+# CHECK-NEXT: SD
+# CHECK-NEXT: SLT
+
+# CHECK: SD
+# CHECK-NEXT: SD
+# CHECK-COUNT-47: SD
+# CHECK-NEXT: SD
+# CHECK-NEXT: SLT
+
+# CHECK: SD
+# CHECK-NEXT: SD
+# CHECK-COUNT-47: SD
+# CHECK-NEXT: SD
+# CHECK-NEXT: SLT
+
+# CHECK: LB
+# CHECK-NEXT: SB
+# CHECK-NEXT: SB
+# CHECK-NEXT: SB

@@ -14,6 +14,7 @@
 #include "snippy/Config/ConfigIOContext.h"
 #include "snippy/Config/FPUSettings.h"
 #include "snippy/Config/FunctionDescriptions.h"
+#include "snippy/Config/HistogramPatterns.h"
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
@@ -148,9 +149,12 @@ public:
       snippy::fatal(
           "OpcodeGenerator initialization failure: empty histogram specified.");
 
-    std::map<unsigned, double> DFHCopy;
-    llvm::copy_if(DataFlowHistogram, std::inserter(DFHCopy, DFHCopy.end()),
+    std::map<unsigned, double> DFHTopOpcodes;
+    llvm::copy_if(DataFlowHistogram.topOpcodes(),
+                  std::inserter(DFHTopOpcodes, DFHTopOpcodes.end()),
                   [&](auto &&Entry) { return OpcMask(Entry.first); });
+    OpcodeHistogram DFHCopy(DFHTopOpcodes);
+    DFHCopy.copyPatterns(DataFlowHistogram);
     if (DFHCopy.size() == 0)
       return makeFailure(
           Errc::InvalidConfiguration,
@@ -162,9 +166,8 @@ public:
 
     auto &PluginManager = *Common->ProgramCfg.PluginManagerImpl;
     if (PluginManager.pluginHasBeenLoaded())
-      return PluginManager.createPlugin(DFHCopy.begin(), DFHCopy.end());
-    return std::make_unique<DefaultOpcodeGenerator>(DFHCopy.begin(),
-                                                    DFHCopy.end());
+      return PluginManager.createPlugin(DFHCopy);
+    return std::make_unique<DefaultOpcodeGenerator>(DFHCopy);
   }
 
   bool isApplyValuegramEachInstr() const {
@@ -238,10 +241,8 @@ public:
   OpcGenHolder createCFOpcodeGenerator() const {
     auto &PluginManager = *ProgramCfg->PluginManagerImpl;
     if (PluginManager.pluginHasBeenLoaded())
-      return PluginManager.createPlugin(BranchOpcodes.begin(),
-                                        BranchOpcodes.end());
-    return std::make_unique<DefaultOpcodeGenerator>(BranchOpcodes.begin(),
-                                                    BranchOpcodes.end());
+      return PluginManager.createPlugin(BranchOpcodes);
+    return std::make_unique<DefaultOpcodeGenerator>(BranchOpcodes);
   }
 
   bool hasExternalCallees() const {
@@ -348,22 +349,17 @@ public:
 
   std::map<unsigned /* Opcode */, double /* probability */>
   getOpcodeProbabilities() const {
-    std::map<unsigned, double> OpcodeProb;
-    transform(Histogram, std::inserter(OpcodeProb, OpcodeProb.end()),
-              [TotalWeight = Histogram.getTotalWeight()](auto &Elem) {
-                return std::make_pair(Elem.first, Elem.second / TotalWeight);
-              });
-    return OpcodeProb;
+    return Histogram.opcodeProbabilities();
   }
 
   const OpcodeHistogram &getOpcodeHistogram() const { return Histogram; }
 
-  double getBurstOpcodesWeight() const {
+  double getBurstOpcodesProbability() const {
     if (!BurstConfig)
       return 0.0;
     auto &BCfg = *BurstConfig;
     auto BurstOpcodes = BCfg.Burst.getAllBurstOpcodes();
-    return Histogram.getOpcodesWeight([&BurstOpcodes](unsigned Opcode) {
+    return Histogram.getOpcodesProbability([&BurstOpcodes](unsigned Opcode) {
       return BurstOpcodes.count(Opcode);
     });
   }
@@ -391,7 +387,7 @@ public:
 
   auto getHistogramCFInstrsNum(const OpcodeCache &OpCC,
                                size_t TotalInstructions) const {
-    return Histogram.getHistogramCFInstrsNum(TotalInstructions, OpCC);
+    return Histogram.getCFInstrsNum(TotalInstructions, OpCC);
   }
 
   bool hasCallInstrs(const OpcodeCache &OpCC, const SnippyTarget &Tgt) const {

@@ -1,0 +1,39 @@
+# RUN: llvm-snippy %s -model-plugin=None | FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu 
+  mattr: "+m"
+  num-instrs: 1000
+  dump-mf: on
+  verify-gen-histogram: on
+  histogram-must-succeed: on
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - hist1: "XOR | SUB"
+  - hist2: "MUL"
+  - hist3: "hist1 * hist2"
+
+histogram:
+    - [pattern: hist3, 1.0]
+    - [AND, 1.0]
+
+# COM: verify that patterns and top opcode AND are generated
+# CHECK: XOR
+# CHECK-NEXT: MUL
+# CHECK: XOR
+# CHECK-NEXT: MUL
+# CHECK: XOR
+# CHECK-NEXT: MUL
+
+# CHECK-COUNT-3: AND
+
+# CHECK: SUB
+# CHECK-NEXT: MUL
+# CHECK: SUB
+# CHECK-NEXT: MUL
+# CHECK: SUB
+# CHECK-NEXT: MUL
+

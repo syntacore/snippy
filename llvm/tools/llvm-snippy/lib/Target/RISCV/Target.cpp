@@ -1033,7 +1033,7 @@ inline bool checkPairedLrScInstrs(const OpcodeHistogram &H) {
 }
 
 inline bool checkSupportedJumps(const OpcodeHistogram &H) {
-  return H.isWeightZero(RISCV::C_JR);
+  return H.isProbabilityZero(RISCV::C_JR);
 }
 
 static DisableMisalignedAccessMode getMisalignedAccessMode() {
@@ -1280,7 +1280,7 @@ public:
   std::string
   validateSelfcheckConfig(const SelfcheckConfig &SelfcheckCfg,
                           const OpcodeHistogram &Histogram) const override {
-    if (Histogram.count(RISCV::AUIPC))
+    if (Histogram.contains(RISCV::AUIPC))
       return std::string("AUIPC is not supported for selfcheck");
 
     const auto *RVSelfcheckTgtCfg =
@@ -1382,7 +1382,7 @@ public:
       snippy::fatal("C_JR currently is not supported. Use PseudoC_JRB instead");
 
     auto HasCalls = H.hasCallInstrs(OpCC, *this);
-    for (const auto &[Opcode, Weight] : H) {
+    for (auto &&Opcode : H.uniqueOpcodes()) {
       if (HasCalls && Opcode == RISCV::CM_POP)
         snippy::fatal("The generation of calls with CM_POP instruction from "
                       "the Zcmp extension is not supported.");
@@ -1607,6 +1607,15 @@ public:
   }
 
   void
+  getSubregsInclusive(Register Reg, const MCRegisterInfo &RI,
+                      SmallVectorImpl<Register> &OutPhysRegs) const override {
+    OutPhysRegs.clear();
+    if (Reg == RISCV::NoRegister)
+      return;
+    llvm::append_range(OutPhysRegs, RI.subregs_inclusive(Reg));
+  }
+
+  void
   getPhysRegsFromUnit(Register RegUnit, const MCRegisterInfo &RI,
                       SmallVectorImpl<Register> &OutPhysRegs) const override {
     OutPhysRegs.clear();
@@ -1692,6 +1701,12 @@ public:
   bool isAtomicMemInstr(const MCInstrDesc &InstrDesc) const override {
     return isAtomicAMO(InstrDesc.getOpcode()) ||
            isScInstr(InstrDesc.getOpcode()) || isLrInstr(InstrDesc.getOpcode());
+  }
+
+  // "Vector" here means multiple access instruction
+  bool isVectorInstr(const MCInstrDesc &InstrDesc) const override {
+    return isRVV(InstrDesc.getOpcode()) &&
+           !isRVVWholeRegLoadStore(InstrDesc.getOpcode());
   }
 
   bool isDivOpcode(unsigned Opcode) const override {
@@ -4882,9 +4897,9 @@ static void dumpRvvConfigurationInfo(StringRef FilePath,
 }
 
 static void checkThatRVVInitModeSupportsReinit(const OpcodeHistogram &Hist) {
-  auto IsRVVOpcode = [](const auto &Pair) -> bool { return isRVV(Pair.first); };
+  auto IsRVVOpcode = [](auto &&Opc) -> bool { return isRVV(Opc); };
 
-  if (none_of(Hist, IsRVVOpcode))
+  if (none_of(Hist.uniqueOpcodes(), IsRVVOpcode))
     return;
   // Register reinitialization uses generateWriteValueV function, which always
   // uses loads for writing to a register
@@ -4901,11 +4916,11 @@ matchRVVOpcodesWithDisallowedIntersectingAccesses(const OpcodeHistogram &OpHist,
 
   auto &OpcRegex = *RVVDisallowIntersectingMemAccesses.getValue().Regex;
   DenseSet<unsigned> MatchedOpcodes;
-  for (auto Opcode :
-       make_filter_range(make_first_range(OpHist), [](unsigned Opc) {
-         // TODO: Support indexed unoredred stores too.
-         return isRVVStridedStore(Opc) || isRVVStridedSegStore(Opc);
-       })) {
+  for (auto Opcode : make_filter_range(
+           make_first_range(OpHist.topOpcodes()), [](unsigned Opc) {
+             // TODO: Support indexed unordered stores too.
+             return isRVVStridedStore(Opc) || isRVVStridedSegStore(Opc);
+           })) {
     if (OpcRegex.match(MCII.getName(Opcode)))
       MatchedOpcodes.insert(Opcode);
   }
