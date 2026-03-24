@@ -1,0 +1,68 @@
+# RUN: llvm-snippy %s -model-plugin=None -define-main-histogram=FPULoadSeq \
+# RUN: |& FileCheck %s --check-prefixes=FPU_LOAD_SEQ
+
+# RUN: llvm-snippy %s -model-plugin=None -define-main-histogram=FPUStoreSeq \
+# RUN: |& FileCheck %s --check-prefixes=FPU_STORE_SEQ
+
+options:
+  mtriple: riscv64-linux-gnu 
+  mattr: "+f,+d,+zfh,+zfhmin,+m"
+  num-instrs: 2000
+  dump-mf: on
+  verify-gen-histogram: on
+  histogram-must-succeed: on
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  # COM: insert opcodes like FADD,FSUB,FDIV ... - to check that pattern generate
+  # separately from other instrs
+  - FPULoadSeq: "FADD_H | FLD * FLW * FLH | FDIV_S"
+  - FPUStoreSeq: "FSUB_S | FSD * FSW * FSH | FMUL_H"
+
+# COM: FPULoadSeq histogram  
+# FPU_LOAD_SEQ: FADD_H
+# COM: check pattern
+# FPU_LOAD_SEQ: FLD
+# FPU_LOAD_SEQ-NEXT: FLW
+# FPU_LOAD_SEQ-NEXT: FLH
+# COM: end pattern
+# FPU_LOAD_SEQ: FDIV_S
+# FPU_LOAD_SEQ: FADD_H
+# COM: check pattern
+# FPU_LOAD_SEQ: FLD
+# FPU_LOAD_SEQ-NEXT: FLW
+# FPU_LOAD_SEQ-NEXT: FLH
+# FPU_LOAD_SEQ: FDIV_S
+# COM: end pattern
+# FPU_LOAD_SEQ: FADD_H
+# COM: check pattern
+# FPU_LOAD_SEQ: FLD
+# FPU_LOAD_SEQ-NEXT: FLW
+# FPU_LOAD_SEQ-NEXT: FLH
+# COM: end pattern
+# FPU_LOAD_SEQ: FDIV_S
+
+# COM: FPUStoreSeq histogram  
+# FPU_STORE_SEQ: FSUB_S
+# COM: check pattern
+# FPU_STORE_SEQ: FSD
+# FPU_STORE_SEQ-NEXT: FSW
+# FPU_STORE_SEQ-NEXT: FSH
+# COM: end pattern
+# FPU_STORE_SEQ: FMUL_H
+# FPU_STORE_SEQ: FSUB_S
+# COM: check pattern
+# FPU_STORE_SEQ: FSD
+# FPU_STORE_SEQ-NEXT: FSW
+# FPU_STORE_SEQ-NEXT: FSH
+# COM: end pattern
+# FPU_STORE_SEQ: FMUL_H
+# FPU_STORE_SEQ: FSUB_S
+# COM: check pattern
+# FPU_STORE_SEQ: FSD
+# FPU_STORE_SEQ-NEXT: FSW
+# FPU_STORE_SEQ-NEXT: FSH
+# COM: end pattern
+# FPU_STORE_SEQ: FMUL_H

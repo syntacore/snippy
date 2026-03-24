@@ -86,8 +86,8 @@ bool CFGenerator::runOnMachineFunction(MachineFunction &MF) {
   auto CFOpcGen = PassCfg.createCFOpcodeGenerator();
   auto *CurrMBB = &MF.front();
   for (auto NInstr = 0u; NInstr < CFInstrsNum; ++NInstr) {
-    auto Opc = CFOpcGen->generate();
-    const auto &InstrDesc = InstrInfo.get(Opc);
+    auto CFOpc = generateSingleOpcode(*CFOpcGen);
+    const auto &InstrDesc = InstrInfo.get(CFOpc);
     // FIXME: one of current IGC's design flaw does not
     // allow to re-assign MBB.
     InstructionGenerationContext IGC{*CurrMBB, CurrMBB->getFirstTerminator(),

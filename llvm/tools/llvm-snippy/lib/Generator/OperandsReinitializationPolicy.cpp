@@ -73,10 +73,10 @@ selectInitializableOperandsRegisters(InstructionGenerationContext &InstrGenCtx,
     return !isDestinationRegister(OpIndex, InstrDesc.getNumDefs()) ||
            ValuegramOperandsRegsInitOutputs;
   };
+
   llvm::transform(
       llvm::enumerate(InstrDesc.operands()), std::back_inserter(Preselected),
-      [&, &Tgt = ProgCtx.getLLVMState().getSnippyTarget()](
-          const auto &&Args) -> planning::PreselectedOpInfo {
+      [&](const auto &&Args) -> planning::PreselectedOpInfo {
         const auto &[OpIndex, MCOpInfo] = Args;
         // If it is TIED_TO, this register is already
         // selected.
@@ -181,9 +181,11 @@ void ValuegramGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
         Twine("Failed to create OpcodeGenerator in ValuegramGenPolicy: ") +
         toString(std::move(Err)));
 
-  for (size_t I = 0; I < Limit.getLimit(); ++I)
-    llvm::append_range(Instructions, generateOneInstrWithInitRegs(
-                                         InstrGenCtx, OpcGen->generate()));
+  for (size_t I = 0; I < Limit.getLimit(); ++I) {
+    auto Opcode = generateSingleOpcode(*OpcGen);
+    llvm::append_range(Instructions,
+                       generateOneInstrWithInitRegs(InstrGenCtx, Opcode));
+  }
 }
 
 Expected<std::optional<APInt>> ValuegramGenPolicy::getValueFromValuegram(

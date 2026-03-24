@@ -637,6 +637,154 @@ The ``histogram`` key supports regex. For example:
      - ["(VSSE16_V)|(VSSE32_V)", 1.0]
      - ["VSSE.*", 2.0]
 
+.. _`_patterns`:
+
+Patterns
+~~~~~~~~
+In addition to just opcodes, you can specify patterns in the histogram. For example:
+
+.. code:: yaml
+
+   histogram:
+     - [pattern: PatternName1, 1.0]
+     - [pattern: PatternName2, 2.0]
+     # Other opcodes
+     - [ADDI, 1.0]
+     - [LUI, 1.0]
+
+A pattern is a sequence of machine instructions (such as *ADD, MUL, LD, SD*) that
+together perform a specific, complex action defined by the user. Patterns can be
+specified in the dedicated `Histogram patterns <#histogram-patterns>`__ field.
+
+.. _`_histogram-patterns`:
+
+Histogram patterns
+^^^^^^^^^^^^^^^^^^
+The ``histogram-patterns`` allows you to define histograms from opcodes and other
+histograms (defined within the same configuration) using various algebraic
+operations, such as:
+
+-   `|` - Probabilistic OR (selection from either the left or right expression).
+    Lets take two opcodes, DIV and MUL. The expression ``DIV | MUL`` then means
+    choosing either ``DIV`` or ``MUL`` (currently, all opcodes within the patterns have equal probability).
+
+-   `*` - Cartesian product.
+    For example, consider two opcode sequences: ``[ADD | SUB] * [LD | SD]``.
+    Their Cartesian product yields all possible two-instruction sequences
+    where an opcode from the first set is followed by an opcode from the second:
+    ``ADD + LD; ADD + SD; SUB + LD; SUB + SD``.
+
+-   `^` - Repetition of an opcode/pattern N times. You can specify either a possible range
+    in the format [min : max] or a specific number of repetitions for the pattern. E.g: 
+
+    -  For instance, ``ADD ^ 3`` would signify three consecutive ``ADD`` instructions.
+
+    -  For instance, ``ADD ^ [3 : 4]`` would signify either three or four consecutive ``ADD`` instructions.
+
+
+In the ``histogram-patterns``, you can define any number of patterns as a list, using
+previously created patterns to build new ones. A pattern is initialized using
+either a string or the algebraic operations described above.
+
+.. Important::
+
+   By default, the weight of all opcodes is set to one.
+
+Lets look at a simple example of defining histogram patterns:
+
+.. code:: yaml
+
+    histogram-patterns:
+      - AddMul: "ADD * MUL | ADD | MUL"
+      - LoadStore: "LD * SD | SD * LD"
+      - MultiHistogram: "AddMul ^ 2 | LoadStore * LUI"
+
+In the example above:
+
+-  The ``AddMul`` histogram can produce one of the following:
+  
+   - The sequence [ADD MUL]:
+
+      ::
+
+         ADD r1, r2, r3
+         MUL r4, r5, r6
+
+   - The single opcode ADD:
+
+      ::
+
+         ADD r1, r2, r3
+
+   - The single opcode MUL:
+
+      ::
+
+         MUL r1, r2, r3
+
+-  Similarly, the ``LoadStore`` histogram can produce one of two sequences:
+
+   - [LD SD]:
+
+      ::
+
+         LD r1, [r2]
+         SD r3, [r4]
+
+   - [SD LD]
+
+      ::
+
+         SD r1, [r2]
+         LD r3, [r4]
+
+-  The ``MultiHistogram`` is initialized using the two previous histograms and can
+   produce either:
+
+   - The ``AddMul`` histogram repeated twice
+   - The ``LoadStore`` histogram with an appended LUI instruction
+
+
+.. note::
+
+    If the size of the generated pattern exceeds the remaining number of
+    instructions, it will be generated only partially, until the instruction
+    limit is reached
+
+Now they can be used in the main histogram.
+
+.. code:: yaml
+  
+   histogram:
+     - [pattern: AddMul, 1.0]
+     - [pattern: LoadStore, 1.0]
+     - [pattern: MultiHistogram, 1.0]
+
+Also, using the ``--define-main-histogram=<Name>`` option, you can override the main
+`histogram` with a histogram from the `histogram-patterns`. If you do not specify it,
+snippy uses the default value (``histogram``).  
+
+For example, by providing ``--define-main-histogram=LoadStore``, only the following
+pairs will be generated:  
+
+::
+
+   LD r1, [r2]
+   SD r3, [r4]
+
+or
+
+::
+
+   SD r1, [r2]
+   LD r3, [r4]
+
+.. important::
+
+   -  Patterns are currently incompatible with ``--valuegram-operands-regs``
+      .
+   -  You cannot yet use vector or branch instructions in patterns.
+
 .. _`_immediate_histograms`:
 
 Immediate Histograms

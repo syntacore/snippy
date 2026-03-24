@@ -130,6 +130,15 @@ BurstGenPolicy::BurstGenPolicy(SnippyProgramContext &ProgCtx,
   Dist = std::discrete_distribution<size_t>(Weights.begin(), Weights.end());
 }
 
+std::optional<InstructionRequest> DefaultGenPolicy::next() {
+  if (Idx < Instructions.size())
+    return Instructions[Idx++];
+  SmallVector<unsigned> OpcSeq;
+  OpcGen->generate(OpcSeq);
+  assert(!OpcSeq.empty());
+  return InstructionRequest{OpcSeq.front(), {}};
+}
+
 void DefaultGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
                                   const RequestLimit &Limit) {
   InstrGenCtx.switchConfig(*Cfg);
@@ -137,7 +146,8 @@ void DefaultGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
   if (Limit.isEmpty())
     return;
 
-  const auto &Tgt = InstrGenCtx.ProgCtx.getLLVMState().getSnippyTarget();
+  auto &State = InstrGenCtx.ProgCtx.getLLVMState();
+  const auto &Tgt = State.getSnippyTarget();
   const auto &Filter = ModeChangingPolicy
                            ? ModeChangingPolicy->getOpcodeFilter()
                            : getDefaultFilter(Tgt);
@@ -146,6 +156,62 @@ void DefaultGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
     snippy::fatal(
         Twine("Failed to create OpcodeGenerator in DefaultGenPolicy: ") +
         toString(std::move(Err)));
+  assert(Cfg);
+  if (!Cfg->DataFlowHistogram.hasPatterns())
+    return;
+
+  SmallVector<std::vector<InstructionRequest>> RequestSeqs;
+  auto InstrLimit = Limit.getLimit();
+  Instructions.reserve(InstrLimit);
+  unsigned InstrNum = 0;
+  while (InstrNum < InstrLimit) {
+    SmallVector<unsigned> GenSeq;
+    OpcGen->generate(GenSeq);
+    InstrNum += GenSeq.size();
+    std::vector<InstructionRequest> RequestVector;
+    RequestVector.reserve(GenSeq.size());
+    llvm::transform(GenSeq, std::back_inserter(RequestVector),
+                    [](auto &&Opc) { return InstructionRequest{Opc, {}}; });
+    RequestSeqs.emplace_back(std::move(RequestVector));
+  }
+  if (InstrNum > InstrLimit) {
+    auto OverflowNum = InstrNum - InstrLimit;
+    auto &OverflowSeq = RequestSeqs.back();
+    // Get rid of extra instructions that don't fit in the requested limit
+    OverflowSeq.resize(OverflowSeq.size() - OverflowNum);
+    snippy::warn(
+        WarningName::HistPatternsIncomplete,
+        "Some patterns may be generated incomplete due to total "
+        "instruction limit",
+        llvm::formatv("Skipping {0} instructions in a pattern", OverflowNum));
+  }
+
+  for (auto &&OpcSeqReq : RequestSeqs) {
+    if (OpcSeqReq.size() == 1) {
+      Instructions.push_back(OpcSeqReq.front());
+      continue;
+    }
+    auto RP = InstrGenCtx.pushRegPool();
+    auto RegsToInit =
+        selectOperandsForConsecutiveInstrs(InstrGenCtx, Tgt, *RP, OpcSeqReq);
+    SmallVector<MCInst> InitInstrs;
+    for (auto &[BaseReg, NewValue] : RegsToInit) {
+      assert(RP->isReserved(BaseReg, AccessMaskBit::W));
+      Tgt.generateWriteValueSeq(InstrGenCtx, NewValue, BaseReg, InitInstrs);
+    }
+    // Add the initializing instructions for memory regs
+    llvm::transform(
+        InitInstrs, std::back_inserter(Instructions), [&](const auto &I) {
+          auto ExpPreselected = getPreselectedForInstr(I);
+          if (!ExpPreselected)
+            snippy::fatal(ExpPreselected.takeError());
+          return InstructionRequest{
+              I.getOpcode(), *ExpPreselected,
+              getMetadataMark(State.getCtx(), SnippyMetadata::Support)};
+        });
+    // Add the primary instructions
+    llvm::append_range(Instructions, std::move(OpcSeqReq));
+  }
 }
 
 void BurstGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
@@ -156,38 +222,11 @@ void BurstGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
   const auto &Tgt = State.getSnippyTarget();
   std::generate_n(std::back_inserter(Instructions), Limit.getLimit(),
                   [this] { return InstructionRequest{genOpc(), {}}; });
-  auto IsMemUser = [&Tgt](auto Opc) -> bool {
-    return Tgt.countAddrsToGenerate(Opc);
-  };
-  std::vector<unsigned> MemUsers;
-  MemUsers.reserve(Instructions.size());
-  copy_if(map_range(Instructions, [](auto &&IR) { return IR.Opcode; }),
-          std::back_inserter(MemUsers), IsMemUser);
+
   auto RP = InstrGenCtx.pushRegPool();
-  auto [MemUserIdxToPreselectedOps, RegsToInit] =
-      selectOperandsForMemoryInstructions(InstrGenCtx, MemUsers, *RP);
-  // Here we collected all registers that should be initialized (we don't
-  // initialize registers for non-memory instructions). Initialize them all in
-  // one go.
+  auto RegsToInit =
+      selectOperandsForConsecutiveInstrs(InstrGenCtx, Tgt, *RP, Instructions);
   initializeBaseRegs(InstrGenCtx, RegsToInit);
-  unsigned MemUsersIdx = 0;
-  for (auto &&Instr : Instructions) {
-    if (IsMemUser(Instr.Opcode)) {
-      Instr.Preselected = MemUserIdxToPreselectedOps[MemUsersIdx++];
-    } else {
-      // For instructions that do not use memory we can simply preselect their
-      // operands.
-      auto &II = State.getInstrInfo();
-      auto &InstrDesc = II.get(Instr.Opcode);
-      Instr.Preselected.resize(InstrDesc.getNumOperands());
-      // To avoid spoling registers used in memory instruction we use same
-      // register pool and mark all initialized registers as excluded
-      DenseSet<Register> Excluded;
-      Excluded.insert_range(make_first_range(RegsToInit));
-      selectNonMemoryOperands(InstrDesc, Instr.Preselected, InstrGenCtx, *RP,
-                              Excluded);
-    }
-  }
 }
 
 LLVMState &InstructionGenerationContext::getLLVMStateImpl() const {

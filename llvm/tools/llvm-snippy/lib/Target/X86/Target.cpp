@@ -327,6 +327,12 @@ public:
   }
 
   void
+  getSubregsInclusive(Register Reg, const MCRegisterInfo &RI,
+                      SmallVectorImpl<Register> &OutPhysRegs) const override {
+    reportUnimplementedError();
+  }
+
+  void
   getPhysRegsFromUnit(Register RegUnit, const MCRegisterInfo &RI,
                       SmallVectorImpl<Register> &OutPhysRegs) const override {
     reportUnimplementedError();
@@ -403,6 +409,10 @@ public:
   }
 
   bool isAtomicMemInstr(const MCInstrDesc &InstrDesc) const override {
+    reportUnimplementedError();
+  }
+
+  bool isVectorInstr(const MCInstrDesc &InstrDesc) const override {
     reportUnimplementedError();
   }
 
