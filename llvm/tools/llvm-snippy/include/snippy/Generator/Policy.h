@@ -348,11 +348,14 @@ class DefaultGenPolicy final : public detail::EmptyFinalizeMixin {
   OpcGenHolder OpcGen;
   const DefaultPolicyConfig *Cfg;
   const ModeChangingInstPolicy *ModeChangingPolicy;
+  std::vector<InstructionRequest> Instructions;
+  unsigned Idx = 0;
 
 public:
   DefaultGenPolicy(const DefaultGenPolicy &Other)
       : OpcGen(Other.OpcGen ? Other.OpcGen->copy() : nullptr), Cfg(Other.Cfg),
-        ModeChangingPolicy(Other.ModeChangingPolicy) {}
+        ModeChangingPolicy(Other.ModeChangingPolicy),
+        Instructions(Other.Instructions), Idx(Other.Idx) {}
 
   DefaultGenPolicy(DefaultGenPolicy &&) = default;
 
@@ -368,11 +371,7 @@ public:
 
   DefaultGenPolicy &operator=(DefaultGenPolicy &&) = default;
 
-  std::optional<InstructionRequest> next() const {
-    assert(OpcGen && "There is no opcode generator. Usually it is created "
-                     "during initialize().");
-    return InstructionRequest{OpcGen->generate(), {}};
-  }
+  std::optional<InstructionRequest> next();
 
   void initialize(InstructionGenerationContext &InstrGenCtx,
                   const RequestLimit &Limit);

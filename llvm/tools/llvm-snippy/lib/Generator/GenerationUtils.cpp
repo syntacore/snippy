@@ -138,6 +138,44 @@ selectAddressForSingleInstrFromBurstGroup(InstructionGenerationContext &IGC,
   return OrigAI;
 }
 
+std::map<unsigned, APInt> selectOperandsForConsecutiveInstrs(
+    InstructionGenerationContext &InstrGenCtx, const SnippyTarget &Tgt,
+    RegPoolWrapper &RP,
+    std::vector<planning::InstructionRequest> &BurstInstrs) {
+  auto &State = InstrGenCtx.ProgCtx.getLLVMState();
+  auto IsMemUser = [&Tgt](auto Opc) -> bool {
+    return Tgt.countAddrsToGenerate(Opc);
+  };
+  std::vector<unsigned> MemUsers;
+  MemUsers.reserve(BurstInstrs.size());
+  copy_if(map_range(BurstInstrs, [](auto &&IR) { return IR.Opcode; }),
+          std::back_inserter(MemUsers), IsMemUser);
+  auto [MemUserIdxToPreselectedOps, RegsToInit] =
+      selectOperandsForMemoryInstructions(InstrGenCtx, MemUsers, RP);
+  // Here we collected all registers that should be initialized (we don't
+  // initialize registers for non-memory instructions). Initialize them all in
+  // one go.
+  unsigned MemUsersIdx = 0;
+  for (auto &&Instr : BurstInstrs) {
+    if (IsMemUser(Instr.Opcode)) {
+      Instr.Preselected = MemUserIdxToPreselectedOps[MemUsersIdx++];
+    } else {
+      // For instructions that do not use memory we can simply preselect their
+      // operands.
+      auto &II = State.getInstrInfo();
+      auto &InstrDesc = II.get(Instr.Opcode);
+      Instr.Preselected.resize(InstrDesc.getNumOperands());
+      // To avoid spoling registers used in memory instruction we use same
+      // register pool and mark all initialized registers as excluded
+      DenseSet<Register> Excluded;
+      Excluded.insert_range(make_first_range(RegsToInit));
+      selectNonMemoryOperands(InstrDesc, Instr.Preselected, InstrGenCtx, RP,
+                              Excluded);
+    }
+  }
+  return RegsToInit;
+}
+
 // NumDefs + NumAddrs might be more than a number of available regs. This
 // normalizes the number of regs to reserve for addrs.
 unsigned normalizeNumRegs(unsigned NumDefs, unsigned NumAddrs,

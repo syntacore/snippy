@@ -1,0 +1,2 @@
+histogram-patterns:
+  - ZeroArg: "ADD ^ 0"

@@ -8,6 +8,7 @@ set(snippy_sources
   MemoryAccessRange.cpp
   FormattedAPIntWithSign.cpp
   Random.cpp
+  HistogramPatterns.cpp
   )
 
 set(snippy_link_libraries

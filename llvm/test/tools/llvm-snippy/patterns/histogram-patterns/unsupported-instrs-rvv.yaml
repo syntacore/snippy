@@ -1,0 +1,14 @@
+# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu 
+  mattr: "+v"
+  num-instrs: 10
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - Vector: "ADDI * VADD_VV"
+
+# CHECK: error: vector instructions are not supported

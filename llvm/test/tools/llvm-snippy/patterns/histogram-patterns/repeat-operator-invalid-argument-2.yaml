@@ -1,0 +1,24 @@
+# RUN: not llvm-snippy %s -model-plugin=None %S/Inputs/invalid-repeat-zero-argument.yaml \
+# RUN: |& FileCheck %s --check-prefix=ZERO_ARG
+
+# RUN: not llvm-snippy %s -model-plugin=None %S/Inputs/invalid-repeat-negative-argument.yaml \
+# RUN: |& FileCheck %s --check-prefix=NEGATIVE_ARG
+
+# RUN: not llvm-snippy %s -model-plugin=None %S/Inputs/invalid-repeat-float-argument.yaml \
+# RUN: |& FileCheck %s --check-prefix=FLOAT_ARG
+
+include:
+  - Inputs/sections.yaml
+
+options:
+  mtriple: riscv64-linux-gnu 
+  num-instrs: 15
+
+# ZERO_ARG: error: invalid argument for '^' operation. An integer greater than 0 is expected
+# ZERO_ARG-NEXT:  - ZeroArg: "ADD ^ 0"
+
+# NEGATIVE_ARG: error: invalid argument for '^' operation. An integer greater than 0 is expected
+# NEGATIVE_ARG-NEXT:  - NegativeArg: "ADD ^ -1"
+
+# FLOAT_ARG:  error: unexpected floating-point value encountered: '3.8' (floating-point not currently supported)
+# FLOAT_ARG: - FloatArg: "ADD ^ 3.8"

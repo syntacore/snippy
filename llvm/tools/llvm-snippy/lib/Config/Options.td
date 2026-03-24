@@ -32,6 +32,12 @@ let Group = ProgramOptionsCategory in {
                  "Seed for instruction generation. If the option is not used "
                  "or its value is not set, seed will be generated randomly.">;
 
+  def DefineMainHistogram : StringOption<"define-main-histogram">,
+                          Description<"Override the instruction histogram with "
+                          "the specified pattern, generating only pattern "
+                          "instructions.">,
+                          DefaultValue<"histogram">;
+
   def RedefineSP : StringOption<"redefine-sp">,
                    Description<"Specify the reg to use as a stack pointer">,
                    DefaultValue<"any">;

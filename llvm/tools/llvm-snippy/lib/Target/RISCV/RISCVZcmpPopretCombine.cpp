@@ -70,7 +70,7 @@ char RISCVZcmpPopretCombine::ID = 0;
 bool RISCVZcmpPopretCombine::runOnMachineFunction(MachineFunction &MF) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   const auto &Hist = SGCtx.getConfig().Histogram;
-  if (!Hist.count(RISCV::CM_POPRET) && !Hist.count(RISCV::CM_POPRETZ))
+  if (!Hist.contains(RISCV::CM_POPRET) && !Hist.contains(RISCV::CM_POPRETZ))
     return false;
 
   auto &FG = getAnalysis<FunctionGenerator>();
@@ -83,12 +83,12 @@ bool RISCVZcmpPopretCombine::runOnMachineFunction(MachineFunction &MF) {
     STI = &MF.getSubtarget<RISCVSubtarget>();
     // We add weight of the PreudoRET to indicate the case when we do
     // not replace the usual prologue and epilogue with any popret instruction.
-    std::map<unsigned, double> PopretHist = {
+    std::map<unsigned, double> PopretOpcWeight = {
         {RISCV::PseudoRET, 1.0},
         {RISCV::CM_POPRET, Hist.weight(RISCV::CM_POPRET)},
         {RISCV::CM_POPRETZ, Hist.weight(RISCV::CM_POPRETZ)}};
-    PopretGen = std::make_unique<DefaultOpcodeGenerator>(PopretHist.begin(),
-                                                         PopretHist.end());
+    OpcodeHistogram PopretHist(PopretOpcWeight);
+    PopretGen = std::make_unique<DefaultOpcodeGenerator>(PopretHist);
   }
 
   assert(!MF.empty());
@@ -97,7 +97,7 @@ bool RISCVZcmpPopretCombine::runOnMachineFunction(MachineFunction &MF) {
   // its argument RList. To cover all possible values of the instruction
   // arguments, we need to replace the prologue with a spill of exactly as many
   // registers as CM_POPRET/CM_POPRETZ will reload.
-  auto PopretOpcode = PopretGen->generate();
+  auto PopretOpcode = generateSingleOpcode(*PopretGen);
   if (PopretOpcode == RISCV::PseudoRET)
     return false;
   auto RList = replacePrologueWithRListSpill(PopretOpcode, MF.front());
