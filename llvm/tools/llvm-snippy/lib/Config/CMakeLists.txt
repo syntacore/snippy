@@ -1,5 +1,8 @@
 set(LLVMSnippyConfigSources
     Config.cpp
+    HistogramPatterns.cpp
+    OpcodeHistogramNode.cpp
+    OpcodeHistogramVisitor.cpp
     OpcodeHistogram.cpp
     Branchegram.cpp
     BurstGram.cpp

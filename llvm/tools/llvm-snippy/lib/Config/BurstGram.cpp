@@ -20,7 +20,8 @@ void BurstGramData::convertToCustomMode(const OpcodeHistogram &Histogram,
          "Groupings are specified but burst mode is not \"custom\"");
   Groupings = BurstGramData::GroupingsTy();
   auto CopyFirstIfSatisfies = [&Histogram](auto &Cont, auto &&Cond) {
-    copy_if(make_first_range(Histogram), std::inserter(Cont, Cont.end()), Cond);
+    copy_if(make_first_range(Histogram.topOpcodes()),
+            std::inserter(Cont, Cont.end()), Cond);
   };
   auto Group = BurstGramData::UniqueOpcodesTy{};
   switch (Mode) {

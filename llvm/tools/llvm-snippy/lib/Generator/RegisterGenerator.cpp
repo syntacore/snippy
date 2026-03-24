@@ -30,13 +30,13 @@ regUnitIsReserved(unsigned RegUnitIdx, const SnippyTarget &SnippyTgt,
                   AccessMaskBit Mask, const MCRegisterClass &RC,
                   ArrayRef<Register> Include) {
   auto RegUnit = getRegFromIdx(RC, Include, RegUnitIdx);
-  SmallVector<Register> RegsInUnit;
-  SnippyTgt.getPhysRegsFromUnit(RegUnit, RI, RegsInUnit);
-  if (any_of(RegsInUnit, [&RP, &MBB, Mask](unsigned Reg) {
+  SmallVector<Register> SubregsInc;
+  SnippyTgt.getSubregsInclusive(RegUnit, RI, SubregsInc);
+  if (any_of(SubregsInc, [&RP, &MBB, Mask](unsigned Reg) {
         return RP.isReserved(Reg, MBB, Mask);
       }))
     return true;
-  return any_of(RegsInUnit, [&Exclude](unsigned Reg) {
+  return any_of(SubregsInc, [&Exclude](unsigned Reg) {
     return is_contained(Exclude, Reg);
   });
 }

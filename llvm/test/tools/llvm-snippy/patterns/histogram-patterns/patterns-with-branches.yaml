@@ -1,0 +1,48 @@
+# RUN: llvm-snippy %s -model-plugin=None | FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu 
+  mattr: "+m"
+  num-instrs: 500
+  dump-mf: on
+  verify-gen-histogram: on
+  histogram-must-succeed: on
+
+include:
+  - Inputs/sections.yaml
+
+branches:
+  max-depth:
+    loop: 1
+  distance:
+    pc:
+      min: 120
+      max: 120
+histogram-patterns:
+  - Hist: "MUL * DIV | AND * XOR"
+
+histogram:
+    - [pattern: Hist, 2.0]
+    - [BLT, 1.0]
+    - [BNE, 1.0]
+    - [BGE, 1.0]
+
+# CHECK: MUL
+# CHECK-NEXT: DIV
+# CHECK: PseudoBR
+# CHECK: MUL
+# CHECK-NEXT: DIV
+# CHECK: PseudoBR
+# CHECK: MUL
+# CHECK-NEXT: DIV
+# CHECK: PseudoBR
+
+# CHECK: AND
+# CHECK-NEXT: XOR
+# CHECK: PseudoBR
+# CHECK: AND
+# CHECK-NEXT: XOR
+# CHECK: PseudoBR
+# CHECK: AND
+# CHECK-NEXT: XOR
+# CHECK: PseudoBR
