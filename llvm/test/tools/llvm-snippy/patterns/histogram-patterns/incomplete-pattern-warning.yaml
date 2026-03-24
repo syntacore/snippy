@@ -1,0 +1,24 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu 
+  mattr: "+m"
+  num-instrs: 15
+  dump-mf: on
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - hist1: "XOR ^ 4"
+
+histogram:
+    - [pattern: hist1, 1.0]
+
+# COM: Generate 15 XOR -> 3 groups of 4 and one incomplete of 3
+# CHECK: warning: (histogram-patterns-incomplete) Some patterns may be generated
+# CHECK-SAME: incomplete due to total instruction limit: Skipping 1 instructions
+# CHECK-SAME: in a pattern
+
+# CHECK-COUNT-15: XOR
+# CHECK-NOT: XOR

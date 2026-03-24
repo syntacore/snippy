@@ -1,0 +1,21 @@
+# RUN: not llvm-snippy %s -model-plugin=None \
+# RUN: --valuegram-operands-regs=%S/../../initialization/Inputs/initial_state_rv64g.yaml |& FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu 
+  mattr: "+f"
+  num-instrs: 10
+  dump-mf: on
+  verify-gen-histogram: on
+  histogram-must-succeed: on
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - hist: "XOR | SUB"
+
+histogram:
+    - [pattern: hist, 1.0]
+
+# CHECK: Usage of valuegram-operands-regs option with specified histogram-patterns is prohibited

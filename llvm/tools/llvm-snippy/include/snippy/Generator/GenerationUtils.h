@@ -17,6 +17,9 @@
 
 namespace llvm {
 namespace snippy {
+namespace planning {
+struct InstructionRequest;
+} // namespace planning
 // For the given InstrDesc fill the vector of selected operands to account them
 // in instruction generation procedure.
 planning::PreselectedOperands selectMemoryOperands(const MCInstrDesc &InstrDesc,
@@ -66,6 +69,13 @@ AddressInfo
 selectAddressForSingleInstrFromBurstGroup(InstructionGenerationContext &IGC,
                                           AddressInfo OrigAI,
                                           const AddressRestriction &OpcodeAR);
+
+// \brief Selects memory and non-memory operands for the consecutive instruction
+//  sequence.
+// \return a std::map mapping memory registers to their initial values.
+std::map<unsigned, APInt> selectOperandsForConsecutiveInstrs(
+    InstructionGenerationContext &InstrGenCtx, const SnippyTarget &Tgt,
+    RegPoolWrapper &RP, std::vector<planning::InstructionRequest> &BurstInstrs);
 
 enum class MemAccessKind { BURST, REGULAR };
 void markMemAccessAsUsed(InstructionGenerationContext &IGC,

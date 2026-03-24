@@ -1,0 +1,20 @@
+# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu 
+  mattr: "+m"
+  num-instrs: 15
+  dump-mf: on
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - hist1: "MUL ^ 3"
+  - hist2: "MUL ^ MUL"
+
+histogram:
+    - [pattern: hist1, 1.0]
+
+# CHECK: error: invalid argument for '^' operation
+# CHECK-NEXT: - hist2: "MUL ^ MUL"

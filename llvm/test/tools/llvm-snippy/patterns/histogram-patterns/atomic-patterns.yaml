@@ -1,0 +1,89 @@
+# RUN: llvm-snippy %s -model-plugin=None -verify-mi |& FileCheck %s \
+# RUN: --check-prefixes=ATOMIC_RELAXED,ATOMIC_REL,ATOMIC_AQ,CHECK
+
+options:
+  mtriple: riscv64-linux-gnu 
+  mattr: "+a"
+  dump-mf: on
+  num-instrs: 1500
+  verify-gen-histogram: on
+  histogram-must-succeed: on
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - atomicRelaxed: |
+        AMOADD_D * AMOAND_W * AMOMAXU_D |
+        AMOMAX_W * AMOMINU_D |
+        AMOMIN_W * AMOOR_D * AMOSWAP_D * AMOXOR_W
+  - atomicRel: |
+        AMOADD_D_RL * AMOAND_W_RL * AMOMAXU_W_RL * AMOMAX_D_RL |
+        AMOMINU_D_RL * AMOMIN_W_RL * AMOOR_D_RL * AMOSWAP_W_RL |
+        AMOXOR_D_RL ^ 3
+  - atomicAQ: |
+        AMOADD_D_AQ * AMOADD_W_AQ * AMOAND_D_AQ * AMOAND_W_AQ |
+        AMOSWAP_D_AQ * AMOSWAP_W_AQ * AMOXOR_D_AQ * AMOXOR_W_AQ
+
+histogram:
+    - [pattern: atomicAQ, 2.0]
+    - [pattern: atomicRel, 2.0]
+    - [pattern: atomicRelaxed, 2.0]
+    - [XOR, 1.0]
+    - [AND, 1.0]
+
+# COM: check such pattern: AMOADD_D * AMOAND_W * AMOMAXU_D
+# ATOMIC_RELAXED: AMOADD_D $x
+# ATOMIC_RELAXED-NEXT: AMOAND_W $x
+# ATOMIC_RELAXED-NEXT: AMOMAXU_D $x
+
+# COM: check top opcodes 
+# CHECK: XOR
+# CHECK: AND
+
+# COM: check such pattern: AMOMAX_W * AMOMINU_D
+# ATOMIC_RELAXED: AMOMAX_W
+# ATOMIC_RELAXED-NEXT: AMOMINU_D
+
+# COM: check such pattern: AMOMIN_W * AMOOR_D * AMOSWAP_D * AMOXOR_W
+# ATOMIC_RELAXED: AMOMIN_W $x
+# ATOMIC_RELAXED-NEXT: AMOOR_D $x
+# ATOMIC_RELAXED-NEXT: AMOSWAP_D $x
+# ATOMIC_RELAXED-NEXT: AMOXOR_W $x
+
+# COM: check such pattern: AMOADD_D_RL * AMOAND_W_RL * AMOMAXU_W_RL * AMOMAX_D_RL
+# ATOMIC_REL: AMOADD_D_RL
+# ATOMIC_REL-NEXT: AMOAND_W_RL
+# ATOMIC_REL-NEXT: AMOMAXU_W_RL
+# ATOMIC_REL-NEXT: AMOMAX_D_RL
+
+# COM: check top opcodes 
+# CHECK: XOR
+# CHECK: AND
+
+# COM: check such pattern: AMOMINU_D_RL * AMOMIN_W_RL * AMOOR_D_RL * AMOSWAP_W_RL
+# ATOMIC_REL: AMOMINU_D_RL
+# ATOMIC_REL-NEXT: AMOMIN_W_RL
+# ATOMIC_REL-NEXT: AMOOR_D_RL
+# ATOMIC_REL-NEXT: AMOSWAP_W_RL
+
+# COM: check such pattern: AMOXOR_D_RL ^ 3
+# ATOMIC_REL: AMOXOR_D_RL
+# ATOMIC_REL-NEXT: AMOXOR_D_RL
+# ATOMIC_REL-NEXT: AMOXOR_D_RL
+
+# COM: check such pattern: AMOADD_D_AQ * AMOADD_W_AQ * AMOAND_D_AQ * AMOAND_W_AQ
+# ATOMIC_AQ: AMOADD_D_AQ
+# ATOMIC_AQ-NEXT: AMOADD_W_AQ
+# ATOMIC_AQ-NEXT: AMOAND_D_AQ
+# ATOMIC_AQ-NEXT: AMOAND_W_AQ
+
+# COM: check such pattern: AMOSWAP_D_AQ * AMOSWAP_W_AQ * AMOXOR_D_AQ * AMOXOR_W_AQ
+# ATOMIC_AQ: AMOSWAP_D_AQ
+# ATOMIC_AQ-NEXT: AMOSWAP_W_AQ
+# ATOMIC_AQ-NEXT: AMOXOR_D_AQ
+# ATOMIC_AQ-NEXT: AMOXOR_W_AQ
+
+# COM: check top opcodes 
+# CHECK: XOR
+# CHECK: AND

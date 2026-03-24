@@ -1,0 +1,6 @@
+
+histogram-patterns:
+  - LoadSeq: "LD ^ 3 | LW ^ 3"
+  - StoreSeq: "SD ^ 3 | SW ^ 3"
+  - LoadStoreSeq: "LD * (SD ^ 2) * LW * LD | SW ^ 3"
+  - LoadStoreWithOthers: "LoadSeq | StoreSeq | AUIPC | OR | SLT"

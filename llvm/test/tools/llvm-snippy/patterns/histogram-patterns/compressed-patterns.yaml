@@ -1,0 +1,94 @@
+# RUN: llvm-snippy %s -model-plugin=None -verify-mi | FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu 
+  mattr: "+c,+d,+m,+zcb"
+  dump-mf: on
+  num-instrs: 2500
+  verify-gen-histogram: on
+  histogram-must-succeed: on
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - CompressedLoadStore: "C_LD * C_SD * C_LD * C_SD * C_FLD * C_FSD * C_LW * C_SW"
+  - CompressedBasicInstrs: "(C_ADDI ^ 2) * (C_SUB ^ 5) | (C_XOR ^ 3) * (C_ADDIW ^ 2)"
+  - CompressedMixed: "(AND ^ 15) * (C_LHU ^ 20) * (C_ADD ^ 15) * (C_LH ^ 20) * (C_SH ^ 15) * (ADDI ^ 10)"
+
+histogram:
+    - [pattern: CompressedLoadStore, 1.0]
+    - [pattern: CompressedBasicInstrs, 1.0]
+    - [pattern: CompressedMixed, 1.0]
+
+# COM: check CompressedLoadStore pattern
+# CHECK: C_LD
+# CHECK-NEXT: C_SD
+# CHECK-NEXT: C_LD
+# CHECK-NEXT: C_SD
+# CHECK-NEXT: C_FLD
+# CHECK-NEXT: C_FSD
+# CHECK-NEXT: C_LW
+# CHECK-NEXT: C_SW
+
+# COM: check CompressedLoadStore pattern
+# CHECK: C_LD
+# CHECK-NEXT: C_SD
+# CHECK-NEXT: C_LD
+# CHECK-NEXT: C_SD
+# CHECK-NEXT: C_FLD
+# CHECK-NEXT: C_FSD
+# CHECK-NEXT: C_LW
+# CHECK-NEXT: C_SW
+
+# COM: check CompressedLoadStore pattern
+# CHECK: C_LD
+# CHECK-NEXT: C_SD
+# CHECK-NEXT: C_LD
+# CHECK-NEXT: C_SD
+# CHECK-NEXT: C_FLD
+# CHECK-NEXT: C_FSD
+# CHECK-NEXT: C_LW
+# CHECK-NEXT: C_SW
+
+# COM: check CompressedBasicInstrs pattern
+# CHECK: C_ADDI $
+# CHECK-NEXT: C_ADDI $
+# CHECK-NEXT: C_SUB
+# CHECK-NEXT: C_SUB
+# CHECK-NEXT: C_SUB
+# CHECK-NEXT: C_SUB
+# CHECK-NEXT: C_SUB
+
+# COM: check CompressedBasicInstrs pattern
+# CHECK: C_XOR
+# CHECK-NEXT: C_XOR
+# CHECK-NEXT: C_XOR
+# CHECK-NEXT: C_ADDIW 
+# CHECK-NEXT: C_ADDIW 
+
+# COM: check CompressedMixed pattern
+# CHECK: AND
+# CHECK-NEXT: AND
+# CHECK-COUNT-12: AND
+# CHECK-NEXT: AND
+# CHECK: C_LHU
+# CHECK-NEXT: C_LHU
+# CHECK-COUNT-17: C_LHU
+# CHECK-NEXT: C_LHU
+# CHECK: C_ADD
+# CHECK-NEXT: C_ADD
+# CHECK-COUNT-12: C_ADD
+# CHECK-NEXT: C_ADD
+# CHECK: C_LH
+# CHECK-NEXT: C_LH
+# CHECK-COUNT-17: C_LH
+# CHECK-NEXT: C_LH
+# CHECK: C_SH
+# CHECK-NEXT: C_SH
+# CHECK-COUNT-12: C_SH
+# CHECK-NEXT: C_SH
+# CHECK: ADDI
+# CHECK-NEXT: ADDI
+# CHECK-COUNT-7: ADDI
+# CHECK-NEXT: ADDI

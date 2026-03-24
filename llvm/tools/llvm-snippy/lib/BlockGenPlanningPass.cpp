@@ -194,18 +194,32 @@ collectLatchBlocks(const GeneratorContext &GenCtx, const MachineLoopInfo &MLI,
   return LatchBlocks;
 }
 
-static double getBurstProb(const Config &Cfg, GeneratorContext &GenCtx) {
-  auto TotalWeight = Cfg.Histogram.getTotalWeight();
-  auto CFWeight =
-      Cfg.Histogram.getCFWeight(GenCtx.getProgramContext().getOpcodeCache());
-  auto BurstWeight = Cfg.getBurstOpcodesWeight();
-  assert(TotalWeight >= CFWeight);
-  assert(BurstWeight <= (TotalWeight - CFWeight));
-  double BurstProb = (std::abs(TotalWeight - CFWeight) <=
-                      std::numeric_limits<double>::epsilon())
-                         ? 0.0
-                         : BurstWeight / (TotalWeight - CFWeight);
+static double getBurstProbWithoutCF(const Config &Cfg,
+                                    GeneratorContext &GenCtx) {
+  static constexpr auto TotalProb = 1.0;
+
+  auto CFProb = Cfg.Histogram.getCFProbability(
+      GenCtx.getProgramContext().getOpcodeCache());
+  auto BurstProb = Cfg.getBurstOpcodesProbability();
+  BurstProb =
+      (std::abs(TotalProb - CFProb) <= std::numeric_limits<double>::epsilon())
+          ? 0.0
+          : BurstProb / (TotalProb - CFProb);
   return BurstProb;
+}
+
+static unsigned long long getBurstNumInstr(const Config &Cfg,
+                                           GeneratorContext &GenCtx,
+                                           unsigned NumInstrsLeft) {
+  static constexpr auto TotalProb = 1.0;
+
+  auto BurstProb = getBurstProbWithoutCF(Cfg, GenCtx);
+  auto IsFullBurstMode = Cfg.DefFlowConfig.DataFlowHistogram.empty() &&
+                         (std::abs(BurstProb - TotalProb) <=
+                          std::numeric_limits<double>::epsilon());
+  if (IsFullBurstMode)
+    return NumInstrsLeft;
+  return std::ceil(BurstProb * NumInstrsLeft);
 }
 
 // Returns number of instructions that each burst group must have in the
@@ -229,18 +243,17 @@ getBurstInstCounts(GeneratorContext &GenCtx, unsigned long long NumInstrBurst,
   NumInstrToGroupIdTy NumInstrToGroupId;
   auto InstrLeft = NumInstrBurst;
   for (const auto &[Idx, Group] : enumerate(drop_end(*BGram.Groupings))) {
-    auto Weight =
+    auto Probability =
         std::accumulate(Group.begin(), Group.end(), 0.0,
                         [&OpcodeToNumOfGroups, &Cfg](double Acc, auto Opcode) {
                           assert(OpcodeToNumOfGroups.count(Opcode));
                           // If an opcode is used more in one burst group, its
-                          // weight must be distributed among these groups.
-                          return Acc + Cfg.Histogram.weight(Opcode) /
+                          // probability must be distributed among these groups.
+                          return Acc + Cfg.Histogram.probability(Opcode) /
                                            OpcodeToNumOfGroups[Opcode];
                         });
 
-    unsigned long long GroupNumInstrTotal =
-        Weight / Cfg.Histogram.getTotalWeight() * NumInstrTotal;
+    unsigned long long GroupNumInstrTotal = Probability * NumInstrTotal;
     NumInstrToGroupId.emplace(GroupNumInstrTotal, Idx);
     assert(InstrLeft >= GroupNumInstrTotal);
     InstrLeft -= GroupNumInstrTotal;
@@ -653,7 +666,7 @@ BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
   // FIXME: NumInstrBurst should be somehow randomized. But we must be careful
   // as in some cases there are no instructions outside burst groups and then
   // the number must be exact.
-  unsigned long long NumInstrBurst = getBurstProb(Cfg, *GenCtx) * NumInstrsLeft;
+  auto NumInstrBurst = getBurstNumInstr(Cfg, *GenCtx, NumInstrsLeft);
   fillReqWithBurstGroups(FunReq, NumInstrBurst, NumInstrsLeft,
                          AverageBlockInstrs);
   NumInstrsLeft -= NumInstrBurst;
@@ -952,7 +965,7 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
   // FIXME: NumInstrBurst should be somehow randomized. But we must be careful
   // as in some cases there are no instructions outside burst groups and then
   // the number must be exact.
-  unsigned long long NumInstrBurst = getBurstProb(Cfg, *GenCtx) * NumInstrsLeft;
+  auto NumInstrBurst = getBurstNumInstr(Cfg, *GenCtx, NumInstrsLeft);
   fillReqWithBurstGroups(FunReq, NumInstrBurst, NumInstrsLeft,
                          AverageBlockInstrs);
   NumInstrsLeft -= NumInstrBurst;

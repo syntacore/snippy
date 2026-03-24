@@ -316,7 +316,7 @@ ModeChangeInfo deriveModeSwitchingProbability(const Config &Cfg,
   Result.ProbSetVill = Bias.SetVillP;
   Result.TotalHistWeight = TotalWeight;
 
-  bool RVVPresentInHistogram = Hist.getOpcodesWeight([](unsigned Opcode) {
+  bool RVVPresentInHistogram = Hist.getOpcodesProbability([](unsigned Opcode) {
     return isRVV(Opcode);
   }) > 0.0;
   Result.RVVPresentInHistogram = RVVPresentInHistogram;
@@ -329,7 +329,7 @@ ModeChangeInfo deriveModeSwitchingProbability(const Config &Cfg,
     return Result;
   }
 
-  bool VSETPresentInHistogram = Hist.getOpcodesWeight([](unsigned Opcode) {
+  bool VSETPresentInHistogram = Hist.getOpcodesProbability([](unsigned Opcode) {
     return isRVVModeSwitch(Opcode);
   }) > 0.0;
   Result.VSETPresentInHistogram = VSETPresentInHistogram;
@@ -1312,7 +1312,7 @@ static WeightedItems<RVVConfiguration> getConfigsCompatibleWithVLs(
 }
 
 static bool hasVXRMUsers(const OpcodeHistogram &Hist) {
-  return llvm::any_of(llvm::make_first_range(Hist),
+  return llvm::any_of(llvm::make_first_range(Hist.topOpcodes()),
                       [](auto Opcode) { return isRVVuseVXRM(Opcode); });
 }
 

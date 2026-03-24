@@ -1,0 +1,18 @@
+# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu 
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - hist1: "XOR | SUB"
+    hist2: "AND"
+    hist3: "AND"
+
+histogram:
+    - [pattern: hist1, 1.0]
+
+# CHECK: expected only one pattern definition
+# CHECK-NEXT: - hist1: "XOR | SUB"

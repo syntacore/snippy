@@ -1,0 +1,73 @@
+# RUN: llvm-snippy %s -model-plugin=None | FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu 
+  mattr: "+m"
+  num-instrs: 1000
+  dump-mf: on
+  histogram-must-succeed: on
+
+sections:
+    - no:        1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x1300000
+      SIZE:      0x1000
+      LMA:       0x1300000
+      ACCESS:    rw
+
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - fun1
+        - fun2
+    - name: fun1
+      callees:
+        - fun2
+    - name: fun2
+      callees:
+        - fun3
+    - name: fun3
+      external: true
+
+histogram-patterns:
+  - Pairs: "MUL * DIV | AND * XOR"
+  - LoadStore: "LD * LW * SD * SW"
+
+histogram:
+    - [pattern: Pairs, 2.0]
+    - [pattern: LoadStore, 2.0]
+    - [JAL, 1.0]
+    - [JALR, 1.0]
+    - [OR, 1.0]
+    - [SLT, 1.0]
+    - [LUI, 1.0]
+
+# CHECK: MUL
+# CHECK-NEXT: DIV
+# CHECK: MUL
+# CHECK-NEXT: DIV
+# CHECK: MUL
+# CHECK-NEXT: DIV
+
+# CHECK: AND
+# CHECK-NEXT: XOR
+# CHECK: AND
+# CHECK-NEXT: XOR
+# CHECK: AND
+# CHECK-NEXT: XOR
+
+# CHECK: LD
+# CHECK-NEXT: LW
+# CHECK-NEXT: SD
+# CHECK-NEXT: SW

@@ -11,6 +11,8 @@
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/OpcodeGenerator.h"
 
+#include "llvm/ADT/SmallVector.h"
+
 #include <algorithm>
 #include <memory>
 #include <unordered_set>
@@ -51,14 +53,14 @@ class PluginManager final {
     };
 
     GenCommunicator Communicator;
+    OpcodeHistogram OpcodeHist;
     std::unordered_set<unsigned> AvailableOpcodes;
     int GeneratorID = -1;
 
   public:
-    template <typename Iter>
-    Plugin(const PluginFunctionsTable *DLTable, Iter First, Iter Last)
-        : Communicator{DLTable} {
-      if (std::distance(First, Last) == 0)
+    Plugin(const PluginFunctionsTable *DLTable, const OpcodeHistogram &OpcHist)
+        : Communicator{DLTable}, OpcodeHist(OpcHist) {
+      if (OpcodeHist.empty())
         snippy::fatal(
             "Plugin initialization failure",
             "opcodes are not defined."
@@ -67,21 +69,22 @@ class PluginManager final {
             "Try to increase requested number of instructions or add more "
             "available instructions.");
       std::vector<unsigned> OpcodesToSend;
-      std::transform(First, Last, std::back_inserter(OpcodesToSend),
-                     [](auto It) { return It.first; });
+      llvm::transform(llvm::make_first_range(OpcHist.topOpcodes()),
+                      std::back_inserter(OpcodesToSend),
+                      [](auto &&Opc) { return Opc; });
       AvailableOpcodes.clear();
-      std::transform(First, Last,
-                     std::inserter(AvailableOpcodes, AvailableOpcodes.begin()),
-                     [](auto It) { return It.first; });
+      llvm::transform(llvm::make_first_range(OpcHist.topOpcodes()),
+                      std::inserter(AvailableOpcodes, AvailableOpcodes.begin()),
+                      [](auto &&Opc) { return Opc; });
       GeneratorID = Communicator.sendOpcodes(OpcodesToSend);
     }
 
-    unsigned generate() override {
-      auto NewOpc = Communicator.generate(GeneratorID);
-      if (AvailableOpcodes.count(NewOpc) == 0)
+    void generate(SmallVectorImpl<unsigned> &Opcodes) override {
+      auto Opcode = Communicator.generate(GeneratorID);
+      if (AvailableOpcodes.count(Opcode) == 0)
         snippy::fatal("Plugin opcode",
                       "generated opcode doesn't fit in the current policy");
-      return NewOpc;
+      Opcodes.push_back(Opcode);
     }
 
     std::unique_ptr<OpcodeGeneratorInterface> copy() const override {
@@ -112,14 +115,12 @@ public:
   void loadPluginDL(const std::string &PluginLibName);
   bool pluginHasBeenLoaded() const { return DLTable != nullptr; }
 
-  template <typename Iter>
-  std::unique_ptr<Plugin> createPlugin(Iter First, Iter Last) const {
-    return std::make_unique<Plugin>(DLTable, First, Last);
+  std::unique_ptr<Plugin> createPlugin(const OpcodeHistogram &OpcHist) const {
+    return std::make_unique<Plugin>(DLTable, OpcHist);
   }
 
-  template <typename InsertIt>
   void parseOpcodes(const OpcodeCache &OpcCache, std::string FileName,
-                    InsertIt HistogramIt) {
+                    OpcodeHistogram &OpcHist) {
     assert(pluginHasBeenLoaded());
     setParsingContext(OpcCache);
     constexpr double OpcDefaultWeight = 1;
@@ -131,8 +132,10 @@ public:
     if (PluginOpcodes.Num == 0 || !PluginOpcodes.Data)
       snippy::fatal("Invalid opcodes from plugin.");
 
+    SmallVector<std::pair<unsigned, double>> OpcWeightRange;
     for (unsigned i = 0; i < PluginOpcodes.Num; i++)
-      HistogramIt = std::pair{PluginOpcodes.Data[i], OpcDefaultWeight};
+      OpcWeightRange.emplace_back(PluginOpcodes.Data[i], OpcDefaultWeight);
+    OpcHist.insertTopOpcodes(std::move(OpcWeightRange));
   }
 
   void loadPluginLib(const std::string &PluginFile) {

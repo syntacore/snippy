@@ -142,7 +142,6 @@ template <> struct yaml::MappingTraits<BurstGramData> {
 } // namespace llvm
 
 namespace llvm {
-LLVM_SNIPPY_YAML_INSTANTIATE_HISTOGRAM_IO(snippy::OpcodeHistogramDecodedEntry);
 namespace snippy {
 
 extern cl::OptionCategory Options;
@@ -873,6 +872,9 @@ static void normalizeRegInitOptions(Config &Cfg, LLVMState &State,
     snippy::fatal("Incompatible options",
                   "-valuegram-operands-regs-init-outputs available only if "
                   "-valuegram-operands-regs specified");
+  if (Opts.ValueGramRegsDataFile.isSpecified() && Cfg.Histogram.hasPatterns())
+    snippy::fatal("Usage of valuegram-operands-regs option with specified "
+                  "histogram-patterns is prohibited");
 
   if (Opts.ValueGramRegsDataFile.isSpecified()) {
     Cfg.DefFlowConfig.Valuegram.emplace();
@@ -953,6 +955,21 @@ static void normalizeModelOptions(Config &Cfg, LLVMState &State,
           : std::nullopt;
 }
 
+static void mapOpcodeHistogram(yaml::IO &IO, Config &Info) {
+  // Check if Histogram was filled with plugin previously
+  if (!Info.Histogram.empty() && !IO.outputting())
+    return;
+
+  yaml::MappingNormalization<OpcodeHistogramNormalization, OpcodeHistogram>
+      HistNorm(IO, Info.Histogram);
+  // FIXME: Remove this copy of all the program options
+  auto ProgramOpts = copyOptionsToProgramOptions();
+  const auto &DefMainHist = ProgramOpts.DefineMainHistogram.value();
+  if (ProgramOpts.DefineMainHistogram.isSpecified() && !DefMainHist.empty())
+    HistNorm->DefineMainHist = DefMainHist;
+  IO.mapOptional("histogram", HistNorm->OpcHistSeq);
+}
+
 void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
   IO.mapOptional("sections", Info.ProgramCfg.Sections);
   // Here we call yamlize directly since memory scheme has no top-level key.
@@ -973,8 +990,7 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
       IO.mapRequired("burst", Info.BurstConfig->Burst);
   }
 
-  YAMLHistogramIO<OpcodeHistogramDecodedEntry> HistIO(Info.Histogram);
-  IO.mapOptional("histogram", HistIO);
+  mapOpcodeHistogram(IO, Info);
   IO.mapOptional("selfcheck", Info.CommonPolicyCfg->TrackCfg.Selfcheck);
 
   yaml::MappingNormalization<ImmediateHistogramNormalization,
@@ -1036,13 +1052,12 @@ static void diagnoseHistogram(LLVMContext &Ctx, const OpcodeCache &OpCC,
   auto InvalidOpcChecker = [OpCC](auto It) {
     return OpCC.desc(It.first) == nullptr;
   };
-  if (std::find_if(Histogram.begin(), Histogram.end(), InvalidOpcChecker) !=
-      Histogram.end())
+  const auto &TopOpcodes = Histogram.topOpcodes();
+  if (llvm::find_if(TopOpcodes, InvalidOpcChecker) != TopOpcodes.end())
     snippy::fatal("Plugin filled histogram with invalid opcodes");
 
   auto InvalidWeightsChecker = [](auto It) { return It.second < 0; };
-  if (std::find_if(Histogram.begin(), Histogram.end(), InvalidWeightsChecker) !=
-      Histogram.end())
+  if (llvm::find_if(TopOpcodes, InvalidWeightsChecker) != TopOpcodes.end())
     snippy::fatal("Plugin filled histogram with negative opcodes weights");
 }
 
@@ -1067,8 +1082,7 @@ Config::Config(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State,
   auto &Ctx = State.getCtx();
   if (ParseWithPlugin) {
     ProgramCfg.PluginManagerImpl->parseOpcodes(
-        OpCC, ProgramCfg.PluginInfoFilename,
-        std::inserter(Histogram, Histogram.begin()));
+        OpCC, ProgramCfg.PluginInfoFilename, Histogram);
     diagnoseHistogram(Ctx, OpCC, Histogram);
   }
 }
@@ -1180,7 +1194,7 @@ static void deleteCallsIfNeeded(
     const SnippyTarget &Tgt, OpcodeHistogram &Histogram,
     const std::variant<CallGraphLayout, FunctionDescs> &CGLayout) {
   auto IsCall = [&Tgt](unsigned Opcode) { return Tgt.isCall(Opcode); };
-  auto CallsWeight = Histogram.getOpcodesWeight(IsCall);
+  auto CallsWeight = Histogram.getTopOpcodesWeight(IsCall);
   if (CallsWeight < std::numeric_limits<decltype(CallsWeight)>::epsilon())
     return;
   if (std::abs(Histogram.getTotalWeight() - CallsWeight) <
@@ -1197,7 +1211,7 @@ static void deleteCallsIfNeeded(
                          "Provided call-graph doesn't allow generation of "
                          "calls as no callees were found",
                          "no calls will be generated");
-                     Histogram.erase_if(IsCall);
+                     Histogram.eraseTopOpcodes(IsCall);
                    }
                  },
                  [&Histogram, IsCall](const CallGraphLayout &CGLayout) -> void {
@@ -1206,7 +1220,7 @@ static void deleteCallsIfNeeded(
                                   "Not enough functions specified to generate "
                                   "calls (required at least 2)",
                                   "-function-number is " + Twine(NumFunc));
-                     Histogram.erase_if(IsCall);
+                     Histogram.eraseTopOpcodes(IsCall);
                    }
                  }),
              CGLayout);
@@ -1220,7 +1234,7 @@ static void checkBurstGram(LLVMContext &Ctx, const OpcodeHistogram &Histogram,
   assert(Burst.Groupings);
   for (auto &&Group : *Burst.Groupings) {
     for (auto Opc : Group) {
-      if (!Histogram.count(Opc))
+      if (!Histogram.contains(Opc))
         snippy::fatal(
             Ctx, "Bad burst config",
             "instruction \"" + OpCC.name(Opc) +
@@ -1248,7 +1262,7 @@ static void checkCompatibilityWithValuegramPolicy(const Config &Cfg,
 static void checkFPUSettings(Config &Cfg, LLVMContext &Ctx,
                              const SnippyTarget &Tgt, const MCInstrInfo &II) {
   const auto &Histogram = Cfg.Histogram;
-  if (llvm::none_of(llvm::make_first_range(Histogram), [&](auto Opcode) {
+  if (llvm::none_of(Histogram.uniqueOpcodes(), [&](auto Opcode) {
         auto &InstrDesc = II.get(Opcode);
         return Tgt.isFloatingPoint(InstrDesc);
       }))
@@ -1288,18 +1302,13 @@ static void checkGlobalRegsSpillSettings(const SnippyTarget &Tgt,
 
 static void checkFullSizeGenerationRequirements(const MCInstrInfo &II,
                                                 const SnippyTarget &Tgt,
+                                                const OpcodeCache &OpCC,
                                                 const Config &Cfg) {
   bool FillCodeSectionMode = !Cfg.PassCfg.InstrsGenerationConfig.NumInstrs;
-  if (FillCodeSectionMode &&
-      Cfg.Histogram.getOpcodesWeight([&II](unsigned Opcode) {
-        auto &Desc = II.get(Opcode);
-        return Desc.isBranch();
-      }) > 0.0)
+  if (FillCodeSectionMode && Cfg.Histogram.hasCFInstrs(OpCC))
     snippy::fatal(
         "when -num-instrs=all is specified, branches are not supported");
-  if (FillCodeSectionMode &&
-      Cfg.Histogram.getOpcodesWeight(
-          [&Tgt](unsigned Opcode) { return Tgt.isCall(Opcode); }) > 0.0)
+  if (FillCodeSectionMode && Cfg.Histogram.hasCallInstrs(OpCC, Tgt))
     snippy::fatal("when -num-instrs=all is specified, calls are not supported");
 
   if (FillCodeSectionMode && Cfg.CommonPolicyCfg->TrackCfg.Selfcheck)
@@ -1392,7 +1401,7 @@ static void checkOpcodeToSettingsMap(const WeightedOpcToSettingsMaps &Map,
                                      const OpcodeCache &OpCC,
                                      const LLVMState &State) {
   const auto &Tgt = State.getSnippyTarget();
-  for (auto Opc : make_first_range(Histogram)) {
+  for (auto Opc : Histogram.uniqueOpcodes()) {
     for (auto &&DataSourceMapAndWeight : Map) {
       auto &DataSourceMap = DataSourceMapAndWeight.first;
       assert(DataSourceMap.count(Opc));
@@ -1435,7 +1444,7 @@ static void validateImmHist(const OpcodeToImmHistSequenceMap &IHMap,
   const auto &Tgt = State.getSnippyTarget();
   const auto &InstrInfo = State.getInstrInfo();
 
-  for (auto Opc : make_first_range(H)) {
+  for (auto Opc : make_first_range(H.opcodeProbabilities())) {
     const auto &Settings = IHMap.getConfigForOpcode(Opc);
     if (!Settings.isPerOperand())
       continue;
@@ -1479,9 +1488,9 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
   // General-purpose RW sections are only required when the histogram contains
   // memory-access instructions. Register-only snippets can be generated with
   // RX sections only.
-  bool NeedsGeneralRWSection = Histogram.getOpcodesWeight([&](unsigned Opcode) {
-    return isLoadStoreInstr(Opcode, *II);
-  }) > 0.0;
+  bool NeedsGeneralRWSection =
+      Histogram.getOpcodesProbability(
+          [&](unsigned Opcode) { return isLoadStoreInstr(Opcode, *II); }) > 0.0;
 
   if (Sections.generalRWSections().empty() && NeedsGeneralRWSection)
     fatal(Ctx, "Incorrect list of sections",
@@ -1558,7 +1567,7 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
   checkGlobalRegsSpillSettings(State.getSnippyTarget(), State.getRegInfo(),
                                *this, Ctx);
   checkFullSizeGenerationRequirements(State.getInstrInfo(),
-                                      State.getSnippyTarget(), *this);
+                                      State.getSnippyTarget(), OpCC, *this);
 
   if (!PassCfg.ModelPluginConfig.runOnModel() &&
       !PassCfg.RegistersConfig.FinalStateOutputYaml.empty())
@@ -1665,8 +1674,6 @@ void Config::complete(LLVMState &State, const OpcodeCache &OpCC) {
   CommonPolicyCfg->setupImmHistMap(OpCC, Histogram);
   DefFlowConfig.setupOROpcodeMap(OpCC, Histogram);
 
-  // Data flow histogram.
-
   auto UsedInBurst = [&](auto Opc) -> bool {
     if (!BurstConfig.has_value())
       return false;
@@ -1674,40 +1681,43 @@ void Config::complete(LLVMState &State, const OpcodeCache &OpCC) {
     auto BurstOpcodes = BCfg.Burst.getAllBurstOpcodes();
     return BurstOpcodes.count(Opc);
   };
-  auto DFHistogram = Histogram;
+  // Data flow histogram.
+  auto &DFHistogram = DefFlowConfig.DataFlowHistogram;
+  DFHistogram = Histogram;
   deleteCallsIfNeeded(State.getSnippyTarget(), DFHistogram, PassCfg.CGLayout);
-  DefFlowConfig.DataFlowHistogram.clear();
-  std::copy_if(DFHistogram.begin(), DFHistogram.end(),
-               std::inserter(DefFlowConfig.DataFlowHistogram,
-                             DefFlowConfig.DataFlowHistogram.end()),
-               [&](const auto &Hist) {
-                 auto *Desc = OpCC.desc(Hist.first);
-                 const auto &Tgt = State.getSnippyTarget();
-                 assert(Desc);
-                 return Desc->isBranch() == false && !UsedInBurst(Hist.first) &&
-                        Tgt.canBeGeneratedAsCommonInstr(*Desc);
-               });
+  auto DFOpcodesToErase = [&](unsigned Opcode) {
+    auto *Desc = OpCC.desc(Opcode);
+    const auto &Tgt = State.getSnippyTarget();
+    assert(Desc);
+    return Desc->isBranch() || UsedInBurst(Opcode) ||
+           !Tgt.canBeGeneratedAsCommonInstr(*Desc);
+  };
+  DFHistogram.eraseTopOpcodes(std::move(DFOpcodesToErase));
 
   // Control flow histogram:
   auto &CFHistogram = PassCfg.BranchOpcodes;
-  std::copy_if(Histogram.begin(), Histogram.end(),
-               std::inserter(CFHistogram, CFHistogram.end()),
-               [&OpCC](const auto &Hist) {
-                 auto *Desc = OpCC.desc(Hist.first);
-                 assert(Desc);
-                 return Desc->isBranch();
-               });
+  // CF instructions can only present in the top level of the OpcodeHistogram
+  // tree
+  CFHistogram.insertTopOpcodes(Histogram.topOpcodes());
+  auto CFOpcodesToErase = [&OpCC](unsigned Opcode) {
+    auto *Desc = OpCC.desc(Opcode);
+    assert(Desc);
+    return !Desc->isBranch();
+  };
+  CFHistogram.eraseTopOpcodes(CFOpcodesToErase);
   if (BurstConfig) {
     auto &BurstWeights = BurstConfig->BurstOpcodeWeights;
     auto &&BurstOpcodes = BurstConfig->Burst.getAllBurstOpcodes();
-    auto AllPresentInHistogram = llvm::make_filter_range(
-        BurstOpcodes, [&](auto &&Opcode) { return Histogram.count(Opcode); });
+    auto AllPresentInHistogram =
+        llvm::make_filter_range(BurstOpcodes, [&](auto &&Opcode) {
+          return Histogram.contains(Opcode);
+        });
     llvm::transform(AllPresentInHistogram,
                     std::inserter(BurstWeights, BurstWeights.begin()),
                     [&](auto &&Opcode) {
-                      auto Found = Histogram.find(Opcode);
-                      assert(Found != Histogram.end());
-                      return *Found;
+                      auto FoundOpt = Histogram.find(Opcode);
+                      assert(FoundOpt.has_value());
+                      return FoundOpt.value();
                     });
   }
 }

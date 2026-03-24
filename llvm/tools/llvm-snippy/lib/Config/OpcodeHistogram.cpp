@@ -8,25 +8,17 @@
 
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/ConfigIOContext.h"
-#include "snippy/GeneratorUtils/LLVMState.h"
-#include "snippy/Support/Options.h"
-#include "snippy/Support/YAMLHistogram.h"
 
 // FIXME: remove this dependency (an interface should be introduced)
 #include "snippy/Config/PluginWrapper.h"
 
-#include "llvm/MC/MCInstrInfo.h"
-#include "llvm/Support/Errc.h"
 #include "llvm/Support/Error.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "snippy/Target/Target.h"
 
 #include <optional>
-#include <sstream>
 #include <type_traits>
 
 namespace llvm {
@@ -34,11 +26,136 @@ namespace llvm {
 // all mapping shall live in llvm, not in llvm::snippy
 using namespace snippy;
 
+size_t yaml::SequenceTraits<OpcodeHistogramSequence>::size(
+    IO &IO, OpcodeHistogramSequence &Seq) {
+  return Seq.Data.size();
+}
+
+SequenceType &yaml::SequenceTraits<OpcodeHistogramSequence>::element(
+    IO &IO, OpcodeHistogramSequence &Seq, size_t Index) {
+  if (Index >= Seq.Data.size())
+    Seq.Data.resize(Index + 1);
+  return Seq.Data[Index];
+}
+
+void OpcodeHistogramSequence::validate(yaml::IO &IO) const {
+  if (llvm::any_of(Data, [](auto &&StringSeq) { return StringSeq.size() < 2; }))
+    IO.setError("Incorrect histogram: Key and weight must be specified and "
+                "separated with a comma");
+}
+
+OpcodeHistogramNormalization::OpcodeHistogramNormalization(yaml::IO &IO) {
+  mapHistogramPatterns(IO);
+}
+
+OpcodeHistogramNormalization::OpcodeHistogramNormalization(
+    yaml::IO &IO, const OpcodeHistogram &HistData) {
+  mapHistogramPatterns(IO);
+  const auto &CfgIOContext =
+      static_cast<const ConfigIOContext *>(IO.getContext());
+  assert(CfgIOContext);
+  const auto &OpCC = CfgIOContext->OpCC;
+  auto InsertHistogramEntry = [&](const std::string &Name, double Weight,
+                                  yaml::NodeKind EntityKind) {
+    OpcodeHistogramSequence::SequenceType EntrySeq;
+    EntrySeq.emplace_back(Name, EntityKind);
+    EntrySeq.emplace_back(std::to_string(Weight), yaml::NodeKind::Scalar);
+    OpcHistSeq.Data.push_back(std::move(EntrySeq));
+  };
+  // Normalize top opcodes and patterns
+  for (auto &&[Opc, Weight] : HistData.topOpcodes())
+    InsertHistogramEntry(OpCC.name(Opc).str(), Weight, yaml::NodeKind::Scalar);
+  for (auto &&[Pattern, Weight] : HistData.patterns()) {
+    auto *HistNode = dyn_cast<HistogramNode>(Pattern);
+    assert(HistNode);
+    InsertHistogramEntry(HistNode->getName(), Weight, yaml::NodeKind::Map);
+  }
+}
+
+OpcodeHistogram OpcodeHistogramNormalization::denormalize(yaml::IO &IO) {
+  OpcHistSeq.validate(IO);
+  if (IO.error())
+    return {};
+
+  auto NameWeightSeq = OpcHistSeq.getEntryWeightSequence();
+  OpcodeHistogram Result;
+  if (!DefineMainHist.empty() && DefineMainHist != "histogram") {
+    if (auto ErrStr = insertHistogramNode(Result, DefineMainHist,
+                                          BaseNode::DefaultNodeWeight);
+        !ErrStr.empty()) {
+      IO.setError(ErrStr);
+      return {};
+    }
+    Result.reinitProbabilityVisitor();
+    return Result;
+  }
+  for (auto &&[NameInfo, WeightStr] : NameWeightSeq) {
+    double Weight = 0.0;
+    if (StringRef(WeightStr).getAsDouble(Weight)) {
+      IO.setError("Incorrect histogram: Weight must be a floating point value");
+      break;
+    }
+
+    auto Name = NameInfo.Val;
+    if (NameInfo.Kind == yaml::NodeKind::Map) {
+      if (auto ErrStr = insertHistogramNode(Result, Name, Weight);
+          !ErrStr.empty()) {
+        IO.setError(ErrStr);
+        return {};
+      }
+    } else if (NameInfo.Kind == yaml::NodeKind::Scalar) {
+      auto DecodeEntry = decodeInstrRegex(IO, NameInfo.Val, Weight);
+      if (!DecodeEntry) {
+        IO.setError(llvm::toString(DecodeEntry.takeError()));
+        return {};
+      }
+      for (auto &&[Opc, WeightRes] : DecodeEntry->Decoded)
+        Result.insertTopOpcode(Opc, WeightRes);
+    }
+  }
+  // Recalculate opcode probabilities for the fully constructed histogram
+  Result.reinitProbabilityVisitor();
+  return Result;
+}
+
+void OpcodeHistogramNormalization::mapHistogramPatterns(yaml::IO &IO) {
+  auto *CurrContext = IO.getContext();
+  assert(CurrContext);
+  auto *ConfigIOCtx = static_cast<ConfigIOContext *>(CurrContext);
+  assert(ConfigIOCtx);
+  HistogramPatternsContext HistCtx(*ConfigIOCtx, HistPatterns);
+  // We swap the context during mapping to access specific objects
+  IO.setContext(&HistCtx);
+  IO.mapOptional("histogram-patterns", HistPatterns);
+  // Return the previous context
+  IO.setContext(CurrContext);
+}
+
+std::string OpcodeHistogramNormalization::insertHistogramNode(
+    OpcodeHistogram &Hist, StringRef Name, double Weight) {
+  if (!HistPatterns.contains(Name))
+    return llvm::formatv("unknown pattern: '{0}'", Name);
+  if (isa<HistogramNode>(HistPatterns.get(Name)))
+    Hist.insert(HistPatterns.clone(Name));
+  else
+    Hist.emplace<HistogramNode>(Name, HistPatterns.clone(Name), Weight);
+  Hist.HasPatterns = true;
+  return "";
+}
+
+void yaml::MappingTraits<snippy::OpcodeHistogramMappingWrapper>::mapping(
+    yaml::IO &Io, snippy::OpcodeHistogramMappingWrapper &Info) {
+  yaml::MappingNormalization<OpcodeHistogramNormalization, OpcodeHistogram>
+      HistNorm(Io, Info.Histogram);
+  Io.mapOptional("histogram", HistNorm->OpcHistSeq);
+}
+
 Expected<OpcodeHistogramDecodedEntry>
 decodeInstrRegex(yaml::IO &IO, StringRef OpcodeStr, double Weight) {
-  auto &ParserCtx = snippy::YAMLHistogramTraits<
-      snippy::OpcodeHistogramDecodedEntry>::getContext(IO);
-  const auto &OpCC = ParserCtx.OpCC;
+  const auto &CfgIOContext =
+      static_cast<const ConfigIOContext *>(IO.getContext());
+  assert(CfgIOContext);
+  const auto &OpCC = CfgIOContext->OpCC;
 
   auto ReportError = [&](Twine Msg) -> Error {
     return createStringError(std::make_error_code(std::errc::invalid_argument),
@@ -78,120 +195,78 @@ decodeInstrRegex(yaml::IO &IO, StringRef OpcodeStr, double Weight) {
   return Result;
 }
 
-OpcodeHistogramDecodedEntry
-YAMLHistogramTraits<OpcodeHistogramDecodedEntry>::denormalizeEntry(
-    yaml::IO &IO, StringRef OpcodeStr, double Weight) {
-  Expected<OpcodeHistogramDecodedEntry> Decoded =
-      decodeInstrRegex(IO, OpcodeStr, Weight);
-  if (!Decoded) {
-    IO.setError(toString(Decoded.takeError()));
-    return OpcodeHistogramDecodedEntry{};
-  }
-
-  return *Decoded;
-}
-
 OpcodeHistogramCodedEntry
 codeInstrFromOpcode(yaml::IO &IO, const OpcodeHistogramDecodedEntry &E) {
   auto &Decoded = E.Decoded;
   assert(Decoded.size() == 1 && "Expected entry to contain only a "
                                 "single opcode, can't serialize");
   auto &First = Decoded.front();
-  const auto &OpCC = snippy::YAMLHistogramTraits<
-                         snippy::OpcodeHistogramDecodedEntry>::getContext(IO)
-                         .OpCC;
+  const auto &CfgIOContext =
+      static_cast<const ConfigIOContext *>(IO.getContext());
+  assert(CfgIOContext);
+  const auto &OpCC = CfgIOContext->OpCC;
   return OpcodeHistogramCodedEntry{std::string(OpCC.name(First.Opcode)),
                                    std::to_string(First.Weight)};
 }
 
-void YAMLHistogramTraits<OpcodeHistogramDecodedEntry>::normalizeEntry(
-    yaml::IO &IO, const DenormEntry &E, SmallVectorImpl<SValue> &RawStrings) {
-  auto Result = codeInstrFromOpcode(IO, E);
-  RawStrings.push_back(Result.InstrMnemonic);
-  RawStrings.push_back(Result.Weight);
+SmallVector<unsigned> OpcodeHistogram::uniqueOpcodes() const {
+  auto Opcodes = llvm::make_first_range(ProbVisitor.opcodeProbabilities());
+  return SmallVector<unsigned>(std::move(Opcodes));
 }
 
-OpcodeHistogram
-YAMLHistogramTraits<OpcodeHistogramDecodedEntry>::denormalizeMap(
-    yaml::IO &IO, ArrayRef<DenormEntry> Entries) {
-  auto &ParserCtx = getContext(IO);
-  auto &Ctx = ParserCtx.State.getCtx();
-  const auto &OpCC = ParserCtx.OpCC;
+unsigned OpcodeHistogram::getCFInstrsNum(unsigned InstrsNum,
+                                         const OpcodeCache &OpCC) const {
+  // CF instructions can only be present in the top-level histogram.
+  double CFInstrsWeight =
+      std::accumulate(TopOpcodes.begin(), TopOpcodes.end(), 0.0,
+                      [&OpCC](double Accumulation, auto &&Hist) -> double {
+                        auto *Desc = OpCC.desc(Hist.first);
+                        if (Desc && Desc->isBranch())
+                          return Accumulation + Hist.second;
+                        return Accumulation;
+                      });
+  double TotalWeight = getTotalChildsWeight();
 
-  MapType Histogram;
-  for (const auto &HEntry : Entries) {
-    if (HEntry.Decoded.empty())
-      continue;
+  double CFInstrsRatio = CFInstrsWeight / TotalWeight;
+  if (!std::isfinite(CFInstrsRatio))
+    return 0;
 
-    if (HEntry.RegexPattern.empty()) {
-      assert(HEntry.Decoded.size() == 1 && "Expected to have a single opcode");
+  double CFInstrsNum = InstrsNum * CFInstrsRatio;
+  if (CFInstrsNum > std::numeric_limits<int>::max())
+    return std::numeric_limits<int>::max();
 
-      auto &&[Opcode, Weight] = HEntry.Decoded.front();
-      bool Inserted = Histogram.insert_or_assign(Opcode, Weight).second;
-      if (!Inserted)
-        snippy::warn(WarningName::InstructionHistogram, Ctx,
-                     "Repeated instruction in histogram",
-                     "Replacing weight for instruction " + OpCC.name(Opcode));
-      continue;
-    }
+  if (!std::isnan(CFInstrsNum) && (CFInstrsNum >= 1.0))
+    return static_cast<int>(CFInstrsNum);
 
-    for (auto &&[Opcode, Weight] : HEntry.Decoded) {
-      // Don't overwrite weight if it was previously set
-      bool Inserted = Histogram.insert({Opcode, Weight}).second;
-      if (!Inserted)
-        snippy::warn(WarningName::InstructionHistogram, Ctx,
-                     "Repeated instruction in histogram",
-                     "Keeping old weight for instruction " + OpCC.name(Opcode) +
-                         " matched by pattern \"" + HEntry.RegexPattern + "\"");
-    }
-  }
-
-  return Histogram;
+  return 0;
 }
 
-void YAMLHistogramTraits<OpcodeHistogramDecodedEntry>::normalizeMap(
-    yaml::IO &IO, const MapType &Hist, std::vector<DenormEntry> &Entries) {
-  transform(Hist, std::back_inserter(Entries), [](auto Pair) {
-    auto &&[Opcode, Weight] = Pair;
-    return DenormEntry{{Opcode, Weight}};
-  });
+bool OpcodeHistogram::contains(unsigned OpcodeToFind) const {
+  return ProbVisitor.opcodeProbabilities().count(OpcodeToFind);
 }
 
-LLVM_SNIPPY_YAML_INSTANTIATE_HISTOGRAM_IO(snippy::OpcodeHistogramDecodedEntry);
-LLVM_SNIPPY_YAML_IS_HISTOGRAM_DENORM_ENTRY(snippy::OpcodeHistogramDecodedEntry)
-
-void yaml::MappingTraits<snippy::OpcodeHistogramMappingWrapper>::mapping(
-    yaml::IO &Io, snippy::OpcodeHistogramMappingWrapper &Info) {
-  YAMLHistogramIO<OpcodeHistogramDecodedEntry> HistIo(Info.Histogram);
-  Io.mapRequired("histogram", HistIo);
+OpcodeProbVisitor::OpcProbOpt
+OpcodeHistogram::find(unsigned OpcodeToFind) const {
+  return ProbVisitor.find(OpcodeToFind);
 }
 
-namespace snippy {
-void diagnoseHistogram(LLVMContext &Ctx, const OpcodeCache &OpCC,
-                       std::map<unsigned, double> &Histogram) {
-  if (Histogram.size() == 0) {
-    snippy::warn(WarningName::InstructionHistogram, Ctx,
-                 "Plugin didn't fill histogram",
-                 "Generating instructions with only plugin calls");
-    return;
-  }
+const OpcodeProbVisitor::OpcodeProbsType &
+OpcodeHistogram::opcodeProbabilities() const {
+  return ProbVisitor.opcodeProbabilities();
+}
 
-  auto InvalidOpcChecker = [OpCC](auto It) {
-    return OpCC.desc(It.first) == nullptr;
-  };
-  if (std::find_if(Histogram.begin(), Histogram.end(), InvalidOpcChecker) !=
-      Histogram.end())
-    snippy::fatal("Plugin filled histogram with invalid opcodes");
-
-  auto InvalidWeightsChecker = [](auto It) { return It.second < 0; };
-  if (std::find_if(Histogram.begin(), Histogram.end(), InvalidWeightsChecker) !=
-      Histogram.end())
-    snippy::fatal("Plugin filled histogram with negative opcodes weights");
+double
+OpcodeHistogram::getTopOpcodesWeight(std::function<bool(unsigned)> Pred) const {
+  auto TopOpcodesFiltered = llvm::make_filter_range(
+      TopOpcodes, [&](auto &&OpcWeight) { return Pred(OpcWeight.first); });
+  auto Weights = llvm::make_second_range(TopOpcodesFiltered);
+  return std::accumulate(Weights.begin(), Weights.end(), /* init */ 0.0);
 }
 
 bool OpcodeHistogram::hasCallInstrs(const OpcodeCache &OpCC,
                                     const SnippyTarget &Tgt) const {
-  return std::any_of(begin(), end(), [&OpCC, &Tgt](auto &Hist) {
+  // Call instructions can only be present in the top-level histogram.
+  return llvm::any_of(TopOpcodes, [&OpCC, &Tgt](auto &Hist) {
     auto *Desc = OpCC.desc(Hist.first);
     return Desc && Tgt.isCall(Desc->getOpcode());
   });
@@ -199,19 +274,20 @@ bool OpcodeHistogram::hasCallInstrs(const OpcodeCache &OpCC,
 
 bool OpcodeHistogram::hasSPRelativeInstrs(const OpcodeCache &OpCC,
                                           const SnippyTarget &Tgt) const {
-  return std::any_of(begin(), end(), [&OpCC, &Tgt](auto &Hist) {
-    auto *Desc = OpCC.desc(Hist.first);
+  auto Pred = [&OpCC, &Tgt](unsigned Opc) {
+    auto *Desc = OpCC.desc(Opc);
     return Desc && Tgt.isSPRelative(Desc->getOpcode());
-  });
+  };
+  return ProbVisitor.find(Pred).has_value();
 }
 
 bool OpcodeHistogram::hasPlainInstrs(const OpcodeCache &OpCC,
                                      const SnippyTarget &Tgt) const {
-  return std::any_of(begin(), end(), [&OpCC, &Tgt](auto &Hist) {
-    auto *Desc = OpCC.desc(Hist.first);
+  auto Opcodes = uniqueOpcodes();
+  return llvm::any_of(Opcodes, [&OpCC, &Tgt](unsigned Opcode) {
+    auto *Desc = OpCC.desc(Opcode);
     return Desc && !Tgt.isCall(Desc->getOpcode()) && !Desc->isBranch();
   });
 }
 
-} // namespace snippy
 } // namespace llvm

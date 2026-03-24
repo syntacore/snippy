@@ -1,0 +1,14 @@
+# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu 
+  num-instrs: 10
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - Branches: "FENCE | BEQ | BNE"
+
+# CHECK: error: control-flow instructions are not supported
+# CHECK-NEXT: - Branches: "FENCE | BEQ | BNE"
