@@ -708,12 +708,11 @@ static MachineOperand createRegAsOperand(Register Reg, unsigned Flags,
       Flags & RegState::InternalRead, Flags & RegState::Renamable);
 }
 
-std::optional<MachineOperand> pregenerateOneOperand(
+static std::optional<MachineOperand> pregenerateOneOperand(
     InstructionGenerationContext &InstrGenCtx, const MCInstrDesc &InstrDesc,
-    const MCOperandInfo &MCOpInfo,
     const planning::PreselectedOpInfo &Preselected, unsigned OpIndex,
-    ArrayRef<MachineOperand> PregeneratedOperands) {
-  auto OpType = MCOpInfo.OperandType;
+    ArrayRef<MachineOperand> PregeneratedOperands,
+    std::optional<MemAddr> AccessAddress) {
 
   auto &RP = InstrGenCtx.getRegPool();
   auto &MBB = InstrGenCtx.MBB;
@@ -722,11 +721,14 @@ std::optional<MachineOperand> pregenerateOneOperand(
   const auto &RegInfo = State.getRegInfo();
   const auto &SnippyTgt = State.getSnippyTarget();
   auto &RegGen = ProgCtx.getRegGen();
-  auto &Cfg = InstrGenCtx.getCommonCfg();
+  const auto &Cfg = InstrGenCtx.getCommonCfg();
+  auto Opcode = InstrDesc.getOpcode();
   auto Operand = InstrDesc.operands()[OpIndex];
+  auto OpType = Operand.OperandType;
   auto OperandRegClassID = Operand.RegClass;
+
   if (OpType == MCOI::OperandType::OPERAND_REGISTER) {
-    assert(MCOpInfo.RegClass != -1);
+    assert(OperandRegClassID != -1);
     bool IsDst = Preselected.getFlags() & RegState::Define;
     Register Reg;
     if (Preselected.isTiedTo())
@@ -736,12 +738,11 @@ std::optional<MachineOperand> pregenerateOneOperand(
       if (SnippyTgt.isPhysRegClass(OperandRegClassID, RegInfo))
         Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
     } else {
-      auto RegClass =
-          SnippyTgt.getRegClass(InstrGenCtx, OperandRegClassID, OpIndex,
-                                InstrDesc.getOpcode(), RegInfo);
+      auto RegClass = SnippyTgt.getRegClass(InstrGenCtx, OperandRegClassID,
+                                            OpIndex, Opcode, RegInfo);
       auto Exclude = SnippyTgt.excludeRegsForOperand(InstrGenCtx, RegClass,
                                                      InstrDesc, OpIndex);
-      auto Include = SnippyTgt.includeRegs(InstrDesc.getOpcode(), RegClass);
+      auto Include = SnippyTgt.includeRegs(Opcode, RegClass);
       AccessMaskBit Mask = IsDst ? AccessMaskBit::W : AccessMaskBit::R;
 
       auto CustomMask =
@@ -762,24 +763,26 @@ std::optional<MachineOperand> pregenerateOneOperand(
       if (SnippyTgt.isPhysRegClass(OperandRegClassID, RegInfo))
         Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
     }
-    SnippyTgt.reserveRegsIfNeeded(InstrGenCtx, InstrDesc.getOpcode(),
+    SnippyTgt.reserveRegsIfNeeded(InstrGenCtx, Opcode,
                                   /* isDst */ IsDst,
                                   /* isMem */ false, Reg);
     return createRegAsOperand(Reg, Preselected.getFlags());
   }
+
   if (OpType == MCOI::OperandType::OPERAND_MEMORY) {
     // FIXME: we expect memory operands to be registers
-    assert(MCOpInfo.RegClass != -1);
+    assert(OperandRegClassID != -1);
     Register Reg;
     if (Preselected.isTiedTo())
       Reg = PregeneratedOperands[Preselected.getTiedTo()].getReg();
     else if (Preselected.isReg())
       Reg = Preselected.getReg();
     else {
-      auto RegClass = RegInfo.getRegClass(MCOpInfo.RegClass);
       SmallVector<Register> Exclude;
-      SnippyTgt.excludeFromMemRegsForOpcode(InstrDesc.getOpcode(), RegInfo,
-                                            Exclude);
+      SnippyTgt.excludeFromMemRegsForInstr(InstrDesc, RegInfo, Exclude,
+                                           AccessAddress, &Cfg);
+
+      auto RegClass = RegInfo.getRegClass(OperandRegClassID);
       auto ExpectedRegOpt = RegGen.generate(
           RegClass, OperandRegClassID, RegInfo, RP, MBB, SnippyTgt, Exclude);
       if (auto Err = ExpectedRegOpt.takeError())
@@ -792,7 +795,7 @@ std::optional<MachineOperand> pregenerateOneOperand(
         Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
     }
     // FIXME: RW mask is too restrictive for the majority of instructions.
-    SnippyTgt.reserveRegsIfNeeded(InstrGenCtx, InstrDesc.getOpcode(),
+    SnippyTgt.reserveRegsIfNeeded(InstrGenCtx, Opcode,
                                   /* isDst */ Preselected.getFlags() &
                                       RegState::Define,
                                   /* isMem */ true, Reg);
@@ -807,24 +810,42 @@ std::optional<MachineOperand> pregenerateOneOperand(
     if (StridedImm.isInitialized() &&
         StridedImm.getMin() == StridedImm.getMax())
       return MachineOperand::CreateImm(StridedImm.getMax());
-    return SnippyTgt.generateTargetOperand(ProgCtx, Cfg, InstrDesc.getOpcode(),
-                                           OpType, StridedImm, OpIndex);
+
+    if (SnippyTgt.countAddrsToGenerate(Opcode) > 0) {
+      assert(AccessAddress.has_value());
+      // We assume that other operands have already been pregenerated.
+      return SnippyTgt.generateMemoryRelatedImmediate(
+          InstrDesc, OpIndex, StridedImm, ProgCtx, Cfg, PregeneratedOperands,
+          *AccessAddress);
+    }
+    return SnippyTgt.generateTargetOperand(InstrDesc, OpIndex, StridedImm,
+                                           ProgCtx, Cfg);
   }
+
   llvm_unreachable("this operand type unsupported");
 }
-std::optional<SmallVector<MachineOperand, 8>>
-tryToPregenerateOperands(InstructionGenerationContext &InstrGenCtx,
-                         const MCInstrDesc &InstrDesc,
-                         ArrayRef<planning::PreselectedOpInfo> Preselected) {
+
+using AddressInfoForInstr = std::pair<AddressInfo, AddressGenInfo>;
+
+static std::optional<SmallVector<MachineOperand, 8>> tryToPregenerateOperands(
+    InstructionGenerationContext &InstrGenCtx, const MCInstrDesc &InstrDesc,
+    ArrayRef<planning::PreselectedOpInfo> Preselected,
+    const SmallVectorImpl<AddressInfoForInstr> &AddressesInfo) {
   SmallVector<MachineOperand, 8> PregeneratedOperands;
   assert(InstrDesc.getNumOperands() == Preselected.size());
-  iota_range<unsigned long> PreIota(0, Preselected.size(),
-                                    /* Inclusive */ false);
-  for (const auto &[MCOpInfo, PreselOpInfo, Index] :
-       zip(InstrDesc.operands(), Preselected, PreIota)) {
+
+  auto AccessAddress = [&]() -> std::optional<MemAddr> {
+    if (AddressesInfo.empty())
+      return std::nullopt;
+    // For now support only one memory operand per instruction
+    assert(AddressesInfo.size() == 1);
+    return std::get<0>(AddressesInfo.front()).Address;
+  }();
+
+  for (const auto &[Index, PreselOpInfo] : enumerate(Preselected)) {
     auto OpOpt =
-        pregenerateOneOperand(InstrGenCtx, InstrDesc, MCOpInfo, PreselOpInfo,
-                              Index, PregeneratedOperands);
+        pregenerateOneOperand(InstrGenCtx, InstrDesc, PreselOpInfo, Index,
+                              PregeneratedOperands, AccessAddress);
     if (!OpOpt)
       return std::nullopt;
     PregeneratedOperands.push_back(OpOpt.value());
@@ -832,10 +853,11 @@ tryToPregenerateOperands(InstructionGenerationContext &InstrGenCtx,
   return PregeneratedOperands;
 }
 
-SmallVector<MachineOperand, 8>
+static SmallVector<MachineOperand, 8>
 pregenerateOperands(InstructionGenerationContext &InstrGenCtx,
                     const MCInstrDesc &InstrDesc,
-                    ArrayRef<planning::PreselectedOpInfo> Preselected) {
+                    ArrayRef<planning::PreselectedOpInfo> Preselected,
+                    const SmallVectorImpl<AddressInfoForInstr> &AddressesInfo) {
   auto &RP = InstrGenCtx.getRegPool();
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &RegGenerator = ProgCtx.getRegGen();
@@ -861,8 +883,8 @@ pregenerateOperands(InstructionGenerationContext &InstrGenCtx,
       });
     });
     RegGenerator.setRegContextForPlugin();
-    auto PregeneratedOperandsOpt =
-        tryToPregenerateOperands(InstrGenCtx, InstrDesc, Preselected);
+    auto PregeneratedOperandsOpt = tryToPregenerateOperands(
+        InstrGenCtx, InstrDesc, Preselected, AddressesInfo);
     IterNum++;
 
     if (PregeneratedOperandsOpt)
@@ -938,29 +960,29 @@ bool sizeLimitIsExceeded(const planning::RequestLimit &Lim,
   return NewGeneratedCodeSize > Lim.getSizeLeft(CommitedStats);
 }
 
-static std::pair<AddressInfo, AddressGenInfo>
-chooseAddrInfoForInstr(MachineInstr &MI, InstructionGenerationContext &IGC,
-                       const MachineLoop *ML, const SnippyLoopInfo *SLI) {
+static AddressInfoForInstr
+chooseAddrInfoForInstr(const MCInstrDesc &MIDesc,
+                       InstructionGenerationContext &IGC, const MachineLoop *ML,
+                       const SnippyLoopInfo *SLI,
+                       planning::PreselectedOperands &Preselected) {
   assert(!ML || SLI);
   auto &ProgCtx = IGC.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   auto &MS = IGC.getMemoryAccessSampler();
   const auto &SnippyTgt = State.getSnippyTarget();
-  auto AddrGenInfo = SnippyTgt.selectAddrGenInfoForInstr(
-      ProgCtx, MI.getOpcode(), *MI.getParent(), &MI);
+  auto Opcode = MIDesc.getOpcode();
 
-  auto ReportError = [&](Error Err) {
-    std::string InstrStr;
-    raw_string_ostream OS(InstrStr);
-    MI.print(OS);
-    snippy::fatal(formatv("Cannot sample memory access for instruction \"{0}\"",
-                          StringRef(InstrStr).rtrim()),
-                  Twine("\n").concat(toString(std::move(Err))));
-  };
+  SnippyTgt.preselectAccessSizeOperand(IGC, MIDesc, Preselected);
+  auto AddrGenInfo = SnippyTgt.selectAddrGenInfoForInstr(ProgCtx, Opcode,
+                                                         IGC.MBB, Preselected);
 
   auto ChosenAccess = MS.chooseAccess(AddrGenInfo);
-  if (!ChosenAccess)
-    ReportError(ChosenAccess.takeError());
+  if (!ChosenAccess) {
+    const auto &OpCC = ProgCtx.getOpcodeCache();
+    snippy::fatal(formatv("Cannot sample memory access for instruction \"{0}\"",
+                          OpCC.name(Opcode)),
+                  Twine("\n").concat(toString(ChosenAccess.takeError())));
+  }
 
   auto AddrInfo = ChosenAccess->randomAddress(AddrGenInfo);
 
@@ -1010,7 +1032,7 @@ unsigned chooseAddressRegister(InstructionGenerationContext &IGC,
   auto AllRegisters =
       RP.getAllAvailableRegisters(*AP.RegClass, *MI.getParent());
   SmallVector<Register> Exclude;
-  SnippyTgt.excludeFromMemRegsForOpcode(MI.getOpcode(), RI, Exclude);
+  SnippyTgt.excludeFromMemRegsForInstr(MI.getDesc(), RI, Exclude);
 
   erase_if(AllRegisters, [&](Register Reg) {
     SmallVector<Register> PhysRegs;
@@ -1058,8 +1080,9 @@ unsigned chooseAddressRegister(InstructionGenerationContext &IGC,
   return ChosenReg;
 }
 
-void postprocessMemoryOperands(MachineInstr &MI,
-                               planning::InstructionGenerationContext &IGC) {
+static void postprocessMemoryOperands(
+    MachineInstr &MI, planning::InstructionGenerationContext &IGC,
+    const SmallVectorImpl<AddressInfoForInstr> &AddressesInfo) {
   auto *MAI = IGC.MAI;
   auto *MLI = IGC.MLI;
   const auto *SLI = IGC.SLI;
@@ -1069,15 +1092,16 @@ void postprocessMemoryOperands(MachineInstr &MI,
   const auto &SnippyTgt = State.getSnippyTarget();
   auto Opcode = MI.getOpcode();
   auto NumAddrsToGen = SnippyTgt.countAddrsToGenerate(Opcode);
+  assert(AddressesInfo.size() == NumAddrsToGen);
+
   auto *MBB = MI.getParent();
   auto *ML = MLI ? MLI->getLoopFor(MBB) : nullptr;
   assert(!ML || SLI);
 
   for (size_t i = 0; i < NumAddrsToGen; ++i) {
-    auto [AddrInfo, AddrGenInfo] = chooseAddrInfoForInstr(MI, IGC, ML, SLI);
-    auto AccessSize = AddrInfo.AccessSize;
+    const auto &[AddrInfo, AddrGenInfo] = AddressesInfo[i];
 
-    auto &InstrDesc = MI.getDesc();
+    const auto &InstrDesc = MI.getDesc();
     auto Operands = planning::getPreselectedForInstr(MI.operands());
     if (auto Err = Operands.takeError())
       snippy::fatal("While postprocessing memory operands",
@@ -1085,6 +1109,7 @@ void postprocessMemoryOperands(MachineInstr &MI,
     auto &&[RegToValue, ChosenAddresses] =
         SnippyTgt.breakDownAddr(IGC, AddrInfo, InstrDesc, *Operands, i);
 
+    auto AccessSize = AddrInfo.AccessSize;
     for (unsigned j = 0; j < AddrGenInfo.NumElements; ++j) {
       if (MAI)
         addMemAccessToDump(ChosenAddresses, *MAI, AccessSize);
@@ -1172,7 +1197,7 @@ isPostprocessNeeded(const MCInstrDesc &InstrDesc,
   return llvm::any_of(Preselected, [](const auto &Op) { return Op.isUnset(); });
 }
 
-MachineInstr *randomInstruction(
+static MachineInstr *randomInstruction(
     const MCInstrDesc &InstrDesc, planning::PreselectedOperands Preselected,
     planning::InstructionGenerationContext &InstrGenCtx, MDNode *MetadataMark) {
   auto &MBB = InstrGenCtx.MBB;
@@ -1200,14 +1225,27 @@ MachineInstr *randomInstruction(
       OpInfo.setTiedTo(TiedTo);
   }
 
+  SmallVector<AddressInfoForInstr, 1> AddressesInfo;
+  if (DoPostprocess) {
+    const auto *SLI = InstrGenCtx.SLI;
+    const auto *MLI = InstrGenCtx.MLI;
+    const auto *ML = MLI ? MLI->getLoopFor(&InstrGenCtx.MBB) : nullptr;
+    assert(!ML || SLI);
+    auto NumAddrsToGen = SnippyTgt.countAddrsToGenerate(InstrDesc.getOpcode());
+    for (unsigned I = 0; I < NumAddrsToGen; ++I) {
+      AddressesInfo.push_back(
+          chooseAddrInfoForInstr(InstrDesc, InstrGenCtx, ML, SLI, Preselected));
+    }
+  }
+
   auto RP = InstrGenCtx.pushRegPool();
   auto PregeneratedOperands =
-      pregenerateOperands(InstrGenCtx, InstrDesc, Preselected);
+      pregenerateOperands(InstrGenCtx, InstrDesc, Preselected, AddressesInfo);
   for (auto &Op : PregeneratedOperands)
     MIB.add(Op);
 
   if (DoPostprocess)
-    postprocessMemoryOperands(*MIB, InstrGenCtx);
+    postprocessMemoryOperands(*MIB, InstrGenCtx, AddressesInfo);
   // FIXME:
   // We have a lot of problems with rollback and configurations
   // After this, we can have additional instruction after main one!

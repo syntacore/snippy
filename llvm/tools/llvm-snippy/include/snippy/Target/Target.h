@@ -360,11 +360,18 @@ public:
 
   virtual bool isFloatingPoint(const MCInstrDesc &InstrDesc) const = 0;
 
+  // Special handling for memory-related immediates (offsets, etc.)
+  virtual MachineOperand generateMemoryRelatedImmediate(
+      const MCInstrDesc &InstrDesc, unsigned OperandIdx,
+      const StridedImmediate &StridedImm, const SnippyProgramContext &ProgCtx,
+      const CommonPolicyConfig &Cfg,
+      ArrayRef<MachineOperand> PregeneratedOperands, MemAddr Addr) const = 0;
+
   virtual MachineOperand
-  generateTargetOperand(SnippyProgramContext &ProgCtx,
-                        const CommonPolicyConfig &Cfg, unsigned OpCode,
-                        unsigned OpType, const StridedImmediate &StridedImm,
-                        unsigned OperandIdx) const = 0;
+  generateTargetOperand(const MCInstrDesc &InstrDesc, unsigned OperandIdx,
+                        const StridedImmediate &StridedImm,
+                        const SnippyProgramContext &ProgCtx,
+                        const CommonPolicyConfig &Cfg) const = 0;
 
   virtual bool canProduceNaN(const MCInstrDesc &InstrDesc) const = 0;
 
@@ -537,16 +544,23 @@ public:
       InstructionGenerationContext &IGC, MCRegister AddrReg, MCRegister Reg,
       SnippyMetadata MetadataMark = SnippyMetadata::Support) const = 0;
 
+  // Preselect (access size) operand that directly affects address selection
+  virtual void preselectAccessSizeOperand(
+      InstructionGenerationContext &IGC, const MCInstrDesc &InstrDesc,
+      MutableArrayRef<planning::PreselectedOpInfo> Preselected) const = 0;
+
   // Choose the parameters used to sample the memory scheme for a particular
   // opcode in the context of \ref MBB and \ref ProgCtx.
-  virtual AddressGenInfo
-  selectAddrGenInfoForInstr(SnippyProgramContext &ProgCtx, unsigned Opcode,
-                            const MachineBasicBlock &MBB,
-                            const MachineInstr *MI = nullptr) const = 0;
+  virtual AddressGenInfo selectAddrGenInfoForInstr(
+      const SnippyProgramContext &ProgCtx, unsigned Opcode,
+      const MachineBasicBlock &MBB,
+      ArrayRef<planning::PreselectedOpInfo> Preselected = {}) const = 0;
 
   virtual void
-  excludeFromMemRegsForOpcode(unsigned Opcode, const MCRegisterInfo &RI,
-                              SmallVectorImpl<Register> &Regs) const = 0;
+  excludeFromMemRegsForInstr(const MCInstrDesc &Instr, const MCRegisterInfo &RI,
+                             SmallVectorImpl<Register> &Regs,
+                             std::optional<MemAddr> Addr = std::nullopt,
+                             const CommonPolicyConfig *Cfg = nullptr) const = 0;
 
   // FIXME: basically, we should need only MCRegisterClass, but now
   // MCRegisterClass for RISCV does not fully express available regs.

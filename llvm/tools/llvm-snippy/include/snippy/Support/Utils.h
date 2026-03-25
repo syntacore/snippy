@@ -72,7 +72,27 @@ inline StringRef getStrMetadata(SnippyMetadata M) {
   }
   llvm_unreachable("unknown metadata value");
 }
+
+template <typename... T> constexpr auto makeArray(T &&...Ts) {
+  using CT = std::common_type_t<T...>;
+  return std::array<CT, sizeof...(T)>{std::forward<CT>(Ts)...};
+}
+
 } // namespace detail
+
+template <typename... Ts> constexpr bool isContinuous(Ts &&...Args) {
+  constexpr std::size_t N = sizeof...(Ts);
+  if (N <= 1)
+    return true;
+
+  auto Arr = detail::makeArray(std::forward<Ts>(Args)...);
+
+  for (std::size_t I = 1; I < N; ++I) {
+    if (Arr[I] != Arr[I - 1] + 1)
+      return false;
+  }
+  return true;
+}
 
 bool checkMetadata(const MachineInstr &MI, SnippyMetadata M);
 bool checkMetadata(MDNode *MetadataMark, SnippyMetadata M);

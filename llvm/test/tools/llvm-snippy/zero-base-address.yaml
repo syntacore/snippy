@@ -1,0 +1,73 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+# COM: Reserving all registers but x0 and x2 (sp). Option honor-target-abi
+# COM: makes it so x2 can't be used for address creation, so all memory
+# COM: accesses will have x0 as base address.
+
+options:
+  mtriple: riscv64
+  mattr: +d,+zfh
+  num-instrs: 1000
+  dump-mf: true
+  reserved-regs-list: ["X(1|[3-9]|[12][0-9]|3[01])"]
+  honor-target-abi: true
+
+sections:
+    - no:        0
+      VMA:       0x2100000
+      SIZE:      0x11000
+      LMA:       0x2100000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x2004000
+      SIZE:      0xF2000
+      LMA:       0x2004000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x100
+      SIZE:      0x80
+      LMA:       0x100
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x40100000
+      SIZE:      0x1000
+      LMA:       0x40100000
+      ACCESS:    rw
+
+histogram:
+      - [LB, 1.0]
+      - [LBU, 1.0]
+      - [LH, 1.0]
+      - [LHU, 1.0]
+      - [LW, 1.0]
+      - [LWU, 1.0]
+      - [LD, 1.0]
+      - [SB, 1.0]
+      - [SH, 1.0]
+      - [SW, 1.0]
+      - [SD, 1.0]
+      - [FLH, 1.0]
+      - [FLW, 1.0]
+      - [FLD, 1.0]
+      - [FSH, 1.0]
+      - [FSW, 1.0]
+      - [FSD, 1.0]
+
+# CHECK-DAG: LB $x0
+# CHECK-DAG: LBU $x0
+# CHECK-DAG: LH $x0
+# CHECK-DAG: LHU $x0
+# CHECK-DAG: LW $x0
+# CHECK-DAG: LWU $x0
+# CHECK-DAG: LD $x0
+# CHECK-DAG: FLH $x0
+# CHECK-DAG: FLW $x0
+# CHECK-DAG: FLD $x0
+
+# CHECK-DAG: SB $x{{0|2}}, $x0
+# CHECK-DAG: SH $x{{0|2}}, $x0
+# CHECK-DAG: SW $x{{0|2}}, $x0
+# CHECK-DAG: SD $x{{0|2}}, $x0
+# CHECK-DAG: FSH $f{{[0-9]+_h}}, $x0
+# CHECK-DAG: FSW $f{{[0-9]+_f}}, $x0
+# CHECK-DAG: FSD $f{{[0-9]+_d}}, $x0
