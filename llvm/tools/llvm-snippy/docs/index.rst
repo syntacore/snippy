@@ -832,6 +832,11 @@ configurations in the ``./yml`` directory.
 
    ./llvm-snippy ./yml/layout-example.yaml -seed=1 ./yml/imm-hist.yaml
 
+.. important::
+
+   When using immediate histogram with memory instructions, note that constant registers
+   (such as x0 on RISC-V) will not be used as the base address register.
+
 .. _`_operation_codes_for_specific_architecture`:
 
 Operation Codes for Specific Architecture

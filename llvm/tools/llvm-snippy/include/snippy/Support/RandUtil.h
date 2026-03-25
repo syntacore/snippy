@@ -28,15 +28,6 @@
 namespace llvm {
 namespace snippy {
 
-namespace details {
-
-template <typename... Ts> constexpr auto makeArray(Ts &&...ts) {
-  using CT = std::common_type_t<Ts...>;
-  return std::array<CT, sizeof...(Ts)>{std::forward<CT>(ts)...};
-}
-
-} // namespace details
-
 // INFO: this snippy implementation of UniformIntDistribution is
 // required because std::uniform_int_distribution has different
 // implementation(therefore different results) on different OS.
@@ -655,10 +646,9 @@ void uniformlyFill(MutableArrayRef<T> Out, T Low, T High) {
   std::generate(Out.begin(), Out.end(), [&] { return Dist(Engine); });
 }
 
-template <typename... Ts> auto selectFrom(Ts... args) {
-  auto Items = details::makeArray(std::forward<Ts>(args)...);
+template <typename... Ts> auto selectFrom(Ts... Args) {
+  auto Items = detail::makeArray(std::forward<Ts>(Args)...);
   return Items[RandEngine::genInRangeInclusive(Items.size() - 1)];
 }
-
 } // namespace snippy
 } // namespace llvm
