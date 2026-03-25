@@ -310,13 +310,14 @@ void selectNonMemoryOperands(
 }
 
 static DenseSet<Register> getExcludedRegsForOpcodes(ArrayRef<unsigned> Opcodes,
-                                                    LLVMState &State) {
-  auto &Tgt = State.getSnippyTarget();
-  auto &RI = State.getRegInfo();
+                                                    const LLVMState &State) {
+  const auto &Tgt = State.getSnippyTarget();
+  const auto &RI = State.getRegInfo();
+  const auto &II = State.getInstrInfo();
   DenseSet<Register> Exclude;
   SmallVector<Register> ExcludedRegs;
   for (auto Opcode : Opcodes) {
-    Tgt.excludeFromMemRegsForOpcode(Opcode, RI, ExcludedRegs);
+    Tgt.excludeFromMemRegsForInstr(II.get(Opcode), RI, ExcludedRegs);
     Exclude.insert(ExcludedRegs.begin(), ExcludedRegs.end());
   }
   return Exclude;
@@ -338,8 +339,8 @@ selectOperandsForMemoryInstructions(InstructionGenerationContext &InstrGenCtx,
                                     ArrayRef<unsigned> Opcodes,
                                     RegPoolWrapper &RP) {
   unsigned Count = Opcodes.size();
-  auto &ProgCtx = InstrGenCtx.ProgCtx;
-  auto &State = ProgCtx.getLLVMState();
+  const auto &ProgCtx = InstrGenCtx.ProgCtx;
+  const auto &State = ProgCtx.getLLVMState();
   const auto &Tgt = State.getSnippyTarget();
   const auto &InstrInfo = State.getInstrInfo();
   const auto &RegInfo = State.getRegInfo();
@@ -409,13 +410,11 @@ void selectConcreteOffsets(
       enumerate(Preselected), [&](auto &&Args) -> planning::PreselectedOpInfo {
         auto &[Idx, Operand] = Args;
         if (Operand.isImm()) {
-          auto OpType = InstrDesc.operands()[Idx].OperandType;
           auto &ProgCtx = IGC.ProgCtx;
           auto &Cfg = IGC.getCommonCfg();
           auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
-          auto Concrete =
-              Tgt.generateTargetOperand(ProgCtx, Cfg, InstrDesc.getOpcode(),
-                                        OpType, Operand.getImm(), Idx);
+          auto Concrete = Tgt.generateTargetOperand(
+              InstrDesc, Idx, Operand.getImm(), ProgCtx, Cfg);
           return StridedImmediate(Concrete.getImm(), Concrete.getImm(),
                                   Operand.getImm().getStride());
         }
@@ -607,7 +606,8 @@ generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
   std::unordered_set<unsigned> Exclude;
   for (auto Opcode : Opcodes) {
     SmallVector<Register> ExcludedRegs;
-    SnippyTgt.excludeFromMemRegsForOpcode(Opcode, RI, ExcludedRegs);
+    SnippyTgt.excludeFromMemRegsForInstr(InstrInfo.get(Opcode), RI,
+                                         ExcludedRegs);
     copy(ExcludedRegs, std::inserter(Exclude, Exclude.begin()));
   }
   // Current implementation expects that each target has only one addr reg

@@ -297,11 +297,20 @@ public:
     reportUnimplementedError();
   }
 
-  virtual MachineOperand
-  generateTargetOperand(SnippyProgramContext &ProgCtx,
-                        const CommonPolicyConfig &Cfg, unsigned OpCode,
-                        unsigned OpType, const StridedImmediate &StridedImm,
-                        unsigned OperandIdx) const override {
+  MachineOperand generateMemoryRelatedImmediate(
+      const MCInstrDesc &InstrDesc, unsigned OperandIdx,
+      const StridedImmediate &StridedImm, const SnippyProgramContext &ProgCtx,
+      const CommonPolicyConfig &Cfg,
+      ArrayRef<MachineOperand> PregeneratedOperands,
+      MemAddr Addr) const override {
+    reportUnimplementedError();
+  }
+
+  MachineOperand
+  generateTargetOperand(const MCInstrDesc &InstrDesc, unsigned OperandIdx,
+                        const StridedImmediate &StridedImm,
+                        const SnippyProgramContext &ProgCtx,
+                        const CommonPolicyConfig &Cfg) const override {
     reportUnimplementedError();
   }
 
@@ -564,16 +573,24 @@ public:
     reportUnimplementedError();
   }
 
-  AddressGenInfo
-  selectAddrGenInfoForInstr(SnippyProgramContext &ProgCtx, unsigned Opcode,
-                            const MachineBasicBlock &MBB,
-                            const MachineInstr *MI = nullptr) const override {
+  void preselectAccessSizeOperand(
+      InstructionGenerationContext &IGC, const MCInstrDesc &InstrDesc,
+      MutableArrayRef<planning::PreselectedOpInfo> Preselected) const override {
     reportUnimplementedError();
   }
 
-  void
-  excludeFromMemRegsForOpcode(unsigned Opcode, const MCRegisterInfo &RI,
-                              SmallVectorImpl<Register> &Regs) const override {
+  AddressGenInfo selectAddrGenInfoForInstr(
+      const SnippyProgramContext &ProgCtx, unsigned Opcode,
+      const MachineBasicBlock &MBB,
+      ArrayRef<planning::PreselectedOpInfo> Preselected = {}) const override {
+    reportUnimplementedError();
+  }
+
+  void excludeFromMemRegsForInstr(
+      const MCInstrDesc &Instr, const MCRegisterInfo &RI,
+      SmallVectorImpl<Register> &Regs,
+      std::optional<MemAddr> Addr = std::nullopt,
+      const CommonPolicyConfig *Cfg = nullptr) const override {
     reportUnimplementedError();
   }
 
