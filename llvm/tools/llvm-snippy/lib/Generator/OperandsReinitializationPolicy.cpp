@@ -42,15 +42,14 @@ static Register pregenerateRegister(InstructionGenerationContext &InstrGenCtx,
   auto CustomMask = Tgt.getCustomAccessMaskForOperand(InstrDesc, OpIndex);
   if (CustomMask != AccessMaskBit::None)
     Mask = CustomMask;
-  auto ExpectedRegOpt =
+  auto ExpectedReg =
       ProgCtx.getRegGen().generate(RegClass, OperandRegClassID, RegInfo, RP,
                                    MBB, Tgt, Exclude, Include, Mask);
-  if (auto Err = ExpectedRegOpt.takeError())
+  if (auto Err = ExpectedReg.takeError())
     snippy::fatal(std::move(Err));
-  auto RegOpt = *ExpectedRegOpt;
-  assert(RegOpt.has_value());
-  assert(RegOpt.value() != MCRegister::NoRegister);
-  return RegOpt.value();
+  auto Reg = *ExpectedReg;
+  assert(Reg != MCRegister::NoRegister);
+  return Reg;
 }
 
 /// Pregenerate available register operands.
