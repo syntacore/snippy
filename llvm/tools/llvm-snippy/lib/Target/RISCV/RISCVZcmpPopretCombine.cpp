@@ -139,11 +139,12 @@ RISCVZcmpPopretCombine::replacePrologueWithRListSpill(unsigned PopretOpcode,
 
   assert(!MBB.empty());
   InstructionGenerationContext IGC(MBB, MBB.begin(), SGCtx);
-  auto RList =
-      Tgt.generateTargetOperand(ProgCtx, IGC.getCommonCfg(), RISCV::CM_POPRET,
-                                /* OperandType */ RISCVOp::OPERAND_RLIST,
-                                /* StridedImm */ {}, /* OperandIdx */ 0)
-          .getImm();
+  const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
+  const auto &InstrDesc = InstrInfo.get(RISCV::CM_POPRET);
+  auto RList = Tgt.generateTargetOperand(InstrDesc, /* OperandIdx */ 0,
+                                         /* StridedImm */ {}, ProgCtx,
+                                         IGC.getCommonCfg())
+                   .getImm();
   // We have already removed creation stack frame (spilling callee-saved
   // registers to the stack). Now we need to spill of exactly as many
   // registers as CM_POPRET/CM_POPRETZ will reload (RList).
@@ -198,12 +199,13 @@ void RISCVZcmpPopretCombine::replaceEpilogueWithPopret(unsigned PopretOpcode,
   auto &State = ProgCtx.getLLVMState();
   auto &Tgt = State.getSnippyTarget();
   const auto *InstrInfo = STI->getInstrInfo();
+  const auto &InstrDesc = InstrInfo->get(PopretOpcode);
+
   InstructionGenerationContext IGC(MBB, MBB.begin(), SGCtx);
-  auto Spimm =
-      Tgt.generateTargetOperand(ProgCtx, IGC.getCommonCfg(), PopretOpcode,
-                                /* OperandType */ RISCVOp::OPERAND_STACKADJ,
-                                /* StridedImm */ {}, /* OperandIdx */ 1)
-          .getImm();
+  auto Spimm = Tgt.generateTargetOperand(InstrDesc, /* OperandIdx */ 1,
+                                         /* StridedImm */ {}, ProgCtx,
+                                         IGC.getCommonCfg())
+                   .getImm();
   auto &Ctx = State.getCtx();
   // This means that rlist contains an odd number of registers and now SP is not
   // aligned to 16 bytes. This means that we need to subtract 8 bytes to restore
