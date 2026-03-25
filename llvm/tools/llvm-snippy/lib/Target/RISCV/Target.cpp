@@ -642,16 +642,31 @@ getSEWXlenVLMaxSupportRVVMode(InstructionGenerationContext &IGC,
   return RVVModeInfo(VLVM, *Config, MBB);
 }
 
-static unsigned getMemOperandIdx(const MCInstrDesc &InstrDesc) {
-  auto Opcode = InstrDesc.getOpcode();
-  assert(isSupportedLoadStore(Opcode) || isAtomicAMO(Opcode) ||
-         isLrInstr(Opcode) || isScInstr(Opcode));
+// TODO: We should expect that one instruction can have multiple operands of the
+// same type.
+template <typename Predicate>
+static unsigned getOperandIdx(const MCInstrDesc &InstrDesc, Predicate Pred) {
   auto Ops = InstrDesc.operands();
-  auto MemMCOpInfo = llvm::find_if(Ops, [](const auto &OpInfo) {
-    return OpInfo.OperandType == MCOI::OperandType::OPERAND_MEMORY;
-  });
+  auto MemMCOpInfo = llvm::find_if(Ops, Pred);
   assert(MemMCOpInfo != Ops.end());
   return std::distance(Ops.begin(), MemMCOpInfo);
+}
+
+static unsigned getMemOperandIdx(const MCInstrDesc &InstrDesc) {
+  [[maybe_unused]] auto Opcode = InstrDesc.getOpcode();
+  assert(isSupportedLoadStore(Opcode) || isAtomicAMO(Opcode) ||
+         isLrInstr(Opcode) || isScInstr(Opcode));
+  return getOperandIdx(InstrDesc, [](const MCOperandInfo &Op) {
+    return Op.OperandType == MCOI::OperandType::OPERAND_MEMORY;
+  });
+}
+
+static unsigned getImmOperandIdx(const MCInstrDesc &InstrDesc) {
+  return getOperandIdx(InstrDesc, [](const MCOperandInfo &Op) {
+    return Op.OperandType == MCOI::OperandType::OPERAND_IMMEDIATE ||
+           (Op.OperandType >= MCOI::OperandType::OPERAND_FIRST_TARGET &&
+            Op.RegClass == -1);
+  });
 }
 
 static const planning::PreselectedOpInfo &
@@ -998,7 +1013,7 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForInstrWithImmOffset(
     std::optional<MemAddr> MainPart = std::nullopt) {
   auto Opcode = InstrDesc.getOpcode();
   assert(isLoadStore(Opcode) || isCLoadStore(Opcode) || isFPLoadStore(Opcode) ||
-         isCFPLoadStore(Opcode) || isZicbo(Opcode) || isZcmpPushPop(Opcode));
+         isCFPLoadStore(Opcode) || isZcmpPushPop(Opcode));
 
   const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
   unsigned AddrRegIdx = getMemOperandIdx(InstrDesc);
@@ -1011,6 +1026,9 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForInstrWithImmOffset(
   auto AddrValue =
       AddrInfo.Address - (AddrImm.getImm().getMin() * (!MainPart.has_value()));
 
+  // If we've chosen X0 as address register, address is completely defined by
+  // the offset (imm).
+  assert(AddrReg.getReg() != RISCV::X0 || AddrValue == 0);
   auto Part = AddressPart{AddrReg.getReg(), APInt(ST.getXLen(), AddrValue)};
   return std::make_pair<AddressParts, MemAddresses>(
       {std::move(Part)}, {uintToTargetXLen(Is64Bit, AddrInfo.Address)});
@@ -1078,7 +1096,7 @@ addGeneratedInstrsToBB(InstructionGenerationContext &IGC,
 }
 
 static unsigned getRelativeImmOperandIdx(unsigned Opcode,
-                                         SnippyProgramContext &ProgCtx,
+                                         const SnippyProgramContext &ProgCtx,
                                          unsigned AbsoluteOpIdx) {
   const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
   const auto &Operands = InstrInfo.get(Opcode).operands();
@@ -1096,6 +1114,11 @@ class SnippyRISCVTarget final : public SnippyTarget {
   void generateWriteValueSeq(InstructionGenerationContext &IGC, APInt Value,
                              MCRegister DestReg,
                              SmallVectorImpl<MCInst> &Insts) const override {
+    // FIXME: This should not happen. Callers should not write to X0.
+    // (might be acceptable to call with DestReg == X0 and Value == 0)
+    if (DestReg == RISCV::X0)
+      return;
+
     if (RISCV::VRRegClass.contains(DestReg)) {
       generateWriteValueV(IGC, Value, DestReg, Insts);
       return;
@@ -3023,31 +3046,44 @@ public:
         .addReg(AddrReg);
   }
 
-  MachineOperand createOperandForOpType(unsigned Opcode,
-                                        const ImmediateHistogramSequence *IH,
-                                        unsigned OperandType,
+  MachineOperand createOperandForOpType(const MCInstrDesc &MIDesc,
+                                        unsigned OperandIdx,
                                         const StridedImmediate &StridedImm,
+                                        const ImmediateHistogramSequence *IH,
                                         const LLVMState &State) const {
+    auto Opcode = MIDesc.getOpcode();
+    auto OperandType = MIDesc.operands()[OperandIdx].OperandType;
+    return MachineOperand::CreateImm(
+        genImmOperandForOpcode(Opcode, IH, OperandType, StridedImm, State));
+  }
+
+  int64_t genImmOperandForOpcode(unsigned Opcode,
+                                 const ImmediateHistogramSequence *IH,
+                                 unsigned OperandType,
+                                 const StridedImmediate &StridedImm,
+                                 const LLVMState &State) const {
     const auto &TM = State.getTargetMachine();
     // NOTE: need to be in sync with
     // llvm/lib/Target/RISCV/MCTargetDesc/RISCVBaseInfo.h(RISCVOp)
     // llvm/lib/Target/RISCV/RISCVInstrInfo.cpp
     // (RISCVInstrInfo::verifyInstruction)
+    using namespace RISCVOp;
     switch (OperandType) {
     default:
-      snippy::fatal("Requested generation for an unexpected operand type.");
-    case RISCVOp::OPERAND_UIMM1:
-      return MachineOperand::CreateImm(genImmUINT<1>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM2:
-      return MachineOperand::CreateImm(genImmUINT<2>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM2_LSB0:
-      return MachineOperand::CreateImm(
-          genImmUINTWithNZeroLSBs<2, 1>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM3:
-      return MachineOperand::CreateImm(genImmUINT<3>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM4:
-      return MachineOperand::CreateImm(genImmUINT<4>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM5: {
+      snippy::fatal(formatv(
+          "Requested generation for an unexpected immediate operand type: {0}.",
+          OperandType));
+    case OPERAND_UIMM1:
+      return genImmUINT<1>(IH, StridedImm);
+    case OPERAND_UIMM2:
+      return genImmUINT<2>(IH, StridedImm);
+    case OPERAND_UIMM2_LSB0:
+      return genImmUINTWithNZeroLSBs<2, 1>(IH, StridedImm);
+    case OPERAND_UIMM3:
+      return genImmUINT<3>(IH, StridedImm);
+    case OPERAND_UIMM4:
+      return genImmUINT<4>(IH, StridedImm);
+    case OPERAND_UIMM5: {
       // Has to be in sync with llvm/lib/Target/RISCV/RISCVInstrInfo.td
       // Specifically with WriteSysRegImm and SwapSysRegImm classes.
       bool IsFRMSysRegWrite =
@@ -3059,87 +3095,76 @@ public:
         // When generating immediates for operations that modify the FRM
         // we should generate only valid rounding modes and not use the dynamic
         // mode, since that value is reserved.
-        return MachineOperand::CreateImm(
-            static_cast<int>(snippy::selectFrom(RNE, RTZ, RDN, RUP, RMM)));
+        return snippy::selectFrom(RNE, RTZ, RDN, RUP, RMM);
       }
-      return MachineOperand::CreateImm(genImmUINT<5>(IH, StridedImm));
+      return genImmUINT<5>(IH, StridedImm);
     }
-    case RISCVOp::OPERAND_UIMM5_NONZERO:
-      return MachineOperand::CreateImm(genImmNonZeroUINT<5>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM6:
-      return MachineOperand::CreateImm(genImmUINT<6>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM7:
-      return MachineOperand::CreateImm(genImmUINT<7>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM7_LSB00:
-      return MachineOperand::CreateImm(
-          genImmUINTWithNZeroLSBs<7, 2>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM8:
-      return MachineOperand::CreateImm(genImmUINT<8>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM8_LSB00:
-      return MachineOperand::CreateImm(
-          genImmUINTWithNZeroLSBs<8, 2>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM8_GE32:
-      return MachineOperand::CreateImm(
-          genImmInInterval<32, 1 << 8>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM8_LSB000:
-      return MachineOperand::CreateImm(
-          genImmUINTWithNZeroLSBs<8, 3>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM9_LSB000:
-      return MachineOperand::CreateImm(
-          genImmUINTWithNZeroLSBs<9, 3>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM12:
-      return MachineOperand::CreateImm(genImmUINT<12>(IH, StridedImm));
-    case RISCVOp::OPERAND_ZERO:
-      return MachineOperand::CreateImm(0);
-    case RISCVOp::OPERAND_SIMM5:
-      return MachineOperand::CreateImm(genImmSINT<5>(IH, StridedImm));
-    case RISCVOp::OPERAND_SIMM5_PLUS1:
-      return MachineOperand::CreateImm(
-          genImmSINTWithOffset<5, 1>(IH, StridedImm));
-    case RISCVOp::OPERAND_SIMM6:
-      return MachineOperand::CreateImm(genImmSINT<6>(IH, StridedImm));
-    case RISCVOp::OPERAND_SIMM6_NONZERO:
-      return MachineOperand::CreateImm(genImmNonZeroSINT<6>(IH, StridedImm));
-    case RISCVOp::OPERAND_SIMM10_LSB0000_NONZERO:
-      return MachineOperand::CreateImm(
-          genImmNonZeroSINTWithNZeroLSBs<10, 4>(IH, StridedImm));
-    case RISCVOp::OPERAND_CLUI_IMM:
-      return MachineOperand::CreateImm(
-          genImmSINTWithOffset<5, 0xffff0>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM10_LSB00_NONZERO:
-      return MachineOperand::CreateImm(
-          genImmNonZeroUINTWithNZeroLSBs<10, 2>(IH, StridedImm));
-    case RISCVOp::OPERAND_SIMM12:
-      return MachineOperand::CreateImm(genImmSINT<12>(IH, StridedImm));
-    case RISCVOp::OPERAND_SIMM12_LSB00000:
-      return MachineOperand::CreateImm(
-          genImmSINTWithNZeroLSBs<12, 5>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMM20:
-      return MachineOperand::CreateImm(genImmUINT<20>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMMLOG2XLEN:
+    case OPERAND_UIMM5_NONZERO:
+      return genImmNonZeroUINT<5>(IH, StridedImm);
+    case OPERAND_UIMM6:
+      return genImmUINT<6>(IH, StridedImm);
+    case OPERAND_UIMM7:
+      return genImmUINT<7>(IH, StridedImm);
+    case OPERAND_UIMM7_LSB00:
+      return genImmUINTWithNZeroLSBs<7, 2>(IH, StridedImm);
+    case OPERAND_UIMM8:
+      return genImmUINT<8>(IH, StridedImm);
+    case OPERAND_UIMM8_LSB00:
+      return genImmUINTWithNZeroLSBs<8, 2>(IH, StridedImm);
+    case OPERAND_UIMM8_GE32:
+      return genImmInInterval<32, 1 << 8>(IH, StridedImm);
+    case OPERAND_UIMM8_LSB000:
+      return genImmUINTWithNZeroLSBs<8, 3>(IH, StridedImm);
+    case OPERAND_UIMM9_LSB000:
+      return genImmUINTWithNZeroLSBs<9, 3>(IH, StridedImm);
+    case OPERAND_UIMM12:
+      return genImmUINT<12>(IH, StridedImm);
+    case OPERAND_ZERO:
+      return 0;
+    case OPERAND_SIMM5:
+      return genImmSINT<5>(IH, StridedImm);
+    case OPERAND_SIMM5_PLUS1:
+      return genImmSINTWithOffset<5, 1>(IH, StridedImm);
+    case OPERAND_SIMM6:
+      return genImmSINT<6>(IH, StridedImm);
+    case OPERAND_SIMM6_NONZERO:
+      return genImmNonZeroSINT<6>(IH, StridedImm);
+    case OPERAND_SIMM10_LSB0000_NONZERO:
+      return genImmNonZeroSINTWithNZeroLSBs<10, 4>(IH, StridedImm);
+    case OPERAND_CLUI_IMM:
+      return genImmSINTWithOffset<5, 0xffff0>(IH, StridedImm);
+    case OPERAND_UIMM10_LSB00_NONZERO:
+      return genImmNonZeroUINTWithNZeroLSBs<10, 2>(IH, StridedImm);
+    case OPERAND_SIMM12:
+      return genImmSINT<12>(IH, StridedImm);
+    case OPERAND_SIMM12_LSB00000:
+      return genImmSINTWithNZeroLSBs<12, 5>(IH, StridedImm);
+    case OPERAND_UIMM20:
+      return genImmUINT<20>(IH, StridedImm);
+    case OPERAND_UIMMLOG2XLEN:
       if (is64Bit(TM))
-        return MachineOperand::CreateImm(genImmUINT<6>(IH, StridedImm));
-      return MachineOperand::CreateImm(genImmUINT<5>(IH, StridedImm));
-    case RISCVOp::OPERAND_UIMMLOG2XLEN_NONZERO:
+        return genImmUINT<6>(IH, StridedImm);
+      return genImmUINT<5>(IH, StridedImm);
+    case OPERAND_UIMMLOG2XLEN_NONZERO:
       if (is64Bit(TM))
-        return MachineOperand::CreateImm(genImmNonZeroUINT<6>(IH, StridedImm));
-      return MachineOperand::CreateImm(genImmNonZeroUINT<5>(IH, StridedImm));
-    case RISCVOp::OPERAND_VTYPEI10:
-    case RISCVOp::OPERAND_VTYPEI11:
+        return genImmNonZeroUINT<6>(IH, StridedImm);
+      return genImmNonZeroUINT<5>(IH, StridedImm);
+    case OPERAND_VTYPEI10:
+    case OPERAND_VTYPEI11:
       assert(false && "VTYPE immediates should not be randomly sampled");
-    case RISCVOp::OPERAND_RVKRNUM:
-      return MachineOperand::CreateImm(genImmInInterval<0, 10>(IH, StridedImm));
-    case RISCVOp::OPERAND_RVKRNUM_0_7:
-      return MachineOperand::CreateImm(genImmInInterval<0, 7>(IH, StridedImm));
-    case RISCVOp::OPERAND_RVKRNUM_1_10:
-      return MachineOperand::CreateImm(genImmInInterval<1, 10>(IH, StridedImm));
-    case RISCVOp::OPERAND_RVKRNUM_2_14:
-      return MachineOperand::CreateImm(genImmInInterval<2, 14>(IH, StridedImm));
-    case RISCVOp::OPERAND_AVL:
+    case OPERAND_RVKRNUM:
+      return genImmInInterval<0, 10>(IH, StridedImm);
+    case OPERAND_RVKRNUM_0_7:
+      return genImmInInterval<0, 7>(IH, StridedImm);
+    case OPERAND_RVKRNUM_1_10:
+      return genImmInInterval<1, 10>(IH, StridedImm);
+    case OPERAND_RVKRNUM_2_14:
+      return genImmInInterval<2, 14>(IH, StridedImm);
+    case OPERAND_AVL:
       snippy::fatal("AVL operand generation is not supported. Probably "
                     "snippy still does "
                     "not support vector instructions generation.");
-    case RISCVOp::OPERAND_FRMARG: {
+    case OPERAND_FRMARG: {
       // Floating-point operations use either a static rounding mode encoded in
       // the instruction, or a dynamic rounding mode held in frm.
       // 000 - RNE (Round to Nearest, ties to Even)
@@ -3150,47 +3175,35 @@ public:
       // 101 - <reserved>
       // 110 - <reserved>
       // 111 - DYN (In instruction’s rm field, selects dynamic rounding mode)
-      return MachineOperand::CreateImm([&]() -> int {
-        using namespace RISCVFPRndMode;
-        // If the immediate histogram is specified then sample it.
-        if (IH)
-          return genImmInInterval<RNE, DYN>(*IH);
-        // Otherwise generate only valid static rounding modes or use dynamic
-        // one.
-        return static_cast<int>(
-            snippy::selectFrom(RNE, RTZ, RDN, RUP, RMM, DYN));
-      }());
+      using namespace RISCVFPRndMode;
+      if (IH || StridedImm.isInitialized()) {
+        // If requested, allow even reserved imm values
+        return genImmInInterval<RNE, DYN>(IH, StridedImm);
+      }
+      // Otherwise, generate only valid static rounding modes or the dynamic
+      // one.
+      return snippy::selectFrom(RNE, RTZ, RDN, RUP, RMM, DYN);
     }
-    case RISCVOp::OPERAND_RTZARG:
-      return MachineOperand::CreateImm(RISCVFPRndMode::RTZ);
-    case RISCVOp::OPERAND_RLIST: {
-      return MachineOperand::CreateImm([&]() -> int {
-        using namespace RISCVZC;
-        // If the immediate histogram is specified then sample it.
-        if (IH)
-          return genImmInInterval<RA, RA_S0_S11>(*IH);
-        return static_cast<int>(snippy::selectFrom(
-            RA, RA_S0, RA_S0_S1, RA_S0_S2, RA_S0_S3, RA_S0_S4, RA_S0_S5,
-            RA_S0_S6, RA_S0_S7, RA_S0_S8, RA_S0_S9, RA_S0_S11));
-      }());
+    case OPERAND_RTZARG:
+      return RISCVFPRndMode::RTZ;
+    case OPERAND_RLIST: {
+      using namespace RISCVZC;
+      static_assert(snippy::isContinuous(
+          RA, RA_S0, RA_S0_S1, RA_S0_S2, RA_S0_S3, RA_S0_S4, RA_S0_S5, RA_S0_S6,
+          RA_S0_S7, RA_S0_S8, RA_S0_S9, RA_S0_S11));
+
+      return genImmInInterval<RA, RA_S0_S11>(IH, StridedImm);
     }
-    case RISCVOp::OPERAND_STACKADJ: {
+    case OPERAND_STACKADJ: {
       // spimm is the 2-bit number of additional 16-byte address increments
       // allocated for the stack frame. The total stack adjustment represents
       // the total size of the stack frame, which is stack_adj_base (calculated
       // depending on how many registers are in the rlist) added to spimm scaled
       // by 16:
       // stack_adj = stack_adj_base + spimm * 16
-      return MachineOperand::CreateImm([&]() -> int {
-        // If the immediate histogram is specified then sample it.
-        if (IH)
-          return genImmInInterval<0b00, 0b11>(*IH) *
-                 getSpillAlignmentInBytes(/* any saved register */ RISCV::X1,
-                                          State);
-        return static_cast<int>(snippy::selectFrom(0b00, 0b01, 0b10, 0b11) *
-                                getSpillAlignmentInBytes(
-                                    /* any saved register */ RISCV::X1, State));
-      }());
+      auto SpillAlignment =
+          getSpillAlignmentInBytes(/* any saved register */ RISCV::X1, State);
+      return genImmInInterval<0b00, 0b11>(IH, StridedImm) * SpillAlignment;
     }
     }
   }
@@ -3202,19 +3215,21 @@ public:
     });
   }
 
-  MachineOperand genTargetOpForOpcode(unsigned Opcode, unsigned OperandType,
+  MachineOperand genTargetOpForOpcode(const MCInstrDesc &InstrDesc,
+                                      unsigned OperandIdx,
                                       const StridedImmediate &StridedImm,
-                                      SnippyProgramContext &ProgCtx,
-                                      const CommonPolicyConfig &Cfg,
-                                      unsigned OperandIdx) const {
+                                      const SnippyProgramContext &ProgCtx,
+                                      const CommonPolicyConfig &Cfg) const {
+    auto Opcode = InstrDesc.getOpcode();
     const auto &State = ProgCtx.getLLVMState();
     const auto &OpcSetting = Cfg.ImmHistMap.getConfigForOpcode(Opcode);
+
     if (OpcSetting.isUniform())
-      return createOperandForOpType(Opcode, /*IH=*/nullptr, OperandType,
-                                    StridedImm, State);
+      return createOperandForOpType(InstrDesc, OperandIdx, StridedImm,
+                                    /*IH*/ nullptr, State);
     if (OpcSetting.isSequence()) {
-      const auto &Seq = OpcSetting.getSequence();
-      return createOperandForOpType(Opcode, &Seq, OperandType, StridedImm,
+      const auto &IH = OpcSetting.getSequence();
+      return createOperandForOpType(InstrDesc, OperandIdx, StridedImm, &IH,
                                     State);
     }
     assert(OpcSetting.isPerOperand());
@@ -3222,21 +3237,49 @@ public:
         getRelativeImmOperandIdx(Opcode, ProgCtx, OperandIdx);
     const auto &OperandsMap = OpcSetting.getOperandsMap();
     if (OperandsMap.isUniformForOperand(RelativeOpIdx))
-      return createOperandForOpType(Opcode, /*IH=*/nullptr, OperandType,
-                                    StridedImm, State);
-    const auto &Seq = OperandsMap.getIHForOperand(RelativeOpIdx);
-    return createOperandForOpType(Opcode, &Seq, OperandType, StridedImm, State);
+      return createOperandForOpType(InstrDesc, OperandIdx, StridedImm,
+                                    /*IH*/ nullptr, State);
+    const auto &IH = OperandsMap.getIHForOperand(RelativeOpIdx);
+    return createOperandForOpType(InstrDesc, OperandIdx, StridedImm, &IH,
+                                  State);
   }
 
-  MachineOperand generateTargetOperand(SnippyProgramContext &ProgCtx,
-                                       const CommonPolicyConfig &Cfg,
-                                       unsigned Opcode, unsigned OperandType,
-                                       const StridedImmediate &StridedImm,
-                                       unsigned OperandIdx) const override {
+  MachineOperand generateMemoryRelatedImmediate(
+      const MCInstrDesc &InstrDesc, unsigned OperandIdx,
+      const StridedImmediate &StridedImm, const SnippyProgramContext &ProgCtx,
+      const CommonPolicyConfig &Cfg,
+      ArrayRef<MachineOperand> PregeneratedOperands,
+      MemAddr Addr) const override {
+    // Handle the case when the memory operand is X0. We ignore StridedImm in
+    // that case.
+    auto MemOpIdx = getMemOperandIdx(InstrDesc);
+    const auto &MemMCReg = PregeneratedOperands[MemOpIdx].getReg().asMCReg();
+    if (MemMCReg == RISCV::X0) {
+      // For now support only these instructions
+      assert(isLoadStore(InstrDesc.getOpcode()) ||
+             isFPLoadStore(InstrDesc.getOpcode()));
+      // We expect that the address is small enough to fit into immediate,
+      // as otherwise X0 would not be generated prior.
+      assert(isInt<12>(Addr));
+      return MachineOperand::CreateImm(Addr);
+    }
+
+    return generateTargetOperand(InstrDesc, OperandIdx, StridedImm, ProgCtx,
+                                 Cfg);
+  }
+
+  MachineOperand
+  generateTargetOperand(const MCInstrDesc &InstrDesc, unsigned OperandIdx,
+                        const StridedImmediate &StridedImm,
+                        const SnippyProgramContext &ProgCtx,
+                        const CommonPolicyConfig &Cfg) const override {
+    auto Opcode = InstrDesc.getOpcode();
+    const auto &State = ProgCtx.getLLVMState();
     const auto &IHV = Cfg.ImmHistogram;
+
     if (IHV.holdsAlternative<ImmediateHistogramRegEx>())
-      return genTargetOpForOpcode(Opcode, OperandType, StridedImm, ProgCtx, Cfg,
-                                  OperandIdx);
+      return genTargetOpForOpcode(InstrDesc, OperandIdx, StridedImm, ProgCtx,
+                                  Cfg);
 
     const auto *IH = [&]() -> const ImmediateHistogramSequence * {
       // Disable histogram for loads and stores
@@ -3248,8 +3291,7 @@ public:
       return Sequence->empty() ? nullptr : Sequence;
     }();
 
-    return createOperandForOpType(Opcode, IH, OperandType, StridedImm,
-                                  ProgCtx.getLLVMState());
+    return createOperandForOpType(InstrDesc, OperandIdx, StridedImm, IH, State);
   }
 
   AccessMaskBit getCustomAccessMaskForOperand(const MCInstrDesc &InstrDesc,
@@ -3354,6 +3396,7 @@ public:
       return std::make_pair<AddressParts, MemAddresses>({std::move(Part)},
                                                         std::move(Addresses));
     }
+
     if (isRVVStridedLoadStore(Opcode) || isRVVStridedSegLoadStore(Opcode))
       return breakDownAddrForRVVStrided(AddrInfo, InstrDesc, Preselected, IGC,
                                         is64Bit(TM), MainPart);
@@ -3679,14 +3722,38 @@ public:
     storeRegToAddr(IGC, Addr, RegForValue, ValueRegBitSize / RISCV_CHAR_BIT);
   }
 
-  // There is an optional operand MI, which is initialized when we need select
-  // an address for an instruction with already known operands at the generation
-  // stage. Because, for example, for extension Zcmp, the access size depends on
-  // the values of the operands.
-  AddressGenInfo
-  selectAddrGenInfoForInstr(SnippyProgramContext &ProgCtx, unsigned Opcode,
-                            const MachineBasicBlock &MBB,
-                            const MachineInstr *MI = nullptr) const override {
+  void preselectAccessSizeOperand(
+      InstructionGenerationContext &IGC, const MCInstrDesc &InstrDesc,
+      MutableArrayRef<planning::PreselectedOpInfo> Preselected) const override {
+    auto Opcode = InstrDesc.getOpcode();
+    if (!isZcmpPushPop(Opcode))
+      return;
+
+    const auto &ProgCtx = IGC.ProgCtx;
+    const auto &Cfg = IGC.getCommonCfg();
+
+    for (auto [OpIdx, PreselectedOp] : enumerate(Preselected)) {
+      // might have some operands already preselected
+      StridedImmediate StridedImm;
+      if (PreselectedOp.isImm())
+        StridedImm = PreselectedOp.getImm();
+
+      const auto &MO =
+          generateTargetOperand(InstrDesc, OpIdx, StridedImm, ProgCtx, Cfg);
+      assert(MO.isImm() && "In ZcmpPushPop all operands must be immediates");
+      auto ImmVal = MO.getImm();
+      PreselectedOp = StridedImmediate(ImmVal, ImmVal, /*Stride=*/0);
+    }
+  }
+
+  // In some instructions, operand selection and memory access patterns are
+  // closely coupled. For example, in the Zcmp extension, the access size is
+  // determined by the immediate operand values. For such instructions we
+  // expect these values to be already preselected.
+  AddressGenInfo selectAddrGenInfoForInstr(
+      const SnippyProgramContext &ProgCtx, unsigned Opcode,
+      const MachineBasicBlock &MBB,
+      ArrayRef<planning::PreselectedOpInfo> Preselected = {}) const override {
     assert(countAddrsToGenerate(Opcode) && "Instruction doesn't access memory");
     auto MisalignedAccessMode = getMisalignedAccessMode();
     bool DisableMisalign =
@@ -3695,17 +3762,28 @@ public:
           (isAtomicAMO(Opcode) || isScInstr(Opcode) || isLrInstr(Opcode))));
 
     if (isZcmpPushPop(Opcode)) {
-      assert(MI && "To calculate the access size of push/pop, the operands "
-                   "must be known");
+      [[maybe_unused]] const auto *MIDesc =
+          ProgCtx.getOpcodeCache().desc(Opcode);
+      assert(
+          Preselected.size() == MIDesc->getNumOperands() &&
+          "ZcmpPushPop instruction must already have all operands preselected");
+
       const auto &TM = ProgCtx.getLLVMState().getTargetMachine();
-      auto RListOp = MI->getOperand(0);
-      assert(RListOp.isImm() && "Rlist operand must be immediate");
+      const auto &RList = Preselected[0];
+      assert(RList.isImm() && "Preselected Rlist operand must be immediate");
+      const auto &ImmRList = RList.getImm();
+      assert(ImmRList.getMax() == ImmRList.getMin());
       auto StackAdjBase =
-          RISCVZC::getStackAdjBase(RListOp.getImm(), is64Bit(TM));
-      auto Spimm = MI->getOperand(1);
-      assert(Spimm.isImm() && "Spimm operand must be immediate");
+          RISCVZC::getStackAdjBase(ImmRList.getMax(), is64Bit(TM));
+
+      const auto &SpimmOp = Preselected[1];
+      assert(SpimmOp.isImm() &&
+             "Preselected StackAdj operand must be immediate");
+      const auto &ImmSpimm = SpimmOp.getImm();
+      assert(ImmSpimm.getMax() == ImmSpimm.getMin());
+
       return AddressGenInfo::singleAccess(
-          /*AccessSize=*/StackAdjBase + Spimm.getImm(),
+          /*AccessSize=*/StackAdjBase + ImmSpimm.getMax(),
           /*Alignment=*/
           getSpillAlignmentInBytes(/* any saved register */ RISCV::X1,
                                    ProgCtx.getLLVMState()),
@@ -3781,9 +3859,36 @@ public:
     return MakeGenInfoWithAlignment(AccessSize * NFields + (VL - 1) * Stride);
   }
 
-  void
-  excludeFromMemRegsForOpcode(unsigned Opcode, const MCRegisterInfo &RI,
-                              SmallVectorImpl<Register> &Regs) const override {
+  void excludeFromMemRegsForInstr(
+      const MCInstrDesc &InstrDesc, const MCRegisterInfo &RI,
+      SmallVectorImpl<Register> &Regs,
+      std::optional<MemAddr> Addr = std::nullopt,
+      const CommonPolicyConfig *Cfg = nullptr) const override {
+    auto Opcode = InstrDesc.getOpcode();
+
+    // If the address value is small enough to fit into immediate,
+    // we might use X0 as the base address register.
+    if (Addr && Cfg) {
+      // But if this opcode has custom (non-uniform) immediate histogram, we
+      // can't use X0 because that might ruin the distribution of immediate
+      // values.
+      const auto &OpcToImmMap = Cfg->ImmHistMap;
+      bool IsImmHistUniform =
+          OpcToImmMap.empty() ||
+          OpcToImmMap.getConfigForOpcode(Opcode).isUniform();
+      // Compressed loads and stores can't use X0 at all
+      bool IsSimpleLoadStore = isLoadStore(Opcode) || isFPLoadStore(Opcode);
+
+      if (IsSimpleLoadStore && IsImmHistUniform) {
+        [[maybe_unused]] auto ImmOpIdx = getImmOperandIdx(InstrDesc);
+        assert(InstrDesc.operands()[ImmOpIdx].OperandType ==
+               RISCVOp::OPERAND_SIMM12);
+        // Both LoadStores and FPLoadStores have simm12 immediate
+        if (isInt<12>(*Addr))
+          return;
+      }
+    }
+
     if (!isCLoadStore(Opcode) && !isCFPLoadStore(Opcode)) {
       getPhysRegsFromUnit(RISCV::X0, RI, Regs);
       return;

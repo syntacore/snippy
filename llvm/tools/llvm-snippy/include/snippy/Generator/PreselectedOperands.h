@@ -89,7 +89,7 @@ public:
   }
 };
 
-// Typicaly instructions have very limited number of operands
+// Typically instructions have very limited number of operands
 using PreselectedOperands = SmallVector<PreselectedOpInfo, 8>;
 
 } // namespace llvm::snippy::planning

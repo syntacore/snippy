@@ -1,0 +1,64 @@
+# RUN: llvm-snippy %s -model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix=CHECK-POSITIVE
+
+# RUN: llvm-snippy %s -model-plugin=None \
+# RUN: |& FileCheck %s --check-prefix=CHECK-NEGATIVE
+
+# COM: Reserving all registers but x0 and x2 (sp). This means that if instruction
+# COM: with custom-defined immediate is generated, it will have x2 as base address register.
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  dump-mf: true
+  reserved-regs-list: ["X(1|[3-9]|[12][0-9]|3[01])"]
+
+sections:
+    - no:        0
+      VMA:       0x2100000
+      SIZE:      0x11000
+      LMA:       0x2100000
+      ACCESS:    r
+    - no:        1
+      VMA:       0x2004000
+      SIZE:      0xF2000
+      LMA:       0x2004000
+      ACCESS:    rx
+    - no:        2
+      VMA:       0x100
+      SIZE:      0x80
+      LMA:       0x100
+      ACCESS:    rw
+
+imm-hist:
+  opcodes:
+    - 'LH':
+      - [0x20, 1.0] # 32
+    - 'SH':
+      - [0x140, 1.0] # 320
+
+histogram:
+      - [LB, 1.0]
+      - [LH, 1.0]
+      - [LW, 1.0]
+      - [LD, 1.0]
+      - [SB, 1.0]
+      - [SH, 1.0]
+      - [SW, 1.0]
+      - [SD, 1.0]
+
+# COM: LH and SH won't be generated with x0 as base address because of imm-hist.
+# COM: Mind that even though immediate for SH (0x140) could hit the memory scheme
+# COM: with x0 as base address, x0 still won't be generated.
+
+# CHECK-NEGATIVE-NOT: LH $x0
+# CHECK-NEGATIVE-NOT: SH $x{{0|2}}, $x0
+
+# CHECK-POSITIVE-DAG: LB $x0
+# CHECK-POSITIVE-DAG: LH $x2, 32
+# CHECK-POSITIVE-DAG: LW $x0
+# CHECK-POSITIVE-DAG: LD $x0
+# CHECK-POSITIVE-DAG: SB $x{{0|2}}, $x0
+# CHECK-POSITIVE-DAG: SH $x{{0|2}}, $x2, 320
+# CHECK-POSITIVE-DAG: SW $x{{0|2}}, $x0
+# CHECK-POSITIVE-DAG: SD $x{{0|2}}, $x0
