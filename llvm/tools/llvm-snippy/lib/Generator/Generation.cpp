@@ -708,7 +708,7 @@ static MachineOperand createRegAsOperand(Register Reg, unsigned Flags,
       Flags & RegState::InternalRead, Flags & RegState::Renamable);
 }
 
-static std::optional<MachineOperand> pregenerateOneOperand(
+static MachineOperand pregenerateOneOperand(
     InstructionGenerationContext &InstrGenCtx, const MCInstrDesc &InstrDesc,
     const planning::PreselectedOpInfo &Preselected, unsigned OpIndex,
     ArrayRef<MachineOperand> PregeneratedOperands,
@@ -751,15 +751,12 @@ static std::optional<MachineOperand> pregenerateOneOperand(
       // not conflicting.
       if (CustomMask != AccessMaskBit::None)
         Mask = CustomMask;
-      auto ExpectedRegOpt =
+      auto ExpectedReg =
           RegGen.generate(RegClass, OperandRegClassID, RegInfo, RP, MBB,
                           SnippyTgt, Exclude, Include, Mask);
-      if (auto Err = ExpectedRegOpt.takeError())
+      if (auto Err = ExpectedReg.takeError())
         snippy::fatal(std::move(Err));
-      auto RegOpt = *ExpectedRegOpt;
-      if (!RegOpt)
-        return std::nullopt;
-      Reg = RegOpt.value();
+      Reg = *ExpectedReg;
       if (SnippyTgt.isPhysRegClass(OperandRegClassID, RegInfo))
         Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
     }
@@ -783,14 +780,11 @@ static std::optional<MachineOperand> pregenerateOneOperand(
                                            AccessAddress, &Cfg);
 
       auto RegClass = RegInfo.getRegClass(OperandRegClassID);
-      auto ExpectedRegOpt = RegGen.generate(
-          RegClass, OperandRegClassID, RegInfo, RP, MBB, SnippyTgt, Exclude);
-      if (auto Err = ExpectedRegOpt.takeError())
+      auto ExpectedReg = RegGen.generate(RegClass, OperandRegClassID, RegInfo,
+                                         RP, MBB, SnippyTgt, Exclude);
+      if (auto Err = ExpectedReg.takeError())
         snippy::fatal(std::move(Err));
-      auto RegOpt = *ExpectedRegOpt;
-      if (!RegOpt)
-        return std::nullopt;
-      Reg = RegOpt.value();
+      Reg = *ExpectedReg;
       if (SnippyTgt.isPhysRegClass(OperandRegClassID, RegInfo))
         Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
     }
@@ -827,7 +821,7 @@ static std::optional<MachineOperand> pregenerateOneOperand(
 
 using AddressInfoForInstr = std::pair<AddressInfo, AddressGenInfo>;
 
-static std::optional<SmallVector<MachineOperand, 8>> tryToPregenerateOperands(
+static SmallVector<MachineOperand, 8> pregenerateOperandsImpl(
     InstructionGenerationContext &InstrGenCtx, const MCInstrDesc &InstrDesc,
     ArrayRef<planning::PreselectedOpInfo> Preselected,
     const SmallVectorImpl<AddressInfoForInstr> &AddressesInfo) {
@@ -843,12 +837,9 @@ static std::optional<SmallVector<MachineOperand, 8>> tryToPregenerateOperands(
   }();
 
   for (const auto &[Index, PreselOpInfo] : enumerate(Preselected)) {
-    auto OpOpt =
-        pregenerateOneOperand(InstrGenCtx, InstrDesc, PreselOpInfo, Index,
-                              PregeneratedOperands, AccessAddress);
-    if (!OpOpt)
-      return std::nullopt;
-    PregeneratedOperands.push_back(OpOpt.value());
+    auto Op = pregenerateOneOperand(InstrGenCtx, InstrDesc, PreselOpInfo, Index,
+                                    PregeneratedOperands, AccessAddress);
+    PregeneratedOperands.push_back(Op);
   }
   return PregeneratedOperands;
 }
@@ -860,40 +851,26 @@ pregenerateOperands(InstructionGenerationContext &InstrGenCtx,
                     const SmallVectorImpl<AddressInfoForInstr> &AddressesInfo) {
   auto &RP = InstrGenCtx.getRegPool();
   auto &ProgCtx = InstrGenCtx.ProgCtx;
-  auto &RegGenerator = ProgCtx.getRegGen();
   auto &State = ProgCtx.getLLVMState();
-  auto &InstrInfo = State.getInstrInfo();
   const auto &Tgt = State.getSnippyTarget();
   const auto &RI = State.getRegInfo();
 
-  auto IterNum = 0u;
-  constexpr auto FailsMaxNum = 10000u;
-
-  while (IterNum < FailsMaxNum) {
-    RP.reset();
-    // Initialized registers must not be overwritten during other instruction
-    // preparation.
-    llvm::for_each(Preselected, [&](const auto &Op) {
-      if (!Op.isReg())
-        return;
-      SmallVector<Register> PhysRegs;
-      Tgt.getPhysRegsFromUnit(Op.getReg(), RI, PhysRegs);
-      llvm::for_each(PhysRegs, [&RP](auto SimpleReg) {
-        RP.addReserved(SimpleReg, AccessMaskBit::W);
-      });
+  RP.reset();
+  // Initialized registers must not be overwritten during other instruction
+  // preparation.
+  llvm::for_each(Preselected, [&](const auto &Op) {
+    if (!Op.isReg())
+      return;
+    SmallVector<Register> PhysRegs;
+    Tgt.getPhysRegsFromUnit(Op.getReg(), RI, PhysRegs);
+    llvm::for_each(PhysRegs, [&RP](auto SimpleReg) {
+      RP.addReserved(SimpleReg, AccessMaskBit::W);
     });
-    RegGenerator.setRegContextForPlugin();
-    auto PregeneratedOperandsOpt = tryToPregenerateOperands(
-        InstrGenCtx, InstrDesc, Preselected, AddressesInfo);
-    IterNum++;
+  });
+  auto PregeneratedOperands = pregenerateOperandsImpl(
+      InstrGenCtx, InstrDesc, Preselected, AddressesInfo);
 
-    if (PregeneratedOperandsOpt)
-      return std::move(PregeneratedOperandsOpt.value());
-  }
-
-  snippy::fatal(formatv("Limit on failed generation attempts exceeded "
-                        "on instruction {0}",
-                        InstrInfo.getName(InstrDesc.getOpcode())));
+  return PregeneratedOperands;
 }
 
 static auto stringifyRequestStatus(GenerationStatus Status) {
@@ -1129,8 +1106,8 @@ static void postprocessMemoryOperands(
     for (auto &AP : RegToValue) {
       if (SimCtx.hasTrackingMode() && IGC.getCommonCfg().TrackCfg.AddressVH)
         AP.FixedReg = chooseAddressRegister(IGC, MI, AP);
-      // Address registers must not be overwritten during other memory operands
-      // preparation.
+      // Address registers must not be overwritten during other memory
+      // operands preparation.
       RP.addReserved(AP.FixedReg);
     }
     for (auto &AP : RegToValue) {
@@ -1183,7 +1160,8 @@ static bool
 isPostprocessNeeded(const MCInstrDesc &InstrDesc,
                     ArrayRef<planning::PreselectedOpInfo> Preselected,
                     InstructionGenerationContext &IGC) {
-  // 1. If any information about operands is provided from the caller, we won't
+  // 1. If any information about operands is provided from the caller, we
+  // won't
   //    do any postprocessing.
   if (!IGC.hasCfg<DefaultPolicyConfig>() ||
       !IGC.getCfg<DefaultPolicyConfig>().isApplyValuegramEachInstr())
@@ -1370,8 +1348,8 @@ findNextBlock(MachineBasicBlock *MBB,
       return ML->getExitBlock();
     return findNextBlockOnModel(*MBB, State, SimCtx);
   }
-  // When we're not tracking execution on the model or worrying about BBs order,
-  // we can pick up any BB that we haven't processed yet.
+  // When we're not tracking execution on the model or worrying about BBs
+  // order, we can pick up any BB that we haven't processed yet.
   if (NotVisited.empty())
     return nullptr;
   return *NotVisited.begin();
@@ -1424,9 +1402,9 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
   auto VRegsSnapshot = I.getVRegsBeforeTransaction();
   auto CSRSnapshot = I.getCSRsBeforeTransaction();
   // Restoring memory requires GPR registers to prepare address and value to
-  // write, so we need know which registers were changed. We cannot do it in the
-  // current opened transaction as we'll mess up exiting from the loop state.
-  // So, open a new one.
+  // write, so we need know which registers were changed. We cannot do it in
+  // the current opened transaction as we'll mess up exiting from the loop
+  // state. So, open a new one.
   I.openTransaction();
   if (!MemSnapshot.empty()) {
     assert(ProgCtx.hasStackSection());
@@ -1478,12 +1456,12 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
   //    Exit
   //
   // We opened the first transaction right before Header to keep the state
-  // change to be able to insert compensation code in the latch block. Now let's
-  // take a more detailed look at Latch. When we entered Latch we know which
-  // registers and memory we need to roll-back. To roll-back memory, FP and V
-  // registers we need additional X registers to form addresses, intermediate
-  // values and so on. Let's say in the loop body we have only three
-  // instructions:
+  // change to be able to insert compensation code in the latch block. Now
+  // let's take a more detailed look at Latch. When we entered Latch we know
+  // which registers and memory we need to roll-back. To roll-back memory, FP
+  // and V registers we need additional X registers to form addresses,
+  // intermediate values and so on. Let's say in the loop body we have only
+  // three instructions:
   //   Header:
   //      addi x1, x0, 0x10
   //      addi x2, x0, 0x1
@@ -1498,9 +1476,9 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
   //      addi xB, x0, 0x5
   //      sd xB, 0(xA)
   // In this example xA and xB are randomly chosen registers. As you can see,
-  // we've restored memory and now should restore registers: x1, x2 ... and xA,
-  // xB. Though, xA and xB haven't been tracked in transactions as they were not
-  // executed. Let's execute them than.
+  // we've restored memory and now should restore registers: x1, x2 ... and
+  // xA, xB. Though, xA and xB haven't been tracked in transactions as they
+  // were not executed. Let's execute them than.
   //    Latch block:
   //      addi xA, x0, 0x10
   //      addi xB, x0, 0x5
@@ -1518,11 +1496,11 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
   //      addi x1, x0, some prev value
   //      addi x2, x0, some prev value
   // Latch block is ready and we can go to the exit block and commit the
-  // transaction, right? Well, not exactly. The state must match the one at loop
-  // exit, but interpretation in the latch block added xA and xB to the
+  // transaction, right? Well, not exactly. The state must match the one at
+  // loop exit, but interpretation in the latch block added xA and xB to the
   // transaction with wrong values (0x10 and ox5). The solution is to hide
-  // interpretation in Latch to one more transaction that we can simply discard.
-  // Then final logic in Latch is the following:
+  // interpretation in Latch to one more transaction that we can simply
+  // discard. Then final logic in Latch is the following:
   //    Latch block:
   //       <----------- open transaction to allow interpreting instruction in
   //       Latch
@@ -1533,8 +1511,8 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
   //       collect X regs to restore
   //      addi xA, x0, some prev value
   //      addi xB, x0, some prev value
-  //       <----------- x regs changed in the last transaction restored, discard
-  //       the transaction
+  //       <----------- x regs changed in the last transaction restored,
+  //       discard the transaction
   //       <----------- drop the trasnaction (commit the empty one)
   //      addi x1, x0, some prev value
   //      addi x2, x0, some prev value
@@ -1544,8 +1522,8 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
   // It may not be the most optimal solution, but generic enough and rather
   // simple. To minimize compensation code we can do simple analyzes to track
   // that we can re-use x1 and don't use xA at all. Also it's possible that
-  // we'll restore some registers twice. All these mentioned might be the field
-  // for futher improvements.
+  // we'll restore some registers twice. All these mentioned might be the
+  // field for futher improvements.
   auto XRegsCompCode = I.getXRegsBeforeTransaction();
   I.discardTransaction();
   I.commitTransaction();
@@ -1717,10 +1695,10 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
     }
 
     if (ML && ML->getLoopLatch() == MBB) {
-      // Loop latch is unconditional block that jumps to the loop header (by our
-      // special canonicalization when selfcheck is enabled). As we expect that
-      // each loop iteration will do the same, insert compensation code in the
-      // latch block.
+      // Loop latch is unconditional block that jumps to the loop header (by
+      // our special canonicalization when selfcheck is enabled). As we expect
+      // that each loop iteration will do the same, insert compensation code
+      // in the latch block.
       assert(BBReq.isLimitReached(GenerationStatistics{}) &&
              "Latch block for compensation code cannot be requested to "
              "generate primary instructions");
@@ -1863,7 +1841,6 @@ void generate(planning::InstructionGroupRequest &IG,
 }
 
 namespace {
-
 void interpretMBBInstrs(LLVMState &State, const SimulatorContext &SimCtx,
                         MachineBasicBlock::const_iterator BeginInterpretIter,
                         MachineBasicBlock::const_iterator EndInterpretIter) {

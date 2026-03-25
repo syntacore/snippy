@@ -63,15 +63,6 @@ namespace snippy {
 
 extern cl::OptionCategory Options;
 
-static snippy::opt<std::string>
-    RegGeneratorFile("reg-generator-plugin",
-                     cl::desc("Plugin for custom registers generation."
-                              "Use =None to generate registers "
-                              "with build-in randomizer."
-                              "(=None - default value)"),
-                     cl::value_desc("filename"), cl::cat(Options),
-                     cl::init("None"));
-
 static snippy::opt<bool> SelfcheckMem(
     "selfcheck-mem",
     cl::desc("check a memory state after execution in selfcheck mode"),
@@ -97,13 +88,6 @@ static snippy::opt<std::string>
     MemorySectionFile("memory-section-file",
                       cl::desc("file to dump specified section"),
                       cl::cat(Options), cl::init("mem_state.bin"));
-
-static snippy::opt<std::string>
-    RegInfoFile("reg-plugin-info-file",
-                cl::desc("File with info for registers generator. "
-                         "Use =None if plugin doesn't need additional info."
-                         "(=None - default value)"),
-                cl::value_desc("filename"), cl::cat(Options), cl::init("None"));
 
 static snippy::opt<std::string>
     DumpMIR("dump-mir", cl::ValueOptional,
@@ -229,20 +213,10 @@ static void dumpVerificationIntervalsIfNeeeded(SnippyModule &SM,
                   std::move(E));
 }
 
-static RegisterGenerator createRegGen(std::string PluginFileName,
-                                      std::string InfoFileName) {
-  if (PluginFileName == "None")
-    PluginFileName = "";
-  if (InfoFileName == "None")
-    InfoFileName = "";
-  return RegisterGenerator{PluginFileName, InfoFileName};
-}
-
 GeneratorResult FlowGenerator::generate(LLVMState &State,
                                         const DebugOptions &DebugCfg) {
 
-  auto RegGen =
-      createRegGen(RegGeneratorFile.getValue(), RegInfoFile.getValue());
+  auto RegGen = RegisterGenerator();
 
   SnippyProgramContext ProgContext(State, RegGen, RegPools, OpCC,
                                    Cfg.ProgramCfg);
