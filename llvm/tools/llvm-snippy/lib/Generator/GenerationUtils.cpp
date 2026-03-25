@@ -281,7 +281,7 @@ void selectNonMemoryOperands(
     if (!IsDst)
       copy(Destinations, std::back_inserter(ExcludedForOperand));
     auto Include = Tgt.includeRegs(InstrDesc.getOpcode(), RegClass);
-    auto ExpectedRegOpt =
+    auto ExpectedReg =
         RegGen.generate(RegClass, OpInfo.RegClass, RI, *TmpRP, InstrGenCtx.MBB,
                         Tgt, ExcludedForOperand, Include, Mask);
     auto ReportCouldNotSelectReg = [&]() {
@@ -290,14 +290,11 @@ void selectNonMemoryOperands(
                   II.getName(InstrDesc.getOpcode())),
           "try reducing burst group size and relaxing register reservation");
     };
-    if (auto Err = ExpectedRegOpt.takeError()) {
+    if (auto Err = ExpectedReg.takeError()) {
       consumeError(std::move(Err));
       ReportCouldNotSelectReg();
     }
-    auto RegOpt = *ExpectedRegOpt;
-    if (!RegOpt.has_value())
-      ReportCouldNotSelectReg();
-    auto SelectedReg = *RegOpt;
+    auto SelectedReg = *ExpectedReg;
     auto FirstReg = SelectedReg;
     if (!Tgt.isPhysRegClass(RegClass.getID(), RI))
       FirstReg = Tgt.getFirstPhysReg(SelectedReg, RI);
