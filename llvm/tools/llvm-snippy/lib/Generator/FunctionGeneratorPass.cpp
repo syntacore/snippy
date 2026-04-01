@@ -204,7 +204,8 @@ MachineFunction &FunctionGenerator::createFunction(
           : (Twine(SectionName) + "." + Name).str();
   auto &MF = State.createMachineFunctionFor(
       State.createFunction(M, FinalName, SectionName, Linkage),
-      SnippyModule::fromModule(M).getMMI());
+      SnippyModule::fromModule(M).getMMI(),
+      SGCtx.getConfig().PassCfg.CodeLayout.has_value());
   auto *MBB = createMachineBasicBlock(MF);
   assert(MBB);
   MF.push_back(MBB);
@@ -345,15 +346,17 @@ void FunctionGenerator::initExecutionPath() {
   auto &L = SGCtx.getProgramContext().getLinker();
   assert(L.sections().hasOutputSectionFor(Linker::kDefaultTextSectionName));
   auto &PassCfg = Cfg.PassCfg;
+  auto CodeLayout = PassCfg.CodeLayout.has_value();
   auto DefaultCodeSection =
       L.sections().getOutputSectionFor(Linker::kDefaultTextSectionName);
-  if (PassCfg.InstrsGenerationConfig.ChainedRXSectionsFill)
+  if (PassCfg.InstrsGenerationConfig.ChainedRXSectionsFill || CodeLayout)
     for (auto &RXSection : llvm::make_filter_range(L.sections(), [](auto &S) {
            return S.OutputSection.Desc.M.X();
          })) {
       if (!L.sections().hasOutputSectionFor(RXSection.OutputSection.Name))
-        L.sections().addInputSectionFor(RXSection.OutputSection.Desc,
-                                        RXSection.OutputSection.Name);
+        if (!CodeLayout)
+          L.sections().addInputSectionFor(RXSection.OutputSection.Desc,
+                                          RXSection.OutputSection.Name);
       ExecutionPath.push_back(RXSection);
     }
 
@@ -366,7 +369,7 @@ void FunctionGenerator::initExecutionPath() {
                 });
     } else
       RandEngine::shuffle(ExecutionPath.begin(), ExecutionPath.end());
-  } else {
+  } else if (!CodeLayout) {
     checkForUnusedRXSections(L.sections(), DefaultCodeSection, State.getCtx());
     ExecutionPath.push_back(Linker::SectionEntry{
         DefaultCodeSection, {{std::string(Linker::kDefaultTextSectionName)}}});
