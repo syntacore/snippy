@@ -792,6 +792,10 @@ void diagnoseXSections(LLVMContext &Ctx, SecIt SectionsStart, SecIt SectionsFin,
   }
 }
 
+struct CodeLayoutConfig final {
+  std::vector<MemoryAccessRange> Ranges;
+};
+
 class MemoryScheme {
 public:
   MemoryAccessSeq BaseAccesses;
@@ -842,4 +846,5 @@ LLVM_SNIPPY_YAML_DECLARE_SEQUENCE_TRAITS(snippy::SectionsDescriptions,
 
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::MemoryScheme);
 
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(snippy::CodeLayoutConfig);
 } // namespace llvm

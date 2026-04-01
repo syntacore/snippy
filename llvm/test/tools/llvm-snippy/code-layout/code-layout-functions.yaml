@@ -1,0 +1,48 @@
+# RUN: llvm-snippy %s | FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu
+  num-instrs: 500
+  redefine-sp: "SP"
+  dump-mf: true
+  function-number: 2
+  num-instr-ancil: 10
+
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x4000000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x100000
+    SIZE:      0x50000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      3
+    VMA:       0x5100000
+    SIZE:      0x50000
+    LMA:       0x510000
+    ACCESS:    r
+  - name:      stack
+    VMA:       0x6500000
+    SIZE:      0x50000
+    LMA:       0x6500000
+    ACCESS:    rw
+
+histogram:
+    - [BNE, 3.0]
+    - [XOR, 1.0]
+    - [JAL, 3.0]
+
+code-layout:
+  ranges:
+    - start: 0x210000
+      size: 0x400000
+      stride: 0x1
+      first-offset: 0
+      last-offset: 0x0
+
+# CHECK: Machine code for function fun0:
+# CHECK: SD $x1, $x2, 0
+# CHECK: $x1 = LD $x2, 0

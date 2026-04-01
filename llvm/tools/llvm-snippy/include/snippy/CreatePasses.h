@@ -95,4 +95,17 @@ MachineFunctionPass *createRISCVExpandSnippyPseudoPass();
 
 MachineFunctionPass *createRISCVZcmpPopretCombinePass();
 
+MachineFunctionPass *createCLBasicBlockPreprocessPass();
+
+MachineFunctionPass *createCodeAddrSamplingPass();
+
+MachineFunctionPass *createFallThroughEraserPass();
+
+MachineFunctionPass *createBranchLengthenerPass();
+
+snippy::ActiveImmutablePassInterface *createJumpLengthenerPass();
+
+MachineFunctionPass *createLongJumpRelaxatorPass();
+
+MachineFunctionPass *createLinkerConfigurePass();
 } // namespace llvm

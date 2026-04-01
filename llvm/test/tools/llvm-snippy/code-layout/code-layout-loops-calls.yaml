@@ -1,0 +1,63 @@
+# REQUIRES: asserts
+
+# RUN: sed -e s/COMMENTED-CALLS/"#"/g %s | \
+# RUN: sed -e s/"COMMENTED-CL "/""/g > %t.com-calls-uncom-cl.yaml
+# RUN: llvm-snippy %t.com-calls-uncom-cl.yaml -debug \
+# RUN: |& FileCheck %t.com-calls-uncom-cl.yaml --check-prefix=NOT-ON-STACK
+
+# RUN: sed -e s/COMMENTED-CALLS/""/g %s | \
+# RUN: sed -e s/"COMMENTED-CL "/"#"/g > %t.uncom-calls-com-cl.yaml
+# RUN: llvm-snippy %t.uncom-calls-com-cl.yaml -debug \
+# RUN: |& FileCheck %t.uncom-calls-com-cl.yaml --check-prefix=NOT-ON-STACK
+
+# RUN: sed -e s/COMMENTED-CALLS/""/g %s | \
+# RUN: sed -e s/"COMMENTED-CL "/""/g > %t.uncom-calls-uncom-cl.yaml
+# RUN: llvm-snippy %t.uncom-calls-uncom-cl.yaml -debug \
+# RUN: |& FileCheck %t.uncom-calls-uncom-cl.yaml --check-prefix=ON-STACK
+
+options:
+  mtriple: riscv64-linux-gnu
+  num-instrs: 200
+  init-regs-in-elf: true
+  function-number: 3
+  function-layers: 1
+  num-instr-ancil: 10
+
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x4000000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x100000
+    SIZE:      0x50000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      3
+    VMA:       0x5100000
+    SIZE:      0x50000
+    LMA:       0x510000
+    ACCESS:    r
+  - name:      stack
+    VMA:       0x6500000
+    SIZE:      0x50000
+    LMA:       0x6500000
+    ACCESS:    rw
+
+histogram:
+    - [BNE, 3.0]
+    - [SUB, 1.0]
+COMMENTED-CALLS    - [JAL, 3.0]
+
+COMMENTED-CL code-layout:
+COMMENTED-CL   ranges:
+COMMENTED-CL     - start: 0x210000
+COMMENTED-CL       size: 0x400000
+COMMENTED-CL       stride: 0x1
+COMMENTED-CL       first-offset: 0
+COMMENTED-CL       last-offset: 0x0
+
+# NOT-ON-STACK-NOT: place-on-stack: false
+# ON-STACK-DAG: place-on-stack: true
+# ON-STACK-DAG: 'place-on-stack' option for loop counters implicitly enabled: code layout and calls in common require such a behaviour

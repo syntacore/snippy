@@ -1680,6 +1680,8 @@ Advanced configuration includes keys for:
 
 -  `Call graph <#call-graph>`__
 
+-  `Basic block layout <#basic-block-layout>`__
+
 
 -  `Register Reservation Config`_
 
@@ -1835,6 +1837,52 @@ instructions. For the details on vector register grouping, refer
 
 .. note::
    Even if you reserve only one register from the vector group, the whole register group is reserved for the respective instructions.
+
+Basic Block Layout
+------------------
+
+Use the ``code-layout`` key in your layout to configure a specific range
+of addresses for basic blocks to be put in.
+
+Via ``code-layout``, you provide memory address ranges where you want
+basic blocks to be replaced by the linker in the generated snippet. All
+the basic blocks in the generated snippet are then randomly placed in
+memory addresses that correspond to these ranges. Configuration of the
+``code-layout`` schemes is similar to the configuration of
+``access-ranges`` in `memory schemes <#memory-scheme>`__.
+
+Address ranges can reference memory from different RX section. For
+example, it makes possible code distribution between different RX
+sections.
+
+An example of ``code-layout``:
+
+.. code:: yaml
+
+   code-layout:
+     ranges:
+       - start: 0x10000
+         size: 0x2000
+         stride: 0x20
+         first-offset: 0
+         last-offset: 0
+       - start: 0x13000
+         size: 0x2000
+         stride: 0x20
+         first-offset: 0
+         last-offset: 0
+
+where:
+
+-  ``start`` |nbsp| -- |nbsp| Section start address.
+
+-  ``size`` |nbsp| -- |nbsp| Section size.
+
+-  ``stride`` |nbsp| -- |nbsp| Stride size.
+
+-  ``first offset`` |nbsp| -- |nbsp| Number of the first available bit in a stride.
+
+-  ``last offset`` |nbsp| -- |nbsp| Number of the last available bit in a stride.
 
 
 Control Flow (Branchegrams)

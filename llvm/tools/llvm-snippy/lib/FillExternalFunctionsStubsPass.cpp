@@ -82,8 +82,9 @@ bool FillExternalFunctionsStubs::runOnModule(Module &M) {
             [&F](StringRef FuncName) { return F.getName() == FuncName; }))
       continue;
 
-    auto &MF =
-        State.createMachineFunctionFor(F, SnippyModule::fromModule(M).getMMI());
+    auto &MF = State.createMachineFunctionFor(
+        F, SnippyModule::fromModule(M).getMMI(),
+        SGCtx.getConfig().PassCfg.CodeLayout.has_value());
     auto *MBB = createMachineBasicBlock(MF);
     MF.push_back(MBB);
     InstructionGenerationContext IGC{*MBB, MBB->end(), SGCtx};

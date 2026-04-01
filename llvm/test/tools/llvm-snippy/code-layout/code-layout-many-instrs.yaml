@@ -1,0 +1,59 @@
+# RUN: llvm-snippy %s --model-plugin None -o %t -verify-mi
+# RUN: readelf -S %t.elf | FileCheck %s
+
+options:
+  march: riscv64-unknown-elf
+  mcpu: generic-rv64
+  enable-phdrs-definition: true
+  num-instrs: 1000
+
+sections:
+    - name:      1
+      VMA:       0x100000000
+      SIZE:      0x200000
+      LMA:       0x100000000
+      ACCESS:    rx
+      PHDR:      'header1'
+    - name:      2
+      VMA:       0x15000000
+      SIZE:      0x200000
+      LMA:       0x15000000
+      ACCESS:    rx
+      PHDR:      'header2'
+    - name:      3
+      VMA:       0x1000
+      SIZE:      0x1000
+      LMA:       0x1000
+      ACCESS:    rw
+      PHDR:      'header3'
+    - name:      4
+      VMA:       0x100000
+      SIZE:      0x1000
+      LMA:       0x100000
+      ACCESS:    r
+      PHDR:      'header3'
+
+# About 3.5 Gb between access ranges
+code-layout:
+  ranges:
+    - start: 0x100000000
+      size: 0x200000
+      stride: 0x100000
+      first-offset: 0
+      last-offset: 0xfffff
+    - start: 0x15000000
+      size: 0x200000
+      stride: 0x100000
+      first-offset: 0
+      last-offset: 0xfffff
+histogram:
+    - [ADD, 3.0]
+    - [BLT, 1.0]
+    - [LD,  3.0]
+    - [SW,  3.0]
+
+# CHECK: .snippy.2.rx
+# CHECK-SAME: PROGBITS
+# CHECK: .snippy.1.rx
+# CHECK-SAME: PROGBITS
+

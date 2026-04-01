@@ -29,12 +29,14 @@ set(LLVM_LINK_COMPONENTS
   SnippyGenerator
   )
 set(LLVMSnippySources
+  BranchLengthenerPass.cpp
   BranchRelaxatorPass.cpp
   BlockGenPlanningPass.cpp
   BlockGenPlanWrapperPass.cpp
   PreserveRegsInsertionPass.cpp
   CFGeneratorPass.cpp
   CFGPrinter.cpp
+  ConfigureLinkerPass.cpp
   ConsecutiveLoopsVerifierPass.cpp
   FillExternalFunctionsStubsPass.cpp
   FlowGenerator.cpp
