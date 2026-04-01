@@ -225,6 +225,29 @@ bool Linker::LinkedSections::hasOutputSectionFor(StringRef SectionName) const {
   });
 }
 
+static bool operator<(const Linker::InputSection &LHS,
+                      const Linker::InputSection &RHS) {
+  auto LHSAddr = transformOpt(LHS.Addr, &AddressInfo::Address);
+  auto RHSAddr = transformOpt(RHS.Addr, &AddressInfo::Address);
+  return LHSAddr < RHSAddr;
+}
+
+void Linker::LinkedSections::addInputSection(StringRef Name, AddressInfo AI) {
+  MemRange InSectionRange(AI);
+  auto OutSection = std::find_if(begin(), end(), [InSectionRange](auto &Entry) {
+    auto &Desc = Entry.OutputSection.Desc;
+    MemRange OutSect(Desc.VMA, Desc.VMA + Desc.Size);
+    return OutSect.intersect(InSectionRange) == InSectionRange;
+  });
+  assert(OutSection != end());
+  auto &InputSections = OutSection->InputSections;
+  InputSections.push_back({Name.str(), AI});
+  [[maybe_unused]] auto [It, Inserted] =
+      SectToAddrMap.try_emplace(Name.str(), AI.Address);
+  assert(Inserted && "Attempt to overwrite InputSection address");
+  llvm::sort(InputSections);
+}
+
 const Linker::NamedOutputSection &
 Linker::LinkedSections::getOutputSectionFor(StringRef SectionName) const {
   auto S = std::find_if(begin(), end(), [SectionName](auto &Section) {
@@ -234,6 +257,13 @@ Linker::LinkedSections::getOutputSectionFor(StringRef SectionName) const {
   });
   assert(S != end());
   return S->OutputSection;
+}
+
+MemAddr Linker::LinkedSections::getAddressFor(StringRef SectionName) const {
+  auto Found = SectToAddrMap.find(SectionName.str());
+  assert(Found != SectToAddrMap.end());
+  auto &Addr = Found->second;
+  return Addr;
 }
 
 std::string
@@ -250,6 +280,7 @@ void Linker::LinkedSections::addInputSectionFor(const SectionDesc &Desc,
   assert(SectIt != end() &&
          "Can't find current section in the output sections");
   SectIt->InputSections.push_back({InSectName.str()});
+  llvm::sort(SectIt->InputSections);
 }
 
 std::string Linker::getMangledName(StringRef SectionName) const {
@@ -356,7 +387,16 @@ Expected<std::string> Linker::createLinkerScriptImpl(bool Shared) const {
       STS << "  . +=" << utostr(SE.OutputSection.Desc.Size) << ";\n";
       STS << "  PROVIDE(" << OutSectionName << "_end_ = .);\n";
     } else {
+      auto HasAddressedSections = llvm::any_of(
+          SE.InputSections, [&](auto &IS) { return IS.Addr.has_value(); });
       for (auto &&InputSection : SE.InputSections) {
+        if (HasAddressedSections) {
+          // We should not output input sections with no address here since
+          // all the code should be in addressed sections.
+          if (!InputSection.Addr)
+            continue;
+          STS << "  . = " << utostr(InputSection.Addr->Address) << ";\n";
+        }
         STS << "  KEEP(*(" << InputSection.Name << "))\n";
       }
     }
@@ -422,7 +462,16 @@ std::string Linker::createLinkerScriptImplLegacy(bool Export) const {
         STS << "  . +=" << utostr(SE.OutputSection.Desc.Size) << ";\n";
         STS << "  PROVIDE(" << OutSectionName << "_end_ = .);\n";
       } else {
+        auto HasAddressedSections = llvm::any_of(
+            SE.InputSections, [&](auto &IS) { return IS.Addr.has_value(); });
         for (auto &&InputSection : SE.InputSections) {
+          if (HasAddressedSections) {
+            // We should not output input sections with no address here since
+            // all the code should be in addressed sections.
+            if (!InputSection.Addr)
+              continue;
+            STS << "  . = " << utostr(InputSection.Addr->Address) << ";\n";
+          }
           STS << "  KEEP(*(" << InputSection.Name << "))\n";
         }
       }

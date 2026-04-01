@@ -1248,6 +1248,18 @@ yaml::SequenceTraits<snippy::SectionsDescriptions>::element(
   return Sections.at(Index);
 }
 
+void yaml::MappingTraits<snippy::CodeLayoutConfig>::mapping(
+    yaml::IO &IO, snippy::CodeLayoutConfig &Info) {
+  IO.mapRequired("ranges", Info.Ranges);
+}
+
+std::string yaml::MappingTraits<snippy::CodeLayoutConfig>::validate(
+    yaml::IO &IO, snippy::CodeLayoutConfig &Addrs) {
+  if (Addrs.Ranges.empty())
+    return "Code address ranges should not be empty";
+  return "";
+}
+
 using snippy::AccMask;
 void yaml::ScalarTraits<AccMask>::output(const AccMask &Val, void *,
                                          raw_ostream &Out) {

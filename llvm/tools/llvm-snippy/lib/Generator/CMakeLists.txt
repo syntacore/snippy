@@ -3,6 +3,10 @@ set(LLVMSnippyGeneratorSources
   CallGraphState.cpp
   CFPermutation.cpp
   CFPermutationPass.cpp
+  CLBasicBlockPreprocessPass.cpp
+  CodeAddrSampler.cpp
+  CodeAddrSamplingPass.cpp
+  FallThroughsEraserPass.cpp
   FunctionGeneratorPass.cpp
   FPRNaNIdentifier.cpp
   GeneratorContext.cpp
@@ -12,8 +16,10 @@ set(LLVMSnippyGeneratorSources
   Generation.cpp
   InstructionGeneratorPass.cpp
   Interpreter.cpp
+  JumpLengthenerPass.cpp
   Linker.cpp
   IntervalsToVerify.cpp
+  LongJumpRelaxatorPass.cpp
   Policy.cpp
   RegisterGenerator.cpp
   RootRegPoolWrapperPass.cpp
