@@ -8,6 +8,8 @@
 
 #include "snippy/Generator/SnippyModule.h"
 #include "snippy/Config/Config.h"
+#include "snippy/Generator/CodeAddrSampler.h"
+#include "snippy/Generator/CodeAddrSamplingPass.h"
 #include "snippy/Generator/Linker.h"
 #include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/InitializePasses.h"
@@ -79,6 +81,16 @@ void SnippyModule::generateObject(const PassInserter &BeforePrinter,
 
   outs().flush(); // FIXME: this is currently needed because
                   //        MachineFunctionPrinter don't flush
+}
+
+CodeAddrSampler &
+SnippyProgramContext::getOrCreateAddrSampler(const PassConfig &Cfg) {
+  auto &TM = getLLVMState().getTargetMachine();
+  if (!PSampler)
+    PSampler = std::make_unique<CodeAddrSampler>(
+        *Cfg.CodeLayout, Cfg.ProgramCfg->Sections,
+        TM.createDataLayout().getPointerABIAlignment(/* Address Space */ 0));
+  return *PSampler;
 }
 
 void SnippyProgramContext::initializeROMSection(const ProgramConfig &Settings) {

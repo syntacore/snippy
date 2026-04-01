@@ -41,6 +41,7 @@ public:
 
   struct InputSection final {
     std::string Name;
+    std::optional<AddressInfo> Addr = std::nullopt;
   };
 
   struct SectionEntry {
@@ -53,6 +54,7 @@ public:
   };
 
   class LinkedSections final : private std::vector<SectionEntry> {
+    std::unordered_map<std::string, MemAddr> SectToAddrMap;
     auto getSectionImpl(StringRef Name) const {
       return std::find_if(begin(), end(), [Name](const auto &E) {
         return E.OutputSection.Name == Name;
@@ -113,6 +115,13 @@ public:
     }
 
     void addInputSectionFor(const SectionDesc &OutDesc, StringRef InSectName);
+    void addInputSection(StringRef Name, AddressInfo AI);
+
+    MemAddr getAddressFor(StringRef Name) const;
+
+    bool hasAddressFor(StringRef Name) const {
+      return SectToAddrMap.count(Name.str());
+    }
   };
 
   explicit Linker(LLVMContext &Ctx, const SectionsDescriptions &Sects,

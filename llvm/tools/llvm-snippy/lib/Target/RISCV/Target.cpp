@@ -1806,6 +1806,11 @@ public:
     auto DestBBOpNum = Branch.getNumExplicitOperands() - 1;
     return Branch.getOperand(DestBBOpNum).getMBB();
   }
+  bool branchDestinationIsMBB(const MachineInstr &Branch) const {
+    assert(Branch.isBranch());
+    auto DestBBOpNum = Branch.getNumExplicitOperands() - 1;
+    return Branch.getOperand(DestBBOpNum).isMBB();
+  }
 
   bool branchNeedsVerification(const MachineInstr &Branch) const override {
     assert(Branch.isBranch());
@@ -1994,12 +1999,27 @@ public:
                           InstrInfo.get(RISCV::PseudoBR))
         .addMBB(&To);
   }
+  bool replaceBranchDest(MachineInstr &Branch,
+                         MachineBasicBlock::iterator To) const override {
+    assert(Branch.isBranch());
+    auto DestOpIdx = Branch.getNumExplicitOperands() - 1;
+    Branch.removeOperand(DestOpIdx);
+    auto *Symbol = To->getPreInstrSymbol();
+    assert(Symbol);
+    auto NewDestOperand = MachineOperand::CreateMCSymbol(Symbol);
+    Branch.addOperand(NewDestOperand);
+    return true;
+  }
 
   bool replaceBranchDest(MachineInstr &Branch,
                          MachineBasicBlock &NewDestMBB) const override {
-    auto *OldDestBB = getBranchDestination(Branch);
-    if (OldDestBB == &NewDestMBB)
-      return false;
+    auto ShouldReplaceSuccessor = branchDestinationIsMBB(Branch);
+    MachineBasicBlock *OldDestBB = nullptr;
+    if (ShouldReplaceSuccessor) {
+      OldDestBB = getBranchDestination(Branch);
+      if (OldDestBB == &NewDestMBB)
+        return false;
+    }
     assert(Branch.getNumExplicitOperands() >= 1);
     auto DestBBOpNum = Branch.getNumExplicitOperands() - 1;
     Branch.removeOperand(DestBBOpNum);
@@ -2007,6 +2027,9 @@ public:
     auto NewDestOperand = MachineOperand::CreateMBB(&NewDestMBB);
     Branch.addOperand(NewDestOperand);
 
+    if (!ShouldReplaceSuccessor)
+      return true;
+    assert(OldDestBB);
     auto *BranchBB = Branch.getParent();
     assert(BranchBB);
     if (Branch.isConditionalBranch()) {
@@ -4323,6 +4346,30 @@ private:
       return 2;
     return 4;
   }
+  MachineBasicBlock::iterator
+  insertJumpThroughRelocation(InstructionGenerationContext &IGC,
+                              uint64_t Addr) const override {
+    auto &MBB = IGC.MBB;
+    auto Ins = IGC.Ins;
+    auto &RP = IGC.getRegPool();
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
+    auto &RI = State.getRegInfo();
+    auto &InstrInfo = State.getInstrInfo();
+    auto &RegClass = RI.getRegClass(RISCV::GPRJALRRegClassID);
+    auto Reg =
+        RP.getAvailableRegister("Reg to be used by JALR in relocation", RI,
+                                RegClass, MBB, AccessMaskBit::PrimaryRW);
+    RP.addReserved(Reg);
+    IGC.Ins = MBB.getFirstTerminator();
+    loadRegFromAddr(IGC, Addr, Reg);
+    IGC.Ins = Ins;
+    return *getSupportInstBuilder(*this, MBB, Ins, State.getCtx(),
+                                  InstrInfo.get(RISCV::PseudoBRIND))
+                .addReg(Reg)
+                .addImm(0)
+                .getInstr();
+  }
 
   MachineBasicBlock::iterator generateJump(MachineBasicBlock &MBB,
                                            MachineBasicBlock::iterator Ins,
@@ -4333,6 +4380,14 @@ private:
                                   InstrInfo.get(RISCV::PseudoBR))
                 .addMBB(&TBB)
                 .getInstr();
+  }
+
+  bool fitsCondBranch(uint64_t Distance) const override {
+    return fitsBranch(Distance);
+  }
+
+  bool fitsUncondBranch(uint64_t Distance) const override {
+    return fitsJump(Distance);
   }
 
   void addAsmPrinterFlags(MachineInstr &MI) const override {
@@ -5019,7 +5074,7 @@ matchRVVOpcodesWithDisallowedIntersectingAccesses(const OpcodeHistogram &OpHist,
   if (!RVVDisallowIntersectingMemAccesses.isSpecified())
     return {};
 
-  auto &OpcRegex = *RVVDisallowIntersectingMemAccesses.getValue().Regex;
+  auto &OpcRegex = *RVVDisallowIntersectingMemAccesses.getValue().RegexPtr;
   DenseSet<unsigned> MatchedOpcodes;
   for (auto Opcode : make_filter_range(
            make_first_range(OpHist.topOpcodes()), [](unsigned Opc) {

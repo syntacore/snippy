@@ -193,6 +193,7 @@ Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
       std::unique_ptr<MCCodeEmitter>(T.createMCCodeEmitter(*MCII, *MCCtx));
   auto Disassembler =
       std::unique_ptr<MCDisassembler>(T.createMCDisassembler(*STI, *MCCtx));
+  TM->Options.UniqueBasicBlockSectionNames = 1;
 
   return LLVMState(SnippyTgt, std::move(TM), std::move(MCCtx),
                    std::move(CodeEmitter), std::move(Disassembler));

@@ -1,0 +1,50 @@
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 300
+  dump-mf: true
+  function-number: 20
+sections:
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x50000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x150000
+      SIZE:      0x70000
+      LMA:       0x150000
+      ACCESS:    rx
+    - name:      3
+      VMA:       0x220000
+      SIZE:      0x100000
+      LMA:       0x220000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x400000
+      LMA:       0x400000
+      SIZE:      0x1000
+      ACCESS:    rw
+ 
+
+code-layout:
+  ranges:
+    - start: 0x100000
+      size: 0x50000
+      stride: 0x10
+      first-offset: 0
+      last-offset: 0
+    - start: 0x150000
+      size: 0x70000
+      stride: 0x10
+      first-offset: 0
+      last-offset: 0
+histogram:
+    - [ADD, 3.0]
+    - [BLT, 1.0]
+    - [LD,  3.0]
+    - [SW,  3.0]
+    - [JAL, 1.0]
+
+# CHECK: PseudoCALL

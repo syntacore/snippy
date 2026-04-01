@@ -664,6 +664,20 @@ static std::vector<std::string> parseModelPluginList(const ModelOptions &Opts) {
   return Ret;
 }
 
+static bool codeLayoutIsBig(const CodeLayoutConfig &CodeLayout,
+                            const SnippyTarget &Tgt) {
+  auto &Addresses = CodeLayout.Ranges;
+  assert(!Addresses.empty());
+  auto Starts = llvm::map_range(Addresses, [](auto &R) { return R.Start; });
+  auto MinStart = *std::min_element(Starts.begin(), Starts.end());
+  auto Finishes =
+      llvm::map_range(Addresses, [](auto &R) { return R.Start + R.Size; });
+  auto MaxFinish = *std::max_element(Finishes.begin(), Finishes.end());
+  assert(MaxFinish > MinStart);
+  auto MaxDist = MaxFinish - MinStart;
+  return !Tgt.fitsUncondBranch(MaxDist);
+}
+
 static unsigned long long
 seedOptToValue(StringRef SeedStr, StringRef SeedType = "instructions seed",
                StringRef Warning =
@@ -811,6 +825,22 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
     DEBUG_WITH_TYPE("snippy-regpool",
                     (dbgs() << "Reserved with option:\n", RP.print(dbgs())));
   }
+  if (Cfg.PassCfg.CodeLayout) {
+    auto HasCalls = Cfg.Histogram.hasCallInstrs(OpCC, Tgt);
+    if (HasCalls) {
+      if (!Cfg.PassCfg.Branches.LoopCounters.UseStack.has_value()) {
+        Cfg.PassCfg.Branches.LoopCounters.UseStack = true;
+        snippy::warn(
+            WarningName::LoopCountersOnStack, Ctx,
+            "'place-on-stack' option for loop counters implicitly enabled",
+            "code layout and calls in common require such a behaviour");
+      } else if (!Cfg.PassCfg.Branches.LoopCounters.UseStack.value()) {
+        snippy::fatal("Incompatible options",
+                      "When code-layout and calls provided, generation of "
+                      "loops without spilling counters is not supported");
+      }
+    }
+  }
   auto RegsSpilledToStack = parseSpilledRegistersOption(RP, Tgt, RI, Ctx, Opts);
   auto RegsSpilledToMem = getRegsToSpillToMem(Tgt, Cfg);
   bool HasSPRelativeInstrs = Cfg.Histogram.hasSPRelativeInstrs(OpCC, Tgt);
@@ -905,6 +935,10 @@ static Error normalizeInstrGenOptions(Config &Cfg, LLVMState &State,
     snippy::warn(WarningName::InconsistentOptions, State.getCtx(),
                  "'" + Twine(ChainedRXChunkSize.ArgStr) + "' is ignored",
                  "pass 'chained-rx-sections-fill' to enable it");
+  bool MayNeedRelocatedJumps =
+      PassCfg.CodeLayout &&
+      codeLayoutIsBig(*PassCfg.CodeLayout, State.getSnippyTarget());
+  InstrsCfg.NeedsRelocations = MayNeedRelocatedJumps;
   InstrsCfg.NumInstrs = NumPrimaryInstrs;
   InstrsCfg.LastInstr = Opts.LastInstr;
 
@@ -1021,6 +1055,7 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
 
   Info.ProgramCfg.TargetConfig->mapConfig(IO);
   IO.mapOptional("fpu-config", Info.CommonPolicyCfg->FPUConfig);
+  IO.mapOptional("code-layout", Info.PassCfg.CodeLayout);
   IO.mapOptional("operands-reinitialization",
                  Info.DefFlowConfig.OperandsReinitialization);
   MappingNormalization<RegisterAccessNormalization, RegisterAccessConfig>
@@ -1029,6 +1064,11 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
 }
 
 std::string yaml::MappingTraits<Config>::validate(yaml::IO &Io, Config &Info) {
+  if (Info.PassCfg.CodeLayout && !Info.PassCfg.Branches.unaligned())
+    return Twine("Code layout feature is only supported with branches "
+                 "alignment set to ")
+        .concat(Twine(Branchegram::Unaligned))
+        .str();
   void *Ctx = Io.getContext();
   assert(Ctx && "To parse or output Config provide ConfigIOContext as "
                 "context for yaml::IO");

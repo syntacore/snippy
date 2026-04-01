@@ -1,0 +1,56 @@
+# RUN: llvm-snippy %s -model-plugin None
+
+options:
+  mtriple: riscv64
+  march: rv64ic
+  num-instrs: 100
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+
+sections:
+    - name:      1
+      VMA:       0x10000
+      SIZE:      0x20000
+      LMA:       0x10000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x40000
+      SIZE:      0x10000
+      LMA:       0x40000
+      ACCESS:    rw
+code-layout:
+  ranges:
+    - start: 0x10000
+      size: 0x4000
+      stride: 0x10
+      first-offset: 0
+      last-offset: 0
+    - start: 0x20000
+      size: 0x5000
+      stride: 0xD
+      first-offset: 0
+      last-offset: 0
+histogram:
+    - [ADD, 3.0]
+    - [BLT, 1.0]
+    - [BEQ, 2.0]
+    - [BLT, 2.0]
+    - [BGE, 2.0]
+    - [BNE, 2.0]
+    - [C_BEQZ, 2.0]
+    - [C_BNEZ, 2.0]
+
+branches:
+  permutation: on
+  loop-ratio: 0.5
+  number-of-loop-iterations:
+      min: 2
+      max: 32
+  max-depth:
+    if: 500
+    loop: 4
+  distance:
+    blocks:
+      min: 1
+      max: 20
+

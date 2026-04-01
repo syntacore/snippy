@@ -91,6 +91,16 @@ public:
       llvm::copy(SGCtx.getConfig().ProgramCfg.getRegsSpilledToStack(),
                  std::back_inserter(Ret));
     } else {
+      // Code layout may modify function code after this pass and it's
+      // not enough to save only mutated registers if code layout enabled,
+      // so we should follow the ABI
+      if (SGCtx.getConfig().PassCfg.CodeLayout) {
+        auto &State = ProgCtx.getLLVMState();
+        auto &Tgt = State.getSnippyTarget();
+        llvm::copy(Tgt.getRegsPreservedByABI(State.getSubtargetInfo()),
+                   std::back_inserter(Ret));
+        return Ret;
+      }
       auto RegSet = getAllMutatedRegs(MF);
       llvm::copy(RegSet, std::back_inserter(Ret));
     }
@@ -372,6 +382,8 @@ bool PrologueEpilogueInsertion::insertPrologue(
   auto &SM = InstrGenCtx.getSnippyModule();
   SM.getOrAddResult<ObjectMetadata>().EntryPrologueInstrCnt =
       std::distance(MBB->begin(), Ins);
+  if (SGCtx.getConfig().PassCfg.CodeLayout)
+    return true;
   // For entry also check that function still fits assigned section
   // after prologue insertion
   auto &&[FSize, SectionInfo] = getFunctionSizeInfo(MF);
@@ -448,6 +460,8 @@ bool PrologueEpilogueInsertion::insertEpilogue(
   auto &SM = InstrGenCtx.getSnippyModule();
   SM.getOrAddResult<ObjectMetadata>().EntryEpilogueInstrCnt =
       std::distance(FirstInserted, MBB->end());
+  if (SGCtx.getConfig().PassCfg.CodeLayout)
+    return true;
   // For exit also check that function still fits assigned section
   // after epilogue insertion
   auto &&[FSize, SectionInfo] = getFunctionSizeInfo(MF);

@@ -1,0 +1,50 @@
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu
+  num-instrs: 10
+  init-regs-in-elf: true
+  function-number: 3
+  function-layers: 1
+  num-instr-ancil: 10
+
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x4000000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x100000
+    SIZE:      0x50000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      3
+    VMA:       0x5100000
+    SIZE:      0x50000
+    LMA:       0x510000
+    ACCESS:    r
+  - name:      stack
+    VMA:       0x6500000
+    SIZE:      0x50000
+    LMA:       0x6500000
+    ACCESS:    rw
+
+histogram:
+    - [BNE, 3.0]
+    - [SUB, 1.0]
+    - [JAL, 3.0]
+
+branches:
+  loop-counters:
+    place-on-stack: off
+
+code-layout:
+  ranges:
+    - start: 0x210000
+      size: 0x400000
+      stride: 0x1
+      first-offset: 0
+      last-offset: 0x0
+
+# CHECK: error: Incompatible options: When code-layout and calls provided, generation of loops without spilling counters is not supported

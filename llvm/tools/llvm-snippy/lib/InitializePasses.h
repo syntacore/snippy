@@ -40,5 +40,11 @@ void initializeMemoryAccessDumperPass(llvm::PassRegistry &);
 void initializeRISCVExpandSnippyPseudoPass(PassRegistry &);
 void initializeRISCVZcmpPopretCombinePass(PassRegistry &);
 void initializeConsecutiveLoopsVerifierPass(PassRegistry &);
+void initializeCLBasicBlockPreprocessPass(PassRegistry &);
+void initializeBranchLengthenerPass(PassRegistry &);
+void initializeJumpLengthenerPass(PassRegistry &);
+void initializeCodeAddrSamplingPass(PassRegistry &);
+void initializeLongJumpRelaxatorPass(PassRegistry &);
+void initializeConfigureLinkerPass(PassRegistry &);
 
 } // namespace llvm

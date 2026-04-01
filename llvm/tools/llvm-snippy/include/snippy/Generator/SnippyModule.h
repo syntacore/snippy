@@ -52,6 +52,7 @@ class OpcodeCache;
 class MemoryManager;
 class ProgramConfig;
 class RootRegPoolWrapper;
+class CodeAddrSampler;
 
 struct ObjectFile final {
   SmallString<32> Object;
@@ -238,6 +239,8 @@ public:
     return getOutputSectionFor(F);
   }
 
+  CodeAddrSampler &getOrCreateAddrSampler(const PassConfig &Cfg);
+
   bool isManglingEnabled() const { return MangleExportedNames; }
 
   auto hasSelfcheckSections() const { return SelfcheckSection.has_value(); }
@@ -359,6 +362,7 @@ private:
   std::unique_ptr<ProgramGlobalStateKeeper> PGSK;
   std::map<Module *, std::unique_ptr<GlobalsPool>> PerModuleGPs;
   std::unique_ptr<TargetGenContextInterface> TargetContext;
+  std::unique_ptr<CodeAddrSampler> PSampler;
   std::unique_ptr<StaticStackContext> StaticStack;
 
   MCRegister StackPointer;
