@@ -89,6 +89,9 @@ bool RegsInitInsertion::runOnMachineFunction(MachineFunction &MF) {
   auto *BlockRegsInit = createMachineBasicBlock(MF);
   auto *SuccessorBlockPtr = &MF.front();
   auto InsertIterPos = MF.begin();
+  if (SGCtx.getConfig().PassCfg.CodeLayout)
+    SnippyTgt.generateJump(*BlockRegsInit, BlockRegsInit->getFirstTerminator(),
+                           *SuccessorBlockPtr, State);
   BlockRegsInit->addSuccessor(SuccessorBlockPtr);
   MF.insert(InsertIterPos, BlockRegsInit);
   SFM.RegsInitBlock = BlockRegsInit;

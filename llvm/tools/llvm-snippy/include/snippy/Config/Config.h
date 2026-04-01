@@ -198,6 +198,7 @@ struct InstrsGenerationOptions {
   bool RunMachineInstrVerifier;
   bool ChainedRXSectionsFill;
   bool ChainedRXSorted;
+  bool NeedsRelocations;
   std::optional<unsigned> ChainedRXChunkSize;
   std::optional<unsigned> NumInstrs;
   std::string LastInstr;
@@ -238,6 +239,7 @@ public:
   // Function generator pass config.
   std::variant<CallGraphLayout, FunctionDescs> CGLayout;
 
+  std::optional<CodeLayoutConfig> CodeLayout;
   TraceConvertOptions TFOpts;
   PassConfig(const ProgramConfig &ProgramCfg) : ProgramCfg(&ProgramCfg) {}
 

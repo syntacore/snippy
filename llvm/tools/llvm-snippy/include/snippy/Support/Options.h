@@ -405,7 +405,7 @@ Error diagnoseIfOptionAndOptionalAreBothSet(const std::optional<T> &Val,
 
 struct RegexOption {
   std::string Str;
-  std::shared_ptr<Regex> Regex;
+  std::shared_ptr<Regex> RegexPtr;
 };
 
 } // namespace snippy
