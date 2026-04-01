@@ -106,6 +106,11 @@ static snippy::opt<bool> DisableLinkerRelaxations(
     cl::desc("Disable linker relaxations for the final image"),
     cl::cat(Options), cl::init(false), cl::Hidden);
 
+snippy::opt<bool>
+    DumpCodeAddrMapping("dump-bb-addresses",
+                        cl::desc("Dump selected basic block addresses"),
+                        cl::cat(Options), cl::init(false), cl::Hidden);
+
 } // namespace snippy
 
 namespace snippy {
@@ -213,6 +218,20 @@ static void dumpVerificationIntervalsIfNeeeded(SnippyModule &SM,
                   std::move(E));
 }
 
+static void dumpCodeAddrMapping(const Linker &Linker, raw_ostream &OS) {
+  OS << "Basic Block Addresses:\n";
+  auto &Sections = Linker.sections();
+  for (auto &E : Sections) {
+    auto BBSections = llvm::make_filter_range(E.InputSections,
+                                              [](auto &I) { return I.Addr; });
+    for (auto &[Name, Addr] : BBSections) {
+      assert(Addr);
+      OS.indent(2);
+      OS << Name << ": 0x" << llvm::utohexstr(Addr->Address) << "\n";
+    }
+  }
+}
+
 GeneratorResult FlowGenerator::generate(LLVMState &State,
                                         const DebugOptions &DebugCfg) {
 
@@ -246,9 +265,15 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         PM.add(createLoopCanonicalizationPass());
         PM.add(createLoopLatcherPass());
 
+        if (GenCtx.getConfig().PassCfg.CodeLayout) {
+          PM.add(createCLBasicBlockPreprocessPass());
+        }
         PM.add(createRegsInitInsertionPass(
             PassCfg.RegistersConfig.InitializeRegs));
         SnippyTgt.addTargetSpecificPasses(PM);
+        if (GenCtx.getConfig().PassCfg.CodeLayout) {
+          PM.add(createCLBasicBlockPreprocessPass());
+        }
         // Pre backtrack end
 
         PM.add(createBlockGenPlanWrapperPass());
@@ -267,7 +292,9 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
 
         if (DebugCfg.DumpMI.value())
           PM.add(createPrintMachineInstrsPass(outs()));
-        PM.add(createBranchRelaxatorPass());
+
+        if (!GenCtx.getConfig().PassCfg.CodeLayout)
+          PM.add(createBranchRelaxatorPass());
         if (VerifyConsecutiveLoops)
           PM.add(createConsecutiveLoopsVerifierPass());
 
@@ -275,8 +302,17 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         PM.add(createTrackLivenessPass());
 
         PM.add(createPostGenVerifierPass());
+        if (GenCtx.getConfig().PassCfg.CodeLayout) {
+          PM.add(createCLBasicBlockPreprocessPass());
+          PM.add(createFallThroughEraserPass());
+          PM.add(createBranchLengthenerPass());
+          PM.add(createJumpLengthenerPass());
+          PM.add(createCodeAddrSamplingPass());
+          PM.add(createLongJumpRelaxatorPass());
+        }
         PM.add(createInstructionsPostProcessPass());
-        PM.add(createFunctionDistributePass());
+        if (!GenCtx.getConfig().PassCfg.CodeLayout)
+          PM.add(createFunctionDistributePass());
 
         if (PassCfg.InstrsGenerationConfig.RunMachineInstrVerifier)
           PM.add(createMachineVerifierPass("Machine Verifier Pass report"));
@@ -289,12 +325,23 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         PM.add(createMemAccessDumperPass());
       },
       [](PassManagerWrapper &PM) {
+        PM.add(createLinkerConfigurePass());
         PM.add(createSimulatorContextPreserverPass());
       });
 
   if (DumpMIR.isSpecified())
     writeMIRFile(MIR);
   std::vector<const SnippyModule *> Modules{&MainModule};
+  if (DumpCodeAddrMapping) {
+    if (!GenCtx.getConfig().PassCfg.CodeLayout) {
+      snippy::warn(
+          WarningName::InconsistentOptions, State.getCtx(),
+          "Option \"" + Twine() +
+              "\" was specified but code layout config was not provided",
+          "mapping won't be dumped");
+    }
+    dumpCodeAddrMapping(ProgContext.getLinker(), outs());
+  }
   bool NoRelax = DisableLinkerRelaxations;
   auto EResult = ProgContext.generateELF(Modules, ObjectType, NoRelax);
   if (!EResult)

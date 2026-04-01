@@ -392,6 +392,10 @@ public:
                          MachineBasicBlock &NewDestMBB) const override {
     reportUnimplementedError();
   }
+  bool replaceBranchDest(MachineInstr &Branch,
+                         MachineBasicBlock::iterator To) const override {
+    reportUnimplementedError();
+  }
 
   bool replaceBranchDest(MachineBasicBlock &BranchMBB,
                          MachineBasicBlock &OldDestMBB,
@@ -691,10 +695,23 @@ public:
     reportUnimplementedError();
   }
 
+  MachineBasicBlock::iterator
+  insertJumpThroughRelocation(InstructionGenerationContext &IGC,
+                              uint64_t Addr) const override {
+    reportUnimplementedError();
+  }
+
   MachineBasicBlock::iterator generateJump(MachineBasicBlock &MBB,
                                            MachineBasicBlock::iterator Ins,
                                            MachineBasicBlock &TBB,
                                            LLVMState &State) const override {
+    reportUnimplementedError();
+  }
+  bool fitsCondBranch(uint64_t Distance) const override {
+    reportUnimplementedError();
+  }
+
+  bool fitsUncondBranch(uint64_t Distance) const override {
     reportUnimplementedError();
   }
 
