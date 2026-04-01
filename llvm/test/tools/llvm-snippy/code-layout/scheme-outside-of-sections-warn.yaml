@@ -1,0 +1,46 @@
+# RUN: llvm-snippy %s --model-plugin=None -o %t |& FileCheck %s
+# RUN: llvm-objdump -D -j .snippy.1.rx %t.elf | FileCheck %s --check-prefix OBJ
+options:
+  mtriple: riscv64
+  num-instrs: 20
+
+sections:
+    - name:      1
+      VMA:       0x10000
+      SIZE:      0x20000
+      LMA:       0x10000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x3000
+      SIZE:      0x1000
+      LMA:       0x3000
+      ACCESS:    rw
+
+code-layout:
+  ranges:
+    - start: 0x10000
+      size: 0x20000
+      stride: 0x10
+      first-offset: 0
+      last-offset: 0
+    - start: 0x0
+      size: 0x10
+      stride: 0x10
+      first-offset: 0
+      last-offset: 0xf
+
+histogram:
+    - [ADD, 1.0]
+    - [BLT, 1.0]
+
+# CHECK: warning: (memory-access) Possibly wrong code layout:
+# CHECK-SAME: Following scheme permits code generation outside of all RX sections
+# CHECK: access-ranges:
+# CHECK-NEXT:   - weight:          1
+# CHECK-NEXT:     start:           0x0
+# CHECK-NEXT:     size:            0x10
+# CHECK-NEXT:     stride:          0x10
+# CHECK-NEXT:     first-offset:    0
+# CHECK-NEXT:     last-offset:     0xF
+
+# OBJ-NOT: 000000000300{{[01]([[:xdigit:]]{3})}}

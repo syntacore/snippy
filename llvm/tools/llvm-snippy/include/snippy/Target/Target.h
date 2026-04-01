@@ -464,6 +464,8 @@ public:
 
   virtual bool replaceBranchDest(MachineInstr &Branch,
                                  MachineBasicBlock &NewDestMBB) const = 0;
+  virtual bool replaceBranchDest(MachineInstr &Branch,
+                                 MachineBasicBlock::iterator To) const = 0;
 
   virtual bool replaceBranchDest(MachineBasicBlock &BranchMBB,
                                  MachineBasicBlock &OldDestMBB,
@@ -663,10 +665,16 @@ public:
   virtual std::unique_ptr<AsmPrinter>
   createAsmPrinter(LLVMTargetMachine &TM,
                    std::unique_ptr<MCStreamer> Streamer) const = 0;
+  virtual MachineBasicBlock::iterator
+  insertJumpThroughRelocation(InstructionGenerationContext &IGC,
+                              uint64_t Addr) const = 0;
 
   virtual MachineBasicBlock::iterator
   generateJump(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
                MachineBasicBlock &TBB, LLVMState &State) const = 0;
+  virtual bool fitsCondBranch(uint64_t Distance) const = 0;
+
+  virtual bool fitsUncondBranch(uint64_t Distance) const = 0;
 
   // Add any additional target-dependent flags to provide additional information
   // to asm printer.
