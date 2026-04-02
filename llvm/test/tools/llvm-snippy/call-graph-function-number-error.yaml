@@ -1,0 +1,36 @@
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+# CHECK: error: Option "function-number" cannot be used together with "call-graph"
+
+include:
+  - Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +m
+  function-number: 37
+  num-instrs: 100
+  dump-mf: true
+
+histogram:
+  - [ADD, 1.0]
+  - [ADDI, 1.0]
+  - [SUB, 1.0]
+  - [MUL, 1.0]
+
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - fun1
+        - fun2
+        - fun3
+    - name: fun1
+      callees:
+        - fun2
+    - name: fun2
+      callees:
+        - fun3
+    - name: fun3
+      external: true

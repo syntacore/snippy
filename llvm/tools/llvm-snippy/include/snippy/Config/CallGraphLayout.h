@@ -46,6 +46,10 @@ struct CallGraphLayout {
 
   unsigned getDepth() const { return MaxLayers; }
 };
+
+bool isFunctionLayersSpecified();
+bool isFunctionNumberSpecified();
+
 } // namespace snippy
 
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::CallGraphLayout);

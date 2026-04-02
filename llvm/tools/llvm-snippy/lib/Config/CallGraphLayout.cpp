@@ -45,6 +45,10 @@ static snippy::opt<bool>
                    cl::desc("return address register randomization"),
                    cl::Hidden, cl::cat(Options), cl::init(false));
 
+bool isFunctionLayersSpecified() { return FunctionLayers.isSpecified(); }
+
+bool isFunctionNumberSpecified() { return FunctionNumberOpt.isSpecified(); }
+
 CallGraphLayout::CallGraphLayout()
     : MaxLayers(FunctionLayers), FunctionNumber(FunctionNumberOpt),
       InstrNumAncil(NumInstrAncil), RandomizeRA(RandomizeRAOpt) {}

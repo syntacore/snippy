@@ -1,8 +1,7 @@
 # COM: This test checks that option randomize-ra can be specified for specific
 #      functions in call-graph.
 
-# RUN: llvm-snippy %S/calls-randomize-ra.yaml %s -redefine-ra=reg::X7 \
-# RUN:   -model-plugin None &> %t.mf
+# RUN: llvm-snippy %s -redefine-ra=reg::X7 -model-plugin None &> %t.mf
 
 
 # COM: Here we check that there are exactly two different return addresses (for
@@ -35,6 +34,22 @@
 # COM: Here we check that all lines contain 'x7 = '
 # RUN: | not grep -n -v 'x7 = '
 
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  num-instr-ancil: 50
+  verify-mi: on
+  dump-mf: on
+
+include:
+  - Inputs/sections-with-stack.yaml
+
+histogram:
+  - [ADD, 1.0]
+  - [ADDI, 1.0]
+  - [SUB, 1.0]
+  - [JAL, 1.0]
 
 call-graph:
   entry-point: fun4
