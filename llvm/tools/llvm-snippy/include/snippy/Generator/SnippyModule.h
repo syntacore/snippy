@@ -318,6 +318,8 @@ public:
   const IRegisterState &
   getInitialRegisterState(const TargetSubtargetInfo &ST) const;
 
+  const IRegisterState &getInitialRegisterState() const;
+
   bool hasProgramStateSaveSpace() const { return PGSK.get(); }
   const auto &getProgramStateSaveSpace() const { return *PGSK; }
   auto &getProgramStateSaveSpace() { return *PGSK; }
@@ -363,6 +365,8 @@ private:
   std::unique_ptr<Linker> PLinker;
   std::unique_ptr<MemoryManager> MemManager;
   std::unique_ptr<SMCManagerT> SMCManager;
+
+  const TargetSubtargetInfo *InitialStateSubtarget = nullptr;
 
   constexpr static auto SmallStringDefaultSize = 16;
 
