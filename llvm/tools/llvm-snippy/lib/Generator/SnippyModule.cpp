@@ -320,6 +320,13 @@ const IRegisterState &SnippyProgramContext::getInitialRegisterState(
   return *InitialMachineState;
 }
 
+const IRegisterState &SnippyProgramContext::getInitialRegisterState() const {
+  assert(InitialStateSubtarget &&
+         "Initial register state requested before target context "
+         "initialization");
+  return getInitialRegisterState(*InitialStateSubtarget);
+}
+
 SnippyProgramContext::SnippyProgramContext(LLVMState &State,
                                            RegisterGenerator &RegGen,
                                            std::vector<RegPool> Pools,
@@ -353,6 +360,7 @@ void SnippyProgramContext::createTargetContext(const Config &Cfg,
                                                const TargetSubtargetInfo &STI,
                                                const RegPoolWrapper &RP) {
   assert(!TargetContext && "Double context insertion");
+  InitialStateSubtarget = &STI;
   TargetContext =
       State->getSnippyTarget().createTargetContext(*State, Cfg, &STI, RP);
 }
