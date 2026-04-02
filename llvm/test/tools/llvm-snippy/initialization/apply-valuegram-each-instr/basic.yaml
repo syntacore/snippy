@@ -17,6 +17,22 @@
 # RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
 # RUN: |& FileCheck %s --check-prefix TWO_OPERANDS
 
+# RUN: llvm-snippy %s %S/Inputs/rv32-basic.yaml --march=riscv32-linux-gnu \
+# RUN:    -valuegram-operands-regs=%S/Inputs/bitrange.yaml \
+# RUN: |& FileCheck %s --check-prefix BR_THREE_OPERANDS
+
+# RUN: llvm-snippy %s %S/Inputs/rv64-basic.yaml --march=riscv64 \
+# RUN:    -valuegram-operands-regs=%S/Inputs/bitrange.yaml \
+# RUN: |& FileCheck %s --check-prefix BR_THREE_OPERANDS
+
+# RUN: llvm-snippy %s %S/Inputs/rv32-basic.yaml --march=riscv32-linux-gnu \
+# RUN:    -valuegram-operands-regs=%S/Inputs/bitrange.yaml \
+# RUN: |& FileCheck %s --check-prefix BR_TWO_OPERANDS
+
+# RUN: llvm-snippy %s %S/Inputs/rv64-basic.yaml --march=riscv64 \
+# RUN:    -valuegram-operands-regs=%S/Inputs/bitrange.yaml \
+# RUN: |& FileCheck %s --check-prefix BR_TWO_OPERANDS
+
 
 options:
   dump-mf: on
@@ -65,4 +81,28 @@ sections:
 # THREE_OPERANDS-COUNT-100: $[[REG1:x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}$[[REG2:x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}$[[REG3:x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}$[[REG1]] = {{.*}}[[REG2]]{{.*}}[[REG3]]
 
 # TWO_OPERANDS-COUNT-100: $[[REG1:x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}$[[REG2:x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}$[[REG1]] = {{.*}}[[REG2]]
+
+
+#          Valuegram values for gpr: [0-3].
+#          We want to see them in initialization
+#
+#          An example of what we're matching:
+#
+#          Three_operands:
+#
+#                     $x6 = ADDI $x0, 1, pcsections <0x5568087a7c58>
+#                     $x22 = ADDI $x0, 1, pcsections <0x5568087a7c58>
+#                     $x3 = ADDI $x0, 0, pcsections <0x5568087a7c58>
+#                     $x6 = SRL $x22, $x3
+#
+#          Two_operands:
+#
+#                     $x22 = ADDI $x0, 1, pcsections <0x5643c57f7a48>
+#                     $x20 = ADDI $x0, 255, pcsections <0x5643c57f7a48>
+#                     $x22 = XORI $x20, 1590
+
+
+# BR_THREE_OPERANDS-COUNT-100: $[[REG1:x[0-9]+]] = ADDI $x0, {{[0-3].*[[:space:]].*}}$[[REG2:x[0-9]+]] = ADDI $x0, {{[0-3].*[[:space:]].*}}$[[REG3:x[0-9]+]] = ADDI $x0, {{[0-3].*[[:space:]].*}}$[[REG1]] = {{.*}}[[REG2]]{{.*}}[[REG3]]
+
+# BR_TWO_OPERANDS-COUNT-100: $[[REG1:x[0-9]+]] = ADDI $x0, {{[0-3].*[[:space:]].*}}$[[REG2:x[0-9]+]] = ADDI $x0, {{[0-3].*[[:space:]].*}}$[[REG1]] = {{.*}}[[REG2]]
         
