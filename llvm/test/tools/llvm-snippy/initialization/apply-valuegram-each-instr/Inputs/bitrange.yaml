@@ -1,0 +1,16 @@
+histograms:
+  - reg-type: X
+    values:
+      - type: bitrange
+        min: 0x0000000000000000
+        max: 0x0000000000000003
+        weight: 1.0
+  - reg-type: F
+    values:
+      - type: bitrange
+        min: 0x0000000000000004
+        max: 0x0000000000000007
+        weight: 1.0
+  - reg-type: V
+    values:
+      - [uniform, 1.0]
