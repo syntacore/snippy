@@ -24,14 +24,26 @@
 namespace llvm {
 namespace snippy {
 
-static Expected<APInt>
-getValueFromHistogramPattern(ValuegramEntry::EntryKind Pattern,
-                             unsigned NumBits) {
+static Expected<APInt> getValueFromHistogramPattern(const ValuegramEntry &Entry,
+                                                    unsigned NumBits) {
+  auto Pattern = Entry.getKind();
   switch (Pattern) {
   case ValuegramEntry::EntryKind::Uniform:
     return UniformAPIntSampler::generate(NumBits).Value;
   case ValuegramEntry::EntryKind::BitPattern:
     return BitPatternAPIntSampler::generate(NumBits).Value;
+  case ValuegramEntry::EntryKind::BitRange: {
+    const auto &ValBitRange =
+        static_cast<const ValuegramBitRangeEntry &>(Entry.get());
+    // bitrange is not expected to be signed.
+    auto SamplerOrErr = APIntRangeSampler(ValBitRange.Min.zextOrTrunc(NumBits),
+                                          ValBitRange.Max.zextOrTrunc(NumBits),
+                                          /* isSigned */ false)
+                            .sample();
+    if (!SamplerOrErr)
+      return SamplerOrErr.takeError();
+    return SamplerOrErr->Value;
+  }
   default:
     return createStringError(std::make_error_code(std::errc::invalid_argument),
                              "Not a histogram pattern");
@@ -118,9 +130,10 @@ APInt sampleValuegramForOneReg(const Valuegram &Valuegram, StringRef Prefix,
     return Value.zextOrTrunc(NumBits);
   }
   case EntryKind::BitPattern:
+  case EntryKind::BitRange:
   case EntryKind::Uniform: {
     APInt Val;
-    if (Error E = getValueFromHistogramPattern(Kind, NumBits).moveInto(Val)) {
+    if (Error E = getValueFromHistogramPattern(Entry, NumBits).moveInto(Val)) {
       LLVMContext Ctx;
       snippy::fatal(Ctx, "Failed to sample register histogram", std::move(E));
     }
