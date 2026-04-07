@@ -26,11 +26,7 @@ class LLVMContext;
 
 namespace yaml {
 class IO;
-}
-
-} // namespace llvm
-
-namespace llvm {
+} // namespace yaml
 
 struct RVVConfigInterface {
   virtual ~RVVConfigInterface(){};
@@ -49,16 +45,60 @@ struct RVVConfigInterface {
 
 namespace snippy {
 
+enum RVVConstants { kMaxVLForVSETIVLI = 31u, kMaxLMUL = 8u };
+
+// Enum lists are necessary for mapping and validation during YAML parsing
+
+using VLMUL = llvm::RISCVVType::VLMUL;
+struct LMULEnumList final {
+  static constexpr std::array Arr = {
+      VLMUL::LMUL_1,        VLMUL::LMUL_2,  VLMUL::LMUL_4,  VLMUL::LMUL_8,
+      VLMUL::LMUL_RESERVED, VLMUL::LMUL_F8, VLMUL::LMUL_F4, VLMUL::LMUL_F2};
+};
+
+enum class VSEW : unsigned {
+  SEW8 = 8,
+  SEW16 = 16,
+  SEW32 = 32,
+  SEW64 = 64,
+  SEWReserved1 = 128,
+  SEWReserved2 = 256,
+  SEWReserved3 = 512,
+  SEWReserved4 = 1024
+};
+struct SEWEnumList final {
+  static constexpr std::array Arr = {VSEW::SEW8,         VSEW::SEW16,
+                                     VSEW::SEW32,        VSEW::SEW64,
+                                     VSEW::SEWReserved1, VSEW::SEWReserved2,
+                                     VSEW::SEWReserved3, VSEW::SEWReserved4};
+};
+
+enum class VXRMMode : unsigned { RNU = 0, RNE = 1, RDN = 2, RON = 3 };
+struct VXRMEnumList final {
+  static constexpr std::array Arr = {VXRMMode::RNU, VXRMMode::RNE,
+                                     VXRMMode::RDN, VXRMMode::RON};
+};
+
+enum class VMAMode : unsigned { MU = 0, MA = 1 };
+struct VMAEnumList final {
+  static constexpr std::array Arr = {VMAMode::MA, VMAMode::MU};
+};
+
+enum class VTAMode : unsigned { TU = 0, TA = 1 };
+struct VTAEnumList final {
+  static constexpr std::array Arr = {VTAMode::TA, VTAMode::TU};
+};
+
 class LLVMState;
 class Config;
 
 std::unique_ptr<RVVConfigInterface> createRVVConfig();
 
 // Compute EMUL = EEW / SEW * LMUL
-RISCVII::VLMUL computeEMUL(unsigned SEW, unsigned EEW, RISCVII::VLMUL LMUL);
+VLMUL computeEMUL(unsigned SEW, unsigned EEW, VLMUL LMUL);
 std::pair<unsigned, bool> computeDecodedEMUL(unsigned SEW, unsigned EEW,
-                                             RISCVII::VLMUL LMUL);
-bool isValidEMUL(unsigned SEW, unsigned EEW, RISCVII::VLMUL LMUL);
+                                             VLMUL LMUL);
+bool isValidEMUL(unsigned SEW, unsigned EEW, VLMUL LMUL);
 
 inline static bool canBeEncoded(unsigned SEW) {
   // This wrapper clarify the meaning of the function RISCVVType::isValidSEW.
@@ -72,29 +112,16 @@ inline static bool canBeEncoded(unsigned SEW) {
 // LMUL - lmul for which we want to compute VLMAX
 // If function returns zero - it means that such combination is not valid
 // TODO: consider replacing unsigned `SEW` parameter with typed enum
-unsigned computeVLMax(unsigned VLEN, unsigned SEW, RISCVII::VLMUL LMUL);
-
-enum RVVConstants { kMaxVLForVSETIVLI = 31u, kMaxLMUL = 8u };
+unsigned computeVLMax(unsigned VLEN, unsigned SEW, VLMUL LMUL);
 
 struct RVVConfiguration final {
   // Note: integer values are in-sync with RVV spec 1.0
-  enum class VXRMMode : unsigned { RNU = 0, RNE = 1, RDN = 2, RON = 3 };
-  enum class VSEW : unsigned {
-    SEW8 = 8,
-    SEW16 = 16,
-    SEW32 = 32,
-    SEW64 = 64,
-    SEWReserved1 = 128,
-    SEWReserved2 = 256,
-    SEWReserved3 = 512,
-    SEWReserved4 = 1024
-  };
 
   unsigned static getMinSEW() { return static_cast<unsigned>(VSEW::SEW8); }
   unsigned static getMaxLMUL() { return RVVConstants::kMaxLMUL; }
 
   bool IsLegal = true;
-  RISCVII::VLMUL LMUL = RISCVII::VLMUL::LMUL_1;
+  VLMUL LMUL = VLMUL::LMUL_1;
   VSEW SEW = VSEW::SEW64;
   bool MaskAgnostic = false;
   bool TailAgnostic = false;
@@ -121,14 +148,14 @@ struct RVVConfiguration final {
 };
 
 inline static bool isLegalSEW(unsigned SEW) {
-  auto SEWEnum = static_cast<RVVConfiguration::VSEW>(SEW);
+  auto SEWEnum = static_cast<VSEW>(SEW);
   switch (SEWEnum) {
   default:
     return false;
-  case RVVConfiguration::VSEW::SEW8:
-  case RVVConfiguration::VSEW::SEW16:
-  case RVVConfiguration::VSEW::SEW32:
-  case RVVConfiguration::VSEW::SEW64:
+  case VSEW::SEW8:
+  case VSEW::SEW16:
+  case VSEW::SEW32:
+  case VSEW::SEW64:
     return true;
   }
 }
@@ -333,10 +360,10 @@ private:
 public:
   // Support configuration can be temporarily used for support sequences, like
   // writing to a register. After that the previous configuration is restored.
-  constexpr static RVVConfiguration SupportCfgSew64{
-      true /*IsLegal*/, RISCVII::VLMUL::LMUL_1, RVVConfiguration::VSEW::SEW64};
-  constexpr static RVVConfiguration SupportCfgSew32{
-      true /*IsLegal*/, RISCVII::VLMUL::LMUL_1, RVVConfiguration::VSEW::SEW32};
+  constexpr static RVVConfiguration SupportCfgSew64{true /*IsLegal*/,
+                                                    VLMUL::LMUL_1, VSEW::SEW64};
+  constexpr static RVVConfiguration SupportCfgSew32{true /*IsLegal*/,
+                                                    VLMUL::LMUL_1, VSEW::SEW32};
 };
 
 class BaseConfigurationInfo final {

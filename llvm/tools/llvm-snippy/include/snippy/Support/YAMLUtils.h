@@ -311,6 +311,17 @@ void outputYAMLToStream(ObjT &&Obj, raw_ostream &OS) {
   outputYAMLToStream(std::forward<ObjT>(Obj), OS, [](auto &&) {});
 }
 
+template <typename ObjT>
+void outputYAMLToStreamTrimmed(ObjT &&Obj, raw_ostream &OS) {
+  std::string Str;
+  llvm::raw_string_ostream StringOS(Str);
+  outputYAMLToStream(std::forward<ObjT>(Obj), StringOS);
+  llvm::StringRef Ref(Str);
+  Ref.consume_front("---");
+  Ref.consume_back("...\n");
+  OS << Ref;
+}
+
 template <typename ObjT, typename OutT = yaml::Output>
 void outputYAMLToFileOrFatal(ObjT &Obj, const Twine &Path,
                              const Twine &Description = "") {
