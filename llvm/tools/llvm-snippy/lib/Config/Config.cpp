@@ -795,7 +795,6 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
   ProgCfg.ExternalStack =
       Opts.ExternalStack ||
       (ProgCfg.FollowTargetABI && !ProgCfg.hasInternalStackSection());
-  ProgCfg.SkipLegacySPSpill = Opts.SkipLegacySPSpill;
   ProgCfg.StaticStack = getStaticStackValue(Cfg, OpCC, Opts);
   ProgCfg.InitialRegYamlFile = Opts.InitialRegisterDataFile;
   // Here we don't use Seed.value_or() because we don't want seedOptToValue to
@@ -853,11 +852,6 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
           "When --honor-target-abi is enabled, generation of "
           "SP-relative instructions is not supported. You can provide "
           "`redefine-sp` option to make a generation process possible");
-
-    if (Opts.SkipLegacySPSpill)
-      snippy::fatal("Incompatible options",
-                    "--skip-legacy-sp-spill option is incompatible with "
-                    "--honor-target-abi");
 
     if (!RegsSpilledToStack.empty())
       snippy::warn(WarningName::InconsistentOptions, Ctx,

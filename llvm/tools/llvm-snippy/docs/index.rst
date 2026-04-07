@@ -2513,10 +2513,11 @@ Following is an example for the ``options`` key:
 where ``<string>`` is a list of registers to spill, for example,
 ``X1,X2,X3`` (comma-delimited).
 
-.. note::
+.. important::
 
-   You do not need to explicitly specify the stack pointer (``X2``) as
-   spilled as it is spilled by default when the stack is being used.
+   When `--honor-target-abi option <#generating-abi-with-respect-to-target>`__
+   is used, the ``--spilled-regs-list`` option is ignored and a
+   warning is given.
 
 In the following example, a spilled register (``X1``) is specified via
 the command line. ``X1`` will be spilled in prologue and restored in

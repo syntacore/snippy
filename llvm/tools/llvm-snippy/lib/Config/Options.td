@@ -41,7 +41,7 @@ let Group = ProgramOptionsCategory in {
   def RedefineSP : StringOption<"redefine-sp">,
                    Description<"Specify the reg to use as a stack pointer">,
                    DefaultValue<"any">;
-  
+
   def PreserveCallerSavedRegs
       : CommaSeparatedList<"preserve-caller-saved-regs", StringType>,
         Description<
@@ -82,11 +82,6 @@ let Group = ProgramOptionsCategory in {
   def ReservedRegsList
       : CommaSeparatedList<"reserved-regs-list", RegexType>,
         Description<"List of registers that shall not be used om snippet code">;
-
-  def SkipLegacySPSpill
-      : Flag<"skip-legacy-sp-spill">,
-        Description<"Skips legacy stack pointer spill when 'honor-target-abi' is disabled">,
-        Hidden;
 
   def StaticStack
       : Flag<"enable-static-stack">,
@@ -147,7 +142,7 @@ let Group = RegInitOptionsCategory in {
         DefaultValue<"none"> {
     let ValueOptional = true;
     let Callback = [{
-      if(DumpInitialRegistersValue.empty()) 
+      if(DumpInitialRegistersValue.empty())
         DumpInitialRegisters = DumpInitialRegistersValue;
     }];
   }
@@ -266,13 +261,13 @@ let Group = DebugOptionsCategory in {
                 Description<"View generated CFG"> {
     let Callback = "if(ViewCFGValue) DumpCFG = true;";
   }
-  
+
   def DumpLayout : Flag<"dump-layout">,
                    Description<"Dump the whole snippy configuration YAML">;
-  
+
   def DumpOptions : Flag<"dump-options">,
                     Description<"Dump snippy options' values">;
-  
+
   def DumpPreprocessedConfig
       : Flag<"E">,
         Description<"Dump snippy config after preprocessing it">;
