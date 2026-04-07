@@ -54,10 +54,10 @@ histogram:
 # CHECK-NEXT:   - VL Generators:
 # CHECK-NEXT:     <imm_1>
 # CHECK-NEXT:   - Configuration Bag Listing:
-# CHECK-NEXT:     Conf: { e64, m1, tu, mu, vxrm: rnu }
-# CHECK-NEXT:     Conf: { e32, mf2, tu, mu, vxrm: rnu }
-# CHECK-NEXT:     Conf: { e16, mf4, tu, mu, vxrm: rnu }
-# CHECK-NEXT:     Conf: { e8, mf8, tu, mu, vxrm: rnu }
+# CHECK-DAG:     Conf: { e64, m1, tu, mu, vxrm: rnu }
+# CHECK-DAG:     Conf: { e32, mf2, tu, mu, vxrm: rnu }
+# CHECK-DAG:     Conf: { e16, mf4, tu, mu, vxrm: rnu }
+# CHECK-DAG:     Conf: { e8, mf8, tu, mu, vxrm: rnu }
 # CHECK-NEXT: --- RVV Unit Discarded End  ---
 
 # CHECK: --- RVV Configuration Info ---
@@ -70,13 +70,14 @@ histogram:
 # CHECK-NEXT:     P: 0.5 <imm_4>
 # CHECK-NEXT:   - VM Selection Rules:
 # CHECK-NEXT:     P: 1 <imm_3>
+
 # CHECK:        - Configuration Bag Listing:
-# CHECK-NEXT:     P: 0.16667 Conf: { e8, m1, tu, mu, vxrm: rnu }/MaxVL: 16
-# CHECK-NEXT:     P: 0.16667 Conf: { e16, m1, tu, mu, vxrm: rnu }/MaxVL: 8
-# CHECK-NEXT:     P: 0.16667 Conf: { e32, m1, tu, mu, vxrm: rnu }/MaxVL: 4
-# CHECK-NEXT:     P: 0.16667 Conf: { e8, mf2, tu, mu, vxrm: rnu }/MaxVL: 8
-# CHECK-NEXT:     P: 0.16667 Conf: { e16, mf2, tu, mu, vxrm: rnu }/MaxVL: 4
-# CHECK-NEXT:     P: 0.16667 Conf: { e8, mf4, tu, mu, vxrm: rnu }/MaxVL: 4
+# CHECK-DAG:     P: 0.16667 Conf: { e8, m1, tu, mu, vxrm: rnu }/MaxVL: 16
+# CHECK-DAG:     P: 0.16667 Conf: { e16, m1, tu, mu, vxrm: rnu }/MaxVL: 8
+# CHECK-DAG:     P: 0.16667 Conf: { e32, m1, tu, mu, vxrm: rnu }/MaxVL: 4
+# CHECK-DAG:     P: 0.16667 Conf: { e8, mf2, tu, mu, vxrm: rnu }/MaxVL: 8
+# CHECK-DAG:     P: 0.16667 Conf: { e16, mf2, tu, mu, vxrm: rnu }/MaxVL: 4
+# CHECK-DAG:     P: 0.16667 Conf: { e8, mf4, tu, mu, vxrm: rnu }/MaxVL: 4
 # CHECK-NEXT:   - Configuration Bag Size: 6
 # CHECK-NEXT:   - State Cardinality: 44 ~ {MASKS}
 # CHECK-NEXT: --- RVV Configuration End  ---

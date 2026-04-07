@@ -275,8 +275,8 @@ public:
 
   // This function differs from the RISCVVType::decodeVLMUL in that it also
   // handles the reserved LMUL
-  static std::pair<unsigned, bool> decodeVLMUL(RISCVII::VLMUL LMUL) {
-    if (LMUL == RISCVII::VLMUL::LMUL_RESERVED)
+  static std::pair<unsigned, bool> decodeVLMUL(VLMUL LMUL) {
+    if (LMUL == VLMUL::LMUL_RESERVED)
       return std::make_pair(1 << static_cast<unsigned>(LMUL), false);
     return RISCVVType::decodeVLMUL(LMUL);
   }

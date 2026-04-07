@@ -428,6 +428,21 @@ std::string toHexStringTruncate(APInt AI, unsigned Len);
 // * all . .. and ~ symbolls are expanded
 Expected<std::string> canonicalizePath(StringRef Path);
 
+// Make it so the sum of all values in the range is 1.0
+template <typename ItType> void normalizeValues(ItType Begin, ItType End) {
+  static_assert(
+      std::is_convertible_v<typename std::iterator_traits<ItType>::value_type,
+                            double>);
+  auto Total = std::accumulate(Begin, End, 0.0);
+  assert(Total > std::numeric_limits<double>::epsilon());
+  for (auto It = Begin; It != End; ++It)
+    *It /= Total;
+}
+
+template <typename T> void normalizeValues(T &&RangeOrContainer) {
+  normalizeValues(llvm::adl_begin(RangeOrContainer),
+                  llvm::adl_end(RangeOrContainer));
+}
 } // namespace snippy
 } // namespace llvm
 

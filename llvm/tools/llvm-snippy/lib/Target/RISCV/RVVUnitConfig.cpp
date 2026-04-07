@@ -13,6 +13,7 @@
 #include "snippy/Config/Valuegram.h"
 #include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Support/Options.h"
+#include "snippy/Support/ProbabilityUtils.h"
 #include "snippy/Support/Utils.h"
 #include "snippy/Support/YAMLUtils.h"
 
@@ -88,55 +89,6 @@ namespace {
 using namespace llvm;
 using namespace llvm::snippy;
 
-template <typename T, typename B>
-bool cartesianIncrement(const B &begins, std::pair<T, T> &Range) {
-  ++Range.first;
-  if (Range.first == Range.second)
-    return true;
-  return false;
-}
-template <typename T, typename... TT, typename B>
-bool cartesianIncrement(const B &begins, std::pair<T, T> &Range,
-                        std::pair<TT, TT> &...Tail) {
-  ++Range.first;
-  if (Range.first == Range.second) {
-    Range.first =
-        std::get<std::tuple_size<B>::value - sizeof...(Tail) - 1>(begins);
-    return cartesianIncrement(begins, Tail...);
-  }
-  return false;
-}
-
-template <typename Container> auto cartesianRange(const Container &Cont) {
-  return std::make_pair(Cont.begin(), Cont.end());
-}
-// I dream about C++23
-template <typename OutputIterator, typename... Iter>
-void cartesianProduct(OutputIterator Output, std::pair<Iter, Iter>... Ranges) {
-  const auto begins = std::make_tuple(Ranges.first...);
-  for (;;) {
-    Output = {*Ranges.first...};
-    if (cartesianIncrement(begins, Ranges...))
-      break;
-  }
-}
-
-template <typename EnType> struct WeightsStorage {
-  using EnumerationType = EnType;
-  using WeightType = double;
-  using IndexType = std::underlying_type_t<EnType>;
-  using StorageType =
-      std::array<WeightType, static_cast<IndexType>(EnType::ItemsNum)>;
-
-  StorageType W;
-
-  WeightType &operator[](EnType idx) { return W[static_cast<IndexType>(idx)]; }
-
-  const WeightType &operator[](EnType idx) const {
-    return W[static_cast<IndexType>(idx)];
-  }
-};
-
 template <typename ItType>
 static bool checkWeightsNonNegative(ItType Begin, ItType End) {
   return std::all_of(Begin, End, [](const auto Item) { return Item >= 0; });
@@ -149,6 +101,10 @@ static bool checkNonZeroWeightPresent(ItType Begin, ItType End) {
 
 template <typename ItType>
 std::string checkWeights(ItType Begin, ItType End, const llvm::Twine &What) {
+  using value_type = typename std::iterator_traits<ItType>::value_type;
+  static_assert(std::is_convertible_v<value_type, double>,
+                "Element type must be convertible to double");
+
   if (!checkWeightsNonNegative(Begin, End))
     return (What + ": weights must be non-negative!").str();
 
@@ -158,48 +114,10 @@ std::string checkWeights(ItType Begin, ItType End, const llvm::Twine &What) {
 }
 
 template <typename ItType>
-static void dumpRawProbabilities(llvm::raw_ostream &Stream,
-                                 llvm::StringRef What, ItType Begin,
-                                 ItType End) {
-  Stream << "Raw Probabilities: <" << What << ">:";
-  for (auto It = Begin; It != End; ++It) {
-    Stream << " " << It->Value << "{" << floatToString(It->P, 5 /*precision*/)
-           << "}";
-  }
-  Stream << "\n";
+std::string checkWeights(llvm::iterator_range<ItType> Range,
+                         const llvm::Twine &What) {
+  return checkWeights(Range.begin(), Range.end(), What);
 }
-
-enum class LMULTypes : unsigned {
-  M1,
-  M2,
-  M4,
-  M8,
-  MF2,
-  MF4,
-  MF8,
-  MReserved,
-  ItemsNum
-};
-enum class SEWTypes : unsigned {
-  SEW8,
-  SEW16,
-  SEW32,
-  SEW64,
-  SEWReserved1,
-  SEWReserved2,
-  SEWReserved3,
-  SEWReserved4,
-  ItemsNum
-};
-enum class VXRMTypes : unsigned { RNU, RNE, RDN, RON, ItemsNum };
-enum class VMAMode : unsigned { MU, MA, ItemsNum };
-enum class VTAMode : unsigned { TU, TA, ItemsNum };
-
-using VXRMInfo = WeightsStorage<VXRMTypes>;
-using SEWInfo = WeightsStorage<SEWTypes>;
-using LMULInfo = WeightsStorage<LMULTypes>;
-using VMAInfo = WeightsStorage<VMAMode>;
-using VTAInfo = WeightsStorage<VTAMode>;
 
 struct ModeChangeP final {
   // Indicates that ModeChangeP comes from the histogram and
@@ -236,6 +154,12 @@ struct ModeChangeBias final {
   // instruction is selected
   double SetVillP = 0.0;
 };
+
+using SEWInfo = WeightsArray<SEWEnumList>;
+using LMULInfo = WeightsArray<LMULEnumList>;
+using VMAInfo = WeightsArray<VMAEnumList>;
+using VTAInfo = WeightsArray<VTAEnumList>;
+using VXRMInfo = WeightsArray<VXRMEnumList>;
 
 struct VTypeInfo {
   SEWInfo SEW;
@@ -275,38 +199,6 @@ template <typename T> struct ConfigurationElement {
   double P;
   UnderlyingType Value;
 };
-
-struct ConfigPoint {
-  ConfigurationElement<SEWTypes> SEW;
-  ConfigurationElement<LMULTypes> LMUL;
-  ConfigurationElement<VMAMode> VMA;
-  ConfigurationElement<VTAMode> VTA;
-  ConfigurationElement<VXRMTypes> VXRM;
-};
-
-template <typename SliceType>
-static auto extractElementsWithProbabilities(const SliceType &ConfSlice) {
-  using EnumerationType = typename SliceType::EnumerationType;
-  using Element = ConfigurationElement<EnumerationType>;
-  std::vector<Element> Result;
-  // First we need to normalize weights to get propabilities
-  auto WeightSum = std::accumulate(ConfSlice.W.begin(), ConfSlice.W.end(), 0.0);
-  constexpr auto NumberOfItems = static_cast<size_t>(EnumerationType::ItemsNum);
-  static_assert(NumberOfItems ==
-                std::tuple_size_v<typename SliceType::StorageType>);
-  using IndexType = typename Element::UnderlyingType;
-  for (IndexType Idx = 0; Idx < NumberOfItems; ++Idx) {
-    auto Weight = ConfSlice.W[Idx];
-    if (Weight > 0.0)
-      Result.push_back({Weight / WeightSum, Idx});
-  }
-  assert(std::abs(std::accumulate(Result.begin(), Result.end(), 0.0,
-                                  [](const auto &Acc, const auto &Item) {
-                                    return Acc + Item.P;
-                                  }) -
-                  1.0) < kProbabilityThreshold);
-  return Result;
-}
 
 ModeChangeInfo deriveModeSwitchingProbability(const Config &Cfg,
                                               const ModeChangeBias &Bias) {
@@ -376,105 +268,25 @@ ModeChangeInfo deriveModeSwitchingProbability(const Config &Cfg,
   return Result;
 }
 
-static auto convertLMULRepresentation(unsigned LMULInternal) {
-  assert(LMULInternal < static_cast<unsigned>(LMULTypes::ItemsNum));
-  switch (static_cast<LMULTypes>(LMULInternal)) {
-  case LMULTypes::M1:
-    return RISCVII::VLMUL::LMUL_1;
-  case LMULTypes::M2:
-    return RISCVII::VLMUL::LMUL_2;
-  case LMULTypes::M4:
-    return RISCVII::VLMUL::LMUL_4;
-  case LMULTypes::M8:
-    return RISCVII::VLMUL::LMUL_8;
-  case LMULTypes::MReserved:
-    return RISCVII::VLMUL::LMUL_RESERVED;
-  case LMULTypes::MF2:
-    return RISCVII::VLMUL::LMUL_F2;
-  case LMULTypes::MF4:
-    return RISCVII::VLMUL::LMUL_F4;
-  case LMULTypes::MF8:
-    return RISCVII::VLMUL::LMUL_F8;
-  default:
-    llvm_unreachable("incorrect LMULInternal representation");
-  }
-}
-
-static auto convertSEWRepresentation(unsigned SEWInternal) {
-  assert(SEWInternal < static_cast<unsigned>(SEWTypes::ItemsNum));
-  switch (static_cast<SEWTypes>(SEWInternal)) {
-  case SEWTypes::SEW8:
-    return snippy::RVVConfiguration::VSEW::SEW8;
-  case SEWTypes::SEW16:
-    return snippy::RVVConfiguration::VSEW::SEW16;
-  case SEWTypes::SEW32:
-    return snippy::RVVConfiguration::VSEW::SEW32;
-  case SEWTypes::SEW64:
-    return snippy::RVVConfiguration::VSEW::SEW64;
-  case SEWTypes::SEWReserved1:
-    return snippy::RVVConfiguration::VSEW::SEWReserved1;
-  case SEWTypes::SEWReserved2:
-    return snippy::RVVConfiguration::VSEW::SEWReserved2;
-  case SEWTypes::SEWReserved3:
-    return snippy::RVVConfiguration::VSEW::SEWReserved3;
-  case SEWTypes::SEWReserved4:
-    return snippy::RVVConfiguration::VSEW::SEWReserved4;
-  default:
-    llvm_unreachable("incorrect SEWInternal representation");
-  }
-}
-
-static auto convertVXRMRepresentation(unsigned VXRMInternal) {
-  switch (static_cast<VXRMTypes>(VXRMInternal)) {
-  case VXRMTypes::RNU:
-    return snippy::RVVConfiguration::VXRMMode::RNU;
-  case VXRMTypes::RNE:
-    return snippy::RVVConfiguration::VXRMMode::RNE;
-  case VXRMTypes::RDN:
-    return snippy::RVVConfiguration::VXRMMode::RDN;
-  case VXRMTypes::RON:
-    return snippy::RVVConfiguration::VXRMMode::RON;
-  default:
-    llvm_unreachable("incorrect VXRMInternal representation");
-  }
-}
-
-static auto convertMARepresentation(unsigned MAInternal) {
-  switch (static_cast<VMAMode>(MAInternal)) {
-  case VMAMode::MU:
-    return false;
-  case VMAMode::MA:
-    return true;
-  default:
-    llvm_unreachable("incorrect TAInternal representation");
-  }
-}
-
-static auto convertTARepresentation(unsigned TAInternal) {
-  switch (static_cast<VTAMode>(TAInternal)) {
-  case VTAMode::TU:
-    return false;
-  case VTAMode::TA:
-    return true;
-  default:
-    llvm_unreachable("incorrect TAInternal representation");
-  }
-}
-
 struct InternalConfigurationPoint {
   double Probability;
   RVVConfiguration Config;
 };
 
-static auto convertRepresentation(unsigned VLEN, const ConfigPoint &Point) {
+using RVVConfigPoint =
+    ProbableElement<std::tuple<VSEW, VLMUL, VMAMode, VTAMode, VXRMMode>>;
+
+static InternalConfigurationPoint
+convertRepresentation(unsigned VLEN, const RVVConfigPoint &Point) {
   InternalConfigurationPoint Result;
-  Result.Probability =
-      Point.SEW.P * Point.LMUL.P * Point.VMA.P * Point.VTA.P * Point.VXRM.P;
-  Result.Config.LMUL = convertLMULRepresentation(Point.LMUL.Value);
-  Result.Config.SEW = convertSEWRepresentation(Point.SEW.Value);
-  Result.Config.VXRM = convertVXRMRepresentation(Point.VXRM.Value);
-  Result.Config.MaskAgnostic = convertMARepresentation(Point.VMA.Value);
-  Result.Config.TailAgnostic = convertTARepresentation(Point.VTA.Value);
+  Result.Probability = Point.Prob;
+  Result.Config.SEW = std::get<VSEW>(Point.Element);
+  Result.Config.LMUL = std::get<VLMUL>(Point.Element);
+  Result.Config.MaskAgnostic =
+      (std::get<VMAMode>(Point.Element) == VMAMode::MA);
+  Result.Config.TailAgnostic =
+      (std::get<VTAMode>(Point.Element) == VTAMode::TA);
+  Result.Config.VXRM = std::get<VXRMMode>(Point.Element);
 
   auto MaxVL = computeVLMax(VLEN, static_cast<unsigned>(Result.Config.SEW),
                             Result.Config.LMUL);
@@ -689,6 +501,7 @@ template <> struct GeneratorFactory<RVVConfigurationInfo::VMGeneratorHolder> {
 
 void RVVConfigurationSpace::mapYaml(llvm::yaml::IO &IO,
                                     std::optional<RVVConfigurationSpace> &CS) {
+  static_assert(std::is_copy_assignable_v<RVVConfigurationSpace>);
   yaml::EmptyContext Ctx;
   IO.mapOptionalWithContext(RVVConfigurationSpace::kUnitName, CS, Ctx);
 }
@@ -715,43 +528,43 @@ namespace llvm {
 
 template <> struct yaml::MappingTraits<VXRMInfo> {
   static void mapping(yaml::IO &IO, VXRMInfo &VXRM) {
-    IO.mapOptional("rnu", VXRM[VXRMTypes::RNU], 0.0);
-    IO.mapOptional("rne", VXRM[VXRMTypes::RNE], 0.0);
-    IO.mapOptional("rdn", VXRM[VXRMTypes::RDN], 0.0);
-    IO.mapOptional("ron", VXRM[VXRMTypes::RON], 0.0);
+    IO.mapOptional("rnu", VXRM[VXRMMode::RNU], 0.0);
+    IO.mapOptional("rne", VXRM[VXRMMode::RNE], 0.0);
+    IO.mapOptional("rdn", VXRM[VXRMMode::RDN], 0.0);
+    IO.mapOptional("ron", VXRM[VXRMMode::RON], 0.0);
   }
 
   static std::string validate(yaml::IO &IO, VXRMInfo &VXRM) {
-    return checkWeights(VXRM.W.begin(), VXRM.W.end(), "VXRM");
+    return checkWeights(make_second_range(VXRM), "VXRM");
   }
 };
 
 template <> struct yaml::MappingTraits<SEWInfo> {
   static void mapping(yaml::IO &IO, SEWInfo &SEW) {
-    IO.mapOptional("sew_8", SEW[SEWTypes::SEW8], 0.0);
-    IO.mapOptional("sew_16", SEW[SEWTypes::SEW16], 0.0);
-    IO.mapOptional("sew_32", SEW[SEWTypes::SEW32], 0.0);
-    IO.mapOptional("sew_64", SEW[SEWTypes::SEW64], 0.0);
+    IO.mapOptional("sew_8", SEW[VSEW::SEW8], 0.0);
+    IO.mapOptional("sew_16", SEW[VSEW::SEW16], 0.0);
+    IO.mapOptional("sew_32", SEW[VSEW::SEW32], 0.0);
+    IO.mapOptional("sew_64", SEW[VSEW::SEW64], 0.0);
   }
 
   static std::string validate(yaml::IO &IO, SEWInfo &SEW) {
-    return checkWeights(SEW.W.begin(), SEW.W.end(), "SEW");
+    return checkWeights(make_second_range(SEW), "SEW");
   }
 };
 
 template <> struct yaml::MappingTraits<LMULInfo> {
   static void mapping(yaml::IO &IO, LMULInfo &LMUL) {
-    IO.mapOptional("m1", LMUL[LMULTypes::M1], 0.0);
-    IO.mapOptional("m2", LMUL[LMULTypes::M2], 0.0);
-    IO.mapOptional("m4", LMUL[LMULTypes::M4], 0.0);
-    IO.mapOptional("m8", LMUL[LMULTypes::M8], 0.0);
-    IO.mapOptional("mf2", LMUL[LMULTypes::MF2], 0.0);
-    IO.mapOptional("mf4", LMUL[LMULTypes::MF4], 0.0);
-    IO.mapOptional("mf8", LMUL[LMULTypes::MF8], 0.0);
+    IO.mapOptional("m1", LMUL[VLMUL::LMUL_1], 0.0);
+    IO.mapOptional("m2", LMUL[VLMUL::LMUL_2], 0.0);
+    IO.mapOptional("m4", LMUL[VLMUL::LMUL_4], 0.0);
+    IO.mapOptional("m8", LMUL[VLMUL::LMUL_8], 0.0);
+    IO.mapOptional("mf2", LMUL[VLMUL::LMUL_F2], 0.0);
+    IO.mapOptional("mf4", LMUL[VLMUL::LMUL_F4], 0.0);
+    IO.mapOptional("mf8", LMUL[VLMUL::LMUL_F8], 0.0);
   }
 
   static std::string validate(yaml::IO &IO, LMULInfo &LMUL) {
-    return checkWeights(LMUL.W.begin(), LMUL.W.end(), "LMUL");
+    return checkWeights(make_second_range(LMUL), "LMUL");
   }
 };
 
@@ -762,7 +575,7 @@ template <> struct yaml::MappingTraits<VMAInfo> {
   }
 
   static std::string validate(yaml::IO &IO, VMAInfo &VMA) {
-    return checkWeights(VMA.W.begin(), VMA.W.end(), "VMA");
+    return checkWeights(make_second_range(VMA), "VMA");
   }
 };
 
@@ -773,7 +586,7 @@ template <> struct yaml::MappingTraits<VTAInfo> {
   }
 
   static std::string validate(yaml::IO &IO, VTAInfo &VTA) {
-    return checkWeights(VTA.W.begin(), VTA.W.end(), "VTA");
+    return checkWeights(make_second_range(VTA), "VTA");
   }
 };
 
@@ -811,8 +624,7 @@ template <> struct YAMLHistogramTraits<VLVMSequence::VLVMEntry> {
   }
 
   static std::string validate(ArrayRef<DenormEntry> VLVMs) {
-    SmallVector<double> Weights(llvm::make_second_range(VLVMs));
-    return checkWeights(Weights.begin(), Weights.end(), "VL/VM");
+    return checkWeights(make_second_range(VLVMs), "VL/VM");
   }
 };
 
@@ -914,14 +726,22 @@ template <> struct yaml::MappingTraits<VectorUnitRules> {
 namespace snippy {
 
 std::unique_ptr<RVVConfigInterface> createRVVConfig() {
+#if 0
+  initRISCVTargetParserOptions();
+  if (AllowReservedSEW == cl::BOU_UNSET)
+    // Snippy allows using reserved SEW (128 - 1024) encodings and RISC-V LLVM
+    // backend should be able to encode it.
+    AllowReservedSEW = cl::BOU_TRUE;
+#endif
+  AllowReservedSEW = true;
   return std::make_unique<RVVConfig>();
 }
 
-inline static bool isReservedValues(unsigned SEW, RISCVII::VLMUL LMUL) {
-  return LMUL == RISCVII::VLMUL::LMUL_RESERVED || !isLegalSEW(SEW);
+inline static bool isReservedValues(unsigned SEW, VLMUL LMUL) {
+  return LMUL == VLMUL::LMUL_RESERVED || !isLegalSEW(SEW);
 }
 
-unsigned computeVLMax(unsigned VLEN, unsigned SEW, RISCVII::VLMUL LMUL) {
+unsigned computeVLMax(unsigned VLEN, unsigned SEW, VLMUL LMUL) {
   if (isReservedValues(SEW, LMUL))
     return 0;
   assert(canBeEncoded(SEW));
@@ -936,7 +756,7 @@ unsigned computeVLMax(unsigned VLEN, unsigned SEW, RISCVII::VLMUL LMUL) {
 }
 
 std::pair<unsigned, bool> computeDecodedEMUL(unsigned SEW, unsigned EEW,
-                                             RISCVII::VLMUL LMUL) {
+                                             VLMUL LMUL) {
   if (isReservedValues(SEW, LMUL) || !isLegalSEW(SEW) || !isLegalSEW(EEW)) {
     // Calculating EMUL doesn't make sense for illegal values of SEW or LMUL, so
     // just return {1, 0}
@@ -951,29 +771,29 @@ std::pair<unsigned, bool> computeDecodedEMUL(unsigned SEW, unsigned EEW,
   return {Dividend / Divisor, /* fractional */ false};
 }
 
-bool isValidEMUL(unsigned SEW, unsigned EEW, RISCVII::VLMUL LMUL) {
+bool isValidEMUL(unsigned SEW, unsigned EEW, VLMUL LMUL) {
   auto [EMUL, IsFractional] = computeDecodedEMUL(SEW, EEW, LMUL);
   return RISCVVType::isValidLMUL(EMUL, IsFractional);
 }
 
-RISCVII::VLMUL computeEMUL(unsigned SEW, unsigned EEW, RISCVII::VLMUL LMUL) {
+VLMUL computeEMUL(unsigned SEW, unsigned EEW, VLMUL LMUL) {
   auto [EMUL, IsFractional] = computeDecodedEMUL(SEW, EEW, LMUL);
   assert(RISCVVType::isValidLMUL(EMUL, IsFractional));
   return RISCVVType::encodeLMUL(EMUL, IsFractional);
 }
 
 static unsigned getNumReservedSEW(unsigned SEW) {
-  auto SEWEnum = static_cast<RVVConfiguration::VSEW>(SEW);
+  auto SEWEnum = static_cast<VSEW>(SEW);
   switch (SEWEnum) {
   default:
     return 0;
-  case RVVConfiguration::VSEW::SEWReserved1:
+  case VSEW::SEWReserved1:
     return 1;
-  case RVVConfiguration::VSEW::SEWReserved2:
+  case VSEW::SEWReserved2:
     return 2;
-  case RVVConfiguration::VSEW::SEWReserved3:
+  case VSEW::SEWReserved3:
     return 3;
-  case RVVConfiguration::VSEW::SEWReserved4:
+  case VSEW::SEWReserved4:
     return 4;
   }
 }
@@ -990,7 +810,7 @@ static void printVType(unsigned VType, raw_ostream &OS) {
   bool IsReserved = false;
   bool Fractional = false;
 
-  if (RISCVVType::getVLMUL(VType) == RISCVII::VLMUL::LMUL_RESERVED)
+  if (RISCVVType::getVLMUL(VType) == VLMUL::LMUL_RESERVED)
     IsReserved = true;
   else
     std::tie(LMul, Fractional) =
@@ -1053,43 +873,59 @@ template <typename T> struct WeightedItems {
   }
 };
 
+template <typename T>
+static void printRawProbabilities(raw_ostream &OS, StringRef Name,
+                                  const WeightsArray<T> &Probabilities) {
+  using Weights = WeightsArray<T>;
+  static_assert(
+      llvm::yaml::has_MappingTraits<Weights, llvm::yaml::EmptyContext>::value,
+      "WeightsArray<T> must have MappingTraits specialization");
+  LLVM_DEBUG(OS << "\n--- Raw Probabilities " << Name << " ---");
+  LLVM_DEBUG(outputYAMLToStreamTrimmed(Probabilities, OS));
+}
+
 static std::vector<InternalConfigurationPoint> getLegalConfigurationPoints(
     const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &VLGen,
     unsigned VLEN, const RVVUnitInfo &VUInfo,
     std::vector<RVVConfiguration> &DiscardedConfigs) {
-  auto SEW = extractElementsWithProbabilities(VUInfo.VTYPE.SEW);
-  auto LMUL = extractElementsWithProbabilities(VUInfo.VTYPE.LMUL);
-  auto MA = extractElementsWithProbabilities(VUInfo.VTYPE.VMA);
-  auto TA = extractElementsWithProbabilities(VUInfo.VTYPE.VTA);
+  auto SEW = normalizeWeights(VUInfo.VTYPE.SEW);
+  auto LMUL = normalizeWeights(VUInfo.VTYPE.LMUL);
+  auto MA = normalizeWeights(VUInfo.VTYPE.VMA);
+  auto TA = normalizeWeights(VUInfo.VTYPE.VTA);
+  auto XRM = normalizeWeights(VUInfo.VXRM);
 
-  auto VXRM = extractElementsWithProbabilities(VUInfo.VXRM);
+  LLVM_DEBUG(printRawProbabilities(dbgs(), "SEW", SEW));
+  LLVM_DEBUG(printRawProbabilities(dbgs(), "LMUL", LMUL));
+  LLVM_DEBUG(printRawProbabilities(dbgs(), "MA", MA));
+  LLVM_DEBUG(printRawProbabilities(dbgs(), "TA", TA));
+  LLVM_DEBUG(printRawProbabilities(dbgs(), "VXRM", XRM));
+  LLVM_DEBUG(dbgs() << "\n");
 
-  LLVM_DEBUG(dumpRawProbabilities(dbgs(), "SEW", SEW.begin(), SEW.end()));
-  LLVM_DEBUG(dumpRawProbabilities(dbgs(), "LMUL", LMUL.begin(), LMUL.end()));
-  LLVM_DEBUG(dumpRawProbabilities(dbgs(), "MA", MA.begin(), MA.end()));
-  LLVM_DEBUG(dumpRawProbabilities(dbgs(), "TA", TA.begin(), TA.end()));
-  LLVM_DEBUG(dumpRawProbabilities(dbgs(), "VXRM", MA.begin(), MA.end()));
+  auto Points = jointProbabilityDistribution(SEW, LMUL, MA, TA, XRM);
 
-  std::vector<ConfigPoint> Points;
-  cartesianProduct(std::back_inserter(Points), cartesianRange(SEW),
-                   cartesianRange(LMUL), cartesianRange(MA), cartesianRange(TA),
-                   cartesianRange(VXRM));
+  // Erase points with zero probability (e.g. unspecified combinations)
+  llvm::erase_if(Points, [](const auto &Point) {
+    return Point.Prob < std::numeric_limits<double>::epsilon();
+  });
+
   LLVM_DEBUG(dbgs() << "Raw Probabilities Points Count: " << Points.size()
                     << "\n");
   std::vector<InternalConfigurationPoint> ConfigPoints;
+  ConfigPoints.reserve(Points.size());
   std::transform(
       Points.begin(), Points.end(), std::back_inserter(ConfigPoints),
       [VLEN](const auto &Point) { return convertRepresentation(VLEN, Point); });
 
   // Now, at this moment ConfigPoints can contain illegal configurations
-  auto RemoveIt = std::remove_if(
-      ConfigPoints.begin(), ConfigPoints.end(), [](const auto &Point) {
-        if (!Point.Config.IsLegal)
-          LLVM_DEBUG(dbgs() << "  !!!RVV-CFG: discarding illegal config ";
-                     Point.Config.print(dbgs()); dbgs() << "\n");
-        return !Point.Config.IsLegal;
-      });
-  ConfigPoints.erase(RemoveIt, ConfigPoints.end());
+  llvm::erase_if(ConfigPoints, [](const auto &Point) {
+    if (!Point.Config.IsLegal) {
+      LLVM_DEBUG(dbgs() << "  !!!RVV-CFG: discarding illegal config ");
+      LLVM_DEBUG(Point.Config.print(dbgs()));
+      LLVM_DEBUG(dbgs() << "\n");
+    }
+    return !Point.Config.IsLegal;
+  });
+
   // Also erase all ConfigPoints for which there are no valid VLs
   auto DiscardedIt = std::partition(
       ConfigPoints.begin(), ConfigPoints.end(),
@@ -1107,33 +943,31 @@ static std::vector<InternalConfigurationPoint> getLegalConfigurationPoints(
 
 static std::vector<InternalConfigurationPoint>
 getIllegalConfigurationPoints(unsigned VLEN) {
-  auto AllSEW = extractElementsWithProbabilities(
-      SEWInfo{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
-  auto AllLMUL = extractElementsWithProbabilities(
-      LMULInfo{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
-  auto AllMA = extractElementsWithProbabilities(VMAInfo{1.0, 1.0});
-  auto AllTA = extractElementsWithProbabilities(VTAInfo{1.0, 1.0});
+  auto AllSEW = normalizeWeights(
+      WeightsArray<SEWEnumList>{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
+  auto AllLMUL = normalizeWeights(
+      WeightsArray<LMULEnumList>{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
+  auto AllMA = normalizeWeights(WeightsArray<VMAEnumList>{1.0, 1.0});
+  auto AllTA = normalizeWeights(WeightsArray<VTAEnumList>{1.0, 1.0});
+  auto AllVXRM =
+      normalizeWeights(WeightsArray<VXRMEnumList>{1.0, 1.0, 1.0, 1.0});
 
-  auto AllVXRM = extractElementsWithProbabilities(VXRMInfo{1.0, 1.0, 1.0, 1.0});
-
-  std::vector<ConfigPoint> AllPoints;
-  cartesianProduct(std::back_inserter(AllPoints), cartesianRange(AllSEW),
-                   cartesianRange(AllLMUL), cartesianRange(AllMA),
-                   cartesianRange(AllTA), cartesianRange(AllVXRM));
+  auto AllPoints =
+      jointProbabilityDistribution(AllSEW, AllLMUL, AllMA, AllTA, AllVXRM);
   std::vector<InternalConfigurationPoint> AllConfigPoints;
   std::transform(
       AllPoints.begin(), AllPoints.end(), std::back_inserter(AllConfigPoints),
       [VLEN](const auto &Point) { return convertRepresentation(VLEN, Point); });
+
   // Now, at this moment AllConfigPoints contain legal configurations
-  auto RemoveLegalIt = std::remove_if(
-      AllConfigPoints.begin(), AllConfigPoints.end(), [](const auto &Point) {
+  llvm::erase_if(
+      AllConfigPoints, [](const auto &Point) {
         if (NoReservedCfgRVV &&
             isReservedValues(static_cast<unsigned>(Point.Config.SEW),
                              Point.Config.LMUL))
           return true;
         return Point.Config.IsLegal;
       });
-  AllConfigPoints.erase(RemoveLegalIt, AllConfigPoints.end());
   return AllConfigPoints;
 }
 
