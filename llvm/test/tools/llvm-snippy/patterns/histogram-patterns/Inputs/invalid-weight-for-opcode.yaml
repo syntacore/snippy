@@ -1,0 +1,3 @@
+histogram-patterns:
+  - ValidDoubles: "SUB[5.3e] | AND [0.4324e] | ADDI [100]"
+  - InvalidDouble: "ADD [1.324fdsfsd]"

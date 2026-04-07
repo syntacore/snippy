@@ -98,6 +98,15 @@ ChoiceNode::ResultSequenceType ChoiceNode::evaluate() const {
   return evaluateRandChildNode();
 }
 
+double CartesianNode::getWeight() const {
+  auto WeightRange = llvm::map_range(ChildNodes, [](auto &&NodePtr) {
+    assert(NodePtr);
+    return NodePtr->getWeight();
+  });
+  return std::accumulate(WeightRange.begin(), WeightRange.end(), /* init */ 1.0,
+                         std::multiplies<double>{});
+}
+
 CartesianNode::ResultSequenceType CartesianNode::evaluate() const {
   ResultSequenceType ResultSeq;
   for (auto &&NodePtr : ChildNodes) {
