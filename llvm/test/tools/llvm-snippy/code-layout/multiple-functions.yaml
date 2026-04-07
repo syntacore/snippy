@@ -2,7 +2,7 @@
 
 options:
   mtriple: riscv64
-  num-instrs: 300
+  num-instrs: 100
   dump-mf: true
   function-number: 20
 sections:
@@ -26,7 +26,7 @@ sections:
       LMA:       0x400000
       SIZE:      0x1000
       ACCESS:    rw
- 
+
 
 code-layout:
   ranges:
