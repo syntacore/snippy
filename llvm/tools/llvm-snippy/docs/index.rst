@@ -666,7 +666,7 @@ operations, such as:
 
 -   `|` - Probabilistic OR (selection from either the left or right expression).
     Lets take two opcodes, DIV and MUL. The expression ``DIV | MUL`` then means
-    choosing either ``DIV`` or ``MUL`` (currently, all opcodes within the patterns have equal probability).
+    choosing either ``DIV`` or ``MUL`` (by default, all opcodes within the patterns have equal probability).
 
 -   `*` - Cartesian product.
     For example, consider two opcode sequences: ``[ADD | SUB] * [LD | SD]``.
@@ -759,6 +759,20 @@ Now they can be used in the main histogram.
      - [pattern: AddMul, 1.0]
      - [pattern: LoadStore, 1.0]
      - [pattern: MultiHistogram, 1.0]
+
+You can specify weights for opcodes and patterns using the square bracket syntax:
+
+.. code:: yaml
+
+   histogram-patterns:
+     - AddSub: "ADD [2.0] | SUB [1.5]"
+     - MulDivMixed: "MUL [3.5] | AddSub [0.5] | DIV [10.0] * AND [2.0]"
+
+
+In operations ``*`` and ``^``, the weight of the resulting expression is
+obtained by multiplying the weights of the individual opcodes.
+In the example above, the expression ``DIV [10.0] * AND [2.0]`` expands to
+``DIV * AND [20.0]``.
 
 Also, using the ``--define-main-histogram=<Name>`` option, you can override the main
 `histogram` with a histogram from the `histogram-patterns`. If you do not specify it,

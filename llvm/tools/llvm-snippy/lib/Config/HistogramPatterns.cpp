@@ -35,6 +35,20 @@ struct HistogramExpressionParser final {
         SnippyTgt(SnippyTgt), HistPatterns(HistPatterns) {}
 
   ParserReturnType evaluateExpression() {
+    auto Exp = parseExp();
+    if (!Exp)
+      return Exp;
+    // Ensure that all data is parsed correctly until the end
+    if (Pos != HistData.end())
+      return createStringError(
+          std::make_error_code(std::errc::invalid_argument),
+          llvm::formatv("unexpected data: '{0}'",
+                        std::string(Pos, HistData.end())));
+    return Exp;
+  }
+
+private:
+  ParserReturnType parseExp() {
     auto LhsNode = parseTerm();
     if (!LhsNode)
       return LhsNode.takeError();
@@ -55,7 +69,6 @@ struct HistogramExpressionParser final {
     return ResultNode;
   }
 
-private:
   ParserReturnType parseTerm() {
     skipWhitespaces();
     auto LhsNode = parsePower();
@@ -107,7 +120,7 @@ private:
     skipWhitespaces();
     if (*Pos == '(') {
       Pos++;
-      auto LhsNode = evaluateExpression();
+      auto LhsNode = parseExp();
       if (!LhsNode)
         return LhsNode.takeError();
       assert(LhsNode);
@@ -123,28 +136,22 @@ private:
   }
 
   ParserReturnType parseVariableName() {
-    skipWhitespaces();
-
-    auto *Start = Pos;
-    while (isAsciiAlpha(*Pos) || isAsciiDigit(*Pos) || *Pos == '_' ||
-           *Pos == '-' || *Pos == '.')
-      Pos++;
-
-    StringRef Name(Start, Pos - Start);
+    auto Name = parseCharSequence();
     if (auto Tmp = 0; !StringRef(Name).getAsInteger(/* Radix */ 0, Tmp))
       return std::make_unique<NumberNode>(Name);
     if (auto Tmp = 0.0; !StringRef(Name).getAsDouble(Tmp))
       return createStringError(
           std::make_error_code(std::errc::invalid_argument),
-          llvm::formatv("unexpected floating-point value encountered: '{0}' "
-                        "(floating-point not currently supported)",
-                        Name));
+          "floating-point values are not supported in this context");
     auto OpcodeOpt = OpCC.code(Name);
     if (OpcodeOpt.has_value()) {
       auto Opcode = OpcodeOpt.value();
       if (auto IsAllowed = isOpcodeAllowed(Opcode); !IsAllowed)
         return IsAllowed.takeError();
-      return std::make_unique<OpcodeNode>(Opcode);
+      auto OpcWeight = parseWeight();
+      if (!OpcWeight)
+        return OpcWeight.takeError();
+      return std::make_unique<OpcodeNode>(Opcode, *OpcWeight);
     }
     if (!HistPatterns.contains(Name))
       return createStringError(
@@ -155,7 +162,11 @@ private:
               "Use -list-opcode-names option to check for available "
               "instructions!",
               HistName, Name));
-    return std::make_unique<HistogramNode>(Name, HistPatterns.clone(Name));
+    auto HistWeight = parseWeight();
+    if (!HistWeight)
+      return HistWeight.takeError();
+    return std::make_unique<HistogramNode>(Name, HistPatterns.clone(Name),
+                                           *HistWeight);
   }
 
   ParserReturnType parseRangeForRepeatNode(ParserReturnType LhsNode) {
@@ -212,6 +223,42 @@ private:
                         "greater than 0 is expected",
                         Operations::Pow));
     return Arg;
+  }
+
+  // In the config, we can specify a weight for an opcode/pattern (optional).
+  // E.g:
+  // histogram-patterns:
+  //   - PatternName: "... | PATTERN [WEIGHT1] | OPC [WEIGHT2] | ..."
+  Expected<double> parseWeight() {
+    skipWhitespaces();
+    if (Pos == HistData.end() || *Pos != '[')
+      return BaseNode::DefaultNodeWeight;
+    // Skip '['
+    ++Pos;
+    auto WeightStr = parseCharSequence();
+    double Result = 0.0;
+    if (StringRef(WeightStr).getAsDouble(Result))
+      return createStringError(
+          std::make_error_code(std::errc::invalid_argument),
+          llvm::formatv("expected floating-point value, got '{0}'", WeightStr));
+    if (Pos == HistData.end() || *Pos != ']')
+      return createStringError(
+          std::make_error_code(std::errc::invalid_argument), "expected ']'");
+    // Skip ']'
+    ++Pos;
+    return Result;
+  }
+
+  StringRef parseCharSequence() {
+    skipWhitespaces();
+    auto *Start = Pos;
+    while (isAsciiAlpha(*Pos) || isAsciiDigit(*Pos) || *Pos == '_' ||
+           *Pos == '-' || *Pos == '.')
+      Pos++;
+
+    StringRef Name(Start, Pos - Start);
+    skipWhitespaces();
+    return Name;
   }
 
   bool isGivenOperation(Operations Oper) const {
