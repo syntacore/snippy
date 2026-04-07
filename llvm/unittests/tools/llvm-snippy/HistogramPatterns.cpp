@@ -1,9 +1,12 @@
 #include "snippy/Config/OpcodeHistogramVisitor.h"
 
+#include "llvm/ADT/STLExtras.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 #include <unordered_map>
+#include <utility>
 
 namespace {
 
@@ -11,6 +14,55 @@ using namespace llvm::snippy;
 using OpcCategory = OpcodeNode::OpcodeCategory;
 
 enum Opcodes { ADD, SUB, MUL, DIV, MOV, AND };
+
+using OpcodeWeightsTy = std::vector<std::pair<unsigned, double>>;
+
+// We generate a given number of patterns and verify that the final distribution
+// of opcodes matches the theoretically calculated one (stored in OpcProb).
+void checkBySamplingTree(const ChoiceNode &OpcodesTree,
+                         const std::unordered_map<unsigned, double> &OpcProb,
+                         size_t SampleNum) {
+  // Must be initialized before calling evaluate()
+  RandEngine::init(::testing::GTEST_FLAG(random_seed));
+  std::unordered_map<unsigned, size_t> OpcCount;
+  // Generate SampleNum patterns
+  assert(SampleNum);
+  while (SampleNum--) {
+    auto Pattern = OpcodesTree.evaluate();
+    for (auto &&Opc : Pattern)
+      OpcCount[Opc]++;
+  }
+  auto CountRange = llvm::make_second_range(OpcCount);
+  auto TotalSize =
+      std::accumulate(CountRange.begin(), CountRange.end(), /* init */ 0u);
+  for (auto &&[Opc, Count] : OpcCount) {
+    auto Found = OpcProb.find(Opc);
+    assert(Found != OpcProb.end());
+    auto Prob = Found->second;
+    EXPECT_THAT(Prob, ::testing::DoubleNear(
+                          static_cast<double>(Count) / TotalSize, 0.05));
+  }
+}
+
+void checkOpcodeProbabilities(const ChoiceNode &OpcodesTree,
+                              const OpcodeWeightsTy &OpcodeWeights) {
+  OpcodeProbVisitor Vis(OpcodesTree);
+  std::unordered_map<unsigned, double> OpcProb;
+  auto Weights = llvm::make_second_range(OpcodeWeights);
+  auto TotalWeight =
+      std::accumulate(Weights.begin(), Weights.end(), /* init */ 0.0);
+  EXPECT_DOUBLE_EQ(Vis.getTotalWeight(), TotalWeight);
+  llvm::transform(OpcodeWeights, std::inserter(OpcProb, OpcProb.end()),
+                  [TotalWeight](auto &&OpcWeight) {
+                    return std::make_pair(OpcWeight.first,
+                                          OpcWeight.second / TotalWeight);
+                  });
+  llvm::for_each(OpcProb, [&Vis](auto &&OpcToProb) {
+    EXPECT_DOUBLE_EQ(Vis.getProbability(OpcToProb.first), OpcToProb.second);
+  });
+
+  checkBySamplingTree(OpcodesTree, OpcProb, /* SampleNum */ 10000);
+}
 
 // Logic for calculating weights and final probability:
 // - The weight of a ChoiceNode (marked with |) is distributed equally among the
@@ -38,14 +90,10 @@ TEST(OpcodeHistogramVisitor, CheckWeightMethodSimple) {
   OpcodesTree.emplace<OpcodeNode>(DIV, 1.0);
   OpcodesTree.emplace<OpcodeNode>(MOV, 1.0);
   OpcodesTree.emplace<OpcodeNode>(AND, 2.0);
-  OpcodeProbVisitor Vis(OpcodesTree);
 
-  EXPECT_DOUBLE_EQ(Vis.getProbability(ADD), 0.2);
-  EXPECT_DOUBLE_EQ(Vis.getProbability(SUB), 0.1);
-  EXPECT_DOUBLE_EQ(Vis.getProbability(MUL), 0.3);
-  EXPECT_DOUBLE_EQ(Vis.getProbability(DIV), 0.1);
-  EXPECT_DOUBLE_EQ(Vis.getProbability(MOV), 0.1);
-  EXPECT_DOUBLE_EQ(Vis.getProbability(AND), 0.2);
+  OpcodeWeightsTy OpcodeWeights{{ADD, 2.0}, {SUB, 1.0}, {MUL, 3.0},
+                                {DIV, 1.0}, {MOV, 1.0}, {AND, 2.0}};
+  checkOpcodeProbabilities(OpcodesTree, OpcodeWeights);
 }
 
 TEST(OpcodeHistogramVisitor, CheckWeightMethodMedium) {
@@ -77,46 +125,10 @@ TEST(OpcodeHistogramVisitor, CheckWeightMethodMedium) {
   AddAddMovOrAnd.insert(MovOrAnd.clone());
   OpcodesTree.emplace<HistogramNode>("MULNODE", AddAddMovOrAnd.clone(), 2.0);
   OpcodesTree.emplace<OpcodeNode>(MUL, 5.0);
-  OpcodeProbVisitor Vis(OpcodesTree);
-  double TotalWeight = 11.0;
-  double ADDProbability = 4.0 / TotalWeight;
-  double MULProbability = 5.0 / TotalWeight;
-  double MOVProbability = 1.0 / TotalWeight;
-  double ANDProbability = 1.0 / TotalWeight;
-  double DIVProbability = 0.0;
-  double SUBProbability = 0.0;
-  std::unordered_map<unsigned, double> OpcProb;
-  OpcProb[ADD] = ADDProbability;
-  OpcProb[MUL] = MULProbability;
-  OpcProb[MOV] = MOVProbability;
-  OpcProb[AND] = ANDProbability;
-  OpcProb[DIV] = DIVProbability;
-  OpcProb[SUB] = SUBProbability;
-  EXPECT_DOUBLE_EQ(Vis.getProbability(ADD), OpcProb[ADD]);
-  EXPECT_DOUBLE_EQ(Vis.getProbability(MUL), OpcProb[MUL]);
-  EXPECT_DOUBLE_EQ(Vis.getProbability(MOV), OpcProb[MOV]);
-  EXPECT_DOUBLE_EQ(Vis.getProbability(AND), OpcProb[AND]);
-  EXPECT_DOUBLE_EQ(Vis.getProbability(DIV), OpcProb[DIV]);
-  EXPECT_DOUBLE_EQ(Vis.getProbability(SUB), OpcProb[SUB]);
 
-  // Must be initialized before calling evaluate()
-  RandEngine::init(1);
-  std::unordered_map<unsigned, size_t> OpcCount;
-  // Generate 1000 patterns
-  size_t TotalSize = 0;
-  for (size_t Count = 0; Count < 1000; ++Count) {
-    auto Pattern = OpcodesTree.evaluate();
-    for (auto &&Opc : Pattern) {
-      if (!OpcCount.count(Opc))
-        OpcCount[Opc] = 0;
-      OpcCount[Opc]++;
-      TotalSize++;
-    }
-  }
-  for (auto &&[Opc, Count] : OpcCount)
-    EXPECT_THAT(
-        OpcProb[Opc],
-        ::testing::DoubleNear(static_cast<double>(Count) / TotalSize, 0.05));
+  OpcodeWeightsTy OpcodeWeights{{ADD, 4.0}, {MUL, 5.0}, {MOV, 1.0},
+                                {AND, 1.0}, {DIV, 0.0}, {SUB, 0.0}};
+  checkOpcodeProbabilities(OpcodesTree, OpcodeWeights);
 }
 
 TEST(OpcodeHistogramVisitor, CheckWeightMethodHard) {
@@ -164,46 +176,103 @@ TEST(OpcodeHistogramVisitor, CheckWeightMethodHard) {
   OpcodesTree.emplace<OpcodeNode>(AND, 3.0);
   OpcodesTree.emplace<OpcodeNode>(ADD, 1.0);
 
-  OpcodeProbVisitor Vis(OpcodesTree);
-  double TotalWeight = 84.0 / 3;
-  double ADDProbability = (7.0 / 3) / TotalWeight;
-  double ANDProbability = (17.0 / 3) / TotalWeight;
-  double MULProbability = (16.0 / 3) / TotalWeight;
-  double DIVProbability = (4.0 / 3) / TotalWeight;
-  double SUBProbability = (4.0 / 3) / TotalWeight;
-  double MOVProbability = 12.0 / TotalWeight;
-  std::unordered_map<unsigned, double> OpcProb;
-  OpcProb[ADD] = ADDProbability;
-  OpcProb[AND] = ANDProbability;
-  OpcProb[MUL] = MULProbability;
-  OpcProb[DIV] = DIVProbability;
-  OpcProb[SUB] = SUBProbability;
-  OpcProb[MOV] = MOVProbability;
-  EXPECT_DOUBLE_EQ(Vis.getProbability(ADD), OpcProb[ADD]);
-  EXPECT_DOUBLE_EQ(Vis.getProbability(AND), OpcProb[AND]);
-  EXPECT_DOUBLE_EQ(Vis.getProbability(MUL), OpcProb[MUL]);
-  EXPECT_DOUBLE_EQ(Vis.getProbability(DIV), OpcProb[DIV]);
-  EXPECT_DOUBLE_EQ(Vis.getProbability(SUB), OpcProb[SUB]);
-  EXPECT_DOUBLE_EQ(Vis.getProbability(MOV), OpcProb[MOV]);
+  OpcodeWeightsTy OpcodeWeights{{ADD, 7.0 / 3},  {AND, 17.0 / 3},
+                                {MUL, 16.0 / 3}, {DIV, 4.0 / 3},
+                                {SUB, 4.0 / 3},  {MOV, 12.0}};
+  checkOpcodeProbabilities(OpcodesTree, OpcodeWeights);
+}
 
-  // Must be initialized before calling evaluate()
-  RandEngine::init(1);
-  std::unordered_map<unsigned, size_t> OpcCount;
-  // Generate 1000 patterns
-  size_t TotalSize = 0;
-  for (size_t Count = 0; Count < 1000; ++Count) {
-    auto Pattern = OpcodesTree.evaluate();
-    for (auto &&Opc : Pattern) {
-      if (!OpcCount.count(Opc))
-        OpcCount[Opc] = 0;
-      OpcCount[Opc]++;
-      TotalSize++;
-    }
-  }
-  for (auto &&[Opc, Count] : OpcCount)
-    EXPECT_THAT(
-        OpcProb[Opc],
-        ::testing::DoubleNear(static_cast<double>(Count) / TotalSize, 0.05));
+TEST(OpcodeHistogramVisitor, CheckWeightedOpcodes) {
+  //            OpcodesTree
+  //  --------------------------------------------------------------
+  //        |                                         |            |
+  //    [ChoiceNode1][2.0]                        [AND][2.0]   [ADD][1.0]
+  //    ------------------------------------------
+  //    |               |            |           |
+  // [AND][3.5]   [ChoiceNode2]  [ADD][7.0]    [POWNODE]
+  //            ----------------              ---------
+  //            |        |                    |       |
+  //         [MUL][2.0] [SUB][0.5]     [ChoiceNode3] [5]
+  //                                   -------------
+  //                                      |        |
+  //                                 [MUL][2.0]  [AND]
+  // Weights:
+  // ADD -> 1.0 + 7.0 * (2 / 12.5) = 265 / 125
+  // AND -> 2.0 + 3.5 * (2 / 12.5) + (2 / 12.5) * (1 * 1 / 3) * 5 = 1060 / 375
+  // SUB -> 0.5 * (2 / 12.5) * (1 / 2.5) = 32 / 1000
+  // MUL -> 2.0 * (2 / 12.5) * (1 / 2.5) + (2 / 12.5) * (2 * 1 / 3) * 5 = 1240 /
+  // 1875
+  ChoiceNode OpcodesTree;
+  OpcodesTree.emplace<OpcodeNode>(AND, 2.0);
+  OpcodesTree.emplace<OpcodeNode>(ADD, 1.0);
+  ChoiceNode ChoiceNode1;
+  ChoiceNode1.emplace<OpcodeNode>(AND, 3.5);
+  ChoiceNode1.emplace<OpcodeNode>(ADD, 7.0);
+  ChoiceNode ChoiceNode2;
+  ChoiceNode2.emplace<OpcodeNode>(MUL, 2.0);
+  ChoiceNode2.emplace<OpcodeNode>(SUB, 0.5);
+  ChoiceNode1.insert(ChoiceNode2.clone());
+  ChoiceNode ChoiceNode3;
+  ChoiceNode3.emplace<OpcodeNode>(MUL, 2.0);
+  ChoiceNode3.emplace<OpcodeNode>(AND);
+  ChoiceNode1.emplace<RepeatNode>(ChoiceNode3.clone(), 5);
+  OpcodesTree.emplace<HistogramNode>("ChoiceNode1", ChoiceNode1.clone(), 2.0);
+
+  OpcodeWeightsTy OpcodeWeights{{ADD, 265.0 / 125},
+                                {AND, 1060.0 / 375},
+                                {SUB, 32.0 / 1000},
+                                {MUL, 1240.0 / 1875}};
+  checkOpcodeProbabilities(OpcodesTree, OpcodeWeights);
+}
+
+TEST(OpcodeHistogramVisitor, CheckWeightedOpcodesPatterns) {
+  //            OpcodesTree
+  //  --------------------------------------------------------------
+  //        |                                         |            |
+  //    [ChoiceNode1][2.0]                        [AND][2.0]   [ADD][1.0]
+  //    ------------------------------------------
+  //    |               |            |           |
+  // [AND][5.0] [Pattern1][2.0]   [ADD][7.0] [POWNODE]
+  //            -----------------            ----------
+  //            |        |                   |        |
+  //         [MUL][2.0] [SUB][4.0]       [Pattern2]  [5]
+  //                                   -------------
+  //                                      |        |
+  //                                 [MUL][2.0] CartesianNode1
+  //                                          -----------------
+  //                                          |   *   |  *    |
+  //                                       SUB[3.0] MUL[2.0] AND[4.0]
+  // Weights:
+  // ADD -> 1.0 + 7.0 * (2.0 / 15) = 29.0 / 15
+  // AND -> 2.0 + 5.0 * (2.0 / 15) + (2.0 / 15) * (1.0 / 26) * 24 * 5 = 1920.0 /
+  // 585 SUB -> 4.0 * (2.0 / 6) * (2.0 / 15) + (2.0 / 15) * (1.0 / 26) * 24 * 5
+  // = 1392.0 / 1755 MUL -> 2.0 * (2.0 / 15) * (2.0 / 6) + 5 * (2.0 / 15) = 68.0
+  // / 90
+  ChoiceNode OpcodesTree;
+  OpcodesTree.emplace<OpcodeNode>(AND, 2.0);
+  OpcodesTree.emplace<OpcodeNode>(ADD, 1.0);
+  ChoiceNode ChoiceNode1;
+  ChoiceNode1.emplace<OpcodeNode>(AND, 5.0);
+  ChoiceNode1.emplace<OpcodeNode>(ADD, 7.0);
+  ChoiceNode Pattern1;
+  Pattern1.emplace<OpcodeNode>(MUL, 2.0);
+  Pattern1.emplace<OpcodeNode>(SUB, 4.0);
+  ChoiceNode1.emplace<HistogramNode>("Pattern1", Pattern1.clone(), 2.0);
+  CartesianNode CartesianNode1;
+  CartesianNode1.emplace<OpcodeNode>(SUB, 3.0);
+  CartesianNode1.emplace<OpcodeNode>(MUL, 2.0);
+  CartesianNode1.emplace<OpcodeNode>(AND, 4.0);
+  ChoiceNode Pattern2;
+  Pattern2.emplace<OpcodeNode>(MUL, 2.0);
+  Pattern2.insert(CartesianNode1.clone());
+  ChoiceNode1.emplace<RepeatNode>(Pattern2.clone(), 5);
+  OpcodesTree.emplace<HistogramNode>("ChoiceNode1", ChoiceNode1.clone(), 2.0);
+
+  OpcodeWeightsTy OpcodeWeights{{ADD, 29.0 / 15},
+                                {AND, 384.0 / 117},
+                                {SUB, 1392.0 / 1755},
+                                {MUL, 68.0 / 90}};
+  checkOpcodeProbabilities(OpcodesTree, OpcodeWeights);
 }
 
 } // namespace
