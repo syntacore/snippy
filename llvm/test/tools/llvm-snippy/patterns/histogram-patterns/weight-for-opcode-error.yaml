@@ -1,0 +1,17 @@
+# RUN: not llvm-snippy %s -model-plugin=None %S/Inputs/invalid-weight-missing-close-bracket.yaml \
+# RUN: |& FileCheck %s --check-prefix=MISSING_BRACKET
+
+# RUN: not llvm-snippy %s -model-plugin=None %S/Inputs/invalid-weight-for-opcode.yaml \
+# RUN: |& FileCheck %s --check-prefix=INVALID_DOUBLE
+
+options:
+  mtriple: riscv64-linux-gnu
+
+include:
+  - Inputs/sections.yaml
+
+# MISSING_BRACKET: error: expected ']'
+# MISSING_BRACKET-NEXT: - MissingBracket: "LD [1.0] | SD [5.0 | AND"
+
+# INVALID_DOUBLE: error: expected floating-point value, got '1.324fdsfsd'
+# INVALID_DOUBLE-NEXT: - InvalidDouble: "ADD [1.324fdsfsd]"

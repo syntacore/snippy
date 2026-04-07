@@ -128,7 +128,7 @@ public:
   //     - [pattern: AddPattern, Weight] # Opcode pattern
   enum class OpcodeCategory { Top, Pattern };
 
-  OpcodeNode(unsigned Num, double Weight = 1.0,
+  OpcodeNode(unsigned Num, double Weight = DefaultNodeWeight,
              OpcodeCategory Categ = OpcodeCategory::Pattern)
       : NumberNode(Num), Weight(Weight), Category(Categ) {}
 
@@ -356,6 +356,8 @@ public:
     ArgNode->setParent(this);
     ChildNodes.push_back(std::move(ArgNode));
   }
+
+  double getWeight() const override;
 
   ResultSequenceType evaluate() const override;
 

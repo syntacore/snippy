@@ -1,0 +1,10 @@
+# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64-linux-gnu
+
+histogram-patterns:
+  - UnexpectedData: "ADDI [1.5] | SUB * AND FFF"
+
+# CHECK: error: unexpected data: 'FFF'
+# CHECK-NEXT:  - UnexpectedData: "ADDI [1.5] | SUB * AND FFF"
