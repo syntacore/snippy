@@ -210,7 +210,7 @@ static void setupStackPointer(InstructionGenerationContext &IGC,
   auto Addr = ProgCtx.getStackTop() - SPSpillSize;
   assert(Addr % SPSpillSize == 0u && "Stack section must be properly aligned");
 
-  if (!ProgramCfg.isRegSpilledToMem(AuxReg) && !ProgramCfg.SkipLegacySPSpill)
+  if (!ProgramCfg.isRegSpilledToMem(AuxReg) && ProgramCfg.FollowTargetABI)
     SnippyTgt.storeRegToAddr(IGC, Addr, AuxReg,
                              /* store the whole register */ 0);
   auto SPInitValue = Addr;
@@ -238,7 +238,7 @@ static void restoreStackPointer(InstructionGenerationContext &IGC,
     return;
   }
 
-  if (ProgramCfg.SkipLegacySPSpill) {
+  if (!ProgramCfg.FollowTargetABI) {
     assert(!ProgCtx.shouldSpillStackPointer());
     return;
   }

@@ -55,7 +55,6 @@ public:
   SmallVector<MCRegister> SpilledToStack;
   SmallVector<MCRegister> SpilledToMem;
   bool ExternalStack;
-  bool SkipLegacySPSpill;
   bool StaticStack;
 
   // linker options.
