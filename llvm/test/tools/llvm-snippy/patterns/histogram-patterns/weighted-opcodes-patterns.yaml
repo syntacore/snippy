@@ -1,0 +1,37 @@
+# RUN: llvm-snippy %s -model-plugin=None
+
+# COM: This test checks that 'verify-gen-histogram' and 'histogram-must-succeed'
+# COM: succeed with weighted instructions
+
+options:
+  mtriple: riscv64-linux-gnu
+  num-instrs: 5000
+  dump-mf: on
+  mattr: "+zihintntl,+m"
+  verify-gen-histogram: on
+  histogram-must-succeed: on
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - LoadStore: "(LD [5.0] | SD [2.0] | LD | SD) ^ 20 | SD[10.5] | LD[3.0]"
+  - LoadStoreWithHints: "(NTL_ALL * SB | LB [2.55] | SB [1.5]) ^ 20 | NTL_P1 * LB"
+  - MulDiv: "MUL [3.3] | DIV [20.5] | MUL * DIV * MUL"
+  - Mixed: "MulDiv [5.5] | LoadStore [100] * MulDiv [11] | LoadStoreWithHints[32.4]"
+
+histogram:
+    - [pattern: LoadStore, 33.542]
+    - [pattern: LoadStoreWithHints, 29.324]
+    - [pattern: MulDiv, 12.34]
+    - [pattern: Mixed, 15.5]
+    - [LD, 25.0]
+    - [SD, 25.0]
+    - [ADD, 5.0]
+    - [SUB, 5.0]
+    - [DIV, 5.0]
+    - [MUL, 5.0]
+    - [NTL_PALL, 5.0]
+    - [NTL_ALL, 5.0]
+    - [NTL_P1, 5.0]
+    - [NTL_S1, 5.0]

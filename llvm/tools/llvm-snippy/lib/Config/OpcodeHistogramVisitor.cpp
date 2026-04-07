@@ -52,13 +52,14 @@ void OpcodeProbVisitor::OpcodeProbVisitor::visit(
 }
 
 void OpcodeProbVisitor::visit(const OpcodeNode &OpcNode) {
-  unsigned Opc = OpcNode.getNum();
+  auto Opc = OpcNode.getNum();
   // The weight of an individually occurring opcode in the pattern / at the top
   // level of the histogram. Several identical opcodes with different weights
   // may occur.
   auto LocalOpcodeWeight = NodeWeight[&OpcNode];
   OpcWeights[Opc].push_back(LocalOpcodeWeight);
 }
+
 void OpcodeProbVisitor::visit(const ChoiceNode &Or) {
   auto *OrParent = Or.getParent();
   // Check if it's a root
@@ -71,6 +72,7 @@ void OpcodeProbVisitor::visit(const ChoiceNode &Or) {
     }
     return;
   }
+  auto LevelWeight = Or.getTotalChildsWeight();
   for (auto &&CurrNode : Or) {
     assert(CurrNode);
     assert(CurrNode->getParent() == &Or);
@@ -78,8 +80,10 @@ void OpcodeProbVisitor::visit(const ChoiceNode &Or) {
     assert(Found != NodeWeight.end() &&
            "All parent nodes must have already been processed");
     auto PathWeight = Found->second;
-    PathWeight /= Or.size();
-    NodeWeight[CurrNode.get()] = PathWeight;
+    // Make normalization for PathWeight
+    PathWeight /= LevelWeight;
+    auto CurrNodeWeight = PathWeight * CurrNode->getWeight();
+    NodeWeight[CurrNode.get()] = CurrNodeWeight;
     CurrNode->accept(*this);
   }
 }
