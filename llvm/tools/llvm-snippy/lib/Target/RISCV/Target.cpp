@@ -4979,8 +4979,7 @@ void SnippyRISCVTarget::generateVTypeChange(
 }
 
 void generateVXRMUpdate(InstructionGenerationContext &IGC,
-                        RVVConfiguration::VXRMMode RoundingMode,
-                        const MCInstrInfo &InstrInfo) {
+                        VXRMMode RoundingMode, const MCInstrInfo &InstrInfo) {
   auto &MBB = IGC.MBB;
   const auto &Ins = IGC.Ins;
   const auto &Tgt = IGC.ProgCtx.getLLVMState().getSnippyTarget();
