@@ -9,6 +9,7 @@ set(snippy_sources
   FormattedAPIntWithSign.cpp
   Random.cpp
   HistogramPatterns.cpp
+  ProbabilityUtils.cpp
   )
 
 set(snippy_link_libraries

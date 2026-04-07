@@ -1861,9 +1861,6 @@ inline bool isRVVMaskProducing(unsigned Opcode) {
   }
 }
 
-std::pair<unsigned, bool> computeDecodedEMUL(unsigned SEW, unsigned EEW,
-                                             RISCVII::VLMUL LMUL);
-
 inline unsigned getStoreOpcode(unsigned ValueSizeInBits) {
   switch (ValueSizeInBits) {
   default:
