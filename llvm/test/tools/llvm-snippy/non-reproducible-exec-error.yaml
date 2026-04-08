@@ -1,7 +1,7 @@
 # COM: llvm-snippy is not used directly, because substitutions here will
 # COM: mess up default options.
 
-# RUN: not %llvm_tools/llvm-snippy %s -march=riscv64-unknown-elf -model-plugin=some/path \
+# RUN: not %llvm_tools/llvm-snippy %s -mtriple=riscv64 -model-plugin=some/path \
 # RUN:   |& FileCheck %s
 
 sections:

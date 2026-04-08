@@ -1,13 +1,13 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -o %t_1
+# RUN: llvm-snippy %s -mtriple=riscv64 -o %t_1
 # RUN: ls %t_1.elf
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -o %t_2.elf
+# RUN: llvm-snippy %s -mtriple=riscv64 -o %t_2.elf
 # RUN: ls %t_2.elf
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -o %t_3.yaml
+# RUN: llvm-snippy %s -mtriple=riscv64 -o %t_3.yaml
 # RUN: ls %t_3.yaml.elf
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -o %t_4.yaml.elf
+# RUN: llvm-snippy %s -mtriple=riscv64 -o %t_4.yaml.elf
 # RUN: ls %t_4.yaml.elf
 
 sections:

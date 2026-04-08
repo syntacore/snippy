@@ -8,7 +8,7 @@
 # RUN: -define-main-histogram=hist3 | FileCheck %s --check-prefix=HIST3
 
 options:
-  mtriple: riscv64-linux-gnu 
+  mtriple: riscv64 
   mattr: "+m"
   num-instrs: 1000
   dump-mf: on

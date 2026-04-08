@@ -1,8 +1,8 @@
-# RUN: llvm-snippy %s -march=riscv32-linux-gnu -mattr=+d \
+# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+d \
 # RUN: -num-instrs=10 -init-regs-in-elf -riscv-init-fregs-from-memory \
 # RUN: -model-plugin=None --dump-mf |& FileCheck %s --check-prefix DINIT
 
-# RUN: llvm-snippy %s -march=riscv32-linux-gnu -mattr=+f \
+# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+f \
 # RUN: -num-instrs=10 -init-regs-in-elf -riscv-init-fregs-from-memory \
 # RUN: -model-plugin=None --dump-mf |& FileCheck %s --check-prefix FINIT
 sections:

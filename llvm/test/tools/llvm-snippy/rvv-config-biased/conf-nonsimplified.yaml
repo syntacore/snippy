@@ -1,11 +1,11 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:  --model-plugin None \
 # RUN:  --num-instrs=10 -o %t \
 # RUN:  --snippy-riscv-disable-simplified-rvv-configuration \
 # RUN:  -riscv-dump-rvv-config \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-DEFAULT
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:  --model-plugin None \
 # RUN:  --num-instrs=10 -o %t \
 # RUN:  --riscv-v-vector-bits-max=512 \

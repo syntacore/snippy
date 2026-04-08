@@ -1,10 +1,10 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+a \
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+a \
 # RUN:   --init-regs-in-elf --verify-mi \
 # RUN:   --num-instrs=4 \
 # RUN:   --histogram-must-succeed=false --verify-gen-histogram \
 # RUN:    |& FileCheck %s --check-prefixes=EVEN
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+a \
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+a \
 # RUN:   --init-regs-in-elf --verify-mi \
 # RUN:   --num-instrs=5 \
 # RUN:   --histogram-must-succeed=false --verify-gen-histogram \

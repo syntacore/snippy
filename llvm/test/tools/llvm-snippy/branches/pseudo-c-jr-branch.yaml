@@ -1,4 +1,4 @@
-# RUN: llvm-snippy -mtriple=riscv64-unknown-elf -mattr=+c \
+# RUN: llvm-snippy -mtriple=riscv64 -mattr=+c \
 # RUN:      -num-instrs=500 -model-plugin=None %s
 
 sections:

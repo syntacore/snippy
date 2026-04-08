@@ -1,7 +1,7 @@
 # COM: This test checks that if the probabilities of mode changing and setting vill
 # COM: are zero then there are no instructions vset*
 
-# RUN:  llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:   -model-plugin=None -dump-mf --num-instrs=1000 -o %t \
 # RUN:  |& FileCheck %s
 

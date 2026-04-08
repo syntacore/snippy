@@ -4,7 +4,7 @@ include:
   - ../../Inputs/sections.yaml
 
 options:
-    mtriple: riscv64-unknown-elf
+    mtriple: riscv64
     mattr: +f,+d
     dump-layout: on
     num-instrs: 100

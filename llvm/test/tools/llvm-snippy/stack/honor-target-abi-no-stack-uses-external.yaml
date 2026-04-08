@@ -2,7 +2,7 @@
 
 options:
   march: rv64gc
-  mtriple: riscv64-linux-gnu
+  mtriple: riscv64
   honor-target-abi: true
 
 sections:

@@ -34,7 +34,7 @@
 
 
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   mcpu: generic-rv64
   mattr: "+c,+f,+d"
   num-instrs: 100

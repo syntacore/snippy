@@ -45,7 +45,7 @@ histogram:
     - [SW, 10.0]
 
 options:
-  march: riscv64-linux-gnu
+  mtriple: riscv64
   num-instrs: 100
   riscv-disable-misaligned-access: true
 

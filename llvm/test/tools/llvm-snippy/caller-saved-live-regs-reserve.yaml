@@ -1,7 +1,7 @@
 # RUN: llvm-snippy %s -model-plugin None --dump-mir=- |& FileCheck %s
 
 options:
-  mtriple: riscv64-unknown-elf
+  mtriple: riscv64
   num-instrs: 200
   init-regs-in-elf: on
   honor-target-abi: on

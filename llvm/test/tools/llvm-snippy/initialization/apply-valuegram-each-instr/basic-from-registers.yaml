@@ -1,10 +1,10 @@
 # COM: This test checks that initialization takes place only according to the "registers" file.
 
-# RUN: llvm-snippy %s %S/Inputs/rv32-basic.yaml --march=riscv32-linux-gnu \
+# RUN: llvm-snippy %s %S/Inputs/rv32-basic.yaml --mtriple=riscv32 \
 # RUN:    -valuegram-operands-regs=%S/Inputs/registers.yaml \
 # RUN: |& FileCheck %s
  
-# RUN: llvm-snippy %s %S/Inputs/rv64-basic.yaml --march=riscv64 \
+# RUN: llvm-snippy %s %S/Inputs/rv64-basic.yaml --mtriple=riscv64 \
 # RUN:    -valuegram-operands-regs=%S/Inputs/registers.yaml \
 # RUN: |& FileCheck %s
 
