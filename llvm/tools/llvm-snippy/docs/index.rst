@@ -675,7 +675,7 @@ operations, such as:
     ``ADD + LD; ADD + SD; SUB + LD; SUB + SD``.
 
 -   `^` - Repetition of an opcode/pattern N times. You can specify either a possible range
-    in the format [min : max] or a specific number of repetitions for the pattern. E.g: 
+    in the format [min : max] or a specific number of repetitions for the pattern. E.g:
 
     -  For instance, ``ADD ^ 3`` would signify three consecutive ``ADD`` instructions.
 
@@ -702,7 +702,7 @@ Lets look at a simple example of defining histogram patterns:
 In the example above:
 
 -  The ``AddMul`` histogram can produce one of the following:
-  
+
    - The sequence [ADD MUL]:
 
       ::
@@ -754,7 +754,7 @@ In the example above:
 Now they can be used in the main histogram.
 
 .. code:: yaml
-  
+
    histogram:
      - [pattern: AddMul, 1.0]
      - [pattern: LoadStore, 1.0]
@@ -776,10 +776,10 @@ In the example above, the expression ``DIV [10.0] * AND [2.0]`` expands to
 
 Also, using the ``--define-main-histogram=<Name>`` option, you can override the main
 `histogram` with a histogram from the `histogram-patterns`. If you do not specify it,
-snippy uses the default value (``histogram``).  
+snippy uses the default value (``histogram``).
 
 For example, by providing ``--define-main-histogram=LoadStore``, only the following
-pairs will be generated:  
+pairs will be generated:
 
 ::
 
@@ -1683,6 +1683,39 @@ For example:
    ./llvm-snippy -mtriple=riscv64-linux-gnu -mcpu=generic-rv64 \
       ./yml/layout.yaml ./yml/memory.yaml -model-plugin=None \
       -num-instrs=50 -seed=0 ./yml/burst-store.yaml -o layout.elf
+
+.. _`_base_register_groups`:
+
+Base register groups
+~~~~~~~~~~~~~~~~~~~~
+
+You can specify opcodes of memory-access instructions that share
+a common register for loading the base address. A base-register
+group can be defined as shown in the example below:
+
+.. code:: yaml
+
+   burst:
+     mode: custom
+     min-size: 10
+     max-size: 30
+     groupings:
+       - [ SW, LW, SD, LD ]
+     base-register-groups:
+       - [SW, SD]
+       - [LW, LD]
+
+In the example we define two base-register groups: stores and loads.
+This prevents an instruction in one group from using the base registers
+assigned to the other group (and vice-versa).
+
+.. important::
+
+   All opcodes that appear in the histogram but are not assigned to any
+   base-register group are placed in a single implicit group. Opcodes
+   in this implicit group cannot share registers with any opcodes that
+   belong to an explicit base-register group.
+
 
 
 Advanced Configuration
