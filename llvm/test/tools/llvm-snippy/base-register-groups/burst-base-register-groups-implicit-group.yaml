@@ -1,0 +1,6 @@
+# RUN: llvm-snippy %S/Inputs/burst-base-register-groups-implicit-group.yaml \
+# RUN:    -model-plugin=None |& FileCheck %s
+
+# CHECK: LW [[REG:\$x[0-9]+]],
+# CHECK-NOT: CBO-INVAL [[REG]],
+# CHECK-NOT: SW {{\$x[0-9]+}}, [[REG]],
