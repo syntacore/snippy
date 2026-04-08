@@ -166,7 +166,7 @@ static StringRef findLLD() {
 static std::string getUniqueSectionName(const SectionDesc &Desc) {
   std::string Buf;
   llvm::raw_string_ostream StringStream{Buf};
-  StringStream << "." << Desc.getIDString() << ".";
+  StringStream << "." << Desc.getName() << ".";
   Desc.M.dump(StringStream);
 
   return Buf;
