@@ -1,35 +1,35 @@
 # COM: This test checks that before each instruction (rv32 and rv64 basic isa with three operands), 
 # COM: the registers it uses are initialized. They are initialized only according to the histogram.
 
-# RUN: llvm-snippy %s %S/Inputs/rv32-basic.yaml --march=riscv32-linux-gnu \
+# RUN: llvm-snippy %s %S/Inputs/rv32-basic.yaml --mtriple=riscv32 \
 # RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
 # RUN: |& FileCheck %s --check-prefix THREE_OPERANDS
  
-# RUN: llvm-snippy %s %S/Inputs/rv64-basic.yaml --march=riscv64 \
+# RUN: llvm-snippy %s %S/Inputs/rv64-basic.yaml --mtriple=riscv64 \
 # RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
 # RUN: |& FileCheck %s --check-prefix THREE_OPERANDS
 
-# RUN: llvm-snippy %s %S/Inputs/rv32-basic.yaml --march=riscv32-linux-gnu \
+# RUN: llvm-snippy %s %S/Inputs/rv32-basic.yaml --mtriple=riscv32 \
 # RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
 # RUN: |& FileCheck %s --check-prefix TWO_OPERANDS
  
-# RUN: llvm-snippy %s %S/Inputs/rv64-basic.yaml --march=riscv64 \
+# RUN: llvm-snippy %s %S/Inputs/rv64-basic.yaml --mtriple=riscv64 \
 # RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
 # RUN: |& FileCheck %s --check-prefix TWO_OPERANDS
 
-# RUN: llvm-snippy %s %S/Inputs/rv32-basic.yaml --march=riscv32-linux-gnu \
+# RUN: llvm-snippy %s %S/Inputs/rv32-basic.yaml --mtriple=riscv32 \
 # RUN:    -valuegram-operands-regs=%S/Inputs/bitrange.yaml \
 # RUN: |& FileCheck %s --check-prefix BR_THREE_OPERANDS
 
-# RUN: llvm-snippy %s %S/Inputs/rv64-basic.yaml --march=riscv64 \
+# RUN: llvm-snippy %s %S/Inputs/rv64-basic.yaml --mtriple=riscv64 \
 # RUN:    -valuegram-operands-regs=%S/Inputs/bitrange.yaml \
 # RUN: |& FileCheck %s --check-prefix BR_THREE_OPERANDS
 
-# RUN: llvm-snippy %s %S/Inputs/rv32-basic.yaml --march=riscv32-linux-gnu \
+# RUN: llvm-snippy %s %S/Inputs/rv32-basic.yaml --mtriple=riscv32 \
 # RUN:    -valuegram-operands-regs=%S/Inputs/bitrange.yaml \
 # RUN: |& FileCheck %s --check-prefix BR_TWO_OPERANDS
 
-# RUN: llvm-snippy %s %S/Inputs/rv64-basic.yaml --march=riscv64 \
+# RUN: llvm-snippy %s %S/Inputs/rv64-basic.yaml --mtriple=riscv64 \
 # RUN:    -valuegram-operands-regs=%S/Inputs/bitrange.yaml \
 # RUN: |& FileCheck %s --check-prefix BR_TWO_OPERANDS
 

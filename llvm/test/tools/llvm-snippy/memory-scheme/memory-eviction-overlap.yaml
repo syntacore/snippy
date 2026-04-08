@@ -1,5 +1,5 @@
 # RUN: not llvm-snippy %S/Inputs/default-layout.yaml %s \
-# RUN:   -march=riscv64-linux-gnu -num-instrs=100 -model-plugin None \
+# RUN:   -mtriple=riscv64 -num-instrs=100 -model-plugin None \
 # RUN:   |& FileCheck --dump-input always %s
 
 access-evictions:

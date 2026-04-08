@@ -17,7 +17,7 @@ histogram:
 
 options:
   mcpu: generic-rv64
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   num-instrs: 100
   dump-registers-yaml: true
 

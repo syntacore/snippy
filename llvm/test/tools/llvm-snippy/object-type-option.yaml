@@ -6,7 +6,7 @@
 # RUN: llvm-readelf -hl %t.elf | FileCheck %s --check-prefix=SHARED
 
 options:
-  march: "riscv64-linux-gnu"
+  mtriple: "riscv64"
   num-instrs: 10
 sections:
     - name:      1

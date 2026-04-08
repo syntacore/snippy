@@ -1,36 +1,36 @@
-# RUN: not llvm-snippy %s %S/Inputs/error-burst-min-gt-max.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-min-gt-max.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \
 # RUN: -num-instrs=100 |& FileCheck %s \
 # RUN: -check-prefix=MINGTMAX
 
-# RUN: not llvm-snippy %s %S/Inputs/error-burst-min-max-zero.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-min-max-zero.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \
 # RUN: -num-instrs=100 |& FileCheck %s \
 # RUN: -check-prefix=MINMAXZERO
 
-# RUN: not llvm-snippy %s %S/Inputs/error-burst-err-mode.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-err-mode.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \
 # RUN: -num-instrs=100 |& FileCheck %s \
 # RUN: -check-prefix=ERRMODE
 
-# RUN: not llvm-snippy %s %S/Inputs/error-burst-groupings-with-mixed.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-groupings-with-mixed.yaml -mtriple=riscv64 -mattr=+a,+f \
 # RUN: -num-instrs=20 \
 # RUN: |& FileCheck %s --check-prefix=MIXEDGROUPINGS
 
-# RUN: not llvm-snippy %s %S/Inputs/error-burst-custom-without-groupings.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-custom-without-groupings.yaml -mtriple=riscv64 -mattr=+a,+f \
 # RUN: -num-instrs=20 \
 # RUN: |& FileCheck %s --check-prefix=NOGROUPINGS
 
-# RUN: not llvm-snippy %s %S/Inputs/error-burst-custom-with-empty-groupings.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-custom-with-empty-groupings.yaml -mtriple=riscv64 -mattr=+a,+f \
 # RUN: -num-instrs=20 \
 # RUN: |& FileCheck %s --check-prefix=EMPTYGROUPINGS
 
-# RUN: not llvm-snippy %s %S/Inputs/error-burst-custom-unknown-opcode.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-custom-unknown-opcode.yaml -mtriple=riscv64 -mattr=+a,+f \
 # RUN: -num-instrs=20 \
 # RUN: |& FileCheck %s --check-prefix=UNKNOWNOPC
 
-# RUN: not llvm-snippy %s %S/Inputs/error-burst-custom-empty-grouping.yaml -march=riscv64-linux-gnu -mattr=+a,+f \
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-custom-empty-grouping.yaml -mtriple=riscv64 -mattr=+a,+f \
 # RUN: -num-instrs=20 \
 # RUN: |& FileCheck %s --check-prefix=EMPTYGROUP
 
-# RUN: not llvm-snippy %s %S/Inputs/error-burst-basic-burst-with-non-zero-group.yaml -march=riscv64-linux-gnu \
+# RUN: not llvm-snippy %s %S/Inputs/error-burst-basic-burst-with-non-zero-group.yaml -mtriple=riscv64 \
 # RUN: -num-instrs=20 \
 # RUN: |& FileCheck %s --check-prefix=NONZEROBASIC
 

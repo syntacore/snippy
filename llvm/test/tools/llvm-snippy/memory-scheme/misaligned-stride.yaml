@@ -14,7 +14,7 @@ sections:
     ACCESS: rw
 
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   mattr: "+c"
   riscv-disable-misaligned-access: atomics-only
   num-instrs: 10000

@@ -1,5 +1,5 @@
 # RUN: llvm-snippy %s \
-# RUN:    -march=riscv64-linux-gnu \
+# RUN:    -mtriple=riscv64 \
 # RUN:    -mattr=+f -num-instrs=2 \
 # RUN:    -init-regs-in-elf -initial-regs-yaml=%S/Inputs/histogram_32_bit.yaml \
 # RUN: |& FileCheck %s

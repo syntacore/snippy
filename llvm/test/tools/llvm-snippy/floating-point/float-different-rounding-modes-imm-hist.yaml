@@ -3,7 +3,7 @@
 include:
   - ../Inputs/sections.yaml
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   mcpu: generic-rv64
   mattr: "+f"
   num-instrs: 1000

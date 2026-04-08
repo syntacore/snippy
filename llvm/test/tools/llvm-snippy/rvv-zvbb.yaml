@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v,+zvbb \
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v,+zvbb \
 # RUN:  -o %t --num-instrs=1000 -model-plugin=None \
 # RUN:  --init-regs-in-elf --verify-mi -verify-gen-histogram
 

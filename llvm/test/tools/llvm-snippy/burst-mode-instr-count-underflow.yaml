@@ -1,19 +1,19 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu  \
+# RUN: llvm-snippy %s -mtriple=riscv64  \
 # RUN: -num-instrs=97  \
 # RUN: --histogram-must-succeed=false --verify-gen-histogram \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-TWO-OFF
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu  \
+# RUN: llvm-snippy %s -mtriple=riscv64  \
 # RUN: -num-instrs=98 \
 # RUN: --histogram-must-succeed=false --verify-gen-histogram \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-ONE-OFF
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu  \
+# RUN: llvm-snippy %s -mtriple=riscv64  \
 # RUN: -num-instrs=99 \
 # RUN: --histogram-must-succeed=false --verify-gen-histogram \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-MATCH
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu  \
+# RUN: llvm-snippy %s -mtriple=riscv64  \
 # RUN: -num-instrs=100 \
 # RUN: --histogram-must-succeed=false --verify-gen-histogram \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-ONE-PLUS

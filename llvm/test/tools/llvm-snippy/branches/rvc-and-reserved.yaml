@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=1000 \
+# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
 # RUN:     -model-plugin=None -verify-mi
 
 sections:

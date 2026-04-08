@@ -2,7 +2,7 @@
 # RUN: --valuegram-operands-regs=%S/../../initialization/Inputs/initial_state_rv64g.yaml |& FileCheck %s
 
 options:
-  mtriple: riscv64-linux-gnu 
+  mtriple: riscv64 
   mattr: "+f"
   num-instrs: 10
   dump-mf: on

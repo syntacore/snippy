@@ -1,7 +1,7 @@
 # RUN: llvm-snippy %s -model-plugin None | FileCheck %s
 
 options:
-  march: riscv32-unknown-elf
+  mtriple: riscv32
   mattr: +zihintpause
   num-instrs: 10000
   verify-mi: true

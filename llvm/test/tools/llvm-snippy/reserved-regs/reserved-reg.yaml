@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+d \
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+d \
 # RUN:    -dump-mi -num-instrs=2000 -reserved-regs-list=X4,X6,F1_D \
 # RUN:    -last-instr= -model-plugin=None \
 # RUN:    | FileCheck %s

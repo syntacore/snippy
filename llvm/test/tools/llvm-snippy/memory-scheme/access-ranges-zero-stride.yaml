@@ -3,7 +3,7 @@
 include:
   - Inputs/default-layout.yaml
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   num-instrs: 10
 access-ranges:
   - start: 0x100000

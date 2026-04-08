@@ -1,4 +1,4 @@
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=1000 \
+# RUN: not llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
 # RUN: --chained-rx-sections-fill --chained-rx-sorted  \
 # RUN: --honor-target-abi |& \
 # RUN: FileCheck %s --check-prefix=SIZE_ERROR

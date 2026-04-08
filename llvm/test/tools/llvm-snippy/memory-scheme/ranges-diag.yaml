@@ -1,4 +1,4 @@
-# RUN: not llvm-snippy %S/Inputs/loadstore-layout.yaml %s -march=riscv64-linux-gnu \
+# RUN: not llvm-snippy %S/Inputs/loadstore-layout.yaml %s -mtriple=riscv64 \
 # RUN:   -model-plugin=None \
 # RUN:   -num-instrs=1000 \
 # RUN: |& FileCheck %s

@@ -1,6 +1,6 @@
 # There register initialization always is of size 0x7C. We add some space to generate necessary adds.
 # RUN: sed -e s/SIZE_RX/0x80/ %s > %t.1.yaml
-# RUN: llvm-snippy %t.1.yaml -march=riscv64-linux-gnu  \
+# RUN: llvm-snippy %t.1.yaml -mtriple=riscv64  \
 # RUN: --init-regs-in-elf \
 # RUN: -num-instrs=all \
 # RUN: --mattr=-c --initial-regs=%S/../initialization/Inputs/initial_state_zero.yaml
@@ -10,7 +10,7 @@
 # successfully generate register initialization but fail to generate anything else.
 
 # RUN: sed -e s/SIZE_RX/0x7D/ %s > %t.2.yaml
-# RUN: not llvm-snippy %t.2.yaml -march=riscv64-linux-gnu  \
+# RUN: not llvm-snippy %t.2.yaml -mtriple=riscv64  \
 # RUN: --init-regs-in-elf \
 # RUN: -num-instrs=all -model-plugin=None \
 # RUN: --mattr=-c --initial-regs=%S/../initialization/Inputs/initial_state_zero.yaml \

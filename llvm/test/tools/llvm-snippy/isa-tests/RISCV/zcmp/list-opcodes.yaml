@@ -1,4 +1,4 @@
-# RUN: llvm-snippy -march=riscv64 -mattr=+zcmp -list-opcode-names \
+# RUN: llvm-snippy -mtriple=riscv64 -mattr=+zcmp -list-opcode-names \
 # RUN: |& FileCheck %s
 
 # CHECK-DAG: CM_MVA01S

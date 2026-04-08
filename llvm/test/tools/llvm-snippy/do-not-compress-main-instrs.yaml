@@ -13,7 +13,7 @@
 # RUN: diff -q %t.count.mf %t.count.obj
 
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   mattr: +c
   num-instrs: 100000
 

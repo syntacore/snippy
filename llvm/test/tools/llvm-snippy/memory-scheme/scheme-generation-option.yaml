@@ -1,9 +1,9 @@
-# RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %S/Inputs/access-addresses.yaml -march=riscv64-linux-gnu \
+# RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %S/Inputs/access-addresses.yaml -mtriple=riscv64 \
 # RUN:  -num-instrs=5 \
 # RUN:  -dump-memory-accesses= \
 # RUN: |& FileCheck %s --check-prefix TO-STDOUT
 
-# RUN: llvm-snippy %S/Inputs/no-mem.yaml %S/Inputs/access-addresses.yaml -march=riscv64-linux-gnu \
+# RUN: llvm-snippy %S/Inputs/no-mem.yaml %S/Inputs/access-addresses.yaml -mtriple=riscv64 \
 # RUN:  -num-instrs=5 \
 # RUN:  -dump-memory-accesses=%t \
 # RUN: |& FileCheck %s --check-prefix NO-MEM

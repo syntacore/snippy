@@ -1,5 +1,5 @@
 # RUN: not llvm-snippy %s \
-# RUN:    -mtriple=riscv32-linux-gnu \
+# RUN:    -mtriple=riscv32 \
 # RUN:  |& FileCheck %s
 
 sections:

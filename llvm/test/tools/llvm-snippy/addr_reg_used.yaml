@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=-a -dump-mf \
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a -dump-mf \
 # RUN: -num-instrs=1000 |& FileCheck %s --dump-input always
 
 sections:

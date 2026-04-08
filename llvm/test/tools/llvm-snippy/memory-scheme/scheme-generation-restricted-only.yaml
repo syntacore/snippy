@@ -1,7 +1,7 @@
 # NOTE: This test relies on default initialized memory scheme
 # from layout of loadstore-layout-1b.yaml. In case of change
 # of that layout, you may need adjust this test too.
-# RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s -march=riscv64-linux-gnu \
+# RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
 # RUN:  -num-instrs=1000 \
 # RUN:  -dump-memory-accesses=%t
 # RUN: FileCheck --input-file=%t %s

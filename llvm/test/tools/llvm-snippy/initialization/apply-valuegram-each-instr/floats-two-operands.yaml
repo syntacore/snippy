@@ -1,15 +1,15 @@
 # COM: This test checks that before each instruction (rv64 floats with two operands), 
 # COM: the registers it uses are initialized. They are initialized only according to the histogram.
 
-# RUN: llvm-snippy %s %S/Inputs/double-floats.yaml -march=riscv64 \
+# RUN: llvm-snippy %s %S/Inputs/double-floats.yaml -mtriple=riscv64 \
 # RUN:    -mattr=+zfh,+d -valuegram-operands-regs=%S/Inputs/histograms.yaml \
 # RUN: |& FileCheck %s --check-prefix DOUBLE_XF_TWO_OPERANDS_ONE_X
 
-# RUN: llvm-snippy %s %S/Inputs/single-floats.yaml -march=riscv64 \
+# RUN: llvm-snippy %s %S/Inputs/single-floats.yaml -mtriple=riscv64 \
 # RUN:    -mattr=+zfh -valuegram-operands-regs=%S/Inputs/histograms.yaml \
 # RUN: |& FileCheck %s --check-prefix FX_TWO_OPERANDS_ONE_X
 
-# RUN: llvm-snippy %s %S/Inputs/double-floats.yaml -march=riscv64 \
+# RUN: llvm-snippy %s %S/Inputs/double-floats.yaml -mtriple=riscv64 \
 # RUN:    -mattr=+zfh,+d -valuegram-operands-regs=%S/Inputs/histograms.yaml \
 # RUN: |& FileCheck %s --check-prefix DOUBLE_FX_TWO_OPERANDS_ONE_X
 

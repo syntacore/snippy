@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %S/Inputs/default-layout.yaml %s -march=riscv64-linux-gnu -num-instrs=10 >& %t || true
+# RUN: llvm-snippy %S/Inputs/default-layout.yaml %s -mtriple=riscv64 -num-instrs=10 >& %t || true
 # RUN: FileCheck --input-file=%t --dump-input always %s
 
 access-evictions:

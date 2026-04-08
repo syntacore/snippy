@@ -1,4 +1,4 @@
-# RUN: llvm-snippy -mtriple=riscv64-unknown-elf -mattr=+i,+m,+a,+f,+d,+c,+zba,+zbb,+zbc,+zbs %s
+# RUN: llvm-snippy -mtriple=riscv64 -mattr=+i,+m,+a,+f,+d,+c,+zba,+zbb,+zbc,+zbs %s
 
 sections:
     - name: 0

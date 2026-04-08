@@ -8,7 +8,7 @@
 # RUN: --define-main-histogram=LoadStoreNTL | FileCheck %s --check-prefix=LOAD_STORE_NTL
 
 options:
-  mtriple: riscv64-linux-gnu 
+  mtriple: riscv64 
   mattr: "+zihintntl"
   dump-mf: on
   num-instrs: 1000

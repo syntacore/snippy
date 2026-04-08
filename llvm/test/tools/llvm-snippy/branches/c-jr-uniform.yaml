@@ -1,5 +1,5 @@
 # RUN: not llvm-snippy -model-plugin=None          \
-# RUN:      -mtriple=riscv64-unknown-elf -mattr=+c \
+# RUN:      -mtriple=riscv64 -mattr=+c \
 # RUN:      -num-instrs=500 %s                     \
 # RUN: |& FileCheck %s
 

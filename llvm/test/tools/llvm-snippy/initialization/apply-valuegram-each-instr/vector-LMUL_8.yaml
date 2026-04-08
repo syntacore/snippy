@@ -7,7 +7,7 @@
 # RUN: |& FileCheck %s --enable-var-scope
 
 options:
-  march: riscv64
+  mtriple: riscv64
   mcpu: generic-rv64
   mattr: +v
   dump-mf: true

@@ -2,7 +2,7 @@ include:
   - sections.yaml
   - custom-burst-fence-in-both-groups.yaml
 options:
-  march: "riscv64-linux-gnu"
+  mtriple: "riscv64"
   mattr: "+a,+f"
   num-instrs: 200
   dump-mf: "true"

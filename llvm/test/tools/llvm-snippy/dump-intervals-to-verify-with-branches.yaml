@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-unknown-elf -num-instrs=50 \
+# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=50 \
 # RUN:    -verify-mi -o %t.layout.elf \
 # RUN:    -dump-intervals-to-verify -init-regs-in-elf
 # RUN: FileCheck -input-file=%t.layout.elf.intervals-to-verify.yaml %s

@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+c,+f,+d \
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+c,+f,+d \
 # RUN:    -dump-mi -num-instrs=10 -last-instr= -model-plugin=None \
 # RUN:    -init-regs-in-elf --verify-mi \
 # RUN:    | FileCheck %s --dump-input always

@@ -1,22 +1,22 @@
 # COM: llvm-snippy is not used directly, because substitutions here will
 # COM: mess up default options.
 
-# RUN: not %llvm_tools/llvm-snippy %s -march=riscv64-linux-gnu  \
+# RUN: not %llvm_tools/llvm-snippy %s -mtriple=riscv64  \
 # RUN:   -Werror=memory-access,no-model-exec \
 # RUN:   --model-plugin=None -Wno-error=memory-access -num-instrs=10 \
 # RUN:   |& FileCheck %s
 
-# RUN: %llvm_tools/llvm-snippy %s -march=riscv64-linux-gnu --model-plugin=None \
+# RUN: %llvm_tools/llvm-snippy %s -mtriple=riscv64 --model-plugin=None \
 # RUN:   -Werror=memory-access,no-model-exec -o %t  \
 # RUN:   -Wno-error=no-model-exec,memory-access -num-instrs=10 \
 # RUN:   |& FileCheck %s --check-prefix=PASS
  
-# RUN: %llvm_tools/llvm-snippy %s -march=riscv64-linux-gnu --model-plugin=None \
+# RUN: %llvm_tools/llvm-snippy %s -mtriple=riscv64 --model-plugin=None \
 # RUN:   -Werror=memory-access,no-model-exec \
 # RUN:   -Wno-error -num-instrs=10 -o %t \
 # RUN:   |& FileCheck %s --check-prefix=PASS
 
-# RUN: not %llvm_tools/llvm-snippy %s -march=riscv64-linux-gnu  -Werror --model-plugin=None \
+# RUN: not %llvm_tools/llvm-snippy %s -mtriple=riscv64  -Werror --model-plugin=None \
 # RUN:   -Wno-error=foo,bar -num-instrs=10 \
 # RUN:   |& FileCheck %s --check-prefix=UNKNOWN
 

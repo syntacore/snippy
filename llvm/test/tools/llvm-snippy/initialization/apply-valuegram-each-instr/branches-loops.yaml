@@ -1,10 +1,10 @@
 # COM: This test checks that before branches and loops instructions there is no initialization. 
 # COM: That is, the run on the model completes successfully, without traps.
 
-# RUN: llvm-snippy %s --march=riscv32-linux-gnu \ 
+# RUN: llvm-snippy %s --mtriple=riscv32 \ 
 # RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml
 
-# RUN: llvm-snippy %s --march=riscv64 \ 
+# RUN: llvm-snippy %s --mtriple=riscv64 \ 
 # RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml
 
 options:
