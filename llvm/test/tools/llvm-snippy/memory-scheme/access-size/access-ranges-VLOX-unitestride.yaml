@@ -73,6 +73,6 @@ histogram:
     - [VSETIVLI, 1.0]
 
 options:
-  march: riscv64-linux-gnu
+  mtriple: riscv64
   mattr: +v
   num-instrs: 200

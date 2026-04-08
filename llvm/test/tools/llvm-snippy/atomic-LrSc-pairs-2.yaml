@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=500 \
+# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=500 \
 # RUN:    -mattr=+a \
 # RUN:    -init-regs-in-elf --verify-mi
 

@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -generate-insertion-point-hints \
+# RUN: llvm-snippy %s -mtriple=riscv64 -generate-insertion-point-hints \
 # RUN: -dump-mi -num-instrs=1000 -last-instr= -model-plugin=None \
 # RUN: | FileCheck %s
 

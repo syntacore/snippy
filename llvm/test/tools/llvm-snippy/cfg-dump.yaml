@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s --num-instrs=100 --march=riscv64-linux-gnu \
+# RUN: llvm-snippy %s --num-instrs=100 --mtriple=riscv64 \
 # RUN:   --model-plugin=None --dump-cfg --cfg-basename=%t
 # RUN: rm %t_SnippyFunction-cfg-dump.dot
 

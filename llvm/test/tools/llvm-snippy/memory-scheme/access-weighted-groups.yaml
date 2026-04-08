@@ -4,7 +4,7 @@
 # COM:    3. Access-groups may exist with regular memory-schemes (access-ranges, ...)
 # COM:    4. Zero weight is handled correctly
 
-# RUN: llvm-snippy %S/Inputs/default-layout.yaml %s -march=riscv64-linux-gnu \
+# RUN: llvm-snippy %S/Inputs/default-layout.yaml %s -mtriple=riscv64 \
 # RUN:   -num-instrs=100 -dump-layout=true -model-plugin None \
 # RUN:   | FileCheck %s --dump-input always
 

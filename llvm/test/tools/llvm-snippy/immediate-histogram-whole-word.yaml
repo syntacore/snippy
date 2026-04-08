@@ -1,7 +1,7 @@
 # RUN: llvm-snippy %s %S/Inputs/sections.yaml -model-plugin None \
 # RUN:   |& FileCheck %s
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   num-instrs: 100
   dump-mf: true
 

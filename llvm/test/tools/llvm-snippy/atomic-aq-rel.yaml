@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=500 -mattr=+a -dump-mf |& FileCheck %s --dump-input always
+# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=500 -mattr=+a -dump-mf |& FileCheck %s --dump-input always
 
 # CHECK: bb.0:
 # CHECK-COUNT-500: AMO

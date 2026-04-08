@@ -1,7 +1,7 @@
-# RUN: timeout 300 llvm-snippy %s -mtriple=riscv64-unknown-elf \
+# RUN: timeout 300 llvm-snippy %s -mtriple=riscv64 \
 # RUN: -model-plugin=None | FileCheck %s
 
-# RUN: timeout 300 llvm-snippy %s -mtriple=riscv32-unknown-elf \
+# RUN: timeout 300 llvm-snippy %s -mtriple=riscv32 \
 # RUN: -model-plugin=None | FileCheck %s
 
 options:

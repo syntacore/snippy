@@ -1,4 +1,4 @@
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:  -model-plugin=None --num-instrs=10000 -o %t \
 # RUN:  -verify-gen-histogram  -histogram-must-succeed=true \
 # RUN:  |& FileCheck %s

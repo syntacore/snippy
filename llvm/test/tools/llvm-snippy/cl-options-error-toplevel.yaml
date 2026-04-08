@@ -1,7 +1,7 @@
 # RUN: not llvm-snippy %s |& FileCheck %s
 
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   mcpu: generic-rv64
 clueless-user-toplevel-option: check
 dump-mf: true

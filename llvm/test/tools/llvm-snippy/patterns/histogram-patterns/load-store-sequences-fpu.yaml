@@ -5,7 +5,7 @@
 # RUN: |& FileCheck %s --check-prefixes=FPU_STORE_SEQ
 
 options:
-  mtriple: riscv64-linux-gnu 
+  mtriple: riscv64 
   mattr: "+f,+d,+zfh,+zfhmin,+m"
   num-instrs: 2000
   dump-mf: on

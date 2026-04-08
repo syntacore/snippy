@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-unknown-elf \
+# RUN: llvm-snippy %s -mtriple=riscv64 \
 # RUN:   -num-instrs=10000  \
 # RUN:   -init-regs-in-elf -force-emit-linker-script \
 # RUN:   -reserved-regs-list=X1,X2,X8 -mattr=+c,+a,+m -last-instr=RET

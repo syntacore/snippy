@@ -1,4 +1,4 @@
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu  -backtrack -mattr=+a\
+# RUN: not llvm-snippy %s -mtriple=riscv64  -backtrack -mattr=+a\
 # RUN: -num-instrs=10 |& FileCheck %s
 
 sections:

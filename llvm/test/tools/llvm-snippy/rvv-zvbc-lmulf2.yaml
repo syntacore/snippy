@@ -1,4 +1,4 @@
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v,+zvbc \
+# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+v,+zvbc \
 # RUN:  -o %t --num-instrs=1000 -model-plugin=None \
 # RUN:  --init-regs-in-elf --verify-mi |& FileCheck %s
 

@@ -1,4 +1,4 @@
-# RUN: not llvm-snippy %s -march=riscv64-unknown-elf \
+# RUN: not llvm-snippy %s -mtriple=riscv64 \
 # RUN:   -init-regs-in-elf -force-emit-linker-script \
 # RUN:   -selfcheck -selfcheck-gv -mattr=+c,+a,+m |& FileCheck %s
 

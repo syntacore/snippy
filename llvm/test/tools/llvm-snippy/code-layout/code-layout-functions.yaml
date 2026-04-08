@@ -1,7 +1,7 @@
 # RUN: llvm-snippy %s | FileCheck %s
 
 options:
-  mtriple: riscv64-linux-gnu
+  mtriple: riscv64
   num-instrs: 500
   redefine-sp: "SP"
   dump-mf: true

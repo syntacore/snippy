@@ -2,7 +2,7 @@
 # RUN: not llvm-snippy %s -model-plugin=None --object-type=shared |& FileCheck %s
 
 options:
-  march: "riscv64-linux-gnu"
+  mtriple: "riscv64"
   num-instrs: 10
 sections:
     - name:      1

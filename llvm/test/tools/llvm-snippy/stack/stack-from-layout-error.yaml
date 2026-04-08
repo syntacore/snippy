@@ -1,4 +1,4 @@
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
+# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+m,+c \
 # RUN:  -num-instrs=10000  \
 # RUN:  -spilled-regs-list=X1 -init-regs-in-elf -verify-mi |& FileCheck %s
 sections:

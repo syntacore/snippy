@@ -1,9 +1,9 @@
 # RUN: sed -e s/LOOP_RATIO/-0.1/ %s > %t.1.yaml
-# RUN: not llvm-snippy %t.1.yaml -march=riscv64-linux-gnu -num-instrs=50 \
+# RUN: not llvm-snippy %t.1.yaml -mtriple=riscv64 -num-instrs=50 \
 # RUN:     -verify-mi -dump-mf -o %t |& FileCheck %s
 #
 # RUN: sed -e s/LOOP_RATIO/1.1/ %s > %t.2.yaml
-# RUN: not llvm-snippy %t.2.yaml -march=riscv64-linux-gnu -num-instrs=50 \
+# RUN: not llvm-snippy %t.2.yaml -mtriple=riscv64 -num-instrs=50 \
 # RUN:     -verify-mi -dump-mf -o %t |& FileCheck %s
 
 sections:

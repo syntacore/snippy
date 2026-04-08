@@ -1,5 +1,5 @@
 # RUN: not llvm-snippy %s \
-# RUN: -march=riscv64-linux-gnu -mattr=-c \
+# RUN: -mtriple=riscv64 -mattr=-c \
 # RUN: -model-plugin=None -selfcheck -dump-mf |& FileCheck --dump-input always %s
 
 sections:

@@ -1,17 +1,17 @@
 # RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/DIST/0/ > %t.0.yaml
-# RUN: not llvm-snippy %t.0.yaml -march=riscv64-linux-gnu -num-instrs=50 \
+# RUN: not llvm-snippy %t.0.yaml -mtriple=riscv64 -num-instrs=50 \
 # RUN:     -verify-mi -o %t.0 |& FileCheck %t.0.yaml
 
 # RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/DIST/1/ > %t.1.yaml
-# RUN: not llvm-snippy %t.1.yaml -march=riscv64-linux-gnu -num-instrs=50 \
+# RUN: not llvm-snippy %t.1.yaml -mtriple=riscv64 -num-instrs=50 \
 # RUN:     -verify-mi -o %t.1 |& FileCheck %t.1.yaml
 
 # RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/DIST/2/ > %t.2.yaml
-# RUN: not llvm-snippy %t.2.yaml -march=riscv64-linux-gnu -num-instrs=50 \
+# RUN: not llvm-snippy %t.2.yaml -mtriple=riscv64 -num-instrs=50 \
 # RUN:     -verify-mi -o %t.2 |& FileCheck %t.2.yaml
 
 # RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/DIST/3/ > %t.3.yaml
-# RUN: not llvm-snippy %t.3.yaml -march=riscv64-linux-gnu -num-instrs=50 \
+# RUN: not llvm-snippy %t.3.yaml -mtriple=riscv64 -num-instrs=50 \
 # RUN:     -verify-mi -o %t.3 |& FileCheck %t.3.yaml
 
 # CHECK: error: Max PC distance (DIST) is less than max instruction size: 4

@@ -1,7 +1,7 @@
 # RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
 
 options:
-  mtriple: riscv64-unknow-elf
+  mtriple: riscv64
   num-instrs: 2000
   reserved-regs-list: ["X1[45]", "X1[45]nonexistentsuffix*"]
 
