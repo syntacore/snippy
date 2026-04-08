@@ -23,7 +23,7 @@
 # RUN: |& FileCheck %t.C_EBREAK.yaml --check-prefix=C_EBREAK
 
 options:
-  mtriple: riscv64-unknown-elf
+  mtriple: riscv64
   mattr: +c
   num-instrs: 100
   dump-mf: true

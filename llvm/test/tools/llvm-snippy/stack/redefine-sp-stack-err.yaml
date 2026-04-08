@@ -100,7 +100,7 @@
 
 
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   enable-static-stack: false
   mcpu: generic-rv64
   mattr: "+c,+f,+d"

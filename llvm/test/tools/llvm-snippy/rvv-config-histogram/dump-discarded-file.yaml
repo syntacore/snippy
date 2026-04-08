@@ -8,7 +8,7 @@
 # RUN: FileCheck --input-file=%t.rvv.info --check-prefix=RVV-INFO %s
 
 options:
-  march: riscv64
+  mtriple: riscv64
   mcpu: generic-rv64
   mattr: +v
   num-instrs: 1

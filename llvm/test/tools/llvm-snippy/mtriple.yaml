@@ -1,6 +1,6 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN: llvm-snippy %s -mtriple=riscv64 \
 # RUN:     |& FileCheck %s --check-prefix=MARCH-AS-TRIPLE
-# RUN: llvm-snippy %s -mtriple=riscv64-linux-gnu
+# RUN: llvm-snippy %s -mtriple=riscv64
 # RUN: not llvm-snippy %s -march=rv64i |& FileCheck %s --check-prefix=NO-TRIPLE
 
 sections:
@@ -15,8 +15,8 @@ sections:
       LMA:       0x80600000
       ACCESS:    rw
 
-histogram: 
+histogram:
     - [ADD, 1.0]
-      
+
 # MARCH-AS-TRIPLE: warning:
 # NO-TRIPLE: error: target triple is not specified

@@ -5,7 +5,7 @@
 # RUN: |& FileCheck %s 
 
 options:
-  march: riscv64
+  mtriple: riscv64
   mcpu: generic-rv64
   mattr: +v
   dump-mf: true

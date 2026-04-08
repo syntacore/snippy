@@ -2,4 +2,4 @@
 # CHECK: Snippy version: {{[[:digit:]]+}}.{{[[:digit:]]+}}.{{[[:digit:]]+}}
 
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64

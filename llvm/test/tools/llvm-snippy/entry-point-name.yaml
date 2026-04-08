@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=-a,+m -num-instrs=10 -entry-point=start -o %t
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a,+m -num-instrs=10 -entry-point=start -o %t
 # RUN: llvm-objdump -d %t.elf | FileCheck %s
 
 sections:

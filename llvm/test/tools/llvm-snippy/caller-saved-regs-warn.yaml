@@ -1,4 +1,4 @@
-# RUN:  llvm-snippy %s -mtriple=riscv64-unknown-elf -mcpu=generic-rv64 \
+# RUN:  llvm-snippy %s -mtriple=riscv64 -mcpu=generic-rv64 \
 # RUN:  --model-plugin=None |& FileCheck %s
  
 options:

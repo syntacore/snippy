@@ -1,4 +1,4 @@
-# RUN: not llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s -march=riscv64-linux-gnu \
+# RUN: not llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
 # RUN:   -num-instrs=10 \
 # RUN:   -riscv-disable-misaligned-access \
 # RUN: |& FileCheck %s --dump-input fail

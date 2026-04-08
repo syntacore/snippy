@@ -1,4 +1,4 @@
-# RUN: llvm-snippy -mcpu=generic-rv64 -mtriple=riscv64-unknown-elf \
+# RUN: llvm-snippy -mcpu=generic-rv64 -mtriple=riscv64 \
 # RUN:     -list-opcode-names \
 # RUN:     2> %t.stderr \
 # RUN:     | FileCheck %s

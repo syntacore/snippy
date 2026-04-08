@@ -5,7 +5,7 @@ include:
   - ../Inputs/sections.yaml
 
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   mcpu: generic-rv64
   mattr: "+zbkb,+zbkc,+zbkx,+zknd,+zkne,+zknh,+zksed,+zksh,+zkr,+zkn,+zks,+zkt"
   num-instrs: 600

@@ -9,7 +9,7 @@
 # RUN: FileCheck %s --input-file %t.mem2 --check-prefix LB
 
 options:
-  mtriple: riscv64-unknown-elf
+  mtriple: riscv64
   num-instrs: 1000
 
 sections:

@@ -1,14 +1,14 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN: llvm-snippy %s -mtriple=riscv64 \
 # RUN:    -mcpu=generic-rv64 -mattr=+c  -num-instrs=100 \
 # RUN:    -dump-mf -riscv-loop-control-logic-compression=on \
 # RUN: |& FileCheck %s --check-prefix=ON
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN: llvm-snippy %s -mtriple=riscv64 \
 # RUN:    -mcpu=generic-rv64 -mattr=+c  -num-instrs=10000 \
 # RUN:    -dump-mf -riscv-loop-control-logic-compression=random \
 # RUN: |& FileCheck %s --check-prefix=RANDOM-DAG
 
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN: llvm-snippy %s -mtriple=riscv64 \
 # RUN:    -mcpu=generic-rv64 -mattr=+c  -num-instrs=100 \
 # RUN:    -dump-mf -riscv-loop-control-logic-compression=off \
 # RUN: |& FileCheck %s --check-prefix=OFF

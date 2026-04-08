@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN: llvm-snippy %s -mtriple=riscv64 \
 # RUN: -mattr=+a -dump-memory-accesses=%t \
 # RUN: --riscv-disable-misaligned-access=atomics-only \
 # RUN: --num-instrs=300

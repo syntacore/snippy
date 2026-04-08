@@ -23,7 +23,7 @@
 # RUN: |& FileCheck %t.REM.yaml --check-prefix=REM
 
 options:
-  mtriple: riscv64-unknown-elf
+  mtriple: riscv64
   mattr: +m
   num-instrs: 100
   dump-mf: true

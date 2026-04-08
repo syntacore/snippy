@@ -1,15 +1,15 @@
 # COM: Dump after (almost) the first pass
-# RUN: llvm-snippy %s -num-instrs=100 -march=riscv64-linux-gnu \
+# RUN: llvm-snippy %s -num-instrs=100 -mtriple=riscv64 \
 # RUN:   --model-plugin=None --dump-cfg-after=snippy-function-generator \
 # RUN:   --cfg-basename=%t -o %t
 # RUN: rm %t_SnippyFunction-cfg-dump-after-snippy-function-generator.dot
 # COM: Dump before function generator when there is some CF
-# RUN: llvm-snippy %s -num-instrs=100 -march=riscv64-linux-gnu \
+# RUN: llvm-snippy %s -num-instrs=100 -mtriple=riscv64 \
 # RUN:   --model-plugin=None --dump-cfg-after=snippy-loop-latcher \
 # RUN:   --cfg-basename=%t -o %t
 # RUN: rm %t_SnippyFunction-cfg-dump-after-snippy-loop-latcher.dot
 # COM: Dump when generation is almost done
-# RUN: llvm-snippy %s -num-instrs=100 -march=riscv64-linux-gnu \
+# RUN: llvm-snippy %s -num-instrs=100 -mtriple=riscv64 \
 # RUN:   --model-plugin=None --dump-cfg-after=snippy-branch-relaxator \
 # RUN:   --cfg-basename=%t -o %t
 # RUN: rm %t_SnippyFunction-cfg-dump-after-snippy-branch-relaxator.dot

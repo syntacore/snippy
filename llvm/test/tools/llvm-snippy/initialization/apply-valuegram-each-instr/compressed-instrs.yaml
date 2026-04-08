@@ -10,7 +10,7 @@
 # RUN: |& FileCheck %s --check-prefix THREE_OPERANDS
 
 options:
-  march: riscv64
+  mtriple: riscv64
   mcpu: generic-rv64
   mattr: +c
   num-instrs: 1000

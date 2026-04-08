@@ -25,7 +25,7 @@ burst:
   min-size: 31
   max-size: 31
 options:
-  march: "riscv64-linux-gnu" 
+  mtriple: "riscv64" 
   init-regs-in-elf: true
   num-instrs: 400
   mattr: "+c"

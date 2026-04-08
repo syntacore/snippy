@@ -2,7 +2,7 @@
 # RUN: readelf -S %t.elf | FileCheck %s
 
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   mcpu: generic-rv64
   enable-phdrs-definition: true
   num-instrs: 1000

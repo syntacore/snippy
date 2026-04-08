@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+a,+f -dump-mf \
 # RUN: -num-instrs=1000 \
 # RUN: >& %t
 # RUN: FileCheck --input-file=%t %s --dump-input=always --check-prefixes=THREE,CHECK

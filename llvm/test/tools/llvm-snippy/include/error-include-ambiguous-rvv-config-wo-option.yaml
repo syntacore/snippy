@@ -1,6 +1,6 @@
 # COM: this is the test for catching error,
 # COM: when specifying rvv configuration through include and inline
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:  -model-plugin=None --num-instrs=10 -o %t \
 # RUN:  |& FileCheck %s
 

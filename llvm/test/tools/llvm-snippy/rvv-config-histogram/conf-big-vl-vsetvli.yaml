@@ -6,7 +6,7 @@
 # RUN: llvm-snippy %s
 
 options:
-  march: riscv64
+  mtriple: riscv64
   mcpu: generic-rv64
   mattr: +v
   num-instrs: 100

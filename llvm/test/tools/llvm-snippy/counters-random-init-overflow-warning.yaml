@@ -1,7 +1,7 @@
 # RUN: timeout 300 llvm-snippy -model-plugin None %s |& FileCheck %s
 
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   num-instrs: 100
 
 histogram:

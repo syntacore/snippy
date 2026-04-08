@@ -1,8 +1,8 @@
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN: not llvm-snippy %s -mtriple=riscv64 \
 # RUN:   --layout-include-dir=%S/Inputs \
 # RUN:   --dump-mf --num-instrs=150 |& FileCheck %s
 
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN: not llvm-snippy %s -mtriple=riscv64 \
 # RUN:   --layout-include-dir=%S/Inputs \
 # RUN:   --dump-mf --num-instrs=150 |& FileCheck %s
 

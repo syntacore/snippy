@@ -1,6 +1,6 @@
-# RUN: timeout 300 llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=50 \
+# RUN: timeout 300 llvm-snippy %s -mtriple=riscv64 -num-instrs=50 \
 # RUN:     -verify-mi -dump-mf -mattr=+c -o %t |& FileCheck %s
-# RUN: timeout 300 llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=50 \
+# RUN: timeout 300 llvm-snippy %s -mtriple=riscv64 -num-instrs=50 \
 # RUN:     -verify-mi -dump-mf -mattr=+c -init-regs-in-elf \
 # RUN:     -o %t |& FileCheck %s
 

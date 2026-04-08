@@ -16,7 +16,7 @@ include:
   - Inputs/sections.yaml
 
 options:
-  mtriple: riscv64-linux-gnu 
+  mtriple: riscv64 
   mattr: "+m"
   num-instrs: 2000
   dump-mf: on

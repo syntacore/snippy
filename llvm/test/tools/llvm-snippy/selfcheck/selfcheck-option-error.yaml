@@ -1,5 +1,5 @@
 # RUN: llvm-snippy %s \
-# RUN:    -march=riscv64-linux-gnu -mattr=-c \
+# RUN:    -mtriple=riscv64 -mattr=-c \
 # RUN:     -selfcheck=qwerty -dump-mf >& %t || true 
 # RUN: FileCheck --input-file=%t --dump-input always %s  
 

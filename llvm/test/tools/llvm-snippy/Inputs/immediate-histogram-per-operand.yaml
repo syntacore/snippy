@@ -2,7 +2,7 @@ include:
   - sections.yaml
 
 options:
-  mtriple: riscv64-unknown-elf
+  mtriple: riscv64
   num-instrs: 100
   dump-mf: on
   mattr: +Zicsr,+f

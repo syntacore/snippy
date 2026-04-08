@@ -2,7 +2,7 @@
 # RUN: llvm-snippy %s -model-plugin None
 
 options:
-  mtriple: riscv64-unknown-elf
+  mtriple: riscv64
   mattr: +v,+zvfh
   num-instrs: 1000
   dump-mf: true

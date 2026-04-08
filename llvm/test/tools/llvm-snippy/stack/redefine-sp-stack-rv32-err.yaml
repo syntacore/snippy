@@ -37,7 +37,7 @@
 
 
 options:
-  march: riscv32-unknown-elf
+  mtriple: riscv32
   mcpu: generic-rv32
   mattr: "+c,+f"
   num-instrs: 100

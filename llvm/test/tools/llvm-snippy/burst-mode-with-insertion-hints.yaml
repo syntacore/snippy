@@ -1,7 +1,7 @@
 # RUN: llvm-snippy --model-plugin None %s %S/Inputs/load-burst.yaml | FileCheck %s
 
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   dump-mf: on
   num-instrs: 6
   generate-insertion-point-hints: on

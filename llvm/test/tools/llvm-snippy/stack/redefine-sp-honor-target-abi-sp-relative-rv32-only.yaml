@@ -44,7 +44,7 @@
 
 
 options:
-  march: riscv32-unknown-elf
+  mtriple: riscv32
   enable-static-stack: false
   mcpu: generic-rv32
   mattr: "+c,+f"

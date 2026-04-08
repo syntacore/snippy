@@ -1,7 +1,7 @@
 # RUN: llvm-snippy %s -model-plugin=None -verify-mi | FileCheck %s
 
 options:
-  mtriple: riscv64-linux-gnu 
+  mtriple: riscv64 
   mattr: "+c,+d,+m,+zcb"
   dump-mf: on
   num-instrs: 2500

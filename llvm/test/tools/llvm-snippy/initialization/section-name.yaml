@@ -1,7 +1,7 @@
 # RUN: llvm-snippy %s | FileCheck %s
 
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   num-instrs: 10
   dump-layout: true
 sections:

@@ -2,7 +2,7 @@
 # RUN: --check-prefixes=ATOMIC_RELAXED,ATOMIC_REL,ATOMIC_AQ,CHECK
 
 options:
-  mtriple: riscv64-linux-gnu 
+  mtriple: riscv64 
   mattr: "+a"
   dump-mf: on
   num-instrs: 1500

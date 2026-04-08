@@ -1,4 +1,4 @@
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=20 \
+# RUN: not llvm-snippy %s -mtriple=riscv64 -num-instrs=20 \
 # RUN:     -verify-mi -mattr=-c -dump-mf --verify-consecutive-loops -o %t \
 # RUN:     --model-plugin=None |& FileCheck %s
 

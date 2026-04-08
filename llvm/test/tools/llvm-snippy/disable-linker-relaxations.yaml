@@ -1,8 +1,8 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+c \
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+c \
 # RUN:    -num-instrs=1000 -o %t_1 \
 # RUN:    -function-number=5 -function-layers=2
 #
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+c \
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+c \
 # RUN:    -num-instrs=1000 -disable-linker-relaxations -o %t_2 \
 # RUN:    -function-number=5 -function-layers=2
 

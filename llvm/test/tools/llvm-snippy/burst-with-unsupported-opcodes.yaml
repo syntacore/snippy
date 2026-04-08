@@ -1,7 +1,7 @@
 # RUN: llvm-snippy %s -seed=1 -model-plugin=None |& FileCheck %s
 
 options:
-    mtriple: riscv64-unknown-elf
+    mtriple: riscv64
     mattr: +v,+c
     dump-mf: on
     num-instrs: 100

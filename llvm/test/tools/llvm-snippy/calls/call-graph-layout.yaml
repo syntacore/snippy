@@ -1,5 +1,5 @@
 # RUN: split-file %s %t
-# RUN: llvm-snippy %t/layout.yaml %t/cg-layout.yaml -march=riscv64-linux-gnu -num-instrs=100 \
+# RUN: llvm-snippy %t/layout.yaml %t/cg-layout.yaml -mtriple=riscv64 -num-instrs=100 \
 # RUN: --dump-mf | FileCheck %s
 
 # CHECK-COUNT-9: Machine code for

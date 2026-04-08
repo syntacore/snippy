@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-unknown-elf  \
+# RUN: llvm-snippy %s -mtriple=riscv64  \
 # RUN:   -mattr=+a -num-instrs=2000 \
 # RUN:   -init-regs-in-elf
 

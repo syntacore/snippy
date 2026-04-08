@@ -1,4 +1,4 @@
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN: not llvm-snippy %s -mtriple=riscv64 \
 # RUN:    --num-instrs=10 --model-plugin=None \
 # RUN:    -o /wobble/wobble/wobble/wobble/wobble/wobble/out.docx \
 # RUN:    |& FileCheck %s
