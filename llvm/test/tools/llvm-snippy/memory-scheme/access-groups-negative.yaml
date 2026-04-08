@@ -1,6 +1,6 @@
 # COM: This test verifies that field "weight" can not be less than zero
 
-# RUN: not llvm-snippy %S/Inputs/default-layout.yaml %s -march=riscv64-linux-gnu \
+# RUN: not llvm-snippy %S/Inputs/default-layout.yaml %s -mtriple=riscv64 \
 # RUN:   -num-instrs=100 \
 # RUN: |& FileCheck %s --dump-input always
 

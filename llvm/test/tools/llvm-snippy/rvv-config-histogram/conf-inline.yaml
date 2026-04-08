@@ -1,5 +1,5 @@
 # COM: this is the test for checking possibility to put rvv-config in the body of main config
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v -model-plugin=None \
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v -model-plugin=None \
 # RUN:  --num-instrs=10 -riscv-dump-rvv-config -o %t \
 # RUN:  |& FileCheck %s
 

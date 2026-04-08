@@ -1,8 +1,8 @@
-# RUN: not llvm-snippy %s -march=riscv32-linux-gnu -mattr=+d,+f \
+# RUN: not llvm-snippy %s -mtriple=riscv32 -mattr=+d,+f \
 # RUN: -num-instrs=10 -init-regs-in-elf \
 # RUN: -model-plugin=None --dump-mf |& FileCheck %s --check-prefix=DPREC 
 
-# RUN: llvm-snippy %s -march=riscv32-linux-gnu -mattr=+f \
+# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+f \
 # RUN: -num-instrs=10 -init-regs-in-elf \
 # RUN: -model-plugin=None --dump-mf |& FileCheck %s --check-prefix=FPREC
 

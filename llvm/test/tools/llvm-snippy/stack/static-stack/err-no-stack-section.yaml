@@ -2,7 +2,7 @@
 # RUN: |& FileCheck %s
 
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   enable-static-stack: on
 
 sections:

@@ -1,7 +1,7 @@
-# RUN: not llvm-snippy %s -mtriple=riscv64-unknown-elf -mcpu=generic-rv64 \
+# RUN: not llvm-snippy %s -mtriple=riscv64 -mcpu=generic-rv64 \
 # RUN: -preserve-caller-saved-regs=X,G,P |& FileCheck %s --check-prefix=CHECK1
 
-# RUN: not llvm-snippy %s -mtriple=riscv64-unknown-elf -mcpu=generic-rv64 \
+# RUN: not llvm-snippy %s -mtriple=riscv64 -mcpu=generic-rv64 \
 # RUN: -preserve-caller-saved-regs=f,X,V |& FileCheck %s --check-prefix=CHECK2
  
 options:

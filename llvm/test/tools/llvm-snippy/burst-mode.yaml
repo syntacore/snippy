@@ -1,30 +1,30 @@
-# RUN: llvm-snippy %s %S/Inputs/store-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: llvm-snippy %s %S/Inputs/store-burst.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \
 # RUN: -num-instrs=200 >& %t
 # RUN: FileCheck --input-file=%t %s -check-prefix=STORE
 # RUN: FileCheck --input-file=%t %s -check-prefix=STORE-ERR
 
-# RUN: llvm-snippy %s %S/Inputs/load-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: llvm-snippy %s %S/Inputs/load-burst.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \
 # RUN: -num-instrs=200 >& %t
 # RUN: FileCheck --input-file=%t %s -check-prefix=LOAD
 # RUN: FileCheck --input-file=%t %s -check-prefix=LOAD-ERR
 
-# RUN: llvm-snippy %s %S/Inputs/mixed-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: llvm-snippy %s %S/Inputs/mixed-burst.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \
 # RUN: -num-instrs=200 |& FileCheck %s \
 # RUN: -check-prefix=MIXED
 
-# RUN: llvm-snippy %s %S/Inputs/load-store-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: llvm-snippy %s %S/Inputs/load-store-burst.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \
 # RUN: -num-instrs=200 |& FileCheck %s \
 # RUN: -check-prefix=LOADSTORE
 
 # Generate many instructions to have extremely high probability that desired
 # pattern wasn't met because it cannot be emitted. It's not the most robust test
 # case. Please, improve it if you have better ideas.
-# RUN: llvm-snippy %s %S/Inputs/load-store-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: llvm-snippy %s %S/Inputs/load-store-burst.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \
 # RUN: -num-instrs=1000 \
 # RUN: -model-plugin=None |& FileCheck %s \
 # RUN: -check-prefix=LOADSTORE-ERR
 
-# RUN: llvm-snippy %s %S/Inputs/mixed-burst.yaml -march=riscv64-linux-gnu -mattr=+a,+f -dump-mf \
+# RUN: llvm-snippy %s %S/Inputs/mixed-burst.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \
 # RUN: -num-instrs=500 >& t
 # RUN  FileCheck --input-file=%t %s -check-prefix=MIXED-HUGEGROUP
 # RUN  FileCheck --input-file=%t %s -check-prefix=MIXED-HUGEGROUP-ERR

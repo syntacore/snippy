@@ -1,4 +1,4 @@
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=-v \
+# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=-v \
 # RUN:  --num-instrs=100 -o %t \
 # RUN:  |& FileCheck %s
 

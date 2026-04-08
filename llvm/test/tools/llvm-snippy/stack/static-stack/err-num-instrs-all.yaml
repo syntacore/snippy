@@ -2,7 +2,7 @@
 # RUN: |& FileCheck %s
 
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   num-instrs: all
   enable-static-stack: on
 

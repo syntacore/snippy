@@ -3,7 +3,7 @@
 # RUN: llvm-snippy %s --model-plugin=None
 
 options:
-  mtriple: riscv64-linux-gnu
+  mtriple: riscv64
   num-instrs: 100
   init-regs-in-elf: true
   function-number: 5

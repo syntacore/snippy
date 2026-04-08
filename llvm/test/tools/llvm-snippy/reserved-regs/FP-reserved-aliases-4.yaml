@@ -6,7 +6,7 @@
 # RUN:  |& FileCheck %s
 
 options:
-  march: riscv64-linux-gnu
+  mtriple: riscv64
   mcpu: generic-rv64
   mattr: +d,+zfh
   dump-mf: on

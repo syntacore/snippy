@@ -1,7 +1,7 @@
 # RUN: llvm-snippy %s -model-plugin=None
 
 options:
-  mtriple: riscv64-unknown-elf
+  mtriple: riscv64
   riscv-init-fregs-from-memory: true
   verify-gen-histogram: true
   histogram-must-succeed: true

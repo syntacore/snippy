@@ -1,7 +1,7 @@
 # RUN: llvm-snippy %s -o %t 2>&1 | FileCheck %s
 
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   dump-rand-mem-accesses: true
 
 sections:

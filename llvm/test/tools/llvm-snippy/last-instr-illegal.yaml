@@ -1,4 +1,4 @@
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=-a,+m \
+# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=-a,+m \
 # RUN:    -last-instr=abrakadabra -dump-mi \
 # RUN:    -num-instrs=10 |& FileCheck %s --dump-input always
 

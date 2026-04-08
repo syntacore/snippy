@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -mtriple=riscv64-linux-gnu -num-instrs=100 \
+# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=100 \
 # RUN:     -mattr=+c -model-plugin None
 
 branches:

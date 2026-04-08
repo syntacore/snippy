@@ -11,7 +11,7 @@ include:
   - Inputs/sections.yaml
 
 options:
-  mtriple: riscv64-linux-gnu 
+  mtriple: riscv64 
   num-instrs: 15
 
 # ZERO_ARG: error: invalid argument for '^' operation. An integer greater than 0 is expected

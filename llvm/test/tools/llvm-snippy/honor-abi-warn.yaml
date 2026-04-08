@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+m,+c \
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+m,+c \
 # RUN: --model-plugin=None -num-instrs=100 -verify-mi \
 # RUN:  -honor-target-abi -spilled-regs-list=X5 -init-regs-in-elf |& FileCheck %s
 sections:
