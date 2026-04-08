@@ -1,0 +1,21 @@
+options:
+    mtriple: riscv64-unknown-elf
+    dump-mf: on
+    num-instrs: 200
+
+include:
+  - ../../Inputs/sections.yaml
+
+histogram:
+    - [LW, 1.0]
+    - [SW, 1.0]
+
+burst:
+    mode: custom
+    min-size: 200
+    max-size: 200
+    groupings:
+      - [LW, SW]
+    base-register-groups:
+      - [SW]
+      - [LW]

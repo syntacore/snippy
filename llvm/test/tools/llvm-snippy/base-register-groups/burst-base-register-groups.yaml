@@ -1,0 +1,9 @@
+# RUN: llvm-snippy %S/Inputs/burst-base-register-groups.yaml \
+# RUN:   -model-plugin=None |& FileCheck %s
+
+# CHECK: SW {{\$x[0-9]+}}, [[REG1:\$x[0-9]+]],
+# CHECK-NOT: LW [[REG1]],
+
+# CHECK: LW [[REG2:\$x[0-9]+]],
+# CHECK-NOT: SW {{\$x[0-9]+}}, [[REG2]],
+# CHECK-NOT: LW [[REG1]],

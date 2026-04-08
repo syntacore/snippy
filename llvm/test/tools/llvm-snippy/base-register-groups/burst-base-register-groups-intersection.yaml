@@ -1,0 +1,31 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+    mtriple: riscv64-unknown-elf
+    dump-mf: on
+    num-instrs: 300
+    mattr: +zicbom
+
+include:
+  - ../Inputs/sections.yaml
+
+histogram:
+    - [CBO_INVAL, 1.0]
+    - [LW, 1.0]
+    - [SW, 1.0]
+
+burst:
+    mode: custom
+    min-size: 300
+    max-size: 300
+    groupings:
+      - [CBO_INVAL, LW, SW]
+    base-register-groups:
+      - [CBO_INVAL, SW]
+      - [SW, LW]
+
+# CHECK: CBO_INVAL [[REG1:\$x[0-9]+]]{{.*[[:space:]].*}}
+# CHECK: LW [[REG2:\$x[0-9]+]],
+
+# CHECK-NOT: LW [[REG1]],
+# CHECK-NOT: CBO_INVAL [[REG2]]{{.*[[:space:]].*}}
