@@ -89,8 +89,8 @@ void FunctionDistribute::verifyFunctionSizes(Module &M,
     std::vector<Function *> Functions;
     auto Examined = [&](auto &F) {
       return (!OnlyRootOnes || FG.isRootFunction(F)) &&
-             ProgCtx.getOutputSectionFor(F).getIDString() ==
-                 Section.OutputSection.Desc.getIDString();
+             ProgCtx.getOutputSectionFor(F).getName() ==
+                 Section.OutputSection.Desc.getName();
     };
     for (auto &F : llvm::make_filter_range(M, Examined))
       Functions.emplace_back(&F);
@@ -104,8 +104,8 @@ void FunctionDistribute::verifyFunctionSizes(Module &M,
     std::string Message;
     llvm::raw_string_ostream OS{Message};
 
-    OS << "RX section '" << Section.OutputSection.Desc.getIDString()
-       << "' (size " << Section.OutputSection.Desc.Size
+    OS << "RX section '" << Section.OutputSection.Desc.getName() << "' (size "
+       << Section.OutputSection.Desc.Size
        << ") failed to fit code mapped to it. Total code size: " << totalSize
        << "\n";
     OS << " List of functions mapped to this section:\n";

@@ -1163,10 +1163,10 @@ public:
     // TODO: use model interface to fetch restricted sections
 
     // htif
-    ReservedRanges.emplace_back(0, 0xFFF1001000, 8, 0xFFF1001000,
+    ReservedRanges.emplace_back("0", 0xFFF1001000, 8, 0xFFF1001000,
                                 Permissions::R | Permissions::W);
     // clint
-    ReservedRanges.emplace_back(0, 0xFFF1000000, 8, 0xFFF1000000,
+    ReservedRanges.emplace_back("0", 0xFFF1000000, 8, 0xFFF1000000,
                                 Permissions::RWX);
   }
 
@@ -4979,8 +4979,7 @@ void SnippyRISCVTarget::generateVTypeChange(
 }
 
 void generateVXRMUpdate(InstructionGenerationContext &IGC,
-                        RVVConfiguration::VXRMMode RoundingMode,
-                        const MCInstrInfo &InstrInfo) {
+                        VXRMMode RoundingMode, const MCInstrInfo &InstrInfo) {
   auto &MBB = IGC.MBB;
   const auto &Ins = IGC.Ins;
   const auto &Tgt = IGC.ProgCtx.getLLVMState().getSnippyTarget();
