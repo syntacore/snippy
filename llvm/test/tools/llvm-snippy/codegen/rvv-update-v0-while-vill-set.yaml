@@ -20,7 +20,7 @@
 # RUN:  | grep -E '((VSETIVLI |VSETVLI )[^ ]+(, 128)(([^V]|V[^S]|VS[^E]|VSE[^T])+)(v0 = VL1RE8_V))'
 
 options:
-  march: riscv64-linux-gnu
+  mtriple: riscv64
   mcpu: generic-rv64
   mattr: +v
   dump-mf: on

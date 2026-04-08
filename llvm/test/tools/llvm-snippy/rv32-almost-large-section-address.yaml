@@ -1,7 +1,7 @@
 # RUN: llvm-snippy -model-plugin=None %s |& FileCheck %s
 
 options:
-  mtriple: riscv32-unknown-elf
+  mtriple: riscv32
   num-instrs: 10
 
 sections:

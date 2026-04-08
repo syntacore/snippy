@@ -1,4 +1,4 @@
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN: not llvm-snippy %s -mtriple=riscv64 \
 # RUN:    -dump-mi -num-instrs=20000 -last-instr= -model-plugin=None \
 # RUN:    |& FileCheck %s --dump-input always
 

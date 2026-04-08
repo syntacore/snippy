@@ -6,7 +6,7 @@
 # RUN: |& FileCheck %s
 
 options:
-  mtriple: riscv64-linux-gnu
+  mtriple: riscv64
   mattr: +v
   num-instrs: 1000
   dump-mf: true

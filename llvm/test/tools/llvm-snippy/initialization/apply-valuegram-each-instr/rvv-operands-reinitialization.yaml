@@ -4,7 +4,7 @@ include:
   - ../../rvv-config-histogram/Inputs/sections.yaml
 
 options:
-    mtriple: riscv64-unknown-elf
+    mtriple: riscv64
     mattr: +v
     dump-mf: on
     num-instrs: 100

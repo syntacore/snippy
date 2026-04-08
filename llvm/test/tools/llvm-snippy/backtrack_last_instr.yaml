@@ -1,5 +1,5 @@
 # RUN: llvm-snippy %s \
-# RUN:    -march=riscv64-linux-gnu \
+# RUN:    -mtriple=riscv64 \
 # RUN:    -num-instrs=10 -dump-mf -backtrack \
 # RUN:    -initial-regs-yaml=%S/initialization/Inputs/initial_state_zero.yaml \
 # RUN:    -last-instr=DIV >& %t || true \

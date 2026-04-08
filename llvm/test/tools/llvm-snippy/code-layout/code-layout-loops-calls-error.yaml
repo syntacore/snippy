@@ -1,7 +1,7 @@
 # RUN: not llvm-snippy %s |& FileCheck %s
 
 options:
-  mtriple: riscv64-linux-gnu
+  mtriple: riscv64
   num-instrs: 10
   init-regs-in-elf: true
   function-number: 3

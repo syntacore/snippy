@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %S/Inputs/loadstore-layout-4b.yaml %s -march=riscv64-linux-gnu \
+# RUN: llvm-snippy %S/Inputs/loadstore-layout-4b.yaml %s -mtriple=riscv64 \
 # RUN:  -num-instrs=1000 \
 # RUN:  --riscv-disable-misaligned-access \
 # RUN:  -dump-memory-accesses=%t.accesses >& %t.dump

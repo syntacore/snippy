@@ -4,12 +4,12 @@
 # COM: vset{i}vl{i} and whole-register loads, stores, and moves). 
 
 # RUN: llvm-snippy %S/Inputs/rvv-vill-generate-all-legal.yaml \
-# RUN:  -model-plugin=None -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None -mtriple=riscv64 -mattr=+v \
 # RUN:  -dump-mf --num-instrs=1000 -o %t \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-ILLEGAL
 
 # RUN: llvm-snippy %S/Inputs/rvv-vill-generate-all-legal.yaml \
-# RUN:  -model-plugin=None -march=riscv64-linux-gnu -mattr=+v \
+# RUN:  -model-plugin=None -mtriple=riscv64 -mattr=+v \
 # RUN:  -dump-mf --num-instrs=10000 -o %t \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-LEGAL
 

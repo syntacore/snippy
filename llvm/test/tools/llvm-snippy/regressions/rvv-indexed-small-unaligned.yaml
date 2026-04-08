@@ -1,6 +1,6 @@
 # RUN: llvm-snippy %s -model-plugin None
 options:
-  mtriple: riscv64-unknown-elf
+  mtriple: riscv64
   mattr: +v
   num-instrs: 100
   init-regs-in-elf: true

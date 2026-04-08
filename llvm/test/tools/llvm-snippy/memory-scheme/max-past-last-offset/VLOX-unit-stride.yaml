@@ -6,7 +6,7 @@
 # RUN: FileCheck %s --input-file %t.mem --check-prefix NEGATIVE-CHECK
 
 options:
-  mtriple: riscv64-unknown-elf
+  mtriple: riscv64
   mattr: +v
   num-instrs: 100
 

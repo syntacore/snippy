@@ -9,7 +9,7 @@
 # RUN: |& FileCheck %s
 
 options:
-  mtriple: "riscv64-linux-gnu"
+  mtriple: "riscv64"
   num-instrs: 100
   dump-mf: on
 

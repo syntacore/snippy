@@ -1,4 +1,4 @@
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu -mattr=+a  -backtrack -enable-address-value-hazards\
+# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+a  -backtrack -enable-address-value-hazards\
 # RUN: |& FileCheck %s
 
 sections:

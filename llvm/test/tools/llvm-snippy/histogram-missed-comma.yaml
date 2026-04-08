@@ -1,4 +1,4 @@
-# RUN: not llvm-snippy %s -march=riscv64-linux-gnu \
+# RUN: not llvm-snippy %s -mtriple=riscv64 \
 # RUN:       -model-plugin=None |& FileCheck %s
 
 sections:

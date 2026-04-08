@@ -3,7 +3,7 @@
 # COM: Check that we tracks the liveness and 'verify-mi' finishes without errors.
 
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   init-regs-in-elf: true
   num-instrs: 100
   mattr: "+f"

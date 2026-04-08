@@ -24,7 +24,7 @@ histogram:
 options:
   num-instrs: 10
   init-regs-in-elf: true
-  mtriple: riscv64-linux-gnu
+  mtriple: riscv64
   selfcheck: 1
 
 # CHECK: error: AUIPC is not supported for selfcheck

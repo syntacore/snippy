@@ -1,6 +1,6 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=100 \
+# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=100 \
 # RUN:     -verify-mi -mattr=+c -model-plugin None
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -num-instrs=100 \
+# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=100 \
 # RUN:     -verify-mi -mattr=+c -init-regs-in-elf -model-plugin None
 sections:
   - name:      1

@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -dump-mf \
+# RUN: llvm-snippy %s -mtriple=riscv64 -dump-mf \
 # RUN:   -num-instrs=1000  >& %t
 # RUN: FileCheck %s --input-file=%t --check-prefix=LD
 # RUN: FileCheck %s --input-file=%t --check-prefix=SW

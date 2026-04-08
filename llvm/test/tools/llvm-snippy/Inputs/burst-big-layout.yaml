@@ -1,5 +1,5 @@
 options:
-  march: riscv64-unknown-elf
+  mtriple: riscv64
   mattr: "+zifencei,+c,+m"
   init-regs-in-elf: true
   num-instrs: 12000

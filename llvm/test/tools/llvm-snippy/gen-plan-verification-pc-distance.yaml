@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s --march=riscv64-unknown-elf --verify-gen-plan \
+# RUN: llvm-snippy %s --mtriple=riscv64 --verify-gen-plan \
 # RUN: --num-instrs=10 --init-regs-in-elf --last-instr=RET --mattr=-c
 
 include:

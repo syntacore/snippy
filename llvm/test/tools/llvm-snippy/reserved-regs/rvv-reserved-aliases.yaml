@@ -7,7 +7,7 @@
 # RUN: |& FileCheck %s --dump-input always
 
 options:
-  march: riscv64-linux-gnu
+  mtriple: riscv64
   mcpu: generic-rv64
   mattr: +v
   dump-mf: on

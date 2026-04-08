@@ -1,8 +1,8 @@
-# RUN: llvm-snippy %s -mtriple=riscv64-unknown-gnu -model-plugin=None \
+# RUN: llvm-snippy %s -mtriple=riscv64 -model-plugin=None \
 # RUN:    -num-instrs=10 -o %t
 # RUN: llvm-readelf -S %t.elf |& FileCheck %s --check-prefix=DEFAULT_ELF
 # RUN: FileCheck %s --input-file=%t.ld --check-prefix=DEFAULT_LS
-# RUN: llvm-snippy %s -mtriple=riscv64-unknown-gnu -model-plugin=None \
+# RUN: llvm-snippy %s -mtriple=riscv64 -model-plugin=None \
 # RUN:    -num-instrs=10 -sections-prefix=snippy_sections -o %t
 # RUN: llvm-readelf -S %t.elf |& FileCheck %s --check-prefix=ELF
 # RUN: FileCheck %s --input-file=%t.ld --check-prefix=LINKER_SCRIPT

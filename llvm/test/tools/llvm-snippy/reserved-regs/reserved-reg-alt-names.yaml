@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -init-regs-in-elf \
+# RUN: llvm-snippy %s -mtriple=riscv64 -init-regs-in-elf \
 # RUN:    -dump-mi -num-instrs=2000 -reserved-regs-list=x4,s0,ra \
 # RUN:    | FileCheck %s
 

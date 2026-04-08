@@ -1,9 +1,9 @@
 # RUN: llvm-snippy %s \
-# RUN:    -march=riscv64-linux-gnu -mattr=-c,+m \
+# RUN:    -mtriple=riscv64 -mattr=-c,+m \
 # RUN:    -num-instrs=1000 -init-regs-in-elf \
 # RUN:    -o %t.1
 # RUN: llvm-snippy %s \
-# RUN:    -march=riscv64-linux-gnu -mattr=-c,+m \
+# RUN:    -mtriple=riscv64 -mattr=-c,+m \
 # RUN:    -num-instrs=1000 -init-regs-in-elf \
 # RUN:    -o %t.2
 # RUN: diff %t.1.elf %t.2.elf

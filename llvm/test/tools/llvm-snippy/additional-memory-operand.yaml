@@ -9,7 +9,7 @@
 #  corrupted, trap access fault will be generated upon reload in epilogue
 #  and last instruction(ebreak) will not be reached.
 #
-# RUN: llvm-snippy %s -march=riscv64-linux-gnu -mattr=+v \
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:  -honor-target-abi \
 # RUN:  -model-plugin=None --num-instrs=3000 -o %t
 

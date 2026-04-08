@@ -16,7 +16,7 @@
 # RUN: |& FileCheck %t.uncom-calls-uncom-cl.yaml --check-prefix=ON-STACK
 
 options:
-  mtriple: riscv64-linux-gnu
+  mtriple: riscv64
   num-instrs: 200
   init-regs-in-elf: true
   function-number: 3
