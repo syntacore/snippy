@@ -35,8 +35,9 @@ struct BurstGramData final {
   unsigned MinSize = 0;
   unsigned MaxSize = 0;
   using UniqueOpcodesTy = std::set<unsigned>;
-  using GroupingsTy = std::vector<UniqueOpcodesTy>;
-  std::optional<GroupingsTy> Groupings = std::nullopt;
+  using OpcodeGroupsTy = std::vector<UniqueOpcodesTy>;
+  std::optional<OpcodeGroupsTy> Groupings = std::nullopt;
+  std::optional<OpcodeGroupsTy> BaseRegisterGroups = std::nullopt;
   using OpcodeToNumGroupsTy = std::map<unsigned, unsigned>;
   // Returns a mapping from opcode to the number of burst groups it is used in.
   OpcodeToNumGroupsTy getOpcodeToNumBurstGroups() const {

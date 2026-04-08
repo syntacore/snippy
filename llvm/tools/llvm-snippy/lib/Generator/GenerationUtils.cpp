@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Generator/GenerationUtils.h"
+#include "snippy/Config/Config.h"
 #include "snippy/Config/RegisterAccess.h"
 #include "snippy/Generator/MemAccessInfo.h"
 #include "snippy/Generator/Policy.h"
@@ -18,6 +19,8 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/CodeGen/MachineLoopInfo.h"
 #include "llvm/Support/Debug.h"
+
+#include <functional>
 
 namespace llvm {
 namespace snippy {
@@ -586,6 +589,70 @@ collectAddressRestrictions(ArrayRef<unsigned> Opcodes,
   return OpcodeToAR;
 }
 
+using BRGroupRefTy =
+    std::reference_wrapper<const BurstGramData::UniqueOpcodesTy>;
+static BRGroupRefTy
+selectBRGroupWithOpcode(const BurstGramData::OpcodeGroupsTy &BaseRegisterGroups,
+                        unsigned Opcode) {
+  auto DoesNotContainOpcode = [&Opcode](auto GroupRef) {
+    return !GroupRef.count(Opcode);
+  };
+  auto ExpectedGroup = RandEngine::selectFromContainerFiltered(
+      BaseRegisterGroups, DoesNotContainOpcode);
+  assert(ExpectedGroup && "Each opcode must appear in at least one group");
+  return std::cref(*ExpectedGroup);
+}
+
+static unsigned
+selectBaseRegForOpcode(unsigned Opcode,
+                       std::unordered_map<unsigned, BRGroupRefTy> &RegToBRGroup,
+                       ArrayRef<unsigned> AvailableRegs) {
+  // A register is allowed for an opcode if it is bound to a base‑register
+  // group that contains the opcode, or if it is not bound to any group.
+  auto IsAllowed = [&RegToBRGroup, &Opcode](auto Reg) -> bool {
+    if (!RegToBRGroup.count(Reg))
+      return true;
+    auto GroupRef = RegToBRGroup.find(Reg)->second;
+    return GroupRef.get().count(Opcode);
+  };
+
+  auto ExpectedReg = RandEngine::selectFromContainerFiltered(
+      AvailableRegs, std::not_fn(IsAllowed));
+  if (!ExpectedReg)
+    snippy::fatal("Failed to select base register for burst group",
+                  formatv("No available registers for {0} opcode", Opcode));
+  return *ExpectedReg;
+}
+
+static std::vector<unsigned>
+generateBaseRegsForOpcodes(InstructionGenerationContext &IGC,
+                           ArrayRef<unsigned> Opcodes,
+                           ArrayRef<unsigned> AvailableRegs) {
+  std::vector<unsigned> Res(Opcodes.size());
+
+  if (!IGC.hasCfg<BurstPolicyConfig>() ||
+      !IGC.getCfg<BurstPolicyConfig>().Burst.BaseRegisterGroups) {
+    std::generate(Res.begin(), Res.end(), [&AvailableRegs]() {
+      return RandEngine::selectFromContainer(AvailableRegs);
+    });
+    return Res;
+  }
+
+  const auto &BaseRegsGroups =
+      *IGC.getCfg<BurstPolicyConfig>().Burst.BaseRegisterGroups;
+  std::unordered_map<unsigned, BRGroupRefTy> RegToBRGroup;
+  transform(Opcodes, Res.begin(), [&](auto Opcode) {
+    auto Reg = selectBaseRegForOpcode(Opcode, RegToBRGroup, AvailableRegs);
+    // Bind the selected register to some base-register-group that
+    // contains this opcode
+    if (!RegToBRGroup.count(Reg))
+      RegToBRGroup.emplace(Reg,
+                           selectBRGroupWithOpcode(BaseRegsGroups, Opcode));
+    return Reg;
+  });
+  return Res;
+}
+
 std::vector<unsigned>
 generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
                  ArrayRef<unsigned> Opcodes) {
@@ -677,11 +744,7 @@ generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
   // (`BaseRegToAI` as we've already had a mapping from opcode index to the base
   // register). Gathered information gives us restriction on the offset
   // immediate for each base register for each opcode.
-  std::vector<unsigned> OpcodeIdxToBaseReg(Opcodes.size());
-  std::generate(
-      OpcodeIdxToBaseReg.begin(), OpcodeIdxToBaseReg.end(),
-      [&AddrRegs]() { return RandEngine::selectFromContainer(AddrRegs); });
-  return OpcodeIdxToBaseReg;
+  return generateBaseRegsForOpcodes(InstrGenCtx, Opcodes, AddrRegs);
 }
 
 // Collect addresses that will meet the specified restrictions. We call such
