@@ -57,19 +57,22 @@ void yaml::ScalarEnumerationTraits<BurstMode>::enumeration(yaml::IO &IO,
 }
 
 template <> struct yaml::MappingTraits<BurstGramData> {
-  struct NormalizedGroupings final {
-    std::vector<SList> Groupings;
+  enum class GroupKinds { Groupings, BaseRegisterGroups };
 
-    NormalizedGroupings(yaml::IO &) {}
+  template <GroupKinds Kind> struct NormalizedOpcodeGroups final {
+    std::vector<SList> OpcodeGroups;
 
-    NormalizedGroupings(
-        yaml::IO &IO, const std::optional<BurstGramData::GroupingsTy> &Denorm) {
+    NormalizedOpcodeGroups(yaml::IO &) {}
+
+    NormalizedOpcodeGroups(
+        yaml::IO &IO,
+        const std::optional<BurstGramData::OpcodeGroupsTy> &Denorm) {
       if (Denorm.has_value()) {
         void *Ctx = IO.getContext();
         assert(Ctx && "To parse or output BurstGram provide ConfigIOContext as "
                       "context for yaml::IO");
         const auto &OpCC = static_cast<const ConfigIOContext *>(Ctx)->OpCC;
-        transform(*Denorm, std::back_inserter(Groupings),
+        transform(*Denorm, std::back_inserter(OpcodeGroups),
                   [&OpCC](const auto &Set) {
                     SList Res;
                     transform(Set, std::back_inserter(Res),
@@ -81,14 +84,38 @@ template <> struct yaml::MappingTraits<BurstGramData> {
       }
     }
 
-    std::optional<BurstGramData::GroupingsTy> denormalize(yaml::IO &IO) {
-      BurstGramData::GroupingsTy Denorm;
+    BurstGramData::OpcodeGroupsTy
+    getKindDependentGroups(const BurstGramData::OpcodeGroupsTy &Denorm,
+                           const OpcodeHistogram &Hist,
+                           const OpcodeCache &OpCC) const {
+      if constexpr (Kind == GroupKinds::Groupings)
+        return {};
+      else {
+        assert(Kind == GroupKinds::BaseRegisterGroups);
+        auto IsNotContainedInAnyGroup = [&Denorm](auto Opcode) {
+          return all_of(Denorm, [&Opcode](const auto &Group) {
+            return !Group.count(Opcode);
+          });
+        };
+        auto NotSpecifiedOpcodes = make_filter_range(
+            make_first_range(Hist.topOpcodes()), IsNotContainedInAnyGroup);
+        return {BurstGramData::UniqueOpcodesTy(NotSpecifiedOpcodes.begin(),
+                                               NotSpecifiedOpcodes.end())};
+      }
+    }
+
+    std::optional<BurstGramData::OpcodeGroupsTy> denormalize(yaml::IO &IO) {
+      if (OpcodeGroups.empty())
+        return std::nullopt;
+      BurstGramData::OpcodeGroupsTy Denorm;
       void *Ctx = IO.getContext();
       assert(Ctx && "To parse or output BurstGram provide ConfigIOContext as "
                     "context for yaml::IO");
-      const auto &OpCC = static_cast<const ConfigIOContext *>(Ctx)->OpCC;
+      const auto &CfgCtx = *static_cast<const ConfigIOContext *>(Ctx);
+      const auto &OpCC = CfgCtx.OpCC;
+      const auto &Hist = CfgCtx.Histogram;
       transform(
-          Groupings, std::back_inserter(Denorm), [&OpCC](const auto &Vec) {
+          OpcodeGroups, std::back_inserter(Denorm), [&OpCC](const auto &Vec) {
             std::set<unsigned> Res;
             transform(Vec, std::inserter(Res, Res.end()),
                       [OpCC](const std::string &Name) {
@@ -102,8 +129,7 @@ template <> struct yaml::MappingTraits<BurstGramData> {
                       });
             return Res;
           });
-      if (Denorm.empty())
-        return std::nullopt;
+      append_range(Denorm, getKindDependentGroups(Denorm, Hist, OpCC));
       return Denorm;
     }
   };
@@ -112,10 +138,15 @@ template <> struct yaml::MappingTraits<BurstGramData> {
     IO.mapRequired("min-size", Burst.MinSize);
     IO.mapRequired("max-size", Burst.MaxSize);
     IO.mapRequired("mode", Burst.Mode);
-    yaml::MappingNormalization<NormalizedGroupings,
-                               std::optional<BurstGramData::GroupingsTy>>
+    yaml::MappingNormalization<NormalizedOpcodeGroups<GroupKinds::Groupings>,
+                               std::optional<BurstGramData::OpcodeGroupsTy>>
         Keys(IO, Burst.Groupings);
-    IO.mapOptional("groupings", Keys->Groupings);
+    IO.mapOptional("groupings", Keys->OpcodeGroups);
+    yaml::MappingNormalization<
+        NormalizedOpcodeGroups<GroupKinds::BaseRegisterGroups>,
+        std::optional<BurstGramData::OpcodeGroupsTy>>
+        BaseRegsNorm(IO, Burst.BaseRegisterGroups);
+    IO.mapOptional("base-register-groups", BaseRegsNorm->OpcodeGroups);
   }
 
   static std::string validate(yaml::IO &IO, BurstGramData &Burst) {
@@ -1007,6 +1038,10 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
   yaml::MappingTraits<MemoryScheme>::mapping(IO, Info.CommonPolicyCfg->MS);
   IO.mapOptional("branches", Info.PassCfg.Branches);
 
+  mapOpcodeHistogram(IO, Info);
+
+  // Map burst after the opcode histogram, since it may require generating an
+  // implicit base‑register group.
   // TODO: get rid of this.
   if (!IO.outputting()) {
     std::optional<BurstGramData> BurstData;
@@ -1020,7 +1055,6 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
       IO.mapRequired("burst", Info.BurstConfig->Burst);
   }
 
-  mapOpcodeHistogram(IO, Info);
   IO.mapOptional("selfcheck", Info.CommonPolicyCfg->TrackCfg.Selfcheck);
 
   yaml::MappingNormalization<ImmediateHistogramNormalization,
