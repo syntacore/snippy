@@ -1,39 +1,42 @@
 # REQUIRES: riscv-rvv
-# COM: This test checks that VL can't be negative.
+# COM: This test checks that if vlmax is selected, only vlmax values are
+#      generated.
 
-# RUN: not llvm-snippy %s \
+# RUN: llvm-snippy %s \
 # RUN: |& FileCheck %s
 
 options:
   mtriple: riscv64
-  mcpu: generic-rv64
   mattr: +v
   num-instrs: 100
+  dump-mf: on
 
 include:
-- "Inputs/sections.yaml"
+- Inputs/sections.yaml
 
 riscv-vector-unit:
   mode-distribution:
     VM:
       - [any_legal, 1.0]
     VL:
-      - [-1, 1.0]
+      - [vlmax, 1.0]
     VXRM:
       rnu: 1.0
     VTYPE:
       SEW:
         sew_32: 1.0
       LMUL:
-        m8: 1.0
+        m4: 1.0
       VMA:
         mu: 1.0
       VTA:
         tu: 1.0
 
 histogram:
-       - [VADD_VV, 1.0]
        - [VSETIVLI, 1.0]
+       - [VADD_VV, 1.0]
 
-# CHECK: error: VL can't be negative: -1
+# vlmax = VLEN * LMUL / SEW = 128 * 4 / 32 = 16
+# CHECK: VSETIVLI 16
+# CHECK-NOT: VSETIVLI {{([^1]|1[^6])+}}
 
