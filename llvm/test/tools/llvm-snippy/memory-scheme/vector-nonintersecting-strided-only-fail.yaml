@@ -13,17 +13,17 @@ options:
   init-regs-in-elf: true
   verify-mi: true
 sections:
-  - no: 1
+  - name: 1
     VMA: 0x80000000
     SIZE: 0x00400000
     LMA: 0x80000000
     ACCESS: rx
-  - no: 2
+  - name: 2
     VMA: 0x80600000
     SIZE: 0x00400000
     LMA: 0x80600000
     ACCESS: r
-  - no: 3
+  - name: 3
     VMA: 0x81000000
     SIZE: 0x00400000
     LMA: 0x81000000

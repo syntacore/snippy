@@ -88,7 +88,7 @@ collectSectionsWithAccess(Interpreter &I, StringRef Selector) {
                });
   auto Mapped = map_range(SuitableSectDesc, [](const SectionDesc &SectDesc) {
     return NamedMemoryRange{SectDesc.VMA, SectDesc.VMA + SectDesc.Size,
-                            SectDesc.getIDString()};
+                            SectDesc.getName().str()};
   });
   return {Mapped.begin(), Mapped.end()};
 }
