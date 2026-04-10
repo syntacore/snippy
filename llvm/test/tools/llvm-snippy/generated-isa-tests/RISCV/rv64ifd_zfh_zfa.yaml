@@ -1,5 +1,5 @@
 # generated with isa-tests-gen.sh, to regenerate run:
-# isa-tests-gen.sh --march rv64ifd_zfh_zfa --mtriple riscv64 --extensions zfa\ -\ c\ -\ f --include Inputs/no-fpu-overwrite.yaml
+# isa-tests-gen.sh --march rv64ifd_zfh_zfa --mtriple riscv64 --extensions zfa\ -\ c\ -\ f --ignore-opcode-regex \^FLEQ_Q\$\|\^FLI_Q\$\|\^FLT_Q\$\|\^FLTQ_Q\$\|\^FMAXM_Q\$\|\^FMINM_Q\$\|\^FMVH_X_Q\$\|\^FMVP_Q_X\$\|\^FROUNDNX_Q\$\|\^FROUND_Q\$ --include Inputs/no-fpu-overwrite.yaml
 # RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail
 include:
   - "Inputs/sections.yaml"
