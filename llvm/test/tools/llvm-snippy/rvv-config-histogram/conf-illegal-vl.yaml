@@ -1,8 +1,8 @@
 # REQUIRES: riscv-rvv
 # COM: This test checks that VL can't be illegal.
 
-# RUN: not llvm-snippy %s \ 
-# RUN: |& FileCheck %s 
+# RUN: not llvm-snippy %s \
+# RUN: |& FileCheck %s
 
 options:
   mtriple: riscv64
@@ -30,10 +30,10 @@ riscv-vector-unit:
         mu: 1.0
       VTA:
         tu: 1.0
- 
+
 histogram:
        - [VADD_VV, 1.0]
-         
+       - [VSETIVLI, 1.0]
 
 # CHECK: error: Illegal IMM-based VL: IllegalVL:D
 

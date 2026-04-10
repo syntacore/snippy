@@ -1,14 +1,15 @@
 # REQUIRES: riscv-rvv
-# COM: This test checks that VL can't be negative.
+# COM: This test checks that if all vlmax values > max possible value for
+#      VSETIVLI (31), vlmax generator is discarded.
 
 # RUN: not llvm-snippy %s \
 # RUN: |& FileCheck %s
 
 options:
-  mtriple: riscv64
+  march: riscv64
   mcpu: generic-rv64
   mattr: +v
-  num-instrs: 100
+  num-instrs: 10
 
 include:
 - "Inputs/sections.yaml"
@@ -18,7 +19,7 @@ riscv-vector-unit:
     VM:
       - [any_legal, 1.0]
     VL:
-      - [-1, 1.0]
+      - [vlmax, 1.0]
     VXRM:
       rnu: 1.0
     VTYPE:
@@ -32,8 +33,10 @@ riscv-vector-unit:
         tu: 1.0
 
 histogram:
-       - [VADD_VV, 1.0]
        - [VSETIVLI, 1.0]
+       - [VADD_VV, 1.0]
 
-# CHECK: error: VL can't be negative: -1
+# CHECK: error: RVV Config: no legal configuration detected and Pvill != 1,
+# CHECK-SAME: aborting. All RVV configurations from the riscv-vector-unit are
+# CHECK-SAME: incompatible with all VL generators
 

@@ -39,6 +39,6 @@ histogram:
        - [VSETIVLI, 1.0]
        - [VADD_VV, 1.0]
          
-# CHECK: error: All RVV configuration-compatible VLs exceeds the maximum VL 31 
-#        for the selected instruction VSETIVLI
+# CHECK: All RVV configurations from the riscv-vector-unit are incompatible
+# CHECK-SAME: with all VL generators
 
