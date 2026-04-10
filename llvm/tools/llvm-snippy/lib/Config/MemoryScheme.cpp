@@ -1279,31 +1279,7 @@ yaml::QuotingType yaml::ScalarTraits<AccMask>::mustQuote(StringRef) {
 
 void yaml::MappingTraits<snippy::SectionDesc>::mapping(
     yaml::IO &Io, snippy::SectionDesc &Info) {
-  if (!Io.outputting()) {
-    std::optional<int> NumberFromNo;
-    std::optional<std::string> NumberFromName;
-
-    Io.mapOptional("no", NumberFromNo);
-    Io.mapOptional("name", NumberFromName);
-
-    if (!NumberFromNo && !NumberFromName) {
-      Io.setError("There is a section in the layout file that does not have "
-                  "'no' key, nor 'name'.");
-    } else if (NumberFromNo && NumberFromName) {
-      Io.setError("There is a section in the layout file that has both "
-                  "'no' and 'name' keys.");
-    } else {
-      using IDType = decltype(Info.ID);
-      Info.ID = NumberFromName.has_value() ? IDType(NumberFromName.value())
-                                           : IDType(NumberFromNo.value());
-    }
-  } else {
-    std::visit(snippy::OverloadedCallable{
-                   [&](StringRef Name) { Io.mapRequired("name", Name); },
-                   [&](int Index) { Io.mapRequired("no", Index); }},
-               Info.ID);
-  }
-
+  Io.mapRequired("name", Info.ID);
   CREATE_HEX_NORMALIZATION(Info, VMA);
   CREATE_HEX_NORMALIZATION(Info, Size);
   CREATE_HEX_NORMALIZATION(Info, LMA);

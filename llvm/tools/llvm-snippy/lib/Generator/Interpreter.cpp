@@ -316,11 +316,11 @@ Interpreter::getSectionPosition(StringRef SectionName) const {
   const auto &Sections = Env.Sections;
   auto S = std::find_if(Sections.begin(), Sections.end(),
                         [SectionName](const auto &CurSection) {
-                          return CurSection.getIDString() == SectionName;
+                          return CurSection.getName() == SectionName;
                         });
   if (S == Sections.end())
     return std::nullopt;
-  return {NamedMemoryRange{S->VMA, S->VMA + S->Size, S->getIDString()}};
+  return {NamedMemoryRange{S->VMA, S->VMA + S->Size, S->getName().str()}};
 }
 
 void Interpreter::dumpRanges(ArrayRef<NamedMemoryRange> Ranges,
