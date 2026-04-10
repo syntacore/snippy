@@ -3333,6 +3333,13 @@ reachable RVV configurations for the snippet:
          match the one provided there. Consider the description above
          when setting ``max_encodable`` as the ``VL`` value.
 
+   -  ``vlmax`` |nbsp| -- |nbsp| Compliant with RVV specification value:
+      ``vlmax`` = ``LMUL`` * ``VLEN`` / ``SEW``. It behaves the same as
+      ``max_encodable``, but it will not be selected if according to current
+      sutuation ``vlmax`` can not be selected (for example, to change the RVV
+      mode, opcode ``VSETIVLI`` is selected, where the maximum ``vl`` value that
+      fits into the encoding is 31, and ``vlmax`` is greater than 31).
+
    -  ``any_legal`` |nbsp| -- |nbsp| Allows any legal value given the selected RVV mode
       and the mode-changing instruction.
 
