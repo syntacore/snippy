@@ -397,7 +397,7 @@ bool PrologueEpilogueInsertion::insertPrologue(
   std::string Message;
   llvm::raw_string_ostream OS{Message};
   OS << "Function '" << MF.getName() << "' won't fit into assigned section '"
-     << SectionInfo.getIDString() << "' of size " << SectionInfo.Size
+     << SectionInfo.getName() << "' of size " << SectionInfo.Size
      << " after prologue insertion\n";
   OS << "Total function size: " << FSize << "; Prologue size: " << PrologueSize;
   snippy::fatal(StringRef(Message));
@@ -475,7 +475,7 @@ bool PrologueEpilogueInsertion::insertEpilogue(
   std::string Message;
   llvm::raw_string_ostream OS{Message};
   OS << "Function '" << MF.getName() << "' won't fit into assigned section '"
-     << SectionInfo.getIDString() << "' of size " << SectionInfo.Size
+     << SectionInfo.getName() << "' of size " << SectionInfo.Size
      << " after epilogue insertion\n";
   OS << "Total function size: " << FSize << "; Epilogue size: " << EpilogueSize;
   snippy::fatal(StringRef(Message));
