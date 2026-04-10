@@ -1,0 +1,190 @@
+tests:
+- filename: rv32i_zicond.yaml
+  description: rv32 tests for zicond extension
+  march: rv32i_zicond
+  mtriple: riscv32
+  extensions: zicond
+- filename: rv32i_zabha.yaml
+  description: rv32 tests for zabha extension
+  march: rv32i_zabha
+  mtriple: riscv32
+  num_instructions: 2000
+  extensions: zabha - zaamo - zacas
+- filename: rv64i_zksed.yaml
+  description: rv64 tests for zksed extension
+  march: rv64i_zksed
+  mtriple: riscv64
+  extensions: zksed
+- filename: rv64ifd_zfh_zfa.yaml
+  description: rv64 tests for zfa extension
+  march: rv64ifd_zfh_zfa
+  mtriple: riscv64
+  extensions: zfa - c - f
+  ignore-opcode-regex: ^FLEQ_Q$|^FLI_Q$|^FLT_Q$|^FLTQ_Q$|^FMAXM_Q$|^FMINM_Q$|^FMVH_X_Q$|^FMVP_Q_X$|^FROUNDNX_Q$|^FROUND_Q$
+  include:
+  - Inputs/no-fpu-overwrite.yaml
+- filename: rv32i_zba_zbb_zbc_zbs.yaml
+  description: rv32 tests for bitmanip
+  march: rv32i_zba_zbb_zbc_zbs
+  mtriple: riscv32
+  extensions: zba + zbb + zbc + zbs - zcb
+- filename: rv32i_zdinx_zhinxmin.yaml
+  description: rv32 tests
+  march: rv32i_zdinx_zhinxmin
+  mtriple: riscv32
+  extensions: zhinxmin - zfinx
+- filename: rv64i_zcb_zca_zmmul_zbb_zba.yaml
+  march: rv64i_zcb_zca_zmmul_zbb_zba
+  mtriple: riscv64
+  extensions: zcb - zca
+- filename: rv64i_zimop.yaml
+  march: rv64i_zimop
+  mtriple: riscv64
+  extensions: zimop
+- filename: rv32i_zcmop.yaml
+  march: rv32i_zcmop
+  mtriple: riscv32
+  extensions: zcmop - c - zicfiss
+- filename: rv32if_zcf.yaml
+  march: rv32if_zcf
+  mtriple: riscv32
+  extensions: zcf&c - zca
+- filename: rv32i_zaamo.yaml
+  march: rv32i_zaamo
+  mtriple: riscv32
+  extensions: zaamo
+- filename: rv32i_zacas.yaml
+  march: rv32i_zacas
+  mtriple: riscv32
+  extensions: zacas - zaamo - zabha
+- filename: rv32i_zcb_zca_zmmul_zbb_zba.yaml
+  march: rv32i_zcb_zca_zmmul_zbb_zba
+  mtriple: riscv32
+  extensions: zcb - zca
+- filename: rv32i_zhinx_zfinx.yaml
+  march: rv32i_zhinx_zfinx
+  mtriple: riscv32
+  extensions: zfinx + zhinx
+  ignore-opcode-regex: ^FCVT_H_D_IN32X$|^FCVT_D_H_IN32X$
+  include:
+  - Inputs/no-fpu-overwrite.yaml
+- filename: rv32i_zicbom.yaml
+  march: rv32i_zicbom
+  mtriple: riscv32
+  extensions: zicbom
+- filename: rv32i_zicbop.yaml
+  march: rv32i_zicbop
+  mtriple: riscv32
+  extensions: zicbop
+- filename: rv32i_zicboz.yaml
+  march: rv32i_zicboz
+  mtriple: riscv32
+  extensions: zicboz
+- filename: rv32i_zimop.yaml
+  march: rv32i_zimop
+  mtriple: riscv32
+  extensions: zimop
+- filename: rv32i_zksed.yaml
+  march: rv32i_zksed
+  mtriple: riscv32
+  extensions: zksed
+- filename: rv32i_zksh.yaml
+  march: rv32i_zksh
+  mtriple: riscv32
+  extensions: zksh
+- filename: rv32if_zfh_zfbfmin.yaml
+  march: rv32if_zfh_zfbfmin
+  mtriple: riscv32
+  extensions: zfbfmin - f
+- filename: rv32ifd_zca_zcd.yaml
+  march: rv32ifd_zca_zcd
+  mtriple: riscv32
+  extensions: zca + zcf&c - d
+  ignore-opcode-regex: ^C_(J|JR|JAL|JALR|UNIMP|BEQZ|BNEZ|EBREAK)$
+- filename: rv32ifd_zcd.yaml
+  march: rv32ifd_zcd
+  mtriple: riscv32
+  extensions: zcd&c&d - zcf
+- filename: rv32ifd_zfh_zfa.yaml
+  march: rv32ifd_zfh_zfa
+  mtriple: riscv32
+  extensions: zfa - c - f
+  ignore-opcode-regex: ^FLEQ_Q$|^FLI_Q$|^FLT_Q$|^FLTQ_Q$|^FMAXM_Q$|^FMINM_Q$|^FMVH_X_Q$|^FMVP_Q_X$|^FROUNDNX_Q$|^FROUND_Q$
+  include:
+  - Inputs/no-fpu-overwrite.yaml
+- filename: rv64i_zaamo.yaml
+  march: rv64i_zaamo
+  mtriple: riscv64
+  extensions: zaamo
+  num_instructions: 2000
+- filename: rv64i_zabha.yaml
+  march: rv64i_zabha
+  mtriple: riscv64
+  extensions: zabha - zaamo - zacas
+  num_instructions: 2000
+- filename: rv64i_zacas.yaml
+  march: rv64i_zacas
+  mtriple: riscv64
+  extensions: zacas - zaamo - zabha
+- filename: rv64i_zba_zbb_zbc_zbs.yaml
+  description: rv64 tests for bitmanip
+  march: rv64i_zba_zbb_zbc_zbs
+  mtriple: riscv64
+  extensions: zba + zbb + zbc + zbs - zcb
+- filename: rv64i_zcmop.yaml
+  march: rv64i_zcmop
+  mtriple: riscv64
+  extensions: zcmop - c - zicfiss
+- filename: rv64i_zdinx_zhinxmin.yaml
+  march: rv64i_zdinx_zhinxmin
+  mtriple: riscv64
+  extensions: zhinxmin - zfinx
+- filename: rv64i_zhinx_zfinx_zdinx.yaml
+  march: rv64i_zhinx_zfinx_zdinx
+  mtriple: riscv64
+  extensions: zfinx + zdinx + zhinx
+  ignore-opcode-regex: ^FCVT_H_D_IN32X$|^FCVT_D_H_IN32X$
+  include:
+  - Inputs/no-fpu-overwrite.yaml
+- filename: rv64i_zicbom.yaml
+  march: rv64i_zicbom
+  mtriple: riscv64
+  extensions: zicbom
+- filename: rv64i_zicbop.yaml
+  march: rv64i_zicbop
+  mtriple: riscv64
+  extensions: zicbop
+- filename: rv64i_zicboz.yaml
+  march: rv64i_zicboz
+  mtriple: riscv64
+  extensions: zicboz
+- filename: rv64i_zicond.yaml
+  description: rv64 tests for zicond extension
+  march: rv64i_zicond
+  mtriple: riscv64
+  extensions: zicond
+- filename: rv64i_zksh.yaml
+  march: rv64i_zksh
+  mtriple: riscv64
+  extensions: zksh
+- filename: rv64if_zfh_zfbfmin.yaml
+  march: rv64if_zfh_zfbfmin
+  mtriple: riscv64
+  extensions: zfbfmin - f
+- filename: rv64ifd_zca_zcd.yaml
+  march: rv64ifd_zca_zcd
+  mtriple: riscv64
+  extensions: zca + zcf&c - d
+  ignore-opcode-regex: ^C_(J|JR|JAL|JALR|UNIMP|BEQZ|BNEZ|EBREAK)$
+- filename: rv64ifd_zcd.yaml
+  march: rv64ifd_zcd
+  mtriple: riscv64
+  extensions: zcd&c&d - zcf
+- filename: rv64ifd_zfa.yaml
+  march: rv64ifd_zfa
+  mtriple: riscv64
+  extensions: zfa - c - f
+  ignore-opcode-regex: ^[A-Z]+_(H)$|^FLEQ_Q$|^FLI_Q$|^FLT_Q$|^FLTQ_Q$|^FMAXM_Q$|^FMINM_Q$|^FMVH_X_Q$|^FMVP_Q_X$|^FROUNDNX_Q$|^FROUND_Q$
+  include:
+  - Inputs/no-fpu-overwrite.yaml
+  
