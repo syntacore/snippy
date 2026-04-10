@@ -1565,40 +1565,6 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
   if (Sections.generalRWSections().empty() && NeedsGeneralRWSection)
     fatal(Ctx, "Incorrect list of sections",
           "there are no general purpose RW sections");
-  // Folowing check is for situations like this:
-  //
-  //
-  // sections:
-  //    - no: 1
-  //      VMA: 0x1000
-  //      SIZE: 0x1000
-  //      LMA: 0x1000
-  //      ACCESS: rx
-  //    - name: 1
-  //      VMA: 0x2000
-  //      SIZE: 0x1000
-  //      LMA: 0x1000
-  //      ACCESS: rw
-  //
-  // -------------
-  //
-  // Technically those are different IDs, because one is int(1) and another is
-  // string("1"). But those IDs have identical getIDString() output which is
-  // disallowed.
-  for (auto &&Section : Sections) {
-    auto FoundSameIDString = std::find_if(
-        Sections.begin(), Sections.end(), [&Section](auto &&AnotherSec) {
-          return Section.ID != AnotherSec.ID &&
-                 Section.getIDString() == AnotherSec.getIDString();
-        });
-    if (FoundSameIDString != Sections.end()) {
-      auto IDString = Section.getIDString();
-      snippy::fatal(Ctx, "Incorrect list of sections",
-                    "List contains both numbered section #" + Twine(IDString) +
-                        " and named section with same name.");
-    }
-  }
-
   if (std::any_of(Sections.begin(), Sections.end(), [&Sections](auto &S1) {
         return std::count_if(Sections.begin(), Sections.end(),
                              [&S1](auto &S2) { return S2.ID == S1.ID; }) != 1;
@@ -1613,8 +1579,8 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
          ++SecIt) {
       if (SecIt->interfere(*std::next(SecIt))) {
         std::stringstream SS;
-        SS << "section " << SecIt->getIDString() << " and section "
-           << std::next(SecIt)->getIDString() << " are interfering";
+        SS << "section " << SecIt->getName().str() << " and section "
+           << std::next(SecIt)->getName().str() << " are interfering";
         snippy::fatal(Ctx, "Incorrect list of sections", SS.str());
       }
     }

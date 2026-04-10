@@ -14,17 +14,17 @@ options:
   reserved-regs-list: ["X(1|[3-9]|[12][0-9]|3[01])"]
 
 sections:
-    - no:        0
+    - name:      0
       VMA:       0x2100000
       SIZE:      0x11000
       LMA:       0x2100000
       ACCESS:    r
-    - no:        1
+    - name:      1
       VMA:       0x2004000
       SIZE:      0xF2000
       LMA:       0x2004000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x100
       SIZE:      0x80
       LMA:       0x100

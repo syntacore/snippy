@@ -11,7 +11,7 @@
 /// Classes to handle memory accesses and scheme. Read from file.
 ///
 /// sections:
-///     - no:        1
+///     - name:      1
 ///       VMA:       0x2000000
 ///       SIZE:      0x400000
 ///       LMA:       0x2000000
@@ -611,58 +611,31 @@ struct AccMask {
 };
 
 struct SectionDesc {
-  std::variant<int, std::string> ID;
+  static constexpr StringRef DefaultSectionName = "0";
+
+  std::string ID;
   size_t VMA;
   size_t Size;
   size_t LMA;
   AccMask M;
   std::optional<std::string> Phdr;
 
-  SectionDesc(int Num = 0, size_t VMAIn = 0, size_t SizeIn = 0,
-              size_t LMAIn = 0, AccMask Mask = Permissions::RWX,
-              std::optional<std::string> Phdr = std::nullopt)
-      : ID(Num), VMA(VMAIn), Size(SizeIn), LMA(LMAIn), M(Mask),
-        Phdr{std::move(Phdr)} {}
-
-  SectionDesc(StringRef Name, size_t VMAIn = 0, size_t SizeIn = 0,
-              size_t LMAIn = 0, AccMask Mask = Permissions::RWX,
-              std::optional<std::string> Phdr = std::nullopt)
-      : ID(std::string(Name)), VMA(VMAIn), Size(SizeIn), LMA(LMAIn), M(Mask),
-        Phdr{std::move(Phdr)} {}
-
-  SectionDesc(std::variant<int, std::string> ID, size_t VMAIn = 0,
+  SectionDesc(StringRef Name = DefaultSectionName, size_t VMAIn = 0,
               size_t SizeIn = 0, size_t LMAIn = 0,
               AccMask Mask = Permissions::RWX,
               std::optional<std::string> Phdr = std::nullopt)
-      : ID(ID), VMA(VMAIn), Size(SizeIn), LMA(LMAIn), M(Mask),
+      : ID(std::string(Name)), VMA(VMAIn), Size(SizeIn), LMA(LMAIn), M(Mask),
         Phdr{std::move(Phdr)} {}
 
   bool interfere(SectionDesc const &another) const {
     if (VMA >= another.VMA + another.Size || VMA + Size <= another.VMA)
       return false;
-    else
-      return true;
+    return true;
   }
 
   bool hasPhdr() const { return Phdr.has_value(); }
-  bool isNamed() const { return std::holds_alternative<std::string>(ID); }
 
-  StringRef getName() const {
-    assert(isNamed() && "cannot get section name: section ID is int");
-    return std::get<std::string>(ID);
-  }
-
-  int getNumber() const {
-    assert(!isNamed() && "cannot get section number: this is named section");
-    return std::get<int>(ID);
-  }
-
-  std::string getIDString() const {
-    if (isNamed())
-      return std::string(getName());
-    else
-      return std::to_string(getNumber());
-  }
+  StringRef getName() const { return ID; }
 
   StringRef getPhdr() const {
     assert(hasPhdr() && "Section does not have a phdr.");
@@ -707,7 +680,7 @@ struct SectionsDescriptions : private std::vector<SectionDesc> {
     return make_filter_range(*this, [](auto &Sec) {
       auto Access = Sec.M;
       return Access.R() && Access.W() &&
-             (!Sec.isNamed() || !isSpecializedSectionName(Sec.getName()));
+             !isSpecializedSectionName(Sec.getName());
     });
   };
   static constexpr const char *StackSectionName = "stack";
@@ -722,24 +695,21 @@ struct SectionsDescriptions : private std::vector<SectionDesc> {
            Name == UtilitySectionName;
   }
   bool hasSection(StringRef Name) const {
-    return std::any_of(begin(), end(), [Name](auto &S) {
-      return S.isNamed() && Name == S.getName();
-    });
+    return std::any_of(begin(), end(),
+                       [Name](auto &S) { return Name == S.getName(); });
   }
 
   auto &getSection(StringRef Name) const {
     assert(hasSection(Name) && "No section with given name");
-    auto Found = std::find_if(begin(), end(), [Name](auto &S) {
-      return S.isNamed() && Name == S.getName();
-    });
+    auto Found = std::find_if(begin(), end(),
+                              [Name](auto &S) { return Name == S.getName(); });
     return *Found;
   }
 
   auto &getSection(StringRef Name) {
     assert(hasSection(Name) && "No section with given name");
-    auto Found = std::find_if(begin(), end(), [Name](auto &S) {
-      return S.isNamed() && Name == S.getName();
-    });
+    auto Found = std::find_if(begin(), end(),
+                              [Name](auto &S) { return Name == S.getName(); });
     return *Found;
   }
 
@@ -773,20 +743,19 @@ void diagnoseXSections(LLVMContext &Ctx, SecIt SectionsStart, SecIt SectionsFin,
     if (!Access.R()) {
       snippy::warn(
           WarningName::MemoryAccess, Ctx, "Incorrect section",
-          "The executable section " + Twine(ExecSection.getIDString()) +
+          "The executable section " + Twine(ExecSection.getName()) +
               " has not R access mode. Implicitly consider it like RX...");
     }
     if (Access.W()) {
       snippy::warn(
           WarningName::MemoryAccess, Ctx, "Incorrect section",
-          "The executable section " + Twine(ExecSection.getIDString()) +
+          "The executable section " + Twine(ExecSection.getName()) +
               " has also W access mode. Snippy does not support SMC for now");
     }
 
     if (ExecSection.VMA % Alignment)
       snippy::fatal(Ctx, "Incorrect section",
-                    "The executable section '" +
-                        Twine(ExecSection.getIDString()) +
+                    "The executable section '" + Twine(ExecSection.getName()) +
                         "' must be aligned to " + Twine(Alignment) +
                         " according to specified config");
   }

@@ -135,16 +135,6 @@ public:
   void setStartPC(uint64_t Addr) { StartPC = Addr; }
   auto getStartPC() const { return StartPC; }
 
-  auto getMaxSectionID() const {
-    auto Unnamed = llvm::make_filter_range(
-        Sections,
-        +[](const SectionEntry &S) { return !S.OutputSection.Desc.isNamed(); });
-    auto IDs = llvm::map_range(
-        Unnamed, [](auto &S) { return S.OutputSection.Desc.getNumber(); });
-    auto MaxId = std::max_element(IDs.begin(), IDs.end());
-    return MaxId == IDs.end() ? 0 : *MaxId;
-  }
-
   // Returns mangled name for supposed section with name SectionName.
   // This is the name that section will have in resulted elf image.
   std::string getMangledName(StringRef SectionName) const;
