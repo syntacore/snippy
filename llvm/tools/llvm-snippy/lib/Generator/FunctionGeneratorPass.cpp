@@ -326,12 +326,11 @@ checkForUnusedRXSections(const Linker::LinkedSections &Sections,
   auto UnusedRXSections =
       llvm::make_filter_range(Sections, [&DefaultCodeSection](auto &S) {
         return S.OutputSection.Desc.M.X() &&
-               S.OutputSection.Desc.getIDString() !=
-                   DefaultCodeSection.Desc.getIDString();
+               S.OutputSection.Desc.getName() !=
+                   DefaultCodeSection.Desc.getName();
       });
-  auto UnusedRXSectionNames = llvm::map_range(UnusedRXSections, [](auto &S) {
-    return S.OutputSection.Desc.getIDString();
-  });
+  auto UnusedRXSectionNames = llvm::map_range(
+      UnusedRXSections, [](auto &S) { return S.OutputSection.Desc.getName(); });
   if (!UnusedRXSectionNames.empty())
     reportUnusedRXSectionWarning(Ctx, UnusedRXSectionNames);
 }
@@ -364,8 +363,8 @@ void FunctionGenerator::initExecutionPath() {
     if (PassCfg.InstrsGenerationConfig.ChainedRXSorted) {
       std::sort(ExecutionPath.begin(), ExecutionPath.end(),
                 [](auto &LHS, auto &RHS) {
-                  return LHS.OutputSection.Desc.getIDString() <
-                         RHS.OutputSection.Desc.getIDString();
+                  return LHS.OutputSection.Desc.getName() <
+                         RHS.OutputSection.Desc.getName();
                 });
     } else
       RandEngine::shuffle(ExecutionPath.begin(), ExecutionPath.end());
