@@ -13,17 +13,17 @@ options:
   init-regs-in-elf: true
 
 sections:
-    - no:        0
+    - name:      0
       VMA:       0x2100000
       SIZE:      0x110000
       LMA:       0x2100000
       ACCESS:    r
-    - no:        1
+    - name:      1
       VMA:       0x2000000
       SIZE:      0x100000
       LMA:       0x2000000
       ACCESS:    rx
-    - no:        2
+    - name:      2
       VMA:       0x2300000
       SIZE:      0x4000
       LMA:       0x2300000

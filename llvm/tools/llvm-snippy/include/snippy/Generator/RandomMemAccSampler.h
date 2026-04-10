@@ -247,8 +247,7 @@ public:
       : RestrictedMB(std::move(Restricted)) {
     auto Filtered = llvm::make_filter_range(
         llvm::make_range(SectBegin, SectEnd), [](auto &S) {
-          return (!S.isNamed() ||
-                  !SectionsDescriptions::isSpecializedSectionName(S.getName()));
+          return !SectionsDescriptions::isSpecializedSectionName(S.getName());
         });
 
     auto Copies = llvm::map_range(llvm::make_range(AccBegin, AccEnd),

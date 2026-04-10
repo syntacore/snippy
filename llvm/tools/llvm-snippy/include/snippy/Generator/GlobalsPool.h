@@ -37,9 +37,9 @@ public:
       return makeFailure(Errc::OutOfSpace,
                          "Out of space when allocating " + Twine(Size) +
                              " bytes (align " + Twine(Alignment) +
-                             ") in section '" + Desc.getIDString() +
-                             "' of size " + Twine(Desc.Size) + ". " +
-                             Twine(Overflow) + " bytes overflow");
+                             ") in section '" + Desc.getName() + "' of size " +
+                             Twine(Desc.Size) + ". " + Twine(Overflow) +
+                             " bytes overflow");
     }
     return NextOffset;
   }
