@@ -1,0 +1,22 @@
+# generated with isa-tests-gen.sh, to regenerate run:
+# isa-tests-gen.sh --march rv64i_zca_zcmp --mtriple riscv64 --extensions zcmp\ -\ zca --ignore-opcode-regex \^CM_POPRET\$\|\^CM_POPRETZ\$
+# RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail
+include:
+  - "Inputs/sections.yaml"
+options:
+  march: rv64i_zca_zcmp
+  mtriple: riscv64
+  num-instrs: 1000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+histogram:
+  - [CM_MVA01S, 1.0]
+  - [CM_MVSA01, 1.0]
+  - [CM_POP, 1.0]
+  - [CM_PUSH, 1.0]
+
+# CHECK-DAG: CM_MVA01S
+# CHECK-DAG: CM_MVSA01
+# CHECK-DAG: CM_POP
+# CHECK-DAG: CM_PUSH
