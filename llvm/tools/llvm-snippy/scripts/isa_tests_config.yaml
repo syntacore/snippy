@@ -187,4 +187,20 @@ tests:
   ignore-opcode-regex: ^[A-Z]+_(H)$|^FLEQ_Q$|^FLI_Q$|^FLT_Q$|^FLTQ_Q$|^FMAXM_Q$|^FMINM_Q$|^FMVH_X_Q$|^FMVP_Q_X$|^FROUNDNX_Q$|^FROUND_Q$
   include:
   - Inputs/no-fpu-overwrite.yaml
-  
+- filename: rv64i_zca.yaml
+  description: tests for zca extension
+  march: rv64i_zca
+  mtriple: riscv64
+  extensions: zca
+  ignore-opcode-regex: ^C_JR$|^C_J$|^C_JALR$
+- filename: rv64i_zcb.yaml
+  description: tests for zcb extension
+  march: rv64i_zba_zbb_zmmul_zcb
+  mtriple: riscv64
+  extensions: zcb - zca
+- filename: rv64i_zcmp.yaml
+  description: tests for zcmp extension (not call-related)
+  march: rv64i_zca_zcmp
+  mtriple: riscv64
+  extensions: zcmp - zca
+  ignore-opcode-regex: ^CM_POPRET$|^CM_POPRETZ$
