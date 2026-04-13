@@ -170,8 +170,12 @@ static SelectedTargetInfo getSelectedTargetInfo(const ProgramOptions &Opts) {
   TargetInfo.Triple = Opts.MTargetTriple;
   TargetInfo.CPU = Opts.CpuName;
   TargetInfo.Features = Opts.MAttr;
-  if (!Opts.MTargetTriple.isSpecified() && !Opts.MArch.isSpecified()) {
+  if (!Opts.MTargetTriple.isSpecified()) {
     TargetInfo.Triple = sys::getProcessTriple();
+    if (Opts.MArch.isSpecified())
+      snippy::warn(WarningName::InconsistentOptions,
+                   "'march' specified without 'mtriple'",
+                   formatv("deduced triple is \"{}\"", TargetInfo.Triple));
     if (!Opts.CpuName.isSpecified())
       TargetInfo.CPU = sys::getHostCPUName();
   }
