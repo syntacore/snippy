@@ -46,7 +46,6 @@ namespace snippy {
   WARN_CASE(GenPlanVerification, "gen-plan-verification")                      \
   WARN_CASE(SeedNotSpecified, "seed-not-specified")                            \
   WARN_CASE(NonReproducibleExecution, "non-reproducible-execution")            \
-  WARN_CASE(MArchIsTriple, "march-is-triple")                                  \
   WARN_CASE(CannotGenerateCalls, "cannot-generate-calls")                      \
   WARN_CASE(OperandsReinitialization, "operands-reinitialization")             \
   WARN_CASE(LoopCountersOnStack, "loop-counters-on-stack")

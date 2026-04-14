@@ -14,7 +14,7 @@ let Group = ProgramOptionsCategory in {
   def MTargetTriple
       : StringOption<"mtriple">,
         Description<"Target triple">,
-        ValueDescription<"One of suppported triple: riscv64-linux-gnu, etc..">;
+        ValueDescription<"One of suppported triple: riscv64, riscv32, etc..">;
 
   def CpuName : StringOption<"mcpu">,
                 Description<"CPU name to use, leave empty to autodetect">;

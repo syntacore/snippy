@@ -1,5 +1,5 @@
 # COM: llvm-snippy is not used directly, because substitutions here will
 # COM: mess up default options. layout file is also unspecified to skip actual
 # COM: generation.
-# RUN: %llvm_tools/llvm-snippy -dump-options -mtriple riscv64-unknown-elf
+# RUN: %llvm_tools/llvm-snippy -dump-options -mtriple riscv64
 # CHECK: model-plugin: None

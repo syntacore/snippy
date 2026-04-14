@@ -4,7 +4,7 @@
 # COM: succeed with weighted instructions
 
 options:
-  mtriple: riscv64-linux-gnu
+  mtriple: riscv64
   num-instrs: 5000
   dump-mf: on
   mattr: "+zihintntl,+m"
