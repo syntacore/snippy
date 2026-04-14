@@ -19,4 +19,6 @@ histogram:
     - [ADD, 1.0]
 
 # MARCH-AS-TRIPLE: warning:
-# NO-TRIPLE: error: target triple is not specified
+# NO-TRIPLE: warning:
+# NO-TRIPLE-SAME: 'march' specified without 'mtriple': deduced triple is "{{.*}}"
+# NO-TRIPLE: error: Invalid march: march "rv64i" is not implemented for the given target

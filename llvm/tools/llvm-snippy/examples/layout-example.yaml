@@ -32,7 +32,7 @@ histogram:
     - [SW, 10.0]
 
 options:
-    mtriple: "riscv64-unknown-elf"
+    mtriple: "riscv64"
     mcpu: generic-rv64
     march: "rv64gc"
     model-plugin: None

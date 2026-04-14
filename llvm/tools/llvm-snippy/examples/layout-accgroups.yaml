@@ -11,7 +11,7 @@ sections:
     ACCESS:    rw
 
 options:
-  mtriple: "riscv64-linux-gnu"
+  mtriple: "riscv64"
   mcpu: "generic-rv64"
   mattr: "+a,+f"
   model-plugin: None
