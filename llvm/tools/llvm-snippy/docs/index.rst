@@ -282,7 +282,7 @@ Following is an example of the configuration layout that contains:
        - [SW, 10.0]
 
    options:
-       mtriple: "riscv64-unknown-elf"
+       mtriple: "riscv64"
        mcpu: generic-rv64
        march: "rv64ifc_zifencei"
        model-plugin: None
@@ -432,7 +432,7 @@ configuration file of via the command line. For example:
    - sublayout-sections.yaml
 
    options:
-     mtriple: riscv64-unknown-elf
+     mtriple: riscv64
      mcpu: generic-rv64
      march: "rv64g"
      num-instrs: 1000
@@ -855,7 +855,7 @@ description, run:
 
 .. code:: shell
 
-   ./llvm-snippy -mtriple=riscv64-unknown-elf -mcpu=<processor_model> \
+   ./llvm-snippy -mtriple=riscv64 -mcpu=<processor_model> \
       -march=<ISA_string> --list-opcode-names
 
 For supported values of ``<ISA_string>``, see `Platform Support`_.
@@ -1461,7 +1461,7 @@ priority over ``--riscv-disable-misaligned-access``.
 .. code:: yaml
 
    options:
-     march: riscv64-linux-gnu
+     mtriple: riscv64
      num-instrs: 100
      riscv-disable-misaligned-access: true
 
@@ -1674,7 +1674,7 @@ For example:
 
 ::
 
-   ./llvm-snippy -mtriple=riscv64-linux-gnu -mcpu=generic-rv64 \
+   ./llvm-snippy -mtriple=riscv64 -mcpu=generic-rv64 \
       ./yml/layout.yaml ./yml/memory.yaml -model-plugin=None \
       -num-instrs=50 -seed=0 ./yml/burst-store.yaml -o layout.elf
 
@@ -2257,7 +2257,7 @@ follows:
 
 .. code:: yaml
 
-   mtriple: "riscv64-unknown-elf"
+   mtriple: "riscv64"
    mcpu: generic-rv64
    march: "rv64gc"
    model-plugin: None
@@ -2290,7 +2290,7 @@ want to use, and then |nbsp| -- |nbsp| the configuration file. For example:
 
 ::
 
-   ./llvm-snippy -mtriple=riscv64-unknown-elf -mcpu=<processor_model> <config>.yaml
+   ./llvm-snippy -mtriple=riscv64 -mcpu=<processor_model> <config>.yaml
 
 The full list of all options you can use as settings is available in the
 ``llvm-snippy options`` section of the embedded snippy help. To call the
@@ -2310,7 +2310,7 @@ command-line option:
 
 ::
 
-   ./llvm-snippy -mtriple=riscv64-unknown-elf --dump-options
+   ./llvm-snippy -mtriple=riscv64 --dump-options
 
 Warning Control Options
 -----------------------
@@ -2686,7 +2686,7 @@ To get a dump with an initial registers state, run:
 
 ::
 
-   ./llvm-snippy -mtriple=riscv64-unknown-elf -mcpu=<processor_model> \
+   ./llvm-snippy -mtriple=riscv64 -mcpu=<processor_model> \
        <config>.yaml -model-plugin=<model_plugin>.so -num-instrs=<int> \
        -seed=0 --dump-initial-registers-yaml[=<filename>] \
        -o layout.elf
@@ -2719,7 +2719,7 @@ To load the initial registers dump file, use the
 
 ::
 
-   ./llvm-snippy -mtriple=riscv64-unknown-elf -mcpu=<processor_model> \
+   ./llvm-snippy -mtriple=riscv64 -mcpu=<processor_model> \
        <config>.yaml -model-plugin=<model_plugin> -num-instrs=<int> \
        -seed=0 --initial-regs-yaml=initial_registers_state.yml \
        -o layout.elf
@@ -2960,7 +2960,7 @@ To get a dump with final registers state after the execution, run:
 
 ::
 
-   ./llvm-snippy -mtriple=riscv64-unknown-elf -mcpu=<processor_model> \
+   ./llvm-snippy -mtriple=riscv64 -mcpu=<processor_model> \
        <config>.yaml -model-plugin=<model_plugin>.so \
        -num-instrs=<int> -seed=0 \
        --dump-registers-yaml[=<filename>] \
@@ -3237,7 +3237,7 @@ Snippy supports RVV and have some knowledge about its semantics to avoid (or pro
 
 ::
 
-   ./llvm-snippy -mtriple=riscv64-unknown-elf -seed=0 -mattr=+v \
+   ./llvm-snippy -mtriple=riscv64 -seed=0 -mattr=+v \
        ./yml/layout-vector.yaml
 
 where:
@@ -3381,7 +3381,7 @@ Following is an example of vector options specific to RISC-V:
 
 ::
 
-   ./llvm-snippy -mtriple=riscv64-unknown-elf -seed=0 \
+   ./llvm-snippy -mtriple=riscv64 -seed=0 \
       -mattr=+v ./yml/layout-vector.yaml \
       ./yml/riscv-vector-unit.yaml
 
@@ -3537,7 +3537,7 @@ Example snippy run:
 
 ::
 
-   ./llvm-snippy -mtriple=riscv64-unknown-elf -seed=0 -mattr=+v \
+   ./llvm-snippy -mtriple=riscv64 -seed=0 -mattr=+v \
       ./yml/layout-vector-nvs.yaml ./yml/riscv-vector-ill.yaml \
       -num-instrs=1000
 
@@ -3843,7 +3843,7 @@ Let’s consider an example with a read-only section below:
 
 .. code:: shell
 
-   ./llvm-snippy -mtriple=riscv64-unknown-elf -mattr=+v \
+   ./llvm-snippy -mtriple=riscv64 -mattr=+v \
        ./yml/layout-vector-init.yaml -num-instrs=100 -seed=0 \
        ./yml/memory-aligned.yaml \
        -init-regs-in-elf -o layout.elf
@@ -3992,7 +3992,7 @@ you do not call linker directly):
 
 .. code:: bash
 
-   riscv64-unknown-elf-gcc startup.S path/to/snippet.elf -T path/to/snippet.ld -Wl,@path/to/snippet.ldargs -o a.out
+   riscv64-gcc startup.S path/to/snippet.elf -T path/to/snippet.ld -Wl,@path/to/snippet.ldargs -o a.out
 
 
 Converting Traces
@@ -4200,7 +4200,7 @@ before. This way, each model gets its own log file.
 
 ::
 
-   ./llvm-snippy -mtriple=riscv64-unknown-elf -mcpu=<processor_model> \
+   ./llvm-snippy -mtriple=riscv64 -mcpu=<processor_model> \
        ./yml/layout.yaml -num-instrs=100 -seed=0 ./yml/memory.yaml \
        -plugin-model=<model_plugin>.so -cosim-model-plugins=<co-sim_model>.so \
        --init-regs-in-elf -trace-log=log -o layout.elf

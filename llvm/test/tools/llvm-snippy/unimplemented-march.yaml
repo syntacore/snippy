@@ -20,4 +20,4 @@ sections:
 histogram: 
     - [ADD, 1.0]
 
-# CHECK: error: Invalid march: march is not implemented for this target
+# CHECK: error: Invalid march: march "tigerlake" is not implemented for the given target

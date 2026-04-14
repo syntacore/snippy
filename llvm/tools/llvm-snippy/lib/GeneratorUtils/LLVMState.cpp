@@ -63,16 +63,14 @@ getTargetFeaturesFromMArch(Triple::ArchType ArchType, StringRef MArch) {
   case Triple::ArchType::riscv64:
     return getRISCVFeaturesFromMArch(MArch);
   default:
-    return makeFailure(Errc::Unimplemented,
-                       "march is not implemented for this target");
+    return makeFailure(
+        Errc::Unimplemented,
+        formatv("march \"{}\" is not implemented for the given target", MArch));
   }
 }
 
 /// Slightly saner validation of Triple parsing than the default behavior of
-/// "anything goes".
-/// For legacy reasons we accept "riscv64-unknown-elf" or "riscv64-linux-gnu",
-/// so "riscv64-blahblah-blahblahblah" goes too. Ideally that should be
-/// "riscv64-unknown-unknown". Also snippy doesn't really care about anything
+/// "anything goes". Also snippy doesn't really care about anything
 /// other than Arch at the moment (and probably shouldn't, so newer configs
 /// should just use "riscv64" or "riscv32").
 static bool checkTriple(const Triple &TheTriple) {
@@ -84,8 +82,6 @@ static bool checkTriple(const Triple &TheTriple) {
   if (TheTriple.getArch() == Triple::ArchType::UnknownArch)
     return false;
 
-  auto EnvironmentName = TheTriple.getEnvironmentName();
-
   auto TrailingDashCount =
       std::find_if_not(TripleString.rbegin(), TripleString.rend(),
                        [](char C) { return C == '-'; }) -
@@ -94,37 +90,40 @@ static bool checkTriple(const Triple &TheTriple) {
   if (TrailingDashCount)
     return false;
 
+  auto EnvironmentName = TheTriple.getEnvironmentName();
   if (!EnvironmentName.empty() &&
       EnvironmentName !=
           Triple::getEnvironmentTypeName(TheTriple.getEnvironment()))
+    return false;
+  auto OSName = TheTriple.getOSName();
+  if (!OSName.empty() && OSName != Triple::getOSTypeName(TheTriple.getOS()))
+    return false;
+  auto VendorName = TheTriple.getVendorName();
+  if (!VendorName.empty() &&
+      VendorName != Triple::getVendorTypeName(TheTriple.getVendor()))
+    return false;
+  auto ArchName = TheTriple.getArchName();
+  if (!ArchName.empty() &&
+      ArchName != Triple::getArchTypeName(TheTriple.getArch()))
     return false;
 
   return true;
 }
 
-struct DeducedTriple {
-  Triple TheTriple;
-  bool MArchIsTriple;
-};
-
 static auto deduceTriple(StringRef MTriple, StringRef MArch) {
-  bool MArchIsTriple = false;
   Triple TheTriple(MTriple);
   if (!MTriple.empty() || MArch.empty())
-    return DeducedTriple{TheTriple, MArchIsTriple};
+    return TheTriple;
 
   assert(!checkTriple(TheTriple));
   Triple TripleFromMArch(MArch);
   if (!checkTriple(TripleFromMArch))
-    return DeducedTriple{TheTriple, MArchIsTriple};
-
-  MArchIsTriple = true;
-  return DeducedTriple{TripleFromMArch, MArchIsTriple};
+    return TheTriple;
+  snippy::fatal("'mtriple' should be specified");
 }
 
 Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
-  auto [TheTriple, MArchIsTriple] =
-      deduceTriple(TargetInfo.Triple, TargetInfo.MArch);
+  auto TheTriple = deduceTriple(TargetInfo.Triple, TargetInfo.MArch);
   if (!checkTriple(TheTriple))
     return makeFailure(Errc::InvalidArgument,
                        TheTriple.getTriple().empty()
@@ -133,19 +132,8 @@ Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
                                  .concat(TheTriple.getTriple())
                                  .concat("'"));
 
-  if (MArchIsTriple)
-    snippy::warn(WarningName::MArchIsTriple,
-                 "'march' with triple value is deprecated",
-                 "use 'mtriple' option instead");
-
-  std::string Error;
-  const Target *Tgt = TargetRegistry::lookupTarget(TheTriple, Error);
-
-  if (!Tgt)
-    return makeFailure(Errc::InvalidConfiguration, Twine(Error));
-
   std::string TargetFeatures;
-  if (!MArchIsTriple && !TargetInfo.MArch.empty()) {
+  if (!TargetInfo.MArch.empty()) {
     auto ExpectedFeatures =
         getTargetFeaturesFromMArch(TheTriple.getArch(), TargetInfo.MArch);
     if (!ExpectedFeatures)
@@ -154,6 +142,11 @@ Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
                                  toString(ExpectedFeatures.takeError())));
     TargetFeatures = std::move(ExpectedFeatures.get());
   }
+  std::string Error;
+  const Target *Tgt = TargetRegistry::lookupTarget(TheTriple, Error);
+
+  if (!Tgt)
+    return makeFailure(Errc::InvalidConfiguration, Twine(Error));
 
   TargetFeatures += ",";
   TargetFeatures += TargetInfo.Features;
