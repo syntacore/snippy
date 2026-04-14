@@ -1,0 +1,21 @@
+# RUN: not llvm-snippy %s %S/Inputs/loadstore-layout.yaml \
+# RUN:   -model-plugin=None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+
+access-ranges:
+    - start: 0x80002001
+      size: 0x14
+      stride: 5
+      first-offset: 3
+      last-offset: 5
+    - start: 0x80002001
+      size: 0x14
+      stride: 5
+      first-offset: 5
+      last-offset: 5
+
+# CHECK: error: Invalid memory access range: 'last-offset' (5) >= 'stride' (5)
