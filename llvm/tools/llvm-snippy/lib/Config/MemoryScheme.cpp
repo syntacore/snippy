@@ -220,27 +220,15 @@ std::string yaml::MappingTraits<snippy::MemoryAccessRange>::validate(
   if (shouldSkipValidation(Io))
     return "";
 
-  if (Range.FirstOffset > Range.LastOffset) {
-    // TODO: Maybe this should become a hard error with the next breaking
-    // release?
-    snippy::warn(snippy::WarningName::MemoryAccess,
-                 "Invalid memory access range",
-                 Twine("'first-offset' (")
-                     .concat(Twine(Range.FirstOffset))
-                     .concat(") > 'last-offset' (")
-                     .concat(Twine(Range.LastOffset).concat(")")));
-  }
+  if (Range.FirstOffset > Range.LastOffset)
+    return llvm::formatv("Invalid memory access range: 'first-offset' ({0}) > "
+                         "'last-offset' ({1})",
+                         Range.FirstOffset, Range.LastOffset);
 
-  if (Range.LastOffset >= Range.Stride) {
-    // TODO: Maybe this should become a hard error with the next breaking
-    // release?
-    snippy::warn(snippy::WarningName::MemoryAccess,
-                 "Invalid memory access range",
-                 Twine("'last-offset' (")
-                     .concat(Twine(Range.LastOffset))
-                     .concat(") >= 'stride' (")
-                     .concat(Twine(Range.Stride).concat(")")));
-  }
+  if (Range.LastOffset >= Range.Stride)
+    return llvm::formatv(
+        "Invalid memory access range: 'last-offset' ({0}) >= 'stride' ({1})",
+        Range.LastOffset, Range.Stride);
 
   if (Range.Stride == 0)
     return "Stride cannot be equal to 0";
