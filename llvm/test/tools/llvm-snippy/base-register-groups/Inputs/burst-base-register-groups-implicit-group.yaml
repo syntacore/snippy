@@ -1,5 +1,5 @@
 options:
-    mtriple: riscv64-unknown-elf
+    mtriple: riscv64
     dump-mf: on
     num-instrs: 200
     mattr: +zicbom
