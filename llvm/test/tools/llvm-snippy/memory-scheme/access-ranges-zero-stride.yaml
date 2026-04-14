@@ -12,5 +12,4 @@ access-ranges:
     first-offset: 0
     last-offset: 0
 
-# CHECK-NOT: error: Aborted (core dumped)
-# CHECK: access-ranges-zero-stride.yaml:9:5: error: Stride cannot be equal to 0
+# CHECK: error: Invalid memory access range: 'last-offset' (0) >= 'stride' (0)
