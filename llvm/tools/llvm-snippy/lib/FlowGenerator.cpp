@@ -287,12 +287,6 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         PM.add(createPreserveRegsInsertionPass());
         SnippyTgt.addTargetLegalizationPasses(PM);
 
-        if (DebugCfg.DumpMF.value())
-          PM.add(createMachineFunctionPrinterPass(outs()));
-
-        if (DebugCfg.DumpMI.value())
-          PM.add(createPrintMachineInstrsPass(outs()));
-
         if (!GenCtx.getConfig().PassCfg.CodeLayout)
           PM.add(createBranchRelaxatorPass());
         if (VerifyConsecutiveLoops)
@@ -300,6 +294,11 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
 
         // Update liveness information
         PM.add(createTrackLivenessPass());
+        if (DebugCfg.DumpMF.value())
+          PM.add(createMachineFunctionPrinterPass(outs()));
+
+        if (DebugCfg.DumpMI.value())
+          PM.add(createPrintMachineInstrsPass(outs()));
 
         PM.add(createPostGenVerifierPass());
         if (GenCtx.getConfig().PassCfg.CodeLayout) {

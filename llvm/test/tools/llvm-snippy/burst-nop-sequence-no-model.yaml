@@ -24,11 +24,32 @@ histogram:
 
 burst:
   mode: custom
-  min-size: 5
-  max-size: 5
+  min-size: 3
+  max-size: 3
   groupings:
     - [ PseudoNOP ]
 
-# COM: Check that there are at least 5 PseudoNOP burst groups of exact size 5
+# COM: Check that there are at least 5 PseudoNOP burst groups of exact size 3
 
-# CHECK-COUNT-5: {{PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP[[:space:]] PseudoNOP}}
+# CHECK: PseudoNOP
+# CHECK-NEXT: PseudoNOP
+# CHECK-NEXT: PseudoNOP
+
+# CHECK: PseudoNOP
+# CHECK-NEXT: PseudoNOP
+# CHECK-NEXT: PseudoNOP
+
+# CHECK: PseudoNOP
+# CHECK-NEXT: PseudoNOP
+# CHECK-NEXT: PseudoNOP
+
+# CHECK: PseudoNOP
+# CHECK-NEXT: PseudoNOP
+# CHECK-NEXT: PseudoNOP
+
+# CHECK: PseudoNOP
+# CHECK-NEXT: PseudoNOP
+# CHECK-NEXT: PseudoNOP
+
+# CHECK-DAG: LD
+# CHECK-DAG: SD
