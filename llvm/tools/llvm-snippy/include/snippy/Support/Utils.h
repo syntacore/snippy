@@ -45,7 +45,9 @@ enum class SnippyMetadata {
   ExternalCall,
   FormAddrForCall,
   Epilogue,
-  Prologue
+  Prologue,
+  // Used when generating patterns or burst groups
+  Bundle
 };
 
 namespace detail {
@@ -56,6 +58,7 @@ constexpr static const char *FormAddrForCallMetadataValue =
     "llvm.snippy.forming.address";
 constexpr static const char *EpilogueMetadataValue = "llvm.snippy.epilogue";
 constexpr static const char *PrologueMetadataValue = "llvm.snippy.prologue";
+constexpr static const char *BundleValue = "llvm.snippy.bundle";
 
 inline StringRef getStrMetadata(SnippyMetadata M) {
   switch (M) {
@@ -69,6 +72,8 @@ inline StringRef getStrMetadata(SnippyMetadata M) {
     return EpilogueMetadataValue;
   case SnippyMetadata::Prologue:
     return PrologueMetadataValue;
+  case SnippyMetadata::Bundle:
+    return BundleValue;
   }
   llvm_unreachable("unknown metadata value");
 }

@@ -170,8 +170,14 @@ void DefaultGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
     InstrNum += GenSeq.size();
     std::vector<InstructionRequest> RequestVector;
     RequestVector.reserve(GenSeq.size());
+    auto *MetadataMark =
+        GenSeq.size() > 1
+            ? getMetadataMark(State.getCtx(), SnippyMetadata::Bundle)
+            : nullptr;
     llvm::transform(GenSeq, std::back_inserter(RequestVector),
-                    [](auto &&Opc) { return InstructionRequest{Opc, {}}; });
+                    [MetadataMark](auto &&Opc) {
+                      return InstructionRequest{Opc, {}, MetadataMark};
+                    });
     RequestSeqs.emplace_back(std::move(RequestVector));
   }
   if (InstrNum > InstrLimit) {
@@ -205,9 +211,10 @@ void DefaultGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
           auto ExpPreselected = getPreselectedForInstr(I);
           if (!ExpPreselected)
             snippy::fatal(ExpPreselected.takeError());
-          return InstructionRequest{
-              I.getOpcode(), *ExpPreselected,
-              getMetadataMark(State.getCtx(), SnippyMetadata::Support)};
+          return InstructionRequest{I.getOpcode(), *ExpPreselected,
+                                    getMetadataMark(State.getCtx(),
+                                                    SnippyMetadata::Support,
+                                                    SnippyMetadata::Bundle)};
         });
     // Add the primary instructions
     llvm::append_range(Instructions, std::move(OpcSeqReq));
@@ -220,13 +227,23 @@ void BurstGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
   assert(Limit.isNumLimit());
   auto &State = InstrGenCtx.ProgCtx.getLLVMState();
   const auto &Tgt = State.getSnippyTarget();
-  std::generate_n(std::back_inserter(Instructions), Limit.getLimit(),
-                  [this] { return InstructionRequest{genOpc(), {}}; });
-
+  std::generate_n(
+      std::back_inserter(Instructions), Limit.getLimit(), [&State, this] {
+        return InstructionRequest{
+            genOpc(),
+            {},
+            getMetadataMark(State.getCtx(), SnippyMetadata::Bundle)};
+      });
   auto RP = InstrGenCtx.pushRegPool();
   auto RegsToInit =
       selectOperandsForConsecutiveInstrs(InstrGenCtx, Tgt, *RP, Instructions);
   initializeBaseRegs(InstrGenCtx, RegsToInit);
+  // Mark all support instrs with Bundle metadata
+  auto RIter = MachineBasicBlock::reverse_iterator(std::prev(InstrGenCtx.Ins));
+  for (auto REnd = InstrGenCtx.MBB.rend();
+       RIter != REnd && checkMetadata(*RIter, SnippyMetadata::Support); ++RIter)
+    addSnippyMetadata(*RIter, *InstrGenCtx.MBB.getParent(), State.getCtx(),
+                      SnippyMetadata::Bundle, SnippyMetadata::Support);
 }
 
 LLVMState &InstructionGenerationContext::getLLVMStateImpl() const {

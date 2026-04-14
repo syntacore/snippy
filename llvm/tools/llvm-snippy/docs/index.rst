@@ -789,8 +789,7 @@ or
 
 .. important::
 
-   -  Patterns are currently incompatible with ``--valuegram-operands-regs``
-      .
+   -  Patterns are currently incompatible with ``--valuegram-operands-regs``.
    -  You cannot yet use vector or branch instructions in patterns.
 
 .. _`_immediate_histograms`:
