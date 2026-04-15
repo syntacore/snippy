@@ -1013,7 +1013,7 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForInstrWithImmOffset(
     MutableArrayRef<planning::PreselectedOpInfo> Preselected,
     InstructionGenerationContext &IGC, bool Is64Bit,
     std::optional<MemAddr> MainPart = std::nullopt) {
-  auto Opcode = InstrDesc.getOpcode();
+  [[maybe_unused]] auto Opcode = InstrDesc.getOpcode();
   assert(isLoadStore(Opcode) || isCLoadStore(Opcode) || isFPLoadStore(Opcode) ||
          isCFPLoadStore(Opcode) || isZcmpPushPop(Opcode));
 
@@ -1513,7 +1513,7 @@ public:
     auto &State = ProgCtx.getLLVMState();
     auto RP = IGC.pushRegPool();
 
-    const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
+    [[maybe_unused]] const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
     const auto &InstrInfo = State.getInstrInfo();
 
     assert(ST.hasStdExtV());
@@ -1553,7 +1553,7 @@ public:
     auto &ProgCtx = IGC.ProgCtx;
     auto &State = ProgCtx.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
-    const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
+    [[maybe_unused]] const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
     auto &RGC = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
     auto RP = IGC.pushRegPool();
 
@@ -1692,7 +1692,7 @@ public:
     auto Opcode = MI.getOpcode();
     auto IsSelfcheckAllowed = [&](unsigned Opcode,
                                   bool SelfcheckRVVEnabled) -> bool {
-      static constexpr StringRef SelfcheckDisabledMessage =
+      [[maybe_unused]] static constexpr StringRef SelfcheckDisabledMessage =
           "Selfcheck is disabled for this instruction\n";
       if (isRVV(Opcode) && !SelfcheckRVVEnabled) {
         LLVM_DEBUG(dbgs() << SelfcheckDisabledMessage; MI.print(dbgs());
@@ -1844,7 +1844,7 @@ public:
     auto &ProgCtx = IGC.ProgCtx;
     auto &State = ProgCtx.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
-    auto &BranchDesc = InstrInfo.get(Opcode);
+    [[maybe_unused]] auto &BranchDesc = InstrInfo.get(Opcode);
     auto &MBB = IGC.MBB;
     assert(BranchDesc.operands()[0].OperandType == MCOI::OPERAND_REGISTER);
     switch (Opcode) {
@@ -4580,9 +4580,9 @@ void SnippyRISCVTarget::rvvUnsafeWriteValueUsingXReg(
 
   assert(RISCV::VRRegClass.contains(DstReg));
   const auto SEW = static_cast<unsigned>(RGC.getSEW(MBB));
-  const auto ELEN = ST.getELen();
+  [[maybe_unused]] const auto ELEN = ST.getELen();
   const auto VL = RGC.getVL(MBB);
-  const auto VLEN = RGC.getVLEN();
+  [[maybe_unused]] const auto VLEN = RGC.getVLEN();
   assert(SEW == ELEN && VL * SEW == VLEN);
   // FIXME: We must set undef flag only when we do initialization. In all
   // other cases it's not quite right to use it. However, I expect the whole
@@ -4631,7 +4631,7 @@ void SnippyRISCVTarget::rvvWriteValueUsingXReg(
 
   auto &ProgCtx = IGC.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
-  const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
+  [[maybe_unused]] const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
   const auto &InstrInfo = State.getInstrInfo();
   assert(ST.hasStdExtV());
 
@@ -4834,7 +4834,7 @@ void SnippyRISCVTarget::generateV0MaskUpdate(
                       << toString(VM, /* Radix */ 16,
                                   /* Signed */ false)
                       << "\n");
-    const auto &ActiveRVVMode = RGC.getActiveRVVMode(MBB);
+    [[maybe_unused]] const auto &ActiveRVVMode = RGC.getActiveRVVMode(MBB);
     // Mask elements past VL - the tail elements, are always updated with a
     // tail-agnostic policy (VMXNOR_MM guaranties result only on first VL bits)
     assert(VM.getBitWidth() == ActiveRVVMode.VLVM.VL);

@@ -371,7 +371,7 @@ selectOperandsForMemoryInstructions(InstructionGenerationContext &InstrGenCtx,
     // reserved as memory operands
     selectNonMemoryOperands(InstrDesc, Preselected, InstrGenCtx, RP,
                             /*Excluded=*/{}, Destinations);
-    if (auto NumDefs = InstrDesc.getNumDefs()) {
+    if ([[maybe_unused]] auto NumDefs = InstrDesc.getNumDefs()) {
       assert(NumDefs == 1 && "Multiple destination operands are not supported");
       assert(Preselected[0].isReg());
       SmallVector<Register, 8> Dsts;
@@ -793,7 +793,7 @@ static std::map<unsigned, AddressInfo> collectPrimaryAddresses(
 void initializeBaseRegs(InstructionGenerationContext &InstrGenCtx,
                         const std::map<unsigned, APInt> &BaseRegToValue) {
   auto &SimCtx = InstrGenCtx.SimCtx;
-  auto &RP = InstrGenCtx.getRegPool();
+  [[maybe_unused]] auto &RP = InstrGenCtx.getRegPool();
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
