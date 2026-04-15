@@ -127,7 +127,7 @@ bool BranchRelaxator::tryRelaxBranch(MachineInstr &Branch,
         return Dist + BBSize;
       });
 
-  auto MaxInstrSize = SnippyTgt.getMaxInstrSize();
+  [[maybe_unused]] auto MaxInstrSize = SnippyTgt.getMaxInstrSize();
   auto MaxBranchDstMod = SnippyTgt.getMaxBranchDstMod(Branch.getOpcode());
   if (DistanceInBytes < MaxBranchDstMod)
     return false;

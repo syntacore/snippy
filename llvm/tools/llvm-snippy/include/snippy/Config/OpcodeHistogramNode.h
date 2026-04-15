@@ -205,11 +205,9 @@ namespace detail {
 // Base pure virtual class for working with child nodes
 class CompositeNode {
 public:
-  using NodeHandle = BaseNode::NodeHandle;
-
   virtual ~CompositeNode() = default;
 
-  virtual void insert(NodeHandle ArgNode) = 0;
+  virtual void insert(BaseNode::NodeHandle ArgNode) = 0;
 
   unsigned size() const { return ChildNodes.size(); }
   bool empty() const { return ChildNodes.empty(); }
@@ -225,7 +223,7 @@ public:
 
 protected:
   CompositeNode() = default;
-  CompositeNode(NodeHandle Arg) {
+  CompositeNode(BaseNode::NodeHandle Arg) {
     assert(Arg);
     ChildNodes.push_back(std::move(Arg));
   }
@@ -234,7 +232,7 @@ protected:
   CompositeNode &operator=(const CompositeNode &Rhs) = delete;
   CompositeNode &operator=(CompositeNode &&Rhs) = default;
 
-  CompositeNode(SmallVector<NodeHandle> ArgNodes)
+  CompositeNode(SmallVector<BaseNode::NodeHandle> ArgNodes)
       : ChildNodes(std::move(ArgNodes)) {}
 
   void setChildsParentLink(const BaseNode *Parent) {
@@ -253,14 +251,14 @@ protected:
     insert(std::move(NewNode));
   }
 
-  template <typename CompositeNodeTy> NodeHandle cloneImpl() const {
-    SmallVector<NodeHandle> CloneArgs;
+  template <typename CompositeNodeTy> BaseNode::NodeHandle cloneImpl() const {
+    SmallVector<BaseNode::NodeHandle> CloneArgs;
     llvm::transform(ChildNodes, std::back_inserter(CloneArgs),
                     [](auto &&ArgPtr) { return ArgPtr->clone(); });
     return std::make_unique<CompositeNodeTy>(std::move(CloneArgs));
   }
 
-  SmallVector<NodeHandle> ChildNodes;
+  SmallVector<BaseNode::NodeHandle> ChildNodes;
 };
 
 } // namespace detail

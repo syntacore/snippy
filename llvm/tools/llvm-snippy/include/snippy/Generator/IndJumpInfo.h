@@ -24,12 +24,13 @@ class IndJumpInfoMap final
     : private DenseMap<const MachineInstr *, IndJumpInfo> {
 public:
   void addJump(const MachineInstr &Jump, IndJumpInfo Dst) {
-    auto [It, WasInserted] = DenseMap::try_emplace(&Jump, std::move(Dst));
+    [[maybe_unused]] auto [It, WasInserted] =
+        DenseMap::try_emplace(&Jump, std::move(Dst));
     assert(WasInserted && "Attempt to specify destination for jump twice");
   }
 
   void remove(const MachineInstr &Jump) {
-    auto Removed = DenseMap::erase(&Jump);
+    [[maybe_unused]] auto Removed = DenseMap::erase(&Jump);
     assert(Removed);
   }
 

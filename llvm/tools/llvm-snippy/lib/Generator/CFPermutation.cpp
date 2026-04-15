@@ -35,7 +35,8 @@ snippy::opt<bool> PermutationStatus("permutation-status",
                                     cl::cat(Options), cl::init(false),
                                     cl::Hidden);
 
-[[nodiscard]] bool checkBranchSettings(const Branchegram &Branches) {
+[[nodiscard, maybe_unused]] bool
+checkBranchSettings(const Branchegram &Branches) {
   return !Branches.anyConsecutiveLoops() ||
          (Branches.LoopRatio == 1.0 && Branches.getMaxLoopDepth() == 1 &&
           Branches.getBlockDistance().Min.value_or(0) == 0 &&

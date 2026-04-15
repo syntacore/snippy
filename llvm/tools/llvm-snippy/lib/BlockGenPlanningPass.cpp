@@ -692,12 +692,13 @@ BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
   addEmptyReqForBlocks(FunReq, LatchBlocks,
                        planning::RequestLimit::NumInstrs{});
 
-  for (auto &[MBB, BBReq] : FunReq) {
-    LLVM_DEBUG(llvm::dbgs() << MBB->getFullName() << ":\n");
-    for (auto &Req : BBReq) {
-      LLVM_DEBUG(Req.print(llvm::dbgs(), /*Indent=*/2));
+  LLVM_DEBUG(for (auto &[MBB, BBReq]
+                  : FunReq) {
+    llvm::dbgs() << MBB->getFullName() << ":\n";
+    for ([[maybe_unused]] auto &Req : BBReq) {
+      Req.print(llvm::dbgs(), /*Indent=*/2);
     }
-  }
+  });
   return FunReq;
 }
 
@@ -795,12 +796,13 @@ BlockGenPlanningImpl::processFunctionWithSize(const MachineFunction &MF) {
   addEmptyReqForBlocks(FunReq, BlocksToProcess,
                        planning::RequestLimit::NumInstrs{});
 
-  for (auto &[MBB, BBReq] : FunReq) {
-    LLVM_DEBUG(llvm::dbgs() << MBB->getFullName() << ":\n");
-    for (auto &Req : BBReq) {
-      LLVM_DEBUG(Req.print(llvm::dbgs(), /*Indent=*/2));
+  LLVM_DEBUG(for (auto &[MBB, BBReq]
+                  : FunReq) {
+    llvm::dbgs() << MBB->getFullName() << ":\n";
+    for ([[maybe_unused]] auto &Req : BBReq) {
+      Req.print(llvm::dbgs(), /*Indent=*/2);
     }
-  }
+  });
   return FunReq;
 }
 
@@ -989,12 +991,13 @@ BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
   addEmptyReqForBlocks(FunReq, BlocksToProcess,
                        planning::RequestLimit::NumInstrs{});
 
-  for (auto &[MBB, BBReq] : FunReq) {
-    LLVM_DEBUG(llvm::dbgs() << MBB->getFullName() << ":\n");
-    for (auto &Req : BBReq) {
-      LLVM_DEBUG(Req.print(llvm::dbgs(), /*Indent=*/2));
-    }
-  }
+  LLVM_DEBUG(for (auto &[MBB, BBReq]
+                  : FunReq) {
+    llvm::dbgs() << MBB->getFullName() << ":\n";
+    for ([[maybe_unused]] auto &Req : BBReq) {
+      Req.print(llvm::dbgs(), /*Indent=*/2);
+    };
+  });
   return FunReq;
 }
 
