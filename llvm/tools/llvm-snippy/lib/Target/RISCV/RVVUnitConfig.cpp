@@ -148,7 +148,7 @@ private:
 struct ModeChangeBias final {
   // Probability of generating a support mode-changing instruction
   // after a primary instruction
-  ModeChangeP ModeChangeP = ModeChangeP::ProbIsDeduced();
+  ModeChangeP ModeChangeProb = ModeChangeP::ProbIsDeduced();
 
   // Probability of choosing an illegal configuration when a mode-changing
   // instruction is selected
@@ -226,22 +226,22 @@ ModeChangeInfo deriveModeSwitchingProbability(const Config &Cfg,
   }) > 0.0;
   Result.VSETPresentInHistogram = VSETPresentInHistogram;
 
-  if (Bias.ModeChangeP.isDeduced() && !VSETPresentInHistogram)
+  if (Bias.ModeChangeProb.isDeduced() && !VSETPresentInHistogram)
     snippy::fatal(
         "No VSET instruction detected in histogram. With RVV you must specify "
         "mode-change-bias P or mode-changing instructions in histogram");
 
-  if (!Bias.ModeChangeP.isDeduced() && VSETPresentInHistogram)
+  if (!Bias.ModeChangeProb.isDeduced() && VSETPresentInHistogram)
     snippy::fatal(
         Twine(
             "It is forbidden to specify any mode-change-bias P other than \"") +
         ModeChangeP::ProbIsDeduced::Str +
         "\" when VSET* instructions are present in histogram");
 
-  assert(Bias.ModeChangeP.isDeduced() == VSETPresentInHistogram);
+  assert(Bias.ModeChangeProb.isDeduced() == VSETPresentInHistogram);
 
   if (!VSETPresentInHistogram) {
-    double ModeChangeBiasP = Bias.ModeChangeP.getAsDouble();
+    double ModeChangeBiasP = Bias.ModeChangeProb.getAsDouble();
     // FIXME: Currently there is a quirky behavior that we keep for
     // backward compatibility reasons:
     // if [VSET* instructions are not found in the histogram] &&
@@ -624,7 +624,7 @@ template <> struct yaml::MappingTraits<VTypeInfo> {
   }
 };
 
-template <> struct YAMLHistogramTraits<VLVMSequence::VLVMEntry> {
+template <> struct snippy::YAMLHistogramTraits<VLVMSequence::VLVMEntry> {
   using DenormEntry = VLVMSequence::VLVMEntry;
   using MapType = VLVMSequence;
 
@@ -716,15 +716,15 @@ template <> struct llvm::yaml::MappingTraits<ModeChangeBias> {
   static constexpr auto kProbBounds = "probability should be from [0.0;1.0]";
 
   static void mapping(IO &Io, ModeChangeBias &Guides) {
-    Io.mapRequired("P", Guides.ModeChangeP);
+    Io.mapRequired("P", Guides.ModeChangeProb);
     Io.mapOptional("Pvill", Guides.SetVillP);
   }
 
   static std::string validate(yaml::IO &IO, ModeChangeBias &Guides) {
     // TODO: implemenent alternative mode changing schemes and
     // replace probability with weight
-    if (!Guides.ModeChangeP.isDeduced() &&
-        !isCorrectProbability(Guides.ModeChangeP.getAsDouble()))
+    if (!Guides.ModeChangeProb.isDeduced() &&
+        !isCorrectProbability(Guides.ModeChangeProb.getAsDouble()))
       return std::string(RVVConfigurationSpace::kUnitName) + ": P " +
              kProbBounds;
 
@@ -1330,7 +1330,7 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
       VLEN, ConfigGenerator(std::move(ConfigPoints), ConfigWeights),
       VLGenerator(std::move(VLGen), VLWeights),
       VMGenerator(std::move(VMGen), VMWeights), ModeSwitchInfo,
-      !CS.Guides.ModeChangeP.isDeduced(), NeedsVXRMUpdate);
+      !CS.Guides.ModeChangeProb.isDeduced(), NeedsVXRMUpdate);
 }
 
 unsigned RVVConfigurationInfo::getVLEN() const { return VLEN; }

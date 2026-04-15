@@ -264,11 +264,10 @@ void TransactionStack::memUpdateNotification(MemoryAddressType Addr,
                                              const char *Data, size_t Size) {
   if (empty())
     return;
-  auto AddrEnd = Addr + Size;
   assert(
       any_of(
           InitialSnapshot.Mem,
-          [Addr, AddrEnd](const auto &MemChunk) {
+          [Addr, AddrEnd = Addr + Size](const auto &MemChunk) {
             auto MemBegin = MemChunk.first;
             auto MemEnd = MemBegin + MemChunk.second.size();
             bool Overlap = std::max(Addr, MemBegin) < std::min(AddrEnd, MemEnd);
