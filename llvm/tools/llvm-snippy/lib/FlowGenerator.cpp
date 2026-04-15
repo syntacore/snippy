@@ -131,8 +131,9 @@ void writeMIRFile(StringRef Data) {
 
 } // namespace
 
-static void dumpSelfcheck(const std::vector<char> &Data, size_t ChunkSize,
-                          size_t ChunksNum, raw_ostream &OS) {
+[[maybe_unused]] static void dumpSelfcheck(const std::vector<char> &Data,
+                                           size_t ChunkSize, size_t ChunksNum,
+                                           raw_ostream &OS) {
   for (size_t Offset = 0; Offset < Data.size();
        Offset += ChunkSize * ChunksNum) {
     OS << "\nOffset: 0x" << Twine::utohexstr(Offset);

@@ -489,7 +489,8 @@ public:
   selectFromContainerWeighted(ContainerT &Container,
                               std::discrete_distribution<unsigned> &DD)
       -> decltype(*Container.begin()) {
-    size_t ContainerSize = std::distance(Container.begin(), Container.end());
+    [[maybe_unused]] size_t ContainerSize =
+        std::distance(Container.begin(), Container.end());
     assert(ContainerSize > 0);
     assert(DD.probabilities().size() == ContainerSize);
 

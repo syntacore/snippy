@@ -887,8 +887,9 @@ static auto stringifyRequestStatus(GenerationStatus Status) {
   llvm_unreachable("unkown GenerationStatus");
 }
 
-static void printInterpretResult(raw_ostream &OS, const Twine &Prefix,
-                                 const GenerationResult &TheResult) {
+[[maybe_unused]] static void
+printInterpretResult(raw_ostream &OS, const Twine &Prefix,
+                     const GenerationResult &TheResult) {
   OS << Prefix << "InterpretResult={ ";
   TheResult.Stats.print(OS);
   OS << ", RequestStatus: " << stringifyRequestStatus(TheResult.Status) << " }";
@@ -913,7 +914,7 @@ generateNopsToSizeLimit(const planning::RequestLimit &Limit,
 
   while (Limit.getSizeLeft(InstrGenCtx.Stats) >=
          (GeneratedNopsSize + NopSize)) {
-    auto *MI = SnpTgt.generateNop(InstrGenCtx);
+    [[maybe_unused]] auto *MI = SnpTgt.generateNop(InstrGenCtx);
     assert(MI && "Nop generation failed");
 
     assert(NopSize == SnpTgt.getInstrSize(*MI, State));
@@ -1062,7 +1063,6 @@ static void postprocessMemoryOperands(
     const SmallVectorImpl<AddressInfoForInstr> &AddressesInfo) {
   auto *MAI = IGC.MAI;
   auto *MLI = IGC.MLI;
-  const auto *SLI = IGC.SLI;
   auto &SimCtx = IGC.SimCtx;
   auto &ProgCtx = IGC.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
@@ -1072,7 +1072,8 @@ static void postprocessMemoryOperands(
   assert(AddressesInfo.size() == NumAddrsToGen);
 
   auto *MBB = MI.getParent();
-  auto *ML = MLI ? MLI->getLoopFor(MBB) : nullptr;
+  [[maybe_unused]] const auto *SLI = IGC.SLI;
+  [[maybe_unused]] auto *ML = MLI ? MLI->getLoopFor(MBB) : nullptr;
   assert(!ML || SLI);
 
   for (size_t i = 0; i < NumAddrsToGen; ++i) {
@@ -1237,7 +1238,7 @@ void spillPseudoInstImplicitReg(MachineInstr &MI, Register Reg,
                                 InstructionGenerationContext &IGC) {
   auto &ProgCtx = IGC.ProgCtx;
   auto &SnpTgt = ProgCtx.getLLVMState().getSnippyTarget();
-  auto *MBBPtr = MI.getParent();
+  [[maybe_unused]] auto *MBBPtr = MI.getParent();
   assert(MBBPtr);
   auto RealStackPointer = ProgCtx.getStackPointer();
 

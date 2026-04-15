@@ -129,7 +129,8 @@ getRangeFromSelector(StringRef Selector) {
 
 static std::vector<NamedMemoryRange> collectRangesByExpr(Interpreter &I,
                                                          StringRef Selector) {
-  auto ErrorRet = Selector.consume_front("{") && Selector.consume_back("}");
+  [[maybe_unused]] auto ErrorRet =
+      Selector.consume_front("{") && Selector.consume_back("}");
   assert(ErrorRet && "Wrong opt formating");
   auto RangeOpt = getRangeFromSelector(Selector);
   if (!RangeOpt) {

@@ -187,7 +187,7 @@ static bool insertPreheaderIfNeeded(MachineLoop &ML, MachineLoopInfo &MLI,
     LLVM_DEBUG(dbgs() << "It's consecutive loop, skip preheader insertion\n");
     return false;
   }
-  if (auto *Preheader = ML.getLoopPreheader()) {
+  if ([[maybe_unused]] auto *Preheader = ML.getLoopPreheader()) {
     LLVM_DEBUG(dbgs() << "Loop has preheader, don't split:\n");
     LLVM_DEBUG(Preheader->dump());
     return false;

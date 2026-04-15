@@ -218,7 +218,7 @@ selectRegsForBranch(const MCInstrDesc &BranchDesc, MachineBasicBlock &Preheader,
   return ReservedRegs;
 }
 
-static void printSelectedRegs(
+[[maybe_unused]] static void printSelectedRegs(
     raw_ostream &OS, ArrayRef<Register> ReservedRegs,
     const MCRegisterInfo &RegInfo,
     std::optional<const MCRegisterClass *> MCRegClass = std::nullopt) {
