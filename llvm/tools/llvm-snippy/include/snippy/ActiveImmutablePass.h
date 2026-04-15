@@ -139,8 +139,8 @@ public:
         PassRegistry::getPassRegistry()->getPassInfo(Pass::getPassID());
     assert(DecoyPI && ThisPI &&
            "ActiveImmutablePass happens to be uninitialized");
-    auto DecoyPassName = DecoyPI->getPassName();
-    auto ThisPassName = ThisPI->getPassName();
+    [[maybe_unused]] auto DecoyPassName = DecoyPI->getPassName();
+    [[maybe_unused]] auto ThisPassName = ThisPI->getPassName();
     assert(DecoyPassName.consume_back(" Storage") &&
            "please, use SNIPPY_INITIALIZE_PASS()");
 
