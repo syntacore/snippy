@@ -176,6 +176,7 @@ void handleDiagnostic(LLVMContext &Ctx, const SnippyDiagnosticInfo &Diag) {
       case DS_Note:
         return HighlightColor::Note;
       }
+      llvm_unreachable("Unknown DiagnosticSeverity value");
     }();
 
     WithColor(errs(), Color)
