@@ -31,20 +31,20 @@ histogram:
     - [ADDI, 1.0]
     - [SW, 5.0]
 
-# NODEF: SNIPPY (rwx) : ORIGIN = 65536, LENGTH = 1536
+# NODEF: SNIPPY (rwx) : ORIGIN = 0x10000, LENGTH = 0x600
 # NODEF-NOT: PHDRS
 # NODEF: SECTIONS
-# WITHDEF: SNIPPY (rwx) : ORIGIN = 65536, LENGTH = 1536
+# WITHDEF: SNIPPY (rwx) : ORIGIN = 0x10000, LENGTH = 0x600
 # WITHDEF: PHDRS
 # WITHDEF: SECTIONS
 
 # BOTH: SECTIONS
 # BOTH: .snippy.1.rx
 # BOTH-NEXT: KEEP(*(.snippy.1.rx))
-# BOTH-NEXT: >SNIPPY :header0 
+# BOTH-NEXT: >SNIPPY :header0
 # BOTH: .snippy.2.rw
 # BOTH-NEXT: KEEP(*(.snippy.2.rw))
-# BOTH-NEXT: >SNIPPY :header1 
+# BOTH-NEXT: >SNIPPY :header1
 # BOTH: .snippy.named.rw
 # BOTH-NEXT: KEEP(*(.snippy.named.rw))
 # BOTH-NEXT: >SNIPPY :header2
