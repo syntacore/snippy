@@ -38,11 +38,10 @@ static snippy::opt<bool> DumpPHDRSDef(
              "that segments themself."),
     cl::cat(Options), cl::init(false));
 
-static snippy::opt<bool>
-    LinkerUseHex("linker-use-hex",
-                 cl::desc("Make linker script use hexadecimal numbers in "
-                          "linker script for better readability"),
-                 cl::cat(Options), cl::init(false));
+static snippy::opt<bool> LinkerUseHex(
+    "linker-use-hex",
+    cl::desc("Make linker script use hexadecimal numbers instead of decimal"),
+    cl::cat(Options), cl::init(true));
 
 static snippy::opt<std::string>
     SectionNamesPrefix("sections-prefix",
