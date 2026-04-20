@@ -158,9 +158,9 @@ public:
 
   virtual const MCRegisterClass &
   getRegClassSuitableForSP(const MCRegisterInfo &RI) const = 0;
-
-  virtual std::function<bool(MCRegister)>
-  filterSuitableRegsForStackPointer() const = 0;
+  virtual const MCRegisterClass &
+  getRegClassSuitableForRA(std::optional<unsigned> CallOpcode,
+                           const MCRegisterInfo &RI) const = 0;
 
   virtual MCRegister getStackPointer() const = 0;
   virtual MCRegister getReturnAddress() const = 0;
@@ -180,7 +180,7 @@ public:
 
   // NOTE: this list do not include stack pointer.
   virtual std::vector<MCRegister>
-  getRegsPreservedByABI(const MCSubtargetInfo &SubTgt) const = 0;
+  getCalleeSavedRegs(const MCSubtargetInfo &SubTgt) const = 0;
 
   // Checks if the given register belongs to a supported register class.
   virtual bool isRegClassSupported(MCRegister Reg) const = 0;
@@ -479,18 +479,15 @@ public:
 
   virtual MachineInstr *generateCall(InstructionGenerationContext &IGC,
                                      const Function &Target,
-                                     MDNode *MetadataMark) const = 0;
-
-  virtual MachineInstr *generateCall(InstructionGenerationContext &IGC,
-                                     const Function &Target,
                                      MDNode *MetadataMark,
-                                     unsigned PreferredCallOpCode) const = 0;
+                                     std::optional<unsigned> Opcode,
+                                     MCRegister RA) const = 0;
 
   virtual MachineInstr *generateTailCall(InstructionGenerationContext &IGC,
                                          const Function &Target) const = 0;
 
-  virtual MachineInstr *
-  generateReturn(InstructionGenerationContext &IGC) const = 0;
+  virtual MachineInstr *generateReturn(InstructionGenerationContext &IGC,
+                                       MCRegister RA) const = 0;
 
   virtual MachineInstr *
   generateNop(InstructionGenerationContext &IGC) const = 0;

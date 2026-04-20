@@ -18,7 +18,7 @@ call-graph:
     - name: fun3
       external: true
 
-# CHECK: PseudoCALL target-flags(riscv-call)
+# CHECK: PseudoJALCall
 # CHECK-SAME: @[[FUN:[a-zA-Z0-9]+]]
 # CHECK: Machine code for function [[FUN]]:
 

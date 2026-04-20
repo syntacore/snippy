@@ -48,7 +48,7 @@ sections:
 histogram:
     - [BNE, 3.0]
     - [SUB, 1.0]
-COMMENTED-CALLS    - [JAL, 3.0]
+COMMENTED-CALLS    - [JALR, 3.0]
 
 COMMENTED-CL code-layout:
 COMMENTED-CL   ranges:

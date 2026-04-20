@@ -4,6 +4,7 @@ options:
   mtriple: riscv64
   num-instrs: 500
   redefine-sp: "SP"
+  redefine-ra: "RA"
   dump-mf: true
   function-number: 2
   num-instr-ancil: 10
@@ -33,7 +34,7 @@ sections:
 histogram:
     - [BNE, 3.0]
     - [XOR, 1.0]
-    - [JAL, 3.0]
+    - [JALR, 3.0]
 
 code-layout:
   ranges:

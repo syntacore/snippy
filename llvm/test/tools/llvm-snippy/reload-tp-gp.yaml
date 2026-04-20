@@ -53,5 +53,5 @@ histogram:
 # Reload right before call
 # CHECK: $x3 = LD
 # CHECK: $x4 = LD
-# CHECK-NEXT: PseudoCALL
+# CHECK-NEXT: PseudoJALCall
 # CHECK-SAME: myfunc

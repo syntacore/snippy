@@ -60,8 +60,8 @@ public:
     llvm::sort(Res);
     llvm::sort(CallerSaved);
     std::vector<MCRegister> Result;
-    auto HasRAReg = llvm::any_of(Res, [&SnippyTgt](auto Reg) {
-      return Reg == SnippyTgt.getReturnAddress();
+    auto HasRAReg = llvm::any_of(Res, [&ProgCtx](auto Reg) {
+      return Reg == ProgCtx.getReturnAddress();
     });
     std::set_difference(Res.begin(), Res.end(), CallerSaved.begin(),
                         CallerSaved.end(), std::back_inserter(Result));
@@ -71,7 +71,7 @@ public:
     // because it can be picked as a scratch one
     auto &FG = getAnalysis<FunctionGenerator>();
     if (HasRAReg || !FG.isRootFunction(MF))
-      Result.push_back(SnippyTgt.getReturnAddress());
+      Result.push_back(ProgCtx.getReturnAddress());
 
     llvm::erase_if(Result, [&](auto &&Reg) {
       return !SnippyTgt.isRegClassSupported(Reg);
@@ -97,12 +97,19 @@ public:
       if (SGCtx.getConfig().PassCfg.CodeLayout) {
         auto &State = ProgCtx.getLLVMState();
         auto &Tgt = State.getSnippyTarget();
-        llvm::copy(Tgt.getRegsPreservedByABI(State.getSubtargetInfo()),
+        llvm::copy(Tgt.getCalleeSavedRegs(State.getSubtargetInfo()),
                    std::back_inserter(Ret));
+        Ret.push_back(ProgCtx.getReturnAddress());
         return Ret;
       }
       auto RegSet = getAllMutatedRegs(MF);
       llvm::copy(RegSet, std::back_inserter(Ret));
+      // FIXME: some target-dependent passes may insert code clobbering return
+      // address, so spill it anyway, We should prohibit such behavior in
+      // future.
+      auto RA = ProgCtx.getReturnAddress();
+      if (!RegSet.contains(RA))
+        Ret.push_back(RA);
     }
 
     llvm::erase_if(
@@ -313,6 +320,8 @@ void PrologueEpilogueInsertion::generateStackTermination(
 
 static void generateSpillToMem(InstructionGenerationContext &IGC,
                                ArrayRef<MCRegister> SpilledToMem) {
+  if (SpilledToMem.empty())
+    return;
   auto &MBB = IGC.MBB;
   auto RP = IGC.pushRegPool();
   auto &ProgCtx = IGC.ProgCtx;
@@ -354,12 +363,14 @@ bool PrologueEpilogueInsertion::insertPrologue(
   // for address forming.
   for (auto SpillReg : SpilledToStack)
     RP->addReserved(SpillReg);
-
-  if (IsEntry && !SpilledToMem.empty())
+  if (IsEntry) {
+    auto RA = ProgCtx.getReturnAddress();
+    auto RAABI = SnippyTgt.getReturnAddress();
+    if (RA != RAABI)
+      SnippyTgt.copyRegToReg(InstrGenCtx, RAABI, RA);
     generateSpillToMem(InstrGenCtx, SpilledToMem);
-
-  if (IsEntry)
     generateStackInitialization(InstrGenCtx);
+  }
 
   bool StaticStack = ProgCtx.getConfig().StaticStack;
   if (StaticStack) {

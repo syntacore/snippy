@@ -16,6 +16,6 @@ call-graph:
         - fun3
     - name: fun3
 
-# CHECK: PseudoCALL target-flags(riscv-call)
+# CHECK: PseudoJALCall
 # CHECK-SAME: @[[FUN:[a-zA-Z0-9]+]]
 # CHECK: Machine code for function [[FUN]]:

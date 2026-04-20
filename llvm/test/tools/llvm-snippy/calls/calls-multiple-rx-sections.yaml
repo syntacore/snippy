@@ -1,12 +1,12 @@
 # RUN: llvm-snippy %s -num-instrs=100 \
 # RUN: --num-instr-ancil=5 -o %t
-# RUN: llvm-objdump %t.elf -d |& FileCheck %s --check-prefix=DISABLED
+# RUN: llvm-objdump %t.elf --disassembler-options=no-aliases -d |& FileCheck %s --check-prefix=DISABLED
 # RUN: llvm-snippy %s -num-instrs=1000 \
 # RUN: --chained-rx-sections-fill --num-instr-ancil=50 -o %t
-# RUN: llvm-objdump %t.elf -d |& FileCheck %s --check-prefix=ENABLED
+# RUN: llvm-objdump %t.elf --disassembler-options=no-aliases -d |& FileCheck %s --check-prefix=ENABLED
 # RUN: llvm-snippy %s -num-instrs=1000 \
 # RUN: --chained-rx-sections-fill --chained-rx-sorted --num-instr-ancil=50 -o %t
-# RUN: llvm-objdump %t.elf -d |& FileCheck %s --check-prefix=SORTED
+# RUN: llvm-objdump %t.elf --disassembler-options=no-aliases -d |& FileCheck %s --check-prefix=SORTED
 # RUN: not llvm-snippy %s -num-instrs=2500 \
 # RUN: --chained-rx-sections-fill --num-instr-ancil=200 |& \
 # RUN: FileCheck %s --check-prefix=SECONDARY-ERROR
@@ -35,14 +35,14 @@ sections:
     LMA:       0x200000
     ACCESS:    rw
   - name:      1
-    VMA:       0x410000
+    VMA:       0x220000
     SIZE:      0x1000
-    LMA:       0x410000
+    LMA:       0x220000
     ACCESS:    rx
   - name:      4
-    VMA:       0x610000
+    VMA:       0x260000
     SIZE:      0x1000
-    LMA:       0x610000
+    LMA:       0x260000
     ACCESS:    rx
 
 histogram:
@@ -53,16 +53,16 @@ histogram:
 function-layers: 3
 function-number: 9
 
-# DISABLED-NOT: jr
+# DISABLED-NOT:  jalr    zero, 0x0({{[a-z0-9]+}}) <
 # DISABLED: ebreak
-# DISABLED-NOT: jr
+# DISABLED-NOT:  jalr    zero, 0x0({{[a-z0-9]+}}) <
 #
-# ENABLED-DAG: jr
+# ENABLED-DAG: jalr    zero, 0x0({{[a-z0-9]+}}) <
 # ENABLED-DAG: ebreak
-# ENABLED-DAG: jr
+# ENABLED-DAG: jalr    zero, 0x0({{[a-z0-9]+}}) <
 #
-# SORTED-COUNT-2: jr
-# SORTED-NOT: jr
+# SORTED-COUNT-2: jalr    zero, 0x0({{[a-z0-9]+}}) <
+# SORTED-NOT: jalr    zero, 0x0({{[a-z0-9]+}}) <
 # SORTED: ebreak
 # SECONDARY-ERROR: error: Failed to fit secondary code in specified RX sections: not enough contiguos space found.
 # ROOT-ERROR: error: RX section '{{[0-9]+}}' (size 4096) failed to fit code mapped to it. Total code size: {{[0-9]+}}
