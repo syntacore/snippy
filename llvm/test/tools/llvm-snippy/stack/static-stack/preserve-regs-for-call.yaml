@@ -27,10 +27,9 @@ histogram:
 #                     $x12 = ADDI $x12, -16
 #                     SD $x31, $x12, 0
 #                     $x20 = AUIPC target-flags(riscv-pcrel-hi) @fun2
-#                     $x20 = ADDI $x20
-#                     PseudoCALLIndirect $x20, implicit-def $x1
+#                     PseudoJALRCall $x20, implicit-def $x1
 #                     $x7 = LUI 64
 #                     $x7 = ADDI $x7, -768
 #                     $x31 = LD $x7, 0
 
-# CHECK: {{ADDI.*[[:space:]].*SD.*[[:space:]].*AUIPC.*[[:space:]].*ADDI.*[[:space:]].*PseudoCALLIndirect.*[[:space:]].*LUI.*[[:space:]].*ADDIW.*[[:space:]].*LD}}
+# CHECK: {{ADDI.*[[:space:]].*SD.*[[:space:]].*AUIPC.*[[:space:]].*PseudoJALRCall.*[[:space:]].*LUI.*[[:space:]].*ADDI.*[[:space:]].*LD}}

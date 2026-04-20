@@ -9,6 +9,7 @@ options:
   function-number: 32
   function-layers: 4
   redefine-sp: SP
+  redefine-ra: RA
   reserved-regs-list:
     - X5
     - X6
@@ -76,5 +77,5 @@ branches:
 
 # CHECK: SnippyFunction
 # CHECK: SD $x1, $x2, 0, pcsections
-# CHECK-NEXT: PseudoCALL
+# CHECK-NEXT: PseudoJALCall
 # CHECK-NEXT: $x1 = LD $x2, 0, pcsections

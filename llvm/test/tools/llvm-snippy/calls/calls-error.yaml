@@ -6,7 +6,7 @@
 # RUN: not llvm-snippy %t/good.yaml -mtriple=riscv64 -function-number=0 -function-layers=5 -num-instrs=100 \
 # RUN: --dump-mf -num-instr-ancil=50 -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=ZERO-FUN
 # RUN: not llvm-snippy %t/good.yaml -mtriple=riscv64 -function-number=20 -function-layers=5 -num-instrs=100 \
-# RUN: --dump-mf -num-instr-ancil=50 -reserved-regs-list=X1 -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=RA-RES
+# RUN: --dump-mf -num-instr-ancil=50 -reserved-regs-list=X1 -redefine-ra=RA -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=RA-RES
 # RUN: not llvm-snippy %t/good.yaml -mtriple=riscv64 -function-number=20 -function-layers=5 -num-instrs=all \
 # RUN: --dump-mf -num-instr-ancil=50 -model-plugin=NONEXISTENT |& FileCheck %s --check-prefix=ALL
 

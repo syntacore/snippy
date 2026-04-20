@@ -88,7 +88,7 @@ bool FillExternalFunctionsStubs::runOnModule(Module &M) {
     auto *MBB = createMachineBasicBlock(MF);
     MF.push_back(MBB);
     InstructionGenerationContext IGC{*MBB, MBB->end(), SGCtx};
-    SnippyTgt.generateReturn(IGC);
+    SnippyTgt.generateReturn(IGC, ProgCtx.getReturnAddress());
   }
 
   return true;

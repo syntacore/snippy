@@ -2673,7 +2673,7 @@ public:
   }
 
   std::vector<MCRegister>
-  getRegsPreservedByABI(const MCSubtargetInfo &SubTgt) const override {
+  getCalleeSavedRegs(const MCSubtargetInfo &SubTgt) const override {
     using namespace ::RISCV;
 
     std::vector<MCRegister> PreservedRegs{
@@ -2707,14 +2707,21 @@ public:
     return RI.getRegClass(RISCV::GPRNoX0RegClassID);
   }
 
-  std::function<bool(MCRegister)>
-  filterSuitableRegsForStackPointer() const override {
-
-    /* X6 is excluded, because it is the default destination for AUIPC in
-     * tailcalls */
-    return [](auto Reg) {
-      return Reg == RISCV::X0 || Reg == RISCV::X1 || Reg == RISCV::X6;
-    };
+  const MCRegisterClass &
+  getRegClassSuitableForRA(std::optional<unsigned> CallOpcode,
+                           const MCRegisterInfo &RI) const override {
+    if (!CallOpcode)
+      return RI.getRegClass(RISCV::GPRNoX0RegClassID);
+    switch (*CallOpcode) {
+    case RISCV::JAL:
+    case RISCV::JALR:
+      return RI.getRegClass(RISCV::GPRNoX0RegClassID);
+    case RISCV::C_JAL:
+    case RISCV::C_JALR:
+      return RI.getRegClass(RISCV::GPRX1RegClassID);
+    default:
+      llvm_unreachable("Bad call opcode");
+    }
   }
 
   MCRegister getStackPointer() const override { return RISCV::X2; }
@@ -2832,12 +2839,25 @@ public:
         .addImm(getSpillSizeInBytes(Reg, ProgCtx, IGC.getSubtargetImpl()));
   }
 
-  MachineInstr *generateCall(InstructionGenerationContext &IGC,
-                             const Function &Target,
-                             MDNode *MetadataMark) const override {
-    return generateCall(IGC, Target, MetadataMark, RISCV::JAL);
+  std::pair<MachineInstr *, MCSymbol *>
+  loadUpperPC(InstructionGenerationContext &IGC, unsigned DestReg,
+              const GlobalValue *Target) const {
+    auto &Ins = IGC.Ins;
+    auto &MBB = IGC.MBB;
+    auto &ProgCtx = IGC.ProgCtx;
+    const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
+    auto &State = ProgCtx.getLLVMState();
+    auto &Ctx = State.getCtx();
+    MachineFunction *MF = MBB.getParent();
+    MachineInstr *MIAUIPC =
+        getFormAddrInstBuilder(*this, MBB, Ins, Ctx,
+                               InstrInfo.get(RISCV::AUIPC))
+            .addDef(DestReg)
+            .addGlobalAddress(Target, 0, RISCVII::MO_PCREL_HI);
+    MCSymbol *AUIPCSymbol = MF->getContext().createNamedTempSymbol("pcrel_hi");
+    MIAUIPC->setPreInstrSymbol(*MF, AUIPCSymbol);
+    return std::make_pair(MIAUIPC, AUIPCSymbol);
   }
-
   MachineInstr *loadSymbolAddress(InstructionGenerationContext &IGC,
                                   unsigned DestReg,
                                   const GlobalValue *Target) const override {
@@ -2847,19 +2867,12 @@ public:
     const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
     auto &State = ProgCtx.getLLVMState();
     auto &Ctx = State.getCtx();
-    MachineFunction *MF = MBB.getParent();
 
     // Cannot emit PseudoLLA here, because this pseudo instruction is expanded
     // by RISCVPreRAExpandPseudo pass, which runs before register allocation.
     // That's why create auipc + addi pair manually.
 
-    MachineInstr *MIAUIPC =
-        getFormAddrInstBuilder(*this, MBB, Ins, Ctx,
-                               InstrInfo.get(RISCV::AUIPC))
-            .addDef(DestReg)
-            .addGlobalAddress(Target, 0, RISCVII::MO_PCREL_HI);
-    MCSymbol *AUIPCSymbol = MF->getContext().createNamedTempSymbol("pcrel_hi");
-    MIAUIPC->setPreInstrSymbol(*MF, AUIPCSymbol);
+    auto [_, AUIPCSymbol] = loadUpperPC(IGC, DestReg, Target);
 
     return getFormAddrInstBuilder(*this, MBB, Ins, Ctx,
                                   InstrInfo.get(RISCV::ADDI))
@@ -2883,46 +2896,95 @@ public:
   }
 
   MachineInstr *generateJAL(InstructionGenerationContext &IGC,
-                            const Function &Target,
+                            const Function &Target, MCRegister RA,
                             MDNode *MetadataMark) const {
     auto &ProgCtx = IGC.ProgCtx;
     const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
     auto &State = ProgCtx.getLLVMState();
     auto &Ctx = State.getCtx();
-    // Despite PseudoCALL gets expanded by RISCVMCCodeEmitter to JALR
-    // instruction, it has chance to be relaxed back to JAL by linker.
     return getInstBuilder(MetadataMark, *this, IGC.MBB, IGC.Ins, Ctx,
-                          InstrInfo.get(RISCV::PseudoCALL))
-        .addGlobalAddress(&Target, 0, RISCVII::MO_CALL);
+                          InstrInfo.get(RISCV::PseudoJALCall))
+        .addDef(RA)
+        .addGlobalAddress(&Target, 0, 0);
   }
 
-  MachineInstr *generateJALR(InstructionGenerationContext &IGC,
+  MachineInstr *generateCJAL(InstructionGenerationContext &IGC,
                              const Function &Target,
                              MDNode *MetadataMark) const {
     auto &ProgCtx = IGC.ProgCtx;
     const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
     auto &State = ProgCtx.getLLVMState();
     auto &Ctx = State.getCtx();
+    return getInstBuilder(MetadataMark, *this, IGC.MBB, IGC.Ins, Ctx,
+                          InstrInfo.get(RISCV::C_JAL))
+        .addGlobalAddress(&Target, 0, 0);
+  }
+
+  MachineInstr *generateCJALR(InstructionGenerationContext &IGC,
+                              const Function &Target,
+                              MDNode *MetadataMark) const {
+    auto &ProgCtx = IGC.ProgCtx;
+    const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
+    auto &State = ProgCtx.getLLVMState();
+    auto &Ctx = State.getCtx();
     const auto &RI = State.getRegInfo();
-    const auto &RegClass = RI.getRegClass(RISCV::GPRJALRRegClassID);
+    const auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
     auto RP = IGC.pushRegPool();
     auto Reg = getNonZeroReg("scratch register for storing function address",
                              RI, RegClass, *RP, IGC.MBB);
-    loadSymbolAddress(IGC, Reg, &Target);
+    auto [_, AUIPCSymbol] = loadUpperPC(IGC, Reg, &Target);
+
+    getFormAddrInstBuilder(*this, IGC.MBB, IGC.Ins, Ctx,
+                           InstrInfo.get(RISCV::ADDI))
+        .addDef(Reg)
+        .addReg(Reg)
+        .addSym(AUIPCSymbol, RISCVII::MO_PCREL_LO);
+
     return getInstBuilder(MetadataMark, *this, IGC.MBB, IGC.Ins, Ctx,
-                          InstrInfo.get(RISCV::PseudoCALLIndirect))
+                          InstrInfo.get(RISCV::C_JALR))
         .addReg(Reg);
   }
 
+  MachineInstr *generateJALR(InstructionGenerationContext &IGC,
+                             const Function &Target, MCRegister RA,
+                             MDNode *MetadataMark, bool Tail = false) const {
+    auto &ProgCtx = IGC.ProgCtx;
+    const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
+    auto &State = ProgCtx.getLLVMState();
+    auto &Ctx = State.getCtx();
+    const auto &RI = State.getRegInfo();
+    const auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
+    auto RP = IGC.pushRegPool();
+    auto Reg = getNonZeroReg("scratch register for storing function address",
+                             RI, RegClass, *RP, IGC.MBB);
+    auto [_, AUIPCSymbol] = loadUpperPC(IGC, Reg, &Target);
+
+    auto Jalr = getInstBuilder(
+        MetadataMark, *this, IGC.MBB, IGC.Ins, Ctx,
+        InstrInfo.get(Tail ? RISCV::PseudoJALRTail : RISCV::PseudoJALRCall));
+    if (!Tail)
+      Jalr.addDef(RA);
+    Jalr.addReg(Reg).addSym(AUIPCSymbol, RISCVII::MO_PCREL_LO);
+    return Jalr;
+  }
+
   MachineInstr *generateCall(InstructionGenerationContext &IGC,
-                             const Function &Target, MDNode *MetadataMark,
-                             unsigned PreferredCallOpcode) const override {
-    assert(isCall(PreferredCallOpcode) && "Expected call here");
-    switch (PreferredCallOpcode) {
+                             const Function &Target, MDNode *MM,
+                             std::optional<unsigned> OptOpcode,
+                             MCRegister RA) const override {
+    auto Opcode = OptOpcode ? *OptOpcode : RISCV::JALR;
+    assert(isCall(Opcode) && "Expected call here");
+    switch (Opcode) {
     case RISCV::JAL:
-      return generateJAL(IGC, Target, MetadataMark);
+      return generateJAL(IGC, Target, RA, MM);
     case RISCV::JALR:
-      return generateJALR(IGC, Target, MetadataMark);
+      return generateJALR(IGC, Target, RA, MM);
+    case RISCV::C_JAL:
+      assert(RA == RISCV::X1);
+      return generateCJAL(IGC, Target, MM);
+    case RISCV::C_JALR:
+      assert(RA == RISCV::X1);
+      return generateCJALR(IGC, Target, MM);
     default:
       snippy::fatal("Unsupported call instruction");
     }
@@ -2930,23 +2992,22 @@ public:
 
   MachineInstr *generateTailCall(InstructionGenerationContext &IGC,
                                  const Function &Target) const override {
-    auto &ProgCtx = IGC.ProgCtx;
-    const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
-    auto &State = ProgCtx.getLLVMState();
-    auto &Ctx = State.getCtx();
-    return getSupportInstBuilder(*this, IGC.MBB, IGC.Ins, Ctx,
-                                 InstrInfo.get(RISCV::PseudoTAIL))
-        .addGlobalAddress(&Target, 0, RISCVII::MO_CALL);
+    auto &State = IGC.ProgCtx.getLLVMState();
+    return generateJALR(
+        IGC, Target, RISCV::X0,
+        getMetadataMark(State.getCtx(), SnippyMetadata::Support),
+        /* Tail */ true);
   }
 
-  MachineInstr *
-  generateReturn(InstructionGenerationContext &IGC) const override {
+  MachineInstr *generateReturn(InstructionGenerationContext &IGC,
+                               MCRegister RA) const override {
     auto &State = IGC.ProgCtx.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
     auto MIB =
         getSupportInstBuilder(*this, IGC.MBB, IGC.Ins,
                               IGC.MBB.getParent()->getFunction().getContext(),
-                              InstrInfo.get(RISCV::PseudoRET));
+                              InstrInfo.get(RISCV::PseudoJALRRet))
+            .addReg(RA);
     return MIB;
   }
 
