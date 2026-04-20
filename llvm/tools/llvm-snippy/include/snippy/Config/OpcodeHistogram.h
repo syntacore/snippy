@@ -147,7 +147,9 @@ public:
   const TopOpcodesType &topOpcodes() const { return TopOpcodes; }
   TopOpcodesType &topOpcodes() { return TopOpcodes; }
   // get all unique opcodes including top-level histogram and all patterns
-  SmallVector<unsigned> uniqueOpcodes() const;
+  auto uniqueOpcodes() const {
+    return llvm::make_first_range(ProbVisitor.opcodeProbabilities());
+  }
 
   template <typename Predicate> void eraseTopOpcodes(Predicate &&Pred) {
     llvm::erase_if(ChildNodes, [&Pred, this](auto &&ArgPtr) {

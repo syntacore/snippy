@@ -3128,6 +3128,46 @@ This setting has the same value in all functions in the call graph.
 
       "error: Incompatible options: When the stack pointer is redefined to 'SP', generation of SP-relative instructions is not supported. Redefine it to 'any-not-SP' or remove SP-relative instructions from the histogram."
 
+.. _`_return_address`:
+
+Return address
+--------------
+
+Snippy generates return instructions in the end of each secondary function and in the main function if ``--last-instr=RET`` option is specified. In these instructions and in all generated call instructions it uses same register for return address that is chosen at configuration stage. User can control choice using following option:
+
+::
+
+   --redefine-ra=
+
+The options are:
+
+-  ``any`` |nbsp| -- |nbsp| Any random suitable register. If ``--honor-target-abi`` option is specified then target ABI return address register is always chosen.
+
+-  ``reg::R`` |nbsp| -- |nbsp| Specific register ``R``. If register is not suitable to be used as return address in at least one of call instructions specifid in histogram, the error is issued.
+
+-  ``RA`` |nbsp| -- |nbsp| Return address register specified by the ABI.
+
+-  ``any-not-RA`` |nbsp| -- |nbsp| Any random suitable register except for RA.
+
+**Default** is:
+
+-  ``any``
+
+Return address register must be distinct from stack pointer register, so be cautious when using this option in pair with ``--redefine-sp``. The configration error may occur if:
+
+- Same register is specified in both options. E.g. ``--redefine-ra=reg::X2 --redefine-sp=SP``
+
+- There is not enough available registers to choose distinct ra and sp.
+
+
+.. important::
+
+   If ``--honor-target-abi`` and ``--redefine-ra=any-not-RA`` are both specified then ra is chosen among ABI caller-saved(temporary) registers due to it's value being dirty at returning instruction. Using ``--honor-target-abi`` and ``--redefine-ra=reg::R`` with ``R`` that is not caller-saved is discouraged, because it's value would not be preserved. The warning is issued in both cases:
+
+   ::
+
+      "warning: When using --honor-target-abi and --redefine-sp/ra=reg::R  options together, target ABI may not be preserved in case of traps: use these options in combination only for valid code generation"
+
 .. _`_static_stack`:
 
 Static stack
