@@ -1,4 +1,4 @@
-# RUN: not llvm-snippy %s %S/Inputs/sections.yaml -model-plugin=None \
+# RUN: not llvm-snippy %s %S/Inputs/sections.yaml -model-plugin=None --redefine-ra=RA \
 # RUN:   |& FileCheck %s --dump-input=fail
 
 options:

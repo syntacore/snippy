@@ -10,7 +10,8 @@
 # RUN: --chained-rx-sorted -o %t |& FileCheck %s --check-prefix=ERR1
 # RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
 # RUN: --chained-rx-chunk-size=10 -o %t |& FileCheck %s --check-prefix=WARN
-
+options:
+  reserved-regs-list: [X1]
 sections:
   - name:      3
     VMA:       0x210000

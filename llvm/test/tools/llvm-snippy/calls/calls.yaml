@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -function-number=20 -function-layers=5 -num-instrs=100 \
+# RUN: llvm-snippy %s -mtriple=riscv64 -function-number=20 -function-layers=5 -num-instrs=1000 \
 # RUN: --dump-mf -num-instr-ancil=50 -verify-mi |& FileCheck %s
 
 sections:
@@ -25,9 +25,7 @@ histogram:
     - [JAL, 0.1]
     - [JALR, 0.1]
 
-# CHECK: AUIPC
-# CHECK-NEXT: ADDI
-# CHECK-NEXT: PseudoCALLIndirect
-# CHECK: PseudoCALL target-flags(riscv-call)
-# CHECK-SAME: @[[FUN:[a-zA-Z0-9]+]]
-# CHECK-DAG: Machine code for function [[FUN]]:
+# CHECK: $[[TMP1:[a-z0-9]+]] = AUIPC target-flags(riscv-pcrel-hi) @[[FUN1:[a-zA-Z0-9_]+]], pre-instr-symbol <mcsymbol .[[TMP_SYM1:[a-zA-Z0-9_]+]]>
+# CHECK-NEXT: ${{[a-z0-9]+}} = PseudoJALRCall $[[TMP1]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM1]]>
+# CHECK-DAG: PseudoJALCall
+# CHECK-DAG: Machine code for function [[FUN1]]:

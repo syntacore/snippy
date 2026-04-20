@@ -41,7 +41,11 @@ let Group = ProgramOptionsCategory in {
   def RedefineSP : StringOption<"redefine-sp">,
                    Description<"Specify the reg to use as a stack pointer">,
                    DefaultValue<"any">;
-
+  
+  def RedefineRA : StringOption<"redefine-ra">,
+                   Description<"Specify the reg to use as return address">,
+                   DefaultValue<"any">;
+  
   def PreserveCallerSavedRegs
       : CommaSeparatedList<"preserve-caller-saved-regs", StringType>,
         Description<

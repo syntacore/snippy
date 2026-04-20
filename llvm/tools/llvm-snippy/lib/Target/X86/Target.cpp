@@ -166,7 +166,7 @@ public:
   }
 
   std::vector<MCRegister>
-  getRegsPreservedByABI(const MCSubtargetInfo &SubTgt) const override {
+  getCalleeSavedRegs(const MCSubtargetInfo &SubTgt) const override {
     reportUnimplementedError();
   }
 
@@ -182,8 +182,9 @@ public:
     reportUnimplementedError();
   }
 
-  std::function<bool(MCRegister)>
-  filterSuitableRegsForStackPointer() const override {
+  const MCRegisterClass &
+  getRegClassSuitableForRA(std::optional<unsigned> CallOpcode,
+                           const MCRegisterInfo &RI) const override {
     reportUnimplementedError();
   }
 
@@ -251,14 +252,9 @@ public:
   }
 
   MachineInstr *generateCall(InstructionGenerationContext &IGC,
-                             const Function &Target,
-                             MDNode *MetadataMark) const override {
-    reportUnimplementedError();
-  }
-
-  MachineInstr *generateCall(InstructionGenerationContext &IGC,
                              const Function &Target, MDNode *MetadataMark,
-                             unsigned PreferredCallOpCode) const override {
+                             std::optional<unsigned> Opcode,
+                             MCRegister RA) const override {
     reportUnimplementedError();
   }
 
@@ -267,8 +263,8 @@ public:
     reportUnimplementedError();
   }
 
-  MachineInstr *
-  generateReturn(InstructionGenerationContext &IGC) const override {
+  MachineInstr *generateReturn(InstructionGenerationContext &IGC,
+                               MCRegister RA) const override {
     reportUnimplementedError();
   }
 

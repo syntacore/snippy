@@ -100,6 +100,10 @@ bool RISCVZcmpPopretCombine::runOnMachineFunction(MachineFunction &MF) {
   auto PopretOpcode = generateSingleOpcode(*PopretGen);
   if (PopretOpcode == RISCV::PseudoRET)
     return false;
+  if (SGCtx.getProgramContext().getReturnAddress() != RISCV::X1) {
+    snippy::fatal("Cannot generate cm.popret(z) with non-abi return adress "
+                  "register. Please, use redefine-ra=RA");
+  }
   auto RList = replacePrologueWithRListSpill(PopretOpcode, MF.front());
   replaceEpilogueWithPopret(PopretOpcode, RList, MF.back());
   return true;

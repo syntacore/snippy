@@ -1882,6 +1882,43 @@ def PseudoCALL : Pseudo<(outs), (ins call_symbol:$func), [],
                         "call", "$func">,
                  Sched<[WriteIALU, WriteJalr, ReadJalr]>;
 
+// Following group of pseudos is used in llvm-snippy to generate arbitrary call instructions that are not usually emitted directly by usual code generation.
+// * PseudoJALCall - call, expanded to JAL
+// * PseudoJALRCall - call, expanded to JALR
+// * PseudoJALRRet - return, expanded to JALR with destination as X0.
+// * PseudoJALRTail - tail call, expanded to JALR with destination as X0.
+
+let isCall = 1, isCodeGenOnly = 1, Size = 4, hasSideEffects = 0,
+    mayStore = 0, mayLoad = 0 in {
+
+def PseudoJALCall : Pseudo<(outs GPR:$rd), (ins simm21_lsb0_jal:$imm20),
+                                  []>,
+                           PseudoInstExpansion<(JAL GPR:$rd, simm21_lsb0_jal:$imm20)>,
+                           Sched<[WriteJal]>;
+
+def PseudoJALRCall : Pseudo<(outs GPR:$rd), (ins GPR:$rs1, simm12:$imm12),
+                                  []>,
+                           PseudoInstExpansion<(JALR GPR:$rd, GPR:$rs1, simm12:$imm12)>,
+                           Sched<[WriteJalr, ReadJalr]>;
+
+}
+
+let isTerminator = 1, isReturn = 1, isCodeGenOnly = 1, Size = 4, hasSideEffects = 0,
+    mayStore = 0, mayLoad = 0 in {
+
+
+def PseudoJALRRet : Pseudo<(outs), (ins GPR:$rs1),
+                                  []>,
+                           PseudoInstExpansion<(JALR X0, GPR:$rs1, 0)>,
+                           Sched<[ReadJalr]>;
+
+def PseudoJALRTail : Pseudo<(outs), (ins GPR:$rs1, simm12:$imm12),
+                                  []>,
+                           PseudoInstExpansion<(JALR X0, GPR:$rs1, simm12:$imm12)>,
+                           Sched<[ReadJalr]>;
+
+}
+
 def : Pat<(riscv_call tglobaladdr:$func), (PseudoCALL tglobaladdr:$func)>;
 def : Pat<(riscv_call texternalsym:$func), (PseudoCALL texternalsym:$func)>;
 

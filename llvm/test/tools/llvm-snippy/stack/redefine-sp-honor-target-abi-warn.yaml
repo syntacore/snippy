@@ -22,4 +22,4 @@ histogram:
     - [DIV, 1.0]
     - [ADD, 1.0]
   
-# CHECK: warning: (inconsistent-options) When using --honor-target-abi and --redefine-sp=any-not-SP options together, target ABI may not be preserved in case of traps: use these options in combination only for valid code generation
+# CHECK: warning: (inconsistent-options) When using --honor-target-abi and --redefine-sp/ra=any-not-SP options together, target ABI may not be preserved in case of traps: use these options in combination only for valid code generation

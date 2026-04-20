@@ -289,6 +289,7 @@ public:
   bool stackEnabled() const { return hasStackSection() || hasExternalStack(); }
 
   MCRegister getStackPointer() const { return StackPointer; }
+  MCRegister getReturnAddress() const { return ReturnAddress; }
 
   auto getStackTop() const {
     assert(hasStackSection() && "No stack section");
@@ -366,6 +367,7 @@ private:
   std::unique_ptr<StaticStackContext> StaticStack;
 
   MCRegister StackPointer;
+  MCRegister ReturnAddress;
   bool MangleExportedNames;
   std::string EntryPointName;
   bool ExternalStack;

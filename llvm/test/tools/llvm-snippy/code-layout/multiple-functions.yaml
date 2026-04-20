@@ -47,4 +47,4 @@ histogram:
     - [SW,  3.0]
     - [JAL, 1.0]
 
-# CHECK: PseudoCALL
+# CHECK: PseudoJALCall
