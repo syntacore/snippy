@@ -44,5 +44,5 @@ histogram:
      - [ADDIW, 1.0]
 
 # CHECK: $x2 = ADD $x5, $x0
-# CHECK-NEXT:  PseudoCALL target-flags(riscv-call) @myfunc
+# CHECK-NEXT:  PseudoJALCall @myfunc
 # CHECK-NEXT:  $x5 = ADD $x2, $x0

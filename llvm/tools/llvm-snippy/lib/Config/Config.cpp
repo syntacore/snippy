@@ -598,76 +598,221 @@ static void generateSPRelativeInstrsError(StringRef RedefineSP) {
           "`redefine-sp` option or remove SP-relative instructions from the "
           "histogram.");
 }
+namespace {
 
-static MCRegister getRealStackPointer(
+struct RegChoice {
+  enum class Opt { Reg, Any, ABI, AnyNotABI };
+
+  Opt get() const { return Val; }
+
+  std::pair<StringRef, MCRegister> getSpecific() const {
+    assert(RegVal.has_value() && "No specifc reg specified");
+    auto &&[Name, Reg] = *RegVal;
+    return std::make_pair(StringRef(Name), Reg);
+  }
+
+  MCRegister getSpecificReg() const {
+    assert(RegVal.has_value() && "No specifc reg specified");
+    return RegVal->second;
+  }
+
+  std::optional<MCRegister> getSpecificRegIfCan() const {
+    if (Val == Opt::Reg)
+      return RegVal->second;
+    return std::nullopt;
+  }
+
+  RegChoice(StringRef ABIName, StringRef OptionVal, StringRef OptionName,
+            const SnippyTarget &Tgt, const MCRegisterInfo &RI) {
+    if (OptionVal == ABIName) {
+      Val = Opt::ABI;
+      return;
+    }
+    if (OptionVal == "any") {
+      Val = Opt::Any;
+      return;
+    }
+    StringRef PrefixAnyNot = "any-not-";
+    if (OptionVal.starts_with(PrefixAnyNot)) {
+      auto ExpectABIName = OptionVal;
+      ExpectABIName.consume_front(PrefixAnyNot);
+      if (ExpectABIName != ABIName) {
+        snippy::fatal(
+            formatv("\"{0}\" passed to {1} is invalid, did you mean '{2}{3}'",
+                    OptionVal, OptionName, PrefixAnyNot, ABIName));
+      }
+      Val = Opt::AnyNotABI;
+      return;
+    }
+    StringRef PrefixReg = "reg::";
+    if (!OptionVal.starts_with(PrefixReg)) {
+      snippy::fatal(formatv("\"{0}\", passed to {1} is not valid option value",
+                            OptionVal, OptionName));
+    }
+    auto RegName = OptionVal;
+    RegName.consume_front(PrefixReg);
+    auto RegV = findRegisterByName(Tgt, RI, RegName);
+    if (!RegV)
+      snippy::fatal(formatv("Illegal register name {0}"
+                            " is specified in {1}",
+                            RegName, OptionName));
+    Val = Opt::Reg;
+    RegVal = std::make_pair(std::string(RegName), *RegV);
+  }
+
+private:
+  Opt Val;
+  std::optional<std::pair<std::string, MCRegister>> RegVal;
+};
+
+} // namespace
+
+static MCRegister chooseRA(const RegPoolWrapper &RP, const SnippyTarget &Tgt,
+                           const MCRegisterInfo &RI, const Config &Cfg,
+                           const RegChoice &RAChoice,
+                           std::optional<MCRegister> SP, bool FollowTargetABI,
+                           ArrayRef<MCRegister> SpilledToStack) {
+  SmallVector<unsigned, 3> CallOpcodes;
+  llvm::copy_if(Cfg.Histogram.uniqueOpcodes(), std::back_inserter(CallOpcodes),
+                [&](auto &&Opcode) { return Tgt.isCall(Opcode); });
+  auto RA = Tgt.getReturnAddress();
+  bool CanUseABI = true;
+  const auto &RARegClass = Tgt.getRegClassSuitableForRA(std::nullopt, RI);
+  auto NotAvailableForSomeCalls = [&](auto &&Reg) {
+    return llvm::any_of(CallOpcodes, [&](auto &&Opcode) {
+      auto &RC = Tgt.getRegClassSuitableForRA(Opcode, RI);
+      return !RC.contains(Reg);
+    });
+  };
+  auto IsCalleeSavedInABIMode = [&](auto &&Reg) {
+    return FollowTargetABI &&
+           (llvm::count(SpilledToStack, Reg) || Reg == Tgt.getStackPointer());
+  };
+  auto Filter = [&](auto Reg) {
+    return !RARegClass.contains(Reg) || (!CanUseABI && Reg == RA) ||
+           NotAvailableForSomeCalls(Reg) || (SP && (*SP == Reg)) ||
+           IsCalleeSavedInABIMode(Reg);
+  };
+
+  switch (RAChoice.get()) {
+  case RegChoice::Opt::ABI:
+    return RA;
+  case RegChoice::Opt::AnyNotABI:
+    CanUseABI = false;
+    LLVM_FALLTHROUGH;
+  case RegChoice::Opt::Any:
+    if (CanUseABI && FollowTargetABI)
+      return RA;
+    return RP.getAvailableRegister("return address", RI, RARegClass, Filter);
+  case RegChoice::Opt::Reg: {
+    auto [RegStr, Reg] = RAChoice.getSpecific();
+    if (Filter(Reg))
+      snippy::fatal(
+          formatv("Register {0} specified in --redefine-ra is not suitable "
+                  "for return address redefinition",
+                  RegStr));
+    return Reg;
+  }
+  }
+  llvm_unreachable("Unhandled choice");
+}
+
+static std::pair<MCRegister, MCRegister> configureSPandRA(
     const RegPoolWrapper &RP, const SnippyTarget &Tgt, const MCRegisterInfo &RI,
     std::vector<MCRegister> &SpilledToStack, LLVMContext &Ctx, Config &Cfg,
     const ProgramOptions &Opts, bool HasSPRelativeInstrs) {
   auto SP = Tgt.getStackPointer();
+  auto RA = Tgt.getReturnAddress();
   bool FollowTargetABI = Cfg.ProgramCfg.FollowTargetABI;
   bool StaticStack = Cfg.ProgramCfg.StaticStack;
   std::string RedefineSP = Opts.RedefineSP;
+  std::string RedefineRA = Opts.RedefineRA;
+  auto SPChoice = RegChoice("SP", RedefineSP, "--redefine-sp", Tgt, RI);
+  auto RAChoice = RegChoice("RA", RedefineRA, "--redefine-ra", Tgt, RI);
+  auto NotABIAndNotAny = [](auto &Choice) {
+    return Choice.get() != RegChoice::Opt::ABI &&
+           Choice.get() != RegChoice::Opt::Any;
+  };
+  bool BothSame = SPChoice.get() == RegChoice::Opt::Reg &&
+                  RAChoice.get() == RegChoice::Opt::Reg &&
+                  SPChoice.getSpecificReg() == RAChoice.getSpecificReg();
+  bool BothRA = SPChoice.get() == RegChoice::Opt::Reg &&
+                SPChoice.getSpecificReg() == RA &&
+                RAChoice.get() == RegChoice::Opt::ABI;
+  bool BothSP = RAChoice.get() == RegChoice::Opt::Reg &&
+                RAChoice.getSpecificReg() == SP &&
+                SPChoice.get() == RegChoice::Opt::ABI;
 
-  bool NotSPAndNotAny = RedefineSP != "SP" && RedefineSP != "any";
+  if (BothSame || BothRA || BothSP)
+    snippy::fatal(
+        "Cannot assign stack pointer and return address to same register");
+
   if (!StaticStack && HasSPRelativeInstrs && Opts.RedefineSP.isSpecified() &&
-      !NotSPAndNotAny)
+      !NotABIAndNotAny(SPChoice))
     generateSPRelativeInstrsError(RedefineSP);
 
+  // Choose RA first.
+  auto RealRA =
+      chooseRA(RP, Tgt, RI, Cfg, RAChoice, SPChoice.getSpecificRegIfCan(),
+               FollowTargetABI, SpilledToStack);
+  // Add redefined RA to spill list to be able to exit from snippy function
+  // correctly as required by target abi. We still want to spill target return
+  // address register as abi may require it to be preserved.
+  if (FollowTargetABI && (RealRA != RA) && !llvm::count(SpilledToStack, RealRA))
+    SpilledToStack.push_back(RealRA);
+
   if (FollowTargetABI) {
-    if (NotSPAndNotAny)
+    if (NotABIAndNotAny(SPChoice) || NotABIAndNotAny(RAChoice))
       snippy::warn(
           WarningName::InconsistentOptions, Ctx,
-          "When using --honor-target-abi and --redefine-sp=" +
+          "When using --honor-target-abi and --redefine-sp/ra=" +
               Twine(RedefineSP) +
               " options together, target ABI may not be preserved in case of "
               "traps",
           "use these options in combination only for valid code generation");
     else
-      RedefineSP = "SP";
+      return std::make_pair(SP, RA);
   }
 
-  if (RedefineSP == "SP")
-    return SP;
+  if (SPChoice.get() == RegChoice::Opt::ABI)
+    return std::make_pair(SP, RealRA);
 
   MCRegister RealSP = MCRegister::NoRegister;
-  bool CanUseSP =
-      StaticStack || (RedefineSP != "any-not-SP" && !HasSPRelativeInstrs);
+  bool CanUseSP = StaticStack || (SPChoice.get() != RegChoice::Opt::AnyNotABI &&
+                                  !HasSPRelativeInstrs);
   const auto &SPRegClass = Tgt.getRegClassSuitableForSP(RI);
-  auto BasicFilter = Tgt.filterSuitableRegsForStackPointer();
 
   auto FullFilter = [&](auto Reg) {
-    return std::invoke(BasicFilter, Reg) || (!CanUseSP && Reg == SP) ||
+    return !SPRegClass.contains(Reg) || Reg == RealRA ||
+           (!CanUseSP && Reg == SP) ||
            (!FollowTargetABI && llvm::any_of(SpilledToStack, [Reg](auto SpReg) {
              return SpReg == Reg;
            }));
   };
 
-  std::string RegPrefix = "reg::";
-  if (RedefineSP.rfind(RegPrefix, 0) != std::string::npos) {
-    auto RegStr = RedefineSP.substr(RegPrefix.size());
-    auto Reg = findRegisterByName(Tgt, RI, RegStr);
-    if (!Reg)
-      snippy::fatal(formatv("Illegal register name {0}"
-                            " is specified in --redefine-sp",
-                            RegStr));
+  switch (SPChoice.get()) {
+  case RegChoice::Opt::Reg: {
+    auto [RegStr, Reg] = SPChoice.getSpecific();
 
-    if (!StaticStack && Reg.value() == SP && HasSPRelativeInstrs)
+    if (!StaticStack && Reg == SP && HasSPRelativeInstrs)
       generateSPRelativeInstrsError(RedefineSP);
 
-    if (FullFilter(Reg.value()))
+    if (FullFilter(Reg))
       snippy::fatal(
           formatv("Register {0} specified in --redefine-sp is not suitable "
                   "for stack pointer redefinition",
                   RegStr));
 
-    RealSP = Reg.value();
-  } else if (RedefineSP == "any" || RedefineSP == "any-not-SP") {
+    RealSP = Reg;
+    break;
+  }
+  case RegChoice::Opt::Any:
+  case RegChoice::Opt::AnyNotABI:
     RealSP =
         RP.getAvailableRegister("stack pointer", RI, SPRegClass, FullFilter);
-  } else {
-    snippy::fatal(
-        formatv("\"{0}\", passed to --redefine-sp is not valid option value",
-                RedefineSP));
+    break;
+  default:
+    llvm_unreachable("unhandled case");
   }
 
   // We need to spill SP if it is not used as intended
@@ -678,7 +823,7 @@ static MCRegister getRealStackPointer(
     SpilledToStack.push_back(SP);
   }
 
-  return RealSP;
+  return std::make_pair(RealSP, RealRA);
 }
 
 static std::vector<std::string> parseModelPluginList(const ModelOptions &Opts) {
@@ -889,7 +1034,7 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
                    "--spilled-regs-list is ignored",
                    "--honor-target-abi is enabled.");
     RegsSpilledToStack.clear();
-    auto ABIPreserved = Tgt.getRegsPreservedByABI(State.getSubtargetInfo());
+    auto ABIPreserved = Tgt.getCalleeSavedRegs(State.getSubtargetInfo());
     // Global Regs will be spilled separately as we need to spill them to
     // Memory, not stack.
     llvm::copy_if(
@@ -897,7 +1042,7 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
         [&](auto Reg) { return !llvm::is_contained(RegsSpilledToMem, Reg); });
   }
 
-  ProgCfg.StackPointer = getRealStackPointer(
+  std::tie(ProgCfg.StackPointer, ProgCfg.ReturnAddress) = configureSPandRA(
       RP, Tgt, RI, RegsSpilledToStack, Ctx, Cfg, Opts, HasSPRelativeInstrs);
   llvm::copy(RegsSpilledToStack, std::back_inserter(ProgCfg.SpilledToStack));
   llvm::copy(RegsSpilledToMem, std::back_inserter(ProgCfg.SpilledToMem));
@@ -1261,8 +1406,11 @@ static bool hasCallees(const FunctionDesc &FuncDesc) {
 }
 
 static void deleteCallsIfNeeded(
-    const SnippyTarget &Tgt, OpcodeHistogram &Histogram,
-    const std::variant<CallGraphLayout, FunctionDescs> &CGLayout) {
+    LLVMState &State, const OpcodeCache &OpCC, OpcodeHistogram &Histogram,
+    const std::variant<CallGraphLayout, FunctionDescs> &CGLayout,
+    MCRegister RA) {
+  auto &Tgt = State.getSnippyTarget();
+  auto &RI = State.getRegInfo();
   auto IsCall = [&Tgt](unsigned Opcode) { return Tgt.isCall(Opcode); };
   auto CallsWeight = Histogram.getTopOpcodesWeight(IsCall);
   if (CallsWeight < std::numeric_limits<decltype(CallsWeight)>::epsilon())
@@ -1294,6 +1442,15 @@ static void deleteCallsIfNeeded(
                    }
                  }),
              CGLayout);
+  for (auto &&CallOpcode :
+       make_filter_range(Histogram.uniqueOpcodes(),
+                         [&](auto &&Opcode) { return Tgt.isCall(Opcode); })) {
+    auto &RARegClass = Tgt.getRegClassSuitableForRA(CallOpcode, RI);
+    if (!RARegClass.contains(RA))
+      snippy::fatal(llvm::formatv("Call instruction {0} does not support {1} "
+                                  "as return address register.",
+                                  OpCC.name(CallOpcode), RI.getName(RA)));
+  }
 }
 
 static void checkBurstGram(LLVMContext &Ctx, const OpcodeHistogram &Histogram,
@@ -1612,8 +1769,7 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
                   "is not provided.");
 
   if (hasCallInstrs(OpCC, Tgt)) {
-    const auto &RI = State.getRegInfo();
-    auto RA = RI.getRARegister();
+    auto RA = ProgramCfg.ReturnAddress;
     if (RP.isReserved(RA))
       snippy::fatal(State.getCtx(),
                     "Cannot generate requested call instructions",
@@ -1720,7 +1876,8 @@ void Config::complete(LLVMState &State, const OpcodeCache &OpCC) {
   // Data flow histogram.
   auto &DFHistogram = DefFlowConfig.DataFlowHistogram;
   DFHistogram = Histogram;
-  deleteCallsIfNeeded(State.getSnippyTarget(), DFHistogram, PassCfg.CGLayout);
+  deleteCallsIfNeeded(State, OpCC, DFHistogram, PassCfg.CGLayout,
+                      ProgramCfg.ReturnAddress);
   auto DFOpcodesToErase = [&](unsigned Opcode) {
     auto *Desc = OpCC.desc(Opcode);
     const auto &Tgt = State.getSnippyTarget();

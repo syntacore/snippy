@@ -1145,13 +1145,21 @@ MachineInstr *generateCall(unsigned OpCode,
 
   auto &CallTarget = *RandEngine::selectFromContainer(CalleeNode->functions());
   assert(CallTarget.hasName());
+  auto RA = ProgCtx.getReturnAddress();
+  auto &RP = InstrGenCtx.getRegPool();
+  auto SpillRA = RP.isReserved(RA, MBB);
+  auto RealStackPointer = ProgCtx.getStackPointer();
+  if (SpillRA)
+    SnippyTgt.generateSpillToStack(InstrGenCtx, RA, RealStackPointer);
 
   auto *Call =
-      SnippyTgt.generateCall(InstrGenCtx, CallTarget, MetadataMark, OpCode);
+      SnippyTgt.generateCall(InstrGenCtx, CallTarget, MetadataMark, OpCode, RA);
   assert(Call);
   if (CalleeNode->isExternal())
     addSnippyMetadata(*Call, *MBB.getParent(), State.getCtx(),
                       SnippyMetadata::ExternalCall);
+  if (SpillRA)
+    SnippyTgt.generateReloadFromStack(InstrGenCtx, RA, RealStackPointer);
 
   Node->markAsCommitted(CalleeNode);
   return Call;
@@ -1550,17 +1558,17 @@ void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
   planning::InstructionGenerationContext InstrGenCtx{MBB, MF.back().end(), GC,
                                                      SimCtx};
   auto RP = InstrGenCtx.pushRegPool();
-
+  auto &SnippyTgt = State.getSnippyTarget();
+  auto RA = ProgCtx.getReturnAddress();
   // Secondary functions always return.
   if (!CGS || !CGS->isRootFunction(MF)) {
-    State.getSnippyTarget().generateReturn(InstrGenCtx);
+    SnippyTgt.generateReturn(InstrGenCtx, RA);
     return;
   }
 
   // Root functions are connected via tail calls.
   if (!CGS->isExitFunction(MF)) {
-    State.getSnippyTarget().generateTailCall(InstrGenCtx,
-                                             *CGS->nextRootFunction(MF));
+    SnippyTgt.generateTailCall(InstrGenCtx, *CGS->nextRootFunction(MF));
     return;
   }
 
@@ -1569,9 +1577,7 @@ void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
 
   // User may ask for last instruction to be return.
   if (PassCfg.InstrsGenerationConfig.useRetAsLastInstr()) {
-    State.getSnippyTarget()
-        .generateReturn(InstrGenCtx)
-        ->setPreInstrSymbol(MF, ExitSym);
+    SnippyTgt.generateReturn(InstrGenCtx, RA)->setPreInstrSymbol(MF, ExitSym);
     return;
   }
 

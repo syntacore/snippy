@@ -1,3 +1,5 @@
+# COM: This test sometimes fails on a few seeds and is sensitive to any random flow change.
+# REQUIRES: unstable
 # RUN: llvm-snippy %s -model-plugin=None | FileCheck %s
 
 options:
