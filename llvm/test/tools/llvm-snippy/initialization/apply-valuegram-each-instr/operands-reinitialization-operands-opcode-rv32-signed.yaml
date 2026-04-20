@@ -23,4 +23,4 @@ operands-reinitialization:
 #      Reinit <     $x7 = LUI 524288, pcsections <0x55fa487fa378>
 #              |_   $x26 = REM $x9, $x7
 #
-# CHECK: [[XREG1:\$x[0-9]+]] = LUI 524288{{.*[[:space:]].*}}[[XREG2:\$x[0-9]+]] = LUI 524288{{.*[[:space:]].*}}[[XREG2:\$x[0-9]+]] = REM [[XREG1]], [[XREG2]]
+# CHECK: [[XREG1:\$x[0-9]+]] = LUI 524288{{.*[[:space:]].*}}[[XREG2:\$x[0-9]+]] = LUI 524288{{.*[[:space:]].*}}[[XREG3:\$x[0-9]+]] = REM [[XREG1]], [[XREG2]]

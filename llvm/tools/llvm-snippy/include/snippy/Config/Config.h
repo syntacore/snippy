@@ -50,6 +50,7 @@ public:
   // stack frame specific.
   std::string ABIName;
   MCRegister StackPointer;
+  MCRegister ReturnAddress;
   bool FollowTargetABI;
   std::vector<std::string> PreserveCallerSavedGroups;
   SmallVector<MCRegister> SpilledToStack;
