@@ -95,7 +95,9 @@ private:
     }
   }
 
-  auto getPreserveRegs(MachineFunction &MF, const SnippyTarget &SnippyTgt) {
+  auto getPreserveRegs(MachineFunction &MF,
+                       const SnippyProgramContext &ProgCtx) {
+    auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
     auto PreserveRegs =
         SnippyTgt.getCallerSavedRegs(MF, SnippyTgt.getCallerSavedRegGroups());
     auto MutatedRegs = getAllMutatedRegs(MF);
@@ -106,7 +108,7 @@ private:
     std::set_intersection(PreserveRegs.begin(), PreserveRegs.end(),
                           MutatedRegs.begin(), MutatedRegs.end(),
                           std::back_inserter(Result));
-    auto RAIt = llvm::find(Result, SnippyTgt.getReturnAddress());
+    auto RAIt = llvm::find(Result, ProgCtx.getReturnAddress());
     if (RAIt != Result.end())
       Result.erase(RAIt);
     return Result;
@@ -121,7 +123,7 @@ private:
     auto &ProgCtx = SGCtx.getProgramContext();
     auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
     auto &MF = *MBB.getParent();
-    auto PreserveRegs = getPreserveRegs(MF, SnippyTgt);
+    auto PreserveRegs = getPreserveRegs(MF, ProgCtx);
 
     auto *TRI = MF.getSubtarget().getRegisterInfo();
     assert(TRI && "register information must be available");

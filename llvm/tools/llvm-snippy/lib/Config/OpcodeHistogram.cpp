@@ -209,11 +209,6 @@ codeInstrFromOpcode(yaml::IO &IO, const OpcodeHistogramDecodedEntry &E) {
                                    std::to_string(First.Weight)};
 }
 
-SmallVector<unsigned> OpcodeHistogram::uniqueOpcodes() const {
-  auto Opcodes = llvm::make_first_range(ProbVisitor.opcodeProbabilities());
-  return SmallVector<unsigned>(std::move(Opcodes));
-}
-
 unsigned OpcodeHistogram::getCFInstrsNum(unsigned InstrsNum,
                                          const OpcodeCache &OpCC) const {
   // CF instructions can only be present in the top-level histogram.
