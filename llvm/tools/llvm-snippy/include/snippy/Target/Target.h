@@ -55,6 +55,9 @@ class DynamicLibrary;
 } // namespace sys
 
 namespace snippy {
+namespace planning {
+class PreselectedOpInfo;
+} // namespace planning
 struct SectionDesc;
 struct Branchegram;
 class LLVMState;
@@ -307,6 +310,8 @@ public:
   createRegisterState(const TargetGenContextInterface &TgtGenCtx,
                       const TargetSubtargetInfo &ST) const = 0;
 
+  virtual std::string getDefaultLastInstr() const = 0;
+
   virtual void generateRegsInit(InstructionGenerationContext &IGC,
                                 const IRegisterState &R) const = 0;
 
@@ -315,7 +320,8 @@ public:
 
   virtual void generateCustomInst(
       const MCInstrDesc &InstrDesc,
-      planning::InstructionGenerationContext &InstrGenCtx) const = 0;
+      planning::InstructionGenerationContext &InstrGenCtx,
+      ArrayRef<planning::PreselectedOpInfo> Preselected) const = 0;
 
   virtual bool requiresCustomGeneration(const MCInstrDesc &InstrDesc) const = 0;
   virtual bool

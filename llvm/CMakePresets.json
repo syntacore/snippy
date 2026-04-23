@@ -11,7 +11,7 @@
         "LLVM_ENABLE_ASSERTIONS": "ON",
         "LLVM_OPTIMIZED_TABLEGEN": "ON",
         "LLVM_CCACHE_BUILD": "ON",
-        "LLVM_TARGETS_TO_BUILD": "RISCV",
+        "LLVM_TARGETS_TO_BUILD": "RISCV;AArch64",
         "LLVM_BUILD_SNIPPY": "ON",
         "LLVM_ENABLE_SPHINX": "ON"
       }
