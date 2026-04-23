@@ -1288,7 +1288,8 @@ void generateRealInstruction(
          "All branch instructions expected to be generated separately");
 
   if (SnippyTgt.requiresCustomGeneration(InstrDesc)) {
-    SnippyTgt.generateCustomInst(InstrDesc, InstrGenCtx);
+    SnippyTgt.generateCustomInst(InstrDesc, InstrGenCtx,
+                                 std::move(Preselected));
     return;
   }
 
