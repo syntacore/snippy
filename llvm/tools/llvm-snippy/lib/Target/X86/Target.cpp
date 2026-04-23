@@ -118,6 +118,10 @@ public:
     reportUnimplementedError();
   }
 
+  std::string getDefaultLastInstr() const override {
+    reportUnimplementedError();
+  }
+
   void generateRegsInit(InstructionGenerationContext &IGC,
                         const IRegisterState &R) const override {
     reportUnimplementedError();
@@ -138,7 +142,8 @@ public:
 
   void generateCustomInst(
       const MCInstrDesc &InstrDesc,
-      planning::InstructionGenerationContext &InstrGenCtx) const override {
+      planning::InstructionGenerationContext &InstrGenCtx,
+      ArrayRef<planning::PreselectedOpInfo> Preselected) const override {
     reportUnimplementedError();
   }
   void instructionPostProcess(InstructionGenerationContext &IGC,

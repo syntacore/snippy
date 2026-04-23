@@ -1,0 +1,29 @@
+# RUN: llvm-snippy %s -dump-mi -model-plugin=None -honor-target-abi |& FileCheck %s
+options:
+  mtriple: aarch64
+  num-instrs: 10
+
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      stack
+    VMA:       0x400000
+    SIZE:      0x100000
+    LMA:       0x400000
+    ACCESS:    rw
+
+histogram:
+  - ["ADDWri", 1.0]
+
+# CHECK-COUNT-12: STRXui ${{(x(19|2[0-8])|fp|lr)}}, $sp, 0, {{.*}}
+# CHECK-COUNT-8: STRDui $d{{(8|9|1[0-5])}}, $sp, 0, {{.*}}
+# CHECK-COUNT-8: $d{{(8|9|1[0-5])}} = LDRDui $sp, 0, {{.*}}
+# CHECK-COUNT-12: ${{(x(19|2[0-8])|fp|lr)}} = LDRXui $sp, 0, {{.*}}

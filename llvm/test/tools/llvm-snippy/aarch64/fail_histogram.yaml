@@ -1,0 +1,22 @@
+# RUN: not llvm-snippy %s -model-plugin=None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: aarch64
+  mattr: +cssc
+  num-instrs: 1000
+
+include:
+  - Inputs/simple_sections.yaml
+
+histogram:
+  - [MOVZWi, 1.0]
+
+imm-hist:
+  opcodes:
+    - "MOVZWi":
+        - [0x11111, 1.0]
+        - [0x1111000, 1.0]
+        - [0x11111000, 1.0]
+
+#CHECK: error: No suitable immediates in histogram

@@ -1,0 +1,22 @@
+# RUN: llvm-snippy %s -dump-mi -last-instr= -model-plugin=None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: aarch64
+  mattr: +cssc
+  num-instrs: 1000
+
+include:
+  - Inputs/simple_sections.yaml
+
+histogram:
+  - [MOVZWi, 1.0]
+  - [MOVNWi, 1.0]
+  - [MOVKWi, 1.0]
+  - [MOVZXi, 1.0]
+  - [MOVNXi, 1.0]
+  - [MOVKXi, 1.0]
+  - [MOVIv2i32, 1.0]
+
+# CHECK-COUNT-1000: Generated MI_
+# CHECK-NEXT: HINT 0, post-instr-symbol <mcsymbol __snippy_exit>
