@@ -1,0 +1,13 @@
+# RUN: llvm-snippy %s -dump-mi -model-plugin=None |& FileCheck %s
+options:
+  mtriple: aarch64
+  num-instrs: 10
+
+include:
+  - Inputs/simple_sections.yaml
+
+histogram:
+  - ["ADDWri", 1.0]
+
+# CHECK-COUNT-10: Generated MI_
+# CHECK-NEXT: RET {{.*}}, pre-instr-symbol <mcsymbol __snippy_exit>, pcsections {{.*}}

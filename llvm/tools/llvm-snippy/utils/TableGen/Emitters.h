@@ -17,7 +17,12 @@ namespace snippy {
 
 bool emitRISCVGenerated(llvm::raw_ostream &OS,
                         const llvm::RecordKeeper &Records);
-
+bool emitAArch64Operands(llvm::raw_ostream &OS,
+                         const llvm::RecordKeeper &Records);
+bool emitAArch64Generated(llvm::raw_ostream &OS,
+                          const llvm::RecordKeeper &Records);
+bool emitRISCVOperands(llvm::raw_ostream &OS,
+                       const llvm::RecordKeeper &Records);
 } // namespace snippy
 } // namespace llvm
 

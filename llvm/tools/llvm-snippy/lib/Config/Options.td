@@ -190,8 +190,7 @@ let Group = InstrGenOptionsCategory in {
   def LastInstr
       : StringOption<"last-instr">,
         Description<
-            "Custom choice of the last instruction. Use 'RET' to emit return">,
-        DefaultValue<"EBREAK">;
+            "Custom choice of the last instruction. Use 'RET' to emit return">;
 
   def ChainedRXSectionsFill
       : Flag<"chained-rx-sections-fill">,
