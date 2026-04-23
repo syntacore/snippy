@@ -1,0 +1,31 @@
+# RUN: llvm-snippy %s -dump-mi -last-instr= -model-plugin=None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: aarch64
+  mattr: +cssc
+  num-instrs: 1000
+
+include:
+  - Inputs/simple_sections.yaml
+
+histogram:
+  - [MOVZWi, 1.0]
+  - [MOVNWi, 1.0]
+  - [MOVIv2i32, 1.0]
+# TODO: add tests for wider immediates, when it will be supported
+imm-hist:
+  opcodes:
+    - "MOVZWi":
+        - [0x1, 1.0]
+        - [0x11, 1.0]
+        - [0x111, 1.0]
+        - [0x1111, 1.0]
+    - "MOVNWi":
+        - [0x10000, 1.0]
+        - [0x110000, 1.0]
+        - [0x1110000, 1.0]
+        - [0x11110000, 1.0]
+
+# CHECK-COUNT-1000: Generated MI_
+# CHECK-NEXT: HINT 0, post-instr-symbol <mcsymbol __snippy_exit>

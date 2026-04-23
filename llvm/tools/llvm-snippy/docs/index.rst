@@ -13,8 +13,8 @@ Snippy Documentation (|release|)
 Overview
 ========
 
-LLVM-snippy is a random test generator (RTG) based on LLVM. It currently only
-supports RISC-V, but is potentially target-independent.
+LLVM-snippy is a random test generator (RTG) based on LLVM. It currently
+supports RISC-V and AArch64(experimental), but can potentially support any target.
 
 LLVM-snippy generates snippets |nbsp| -- |nbsp| sequences of randomly selected
 machine instructions with randomly selected registers, immediates, and other
@@ -4567,6 +4567,15 @@ just need to link ``svinval-caller.elf`` and ``svinval.elf`` together and we
 will get a random snippet with normal generation of instructions from the second
 config and constrained generation of svinval instructions that increases probability
 of using **X0** as source register.
+
+AArch64
+-------
+
+snippy currently supports only the **AArch64** (A64) base ISA
+and a handful of its “basic” instructions. The supported
+subset is intended mainly for demonstration and simple
+testing purposes; the list of supported and tested instructions can be found in
+the test/tools/llvm-snippy/aarch64 directory.
 
 
 .. rst-class:: break_before

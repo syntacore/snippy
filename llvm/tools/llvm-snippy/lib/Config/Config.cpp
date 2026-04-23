@@ -1111,8 +1111,14 @@ static Error normalizeInstrGenOptions(Config &Cfg, LLVMState &State,
       PassCfg.CodeLayout &&
       codeLayoutIsBig(*PassCfg.CodeLayout, State.getSnippyTarget());
   InstrsCfg.NeedsRelocations = MayNeedRelocatedJumps;
+  const auto &Tgt = State.getSnippyTarget();
   InstrsCfg.NumInstrs = NumPrimaryInstrs;
-  InstrsCfg.LastInstr = Opts.LastInstr;
+  // According to documentation:
+  // last-instr not specified - using default one for the target
+  // last-instr empty - no last instruction (handled further)
+  // last-instr specified - use it as a last instruction
+  InstrsCfg.LastInstr =
+      Opts.LastInstr.isSpecified() ? Opts.LastInstr : Tgt.getDefaultLastInstr();
 
   auto &TrackCfg = Cfg.CommonPolicyCfg->TrackCfg;
   TrackCfg.BTMode = Opts.Backtrack;
@@ -1131,7 +1137,6 @@ static Error normalizeInstrGenOptions(Config &Cfg, LLVMState &State,
     auto Mode = Opts.SelfcheckRefValueStorage;
     TrackCfg.Selfcheck = SelfcheckConfig{Mode, Period};
 
-    const auto &Tgt = State.getSnippyTarget();
     assert(TrackCfg.Selfcheck);
     auto Err = Tgt.validateSelfcheckConfig(*TrackCfg.Selfcheck,
                                            Cfg.getOpcodeHistogram());

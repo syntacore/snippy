@@ -1324,6 +1324,10 @@ public:
     return std::string();
   }
 
+  std::string getDefaultLastInstr() const override {
+    return std::string("EBREAK");
+  }
+
   std::vector<OpcodeHistogramEntry>
   getPolicyOverrides(const SnippyProgramContext &ProgCtx,
                      const MachineBasicBlock &MBB) const override {
@@ -1760,7 +1764,8 @@ public:
 
   void generateCustomInst(
       const MCInstrDesc &InstrDesc,
-      planning::InstructionGenerationContext &InstrGenCtx) const override {
+      planning::InstructionGenerationContext &InstrGenCtx,
+      ArrayRef<planning::PreselectedOpInfo> Preselected) const override {
     assert(requiresCustomGeneration(InstrDesc));
     llvm_unreachable("Not used at the moment");
   }

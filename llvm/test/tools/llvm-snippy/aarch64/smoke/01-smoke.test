@@ -1,0 +1,17 @@
+#------------------------------------------------------------------------------
+#
+# AArch64 tests part 1, simple smoke tests
+#
+# idea of this packet is to check basic functionality of aarch64 backend
+#
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+# check CPU opcodes list
+#------------------------------------------------------------------------------
+# RUN: llvm-snippy -mtriple=aarch64 -list-opcode-names \
+# RUN: |& FileCheck %s
+
+
+# CHECK: {{ADDWri}}
+# CHECK-NOT: {{ ADDWrr}}
