@@ -24,6 +24,9 @@ enum ActionType {
   GenOptions,
   GenOptionsStruct,
   GenRISCV,
+  GenAArch64Operands,
+  GenAArch64,
+  GenRISCVOperands
 };
 
 static cl::opt<ActionType>
@@ -37,7 +40,13 @@ static cl::opt<ActionType>
                       clEnumValN(GenOptions, "gen-options",
                                  "Generate option definitions"),
                       clEnumValN(GenRISCV, "gen-riscv",
-                                 "Generate RISCV Target definitions")));
+                                 "Generate RISCV Target definitions"),
+                      clEnumValN(GenAArch64Operands, "gen-aarch64-operands",
+                                 "Generate Aarch64 operands"),
+                      clEnumValN(GenAArch64, "gen-aarch64",
+                                 "Generate AArch64 Target definitions"),
+                      clEnumValN(GenRISCVOperands, "gen-riscv-operands",
+                                 "Generate RISCV operands")));
 
 static bool snippyTableGenMain(raw_ostream &OS, const RecordKeeper &Records) {
   switch (Action) {
@@ -55,6 +64,15 @@ static bool snippyTableGenMain(raw_ostream &OS, const RecordKeeper &Records) {
     break;
   case GenRISCV:
     emitRISCVGenerated(OS, Records);
+    break;
+  case GenAArch64Operands:
+    emitAArch64Operands(OS, Records);
+    break;
+  case GenAArch64:
+    emitAArch64Generated(OS, Records);
+    break;
+  case GenRISCVOperands:
+    emitRISCVOperands(OS, Records);
     break;
   }
 

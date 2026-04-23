@@ -11,6 +11,7 @@
 #include "snippy/Support/Error.h"
 #include "snippy/Target/Target.h"
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/MC/MCCodeEmitter.h"
 #include "llvm/MC/MCContext.h"
@@ -25,6 +26,7 @@
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/TargetParser/RISCVISAInfo.h"
+#include "llvm/TargetParser/Triple.h"
 
 namespace llvm {
 namespace snippy {
@@ -154,7 +156,9 @@ Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
   // type of relocations be produced by linker that AsmPrinter
   // cannot do by itself on some targets.
   // E.G.: RISCV AsmPrinter cannot emit JAL directly.
-  TargetFeatures += ",+relax";
+  // Exception: AArch64 has no relax feature
+  if (!TheTriple.isAArch64())
+    TargetFeatures += ",+relax";
   const TargetOptions Options;
   auto TM = std::unique_ptr<TargetMachine>(static_cast<TargetMachine *>(
       Tgt->createTargetMachine(TheTriple, TargetInfo.CPU, TargetFeatures,

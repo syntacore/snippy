@@ -2,6 +2,8 @@ include(TableGen)
 set(LLVM_LINK_COMPONENTS Support)
 
 add_tablegen(snippy-tblgen SNIPPY
+  AArch64Generated.cpp
+  OperandEmitter.cpp
   RISCVGenerated.cpp
   SnippyOptions.cpp
   TableGen.cpp
