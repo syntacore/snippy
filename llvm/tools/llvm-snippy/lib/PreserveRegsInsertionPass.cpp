@@ -105,6 +105,8 @@ private:
     // Works only with sorted containers.
     llvm::sort(PreserveRegs);
     std::vector<MCRegister> Result;
+
+    assert(is_sorted(PreserveRegs) && is_sorted(MutatedRegs));
     std::set_intersection(PreserveRegs.begin(), PreserveRegs.end(),
                           MutatedRegs.begin(), MutatedRegs.end(),
                           std::back_inserter(Result));
