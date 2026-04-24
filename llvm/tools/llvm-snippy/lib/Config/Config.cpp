@@ -757,8 +757,10 @@ static std::pair<MCRegister, MCRegister> configureSPandRA(
                FollowTargetABI, SpilledToStack);
   // Add redefined RA to spill list to be able to exit from snippy function
   // correctly as required by target abi. We still want to spill target return
-  // address register as abi may require it to be preserved.
-  if (FollowTargetABI && (RealRA != RA) && !llvm::count(SpilledToStack, RealRA))
+  // address register as abi may require it to be preserved. This is also
+  // guaranteed in case if preserve-ra is specified.
+  if (((FollowTargetABI && (RealRA != RA)) || Opts.PreserveRA.value()) &&
+      !llvm::count(SpilledToStack, RealRA))
     SpilledToStack.push_back(RealRA);
 
   if (FollowTargetABI) {
