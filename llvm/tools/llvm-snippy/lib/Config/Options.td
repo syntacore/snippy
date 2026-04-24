@@ -46,6 +46,11 @@ let Group = ProgramOptionsCategory in {
                    Description<"Specify the reg to use as return address">,
                    DefaultValue<"any">;
   
+  def PreserveRA
+      : Flag<"preserve-ra">,
+        Description<
+            "This flag enables return address value to be preserved in order to safely exit root function back to caller code.">;
+
   def PreserveCallerSavedRegs
       : CommaSeparatedList<"preserve-caller-saved-regs", StringType>,
         Description<

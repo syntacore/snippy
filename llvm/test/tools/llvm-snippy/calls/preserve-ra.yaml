@@ -1,0 +1,51 @@
+# RUN: llvm-snippy %s -redefine-ra=any |& FileCheck %s --check-prefix=NO-SPILL
+# RUN: llvm-snippy %s -redefine-ra=any -preserve-ra |& FileCheck %s --check-prefix=SPILL-ANY
+# RUN: llvm-snippy %s -redefine-ra=reg::X7 -preserve-ra |& FileCheck %s --check-prefix=SPILL-X7
+
+# NO-SPILL-NOT: SD ${{[a-z0-9]+}}, $x2
+# NO-SPILL-NOT: ${{[a-z0-9]+}} = LD $x2
+
+# SPILL-ANY-NOT: SD ${{[a-z0-9]+}}, $x2
+# SPILL-ANY: SD $[[RA:[a-z0-9]+]], $x2
+# SPILL-ANY-NOT: SD ${{[a-z0-9]+}}, $x2
+# SPILL-ANY-NOT: ${{[a-z0-9]+}} = LD  $x2
+# SPILL-ANY: $[[RA]] = LD $x2
+# SPILL-ANY-NOT: ${{[a-z0-9]+}} = LD $x2
+# SPILL-ANY: PseudoJALRRet $[[RA]]
+
+# SPILL-X7-NOT: SD ${{[a-z0-9]+}}, $x2
+# SPILL-X7: SD $x7, $x2
+# SPILL-X7-NOT: SD ${{[a-z0-9]+}}, $x2
+# SPILL-X7-NOT: ${{[a-z0-9]+}} = LD $x2
+# SPILL-X7: $x7 = LD $x2
+# SPILL-X7-NOT: ${{[a-z0-9]+}} = LD $x2
+# SPILL-X7: PseudoJALRRet $x7
+
+options:
+  num-instrs: 100
+  dump-mf: on
+  verify-mi: on
+  mtriple: riscv64
+  redefine-sp: SP
+  enable-static-stack: off
+  last-instr: RET
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      stack
+    VMA:       0x310000
+    SIZE:      0x100000
+    LMA:       0x310000
+    ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]

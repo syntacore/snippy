@@ -3168,6 +3168,12 @@ Return address register must be distinct from stack pointer register, so be caut
 
       "warning: When using --honor-target-abi and --redefine-sp/ra=reg::R  options together, target ABI may not be preserved in case of traps: use these options in combination only for valid code generation"
 
+::
+
+   --preserve-ra
+
+This flag enables return address value to be preserved in order to safely exit root function back to caller code. This is done by spilling it to stack like its done in ``--honor-target-abi`` mode.
+
 .. _`_static_stack`:
 
 Static stack
