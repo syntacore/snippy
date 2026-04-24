@@ -151,8 +151,8 @@ Expected<Regex> createWholeWordMatchRegex(StringRef Orig) {
 }
 
 // TODO: Add unit-tests for this function.
-DenseSet<unsigned> getAllMutatedRegs(MachineFunction &MF) {
-  DenseSet<unsigned> MutatedRegs;
+std::set<MCRegister> getAllMutatedRegs(MachineFunction &MF) {
+  std::set<MCRegister> MutatedRegs;
   for (auto &MBB : MF)
     for (auto &MI : MBB) {
       for (auto &Def : MI.defs()) {

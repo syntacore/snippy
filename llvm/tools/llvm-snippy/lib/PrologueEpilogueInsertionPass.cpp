@@ -108,7 +108,7 @@ public:
       // address, so spill it anyway, We should prohibit such behavior in
       // future.
       auto RA = ProgCtx.getReturnAddress();
-      if (!RegSet.contains(RA))
+      if (!RegSet.count(RA))
         Ret.push_back(RA);
     }
 

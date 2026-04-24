@@ -14,6 +14,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 
 #include <array>
+#include <set>
 #include <type_traits>
 
 namespace llvm {
@@ -425,7 +426,7 @@ matchRemainder(T Orig, T Num, T Div, T RoundTo = 0) {
 }
 
 Expected<Regex> createWholeWordMatchRegex(StringRef RegEx);
-DenseSet<unsigned> getAllMutatedRegs(MachineFunction &MF);
+std::set<MCRegister> getAllMutatedRegs(MachineFunction &MF);
 std::string toHexStringTruncate(uint64_t Value, unsigned Len);
 std::string toHexStringTruncate(APInt AI, unsigned Len);
 
