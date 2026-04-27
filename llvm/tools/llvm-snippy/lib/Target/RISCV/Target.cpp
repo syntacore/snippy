@@ -1158,6 +1158,62 @@ class SnippyRISCVTarget final : public SnippyTarget {
                     });
   }
 
+  const auto &getMemInitRegs(SnippyProgramContext &ProgCtx) const {
+    return ProgCtx.getTargetContext()
+        .getImpl<RISCVGeneratorContext>()
+        .getMemInitRegs();
+  }
+
+  void createStoreToAddr(InstructionGenerationContext &IGC, MemAddr Addr,
+                         MemoryUnit Value, const MCInstrInfo &InstrInfo) const {
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &MBB = IGC.MBB;
+    const auto &MemInitRegs = getMemInitRegs(ProgCtx);
+
+    auto AddrReg = MemInitRegs.Offset;
+    auto ValueReg = MemInitRegs.TmpA;
+    auto APAddr = APInt(getRegBitWidth(AddrReg, IGC), Addr);
+    writeValueToReg(IGC, APAddr, AddrReg);
+    auto APValue = APInt(getRegBitWidth(ValueReg, IGC), Value);
+    writeValueToReg(IGC, APValue, ValueReg);
+
+    getSupportInstBuilder(*this, MBB, MBB.end(),
+                          MBB.getParent()->getFunction().getContext(),
+                          InstrInfo.get(RISCV::SB))
+        .addReg(ValueReg)
+        .addReg(AddrReg)
+        .addImm(0x0);
+  }
+
+  // inserts registers initialization at the begining of MBB
+  void initRegsForRandFuncCall(InstructionGenerationContext &IGC,
+                               size_t SectionStart, size_t SectionSize,
+                               MemorySeedTy Seed) const {
+    auto &ProgCtx = IGC.ProgCtx;
+    const auto &MemInitRegs = getMemInitRegs(ProgCtx);
+
+    auto APSectStart =
+        APInt(getRegBitWidth(MemInitRegs.Start, IGC), SectionStart);
+    writeValueToReg(IGC, APSectStart, MemInitRegs.Start);
+
+    auto APSectSize = APInt(getRegBitWidth(MemInitRegs.Size, IGC), SectionSize);
+    writeValueToReg(IGC, APSectSize, MemInitRegs.Size);
+
+    auto APSeed = APInt(getRegBitWidth(MemInitRegs.Seed, IGC), Seed);
+    writeValueToReg(IGC, APSeed, MemInitRegs.Seed);
+
+    auto APOffset = APInt(getRegBitWidth(MemInitRegs.Offset, IGC), 0);
+    writeValueToReg(IGC, APOffset, MemInitRegs.Offset);
+  }
+
+  void allocateMemoryInitializationRegs(
+      InstructionGenerationContext &IGC,
+      bool FollowCallingConvention) const override {
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &RGC = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+    RGC.allocateMemoryInitializationRegs(IGC, FollowCallingConvention);
+  }
+
 public:
   SnippyRISCVTarget() {
     // TODO: use model interface to fetch restricted sections
@@ -2532,6 +2588,287 @@ public:
   static constexpr auto kOverheadPerLoop = 4;
 
   unsigned getLoopOverhead() const override { return kOverheadPerLoop; }
+
+  void
+  generateCallToMemInitRoutine(InstructionGenerationContext &IGC,
+                               size_t SectionStart, size_t SectionSize,
+                               MemorySeedTy Seed,
+                               const Function &ExternalGenFunc) const override {
+    initRegsForRandFuncCall(IGC, SectionStart, SectionSize, Seed);
+    auto *MM = getMetadataMark(IGC.ProgCtx.getLLVMState().getCtx(),
+                               SnippyMetadata::Support);
+    generateCall(IGC, ExternalGenFunc, MM, /* Opcode */ std::nullopt,
+                 IGC.ProgCtx.getReturnAddress());
+  }
+
+  // This code should be equal to machine code in
+  // generateCallToMemInitRoutine(),
+  //  so it is simplified for easier comparison.
+  // It is assumed that all registers are GP.
+  // MIR code prototype is presented in generateRandomGenFunction() function
+  // comments.
+  MemInitCallGenResult getSectionStateAfterMemInitRoutine(
+      SnippyProgramContext &ProgCtx, const TargetSubtargetInfo &STI,
+      size_t SectionSize, MemorySeedTy MemSeed) const override {
+    constexpr auto WordSize = 4;
+    if (SectionSize % WordSize != 0)
+      snippy::fatal("RW section size is not aligned to the word size");
+    std::vector<unsigned char> Memory(SectionSize);
+    size_t Offset = 0u;
+    // This is SplitMix32 algorithm, so values are 32-bit
+    auto TmpA = APInt{32, 0u};
+    auto TmpB = APInt{32, 0u};
+    auto Seed = APInt{32, MemSeed};
+    do {
+      Seed += 0x9e3779b9;
+      TmpA = Seed.lshr(16);
+      TmpB = Seed ^ TmpA;
+      TmpB *= 0x21f0aaad;
+      TmpA = TmpB.lshr(15);
+      TmpB = TmpB ^ TmpA;
+      TmpB *= 0x735a2d97;
+      TmpA = TmpB.lshr(15);
+      TmpB = TmpB ^ TmpA;
+      storeWordToMem(Memory.begin() + Offset, TmpB.getLimitedValue(UINT32_MAX));
+      Offset += WordSize;
+    } while (Offset < SectionSize);
+    return Memory;
+  }
+
+  // Generates function for random sections initialization.
+  // This is SplitMix32 algorithm with 32 bit multiplication emulation
+
+  //   uint32_t splitmix32(void) {
+  //     seed += 0x9e3779b9;
+  //     uint32_t A = seed >> 16;
+  //     uint32_t B = seed ^ A;
+  //     B *= 0x21f0aaad;
+  //     A = B >> 15;
+  //     B = B ^ A;
+  //     B *= 0x735a2d97;
+  //     A = B >> 15;
+  //     B = B ^ A;
+  //     return B;
+  //   }
+
+  // 'Magic' sequences for multiplication emulation were acquired using compiler
+  // [riscv32-unknown-linux-gnu-g++ 14.2.0]
+  // with flags [-O1 -march=rv32id] and functions:
+
+  // uint32_t mul(uint32_t A) {
+  //   return A * 0x21f0aaad;
+  // }
+  // uint32_t mul(uint32_t A) {
+  //   return A * 0x735a2d97;
+  // }
+
+  // For 32 bit target the resulting function will be as below.
+  // For >32 bit target there will be additional shifts clearing top bits before
+  // every SRLI instruction.
+
+  // loop:
+  //   li %A 0x9e3779b9
+  //   add %Seed %Seed %A
+  //   srli %A %Seed 16
+  //   xor %B %Seed %A
+
+  //   slli    %A, %B, 10 \
+  //   sub     %A, %A, %B  \
+  //   slli    %A, %A, 2    \
+  //   add     %A, %A, %B    \
+  //   slli    %C, %A, 3      \
+  //   sub     %C, %C, %A      \
+  //   slli    %A, %C, 6        \
+  //   sub     %A, %A, %C        MUL %B %B 0x21f0aaad
+  //   slli    %C, %A, 7       /
+  //   add     %A, %A, %C     /
+  //   slli    %A, %A, 2     /
+  //   add     %A, %A, %B   /
+  //   slli    %A, %A, 2   /
+  //   sub     %B, %B, %A /
+
+  //   srli    %A, %B, 15
+  //   xor     %B, %B, %A
+
+  //   slli    %C, %B, 10 \
+  //   sub     %C, %C, %B  \
+  //   slli    %C, %C, 2    \
+  //   sub     %C, %C, %B    \
+  //   slli    %C, %C, 2      \
+  //   sub     %C, %C, %B      \
+  //   slli    %A, %C, 3        \
+  //   sub     %A, %A, %C        \
+  //   slli    %A, %A, 2          \
+  //   add     %A, %A, %B          MUL %A %B 0x735a2d97
+  //   slli    %A, %A, 2         /
+  //   add     %A, %A, %B       /
+  //   slli    %A, %A, 2       /
+  //   sub     %A, %A, %B     /
+  //   slli    %C, %A, 5     /
+  //   add     %A, %A, %C   /
+  //   slli    %A, %A, 3   /
+  //   sub     %A, %A, %B /
+
+  //   slri    %B, %A, 15
+  //   xor     %B, %A, %B
+
+  //   add %A, %Offset, %Start
+  //   SW  %A, %B, 0x0
+  //   ADDI %Offset, %Offset, 4
+  //   BLT %Offset, %Size, loop
+  //   ret
+
+  void
+  generateRandomGenFunction(InstructionGenerationContext &IGC) const override {
+    auto &MF = *IGC.MBB.getParent();
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
+    auto &Ctx = State.getCtx();
+    const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
+    auto GPRegSize = ST.getXLen();
+
+    auto *HeaderMBB = createMachineBasicBlock(MF);
+    auto *BodyMBB = createMachineBasicBlock(MF);
+    MF.push_front(BodyMBB);
+    MF.push_front(HeaderMBB);
+    HeaderMBB->addSuccessor(BodyMBB);
+    auto *ExitMBB = &IGC.MBB;
+
+    BodyMBB->addSuccessor(BodyMBB);
+    BodyMBB->addSuccessor(ExitMBB);
+
+    const auto &InstrInfo = State.getInstrInfo();
+    const auto &CallRegs = getMemInitRegs(ProgCtx);
+    //--header--
+    getSupportInstBuilder(*this, *HeaderMBB, HeaderMBB->end(), Ctx,
+                          InstrInfo.get(RISCV::LUI))
+        .addReg(CallRegs.Offset)
+        .addImm(0x0);
+
+#define BUILD_INSTR(instr, reg1, reg2, reg3)                                   \
+  do {                                                                         \
+    getSupportInstBuilder(*this, *BodyMBB, BodyMBB->end(), Ctx,                \
+                          InstrInfo.get(RISCV::instr))                         \
+        .addReg(CallRegs.reg1)                                                 \
+        .addReg(CallRegs.reg2)                                                 \
+        .addReg(CallRegs.reg3);                                                \
+  } while (0)
+
+#define BUILD_INSTR_IMM(instr, reg1, reg2, imm)                                \
+  do {                                                                         \
+    getSupportInstBuilder(*this, *BodyMBB, BodyMBB->end(), Ctx,                \
+                          InstrInfo.get(RISCV::instr))                         \
+        .addReg(CallRegs.reg1)                                                 \
+        .addReg(CallRegs.reg2)                                                 \
+        .addImm(imm);                                                          \
+  } while (0)
+
+    // =====  BODY  =====
+    // increase seed by 0x9e3779b9
+    getSupportInstBuilder(*this, *BodyMBB, BodyMBB->end(), Ctx,
+                          InstrInfo.get(RISCV::LUI))
+        .addReg(CallRegs.TmpA)
+        .addImm(0x9e378);
+    BUILD_INSTR_IMM(ADDI, TmpA, TmpA, 0x9b9);
+    BUILD_INSTR(ADD, Seed, Seed, TmpA);
+    // clear all but lower 32 bits
+    if (GPRegSize > 32) {
+      BUILD_INSTR_IMM(SLLI, Seed, Seed, GPRegSize - 32);
+      BUILD_INSTR_IMM(SRLI, Seed, Seed, GPRegSize - 32);
+    }
+    BUILD_INSTR_IMM(SRLI, TmpA, Seed, 16);
+    BUILD_INSTR(XOR, TmpB, Seed, TmpA);
+    // multiplication: TmpB = TmpB * 0x21f0aaad:
+    BUILD_INSTR_IMM(SLLI, TmpA, TmpB, 10);
+    BUILD_INSTR(SUB, TmpA, TmpA, TmpB);
+    BUILD_INSTR_IMM(SLLI, TmpA, TmpA, 2);
+    BUILD_INSTR(ADD, TmpA, TmpA, TmpB);
+    BUILD_INSTR_IMM(SLLI, TmpC, TmpA, 3);
+    BUILD_INSTR(SUB, TmpC, TmpC, TmpA);
+    BUILD_INSTR_IMM(SLLI, TmpA, TmpC, 6);
+    BUILD_INSTR(SUB, TmpA, TmpA, TmpC);
+    BUILD_INSTR_IMM(SLLI, TmpC, TmpA, 7);
+    BUILD_INSTR(ADD, TmpA, TmpA, TmpC);
+    BUILD_INSTR_IMM(SLLI, TmpA, TmpA, 2);
+    BUILD_INSTR(ADD, TmpA, TmpA, TmpB);
+    BUILD_INSTR_IMM(SLLI, TmpA, TmpA, 2);
+    BUILD_INSTR(SUB, TmpB, TmpB, TmpA);
+    // end of multiplication
+    if (GPRegSize > 32) {
+      BUILD_INSTR_IMM(SLLI, TmpB, TmpB, GPRegSize - 32);
+      BUILD_INSTR_IMM(SRLI, TmpB, TmpB, GPRegSize - 32);
+    }
+    BUILD_INSTR_IMM(SRLI, TmpA, TmpB, 15);
+    BUILD_INSTR(XOR, TmpB, TmpB, TmpA);
+    // multiplication: TmpA = TmpB * 0x735a2d97
+    BUILD_INSTR_IMM(SLLI, TmpC, TmpB, 10);
+    BUILD_INSTR(SUB, TmpC, TmpC, TmpB);
+    BUILD_INSTR_IMM(SLLI, TmpC, TmpC, 2);
+    BUILD_INSTR(SUB, TmpC, TmpC, TmpB);
+    BUILD_INSTR_IMM(SLLI, TmpC, TmpC, 2);
+    BUILD_INSTR(SUB, TmpC, TmpC, TmpB);
+    BUILD_INSTR_IMM(SLLI, TmpA, TmpC, 3);
+    BUILD_INSTR(SUB, TmpA, TmpA, TmpC);
+    BUILD_INSTR_IMM(SLLI, TmpA, TmpA, 2);
+    BUILD_INSTR(ADD, TmpA, TmpA, TmpB);
+    BUILD_INSTR_IMM(SLLI, TmpA, TmpA, 2);
+    BUILD_INSTR(ADD, TmpA, TmpA, TmpB);
+    BUILD_INSTR_IMM(SLLI, TmpA, TmpA, 2);
+    BUILD_INSTR(SUB, TmpA, TmpA, TmpB);
+    BUILD_INSTR_IMM(SLLI, TmpC, TmpA, 5);
+    BUILD_INSTR(ADD, TmpA, TmpA, TmpC);
+    BUILD_INSTR_IMM(SLLI, TmpA, TmpA, 3);
+    BUILD_INSTR(SUB, TmpA, TmpA, TmpB);
+    // end of multiplication
+    if (GPRegSize > 32) {
+      BUILD_INSTR_IMM(SLLI, TmpA, TmpA, GPRegSize - 32);
+      BUILD_INSTR_IMM(SRLI, TmpA, TmpA, GPRegSize - 32);
+    }
+    BUILD_INSTR_IMM(SRLI, TmpB, TmpA, 15);
+    BUILD_INSTR(XOR, TmpB, TmpA, TmpB);
+    // save to memory:
+    BUILD_INSTR(ADD, TmpA, Offset, Start);
+    BUILD_INSTR_IMM(SW, TmpB, TmpA, 0x0);
+    constexpr auto WordSize = 4;
+    BUILD_INSTR_IMM(ADDI, Offset, Offset, WordSize);
+    getSupportInstBuilder(*this, *BodyMBB, BodyMBB->end(), Ctx,
+                          InstrInfo.get(RISCV::BLT))
+        .addReg(CallRegs.Offset)
+        .addReg(CallRegs.Size)
+        .addMBB(BodyMBB);
+
+#undef BUILD_INSTR
+#undef BUILD_INSTR_IMM
+  }
+
+  // Used in BlockGenPlanningPass to calculate size limit,
+  // as there is no __snippy_random yet.
+  // The actual size can be smaller if compressed code is used, and it's almost
+  // impossible to predict correct size with compressed instructions.
+  unsigned getRandomGenFunctionMaxSize() const override { return 212; }
+
+  // Generates function that generates passed memory state in the snippet.
+  // Generation result:
+  //  ---materialization of addr to %X10---
+  //  ---materialization of value to %X11---
+  //  SB %X10 %x11 0x0
+  void generateMemorytInitializationAtAddresses(
+      InstructionGenerationContext &IGC,
+      const MemoryMap &Addresses) const override {
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
+    const auto &AllowedRegs = getMemInitRegs(ProgCtx);
+
+    auto RP = IGC.pushRegPool();
+    auto RA = ProgCtx.getReturnAddress();
+    assert(!AllowedRegs.contains(RA));
+    for (unsigned Reg = RISCV::X0; Reg <= RISCV::X31; ++Reg)
+      if (!AllowedRegs.contains(Reg))
+        RP->addReserved(Reg);
+
+    for (auto [Addr, Value] : Addresses)
+      createStoreToAddr(IGC, Addr, Value, State.getInstrInfo());
+  }
 
   MachineInstr *generateFinalInst(InstructionGenerationContext &IGC,
                                   unsigned LastInstrOpc) const override {

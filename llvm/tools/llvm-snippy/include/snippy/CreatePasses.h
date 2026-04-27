@@ -29,6 +29,7 @@ class MemoryScheme;
 class OpcodeCache;
 class GeneratorContext;
 class MemoryManager;
+struct MemInitMode;
 
 } // namespace snippy
 
@@ -50,6 +51,10 @@ ModulePass *createFillExternalFunctionsStubsPass(
     const std::vector<std::string> &FunctionsToAvoid);
 
 MachineFunctionPass *createTrackLivenessPass();
+
+ModulePass *createMemoryInitializerPass(bool ExternalCallOfMemInitRoutine);
+
+ModulePass *createLateMemoryInitializationPass();
 
 MachineFunctionPass *createPreserveRegsInsertionPass();
 
@@ -83,6 +88,11 @@ MachineFunctionPass *createRegsInitInsertionPass(bool InitRegs);
 MachineFunctionPass *createPrologueEpilogueInsertionPass();
 
 MachineFunctionPass *createPrintMachineInstrsPass(raw_ostream &OS);
+
+ModulePass *createMemInitGeneratorPass(snippy::MemoryManager &MemManager,
+                                       const snippy::LLVMState &State,
+                                       MachineModuleInfo &MMI,
+                                       snippy::MemInitMode InitMode);
 
 MachineFunctionPass *createBlockGenPlanningPass();
 ImmutablePass *createBlockGenPlanWrapperPass();

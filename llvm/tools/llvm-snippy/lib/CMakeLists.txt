@@ -55,6 +55,9 @@ set(LLVMSnippySources
   PrologueEpilogueInsertionPass.cpp
   RegsInitInsertionPass.cpp
   ReserveRegsPass.cpp
+  MemoryInitializerPass.cpp
+  LateMemoryInitializationPass.cpp
+  MemInitGeneratorPass.cpp
   )
 
 
