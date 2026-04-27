@@ -136,6 +136,8 @@ public:
     return CurrentRVVMode.MBBGuard == &MBB;
   }
 
+  auto getELEN() const { return getVUConfigInfo().getELEN(); }
+  
   auto getVLENB() const { return getVUConfigInfo().getVLENB(); }
 
   auto getVLEN() const { return getVUConfigInfo().getVLEN(); }
@@ -173,10 +175,11 @@ public:
         isRVVUnitStrideSegLoadStore(Opcode) || isRVVStridedLoadStore(Opcode) ||
         isRVVStridedSegLoadStore(Opcode)) {
       assert(OpIndex == 0 && "We can be here only for vd vector operand");
+      auto ELEN = getELEN();
       auto LMUL = getLMUL(MBB);
       auto SEW = getSEW(MBB);
       auto EEW = getDataElementWidth(Opcode) * CHAR_BIT;
-      return computeDecodedEMUL(static_cast<unsigned>(SEW), EEW, LMUL);
+      return computeDecodedEMUL(ELEN, static_cast<unsigned>(SEW), EEW, LMUL);
     }
 
     // For Vector Indexed Loads and Stores Instructions EMULs of the operands
@@ -218,10 +221,11 @@ public:
       if (OpIndex == 0)
         return std::make_pair(Multiplier, IsFractional);
       assert(OpIndex == 2 && "We can be here only for index vector operand");
+      auto ELEN = getELEN();
       auto LMUL = getLMUL(MBB);
       auto SEW = static_cast<unsigned>(getSEW(MBB));
       auto EIEW = getIndexElementWidth(Opcode);
-      return computeDecodedEMUL(static_cast<unsigned>(SEW), EIEW, LMUL);
+      return computeDecodedEMUL(ELEN, static_cast<unsigned>(SEW), EIEW, LMUL);
     }
 
     // FIXME: This function must take into account the index of the operand
@@ -257,17 +261,19 @@ public:
     if ((isRVVIntegerWidening(Opcode) || isRVVFPWidening(Opcode) ||
          isRVVIntegerNarrowing(Opcode) || isRVVFPNarrowing(Opcode)) &&
         !IsFractional) {
+      auto ELEN = getELEN();
       auto LMUL = getLMUL(MBB);
       auto SEW = static_cast<unsigned>(getSEW(MBB));
-      return computeDecodedEMUL(SEW, SEW * 2u, LMUL);
+      return computeDecodedEMUL(ELEN, SEW, SEW * 2u, LMUL);
     }
 
     if (isRVVGather16(Opcode)) {
+      auto ELEN = getELEN();
       auto LMUL = getLMUL(MBB);
       auto SEW = static_cast<unsigned>(getSEW(MBB));
       auto EEW = 16u;
       if (EEW > SEW)
-        std::tie(Multiplier, IsFractional) = computeDecodedEMUL(SEW, EEW, LMUL);
+        std::tie(Multiplier, IsFractional) = computeDecodedEMUL(ELEN, SEW, EEW, LMUL);
     }
 
     return std::make_pair(Multiplier, IsFractional);

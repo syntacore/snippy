@@ -273,7 +273,7 @@ getElemWidthAndGapForVectorLoad(unsigned Opcode, unsigned EEW,
     // segment and non-indexed loads
     auto SEW = static_cast<unsigned>(RISCVCtx.getSEW(MBB));
     auto [EMUL, IsFractionEMUL] =
-        computeDecodedEMUL(SEW, EEW, RISCVCtx.getLMUL(MBB));
+        computeDecodedEMUL(RISCVCtx.getELEN(), SEW, EEW, RISCVCtx.getLMUL(MBB));
     assert(RISCVVType::isValidLMUL(EMUL, IsFractionEMUL));
     return {EEW, EMUL};
   }
@@ -451,6 +451,7 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVConfiguration &Cfg,
     return false;
   auto SEW = static_cast<unsigned>(Cfg.SEW);
   auto LMUL = Cfg.LMUL;
+  auto ELEN = ST->getELen();
 
   if (!Cfg.IsLegal) {
     // From RISCV-V spec 1.0:
@@ -472,12 +473,12 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVConfiguration &Cfg,
       isRVVStridedLoadStore(Opcode)) {
     // EEW is a data element width.
     auto EEW = getDataElementWidth(Opcode) * CHAR_BIT;
-    return isValidEMUL(SEW, EEW, LMUL);
+    return isValidEMUL(ELEN, SEW, EEW, LMUL);
   }
   if (isRVVIndexedLoadStore(Opcode)) {
     // EEW is an index element width.
     auto EEW = getIndexElementWidth(Opcode);
-    return isValidEMUL(SEW, EEW, LMUL);
+    return isValidEMUL(ELEN, SEW, EEW, LMUL);
   }
   // RVV segment loads/stores encodes not only EEW in the opcode, but number of
   // fields (NFIELDS) as well. This introduces one more restriction in addition
@@ -491,9 +492,9 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVConfiguration &Cfg,
   if (isRVVUnitStrideSegLoadStore(Opcode) || isRVVStridedSegLoadStore(Opcode)) {
     // EEW is a data element width.
     auto EEW = getDataElementWidth(Opcode) * CHAR_BIT;
-    if (!isValidEMUL(SEW, EEW, LMUL))
+    if (!isValidEMUL(ELEN, SEW, EEW, LMUL))
       return false;
-    auto EMUL = computeEMUL(SEW, EEW, LMUL);
+    auto EMUL = computeEMUL(ELEN, SEW, EEW, LMUL);
     auto [Multiplier, IsFractional] = RISCVVType::decodeVLMUL(EMUL);
     if (IsFractional)
       return true;
@@ -501,7 +502,7 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVConfiguration &Cfg,
   }
   if (isRVVIndexedSegLoadStore(Opcode)) {
     auto EEW = getIndexElementWidth(Opcode);
-    if (!isValidEMUL(SEW, EEW, LMUL))
+    if (!isValidEMUL(ELEN, SEW, EEW, LMUL))
       return false;
     auto [Multiplier, IsFractional] = RISCVVType::decodeVLMUL(LMUL);
     if (IsFractional)
@@ -530,7 +531,7 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVConfiguration &Cfg,
     auto EEW = SEW / Factor;
     if (!isLegalSEW(EEW))
       return false;
-    return isValidEMUL(SEW, EEW, LMUL);
+    return isValidEMUL(ELEN, SEW, EEW, LMUL);
   }
   if (isRVVIntegerWidening(Opcode) || isRVVFPWidening(Opcode) ||
       isRVVIntegerNarrowing(Opcode) || isRVVFPNarrowing(Opcode)) {
@@ -539,13 +540,13 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVConfiguration &Cfg,
     if (!isLegalSEW(EEW))
       return false;
     // Check that LMUL * 2 is also legal.
-    return isValidEMUL(SEW, EEW, LMUL);
+    return isValidEMUL(ELEN, SEW, EEW, LMUL);
   }
   if (isRVVGather16(Opcode)) {
     // The vrgatherei16.vv form uses SEW/LMUL for the data in vs2 but EEW=16 and
     // EMUL = (16/SEW)*LMUL for the indices in vs1.
     auto EEW = 16u;
-    return isValidEMUL(SEW, EEW, LMUL);
+    return isValidEMUL(ELEN, SEW, EEW, LMUL);
   }
 
   // Instructions from zvbc (carryless multiplication) extension
