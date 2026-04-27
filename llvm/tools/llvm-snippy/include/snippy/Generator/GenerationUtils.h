@@ -78,6 +78,9 @@ std::map<unsigned, APInt> selectOperandsForConsecutiveInstrs(
     RegPoolWrapper &RP, std::vector<planning::InstructionRequest> &BurstInstrs);
 
 enum class MemAccessKind { BURST, REGULAR };
+void markMemAccess(InstructionGenerationContext &IGC,
+                   const MemAddresses &Addresses, size_t AccessSize,
+                   const MCInstrDesc &InstrDesc);
 void markMemAccessAsUsed(InstructionGenerationContext &IGC,
                          const MCInstrDesc &InstrDesc, const AddressInfo &AI,
                          MemAccessKind Kind, MemAccessInfo *MAI);

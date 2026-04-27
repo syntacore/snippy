@@ -1,0 +1,33 @@
+# RUN: llvm-snippy %s -model-plugin=None -mtriple=riscv64 -mattr=-c \
+# RUN:   -num-instrs=100 \
+# RUN:   -init-memory=loads -init-regs-in-elf
+
+access-ranges:
+    - start: 0x80002000
+      size: 0x1000
+      stride: 16
+      first-offset: 1
+      last-offset: 2
+
+burst:
+  mode: mixed
+  min-size: 5
+  max-size: 5
+
+sections:
+    - name:      1
+      VMA:       0x70000000
+      SIZE:      0x400000
+      LMA:       0x70000000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [LW, 1.0]
+    - [SD, 1.0]
+    - [ADD, 1.0]
+    - [XOR, 1.0]

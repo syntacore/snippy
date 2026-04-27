@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "InitializePasses.h"
+#include "MemoryInitializerPass.h"
 
 #include "snippy/CreatePasses.h"
 #include "snippy/Generator/FunctionGeneratorPass.h"
@@ -40,6 +41,7 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<GeneratorContextWrapper>();
+    AU.addRequired<MemoryInitializer>();
     AU.addRequired<SnippyFunctionMetadataWrapper>();
     AU.addRequired<FunctionGenerator>();
     AU.addRequired<SimulatorContextWrapper>();
@@ -89,6 +91,16 @@ bool RegsInitInsertion::runOnMachineFunction(MachineFunction &MF) {
   auto *BlockRegsInit = createMachineBasicBlock(MF);
   auto *SuccessorBlockPtr = &MF.front();
   auto InsertIterPos = MF.begin();
+  auto IsMemInit =
+      SGCtx.getConfig()
+          .ProgramCfg.MemoryCfg.InitializationMode.isDuringRuntime();
+  if (IsMemInit) {
+    // if init-memory option is set, register block inserts after memory init
+    // block: mem_block -> regs_block -> ...
+    SuccessorBlockPtr = &*(++InsertIterPos);
+    MF.front().removeSuccessor(&*InsertIterPos);
+    MF.front().addSuccessor(BlockRegsInit);
+  }
   if (SGCtx.getConfig().PassCfg.CodeLayout)
     SnippyTgt.generateJump(*BlockRegsInit, BlockRegsInit->getFirstTerminator(),
                            *SuccessorBlockPtr, State);
