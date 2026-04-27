@@ -1,0 +1,45 @@
+# REQUIRES: riscv-rvv
+# COM: The test checks that only valid configurations for ELEN=64 are generated.
+
+# RUN: llvm-snippy %s \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  march: "rv64gv_zvl1024b"
+  snippy-riscv-simplified-vector-bits-max: 1024
+  num-instrs: 1
+  riscv-dump-rvv-config: ""
+
+include:
+  - "Inputs/rvv-unit-all.yaml"
+  - "Inputs/sections.yaml"
+
+histogram:
+       - [VSETIVLI, 1.0]
+       - [VSETVL, 1.0]
+       - [VSETVLI, 1.0]
+       - [VADD_VV, 1.0]
+
+# CHECK: --- RVV Configuration Info ---
+# CHECK-NEXT:   - Derived VLEN: 1024 (VLENB = 128)
+# CHECK-NEXT:   - Mode Change Decision Policy: Histogram
+# CHECK-NEXT:   - Mode Change Probability: 0.750 (vsetvl/vsetvli/vsetivli=0.250/0.250/0.250)
+# CHECK-NEXT:     Set Vill Bit Probability: 0
+# CHECK-NEXT:   - VL Selection Rules:
+# CHECK-NEXT:     P: 0.66667 <max_encodable>
+# CHECK-NEXT:     P: 0.33333 <any_legal>
+# CHECK-NEXT:   - VM Selection Rules:
+# CHECK-NEXT:     P: 0.66667 <all_ones>
+# CHECK-NEXT:     P: 0.33333 <any_legal>
+  
+# CHECK: - Configuration Bag Listing:
+# CHECK-NOT: Conf: { e64, mf2
+# CHECK-NOT: Conf: { e64, mf4
+# CHECK-NOT: Conf: { e64, mf8
+# CHECK-NOT: Conf: { e32, mf4
+# CHECK-NOT: Conf: { e32, mf8
+# CHECK-NOT: Conf: { e16, mf8
+# CHECK:   - Configuration Bag Size: 352
+# CHECK-NEXT:   - State Cardinality: 60416 ~ {MASKS} 
+# CHECK-NEXT: --- RVV Configuration End  ---
