@@ -119,6 +119,12 @@ struct AddressPart {
   }
 };
 
+// Represents the minimal access size
+using MemoryUnit = uint8_t;
+using MemoryMap = std::map<MemAddr, MemoryUnit>;
+// this is the future memory state that will be created
+//  during snippet runtime with the call to __snippy_random
+using MemInitCallGenResult = std::vector<MemoryUnit>;
 using RegToValueType = DenseMap<Register, APInt>;
 using AddressParts = SmallVector<AddressPart>;
 using MemorySeedTy = uint32_t;
@@ -477,6 +483,26 @@ public:
                                  MachineBasicBlock &OldDestMBB,
                                  MachineBasicBlock &NewDestMBB) const = 0;
 
+  virtual void
+  generateCallToMemInitRoutine(InstructionGenerationContext &IGC,
+                               size_t SectionStart, size_t SectionSize,
+                               MemorySeedTy Seed,
+                               const Function &ExternalGFunc) const = 0;
+
+  virtual MemInitCallGenResult getSectionStateAfterMemInitRoutine(
+      SnippyProgramContext &ProgCtx, const TargetSubtargetInfo &STI,
+      size_t SectionSize, MemorySeedTy Seed) const = 0;
+
+  virtual void
+  generateRandomGenFunction(InstructionGenerationContext &IGC) const = 0;
+
+  virtual unsigned getRandomGenFunctionMaxSize() const = 0;
+
+  // FIXME: use more appropriate data structure for addresses
+  virtual void generateMemorytInitializationAtAddresses(
+      InstructionGenerationContext &IGC,
+      const std::map<MemAddr, uint8_t> &Addresses) const = 0;
+
   virtual MachineInstr *generateFinalInst(InstructionGenerationContext &IGC,
                                           unsigned LastInstrOpc) const = 0;
 
@@ -657,6 +683,10 @@ public:
 
   virtual bool isCall(unsigned Opcode) const = 0;
   virtual bool isSPRelative(unsigned Opcode) const = 0;
+
+  virtual void
+  allocateMemoryInitializationRegs(InstructionGenerationContext &IGC,
+                                   bool FollowCallingConvention) const = 0;
 
   virtual std::vector<OpcodeHistogramEntry>
   getPolicyOverrides(const SnippyProgramContext &ProgCtx,

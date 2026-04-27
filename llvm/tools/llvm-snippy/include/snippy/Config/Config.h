@@ -16,6 +16,7 @@
 #include "snippy/Config/FunctionDescriptions.h"
 #include "snippy/Config/HistogramPatterns.h"
 #include "snippy/Config/ImmediateHistogram.h"
+#include "snippy/Config/MemInitializationMode.h"
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/OperandsReinitialization.h"
@@ -35,6 +36,20 @@ namespace snippy {
 #include "SnippyConfigOptionsStruct.inc"
 #undef GEN_SNIPPY_OPTIONS_STRUCT_DEF
 class SnippyTarget;
+
+struct MemoryInitConfig {
+  MemInitMode InitializationMode;
+  // FIXME: shouldn't it be MemorySeedTy?
+  std::optional<uint32_t> MemorySeed;
+  std::optional<std::string> MemoryFile;
+  bool SkipRuntimeMemInit;
+  bool ExternalMemInitRoutine;
+
+  bool modelMemoryInitIsNeeded() const {
+    return SkipRuntimeMemInit || ExternalMemInitRoutine ||
+           isFileInit(InitializationMode);
+  }
+};
 
 // Basic snippy configuration.
 class ProgramConfig {
@@ -63,6 +78,8 @@ public:
   std::string EntryPointName;
 
   std::string PluginInfoFilename;
+  // MemoryManager config.
+  MemoryInitConfig MemoryCfg;
 
   // TODO: rethink if it is needed here.
   std::string InitialRegYamlFile;
