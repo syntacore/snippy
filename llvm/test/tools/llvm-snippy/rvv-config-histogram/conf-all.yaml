@@ -1,21 +1,8 @@
-# COM: this is the test for default value of snippy-riscv-rvv-wa-exclude-vlmax1
+# COM: this is the test for checking the amount of all valid combinations of listed parameters
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:  -model-plugin=None --num-instrs=10 -o %t \
 # RUN:  -riscv-dump-rvv-config \
-# RUN:  |& FileCheck %s --check-prefix=CHECK-FULL-VLMAX1-DISABLED
-
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  -model-plugin=None --num-instrs=10 -o %t \
-# RUN:  -riscv-dump-rvv-config \
-# RUN:  --snippy-riscv-rvv-wa-exclude-vlmax1=true \
-# RUN:  |& FileCheck %s --check-prefix=CHECK-FULL-VLMAX1-DISABLED
-
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --model-plugin None \
-# RUN:  --num-instrs=10 -o %t \
-# RUN:  -riscv-dump-rvv-config \
-# RUN:  --snippy-riscv-rvv-wa-exclude-vlmax1=false \
-# RUN:  |& FileCheck %s --check-prefix=CHECK-FULL-VLMAX1-ENABLED
+# RUN:  |& FileCheck %s
 
 include:
 - Inputs/rvv-unit-all.yaml
@@ -43,37 +30,20 @@ histogram:
     - [VSETVL, 1.0]
     - [VADD_VV, 1.0]
 
-# CHECK-FULL-VLMAX1-DISABLED:       --- RVV Configuration Info ---
-# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - Derived VLEN: 128 (VLENB = 16)
-# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - Mode Change Decision Policy: Histogram
-# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - Mode Change Probability: 0
-# CHECK-FULL-VLMAX1-DISABLED-NEXT:    Set Vill Bit Probability: 0
-# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - VL Selection Rules:
-# CHECK-FULL-VLMAX1-DISABLED-NEXT:    P: 0.66667 <max_encodable>
-# CHECK-FULL-VLMAX1-DISABLED-NEXT:    P: 0.33333 <any_legal>
-# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - VM Selection Rules:
-# CHECK-FULL-VLMAX1-DISABLED-NEXT:    P: 0.66667 <all_ones>
-# CHECK-FULL-VLMAX1-DISABLED-NEXT:    P: 0.33333 <any_legal>
-# CHECK-FULL-VLMAX1-DISABLED:  - Configuration Bag Listing:
-# CHECK-FULL-VLMAX1-DISABLED-COUNT-352:   /MaxVL
-# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - Configuration Bag Size: 352
-# CHECK-FULL-VLMAX1-DISABLED-NEXT:  - State Cardinality: 7552 ~ {MASKS}
-# CHECK-FULL-VLMAX1-DISABLED-NEXT: --- RVV Configuration End  ---
-
-# CHECK-FULL-VLMAX1-ENABLED:       --- RVV Configuration Info ---
-# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - Derived VLEN: 128 (VLENB = 16)
-# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - Mode Change Decision Policy: Histogram
-# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - Mode Change Probability: 0
-# CHECK-FULL-VLMAX1-ENABLED-NEXT:    Set Vill Bit Probability: 0
-# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - VL Selection Rules:
-# CHECK-FULL-VLMAX1-ENABLED-NEXT:    P: 0.66667 <max_encodable>
-# CHECK-FULL-VLMAX1-ENABLED-NEXT:    P: 0.33333 <any_legal>
-# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - VM Selection Rules:
-# CHECK-FULL-VLMAX1-ENABLED-NEXT:    P: 0.66667 <all_ones>
-# CHECK-FULL-VLMAX1-ENABLED-NEXT:    P: 0.33333 <any_legal>
-# CHECK-FULL-VLMAX1-ENABLED:  - Configuration Bag Listing:
-# CHECK-FULL-VLMAX1-ENABLED-COUNT-400:   /MaxVL
-# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - Configuration Bag Size: 400
-# CHECK-FULL-VLMAX1-ENABLED-NEXT:  - State Cardinality: 7600 ~ {MASKS}
-# CHECK-FULL-VLMAX1-ENABLED-NEXT: --- RVV Configuration End  ---
-# CHECK-FULL-VLMAX1-ENABLED: Skipping snippet execution on the model: model was set to 'None'
+# CHECK:       --- RVV Configuration Info ---
+# CHECK-NEXT:  - Derived VLEN: 128 (VLENB = 16)
+# CHECK-NEXT:  - Mode Change Decision Policy: Histogram
+# CHECK-NEXT:  - Mode Change Probability: 0
+# CHECK-NEXT:    Set Vill Bit Probability: 0
+# CHECK-NEXT:  - VL Selection Rules:
+# CHECK-NEXT:    P: 0.66667 <max_encodable>
+# CHECK-NEXT:    P: 0.33333 <any_legal>
+# CHECK-NEXT:  - VM Selection Rules:
+# CHECK-NEXT:    P: 0.66667 <all_ones>
+# CHECK-NEXT:    P: 0.33333 <any_legal>
+# CHECK:  - Configuration Bag Listing:
+# CHECK-COUNT-352:   /MaxVL
+# CHECK-NEXT:  - Configuration Bag Size: 352
+# CHECK-NEXT:  - State Cardinality: 7552 ~ {MASKS}
+# CHECK-NEXT: --- RVV Configuration End  ---
+# CHECK: Skipping snippet execution on the model: model was set to 'None'

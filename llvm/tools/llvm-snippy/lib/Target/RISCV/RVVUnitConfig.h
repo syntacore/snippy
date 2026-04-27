@@ -95,10 +95,12 @@ class Config;
 std::unique_ptr<RVVConfigInterface> createRVVConfig();
 
 // Compute EMUL = EEW / SEW * LMUL
-VLMUL computeEMUL(unsigned SEW, unsigned EEW, VLMUL LMUL);
-std::pair<unsigned, bool> computeDecodedEMUL(unsigned SEW, unsigned EEW,
+VLMUL computeEMUL(unsigned ELEN, unsigned SEW, unsigned EEW, VLMUL LMUL);
+std::pair<unsigned, bool> computeDecodedEMUL(unsigned ELEN,
+                                             unsigned SEW,
+                                             unsigned EEW,
                                              VLMUL LMUL);
-bool isValidEMUL(unsigned SEW, unsigned EEW, VLMUL LMUL);
+bool isValidEMUL(unsigned ELEN, unsigned SEW, unsigned EEW, VLMUL LMUL);
 
 inline static bool canBeEncoded(unsigned SEW) {
   // This wrapper clarify the meaning of the function RISCVVType::isValidSEW.
@@ -112,7 +114,7 @@ inline static bool canBeEncoded(unsigned SEW) {
 // LMUL - lmul for which we want to compute VLMAX
 // If function returns zero - it means that such combination is not valid
 // TODO: consider replacing unsigned `SEW` parameter with typed enum
-unsigned computeVLMax(unsigned VLEN, unsigned SEW, VLMUL LMUL);
+unsigned computeVLMax(unsigned ELEN, unsigned VLEN, unsigned SEW, VLMUL LMUL);
 
 struct RVVConfiguration final {
   // Note: integer values are in-sync with RVV spec 1.0
@@ -220,11 +222,11 @@ private:
 
 struct VLGeneratorInterface {
   virtual std::string identify() const = 0;
-  virtual bool isApplicable(unsigned /* VLEN */, bool /* ReduceVL */,
+  virtual bool isApplicable(unsigned /* ELEN */, unsigned /* VLEN */, bool /* ReduceVL */,
                             const RVVConfiguration & /* Cfg */) const {
     return true;
   };
-  virtual unsigned generate(unsigned VLEN,
+  virtual unsigned generate(unsigned ELEN, unsigned VLEN,
                             const RVVConfiguration &Cfg) const = 0;
   virtual ~VLGeneratorInterface(){};
 };
@@ -304,15 +306,16 @@ struct RVVConfigurationInfo final {
   using VLGeneratorHolder = std::unique_ptr<VLGeneratorInterface>;
   using VMGeneratorHolder = std::unique_ptr<VMGeneratorInterface>;
 
-  static RVVConfigurationInfo createDefault(const Config &Cfg, unsigned VLEN);
+  static RVVConfigurationInfo createDefault(const Config &Cfg, unsigned ELEN, unsigned VLEN);
 
   static RVVConfigurationInfo
-  buildConfiguration(const Config &Cfg, unsigned VLEN,
+  buildConfiguration(const Config &Cfg, unsigned ELEN, unsigned VLEN,
                      std::unique_ptr<RVVConfigInterface> &&VU,
                      std::vector<VMGeneratorHolder> &DiscardedVMs,
                      std::vector<VLGeneratorHolder> &DiscardedVLs,
                      std::vector<RVVConfiguration> &DiscardedConfigs);
 
+  unsigned getELEN() const;
   unsigned getVLEN() const;
   unsigned getVLENB() const { return getVLEN() / RISCV_CHAR_BIT; }
 
@@ -340,7 +343,7 @@ private:
   using VLGenerator = DiscreteGeneratorInfo<VLGeneratorHolder>;
   using VMGenerator = DiscreteGeneratorInfo<VMGeneratorHolder>;
 
-  RVVConfigurationInfo(unsigned VLEN, ConfigGenerator &&CfgGen,
+  RVVConfigurationInfo(unsigned ELEN, unsigned VLEN, ConfigGenerator &&CfgGen,
                        VLGenerator &&VLGen, VMGenerator &&VMGen,
                        const ModeChangeInfo &SwitchInfo, bool EnableGuides,
                        bool NeedsVXRMUpdate);
@@ -350,6 +353,7 @@ private:
   const VMGeneratorHolder &selectVMGen(unsigned VL) const;
 
   unsigned VLEN;
+  unsigned ELEN;
   ConfigGenerator CfgGen;
   VLGenerator VLGen;
   VMGenerator VMGen;
@@ -379,6 +383,7 @@ class RISCVConfigurationInfo final {
   struct ArchitecturalInfo {
     unsigned VLEN = 0;
     unsigned XLEN = 0;
+    unsigned ELEN = 0;
   };
 
   BaseConfigurationInfo BaseCfgInfo;
