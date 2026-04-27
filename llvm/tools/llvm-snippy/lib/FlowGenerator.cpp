@@ -129,6 +129,35 @@ void writeMIRFile(StringRef Data) {
   writeFile(Path, Data);
 }
 
+static auto createExternalMemInitRoutine(GeneratorContext &Ctx) {
+  auto &ProgCtx = Ctx.getProgramContext();
+  auto ExtModule = std::make_unique<SnippyModule>(ProgCtx.getLLVMState(),
+                                                  "InitializerModule");
+
+  ExtModule->generateObject(
+      [&](PassManagerWrapper &PM) {
+        auto MemoryInitializationMode =
+            Ctx.getConfig().ProgramCfg.MemoryCfg.InitializationMode;
+        PM.add(createGeneratorContextWrapperPass(Ctx));
+        PM.add(createSimulatorContextWrapperPass(/* DoInit */ false));
+        PM.add(createMemInitGeneratorPass(
+            ProgCtx.getMemoryManager(), ProgCtx.getLLVMState(),
+            ExtModule->getMMI(), MemoryInitializationMode));
+        if (Ctx.getConfig().PassCfg.CodeLayout) {
+          PM.add(createCLBasicBlockPreprocessPass());
+          PM.add(createFallThroughEraserPass());
+          PM.add(createBranchLengthenerPass());
+          PM.add(createJumpLengthenerPass());
+          PM.add(createCodeAddrSamplingPass());
+          PM.add(createLongJumpRelaxatorPass());
+        }
+        // Strip llvm.snippy.support metadata
+        PM.add(createInstructionsPostProcessPass());
+      },
+      [&](PassManagerWrapper &PM) {});
+  return ExtModule;
+}
+
 } // namespace
 
 [[maybe_unused]] static void dumpSelfcheck(const std::vector<char> &Data,
@@ -246,6 +275,11 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
 
   GeneratorContext GenCtx(ProgContext, Cfg);
   auto &PassCfg = Cfg.PassCfg;
+  std::vector<std::string> FuncToAvoidInStubGen;
+  auto &ProgramCfg = Cfg.ProgramCfg;
+  if (!ProgramCfg.MemoryCfg.SkipRuntimeMemInit)
+    FuncToAvoidInStubGen.push_back(
+        ProgContext.getMemoryManager().getExternalRandomizerName());
 
   std::string MIR;
   raw_string_ostream MIROS(MIR);
@@ -269,6 +303,8 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         if (GenCtx.getConfig().PassCfg.CodeLayout) {
           PM.add(createCLBasicBlockPreprocessPass());
         }
+        PM.add(createMemoryInitializerPass(
+            ProgramCfg.MemoryCfg.ExternalMemInitRoutine));
         PM.add(createRegsInitInsertionPass(
             PassCfg.RegistersConfig.InitializeRegs));
         SnippyTgt.addTargetSpecificPasses(PM);
@@ -283,7 +319,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
 
         // Post backtrack
         PM.add(createPrologueEpilogueInsertionPass());
-        PM.add(createFillExternalFunctionsStubsPass({}));
+        PM.add(createFillExternalFunctionsStubsPass(FuncToAvoidInStubGen));
         PM.add(createTrackLivenessPass());
         PM.add(createPreserveRegsInsertionPass());
         SnippyTgt.addTargetLegalizationPasses(PM);
@@ -314,6 +350,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         if (!GenCtx.getConfig().PassCfg.CodeLayout)
           PM.add(createFunctionDistributePass());
 
+        PM.add(createLateMemoryInitializationPass());
         if (PassCfg.InstrsGenerationConfig.RunMachineInstrVerifier)
           PM.add(createMachineVerifierPass("Machine Verifier Pass report"));
 
@@ -332,6 +369,12 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
   if (DumpMIR.isSpecified())
     writeMIRFile(MIR);
   std::vector<const SnippyModule *> Modules{&MainModule};
+  auto InitMemMode = ProgramCfg.MemoryCfg.InitializationMode;
+  std::unique_ptr<SnippyModule> MemInitModule;
+  if (InitMemMode.isDuringRuntime()) {
+    MemInitModule = createExternalMemInitRoutine(GenCtx);
+    Modules.push_back(MemInitModule.get());
+  }
   if (DumpCodeAddrMapping) {
     if (!GenCtx.getConfig().PassCfg.CodeLayout) {
       snippy::warn(
@@ -346,6 +389,8 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
   auto EResult = ProgContext.generateELF(Modules, ObjectType, NoRelax);
   if (!EResult)
     snippy::fatal(EResult.takeError());
+  if (ProgramCfg.MemoryCfg.SkipRuntimeMemInit)
+    Modules = {&MainModule};
 
   dumpVerificationIntervalsIfNeeeded(MainModule, GenCtx, BaseFileName);
 
@@ -365,6 +410,9 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
 
     auto RI = SimulatorContext::RunInfo{
         ESnippetImageForModelExecution->SnippetImage, ProgContext, MainModule,
+        ProgramCfg.MemoryCfg.modelMemoryInitIsNeeded()
+            ? &ProgContext.getMemoryManager()
+            : nullptr,
         PassCfg.ProgramCfg->EntryPointName,
         PassCfg.RegistersConfig.InitialStateOutputYaml,
         PassCfg.RegistersConfig.FinalStateOutputYaml, SelfcheckMem,

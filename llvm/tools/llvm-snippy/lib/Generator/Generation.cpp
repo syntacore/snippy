@@ -168,6 +168,12 @@ void reportGeneratorRollback(InstrIt ItBegin, InstrIt ItEnd) {
 void storeRefValue(InstructionGenerationContext &InstrGenCtx, MemAddr Addr,
                    APInt Val) {
   auto &ProgCtx = InstrGenCtx.ProgCtx;
+  // TODO: this should not be here
+  if (InstrGenCtx.getCommonCfg().TrackCfg.Selfcheck->Mode ==
+      SelfcheckMode::Memory) {
+    ProgCtx.getMemoryManager().writeValueToWriteOnlyAddr(Val, Addr);
+    return;
+  }
   ProgCtx.getLLVMState().getSnippyTarget().storeValueToAddr(InstrGenCtx, Addr,
                                                             Val);
 }

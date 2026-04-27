@@ -1,0 +1,29 @@
+# RUN: llvm-snippy %s -model-plugin=None \
+# RUN:   --init-memory=ascii-file --init-memory-file=%S/Inputs/memory-map.yaml
+
+sections:
+  - name:      1
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x200000
+    SIZE:      0x000010
+    LMA:       0x200000
+    ACCESS:    rw
+  - name:      4
+    VMA:       0x400000
+    SIZE:      0x000010
+    LMA:       0x400000
+    ACCESS:    rw
+
+options:
+  mtriple: "riscv64"
+  mcpu: "generic-rv64"
+  num-instrs: 10
+  
+histogram:
+    - [LB, 2.0]
+    - [ADD, 4.0]
+    - [SW, 2.0]
