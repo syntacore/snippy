@@ -62,6 +62,8 @@ static std::string makeModelNameFromPartialName(StringRef PartialName) {
 namespace llvm {
 namespace snippy {
 
+static constexpr auto BitsInByte = 8u;
+
 namespace {
 void applyMemCfgToSimCfg(const Linker &L, SimulationEnvironment &Env) {
   llvm::transform(L.sections(), std::back_inserter(Env.SimCfg.MemoryRegions),
@@ -355,6 +357,12 @@ void Interpreter::setReg(llvm::Register Reg, const APInt &NewValue) {
     return;
   }
   llvm_unreachable("unknown storage");
+}
+
+void Interpreter::writeSection(const SectionData &Section) {
+  for (auto [MemUnitAddr, MemVal] : Section.MemMap)
+    writeMem(MemUnitAddr + Section.Desc.VMA,
+             APInt{sizeof(MemoryUnit) * BitsInByte, MemVal});
 }
 
 void Interpreter::initTransactionMechanism() {

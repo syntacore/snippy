@@ -1,0 +1,81 @@
+
+# RUN: llvm-snippy %s --seed="" -model-plugin None -init-memory=no \
+# RUN:    |& FileCheck %s --check-prefix=ONCE
+# RUN: llvm-snippy %s --seed="" -model-plugin None -init-memory=runtime \
+# RUN:   |& FileCheck %s --check-prefix=ONCE
+# RUN: llvm-snippy %s --seed="" -model-plugin None -init-memory=full \
+# RUN:   |& FileCheck %s --check-prefix=ONCE
+# RUN: llvm-snippy %s --seed="" -model-plugin None -init-memory=loads \
+# RUN:   |& FileCheck %s --check-prefix=ONCE
+# RUN: llvm-snippy %s --seed="" -model-plugin None \
+# RUN:   -init-memory=full-with-addresses |& FileCheck %s --check-prefix=ONCE
+# RUN: llvm-snippy %s --seed="" -model-plugin None \
+# RUN:   -init-memory=loads-with-addresses |& FileCheck %s --check-prefix=ONCE
+
+# This run is the most important. Use -init-memory=runtime for memory-seed
+# to be used
+# RUN: llvm-snippy %s -o %t.1 -seed="" -memory-seed=none -init-memory=runtime \
+# RUN:   -model-plugin None \
+# RUN:   |& grep "seed-not-specified" | grep "[0-9]\+" -o > %t.1.seed
+# RUN: llvm-snippy %s -o %t.2 -seed=$(cat %t.1.seed) -init-memory=runtime \
+# RUN:   -memory-seed=none -model-plugin None |& FileCheck %s
+# RUN: cmp %t.1.elf %t.2.elf
+
+# RUN: llvm-snippy %s -o %t.1 -seed="" -memory-seed=none -init-memory=full \
+# RUN:   -model-plugin None \
+# RUN:   |& grep "seed-not-specified" | grep "[0-9]\+" -o > %t.1.seed
+# RUN: llvm-snippy %s -o %t.2 -seed=$(cat %t.1.seed) -init-memory=full \
+# RUN:   -memory-seed=none -model-plugin None
+# RUN: cmp %t.1.elf %t.2.elf
+
+# RUN: llvm-snippy %s -o %t.1 -seed="" -memory-seed=none -init-memory=loads \
+# RUN:   -model-plugin None \
+# RUN:   |& grep "seed-not-specified" | grep "[0-9]\+" -o > %t.1.seed
+# RUN: llvm-snippy %s -o %t.2 -seed=$(cat %t.1.seed) -init-memory=loads \
+# RUN:   -memory-seed=none -model-plugin None
+# RUN: cmp %t.1.elf %t.2.elf
+
+# RUN: llvm-snippy %s -o %t.1 -seed="" -memory-seed=none \
+# RUN:   -init-memory=full-with-addresses -model-plugin None \
+# RUN:   |& grep "seed-not-specified" | grep "[0-9]\+" -o > %t.1.seed
+# RUN: llvm-snippy %s -o %t.2 -seed=$(cat %t.1.seed) \
+# RUN:   -init-memory=full-with-addresses \
+# RUN:   -memory-seed=none -model-plugin None
+# RUN: cmp %t.1.elf %t.2.elf
+
+# RUN: llvm-snippy %s -o %t.1 -seed="" -memory-seed=none \
+# RUN:   -init-memory=loads-with-addresses -model-plugin None \
+# RUN:   |& grep "seed-not-specified" | grep "[0-9]\+" -o > %t.1.seed
+# RUN: llvm-snippy %s -o %t.2 -seed=$(cat %t.1.seed) \
+# RUN:   -init-memory=loads-with-addresses \
+# RUN:   -memory-seed=none -model-plugin None
+# RUN: cmp %t.1.elf %t.2.elf
+
+# ONCE: warning: (seed-not-specified)
+# OCNE-NOT: warning: (seed-not-specified)
+
+# CHECK: warning:
+# CHECK-SAME: memory seed "none" specified for mode "runtime" that requires it
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  init-regs-in-elf: on
+
+sections:
+- name: 1
+  VMA: 0x10000
+  LMA: 0x10000
+  SIZE: 0x10000
+  ACCESS: rx
+- name: 2
+  VMA: 0x20000
+  LMA: 0x20000
+  SIZE: 0x20000
+  ACCESS: rw
+
+histogram:
+  - [LW, 1.0]
+  - [SW, 1.0]
+  - [ADDI, 1.0]
+  - [SUB, 1.0]

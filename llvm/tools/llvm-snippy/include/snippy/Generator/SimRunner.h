@@ -24,6 +24,8 @@
 namespace llvm {
 namespace snippy {
 
+class MemoryManager;
+
 class SimRunner {
 public:
   // Constructructs SimRunner with interpreters that share single
@@ -55,6 +57,18 @@ public:
   void resetState(const SnippyProgramContext &ProgCtx, bool FullReset) {
     for (auto &&PI : CoInterp)
       PI->resetState(ProgCtx, FullReset);
+  }
+  // Initializes memory in all interpreters.
+  template <typename ItT>
+  void initInterpretersMemory(const ItT MemStateBeg, const ItT MemStateEnd) {
+    std::for_each(
+        CoInterp.begin(), CoInterp.end(),
+        [MemStateBeg, MemStateEnd](std::unique_ptr<Interpreter> &InterpPtr) {
+          std::for_each(MemStateBeg, MemStateEnd,
+                        [&InterpPtr](const auto &SectData) {
+                          InterpPtr->writeSection(SectData);
+                        });
+        });
   }
   auto &getSimConfig() & {
     assert(Env);

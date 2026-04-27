@@ -14,6 +14,7 @@
 #include "snippy/Config/Config.h"
 #include "snippy/Config/FunctionDescriptions.h"
 #include "snippy/Config/ImmediateHistogram.h"
+#include "snippy/Config/MemInitializationMode.h"
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/RegisterAccess.h"
@@ -40,6 +41,9 @@
 #define DEBUG_TYPE "snippy-layout-config"
 
 namespace llvm {
+
+LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML_NO_DECL(
+    snippy::MemInitMode, snippy::MemInitModeEnumOption)
 
 LLVM_SNIPPY_OPTION_DEFINE_ENUM_OPTION_YAML_NO_DECL(
     snippy::SelfcheckMode, snippy::SelfcheckModeEnumOption)
@@ -177,6 +181,8 @@ namespace snippy {
 
 extern cl::OptionCategory Options;
 cl::OptionCategory ProgramOptionsCategory("Snippy Program Level Options");
+cl::OptionCategory
+    MemInitOptionsCategory("Snippy Memory Initialization options");
 cl::OptionCategory
     RegInitOptionsCategory("Snippy Registers Initialization options");
 
@@ -885,6 +891,96 @@ static std::optional<unsigned> getExpectedNumInstrs(StringRef NumAsString) {
   return Value;
 }
 
+static MemorySeedTy hashMemorySeed(uint64_t MemorySeed, LLVMContext &Ctx) {
+  static_assert(sizeof(MemorySeedTy) == 4,
+                "This hash function is created for 32-bit memory seed");
+  auto BytesArr = std::vector<std::byte>{};
+  convertNumberToBytesArray(MemorySeed, std::back_inserter(BytesArr));
+  assert(BytesArr.size() == sizeof(MemorySeed));
+  auto SeedUpperPart = convertBytesToNumber<MemorySeedTy>(
+      BytesArr.begin(), BytesArr.begin() + sizeof(MemorySeedTy));
+  auto SeedBottomPart = convertBytesToNumber<MemorySeedTy>(
+      BytesArr.begin() + sizeof(MemorySeedTy), BytesArr.end());
+  if (SeedUpperPart != 0u) {
+    MemorySeedTy FinalSeed = SeedUpperPart ^ SeedBottomPart;
+    if (FinalSeed == 0)
+      FinalSeed = SeedBottomPart | 1;
+    snippy::notice(WarningName::NotAWarning, Ctx,
+                   "memory seed value is too big, "
+                   "so it has been hashed",
+                   "new memory seed: " + Twine(FinalSeed));
+    return FinalSeed;
+  }
+  return SeedBottomPart;
+}
+
+static std::optional<MemorySeedTy>
+getMemorySeed(LLVMContext &Ctx, uint64_t Seed, StringRef MemorySeed,
+              MemInitMode InitializeMemory, Config &Cfg) {
+  // TODO: move this checks to final config verification
+  if (InitializeMemory == MemInitMode::NoInit &&
+      (!MemorySeed.empty() && MemorySeed != "none"))
+    snippy::fatal("Specify memory init mode in order to use memory seed");
+
+  if (isDuringRuntime(InitializeMemory) &&
+      !Cfg.PassCfg.RegistersConfig.InitializeRegs)
+    snippy::fatal(formatv("runtime memory initialization may be performed "
+                          "only with init-regs-in-elf option"));
+
+  if (isSeedProhibited(InitializeMemory) && MemorySeed != "none")
+    snippy::fatal(
+        formatv("memory seed is prohibited in {0} mode", InitializeMemory));
+
+  if (isSeedProhibited(InitializeMemory))
+    return std::nullopt;
+
+  if (InitializeMemory == MemInitMode::NoInit)
+    return std::nullopt;
+
+  if (isSeedOptional(InitializeMemory) && MemorySeed == "none")
+    return std::nullopt;
+
+  uint64_t MemSeed;
+  if (MemorySeed.empty() || MemorySeed == "random") {
+    MemSeed = seedOptToValue(
+        "", "memory seed",
+        "random memory seed specified, using auto-generated one");
+  } else if (MemorySeed == "none") {
+    MemSeed = Seed;
+    auto Name = MemInitModeEnumOption::toString(InitializeMemory);
+    assert(Name.has_value());
+    snippy::warn(
+        WarningName::SeedNotSpecified,
+        formatv(
+            "memory seed \"none\" specified for mode \"{0}\" that requires it",
+            *Name),
+        "using instructions seed");
+  } else {
+    MemSeed = seedOptToValue(MemorySeed, "");
+  }
+
+  return hashMemorySeed(MemSeed, Ctx);
+}
+
+static std::optional<std::string> getMemoryFile(LLVMContext &Ctx,
+                                                MemInitMode InitializeMemory,
+                                                StringRef MemoryFile) {
+  if (!isFileInit(InitializeMemory) && MemoryFile != "none")
+    snippy::fatal(formatv("init-memory-file option needs memory init mode "
+                          "to be specified as file init"));
+
+  if (isFileInit(InitializeMemory) && MemoryFile == "none")
+    snippy::notice(WarningName::NotAWarning, Ctx,
+                   "init-memory-file option hasn't been specified",
+                   "using default file: mem_state.bin");
+
+  return isFileInit(InitializeMemory)
+             ? std::make_optional<std::string>(MemoryFile == "none"
+                                                   ? StringRef("mem_state.bin")
+                                                   : MemoryFile)
+             : std::nullopt;
+}
+
 static unsigned getSelfcheckPeriod(StringRef Selfcheck) {
   if (Selfcheck == "none")
     return 0;
@@ -1048,6 +1144,30 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
       RP, Tgt, RI, RegsSpilledToStack, Ctx, Cfg, Opts, HasSPRelativeInstrs);
   llvm::copy(RegsSpilledToStack, std::back_inserter(ProgCfg.SpilledToStack));
   llvm::copy(RegsSpilledToMem, std::back_inserter(ProgCfg.SpilledToMem));
+}
+static void normalizeMemInitOptions(Config &Cfg, LLVMState &State,
+                                    const MemInitOptions &Opts) {
+  auto &ProgCfg = Cfg.ProgramCfg;
+  auto &MemInitCfg = ProgCfg.MemoryCfg;
+  MemInitCfg.InitializationMode = Opts.InitializeMemory;
+  auto MemorySeedVal =
+      getMemorySeed(State.getCtx(), ProgCfg.Seed, Opts.MemorySeed.value(),
+                    InitializeMemory, Cfg);
+  MemInitCfg.MemorySeed = MemorySeedVal;
+  MemInitCfg.MemoryFile = getMemoryFile(
+      State.getCtx(), Opts.InitializeMemory.value(), Opts.MemoryFile.value());
+  MemInitCfg.SkipRuntimeMemInit = Opts.SkipRuntimeMemInit;
+  MemInitCfg.ExternalMemInitRoutine = Opts.ExternalMemInitRoutine;
+  auto NoRuntimeError = [](auto OptionName) {
+    snippy::fatal(formatv(
+        "Option '{0}' requires runtime memory init to be enabled", OptionName));
+  };
+  if (!isDuringRuntime(MemInitCfg.InitializationMode) &&
+      MemInitCfg.SkipRuntimeMemInit)
+    NoRuntimeError(SkipRuntimeMemInit.ArgStr);
+  if (!isDuringRuntime(MemInitCfg.InitializationMode) &&
+      MemInitCfg.ExternalMemInitRoutine)
+    NoRuntimeError(ExternalMemInitRoutine.ArgStr);
 }
 
 static void normalizeRegInitOptions(Config &Cfg, LLVMState &State,
@@ -1383,6 +1503,7 @@ Expected<Config> Config::create(IncludePreprocessor &IPP, RegPoolWrapper &RP,
   normalizeProgramLevelOptions(Cfg, State, RP, OpCC, Seed,
                                copyOptionsToProgramOptions());
   normalizeRegInitOptions(Cfg, State, copyOptionsToRegInitOptions());
+  normalizeMemInitOptions(Cfg, State, copyOptionsToMemInitOptions());
   normalizeModelOptions(Cfg, State, copyOptionsToModelOptions());
   if ((Err = normalizeInstrGenOptions(Cfg, State,
                                       copyOptionsToInstrGenOptions())))

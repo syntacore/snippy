@@ -15,10 +15,7 @@
 namespace llvm {
 namespace snippy {
 
-enum class SelfcheckMode {
-  Code,
-  CheckSum,
-};
+enum class SelfcheckMode { Code, CheckSum, Memory };
 
 struct SelfcheckModeEnumOption
     : public snippy::EnumOptionMixin<SelfcheckModeEnumOption> {
@@ -29,6 +26,9 @@ struct SelfcheckModeEnumOption
     Mapper.enumCase(
         SelfcheckMode::CheckSum, "checksum",
         "selfcheck reference values are tracking with checksum computation");
+    Mapper.enumCase(SelfcheckMode::Memory, "memory",
+                    "selfcheck reference values are stored "
+                    "in the selfcheck section");
   }
 };
 
@@ -47,8 +47,7 @@ struct SelfcheckConfig {
   }
 
   bool isMemoryBasedSelfcheckModeEnabled() const {
-    return Mode == SelfcheckMode::Code
-        ;
+    return Mode == SelfcheckMode::Code || Mode == SelfcheckMode::Memory;
   }
 
   SelfcheckConfig(SelfcheckMode Mode = SelfcheckMode::Code, unsigned Period = 1,

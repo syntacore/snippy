@@ -151,6 +151,35 @@ public:
     reportUnimplementedError();
   }
 
+  void
+  generateCallToMemInitRoutine(InstructionGenerationContext &IGC,
+                               size_t SectionStart, size_t SectionSize,
+                               MemorySeedTy Seed,
+                               const Function &ExternalGFunc) const override {
+    reportUnimplementedError();
+  }
+
+  MemInitCallGenResult getSectionStateAfterMemInitRoutine(
+      SnippyProgramContext &ProgCtx, const TargetSubtargetInfo &STI,
+      size_t SectionSize, MemorySeedTy Seed) const override {
+    reportUnimplementedError();
+  }
+
+  void
+  generateRandomGenFunction(InstructionGenerationContext &IGC) const override {
+    reportUnimplementedError();
+  }
+
+  unsigned getRandomGenFunctionMaxSize() const override {
+    reportUnimplementedError();
+  }
+
+  void generateMemorytInitializationAtAddresses(
+      InstructionGenerationContext &IGC,
+      const MemoryMap &Addresses) const override {
+    reportUnimplementedError();
+  }
+
   virtual MachineInstr *generateFinalInst(InstructionGenerationContext &IGC,
                                           unsigned LastInstr) const override {
     reportUnimplementedError();
@@ -658,6 +687,11 @@ public:
     reportUnimplementedError();
   }
 
+  void allocateMemoryInitializationRegs(
+      InstructionGenerationContext &IGC,
+      bool FollowCallingConvention) const override {
+    reportUnimplementedError();
+  }
   std::vector<OpcodeHistogramEntry>
   getPolicyOverrides(const SnippyProgramContext &ProgCtx,
                      const MachineBasicBlock &MBB) const override {

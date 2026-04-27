@@ -469,7 +469,6 @@ bool latchLoops(MachineFunction &MF, GeneratorContext &SGCtx,
   auto &ProgCtx = SGCtx.getProgramContext();
   auto &Branches = Cfg.PassCfg.Branches;
   assert(Cfg.CommonPolicyCfg);
-  auto &CommonPolCfg = *Cfg.CommonPolicyCfg;
   LLVM_DEBUG(
       dbgs() << "MachineFunction at the start of llvm::snippy::LoopLatcher:\n";
       MF.dump());

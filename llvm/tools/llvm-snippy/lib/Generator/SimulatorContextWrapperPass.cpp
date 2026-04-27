@@ -180,6 +180,7 @@ getMemoryRangesToDump(Interpreter &I, ArrayRef<std::string> RangesSelectors) {
 Error SimulatorContext::runSimulator(const RunInfo &RI) {
   auto &ImageToRun = RI.ImageToRun;
   auto &ProgCtx = RI.ProgCtx;
+  auto *MemManager = RI.MemManager;
   auto &InitialStateOutputYaml = RI.InitialRegStateOutputYaml;
   auto &FinalStateOutputYaml = RI.FinalRegStateOutputYaml;
   auto &DumpMemorySection = RI.DumpMemorySection;
@@ -199,6 +200,9 @@ Error SimulatorContext::runSimulator(const RunInfo &RI) {
 
   auto &SimRunner = getSimRunner();
   SimRunner.resetState(ProgCtx, RI.NeedMemoryReset);
+  // Elf image should be loaded before memory initialization, because
+  // it may overwrite initialized memory with zeros if it happens to be
+  // .bss section there.
 
   auto ElfData = ParsedElf::createParsedElf(
       ImageToRun, RI.EntryPointName, [](llvm::object::SectionRef Section) {
@@ -214,6 +218,11 @@ Error SimulatorContext::runSimulator(const RunInfo &RI) {
   if (auto Err =
           SimRunner.loadElfSectionsToModel(*ElfData, /* InitBSS */ false))
     return Err;
+
+  if (MemManager) {
+    auto MemState = MemManager->getMemState();
+    SimRunner.initInterpretersMemory(MemState.begin(), MemState.end());
+  }
 
   I.setRegisterState(InitRegState);
   // StartPC location may be updated since last time it was configured.

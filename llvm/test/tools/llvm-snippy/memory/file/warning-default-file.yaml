@@ -1,0 +1,30 @@
+# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x100000
+    SIZE:      0x001000
+    LMA:       0x100000
+    ACCESS:    rw
+
+options:
+  mtriple: "riscv64"
+  mcpu: "generic-rv64"
+  num-instrs: 10
+
+  init-memory: "ascii-file"
+  
+histogram:
+    - [LB, 2.0]
+
+# CHECK: remark: init-memory-file option hasn't been specified:
+# CHECK:         using default file: mem_state.bin
+
+# COMM: Surely, no one will use default file to dump memory. (clueless)
+# CHECK: error: Can't open file with initial memory
+

@@ -256,6 +256,8 @@ public:
     Simulator->writeMem(Addr, Val);
   }
 
+  void writeSection(const SectionData &Section);
+
   const auto &getSubTarget() const { return *Env.ST; }
 
   const auto &getSections() const { return Env.Sections; }
