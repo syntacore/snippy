@@ -26,6 +26,8 @@ class TargetSubtargetInfo;
 namespace llvm {
 namespace snippy {
 
+class MemoryManager;
+
 struct GeneratorResult {
   enum class Type {
     RELOC,       // relocatable elf image
@@ -322,6 +324,8 @@ public:
   }
   MonoAllocatableSection &getROMSectionManager() { return *ROMSectionManager; }
 
+  MemoryManager &getMemoryManager() const { return *MemManager; }
+
   TargetGenContextInterface &getTargetContext() const {
     assert(TargetContext && "no target context");
     return *TargetContext;
@@ -352,6 +356,7 @@ private:
 
   const OpcodeCache *OpCC = nullptr;
   std::unique_ptr<Linker> PLinker;
+  std::unique_ptr<MemoryManager> MemManager;
 
   constexpr static auto SmallStringDefaultSize = 16;
 

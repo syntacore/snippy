@@ -1488,6 +1488,170 @@ priority over ``--riscv-disable-misaligned-access``.
       - [LW, 1.0]
       - [SW, 1.0]
 
+.. _`_memory_initialization`:
+
+Memory Initialization
+~~~~~~~~~~~~~~~~~~~~~
+
+Use the ``-init-memory=`` option to initialize memory. Along with it,
+you must also provide the ``-init-regs-in-elf`` option.
+
+Possible values of ``-init-memory=`` are:
+
+-  ``no`` |nbsp| -- |nbsp| Use this setting to not initialize memory. The RW sections
+   will be marked as ``NOLOAD``.
+
+   .. container:: formalpara-title
+
+      **Example:**
+
+   ::
+
+      ./llvm-snippy -mtriple=riscv64 \
+          ./yml/layout-shorter.yaml \
+          -num-instrs=100 -seed=0 --init-memory=no \
+          --init-regs-in-elf --trace-log=log \
+          -o layout.elf
+
+-  ``full`` |nbsp| -- |nbsp| Use this setting to initialize all RW sections from the
+   layout with random values.
+
+   You can set up a special seed for memory initialization with the
+   ``--memory-seed=`` option to get the same snippet with differently
+   initialized memory.
+
+   .. container:: formalpara-title
+
+      **Example:**
+
+   ::
+
+      ./llvm-snippy -mtriple=riscv64 \
+          ./yml/layout.yaml \
+          -num-instrs=100 -seed=0 --memory-seed=1 --init-memory=full \
+          --init-regs-in-elf --trace-log=log \
+          -o layout.elf
+
+-  ``full-with-addresses`` |nbsp| -- |nbsp| Use this setting to add sections
+   initialized with the addresses you specify here to the output .elf
+   file.
+
+-  ``runtime`` |nbsp| -- |nbsp| Use this setting to use the initialization function.
+   The RW sections will be marked as ``NOLOAD`` and the initialization
+   function will be called in runtime to initialize the data section.
+
+   .. container:: formalpara-title
+
+      **Example:**
+
+   ::
+
+      ./llvm-snippy -mtriple=riscv64 \
+          ./yml/layout-shorter.yaml \
+          -num-instrs=100 -seed=0 --init-memory=runtime \
+          --init-regs-in-elf --trace-log=log \
+          -o layout.elf
+
+   .. note::
+
+      This option might considerably slow down the generation process.
+      Due to RW memory regions size, execution of such initialization
+      function might take a significant amount of time on an SW model.
+      Since output of such a function is deterministic (given that we
+      know the seed value), llvm-snippy can deduce the values produced
+      by such a function quite easily and fast.
+
+      To make test generation (but **not** test execution) faster, use
+      the ``--skip-memory-runtime-init`` option. It will skip the
+      memory-randomization function execution and just pre-initialize
+      the internal memory representation as if this function was called.
+      Then test generation proceeds as usual.
+
+      .. container:: formalpara-title
+
+         **Example:**
+
+      ::
+
+         ./llvm-snippy -mtriple=riscv64 \
+             ./yml/layout-shorter.yaml -model-plugin=<model> \
+             -num-instrs=100 -seed=0 --init-memory=runtime \
+             --skip-memory-runtime-init --init-regs-in-elf \
+             --trace-log=log -o layout.elf
+
+-  ``loads`` |nbsp| -- |nbsp| This setting is similar to ``runtime``, but it only
+   initializes the addresses that were accessed in the program.
+
+   .. note::
+
+      You can use this setting with both ``--memory-seed=`` and
+      ``--skip-memory-runtime-init`` options.
+
+   .. container:: formalpara-title
+
+      **Example:**
+
+   ::
+
+      ./llvm-snippy -mtriple=riscv64 \
+          ./yml/layout-shorter.yaml -model-plugin=<model> \
+          -num-instrs=100 -seed=1 --init-regs-in-elf \
+          --init-memory=loads -o layout.elf \
+          --skip-memory-runtime-init -memory-seed=2 -trace-log=log
+
+-  ``loads-with-addresses`` |nbsp| -- |nbsp| This setting is similar to ``loads``, but
+   it only initializes legal addresses from the scheme.
+
+-  ``ascii-file`` |nbsp| -- |nbsp| Use this setting to initialize memory as an ASCII
+   file. Then, use it along with the ``--init-memory-file`` option to
+   initialize memory in the format snippy uses to dump memory sections.
+   For more details, refer to the
+   `chapter <#initializing-memory-from-results-of-another-snippet>`__
+   that follows.
+
+Initializing Memory from Results of Another Snippet
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can generate a snippet with memory initialized with results of a
+previously executed snippet. To do this, you need to specify the
+following parameters:
+
+-  ``--init-memory=ascii-file`` |nbsp| -- |nbsp| Flag that initializes memory as an
+   ASCII file.
+
+-  ``--init-memory-file`` - File with the ASCII data from the previous
+   memory dump that you want to use in this run. The data in this file
+   is based on memory dumps with the ```--dump-memory-as-ascii``
+   option <#dumping-memory-sections-as-ascii>`__. See the following
+   examples:
+
+   -  Standard dump:
+
+      ::
+
+         Section <section_name>:
+         0x0:  11 11 11 11 11 11 11 11 11 11 11 11 11 11 11 11
+         0x10: 22 22 22 22 22 33 33 33 33 33 33 33 33 33 33 33
+
+   -  Dump with arbitrary number of bytes per line. In this case, the
+      address from the beginning of the section at the line start must
+      be correct:
+
+      ::
+
+         Section <section_name>:
+         0x0: Bf 00 11 6f 07
+         0x5: bf 11 49 aa 55 77 91 02 01 10
+         0xf: 8F
+         0x10: 11 11 11 11 11 11 11 11 11 11 11 11 11 11 11 11
+
+.. important::
+
+   The data provided by dumping a specific memory range is currently not
+   supported for ASCII initialization. For the details, refer to the
+   `Dumping Memory Sections <#dumping-memory-sections>`__ section of
+   this guide.
+
 Memory Scheme Groups
 ~~~~~~~~~~~~~~~~~~~~
 

@@ -11,6 +11,7 @@
 #include "snippy/Generator/CodeAddrSampler.h"
 #include "snippy/Generator/CodeAddrSamplingPass.h"
 #include "snippy/Generator/Linker.h"
+#include "snippy/Generator/MemoryManager.h"
 #include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/InitializePasses.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
@@ -293,6 +294,7 @@ SnippyProgramContext::SnippyProgramContext(LLVMState &State,
       PLinker(std::make_unique<Linker>(
           State.getCtx(), Settings.Sections,
           Settings.MangleExportedNames ? Settings.EntryPointName : "")),
+      MemManager(std::make_unique<MemoryManager>()),
       StackPointer(Settings.StackPointer),
       ReturnAddress(Settings.ReturnAddress),
       MangleExportedNames(Settings.MangleExportedNames),
@@ -307,6 +309,7 @@ SnippyProgramContext::SnippyProgramContext(LLVMState &State,
   initializeUtilitySection(Settings);
   initializeROMSection(Settings);
   initializeStaticStack(Settings);
+  MemManager->mangleExternalRandomizer(*PLinker);
 }
 
 void SnippyProgramContext::createTargetContext(const Config &Cfg,

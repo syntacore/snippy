@@ -133,6 +133,38 @@ let Group = ModelOptionsCategory in {
                DefaultValue<"0">;
 }
 
+def MemInitOptionsCategory
+    : OptionGroup<"Snippy Memory Initialization Options", true> {
+  let StructName = "MemInitOptions";
+}
+
+let Group = MemInitOptionsCategory in {
+  def MemoryFile : StringOption<"init-memory-file">,
+                   Description<"File with initial memory map">,
+                   DefaultValue<"none">;
+
+  def SkipRuntimeMemInit
+      : Flag<"skip-memory-runtime-init">,
+        Description<"Simulation will be started without runtime memory "
+                    "initialization and with pre-initialized RW sections">,
+        Hidden;
+
+  def ExternalMemInitRoutine
+      : Flag<"external-mem-init-routine">,
+        Description<"Memory initialization routine won't be called from snippy "
+                    "and it will be generated according to calling convention">,
+        Hidden;
+
+  def InitializeMemory : EnumOption<"init-memory", "MemInitMode">,
+                         Description<"initialize memory sections">,
+                         DefaultValue<"MemInitMode::NoInit"> {
+    let AdditionalArgs = "MemInitModeEnumOption::getClValues()";
+  }
+
+  def MemorySeed : StringOption<"memory-seed">,
+                   Description<"Seed for runtime memory initialization">,
+                   DefaultValue<"none">;
+}
 
 def RegInitOptionsCategory
     : OptionGroup<"Snippy Register Initialization Options", true> {

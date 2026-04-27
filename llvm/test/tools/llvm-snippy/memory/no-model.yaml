@@ -1,0 +1,24 @@
+# RUN: llvm-snippy %s -mtriple=riscv64 \
+# RUN:   -num-instrs=1 -init-memory=full -model-plugin=None \
+# RUN:   -memory-seed=11 -o %t
+
+# RUN: llvm-readelf --hex-dump=.snippy.1.rw %t.elf \
+# RUN: |& FileCheck %s --dump-input fail
+
+# COMM: This is the reference of splitmix32 generation for memory-seed=11
+# CHECK: 330e1273 299ed19a 53102ded 30fbf41c
+
+sections:
+- name: 0
+  VMA: 0x4000000
+  SIZE: 0x1000
+  LMA: 0x4000000
+  ACCESS: rx
+- name: 1
+  VMA: 0x5000000
+  SIZE: 0x1000
+  LMA: 0x5000000
+  ACCESS: rw
+
+histogram:
+- [XOR, 1]

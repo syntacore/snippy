@@ -17,6 +17,7 @@ class MachineFunction;
 namespace snippy {
 
 struct SnippyFunctionMetadata {
+  const MachineBasicBlock *MemInitBlock = nullptr;
   const MachineBasicBlock *RegsInitBlock = nullptr;
 };
 

@@ -203,10 +203,34 @@ public:
     // TODO: no need to postprocess for now
   }
 
+  void
+  generateCallToMemInitRoutine(InstructionGenerationContext &IGC,
+                               size_t SectionStart, size_t SectionSize,
+                               MemorySeedTy Seed,
+                               const Function &ExternalGFunc) const override {
+    SNIPPY_UNIMPLEMENTED();
+  }
 
+  MemInitCallGenResult getSectionStateAfterMemInitRoutine(
+      SnippyProgramContext &ProgCtx, const TargetSubtargetInfo &STI,
+      size_t SectionSize, MemorySeedTy Seed) const override {
+    SNIPPY_UNIMPLEMENTED();
+  }
 
+  void
+  generateRandomGenFunction(InstructionGenerationContext &IGC) const override {
+    SNIPPY_UNIMPLEMENTED();
+  }
 
+  unsigned getRandomGenFunctionMaxSize() const override {
+    SNIPPY_UNIMPLEMENTED();
+  }
 
+  void generateMemorytInitializationAtAddresses(
+      InstructionGenerationContext &IGC,
+      const MemoryMap &Addresses) const override {
+    SNIPPY_UNIMPLEMENTED();
+  }
 
   virtual MachineInstr *generateFinalInst(InstructionGenerationContext &IGC,
                                           unsigned LastInstr) const override {
@@ -1138,6 +1162,11 @@ public:
     return snippy::isSPRelative(Opcode);
   }
 
+  void allocateMemoryInitializationRegs(
+      InstructionGenerationContext &IGC,
+      bool FollowCallingConvention) const override {
+    SNIPPY_UNIMPLEMENTED();
+  }
   std::vector<OpcodeHistogramEntry>
   getPolicyOverrides(const SnippyProgramContext &ProgCtx,
                      const MachineBasicBlock &MBB) const override {

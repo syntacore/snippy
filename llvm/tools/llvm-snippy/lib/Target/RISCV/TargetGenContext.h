@@ -73,6 +73,15 @@ private:
   std::array<OpcodeHistogramEntry, 3> Result;
 };
 
+struct RISCVMemInitRegs final {
+  unsigned Start, Size, Seed, Offset, TmpA, TmpB, TmpC;
+
+  bool contains(unsigned Reg) const {
+    return Reg == Start || Reg == Size || Reg == Seed || Reg == Offset ||
+           Reg == TmpA || Reg == TmpB || Reg == TmpC;
+  }
+};
+
 class RISCVGeneratorContext : public TargetGenContextInterface {
 public:
   RISCVGeneratorContext(
@@ -148,6 +157,55 @@ public:
     return getActiveRVVMode(MBB).Config->SEW;
   }
 
+  const RISCVMemInitRegs &getMemInitRegs() const {
+    assert(MemInitRegs.has_value() &&
+           "getMemInitRegs was called before allocateMemoryInitializationRegs");
+    return *MemInitRegs;
+  }
+  // if FollowCallingConvention is true, then signature of the __snippy_random
+  // is follows:
+  //  size_t - 8 bytes for RV64, 4 bytes for RV32
+  //  void __snippy_random(size_t Start, size_t Size,
+  //                       size_t Seed,  size_t Offset);
+  //  (additionally it uses a5, a6, a7 regs as temporary)
+  // Start  - section start
+  // Size   - size of the section
+  // Seed   - memory seed
+  // Offset - should be zero
+  void allocateMemoryInitializationRegs(InstructionGenerationContext &IGC,
+                                        bool FollowCallingConvention) {
+
+    std::array<unsigned, 7> Regs{/*Start*/ RISCV::X10,
+                                 /*Size*/ RISCV::X11,
+                                 /*Seed*/ RISCV::X12,
+                                 /*Offset*/ RISCV::X13,
+                                 /*TmpA*/ RISCV::X14,
+                                 /*TmpB*/ RISCV::X15,
+                                 /*TmpC*/ RISCV::X16};
+    auto &RP = IGC.getRegPool();
+
+    if (!FollowCallingConvention) {
+      // Override default argument registers with randomly chosen ones.
+      auto &ProgCtx = IGC.ProgCtx;
+      const auto &State = ProgCtx.getLLVMState();
+      const auto &RegInfo = State.getRegInfo();
+      const auto &RegClass = RegInfo.getRegClass(RISCV::GPRNoX0RegClassID);
+      auto RA = ProgCtx.getReturnAddress();
+      // __snippy_random ends with ret instruction,
+      //  so return address register shouldn't be used to generate memory
+      auto Filter = [RA](auto Reg) { return Reg == RA; };
+      Regs = RP.getNAvailableRegisters<Regs.size()>(
+          "Function call regs", RegInfo, RegClass, IGC.MBB, Filter);
+    }
+
+    // Registers must not be overrided by caller code.
+    for (auto &&Reg : Regs) {
+      RP.addReserved(Reg);
+    }
+
+    auto &&[Start, Size, Seed, Offset, TmpA, TmpB, TmpC] = Regs;
+    MemInitRegs = {Start, Size, Seed, Offset, TmpA, TmpB, TmpC};
+  }
   std::pair<unsigned, bool> getEMUL(unsigned Opcode, unsigned OpIndex,
                                     const MachineBasicBlock &MBB) const {
     // EMUL - effective LMUL of each vector operand.
@@ -310,6 +368,7 @@ private:
   RVVModeInfo CurrentRVVMode;
   RISCVConfigurationInfo RISCVConfig;
   DenseSet<unsigned> DisallowedIntersectingMemAccessesForOpcodes;
+  std::optional<RISCVMemInitRegs> MemInitRegs;
 };
 
 } // namespace snippy

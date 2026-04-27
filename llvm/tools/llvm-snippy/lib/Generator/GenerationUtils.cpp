@@ -808,6 +808,18 @@ void initializeBaseRegs(InstructionGenerationContext &InstrGenCtx,
   }
 }
 
+// TODO: that should not be here.
+void markMemAccess(InstructionGenerationContext &IGC,
+                   const MemAddresses &Addresses, size_t AccessSize,
+                   const MCInstrDesc &InstrDesc) {
+  if (!IGC.getCommonCfg()
+           .ProgramCfg.MemoryCfg.InitializationMode.isLoadsInit() ||
+      !InstrDesc.mayLoad())
+    return;
+  IGC.ProgCtx.getMemoryManager().markMemAccessToInitialize(Addresses,
+                                                           AccessSize);
+}
+
 // This function returns address info to use for each opcode.
 std::pair<std::map<unsigned, APInt>, std::vector<AddressInfo>>
 mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
@@ -873,6 +885,8 @@ void markMemAccessAsUsed(InstructionGenerationContext &IGC,
                          MemAccessKind Kind, MemAccessInfo *MAI) {
   auto EffectiveAddr = AI.Address;
   auto AccessSize = AI.AccessSize;
+  auto AddrToAccess = MemAddresses{EffectiveAddr};
+  markMemAccess(IGC, AddrToAccess, AccessSize, InstrDesc);
   if (MAI) {
     if (Kind == MemAccessKind::BURST)
       MAI->addBurstPlainMemAccess(EffectiveAddr, AccessSize);

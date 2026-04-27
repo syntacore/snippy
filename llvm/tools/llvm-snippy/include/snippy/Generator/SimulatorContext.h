@@ -47,6 +47,7 @@ struct SimulatorContext {
     StringRef ImageToRun;
     SnippyProgramContext &ProgCtx;
     SnippyModule &MainModule;
+    MemoryManager *MemManager;
     StringRef EntryPointName;
     StringRef InitialRegStateOutputYaml;
     StringRef FinalRegStateOutputYaml;

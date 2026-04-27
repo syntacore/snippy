@@ -140,6 +140,16 @@ BlockGenPlanningImpl::calculateMFSizeLimit(const MachineFunction &MF) const {
   const auto &Cfg = GenCtx->getConfig();
   const auto &ProgCfg = Cfg.ProgramCfg;
   auto &PassCfg = Cfg.PassCfg;
+  auto MemMode = ProgCfg.MemoryCfg.InitializationMode;
+  if (MemMode.Value == MemInitMode::RuntimeFull) {
+    // actual size of __snippy_random may vary due to compressed instructions
+    CurrentCodeSize += SnpTgt.getRandomGenFunctionMaxSize();
+  } else if (MemMode.Value == MemInitMode::LoadsOnly ||
+             MemMode.Value == MemInitMode::LoadsWithAddresses) {
+    snippy::fatal("Incompatible options",
+                  "Runtime memory initialization using loads and "
+                  "num-instrs=all are incompatible");
+  }
   // last instruction in the trace might be target dependent: EBREAK or
   // int 3, etc.
   StringRef LastInstr = PassCfg.InstrsGenerationConfig.LastInstr;

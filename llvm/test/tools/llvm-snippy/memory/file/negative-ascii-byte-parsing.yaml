@@ -1,0 +1,27 @@
+# RUN: not llvm-snippy %s -model-plugin=None \
+# RUN:   --init-memory-file=%S/Inputs/memory-map-wrong-byte-format.yaml \
+# RUN:   --init-memory=ascii-file |& FileCheck %s
+
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x100000
+    SIZE:      0x001000
+    LMA:       0x100000
+    ACCESS:    rw
+
+options:
+  mtriple: "riscv64"
+  mcpu: "generic-rv64"
+  num-instrs: 10
+
+  
+histogram:
+    - [LB, 2.0]
+
+# CHECK: error: [memory-map-wrong-byte-format.yaml, 3] 
+# CHECK: Wrong memory init file format: can't convert to byte: BOBA
