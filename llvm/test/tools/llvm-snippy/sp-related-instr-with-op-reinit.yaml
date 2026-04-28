@@ -1,0 +1,20 @@
+# RUN: llvm-snippy --model-plugin=None %s |& FileCheck %s
+
+include:
+    - "Inputs/sections.yaml"
+
+options:
+    mtriple: riscv32
+    march: "rv32ic"
+    num-instrs: 5000
+    dump-mf: true
+
+imm-hist:
+  opcodes:
+    - "C_SWSP": "uniform"
+
+histogram:
+  - [C_SWSP, 10.0]
+
+
+# CHECK-NOT: C_SWSP $x2, $x2, {{[0-9]*}}
