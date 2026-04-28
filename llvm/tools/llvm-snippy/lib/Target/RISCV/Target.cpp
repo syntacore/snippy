@@ -4356,6 +4356,9 @@ public:
     const auto &TgtCtx =
         IGC.ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
 
+    if (isSPRelative(Opcode) && RC.getID() != RISCV::SPRegClassID)
+      return {RISCV::X2};
+
     if (!isRVV(Opcode))
       return {};
 
