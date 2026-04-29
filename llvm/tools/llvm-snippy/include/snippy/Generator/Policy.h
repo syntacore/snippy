@@ -430,6 +430,33 @@ public:
   void setModeChangingPolicy(const ModeChangingInstPolicy *) {}
 };
 
+class SMCGenPolicy final : public detail::EmptyFinalizeMixin {
+  GeneratorContext &GC;
+  const Function &SMCCopyFunc;
+  const Function &SMCTgtFunc;
+  unsigned OverwritersNum;
+
+public:
+  SMCGenPolicy(SnippyProgramContext &ProgCtx, GeneratorContext &GC,
+               const Function &SMCCopyFunc, const Function &SMCTgtFunc,
+               unsigned OverwritersNum);
+
+  void initialize(InstructionGenerationContext &InstrGenCtx,
+                  const RequestLimit &Limit);
+
+  std::optional<InstructionRequest> next() { return std::nullopt; }
+
+  void print(raw_ostream &OS) const { OS << "SMC Generation Policy\n"; }
+
+  bool isInseparableBundle() const { return true; }
+
+  const ModeChangingInstPolicy *getModeChangingPolicy() const {
+    return nullptr;
+  }
+
+  void setModeChangingPolicy(const ModeChangingInstPolicy *) {}
+};
+
 class FinalInstPolicy final : public detail::EmptyFinalizeMixin {
   unsigned Opcode;
   const CommonPolicyConfig *Cfg;

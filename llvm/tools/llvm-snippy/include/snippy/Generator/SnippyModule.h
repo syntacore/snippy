@@ -28,6 +28,8 @@ namespace snippy {
 
 class MemoryManager;
 
+class SMCManagerT;
+
 struct GeneratorResult {
   enum class Type {
     RELOC,       // relocatable elf image
@@ -326,6 +328,8 @@ public:
 
   MemoryManager &getMemoryManager() const { return *MemManager; }
 
+  SMCManagerT &getSMCManager() const { return *SMCManager; }
+
   TargetGenContextInterface &getTargetContext() const {
     assert(TargetContext && "no target context");
     return *TargetContext;
@@ -357,6 +361,7 @@ private:
   const OpcodeCache *OpCC = nullptr;
   std::unique_ptr<Linker> PLinker;
   std::unique_ptr<MemoryManager> MemManager;
+  std::unique_ptr<SMCManagerT> SMCManager;
 
   constexpr static auto SmallStringDefaultSize = 16;
 
