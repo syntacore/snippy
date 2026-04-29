@@ -17,6 +17,7 @@
 #include "snippy/Generator/GenerationRequest.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/Policy.h"
+#include "snippy/Generator/SMCManager.h"
 #include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/Support/Utils.h"
 #include "snippy/Target/Target.h"
@@ -62,6 +63,9 @@ private:
   void fillReqWithBurstGroups(planning::FunctionRequest &FunReq,
                               size_t NumInstrBurst, size_t NumInstrTotal,
                               size_t AverageBlockInstrs);
+  void fillReqWithSMC(planning::FunctionRequest &FunReq,
+                      size_t AverageBlockInstrs, const Function &SMCCopyFunc,
+                      const Function &SMCTgtFunc);
 
   size_t fillReqWithContextModeChanges(
       SmallDenseMap<const MachineBasicBlock *, size_t> &OutModeChangeAmounts,
@@ -417,6 +421,38 @@ void BlockGenPlanningImpl::fillReqWithBurstGroups(
   }
 }
 
+void BlockGenPlanningImpl::fillReqWithSMC(planning::FunctionRequest &FunReq,
+                                          size_t AverageBlockInstrs,
+                                          const Function &SMCCopyFunc,
+                                          const Function &SMCTgtFunc) {
+  auto &ProgCtx = GenCtx->getProgramContext();
+  const auto &Config = GenCtx->getConfig();
+  auto SMCTgtRatio = Config.PassCfg.SMC->SMCTgtBlocksRatio;
+  unsigned MBBNumToInsert = BlocksToProcess.size() * SMCTgtRatio;
+
+  auto ToInsertRange = RandEngine::genNUniqInInterval(
+      0ul, BlocksToProcess.size() - 1, MBBNumToInsert);
+  if (!ToInsertRange)
+    snippy::fatal("Error in getting random overwritting basic blocks for smc");
+  for (auto BlockId : *ToInsertRange) {
+    const auto *MBB = BlocksToProcess[BlockId];
+
+    auto OverwritersNum = RandEngine::genInRangeInclusive(
+        *Config.PassCfg.SMC->SMCOverwriters.Min,
+        *Config.PassCfg.SMC->SMCOverwriters.Max);
+
+    FunReq.addToBlock(MBB,
+                      planning::InstructionGroupRequest(
+                          planning::RequestLimit::NumInstrs{/* WHAT? */ 0},
+                          planning::SMCGenPolicy(ProgCtx, *GenCtx, SMCCopyFunc,
+                                                 SMCTgtFunc, OverwritersNum)));
+    --MBBNumToInsert;
+
+    auto &BlockReq = FunReq.at(MBB);
+    updateBlocksToProcess(BlockReq, AverageBlockInstrs);
+  }
+}
+
 // Returns the number of primary mode-changing instructions added to
 // this function request
 size_t BlockGenPlanningImpl::fillReqWithContextModeChanges(
@@ -680,6 +716,13 @@ BlockGenPlanningImpl::processFunctionWithNumInstr(const MachineFunction &MF) {
   fillReqWithBurstGroups(FunReq, NumInstrBurst, NumInstrsLeft,
                          AverageBlockInstrs);
   NumInstrsLeft -= NumInstrBurst;
+
+  if (Cfg.PassCfg.SMC.has_value() &&
+      MF.getName() != SMCManagerT::SMCSrcFuncName &&
+      MF.getName() != SMCManagerT::SMCTgtFuncName) {
+    fillReqWithSMC(FunReq, AverageBlockInstrs, FG->getSMCCopyFuncDecl(),
+                   FG->getSMCTgtFunc());
+  }
 
   const auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
 

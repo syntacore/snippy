@@ -226,6 +226,16 @@ public:
     SNIPPY_UNIMPLEMENTED();
   }
 
+  std::vector<unsigned>
+  getRegListForMemCpyForSMC(InstructionGenerationContext &IGC) const override {
+    SNIPPY_UNIMPLEMENTED();
+  }
+
+  void generateMemCpyForSMC(MachineFunction &MF,
+                            SnippyProgramContext &ProgCtx) const override {
+    SNIPPY_UNIMPLEMENTED();
+  }
+
   void generateMemorytInitializationAtAddresses(
       InstructionGenerationContext &IGC,
       const MemoryMap &Addresses) const override {
@@ -802,8 +812,15 @@ public:
     SNIPPY_UNIMPLEMENTED();
   }
 
+  Error
+  hasMandatoryTargetFeaturesForSMC(const MCSubtargetInfo &SI) const override {
+    return createStringError(inconvertibleErrorCode(),
+                             "SMC generation supported only for RISC-V");
+  }
 
-
+  bool isUnsupportedForSMC(const MCInstrDesc &InstrDesc) const override {
+    SNIPPY_UNIMPLEMENTED();
+  }
 
   bool
   canBeGeneratedAsCommonInstr(const MCInstrDesc &InstrDesc) const override {

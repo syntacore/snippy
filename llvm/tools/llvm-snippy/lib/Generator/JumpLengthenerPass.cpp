@@ -13,6 +13,7 @@
 #include "snippy/Generator/Policy.h"
 
 #include "../InitializePasses.h"
+#include "snippy/Generator/SMCManager.h"
 
 #define DEBUG_TYPE "snippy-jump-lengthener"
 #define PASS_DESC "Snippy Jump Lengthener"

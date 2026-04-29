@@ -1,0 +1,36 @@
+# RUN: not llvm-snippy %s -model-plugin None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mcpu: generic-rv64
+  mattr: +zifencei
+  enable-static-stack: on
+
+sections:
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      stack
+    VMA:       0x80a00000
+    SIZE:      0x400000
+    LMA:       0x80a00000
+    ACCESS:    rw
+
+code-layout:
+  ranges:
+    - start: 0x20
+      size: 0x10
+      stride: 0x1
+      first-offset: 0
+      last-offset: 0
+
+smcgram:
+  smc-mode: immediate
+
+histogram:
+  - [ADD, 1.0]
+
+# CHECK: error: Incompatible options: When SMC is enabled, option -enable-static-stack is not supported.

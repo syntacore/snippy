@@ -12,6 +12,7 @@
 #include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/Policy.h"
+#include "snippy/Generator/SMCManager.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/PassRegistry.h"
 
@@ -73,6 +74,8 @@ bool CFGenerator::runOnMachineFunction(MachineFunction &MF) {
   auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
   bool IsNoCallees = Node && Node->callees().size() == 0;
+  if (MF.getName() == SMCManagerT::SMCTgtFuncName)
+    IsNoCallees = true;
 
   // We need to change the number of CF instructions, under the conditions:
   //   1. Only the call instructions remain in the histogram (no plain left).
