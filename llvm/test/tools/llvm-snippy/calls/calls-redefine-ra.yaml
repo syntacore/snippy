@@ -5,13 +5,22 @@
 # RUN: not llvm-snippy %s --redefine-sp=SP --redefine-ra=reg::X2 |& FileCheck %s --check-prefix=COLLISION
 
 # ANY: $[[TMP1:[a-z0-9]+]] = AUIPC target-flags(riscv-pcrel-hi) @[[FUN1:[a-zA-Z0-9_]+]], pre-instr-symbol <mcsymbol .[[TMP_SYM1:[a-zA-Z0-9_]+]]>
-# ANY-NEXT: ${{[a-z0-9]+}} = PseudoJALRCall $[[TMP1]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM1]]>
+# ANY: $[[TMP1]] = ADDI $[[TMP1]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM1]]>
+# ANY: $[[TMP1]] = ADDI $[[TMP1]]
+# ANY: $[[TMP1]] = ADDI $[[TMP1]], {{[0-1]}}
+# ANY-NEXT: ${{[a-z0-9]+}} = PseudoJALRCall $[[TMP1]],
 
 # ABI: $[[TMP1:[a-z0-9]+]] = AUIPC target-flags(riscv-pcrel-hi) @[[FUN1:[a-zA-Z0-9_]+]], pre-instr-symbol <mcsymbol .[[TMP_SYM1:[a-zA-Z0-9_]+]]>
-# ABI-NEXT: $x1 = PseudoJALRCall $[[TMP1]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM1]]>
+# ABI: $[[TMP1]] = ADDI $[[TMP1]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM1]]>
+# ABI: $[[TMP1]] = ADDI $[[TMP1]]
+# ABI: $[[TMP1]] = ADDI $[[TMP1]], {{[0-1]}}
+# ABI-NEXT: $x1 = PseudoJALRCall $[[TMP1]],
 
 # SPECIFIC: $[[TMP1:[a-z0-9]+]] = AUIPC target-flags(riscv-pcrel-hi) @[[FUN1:[a-zA-Z0-9_]+]], pre-instr-symbol <mcsymbol .[[TMP_SYM1:[a-zA-Z0-9_]+]]>
-# SPECIFIC-NEXT: $x10 = PseudoJALRCall $[[TMP1]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM1]]>
+# SPECIFIC: $[[TMP1]] = ADDI $[[TMP1]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM1]]>
+# SPECIFIC: $[[TMP1]] = ADDI $[[TMP1]]
+# SPECIFIC: $[[TMP1]] = ADDI $[[TMP1]], {{[0-1]}}
+# SPECIFIC-NEXT: $x10 = PseudoJALRCall $[[TMP1]]
 
 # ZERO: error: Register X0 specified in --redefine-ra is not suitable for return address redefinition
 # COLLISION: error: Cannot assign stack pointer and return address to same register
