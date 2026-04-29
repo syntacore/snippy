@@ -152,6 +152,13 @@ bool RISCVExpandSnippyPseudo::expandC_JRB(MachineBasicBlock &MBB,
       RP->getAvailableRegister("c.jr destination register", RI, RegClass, MBB);
 
   expandAuipcInstPair(MBB, MBBI, RISCVII::MO_PCREL_HI, RISCV::ADDI, DestReg);
+
+  // According to the spec LSB is set to zero, so we can make RS value odd
+  snippy::getFormAddrInstBuilder(Tgt, IGC.MBB, IGC.Ins, State.getCtx(),
+                                 TII->get(RISCV::ADDI))
+      .addDef(DestReg)
+      .addReg(DestReg)
+      .addImm(snippy::RandEngine::genBool());
   getMainInstBuilder(Tgt, MBB, MBBI, State.getCtx(), TII->get(RISCV::C_JR),
                      DestReg);
   MI.eraseFromParent();
