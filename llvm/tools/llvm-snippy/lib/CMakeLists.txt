@@ -58,6 +58,10 @@ set(LLVMSnippySources
   MemoryInitializerPass.cpp
   LateMemoryInitializationPass.cpp
   MemInitGeneratorPass.cpp
+  SMCInitPass.cpp
+  SMCGeneratorPass.cpp
+  SMCFillerPass.cpp
+  SMCBBToNamePass.cpp
   )
 
 

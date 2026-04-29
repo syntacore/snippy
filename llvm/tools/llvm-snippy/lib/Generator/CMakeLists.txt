@@ -32,8 +32,9 @@ set(LLVMSnippyGeneratorSources
   SnippyModule.cpp
   TopMemAccSampler.cpp
   RandomMemAccSampler.cpp
+  SMCManager.cpp
+  SMCSetSizeGlobalsPass.cpp
 )
-
 
 add_llvm_library(LLVMSnippyGenerator
   DISABLE_LLVM_LINK_LLVM_DYLIB

@@ -48,7 +48,8 @@ namespace snippy {
   WARN_CASE(NonReproducibleExecution, "non-reproducible-execution")            \
   WARN_CASE(CannotGenerateCalls, "cannot-generate-calls")                      \
   WARN_CASE(OperandsReinitialization, "operands-reinitialization")             \
-  WARN_CASE(LoopCountersOnStack, "loop-counters-on-stack")
+  WARN_CASE(LoopCountersOnStack, "loop-counters-on-stack")                     \
+  WARN_CASE(SMCWithoutEffect, "smc-without-effect")
 
 #ifdef WARN_CASE
 #error WARN_CASE should not be defined at this point

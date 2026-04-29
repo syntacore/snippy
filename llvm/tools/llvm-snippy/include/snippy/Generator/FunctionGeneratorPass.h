@@ -79,6 +79,14 @@ public:
     CFInstrNum.emplace(&MF, NumInstr);
   }
 
+  Function &getSMCCopyFuncDecl() const { return *SMCCopyFuncDecl; }
+
+  Function &getSMCTgtFunc() const { return *SMCTgtFunc; }
+
+private:
+  void initSMCFunctions(Module &M, GeneratorContext &SGCtx,
+                        unsigned long long InstrsNum);
+
 private:
   unsigned long long calculateEntryFnInstrsNum(Module &M,
                                                const CallGraphState &CGS);
@@ -105,6 +113,8 @@ private:
 
   std::unordered_map<const MachineFunction *, size_t> RequestedInstrNum;
   std::unordered_map<const MachineFunction *, size_t> CFInstrNum;
+  Function *SMCCopyFuncDecl = nullptr;
+  Function *SMCTgtFunc = nullptr;
 };
 
 } // namespace snippy

@@ -9,6 +9,7 @@
 
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/RootRegPoolWrapperPass.h"
+#include "snippy/Generator/SMCInitPass.h"
 #include "snippy/InitializePasses.h"
 
 void llvm::snippy::initializeSnippyPasses(PassRegistry &Registry) {
@@ -39,6 +40,11 @@ void llvm::snippy::initializeSnippyPasses(PassRegistry &Registry) {
   initializeBlockGenPlanningPass(Registry);
   initializeMemoryAccessDumperPass(Registry);
   initializeMemInitGeneratorPass(Registry);
+  initializeSMCFillerPass(Registry);
+  initializeSMCGeneratorPass(Registry);
+  initializeSMCInitPass(Registry);
+  initializeSMCSetSizeGlobalsPass(Registry);
+  initializeSMCBBToNamePass(Registry);
   initializeConsecutiveLoopsVerifierPass(Registry);
   initializeCLBasicBlockPreprocessPass(Registry);
   initializeConfigureLinkerPass(Registry);

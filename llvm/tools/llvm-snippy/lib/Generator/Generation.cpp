@@ -16,6 +16,7 @@
 #include "snippy/Generator/GenerationRequest.h"
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/Policy.h"
+#include "snippy/Generator/SMCManager.h"
 #include "snippy/Generator/SimulatorContext.h"
 #include "snippy/Generator/SnippyFunctionMetadata.h"
 #include "snippy/Generator/SnippyLoopInfo.h"
