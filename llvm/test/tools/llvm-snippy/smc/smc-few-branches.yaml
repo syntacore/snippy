@@ -1,0 +1,53 @@
+# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=10 \
+# RUN:             -dump-mf |& FileCheck %s
+
+# CHECK: warning: (smc-without-effect) SMC mode doesn't provide any effect: there are no branches in the histogram or their weight is too small
+# CHECK-NOT:  AUIPC.*@__snippy_smc_memcpy
+# CHECK-NOT:  AUIPC.*@__snippy_smc_target
+options:
+  mattr: +m,+zifencei
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x100000
+    SIZE:      0x50000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      3     # SMC requires read-only section
+    VMA:       0x310000
+    SIZE:      0x50000
+    LMA:       0x310000
+    ACCESS:    r
+  - name:      stack # SMC requires internal or external stack enabled 
+    VMA:       0x150000
+    SIZE:      0x50000
+    LMA:       0x150000
+    ACCESS:    rw
+
+histogram:
+    - [ADD, 10.0]
+    - [ADDI, 10.0]
+    - [SUB, 10.0]
+    - [MUL, 10.0]
+    - [BNE, 0.01]
+
+code-layout:
+  ranges:
+    - start: 0x210000
+      size: 0x100000
+      stride: 0x1
+      first-offset: 0
+      last-offset: 0x0
+include:
+  - Inputs/smc-branchegram.yaml
+
+smcgram:
+  smc-tgt-blocks: 0.5 # 0.5 by default
+  smc-overwriters:
+    min: 1
+    max: 1
+  smc-mode: immediate # Trigger SMC immediately after overwritting

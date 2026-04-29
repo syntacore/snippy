@@ -12,6 +12,7 @@
 #include "snippy/Generator/CodeAddrSamplingPass.h"
 #include "snippy/Generator/Linker.h"
 #include "snippy/Generator/MemoryManager.h"
+#include "snippy/Generator/SMCManager.h"
 #include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/InitializePasses.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
@@ -295,6 +296,7 @@ SnippyProgramContext::SnippyProgramContext(LLVMState &State,
           State.getCtx(), Settings.Sections,
           Settings.MangleExportedNames ? Settings.EntryPointName : "")),
       MemManager(std::make_unique<MemoryManager>()),
+      SMCManager(std::make_unique<SMCManagerT>()),
       StackPointer(Settings.StackPointer),
       ReturnAddress(Settings.ReturnAddress),
       MangleExportedNames(Settings.MangleExportedNames),

@@ -14,6 +14,7 @@
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/Interpreter.h"
 #include "snippy/Generator/IntervalsToVerify.h"
+#include "snippy/Generator/SMCManager.h"
 #include "snippy/Generator/SelfcheckInfo.h"
 #include "snippy/Generator/SimulatorContextWrapperPass.h"
 #include "snippy/InitializePasses.h"
@@ -158,6 +159,34 @@ static auto createExternalMemInitRoutine(GeneratorContext &Ctx) {
   return ExtModule;
 }
 
+static auto createSMCInitRoutine(GeneratorContext &Ctx) {
+  auto &ProgCtx = Ctx.getProgramContext();
+  auto ExtModule =
+      std::make_unique<SnippyModule>(ProgCtx.getLLVMState(), "SMCModule");
+
+  ExtModule->generateObject(
+      [&](PassManagerWrapper &PM) {
+        PM.add(createGeneratorContextWrapperPass(Ctx));
+        PM.add(createRootRegPoolWrapperPass());
+        PM.add(createSimulatorContextWrapperPass(/* DoInit */ false));
+        PM.add(createSMCInitPass(ExtModule->getMMI()));
+        PM.add(createSMCBBToNamePass());
+        PM.add(createSMCFillerPass(ProgCtx.getLLVMState()));
+        PM.add(createSMCGeneratorPass(ExtModule->getMMI()));
+        assert(Ctx.getConfig().PassCfg.CodeLayout);
+        PM.add(createCLBasicBlockPreprocessPass());
+        PM.add(createFallThroughEraserPass());
+        PM.add(createBranchLengthenerPass());
+        PM.add(createJumpLengthenerPass());
+        PM.add(createCodeAddrSamplingPass());
+        PM.add(createLongJumpRelaxatorPass());
+        PM.add(createInstructionsPostProcessPass());
+      },
+      [&](PassManagerWrapper &PM) {});
+
+  return ExtModule;
+}
+
 } // namespace
 
 [[maybe_unused]] static void dumpSelfcheck(const std::vector<char> &Data,
@@ -280,7 +309,9 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
   if (!ProgramCfg.MemoryCfg.SkipRuntimeMemInit)
     FuncToAvoidInStubGen.push_back(
         ProgContext.getMemoryManager().getExternalRandomizerName());
-
+  auto SelfModifiedCode = PassCfg.SMC.has_value();
+  if (SelfModifiedCode)
+    FuncToAvoidInStubGen.push_back(std::string{SMCManagerT::SMCCopyFuncName});
   std::string MIR;
   raw_string_ostream MIROS(MIR);
 
@@ -338,6 +369,8 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
           PM.add(createPrintMachineInstrsPass(outs()));
 
         PM.add(createPostGenVerifierPass());
+        if (SelfModifiedCode)
+          PM.add(createSMCSetSizeGlobalsPass());
         if (GenCtx.getConfig().PassCfg.CodeLayout) {
           PM.add(createCLBasicBlockPreprocessPass());
           PM.add(createFallThroughEraserPass());
@@ -369,6 +402,11 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
   if (DumpMIR.isSpecified())
     writeMIRFile(MIR);
   std::vector<const SnippyModule *> Modules{&MainModule};
+  std::unique_ptr<SnippyModule> SMCModule;
+  if (SelfModifiedCode) {
+    SMCModule = createSMCInitRoutine(GenCtx);
+    Modules.push_back(SMCModule.get());
+  }
   auto InitMemMode = ProgramCfg.MemoryCfg.InitializationMode;
   std::unique_ptr<SnippyModule> MemInitModule;
   if (InitMemMode.isDuringRuntime()) {
@@ -385,7 +423,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
     }
     dumpCodeAddrMapping(ProgContext.getLinker(), outs());
   }
-  bool NoRelax = DisableLinkerRelaxations;
+  bool NoRelax = DisableLinkerRelaxations || SelfModifiedCode;
   auto EResult = ProgContext.generateELF(Modules, ObjectType, NoRelax);
   if (!EResult)
     snippy::fatal(EResult.takeError());
