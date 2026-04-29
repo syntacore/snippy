@@ -76,6 +76,7 @@ snippy::ActiveImmutablePassInterface *createInstructionGeneratorPass();
 
 MachineFunctionPass *createLoopAlignmentPass();
 
+MachineFunctionPass *createRandomSchedulingPass(unsigned MaxRegionSize);
 
 MachineFunctionPass *createInstructionsPostProcessPass();
 

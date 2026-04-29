@@ -13,6 +13,7 @@ set(LLVMSnippyConfigSources
     CallGraphLayout.cpp
     ImmediateHistogram.cpp
     OperandsReinitialization.cpp
+    Scheduling.cpp
     Valuegram.cpp
     Selfcheck.cpp
     )

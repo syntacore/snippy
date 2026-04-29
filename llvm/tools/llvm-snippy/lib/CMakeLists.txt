@@ -53,6 +53,7 @@ set(LLVMSnippySources
   PassManagerWrapper.cpp
   PrintMachineInstrsPass.cpp
   PrologueEpilogueInsertionPass.cpp
+  RandomSchedulingPass.cpp
   RegsInitInsertionPass.cpp
   ReserveRegsPass.cpp
   MemoryInitializerPass.cpp

@@ -396,6 +396,10 @@ public:
     reportUnimplementedError();
   }
 
+  bool mayBeScheduled(const MachineInstr &MI) const override {
+    reportUnimplementedError();
+  }
+
   MachineBasicBlock *generateBranch(InstructionGenerationContext &IGC,
                                     const MCInstrDesc &InstrDesc,
                                     MachineBasicBlock *Dst) const override {

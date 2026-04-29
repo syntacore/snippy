@@ -1,0 +1,40 @@
+# RUN: llvm-snippy %s -model-plugin=None -verify-mi -dump-mir=- | FileCheck %s
+
+# COM: Check that we tracks the liveness and 'verify-mi' finishes without errors.
+
+sections:
+- name: sect_rx_45a440000
+  PHDR: sect_rx_45a440000
+  VMA: 0x45a440000
+  SIZE: 0x2400000
+  LMA: 0x45a440000
+  ACCESS: rx
+- name: stack
+  PHDR: stack
+  VMA: 0x429f4c000
+  SIZE: 0x10000
+  LMA: 0x429f4c000
+  ACCESS: rw
+- name: somesect
+  VMA: 0x4692cd000
+  SIZE: 0x1000000
+  LMA: 0x4692cd000
+  ACCESS: rw
+histogram:
+- [ADDI, 1]
+options:
+  external-stack: 'True'
+  riscv-disable-misaligned-access: atomics-only
+  random-scheduling: 'True'
+  enable-phdrs-definition: 'True'
+  num-instrs: 50
+  last-instr: RET
+  mcpu: scr9
+  mtriple: riscv64
+  mattr: +zifencei,+xsccache
+  honor-target-abi: 'True'
+  mangle-exported-names: 'True'
+  init-regs-in-elf: 'True'
+  entry-point: test_0
+
+# CHECK: tracksRegLiveness: true

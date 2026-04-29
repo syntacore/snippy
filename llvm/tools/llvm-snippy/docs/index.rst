@@ -1887,6 +1887,8 @@ Advanced configuration includes keys for:
 -  `Basic block layout <#basic-block-layout>`__
 
 
+-  `Random scheduling pass <#random-scheduling>`__
+
 -  `Register Reservation Config`_
 
 .. _register-reservation:
@@ -2375,6 +2377,122 @@ The generated snippet includes a part of the trace:
 
 where ``jalr`` is ``fun3`` |nbsp| -- |nbsp| a weak symbol in the snippet (a stub for
 the model) to which you want to link the user function.
+
+
+.. _`_random_scheduling`:
+
+Random Scheduling
+-----------------
+
+Use the ``random-scheduling`` feature to apply a random scheduling pass
+for the generated code. It reorders instructions according to a topology
+sort of data dependency graph for each basic block of each function.
+
+To enable ``random-scheduling``, use one of the following approaches:
+
+-  Using the ``scheduling`` top-level key (preferred):
+
+   ::
+
+      scheduling:
+        enabled: true
+
+-  Using the ``random-scheduling`` key in ``options`` (outdated, but
+   still supported):
+
+   ::
+
+      options:
+        random-scheduling: true
+
+-  Via snippy command line:
+
+   ::
+
+      -random-scheduling
+
+Random scheduling does not change the behaviour of the program. However,
+it might be ineffective for large basic blocks, as they force it to run
+for a long time. To control this behavior, you can `configure the
+maximum size of scheduling
+regions <#configuring-max-size-of-scheduling-region>`__.
+
+Random scheduling also does not affect barrier instructions |nbsp| -- |nbsp| these are
+instructions that have various side effects, for example:
+
+-  ``EBREAK`` and ``ECALL``
+
+-  ``VSET*``
+
+-  ``UNIMP``
+
+-  ``WFI``
+
+-  Fence instructions (``FENCE``, ``FENCE_I``)
+
+-  ``SFENCE_VMA``
+
+.. _`_limitations_2`:
+
+Limitations
+~~~~~~~~~~~
+
+The following is a list of instructions snippy does not currently
+schedule:
+
+-  RVV instructions
+
+-  Floating point instructions
+
+-  Branches
+
+-  EBREAK and ECALL
+
+-  The last instruction in the last basic block of ``EntryFunction``
+
+However, if you have such instructions in the basic block, the pass:
+
+1. Splits the block into regions that only consist of the supported
+   instructions.
+
+2. Schedules all these regions.
+
+Configuring Max Size of Scheduling Region
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify the maximum number of instructions for random scheduling using
+the ``max-region-size`` feature. It changes the default value ``131072``
+to a certain reasonable number, this way controlling the size of the
+scheduling region.
+
+.. note::
+
+   The reasonable maximum number of instructions for this option depends
+   on the configuration, but it must not be too small, as this will
+   result in long runtimes.
+
+To use the ``max-region-size`` feature, ``random-scheduling`` must be
+explicitly enabled in your configuration, as described above.
+
+-  If you used the ``scheduling`` key, add ``max-region-size`` to it:
+
+   .. code:: yaml
+
+      scheduling:
+        enabled: true
+        max-region-size: 20000
+
+-  If you used the ``options`` key, add the ``scheduling`` key with
+   ``max-region-size``:
+
+   ::
+
+      options:
+        random-scheduling: true
+      scheduling:
+        max-region-size: 20000
+
+.. _`_options`:
 
 Options
 =======

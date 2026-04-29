@@ -1,0 +1,81 @@
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:    -num-instrs=10000 -init-regs-in-elf -o %t_1 \
+# RUN:    -mattr=+c,+f \
+# RUN:    -initial-regs=%S/initialization/Inputs/initial_state_rv64i.yaml
+
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:    -num-instrs=10000 -init-regs-in-elf -o %t_2 \
+# RUN:    -mattr=+c,+f -random-scheduling \
+# RUN:    -initial-regs=%S/initialization/Inputs/initial_state_rv64i.yaml
+
+# RUN: not diff -q %t_1.elf %t_2.elf
+
+sections:
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x1000000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x1100000
+      SIZE:      0x100000
+      LMA:       0x1100000
+      ACCESS:    rw
+
+histogram:
+  # branches ~ every 30 instructions
+  - [BEQ, 3.7]
+  - [BGE, 3.7]
+  - [BGEU, 3.7]
+  - [BLT, 3.7]
+  - [BLTU, 3.7]
+  - [BNE, 3.7]
+  - [C_BEQZ, 3.7]
+  - [C_BNEZ, 3.7]
+  - [C_J, 3.7]
+  # Floats
+  - [FMADD_S, 1.0]
+  - [FMSUB_S, 1.0]
+  - [FNMSUB_S, 1.0]
+  - [FNMADD_S, 1.0]
+  - [FADD_S, 1.0]
+  - [FSUB_S, 1.0]
+  - [FMUL_S, 1.0]
+  - [FDIV_S, 1.0]
+  - [FSQRT_S, 1.0]
+  - [FSGNJ_S, 1.0]
+  - [FSGNJN_S, 1.0]
+  - [FSGNJX_S, 1.0]
+  - [FMIN_S, 1.0]
+  - [FMAX_S, 1.0]
+  - [FCVT_W_S, 1.0]
+  - [FCVT_WU_S, 1.0]
+  - [FMV_X_W, 1.0]
+  - [FEQ_S, 1.0]
+  - [FLT_S, 1.0]
+  - [FLE_S, 1.0]
+  - [FCLASS_S, 1.0]
+  - [FCVT_S_W, 1.0]
+  - [FCVT_S_WU, 1.0]
+  - [FMV_W_X, 1.0]
+  - [FCVT_L_S, 1.0]
+  - [FCVT_LU_S, 1.0]
+  - [FCVT_S_L, 1.0]
+  - [FCVT_S_LU, 1.0]
+  - [FLW, 1.0]
+  - [FSW, 1.0]  
+  - [SW, 5.0]
+  - [ADD, 5.0]
+  - [XOR, 5.0]
+  - [AND, 5.0]
+  - [SUB, 5.0]
+branches:
+  number-of-loop-iterations:
+    min: 1
+    max: 2
+  max-depth:
+    if: 3
+    loop: 3
+

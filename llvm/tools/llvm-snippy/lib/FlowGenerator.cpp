@@ -329,6 +329,9 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         if (VerifyConsecutiveLoops)
           PM.add(createConsecutiveLoopsVerifierPass());
 
+        if (auto Sched = GenCtx.getConfig().PassCfg.Scheduling;
+            Sched.isEnabled())
+          PM.add(createRandomSchedulingPass(Sched.MaxRegionSize));
         // Update liveness information
         PM.add(createTrackLivenessPass());
         if (DebugCfg.DumpMF.value())
