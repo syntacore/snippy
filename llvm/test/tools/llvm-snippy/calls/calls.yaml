@@ -26,6 +26,9 @@ histogram:
     - [JALR, 0.1]
 
 # CHECK: $[[TMP1:[a-z0-9]+]] = AUIPC target-flags(riscv-pcrel-hi) @[[FUN1:[a-zA-Z0-9_]+]], pre-instr-symbol <mcsymbol .[[TMP_SYM1:[a-zA-Z0-9_]+]]>
-# CHECK-NEXT: ${{[a-z0-9]+}} = PseudoJALRCall $[[TMP1]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM1]]>
+# CHECK-NEXT: $[[TMP1]] = ADDI $[[TMP1]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM1]]>
+# CHECK-NEXT: $[[TMP1]] = ADDI $[[TMP1]]
+# CHECK-NEXT: $[[TMP1]] = ADDI $[[TMP1]], {{[0-1]}}
+# CHECK-NEXT: ${{[a-z0-9]+}} = PseudoJALRCall $[[TMP1]],
 # CHECK-DAG: PseudoJALCall
 # CHECK-DAG: Machine code for function [[FUN1]]:

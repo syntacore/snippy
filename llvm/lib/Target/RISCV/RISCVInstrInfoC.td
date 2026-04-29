@@ -551,7 +551,7 @@ def PseudoC_JRB : Pseudo<(outs), (ins GPRNoX0X1:$rs1), []>,
             PseudoInstExpansion<(C_JR GPRNoX0:$rs1)>;
 
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isCodeGenOnly = 1,
-    isAsmParserOnly = 0, Size = 10, isTerminator = 1, isBranch = 1,
+    isAsmParserOnly = 0, Size = 14, isTerminator = 1, isBranch = 1,
     isIndirectBranch = 1, isBarrier = 1 in
 def PseudoSnippyC_JRB : Pseudo<(outs), (ins bare_symbol:$src), []>;
 

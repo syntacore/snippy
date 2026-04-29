@@ -3290,6 +3290,15 @@ public:
         .addReg(Reg)
         .addSym(AUIPCSymbol, RISCVII::MO_PCREL_LO);
 
+    auto IsSupport = checkMetadata(MetadataMark, SnippyMetadata::Support);
+    // According to the spec LSB is set to zero, so we can make RS value odd
+    if (!IsSupport)
+      getFormAddrInstBuilder(*this, IGC.MBB, IGC.Ins, Ctx,
+                             InstrInfo.get(RISCV::ADDI))
+          .addDef(Reg)
+          .addReg(Reg)
+          .addImm(RandEngine::genBool());
+
     return getInstBuilder(MetadataMark, *this, IGC.MBB, IGC.Ins, Ctx,
                           InstrInfo.get(RISCV::C_JALR))
         .addReg(Reg);
@@ -3309,12 +3318,54 @@ public:
                              RI, RegClass, *RP, IGC.MBB);
     auto [_, AUIPCSymbol] = loadUpperPC(IGC, Reg, &Target);
 
+    auto IsSupport = checkMetadata(MetadataMark, SnippyMetadata::Support);
+    if (IsSupport) {
+      auto Jalr = getInstBuilder(
+          MetadataMark, *this, IGC.MBB, IGC.Ins, Ctx,
+          InstrInfo.get(Tail ? RISCV::PseudoJALRTail : RISCV::PseudoJALRCall));
+      if (!Tail)
+        Jalr.addDef(RA);
+      Jalr.addReg(Reg).addSym(AUIPCSymbol, RISCVII::MO_PCREL_LO);
+      return Jalr;
+    }
+
+    // According to the RISC-V spec:
+    // "The target address is obtained by adding the sign-extended 12-bit
+    // I-immediate to the register rs1, then setting the least-significant bit
+    // of the result to zero." This means both TargetAddress and
+    // [TargetAddress + 1] are valid. To cover as many cases as possible,
+    // we pick any valid imm[11:0], then add an opposite value to the source
+    // register containing a TargetAddress. It is also safe to adjust it by 1.
+    // However, there is a corner case when |Imm| == ImmMax that requires
+    // special handling.
+    static constexpr auto ImmMin = -(1 << 11);
+    static constexpr auto ImmMax = (1 << 11) - 1;
+    auto Imm = RandEngine::genInRangeInclusive(ImmMin, ImmMax);
+
+    getFormAddrInstBuilder(*this, IGC.MBB, IGC.Ins, Ctx,
+                           InstrInfo.get(RISCV::ADDI))
+        .addDef(Reg)
+        .addReg(Reg)
+        .addSym(AUIPCSymbol, RISCVII::MO_PCREL_LO);
+
+    getFormAddrInstBuilder(*this, IGC.MBB, IGC.Ins, Ctx,
+                           InstrInfo.get(RISCV::ADDI))
+        .addDef(Reg)
+        .addReg(Reg)
+        .addImm(std::clamp(-Imm, ImmMin, ImmMax));
+
+    getFormAddrInstBuilder(*this, IGC.MBB, IGC.Ins, Ctx,
+                           InstrInfo.get(RISCV::ADDI))
+        .addDef(Reg)
+        .addReg(Reg)
+        .addImm(RandEngine::genBool() + (Imm == ImmMin));
+
     auto Jalr = getInstBuilder(
         MetadataMark, *this, IGC.MBB, IGC.Ins, Ctx,
         InstrInfo.get(Tail ? RISCV::PseudoJALRTail : RISCV::PseudoJALRCall));
     if (!Tail)
       Jalr.addDef(RA);
-    Jalr.addReg(Reg).addSym(AUIPCSymbol, RISCVII::MO_PCREL_LO);
+    Jalr.addReg(Reg).addImm(Imm);
     return Jalr;
   }
 
