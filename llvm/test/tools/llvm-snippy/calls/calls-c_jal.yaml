@@ -6,6 +6,7 @@
 # CHECK:  C_JAL @fun{{[0-9]+}}, implicit-def $x1
 # CHECK: $[[TMP_REG:[a-z0-9]+]] = AUIPC target-flags(riscv-pcrel-hi) @fun{{[0-9]+}}, pre-instr-symbol <mcsymbol .[[TMP_SYM:[a-zA-Z0-9_]+]]>
 # CHECK: $[[TMP_REG]] = ADDI $[[TMP_REG]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM]]>
+# CHECK: $[[TMP_REG]] = ADDI $[[TMP_REG]], {{[0-1]}}
 # CHECK-NOT: $[[TMP_REG]]
 # CHECK: C_JALR $[[TMP_REG]], implicit-def $x1
 

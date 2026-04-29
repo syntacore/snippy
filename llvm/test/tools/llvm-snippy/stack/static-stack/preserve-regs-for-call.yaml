@@ -24,12 +24,15 @@ histogram:
 
 #          An example of what we're matching. Spill and reload caller-saved x31:
 #
-#                     $x12 = ADDI $x12, -16
-#                     SD $x31, $x12, 0
-#                     $x20 = AUIPC target-flags(riscv-pcrel-hi) @fun2
-#                     PseudoJALRCall $x20, implicit-def $x1
-#                     $x7 = LUI 64
-#                     $x7 = ADDI $x7, -768
-#                     $x31 = LD $x7, 0
+#                     $x3 = ADDI $x3, -16
+#                     SD $x31, $x3, 0
+#                     $x19 = AUIPC target-flags(riscv-pcrel-hi) @fun7
+#                     $x19 = ADDI $x19, target-flags(riscv-pcrel-lo)
+#                     $x19 = ADDI $x19, -1478
+#                     $x19 = ADDI $x19, 0
+#                     $x1 = PseudoJALRCall $x19
+#                     $x20 = LUI 64
+#                     $x20 = ADDI $x20
+#                     $x31 = LD $x20, 0
 
-# CHECK: {{ADDI.*[[:space:]].*SD.*[[:space:]].*AUIPC.*[[:space:]].*PseudoJALRCall.*[[:space:]].*LUI.*[[:space:]].*ADDI.*[[:space:]].*LD}}
+# CHECK: {{ADDI.*[[:space:]].*SD.*[[:space:]].*AUIPC.*[[:space:]].*ADDI.*[[:space:]].*ADDI.*[[:space:]].*ADDI.*[[:space:]].*PseudoJALRCall.*[[:space:]].*LUI.*[[:space:]].*ADDI.*[[:space:]].*LD}}
