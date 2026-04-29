@@ -498,6 +498,12 @@ public:
 
   virtual unsigned getRandomGenFunctionMaxSize() const = 0;
 
+  virtual std::vector<unsigned>
+  getRegListForMemCpyForSMC(InstructionGenerationContext &IGC) const = 0;
+
+  virtual void generateMemCpyForSMC(MachineFunction &MF,
+                                    SnippyProgramContext &ProgCtx) const = 0;
+
   // FIXME: use more appropriate data structure for addresses
   virtual void generateMemorytInitializationAtAddresses(
       InstructionGenerationContext &IGC,
@@ -540,6 +546,11 @@ public:
   virtual bool isAtomicMemInstr(const MCInstrDesc &InstrDesc) const = 0;
 
   virtual bool isVectorInstr(const MCInstrDesc &InstrDesc) const = 0;
+
+  virtual Error
+  hasMandatoryTargetFeaturesForSMC(const MCSubtargetInfo &SI) const = 0;
+
+  virtual bool isUnsupportedForSMC(const MCInstrDesc &InstrDesc) const = 0;
 
   virtual unsigned countAddrsToGenerate(unsigned Opcode) const = 0;
 

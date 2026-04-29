@@ -12,6 +12,7 @@
 #include "snippy/Generator/CodeAddrSamplingPass.h"
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContextPass.h"
+#include "snippy/Generator/SMCManager.h"
 
 #define DEBUG_TYPE "snippy-code-addr-sampler"
 #define PASS_DESC "Snippy Code Address Sampling"
@@ -63,8 +64,7 @@ bool CodeAddrSampling::runOnMachineFunction(MachineFunction &MF) {
     auto &TM = State.getTargetMachine();
     auto AddrLen = Tgt.getAddrRegLen(TM);
     auto &InstrGenCfg = Cfg.InstrsGenerationConfig;
-    if (!InstrGenCfg.NeedsRelocations
-    )
+    if (!InstrGenCfg.NeedsRelocations && !Cfg.SMC.has_value())
       return;
     auto &GP = ProgCtx.getOrAddGlobalsPoolFor(
         SM, "Failed to allocate space for relocation for BB "
@@ -81,6 +81,13 @@ bool CodeAddrSampling::runOnMachineFunction(MachineFunction &MF) {
 
   StringRef FirstBlockName = MF.getFunction().getSection();
   SampleAddrForBB(MF.front(), FirstBlockName, FirstBlockName);
+  auto &SMCManager = ProgCtx.getSMCManager();
+  if (MF.getName() == SMCManagerT::SMCSrcFuncName) {
+    for (auto &&[MBB, Name] :
+         zip(drop_begin(MF), SMCManager.getSrcNamesFromSMCBlockPairs()))
+      SampleAddrForBB(MBB, Name, getMBBSectionName(MBB));
+    return false;
+  }
   for (auto &MBB : llvm::drop_begin(MF))
     SampleAddrForBB(MBB, getMBBSectionName(MBB), getMBBSectionName(MBB));
   return false;

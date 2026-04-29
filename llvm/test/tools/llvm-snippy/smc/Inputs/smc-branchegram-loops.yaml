@@ -1,0 +1,4 @@
+branches:
+  permutation: on
+  alignment: 1    # SMC requires Code Layout. Code Layout requires alignment 1 
+  loop-ratio: 0.1 # SMC currently doesn't support loops

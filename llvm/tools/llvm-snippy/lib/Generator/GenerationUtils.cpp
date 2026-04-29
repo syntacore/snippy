@@ -11,6 +11,7 @@
 #include "snippy/Config/RegisterAccess.h"
 #include "snippy/Generator/MemAccessInfo.h"
 #include "snippy/Generator/Policy.h"
+#include "snippy/Generator/SMCManager.h"
 #include "snippy/Generator/SimulatorContext.h"
 #include "snippy/Generator/TopMemAccSampler.h"
 #include "snippy/Support/Options.h"
@@ -920,6 +921,8 @@ std::string getMBBSectionName(const MachineBasicBlock &MBB) {
 
 GlobalVariable *getGVForMBB(const MachineBasicBlock &MBB, GlobalsPool &GP,
                             SnippyProgramContext &ProgCtx) {
+  if (MBB.getParent()->getName() == SMCManagerT::SMCSrcFuncName)
+    return ProgCtx.getSMCManager().getGVFromSMCSrcMap(&MBB);
 
   auto &State = ProgCtx.getLLVMState();
   auto &Tgt = State.getSnippyTarget();

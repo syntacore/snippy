@@ -15,6 +15,7 @@ set(LLVMSnippyConfigSources
     OperandsReinitialization.cpp
     Valuegram.cpp
     Selfcheck.cpp
+    SMCGram.cpp
     )
 
 

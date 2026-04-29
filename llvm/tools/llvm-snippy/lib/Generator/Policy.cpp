@@ -10,6 +10,7 @@
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Generator/OperandsReinitialiazationPolicy.h"
+#include "snippy/Generator/SMCManager.h"
 #include "snippy/Generator/SimulatorContext.h"
 #include "snippy/Support/Error.h"
 #include "snippy/Target/Target.h"
@@ -244,6 +245,111 @@ void BurstGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
        RIter != REnd && checkMetadata(*RIter, SnippyMetadata::Support); ++RIter)
     addSnippyMetadata(*RIter, *InstrGenCtx.MBB.getParent(), State.getCtx(),
                       SnippyMetadata::Bundle, SnippyMetadata::Support);
+}
+
+SMCGenPolicy::SMCGenPolicy(SnippyProgramContext &ProgCtx, GeneratorContext &GC,
+                           const Function &SMCCopyFunc,
+                           const Function &SMCTgtFunc, unsigned OverwritersNum)
+    : GC(GC), SMCCopyFunc(SMCCopyFunc), SMCTgtFunc(SMCTgtFunc),
+      OverwritersNum(OverwritersNum) {}
+
+void SMCGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
+                              const RequestLimit &Limit) {
+  auto &MainModule = InstrGenCtx.getSnippyModule();
+  auto &MBB = InstrGenCtx.MBB;
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+
+  auto &State = ProgCtx.getLLVMState();
+  auto RP = ProgCtx.getRegisterPool();
+  auto &SMCManager = ProgCtx.getSMCManager();
+
+  const auto &Tgt = State.getSnippyTarget();
+  auto SMCRegList = SMCManager.getOrCreateSMCRegList(InstrGenCtx);
+
+  for (auto Reg : SMCRegList)
+    RP.addReserved(Reg, AccessMaskBit::W);
+  auto &GP = ProgCtx.getOrAddGlobalsPoolFor(MainModule,
+                                            "Failed to allocate space for SMC");
+
+  std::vector<const MachineBasicBlock *> BlocksToOverwrite;
+  const auto *SMCTgtMF = SnippyModule::fromModule(MainModule.getModule())
+                             .getMMI()
+                             .getMachineFunction(SMCTgtFunc);
+  assert(SMCTgtMF);
+
+  // This condition is about prologue and epilogue blocks
+  if (SMCTgtMF->size() < 2)
+    return;
+
+  llvm::transform(drop_end(drop_begin(*SMCTgtMF)),
+                  std::back_inserter(BlocksToOverwrite),
+                  [](auto &MBB) { return &MBB; });
+
+  if (!BlocksToOverwrite.size())
+    return;
+
+  auto ToTargetRange = RandEngine::genNInRangeInclusive(
+      0ul, BlocksToOverwrite.size() - 1,
+      std::min<size_t>(OverwritersNum, BlocksToOverwrite.size()));
+  if (!ToTargetRange)
+    report_fatal_error("error in getting random", false);
+
+  for (auto Reg : SMCRegList)
+    Tgt.generateSpillToStack(InstrGenCtx, Reg,
+                             GC.getProgramContext().getStackPointer());
+
+  auto &TM = State.getTargetMachine();
+  auto AddrLen = Tgt.getAddrRegLen(State.getTargetMachine());
+  std::unordered_map<const MachineBasicBlock *, unsigned> TBBsCounter;
+  assert(SMCRegList.size() >= 3);
+  for (auto TargetBlockId : *ToTargetRange) {
+    auto &TBB = *BlocksToOverwrite[TargetBlockId];
+    auto Prefix =
+        SMCManagerT::SMCSrcBlockPrefix.str() + utohexstr(TBBsCounter[&TBB]++);
+    auto MBBName = getMBBSectionName(MBB);
+    auto DstName = getMBBSectionName(TBB);
+
+    auto SrcName = Prefix + DstName + MBBName;
+
+    auto *GVDst = GP.getGV(DstName);
+    if (!GVDst)
+      GVDst = GP.createGV(APInt::getZero(AddrLen), 1,
+                          GlobalValue::InternalLinkage, DstName);
+
+    Tgt.loadRegFromAddr(InstrGenCtx, GP.getGVAddress(GVDst), SMCRegList[0]);
+
+    auto *GVSrc = GP.createGVDecl(Tgt.getAddrRegLen(TM), 1,
+                                  GlobalValue::ExternalLinkage, SrcName);
+
+    Tgt.loadSymbolAddress(InstrGenCtx, SMCRegList[1], GVSrc);
+
+    SMCManager.emplacePair(SrcName, &TBB);
+
+    Tgt.loadRegFromAddrInReg(InstrGenCtx, SMCRegList[1], SMCRegList[1]);
+
+    auto SizeName = SMCManagerT::SMCTgtBlockSizePrefix.str() + DstName;
+
+    auto *GVSize = GP.getGV(SizeName);
+    if (!GVSize) {
+      GVSize = GP.createGV(APInt::getZero(AddrLen), 1,
+                           GlobalValue::InternalLinkage, SizeName);
+    }
+
+    Tgt.loadRegFromAddr(InstrGenCtx, GP.getGVAddress(GVSize), SMCRegList[2]);
+
+    auto *MM = getMetadataMark(State.getCtx(), SnippyMetadata::Support);
+    auto RA = ProgCtx.getReturnAddress();
+    Tgt.generateCall(InstrGenCtx, SMCCopyFunc, MM, /* Opcode */ std::nullopt,
+                     RA);
+    Tgt.generateMemoryBarrier(InstrGenCtx);
+    Tgt.generateCall(InstrGenCtx, SMCTgtFunc, MM, /* Opcode */ std::nullopt,
+                     RA);
+  }
+
+  for (auto RegIt = SMCRegList.rbegin(); RegIt != SMCRegList.rend();
+       RegIt = std::next(RegIt))
+    Tgt.generateReloadFromStack(InstrGenCtx, *RegIt,
+                                GC.getProgramContext().getStackPointer());
 }
 
 LLVMState &InstructionGenerationContext::getLLVMStateImpl() const {

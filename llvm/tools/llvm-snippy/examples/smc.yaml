@@ -1,0 +1,3 @@
+smcgram:
+  smc-tgt-blocks: 1
+  smc-mode: immediate

@@ -13,6 +13,7 @@
 #include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContextPass.h"
+#include "snippy/Generator/SMCManager.h"
 #include "snippy/Support/Options.h"
 #include "snippy/Support/YAMLUtils.h"
 
@@ -405,6 +406,19 @@ bool FunctionGenerator::runOnModule(Module &M) {
   return Ret;
 }
 
+void FunctionGenerator::initSMCFunctions(Module &M, GeneratorContext &SGCtx,
+                                         unsigned long long InstrsNum) {
+  auto &State = SGCtx.getProgramContext().getLLVMState();
+  auto &SMCFunc =
+      State.createFunction(M, SMCManagerT::SMCCopyFuncName,
+                           /* SectionName */ "", Function::ExternalLinkage);
+  SMCCopyFuncDecl = &SMCFunc;
+
+  auto &SMCMFTgt = createFunction(SGCtx, M, SMCManagerT::SMCTgtFuncName, "",
+                                  Function::InternalLinkage, InstrsNum);
+  SMCTgtFunc = &SMCMFTgt.getFunction();
+}
+
 unsigned long long
 FunctionGenerator::calculateEntryFnInstrsNum(Module &M,
                                              const CallGraphState &CGS) {
@@ -463,6 +477,9 @@ bool FunctionGenerator::generateFunctions(Module &M, const FunctionDescs &FDs) {
     }
   }
 
+  if (SGCtx.getConfig().PassCfg.SMC.has_value())
+    initSMCFunctions(M, SGCtx, calculateEntryFnInstrsNum(M, CGS));
+
   // Fill in connections.
   for (auto &Desc : Descs) {
     assert(NameMap.count(Desc.Name) && "missing entry for Desc");
@@ -486,6 +503,9 @@ bool FunctionGenerator::generateFunctions(Module &M,
   assert(NumF && "Expected NumF >= 1");
 
   initRootFunctions(M, SGCtx.getProgramContext().getEntryPointName());
+
+  if (SGCtx.getConfig().PassCfg.SMC.has_value())
+    initSMCFunctions(M, SGCtx, calculateEntryFnInstrsNum(M, CGS));
 
   iota_range<size_t> funIDs(0u, NumF - 1u, /*Inclusive*/ false);
   std::transform(

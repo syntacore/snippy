@@ -12,6 +12,7 @@
 #include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/Policy.h"
+#include "snippy/Generator/SMCManager.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
@@ -87,6 +88,10 @@ public:
     auto &FG = getAnalysis<FunctionGenerator>();
 
     std::vector<MCRegister> Ret;
+    if (MF.getName() == SMCManagerT::SMCTgtFuncName) {
+      Ret.push_back(ProgCtx.getReturnAddress());
+      return Ret;
+    }
     if (FG.isRootFunction(MF)) {
       llvm::copy(SGCtx.getConfig().ProgramCfg.getRegsSpilledToStack(),
                  std::back_inserter(Ret));
