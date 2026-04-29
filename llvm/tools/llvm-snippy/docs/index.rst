@@ -590,6 +590,11 @@ with the following details for each entry:
 
    If present, snippy places the code in the executable sections.
 
+   .. important::
+
+      In future releases, RWX will be used for self-modifying code
+      (SMC). We **strongly recommend** switching to RW + RX for all
+      non-SMC cases.
 
 -  ``PHDR`` (optional) |nbsp| -- |nbsp| Program header you assign to the current
    section. Program headers (or segments) describe how the program must
@@ -1886,6 +1891,8 @@ Advanced configuration includes keys for:
 
 -  `Basic block layout <#basic-block-layout>`__
 
+-  `SMC blocks <#smc-blocks>`__
+
 
 -  `Register Reservation Config`_
 
@@ -2375,6 +2382,38 @@ The generated snippet includes a part of the trace:
 
 where ``jalr`` is ``fun3`` |nbsp| -- |nbsp| a weak symbol in the snippet (a stub for
 the model) to which you want to link the user function.
+
+SMC Blocks
+----------
+
+Add the ``smcgram`` key to your layout to configure self-modifying code
+(SMC) blocks.
+
+SMC blocks overwrite basic blocks based on the following configuration:
+
+.. code:: yaml
+
+   smcgram:
+     smc-tgt-blocks: 0.5
+     smc-overwriters:
+       min: 1
+       max: 1
+     smc-mode: immediate
+
+where:
+
+-  ``smc-tgt-blocks`` |nbsp| -- |nbsp| Ratio relative to the total number of target
+   basic blocks that can be overwritten by SMC blocks. By default, it is
+   ``0.5``.
+
+-  ``smc-overwriters`` |nbsp| -- |nbsp| The ``min`` to ``max`` range for the number of
+   times the generated overwriting routine occurs in a random basic
+   block.
+
+-  ``smc-mode`` |nbsp| -- |nbsp| Defines when and how often the overwritten basic
+   blocks are triggered. In the current implementation, the only
+   possible mode is ``immediate`` |nbsp| -- |nbsp| basic blocks will be executed right
+   after they are overwritten.
 
 Options
 =======
@@ -3363,6 +3402,7 @@ The feature is **not supported** (and therefore Snippy does not enable it automa
 - section ``stack`` is not provided
 - external stack is provided
 - calls to external functions are possible
+- ``SMC`` is enabled
 - ``--num-instrs=all`` is specified
 - loop generation is possible
 

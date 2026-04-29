@@ -1,0 +1,58 @@
+# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=500 \
+# RUN:             -dump-mf |& FileCheck %s -check-prefix=CHECK
+
+# RUN: llvm-snippy %s -mtriple=riscv32 -num-instrs=500 \
+# RUN:             -dump-mf |& FileCheck %s -check-prefix=CHECK
+
+# CHECK: $[[TMP1:[a-z0-9]+]] = AUIPC target-flags(riscv-pcrel-hi) @__snippy_smc_memcpy, pre-instr-symbol <mcsymbol .[[TMP_SYM1:[a-zA-Z0-9_]+]]>
+# CHECK-NEXT: $[[RA:[a-z0-9]+]] = PseudoJALRCall $[[TMP1]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM1]]>
+# CHECK: $[[TMP2:[a-z0-9]+]] = AUIPC target-flags(riscv-pcrel-hi) @__snippy_smc_target, pre-instr-symbol <mcsymbol .[[TMP_SYM2:[a-zA-Z0-9_]+]]>
+# CHECK-NEXT: $[[RA]] = PseudoJALRCall $[[TMP2]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM2]]>
+
+options:
+  mattr: +m,+zifencei
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x100000
+    SIZE:      0x50000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      3     # SMC requires read-only section
+    VMA:       0x310000
+    SIZE:      0x50000
+    LMA:       0x310000
+    ACCESS:    r
+  - name:      stack # SMC requires internal or external stack enabled 
+    VMA:       0x150000
+    SIZE:      0x50000
+    LMA:       0x150000
+    ACCESS:    rw
+
+histogram:
+    - [BNE, 2.0]
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [MUL, 1.0]
+
+code-layout:
+  ranges:
+    - start: 0x210000
+      size: 0x100000
+      stride: 0x1
+      first-offset: 0
+      last-offset: 0x0
+include:
+  - Inputs/smc-branchegram.yaml
+
+smcgram:
+  smc-tgt-blocks: 0.5 # 0.5 by default
+  smc-overwriters:
+    min: 1
+    max: 1
+  smc-mode: immediate # Trigger SMC immediately after overwritting

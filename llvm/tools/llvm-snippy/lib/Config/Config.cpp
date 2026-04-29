@@ -1010,7 +1010,7 @@ static bool getStaticStackValue(Config &Cfg, const OpcodeCache &OpCC,
   auto HasStackSection =
       ProgCfg.Sections.hasSection(SectionsDescriptions::StackSectionName);
   auto StaticStack = !Opts.FollowTargetABI && HasStackSection &&
-                     !ProgCfg.ExternalStack &&
+                     !Cfg.PassCfg.SMC.has_value() && !ProgCfg.ExternalStack &&
                      !Cfg.PassCfg.hasExternalCallees() &&
                      ProgCfg.PreserveCallerSavedGroups.empty() &&
                      NumPrimaryInstrs && !Cfg.isLoopGenerationPossible(OpCC);
@@ -1037,6 +1037,10 @@ static bool getStaticStackValue(Config &Cfg, const OpcodeCache &OpCC,
         "Incompatible options",
         "When external functions are provided, option -enable-static-stack "
         "is not supported.");
+  if (Cfg.PassCfg.SMC.has_value())
+    snippy::fatal("Incompatible options",
+                  "When SMC is enabled, option -enable-static-stack "
+                  "is not supported.");
   if (!ProgCfg.PreserveCallerSavedGroups.empty())
     snippy::fatal("Incompatible options",
                   "When PreserveCallerSavedGroups is not empty, option "
@@ -1309,6 +1313,7 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
   // This could be changed in the future but it'd be a breaking change.
   yaml::MappingTraits<MemoryScheme>::mapping(IO, Info.CommonPolicyCfg->MS);
   IO.mapOptional("branches", Info.PassCfg.Branches);
+  IO.mapOptional("smcgram", Info.PassCfg.SMC);
 
   mapOpcodeHistogram(IO, Info);
 
@@ -1365,6 +1370,36 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
   IO.mapOptional("register-reservation", RegAcc->Data);
 }
 
+static bool hasUnsupportedForSMCInstrs(const OpcodeHistogram &OpHist,
+                                       const OpcodeCache &OpCC,
+                                       const SnippyTarget &Tgt) {
+  return llvm::any_of(OpHist.uniqueOpcodes(), [&OpCC, &Tgt](auto &&Opc) {
+    auto *Desc = OpCC.desc(Opc);
+    return Desc && Tgt.isUnsupportedForSMC(*Desc);
+  });
+}
+
+static std::string checkSMCConfig(ConfigIOContext &ConfigIOCtx, Config &Info) {
+  auto &OpCC = ConfigIOCtx.OpCC;
+  auto &Histogram = Info.Histogram;
+  auto &Tgt = ConfigIOCtx.State.getSnippyTarget();
+  const auto &MCI = ConfigIOCtx.State.getSubtargetInfo();
+
+  if (auto Err = Tgt.hasMandatoryTargetFeaturesForSMC(MCI))
+    return toString(std::move(Err));
+
+  if (Histogram.hasCFInstrs(OpCC) && Info.PassCfg.Branches.LoopRatio)
+    return std::string("SMC mode currently isn't supported for histogram with "
+                       "loops enabled");
+  if (hasUnsupportedForSMCInstrs(Histogram, OpCC, Tgt))
+    return std::string("SMC mode currently isn't supported for histogram with "
+                       "vector instructions");
+  if (!Info.PassCfg.CodeLayout)
+    return std::string("SMC mode expects code layout provided");
+
+  return std::string{};
+}
+
 std::string yaml::MappingTraits<Config>::validate(yaml::IO &Io, Config &Info) {
   if (Info.PassCfg.CodeLayout && !Info.PassCfg.Branches.unaligned())
     return Twine("Code layout feature is only supported with branches "
@@ -1375,6 +1410,11 @@ std::string yaml::MappingTraits<Config>::validate(yaml::IO &Io, Config &Info) {
   assert(Ctx && "To parse or output Config provide ConfigIOContext as "
                 "context for yaml::IO");
   auto &ConfigIOCtx = *static_cast<ConfigIOContext *>(Ctx);
+  if (Info.PassCfg.SMC.has_value()) {
+    auto Err = checkSMCConfig(ConfigIOCtx, Info);
+    if (!Err.empty())
+      return Err;
+  }
   return Info.CommonPolicyCfg->MS
       .validateSchemes(ConfigIOCtx.State.getCtx(), Info.ProgramCfg.Sections)
       .value_or("");
@@ -1969,6 +2009,14 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
           SectionsDescriptions::SelfcheckSectionName) &&
       CommonPolicyCfg->TrackCfg.Selfcheck)
     diagnoseSelfcheckSection(State, *this, getMinimumSelfcheckSize(*this));
+  if (PassCfg.SMC) {
+    // FIXME: Clean up this checks after config refactoring
+    if (hasTrackingMode())
+      snippy::fatal("SMC mode currently isn't supported for any tracking mode "
+                    "(selfcheck/backtrack/hazards)");
+    if (!ProgramCfg.stackEnabled())
+      snippy::fatal("SMC mode expects stack section provided");
+  }
   if (DefFlowConfig.Valuegram.has_value() &&
       DefFlowConfig.OperandsReinitialization.has_value())
     snippy::fatal("Usage of valuegram-operands-regs option with specified "

@@ -174,6 +174,16 @@ public:
     reportUnimplementedError();
   }
 
+  std::vector<unsigned>
+  getRegListForMemCpyForSMC(InstructionGenerationContext &IGC) const override {
+    reportUnimplementedError();
+  }
+
+  void generateMemCpyForSMC(MachineFunction &MF,
+                            SnippyProgramContext &ProgCtx) const override {
+    reportUnimplementedError();
+  }
+
   void generateMemorytInitializationAtAddresses(
       InstructionGenerationContext &IGC,
       const MemoryMap &Addresses) const override {
@@ -456,6 +466,15 @@ public:
   }
 
   bool isVectorInstr(const MCInstrDesc &InstrDesc) const override {
+    reportUnimplementedError();
+  }
+
+  Error
+  hasMandatoryTargetFeaturesForSMC(const MCSubtargetInfo &SI) const override {
+    reportUnimplementedError();
+  }
+
+  bool isUnsupportedForSMC(const MCInstrDesc &InstrDesc) const override {
     reportUnimplementedError();
   }
 

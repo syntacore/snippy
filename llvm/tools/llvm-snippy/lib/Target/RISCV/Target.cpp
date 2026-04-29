@@ -11,6 +11,7 @@
 #include "snippy/Generator/GlobalsPool.h"
 #include "snippy/Generator/Policy.h"
 #include "snippy/Generator/RegsReservedForLoop.h"
+#include "snippy/Generator/SMCManager.h"
 #include "snippy/Generator/SimulatorContext.h"
 #include "snippy/Generator/SnippyLoopInfo.h"
 #include "snippy/GeneratorUtils/LLVMState.h"
@@ -1800,6 +1801,19 @@ public:
            !isRVVWholeRegLoadStore(InstrDesc.getOpcode());
   }
 
+  Error
+  hasMandatoryTargetFeaturesForSMC(const MCSubtargetInfo &SI) const override {
+    if (!checkOpcodeSupported(RISCV::FENCE_I, SI))
+      return createStringError(
+          inconvertibleErrorCode(),
+          "SMC generation required Zifencei extension to be enabled");
+    return Error::success();
+  }
+
+  bool isUnsupportedForSMC(const MCInstrDesc &InstrDesc) const override {
+    return isRVV(InstrDesc.getOpcode());
+  }
+
   bool isDivOpcode(unsigned Opcode) const override {
     return Opcode == RISCV::DIV;
   }
@@ -2846,6 +2860,105 @@ public:
   // The actual size can be smaller if compressed code is used, and it's almost
   // impossible to predict correct size with compressed instructions.
   unsigned getRandomGenFunctionMaxSize() const override { return 212; }
+
+  std::vector<unsigned>
+  getRegListForMemCpyForSMC(InstructionGenerationContext &IGC) const override {
+    auto &ProgCtx = IGC.ProgCtx;
+    auto RA = ProgCtx.getReturnAddress();
+    if (ProgCtx.followTargetABI())
+      return {RISCV::X10, RISCV::X11, RISCV::X12, RISCV::X13};
+
+    const auto &State = ProgCtx.getLLVMState();
+    const auto &RegInfo = State.getRegInfo();
+    const auto &RegClass = RegInfo.getRegClass(RISCV::GPRRegClassID);
+
+    auto Filter = [&ProgCtx, RA](auto Reg) {
+      return Reg == ProgCtx.getStackPointer() || Reg == RISCV::X0 || Reg == RA;
+    };
+
+    auto RP = IGC.pushRegPool();
+    auto Regs = RP->getNAvailableRegisters("MemCpy call regs", RegInfo,
+                                           RegClass, Filter, 4);
+    assert(Regs.size() == 4);
+    return Regs;
+  }
+
+  void generateMemCpyForSMC(MachineFunction &MF,
+                            SnippyProgramContext &ProgCtx) const override {
+    auto &State = ProgCtx.getLLVMState();
+
+    // FIXME: Probably there is an opportunity to make it faster:
+    // f.e substitute with library version, or add runtime checkers
+    // for 4/8 allignment, compess?
+
+    const auto &ST = static_cast<const RISCVSubtarget &>(MF.getSubtarget());
+    auto &&[LdOpcode, StOpcode, Step] =
+        (ST.hasStdExtC())
+            ? std::tuple{RISCV::LHU, RISCV::SH, 0x2}
+            : std::tuple{ST.getXLen() == 64 ? RISCV::LWU : RISCV::LW, RISCV::SW,
+                         0x4};
+
+    auto *EntryMBB = snippy::createMachineBasicBlock(MF);
+    MF.push_back(EntryMBB);
+    auto *PrehederMBB = snippy::createMachineBasicBlock(MF);
+    MF.push_back(PrehederMBB);
+    auto *LoopBodyMBB = snippy::createMachineBasicBlock(MF);
+    MF.push_back(LoopBodyMBB);
+    auto *ExitMBB = snippy::createMachineBasicBlock(MF);
+    MF.push_back(ExitMBB);
+
+    EntryMBB->addSuccessor(ExitMBB);
+    EntryMBB->addSuccessor(PrehederMBB);
+    PrehederMBB->addSuccessor(LoopBodyMBB);
+    LoopBodyMBB->addSuccessor(LoopBodyMBB);
+    LoopBodyMBB->addSuccessor(ExitMBB);
+
+    const auto &InstrInfo = State.getInstrInfo();
+
+    auto CallRegs = ProgCtx.getSMCManager().getSMCRegList();
+
+    // BGE $x0, $x12, ExitMBB
+    BuildMI(*EntryMBB, EntryMBB->end(), MIMetadata(), InstrInfo.get(RISCV::BGE))
+        .addReg(RISCV::X0)
+        .addReg(CallRegs[2]) // $x12
+        .addMBB(ExitMBB);
+    // $x12 = ADD $x10, $x12
+    BuildMI(*PrehederMBB, PrehederMBB->end(), MIMetadata(),
+            InstrInfo.get(RISCV::ADD))
+        .addReg(CallRegs[2])  // $x12
+        .addReg(CallRegs[0])  // $x10
+        .addReg(CallRegs[2]); // $x12
+    // $x13 = LBU $x11, 0
+    BuildMI(*LoopBodyMBB, LoopBodyMBB->end(), MIMetadata(),
+            InstrInfo.get(LdOpcode))
+        .addReg(CallRegs[3]) // $x13
+        .addReg(CallRegs[1]) // $x11
+        .addImm(0x0);
+    // $x11 = ADDI $x11, 1
+    BuildMI(*LoopBodyMBB, LoopBodyMBB->end(), MIMetadata(),
+            InstrInfo.get(RISCV::ADDI))
+        .addReg(CallRegs[1]) // $x11
+        .addReg(CallRegs[1]) // $x11
+        .addImm(Step);
+    // SB $x13, $x10, 0
+    BuildMI(*LoopBodyMBB, LoopBodyMBB->end(), MIMetadata(),
+            InstrInfo.get(StOpcode))
+        .addReg(CallRegs[3]) // $x13
+        .addReg(CallRegs[0]) // $x10
+        .addImm(0x0);
+    // $x10 = ADDI $x10, 1
+    BuildMI(*LoopBodyMBB, LoopBodyMBB->end(), MIMetadata(),
+            InstrInfo.get(RISCV::ADDI))
+        .addReg(CallRegs[0]) // $x10
+        .addReg(CallRegs[0]) // $x10
+        .addImm(Step);
+    // BNE $x10, $x12, ExitMBB
+    BuildMI(*LoopBodyMBB, LoopBodyMBB->end(), MIMetadata(),
+            InstrInfo.get(RISCV::BNE))
+        .addReg(CallRegs[0]) // $x10
+        .addReg(CallRegs[2]) // $x12
+        .addMBB(LoopBodyMBB);
+  }
 
   // Generates function that generates passed memory state in the snippet.
   // Generation result:

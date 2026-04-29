@@ -22,6 +22,7 @@
 #include "snippy/Config/OperandsReinitialization.h"
 #include "snippy/Config/PluginWrapper.h"
 #include "snippy/Config/RegisterAccess.h"
+#include "snippy/Config/SMCGram.h"
 #include "snippy/Config/Selfcheck.h"
 #include "snippy/Support/YAMLUtils.h"
 #include "snippy/Target/TargetConfigIface.h"
@@ -252,6 +253,7 @@ public:
   InstrsGenerationOptions InstrsGenerationConfig;
   RegistersOptions RegistersConfig;
   RegisterAccessConfig RegisterAccess;
+  std::optional<SMCGram> SMC;
 
   // Function generator pass config.
   std::variant<CallGraphLayout, FunctionDescs> CGLayout;
