@@ -53,6 +53,8 @@ static Expected<std::string> getRISCVFeaturesFromMArch(StringRef MArch) {
   ListSeparator LS(",");
   for (const auto &Feat : ISAFeatures)
     FeatOS << LS << Feat;
+  // Explicitly disable implicit compressions/uncompressions.
+  FeatOS << LS << "+exact-asm";
 
   return FeatOS.str();
 }
@@ -152,13 +154,6 @@ Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
 
   TargetFeatures += ",";
   TargetFeatures += TargetInfo.Features;
-  // Relax feature is enabled by default to enable desired
-  // type of relocations be produced by linker that AsmPrinter
-  // cannot do by itself on some targets.
-  // E.G.: RISCV AsmPrinter cannot emit JAL directly.
-  // Exception: AArch64 has no relax feature
-  if (!TheTriple.isAArch64())
-    TargetFeatures += ",+relax";
   const TargetOptions Options;
   auto TM = std::unique_ptr<TargetMachine>(static_cast<TargetMachine *>(
       Tgt->createTargetMachine(TheTriple, TargetInfo.CPU, TargetFeatures,

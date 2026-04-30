@@ -187,7 +187,8 @@ bool RISCVAsmPrinter::EmitToStreamer(MCStreamer &S, const MCInst &Inst,
                                      const MCSubtargetInfo &SubtargetInfo) {
   MCInst CInst;
   bool Res = RISCVRVC::compress(CInst, Inst, SubtargetInfo);
-  if (Inst.getFlags() & RISCV::DoNotCompress)
+  if ((Inst.getFlags() & RISCV::DoNotCompress) ||
+      STI->hasFeature(RISCV::FeatureExactAssembly))
     Res = false;
   if (Res)
     ++RISCVNumInstrsCompressed;
