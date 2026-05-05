@@ -274,6 +274,10 @@ void OperandGeneratorEmitter::emitCaseForInst(raw_ostream &OS,
 
 void OperandGeneratorEmitter::emitDispatcher(raw_ostream &OS) {
   OS << "/// addOperands - generated dispatcher that renders all operands\n";
+  // FIXME: remove this code after enabling new operand pipeline for all targets
+  OS << "#ifdef __clang__\n";
+  OS << "__attribute__((optnone))\n";
+  OS << "#endif\n";
   OS << "virtual void "
         "generateOperands(llvm::ArrayRef<planning::PreselectedOpInfo> "
         "Preselected) override "
