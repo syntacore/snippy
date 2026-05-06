@@ -454,6 +454,8 @@ public:
 
   virtual bool branchNeedsVerification(const MachineInstr &Branch) const = 0;
 
+  virtual bool mayBeScheduled(const MachineInstr &MI) const = 0;
+
   virtual MachineBasicBlock *
   getBranchDestination(const MachineInstr &Branch) const = 0;
 

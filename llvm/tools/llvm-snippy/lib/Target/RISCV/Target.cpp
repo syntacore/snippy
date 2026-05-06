@@ -392,6 +392,15 @@ unsigned getNonZeroReg(const Twine &Desc, const MCRegisterInfo &RI,
       /*Filter*/ [](unsigned Reg) { return Reg == RISCV::X0; }, Mask);
 }
 
+template <bool StrictBarrier = true>
+static void reportSchedulingBarrier(const MachineInstr &MI, raw_ostream &OS) {
+  if constexpr (StrictBarrier)
+    OS << "Unsupported scheduling instruction : ";
+  else
+    OS << "Currently unsupported scheduling instruction : ";
+  MI.print(OS);
+}
+
 static bool isSupportedLoadStore(unsigned Opcode) {
   return isLoadStore(Opcode) || isCLoadStore(Opcode) || isFPLoadStore(Opcode) ||
          isCFPLoadStore(Opcode) || isRVVUnitStrideLoadStore(Opcode) ||
@@ -1911,6 +1920,34 @@ public:
     default:
       return false;
     }
+  }
+
+  bool mayBeScheduled(const MachineInstr &MI) const override {
+    if (MI.isTerminator())
+      return false;
+    if (checkMetadata(MI, SnippyMetadata::Bundle) &&
+        !checkMetadata(MI, SnippyMetadata::Support))
+      return false;
+    if (MI.hasUnmodeledSideEffects() || (MI.getOpcode() == RISCV::AUIPC)) {
+      LLVM_DEBUG(reportSchedulingBarrier(MI, dbgs()));
+      return false;
+    }
+    if (MI.getOpcode() == RISCV::PseudoNOP)
+      return false;
+
+    auto Opcode = MI.getOpcode();
+    if (MI.isCall() || isRVV(Opcode) || snippy::isFloatingPoint(Opcode)) {
+      LLVM_DEBUG(
+          reportSchedulingBarrier</* StrictBarrier */ false>(MI, dbgs()));
+      return false;
+    }
+
+    const auto *MBB = MI.getParent();
+    assert(MBB);
+    if (std::next(MI.getIterator()) == MBB->end())
+      return false;
+
+    return true;
   }
 
   MachineInstr &insertIndirectJump(InstructionGenerationContext &IGC,
