@@ -3165,26 +3165,38 @@ public:
     return {RISCV::X3, RISCV::X4};
   }
 
-  const MCRegisterClass &
-  getRegClassSuitableForSP(const MCRegisterInfo &RI) const override {
-    return RI.getRegClass(RISCV::GPRNoX0RegClassID);
+  std::vector<MCRegister> getRegsSuitableForSP() const override {
+    std::vector<MCRegister> Result;
+    copy(RISCV::GPRNoX0RegClass, std::back_inserter(Result));
+    return Result;
   }
 
-  const MCRegisterClass &
-  getRegClassSuitableForRA(std::optional<unsigned> CallOpcode,
-                           const MCRegisterInfo &RI) const override {
+  std::vector<MCRegister>
+  getRegsSuitableForRA(std::optional<unsigned> CallOpcode) const override {
+    [[maybe_unused]] std::vector<MCRegister> Result;
+    copy(RISCV::GPRNoX0RegClass, std::back_inserter(Result));
+
     if (!CallOpcode)
-      return RI.getRegClass(RISCV::GPRNoX0RegClassID);
+      return Result;
     switch (*CallOpcode) {
-    case RISCV::JAL:
-    case RISCV::JALR:
-      return RI.getRegClass(RISCV::GPRNoX0RegClassID);
     case RISCV::C_JAL:
     case RISCV::C_JALR:
-      return RI.getRegClass(RISCV::GPRX1RegClassID);
+      return {RISCV::X1};
+    case RISCV::JAL:
+    case RISCV::JALR:
+      return Result;
     default:
       llvm_unreachable("Bad call opcode");
     }
+    return Result;
+  }
+
+  void getImplicitDefRegs(unsigned Opcode,
+                          SmallVectorImpl<MCRegister> &OutRegs) const override {
+    // cm.mva01s overwrites registers x10 and x11
+    if (Opcode != RISCV::CM_MVA01S)
+      return;
+    OutRegs.append({RISCV::X10, RISCV::X11});
   }
 
   MCRegister getStackPointer() const override { return RISCV::X2; }

@@ -254,16 +254,22 @@ public:
     return RegInfo.getRegClass(OperandRegClassID);
   }
 
-  const MCRegisterClass &
-  getRegClassSuitableForSP(const MCRegisterInfo &RI) const override {
+  std::vector<MCRegister> getRegsSuitableForSP() const override {
     // TODO: re-check register class
-    return RI.getRegClass(AArch64::GPR64noipRegClassID);
+    std::vector<MCRegister> Result;
+    copy(AArch64::GPR64noipRegClass, std::back_inserter(Result));
+    return Result;
   }
 
-  const MCRegisterClass &
-  getRegClassSuitableForRA(std::optional<unsigned> CallOpcode,
-                           const MCRegisterInfo &RI) const override {
-    return RI.getRegClass(AArch64::GPR64commonRegClassID);
+  std::vector<MCRegister>
+  getRegsSuitableForRA(std::optional<unsigned> CallOpcode) const override {
+    std::vector<MCRegister> Result;
+    copy(AArch64::GPR64commonRegClass, std::back_inserter(Result));
+    return Result;
+  }
+
+  void getImplicitDefRegs(unsigned Opcode,
+                          SmallVectorImpl<MCRegister> &OutRegs) const override {
   }
 
   MCRegister getStackPointer() const override {

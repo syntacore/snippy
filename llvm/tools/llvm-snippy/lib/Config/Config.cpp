@@ -673,9 +673,16 @@ private:
 
 } // namespace
 
+static SmallVector<MCRegister> getImplicitDefRegs(const OpcodeHistogram &H,
+                                                  const SnippyTarget &Tgt) {
+  SmallVector<MCRegister> Result;
+  for_each(make_first_range(H.topOpcodes()),
+           [&](auto Opcode) { Tgt.getImplicitDefRegs(Opcode, Result); });
+  return Result;
+}
+
 static MCRegister chooseRA(const RegPoolWrapper &RP, const SnippyTarget &Tgt,
-                           const MCRegisterInfo &RI, const Config &Cfg,
-                           const RegChoice &RAChoice,
+                           const Config &Cfg, const RegChoice &RAChoice,
                            std::optional<MCRegister> SP, bool FollowTargetABI,
                            ArrayRef<MCRegister> SpilledToStack) {
   SmallVector<unsigned, 3> CallOpcodes;
@@ -683,11 +690,13 @@ static MCRegister chooseRA(const RegPoolWrapper &RP, const SnippyTarget &Tgt,
                 [&](auto &&Opcode) { return Tgt.isCall(Opcode); });
   auto RA = Tgt.getReturnAddress();
   bool CanUseABI = true;
-  const auto &RARegClass = Tgt.getRegClassSuitableForRA(std::nullopt, RI);
+  auto RARegs = Tgt.getRegsSuitableForRA(/* CallOpcode */ std::nullopt);
+  auto Exclude = getImplicitDefRegs(Cfg.Histogram, Tgt);
+
   auto NotAvailableForSomeCalls = [&](auto &&Reg) {
     return llvm::any_of(CallOpcodes, [&](auto &&Opcode) {
-      auto &RC = Tgt.getRegClassSuitableForRA(Opcode, RI);
-      return !RC.contains(Reg);
+      const auto &Regs = Tgt.getRegsSuitableForRA(Opcode);
+      return !is_contained(Regs, Reg) || is_contained(Exclude, Reg);
     });
   };
   auto IsCalleeSavedInABIMode = [&](auto &&Reg) {
@@ -695,7 +704,7 @@ static MCRegister chooseRA(const RegPoolWrapper &RP, const SnippyTarget &Tgt,
            (llvm::count(SpilledToStack, Reg) || Reg == Tgt.getStackPointer());
   };
   auto Filter = [&](auto Reg) {
-    return !RARegClass.contains(Reg) || (!CanUseABI && Reg == RA) ||
+    return is_contained(Exclude, Reg) || (!CanUseABI && Reg == RA) ||
            NotAvailableForSomeCalls(Reg) || (SP && (*SP == Reg)) ||
            IsCalleeSavedInABIMode(Reg);
   };
@@ -709,10 +718,10 @@ static MCRegister chooseRA(const RegPoolWrapper &RP, const SnippyTarget &Tgt,
   case RegChoice::Opt::Any:
     if (CanUseABI && FollowTargetABI)
       return RA;
-    return RP.getAvailableRegister("return address", RI, RARegClass, Filter);
+    return RP.getAvailableRegister("return address", Filter, RARegs);
   case RegChoice::Opt::Reg: {
     auto [RegStr, Reg] = RAChoice.getSpecific();
-    if (Filter(Reg))
+    if (!is_contained(RARegs, Reg) || Filter(Reg))
       snippy::fatal(
           formatv("Register {0} specified in --redefine-ra is not suitable "
                   "for return address redefinition",
@@ -758,9 +767,8 @@ static std::pair<MCRegister, MCRegister> configureSPandRA(
     generateSPRelativeInstrsError(RedefineSP);
 
   // Choose RA first.
-  auto RealRA =
-      chooseRA(RP, Tgt, RI, Cfg, RAChoice, SPChoice.getSpecificRegIfCan(),
-               FollowTargetABI, SpilledToStack);
+  auto RealRA = chooseRA(RP, Tgt, Cfg, RAChoice, SPChoice.getSpecificRegIfCan(),
+                         FollowTargetABI, SpilledToStack);
   // Add redefined RA to spill list to be able to exit from snippy function
   // correctly as required by target abi. We still want to spill target return
   // address register as abi may require it to be preserved. This is also
@@ -788,10 +796,11 @@ static std::pair<MCRegister, MCRegister> configureSPandRA(
   MCRegister RealSP = MCRegister::NoRegister;
   bool CanUseSP = StaticStack || (SPChoice.get() != RegChoice::Opt::AnyNotABI &&
                                   !HasSPRelativeInstrs);
-  const auto &SPRegClass = Tgt.getRegClassSuitableForSP(RI);
+  const auto &SPRegs = Tgt.getRegsSuitableForSP();
+  auto Exclude = getImplicitDefRegs(Cfg.Histogram, Tgt);
 
   auto FullFilter = [&](auto Reg) {
-    return !SPRegClass.contains(Reg) || Reg == RealRA ||
+    return is_contained(Exclude, Reg) || Reg == RealRA ||
            (!CanUseSP && Reg == SP) ||
            (!FollowTargetABI && llvm::any_of(SpilledToStack, [Reg](auto SpReg) {
              return SpReg == Reg;
@@ -805,7 +814,7 @@ static std::pair<MCRegister, MCRegister> configureSPandRA(
     if (!StaticStack && Reg == SP && HasSPRelativeInstrs)
       generateSPRelativeInstrsError(RedefineSP);
 
-    if (FullFilter(Reg))
+    if (!is_contained(SPRegs, Reg) || FullFilter(Reg))
       snippy::fatal(
           formatv("Register {0} specified in --redefine-sp is not suitable "
                   "for stack pointer redefinition",
@@ -816,8 +825,7 @@ static std::pair<MCRegister, MCRegister> configureSPandRA(
   }
   case RegChoice::Opt::Any:
   case RegChoice::Opt::AnyNotABI:
-    RealSP =
-        RP.getAvailableRegister("stack pointer", RI, SPRegClass, FullFilter);
+    RealSP = RP.getAvailableRegister("stack pointer", FullFilter, SPRegs);
     break;
   default:
     llvm_unreachable("unhandled case");
@@ -1573,12 +1581,11 @@ static bool hasCallees(const FunctionDesc &FuncDesc) {
   return FuncDesc.Callees.size();
 }
 
-static void deleteCallsIfNeeded(
-    LLVMState &State, const OpcodeCache &OpCC, OpcodeHistogram &Histogram,
-    const std::variant<CallGraphLayout, FunctionDescs> &CGLayout,
-    MCRegister RA) {
+static void deleteCallsIfNeeded(LLVMState &State, const OpcodeCache &OpCC,
+                                OpcodeHistogram &Histogram, const Config &Cfg) {
+  auto &CGLayout = Cfg.PassCfg.CGLayout;
+  auto RA = Cfg.ProgramCfg.ReturnAddress;
   auto &Tgt = State.getSnippyTarget();
-  auto &RI = State.getRegInfo();
   auto IsCall = [&Tgt](unsigned Opcode) { return Tgt.isCall(Opcode); };
   auto CallsWeight = Histogram.getTopOpcodesWeight(IsCall);
   if (CallsWeight < std::numeric_limits<decltype(CallsWeight)>::epsilon())
@@ -1613,11 +1620,12 @@ static void deleteCallsIfNeeded(
   for (auto &&CallOpcode :
        make_filter_range(Histogram.uniqueOpcodes(),
                          [&](auto &&Opcode) { return Tgt.isCall(Opcode); })) {
-    auto &RARegClass = Tgt.getRegClassSuitableForRA(CallOpcode, RI);
-    if (!RARegClass.contains(RA))
+    const auto &RARegs = Tgt.getRegsSuitableForRA(CallOpcode);
+    if (!is_contained(RARegs, RA))
       snippy::fatal(llvm::formatv("Call instruction {0} does not support {1} "
                                   "as return address register.",
-                                  OpCC.name(CallOpcode), RI.getName(RA)));
+                                  OpCC.name(CallOpcode),
+                                  State.getRegInfo().getName(RA)));
   }
 }
 
@@ -2052,8 +2060,7 @@ void Config::complete(LLVMState &State, const OpcodeCache &OpCC) {
   // Data flow histogram.
   auto &DFHistogram = DefFlowConfig.DataFlowHistogram;
   DFHistogram = Histogram;
-  deleteCallsIfNeeded(State, OpCC, DFHistogram, PassCfg.CGLayout,
-                      ProgramCfg.ReturnAddress);
+  deleteCallsIfNeeded(State, OpCC, DFHistogram, *this);
   auto DFOpcodesToErase = [&](unsigned Opcode) {
     auto *Desc = OpCC.desc(Opcode);
     const auto &Tgt = State.getSnippyTarget();
