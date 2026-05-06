@@ -168,6 +168,29 @@ RISCVZcmpPopretCombine::replacePrologueWithRListSpill(unsigned PopretOpcode,
   return RList;
 }
 
+static auto getRListOffset(uint64_t RList, const LLVMState &State,
+                           InstructionGenerationContext &IGC) {
+  auto &Tgt = State.getSnippyTarget();
+  auto SpillAlignment =
+      Tgt.getSpillAlignmentInBytes(/*any GPR*/ RISCV::X0, State);
+  auto RegSize =
+      Tgt.getRegBitWidth(/*any GPR*/ RISCV::X0, IGC) / RISCV_CHAR_BIT;
+  // The magic number 3 is associated with the encoding of the operand RList.
+  // The available values start with 4, which means "ra", then 5 - "ra, s0", 6 -
+  // "ra, s0-s1", and incrementally.
+  assert(RList > 3 && RList < 16 && "Unexpected RList value");
+  auto NumRegs = RList - 3;
+  auto NumWholeRegsInSlot = SpillAlignment / RegSize;
+  // 15 - "ra, s0-s11" needs separate processing.
+  if (RList == RISCVZC::RA_S0_S11)
+    NumRegs = 13;
+  // The number of registers that are missing so that the stack top is aligned
+  // to SpillAlignment bytes.
+  auto MissingRegs =
+      (NumWholeRegsInSlot - NumRegs % NumWholeRegsInSlot) % NumWholeRegsInSlot;
+  return MissingRegs * RegSize;
+}
+
 void RISCVZcmpPopretCombine::replaceEpilogueWithPopret(unsigned PopretOpcode,
                                                        uint64_t RList,
                                                        MachineBasicBlock &MBB) {
@@ -211,17 +234,10 @@ void RISCVZcmpPopretCombine::replaceEpilogueWithPopret(unsigned PopretOpcode,
                                          IGC.getCommonCfg())
                    .getImm();
   auto &Ctx = State.getCtx();
-  // This means that rlist contains an odd number of registers and now SP is not
-  // aligned to 16 bytes. This means that we need to subtract 8 bytes to restore
-  // alignment, since CM_POPRET/CM_POPRETZ instruction relies on alignment.
-  if (RList % 2 == 0 || RList == RISCVZC::RA_S0_S11) {
-    assert(Tgt.getSpillSizeInBytes(RISCV::X2, ProgCtx, *STI) == 8u);
-    getSupportInstBuilder(Tgt, MBB, MBB.end(), Ctx, InstrInfo->get(RISCV::ADDI))
-        .addDef(RISCV::X2)
-        .addReg(RISCV::X2)
-        .addImm(-Tgt.getSpillSizeInBytes(RISCV::X2, ProgCtx, *STI))
-        .getInstr();
-  }
+  // Now SP is not aligned to 16 bytes. This means that we need to subtract
+  // Offset(RList) bytes to restore alignment, since CM_POPRET/CM_POPRETZ
+  // instruction relies on alignment.
+  auto Offset = getRListOffset(RList, State, IGC);
   // spimm is the number of additional 16-byte address increments allocated for
   // the stack frame. This means that CM_POPRET/CM_POPRETZ instruction adds
   // Spimm (= spimm * 16) bytes to the SP, meaning that in order to restore the
@@ -229,9 +245,8 @@ void RISCVZcmpPopretCombine::replaceEpilogueWithPopret(unsigned PopretOpcode,
   getSupportInstBuilder(Tgt, MBB, MBB.end(), Ctx, InstrInfo->get(RISCV::ADDI))
       .addDef(RISCV::X2)
       .addReg(RISCV::X2)
-      .addImm(-Spimm)
+      .addImm(-Spimm - Offset)
       .getInstr();
-
   getMainInstBuilder(Tgt, MBB, MBB.end(), Ctx, InstrInfo->get(PopretOpcode))
       .addImm(RList)
       .addImm(Spimm)

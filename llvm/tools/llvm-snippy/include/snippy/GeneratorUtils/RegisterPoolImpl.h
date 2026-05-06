@@ -50,6 +50,15 @@ class AvailableRegisterImpl {
         .front();
   }
 
+  template <class Pool, typename Pred, typename... Args>
+  static unsigned getOne(const Twine &Desc, const Pool &P, Pred Filter,
+                         ArrayRef<MCRegister> RegisterSet,
+                         Args &&...OtherArgs) {
+    return get</* NumRegs */ 1>(Desc, P, Filter, RegisterSet,
+                                std::forward<Args>(OtherArgs)...)
+        .front();
+  }
+
   template <class Pool, typename... Args>
   static auto get(const Twine &Desc, const MCRegisterInfo &RI, const Pool &P,
                   unsigned NumRegs, const MCRegisterClass &RegClass,
@@ -117,6 +126,27 @@ class AvailableRegisterImpl {
               [&RegClass](auto Idx) { return RegClass.getRegister(Idx); });
   }
 
+  template <class Pool, typename Pred, typename OutItType, typename... Args>
+  static auto getImpl(const Twine &Desc, const Pool &P, Pred Filter,
+                      unsigned NumRegs, OutItType OutputIt,
+                      ArrayRef<MCRegister> RegisterSet, Args &&...OtherArgs) {
+
+    auto RegIdxs = RandEngine::genNUniqInInterval(
+        0u, static_cast<unsigned>(RegisterSet.size() - 1), NumRegs,
+        [&](unsigned Idx) {
+          auto R = RegisterSet[Idx];
+          return P.isReserved(R, std::forward<Args>(OtherArgs)...) ||
+                 std::invoke(Filter, R);
+        });
+
+    if (!RegIdxs)
+      snippy::fatal(make_error<NoAvailableRegister>(
+          Twine("No available register: ") + Desc));
+
+    transform(*RegIdxs, OutputIt,
+              [&RegisterSet](auto Idx) { return RegisterSet[Idx]; });
+  }
+
   template <class Pool, typename Pred, typename... Args>
   static std::vector<unsigned>
   get(const Twine &Desc, const MCRegisterInfo &RI, const Pool &P, Pred Filter,
@@ -146,6 +176,16 @@ class AvailableRegisterImpl {
       const MCRegisterClass &RegClass, Args &&... OtherArgs) {
     std::array<unsigned, N> Regs;
     getImpl(Desc, RI, P, std::move(Filter), N, Regs.begin(), RegClass,
+            std::forward<Args>(OtherArgs)...);
+    return Regs;
+  }
+
+  template <size_t N, class Pool, typename Pred, typename... Args>
+  static std::array<unsigned, N>
+  get(const Twine &Desc, const Pool &P, Pred Filter,
+      ArrayRef<MCRegister> RegisterSet, Args &&...OtherArgs) {
+    std::array<unsigned, N> Regs;
+    getImpl(Desc, P, std::move(Filter), N, Regs.begin(), RegisterSet,
             std::forward<Args>(OtherArgs)...);
     return Regs;
   }

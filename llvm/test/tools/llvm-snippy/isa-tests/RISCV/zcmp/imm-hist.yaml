@@ -1,7 +1,7 @@
-# RUN: llvm-snippy %s -model-plugin None |& FileCheck %s
+# RUN: llvm-snippy %s -mtriple=riscv64 -model-plugin None |& FileCheck %s
+# RUN: llvm-snippy %s -mtriple=riscv32 -model-plugin None |& FileCheck %s
 
 options:
-  mtriple: riscv64
   num-instrs: 1000
   mattr: +zcmp
   dump-mf: on
