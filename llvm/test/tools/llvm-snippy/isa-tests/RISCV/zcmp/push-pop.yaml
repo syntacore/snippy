@@ -1,9 +1,9 @@
 # COM: This test checks that all valid rlist and spimm values for push/pop are
 #      generated.
-# RUN: llvm-snippy %s -model-plugin None |& FileCheck %s
+# RUN: llvm-snippy %s -mtriple=riscv64 -model-plugin None |& FileCheck %s
+# RUN: llvm-snippy %s -mtriple=riscv32 -model-plugin None |& FileCheck %s
 
 options:
-  mtriple: riscv64
   num-instrs: 10000
   mattr: +zcmp
   verify-gen-histogram: true

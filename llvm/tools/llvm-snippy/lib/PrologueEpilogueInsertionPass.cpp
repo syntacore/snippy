@@ -187,10 +187,10 @@ static MCRegister getRegisterForPreservedSPSpill(SnippyProgramContext &ProgCtx,
     return SnippyTgt.getStackPointer();
 
   auto RP = ProgCtx.getRegisterPool();
-  const auto &RI = State.getRegInfo();
-  const auto &RegClass = SnippyTgt.getRegClassSuitableForSP(RI);
-  return RP.getAvailableRegister("scratch register for preserved reg spill", RI,
-                                 RegClass, MBB);
+  const auto &SPRegs = SnippyTgt.getRegsSuitableForSP();
+  return RP.getAvailableRegister(
+      "suitable for SP scratch register for preserved reg spill",
+      /* Filter */ [](unsigned Reg) { return false; }, SPRegs);
 }
 
 static void setupStackPointer(InstructionGenerationContext &IGC,

@@ -221,14 +221,17 @@ public:
     reportUnimplementedError();
   }
 
-  const MCRegisterClass &
-  getRegClassSuitableForSP(const MCRegisterInfo &RI) const override {
+  std::vector<MCRegister> getRegsSuitableForSP() const override {
     reportUnimplementedError();
   }
 
-  const MCRegisterClass &
-  getRegClassSuitableForRA(std::optional<unsigned> CallOpcode,
-                           const MCRegisterInfo &RI) const override {
+  std::vector<MCRegister>
+  getRegsSuitableForRA(std::optional<unsigned> CallOpcode) const override {
+    reportUnimplementedError();
+  }
+
+  void getImplicitDefRegs(unsigned Opcode,
+                          SmallVectorImpl<MCRegister> &OutRegs) const override {
     reportUnimplementedError();
   }
 

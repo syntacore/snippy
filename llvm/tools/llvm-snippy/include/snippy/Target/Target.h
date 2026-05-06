@@ -165,11 +165,12 @@ public:
               unsigned OperandRegClassID, unsigned OpIndex, unsigned Opcode,
               const MCRegisterInfo &RegInfo) const = 0;
 
-  virtual const MCRegisterClass &
-  getRegClassSuitableForSP(const MCRegisterInfo &RI) const = 0;
-  virtual const MCRegisterClass &
-  getRegClassSuitableForRA(std::optional<unsigned> CallOpcode,
-                           const MCRegisterInfo &RI) const = 0;
+  virtual std::vector<MCRegister> getRegsSuitableForSP() const = 0;
+  virtual std::vector<MCRegister>
+  getRegsSuitableForRA(std::optional<unsigned> CallOpcode) const = 0;
+  virtual void
+  getImplicitDefRegs(unsigned Opcode,
+                     SmallVectorImpl<MCRegister> &OutRegs) const = 0;
 
   virtual MCRegister getStackPointer() const = 0;
   virtual MCRegister getReturnAddress() const = 0;

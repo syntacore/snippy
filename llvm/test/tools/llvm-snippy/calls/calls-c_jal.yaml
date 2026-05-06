@@ -10,7 +10,7 @@
 # CHECK-NOT: $[[TMP_REG]]
 # CHECK: C_JALR $[[TMP_REG]], implicit-def $x1
 
-# ERROR1: error: No available register GPRNoX0: return address
+# ERROR1: error: No available register: return address
 # ERROR2: error: Register X3 specified in --redefine-ra is not suitable for return address redefinition
 
 options:
