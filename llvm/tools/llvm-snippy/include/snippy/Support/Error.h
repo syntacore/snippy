@@ -56,6 +56,9 @@ public:
       : Failure(makeErrorCode(Errc::OutOfRegisters),
                 Twine("No available register ") +
                     RegInfo.getRegClassName(&RegClass) + ": " + Msg) {}
+
+  NoAvailableRegister(const Twine &Msg)
+      : Failure(makeErrorCode(Errc::OutOfRegisters), Msg) {}
 };
 
 class MemoryAccessSampleError : public StringError {

@@ -1,0 +1,24 @@
+# RUN: not llvm-snippy %s \
+# RUN:   -redefine-sp=reg::X10 -model-plugin None \
+# RUN: |& FileCheck %s --check-prefix SP
+
+# RUN: not llvm-snippy %s \
+# RUN:   -redefine-ra=reg::X11 -model-plugin None \
+# RUN: |& FileCheck %s --check-prefix RA
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  mattr: +zcmp
+
+include:
+  - ../Inputs/sections-with-stack.yaml
+
+histogram:
+  # This instruction overwrites registers X10 and X11, so they cannot be used
+  # as SP and RA
+  - [CM_MVA01S, 1.0]
+
+# SP: error: Register X10 specified in --redefine-sp is not suitable for stack pointer redefinition
+# RA: error: Register X11 specified in --redefine-ra is not suitable for return address redefinition
+
