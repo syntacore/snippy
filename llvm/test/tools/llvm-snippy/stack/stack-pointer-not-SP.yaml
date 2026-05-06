@@ -21,4 +21,4 @@ sections:
 histogram:
     - [ADD, 1.0]
 
-# CHECK: error: No available register GPRNoX0: stack pointer
+# CHECK: error: No available register: stack pointer

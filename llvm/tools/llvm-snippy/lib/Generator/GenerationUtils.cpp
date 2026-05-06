@@ -678,7 +678,7 @@ generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
   // Current implementation expects that each target has only one addr reg
   // class.
   const auto &AddrRegClass = SnippyTgt.getAddrRegClass();
-  SmallVector<Register, 32> Include;
+  SmallVector<MCRegister, 32> Include;
   copy_if(AddrRegClass, std::back_inserter(Include), [&](Register Reg) {
     SmallVector<Register> Units;
     SnippyTgt.getPhysRegsFromUnit(Reg, RI, Units);

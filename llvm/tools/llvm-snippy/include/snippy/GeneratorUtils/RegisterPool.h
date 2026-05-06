@@ -107,6 +107,14 @@ public:
                        const MCRegisterClass &RegClass, Pred Filter,
                        AccessMaskBit AccessMask = AccessMaskBit::RW) const;
 
+  // Pick random non-reserved register from register set with required access
+  // mask and filter.
+  template <typename Pred>
+  unsigned
+  getAvailableRegister(const Twine &Desc, Pred Filter,
+                       ArrayRef<MCRegister> RegisterSet,
+                       AccessMaskBit AccessMask = AccessMaskBit::RW) const;
+
   void print(raw_ostream &OS) const;
 
   LocalRegPool splitToUnits(const SnippyTarget &SnippyTgt,
@@ -310,7 +318,7 @@ public:
                            IsReservedTys &&...Args) const;
 
   template <typename... IsReservedTys>
-  unsigned getNumAvailableInSet(ArrayRef<Register> RegisterSet,
+  unsigned getNumAvailableInSet(ArrayRef<MCRegister> RegisterSet,
                                 IsReservedTys &&...Args) const;
 
   unsigned
@@ -328,6 +336,12 @@ public:
   unsigned
   getAvailableRegister(const Twine &Desc, const MCRegisterInfo &RI,
                        const MCRegisterClass &RegClass, Pred Filter,
+                       AccessMaskBit AccessMask = AccessMaskBit::RW) const;
+
+  template <typename Pred>
+  unsigned
+  getAvailableRegister(const Twine &Desc, Pred Filter,
+                       ArrayRef<MCRegister> RegisterSet,
                        AccessMaskBit AccessMask = AccessMaskBit::RW) const;
 
   template <typename Pred>
@@ -460,7 +474,7 @@ unsigned RegPoolWrapper::getNumAvailable(const MCRegisterClass &RegClass,
 }
 
 template <typename... IsReservedTys>
-unsigned RegPoolWrapper::getNumAvailableInSet(ArrayRef<Register> Registers,
+unsigned RegPoolWrapper::getNumAvailableInSet(ArrayRef<MCRegister> Registers,
                                               IsReservedTys &&...Args) const {
   return std::count_if(
       Registers.begin(), Registers.end(), [&Args..., this](auto Reg) {
@@ -476,6 +490,14 @@ unsigned RegPoolWrapper::getAvailableRegister(const Twine &Desc,
                                               Pred Filter,
                                               AccessMaskBit AccessMask) const {
   return AvailableRegisterImpl::getOne(Desc, RI, *this, Filter, RegClass,
+                                       AccessMask);
+}
+
+template <typename Pred>
+unsigned RegPoolWrapper::getAvailableRegister(const Twine &Desc, Pred Filter,
+                                              ArrayRef<MCRegister> RegisterSet,
+                                              AccessMaskBit AccessMask) const {
+  return AvailableRegisterImpl::getOne(Desc, *this, Filter, RegisterSet,
                                        AccessMask);
 }
 
