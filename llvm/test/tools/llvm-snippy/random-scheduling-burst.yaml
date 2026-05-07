@@ -1,0 +1,103 @@
+# RUN: llvm-snippy %s | FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: "+m,+v"
+  num-instrs: 10000
+  dump-mf: on
+  verify-gen-histogram: on
+  histogram-must-succeed: on
+
+include:
+  - Inputs/sections.yaml
+
+scheduling:
+  enabled: on
+
+burst:
+  mode: custom
+  min-size: 5
+  max-size: 5
+  groupings:
+    - [LD]
+    - [SD]
+    - [LW]
+    - [SW]
+    - [VLE8_V]
+    - [VADD_VX]
+    - [VLSEG2E32_V]
+    - [VL2RE8_V]
+    - [VS2R_V]
+
+histogram:
+    - [LD, 1.0]
+    - [SD, 1.0]
+    - [LW, 1.0]
+    - [SW, 1.0]
+    - [VSETVL, 0.5]
+    - [VLE8_V, 1.0]
+    - [VADD_VX, 1.0]
+    - [VLSEG2E32_V, 1.0]
+    - [VL2RE8_V, 1.0]
+    - [VS2R_V, 1.0]
+    - [MUL, 1.0]
+    - [DIV, 1.0]
+    - [SUB, 1.0]
+
+# CHECK-DAG: MUL
+# CHECK-DAG: DIV
+# CHECK-DAG: SUB
+
+# CHECK: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+
+# CHECK: SD
+# CHECK-NEXT: SD
+# CHECK-NEXT: SD
+# CHECK-NEXT: SD
+# CHECK-NEXT: SD
+
+# CHECK: LW
+# CHECK-NEXT: LW
+# CHECK-NEXT: LW
+# CHECK-NEXT: LW
+# CHECK-NEXT: LW
+
+# CHECK: SW
+# CHECK-NEXT: SW
+# CHECK-NEXT: SW
+# CHECK-NEXT: SW
+# CHECK-NEXT: SW
+
+# CHECK: VLE8_V
+# CHECK-NEXT: VLE8_V
+# CHECK-NEXT: VLE8_V
+# CHECK-NEXT: VLE8_V
+# CHECK-NEXT: VLE8_V
+
+# CHECK: VADD_V
+# CHECK-NEXT: VADD_V
+# CHECK-NEXT: VADD_V
+# CHECK-NEXT: VADD_V
+# CHECK-NEXT: VADD_V
+
+# CHECK: VLSEG2E32_V
+# CHECK-NEXT: VLSEG2E32_V
+# CHECK-NEXT: VLSEG2E32_V
+# CHECK-NEXT: VLSEG2E32_V
+# CHECK-NEXT: VLSEG2E32_V
+
+# CHECK: VL2RE8_V
+# CHECK-NEXT: VL2RE8_V
+# CHECK-NEXT: VL2RE8_V
+# CHECK-NEXT: VL2RE8_V
+# CHECK-NEXT: VL2RE8_V
+
+# CHECK: VS2R_V
+# CHECK-NEXT: VS2R_V
+# CHECK-NEXT: VS2R_V
+# CHECK-NEXT: VS2R_V
+# CHECK-NEXT: VS2R_V

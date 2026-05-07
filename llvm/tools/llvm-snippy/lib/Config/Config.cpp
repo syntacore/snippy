@@ -1371,6 +1371,7 @@ void yaml::MappingTraits<Config>::mapping(yaml::IO &IO, Config &Info) {
   Info.ProgramCfg.TargetConfig->mapConfig(IO);
   IO.mapOptional("fpu-config", Info.CommonPolicyCfg->FPUConfig);
   IO.mapOptional("code-layout", Info.PassCfg.CodeLayout);
+  IO.mapOptional("scheduling", Info.PassCfg.Scheduling);
   IO.mapOptional("operands-reinitialization",
                  Info.DefFlowConfig.OperandsReinitialization);
   MappingNormalization<RegisterAccessNormalization, RegisterAccessConfig>
