@@ -96,10 +96,8 @@ std::unique_ptr<RVVConfigInterface> createRVVConfig();
 
 // Compute EMUL = EEW / SEW * LMUL
 VLMUL computeEMUL(unsigned ELEN, unsigned SEW, unsigned EEW, VLMUL LMUL);
-std::pair<unsigned, bool> computeDecodedEMUL(unsigned ELEN,
-                                             unsigned SEW,
-                                             unsigned EEW,
-                                             VLMUL LMUL);
+std::pair<unsigned, bool> computeDecodedEMUL(unsigned ELEN, unsigned SEW,
+                                             unsigned EEW, VLMUL LMUL);
 bool isValidEMUL(unsigned ELEN, unsigned SEW, unsigned EEW, VLMUL LMUL);
 
 inline static bool canBeEncoded(unsigned SEW) {
@@ -222,7 +220,8 @@ private:
 
 struct VLGeneratorInterface {
   virtual std::string identify() const = 0;
-  virtual bool isApplicable(unsigned /* ELEN */, unsigned /* VLEN */, bool /* ReduceVL */,
+  virtual bool isApplicable(unsigned /* ELEN */, unsigned /* VLEN */,
+                            bool /* ReduceVL */,
                             const RVVConfiguration & /* Cfg */) const {
     return true;
   };
@@ -306,7 +305,8 @@ struct RVVConfigurationInfo final {
   using VLGeneratorHolder = std::unique_ptr<VLGeneratorInterface>;
   using VMGeneratorHolder = std::unique_ptr<VMGeneratorInterface>;
 
-  static RVVConfigurationInfo createDefault(const Config &Cfg, unsigned ELEN, unsigned VLEN);
+  static RVVConfigurationInfo createDefault(const Config &Cfg, unsigned ELEN,
+                                            unsigned VLEN);
 
   static RVVConfigurationInfo
   buildConfiguration(const Config &Cfg, unsigned ELEN, unsigned VLEN,
