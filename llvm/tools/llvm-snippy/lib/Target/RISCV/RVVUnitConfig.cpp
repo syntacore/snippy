@@ -270,7 +270,8 @@ using RVVConfigPoint =
     ProbableElement<std::tuple<VSEW, VLMUL, VMAMode, VTAMode, VXRMMode>>;
 
 static InternalConfigurationPoint
-convertRepresentation(unsigned ELEN, unsigned VLEN, const RVVConfigPoint &Point) {
+convertRepresentation(unsigned ELEN, unsigned VLEN,
+                      const RVVConfigPoint &Point) {
   InternalConfigurationPoint Result;
   Result.Probability = Point.Prob;
   Result.Config.SEW = std::get<VSEW>(Point.Element);
@@ -281,8 +282,8 @@ convertRepresentation(unsigned ELEN, unsigned VLEN, const RVVConfigPoint &Point)
       (std::get<VTAMode>(Point.Element) == VTAMode::TA);
   Result.Config.VXRM = std::get<VXRMMode>(Point.Element);
 
-  auto MaxVL = computeVLMax(ELEN, VLEN, static_cast<unsigned>(Result.Config.SEW),
-                            Result.Config.LMUL);
+  auto MaxVL = computeVLMax(
+      ELEN, VLEN, static_cast<unsigned>(Result.Config.SEW), Result.Config.LMUL);
   if (MaxVL == 0)
     Result.Config.IsLegal = false;
   return Result;
@@ -292,7 +293,8 @@ static unsigned getMaxPossibleVL(unsigned VLEN) {
   return VLEN * RVVConfiguration::getMaxLMUL() / RVVConfiguration::getMinSEW();
 }
 
-static unsigned generateMaxVL(unsigned ELEN, unsigned VLEN, const RVVConfiguration &Cfg) {
+static unsigned generateMaxVL(unsigned ELEN, unsigned VLEN,
+                              const RVVConfiguration &Cfg) {
   auto PointSEW = static_cast<unsigned>(Cfg.SEW);
   auto MaxVL = computeVLMax(ELEN, VLEN, PointSEW, Cfg.LMUL);
   if (MaxVL > 0)
@@ -307,7 +309,8 @@ struct MaxPossibleVLGen final : VLGeneratorInterface {
   static constexpr const char *kID = "max_encodable";
   std::string identify() const override { return kID; }
 
-  unsigned generate(unsigned ELEN, unsigned VLEN, const RVVConfiguration &Cfg) const override {
+  unsigned generate(unsigned ELEN, unsigned VLEN,
+                    const RVVConfiguration &Cfg) const override {
     return generateMaxVL(ELEN, VLEN, Cfg);
   }
 };
@@ -327,7 +330,8 @@ struct MaxVLGenerator final : VLGeneratorInterface {
     return !ReduceVL || (MaxVL <= kMaxVLForVSETIVLI);
   }
 
-  unsigned generate(unsigned ELEN, unsigned VLEN, const RVVConfiguration &Cfg) const override {
+  unsigned generate(unsigned ELEN, unsigned VLEN,
+                    const RVVConfiguration &Cfg) const override {
     return generateMaxVL(ELEN, VLEN, Cfg);
   }
 };
@@ -337,7 +341,8 @@ struct LegalVLGenerator final : VLGeneratorInterface {
   static constexpr const char *kID = "any_legal";
   std::string identify() const override { return kID; }
 
-  unsigned generate(unsigned ELEN, unsigned VLEN, const RVVConfiguration &Cfg) const override {
+  unsigned generate(unsigned ELEN, unsigned VLEN,
+                    const RVVConfiguration &Cfg) const override {
     auto PointSEW = static_cast<unsigned>(Cfg.SEW);
     auto MaxVL = computeVLMax(ELEN, VLEN, PointSEW, Cfg.LMUL);
     if (MaxVL > 0)
@@ -354,7 +359,8 @@ struct LegalVLNonZeroGenerator final : VLGeneratorInterface {
   static constexpr const char *kID = "any_legal_non_zero";
   std::string identify() const override { return kID; }
 
-  unsigned generate(unsigned ELEN, unsigned VLEN, const RVVConfiguration &Cfg) const override {
+  unsigned generate(unsigned ELEN, unsigned VLEN,
+                    const RVVConfiguration &Cfg) const override {
     auto PointSEW = static_cast<unsigned>(Cfg.SEW);
     auto MaxVL = computeVLMax(ELEN, VLEN, PointSEW, Cfg.LMUL);
     if (MaxVL > 0)
@@ -422,7 +428,8 @@ struct ImmVLGen : public VLGeneratorInterface {
     return (Value <= MaxVL) && (!ReduceVL || (Value <= kMaxVLForVSETIVLI));
   }
 
-  unsigned generate(unsigned ELEN, unsigned VLEN, const RVVConfiguration &Cfg) const override {
+  unsigned generate(unsigned ELEN, unsigned VLEN,
+                    const RVVConfiguration &Cfg) const override {
     assert(isApplicable(ELEN, VLEN, /* ReduceVL */ false, Cfg) &&
            "Generation request should be made only for valid VLs");
     return Value;
@@ -761,7 +768,7 @@ inline static bool isReservedValues(unsigned ELEN, unsigned SEW, VLMUL LMUL) {
   auto [Multiplier, IsFractional] = RISCVVType::decodeVLMUL(LMUL);
   auto MinFracMultiplier = ELEN / SEW;
   return !isLegalSEW(SEW) || (SEW > ELEN) ||
-    (IsFractional && (Multiplier > MinFracMultiplier));
+         (IsFractional && (Multiplier > MinFracMultiplier));
 }
 
 unsigned computeVLMax(unsigned ELEN, unsigned VLEN, unsigned SEW, VLMUL LMUL) {
@@ -776,9 +783,10 @@ unsigned computeVLMax(unsigned ELEN, unsigned VLEN, unsigned SEW, VLMUL LMUL) {
   return VLEN / SEW * Multiplier;
 }
 
-std::pair<unsigned, bool> computeDecodedEMUL(unsigned ELEN, unsigned SEW, unsigned EEW,
-                                             VLMUL LMUL) {
-  if (isReservedValues(ELEN, SEW, LMUL) || !isLegalSEW(SEW) || !isLegalSEW(EEW)) {
+std::pair<unsigned, bool> computeDecodedEMUL(unsigned ELEN, unsigned SEW,
+                                             unsigned EEW, VLMUL LMUL) {
+  if (isReservedValues(ELEN, SEW, LMUL) || !isLegalSEW(SEW) ||
+      !isLegalSEW(EEW)) {
     // Calculating EMUL doesn't make sense for illegal values of SEW or LMUL, so
     // just return {1, 0}
     return {1, 0};
@@ -933,9 +941,10 @@ static std::vector<InternalConfigurationPoint> getLegalConfigurationPoints(
                     << "\n");
   std::vector<InternalConfigurationPoint> ConfigPoints;
   ConfigPoints.reserve(Points.size());
-  std::transform(
-      Points.begin(), Points.end(), std::back_inserter(ConfigPoints),
-      [ELEN, VLEN](const auto &Point) { return convertRepresentation(ELEN, VLEN, Point); });
+  std::transform(Points.begin(), Points.end(), std::back_inserter(ConfigPoints),
+                 [ELEN, VLEN](const auto &Point) {
+                   return convertRepresentation(ELEN, VLEN, Point);
+                 });
 
   // Now, at this moment ConfigPoints can contain illegal configurations
   llvm::erase_if(ConfigPoints, [](const auto &Point) {
@@ -951,11 +960,11 @@ static std::vector<InternalConfigurationPoint> getLegalConfigurationPoints(
   auto DiscardedIt = std::partition(
       ConfigPoints.begin(), ConfigPoints.end(),
       [&VLGen, IsOnlyVSETIVLI, ELEN, VLEN](const auto &Point) {
-        return llvm::any_of(
-            VLGen, [ELEN, VLEN, IsOnlyVSETIVLI, &Point = Point](const auto &VL) {
-              return VL->isApplicable(ELEN, VLEN, /* ReduceVL */ IsOnlyVSETIVLI,
-                                      Point.Config);
-            });
+        return llvm::any_of(VLGen, [ELEN, VLEN, IsOnlyVSETIVLI,
+                                    &Point = Point](const auto &VL) {
+          return VL->isApplicable(ELEN, VLEN, /* ReduceVL */ IsOnlyVSETIVLI,
+                                  Point.Config);
+        });
       });
   std::transform(DiscardedIt, ConfigPoints.end(),
                  std::back_inserter(DiscardedConfigs),
@@ -978,19 +987,20 @@ getIllegalConfigurationPoints(unsigned ELEN, unsigned VLEN) {
   auto AllPoints =
       jointProbabilityDistribution(AllSEW, AllLMUL, AllMA, AllTA, AllVXRM);
   std::vector<InternalConfigurationPoint> AllConfigPoints;
-  std::transform(
-      AllPoints.begin(), AllPoints.end(), std::back_inserter(AllConfigPoints),
-      [ELEN, VLEN](const auto &Point) { return convertRepresentation(ELEN, VLEN, Point); });
+  std::transform(AllPoints.begin(), AllPoints.end(),
+                 std::back_inserter(AllConfigPoints),
+                 [ELEN, VLEN](const auto &Point) {
+                   return convertRepresentation(ELEN, VLEN, Point);
+                 });
 
   // Now, at this moment AllConfigPoints contain legal configurations
-  llvm::erase_if(
-      AllConfigPoints, [ELEN](const auto &Point) {
-        if (NoReservedCfgRVV &&
-            isReservedValues(ELEN, static_cast<unsigned>(Point.Config.SEW),
-                             Point.Config.LMUL))
-          return true;
-        return Point.Config.IsLegal;
-      });
+  llvm::erase_if(AllConfigPoints, [ELEN](const auto &Point) {
+    if (NoReservedCfgRVV &&
+        isReservedValues(ELEN, static_cast<unsigned>(Point.Config.SEW),
+                         Point.Config.LMUL))
+      return true;
+    return Point.Config.IsLegal;
+  });
   return AllConfigPoints;
 }
 
@@ -1152,7 +1162,8 @@ getVLsCompatibleWithVMsAndConfigs(
 
 static WeightedItems<RVVConfiguration> getConfigsCompatibleWithVLs(
     const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &VLGen,
-    unsigned ELEN, unsigned VLEN, WeightedItems<RVVConfiguration> &ConfigPointsWeights,
+    unsigned ELEN, unsigned VLEN,
+    WeightedItems<RVVConfiguration> &ConfigPointsWeights,
     std::vector<RVVConfiguration> &DiscardedConfigs, bool IsOnlyVSETIVLI) {
   WeightedItems<RVVConfiguration> Result;
   for (auto &&[Config, ConfigWeight] :
@@ -1160,7 +1171,8 @@ static WeightedItems<RVVConfiguration> getConfigsCompatibleWithVLs(
     // Keep the RVV Configs that have at least one compatible VL
     if (llvm::any_of(VLGen, [ELEN, VLEN, IsOnlyVSETIVLI,
                              &Config = Config](const auto &VL) {
-          return VL->isApplicable(ELEN, VLEN, /* ReduceVL */ IsOnlyVSETIVLI, Config);
+          return VL->isApplicable(ELEN, VLEN, /* ReduceVL */ IsOnlyVSETIVLI,
+                                  Config);
         })) {
       Result.addWeightedElement(ConfigWeight, std::move(Config));
       continue;
@@ -1255,10 +1267,12 @@ extractMinMaxVL(unsigned ELEN, unsigned VLEN,
                 const std::vector<RVVConfiguration> &ConfigPoints) {
   assert(!ConfigPoints.empty());
   std::vector<unsigned> MaxVLs;
-  llvm::transform(
-      ConfigPoints, std::back_inserter(MaxVLs), [ELEN, VLEN](const auto &Point) {
-        return computeVLMax(ELEN, VLEN, static_cast<unsigned>(Point.SEW), Point.LMUL);
-      });
+  llvm::transform(ConfigPoints, std::back_inserter(MaxVLs),
+                  [ELEN, VLEN](const auto &Point) {
+                    return computeVLMax(ELEN, VLEN,
+                                        static_cast<unsigned>(Point.SEW),
+                                        Point.LMUL);
+                  });
   return *llvm::min_element(MaxVLs);
 }
 
@@ -1444,7 +1458,8 @@ void RVVConfigurationInfo::print(raw_ostream &OS) const {
     OS << " Conf: ";
     Point.print(OS);
     OS << "/MaxVL: "
-       << computeVLMax(ELEN, VLEN, static_cast<unsigned>(Point.SEW), Point.LMUL);
+       << computeVLMax(ELEN, VLEN, static_cast<unsigned>(Point.SEW),
+                       Point.LMUL);
     OS << "\n";
   }
   if (IllegalPointsSize > 0) {
@@ -1459,7 +1474,8 @@ void RVVConfigurationInfo::print(raw_ostream &OS) const {
       std::accumulate(CfgGen.elements().begin(), CfgGen.elements().end(),
                       size_t(0), [this](const auto &Acc, const auto &Point) {
                         auto PointSEW = static_cast<unsigned>(Point.SEW);
-                        auto MaxVL = computeVLMax(ELEN, VLEN, PointSEW, Point.LMUL);
+                        auto MaxVL =
+                            computeVLMax(ELEN, VLEN, PointSEW, Point.LMUL);
                         return Acc + MaxVL;
                       });
   OS << "  - State Cardinality: " << Cardinality << " ~ {MASKS} \n";
@@ -1472,8 +1488,8 @@ RVVConfigurationInfo::RVVConfigurationInfo(
     unsigned ELEN, unsigned VLEN, ConfigGenerator &&CfgGen, VLGenerator &&VLGen,
     VMGenerator &&VMGen, const ModeChangeInfo &SwitchInfo, bool EnableGuides,
     bool NeedsVXRMUpdate)
-    : VLEN(VLEN), ELEN(ELEN), CfgGen(std::move(CfgGen)), VLGen(std::move(VLGen)),
-      VMGen(std::move(VMGen)), SwitchInfo(SwitchInfo),
+    : VLEN(VLEN), ELEN(ELEN), CfgGen(std::move(CfgGen)),
+      VLGen(std::move(VLGen)), VMGen(std::move(VMGen)), SwitchInfo(SwitchInfo),
       ArtificialModeChange(EnableGuides), NeedsVXRMUpdate(NeedsVXRMUpdate) {}
 
 RISCVConfigurationInfo
@@ -1492,9 +1508,10 @@ RISCVConfigurationInfo::constructConfiguration(LLVMState &State,
                         .getRVVConfigurationSpace()
                         .has_value()
                     ? RVVConfigurationInfo::buildConfiguration(
-                          Cfg, ArchInfo.ELEN, ArchInfo.VLEN, nullptr, DiscardedVMs,
-                          DiscardedVLs, DiscardedConfigs)
-                    : RVVConfigurationInfo::createDefault(Cfg, ArchInfo.VLEN, ArchInfo.VLEN);
+                          Cfg, ArchInfo.ELEN, ArchInfo.VLEN, nullptr,
+                          DiscardedVMs, DiscardedVLs, DiscardedConfigs)
+                    : RVVConfigurationInfo::createDefault(Cfg, ArchInfo.VLEN,
+                                                          ArchInfo.VLEN);
 
   if (DumpDiscardedRVVConfigurations.isSpecified())
     printDiscardedRVVConfigurations(DumpDiscardedRVVConfigurations.getValue(),
@@ -1526,7 +1543,7 @@ RISCVConfigurationInfo::deriveArchitecturalInformation(
     return Result;
 
   Result.ELEN = ST.getELen();
-  
+
   if (!UseNonSimplifiedRVVConfig) {
     Result.VLEN = SimplifiedRVV_VLEN;
     return Result;
