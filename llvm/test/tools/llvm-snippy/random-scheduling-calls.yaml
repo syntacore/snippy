@@ -1,0 +1,31 @@
+# REQUIRES: asserts
+# RUN: llvm-snippy %S/Inputs/jal-layout.yaml %s \
+# RUN:    -mtriple=riscv64 -enable-static-stack=false \
+# RUN:    -num-instrs=10000 -mattr=+c \
+# RUN:    -initial-regs=%S/initialization/Inputs/initial_state_rv64i.yaml \
+# RUN:    -o %t_1
+
+# RUN: llvm-snippy %S/Inputs/jal-layout.yaml %s \
+# RUN:    -mtriple=riscv64 -enable-static-stack=false \
+# RUN:    -num-instrs=10000 -mattr=+c -debug-only=snippy-riscv \
+# RUN:    -initial-regs=%S/initialization/Inputs/initial_state_rv64i.yaml \
+# RUN:    -o %t_2 -random-scheduling \
+# RUN:  |& FileCheck %s
+
+# RUN: not diff -q %t_1.elf %t_2.elf
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - fun1
+        - fun2
+    - name: fun1
+      callees:
+        - fun2
+    - name: fun2
+      callees:
+        - fun3
+    - name: fun3
+
+# CHECK: Currently unsupported scheduling instruction : ${{[a-z0-9]+}} = PseudoJALCall

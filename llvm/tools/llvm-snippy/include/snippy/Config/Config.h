@@ -24,6 +24,7 @@
 #include "snippy/Config/RegisterAccess.h"
 #include "snippy/Config/SMCGram.h"
 #include "snippy/Config/Selfcheck.h"
+#include "snippy/Config/Scheduling.h"
 #include "snippy/Support/YAMLUtils.h"
 #include "snippy/Target/TargetConfigIface.h"
 
@@ -256,6 +257,7 @@ public:
   std::variant<CallGraphLayout, FunctionDescs> CGLayout;
 
   std::optional<CodeLayoutConfig> CodeLayout;
+  SchedulingSettings Scheduling;
   TraceConvertOptions TFOpts;
   PassConfig(const ProgramConfig &ProgramCfg) : ProgramCfg(&ProgramCfg) {}
 

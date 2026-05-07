@@ -1,0 +1,9 @@
+# RUN: not llvm-snippy %s -model-plugin None -random-scheduling |& FileCheck %s
+# CHECK: random-scheduling-option-and-config.yaml:5:3: error: 'random-scheduling' has been specified both as an option and as a configuration field 'enabled'
+
+scheduling:
+  enabled: true
+options:
+  num-instrs: 10
+  mtriple: riscv64
+  mcpu: generic-rv64

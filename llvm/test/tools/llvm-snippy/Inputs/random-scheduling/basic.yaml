@@ -1,0 +1,3 @@
+scheduling:
+  enabled: true
+  max-region-size: 1000

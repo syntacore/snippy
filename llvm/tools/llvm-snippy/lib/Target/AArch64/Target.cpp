@@ -752,6 +752,9 @@ public:
     SNIPPY_UNIMPLEMENTED();
   }
 
+  bool mayBeScheduled(const MachineInstr &MI) const override {
+    SNIPPY_UNIMPLEMENTED();
+  }
 
   MachineBasicBlock *generateBranch(InstructionGenerationContext &IGC,
                                     const MCInstrDesc &InstrDesc,
