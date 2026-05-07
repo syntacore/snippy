@@ -146,7 +146,7 @@ public:
   }
 
   auto getELEN() const { return getVUConfigInfo().getELEN(); }
-  
+
   auto getVLENB() const { return getVUConfigInfo().getVLENB(); }
 
   auto getVLEN() const { return getVUConfigInfo().getVLEN(); }
@@ -331,7 +331,8 @@ public:
       auto SEW = static_cast<unsigned>(getSEW(MBB));
       auto EEW = 16u;
       if (EEW > SEW)
-        std::tie(Multiplier, IsFractional) = computeDecodedEMUL(ELEN, SEW, EEW, LMUL);
+        std::tie(Multiplier, IsFractional) =
+            computeDecodedEMUL(ELEN, SEW, EEW, LMUL);
     }
 
     return std::make_pair(Multiplier, IsFractional);
