@@ -1,0 +1,108 @@
+# RUN: llvm-snippy %s -model-plugin=None -verify-mi |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  dump-mf: on
+  mattr: "+c"
+  num-instrs: 10000
+  verify-gen-histogram: on
+  histogram-must-succeed: on
+
+scheduling:
+  enabled: on
+  max-region-size: 250
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - LdSd: "AND * (LD ^ 10) * SUB * (SD ^ 5)"
+  - C_LdSd: "(C_LW ^ 5) * C_LD | (C_SW ^ 3) * C_SD"
+
+histogram:
+  - [pattern: LdSd, 11]
+  - [pattern: C_LdSd, 11]
+  - [LB, 11]
+  - [LBU, 11]
+  - [LH, 11]
+  - [LHU, 11]
+  - [LW, 11]
+  - [LWU, 11]
+  - [SB, 16]
+  - [SH, 16]
+  - [PseudoNOP, 5]
+
+# CHECK-DAG: LB
+# CHECK-DAG: LBU
+# CHECK-DAG: LH
+# CHECK-DAG: LHU
+# CHECK-DAG: LW
+# CHECK-DAG: SB
+# CHECK-DAG: SH
+# CHECK-DAG: PseudoNOP
+
+# COM: Chekc LdSd pattern
+# CHECK: AND
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: SUB
+# CHECK-NEXT: SD
+# CHECK-NEXT: SD
+# CHECK-NEXT: SD
+# CHECK-NEXT: SD
+# CHECK-NEXT: SD
+
+# COM: Chekc LdSd pattern
+# CHECK: AND
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: SUB
+# CHECK-NEXT: SD
+# CHECK-NEXT: SD
+# CHECK-NEXT: SD
+# CHECK-NEXT: SD
+# CHECK-NEXT: SD
+
+# COM: Chekc C_LdSd pattern
+# CHECK: C_LW
+# CHECK-NEXT: C_LW
+# CHECK-NEXT: C_LW
+# CHECK-NEXT: C_LW
+# CHECK-NEXT: C_LW
+# CHECK-NEXT: C_LD
+
+# COM: Chekc C_LdSd pattern
+# CHECK: C_SW
+# CHECK-NEXT: C_SW
+# CHECK-NEXT: C_SW
+# CHECK-NEXT: C_SD
+
+# COM: Chekc C_LdSd pattern
+# CHECK: C_LW
+# CHECK-NEXT: C_LW
+# CHECK-NEXT: C_LW
+# CHECK-NEXT: C_LW
+# CHECK-NEXT: C_LW
+# CHECK-NEXT: C_LD
+
+# COM: Chekc C_LdSd pattern
+# CHECK: C_SW
+# CHECK-NEXT: C_SW
+# CHECK-NEXT: C_SW
+# CHECK-NEXT: C_SD

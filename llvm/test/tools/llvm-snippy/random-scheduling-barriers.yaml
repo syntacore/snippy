@@ -1,0 +1,62 @@
+# REQUIRES: asserts 
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -model-plugin=None \
+# RUN:     -num-instrs=10000 -init-regs-in-elf -debug-only=snippy-riscv \
+# RUN:     -initial-regs=%S/initialization/Inputs/initial_state_rv64i.yaml \
+# RUN:     -random-scheduling \
+# RUN:  |& FileCheck %s 
+
+options:
+  mattr: +zifencei
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+
+histogram:
+  # branches
+  - [BEQ, 3.7]
+  - [BGE, 3.7]
+  - [BGEU, 3.7]
+  - [BLT, 3.7]
+  - [BLTU, 3.7]
+  - [BNE, 3.7]
+  - [ECALL, 10.0]
+  - [WFI, 10.0]
+  - [FENCE, 10.0]
+  - [FENCE_I, 10.0]
+  - [SFENCE_VMA, 10.0]
+  - [UNIMP, 10.0]
+  - [AUIPC, 10.0]
+  - [SW, 1.0]
+  - [ADD, 1.0]
+  - [XOR, 1.0]
+  - [AND, 1.0]
+  - [SUB, 1.0]
+branches:
+  number-of-loop-iterations:
+    min: 1
+    max: 2
+  max-depth:
+    if: 3
+    loop: 3
+
+# CHECK-DAG: Unsupported scheduling instruction : {{((\$x([0-9]+)))}} = AUIPC
+# CHECK-DAG: Unsupported scheduling instruction : ECALL
+# CHECK-DAG: Unsupported scheduling instruction : WFI
+# CHECK-DAG: Unsupported scheduling instruction : FENCE
+# CHECK-DAG: Unsupported scheduling instruction : FENCE_I
+# CHECK-DAG: Unsupported scheduling instruction : SFENCE_VMA
+# CHECK-DAG: Unsupported scheduling instruction : UNIMP
