@@ -27,6 +27,8 @@
 #include "snippy/Support/YAMLUtils.h"
 #include "snippy/Target/TargetConfigIface.h"
 
+#include "snippy/Config/Scheduling.h"
+
 #include "llvm/ADT/SmallSet.h"
 
 #include <unordered_map>
@@ -259,6 +261,7 @@ public:
   std::variant<CallGraphLayout, FunctionDescs> CGLayout;
 
   std::optional<CodeLayoutConfig> CodeLayout;
+  SchedulingSettings Scheduling;
   TraceConvertOptions TFOpts;
   PassConfig(const ProgramConfig &ProgramCfg) : ProgramCfg(&ProgramCfg) {}
 
