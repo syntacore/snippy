@@ -2010,7 +2010,9 @@ unsigned RISCVInstrInfo::getInstSizeInBytes(const MachineInstr &MI) const {
                               MF.getTarget().getMCAsmInfo());
   }
 
-  bool CompressionEnabled = !(MI.getAsmPrinterFlags() & RISCV::DoNotCompress);
+  bool CompressionEnabled =
+      !((MI.getAsmPrinterFlags() & RISCV::DoNotCompress) ||
+        STI.hasFeature(RISCV::FeatureExactAssembly));
 
   if (requiresNTLHint(MI)) {
     if (STI.hasStdExtZca()) {
