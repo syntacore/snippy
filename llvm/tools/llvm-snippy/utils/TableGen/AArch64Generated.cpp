@@ -49,7 +49,7 @@ public:
   }
   void expandFunction(raw_ostream &OS, const Record *Rec) {
     const auto &Name = Rec->getValueAsString("FunctionName");
-    OS << "bool " + Name + "(unsigned Opcode) {\n";
+    OS << "inline bool " + Name + "(unsigned Opcode) {\n";
     // TODO: add prologue and refactor
     Rec = Rec->getValueAsDef("Body");
     if (Rec->isSubClassOf("MCOpcodeSwitchStatement")) {
