@@ -20,4 +20,4 @@ histogram:
 # This RegEx checks that x2 is not used as a source register
 # It matches occurences of x2 as either a first of 2 register operands or rs2
 # (both are not possible in SP use)
-# CHECK-NOT: x2{{(, \$)|($)}}
+# CHECK-NOT: $x2{{(, \$)|($)}}

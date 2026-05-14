@@ -31,5 +31,5 @@ histogram:
 register-reservation:
   # Hard reserve
   - "X1[0-1]": [RW]
-# CHECK-NOT: x10
-# CHECK-NOT: x11
+# CHECK-NOT: $x10
+# CHECK-NOT: $x11
