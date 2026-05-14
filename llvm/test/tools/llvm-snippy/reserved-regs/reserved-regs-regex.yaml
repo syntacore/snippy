@@ -24,6 +24,6 @@ histogram:
     - [LW, 1.0]
     - [SW, 1.0]
 
-# CHECK-NOT: x10
-# CHECK-NOT: x11
-# CHECK-NOT: {{x2[0-9]}}
+# CHECK-NOT: $x10
+# CHECK-NOT: $x11
+# CHECK-NOT: ${{x2[0-9]}}
