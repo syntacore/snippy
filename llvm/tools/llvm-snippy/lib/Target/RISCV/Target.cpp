@@ -819,7 +819,8 @@ getBaseAddressForRVVIndexed(size_t XLen, APInt FirstLegalAddr,
                             std::optional<MemAddr> Preselected = {}) {
   if (Preselected)
     return APInt(XLen, *Preselected);
-  auto IndexMaxValue = getMaxPossibleIndexValue(InstrDesc, XLen);
+  auto IndexMaxValue = RandEngine::genInRangeInclusive(
+      getMaxPossibleIndexValue(InstrDesc, XLen));
   // Pick the legal random Base' value with the index constraints for current
   // instruction. So, from the equation:
   // FirstLegalAddr <= Base' + IndexMaxValue <= LastLegalAddr
@@ -909,7 +910,8 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVIndexed(
   LLVM_DEBUG(dbgs() << "breakDownAddrForRVVIndexed\n";
              dbgs().indent(2) << "Instruction: "
                               << ProgCtx.getLLVMState().getInstrInfo().getName(
-                                     InstrDesc.getOpcode()));
+                                     InstrDesc.getOpcode())
+                              << "\n");
 
   // For indexed loads/stores, only base address + index must be legal according
   // to the memory scheme, but base address by itself doesn't have to be. So the
@@ -956,15 +958,48 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVIndexed(
          (FirstLegalAddr.getZExtValue() % AddrInfo.MinStride));
   assert(AddrStrideRemainder ==
          (LastLegalAddr.getZExtValue() % AddrInfo.MinStride));
-  APInt IndexMaxValue = getMaxPossibleIndexValue(EIEW, XLen);
 
   auto BaseAddr = getBaseAddressForRVVIndexed(
       ST.getXLen(), FirstLegalAddr, LastLegalAddr, InstrDesc, MainPartAddr);
+
   LLVM_DEBUG(dbgs().indent(2)
              << Twine("Generated BaseAddress 0x")
                     .concat(Twine(utohexstr(BaseAddr.getZExtValue())))
                     .concat("\n"));
-  auto IndexMinValue = FirstLegalAddr - BaseAddr;
+
+  auto [IndexMinValue, IndexMaxValue] = [&]() -> std::pair<APInt, APInt> {
+    if (FirstLegalAddr.uge(BaseAddr))
+      // This is the simple case where BaseAddr is chosen to a value just before
+      // the range [FirstLegalAddr, LastLegalAddr]:
+      // |---|BaseAddr|-----|FirstLegalAddr|-------|LastLegalAddr|-------|
+      //              ^-----^ = IndexMinValue
+      return {FirstLegalAddr - BaseAddr, LastLegalAddr - BaseAddr};
+
+    if (BaseAddr.ule(LastLegalAddr)) {
+      // Another case where BaseAddr lies between FirstLegalAddr and
+      // LastLegalAddr.
+      // |---|FirstLegalAddr|-----|BaseAddr|-------|LastLegalAddr|-------|
+      //                                      ^- First address reachable via
+      //                                         MinStride from FirstLegalAddr
+      uint64_t Rem = (BaseAddr - FirstLegalAddr).urem(AddrInfo.MinStride);
+      APInt MinIndex =
+          Rem ? APInt(XLen, AddrInfo.MinStride - Rem) : APInt::getZero(XLen);
+      // FirstLegalAddr <= BaseAddr <= LastLegalAddr
+      return {MinIndex, LastLegalAddr - BaseAddr};
+    }
+
+    APInt MaxXLenValue = APInt::getMaxValue(XLen);
+    return {(MaxXLenValue - (BaseAddr - FirstLegalAddr)) + 1,
+            (MaxXLenValue - (BaseAddr - LastLegalAddr)) + 1};
+  }();
+
+  LLVM_DEBUG(dbgs().indent(2)
+             << Twine("IndexMinValue 0x")
+                    .concat(Twine(utohexstr(IndexMinValue.getZExtValue())))
+                    .concat(", IndexMaxValue 0x")
+                    .concat(utohexstr(IndexMaxValue.getZExtValue()))
+                    .concat("\n"));
+
   if (MainPartAddr) {
     assert(*MainPartAddr >= FirstLegalAddr.getZExtValue());
     assert(*MainPartAddr <= LastLegalAddr.getZExtValue());
@@ -972,6 +1007,12 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVIndexed(
     IndexMinValue = APInt::getZero(XLen);
   }
 
+  auto MaxPossibleIndexValue = getMaxPossibleIndexValue(EIEW, XLen);
+  IndexMaxValue = IndexMaxValue.ugt(MaxPossibleIndexValue)
+                      ? MaxPossibleIndexValue
+                      : IndexMaxValue;
+
+  assert(IndexMaxValue.uge(IndexMinValue));
   auto MaxN = (IndexMaxValue - IndexMinValue).udiv(AddrInfo.MinStride);
 
   AddressPart MainPart{AddrReg.getReg(), BaseAddr};
@@ -991,8 +1032,13 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVIndexed(
     for (size_t ElemIdx = 0; ElemIdx < NElts; ++ElemIdx) {
       // TODO: for unordered stores, generating indices like this is not
       // correct, since store order for overlapping regions is not defined
+      // FIXME: What about alignment?
       auto N = RandEngine::genInRangeInclusive(MaxN);
       auto IndexValue = IndexMinValue + AddrInfo.MinStride * N;
+
+      assert(IndexValue.ule(IndexMaxValue));
+      assert(IndexValue.uge(IndexMinValue));
+      assert(IndexValue.getActiveBits() <= EIEW);
 
       Offsets.insertBits(IndexValue.getZExtValue(), ElemIdx * EIEW, EIEW);
       LLVM_DEBUG(APInt Index(EIEW, IndexValue.getZExtValue());
