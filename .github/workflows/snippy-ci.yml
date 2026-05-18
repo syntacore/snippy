@@ -9,7 +9,18 @@ on:
   workflow_dispatch:
 jobs:
   main:
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ubuntu
+            runs-on: ubuntu-24.04
+          - name: rocky
+            runs-on: ubuntu-24.04
+            image: rockylinux:8
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runs-on }}
+    container: ${{ matrix.image || '' }}
     defaults:
       run:
         shell: bash
@@ -17,8 +28,6 @@ jobs:
       BUILD_DIR: "release/build"
       INSTALL_DIR: "release/install"
     steps:
-      - name: Install required compiler to be sure
-        run: sudo apt-get update && sudo apt-get install -y clang-14 ninja-build ccache lld cmake && pip install sphinx myst-parser
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -29,6 +38,19 @@ jobs:
             lld
             llvm
             third-party
+      - name: Install required compiler to be sure (Ubuntu)
+        if: matrix.name == 'ubuntu'
+        run: sudo apt-get update && sudo apt-get install -y clang-14 ninja-build ccache lld cmake && pip install sphinx myst-parser
+      - name: Install required compiler to be sure (Rocky)
+        if: matrix.name == 'rocky'
+        run: |
+          dnf install -y epel-release 'dnf-command(config-manager)'
+          dnf config-manager --set-enabled powertools || \
+          dnf config-manager --set-enabled PowerTools || \
+          dnf config-manager --set-enabled crb
+          dnf update -y
+          dnf install -y clang ninja-build ccache lld cmake tar xz python3 python3-pip
+          pip3 install sphinx myst-parser
       - name: Prepare ccache
         id: prepare_ccache
         run: |
@@ -38,13 +60,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .ccache
-          key: ccache-${{ github.job }}-${{ steps.prepare_ccache.outputs.timestamp }}
-          restore-keys: ccache-${{ github.job }}-
+          key: ccache-${{ matrix.name }}-${{ github.job }}-${{ steps.prepare_ccache.outputs.timestamp }}
+          restore-keys: ccache-${{ matrix.name }}-${{ github.job }}-
       - name: CMake release config
         run: >-
           cmake -S llvm -B "$BUILD_DIR" -G Ninja
-          -DCMAKE_C_COMPILER=clang-14 -DCMAKE_CXX_COMPILER=clang++-14
-          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
           -DLLVM_EXTERNAL_PROJECT_PASSTHROUGH="CMAKE_C_COMPILER_LAUNCHER;CMAKE_CXX_COMPILER_LAUNCHER"
           -DCMAKE_BUILD_TYPE=Release --preset snippy_basic
       - name: CMake release build
@@ -54,7 +75,7 @@ jobs:
       - name: CMake install
         id: install_release
         run: |
-          release_os="${RUNNER_OS@L}" # Lowercase OS (linux)
+          release_os="$(echo "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')-${{ matrix.name }}" # Lowercase OS (linux) + "ubuntu/rocky"
           release_arch="$(uname -m)" # Arch (x86_64, aarch64)
           release_basename="snippy-$release_arch-$release_os"
           release_tarball_filename="$release_basename.tar.xz" # snippy-x86_64-linux.tar.xz
@@ -72,18 +93,21 @@ jobs:
           name: ${{ steps.install_release.outputs.release_basename }}
           path: ${{ steps.install_release.outputs.release_tarball_filename }}
           compression-level: 0 # Artifact is already compressed
+      # Upload docs only on ubuntu
       - name: Upload html docs artifacts
+        if: matrix.name == 'ubuntu'
         uses: actions/upload-artifact@v4
         with:
           name: snippy-doc-html
           path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/html
       - name: Upload latex docs artifacts
+        if: matrix.name == 'ubuntu'
         uses: actions/upload-artifact@v4
         with:
           name: snippy-doc-latex
           path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/latex
       - name: Upload github pages artifact
-        if: github.event_name == 'push' && github.ref_name == 'main' && (github.repository_owner == 'syntacore' || github.repository_owner == 'LLVM-Snippy')
+        if: (matrix.name == 'ubuntu') && github.event_name == 'push' && github.ref_name == 'main' && (github.repository_owner == 'syntacore' || github.repository_owner == 'LLVM-Snippy')
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
         with:
           path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/html
