@@ -10,6 +10,7 @@
 
 #include "snippy/Config/FunctionDescriptions.h"
 #include "snippy/Generator/CallGraphState.h"
+#include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/Linker.h"
 
 #include "snippy/ActiveImmutablePass.h"
@@ -77,6 +78,15 @@ public:
 
   void setCFInstrNum(const MachineFunction &MF, size_t NumInstr) {
     CFInstrNum.emplace(&MF, NumInstr);
+  }
+
+  MCRegister getRAFor(const MachineFunction &MF) const {
+    auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+    auto &ProgCtx = SGCtx.getProgramContext();
+    auto *FN = getCallGraphState().getNode(&MF.getFunction());
+    if (FN && FN->returnAddress())
+      return *FN->returnAddress();
+    return ProgCtx.getReturnAddress();
   }
 
   Function &getSMCCopyFuncDecl() const { return *SMCCopyFuncDecl; }

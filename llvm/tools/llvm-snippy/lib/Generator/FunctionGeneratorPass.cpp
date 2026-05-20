@@ -120,6 +120,7 @@ void yaml::MappingTraits<snippy::FunctionDesc>::mapping(
   IO.mapOptional("name", Desc.Name);
   IO.mapOptional("external", Desc.External);
   IO.mapOptional("callees", Desc.Callees);
+  IO.mapOptional("randomize-ra", Desc.RandomizeRA);
 }
 
 std::string yaml::MappingTraits<snippy::FunctionDesc>::validate(
@@ -432,6 +433,48 @@ FunctionGenerator::calculateEntryFnInstrsNum(Module &M,
       });
 }
 
+namespace {
+struct ReturnAddressRegGenerator {
+public:
+  ReturnAddressRegGenerator(GeneratorContext &SGCtx)
+      : State(SGCtx.getProgramContext().getLLVMState()),
+        RP(SGCtx.getProgramContext().getRegisterPool()),
+        SP(SGCtx.getProgramContext().getStackPointer()) {
+    auto &Cfg = SGCtx.getConfig();
+    auto &Tgt = State.getSnippyTarget();
+    RegsSuitableForRA = Tgt.getRegsSuitableForRA(std::nullopt);
+
+    for_each(llvm::make_filter_range(
+                 Cfg.Histogram.uniqueOpcodes(),
+                 [&Tgt](auto &&Opcode) { return Tgt.isCall(Opcode); }),
+             [&](auto &&Opcode) {
+               auto SuitableForOpcode = Tgt.getRegsSuitableForRA(Opcode);
+               decltype(SuitableForOpcode) Intersection;
+               Intersection.reserve(SuitableForOpcode.size());
+               sort(SuitableForOpcode);
+               sort(RegsSuitableForRA);
+               std::set_intersection(
+                   SuitableForOpcode.begin(), SuitableForOpcode.end(),
+                   RegsSuitableForRA.begin(), RegsSuitableForRA.end(),
+                   std::back_inserter(Intersection));
+               RegsSuitableForRA = std::move(Intersection);
+             });
+  }
+
+  MCRegister get() const {
+    auto Filter = [this](auto Reg) { return Reg == SP; };
+    return RP.getAvailableRegister("return address", Filter, RegsSuitableForRA);
+  }
+
+private:
+  std::vector<MCRegister> RegsSuitableForRA;
+  const LLVMState &State;
+  RegPoolWrapper RP;
+  MCRegister SP;
+};
+
+} // namespace
+
 bool FunctionGenerator::generateFunctions(Module &M, const FunctionDescs &FDs) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &ProgCtx = SGCtx.getProgramContext();
@@ -447,6 +490,13 @@ bool FunctionGenerator::generateFunctions(Module &M, const FunctionDescs &FDs) {
 
   std::map<std::string, CallGraphState::Node *> NameMap;
 
+  ReturnAddressRegGenerator RAGen{SGCtx};
+  auto GetRA = [&](bool RandomizeRA) -> std::optional<MCRegister> {
+    if (RandomizeRA)
+      return RAGen.get();
+    return std::nullopt;
+  };
+
   // Create functions.
   for (auto &Desc : Descs) {
     if (Desc.External) {
@@ -455,7 +505,7 @@ bool FunctionGenerator::generateFunctions(Module &M, const FunctionDescs &FDs) {
       // Fuction bodies are filled later in FillExternalFunctionsStubsPass.
       auto &F = State.createFunction(M, Desc.Name, Sections.front(),
                                      Function::WeakAnyLinkage);
-      auto *Node = CGS.emplaceNode(&F);
+      auto *Node = CGS.emplaceNode(&F, GetRA(Desc.RandomizeRA));
       Node->setExternal();
       NameMap.emplace(Desc.Name, Node);
     } else {
@@ -471,7 +521,7 @@ bool FunctionGenerator::generateFunctions(Module &M, const FunctionDescs &FDs) {
         auto *NullSection = "";
         auto &MF = createFunction(SGCtx, M, Desc.Name, NullSection,
                                   Function::InternalLinkage, FDs.InstrNumAncil);
-        N = CGS.emplaceNode(&(MF.getFunction()));
+        N = CGS.emplaceNode(&(MF.getFunction()), GetRA(Desc.RandomizeRA));
       }
       NameMap.emplace(Desc.Name, N);
     }
@@ -508,6 +558,12 @@ bool FunctionGenerator::generateFunctions(Module &M,
     initSMCFunctions(M, SGCtx, calculateEntryFnInstrsNum(M, CGS));
 
   iota_range<size_t> funIDs(0u, NumF - 1u, /*Inclusive*/ false);
+  ReturnAddressRegGenerator RAGen{SGCtx};
+  auto GetRA = [&]() -> std::optional<MCRegister> {
+    if (CGL.RandomizeRA)
+      return RAGen.get();
+    return std::nullopt;
+  };
   std::transform(
       funIDs.begin(), funIDs.end(), std::back_inserter(CGS), [&](auto ID) {
         // All secondary functions are not assigned to specific RX section upon
@@ -517,7 +573,7 @@ bool FunctionGenerator::generateFunctions(Module &M,
         auto &MF =
             createFunction(SGCtx, M, ("fun" + Twine(ID)).str(), NullSection,
                            Function::InternalLinkage, CGL.InstrNumAncil);
-        return &MF.getFunction();
+        return std::make_pair(&MF.getFunction(), GetRA());
       });
 
   // Fill in connections.
