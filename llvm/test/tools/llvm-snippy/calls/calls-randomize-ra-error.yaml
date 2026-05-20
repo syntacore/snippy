@@ -1,0 +1,9 @@
+# RUN: not llvm-snippy %s -model-plugin None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  randomize-ra: on
+  redefine-ra: reg::X13
+
+# CHECK: error: Incompatible options: When --redefine-ra is specified, return address randomization is not supported

@@ -19,6 +19,7 @@ namespace snippy {
 struct FunctionDesc {
   std::string Name;
   bool External = false;
+  bool RandomizeRA = false;
   std::vector<std::string> Callees;
 };
 
