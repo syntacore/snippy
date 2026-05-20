@@ -1,0 +1,17 @@
+# RUN: not llvm-snippy %s -model-plugin None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +c
+  num-instrs: 1000
+  randomize-ra: on
+
+include:
+  - Inputs/sections-with-stack.yaml
+
+histogram:
+    - [ADD, 1.0]
+    - [C_JALR, 0.1]
+
+# CHECK: error: Call instruction C_JALR supports only one return address register therefore, -randomize-ra cannot be enabled.

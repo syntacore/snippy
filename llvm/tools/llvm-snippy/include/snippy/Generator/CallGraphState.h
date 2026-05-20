@@ -64,7 +64,9 @@ public:
      *
      */
 
-    explicit Node(const Function *Func) : Fs(1u, Func){};
+    explicit Node(const Function *Func,
+                  std::optional<MCRegister> RA = std::nullopt)
+        : Fs(1u, Func), RA(RA) {};
 
     // Creates caller(this) <-> callee(N) relationship.
     void addCallee(Node *N);
@@ -99,8 +101,11 @@ public:
     using ChildContainerT = std::vector<Edge>;
     using ChildIteratorT = ChildContainerT::const_iterator;
 
+    std::optional<MCRegister> returnAddress() const { return RA; }
+
   private:
     SmallVector<const Function *, 2> Fs;
+    std::optional<MCRegister> RA{};
     ChildContainerT Callees;
     ChildContainerT Callers;
     bool External = false;
@@ -118,17 +123,18 @@ public:
   CallGraphState() = default;
 
   bool registered(const Function *F) const { return FunToNodeMap.count(F); }
-  auto *emplaceNode(const Function *F) {
+  auto *emplaceNode(const Function *F,
+                    std::optional<MCRegister> RA = std::nullopt) {
     assert(!registered(F) && "Node for MF has been already registered");
-    auto *N = Nodes.emplace_back(std::make_unique<Node>(F)).get();
+    auto *N = Nodes.emplace_back(std::make_unique<Node>(F, RA)).get();
     NodeRefs.emplace_back(N);
     FunToNodeMap.insert({F, N});
     return N;
   }
 
   // This is done for back_inserter_iterator.
-  using value_type = const Function *;
-  void push_back(value_type F) { emplaceNode(F); }
+  using value_type = std::pair<const Function *, std::optional<MCRegister>>;
+  void push_back(value_type F) { emplaceNode(F.first, F.second); }
 
   Node *getNode(const Function *F) const {
     if (!registered(F))

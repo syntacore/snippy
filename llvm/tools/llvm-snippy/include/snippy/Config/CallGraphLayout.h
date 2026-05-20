@@ -31,6 +31,8 @@ struct CallGraphLayout {
   unsigned FunctionNumber;
   // Number of instructions in ancillary functions.
   unsigned InstrNumAncil;
+  // Use different registers for return address in different functions.
+  bool RandomizeRA = false;
 
   CallGraphLayout();
 

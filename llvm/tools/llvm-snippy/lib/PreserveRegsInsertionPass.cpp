@@ -10,6 +10,7 @@
 
 #include "InitializePasses.h"
 #include "snippy/CreatePasses.h"
+#include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/Policy.h"
 #include "snippy/Generator/RootRegPoolWrapperPass.h"
@@ -56,6 +57,7 @@ public:
     AU.setPreservesCFG();
     AU.addRequired<GeneratorContextWrapper>();
     AU.addRequired<RootRegPoolWrapper>();
+    AU.addRequired<FunctionGenerator>();
     AU.addRequired<TrackLiveness>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
@@ -110,7 +112,8 @@ private:
     std::set_intersection(PreserveRegs.begin(), PreserveRegs.end(),
                           MutatedRegs.begin(), MutatedRegs.end(),
                           std::back_inserter(Result));
-    auto RAIt = llvm::find(Result, ProgCtx.getReturnAddress());
+    auto RA = getAnalysis<FunctionGenerator>().getRAFor(MF);
+    auto RAIt = llvm::find(Result, RA);
     if (RAIt != Result.end())
       Result.erase(RAIt);
     return Result;

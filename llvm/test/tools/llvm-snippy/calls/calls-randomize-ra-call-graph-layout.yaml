@@ -1,0 +1,36 @@
+# COM: This test checks that option randomize-ra can be specified in cg-layout.
+
+# RUN: split-file %s %t
+# RUN: llvm-snippy %t/layout.yaml %t/cg-layout.yaml \
+# RUN:   %S/Inputs/sections-with-stack.yaml -model-plugin None &> %t.mf
+
+# COM: Here we check that if option -randomize-ra==true, then there are at
+#      least three different return addresses
+
+# RUN: grep -E 'x[0-9]+ = PseudoJALCall' %t.mf \
+# COM: Leave only names of the registers of the return address
+# RUN: | sed -E 's/.*(x[0-9]+).*/\1/' \
+# COM: Leave only unique names
+# RUN: | awk '!seen[$0]++' \
+# RUN: | wc -l \
+# COM: Check that the number of unique names is at least three
+# RUN: | awk '{ exit ($1 < 3) }'
+
+
+#--- layout.yaml
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  dump-mf: on
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [JAL, 1.0]
+
+#--- cg-layout.yaml
+function-layers: 3
+function-number: 9
+num-instr-ancil: 10
+randomize-ra: on

@@ -76,7 +76,7 @@ bool RISCVZcmpPopretCombine::runOnMachineFunction(MachineFunction &MF) {
   auto &FG = getAnalysis<FunctionGenerator>();
   // We can't replace epilogue in entry function, because it doesn't always
   // end with RET instruction.
-  if (FG.isEntryFunction(MF))
+  if (FG.isRootFunction(MF))
     return false;
 
   if (!PopretGen) {
@@ -104,6 +104,11 @@ bool RISCVZcmpPopretCombine::runOnMachineFunction(MachineFunction &MF) {
     snippy::fatal("Cannot generate cm.popret(z) with non-abi return adress "
                   "register. Please, use redefine-ra=RA");
   }
+  auto RA = FG.getRAFor(MF);
+  if (RA != RISCV::X1)
+    snippy::fatal(
+        "Cannot generate cm.popret(z) with non-abi return adress "
+        "register. Please, turn off return address register randomization");
   auto RList = replacePrologueWithRListSpill(PopretOpcode, MF.front());
   replaceEpilogueWithPopret(PopretOpcode, RList, MF.back());
   return true;
