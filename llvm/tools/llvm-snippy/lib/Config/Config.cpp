@@ -612,13 +612,13 @@ struct RegChoice {
   Opt get() const { return Val; }
 
   std::pair<StringRef, MCRegister> getSpecific() const {
-    assert(RegVal.has_value() && "No specifc reg specified");
+    assert(RegVal.has_value() && "No specific reg specified");
     auto &&[Name, Reg] = *RegVal;
     return std::make_pair(StringRef(Name), Reg);
   }
 
   MCRegister getSpecificReg() const {
-    assert(RegVal.has_value() && "No specifc reg specified");
+    assert(RegVal.has_value() && "No specific reg specified");
     return RegVal->second;
   }
 
@@ -1131,6 +1131,13 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
   auto RegsSpilledToStack = parseSpilledRegistersOption(RP, Tgt, RI, Ctx, Opts);
   auto RegsSpilledToMem = getRegsToSpillToMem(Tgt, Cfg);
   bool HasSPRelativeInstrs = Cfg.Histogram.hasSPRelativeInstrs(OpCC, Tgt);
+  if (auto CG = std::get_if<CallGraphLayout>(&Cfg.PassCfg.CGLayout)) {
+    if (Opts.RedefineRA.isSpecified() && CG->RandomizeRA) {
+      snippy::fatal("Incompatible options",
+                    "When --redefine-ra is specified, return address "
+                    "randomization is not supported");
+    }
+  }
   if (ProgCfg.FollowTargetABI) {
     if (HasSPRelativeInstrs && !Opts.RedefineSP.isSpecified())
       snippy::fatal(
@@ -1585,7 +1592,6 @@ static bool hasCallees(const FunctionDesc &FuncDesc) {
 static void deleteCallsIfNeeded(LLVMState &State, const OpcodeCache &OpCC,
                                 OpcodeHistogram &Histogram, const Config &Cfg) {
   auto &CGLayout = Cfg.PassCfg.CGLayout;
-  auto RA = Cfg.ProgramCfg.ReturnAddress;
   auto &Tgt = State.getSnippyTarget();
   auto IsCall = [&Tgt](unsigned Opcode) { return Tgt.isCall(Opcode); };
   auto CallsWeight = Histogram.getTopOpcodesWeight(IsCall);
@@ -1596,6 +1602,20 @@ static void deleteCallsIfNeeded(LLVMState &State, const OpcodeCache &OpCC,
     snippy::fatal(
         "for using calls you need to add to histogram non-call instructions");
 
+  for (auto &&CallOpcode :
+       make_filter_range(Histogram.uniqueOpcodes(),
+                         [&](auto &&Opcode) { return Tgt.isCall(Opcode); })) {
+    const auto &RARegs = Tgt.getRegsSuitableForRA(CallOpcode);
+    assert(!RARegs.empty());
+    if (RARegs.size() == 1 &&
+        std::holds_alternative<CallGraphLayout>(CGLayout) &&
+        std::get<CallGraphLayout>(CGLayout).RandomizeRA) {
+      snippy::fatal(llvm::formatv(
+          "Call instruction {0} supports only one return address register "
+          "therefore, -randomize-ra cannot be enabled.",
+          OpCC.name(CallOpcode)));
+    }
+  }
   std::visit(OverloadedCallable(
                  [&Histogram, IsCall](const FunctionDescs &Descs) -> void {
                    if (!std::any_of(Descs.Descs.begin(), Descs.Descs.end(),
@@ -1618,16 +1638,6 @@ static void deleteCallsIfNeeded(LLVMState &State, const OpcodeCache &OpCC,
                    }
                  }),
              CGLayout);
-  for (auto &&CallOpcode :
-       make_filter_range(Histogram.uniqueOpcodes(),
-                         [&](auto &&Opcode) { return Tgt.isCall(Opcode); })) {
-    const auto &RARegs = Tgt.getRegsSuitableForRA(CallOpcode);
-    if (!is_contained(RARegs, RA))
-      snippy::fatal(llvm::formatv("Call instruction {0} does not support {1} "
-                                  "as return address register.",
-                                  OpCC.name(CallOpcode),
-                                  State.getRegInfo().getName(RA)));
-  }
 }
 
 static void checkBurstGram(LLVMContext &Ctx, const OpcodeHistogram &Histogram,

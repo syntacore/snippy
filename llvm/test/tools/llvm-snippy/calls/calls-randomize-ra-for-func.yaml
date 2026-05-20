@@ -1,0 +1,53 @@
+# COM: This test checks that option randomize-ra can be specified for specific
+#      functions in call-graph.
+
+# RUN: llvm-snippy %S/calls-randomize-ra.yaml %s -redefine-ra=reg::X7 \
+# RUN:   -model-plugin None &> %t.mf
+
+
+# COM: Here we check that there are exactly two different return addresses (for
+#      fun1 and for other functions)
+
+# RUN: grep -E 'x[0-9]+ = PseudoJALCall' %t.mf \
+# COM: Leave only names of the registers of the return address
+# RUN: | sed -E 's/.*(x[0-9]+).*/\1/' \
+# COM: Leave only unique names
+# RUN: | awk '!seen[$0]++' \
+# RUN: | wc -l \
+# COM: Check that the number of unique return addresses is two
+# RUN: | awk '{ exit ($1 != 2) }'
+
+
+# COM: Here we check that there are only one return addresses for fun1
+
+# RUN: grep -E 'PseudoJALCall @fun1' %t.mf \
+# COM: Leave only names of the registers of the return address
+# RUN: | sed -E 's/.*(x[0-9]+).*/\1/' \
+# RUN: | awk '!seen[$0]++' \
+# RUN: | wc -l \
+# COM: Check that the number of unique return address is one
+# RUN: | awk '{ exit ($1 != 1) }'
+
+
+# COM: Here we check that there are only X7 return addresses for other funcs
+
+# RUN: grep -E 'PseudoJALCall @fun[^1]' %t.mf \
+# COM: Here we check that all lines contain 'x7 = '
+# RUN: | not grep -n -v 'x7 = '
+
+
+call-graph:
+  entry-point: fun4
+  function-list:
+    - name: fun4
+      callees:
+        - fun1
+        - fun2
+    - name: fun1
+      callees:
+        - fun2
+      randomize-ra: on
+    - name: fun2
+      callees:
+        - fun3
+    - name: fun3

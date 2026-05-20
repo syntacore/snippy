@@ -8,6 +8,7 @@
 
 #include "InitializePasses.h"
 
+#include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/Policy.h"
 
@@ -38,6 +39,7 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<GeneratorContextWrapper>();
+    AU.addRequired<FunctionGenerator>();
     ModulePass::getAnalysisUsage(AU);
   }
 };
@@ -70,6 +72,7 @@ namespace snippy {
 
 bool FillExternalFunctionsStubs::runOnModule(Module &M) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &FG = getAnalysis<FunctionGenerator>();
   auto &ProgCtx = SGCtx.getProgramContext();
   auto &State = ProgCtx.getLLVMState();
   const auto &SnippyTgt = State.getSnippyTarget();
@@ -88,7 +91,7 @@ bool FillExternalFunctionsStubs::runOnModule(Module &M) {
     auto *MBB = createMachineBasicBlock(MF);
     MF.push_back(MBB);
     InstructionGenerationContext IGC{*MBB, MBB->end(), SGCtx};
-    SnippyTgt.generateReturn(IGC, ProgCtx.getReturnAddress());
+    SnippyTgt.generateReturn(IGC, FG.getRAFor(MF));
   }
 
   return true;

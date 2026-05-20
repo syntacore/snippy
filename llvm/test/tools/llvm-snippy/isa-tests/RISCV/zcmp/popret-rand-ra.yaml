@@ -1,0 +1,23 @@
+# RUN: not llvm-snippy %s -model-plugin None |& FileCheck %s
+
+# CHECK: error: Cannot generate cm.popret(z) with non-abi return adress register. Please, turn off return address register randomization
+
+options:
+  mtriple: riscv64
+  num-instrs: 10000
+  mattr: +zcmp
+  honor-target-abi: on
+  function-number: 40
+  function-layers: 5
+  redefine-sp: SP
+randomize-ra: on
+include:
+  - ../Inputs/sections-with-stack.yaml
+
+histogram:
+  - [CM_POPRET, 1.0]
+  - [CM_POPRETZ, 1.0]
+  - [JAL, 1.0]
+  - [ADD, 1.0]
+
+

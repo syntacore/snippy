@@ -61,9 +61,8 @@ public:
     llvm::sort(Res);
     llvm::sort(CallerSaved);
     std::vector<MCRegister> Result;
-    auto HasRAReg = llvm::any_of(Res, [&ProgCtx](auto Reg) {
-      return Reg == ProgCtx.getReturnAddress();
-    });
+    auto RA = getRAFor(MF);
+    auto HasRAReg = llvm::any_of(Res, [RA](auto Reg) { return Reg == RA; });
     std::set_difference(Res.begin(), Res.end(), CallerSaved.begin(),
                         CallerSaved.end(), std::back_inserter(Result));
     // RA register is a special one: it may be caller saved, but we still need
@@ -72,12 +71,16 @@ public:
     // because it can be picked as a scratch one
     auto &FG = getAnalysis<FunctionGenerator>();
     if (HasRAReg || !FG.isRootFunction(MF))
-      Result.push_back(ProgCtx.getReturnAddress());
+      Result.push_back(RA);
 
     llvm::erase_if(Result, [&](auto &&Reg) {
       return !SnippyTgt.isRegClassSupported(Reg);
     });
     return Result;
+  }
+
+  MCRegister getRAFor(MachineFunction &MF) {
+    return getAnalysis<FunctionGenerator>().getRAFor(MF);
   }
 
   auto getSpilledRegs(MachineFunction &MF) {
@@ -86,10 +89,11 @@ public:
     auto &State = ProgCtx.getLLVMState();
     const auto &SnippyTgt = State.getSnippyTarget();
     auto &FG = getAnalysis<FunctionGenerator>();
+    auto RA = getRAFor(MF);
 
     std::vector<MCRegister> Ret;
     if (MF.getName() == SMCManagerT::SMCTgtFuncName) {
-      Ret.push_back(ProgCtx.getReturnAddress());
+      Ret.push_back(RA);
       return Ret;
     }
     if (FG.isRootFunction(MF)) {
@@ -104,7 +108,7 @@ public:
         auto &Tgt = State.getSnippyTarget();
         llvm::copy(Tgt.getCalleeSavedRegs(State.getSubtargetInfo()),
                    std::back_inserter(Ret));
-        Ret.push_back(ProgCtx.getReturnAddress());
+        Ret.push_back(RA);
         return Ret;
       }
       auto RegSet = getAllMutatedRegs(MF);
@@ -112,7 +116,6 @@ public:
       // FIXME: some target-dependent passes may insert code clobbering return
       // address, so spill it anyway, We should prohibit such behavior in
       // future.
-      auto RA = ProgCtx.getReturnAddress();
       if (!RegSet.count(RA))
         Ret.push_back(RA);
     }
@@ -369,7 +372,7 @@ bool PrologueEpilogueInsertion::insertPrologue(
   for (auto SpillReg : SpilledToStack)
     RP->addReserved(SpillReg);
   if (IsEntry) {
-    auto RA = ProgCtx.getReturnAddress();
+    auto RA = getRAFor(MF);
     auto RAABI = SnippyTgt.getReturnAddress();
     if (RA != RAABI)
       SnippyTgt.copyRegToReg(InstrGenCtx, RAABI, RA);

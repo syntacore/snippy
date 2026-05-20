@@ -1,0 +1,63 @@
+# COM: This test checks that option -randomize-ra is working correctly.
+
+# COM: Here we check that if option -randomize-ra==true, then there are at
+#      least three different return addresses
+
+# RUN: llvm-snippy %s -randomize-ra=true -model-plugin None &> %t.rand.mf
+# RUN: FileCheck %s --input-file %t.rand.mf
+# RUN: grep -E 'x[0-9]+ = PseudoJALCall' %t.rand.mf \
+# COM: Leave only names of the registers of the return address
+# RUN: | sed -E 's/.*(x[0-9]+).*/\1/' \
+# COM: Leave only unique names
+# RUN: | awk '!seen[$0]++' \
+# RUN: | wc -l \
+# COM: Check that the number of unique names is at least three
+# RUN: | awk '{ exit ($1 < 3) }'
+
+
+# COM: Here we check that if option -randomize-ra==false, there is only one
+#      unique return address
+
+# RUN: llvm-snippy %s -randomize-ra=false -model-plugin None &> %t.not-rand.mf
+# RUN: grep -E 'x[0-9]+ = PseudoJALCall' %t.not-rand.mf \
+# COM: Leave only names of the registers of the return address
+# RUN: | sed -E 's/.*(x[0-9]+).*/\1/' \
+# COM: Leave only unique names
+# RUN: | awk '!seen[$0]++' \
+# RUN: | wc -l \
+# COM: Check that the number of unique names is one
+# RUN: | awk '{ exit ($1 != 1) }'
+
+
+# COM: Here we check that -randomize-ra default is false.
+
+# RUN: llvm-snippy %s -randomize-ra=false -model-plugin None &> %t.default.mf
+# RUN: grep -E 'x[0-9]+ = PseudoJALCall' %t.default.mf \
+# RUN: | sed -E 's/.*(x[0-9]+).*/\1/' \
+# RUN: | awk '!seen[$0]++' \
+# RUN: | wc -l \
+# COM: Check that the number of unique names is one
+# RUN: | awk '{ exit ($1 != 1) }'
+
+
+options:
+  mtriple: riscv64
+  function-number: 20
+  function-layers: 5
+  num-instrs: 1000
+  num-instr-ancil: 50
+  verify-mi: on
+  dump-mf: on
+
+include:
+  - Inputs/sections-with-stack.yaml
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [JAL, 1.0]
+
+# CHECK: {{.*}} = PseudoJALCall
+# CHECK: {{.*}} = PseudoJALCall
+# CHECK: {{.*}} = PseudoJALCall
