@@ -1152,7 +1152,8 @@ MachineInstr *generateCall(unsigned OpCode,
 
   auto &CallTarget = *RandEngine::selectFromContainer(CalleeNode->functions());
   assert(CallTarget.hasName());
-  auto RA = ProgCtx.getReturnAddress();
+  auto CalleeOverrideRA = CalleeNode->returnAddress();
+  auto RA = CalleeOverrideRA ? *CalleeOverrideRA : ProgCtx.getReturnAddress();
   auto &RP = InstrGenCtx.getRegPool();
   auto SpillRA = RP.isReserved(RA, MBB);
   auto RealStackPointer = ProgCtx.getStackPointer();
@@ -1569,7 +1570,10 @@ void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
                                                      SimCtx};
   auto RP = InstrGenCtx.pushRegPool();
   auto &SnippyTgt = State.getSnippyTarget();
-  auto RA = ProgCtx.getReturnAddress();
+  std::optional<MCRegister> OverrideRA{};
+  if (CallGraphState::Node * FN; CGS && (FN = CGS->getNode(&MF.getFunction())))
+    OverrideRA = FN->returnAddress();
+  auto RA = OverrideRA ? *OverrideRA : ProgCtx.getReturnAddress();
   // Secondary functions always return.
   if (!CGS || !CGS->isRootFunction(MF)) {
     SnippyTgt.generateReturn(InstrGenCtx, RA);

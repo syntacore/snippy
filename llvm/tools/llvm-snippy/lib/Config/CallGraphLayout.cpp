@@ -18,6 +18,7 @@ void yaml::MappingTraits<snippy::CallGraphLayout>::mapping(
   IO.mapOptional("function-layers", Info.MaxLayers);
   IO.mapOptional("function-number", Info.FunctionNumber);
   IO.mapOptional("num-instr-ancil", Info.InstrNumAncil);
+  IO.mapOptional("randomize-ra", Info.RandomizeRA);
 }
 
 namespace snippy {
@@ -39,9 +40,14 @@ static snippy::opt<unsigned>
                   cl::desc("number of instructions in ancillary functions"),
                   cl::cat(Options), cl::init(10));
 
+static snippy::opt<bool>
+    RandomizeRAOpt("randomize-ra",
+                   cl::desc("return address register randomization"),
+                   cl::Hidden, cl::cat(Options), cl::init(false));
+
 CallGraphLayout::CallGraphLayout()
     : MaxLayers(FunctionLayers), FunctionNumber(FunctionNumberOpt),
-      InstrNumAncil(NumInstrAncil) {}
+      InstrNumAncil(NumInstrAncil), RandomizeRA(RandomizeRAOpt) {}
 
 } // namespace snippy
 } // namespace llvm
