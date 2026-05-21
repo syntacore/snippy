@@ -1,0 +1,29 @@
+# RUN: llvm-snippy --model-plugin=None %s
+
+include:
+  - "Inputs/sections.yaml"
+
+options:
+    mtriple: "riscv32"
+    mcpu: generic-rv32
+    march: "rv32imc_zba_zbb_zbc_zbs_zicsr"
+    mattr: "+c,+exact-asm"
+    num-instrs: 8
+    init-memory: full
+    preserve-ra: true
+    init-regs-in-elf: on
+    function-number: 3
+    function-layers: 3
+    enable-static-stack: false
+
+code-layout:
+  ranges:
+    - start: 0x80050000
+      size: 0x7D0
+      stride: 0x1
+      first-offset: 0
+      last-offset: 0
+
+histogram:
+  - [C_JAL, 1.0]
+  - [ADD, 1.0]
