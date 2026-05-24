@@ -391,6 +391,16 @@ struct OpcodeHistogramNormalization final {
   // Returns non empty error string if something went wrong
   std::string insertHistogramNode(snippy::OpcodeHistogram &Hist, StringRef Name,
                                   double Weight);
+
+private:
+  // Returns true if 'WeightStr' contains a non-negative floating-point value
+  // and isn't NaN or inf. If the return value is true, 'Weight' will be set to
+  // the double representation of 'WeightStr'. Otherwise (if the return value is
+  // false), 'Weight' will remain unchanged.
+  static bool verifyAndSetWeight(StringRef WeightStr, double &Weight) {
+    return not(WeightStr.getAsDouble(Weight, true) or std::isnan(Weight) or
+               std::isinf(Weight) or Weight < 0.0);
+  }
 };
 
 snippy::OpcodeHistogramCodedEntry

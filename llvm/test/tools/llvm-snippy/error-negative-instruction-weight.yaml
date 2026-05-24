@@ -1,0 +1,27 @@
+# RUN: not llvm-snippy %s \
+# RUN:  |& FileCheck %s
+
+sections:
+    - name:      1
+      VMA:       0x10000
+      SIZE:      0x10000
+      LMA:       0x10000
+      ACCESS:    rx
+      PHDR:      'header1'
+    - name:      2
+      VMA:       0x20000
+      SIZE:      0x200
+      LMA:       0x20000
+      ACCESS:    rw
+      PHDR:      'header2'
+
+histogram:
+    - [ADD, 1.0]
+    - [SUB, -3.0]
+
+options:
+    mtriple: "riscv64"
+    mcpu: generic-rv64
+    march: "rv64ifc_zifencei"
+
+# CHECK: error: Incorrect histogram: Weight must be a non-negative floating point value, but instruction SUB was given with the weight '-3.0'

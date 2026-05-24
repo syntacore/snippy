@@ -6,8 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "snippy/Config/OpcodeHistogram.h"
+#include <iostream>
+
 #include "snippy/Config/ConfigIOContext.h"
+#include "snippy/Config/OpcodeHistogram.h"
 
 // FIXME: remove this dependency (an interface should be introduced)
 #include "snippy/Config/PluginWrapper.h"
@@ -90,15 +92,18 @@ OpcodeHistogram OpcodeHistogramNormalization::denormalize(yaml::IO &IO) {
     return Result;
   }
   for (auto &&[NameInfo, WeightStr] : NameWeightSeq) {
-    double Weight = 0.0;
-    if (StringRef(WeightStr).getAsDouble(Weight)) {
-      IO.setError("Incorrect histogram: Weight must be a floating point value");
+    auto Weight = 0.0;
+    auto IsWeightCorrect = verifyAndSetWeight(WeightStr, Weight);
+    if (not IsWeightCorrect) {
+      IO.setError("Incorrect histogram: Weight must be a non-negative floating "
+                  "point value, but instruction " +
+                  NameInfo.Val + " was given with the weight '" + WeightStr +
+                  "'");
       break;
     }
 
-    auto Name = NameInfo.Val;
     if (NameInfo.Kind == yaml::NodeKind::Map) {
-      if (auto ErrStr = insertHistogramNode(Result, Name, Weight);
+      if (auto ErrStr = insertHistogramNode(Result, NameInfo.Val, Weight);
           !ErrStr.empty()) {
         IO.setError(ErrStr);
         return {};
@@ -109,8 +114,18 @@ OpcodeHistogram OpcodeHistogramNormalization::denormalize(yaml::IO &IO) {
         IO.setError(llvm::toString(DecodeEntry.takeError()));
         return {};
       }
-      for (auto &&[Opc, WeightRes] : DecodeEntry->Decoded)
+      for (auto &&[Opc, WeightRes] : DecodeEntry->Decoded) {
+        // FIXME: here we run probability visitor to collect information on
+        // which opcodes were already mentioned
+        Result.reinitProbabilityVisitor();
+        // Check the re-assignment of 'Opc' instruction
+        if (Result.contains(Opc)) {
+          IO.setError("Incorrect histogram: Redeclaration of " + NameInfo.Val +
+                      " weight");
+          return {};
+        }
         Result.insertTopOpcode(Opc, WeightRes);
+      }
     }
   }
   // Recalculate opcode probabilities for the fully constructed histogram
