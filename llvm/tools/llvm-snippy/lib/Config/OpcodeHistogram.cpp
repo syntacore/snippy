@@ -6,10 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <iostream>
-
-#include "snippy/Config/ConfigIOContext.h"
 #include "snippy/Config/OpcodeHistogram.h"
+#include "snippy/Config/ConfigIOContext.h"
 
 // FIXME: remove this dependency (an interface should be introduced)
 #include "snippy/Config/PluginWrapper.h"
