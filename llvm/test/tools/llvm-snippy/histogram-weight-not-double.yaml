@@ -33,4 +33,4 @@ histogram:
     - [LW, 10.0]
     - [SW, 10.0]
 
-# CHECK: error: Incorrect histogram: Weight must be a floating point value
+# CHECK: error: MUL is given with incorrect weight: '1.0_o' can't be converted to double
