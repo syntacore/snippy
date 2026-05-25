@@ -142,7 +142,7 @@ static Config readSnippyConfig(LLVMState &State, RegPoolWrapper &RP,
       Config::create(IPP, RP, State, ProgCfg, OpCC, ParseWithPlugin);
   if (auto Err = ConfigOrErr.takeError())
     snippy::fatal(
-        Ctx, "Failed to parse file \"" + Twine(IPP.getPrimaryFilename()) + "\'",
+        Ctx, "Failed to parse file \"" + Twine(IPP.getPrimaryFilename()) + "\"",
         toString(std::move(Err)));
   return std::move(*ConfigOrErr);
 }
