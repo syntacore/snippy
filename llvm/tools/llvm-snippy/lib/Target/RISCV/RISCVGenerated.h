@@ -743,6 +743,16 @@ inline bool isRVVIndexedSegLoadStore(unsigned Opcode) {
   }
 }
 
+inline bool isRVVIndexedUnorderedSegLoadStore(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RVV_INDEX_SEG_EACHNFIELDS_PLACER(VLUXSEG):
+  case RVV_INDEX_SEG_EACHNFIELDS_PLACER(VSUXSEG):
+    return true;
+  }
+}
+
 inline bool isRVVStridedStore(unsigned Opcode) {
   switch (Opcode) {
   default:
@@ -767,7 +777,6 @@ inline bool isRVVStridedSegStore(unsigned Opcode) {
 #undef RVV_SEG_EACHNFIELDS_PLACER
 #undef RVV_INDEX_SEG_EACHNFIELDS_PLACER
 #undef RVV_SEG_EACHEEW_PLACER
-#undef RVV_SEG_EACHEIEW_PLACER
 
 inline bool isRVVWholeRegLoadStore(unsigned Opcode) {
   switch (Opcode) {
@@ -1115,25 +1124,25 @@ inline bool isRVVIndexedLoadStore(unsigned Opcode) {
   switch (Opcode) {
   default:
     return false;
-  case RISCV::VLUXEI8_V:
-  case RISCV::VLUXEI16_V:
-  case RISCV::VLUXEI32_V:
-  case RISCV::VLUXEI64_V:
-  case RISCV::VLOXEI8_V:
-  case RISCV::VLOXEI16_V:
-  case RISCV::VLOXEI32_V:
-  case RISCV::VLOXEI64_V:
-  case RISCV::VSUXEI8_V:
-  case RISCV::VSUXEI16_V:
-  case RISCV::VSUXEI32_V:
-  case RISCV::VSUXEI64_V:
-  case RISCV::VSOXEI8_V:
-  case RISCV::VSOXEI16_V:
-  case RISCV::VSOXEI32_V:
-  case RISCV::VSOXEI64_V:
+  case RVV_SEG_EACHEIEW_PLACER(VLUX, ):
+  case RVV_SEG_EACHEIEW_PLACER(VLOX, ):
+  case RVV_SEG_EACHEIEW_PLACER(VSUX, ):
+  case RVV_SEG_EACHEIEW_PLACER(VSOX, ):
     return true;
   }
 }
+
+inline bool isRVVIndexedUnorderedLoadStore(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RVV_SEG_EACHEIEW_PLACER(VLUX, ):
+  case RVV_SEG_EACHEIEW_PLACER(VSUX, ):
+    return true;
+  }
+}
+
+#undef RVV_SEG_EACHEIEW_PLACER
 
 inline bool isRVVUnitStrideMaskLoadStore(unsigned Opcode) {
   switch (Opcode) {
