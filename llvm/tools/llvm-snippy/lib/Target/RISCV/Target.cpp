@@ -813,25 +813,56 @@ static APInt getMaxPossibleIndexValue(const MCInstrDesc &InstrDesc,
                                   XLen);
 }
 
-static APInt
-getBaseAddressForRVVIndexed(size_t XLen, APInt FirstLegalAddr,
-                            APInt LastLegalAddr, const MCInstrDesc &InstrDesc,
-                            std::optional<MemAddr> Preselected = {}) {
+/// Randomly select an address used for indexed RVV ops. See the detailed
+/// comment in breakDownAddrForRVVIndexed for the reasoning. IndexShiftHeadroom
+/// is the number of consecutive bytes reachable from the selected base address
+/// via indices in range [0, maxPossibleIndexValue].
+static APInt getBaseAddressForRVVIndexed(size_t XLen, APInt FirstLegalAddr,
+                                         APInt LastLegalAddr,
+                                         const MCInstrDesc &InstrDesc,
+                                         std::optional<MemAddr> Preselected,
+                                         APInt IndexShiftHeadroom) {
   if (Preselected)
     return APInt(XLen, *Preselected);
-  auto IndexMaxValue = RandEngine::genInRangeInclusive(
-      getMaxPossibleIndexValue(InstrDesc, XLen));
-  // Pick the legal random Base' value with the index constraints for current
-  // instruction. So, from the equation:
-  // FirstLegalAddr <= Base' + IndexMaxValue <= LastLegalAddr
-  // FirstLegalAddr - IndexMaxValue  <= Base' <= LastLegalAddr - IndexMaxValue
+
+  // This can happen if the selected scheme has a large stride specified and the
+  // instruction uses a small index register. TODO: Do something better then
+  // erroring out. Hard problem to solve and unclear whether it's worth solving.
+  // TODO: Return Expected and include the machine instr in the error message.
+  auto MaxPossibleIndexValue = getMaxPossibleIndexValue(InstrDesc, XLen);
+  if (IndexShiftHeadroom.ugt(MaxPossibleIndexValue)) {
+    snippy::fatal("Can't fulfill non-intersecting RVV index requirements",
+                  Twine("Instruction needs to access ")
+                      .concat(Twine(IndexShiftHeadroom.getZExtValue()))
+                      .concat(" consecutive bytes, but maximum "
+                              "represenatable index is ")
+                      .concat(Twine(MaxPossibleIndexValue.getZExtValue())));
+  }
+
   assert(FirstLegalAddr.getBitWidth() == XLen);
   assert(LastLegalAddr.getBitWidth() == XLen);
 
+  auto IndexShiftMaxValue = RandEngine::genInRangeInclusive(
+      getMaxPossibleIndexValue(InstrDesc, XLen) - IndexShiftHeadroom);
+
+  LLVM_DEBUG(dbgs().indent(2)
+             << "IndexShiftMaxValue: 0x"
+             << utohexstr(IndexShiftMaxValue.getZExtValue()) << "\n");
+
+  // Pick the legal random Base' value with the index constraints for current
+  // instruction. When IndexShiftHeadroom is nonzero, we also ensure that the
+  // base address is selected in such a way, that the resulting legal index
+  // range can be used to access IndexShiftHeadroom consecutive bytes. Note that
+  // IndexShiftMaxValue reduces the maximum offset that can be applied to the
+  // start of the range (FirstLegalAddr), but LastLegalAddr is affected in a
+  // different manner - it has to be reduced, not increased like it happens with
+  // MinBase.
+
   // NOTE: All arithmetic is modulo XLen and it's expected that these operations
   // will overflow. Either both at the same time or just one.
-  auto MinBase = FirstLegalAddr - IndexMaxValue;
-  auto MaxBase = LastLegalAddr - IndexMaxValue;
+  auto MinBase = FirstLegalAddr - IndexShiftMaxValue;
+  auto MaxBase =
+      MinBase + ((LastLegalAddr - IndexShiftHeadroom) - FirstLegalAddr);
 
   LLVM_DEBUG(dbgs().indent(2)
              << "MinBase: 0x" << utohexstr(MinBase.getZExtValue()) << "\n");
@@ -960,7 +991,13 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVIndexed(
          (LastLegalAddr.getZExtValue() % AddrInfo.MinStride));
 
   auto BaseAddr = getBaseAddressForRVVIndexed(
-      ST.getXLen(), FirstLegalAddr, LastLegalAddr, InstrDesc, MainPartAddr);
+      ST.getXLen(), FirstLegalAddr, LastLegalAddr, InstrDesc, MainPartAddr,
+      // NOTE: It's not clear how to handle cases when the index range is too
+      // small to reach into VL unique elements when the scheme has a large
+      // stride.
+      /*IndexShiftHeadroom=*/TgtCtx.disallowIntersectingMemoryAccesses(Opcode)
+          ? APInt(XLen, AddrInfo.MinStride * (VL - 1))
+          : APInt::getZero(XLen));
 
   LLVM_DEBUG(dbgs().indent(2)
              << Twine("Generated BaseAddress 0x")
@@ -1015,6 +1052,12 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVIndexed(
   assert(IndexMaxValue.uge(IndexMinValue));
   auto MaxN = (IndexMaxValue - IndexMinValue).udiv(AddrInfo.MinStride);
 
+  std::vector<uint64_t> StridesTakenForElements = unwrapOrFatal(
+      TgtCtx.disallowIntersectingMemoryAccesses(Opcode)
+          ? RandEngine::genNUniqInInterval<uint64_t>(0, MaxN.getZExtValue(), VL)
+          : RandEngine::genNInRangeInclusive<uint64_t>(0, MaxN.getZExtValue(),
+                                                       VL));
+
   AddressPart MainPart{AddrReg.getReg(), BaseAddr};
 
   AddressParts ValueToReg = {MainPart};
@@ -1030,10 +1073,8 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVIndexed(
     auto NElts = std::min(VL, NIdxsPerVReg);
     auto Offsets = APInt::getZero(VLEN);
     for (size_t ElemIdx = 0; ElemIdx < NElts; ++ElemIdx) {
-      // TODO: for unordered stores, generating indices like this is not
-      // correct, since store order for overlapping regions is not defined
-      // FIXME: What about alignment?
-      auto N = RandEngine::genInRangeInclusive(MaxN);
+      auto N = StridesTakenForElements.back();
+      StridesTakenForElements.pop_back();
       auto IndexValue = IndexMinValue + AddrInfo.MinStride * N;
 
       assert(IndexValue.ule(IndexMaxValue));
@@ -5759,8 +5800,9 @@ matchRVVOpcodesWithDisallowedIntersectingAccesses(const OpcodeHistogram &OpHist,
   DenseSet<unsigned> MatchedOpcodes;
   for (auto Opcode : make_filter_range(
            make_first_range(OpHist.topOpcodes()), [](unsigned Opc) {
-             // TODO: Support indexed unordered stores too.
-             return isRVVStridedStore(Opc) || isRVVStridedSegStore(Opc);
+             return isRVVStridedStore(Opc) || isRVVStridedSegStore(Opc) ||
+                    isRVVIndexedUnorderedLoadStore(Opc) ||
+                    isRVVIndexedUnorderedSegLoadStore(Opc);
            })) {
     if (OpcRegex.match(MCII.getName(Opcode)))
       MatchedOpcodes.insert(Opcode);
