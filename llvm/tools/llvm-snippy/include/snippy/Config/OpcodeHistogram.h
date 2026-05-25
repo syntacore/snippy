@@ -15,6 +15,7 @@
 #include "snippy/Support/YAMLUtils.h"
 
 #include "llvm/MC/MCInstrDesc.h"
+#include "llvm/Support/Error.h"
 
 #include <algorithm>
 #include <cmath>
@@ -391,6 +392,25 @@ struct OpcodeHistogramNormalization final {
   // Returns non empty error string if something went wrong
   std::string insertHistogramNode(snippy::OpcodeHistogram &Hist, StringRef Name,
                                   double Weight);
+
+private:
+  static Expected<double> parseWeight(StringRef WeightStr) {
+    auto Weight = 0.0;
+    auto ParseFailure = WeightStr.getAsDouble(Weight, true);
+    if (ParseFailure) {
+      return makeFailure(
+          snippy::Errc::InvalidArgument,
+          formatv("'{}' can't be converted to double", WeightStr));
+    }
+    auto IncorrectWeightValue =
+        (std::isnan(Weight) || std::isinf(Weight) || Weight < 0.0);
+    if (IncorrectWeightValue) {
+      return makeFailure(
+          snippy::Errc::InvalidArgument,
+          formatv("'{}' should be a positive double value", WeightStr));
+    }
+    return Weight;
+  }
 };
 
 snippy::OpcodeHistogramCodedEntry
