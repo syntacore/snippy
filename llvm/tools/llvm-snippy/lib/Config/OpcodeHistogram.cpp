@@ -90,21 +90,22 @@ OpcodeHistogram OpcodeHistogramNormalization::denormalize(yaml::IO &IO) {
     return Result;
   }
   for (auto &&[NameInfo, WeightStr] : NameWeightSeq) {
-    double Weight = 0.0;
-    if (StringRef(WeightStr).getAsDouble(Weight)) {
-      IO.setError("Incorrect histogram: Weight must be a floating point value");
+    auto Weight = parseWeight(WeightStr);
+    if (!Weight) {
+      IO.setError(NameInfo.Val + " is given with incorrect weight: " +
+                  llvm::toString(Weight.takeError()));
       break;
     }
 
     auto Name = NameInfo.Val;
     if (NameInfo.Kind == yaml::NodeKind::Map) {
-      if (auto ErrStr = insertHistogramNode(Result, Name, Weight);
+      if (auto ErrStr = insertHistogramNode(Result, Name, Weight.get());
           !ErrStr.empty()) {
         IO.setError(ErrStr);
         return {};
       }
     } else if (NameInfo.Kind == yaml::NodeKind::Scalar) {
-      auto DecodeEntry = decodeInstrRegex(IO, NameInfo.Val, Weight);
+      auto DecodeEntry = decodeInstrRegex(IO, NameInfo.Val, Weight.get());
       if (!DecodeEntry) {
         IO.setError(llvm::toString(DecodeEntry.takeError()));
         return {};

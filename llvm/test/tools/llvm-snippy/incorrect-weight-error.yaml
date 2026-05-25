@@ -1,0 +1,45 @@
+# COM: This test checks that an error occurs if the options are incompatible
+
+# RUN: sed -e s/INCORRECT_WEIGHT_VALUE/-1.0/ %s > %t.1.yaml
+# RUN: not llvm-snippy %t.1.yaml --model-plugin=None -mtriple=riscv64 \
+# RUN: |& FileCheck %t.1.yaml
+
+# RUN: sed -e s/INCORRECT_WEIGHT_VALUE/-7.215/ %s > %t.2.yaml
+# RUN: not llvm-snippy %t.2.yaml --model-plugin=None -mtriple=riscv64 \
+# RUN: |& FileCheck %t.2.yaml
+
+# RUN: sed -e s/INCORRECT_WEIGHT_VALUE/NaN/ %s > %t.3.yaml
+# RUN: not llvm-snippy %t.3.yaml --model-plugin=None -mtriple=riscv64 \
+# RUN: |& FileCheck %t.3.yaml
+
+# RUN: sed -e s/INCORRECT_WEIGHT_VALUE/-NaN/ %s > %t.4.yaml
+# RUN: not llvm-snippy %t.4.yaml --model-plugin=None -mtriple=riscv64 \
+# RUN: |& FileCheck %t.4.yaml
+
+# RUN: sed -e s/INCORRECT_WEIGHT_VALUE/inf/ %s > %t.5.yaml
+# RUN: not llvm-snippy %t.5.yaml --model-plugin=None -mtriple=riscv64 \
+# RUN: |& FileCheck %t.5.yaml
+
+# RUN: sed -e s/INCORRECT_WEIGHT_VALUE/-inf/ %s > %t.6.yaml
+# RUN: not llvm-snippy %t.6.yaml --model-plugin=None -mtriple=riscv64 \
+# RUN: |& FileCheck %t.6.yaml
+
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x400000
+    SIZE:      0x100000
+    LMA:       0x400000
+    ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, INCORRECT_WEIGHT_VALUE]
+    - [SUB, 1.0]
+    - [BEQ, 1.0]
+
+# CHECK: error: ADDI is given with incorrect weight: 'INCORRECT_WEIGHT_VALUE' should be a positive double value
