@@ -711,11 +711,11 @@ AddressInfo MemoryAccessRange::randomAddress(const AddressGenInfo &Params) {
   }
   assert(Offset <= MaxOffset);
 
-  auto MinOffAligned = alignDown(Offset, LCStride);
+  auto MinOffAligned = alignDown(Offset, RequiredStride);
 
   AddressInfo AI;
   AI.Address = Start + Offset;
-  AI.MaxOffset = alignDown(Size - Offset - AccessSize, LCStride);
+  AI.MaxOffset = alignDown(Size - Offset - AccessSize, RequiredStride);
   AI.MinOffset = -static_cast<int long long>(MinOffAligned);
   AI.MinStride = RequiredStride;
   AI.AccessSize = AccessSize;
