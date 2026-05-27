@@ -26,8 +26,11 @@ namespace snippy {
 
 extern cl::OptionCategory Options;
 
-snippy::opt<bool> NoRelax("no-branch-relax", cl::cat(Options),
-                          cl::desc("don't relax too far branches"));
+static snippy::opt<bool> NoRelax("no-branch-relax", cl::cat(Options),
+                                 cl::desc("don't relax too far branches"));
+static snippy::opt<unsigned> MaxRelaxPassCount(
+    "max-branch-relax-passes", cl::cat(Options), cl::Hidden, cl::init(100),
+    cl::desc("maximum number of branch relaxation pass iterations"));
 
 namespace {
 
@@ -40,6 +43,8 @@ public:
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
   bool runOnMachineBasicBlock(MachineBasicBlock &MBB);
+
+  bool runOnce(MachineFunction &MF);
 
   bool runOnMachineFunction(MachineFunction &MF) override;
 
@@ -175,12 +180,33 @@ bool BranchRelaxator::runOnMachineBasicBlock(MachineBasicBlock &MBB) {
   return tryRelaxBranch(FirstTerm, *R);
 }
 
-bool BranchRelaxator::runOnMachineFunction(MachineFunction &MF) {
+bool BranchRelaxator::runOnce(MachineFunction &MF) {
   bool Changed = false;
   // Hope changes in one MBB don't affect any other
   for (auto &MBB : MF)
     Changed |= runOnMachineBasicBlock(MBB);
 
+  return Changed;
+}
+
+bool BranchRelaxator::runOnMachineFunction(MachineFunction &MF) {
+  bool Changed = false;
+  const unsigned MaxRelaxPasses = MaxRelaxPassCount;
+  unsigned I = 0;
+  for (; I < MaxRelaxPasses; ++I) {
+    // Changes may increase code size and branch distances, therefore keep
+    // relaxing until code is stable.
+    if (runOnce(MF))
+      Changed = true;
+    else
+      break;
+  }
+  if (I >= MaxRelaxPasses)
+    snippy::fatal(
+        PASS_DESC,
+        llvm::formatv("branch distances unstable after {} relaxation passes. "
+                      "You can increase iteration limit using '{}' option",
+                      MaxRelaxPasses, MaxRelaxPassCount.ArgStr));
   return Changed;
 }
 
