@@ -1123,13 +1123,16 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForInstrWithImmOffset(
   assert((Preselected.size() > AddrRegIdx + 1) && "Expected offset operand");
   const auto &AddrImm = Preselected[AddrRegIdx + 1];
   assert(AddrImm.isImm() && "Offset operand must be imm");
-  auto AddrValue =
-      AddrInfo.Address - (AddrImm.getImm().getMin() * (!MainPart.has_value()));
+  unsigned AddrBits = ST.getXLen();
 
+  int64_t Offset = AddrImm.getImm().getMin() * (!MainPart.has_value());
+
+  llvm::APInt AddrValue =
+      AddrInfo.Address - llvm::APInt(AddrBits, Offset, /*isSigned*/ true);
   // If we've chosen X0 as address register, address is completely defined by
   // the offset (imm).
   assert(AddrReg.getReg() != RISCV::X0 || AddrValue == 0);
-  auto Part = AddressPart{AddrReg.getReg(), APInt(ST.getXLen(), AddrValue)};
+  auto Part = AddressPart{AddrReg.getReg(), AddrValue};
   return std::make_pair<AddressParts, MemAddresses>(
       {std::move(Part)}, {uintToTargetXLen(Is64Bit, AddrInfo.Address)});
 }
