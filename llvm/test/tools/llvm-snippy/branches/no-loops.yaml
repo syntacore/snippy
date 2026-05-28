@@ -22,6 +22,7 @@ histogram:
     - [BNE, 1.0]
     - [C_BEQZ, 1.0]
     - [C_BNEZ, 1.0]
+    - [C_JR, 1.0]
     - [AND, 8.0]
 
 branches:

@@ -8,6 +8,7 @@
 
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/ConfigIOContext.h"
+#include "snippy/GeneratorUtils/LLVMState.h"
 
 // FIXME: remove this dependency (an interface should be introduced)
 #include "snippy/Config/PluginWrapper.h"
@@ -78,6 +79,9 @@ OpcodeHistogram OpcodeHistogramNormalization::denormalize(yaml::IO &IO) {
     return {};
 
   auto NameWeightSeq = OpcHistSeq.getEntryWeightSequence();
+  auto *ConfigIOCtx = static_cast<ConfigIOContext *>(IO.getContext());
+  assert(ConfigIOCtx);
+  auto &Tgt = ConfigIOCtx->State.getSnippyTarget();
   OpcodeHistogram Result;
   if (!DefineMainHist.empty() && DefineMainHist != "histogram") {
     if (auto ErrStr = insertHistogramNode(Result, DefineMainHist,
@@ -111,11 +115,11 @@ OpcodeHistogram OpcodeHistogramNormalization::denormalize(yaml::IO &IO) {
         return {};
       }
       for (auto &&[Opc, WeightRes] : DecodeEntry->Decoded)
-        Result.insertTopOpcode(Opc, WeightRes);
+        Result.insertTopOpcode(Tgt.getInternalOpcode(Opc), WeightRes);
     }
   }
-  // Recalculate opcode probabilities for the fully constructed histogram
-  Result.reinitProbabilityVisitor();
+  // Recalculate opcodes state for the fully constructed histogram
+  Result.reinitOpcodesState();
   return Result;
 }
 

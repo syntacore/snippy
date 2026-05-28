@@ -2182,6 +2182,11 @@ of whether snippy will generate a loop when generating a branch.
    If you specify PC distance restrictions, and a nested loop is
    generated, you will get an error.
 
+.. note::
+
+   **RISC-V only:** C_JR is generated as an indirect branch instruction.
+   **RISC-V only:** PseudoC_JRB is currently deprecated. Use C_JR instead.
+
 
 .. _`_restricting_compressed_instructions_for_loop_counters`:
 
