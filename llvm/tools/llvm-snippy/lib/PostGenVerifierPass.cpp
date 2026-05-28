@@ -121,7 +121,27 @@ void PostGenVerifier::collectFreq(const MachineFunction &MF,
 }
 
 template <typename ValueTy>
-static inline ValueTy getValueOrZero(const std::map<unsigned, ValueTy> Map,
+static inline void
+replaceAliasesWithOriginalOpcodes(const SnippyTarget &SnippyTgt,
+                                  std::map<unsigned, ValueTy> &OpcWeightMap) {
+  auto IsAlias = [&](unsigned Opc) {
+    return SnippyTgt.getOriginalOpcode(Opc) != Opc;
+  };
+  // Here we remove internal opcodes and replace them with the original ones
+  // specified in the config
+  for (auto It = OpcWeightMap.begin(); It != OpcWeightMap.end();) {
+    auto [Opcode, Weight] = *It;
+    if (IsAlias(Opcode)) {
+      OpcWeightMap.emplace(SnippyTgt.getOriginalOpcode(Opcode), Weight);
+      It = OpcWeightMap.erase(It);
+    } else {
+      ++It;
+    }
+  }
+}
+
+template <typename ValueTy>
+static inline ValueTy getValueOrZero(const std::map<unsigned, ValueTy> &Map,
                                      unsigned Opcode) {
   return Map.count(Opcode) ? Map.at(Opcode) : 0;
 }
@@ -130,8 +150,11 @@ void PostGenVerifier::printData(const MachineFunction &MF) const {
   GeneratorContextWrapper &CtxWrapper = getAnalysis<GeneratorContextWrapper>();
   const GeneratorContext &SGCtx = CtxWrapper.getContext();
   const OpcodeCache &OpCache = SGCtx.getProgramContext().getOpcodeCache();
+  auto &State = SGCtx.getProgramContext().getLLVMState();
+  auto &SnippyTgt = State.getSnippyTarget();
 
   auto ExpectedDist = SGCtx.getConfig().getOpcodeProbabilities();
+  replaceAliasesWithOriginalOpcodes(SnippyTgt, ExpectedDist);
 
   auto &Output = outs();
   constexpr unsigned OpcodeWidth = 12;
