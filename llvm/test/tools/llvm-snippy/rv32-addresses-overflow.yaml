@@ -1,0 +1,24 @@
+# RUN: llvm-snippy %s
+
+sections:
+- name:      for_x0
+  VMA:       0x0
+  SIZE:      0x10
+  LMA:       0x0
+  ACCESS:    rw
+- name:      text
+  VMA:       0x80000000
+  SIZE:      0x10000
+  LMA:       0x80000000
+  ACCESS:    rx
+
+options:
+    mtriple: "riscv32"
+    num-instrs: 1000
+    redefine-ra: RA
+    reserved-regs-list: ["X(1|[3-9]|[12][0-9]|3[01])"]
+histogram:
+      - [SB, 1.0]
+      - [SH, 1.0]
+      - [SW, 1.0]
+
