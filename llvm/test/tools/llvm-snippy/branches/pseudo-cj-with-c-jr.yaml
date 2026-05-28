@@ -1,0 +1,19 @@
+# RUN: llvm-snippy -model-plugin=None %s
+
+options:
+  mtriple: riscv64
+  mattr: "+c"
+  num-instrs: 1000
+  verify-mi: on
+  verify-gen-histogram: on
+  dump-mf: on
+
+include:
+  - ../Inputs/sections.yaml 
+
+histogram:
+    - [ADD, 1.0]
+    - [C_JR, 1.0]
+    - [PseudoC_JRB, 1.0]
+
+# CHECK-COUNT-100: C_JR

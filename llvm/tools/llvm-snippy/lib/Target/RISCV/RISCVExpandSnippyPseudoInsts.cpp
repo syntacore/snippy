@@ -159,8 +159,9 @@ bool RISCVExpandSnippyPseudo::expandC_JRB(MachineBasicBlock &MBB,
       .addDef(DestReg)
       .addReg(DestReg)
       .addImm(snippy::RandEngine::genBool());
-  getMainInstBuilder(Tgt, MBB, MBBI, State.getCtx(), TII->get(RISCV::C_JR),
-                     DestReg);
+  getMainInstBuilder(Tgt, IGC.MBB, IGC.Ins, State.getCtx(),
+                     TII->get(RISCV::C_JR))
+      .addReg(DestReg);
   MI.eraseFromParent();
   return true;
 }
