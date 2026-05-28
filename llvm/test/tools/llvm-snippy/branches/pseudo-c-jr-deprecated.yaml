@@ -1,0 +1,18 @@
+# RUN: llvm-snippy -model-plugin=None %s
+
+options:
+  mtriple: riscv64
+  mattr: "+c"
+  num-instrs: 50
+  verify-mi: on
+  verify-gen-histogram: on
+  dump-mf: on
+
+include:
+  - ../Inputs/sections.yaml 
+
+histogram:
+    - [PseudoC_JRB, 1.0]
+
+# CHECK-COUNT-100: C_JR
+# CHECK: PseudoC_JRB is deprecated: Use C_JR instead

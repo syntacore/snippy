@@ -704,6 +704,14 @@ public:
     reportUnimplementedError();
   }
 
+  unsigned getInternalOpcode(unsigned Opc) const override {
+    reportUnimplementedError();
+  }
+
+  unsigned getOriginalOpcode(unsigned Opc) const override {
+    reportUnimplementedError();
+  }
+
   size_t getAccessSize(unsigned Opcode) const override {
     reportUnimplementedError();
   }

@@ -693,6 +693,16 @@ public:
   virtual unsigned
   getImmOffsetAlignmentForMemAccessInst(const MCInstrDesc &InstrDesc) const = 0;
 
+  // Translates opcodes from user-provided in histogram to ones used by snippy
+  // internally. Returns an alias opcode if the given opcode should be treated
+  // as another. Otherwise, returns the original opcode
+  virtual unsigned getInternalOpcode(unsigned Opc) const = 0;
+
+  // Translates internal opcodes used by snippy back to the user-provided
+  // opcodes from histogram. If the internal opcode corresponds to an alias,
+  // returns the original user opcode. Otherwise, returns the same opcode.
+  virtual unsigned getOriginalOpcode(unsigned InternalOpc) const = 0;
+
   virtual size_t getAccessSize(unsigned Opcode) const = 0;
 
   virtual bool isCall(unsigned Opcode) const = 0;
