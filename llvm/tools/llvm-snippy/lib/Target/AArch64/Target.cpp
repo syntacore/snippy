@@ -1179,6 +1179,10 @@ public:
     SNIPPY_UNIMPLEMENTED();
   }
 
+  unsigned getInternalOpcode(unsigned Opc) const override { return Opc; }
+
+  unsigned getOriginalOpcode(unsigned Opc) const override { return Opc; }
+
   size_t getAccessSize(unsigned Opcode) const override {
     SNIPPY_UNIMPLEMENTED();
   }

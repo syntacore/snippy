@@ -1,5 +1,5 @@
 # RUN: llvm-snippy -mtriple=riscv64 -mattr=+c \
-# RUN:      -num-instrs=500 -model-plugin=None %s
+# RUN:      -num-instrs=500 -verify-gen-histogram -model-plugin=None %s
 
 sections:
     - name:      text

@@ -1153,10 +1153,6 @@ inline bool checkPairedLrScInstrs(const OpcodeHistogram &H) {
   return hasScInstr(H) && hasLrInstr(H);
 }
 
-inline bool checkSupportedJumps(const OpcodeHistogram &H) {
-  return H.isProbabilityZero(RISCV::C_JR);
-}
-
 static DisableMisalignedAccessMode getMisalignedAccessMode() {
   if (!RISCVDisableMisaligned.isSpecified())
     return DisableMisalignedAccessMode::None;
@@ -1564,9 +1560,6 @@ public:
   void
   checkInstrTargetDependency(const OpcodeHistogram &H, const OpcodeCache &OpCC,
                              const ProgramConfig &ProgramCfg) const override {
-    if (!checkSupportedJumps(H))
-      snippy::fatal("C_JR currently is not supported. Use PseudoC_JRB instead");
-
     auto HasCalls = H.hasCallInstrs(OpCC, *this);
     for (auto &&Opcode : H.uniqueOpcodes()) {
       if (HasCalls && Opcode == RISCV::CM_POP)
@@ -4886,6 +4879,27 @@ public:
           1 << ZeroBits);
     }
     return StridedImmediate(0, 0, 0);
+  }
+
+  unsigned getInternalOpcode(unsigned Opc) const override {
+    if (Opc == RISCV::PseudoC_JRB)
+      snippy::notice("PseudoC_JRB is deprecated", "Use C_JR instead");
+
+    switch (Opc) {
+    case RISCV::C_JR:
+      return RISCV::PseudoC_JRB;
+    default:
+      return Opc;
+    }
+  }
+
+  unsigned getOriginalOpcode(unsigned InternalOpc) const override {
+    switch (InternalOpc) {
+    case RISCV::PseudoC_JRB:
+      return RISCV::C_JR;
+    default:
+      return InternalOpc;
+    }
   }
 
   size_t getAccessSize(unsigned Opcode) const override {
