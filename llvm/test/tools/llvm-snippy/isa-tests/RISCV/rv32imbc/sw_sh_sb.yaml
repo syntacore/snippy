@@ -1,5 +1,3 @@
-# XFAIL: *
-
 # RUN: llvm-snippy --model-plugin=None %s
 
 sections:
