@@ -712,10 +712,6 @@ public:
     reportUnimplementedError();
   }
 
-  size_t getAccessSize(unsigned Opcode) const override {
-    reportUnimplementedError();
-  }
-
   bool isCall(unsigned Opcode) const override { reportUnimplementedError(); }
   bool isSPRelative(unsigned Opcode) const override {
     reportUnimplementedError();
