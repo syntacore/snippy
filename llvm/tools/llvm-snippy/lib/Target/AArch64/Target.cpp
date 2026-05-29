@@ -1183,10 +1183,6 @@ public:
 
   unsigned getOriginalOpcode(unsigned Opc) const override { return Opc; }
 
-  size_t getAccessSize(unsigned Opcode) const override {
-    SNIPPY_UNIMPLEMENTED();
-  }
-
   bool isCall(unsigned Opcode) const override { return snippy::isCall(Opcode); }
   bool isSPRelative(unsigned Opcode) const override {
     return snippy::isSPRelative(Opcode);

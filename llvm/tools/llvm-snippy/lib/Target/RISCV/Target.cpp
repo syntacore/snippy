@@ -4907,16 +4907,6 @@ public:
     }
   }
 
-  size_t getAccessSize(unsigned Opcode) const override {
-    assert(isSupportedLoadStore(Opcode) || isAtomicAMO(Opcode));
-    // FIXME: To support RVV we must pass SEW and VLENB to
-    // getDataElementWidth. But SEW and VLENB depend on the position, so
-    // don't support it right now.
-    assert(!isRVVExt(Opcode) &&
-           "RVV opcodes are not supported in getAccessSize function");
-    return getDataElementWidth(Opcode);
-  }
-
   bool isCall(unsigned Opcode) const override { return snippy::isCall(Opcode); }
   bool isSPRelative(unsigned Opcode) const override {
     return snippy::isSPRelative(Opcode);
