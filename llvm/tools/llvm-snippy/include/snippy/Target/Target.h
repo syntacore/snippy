@@ -703,8 +703,6 @@ public:
   // returns the original user opcode. Otherwise, returns the same opcode.
   virtual unsigned getOriginalOpcode(unsigned InternalOpc) const = 0;
 
-  virtual size_t getAccessSize(unsigned Opcode) const = 0;
-
   virtual bool isCall(unsigned Opcode) const = 0;
   virtual bool isSPRelative(unsigned Opcode) const = 0;
 
