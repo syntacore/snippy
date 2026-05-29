@@ -3661,13 +3661,18 @@ public:
   MachineInstr *generateNop(InstructionGenerationContext &IGC) const override {
     auto &State = IGC.ProgCtx.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
-    auto MIB =
-        getSupportInstBuilder(*this, IGC.MBB, IGC.Ins,
-                              IGC.MBB.getParent()->getFunction().getContext(),
-                              InstrInfo.get(RISCV::ADDI), RISCV::X0)
-            .addReg(RISCV::X0)
-            .addImm(0);
-    return MIB;
+    if (IGC.getSubtarget<RISCVSubtarget>().hasStdExtC())
+      return getSupportInstBuilder(
+          *this, IGC.MBB, IGC.Ins,
+          IGC.MBB.getParent()->getFunction().getContext(),
+          InstrInfo.get(RISCV::C_NOP));
+
+    return getSupportInstBuilder(
+               *this, IGC.MBB, IGC.Ins,
+               IGC.MBB.getParent()->getFunction().getContext(),
+               InstrInfo.get(RISCV::ADDI), RISCV::X0)
+        .addReg(RISCV::X0)
+        .addImm(0);
   }
 
   unsigned getTransformSequenceLength(InstructionGenerationContext &IGC,
