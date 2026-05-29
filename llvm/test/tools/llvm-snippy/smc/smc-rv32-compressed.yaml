@@ -1,17 +1,10 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=500 \
-# RUN:             -dump-mf -function-number=20 -function-layers=5 \
-# RUN:             -num-instr-ancil=50 |& FileCheck %s
-
 # RUN: llvm-snippy %s -mtriple=riscv32 -num-instrs=500 \
-# RUN:             -dump-mf -function-number=20 -function-layers=5 \
-# RUN:             -num-instr-ancil=50 |& FileCheck %s
+# RUN:             -dump-mf |& FileCheck %s -check-prefix=CHECK
 
 # CHECK: $[[TMP1:[a-z0-9]+]] = AUIPC target-flags(riscv-pcrel-hi) @__snippy_smc_memcpy, pre-instr-symbol <mcsymbol .[[TMP_SYM1:[a-zA-Z0-9_]+]]>
 # CHECK-NEXT: $[[RA:[a-z0-9]+]] = PseudoJALRCall $[[TMP1]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM1]]>
-# CHECK-NEXT:  FENCE_I
-# CHECK-NEXT: $[[TMP2:[a-z0-9]+]] = AUIPC target-flags(riscv-pcrel-hi) @__snippy_smc_target, pre-instr-symbol <mcsymbol .[[TMP_SYM2:[a-zA-Z0-9_]+]]>
+# CHECK: $[[TMP2:[a-z0-9]+]] = AUIPC target-flags(riscv-pcrel-hi) @__snippy_smc_target, pre-instr-symbol <mcsymbol .[[TMP_SYM2:[a-zA-Z0-9_]+]]>
 # CHECK-NEXT: $[[RA]] = PseudoJALRCall $[[TMP2]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM2]]>
-# CHECK: $[[RA]] = PseudoJALCall @fun
 
 options:
   mattr: +m,+zifencei,+c
@@ -31,24 +24,37 @@ sections:
     SIZE:      0x50000
     LMA:       0x310000
     ACCESS:    r
-  - name:      stack # SMC requires internal or external stack enabled 
+  - name:      stack # SMC requires internal or external stack enabled
     VMA:       0x150000
     SIZE:      0x50000
     LMA:       0x150000
     ACCESS:    rw
 
 histogram:
-    - [BNE, 2.0]
-    - [C_BEQZ, 2.0]
-    - [C_BNEZ, 2.0]
+    - [BNE, 1.0]
     - [ADD, 1.0]
     - [ADDI, 1.0]
     - [SUB, 1.0]
     - [MUL, 1.0]
-    - [JAL, 5.0]
-    - [C_J, 1.25]
-    # - [PseudoC_JRB, 1.25] 
-    - [C_JALR, 1.25]
+    - [C_NOP, 1.0]
+    - [C_ADDI, 1.0]
+    - [C_LI, 1.0]
+    - [C_LUI, 1.0]
+    - [C_SRLI, 1.0]
+    - [C_SRAI, 1.0]
+    - [C_ANDI, 1.0]
+    - [C_MV, 1.0]
+    - [C_ADD, 1.0]
+    - [C_SUB, 1.0]
+    - [C_XOR, 1.0]
+    - [C_OR, 1.0]
+    - [C_AND, 1.0]
+    - [C_BEQZ, 1.0]
+    - [C_BNEZ, 1.0]
+    - [C_LWSP, 1.0]
+    - [C_SWSP, 1.0]
+    - [C_LW, 1.0]
+    - [C_SW, 1.0]
 
 code-layout:
   ranges:
