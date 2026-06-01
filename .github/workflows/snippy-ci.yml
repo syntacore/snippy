@@ -29,7 +29,7 @@ jobs:
       INSTALL_DIR: "release/install"
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -57,7 +57,7 @@ jobs:
           echo "timestamp=$(TZ=UTC date "+%Y-%m-%d-T%H:%M:%S")" >> $GITHUB_OUTPUT
           echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> $GITHUB_ENV
       - name: Set up ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .ccache
           key: ccache-${{ matrix.name }}-${{ github.job }}-${{ steps.prepare_ccache.outputs.timestamp }}
@@ -88,7 +88,7 @@ jobs:
 
           tar --xz -C "$INSTALL_DIR" -cvf "$release_tarball_filename" .
       - name: Upload binary install artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.install_release.outputs.release_basename }}
           path: ${{ steps.install_release.outputs.release_tarball_filename }}
@@ -96,19 +96,19 @@ jobs:
       # Upload docs only on ubuntu
       - name: Upload html docs artifacts
         if: matrix.name == 'ubuntu'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: snippy-doc-html
           path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/html
       - name: Upload latex docs artifacts
         if: matrix.name == 'ubuntu'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: snippy-doc-latex
           path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/latex
       - name: Upload github pages artifact
         if: (matrix.name == 'ubuntu') && github.event_name == 'push' && github.ref_name == 'main' && (github.repository_owner == 'syntacore' || github.repository_owner == 'LLVM-Snippy')
-        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/html
       - name: Show ccache statistics
@@ -131,4 +131,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
