@@ -673,6 +673,8 @@ inline size_t getImmSizeInBits(unsigned Opcode) {
   case RISCV::C_BNEZ:
   case RISCV::C_ADDI4SPN:
     return 8;
+  case RISCV::CSRRWI:
+    return 5;
   default:
     llvm_unreachable(llvm::formatv("Invalid opcode: {0}. There is no immediate "
                                    "operand for such an instruction",
@@ -1775,6 +1777,7 @@ inline bool isCall(unsigned Opcode) {
   case RISCV::C_JALR:
   case RISCV::JAL:
   case RISCV::JALR:
+  case RISCV::CM_JALT:
     return true;
   }
 }
