@@ -3302,6 +3302,7 @@ public:
     switch (*CallOpcode) {
     case RISCV::C_JAL:
     case RISCV::C_JALR:
+    case RISCV::CM_JALT:
       return {RISCV::X1};
     case RISCV::JAL:
     case RISCV::JALR:
@@ -3516,6 +3517,70 @@ public:
         .addGlobalAddress(&Target, 0, 0);
   }
 
+  void prepareJmpTable(InstructionGenerationContext &IGC, size_t Index,
+                       const GlobalValue &Target) const {
+    assert(IGC.getSubtarget<RISCVSubtarget>().hasStdExtZcmt());
+    assert(Index <= 255);
+    auto &ProgCtx = IGC.ProgCtx;
+    auto RP = IGC.pushRegPool();
+    auto &State = ProgCtx.getLLVMState();
+    const auto &RI = State.getRegInfo();
+    const auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
+    auto TmpReg = getNonZeroReg("tmp register to store address of function to "
+                                "jmp table (zcmt extension)",
+                                RI, RegClass, *RP, IGC.MBB);
+
+    loadSymbolAddress(IGC, TmpReg, &Target);
+    auto &GP = ProgCtx.getOrAddGlobalsPoolFor(
+        IGC.getSnippyModule(), "Failed to get GP for jump table creation");
+    // We want to have some constant with table size
+    size_t AddrLen = IGC.getSubtarget<RISCVSubtarget>().getXLen();
+    size_t TableSize = AddrLen * 256;
+    APInt PreTable(/* numBits */ TableSize, /* Value */ 0xdeadbeef);
+
+    StringRef TableName = "jvt table";
+    auto *GV = GP.getGV(TableName);
+    if (!GV)
+      GV = GP.createGV(PreTable, /* alignment */ 1 << 6,
+                       GlobalValue::InternalLinkage, TableName,
+                       "Table for zcmt extension", /* IsConstant */ false);
+
+    // TODO: we might want to add random here
+    size_t StartAddr = GP.getGVAddress(GV);
+    size_t PosAddress = StartAddr + AddrLen * Index / RISCV_CHAR_BIT;
+    storeRegToAddr(IGC, PosAddress, TmpReg);
+    writeValueToCSR(IGC, APInt(AddrLen, StartAddr), RISCVSimulatorSysReg::JVT);
+  }
+
+  MachineInstr *generateCM_JALT(InstructionGenerationContext &IGC,
+                                const Function &Target,
+                                MDNode *MetadataMark) const {
+    assert(IGC.getSubtarget<RISCVSubtarget>().hasStdExtZcmt());
+    const auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
+    const auto &OpcodeCache = ProgCtx.getOpcodeCache();
+    auto Opcode = RISCV::CM_JALT;
+    const MCInstrDesc *MIDesc = OpcodeCache.desc(Opcode);
+    assert(MIDesc != nullptr);
+
+    auto OperandType = MIDesc->operands()[0].OperandType;
+    StridedImmediate ImmLimits(
+        /* MinIn */ 0,
+        /* MaxIn */ APInt::getMaxValue(/* numBits */ 32).getZExtValue(),
+        /* StrideIn */ 1);
+    auto Index =
+        genImmOperandForOpcode(Opcode, /* ImmediateHistogramSequence */ nullptr,
+                               OperandType, ImmLimits, State);
+    prepareJmpTable(IGC, Index, Target);
+
+    auto &Ctx = State.getCtx();
+    const auto &InstrInfo = IGC.ProgCtx.getLLVMState().getInstrInfo();
+
+    return getInstBuilder(MetadataMark, *this, IGC.MBB, IGC.Ins, Ctx,
+                          InstrInfo.get(Opcode))
+        .addImm(Index);
+  }
+
   MachineInstr *generateCJALR(InstructionGenerationContext &IGC,
                               const Function &Target,
                               MDNode *MetadataMark) const {
@@ -3632,6 +3697,9 @@ public:
     case RISCV::C_JALR:
       assert(RA == RISCV::X1);
       return generateCJALR(IGC, Target, MM);
+    case RISCV::CM_JALT:
+      assert(RA == RISCV::X1);
+      return generateCM_JALT(IGC, Target, MM);
     default:
       snippy::fatal("Unsupported call instruction");
     }
@@ -3848,7 +3916,7 @@ public:
     case OPERAND_UIMM8_LSB00:
       return genImmUINTWithNZeroLSBs<8, 2>(IH, StridedImm);
     case OPERAND_UIMM8_GE32:
-      return genImmInInterval<32, 1 << 8>(IH, StridedImm);
+      return genImmInInterval<32, (1 << 8) - 1>(IH, StridedImm);
     case OPERAND_UIMM8_LSB000:
       return genImmUINTWithNZeroLSBs<8, 3>(IH, StridedImm);
     case OPERAND_UIMM9_LSB000:
@@ -4177,6 +4245,24 @@ public:
 
     using namespace RISCVSimulatorSysRegs;
     using namespace RISCVFPRndMode;
+
+    auto ImmBitSize = getImmSizeInBits(RISCV::CSRRWI);
+
+    if (Value.ugt((1 << ImmBitSize) - 1)) {
+      auto RP = IGC.pushRegPool();
+      const auto &RI = State.getRegInfo();
+      const auto &RegClass = RI.getRegClass(RISCV::GPRRegClassID);
+      auto TmpReg = getNonZeroReg("tmp register to store value for csr", RI,
+                                  RegClass, *RP, IGC.MBB);
+
+      writeValueToReg(IGC, Value, TmpReg);
+      getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::CSRRW),
+                            RISCV::X0)
+          .addImm(
+              lookupSysReg(static_cast<RISCVSimulatorSysReg>(CSR))->Encoding)
+          .addReg(TmpReg);
+      return;
+    }
 
     getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::CSRRWI),
                           RISCV::X0)
