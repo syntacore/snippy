@@ -1,0 +1,22 @@
+# RUN: llvm-snippy %s -mtriple=riscv64 -model-plugin None | FileCheck %s
+# RUN: llvm-snippy %s -mtriple=riscv32 -model-plugin None | FileCheck %s
+
+# CHECK-COUNT-9: CM_JALT
+
+options:
+    mattr: +zcmt
+    num-instrs: 2000
+    dump-mf: true
+    function-layers: 3
+    function-number: 9
+    num-instr-ancil: 10
+
+include:
+  - ../Inputs/sections-with-ro.yaml
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [CM_JALT, 10.0]
+

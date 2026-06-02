@@ -1,0 +1,22 @@
+# RUN: not llvm-snippy %s -mtriple=riscv64 -model-plugin None |& FileCheck %s
+# RUN: not llvm-snippy %s -mtriple=riscv32 -model-plugin None |& FileCheck %s
+
+# CHECK: error: Register X11 specified in --redefine-ra is not suitable for return address redefinition
+
+options:
+    mattr: +zcmt
+    redefine-ra: reg::X11
+    num-instrs: 100
+    function-layers: 3
+    function-number: 9
+    num-instr-ancil: 10
+
+include:
+  - ../Inputs/sections-with-ro.yaml
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [CM_JALT, 10.0]
+
