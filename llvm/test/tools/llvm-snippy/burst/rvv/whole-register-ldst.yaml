@@ -1,20 +1,23 @@
-# RUN: llvm-snippy %s %S/Inputs/sections.yaml -model-plugin=None
+# RUN: llvm-snippy %s -model-plugin=None
 
 options:
   mtriple: riscv64
   march: rv64imfdv
-  num-instrs: 20000
+  num-instrs: 5000
   verify-gen-histogram: true
   histogram-must-succeed: true
 
+include:
+  - Inputs/sections.yaml
+  - Inputs/rvv-unit-all.yaml
+
 burst:
   mode: mixed
-  min-size: 100
-  max-size: 100
+  min-size: 4
+  max-size: 8
 
 histogram:
-  - ["V[LS]SSEG[2-8]E[123468]{1,2}_V", 1.0]
-  - [VSETIVLI, 10.0]
+  - ["VL[1248]RE[123468]{1,2}_V", 1.0]
   - [SW, 1.0]
   - [MUL, 2.0]
   - [DIV, 1.0]

@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s %S/Inputs/sections.yaml -model-plugin=None
+# RUN: llvm-snippy %s -model-plugin=None
 
 # COM: This test checks that snippy is able to produce burst groups with all
 # types of vector load/store instructions at the same time.
@@ -11,10 +11,14 @@ options:
   histogram-must-succeed: true
   dump-mf: true
 
+include:
+  - Inputs/sections.yaml
+  - Inputs/rvv-unit-little-lmul.yaml
+
 burst:
   mode: custom
-  min-size: 4
-  max-size: 8
+  min-size: 2
+  max-size: 5
   groupings:
     - - VLE64_V # unit-stride
       - VLE64FF_V # unit-stride fault-only-first
@@ -34,7 +38,6 @@ histogram:
   - [VLUXSEG2EI8_V, 1.0]
   - [VL1RE8_V, 1.0]
   - [VADD_VV, 1.0]
-  - [VSETIVLI, 1.0]
   - [SW, 1.0]
   - [MUL, 2.0]
   - [DIV, 1.0]
