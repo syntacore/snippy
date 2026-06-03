@@ -22,12 +22,5 @@ void DefaultOpcodeGenerator::generate(SmallVectorImpl<unsigned> &Opcodes) {
   OpcodeHist.generate(Opcodes);
 }
 
-unsigned generateSingleOpcode(OpcodeGeneratorInterface &OpcGen) {
-  SmallVector<unsigned, 1> OpcSeq;
-  OpcGen.generate(OpcSeq);
-  assert(OpcSeq.size() == 1);
-  return OpcSeq.front();
-}
-
 } // namespace snippy
 } // namespace llvm

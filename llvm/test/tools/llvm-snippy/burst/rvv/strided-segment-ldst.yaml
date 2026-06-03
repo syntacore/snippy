@@ -1,0 +1,45 @@
+# RUN: llvm-snippy %s -model-plugin=None
+
+options:
+  mtriple: riscv64
+  march: rv64imfdv
+  num-instrs: 20000
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+
+include:
+  - Inputs/sections.yaml
+  - Inputs/rvv-unit-all.yaml
+
+burst:
+  mode: custom
+  min-size: 4
+  max-size: 8
+  groupings:
+    - - VLSSEG6E32_V
+      - VSSSEG7E16_V
+      - VLSSEG8E64_V
+      - VSSSEG2E32_V
+      - VLSSEG3E16_V
+      - VSSSEG4E64_V
+      - VLSSEG5E8_V
+      - VSSSEG6E8_V
+      - VLSSEG7E16_V
+      - VSSSEG8E32_V
+
+histogram:
+  - [VLSSEG6E32_V, 1.0]
+  - [VSSSEG7E16_V, 1.0]
+  - [VLSSEG8E64_V, 1.0]
+  - [VSSSEG2E32_V, 1.0]
+  - [VLSSEG3E16_V, 1.0]
+  - [VSSSEG4E64_V, 1.0]
+  - [VLSSEG5E8_V, 1.0]
+  - [VSSSEG6E8_V, 1.0]
+  - [VLSSEG7E16_V, 1.0]
+  - [VSSSEG8E32_V, 1.0]
+  - [SW, 1.0]
+  - [MUL, 2.0]
+  - [DIV, 1.0]
+  - [ADD, 1.0]
+  - [ADDI, 1.0]

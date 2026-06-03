@@ -1,0 +1,28 @@
+# RUN: llvm-snippy %s -model-plugin=None
+
+options:
+    mtriple: riscv64
+    mattr: +v
+    num-instrs: 100
+    verify-gen-histogram: true
+    histogram-must-succeed: true
+
+include:
+  - Inputs/sections.yaml
+  - Inputs/rvv-unit-all.yaml
+
+histogram:
+    - [LD, 1.0]
+    - [SD, 1.0]
+    - [ADD, 1.0]
+    - [VFADD_VF, 1.0]
+    - [VFSUB_VF, 1.0]
+
+burst:
+    mode: custom
+    min-size: 4
+    max-size: 16
+    groupings:
+      - [LD, VFADD_VF]
+      - [SD, VFSUB_VF]
+

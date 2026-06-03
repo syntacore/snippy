@@ -1,0 +1,64 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  march: rv64imfdv
+  num-instrs: 1000
+  dump-mf: true
+
+include:
+  - Inputs/sections.yaml
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: 0.2
+  mode-distribution:
+    VM:
+      - [all_ones, 2.0]
+      - [any_legal, 1.0]
+    VL:
+      - [max_encodable, 2.0]
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+      rne: 1.0
+      rdn: 1.0
+      ron: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+        sew_16: 1.0
+        sew_32: 1.0
+      LMUL:
+        m1: 1.0
+        m2: 1.0
+        m4: 1.0
+        m8: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+burst:
+  mode: custom
+  min-size: 10
+  max-size: 10
+  groupings:
+    - [VLE8_V, VADD_VX, VLSEG8E64_V, VL2RE8_V, VS2R_V]
+
+histogram:
+  - [VLE8_V, 1.0]
+  - [VLSE8_V, 1.0]
+  - [VLSEG8E64_V, 1.0]
+  - [VSSE8_V, 1.0]
+  - [VADD_VX, 1.0]
+  - [VLSSEG2E32_V, 1.0]
+  - [VL2RE8_V, 1.0]
+  - [VS2R_V, 1.0]
+  - [SW, 1.0]
+  - [MUL, 2.0]
+  - [DIV, 1.0]
+  - [ADD, 1.0]
+  - [ADDI, 1.0]
+
+# CHECK: warning: (burst-mode) Opcode VLSEG8E64_V will not be generated in the burst group because it is incompatible with RVV configuration selected for this group : Please keep only valid configurations for all opcodes, or change the group so that all opcodes have a valid configuration.

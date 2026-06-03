@@ -1,0 +1,23 @@
+# RUN: llvm-snippy %s -model-plugin=None
+
+options:
+  mtriple: riscv64
+  march: rv64imfdv
+  num-instrs: 10000
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+
+include:
+  - Inputs/sections.yaml
+  - Inputs/rvv-unit-little-lmul.yaml
+
+burst:
+  mode: load-store
+  min-size: 2
+  max-size: 3
+
+histogram:
+  - ["V[LS][OU]XEI[12368]{1,2}_V", 1.0]
+  - [MUL, 2.0]
+  - [ADD, 1.0]
+  - [ADDI, 1.0]

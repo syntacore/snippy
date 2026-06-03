@@ -78,6 +78,8 @@ struct OpcodeHistogramEntry {
   double Weight;
 };
 
+using OpcodeFilterType = std::function<bool(unsigned)>;
+
 // OpcodeHistogram is a tree structure that stores opcodes and complete patterns
 // along with the probabilities with which they can be generated. Opcodes
 // specified directly in the configuration are top-level opcodes. In turn,
@@ -187,10 +189,11 @@ public:
     return probability(Opcode) * getTotalWeight();
   }
 
-  double getTopOpcodesWeight(std::function<bool(unsigned)> Pred =
-                                 [](unsigned Opc) { return true; }) const;
+  double getTopOpcodesWeight(OpcodeFilterType Pred = [](unsigned Opc) {
+    return true;
+  }) const;
 
-  double getOpcodesProbability(std::function<bool(unsigned)> Pred) const {
+  double getOpcodesProbability(OpcodeFilterType Pred) const {
     auto OpcProbs = opcodeProbabilities();
     return std::accumulate(OpcProbs.begin(), OpcProbs.end(), 0.0,
                            [&Pred](double Accumulation, auto &&Hist) -> double {

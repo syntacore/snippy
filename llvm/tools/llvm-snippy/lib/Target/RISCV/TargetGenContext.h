@@ -22,18 +22,21 @@ namespace llvm {
 namespace snippy {
 
 struct RVVModeInfo {
+  unsigned VsetOpcode;
   RVVConfigurationInfo::VLVM VLVM;
   const RVVConfiguration *Config = nullptr;
   const MachineBasicBlock *MBBGuard = nullptr;
 
   RVVModeInfo() = default;
 
-  RVVModeInfo(RVVConfigurationInfo::VLVM RVV_VLVM,
+  RVVModeInfo(unsigned VsetOpcode, RVVConfigurationInfo::VLVM RVV_VLVM,
               const RVVConfiguration &RVVCfg, const MachineBasicBlock &MBB)
-      : VLVM(RVV_VLVM), Config(&RVVCfg), MBBGuard(&MBB) {}
+      : VsetOpcode(VsetOpcode), VLVM(RVV_VLVM), Config(&RVVCfg),
+        MBBGuard(&MBB) {}
 
   bool operator==(const RVVModeInfo &Other) const {
-    return VLVM == Other.VLVM && MBBGuard == Other.MBBGuard &&
+    return VsetOpcode == Other.VsetOpcode && VLVM == Other.VLVM &&
+           MBBGuard == Other.MBBGuard &&
            (Config == Other.Config ||
             (Config != nullptr && Other.Config != nullptr &&
              *Config == *Other.Config));
@@ -41,8 +44,9 @@ struct RVVModeInfo {
 
   bool operator!=(const RVVModeInfo &Other) const { return !(*this == Other); }
 
-  void print(raw_ostream &OS) const {
+  void print(const MCInstrInfo &II, raw_ostream &OS) const {
     OS << "--- RVV Mode Info ---\n";
+    OS << "  - VsetOpcode: " << II.getName(VsetOpcode) << "\n";
     OS << "  - VL: " << VLVM.VL << "\n";
     OS << "  - VM: 0x" << toString(VLVM.VM, /* Radix */ 16, /* Signed */ false)
        << "\n";
@@ -362,9 +366,11 @@ public:
   }
 
   void updateActiveRVVModeConfigAndVL(const MachineBasicBlock *NewMBBGuard,
+                                      unsigned VsetOpcode,
                                       const RVVConfiguration *NewConfig,
                                       unsigned VL) {
     CurrentRVVMode.MBBGuard = NewMBBGuard;
+    CurrentRVVMode.VsetOpcode = VsetOpcode;
     CurrentRVVMode.Config = NewConfig;
     CurrentRVVMode.VLVM.VL = VL;
   }

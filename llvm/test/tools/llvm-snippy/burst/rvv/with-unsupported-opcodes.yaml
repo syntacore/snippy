@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s -seed=1 -model-plugin=None |& FileCheck %s
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
 
 options:
     mtriple: riscv64
@@ -6,32 +6,18 @@ options:
     dump-mf: on
     num-instrs: 100
 
-sections:
-    - name:      1
-      VMA:       0x80000000
-      SIZE:      0x400000
-      LMA:       0x80000000
-      ACCESS:    rx
-    - name:      2
-      VMA:       0x90000000
-      SIZE:      0x400000
-      LMA:       0x90000000
-      ACCESS:    rw
-    - name:      3
-      VMA:       0x70000000
-      SIZE:      0x400000
-      LMA:       0x70000000
-      ACCESS:    r
+include:
+  - Inputs/sections.yaml
+  - Inputs/rvv-unit-all.yaml
 
 histogram:
     - [LB, 1.0]
     - [LBU, 1.0]
     - [C_SD, 1.0]
     - [C_LD, 1.0]
-    - [VSETVL, 1.0]
-    - [VSETVLI, 1.0]
     - [VLSE16_V, 1.0]
     - [VSSE16_V, 1.0]
+    - [VADD_VV, 1.0]
 
 burst:
     mode: custom

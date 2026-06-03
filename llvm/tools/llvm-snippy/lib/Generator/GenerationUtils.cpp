@@ -273,9 +273,10 @@ void selectNonMemoryOperands(
       Preselected[Idx].setTiedTo(TiedTo);
       continue;
     }
+    auto Opcode = InstrDesc.getOpcode();
     bool IsDst = Idx < InstrDesc.getNumDefs();
-    auto RegClass = Tgt.getRegClass(InstrGenCtx, OpInfo.RegClass, Idx,
-                                    InstrDesc.getOpcode(), RI);
+    auto RegClass =
+        Tgt.getRegClass(InstrGenCtx, OpInfo.RegClass, Idx, Opcode, RI);
     AccessMaskBit Mask =
         IsDst ? AccessMaskBit::PrimaryW : AccessMaskBit::PrimaryR;
     auto CustomMask = Tgt.getCustomAccessMaskForOperand(InstrDesc, Idx);
@@ -286,14 +287,14 @@ void selectNonMemoryOperands(
     copy(Excluded, std::back_inserter(ExcludedForOperand));
     if (!IsDst)
       copy(Destinations, std::back_inserter(ExcludedForOperand));
-    auto Include = Tgt.includeRegs(InstrDesc.getOpcode(), RegClass);
+    auto Include = Tgt.includeRegs(Opcode, RegClass);
     auto ExpectedReg =
         RegGen.generate(RegClass, OpInfo.RegClass, RI, *TmpRP, InstrGenCtx.MBB,
                         Tgt, ExcludedForOperand, Include, Mask);
     auto ReportCouldNotSelectReg = [&]() {
       snippy::fatal(
           formatv("Could not select register for \"{0}\" in burst group",
-                  II.getName(InstrDesc.getOpcode())),
+                  II.getName(Opcode)),
           "try reducing burst group size and relaxing register reservation");
     };
     if (auto Err = ExpectedReg.takeError()) {
@@ -306,7 +307,7 @@ void selectNonMemoryOperands(
       FirstReg = Tgt.getFirstPhysReg(SelectedReg, RI);
     // This handles situations where selected register cannot be reused as
     // another operand of the same instruction
-    Tgt.reserveRegsIfNeeded(InstrGenCtx, InstrDesc.getOpcode(), IsDst,
+    Tgt.reserveRegsIfNeeded(InstrGenCtx, Opcode, IsDst,
                             /*isMem=*/false, FirstReg);
     Preselected[Idx] = Register(SelectedReg);
   }

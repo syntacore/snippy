@@ -36,9 +36,7 @@ public:
     if (Op.isReg())
       return PreselectedOpInfo(Register(Op.getReg()));
     if (Op.isImm())
-      return PreselectedOpInfo(StridedImmediate(/* MinIn */ Op.getImm(),
-                                                /* MaxIn */ Op.getImm(),
-                                                /* StrideIn */ 0));
+      return PreselectedOpInfo(StridedImmediate(Op.getImm()));
     return snippy::makeFailure(
         Errc::Unimplemented,
         "Unknown Operand Type while constructing PreselectedOpInfo");

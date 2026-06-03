@@ -1,0 +1,38 @@
+# COM: This test checks that the number of non-burst loads and burst stores
+#      are present at the beginning and end of function in enough count.
+
+# RUN: llvm-snippy %s -model-plugin=None &> %t.mf
+
+# COM: We divide %t.mf into two equal parts %t.mf.part_0 and %t.mf.part_1 to
+#      make sure that each of them contains enough instructions.
+# RUN: split -n 2 -d -a 1 %t.mf %t.mf.part_
+# RUN: FileCheck %s --input-file %t.mf.part_0
+# RUN: FileCheck %s --input-file %t.mf.part_1
+
+options:
+  mtriple: riscv64
+  march: rv64imfdv
+  num-instrs: 10000
+  dump-mf: on
+
+include:
+  - Inputs/sections.yaml
+  - Inputs/rvv-unit-little-lmul.yaml
+
+burst:
+  mode: store
+  min-size: 2
+  max-size: 4
+
+histogram:
+    - [LW, 1.0]
+    - [LD, 1.0]
+    - [SW, 1.0]
+    - [VSE8_V, 1.0]
+    - [VS1R_V, 1.0]
+
+# CHECK-COUNT-100: LD
+# CHECK-COUNT-100: LW
+# CHECK-COUNT-100: SW
+# CHECK-COUNT-100: VSE8_V
+# CHECK-COUNT-100: VS1R_V
