@@ -31,7 +31,7 @@ class SnippyLoopInfo;
 struct SnippyFunctionMetadata;
 class DefaultPolicyConfig;
 
-void generate(planning::InstructionGroupRequest &IG,
+void generate(const planning::InstructionGroupRequest &IG,
               planning::InstructionGenerationContext &InstrGenCtx);
 
 GenerationStatistics

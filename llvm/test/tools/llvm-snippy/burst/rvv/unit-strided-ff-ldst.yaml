@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s %S/Inputs/sections.yaml -model-plugin=None
+# RUN: llvm-snippy %s -model-plugin=None
 
 options:
   mtriple: riscv64
@@ -7,10 +7,14 @@ options:
   verify-gen-histogram: true
   histogram-must-succeed: true
 
+include:
+  - Inputs/sections.yaml
+  - Inputs/rvv-unit-all.yaml
+
 burst:
   mode: custom
   min-size: 4
-  max-size: 8
+  max-size: 5
   groupings:
     - - VLE8FF_V
       - VLE16FF_V
@@ -22,7 +26,6 @@ histogram:
   - [VLE16FF_V, 1.0]
   - [VLE32FF_V, 1.0]
   - [VLE64FF_V, 1.0]
-  - [VSETIVLI, 1.0]
   - [SW, 1.0]
   - [MUL, 2.0]
   - [DIV, 1.0]

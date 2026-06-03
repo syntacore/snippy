@@ -326,6 +326,11 @@ struct RVVConfigurationInfo final {
   VLVM updateVM(const RVVConfiguration &Config, const VLVM &OldVLVM) const;
 
   const RVVConfiguration &selectConfiguration() const;
+  const RVVConfiguration &getConfiguration(const RVVConfiguration &Cfg) const {
+    auto CfgIt = find(CfgGen.elements(), Cfg);
+    assert(CfgIt != CfgGen.elements().end());
+    return *CfgIt;
+  }
 
   bool isModeChangeArtificial() const { return ArtificialModeChange; }
   bool isVXRMUpdateNeeded() const { return NeedsVXRMUpdate; }

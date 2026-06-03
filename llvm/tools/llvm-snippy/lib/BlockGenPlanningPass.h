@@ -19,7 +19,6 @@ namespace llvm {
 namespace snippy {
 
 class BlockGenPlanning final : public MachineFunctionPass {
-  std::optional<planning::FunctionRequest> Req;
 
 public:
   static char ID;
@@ -30,14 +29,7 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const override;
 
-  planning::FunctionRequest &get() {
-    assert(Req.has_value());
-    return *Req;
-  }
-  const planning::BasicBlockRequest &get(const MachineBasicBlock &MBB) const;
-
   bool runOnMachineFunction(MachineFunction &MF) override;
-  void releaseMemory() override;
 };
 
 } // namespace snippy

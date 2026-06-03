@@ -166,8 +166,7 @@ public:
   DefaultPolicyConfig(const CommonPolicyConfig &Common) : Common(&Common) {}
 
   Expected<OpcGenHolder>
-  createOpcodeGenerator(const std::function<bool(unsigned)> &OpcMask) const {
-
+  createOpcodeGenerator(const OpcodeFilterType &OpcMask) const {
     if (DataFlowHistogram.empty())
       snippy::fatal(
           "OpcodeGenerator initialization failure: empty histogram specified.");
@@ -330,8 +329,6 @@ public:
 // legacy config
 class Config final {
 public:
-  using OpcodeFilter = std::function<bool(unsigned)>;
-
   // legacy specific.
   std::vector<std::string> Includes;
   ProgramConfig &ProgramCfg;

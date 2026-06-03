@@ -1798,7 +1798,7 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
                    MAI);
 }
 
-void generate(planning::InstructionGroupRequest &IG,
+void generate(const planning::InstructionGroupRequest &IG,
               planning::InstructionGenerationContext &InstrGenCtx) {
   LLVM_DEBUG(dbgs() << "Generating IG:\n");
   LLVM_DEBUG(IG.print(dbgs(), 2));
@@ -1878,19 +1878,24 @@ void interpretMBBInstrs(LLVMState &State, const SimulatorContext &SimCtx,
 GenerationStatistics
 generate(planning::BasicBlockRequest &BB,
          planning::InstructionGenerationContext &InstrGenCtx) {
-  for (auto &&IG : BB)
-    generate(IG, InstrGenCtx);
+  for (const auto &SG : BB) {
+    if (SG.hasModeChange())
+      generate(SG.createModeChangeIG(), InstrGenCtx);
+    for (const auto &IG : SG)
+      generate(IG, InstrGenCtx);
+  }
 
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   auto &SimCtx = InstrGenCtx.SimCtx;
-  const auto &MBB = BB.getMBB();
+  const auto *MBB = BB.getMBB();
   // In the register block we start interpretation from the beginning
   // In other blocks we begin from a pre-established iterator (Ins)
   if (SimCtx.hasTrackingMode()) {
     auto *SFM = InstrGenCtx.SFM;
-    if (!SFM || (SFM->RegsInitBlock == &MBB))
-      interpretMBBInstrs(State, SimCtx, MBB.begin(), MBB.getFirstTerminator());
+    if (!SFM || (SFM->RegsInitBlock == MBB))
+      interpretMBBInstrs(State, SimCtx, MBB->begin(),
+                         MBB->getFirstTerminator());
   }
   return InstrGenCtx.Stats;
 }
