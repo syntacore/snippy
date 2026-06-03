@@ -173,12 +173,15 @@ public:
 
 class StridedImmediate {
 public:
-  using ValueType = int64_t;
+  using ValueType = APInt;
+  using IntType = int64_t;
   using StrideType = uint64_t;
 
+  constexpr static auto DefaultBitWidth = sizeof(uint64_t) * CHAR_BIT;
+
 private:
-  ValueType Min = 0;
-  ValueType Max = 0;
+  ValueType Min = ValueType(DefaultBitWidth, 0);
+  ValueType Max = ValueType(DefaultBitWidth, 0);
   StrideType Stride = 0;
   bool Init = false;
 
@@ -188,18 +191,33 @@ public:
   // constructor of llvm::Register when PreselectedOpInfo is used.
   StridedImmediate(ValueType MinIn, ValueType MaxIn, StrideType StrideIn)
       : Min(MinIn), Max(MaxIn), Stride(StrideIn), Init(true) {
-    assert(Min <= Max);
+    assert(Min.sle(Max));
   }
+  StridedImmediate(IntType MinIn, IntType MaxIn, StrideType StrideIn)
+      : StridedImmediate(ValueType(DefaultBitWidth, MinIn, /*IsSigned*/ true),
+                         ValueType(DefaultBitWidth, MaxIn, /*IsSigned*/ true),
+                         StrideIn) {}
+  template <typename T>
+  explicit StridedImmediate(T In)
+      : StridedImmediate(/*Min*/ In, /*Max*/ In, /*Stride*/ 0) {}
   StridedImmediate() = default;
 
   bool isInitialized() const { return Init; }
   auto getMin() const {
     assert(isInitialized());
-    return Min;
+    return Min.getSExtValue();
   }
   auto getMax() const {
     assert(isInitialized());
-    return Max;
+    return Max.getSExtValue();
+  }
+  auto getVal() const {
+    assert(Min.eq(Max) && Stride == 0);
+    return Min;
+  }
+  auto getSExtVal() const {
+    assert(Min.eq(Max) && Stride == 0);
+    return Min.getSExtValue();
   }
   auto getStride() const {
     assert(isInitialized());
@@ -266,9 +284,9 @@ template <int MinValue, int MaxValue>
 int genImmInInterval(const StridedImmediate &StridedImm) {
   static_assert(MinValue <= MaxValue, "Invalid range");
   assert(StridedImm.isInitialized());
-  using ValueType = StridedImmediate::ValueType;
-  auto Min = std::clamp<ValueType>(StridedImm.getMin(), MinValue, MaxValue);
-  auto Max = std::clamp<ValueType>(StridedImm.getMax(), MinValue, MaxValue);
+  using IntType = StridedImmediate::IntType;
+  auto Min = std::clamp<IntType>(StridedImm.getMin(), MinValue, MaxValue);
+  auto Max = std::clamp<IntType>(StridedImm.getMax(), MinValue, MaxValue);
   using SignedStrideTy = std::make_signed_t<StridedImmediate::StrideType>;
   assert(StridedImm.getStride() <= std::numeric_limits<SignedStrideTy>::max());
   auto Stride = static_cast<SignedStrideTy>(StridedImm.getStride());

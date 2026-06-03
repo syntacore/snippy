@@ -1,5 +1,4 @@
-# RUN: llvm-snippy %s %S/Inputs/sections.yaml \
-# RUN:   -model-plugin=None |& FileCheck %s
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
 
 options:
   mtriple: riscv64
@@ -8,6 +7,10 @@ options:
   verify-gen-histogram: true
   histogram-must-succeed: true
   dump-mf: true
+
+include:
+  - Inputs/sections.yaml
+  - Inputs/rvv-unit-all.yaml
 
 burst:
   mode: custom
@@ -26,7 +29,6 @@ histogram:
   - [VSSE8_V, 1.0]
   - [VADD_VX, 1.0]
   - [VLSSEG2E32_V, 1.0]
-  - [VSETIVLI, 1.0]
   - [VL2RE8_V, 1.0]
   - [VS2R_V, 1.0]
   - [SW, 1.0]
@@ -36,4 +38,5 @@ histogram:
   - [ADDI, 1.0]
 
 # CHECK-DAG: {{((SW.*[[:space:]].*){10})}}
-# CHECK-DAG: {{(((VLE8_V|VADD_VX|VLSEG2E32_V|VL2RE8_V|VS2R_V).*[[:space:]].*){10})}}
+# CHECK-DAG: {{(((VLE8_V|VADD_VX|VL2RE8_V|VS2R_V).*[[:space:]].*){10})}}
+# CHECK-NOT: Opcode VLSEG2E32_V will not be generated in the burst group
