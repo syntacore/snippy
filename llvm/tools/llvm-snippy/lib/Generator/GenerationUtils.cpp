@@ -230,9 +230,10 @@ planning::PreselectedOperands selectMemoryOperands(const MCInstrDesc &InstrDesc,
                                                    const AddressInfo &AI) {
   planning::PreselectedOperands Preselected;
   for (const auto &MCOpInfo : InstrDesc.operands()) {
-    if (MCOpInfo.OperandType == MCOI::OperandType::OPERAND_MEMORY)
+    if (MCOpInfo.OperandType == MCOI::OperandType::OPERAND_MEMORY) {
       Preselected.emplace_back(BaseReg);
-    else if (MCOpInfo.OperandType >= MCOI::OperandType::OPERAND_FIRST_TARGET) {
+    } else if (MCOpInfo.OperandType >=
+               MCOI::OperandType::OPERAND_FIRST_TARGET) {
       // FIXME: Here we just use the fact that RISC-V loads and stores from base
       // subset have only one target specific operand that is offset.
       auto MinStride = AI.MinStride;
@@ -240,8 +241,9 @@ planning::PreselectedOperands selectMemoryOperands(const MCInstrDesc &InstrDesc,
         MinStride = 1;
       Preselected.emplace_back(
           StridedImmediate(AI.MinOffset, AI.MaxOffset, MinStride));
-    } else
+    } else {
       Preselected.emplace_back();
+    }
   }
   return Preselected;
 }
