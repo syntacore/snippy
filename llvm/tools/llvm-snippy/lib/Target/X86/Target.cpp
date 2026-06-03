@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Target/Target.h"
+#include "snippy/Generator/Policy.h"
 
 #include "snippy/Config/Selfcheck.h"
 #include "snippy/Simulator/Targets/X86.h"
@@ -95,9 +96,16 @@ public:
     reportUnimplementedError();
   }
 
-  std::function<bool(unsigned)>
-  generateModeChangeAndGetFilter(InstructionGenerationContext &IGC,
-                                 MDNode *MetadataMark) const override {
+  std::pair<planning::InstructionRequest, std::function<bool(unsigned)>>
+  selectModeChangeAndGetFilter(const SnippyProgramContext &ProgCtx,
+                               const MachineBasicBlock &MBB,
+                               MDNode *MetadataMark) const override {
+    reportUnimplementedError();
+  }
+
+  void generateModeChange(const planning::InstructionRequest &ModeChangeInstr,
+                          InstructionGenerationContext &IGC,
+                          MDNode *MetadataMark) const override {
     reportUnimplementedError();
   }
 

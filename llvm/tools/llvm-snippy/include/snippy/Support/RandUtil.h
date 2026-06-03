@@ -470,16 +470,26 @@ public:
 
   // Doesn't require container to be random access,
   // still O(1) for random access containers
+  template <typename IterT>
+  static IterT selectItFromRange(IterT First, IterT Last) {
+    size_t Size = std::distance(First, Last);
+    assert(Size > 0);
+    auto SelectedIdx = genInRangeExclusive<unsigned>(0, Size);
+    auto SelectedPos = First;
+    std::advance(SelectedPos, SelectedIdx);
+    return SelectedPos;
+  }
+
+  template <typename ContainerT>
+  static auto
+  selectItFromContainer(ContainerT &Container) -> decltype(Container.begin()) {
+    return selectItFromRange(Container.begin(), Container.end());
+  }
+
   template <typename ContainerT>
   static auto
   selectFromContainer(ContainerT &Container) -> decltype(*Container.begin()) {
-    size_t ContainerSize = std::distance(Container.begin(), Container.end());
-    assert(ContainerSize > 0);
-
-    auto SelectedIdx = genInRangeExclusive<unsigned>(0, ContainerSize);
-    auto SelectedPos = Container.begin();
-    std::advance(SelectedPos, SelectedIdx);
-    return *SelectedPos;
+    return *selectItFromContainer(Container);
   }
 
   // Doesn't require container to be random access,

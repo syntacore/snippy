@@ -90,13 +90,20 @@ selectInitializableOperandsRegisters(InstructionGenerationContext &InstrGenCtx,
 ValuegramGenPolicy::ValuegramGenPolicy(
     SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
     std::unique_ptr<IOperandsReinitializationValueSource> ValueSource,
-    const ModeChangingInstPolicy *ModeChangingPolicy)
-    : OpcGen(nullptr), Cfg(&Cfg), ModeChangingPolicy(ModeChangingPolicy),
-      OperandsValueSource(std::move(ValueSource)) {
+    std::optional<OpcodeFilterType> Filter)
+    : Cfg(&Cfg), OperandsValueSource(std::move(ValueSource)) {
   assert(Cfg.isApplyValuegramEachInstr() &&
          "This policy can only be used when the "
          "-valuegram-operands-regs file provided");
   assert(OperandsValueSource);
+
+  if (!Filter)
+    Filter = getDefaultFilter(ProgCtx.getLLVMState().getSnippyTarget());
+  auto Err = Cfg.createOpcodeGenerator(*Filter).moveInto(OpcGen);
+  if (Err)
+    snippy::fatal(
+        Twine("Failed to create OpcodeGenerator in ValuegramGenPolicy: ") +
+        toString(std::move(Err)));
 }
 
 std::vector<InstructionRequest>
@@ -170,16 +177,7 @@ void ValuegramGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
   if (Limit.isEmpty())
     return;
 
-  const auto &Tgt = InstrGenCtx.ProgCtx.getLLVMState().getSnippyTarget();
-  const auto &Filter = ModeChangingPolicy
-                           ? ModeChangingPolicy->getOpcodeFilter()
-                           : getDefaultFilter(Tgt);
-  auto Err = Cfg->createOpcodeGenerator(Filter).moveInto(OpcGen);
-  if (Err)
-    snippy::fatal(
-        Twine("Failed to create OpcodeGenerator in ValuegramGenPolicy: ") +
-        toString(std::move(Err)));
-
+  assert(OpcGen);
   for (size_t I = 0; I < Limit.getLimit(); ++I) {
     auto Opcode = generateSingleOpcode(*OpcGen);
     llvm::append_range(Instructions,

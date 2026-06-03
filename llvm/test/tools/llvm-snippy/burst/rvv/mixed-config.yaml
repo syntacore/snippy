@@ -1,5 +1,4 @@
-# RUN: llvm-snippy %s %S/rvv-config-biased/Inputs/rvv-unit-all.yaml \
-# RUN:   -model-plugin=None |& FileCheck %s
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
 
 options:
   mtriple: riscv64
@@ -9,23 +8,9 @@ options:
   verify-gen-histogram: true
   histogram-must-succeed: true
 
-sections:
-  - name:      1
-    VMA:       0x210000
-    SIZE:      0x100000
-    LMA:       0x210000
-    ACCESS:    rx
-  - name:      2
-    VMA:       0x80000000
-    SIZE:      0x100000
-    LMA:       0x80000000
-    ACCESS:    rw
-  - name:      3
-    VMA:       0x10000
-    LMA:       0x10000
-    SIZE:      0x10000
-    ACCESS:    r
-
+include:
+  - Inputs/sections.yaml
+  - Inputs/rvv-unit-all.yaml
 
 burst:
   mode: custom

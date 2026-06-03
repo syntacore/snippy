@@ -1,4 +1,4 @@
-# RUN: llvm-snippy %s %S/Inputs/sections.yaml -model-plugin=None
+# RUN: llvm-snippy %s -model-plugin=None
 
 options:
   mtriple: riscv64
@@ -6,6 +6,10 @@ options:
   num-instrs: 1000
   verify-gen-histogram: true
   histogram-must-succeed: true
+
+include:
+  - Inputs/sections.yaml
+  - Inputs/rvv-unit-all.yaml
 
 burst:
   mode: custom
@@ -34,7 +38,6 @@ histogram:
   - [VSE64_V, 1.0]
   - [VLM_V, 1.0]
   - [VSM_V, 1.0]
-  - [VSETIVLI, 1.0]
   - [SW, 1.0]
   - [MUL, 2.0]
   - [DIV, 1.0]

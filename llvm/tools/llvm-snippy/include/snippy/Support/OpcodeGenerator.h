@@ -67,7 +67,13 @@ public:
 
 // We call this function when we are absolutely sure that exactly one opcode
 // will always be generated
-unsigned generateSingleOpcode(OpcodeGeneratorInterface &OpcGen);
+template <typename OpcodeGeneratorType>
+unsigned generateSingleOpcode(OpcodeGeneratorType &&OpcGen) {
+  SmallVector<unsigned, 1> OpcSeq;
+  std::forward<OpcodeGeneratorType>(OpcGen).generate(OpcSeq);
+  assert(OpcSeq.size() == 1);
+  return OpcSeq.front();
+}
 
 } // namespace snippy
 } // namespace llvm

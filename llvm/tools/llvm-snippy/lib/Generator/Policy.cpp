@@ -93,17 +93,26 @@ InstructionGenerationContext::getOrCreateFloatOverwriteValueSampler(
   return *SamplerRefOrErr;
 }
 
-DefaultGenPolicy::DefaultGenPolicy(
-    SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
-    const ModeChangingInstPolicy *ModeChangingPolicy)
-    : OpcGen(nullptr), Cfg(&Cfg), ModeChangingPolicy(ModeChangingPolicy) {
+DefaultGenPolicy::DefaultGenPolicy(SnippyProgramContext &ProgCtx,
+                                   const DefaultPolicyConfig &Cfg,
+                                   std::optional<OpcodeFilterType> Filter)
+    : Cfg(&Cfg) {
   assert(!Cfg.isApplyValuegramEachInstr() &&
          "In this case you must use ValuegramGenPolicy");
+
+  if (!Filter)
+    Filter = getDefaultFilter(ProgCtx.getLLVMState().getSnippyTarget());
+  auto Err = Cfg.createOpcodeGenerator(*Filter).moveInto(OpcGen);
+  if (Err)
+    snippy::fatal(
+        Twine("Failed to create OpcodeGenerator in DefaultGenPolicy: ") +
+        toString(std::move(Err)));
 }
 
 BurstGenPolicy::BurstGenPolicy(SnippyProgramContext &ProgCtx,
                                const BurstPolicyConfig &Cfg,
-                               unsigned BurstGroupID)
+                               unsigned BurstGroupID,
+                               std::optional<OpcodeFilterType> Filter)
     : Cfg(&Cfg) {
   const auto &BGram = Cfg.Burst;
 
@@ -118,23 +127,30 @@ BurstGenPolicy::BurstGenPolicy(SnippyProgramContext &ProgCtx,
   assert(BurstGroupId < Groupings.size());
   const auto &Group = Groupings[BurstGroupId];
 
-  std::copy(Group.begin(), Group.end(), std::back_inserter(Opcodes));
-
-  std::vector<double> Weights;
+  OpcodeHistogram::TopOpcodesType OpcWeights;
   auto OpcodeToNumOfGroups = BGram.getOpcodeToNumBurstGroups();
-  std::transform(Opcodes.begin(), Opcodes.end(), std::back_inserter(Weights),
-                 [&Cfg, &OpcodeToNumOfGroups](unsigned Opcode) {
-                   assert(OpcodeToNumOfGroups.count(Opcode));
-                   return Cfg.BurstOpcodeWeights.at(Opcode) /
-                          OpcodeToNumOfGroups[Opcode];
-                 });
-  Dist = std::discrete_distribution<size_t>(Weights.begin(), Weights.end());
+  transform(Group, std::inserter(OpcWeights, OpcWeights.end()),
+            [&Cfg, &OpcodeToNumOfGroups](unsigned Opcode) {
+              assert(OpcodeToNumOfGroups.count(Opcode));
+              return std::make_pair(Opcode, Cfg.BurstOpcodeWeights.at(Opcode) /
+                                                OpcodeToNumOfGroups[Opcode]);
+            });
+  assert(!OpcWeights.empty());
+  ModeCompatibleOpcodes = OpcodeHistogram(OpcWeights);
+
+  if (!Filter)
+    Filter = getDefaultFilter(ProgCtx.getLLVMState().getSnippyTarget());
+  ModeCompatibleOpcodes.eraseTopOpcodes(std::not_fn(*Filter));
+
+  assert(!ModeCompatibleOpcodes.empty() &&
+         "Failed to create mode compatible OpcodeGenerator in BurstGenPolicy");
 }
 
 std::optional<InstructionRequest> DefaultGenPolicy::next() {
   if (Idx < Instructions.size())
     return Instructions[Idx++];
   SmallVector<unsigned> OpcSeq;
+  assert(OpcGen);
   OpcGen->generate(OpcSeq);
   assert(!OpcSeq.empty());
   return InstructionRequest{OpcSeq.front(), {}};
@@ -149,14 +165,7 @@ void DefaultGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
 
   auto &State = InstrGenCtx.ProgCtx.getLLVMState();
   const auto &Tgt = State.getSnippyTarget();
-  const auto &Filter = ModeChangingPolicy
-                           ? ModeChangingPolicy->getOpcodeFilter()
-                           : getDefaultFilter(Tgt);
-  auto Err = Cfg->createOpcodeGenerator(Filter).moveInto(OpcGen);
-  if (Err)
-    snippy::fatal(
-        Twine("Failed to create OpcodeGenerator in DefaultGenPolicy: ") +
-        toString(std::move(Err)));
+
   assert(Cfg);
   if (!Cfg->DataFlowHistogram.hasPatterns())
     return;
@@ -165,6 +174,7 @@ void DefaultGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
   auto InstrLimit = Limit.getLimit();
   Instructions.reserve(InstrLimit);
   unsigned InstrNum = 0;
+  assert(OpcGen);
   while (InstrNum < InstrLimit) {
     SmallVector<unsigned> GenSeq;
     OpcGen->generate(GenSeq);
@@ -228,13 +238,15 @@ void BurstGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
   assert(Limit.isNumLimit());
   auto &State = InstrGenCtx.ProgCtx.getLLVMState();
   const auto &Tgt = State.getSnippyTarget();
-  std::generate_n(
-      std::back_inserter(Instructions), Limit.getLimit(), [&State, this] {
-        return InstructionRequest{
-            genOpc(),
-            {},
-            getMetadataMark(State.getCtx(), SnippyMetadata::Bundle)};
-      });
+
+  std::generate_n(std::back_inserter(Instructions), Limit.getLimit(), [&] {
+    // Generate exactly one opcode, since burst is uncompatible with patterns.
+    return InstructionRequest{
+        generateSingleOpcode(ModeCompatibleOpcodes),
+        {},
+        getMetadataMark(State.getCtx(), SnippyMetadata::Bundle)};
+  });
+
   auto RP = InstrGenCtx.pushRegPool();
   auto RegsToInit =
       selectOperandsForConsecutiveInstrs(InstrGenCtx, Tgt, *RP, Instructions);
@@ -375,23 +387,23 @@ getValuegramPolicyValueSource(const DefaultPolicyConfig &Cfg) {
 
 void ModeChangingInstPolicy::initialize(
     InstructionGenerationContext &InstrGenCtx, const RequestLimit &Limit) {
-  assert(!OpcodeFilter && "Opcode filter should not be created at this point.");
-
   const auto &Tgt = InstrGenCtx.ProgCtx.getLLVMState().getSnippyTarget();
-  OpcodeFilter = Tgt.generateModeChangeAndGetFilter(InstrGenCtx, MetadataMark);
+  Tgt.generateModeChange(ModeChangeInstr, InstrGenCtx, MetadataMark);
 }
 
 GenPolicy createGenPolicy(SnippyProgramContext &ProgCtx,
                           const DefaultPolicyConfig &Cfg,
-                          const ModeChangingInstPolicy *ModeChangingPolicy) {
+                          std::optional<OpcodeFilterType> Filter) {
+  if (!Filter)
+    Filter = getDefaultFilter(ProgCtx.getLLVMState().getSnippyTarget());
   if (Cfg.isApplyValuegramEachInstr()) {
     assert(Cfg.Valuegram.has_value() ||
            Cfg.OperandsReinitialization.has_value());
     auto ValuegramValueSource = getValuegramPolicyValueSource(Cfg);
     return planning::ValuegramGenPolicy(
-        ProgCtx, Cfg, std::move(ValuegramValueSource), ModeChangingPolicy);
+        ProgCtx, Cfg, std::move(ValuegramValueSource), *Filter);
   }
-  return planning::DefaultGenPolicy(ProgCtx, Cfg, ModeChangingPolicy);
+  return planning::DefaultGenPolicy(ProgCtx, Cfg, *Filter);
 }
 
 } // namespace planning

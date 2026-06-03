@@ -25,7 +25,6 @@ namespace planning {
 class ValuegramGenPolicy final : public detail::EmptyFinalizeMixin {
   OpcGenHolder OpcGen;
   const DefaultPolicyConfig *Cfg;
-  const ModeChangingInstPolicy *ModeChangingPolicy;
 
   /// Abstract source of (register) operand values.
   std::unique_ptr<IOperandsReinitializationValueSource> OperandsValueSource;
@@ -35,7 +34,6 @@ class ValuegramGenPolicy final : public detail::EmptyFinalizeMixin {
 public:
   ValuegramGenPolicy(const ValuegramGenPolicy &Other)
       : OpcGen(Other.OpcGen ? Other.OpcGen->copy() : nullptr), Cfg(Other.Cfg),
-        ModeChangingPolicy(Other.ModeChangingPolicy),
         OperandsValueSource(Other.OperandsValueSource->clone()) {}
 
   ValuegramGenPolicy(ValuegramGenPolicy &&) = default;
@@ -51,7 +49,7 @@ public:
   ValuegramGenPolicy(
       SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
       std::unique_ptr<IOperandsReinitializationValueSource> OperandsValueSource,
-      const ModeChangingInstPolicy *ModeChangingPolicy = nullptr);
+      std::optional<OpcodeFilterType> Filter = std::nullopt);
 
   std::optional<InstructionRequest> next() {
     assert(Idx <= Instructions.size());
@@ -65,20 +63,7 @@ public:
 
   bool isInseparableBundle() const { return false; }
 
-  const ModeChangingInstPolicy *getModeChangingPolicy() const {
-    return ModeChangingPolicy;
-  }
-
-  void setModeChangingPolicy(const ModeChangingInstPolicy *MDP) {
-    ModeChangingPolicy = MDP;
-  }
-
-  void print(raw_ostream &OS) const {
-    OS << "Valuegram Generation Policy ("
-       << (ModeChangingPolicy ? "Has mode-changing policy"
-                              : "No mode-changing policy")
-       << ")\n";
-  }
+  void print(raw_ostream &OS) const { OS << "Valuegram Generation Policy\n"; }
 
 private:
   std::vector<InstructionRequest>

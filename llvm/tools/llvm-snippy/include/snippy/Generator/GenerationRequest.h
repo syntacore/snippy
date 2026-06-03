@@ -46,6 +46,8 @@
 #include "snippy/Generator/Policy.h"
 #include "snippy/Target/Target.h"
 
+#include <optional>
+
 namespace llvm {
 namespace snippy {
 
@@ -99,14 +101,6 @@ public:
   bool isInseparableBundle() const {
     return planning::isInseparableBundle(Policy);
   }
-
-  const ModeChangingInstPolicy *getModeChangingPolicy() const {
-    return planning::getModeChangingPolicy(Policy);
-  }
-
-  void setModeChangingPolicy(const ModeChangingInstPolicy *MDP) {
-    planning::setModeChangingPolicy(Policy, MDP);
-  }
 };
 
 class InstrGroupGenerationRAIIWrapper final {
@@ -114,7 +108,7 @@ class InstrGroupGenerationRAIIWrapper final {
   InstructionGenerationContext &InstrGenCtx;
 
 public:
-  InstrGroupGenerationRAIIWrapper(InstructionGroupRequest &Req,
+  InstrGroupGenerationRAIIWrapper(const InstructionGroupRequest &Req,
                                   InstructionGenerationContext &InstrGenCtx)
       : IG(Req), InstrGenCtx(InstrGenCtx) {
     IG.initialize(InstrGenCtx);
@@ -200,7 +194,8 @@ class InstrRequestRange final {
   const InstructionGroupRequest &Request;
 
 public:
-  InstrRequestRange(InstructionGroupRequest &Req, GenerationStatistics &Stats)
+  InstrRequestRange(const InstructionGroupRequest &Req,
+                    GenerationStatistics &Stats)
       : Stats(Stats), Request(Req) {}
 
   auto begin() const { return detail::InstrRequestIterator(Request.policy()); }
@@ -212,76 +207,85 @@ public:
 
 constexpr auto SubReqIndentSize = 2;
 
-class BasicBlockRequest final : private std::vector<InstructionGroupRequest> {
+/// \class SingleContextGroup
+/// \brief The class wraps a vector of InstructionGroupRequest with a specific
+/// mode changing policy.
+/// Class is needed to define the execution context of instructions. They all
+/// execute in a single context. This makes it easy to find the suitable context
+/// for a specific instruction and insert it into basic block. It like a scope
+/// block in a C++.
+class SingleContextGroup final : private std::vector<InstructionGroupRequest> {
+  // If there is no context or it does not make sense, then SingleContextGroup
+  // simply represents a group of instructions.
+  std::optional<ModeChangingInstPolicy> ModeChangingPolicy;
+
+public:
+  SingleContextGroup(ModeChangingInstPolicy &&MCPolicy)
+      : ModeChangingPolicy(std::move(MCPolicy)) {}
+  SingleContextGroup() = default;
+
+  bool hasModeChange() const { return ModeChangingPolicy.has_value(); }
+  std::optional<OpcodeFilterType> getOpcodeFilter() const {
+    if (!ModeChangingPolicy.has_value())
+      return std::nullopt;
+    return ModeChangingPolicy->getOpcodeFilter();
+  }
+  InstructionGroupRequest createModeChangeIG() const {
+    assert(hasModeChange());
+    return planning::InstructionGroupRequest(
+        planning::RequestLimit::NumInstrs{!ModeChangingPolicy->isSupport()},
+        *ModeChangingPolicy);
+  }
+  size_t numIGs() const {
+    // Because of one additional instruction group with mode change policy
+    if (ModeChangingPolicy.has_value())
+      return size() + 1;
+    return size();
+  }
+  GenerationStatistics initialStats() const & {
+    return std::accumulate(begin(), end(), GenerationStatistics{},
+                           [](auto Acc, const auto &Entry) {
+                             Acc.merge(Entry.initialStats());
+                             return Acc;
+                           });
+  }
+  RequestLimit limit() const & {
+    auto MCNumInstr = static_cast<size_t>(hasModeChange() &&
+                                          !ModeChangingPolicy->isSupport());
+    using planning::RequestLimit;
+    return std::accumulate(
+        begin(), end(), RequestLimit{RequestLimit::NumInstrs{MCNumInstr}},
+        [](auto Acc, const auto &Entry) { return Acc += Entry.limit(); });
+  }
+
+  using vector::begin;
+  using vector::end;
+
+  void print(raw_ostream &OS, size_t Indent = 0) const {
+    bool HasModeChange = ModeChangingPolicy.has_value();
+    OS.indent(Indent) << "SingleContextGroup <HasModeChange: " << HasModeChange;
+    OS << ", Limit: " << limit().getAsString() << ">\n";
+    for_each(*this, [&](const auto &Req) {
+      Req.print(OS, Indent + SubReqIndentSize);
+    });
+  }
+
+  void add(InstructionGroupRequest IG) { emplace_back(std::move(IG)); }
+  void shuffle() { RandEngine::shuffle(begin(), end()); }
+};
+
+class BasicBlockRequest final : private std::vector<SingleContextGroup> {
   const MachineBasicBlock *MBB = nullptr;
   RequestLimit Limit;
 
-  // Should only be called in the copy constructor/assignment.
-  // Elements in the vector (IG requests, which contain policies) might have
-  // pointers to the other elements in the same vector (policies of other IGs).
-  // We need to update the pointers, so they reference the newly allocated IGs.
-  void setModeChangingPolicies(const BasicBlockRequest &Other) {
-    assert(Other.size() == size());
-
-    // Map old mode-changing policies addresses to their new ones
-    DenseMap<const ModeChangingInstPolicy *, const ModeChangingInstPolicy *>
-        PolicyMap;
-
-    auto IsModeChangingPolicy = [](const auto &IGReq) -> bool {
-      return IGReq.policy().template as<planning::ModeChangingInstPolicy>() !=
-             nullptr;
-    };
-
-    // If the group had no mode-changing policy (getModeChangingPolicy() is
-    // nullptr), it should stay nullptr. Adding nullptr, so that the
-    // PolicyMap.at(nullptr) won't crash.
-    PolicyMap[nullptr] = nullptr;
-
-    // Fill the map
-    for (const auto &[NewIGReq, OldIGReq] : zip_equal(*this, Other))
-      if (auto *ModeChangingPolicy =
-              OldIGReq.policy().as<planning::ModeChangingInstPolicy>()) {
-        assert(IsModeChangingPolicy(NewIGReq));
-        PolicyMap[ModeChangingPolicy] =
-            NewIGReq.policy().as<planning::ModeChangingInstPolicy>();
-      }
-
-    // Change pointers to the according mode-changing policies
-    for (auto &Req : *this)
-      if (!IsModeChangingPolicy(Req))
-        Req.setModeChangingPolicy(PolicyMap.at(Req.getModeChangingPolicy()));
-  }
-
 public:
-  BasicBlockRequest(const MachineBasicBlock &MBB)
-      : MBB(&MBB), Limit(RequestLimit::NumInstrs{}) {}
+  BasicBlockRequest(const MachineBasicBlock *MBB)
+      : MBB(MBB), Limit(RequestLimit::NumInstrs{}) {}
 
-  const MachineBasicBlock &getMBB() const {
+  const MachineBasicBlock *getMBB() const {
     assert(MBB);
-    return *MBB;
+    return MBB;
   }
-
-  BasicBlockRequest(const BasicBlockRequest &Other)
-      : std::vector<InstructionGroupRequest>(Other), MBB(Other.MBB),
-        Limit(Other.Limit) {
-    setModeChangingPolicies(Other);
-  }
-
-  BasicBlockRequest &operator=(const BasicBlockRequest &Other) {
-    if (this == &Other)
-      return *this;
-    std::vector<InstructionGroupRequest>::operator=(Other);
-    MBB = Other.MBB;
-    Limit = Other.Limit;
-    setModeChangingPolicies(Other);
-    return *this;
-  }
-
-  BasicBlockRequest(BasicBlockRequest &&) = default;
-  BasicBlockRequest &operator=(BasicBlockRequest &&) = default;
-  ~BasicBlockRequest() = default;
-
-  RequestLimit &limit() & { return Limit; }
 
   const RequestLimit &limit() const & { return Limit; }
 
@@ -289,14 +293,21 @@ public:
     return Limit.isReached(Stats);
   }
 
+  size_t numIGs() const {
+    return std::accumulate(begin(), end(), 0u, [](auto Acc, const auto &Entry) {
+      return Acc + Entry.numIGs();
+    });
+  }
+
   using vector::begin;
-  using vector::cbegin;
-  using vector::cend;
   using vector::end;
 
   using vector::back;
   using vector::empty;
   using vector::size;
+
+  using vector::iterator;
+  using vector::operator[];
 
   void print(raw_ostream &OS, size_t Indent = 0) const {
     OS.indent(Indent) << "BasicBlockRequest<" << Limit.getAsString() << ">("
@@ -305,9 +316,26 @@ public:
              [&](auto &Req) { Req.print(OS, Indent + SubReqIndentSize); });
   }
 
+  // Add in last single context group
   void add(InstructionGroupRequest IG) {
-    vector::emplace_back(std::move(IG));
-    Limit += vector::back().limit();
+    if (empty())
+      emplace_back(SingleContextGroup{});
+    Limit += IG.limit();
+    back().add(std::move(IG));
+  }
+
+  void add(iterator It, InstructionGroupRequest IG) {
+    Limit += IG.limit();
+    It->add(std::move(IG));
+  }
+
+  void add(SingleContextGroup &&SG) {
+    Limit += SG.limit();
+    emplace_back(std::move(SG));
+  }
+
+  void shuffle() {
+    for_each(*this, [](auto &SG) { SG.shuffle(); });
   }
 };
 
@@ -329,9 +357,6 @@ class FunctionRequest final
            "Size generation mode for block is incompatible with function "
            "generation by num instrs");
   }
-  // It is used in DFGenerator because sometimes we may need to change the
-  // weights of opcodes.
-  std::unordered_map<unsigned, double> OpcWeightOverrides;
 
 public:
   FunctionRequest(const MachineFunction &MFn, GeneratorContext &GC,
@@ -340,51 +365,77 @@ public:
       : MF(&MFn), Limit(RequestLimit::Mixed{}), FinalInstrDesc(FinalInstrDesc),
         GC(&GC){};
 
-  auto &getOpcodeWeightOverrides() { return OpcWeightOverrides; }
-  const auto &getOpcodeWeightOverrides() const { return OpcWeightOverrides; }
-
   void setFinalInstr(const MCInstrDesc *Desc) { FinalInstrDesc = Desc; }
 
-  void addToBlock(const MachineBasicBlock *MBB, InstructionGroupRequest IG) {
-    assert(MBB);
-    checkLimitCompatibility(IG.limit());
-    auto Found = map::find(MBB);
-    if (Found == map::end()) {
-      BasicBlockRequest BB(*MBB);
-      BB.add(std::move(IG));
-      add(MBB, std::move(BB));
-    } else {
-      auto &BB = Found->second;
-      auto Lim = IG.limit();
-      BB.add(std::move(IG));
-      Limit += Lim;
-    }
+  SmallVector<size_t> getNumCtxGroupsPerMBBs(
+      const std::vector<const MachineBasicBlock *> &Blocks) const {
+    SmallVector<size_t> ModeChangesPerMBBs;
+    ModeChangesPerMBBs.reserve(Blocks.size());
+    transform(Blocks, std::back_inserter(ModeChangesPerMBBs),
+              [&](const auto *MBB) {
+                auto Found = map::find(MBB);
+                auto &BBReq = Found->second;
+                return BBReq.size();
+              });
+    return ModeChangesPerMBBs;
   }
 
-  bool isLimitReached(const GenerationStatistics &Stats) const {
-    return Limit.isReached(Stats);
-  }
-  void add(const MachineBasicBlock *MBB, BasicBlockRequest &&BB) {
+  auto add(const MachineBasicBlock *MBB, BasicBlockRequest &&BB) {
     assert(MBB);
     checkLimitCompatibility(BB.limit());
     auto [It, WasInserted] = map::try_emplace(MBB, std::move(BB));
     assert(WasInserted);
     Limit += It->second.limit();
+    return It;
+  }
+
+  // Here can be InstructionGroupRequest or SingleContextGroup
+  template <typename GroupRequest>
+  void addToBlock(const MachineBasicBlock *MBB, GroupRequest &&G) {
+    assert(MBB);
+    checkLimitCompatibility(G.limit());
+    auto Found = map::find(MBB);
+    if (Found != map::end()) {
+      auto &BB = Found->second;
+      Limit += G.limit();
+      BB.add(std::move(G));
+      return;
+    }
+    BasicBlockRequest BB(MBB);
+    BB.add(std::move(G));
+    add(MBB, std::move(BB));
+  }
+
+  void addToBlockIn(const MachineBasicBlock *MBB,
+                    BasicBlockRequest::iterator It,
+                    InstructionGroupRequest IG) {
+    checkLimitCompatibility(IG.limit());
+    auto Found = map::find(MBB);
+    assert(Found != map::end());
+    auto &BBReq = Found->second;
+    assert(It >= BBReq.begin() && It < BBReq.end());
+    Limit += IG.limit();
+    BBReq.add(It, std::move(IG));
+  }
+
+  bool isLimitReached(const GenerationStatistics &Stats) const {
+    return Limit.isReached(Stats);
   }
 
   const RequestLimit &limit() const & { return Limit; }
 
-  using map::begin;
-  using map::cbegin;
-  using map::cend;
-  using map::end;
+  BasicBlockRequest &get(const MachineBasicBlock *MBB) {
+    assert(MBB);
+    auto Found = map::find(MBB);
+    assert(Found != map::end());
+    return Found->second;
+  }
+
+  bool contains(const MachineBasicBlock *MBB) { return map::count(MBB); }
 
   using map::at;
-  using map::clear;
-  using map::count;
-  using map::empty;
-  using map::find;
-  using map::size;
+  using map::begin;
+  using map::end;
 
   std::vector<InstructionGroupRequest>
   getFinalGenReqs(const GenerationStatistics &MFStats) const {
@@ -413,6 +464,10 @@ public:
       Reqs.emplace_back(RequestLimit::NumInstrs{NumInstrsLeft}, std::move(GP));
     }
     return Reqs;
+  }
+
+  void shuffle() {
+    for_each(*this, [](auto &MBB) { MBB.second.shuffle(); });
   }
 
   void print(raw_ostream &OS, size_t Indent = 0) const {
