@@ -1,0 +1,27 @@
+# REQUIRES: riscv-rvv
+# RUN: not llvm-snippy %s \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: all
+  dump-mf: on
+
+sections:
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x4000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+
+histogram:
+    - [VADD_VV, 1.0]
+    - [VSETVL, 1.0]
+
+# CHECK: error: Generation by size with rvv is not supported yet

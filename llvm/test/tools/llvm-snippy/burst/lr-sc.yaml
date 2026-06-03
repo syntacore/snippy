@@ -3,7 +3,7 @@
 # RUN:   -init-regs-in-elf
 
 include:
-- Inputs/large-addrs-scheme.yaml
+- ../Inputs/large-addrs-scheme.yaml
 - Inputs/custom-burst-load-store.yaml
 
 sections:

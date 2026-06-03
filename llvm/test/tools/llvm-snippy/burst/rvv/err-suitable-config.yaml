@@ -1,0 +1,45 @@
+# COM: This test checks if for burst opcodes there is no suitable rvv
+#      configuration, then this is an error.
+# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  march: rv64imfdv
+  num-instrs: 100
+
+include:
+  - Inputs/sections.yaml
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: 0.2
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+        sew_16: 1.0
+      LMUL:
+        m4: 1.0
+        m8: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+burst:
+  mode: load-store
+  min-size: 1
+  max-size: 1
+
+histogram:
+  - ["V[LS][OU]XEI64_V", 1.0]
+
+# COM: There is no suitable rvv configuration here because all values of EMUL
+# COM: (EMUL = (EEW/SEW)*LMUL) are greater than 8 => illegal instruction
+# CHECK: error: Can't find suitable RVV configuration for burst group
