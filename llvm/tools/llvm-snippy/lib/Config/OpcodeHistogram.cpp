@@ -17,6 +17,7 @@
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "snippy/Support/OpcodeCache.h"
 #include "snippy/Target/Target.h"
 
 #include <optional>
@@ -93,6 +94,7 @@ OpcodeHistogram OpcodeHistogramNormalization::denormalize(yaml::IO &IO) {
     Result.reinitProbabilityVisitor();
     return Result;
   }
+  auto OpCC = ConfigIOCtx->OpCC;
   for (auto &&[NameInfo, WeightStr] : NameWeightSeq) {
     auto Weight = parseWeight(WeightStr);
     if (!Weight) {
@@ -102,6 +104,13 @@ OpcodeHistogram OpcodeHistogramNormalization::denormalize(yaml::IO &IO) {
     }
 
     auto Name = NameInfo.Val;
+    if (auto OpcOpt = OpCC.code(Name); OpcOpt) {
+      auto Opc = Tgt.getInternalOpcode(*OpcOpt);
+      bool OpcAlreadyDefined = Result.topOpcodes().count(Opc);
+      if (OpcAlreadyDefined) {
+        duplicateInstructionMsg(ConfigIOCtx->State.getCtx(), Name);
+      }
+    }
     if (NameInfo.Kind == yaml::NodeKind::Map) {
       if (auto ErrStr = insertHistogramNode(Result, Name, Weight.get());
           !ErrStr.empty()) {
@@ -109,7 +118,7 @@ OpcodeHistogram OpcodeHistogramNormalization::denormalize(yaml::IO &IO) {
         return {};
       }
     } else if (NameInfo.Kind == yaml::NodeKind::Scalar) {
-      auto DecodeEntry = decodeInstrRegex(IO, NameInfo.Val, Weight.get());
+      auto DecodeEntry = decodeInstrRegex(IO, Name, Weight.get());
       if (!DecodeEntry) {
         IO.setError(llvm::toString(DecodeEntry.takeError()));
         return {};
