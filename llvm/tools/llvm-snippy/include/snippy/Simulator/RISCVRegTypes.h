@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_RISCVREGTYPES_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_RISCVREGTYPES_H
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -32,3 +33,4 @@ constexpr inline StringRef regTypeToString(RegType RT) {
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_RISCVREGTYPES_H

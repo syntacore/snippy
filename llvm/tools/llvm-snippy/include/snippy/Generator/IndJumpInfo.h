@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_SNIPPY_INCLUDE_GENERATOR_IND_JUMP_INFO_H
-#define LLVM_SNIPPY_INCLUDE_GENERATOR_IND_JUMP_INFO_H
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_INDJUMPINFO_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_INDJUMPINFO_H
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
@@ -50,5 +50,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
-
-#endif
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_INDJUMPINFO_H

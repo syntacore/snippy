@@ -12,7 +12,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_TARGET_TARGETSELECT_H
+#define LLVM_TOOLS_LLVM_SNIPPY_TARGET_TARGETSELECT_H
 
 namespace llvm {
 namespace snippy {
@@ -30,3 +31,4 @@ inline void InitializeAllSnippyTargets() {
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_TARGET_TARGETSELECT_H

@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TOOLS_SNIPPY_GENERATION_LIMIT_H
-#define LLVM_TOOLS_SNIPPY_GENERATION_LIMIT_H
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATIONLIMIT_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATIONLIMIT_H
 
 #include "snippy/Support/Utils.h"
 
@@ -97,4 +97,4 @@ public:
 } // namespace planning
 } // namespace snippy
 } // namespace llvm
-#endif
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATIONLIMIT_H

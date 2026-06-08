@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_TYPES_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_TYPES_H
 
 #include "llvm/ADT/APInt.h"
 
@@ -22,3 +23,4 @@ using MaxInstrBitsType = uint32_t;
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_TYPES_H

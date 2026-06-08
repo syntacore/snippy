@@ -5,7 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SIMULATORCONTEXTWRAPPERPASS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SIMULATORCONTEXTWRAPPERPASS_H
 
 #include "snippy/ActiveImmutablePass.h"
 #include "snippy/Generator/SimulatorContext.h"
@@ -73,3 +74,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SIMULATORCONTEXTWRAPPERPASS_H

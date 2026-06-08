@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_OPCODEHISTOGRAM_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_OPCODEHISTOGRAM_H
 
 #include "snippy/Config/HistogramPatterns.h"
 #include "snippy/Config/OpcodeHistogramVisitor.h"
@@ -428,3 +429,4 @@ void yamlize(yaml::IO &, snippy::OpcodeHistogramDecodedEntry &, bool,
              EmptyContext &Ctx);
 } // namespace yaml
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_OPCODEHISTOGRAM_H

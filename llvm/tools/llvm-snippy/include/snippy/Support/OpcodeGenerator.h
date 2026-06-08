@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_OPCODEGENERATOR_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_OPCODEGENERATOR_H
 
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Support/DiagnosticInfo.h"
@@ -77,3 +78,4 @@ unsigned generateSingleOpcode(OpcodeGeneratorType &&OpcGen) {
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_OPCODEGENERATOR_H

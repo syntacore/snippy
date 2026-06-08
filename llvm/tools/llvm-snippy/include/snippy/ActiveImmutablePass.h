@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_ACTIVEIMMUTABLEPASS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_ACTIVEIMMUTABLEPASS_H
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/Pass.h"
 
@@ -263,3 +264,4 @@ private:
   }
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_ACTIVEIMMUTABLEPASS_H

@@ -12,7 +12,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_AARCH64_AARCH64GENERATED_H
+#define LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_AARCH64_AARCH64GENERATED_H
 
 #include "MCTargetDesc/AArch64MCTargetDesc.h"
 
@@ -20,3 +21,4 @@
 namespace llvm {
 namespace snippy {} // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_AARCH64_AARCH64GENERATED_H

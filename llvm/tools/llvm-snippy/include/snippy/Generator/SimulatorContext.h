@@ -5,7 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SIMULATORCONTEXT_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SIMULATORCONTEXT_H
 #include "snippy/Config/Config.h"
 #include "snippy/Generator/MemoryManager.h"
 #include "snippy/Generator/SimRunner.h"
@@ -67,3 +68,4 @@ private:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SIMULATORCONTEXT_H

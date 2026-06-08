@@ -13,7 +13,8 @@
 ///
 //===----------------------------------------------------------------------===//
 //
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_IMMEDIATEHISTOGRAM_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_IMMEDIATEHISTOGRAM_H
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/OpcodeCache.h"
 #include "snippy/Support/RandUtil.h"
@@ -504,3 +505,4 @@ LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::ImmHistOperandsEntryHolder);
 LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::ImmHistOperandsEntryHolder, false);
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::ImmediateHistogramSequence);
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_IMMEDIATEHISTOGRAM_H

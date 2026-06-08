@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_LOOPCANONICALIZATION_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_LOOPCANONICALIZATION_H
 
 #include "llvm/CodeGen/MachineLoopInfo.h"
 
@@ -23,3 +24,4 @@ bool canonicalizeLoops(MachineFunction &MF, SimulatorContext &SimCtx,
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_LOOPCANONICALIZATION_H

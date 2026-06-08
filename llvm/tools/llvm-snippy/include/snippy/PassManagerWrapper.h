@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef PASS_MANAGER_WRAPPER_H_
-#define PASS_MANAGER_WRAPPER_H_
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_PASSMANAGERWRAPPER_H
+#define LLVM_TOOLS_LLVM_SNIPPY_PASSMANAGERWRAPPER_H
 
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Support/CodeGen.h"
@@ -40,5 +40,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
-
-#endif // PASS_MANAGER_WRAPPER_H_
+#endif // LLVM_TOOLS_LLVM_SNIPPY_PASSMANAGERWRAPPER_H

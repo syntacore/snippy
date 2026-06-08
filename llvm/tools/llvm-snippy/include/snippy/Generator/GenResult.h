@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TOOLS_SNIPPY_GEN_RESULT_INFO_H
-#define LLVM_TOOLS_SNIPPY_GEN_RESULT_INFO_H
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENRESULT_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENRESULT_H
 
 #include <utility>
 
@@ -50,5 +50,4 @@ template <typename T> char &GenResultT<T>::getID() {
 
 } // namespace snippy
 } // namespace llvm
-
-#endif
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENRESULT_H

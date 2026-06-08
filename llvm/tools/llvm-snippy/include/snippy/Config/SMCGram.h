@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_SMCGRAM_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_SMCGRAM_H
 
 #include "snippy/Simulator/Types.h"
 #include "snippy/Support/YAMLUtils.h"
@@ -38,3 +39,4 @@ inline constexpr StringLiteral getSMCModeName<SMCGram::SMCMode::Immediate>() {
 } // namespace snippy
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(snippy::SMCGram);
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_SMCGRAM_H

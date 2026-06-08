@@ -12,7 +12,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_RISCV_RISCVGENERATED_H
+#define LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_RISCV_RISCVGENERATED_H
 
 #include "MCTargetDesc/RISCVMCTargetDesc.h"
 #include "snippy/Simulator/Targets/RISCV.h"
@@ -2026,3 +2027,4 @@ inline SmallVector<MCRegister> getSpilledRegsFromRList(uint64_t RList) {
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_RISCV_RISCVGENERATED_H

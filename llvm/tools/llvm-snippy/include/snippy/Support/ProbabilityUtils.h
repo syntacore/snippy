@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_PROBABILITYUTILS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_PROBABILITYUTILS_H
 
 #include "snippy/Support/Utils.h"
 
@@ -213,3 +214,4 @@ static WeightsArray<T> normalizeWeights(WeightsArray<T> Weights) {
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_PROBABILITYUTILS_H

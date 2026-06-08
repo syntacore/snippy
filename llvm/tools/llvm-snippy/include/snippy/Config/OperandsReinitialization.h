@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_OPERANDSREINITIALIZATION_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_OPERANDSREINITIALIZATION_H
 
 #include "snippy/Config/OpcodeHistogram.h"
 #include "snippy/Config/Valuegram.h"
@@ -711,3 +712,4 @@ LLVM_SNIPPY_YAML_DECLARE_SEQUENCE_TRAITS(
     snippy::OpcodeValuegramSettings, snippy::OpcodeValuegramOpcSettingsEntry);
 
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_OPERANDSREINITIALIZATION_H

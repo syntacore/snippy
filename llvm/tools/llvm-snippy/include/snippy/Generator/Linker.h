@@ -14,7 +14,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_LINKER_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_LINKER_H
 
 #include "snippy/Config/Config.h"
 #include "snippy/Config/MemoryScheme.h"
@@ -183,3 +184,4 @@ private:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_LINKER_H
