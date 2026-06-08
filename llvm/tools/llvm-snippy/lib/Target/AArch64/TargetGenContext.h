@@ -1,6 +1,3 @@
-#ifndef LLVM_TOOLS_SNIPPY_LIB_AArch64_GEN_CONTEXT_H
-#define LLVM_TOOLS_SNIPPY_LIB_AArch64_GEN_CONTEXT_H
-
 //===-- TargetGenContext.h --------------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -8,6 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_AARCH64_TARGETGENCONTEXT_H
+#define LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_AARCH64_TARGETGENCONTEXT_H
 
 #include "snippy/Generator/Policy.h"
 #include "snippy/Target/Target.h"
@@ -33,5 +33,4 @@ private:
 
 } // namespace snippy
 } // namespace llvm
-
-#endif // LLVM_TOOLS_SNIPPY_LIB_AArch64_GEN_CONTEXT_H
+#endif // LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_AARCH64_TARGETGENCONTEXT_H

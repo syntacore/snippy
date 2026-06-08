@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_SNIPPY_INCLUDE_CONFIG_FPR_NAN_IDENTIFIER_H
-#define LLVM_SNIPPY_INCLUDE_CONFIG_FPR_NAN_IDENTIFIER_H
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_FPRNANIDENTIFIER_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_FPRNANIDENTIFIER_H
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
@@ -95,5 +95,4 @@ private:
 
 } // namespace snippy
 } // namespace llvm
-
-#endif
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_FPRNANIDENTIFIER_H

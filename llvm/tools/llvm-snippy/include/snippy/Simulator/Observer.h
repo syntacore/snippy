@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_OBSERVER_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_OBSERVER_H
 
 #include "Types.h"
 
@@ -85,3 +86,4 @@ public:
     assert(Res && "Observer handle to erase must be in the map");
   }
 };
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_OBSERVER_H

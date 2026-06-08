@@ -1,6 +1,3 @@
-#ifndef LLVM_TOOLS_SNIPPY_LIB_INTERPRETER_H
-#define LLVM_TOOLS_SNIPPY_LIB_INTERPRETER_H
-
 //===-- Interpreter.h -------------------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -14,6 +11,9 @@
 /// Class to execute binary code on SAIL and inspect the result.
 ///
 //===----------------------------------------------------------------------===//
+
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_INTERPRETER_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_INTERPRETER_H
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
@@ -290,5 +290,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
-
-#endif // LLVM_TOOLS_SNIPPY_LIB_INTERPRETER_H
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_INTERPRETER_H

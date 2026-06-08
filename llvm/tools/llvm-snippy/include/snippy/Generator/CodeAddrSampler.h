@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_SNIPPY_INCLUDE_GENERATOR_CODE_ADDR_SAMPLER_H
-#define LLVM_SNIPPY_INCLUDE_GENERATOR_CODE_ADDR_SAMPLER_H
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_CODEADDRSAMPLER_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_CODEADDRSAMPLER_H
 
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Generator/RandomMemAccSampler.h"
@@ -30,4 +30,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
-#endif
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_CODEADDRSAMPLER_H

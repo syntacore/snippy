@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_VALUEGRAM_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_VALUEGRAM_H
 
 #include "snippy/Support/APIntSampler.h"
 #include "snippy/Support/YAMLUtils.h"
@@ -439,3 +440,4 @@ LLVM_SNIPPY_YAML_DECLARE_SCALAR_ENUMERATION_TRAITS(
     snippy::IValuegramEntry::EntryKind);
 
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_VALUEGRAM_H

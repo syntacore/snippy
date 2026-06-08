@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_OPCODEHISTOGRAMNODE_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_OPCODEHISTOGRAMNODE_H
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -428,3 +429,4 @@ private:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_OPCODEHISTOGRAMNODE_H

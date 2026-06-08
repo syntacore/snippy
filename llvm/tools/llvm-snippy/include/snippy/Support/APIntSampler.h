@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_APINTSAMPLER_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_APINTSAMPLER_H
 
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
@@ -132,3 +133,4 @@ private:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_APINTSAMPLER_H
