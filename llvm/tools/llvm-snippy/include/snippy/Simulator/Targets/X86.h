@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_TARGETS_X86_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_TARGETS_X86_H
 
 #include "../Simulator.h"
 
@@ -31,3 +32,4 @@ std::unique_ptr<SimulatorInterface> createX86Simulator(
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_TARGETS_X86_H

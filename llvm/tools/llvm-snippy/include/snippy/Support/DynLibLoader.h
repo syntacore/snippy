@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TOOLS_SNIPPY_LIB_DYNLIBLOADER_H
-#define LLVM_TOOLS_SNIPPY_LIB_DYNLIBLOADER_H
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_DYNLIBLOADER_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_DYNLIBLOADER_H
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/FileSystem.h"
@@ -40,5 +40,4 @@ std::string getCurrentLibExecutablePath();
 } // namespace snippy
 
 } // namespace llvm
-
-#endif // LLVM_TOOLS_SNIPPY_LIB_DYNLIBLOADER_H
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_DYNLIBLOADER_H

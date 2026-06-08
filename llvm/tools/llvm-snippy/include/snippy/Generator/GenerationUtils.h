@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TOOLS_SNIPPY_GENERATION_UTILS_H
-#define LLVM_TOOLS_SNIPPY_GENERATION_UTILS_H
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATIONUTILS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATIONUTILS_H
 
 #include "snippy/Generator/GenerationLimit.h"
 #include "snippy/Generator/GlobalsPool.h"
@@ -155,4 +155,4 @@ getMainInstBuilder(const SnippyTarget &Tgt, MachineBasicBlock &MBB,
 
 } // namespace snippy
 } // namespace llvm
-#endif
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATIONUTILS_H

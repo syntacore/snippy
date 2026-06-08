@@ -14,7 +14,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SIMRUNNER_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SIMRUNNER_H
 
 #include "snippy/Generator/Interpreter.h"
 #include "snippy/Support/DiagnosticInfo.h"
@@ -84,3 +85,4 @@ private:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SIMRUNNER_H

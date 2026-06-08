@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_LIB_BLOCKGENPLANNINGPASS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_LIB_BLOCKGENPLANNINGPASS_H
 
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/Pass.h"
@@ -34,3 +35,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_LIB_BLOCKGENPLANNINGPASS_H

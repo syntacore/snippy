@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_RANDUTIL_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_RANDUTIL_H
 
 #include "Error.h"
 #include "Utils.h"
@@ -663,3 +664,4 @@ template <typename... Ts> auto selectFrom(Ts... Args) {
 }
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_RANDUTIL_H

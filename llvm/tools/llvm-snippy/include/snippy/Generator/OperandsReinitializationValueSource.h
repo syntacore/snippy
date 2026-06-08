@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_OPERANDSREINITIALIZATIONVALUESOURCE_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_OPERANDSREINITIALIZATIONVALUESOURCE_H
 
 #include "snippy/Generator/Policy.h"
 
@@ -99,3 +100,4 @@ public:
 } // namespace planning
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_OPERANDSREINITIALIZATIONVALUESOURCE_H

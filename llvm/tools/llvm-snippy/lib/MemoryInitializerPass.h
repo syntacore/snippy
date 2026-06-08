@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_LIB_MEMORYINITIALIZERPASS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_LIB_MEMORYINITIALIZERPASS_H
 
 #include "llvm/Pass.h"
 namespace llvm {
@@ -30,3 +31,4 @@ public:
 };
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_LIB_MEMORYINITIALIZERPASS_H

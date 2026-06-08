@@ -11,7 +11,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATORUTILS_LLVMSTATE_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATORUTILS_LLVMSTATE_H
 
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Target/Target.h"
@@ -261,3 +262,4 @@ private:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATORUTILS_LLVMSTATE_H

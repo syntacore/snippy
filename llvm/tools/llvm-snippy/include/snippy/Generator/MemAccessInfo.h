@@ -5,7 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_MEMACCESSINFO_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_MEMACCESSINFO_H
 
 #include "snippy/Config/MemoryScheme.h"
 
@@ -48,3 +49,4 @@ private:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_MEMACCESSINFO_H

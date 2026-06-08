@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SNIPPY_SUPPORT_OPTIONS_TD
-#define SNIPPY_SUPPORT_OPTIONS_TD
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_OPTIONS_TD
+#define LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_OPTIONS_TD
 
 // Define the kinds of options.
 class OptionKind<string name> { string Name = name; }
@@ -98,4 +98,4 @@ class CommaSeparated { bit CommaSeparated = true; }
 class CommaSeparatedList<string name, OptionType type>
     : Option<name, KindList, type>, CommaSeparated;
 
-#endif // SNIPPY_SUPPORT_OPTIONS_TD
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_OPTIONS_TD

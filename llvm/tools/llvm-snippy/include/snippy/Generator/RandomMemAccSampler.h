@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_SNIPPY_INCLUDE_GENERATOR_RAND_MEM_ACCESS_SAMPLER_H
-#define LLVM_SNIPPY_INCLUDE_GENERATOR_RAND_MEM_ACCESS_SAMPLER_H
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_RANDOMMEMACCSAMPLER_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_RANDOMMEMACCSAMPLER_H
 
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Generator/MemAccessSampler.h"
@@ -287,5 +287,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
-
-#endif
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_RANDOMMEMACCSAMPLER_H

@@ -5,8 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-#ifndef CFGPRINTER_H
-#define CFGPRINTER_H
+
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_LIB_CFGPRINTER_H
+#define LLVM_TOOLS_LLVM_SNIPPY_LIB_CFGPRINTER_H
 
 #include "snippy/Support/Utils.h"
 
@@ -41,5 +42,4 @@ bool shouldViewCFGAfterPass(StringRef PassID);
 
 } // namespace snippy
 } // namespace llvm
-
-#endif
+#endif // LLVM_TOOLS_LLVM_SNIPPY_LIB_CFGPRINTER_H

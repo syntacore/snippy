@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_FUNCTIONGENERATORPASS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_FUNCTIONGENERATORPASS_H
 
 #include "snippy/Config/FunctionDescriptions.h"
 #include "snippy/Generator/CallGraphState.h"
@@ -129,3 +130,4 @@ private:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_FUNCTIONGENERATORPASS_H

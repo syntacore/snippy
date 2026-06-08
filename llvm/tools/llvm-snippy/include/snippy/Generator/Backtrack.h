@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TOOLS_SNIPPY_BACKTRACK_H
-#define LLVM_TOOLS_SNIPPY_BACKTRACK_H
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_BACKTRACK_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_BACKTRACK_H
 
 #include "snippy/Generator/Interpreter.h"
 
@@ -31,5 +31,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
-
-#endif
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_BACKTRACK_H

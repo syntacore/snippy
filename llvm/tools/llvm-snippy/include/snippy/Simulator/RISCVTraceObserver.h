@@ -1,6 +1,3 @@
-#ifndef LLVM_TOOLS_SNIPPY_RISCV_TRACE_OBSERVER_H
-#define LLVM_TOOLS_SNIPPY_RISCV_TRACE_OBSERVER_H
-
 //===-- RISCVTraceObserver.h---------------------------------------*-C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -8,6 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_RISCVTRACEOBSERVER_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_RISCVTRACEOBSERVER_H
 
 #include "snippy/Simulator/RISCVConverterSNTF.h"
 
@@ -38,5 +38,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
-
-#endif // LLVM_TOOLS_SNIPPY_RISCV_TRACE_OBSERVER_H
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_RISCVTRACEOBSERVER_H

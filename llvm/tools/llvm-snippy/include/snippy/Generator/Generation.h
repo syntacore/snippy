@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TOOLS_SNIPPY_GENERATION_H
-#define LLVM_TOOLS_SNIPPY_GENERATION_H
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATION_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATION_H
 
 namespace llvm {
 class MachineFunction;
@@ -47,4 +47,4 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
 
 } // namespace snippy
 } // namespace llvm
-#endif
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATION_H

@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_DIAGNOSTICINFO_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_DIAGNOSTICINFO_H
 
 #include "Error.h"
 
@@ -151,3 +152,4 @@ template <typename T> T unwrapOrFatal(Expected<T> ValOrErr) {
 } // namespace snippy
 
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_DIAGNOSTICINFO_H

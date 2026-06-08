@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_TARGET_TARGETCONFIGIFACE_H
+#define LLVM_TOOLS_LLVM_SNIPPY_TARGET_TARGETCONFIGIFACE_H
 
 #include "snippy/Support/YAMLUtils.h"
 namespace llvm {
@@ -46,3 +47,4 @@ struct SelfcheckTargetConfigInterface {
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::SelfcheckTargetConfigInterface);
 
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_TARGET_TARGETCONFIGIFACE_H

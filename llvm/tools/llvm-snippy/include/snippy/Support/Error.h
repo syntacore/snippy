@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_ERROR_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_ERROR_H
 
 #include "llvm/ADT/Twine.h"
 #include "llvm/CodeGen/RegisterClassInfo.h"
@@ -68,3 +69,4 @@ public:
 };
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_ERROR_H

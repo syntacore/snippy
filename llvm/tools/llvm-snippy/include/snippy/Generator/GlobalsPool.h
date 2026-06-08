@@ -14,7 +14,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GLOBALSPOOL_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GLOBALSPOOL_H
 
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/GeneratorUtils/LLVMState.h"
@@ -178,3 +179,4 @@ private:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GLOBALSPOOL_H

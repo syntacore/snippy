@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_FUNCTIONDESCRIPTIONS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_FUNCTIONDESCRIPTIONS_H
 
 #include "snippy/Support/YAMLUtils.h"
 
@@ -48,3 +49,4 @@ LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(snippy::FunctionDesc);
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(snippy::FunctionDescs);
 LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::FunctionDesc, false);
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_FUNCTIONDESCRIPTIONS_H

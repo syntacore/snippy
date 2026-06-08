@@ -39,7 +39,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATIONREQUEST_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATIONREQUEST_H
 
 #include "snippy/Generator/GenerationLimit.h"
 #include "snippy/Generator/GeneratorContext.h"
@@ -483,3 +484,4 @@ public:
 } // namespace planning
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATIONREQUEST_H

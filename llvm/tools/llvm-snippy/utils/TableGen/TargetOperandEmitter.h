@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_CODEGEN_TARGETOPERANDEMITTER_H
-#define LLVM_CODEGEN_TARGETOPERANDEMITTER_H
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_UTILS_TABLEGEN_TARGETOPERANDEMITTER_H
+#define LLVM_TOOLS_LLVM_SNIPPY_UTILS_TABLEGEN_TARGETOPERANDEMITTER_H
 
 #include "Common/CodeGenTarget.h"
 #include "Common/PredicateExpander.h"
@@ -77,4 +77,4 @@ private:
 } // namespace snippy
 } // namespace llvm
 
-#endif // LLVM_CODEGEN_TARGETOPERANDEMITTER_H
+#endif // LLVM_TOOLS_LLVM_SNIPPY_UTILS_TABLEGEN_TARGETOPERANDEMITTER_H
