@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TOOLS_SNIPPY_SELFCHECK_INFO_H
-#define LLVM_TOOLS_SNIPPY_SELFCHECK_INFO_H
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SELFCHECKINFO_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SELFCHECKINFO_H
 
 #include "snippy/Config/MemoryScheme.h"
 #include "snippy/Generator/GenResult.h"
@@ -44,4 +44,4 @@ extern template class GenResultT<SelfcheckMap>;
 
 } // namespace snippy
 } // namespace llvm
-#endif
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SELFCHECKINFO_H

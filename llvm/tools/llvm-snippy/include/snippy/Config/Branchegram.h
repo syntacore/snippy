@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_BRANCHEGRAM_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_BRANCHEGRAM_H
 
 #include "snippy/Simulator/Types.h"
 #include "snippy/Support/YAMLUtils.h"
@@ -133,3 +134,4 @@ struct Branchegram final {
 } // namespace snippy
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(snippy::Branchegram);
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_BRANCHEGRAM_H

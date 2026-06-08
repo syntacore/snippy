@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_YAMLUTILS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_YAMLUTILS_H
 
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/Utils.h"
@@ -399,3 +400,4 @@ LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::SList, false /* not a flow */);
 LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::SValue, true /* flow sequence */);
 
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_YAMLUTILS_H

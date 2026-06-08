@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_SNIPPY_INCLUDE_CONFIG_REGACCESS_H
-#define LLVM_SNIPPY_INCLUDE_CONFIG_REGACCESS_H
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_REGISTERACCESS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_REGISTERACCESS_H
 
 #include "snippy/Support/YAMLUtils.h"
 #include <unordered_map>
@@ -94,5 +94,4 @@ struct RegisterAccessConfig final : private std::map<unsigned, AccessMaskBit> {
 
 LLVM_SNIPPY_YAML_DECLARE_CUSTOM_MAPPING_TRAITS(
     llvm::snippy::RegisterAccessConfig);
-
-#endif // #ifdef LLVM_SNIPPY_INCLUDE_CONFIG_REGACCESS_H
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_REGISTERACCESS_H

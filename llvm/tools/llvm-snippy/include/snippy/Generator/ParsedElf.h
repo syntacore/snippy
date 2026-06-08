@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_PARSEDELF_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_PARSEDELF_H
 
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/Error.h"
@@ -173,3 +174,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_PARSEDELF_H

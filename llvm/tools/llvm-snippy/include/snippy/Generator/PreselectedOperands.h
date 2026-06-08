@@ -5,8 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-#ifndef LLVM_TOOLS_SNIPPY_GENERATION_PRESELECTED_OPERANDS_H
-#define LLVM_TOOLS_SNIPPY_GENERATION_PRESELECTED_OPERANDS_H
+
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_PRESELECTEDOPERANDS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_PRESELECTEDOPERANDS_H
 
 #include "snippy/Config/ImmediateHistogram.h"
 
@@ -91,5 +92,4 @@ public:
 using PreselectedOperands = SmallVector<PreselectedOpInfo, 8>;
 
 } // namespace llvm::snippy::planning
-
-#endif
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_PRESELECTEDOPERANDS_H

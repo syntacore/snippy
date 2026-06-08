@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SNIPPYMODULE_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SNIPPYMODULE_H
 
 #include "snippy/Generator/GenResult.h"
 #include "snippy/Generator/GlobalsPool.h"
@@ -393,3 +394,4 @@ private:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SNIPPYMODULE_H

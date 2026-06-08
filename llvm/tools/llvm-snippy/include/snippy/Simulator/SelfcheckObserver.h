@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_SELFCHECKOBSERVER_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_SELFCHECKOBSERVER_H
 
 #include "Observer.h"
 
@@ -60,3 +61,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_SELFCHECKOBSERVER_H

@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_SNIPPY_INCLUDE_GENERATOR_CODE_ADDR_SAMPLING_PASS_H
-#define LLVM_SNIPPY_INCLUDE_GENERATOR_CODE_ADDR_SAMPLING_PASS_H
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_CODEADDRSAMPLINGPASS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_CODEADDRSAMPLINGPASS_H
 
 #include "llvm/CodeGen/MachineFunctionPass.h"
 
@@ -34,4 +34,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
-#endif
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_CODEADDRSAMPLINGPASS_H

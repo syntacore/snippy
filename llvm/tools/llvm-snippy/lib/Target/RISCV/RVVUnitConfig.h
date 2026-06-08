@@ -1,6 +1,3 @@
-#ifndef LLVM_TOOLS_SNIPPY_LIB_RISCV_TARGET_RVV_UNIT_CONFIG_H
-#define LLVM_TOOLS_SNIPPY_LIB_RISCV_TARGET_RVV_UNIT_CONFIG_H
-
 //===-- RVVUnitConfig.h -----------------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -8,6 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_RISCV_RVVUNITCONFIG_H
+#define LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_RISCV_RVVUNITCONFIG_H
 
 #include "MCTargetDesc/RISCVBaseInfo.h"
 #include "snippy/Simulator/Targets/RISCV.h"
@@ -410,5 +410,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
-
-#endif // LLVM_TOOLS_SNIPPY_LIB_RISCV_TARGET_RVV_UNIT_CONFIG_H
+#endif // LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_RISCV_RVVUNITCONFIG_H

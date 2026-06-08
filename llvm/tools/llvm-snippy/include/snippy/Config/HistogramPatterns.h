@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_HISTOGRAMPATTERNS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_HISTOGRAMPATTERNS_H
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
@@ -118,3 +119,4 @@ LLVM_SNIPPY_YAML_DECLARE_CUSTOM_MAPPING_TRAITS(snippy::HistogramPatternsEntry);
 LLVM_SNIPPY_YAML_DECLARE_SEQUENCE_TRAITS(snippy::HistogramPatterns,
                                          snippy::HistogramPatternsEntry);
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_HISTOGRAMPATTERNS_H

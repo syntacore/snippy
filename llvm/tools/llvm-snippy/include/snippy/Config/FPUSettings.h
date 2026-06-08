@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_SNIPPY_INCLUDE_CONFIG_FPU_SETTINGS_H
-#define LLVM_SNIPPY_INCLUDE_CONFIG_FPU_SETTINGS_H
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_FPUSETTINGS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_FPUSETTINGS_H
 
 #include "snippy/Config/RegisterHistogram.h"
 #include "snippy/Config/Valuegram.h"
@@ -114,5 +114,4 @@ LLVM_SNIPPY_YAML_DECLARE_SCALAR_ENUMERATION_TRAITS(snippy::FloatOverwriteMode);
 LLVM_SNIPPY_YAML_DECLARE_SCALAR_ENUMERATION_TRAITS(snippy::FPURoundingMode);
 
 } // namespace llvm
-
-#endif
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_FPUSETTINGS_H

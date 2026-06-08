@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SNIPPYLOOPINFO_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SNIPPYLOOPINFO_H
 
 #include "llvm/ADT/DenseMap.h"
 
@@ -110,3 +111,4 @@ private:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SNIPPYLOOPINFO_H

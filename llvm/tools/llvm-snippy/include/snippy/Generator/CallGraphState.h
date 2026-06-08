@@ -14,7 +14,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_CALLGRAPHSTATE_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_CALLGRAPHSTATE_H
 
 #include "snippy/Support/YAMLUtils.h"
 
@@ -262,3 +263,4 @@ struct DOTGraphTraits<snippy::CallGraphState> : public DefaultDOTGraphTraits {
 };
 
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_CALLGRAPHSTATE_H

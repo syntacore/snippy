@@ -1,6 +1,3 @@
-#ifndef LLVM_TOOLS_SNIPPY_LIB_RISCV_TARGET_CONFIG_H
-#define LLVM_TOOLS_SNIPPY_LIB_RISCV_TARGET_CONFIG_H
-
 //===-- TargetConfig.h ------------------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -8,6 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_RISCV_TARGETCONFIG_H
+#define LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_RISCV_TARGETCONFIG_H
 
 #include "snippy/Target/Target.h"
 
@@ -49,5 +49,4 @@ struct RISCVSelfcheckTargetConfig final
 };
 
 } // namespace llvm::snippy
-
-#endif // LLVM_TOOLS_SNIPPY_LIB_RISCV_TARGET_CONFIG_H
+#endif // LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_RISCV_TARGETCONFIG_H

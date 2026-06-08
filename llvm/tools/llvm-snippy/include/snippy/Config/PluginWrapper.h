@@ -5,7 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_PLUGINWRAPPER_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_PLUGINWRAPPER_H
 
 #include "snippy/Plugins/PluginCInterface.h"
 #include "snippy/Support/DiagnosticInfo.h"
@@ -148,3 +149,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_PLUGINWRAPPER_H

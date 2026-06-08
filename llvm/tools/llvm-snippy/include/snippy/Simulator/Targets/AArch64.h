@@ -5,8 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-#ifndef LLVM_TOOLS_SNIPPY_SIMULATOR_TARGETS_AARCH64
-#define LLVM_TOOLS_SNIPPY_SIMULATOR_TARGETS_AARCH64
+
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_TARGETS_AARCH64_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_TARGETS_AARCH64_H
 
 #include "../Simulator.h"
 
@@ -31,4 +32,4 @@ std::unique_ptr<SimulatorInterface> createAArch64Simulator(
 
 } // namespace snippy
 } // namespace llvm
-#endif // LLVM_TOOLS_SNIPPY_SIMULATOR_TARGETS_AARCH64
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_TARGETS_AARCH64_H

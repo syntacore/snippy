@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_YAMLHISTOGRAM_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_YAMLHISTOGRAM_H
 
 #include "snippy/Support/YAMLUtils.h"
 
@@ -246,3 +247,4 @@ void yamlize(yaml::IO &Io, snippy::YAMLHistogramIO<T> &Hist, bool,
     yamlize(Io, Norm->Elements, true /* not used */, Ctx);                     \
   }                                                                            \
   } // namespace yaml
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_YAMLHISTOGRAM_H

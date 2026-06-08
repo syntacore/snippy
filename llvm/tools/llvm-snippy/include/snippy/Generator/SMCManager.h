@@ -5,7 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SMCMANAGER_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SMCMANAGER_H
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
@@ -87,3 +88,4 @@ public:
 };
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SMCMANAGER_H

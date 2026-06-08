@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_INTERVALSTOVERIFY_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_INTERVALSTOVERIFY_H
 
 #include "llvm/Support/Error.h"
 
@@ -47,3 +48,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_INTERVALSTOVERIFY_H

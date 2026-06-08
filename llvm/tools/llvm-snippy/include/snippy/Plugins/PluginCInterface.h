@@ -5,7 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_PLUGINS_PLUGINCINTERFACE_H
+#define LLVM_TOOLS_LLVM_SNIPPY_PLUGINS_PLUGINCINTERFACE_H
 
 #define PLUGIN_ENTRY_NAME "FuncTable"
 
@@ -66,3 +67,4 @@ struct PluginFunctionsTable {
 #ifdef __cplusplus
 }
 #endif
+#endif // LLVM_TOOLS_LLVM_SNIPPY_PLUGINS_PLUGINCINTERFACE_H
