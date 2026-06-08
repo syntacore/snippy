@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_MEMINITIALIZATIONMODE_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_MEMINITIALIZATIONMODE_H
 
 #include "snippy/Support/Options.h"
 #include "snippy/Support/YAMLUtils.h"
@@ -161,3 +162,4 @@ private:
 LLVM_SNIPPY_YAML_DECLARE_SCALAR_ENUMERATION_TRAITS(snippy::MemInitMode);
 
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_MEMINITIALIZATIONMODE_H

@@ -5,8 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-#ifndef LLVM_TOOLS_SNIPPY_LIB_UTILS
-#define LLVM_TOOLS_SNIPPY_LIB_UTILS
+
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_UTILS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_UTILS_H
 
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/MC/MCInstrInfo.h"
@@ -454,5 +455,4 @@ template <typename T> void normalizeValues(T &&RangeOrContainer) {
 }
 } // namespace snippy
 } // namespace llvm
-
-#endif
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_UTILS_H

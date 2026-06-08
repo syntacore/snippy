@@ -5,8 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-#ifndef LLVM_SNIPPY_INCLUDE_GENERATOR_OPERAND_GENERATOR_H
-#define LLVM_SNIPPY_INCLUDE_GENERATOR_OPERAND_GENERATOR_H
+
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SNIPPYOPERANDGENERATOR_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SNIPPYOPERANDGENERATOR_H
 
 #include "snippy/Config/ImmediateHistogram.h"
 #include "snippy/Generator/GenerationUtils.h"
@@ -88,5 +89,4 @@ public:
 };
 } // namespace snippy
 } // namespace llvm
-
-#endif // LLVM_SNIPPY_INCLUDE_GENERATOR_OPERAND_GENERATOR_H
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SNIPPYOPERANDGENERATOR_H

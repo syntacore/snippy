@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_CFPERMUTATIONPASS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_CFPERMUTATIONPASS_H
 
 #include "snippy/ActiveImmutablePass.h"
 #include "snippy/Generator/CFPermutation.h"
@@ -32,3 +33,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_CFPERMUTATIONPASS_H

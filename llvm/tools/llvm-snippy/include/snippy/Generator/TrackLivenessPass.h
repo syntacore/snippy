@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_TRACKLIVENESSPASS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_TRACKLIVENESSPASS_H
 
 #include "llvm/CodeGen/MachineFunctionPass.h"
 
@@ -33,3 +34,4 @@ private:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_TRACKLIVENESSPASS_H

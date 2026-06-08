@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATORUTILS_REGISTERPOOLIMPL_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATORUTILS_REGISTERPOOLIMPL_H
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
@@ -193,3 +194,4 @@ class AvailableRegisterImpl {
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATORUTILS_REGISTERPOOLIMPL_H

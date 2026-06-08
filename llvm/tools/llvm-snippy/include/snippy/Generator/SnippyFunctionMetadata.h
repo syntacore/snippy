@@ -5,7 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SNIPPYFUNCTIONMETADATA_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SNIPPYFUNCTIONMETADATA_H
 #include "llvm/Pass.h"
 
 #include <unordered_map>
@@ -41,3 +42,4 @@ private:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_SNIPPYFUNCTIONMETADATA_H

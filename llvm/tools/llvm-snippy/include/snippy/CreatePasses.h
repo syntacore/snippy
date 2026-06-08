@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CREATEPASSES_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CREATEPASSES_H
 
 #include <string>
 #include <vector>
@@ -127,3 +128,4 @@ MachineFunctionPass *createLongJumpRelaxatorPass();
 
 MachineFunctionPass *createLinkerConfigurePass();
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CREATEPASSES_H

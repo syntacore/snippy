@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_CONFIGIOCONTEXT_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_CONFIGIOCONTEXT_H
 
 namespace llvm {
 namespace snippy {
@@ -25,3 +26,4 @@ struct ConfigIOContext {
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_CONFIGIOCONTEXT_H

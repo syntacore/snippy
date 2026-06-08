@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATORCONTEXTPASS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATORCONTEXTPASS_H
 
 #include "snippy/Generator/GeneratorContext.h"
 #include "llvm/Pass.h"
@@ -37,3 +38,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATORCONTEXTPASS_H

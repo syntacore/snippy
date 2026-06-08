@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_YAMLNUMERICRANGE_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_YAMLNUMERICRANGE_H
 
 #include "snippy/Support/YAMLUtils.h"
 
@@ -28,3 +29,4 @@ template <typename T> struct yaml::MappingTraits<snippy::NumericRange<T>> {
 };
 
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_YAMLNUMERICRANGE_H

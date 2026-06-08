@@ -61,7 +61,8 @@
 /// necessary information about MyPolicy.
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_POLICY_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_POLICY_H
 
 #include "snippy/Config/Config.h"
 #include "snippy/Config/OpcodeHistogram.h"
@@ -623,3 +624,4 @@ getPreselectedForInstr(const OperandsTy &Operands) {
 } // namespace planning
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_POLICY_H

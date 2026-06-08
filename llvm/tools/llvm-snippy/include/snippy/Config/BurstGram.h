@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_BURSTGRAM_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_BURSTGRAM_H
 
 #include "snippy/Config/ConfigIOContext.h"
 #include "snippy/Support/YAMLUtils.h"
@@ -67,3 +68,4 @@ struct BurstGramData final {
 } // namespace snippy
 LLVM_SNIPPY_YAML_DECLARE_SCALAR_ENUMERATION_TRAITS(snippy::BurstMode);
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_BURSTGRAM_H

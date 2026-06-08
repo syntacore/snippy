@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_OPCODECACHE_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_OPCODECACHE_H
 
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallString.h"
@@ -76,3 +77,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_OPCODECACHE_H

@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_REGISTERHISTOGRAM_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_REGISTERHISTOGRAM_H
 
 #include "snippy/Config/Valuegram.h"
 #include "snippy/Support/YAMLUtils.h"
@@ -98,3 +99,4 @@ LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(
     snippy::RegisterClassHistogram);
 
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_REGISTERHISTOGRAM_H

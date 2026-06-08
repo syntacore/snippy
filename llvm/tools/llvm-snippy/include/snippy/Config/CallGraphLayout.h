@@ -13,7 +13,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_CALLGRAPHLAYOUT_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_CALLGRAPHLAYOUT_H
 
 #include "snippy/Support/YAMLUtils.h"
 
@@ -50,3 +51,4 @@ struct CallGraphLayout {
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::CallGraphLayout);
 
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_CALLGRAPHLAYOUT_H

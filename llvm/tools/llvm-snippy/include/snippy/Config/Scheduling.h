@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_SCHEDULING_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_SCHEDULING_H
 
 #include "snippy/Simulator/Types.h"
 #include "snippy/Support/YAMLUtils.h"
@@ -36,3 +37,4 @@ LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(
     snippy::SchedulingSettings);
 
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_SCHEDULING_H

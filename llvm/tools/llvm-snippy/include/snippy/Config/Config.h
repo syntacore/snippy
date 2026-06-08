@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_CONFIG_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_CONFIG_H
 
 #include "snippy/Config/Branchegram.h"
 #include "snippy/Config/BurstGram.h"
@@ -451,3 +452,4 @@ private:
 } // namespace snippy
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(snippy::Config);
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_CONFIG_H

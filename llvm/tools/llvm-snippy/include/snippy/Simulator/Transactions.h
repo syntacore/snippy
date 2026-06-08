@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_TRANSACTIONS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_TRANSACTIONS_H
 
 #include "Observer.h"
 
@@ -117,3 +118,4 @@ private:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_TRANSACTIONS_H

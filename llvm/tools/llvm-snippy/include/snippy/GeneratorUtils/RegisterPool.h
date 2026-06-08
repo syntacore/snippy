@@ -25,7 +25,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATORUTILS_REGISTERPOOL_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATORUTILS_REGISTERPOOL_H
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/LLVMContext.h"
@@ -597,3 +598,4 @@ std::vector<unsigned> RegPoolWrapper::getNAvailableRegisters(
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATORUTILS_REGISTERPOOL_H

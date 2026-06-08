@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_BLOCKGENPLANWRAPPERPASS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_BLOCKGENPLANWRAPPERPASS_H
 
 #include "snippy/Generator/GenerationRequest.h"
 
@@ -38,3 +39,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_BLOCKGENPLANWRAPPERPASS_H

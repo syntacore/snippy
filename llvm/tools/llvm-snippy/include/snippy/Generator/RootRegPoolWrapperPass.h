@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_ROOTREGPOOLWRAPPERPASS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_ROOTREGPOOLWRAPPERPASS_H
 
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/SnippyModule.h"
@@ -45,3 +46,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_ROOTREGPOOLWRAPPERPASS_H

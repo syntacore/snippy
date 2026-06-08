@@ -1,6 +1,3 @@
-#ifndef LLVM_TOOLS_SNIPPY_RISCV_CONVERTER_SNTF_H
-#define LLVM_TOOLS_SNIPPY_RISCV_CONVERTER_SNTF_H
-
 //===-- RISCVConverterSNTF.h---------------------------------------*-C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -8,6 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_RISCVCONVERTERSNTF_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_RISCVCONVERTERSNTF_H
 
 #include "snippy/Generator/Interpreter.h"
 #include "snippy/Simulator/RISCVRegTypes.h"
@@ -177,5 +177,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
-
-#endif // LLVM_TOOLS_SNIPPY_RISCV_CONVERTER_SNTF_H
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_RISCVCONVERTERSNTF_H
