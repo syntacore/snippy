@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_JUMPLENGTHENERPASS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_JUMPLENGTHENERPASS_H
 
 #include "snippy/ActiveImmutablePass.h"
 #include "snippy/Generator/IndJumpInfo.h"
@@ -33,3 +34,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_JUMPLENGTHENERPASS_H

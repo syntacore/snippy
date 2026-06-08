@@ -17,7 +17,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_REGSRESERVEDFORLOOP_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_REGSRESERVEDFORLOOP_H
 
 // we store reserved regs in SmallVector
 constexpr unsigned CounterRegIdx = 0;
@@ -25,3 +26,4 @@ constexpr unsigned LimitRegIdx = 1;
 
 constexpr unsigned MinNumOfReservedRegsForLoop = 1;
 constexpr unsigned MaxNumOfReservedRegsForLoop = 2;
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_REGSRESERVEDFORLOOP_H

@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATORCONTEXT_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATORCONTEXT_H
 
 #include "snippy/Config/Config.h"
 #include "snippy/Generator/SnippyModule.h"
@@ -39,3 +40,4 @@ public:
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATORCONTEXT_H

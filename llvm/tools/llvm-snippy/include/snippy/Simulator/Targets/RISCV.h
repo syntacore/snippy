@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_TARGETS_RISCV_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_TARGETS_RISCV_H
 
 #include "../Simulator.h"
 
@@ -142,3 +143,4 @@ std::unique_ptr<SimulatorInterface> createRISCVSimulator(
     unsigned VLENB = 0, bool EnableMisalignedAccess = false);
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_TARGETS_RISCV_H

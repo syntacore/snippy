@@ -10,7 +10,8 @@
 #include "snippy/Support/YAMLUtils.h"
 #include "snippy/Target/TargetConfigIface.h"
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_SELFCHECK_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_SELFCHECK_H
 
 namespace llvm {
 namespace snippy {
@@ -82,3 +83,4 @@ LLVM_SNIPPY_YAML_DECLARE_SCALAR_ENUMERATION_TRAITS(snippy::SelfcheckMode);
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(snippy::SelfcheckConfig);
 
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_SELFCHECK_H

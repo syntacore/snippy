@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_SIMULATOR_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_SIMULATOR_H
 
 #include "Observer.h"
 #include "Types.h"
@@ -134,3 +135,4 @@ template <> struct yaml::MappingTraits<snippy::SimulationConfig::Section> {
 
 LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(llvm::snippy::SimulationConfig::Section,
                                      /* flow */ false);
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_SIMULATOR_H

@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_YAMLEXTRAS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_YAMLEXTRAS_H
 
 #include "snippy/Support/YAMLUtils.h"
 
@@ -38,3 +39,4 @@ yamlize(yaml::IO &Io, T &Val, bool, EmptyContext &Ctx) {
 } // namespace yaml
 
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_YAMLEXTRAS_H

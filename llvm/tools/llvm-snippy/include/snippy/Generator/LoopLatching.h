@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_LOOPLATCHING_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_LOOPLATCHING_H
 
 #include "snippy/Config/Config.h"
 #include "snippy/Generator/SnippyLoopInfo.h"
@@ -30,3 +31,4 @@ bool latchLoops(MachineFunction &MF, GeneratorContext &SGCtx,
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_LOOPLATCHING_H

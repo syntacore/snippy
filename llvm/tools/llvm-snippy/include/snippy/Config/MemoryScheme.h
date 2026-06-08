@@ -19,7 +19,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_MEMORYSCHEME_H
+#define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_MEMORYSCHEME_H
 
 #include "ImmediateHistogram.h"
 
@@ -817,3 +818,4 @@ LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::MemoryScheme);
 
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(snippy::CodeLayoutConfig);
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_MEMORYSCHEME_H

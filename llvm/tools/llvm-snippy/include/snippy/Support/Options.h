@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_OPTIONS_H
+#define LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_OPTIONS_H
 
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/YAMLUtils.h"
@@ -431,3 +432,4 @@ LLVM_SNIPPY_YAML_DECLARE_CUSTOM_MAPPING_TRAITS(snippy::OptionsStorage);
 LLVM_SNIPPY_YAML_IS_SEQUENCE_ELEMENT(snippy::RegexOption, true);
 
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_OPTIONS_H

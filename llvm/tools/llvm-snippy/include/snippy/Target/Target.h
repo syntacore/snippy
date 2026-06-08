@@ -13,7 +13,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_TARGET_TARGET_H
+#define LLVM_TOOLS_LLVM_SNIPPY_TARGET_TARGET_H
 
 #include "TargetConfigIface.h"
 
@@ -757,3 +758,4 @@ inline const llvm::MachineOperand &getDividerOp(const MachineInstr &MI) {
 
 } // namespace snippy
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_TARGET_TARGET_H

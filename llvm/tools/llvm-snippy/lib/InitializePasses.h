@@ -6,7 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#pragma once
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_LIB_INITIALIZEPASSES_H
+#define LLVM_TOOLS_LLVM_SNIPPY_LIB_INITIALIZEPASSES_H
 
 namespace llvm {
 
@@ -57,3 +58,4 @@ void initializeLongJumpRelaxatorPass(PassRegistry &);
 void initializeConfigureLinkerPass(PassRegistry &);
 
 } // namespace llvm
+#endif // LLVM_TOOLS_LLVM_SNIPPY_LIB_INITIALIZEPASSES_H
