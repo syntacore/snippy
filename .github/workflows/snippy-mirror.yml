@@ -35,5 +35,5 @@ jobs:
           ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
       - name: Push mirror to target
         run: |
-          git remote add target git@github.com:LLVM-Snippy/llvm-snippy.git
+          git remote add target git@github.com:syntacore/snippy.git
           git push --mirror target
