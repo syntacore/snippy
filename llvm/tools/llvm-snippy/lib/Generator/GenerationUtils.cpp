@@ -348,9 +348,10 @@ selectOperandsForMemoryInstructions(InstructionGenerationContext &InstrGenCtx,
   const auto &Tgt = State.getSnippyTarget();
   const auto &InstrInfo = State.getInstrInfo();
   const auto &RegInfo = State.getRegInfo();
+  // Select and assign base registers for each instruction. Note that this
+  // also reserves them for writing, since they might be reused and can't be
+  // used as destinations.
   auto OpcodeIdxToBaseReg = generateBaseRegs(InstrGenCtx, Opcodes);
-  for (auto R : OpcodeIdxToBaseReg)
-    RP.addReserved(R, AccessMaskBit::RW);
   auto [RegsToInit, OpcodeIdxToAI] =
       mapOpcodeIdxToAI(InstrGenCtx, OpcodeIdxToBaseReg, Opcodes);
   // We already initialized base registers. Now to select other register
