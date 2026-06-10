@@ -2101,30 +2101,15 @@ public:
   getBranchDestination(const MachineInstr &Branch) const override {
     assert(Branch.isBranch() && "Only branches expected");
     auto DestBBOpNum = Branch.getNumExplicitOperands() - 1;
-    return Branch.getOperand(DestBBOpNum).getMBB();
+    auto &DestOp = Branch.getOperand(DestBBOpNum);
+    if (!DestOp.isMBB())
+      return nullptr;
+    return DestOp.getMBB();
   }
   bool branchDestinationIsMBB(const MachineInstr &Branch) const {
     assert(Branch.isBranch());
     auto DestBBOpNum = Branch.getNumExplicitOperands() - 1;
     return Branch.getOperand(DestBBOpNum).isMBB();
-  }
-
-  bool branchNeedsVerification(const MachineInstr &Branch) const override {
-    assert(Branch.isBranch());
-
-    switch (Branch.getOpcode()) {
-    case RISCV::C_BEQZ:
-    case RISCV::C_BNEZ:
-    case RISCV::BEQ:
-    case RISCV::BNE:
-    case RISCV::BGE:
-    case RISCV::BLT:
-    case RISCV::BGEU:
-    case RISCV::BLTU:
-      return true;
-    default:
-      return false;
-    }
   }
 
   bool mayBeScheduled(const MachineInstr &MI) const override {
@@ -2239,82 +2224,6 @@ public:
   }
 
   bool fitsJump(unsigned Distance) const { return Distance <= kMaxJumpDstMod; }
-
-  MachineInstr *relaxCompressedBranch(MachineInstr &Branch,
-                                      SnippyProgramContext &ProgCtx) const {
-    auto Opcode = Branch.getOpcode();
-    assert(isCompressedBranch(Opcode) && "Compressed branch expected");
-    auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
-    auto UncompOpcode = Opcode == RISCV::C_BEQZ ? RISCV::BEQ : RISCV::BNE;
-    auto *MBB = Branch.getParent();
-    assert(MBB);
-    auto CondOp = Branch.getOperand(0);
-    assert(CondOp.isReg());
-    auto CondReg = CondOp.getReg();
-    auto *DstMBB = getBranchDestination(Branch);
-    assert(DstMBB);
-    auto &MI = *getMainInstBuilder(*this, *MBB, Branch,
-                                   MBB->getParent()->getFunction().getContext(),
-                                   InstrInfo.get(UncompOpcode))
-                    .addReg(CondReg)
-                    .addReg(RISCV::X0)
-                    .addMBB(DstMBB);
-    Branch.eraseFromParent();
-    return &MI;
-  }
-
-  // Replacing branch with opposite branch to fallback BB and setting fallback
-  // branch to target BB. Example:
-  //     ...                                ...
-  //     BEQ $x1, $x0, %bb.1000     =>      BNE $x1, $x0, %bb.1
-  //     PseudoBR %bb.1                     PseudoBR %bb.1000
-  //     ...                                ...
-  MachineInstr *relaxWithJump(MachineInstr &Branch,
-                              SnippyProgramContext &ProgCtx) const {
-    auto *ProcessedBranch = &Branch;
-    auto *MBB = Branch.getParent();
-    assert(MBB);
-
-    // We need to uncompress branch because all actions below don't expect
-    // compressed branch
-    if (isCompressedBranch(Branch.getOpcode()))
-      ProcessedBranch = relaxCompressedBranch(Branch, ProgCtx);
-    assert(ProcessedBranch);
-
-    const auto *InstrInfo = MBB->getParent()->getSubtarget().getInstrInfo();
-    assert(InstrInfo);
-    const auto &RVInstrInfo = static_cast<const RISCVInstrInfo &>(*InstrInfo);
-    MachineBasicBlock *TBB = nullptr, *FBB = nullptr;
-    SmallVector<MachineOperand> Cond;
-    assert(MBB);
-    RVInstrInfo.analyzeBranch(*MBB, TBB, FBB, Cond,
-                              /* AllowModify */ false);
-    assert(TBB && FBB);
-
-    RVInstrInfo.reverseBranchCondition(Cond);
-    auto *FallbackBR = ProcessedBranch->getNextNode();
-    assert(FallbackBR && "Fallback branch expected");
-    assert(*FallbackBR != MBB->end() && "Fallback branch expected");
-    assert(checkMetadata(*FallbackBR, SnippyMetadata::Support));
-    ProcessedBranch->eraseFromParent();
-    FallbackBR->eraseFromParent();
-    RVInstrInfo.insertBranch(*MBB, FBB, TBB, Cond, DebugLoc());
-    setAsSupportInstr(MBB->back(), ProgCtx.getLLVMState().getCtx());
-    return &*MBB->getFirstTerminator();
-  }
-
-  bool relaxBranch(MachineInstr &Branch, unsigned Distance,
-                   SnippyProgramContext &ProgCtx) const override {
-    assert(Branch.isBranch());
-    if (fitsCompressedBranch(Distance))
-      return true;
-    if (fitsBranch(Distance) && isCompressedBranch(Branch.getOpcode()))
-      return relaxCompressedBranch(Branch, ProgCtx) != nullptr;
-    if (fitsJump(Distance))
-      return relaxWithJump(Branch, ProgCtx) != nullptr;
-
-    return false;
-  }
 
   void insertFallbackBranch(MachineBasicBlock &From, MachineBasicBlock &To,
                             const LLVMState &State) const override {
@@ -2496,6 +2405,7 @@ public:
     assert(Branch.isBranch() && "Branch expected");
     auto *BranchMBB = Branch.getParent();
     auto *DestBB = getBranchDestination(Branch);
+    assert(DestBB);
     auto Opcode = Branch.getOpcode();
     bool EqBranch = isEqBranch(Opcode);
     assert(!EqBranch ||

@@ -30,7 +30,6 @@ set(LLVM_LINK_COMPONENTS
   )
 set(LLVMSnippySources
   BranchLengthenerPass.cpp
-  BranchRelaxatorPass.cpp
   BlockGenPlanningPass.cpp
   BlockGenPlanWrapperPass.cpp
   PreserveRegsInsertionPass.cpp

@@ -756,10 +756,6 @@ public:
     SNIPPY_UNIMPLEMENTED();
   }
 
-  bool branchNeedsVerification(const MachineInstr &Branch) const override {
-    SNIPPY_UNIMPLEMENTED();
-  }
-
   bool mayBeScheduled(const MachineInstr &MI) const override {
     SNIPPY_UNIMPLEMENTED();
   }
@@ -775,11 +771,6 @@ public:
   MachineInstr &insertIndirectJump(InstructionGenerationContext &IGC,
                                    MachineBasicBlock &TBB,
                                    unsigned Opcode) const override {
-    SNIPPY_UNIMPLEMENTED();
-  }
-
-  bool relaxBranch(MachineInstr &Branch, unsigned Distance,
-                   SnippyProgramContext &ProgCtx) const override {
     SNIPPY_UNIMPLEMENTED();
   }
 

@@ -1,0 +1,28 @@
+# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=800 \
+# RUN:   -mattr=+c -model-plugin None -no-branch-relax \
+# RUN:    -o %t 2>&1 | FileCheck %s
+
+sections:
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+    - [BLT, 1.0]
+    - [BLTU, 1.0]
+    - [BGE, 1.0]
+    - [BGEU, 1.0]
+    - [BNE, 1.0]
+    - [C_BEQZ, 1.0]
+    - [C_BNEZ, 1.0]
+    - [AND, 8.0]
+
+# CHECK: warning: (deprecated-option) no-branch-relax: has no effect and will be removed in next major release
