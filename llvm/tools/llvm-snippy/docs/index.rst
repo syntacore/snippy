@@ -2202,6 +2202,21 @@ compression of instructions for loop counters. The options include:
 
 -  ``random`` – Compression can be any.
 
+RISC-V Branch Range Limitations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+RISC-V branches have limited range depending on the instruction format:
+
+-  **Compressed instructions** (C extension): ±256 B range
+
+-  **Uncompressed instructions**: ±4 KiB range
+
+Snippy automatically detects when a generated branch cannot reach its destination within the instruction's range limitation. When such a situation occurs, snippy extends the reach by inserting proxy indirect jumps immediately after the branch and redirecting the branch's destination to them.
+
+.. important::
+
+   If you consider this automatic behavior unacceptable for your use case, it is your responsibility to ensure that any generated branch can reach its destination. You can do this by limiting code section size.
+
 
 Dumping Control Flow Graphs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
