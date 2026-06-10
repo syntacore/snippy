@@ -10,17 +10,18 @@
 #define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_FALLTHROUGHSERASERPASS_H
 
 #include "llvm/CodeGen/MachineFunctionPass.h"
+
 namespace llvm {
 namespace snippy {
 
-class FallThroughEraserPass final : public MachineFunctionPass {
+class FallThroughsEraser final : public MachineFunctionPass {
 
 public:
   static char ID;
 
-  FallThroughEraserPass() : MachineFunctionPass(ID) {}
+  FallThroughsEraser() : MachineFunctionPass(ID) {}
 
-  StringRef getPassName() const override { return "Fall Through Eraser Pass"; }
+  StringRef getPassName() const override;
 
   void getAnalysisUsage(AnalysisUsage &AU) const override;
 
