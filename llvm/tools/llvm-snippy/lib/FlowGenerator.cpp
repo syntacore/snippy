@@ -129,7 +129,14 @@ void writeMIRFile(StringRef Data) {
     Path = DumpMIR.getDefault().getValue();
   writeFile(Path, Data);
 }
-
+static void addCodeLayout(PassManagerWrapper &PM) {
+  PM.add(createCLBasicBlockPreprocessPass());
+  PM.add(createFallThroughsEraserPass());
+  PM.add(createBranchLengthenerPass(/* CheckDistance */ false));
+  PM.add(createJumpLengthenerPass());
+  PM.add(createCodeAddrSamplingPass());
+  PM.add(createLongJumpRelaxatorPass());
+}
 static auto createExternalMemInitRoutine(GeneratorContext &Ctx) {
   auto &ProgCtx = Ctx.getProgramContext();
   auto ExtModule = std::make_unique<SnippyModule>(ProgCtx.getLLVMState(),
@@ -144,14 +151,8 @@ static auto createExternalMemInitRoutine(GeneratorContext &Ctx) {
         PM.add(createMemInitGeneratorPass(
             ProgCtx.getMemoryManager(), ProgCtx.getLLVMState(),
             ExtModule->getMMI(), MemoryInitializationMode));
-        if (Ctx.getConfig().PassCfg.CodeLayout) {
-          PM.add(createCLBasicBlockPreprocessPass());
-          PM.add(createFallThroughEraserPass());
-          PM.add(createBranchLengthenerPass());
-          PM.add(createJumpLengthenerPass());
-          PM.add(createCodeAddrSamplingPass());
-          PM.add(createLongJumpRelaxatorPass());
-        }
+        if (Ctx.getConfig().PassCfg.CodeLayout)
+          addCodeLayout(PM);
         // Strip llvm.snippy.support metadata
         PM.add(createInstructionsPostProcessPass());
       },
@@ -174,12 +175,7 @@ static auto createSMCInitRoutine(GeneratorContext &Ctx) {
         PM.add(createSMCFillerPass(ProgCtx.getLLVMState()));
         PM.add(createSMCGeneratorPass(ExtModule->getMMI()));
         assert(Ctx.getConfig().PassCfg.CodeLayout);
-        PM.add(createCLBasicBlockPreprocessPass());
-        PM.add(createFallThroughEraserPass());
-        PM.add(createBranchLengthenerPass());
-        PM.add(createJumpLengthenerPass());
-        PM.add(createCodeAddrSamplingPass());
-        PM.add(createLongJumpRelaxatorPass());
+        addCodeLayout(PM);
         PM.add(createInstructionsPostProcessPass());
       },
       [&](PassManagerWrapper &PM) {});
@@ -356,7 +352,7 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         SnippyTgt.addTargetLegalizationPasses(PM);
 
         if (!GenCtx.getConfig().PassCfg.CodeLayout)
-          PM.add(createBranchRelaxatorPass());
+          PM.add(createBranchLengthenerPass(/* CheckDistance */ true));
         if (VerifyConsecutiveLoops)
           PM.add(createConsecutiveLoopsVerifierPass());
 
@@ -374,14 +370,8 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         PM.add(createPostGenVerifierPass());
         if (SelfModifiedCode)
           PM.add(createSMCSetSizeGlobalsPass());
-        if (GenCtx.getConfig().PassCfg.CodeLayout) {
-          PM.add(createCLBasicBlockPreprocessPass());
-          PM.add(createFallThroughEraserPass());
-          PM.add(createBranchLengthenerPass());
-          PM.add(createJumpLengthenerPass());
-          PM.add(createCodeAddrSamplingPass());
-          PM.add(createLongJumpRelaxatorPass());
-        }
+        if (GenCtx.getConfig().PassCfg.CodeLayout)
+          addCodeLayout(PM);
         PM.add(createInstructionsPostProcessPass());
         if (!GenCtx.getConfig().PassCfg.CodeLayout)
           PM.add(createFunctionDistributePass());

@@ -83,8 +83,6 @@ MachineFunctionPass *createInstructionsPostProcessPass();
 
 MachineFunctionPass *createPostGenVerifierPass();
 
-MachineFunctionPass *createBranchRelaxatorPass();
-
 MachineFunctionPass *createRegsInitInsertionPass(bool InitRegs);
 
 MachineFunctionPass *createPrologueEpilogueInsertionPass();
@@ -118,9 +116,9 @@ MachineFunctionPass *createCLBasicBlockPreprocessPass();
 
 MachineFunctionPass *createCodeAddrSamplingPass();
 
-MachineFunctionPass *createFallThroughEraserPass();
+MachineFunctionPass *createFallThroughsEraserPass();
 
-MachineFunctionPass *createBranchLengthenerPass();
+MachineFunctionPass *createBranchLengthenerPass(bool CheckDistance);
 
 snippy::ActiveImmutablePassInterface *createJumpLengthenerPass();
 
