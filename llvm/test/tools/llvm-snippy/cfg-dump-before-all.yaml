@@ -14,7 +14,7 @@
 # RUN:  %t_SnippyFunction-cfg-dump-before-snippy-fill-external-functions-stubs.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-before-riscv-expand-pseudo.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-before-riscv-expand-atomic-pseudo.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-branch-relaxator.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-branch-lengthener.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-before-snippy-post-verification.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-before-snippy-inst-postprocess.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-before-snippy-function-distribute.dot

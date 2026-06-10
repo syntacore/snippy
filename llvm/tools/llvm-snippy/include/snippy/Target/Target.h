@@ -464,10 +464,9 @@ public:
 
   virtual unsigned getMaxBranchDstMod(unsigned Opcode) const = 0;
 
-  virtual bool branchNeedsVerification(const MachineInstr &Branch) const = 0;
-
   virtual bool mayBeScheduled(const MachineInstr &MI) const = 0;
 
+  // May return nullptr if branch does not point to basic block.
   virtual MachineBasicBlock *
   getBranchDestination(const MachineInstr &Branch) const = 0;
 
@@ -480,9 +479,6 @@ public:
   virtual MachineInstr &insertIndirectJump(InstructionGenerationContext &IGC,
                                            MachineBasicBlock &TBB,
                                            unsigned Opcode) const = 0;
-
-  virtual bool relaxBranch(MachineInstr &Branch, unsigned Distance,
-                           SnippyProgramContext &ProgCtx) const = 0;
 
   virtual void insertFallbackBranch(MachineBasicBlock &From,
                                     MachineBasicBlock &To,

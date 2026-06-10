@@ -1,4 +1,4 @@
-//===-- FallThroughEraserPass.cpp -------------------------------*- C++ -*-===//
+//===-- FallThroughsEraserPass.cpp ------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -10,22 +10,37 @@
 #include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 
-namespace llvm {
+#include "../InitializePasses.h"
 
-MachineFunctionPass *createFallThroughEraserPass() {
-  return new snippy::FallThroughEraserPass;
+#define DEBUG_TYPE "snippy-fallthrough-eraser"
+#define PASS_DESC "Snippy Fallthrough Eraser"
+
+using llvm::callDefaultCtor;
+using llvm::PassInfo;
+using llvm::PassRegistry;
+using llvm::snippy::FallThroughsEraser;
+
+INITIALIZE_PASS_BEGIN(FallThroughsEraser, DEBUG_TYPE, PASS_DESC, false, false)
+INITIALIZE_PASS_DEPENDENCY(GeneratorContextWrapper)
+INITIALIZE_PASS_END(FallThroughsEraser, DEBUG_TYPE, PASS_DESC, false, false)
+
+namespace llvm {
+StringRef FallThroughsEraser::getPassName() const { return PASS_DESC; }
+
+MachineFunctionPass *createFallThroughsEraserPass() {
+  return new snippy::FallThroughsEraser;
 }
 
 namespace snippy {
-char FallThroughEraserPass::ID = 0;
+char FallThroughsEraser::ID = 0;
 
-void FallThroughEraserPass::getAnalysisUsage(AnalysisUsage &AU) const {
+void FallThroughsEraser::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesCFG();
   AU.addRequired<GeneratorContextWrapper>();
   MachineFunctionPass::getAnalysisUsage(AU);
 }
 
-bool FallThroughEraserPass::runOnMachineFunction(MachineFunction &MF) {
+bool FallThroughsEraser::runOnMachineFunction(MachineFunction &MF) {
   auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &ProgCtx = GC.getProgramContext();
   auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
