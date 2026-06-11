@@ -278,7 +278,21 @@ struct InstructionRequest final {
   unsigned Opcode;
   PreselectedOperands Preselected;
   MDNode *MetadataMark = nullptr;
+
+  InstructionRequest() = default;
+
+  InstructionRequest(unsigned Opcode, PreselectedOperands Preselected,
+                     MDNode *MetadataMark = nullptr)
+      : Opcode(Opcode), Preselected(Preselected), MetadataMark(MetadataMark) {}
+
+  InstructionRequest(InstructionRequest &&) noexcept = default;
+  InstructionRequest &operator=(InstructionRequest &&) noexcept = default;
+  InstructionRequest(const InstructionRequest &) = default;
+  InstructionRequest &operator=(const InstructionRequest &) = default;
 };
+
+static_assert(std::is_nothrow_move_constructible_v<InstructionRequest>);
+static_assert(std::is_nothrow_move_assignable_v<InstructionRequest>);
 
 namespace detail {
 struct EmptyFinalizeMixin {
