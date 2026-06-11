@@ -153,8 +153,8 @@ void InstructionGenerator::addSelfcheckSectionPropertiesAsGV(Module &M) const {
         "selfcheck_data_byte_stride");
 }
 
-planning::FunctionRequest InstructionGenerator::createMFGenerationRequest(
-    const MachineFunction &MF) const {
+planning::FunctionRequest &
+InstructionGenerator::getMFGenerationRequest(const MachineFunction &MF) const {
   auto &FunReq = getAnalysis<BlockGenPlanWrapper>().getFunctionRequest(&MF);
   const auto &ProgCtx = SGCtx->getProgramContext();
   const MCInstrDesc *FinalInstDesc = nullptr;
@@ -226,7 +226,7 @@ bool InstructionGenerator::runOnMachineFunction(MachineFunction &MF) {
       addSelfcheckSectionPropertiesAsGV(M);
   }
 
-  auto FunctionGenRequest = createMFGenerationRequest(MF);
+  auto &FunctionGenRequest = getMFGenerationRequest(MF);
   generate(FunctionGenRequest, MF, *SGCtx, SimCtx,
            &getAnalysis<MachineLoopInfoWrapperPass>().getLI(),
            &getAnalysis<FunctionGenerator>().getCallGraphState(),
