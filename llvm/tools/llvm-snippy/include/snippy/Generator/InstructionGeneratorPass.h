@@ -24,8 +24,8 @@ namespace snippy {
 
 class InstructionGenerator final
     : public ActiveImmutablePass<MachineFunctionPass, MemAccessInfo> {
-  planning::FunctionRequest
-  createMFGenerationRequest(const MachineFunction &MF) const;
+  planning::FunctionRequest &
+  getMFGenerationRequest(const MachineFunction &MF) const;
 
   void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
                         const GenerationStatistics &MFStats);

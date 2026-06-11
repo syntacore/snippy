@@ -28,7 +28,7 @@ public:
   void setFunctionRequest(const MachineFunction *MF,
                           planning::FunctionRequest Req) {
     assert(!FuncGenPlan.contains(MF));
-    FuncGenPlan.insert(std::make_pair(MF, Req));
+    FuncGenPlan.insert(std::make_pair(MF, std::move(Req)));
   }
 
   planning::FunctionRequest &getFunctionRequest(const MachineFunction *MF) {
