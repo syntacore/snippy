@@ -453,7 +453,7 @@ auto BlockGenPlanningImpl::findSuitableBBAndContextGroup(
     auto &BBReq = FunBlocks.call(&FunctionRequest::get, MBB);
     auto Indices = getRandomIndices(BBReq.size());
     for (auto Idx : Indices) {
-      auto SingleGroup = BBReq[Idx];
+      const auto &SingleGroup = BBReq[Idx];
       assert(SingleGroup.getOpcodeFilter().has_value());
       auto SuitableOpcodes =
           count_if(BurstGroup, *SingleGroup.getOpcodeFilter());
@@ -1095,7 +1095,7 @@ bool BlockGenPlanning::runOnMachineFunction(MachineFunction &MF) {
   planning::FunctionRequest FunReq(MF, *GenCtx);
   BlockGenPlanningImpl Impl(GenCtx, MLI, FG, SimCtx, FunReq);
   Impl.processFunction(MF);
-  GenPlanWrapper->setFunctionRequest(&MF, FunReq);
+  GenPlanWrapper->setFunctionRequest(&MF, std::move(FunReq));
 
   return true;
 }
