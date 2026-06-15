@@ -78,8 +78,24 @@ bool SMCSetSizeGlobals::runOnModule(Module &M) {
     assert(TBB);
     auto GVSizeName =
         SMCManagerT::SMCTgtBlockSizePrefix.str() + getMBBSectionName(*TBB);
+
+    auto TermIt = TBB->getFirstTerminator();
+    auto LastMainInstrIt = TermIt;
+    if (TermIt != TBB->begin()) {
+      // We can only overwrite those instructions that are not involved in
+      // forming address for jump.
+      LastMainInstrIt =
+          llvm::find_if_not(make_range((--TermIt)->getReverseIterator(),
+                                       TBB->begin()->getReverseIterator()),
+                            [](const auto &Instr) {
+                              return checkMetadata(Instr,
+                                                   SnippyMetadata::Support);
+                            })
+              ->getIterator();
+      ++LastMainInstrIt;
+    }
     auto *Size = ConstantInt::get(
-        Type, State.getCodeBlockSize(TBB->begin(), TBB->getFirstTerminator()));
+        Type, State.getCodeBlockSize(TBB->begin(), LastMainInstrIt));
 
     auto *GVSize = GP.getGV(GVSizeName);
     GVSize->setInitializer(Size);

@@ -53,7 +53,6 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<GeneratorContextWrapper>();
-    AU.addRequired<FunctionGenerator>();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 
@@ -67,16 +66,22 @@ private:
 
 char RISCVZcmpPopretCombine::ID = 0;
 
+static bool isRoot(const MachineFunction &MF, const GeneratorContext &SGCtx) {
+  auto &CGLayout = SGCtx.getConfig().PassCfg.CGLayout;
+  if (std::holds_alternative<CallGraphLayout>(CGLayout))
+    return MF.getName() == SGCtx.getProgramContext().getEntryPointName();
+  return MF.getName() == std::get<FunctionDescs>(CGLayout).EntryPoint;
+}
+
 bool RISCVZcmpPopretCombine::runOnMachineFunction(MachineFunction &MF) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
   const auto &Hist = SGCtx.getConfig().Histogram;
   if (!Hist.contains(RISCV::CM_POPRET) && !Hist.contains(RISCV::CM_POPRETZ))
     return false;
 
-  auto &FG = getAnalysis<FunctionGenerator>();
   // We can't replace epilogue in entry function, because it doesn't always
   // end with RET instruction.
-  if (FG.isRootFunction(MF))
+  if (isRoot(MF, SGCtx))
     return false;
 
   if (!PopretGen) {
@@ -100,15 +105,7 @@ bool RISCVZcmpPopretCombine::runOnMachineFunction(MachineFunction &MF) {
   auto PopretOpcode = generateSingleOpcode(*PopretGen);
   if (PopretOpcode == RISCV::PseudoRET)
     return false;
-  if (SGCtx.getProgramContext().getReturnAddress() != RISCV::X1) {
-    snippy::fatal("Cannot generate cm.popret(z) with non-abi return adress "
-                  "register. Please, use redefine-ra=RA");
-  }
-  auto RA = FG.getRAFor(MF);
-  if (RA != RISCV::X1)
-    snippy::fatal(
-        "Cannot generate cm.popret(z) with non-abi return adress "
-        "register. Please, turn off return address register randomization");
+
   auto RList = replacePrologueWithRListSpill(PopretOpcode, MF.front());
   replaceEpilogueWithPopret(PopretOpcode, RList, MF.back());
   return true;

@@ -19,6 +19,7 @@
 
 #include "snippy/Target/Target.h"
 
+#include <functional>
 #include <optional>
 #include <type_traits>
 
@@ -263,22 +264,15 @@ OpcodeHistogram::getTopOpcodesWeight(std::function<bool(unsigned)> Pred) const {
   return std::accumulate(Weights.begin(), Weights.end(), /* init */ 0.0);
 }
 
-bool OpcodeHistogram::hasCallInstrs(const OpcodeCache &OpCC,
-                                    const SnippyTarget &Tgt) const {
+bool OpcodeHistogram::hasCallInstrs(const SnippyTarget &Tgt) const {
   // Call instructions can only be present in the top-level histogram.
-  return llvm::any_of(TopOpcodes, [&OpCC, &Tgt](auto &Hist) {
-    auto *Desc = OpCC.desc(Hist.first);
-    return Desc && Tgt.isCall(Desc->getOpcode());
-  });
+  return hasInstrs(
+      std::bind(&SnippyTarget::isCall, &Tgt, std::placeholders::_1));
 }
 
-bool OpcodeHistogram::hasSPRelativeInstrs(const OpcodeCache &OpCC,
-                                          const SnippyTarget &Tgt) const {
-  auto Pred = [&OpCC, &Tgt](unsigned Opc) {
-    auto *Desc = OpCC.desc(Opc);
-    return Desc && Tgt.isSPRelative(Desc->getOpcode());
-  };
-  return ProbVisitor.find(Pred).has_value();
+bool OpcodeHistogram::hasSPRelativeInstrs(const SnippyTarget &Tgt) const {
+  return hasInstrs(
+      std::bind(&SnippyTarget::isSPRelative, &Tgt, std::placeholders::_1));
 }
 
 bool OpcodeHistogram::hasPlainInstrs(const OpcodeCache &OpCC,

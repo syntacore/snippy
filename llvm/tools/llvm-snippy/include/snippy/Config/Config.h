@@ -415,8 +415,8 @@ public:
     return Histogram.getCFInstrsNum(TotalInstructions, OpCC);
   }
 
-  bool hasCallInstrs(const OpcodeCache &OpCC, const SnippyTarget &Tgt) const {
-    return Histogram.hasCallInstrs(OpCC, Tgt);
+  bool hasCallInstrs(const SnippyTarget &Tgt) const {
+    return Histogram.hasCallInstrs(Tgt);
   }
 
   bool hasCFInstrs(const OpcodeCache &OpCC) const {
