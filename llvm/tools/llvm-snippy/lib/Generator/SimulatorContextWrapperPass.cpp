@@ -62,8 +62,7 @@ void OwningSimulatorContext::initialize(SnippyProgramContext &ProgCtx,
     snippy::fatal(State.getCtx(), "Cannot generate chained code routine",
                   "backtrack, selfcheck and address hazard mode do not work "
                   "with it yet.");
-  if (Cfg.hasCallInstrs(ProgCtx.getOpcodeCache(), SnippyTgt) &&
-      hasTrackingMode()) {
+  if (Cfg.hasCallInstrs(SnippyTgt) && hasTrackingMode()) {
     snippy::fatal(State.getCtx(), "Cannot generate requested call instructions",
                   "backtrack and selfcheck do not work with calls yet.");
   }

@@ -70,6 +70,7 @@ struct SelfcheckConfig;
 class CommonPolicyConfig;
 class Config;
 class ProgramConfig;
+class PassConfig;
 
 namespace planning {
 struct InstructionRequest;
@@ -287,9 +288,10 @@ public:
     return nullptr;
   }
 
-  virtual void
-  checkInstrTargetDependency(const OpcodeHistogram &H, const OpcodeCache &OpCC,
-                             const ProgramConfig &ProgramCfg) const = 0;
+  virtual void checkInstrTargetDependency(const OpcodeHistogram &H,
+                                          const OpcodeCache &OpCC,
+                                          const ProgramConfig &ProgramCfg,
+                                          const PassConfig &PassCfg) const = 0;
   virtual void checkTrackingRestrictions(const OpcodeHistogram &H) const = 0;
 
   virtual bool isModeSwitchInstr(unsigned Opcode) const = 0;

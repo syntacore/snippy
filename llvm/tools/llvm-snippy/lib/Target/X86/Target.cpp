@@ -59,9 +59,10 @@ public:
     reportUnimplementedError();
   }
 
-  void
-  checkInstrTargetDependency(const OpcodeHistogram &H, const OpcodeCache &OpCC,
-                             const ProgramConfig &ProgramCfg) const override {
+  void checkInstrTargetDependency(const OpcodeHistogram &H,
+                                  const OpcodeCache &OpCC,
+                                  const ProgramConfig &ProgramCfg,
+                                  const PassConfig &PassCfg) const override {
     reportUnimplementedError();
   }
 

@@ -1,0 +1,35 @@
+# RUN: llvm-snippy %s -mtriple=riscv64 -model-plugin None \
+# RUN: |& FileCheck %s
+
+# RUN: llvm-snippy %s -mtriple=riscv32 -model-plugin None \
+# RUN: |& FileCheck %s
+
+# CHECK: $[[TMP1:[a-z0-9]+]] = AUIPC target-flags(riscv-pcrel-hi) @__snippy_smc_memcpy, pre-instr-symbol <mcsymbol .[[TMP_SYM1:[a-zA-Z0-9_]+]]>
+# CHECK-NEXT: $[[RA:[a-z0-9]+]] = PseudoJALRCall $[[TMP1]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM1]]>
+# CHECK: $[[TMP2:[a-z0-9]+]] = AUIPC target-flags(riscv-pcrel-hi) @__snippy_smc_target, pre-instr-symbol <mcsymbol .[[TMP_SYM2:[a-zA-Z0-9_]+]]>
+# CHECK-NEXT: $[[RA]] = PseudoJALRCall $[[TMP2]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM2]]>
+
+options:
+  mattr: +m,+zifencei
+  num-instrs: 500
+  dump-mf: on
+
+histogram:
+    - [BNE, 2.0]
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [MUL, 1.0]
+
+code-layout:
+  ranges:
+    - start: 0
+      size: 1
+      stride: 0x1
+      first-offset: 0
+      last-offset: 0x0
+
+include:
+  - Inputs/branchegram.yaml
+  - Inputs/sections.yaml
+  - Inputs/smcgram.yaml

@@ -1,0 +1,21 @@
+# RUN: not llvm-snippy %s -mtriple=riscv64 -model-plugin None \
+# RUN: |& FileCheck %s
+
+# CHECK: error: SMC mode currently isn't supported for histogram with vector instructions
+
+options:
+  mattr: +m,+v,+zifencei
+
+histogram:
+    - [BNE, 2.0]
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [MUL, 1.0]
+    - [VSETVL, 1.0]
+
+include:
+  - Inputs/branchegram.yaml
+  - Inputs/sections.yaml
+  - Inputs/smcgram.yaml
+  - Inputs/code-layout.yaml

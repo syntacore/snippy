@@ -216,6 +216,12 @@ public:
     });
   }
 
+  bool hasInstrs(OpcodeFilterType Pred) const {
+    // CF instructions can only be present in the top-level histogram.
+    return llvm::any_of(uniqueOpcodes(),
+                        [&](unsigned Opcode) { return Pred(Opcode); });
+  }
+
   bool hasCFInstrs(const OpcodeCache &OpCC) const {
     // CF instructions can only be present in the top-level histogram.
     return llvm::any_of(TopOpcodes, [&OpCC](auto &Hist) {
@@ -242,11 +248,10 @@ public:
 
   const OpcodeProbVisitor::OpcodeProbsType &opcodeProbabilities() const;
 
-  bool hasCallInstrs(const OpcodeCache &OpCC, const SnippyTarget &Tgt) const;
+  bool hasCallInstrs(const SnippyTarget &Tgt) const;
   unsigned getCFInstrsNum(unsigned InstrsNum, const OpcodeCache &OpCC) const;
 
-  bool hasSPRelativeInstrs(const OpcodeCache &OpCC,
-                           const SnippyTarget &Tgt) const;
+  bool hasSPRelativeInstrs(const SnippyTarget &Tgt) const;
   bool hasPlainInstrs(const OpcodeCache &OpCC, const SnippyTarget &Tgt) const;
 
   bool contains(unsigned OpcodeToFind) const;

@@ -1113,7 +1113,7 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
                     (dbgs() << "Reserved with option:\n", RP.print(dbgs())));
   }
   if (Cfg.PassCfg.CodeLayout) {
-    auto HasCalls = Cfg.Histogram.hasCallInstrs(OpCC, Tgt);
+    auto HasCalls = Cfg.Histogram.hasCallInstrs(Tgt);
     if (HasCalls) {
       if (!Cfg.PassCfg.Branches.LoopCounters.UseStack.has_value()) {
         Cfg.PassCfg.Branches.LoopCounters.UseStack = true;
@@ -1130,7 +1130,7 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
   }
   auto RegsSpilledToStack = parseSpilledRegistersOption(RP, Tgt, RI, Ctx, Opts);
   auto RegsSpilledToMem = getRegsToSpillToMem(Tgt, Cfg);
-  bool HasSPRelativeInstrs = Cfg.Histogram.hasSPRelativeInstrs(OpCC, Tgt);
+  bool HasSPRelativeInstrs = Cfg.Histogram.hasSPRelativeInstrs(Tgt);
   if (auto CG = std::get_if<CallGraphLayout>(&Cfg.PassCfg.CGLayout)) {
     if (Opts.RedefineRA.isSpecified() && CG->RandomizeRA) {
       snippy::fatal("Incompatible options",
@@ -1722,7 +1722,7 @@ static void checkFullSizeGenerationRequirements(const MCInstrInfo &II,
   if (FillCodeSectionMode && Cfg.Histogram.hasCFInstrs(OpCC))
     snippy::fatal(
         "when -num-instrs=all is specified, branches are not supported");
-  if (FillCodeSectionMode && Cfg.Histogram.hasCallInstrs(OpCC, Tgt))
+  if (FillCodeSectionMode && Cfg.Histogram.hasCallInstrs(Tgt))
     snippy::fatal("when -num-instrs=all is specified, calls are not supported");
 
   if (FillCodeSectionMode && Cfg.CommonPolicyCfg->TrackCfg.Selfcheck)
@@ -1938,7 +1938,7 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
   if (BurstConfig)
     checkBurstGram(Ctx, Histogram, OpCC, BurstConfig->Burst);
   checkMemoryRegions(Tgt, *this);
-  Tgt.checkInstrTargetDependency(Histogram, OpCC, ProgramCfg);
+  Tgt.checkInstrTargetDependency(Histogram, OpCC, ProgramCfg, PassCfg);
   if (hasTrackingMode())
     Tgt.checkTrackingRestrictions(Histogram);
   checkCompatibilityWithValuegramPolicy(*this, Ctx);
@@ -1955,7 +1955,7 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
                   "dump-registers-yaml option is passed but model-plugin "
                   "is not provided.");
 
-  if (hasCallInstrs(OpCC, Tgt)) {
+  if (hasCallInstrs(Tgt)) {
     auto RA = ProgramCfg.ReturnAddress;
     if (RP.isReserved(RA))
       snippy::fatal(State.getCtx(),
@@ -2005,9 +2005,9 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
       snippy::fatal(Ctx, "Cannot spill requested registers",
                     "no stack space allocated.");
 
-    auto &CGL = PassCfg.CGLayout;
-    if (hasCallInstrs(OpCC, Tgt) &&
-        std::visit([](auto &&Layout) { return Layout.getDepth(); }, CGL) > 1)
+    if (hasCallInstrs(Tgt) &&
+        std::visit([](auto &&Layout) { return Layout.getDepth(); }, CGLayout) >
+            1)
       snippy::fatal(
           State.getCtx(), "Cannot generate requested call instructions",
           "layout allows calls with depth>=1 but stack space is not provided.");
