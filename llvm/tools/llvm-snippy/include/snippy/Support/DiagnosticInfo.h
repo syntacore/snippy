@@ -51,7 +51,8 @@ namespace snippy {
   WARN_CASE(OperandsReinitialization, "operands-reinitialization")             \
   WARN_CASE(LoopCountersOnStack, "loop-counters-on-stack")                     \
   WARN_CASE(SMCWithoutEffect, "smc-without-effect")                            \
-  WARN_CASE(DeprecatedOption, "deprecated-option")
+  WARN_CASE(DeprecatedOption, "deprecated-option")                             \
+  WARN_CASE(DuplicatedInstructions, "duplicated-instructions")
 
 #ifdef WARN_CASE
 #error WARN_CASE should not be defined at this point
