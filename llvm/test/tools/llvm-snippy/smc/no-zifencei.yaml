@@ -1,0 +1,20 @@
+# RUN: not llvm-snippy %s -mtriple=riscv64 -model-plugin None \
+# RUN: |& FileCheck %s
+
+options:
+  mattr: +m
+
+histogram:
+    - [BNE, 2.0]
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [MUL, 1.0]
+
+include:
+  - Inputs/branchegram.yaml
+  - Inputs/sections.yaml
+  - Inputs/smcgram.yaml
+  - Inputs/code-layout.yaml
+
+# CHECK: error: SMC generation required Zifencei extension to be enabled

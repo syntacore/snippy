@@ -1,0 +1,24 @@
+# RUN: llvm-snippy %s -model-plugin None \
+# RUN: |& FileCheck %s
+
+# CHECK: warning: (smc-without-effect) SMC mode doesn't provide any effect: there are no branches in the histogram or their weight is too small
+# CHECK-NOT: AUIPC target-flags(riscv-pcrel-hi) @__snippy_smc_memcpy
+# CHECK-NOT: AUIPC target-flags(riscv-pcrel-hi) @__snippy_smc_target
+
+options:
+  mattr: +m,+zifencei
+  mtriple: riscv64
+  num-instrs: 500
+  dump-mf: on
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [MUL, 1.0]
+
+include:
+  - Inputs/branchegram.yaml
+  - Inputs/sections.yaml
+  - Inputs/smcgram.yaml
+  - Inputs/code-layout.yaml
