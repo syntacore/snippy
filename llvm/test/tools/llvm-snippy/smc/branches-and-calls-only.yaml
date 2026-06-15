@@ -1,0 +1,27 @@
+# COM: This test checks that SMC works with only calls and branches.
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -model-plugin None
+# RUN: llvm-snippy %s -mtriple=riscv32 -model-plugin None
+
+options:
+  mattr: +zifencei
+  num-instrs: 100
+  function-layers: 5
+  function-number: 5
+  num-instr-ancil: 10
+
+histogram:
+    - [BEQ, 1.0]
+    - [BNE, 1.0]
+    - [BLT, 1.0]
+    - [BGE, 1.0]
+    - [BLTU, 1.0]
+    - [BGEU, 1.0]
+    - [JAL, 1.0]
+    - [JALR, 1.0]
+
+include:
+  - Inputs/branchegram.yaml
+  - Inputs/sections.yaml
+  - Inputs/smcgram.yaml
+  - Inputs/code-layout.yaml

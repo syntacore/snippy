@@ -1,0 +1,7 @@
+code-layout:
+  ranges:
+    - start: 0x210000
+      size: 0x100000
+      stride: 0x1
+      first-offset: 0
+      last-offset: 0

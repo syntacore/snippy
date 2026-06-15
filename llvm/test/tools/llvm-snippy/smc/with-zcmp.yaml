@@ -1,0 +1,33 @@
+# RUN: llvm-snippy %s -mtriple=riscv64 -model-plugin None \
+# RUN: |& FileCheck %s
+
+# RUN: llvm-snippy %s -mtriple=riscv32 -model-plugin None \
+# RUN: |& FileCheck %s
+
+options:
+    mattr: +zcmp,+zifencei,+m
+    preserve-ra: true
+    num-instrs: 1000
+    function-number: 20
+    function-layers: 3
+    num-instr-ancil: 15
+    random-scheduling: true
+    enable-static-stack: false
+    redefine-sp: SP
+    redefine-ra: RA
+    dump-mf: on
+
+include:
+  - Inputs/sections.yaml
+  - Inputs/smcgram.yaml
+  - Inputs/code-layout.yaml
+  - Inputs/branchegram.yaml
+
+histogram:
+    - [ADD, 1.0]
+    - [CM_POPRET, 1.0]
+    - [JAL, 1.0]
+    - [BNE, 1.0]
+
+# CHECK: CM_POPRET
+# CHECK: FENCE_I
