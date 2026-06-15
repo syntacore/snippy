@@ -1,0 +1,25 @@
+# RUN: not llvm-snippy %s -mtriple=riscv64 -model-plugin None \
+# RUN: |& FileCheck %s
+
+# CHECK: error: SMC mode expects code layout provided
+
+options:
+  mattr: +m,+zifencei
+
+histogram:
+    - [BNE, 2.0]
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [MUL, 1.0]
+
+include:
+  - Inputs/branchegram.yaml
+  - Inputs/sections.yaml
+
+smcgram:
+  smc-tgt-blocks: 0.5 # 0.5 by default
+  smc-overwriters:
+    min: 1
+    max: 1
+  smc-mode: immediate # Trigger SMC immediately after overwritting
