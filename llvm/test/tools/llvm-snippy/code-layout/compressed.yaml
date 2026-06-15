@@ -32,7 +32,6 @@ code-layout:
       last-offset: 0
 histogram:
     - [ADD, 3.0]
-    - [BLT, 1.0]
     - [BEQ, 2.0]
     - [BLT, 2.0]
     - [BGE, 2.0]

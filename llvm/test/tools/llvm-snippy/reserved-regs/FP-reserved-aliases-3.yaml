@@ -30,7 +30,6 @@ histogram:
     - [FMSUB_S, 1.0]
     - [FNMSUB_S, 1.0]
     - [FNMADD_S, 1.0]
-    - [FADD_S, 1.0]
     - [FSUB_S, 1.0]
     - [FMUL_S, 1.0]
     - [FDIV_S, 1.0]
