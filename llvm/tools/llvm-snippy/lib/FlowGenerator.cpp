@@ -162,8 +162,9 @@ static auto createExternalMemInitRoutine(GeneratorContext &Ctx) {
 
 static auto createSMCInitRoutine(GeneratorContext &Ctx) {
   auto &ProgCtx = Ctx.getProgramContext();
-  auto ExtModule =
-      std::make_unique<SnippyModule>(ProgCtx.getLLVMState(), "SMCModule");
+  auto &State = ProgCtx.getLLVMState();
+  const auto &SnippyTgt = State.getSnippyTarget();
+  auto ExtModule = std::make_unique<SnippyModule>(State, "SMCModule");
 
   ExtModule->generateObject(
       [&](PassManagerWrapper &PM) {
@@ -172,8 +173,9 @@ static auto createSMCInitRoutine(GeneratorContext &Ctx) {
         PM.add(createSimulatorContextWrapperPass(/* DoInit */ false));
         PM.add(createSMCInitPass(ExtModule->getMMI()));
         PM.add(createSMCBBToNamePass());
-        PM.add(createSMCFillerPass(ProgCtx.getLLVMState()));
+        PM.add(createSMCFillerPass(State));
         PM.add(createSMCGeneratorPass(ExtModule->getMMI()));
+        SnippyTgt.addTargetLegalizationPasses(PM);
         assert(Ctx.getConfig().PassCfg.CodeLayout);
         addCodeLayout(PM);
         PM.add(createInstructionsPostProcessPass());

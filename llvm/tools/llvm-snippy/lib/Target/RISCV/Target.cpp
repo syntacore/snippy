@@ -1678,25 +1678,11 @@ public:
     generateRVVModeUpdate(IGC, InstrInfo, NewRVVMode, MetadataMark);
   }
 
-  void
-  checkInstrTargetDependency(const OpcodeHistogram &H, const OpcodeCache &OpCC,
-                             const ProgramConfig &ProgramCfg) const override {
-    auto HasCalls = H.hasCallInstrs(OpCC, *this);
+  void checkInstrTargetDependency(const OpcodeHistogram &H,
+                                  const OpcodeCache &OpCC,
+                                  const ProgramConfig &ProgramCfg,
+                                  const PassConfig &PassCfg) const override {
     for (auto &&Opcode : H.uniqueOpcodes()) {
-      if (HasCalls && Opcode == RISCV::CM_POP)
-        snippy::fatal("The generation of calls with CM_POP instruction from "
-                      "the Zcmp extension is not supported.");
-      if (isZcmpPopret(Opcode)) {
-        if (!HasCalls) {
-          snippy::fatal("The generation CM_POPRET and CM_POPRETZ instructions "
-                        "from the Zcmp extension "
-                        "without calls is not possible.");
-        }
-        if (ProgramCfg.StackPointer != RISCV::X2) {
-          snippy::fatal("With CM_POPRET and CM_POPRETZ instructions"
-                        " please set stack pointer to SP.");
-        }
-      }
       // NOTE: these checks are just a safety measure to control that we
       // process only supported instructions
       if (isLrInstr(Opcode) || isScInstr(Opcode) || isAtomicAMO(Opcode) ||
@@ -1705,14 +1691,54 @@ public:
       if (OpCC.desc(Opcode)->mayLoad() || OpCC.desc(Opcode)->mayStore())
         snippy::fatal("Memory instruction " + Twine(OpCC.name(Opcode)) +
                       " is unsupported");
-      // FIXME: here explicitly placed all vector istructions that use V0 mask
-      // explicitly and this can not be changed
-      if (NoMaskModeForRVV &&
-          (isRVVuseV0RegExplicitly(Opcode) || isRVVuseV0RegImplicitly(Opcode)))
-        snippy::fatal("In histogram given a vector opcode with explicit V0 "
-                      "mask usage, but snippy was given option that forbids "
-                      "any masks for vector instructions");
     }
+
+    auto HasCalls = H.hasCallInstrs(*this);
+    if (HasCalls &&
+        H.hasInstrs([](unsigned Opcode) { return Opcode == RISCV::CM_POP; }))
+      snippy::fatal("The generation of calls with CM_POP instruction from "
+                    "the Zcmp extension is not supported.");
+    // FIXME: here explicitly placed all vector istructions that use V0 mask
+    // explicitly and this can not be changed
+    if (NoMaskModeForRVV && H.hasInstrs([](unsigned Opcode) {
+          return isRVVuseV0RegExplicitly(Opcode) ||
+                 isRVVuseV0RegImplicitly(Opcode);
+        }))
+      snippy::fatal("In histogram given a vector opcode with explicit V0 "
+                    "mask usage, but snippy was given option that forbids "
+                    "any masks for vector instructions");
+    if (!H.hasInstrs(isZcmpPopret))
+      return;
+    if (!HasCalls)
+      snippy::fatal("The generation CM_POPRET and CM_POPRETZ instructions "
+                    "from the Zcmp extension "
+                    "without calls is not possible.");
+    if (ProgramCfg.StackPointer != RISCV::X2)
+      snippy::fatal("With CM_POPRET and CM_POPRETZ instructions"
+                    " please set stack pointer to SP.");
+    if (ProgramCfg.ReturnAddress != RISCV::X1)
+      snippy::fatal("Cannot generate cm.popret(z) with non-abi return adress "
+                    "register. Please, use redefine-ra=RA");
+
+    auto &CGLayout = PassCfg.CGLayout;
+    bool GenerateRAError = false;
+    std::visit(OverloadedCallable(
+                   [&GenerateRAError](const FunctionDescs &Descs) -> void {
+                     if (std::any_of(Descs.Descs.begin(), Descs.Descs.end(),
+                                     [](const auto &FuncDesc) {
+                                       return FuncDesc.RandomizeRA;
+                                     }))
+                       GenerateRAError = true;
+                   },
+                   [&GenerateRAError](const CallGraphLayout &CGLayout) -> void {
+                     if (CGLayout.RandomizeRA)
+                       GenerateRAError = true;
+                   }),
+               CGLayout);
+    if (GenerateRAError)
+      snippy::fatal(
+          "Cannot generate cm.popret(z) with non-abi return adress "
+          "register. Please, turn off return address register randomization");
   }
 
   void checkTrackingRestrictions(const OpcodeHistogram &H) const override {

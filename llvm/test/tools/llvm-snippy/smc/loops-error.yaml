@@ -1,0 +1,20 @@
+# RUN: not llvm-snippy %s -mtriple=riscv64 -model-plugin None \
+# RUN: |& FileCheck %s
+
+# CHECK: error: SMC mode currently isn't supported for histogram with loops enabled
+
+options:
+  mattr: +m,+zifencei
+
+histogram:
+    - [BNE, 2.0]
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [MUL, 1.0]
+
+include:
+  - Inputs/branchegram-loops.yaml
+  - Inputs/sections.yaml
+  - Inputs/smcgram.yaml
+  - Inputs/code-layout.yaml

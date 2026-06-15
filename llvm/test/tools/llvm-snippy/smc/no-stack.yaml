@@ -1,9 +1,8 @@
-# RUN: not llvm-snippy %s -mtriple=riscv64 -num-instrs=500 \
-# RUN:             -dump-mf |& FileCheck %s --check-prefix=NO-STACK
+# RUN: not llvm-snippy %s -model-plugin None \
+# RUN: |& FileCheck %s --check-prefix=NO-STACK
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=500 \
-# RUN:             -dump-mf --model-plugin None \
-# RUN:             -external-stack |& FileCheck %s --check-prefix=EXT-STACK
+# RUN: llvm-snippy %s -model-plugin None -external-stack \
+# RUN: |& FileCheck %s --check-prefix=EXT-STACK
 
 # NO-STACK: error: SMC mode expects stack section provided
 
@@ -15,6 +14,10 @@
 
 options:
   mattr: +m,+zifencei
+  mtriple: riscv64
+  num-instrs: 500
+  dump-mf: on
+
 sections:
   - name:      1
     VMA:       0x210000
@@ -39,19 +42,7 @@ histogram:
     - [SUB, 1.0]
     - [MUL, 1.0]
 
-code-layout:
-  ranges:
-    - start: 0x210000
-      size: 0x100000
-      stride: 0x1
-      first-offset: 0
-      last-offset: 0x0
 include:
-  - Inputs/smc-branchegram.yaml
-
-smcgram:
-  smc-tgt-blocks: 0.5 # 0.5 by default
-  smc-overwriters:
-    min: 1
-    max: 1
-  smc-mode: immediate # Trigger SMC immediately after overwritting
+  - Inputs/branchegram.yaml
+  - Inputs/smcgram.yaml
+  - Inputs/code-layout.yaml
