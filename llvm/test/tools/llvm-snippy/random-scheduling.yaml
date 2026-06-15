@@ -167,7 +167,6 @@ histogram:
   - [C_LUI_HINT, 4.26]
   - [C_MV, 4.26]
   - [C_MV_HINT, 4.26]
-  - [C_NOP, 4.26]
   - [C_NOP_HINT, 4.26]
   - [C_OR, 4.26]
   - [C_SLLI, 4.26]

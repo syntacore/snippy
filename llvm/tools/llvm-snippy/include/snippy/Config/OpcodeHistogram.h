@@ -11,15 +11,20 @@
 
 #include "snippy/Config/HistogramPatterns.h"
 #include "snippy/Config/OpcodeHistogramVisitor.h"
+#include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/OpcodeCache.h"
 #include "snippy/Support/YAMLHistogram.h"
 #include "snippy/Support/YAMLUtils.h"
 
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/IR/Instruction.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/MC/MCInstrDesc.h"
 #include "llvm/Support/Error.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <iterator>
 #include <map>
 #include <numeric>
@@ -414,6 +419,24 @@ private:
           formatv("'{}' should be a positive double value", WeightStr));
     }
     return Weight;
+  }
+
+  static void duplicateInstructionMsg(LLVMContext &LLVMCtx,
+                                      StringRef NameOfDuplicatedInstruction) {
+    // 'snippy::warn' and 'snippy::notice' are separated to split the message
+    // about the reason for the warning and the message about potential future
+    // changes in this warning case.
+    snippy::warn(snippy::WarningName::DuplicatedInstructions, LLVMCtx,
+                 "found duplicate weight definition for",
+                 NameOfDuplicatedInstruction);
+    // FIXME: remove notice when duplicated instructions become an error by
+    // default
+    snippy::notice(snippy::WarningName::DuplicatedInstructions, LLVMCtx,
+                   "Duplicate weight definitions will be forbidden in the next "
+                   "major release. "
+                   "It is recommended to fix this. For now",
+                   "the last weight in the histogram will be used and all "
+                   "others will be ignored");
   }
 };
 

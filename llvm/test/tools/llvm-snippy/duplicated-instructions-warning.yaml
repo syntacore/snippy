@@ -1,0 +1,35 @@
+# COM: This test checks that an error occurs if the options are incompatible
+
+# RUN: llvm-snippy %s --model-plugin=None -mtriple=riscv64 \
+# RUN: |& FileCheck %s
+
+include:
+  - Inputs/sections.yaml
+
+histogram:
+  - [ADD, 1.0] # ADD duplicate 1
+  - [ADDI, 1.0]
+  - [SUB, 1.0]
+  - [AND, 1.0]
+  - [SRA, 1.0] # SRA duplicate 1
+  - [SRAI, 1.0]
+  - [ADD, 666] # ADD duplicate 2
+  - [SRL, 1.0]
+  - [SRLI, 1.0]
+  - [SLL, 1.0]
+  - [SLLI, 1.0] # SLLI duplicate 1
+  - [SLLI, 777] # SLLI duplicate 2
+  - [ANDI, 1.0]
+  - [OR, 1.0]
+  - [ORI, 1.0]
+  - [SLLI, 777] # SLLI duplicate 3
+  - [XOR, 1.0]
+  - [XORI, 1.0]
+  - [LW, 1.0]
+  - [SW, 1.0]
+  - [SRA, 67] # SRA duplicate 2
+
+# CHECK-DAG: warning: (duplicated-instructions) found duplicate weight definition for: ADD
+# CHECK-DAG: warning: (duplicated-instructions) found duplicate weight definition for: SLLI
+# CHECK-DAG: warning: (duplicated-instructions) found duplicate weight definition for: SLLI
+# CHECK-DAG: warning: (duplicated-instructions) found duplicate weight definition for: SRA
