@@ -10,6 +10,7 @@
 #define LLVM_TOOLS_LLVM_SNIPPY_SIMULATOR_RISCVCONVERTERSNTF_H
 
 #include "snippy/Generator/Interpreter.h"
+#include "snippy/Simulator/RISCVFeatureFlagsSNTF.h"
 #include "snippy/Simulator/RISCVRegTypes.h"
 
 namespace llvm {
@@ -119,24 +120,6 @@ public:
 
 #define SNTF_VERSION "1.0"
 
-struct FeatureFlagsSNTF {
-  bool EnableTime = true;
-  bool EnablePC = true;
-  bool EnableInstrCode = true;
-  bool EnableNextPC = true;
-  bool EnableRegVals = true;
-  bool EnableMemAccesses = true;
-
-  bool operator==(const FeatureFlagsSNTF &Other) const {
-    return std::tie(EnableTime,
-                    EnablePC, EnableInstrCode, EnableNextPC, EnableRegVals,
-                    EnableMemAccesses) ==
-           std::tie(Other.EnableTime,
-                    Other.EnablePC, Other.EnableInstrCode, Other.EnableNextPC,
-                    Other.EnableRegVals, Other.EnableMemAccesses);
-  }
-};
-
 class RISCVConverterSNTF {
   // Vector register can be printed element by element, where the length of one
   // element is 64 bits.
@@ -153,6 +136,7 @@ class RISCVConverterSNTF {
   DualWindow<std::optional<ProgramCounterType>> PrevPCs;
   using FeatureFuncT = std::function<void(raw_ostream &)>;
   std::vector<FeatureFuncT> Features;
+  RISCVFeatureFlagsSNTF SNTFFlags;
   ArrayRef<RegisterLog> RegLogs;
   ArrayRef<MemoryLog> MemLogs;
 
@@ -162,10 +146,9 @@ class RISCVConverterSNTF {
   void logHeader(raw_ostream &LogsBuff) const;
 
 public:
-  RISCVConverterSNTF(const unsigned XLen,
-                     const ProgramCounterType StartPC,
+  RISCVConverterSNTF(const unsigned XLen, const ProgramCounterType StartPC,
                      const ProgramCounterType LastPC, const Interpreter &I,
-                     StringRef Path, FeatureFlagsSNTF FeatureFlags = {});
+                     StringRef Path, RISCVFeatureFlagsSNTF FeatureFlags = {});
 
   void acceptRecordsAndShiftPC(ProgramCounterType PC,
                                ArrayRef<RegisterLog> RegLogs,

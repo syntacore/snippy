@@ -21,6 +21,7 @@
 #include "snippy/Config/Selfcheck.h"
 #include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/GeneratorUtils/RegisterPool.h"
+#include "snippy/Simulator/RISCVFeatureFlagsSNTF.h"
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/Options.h"
 #include "snippy/Support/Utils.h"
