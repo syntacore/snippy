@@ -6,6 +6,7 @@ set(LLVMSnippySimulatorSources
     Transactions.cpp
     RISCVTraceObserver.cpp
     RISCVConverterSNTF.cpp
+    RISCVFeatureFlagsSNTF.cpp
     )
 
 add_llvm_library(LLVMSnippySimulator

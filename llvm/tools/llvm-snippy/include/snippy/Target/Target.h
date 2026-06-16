@@ -71,6 +71,7 @@ class CommonPolicyConfig;
 class Config;
 class ProgramConfig;
 class PassConfig;
+class Interpreter;
 
 namespace planning {
 struct InstructionRequest;
@@ -725,6 +726,12 @@ public:
 
   // Registers that should be valid while calling an external function
   virtual std::vector<MCRegister> getGlobalStateRegs() const = 0;
+
+  virtual void
+  appendTraceSNTFConverter(Observer *Obs, const LLVMState &State,
+
+                           Interpreter &I, const PassConfig &PassCfg,
+                           const SnippyProgramContext &ProgCtx) const = 0;
 
   virtual std::unique_ptr<AsmPrinter>
   createAsmPrinter(TargetMachine &TM,

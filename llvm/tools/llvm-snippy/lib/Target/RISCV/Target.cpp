@@ -28,6 +28,7 @@
 #include "snippy/Target/Target.h"
 
 #include "snippy/Simulator/RISCVRegTypes.h"
+#include "snippy/Simulator/RISCVTraceObserver.h"
 #include "snippy/Simulator/Targets/RISCV.h"
 
 #include "TargetConfig.h"
@@ -3341,6 +3342,23 @@ public:
   // they have valid values when we call external functions.
   std::vector<MCRegister> getGlobalStateRegs() const override {
     return {RISCV::X3, RISCV::X4};
+  }
+
+  void
+  appendTraceSNTFConverter(Observer *Obs, const LLVMState &State,
+                           Interpreter &I, const PassConfig &PassCfg,
+                           const SnippyProgramContext &ProgCtx) const override {
+    auto *RISCVObserver = static_cast<RISCVTraceObserver *>(Obs);
+    auto &TFCfg = PassCfg.TFOpts;
+    auto *TargetCfg = static_cast<RISCVConfigInterface *>(
+        ProgCtx.getConfig().TargetConfig.get());
+    auto XLen = getAddrRegLen(State.getTargetMachine());
+    auto SNTFFlags = TargetCfg->SNTFFlags;
+    auto PathOpt = TFCfg.TraceSNTFPath;
+    assert(PathOpt.has_value());
+    RISCVObserver->Converters.push_back(std::make_unique<RISCVConverterSNTF>(
+        XLen, *ProgCtx.getLinker().getStartPC(), TFCfg.LastPC, I,
+        PathOpt.value(), SNTFFlags));
   }
 
   std::vector<MCRegister> getRegsSuitableForSP() const override {

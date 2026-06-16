@@ -12,15 +12,13 @@
 namespace llvm {
 namespace snippy {
 
-
 RISCVConverterSNTF::RISCVConverterSNTF(const unsigned XL,
                                        const ProgramCounterType StartPC,
                                        const ProgramCounterType LastPC,
                                        const Interpreter &I, StringRef Path,
-                                       FeatureFlagsSNTF FeatureFlags)
-    : XLen(XL),
-      FLen(getRISCVFloatRegLen(I.getSubTarget())), SimInterpreter(I),
-      LastPC(LastPC) {
+                                       RISCVFeatureFlagsSNTF FeatureFlags)
+    : XLen(XL), FLen(getRISCVFloatRegLen(I.getSubTarget())), SimInterpreter(I),
+      LastPC(LastPC), SNTFFlags(FeatureFlags) {
   std::error_code EC;
   TraceFile = std::make_unique<raw_fd_ostream>(Path, EC);
   if (EC)
@@ -28,16 +26,16 @@ RISCVConverterSNTF::RISCVConverterSNTF(const unsigned XL,
                           EC.message(), Path));
   PrevPCs.setFirst(StartPC);
 
-  if (FeatureFlags.EnableTime)
+  if (SNTFFlags.EnableTime)
     Features.push_back([this](raw_ostream &LogsBuff) {
       assert(Time >= 2);
       LogsBuff << Time - 2 << " ";
     });
-  if (FeatureFlags.EnablePC)
+  if (SNTFFlags.EnablePC)
     Features.push_back([this](raw_ostream &LogsBuff) {
       LogsBuff << toHexStringTruncate(PrevPCs.second().value(), XLen) << " ";
     });
-  if (FeatureFlags.EnableInstrCode)
+  if (SNTFFlags.EnableInstrCode)
     Features.push_back([this](raw_ostream &LogsBuff) {
       assert(PrevPCs.second().has_value() && "PC must be legal");
       MaxInstrBitsType InstrCode =
@@ -45,11 +43,11 @@ RISCVConverterSNTF::RISCVConverterSNTF(const unsigned XL,
       LogsBuff << format_hex_no_prefix(InstrCode, sizeof(MaxInstrBitsType) * 2)
                << " ";
     });
-  if (FeatureFlags.EnableNextPC)
+  if (SNTFFlags.EnableNextPC)
     Features.push_back([this](raw_ostream &LogsBuff) {
       LogsBuff << toHexStringTruncate(PrevPCs.first().value(), XLen);
     });
-  if (FeatureFlags.EnableRegVals)
+  if (SNTFFlags.EnableRegVals)
     Features.push_back([this](raw_ostream &LogsBuff) {
       if (!RegLogs.empty()) {
         LogsBuff << " ";
@@ -60,7 +58,7 @@ RISCVConverterSNTF::RISCVConverterSNTF(const unsigned XL,
         });
       }
     });
-  if (FeatureFlags.EnableMemAccesses)
+  if (SNTFFlags.EnableMemAccesses)
     Features.push_back([this](raw_ostream &LogsBuff) {
       if (!MemLogs.empty()) {
         LogsBuff << " ";
@@ -74,20 +72,17 @@ RISCVConverterSNTF::RISCVConverterSNTF(const unsigned XL,
 }
 
 void RISCVConverterSNTF::logHeader(raw_ostream &LogsBuff) const {
-  FeatureFlagsSNTF DefaultFeatureFlags;
   auto IsFlagEnabled = [](bool Flag, const char *FlagName) {
     return std::string("# ") + (Flag ? "+" : "-") + FlagName + "\n";
   };
   LogsBuff << "# SNTF\n"
            << "# " << SNTF_VERSION << "\n"
-           << IsFlagEnabled(DefaultFeatureFlags.EnableTime, "time")
-           << IsFlagEnabled(DefaultFeatureFlags.EnablePC, "pc")
-           << IsFlagEnabled(DefaultFeatureFlags.EnableInstrCode, "instr-code")
-           << IsFlagEnabled(DefaultFeatureFlags.EnableNextPC, "next-pc")
-           << IsFlagEnabled(DefaultFeatureFlags.EnableRegVals,
-                            "registers-changed")
-           << IsFlagEnabled(DefaultFeatureFlags.EnableMemAccesses,
-                            "memory-accesses");
+           << IsFlagEnabled(SNTFFlags.EnableTime, "time")
+           << IsFlagEnabled(SNTFFlags.EnablePC, "pc")
+           << IsFlagEnabled(SNTFFlags.EnableInstrCode, "instr-code")
+           << IsFlagEnabled(SNTFFlags.EnableNextPC, "next-pc")
+           << IsFlagEnabled(SNTFFlags.EnableRegVals, "registers-changed")
+           << IsFlagEnabled(SNTFFlags.EnableMemAccesses, "memory-accesses");
 }
 
 void RISCVConverterSNTF::printMemLog(raw_ostream &LogsBuff,
