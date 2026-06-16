@@ -1212,6 +1212,13 @@ public:
     SNIPPY_UNIMPLEMENTED();
   }
 
+  void
+  appendTraceSNTFConverter(Observer *Obs, const LLVMState &State,
+                           Interpreter &I, const PassConfig &PassCfg,
+                           const SnippyProgramContext &ProgCtx) const override {
+    SNIPPY_UNIMPLEMENTED();
+  }
+
   bool canProduceNaN(const MCInstrDesc &InstrDesc) const override {
     SNIPPY_UNIMPLEMENTED();
   }

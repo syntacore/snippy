@@ -732,6 +732,13 @@ public:
     reportUnimplementedError();
   }
 
+  void
+  appendTraceSNTFConverter(Observer *Obs, const LLVMState &State,
+                           Interpreter &I, const PassConfig &PassCfg,
+                           const SnippyProgramContext &ProgCtx) const override {
+    reportUnimplementedError();
+  }
+
   bool canProduceNaN(const MCInstrDesc &InstrDesc) const override {
     reportUnimplementedError();
   }
