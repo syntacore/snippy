@@ -9,6 +9,7 @@
 #ifndef LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_RISCV_TARGETCONFIG_H
 #define LLVM_TOOLS_LLVM_SNIPPY_LIB_TARGET_RISCV_TARGETCONFIG_H
 
+#include "snippy/Simulator/RISCVFeatureFlagsSNTF.h"
 #include "snippy/Target/Target.h"
 
 #include "RVVUnitConfig.h"
@@ -23,6 +24,7 @@ public:
   void mapConfig(yaml::IO &IO) override {
     RVVConfig = createRVVConfig();
     RVVConfig->mapYaml(IO);
+    IO.mapOptional("sntf-config", SNTFFlags);
   }
 
   bool hasConfig() const override {
@@ -32,6 +34,7 @@ public:
     return false;
   }
 
+  RISCVFeatureFlagsSNTF SNTFFlags;
   std::unique_ptr<RVVConfigInterface> RVVConfig;
 };
 
