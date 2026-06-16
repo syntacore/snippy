@@ -4410,6 +4410,18 @@ All names of **1.0** version features:
 * ``registers-changed``
 * ``memory-accesses``
 
+You can enable or disable these features using the sntf-config key in your layout:
+
+.. code:: yaml
+
+  sntf-config:
+    time: on 
+    pc: on
+    instr-code: on
+    next-pc: on
+    registers-changed: on
+    memory-accesses: on
+
 **Header example:**
 
 .. code:: yaml

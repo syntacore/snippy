@@ -474,12 +474,11 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
     auto &TFCfg = PassCfg.TFOpts;
     std::unique_ptr<RVMCallbackHandler::ObserverHandle<RISCVTraceObserver>>
         RISCVTraceObserverHandle;
-    auto XLen = State.getSnippyTarget().getAddrRegLen(State.getTargetMachine());
+    auto &SnippyTgt = State.getSnippyTarget();
     RISCVTraceObserver TraceObserver;
     if (TFCfg.TraceSNTFPath)
-      TraceObserver.Converters.push_back(std::make_unique<RISCVConverterSNTF>(
-          XLen, *ProgContext.getLinker().getStartPC(), TFCfg.LastPC, I,
-          TFCfg.TraceSNTFPath.value()));
+      SnippyTgt.appendTraceSNTFConverter(&TraceObserver, State, I, PassCfg,
+                                         ProgContext);
     if (TFCfg.TraceSNTFPath)
       RISCVTraceObserverHandle =
           I.setObserver<RISCVTraceObserver>(std::move(TraceObserver));
