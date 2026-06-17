@@ -62,6 +62,7 @@ private:
                            MachineBasicBlock::iterator MBBI, unsigned FlagsHi,
                            unsigned SecondOpcode, unsigned DestReg);
   bool expandC_JRB(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI);
+  bool expandCM_JT(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI);
 };
 
 char RISCVExpandSnippyPseudo::ID = 0;
@@ -99,6 +100,8 @@ bool RISCVExpandSnippyPseudo::expandMI(MachineBasicBlock &MBB,
   switch (MBBI->getOpcode()) {
   case RISCV::PseudoSnippyC_JRB:
     return expandC_JRB(MBB, MBBI);
+  case RISCV::PseudoSnippyCM_JT:
+    return expandCM_JT(MBB, MBBI);
   }
   return false;
 }
@@ -130,6 +133,19 @@ bool RISCVExpandSnippyPseudo::expandAuipcInstPair(
       .addSym(AUIPCSymbol, RISCVII::MO_PCREL_LO)
       .getInstr();
 
+  return true;
+}
+
+bool RISCVExpandSnippyPseudo::expandCM_JT(MachineBasicBlock &MBB,
+                                          MachineBasicBlock::iterator MBBI) {
+  MachineInstr &MI = *MBBI;
+  auto &SGCtx = getAnalysis<snippy::GeneratorContextWrapper>().getContext();
+  const auto &ProgCtx = SGCtx.getProgramContext();
+  const auto &State = ProgCtx.getLLVMState();
+  const auto &Tgt = State.getSnippyTarget();
+  snippy::planning::InstructionGenerationContext IGC(
+      MBB, MBB.getFirstTerminator(), SGCtx);
+  Tgt.lowerInstruction(IGC, MI);
   return true;
 }
 

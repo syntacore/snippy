@@ -345,6 +345,14 @@ public:
       ArrayRef<planning::PreselectedOpInfo> Preselected) const = 0;
 
   virtual bool requiresCustomGeneration(const MCInstrDesc &InstrDesc) const = 0;
+
+  // Pack of functions that should be used to lower snippy-internal opcodes to
+  // real opcodes.
+  // After lowering, no additional work with generated instructions is expected.
+  virtual bool needsLowering(const MCInstrDesc &InstrDesc) const = 0;
+  virtual void lowerInstruction(InstructionGenerationContext &IGC,
+                                MachineInstr &MI) const = 0;
+
   virtual bool
   canBeGeneratedAsCommonInstr(const MCInstrDesc &InstrDesc) const = 0;
 
