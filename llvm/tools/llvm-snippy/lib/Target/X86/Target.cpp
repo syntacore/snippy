@@ -155,6 +155,16 @@ public:
       ArrayRef<planning::PreselectedOpInfo> Preselected) const override {
     reportUnimplementedError();
   }
+
+  bool needsLowering(const MCInstrDesc &InstrDesc) const override {
+    reportUnimplementedError();
+  }
+
+  void lowerInstruction(InstructionGenerationContext &IGC,
+                        MachineInstr &MI) const override {
+    reportUnimplementedError();
+  }
+
   void instructionPostProcess(InstructionGenerationContext &IGC,
                               MachineInstr &MI) const override {
     reportUnimplementedError();

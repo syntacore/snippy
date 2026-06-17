@@ -1,0 +1,16 @@
+# RUN: llvm-snippy %s -mtriple=riscv64 -model-plugin None
+# RUN: llvm-snippy %s -mtriple=riscv32 -model-plugin None
+
+options:
+    mattr: +zcmt
+    num-instrs: 500
+    verify-gen-histogram: True
+    histogram-must-succeed: True
+
+include:
+  - ../Inputs/sections-with-ro.yaml
+
+histogram:
+    - [ADDI, 1.0]
+    - [CM_JT, 10.0]
+

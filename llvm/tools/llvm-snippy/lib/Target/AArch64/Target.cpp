@@ -206,6 +206,15 @@ public:
     for (auto &Op : Operands)
       MIB.add(Op);
   }
+
+  bool needsLowering(const MCInstrDesc &InstrDesc) const override {
+    return false;
+  }
+  void lowerInstruction(InstructionGenerationContext &IGC,
+                        MachineInstr &MI) const override {
+    return;
+  }
+
   void instructionPostProcess(InstructionGenerationContext &IGC,
                               MachineInstr &MI) const override {
     // TODO: no need to postprocess for now
