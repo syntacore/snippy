@@ -1,0 +1,15 @@
+# RUN: not llvm-snippy %s -mtriple=riscv64 -model-plugin None |& FileCheck %s
+
+# CHECK: error: PseudoSnippyCM_JT is not supported, use CM_JT instead
+
+options:
+    mattr: +zcmt
+    num-instrs: 500
+
+include:
+  - ../Inputs/sections-with-ro.yaml
+
+histogram:
+    - [ADDI, 1.0]
+    - [PseudoSnippyCM_JT, 10.0]
+
