@@ -262,6 +262,7 @@ def CM_POP : RVInstZcCPPP<0b11010, "cm.pop">,
 
 let DecoderNamespace = "ZcOverlap", Predicates = [HasStdExtZcmt],
     hasSideEffects = 0, mayLoad = 0, mayStore = 0 in {
+let isTerminator = 1 in
 def CM_JT : RVInst16CJ<0b101, 0b10, (outs), (ins uimm5:$index),
                        "cm.jt", "$index">{
   bits<5> index;
@@ -269,6 +270,8 @@ def CM_JT : RVInst16CJ<0b101, 0b10, (outs), (ins uimm5:$index),
   let Inst{12-7} = 0b000000;
   let Inst{6-2} = index;
 }
+let isCodeGenOnly = 1, isAsmParserOnly = 0, Size = 32, isTerminator = 1, isBranch = 1, isIndirectBranch = 1, isBarrier = 1 in
+def PseudoSnippyCM_JT : Pseudo<(outs), (ins bare_symbol:$src), []>;
 
 let Defs = [X1] in
 def CM_JALT : RVInst16CJ<0b101, 0b10, (outs), (ins uimm8ge32:$index),

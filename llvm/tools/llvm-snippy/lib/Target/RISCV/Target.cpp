@@ -1530,6 +1530,9 @@ public:
     case RISCV::C_NTL_P1:
     case RISCV::C_NTL_PALL:
     case RISCV::C_NTL_S1:
+    // This is snippy-internal opcode.
+    // Users should use CM_JT
+    case RISCV::PseudoSnippyCM_JT:
     case RISCV::PseudoNOP:
       return true;
     default:
@@ -1689,7 +1692,9 @@ public:
       if (isLrInstr(Opcode) || isScInstr(Opcode) || isAtomicAMO(Opcode) ||
           isSupportedLoadStore(Opcode))
         continue;
-      if (OpCC.desc(Opcode)->mayLoad() || OpCC.desc(Opcode)->mayStore())
+      const auto *InstrDesc = OpCC.desc(Opcode);
+      assert(InstrDesc);
+      if (InstrDesc->mayLoad() || InstrDesc->mayStore())
         snippy::fatal("Memory instruction " + Twine(OpCC.name(Opcode)) +
                       " is unsupported");
     }
@@ -2063,6 +2068,10 @@ public:
     return false;
   }
 
+  bool needsLowering(const MCInstrDesc &InstrDesc) const override {
+    return InstrDesc.getOpcode() == RISCV::PseudoSnippyCM_JT;
+  }
+
   bool
   canBeGeneratedAsCommonInstr(const MCInstrDesc &InstrDesc) const override {
     // Zcmp poprets generated separately in RISCVZcmpPopretCombine pass
@@ -2087,6 +2096,23 @@ public:
       ArrayRef<planning::PreselectedOpInfo> Preselected) const override {
     assert(requiresCustomGeneration(InstrDesc));
     llvm_unreachable("Not used at the moment");
+  }
+
+  void lowerInstruction(InstructionGenerationContext &IGC,
+                        MachineInstr &MI) const override {
+    assert(needsLowering(MI.getDesc()));
+    const auto Opcode = MI.getDesc().getOpcode();
+    const auto &State = IGC.ProgCtx.getLLVMState();
+    auto &II = State.getInstrInfo();
+    const auto OpcodeName = II.getName(Opcode);
+    switch (Opcode) {
+    case RISCV::PseudoSnippyCM_JT:
+      return expandPseudoCM_JT(IGC, MI);
+    default:
+      std::string ErrorMessage =
+          ("Unexpected opcode '" + OpcodeName + "' in " + __func__).str();
+      llvm_unreachable(ErrorMessage.c_str());
+    }
   }
 
   void instructionPostProcess(InstructionGenerationContext &IGC,
@@ -2167,6 +2193,50 @@ public:
     return true;
   }
 
+  MachineInstr *generateCM_JT(InstructionGenerationContext &IGC,
+                              MachineBasicBlock &Target) const {
+    assert(IGC.getSubtarget<RISCVSubtarget>().hasStdExtZcmt());
+    const auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
+    const auto &OpcodeCache = ProgCtx.getOpcodeCache();
+    auto Opcode = RISCV::CM_JT;
+    const MCInstrDesc *MIDesc = OpcodeCache.desc(Opcode);
+    assert(MIDesc != nullptr);
+
+    auto OperandType = MIDesc->operands()[0].OperandType;
+    StridedImmediate ImmLimits(
+        /* MinIn */ 0,
+        /* MaxIn */ APInt::getMaxValue(/* numBits */ 32).getZExtValue(),
+        /* StrideIn */ 1);
+    auto Index =
+        genImmOperandForOpcode(Opcode, /* ImmediateHistogramSequence */ nullptr,
+                               OperandType, ImmLimits, State);
+    assert(Index <= 31); // 5 bits for immediate
+    auto RP = IGC.pushRegPool();
+    const auto &RI = State.getRegInfo();
+    auto TmpReg =
+        getNonZeroReg("tmp register to store address of BasicBlock to "
+                      "jmp table (zcmt extension)",
+                      RI, *RP, IGC.MBB);
+
+    loadBBAddress(IGC, TmpReg, Target);
+    prepareJmpTable(IGC, Index, TmpReg);
+    auto &Ctx = State.getCtx();
+    const auto &InstrInfo = IGC.ProgCtx.getLLVMState().getInstrInfo();
+
+    return getMainInstBuilder(*this, IGC.MBB, IGC.Ins, Ctx,
+                              InstrInfo.get(Opcode))
+        .addImm(Index);
+  }
+
+  void expandPseudoCM_JT(InstructionGenerationContext &IGC,
+                         MachineInstr &MI) const {
+    auto *TargetBB = getBranchDestination(MI);
+    assert(TargetBB);
+    generateCM_JT(IGC, *TargetBB);
+    MI.eraseFromParent();
+  }
+
   MachineInstr &insertIndirectJump(InstructionGenerationContext &IGC,
                                    MachineBasicBlock &TBB,
                                    unsigned Opcode) const override {
@@ -2175,17 +2245,23 @@ public:
     const auto &InstrInfo = State.getInstrInfo();
     [[maybe_unused]] auto &BranchDesc = InstrInfo.get(Opcode);
     auto &MBB = IGC.MBB;
-    assert(BranchDesc.operands()[0].OperandType == MCOI::OPERAND_REGISTER);
+    const auto OpcodeName = InstrInfo.getName(Opcode);
     switch (Opcode) {
     case RISCV::PseudoC_JRB:
+      assert(BranchDesc.operands()[0].OperandType == MCOI::OPERAND_REGISTER);
       return *getMainInstBuilder(*this, MBB, IGC.Ins,
                                  MBB.getParent()->getFunction().getContext(),
                                  InstrInfo.get(RISCV::PseudoSnippyC_JRB))
                   .addMBB(&TBB)
                   .getInstr();
-      break;
+    case RISCV::PseudoSnippyCM_JT:
+      return *getMainInstBuilder(*this, MBB, IGC.Ins,
+                                 MBB.getParent()->getFunction().getContext(),
+                                 InstrInfo.get(RISCV::PseudoSnippyCM_JT))
+                  .addMBB(&TBB)
+                  .getInstr();
     default:
-      snippy::fatal("Indirect branch with opcode '" + Twine(Opcode) +
+      snippy::fatal("Indirect branch with opcode '" + OpcodeName +
                     "' is not supported");
     }
   }
@@ -3551,6 +3627,31 @@ public:
         .addSym(AUIPCSymbol, RISCVII::MO_PCREL_LO);
   }
 
+  MachineInstr *loadBBAddress(InstructionGenerationContext &IGC,
+                              unsigned DestReg,
+                              MachineBasicBlock &Target) const {
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
+    auto &II = State.getInstrInfo();
+    auto &MBB = IGC.MBB;
+    MachineOperand Symbol = MachineOperand::CreateMBB(&Target);
+    Symbol.setTargetFlags(RISCVII::MO_PCREL_HI);
+    MCSymbol *AUIPCSymbol =
+        State.getMCContext().createNamedTempSymbol("pcrel_hi");
+
+    MachineInstr *MIAUIPC =
+        getSupportInstBuilder(*this, MBB, IGC.Ins, State.getCtx(),
+                              II.get(RISCV::AUIPC), DestReg)
+            .add(Symbol);
+
+    MIAUIPC->setPreInstrSymbol(*Target.getParent(), AUIPCSymbol);
+
+    return getSupportInstBuilder(*this, MBB, IGC.Ins, State.getCtx(),
+                                 II.get(RISCV::ADDI), DestReg)
+        .addReg(DestReg)
+        .addSym(AUIPCSymbol, RISCVII::MO_PCREL_LO);
+  }
+
   MachineInstr *generateFenceI(InstructionGenerationContext &IGC) const {
     auto &ProgCtx = IGC.ProgCtx;
     const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
@@ -3591,18 +3692,11 @@ public:
   }
 
   void prepareJmpTable(InstructionGenerationContext &IGC, size_t Index,
-                       const GlobalValue &Target) const {
+                       unsigned RegisterWithAddr) const {
     assert(IGC.getSubtarget<RISCVSubtarget>().hasStdExtZcmt());
     assert(Index <= 255);
     auto &ProgCtx = IGC.ProgCtx;
-    auto RP = IGC.pushRegPool();
-    auto &State = ProgCtx.getLLVMState();
-    const auto &RI = State.getRegInfo();
-    auto TmpReg = getNonZeroReg("tmp register to store address of function to "
-                                "jmp table (zcmt extension)",
-                                RI, *RP, IGC.MBB);
 
-    loadSymbolAddress(IGC, TmpReg, &Target);
     auto &GP = ProgCtx.getOrAddGlobalsPoolFor(
         IGC.getSnippyModule(), "Failed to get GP for jump table creation");
     // We want to have some constant with table size
@@ -3620,7 +3714,7 @@ public:
     // TODO: we might want to add random here
     size_t StartAddr = GP.getGVAddress(GV);
     size_t PosAddress = StartAddr + AddrLen * Index / RISCV_CHAR_BIT;
-    storeRegToAddr(IGC, PosAddress, TmpReg);
+    storeRegToAddr(IGC, PosAddress, RegisterWithAddr);
     writeValueToCSR(IGC, APInt(AddrLen, StartAddr), RISCVSimulatorSysReg::JVT);
   }
 
@@ -3643,7 +3737,14 @@ public:
     auto Index =
         genImmOperandForOpcode(Opcode, /* ImmediateHistogramSequence */ nullptr,
                                OperandType, ImmLimits, State);
-    prepareJmpTable(IGC, Index, Target);
+
+    auto RP = IGC.pushRegPool();
+    const auto &RI = State.getRegInfo();
+    auto TmpReg = getNonZeroReg("tmp register to store address of function to "
+                                "jmp table (zcmt extension)",
+                                RI, *RP, IGC.MBB);
+    loadSymbolAddress(IGC, TmpReg, &Target);
+    prepareJmpTable(IGC, Index, TmpReg);
 
     auto &Ctx = State.getCtx();
     const auto &InstrInfo = IGC.ProgCtx.getLLVMState().getInstrInfo();
@@ -5037,10 +5138,14 @@ public:
   unsigned getInternalOpcode(unsigned Opc) const override {
     if (Opc == RISCV::PseudoC_JRB)
       snippy::notice("PseudoC_JRB is deprecated", "Use C_JR instead");
+    if (Opc == RISCV::PseudoSnippyCM_JT)
+      snippy::fatal("PseudoSnippyCM_JT is not supported, use CM_JT instead");
 
     switch (Opc) {
     case RISCV::C_JR:
       return RISCV::PseudoC_JRB;
+    case RISCV::CM_JT:
+      return RISCV::PseudoSnippyCM_JT;
     default:
       return Opc;
     }
@@ -5050,6 +5155,8 @@ public:
     switch (InternalOpc) {
     case RISCV::PseudoC_JRB:
       return RISCV::C_JR;
+    case RISCV::PseudoSnippyCM_JT:
+      return RISCV::CM_JT;
     default:
       return InternalOpc;
     }
