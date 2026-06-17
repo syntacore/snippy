@@ -362,6 +362,10 @@ struct SimulatorIsaInfo {
 static void addMisaBits(RVMExtDescriptor &Ext,
                         const RISCVSubtarget &Subtarget) {
   auto &MisaBits = Ext.MisaExt;
+  if (Subtarget.hasStdExtE())
+    MisaBits[RVM_MISA_E] = true;
+  if (Subtarget.hasStdExtI())
+    MisaBits[RVM_MISA_I] = true;
   if (Subtarget.hasStdExtA())
     MisaBits[RVM_MISA_A] = true;
   if (Subtarget.hasStdExtC())
