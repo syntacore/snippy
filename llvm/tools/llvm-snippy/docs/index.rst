@@ -4401,13 +4401,14 @@ SNTF file begins with a **header**, in which after **#** (comments), starting fr
 
 In total, paragraphs 3 and 4 should list all the features of the version from paragraph 2.
 
-All names of **1.0** version features:
+All names of **1.1** version features:
 
 * ``time``
 * ``pc``
 * ``instr-code``
 * ``next-pc``
 * ``registers-changed``
+* ``csrs-changed``
 * ``memory-accesses``
 
 You can enable or disable these features using the sntf-config key in your layout:
@@ -4420,6 +4421,7 @@ You can enable or disable these features using the sntf-config key in your layou
     instr-code: on
     next-pc: on
     registers-changed: on
+    csrs-changed: on
     memory-accesses: on
 
 **Header example:**
@@ -4427,12 +4429,13 @@ You can enable or disable these features using the sntf-config key in your layou
 .. code:: yaml
 
   # SNTF
-  # 1.0
+  # 1.1
   # +time
   # +pc
   # +instr-code
   # +next-pc
   # +registers-changed
+  # +csrs-changed
   # +memory-accesses
 
 After the header, on each line placed entries that were selected in the
