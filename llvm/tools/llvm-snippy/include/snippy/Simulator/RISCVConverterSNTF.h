@@ -73,22 +73,24 @@ public:
 // In total, paragraphs 3 and 4 should list all the features of the version from
 // paragraph 2.
 //
-// All names of 1.0 version features:
+// All names of 1.1 version features:
 //   * time
 //   * pc
 //   * instr-code
 //   * next-pc
 //   * registers-changed
+//   * csrs-changed
 //   * memory-accesses
 //
 // Header example:
 //   # SNTF
-//   # 1.0
+//   # 1.1
 //   # +time
 //   # +pc
 //   # +instr-code
 //   # +next-pc
 //   # +registers-changed
+//   # -csrs-changed
 //   # +memory-accesses
 //
 // After the header, on each line placed entries that were selected in the
@@ -118,7 +120,7 @@ public:
 //
 // clang-format on
 
-#define SNTF_VERSION "1.0"
+#define SNTF_VERSION "1.1"
 
 class RISCVConverterSNTF {
   // Vector register can be printed element by element, where the length of one
@@ -138,9 +140,11 @@ class RISCVConverterSNTF {
   std::vector<FeatureFuncT> Features;
   RISCVFeatureFlagsSNTF SNTFFlags;
   ArrayRef<RegisterLog> RegLogs;
+  ArrayRef<RegisterLog> CSRLogs;
   ArrayRef<MemoryLog> MemLogs;
 
   static std::string getVectorDataSNTF(const VectorRegisterType &VecData);
+  void printRegLogs(raw_ostream &LogsBuff, ArrayRef<RegisterLog> Logs) const;
   void printRegLog(raw_ostream &LogsBuff, const RegisterLog &RegLog) const;
   void printMemLog(raw_ostream &LogsBuff, const MemoryLog &MemLog) const;
   void logHeader(raw_ostream &LogsBuff) const;
@@ -152,9 +156,11 @@ public:
 
   void acceptRecordsAndShiftPC(ProgramCounterType PC,
                                ArrayRef<RegisterLog> RegLogs,
+                               ArrayRef<RegisterLog> CSRLogs,
                                [[maybe_unused]] ArrayRef<MemoryLog> MemLogs);
   void acceptRecords(raw_ostream &LogsBuff, ProgramCounterType PC,
                      ArrayRef<RegisterLog> RegLogs,
+                     ArrayRef<RegisterLog> CSRLogs,
                      ArrayRef<MemoryLog> MemLogs);
 };
 
