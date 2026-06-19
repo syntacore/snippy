@@ -30,6 +30,11 @@ void RISCVTraceObserver::vregUpdateNotification(unsigned RegID,
   RegLogs.emplace_back(RegisterLog{RegType::V, RegID, VecData});
 }
 
+void RISCVTraceObserver::csrUpdateNotification(unsigned RegID,
+                                               RegisterType Value) {
+  CSRLogs.emplace_back(RegisterLog{RegType::CSR, RegID, Value});
+}
+
 void RISCVTraceObserver::memUpdateNotification(MemoryAddressType Addr,
                                                const char *Data, size_t Size) {
   auto DataSize = Size * CHAR_BIT;
@@ -41,9 +46,10 @@ void RISCVTraceObserver::memUpdateNotification(MemoryAddressType Addr,
 
 void RISCVTraceObserver::PCUpdateNotification(ProgramCounterType PC) {
   for_each(Converters, [&](auto &Converter) {
-    Converter->acceptRecordsAndShiftPC(PC, RegLogs, MemLogs);
+    Converter->acceptRecordsAndShiftPC(PC, RegLogs, CSRLogs, MemLogs);
   });
   RegLogs.clear();
+  CSRLogs.clear();
   MemLogs.clear();
 }
 
