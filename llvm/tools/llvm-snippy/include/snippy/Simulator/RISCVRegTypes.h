@@ -15,7 +15,7 @@
 namespace llvm {
 namespace snippy {
 
-enum class RegType { X, F, V, NoReg };
+enum class RegType { X, F, V, CSR, NoReg };
 
 constexpr inline StringRef regTypeToString(RegType RT) {
   switch (RT) {
@@ -25,6 +25,8 @@ constexpr inline StringRef regTypeToString(RegType RT) {
     return "F";
   case RegType::V:
     return "V";
+  case RegType::CSR:
+    return "CSR";
   case RegType::NoReg:
     return "NoReg";
   }

@@ -23,14 +23,14 @@ struct RISCVFeatureFlagsSNTF {
   bool EnableNextPC = true;
   bool EnableRegVals = true;
   bool EnableMemAccesses = true;
+  bool EnableCSRVals = false;
 
   bool operator==(const RISCVFeatureFlagsSNTF &Other) const {
-    return std::tie(EnableTime,
-                    EnablePC, EnableInstrCode, EnableNextPC, EnableRegVals,
-                    EnableMemAccesses) ==
-           std::tie(Other.EnableTime,
-                    Other.EnablePC, Other.EnableInstrCode, Other.EnableNextPC,
-                    Other.EnableRegVals, Other.EnableMemAccesses);
+    return std::tie(EnableTime, EnablePC, EnableInstrCode, EnableNextPC,
+                    EnableRegVals, EnableMemAccesses, EnableCSRVals) ==
+           std::tie(Other.EnableTime, Other.EnablePC, Other.EnableInstrCode,
+                    Other.EnableNextPC, Other.EnableRegVals,
+                    Other.EnableMemAccesses, Other.EnableCSRVals);
   }
 };
 
