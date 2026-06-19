@@ -18,6 +18,7 @@ void yaml::MappingTraits<snippy::RISCVFeatureFlagsSNTF>::mapping(
   IO.mapOptional("instr-code", SNTF.EnableInstrCode);
   IO.mapOptional("next-pc", SNTF.EnableNextPC);
   IO.mapOptional("registers-changed", SNTF.EnableRegVals);
+  IO.mapOptional("csrs-changed", SNTF.EnableCSRVals);
   IO.mapOptional("memory-accesses", SNTF.EnableMemAccesses);
 }
 

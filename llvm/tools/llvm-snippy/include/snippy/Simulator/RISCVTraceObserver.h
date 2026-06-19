@@ -23,12 +23,14 @@ public:
 
 private:
   SmallVector<RegisterLog> RegLogs;
+  SmallVector<RegisterLog> CSRLogs;
   SmallVector<MemoryLog> MemLogs;
 
 public:
   void xregUpdateNotification(unsigned RegID, RegisterType Value) override;
   void fregUpdateNotification(unsigned RegID, RegisterType Value) override;
   void vregUpdateNotification(unsigned RegID, ArrayRef<char> Data) override;
+  void csrUpdateNotification(unsigned RegID, RegisterType Value) override;
   void PCUpdateNotification(ProgramCounterType PC) override;
   void memUpdateNotification(MemoryAddressType Addr, const char *Data,
                              size_t Size) override;
