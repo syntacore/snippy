@@ -51,11 +51,17 @@ RISCVConverterSNTF::RISCVConverterSNTF(const unsigned XL,
     Features.push_back([this](raw_ostream &LogsBuff) {
       if (!RegLogs.empty()) {
         LogsBuff << " ";
-        printRegLog(LogsBuff, *RegLogs.begin());
-        llvm::for_each(llvm::drop_begin(RegLogs), [&](const auto &RegLog) {
+        printRegLogs(LogsBuff, RegLogs);
+        if (SNTFFlags.EnableCSRVals && !CSRLogs.empty())
           LogsBuff << ",";
-          printRegLog(LogsBuff, RegLog);
-        });
+      }
+    });
+  if (SNTFFlags.EnableCSRVals)
+    Features.push_back([this](raw_ostream &LogsBuff) {
+      if (!CSRLogs.empty()) {
+        if (SNTFFlags.EnableRegVals && RegLogs.empty())
+          LogsBuff << " ";
+        printRegLogs(LogsBuff, CSRLogs);
       }
     });
   if (SNTFFlags.EnableMemAccesses)
@@ -82,6 +88,7 @@ void RISCVConverterSNTF::logHeader(raw_ostream &LogsBuff) const {
            << IsFlagEnabled(SNTFFlags.EnableInstrCode, "instr-code")
            << IsFlagEnabled(SNTFFlags.EnableNextPC, "next-pc")
            << IsFlagEnabled(SNTFFlags.EnableRegVals, "registers-changed")
+           << IsFlagEnabled(SNTFFlags.EnableCSRVals, "csrs-changed")
            << IsFlagEnabled(SNTFFlags.EnableMemAccesses, "memory-accesses");
 }
 
@@ -117,6 +124,15 @@ RISCVConverterSNTF::getVectorDataSNTF(const VectorRegisterType &VecData) {
   return ResultStr;
 }
 
+void RISCVConverterSNTF::printRegLogs(raw_ostream &LogsBuff,
+                                      ArrayRef<RegisterLog> Logs) const {
+  printRegLog(LogsBuff, *Logs.begin());
+  llvm::for_each(llvm::drop_begin(Logs), [&](const auto &RegLog) {
+    LogsBuff << ",";
+    printRegLog(LogsBuff, RegLog);
+  });
+}
+
 void RISCVConverterSNTF::printRegLog(raw_ostream &LogsBuff,
                                      const RegisterLog &RegLog) const {
   switch (RegLog.Type) {
@@ -137,14 +153,24 @@ void RISCVConverterSNTF::printRegLog(raw_ostream &LogsBuff,
                     std::get<VectorRegisterType>(RegLog.NewValue));
     break;
   }
+  case RegType::CSR: {
+    [[maybe_unused]] auto *SysReg =
+        lookupSysReg(RISCVSimulatorSysReg(RegLog.RegID));
+    assert(SysReg && "couldn't deduce csr register");
+    LogsBuff << llvm::formatv("csr{}", RegLog.RegID) << "="
+             << toHexStringTruncate(std::get<RegisterType>(RegLog.NewValue),
+                                    XLen);
+    break;
+  }
   default:
     snippy::fatal("Unknown register type");
   }
 }
 
-void RISCVConverterSNTF::acceptRecordsAndShiftPC(
-    ProgramCounterType PC, ArrayRef<RegisterLog> RegLogs,
-    [[maybe_unused]] ArrayRef<MemoryLog> MemLogs) {
+void RISCVConverterSNTF::acceptRecordsAndShiftPC(ProgramCounterType PC,
+                                                 ArrayRef<RegisterLog> RegLogs,
+                                                 ArrayRef<RegisterLog> CSRLogs,
+                                                 ArrayRef<MemoryLog> MemLogs) {
   ++Time;
   // Create buffer to print all logs at this time step.
   std::string StrLogsBuff;
@@ -155,7 +181,7 @@ void RISCVConverterSNTF::acceptRecordsAndShiftPC(
   if (Time - 1 == 0) {
     logHeader(LogsBuff);
   } else {
-    acceptRecords(LogsBuff, PC, RegLogs, MemLogs);
+    acceptRecords(LogsBuff, PC, RegLogs, CSRLogs, MemLogs);
   }
   // Dump all logs at this iteration into the file.
   *TraceFile << StrLogsBuff;
@@ -165,11 +191,13 @@ void RISCVConverterSNTF::acceptRecordsAndShiftPC(
 void RISCVConverterSNTF::acceptRecords(raw_ostream &LogsBuff,
                                        ProgramCounterType PC,
                                        ArrayRef<RegisterLog> RL,
+                                       ArrayRef<RegisterLog> CSRL,
                                        ArrayRef<MemoryLog> ML) {
   // This means that the end of the trace has been reached.
   if (PC == LastPC)
     PrevPCs.setFirst(PC);
   RegLogs = RL;
+  CSRLogs = CSRL;
   MemLogs = ML;
 
   for (auto &LogFunc : Features)
