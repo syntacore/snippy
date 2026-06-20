@@ -285,6 +285,31 @@ const IRegisterState &SnippyProgramContext::getInitialRegisterState(
   return *InitialMachineState;
 }
 
+void SnippyProgramContext::dumpInitialRegisterState(
+    StringRef YamlPath, const TargetSubtargetInfo &ST) const {
+  if (YamlPath.empty())
+    return;
+
+  std::error_code EC;
+  raw_fd_ostream File(YamlPath, EC);
+  if (EC)
+    snippy::fatal(State->getCtx(), "Failed to dump initial registers",
+                  "cannot open file \"" + Twine(YamlPath) +
+                      "\": " + EC.message());
+
+  getInitialRegisterState(ST).saveAsYAMLFile(File);
+}
+
+void SnippyProgramContext::dumpInitialRegisterState(StringRef YamlPath) const {
+  if (YamlPath.empty())
+    return;
+
+  assert(
+      InitialStateSubtarget &&
+      "Initial register state requested before target context initialization");
+  dumpInitialRegisterState(YamlPath, *InitialStateSubtarget);
+}
+
 const IRegisterState &SnippyProgramContext::getInitialRegisterState() const {
   assert(InitialStateSubtarget &&
          "Initial register state requested before target context "

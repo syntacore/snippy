@@ -318,6 +318,10 @@ public:
   const IRegisterState &
   getInitialRegisterState(const TargetSubtargetInfo &ST) const;
 
+  void dumpInitialRegisterState(StringRef YamlPath) const;
+  void dumpInitialRegisterState(StringRef YamlPath,
+                                const TargetSubtargetInfo &ST) const;
+
   const IRegisterState &getInitialRegisterState() const;
 
   bool hasProgramStateSaveSpace() const { return PGSK.get(); }

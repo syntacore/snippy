@@ -185,27 +185,6 @@ static auto createSMCInitRoutine(GeneratorContext &Ctx) {
   return ExtModule;
 }
 
-void dumpInitialRegistersIfRequested(SnippyProgramContext &ProgContext,
-                                     LLVMContext &Ctx,
-                                     const PassConfig &PassCfg) {
-  auto &YamlPath = PassCfg.RegistersConfig.InitialStateOutputYaml;
-  if (YamlPath.empty())
-    return;
-
-  if (PassCfg.ModelPluginConfig.runOnModel())
-    return;
-
-  auto &Regs = ProgContext.getInitialRegisterState();
-
-  std::error_code EC;
-  raw_fd_ostream File(YamlPath, EC);
-  if (EC)
-    snippy::fatal(Ctx, "Failed to dump initial registers",
-                  "cannot open file \"" + YamlPath + "\": " + EC.message());
-
-  Regs.saveAsYAMLFile(File);
-}
-
 } // namespace
 
 [[maybe_unused]] static void dumpSelfcheck(const std::vector<char> &Data,
@@ -446,8 +425,6 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
   if (ProgramCfg.MemoryCfg.SkipRuntimeMemInit)
     Modules = {&MainModule};
 
-  dumpInitialRegistersIfRequested(ProgContext, State.getCtx(), PassCfg);
-
   dumpVerificationIntervalsIfNeeeded(MainModule, GenCtx, BaseFileName);
 
   if (PassCfg.ModelPluginConfig.runOnModel()) {
@@ -526,6 +503,9 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
           .PCUpdateNotification(TFCfg.LastPC);
 
   } else {
+
+    ProgContext.dumpInitialRegisterState(
+        PassCfg.RegistersConfig.InitialStateOutputYaml);
 
     snippy::warn(WarningName::NoModelExec, State.getCtx(),
                  "Skipping snippet execution on the model",
