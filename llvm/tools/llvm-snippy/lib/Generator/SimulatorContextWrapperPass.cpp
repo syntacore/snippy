@@ -229,7 +229,7 @@ Error SimulatorContext::runSimulator(const RunInfo &RI) {
   auto Err = I.setPC(ElfData->ProgStart);
   if (Err)
     return Err;
-  I.dumpCurrentRegState(InitialStateOutputYaml);
+  ProgCtx.dumpInitialRegisterState(InitialStateOutputYaml, I.getSubTarget());
 
   if (ElfData->ProgEnd == std::nullopt)
     return createStringError(

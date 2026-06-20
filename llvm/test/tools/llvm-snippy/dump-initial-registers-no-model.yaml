@@ -1,20 +1,10 @@
-# RUN: rm -f %t.initial-regs.yaml
-# RUN: llvm-snippy %s -mtriple=riscv64-unknown-elf -num-instrs=10 \
+# RUN: llvm-snippy %s -mtriple=riscv64 --model-plugin=None -num-instrs=10 \
 # RUN:   --init-regs-in-elf \
 # RUN:   --dump-initial-registers-yaml=%t.initial-regs.yaml
 # RUN: test -s %t.initial-regs.yaml
 
-sections:
-  - name: text
-    VMA: 0x1000
-    LMA: 0x1000
-    SIZE: 0x1000
-    ACCESS: rx
-  - name: data
-    VMA: 0x3000
-    LMA: 0x3000
-    SIZE: 0x1000
-    ACCESS: rw
+include:
+  - "Inputs/sections.yaml"
 
 histogram:
   - [ADD, 1]
