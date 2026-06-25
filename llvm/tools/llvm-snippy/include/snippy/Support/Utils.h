@@ -269,6 +269,28 @@ template <class Target, class Source> Target narrowCast(Source Value) {
   return Narrow;
 }
 
+template <typename T>
+inline bool isZero(T Value, T Tolerance = std::numeric_limits<T>::epsilon()) {
+  return std::abs(Value) < Tolerance;
+}
+
+inline unsigned getIdxLastNonZero(const std::vector<double> &Dist) {
+  assert(!Dist.empty());
+  auto It = std::find_if(Dist.rbegin(), Dist.rend(),
+                         [](double X) { return !isZero(X); });
+  assert(It != Dist.rend());
+  assert(Dist.begin() != It.base());
+  return std::distance(Dist.begin(), It.base()) - 1;
+}
+
+inline unsigned getIdxFirstNonZero(const std::vector<double> &Dist) {
+  assert(!Dist.empty());
+  auto It = std::find_if(Dist.begin(), Dist.end(),
+                         [](double X) { return !isZero(X); });
+  assert(It != Dist.end());
+  return std::distance(Dist.begin(), It);
+}
+
 inline long long int alignSignedTo(long long int Value,
                                    long long unsigned Align) {
   if (Value < 0) {
@@ -440,6 +462,7 @@ Expected<std::string> canonicalizePath(StringRef Path);
 
 // Make it so the sum of all values in the range is 1.0
 template <typename ItType> void normalizeValues(ItType Begin, ItType End) {
+  assert(Begin != End);
   static_assert(
       std::is_convertible_v<typename std::iterator_traits<ItType>::value_type,
                             double>);
