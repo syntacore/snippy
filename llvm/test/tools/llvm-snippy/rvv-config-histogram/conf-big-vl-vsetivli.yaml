@@ -38,7 +38,5 @@ riscv-vector-unit:
 histogram:
        - [VSETIVLI, 1.0]
        - [VADD_VV, 1.0]
-         
-# CHECK: All RVV configurations from the riscv-vector-unit are incompatible
-# CHECK-SAME: with all VL generators
 
+# CHECK: error: riscv-vector-unit: Could not find any applicable VL generators

@@ -1,17 +1,17 @@
 # REQUIRES: riscv-rvv
-# COM: This test checks that if all vlmax values > max possible value for
-#      VSETIVLI (31), vlmax generator is discarded.
+# COM: This test checks that VSETVL works fine with vlmax generator
+#      when we have VL value greater than 31.
 
-# RUN: not llvm-snippy %s \
-# RUN: |& FileCheck %s
+# RUN: llvm-snippy %s
 
 options:
   mtriple: riscv64
   mattr: +v
-  num-instrs: 10
+  num-instrs: 100
+  dump-mf: on
 
 include:
-- "Inputs/sections.yaml"
+- Inputs/sections.yaml
 
 riscv-vector-unit:
   mode-distribution:
@@ -23,7 +23,7 @@ riscv-vector-unit:
       rnu: 1.0
     VTYPE:
       SEW:
-        sew_32: 1.0
+        sew_16: 1.0
       LMUL:
         m8: 1.0
       VMA:
@@ -32,7 +32,7 @@ riscv-vector-unit:
         tu: 1.0
 
 histogram:
-       - [VSETIVLI, 1.0]
+       - [VSETVL, 1.0]
        - [VADD_VV, 1.0]
 
-# CHECK: error: riscv-vector-unit: Could not find any applicable VL generators
+# vlmax = VLEN * LMUL / SEW = 128 * 8 / 16 = 64 > 31

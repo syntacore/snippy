@@ -13,7 +13,6 @@
 #include "snippy/Config/Valuegram.h"
 #include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Support/Options.h"
-#include "snippy/Support/ProbabilityUtils.h"
 #include "snippy/Support/Utils.h"
 #include "snippy/Support/YAMLUtils.h"
 
@@ -144,34 +143,9 @@ struct ModeChangeBias final {
   ModeChangeP ModeChangeProb = ModeChangeP::ProbIsDeduced();
 
   // Probability of choosing an illegal configuration when a mode-changing
-  // instruction is selected
+  // instruction is selected. Illegal configuration occurs when the {SEW, LMUL}
+  // pair violates the target's constraints based on VLEN and ELEN.
   double SetVillP = 0.0;
-};
-
-using SEWInfo = WeightsArray<SEWEnumList>;
-using LMULInfo = WeightsArray<LMULEnumList>;
-using VMAInfo = WeightsArray<VMAEnumList>;
-using VTAInfo = WeightsArray<VTAEnumList>;
-using VXRMInfo = WeightsArray<VXRMEnumList>;
-
-struct VTypeInfo {
-  SEWInfo SEW;
-  LMULInfo LMUL;
-  VMAInfo VMA;
-  VTAInfo VTA;
-};
-
-struct VLVMSequence final {
-  using VLVMEntry = std::pair<std::string, double>;
-  std::vector<VLVMEntry> Values;
-};
-
-struct RVVUnitInfo {
-  VXRMInfo VXRM;
-  VTypeInfo VTYPE;
-
-  VLVMSequence VM;
-  VLVMSequence VL;
 };
 
 struct RVVConfigurationSpace {
@@ -261,61 +235,20 @@ ModeChangeInfo deriveModeSwitchingProbability(const Config &Cfg,
   return Result;
 }
 
-struct InternalConfigurationPoint {
-  double Probability;
-  RVVConfiguration Config;
-};
-
-using RVVConfigPoint =
-    ProbableElement<std::tuple<VSEW, VLMUL, VMAMode, VTAMode, VXRMMode>>;
-
-static InternalConfigurationPoint
-convertRepresentation(unsigned ELEN, unsigned VLEN,
-                      const RVVConfigPoint &Point) {
-  InternalConfigurationPoint Result;
-  Result.Probability = Point.Prob;
-  Result.Config.SEW = std::get<VSEW>(Point.Element);
-  Result.Config.LMUL = std::get<VLMUL>(Point.Element);
-  Result.Config.MaskAgnostic =
-      (std::get<VMAMode>(Point.Element) == VMAMode::MA);
-  Result.Config.TailAgnostic =
-      (std::get<VTAMode>(Point.Element) == VTAMode::TA);
-  Result.Config.VXRM = std::get<VXRMMode>(Point.Element);
-
-  auto MaxVL = computeVLMax(
-      ELEN, VLEN, static_cast<unsigned>(Result.Config.SEW), Result.Config.LMUL);
-  if (MaxVL == 0)
-    Result.Config.IsLegal = false;
-  return Result;
-}
-
-static unsigned getMaxPossibleVL(unsigned VLEN) {
-  return VLEN * RVVConfiguration::getMaxLMUL() / RVVConfiguration::getMinSEW();
-}
-
-static unsigned generateMaxVL(unsigned ELEN, unsigned VLEN,
-                              const RVVConfiguration &Cfg) {
-  auto PointSEW = static_cast<unsigned>(Cfg.SEW);
-  auto MaxVL = computeVLMax(ELEN, VLEN, PointSEW, Cfg.LMUL);
-  if (MaxVL > 0)
-    return MaxVL;
-  // If MaxVL == 0 this means that RVVConfiguration is illegal
-  // and we just return Max Possible VL
-  return getMaxPossibleVL(VLEN);
-}
-
 struct MaxPossibleVLGen final : VLGeneratorInterface {
 
   static constexpr const char *kID = "max_encodable";
   std::string identify() const override { return kID; }
 
-  unsigned generate(unsigned ELEN, unsigned VLEN,
-                    const RVVConfiguration &Cfg) const override {
-    return generateMaxVL(ELEN, VLEN, Cfg);
+  VLDistributionType getDistribution(unsigned VLMax) const override {
+    // VL can be [0, VLMax], so we need VLMax + 1 values
+    VLDistributionType Result(VLMax + 1);
+    Result.back() = 1.0;
+    return Result;
   }
 };
 
-// It's difference from MaxPossibleVLGen is that in case when the vlmax value is
+// It's different from MaxPossibleVLGen in that, in case when the vlmax value is
 // greater than kMaxVLForVSETIVLI, it will not be generated. In case of the
 // MaxPossibleVLGen, the value will be generated and reduced.
 struct MaxVLGenerator final : VLGeneratorInterface {
@@ -323,16 +256,19 @@ struct MaxVLGenerator final : VLGeneratorInterface {
   static constexpr const char *kID = "vlmax";
   std::string identify() const override { return kID; }
 
-  virtual bool isApplicable(unsigned ELEN, unsigned VLEN, bool ReduceVL,
-                            const RVVConfiguration &Cfg) const override {
-    auto PointSEW = static_cast<unsigned>(Cfg.SEW);
-    auto MaxVL = computeVLMax(ELEN, VLEN, PointSEW, Cfg.LMUL);
-    return !ReduceVL || (MaxVL <= kMaxVLForVSETIVLI);
+  // Exactly the same as MaxPossibleVLGen
+  VLDistributionType getDistribution(unsigned VLMax) const override {
+    VLDistributionType Result(VLMax + 1);
+    Result.back() = 1.0;
+    return Result;
   }
 
-  unsigned generate(unsigned ELEN, unsigned VLEN,
-                    const RVVConfiguration &Cfg) const override {
-    return generateMaxVL(ELEN, VLEN, Cfg);
+  // Unapplicable (all weights are zero) if VLMax > kMaxVLForVSETIVLI
+  VLDistributionType getDistributionForVSETIVLI(unsigned VLMax) const override {
+    VLDistributionType Result(kMaxVLForVSETIVLI + 1);
+    if (VLMax <= kMaxVLForVSETIVLI)
+      Result[VLMax] = 1.0;
+    return Result;
   }
 };
 
@@ -341,16 +277,8 @@ struct LegalVLGenerator final : VLGeneratorInterface {
   static constexpr const char *kID = "any_legal";
   std::string identify() const override { return kID; }
 
-  unsigned generate(unsigned ELEN, unsigned VLEN,
-                    const RVVConfiguration &Cfg) const override {
-    auto PointSEW = static_cast<unsigned>(Cfg.SEW);
-    auto MaxVL = computeVLMax(ELEN, VLEN, PointSEW, Cfg.LMUL);
-    if (MaxVL > 0)
-      return RandEngine::genInRangeInclusive<unsigned>(0u, MaxVL);
-    // If MaxVL == 0 this means that RVVConfiguration is illegal
-    // and we just return VL from [0, Max Possible VL]
-    return RandEngine::genInRangeInclusive<unsigned>(0u,
-                                                     getMaxPossibleVL(VLEN));
+  VLDistributionType getDistribution(unsigned VLMax) const override {
+    return VLDistributionType(VLMax + 1, 1.0 / (VLMax + 1));
   }
 };
 
@@ -359,16 +287,11 @@ struct LegalVLNonZeroGenerator final : VLGeneratorInterface {
   static constexpr const char *kID = "any_legal_non_zero";
   std::string identify() const override { return kID; }
 
-  unsigned generate(unsigned ELEN, unsigned VLEN,
-                    const RVVConfiguration &Cfg) const override {
-    auto PointSEW = static_cast<unsigned>(Cfg.SEW);
-    auto MaxVL = computeVLMax(ELEN, VLEN, PointSEW, Cfg.LMUL);
-    if (MaxVL > 0)
-      return RandEngine::genInRangeInclusive<unsigned>(1u, MaxVL);
-    // If MaxVL == 0 this means that RVVConfiguration is illegal
-    // and we just return VL from [1, Max Possible VL]
-    return RandEngine::genInRangeInclusive<unsigned>(1u,
-                                                     getMaxPossibleVL(VLEN));
+  VLDistributionType getDistribution(unsigned VLMax) const override {
+    VLDistributionType Result(VLMax + 1);
+    for (auto &W : drop_begin(Result))
+      W = 1.0 / VLMax;
+    return Result;
   }
 };
 
@@ -377,6 +300,8 @@ struct UnmaskedVMGenerator final : VMGeneratorInterface {
   static constexpr const char *kID = "all_ones";
   std::string identify() const override { return kID; }
 
+  unsigned getMinRequiredVL() const override { return 0; }
+
   APInt generate(unsigned VL) const override { return APInt::getAllOnes(VL); }
 };
 
@@ -384,6 +309,8 @@ struct LegalVMGenerator final : VMGeneratorInterface {
 
   static constexpr const char *kID = "any_legal";
   std::string identify() const override { return kID; }
+
+  unsigned getMinRequiredVL() const override { return 0; }
 
   APInt generate(unsigned VL) const override {
     auto MaxValue = APInt::getAllOnes(VL);
@@ -421,21 +348,12 @@ struct ImmVLGen : public VLGeneratorInterface {
   static constexpr const char *kID = "imm";
   std::string identify() const override { return Context; }
 
-  bool isApplicable(unsigned ELEN, unsigned VLEN, bool ReduceVL,
-                    const RVVConfiguration &Cfg) const override {
-    auto PointSEW = static_cast<unsigned>(Cfg.SEW);
-    auto MaxVL = computeVLMax(ELEN, VLEN, PointSEW, Cfg.LMUL);
-    return (Value <= MaxVL) && (!ReduceVL || (Value <= kMaxVLForVSETIVLI));
+  VLDistributionType getDistribution(unsigned VLMax) const override {
+    VLDistributionType Result(VLMax + 1);
+    if (Value <= VLMax)
+      Result[Value] = 1.0;
+    return Result;
   }
-
-  unsigned generate(unsigned ELEN, unsigned VLEN,
-                    const RVVConfiguration &Cfg) const override {
-    assert(isApplicable(ELEN, VLEN, /* ReduceVL */ false, Cfg) &&
-           "Generation request should be made only for valid VLs");
-    return Value;
-  }
-
-  unsigned getValue() const { return Value; }
 
 private:
   unsigned Value;
@@ -451,21 +369,10 @@ struct ImmVMGen : public VMGeneratorInterface {
 
   std::string identify() const override { return Context; }
 
-  bool isApplicable(unsigned VL) const override {
-    // We can apply a mask only if the number of active bits in it
-    // does not exceed the total number of elements (VL).
-    //
-    // For example,
-    //             active 8 bits/total 11 bits
-    //                <------>
-    //   ImmVM = 0b00010011110 (158)
-    //   APInt(/* numBits */ 11, /* val */ 158).getActiveBits() == 8
-    //   If number of elements (VL) >= 8 this mask is applicable, otherwise not.
-    return Value.getActiveBits() <= VL;
-  }
+  unsigned getMinRequiredVL() const override { return Value.getActiveBits(); }
 
   APInt generate(unsigned VL) const override {
-    assert(isApplicable(VL) &&
+    assert((getMinRequiredVL() <= VL) &&
            "Generation request should be made only for valid VMs");
     return Value;
   }
@@ -506,22 +413,358 @@ static std::unique_ptr<ResultType> constructByID(const std::string_view &ID) {
 }
 
 template <typename Result> struct GeneratorFactory;
-template <> struct GeneratorFactory<RVVConfigurationInfo::VLGeneratorHolder> {
+
+template <> struct GeneratorFactory<VLGeneratorHolder> {
   using ObjectType = VLGeneratorInterface;
-  static RVVConfigurationInfo::VLGeneratorHolder create(const std::string &ID) {
+  static VLGeneratorHolder create(const std::string &ID) {
     return constructByID<VLGeneratorInterface, ImmVLGen, MaxPossibleVLGen,
                          MaxVLGenerator, LegalVLGenerator,
                          LegalVLNonZeroGenerator>(ID);
   }
 };
-template <> struct GeneratorFactory<RVVConfigurationInfo::VMGeneratorHolder> {
+template <> struct GeneratorFactory<VMGeneratorHolder> {
   using ObjectType = VMGeneratorInterface;
-  static RVVConfigurationInfo::VMGeneratorHolder create(const std::string &ID) {
+  static VMGeneratorHolder create(const std::string &ID) {
     return constructByID<VMGeneratorInterface, ImmVMGen, UnmaskedVMGenerator,
                          LegalVMGenerator>(ID);
   }
 };
+} // namespace
 
+namespace llvm {
+namespace snippy {
+
+static std::string toString(VSEW SEW) {
+  switch (SEW) {
+  case VSEW::SEWReserved1:
+    return "eReserved1";
+  case VSEW::SEWReserved2:
+    return "eReserved2";
+  case VSEW::SEWReserved3:
+    return "eReserved3";
+  case VSEW::SEWReserved4:
+    return "eReserved4";
+  case VSEW::SEW8:
+  case VSEW::SEW16:
+  case VSEW::SEW32:
+  case VSEW::SEW64:
+    return 'e' + std::to_string(static_cast<unsigned>(SEW));
+  }
+}
+
+static std::string toString(VLMUL LMUL) {
+  switch (LMUL) {
+  case VLMUL::LMUL_RESERVED:
+    return "reserved";
+  case VLMUL::LMUL_1:
+    return "m1";
+  case VLMUL::LMUL_2:
+    return "m2";
+  case VLMUL::LMUL_4:
+    return "m4";
+  case VLMUL::LMUL_8:
+    return "m8";
+  case VLMUL::LMUL_F2:
+    return "mf2";
+  case VLMUL::LMUL_F4:
+    return "mf4";
+  case VLMUL::LMUL_F8:
+    return "mf8";
+  }
+  llvm_unreachable("Unknown LMUL");
+}
+
+static std::string toString(VTAMode TA) {
+  switch (TA) {
+  case VTAMode::TA:
+    return "ta";
+  case VTAMode::TU:
+    return "tu";
+  }
+  llvm_unreachable("Unknown TA");
+}
+
+static std::string toString(VMAMode MA) {
+  switch (MA) {
+  case VMAMode::MA:
+    return "ma";
+  case VMAMode::MU:
+    return "mu";
+  }
+  llvm_unreachable("Unknown MA");
+}
+
+static std::string toString(VXRMMode XRM) {
+  switch (XRM) {
+  case VXRMMode::RNE:
+    return "rne";
+  case VXRMMode::RNU:
+    return "rnu";
+  case VXRMMode::RDN:
+    return "rdn";
+  case VXRMMode::RON:
+    return "ron";
+  }
+  llvm_unreachable("Unknown XRM");
+}
+
+static void printRawSewLmulProbs(raw_ostream &OS, const SEWInfo &SEWProbs,
+                                 const LMULInfo &LMULProbs) {
+  OS << "=== Raw SEW Probabilities ===\n";
+  SEWProbs.print(OS, [](VSEW SEW) { return toString(SEW); });
+  OS << "=== Raw LMUL Probabilities ===\n";
+  LMULProbs.print(OS, [](VLMUL LMUL) { return toString(LMUL); });
+}
+
+static void printCombinedSewLmulProbs(raw_ostream &OS,
+                                      const SewLmulDistribution &Dist) {
+  constexpr auto SewSize = SEWInfo::size();
+  constexpr auto LmulSize = LMULInfo::size();
+  double Probs[SewSize][LmulSize] = {};
+
+  for (auto &[SewLmul, P] : Dist) {
+    auto [SEW, LMUL] = SewLmul;
+    unsigned SEWIdx = SEWInfo::Mapping::toIdx(SEW);
+    unsigned LMULIdx = LMULInfo::Mapping::toIdx(LMUL);
+    Probs[SEWIdx][LMULIdx] = P;
+  }
+
+  // Print a table like:
+  //      | reserved | mf8 | mf4 | mf2 |  m1 |  m2 |  m4 |  m8
+  //    8 |      0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5
+  //   16 |      0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5
+  //  . . . . .
+  //  512 |      0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5
+  // 1024 |      0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5
+
+  constexpr std::array ColumnsWidths = {9, 5, 5, 5, 5, 5, 5, 5};
+  constexpr std::array LMULs = {
+      VLMUL::LMUL_RESERVED, VLMUL::LMUL_F8, VLMUL::LMUL_F4, VLMUL::LMUL_F2,
+      VLMUL::LMUL_1,        VLMUL::LMUL_2,  VLMUL::LMUL_4,  VLMUL::LMUL_8};
+  constexpr auto SewWidth = 9;
+
+  OS << right_justify("", SewWidth);
+  for (const auto &[LMUL, ColWidth] : zip_equal(LMULs, ColumnsWidths))
+    OS << " |" << right_justify(toString(LMUL), ColWidth);
+  OS << "\n";
+
+  for (auto SEW : SEWEnumList::Arr) {
+    OS << right_justify(toString(SEW), SewWidth);
+    for (const auto &[LMUL, ColWidth] : zip_equal(LMULs, ColumnsWidths)) {
+      double Prob =
+          Probs[SEWInfo::Mapping::toIdx(SEW)][LMULInfo::Mapping::toIdx(LMUL)];
+      OS << " |" << format("%*.2f", ColWidth, Prob * 100);
+    }
+    OS << "\n";
+  }
+  OS << "\n";
+}
+
+[[maybe_unused]] static void printVLProbs(raw_ostream &OS,
+                                          const VLDistributionType &Dist) {
+  ProbableItems<size_t> VLProbs;
+  for (const auto &[VL, P] : enumerate(Dist))
+    VLProbs.push_back({VL, P});
+  VLProbs.print(OS);
+}
+
+// This doesn't account for VL. There might be a {SEW, LMUL} pair with
+// no legal VLs from config for it.
+static SewLmulDistribution
+buildRawSewLmulDistribution(unsigned ELEN, unsigned VLEN,
+                            const SEWInfo &SEWWeights,
+                            const LMULInfo &LMULWeights, double PVill) {
+  auto SEWProbs = normalizeWeights(SEWWeights);
+  auto LMULProbs = normalizeWeights(LMULWeights);
+  LLVM_DEBUG(printRawSewLmulProbs(dbgs(), SEWProbs, LMULProbs));
+
+  // All values, including the reserved ones
+  SEWInfo AllSewWeights = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+  LMULInfo AllLMULWeights = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+
+  // Zero-out the reserved ones if required
+  if (NoReservedCfgRVV) {
+    for (auto &[SEW, Prob] : AllSewWeights) {
+      if (!isLegalSEW(SEW))
+        Prob = 0.0;
+    }
+    for (auto &[LMUL, Prob] : AllLMULWeights) {
+      if (!isLegalLMUL(LMUL))
+        Prob = 0.0;
+    }
+  }
+
+  SewLmulDistribution Dist =
+      jointProbabilityDistribution(AllSewWeights, AllLMULWeights);
+
+  auto IsLegal =
+      [=](const ProbableElement<std::tuple<VSEW, VLMUL>> &Item) -> bool {
+    auto [SEW, LMUL] = Item.Element;
+    return isLegalSewLmul(ELEN, VLEN, SEW, LMUL);
+  };
+  auto LegalRange = make_filter_range(Dist, IsLegal);
+  auto IllegalRange = make_filter_range(Dist, std::not_fn(IsLegal));
+
+  // Note that at the moment users can't set probabilities for reserved
+  // values of SEW and LMUL, so we copy only probs for legal values
+  // and ignore the rest. All illegal configs will have the same probability.
+  for (auto &[SewLmul, P] : LegalRange) {
+    auto [SEW, LMUL] = SewLmul;
+    P = SEWProbs[SEW] * LMULProbs[LMUL];
+  }
+
+  // The total probability of all illegal combinations must be PVill. The total
+  // probability of all legal combinations must be 1 - PVill.
+  auto AddProb = [](double Acc,
+                    const ProbableElement<std::tuple<VSEW, VLMUL>> &E) {
+    return Acc + E.Prob;
+  };
+  double TotalLegalWeight =
+      std::accumulate(LegalRange.begin(), LegalRange.end(), 0.0, AddProb);
+  double TotalIllegalWeight =
+      std::accumulate(IllegalRange.begin(), IllegalRange.end(), 0.0, AddProb);
+
+  if (isZero(TotalLegalWeight) && !isZero(1.0 - PVill))
+    fatal(
+        "RVV Config: no legal configuration detected and Pvill != 1, aborting");
+  // Should never happen as there're always reserved SEW and LMUL values
+  // (which are always illegal)
+  if (isZero(TotalIllegalWeight) && !isZero(PVill))
+    fatal("RVV Config: no illegal configuration detected and Pvill != 0, "
+          "aborting");
+
+  for (auto &[SewLmul, P] : LegalRange)
+    P *= (1.0 - PVill);
+  for (auto &[SewLmul, P] : IllegalRange)
+    P *= PVill;
+
+  if (!isZero(TotalLegalWeight)) {
+    for (auto &[SewLmul, P] : LegalRange)
+      P /= TotalLegalWeight;
+  }
+  if (!isZero(TotalIllegalWeight)) {
+    for (auto &[SewLmul, P] : IllegalRange)
+      P /= TotalIllegalWeight;
+  }
+  assert(Dist.checkSumOfProbabilities());
+  erase_if(Dist, [&](const auto &E) { return isZero(E.Prob); });
+
+  LLVM_DEBUG(
+      dbgs() << "=== {SEW, LMUL} Probabilities Accounting for Pvill (%) ===\n");
+  LLVM_DEBUG(printCombinedSewLmulProbs(dbgs(), Dist));
+
+  return Dist;
+}
+
+static void addToVLDistribution(unsigned MaxVL, double Weight,
+                                const VLGeneratorHolder &VLGen,
+                                VLDistributionType &ResultingDistribution,
+                                bool IsForVSETIVLI) {
+  assert(ResultingDistribution.size() > 0);
+  // At the end of function the total sum of ResultingDistribution must either
+  // stay the same or increase by Weight.
+
+  auto VLDist = IsForVSETIVLI ? VLGen->getDistributionForVSETIVLI(MaxVL)
+                              : VLGen->getDistribution(MaxVL);
+  assert(VLDist.size() == ResultingDistribution.size());
+
+  [[maybe_unused]] double TotalWeight =
+      std::accumulate(VLDist.begin(), VLDist.end(), 0.0);
+  assert(isZero(TotalWeight) || isZero(TotalWeight - 1.0, /*Tolerance=*/1e-6));
+
+  for (auto [ResW, W] : zip_equal(ResultingDistribution, VLDist))
+    ResW += W * Weight;
+}
+
+static VLDistributionType
+buildDistributionForMaxVL(unsigned MaxVL,
+                          const ProbableItems<VLGeneratorHolder> &VLGens,
+                          bool IsForVSETIVLI) {
+  assert(VLGens.size() != 0);
+
+  unsigned DistributionSize = IsForVSETIVLI ? kMaxVLForVSETIVLI + 1 : MaxVL + 1;
+  VLDistributionType ResultingDistribution(DistributionSize, 0.0);
+  for (const auto &[VLGen, Weight] : VLGens)
+    addToVLDistribution(MaxVL, Weight, VLGen, ResultingDistribution,
+                        IsForVSETIVLI);
+
+  // Can be all zeros (meaning that all VLGens are incompatible with the given
+  // MaxVL), but otherwise should be normalized.
+  if (!all_of(ResultingDistribution, [](double W) { return isZero(W); }))
+    normalizeValues(ResultingDistribution);
+
+  return ResultingDistribution;
+}
+
+static VLDistributionType buildDistributionForIllegalConfig(
+    unsigned ELEN, unsigned VLEN,
+    const ProbableItems<VLGeneratorHolder> &VLGens, bool IsForVSETIVLI) {
+  // Treating illegal configurations as if they have
+  // MaxVL == MaxPossibleVL(VLEN).
+  return buildDistributionForMaxVL(getMaxPossibleVL(ELEN, VLEN), VLGens,
+                                   IsForVSETIVLI);
+}
+
+} // namespace snippy
+} // namespace llvm
+
+namespace {
+// Exists to cache and give out a VL distribution for each {SEW, LMUL} pair
+class VlDistributionStorage final {
+  using VLType = unsigned;
+
+  const unsigned ELEN;
+  const unsigned VLEN;
+  // {MaxVL -> VLProbabilityDistribution}
+  std::map<VLType, VLDistributionType> Distributions;
+
+  // Tipically MaxVls are [0, 1, 2, 4, ... , VLEN].
+  std::vector<VLType> getAllMaxVLs() {
+    std::vector<VLType> MaxVls;
+    for (const auto &SEW : SEWEnumList::Arr) {
+      for (const auto &LMUL : LMULEnumList::Arr) {
+        VLType MaxVL = computeVLMax(ELEN, VLEN, SEW, LMUL);
+        MaxVls.push_back(MaxVL);
+      }
+    }
+    std::sort(MaxVls.begin(), MaxVls.end());
+    MaxVls.erase(llvm::unique(MaxVls), MaxVls.end());
+    return MaxVls;
+  }
+
+public:
+  VlDistributionStorage(unsigned ELEN, unsigned VLEN,
+                        const ProbableItems<VLGeneratorHolder> &VLGens,
+                        bool IsForVSETIVLI)
+      : ELEN(ELEN), VLEN(VLEN) {
+    assert(VLEN > 0);
+
+    const auto &MaxVls = getAllMaxVLs();
+    for (unsigned MaxVL : MaxVls) {
+      // Illegal configurations have MaxVL == 0
+      if (MaxVL == 0) {
+        Distributions[MaxVL] = buildDistributionForIllegalConfig(
+            ELEN, VLEN, VLGens, IsForVSETIVLI);
+        continue;
+      }
+      Distributions[MaxVL] =
+          buildDistributionForMaxVL(MaxVL, VLGens, IsForVSETIVLI);
+    }
+  }
+
+  const VLDistributionType &get(VSEW SEW, VLMUL LMUL) const {
+    VLType MaxVL = computeVLMax(ELEN, VLEN, SEW, LMUL);
+    assert(Distributions.find(MaxVL) != Distributions.end());
+    return Distributions.at(MaxVL);
+  }
+};
+
+struct VLVMInfo {
+  ProbableItems<VLGeneratorHolder> VLGens;
+  ProbableItems<VMGeneratorHolder> VMGens;
+  std::vector<std::string> DiscardedVLNames;
+  std::vector<std::string> DiscardedVMNames;
+};
 } // namespace
 
 void RVVConfigurationSpace::mapYaml(llvm::yaml::IO &IO,
@@ -721,8 +964,6 @@ template <> struct llvm::yaml::MappingTraits<ModeChangeBias> {
   }
 
   static std::string validate(yaml::IO &IO, ModeChangeBias &Guides) {
-    // TODO: implemenent alternative mode changing schemes and
-    // replace probability with weight
     if (!Guides.ModeChangeProb.isDeduced() &&
         !isCorrectProbability(Guides.ModeChangeProb.getAsDouble()))
       return std::string(RVVConfigurationSpace::kUnitName) + ": P " +
@@ -750,6 +991,189 @@ template <> struct yaml::MappingTraits<VectorUnitRules> {
 
 namespace snippy {
 
+static std::vector<double>
+buildWeights(unsigned ELEN, unsigned VLEN, const PrimaryConfigMapping &Mapping,
+             const SewLmulDistribution &SewLmulDist,
+             const ProbableItems<VLGeneratorHolder> &VLGenerators,
+             bool IsForVSETIVLI) {
+  // Weights for each combination of {SEW, LMUL, VL}.
+  std::vector<double> Weights(
+      Mapping.SEWSize * Mapping.LMULSize * Mapping.VLSize, 0.0);
+
+  // Construct VL distributions for each combination of {SEW, LMUL}
+  VlDistributionStorage VLDistStorage(ELEN, VLEN, VLGenerators, IsForVSETIVLI);
+
+  // For each {SEW, LMUL} pair valid VLs are [0, computeVLMax()]
+  for (const auto &[SewLmul, SewLmulProb] : SewLmulDist) {
+    auto [SEW, LMUL] = SewLmul;
+    // Total weight of VLDist must be either 0.0 or 1.0
+    auto VLDist = VLDistStorage.get(SEW, LMUL);
+    assert(VLDist.size() <= Mapping.VLSize);
+
+    for (unsigned VL = 0; VL < VLDist.size(); ++VL)
+      Weights[Mapping.toIdx(SEW, LMUL, VL)] = VLDist[VL] * SewLmulProb;
+  }
+
+  return Weights;
+}
+
+RVVPrimaryConfigGenerator::RVVPrimaryConfigGenerator(
+    unsigned ELEN, unsigned VLEN, const SewLmulDistribution &SewLmulDist,
+    const ProbableItems<VLGeneratorHolder> &VLGenerators,
+    unsigned MinVMBitWidth, bool IsForVSETIVLI)
+    : VLSize(IsForVSETIVLI ? (kMaxVLForVSETIVLI + 1)
+                           : (getMaxPossibleVL(ELEN, VLEN) + 1)),
+      IsForVSETIVLI(IsForVSETIVLI), Mapping(VLSize) {
+
+  auto Weights = buildWeights(ELEN, VLEN, Mapping, SewLmulDist, VLGenerators,
+                              IsForVSETIVLI);
+
+  // Zero-out weights of VLs < minVMBitWidth.
+  // For such configs there're no applicable VMgens.
+  for (auto &&[Idx, Weight] : enumerate(Weights)) {
+    auto VL = idxToConfig(Idx).VL;
+    if (VL < MinVMBitWidth)
+      Weight = 0.0;
+  }
+
+  if (all_of(Weights, [](double W) { return isZero(W); })) {
+    if (IsForVSETIVLI)
+      snippy::fatal(
+          "There are no VL generators in riscv-vector-unit which are "
+          "compatible with VSETIVLI under any requested VTYPE configuration");
+    snippy::fatal("There are no VL generators in riscv-vector-unit which are "
+                  "compatible with any requested VTYPE configuration");
+  }
+  Dist = std::discrete_distribution<unsigned>(Weights.begin(), Weights.end());
+
+  LLVM_DEBUG(dbgs() << "=== Primary RVV Config Probabilities ===\n");
+  LLVM_DEBUG(printProbabilities(dbgs()));
+  LLVM_DEBUG(dbgs() << "=== Final {SEW, LMUL} Probabilities ===\n");
+  LLVM_DEBUG(printCombinedSewLmulProbs(dbgs(), getAllPossibleSewLmulPairs()));
+}
+
+RVVPrimaryConfig RVVPrimaryConfigGenerator::generate() const {
+  size_t Idx = Dist(RandEngine::engine());
+  return idxToConfig(Idx);
+}
+
+ProbableItems<RVVPrimaryConfig>
+PrimaryWeightsAndMapping::getAllPossibleConfigs() const {
+  ProbableItems<RVVPrimaryConfig> Result;
+  // Add to result only points with non-zero probabilities
+  for (const auto &[Idx, Prob] : enumerate(Weights)) {
+    if (!isZero(Prob))
+      Result.emplace_back(Mapping.idxToConfig(Idx), Prob);
+  }
+  assert(Result.checkSumOfProbabilities());
+  return Result;
+}
+
+SewLmulDistribution
+PrimaryWeightsAndMapping::getAllPossibleSewLmulPairs() const {
+  SewLmulDistribution Result;
+  const auto Cfgs = getAllPossibleConfigs();
+  for (const auto &[Cfg, Prob] : Cfgs) {
+    const auto SEW = Cfg.SEW;
+    const auto LMUL = Cfg.LMUL;
+
+    Result.getProbOrEmplace({SEW, LMUL}) += Prob;
+  }
+  assert(Result.checkSumOfProbabilities());
+  return Result;
+}
+
+void PrimaryWeightsAndMapping::printProbabilities(raw_ostream &OS) const {
+  constexpr unsigned SewWidth = 9;
+  constexpr unsigned LmulWidth = 9;
+  constexpr unsigned VLWidth = 7;
+  constexpr unsigned ProbWidth = 9;
+
+  OS << right_justify("SEW", SewWidth) << right_justify("LMUL", LmulWidth)
+     << right_justify("VL", VLWidth) << right_justify("Prob,%", ProbWidth);
+
+  std::optional<VSEW> PrevSEW;
+  std::optional<VLMUL> PrevLMUL;
+
+  for (const auto &[Cfg, Prob] : getAllPossibleConfigs()) {
+    assert(!isZero(Prob));
+    auto [SEW, LMUL, VL] = Cfg;
+
+    // Separate by {SEW, LMUL}
+    if (SEW != PrevSEW || LMUL != PrevLMUL) {
+      OS << "\n";
+      PrevSEW = SEW;
+      PrevLMUL = LMUL;
+    }
+
+    OS << right_justify(toString(SEW), SewWidth)
+       << right_justify(toString(LMUL), LmulWidth)
+       << right_justify(std::to_string(VL), VLWidth)
+       << format("%*.3f", ProbWidth, Prob * 100) << "\n";
+  }
+  OS << "\n";
+}
+
+RVVConfiguration RVVConfigGenerator::generate(bool MustUseReducedVL) const {
+  assert(!MustUseReducedVL ||
+         PrimaryGenReduced &&
+             "Requested to sample a mode for VSETIVLI but there "
+             "is no generator for it");
+  assert(MustUseReducedVL ||
+         PrimaryGen && "Requested to sample a mode for VSETVLI or VSETVL but "
+                       "there is no generator for them");
+  // Weights of VSET opcodes can affect the sum of two primary distributions
+  // (which we get when sampling with this generator). In the future, to
+  // account for this, we can shift marginal VL distribution to smaller values
+  // for VSETIVLI and to larger for VSETVL & VSETVLI.
+  //
+  // But this problem has some mathematical limitations:
+  // For example, if we have histogram:
+  //   - [VSETVL, 0.001]
+  //   - [VSETIVLI, 0.999]
+  // It's impossible to satisfy
+  // VL:
+  //   - [100, 0.999]
+  //   - [1, 0.001]
+  auto PrimaryCfg =
+      MustUseReducedVL ? PrimaryGenReduced->generate() : PrimaryGen->generate();
+  auto MA = VmaGen.generate();
+  auto TA = VtaGen.generate();
+  auto XRM = VxrmGen.generate();
+
+  return RVVConfiguration{PrimaryCfg, MA, TA, XRM};
+}
+
+PrimaryWeightsAndMapping RVVConfigGenerator::getCombinedDistribution(
+    const ModeChangeInfo &SwitchInfo) const {
+  assert(PrimaryGen || PrimaryGenReduced);
+  if (!PrimaryGenReduced)
+    return PrimaryGen->getWeightsAndMapping();
+  if (!PrimaryGen)
+    return PrimaryGenReduced->getWeightsAndMapping();
+
+  auto [ProbVSETVL, ProbVSETVLI, ProbVSETIVLI] =
+      SwitchInfo.getRelativeProbabilities();
+
+  bool IsReducedGenLarger = PrimaryGen->VLSize > PrimaryGenReduced->VLSize;
+  const auto &LargerGen =
+      !IsReducedGenLarger ? *PrimaryGenReduced : *PrimaryGen;
+  const auto &SmallerGen =
+      IsReducedGenLarger ? *PrimaryGenReduced : *PrimaryGen;
+  double LargerMult =
+      IsReducedGenLarger ? ProbVSETIVLI : ProbVSETVL + ProbVSETVLI;
+  double SmallerMult = 1.0 - LargerMult;
+
+  auto LargerWeights = LargerGen.getWeightsAndMapping();
+  auto SmallerWeights = SmallerGen.getWeightsAndMapping();
+
+  LargerWeights *= LargerMult;
+  SmallerWeights *= SmallerMult;
+  LargerWeights += SmallerWeights;
+
+  return LargerWeights;
+}
+
 std::unique_ptr<RVVConfigInterface> createRVVConfig() {
 #if 0
   initRISCVTargetParserOptions();
@@ -762,31 +1186,45 @@ std::unique_ptr<RVVConfigInterface> createRVVConfig() {
   return std::make_unique<RVVConfig>();
 }
 
-inline static bool isReservedValues(unsigned ELEN, unsigned SEW, VLMUL LMUL) {
-  if (LMUL == VLMUL::LMUL_RESERVED)
-    return true;
+bool isLegalSewLmul(unsigned ELEN, unsigned VLEN, VSEW SEW, VLMUL LMUL) {
+  if (!isLegalLMUL(LMUL))
+    return false;
+  if (!isLegalSEW(SEW))
+    return false;
+
+  unsigned SEWVal = static_cast<unsigned>(SEW);
+  if (SEWVal > ELEN)
+    return false;
+
   auto [Multiplier, IsFractional] = RISCVVType::decodeVLMUL(LMUL);
-  auto MinFracMultiplier = ELEN / SEW;
-  return !isLegalSEW(SEW) || (SEW > ELEN) ||
-         (IsFractional && (Multiplier > MinFracMultiplier));
+
+  if (IsFractional) {
+    unsigned MinFracMultiplier = ELEN / SEWVal;
+    if (Multiplier > MinFracMultiplier)
+      return false;
+
+    if (VLEN / SEWVal < Multiplier)
+      return false;
+  }
+  return true;
 }
 
-unsigned computeVLMax(unsigned ELEN, unsigned VLEN, unsigned SEW, VLMUL LMUL) {
-  if (isReservedValues(ELEN, SEW, LMUL))
+unsigned computeVLMax(unsigned ELEN, unsigned VLEN, VSEW VSEW, VLMUL LMUL) {
+  if (!isLegalSewLmul(ELEN, VLEN, VSEW, LMUL))
     return 0;
-  assert(canBeEncoded(SEW));
+
   auto [Multiplier, IsFractional] = RISCVVType::decodeVLMUL(LMUL);
-  if (IsFractional) {
-    auto Result = VLEN / SEW / Multiplier;
-    return Result;
-  }
-  return VLEN / SEW * Multiplier;
+  unsigned SEW = static_cast<unsigned>(VSEW);
+
+  unsigned Result =
+      IsFractional ? (VLEN / SEW / Multiplier) : (VLEN / SEW * Multiplier);
+  assert(Result > 0 && "At this point SEW and LMUL are known to be legal");
+  return Result;
 }
 
 std::pair<unsigned, bool> computeDecodedEMUL(unsigned ELEN, unsigned SEW,
                                              unsigned EEW, VLMUL LMUL) {
-  if (isReservedValues(ELEN, SEW, LMUL) || !isLegalSEW(SEW) ||
-      !isLegalSEW(EEW)) {
+  if (!isLegalSewLmul(ELEN, EEW, VSEW(SEW), LMUL)) {
     // Calculating EMUL doesn't make sense for illegal values of SEW or LMUL, so
     // just return {1, 0}
     return {1, 0};
@@ -811,9 +1249,26 @@ VLMUL computeEMUL(unsigned ELEN, unsigned SEW, unsigned EEW, VLMUL LMUL) {
   return RISCVVType::encodeLMUL(EMUL, IsFractional);
 }
 
+std::string RVVConfiguration::toStr() const {
+  constexpr unsigned SewWidth = 3;
+  constexpr unsigned LmulWidth = 3;
+  constexpr unsigned VLWidth = 3;
+
+  auto SewStr = toString(PrimaryCfg.SEW);
+  auto LmulStr = toString(PrimaryCfg.LMUL);
+  auto VLStr = std::to_string(PrimaryCfg.VL);
+
+  std::string Result;
+  raw_string_ostream OS(Result);
+  OS << "[" << right_justify(SewStr, SewWidth) << ", "
+     << right_justify(LmulStr, LmulWidth) << ", "
+     << right_justify(VLStr, VLWidth) << ", " << toString(MA) << ", "
+     << toString(TA) << ", " << toString(XRM) << "]";
+  return Result;
+}
+
 static unsigned getNumReservedSEW(unsigned SEW) {
-  auto SEWEnum = static_cast<VSEW>(SEW);
-  switch (SEWEnum) {
+  switch (static_cast<VSEW>(SEW)) {
   default:
     return 0;
   case VSEW::SEWReserved1:
@@ -827,580 +1282,407 @@ static unsigned getNumReservedSEW(unsigned SEW) {
   }
 }
 
-static void printVType(unsigned VType, raw_ostream &OS) {
-  unsigned Sew = RISCVVType::getSEW(VType);
-  OS << "e";
-  if (!isLegalSEW(Sew))
-    OS << "Reserved" << getNumReservedSEW(Sew);
-  else
-    OS << Sew;
-
-  unsigned LMul;
-  bool IsReserved = false;
-  bool Fractional = false;
-
-  if (RISCVVType::getVLMUL(VType) == VLMUL::LMUL_RESERVED)
-    IsReserved = true;
-  else
-    std::tie(LMul, Fractional) =
-        RISCVVType::decodeVLMUL(RISCVVType::getVLMUL(VType));
-
-  if (Fractional)
-    OS << ", mf";
-  else
-    OS << ", m";
-
-  if (IsReserved)
-    OS << "Reserved";
-  else
-    OS << LMul;
-
-  if (RISCVVType::isTailAgnostic(VType))
-    OS << ", ta";
-  else
-    OS << ", tu";
-
-  if (RISCVVType::isMaskAgnostic(VType))
-    OS << ", ma";
-  else
-    OS << ", mu";
-}
-
-void RVVConfiguration::print(raw_ostream &OS) const {
+static void printOldStyleConfig(raw_ostream &OS, VSEW SEW, VLMUL LMUL,
+                                VTAMode TA, VMAMode MA, VXRMMode XRM) {
   OS << "{ ";
-  unsigned EncodedVTYPE = RISCVVType::encodeVTYPE(
-      LMUL, static_cast<unsigned>(SEW), TailAgnostic, MaskAgnostic);
-  printVType(EncodedVTYPE, OS);
-  OS << ", vxrm: ";
-  switch (VXRM) {
-  case VXRMMode::RNU:
-    OS << "rnu";
-    break;
-  case VXRMMode::RNE:
-    OS << "rne";
-    break;
-  case VXRMMode::RDN:
-    OS << "rdn";
-    break;
-  case VXRMMode::RON:
-    OS << "ron";
-    break;
+  unsigned SewVal = static_cast<unsigned>(SEW);
+  OS << "e";
+  if (!isLegalSEW(SEW))
+    OS << "Reserved" << getNumReservedSEW(SewVal);
+  else
+    OS << SewVal;
+
+  if (LMUL == VLMUL::LMUL_RESERVED) {
+    OS << ", mReserved";
+  } else {
+    auto [LMulVal, Fractional] = RISCVVType::decodeVLMUL(LMUL);
+    OS << (Fractional ? ", mf" : ", m") << LMulVal;
   }
 
+  OS << (TA == VTAMode::TA ? ", ta" : ", tu");
+  OS << (MA == VMAMode::MA ? ", ma" : ", mu");
+  OS << ", vxrm: " << toString(XRM);
   OS << " }";
 }
 
-void RVVConfiguration::dump() const { print(dbgs()); }
+// Computes {SEW, LMUL} pairs that have non-zero user-specified weight but
+// zero probability in the final distribution (i.e. no VL generator was
+// applicable). Returns them expanded with all non-zero MA/TA/VXRM combos.
+static std::vector<std::tuple<VSEW, VLMUL, VTAMode, VMAMode, VXRMMode>>
+computeDiscardedConfigs(unsigned ELEN, unsigned VLEN, const RVVUnitInfo &VUInfo,
+                        const PrimaryWeightsAndMapping &WeightsAndMapping) {
+  const auto &SewLmulPairs = WeightsAndMapping.getAllPossibleSewLmulPairs();
 
-template <typename T> struct WeightedItems {
-  std::vector<T> Elements;
-  std::vector<double> Weights;
+  auto SEWNorm = normalizeWeights(VUInfo.VTYPE.SEW);
+  auto LMULNorm = normalizeWeights(VUInfo.VTYPE.LMUL);
+  const auto &RawSewLmulPairs = jointProbabilityDistribution(SEWNorm, LMULNorm);
 
-  void addWeightedElement(double Weight, T &&Item) {
-    Elements.push_back(std::move(Item));
-    Weights.push_back(Weight);
-  }
-};
+  auto MANorm = normalizeWeights(VUInfo.VTYPE.VMA);
+  auto TANorm = normalizeWeights(VUInfo.VTYPE.VTA);
+  auto XRMNorm = normalizeWeights(VUInfo.VXRM);
+  const auto &SecondaryCombos =
+      jointProbabilityDistribution(MANorm, TANorm, XRMNorm);
 
-template <typename T>
-static void printRawProbabilities(raw_ostream &OS, StringRef Name,
-                                  const WeightsArray<T> &Probabilities) {
-  using Weights = WeightsArray<T>;
-  static_assert(
-      llvm::yaml::has_MappingTraits<Weights, llvm::yaml::EmptyContext>::value,
-      "WeightsArray<T> must have MappingTraits specialization");
-  LLVM_DEBUG(OS << "\n--- Raw Probabilities " << Name << " ---");
-  LLVM_DEBUG(outputYAMLToStreamTrimmed(Probabilities, OS));
-}
+  std::vector<std::tuple<VSEW, VLMUL, VTAMode, VMAMode, VXRMMode>> Result;
+  for (const auto &[SewLmul, Prob] : RawSewLmulPairs) {
+    const auto &[SEW, LMUL] = SewLmul;
+    if (!isLegalSewLmul(ELEN, VLEN, SEW, LMUL))
+      continue; // illegal, not "discarded"
+    if (SewLmulPairs.contains(SewLmul))
+      continue; // present in the final distribution
 
-static std::vector<InternalConfigurationPoint> getLegalConfigurationPoints(
-    const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &VLGen,
-    unsigned ELEN, unsigned VLEN, const RVVUnitInfo &VUInfo,
-    std::vector<RVVConfiguration> &DiscardedConfigs, bool IsOnlyVSETIVLI) {
-  auto SEW = normalizeWeights(VUInfo.VTYPE.SEW);
-  auto LMUL = normalizeWeights(VUInfo.VTYPE.LMUL);
-  auto MA = normalizeWeights(VUInfo.VTYPE.VMA);
-  auto TA = normalizeWeights(VUInfo.VTYPE.VTA);
-  auto XRM = normalizeWeights(VUInfo.VXRM);
-
-  LLVM_DEBUG(printRawProbabilities(dbgs(), "SEW", SEW));
-  LLVM_DEBUG(printRawProbabilities(dbgs(), "LMUL", LMUL));
-  LLVM_DEBUG(printRawProbabilities(dbgs(), "MA", MA));
-  LLVM_DEBUG(printRawProbabilities(dbgs(), "TA", TA));
-  LLVM_DEBUG(printRawProbabilities(dbgs(), "VXRM", XRM));
-  LLVM_DEBUG(dbgs() << "\n");
-
-  auto Points = jointProbabilityDistribution(SEW, LMUL, MA, TA, XRM);
-
-  // Erase points with zero probability (e.g. unspecified combinations)
-  llvm::erase_if(Points, [](const auto &Point) {
-    return Point.Prob < std::numeric_limits<double>::epsilon();
-  });
-
-  LLVM_DEBUG(dbgs() << "Raw Probabilities Points Count: " << Points.size()
-                    << "\n");
-  std::vector<InternalConfigurationPoint> ConfigPoints;
-  ConfigPoints.reserve(Points.size());
-  std::transform(Points.begin(), Points.end(), std::back_inserter(ConfigPoints),
-                 [ELEN, VLEN](const auto &Point) {
-                   return convertRepresentation(ELEN, VLEN, Point);
-                 });
-
-  // Now, at this moment ConfigPoints can contain illegal configurations
-  llvm::erase_if(ConfigPoints, [](const auto &Point) {
-    if (!Point.Config.IsLegal) {
-      LLVM_DEBUG(dbgs() << "  !!!RVV-CFG: discarding illegal config ");
-      LLVM_DEBUG(Point.Config.print(dbgs()));
-      LLVM_DEBUG(dbgs() << "\n");
+    // At this point we know that {SEW, LMUL} was "requested" by the user but
+    // not present in the final distribution. Expand it with MA/TA/VXRM combos.
+    for (const auto &[Item, Prob] : SecondaryCombos) {
+      const auto &[MA, TA, XRM] = Item;
+      Result.emplace_back(SEW, LMUL, TA, MA, XRM);
     }
-    return !Point.Config.IsLegal;
-  });
-
-  // Also erase all ConfigPoints for which there are no valid VLs
-  auto DiscardedIt = std::partition(
-      ConfigPoints.begin(), ConfigPoints.end(),
-      [&VLGen, IsOnlyVSETIVLI, ELEN, VLEN](const auto &Point) {
-        return llvm::any_of(VLGen, [ELEN, VLEN, IsOnlyVSETIVLI,
-                                    &Point = Point](const auto &VL) {
-          return VL->isApplicable(ELEN, VLEN, /* ReduceVL */ IsOnlyVSETIVLI,
-                                  Point.Config);
-        });
-      });
-  std::transform(DiscardedIt, ConfigPoints.end(),
-                 std::back_inserter(DiscardedConfigs),
-                 [](const auto &Point) { return Point.Config; });
-  ConfigPoints.erase(DiscardedIt, ConfigPoints.end());
-  return ConfigPoints;
-}
-
-static std::vector<InternalConfigurationPoint>
-getIllegalConfigurationPoints(unsigned ELEN, unsigned VLEN) {
-  auto AllSEW = normalizeWeights(
-      WeightsArray<SEWEnumList>{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
-  auto AllLMUL = normalizeWeights(
-      WeightsArray<LMULEnumList>{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
-  auto AllMA = normalizeWeights(WeightsArray<VMAEnumList>{1.0, 1.0});
-  auto AllTA = normalizeWeights(WeightsArray<VTAEnumList>{1.0, 1.0});
-  auto AllVXRM =
-      normalizeWeights(WeightsArray<VXRMEnumList>{1.0, 1.0, 1.0, 1.0});
-
-  auto AllPoints =
-      jointProbabilityDistribution(AllSEW, AllLMUL, AllMA, AllTA, AllVXRM);
-  std::vector<InternalConfigurationPoint> AllConfigPoints;
-  std::transform(AllPoints.begin(), AllPoints.end(),
-                 std::back_inserter(AllConfigPoints),
-                 [ELEN, VLEN](const auto &Point) {
-                   return convertRepresentation(ELEN, VLEN, Point);
-                 });
-
-  // Now, at this moment AllConfigPoints contain legal configurations
-  llvm::erase_if(AllConfigPoints, [ELEN](const auto &Point) {
-    if (NoReservedCfgRVV &&
-        isReservedValues(ELEN, static_cast<unsigned>(Point.Config.SEW),
-                         Point.Config.LMUL))
-      return true;
-    return Point.Config.IsLegal;
-  });
-  return AllConfigPoints;
-}
-
-static std::vector<InternalConfigurationPoint> getAllConfigurationPoints(
-    const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &VLGen,
-    unsigned ELEN, unsigned VLEN, const RVVUnitInfo &VUInfo,
-    std::vector<RVVConfiguration> &DiscardedConfigs, bool IsOnlyVSETIVLI) {
-  auto ConfigPoints = getLegalConfigurationPoints(
-      VLGen, ELEN, VLEN, VUInfo, DiscardedConfigs, IsOnlyVSETIVLI);
-  auto IllegalConfigPoints = getIllegalConfigurationPoints(ELEN, VLEN);
-  // Merge two arrays with legal and illegal configurations into one common
-  ConfigPoints.insert(ConfigPoints.end(), IllegalConfigPoints.begin(),
-                      IllegalConfigPoints.end());
-  return ConfigPoints;
-}
-
-static WeightedItems<RVVConfiguration> getInternalConfigurationPoints(
-    const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &VLGen,
-    unsigned ELEN, unsigned VLEN, const RVVUnitInfo &VUInfo, double ProbSetVill,
-    std::vector<RVVConfiguration> &DiscardedConfigs, bool IsOnlyVSETIVLI) {
-  auto ConfigPoints = getAllConfigurationPoints(
-      VLGen, ELEN, VLEN, VUInfo, DiscardedConfigs, IsOnlyVSETIVLI);
-  double WeightLegal = std::accumulate(
-      ConfigPoints.begin(), ConfigPoints.end(), 0.0,
-      [](const double Weight, const auto &Point) {
-        return Weight + (Point.Config.IsLegal ? Point.Probability : 0);
-      });
-  double WeightIllegal = std::accumulate(
-      ConfigPoints.begin(), ConfigPoints.end(), 0.0,
-      [](const double Weight, const auto &Point) {
-        return Weight + (Point.Config.IsLegal ? 0 : Point.Probability);
-      });
-  if (WeightLegal == 0 && ProbSetVill != 1)
-    snippy::fatal(
-        "RVV Config: no legal configuration detected and Pvill != 1, aborting. "
-        "All RVV configurations from the riscv-vector-unit are "
-        "incompatible with all VL generators");
-  // If LegalWeight is zero that means that there are no legal configurations
-  // and LegalWeightCoeff not needed because LegalPoints empty
-  double LegalWeightCoeff = WeightLegal ? (1.0 - ProbSetVill) / WeightLegal : 0;
-  double IllegalWeightCoeff = ProbSetVill / WeightIllegal;
-  // We multiply all configurations by their weight coefficients.
-  // This is necessary so that the sum of all probabilities is equal to 1
-  std::for_each(ConfigPoints.begin(), ConfigPoints.end(),
-                [LegalWeightCoeff, IllegalWeightCoeff](auto &Point) {
-                  if (Point.Config.IsLegal)
-                    Point.Probability *= LegalWeightCoeff;
-                  else
-                    Point.Probability *= IllegalWeightCoeff;
-                });
-  // Sort the array from highest to lowest Probabilities
-  std::stable_sort(ConfigPoints.begin(), ConfigPoints.end(),
-                   [](const auto &L, const auto &R) {
-                     return L.Probability > R.Probability;
-                   });
-  // Erase Points with zero Probabilities
-  auto RemoveZeroIt =
-      std::remove_if(ConfigPoints.begin(), ConfigPoints.end(),
-                     [](const auto &Point) { return Point.Probability == 0; });
-  ConfigPoints.erase(RemoveZeroIt, ConfigPoints.end());
-
-  LLVM_DEBUG(dbgs() << "Points Count After Cleanup: " << ConfigPoints.size()
-                    << "\n");
-  assert(std::abs(std::accumulate(ConfigPoints.begin(), ConfigPoints.end(), 0.0,
-                                  [](const double Acc, const auto &Point) {
-                                    return Acc + Point.Probability;
-                                  }) -
-                  1.0) < kProbabilityThreshold);
-
-  WeightedItems<RVVConfiguration> Result;
-  for (auto &&[Prob, Config] : ConfigPoints)
-    Result.addWeightedElement(Prob, std::move(Config));
-
-  return Result;
-}
-
-template <typename T>
-auto constructGeneratorsFromWeightedIds(const VLVMSequence &IDs) {
-  WeightedItems<T> Result;
-  for (const auto &GenID : IDs.Values) {
-    auto Gen = GeneratorFactory<T>::create(GenID.first);
-    if (!Gen)
-      snippy::fatal("unsupported generator ID specified");
-    Result.addWeightedElement(GenID.second, std::move(Gen));
   }
   return Result;
 }
 
-static auto getMinVLValue(unsigned MinMaxVL,
-                          const RVVConfigurationInfo::VLGeneratorHolder &VL) {
-  if (VL->identify() == LegalVLGenerator::kID)
-    return 0u;
-  if (VL->identify() == LegalVLNonZeroGenerator::kID)
-    return 1u;
-  if (VL->identify() == MaxPossibleVLGen::kID ||
-      VL->identify() == MaxVLGenerator::kID)
-    return MinMaxVL;
-  assert((VL->identify().find(ImmVLGen::kID) != std::string::npos) &&
-         "There should have been only ImmVLGens");
-  return static_cast<ImmVLGen *>(VL.get())->getValue();
-}
-
-static WeightedItems<RVVConfigurationInfo::VMGeneratorHolder>
-getVMsCompatibleWithVLs(
-    unsigned MinMaxVL,
-    WeightedItems<RVVConfigurationInfo::VMGeneratorHolder> &VMGensWeights,
-    const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &VLGen,
-    std::vector<RVVConfigurationInfo::VMGeneratorHolder> &DiscardedVMs) {
-  WeightedItems<RVVConfigurationInfo::VMGeneratorHolder> Result;
-  for (auto &&[VMGen, VMWeight] :
-       zip(VMGensWeights.Elements, VMGensWeights.Weights)) {
-    // Keep the VMs that have at least one compatible VL
-    if (llvm::any_of(VLGen, [MinMaxVL, &VMGen = VMGen](auto &VL) {
-          return VMGen->isApplicable(getMinVLValue(MinMaxVL, VL));
-        })) {
-      Result.addWeightedElement(VMWeight, std::move(VMGen));
-      continue;
-    }
-    DiscardedVMs.push_back(std::move(VMGen));
-  }
-  if (Result.Elements.empty())
-    snippy::fatal("All VMs generators from the riscv-vector-unit are "
-                  "incompatible with all VL generators");
-  return Result;
-}
-
-static WeightedItems<RVVConfigurationInfo::VLGeneratorHolder>
-getVLsCompatibleWithVMsAndConfigs(
-    unsigned MinMaxVL, unsigned ELEN, unsigned VLEN,
-    const std::vector<RVVConfiguration> &ConfigPoints,
-    const std::vector<RVVConfigurationInfo::VMGeneratorHolder> &VMGen,
-    WeightedItems<RVVConfigurationInfo::VLGeneratorHolder> &VLGensWeights,
-    std::vector<RVVConfigurationInfo::VLGeneratorHolder> &DiscardedVLs,
-    bool IsOnlyVSETIVLI) {
-  WeightedItems<RVVConfigurationInfo::VLGeneratorHolder> Result;
-  for (auto &&[VLGen, VLWeight] :
-       zip(VLGensWeights.Elements, VLGensWeights.Weights)) {
-    // Keep the VLs that have at least one compatible VM and one compatible RVV
-    // Config
-    if (llvm::any_of(VMGen,
-                     [MinMaxVL, &VLGen = VLGen](auto &VM) {
-                       return VM->isApplicable(getMinVLValue(MinMaxVL, VLGen));
-                     }) &&
-        llvm::any_of(ConfigPoints, [ELEN, VLEN, IsOnlyVSETIVLI,
-                                    &VLGen = VLGen](const auto &Config) {
-          return VLGen->isApplicable(ELEN, VLEN, /* ReduceVL */ IsOnlyVSETIVLI,
-                                     Config);
-        })) {
-      Result.addWeightedElement(VLWeight, std::move(VLGen));
-      continue;
-    }
-    DiscardedVLs.push_back(std::move(VLGen));
-  }
-  if (Result.Elements.empty())
-    snippy::fatal("All VLs generators from the riscv-vector-unit are "
-                  "incompatible with VM or RVV Config generators");
-  return Result;
-}
-
-static WeightedItems<RVVConfiguration> getConfigsCompatibleWithVLs(
-    const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &VLGen,
-    unsigned ELEN, unsigned VLEN,
-    WeightedItems<RVVConfiguration> &ConfigPointsWeights,
-    std::vector<RVVConfiguration> &DiscardedConfigs, bool IsOnlyVSETIVLI) {
-  WeightedItems<RVVConfiguration> Result;
-  for (auto &&[Config, ConfigWeight] :
-       zip(ConfigPointsWeights.Elements, ConfigPointsWeights.Weights)) {
-    // Keep the RVV Configs that have at least one compatible VL
-    if (llvm::any_of(VLGen, [ELEN, VLEN, IsOnlyVSETIVLI,
-                             &Config = Config](const auto &VL) {
-          return VL->isApplicable(ELEN, VLEN, /* ReduceVL */ IsOnlyVSETIVLI,
-                                  Config);
-        })) {
-      Result.addWeightedElement(ConfigWeight, std::move(Config));
-      continue;
-    }
-    DiscardedConfigs.push_back(std::move(Config));
-  }
-  if (Result.Elements.empty())
-    snippy::fatal("All RVV configurations from the riscv-vector-unit are "
-                  "incompatible with all VL generators");
-  return Result;
-}
-
-static bool hasVXRMUsers(const OpcodeHistogram &Hist) {
-  return llvm::any_of(llvm::make_first_range(Hist.topOpcodes()),
-                      [](auto Opcode) { return isRVVuseVXRM(Opcode); });
-}
-
-RVVConfigurationInfo RVVConfigurationInfo::createDefault(const Config &Cfg,
-                                                         unsigned ELEN,
-                                                         unsigned VLEN) {
-  std::vector<RVVConfiguration> Configurations = {{}};
-
-  std::vector<VLGeneratorHolder> VLGen;
-  VLGen.push_back(std::make_unique<MaxPossibleVLGen>());
-
-  std::vector<VMGeneratorHolder> VMGen;
-  VMGen.push_back(std::make_unique<UnmaskedVMGenerator>());
-
-  auto ModeSwitchInfo = deriveModeSwitchingProbability(
-      Cfg, /*no bias, deduce P from histogram*/ ModeChangeBias());
-
-  bool NeedsVXRMUpdate = hasVXRMUsers(Cfg.getOpcodeHistogram());
-
-  return RVVConfigurationInfo(
-      ELEN, VLEN,
-      ConfigGenerator(std::move(Configurations), std::vector<double>(1, 1.0)),
-      VLGenerator(std::move(VLGen), std::vector<double>(1, 1.0)),
-      VMGenerator(std::move(VMGen), std::vector<double>(1, 1.0)),
-      ModeSwitchInfo, !ModeSwitchInfo.VSETPresentInHistogram, NeedsVXRMUpdate);
-}
-
-static void printDiscardedRVVConfigurations(
-    raw_ostream &OS,
-    const std::vector<RVVConfigurationInfo::VMGeneratorHolder> &DiscardedVMs,
-    const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &DiscardedVLs,
-    const std::vector<RVVConfiguration> &DiscardedConfigs, bool IsRVVPresent) {
+static void
+printDiscardedRVVConfigurationsImpl(raw_ostream &OS,
+                                    const RVVConfigurationInfo &RVVCfg) {
   OS << "--- RVV Unit Discarded Info ---\n";
-  if (!IsRVVPresent) {
+  if (!RVVCfg.isRVVEnabled()) {
     OS << "None\n";
-    OS << "--- RVV Unit Discarded End  ---\n";
+    OS << "--- RVV Unit Discarded End  ---\n\n";
     return;
   }
+
+  // Access internal generator info via the public getAllPossiblePrimaryConfigs
+  // proxy; discarded VM/VL names are stored directly on GenInfo.
+  // We reach them through the RVVConfigurationInfo interface.
+  const auto *GenInfoPtr = RVVCfg.getGenInfoPtr();
+  assert(GenInfoPtr && "GenInfo must be present when RVV is enabled");
+  const auto &GenInfo = *GenInfoPtr;
+
   OS << "  - VM Generators:\n";
-  for (const auto &VM : DiscardedVMs)
-    OS << "    <" << VM->identify() << ">\n";
+  for (const auto &Name : GenInfo.SupportInfo.DiscardedVMNames)
+    OS << "    <" << Name << ">\n";
 
   OS << "  - VL Generators:\n";
-  for (const auto &VL : DiscardedVLs)
-    OS << "    <" << VL->identify() << ">\n";
+  for (const auto &Name : GenInfo.SupportInfo.DiscardedVLNames)
+    OS << "    <" << Name << ">\n";
 
+  const auto &VUInfo = GenInfo.SupportInfo.OriginalVUInfo;
+  unsigned VLEN = RVVCfg.getVLEN();
+  unsigned ELEN = RVVCfg.getELEN();
   OS << "  - Configuration Bag Listing:\n";
-  for (const auto &Point : DiscardedConfigs) {
+
+  auto DiscardedCfgs = computeDiscardedConfigs(
+      ELEN, VLEN, VUInfo,
+      GenInfo.CfgGen.getCombinedDistribution(RVVCfg.getModeChangeInfo()));
+  for (const auto &[SEW, LMUL, TA, MA, XRM] : DiscardedCfgs) {
     OS << "    Conf: ";
-    Point.print(OS);
+    printOldStyleConfig(OS, SEW, LMUL, TA, MA, XRM);
     OS << "\n";
   }
 
-  OS << "--- RVV Unit Discarded End  ---\n";
+  OS << "--- RVV Unit Discarded End  ---\n\n";
 }
 
-static void printDiscardedRVVConfigurations(
-    StringRef FilePath,
-    const std::vector<RVVConfigurationInfo::VMGeneratorHolder> &DiscardedVMs,
-    const std::vector<RVVConfigurationInfo::VLGeneratorHolder> &DiscardedVLs,
-    const std::vector<RVVConfiguration> &DiscardedConfigs, bool IsRVVPresent) {
-  std::string Filename;
-  if (FilePath.empty())
-    Filename = "-";
-  else
-    Filename = FilePath;
+static void
+printDiscardedRVVConfigurations(const RVVConfigurationInfo &RVVCfg) {
+  StringRef FilePath = DumpDiscardedRVVConfigurations.getValue();
+  std::string Filename = FilePath.empty() ? "-" : FilePath.str();
   if (Error Err = checkedWriteToOutput(Filename, [&](raw_ostream &OS) {
-        printDiscardedRVVConfigurations(OS, DiscardedVMs, DiscardedVLs,
-                                        DiscardedConfigs, IsRVVPresent);
+        printDiscardedRVVConfigurationsImpl(OS, RVVCfg);
         return Error::success();
       }))
     snippy::fatal("riscv-dump-discarded-rvv-configurations error : " +
                   toString(std::move(Err)));
 }
 
-static unsigned
-extractMinMaxVL(unsigned ELEN, unsigned VLEN,
-                const std::vector<RVVConfiguration> &ConfigPoints) {
-  assert(!ConfigPoints.empty());
-  std::vector<unsigned> MaxVLs;
-  llvm::transform(ConfigPoints, std::back_inserter(MaxVLs),
-                  [ELEN, VLEN](const auto &Point) {
-                    return computeVLMax(ELEN, VLEN,
-                                        static_cast<unsigned>(Point.SEW),
-                                        Point.LMUL);
-                  });
-  return *llvm::min_element(MaxVLs);
+static bool hasVXRMUsers(const OpcodeHistogram &Hist) {
+  return llvm::any_of(Hist.uniqueOpcodes(),
+                      [](auto Opcode) { return isRVVuseVXRM(Opcode); });
 }
 
-RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
-    const Config &Cfg, unsigned ELEN, unsigned VLEN,
-    std::unique_ptr<RVVConfigInterface> &&Iface,
-    std::vector<VMGeneratorHolder> &DiscardedVMs,
-    std::vector<VLGeneratorHolder> &DiscardedVLs,
-    std::vector<RVVConfiguration> &DiscardedConfigs) {
-  const RVVConfigurationSpace CS =
-      Iface ? Iface->getImpl<RVVConfig>().getRVVConfigurationSpace().value()
-            : Cfg.ProgramCfg.TargetConfig->getImpl<RISCVConfigInterface>()
-                  .RVVConfig->getImpl<RVVConfig>()
-                  .getRVVConfigurationSpace()
-                  .value();
+static RVVConfigurationSpace createDefaultConfigurationSpace() {
+  SEWInfo SEW;
+  LMULInfo LMUL;
+  VMAInfo VMA;
+  VTAInfo VTA;
+  VXRMInfo VXRM;
 
-  if (VLEN == 0)
+  // Default vector unit info. Will always use the config that represents all
+  // bits of `vtype` field set to zero and LMUL=1, SEW=64.
+  SEW[VSEW::SEW64] = 1.0;
+  LMUL[VLMUL::LMUL_1] = 1.0;
+  VMA[VMAMode::MU] = 1.0;
+  VTA[VTAMode::TU] = 1.0;
+  VXRM[VXRMMode::RNU] = 1.0;
+  VLVMSequence VMSeq = {{{UnmaskedVMGenerator::kID, 1.0}}};
+  VLVMSequence VLSeq = {{{MaxPossibleVLGen::kID, 1.0}}};
+
+  VTypeInfo VTYPE{SEW, LMUL, VMA, VTA};
+  RVVUnitInfo VUInfo{VXRM, VTYPE, VMSeq, VLSeq};
+  RVVConfigurationSpace CS{
+      /*no bias, deduce P from histogram*/ ModeChangeBias{}, VUInfo};
+
+  return CS;
+}
+
+// MinVL = minimum bit width of all VM generators
+static unsigned getMinRequestedBitWidth(const VLVMSequence &VMSeq) {
+  assert(!VMSeq.Values.empty());
+  unsigned MinVL = std::numeric_limits<unsigned>::max();
+  for (const auto &[Str, Weight] : VMSeq.Values) {
+    auto VMGen = GeneratorFactory<VMGeneratorHolder>::create(Str);
+    MinVL = std::min(MinVL, VMGen->getMinRequiredVL());
+  }
+  return MinVL;
+}
+
+// For most VL generators, if it's applicable for a given {SEW, LMUL} pair, it
+// will be applicable for any {SEW, LMUL} pair that has greater VLMax. So we
+// could find the minimum VLMax of all {SEW, LMUL} pairs and check only it.
+//
+// Sadly, this is not the case for 'vlmax' generator (MaxVLGenerator),
+// so we have to check all {SEW, LMUL} pairs.
+//
+// Returns std::nullopt if the given VLGen is not applicable for any {SEW, LMUL}
+// from the SewLmulDist
+static std::optional<std::pair</*MinVL*/ unsigned, /*MaxVL*/ unsigned>>
+getMinMaxPossibleVLOfGenerator(unsigned ELEN, unsigned VLEN,
+                               const VLGeneratorHolder &VLGen,
+                               const SewLmulDistribution &SewLmulDist) {
+  unsigned MaxPossibleVL = getMaxPossibleVL(ELEN, VLEN);
+
+  // If all configurations are illegal we allow all VL gens.
+  if (none_of(SewLmulDist.getItemsRange(), [=](const auto &SewLmul) {
+        const auto &[SEW, LMUL] = SewLmul;
+        return isLegalSewLmul(ELEN, VLEN, SEW, LMUL);
+      }))
+    return {{0, MaxPossibleVL}};
+
+  VLDistributionType FinalHist(MaxPossibleVL + 1);
+  for (const auto &[SewLmul, Weight] : SewLmulDist) {
+    assert(!isZero(Weight));
+
+    const auto &[SEW, LMUL] = SewLmul;
+    unsigned VLMax = computeVLMax(ELEN, VLEN, SEW, LMUL);
+    if (VLMax == 0) // config is illegal
+      continue;
+
+    // Never using here VLGen->getDistributionForVSETIVLI(VLMax) because at the
+    // moment it squashes weights from VL > kMaxVLForVSETIVLI to
+    // kMaxVLForVSETIVLI. This can make it so the distribution is not empty even
+    // if it should be.
+    const auto &Hist = VLGen->getDistribution(VLMax);
+
+    // Note: zip will iterate till the shortest container
+    assert(FinalHist.size() >= Hist.size());
+    for (auto [FinalW, W] : zip(FinalHist, Hist))
+      FinalW += W;
+  }
+
+  if (all_of(FinalHist, [](double W) { return isZero(W); }))
+    return std::nullopt;
+
+  return {{getIdxFirstNonZero(FinalHist), getIdxLastNonZero(FinalHist)}};
+}
+
+// Leaves only VMs and VLs for which there is at least one compatible VL/VM
+// generator. For example:
+//   - VM1 = 0b1001  (4 bits)
+//   - VM2 = 0b11010 (5 bits)
+//
+//   - VL1 = 1
+//   - VL2 = 4
+// VM2 must be discarded since there is no VL generator that can do 5 bits
+// VL1 must be discarded since there is no VM generator that can do 1 bit VM
+static VLVMInfo buildVLVMgenerators(unsigned ELEN, unsigned VLEN,
+                                    const VLVMSequence &OriginalVLSeq,
+                                    const VLVMSequence &OriginalVMSeq,
+                                    const SewLmulDistribution &SewLmulDist,
+                                    bool IsOnlyVSETIVLI) {
+  VLVMInfo Result;
+
+  // We discard all VL generators for which there is no available VM
+  // generator (MinBitWidth > MaxVL of this generator).
+  unsigned MinRequestedBitWidth = getMinRequestedBitWidth(OriginalVMSeq);
+
+  unsigned GlobalMaxVL = 0;
+  for (const auto &[Str, Weight] : OriginalVLSeq.Values) {
+    auto VLGen = GeneratorFactory<VLGeneratorHolder>::create(Str);
+    auto MinMaxVLOpt =
+        getMinMaxPossibleVLOfGenerator(ELEN, VLEN, VLGen, SewLmulDist);
+
+    unsigned MinVL = 0, MaxVL = 0;
+    bool NeedToDiscard = std::invoke([&] {
+      if (!MinMaxVLOpt.has_value())
+        return true;
+      std::tie(MinVL, MaxVL) = MinMaxVLOpt.value();
+      // Some terrible logic here: we don't discard 'max_encodable' VL generator
+      // when it's MinVL > kMaxVLForVSETIVLI. That's the difference between
+      // 'max_encodable' and 'vlmax'.
+      return MaxVL < MinRequestedBitWidth ||
+             (IsOnlyVSETIVLI && MinVL > kMaxVLForVSETIVLI &&
+              VLGen->identify() != MaxPossibleVLGen::kID);
+    });
+
+    if (NeedToDiscard) {
+      Result.DiscardedVLNames.push_back(VLGen->identify());
+    } else {
+      Result.VLGens.emplace_back(std::move(VLGen), Weight);
+      GlobalMaxVL = std::max(GlobalMaxVL, MaxVL);
+    }
+  }
+
+  // We also discard all VM generators for which there is no available VL
+  // generator (GlobalMaxVL < BitWidth of this generator).
+  for (const auto &[Str, Weight] : OriginalVMSeq.Values) {
+    auto VMGen = GeneratorFactory<VMGeneratorHolder>::create(Str);
+    unsigned MinVMBitWidth = VMGen->getMinRequiredVL();
+    if (MinVMBitWidth > GlobalMaxVL)
+      Result.DiscardedVMNames.push_back(VMGen->identify());
+    else
+      Result.VMGens.emplace_back(std::move(VMGen), Weight);
+  }
+
+  if (Result.VLGens.empty())
+    snippy::fatal(
+        "riscv-vector-unit: Could not find any applicable VL generators");
+  if (Result.VMGens.empty())
+    snippy::fatal(
+        "riscv-vector-unit: Could not find any applicable VM generators");
+
+  Result.VLGens.normalizeProbs();
+  Result.VMGens.normalizeProbs();
+
+  LLVM_DEBUG({
+    dbgs() << "=== RVV VM Generators ===\n";
+    Result.VMGens.print(dbgs(),
+                        [](const VMGeneratorHolder &Gen) -> std::string {
+                          return Gen->identify();
+                        });
+    dbgs() << "=== RVV VL Generators ===\n";
+    Result.VLGens.print(dbgs(),
+                        [](const VLGeneratorHolder &Gen) -> std::string {
+                          return Gen->identify();
+                        });
+    dbgs() << "=== RVV Discarded VM Generators ===\n";
+    if (Result.DiscardedVMNames.empty())
+      dbgs() << "None\n";
+    for (const auto &Name : Result.DiscardedVMNames)
+      dbgs() << Name << "\n";
+    dbgs() << "\n=== RVV Discarded VL Generators ===\n";
+    if (Result.DiscardedVLNames.empty())
+      dbgs() << "None\n";
+    for (const auto &Name : Result.DiscardedVLNames)
+      dbgs() << Name << "\n";
+    dbgs() << "\n";
+  });
+
+  return Result;
+}
+
+RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(const Config &Cfg,
+                                                              unsigned ELEN,
+                                                              unsigned VLEN) {
+  auto CSOpt = Cfg.ProgramCfg.TargetConfig->getImpl<RISCVConfigInterface>()
+                   .RVVConfig->getImpl<RVVConfig>()
+                   .getRVVConfigurationSpace();
+  if (CSOpt && VLEN == 0)
     snippy::fatal("RVV configuration file should not be "
                   "specified for targets without RVV");
+  const auto &CS = CSOpt ? CSOpt.value() : createDefaultConfigurationSpace();
 
-  auto ModeSwitchInfo = deriveModeSwitchingProbability(Cfg, CS.Guides);
-  assert((ModeSwitchInfo.WeightVSETVL + ModeSwitchInfo.WeightVSETVLI +
-          ModeSwitchInfo.WeightVSETIVLI) >
-         std::numeric_limits<double>::epsilon());
-  // This flag affects VLs that are larger than kMaxVLForVSETIVLI. In the case
-  // that the VL allows reductions, they will be reduced, otherwise they will
-  // be discarded.
-  auto IsOnlyVSETIVLI =
-      (ModeSwitchInfo.WeightVSETVL + ModeSwitchInfo.WeightVSETVLI) <
-      std::numeric_limits<double>::epsilon();
-
-  // The procedure for generating all reachable heaps of VLs, VMs, and RVV
-  // Configs occurs in two views of each heap:
-  // 1. Get all VLs from the rvv-unit-config
-  auto VLGensWeights =
-      constructGeneratorsFromWeightedIds<VLGeneratorHolder>(CS.VUInfo.VL);
-  // 2. Get all RVV Configs that are compatible with at least one VL
-  auto ConfigPointsWeights = getInternalConfigurationPoints(
-      VLGensWeights.Elements, ELEN, VLEN, CS.VUInfo, CS.Guides.SetVillP,
-      DiscardedConfigs, IsOnlyVSETIVLI);
-  auto MinMaxVL = extractMinMaxVL(ELEN, VLEN, ConfigPointsWeights.Elements);
-  // 3.1 Get all VMs from the rvv-unit-config
-  auto VMGensWeights = constructGeneratorsFromWeightedIds<
-      RVVConfigurationInfo::VMGeneratorHolder>(CS.VUInfo.VM);
-  // 3.2 Filter out VMs that are incompatible with all VLs
-  auto VMGensWeightsFiltered = getVMsCompatibleWithVLs(
-      MinMaxVL, VMGensWeights, VLGensWeights.Elements, DiscardedVMs);
-  // 4. Filter out VLs that are incompatible with all remaining VLs and/or all
-  // remaining RVV Configs
-  auto &&[VLGen, VLWeights] = getVLsCompatibleWithVMsAndConfigs(
-      MinMaxVL, ELEN, VLEN, ConfigPointsWeights.Elements,
-      VMGensWeightsFiltered.Elements, VLGensWeights, DiscardedVLs,
-      IsOnlyVSETIVLI);
-  // 5. Filter out the RVV Configs that were compatible only with the VLs that
-  // were discarded in step 4
-  auto &&[ConfigPoints, ConfigWeights] = getConfigsCompatibleWithVLs(
-      VLGen, ELEN, VLEN, ConfigPointsWeights, DiscardedConfigs, IsOnlyVSETIVLI);
-  // 6. Filter out the VMs that were compatible only with the VLs that were
-  // discarded in step 4
-  auto &&[VMGen, VMWeights] = getVMsCompatibleWithVLs(
-      MinMaxVL, VMGensWeightsFiltered, VLGen, DiscardedVMs);
-
+  auto SwitchInfo = deriveModeSwitchingProbability(Cfg, CS.Guides);
+  bool IsArtificialModeChange = !CS.Guides.ModeChangeProb.isDeduced();
   bool NeedsVXRMUpdate = hasVXRMUsers(Cfg.getOpcodeHistogram());
 
-  return RVVConfigurationInfo(
-      ELEN, VLEN, ConfigGenerator(std::move(ConfigPoints), ConfigWeights),
-      VLGenerator(std::move(VLGen), VLWeights),
-      VMGenerator(std::move(VMGen), VMWeights), ModeSwitchInfo,
-      !CS.Guides.ModeChangeProb.isDeduced(), NeedsVXRMUpdate);
+  if (VLEN == 0)
+    return RVVConfigurationInfo{ELEN, VLEN, std::move(SwitchInfo),
+                                IsArtificialModeChange, NeedsVXRMUpdate};
+
+  const auto &SewLmulDist =
+      buildRawSewLmulDistribution(ELEN, VLEN, CS.VUInfo.VTYPE.SEW,
+                                  CS.VUInfo.VTYPE.LMUL, SwitchInfo.ProbSetVill);
+
+  bool IsPresentVSETIVLI = SwitchInfo.hasVSETIVLI();
+  bool IsPresentNonVSETIVLI = SwitchInfo.hasVSETVL() || SwitchInfo.hasVSETVLI();
+  assert(IsPresentVSETIVLI || IsPresentNonVSETIVLI);
+
+  // At *some* point we HAVE TO exclude all VL values that don't have any
+  // compatible VMgen. Currently this is done here, by discarding all VLgens
+  // that don't have any applicable VMgens. It would be better to discard
+  // individual VL values, and do this inside RVVPrimaryConfigGenerator
+  // constructor.
+  // Everything else that is done here, like discarding VLgens for which
+  // there're no {SEW, LMUL} combinations or discarding VMgens, is UNNECESSARY
+  // and is done only to get discarded names (backward compatibility).
+  auto [VLGenerators, VMGenerators, DiscardedVLNames, DiscardedVMNames] =
+      buildVLVMgenerators(ELEN, VLEN, CS.VUInfo.VL, CS.VUInfo.VM, SewLmulDist,
+                          /*IsOnlyVSETIVLI*/ !IsPresentNonVSETIVLI);
+
+  unsigned MinVMBitWidth = getMinRequestedBitWidth(CS.VUInfo.VM);
+  // One generator for (VSETVLI & VSETVL) and another for VSETIVLI
+
+  std::optional<RVVPrimaryConfigGenerator> PrimaryConfigGen;
+  if (IsPresentNonVSETIVLI)
+    PrimaryConfigGen.emplace(ELEN, VLEN, SewLmulDist, VLGenerators,
+                             MinVMBitWidth,
+                             /*BuildForVSETIVLI*/ false);
+
+  std::optional<RVVPrimaryConfigGenerator> PrimaryConfigGenReduced;
+  if (IsPresentVSETIVLI)
+    PrimaryConfigGenReduced.emplace(ELEN, VLEN, SewLmulDist, VLGenerators,
+                                    MinVMBitWidth,
+                                    /*BuildForVSETIVLI*/ true);
+
+  RVVConfigGenerator RVVConfigGen(
+      std::move(PrimaryConfigGen), std::move(PrimaryConfigGenReduced),
+      CS.VUInfo.VTYPE.VMA, CS.VUInfo.VTYPE.VTA, CS.VUInfo.VXRM);
+  RVVSupportInfo SupportInfo(CS.VUInfo, std::move(DiscardedVMNames),
+                             std::move(DiscardedVLNames));
+
+  return RVVConfigurationInfo{ELEN,
+                              VLEN,
+                              std::move(SwitchInfo),
+                              IsArtificialModeChange,
+                              NeedsVXRMUpdate,
+                              RVVGeneratorInfo(std::move(RVVConfigGen),
+                                               std::move(VMGenerators),
+                                               std::move(SupportInfo))};
 }
 
-unsigned RVVConfigurationInfo::getVLEN() const { return VLEN; }
-unsigned RVVConfigurationInfo::getELEN() const { return ELEN; }
-
-const RVVConfigurationInfo::VLGeneratorHolder &
-RVVConfigurationInfo::selectVLGen(const RVVConfiguration &Config,
-                                  bool ReduceVL) const {
-  auto Filter = [ELEN = getELEN(), VLEN = getVLEN(), ReduceVL,
-                 &Config](const VLGeneratorHolder &VLGen) {
-    return VLGen->isApplicable(ELEN, VLEN, ReduceVL, Config);
-  };
-  const auto &ApplicGen = VLGen.generateIf(Filter);
-  // Generation under a condition can return a nullopt only if all elements do
-  // not satisfy this condition. This can't be the case, since we have already
-  // thrown out all RVV configurations for which there is no available VL.
-  assert(ApplicGen.has_value() &&
-         "At least one VM must be found for the selected VL");
-  assert(ApplicGen.value().get() && "We can't return nullptr");
-  return ApplicGen.value();
-}
-
-const RVVConfigurationInfo::VMGeneratorHolder &
-RVVConfigurationInfo::selectVMGen(unsigned VL) const {
+APInt RVVConfigurationInfo::selectVM(unsigned VL) const {
+  assert(GenInfo && "There must be a generator. Probably VLEN is 0.");
   auto Filter = [VL](const VMGeneratorHolder &VMGen) {
-    return VMGen->isApplicable(VL);
+    return VMGen->getMinRequiredVL() <= VL;
   };
-  const auto &ApplicGen = VMGen.generateIf(Filter);
-  // Generation under a condition can return a nullopt only if all elements
+  // Generation under a condition can return error only if all elements
   // do not satisfy this condition. This can't be the case, since we have
   // already thrown out all VMs for which there is no available VL.
-  assert(ApplicGen.has_value() &&
-         "At least one VM must be found for the selected VL");
-  assert(ApplicGen.value().get() && "We can't return nullptr");
-  return ApplicGen.value();
+  const auto &ApplicableGen = cantFail(GenInfo->VMGen.generateIf(Filter));
+  return ApplicableGen->generate(VL);
 }
 
-RVVConfigurationInfo::VLVM
-RVVConfigurationInfo::selectVLVM(const RVVConfiguration &Config,
-                                 bool ReduceVL) const {
-  auto VL = selectVLGen(Config, ReduceVL)->generate(ELEN, VLEN, Config);
-  if (ReduceVL && (VL > kMaxVLForVSETIVLI))
-    VL = kMaxVLForVSETIVLI;
-  auto VM = selectVMGen(VL)->generate(VL);
-  return {VL, VM};
+RVVConfiguration
+RVVConfigurationInfo::selectConfiguration(bool MustUseReducedVL) const {
+  assert(GenInfo && "There must be a generator. Probably VLEN is 0.");
+  auto Cfg = GenInfo->CfgGen.generate(MustUseReducedVL);
+
+  assert(!MustUseReducedVL || Cfg.PrimaryCfg.VL <= kMaxVLForVSETIVLI);
+  return Cfg;
 }
 
-RVVConfigurationInfo::VLVM
-RVVConfigurationInfo::updateVM(const RVVConfiguration &Config,
-                               const VLVM &OldVLVM) const {
-  auto VL = OldVLVM.VL;
-  auto VM = VMGen()->generate(VL);
-  return {VL, VM};
+ProbableItems<RVVPrimaryConfig>
+RVVConfigurationInfo::getAllPossiblePrimaryConfigs() const {
+  assert(GenInfo && "There must be a generator. Probably VLEN is 0.");
+
+  return GenInfo->CfgGen.getCombinedDistribution(SwitchInfo)
+      .getAllPossibleConfigs();
 }
 
-const RVVConfiguration &RVVConfigurationInfo::selectConfiguration() const {
-  return CfgGen();
-}
-
+// This print functionality is kept for backward compatibility.
+// It barely represents the current state of the configuration.
+// We actually have more information than we print, for example
+// probability of each {SEW, LMUL, VL} combination.
 void RVVConfigurationInfo::print(raw_ostream &OS) const {
   OS << "--- RVV Configuration Info ---\n";
   OS << "  - Derived VLEN: " << VLEN << " (VLENB = " << VLEN / RISCV_CHAR_BIT
@@ -1409,9 +1691,12 @@ void RVVConfigurationInfo::print(raw_ostream &OS) const {
 
   if (!SwitchInfo.RVVPresentInHistogram) {
     OS << "None\n";
-    OS << "--- RVV Configuration End  ---\n";
+    OS << "--- RVV Configuration End  ---\n\n";
     return;
   }
+  assert(GenInfo && "There must be a generator. Probably VLEN is 0.");
+  const auto &VMGen = GenInfo->VMGen;
+  const auto &CfgGen = GenInfo->CfgGen;
 
   if (ArtificialModeChange)
     OS << "Configuration Bias\n";
@@ -1430,16 +1715,29 @@ void RVVConfigurationInfo::print(raw_ostream &OS) const {
   OS << "Set Vill Bit Probability: " << floatToString(SwitchInfo.ProbSetVill, 3)
      << "\n";
 
+  // Simply print values from the OriginalVUInfo but exclude the
+  // discarded ones.
+  const auto &DiscardedVLNames = GenInfo->SupportInfo.DiscardedVLNames;
+  ProbableItems<std::string> VLGensNames;
+  for (const auto &[GenStr, Prob] :
+       GenInfo->SupportInfo.OriginalVUInfo.VL.Values) {
+    auto Name = GeneratorFactory<VLGeneratorHolder>::create(GenStr)->identify();
+    if (find(DiscardedVLNames, Name) == DiscardedVLNames.end())
+      VLGensNames.emplace_back(Name, Prob);
+  }
+  assert(!VLGensNames.empty());
+  VLGensNames.normalizeProbs();
+
   OS << "  - VL Selection Rules:\n";
-  for (const auto &[Gen, Prob] :
-       llvm::zip(VLGen.elements(), VLGen.probabilities())) {
+  for (const auto &[Str, Prob] : VLGensNames) {
     OS << "    ";
     OS << "P: " << floatToString(Prob, 5) << " ";
-    OS << "<" << Gen->identify() << ">\n";
+    OS << "<" << Str << ">\n";
   }
+
   OS << "  - VM Selection Rules:\n";
   for (const auto &[Gen, Prob] :
-       llvm::zip(VMGen.elements(), VMGen.probabilities())) {
+       zip_equal(VMGen.Items, VMGen.Dist.probabilities())) {
     OS << "    ";
     OS << "P: " << floatToString(Prob, 5) << " ";
     OS << "<" << Gen->identify() << ">\n";
@@ -1447,19 +1745,29 @@ void RVVConfigurationInfo::print(raw_ostream &OS) const {
 
   OS << "  - Configuration Bag Listing:\n";
   unsigned IllegalPointsSize = 0;
-  for (const auto &[Point, Prob] :
-       llvm::zip(CfgGen.elements(), CfgGen.probabilities())) {
-    if (!Point.IsLegal) {
+
+  // This ignores VL.
+  auto AllPossibleConfigs = jointProbabilityDistribution(
+      CfgGen.getCombinedDistribution(getModeChangeInfo())
+          .getAllPossibleSewLmulPairs(),
+      CfgGen.VmaGen.toProbableItems(), CfgGen.VtaGen.toProbableItems(),
+      CfgGen.VxrmGen.toProbableItems());
+  AllPossibleConfigs.normalizeProbs();
+
+  for (const auto &[Cfg, Prob] : AllPossibleConfigs) {
+    auto [SewLmul, MA, TA, XRM] = Cfg;
+    auto [SEW, LMUL] = SewLmul;
+    if (!isLegalSewLmul(ELEN, VLEN, SEW, LMUL)) {
       ++IllegalPointsSize;
       continue;
     }
     OS << "    ";
     OS << "P: " << floatToString(Prob, 5);
     OS << " Conf: ";
-    Point.print(OS);
-    OS << "/MaxVL: "
-       << computeVLMax(ELEN, VLEN, static_cast<unsigned>(Point.SEW),
-                       Point.LMUL);
+    OS << "{ " << toString(SEW) << ", " << toString(LMUL) << ", "
+       << toString(TA) << ", " << toString(MA) << ", vxrm: " << toString(XRM)
+       << " }";
+    OS << "/MaxVL: " << computeVLMax(ELEN, VLEN, SEW, LMUL);
     OS << "\n";
   }
   if (IllegalPointsSize > 0) {
@@ -1468,29 +1776,26 @@ void RVVConfigurationInfo::print(raw_ostream &OS) const {
     OS << "{  Illegal Configurations:  " << IllegalPointsSize
        << " points }/MaxVL: 0\n";
   }
-  OS << "  - Configuration Bag Size: " << CfgGen.elements().size() << "\n";
-  // Now, lets try to get an approximate cardianality of the set
-  auto Cardinality =
-      std::accumulate(CfgGen.elements().begin(), CfgGen.elements().end(),
-                      size_t(0), [this](const auto &Acc, const auto &Point) {
-                        auto PointSEW = static_cast<unsigned>(Point.SEW);
-                        auto MaxVL =
-                            computeVLMax(ELEN, VLEN, PointSEW, Point.LMUL);
-                        return Acc + MaxVL;
-                      });
+  OS << "  - Configuration Bag Size: " << AllPossibleConfigs.size() << "\n";
+
+  // This "cardinality" is completely fake and is kept for backward
+  // compatibility. The true amount of {VL, SEW, LMUL, MA, TA, XRM} states can
+  // be computed as PrimaryConfigsSize * SecondaryConfigsSize, where unsigned
+  // PrimaryConfigsSize =
+  //     CfgGen.PrimaryGen.getAllPossibleConfigs().size();
+  // unsigned SecondaryConfigsSize =
+  //     jointProbabilityDistribution(CfgGen.VmaGen.toWeightsArray(),
+  //                                  CfgGen.VtaGen.toWeightsArray(),
+  //                                  CfgGen.VxrmGen.toWeightsArray()).size();
+  unsigned Cardinality = 0;
+  for (const auto &[Cfg, Prob] : AllPossibleConfigs) {
+    auto [SewLmul, MA, TA, XRM] = Cfg;
+    auto [SEW, LMUL] = SewLmul;
+    Cardinality += computeVLMax(ELEN, VLEN, SEW, LMUL);
+  }
   OS << "  - State Cardinality: " << Cardinality << " ~ {MASKS} \n";
-  OS << "--- RVV Configuration End  ---\n";
+  OS << "--- RVV Configuration End  ---\n\n";
 }
-
-void RVVConfigurationInfo::dump() const { print(dbgs()); }
-
-RVVConfigurationInfo::RVVConfigurationInfo(
-    unsigned ELEN, unsigned VLEN, ConfigGenerator &&CfgGen, VLGenerator &&VLGen,
-    VMGenerator &&VMGen, const ModeChangeInfo &SwitchInfo, bool EnableGuides,
-    bool NeedsVXRMUpdate)
-    : VLEN(VLEN), ELEN(ELEN), CfgGen(std::move(CfgGen)),
-      VLGen(std::move(VLGen)), VMGen(std::move(VMGen)), SwitchInfo(SwitchInfo),
-      ArtificialModeChange(EnableGuides), NeedsVXRMUpdate(NeedsVXRMUpdate) {}
 
 RISCVConfigurationInfo
 RISCVConfigurationInfo::constructConfiguration(LLVMState &State,
@@ -1500,24 +1805,11 @@ RISCVConfigurationInfo::constructConfiguration(LLVMState &State,
   auto ArchInfo =
       RISCVConfigurationInfo::deriveArchitecturalInformation(Ctx, TM);
   auto BaseCfg = BaseConfigurationInfo(ArchInfo.XLEN);
-  std::vector<RVVConfigurationInfo::VMGeneratorHolder> DiscardedVMs;
-  std::vector<RVVConfigurationInfo::VLGeneratorHolder> DiscardedVLs;
-  std::vector<RVVConfiguration> DiscardedConfigs;
-  auto RVVCfg = Cfg.ProgramCfg.TargetConfig->getImpl<RISCVConfigInterface>()
-                        .RVVConfig->getImpl<RVVConfig>()
-                        .getRVVConfigurationSpace()
-                        .has_value()
-                    ? RVVConfigurationInfo::buildConfiguration(
-                          Cfg, ArchInfo.ELEN, ArchInfo.VLEN, nullptr,
-                          DiscardedVMs, DiscardedVLs, DiscardedConfigs)
-                    : RVVConfigurationInfo::createDefault(Cfg, ArchInfo.VLEN,
-                                                          ArchInfo.VLEN);
+  auto RVVCfg = RVVConfigurationInfo::buildConfiguration(Cfg, ArchInfo.ELEN,
+                                                         ArchInfo.VLEN);
 
   if (DumpDiscardedRVVConfigurations.isSpecified())
-    printDiscardedRVVConfigurations(DumpDiscardedRVVConfigurations.getValue(),
-                                    DiscardedVMs, DiscardedVLs,
-                                    DiscardedConfigs,
-                                    /* IsRVVPresent */ ArchInfo.VLEN != 0);
+    printDiscardedRVVConfigurations(RVVCfg);
 
   return RISCVConfigurationInfo(std::move(BaseCfg), std::move(RVVCfg));
 }
