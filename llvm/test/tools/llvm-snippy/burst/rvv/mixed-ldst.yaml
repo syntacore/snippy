@@ -39,7 +39,7 @@ histogram:
   - [VL1RE8_V, 1.0]
   - [VADD_VV, 1.0]
   - [SW, 1.0]
-  - [MUL, 2.0]
+  - [MUL, 1.0]
   - [DIV, 1.0]
   - [ADD, 1.0]
   - [ADDI, 1.0]
