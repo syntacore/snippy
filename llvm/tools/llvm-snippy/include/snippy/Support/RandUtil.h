@@ -528,6 +528,47 @@ public:
     return selectFromContainer(Candidates);
   }
 
+  // Doesn't require container to be random access. If element is filtered out,
+  // it's weight is considered to be 0.0.
+  template <typename ContainerT, typename Pred>
+  static auto selectFromContainerWeightedFiltered(
+      ContainerT &Container, ArrayRef<double> Weights,
+      Pred FilterOut) -> Expected<decltype(*Container.begin())> {
+    static_assert(
+        std::is_invocable_r_v<bool, Pred, const decltype(*Container.begin())>,
+        "Filter must be callable with const T and return bool");
+    size_t ContainerSize = std::distance(Container.begin(), Container.end());
+    if (ContainerSize != Weights.size())
+      return makeFailure(
+          Errc::LogicError,
+          "Error in selectFromContainerWeightedFiltered: Container and Weights "
+          "have different sizes.");
+
+    auto WeightedCandidates = llvm::make_filter_range(
+        zip_equal(Container, Weights), [&](const auto &Item) {
+          const auto &[Elem, Weight] = Item;
+          return !std::invoke(FilterOut, Elem);
+        });
+
+    if (WeightedCandidates.empty())
+      return makeFailure(
+          Errc::NoElements,
+          "Error in selectFromContainerWeightedFiltered: No candidates "
+          "left after filtering.");
+
+    auto WeightRange =
+        map_range(WeightedCandidates, [](const auto &Item) -> const double & {
+          return std::get<1>(Item);
+        });
+    std::discrete_distribution<unsigned> DD(WeightRange.begin(),
+                                            WeightRange.end());
+    auto Candidates =
+        map_range(WeightedCandidates, [](const auto &Item) -> const auto & {
+          return std::get<0>(Item);
+        });
+    return selectFromContainerWeighted(Candidates, DD);
+  }
+
   static auto &engine() { return pimpl->Engine; }
 
   // INFO: this snippy implementation of shuffle is required because
