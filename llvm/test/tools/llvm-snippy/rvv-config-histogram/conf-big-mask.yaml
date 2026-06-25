@@ -1,15 +1,16 @@
 # REQUIRES: riscv-rvv
-# COM: This test checks that if all RVV configurations are not compatible with 
-#      all VLs, this is an error.
+# COM: This test checks that VL:any_legal works fine with `immediate` mask
+#      and doesn't generate any VLs < minimal VM bit width
 
-# RUN: not llvm-snippy %s \ 
-# RUN: |& FileCheck %s 
+# RUN: llvm-snippy %s \
+# RUN: |& FileCheck %s
 
 options:
   mtriple: riscv64
   mcpu: generic-rv64
   mattr: +v
   num-instrs: 100
+  dump-mf: on
 
 include:
 - "Inputs/sections.yaml"
@@ -17,13 +18,15 @@ include:
 riscv-vector-unit:
   mode-distribution:
     VM:
-      - [any_legal, 1.0]
+      - [0b101010111000, 1.0] # bit width of VM is 12
     VL:
-      - [17, 1.0]   
+      - [any_legal, 1.0]
     VXRM:
       rnu: 1.0
     VTYPE:
       SEW:
+        sew_8: 1.0
+        sew_32: 1.0
         sew_64: 1.0
       LMUL:
         m8: 1.0
@@ -32,9 +35,10 @@ riscv-vector-unit:
         mu: 1.0
       VTA:
         tu: 1.0
- 
+
 histogram:
        - [VSETIVLI, 1.0]
        - [VADD_VV, 1.0]
 
-# CHECK: error: riscv-vector-unit: Could not find any applicable VL generators
+# CHECK: VSETIVLI
+# CHECK-NOT: VSETIVLI {{(0|1|2|3|4|5|6|7|8|9|10|11) }}

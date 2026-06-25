@@ -21,42 +21,15 @@
 namespace llvm {
 namespace snippy {
 
-struct RVVModeInfo {
+struct RVVModeInfo final {
   unsigned VsetOpcode;
-  RVVConfigurationInfo::VLVM VLVM;
-  const RVVConfiguration *Config = nullptr;
+  APInt VM;
+  RVVConfiguration Config;
   const MachineBasicBlock *MBBGuard = nullptr;
 
-  RVVModeInfo() = default;
-
-  RVVModeInfo(unsigned VsetOpcode, RVVConfigurationInfo::VLVM RVV_VLVM,
-              const RVVConfiguration &RVVCfg, const MachineBasicBlock &MBB)
-      : VsetOpcode(VsetOpcode), VLVM(RVV_VLVM), Config(&RVVCfg),
-        MBBGuard(&MBB) {}
-
   bool operator==(const RVVModeInfo &Other) const {
-    return VsetOpcode == Other.VsetOpcode && VLVM == Other.VLVM &&
-           MBBGuard == Other.MBBGuard &&
-           (Config == Other.Config ||
-            (Config != nullptr && Other.Config != nullptr &&
-             *Config == *Other.Config));
-  }
-
-  bool operator!=(const RVVModeInfo &Other) const { return !(*this == Other); }
-
-  void print(const MCInstrInfo &II, raw_ostream &OS) const {
-    OS << "--- RVV Mode Info ---\n";
-    OS << "  - VsetOpcode: " << II.getName(VsetOpcode) << "\n";
-    OS << "  - VL: " << VLVM.VL << "\n";
-    OS << "  - VM: 0x" << toString(VLVM.VM, /* Radix */ 16, /* Signed */ false)
-       << "\n";
-    OS << "  - Config: ";
-    assert(Config);
-    Config->print(OS);
-    OS << "\n";
-    assert(MBBGuard);
-    OS << "  - MBB: " << MBBGuard->getNumber() << "\n";
-    OS << "--- RVV Mode Info End ---\n";
+    return VsetOpcode == Other.VsetOpcode && Config == Other.Config &&
+           APInt::isSameValue(VM, Other.VM) && MBBGuard == Other.MBBGuard;
   }
 };
 
@@ -155,12 +128,16 @@ public:
 
   auto getVLEN() const { return getVUConfigInfo().getVLEN(); }
 
-  auto getLMUL(const MachineBasicBlock &MBB) const {
-    return getActiveRVVMode(MBB).Config->LMUL;
+  VLMUL getLMUL(const MachineBasicBlock &MBB) const {
+    return getActiveRVVMode(MBB).Config.PrimaryCfg.LMUL;
   }
 
-  auto getSEW(const MachineBasicBlock &MBB) const {
-    return getActiveRVVMode(MBB).Config->SEW;
+  VSEW getSEW(const MachineBasicBlock &MBB) const {
+    return getActiveRVVMode(MBB).Config.PrimaryCfg.SEW;
+  }
+
+  unsigned getVL(const MachineBasicBlock &MBB) const {
+    return getActiveRVVMode(MBB).Config.PrimaryCfg.VL;
   }
 
   const RISCVMemInitRegs &getMemInitRegs() const {
@@ -351,28 +328,21 @@ public:
   }
 
   const RVVConfiguration &getCurrentRVVCfg(const MachineBasicBlock &MBB) const {
-    assert(getActiveRVVMode(MBB).Config);
-    return *getActiveRVVMode(MBB).Config;
-  }
-
-  auto getVL(const MachineBasicBlock &MBB) const {
-    return getActiveRVVMode(MBB).VLVM.VL;
+    return getActiveRVVMode(MBB).Config;
   }
 
   void updateActiveRVVModeVM(const MachineBasicBlock *NewMBBGuard,
                              const APInt &NewVM) {
     CurrentRVVMode.MBBGuard = NewMBBGuard;
-    CurrentRVVMode.VLVM.VM = NewVM;
+    CurrentRVVMode.VM = NewVM;
   }
 
-  void updateActiveRVVModeConfigAndVL(const MachineBasicBlock *NewMBBGuard,
-                                      unsigned VsetOpcode,
-                                      const RVVConfiguration *NewConfig,
-                                      unsigned VL) {
+  void updateActiveRVVModeConfig(const MachineBasicBlock *NewMBBGuard,
+                                 unsigned VsetOpcode,
+                                 const RVVConfiguration &NewConfig) {
     CurrentRVVMode.MBBGuard = NewMBBGuard;
     CurrentRVVMode.VsetOpcode = VsetOpcode;
     CurrentRVVMode.Config = NewConfig;
-    CurrentRVVMode.VLVM.VL = VL;
   }
 
   bool disallowIntersectingMemoryAccesses(unsigned Opcode) const;
