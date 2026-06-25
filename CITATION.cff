@@ -1,0 +1,52 @@
+cff-version: 1.2.0
+message: "If you use LLVM-snippy in your research or verification flow, please cite it using these metadata."
+
+type: software
+title: "LLVM-snippy"
+abstract: >-
+  LLVM-snippy is an LLVM-based instruction sequence generator for low-level
+  verification. It generates randomized machine-code test programs from
+  configurable inputs and reuses LLVM target descriptions and code-generation
+  infrastructure. The project is primarily used for processor verification,
+  with a focus on RISC-V and other targets supported by LLVM.
+
+authors:
+  - family-names: "Vladimirov"
+    given-names: "Konstantin"
+    orcid: "https://orcid.org/0000-0003-0925-1300"
+  - family-names: "Tarasov"
+    given-names: "Yuly"
+    orcid: "https://orcid.org/0000-0003-0416-9703"
+  - family-names: "Belov"
+    given-names: "Vladislav"
+    orcid: "https://orcid.org/0009-0008-8529-6213"
+  - family-names: "Chernikova"
+    given-names: "Anastasiya"
+    orcid: "https://orcid.org/0009-0006-1618-9081"
+  - family-names: "Romanov"
+    given-names: "Alexander"
+    orcid: "https://orcid.org/0009-0000-2884-4772"
+  - family-names: "Gavrilin"
+    given-names: "Ilya"
+    orcid: "https://orcid.org/0009-0009-1179-4460"
+
+repository-code: "https://github.com/LLVM-Snippy/llvm-snippy"
+url: "https://llvm-snippy.github.io/llvm-snippy/"
+license-url: "https://github.com/LLVM-Snippy/llvm-snippy/blob/main/LICENSE.TXT"
+
+keywords:
+  - "LLVM"
+  - "RISC-V"
+  - "instruction sequence generation"
+  - "random test generation"
+  - "processor verification"
+  - "hardware verification"
+  - "fuzzing"
+
+references:
+  - type: generic
+    title: "LLVM-snippy documentation"
+    url: "https://llvm-snippy.github.io/llvm-snippy/"
+  - type: generic
+    title: "LLVM-snippy GitHub repository"
+    url: "https://github.com/LLVM-Snippy/llvm-snippy"
