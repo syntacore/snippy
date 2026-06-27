@@ -12,7 +12,9 @@
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/Utils.h"
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 
@@ -392,6 +394,28 @@ struct has_ScalarTraitsWithStringError // NOLINT
       (sizeof(test<yaml::ScalarTraits<T, void>>(nullptr, nullptr, nullptr)) ==
        1);
 };
+
+inline Expected<double> parseWeight(StringRef WeightStr) {
+  auto Weight = 0.0;
+  auto ParseFailure = WeightStr.getAsDouble(Weight, true);
+  if (ParseFailure)
+    return makeFailure(Errc::InvalidArgument,
+                       formatv("'{}' can't be converted to double", WeightStr));
+  if (isValidWeight(Weight))
+    return Weight;
+  return makeFailure(
+      Errc::InvalidArgument,
+      formatv("got '{}' while expecting a non-negative double value",
+              WeightStr));
+}
+
+inline std::string
+incorrectWeightErrorMsg(StringRef InstructionWithIncorrectWeightName,
+                        Error ErrExplain) {
+  return "incorrect weight specified for " +
+         InstructionWithIncorrectWeightName.str() + ": " +
+         llvm::toString(std::move(ErrExplain));
+}
 
 } // namespace snippy
 

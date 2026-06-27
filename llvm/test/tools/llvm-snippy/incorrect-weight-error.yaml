@@ -42,4 +42,4 @@ histogram:
     - [SUB, 1.0]
     - [BEQ, 1.0]
 
-# CHECK: error: ADDI is given with incorrect weight: 'INCORRECT_WEIGHT_VALUE' should be a positive double value
+# CHECK: error: incorrect weight specified for ADDI: got 'INCORRECT_WEIGHT_VALUE' while expecting a non-negative double value

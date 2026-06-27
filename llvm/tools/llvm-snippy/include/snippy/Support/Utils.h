@@ -15,6 +15,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 
 #include <array>
+#include <cmath>
 #include <set>
 #include <type_traits>
 
@@ -476,6 +477,11 @@ template <typename T> void normalizeValues(T &&RangeOrContainer) {
   normalizeValues(llvm::adl_begin(RangeOrContainer),
                   llvm::adl_end(RangeOrContainer));
 }
+
+inline bool isValidWeight(double Weight) {
+  return !(std::isnan(Weight) || std::isinf(Weight) || Weight < 0.0);
+}
+
 } // namespace snippy
 } // namespace llvm
 #endif // LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_UTILS_H
