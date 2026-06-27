@@ -34,6 +34,10 @@ repository-code: "https://github.com/LLVM-Snippy/llvm-snippy"
 url: "https://llvm-snippy.github.io/llvm-snippy/"
 license-url: "https://github.com/LLVM-Snippy/llvm-snippy/blob/main/LICENSE.TXT"
 
+doi: "10.5281/zenodo.20969925"
+version: "snippy-3.0.1"
+date-released: "2026-06-27"
+
 keywords:
   - "LLVM"
   - "RISC-V"
