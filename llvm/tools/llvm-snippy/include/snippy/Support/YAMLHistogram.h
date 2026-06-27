@@ -9,6 +9,8 @@
 #ifndef LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_YAMLHISTOGRAM_H
 #define LLVM_TOOLS_LLVM_SNIPPY_SUPPORT_YAMLHISTOGRAM_H
 
+#include "snippy/Support/DiagnosticInfo.h"
+#include "snippy/Support/Error.h"
 #include "snippy/Support/YAMLUtils.h"
 
 #include "llvm/Support/YAMLTraits.h"
@@ -170,13 +172,12 @@ template <typename T> struct YAMLHistogramNormEntry {
     if constexpr (YAMLHistogramArbitraryValue_v<DenormEntry>) {
       return YAMLHistogramTraits<T>::denormalizeEntry(Io, KeyStr, WeightStr);
     } else {
-      double Weight = 0.0;
-      if (WeightStr.getAsDouble(Weight, true)) {
-        Io.setError(
-            "Incorrect histogram: Weight must be a floating point value");
+      auto Weight = parseWeight(WeightStr);
+      if (!Weight) {
+        Io.setError(incorrectWeightErrorMsg(KeyStr, Weight.takeError()));
         return E;
       }
-      return YAMLHistogramTraits<T>::denormalizeEntry(Io, KeyStr, Weight);
+      return YAMLHistogramTraits<T>::denormalizeEntry(Io, KeyStr, Weight.get());
     }
   }
 
