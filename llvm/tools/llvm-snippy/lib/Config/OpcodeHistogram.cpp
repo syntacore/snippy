@@ -99,8 +99,7 @@ OpcodeHistogram OpcodeHistogramNormalization::denormalize(yaml::IO &IO) {
   for (auto &&[NameInfo, WeightStr] : NameWeightSeq) {
     auto Weight = parseWeight(WeightStr);
     if (!Weight) {
-      IO.setError(NameInfo.Val + " is given with incorrect weight: " +
-                  llvm::toString(Weight.takeError()));
+      IO.setError(incorrectWeightErrorMsg(NameInfo.Val, Weight.takeError()));
       break;
     }
 

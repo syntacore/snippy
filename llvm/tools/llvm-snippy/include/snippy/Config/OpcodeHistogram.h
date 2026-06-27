@@ -23,7 +23,6 @@
 #include "llvm/Support/Error.h"
 
 #include <algorithm>
-#include <cmath>
 #include <cstddef>
 #include <iterator>
 #include <map>
@@ -408,24 +407,6 @@ struct OpcodeHistogramNormalization final {
                                   double Weight);
 
 private:
-  static Expected<double> parseWeight(StringRef WeightStr) {
-    auto Weight = 0.0;
-    auto ParseFailure = WeightStr.getAsDouble(Weight, true);
-    if (ParseFailure) {
-      return makeFailure(
-          snippy::Errc::InvalidArgument,
-          formatv("'{}' can't be converted to double", WeightStr));
-    }
-    auto IncorrectWeightValue =
-        (std::isnan(Weight) || std::isinf(Weight) || Weight < 0.0);
-    if (IncorrectWeightValue) {
-      return makeFailure(
-          snippy::Errc::InvalidArgument,
-          formatv("'{}' should be a positive double value", WeightStr));
-    }
-    return Weight;
-  }
-
   static void duplicateInstructionMsg(LLVMContext &LLVMCtx,
                                       StringRef NameOfDuplicatedInstruction) {
     // 'snippy::warn' and 'snippy::notice' are separated to split the message
