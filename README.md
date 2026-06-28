@@ -1,4 +1,7 @@
 # LLVM-snippy
+
+[![DOI](https://zenodo.org/badge/1122713941.svg)](https://doi.org/10.5281/zenodo.20969925)
+
 This is an LLVM project fork containing the LLVM-snippy generator. Documentation for this tool is available [here](llvm/tools/llvm-snippy/README.md).
 
 # LLVM Compiler Infrastructure
@@ -45,3 +48,5 @@ chat](https://discord.gg/xS7Z362),
 
 The LLVM project has adopted a [code of conduct](https://llvm.org/docs/CodeOfConduct.html) for
 participants to all modes of communication within the project.
+
+
