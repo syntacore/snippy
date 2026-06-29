@@ -204,3 +204,27 @@ tests:
   mtriple: riscv64
   extensions: zcmp - zca
   ignore-opcode-regex: ^CM_POPRET$|^CM_POPRETZ$
+- filename: rv64iv_zvl128b.yaml
+  description: tests for RVV with VLEN 128
+  march: rv64iv_zvl128b
+  mtriple: riscv64
+  extensions: v - f - d
+  include:
+  - Inputs/rvv-unit-all.yaml
+  ignore-opcode-regex: ^VSET.*$
+  num_instructions: 50000
+  extra-options: |
+    rvv-init-mode: loads
+    histogram-max-deviation: 3.0
+- filename: rv64iv_zvl512b.yaml
+  description: tests for RVV with VLEN 512
+  march: rv64iv_zvl512b
+  mtriple: riscv64
+  extensions: v - f - d
+  include:
+  - Inputs/rvv-unit-all.yaml
+  ignore-opcode-regex: ^VSET.*$
+  num_instructions: 50000
+  extra-options: |
+    rvv-init-mode: loads
+    histogram-max-deviation: 3.0

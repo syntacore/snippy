@@ -7,7 +7,6 @@
 options:
   mtriple: riscv64
   march: "rv64gv_zvl1024b"
-  snippy-riscv-simplified-vector-bits-max: 1024
   num-instrs: 1
   riscv-dump-rvv-config: ""
 
