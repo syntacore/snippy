@@ -3624,12 +3624,10 @@ Snippy supports RVV and have some knowledge about its semantics to avoid (or pro
 
 ::
 
-   ./llvm-snippy -mtriple=riscv64 -seed=0 -mattr=+v \
+   ./llvm-snippy -mtriple=riscv64 -seed=0 -march=rv64gcv_zvl256b \
        ./yml/layout-vector.yaml
 
 where:
-
--  ``-mattr=+v`` |nbsp| -- |nbsp| An attribute that enables vector instructions.
 
 -  ``./yml/layout-vector.yaml`` |nbsp| -- |nbsp| A sample layout file with vector
    instructions.
