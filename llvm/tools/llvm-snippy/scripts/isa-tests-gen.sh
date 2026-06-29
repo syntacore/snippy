@@ -7,6 +7,7 @@ args=("$@")
 march=
 mtriple=
 extensions=
+extra_options=
 ignore_regex='^$'
 includes=("Inputs/sections.yaml")
 num_instrs=1000
@@ -20,6 +21,7 @@ usage() {
         echo "    --include             : Additional include"
         echo "    --num-instrs          : Number of instructions to generate (default: $num_instrs)"
         echo "    --ignore-opcode-regex : Regex to filter out opcodes"
+        echo "    --extra-options       : Additional options"
         echo "    -h, --help            : Print this help message"
     } >&2
 }
@@ -54,6 +56,11 @@ while [[ $# -gt 0 ]]; do
     --ignore-opcode-regex)
         shift
         ignore_regex="$1"
+        shift
+        ;;
+    --extra-options)
+        shift
+        extra_options="$1"
         shift
         ;;
     -h | --help)
@@ -129,8 +136,16 @@ options:
   dump-mf: true
   verify-gen-histogram: true
   histogram-must-succeed: true
-histogram:
 EOF
+
+if [ -n "$extra_options" ]; then
+    echo "# extra options"
+    while IFS= read -r line; do
+        echo "  $line"
+    done < <(printf '%s' "$extra_options")
+fi
+
+echo "histogram:"
 for opc in "${filtered_opcodes[@]}"; do
     echo "  - [$opc, 1.0]"
 done
