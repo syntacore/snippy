@@ -42,24 +42,6 @@ namespace snippy {
 
 extern cl::OptionCategory SnippyRISCVOptions;
 
-// NOTE: RISCV backend can (to an extend) describe RVV configuration limits
-// of the target with -riscv-v-vector-bits-max, -riscv-v-vector-bits-min
-// llvm options. User has an option to specify Zvl*b extension, which
-// affect the list of possible configuations too. For now, llvm-snippy
-// does not use these mechanisms since they complicate generator usage.
-// We may revise this policy later once the code base is stable enough.
-static snippy::opt<bool> UseNonSimplifiedRVVConfig(
-    "snippy-riscv-disable-simplified-rvv-configuration",
-    cl::desc("Experimental. Extract RVV configuration limits from RISCV "
-             "Subtarget instead of generator-specific options."),
-    cl::Hidden, cl::init(false), cl::cat(SnippyRISCVOptions));
-
-static snippy::opt<unsigned> SimplifiedRVV_VLEN(
-    "snippy-riscv-simplified-vector-bits-max",
-    cl::desc("Defines the size of vector register file when simplified "
-             "(the default) RVV configuration is active."),
-    cl::Hidden, cl::init(128), cl::cat(SnippyRISCVOptions));
-
 static snippy::opt<bool> NoReservedCfgRVV(
     "riscv-disable-reserved-sew-lmul",
     cl::desc(
@@ -1822,7 +1804,7 @@ RISCVConfigurationInfo::deriveArchitecturalInformation(
   // RISCVSubtarget which in turn requires an LLVM function...  So we create a
   // temporary module to do the necessary requests without disturbing the
   // primary one.
-  Module M("TemporayModule", Ctx);
+  Module M("TemporaryModule", Ctx);
   auto *DummyFT = FunctionType::get(Type::getVoidTy(Ctx), false);
   constexpr const char *kDummyFnName = "Dummy";
   M.getOrInsertFunction(kDummyFnName, DummyFT);
@@ -1835,13 +1817,12 @@ RISCVConfigurationInfo::deriveArchitecturalInformation(
     return Result;
 
   Result.ELEN = ST.getELen();
+  // This is what's specified in the march with Zvl*b. It usually specifies
+  // the *minimum* VLEN, but since snippy targets a specific VLEN we can
+  // use that directly. This will be used to configure the models with a proper
+  // VLEN too.
+  Result.VLEN = ST.getRealMinVLen();
 
-  if (!UseNonSimplifiedRVVConfig) {
-    Result.VLEN = SimplifiedRVV_VLEN;
-    return Result;
-  }
-
-  Result.VLEN = ST.getRealMaxVLen();
   return Result;
 }
 

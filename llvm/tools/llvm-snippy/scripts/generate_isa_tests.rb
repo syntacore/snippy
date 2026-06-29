@@ -158,6 +158,7 @@ def build_command(entry, script_path)
   ignore_regexp = entry['ignore-opcode-regex']     # may be nil
   num_instructions = entry['num_instructions']     # may be nil
   includes_arr     = entry['include']              # expected to be an Array (or nil)
+  extra_options    = entry['extra-options']        # expected to be a string but may bit nil
 
   cmd = [
     script_path,
@@ -170,6 +171,8 @@ def build_command(entry, script_path)
   cmd += ['--ignore-opcode-regex', ignore_regexp] if ignore_regexp
   # Add --num-instructions only if the key exists (any integer/string is accepted)
   cmd += ['--num-instrs', num_instructions.to_s] if num_instructions
+  # Pass additional options if defined
+  cmd += ['--extra-options', extra_options] if extra_options
 
   if includes_arr
     abort_with "'include' must be an Array (got #{includes_arr.class})" unless includes_arr.is_a?(Array)
