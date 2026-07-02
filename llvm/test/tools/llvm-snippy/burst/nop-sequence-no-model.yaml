@@ -1,5 +1,3 @@
-# COM: This test sometimes fails on a few seeds and is sensitive to any random flow change.
-# REQUIRES: unstable
 # RUN: llvm-snippy %s -model-plugin=None | FileCheck %s
 
 options:
@@ -32,26 +30,6 @@ burst:
     - [ PseudoNOP ]
 
 # COM: Check that there are at least 5 PseudoNOP burst groups of exact size 3
-
-# CHECK: PseudoNOP
-# CHECK-NEXT: PseudoNOP
-# CHECK-NEXT: PseudoNOP
-
-# CHECK: PseudoNOP
-# CHECK-NEXT: PseudoNOP
-# CHECK-NEXT: PseudoNOP
-
-# CHECK: PseudoNOP
-# CHECK-NEXT: PseudoNOP
-# CHECK-NEXT: PseudoNOP
-
-# CHECK: PseudoNOP
-# CHECK-NEXT: PseudoNOP
-# CHECK-NEXT: PseudoNOP
-
-# CHECK: PseudoNOP
-# CHECK-NEXT: PseudoNOP
-# CHECK-NEXT: PseudoNOP
-
+# CHECK-COUNT-5: PseudoNOP{{.*[[:space:]].*}}PseudoNOP{{.*[[:space:]].*}}PseudoNOP{{.*[[:space:]].*}}
 # CHECK-DAG: LD
 # CHECK-DAG: SD
