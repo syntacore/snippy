@@ -1835,6 +1835,14 @@ Based on these settings, snippy will generate separate permuted groups
 (some groups of LWs and FENCEs, and some groups of SWs) divided by other
 instructions (optionally).
 
+   .. note::
+
+      The burst config determines which opcodes are generated within burst groups.
+      However, this does not prohibit the use of these opcodes outside of burst groups.
+      Although llvm-snippy attempts to generate burst-config opcodes only within burst groups, there is no guarantee.
+      Depending on config complexity, llvm-snippy version, and seed, certain opcodes may bypass the burst group construction, resulting in the generation of standalone primary instructions.
+      This is normal behavior and not a bug.
+
 You can then have the result of the generation dumped. For more details,
 see `Dumping Memory Access Scheme <#dumping-memory-access-scheme>`__.
 
