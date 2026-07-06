@@ -483,6 +483,10 @@ std::string Linker::createLinkerScriptImplLegacy(bool Export) const {
     STS << "\n";
   }
 
+  STS << "  .note.snippy : {\n";
+  STS << "    KEEP(*(.note.snippy))\n";
+  STS << "  }\n";
+
   STS << "}";
   return ScriptText;
 }

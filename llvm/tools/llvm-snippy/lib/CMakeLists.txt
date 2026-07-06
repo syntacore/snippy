@@ -29,6 +29,7 @@ set(LLVM_LINK_COMPONENTS
   SnippyGenerator
   )
 set(LLVMSnippySources
+  AddMetadataSectionPass.cpp
   BranchLengthenerPass.cpp
   BlockGenPlanningPass.cpp
   BlockGenPlanWrapperPass.cpp
