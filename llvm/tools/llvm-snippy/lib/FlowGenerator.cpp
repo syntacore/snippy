@@ -9,6 +9,7 @@
 #include "FlowGenerator.h"
 #include "InitializePasses.h"
 
+#include "snippy/AddMetadataSectionPass.h"
 #include "snippy/Config/Selfcheck.h"
 #include "snippy/CreatePasses.h"
 #include "snippy/Generator/GeneratorContextPass.h"
@@ -111,6 +112,11 @@ snippy::opt<bool>
     DumpCodeAddrMapping("dump-bb-addresses",
                         cl::desc("Dump selected basic block addresses"),
                         cl::cat(Options), cl::init(false), cl::Hidden);
+
+snippy::opt<bool> StoreConfigInELF(
+    "store-config-in-elf",
+    cl::desc("Store configuration metadata in ELF note section"),
+    cl::cat(Options), cl::init(false), cl::Hidden);
 
 } // namespace snippy
 
@@ -388,6 +394,8 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
         if (DumpMIR.isSpecified())
           PM.add(createPrintMIRPass(MIROS));
         PM.add(createMemAccessDumperPass());
+        if (StoreConfigInELF)
+          PM.add(createAddMetadataSectionPass());
       },
       [](PassManagerWrapper &PM) {
         PM.add(createLinkerConfigurePass());

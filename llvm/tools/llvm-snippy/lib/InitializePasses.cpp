@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 #include "InitializePasses.h"
 
+#include "snippy/AddMetadataSectionPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/RootRegPoolWrapperPass.h"
 #include "snippy/Generator/SMCInitPass.h"
@@ -53,4 +54,5 @@ void llvm::snippy::initializeSnippyPasses(PassRegistry &Registry) {
   initializeLongJumpRelaxatorPass(Registry);
   initializeBranchLengthenerPass(Registry);
   initializeFallThroughsEraserPass(Registry);
+  initializeAddMetadataSectionPass(Registry);
 }

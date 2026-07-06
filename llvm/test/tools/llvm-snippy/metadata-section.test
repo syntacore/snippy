@@ -1,0 +1,14 @@
+# COM: Check that .note.snippy section exists and contains expected seed value
+
+# RUN: llvm-snippy -mtriple=riscv64 -num-instrs=100 \
+# RUN:     --store-config-in-elf -o %t.elf \
+# RUN:     --seed=12345678 \
+# RUN:     %examples_path/layout.yaml %examples_path/memory.yaml
+
+# RUN: llvm-readelf -S %t.elf | FileCheck %s --check-prefix=SECTIONS
+# RUN: llvm-objcopy --dump-section .note.snippy=%t.note %t.elf /dev/null
+# RUN: tail -c +20 %t.note | FileCheck %s --check-prefix=SEED
+
+# SECTIONS: .note.snippy
+# SEED: Seed: 12345678
+
