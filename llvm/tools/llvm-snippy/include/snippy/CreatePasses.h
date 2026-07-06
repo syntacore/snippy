@@ -125,5 +125,7 @@ snippy::ActiveImmutablePassInterface *createJumpLengthenerPass();
 MachineFunctionPass *createLongJumpRelaxatorPass();
 
 MachineFunctionPass *createLinkerConfigurePass();
+
+ModulePass *createAddMetadataSectionPass();
 } // namespace llvm
 #endif // LLVM_TOOLS_LLVM_SNIPPY_CREATEPASSES_H
