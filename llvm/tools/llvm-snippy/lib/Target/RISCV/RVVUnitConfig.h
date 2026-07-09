@@ -298,8 +298,7 @@ struct ModeChangeInfo {
   // Returns weights in the form of {VSETVL, VSETVLI, VSETIVLI}
   // Even if all weights are 0.0, we still might need to choose one of VSETs
   std::array<double, 3> getRelativeWeights(unsigned VL = 0) const {
-    if (WeightVSETVL + WeightVSETVLI + WeightVSETIVLI <=
-        std::numeric_limits<double>::epsilon())
+    if (isZero(WeightVSETVL + WeightVSETVLI + WeightVSETIVLI))
       return {1.0, 1.0, 1.0};
 
     // VSETIVLI supports only reduced VL

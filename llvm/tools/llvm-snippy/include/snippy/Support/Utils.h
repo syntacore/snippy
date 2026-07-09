@@ -272,6 +272,7 @@ template <class Target, class Source> Target narrowCast(Source Value) {
 
 template <typename T>
 inline bool isZero(T Value, T Tolerance = std::numeric_limits<T>::epsilon()) {
+  static_assert(std::is_floating_point_v<T>, "Don't use this for integers");
   return std::abs(Value) < Tolerance;
 }
 
@@ -468,7 +469,7 @@ template <typename ItType> void normalizeValues(ItType Begin, ItType End) {
       std::is_convertible_v<typename std::iterator_traits<ItType>::value_type,
                             double>);
   auto Total = std::accumulate(Begin, End, 0.0);
-  assert(Total > std::numeric_limits<double>::epsilon());
+  assert(!isZero(Total));
   for (auto It = Begin; It != End; ++It)
     *It /= Total;
 }

@@ -391,9 +391,8 @@ public:
 
   bool isLoopGenerationPossible(const OpcodeCache &OpCC) const {
     const auto &Branches = PassCfg.Branches;
-    return Branches.LoopRatio > std::numeric_limits<double>::epsilon() &&
-           Branches.PermuteCF && Branches.MaxDepth.Loop > 0 &&
-           Histogram.hasCFInstrs(OpCC);
+    return !isZero(Branches.LoopRatio) && Branches.PermuteCF &&
+           Branches.MaxDepth.Loop > 0 && Histogram.hasCFInstrs(OpCC);
   }
 
   GenerationMode getGenerationMode() const {

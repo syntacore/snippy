@@ -258,7 +258,7 @@ public:
   OpcodeProbVisitor::OpcProbOpt find(unsigned OpcodeToFind) const;
 
   bool isProbabilityZero(unsigned Opcode) const {
-    return probability(Opcode) < std::numeric_limits<double>::epsilon();
+    return isZero(probability(Opcode));
   }
 
   template <typename... OpcodeT> bool isAnyNonZero(OpcodeT... Opcodes) const {
