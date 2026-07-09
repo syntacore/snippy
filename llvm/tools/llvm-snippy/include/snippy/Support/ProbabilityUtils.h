@@ -123,7 +123,7 @@ struct ProbableItems final : SmallVector<ProbableElement<T>> {
 
   void normalizeProbs() {
     prob_type TotalWeight = getTotalProb();
-    assert(TotalWeight > std::numeric_limits<prob_type>::epsilon());
+    assert(!isZero(TotalWeight));
     for (auto &Item : *this)
       Item.Prob /= TotalWeight;
 
@@ -197,7 +197,7 @@ auto jointProbabilityDistributionImpl(const MapT &Map) {
   ProbableItems<Key> Result;
   Result.reserve(Map.size());
   for (const auto &[Key, Prob] : Map) {
-    if (Prob > std::numeric_limits<typename MapT::mapped_type>::epsilon())
+    if (!isZero(Prob))
       Result.emplace_back(std::make_tuple(Key), Prob);
   }
   return Result;
@@ -217,12 +217,12 @@ auto jointProbabilityDistributionImpl(const FirstMap &First,
   Result.reserve(First.size() * RestVec.size());
 
   for (const auto &[Key1, Prob1] : First) {
-    if (Prob1 < std::numeric_limits<typename FirstMap::mapped_type>::epsilon())
+    if (isZero(Prob1))
       continue;
     for (const auto &[KeyRest, ProbRest] : RestVec) {
       // RestVec comes from jointProbabilityDistributionImpl, so all probs
       // in it must be non-zero
-      assert(ProbRest > std::numeric_limits<decltype(ProbRest)>::epsilon());
+      assert(!isZero(ProbRest));
       KeyT NewKey = std::tuple_cat(std::make_tuple(Key1), KeyRest);
       Result.emplace_back(std::move(NewKey), Prob1 * ProbRest);
     }

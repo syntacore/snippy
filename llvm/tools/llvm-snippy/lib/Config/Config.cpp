@@ -1596,10 +1596,9 @@ static void deleteCallsIfNeeded(LLVMState &State, const OpcodeCache &OpCC,
   auto &Tgt = State.getSnippyTarget();
   auto IsCall = [&Tgt](unsigned Opcode) { return Tgt.isCall(Opcode); };
   auto CallsWeight = Histogram.getTopOpcodesWeight(IsCall);
-  if (CallsWeight < std::numeric_limits<decltype(CallsWeight)>::epsilon())
+  if (isZero(CallsWeight))
     return;
-  if (std::abs(Histogram.getTotalWeight() - CallsWeight) <
-      std::numeric_limits<decltype(CallsWeight)>::epsilon())
+  if (isZero(Histogram.getTotalWeight() - CallsWeight))
     snippy::fatal(
         "for using calls you need to add to histogram non-call instructions");
 
