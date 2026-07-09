@@ -258,9 +258,7 @@ static double getBurstProbWithoutCF(const Config &Cfg,
       GenCtx.getProgramContext().getOpcodeCache());
   auto BurstProb = Cfg.getBurstOpcodesProbability();
   BurstProb =
-      (std::abs(TotalProb - CFProb) <= std::numeric_limits<double>::epsilon())
-          ? 0.0
-          : BurstProb / (TotalProb - CFProb);
+      isZero(TotalProb - CFProb) ? 0.0 : BurstProb / (TotalProb - CFProb);
   return BurstProb;
 }
 
@@ -270,11 +268,9 @@ static size_t getBurstNumInstr(GeneratorContext &GenCtx,
   static constexpr auto TotalProb = 1.0;
 
   auto BurstProb = getBurstProbWithoutCF(Cfg, GenCtx);
-  auto IsFullBurstMode = Cfg.DefFlowConfig.DataFlowHistogram.empty() &&
-                         (std::abs(BurstProb - TotalProb) <=
-                          std::numeric_limits<double>::epsilon());
-  if (IsFullBurstMode)
-    return NumInstrsLeft;
+  // Due to FP errors, BurstProb can be slightly greater than 1.0,
+  // so we need to limit it, otherwise the result will be > NumInstrsLeft.
+  BurstProb = std::min(BurstProb, TotalProb);
   return std::ceil(BurstProb * NumInstrsLeft);
 }
 
@@ -497,6 +493,9 @@ size_t BlockGenPlanningImpl::fillReqWithBurstGroups(size_t NumInstrsLeft,
   // as in some cases there are no instructions outside burst groups and then
   // the number must be exact.
   auto NumInstrBurst = getBurstNumInstr(*GenCtx, NumInstrsLeft);
+  assert(NumInstrBurst <= NumInstrsLeft &&
+         "It's impossible to generate more instructions than there is left in "
+         "request");
   if (NumInstrBurst == 0)
     return 0;
   auto NumInstrBurstLeft = NumInstrBurst;
