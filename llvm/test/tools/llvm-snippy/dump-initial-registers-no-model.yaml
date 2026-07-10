@@ -1,0 +1,10 @@
+# RUN: llvm-snippy %s -mtriple=riscv64 --model-plugin=None -num-instrs=10 \
+# RUN:   --init-regs-in-elf \
+# RUN:   --dump-initial-registers-yaml=%t.initial-regs.yaml
+# RUN: test -s %t.initial-regs.yaml
+
+include:
+  - "Inputs/sections.yaml"
+
+histogram:
+  - [ADD, 1]

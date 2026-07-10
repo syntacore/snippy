@@ -512,6 +512,9 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
 
   } else {
 
+    ProgContext.dumpInitialRegisterState(
+        PassCfg.RegistersConfig.InitialStateOutputYaml);
+
     snippy::warn(WarningName::NoModelExec, State.getCtx(),
                  "Skipping snippet execution on the model",
                  "model was set to 'None'.");
