@@ -70,37 +70,37 @@ enum class ExecutionResult {
 
 class SimulatorInterface {
 public:
-  virtual void setStopModeByPC(ProgramCounterType PC) = 0;
+  virtual Error setStopModeByPC(ProgramCounterType PC) = 0;
   virtual ProgramCounterType readPC() const = 0;
-  virtual void setPC(ProgramCounterType PC) = 0;
+  virtual Error setPC(ProgramCounterType PC) = 0;
 
-  virtual RegisterType readGPR(unsigned RegID) const = 0;
+  virtual Expected<RegisterType> readGPR(unsigned RegID) const = 0;
 
-  virtual APInt readReg(llvm::Register Reg) const = 0;
-  virtual void setReg(llvm::Register Reg, const APInt &NewValue) = 0;
+  virtual Expected<APInt> readReg(llvm::Register Reg) const = 0;
+  virtual Error setReg(llvm::Register Reg, const APInt &NewValue) = 0;
 
-  virtual void setGPR(unsigned RegID, RegisterType NewValue) = 0;
+  virtual Error setGPR(unsigned RegID, RegisterType NewValue) = 0;
 
-  virtual RegisterType readCSR(unsigned RegID) const = 0;
-  virtual void setCSR(unsigned RegID, RegisterType NewValue) = 0;
+  virtual Expected<RegisterType> readCSR(unsigned RegID) const = 0;
+  virtual Error setCSR(unsigned RegID, RegisterType NewValue) = 0;
 
-  virtual RegisterType readFPR(unsigned RegID) const = 0;
-  virtual void setFPR(unsigned RegID, RegisterType NewValue) = 0;
+  virtual Expected<RegisterType> readFPR(unsigned RegID) const = 0;
+  virtual Error setFPR(unsigned RegID, RegisterType NewValue) = 0;
 
-  virtual VectorRegisterType readVPR(unsigned RegID) const = 0;
-  virtual void setVPR(unsigned RegID, const VectorRegisterType &NewValue) = 0;
+  virtual Expected<VectorRegisterType> readVPR(unsigned RegID) const = 0;
+  virtual Error setVPR(unsigned RegID, const VectorRegisterType &NewValue) = 0;
 
-  virtual void readMem(MemoryAddressType Addr,
-                       MutableArrayRef<char> Data) const = 0;
-  virtual void writeMem(MemoryAddressType Addr, ArrayRef<char> Data) = 0;
+  virtual Error readMem(MemoryAddressType Addr,
+                        MutableArrayRef<char> Data) const = 0;
+  virtual Error writeMem(MemoryAddressType Addr, ArrayRef<char> Data) = 0;
 
-  void writeMem(MemoryAddressType Addr, StringRef Data) {
-    writeMem(Addr, ArrayRef<char>{Data.data(), Data.size()});
+  Error writeMem(MemoryAddressType Addr, StringRef Data) {
+    return writeMem(Addr, ArrayRef<char>{Data.data(), Data.size()});
   }
-  void writeMem(MemoryAddressType Addr, const llvm::APInt &Val) {
-    writeMem(Addr,
-             ArrayRef<char>{reinterpret_cast<const char *>(Val.getRawData()),
-                            Val.getBitWidth() / CHAR_BIT});
+  Error writeMem(MemoryAddressType Addr, const llvm::APInt &Val) {
+    return writeMem(
+        Addr, ArrayRef<char>{reinterpret_cast<const char *>(Val.getRawData()),
+                             Val.getBitWidth() / CHAR_BIT});
     ;
   };
 

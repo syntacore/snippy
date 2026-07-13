@@ -24,6 +24,14 @@ if (LLVM_TARGETS_TO_BUILD MATCHES "RISCV")
     ${LLVM_MAIN_SRC_DIR}/lib/Target/RISCV
     ${LLVM_BINARY_DIR}/lib/Target/RISCV
   )
-
-  target_include_directories(LLVMSnippySimulator PUBLIC ${RISCVModelHeaders_DIR})
+  find_package(PkgConfig)
+  if (PkgConfig_FOUND)
+    pkg_check_modules(rvmi IMPORTED_TARGET rvmi)
+  endif()
+  if (rvmi_FOUND)
+    target_link_libraries(LLVMSnippySimulator PUBLIC PkgConfig::rvmi)
+  else()
+    add_subdirectory(../../Model/RISCVModel ${CMAKE_CURRENT_BINARY_DIR}/rvmi)
+    target_link_libraries(LLVMSnippySimulator PUBLIC rvmi)
+  endif()
 endif()

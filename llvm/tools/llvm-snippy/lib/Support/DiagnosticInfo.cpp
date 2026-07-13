@@ -278,5 +278,16 @@ void warn(WarningName WN, const llvm::Twine &Prefix, const llvm::Twine &Desc) {
   llvm_unreachable("snippy::fatal should never return");
 }
 
+[[noreturn]] void fatalInternal(llvm::LLVMContext &Ctx,
+                                const llvm::Twine &Where,
+                                const llvm::Twine &Prefix, Error E) {
+  fatal(Ctx, "internal error at " + Where + ": " + Prefix, std::move(E));
+}
+
+[[noreturn]] void fatalInternal(const llvm::Twine &Where,
+                                const llvm::Twine &Prefix, Error E) {
+  fatal("internal error at " + Where + ": " + Prefix, std::move(E));
+}
+
 } // namespace snippy
 } // namespace llvm

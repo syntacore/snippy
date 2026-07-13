@@ -24,40 +24,6 @@ public:
   CommonSimulatorImpl(StateType &&State) : ModelState(std::move(State)) {}
 
   ProgramCounterType readPC() const override { return ModelState.readPC(); }
-  void setPC(ProgramCounterType NewPC) override { ModelState.setPC(NewPC); }
-
-  RegisterType readGPR(unsigned RegID) const override {
-    return ModelState.readXReg(static_cast<GPRType>(RegID));
-  }
-
-  virtual void setGPR(unsigned RegID, RegisterType NewValue) override {
-    ModelState.setXReg(static_cast<GPRType>(RegID), NewValue);
-  }
-
-  RegisterType readFPR(unsigned RegID) const override {
-    return ModelState.readFReg(static_cast<FPRType>(RegID));
-  }
-
-  void setFPR(unsigned RegID, RegisterType NewValue) override {
-    ModelState.setFReg(static_cast<FPRType>(RegID), NewValue);
-  }
-
-  RegisterType readCSR(unsigned RegID) const override {
-    return ModelState.readCSR(RegID);
-  }
-
-  void setCSR(unsigned RegID, RegisterType NewValue) override {
-    ModelState.setCSR(RegID, NewValue);
-  }
-
-  void readMem(MemoryAddressType Addr,
-               MutableArrayRef<char> Data) const override {
-    ModelState.readMem(Addr, Data.size(), Data.data());
-  }
-
-  void writeMem(MemoryAddressType Addr, ArrayRef<char> Data) override {
-    ModelState.writeMem(Addr, Data.size(), Data.data());
-  }
 
   void logMessage(const Twine &Message) const override {
     ModelState.logMessage(Message.str().c_str());

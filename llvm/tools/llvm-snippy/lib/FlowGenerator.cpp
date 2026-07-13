@@ -215,7 +215,8 @@ static void checkMemStateAfterSelfcheck(SnippyProgramContext &ProgCtx,
                                         Interpreter &I) {
   auto &SelfcheckSection = ProgCtx.getSelfcheckSection();
   std::vector<char> Data(SelfcheckSection.Size);
-  I.readMem(SelfcheckSection.VMA, Data);
+  auto Err = I.readMem(SelfcheckSection.VMA, Data);
+  SNIPPY_CHECK_ERROR(Err, "failed to readMem");
 
   const auto SCStride = ProgramConfig::getSCStride();
   auto ResultOffset = 0;
@@ -231,6 +232,7 @@ static void checkMemStateAfterSelfcheck(SnippyProgramContext &ProgCtx,
     auto ReferenceIt = It + ReferenceOffset;
     for (size_t ByteIdx = 0; ByteIdx < SCStride; ++ByteIdx) {
       auto Result = ResultIt[ByteIdx];
+      static_assert(std::is_same_v<decltype(Result), char>);
       auto Reference = ReferenceIt[ByteIdx];
       auto DefMaskByte = 0xFF;
       if ((Result & DefMaskByte) != (Reference & DefMaskByte)) {
@@ -239,9 +241,11 @@ static void checkMemStateAfterSelfcheck(SnippyProgramContext &ProgCtx,
             dumpSelfcheck(Data, BlockSize / ChunksNum, ChunksNum, dbgs()));
         snippy::fatal(formatv(
             "Incorrect memory state after interpretation in "
-            "self-check mode. Error is in block @ 0x{0}{{{1} + {2} + {3}}\n",
+            "self-check mode. Error is in block @ 0x{0}{{{1} + {2} + {3}}: "
+            "expected {4} but got {5}\n",
             Twine::utohexstr(FaultAddr), Twine::utohexstr(SelfcheckSection.VMA),
-            Twine::utohexstr(Offset), Twine::utohexstr(ByteIdx)));
+            Twine::utohexstr(Offset), Twine::utohexstr(ByteIdx),
+            Twine::utohexstr(Reference), Twine::utohexstr(Result)));
       }
     }
   }

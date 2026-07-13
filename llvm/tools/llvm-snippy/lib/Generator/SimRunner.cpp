@@ -37,8 +37,10 @@ SimRunner::SimRunner(LLVMContext &Ctx, const SnippyTarget &TGT,
 void SimRunner::run(ProgramCounterType StartPC, ProgramCounterType EndPC) {
 
   for (auto &I : CoInterp) {
-    I->setStopModeByPC(EndPC);
-    I->setPC(StartPC);
+    auto Err = I->setStopModeByPC(EndPC);
+    SNIPPY_CHECK_ERROR(Err, "failed to set stop mode and PC");
+    Err = I->setPC(StartPC);
+    SNIPPY_CHECK_ERROR(Err, "failed to set start PC");
   }
 
   checkStates(/* CheckMemory */ true);

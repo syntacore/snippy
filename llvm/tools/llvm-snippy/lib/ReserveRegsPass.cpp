@@ -78,6 +78,15 @@ bool ReserveRegs::runOnModule(Module &M) {
   auto ReservationMode =
       SimCtx.hasTrackingMode() ? AccessMaskBit::RW : AccessMaskBit::W;
   RootPool.addReserved(StackPointer, ReservationMode);
+  auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
+  // We should reserve redefined RA for tracking mode because at the start we
+  // move value from ABI RA to this register. This assignment to ActualRA is not
+  // taken into account during selfcheck execution so it causes selfcheck
+  // failures on final execution
+  if (SimCtx.hasTrackingMode() &&
+      ProgCtx.getReturnAddress() != Tgt.getReturnAddress() &&
+      !SGCtx.getConfig().PassCfg.RegistersConfig.InitializeRegs)
+    RootPool.addReserved(ProgCtx.getReturnAddress(), ReservationMode);
 
   return true;
 }

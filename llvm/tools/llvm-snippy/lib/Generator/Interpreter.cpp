@@ -187,8 +187,10 @@ bool Interpreter::compareStates(const Interpreter &Another,
     std::vector<char> MI1, MI2;
     MI1.resize(Region.Size);
     MI2.resize(Region.Size);
-    Simulator->readMem(Region.Start, MI1);
-    Another.Simulator->readMem(Region.Start, MI2);
+    auto Err = Simulator->readMem(Region.Start, MI1);
+    SNIPPY_CHECK_ERROR(Err, "failed to readMem");
+    Err = Another.Simulator->readMem(Region.Start, MI2);
+    SNIPPY_CHECK_ERROR(Err, "failed to readMem");
     return MI1 == MI2;
   });
 }
@@ -198,7 +200,8 @@ void Interpreter::resetMem() {
   std::vector<char> Zeros;
   for (auto &&Region : SimCfg.MemoryRegions) {
     Zeros.resize(Region.Size, 0);
-    Simulator->writeMem(Region.Start, Zeros);
+    auto Err = Simulator->writeMem(Region.Start, Zeros);
+    SNIPPY_CHECK_ERROR(Err, "failed to writeMem");
   }
 }
 
@@ -281,7 +284,8 @@ void Interpreter::addInstr(const MachineInstr &MI, const LLVMState &State) {
             Twine(llvm::utohexstr(CurrentPC)) +
             " that is not fully covered by allocated sections. Probably rx "
             "section overflow. Try reducing number of instructions.");
-  Simulator->writeMem(Simulator->readPC(), EncodedMI);
+  auto Err = Simulator->writeMem(Simulator->readPC(), EncodedMI);
+  SNIPPY_CHECK_ERROR(Err, "failed to writeMem");
 }
 
 void Interpreter::dumpRegsAsYAML(const IRegisterState &Regs, raw_ostream &OS) {
@@ -306,8 +310,8 @@ void Interpreter::dumpOneRange(NamedMemoryRange Range,
   auto [RangeBeg, RangeEnd] = Range.boundaries();
   auto Size = RangeEnd - RangeBeg;
   std::vector<char> Data(Size);
-  Simulator->readMem(RangeBeg, Data);
-
+  auto Err = Simulator->readMem(RangeBeg, Data);
+  SNIPPY_CHECK_ERROR(Err, "failed to readMem");
   writeSectionToFile(Data, Range, File);
   if (File.has_error())
     snippy::fatal(formatv("Memory dump error: {0}", File.error().message()));
@@ -336,36 +340,42 @@ void Interpreter::dumpRanges(ArrayRef<NamedMemoryRange> Ranges,
     dumpOneRange(Range, File);
 }
 
-void Interpreter::setReg(llvm::Register Reg, const APInt &NewValue) {
-  Simulator->setReg(Reg, NewValue);
+Error Interpreter::setReg(llvm::Register Reg, const APInt &NewValue) {
+  auto Err = Simulator->setReg(Reg, NewValue);
+  if (Err)
+    return Err;
   if (!TransactionsObserverHandle)
-    return;
+    return Error::success();
   auto RegIdx = Env.SnippyTGT->regToIndex(Reg);
   auto &Transactions =
       Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
   switch (Env.SnippyTGT->regToStorage(Reg)) {
   case RegStorageType::XReg:
     Transactions.xregUpdateNotification(RegIdx, NewValue.getZExtValue());
-    return;
+    return Error::success();
   case RegStorageType::FReg:
     Transactions.fregUpdateNotification(RegIdx, NewValue.getZExtValue());
-    return;
+    return Error::success();
   case RegStorageType::VReg:
     Transactions.vregUpdateNotification(
         RegIdx, {reinterpret_cast<const char *>(NewValue.getRawData()),
                  NewValue.getBitWidth() / CHAR_BIT});
-    return;
+    return Error::success();
   }
   llvm_unreachable("unknown storage");
 }
 
-void Interpreter::writeSection(const SectionData &Section) {
-  for (auto [MemUnitAddr, MemVal] : Section.MemMap)
-    writeMem(MemUnitAddr + Section.Desc.VMA,
-             APInt{sizeof(MemoryUnit) * BitsInByte, MemVal});
+Error Interpreter::writeSection(const SectionData &Section) {
+  for (auto [MemUnitAddr, MemVal] : Section.MemMap) {
+    auto Err = writeMem(MemUnitAddr + Section.Desc.VMA,
+                        APInt{sizeof(MemoryUnit) * BitsInByte, MemVal});
+    if (Err)
+      return Err;
+  }
+  return Error::success();
 }
 
-void Interpreter::initTransactionMechanism() {
+Error Interpreter::initTransactionMechanism() {
   auto &Transactions =
       Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
   assert(Transactions.empty());
@@ -374,7 +384,9 @@ void Interpreter::initTransactionMechanism() {
     if (Size == 0)
       continue;
     std::vector<char> Snapshot(Size);
-    Simulator->readMem(Start, Snapshot);
+    auto Err = Simulator->readMem(Start, Snapshot);
+    if (Err)
+      return Err;
     Transactions.addMemSnapshot(Start, std::move(Snapshot));
   }
 
@@ -383,29 +395,38 @@ void Interpreter::initTransactionMechanism() {
   for (auto i = 0u;
        i < Env.SnippyTGT->getNumRegs(RegStorageType::XReg, *Env.ST); ++i) {
     auto Value = Simulator->readGPR(i);
-    Transactions.addXRegToSnapshot(i, Value);
+    if (auto Err = Value.takeError())
+      return Err;
+    Transactions.addXRegToSnapshot(i, *Value);
   }
   for (auto i = 0u;
        i < Env.SnippyTGT->getNumRegs(RegStorageType::FReg, *Env.ST); ++i) {
     auto Value = Simulator->readFPR(i);
-    Transactions.addFRegToSnapshot(i, Value);
+    if (auto Err = Value.takeError())
+      return Err;
+    Transactions.addFRegToSnapshot(i, *Value);
   }
   for (auto i = 0u;
        i < Env.SnippyTGT->getNumRegs(RegStorageType::VReg, *Env.ST); ++i) {
     auto Value = Simulator->readVPR(i);
-    Transactions.addVRegToSnapshot(i, std::move(Value));
+    if (auto Err = Value.takeError())
+      return Err;
+    Transactions.addVRegToSnapshot(i, std::move(*Value));
   }
   auto CSRs = Simulator->getCSRValues();
   for (auto &&[CSR, Val] : CSRs)
     Transactions.addCSRToSnapshot(CSR, Val);
+  return Error::success();
 }
 
 void Interpreter::openTransaction() {
   auto &Transactions =
       Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
 
-  if (Transactions.empty())
-    initTransactionMechanism();
+  if (Transactions.empty()) {
+    auto Err = initTransactionMechanism();
+    SNIPPY_CHECK_ERROR(Err, "failed to init transaction");
+  }
 
   Transactions.push();
 }
@@ -467,18 +488,29 @@ void Interpreter::discardTransaction() {
 
   assert(!Transactions.empty());
 
-  Simulator->setPC(getPCBeforeTransaction());
-  for (auto [Addr, Value] : getMemBeforeTransaction())
-    Simulator->writeMem(
+  auto Err = Simulator->setPC(getPCBeforeTransaction());
+  SNIPPY_CHECK_ERROR(Err, "failed to setPC");
+  for (auto [Addr, Value] : getMemBeforeTransaction()) {
+    Err = Simulator->writeMem(
         Addr, APInt(sizeof(Value) * CHAR_BIT, Value, /* signed */ true));
-  for (auto [RegID, Value] : getXRegsBeforeTransaction())
-    Simulator->setGPR(RegID, Value);
-  for (auto [RegID, Value] : getCSRsBeforeTransaction())
-    Simulator->setCSR(RegID, Value);
-  for (auto [RegID, Value] : getFRegsBeforeTransaction())
-    Simulator->setFPR(RegID, Value);
-  for (auto [RegID, Value] : getVRegsBeforeTransaction())
-    Simulator->setVPR(RegID, Value);
+    SNIPPY_CHECK_ERROR(Err, "failed to writeMem");
+  }
+  for (auto [RegID, Value] : getXRegsBeforeTransaction()) {
+    Err = Simulator->setGPR(RegID, Value);
+    SNIPPY_CHECK_ERROR(Err, "failed to setGPR");
+  }
+  for (auto [RegID, Value] : getCSRsBeforeTransaction()) {
+    Err = Simulator->setCSR(RegID, Value);
+    SNIPPY_CHECK_ERROR(Err, "failed to setCSR");
+  }
+  for (auto [RegID, Value] : getFRegsBeforeTransaction()) {
+    Err = Simulator->setFPR(RegID, Value);
+    SNIPPY_CHECK_ERROR(Err, "failed to setFPR");
+  }
+  for (auto [RegID, Value] : getVRegsBeforeTransaction()) {
+    Err = Simulator->setVPR(RegID, Value);
+    SNIPPY_CHECK_ERROR(Err, "failed to setVPR");
+  }
 
   Transactions.clearLastTransaction();
 }

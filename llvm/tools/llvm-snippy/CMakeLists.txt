@@ -95,10 +95,6 @@ add_dependencies(llvm-snippy LLVMSnippyDriverOptionsTableGen)
 target_include_directories(LLVMSnippyConfig PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 target_include_directories(LLVMSnippySupport PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 target_include_directories(LLVMSnippySimulator PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
-if (NOT RISCVModelHeaders_DIR)
-  target_include_directories(LLVMSnippySimulator PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Model> $<INSTALL_INTERFACE:include/Model>)
-  message(STATUS "RISCVModelHeaders_DIR is not provided. Try to find model interface headers in ${CMAKE_CURRENT_SOURCE_DIR}/Model")
-endif()
 
 target_link_libraries(llvm-snippy PRIVATE
   SnippyHeaders
