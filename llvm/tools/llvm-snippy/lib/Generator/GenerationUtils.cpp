@@ -806,8 +806,11 @@ void initializeBaseRegs(InstructionGenerationContext &InstrGenCtx,
     assert(RP.isReserved(BaseReg, AccessMaskBit::W));
     if (InstrGenCtx.getCommonCfg().TrackCfg.AddressVH) {
       auto &I = SimCtx.getInterpreter();
-      auto OldValue = I.readReg(BaseReg);
-      SnippyTgt.transformValueInReg(InstrGenCtx, OldValue, NewValue, BaseReg);
+      auto MaybeOldValue = I.readReg(BaseReg);
+      SnippyTgt.transformValueInReg(
+          InstrGenCtx,
+          SNIPPY_UNWRAP_EXPECTED(MaybeOldValue, "failed to read old reg value"),
+          NewValue, BaseReg);
     } else
       SnippyTgt.writeValueToReg(InstrGenCtx, NewValue, BaseReg);
   }

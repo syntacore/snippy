@@ -119,7 +119,8 @@ void InstructionGenerator::prepareInterpreterEnv(MachineFunction &MF) const {
                                    SimCtx};
   APInt StackTop(SnippyTgt.getRegBitWidth(SP, IGC),
                  ProgCtx.getStackTop() - calcMainFuncInitialSpillSize(IGC));
-  I.setReg(SP, StackTop);
+  auto Err = I.setReg(SP, StackTop);
+  SNIPPY_CHECK_ERROR(Err, "failed to setReg");
 }
 
 void InstructionGenerator::addGV(
@@ -135,8 +136,10 @@ void InstructionGenerator::addGV(
                     .get<OwningSimulatorContext>()
                     .get();
   auto *GV = GP.createGV(Value, Stride, LType, Name);
-  if (SimCtx.hasTrackingMode())
-    SimCtx.getInterpreter().writeMem(GP.getGVAddress(GV), Value);
+  if (SimCtx.hasTrackingMode()) {
+    auto Err = SimCtx.getInterpreter().writeMem(GP.getGVAddress(GV), Value);
+    SNIPPY_CHECK_ERROR(Err, "failed to add global variable");
+  }
 }
 
 void InstructionGenerator::addSelfcheckSectionPropertiesAsGV(Module &M) const {
