@@ -9,11 +9,20 @@
 #pragma once
 #include "RVM.h"
 
+/** @file VTable.h This file contains definition for VTable used to dispatch
+ * between C API functions from @ref RVM.h */
+
 #ifdef __cplusplus
 extern "C" {
+/** @brief Contains VTable definition */
 namespace rvm {
 #endif // __cplusplus
 
+/** @brief VTable used to dispatch to RVM interface implementation
+ *
+ * These function pointers are assigned by RVM implementation and read by C++
+ * API in @ref RVM.hpp on user's side
+ */
 struct RVM_FunctionPointers {
   rvm_modelCreate_t modelCreate;
   rvm_modelDestroy_t modelDestroy;
@@ -44,8 +53,12 @@ struct RVM_FunctionPointers {
   rvm_readVReg_t readVReg;
   rvm_setVReg_t setVReg;
 
+  rvm_raiseInterrupt_t raiseInterrupt;
+  rvm_clearInterrupt_t clearInterrupt;
+
   rvm_logMessage_t logMessage;
   rvm_queryCallbackSupportPresent_t queryCallbackSupportPresent;
+  rvm_getErrorContext_t getErrorContext;
 };
 
 #ifdef __cplusplus

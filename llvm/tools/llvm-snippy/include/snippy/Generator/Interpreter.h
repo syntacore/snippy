@@ -90,7 +90,7 @@ class Interpreter final {
   const SimulationEnvironment &Env;
   std::unique_ptr<RVMCallbackHandler::ObserverHandle<TransactionStack>>
       TransactionsObserverHandle;
-  void initTransactionMechanism();
+  Error initTransactionMechanism();
   void dumpOneRange(NamedMemoryRange Range, raw_fd_ostream &OS) const;
   bool coveredByMemoryRegion(MemAddr Start, MemAddr Size, AccMask Mode) const;
 
@@ -171,7 +171,9 @@ public:
     for (auto &&Section : ElfData.TextAndDataSections) {
       if (auto EContents = Section.getContents()) {
         auto Address = Section.getAddress();
-        Simulator->writeMem(Address, *EContents);
+        auto Err = Simulator->writeMem(Address, *EContents);
+        if (Err)
+          return Err;
         continue;
       }
       snippy::warn(WarningName::EmptyElfSection,
@@ -187,7 +189,9 @@ public:
       auto Size = Section.getSize();
       auto Address = Section.getAddress();
       std::vector<char> Zeroes(Size, 0);
-      Simulator->writeMem(Address, Zeroes);
+      auto Err = Simulator->writeMem(Address, Zeroes);
+      if (Err)
+        return Err;
     }
 
     return Error::success();
@@ -205,8 +209,8 @@ public:
     Simulator->setState(Regs);
   }
 
-  void setStopModeByPC(ProgramCounterType StopPC) {
-    Simulator->setStopModeByPC(StopPC);
+  Error setStopModeByPC(ProgramCounterType StopPC) {
+    return Simulator->setStopModeByPC(StopPC);
   }
 
   template <typename InstrIt>
@@ -236,27 +240,29 @@ public:
 
   ProgramCounterType getPC() const { return Simulator->readPC(); }
 
-  void setPC(ProgramCounterType PC) { Simulator->setPC(PC); }
+  Error setPC(ProgramCounterType PC) { return Simulator->setPC(PC); }
 
   bool modelSupportCallbacks() const { return Simulator->supportsCallbacks(); }
 
-  APInt readReg(llvm::Register Reg) const { return Simulator->readReg(Reg); };
-  void setReg(llvm::Register Reg, const APInt &NewValue);
-
-  void readMem(MemoryAddressType Addr, MutableArrayRef<char> Data) const {
-    Simulator->readMem(Addr, Data);
-  }
-  void writeMem(MemoryAddressType Addr, ArrayRef<char> Data) {
-    Simulator->writeMem(Addr, Data);
+  Expected<APInt> readReg(llvm::Register Reg) const {
+    return Simulator->readReg(Reg);
   };
-  void writeMem(MemoryAddressType Addr, StringRef Data) {
-    Simulator->writeMem(Addr, Data);
+  Error setReg(llvm::Register Reg, const APInt &NewValue);
+
+  Error readMem(MemoryAddressType Addr, MutableArrayRef<char> Data) const {
+    return Simulator->readMem(Addr, Data);
   }
-  void writeMem(MemoryAddressType Addr, const llvm::APInt &Val) {
-    Simulator->writeMem(Addr, Val);
+  Error writeMem(MemoryAddressType Addr, ArrayRef<char> Data) {
+    return Simulator->writeMem(Addr, Data);
+  };
+  Error writeMem(MemoryAddressType Addr, StringRef Data) {
+    return Simulator->writeMem(Addr, Data);
+  }
+  Error writeMem(MemoryAddressType Addr, const llvm::APInt &Val) {
+    return Simulator->writeMem(Addr, Val);
   }
 
-  void writeSection(const SectionData &Section);
+  Error writeSection(const SectionData &Section);
 
   const auto &getSubTarget() const { return *Env.ST; }
 

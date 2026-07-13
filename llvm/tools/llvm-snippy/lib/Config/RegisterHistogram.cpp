@@ -52,8 +52,9 @@ static Expected<APInt> getValueFromHistogramPattern(const ValuegramEntry &Entry,
 
 void getFixedRegisterValues(const RegistersWithHistograms &RH,
                             size_t ExpectedNumber, StringRef Prefix,
-                            unsigned NumBits, std::vector<APInt> &Result) {
-  assert((NumBits % CHAR_BIT) == 0);
+                            unsigned AllowedNumBits, unsigned ActualNumBits,
+                            std::vector<APInt> &Result) {
+  assert((AllowedNumBits % CHAR_BIT) == 0);
 
   const auto &ClassValues = RH.Registers.ClassValues;
   auto It = std::find_if(
@@ -81,15 +82,23 @@ void getFixedRegisterValues(const RegistersWithHistograms &RH,
   Result.resize(NumFound);
   std::transform(First, Last, Result.begin(), [&](const APInt &Value) {
     auto LeadingZeroBits = Value.countLeadingZeros();
-    if (Value.getBitWidth() - LeadingZeroBits > NumBits) {
+    if (Value.getBitWidth() - LeadingZeroBits > AllowedNumBits) {
       SmallVector<char> Str;
       Value.toStringUnsigned(Str, 16);
       snippy::fatal("Registers file error",
                     "Entry " + Str + " for register type " + Prefix +
-                        " is wider than requested bit width " + Twine(NumBits));
+                        " is wider than requested bit width " +
+                        Twine(AllowedNumBits));
     }
-    return Value.zextOrTrunc(NumBits);
+    return Value.zextOrTrunc(ActualNumBits);
   });
+}
+
+void getFixedRegisterValues(const RegistersWithHistograms &RH,
+                            size_t ExpectedNumber, StringRef Prefix,
+                            unsigned NumBits, std::vector<APInt> &Result) {
+  return getFixedRegisterValues(RH, ExpectedNumber, Prefix, NumBits, NumBits,
+                                Result);
 }
 
 APInt sampleValuegramForOneReg(const Valuegram &Valuegram, StringRef Prefix,
@@ -172,9 +181,11 @@ void getRegisterGroup(const RegistersWithHistograms &RH, size_t ExpectedNumber,
                       std::vector<uint64_t> &Registers) {
   std::vector<APInt> APInts(ExpectedNumber);
   sampleHistogramForRegType(RH, Prefix, NumBits, APInts);
+
   if (APInts.empty()) {
-    getFixedRegisterValues(RH, ExpectedNumber, Prefix, 64, APInts);
+    getFixedRegisterValues(RH, ExpectedNumber, Prefix, 64, NumBits, APInts);
   }
+
   Registers.resize(APInts.size());
   std::transform(APInts.begin(), APInts.end(), Registers.begin(),
                  [](const APInt &Value) { return Value.getZExtValue(); });

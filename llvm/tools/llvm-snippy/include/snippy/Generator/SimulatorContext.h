@@ -41,7 +41,8 @@ struct SimulatorContext {
   bool hasModel() const { return Runner; }
   void disableTrackingMode() const { HasTrackingMode = false; }
   void notifyMemUpdate(uint64_t Addr, const APInt &Value) const {
-    getInterpreter().writeMem(Addr, Value);
+    auto Err = getInterpreter().writeMem(Addr, Value);
+    SNIPPY_CHECK_ERROR(Err, "failed to write memory");
   }
 
   struct RunInfo {

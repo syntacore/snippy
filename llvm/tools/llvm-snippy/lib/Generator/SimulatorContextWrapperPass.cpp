@@ -226,7 +226,9 @@ Error SimulatorContext::runSimulator(const RunInfo &RI) {
   I.setRegisterState(InitRegState);
   // StartPC location may be updated since last time it was configured.
 
-  I.setPC(ElfData->ProgStart);
+  auto Err = I.setPC(ElfData->ProgStart);
+  if (Err)
+    return Err;
   I.dumpCurrentRegState(InitialStateOutputYaml);
 
   if (ElfData->ProgEnd == std::nullopt)

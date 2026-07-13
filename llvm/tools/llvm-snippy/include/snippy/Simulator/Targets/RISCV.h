@@ -89,7 +89,7 @@ struct RISCVRegisterState : public IRegisterState {
   RegSizeInBytes XRegSize = Reg4Bytes;
   RegSizeInBytes FRegSize = Reg4Bytes;
 
-  ProgramCounterType PC;
+  ProgramCounterType PC = 0;
   std::vector<uint64_t> XRegs;
   std::vector<uint64_t> FRegs;
   std::vector<APInt> VRegs;

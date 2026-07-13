@@ -67,7 +67,8 @@ public:
         [MemStateBeg, MemStateEnd](std::unique_ptr<Interpreter> &InterpPtr) {
           std::for_each(MemStateBeg, MemStateEnd,
                         [&InterpPtr](const auto &SectData) {
-                          InterpPtr->writeSection(SectData);
+                          auto Err = InterpPtr->writeSection(SectData);
+                          SNIPPY_CHECK_ERROR(Err, "failed to write section");
                         });
         });
   }

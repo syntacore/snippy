@@ -1967,8 +1967,10 @@ MaxInstrBitsType readInstrCode(const SimulatorT &Sim, ProgramCounterType PC) {
   // than 2 bytes in RISCV, we can read them), recognize the size of the
   // instruction, and then, if it is not a compressed instruction, read 4 bytes.
   uint16_t BeginOfInstr;
-  Sim.readMem(PC, MutableArrayRef<char>(reinterpret_cast<char *>(&BeginOfInstr),
-                                        sizeof(BeginOfInstr)));
+  auto Err = Sim.readMem(
+      PC, MutableArrayRef<char>(reinterpret_cast<char *>(&BeginOfInstr),
+                                sizeof(BeginOfInstr)));
+  SNIPPY_CHECK_ERROR(Err, "failed to readMem");
   auto InstructionSize = getInstructionSize(BeginOfInstr);
   if (InstructionSize == kCompressedInstrSize * RISCV_CHAR_BIT)
     return BeginOfInstr;
@@ -1976,8 +1978,9 @@ MaxInstrBitsType readInstrCode(const SimulatorT &Sim, ProgramCounterType PC) {
     snippy::fatal("Currently only instructions up to 32 bits are supported.");
   uint32_t Instr;
   // Read the full 32-bit instruction.
-  Sim.readMem(PC, MutableArrayRef<char>(reinterpret_cast<char *>(&Instr),
-                                        sizeof(Instr)));
+  Err = Sim.readMem(PC, MutableArrayRef<char>(reinterpret_cast<char *>(&Instr),
+                                              sizeof(Instr)));
+  SNIPPY_CHECK_ERROR(Err, "failed to readMem");
   return Instr;
 }
 
