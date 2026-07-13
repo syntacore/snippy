@@ -21,8 +21,8 @@ namespace {
 bool processDiv(const MachineInstr &MI, const Interpreter &I) {
   const auto &DividerOp = getDividerOp(MI);
   auto DividerRegVal = I.readReg(DividerOp.getReg());
-
-  if (DividerRegVal == 0) {
+  if (SNIPPY_UNWRAP_EXPECTED(DividerRegVal, "failed to read divider reg") ==
+      0) {
     LLVM_DEBUG(dbgs() << "Division by zero in generated instruction\n";);
     return false;
   }
