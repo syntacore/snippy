@@ -217,101 +217,199 @@ class SnippyRISCVSimulator final
   RegSizeInBytes XRegSize = Reg4Bytes;
   RegSizeInBytes FRegSize = Reg4Bytes;
 
+  Error convertToError(RVMErrorCode Err) const {
+    assert(Err != RVM_ERRC_SUCCESS);
+    std::string Msg;
+    raw_string_ostream Os(Msg);
+    Os << rvm_strerror(Err) << ": " << ModelState.getErrorContext();
+    return makeFailure(makeErrorCode(Errc::InvalidArgument), Msg);
+  }
+
 public:
   SnippyRISCVSimulator(rvm::State &&MS) : CommonSimulatorImpl(std::move(MS)) {}
 
   ExecutionResult executeInstr() override {
     auto ExecRes = ModelState.executeInstr();
     switch (ExecRes) {
-    case MODEL_SUCCESS:
+    case RVM_STEP_SUCCESS:
       return ExecutionResult::Success;
-    case MODEL_EXCEPTION:
+    case RVM_STEP_EXCEPTION:
       return ExecutionResult::FatalError;
-    case MODEL_FINISH:
+    case RVM_STEP_FINISH:
       return ExecutionResult::SimulationExit;
     }
 
     llvm_unreachable("unknown model result of instruction execution");
   }
 
-  void setStopModeByPC(ProgramCounterType PC) override {
-    ModelState.setStopMode(STOP_BY_PC);
-    ModelState.setStopPC(PC);
+  Error setStopModeByPC(ProgramCounterType PC) override {
+    ModelState.setStopMode(RVM_STOP_BY_PC);
+    auto Err = ModelState.setStopPC(PC);
+    if (Err != RVM_ERRC_SUCCESS)
+      return convertToError(Err);
+    return Error::success();
   }
 
-  llvm::APInt readReg(llvm::Register Reg) const override {
+  Expected<RegisterType> readCSR(unsigned RegID) const override {
+    RVMRegT Val = 0;
+    auto Err = ModelState.readCSR(RegID, Val);
+    if (Err != RVM_ERRC_SUCCESS)
+      return convertToError(Err);
+    return Val;
+  }
+
+  Expected<RegisterType> readGPR(unsigned RegID) const override {
+    RVMRegT Val = 0;
+    auto Err = ModelState.readXReg(static_cast<RVMXReg>(RegID), Val);
+    if (Err != RVM_ERRC_SUCCESS)
+      return convertToError(Err);
+    return Val;
+  }
+
+  Expected<RegisterType> readFPR(unsigned RegID) const override {
+    RVMRegT Val = 0;
+    auto Err = ModelState.readFReg(static_cast<RVMFReg>(RegID), Val);
+    if (Err != RVM_ERRC_SUCCESS)
+      return convertToError(Err);
+    return Val;
+  }
+
+  Expected<VectorRegisterType> readVPR(unsigned RegID) const override {
+    size_t RegSize = VLEN / RISCV_CHAR_BIT;
+    llvm::SmallVector<uint64_t> Val(RegSize / sizeof(uint64_t));
+    auto Err =
+        ModelState.readVReg(static_cast<RVMVReg>(RegID),
+                            reinterpret_cast<char *>(Val.data()), RegSize);
+    if (Err != RVM_ERRC_SUCCESS)
+      return convertToError(Err);
+    return APInt(VLEN, Val);
+  }
+
+  Expected<APInt> readReg(llvm::Register Reg) const override {
     auto RegSize = getRegBitWidth(Reg, XRegSize * RISCV_CHAR_BIT, VLEN);
     auto RegIdx = regToIndex(Reg);
-    if (Reg >= RISCV::X0 && Reg <= RISCV::X31)
-      return llvm::APInt(RegSize,
-                         ModelState.readXReg(static_cast<RVMXReg>(RegIdx)));
-    if ((Reg >= RISCV::F0_D && Reg <= RISCV::F31_D) ||
-        (Reg >= RISCV::F0_F && Reg <= RISCV::F31_F) ||
-        (Reg >= RISCV::F0_H && Reg <= RISCV::F31_H))
-      return llvm::APInt(RegSize,
-                         ModelState.readFReg(static_cast<RVMFReg>(RegIdx)),
-                         /* signed */ false, /* implicitTrunc */ true);
-    if (Reg >= RISCV::V0 && Reg <= RISCV::V31) {
-      llvm::SmallVector<uint64_t> Val(RegSize / 64);
-      ModelState.readVReg(static_cast<RVMVReg>(RegIdx),
-                          reinterpret_cast<char *>(Val.data()), RegSize);
-      return llvm::APInt(RegSize, Val);
-    }
-    snippy::fatal("Impossible to read the register from the "
-                  "Simulator. Invalid RegID for the RISCV target");
-  }
-
-  void setReg(llvm::Register Reg, const APInt &NewValue) override {
-    auto RegIdx = regToIndex(Reg);
     if (Reg >= RISCV::X0 && Reg <= RISCV::X31) {
-      setGPR(RegIdx, NewValue.getZExtValue());
-      return;
+      auto Val = readGPR(RegIdx);
+      if (auto Err = Val.takeError())
+        return std::move(Err);
+      return llvm::APInt(RegSize, *Val);
     }
     if ((Reg >= RISCV::F0_D && Reg <= RISCV::F31_D) ||
         (Reg >= RISCV::F0_F && Reg <= RISCV::F31_F) ||
         (Reg >= RISCV::F0_H && Reg <= RISCV::F31_H)) {
-      setFPR(RegIdx, NewValue.getZExtValue());
-      return;
+      auto Val = readFPR(RegIdx);
+      if (auto Err = Val.takeError())
+        return std::move(Err);
+      return llvm::APInt(RegSize, *Val, /* signed */ false,
+                         /* implicitTrunc */ true);
     }
     if (Reg >= RISCV::V0 && Reg <= RISCV::V31) {
-      setVPR(RegIdx, NewValue);
-      return;
+      return readVPR(RegIdx);
     }
-    snippy::fatal("Impossible to set the register from the "
-                  "Simulator. Invalid RegID for the RISCV target");
+    return createStringError("Impossible to read the register from the "
+                             "Simulator. Invalid RegID for the RISCV target");
+  }
+
+  Error setPC(ProgramCounterType PC) override {
+    auto Err = ModelState.setPC(PC);
+    if (Err != RVM_ERRC_SUCCESS)
+      return convertToError(Err);
+    return Error::success();
+  }
+
+  Error setGPR(unsigned RegID, RegisterType NewValue) override {
+    auto Err = ModelState.setXReg(static_cast<RVMXReg>(RegID), NewValue);
+    if (Err != RVM_ERRC_SUCCESS)
+      return convertToError(Err);
+    return Error::success();
+  }
+
+  Error setFPR(unsigned RegID, RegisterType NewValue) override {
+    auto Err = ModelState.setFReg(static_cast<RVMFReg>(RegID), NewValue);
+    if (Err != RVM_ERRC_SUCCESS)
+      return convertToError(Err);
+    return Error::success();
+  }
+  Error setCSR(unsigned RegID, RegisterType NewValue) override {
+    auto Err = ModelState.setCSR(RegID, NewValue);
+    if (Err != RVM_ERRC_SUCCESS)
+      return convertToError(Err);
+    return Error::success();
+  }
+
+  Error setVPR(unsigned RegID, const VectorRegisterType &NewValue) override {
+    assert(NewValue.getBitWidth() == VLEN);
+    size_t RegSize = NewValue.getBitWidth() / RISCV_CHAR_BIT;
+    auto Err = ModelState.setVReg(
+        static_cast<RVMVReg>(RegID),
+        reinterpret_cast<const char *>(NewValue.getRawData()), RegSize);
+    if (Err != RVM_ERRC_SUCCESS)
+      return convertToError(Err);
+    return Error::success();
+  }
+
+  Error setReg(llvm::Register Reg, const APInt &NewValue) override {
+    auto RegIdx = regToIndex(Reg);
+    if (Reg >= RISCV::X0 && Reg <= RISCV::X31) {
+      return setGPR(RegIdx, NewValue.getZExtValue());
+    }
+    if ((Reg >= RISCV::F0_D && Reg <= RISCV::F31_D) ||
+        (Reg >= RISCV::F0_F && Reg <= RISCV::F31_F) ||
+        (Reg >= RISCV::F0_H && Reg <= RISCV::F31_H)) {
+      return setFPR(RegIdx, NewValue.getZExtValue());
+    }
+    if (Reg >= RISCV::V0 && Reg <= RISCV::V31) {
+      return setVPR(RegIdx, NewValue);
+    }
+    return createStringError("Impossible to set the register from the "
+                             "Simulator. Invalid RegID for the RISCV target");
   }
 
   void saveState(IRegisterState &Output) const override {
     auto &Regs = static_cast<RISCVRegisterState &>(Output);
     Regs.PC = readPC();
-    for (size_t XRegNo = 0; XRegNo < Regs.XRegs.size(); ++XRegNo)
-      Regs.XRegs[XRegNo] = readGPR(XRegNo);
-    for (size_t FRegNo = 0; FRegNo < Regs.FRegs.size(); ++FRegNo)
-      Regs.FRegs[FRegNo] = readFPR(FRegNo);
+
+    for (size_t XRegNo = 0; XRegNo < Regs.XRegs.size(); ++XRegNo) {
+      auto Val = readGPR(XRegNo);
+      Regs.XRegs[XRegNo] = SNIPPY_UNWRAP_EXPECTED(Val, "failed to readGPR");
+    }
+    for (size_t FRegNo = 0; FRegNo < Regs.FRegs.size(); ++FRegNo) {
+      auto Val = readFPR(FRegNo);
+      Regs.FRegs[FRegNo] = SNIPPY_UNWRAP_EXPECTED(Val, "failed to readFPR");
+    }
     if (Regs.VRegs.empty())
       return;
 
-    for (size_t VRegNo = 0; VRegNo < Regs.VRegs.size(); ++VRegNo)
-      Regs.VRegs[VRegNo] = readVPR(VRegNo);
+    for (size_t VRegNo = 0; VRegNo < Regs.VRegs.size(); ++VRegNo) {
+      auto Val = readVPR(VRegNo);
+      Regs.VRegs[VRegNo] = SNIPPY_UNWRAP_EXPECTED(Val, "failed to readVPR");
+    }
   }
 
   void setState(const IRegisterState &Input) override {
     const auto &Regs = static_cast<const RISCVRegisterState &>(Input);
-    setPC(Regs.PC);
+    auto Err = setPC(Regs.PC);
+    SNIPPY_CHECK_ERROR(Err, "failed to setPC");
     XRegSize = Regs.XRegSize;
     FRegSize = Regs.FRegSize;
     VLEN = Regs.VLEN;
 
-    for (size_t XRegNo = 0; XRegNo < Regs.XRegs.size(); ++XRegNo)
-      setGPR(XRegNo, Regs.XRegs[XRegNo]);
-    for (size_t FRegNo = 0; FRegNo < Regs.FRegs.size(); ++FRegNo)
-      setFPR(FRegNo, Regs.FRegs[FRegNo]);
+    for (size_t XRegNo = 0; XRegNo < Regs.XRegs.size(); ++XRegNo) {
+      auto Err = setGPR(XRegNo, Regs.XRegs[XRegNo]);
+      SNIPPY_CHECK_ERROR(Err, "failed to setGPR");
+    }
+    for (size_t FRegNo = 0; FRegNo < Regs.FRegs.size(); ++FRegNo) {
+      auto Err = setFPR(FRegNo, Regs.FRegs[FRegNo]);
+      SNIPPY_CHECK_ERROR(Err, "failed to setFPR");
+    }
 
     if (Regs.VRegs.empty())
       return;
 
-    for (size_t VRegNo = 0; VRegNo < Regs.VRegs.size(); ++VRegNo)
-      setVPR(VRegNo, Regs.VRegs[VRegNo]);
+    for (size_t VRegNo = 0; VRegNo < Regs.VRegs.size(); ++VRegNo) {
+      auto Err = setVPR(VRegNo, Regs.VRegs[VRegNo]);
+      SNIPPY_CHECK_ERROR(Err, "failed to setVPR");
+    }
   }
 
   void resetState(const TargetSubtargetInfo &SubTgt) override;
@@ -320,31 +418,40 @@ public:
     auto CSRs = supportedSysRegs();
     std::vector<std::pair<unsigned, RegisterType>> Values;
     transform(CSRs, std::back_inserter(Values), [this](auto CSR) {
-      auto Val = readCSR(CSR);
-      return std::make_pair(CSR, Val);
+      return std::make_pair(
+          CSR, SNIPPY_UNWRAP_EXPECTED(readCSR(CSR),
+                                      formatv("failed to read CSR {}", CSR)));
     });
     return Values;
   }
 
-  VectorRegisterType readVPR(unsigned RegID) const override {
-    SmallVector<uint64_t, 2> Data(VLEN / RISCV_CHAR_BIT);
-    ModelState.readVReg(static_cast<RVMVReg>(RegID),
-                        reinterpret_cast<char *>(Data.data()),
-                        VLEN / RISCV_CHAR_BIT);
-    return VectorRegisterType(VLEN, Data);
-  }
-
-  void setVPR(unsigned RegID, const VectorRegisterType &NewValue) override {
-    assert(NewValue.getBitWidth() == VLEN);
-    ModelState.setVReg(static_cast<RVMVReg>(RegID),
-                       reinterpret_cast<const char *>(NewValue.getRawData()),
-                       NewValue.getBitWidth() / RISCV_CHAR_BIT);
-  }
-
   void dumpSystemRegistersState(raw_ostream &OS) const override {
-    OS << "MEPC:   0x" << utohexstr(ModelState.readCSR(RVM_CSR_MEPC)) << "\n";
-    OS << "MCAUSE: 0x" << utohexstr(ModelState.readCSR(RVM_CSR_MCAUSE)) << "\n";
-    OS << "MTVAL:  0x" << utohexstr(ModelState.readCSR(RVM_CSR_MTVAL)) << "\n";
+    auto ReadOrReport = [&](unsigned Reg, StringRef Name) {
+      auto Val = readCSR(Reg);
+      return SNIPPY_UNWRAP_EXPECTED(Val,
+                                    formatv("failed to read CSR {}", Name));
+    };
+
+    OS << "MEPC:   0x" << utohexstr(ReadOrReport(RVM_CSR_MEPC, "MEPC")) << "\n";
+    OS << "MCAUSE: 0x" << utohexstr(ReadOrReport(RVM_CSR_MCAUSE, "MCAUSE"))
+       << "\n";
+    OS << "MTVAL:  0x" << utohexstr(ReadOrReport(RVM_CSR_MTVAL, "MTVAL"))
+       << "\n";
+  }
+
+  Error writeMem(MemoryAddressType Addr, ArrayRef<char> Data) override {
+    auto Err = ModelState.writeMem(Addr, Data.size(), Data.data());
+    if (Err != RVM_ERRC_SUCCESS)
+      return convertToError(Err);
+    return Error::success();
+  }
+
+  Error readMem(MemoryAddressType Addr,
+                MutableArrayRef<char> Data) const override {
+    auto Err = ModelState.readMem(Addr, Data.size(), Data.data());
+    if (Err != RVM_ERRC_SUCCESS)
+      return convertToError(Err);
+    return Error::success();
   }
 
   bool supportsCallbacks() const override {
@@ -519,8 +626,8 @@ static SimulatorIsaInfo deriveSimulatorIsaInfo(const RISCVSubtarget &ST) {
 
 static void auxSimInit(const RISCVSubtarget &Subtarget,
                        SnippyRISCVSimulator &Simulator) {
-  auto &LLSim = Simulator.getLLImpl();
-  auto MSTATUS_CSR = LLSim.readCSR(RVM_CSR_MSTATUS);
+  auto Val = Simulator.readCSR(RVM_CSR_MSTATUS);
+  auto MSTATUS_CSR = SNIPPY_UNWRAP_EXPECTED(Val, "failed to read MSTATUS");
   auto DEFAULT_MSTATUS = MSTATUS_CSR;
   // NOTE: our generator focuses on creating snippets that can be run in
   // user mode. Some extensions (like F), require some CSRs
@@ -540,7 +647,8 @@ static void auxSimInit(const RISCVSubtarget &Subtarget,
   errs() << "NOTE: adjusting MSTATUS: 0x" << Twine::utohexstr(DEFAULT_MSTATUS)
          << "->0x" << Twine::utohexstr(MSTATUS_CSR) << "\n";
 
-  LLSim.setCSR(RVM_CSR_MSTATUS, MSTATUS_CSR);
+  auto Err = Simulator.setCSR(RVM_CSR_MSTATUS, MSTATUS_CSR);
+  SNIPPY_CHECK_ERROR(Err, "failed to write to MSTATUS");
 }
 
 #define D_STRINGIFY(S) #S
@@ -674,7 +782,12 @@ std::unique_ptr<SimulatorInterface> createRISCVSimulator(
   }
 
   auto ModelState = StateBuilder.build();
-  auto Sim = std::make_unique<SnippyRISCVSimulator>(std::move(ModelState));
+  if (std::holds_alternative<std::string>(ModelState))
+    snippy::fatalInternal("createRISCVSimulator",
+                          "failed to create RISCV simulator",
+                          createStringError(std::get<std::string>(ModelState)));
+  auto Sim = std::make_unique<SnippyRISCVSimulator>(
+      std::move(std::get<rvm::State>(ModelState)));
   auxSimInit(Subtarget, *Sim);
   return Sim;
 }

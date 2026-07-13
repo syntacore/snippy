@@ -144,6 +144,32 @@ void warn(WarningName WN, const llvm::Twine &Prefix, const llvm::Twine &Desc);
 
 [[noreturn]] void fatal(const llvm::Twine &Desc);
 
+[[noreturn]] void fatalInternal(llvm::LLVMContext &Ctx,
+                                const llvm::Twine &Where,
+                                const llvm::Twine &Prefix, Error E);
+
+[[noreturn]] void fatalInternal(const llvm::Twine &Where,
+                                const llvm::Twine &Prefix, Error E);
+
+#define SNIPPY_UNWRAP_EXPECTED(EXP, WHAT)                                      \
+  [&, name_ = __PRETTY_FUNCTION__](auto &&Exp_) -> decltype(auto) {            \
+    if (!Exp_)                                                                 \
+      snippy::fatalInternal(                                                   \
+          formatv("\"{}\" ({}:{})", name_, __FILE_NAME__, __LINE__),           \
+          Twine(WHAT) + " because expected \"" #EXP "\" contained error",      \
+          Exp_.takeError());                                                   \
+    return *Exp_;                                                              \
+  }(std::move(EXP))
+
+#define SNIPPY_CHECK_ERROR(ERR, WHAT)                                          \
+  [&, name_ = __PRETTY_FUNCTION__](auto &&Err_) {                              \
+    if (Err_)                                                                  \
+      snippy::fatalInternal(                                                   \
+          formatv("\"{}\" ({}:{})", name_, __FILE_NAME__, __LINE__),           \
+          Twine(WHAT) + " because \"" #ERR "\" contained error",               \
+          std::move(Err_));                                                    \
+  }(std::move(ERR))
+
 /// \brief Unwrap Expected value or fail with fatal error.
 template <typename T> T unwrapOrFatal(Expected<T> ValOrErr) {
   if (!ValOrErr)

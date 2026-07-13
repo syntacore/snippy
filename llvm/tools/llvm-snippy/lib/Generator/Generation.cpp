@@ -201,7 +201,10 @@ storeRefAndActualValueForSelfcheck(
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   const auto &ST = ProgCtx.getLLVMState().getSnippyTarget();
   auto &I = SimCtx.getInterpreter();
-  auto RegValue = I.readReg(DestReg);
+  auto MaybeRegValue = I.readReg(DestReg);
+
+  auto RegValue =
+      SNIPPY_UNWRAP_EXPECTED(MaybeRegValue, "failed to read dst reg");
 
   assert(InstrGenCtx.MBB.begin() != InsertPos);
   auto FirstInserted = std::prev(InsertPos);
@@ -282,11 +285,13 @@ void generateRegisterBasedSelfcheckRoutine(
     I.reportSimulationFatalError(
         "Failed to execute chain of instructions in tracking mode");
 
-  auto Imm = I.readReg(AccReg);
+  auto MaybeImm = I.readReg(AccReg);
 
   FirstInserted = std::prev(InsPoint);
 
-  ST.writeValueToReg(InstrGenCtx, Imm, TmpReg);
+  ST.writeValueToReg(InstrGenCtx,
+                     SNIPPY_UNWRAP_EXPECTED(MaybeImm, "failed to read Acc Reg"),
+                     TmpReg);
 
   ST.generateCheckForCheckSumSelfcheck(InstrGenCtx, TmpReg, AccReg);
 
@@ -406,26 +411,23 @@ overwriteFPRegValue(planning::InstructionGenerationContext &InstrGenCtx,
   const auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
   assert(Tgt.isFloatingPoint(Reg));
 
-  auto SelectedSemantics = getFloatSemanticsForRegClass(MCRegClass);
-  if (!SelectedSemantics)
-    snippy::fatal("Internal error",
-                  Twine("Cannot overwriteFPRegValue: ")
-                      .concat(toString(SelectedSemantics.takeError())));
+  auto MaybeSelectedSemantics = getFloatSemanticsForRegClass(MCRegClass);
+  auto &SelectedSemantics = SNIPPY_UNWRAP_EXPECTED(
+      MaybeSelectedSemantics, "failed to get float semantics");
+
   Expected<APIntWithSign> ValueToWriteOrErr =
-      InstrGenCtx.getOrCreateFloatOverwriteValueSampler(*SelectedSemantics)
+      InstrGenCtx.getOrCreateFloatOverwriteValueSampler(SelectedSemantics)
           .sample();
 
-  if (!ValueToWriteOrErr)
-    snippy::fatal(ProgCtx.getLLVMState().getCtx(), "Internal error",
-                  ValueToWriteOrErr.takeError());
+  auto ValueToWrite =
+      SNIPPY_UNWRAP_EXPECTED(ValueToWriteOrErr, "faled to sample value").Value;
   assert(ValueToWriteOrErr->Value.getBitWidth() ==
-         APFloat::semanticsSizeInBits(*SelectedSemantics));
+         APFloat::semanticsSizeInBits(SelectedSemantics));
 
-  auto ValueToWrite = ValueToWriteOrErr->Value;
   auto RP = InstrGenCtx.pushRegPool();
   Tgt.writeValueToReg(InstrGenCtx, ValueToWrite, Reg);
 
-  APFloat SupportVal(*SelectedSemantics, ValueToWrite);
+  APFloat SupportVal(SelectedSemantics, ValueToWrite);
   auto RegState =
       SupportVal.isNaN() ? FPRNaNState::DEFINITELY_NAN : FPRNaNState::NOT_NAN;
   InstrGenCtx.NaNIdent.markRegisterWithNaNState(Reg, MCRegClass, RegState);
@@ -528,14 +530,14 @@ static bool shouldRewriteRegValue(
     auto Reg = getDestinationRegister(MI);
     auto &ProgCtx = InstrGenCtx.ProgCtx;
     auto &RI = ProgCtx.getLLVMState().getRegInfo();
-    auto SelectedSemantics =
+    auto MaybeSelectedSemantics =
         getFloatSemanticsForRegClass(getRegClassForDestReg(MI, RI));
-    if (!SelectedSemantics)
-      snippy::fatal("Internal error",
-                    Twine("Cannot check if register is NaN: ")
-                        .concat(toString(SelectedSemantics.takeError())));
+    auto &SelectedSemantics = SNIPPY_UNWRAP_EXPECTED(
+        MaybeSelectedSemantics, "cannot check if register is NaN");
     auto &I = SimCtx.getInterpreter();
-    APFloat Val(*SelectedSemantics, I.readReg(Reg));
+    auto MaybeRegVal = I.readReg(Reg);
+    APFloat Val(SelectedSemantics,
+                SNIPPY_UNWRAP_EXPECTED(MaybeRegVal, "failed to readReg"));
     return Val.isNaN();
   }
   case FloatOverwriteMode::DISABLED:
@@ -1044,8 +1046,10 @@ unsigned chooseAddressRegister(InstructionGenerationContext &IGC,
   auto AddrValue = AP.Value;
 
   auto GetMatCost = [&](auto Reg) {
-    return SnippyTgt.getTransformSequenceLength(IGC, I.readReg(Reg), AddrValue,
-                                                Reg);
+    auto MaybeReg = I.readReg(Reg);
+    return SnippyTgt.getTransformSequenceLength(
+        IGC, SNIPPY_UNWRAP_EXPECTED(MaybeReg, "failed to readReg"), AddrValue,
+        Reg);
   };
   auto ChosenRegIt =
       std::min_element(PickedRegisters.begin(), PickedRegisters.end(),
@@ -1122,7 +1126,10 @@ static void postprocessMemoryOperands(
       MCRegister Reg = AP.FixedReg;
       if (SimCtx.hasTrackingMode() && IGC.getCommonCfg().TrackCfg.AddressVH) {
         auto &I = SimCtx.getInterpreter();
-        SnippyTgt.transformValueInReg(IGC, I.readReg(Reg), AP.Value, Reg);
+        auto MaybeReg = I.readReg(Reg);
+        SnippyTgt.transformValueInReg(
+            IGC, SNIPPY_UNWRAP_EXPECTED(MaybeReg, "failed to readReg"),
+            AP.Value, Reg);
       } else {
         SnippyTgt.writeValueToReg(IGC, AP.Value, Reg);
       }
@@ -1692,7 +1699,11 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
     auto &I = SimCtx.Runner->getPrimaryInterpreter();
     auto StartPC = GC.getProgramContext().getLinker().getStartPC();
     assert(StartPC);
-    I.setPC(*StartPC);
+    auto Err = I.setPC(*StartPC);
+    if (Err)
+      snippy::fatal(State.getCtx(),
+                    "failed to set PC register for tracking mode",
+                    std::move(Err));
   }
   while (!NotVisited.empty()) {
     assert(MBB);
@@ -1754,8 +1765,10 @@ void generate(planning::FunctionRequest &FunctionGenRequest,
     // condition (we execute only the first iteration of the loop). See
     // addIncomingValues/getIncomingValues description for additional details.
     assert(SLI);
-    for (const auto &[Reg, Value] : SLI->getIncomingValues(MBB))
-      I.setReg(Reg, Value);
+    for (const auto &[Reg, Value] : SLI->getIncomingValues(MBB)) {
+      auto Err = I.setReg(Reg, Value);
+      SNIPPY_CHECK_ERROR(Err, "failed to intialize register for loop exit");
+    }
   }
 
   LLVM_DEBUG(
