@@ -4069,8 +4069,34 @@ Self-check
 
    This functionality is not supported without model plugin
 
-Self-check is a code generation mode. After each (or each ``N``) main
-instruction, snippy stores an etalon value and the result of the
+Self-check is a code generation mode that lets snippy verify the values
+its own instructions produce, using values obtained from the model
+plugin as a reference. Snippy supports two families of self-check
+modes:
+
+-  Memory-based modes (``code`` and ``memory``) |nbsp| -- |nbsp| the default. After
+   each (or each ``N``) main instruction(s), snippy stores a reference value
+   and the result of the instruction (a destination register) into the ``selfcheck`` section. You
+   then compare the two afterwards with something like an additional routine
+   embedded into your harness. See `Memory-based Self-check <#memory-based-self-check>`__.
+
+-  A register-based mode (``checksum``) |nbsp| -- |nbsp| snippy inserts code
+   that computes and compares a running checksum on-the-fly and traps
+   immediately if a mismatch is detected. This mode does not require a
+   ``selfcheck`` section. See `Register-based Self-check (Checksum Mode) <#register-based-self-check-checksum-mode>`__.
+
+You select the mode with the ``mode`` key of the top-level ``selfcheck``
+configuration key (see below), or with the ``-selfcheck-ref-value-storage``
+command-line option when using the legacy ``options: selfcheck: <N>`` way
+of enabling self-check.
+
+.. _memory-based-self-check:
+
+Memory-based Self-check
+------------------------
+
+After each (or each ``N``) main
+instruction(s), snippy stores an etalon value and the result of the
 instruction to the ``selfcheck`` key. After execution, you have a
 section filled with pairs of values (``etalon1``-``real1``,
 ``etalon2``-``real2``, etc). These values can be then compared to check
@@ -4120,6 +4146,140 @@ format:
    REAL-1, ETA-1, REAL-2, ETA-2, REAL-3, ETA-3, ....
 
 where every value spans 128-bit.
+
+.. _selfcheck-configuration-key:
+
+The ``selfcheck`` Configuration Key
+------------------------------------
+
+In addition to the legacy ``options: selfcheck: <N>`` way of enabling
+self-check (described above), you can use the top-level ``selfcheck``
+configuration key. It is required if you want to select a self-check mode
+other than the default (``code``), for example, the `register-based
+(checksum) mode <#register-based-self-check-checksum-mode>`__.
+
+.. code:: yaml
+
+   selfcheck:
+     mode: code       # code | memory | checksum
+     period: 1        # optional, defaults to 1 (self-check every instruction)
+     selfcheck-gv: false  # optional, same effect as --selfcheck-gv
+
+where:
+
+-  ``mode`` (required) |nbsp| -- |nbsp| Selects the self-check mode:
+
+   -  ``code`` (default) |nbsp| -- |nbsp| Memory-based. Reference values are
+      materialized during runtime and stored in the ``selfcheck`` section.
+
+   -  ``memory`` |nbsp| -- |nbsp| Memory-based, behaves the same as ``code``,
+      but values are not materialized during runtime.
+
+   -  ``checksum`` |nbsp| -- |nbsp| Register-based. See `Register-based
+      Self-check (Checksum Mode) <#register-based-self-check-checksum-mode>`__.
+
+-  ``period`` (optional) |nbsp| -- |nbsp| Same meaning as ``<N>`` in
+   ``options: selfcheck: <N>`` |nbsp| -- |nbsp| self-check every ``period`` th
+   instruction. Defaults to ``1``.
+
+-  ``selfcheck-gv`` (optional) |nbsp| -- |nbsp| Same effect as the
+   ``--selfcheck-gv`` command-line option (see `Self-check Properties to
+   Global Variables <#self-check-properties-to-global-variables>`__).
+   Only applicable to memory-based modes.
+
+-  ``selfcheck-td-options`` (optional) |nbsp| -- |nbsp| Target-dependent
+   self-check options. For RISC-V, this currently supports
+   ``enable-selfcheck-rvv``, which is equivalent to the
+   ``--enable-selfcheck-rvv`` command-line option (see `Self-check for
+   RVV <#self-check-for-rvv>`__):
+
+   .. code:: yaml
+
+      selfcheck:
+        mode: code
+        selfcheck-td-options:
+          enable-selfcheck-rvv: true
+
+.. important::
+
+   You cannot specify the same setting (self-check period, ``selfcheck-gv``,
+   ``enable-selfcheck-rvv``) both as a command-line option and inside the
+   ``selfcheck`` configuration key at the same time.
+
+.. _register-based-self-check-checksum-mode:
+
+Register-based Self-check (Checksum Mode)
+------------------------------------------
+
+.. important::
+
+   This functionality is not supported without model plugin
+
+Unlike the memory-based modes, the ``checksum`` self-check mode does not
+store reference/actual value pairs into a ``selfcheck`` section for later
+(offline or ``-selfcheck-mem``) comparison. Instead, snippy inserts
+inline instructions that:
+
+1. Accumulate a running checksum (bitwise XOR) of the selfchecked
+   register values into a spare register, as they are produced by the
+   snippet.
+
+2. Materialize the reference checksum computed from the model plugin’s
+   execution into another register.
+
+3. Compare the two registers and trap (``EBREAK``/``C.EBREAK`` on
+   RISC-V) immediately if they differ.
+
+Because the check happens inline and traps as soon as a mismatch is
+detected, this mode does not require a ``selfcheck`` section, and you do
+not need any external tooling or the ``-selfcheck-mem`` option to detect
+a divergence -- the generated snippet checks itself while it runs.
+
+To enable this mode, use the ``checksum`` value of the ``mode`` key:
+
+.. code:: yaml
+
+   sections:
+       - name:      1
+         VMA:       0x100000
+         SIZE:      0x100000
+         LMA:       0x100000
+         ACCESS:    rx
+       - name:      2
+         VMA:       0x210000
+         SIZE:      0x100000
+         LMA:       0x210000
+         ACCESS:    rw
+
+   selfcheck:
+     mode: checksum
+     period: 1
+
+   histogram:
+       - [ADD, 1.0]
+       - [SUB, 1.0]
+
+Alternatively, you can select this mode via the command line together
+with the legacy ``options: selfcheck: <N>`` way of enabling self-check:
+
+::
+
+   --selfcheck-ref-value-storage=checksum
+
+.. important::
+
+   Limitations of the ``checksum`` mode:
+
+   -  It does not support RVV self-check (``enable-selfcheck-rvv``) yet.
+      Specifying both at once is an error.
+
+   -  ``selfcheck-gv`` doesn’t make sense with this mode (there is no
+      ``selfcheck`` section to describe), and specifying both is an
+      error.
+
+   -  As with any self-check mode, ``AUIPC`` is not supported in the
+      histogram.
+
 
 
 Self-check for RVV
