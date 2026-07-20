@@ -18,7 +18,7 @@ riscv-vector-unit:
     VM:
       - [any_legal, 1.0]
     VL:
-      - [IllegalVL:D, 1.0]
+      - [abacaba, 1.0]
     VXRM:
       rnu: 1.0
     VTYPE:
@@ -35,5 +35,4 @@ histogram:
        - [VADD_VV, 1.0]
        - [VSETIVLI, 1.0]
 
-# CHECK: error: Illegal IMM-based VL: IllegalVL:D
-
+# CHECK: error: 'abacaba' is none of: Non-negative integer, 'max_encodable', 'vlmax', 'any_legal', 'any_legal_non_zero'
