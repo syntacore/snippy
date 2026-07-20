@@ -14,6 +14,7 @@
 #include "snippy/Generator/GeneratorContext.h"
 #include "snippy/Support/Options.h"
 #include "snippy/Support/Utils.h"
+#include "snippy/Support/YAMLProbableItems.h"
 #include "snippy/Support/YAMLUtils.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -217,10 +218,29 @@ ModeChangeInfo deriveModeSwitchingProbability(const Config &Cfg,
   return Result;
 }
 
-struct MaxPossibleVLGen final : VLGeneratorInterface {
+// Declares static methods which are used by the class factory.
+//
+// static tryBuildFromString() can return 3 things:
+//  - unique_ptr: a valid pointer - success
+//  - nullptr: no match - should try next generator
+//  - llvm::Error: match did happen, but some limitation was hit
+#define DECLARE_ID_AND_DEFAULT_CONSTRUCTION_METHODS(InterfaceName,             \
+                                                    DerivedName, ID)           \
+  static constexpr const char *kID = ID;                                       \
+  std::string identify() const override { return ID; }                         \
+                                                                               \
+  static std::string getErrorName() { return std::string("'") + kID + "'"; }   \
+                                                                               \
+  static Expected<std::unique_ptr<InterfaceName>> tryBuildFromString(          \
+      StringRef S) {                                                           \
+    if (S != kID)                                                              \
+      return nullptr;                                                          \
+    return std::make_unique<DerivedName>();                                    \
+  }
 
-  static constexpr const char *kID = "max_encodable";
-  std::string identify() const override { return kID; }
+struct MaxPossibleVLGen final : VLGeneratorInterface {
+  DECLARE_ID_AND_DEFAULT_CONSTRUCTION_METHODS(VLGeneratorInterface,
+                                              MaxPossibleVLGen, "max_encodable")
 
   VLDistributionType getDistribution(unsigned VLMax) const override {
     // VL can be [0, VLMax], so we need VLMax + 1 values
@@ -234,9 +254,8 @@ struct MaxPossibleVLGen final : VLGeneratorInterface {
 // greater than kMaxVLForVSETIVLI, it will not be generated. In case of the
 // MaxPossibleVLGen, the value will be generated and reduced.
 struct MaxVLGenerator final : VLGeneratorInterface {
-
-  static constexpr const char *kID = "vlmax";
-  std::string identify() const override { return kID; }
+  DECLARE_ID_AND_DEFAULT_CONSTRUCTION_METHODS(VLGeneratorInterface,
+                                              MaxVLGenerator, "vlmax")
 
   // Exactly the same as MaxPossibleVLGen
   VLDistributionType getDistribution(unsigned VLMax) const override {
@@ -255,9 +274,8 @@ struct MaxVLGenerator final : VLGeneratorInterface {
 };
 
 struct LegalVLGenerator final : VLGeneratorInterface {
-
-  static constexpr const char *kID = "any_legal";
-  std::string identify() const override { return kID; }
+  DECLARE_ID_AND_DEFAULT_CONSTRUCTION_METHODS(VLGeneratorInterface,
+                                              LegalVLGenerator, "any_legal")
 
   VLDistributionType getDistribution(unsigned VLMax) const override {
     return VLDistributionType(VLMax + 1, 1.0 / (VLMax + 1));
@@ -265,9 +283,9 @@ struct LegalVLGenerator final : VLGeneratorInterface {
 };
 
 struct LegalVLNonZeroGenerator final : VLGeneratorInterface {
-
-  static constexpr const char *kID = "any_legal_non_zero";
-  std::string identify() const override { return kID; }
+  DECLARE_ID_AND_DEFAULT_CONSTRUCTION_METHODS(VLGeneratorInterface,
+                                              LegalVLNonZeroGenerator,
+                                              "any_legal_non_zero")
 
   VLDistributionType getDistribution(unsigned VLMax) const override {
     VLDistributionType Result(VLMax + 1);
@@ -278,9 +296,8 @@ struct LegalVLNonZeroGenerator final : VLGeneratorInterface {
 };
 
 struct UnmaskedVMGenerator final : VMGeneratorInterface {
-
-  static constexpr const char *kID = "all_ones";
-  std::string identify() const override { return kID; }
+  DECLARE_ID_AND_DEFAULT_CONSTRUCTION_METHODS(VMGeneratorInterface,
+                                              UnmaskedVMGenerator, "all_ones")
 
   unsigned getMinRequiredVL() const override { return 0; }
 
@@ -288,9 +305,8 @@ struct UnmaskedVMGenerator final : VMGeneratorInterface {
 };
 
 struct LegalVMGenerator final : VMGeneratorInterface {
-
-  static constexpr const char *kID = "any_legal";
-  std::string identify() const override { return kID; }
+  DECLARE_ID_AND_DEFAULT_CONSTRUCTION_METHODS(VMGeneratorInterface,
+                                              LegalVMGenerator, "any_legal")
 
   unsigned getMinRequiredVL() const override { return 0; }
 
@@ -300,35 +316,37 @@ struct LegalVMGenerator final : VMGeneratorInterface {
   }
 };
 
-static APInt getImmVLVM(StringRef Item, StringRef ErrorContext) {
-  // Here we are trying to convert a string Item from the yaml config
-  // to a valid VL or VM value, depending on the context ErrorContext.
-  Expected<FormattedAPIntWithSign> ExpectedValue =
-      FormattedAPIntWithSign::fromString(Item);
-  if (auto E = ExpectedValue.takeError())
-    snippy::fatal(Twine("Illegal IMM-based ") + ErrorContext + ": " + Item);
-
-  // If the converted number is negative, it is an error.
-  // Non-negative VLs and VMs are expected.
-  if (ExpectedValue->Number.IsSigned)
-    snippy::fatal(Twine(ErrorContext) + " can't be negative: " + Item);
-  return ExpectedValue->Number.Value;
-}
-
 struct ImmVLGen : public VLGeneratorInterface {
-
-  ImmVLGen(std::string ID) {
-    auto APIntVal = getImmVLVM(ID, "VL");
-    Context = std::string(kID) + "_" + ID;
-    if (APIntVal.getActiveBits() > sizeof(Value) * CHAR_BIT)
-      snippy::fatal(Twine("VL ") + Context +
-                    std::string(" is greater than the maximum possible: ") +
-                    std::to_string(sizeof(Value) * CHAR_BIT));
-    Value = APIntVal.getZExtValue();
-  }
+  ImmVLGen(unsigned Value, std::string Context)
+      : Value(Value), Context(std::move(Context)) {}
 
   static constexpr const char *kID = "imm";
-  std::string identify() const override { return Context; }
+  std::string identify() const override {
+    return std::string(kID) + "_" + Context;
+  }
+
+  static std::string getErrorName() { return "Non-negative integer"; }
+
+  static Expected<std::unique_ptr<VLGeneratorInterface>>
+  tryBuildFromString(StringRef S) {
+    Expected<FormattedAPIntWithSign> ExpValue =
+        FormattedAPIntWithSign::fromString(S);
+    if (auto Err = ExpValue.takeError()) {
+      // Simply means that we can't build this generator
+      consumeError(std::move(Err));
+      return nullptr;
+    }
+    if (ExpValue->Number.IsSigned)
+      return nullptr;
+
+    auto APIntVal = ExpValue->Number.Value;
+    if (APIntVal.getActiveBits() > sizeof(Value) * CHAR_BIT)
+      return makeFailure(Errc::InvalidArgument,
+                         formatv("VLs can't be bigger than {0}",
+                                 std::numeric_limits<unsigned>::max()));
+
+    return std::make_unique<ImmVLGen>(APIntVal.getZExtValue(), S.str());
+  }
 
   VLDistributionType getDistribution(unsigned VLMax) const override {
     VLDistributionType Result(VLMax + 1);
@@ -343,13 +361,30 @@ private:
 };
 
 struct ImmVMGen : public VMGeneratorInterface {
+  ImmVMGen(APInt Value, std::string Context)
+      : Value(std::move(Value)), Context(std::move(Context)) {}
 
-  ImmVMGen(std::string ID) {
-    Value = getImmVLVM(ID, "VM");
-    Context = std::string(ImmVLGen::kID) + "_" + ID;
+  static constexpr const char *kID = "imm";
+  std::string identify() const override {
+    return std::string(kID) + "_" + Context;
   }
 
-  std::string identify() const override { return Context; }
+  static std::string getErrorName() { return "Non-negative integer"; }
+
+  static Expected<std::unique_ptr<VMGeneratorInterface>>
+  tryBuildFromString(StringRef S) {
+    Expected<FormattedAPIntWithSign> ExpValue =
+        FormattedAPIntWithSign::fromString(S);
+    if (auto Err = ExpValue.takeError()) {
+      // Simply means that we can't build this generator
+      consumeError(std::move(Err));
+      return nullptr;
+    }
+    if (ExpValue->Number.IsSigned)
+      return nullptr;
+
+    return std::make_unique<ImmVMGen>(ExpValue->Number.Value, S.str());
+  }
 
   unsigned getMinRequiredVL() const override { return Value.getActiveBits(); }
 
@@ -364,51 +399,98 @@ private:
   std::string Context;
 };
 
+template <typename BaseType>
+static Expected<std::unique_ptr<BaseType>> tryConstructFromString(StringRef S) {
+  // None of the derived types matched the string
+  return nullptr;
+}
+
+template <typename BaseType, typename T, typename... U>
+static Expected<std::unique_ptr<BaseType>> tryConstructFromString(StringRef S) {
+  Expected<std::unique_ptr<BaseType>> ObjOrErr = T::tryBuildFromString(S);
+  // Error means there was a match, but some limitation was hit - report it
+  if (!ObjOrErr)
+    return makeFailure(Errc::InvalidConfiguration,
+                       formatv("{0} was matched, but: {1}", T::getErrorName(),
+                               toString(ObjOrErr.takeError())));
+  // Successful match
+  if (*ObjOrErr != nullptr)
+    return ObjOrErr;
+  // No match, try next
+  return tryConstructFromString<BaseType, U...>(S);
+}
+
+template <typename... Types> std::string getAllErrorNames() {
+  std::string Result;
+  // Fold expression over all types
+  ((Result += Types::getErrorName() + ", "), ...);
+  assert(!Result.empty());
+  Result.pop_back(); // remove last comma
+  Result.pop_back(); // remove space
+  return Result;
+}
+
 template <typename T>
-constexpr bool compareTypeIdWithString(std::string_view S) {
-  return std::string_view(T::kID) == S;
-}
-template <typename... U>
-constexpr bool compareIdFromTypesWithString(std::string_view S) {
-  return (compareTypeIdWithString<U>(S) || ...);
-}
+constexpr bool has_error_name_method_v =
+    std::is_invocable_r_v<std::string, decltype(&T::getErrorName)>;
 
-template <typename T> constexpr bool hasDuplicateId() { return false; }
+template <typename BaseT, typename T>
+constexpr bool has_try_build_from_string_v =
+    std::is_invocable_r_v<Expected<std::unique_ptr<BaseT>>,
+                          decltype(&T::tryBuildFromString), StringRef>;
 
-template <typename T, typename X, typename... U>
-constexpr bool hasDuplicateId() {
-  return compareIdFromTypesWithString<X, U...>(T::kID) ||
-         hasDuplicateId<X, U...>();
-}
+// Try to construct object of type BaseType from string S.
+// If none of the derived types can be constructed, return
+// error with string containing 'names' of all derived types.
+//
+// static tryBuildFromString() can return 3 things:
+//  - unique_ptr: a valid pointer - success
+//  - nullptr: no match - should try next generator
+//  - llvm::Error: match did happen, but some limitation was hit
+template <typename BaseType, typename... Types>
+Expected<std::unique_ptr<BaseType>> constructFromString(StringRef S) {
+  static_assert((has_error_name_method_v<Types> && ...),
+                "All types must have static std::string getErrorName()");
 
-template <typename ResultType, typename Default>
-static std::unique_ptr<ResultType> constructByID(const std::string_view &ID) {
-  return std::make_unique<Default>(std::string(ID.begin(), ID.end()));
-}
+  static_assert(
+      (has_try_build_from_string_v<BaseType, Types> && ...),
+      "All types must have static Expected<std::unique_ptr<BaseType>> "
+      "tryBuildFromString(StringRef)");
 
-template <typename ResultType, typename Default, typename T, typename... U>
-static std::unique_ptr<ResultType> constructByID(const std::string_view &ID) {
-  static_assert(!hasDuplicateId<T, U...>());
-  if (T::kID == ID)
-    return std::make_unique<T>();
-  return constructByID<ResultType, Default, U...>(ID);
+  auto ObjOrErr = tryConstructFromString<BaseType, Types...>(S);
+
+  // Some type matched, but some limitation was hit
+  if (!ObjOrErr)
+    return ObjOrErr;
+  // Successful match
+  if (*ObjOrErr != nullptr)
+    return ObjOrErr;
+  return makeFailure(
+      Errc::InvalidArgument,
+      formatv("'{0}' is none of: {1}", S.str(), getAllErrorNames<Types...>()));
 }
 
 template <typename Result> struct GeneratorFactory;
 
 template <> struct GeneratorFactory<VLGeneratorHolder> {
-  using ObjectType = VLGeneratorInterface;
-  static VLGeneratorHolder create(const std::string &ID) {
-    return constructByID<VLGeneratorInterface, ImmVLGen, MaxPossibleVLGen,
-                         MaxVLGenerator, LegalVLGenerator,
-                         LegalVLNonZeroGenerator>(ID);
+  static Expected<VLGeneratorHolder> createOrErr(StringRef ID) {
+    return constructFromString<VLGeneratorInterface, ImmVLGen, MaxPossibleVLGen,
+                               MaxVLGenerator, LegalVLGenerator,
+                               LegalVLNonZeroGenerator>(ID);
+  }
+
+  static VLGeneratorHolder create(StringRef ID) {
+    return cantFail(createOrErr(ID));
   }
 };
 template <> struct GeneratorFactory<VMGeneratorHolder> {
-  using ObjectType = VMGeneratorInterface;
-  static VMGeneratorHolder create(const std::string &ID) {
-    return constructByID<VMGeneratorInterface, ImmVMGen, UnmaskedVMGenerator,
-                         LegalVMGenerator>(ID);
+  static Expected<VMGeneratorHolder> createOrErr(StringRef ID) {
+    return constructFromString<VMGeneratorInterface, ImmVMGen,
+                               UnmaskedVMGenerator, LegalVMGenerator>(ID);
+  }
+
+  static VMGeneratorHolder create(StringRef ID) {
+    return cantFail(createOrErr(ID));
   }
 };
 } // namespace
@@ -432,6 +514,7 @@ static std::string toString(VSEW SEW) {
   case VSEW::SEW64:
     return 'e' + std::to_string(static_cast<unsigned>(SEW));
   }
+  llvm_unreachable("Unknown SEW");
 }
 
 static std::string toString(VLMUL LMUL) {
@@ -849,56 +932,39 @@ template <> struct yaml::MappingTraits<VTypeInfo> {
   }
 };
 
-template <> struct snippy::YAMLHistogramTraits<VLVMSequence::VLVMEntry> {
-  using DenormEntry = VLVMSequence::VLVMEntry;
-  using MapType = VLVMSequence;
+template <typename Policy>
+std::string snippy::GeneratorName<Policy>::validate() const {
+  auto GenOrErr = GeneratorFactory<typename Policy::Holder>::createOrErr(*this);
+  if (!GenOrErr)
+    return toString(GenOrErr.takeError());
+  return {};
+}
 
-  static DenormEntry denormalizeEntry(yaml::IO &Io, StringRef ParseStr,
-                                      double Weight) {
-    return {ParseStr.data(), Weight};
+template <typename Policy>
+struct yaml::ScalarTraits<snippy::GeneratorName<Policy>> {
+  static void output(const snippy::GeneratorName<Policy> &Name, void *Ctx,
+                     raw_ostream &OS) {
+    ScalarTraits<std::string>::output(Name.asStr(), Ctx, OS);
   }
-
-  static void normalizeEntry(yaml::IO &Io, const DenormEntry &E,
-                             SmallVectorImpl<SValue> &RawStrings) {
-    RawStrings.push_back(E.first);
-    RawStrings.push_back(std::to_string(E.second));
+  static StringRef input(StringRef Scalar, void *Ctx,
+                         snippy::GeneratorName<Policy> &Name) {
+    return ScalarTraits<std::string>::input(Scalar, Ctx, Name.asStr());
   }
-
-  static MapType denormalizeMap(yaml::IO &Io, ArrayRef<DenormEntry> VLVMs) {
-    return {VLVMs};
-  }
-
-  static void normalizeMap(yaml::IO &Io, const MapType &Entries,
-                           std::vector<DenormEntry> &VLVMs) {
-    VLVMs = Entries.Values;
-  }
-
-  static std::string validate(ArrayRef<DenormEntry> VLVMs) {
-    return checkWeights(make_second_range(VLVMs), "VL/VM");
-  }
+  static QuotingType mustQuote(StringRef) { return QuotingType::None; }
 };
 
-LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(VLVMSequence);
-LLVM_SNIPPY_YAML_IS_HISTOGRAM_DENORM_ENTRY(VLVMSequence::VLVMEntry)
-
-void yaml::MappingTraits<VLVMSequence>::mapping(yaml::IO &IO,
-                                                VLVMSequence &VLVMs) {
-  EmptyContext Ctx;
-  yaml::yamlize(IO, VLVMs.Values, false, Ctx);
-}
-
-std::string yaml::MappingTraits<VLVMSequence>::validate(yaml::IO &,
-                                                        VLVMSequence &VLVMs) {
-  return YAMLHistogramTraits<VLVMSequence::VLVMEntry>::validate(VLVMs.Values);
-}
+LLVM_SNIPPY_YAML_IS_PROBABLE_ITEMS(
+    snippy::GeneratorName<snippy::VLGeneratorPolicy>)
+LLVM_SNIPPY_YAML_IS_PROBABLE_ITEMS(
+    snippy::GeneratorName<snippy::VMGeneratorPolicy>)
 
 template <> struct yaml::MappingTraits<RVVUnitInfo> {
   static void mapping(yaml::IO &IO, RVVUnitInfo &VUInfo) {
     IO.mapRequired("VXRM", VUInfo.VXRM);
     IO.mapRequired("VTYPE", VUInfo.VTYPE);
 
-    IO.mapOptional("VM", VUInfo.VM);
-    IO.mapOptional("VL", VUInfo.VL);
+    IO.mapOptional(snippy::VMGeneratorPolicy::Label, VUInfo.VM);
+    IO.mapOptional(snippy::VLGeneratorPolicy::Label, VUInfo.VL);
   }
 };
 
@@ -1097,13 +1163,12 @@ void PrimaryWeightsAndMapping::printProbabilities(raw_ostream &OS) const {
 }
 
 RVVConfiguration RVVConfigGenerator::generate(bool MustUseReducedVL) const {
-  assert(!MustUseReducedVL ||
-         PrimaryGenReduced &&
-             "Requested to sample a mode for VSETIVLI but there "
-             "is no generator for it");
-  assert(MustUseReducedVL ||
-         PrimaryGen && "Requested to sample a mode for VSETVLI or VSETVL but "
-                       "there is no generator for them");
+  assert((!MustUseReducedVL || PrimaryGenReduced) &&
+         "Requested to sample a mode for VSETIVLI but there "
+         "is no generator for it");
+  assert((MustUseReducedVL || PrimaryGen) &&
+         "Requested to sample a mode for VSETVLI or VSETVL but "
+         "there is no generator for them");
   // Weights of VSET opcodes can affect the sum of two primary distributions
   // (which we get when sampling with this generator). In the future, to
   // account for this, we can shift marginal VL distribution to smaller values
@@ -1396,8 +1461,8 @@ static RVVConfigurationSpace createDefaultConfigurationSpace() {
   VMA[VMAMode::MU] = 1.0;
   VTA[VTAMode::TU] = 1.0;
   VXRM[VXRMMode::RNU] = 1.0;
-  VLVMSequence VMSeq = {{{UnmaskedVMGenerator::kID, 1.0}}};
-  VLVMSequence VLSeq = {{{MaxPossibleVLGen::kID, 1.0}}};
+  VMSequence VMSeq = {{UnmaskedVMGenerator::kID, 1.0}};
+  VLSequence VLSeq = {{MaxPossibleVLGen::kID, 1.0}};
 
   VTypeInfo VTYPE{SEW, LMUL, VMA, VTA};
   RVVUnitInfo VUInfo{VXRM, VTYPE, VMSeq, VLSeq};
@@ -1408,11 +1473,11 @@ static RVVConfigurationSpace createDefaultConfigurationSpace() {
 }
 
 // MinVL = minimum bit width of all VM generators
-static unsigned getMinRequestedBitWidth(const VLVMSequence &VMSeq) {
-  assert(!VMSeq.Values.empty());
+static unsigned getMinRequestedBitWidth(const VMSequence &VMSeq) {
+  assert(!VMSeq.empty());
   unsigned MinVL = std::numeric_limits<unsigned>::max();
-  for (const auto &[Str, Weight] : VMSeq.Values) {
-    auto VMGen = GeneratorFactory<VMGeneratorHolder>::create(Str);
+  for (const auto &[Name, Weight] : VMSeq) {
+    auto VMGen = GeneratorFactory<VMGeneratorHolder>::create(Name.asStr());
     MinVL = std::min(MinVL, VMGen->getMinRequiredVL());
   }
   return MinVL;
@@ -1477,8 +1542,8 @@ getMinMaxPossibleVLOfGenerator(unsigned ELEN, unsigned VLEN,
 // VM2 must be discarded since there is no VL generator that can do 5 bits
 // VL1 must be discarded since there is no VM generator that can do 1 bit VM
 static VLVMInfo buildVLVMgenerators(unsigned ELEN, unsigned VLEN,
-                                    const VLVMSequence &OriginalVLSeq,
-                                    const VLVMSequence &OriginalVMSeq,
+                                    const VLSequence &OriginalVLSeq,
+                                    const VMSequence &OriginalVMSeq,
                                     const SewLmulDistribution &SewLmulDist,
                                     bool IsOnlyVSETIVLI) {
   VLVMInfo Result;
@@ -1488,8 +1553,8 @@ static VLVMInfo buildVLVMgenerators(unsigned ELEN, unsigned VLEN,
   unsigned MinRequestedBitWidth = getMinRequestedBitWidth(OriginalVMSeq);
 
   unsigned GlobalMaxVL = 0;
-  for (const auto &[Str, Weight] : OriginalVLSeq.Values) {
-    auto VLGen = GeneratorFactory<VLGeneratorHolder>::create(Str);
+  for (const auto &[Name, Weight] : OriginalVLSeq) {
+    auto VLGen = GeneratorFactory<VLGeneratorHolder>::create(Name.asStr());
     auto MinMaxVLOpt =
         getMinMaxPossibleVLOfGenerator(ELEN, VLEN, VLGen, SewLmulDist);
 
@@ -1516,8 +1581,8 @@ static VLVMInfo buildVLVMgenerators(unsigned ELEN, unsigned VLEN,
 
   // We also discard all VM generators for which there is no available VL
   // generator (GlobalMaxVL < BitWidth of this generator).
-  for (const auto &[Str, Weight] : OriginalVMSeq.Values) {
-    auto VMGen = GeneratorFactory<VMGeneratorHolder>::create(Str);
+  for (const auto &[Name, Weight] : OriginalVMSeq) {
+    auto VMGen = GeneratorFactory<VMGeneratorHolder>::create(Name.asStr());
     unsigned MinVMBitWidth = VMGen->getMinRequiredVL();
     if (MinVMBitWidth > GlobalMaxVL)
       Result.DiscardedVMNames.push_back(VMGen->identify());
@@ -1701,9 +1766,9 @@ void RVVConfigurationInfo::print(raw_ostream &OS) const {
   // discarded ones.
   const auto &DiscardedVLNames = GenInfo->SupportInfo.DiscardedVLNames;
   ProbableItems<std::string> VLGensNames;
-  for (const auto &[GenStr, Prob] :
-       GenInfo->SupportInfo.OriginalVUInfo.VL.Values) {
-    auto Name = GeneratorFactory<VLGeneratorHolder>::create(GenStr)->identify();
+  for (const auto &[GenStr, Prob] : GenInfo->SupportInfo.OriginalVUInfo.VL) {
+    auto Name =
+        GeneratorFactory<VLGeneratorHolder>::create(GenStr.asStr())->identify();
     if (find(DiscardedVLNames, Name) == DiscardedVLNames.end())
       VLGensNames.emplace_back(Name, Prob);
   }

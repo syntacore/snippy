@@ -18,4 +18,4 @@ sections:
 histogram:
     - [VADD_VV, 1.0]
 
-# CHECK: VL/VM: at least one weight must be positive!
+# CHECK: VM: at least one weight must be positive!

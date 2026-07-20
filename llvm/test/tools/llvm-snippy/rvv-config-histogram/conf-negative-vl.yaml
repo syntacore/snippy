@@ -35,5 +35,4 @@ histogram:
        - [VADD_VV, 1.0]
        - [VSETIVLI, 1.0]
 
-# CHECK: error: VL can't be negative: -1
-
+# CHECK: error: '-1' is none of: Non-negative integer, 'max_encodable', 'vlmax', 'any_legal', 'any_legal_non_zero'
