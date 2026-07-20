@@ -18,4 +18,4 @@ sections:
 histogram:
     - [VADD_VV, 1.0]
 
-# CHECK: error: incorrect weight specified for max_encodable: got '-1.0' while expecting a non-negative double value
+# CHECK: error: VL: weights must be non-negative!
