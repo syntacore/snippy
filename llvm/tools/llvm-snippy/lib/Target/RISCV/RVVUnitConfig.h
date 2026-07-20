@@ -343,17 +343,36 @@ struct VTypeInfo {
   VTAInfo VTA;
 };
 
-struct VLVMSequence final {
-  using VLVMEntry = std::pair<std::string, double>;
-  std::vector<VLVMEntry> Values;
+struct VLGeneratorPolicy final {
+  using Holder = VLGeneratorHolder;
+  static constexpr const char *Label = "VL";
 };
+struct VMGeneratorPolicy final {
+  using Holder = VMGeneratorHolder;
+  static constexpr const char *Label = "VM";
+};
+
+// Generator id parsed from a `[name, weight]` histogram entry. Policy selects
+// the factory that knows the valid names and the diagnostics label.
+template <typename Policy> struct GeneratorName final : private std::string {
+  using std::string::string;
+
+  std::string &asStr() { return *this; }
+  const std::string &asStr() const { return *this; }
+
+  static constexpr const char *Label = Policy::Label;
+  std::string validate() const;
+};
+
+using VLSequence = ProbableItems<GeneratorName<VLGeneratorPolicy>>;
+using VMSequence = ProbableItems<GeneratorName<VMGeneratorPolicy>>;
 
 struct RVVUnitInfo {
   VXRMInfo VXRM;
   VTypeInfo VTYPE;
 
-  VLVMSequence VM;
-  VLVMSequence VL;
+  VMSequence VM;
+  VLSequence VL;
 };
 
 // Simply providing connection between Idx in storage and {SEW, LMUL, VL}

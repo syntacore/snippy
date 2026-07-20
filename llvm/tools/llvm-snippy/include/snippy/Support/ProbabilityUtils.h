@@ -80,8 +80,10 @@ template <typename T> struct ProbableElement final {
   using elem_type = T;
   using prob_type = double;
 
-  elem_type Element;
-  prob_type Prob;
+  elem_type Element{};
+  prob_type Prob{};
+
+  ProbableElement() = default;
 
   ProbableElement(elem_type Element, prob_type Prob)
       : Element(std::move(Element)), Prob(Prob) {}

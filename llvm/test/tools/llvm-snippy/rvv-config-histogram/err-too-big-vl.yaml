@@ -1,8 +1,8 @@
 # REQUIRES: riscv-rvv
 # COM: This test checks that if VL is too big, this is an error.
 
-# RUN: not llvm-snippy %s \ 
-# RUN: |& FileCheck %s 
+# RUN: not llvm-snippy %s \
+# RUN: |& FileCheck %s
 
 options:
   mtriple: riscv64
@@ -18,7 +18,7 @@ riscv-vector-unit:
     VM:
       - [any_legal, 1.0]
     VL:
-      - [10000000000, 1.0] 
+      - [10000000000, 1.0]
     VXRM:
       rnu: 1.0
     VTYPE:
@@ -31,10 +31,9 @@ riscv-vector-unit:
         mu: 1.0
       VTA:
         tu: 1.0
- 
+
 histogram:
        - [VSETIVLI, 1.0]
        - [VADD_VV, 1.0]
-         
-# CHECK: VL imm_10000000000 is greater than the maximum possible: 32
 
+# CHECK: error: Non-negative integer was matched, but: VLs can't be bigger than 4294967295
