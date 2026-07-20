@@ -10,6 +10,8 @@ set(snippy_sources
   Random.cpp
   HistogramPatterns.cpp
   ProbabilityUtils.cpp
+  YAMLTuple.cpp
+  YAMLProbableItems.cpp
   )
 
 set(snippy_link_libraries
