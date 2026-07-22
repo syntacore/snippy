@@ -152,7 +152,8 @@ Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
   if (!Tgt)
     return makeFailure(Errc::InvalidConfiguration, Twine(Error));
 
-  TargetFeatures += ",";
+  if (!TargetFeatures.empty())
+    TargetFeatures += ",";
   TargetFeatures += TargetInfo.Features;
   const TargetOptions Options;
   auto TM = std::unique_ptr<TargetMachine>(static_cast<TargetMachine *>(
