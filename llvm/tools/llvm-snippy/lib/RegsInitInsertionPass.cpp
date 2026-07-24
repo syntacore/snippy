@@ -110,10 +110,18 @@ bool RegsInitInsertion::runOnMachineFunction(MachineFunction &MF) {
 
   const auto &RegState =
       SGCtx.getProgramContext().getInitialRegisterState(SubTgt);
-  planning::InstructionGenerationContext IGC{
-      *BlockRegsInit, BlockRegsInit->getFirstTerminator(), SGCtx, SimCtx};
+  auto &&Ins = BlockRegsInit->getFirstTerminator();
+  planning::InstructionGenerationContext IGC{*BlockRegsInit, Ins, SGCtx,
+                                             SimCtx};
 
   SnippyTgt.generateRegsInit(IGC, RegState);
+  // Update the prologue size to include all generated instructions.
+  // Depending on the initialization method, the flow might not yet be
+  // reproducible until initialization completes.
+  auto &SM = IGC.getSnippyModule();
+  size_t InitRegsPrologInstrCnt = std::distance(BlockRegsInit->begin(), Ins);
+  SM.getOrAddResult<ObjectMetadata>().EntryPrologueInstrCnt +=
+      InitRegsPrologInstrCnt;
   return true;
 }
 
