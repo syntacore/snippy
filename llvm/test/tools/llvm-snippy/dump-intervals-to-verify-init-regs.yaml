@@ -1,0 +1,37 @@
+# RUN: llvm-snippy %s -model-plugin=None \
+# RUN:    -mattr=-c,+m \
+# RUN:    -o %t.layout.elf \
+# RUN:    -initial-regs-yaml=%S/initialization/Inputs/histogram_rv64gv.yaml \
+# RUN:    -dump-intervals-to-verify=%t.layout.elf.intervals-to-verify.yaml
+# RUN: FileCheck -input-file=%t.layout.elf.intervals-to-verify.yaml %s
+# RUN: llvm-objdump %t.layout.elf -d |& FileCheck %s --check-prefix=DIS
+
+
+# COM: we expect prologue + init regs size.
+# CHECK: intervals-to-verify:
+# CHECK-NEXT: [ 0xF0, 0x138 ]
+
+# COM: check with disasm that div will start at expected PC, and not div was before.
+# DIS-NOT: ec: {{[0-9a-f]+}} div
+# DIS: f0: {{[0-9a-f]+}} div
+
+options:
+  init-regs-in-elf: on
+  honor-target-abi: on
+  mtriple: riscv64
+  num-instrs: 20
+
+sections:
+    - name:      1
+      VMA:       0x000000
+      SIZE:      0x100000
+      LMA:       0x000000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x400200000
+      SIZE:      0x1000
+      LMA:       0x400200000
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
