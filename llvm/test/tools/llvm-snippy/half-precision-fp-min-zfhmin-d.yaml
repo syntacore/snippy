@@ -1,5 +1,5 @@
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+d,+zfhmin \
-# RUN:    -num-instrs=5000 \
+# RUN:    -num-instrs=5000 -model-plugin=None \
 # RUN:    -init-regs-in-elf -verify-mi \
 # RUN:    -verify-gen-histogram -histogram-must-succeed=true
 

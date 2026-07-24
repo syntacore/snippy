@@ -1,7 +1,7 @@
 # COM: This test checks that only source registers (without destination) are
 #      initialized before each conversion instruction.
 
-# RUN: llvm-snippy %s \
+# RUN: llvm-snippy %s -model-plugin=None \
 # RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
 # RUN: |& FileCheck %s
 
