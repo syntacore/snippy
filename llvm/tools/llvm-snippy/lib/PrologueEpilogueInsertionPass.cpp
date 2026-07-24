@@ -399,7 +399,7 @@ bool PrologueEpilogueInsertion::insertPrologue(
   if (!IsEntry)
     return true;
   auto &SM = InstrGenCtx.getSnippyModule();
-  SM.getOrAddResult<ObjectMetadata>().EntryPrologueInstrCnt =
+  SM.getOrAddResult<ObjectMetadata>().EntryPrologueInstrCnt +=
       std::distance(MBB->begin(), Ins);
   if (SGCtx.getConfig().PassCfg.CodeLayout)
     return true;
