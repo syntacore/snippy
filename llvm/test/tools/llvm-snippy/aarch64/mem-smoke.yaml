@@ -1,0 +1,24 @@
+# RUN: llvm-snippy %s -dump-mi -last-instr= -model-plugin=None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: aarch64
+  num-instrs: 100
+  verify-mi: on
+  verify-gen-histogram: on
+
+include:
+  - Inputs/simple_sections.yaml
+
+histogram:
+  - [LDRXui, 1.0]
+  - [STRXui, 1.0]
+  - [LDRWui, 1.0]
+  - [STRWui, 1.0]
+  - [LDRBBui, 1.0]
+  - [STRBBui, 1.0]
+  - [LDRHHui, 1.0]
+  - [STRHHui, 1.0]
+
+# CHECK-DAG: LDRXui
+# CHECK-DAG: STRHHui

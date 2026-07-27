@@ -14,6 +14,7 @@
 #include "snippy/Generator/SMCManager.h"
 #include "snippy/Generator/SimulatorContext.h"
 #include "snippy/Generator/SnippyLoopInfo.h"
+#include "snippy/Generator/SnippyOperandGenerator.h"
 #include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/GeneratorUtils/RegisterPool.h"
 
@@ -2076,6 +2077,12 @@ public:
       ArrayRef<planning::PreselectedOpInfo> Preselected) const override {
     assert(requiresCustomGeneration(InstrDesc));
     llvm_unreachable("Not used at the moment");
+  }
+
+  std::unique_ptr<SnippyOperandGenerator>
+  createOperandGenerator(planning::InstructionGenerationContext &IGC,
+                         const MCInstrDesc &InstrDesc) const override {
+    return nullptr;
   }
 
   void lowerInstruction(InstructionGenerationContext &IGC,
