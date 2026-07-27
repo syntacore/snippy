@@ -1,4 +1,4 @@
-//===-------- OperandGeneratorEmitter.cpp - Generator for Fusion ---------===//
+//===-------- OperandEmitter.cpp - Table-driven operand generator ---------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,22 +7,43 @@
 //===---------------------------------------------------------------------===//
 
 #include "Common/CodeGenTarget.h"
-#include "Common/GlobalISel/GlobalISelMatchTable.h"
-#include "Common/PredicateExpander.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Regex.h"
 #include "llvm/TableGen/Error.h"
 #include "llvm/TableGen/Record.h"
 #include "llvm/TableGen/TableGenBackend.h"
-#include <iterator>
+#include <map>
+#include <set>
+#include <string>
 #include <vector>
 
 namespace llvm {
 namespace snippy {
 namespace {
+
+static std::string sanitizeMethodToEnumName(llvm::StringRef RenderMethod) {
+  llvm::StringRef S = RenderMethod;
+  if (S.starts_with("add"))
+    S = S.drop_front(3);
+  if (S.ends_with("Operands"))
+    S = S.drop_back(8);
+  else if (S.ends_with("Operand"))
+    S = S.drop_back(7);
+  if (S.empty())
+    return "Unknown";
+
+  std::string Result = S.str();
+  static const llvm::Regex R("[<>:, ]");
+  std::string New;
+  while ((New = R.sub("_", Result)) != Result)
+    Result = std::move(New);
+
+  llvm::StringRef Trimmed = Result;
+  Trimmed = Trimmed.ltrim('_').rtrim('_');
+  return Trimmed.empty() ? "Unknown" : Trimmed.str();
+}
 
 class OperandGeneratorEmitter {
   const RecordKeeper &Records;
@@ -35,8 +56,12 @@ public:
     std::string RenderName;
     size_t MINumOperands;
   };
-  typedef std::vector<OperandRenderInfo> OperandInfoTy;
-  typedef std::vector<OperandInfoTy> OperandInfoListTy;
+  using OperandInfoTy = std::vector<OperandRenderInfo>;
+
+  // Maps render method string -> enum value name
+  using RenderKindMap = std::map<std::string, std::string>;
+  // Ordered list of (method string, enum name) pairs (insertion order)
+  using RenderKindList = std::vector<std::pair<std::string, std::string>>;
 
   OperandGeneratorEmitter(const RecordKeeper &R) : Records(R), Target(R) {}
   virtual ~OperandGeneratorEmitter() = default;
@@ -56,40 +81,45 @@ private:
     return false;
   }
 
-  void emitPrologue(raw_ostream &OS);
-  void emitOperandHelpers(raw_ostream &OS);
-  void emitDispatcher(raw_ostream &OS);
-  void emitCaseForInst(raw_ostream &OS, const CodeGenInstruction &Inst);
+  // Collect all unique render methods across target instructions (post-merge).
+  // Also caches per-instruction OperandInfoTy for reuse in later emit steps.
+  void
+  collectRenderKinds(RenderKindMap &MethodToEnum, RenderKindList &OrderedKinds,
+                     std::map<std::string, OperandInfoTy> &InstrRenderCache);
 
-  // platform specific methods
-  // method to provide an ability to merge operands
-  virtual OperandInfoTy
-  processOperands(OperandInfoTy Renders,
-                  const CodeGenInstruction &Inst) const = 0;
+  void emitRenderKindEnum(raw_ostream &OS, StringRef TgtName,
+                          const RenderKindList &OrderedKinds);
 
-  virtual bool needImmConstraint(std::string RenderMethod) const = 0;
+  void emitStructDefs(raw_ostream &OS, StringRef TgtName);
 
-  virtual void emitImmConstraint(raw_ostream &OS) const = 0;
+  void emitPerInstrArrays(raw_ostream &OS, StringRef TgtName,
+                          const RenderKindMap &MethodToEnum,
+                          const std::map<std::string, OperandInfoTy> &Cache);
 
-  virtual bool needRegConstraint(std::string RenderMethod) const = 0;
+  void emitIndexTable(raw_ostream &OS, StringRef TgtName,
+                      const std::map<std::string, OperandInfoTy> &Cache);
 
-  virtual void emitRegConstraint(raw_ostream &OS) const = 0;
+  void emitGenerateOperandsFunc(raw_ostream &OS, StringRef TgtName,
+                                const RenderKindList &OrderedKinds);
+
+  // Target-specific: merge/reorder operands after initial resolution.
+  virtual OperandInfoTy processOperands(OperandInfoTy Renders,
+                                        const CodeGenInstruction &) const {
+    return Renders;
+  }
 };
 
 class AArch64OperandEmitter final : public OperandGeneratorEmitter {
-
-  virtual OperandInfoTy
-  processOperands(OperandInfoTy Renders,
-                  const CodeGenInstruction &Inst) const override {
-
-    for (auto [RenderName, Operand] : llvm::zip_equal(Renders, Inst.Operands)) {
+  OperandInfoTy processOperands(OperandInfoTy Renders,
+                                const CodeGenInstruction &Inst) const override {
+    for (auto [RenderInfo, Operand] : llvm::zip_equal(Renders, Inst.Operands)) {
       if (Operand.Rec->isSubClassOf("ComplexPattern")) {
         // NOTE: This renders will produce 2 MachineOperands, but Instrdesc
         // expect only 1 operand
         if (Operand.Name == "Rm_and_shift")
-          RenderName = {"addShiftedRegOperands", 1};
+          RenderInfo = {"addShiftedRegOperands", 1};
         else if (Operand.Name == "Rm_and_extend")
-          RenderName = {"addExtendedRegOperands", 1};
+          RenderInfo = {"addExtendedRegOperands", 1};
       }
     }
     // rewrite pattern matching
@@ -112,51 +142,15 @@ class AArch64OperandEmitter final : public OperandGeneratorEmitter {
     return Renders;
   }
 
-  virtual bool needImmConstraint(std::string RenderMethod) const override {
-    if (RenderMethod == "addImmOperands")
-      return true;
-
-    return false;
-  }
-
-  virtual void emitImmConstraint(raw_ostream &OS) const override {}
-
-  virtual bool needRegConstraint(std::string RenderMethod) const override {
-    return RenderMethod == "AddRegOperands";
-  }
-
-  virtual void emitRegConstraint(raw_ostream &OS) const override {}
-
 public:
-  AArch64OperandEmitter(const RecordKeeper &R) : OperandGeneratorEmitter(R) {};
+  explicit AArch64OperandEmitter(const RecordKeeper &R)
+      : OperandGeneratorEmitter(R) {}
 };
 
 class RISCVOperandEmitter final : public OperandGeneratorEmitter {
-
-  virtual OperandInfoTy
-  processOperands(OperandInfoTy Renders,
-                  const CodeGenInstruction &Inst) const override {
-    // No operand processing in RISCV now
-    return Renders;
-  }
-
-  virtual bool needImmConstraint(std::string RenderMethod) const override {
-    if (RenderMethod == "addImmOperands") {
-      return true;
-    }
-    return false;
-  }
-
-  virtual void emitImmConstraint(raw_ostream &OS) const override {}
-
-  virtual bool needRegConstraint(std::string RenderMethod) const override {
-    return RenderMethod == "AddRegOperands";
-  }
-
-  virtual void emitRegConstraint(raw_ostream &OS) const override {}
-
 public:
-  RISCVOperandEmitter(const RecordKeeper &R) : OperandGeneratorEmitter(R) {};
+  explicit RISCVOperandEmitter(const RecordKeeper &R)
+      : OperandGeneratorEmitter(R) {}
 };
 
 OperandGeneratorEmitter::OperandInfoTy
@@ -200,9 +194,9 @@ std::string OperandGeneratorEmitter::resolveRenderMethod(
   if (OpR->isSubClassOf("Operand") || OpR->isSubClassOf("RegisterOperand")) {
     if (const auto *DI =
             dyn_cast<DefInit>(OpR->getValueInit("ParserMatchClass"))) {
-      const Record *ParserMatchClass = DI->getDef();
-      OpR = ParserMatchClass;
-      RMName = ParserMatchClass->getValueInit("RenderMethod");
+      const Record *PMC = DI->getDef();
+      OpR = PMC;
+      RMName = PMC->getValueInit("RenderMethod");
     } else if (OpR->isSubClassOf("RegisterOperand")) {
       return "addRegOperands"; // if RegisterOperand has no parserMatchClass it
                                // could be crated as simple Reg
@@ -221,7 +215,7 @@ std::string OperandGeneratorEmitter::resolveRenderMethod(
     RMName = OpR->getValueInit("RenderMethod");
 
   } else {
-    llvm_unreachable("Unexpected operand type in GetOperandInfo");
+    llvm_unreachable("Unexpected operand type in resolveRenderMethod");
   }
 
   // Resolve RenderMethod field.
@@ -232,76 +226,144 @@ std::string OperandGeneratorEmitter::resolveRenderMethod(
   return "add" + std::string(OpR->getValueAsString("Name")) + "Operands";
 }
 
-void OperandGeneratorEmitter::emitCaseForInst(raw_ostream &OS,
-                                              const CodeGenInstruction &Inst) {
-
-  // Resolve operand renderers once.
-  OperandInfoTy Renders = getOperandInfo(Inst);
-  Renders = processOperands(Renders, Inst);
-
-  OS << "  case " << Inst.Namespace << "::" << Inst.TheDef->getName()
-     << ": {\n";
-  unsigned Logical = 0;
-  for (const auto &Render : Renders) {
-    // TODO: support multiple MIOperands in one logical
-    CGIOperandList::OperandInfo Op = Inst.Operands[Logical];
-
-    if (needRegConstraint(Render.RenderName)) {
-      // TODO: Add assertion on Op type
-      emitRegConstraint(OS);
-    }
-
-    if (needImmConstraint(Render.RenderName)) {
-      emitImmConstraint(OS);
-    }
-
-    // Default: call whatever render the table asked for.
-    if (!Render.RenderName.empty()) {
-      OS << Render.RenderName << "(Preselected.slice(" << Logical << ", "
-         << Render.MINumOperands << "));\n";
-    } else {
-      llvm_unreachable(llvm::formatv("No render method for Inst: {0}",
-                                     Inst.TheDef->getName())
-                           .str()
-                           .c_str());
-    }
-    Logical += Render.MINumOperands;
-  }
-  assert(Logical == Inst.Operands.size());
-  OS << "    break;\n";
-  OS << "  }\n";
-}
-
-void OperandGeneratorEmitter::emitDispatcher(raw_ostream &OS) {
-  OS << "/// addOperands - generated dispatcher that renders all operands\n";
-  // FIXME: remove this code after enabling new operand pipeline for all targets
-  OS << "#ifdef __clang__\n";
-  OS << "__attribute__((optnone))\n";
-  OS << "#endif\n";
-  OS << "virtual void "
-        "generateOperands(llvm::ArrayRef<planning::PreselectedOpInfo> "
-        "Preselected) override "
-        "{\n";
-  OS << "  switch (InstrDesc.getOpcode()) {\n";
+void OperandGeneratorEmitter::collectRenderKinds(
+    RenderKindMap &MethodToEnum, RenderKindList &OrderedKinds,
+    std::map<std::string, OperandInfoTy> &InstrRenderCache) {
+  std::set<std::string> UsedEnumNames;
   for (const CodeGenInstruction *I : Target.getInstructions()) {
     if (I->Namespace != Target.getInstNamespace())
       continue;
     if (I->isPseudo)
       continue;
-    emitCaseForInst(OS, *I);
-  }
 
-  OS << "  default: llvm_unreachable(\"Undefined instruction\");\n";
+    OperandInfoTy Renders = getOperandInfo(*I);
+    Renders = processOperands(Renders, *I);
+    InstrRenderCache[I->TheDef->getName().str()] = Renders;
+
+    for (const auto &Render : Renders) {
+      if (MethodToEnum.count(Render.RenderName))
+        continue;
+      std::string EnumName = sanitizeMethodToEnumName(Render.RenderName);
+      std::string FinalName = EnumName;
+      unsigned Suffix = 2;
+      while (UsedEnumNames.count(FinalName))
+        FinalName = EnumName + std::to_string(Suffix++);
+      UsedEnumNames.insert(FinalName);
+      MethodToEnum[Render.RenderName] = FinalName;
+      OrderedKinds.push_back({Render.RenderName, FinalName});
+    }
+  }
+}
+
+void OperandGeneratorEmitter::emitRenderKindEnum(raw_ostream &OS,
+                                                 StringRef TgtName,
+                                                 const RenderKindList &Kinds) {
+  OS << "enum class " << TgtName << "RenderKind : uint8_t {\n";
+  for (const auto &[Method, Name] : Kinds)
+    OS << "  " << Name << ", // " << Method << "\n";
+  OS << "};\n\n";
+}
+
+void OperandGeneratorEmitter::emitStructDefs(raw_ostream &OS,
+                                             StringRef TgtName) {
+  OS << "struct " << TgtName << "OpDesc {\n";
+  OS << "  " << TgtName << "RenderKind Kind;\n";
+  OS << "  uint8_t MINumOps;\n";
+  OS << "};\n\n";
+
+  OS << "struct " << TgtName << "InstrOpEntry {\n";
+  OS << "  const " << TgtName << "OpDesc *Descs;\n";
+  OS << "  uint8_t NumDescs;\n";
+  OS << "  bool IsValid;\n";
+  OS << "};\n\n";
+}
+
+void OperandGeneratorEmitter::emitPerInstrArrays(
+    raw_ostream &OS, StringRef TgtName, const RenderKindMap &MethodToEnum,
+    const std::map<std::string, OperandInfoTy> &Cache) {
+  for (const auto &[InstName, Renders] : Cache) {
+    if (Renders.empty())
+      continue;
+    OS << "static const " << TgtName << "OpDesc " << TgtName << "_" << InstName
+       << "_descs[] = {\n";
+    for (const auto &R : Renders) {
+      OS << "  {" << TgtName << "RenderKind::" << MethodToEnum.at(R.RenderName)
+         << ", " << R.MINumOperands << "},\n";
+    }
+    OS << "};\n";
+  }
+  OS << "\n";
+}
+
+void OperandGeneratorEmitter::emitIndexTable(
+    raw_ostream &OS, StringRef TgtName,
+    const std::map<std::string, OperandInfoTy> &Cache) {
+  const auto &Instrs = Target.getInstructions();
+  const size_t NumInstr = Instrs.size();
+
+  OS << "static const " << TgtName << "InstrOpEntry " << TgtName << "_OpTable["
+     << NumInstr << "] = {\n";
+
+  for (const CodeGenInstruction *I : Instrs) {
+    const bool InTargetNS = (I->Namespace == Target.getInstNamespace());
+    if (!InTargetNS || I->isPseudo) {
+      OS << "  {nullptr, 0, false},\n";
+      continue;
+    }
+    auto It = Cache.find(I->TheDef->getName().str());
+    assert(It != Cache.end() && "Instruction missing from render cache");
+    const OperandInfoTy &Renders = It->second;
+    if (Renders.empty()) {
+      OS << "  {nullptr, 0, true},\n";
+    } else {
+      OS << "  {" << TgtName << "_" << I->TheDef->getName() << "_descs, "
+         << Renders.size() << ", true},\n";
+    }
+  }
+  OS << "};\n\n";
+}
+
+void OperandGeneratorEmitter::emitGenerateOperandsFunc(
+    raw_ostream &OS, StringRef TgtName, const RenderKindList &OrderedKinds) {
+  OS << "inline void " << TgtName << "OpndGenerator::generateOperands(\n";
+  OS << "    llvm::ArrayRef<planning::PreselectedOpInfo> Preselected) {\n";
+  OS << "  const " << TgtName << "InstrOpEntry &Entry =\n";
+  OS << "      " << TgtName << "_OpTable[InstrDesc.getOpcode()];\n";
+  OS << "  assert(Entry.IsValid &&\n";
+  OS << "         \"Pseudo or non-" << TgtName.str()
+     << " instruction in operand generator\");\n";
+  OS << "  unsigned Logical = 0;\n";
+  OS << "  for (unsigned I = 0; I < Entry.NumDescs; ++I) {\n";
+  OS << "    const " << TgtName << "OpDesc &D = Entry.Descs[I];\n";
+  OS << "    auto Slice = Preselected.slice(Logical, D.MINumOps);\n";
+  OS << "    switch (D.Kind) {\n";
+  for (const auto &[Method, EnumName] : OrderedKinds) {
+    OS << "    case " << TgtName << "RenderKind::" << EnumName << ":\n";
+    OS << "      " << Method << "(Slice);\n";
+    OS << "      break;\n";
+  }
+  OS << "    default: llvm_unreachable(\"Unknown RenderKind\");\n";
+  OS << "    }\n";
+  OS << "    Logical += D.MINumOps;\n";
   OS << "  }\n";
-  OS << "}\n\n";
+  OS << "}\n";
 }
 
 void OperandGeneratorEmitter::run(raw_ostream &OS) {
-  // Emit file header.
-  emitSourceFileHeader("Operand Generators", OS);
+  emitSourceFileHeader("Operand Tables", OS);
 
-  const std::string &TargetName = std::string(Target.getName());
-  emitDispatcher(OS);
+  const std::string TgtName = std::string(Target.getName());
+
+  RenderKindMap MethodToEnum;
+  RenderKindList OrderedKinds;
+  std::map<std::string, OperandInfoTy> InstrRenderCache;
+  collectRenderKinds(MethodToEnum, OrderedKinds, InstrRenderCache);
+
+  emitRenderKindEnum(OS, TgtName, OrderedKinds);
+  emitStructDefs(OS, TgtName);
+  emitPerInstrArrays(OS, TgtName, MethodToEnum, InstrRenderCache);
+  emitIndexTable(OS, TgtName, InstrRenderCache);
+  emitGenerateOperandsFunc(OS, TgtName, OrderedKinds);
 }
 } // namespace
 bool emitAArch64Operands(llvm::raw_ostream &OS,

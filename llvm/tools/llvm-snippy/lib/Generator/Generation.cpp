@@ -20,6 +20,7 @@
 #include "snippy/Generator/SimulatorContext.h"
 #include "snippy/Generator/SnippyFunctionMetadata.h"
 #include "snippy/Generator/SnippyLoopInfo.h"
+#include "snippy/Generator/SnippyOperandGenerator.h"
 #include "snippy/Support/Options.h"
 
 #include "llvm/CodeGen/MachineBasicBlock.h"
@@ -876,10 +877,16 @@ pregenerateOperands(InstructionGenerationContext &InstrGenCtx,
       RP.addReserved(SimpleReg, AccessMaskBit::W);
     });
   });
-  auto PregeneratedOperands = pregenerateOperandsImpl(
-      InstrGenCtx, InstrDesc, Preselected, AddressesInfo);
 
-  return PregeneratedOperands;
+  if (auto Gen = Tgt.createOperandGenerator(InstrGenCtx, InstrDesc)) {
+    // TODO: forward AddressesInfo into SnippyOperandGenerator
+    Gen->generateOperands(Preselected);
+    const auto &Generated = Gen->getGeneratedOperands();
+    return SmallVector<MachineOperand, 8>(Generated.begin(), Generated.end());
+  }
+
+  return pregenerateOperandsImpl(InstrGenCtx, InstrDesc, Preselected,
+                                 AddressesInfo);
 }
 
 static auto stringifyRequestStatus(GenerationStatus Status) {

@@ -1,0 +1,30 @@
+# RUN: llvm-snippy %s -dump-mi -last-instr= -model-plugin=None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: aarch64
+  num-instrs: 200
+  verify-mi: on
+  verify-gen-histogram: on
+
+include:
+  - Inputs/simple_sections.yaml
+
+histogram:
+  # GPR pair loads/stores
+  - [LDPXi, 1.0]
+  - [STPXi, 1.0]
+  - [LDPWi, 1.0]
+  - [STPWi, 1.0]
+  - [LDPSWi, 1.0]
+  # Non-temporal pair
+  - [LDNPXi, 1.0]
+  - [STNPXi, 1.0]
+  # FPR pair loads/stores
+  - [LDPDi, 1.0]
+  - [STPDi, 1.0]
+  - [LDPSi, 1.0]
+  - [STPSi, 1.0]
+
+# CHECK-DAG: LDPXi
+# CHECK-DAG: STPSi

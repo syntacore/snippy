@@ -1,0 +1,32 @@
+# RUN: llvm-snippy %s -dump-mi -last-instr= -model-plugin=None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: aarch64
+  num-instrs: 200
+  verify-mi: on
+  verify-gen-histogram: on
+
+include:
+  - Inputs/simple_sections.yaml
+
+histogram:
+  # GPR unscaled loads
+  - [LDURXi, 1.0]
+  - [LDURWi, 1.0]
+  - [LDURSWi, 1.0]
+  - [LDURHHi, 1.0]
+  - [LDURBBi, 1.0]
+  # GPR unscaled stores
+  - [STURXi, 1.0]
+  - [STURWi, 1.0]
+  - [STURHHi, 1.0]
+  - [STURBBi, 1.0]
+  # FPR unscaled loads/stores
+  - [LDURDi, 1.0]
+  - [LDURSi, 1.0]
+  - [STURDi, 1.0]
+  - [STURSi, 1.0]
+
+# CHECK-DAG: LDURXi
+# CHECK-DAG: STURSi

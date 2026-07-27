@@ -1,0 +1,32 @@
+# RUN: llvm-snippy %s -dump-mi -last-instr= -model-plugin=None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: aarch64
+  num-instrs: 100
+  verify-mi: on
+  verify-gen-histogram: on
+
+include:
+  - Inputs/simple_sections.yaml
+
+histogram:
+  - [LDRBui, 1.0]
+  - [STRBui, 1.0]
+  - [LDRHui, 1.0]
+  - [STRHui, 1.0]
+  - [LDRSui, 1.0]
+  - [STRSui, 1.0]
+  - [LDRDui, 1.0]
+  - [STRDui, 1.0]
+
+# CHECK: Generated MI_
+# CHECK-DAG: LDRBui
+# CHECK-DAG: STRBui
+# CHECK-DAG: LDRHui
+# CHECK-DAG: STRHui
+# CHECK-DAG: LDRSui
+# CHECK-DAG: STRSui
+# CHECK-DAG: LDRDui
+# CHECK-DAG: STRDui
+# CHECK: post-instr-symbol <mcsymbol __snippy_exit>
