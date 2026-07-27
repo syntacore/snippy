@@ -56,6 +56,7 @@ class DynamicLibrary;
 } // namespace sys
 
 namespace snippy {
+class SnippyOperandGenerator;
 namespace planning {
 class PreselectedOpInfo;
 } // namespace planning
@@ -345,6 +346,13 @@ public:
       ArrayRef<planning::PreselectedOpInfo> Preselected) const = 0;
 
   virtual bool requiresCustomGeneration(const MCInstrDesc &InstrDesc) const = 0;
+
+  // If non-null is returned, the generator is used by pregenerateOperands
+  // instead of the default pregenerateOperandsImpl.
+  // Return nullptr to use the previous generation path.
+  virtual std::unique_ptr<SnippyOperandGenerator>
+  createOperandGenerator(planning::InstructionGenerationContext &IGC,
+                         const MCInstrDesc &InstrDesc) const = 0;
 
   // Pack of functions that should be used to lower snippy-internal opcodes to
   // real opcodes.

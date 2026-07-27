@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "AArch64Generated.h"
 #include "MCTargetDesc/AArch64AddressingModes.h"
 #include "MCTargetDesc/AArch64MCTargetDesc.h"
 #include "Utils/AArch64BaseInfo.h"
@@ -572,6 +573,13 @@ public:
   }
 
   void addImmOperands(llvm::ArrayRef<planning::PreselectedOpInfo> Preselected) {
+    if (snippy::isUnscaledMem(InstrDesc.getOpcode())) {
+      // Signed 9-bit unscaled offset [-256, 255]; breakDownAddr adjusts the
+      // base register so that (base + offset) equals the sampled address.
+      int64_t Offset = RandEngine::genInRangeInclusive<int64_t>(-256, 255);
+      Operands.push_back(MachineOperand::CreateImm(Offset));
+      return;
+    }
     Operands.push_back(MachineOperand::CreateImm(
         getImmediate<0, std::numeric_limits<int>::max()>(Preselected[0])));
   }
@@ -606,12 +614,17 @@ public:
 
   void
   addAdrLabelOperands(llvm::ArrayRef<planning::PreselectedOpInfo> Preselected) {
+    SNIPPY_UNIMPLEMENTED();
   }
 
   template <int Scale>
   void addUImm12OffsetOperands(
       llvm::ArrayRef<planning::PreselectedOpInfo> Preselected) {
-    SNIPPY_UNIMPLEMENTED();
+    // Unsigned 12-bit scaled index [0, 4095]; byte offset = Scale * index.
+    // breakDownAddr sets base = Addr - Scale * index
+    // so (base + Scale*index) = Addr.
+    unsigned Index = RandEngine::genInRangeInclusive<unsigned>(0, 4095u);
+    Operands.push_back(MachineOperand::CreateImm(Index));
   }
 
   void
@@ -622,7 +635,11 @@ public:
   template <int Scale>
   void addImmScaledOperands(
       llvm::ArrayRef<planning::PreselectedOpInfo> Preselected) {
-    SNIPPY_UNIMPLEMENTED();
+    // Signed 7-bit scaled index [-64, 63]; byte offset = Scale * index.
+    // breakDownAddr sets base = Addr - Scale * index
+    // so (base + Scale*index) = Addr.
+    int64_t Index = RandEngine::genInRangeInclusive<int64_t>(-64, 63);
+    Operands.push_back(MachineOperand::CreateImm(Index));
   }
 
   template <int Scale>
@@ -812,8 +829,12 @@ public:
     // TODO: fix it
     SNIPPY_UNIMPLEMENTED();
   }
-#include "AArch64Operands.inc"
+
+  virtual void generateOperands(
+      llvm::ArrayRef<planning::PreselectedOpInfo> Preselected) override;
 };
+
+#include "AArch64Operands.inc"
 
 } // namespace snippy
 } // namespace llvm
