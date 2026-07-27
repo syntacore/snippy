@@ -22,12 +22,10 @@
 #include "TargetGenContext.h"
 #include "Utils/AArch64BaseInfo.h"
 #include "snippy/Generator/GenerationUtils.h"
-#include "snippy/Simulator/RISCVRegTypes.h"
 #include "snippy/Simulator/Targets/AArch64.h"
 #include "snippy/Support/DiagnosticInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator_range.h"
-#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineOperand.h"
@@ -46,6 +44,126 @@
   snippy::fatal(llvm::Twine("AArch64 experimental: ") + __PRETTY_FUNCTION__ +  \
                 " at " + __FILE__ + ":" + llvm::Twine(__LINE__))
 
+struct AArch64MemInfo {
+  unsigned AccessSize; // total bytes accessed
+  unsigned Alignment;  // required base-address alignment
+  unsigned BaseOpIdx;  // operand index of the base register (Rn)
+};
+
+static std::optional<AArch64MemInfo> getAArch64MemInfo(unsigned Opcode) {
+  if (Opcode == AArch64::PRFMui || Opcode == AArch64::PRFUMi)
+    return std::nullopt;
+  TypeSize Scale = TypeSize::getFixed(0);
+  TypeSize Width = TypeSize::getFixed(0);
+  int64_t MinOff, MaxOff;
+  if (!AArch64InstrInfo::getMemOpInfo(Opcode, Scale, Width, MinOff, MaxOff))
+    return std::nullopt;
+  if (Scale.isScalable() || Width.isScalable())
+    return std::nullopt;
+
+  unsigned ScaleVal = Scale.getKnownMinValue();
+  unsigned WidthVal = Width.getKnownMinValue();
+  if (ScaleVal == 0 || WidthVal == 0)
+    return std::nullopt;
+
+  // UI-form: unsigned 12-bit scaled offset (MinOff=0, MaxOff=4095).
+  // LDUR-form: signed 9-bit unscaled offset (Scale=1, MinOff=-256, MaxOff=255).
+  //   Both have base register at operand index 1.
+  // Pair-form: signed 7-bit scaled offset (MinOff=-64, MaxOff=63).
+  //   Base register is at operand index 2.
+  // Pre/post-indexed have the same offset ranges as LDUR/pair but emit 4
+  // operands with an early-clobber writeback; they are excluded via
+  // isPairMem/isUnscaledMem which list only the non-update variants.
+  unsigned BaseOpIdx;
+  if (snippy::isPairMem(Opcode))
+    BaseOpIdx = 2;
+  else if (MinOff == 0 && MaxOff == 4095) // UI-form
+    BaseOpIdx = 1;
+  else if (snippy::isUnscaledMem(Opcode)) // LDUR/STUR
+    BaseOpIdx = 1;
+  else
+    return std::nullopt; // pre/post-indexed or SVE, not yet supported
+
+  unsigned Alignment = std::min(ScaleVal, 8u);
+  return AArch64MemInfo{WidthVal, Alignment, BaseOpIdx};
+}
+
+/// Expand a MOVi32imm or MOVi64imm pseudo instruction to one or more
+/// real move-immediate instructions to synthesize the immediate.
+static bool expandMOVImm(APInt Value, MCRegister DstReg,
+                         SmallVectorImpl<MCInst> &Insts) {
+  uint64_t Imm = Value.getZExtValue();
+  uint64_t BitSize = Value.getBitWidth();
+
+  if (DstReg == AArch64::XZR || DstReg == AArch64::WZR) {
+    llvm_unreachable("Destination register could not be zero");
+  }
+
+  SmallVector<AArch64_IMM::ImmInsnModel, 4> Insn;
+  AArch64_IMM::expandMOVImm(Imm, BitSize, Insn);
+  assert(Insn.size() != 0);
+
+  for (auto I = Insn.begin(), E = Insn.end(); I != E; ++I) {
+    bool LastItem = std::next(I) == E;
+    switch (I->Opcode) {
+    default:
+      llvm_unreachable("unhandled!");
+      break;
+
+    case AArch64::ORRWri:
+    case AArch64::ORRXri:
+      if (I->Op1 == 0) {
+        Insts.push_back(MCInstBuilder(I->Opcode)
+                            .addReg(DstReg)
+                            .addReg(BitSize == 32 ? AArch64::WZR : AArch64::XZR)
+                            .addImm(I->Op2));
+      } else {
+        Insts.push_back(
+            MCInstBuilder(I->Opcode).addReg(DstReg).addReg(DstReg).addImm(
+                I->Op2));
+      }
+      break;
+    case AArch64::ORRWrs:
+    case AArch64::ORRXrs: {
+      Insts.push_back(MCInstBuilder(I->Opcode)
+                          .addReg(DstReg)
+                          .addReg(DstReg)
+                          .addReg(DstReg)
+                          .addImm(I->Op2));
+    } break;
+    case AArch64::ANDXri:
+    case AArch64::EORXri:
+      if (I->Op1 == 0) {
+        Insts.push_back(MCInstBuilder(I->Opcode)
+                            .addReg(DstReg)
+                            .addReg(BitSize == 32 ? AArch64::WZR : AArch64::XZR)
+                            .addImm(I->Op2));
+      } else {
+        Insts.push_back(
+            MCInstBuilder(I->Opcode).addReg(DstReg).addReg(DstReg).addImm(
+                I->Op2));
+      }
+      break;
+    case AArch64::MOVNWi:
+    case AArch64::MOVNXi:
+    case AArch64::MOVZWi:
+    case AArch64::MOVZXi: {
+      Insts.push_back(
+          MCInstBuilder(I->Opcode).addReg(DstReg).addImm(I->Op1).addImm(
+              I->Op2));
+    } break;
+    case AArch64::MOVKWi:
+    case AArch64::MOVKXi: {
+      Insts.push_back(MCInstBuilder(I->Opcode)
+                          .addReg(DstReg)
+                          .addReg(DstReg)
+                          .addImm(I->Op1)
+                          .addImm(I->Op2));
+    } break;
+    }
+  }
+  return true;
+}
 namespace llvm {
 namespace snippy {
 namespace {
@@ -58,13 +176,21 @@ public:
                              MCRegister DestReg,
                              SmallVectorImpl<MCInst> &Insts) const override {
     assert(Value.getBitWidth() <= 64);
-    // TODO: check is it possible to use pseudo here (potential issues with
-    // selfcheck)
-    auto Inst =
-        (Value.getBitWidth() <= 32) ? AArch64::MOVi32imm : AArch64::MOVi64imm;
-    auto InstBuilder = MCInstBuilder(Inst).addReg(DestReg);
-    InstBuilder.addImm(Value.getZExtValue());
-    Insts.push_back(InstBuilder);
+    if (DestReg == AArch64::SP) {
+      auto &RI = IGC.ProgCtx.getLLVMState().getRegInfo();
+      auto &GPR64 = RI.getRegClass(AArch64::GPR64RegClassID);
+      auto &MBB = IGC.MBB;
+      MCRegister Tmp =
+          getNonZeroReg("scratch for SP", RI, GPR64, IGC.getRegPool(), MBB);
+      expandMOVImm(Value, Tmp, Insts);
+      Insts.push_back(MCInstBuilder(AArch64::ADDXri)
+                          .addReg(AArch64::SP)
+                          .addReg(Tmp)
+                          .addImm(0)
+                          .addImm(0));
+      return;
+    }
+    expandMOVImm(Value, DestReg, Insts);
   }
 
   [[noreturn]] void reportUnimplementedError() const {
@@ -167,44 +293,21 @@ public:
   }
 
   bool requiresCustomGeneration(const MCInstrDesc &InstrDesc) const override {
-    LLVMContext Ctx;
-    return true;
+    return false;
   }
 
   void generateCustomInst(
       const MCInstrDesc &InstrDesc,
       planning::InstructionGenerationContext &InstrGenCtx,
       ArrayRef<planning::PreselectedOpInfo> Preselected) const override {
+    llvm_unreachable("AArch64 uses createOperandGenerator; generateCustomInst "
+                     "should never be called");
+  }
 
-    auto &MBB = InstrGenCtx.MBB;
-    auto &ProgCtx = InstrGenCtx.ProgCtx;
-    auto &State = ProgCtx.getLLVMState();
-    const auto &SnippyTgt = State.getSnippyTarget();
-
-    auto MIB =
-        getInstBuilder(nullptr, SnippyTgt, MBB, InstrGenCtx.Ins,
-                       MBB.getParent()->getFunction().getContext(), InstrDesc);
-    // NOTE: moved from randomInstruction generator
-    auto NumDefs = InstrDesc.getNumDefs();
-    auto TotalNum = InstrDesc.getNumOperands();
-    std::vector<planning::PreselectedOpInfo> PreselectedOperands;
-    PreselectedOperands.resize(TotalNum);
-    assert(PreselectedOperands.size() == TotalNum);
-    PreselectedOperands.insert(PreselectedOperands.end(), Preselected.begin(),
-                               Preselected.end());
-    for (auto &&[OpIdx, OpInfo] : enumerate(PreselectedOperands)) {
-      OpInfo.setFlags(OpInfo.getFlags() |
-                      (OpIdx < NumDefs ? RegState::Define : 0));
-      auto TiedTo = InstrDesc.getOperandConstraint(OpIdx, MCOI::TIED_TO);
-      if (TiedTo >= 0)
-        OpInfo.setTiedTo(TiedTo);
-    }
-    AArch64OpndGenerator Gen(InstrGenCtx, InstrDesc);
-    Gen.generateOperands(PreselectedOperands);
-    auto Operands = Gen.getGeneratedOperands();
-
-    for (auto &Op : Operands)
-      MIB.add(Op);
+  std::unique_ptr<SnippyOperandGenerator>
+  createOperandGenerator(planning::InstructionGenerationContext &IGC,
+                         const MCInstrDesc &InstrDesc) const override {
+    return std::make_unique<AArch64OpndGenerator>(IGC, InstrDesc);
   }
 
   bool needsLowering(const MCInstrDesc &InstrDesc) const override {
@@ -280,6 +383,8 @@ public:
 
   std::vector<MCRegister>
   getRegsSuitableForRA(std::optional<unsigned> CallOpcode) const override {
+    if (CallOpcode)
+      return {AArch64::LR};
     std::vector<MCRegister> Result;
     copy(AArch64::GPR64commonRegClass, std::back_inserter(Result));
     return Result;
@@ -396,9 +501,9 @@ public:
       } else if (StoreSize == 32) {
         StoreOp = AArch64::STRWui;
       } else if (StoreSize == 16) {
-        StoreOp = AArch64::STRHui;
+        StoreOp = AArch64::STRHHui;
       } else if (StoreSize == 8) {
-        StoreOp = AArch64::STRBui;
+        StoreOp = AArch64::STRBBui;
       } else {
         snippy::fatal(
             formatv("Unsupported store size for GPR: {0} bits", StoreSize));
@@ -554,6 +659,10 @@ public:
       return 32;
     }
 
+    if (AArch64::FPR8RegClass.contains(Reg))
+      return 8;
+    if (AArch64::FPR16RegClass.contains(Reg))
+      return 16;
     if (AArch64::FPR32RegClass.contains(Reg))
       return 32;
     if (AArch64::FPR64RegClass.contains(Reg))
@@ -674,7 +783,14 @@ public:
       const CommonPolicyConfig &Cfg,
       ArrayRef<MachineOperand> PregeneratedOperands,
       MemAddr Addr) const override {
-    SNIPPY_UNIMPLEMENTED();
+    // AArch64 uses createOperandGenerator, so the offset is already produced
+    // by add...Operands
+    // This path is only reached for burst mode; return a fixed 0 offset.
+    assert(getAArch64MemInfo(InstrDesc.getOpcode()));
+    if (StridedImm.isInitialized() &&
+        StridedImm.getMin() == StridedImm.getMax())
+      return MachineOperand::CreateImm(StridedImm.getMin());
+    return MachineOperand::CreateImm(0);
   }
 
   MachineOperand
@@ -822,11 +938,11 @@ public:
   }
 
   bool isAtomicMemInstr(const MCInstrDesc &InstrDesc) const override {
-    SNIPPY_UNIMPLEMENTED();
+    return false;
   }
 
   bool isVectorInstr(const MCInstrDesc &InstrDesc) const override {
-    SNIPPY_UNIMPLEMENTED();
+    return false;
   }
 
   Error
@@ -906,11 +1022,7 @@ public:
   }
 
   unsigned countAddrsToGenerate(unsigned Opcode) const override {
-    // TODO: Add memory instr generation
-    // if (isSupportedLoadStore(Opcode) || isAtomicAMO(Opcode) ||
-    //   isLrInstr(Opcode) || isScInstr(Opcode))
-    // return 1;
-    return 0;
+    return getAArch64MemInfo(Opcode).has_value() ? 1 : 0;
   }
 
   std::pair<AddressParts, MemAddresses>
@@ -919,7 +1031,31 @@ public:
                 MutableArrayRef<planning::PreselectedOpInfo> Preselected,
                 unsigned AddrIdx,
                 std::optional<MemAddr> MainPart = std::nullopt) const override {
-    SNIPPY_UNIMPLEMENTED();
+    auto MemInfo = getAArch64MemInfo(InstrDesc.getOpcode());
+    assert(MemInfo && "breakDownAddr called for non-memory instruction");
+    assert(AddrIdx == 0);
+    unsigned BaseIdx = MemInfo->BaseOpIdx;
+    assert(Preselected[BaseIdx].isReg());
+
+    // The operand generator already chose a raw immediate index (see
+    // addUImm12OffsetOperands / addImmScaledOperands / addImmOperands).
+    // Compute base = Addr - Scale * index so the instruction accesses Addr.
+    TypeSize Scale = TypeSize::getFixed(0);
+    TypeSize Width = TypeSize::getFixed(0);
+    int64_t MinOff, MaxOff;
+    AArch64InstrInfo::getMemOpInfo(InstrDesc.getOpcode(), Scale, Width, MinOff,
+                                   MaxOff);
+    int64_t ScaleVal = static_cast<int64_t>(Scale.getKnownMinValue());
+
+    int64_t RawImm = 0;
+    unsigned OffsetIdx = BaseIdx + 1;
+    if (OffsetIdx < Preselected.size() && Preselected[OffsetIdx].isImm())
+      RawImm = Preselected[OffsetIdx].getImm().getMin();
+
+    uint64_t BaseVal =
+        AddrInfo.Address - static_cast<uint64_t>(ScaleVal * RawImm);
+    auto Part = AddressPart{Preselected[BaseIdx].getReg(), APInt(64, BaseVal)};
+    return {{std::move(Part)}, {AddrInfo.Address}};
   }
 
   unsigned getWriteValueSequenceLength(InstructionGenerationContext &IGC,
@@ -1120,14 +1256,18 @@ public:
   void preselectAccessSizeOperand(
       InstructionGenerationContext &IGC, const MCInstrDesc &InstrDesc,
       MutableArrayRef<planning::PreselectedOpInfo> Preselected) const override {
-    SNIPPY_UNIMPLEMENTED();
+    // AArch64 memory instructions have no access-size operand to preselect.
   }
 
   AddressGenInfo selectAddrGenInfoForInstr(
       const SnippyProgramContext &ProgCtx, unsigned Opcode,
       const MachineBasicBlock &MBB,
       ArrayRef<planning::PreselectedOpInfo> Preselected = {}) const override {
-    SNIPPY_UNIMPLEMENTED();
+    auto MemInfo = getAArch64MemInfo(Opcode);
+    assert(MemInfo);
+    return AddressGenInfo::singleAccess(MemInfo->AccessSize, MemInfo->Alignment,
+                                        /*AllowMisalign=*/false,
+                                        /*Burst=*/false);
   }
 
   void excludeFromMemRegsForInstr(
@@ -1135,7 +1275,7 @@ public:
       SmallVectorImpl<Register> &Regs,
       std::optional<MemAddr> Addr = std::nullopt,
       const CommonPolicyConfig *Cfg = nullptr) const override {
-    SNIPPY_UNIMPLEMENTED();
+    // No special register exclusions for AArch64 memory instructions.
   }
 
   std::vector<Register> excludeRegsForOperand(InstructionGenerationContext &IGC,
@@ -1157,13 +1297,13 @@ public:
   }
 
   const TargetRegisterClass &getAddrRegClass() const override {
-    SNIPPY_UNIMPLEMENTED();
+    return AArch64::GPR64spRegClass;
   }
 
   unsigned getAddrRegLen(const TargetMachine &TM) const override { return 64u; }
 
   bool canUseInBurstMode(const MCInstrDesc &InstrDesc) const override {
-    SNIPPY_UNIMPLEMENTED();
+    return false;
   }
 
   bool canInitializeOperand(const MCInstrDesc &InstrDesc, unsigned OpIndex,
@@ -1171,20 +1311,32 @@ public:
     assert(InstrDesc.getNumOperands() > OpIndex &&
            "This must be the index of the operand");
     auto Operand = InstrDesc.operands()[OpIndex];
-    // TODO: add more constraints in future
     if (Operand.OperandType != MCOI::OperandType::OPERAND_REGISTER)
+      return false;
+    auto MemInfo = getAArch64MemInfo(InstrDesc.getOpcode());
+    if (MemInfo && OpIndex == MemInfo->BaseOpIdx)
       return false;
     return true;
   }
 
   StridedImmediate getImmOffsetRangeForMemAccessInst(
       const MCInstrDesc &InstrDesc) const override {
-    SNIPPY_UNIMPLEMENTED();
+    auto MemInfo = getAArch64MemInfo(InstrDesc.getOpcode());
+    if (!MemInfo)
+      return StridedImmediate(0);
+    TypeSize Scale = TypeSize::getFixed(0);
+    TypeSize Width = TypeSize::getFixed(0);
+    int64_t MinOff, MaxOff;
+    if (!AArch64InstrInfo::getMemOpInfo(InstrDesc.getOpcode(), Scale, Width,
+                                        MinOff, MaxOff))
+      return StridedImmediate(0);
+    int64_t ScaleVal = Scale.getKnownMinValue();
+    return StridedImmediate(MinOff / ScaleVal, MaxOff / ScaleVal, 1);
   }
 
   unsigned getImmOffsetAlignmentForMemAccessInst(
       const MCInstrDesc &InstrDesc) const override {
-    SNIPPY_UNIMPLEMENTED();
+    return 1;
   }
 
   unsigned getInternalOpcode(unsigned Opc) const override { return Opc; }
@@ -1295,7 +1447,7 @@ public:
 
   bool shouldPreselectOperandInBurstMode(const MCInstrDesc &InstrDesc,
                                          unsigned OpIdx) const override {
-    SNIPPY_UNIMPLEMENTED();
+    return false;
   }
 }; // class SnippyAArch64Target
 

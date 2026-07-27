@@ -8,6 +8,7 @@
 
 #include "snippy/Target/Target.h"
 #include "snippy/Generator/Policy.h"
+#include "snippy/Generator/SnippyOperandGenerator.h"
 
 #include "snippy/Config/Selfcheck.h"
 #include "snippy/Simulator/Targets/X86.h"
@@ -153,6 +154,12 @@ public:
       const MCInstrDesc &InstrDesc,
       planning::InstructionGenerationContext &InstrGenCtx,
       ArrayRef<planning::PreselectedOpInfo> Preselected) const override {
+    reportUnimplementedError();
+  }
+
+  std::unique_ptr<SnippyOperandGenerator>
+  createOperandGenerator(planning::InstructionGenerationContext &IGC,
+                         const MCInstrDesc &InstrDesc) const override {
     reportUnimplementedError();
   }
 
