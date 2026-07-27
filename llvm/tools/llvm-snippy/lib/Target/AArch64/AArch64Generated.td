@@ -33,3 +33,25 @@ def IsSPRelativeOp
 def IsSPRelativeFn
     : SnippyFunctionPositivePredicate<"isSPRelative",
                                       IsSPRelativeOp.ValidOpcodes>;
+
+// Unscaled-immediate (LDUR/STUR family, signed 9-bit offset, not pre/post).
+def IsUnscaledMemOp
+    : CheckOpcode<[LDURXi, LDURWi, LDURSWi,
+                   LDURHHi, LDURSHXi, LDURSHWi,
+                   LDURBBi, LDURSBXi, LDURSBWi,
+                   LDURDi, LDURSi, LDURHi, LDURBi, LDURQi,
+                   STURXi, STURWi, STURHHi, STURBBi,
+                   STURDi, STURSi, STURHi, STURBi, STURQi]>;
+def IsUnscaledMemFn
+    : SnippyFunctionPositivePredicate<"isUnscaledMem",
+                                      IsUnscaledMemOp.ValidOpcodes>;
+
+// Pair load/store (LDP/STP, signed 7-bit scaled offset, not pre/post).
+def IsPairMemOp
+    : CheckOpcode<[LDPXi, LDPWi, LDPSWi, LDNPXi, LDNPWi,
+                   LDPDi, LDPSi, LDPQi, LDNPDi, LDNPSi, LDNPQi,
+                   STPXi, STPWi, STNPXi, STNPWi,
+                   STPDi, STPSi, STPQi, STNPDi, STNPSi, STNPQi]>;
+def IsPairMemFn
+    : SnippyFunctionPositivePredicate<"isPairMem",
+                                      IsPairMemOp.ValidOpcodes>;
