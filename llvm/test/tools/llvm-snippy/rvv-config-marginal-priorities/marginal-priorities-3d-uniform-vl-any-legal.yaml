@@ -1,0 +1,47 @@
+# COM: This test checks how weighs are distributed with marginal-priorities:3d_uniform
+# COM: when given VL:any_legal
+#
+# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t.yaml
+# RUN: FileCheck %s < %t.yaml
+
+include:
+  - ../rvv-config-histogram/Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100
+
+riscv-vector-unit:
+  mode-distribution:
+    marginal-priorities:
+      - [3d_uniform, 1.0]
+    VM:
+      - [all_ones, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+      LMUL:
+        m1: 1.0
+        m2: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+    - [VADD_VV, 0.1]
+    - [VSETVL, 1.0]
+
+# COM: {e8, m1}  - VLMAX=16
+# COM: {e8, m2}  - VLMAX=32
+
+# COM: {e8, m2} has 33 possible VL variants, while {e8, m1} has only 17.
+# COM: We have marginal-priorities:3d_uniform, so the weights will be scaled accordingly.
+
+#CHECK-DAG: P: 0.34 Conf: { e8, m1, tu, mu, vxrm: rnu }
+#CHECK-DAG: P: 0.66 Conf: { e8, m2, tu, mu, vxrm: rnu }

@@ -1,0 +1,51 @@
+# COM: This test checks how weighs are distributed with marginal-priorities:vl
+#
+# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t.yaml
+# RUN: FileCheck %s < %t.yaml
+
+include:
+  - ../rvv-config-histogram/Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100
+
+riscv-vector-unit:
+  mode-distribution:
+    marginal-priorities:
+      - [vl, 1.0]
+    VM:
+      - [all_ones, 1.0]
+    VL:
+      - [2, 1.0]
+      - [12, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_64: 1.0
+        sew_8: 1.0
+      LMUL:
+        m1: 1.0
+        m8: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+    - [VADD_VV, 0.1]
+    - [VSETVL, 1.0]
+
+# COM: {e64, m1} - VLMAX=2
+# COM: {e64, m8} - VLMAX=16
+# COM: {e8, m1}  - VLMAX=16
+# COM: {e8, m8}  - VLMAX=128
+# COM: All 4 modes support VL=2, but only 3 support VL=12.
+
+# COM: We have marginal-priorities:vl, so the total probability
+# COM: of VL=2 is 0.5. Hence, we expect probability 0.5/4 = 0.125
+# COM: to be assigned to the mode that supports only VL=2.
+
+#CHECK: P: 0.125 Conf: { e64, m1, tu, mu, vxrm: rnu }
