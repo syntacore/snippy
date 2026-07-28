@@ -15,8 +15,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include <map>
-
 namespace llvm {
 namespace snippy {
 
@@ -31,15 +29,17 @@ struct OpcodeGeneratorInterface {
 using OpcGenHolder = std::unique_ptr<OpcodeGeneratorInterface>;
 
 class DefaultOpcodeGenerator final : public OpcodeGeneratorInterface {
-  using OpcodeProbsType = OpcodeProbVisitor::OpcodeProbsType;
-
-  OpcodeHistogram OpcodeHist;
-  OpcodeProbsType OpcodeProbs;
+  // We store a reference here to avoid memory overhead when many identical
+  // histograms are created: duplicates are simply reused from a global storage.
+  std::reference_wrapper<const OpcodeHistogram> OpcodeHist;
 
 public:
-  DefaultOpcodeGenerator(const OpcodeHistogram &OpcHist)
-      : OpcodeHist(OpcHist), OpcodeProbs(OpcodeHist.opcodeProbabilities()) {
-    if (OpcodeHist.size() == 0)
+  // \warning The referenced OpcodeHistogram must remain valid for the entire
+  // lifetime of this opcode generator. To avoid lifetime issues, use the
+  // factory methods SnippyProgramContext::createDefaultOpcodeGenerator or
+  // DefaultPolicyConfig::createOpcodeGenerator
+  DefaultOpcodeGenerator(const OpcodeHistogram &OpcHist) : OpcodeHist(OpcHist) {
+    if (OpcodeHist.get().size() == 0)
       snippy::fatal(
           "OpcodeGenerator initialization failure: empty histogram specified.\n"
           "Usually this may happen when in some context snippy can not find "
@@ -47,7 +47,8 @@ public:
           "Try to increase instruction number by one or add more instructions "
           "to "
           "histogram.");
-    auto Probs = llvm::make_second_range(OpcodeProbs);
+    auto Probs =
+        llvm::make_second_range(OpcodeHist.get().opcodeProbabilities());
     if (llvm::all_of(Probs, [](double W) { return W == 0.0; }))
       snippy::fatal("OpcodeGenerator initialization failure: all given to "
                     "histogram opcodes have zero weight");
@@ -59,7 +60,9 @@ public:
 
   void generate(SmallVectorImpl<unsigned> &Opcodes) override;
 
-  auto getOpcodesList() const { return llvm::make_first_range(OpcodeProbs); }
+  auto getOpcodesList() const {
+    return llvm::make_first_range(OpcodeHist.get().opcodeProbabilities());
+  }
 
   void print(llvm::raw_ostream &OS) const override;
 
