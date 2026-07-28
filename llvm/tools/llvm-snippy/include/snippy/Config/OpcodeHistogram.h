@@ -103,7 +103,7 @@ class OpcodeHistogram final : private ChoiceNode {
   using ChoiceNode::insert;
 
   auto getTopNodesPtrRange() const {
-    return llvm::map_range(ChildNodes, [](auto &&PtrNode) {
+    return llvm::map_range(ChoiceNode::range(), [](auto &&PtrNode) {
       assert(PtrNode);
       return std::make_pair(PtrNode.get(), PtrNode->getWeight());
     });
@@ -160,12 +160,10 @@ public:
   }
 
   template <typename Predicate> void eraseTopOpcodes(Predicate &&Pred) {
-    llvm::erase_if(ChildNodes, [&Pred, this](auto &&ArgPtr) {
-      auto *NodePtr = ArgPtr.get();
+    ChoiceNode::erase([&](const BaseNode *NodePtr) {
       assert(NodePtr);
-      if (isTopOpcodePtr(NodePtr))
-        return Pred(dyn_cast<OpcodeNode>(NodePtr)->getNum());
-      return false;
+      return isTopOpcodePtr(NodePtr) &&
+             Pred(dyn_cast<OpcodeNode>(NodePtr)->getNum());
     });
     // FIXME: Replace with std::erase_if when there is C++20
     // Erase from cache
@@ -269,6 +267,10 @@ public:
 
   bool hasPatterns() const { return HasPatterns; }
 
+  bool operator==(const OpcodeHistogram &Rhs) const {
+    return ChoiceNode::isEqual(Rhs);
+  }
+
   friend struct llvm::OpcodeHistogramNormalization;
 
 private:
@@ -293,7 +295,7 @@ private:
     TopOpcodes.emplace(Opc, Weight);
   }
 
-  bool isTopOpcodePtr(BaseNode *NodePtr) const {
+  bool isTopOpcodePtr(const BaseNode *NodePtr) const {
     auto *OpcPtr = dyn_cast<OpcodeNode>(NodePtr);
     return OpcPtr && OpcPtr->isTopOpcode();
   }
@@ -325,6 +327,33 @@ struct OpcodeHistogramMappingWrapper final {
 };
 
 } // namespace snippy
+
+template <> struct DenseMapInfo<snippy::OpcodeHistogram *> {
+  static inline snippy::OpcodeHistogram *getEmptyKey() { return nullptr; }
+
+  static inline snippy::OpcodeHistogram *getTombstoneKey() {
+    return reinterpret_cast<snippy::OpcodeHistogram *>(-1);
+  }
+
+  static unsigned getHashValue(const snippy::OpcodeHistogram *Val) {
+    if (Val == getEmptyKey() || Val == getTombstoneKey())
+      return 0;
+    auto Opcodes = Val->uniqueOpcodes();
+    return llvm::hash_combine_range(Opcodes.begin(), Opcodes.end());
+  }
+
+  static bool isEqual(const snippy::OpcodeHistogram *LHS,
+                      const snippy::OpcodeHistogram *RHS) {
+    if (LHS == RHS)
+      return true;
+
+    if (LHS == getEmptyKey() || LHS == getTombstoneKey() ||
+        RHS == getEmptyKey() || RHS == getTombstoneKey())
+      return false;
+
+    return *LHS == *RHS;
+  }
+};
 
 using SequenceType = snippy::OpcodeHistogramSequence::SequenceType;
 template <> struct yaml::SequenceTraits<snippy::OpcodeHistogramSequence> {
