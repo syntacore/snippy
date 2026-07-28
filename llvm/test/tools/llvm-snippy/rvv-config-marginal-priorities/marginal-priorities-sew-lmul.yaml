@@ -1,0 +1,48 @@
+# COM: This test checks how weighs are distributed with marginal-priorities:sew_lmul
+#
+# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t.yaml
+# RUN: FileCheck %s < %t.yaml
+
+include:
+  - ../rvv-config-histogram/Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100
+
+riscv-vector-unit:
+  mode-distribution:
+    marginal-priorities:
+      - [sew_lmul, 1.0]
+    VM:
+      - [all_ones, 1.0]
+    VL:
+      - [2, 1.0]
+      - [12, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_64: 1.0
+        sew_8: 1.0
+      LMUL:
+        m1: 1.0
+        m8: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+    - [VADD_VV, 0.1]
+    - [VSETVL, 1.0]
+
+# COM: We have marginal-priorities:sew_lmul, so weights
+# COM: for each {SEW, LMUL} combination are 1.0*1.0 = 1.0.
+# COM: That means that probability of each {SEW, LMUL} is 0.25.
+
+#CHECK-DAG: P: 0.25 Conf: { e8, m1, tu, mu, vxrm: rnu }
+#CHECK-DAG: P: 0.25 Conf: { e8, m8, tu, mu, vxrm: rnu }
+#CHECK-DAG: P: 0.25 Conf: { e64, m1, tu, mu, vxrm: rnu }
+#CHECK-DAG: P: 0.25 Conf: { e64, m8, tu, mu, vxrm: rnu }
