@@ -1,0 +1,40 @@
+# COM: This test checks that there's an error when all weights for marginal-priorities are 0
+#
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+include:
+  - ../rvv-config-histogram/Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100
+
+riscv-vector-unit:
+  mode-distribution:
+    marginal-priorities:
+      # All zeros is not allowed
+      - [3d_uniform, 0.0]
+      - [sew_lmul, 0.0]
+      - [vl, 0.0]
+    VM:
+      - [all_ones, 1.0]
+    VL:
+      - [1, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+      LMUL:
+        m1: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+    - [VADD_VV, 0.1]
+    - [VSETVL, 1.0]
+
+#CHECK: error: marginal-priorities: at least one weight must be positive!
