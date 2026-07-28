@@ -1,0 +1,45 @@
+# COM: This test checks that nothing fails when multiple marginal-priorities are specified
+#
+# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t.yaml
+# RUN: FileCheck %s < %t.yaml
+
+include:
+  - ../rvv-config-histogram/Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100
+
+riscv-vector-unit:
+  mode-distribution:
+    marginal-priorities:
+      - [3d_uniform, 1.0]
+      - [sew_lmul, 1.0]
+      - [vl, 1.0]
+    VM:
+      - [all_ones, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.5
+        sew_64: 3.0
+      LMUL:
+        m1: 3.5
+        m2: 1.1
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+    - [VADD_VV, 0.1]
+    - [VSETVL, 1.0]
+
+#CHECK-DAG: { e8, m1, tu, mu, vxrm: rnu }
+#CHECK-DAG: { e8, m2, tu, mu, vxrm: rnu }
+#CHECK-DAG: { e64, m1, tu, mu, vxrm: rnu }
+#CHECK-DAG: { e64, m2, tu, mu, vxrm: rnu }
