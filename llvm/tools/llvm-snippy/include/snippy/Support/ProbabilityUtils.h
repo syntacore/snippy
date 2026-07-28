@@ -117,6 +117,11 @@ struct ProbableItems final : SmallVector<ProbableElement<T>> {
     return map_range(*this, [](const ProbableElement<T> &E) { return E.Prob; });
   }
 
+  bool hasNonZeroProbs() const {
+    return std::any_of(begin(), end(),
+                       [](const auto &Item) { return !isZero(Item.Prob); });
+  }
+
   prob_type getTotalProb() const {
     return std::accumulate(
         begin(), end(), 0.0,
@@ -189,6 +194,32 @@ struct ProbableItems final : SmallVector<ProbableElement<T>> {
       return *ProbPtr;
     this->emplace_back(Key, prob_type{});
     return this->back().Prob;
+  }
+
+  // Returns a ProbableItems of the type of the getter's return type.
+  // The probabilities are summed up. Basically a projection.
+  // For example:
+  //   getProbsOf([](const MyData& Data) { return Data.MyField; });
+  // will sum up the probabilities of all MyData instances with the same
+  // MyField.
+  template <typename GetterT, typename KeyType = std::decay_t<
+                                  std::invoke_result_t<GetterT, const T &>>>
+  [[nodiscard]] ProbableItems<KeyType> getProbsOf(GetterT &&Getter) const {
+    static_assert(std::is_invocable_v<GetterT, const T &>,
+                  "getter must be callable with const T& argument");
+    static_assert(!std::is_void_v<std::invoke_result_t<GetterT, const T &>>,
+                  "getter must return a non-void type");
+
+    DenseMap<KeyType, prob_type> SumMap;
+    for (const auto &[Element, Prob] : *this) {
+      const auto &Key = std::invoke(Getter, Element);
+      SumMap[Key] += Prob;
+    }
+    ProbableItems<KeyType> Result;
+    for (auto &[Key, Prob] : SumMap)
+      Result.emplace_back(std::move(Key), Prob);
+
+    return Result;
   }
 };
 
