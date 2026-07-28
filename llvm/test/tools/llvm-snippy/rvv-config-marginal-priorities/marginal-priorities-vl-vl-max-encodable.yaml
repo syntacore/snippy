@@ -1,0 +1,43 @@
+# COM: This test checks that when we have marginal-priorities:vl
+# COM: with VL:max_encodable, the only mode that is generated
+# COM: is the one with the highest VLMAX. (here {sew_8, m4})
+#
+# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t.yaml
+# RUN: FileCheck %s < %t.yaml
+
+include:
+  - ../rvv-config-histogram/Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100
+
+riscv-vector-unit:
+  mode-distribution:
+    marginal-priorities:
+      - [vl, 1.0]
+    VM:
+      - [all_ones, 1.0]
+    VL:
+      - [max_encodable, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+        sew_16: 1.0
+      LMUL:
+        m1: 1.0
+        m4: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+    - [VADD_VV, 0.1]
+    - [VSETVL, 1.0]
+
+#CHECK: P: 1 Conf: { e8, m4, tu, mu, vxrm: rnu }
+#CHECK-NOT: Conf:

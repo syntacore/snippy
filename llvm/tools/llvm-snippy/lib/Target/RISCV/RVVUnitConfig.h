@@ -367,20 +367,14 @@ template <typename Policy> struct GeneratorName final : private std::string {
 using VLSequence = ProbableItems<GeneratorName<VLGeneratorPolicy>>;
 using VMSequence = ProbableItems<GeneratorName<VMGeneratorPolicy>>;
 
-struct RVVUnitInfo {
-  VXRMInfo VXRM;
-  VTypeInfo VTYPE;
-
-  VMSequence VM;
-  VLSequence VL;
-};
-
 // Simply providing connection between Idx in storage and {SEW, LMUL, VL}
 // combination. Using row-major order: SEW iterates slowest, VL fastest
 struct PrimaryConfigMapping final {
   static constexpr size_t LMULSize = LMULEnumList::Arr.size();
   static constexpr size_t SEWSize = SEWEnumList::Arr.size();
   const size_t VLSize;
+
+  size_t maxIdx() const { return VLSize * LMULSize * SEWSize; }
 
   size_t toIdx(VSEW SEW, VLMUL LMUL, unsigned VL) const {
     assert(VL < VLSize);
@@ -396,6 +390,10 @@ struct PrimaryConfigMapping final {
     size_t LMULIdx = Rem / VLSize;
     unsigned VL = Rem % VLSize;
     return {SEWEnumList::Arr[SEWIdx], LMULEnumList::Arr[LMULIdx], VL};
+  }
+
+  bool operator==(const PrimaryConfigMapping &Other) const {
+    return VLSize == Other.VLSize;
   }
 
   PrimaryConfigMapping(size_t VLSize) : VLSize(VLSize) {}
@@ -418,6 +416,12 @@ struct PrimaryWeightsAndMapping {
   PrimaryWeightsAndMapping &operator+=(const PrimaryWeightsAndMapping &Other) {
     assert(Weights.size() >= Other.Weights.size());
 
+    if (Mapping == Other.Mapping) {
+      for (auto &&[Weight, OtherWeight] : zip_equal(Weights, Other.Weights))
+        Weight += OtherWeight;
+      return *this;
+    }
+
     // Add weights of the smaller distribution to the larger one.
     for (const auto &[Idx, Weight] : enumerate(Other.Weights)) {
       auto [SEW, LMUL, VL] = Other.Mapping.idxToConfig(Idx);
@@ -435,9 +439,31 @@ struct PrimaryWeightsAndMapping {
   }
 };
 
+struct PrimaryDistBuilderInterface {
+  virtual std::string identify() const = 0;
+
+  virtual std::vector<double>
+  buildWeights(unsigned ELEN, unsigned VLEN,
+               const PrimaryConfigMapping &Mapping,
+               const SewLmulDistribution &SewLmulDist,
+               const ProbableItems<VLGeneratorHolder> &VLGenerators,
+               bool IsForVSETIVLI) const = 0;
+
+  virtual ~PrimaryDistBuilderInterface() {};
+};
+using PrimaryDistBuilderHolder = std::unique_ptr<PrimaryDistBuilderInterface>;
+
+struct PrimaryDistBuilderPolicy final {
+  using Holder = PrimaryDistBuilderHolder;
+  static constexpr const char *Label = "marginal-priorities";
+};
+using PrimaryDistBuilderSequence =
+    ProbableItems<GeneratorName<PrimaryDistBuilderPolicy>>;
+
 struct RVVPrimaryConfigGenerator final {
   static constexpr size_t LMULSize = LMULEnumList::Arr.size();
   static constexpr size_t SEWSize = SEWEnumList::Arr.size();
+
   // VL can have values [0, GlobalVLMax]
   const size_t VLSize;
   // When creating distribution for VSETIVLI:
@@ -456,7 +482,8 @@ struct RVVPrimaryConfigGenerator final {
   RVVPrimaryConfigGenerator(
       unsigned ELEN, unsigned VLEN, const SewLmulDistribution &SewLmulDist,
       const ProbableItems<VLGeneratorHolder> &VLGenerators,
-      unsigned MinVMBitWidth, bool IsForVSETIVLI);
+      unsigned MinVMBitWidth, bool IsForVSETIVLI,
+      const ProbableItems<PrimaryDistBuilderHolder> &PrimaryDistBuilders);
 
   RVVPrimaryConfig idxToConfig(size_t Idx) const {
     return Mapping.idxToConfig(Idx);
@@ -504,6 +531,16 @@ struct RVVConfigGenerator final {
   // PrimaryGenReduced according to the probabilities of VSET opcodes.
   [[nodiscard]] PrimaryWeightsAndMapping
   getCombinedDistribution(const ModeChangeInfo &SwitchInfo) const;
+};
+
+struct RVVUnitInfo {
+  VXRMInfo VXRM;
+  VTypeInfo VTYPE;
+
+  VMSequence VM;
+  VLSequence VL;
+
+  PrimaryDistBuilderSequence PrimaryBuilders;
 };
 
 struct RVVSupportInfo final {

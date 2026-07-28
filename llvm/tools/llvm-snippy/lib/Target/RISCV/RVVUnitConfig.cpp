@@ -520,7 +520,7 @@ static std::string toString(VSEW SEW) {
 static std::string toString(VLMUL LMUL) {
   switch (LMUL) {
   case VLMUL::LMUL_RESERVED:
-    return "reserved";
+    return "mReserved";
   case VLMUL::LMUL_1:
     return "m1";
   case VLMUL::LMUL_2:
@@ -595,18 +595,18 @@ static void printCombinedSewLmulProbs(raw_ostream &OS,
   }
 
   // Print a table like:
-  //      | reserved | mf8 | mf4 | mf2 |  m1 |  m2 |  m4 |  m8
-  //    8 |      0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5
-  //   16 |      0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5
-  //  . . . . .
-  //  512 |      0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5
-  // 1024 |      0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5
+  //             | mReserved | mf8 | mf4 | mf2 |  m1 |  m2 |  m4 |  m8
+  //          e8 |       0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5
+  //         e16 |       0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5
+  //     . . . .
+  //  eReserved3 |       0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5
+  //  eReserved4 |       0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5 | 0.5
 
-  constexpr std::array ColumnsWidths = {9, 5, 5, 5, 5, 5, 5, 5};
+  constexpr std::array ColumnsWidths = {10, 5, 5, 5, 5, 5, 5, 5};
   constexpr std::array LMULs = {
       VLMUL::LMUL_RESERVED, VLMUL::LMUL_F8, VLMUL::LMUL_F4, VLMUL::LMUL_F2,
       VLMUL::LMUL_1,        VLMUL::LMUL_2,  VLMUL::LMUL_4,  VLMUL::LMUL_8};
-  constexpr auto SewWidth = 9;
+  constexpr auto SewWidth = 10;
 
   OS << right_justify("", SewWidth);
   for (const auto &[LMUL, ColWidth] : zip_equal(LMULs, ColumnsWidths))
@@ -824,6 +824,41 @@ public:
   }
 };
 
+// Exists to cache and give out a {SEW, LMUL} distribution for each VL
+class SewLmulDistributionStorage final {
+  using VLType = unsigned;
+
+  // {VL -> SewLmulProbabilityDistribution}
+  std::map<VLType, SewLmulDistribution> Distributions;
+
+public:
+  SewLmulDistributionStorage(unsigned ELEN, unsigned VLEN,
+                             const SewLmulDistribution &SewLmulDist) {
+    const auto &VLSize = getMaxPossibleVL(ELEN, VLEN);
+    // For each VL add only those {SEW, LMUL} that have VLMax >= VL
+    for (unsigned VL = 0; VL <= VLSize; VL++) {
+      SewLmulDistribution Dist;
+      copy_if(SewLmulDist, std::back_inserter(Dist),
+              [&](const ProbableElement<std::tuple<VSEW, VLMUL>> &Item) {
+                auto [SEW, LMUL] = Item.Element;
+                // If {SEW, LMUL} is illegal, we treat it as if
+                // it has MaxVL == MaxPossibleVL
+                if (computeVLMax(ELEN, VLEN, SEW, LMUL) == 0)
+                  return true;
+                return computeVLMax(ELEN, VLEN, SEW, LMUL) >= VL;
+              });
+      // Dist should not be normalized! Allowed to be empty, but has to be
+      // present in the map.
+      Distributions[VL] = Dist;
+    }
+  }
+
+  const SewLmulDistribution &get(VLType VL) const {
+    assert(Distributions.find(VL) != Distributions.end());
+    return Distributions.at(VL);
+  }
+};
+
 struct VLVMInfo {
   ProbableItems<VLGeneratorHolder> VLGens;
   ProbableItems<VMGeneratorHolder> VMGens;
@@ -957,6 +992,8 @@ LLVM_SNIPPY_YAML_IS_PROBABLE_ITEMS(
     snippy::GeneratorName<snippy::VLGeneratorPolicy>)
 LLVM_SNIPPY_YAML_IS_PROBABLE_ITEMS(
     snippy::GeneratorName<snippy::VMGeneratorPolicy>)
+LLVM_SNIPPY_YAML_IS_PROBABLE_ITEMS(
+    snippy::GeneratorName<snippy::PrimaryDistBuilderPolicy>)
 
 template <> struct yaml::MappingTraits<RVVUnitInfo> {
   static void mapping(yaml::IO &IO, RVVUnitInfo &VUInfo) {
@@ -965,6 +1002,9 @@ template <> struct yaml::MappingTraits<RVVUnitInfo> {
 
     IO.mapOptional(snippy::VMGeneratorPolicy::Label, VUInfo.VM);
     IO.mapOptional(snippy::VLGeneratorPolicy::Label, VUInfo.VL);
+
+    IO.mapOptional(snippy::PrimaryDistBuilderPolicy::Label,
+                   VUInfo.PrimaryBuilders);
   }
 };
 
@@ -1036,45 +1076,165 @@ template <> struct yaml::MappingTraits<VectorUnitRules> {
     IO.mapRequired(RVVConfigurationSpace::kUnitName, VU.Config);
   }
 };
+} // namespace llvm
 
-namespace snippy {
+namespace {
+struct SewLmulPriorityBuilder final : PrimaryDistBuilderInterface {
+  DECLARE_ID_AND_DEFAULT_CONSTRUCTION_METHODS(PrimaryDistBuilderInterface,
+                                              SewLmulPriorityBuilder,
+                                              "sew_lmul")
 
-static std::vector<double>
-buildWeights(unsigned ELEN, unsigned VLEN, const PrimaryConfigMapping &Mapping,
-             const SewLmulDistribution &SewLmulDist,
-             const ProbableItems<VLGeneratorHolder> &VLGenerators,
-             bool IsForVSETIVLI) {
-  // Weights for each combination of {SEW, LMUL, VL}.
-  std::vector<double> Weights(
-      Mapping.SEWSize * Mapping.LMULSize * Mapping.VLSize, 0.0);
+  std::vector<double>
+  buildWeights(unsigned ELEN, unsigned VLEN,
+               const PrimaryConfigMapping &Mapping,
+               const SewLmulDistribution &SewLmulDist,
+               const ProbableItems<VLGeneratorHolder> &VLGenerators,
+               bool IsForVSETIVLI) const override {
+    std::vector<double> Weights(Mapping.maxIdx(), 0.0);
 
-  // Construct VL distributions for each combination of {SEW, LMUL}
-  VlDistributionStorage VLDistStorage(ELEN, VLEN, VLGenerators, IsForVSETIVLI);
+    // Construct VL distributions for each combination of {SEW, LMUL}
+    VlDistributionStorage VLDistStorage(ELEN, VLEN, VLGenerators,
+                                        IsForVSETIVLI);
 
-  // For each {SEW, LMUL} pair valid VLs are [0, computeVLMax()]
-  for (const auto &[SewLmul, SewLmulProb] : SewLmulDist) {
-    auto [SEW, LMUL] = SewLmul;
-    // Total weight of VLDist must be either 0.0 or 1.0
-    auto VLDist = VLDistStorage.get(SEW, LMUL);
-    assert(VLDist.size() <= Mapping.VLSize);
+    // For each {SEW, LMUL} pair valid VLs are [0, computeVLMax()]
+    for (const auto &[SewLmul, SewLmulProb] : SewLmulDist) {
+      auto [SEW, LMUL] = SewLmul;
+      // Total weight of VLDist must be either 0.0 or 1.0
+      auto VLDist = VLDistStorage.get(SEW, LMUL);
+      assert(VLDist.size() <= Mapping.VLSize);
 
-    for (unsigned VL = 0; VL < VLDist.size(); ++VL)
-      Weights[Mapping.toIdx(SEW, LMUL, VL)] = VLDist[VL] * SewLmulProb;
+      for (unsigned VL = 0; VL < VLDist.size(); ++VL)
+        Weights[Mapping.toIdx(SEW, LMUL, VL)] = VLDist[VL] * SewLmulProb;
+    }
+    return Weights;
+  }
+};
+
+struct VlPriorityBuilder final : PrimaryDistBuilderInterface {
+  DECLARE_ID_AND_DEFAULT_CONSTRUCTION_METHODS(PrimaryDistBuilderInterface,
+                                              VlPriorityBuilder, "vl")
+
+  std::vector<double>
+  buildWeights(unsigned ELEN, unsigned VLEN,
+               const PrimaryConfigMapping &Mapping,
+               const SewLmulDistribution &SewLmulDist,
+               const ProbableItems<VLGeneratorHolder> &VLGenerators,
+               bool IsForVSETIVLI) const override {
+    std::vector<double> Weights(Mapping.maxIdx(), 0.0);
+
+    SewLmulDistributionStorage SewLmulDistStorage(ELEN, VLEN, SewLmulDist);
+
+    // Find the maximum possible VL across all given {SEW, LMUL} pairs.
+    auto VLMaxRange = map_range(
+        SewLmulDist, [&](const ProbableElement<std::tuple<VSEW, VLMUL>> &Item) {
+          auto [SEW, LMUL] = Item.Element;
+          return computeVLMax(ELEN, VLEN, SEW, LMUL);
+        });
+    unsigned MaxFeasibleVL = *max_element(VLMaxRange);
+    auto VLDist =
+        buildDistributionForMaxVL(MaxFeasibleVL, VLGenerators, IsForVSETIVLI);
+
+    for (auto [VL, VlWeight] : enumerate(VLDist)) {
+      auto Dist = SewLmulDistStorage.get(VL);
+      if (Dist.empty())
+        continue;
+      // Divide by Dist.size() to avoid overcounting VL weight when multiple
+      // {SEW, LMUL} pairs are legal for the same VL.
+      VlWeight /= Dist.size();
+      for (const auto &[Item, SewLmulP] : Dist) {
+        auto [SEW, LMUL] = Item;
+        Weights[Mapping.toIdx(SEW, LMUL, VL)] = VlWeight * SewLmulP;
+      }
+    }
+    return Weights;
+  }
+};
+
+struct UniformPriorityBuilder final : PrimaryDistBuilderInterface {
+  DECLARE_ID_AND_DEFAULT_CONSTRUCTION_METHODS(PrimaryDistBuilderInterface,
+                                              UniformPriorityBuilder,
+                                              "3d_uniform")
+
+  std::vector<double>
+  buildWeights(unsigned ELEN, unsigned VLEN,
+               const PrimaryConfigMapping &Mapping,
+               const SewLmulDistribution &SewLmulDist,
+               const ProbableItems<VLGeneratorHolder> &VLGenerators,
+               bool IsForVSETIVLI) const override {
+    std::vector<double> Weights(Mapping.maxIdx(), 0.0);
+
+    // Construct VL distributions for each combination of {SEW, LMUL}
+    VlDistributionStorage VLDistStorage(ELEN, VLEN, VLGenerators,
+                                        IsForVSETIVLI);
+
+    // For each {SEW, LMUL} pair valid VLs are [0, computeVLMax()]
+    for (const auto &[SewLmul, SewLmulProb] : SewLmulDist) {
+      auto [SEW, LMUL] = SewLmul;
+      // Total weight of VLDist must be either 0.0 or 1.0
+      auto VLDist = VLDistStorage.get(SEW, LMUL);
+      assert(VLDist.size() <= Mapping.VLSize);
+
+      for (unsigned VL = 0; VL < VLDist.size(); ++VL) {
+        auto PossibleVLAmount =
+            count_if(VLDist, [](double VlWeight) { return !isZero(VlWeight); });
+        // Multiply by PossibleVLAmount. This makes it so the weight of each
+        // {SEW, LMUL} pair is scaled by the number of possible VLs. For
+        // example with VL=any_legal, PossibleVLAmount is VLMAX, so the
+        // distribution shifts to be more uniform across all {SEW, LMUL, VL}
+        // triplets.
+        Weights[Mapping.toIdx(SEW, LMUL, VL)] =
+            VLDist[VL] * SewLmulProb * PossibleVLAmount;
+      }
+    }
+    return Weights;
+  }
+};
+
+template <> struct GeneratorFactory<PrimaryDistBuilderHolder> {
+  static Expected<PrimaryDistBuilderHolder> createOrErr(StringRef ID) {
+    return constructFromString<PrimaryDistBuilderInterface,
+                               SewLmulPriorityBuilder, VlPriorityBuilder,
+                               UniformPriorityBuilder>(ID);
   }
 
-  return Weights;
-}
+  static PrimaryDistBuilderHolder create(StringRef ID) {
+    return cantFail(createOrErr(ID));
+  }
+};
+} // namespace
 
+namespace llvm {
+namespace snippy {
 RVVPrimaryConfigGenerator::RVVPrimaryConfigGenerator(
     unsigned ELEN, unsigned VLEN, const SewLmulDistribution &SewLmulDist,
     const ProbableItems<VLGeneratorHolder> &VLGenerators,
-    unsigned MinVMBitWidth, bool IsForVSETIVLI)
+    unsigned MinVMBitWidth, bool IsForVSETIVLI,
+    const ProbableItems<PrimaryDistBuilderHolder> &PrimaryDistBuilders)
     : VLSize(IsForVSETIVLI ? (kMaxVLForVSETIVLI + 1)
                            : (getMaxPossibleVL(ELEN, VLEN) + 1)),
       IsForVSETIVLI(IsForVSETIVLI), Mapping(VLSize) {
+  assert(VLEN != 0 && ELEN != 0);
 
-  auto Weights = buildWeights(ELEN, VLEN, Mapping, SewLmulDist, VLGenerators,
-                              IsForVSETIVLI);
+  assert(SewLmulDist.hasNonZeroProbs());
+  assert(VLGenerators.hasNonZeroProbs());
+  assert(PrimaryDistBuilders.hasNonZeroProbs());
+
+  std::vector<double> Weights(Mapping.maxIdx(), 0.0);
+  // Add weights from each builder
+  for (const auto &[Builder, Prob] : PrimaryDistBuilders) {
+    if (isZero(Prob))
+      continue;
+    auto BuilderWeights = Builder->buildWeights(
+        ELEN, VLEN, Mapping, SewLmulDist, VLGenerators, IsForVSETIVLI);
+
+    if (all_of(BuilderWeights, [](double W) { return isZero(W); }))
+      continue;
+    // The sum of BuilderWeights must be 1.0
+    normalizeValues(BuilderWeights);
+
+    for (auto &&[Weight, BuilderWeight] : zip(Weights, BuilderWeights))
+      Weight += BuilderWeight * Prob;
+  }
 
   // Zero-out weights of VLs < minVMBitWidth.
   // For such configs there're no applicable VMgens.
@@ -1092,6 +1252,7 @@ RVVPrimaryConfigGenerator::RVVPrimaryConfigGenerator(
     snippy::fatal("There are no VL generators in riscv-vector-unit which are "
                   "compatible with any requested VTYPE configuration");
   }
+
   Dist = std::discrete_distribution<unsigned>(Weights.begin(), Weights.end());
 
   LLVM_DEBUG(dbgs() << "=== Primary RVV Config Probabilities ===\n");
@@ -1132,8 +1293,8 @@ PrimaryWeightsAndMapping::getAllPossibleSewLmulPairs() const {
 }
 
 void PrimaryWeightsAndMapping::printProbabilities(raw_ostream &OS) const {
-  constexpr unsigned SewWidth = 9;
-  constexpr unsigned LmulWidth = 9;
+  constexpr unsigned SewWidth = 10;
+  constexpr unsigned LmulWidth = 10;
   constexpr unsigned VLWidth = 7;
   constexpr unsigned ProbWidth = 9;
 
@@ -1465,7 +1626,7 @@ static RVVConfigurationSpace createDefaultConfigurationSpace() {
   VLSequence VLSeq = {{MaxPossibleVLGen::kID, 1.0}};
 
   VTypeInfo VTYPE{SEW, LMUL, VMA, VTA};
-  RVVUnitInfo VUInfo{VXRM, VTYPE, VMSeq, VLSeq};
+  RVVUnitInfo VUInfo{VXRM, VTYPE, VMSeq, VLSeq, /*PrimaryBuilders=*/{}};
   RVVConfigurationSpace CS{
       /*no bias, deduce P from histogram*/ ModeChangeBias{}, VUInfo};
 
@@ -1627,6 +1788,36 @@ static VLVMInfo buildVLVMgenerators(unsigned ELEN, unsigned VLEN,
   return Result;
 }
 
+static ProbableItems<PrimaryDistBuilderHolder>
+buildPrimaryDistributionBuilders(const PrimaryDistBuilderSequence &Seq) {
+  ProbableItems<PrimaryDistBuilderHolder> Result;
+  if (Seq.empty()) {
+    // By default fall back to SewLmulPriority. (old behavior, backward
+    // compatibility)
+    auto Builder = GeneratorFactory<PrimaryDistBuilderHolder>::create(
+        SewLmulPriorityBuilder::kID);
+    Result.emplace_back(std::move(Builder), /*Prob*/ 1.0);
+  } else {
+    for (const auto &[Name, Weight] : Seq) {
+      auto Builder =
+          GeneratorFactory<PrimaryDistBuilderHolder>::create(Name.asStr());
+      Result.emplace_back(std::move(Builder), Weight);
+    }
+    Result.normalizeProbs();
+  }
+
+  LLVM_DEBUG({
+    dbgs() << "=== RVV Primary Distribution Builders ===\n";
+    Result.print(dbgs(),
+                 [](const PrimaryDistBuilderHolder &Gen) -> std::string {
+                   return Gen->identify();
+                 });
+  });
+
+  assert(Result.checkSumOfProbabilities());
+  return Result;
+}
+
 RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(const Config &Cfg,
                                                               unsigned ELEN,
                                                               unsigned VLEN) {
@@ -1666,20 +1857,23 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(const Config &Cfg,
       buildVLVMgenerators(ELEN, VLEN, CS.VUInfo.VL, CS.VUInfo.VM, SewLmulDist,
                           /*IsOnlyVSETIVLI*/ !IsPresentNonVSETIVLI);
 
+  auto PrimaryDistBuilders =
+      buildPrimaryDistributionBuilders(CS.VUInfo.PrimaryBuilders);
+
   unsigned MinVMBitWidth = getMinRequestedBitWidth(CS.VUInfo.VM);
   // One generator for (VSETVLI & VSETVL) and another for VSETIVLI
 
   std::optional<RVVPrimaryConfigGenerator> PrimaryConfigGen;
   if (IsPresentNonVSETIVLI)
     PrimaryConfigGen.emplace(ELEN, VLEN, SewLmulDist, VLGenerators,
-                             MinVMBitWidth,
-                             /*BuildForVSETIVLI*/ false);
+                             MinVMBitWidth, /*BuildForVSETIVLI*/ false,
+                             PrimaryDistBuilders);
 
   std::optional<RVVPrimaryConfigGenerator> PrimaryConfigGenReduced;
   if (IsPresentVSETIVLI)
-    PrimaryConfigGenReduced.emplace(ELEN, VLEN, SewLmulDist, VLGenerators,
-                                    MinVMBitWidth,
-                                    /*BuildForVSETIVLI*/ true);
+    PrimaryConfigGenReduced.emplace(
+        ELEN, VLEN, SewLmulDist, VLGenerators, MinVMBitWidth,
+        /*BuildForVSETIVLI*/ true, PrimaryDistBuilders);
 
   RVVConfigGenerator RVVConfigGen(
       std::move(PrimaryConfigGen), std::move(PrimaryConfigGenReduced),

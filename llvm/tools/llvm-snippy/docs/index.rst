@@ -3695,19 +3695,13 @@ not cause an exception.
 Below is the list of settings you can specify to control the set of
 reachable RVV configurations for the snippet:
 
--  ``VM`` |nbsp| -- |nbsp| Vector mask. Via ``VM``, you provide the mask value as per
-   the RVV specification. For example, with ``VM`` = ``all_ones``,
-   snippy sets masks to only be ones.
-
-   Not all vector instructions require or consume masks. For the details
-   on vector masking, refer
-   `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#53-vector-masking>`__.
-
 -  ``VL`` |nbsp| -- |nbsp| Vector length. ``VL`` sets the number of elements to be
    processed by instructions. For the details on ``VL``, refer
    `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#35-vector-length-register-vl>`__.
 
-   ``VL`` can be an unsigned integer (for example, ``2``, ``4``), or:
+   ``VL`` is selected from a weighted combination of:
+
+   -  Unsigned integers (for example, ``2``, ``4``, ``Ox10``).
 
    -  ``max_encodable`` |nbsp| -- |nbsp| Maximum possible value of ``VL`` that you can
       set via a particular VSET instruction. A VSET instruction, in
@@ -3729,34 +3723,113 @@ reachable RVV configurations for the snippet:
    -  ``vlmax`` |nbsp| -- |nbsp| Compliant with RVV specification value:
       ``vlmax`` = ``LMUL`` * ``VLEN`` / ``SEW``. It behaves the same as
       ``max_encodable``, but it will not be selected if according to current
-      sutuation ``vlmax`` can not be selected (for example, to change the RVV
+      situation ``vlmax`` can not be selected (for example, to change the RVV
       mode, opcode ``VSETIVLI`` is selected, where the maximum ``vl`` value that
       fits into the encoding is 31, and ``vlmax`` is greater than 31).
 
    -  ``any_legal`` |nbsp| -- |nbsp| Allows any legal value given the selected RVV mode
       and the mode-changing instruction.
 
-   For all VL initializers, you also need to provide the width of the
-   elements in ``VL`` via the ``SEW`` parameter.
+-  ``VM`` |nbsp| -- |nbsp| Vector mask. Via ``VM``, you provide the mask value as per
+   the RVV specification.
+
+   ``VM`` is selected from a weighted combination of:
+
+   -  Unsigned integers (for example, ``2``, ``0b10100``, ``0xFA``).
+
+   -  ``all_ones`` |nbsp| -- |nbsp| The mask is selected to be only ones.
+      The bit width of the mask is exactly ``VL``.
+
+   -  ``any_legal`` |nbsp| -- |nbsp| Allows any value given the selected ``VL``.
+
+   Not all vector instructions require or consume masks. For the details
+   on vector masking, refer
+   `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#53-vector-masking>`__.
 
 -  ``SEW`` |nbsp| -- |nbsp| Selected element width. This parameter defines the widths
    of the elements in ``VL`` (in bits). Possible parameters are
-   ``sew_8``, ``sew_16``, ``sew_32``, ``sew_64``. For them, you specify
-   the relative weights of the elements in VSET.
+   ``sew_8``, ``sew_16``, ``sew_32``, ``sew_64``.
+   For them, you specify the relative weights.
 
    For the details on ``SEW``, refer
    `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#341-vector-selected-element-width-vsew20>`__.
 
--  ``VXRM`` |nbsp| -- |nbsp| Rounding mode. For the details, refer
-   `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#38-vector-fixed-point-rounding-mode-register-vxrm>`__.
-
 -  ``LMUL`` |nbsp| -- |nbsp| Multiplier that allows you to pack multiple vector
-   registers into a group. For the details, refer
+   registers into a group. Possible parameters are
+   ``mf8``, ``mf4``, ``mf2``, ``m1``, ``m2``, ``m4``, ``m8``.
+   For them, you specify the relative weights.
+
+   For the details on ``LMUL``, refer
    `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#4-mapping-of-vector-elements-to-vector-register-state>`__.
 
 -  ``VMA``, ``VTA`` |nbsp| -- |nbsp| Vector mask agnostic and vector tail agnostic
    modes. For the details, refer
    `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#343-vector-tail-agnostic-and-vector-mask-agnostic-vta-and-vma>`__.
+
+-  ``VXRM`` |nbsp| -- |nbsp| Fixed-point rounding mode. For the details, refer
+   `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#38-vector-fixed-point-rounding-mode-register-vxrm>`__.
+
+-  ``marginal-priorities`` (optional) |nbsp| -- |nbsp| Specifies the tradeoff for
+   the 3D ``{SEW, LMUL, VL}`` distribution. It does not add or remove
+   any reachable configurations. In the configuration file, you only
+   define separate *marginal* distributions for ``SEW``, ``LMUL``, and ``VL``.
+   Due to `architectural constraints <https://github.com/riscvarchive/riscv-v-spec/blob/master/v-spec.adoc#342-vector-register-grouping-vlmul20>`__,
+   all marginal distributions cannot simultaneously be satisfied exactly when an
+   arbitrary configuration is given.
+
+   ``marginal-priorities`` is defined by a weighted combination of:
+
+   -  ``3d_uniform`` |nbsp| -- |nbsp| This option does not satisfy any marginal
+      distribution exactly. It tries to balance the tradeoff across all 3 dimensions.
+      It is the best one if you want to cover all possible ``{SEW, LMUL, VL}`` combinations.
+      For example, the following configuration creates a true 3D-uniform distribution
+      containing all legal configurations:
+
+      .. code:: yaml
+
+       mode-distribution:
+         marginal-priorities:
+           - [3d_uniform, 1.0]
+         VL:
+           - [any_legal, 1.0]
+         VTYPE:
+           SEW:
+             sew_8: 1.0
+             sew_16: 1.0
+             sew_32: 1.0
+             sew_64: 1.0
+           LMUL:
+             mf8: 1.0
+             mf4: 1.0
+             mf2: 1.0
+             m1: 1.0
+             m2: 1.0
+             m4: 1.0
+             m8: 1.0
+       # other fields...
+
+      With this option, combinations of ``{SEW, LMUL}`` that support only a few ``VL``
+      values **from the configuration** are less likely to appear.
+
+   -  ``sew_lmul`` (default) |nbsp| -- |nbsp| Distribution is built such that
+      2D marginal distribution of ``{SEW, LMUL}`` is satisfied. For example,
+      with the above config you would get the same amount of modes with
+      ``{sew_8, m1}`` as with ``{sew_32, m8}``.
+
+      With this option, large ``VL`` values are less likely to appear.
+
+   -  ``vl`` |nbsp| -- |nbsp| Distribution is built such that marginal distribution
+      of ``VL`` is satisfied. For example, with the above config you would get
+      the same amount of modes with ``VL:1`` as with ``VL:16``.
+
+      With this option, combinations of ``{SEW, LMUL}``
+      that have small ``vlmax`` are less likely to appear.
+
+      .. note::
+
+         In this mode ``VL:max_encodable``, ``VL:vlmax``, and ``VL:any_legal`` have their
+         ``VL`` limited to **global** ``VLMAX`` across all given ``SEW`` and ``LMUL``
+         combinations.
 
 If you do not specify a configuration, the only reachable RVV
 configuration is:
@@ -4582,7 +4655,7 @@ You can enable or disable these features using the sntf-config key in your layou
 .. code:: yaml
 
   sntf-config:
-    time: on 
+    time: on
     pc: on
     instr-code: on
     next-pc: on
