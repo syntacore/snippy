@@ -40,6 +40,7 @@ namespace snippy {
 #include "SnippyConfigOptionsStruct.inc"
 #undef GEN_SNIPPY_OPTIONS_STRUCT_DEF
 class SnippyTarget;
+class SnippyProgramContext;
 
 struct MemoryInitConfig {
   MemInitMode InitializationMode;
@@ -167,31 +168,8 @@ public:
   DefaultPolicyConfig(const CommonPolicyConfig &Common) : Common(&Common) {}
 
   Expected<OpcGenHolder>
-  createOpcodeGenerator(const OpcodeFilterType &OpcMask) const {
-    if (DataFlowHistogram.empty())
-      snippy::fatal(
-          "OpcodeGenerator initialization failure: empty histogram specified.");
-
-    std::map<unsigned, double> DFHTopOpcodes;
-    llvm::copy_if(DataFlowHistogram.topOpcodes(),
-                  std::inserter(DFHTopOpcodes, DFHTopOpcodes.end()),
-                  [&](auto &&Entry) { return OpcMask(Entry.first); });
-    OpcodeHistogram DFHCopy(DFHTopOpcodes);
-    DFHCopy.copyPatterns(DataFlowHistogram);
-    if (DFHCopy.size() == 0)
-      return makeFailure(
-          Errc::InvalidConfiguration,
-          "We can not create any primary instruction in this "
-          "context.\nUsually this may happen when in some context "
-          "snippy can not find any instruction that could be created "
-          "in current context.\nTry to increase instruction number by "
-          "one or add more instructions to histogram.");
-
-    auto &PluginManager = *Common->ProgramCfg.PluginManagerImpl;
-    if (PluginManager.pluginHasBeenLoaded())
-      return PluginManager.createPlugin(DFHCopy);
-    return std::make_unique<DefaultOpcodeGenerator>(DFHCopy);
-  }
+  createOpcodeGenerator(const OpcodeFilterType &OpcMask,
+                        SnippyProgramContext &ProgCtx) const;
 
   bool isApplyValuegramEachInstr() const {
     return Valuegram.has_value() || OperandsReinitialization.has_value();

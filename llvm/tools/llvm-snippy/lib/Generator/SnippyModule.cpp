@@ -28,6 +28,41 @@ namespace snippy {
 template class GenResultT<ObjectFile>;
 template class GenResultT<ObjectMetadata>;
 
+const OpcodeHistogram &
+SnippyProgramContext::tryInsertOpcHist(const OpcodeHistogram &OpcHist) {
+  auto Found = OpcodeHists.find(std::addressof(OpcHist));
+  if (Found != OpcodeHists.end())
+    return **Found;
+  HistStorage.push_back(std::make_unique<OpcodeHistogram>(OpcHist));
+  auto *HistPtr = HistStorage.back().get();
+  OpcodeHists.insert(HistPtr);
+  return *HistPtr;
+}
+
+const OpcodeHistogram &
+SnippyProgramContext::tryInsertOpcHist(OpcodeHistogram &&OpcHist) {
+  auto Found = OpcodeHists.find(std::addressof(OpcHist));
+  if (Found != OpcodeHists.end())
+    return **Found;
+  HistStorage.push_back(std::make_unique<OpcodeHistogram>(std::move(OpcHist)));
+  auto *HistPtr = HistStorage.back().get();
+  OpcodeHists.insert(HistPtr);
+  return *HistPtr;
+}
+
+OpcGenHolder SnippyProgramContext::createDefaultOpcodeGenerator(
+    const OpcodeHistogram &OpcHist) {
+  assert(!OpcHist.empty());
+  return std::make_unique<DefaultOpcodeGenerator>(tryInsertOpcHist(OpcHist));
+}
+
+OpcGenHolder
+SnippyProgramContext::createDefaultOpcodeGenerator(OpcodeHistogram &&OpcHist) {
+  assert(!OpcHist.empty());
+  return std::make_unique<DefaultOpcodeGenerator>(
+      tryInsertOpcHist(std::move(OpcHist)));
+}
+
 SnippyModule::SnippyModule(LLVMState &State, StringRef Name)
     : Module(Name, State.getCtx()), State(State), Context([&]() {
         setTargetTriple(State.getSubtargetInfo().getTargetTriple());
@@ -323,6 +358,33 @@ void SnippyProgramContext::createTargetContext(const Config &Cfg,
 }
 
 SnippyProgramContext::~SnippyProgramContext() = default;
+
+Expected<OpcGenHolder> DefaultPolicyConfig::createOpcodeGenerator(
+    const OpcodeFilterType &OpcMask, SnippyProgramContext &ProgCtx) const {
+  if (DataFlowHistogram.empty())
+    snippy::fatal(
+        "OpcodeGenerator initialization failure: empty histogram specified.");
+
+  std::map<unsigned, double> DFHTopOpcodes;
+  llvm::copy_if(DataFlowHistogram.topOpcodes(),
+                std::inserter(DFHTopOpcodes, DFHTopOpcodes.end()),
+                [&](auto &&Entry) { return OpcMask(Entry.first); });
+  OpcodeHistogram DFHCopy(DFHTopOpcodes);
+  DFHCopy.copyPatterns(DataFlowHistogram);
+  if (DFHCopy.size() == 0)
+    return makeFailure(
+        Errc::InvalidConfiguration,
+        "We can not create any primary instruction in this "
+        "context.\nUsually this may happen when in some context "
+        "snippy can not find any instruction that could be created "
+        "in current context.\nTry to increase instruction number by "
+        "one or add more instructions to histogram.");
+
+  auto &PluginManager = *Common->ProgramCfg.PluginManagerImpl;
+  if (PluginManager.pluginHasBeenLoaded())
+    return PluginManager.createPlugin(DFHCopy);
+  return ProgCtx.createDefaultOpcodeGenerator(std::move(DFHCopy));
+}
 
 } // namespace snippy
 } // namespace llvm

@@ -38,7 +38,6 @@ public:
   enum class NodeStorageType {
     OpcodeNode,
     NumberNode,
-    CompositeNode,
     ChoiceNode,
     CartesianNode,
     RepeatNode,
@@ -68,6 +67,20 @@ public:
   virtual void accept(HistogramVisitor &) const = 0;
   virtual NodeHandle clone() const = 0;
   virtual NodeStorageType getNodeStorageType() const = 0;
+  virtual bool compareLess(const BaseNode &Rhs) const = 0;
+  virtual bool isEqual(const BaseNode &Rhs) const = 0;
+
+  friend bool operator<(const BaseNode &Lhs, const BaseNode &Rhs) {
+    return Lhs.compareLess(Rhs);
+  }
+
+  friend bool operator==(const BaseNode &Lhs, const BaseNode &Rhs) {
+    return Lhs.isEqual(Rhs);
+  }
+
+  friend bool operator!=(const BaseNode &Lhs, const BaseNode &Rhs) {
+    return !Lhs.isEqual(Rhs);
+  }
 
 protected:
   const BaseNode *Parent;
@@ -91,7 +104,7 @@ public:
   }
 
   NodeHandle clone() const override {
-    return std::make_unique<NumberNode>(Num);
+    return BaseNode::create<NumberNode>(Num);
   }
 
   static bool classof(const BaseNode *BNode) {
@@ -108,6 +121,8 @@ public:
     return NodeStorageType::NumberNode;
   }
 
+  bool compareLess(const BaseNode &Rhs) const override;
+  bool isEqual(const BaseNode &Rhs) const override;
   void accept(HistogramVisitor &HistVis) const override;
 
   bool isNonPositive() const { return Num.isNonPositive(); }
@@ -144,8 +159,12 @@ public:
     return NodeStorageType::OpcodeNode;
   }
 
+  bool compareLess(const BaseNode &Rhs) const override;
+
+  bool isEqual(const BaseNode &Rhs) const override;
+
   NodeHandle clone() const override {
-    return std::make_unique<OpcodeNode>(Num.getZExtValue(), Weight, Category);
+    return BaseNode::create<OpcodeNode>(Num.getZExtValue(), Weight, Category);
   }
 
   bool isTopOpcode() const { return Category == OpcodeCategory::Top; }
@@ -172,8 +191,12 @@ public:
     return HistNode->evaluate();
   }
 
+  bool compareLess(const BaseNode &Rhs) const override;
+
+  bool isEqual(const BaseNode &Rhs) const override;
+
   NodeHandle clone() const override {
-    return std::make_unique<HistogramNode>(Name, HistNode->clone(), Weight);
+    return BaseNode::create<HistogramNode>(Name, HistNode->clone(), Weight);
   }
 
   static bool classof(const BaseNode *BNode) {
@@ -202,68 +225,6 @@ private:
   double Weight;
 };
 
-namespace detail {
-// Base pure virtual class for working with child nodes
-class CompositeNode {
-public:
-  virtual ~CompositeNode() = default;
-
-  virtual void insert(BaseNode::NodeHandle ArgNode) = 0;
-
-  unsigned size() const { return ChildNodes.size(); }
-  bool empty() const { return ChildNodes.empty(); }
-
-  auto begin() { return ChildNodes.begin(); }
-  auto end() { return ChildNodes.end(); }
-  auto begin() const { return ChildNodes.begin(); }
-  auto end() const { return ChildNodes.end(); }
-
-  SmallVector<double> getChildWeights() const;
-
-  double getTotalChildsWeight() const;
-
-protected:
-  CompositeNode() = default;
-  CompositeNode(BaseNode::NodeHandle Arg) {
-    assert(Arg);
-    ChildNodes.push_back(std::move(Arg));
-  }
-  CompositeNode(const CompositeNode &Rhs) = delete;
-  CompositeNode(CompositeNode &&Rhs) = default;
-  CompositeNode &operator=(const CompositeNode &Rhs) = delete;
-  CompositeNode &operator=(CompositeNode &&Rhs) = default;
-
-  CompositeNode(SmallVector<BaseNode::NodeHandle> ArgNodes)
-      : ChildNodes(std::move(ArgNodes)) {}
-
-  void setChildsParentLink(const BaseNode *Parent) {
-    llvm::for_each(ChildNodes, [Parent](auto &&ChildPtr) {
-      assert(ChildPtr);
-      ChildPtr->setParent(Parent);
-    });
-  }
-
-  template <typename NodeTy, typename... ArgsTy,
-            typename = std::enable_if_t<
-                detail::IsConstructibleNode<NodeTy, ArgsTy...>>>
-  void emplaceImpl(const BaseNode *Parent, ArgsTy &&...Values) {
-    auto NewNode = std::make_unique<NodeTy>(std::forward<ArgsTy>(Values)...);
-    NewNode->setParent(Parent);
-    insert(std::move(NewNode));
-  }
-
-  template <typename CompositeNodeTy> BaseNode::NodeHandle cloneImpl() const {
-    SmallVector<BaseNode::NodeHandle> CloneArgs;
-    llvm::transform(ChildNodes, std::back_inserter(CloneArgs),
-                    [](auto &&ArgPtr) { return ArgPtr->clone(); });
-    return std::make_unique<CompositeNodeTy>(std::move(CloneArgs));
-  }
-
-  SmallVector<BaseNode::NodeHandle> ChildNodes;
-};
-
-} // namespace detail
-
 // The main class that defines the tree of opcodes/patterns. It's used to get a
 // random opcode/pattern according to its corresponding weight. E.g:
 //                  ------------
@@ -273,42 +234,70 @@ protected:
 //       [ADD, 1.0]    [SUB, 1.0]   [pattern, 2.0]
 // Gives either ADD (probability 1 / 4), SUB (probability 1 / 4), or a pattern
 // (probability 1 / 2)
-class ChoiceNode : public detail::CompositeNode, public BaseNode {
+class ChoiceNode : public BaseNode {
+  struct NodeComparator final {
+    bool operator()(const BaseNode::NodeHandle &Lhs,
+                    const BaseNode::NodeHandle &Rhs) const {
+      assert(Lhs);
+      assert(Rhs);
+      return *Lhs < *Rhs;
+    }
+  };
+
+  using StorageType = std::multiset<BaseNode::NodeHandle, NodeComparator>;
+  using StorageIteratorTy = StorageType::iterator;
+
 public:
   using OpcodeDistType = std::discrete_distribution<size_t>;
 
   ChoiceNode() = default;
-  ChoiceNode(NodeHandle Arg) : CompositeNode(std::move(Arg)) {
-    setChildsParentLink(this);
-  }
-  ChoiceNode(SmallVector<NodeHandle> Args) : CompositeNode(std::move(Args)) {
-    setChildsParentLink(this);
-  }
+  ChoiceNode(NodeHandle Arg);
+  ChoiceNode(SmallVector<NodeHandle> Args);
   ChoiceNode(const ChoiceNode &Rhs);
   ChoiceNode(ChoiceNode &&Rhs);
   ChoiceNode &operator=(const ChoiceNode &Rhs);
   ChoiceNode &operator=(ChoiceNode &&Rhs);
 
+  void insert(NodeHandle ArgNode);
+
   template <typename NodeTy, typename... ArgsTy,
             typename = std::enable_if_t<
                 detail::IsConstructibleNode<NodeTy, ArgsTy...>>>
   void emplace(ArgsTy &&...Values) {
-    emplaceImpl<NodeTy>(this, std::forward<ArgsTy>(Values)...);
+    auto EmplaceIt = ChildNodes.emplace(
+        BaseNode::create<NodeTy>(std::forward<ArgsTy>(Values)...));
+    (*EmplaceIt)->setParent(this);
+    ChildIters.push_back(EmplaceIt);
     // We will have to recalculate opcode weights after appending new node
     NodeDistOpt.reset();
   }
 
-  void insert(NodeHandle ArgNode) override {
-    assert(ArgNode);
-    ArgNode->setParent(this);
-    ChildNodes.push_back(std::move(ArgNode));
-    // We will have to recalculate opcode weights after appending new node
-    NodeDistOpt.reset();
+  template <typename Predicate> void erase(Predicate &&Pred) {
+    for (auto Begin = ChildNodes.begin(); Begin != ChildNodes.end();) {
+      if (Pred(Begin->get())) {
+        // Don't forget to remove the iterator from the storage
+        llvm::erase(ChildIters, Begin);
+        Begin = ChildNodes.erase(Begin);
+        // We will have to recalculate opcode weights after erasing a node
+        NodeDistOpt.reset();
+      } else {
+        ++Begin;
+      }
+    }
+  }
+
+  double getTotalChildsWeight() const {
+    auto Weights = getChildWeights();
+    return std::accumulate(Weights.begin(), Weights.end(), /* init */ 0.0);
   }
 
   ResultSequenceType evaluate() const override;
 
-  NodeHandle clone() const override { return cloneImpl<ChoiceNode>(); }
+  bool compareLess(const BaseNode &Rhs) const override;
+
+  bool isEqual(const BaseNode &Rhs) const override;
+
+  NodeHandle clone() const override;
 
   static bool classof(const BaseNode *BNode) {
     assert(BNode);
@@ -321,9 +310,41 @@ public:
 
   void accept(HistogramVisitor &HistVis) const override;
 
+  unsigned size() const { return ChildNodes.size(); }
+  bool empty() const { return ChildNodes.empty(); }
+
+  auto range() {
+    return llvm::make_range(ChildNodes.begin(), ChildNodes.end());
+  }
+  auto range() const {
+    return llvm::make_range(ChildNodes.begin(), ChildNodes.end());
+  }
+
+  auto begin() { return ChildNodes.begin(); }
+  auto end() { return ChildNodes.end(); }
+  auto begin() const { return ChildNodes.begin(); }
+  auto end() const { return ChildNodes.end(); }
+
 private:
+  SmallVector<double> getChildWeights() const;
+
   ResultSequenceType evaluateRandChildNode() const;
 
+  // We keep child BaseNodes sorted to enable efficient equality comparison.
+  // For example, consider two ChoiceNodes that have the same children but in
+  // different order:
+  //
+  //   ChoiceNode1:        ChoiceNode2:
+  //    |       |           |       |
+  //   ADD     SUB         SUB     ADD
+  //
+  // If we stored opcodes in the order they appear, we would have sequences
+  // <ADD, SUB> and <SUB, ADD> – they are not lexicographically equal even
+  // though the sets of children are identical. By storing them in a
+  // std::multiset with a custom comparator we guarantee a canonical order.
+  StorageType ChildNodes;
+  // For fast random access during evaluation.
+  SmallVector<StorageIteratorTy> ChildIters;
   mutable std::optional<OpcodeDistType> NodeDistOpt;
 };
 
@@ -333,24 +354,22 @@ private:
 // Sequence2: (SUB | DIV)
 // As a result of Sequence1 * Sequence2, we can get the following sequences:
 //   (ADD SUB), (ADD DIV), (MUL SUB), (MUL DIV).
-class CartesianNode : public detail::CompositeNode, public BaseNode {
+class CartesianNode : public BaseNode {
 public:
   CartesianNode() = default;
-  CartesianNode(NodeHandle Arg) : CompositeNode(std::move(Arg)) {
-    setChildsParentLink(this);
-  }
-  CartesianNode(SmallVector<NodeHandle> Args) : CompositeNode(std::move(Args)) {
-    setChildsParentLink(this);
-  }
+  CartesianNode(NodeHandle Arg);
+  CartesianNode(SmallVector<NodeHandle> Args);
 
   template <typename NodeTy, typename... ArgsTy,
             typename = std::enable_if_t<
                 detail::IsConstructibleNode<NodeTy, ArgsTy...>>>
   void emplace(ArgsTy &&...Values) {
-    emplaceImpl<NodeTy>(this, std::forward<ArgsTy>(Values)...);
+    ChildNodes.emplace_back(
+        BaseNode::create<NodeTy>(std::forward<ArgsTy>(Values)...));
+    ChildNodes.back()->setParent(this);
   }
 
-  void insert(NodeHandle ArgNode) override {
+  void insert(NodeHandle ArgNode) {
     assert(ArgNode);
     ArgNode->setParent(this);
     ChildNodes.push_back(std::move(ArgNode));
@@ -360,7 +379,11 @@ public:
 
   ResultSequenceType evaluate() const override;
 
-  NodeHandle clone() const override { return cloneImpl<CartesianNode>(); }
+  bool compareLess(const BaseNode &Rhs) const override;
+
+  bool isEqual(const BaseNode &Rhs) const override;
+
+  NodeHandle clone() const override;
 
   static bool classof(const BaseNode *BNode) {
     assert(BNode);
@@ -372,6 +395,18 @@ public:
   }
 
   void accept(HistogramVisitor &HistVis) const override;
+
+  unsigned size() const { return ChildNodes.size(); }
+  bool empty() const { return ChildNodes.empty(); }
+
+  auto begin() { return ChildNodes.begin(); }
+  auto end() { return ChildNodes.end(); }
+  auto begin() const { return ChildNodes.begin(); }
+  auto end() const { return ChildNodes.end(); }
+
+private:
+  // We keep an ordered sequence here
+  SmallVector<NodeHandle> ChildNodes;
 };
 
 // Duplicates the stored pattern a random number of times, chosen from the
@@ -395,8 +430,12 @@ public:
 
   ResultSequenceType evaluate() const override;
 
+  bool compareLess(const BaseNode &Rhs) const override;
+
+  bool isEqual(const BaseNode &Rhs) const override;
+
   NodeHandle clone() const override {
-    return std::make_unique<RepeatNode>(ArgNode->clone(), Range);
+    return BaseNode::create<RepeatNode>(ArgNode->clone(), Range);
   }
 
   static bool classof(const BaseNode *BNode) {

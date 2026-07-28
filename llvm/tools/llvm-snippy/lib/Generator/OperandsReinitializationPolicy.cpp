@@ -99,7 +99,7 @@ ValuegramGenPolicy::ValuegramGenPolicy(
 
   if (!Filter)
     Filter = getDefaultFilter(ProgCtx.getLLVMState().getSnippyTarget());
-  auto Err = Cfg.createOpcodeGenerator(*Filter).moveInto(OpcGen);
+  auto Err = Cfg.createOpcodeGenerator(*Filter, ProgCtx).moveInto(OpcGen);
   if (Err)
     snippy::fatal(
         Twine("Failed to create OpcodeGenerator in ValuegramGenPolicy: ") +
