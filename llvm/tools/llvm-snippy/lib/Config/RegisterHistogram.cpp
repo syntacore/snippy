@@ -50,10 +50,11 @@ static Expected<APInt> getValueFromHistogramPattern(const ValuegramEntry &Entry,
   }
 }
 
-void getFixedRegisterValues(const RegistersWithHistograms &RH,
-                            size_t ExpectedNumber, StringRef Prefix,
-                            unsigned AllowedNumBits, unsigned ActualNumBits,
-                            std::vector<APInt> &Result) {
+static void getFixedRegisterValues(const RegistersWithHistograms &RH,
+                                   size_t ExpectedNumber, StringRef Prefix,
+                                   unsigned AllowedNumBits,
+                                   unsigned ActualNumBits,
+                                   std::vector<APInt> &Result) {
   assert((AllowedNumBits % CHAR_BIT) == 0);
 
   const auto &ClassValues = RH.Registers.ClassValues;
@@ -182,9 +183,8 @@ void getRegisterGroup(const RegistersWithHistograms &RH, size_t ExpectedNumber,
   std::vector<APInt> APInts(ExpectedNumber);
   sampleHistogramForRegType(RH, Prefix, NumBits, APInts);
 
-  if (APInts.empty()) {
-    getFixedRegisterValues(RH, ExpectedNumber, Prefix, 64, NumBits, APInts);
-  }
+  if (APInts.empty())
+    getFixedRegisterValues(RH, ExpectedNumber, Prefix, NumBits, APInts);
 
   Registers.resize(APInts.size());
   std::transform(APInts.begin(), APInts.end(), Registers.begin(),
