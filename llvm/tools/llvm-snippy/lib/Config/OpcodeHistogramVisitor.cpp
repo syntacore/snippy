@@ -17,18 +17,19 @@ void HistogramVisitor::visit(const HistogramNode &HistNode) {
   HistNode.getArg().accept(*this);
 }
 
-void HistogramVisitor::visit(const ChoiceNode &Or) { acceptArgNodes(Or); }
+void HistogramVisitor::visit(const ChoiceNode &Or) {
+  for (auto &&Arg : Or)
+    Arg->accept(*this);
+}
 
-void HistogramVisitor::visit(const CartesianNode &Mul) { acceptArgNodes(Mul); }
+void HistogramVisitor::visit(const CartesianNode &Mul) {
+  for (auto &&Arg : Mul)
+    Arg->accept(*this);
+}
 void HistogramVisitor::visit(const RepeatNode &Pow) {
   auto *ArgNode = Pow.getArg();
   assert(ArgNode);
   ArgNode->accept(*this);
-}
-
-void HistogramVisitor::acceptArgNodes(const detail::CompositeNode &ComposNode) {
-  for (auto &&Arg : ComposNode)
-    Arg->accept(*this);
 }
 
 OpcodeProbVisitor::OpcodeProbVisitor(const ChoiceNode &StartNode) {

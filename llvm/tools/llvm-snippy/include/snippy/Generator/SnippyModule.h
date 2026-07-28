@@ -346,6 +346,9 @@ public:
   void createTargetContext(const Config &Cfg, const TargetSubtargetInfo &STI,
                            const RegPoolWrapper &RP);
 
+  OpcGenHolder createDefaultOpcodeGenerator(const OpcodeHistogram &OpcHist);
+  OpcGenHolder createDefaultOpcodeGenerator(OpcodeHistogram &&OpcHist);
+
 private:
   friend RootRegPoolWrapper;
   void initializeStackSection(const ProgramConfig &Settings);
@@ -353,6 +356,11 @@ private:
   void initializeUtilitySection(const ProgramConfig &Settings);
   void initializeROMSection(const ProgramConfig &Settings);
   void initializeStaticStack(const ProgramConfig &Settings);
+
+  // Returns a reference to an existing histogram from the storage or creates a
+  // new one and inserts it if not found.
+  const OpcodeHistogram &tryInsertOpcHist(const OpcodeHistogram &OpcHist);
+  const OpcodeHistogram &tryInsertOpcHist(OpcodeHistogram &&OpcHist);
 
   const ProgramConfig *Cfg;
   LLVMState *State = nullptr;
@@ -384,6 +392,9 @@ private:
   bool ExternalStack;
   bool FollowTargetABI;
   std::vector<std::string> PreserveCallerSavedGroups;
+
+  DenseSet<OpcodeHistogram *> OpcodeHists;
+  SmallVector<std::unique_ptr<OpcodeHistogram>> HistStorage;
 
   // TODO: it would be nice to be able to initialize it right away, but
   // currently it depends on TargetSubtargetInfo which is diffucult to get

@@ -3,25 +3,25 @@
 options:
   mtriple: riscv64 
   mattr: "+m"
-  num-instrs: 1000
+  num-instrs: 5000
   dump-mf: on
   histogram-must-succeed: on
 
 sections:
     - name:      1
       VMA:       0x500000
-      SIZE:      0x100000
+      SIZE:      0x300000
       LMA:       0x500000
       ACCESS:    rx
     - name:      2
-      VMA:       0x600000
+      VMA:       0x800000
       SIZE:      0x700000
-      LMA:       0x600000
+      LMA:       0x800000
       ACCESS:    rw
     - name:      stack
-      VMA:       0x1300000
-      SIZE:      0x1000
-      LMA:       0x1300000
+      VMA:       0x1500000
+      SIZE:      0x2000
+      LMA:       0x1500000
       ACCESS:    rw
 
 call-graph:
