@@ -75,6 +75,7 @@ static bool isRoot(const MachineFunction &MF, const GeneratorContext &SGCtx) {
 
 bool RISCVZcmpPopretCombine::runOnMachineFunction(MachineFunction &MF) {
   auto &SGCtx = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &ProgCtx = SGCtx.getProgramContext();
   const auto &Hist = SGCtx.getConfig().Histogram;
   if (!Hist.contains(RISCV::CM_POPRET) && !Hist.contains(RISCV::CM_POPRETZ))
     return false;
@@ -93,7 +94,7 @@ bool RISCVZcmpPopretCombine::runOnMachineFunction(MachineFunction &MF) {
         {RISCV::CM_POPRET, Hist.weight(RISCV::CM_POPRET)},
         {RISCV::CM_POPRETZ, Hist.weight(RISCV::CM_POPRETZ)}};
     OpcodeHistogram PopretHist(PopretOpcWeight);
-    PopretGen = std::make_unique<DefaultOpcodeGenerator>(PopretHist);
+    PopretGen = ProgCtx.createDefaultOpcodeGenerator(PopretHist);
   }
 
   assert(!MF.empty());

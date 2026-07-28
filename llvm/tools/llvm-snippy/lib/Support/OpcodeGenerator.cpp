@@ -14,12 +14,12 @@ namespace snippy {
 
 void DefaultOpcodeGenerator::print(llvm::raw_ostream &OS) const {
   OS << "OpcodeGen:\n";
-  for (const auto &[Opcode, Prob] : OpcodeHist.opcodeProbabilities())
+  for (const auto &[Opcode, Prob] : OpcodeHist.get().opcodeProbabilities())
     OS << "     Opcode: " << Opcode << ": " << floatToString(Prob, 3) << "\n";
 }
 
 void DefaultOpcodeGenerator::generate(SmallVectorImpl<unsigned> &Opcodes) {
-  OpcodeHist.generate(Opcodes);
+  OpcodeHist.get().generate(Opcodes);
 }
 
 } // namespace snippy

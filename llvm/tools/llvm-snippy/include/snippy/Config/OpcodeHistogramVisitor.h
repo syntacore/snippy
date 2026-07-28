@@ -30,9 +30,6 @@ public:
   virtual void visit(const CartesianNode &Mul);
   virtual void visit(const RepeatNode &Pow);
   virtual void visit(const OpcodeNode &OpcNode) = 0;
-
-protected:
-  void acceptArgNodes(const detail::CompositeNode &BinOpNode);
 };
 
 // This class is used to correctly calculate opcode probabilities based on the
