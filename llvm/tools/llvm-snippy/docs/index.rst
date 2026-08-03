@@ -74,7 +74,7 @@ provide. In the configuration file(s), you specify:
 
 If you run snippy based on more than one YAML file, it will concatenate all
 of the specified and included files and parse it as a single YAML document.
-As snippys configuration consists of several top-level YAML keys each of
+As snippy`s configuration consists of several top-level YAML keys each of
 them should appear no more than once through all of the input files.
 
 .. note::
@@ -1097,7 +1097,7 @@ Memory Schemes <#selecting-applicable-memory-schemes>`__ as for any
 basic scalar instructions.
 
 Snippy does not guarantee that a stride bigger than the element size will
-be chosen, even a stride equal to zero is possible by default. See `Memory Strides <#memory-strides>`__ for more details and how to override this behaviour.
+be chosen, even a stride equal to zero is possible by default. See `Memory Strides <#memory-strides>`__ for more details and how to override this behavior.
 
 For more details on strided instructions, refer
 `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#75-vector-strided-instructions>`__.
@@ -1195,7 +1195,7 @@ In the basic process, snippy:
    addresses are guaranteed to be disjoint. If the memory scheme cannot
    satisfy this non-intersecting requirement, Snippy fails.
 
-   This behaviour applies to instructions described in the
+   This behavior applies to instructions described in the
    `Strided Load/Store <#strided-loadstore>`__ section.
 
    Currently the option works only with ``access-ranges`` memory schemes.
@@ -1256,7 +1256,7 @@ as:
 
 This formula shows which addresses can be generated as operands of memory instructions, but it does not take into account how many bytes the instruction touches. By default, the instruction can affect any number of bytes so that the ``start + size`` of ``access-ranges`` is not exceeded.
 
-In order to regulate all bytes that are accessed, there are two optional fields ``access-size`` and ``max-past-last-offset``. The first ensures that this memory scheme will not be used for instructions with an access size greater than ``access-size``. The second allows you to controll how far access can exceed ``last-offset``, the offset of the last byte to which access is allowed is ``last-offset`` + ``max-past-last-offset``. This way you can generate accesses of ``access-size`` bytes without accessing bytes after ``last-offset`` + ``max-past-last-offset``.
+In order to regulate all bytes that are accessed, there are two optional fields ``access-size`` and ``max-past-last-offset``. The first ensures that this memory scheme will not be used for instructions with an access size greater than ``access-size``. The second allows you to control how far access can exceed ``last-offset``, the offset of the last byte to which access is allowed is ``last-offset`` + ``max-past-last-offset``. This way you can generate accesses of ``access-size`` bytes without accessing bytes after ``last-offset`` + ``max-past-last-offset``.
 
 .. note::
    In order to be able to start accessing memory from the byte with ``last-offset``,
@@ -2478,7 +2478,7 @@ To enable ``random-scheduling``, use one of the following approaches:
 
       -random-scheduling
 
-Random scheduling does not change the behaviour of the program. However,
+Random scheduling does not change the behavior of the program. However,
 it might be ineffective for large basic blocks, as they force it to run
 for a long time. To control this behavior, you can `configure the
 maximum size of scheduling
@@ -3213,7 +3213,7 @@ For example:
 Operands reinitialization
 -------------------------
 
-You can per-opcode reinitialize all initializeable operand registers using
+You can per-opcode reinitialize all initializable operand registers using
 ``operands-reinitialization`` in layout.
 
 .. important::
@@ -3266,7 +3266,7 @@ Currently, only ``valuegram`` data source type is supported. It should include:
 
       - ``values`` |nbsp| -- |nbsp| the ordered list of values. Floating point syntax
         and uniform are supported. The number of values must be equal to the number of
-        initializeable operands of all instructions that this regex matches. Also you
+        initializable operands of all instructions that this regex matches. Also you
         can specify each value via valuegram, the same way as in the **histograms** and
         **imm-hist**.
 
@@ -3492,7 +3492,7 @@ The options are:
 
 -  ``any`` |nbsp| -- |nbsp| Any random suitable register. If ``--honor-target-abi`` option is specified then target ABI return address register is always chosen.
 
--  ``reg::R`` |nbsp| -- |nbsp| Specific register ``R``. If register is not suitable to be used as return address in at least one of call instructions specifid in histogram, the error is issued.
+-  ``reg::R`` |nbsp| -- |nbsp| Specific register ``R``. If register is not suitable to be used as return address in at least one of call instructions specified in histogram, the error is issued.
 
 -  ``RA`` |nbsp| -- |nbsp| Return address register specified by the ABI.
 
@@ -3502,7 +3502,7 @@ The options are:
 
 -  ``any``
 
-Return address register must be distinct from stack pointer register, so be cautious when using this option in pair with ``--redefine-sp``. The configration error may occur if:
+Return address register must be distinct from stack pointer register, so be cautious when using this option in pair with ``--redefine-sp``. The configuration error may occur if:
 
 - Same register is specified in both options. E.g. ``--redefine-ra=reg::X2 --redefine-sp=SP``
 
@@ -4063,7 +4063,7 @@ pseudoinstructions:
 - ``SwapFFLAGSImm``, ``SwapFRMImm`` and ``SwapFCSRImm`` - Save previous CSR value into a GPR and write immediate into it.
 - ``WriteFFLAGS``, ``WriteFRM``, ``WriteFCSR`` - Write register to CSR. Best used in combination with `Operands Reinitialization <#operands-reinitialization>`__
 
-These pseudoinstructions in conjuction with
+These pseudoinstructions in conjunction with
 `Immediate Histograms <#immediate-histograms>`__ provide flexible manipulation
 of static and dynamic rounding modes, reading, clearing and writing exception
 flags and so on. A few examples follow below.
@@ -4426,7 +4426,7 @@ Global Constants
 ================
 
 In some scenarios, snippy produces global constants.
-For example, this is nesassary for
+For example, this is necessary for
 `RISC-V vector register initialization`_,
 `selfcheck-related global constants`_ and so on.
 
@@ -4991,7 +4991,7 @@ RISC-V architecture is supported with the following extensions. For the details,
 - **Zhinxmin** - Minimal Half-Precision Floating-Point in Integer Registers
 
 
-**Priviledged Extensions**
+**Privileged Extensions**
 
 - **Svinval** - Fine-Grained Address-Translation Cache Invalidation
 
@@ -5004,8 +5004,8 @@ Compressed instruction limitations
   `-honor-target-abi <#generating-abi-with-respect-to-target>`__ option:
   ``C_ADDI16SP``, ``C_ADDI4SPN``, ``C_LDSP``, ``C_LWSP``, ``C_SDSP``, and ``C_SWSP``.
 
-Svinval recomendations
-^^^^^^^^^^^^^^^^^^^^^^
+Svinval recommendations
+^^^^^^^^^^^^^^^^^^^^^^^
 
 The most basic **Svinval** tests can be generated by the following config:
 
@@ -5114,7 +5114,7 @@ values that are written to source registers:
 With this config probability of choosing **X0** as a source register is ``1/5``.
 However limiting the number of available registers might affect generation of
 all instructions from histogram. Let us take a look at a possible solution to
-this problem that involves generating 2 snippets with custom callgraph.
+this problem that involves generating 2 snippets with custom call graph.
 
 The first snippet will reuse the :ref:`config above <svinval-hypervisor>` that
 produces a ``svinval_random`` function.
