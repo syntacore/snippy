@@ -1,0 +1,18 @@
+# RUN: not llvm-snippy %s \
+# RUN:    -initial-regs-yaml=%S/Inputs/f-too-wide-freg-values.yaml \
+# RUN:    -model-plugin=None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv32
+  mattr: +f
+  num-instrs: 1
+  init-regs-in-elf: true
+
+include:
+  - ../../../../Inputs/sections.yaml
+
+histogram:
+  - [ADD, 1.0]
+
+# CHECK: error: Registers file error: Entry FFFFFFFF00000002 for register type F is wider than requested bit width 32
