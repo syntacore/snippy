@@ -1,0 +1,18 @@
+# RUN: not llvm-snippy %s \
+# RUN:     -initial-regs-yaml=%S/Inputs/d-unsupported-values.yaml \
+# RUN:     -model-plugin=None \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv32
+  mattr: +d
+  num-instrs: 1
+  init-regs-in-elf: true
+
+include:
+  - ../../../../Inputs/sections.yaml
+
+histogram:
+  - [ADD, 1.0]
+
+# CHECK: error: Cannot write value '0xFBFAFEFC12345678' to an FP register F0_D: on rv32ifd initializing a FP register with a non-NaN-boxed value is impossible without the 'riscv-init-fregs-from-memory' option
