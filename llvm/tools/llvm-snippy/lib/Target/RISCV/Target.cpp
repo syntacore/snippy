@@ -47,6 +47,7 @@
 #include "RISCVSubtarget.h"
 #include "TargetGenContext.h"
 
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallVectorExtras.h"
@@ -5376,26 +5377,49 @@ private:
   }
 };
 
-static unsigned getOpcodeForGPRToFPRInstr(unsigned DstReg, unsigned XLen,
-                                          unsigned NumBits, LLVMContext &Ctx) {
-  if (NumBits > XLen)
-    snippy::fatal(Ctx, "Cannot write value to a FP register",
-                  "it doesn't fit in GRP. Please, provide '" +
-                      InitFRegsFromMemory.ArgStr +
-                      "' option to make "
-                      "initialization possible");
+[[noreturn]]
+static void reportInitializationFPRegError(LLVMContext &Ctx, const APInt &Value,
+                                           StringRef RegName) {
+  snippy::fatal(
+      Ctx,
+      llvm::formatv("Cannot write value '{}' to an FP register {}",
+                    llvm::format_hex(Value.getLimitedValue(), /* Width */ 18,
+                                     /* Upper */ true),
+                    RegName),
+      llvm::formatv(
+          "on rv32ifd initializing a FP register with "
+          "a non-NaN-boxed value is impossible without the '{}' option",
+          InitFRegsFromMemory.ArgStr));
+}
 
-  unsigned FMVOpc;
+static bool isNanBoxedSingle(const APInt &Value) {
+  constexpr uint64_t Mask = 0xFFFF'FFFF'0000'0000;
+  return (Value.getActiveBits() == 64) && ((Value & Mask) == Mask);
+}
+
+static unsigned getOpcodeForGPRToFPRInstrAndPrepareValue(
+    LLVMContext &Ctx, const RISCVSubtarget &ST, APInt &Value, unsigned DstReg,
+    const MCRegisterInfo &RI) {
+  auto XLen = ST.getXLen();
+
+  if (ST.hasStdExtD() && ST.isRV32()) {
+    if (isNanBoxedSingle(Value)) {
+      Value = Value.trunc(32).zext(XLen);
+      return RISCV::FMV_W_X;
+    }
+    reportInitializationFPRegError(Ctx, Value, RI.getName(DstReg));
+  }
+
+  Value = Value.zextOrTrunc(XLen);
+
   if (RISCV::FPR32RegClass.contains(DstReg))
-    FMVOpc = RISCV::FMV_W_X;
-  else if (RISCV::FPR64RegClass.contains(DstReg))
-    FMVOpc = RISCV::FMV_D_X;
-  else if (RISCV::FPR16RegClass.contains(DstReg))
-    FMVOpc = RISCV::FMV_H_X;
-  else
-    snippy::fatal("unknown floating point register class for the register");
+    return RISCV::FMV_W_X;
+  if (RISCV::FPR64RegClass.contains(DstReg) && ST.is64Bit())
+    return RISCV::FMV_D_X;
+  if (RISCV::FPR16RegClass.contains(DstReg))
+    return RISCV::FMV_H_X;
 
-  return FMVOpc;
+  llvm_unreachable("NumBits should be no larger than XLen");
 }
 
 void SnippyRISCVTarget::generateWriteValueFromMemory(
@@ -5438,19 +5462,17 @@ void SnippyRISCVTarget::generateWriteValueFP(
     return;
   }
 
-  auto NumBits = Value.getBitWidth();
   auto &ProgCtx = IGC.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
-  auto FMVOpc =
-      getOpcodeForGPRToFPRInstr(DstReg, ST.getXLen(), NumBits, State.getCtx());
+  auto &RI = State.getRegInfo();
+  auto FMVOpc = getOpcodeForGPRToFPRInstrAndPrepareValue(State.getCtx(), ST,
+                                                         Value, DstReg, RI);
 
-  Value = Value.zext(ST.getXLen());
   // Note that there's no need to manually NaN-box the argument. FMV
   // instructions already do this for us. We could randomize them for a bit more
   // coverage, but that would significantly blow up the code size.
 
-  auto &RI = State.getRegInfo();
   auto &RP = IGC.getRegPool();
   auto ScratchReg = getNonZeroReg("scratch register for writing FP register",
                                   RI, RP, IGC.MBB, AccessMaskBit::SupportRW);
