@@ -2566,22 +2566,22 @@ public:
     }
   }
 
-  static uint64_t getMaxGenValueForRegs(InstructionGenerationContext &IGC,
-                                        const Branchegram &Branches,
-                                        ArrayRef<Register> ReservedRegs) {
+  uint64_t getMaxGenValueForRegs(InstructionGenerationContext &IGC,
+                                 const Branchegram &Branches,
+                                 ArrayRef<Register> ReservedRegs) const {
     auto &ProgCtx = IGC.ProgCtx;
     const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
     auto VLEN =
         ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>().getVLEN();
     auto CounterReg = ReservedRegs[CounterRegIdx];
-    auto MaxCounterRegVal = RISCVRegisterState::getMaxRegValueForSize(
-        CounterReg, ST.getXLen(), VLEN);
+    auto MaxCounterRegVal =
+        RISCVRegisterState::getMaxRegValueForSize(ST, CounterReg.id(), VLEN);
     if (ReservedRegs.size() == 1)
       return MaxCounterRegVal;
 
     auto LimitReg = ReservedRegs[LimitRegIdx];
     auto MaxLimitRegVal =
-        RISCVRegisterState::getMaxRegValueForSize(LimitReg, ST.getXLen(), VLEN);
+        RISCVRegisterState::getMaxRegValueForSize(ST, LimitReg, VLEN);
     return std::min(MaxCounterRegVal, MaxLimitRegVal);
   }
 
@@ -3260,7 +3260,7 @@ public:
     const auto &ST = static_cast<const RISCVSubtarget &>(SubTgt);
     auto VLEN =
         ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>().getVLEN();
-    return snippy::getRegBitWidth(Reg, ST.getXLen(), VLEN);
+    return snippy::getRegBitWidth(ST, Reg, VLEN);
   }
 
   unsigned getRegBitWidth(MCRegister Reg,
