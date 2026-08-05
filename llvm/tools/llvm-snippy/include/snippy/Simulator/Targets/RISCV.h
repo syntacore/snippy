@@ -43,16 +43,17 @@ enum RISCVSimulatorSysReg : uint16_t {
 const RISCVSysReg::SysReg *lookupSysReg(RISCVSimulatorSysReg Reg);
 
 /// Get system register used bit width as defined in the ISA spec.
-unsigned getBitWidth(RISCVSimulatorSysReg Reg);
+unsigned getBitWidth(const RISCVSubtarget &ST, RISCVSimulatorSysReg Reg);
 } // namespace RISCVSimulatorSysRegs
 
 /// \brief Get list of all supported system registers.
-ArrayRef<RISCVSimulatorSysRegs::RISCVSimulatorSysReg> supportedSysRegs();
+SmallVector<RISCVSimulatorSysRegs::RISCVSimulatorSysReg>
+getSupportedSysRegs(const RISCVSubtarget &ST);
 
-static inline unsigned getRegBitWidth(MCRegister Reg, unsigned XLen,
+static inline unsigned getRegBitWidth(const RISCVSubtarget &ST, MCRegister Reg,
                                       unsigned VLEN = 0) {
   if (RISCV::GPRRegClass.contains(Reg))
-    return XLen;
+    return ST.getXLen();
   if (RISCV::FPR16RegClass.contains(Reg))
     return Reg2Bytes * RISCV_CHAR_BIT;
   if (RISCV::FPR32RegClass.contains(Reg))
@@ -60,9 +61,9 @@ static inline unsigned getRegBitWidth(MCRegister Reg, unsigned XLen,
   if (RISCV::FPR64RegClass.contains(Reg))
     return Reg8Bytes * RISCV_CHAR_BIT;
   auto RegID = Reg.id();
-  if (is_contained(supportedSysRegs(), RegID))
+  if (is_contained(getSupportedSysRegs(ST), RegID))
     return RISCVSimulatorSysRegs::getBitWidth(
-        static_cast<RISCVSimulatorSysRegs::RISCVSimulatorSysReg>(Reg.id()));
+        ST, static_cast<RISCVSimulatorSysRegs::RISCVSimulatorSysReg>(Reg.id()));
   assert(RISCV::VRRegClass.contains(Reg) && "unknown register class");
   return VLEN;
 }
@@ -83,6 +84,7 @@ static inline unsigned regToIndex(Register Reg) {
 using RISCVSimulatorSysRegs::RISCVSimulatorSysReg;
 
 struct RISCVRegisterState : public IRegisterState {
+  const RISCVSubtarget *ST;
   unsigned VLEN;
   unsigned VLENB;
   static constexpr unsigned NRegs = 32;
@@ -96,7 +98,7 @@ struct RISCVRegisterState : public IRegisterState {
 
   RISCVRegisterState(const RISCVSubtarget &ST,
                      unsigned VLEN = 16 * RISCV_CHAR_BIT)
-      : VLEN(VLEN), VLENB(VLEN / RISCV_CHAR_BIT), XRegs(NRegs) {
+      : ST(&ST), VLEN(VLEN), VLENB(VLEN / RISCV_CHAR_BIT), XRegs(NRegs) {
     if (ST.is64Bit())
       XRegSize = RegSizeInBytes::Reg8Bytes;
 
@@ -125,11 +127,15 @@ struct RISCVRegisterState : public IRegisterState {
 
   static uint64_t getMaxRegValueForSize(RegSizeInBytes Size);
 
-  static uint64_t getMaxRegValueForSize(Register Reg, unsigned XLenBits,
+  uint64_t getMaxRegValueForSize(Register Reg, unsigned VLen) const;
+
+  static uint64_t getMaxRegValueForSize(const RISCVSubtarget &ST, Register Reg,
                                         unsigned VLen);
 
-  static RegSizeInBytes getRegSizeInBytes(Register Reg, unsigned XLenBits,
-                                          unsigned VLen);
+  RegSizeInBytes getRegSizeInBytes(Register Reg, unsigned VLen) const;
+
+  static RegSizeInBytes getRegSizeInBytes(const RISCVSubtarget &ST,
+                                          Register Reg, unsigned VLen);
 
 private:
   void uniformlyFillXRegs();
