@@ -10,6 +10,7 @@
 
 #include <RISCVModel/RVM.hpp>
 
+#include "RISCVSubtarget.h"
 #include "snippy/Config/RegisterHistogram.h"
 #include "snippy/Simulator/RISCVRegTypes.h"
 #include "snippy/Simulator/Targets/RISCV.h"
@@ -21,6 +22,7 @@
 
 #include "Common.h"
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -140,9 +142,15 @@ bool RISCVRegisterState::operator==(const IRegisterState &Another) const {
 }
 
 RegSizeInBytes RISCVRegisterState::getRegSizeInBytes(Register Reg,
-                                                     unsigned XLenBits,
+                                                     unsigned VLEN) const {
+  return static_cast<RegSizeInBytes>(getRegBitWidth(*ST, Reg, VLEN) /
+                                     RISCV_CHAR_BIT);
+}
+
+RegSizeInBytes RISCVRegisterState::getRegSizeInBytes(const RISCVSubtarget &ST,
+                                                     Register Reg,
                                                      unsigned VLEN) {
-  return static_cast<RegSizeInBytes>(getRegBitWidth(Reg, XLenBits, VLEN) /
+  return static_cast<RegSizeInBytes>(getRegBitWidth(ST, Reg, VLEN) /
                                      RISCV_CHAR_BIT);
 }
 
@@ -158,9 +166,15 @@ uint64_t RISCVRegisterState::getMaxRegValueForSize(RegSizeInBytes Size) {
 }
 
 uint64_t RISCVRegisterState::getMaxRegValueForSize(Register Reg,
-                                                   unsigned XLenBits,
+                                                   unsigned VLEN) const {
+  auto SizeInBytes = getRegSizeInBytes(Reg, VLEN);
+  return getMaxRegValueForSize(SizeInBytes);
+}
+
+uint64_t RISCVRegisterState::getMaxRegValueForSize(const RISCVSubtarget &ST,
+                                                   Register Reg,
                                                    unsigned VLEN) {
-  auto SizeInBytes = getRegSizeInBytes(Reg, XLenBits, VLEN);
+  auto SizeInBytes = getRegSizeInBytes(ST, Reg, VLEN);
   return getMaxRegValueForSize(SizeInBytes);
 }
 
@@ -189,16 +203,21 @@ RISCVSimulatorSysRegs::lookupSysReg(RISCVSimulatorSysReg Reg) {
   return EqualRange.begin();
 }
 
-ArrayRef<RISCVSimulatorSysReg> supportedSysRegs() {
-  constexpr static const RISCVSimulatorSysReg List[] = {
-      RISCVSimulatorSysReg::FCSR,
-      RISCVSimulatorSysReg::FFLAGS,
-      RISCVSimulatorSysReg::FRM,
-  };
-  return List;
+SmallVector<RISCVSimulatorSysReg>
+getSupportedSysRegs(const RISCVSubtarget &ST) {
+  SmallVector<RISCVSimulatorSysReg> SupportedRegs;
+  if (ST.hasStdExtF()) {
+    SupportedRegs.push_back(RISCVSimulatorSysReg::FCSR);
+    SupportedRegs.push_back(RISCVSimulatorSysReg::FRM);
+    SupportedRegs.push_back(RISCVSimulatorSysReg::FFLAGS);
+  }
+  if (ST.hasStdExtZcmt())
+    SupportedRegs.push_back(RISCVSimulatorSysReg::JVT);
+  return SupportedRegs;
 }
 
-unsigned RISCVSimulatorSysRegs::getBitWidth(RISCVSimulatorSysReg Reg) {
+unsigned RISCVSimulatorSysRegs::getBitWidth(const RISCVSubtarget &ST,
+                                            RISCVSimulatorSysReg Reg) {
   switch (Reg) {
   case RISCVSimulatorSysReg::FFLAGS:
     return 5;
@@ -206,6 +225,8 @@ unsigned RISCVSimulatorSysRegs::getBitWidth(RISCVSimulatorSysReg Reg) {
     return 3;
   case RISCVSimulatorSysReg::FCSR:
     return 32;
+  case RISCVSimulatorSysReg::JVT:
+    return ST.getXLen();
   }
   llvm_unreachable("unhandled enum value");
 }
@@ -213,6 +234,7 @@ unsigned RISCVSimulatorSysRegs::getBitWidth(RISCVSimulatorSysReg Reg) {
 class SnippyRISCVSimulator final
     : public CommonSimulatorImpl<rvm::State, SnippyRISCVSimulator, RVMXReg,
                                  RVMFReg> {
+  const RISCVSubtarget *ST;
   unsigned VLEN = 0;
   RegSizeInBytes XRegSize = Reg4Bytes;
   RegSizeInBytes FRegSize = Reg4Bytes;
@@ -226,7 +248,8 @@ class SnippyRISCVSimulator final
   }
 
 public:
-  SnippyRISCVSimulator(rvm::State &&MS) : CommonSimulatorImpl(std::move(MS)) {}
+  SnippyRISCVSimulator(const RISCVSubtarget &ST, rvm::State &&MS)
+      : CommonSimulatorImpl(std::move(MS)), ST(&ST) {}
 
   ExecutionResult executeInstr() override {
     auto ExecRes = ModelState.executeInstr();
@@ -286,7 +309,7 @@ public:
   }
 
   Expected<APInt> readReg(llvm::Register Reg) const override {
-    auto RegSize = getRegBitWidth(Reg, XRegSize * RISCV_CHAR_BIT, VLEN);
+    auto RegSize = getRegBitWidth(*ST, Reg, VLEN);
     auto RegIdx = regToIndex(Reg);
     if (Reg >= RISCV::X0 && Reg <= RISCV::X31) {
       auto Val = readGPR(RegIdx);
@@ -415,7 +438,7 @@ public:
   void resetState(const TargetSubtargetInfo &SubTgt) override;
 
   std::vector<std::pair<unsigned, RegisterType>> getCSRValues() const override {
-    auto CSRs = supportedSysRegs();
+    auto CSRs = getSupportedSysRegs(*ST);
     std::vector<std::pair<unsigned, RegisterType>> Values;
     transform(CSRs, std::back_inserter(Values), [this](auto CSR) {
       return std::make_pair(
@@ -787,7 +810,7 @@ std::unique_ptr<SimulatorInterface> createRISCVSimulator(
                           "failed to create RISCV simulator",
                           createStringError(std::get<std::string>(ModelState)));
   auto Sim = std::make_unique<SnippyRISCVSimulator>(
-      std::move(std::get<rvm::State>(ModelState)));
+      Subtarget, std::move(std::get<rvm::State>(ModelState)));
   auxSimInit(Subtarget, *Sim);
   return Sim;
 }
