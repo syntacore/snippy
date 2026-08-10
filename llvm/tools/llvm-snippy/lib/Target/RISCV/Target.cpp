@@ -466,52 +466,6 @@ static RegStorageType regToStorage(Register Reg) {
   return RegStorageType::VReg;
 }
 
-static RVVModeInfo
-decodeRVVMode(const planning::InstructionRequest &ModeChangeInstr,
-              InstructionGenerationContext &IGC) {
-  const auto &Preselected = ModeChangeInstr.Preselected;
-  assert(Preselected.size() == 4);
-  assert(all_of(Preselected, [](auto Op) { return Op.isImm(); }));
-  auto VTYPEOp = Preselected[0].getImm();
-  auto VLOp = Preselected[1].getImm();
-  auto VMOp = Preselected[2].getImm();
-  auto VXRMOp = Preselected[3].getImm();
-
-  auto VTYPE = VTYPEOp.getSExtVal();
-  auto VL = static_cast<unsigned>(VLOp.getSExtVal());
-  auto VM = VMOp.getVal();
-  auto RVVConfig = RVVConfiguration::fromVTYPE(
-      VL, VTYPE, static_cast<VXRMMode>(VXRMOp.getSExtVal()));
-
-  return RVVModeInfo{ModeChangeInstr.Opcode, VM, RVVConfig, &IGC.MBB};
-}
-
-static planning::InstructionRequest encodeRVVMode(const RVVModeInfo &RVVMode) {
-  const auto &Config = RVVMode.Config;
-  auto VTYPE = Config.getVTYPE();
-  auto VTYPEOp = planning::PreselectedOpInfo(StridedImmediate(VTYPE));
-  auto VLOp =
-      planning::PreselectedOpInfo(StridedImmediate(Config.PrimaryCfg.VL));
-  auto VMOp = planning::PreselectedOpInfo(StridedImmediate(RVVMode.VM));
-  auto VXRMOp = planning::PreselectedOpInfo(
-      StridedImmediate(static_cast<int>(Config.XRM)));
-  // Since the encoding of the RVV configuration depends on the VSET* opcode,
-  // it can't be represented in a single way in InstructionRequest. Therefore,
-  // we will follow the following convention for a compact representation of the
-  // RVV configuration:
-  //
-  //     InstructionRequest(VsetOpcode, Preselected)
-  //
-  // , where Preselected array consist of immediate elements:
-  // Preselected[0] = VTYPE
-  // Preselected[1] = VL
-  // Preselected[2] = VM
-  // Preselected[3] = VXRM
-  SmallVector<planning::PreselectedOpInfo> Preselected{VTYPEOp, VLOp, VMOp,
-                                                       VXRMOp};
-  return {RVVMode.VsetOpcode, Preselected};
-}
-
 static bool isLegalRVVInstr(unsigned Opcode, const RVVPrimaryConfig &Cfg,
                             unsigned VLEN, const RISCVSubtarget *ST) {
   if (!isRVV(Opcode))
@@ -1630,7 +1584,7 @@ public:
     return VSETWeight / ModeChangeInfo.TotalHistWeight;
   }
 
-  std::pair<planning::InstructionRequest, OpcodeFilterType>
+  std::pair<std::shared_ptr<const ModeChangingContext>, OpcodeFilterType>
   selectModeChangeAndGetFilter(const SnippyProgramContext &ProgCtx,
                                const MachineBasicBlock &MBB,
                                MDNode *MetadataMark) const override {
@@ -1653,16 +1607,17 @@ public:
       return isLegalRVVInstr(Opcode, PrimaryCfg, VLEN, Subtarget);
     };
 
-    return std::make_pair(encodeRVVMode(NewRVVMode), Filter);
+    return std::make_pair(
+        std::make_shared<RISCVModeChangingContext>(NewRVVMode), Filter);
   }
 
-  void generateModeChange(const planning::InstructionRequest &ModeChangeInstr,
+  void generateModeChange(const ModeChangingContext &MCC,
                           InstructionGenerationContext &IGC,
                           MDNode *MetadataMark) const override {
     const auto &ProgCtx = IGC.ProgCtx;
     const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
-    const auto &NewRVVMode = decodeRVVMode(ModeChangeInstr, IGC);
-    generateRVVModeUpdate(IGC, InstrInfo, NewRVVMode, MetadataMark);
+    const auto &RVMCC = static_cast<const RISCVModeChangingContext &>(MCC);
+    generateRVVModeUpdate(IGC, InstrInfo, RVMCC.RVVMI, MetadataMark);
   }
 
   void checkInstrTargetDependency(const OpcodeHistogram &H,
