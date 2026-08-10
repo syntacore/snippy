@@ -53,12 +53,12 @@ static Register pregenerateRegister(InstructionGenerationContext &InstrGenCtx,
 }
 
 /// Pregenerate available register operands.
-/// \return Vector of size InstrDesc.getNumOperands(). Uninitializable operands
-/// have corresponding PreselectedOpInfo::isUnset().
-static PreselectedOperands
-selectInitializableOperandsRegisters(InstructionGenerationContext &InstrGenCtx,
-                                     const MCInstrDesc &InstrDesc) {
-  PreselectedOperands Preselected;
+/// \param[out] Vector of size InstrDesc.getNumOperands(). Uninitializable
+/// operands have corresponding PreselectedOpInfo::isUnset().
+static void selectInitializableOperandsRegisters(
+    InstructionGenerationContext &InstrGenCtx, const MCInstrDesc &InstrDesc,
+    SmallVectorImpl<PreselectedOpInfo> &Preselected) {
+  Preselected.clear();
   Preselected.reserve(InstrDesc.getNumOperands());
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   bool ValuegramOperandsRegsInitOutputs =
@@ -84,7 +84,6 @@ selectInitializableOperandsRegisters(InstructionGenerationContext &InstrGenCtx,
           return pregenerateRegister(InstrGenCtx, InstrDesc, MCOpInfo, OpIndex);
         return {};
       });
-  return Preselected;
 }
 
 ValuegramGenPolicy::ValuegramGenPolicy(
@@ -122,8 +121,9 @@ ValuegramGenPolicy::generateOneInstrWithInitRegs(
   // We need to select all operands-registers to insert their
   // initialization according to the valuegram before the main instruction.
   const auto &InstrDesc = State.getInstrInfo().get(Opcode);
-  InstructionRequest MainInstr{
-      Opcode, selectInitializableOperandsRegisters(InstrGenCtx, InstrDesc)};
+  SmallVector<PreselectedOpInfo> Preselected;
+  selectInitializableOperandsRegisters(InstrGenCtx, InstrDesc, Preselected);
+  InstructionRequest MainInstr{Opcode, Preselected};
 
   // TODO: Support selecting immediate operand values. This can be handled by
   // setting Min = Max in the StridedImmediate.
@@ -132,7 +132,7 @@ ValuegramGenPolicy::generateOneInstrWithInitRegs(
         return Operand.isReg();
       });
 
-  PreselectedOperands Registers;
+  SmallVector<PreselectedOpInfo> Registers;
   // Simple quadratic unique because PreselectedOpInfo/StridedImmediate
   // don't have an order defined, so std::unique is not applicable.
   for (auto Operand : OpsRegs) {
@@ -224,13 +224,13 @@ ValuegramGenPolicy::generateRegInit(InstructionGenerationContext &InstrGenCtx,
                               InstrsForWrite);
     llvm::transform(
         InstrsForWrite, std::back_inserter(InitInstrs), [&](const auto &I) {
-          auto Preselected = getPreselectedForInstr(I);
-          if (auto Err = Preselected.takeError())
+          SmallVector<PreselectedOpInfo> Preselected;
+          if (auto Err = getPreselectedForInstr(I, Preselected))
             snippy::fatal(
                 "While generating reg init for operand reinitialization",
                 toString(std::move(Err)));
           return InstructionRequest{
-              I.getOpcode(), std::move(*Preselected),
+              I.getOpcode(), std::move(Preselected),
               getMetadataMark(State.getCtx(), SnippyMetadata::Support)};
         });
   });

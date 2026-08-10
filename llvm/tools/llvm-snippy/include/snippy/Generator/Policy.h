@@ -69,7 +69,7 @@
 #include "snippy/Config/RegisterHistogram.h"
 #include "snippy/Generator/FPRNaNIdentifier.h"
 #include "snippy/Generator/GenerationLimit.h"
-#include "snippy/Generator/PreselectedOperands.h"
+#include "snippy/Generator/PreselectedOpInfo.h"
 #include "snippy/Generator/SelfcheckInfo.h"
 #include "snippy/Generator/SnippyModule.h"
 #include "snippy/GeneratorUtils/LLVMState.h"
@@ -276,12 +276,13 @@ private:
 
 struct InstructionRequest final {
   unsigned Opcode;
-  PreselectedOperands Preselected;
+  // Typically instructions have very limited number of operands
+  SmallVector<PreselectedOpInfo, 8> Preselected;
   MDNode *MetadataMark = nullptr;
 
   InstructionRequest() = default;
 
-  InstructionRequest(unsigned Opcode, PreselectedOperands Preselected,
+  InstructionRequest(unsigned Opcode, ArrayRef<PreselectedOpInfo> Preselected,
                      MDNode *MetadataMark = nullptr)
       : Opcode(Opcode), Preselected(Preselected), MetadataMark(MetadataMark) {}
 
@@ -623,9 +624,9 @@ createGenPolicy(SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
                 std::optional<OpcodeFilterType> Filter = std::nullopt);
 
 template <typename OperandsTy>
-Expected<PreselectedOperands>
-getPreselectedForInstr(const OperandsTy &Operands) {
-  PreselectedOperands Preselected;
+Error getPreselectedForInstr(const OperandsTy &Operands,
+                             SmallVectorImpl<PreselectedOpInfo> &Preselected) {
+  Preselected.clear();
   Preselected.reserve(range_size(Operands));
   for (auto &Operand : Operands) {
     auto OpOrErr = PreselectedOpInfo::fromOperand(Operand);
@@ -633,7 +634,7 @@ getPreselectedForInstr(const OperandsTy &Operands) {
       return Err;
     Preselected.push_back(std::move(*OpOrErr));
   }
-  return Preselected;
+  return Error::success();
 }
 } // namespace planning
 } // namespace snippy

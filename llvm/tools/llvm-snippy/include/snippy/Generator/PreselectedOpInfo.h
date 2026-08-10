@@ -1,4 +1,4 @@
-//===-- PreselectedOperands.h -----------------------------------*- C++ -*-===//
+//===-- PreselectedOpInfo.h -------------------------------------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -87,9 +87,6 @@ public:
     }
   }
 };
-
-// Typically instructions have very limited number of operands
-using PreselectedOperands = SmallVector<PreselectedOpInfo, 8>;
 
 } // namespace llvm::snippy::planning
 #endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_PRESELECTEDOPERANDS_H
