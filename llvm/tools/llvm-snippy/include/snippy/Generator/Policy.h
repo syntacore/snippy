@@ -321,18 +321,14 @@ class ModeChangingInstPolicy final : public detail::EmptyFinalizeMixin {
   //
   OpcodeFilterType OpcodeFilter;
   MDNode *MetadataMark = nullptr;
-  // TODO: A new mode is now encoded in this one instruction request in a
-  // special way. Here should be a target dependent class that will store the
-  // configuration that should be set during the generation process from method
-  // initialize.
-  InstructionRequest ModeChangeInstr;
+  std::shared_ptr<const ModeChangingContext> MCC;
 
 public:
   ModeChangingInstPolicy(const SnippyProgramContext &ProgCtx,
                          const MachineBasicBlock &MBB, MDNode *MetadataMark)
       : MetadataMark(MetadataMark) {
     const auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
-    std::tie(ModeChangeInstr, OpcodeFilter) =
+    std::tie(MCC, OpcodeFilter) =
         Tgt.selectModeChangeAndGetFilter(ProgCtx, MBB, MetadataMark);
   }
 

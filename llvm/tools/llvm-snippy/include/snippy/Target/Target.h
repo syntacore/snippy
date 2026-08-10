@@ -78,6 +78,10 @@ namespace planning {
 struct InstructionRequest;
 }
 
+struct ModeChangingContext {
+  virtual ~ModeChangingContext() = default;
+};
+
 enum class LoopType;
 struct TargetGenContextInterface {
   virtual ~TargetGenContextInterface() = 0;
@@ -307,15 +311,15 @@ public:
   virtual double
   getModeSwitchProbability(const SnippyProgramContext &ProgCtx) const = 0;
 
-  virtual std::pair<planning::InstructionRequest, OpcodeFilterType>
+  virtual std::pair<std::shared_ptr<const ModeChangingContext>,
+                    OpcodeFilterType>
   selectModeChangeAndGetFilter(const SnippyProgramContext &ProgCtx,
                                const MachineBasicBlock &MBB,
                                MDNode *MetadataMark) const = 0;
 
-  virtual void
-  generateModeChange(const planning::InstructionRequest &ModeChangeInstr,
-                     InstructionGenerationContext &IGC,
-                     MDNode *MetadataMark) const = 0;
+  virtual void generateModeChange(const ModeChangingContext &MCC,
+                                  InstructionGenerationContext &IGC,
+                                  MDNode *MetadataMark) const = 0;
 
   virtual std::vector<Register>
   getRegsForSelfcheck(const MachineInstr &MI,
