@@ -390,7 +390,8 @@ getValuegramPolicyValueSource(const DefaultPolicyConfig &Cfg) {
 void ModeChangingInstPolicy::initialize(
     InstructionGenerationContext &InstrGenCtx, const RequestLimit &Limit) {
   const auto &Tgt = InstrGenCtx.ProgCtx.getLLVMState().getSnippyTarget();
-  Tgt.generateModeChange(ModeChangeInstr, InstrGenCtx, MetadataMark);
+  assert(MCC);
+  Tgt.generateModeChange(*MCC, InstrGenCtx, MetadataMark);
 }
 
 GenPolicy createGenPolicy(SnippyProgramContext &ProgCtx,
