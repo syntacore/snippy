@@ -954,11 +954,10 @@ bool sizeLimitIsExceeded(const planning::RequestLimit &Lim,
   return NewGeneratedCodeSize > Lim.getSizeLeft(CommitedStats);
 }
 
-static AddressInfoForInstr
-chooseAddrInfoForInstr(const MCInstrDesc &MIDesc,
-                       InstructionGenerationContext &IGC, const MachineLoop *ML,
-                       const SnippyLoopInfo *SLI,
-                       planning::PreselectedOperands &Preselected) {
+static AddressInfoForInstr chooseAddrInfoForInstr(
+    const MCInstrDesc &MIDesc, InstructionGenerationContext &IGC,
+    const MachineLoop *ML, const SnippyLoopInfo *SLI,
+    SmallVectorImpl<planning::PreselectedOpInfo> &Preselected) {
   assert(!ML || SLI);
   auto &ProgCtx = IGC.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
@@ -1098,12 +1097,12 @@ static void postprocessMemoryOperands(
     const auto &[AddrInfo, AddrGenInfo] = AddressesInfo[i];
 
     const auto &InstrDesc = MI.getDesc();
-    auto Operands = planning::getPreselectedForInstr(MI.operands());
-    if (auto Err = Operands.takeError())
+    SmallVector<planning::PreselectedOpInfo> Operands;
+    if (auto Err = planning::getPreselectedForInstr(MI.operands(), Operands))
       snippy::fatal("While postprocessing memory operands",
                     toString(std::move(Err)));
     auto &&[RegToValue, ChosenAddresses] =
-        SnippyTgt.breakDownAddr(IGC, AddrInfo, InstrDesc, *Operands, i);
+        SnippyTgt.breakDownAddr(IGC, AddrInfo, InstrDesc, Operands, i);
 
     auto AccessSize = AddrInfo.AccessSize;
     for (unsigned j = 0; j < AddrGenInfo.NumElements; ++j) {
@@ -1206,9 +1205,11 @@ isPostprocessNeeded(const MCInstrDesc &InstrDesc,
   return llvm::any_of(Preselected, [](const auto &Op) { return Op.isUnset(); });
 }
 
-static MachineInstr *randomInstruction(
-    const MCInstrDesc &InstrDesc, planning::PreselectedOperands Preselected,
-    planning::InstructionGenerationContext &InstrGenCtx, MDNode *MetadataMark) {
+static MachineInstr *
+randomInstruction(const MCInstrDesc &InstrDesc,
+                  SmallVector<planning::PreselectedOpInfo> Preselected,
+                  planning::InstructionGenerationContext &InstrGenCtx,
+                  MDNode *MetadataMark) {
   auto &MBB = InstrGenCtx.MBB;
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
@@ -1300,7 +1301,8 @@ void spillPseudoInstImplicitRegs(
 void generateRealInstruction(
     const MCInstrDesc &InstrDesc,
     planning::InstructionGenerationContext &InstrGenCtx,
-    planning::PreselectedOperands Preselected, MDNode *MetadataMark = nullptr) {
+    SmallVector<planning::PreselectedOpInfo> Preselected,
+    MDNode *MetadataMark = nullptr) {
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   auto Opc = InstrDesc.getOpcode();
@@ -1328,7 +1330,7 @@ void generateRealInstruction(
 
 void generateInstruction(const MCInstrDesc &InstrDesc,
                          planning::InstructionGenerationContext &InstrGenCtx,
-                         planning::PreselectedOperands Preselected,
+                         SmallVector<planning::PreselectedOpInfo> Preselected,
                          MDNode *MetadataMark) {
 
   generateRealInstruction(InstrDesc, InstrGenCtx, std::move(Preselected),
