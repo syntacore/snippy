@@ -104,7 +104,6 @@ static bool expandMOVImm(APInt Value, MCRegister DstReg,
   assert(Insn.size() != 0);
 
   for (auto I = Insn.begin(), E = Insn.end(); I != E; ++I) {
-    bool LastItem = std::next(I) == E;
     switch (I->Opcode) {
     default:
       llvm_unreachable("unhandled!");

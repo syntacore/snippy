@@ -46,7 +46,6 @@ static std::string sanitizeMethodToEnumName(llvm::StringRef RenderMethod) {
 }
 
 class OperandGeneratorEmitter {
-  const RecordKeeper &Records;
   const CodeGenTarget Target;
 
 public:
@@ -63,7 +62,7 @@ public:
   // Ordered list of (method string, enum name) pairs (insertion order)
   using RenderKindList = std::vector<std::pair<std::string, std::string>>;
 
-  OperandGeneratorEmitter(const RecordKeeper &R) : Records(R), Target(R) {}
+  OperandGeneratorEmitter(const RecordKeeper &R) : Target(R) {}
   virtual ~OperandGeneratorEmitter() = default;
   OperandInfoTy getOperandInfo(const CodeGenInstruction &Inst);
   std::string resolveRenderMethod(const CGIOperandList::OperandInfo &Operand);

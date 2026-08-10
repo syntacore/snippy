@@ -500,14 +500,15 @@ static planning::InstructionRequest encodeRVVMode(const RVVModeInfo &RVVMode) {
   // we will follow the following convention for a compact representation of the
   // RVV configuration:
   //
-  //     InstructionRequest(VsetOpcode, PreselectedOperands)
+  //     InstructionRequest(VsetOpcode, Preselected)
   //
-  // , where PreselectedOperands array consist of immediate elements:
-  // PreselectedOperands[0] = VTYPE
-  // PreselectedOperands[1] = VL
-  // PreselectedOperands[2] = VM
-  // PreselectedOperands[3] = VXRM
-  planning::PreselectedOperands Preselected{VTYPEOp, VLOp, VMOp, VXRMOp};
+  // , where Preselected array consist of immediate elements:
+  // Preselected[0] = VTYPE
+  // Preselected[1] = VL
+  // Preselected[2] = VM
+  // Preselected[3] = VXRM
+  SmallVector<planning::PreselectedOpInfo> Preselected{VTYPEOp, VLOp, VMOp,
+                                                       VXRMOp};
   return {RVVMode.VsetOpcode, Preselected};
 }
 
