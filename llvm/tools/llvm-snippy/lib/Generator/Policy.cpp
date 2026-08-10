@@ -219,10 +219,12 @@ void DefaultGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
     // Add the initializing instructions for memory regs
     llvm::transform(
         InitInstrs, std::back_inserter(Instructions), [&](const auto &I) {
-          auto ExpPreselected = getPreselectedForInstr(I);
-          if (!ExpPreselected)
-            snippy::fatal(ExpPreselected.takeError());
-          return InstructionRequest{I.getOpcode(), *ExpPreselected,
+          SmallVector<PreselectedOpInfo> Preselected;
+          if (auto Err = getPreselectedForInstr(I, Preselected))
+            snippy::fatal(
+                "While generating initializing instructions for memory regs",
+                toString(std::move(Err)));
+          return InstructionRequest{I.getOpcode(), Preselected,
                                     getMetadataMark(State.getCtx(),
                                                     SnippyMetadata::Support,
                                                     SnippyMetadata::Bundle)};
