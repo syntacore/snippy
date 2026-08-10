@@ -59,6 +59,11 @@ struct RISCVMemInitRegs final {
   }
 };
 
+struct RISCVModeChangingContext : public ModeChangingContext {
+  RVVModeInfo RVVMI;
+  RISCVModeChangingContext(const RVVModeInfo &RVVMI) : RVVMI(RVVMI) {}
+};
+
 class RISCVGeneratorContext : public TargetGenContextInterface {
 public:
   RISCVGeneratorContext(
