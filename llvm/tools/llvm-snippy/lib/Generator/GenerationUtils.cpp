@@ -154,8 +154,10 @@ std::map<unsigned, APInt> selectOperandsForConsecutiveInstrs(
   MemUsers.reserve(BurstInstrs.size());
   copy_if(map_range(BurstInstrs, [](auto &&IR) { return IR.Opcode; }),
           std::back_inserter(MemUsers), IsMemUser);
-  auto [MemUserIdxToPreselectedOps, RegsToInit] =
-      selectOperandsForMemoryInstructions(InstrGenCtx, MemUsers, RP);
+  std::vector<SmallVector<planning::PreselectedOpInfo, 8>>
+      MemUserIdxToPreselectedOps(MemUsers.size());
+  auto RegsToInit = selectOperandsForMemoryInstructions(
+      InstrGenCtx, MemUsers, RP, MemUserIdxToPreselectedOps);
   // Here we collected all registers that should be initialized (we don't
   // initialize registers for non-memory instructions). Initialize them all in
   // one go.
@@ -225,10 +227,11 @@ unsigned countAddrs(ArrayRef<unsigned> Opcodes, const SnippyTarget &SnippyTgt) {
 
 // For the given InstrDesc fill the vector of selected operands to account them
 // in instruction generation procedure.
-planning::PreselectedOperands selectMemoryOperands(const MCInstrDesc &InstrDesc,
-                                                   unsigned BaseReg,
-                                                   const AddressInfo &AI) {
-  planning::PreselectedOperands Preselected;
+void selectMemoryOperands(
+    const MCInstrDesc &InstrDesc, unsigned BaseReg, const AddressInfo &AI,
+    SmallVectorImpl<planning::PreselectedOpInfo> &Preselected) {
+  Preselected.clear();
+  Preselected.reserve(InstrDesc.getNumOperands());
   for (const auto &MCOpInfo : InstrDesc.operands()) {
     if (MCOpInfo.OperandType == MCOI::OperandType::OPERAND_MEMORY) {
       Preselected.emplace_back(BaseReg);
@@ -245,7 +248,6 @@ planning::PreselectedOperands selectMemoryOperands(const MCInstrDesc &InstrDesc,
       Preselected.emplace_back();
     }
   }
-  return Preselected;
 }
 
 void selectNonMemoryOperands(
@@ -338,10 +340,11 @@ getOffsetImmediate(ArrayRef<planning::PreselectedOpInfo> Preselected) {
   return Imm.getMax();
 }
 
-std::pair<std::vector<planning::PreselectedOperands>, std::map<unsigned, APInt>>
-selectOperandsForMemoryInstructions(InstructionGenerationContext &InstrGenCtx,
-                                    ArrayRef<unsigned> Opcodes,
-                                    RegPoolWrapper &RP) {
+std::map<unsigned, APInt> selectOperandsForMemoryInstructions(
+    InstructionGenerationContext &InstrGenCtx, ArrayRef<unsigned> Opcodes,
+    RegPoolWrapper &RP,
+    std::vector<SmallVector<planning::PreselectedOpInfo, 8>>
+        &OpcodeIdxToPreselectedOps) {
   unsigned Count = Opcodes.size();
   const auto &ProgCtx = InstrGenCtx.ProgCtx;
   const auto &State = ProgCtx.getLLVMState();
@@ -360,7 +363,6 @@ selectOperandsForMemoryInstructions(InstructionGenerationContext &InstrGenCtx,
   Excluded.insert_range(make_first_range(RegsToInit));
   assert(OpcodeIdxToBaseReg.size() == Count);
   assert(OpcodeIdxToAI.size() == Count);
-  std::vector<planning::PreselectedOperands> OpcodeIdxToPreselectedOps(Count);
   DenseSet<Register> Destinations;
   for (unsigned Idx = 0; Idx < Count; ++Idx) {
     auto Opcode = Opcodes[Idx];
@@ -370,7 +372,7 @@ selectOperandsForMemoryInstructions(InstructionGenerationContext &InstrGenCtx,
     assert(Tgt.countAddrsToGenerate(Opcode));
     const auto &InstrDesc = InstrInfo.get(Opcode);
     // Select memory operands
-    Preselected = selectMemoryOperands(InstrDesc, BaseReg, AI);
+    selectMemoryOperands(InstrDesc, BaseReg, AI, Preselected);
     selectConcreteOffsets(InstrGenCtx, InstrDesc, Preselected);
     // Now select other operands taking into account registers we already
     // reserved as memory operands
@@ -405,7 +407,7 @@ selectOperandsForMemoryInstructions(InstructionGenerationContext &InstrGenCtx,
     markMemAccessAsUsed(InstrGenCtx, InstrDesc, ActualAI, MemAccessKind::BURST,
                         InstrGenCtx.MAI);
   }
-  return {OpcodeIdxToPreselectedOps, RegsToInit};
+  return RegsToInit;
 }
 
 void selectConcreteOffsets(
