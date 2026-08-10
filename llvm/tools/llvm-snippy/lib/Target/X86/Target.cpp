@@ -98,7 +98,8 @@ public:
     reportUnimplementedError();
   }
 
-  std::pair<planning::InstructionRequest, std::function<bool(unsigned)>>
+  std::pair<std::shared_ptr<const ModeChangingContext>,
+            std::function<bool(unsigned)>>
   selectModeChangeAndGetFilter(const SnippyProgramContext &ProgCtx,
                                const MachineBasicBlock &MBB,
                                MDNode *MetadataMark) const override {
