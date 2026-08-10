@@ -12,7 +12,7 @@
 #include "snippy/Generator/GenerationLimit.h"
 #include "snippy/Generator/GlobalsPool.h"
 #include "snippy/Generator/MemAccessInfo.h"
-#include "snippy/Generator/PreselectedOperands.h"
+#include "snippy/Generator/PreselectedOpInfo.h"
 #include "snippy/GeneratorUtils/RegisterPool.h"
 
 namespace llvm {
@@ -22,9 +22,9 @@ struct InstructionRequest;
 } // namespace planning
 // For the given InstrDesc fill the vector of selected operands to account them
 // in instruction generation procedure.
-planning::PreselectedOperands selectMemoryOperands(const MCInstrDesc &InstrDesc,
-                                                   unsigned BaseReg,
-                                                   const AddressInfo &AI);
+void selectMemoryOperands(
+    const MCInstrDesc &InstrDesc, unsigned BaseReg, const AddressInfo &AI,
+    SmallVectorImpl<planning::PreselectedOpInfo> &Preselected);
 
 /// \brief Select all necessary operands for memory instructions.
 ///
@@ -32,12 +32,13 @@ planning::PreselectedOperands selectMemoryOperands(const MCInstrDesc &InstrDesc,
 /// stored register is not selected here as we don't care what register will be
 /// used
 ///
-/// \return pair of preselected operands for each instruction and a map from
-/// selected registers to values they need to be initialized with
-std::pair<std::vector<planning::PreselectedOperands>, std::map<unsigned, APInt>>
-selectOperandsForMemoryInstructions(InstructionGenerationContext &InstrGenCtx,
-                                    ArrayRef<unsigned> Opcodes,
-                                    RegPoolWrapper &RP);
+/// \return map from selected registers to values they need to be initialized
+/// with
+std::map<unsigned, APInt> selectOperandsForMemoryInstructions(
+    InstructionGenerationContext &InstrGenCtx, ArrayRef<unsigned> Opcodes,
+    RegPoolWrapper &RP,
+    std::vector<SmallVector<planning::PreselectedOpInfo, 8>>
+        &OpcodeIdxToPreselectedOps);
 /// \brief Select non-memory operands for instruction. Take into account
 /// registers that are reserved as memory operands
 void selectNonMemoryOperands(
