@@ -243,7 +243,8 @@ public:
 
   const MCRegisterClass &
   getRegClass(const InstructionGenerationContext &IGC,
-              unsigned OperandRegClassID, unsigned OpIndex, unsigned Opcode,
+              unsigned OperandRegClassID, unsigned OpIndex,
+              const MCInstrDesc &InstrDesc,
               const MCRegisterInfo &RegInfo) const override {
     reportUnimplementedError();
   }
@@ -371,7 +372,7 @@ public:
       const MCInstrDesc &InstrDesc, unsigned OperandIdx,
       const StridedImmediate &StridedImm, const SnippyProgramContext &ProgCtx,
       const CommonPolicyConfig &Cfg,
-      ArrayRef<MachineOperand> PregeneratedOperands,
+      ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands,
       MemAddr Addr) const override {
     reportUnimplementedError();
   }
@@ -569,7 +570,7 @@ public:
   std::pair<AddressParts, MemAddresses>
   breakDownAddr(InstructionGenerationContext &IGC, AddressInfo AddrInfo,
                 const MCInstrDesc &InstrDesc,
-                MutableArrayRef<planning::PreselectedOpInfo> Preselected,
+                SmallVectorImpl<planning::PreselectedOpInfo> &Preselected,
                 unsigned AddrIdx,
                 std::optional<MemAddr> MainPart) const override {
     reportUnimplementedError();
@@ -651,9 +652,10 @@ public:
     reportUnimplementedError();
   }
 
-  void preselectAccessSizeOperand(
-      InstructionGenerationContext &IGC, const MCInstrDesc &InstrDesc,
-      MutableArrayRef<planning::PreselectedOpInfo> Preselected) const override {
+  void preselectAccessSizeOperand(InstructionGenerationContext &IGC,
+                                  const MCInstrDesc &InstrDesc,
+                                  SmallVectorImpl<planning::PreselectedOpInfo>
+                                      &Preselected) const override {
     reportUnimplementedError();
   }
 
@@ -661,6 +663,13 @@ public:
       const SnippyProgramContext &ProgCtx, unsigned Opcode,
       const MachineBasicBlock &MBB,
       ArrayRef<planning::PreselectedOpInfo> Preselected = {}) const override {
+    reportUnimplementedError();
+  }
+
+  void
+  getSelectionOperandsOrder(InstructionGenerationContext &IGC,
+                            const MCInstrDesc &InstrDesc,
+                            SmallVectorImpl<unsigned> &Indices) const override {
     reportUnimplementedError();
   }
 
@@ -672,21 +681,16 @@ public:
     reportUnimplementedError();
   }
 
-  std::vector<Register> excludeRegsForOperand(InstructionGenerationContext &IGC,
-                                              const MCRegisterClass &RC,
-                                              const MCInstrDesc &InstrDesc,
-                                              unsigned Operand) const override {
+  std::vector<Register> excludeRegsForOperand(
+      InstructionGenerationContext &IGC, const MCRegisterClass &RC,
+      const MCInstrDesc &InstrDesc, unsigned OpIndex,
+      ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands)
+      const override {
     reportUnimplementedError();
   }
 
   std::vector<Register> includeRegs(unsigned Opcode,
                                     const MCRegisterClass &RC) const override {
-    reportUnimplementedError();
-  }
-
-  void reserveRegsIfNeeded(InstructionGenerationContext &IGC, unsigned Opcode,
-                           bool isDst, bool isMem,
-                           Register Reg) const override {
     reportUnimplementedError();
   }
 
