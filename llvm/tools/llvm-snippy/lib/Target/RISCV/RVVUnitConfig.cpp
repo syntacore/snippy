@@ -1430,9 +1430,19 @@ unsigned computeVLMax(unsigned ELEN, unsigned VLEN, VSEW VSEW, VLMUL LMUL) {
   return Result;
 }
 
+inline static bool isReservedValues(unsigned ELEN, unsigned SEW, VLMUL LMUL) {
+  if (LMUL == VLMUL::LMUL_RESERVED)
+    return true;
+  auto [Multiplier, IsFractional] = RISCVVType::decodeVLMUL(LMUL);
+  auto MinFracMultiplier = ELEN / SEW;
+  return !isLegalSEW(SEW) || (SEW > ELEN) ||
+         (IsFractional && (Multiplier > MinFracMultiplier));
+}
+
 std::pair<unsigned, bool> computeDecodedEMUL(unsigned ELEN, unsigned SEW,
                                              unsigned EEW, VLMUL LMUL) {
-  if (!isLegalSewLmul(ELEN, EEW, VSEW(SEW), LMUL)) {
+  if (isReservedValues(ELEN, SEW, LMUL) || !isLegalSEW(SEW) ||
+      !isLegalSEW(EEW)) {
     // Calculating EMUL doesn't make sense for illegal values of SEW or LMUL, so
     // just return {1, 0}
     return {1, 0};

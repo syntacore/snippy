@@ -12,6 +12,7 @@ options:
   mattr: +v
   dump-mf: true
   num-instrs: 1
+  riscv-nomask-mode-for-rvv: on
   reserved-regs-list: [V2,V4,V6,V8,V10,V12,V14,V16,V18,V20,V22,V24,V26,V28]
   valuegram-operands-regs-init-outputs: on
   rvv-init-mode: loads

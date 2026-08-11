@@ -162,6 +162,9 @@ std::map<unsigned, APInt> selectOperandsForConsecutiveInstrs(
   // initialize registers for non-memory instructions). Initialize them all in
   // one go.
   unsigned MemUsersIdx = 0;
+  DenseSet<Register> Destinations;
+  DenseSet<Register> Excluded;
+  Excluded.insert_range(make_first_range(RegsToInit));
   for (auto &&Instr : BurstInstrs) {
     if (IsMemUser(Instr.Opcode)) {
       Instr.Preselected = MemUserIdxToPreselectedOps[MemUsersIdx++];
@@ -170,13 +173,12 @@ std::map<unsigned, APInt> selectOperandsForConsecutiveInstrs(
       // operands.
       auto &II = State.getInstrInfo();
       auto &InstrDesc = II.get(Instr.Opcode);
-      Instr.Preselected.resize(InstrDesc.getNumOperands());
+      SmallVector<planning::PreselectedOpInfo> Preselected;
       // To avoid spoling registers used in memory instruction we use same
       // register pool and mark all initialized registers as excluded
-      DenseSet<Register> Excluded;
-      Excluded.insert_range(make_first_range(RegsToInit));
-      selectNonMemoryOperands(InstrDesc, Instr.Preselected, InstrGenCtx, RP,
-                              Excluded);
+      selectNonMemoryOperands(InstrDesc, Preselected, InstrGenCtx, RP,
+                              Destinations, Excluded);
+      Instr.Preselected = std::move(Preselected);
     }
   }
   return RegsToInit;
@@ -231,10 +233,10 @@ void selectMemoryOperands(
     const MCInstrDesc &InstrDesc, unsigned BaseReg, const AddressInfo &AI,
     SmallVectorImpl<planning::PreselectedOpInfo> &Preselected) {
   Preselected.clear();
-  Preselected.reserve(InstrDesc.getNumOperands());
-  for (const auto &MCOpInfo : InstrDesc.operands()) {
+  Preselected.resize(InstrDesc.getNumOperands());
+  for (const auto &&[Idx, MCOpInfo] : enumerate(InstrDesc.operands())) {
     if (MCOpInfo.OperandType == MCOI::OperandType::OPERAND_MEMORY) {
-      Preselected.emplace_back(BaseReg);
+      Preselected[Idx] = static_cast<Register>(BaseReg);
     } else if (MCOpInfo.OperandType >=
                MCOI::OperandType::OPERAND_FIRST_TARGET) {
       // FIXME: Here we just use the fact that RISC-V loads and stores from base
@@ -242,10 +244,8 @@ void selectMemoryOperands(
       auto MinStride = AI.MinStride;
       if (MinStride == 0)
         MinStride = 1;
-      Preselected.emplace_back(
-          StridedImmediate(AI.MinOffset, AI.MaxOffset, MinStride));
-    } else {
-      Preselected.emplace_back();
+      Preselected[Idx] =
+          StridedImmediate(AI.MinOffset, AI.MaxOffset, MinStride);
     }
   }
 }
@@ -254,20 +254,22 @@ void selectNonMemoryOperands(
     const MCInstrDesc &InstrDesc,
     SmallVectorImpl<planning::PreselectedOpInfo> &Preselected,
     planning::InstructionGenerationContext &InstrGenCtx, RegPoolWrapper &RP,
-    const DenseSet<Register> &Excluded,
-    const DenseSet<Register> &Destinations) {
+    DenseSet<Register> &Destinations, const DenseSet<Register> &Excluded) {
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   auto &Tgt = State.getSnippyTarget();
   auto &RI = State.getRegInfo();
   auto &II = State.getInstrInfo();
   auto &RegGen = ProgCtx.getRegGen();
-  assert(Preselected.size() == InstrDesc.getNumOperands());
+  Preselected.resize(InstrDesc.getNumOperands());
   // Temporary reg pool to take implicit register restrictions into account.
   // E.g. vluxei instructions cannot have overlapping registers with different
   // element sizes
   auto TmpRP = InstrGenCtx.pushRegPool();
-  for (auto &&[Idx, OpInfo] : enumerate(InstrDesc.operands())) {
+  const auto &Operands = InstrDesc.operands();
+  SmallVector<unsigned> Indices;
+  Tgt.getSelectionOperandsOrder(InstrGenCtx, InstrDesc, Indices);
+  for (auto Idx : Indices) {
     if (!Tgt.shouldPreselectOperandInBurstMode(InstrDesc, Idx))
       continue;
     auto TiedTo = InstrDesc.getOperandConstraint(Idx, MCOI::TIED_TO);
@@ -277,22 +279,24 @@ void selectNonMemoryOperands(
     }
     auto Opcode = InstrDesc.getOpcode();
     bool IsDst = Idx < InstrDesc.getNumDefs();
+    const auto &OpInfo = Operands[Idx];
+    auto OperandRegClassID = OpInfo.RegClass;
     auto RegClass =
-        Tgt.getRegClass(InstrGenCtx, OpInfo.RegClass, Idx, Opcode, RI);
+        Tgt.getRegClass(InstrGenCtx, OperandRegClassID, Idx, InstrDesc, RI);
     AccessMaskBit Mask =
         IsDst ? AccessMaskBit::PrimaryW : AccessMaskBit::PrimaryR;
     auto CustomMask = Tgt.getCustomAccessMaskForOperand(InstrDesc, Idx);
     if (CustomMask != AccessMaskBit::None)
       Mask = CustomMask;
-    auto ExcludedForOperand =
-        Tgt.excludeRegsForOperand(InstrGenCtx, RegClass, InstrDesc, Idx);
+    auto ExcludedForOperand = Tgt.excludeRegsForOperand(
+        InstrGenCtx, RegClass, InstrDesc, Idx, Preselected);
     copy(Excluded, std::back_inserter(ExcludedForOperand));
     if (!IsDst)
       copy(Destinations, std::back_inserter(ExcludedForOperand));
     auto Include = Tgt.includeRegs(Opcode, RegClass);
-    auto ExpectedReg =
-        RegGen.generate(RegClass, OpInfo.RegClass, RI, *TmpRP, InstrGenCtx.MBB,
-                        Tgt, ExcludedForOperand, Include, Mask);
+    auto ExpectedReg = RegGen.generate(RegClass, OperandRegClassID, RI, *TmpRP,
+                                       InstrGenCtx.MBB, Tgt, ExcludedForOperand,
+                                       Include, Mask);
     auto ReportCouldNotSelectReg = [&]() {
       snippy::fatal(
           formatv("Could not select register for \"{0}\" in burst group",
@@ -304,13 +308,12 @@ void selectNonMemoryOperands(
       ReportCouldNotSelectReg();
     }
     auto SelectedReg = *ExpectedReg;
-    auto FirstReg = SelectedReg;
-    if (!Tgt.isPhysRegClass(RegClass.getID(), RI))
-      FirstReg = Tgt.getFirstPhysReg(SelectedReg, RI);
-    // This handles situations where selected register cannot be reused as
-    // another operand of the same instruction
-    Tgt.reserveRegsIfNeeded(InstrGenCtx, Opcode, IsDst,
-                            /*isMem=*/false, FirstReg);
+    if (IsDst) {
+      SmallVector<Register, 8> Dsts;
+      Tgt.getPhysRegsFromUnit(SelectedReg, RI, Dsts);
+      Destinations.insert_range(Dsts);
+    }
+
     Preselected[Idx] = Register(SelectedReg);
   }
 }
@@ -330,7 +333,7 @@ static DenseSet<Register> getExcludedRegsForOpcodes(ArrayRef<unsigned> Opcodes,
 }
 
 static std::optional<int>
-getOffsetImmediate(ArrayRef<planning::PreselectedOpInfo> Preselected) {
+getOffsetImmediate(SmallVectorImpl<planning::PreselectedOpInfo> &Preselected) {
   auto Found =
       find_if(Preselected, [](auto &OpInfo) { return OpInfo.isImm(); });
   if (Found == Preselected.end())
@@ -350,7 +353,6 @@ std::map<unsigned, APInt> selectOperandsForMemoryInstructions(
   const auto &State = ProgCtx.getLLVMState();
   const auto &Tgt = State.getSnippyTarget();
   const auto &InstrInfo = State.getInstrInfo();
-  const auto &RegInfo = State.getRegInfo();
   // Select and assign base registers for each instruction. Note that this
   // also reserves them for writing, since they might be reused and can't be
   // used as destinations.
@@ -377,14 +379,7 @@ std::map<unsigned, APInt> selectOperandsForMemoryInstructions(
     // Now select other operands taking into account registers we already
     // reserved as memory operands
     selectNonMemoryOperands(InstrDesc, Preselected, InstrGenCtx, RP,
-                            /*Excluded=*/{}, Destinations);
-    if ([[maybe_unused]] auto NumDefs = InstrDesc.getNumDefs()) {
-      assert(NumDefs == 1 && "Multiple destination operands are not supported");
-      assert(Preselected[0].isReg());
-      SmallVector<Register, 8> Dsts;
-      Tgt.getPhysRegsFromUnit(Preselected[0].getReg(), RegInfo, Dsts);
-      Destinations.insert_range(Dsts);
-    }
+                            Destinations);
 
     // All registers are selected now. Break down the address into parts to
     // initialize properly.

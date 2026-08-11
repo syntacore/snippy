@@ -1,0 +1,48 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v,+zvksh,+zvknha,+zvkned
+  num-instrs: 1000
+  dump-mf: on
+  reserved-regs-list: ["V([0-9]|1[0-9]|20)"]
+
+include:
+  - Inputs/sections.yaml
+
+riscv-vector-unit:
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [8, 1.0]
+      - [16, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_32: 1.0
+      LMUL:
+        m4: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+  - [VSETIVLI, 1.0]
+  - [VSM3ME_VV, 1.0]
+  - [VSHA2CH_VV, 1.0]
+  - [VSHA2CL_VV, 1.0]
+  - [VSHA2MS_VV, 1.0]
+  - [VAESDF_VV, 1.0]
+  - [VAESDF_VS, 1.0]
+
+# COM: Check that vs1 group can overlap with vd group.
+# CHECK: $v24 = VSM3ME_VV $v28, $v24
+# CHECK: VAESDF_VV $v28(tied-def 0), $v28
+# COM: Check that vs1 group can overlap with vs2 group.
+# CHECK: VSM3ME_VV $v28, $v28
+# CHECK: VSHA2CH_VV $v24(tied-def 0), $v28, $v28
+# CHECK: VSHA2CL_VV $v24(tied-def 0), $v28, $v28
+# CHECK: VSHA2MS_VV $v24(tied-def 0), $v28, $v28

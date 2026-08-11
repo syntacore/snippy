@@ -1,0 +1,42 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  march: rv64imfdv
+  num-instrs: 1000
+  dump-mf: on
+  reserved-regs-list: ["V([0-9]|1[0-9]|2[0-3])"]
+
+include:
+  - Inputs/sections.yaml
+
+riscv-vector-unit:
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_32: 1.0
+      LMUL:
+        m8: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+  - [VSETIVLI, 1.0]
+  - [VZEXT_VF4, 1.0] # dest EEW > src EEW
+
+# COM: Check destination vector register group overlap with source vector
+#      register group when:
+#
+#      The destination EEW (=32, EMUL = 8) is greater than the source EEW (=8, EMUL = 2).
+# CHECK: $v24 = VZEXT_VF4 $v30
+# CHECK-NOT: $v24 = VZEXT_VF4 $v24
+# CHECK-NOT: $v24 = VZEXT_VF4 $v26
+# CHECK-NOT: $v24 = VZEXT_VF4 $v28

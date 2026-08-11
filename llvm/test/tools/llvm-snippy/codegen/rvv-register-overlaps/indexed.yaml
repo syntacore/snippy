@@ -1,0 +1,50 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  march: rv64imfdv
+  num-instrs: 1000
+  dump-mf: on
+  reserved-regs-list: ["V([0-9]|1[0-9]|2[0-3])"]
+
+include:
+  - Inputs/sections.yaml
+
+riscv-vector-unit:
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_32: 1.0
+      LMUL:
+        m8: 1.0
+        m4: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+  - [VSETIVLI, 1.0]
+  - [VLUXEI32_V, 1.0] # dest EEW == src EEW
+  - [VLUXEI64_V, 1.0] # dest EEW < src EEW
+  - [VLUXEI16_V, 1.0] # dest EEW > src EEW
+
+# COM: Check destination vector register group overlap with source vector
+#      register group when:
+#
+#      The destination EEW (=32, EMUL = 4 or 8) equals the source EEW.
+# CHECK: $v24 = VLUXEI32_V $x{{[0-9]+}}, $v24
+# CHECK: $v28 = VLUXEI32_V $x{{[0-9]+}}, $v28
+
+#      The destination EEW (=32, EMUL = 4) is smaller than the source EEW.
+# CHECK: $v24 = VLUXEI64_V $x{{[0-9]+}}, $v24
+
+#      The destination EEW (=32, EMUL = 4 or 8) is greater than the source EEW.
+# CHECK: $v24 = VLUXEI16_V $x{{[0-9]+}}, $v26
+# CHECK: $v28 = VLUXEI16_V $x{{[0-9]+}}, $v30

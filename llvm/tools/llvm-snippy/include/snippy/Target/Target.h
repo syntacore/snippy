@@ -57,9 +57,6 @@ class DynamicLibrary;
 
 namespace snippy {
 class SnippyOperandGenerator;
-namespace planning {
-class PreselectedOpInfo;
-} // namespace planning
 struct SectionDesc;
 struct Branchegram;
 class LLVMState;
@@ -73,16 +70,12 @@ class Config;
 class ProgramConfig;
 class PassConfig;
 class Interpreter;
-
-namespace planning {
-struct InstructionRequest;
-}
+enum class LoopType;
 
 struct ModeChangingContext {
   virtual ~ModeChangingContext() = default;
 };
 
-enum class LoopType;
 struct TargetGenContextInterface {
   virtual ~TargetGenContextInterface() = 0;
 
@@ -144,6 +137,7 @@ namespace planning {
 class GenPolicy;
 class InstructionGenerationContext;
 class PreselectedOpInfo;
+struct InstructionRequest;
 } // namespace planning
 using planning::InstructionGenerationContext;
 
@@ -174,7 +168,8 @@ public:
 
   virtual const MCRegisterClass &
   getRegClass(const InstructionGenerationContext &IGC,
-              unsigned OperandRegClassID, unsigned OpIndex, unsigned Opcode,
+              unsigned OperandRegClassID, unsigned OpIndex,
+              const MCInstrDesc &InstrDesc,
               const MCRegisterInfo &RegInfo) const = 0;
 
   virtual std::vector<MCRegister> getRegsSuitableForSP() const = 0;
@@ -412,7 +407,8 @@ public:
       const MCInstrDesc &InstrDesc, unsigned OperandIdx,
       const StridedImmediate &StridedImm, const SnippyProgramContext &ProgCtx,
       const CommonPolicyConfig &Cfg,
-      ArrayRef<MachineOperand> PregeneratedOperands, MemAddr Addr) const = 0;
+      ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands,
+      MemAddr Addr) const = 0;
 
   virtual MachineOperand
   generateTargetOperand(const MCInstrDesc &InstrDesc, unsigned OperandIdx,
@@ -590,7 +586,7 @@ public:
   virtual std::pair<AddressParts, MemAddresses>
   breakDownAddr(InstructionGenerationContext &IGC, AddressInfo AddrInfo,
                 const MCInstrDesc &InstrDesc,
-                MutableArrayRef<planning::PreselectedOpInfo> Preselected,
+                SmallVectorImpl<planning::PreselectedOpInfo> &Preselected,
                 unsigned AddrIdx,
                 std::optional<MemAddr> MainPart = std::nullopt) const = 0;
 
@@ -622,7 +618,7 @@ public:
   // Preselect (access size) operand that directly affects address selection
   virtual void preselectAccessSizeOperand(
       InstructionGenerationContext &IGC, const MCInstrDesc &InstrDesc,
-      MutableArrayRef<planning::PreselectedOpInfo> Preselected) const = 0;
+      SmallVectorImpl<planning::PreselectedOpInfo> &Preselected) const = 0;
 
   // Choose the parameters used to sample the memory scheme for a particular
   // opcode in the context of \ref MBB and \ref ProgCtx.
@@ -632,6 +628,11 @@ public:
       ArrayRef<planning::PreselectedOpInfo> Preselected = {}) const = 0;
 
   virtual void
+  getSelectionOperandsOrder(InstructionGenerationContext &IGC,
+                            const MCInstrDesc &InstrDesc,
+                            SmallVectorImpl<unsigned> &Indices) const = 0;
+
+  virtual void
   excludeFromMemRegsForInstr(const MCInstrDesc &Instr, const MCRegisterInfo &RI,
                              SmallVectorImpl<Register> &Regs,
                              std::optional<MemAddr> Addr = std::nullopt,
@@ -639,17 +640,13 @@ public:
 
   // FIXME: basically, we should need only MCRegisterClass, but now
   // MCRegisterClass for RISCV does not fully express available regs.
-  virtual std::vector<Register>
-  excludeRegsForOperand(InstructionGenerationContext &IGC,
-                        const MCRegisterClass &RC, const MCInstrDesc &InstrDesc,
-                        unsigned Operand) const = 0;
+  virtual std::vector<Register> excludeRegsForOperand(
+      InstructionGenerationContext &IGC, const MCRegisterClass &RC,
+      const MCInstrDesc &InstrDesc, unsigned OpIndex,
+      ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands) const = 0;
 
   virtual std::vector<Register>
   includeRegs(unsigned Opcode, const MCRegisterClass &RC) const = 0;
-
-  virtual void reserveRegsIfNeeded(InstructionGenerationContext &IGC,
-                                   unsigned Opcode, bool isDst, bool isMem,
-                                   Register Reg) const = 0;
 
   virtual SmallVector<unsigned>
   getImmutableRegs(const MCRegisterClass &MCRegClass) const = 0;
