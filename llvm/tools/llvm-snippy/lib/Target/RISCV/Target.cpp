@@ -250,125 +250,20 @@ static snippy::opt<size_t> ReservationSetSize(
     cl::init(64), cl::cat(SnippyRISCVOptions));
 
 namespace {
-
-struct SelfcheckDestRegistersInfo {
-  Register BaseDestRegister;
-  unsigned NumRegs;
-
-  SelfcheckDestRegistersInfo(Register BaseDestReg, unsigned Num)
-      : BaseDestRegister(BaseDestReg), NumRegs(Num) {}
-};
-
-// Gap is a distance between segments for segment loads
-struct ElemWidthAndGapForVectorLoad {
-  unsigned ElemWidth;
-  unsigned Gap;
-};
-
-ElemWidthAndGapForVectorLoad
-getElemWidthAndGapForVectorLoad(unsigned Opcode, unsigned EEW,
-                                const MachineBasicBlock &MBB,
-                                const SnippyProgramContext &ProgCtx) {
-  assert(EEW && "Effective element width can not be zero");
-  const auto &RISCVCtx =
-      ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
-
-  if (isRVVUnitStrideSegLoadStore(Opcode) || isRVVStridedSegLoadStore(Opcode)) {
-    // segment and non-indexed loads
-    auto SEW = static_cast<unsigned>(RISCVCtx.getSEW(MBB));
-    auto [EMUL, IsFractionEMUL] =
-        computeDecodedEMUL(RISCVCtx.getELEN(), SEW, EEW, RISCVCtx.getLMUL(MBB));
-    assert(RISCVVType::isValidLMUL(EMUL, IsFractionEMUL));
-    return {EEW, EMUL};
-  }
-
-  auto [LMUL, IsFractional] = RISCVCtx.decodeVLMUL(RISCVCtx.getLMUL(MBB));
-  assert(RISCVVType::isValidLMUL(LMUL, IsFractional));
-
-  if (isRVVIndexedSegLoadStore(Opcode))
-    return IsFractional ? ElemWidthAndGapForVectorLoad{EEW, 1}
-                        : ElemWidthAndGapForVectorLoad{EEW, LMUL};
-
-  return {EEW, 0};
-}
-
-bool isDefaultSelfcheckEnough(unsigned Opcode) {
-  if (!isRVV(Opcode) || isRVVModeSwitch(Opcode) || isRVVScalarMove(Opcode))
-    return true;
-
-  // From RISCV-V spec 1.0:
-  //   Vector reduction operations perform a reduction using some binary
-  //   operator, to produce a scalar result in element 0 of a vector register.
-  if (isRVVReduction(Opcode))
-    return true;
-  // A vector mask occupies only one vector register regardless of SEW and LMUL.
-  if (isRVVMaskProducing(Opcode))
-    return true;
-
-  switch (Opcode) {
-  case RISCV::VCPOP_M:
-  case RISCV::VFIRST_M:
-    return true;
-  }
-  return false;
-}
-
-std::vector<SelfcheckDestRegistersInfo>
-getInfoAboutRegsForSelfcheck(unsigned Opcode, Register FirstDestReg,
-                             const MachineBasicBlock &MBB,
-                             const SnippyProgramContext &ProgCtx) {
+static unsigned getDestRegsNum(const MCInstrDesc &InstrDesc,
+                               const MachineBasicBlock &MBB,
+                               const SnippyProgramContext &ProgCtx) {
+  constexpr auto DestIdx = 0u;
   // Not RVV instruction isn't target specific for selfcheck,
   // so we provide only one destination register to store
-  std::vector<SelfcheckDestRegistersInfo> SelfcheckSegsInfo;
-  if (isDefaultSelfcheckEnough(Opcode)) {
-    SelfcheckSegsInfo.emplace_back(FirstDestReg, 1);
-    return SelfcheckSegsInfo;
-  }
-  // Whole register moves (vmv<nr>r.v) and loads (vl<nr>r) affects
-  // <nr> registers as destination of operation. So, for selfcheck
-  // we need to store <nr> consecutive registers starting from the
-  // base one
-  if (isRVVWholeRegisterInstr(Opcode)) {
-    auto DestRegsNum = getRVVWholeRegisterCount(Opcode);
-    assert(DestRegsNum);
-    FirstDestReg = DestRegsNum > 1 ? getBaseRegisterForVRMClass(FirstDestReg)
-                                   : FirstDestReg;
-    SelfcheckSegsInfo.emplace_back(FirstDestReg, DestRegsNum);
-    return SelfcheckSegsInfo;
-  }
-
-  const auto &RISCVCtx =
-      ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
-  auto SEW = static_cast<unsigned>(RISCVCtx.getSEW(MBB));
-  auto EEW = getDataElementWidth(Opcode, SEW) * CHAR_BIT;
-  assert(RISCVVType::isValidSEW(EEW));
-
-  auto VL = RISCVCtx.getVL(MBB);
-  auto VLEN = RISCVCtx.getVLEN();
-
-  auto addSelfcheckDestRegistersInfo =
-      [&SelfcheckSegsInfo, VL, VLEN](unsigned ElemWidth, Register DestReg) {
-        // A commom formula for calculating the number of consecutive
-        // destination registers in one segment for vector load
-        auto DestRegsNum = std::ceil(double(VL * ElemWidth) / VLEN);
-        SelfcheckSegsInfo.emplace_back(DestReg, DestRegsNum);
-      };
-
-  auto &&[ElemWidth, Gap] =
-      getElemWidthAndGapForVectorLoad(Opcode, EEW, MBB, ProgCtx);
-
-  // Gap == 0 --> non-segment instruction
-  if (!Gap) {
-    addSelfcheckDestRegistersInfo(ElemWidth, FirstDestReg);
-    return SelfcheckSegsInfo;
-  }
-
-  auto NumFields = getNumFields(Opcode);
-  for (auto I = 0u; I < NumFields; ++I) {
-    addSelfcheckDestRegistersInfo(ElemWidth, FirstDestReg);
-    FirstDestReg = Register(FirstDestReg.id() + Gap);
-  }
-  return SelfcheckSegsInfo;
+  if (!isVectorRegClass(InstrDesc.operands()[DestIdx].RegClass))
+    return 1;
+  auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+  auto DestRegsMult = TgtCtx.getOperandRegsCount(InstrDesc, DestIdx, MBB);
+  auto Opcode = InstrDesc.getOpcode();
+  if (isRVVSegLoadStore(Opcode))
+    return DestRegsMult * getNumFields(Opcode);
+  return DestRegsMult;
 }
 
 bool isCompressedBranch(unsigned Opcode) {
@@ -526,6 +421,8 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVPrimaryConfig &Cfg,
     auto EEW = getIndexElementWidth(Opcode);
     if (!isValidEMUL(ELEN, SEW, EEW, LMUL))
       return false;
+    // The EMUL * NFIELDS ≤ 8 constraint applies to the data vector register
+    // group. The data vector register group has EEW=SEW, EMUL=LMUL
     auto [Multiplier, IsFractional] = RISCVVType::decodeVLMUL(LMUL);
     if (IsFractional)
       return true;
@@ -736,7 +633,7 @@ static unsigned getImmOperandIdx(const MCInstrDesc &InstrDesc) {
 
 static const planning::PreselectedOpInfo &
 getMemOperand(const MCInstrDesc &InstrDesc,
-              MutableArrayRef<planning::PreselectedOpInfo> Preselected) {
+              SmallVectorImpl<planning::PreselectedOpInfo> &Preselected) {
   unsigned Idx = getMemOperandIdx(InstrDesc);
   planning::PreselectedOpInfo &MemOp = Preselected[Idx];
   assert(MemOp.isReg() && "Memory operand is expected to be a register");
@@ -760,7 +657,7 @@ static MemAddresses generateStridedMemAccesses(MemAddr Base,
 
 static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVStrided(
     AddressInfo AddrInfo, const MCInstrDesc &InstrDesc,
-    MutableArrayRef<planning::PreselectedOpInfo> Preselected,
+    SmallVectorImpl<planning::PreselectedOpInfo> &Preselected,
     InstructionGenerationContext &IGC, bool Is64Bit,
     std::optional<MemAddr> MainPartAddr = std::nullopt) {
   auto Opcode = InstrDesc.getOpcode();
@@ -957,7 +854,7 @@ static APInt getBaseAddressForRVVIndexed(size_t XLen, APInt FirstLegalAddr,
 
 static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVIndexed(
     AddressInfo AddrInfo, const MCInstrDesc &InstrDesc,
-    MutableArrayRef<planning::PreselectedOpInfo> Preselected,
+    SmallVectorImpl<planning::PreselectedOpInfo> &Preselected,
     const InstructionGenerationContext &IGC, const SnippyTarget &Tgt,
     bool Is64Bit, std::optional<MemAddr> MainPartAddr = std::nullopt) {
   auto Opcode = InstrDesc.getOpcode();
@@ -1161,7 +1058,7 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForRVVIndexed(
 
 static std::pair<AddressParts, MemAddresses> breakDownAddrForInstrWithImmOffset(
     AddressInfo AddrInfo, const MCInstrDesc &InstrDesc,
-    MutableArrayRef<planning::PreselectedOpInfo> Preselected,
+    SmallVectorImpl<planning::PreselectedOpInfo> &Preselected,
     InstructionGenerationContext &IGC, bool Is64Bit,
     std::optional<MemAddr> MainPart = std::nullopt) {
   [[maybe_unused]] auto Opcode = InstrDesc.getOpcode();
@@ -1259,6 +1156,370 @@ static unsigned getRelativeImmOperandIdx(unsigned Opcode,
       [](const auto &OpInfo) {
         return isImmediateOperand(OpInfo.OperandType);
       });
+}
+
+static std::pair<std::optional<unsigned>, std::optional<unsigned>>
+getVectorSources(const MCInstrDesc &InstrDesc) {
+  assert(isRVV(InstrDesc.getOpcode()));
+  auto NumOperands = InstrDesc.getNumOperands();
+  const auto &Operands = InstrDesc.operands();
+  std::pair<std::optional<unsigned>, std::optional<unsigned>> Result = {
+      std::nullopt, std::nullopt};
+  auto IsStore = InstrDesc.mayStore();
+  auto SourceIdx = IsStore ? 0u : 1u;
+  if (InstrDesc.getNumOperands() <= SourceIdx)
+    return Result;
+  // For vector instrs TIED_TO constraint can has only first operand
+  if (InstrDesc.getOperandConstraint(SourceIdx, MCOI::TIED_TO) >= 0 ||
+      !isVectorRegClass(Operands[SourceIdx].RegClass))
+    ++SourceIdx;
+
+  auto IsVectorSource = [&](auto Idx) {
+    if (Idx >= NumOperands)
+      return false;
+    assert(InstrDesc.getOperandConstraint(Idx, MCOI::TIED_TO) == -1);
+    const auto &Operand = Operands[Idx];
+    return Idx < NumOperands &&
+           (Operand.OperandType == MCOI::OperandType::OPERAND_REGISTER) &&
+           Operand.RegClass != RISCV::VMV0RegClassID &&
+           isVectorRegClass(Operand.RegClass);
+  };
+
+  if (IsVectorSource(SourceIdx))
+    Result.first = SourceIdx;
+  ++SourceIdx;
+  // skip rs1 base address register
+  if (IsStore)
+    ++SourceIdx;
+  if (Result.first && IsVectorSource(SourceIdx))
+    Result.second = SourceIdx;
+  assert(SourceIdx + 1 >= NumOperands ||
+         none_of(iota_range<unsigned>(SourceIdx + 1, NumOperands,
+                                      /* Inclusive */ false),
+                 [&](auto Idx) { return IsVectorSource(Idx); }) &&
+             "There should have been no more vector operands left");
+  return Result;
+}
+
+static std::vector<Register> initExcludeResult(unsigned OpIndex) {
+  constexpr auto DestIdx = 0u;
+  // We cant overwrite mask register, because the values in the v0 register
+  // must correspond to riscv-vector-unit::mode-distribution::VM.
+  if (NoMaskModeForRVV || OpIndex == DestIdx)
+    return {RISCV::V0};
+  return {};
+}
+
+static std::vector<Register> initExcludeResult(unsigned OpIndex,
+                                               const MCInstrDesc &InstrDesc,
+                                               const LLVMState &State) {
+  if (!initExcludeResult(OpIndex).empty())
+    return {RISCV::V0};
+  // This means that we will initialize this register in a special way. So we
+  // should forbid V0, since V0 is a mask that should not be overwritten.
+  if (!State.isReinitializableOperand(InstrDesc, OpIndex))
+    return {RISCV::V0};
+  return {};
+}
+
+static std::vector<Register> excludeForSPRelative(unsigned RCID) {
+  if (RCID != RISCV::SPRegClassID)
+    return {RISCV::X2};
+  return {};
+}
+
+static std::vector<Register>
+excludeForCmMvsa01(unsigned OpIndex,
+                   ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands) {
+  constexpr auto R2s = 1u;
+  // cm.mvsa01 (Zcmp): for the encoding to be legal r1s' != r2s'
+  if (OpIndex != R2s)
+    return {};
+  return {/* r1s' */ PregeneratedOperands[0].getReg()};
+}
+
+static std::vector<Register>
+excludeForZvk(unsigned OpIndex,
+              std::function<Register(unsigned Idx)> VRegGetter) {
+  constexpr auto DestIdx = 0u;
+  auto Result = initExcludeResult(OpIndex);
+  // Reserved encodings: the vd register group overlaps with either vs1 or vs2
+  if (OpIndex == DestIdx)
+    return Result;
+  Result.push_back(VRegGetter(DestIdx));
+  return Result;
+}
+
+static std::vector<Register>
+excludeForZvksh(unsigned OpIndex, const MCInstrDesc &InstrDesc,
+                std::function<Register(unsigned Idx)> VRegGetter) {
+  constexpr auto DestIdx = 0u;
+  auto Result = initExcludeResult(OpIndex);
+  // Reserved encodings: the vd register group overlaps with the vs2
+  auto &&[VFirstSrc, _] = getVectorSources(InstrDesc);
+  assert(VFirstSrc);
+  if (/* vs2 */ OpIndex != *VFirstSrc)
+    return Result;
+  Result.push_back(VRegGetter(DestIdx));
+  return Result;
+}
+
+static std::vector<Register> excludeForStridedLoadStore(
+    unsigned OpIndex,
+    ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands,
+    const MCInstrDesc &InstrDesc, unsigned RCID,
+    const SnippyProgramContext &ProgCtx) {
+  auto Result = initExcludeResult(OpIndex);
+  auto &State = ProgCtx.getLLVMState();
+  const auto &TgtCtx =
+      ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+  // Addr base reg and stride reg shouldn't match as it's unlikely that a
+  // memory scheme will allow such accesses: `base + n * stride` where n = [0;
+  // VLMAX], base reg == stride reg.
+  if (TgtCtx.disallowIntersectingMemoryAccesses(InstrDesc.getOpcode()) &&
+      RCID == RISCV::GPRRegClass.getID()) {
+    SmallVector<Register> Res;
+    const auto &Tgt = State.getSnippyTarget();
+    Tgt.getPhysRegsFromUnit(RISCV::X0, State.getRegInfo(), Res);
+    copy(Res, std::back_inserter(Result));
+  }
+  if (/* rs2 */ OpIndex != 2)
+    return Result;
+  Result.push_back(/* rs1 */ PregeneratedOperands[1].getReg());
+  return Result;
+}
+
+static std::vector<Register> excludeForVMV0RegClass(
+    unsigned OpIndex, const MCInstrDesc &InstrDesc, unsigned SEW,
+    ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands,
+    std::function<Register(unsigned Idx)> VRegGetter) {
+  auto Result = initExcludeResult(OpIndex);
+  if (!Result.empty())
+    return Result;
+  auto NumOperands = InstrDesc.getNumOperands();
+  const auto &Operands = InstrDesc.operands();
+  auto NeedExcludeV0 =
+      any_of(iota_range<unsigned>(0u, NumOperands,
+                                  /* Inclusive */ false),
+             [&](auto OpIdx) {
+               const auto &Op = PregeneratedOperands[OpIdx];
+               if (!Op.isReg() || !isVectorRegClass(Operands[OpIdx].RegClass))
+                 return false;
+               if (VRegGetter(OpIdx) != RISCV::V0)
+                 return false;
+               return getOperandEEW(InstrDesc, OpIdx, SEW) != 1;
+             });
+  if (NeedExcludeV0)
+    return {RISCV::V0};
+  return {};
+}
+
+static std::vector<Register>
+excludeForIndexedSegLoad(unsigned OpIndex, InstructionGenerationContext &IGC,
+                         const MCInstrDesc &InstrDesc,
+                         std::vector<Register> Result,
+                         std::function<Register(unsigned Idx)> VRegGetter) {
+  constexpr auto DestIdx = 0u;
+  auto &ProgCtx = IGC.ProgCtx;
+  const auto &TgtCtx =
+      ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+  auto &MBB = IGC.MBB;
+  // For vector indexed segment loads, the destination vector register
+  // groups cannot overlap the source vector register group (specified
+  // by vs2), else the instruction encoding is reserved.
+  auto AddConstraint = [&](unsigned Idx, unsigned NumFields) {
+    auto RegsCount =
+        TgtCtx.getOperandRegsCount(InstrDesc, Idx, MBB) * NumFields;
+    auto BaseReg = VRegGetter(Idx);
+    Result.resize(Result.size() + RegsCount);
+    std::iota(Result.end() - RegsCount, Result.end(), BaseReg);
+  };
+
+  constexpr auto Vs2Idx = 2u;
+  auto SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
+  auto VLENB = TgtCtx.getVLENB();
+  auto Vs2EEW = getOperandEEW(InstrDesc, Vs2Idx, SEW, VLENB);
+  auto DestEEW = getOperandEEW(InstrDesc, DestIdx, SEW, VLENB);
+  if (OpIndex == DestIdx) {
+    // If DestEEW >= Vs2EEW, vs2 not yet preselect.
+    if (DestEEW < Vs2EEW)
+      AddConstraint(Vs2Idx, /* NumFields */ 1u);
+    return Result;
+  }
+  assert(OpIndex == Vs2Idx);
+  // If DestEEW < Vs2EEW, vd not yet preselect.
+  if (DestEEW >= Vs2EEW)
+    AddConstraint(DestIdx, getNumFields(InstrDesc.getOpcode()));
+  return Result;
+}
+
+static std::vector<Register>
+excludeForDest(unsigned OpIndex, InstructionGenerationContext &IGC,
+               const MCInstrDesc &InstrDesc, std::vector<Register> Result,
+               std::function<Register(unsigned Idx)> VRegGetter) {
+  auto &ProgCtx = IGC.ProgCtx;
+  const auto &TgtCtx =
+      ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+  auto &MBB = IGC.MBB;
+  auto &&[VFirstSrc, VSecondSrc] = getVectorSources(InstrDesc);
+  if (!VFirstSrc) {
+    assert(!VSecondSrc);
+    return Result;
+  }
+
+  auto AddDestSrcConstraint = [&](unsigned VSrcIdx) {
+    auto DestCount = TgtCtx.getOperandRegsCount(InstrDesc, OpIndex, MBB);
+    auto SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
+    auto VLENB = TgtCtx.getVLENB();
+    auto VsEEW = getOperandEEW(InstrDesc, VSrcIdx, SEW, VLENB);
+    auto EEW = getOperandEEW(InstrDesc, OpIndex, SEW);
+    // If VsEEW <= EEW, vs2 not yet preselect.
+    if (VsEEW > EEW) {
+      auto VsCount = TgtCtx.getOperandRegsCount(InstrDesc, VSrcIdx, MBB);
+      auto BaseVsReg = VRegGetter(VSrcIdx);
+      if (!canSrcDestOperandsOverlap(InstrDesc.getOpcode()))
+        Result.push_back(BaseVsReg);
+
+      // Check dest-source constraint
+      //   * The destination EEW is smaller than the source EEW, and the
+      //     lowest-numbered register in the
+      //     destination vector register group is the same as the
+      //     lowest-numbered register in the source vector register group.
+      //     (For example, when LMUL=1, vnsrl.wi v0, v0, 3 is legal, but a
+      //     destination of v1 is not).
+      assert(VsCount >= DestCount);
+      auto RegsCount = VsCount - DestCount;
+      Result.resize(Result.size() + RegsCount);
+      std::iota(Result.end() - RegsCount, Result.end(), BaseVsReg + DestCount);
+    }
+  };
+  AddDestSrcConstraint(*VFirstSrc);
+  if (!VSecondSrc)
+    return Result;
+  AddDestSrcConstraint(*VSecondSrc);
+  return Result;
+}
+
+static std::vector<Register>
+excludeIfDestEEWBiggerEEW(unsigned OpIndex, InstructionGenerationContext &IGC,
+                          const MCInstrDesc &InstrDesc,
+                          std::vector<Register> Result,
+                          std::function<Register(unsigned Idx)> VRegGetter) {
+  auto &ProgCtx = IGC.ProgCtx;
+  const auto &TgtCtx =
+      ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+  auto &MBB = IGC.MBB;
+  constexpr auto DestIdx = 0u;
+  // A destination vector register group can overlap a source vector
+  // register group only if one of the following holds:
+  //   * The destination EEW is greater than the source EEW, the source
+  //     EMUL is at least 1, and the highest numbered register in the
+  //     destination vector register group is the same as the
+  //     highest-numbered register in the source vector register group.
+  //     (For example, when LMUL=8, vzext.vf4 v0, v6 is legal, but a
+  //     source of v0, v2, or v4 is not).
+  auto DestCount = TgtCtx.getOperandRegsCount(InstrDesc, DestIdx, MBB);
+  auto [VsMultiplier, VsIsFractional] =
+      TgtCtx.getOperandEMUL(InstrDesc, OpIndex, MBB);
+  if (!canSrcDestOperandsOverlap(InstrDesc.getOpcode()) || VsIsFractional)
+    VsMultiplier = 0;
+  assert(DestCount >= VsMultiplier);
+  auto RegsCount = DestCount - VsMultiplier;
+  Result.resize(Result.size() + RegsCount);
+  std::iota(Result.end() - RegsCount, Result.end(), VRegGetter(DestIdx));
+  return Result;
+}
+
+static std::vector<Register>
+excludeIfDestEEWEqualEEW(unsigned Opcode, std::vector<Register> Result,
+                         std::function<Register(unsigned Idx)> VRegGetter) {
+  if (!canSrcDestOperandsOverlap(Opcode))
+    Result.push_back(VRegGetter(/* DestIdx */ 0));
+  return Result;
+}
+
+static bool isNecessaryExcludeRegisters(InstructionGenerationContext &IGC,
+                                        const MCInstrDesc &InstrDesc) {
+  auto Opcode = InstrDesc.getOpcode();
+  std::vector<unsigned> Indices(InstrDesc.getNumOperands());
+  std::iota(Indices.begin(), Indices.end(), 0u);
+  auto &ProgCtx = IGC.ProgCtx;
+  const auto &TgtCtx =
+      ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+  auto &MBB = IGC.MBB;
+
+  std::vector<unsigned> OperandEEWs;
+  auto SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
+  auto VLENB = TgtCtx.getVLENB();
+  transform(Indices, std::back_inserter(OperandEEWs), [&](auto Idx) {
+    return getOperandEEW(InstrDesc, Idx, SEW, VLENB);
+  });
+  // If the opcode is illegal for the current configuration, then all
+  // calculations do not make sense and we can select any register for the
+  // operand.
+  const auto *STI = &MBB.getParent()->getSubtarget();
+  const auto *Subtarget = static_cast<const RISCVSubtarget *>(STI);
+  const auto &PrimaryCfg = TgtCtx.getActiveRVVMode(MBB).Config.PrimaryCfg;
+  if (!isLegalRVVInstr(Opcode, PrimaryCfg, TgtCtx.getVLEN(), Subtarget))
+    return false;
+  // If instruction has only one vector operand (EEW != 0), then we don't
+  // exclude anything.
+  if (count_if(OperandEEWs, [](auto EEW) { return EEW != 0; }) == 1)
+    return false;
+  // If instruction vector operands have identical EEWs, then we don't
+  // exclude anything.
+  assert(!OperandEEWs.empty());
+  return !all_of(OperandEEWs, [DestEEW = getOperandEEW(
+                                   InstrDesc, /* DestIdx */ 0, SEW, VLENB)](
+                                  auto EEW) { return EEW == DestEEW; }) ||
+         !canSrcDestOperandsOverlap(Opcode);
+}
+
+static std::vector<Register> getExcludedForSources(
+    const MCInstrDesc &InstrDesc, unsigned OpIndex,
+    InstructionGenerationContext &IGC,
+    ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands) {
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
+  const auto &TgtCtx =
+      ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+  auto &MBB = IGC.MBB;
+  auto SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
+  auto EEW = getOperandEEW(InstrDesc, OpIndex, SEW);
+  std::vector<Register> Result;
+  auto &&[VFirstSrc, VSecondSrc] = getVectorSources(InstrDesc);
+  if (VFirstSrc && VSecondSrc) {
+    // SrcIdx -- the index of another source vector register. Not the one we
+    // are processing now.
+    auto SrcIdx = *VFirstSrc;
+    if (OpIndex == SrcIdx)
+      SrcIdx = *VSecondSrc;
+
+    auto AnotherEEW = getOperandEEW(InstrDesc, SrcIdx, SEW);
+    // A vector register cannot be used to provide source operands with more
+    // than one EEW for a single instruction. A mask register source is
+    // considered to have EEW=1 for this constraint. An encoding that would
+    // result in the same vector register being read with two or more
+    // different EEWs, including when the vector register appears at different
+    // positions within two or more vector register groups, is reserved.
+    if (AnotherEEW > EEW) {
+      const auto &RegInfo = State.getRegInfo();
+      const auto &Tgt = State.getSnippyTarget();
+      auto BaseReg =
+          Tgt.getFirstPhysReg(PregeneratedOperands[SrcIdx].getReg(), RegInfo);
+      [[maybe_unused]] const auto &VRegClass =
+          RegInfo.getRegClass(RISCV::VRRegClassID);
+      assert(VRegClass.contains(BaseReg));
+      auto AnotherRegsCount =
+          TgtCtx.getOperandRegsCount(InstrDesc, SrcIdx, MBB);
+      Result.resize(Result.size() + AnotherRegsCount);
+      std::iota(Result.end() - AnotherRegsCount, Result.end(), BaseReg);
+    }
+  }
+  // Check source-source overlap constraint with V0
+  if (isRVVuseV0RegExplicitly(InstrDesc.getOpcode()) && EEW != 1)
+    Result.push_back(RISCV::V0);
+  return Result;
 }
 
 class SnippyRISCVTarget final : public SnippyTarget {
@@ -1392,7 +1653,8 @@ public:
 
   const MCRegisterClass &
   getRegClass(const InstructionGenerationContext &IGC,
-              unsigned OperandRegClassID, unsigned OpIndex, unsigned Opcode,
+              unsigned OperandRegClassID, unsigned OpIndex,
+              const MCInstrDesc &InstrDesc,
               const MCRegisterInfo &RegInfo) const override;
 
   bool matchesArch(Triple::ArchType Arch) const override {
@@ -1489,20 +1751,16 @@ public:
   std::vector<Register>
   getRegsForSelfcheck(const MachineInstr &MI,
                       InstructionGenerationContext &IGC) const override {
-    auto &MBB = IGC.MBB;
     const auto &FirstDestOperand = MI.getOperand(0);
     assert(FirstDestOperand.isReg());
-
-    auto &&SelfcheckSegsInfo = getInfoAboutRegsForSelfcheck(
-        MI.getOpcode(), FirstDestOperand.getReg(), MBB, IGC.ProgCtx);
-
-    std::vector<Register> Regs;
-    for (const auto &SelfcheckRegInfo : SelfcheckSegsInfo) {
-      std::vector<unsigned> RegIdxs(SelfcheckRegInfo.NumRegs);
-      std::iota(RegIdxs.begin(), RegIdxs.end(),
-                SelfcheckRegInfo.BaseDestRegister.id());
-      std::copy(RegIdxs.begin(), RegIdxs.end(), std::back_inserter(Regs));
-    }
+    auto BaseDestRegister = FirstDestOperand.getReg();
+    const auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
+    if (isRVVWholeRegisterInstr(MI.getOpcode()))
+      BaseDestRegister = State.getSnippyTarget().getFirstPhysReg(
+          BaseDestRegister, State.getRegInfo());
+    std::vector<Register> Regs(getDestRegsNum(MI.getDesc(), IGC.MBB, ProgCtx));
+    std::iota(Regs.begin(), Regs.end(), BaseDestRegister);
     return Regs;
   }
 
@@ -4166,7 +4424,7 @@ public:
       const MCInstrDesc &InstrDesc, unsigned OperandIdx,
       const StridedImmediate &StridedImm, const SnippyProgramContext &ProgCtx,
       const CommonPolicyConfig &Cfg,
-      ArrayRef<MachineOperand> PregeneratedOperands,
+      ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands,
       MemAddr Addr) const override {
     // Handle the case when the memory operand is X0. We ignore StridedImm in
     // that case.
@@ -4259,7 +4517,7 @@ public:
   std::pair<AddressParts, MemAddresses>
   breakDownAddr(InstructionGenerationContext &IGC, AddressInfo AddrInfo,
                 const MCInstrDesc &InstrDesc,
-                MutableArrayRef<planning::PreselectedOpInfo> Preselected,
+                SmallVectorImpl<planning::PreselectedOpInfo> &Preselected,
                 unsigned AddrIdx,
                 std::optional<MemAddr> MainPart = std::nullopt) const override {
     auto Opcode = InstrDesc.getOpcode();
@@ -4651,9 +4909,10 @@ public:
     storeRegToAddr(IGC, Addr, RegForValue, ValueRegBitSize / RISCV_CHAR_BIT);
   }
 
-  void preselectAccessSizeOperand(
-      InstructionGenerationContext &IGC, const MCInstrDesc &InstrDesc,
-      MutableArrayRef<planning::PreselectedOpInfo> Preselected) const override {
+  void preselectAccessSizeOperand(InstructionGenerationContext &IGC,
+                                  const MCInstrDesc &InstrDesc,
+                                  SmallVectorImpl<planning::PreselectedOpInfo>
+                                      &Preselected) const override {
     auto Opcode = InstrDesc.getOpcode();
     if (!isZcmpPushPop(Opcode))
       return;
@@ -4754,9 +5013,8 @@ public:
       // evl=ceil(vl/8) (i.e. EMUL=1)
       VL = divideCeil(VL, 8);
 
-    auto VLENB = TgtCtx.getVLENB();
-    auto AccessSize =
-        getDataElementWidth(Opcode, static_cast<unsigned>(SEW), VLENB);
+    auto AccessSize = getDataElementWidth(Opcode, static_cast<unsigned>(SEW),
+                                          TgtCtx.getVLENB());
     auto NFields = 1u;
     if (isRVVUnitStrideSegLoadStore(Opcode) ||
         isRVVStridedSegLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode))
@@ -4843,36 +5101,111 @@ public:
     });
   }
 
-  std::vector<Register> excludeRegsForOperand(InstructionGenerationContext &IGC,
-                                              const MCRegisterClass &RC,
-                                              const MCInstrDesc &InstrDesc,
-                                              unsigned Operand) const override {
-    auto Opcode = InstrDesc.getOpcode();
+  void
+  getSelectionOperandsOrder(InstructionGenerationContext &IGC,
+                            const MCInstrDesc &InstrDesc,
+                            SmallVectorImpl<unsigned> &Indices) const override {
+    // For vector instructions, we first select the operands that have a large
+    // EEW in order to minimize cases when there are not enough registers.
+    auto NumOperands = InstrDesc.getNumOperands();
+    auto &ProgCtx = IGC.ProgCtx;
     const auto &TgtCtx =
-        IGC.ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+        ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+    auto &MBB = IGC.MBB;
+    Indices.resize(NumOperands);
+    std::iota(Indices.begin(), Indices.end(), 0u);
+    if (!TgtCtx.hasActiveRVVMode(MBB))
+      return;
+    auto SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
+    auto VLENB = TgtCtx.getVLENB();
+    std::vector<unsigned> OperandEEWs;
+    transform(Indices, std::back_inserter(OperandEEWs), [&](auto Idx) {
+      return getOperandEEW(InstrDesc, Idx, SEW, VLENB);
+    });
+    sort(Indices, [&OperandEEWs](auto Idx1, auto Idx2) {
+      return OperandEEWs[Idx1] > OperandEEWs[Idx2];
+    });
+  }
 
-    if (isSPRelative(Opcode) && RC.getID() != RISCV::SPRegClassID)
-      return {RISCV::X2};
+  std::vector<Register> excludeRegsForOperand(
+      InstructionGenerationContext &IGC, const MCRegisterClass &RC,
+      const MCInstrDesc &InstrDesc, unsigned OpIndex,
+      ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands)
+      const override {
+    auto Opcode = InstrDesc.getOpcode();
+    assert(InstrDesc.operands()[OpIndex].OperandType ==
+           MCOI::OperandType::OPERAND_REGISTER);
+    auto &ProgCtx = IGC.ProgCtx;
+    auto &State = ProgCtx.getLLVMState();
+    const auto &TgtCtx =
+        ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+    auto &MBB = IGC.MBB;
+    auto RCID = RC.getID();
 
+    if (InstrDesc.getOperandConstraint(OpIndex, MCOI::TIED_TO) >= 0)
+      return {};
+    if (isSPRelative(Opcode))
+      return excludeForSPRelative(RCID);
+    if (Opcode == RISCV::CM_MVSA01)
+      return excludeForCmMvsa01(OpIndex, PregeneratedOperands);
+    // The following restrictions apply only to vector instructions.
     if (!isRVV(Opcode))
       return {};
 
-    if (NoMaskModeForRVV)
-      return {RISCV::V0, RISCV::V0M8, RISCV::V0M4, RISCV::V0M2};
+    auto GetVReg = [&](unsigned Idx) {
+      assert(PregeneratedOperands[Idx].isReg());
+      const auto &RegInfo = State.getRegInfo();
+      auto Reg = getFirstPhysReg(PregeneratedOperands[Idx].getReg(), RegInfo);
+      [[maybe_unused]] const auto &VRegClass =
+          RegInfo.getRegClass(RISCV::VRRegClassID);
+      assert(VRegClass.contains(Reg));
+      return Reg;
+    };
 
-    if (RC.getID() == RISCV::VMV0RegClass.getID())
+    if (isRVVStridedLoadStore(Opcode) || isRVVStridedSegLoadStore(Opcode))
+      return excludeForStridedLoadStore(OpIndex, PregeneratedOperands,
+                                        InstrDesc, RCID, ProgCtx);
+    // Non-vector operand.
+    if (!isVectorRegClass(RCID))
       return {};
 
-    if ((isRVVStridedLoadStore(Opcode) || isRVVStridedSegLoadStore(Opcode)) &&
-        TgtCtx.disallowIntersectingMemoryAccesses(Opcode) &&
-        RC.getID() == RISCV::GPRRegClass.getID()) {
-      SmallVector<Register> Res;
-      getPhysRegsFromUnit(RISCV::X0, IGC.ProgCtx.getLLVMState().getRegInfo(),
-                          Res);
-      return std::vector<Register>(Res.begin(), Res.end());
-    }
+    auto SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
+    auto VLENB = TgtCtx.getVLENB();
+    if (RCID == RISCV::VMV0RegClassID)
+      return excludeForVMV0RegClass(OpIndex, InstrDesc, SEW,
+                                    PregeneratedOperands, GetVReg);
 
-    return {RISCV::V0, RISCV::V0M8, RISCV::V0M4, RISCV::V0M2};
+    auto Result = initExcludeResult(OpIndex, InstrDesc, State);
+    if (!isNecessaryExcludeRegisters(IGC, InstrDesc))
+      return Result;
+
+    // 1. Check source-source overlap constraint
+    copy(getExcludedForSources(InstrDesc, OpIndex, IGC, PregeneratedOperands),
+         std::back_inserter(Result));
+    if (InstrDesc.mayStore())
+      return Result;
+    if (isRVVIndexedSegLoadStore(Opcode))
+      return excludeForIndexedSegLoad(OpIndex, IGC, InstrDesc, Result, GetVReg);
+
+    // 2. Check destination-sources overlap constraints
+    constexpr auto DestIdx = 0u;
+    if (OpIndex == DestIdx)
+      return excludeForDest(OpIndex, IGC, InstrDesc, Result, GetVReg);
+    // If destination register in not vector register just return.
+    if (!isVectorRegClass(InstrDesc.operands()[DestIdx].RegClass))
+      return Result;
+
+    // Here we separately process all three relations between DestEEW and EEW.
+    auto DestEEW = getOperandEEW(InstrDesc, DestIdx, SEW, VLENB);
+    auto EEW = getOperandEEW(InstrDesc, OpIndex, SEW, VLENB);
+    if (DestEEW < EEW) {
+      // vd not yet preselected
+      return Result;
+    }
+    if (DestEEW > EEW)
+      return excludeIfDestEEWBiggerEEW(OpIndex, IGC, InstrDesc, Result,
+                                       GetVReg);
+    return excludeIfDestEEWEqualEEW(Opcode, Result, GetVReg);
   }
 
   std::vector<Register> includeRegs(unsigned Opcode,
@@ -4881,67 +5214,6 @@ public:
         !isRVVuseV0RegExplicitly(Opcode))
       return {RISCV::NoRegister};
     return {};
-  }
-
-  // Reserve a register (register group) that has already been used as the
-  // destination or memory if it is needed for the given opcode.
-  // (changes in the GeneratorContext may cause problems
-  //  in operands pregeneration)
-  void reserveRegsIfNeeded(InstructionGenerationContext &IGC, unsigned Opcode,
-                           bool isDst, bool isMem,
-                           Register Reg) const override {
-    auto &MBB = IGC.MBB;
-    const auto &TgtCtx =
-        IGC.ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
-    auto &RP = IGC.getRegPool();
-    // For vector indexed segment loads, the destination vector register groups
-    // cannot overlap the source vector register group (specifed by vs2), else
-    // the instruction encoding is reserved.
-    if ((isRVVIndexedLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode)) &&
-        isDst) {
-      assert(RISCV::VRRegClass.contains(Reg) &&
-             "Dst reg in rvv indexed load/store instruction must be vreg");
-
-      auto [Mult, Fractional] = TgtCtx.decodeVLMUL(TgtCtx.getLMUL(MBB));
-      // Register group here means a register group formed by LMUL multiplied by
-      // NFields for segment which is confusing.
-      auto DstRegGroupSize = Fractional ? 1u : Mult;
-      if (isRVVIndexedSegLoadStore(Opcode))
-        DstRegGroupSize *= getNumFields(Opcode);
-      for (auto i = 0u; i < DstRegGroupSize; ++i)
-        RP.addReserved(Reg + i);
-    }
-    // Addr base reg and stride reg shouldn't match as it's unlikely that a
-    // memory scheme will allow such accesses: `base + n * stride` where n = [0;
-    // VLMAX], base reg == stride reg.
-    if ((isRVVStridedLoadStore(Opcode) || isRVVStridedSegLoadStore(Opcode)) &&
-        isMem)
-      RP.addReserved(Reg);
-
-    // For opcodes below SPEC forbids overlapping of dst and src register
-    // groups.
-    if (isRVVSetFirstMaskBit(Opcode) && isDst)
-      RP.addReserved(Reg);
-    if (isRVVIota(Opcode) && isDst)
-      RP.addReserved(Reg);
-    if (isRVVCompress(Opcode) && isDst)
-      RP.addReserved(Reg);
-    if ((isRVVSlide1Up(Opcode) || isRVVSlideUp(Opcode)) && isDst)
-      RP.addReserved(Reg);
-    // FIXME: The vector integer extension instructions (zero- or sign-extend)
-    // need special handling. Overlaps in the highest-numbered part of the
-    // destination register group are allowed. For example, when LMUL=8,
-    // vzext.vf4 v0, v6 is legal, but a source of v0, v2, or v4 is not.
-    // (riscv-v-spec-1.0, "Vector Operands" section)
-    if (isRVVExt(Opcode) && isDst)
-      RP.addReserved(Reg);
-    if (isRVVWidening(Opcode) && isDst)
-      RP.addReserved(Reg);
-    if ((isRVVGather(Opcode) || isRVVGather16(Opcode)) && isDst)
-      RP.addReserved(Reg);
-    // cm.mvsa01 (Zcmp): for the encoding to be legal r1s' != r2s'
-    if (Opcode == RISCV::CM_MVSA01)
-      RP.addReserved(Reg);
   }
 
   const TargetRegisterClass &getAddrRegClass() const override {
@@ -4965,22 +5237,22 @@ public:
     auto Operands = InstrDesc.operands();
     if (Operands[OpIdx].OperandType != MCOI::OperandType::OPERAND_REGISTER)
       return false;
+    auto Opcode = InstrDesc.getOpcode();
+    if (isRVV(Opcode))
+      return true;
     if (OpIdx < InstrDesc.getNumDefs())
       return true;
     if (!InstrDesc.mayLoad() && !InstrDesc.mayStore())
       return false;
-    auto AddrRegIdx = getMemOperandIdx(InstrDesc);
-    auto Opcode = InstrDesc.getOpcode();
-    if (!isRVVStridedLoadStore(Opcode) && !isRVVStridedSegLoadStore(Opcode) &&
-        !isRVVIndexedLoadStore(Opcode) && !isRVVIndexedSegLoadStore(Opcode))
-      return OpIdx == AddrRegIdx;
-    unsigned StrideOrIndexRegIdx = AddrRegIdx + 1;
-    return OpIdx == AddrRegIdx || OpIdx == StrideOrIndexRegIdx;
+    return OpIdx == getMemOperandIdx(InstrDesc);
   }
 
   bool canInitializeOperand(const MCInstrDesc &InstrDesc, unsigned OpIndex,
                             const LLVMState &State) const override {
     auto Opcode = InstrDesc.getOpcode();
+    // If it is TIED_TO, this register is already selected.
+    if (InstrDesc.getOperandConstraint(OpIndex, MCOI::TIED_TO) >= 0)
+      return false;
     // We can't initialize registers before control flow instructions
     if (isBaseCFInstr(Opcode) || isCall(Opcode) || Opcode == RISCV::AUIPC)
       return false;
@@ -6033,9 +6305,12 @@ SnippyRISCVTarget::createSimulator(llvm::snippy::DynamicLibrary &ModelLib,
       !(MisalignedAccessMode == DisableMisalignedAccessMode::All));
 }
 
-const MCRegisterClass &SnippyRISCVTarget::getRegClass(
-    const InstructionGenerationContext &IGC, unsigned OperandRegClassID,
-    unsigned OpIndex, unsigned Opcode, const MCRegisterInfo &RegInfo) const {
+const MCRegisterClass &
+SnippyRISCVTarget::getRegClass(const InstructionGenerationContext &IGC,
+                               unsigned OperandRegClassID, unsigned OpIndex,
+                               const MCInstrDesc &InstrDesc,
+                               const MCRegisterInfo &RegInfo) const {
+  auto Opcode = InstrDesc.getOpcode();
   const auto &MBB = IGC.MBB;
   const auto &ProgCtx = IGC.ProgCtx;
   const auto &TgtCtx =
@@ -6044,28 +6319,17 @@ const MCRegisterClass &SnippyRISCVTarget::getRegClass(
       (OperandRegClassID != RISCV::VRRegClassID))
     return RegInfo.getRegClass(OperandRegClassID);
 
-  auto [Multiplier, IsFractional] = TgtCtx.getEMUL(Opcode, OpIndex, MBB);
+  auto RegsCount = TgtCtx.getOperandRegsCount(InstrDesc, OpIndex, MBB);
   // Special handling for Vector Load/Store Segment Instructions, because
   // this instructions moves subarrays.
   if ((isRVVUnitStrideSegLoadStore(Opcode) ||
        isRVVStridedSegLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode)) &&
       OpIndex == 0 /* vector destination register group */)
-    return getRVVSegLoadStoreRegClassForVd(
-        Opcode, std::pair(Multiplier, IsFractional), RegInfo);
+    return getRVVSegLoadStoreRegClassForVd(Opcode, RegsCount, RegInfo);
 
-  // FIXME: The vector integer extension instructions (zero- or sign-extend)
-  // also need special handling. The EEW of the source is 1/2, 1/4, or 1/8 of
-  // SEW => EMUL is 1/2, 1/4, or 1/8 of LMUL. The destination has EEW equal to
-  // SEW and EMUL equal to LMUL. Now, it's believed that EMUL_source ==
-  // EMUL_destination == LMUL. That means we're missing a lot of source
-  // registers. For example, we'll never generate with LMUL=8, vzext.vf4 v0, v6
-  // (now, we can only use registers that divide by 8), even though we should.
-  // But the thing to keep in mind here is that overlaps are only allowed in the
-  // highest-numbered part of the destination register group (a source of v0,
-  // v2, or v4 is not allowed). (riscv-v-spec-1.0, "Vector Operands" section)
-  if (IsFractional)
+  switch (RegsCount) {
+  case 1:
     return RegInfo.getRegClass(OperandRegClassID);
-  switch (Multiplier) {
   case 2:
     return RegInfo.getRegClass(RISCV::VRM2RegClassID);
   case 4:

@@ -9,12 +9,12 @@ options:
 
 include:
   - Inputs/sections.yaml
-  - Inputs/rvv-unit-all.yaml
+  - Inputs/rvv-unit-little-lmul.yaml
 
 burst:
   mode: custom
-  min-size: 4
-  max-size: 8
+  min-size: 2
+  max-size: 4
   groupings:
     - - VLSE8_V
       - VLSE16_V

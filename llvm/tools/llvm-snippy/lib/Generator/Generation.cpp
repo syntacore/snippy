@@ -721,7 +721,7 @@ static MachineOperand createRegAsOperand(Register Reg, unsigned Flags,
 static MachineOperand pregenerateOneOperand(
     InstructionGenerationContext &InstrGenCtx, const MCInstrDesc &InstrDesc,
     const planning::PreselectedOpInfo &Preselected, unsigned OpIndex,
-    ArrayRef<MachineOperand> PregeneratedOperands,
+    ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands,
     std::optional<MemAddr> AccessAddress) {
 
   auto &RP = InstrGenCtx.getRegPool();
@@ -739,7 +739,6 @@ static MachineOperand pregenerateOneOperand(
 
   if (OpType == MCOI::OperandType::OPERAND_REGISTER) {
     assert(OperandRegClassID != -1);
-    bool IsDst = Preselected.getFlags() & RegState::Define;
     Register Reg;
     if (Preselected.isTiedTo())
       Reg = PregeneratedOperands[Preselected.getTiedTo()].getReg();
@@ -749,10 +748,11 @@ static MachineOperand pregenerateOneOperand(
         Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
     } else {
       auto RegClass = SnippyTgt.getRegClass(InstrGenCtx, OperandRegClassID,
-                                            OpIndex, Opcode, RegInfo);
-      auto Exclude = SnippyTgt.excludeRegsForOperand(InstrGenCtx, RegClass,
-                                                     InstrDesc, OpIndex);
+                                            OpIndex, InstrDesc, RegInfo);
+      auto Exclude = SnippyTgt.excludeRegsForOperand(
+          InstrGenCtx, RegClass, InstrDesc, OpIndex, PregeneratedOperands);
       auto Include = SnippyTgt.includeRegs(Opcode, RegClass);
+      bool IsDst = Preselected.getFlags() & RegState::Define;
       AccessMaskBit Mask = IsDst ? AccessMaskBit::W : AccessMaskBit::R;
 
       auto CustomMask =
@@ -770,9 +770,6 @@ static MachineOperand pregenerateOneOperand(
       if (SnippyTgt.isPhysRegClass(OperandRegClassID, RegInfo))
         Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
     }
-    SnippyTgt.reserveRegsIfNeeded(InstrGenCtx, Opcode,
-                                  /* isDst */ IsDst,
-                                  /* isMem */ false, Reg);
     return createRegAsOperand(Reg, Preselected.getFlags());
   }
 
@@ -798,11 +795,6 @@ static MachineOperand pregenerateOneOperand(
       if (SnippyTgt.isPhysRegClass(OperandRegClassID, RegInfo))
         Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
     }
-    // FIXME: RW mask is too restrictive for the majority of instructions.
-    SnippyTgt.reserveRegsIfNeeded(InstrGenCtx, Opcode,
-                                  /* isDst */ Preselected.getFlags() &
-                                      RegState::Define,
-                                  /* isMem */ true, Reg);
     return createRegAsOperand(Reg, Preselected.getFlags());
   }
 
@@ -831,9 +823,12 @@ static MachineOperand pregenerateOneOperand(
 
 using AddressInfoForInstr = std::pair<AddressInfo, AddressGenInfo>;
 
+// We accept `Preselected` by reference to avoid unnecessary copying. It's
+// elements will be changed to the generated ones if they were empty in the
+// initial vector.
 static SmallVector<MachineOperand, 8> pregenerateOperandsImpl(
     InstructionGenerationContext &InstrGenCtx, const MCInstrDesc &InstrDesc,
-    ArrayRef<planning::PreselectedOpInfo> Preselected,
+    SmallVectorImpl<planning::PreselectedOpInfo> &Preselected,
     const SmallVectorImpl<AddressInfoForInstr> &AddressesInfo) {
   SmallVector<MachineOperand, 8> PregeneratedOperands;
   assert(InstrDesc.getNumOperands() == Preselected.size());
@@ -846,18 +841,30 @@ static SmallVector<MachineOperand, 8> pregenerateOperandsImpl(
     return std::get<0>(AddressesInfo.front()).Address;
   }();
 
-  for (const auto &[Index, PreselOpInfo] : enumerate(Preselected)) {
+  auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
+  const auto &Tgt = State.getSnippyTarget();
+  SmallVector<unsigned> Indices;
+  Tgt.getSelectionOperandsOrder(InstrGenCtx, InstrDesc, Indices);
+  for (auto Index : Indices) {
+    auto &PreselOpInfo = Preselected[Index];
     auto Op = pregenerateOneOperand(InstrGenCtx, InstrDesc, PreselOpInfo, Index,
-                                    PregeneratedOperands, AccessAddress);
+                                    Preselected, AccessAddress);
+    auto OpOrErr = planning::PreselectedOpInfo::fromOperand(Op);
+    assert(!OpOrErr.takeError());
+    PreselOpInfo = *OpOrErr;
     PregeneratedOperands.push_back(Op);
   }
+
+  // We need to reorder the operands in index order.
+  reorder(PregeneratedOperands, Indices);
   return PregeneratedOperands;
 }
 
 static SmallVector<MachineOperand, 8>
 pregenerateOperands(InstructionGenerationContext &InstrGenCtx,
                     const MCInstrDesc &InstrDesc,
-                    ArrayRef<planning::PreselectedOpInfo> Preselected,
+                    SmallVectorImpl<planning::PreselectedOpInfo> &Preselected,
                     const SmallVectorImpl<AddressInfoForInstr> &AddressesInfo) {
   auto &RP = InstrGenCtx.getRegPool();
   auto &ProgCtx = InstrGenCtx.ProgCtx;
@@ -1207,7 +1214,7 @@ isPostprocessNeeded(const MCInstrDesc &InstrDesc,
 
 static MachineInstr *
 randomInstruction(const MCInstrDesc &InstrDesc,
-                  SmallVector<planning::PreselectedOpInfo> Preselected,
+                  ArrayRef<planning::PreselectedOpInfo> PreselectedIn,
                   planning::InstructionGenerationContext &InstrGenCtx,
                   MDNode *MetadataMark) {
   auto &MBB = InstrGenCtx.MBB;
@@ -1219,13 +1226,15 @@ randomInstruction(const MCInstrDesc &InstrDesc,
       getInstBuilder(MetadataMark, SnippyTgt, MBB, InstrGenCtx.Ins,
                      MBB.getParent()->getFunction().getContext(), InstrDesc);
 
-  bool DoPostprocess = isPostprocessNeeded(InstrDesc, Preselected, InstrGenCtx);
+  bool DoPostprocess =
+      isPostprocessNeeded(InstrDesc, PreselectedIn, InstrGenCtx);
 
   auto NumDefs = InstrDesc.getNumDefs();
   auto TotalNum = InstrDesc.getNumOperands();
 
-  if (Preselected.empty())
-    Preselected.resize(TotalNum);
+  SmallVector<planning::PreselectedOpInfo> Preselected(TotalNum);
+  if (!PreselectedIn.empty())
+    copy(PreselectedIn, Preselected.begin());
   assert(Preselected.size() == TotalNum);
   for (auto &&[OpIdx, OpInfo] : enumerate(Preselected)) {
     OpInfo.setFlags(OpInfo.getFlags() |

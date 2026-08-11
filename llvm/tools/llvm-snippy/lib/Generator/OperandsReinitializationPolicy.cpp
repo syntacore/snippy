@@ -25,7 +25,8 @@ static bool isDestinationRegister(unsigned OpIndex, unsigned NumDefs) {
 static Register pregenerateRegister(InstructionGenerationContext &InstrGenCtx,
                                     const MCInstrDesc &InstrDesc,
                                     const MCOperandInfo &MCOpInfo,
-                                    unsigned OpIndex) {
+                                    unsigned OpIndex,
+                                    ArrayRef<PreselectedOpInfo> Preselected) {
   auto &MBB = InstrGenCtx.MBB;
   auto &RP = InstrGenCtx.getRegPool();
   auto &ProgCtx = InstrGenCtx.ProgCtx;
@@ -34,9 +35,9 @@ static Register pregenerateRegister(InstructionGenerationContext &InstrGenCtx,
   const auto &Tgt = State.getSnippyTarget();
   auto OperandRegClassID = InstrDesc.operands()[OpIndex].RegClass;
   auto RegClass = Tgt.getRegClass(InstrGenCtx, OperandRegClassID, OpIndex,
-                                  InstrDesc.getOpcode(), RegInfo);
-  auto Exclude =
-      Tgt.excludeRegsForOperand(InstrGenCtx, RegClass, InstrDesc, OpIndex);
+                                  InstrDesc, RegInfo);
+  auto Exclude = Tgt.excludeRegsForOperand(InstrGenCtx, RegClass, InstrDesc,
+                                           OpIndex, Preselected);
   auto Include = Tgt.includeRegs(InstrDesc.getOpcode(), RegClass);
   AccessMaskBit Mask = AccessMaskBit::RW;
   auto CustomMask = Tgt.getCustomAccessMaskForOperand(InstrDesc, OpIndex);
@@ -59,8 +60,10 @@ static void selectInitializableOperandsRegisters(
     InstructionGenerationContext &InstrGenCtx, const MCInstrDesc &InstrDesc,
     SmallVectorImpl<PreselectedOpInfo> &Preselected) {
   Preselected.clear();
-  Preselected.reserve(InstrDesc.getNumOperands());
+  Preselected.resize(InstrDesc.getNumOperands());
   auto &ProgCtx = InstrGenCtx.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
+  const auto &Tgt = State.getSnippyTarget();
   bool ValuegramOperandsRegsInitOutputs =
       InstrGenCtx.hasCfg<DefaultPolicyConfig>() &&
       ((InstrGenCtx.getCfg<DefaultPolicyConfig>().Valuegram &&
@@ -73,17 +76,17 @@ static void selectInitializableOperandsRegisters(
            ValuegramOperandsRegsInitOutputs;
   };
 
-  llvm::transform(
-      llvm::enumerate(InstrDesc.operands()), std::back_inserter(Preselected),
-      [&](const auto &&Args) -> planning::PreselectedOpInfo {
-        const auto &[OpIndex, MCOpInfo] = Args;
-        // If it is TIED_TO, this register is already
-        // selected.
-        if (NeedsInit(OpIndex) &&
-            ProgCtx.getLLVMState().isReinitializableOperand(InstrDesc, OpIndex))
-          return pregenerateRegister(InstrGenCtx, InstrDesc, MCOpInfo, OpIndex);
-        return {};
-      });
+  const auto &Operands = InstrDesc.operands();
+  SmallVector<unsigned> Indices;
+  Tgt.getSelectionOperandsOrder(InstrGenCtx, InstrDesc, Indices);
+  for (auto OpIndex : Indices) {
+    // If it is TIED_TO, this register is already selected.
+    if (!NeedsInit(OpIndex) ||
+        !State.isReinitializableOperand(InstrDesc, OpIndex))
+      continue;
+    Preselected[OpIndex] = pregenerateRegister(
+        InstrGenCtx, InstrDesc, Operands[OpIndex], OpIndex, Preselected);
+  }
 }
 
 ValuegramGenPolicy::ValuegramGenPolicy(

@@ -369,7 +369,8 @@ public:
 
   const MCRegisterClass &
   getRegClass(const InstructionGenerationContext &IGC,
-              unsigned OperandRegClassID, unsigned OpIndex, unsigned Opcode,
+              unsigned OperandRegClassID, unsigned OpIndex,
+              const MCInstrDesc &InstrDesc,
               const MCRegisterInfo &RegInfo) const override {
     return RegInfo.getRegClass(OperandRegClassID);
   }
@@ -781,7 +782,7 @@ public:
       const MCInstrDesc &InstrDesc, unsigned OperandIdx,
       const StridedImmediate &StridedImm, const SnippyProgramContext &ProgCtx,
       const CommonPolicyConfig &Cfg,
-      ArrayRef<MachineOperand> PregeneratedOperands,
+      ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands,
       MemAddr Addr) const override {
     // AArch64 uses createOperandGenerator, so the offset is already produced
     // by add...Operands
@@ -1028,7 +1029,7 @@ public:
   std::pair<AddressParts, MemAddresses>
   breakDownAddr(InstructionGenerationContext &IGC, AddressInfo AddrInfo,
                 const MCInstrDesc &InstrDesc,
-                MutableArrayRef<planning::PreselectedOpInfo> Preselected,
+                SmallVectorImpl<planning::PreselectedOpInfo> &Preselected,
                 unsigned AddrIdx,
                 std::optional<MemAddr> MainPart = std::nullopt) const override {
     auto MemInfo = getAArch64MemInfo(InstrDesc.getOpcode());
@@ -1253,9 +1254,10 @@ public:
     SNIPPY_UNIMPLEMENTED();
   }
 
-  void preselectAccessSizeOperand(
-      InstructionGenerationContext &IGC, const MCInstrDesc &InstrDesc,
-      MutableArrayRef<planning::PreselectedOpInfo> Preselected) const override {
+  void preselectAccessSizeOperand(InstructionGenerationContext &IGC,
+                                  const MCInstrDesc &InstrDesc,
+                                  SmallVectorImpl<planning::PreselectedOpInfo>
+                                      &Preselected) const override {
     // AArch64 memory instructions have no access-size operand to preselect.
   }
 
@@ -1270,6 +1272,14 @@ public:
                                         /*Burst=*/false);
   }
 
+  void
+  getSelectionOperandsOrder(InstructionGenerationContext &IGC,
+                            const MCInstrDesc &InstrDesc,
+                            SmallVectorImpl<unsigned> &Indices) const override {
+    Indices.resize(InstrDesc.getNumOperands());
+    std::iota(Indices.begin(), Indices.end(), 0u);
+  }
+
   void excludeFromMemRegsForInstr(
       const MCInstrDesc &InstrDesc, const MCRegisterInfo &RI,
       SmallVectorImpl<Register> &Regs,
@@ -1278,22 +1288,17 @@ public:
     // No special register exclusions for AArch64 memory instructions.
   }
 
-  std::vector<Register> excludeRegsForOperand(InstructionGenerationContext &IGC,
-                                              const MCRegisterClass &RC,
-                                              const MCInstrDesc &InstrDesc,
-                                              unsigned Operand) const override {
+  std::vector<Register> excludeRegsForOperand(
+      InstructionGenerationContext &IGC, const MCRegisterClass &RC,
+      const MCInstrDesc &InstrDesc, unsigned OpIndex,
+      ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands)
+      const override {
     return {};
   }
 
   std::vector<Register> includeRegs(unsigned Opcode,
                                     const MCRegisterClass &RC) const override {
     return {};
-  }
-
-  void reserveRegsIfNeeded(InstructionGenerationContext &IGC, unsigned Opcode,
-                           bool isDst, bool isMem,
-                           Register Reg) const override {
-    // TODO: support register reservation
   }
 
   const TargetRegisterClass &getAddrRegClass() const override {

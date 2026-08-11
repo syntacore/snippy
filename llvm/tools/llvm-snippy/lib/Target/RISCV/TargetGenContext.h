@@ -194,9 +194,26 @@ public:
     auto &&[Start, Size, Seed, Offset, TmpA, TmpB, TmpC] = Regs;
     MemInitRegs = {Start, Size, Seed, Offset, TmpA, TmpB, TmpC};
   }
-  std::pair<unsigned, bool> getEMUL(unsigned Opcode, unsigned OpIndex,
-                                    const MachineBasicBlock &MBB) const {
+
+  std::pair<unsigned, bool> getOperandEMUL(const MCInstrDesc &InstrDesc,
+                                           unsigned OpIndex,
+                                           const MachineBasicBlock &MBB) const {
+    assert(isVectorRegClass(InstrDesc.operands()[OpIndex].RegClass) &&
+           "EMUL exists only for vector registers");
     // EMUL - effective LMUL of each vector operand.
+    auto Opcode = InstrDesc.getOpcode();
+    auto ELEN = getELEN();
+    auto LMUL = getLMUL(MBB);
+    auto SEW = static_cast<unsigned>(getSEW(MBB));
+    constexpr std::pair<unsigned, bool> EMUL1 = {/* Multiplier */ 1,
+                                                 /* IsFractional */ false};
+    // riscv-v-spec-1.0: Scalar operands can be taken from element 0 of a vector
+    // register (.vs suffix denotes the second operand is a scalar stored in
+    // element 0 of a vector register). Any vector register can be used to hold
+    // a scalar regardless of the current LMUL setting (=> EMUL = 1).
+    if (isRVVReduction(Opcode) &&
+        (/* vd */ OpIndex == 0 || /* vs1 */ OpIndex == 2))
+      return EMUL1;
 
     // Vector unit-stride and constant-stride use the EEW/EMUL encoded
     // in the instruction for the data values.
@@ -219,11 +236,8 @@ public:
         isRVVUnitStrideSegLoadStore(Opcode) || isRVVStridedLoadStore(Opcode) ||
         isRVVStridedSegLoadStore(Opcode)) {
       assert(OpIndex == 0 && "We can be here only for vd vector operand");
-      auto ELEN = getELEN();
-      auto LMUL = getLMUL(MBB);
-      auto SEW = getSEW(MBB);
       auto EEW = getDataElementWidth(Opcode) * CHAR_BIT;
-      return computeDecodedEMUL(ELEN, static_cast<unsigned>(SEW), EEW, LMUL);
+      return computeDecodedEMUL(ELEN, SEW, EEW, LMUL);
     }
 
     // For Vector Indexed Loads and Stores Instructions EMULs of the operands
@@ -246,7 +260,6 @@ public:
     //
     //          vsetvli a1, t0, e8, ta, ma
     //          vluxseg3ei32.v v4, (x5), v3
-    //
     //                                         # Load bytes at
     //                                         addresses x5+v3[i] into v4[i],
     //                                         addresses x5+v3[i]+1 into v5[i],
@@ -260,68 +273,34 @@ public:
     // Conclusion: EMUL of index vector register, which are specified by the
     // third operand (OpIndex == 2), must be calculated. While for another
     // vector operand EMUL is simply equal to the LMUL.
-    auto [Multiplier, IsFractional] = decodeVLMUL(getLMUL(MBB));
+    auto [Multiplier, IsFractional] = decodeVLMUL(LMUL);
     if (isRVVIndexedLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode)) {
       if (OpIndex == 0)
         return std::make_pair(Multiplier, IsFractional);
       assert(OpIndex == 2 && "We can be here only for index vector operand");
-      auto ELEN = getELEN();
-      auto LMUL = getLMUL(MBB);
-      auto SEW = static_cast<unsigned>(getSEW(MBB));
       auto EIEW = getIndexElementWidth(Opcode);
-      return computeDecodedEMUL(ELEN, static_cast<unsigned>(SEW), EIEW, LMUL);
+      return computeDecodedEMUL(ELEN, SEW, EIEW, LMUL);
     }
 
-    // FIXME: This function must take into account the index of the operand
-    // in this instructions too. Now it returns the maximum EMUL of all
-    // operands.
-    //
-    // For Widening Vector Arithmetic Instructions EMULs of the operands
-    // are also different.
-    //
-    // E.G.:
-    //        # Double-width result, two single-width sources:
-    //        2*SEW = SEW op SEW
-    //
-    //        vwop.vv vd, vs2, vs1, vm       # integer vector-vector
-    //                                       vd[i] = vs2[i] op vs1[i]
-    //
-    // E.G.:
-    //        # Double-width result, first source double, second - single-width:
-    //        2*SEW = SEW op SEW
-    //
-    //        vwop.vv vd, vs2, vs1, vm       # integer vector-vector
-    //                                       vd[i] = vs2[i] op vs1[i]
+    if (isRVVWholeRegisterInstr(Opcode))
+      return std::make_pair(getRVVWholeRegisterCount(Opcode), 0);
 
-    // For Narrowing Vector Arithmetic Instructions too
-    //
-    // E.G.:
-    //        # Single-width result vd, double-width source vs2,
-    //        # single-width source vs1/rs1: SEW = 2*SEW op SEW
-    //
-    //        vnop.wv vd, vs2, vs1, vm       # integer vector-vector
-    //                                       vd[i] = vs2[i] op vs1[i]
-    //
-    if ((isRVVIntegerWidening(Opcode) || isRVVFPWidening(Opcode) ||
-         isRVVIntegerNarrowing(Opcode) || isRVVFPNarrowing(Opcode)) &&
-        !IsFractional) {
-      auto ELEN = getELEN();
-      auto LMUL = getLMUL(MBB);
-      auto SEW = static_cast<unsigned>(getSEW(MBB));
-      return computeDecodedEMUL(ELEN, SEW, SEW * 2u, LMUL);
-    }
+    auto EEW = getOperandEEW(InstrDesc, OpIndex, SEW);
+    // riscv-v-spec-1.0: For the purpose of determining register group overlap
+    // constraints, mask elements have EEW=1. A vector mask occupies only one
+    // vector register regardless of SEW and LMUL (=> EMUL = 1).
+    if (EEW == 1)
+      return EMUL1;
 
-    if (isRVVGather16(Opcode)) {
-      auto ELEN = getELEN();
-      auto LMUL = getLMUL(MBB);
-      auto SEW = static_cast<unsigned>(getSEW(MBB));
-      auto EEW = 16u;
-      if (EEW > SEW)
-        std::tie(Multiplier, IsFractional) =
-            computeDecodedEMUL(ELEN, SEW, EEW, LMUL);
-    }
+    return computeDecodedEMUL(ELEN, SEW, EEW, LMUL);
+  }
 
-    return std::make_pair(Multiplier, IsFractional);
+  unsigned getOperandRegsCount(const MCInstrDesc &InstrDesc, unsigned OpIndex,
+                               const MachineBasicBlock &MBB) const {
+    auto [Multiplier, IsFractional] = getOperandEMUL(InstrDesc, OpIndex, MBB);
+    if (IsFractional)
+      return 1;
+    return Multiplier;
   }
 
   // This function differs from the RISCVVType::decodeVLMUL in that it also
