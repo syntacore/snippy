@@ -122,10 +122,6 @@ inline bool isRVV(unsigned Opcode);
 
 inline size_t getDataElementWidth(unsigned Opcode, unsigned SEW = 0,
                                   unsigned VLENB = 0) {
-  if (isRVVIntegerWidening(Opcode) || isRVVFPWidening(Opcode) ||
-      isRVVIntegerNarrowing(Opcode) || isRVVFPNarrowing(Opcode)) {
-    return SEW * 2 / CHAR_BIT;
-  }
   switch (Opcode) {
   case RISCV::VL1RE8_V:
   case RISCV::VL1RE16_V:
@@ -133,6 +129,7 @@ inline size_t getDataElementWidth(unsigned Opcode, unsigned SEW = 0,
   case RISCV::VL1RE64_V:
   case RISCV::VS1R_V:
   case RISCV::VMV1R_V:
+    assert(VLENB != 0);
     return VLENB;
   case RISCV::VL2RE8_V:
   case RISCV::VL2RE16_V:
@@ -140,6 +137,7 @@ inline size_t getDataElementWidth(unsigned Opcode, unsigned SEW = 0,
   case RISCV::VL2RE64_V:
   case RISCV::VS2R_V:
   case RISCV::VMV2R_V:
+    assert(VLENB != 0);
     return VLENB * 2u;
   case RISCV::VL4RE8_V:
   case RISCV::VL4RE16_V:
@@ -147,6 +145,7 @@ inline size_t getDataElementWidth(unsigned Opcode, unsigned SEW = 0,
   case RISCV::VL4RE64_V:
   case RISCV::VS4R_V:
   case RISCV::VMV4R_V:
+    assert(VLENB != 0);
     return VLENB * 4u;
   case RISCV::VL8RE8_V:
   case RISCV::VL8RE16_V:
@@ -154,6 +153,7 @@ inline size_t getDataElementWidth(unsigned Opcode, unsigned SEW = 0,
   case RISCV::VL8RE64_V:
   case RISCV::VS8R_V:
   case RISCV::VMV8R_V:
+    assert(VLENB != 0);
     return VLENB * 8u;
   case RISCV::VLE8_V:
   case RISCV::VLE8FF_V:
@@ -300,6 +300,7 @@ inline size_t getDataElementWidth(unsigned Opcode, unsigned SEW = 0,
   default:
     assert(isRVV(Opcode));
     // For vector instructions return one element size.
+    assert(SEW);
     return SEW / CHAR_BIT;
   }
 }
@@ -546,6 +547,11 @@ inline size_t getIndexElementWidth(unsigned Opcode) {
 
 inline size_t getNumFields(unsigned Opcode) {
   switch (Opcode) {
+  case RVV_SEG_EACHEIEW_PLACER(VLUX, ):
+  case RVV_SEG_EACHEIEW_PLACER(VLOX, ):
+  case RVV_SEG_EACHEIEW_PLACER(VSUX, ):
+  case RVV_SEG_EACHEIEW_PLACER(VSOX, ):
+    return 1;
   case RVV_SEG_EACHEEW_PLACER(VLSEG, 2, ):
   case RVV_SEG_EACHEEW_PLACER(VLSEG, 2, FF):
   case RVV_SEG_EACHEEW_PLACER(VSSEG, 2, ):
@@ -744,6 +750,11 @@ inline bool isRVVIndexedSegLoadStore(unsigned Opcode) {
   case RVV_INDEX_SEG_EACHNFIELDS_PLACER(VSOXSEG):
     return true;
   }
+}
+
+inline bool isRVVSegLoadStore(unsigned Opcode) {
+  return isRVVUnitStrideSegLoadStore(Opcode) ||
+         isRVVStridedSegLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode);
 }
 
 inline bool isRVVIndexedUnorderedSegLoadStore(unsigned Opcode) {
@@ -1264,54 +1275,6 @@ inline bool isRVVScalarMove(unsigned Opcode) {
   }
 }
 
-inline unsigned getRVVWholeRegisterMoveCount(unsigned Opcode) {
-  assert(isRVVWholeRegisterMove(Opcode));
-  switch (Opcode) {
-  default:
-    llvm_unreachable("Not a whole register move instruction");
-  case RISCV::VMV1R_V:
-    return 1;
-  case RISCV::VMV2R_V:
-    return 2;
-  case RISCV::VMV4R_V:
-    return 4;
-  case RISCV::VMV8R_V:
-    return 8;
-  }
-}
-
-inline unsigned getRVVWholeRegisterLoadStoreCount(unsigned Opcode) {
-  assert(isRVVWholeRegLoadStore(Opcode));
-  switch (Opcode) {
-  default:
-    llvm_unreachable("Not a whole register load/store instruction");
-  case RISCV::VL1RE8_V:
-  case RISCV::VL1RE16_V:
-  case RISCV::VL1RE32_V:
-  case RISCV::VL1RE64_V:
-  case RISCV::VS1R_V:
-    return 1;
-  case RISCV::VL2RE8_V:
-  case RISCV::VL2RE16_V:
-  case RISCV::VL2RE32_V:
-  case RISCV::VL2RE64_V:
-  case RISCV::VS2R_V:
-    return 2;
-  case RISCV::VL4RE8_V:
-  case RISCV::VL4RE16_V:
-  case RISCV::VL4RE32_V:
-  case RISCV::VL4RE64_V:
-  case RISCV::VS4R_V:
-    return 4;
-  case RISCV::VL8RE8_V:
-  case RISCV::VL8RE16_V:
-  case RISCV::VL8RE32_V:
-  case RISCV::VL8RE64_V:
-  case RISCV::VS8R_V:
-    return 8;
-  }
-}
-
 inline bool isRVVFloatingPoint(unsigned Opcode) {
   // FIXME: We must not rely on opcodes order.
   switch (Opcode) {
@@ -1566,57 +1529,6 @@ inline unsigned getRVVExtFactor(unsigned Opcode) {
   }
 }
 
-inline Register getBaseRegisterForVRMClass(Register Reg) {
-  switch (Reg) {
-  default:
-    llvm_unreachable("Unexpected Register opcode");
-  case RISCV::V0M2:
-  case RISCV::V0M4:
-  case RISCV::V0M8:
-    return RISCV::V0;
-  case RISCV::V2M2:
-    return RISCV::V2;
-  case RISCV::V4M2:
-  case RISCV::V4M4:
-    return RISCV::V4;
-  case RISCV::V6M2:
-    return RISCV::V6;
-  case RISCV::V8M2:
-  case RISCV::V8M4:
-  case RISCV::V8M8:
-    return RISCV::V8;
-  case RISCV::V10M2:
-    return RISCV::V10;
-  case RISCV::V12M2:
-  case RISCV::V12M4:
-    return RISCV::V12;
-  case RISCV::V14M2:
-    return RISCV::V14;
-  case RISCV::V16M2:
-  case RISCV::V16M4:
-  case RISCV::V16M8:
-    return RISCV::V16;
-  case RISCV::V18M2:
-    return RISCV::V18;
-  case RISCV::V20M2:
-  case RISCV::V20M4:
-    return RISCV::V20;
-  case RISCV::V22M2:
-    return RISCV::V22;
-  case RISCV::V24M2:
-  case RISCV::V24M4:
-  case RISCV::V24M8:
-    return RISCV::V24;
-  case RISCV::V26M2:
-    return RISCV::V26;
-  case RISCV::V28M2:
-  case RISCV::V28M4:
-    return RISCV::V28;
-  case RISCV::V30M2:
-    return RISCV::V30;
-  }
-}
-
 inline bool isRVVIntegerWidening(unsigned Opcode) {
   switch (Opcode) {
   default:
@@ -1815,6 +1727,26 @@ inline bool isRVVNarrowing(unsigned Opcode) {
   return isRVVIntegerNarrowing(Opcode) || isRVVFPNarrowing(Opcode);
 }
 
+inline bool isRVVDoubleWidthSource(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return isRVVNarrowing(Opcode) || isRVVSemiWidening(Opcode);
+  case RISCV::VFWREDOSUM_VS:
+  case RISCV::VFWREDUSUM_VS:
+  case RISCV::VWREDSUM_VS:
+  case RISCV::VWREDSUMU_VS:
+  case RISCV::VWADD_WV:
+  case RISCV::VWADDU_WV:
+  case RISCV::VWSUB_WV:
+  case RISCV::VWSUBU_WV:
+  case RISCV::VNCLIP_WV:
+  case RISCV::VNCLIPU_WV:
+  case RISCV::VFWADD_WV:
+  case RISCV::VFWSUB_WV:
+    return true;
+  }
+}
+
 inline bool isRVVMaskLogical(unsigned Opcode) {
   switch (Opcode) {
   default:
@@ -1866,10 +1798,15 @@ inline bool isRVVMaskProducing(unsigned Opcode) {
   case RISCV::VMSGTU_VI:
   case RISCV::VMSGT_VI:
   case RISCV::VMADC_VVM:
-  case RISCV::VMSBC_VVM:
   case RISCV::VMADC_VXM:
-  case RISCV::VMSBC_VXM:
   case RISCV::VMADC_VIM:
+  case RISCV::VMADC_VV:
+  case RISCV::VMADC_VX:
+  case RISCV::VMADC_VI:
+  case RISCV::VMSBC_VVM:
+  case RISCV::VMSBC_VXM:
+  case RISCV::VMSBC_VV:
+  case RISCV::VMSBC_VX:
     return true;
   }
 }
@@ -1895,15 +1832,43 @@ inline bool isRVVWholeRegisterInstr(unsigned Opcode) {
 }
 
 inline size_t getRVVWholeRegisterCount(unsigned Opcode) {
-  if (isRVVWholeRegisterMove(Opcode))
-    return getRVVWholeRegisterMoveCount(Opcode);
-  if (isRVVWholeRegLoadStore(Opcode))
-    return getRVVWholeRegisterLoadStoreCount(Opcode);
-  llvm_unreachable("Not a whole register instruction");
+  assert(isRVVWholeRegisterInstr(Opcode));
+  switch (Opcode) {
+  default:
+    llvm_unreachable("Not a whole register load/store/move instruction");
+  case RISCV::VL1RE8_V:
+  case RISCV::VL1RE16_V:
+  case RISCV::VL1RE32_V:
+  case RISCV::VL1RE64_V:
+  case RISCV::VS1R_V:
+  case RISCV::VMV1R_V:
+    return 1;
+  case RISCV::VL2RE8_V:
+  case RISCV::VL2RE16_V:
+  case RISCV::VL2RE32_V:
+  case RISCV::VL2RE64_V:
+  case RISCV::VS2R_V:
+  case RISCV::VMV2R_V:
+    return 2;
+  case RISCV::VL4RE8_V:
+  case RISCV::VL4RE16_V:
+  case RISCV::VL4RE32_V:
+  case RISCV::VL4RE64_V:
+  case RISCV::VS4R_V:
+  case RISCV::VMV4R_V:
+    return 4;
+  case RISCV::VL8RE8_V:
+  case RISCV::VL8RE16_V:
+  case RISCV::VL8RE32_V:
+  case RISCV::VL8RE64_V:
+  case RISCV::VS8R_V:
+  case RISCV::VMV8R_V:
+    return 8;
+  }
 }
 
 inline const MCRegisterClass &
-getRVVSegLoadStoreRegClassForVd(unsigned Opcode, std::pair<unsigned, bool> EMUL,
+getRVVSegLoadStoreRegClassForVd(unsigned Opcode, unsigned RegNumMult,
                                 const MCRegisterInfo &RegInfo) {
   // The vector load/store segment instructions move subarrays with
   // homogeneous elements. Count of registers in vd operand differ
@@ -1918,13 +1883,9 @@ getRVVSegLoadStoreRegClassForVd(unsigned Opcode, std::pair<unsigned, bool> EMUL,
   //                           EMUL = (eew/SEW) * LMUL = 8  ->  M8
   //
   // Then the register class of the vd operand will be VRN3M8
-  assert((isRVVUnitStrideSegLoadStore(Opcode) ||
-          isRVVStridedSegLoadStore(Opcode) ||
-          isRVVIndexedSegLoadStore(Opcode)) &&
+  assert(isRVVSegLoadStore(Opcode) &&
          "This function requires only these opcodes");
-  auto [Multiplier, IsFractional] = EMUL;
   auto NFields = getNumFields(Opcode);
-  auto RegNumMult = IsFractional ? 1u : Multiplier;
   assert(RegNumMult * NFields <= 8 && "RVV spec 7.8: EMUL * NFIELDS <= 8");
 
   // This hash table matches:
@@ -1947,6 +1908,98 @@ getRVVSegLoadStoreRegClassForVd(unsigned Opcode, std::pair<unsigned, bool> EMUL,
       {{6, 1}, RISCV::VRN6M1RegClassID}, {{7, 1}, RISCV::VRN7M1RegClassID},
       {{8, 1}, RISCV::VRN8M1RegClassID}};
   return RegInfo.getRegClass(Map.at({NFields, RegNumMult}));
+}
+
+inline bool isVectorRegClass(int16_t RegClassID) {
+  // We select the vector register classes only in functions
+  // SnippyRISCVTarget::getRegClass and getRVVSegLoadStoreRegClassForVd, and
+  // therefore expect one from them. Although there are actually more vector
+  switch (RegClassID) {
+  case RISCV::VMV0RegClassID:
+  case RISCV::VRRegClassID:
+  case RISCV::VRM2RegClassID:
+  case RISCV::VRM4RegClassID:
+  case RISCV::VRM8RegClassID:
+  case RISCV::VRN2M1RegClassID:
+  case RISCV::VRN2M2RegClassID:
+  case RISCV::VRN2M4RegClassID:
+  case RISCV::VRN3M1RegClassID:
+  case RISCV::VRN3M2RegClassID:
+  case RISCV::VRN4M1RegClassID:
+  case RISCV::VRN4M2RegClassID:
+  case RISCV::VRN5M1RegClassID:
+  case RISCV::VRN6M1RegClassID:
+  case RISCV::VRN7M1RegClassID:
+  case RISCV::VRN8M1RegClassID:
+    return true;
+  default:
+    return false;
+  }
+}
+
+inline unsigned getOperandEEW(const MCInstrDesc &InstrDesc, unsigned OpIndex,
+                              unsigned SEW, unsigned VLENB = 0) {
+  auto Opcode = InstrDesc.getOpcode();
+  assert(OpIndex < InstrDesc.operands().size());
+  auto Operand = InstrDesc.operands()[OpIndex];
+  auto OperandRegClassID = Operand.RegClass;
+  if (!isVectorRegClass(OperandRegClassID))
+    return 0;
+
+  // riscv-v-spec-1.0: For the purpose of determining register group overlap
+  // constraints, mask elements have EEW=1.
+  if (OperandRegClassID == RISCV::VMV0RegClassID || isRVVMaskLogical(Opcode) ||
+      ((Opcode == RISCV::VCPOP_M || Opcode == RISCV::VFIRST_M ||
+        isRVVIota(Opcode)) &&
+       /* vs2 */ OpIndex == 1) ||
+      isRVVSetFirstMaskBit(Opcode) ||
+      (isRVVMaskProducing(Opcode) && /* vd */ OpIndex == 0) ||
+      isRVVUnitStrideMaskLoadStore(Opcode) ||
+      (isRVVCompress(Opcode) && /* vs1 */ OpIndex == 2))
+    return 1;
+
+  if (isRVVUnitStrideLoadStore(Opcode) || isRVVUnitStrideFFLoad(Opcode) ||
+      isRVVStridedLoadStore(Opcode) || isRVVUnitStrideSegLoadStore(Opcode) ||
+      isRVVStridedSegLoadStore(Opcode)) {
+    // EEW is a data element width.
+    if (/* vd, vs3 */ OpIndex == 0)
+      return getDataElementWidth(Opcode, SEW) * CHAR_BIT;
+    assert(OpIndex == 1);
+    return SEW;
+  }
+  if (isRVVIndexedLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode)) {
+    // EEW is an index element width.
+    if (/* vs2 */ OpIndex == 2)
+      return getIndexElementWidth(Opcode);
+    assert(OpIndex == 0);
+    return SEW;
+  }
+
+  if (isRVVWholeRegLoadStore(Opcode)) {
+    // EEW is a data element width.
+    assert(OpIndex == 0);
+    assert(VLENB != 0);
+    return getLoadStoreNaturalAlignment(Opcode) * CHAR_BIT;
+  }
+
+  if ((isRVVWidening(Opcode) && /* vd */ OpIndex == 0) ||
+      (isRVVDoubleWidthSource(Opcode) && /* vs2 */ OpIndex == 1))
+    return 2 * SEW;
+
+  if (isRVVExt(Opcode) && /* vs2 */ OpIndex == 1)
+    return SEW / getRVVExtFactor(Opcode);
+
+  if (isRVVGather16(Opcode) && /* vs1 */ OpIndex == 2)
+    return 16;
+
+  return SEW;
+}
+
+inline bool canSrcDestOperandsOverlap(unsigned Opcode) {
+  return !(isRVVSetFirstMaskBit(Opcode) || isRVVIndexedSegLoadStore(Opcode) ||
+           isRVVIota(Opcode) || isRVVGather(Opcode) || isRVVGather16(Opcode) ||
+           isRVVSlide1Up(Opcode) || isRVVSlideUp(Opcode) ||
+           isRVVCompress(Opcode));
 }
 
 inline bool canProduceNaN(const MCInstrDesc &InstrDesc) {

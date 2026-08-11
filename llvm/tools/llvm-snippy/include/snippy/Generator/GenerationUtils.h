@@ -45,8 +45,7 @@ void selectNonMemoryOperands(
     const MCInstrDesc &InstrDesc,
     SmallVectorImpl<planning::PreselectedOpInfo> &Preselected,
     planning::InstructionGenerationContext &InstrGenCtx, RegPoolWrapper &RP,
-    const DenseSet<Register> &Excluded = {},
-    const DenseSet<Register> &ExcludedForDst = {});
+    DenseSet<Register> &Destinations, const DenseSet<Register> &Excluded = {});
 void selectConcreteOffsets(
     InstructionGenerationContext &IGC, const MCInstrDesc &InstrDesc,
     SmallVectorImpl<planning::PreselectedOpInfo> &Preselected);
@@ -152,6 +151,20 @@ getMainInstBuilder(const SnippyTarget &Tgt, MachineBasicBlock &MBB,
                    const MCInstrDesc &Desc, DstArgs... DstReg) {
   return getInstBuilder(/* MetadataMark */ nullptr, Tgt, MBB, Ins, Context,
                         Desc, DstReg...);
+}
+
+// Reorder the elements of Vec with the newly specified indices from Indices.
+// The element with the number i becomes the Indices[i] position as a result.
+// For example, reorder({190, -32, -8}, {1, 2, 0}) -> {-8, 190, -32}
+template <typename ArrayT>
+void reorder(ArrayT &Vec, MutableArrayRef<unsigned> Indices) {
+  for (auto I = 0u; I < Vec.size(); ++I) {
+    while (Indices[I] != I) {
+      auto TgtIdx = Indices[I];
+      std::swap(Vec[I], Vec[TgtIdx]);
+      std::swap(Indices[I], Indices[TgtIdx]);
+    }
+  }
 }
 
 } // namespace snippy

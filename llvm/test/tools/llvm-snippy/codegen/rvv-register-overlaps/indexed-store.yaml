@@ -1,0 +1,43 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  march: rv64imfdv
+  num-instrs: 1000
+  dump-mf: on
+  reserved-regs-list: ["V([0-9]|1[0-9])"]
+
+include:
+  - Inputs/sections.yaml
+
+riscv-vector-unit:
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+        sew_16: 1.0
+        sew_32: 1.0
+      LMUL:
+        m4: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+  - [VSETIVLI, 1.0]
+  - [VSUXEI8_V, 1.0]
+  - [VSUXEI16_V, 1.0]
+  - [VSUXEI32_V, 1.0]
+
+# COM: Check that vs3 group can overlap with vs2 group (if EEW == SEW).
+#
+# CHECK: VSUXEI8_V $v28, $x{{[0-9]+}}, $v28
+# CHECK: VSUXEI16_V $v28, $x{{[0-9]+}}, $v28
+# CHECK: VSUXEI32_V $v28, $x{{[0-9]+}}, $v28

@@ -830,8 +830,8 @@ public:
     SNIPPY_UNIMPLEMENTED();
   }
 
-  virtual void generateOperands(
-      llvm::ArrayRef<planning::PreselectedOpInfo> Preselected) override;
+  virtual void
+  generateOperands(ArrayRef<planning::PreselectedOpInfo> Preselected) override;
 };
 
 #include "AArch64Operands.inc"
