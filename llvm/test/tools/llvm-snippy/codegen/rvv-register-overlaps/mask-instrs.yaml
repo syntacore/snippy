@@ -1,0 +1,46 @@
+# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  march: rv64imfdv
+  num-instrs: 1000
+  dump-mf: on
+  reserved-regs-list: ["V([4-9]|1[0-9]|2[0-9]|3[0-1])"]
+
+include:
+  - Inputs/sections.yaml
+
+riscv-vector-unit:
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_32: 1.0
+      LMUL:
+        m2: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+  - [VSETIVLI, 1.0]
+  - [VIOTA_M, 1.0]
+  - [VMSIF_M, 1.0]
+  - [VMSOF_M, 1.0]
+  - [VMSBF_M, 1.0]
+  - [VCPOP_M, 1.0]
+  - [VFIRST_M, 1.0]
+
+# COM: Check that source register groups can overlaps with v0, because EEW = 1.
+# CHECK: VIOTA_M $v0, $v0
+# CHECK: VMSIF_M $v0, $v0
+# CHECK: VMSOF_M $v0, $v0
+# CHECK: VMSBF_M $v0, $v0
+# CHECK: VCPOP_M $v0, $v0
+# CHECK: VFIRST_M $v0, $v0

@@ -20,21 +20,21 @@ burst:
   min-size: 2
   max-size: 5
   groupings:
-    - - VLE64_V # unit-stride
-      - VLE64FF_V # unit-stride fault-only-first
-      - VLSE64_V # constant-stride
-      - VLSSEG2E64_V # constant-stride segment
-      - VLUXEI64_V # indexed
+    - - VLE16_V # unit-stride
+      - VLE16FF_V # unit-stride fault-only-first
+      - VLSE32_V # constant-stride
+      - VLSSEG2E32_V # constant-stride segment
+      - VLUXEI32_V # indexed
       - VLUXSEG2EI8_V # indexed segment
       - VL1RE8_V # whole register
       - VADD_VV # just arithmetics
 
 histogram:
-  - [VLE64_V, 1.0]
-  - [VLE64FF_V, 1.0]
-  - [VLSE64_V, 1.0]
-  - [VLSSEG2E64_V, 1.0]
-  - [VLUXEI64_V, 1.0]
+  - [VLE16_V, 1.0]
+  - [VLE16FF_V, 1.0]
+  - [VLSE32_V, 1.0]
+  - [VLSSEG2E32_V, 1.0]
+  - [VLUXEI32_V, 1.0]
   - [VLUXSEG2EI8_V, 1.0]
   - [VL1RE8_V, 1.0]
   - [VADD_VV, 1.0]
