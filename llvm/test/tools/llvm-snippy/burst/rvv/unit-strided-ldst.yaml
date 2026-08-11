@@ -9,7 +9,7 @@ options:
 
 include:
   - Inputs/sections.yaml
-  - Inputs/rvv-unit-all.yaml
+  - Inputs/rvv-unit-little-lmul.yaml
 
 burst:
   mode: custom

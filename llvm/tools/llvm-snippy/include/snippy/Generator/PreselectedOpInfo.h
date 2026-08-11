@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_PRESELECTEDOPERANDS_H
-#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_PRESELECTEDOPERANDS_H
+#ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_PRESELECTEDOPINFO_H
+#define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_PRESELECTEDOPINFO_H
 
 #include "snippy/Config/ImmediateHistogram.h"
 
@@ -89,4 +89,4 @@ public:
 };
 
 } // namespace llvm::snippy::planning
-#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_PRESELECTEDOPERANDS_H
+#endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_PRESELECTEDOPINFO_H
