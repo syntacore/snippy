@@ -10,8 +10,8 @@
 # RUN: %python %S/Inputs/get_section_size.py .snippy.2.rx > %t.rx2
 
 # Check that both rx sections are not empty
-# RUN: cat %t.rx1 | awk '{print $0 >= 1000}' | grep 1
-# RUN: cat %t.rx2 | awk '{print $0 >= 1000}' | grep 1
+# RUN: cat %t.rx1 | awk '{print ($0 >= 1000)}' | grep 1
+# RUN: cat %t.rx2 | awk '{print ($0 >= 1000)}' | grep 1
 
 # We expect to see at least 5 BBs in each rx section
 # RUN: llvm-objdump -D %t.final.elf | FileCheck %s
