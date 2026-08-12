@@ -76,15 +76,17 @@ public:
 
   std::vector<unsigned> getSMCRegList() const { return SMCRegList; }
 
-  auto getTgtBlocksFromBlockPairs() const {
+  auto getTgtBlocksFromBlockPairs() const & {
     return map_range(SMCBlockPairs,
                      [](const auto &Pair) { return Pair.second; });
   }
+  auto getTgtBlocksFromBlockPairs() && = delete;
 
-  auto getSrcNamesFromSMCBlockPairs() const {
+  auto getSrcNamesFromSMCBlockPairs() const & {
     return map_range(SMCBlockPairs,
                      [](const auto &Pair) { return Pair.first; });
   }
+  auto getSrcNamesFromSMCBlockPairs() && = delete;
 };
 } // namespace snippy
 } // namespace llvm
