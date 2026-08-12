@@ -9,4 +9,5 @@ add_llvm_library(LLVMInstructionEnumeratorRISCV
 
   DEPENDS
   RISCVInstrEnumsTableGen
+  LINK_LIBS PRIVATE LLVMInstructionEnumerator
 )
