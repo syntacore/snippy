@@ -337,13 +337,15 @@ public:
   using BaseType::rend;
   using BaseType::resize;
 
-  auto weights() const {
-    return map_range(*this, [&](auto &&Entry) { return Entry.getWeight(); });
+  auto weights() const & {
+    return map_range(*this, [](auto &&Entry) { return Entry.getWeight(); });
   }
+  auto weights() const && = delete;
 
-  auto weights() {
-    return map_range(*this, [&](auto &&Entry) { return Entry.getWeight(); });
+  auto weights() & {
+    return map_range(*this, [](auto &&Entry) { return Entry.getWeight(); });
   }
+  auto weights() && = delete;
 
   auto weights_begin() const { return weights().begin(); }
   auto weights_end() const { return weights().end(); }
