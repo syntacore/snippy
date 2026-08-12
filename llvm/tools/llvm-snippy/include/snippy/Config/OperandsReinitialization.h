@@ -243,13 +243,15 @@ struct OpcodeValuegramSettings final
 
   OpcodeValuegramSettings() {}
 
-  auto weights() const {
-    return map_range(*this, [&](auto &&Entry) { return Entry.getWeight(); });
+  auto weights() const & {
+    return map_range(*this, [](auto &&Entry) { return Entry.getWeight(); });
   }
+  auto weights() const && = delete;
 
-  auto weights() {
-    return map_range(*this, [&](auto &&Entry) { return Entry.getWeight(); });
+  auto weights() & {
+    return map_range(*this, [](auto &&Entry) { return Entry.getWeight(); });
   }
+  auto weights() && = delete;
 
   auto weightsBegin() const { return weights().begin(); }
   auto weightsEnd() const { return weights().end(); }

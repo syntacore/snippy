@@ -108,14 +108,16 @@ struct ProbableItems final : SmallVector<ProbableElement<T>> {
   ProbableItems(const std::vector<std::pair<key_type, prob_type>> &Items)
       : ProbableItems(Items.begin(), Items.end()) {}
 
-  auto getItemsRange() const {
+  auto getItemsRange() const & {
     return map_range(*this,
                      [](const ProbableElement<T> &E) { return E.Element; });
   }
+  auto getItemsRange() && = delete;
 
-  auto getProbsRange() const {
+  auto getProbsRange() const & {
     return map_range(*this, [](const ProbableElement<T> &E) { return E.Prob; });
   }
+  auto getProbsRange() && = delete;
 
   bool hasNonZeroProbs() const {
     return std::any_of(begin(), end(),
