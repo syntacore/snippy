@@ -1,0 +1,33 @@
+# COM: This test checks an invalid entry in the modelist
+#
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+include:
+  - ../rvv-config-histogram/Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100
+
+riscv-vector-unit:
+  mode-distribution:
+    mode-list:
+      - [[abacaba, bob], 1.0]
+    VM:
+      - [all_ones, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+    - [VADD_VV, 0.1]
+    - [VSETVL, 1.0]
+
+# CHECK: error: unknown enumerated scalar

@@ -3746,7 +3746,7 @@ reachable RVV configurations for the snippet:
    on vector masking, refer
    `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#53-vector-masking>`__.
 
--  ``SEW`` |nbsp| -- |nbsp| Selected element width. This parameter defines the widths
+-  ``SEW`` (optional*) |nbsp| -- |nbsp| Selected element width. This parameter defines the widths
    of the elements in ``VL`` (in bits). Possible parameters are
    ``sew_8``, ``sew_16``, ``sew_32``, ``sew_64``.
    For them, you specify the relative weights.
@@ -3754,13 +3754,45 @@ reachable RVV configurations for the snippet:
    For the details on ``SEW``, refer
    `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#341-vector-selected-element-width-vsew20>`__.
 
--  ``LMUL`` |nbsp| -- |nbsp| Multiplier that allows you to pack multiple vector
+-  ``LMUL`` (optional*) |nbsp| -- |nbsp| Multiplier that allows you to pack multiple vector
    registers into a group. Possible parameters are
    ``mf8``, ``mf4``, ``mf2``, ``m1``, ``m2``, ``m4``, ``m8``.
    For them, you specify the relative weights.
 
    For the details on ``LMUL``, refer
    `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#4-mapping-of-vector-elements-to-vector-register-state>`__.
+
+-  ``mode-list`` (optional*) |nbsp| -- |nbsp| An exact list of ``{SEW, LMUL}``
+   combinations to select from, with their relative weights. Use it when the
+   set of modes you need cannot be expressed as a product of separate ``SEW``
+   and ``LMUL`` distributions:
+
+   .. code:: yaml
+
+    mode-distribution:
+      mode-list:
+        - [[sew_8, m1], 1.0]
+        - [[sew_64, m8], 3.0]
+    # other fields...
+
+   Here ``{sew_8, m1}`` and ``{sew_64, m8}`` are the only reachable
+   ``{SEW, LMUL}`` combinations, selected with the probabilities ``0.25`` and
+   ``0.75``.
+
+   .. note::
+
+      All ``{SEW, LMUL}`` combinations which are illegal for the target
+      will be ignored. Illegal combinations are still controlled by
+      `Pvill <#biased-mode>`__ |nbsp| -- |nbsp| it sets their total
+      probability, while the weights inside ``mode-list`` are normalized to
+      ``1 - Pvill``.
+
+.. important::
+
+   ``mode-list``, ``SEW``, ``LMUL`` are marked as *optional\** because
+   ``mode-list`` is specified **instead** of the ``SEW`` and ``LMUL`` keys of
+   ``VTYPE``: you provide either both ``SEW`` and ``LMUL`` or a ``mode-list``,
+   but never both at once.
 
 -  ``VMA``, ``VTA`` |nbsp| -- |nbsp| Vector mask agnostic and vector tail agnostic
    modes. For the details, refer

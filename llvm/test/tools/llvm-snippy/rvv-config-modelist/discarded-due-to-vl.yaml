@@ -1,0 +1,52 @@
+# COM: This test checks that when some configuration has no
+# COM: suitable VLs it's discarded
+#
+# RUN: llvm-snippy %s \
+# RUN:     -riscv-dump-rvv-config=%t \
+# RUN:     -riscv-dump-discarded-rvv-configurations=%t.discarded
+# RUN: FileCheck %s --input-file=%t
+# RUN: FileCheck --check-prefix=DISCARDED %s --input-file=%t.discarded
+
+include:
+  - ../rvv-config-histogram/Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100
+
+riscv-vector-unit:
+  mode-distribution:
+    mode-list:
+      - [[sew_8, m1], 1.0]
+      - [[sew_8, m4], 1.0]
+    VM:
+      - [all_ones, 1.0]
+    VL:
+      - [52, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+    - [VADD_VV, 0.1]
+    - [VSETVL, 1.0]
+
+
+# COM: {e8, m1} - VLMAX=16
+# COM: {e8, m4} - VLMAX=64
+# COM: The first one has no applicable VL generators, so it will be discarded
+
+# CHECK: P: 1 Conf: { e8, m4, tu, mu, vxrm: rnu }
+# CHECK: - Configuration Bag Size: 1
+
+#DISCARDED:      --- RVV Unit Discarded Info ---
+#DISCARDED-NEXT:   - VM Generators:
+#DISCARDED-NEXT:   - VL Generators:
+#DISCARDED-NEXT:   - Configuration Bag Listing:
+#DISCARDED-NEXT:     Conf: { e8, m1, tu, mu, vxrm: rnu }
+#DISCARDED-NEXT: --- RVV Unit Discarded End  ---

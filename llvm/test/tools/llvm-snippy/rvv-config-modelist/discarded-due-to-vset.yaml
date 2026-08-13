@@ -1,0 +1,50 @@
+# COM: This test checks that a mode-list entry with no applicable VL generator
+# COM: is reported as a discarded configuration.
+#
+# RUN: llvm-snippy %s \
+# RUN:     -riscv-dump-rvv-config=%t \
+# RUN:     -riscv-dump-discarded-rvv-configurations=%t.discarded
+# RUN: FileCheck %s --input-file=%t
+# RUN: FileCheck --check-prefix=DISCARDED %s --input-file=%t.discarded
+
+include:
+  - ../rvv-config-histogram/Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100
+
+riscv-vector-unit:
+  mode-distribution:
+    mode-list:
+      - [[sew_32, m1], 1.0]
+      - [[sew_32, m8], 1.0]
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [vlmax, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+       - [VSETIVLI, 1.0]
+       - [VADD_VV, 1.0]
+
+# COM: {e32, m8} is discarded because its vlmax = VLEN * LMUL / SEW =
+# COM: 128 * 8 / 32 = 32 is greater than the maximum VSETIVLI immediate (31).
+
+# CHECK: P: 1 Conf: { e32, m1, tu, mu, vxrm: rnu }
+# CHECK: - Configuration Bag Size: 1
+
+#DISCARDED:      --- RVV Unit Discarded Info ---
+#DISCARDED-NEXT:   - VM Generators:
+#DISCARDED-NEXT:   - VL Generators:
+#DISCARDED-NEXT:   - Configuration Bag Listing:
+#DISCARDED-NEXT:     Conf: { e32, m8, tu, mu, vxrm: rnu }
+#DISCARDED-NEXT: --- RVV Unit Discarded End  ---

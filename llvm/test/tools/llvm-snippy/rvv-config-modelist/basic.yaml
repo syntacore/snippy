@@ -1,0 +1,41 @@
+# COM: This test checks that mode-list requests exactly the listed {SEW, LMUL}
+# COM: combinations and that the weights are normalized among them.
+#
+# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t
+# RUN: FileCheck %s --input-file=%t
+
+include:
+  - ../rvv-config-histogram/Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100
+
+riscv-vector-unit:
+  mode-distribution:
+    mode-list:
+      - [[sew_8, m1], 1.0]
+      - [[sew_64, m8], 3.0]
+    VM:
+      - [all_ones, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+    - [VADD_VV, 0.1]
+    - [VSETVL, 1.0]
+
+# COM: The same set of modes is impossible to get via marginal SEW and LMUL
+# COM: distributions - those would also create {e8, m8} and {e64, m1}.
+
+# CHECK-DAG: P: 0.25 Conf: { e8, m1, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.75 Conf: { e64, m8, tu, mu, vxrm: rnu }
+# CHECK: - Configuration Bag Size: 2
