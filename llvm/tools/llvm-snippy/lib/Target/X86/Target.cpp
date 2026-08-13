@@ -106,7 +106,7 @@ public:
     reportUnimplementedError();
   }
 
-  void generateModeChange(const planning::InstructionRequest &ModeChangeInstr,
+  void generateModeChange(const ModeChangingContext &MCC,
                           InstructionGenerationContext &IGC,
                           MDNode *MetadataMark) const override {
     reportUnimplementedError();
