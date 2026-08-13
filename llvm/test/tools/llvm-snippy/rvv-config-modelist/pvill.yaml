@@ -1,0 +1,46 @@
+# COM: This test checks that mode-list only affects legal configurations and
+# COM: illegal ones are still controlled by Pvill.
+#
+# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t
+# RUN: FileCheck %s --input-file=%t
+
+include:
+  - ../rvv-config-histogram/Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: 0.5
+    Pvill: 0.5
+  mode-distribution:
+    mode-list:
+      - [[sew_8, m1], 1.0]
+      - [[sew_64, m8], 1.0]
+    VM:
+      - [all_ones, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+    - [VADD_VV, 0.1]
+    - [ADD, 1.0]
+
+# COM: The total probability of the mode-list entries is 1 - Pvill = 0.5,
+# COM: distributed evenly between the two of them.
+
+# CHECK: Set Vill Bit Probability: 0.5
+# CHECK-DAG: P: 0.25 Conf: { e8, m1, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.25 Conf: { e64, m8, tu, mu, vxrm: rnu }
+# CHECK: P: 0.5 Conf: {  Illegal Configurations:  42 points }
+# CHECK: - Configuration Bag Size: 44

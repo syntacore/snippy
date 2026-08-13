@@ -196,6 +196,37 @@ struct ProbableItems final : SmallVector<ProbableElement<T>> {
     return this->back().Prob;
   }
 
+  // Make it so that each Key entry is unique, add probs of all entries of the
+  // same key. Requires a comparison operator for the key type.
+  template <typename Comparator> void squashSame(Comparator Cmp) {
+    static_assert(std::is_invocable_r_v<bool, Comparator, const key_type &,
+                                        const key_type &>);
+    if (this->empty())
+      return;
+
+    sort(*this, [&](const value_type &A, const value_type &B) {
+      return Cmp(A.Element, B.Element);
+    });
+
+    auto AreKeysEqual = [&Cmp](const key_type &X, const key_type &Y) {
+      return !Cmp(X, Y) && !Cmp(Y, X);
+    };
+
+    auto Dst = this->begin();
+    for (auto Src = std::next(Dst); Src != this->end(); ++Src) {
+      if (AreKeysEqual(Dst->Element, Src->Element)) {
+        Dst->Prob += Src->Prob;
+      } else {
+        ++Dst;
+        if (Dst != Src)
+          *Dst = std::move(*Src);
+      }
+    }
+    this->erase(++Dst, this->end());
+  }
+
+  void squashSame() { squashSame(std::less<key_type>{}); }
+
   // Returns a ProbableItems of the type of the getter's return type.
   // The probabilities are summed up. Basically a projection.
   // For example:
