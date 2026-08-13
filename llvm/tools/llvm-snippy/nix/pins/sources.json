@@ -1,0 +1,25 @@
+{
+  "pins": {
+    "nixpkgs": {
+      "type": "Channel",
+      "name": "nixpkgs-unstable",
+      "artifact": "nixexprs.tar.xz",
+      "url": "https://releases.nixos.org/nixpkgs/nixpkgs-26.11pre1052792.044bfe75bfe4/nixexprs.tar.xz",
+      "hash": "sha256-Cwffw7dPM56d8spt4/queFQ1cKg69D9qrsp+wfwKvfo="
+    },
+    "rvmi": {
+      "type": "Git",
+      "repository": {
+        "type": "GitHub",
+        "owner": "LLVM-Snippy",
+        "repo": "rvmi"
+      },
+      "branch": "main",
+      "submodules": false,
+      "revision": "d6f7741cddb3c48f5572d092974bc28ffde18baf",
+      "url": "https://github.com/LLVM-Snippy/rvmi/archive/d6f7741cddb3c48f5572d092974bc28ffde18baf.tar.gz",
+      "hash": "sha256-veXKxrNEvYwv0vtNL3tUYz4k/685UKNcJLsMPAEiyW0="
+    }
+  },
+  "version": 8
+}

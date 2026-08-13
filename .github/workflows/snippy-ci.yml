@@ -9,27 +9,18 @@ on:
   workflow_dispatch:
 jobs:
   main:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: ubuntu
-            runs-on: ubuntu-24.04
-          - name: rocky
-            runs-on: ubuntu-24.04
-            image: rockylinux:8
-    name: ${{ matrix.name }}
-    runs-on: ${{ matrix.runs-on }}
-    container: ${{ matrix.image || '' }}
-    defaults:
-      run:
-        shell: bash
-    env:
-      BUILD_DIR: "release/build"
-      INSTALL_DIR: "release/install"
+    runs-on: ubuntu-24.04
     steps:
+      - name: Install Nix
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          curl --proto '=https' --tlsv1.2 -L https://releases.nixos.org/nix/nix-2.35.2/install | sh -s -- --no-daemon
+          export USER=$(whoami)
+          . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+          echo "$HOME/.nix-profile/bin" >> $GITHUB_PATH
+          echo "NIX_SSL_CERT_FILE=$NIX_SSL_CERT_FILE" >> $GITHUB_ENV
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: |
             .github
@@ -38,83 +29,57 @@ jobs:
             lld
             llvm
             third-party
-      - name: Install required compiler to be sure (Ubuntu)
-        if: matrix.name == 'ubuntu'
-        run: sudo apt-get update && sudo apt-get install -y clang-14 ninja-build ccache lld cmake && pip install sphinx myst-parser
-      - name: Install required compiler to be sure (Rocky)
-        if: matrix.name == 'rocky'
-        run: |
-          dnf install -y epel-release 'dnf-command(config-manager)'
-          dnf config-manager --set-enabled powertools || \
-          dnf config-manager --set-enabled PowerTools || \
-          dnf config-manager --set-enabled crb
-          dnf update -y
-          dnf install -y clang ninja-build ccache lld cmake tar xz python3 python3-pip
-          pip3 install sphinx myst-parser
       - name: Prepare ccache
         id: prepare_ccache
         run: |
           echo "timestamp=$(TZ=UTC date "+%Y-%m-%d-T%H:%M:%S")" >> $GITHUB_OUTPUT
+          CCACHE_DIR=$GITHUB_WORKSPACE/.ccache
           echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> $GITHUB_ENV
+          mkdir -p "$CCACHE_DIR"
+          nixpkgs=$(nix-instantiate --eval -E 'with import llvm/tools/llvm-snippy/nix/pins; "${nixpkgs}"' --read-write-mode --raw)
+          echo "NIX_PATH=nixpkgs=$nixpkgs" >> $GITHUB_ENV
+          echo 'NIX_CONFIG<<EOF' >> $GITHUB_ENV
+          echo "extra-sandbox-paths = /var/ccache=$CCACHE_DIR" >> $GITHUB_ENV
+          echo "max-jobs = auto" >> $GITHUB_ENV
+          echo "sandbox-fallback = false" >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
       - name: Set up ccache
-        uses: actions/cache@v4
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .ccache
-          key: ccache-${{ matrix.name }}-${{ github.job }}-${{ steps.prepare_ccache.outputs.timestamp }}
-          restore-keys: ccache-${{ matrix.name }}-${{ github.job }}-
-      - name: CMake release config
-        run: >-
-          cmake -S llvm -B "$BUILD_DIR" -G Ninja
-          -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-          -DLLVM_EXTERNAL_PROJECT_PASSTHROUGH="CMAKE_C_COMPILER_LAUNCHER;CMAKE_CXX_COMPILER_LAUNCHER"
-          -DCMAKE_BUILD_TYPE=Release --preset snippy_basic
-      - name: CMake release build
-        run: cmake --build "$BUILD_DIR" --target llvm-snippy llvm-ie docs-llvm-snippy-man docs-llvm-snippy-latex docs-llvm-snippy-html
-      - name: CMake release test
-        run: env CTEST_OUTPUT_ON_FAILURE=1 cmake --build "$BUILD_DIR" --target check-llvm-tools-llvm-snippy
-      - name: CMake install
-        id: install_release
+          key: ccache-${{ github.job }}-${{ steps.prepare_ccache.outputs.timestamp }}
+          restore-keys: ccache-${{ github.job }}-
+      - name: Build
         run: |
-          release_os="$(echo "$RUNNER_OS" | tr '[:upper:]' '[:lower:]')-${{ matrix.name }}" # Lowercase OS (linux) + "ubuntu/rocky"
-          release_arch="$(uname -m)" # Arch (x86_64, aarch64)
-          release_basename="snippy-$release_arch-$release_os"
-          release_tarball_filename="$release_basename.tar.xz" # snippy-x86_64-linux.tar.xz
-          echo "release_basename=$release_basename" >> $GITHUB_OUTPUT
-          echo "release_tarball_filename=$release_tarball_filename" >> $GITHUB_OUTPUT
-
-          for component in llvm-snippy llvm-snippy-man-pages; do
-            cmake --install "$BUILD_DIR" --prefix "$INSTALL_DIR" --component "$component"
-          done
-
-          tar --xz -C "$INSTALL_DIR" -cvf "$release_tarball_filename" .
-      - name: Upload binary install artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.install_release.outputs.release_basename }}
-          path: ${{ steps.install_release.outputs.release_tarball_filename }}
-          compression-level: 0 # Artifact is already compressed
-      # Upload docs only on ubuntu
+          nix-build llvm/tools/llvm-snippy -A llvm-snippy -A llvm-snippy.doc --log-format bar-with-logs --arg withCCache true
+          nix-build llvm/tools/llvm-snippy -A snippy-release-tarball --out-link result-release-tarball --log-format bar-with-logs --arg withCCache true
       - name: Upload html docs artifacts
-        if: matrix.name == 'ubuntu'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: snippy-doc-html
-          path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/html
-      - name: Upload latex docs artifacts
-        if: matrix.name == 'ubuntu'
-        uses: actions/upload-artifact@v4
+          path: result-doc/html
+      - name: Upload (pre)release tarball
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: snippy-doc-latex
-          path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/latex
+          name: snippy-x86_64-linux
+          path: result-release-tarball/snippy-x86_64-linux.tar.xz
+      - name: Build Snippy manual
+        run: |
+          nix-build llvm/tools/llvm-snippy -A snippy-manual --out-link result-manual --log-format bar-with-logs --arg withCCache true
+      - name: Upload Snippy manual artifacts (PDF)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: snippy-doc-pdf
+          path: result-manual/snippy_guide.pdf
       - name: Upload github pages artifact
-        if: (matrix.name == 'ubuntu') && github.event_name == 'push' && github.ref_name == 'main' && (github.repository_owner == 'syntacore' || github.repository_owner == 'LLVM-Snippy')
+        if: github.event_name == 'push' && github.ref_name == 'main' && (github.repository_owner == 'syntacore' || github.repository_owner == 'LLVM-Snippy')
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
         with:
-          path: ${{ env.BUILD_DIR }}/tools/llvm-snippy/docs/html
+          path: result-doc/html
       - name: Show ccache statistics
         run: |
-          ccache -s
-          ccache -z
+          nix-shell -p ccache --run "ccache -s"
+          nix-shell -p ccache --run "ccache -z"
   deploy-pages:
     needs: [main]
     if: github.event_name == 'push' && github.ref_name == 'main' && (github.repository_owner == 'syntacore' || github.repository_owner == 'LLVM-Snippy')
