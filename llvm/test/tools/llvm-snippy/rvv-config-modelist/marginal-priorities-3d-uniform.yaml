@@ -1,0 +1,45 @@
+# COM: This test checks that mode-list works together with
+# COM: marginal-priorities:3d_uniform
+#
+# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t
+# RUN: FileCheck %s --input-file=%t
+
+include:
+  - ../rvv-config-histogram/Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100
+
+riscv-vector-unit:
+  mode-distribution:
+    marginal-priorities:
+      - [3d_uniform, 1.0]
+    mode-list:
+      - [[sew_8, m1], 1.0]
+      - [[sew_16, m4], 1.0]
+    VM:
+      - [all_ones, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+    - [VADD_VV, 0.1]
+    - [VSETVL, 1.0]
+
+# COM: {e8, m1}  - VLMAX=16
+# COM: {e16, m4}  - VLMAX=32
+
+# COM: {e16, m4} has 33 possible VL variants, while {e8, m1} has only 17,
+# COM: so the weights are scaled accordingly.
+
+# CHECK-DAG: P: 0.34 Conf: { e8, m1, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.66 Conf: { e16, m4, tu, mu, vxrm: rnu }

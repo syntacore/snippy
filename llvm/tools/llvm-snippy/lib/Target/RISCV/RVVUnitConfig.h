@@ -336,9 +336,13 @@ using VMAInfo = WeightsArray<VMAEnumList>;
 using VTAInfo = WeightsArray<VTAEnumList>;
 using VXRMInfo = WeightsArray<VXRMEnumList>;
 
+using SewLmulPair = std::tuple<VSEW, VLMUL>;
+using SewLmulDistribution = ProbableItems<SewLmulPair>;
+
 struct VTypeInfo {
-  SEWInfo SEW;
-  LMULInfo LMUL;
+  std::optional<SEWInfo> SEW;
+  std::optional<LMULInfo> LMUL;
+
   VMAInfo VMA;
   VTAInfo VTA;
 };
@@ -398,8 +402,6 @@ struct PrimaryConfigMapping final {
 
   PrimaryConfigMapping(size_t VLSize) : VLSize(VLSize) {}
 };
-
-using SewLmulDistribution = ProbableItems<std::tuple<VSEW, VLMUL>>;
 
 struct PrimaryWeightsAndMapping {
   std::vector<double> Weights;
@@ -539,6 +541,9 @@ struct RVVUnitInfo {
 
   VMSequence VM;
   VLSequence VL;
+
+  // optional - can be empty
+  SewLmulDistribution ModeList;
 
   PrimaryDistBuilderSequence PrimaryBuilders;
 };
