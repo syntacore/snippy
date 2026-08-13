@@ -1,0 +1,35 @@
+# COM: This test checks that an illegal {SEW, LMUL} pair inside mode-list
+# COM: is a warning.
+#
+# RUN: llvm-snippy %s |& FileCheck %s
+
+include:
+  - ../rvv-config-histogram/Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100
+
+riscv-vector-unit:
+  mode-distribution:
+    mode-list:
+      - [[sew_8, m1], 1.0]
+      - [[sew_64, mf2], 1.0] # illegal for the target
+    VM:
+      - [all_ones, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+    - [VADD_VV, 0.1]
+    - [VSETVL, 1.0]
+
+# CHECK: warning: (inconsistent-options) RVV mode-list entry [sew_64, mf2] is illegal for the target and will be ignored: ELEN=64, VLEN=128
