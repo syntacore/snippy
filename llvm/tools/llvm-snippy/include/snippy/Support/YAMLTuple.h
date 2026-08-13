@@ -86,6 +86,12 @@ constexpr bool areAllTupleMembersFlowSafe(std::index_sequence<Indices...>) {
           ...);
 }
 
+template <typename TupleT, size_t... Indices>
+constexpr bool areAllTupleMembersRefs(std::index_sequence<Indices...>) {
+  return (std::is_lvalue_reference_v<std::tuple_element_t<Indices, TupleT>> &&
+          ...);
+}
+
 // Prepends `YAMLTupleTraits<T>::Name` when it's present
 template <typename T> std::string labelMsg(const Twine &Msg) {
   if constexpr (has_YAMLTupleName<T>::value)
@@ -122,6 +128,10 @@ void yamlizeTuple(yaml::IO &Io, T &Val, yaml::EmptyContext &Ctx) {
   using MembersT = YAMLTupleMembers_t<T>;
   constexpr size_t NumMembers = YAMLTupleSize_v<T>;
   static_assert(NumMembers > 0, "YAML tuples must have at least one member");
+  static_assert(
+      areAllTupleMembersRefs<MembersT>(std::make_index_sequence<NumMembers>{}),
+      "members() must return lvalue references to the members (e.g. via "
+      "std::tie) to avoid writing into a temporary copy");
   static_assert(
       areAllTupleMembersFlowSafe<MembersT>(
           std::make_index_sequence<NumMembers>{}),

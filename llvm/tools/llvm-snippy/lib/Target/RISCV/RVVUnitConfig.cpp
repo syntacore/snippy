@@ -581,6 +581,14 @@ static void printRawSewLmulProbs(raw_ostream &OS, const SEWInfo &SEWProbs,
   LMULProbs.print(OS, [](VLMUL LMUL) { return toString(LMUL); });
 }
 
+static void printModeList(raw_ostream &OS, const SewLmulDistribution &Dist) {
+  OS << "=== Raw mode-list Probabilities ===\n";
+  Dist.print(OS, [](const SewLmulPair &SewLmul) {
+    auto [SEW, LMUL] = SewLmul;
+    return formatv("[{0}, {1}]", toString(SEW), toString(LMUL));
+  });
+}
+
 static void printCombinedSewLmulProbs(raw_ostream &OS,
                                       const SewLmulDistribution &Dist) {
   constexpr auto SewSize = SEWInfo::size();
@@ -637,12 +645,7 @@ static void printCombinedSewLmulProbs(raw_ostream &OS,
 // no legal VLs from config for it.
 static SewLmulDistribution
 buildRawSewLmulDistribution(unsigned ELEN, unsigned VLEN,
-                            const SEWInfo &SEWWeights,
-                            const LMULInfo &LMULWeights, double PVill) {
-  auto SEWProbs = normalizeWeights(SEWWeights);
-  auto LMULProbs = normalizeWeights(LMULWeights);
-  LLVM_DEBUG(printRawSewLmulProbs(dbgs(), SEWProbs, LMULProbs));
-
+                            const RVVUnitInfo &VUInfo, double PVill) {
   // All values, including the reserved ones
   SEWInfo AllSewWeights = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
   LMULInfo AllLMULWeights = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
@@ -662,26 +665,69 @@ buildRawSewLmulDistribution(unsigned ELEN, unsigned VLEN,
   SewLmulDistribution Dist =
       jointProbabilityDistribution(AllSewWeights, AllLMULWeights);
 
-  auto IsLegal =
-      [=](const ProbableElement<std::tuple<VSEW, VLMUL>> &Item) -> bool {
+  auto IsLegal = [&](const ProbableElement<SewLmulPair> &Item) -> bool {
     auto [SEW, LMUL] = Item.Element;
     return isLegalSewLmul(ELEN, VLEN, SEW, LMUL);
   };
   auto LegalRange = make_filter_range(Dist, IsLegal);
   auto IllegalRange = make_filter_range(Dist, std::not_fn(IsLegal));
 
+  // Now fill the distribution with values from the config
+  //
   // Note that at the moment users can't set probabilities for reserved
   // values of SEW and LMUL, so we copy only probs for legal values
-  // and ignore the rest. All illegal configs will have the same probability.
-  for (auto &[SewLmul, P] : LegalRange) {
-    auto [SEW, LMUL] = SewLmul;
-    P = SEWProbs[SEW] * LMULProbs[LMUL];
+  // and ignore the rest (IllegalRange). All illegal configs will have the same
+  // probability according to PVill.
+
+  if (!VUInfo.ModeList.empty()) {
+    // We're given an exact list of configs. Use it
+    auto ModeListProbs = VUInfo.ModeList;
+    ModeListProbs.normalizeProbs();
+    LLVM_DEBUG(printModeList(dbgs(), ModeListProbs));
+
+    // Zero-out all configs, then add probs to ones that were requested
+    for (auto &[SewLmul, P] : LegalRange)
+      P = 0.0;
+    for (const auto &[ModeListEntry, ModeListP] : ModeListProbs) {
+      auto [SEW, LMUL] = ModeListEntry;
+      if (!isLegalSewLmul(ELEN, VLEN, SEW, LMUL)) {
+        // FIXME: We parse SEW as `sew_8`, but we print it as `e8`.
+        // This is the reason for the erase here. At some point we
+        // should switch to using `e8` everywhere.
+        snippy::warn(
+            WarningName::InconsistentOptions,
+            formatv("RVV mode-list entry [sew_{0}, {1}] is illegal "
+                    "for the target and will be ignored",
+                    /*erasing first letter 'e'*/ toString(SEW).erase(0, 1),
+                    toString(LMUL)),
+            formatv("ELEN={0}, VLEN={1}", ELEN, VLEN));
+        continue;
+      }
+
+      auto EntryIt = find_if(
+          LegalRange,
+          [&ModeListE = ModeListEntry](const ProbableElement<SewLmulPair> &V) {
+            return V.Element == ModeListE;
+          });
+      assert(EntryIt != LegalRange.end());
+      EntryIt->Prob += ModeListP;
+    }
+  } else {
+    // Build from marginal distributions of SEW and LMUL
+    assert(VUInfo.VTYPE.SEW.has_value() && VUInfo.VTYPE.LMUL.has_value());
+    auto SEWProbs = normalizeWeights(*VUInfo.VTYPE.SEW);
+    auto LMULProbs = normalizeWeights(*VUInfo.VTYPE.LMUL);
+    LLVM_DEBUG(printRawSewLmulProbs(dbgs(), SEWProbs, LMULProbs));
+
+    for (auto &[SewLmul, P] : LegalRange) {
+      auto [SEW, LMUL] = SewLmul;
+      P = SEWProbs[SEW] * LMULProbs[LMUL];
+    }
   }
 
-  // The total probability of all illegal combinations must be PVill. The total
-  // probability of all legal combinations must be 1 - PVill.
-  auto AddProb = [](double Acc,
-                    const ProbableElement<std::tuple<VSEW, VLMUL>> &E) {
+  // The total probability of all illegal combinations must be PVill. The
+  // total probability of all legal combinations must be 1 - PVill.
+  auto AddProb = [](double Acc, const ProbableElement<SewLmulPair> &E) {
     return Acc + E.Prob;
   };
   double TotalLegalWeight =
@@ -839,7 +885,7 @@ public:
     for (unsigned VL = 0; VL <= VLSize; VL++) {
       SewLmulDistribution Dist;
       copy_if(SewLmulDist, std::back_inserter(Dist),
-              [&](const ProbableElement<std::tuple<VSEW, VLMUL>> &Item) {
+              [&](const ProbableElement<SewLmulPair> &Item) {
                 auto [SEW, LMUL] = Item.Element;
                 // If {SEW, LMUL} is illegal, we treat it as if
                 // it has MaxVL == MaxPossibleVL
@@ -936,6 +982,38 @@ template <> struct yaml::MappingTraits<LMULInfo> {
   }
 };
 
+template <> struct yaml::ScalarEnumerationTraits<VSEW> {
+  static void enumeration(IO &IO, VSEW &Value) {
+    IO.enumCase(Value, "sew_8", VSEW::SEW8);
+    IO.enumCase(Value, "sew_16", VSEW::SEW16);
+    IO.enumCase(Value, "sew_32", VSEW::SEW32);
+    IO.enumCase(Value, "sew_64", VSEW::SEW64);
+  }
+};
+
+template <> struct yaml::ScalarEnumerationTraits<VLMUL> {
+  static void enumeration(IO &IO, VLMUL &Value) {
+    IO.enumCase(Value, "m1", VLMUL::LMUL_1);
+    IO.enumCase(Value, "m2", VLMUL::LMUL_2);
+    IO.enumCase(Value, "m4", VLMUL::LMUL_4);
+    IO.enumCase(Value, "m8", VLMUL::LMUL_8);
+    IO.enumCase(Value, "mf2", VLMUL::LMUL_F2);
+    IO.enumCase(Value, "mf4", VLMUL::LMUL_F4);
+    IO.enumCase(Value, "mf8", VLMUL::LMUL_F8);
+  }
+};
+
+template <> struct snippy::YAMLTupleTraits<SewLmulPair> {
+  static auto members(SewLmulPair &E) {
+    return std::tie(std::get<0>(E), std::get<1>(E));
+  }
+
+  // Note: It would be a perfect place to verify the validity of the
+  // SEW LMUL pair here, but we don't have VLEN and ELEN available yet.
+};
+LLVM_SNIPPY_YAML_IS_TUPLE(SewLmulPair)
+LLVM_SNIPPY_YAML_IS_PROBABLE_ITEMS(SewLmulPair)
+
 template <> struct yaml::MappingTraits<VMAInfo> {
   static void mapping(yaml::IO &IO, VMAInfo &VMA) {
     IO.mapOptional("mu", VMA[VMAMode::MU], 0.0);
@@ -960,8 +1038,9 @@ template <> struct yaml::MappingTraits<VTAInfo> {
 
 template <> struct yaml::MappingTraits<VTypeInfo> {
   static void mapping(yaml::IO &IO, VTypeInfo &VTYPE) {
-    IO.mapRequired("SEW", VTYPE.SEW);
-    IO.mapRequired("LMUL", VTYPE.LMUL);
+    IO.mapOptional("SEW", VTYPE.SEW);
+    IO.mapOptional("LMUL", VTYPE.LMUL);
+
     IO.mapRequired("VMA", VTYPE.VMA);
     IO.mapRequired("VTA", VTYPE.VTA);
   }
@@ -1003,8 +1082,27 @@ template <> struct yaml::MappingTraits<RVVUnitInfo> {
     IO.mapOptional(snippy::VMGeneratorPolicy::Label, VUInfo.VM);
     IO.mapOptional(snippy::VLGeneratorPolicy::Label, VUInfo.VL);
 
+    IO.mapOptional("mode-list", VUInfo.ModeList);
+
     IO.mapOptional(snippy::PrimaryDistBuilderPolicy::Label,
                    VUInfo.PrimaryBuilders);
+  }
+
+  static std::string validate(yaml::IO &IO, RVVUnitInfo &VUInfo) {
+    bool IsSewSpecified = VUInfo.VTYPE.SEW.has_value();
+    bool IsLmulSpecified = VUInfo.VTYPE.LMUL.has_value();
+    bool IsModeListSpecified = !VUInfo.ModeList.empty();
+
+    if ((IsSewSpecified || IsLmulSpecified) && IsModeListSpecified)
+      return "It's not allowed to specify both SEW/LMUL configuration and a "
+             "mode-list";
+    if (IsSewSpecified && !IsLmulSpecified)
+      return "Missing LMUL configuration for the specified SEW configuration";
+    if (!IsSewSpecified && IsLmulSpecified)
+      return "Missing SEW configuration for the specified LMUL configuration";
+    if (!IsSewSpecified && !IsLmulSpecified && !IsModeListSpecified)
+      return "Missing SEW and LMUL configuration or a mode-list";
+    return {};
   }
 };
 
@@ -1125,8 +1223,8 @@ struct VlPriorityBuilder final : PrimaryDistBuilderInterface {
     SewLmulDistributionStorage SewLmulDistStorage(ELEN, VLEN, SewLmulDist);
 
     // Find the maximum possible VL across all given {SEW, LMUL} pairs.
-    auto VLMaxRange = map_range(
-        SewLmulDist, [&](const ProbableElement<std::tuple<VSEW, VLMUL>> &Item) {
+    auto VLMaxRange =
+        map_range(SewLmulDist, [&](const ProbableElement<SewLmulPair> &Item) {
           auto [SEW, LMUL] = Item.Element;
           return computeVLMax(ELEN, VLEN, SEW, LMUL);
         });
@@ -1531,9 +1629,18 @@ computeDiscardedConfigs(unsigned ELEN, unsigned VLEN, const RVVUnitInfo &VUInfo,
                         const PrimaryWeightsAndMapping &WeightsAndMapping) {
   const auto &SewLmulPairs = WeightsAndMapping.getAllPossibleSewLmulPairs();
 
-  auto SEWNorm = normalizeWeights(VUInfo.VTYPE.SEW);
-  auto LMULNorm = normalizeWeights(VUInfo.VTYPE.LMUL);
-  const auto &RawSewLmulPairs = jointProbabilityDistribution(SEWNorm, LMULNorm);
+  const auto &RawSewLmulPairs = std::invoke([&] {
+    if (!VUInfo.ModeList.empty()) {
+      assert(!VUInfo.VTYPE.SEW.has_value() && !VUInfo.VTYPE.LMUL.has_value());
+      auto Result = VUInfo.ModeList;
+      Result.squashSame();
+      return Result;
+    }
+    assert(VUInfo.VTYPE.SEW.has_value() && VUInfo.VTYPE.LMUL.has_value());
+    auto SEWNorm = normalizeWeights(*VUInfo.VTYPE.SEW);
+    auto LMULNorm = normalizeWeights(*VUInfo.VTYPE.LMUL);
+    return jointProbabilityDistribution(SEWNorm, LMULNorm);
+  });
 
   auto MANorm = normalizeWeights(VUInfo.VTYPE.VMA);
   auto TANorm = normalizeWeights(VUInfo.VTYPE.VTA);
@@ -1543,6 +1650,8 @@ computeDiscardedConfigs(unsigned ELEN, unsigned VLEN, const RVVUnitInfo &VUInfo,
 
   std::vector<std::tuple<VSEW, VLMUL, VTAMode, VMAMode, VXRMMode>> Result;
   for (const auto &[SewLmul, Prob] : RawSewLmulPairs) {
+    if (isZero(Prob))
+      continue; // zero weight was user-specified, not "discarded"
     const auto &[SEW, LMUL] = SewLmul;
     if (!isLegalSewLmul(ELEN, VLEN, SEW, LMUL))
       continue; // illegal, not "discarded"
@@ -1636,7 +1745,8 @@ static RVVConfigurationSpace createDefaultConfigurationSpace() {
   VLSequence VLSeq = {{MaxPossibleVLGen::kID, 1.0}};
 
   VTypeInfo VTYPE{SEW, LMUL, VMA, VTA};
-  RVVUnitInfo VUInfo{VXRM, VTYPE, VMSeq, VLSeq, /*PrimaryBuilders=*/{}};
+  RVVUnitInfo VUInfo{
+      VXRM, VTYPE, VMSeq, VLSeq, SewLmulDistribution{}, /*PrimaryBuilders=*/{}};
   RVVConfigurationSpace CS{
       /*no bias, deduce P from histogram*/ ModeChangeBias{}, VUInfo};
 
@@ -1847,9 +1957,8 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(const Config &Cfg,
     return RVVConfigurationInfo{ELEN, VLEN, std::move(SwitchInfo),
                                 IsArtificialModeChange, NeedsVXRMUpdate};
 
-  const auto &SewLmulDist =
-      buildRawSewLmulDistribution(ELEN, VLEN, CS.VUInfo.VTYPE.SEW,
-                                  CS.VUInfo.VTYPE.LMUL, SwitchInfo.ProbSetVill);
+  const auto &SewLmulDist = buildRawSewLmulDistribution(ELEN, VLEN, CS.VUInfo,
+                                                        SwitchInfo.ProbSetVill);
 
   bool IsPresentVSETIVLI = SwitchInfo.hasVSETIVLI();
   bool IsPresentNonVSETIVLI = SwitchInfo.hasVSETVL() || SwitchInfo.hasVSETVLI();
@@ -2082,15 +2191,20 @@ RISCVConfigurationInfo::deriveArchitecturalInformation(
 
   Result.XLEN = ST.getXLen();
 
-  if (!ST.hasStdExtV())
-    return Result;
+  if (ST.hasStdExtV()) {
+    Result.ELEN = ST.getELen();
+    // This is what's specified in the march with Zvl*b. It usually specifies
+    // the *minimum* VLEN, but since snippy targets a specific VLEN we can
+    // use that directly. This will be used to configure the models with a
+    // proper VLEN too.
+    Result.VLEN = ST.getRealMinVLen();
+  }
 
-  Result.ELEN = ST.getELen();
-  // This is what's specified in the march with Zvl*b. It usually specifies
-  // the *minimum* VLEN, but since snippy targets a specific VLEN we can
-  // use that directly. This will be used to configure the models with a proper
-  // VLEN too.
-  Result.VLEN = ST.getRealMinVLen();
+  LLVM_DEBUG({
+    dbgs() << formatv("\n=== Derived Architectural Info ===\n"
+                      "XLEN={0}, ELEN={1}, VLEN={2}\n\n",
+                      Result.XLEN, Result.ELEN, Result.VLEN);
+  });
 
   return Result;
 }
