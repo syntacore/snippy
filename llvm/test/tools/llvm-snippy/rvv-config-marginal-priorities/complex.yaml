@@ -1,7 +1,7 @@
 # COM: This test checks that nothing fails when multiple marginal-priorities are specified
 #
-# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t.yaml
-# RUN: FileCheck %s < %t.yaml
+# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t
+# RUN: FileCheck %s --input-file=%t
 
 include:
   - ../rvv-config-histogram/Inputs/sections.yaml
@@ -55,4 +55,4 @@ histogram:
     - [VSETVLI, 1.5]
     - [VSETIVLI, 0.1]
 
-#CHECK: Configuration Bag Size: 22
+# CHECK: Configuration Bag Size: 22

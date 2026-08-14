@@ -1,8 +1,8 @@
 # COM: This test checks how weighs are distributed with marginal-priorities:3d_uniform
 # COM: when given VL:any_legal
 #
-# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t.yaml
-# RUN: FileCheck %s < %t.yaml
+# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t
+# RUN: FileCheck %s --input-file=%t
 
 include:
   - ../rvv-config-histogram/Inputs/sections.yaml
@@ -43,5 +43,5 @@ histogram:
 # COM: {e8, m2} has 33 possible VL variants, while {e8, m1} has only 17.
 # COM: We have marginal-priorities:3d_uniform, so the weights will be scaled accordingly.
 
-#CHECK-DAG: P: 0.34 Conf: { e8, m1, tu, mu, vxrm: rnu }
-#CHECK-DAG: P: 0.66 Conf: { e8, m2, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.34 Conf: { e8, m1, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.66 Conf: { e8, m2, tu, mu, vxrm: rnu }
