@@ -3845,14 +3845,14 @@ reachable RVV configurations for the snippet:
 
    -  ``sew_lmul`` (default) |nbsp| -- |nbsp| Distribution is built such that
       2D marginal distribution of ``{SEW, LMUL}`` is satisfied. For example,
-      with the above config you would get the same amount of modes with
+      with the above config you would get the same number of modes with
       ``{sew_8, m1}`` as with ``{sew_32, m8}``.
 
       With this option, large ``VL`` values are less likely to appear.
 
    -  ``vl`` |nbsp| -- |nbsp| Distribution is built such that marginal distribution
       of ``VL`` is satisfied. For example, with the above config you would get
-      the same amount of modes with ``VL:1`` as with ``VL:16``.
+      the same number of modes with ``VL:1`` as with ``VL:16``.
 
       With this option, combinations of ``{SEW, LMUL}``
       that have small ``vlmax`` are less likely to appear.

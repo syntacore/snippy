@@ -1,0 +1,50 @@
+# COM: This test checks several error messages about the weights
+#
+# RUN: sed -e s/WEIGHT/0.0/ %s > %t.1.yaml
+# RUN: not llvm-snippy %t.1.yaml %S/../rvv-config-histogram/Inputs/sections.yaml \
+# RUN: |& FileCheck %s --check-prefix=CHECK-ZERO
+#
+# RUN: sed -e s/WEIGHT/-1.0/ %s > %t.2.yaml
+# RUN: not llvm-snippy %t.2.yaml %S/../rvv-config-histogram/Inputs/sections.yaml \
+# RUN: |& FileCheck %s --check-prefix=CHECK-NEGATIVE
+#
+# RUN: sed -e s/WEIGHT/abacaba/ %s > %t.3.yaml
+# RUN: not llvm-snippy %t.3.yaml %S/../rvv-config-histogram/Inputs/sections.yaml \
+# RUN: |& FileCheck %s --check-prefix=CHECK-NOTAFLOAT
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100
+
+riscv-vector-unit:
+  mode-distribution:
+    marginal-priorities:
+      - [3d_uniform, WEIGHT]
+      - [sew_lmul, 0.0]
+      - [vl, 0.0]
+    VM:
+      - [all_ones, 1.0]
+    VL:
+      - [1, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+      LMUL:
+        m1: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+    - [VADD_VV, 0.1]
+    - [VSETVL, 1.0]
+
+# CHECK-ZERO: error: marginal-priorities: at least one weight must be positive
+#
+# CHECK-NEGATIVE: error: marginal-priorities: weights must be non-negative
+#
+# CHECK-NOTAFLOAT: error: invalid floating point number
