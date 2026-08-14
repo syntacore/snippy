@@ -1,7 +1,7 @@
 # COM: This test checks how weighs are distributed with marginal-priorities:3d_uniform
 #
-# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t.yaml
-# RUN: FileCheck %s < %t.yaml
+# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t
+# RUN: FileCheck %s --input-file=%t
 
 include:
   - ../rvv-config-histogram/Inputs/sections.yaml
@@ -47,12 +47,12 @@ histogram:
 # COM: {e64, m8} - VLMAX=16
 # COM: {e8, m1}  - VLMAX=16
 # COM: {e8, m8}  - VLMAX=128
-# COM: All 4 modes support VL=2, but only {e8, m8} supports VL={120-125}.
+# COM: All 4 modes support VL=2, but only {e8, m8} supports VL={120-126}.
 
 # COM: All {SEW, LMUL} pairs have equal weight, but {e8, m8} supports all 7 VL options,
 # COM: while other support only 1 option. Weight of {e8, m8} will be scaled accordingly.
 
-#CHECK-DAG: P: 0.1 Conf: { e8, m1, tu, mu, vxrm: rnu }
-#CHECK-DAG: P: 0.7 Conf: { e8, m8, tu, mu, vxrm: rnu }
-#CHECK-DAG: P: 0.1 Conf: { e64, m1, tu, mu, vxrm: rnu }
-#CHECK-DAG: P: 0.1 Conf: { e64, m8, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.1 Conf: { e8, m1, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.7 Conf: { e8, m8, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.1 Conf: { e64, m1, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.1 Conf: { e64, m8, tu, mu, vxrm: rnu }
