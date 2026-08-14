@@ -1,7 +1,7 @@
 # COM: This test checks how weighs are distributed with marginal-priorities:vl
 #
-# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t.yaml
-# RUN: FileCheck %s < %t.yaml
+# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t
+# RUN: FileCheck %s --input-file=%t
 
 include:
   - ../rvv-config-histogram/Inputs/sections.yaml
@@ -48,4 +48,7 @@ histogram:
 # COM: of VL=2 is 0.5. Hence, we expect probability 0.5/4 = 0.125
 # COM: to be assigned to the mode that supports only VL=2.
 
-#CHECK: P: 0.125 Conf: { e64, m1, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.125 Conf: { e64, m1, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.29167 Conf: { e64, m8, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.29167 Conf: { e8, m1, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.29167 Conf: { e8, m8, tu, mu, vxrm: rnu }

@@ -889,7 +889,7 @@ public:
                 auto [SEW, LMUL] = Item.Element;
                 // If {SEW, LMUL} is illegal, we treat it as if
                 // it has MaxVL == MaxPossibleVL
-                if (computeVLMax(ELEN, VLEN, SEW, LMUL) == 0)
+                if (!isLegalSewLmul(ELEN, VLEN, SEW, LMUL))
                   return true;
                 return computeVLMax(ELEN, VLEN, SEW, LMUL) >= VL;
               });
@@ -1201,8 +1201,8 @@ struct SewLmulPriorityBuilder final : PrimaryDistBuilderInterface {
       auto VLDist = VLDistStorage.get(SEW, LMUL);
       assert(VLDist.size() <= Mapping.VLSize);
 
-      for (unsigned VL = 0; VL < VLDist.size(); ++VL)
-        Weights[Mapping.toIdx(SEW, LMUL, VL)] = VLDist[VL] * SewLmulProb;
+      for (const auto &[VL, VlWeight] : enumerate(VLDist))
+        Weights[Mapping.toIdx(SEW, LMUL, VL)] = VlWeight * SewLmulProb;
     }
     return Weights;
   }
@@ -1232,7 +1232,7 @@ struct VlPriorityBuilder final : PrimaryDistBuilderInterface {
     auto VLDist =
         buildDistributionForMaxVL(MaxFeasibleVL, VLGenerators, IsForVSETIVLI);
 
-    for (auto [VL, VlWeight] : enumerate(VLDist)) {
+    for (const auto &[VL, VlWeight] : enumerate(VLDist)) {
       auto Dist = SewLmulDistStorage.get(VL);
       if (Dist.empty())
         continue;
@@ -1272,17 +1272,17 @@ struct UniformPriorityBuilder final : PrimaryDistBuilderInterface {
       auto VLDist = VLDistStorage.get(SEW, LMUL);
       assert(VLDist.size() <= Mapping.VLSize);
 
-      for (unsigned VL = 0; VL < VLDist.size(); ++VL) {
-        auto PossibleVLAmount =
-            count_if(VLDist, [](double VlWeight) { return !isZero(VlWeight); });
-        // Multiply by PossibleVLAmount. This makes it so the weight of each
-        // {SEW, LMUL} pair is scaled by the number of possible VLs. For
-        // example with VL=any_legal, PossibleVLAmount is VLMAX, so the
-        // distribution shifts to be more uniform across all {SEW, LMUL, VL}
-        // triplets.
+      // Multiply by PossibleVLAmount. This makes it so the weight of each
+      // {SEW, LMUL} pair is scaled by the number of possible VLs. For
+      // example with VL=any_legal, PossibleVLAmount is VLMAX, so the
+      // distribution shifts to be more uniform across all {SEW, LMUL, VL}
+      // triplets.
+      auto PossibleVLAmount =
+          count_if(VLDist, [](double VlWeight) { return !isZero(VlWeight); });
+
+      for (const auto &[VL, VlWeight] : enumerate(VLDist))
         Weights[Mapping.toIdx(SEW, LMUL, VL)] =
-            VLDist[VL] * SewLmulProb * PossibleVLAmount;
-      }
+            VlWeight * SewLmulProb * PossibleVLAmount;
     }
     return Weights;
   }
@@ -1322,16 +1322,16 @@ RVVPrimaryConfigGenerator::RVVPrimaryConfigGenerator(
   for (const auto &[Builder, Prob] : PrimaryDistBuilders) {
     if (isZero(Prob))
       continue;
-    auto BuilderWeights = Builder->buildWeights(
-        ELEN, VLEN, Mapping, SewLmulDist, VLGenerators, IsForVSETIVLI);
+    auto CfgWeights = Builder->buildWeights(ELEN, VLEN, Mapping, SewLmulDist,
+                                            VLGenerators, IsForVSETIVLI);
 
-    if (all_of(BuilderWeights, [](double W) { return isZero(W); }))
+    if (all_of(CfgWeights, [](double W) { return isZero(W); }))
       continue;
-    // The sum of BuilderWeights must be 1.0
-    normalizeValues(BuilderWeights);
+    // The sum of ConfigWeights must be 1.0
+    normalizeValues(CfgWeights);
 
-    for (auto &&[Weight, BuilderWeight] : zip(Weights, BuilderWeights))
-      Weight += BuilderWeight * Prob;
+    for (auto &&[Weight, CfgWeight] : zip(Weights, CfgWeights))
+      Weight += CfgWeight * Prob;
   }
 
   // Zero-out weights of VLs < minVMBitWidth.

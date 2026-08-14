@@ -1,7 +1,7 @@
 # COM: This test checks how weighs are distributed with marginal-priorities:sew_lmul
 #
-# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t.yaml
-# RUN: FileCheck %s < %t.yaml
+# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t
+# RUN: FileCheck %s --input-file=%t
 
 include:
   - ../rvv-config-histogram/Inputs/sections.yaml
@@ -42,7 +42,7 @@ histogram:
 # COM: for each {SEW, LMUL} combination are 1.0*1.0 = 1.0.
 # COM: That means that probability of each {SEW, LMUL} is 0.25.
 
-#CHECK-DAG: P: 0.25 Conf: { e8, m1, tu, mu, vxrm: rnu }
-#CHECK-DAG: P: 0.25 Conf: { e8, m8, tu, mu, vxrm: rnu }
-#CHECK-DAG: P: 0.25 Conf: { e64, m1, tu, mu, vxrm: rnu }
-#CHECK-DAG: P: 0.25 Conf: { e64, m8, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.25 Conf: { e8, m1, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.25 Conf: { e8, m8, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.25 Conf: { e64, m1, tu, mu, vxrm: rnu }
+# CHECK-DAG: P: 0.25 Conf: { e64, m8, tu, mu, vxrm: rnu }
