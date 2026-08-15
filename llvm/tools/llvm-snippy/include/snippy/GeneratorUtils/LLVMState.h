@@ -50,6 +50,7 @@ struct SelectedTargetInfo final {
   std::string MArch;
   std::string CPU;
   std::string Features;
+  std::string ABI;
 };
 
 // An object to initialize LLVM and prepare objects needed to run the
