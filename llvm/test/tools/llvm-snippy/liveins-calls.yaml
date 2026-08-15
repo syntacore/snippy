@@ -6,8 +6,6 @@ options:
   mtriple: riscv64
   num-instrs: 200
   init-regs-in-elf: true
-  function-number: 20
-  function-layers: 5
   verify-mi: true
 
 sections:

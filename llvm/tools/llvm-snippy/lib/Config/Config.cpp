@@ -1418,11 +1418,22 @@ static std::string checkSMCConfig(ConfigIOContext &ConfigIOCtx, Config &Info) {
 }
 
 std::string yaml::MappingTraits<Config>::validate(yaml::IO &Io, Config &Info) {
+  if (std::holds_alternative<FunctionDescs>(Info.PassCfg.CGLayout)) {
+    if (snippy::isFunctionNumberSpecified())
+      return "Option \"function-number\" cannot be used together with "
+             "\"call-graph\"";
+
+    if (snippy::isFunctionLayersSpecified())
+      return "Option \"function-layers\" cannot be used together with "
+             "\"call-graph\"";
+  }
+
   if (Info.PassCfg.CodeLayout && !Info.PassCfg.Branches.unaligned())
     return Twine("Code layout feature is only supported with branches "
                  "alignment set to ")
         .concat(Twine(Branchegram::Unaligned))
         .str();
+
   void *Ctx = Io.getContext();
   assert(Ctx && "To parse or output Config provide ConfigIOContext as "
                 "context for yaml::IO");
