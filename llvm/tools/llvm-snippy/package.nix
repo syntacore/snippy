@@ -14,7 +14,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "llvm-snippy";
-  version = "3.0.0";
+  version = "3.1.0";
 
   src = lib.fileset.toSource rec {
     root = ../../..;
