@@ -57,6 +57,8 @@ struct LMULEnumList final {
       VLMUL::LMUL_RESERVED, VLMUL::LMUL_F8, VLMUL::LMUL_F4, VLMUL::LMUL_F2};
 };
 
+std::string toString(VLMUL LMUL);
+
 // Note: integer values are in-sync with RVV spec 1.0
 enum class VSEW : unsigned {
   SEW8 = 8,
@@ -74,6 +76,8 @@ struct SEWEnumList final {
                                      VSEW::SEWReserved1, VSEW::SEWReserved2,
                                      VSEW::SEWReserved3, VSEW::SEWReserved4};
 };
+
+std::string toString(VSEW SEW);
 
 enum class VXRMMode : unsigned { RNU = 0, RNE = 1, RDN = 2, RON = 3 };
 struct VXRMEnumList final {

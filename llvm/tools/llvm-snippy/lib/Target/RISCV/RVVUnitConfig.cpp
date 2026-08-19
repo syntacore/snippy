@@ -498,7 +498,7 @@ template <> struct GeneratorFactory<VMGeneratorHolder> {
 namespace llvm {
 namespace snippy {
 
-static std::string toString(VSEW SEW) {
+std::string toString(VSEW SEW) {
   switch (SEW) {
   case VSEW::SEWReserved1:
     return "eReserved1";
@@ -517,7 +517,7 @@ static std::string toString(VSEW SEW) {
   llvm_unreachable("Unknown SEW");
 }
 
-static std::string toString(VLMUL LMUL) {
+std::string toString(VLMUL LMUL) {
   switch (LMUL) {
   case VLMUL::LMUL_RESERVED:
     return "mReserved";

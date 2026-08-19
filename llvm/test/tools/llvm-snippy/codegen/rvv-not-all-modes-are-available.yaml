@@ -1,0 +1,28 @@
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 1 
+
+include:
+  - ../Inputs/rvv-sections.yaml
+  - Inputs/rvv-unit-all.yaml
+
+histogram:
+    - [VFADD_VF, 1.0]
+
+# CHECK: warning: (no-available-opcode-for-context) No opcodes are available to be generated in the following RVV modes. These modes will be deleted from generation:
+# CHECK: [SEW: e8, LMUL: m1, VL: 0-16]
+# CHECK: [SEW: e8, LMUL: m2, VL: 0-32]
+# CHECK: [SEW: e8, LMUL: m4, VL: 0-64]
+# CHECK: [SEW: e8, LMUL: m8, VL: 0-128]
+# CHECK: [SEW: e8, LMUL: mf8, VL: 0-2]
+# CHECK: [SEW: e8, LMUL: mf4, VL: 0-4]
+# CHECK: [SEW: e8, LMUL: mf2, VL: 0-8]
+# CHECK: [SEW: e16, LMUL: m1, VL: 0-8]
+# CHECK: [SEW: e16, LMUL: m2, VL: 0-16]
+# CHECK: [SEW: e16, LMUL: m4, VL: 0-32]
+# CHECK: [SEW: e16, LMUL: m8, VL: 0-64]
+# CHECK: [SEW: e16, LMUL: mf4, VL: 0-2]
+# CHECK: [SEW: e16, LMUL: mf2, VL: 0-4]

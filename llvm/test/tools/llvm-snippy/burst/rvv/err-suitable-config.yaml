@@ -39,7 +39,8 @@ burst:
 
 histogram:
   - ["V[LS][OU]XEI64_V", 1.0]
-
+  - [ADDI, 1.0]
+  
 # COM: There is no suitable rvv configuration here because all values of EMUL
 # COM: (EMUL = (EEW/SEW)*LMUL) are greater than 8 => illegal instruction
 # CHECK: error: Can't find suitable RVV configuration for burst group
