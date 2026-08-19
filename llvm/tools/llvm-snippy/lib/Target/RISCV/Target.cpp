@@ -6190,6 +6190,125 @@ static void dumpRvvConfigurationInfo(StringRef FilePath,
     ReportFileError(OS.error());
 }
 
+// There are many configs, which differ only in VL and don't support the
+// same instruction. So, to avoid making the warning message enormous, we need
+// data structure to squash RVVConfigs by VL.
+using VLSquasher = std::set<unsigned>;
+using RVVConfigSquasher = std::map<SewLmulPair, VLSquasher>;
+
+static std::string toString(const std::pair<SewLmulPair, VLSquasher> &Cfg) {
+  std::string Str;
+  raw_string_ostream RSO{Str};
+  const auto &SewLmul = Cfg.first;
+  RSO << "[SEW: " << toString(std::get<VSEW>(SewLmul))
+      << ", LMUL: " << snippy::toString(std::get<VLMUL>(SewLmul)) << ", VL: ";
+  const auto &VLSquash = Cfg.second;
+  assert(!VLSquash.empty());
+  // squash 1,2,3,4,5 into 1-5
+  // and separate these ranges with ,
+  for (auto It = VLSquash.begin(), Ite = VLSquash.end();;) {
+    RSO << *It;
+    auto Last =
+        std::adjacent_find(It, Ite, [](unsigned First, unsigned Second) {
+          return (First + 1) != Second;
+        });
+    if (Last == Ite) {
+      if (auto LastPrev = std::prev(Last); LastPrev != It)
+        RSO << "-" << *LastPrev;
+      break;
+    }
+    if (Last != It)
+      RSO << "-" << *Last;
+    It = std::next(Last);
+    RSO << ", ";
+  }
+  RSO << "]";
+  return Str;
+}
+
+// Exclude configs without available opcodes and return true, if there is at
+// least one config with at least one available opcode, otherwise return false.
+static bool excludeConfigsWithoutAvailableOpcodes(
+    const RVVPrimaryConfigGenerator &CfgGen, RVVConfigSquasher &CfgSquasher,
+    LLVMContext &Ctx, const OpcodeHistogram::TopOpcodesType &Hist,
+    const RISCVSubtarget &ST, unsigned VLEN) {
+  auto Probabilities = CfgGen.Dist.probabilities();
+  // The Probabilieties array can be large. Avoid copying when it's not used.
+  auto ProbabilitiesChanged = false;
+  auto AvailableConfigs = false;
+  for (size_t I = 0, E = Probabilities.size(); I < E; ++I) {
+    if (isZero(Probabilities[I]))
+      continue;
+    auto PrimaryCfg = CfgGen.idxToConfig(I);
+    auto AtLeastOneAvailableOpcode =
+        llvm::any_of(Hist, [&PrimaryCfg, &ST, VLEN](const auto &Opc) {
+          auto IsOpcodeAvailable =
+              !isRVV(Opc.first) ||
+              isLegalRVVInstr(Opc.first, PrimaryCfg, VLEN, &ST);
+          return IsOpcodeAvailable;
+        });
+    if (AtLeastOneAvailableOpcode) {
+      AvailableConfigs = true;
+      continue;
+    }
+    // exclude configs from generation, because it
+    // doesn't have available opcodes
+    Probabilities[I] = 0.0;
+    ProbabilitiesChanged = true;
+    CfgSquasher[{PrimaryCfg.SEW, PrimaryCfg.LMUL}].insert(PrimaryCfg.VL);
+  }
+  if (ProbabilitiesChanged && AvailableConfigs)
+    CfgGen.Dist = std::discrete_distribution<unsigned>(Probabilities.begin(),
+                                                       Probabilities.end());
+  return AvailableConfigs;
+}
+
+static void processAndFilterRVVConfigs(LLVMContext &Ctx, const Config &Cfg,
+                                       const TargetSubtargetInfo *STI,
+                                       const RVVConfigurationInfo &VUInfo) {
+  // exclude PrimaryConfigs which haven't available opcodes
+  const auto &ST = static_cast<const RISCVSubtarget &>(*STI);
+  const auto &Hist = Cfg.getOpcodeHistogram().topOpcodes();
+  auto VLEN = VUInfo.getVLEN();
+
+  RVVConfigSquasher ConfigSquasher;
+  auto ExcludeConfigs =
+      [&ConfigSquasher, &Ctx, &Hist, &ST, VLEN](
+          const std::optional<RVVPrimaryConfigGenerator> &Generator) -> bool {
+    return (Generator.has_value()
+                ? excludeConfigsWithoutAvailableOpcodes(
+                      *Generator, ConfigSquasher, Ctx, Hist, ST, VLEN)
+                : false);
+  };
+
+  const auto &CfgGen = VUInfo.getGenInfoPtr()->CfgGen;
+  const auto &PrimaryGen = CfgGen.PrimaryGen;
+  const auto &PrimaryGenReduced = CfgGen.PrimaryGenReduced;
+  // We need these temporary variables (AvailableConfigsPrimaryGen and
+  // AvailableConfigsPrimaryGenReduced) because the || operator performs lazy
+  // evaluation. This means we cannot call ExcludeConfigs directly within the
+  // expression, as the method must exclude configurations that lack available
+  // opcodes in both generators.
+  auto AvailableConfigsInPrimaryGen = ExcludeConfigs(PrimaryGen);
+  auto AvailableConfigsInPrimaryGenReduced = ExcludeConfigs(PrimaryGenReduced);
+  auto AvailableConfigs =
+      AvailableConfigsInPrimaryGen || AvailableConfigsInPrimaryGenReduced;
+  if (!AvailableConfigs)
+    snippy::fatal(Ctx, "Incorrect RVV setup",
+                  "there are none opcodes available for all RVV modes");
+  for (const auto &ExcludedConfig : ConfigSquasher) {
+    auto ManyCfgs = (ExcludedConfig.second.size() > 1);
+    snippy::warn(
+        snippy::WarningName::NoAvailableOpcodeForContext, Ctx,
+        llvm::formatv(
+            "No opcodes are available to be generated in the following "
+            "RVV mode{}. {} mode{} will be deleted from generation",
+            (ManyCfgs ? "s" : ""), (ManyCfgs ? "These" : "This"),
+            (ManyCfgs ? "s" : "")),
+        llvm::formatv("\n{}", toString(ExcludedConfig)));
+  }
+}
+
 static void checkThatRVVInitModeSupportsReinit(const OpcodeHistogram &Hist) {
   auto IsRVVOpcode = [](auto &&Opc) -> bool { return isRVV(Opc); };
 
@@ -6242,6 +6361,9 @@ SnippyRISCVTarget::createTargetContext(LLVMState &State, const Config &Cfg,
       std::move(RISCVCfg), matchRVVOpcodesWithDisallowedIntersectingAccesses(
                                Cfg.Histogram, State.getInstrInfo()));
   const auto &VUInfo = RGC->getVUConfigInfo();
+
+  if (VUInfo.isRVVEnabled())
+    processAndFilterRVVConfigs(State.getCtx(), Cfg, STI, VUInfo);
 
   if (DumpRVVConfigurationInfo.isSpecified())
     dumpRvvConfigurationInfo(/*FilePath=*/DumpRVVConfigurationInfo.getValue(),
