@@ -207,6 +207,14 @@ public:
     auto SEW = static_cast<unsigned>(getSEW(MBB));
     constexpr std::pair<unsigned, bool> EMUL1 = {/* Multiplier */ 1,
                                                  /* IsFractional */ false};
+
+    auto EEW = getOperandEEW(InstrDesc, OpIndex, SEW);
+    // riscv-v-spec-1.0: For the purpose of determining register group overlap
+    // constraints, mask elements have EEW=1. A vector mask occupies only one
+    // vector register regardless of SEW and LMUL (=> EMUL = 1).
+    if (EEW == 1)
+      return EMUL1;
+
     // riscv-v-spec-1.0: Scalar operands can be taken from element 0 of a vector
     // register (.vs suffix denotes the second operand is a scalar stored in
     // element 0 of a vector register). Any vector register can be used to hold
@@ -284,22 +292,23 @@ public:
 
     if (isRVVWholeRegisterInstr(Opcode))
       return std::make_pair(getRVVWholeRegisterCount(Opcode), 0);
-
-    auto EEW = getOperandEEW(InstrDesc, OpIndex, SEW);
-    // riscv-v-spec-1.0: For the purpose of determining register group overlap
-    // constraints, mask elements have EEW=1. A vector mask occupies only one
-    // vector register regardless of SEW and LMUL (=> EMUL = 1).
-    if (EEW == 1)
-      return EMUL1;
-
     return computeDecodedEMUL(ELEN, SEW, EEW, LMUL);
   }
 
   unsigned getOperandRegsCount(const MCInstrDesc &InstrDesc, unsigned OpIndex,
                                const MachineBasicBlock &MBB) const {
+    assert(OpIndex < InstrDesc.operands().size());
+    auto Operand = InstrDesc.operands()[OpIndex];
+    auto OperandRegClassID = Operand.RegClass;
+    if (!isVectorRegClass(OperandRegClassID))
+      return 1;
+
     auto [Multiplier, IsFractional] = getOperandEMUL(InstrDesc, OpIndex, MBB);
     if (IsFractional)
-      return 1;
+      Multiplier = 1;
+    auto Opcode = InstrDesc.getOpcode();
+    if (isRVVSegLoadStore(Opcode) && OpIndex == 0)
+      return Multiplier * getNumFields(Opcode);
     return Multiplier;
   }
 

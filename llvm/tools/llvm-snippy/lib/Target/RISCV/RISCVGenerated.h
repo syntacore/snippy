@@ -1626,6 +1626,29 @@ inline bool isRVVFPWidening(unsigned Opcode) {
   }
 }
 
+inline bool isRVVWideningDestOverride(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RISCV::VWMACCU_VV:
+  case RISCV::VWMACCU_VX:
+  case RISCV::VWMACC_VV:
+  case RISCV::VWMACC_VX:
+  case RISCV::VWMACCSU_VV:
+  case RISCV::VWMACCSU_VX:
+  case RISCV::VWMACCUS_VX:
+  case RISCV::VFWMACC_VV:
+  case RISCV::VFWMACC_VF:
+  case RISCV::VFWMSAC_VV:
+  case RISCV::VFWMSAC_VF:
+  case RISCV::VFWNMACC_VV:
+  case RISCV::VFWNMACC_VF:
+  case RISCV::VFWNMSAC_VV:
+  case RISCV::VFWNMSAC_VF:
+    return true;
+  }
+}
+
 inline bool isRVVSemiWidening(unsigned Opcode) {
   switch (Opcode) {
   default:
@@ -1938,7 +1961,7 @@ inline bool isVectorRegClass(int16_t RegClassID) {
 }
 
 inline unsigned getOperandEEW(const MCInstrDesc &InstrDesc, unsigned OpIndex,
-                              unsigned SEW, unsigned VLENB = 0) {
+                              unsigned SEW) {
   auto Opcode = InstrDesc.getOpcode();
   assert(OpIndex < InstrDesc.operands().size());
   auto Operand = InstrDesc.operands()[OpIndex];
@@ -1978,7 +2001,6 @@ inline unsigned getOperandEEW(const MCInstrDesc &InstrDesc, unsigned OpIndex,
   if (isRVVWholeRegLoadStore(Opcode)) {
     // EEW is a data element width.
     assert(OpIndex == 0);
-    assert(VLENB != 0);
     return getLoadStoreNaturalAlignment(Opcode) * CHAR_BIT;
   }
 
@@ -1999,7 +2021,7 @@ inline bool canSrcDestOperandsOverlap(unsigned Opcode) {
   return !(isRVVSetFirstMaskBit(Opcode) || isRVVIndexedSegLoadStore(Opcode) ||
            isRVVIota(Opcode) || isRVVGather(Opcode) || isRVVGather16(Opcode) ||
            isRVVSlide1Up(Opcode) || isRVVSlideUp(Opcode) ||
-           isRVVCompress(Opcode));
+           isRVVCompress(Opcode) || isRVVWideningDestOverride(Opcode));
 }
 
 inline bool canProduceNaN(const MCInstrDesc &InstrDesc) {
