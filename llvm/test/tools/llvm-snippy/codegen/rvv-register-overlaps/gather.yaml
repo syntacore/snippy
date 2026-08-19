@@ -34,6 +34,10 @@ histogram:
   - [VRGATHER_VV, 1.0]
   - [VRGATHEREI16_VV, 1.0]
 
+# COM: Check that vd group cannot overlap with source groups.
+# CHECK-NOT: $v20 = VRGATHEREI16_VV $v20
+# CHECK-NOT: $v24 = VRGATHEREI16_VV $v24
+# CHECK-NOT: $v28 = VRGATHEREI16_VV $v28
 # COM: Check that vs1 group can overlap with vs2 group (if EEW == SEW).
 # CHECK: VRGATHEREI16_VV $v24, $v24
 # COM: Check that vs1 group cannot overlap with vs2 group (if EEW != SEW).

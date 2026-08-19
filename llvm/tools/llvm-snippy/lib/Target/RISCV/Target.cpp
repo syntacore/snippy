@@ -250,22 +250,6 @@ static snippy::opt<size_t> ReservationSetSize(
     cl::init(64), cl::cat(SnippyRISCVOptions));
 
 namespace {
-static unsigned getDestRegsNum(const MCInstrDesc &InstrDesc,
-                               const MachineBasicBlock &MBB,
-                               const SnippyProgramContext &ProgCtx) {
-  constexpr auto DestIdx = 0u;
-  // Not RVV instruction isn't target specific for selfcheck,
-  // so we provide only one destination register to store
-  if (!isVectorRegClass(InstrDesc.operands()[DestIdx].RegClass))
-    return 1;
-  auto &TgtCtx = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
-  auto DestRegsMult = TgtCtx.getOperandRegsCount(InstrDesc, DestIdx, MBB);
-  auto Opcode = InstrDesc.getOpcode();
-  if (isRVVSegLoadStore(Opcode))
-    return DestRegsMult * getNumFields(Opcode);
-  return DestRegsMult;
-}
-
 bool isCompressedBranch(unsigned Opcode) {
   return Opcode == RISCV::C_BEQZ || Opcode == RISCV::C_BNEZ;
 }
@@ -1201,8 +1185,8 @@ getVectorSources(const MCInstrDesc &InstrDesc) {
 
 static std::vector<Register> initExcludeResult(unsigned OpIndex) {
   constexpr auto DestIdx = 0u;
-  // We cant overwrite mask register, because the values in the v0 register
-  // must correspond to riscv-vector-unit::mode-distribution::VM.
+  // FIXME: Now we cant overwrite mask register, because the values in the v0
+  // register must correspond to riscv-vector-unit::mode-distribution::VM.
   if (NoMaskModeForRVV || OpIndex == DestIdx)
     return {RISCV::V0};
   return {};
@@ -1213,8 +1197,15 @@ static std::vector<Register> initExcludeResult(unsigned OpIndex,
                                                const LLVMState &State) {
   if (!initExcludeResult(OpIndex).empty())
     return {RISCV::V0};
-  // This means that we will initialize this register in a special way. So we
-  // should forbid V0, since V0 is a mask that should not be overwritten.
+
+  auto Operand = InstrDesc.operands()[OpIndex];
+  // FIXME: We should remove this condition from here when we can overwrite V0.
+  if (isRVVuseV0RegExplicitly(InstrDesc.getOpcode()) &&
+      (Operand.RegClass != RISCV::VMV0RegClassID))
+    return {RISCV::V0};
+
+  // FIXME: This means that we will initialize this register in a special way.
+  // So we should forbid V0, since V0 is a mask that should not be overwritten.
   if (!State.isReinitializableOperand(InstrDesc, OpIndex))
     return {RISCV::V0};
   return {};
@@ -1325,29 +1316,26 @@ excludeForIndexedSegLoad(unsigned OpIndex, InstructionGenerationContext &IGC,
   // For vector indexed segment loads, the destination vector register
   // groups cannot overlap the source vector register group (specified
   // by vs2), else the instruction encoding is reserved.
-  auto AddConstraint = [&](unsigned Idx, unsigned NumFields) {
-    auto RegsCount =
-        TgtCtx.getOperandRegsCount(InstrDesc, Idx, MBB) * NumFields;
+  auto AddConstraint = [&](unsigned Idx) {
+    auto RegsCount = TgtCtx.getOperandRegsCount(InstrDesc, Idx, MBB);
     auto BaseReg = VRegGetter(Idx);
     Result.resize(Result.size() + RegsCount);
     std::iota(Result.end() - RegsCount, Result.end(), BaseReg);
   };
 
   constexpr auto Vs2Idx = 2u;
-  auto SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
-  auto VLENB = TgtCtx.getVLENB();
-  auto Vs2EEW = getOperandEEW(InstrDesc, Vs2Idx, SEW, VLENB);
-  auto DestEEW = getOperandEEW(InstrDesc, DestIdx, SEW, VLENB);
+  auto Vs2RegsCount = TgtCtx.getOperandRegsCount(InstrDesc, Vs2Idx, MBB);
+  auto DestRegsCount = TgtCtx.getOperandRegsCount(InstrDesc, DestIdx, MBB);
   if (OpIndex == DestIdx) {
-    // If DestEEW >= Vs2EEW, vs2 not yet preselect.
-    if (DestEEW < Vs2EEW)
-      AddConstraint(Vs2Idx, /* NumFields */ 1u);
+    // If DestRegsCount >= Vs2RegsCount, vs2 not yet preselect.
+    if (DestRegsCount < Vs2RegsCount)
+      AddConstraint(Vs2Idx);
     return Result;
   }
   assert(OpIndex == Vs2Idx);
-  // If DestEEW < Vs2EEW, vd not yet preselect.
-  if (DestEEW >= Vs2EEW)
-    AddConstraint(DestIdx, getNumFields(InstrDesc.getOpcode()));
+  // If DestRegsCount < Vs2RegsCount, vd not yet preselect.
+  if (DestRegsCount >= Vs2RegsCount)
+    AddConstraint(DestIdx);
   return Result;
 }
 
@@ -1367,13 +1355,9 @@ excludeForDest(unsigned OpIndex, InstructionGenerationContext &IGC,
 
   auto AddDestSrcConstraint = [&](unsigned VSrcIdx) {
     auto DestCount = TgtCtx.getOperandRegsCount(InstrDesc, OpIndex, MBB);
-    auto SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
-    auto VLENB = TgtCtx.getVLENB();
-    auto VsEEW = getOperandEEW(InstrDesc, VSrcIdx, SEW, VLENB);
-    auto EEW = getOperandEEW(InstrDesc, OpIndex, SEW);
-    // If VsEEW <= EEW, vs2 not yet preselect.
-    if (VsEEW > EEW) {
-      auto VsCount = TgtCtx.getOperandRegsCount(InstrDesc, VSrcIdx, MBB);
+    auto VsCount = TgtCtx.getOperandRegsCount(InstrDesc, VSrcIdx, MBB);
+    // If VsCount < DestCount, vs not yet preselect.
+    if (VsCount > DestCount || (VsCount == DestCount && OpIndex > VSrcIdx)) {
       auto BaseVsReg = VRegGetter(VSrcIdx);
       if (!canSrcDestOperandsOverlap(InstrDesc.getOpcode()))
         Result.push_back(BaseVsReg);
@@ -1448,10 +1432,8 @@ static bool isNecessaryExcludeRegisters(InstructionGenerationContext &IGC,
 
   std::vector<unsigned> OperandEEWs;
   auto SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
-  auto VLENB = TgtCtx.getVLENB();
-  transform(Indices, std::back_inserter(OperandEEWs), [&](auto Idx) {
-    return getOperandEEW(InstrDesc, Idx, SEW, VLENB);
-  });
+  transform(Indices, std::back_inserter(OperandEEWs),
+            [&](auto Idx) { return getOperandEEW(InstrDesc, Idx, SEW); });
   // If the opcode is illegal for the current configuration, then all
   // calculations do not make sense and we can select any register for the
   // operand.
@@ -1467,9 +1449,9 @@ static bool isNecessaryExcludeRegisters(InstructionGenerationContext &IGC,
   // If instruction vector operands have identical EEWs, then we don't
   // exclude anything.
   assert(!OperandEEWs.empty());
-  return !all_of(OperandEEWs, [DestEEW = getOperandEEW(
-                                   InstrDesc, /* DestIdx */ 0, SEW, VLENB)](
-                                  auto EEW) { return EEW == DestEEW; }) ||
+  return !all_of(OperandEEWs,
+                 [DestEEW = getOperandEEW(InstrDesc, /* DestIdx */ 0, SEW)](
+                     auto EEW) { return EEW == DestEEW; }) ||
          !canSrcDestOperandsOverlap(Opcode);
 }
 
@@ -1493,14 +1475,17 @@ static std::vector<Register> getExcludedForSources(
     if (OpIndex == SrcIdx)
       SrcIdx = *VSecondSrc;
 
-    auto AnotherEEW = getOperandEEW(InstrDesc, SrcIdx, SEW);
+    auto RegsCount = TgtCtx.getOperandRegsCount(InstrDesc, OpIndex, MBB);
+    auto SrcRegsCount = TgtCtx.getOperandRegsCount(InstrDesc, SrcIdx, MBB);
+    auto SrcEEW = getOperandEEW(InstrDesc, SrcIdx, SEW);
     // A vector register cannot be used to provide source operands with more
     // than one EEW for a single instruction. A mask register source is
     // considered to have EEW=1 for this constraint. An encoding that would
     // result in the same vector register being read with two or more
     // different EEWs, including when the vector register appears at different
     // positions within two or more vector register groups, is reserved.
-    if (AnotherEEW > EEW) {
+    if (SrcEEW != EEW && (SrcRegsCount > RegsCount ||
+                          (SrcRegsCount == RegsCount && OpIndex > SrcIdx))) {
       const auto &RegInfo = State.getRegInfo();
       const auto &Tgt = State.getSnippyTarget();
       auto BaseReg =
@@ -1508,12 +1493,16 @@ static std::vector<Register> getExcludedForSources(
       [[maybe_unused]] const auto &VRegClass =
           RegInfo.getRegClass(RISCV::VRRegClassID);
       assert(VRegClass.contains(BaseReg));
-      auto AnotherRegsCount =
-          TgtCtx.getOperandRegsCount(InstrDesc, SrcIdx, MBB);
-      Result.resize(Result.size() + AnotherRegsCount);
-      std::iota(Result.end() - AnotherRegsCount, Result.end(), BaseReg);
+      Result.resize(Result.size() + SrcRegsCount);
+      std::iota(Result.end() - SrcRegsCount, Result.end(), BaseReg);
     }
   }
+
+  // FIXME: This condition applies only when we select the source register. In
+  // the case of destination register, this requirement can be relaxed (it is
+  // sufficient that the number of dest registers is 1). But since we can't
+  // write to V0 yet, this check doesn't make sense here, but it needs to be
+  // added in the future.
   // Check source-source overlap constraint with V0
   if (isRVVuseV0RegExplicitly(InstrDesc.getOpcode()) && EEW != 1)
     Result.push_back(RISCV::V0);
@@ -1749,7 +1738,8 @@ public:
   std::vector<Register>
   getRegsForSelfcheck(const MachineInstr &MI,
                       InstructionGenerationContext &IGC) const override {
-    const auto &FirstDestOperand = MI.getOperand(0);
+    constexpr auto DestIdx = 0u;
+    const auto &FirstDestOperand = MI.getOperand(DestIdx);
     assert(FirstDestOperand.isReg());
     auto BaseDestRegister = FirstDestOperand.getReg();
     const auto &ProgCtx = IGC.ProgCtx;
@@ -1757,7 +1747,11 @@ public:
     if (isRVVWholeRegisterInstr(MI.getOpcode()))
       BaseDestRegister = State.getSnippyTarget().getFirstPhysReg(
           BaseDestRegister, State.getRegInfo());
-    std::vector<Register> Regs(getDestRegsNum(MI.getDesc(), IGC.MBB, ProgCtx));
+    const auto &TgtCtx =
+        ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+    auto DestRegsNum =
+        TgtCtx.getOperandRegsCount(MI.getDesc(), DestIdx, IGC.MBB);
+    std::vector<Register> Regs(DestRegsNum);
     std::iota(Regs.begin(), Regs.end(), BaseDestRegister);
     return Regs;
   }
@@ -5097,8 +5091,9 @@ public:
   getSelectionOperandsOrder(InstructionGenerationContext &IGC,
                             const MCInstrDesc &InstrDesc,
                             SmallVectorImpl<unsigned> &Indices) const override {
-    // For vector instructions, we first select the operands that have a large
-    // EEW in order to minimize cases when there are not enough registers.
+    // For vector instructions, we first select the operands in which a larger
+    // number of registers are formed into a register group in order to minimize
+    // cases when there are not enough registers.
     auto NumOperands = InstrDesc.getNumOperands();
     auto &ProgCtx = IGC.ProgCtx;
     const auto &TgtCtx =
@@ -5108,14 +5103,12 @@ public:
     std::iota(Indices.begin(), Indices.end(), 0u);
     if (!TgtCtx.hasActiveRVVMode(MBB))
       return;
-    auto SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
-    auto VLENB = TgtCtx.getVLENB();
-    std::vector<unsigned> OperandEEWs;
-    transform(Indices, std::back_inserter(OperandEEWs), [&](auto Idx) {
-      return getOperandEEW(InstrDesc, Idx, SEW, VLENB);
+    std::vector<unsigned> OperandRegsCounts;
+    transform(Indices, std::back_inserter(OperandRegsCounts), [&](auto Idx) {
+      return TgtCtx.getOperandRegsCount(InstrDesc, Idx, MBB);
     });
-    sort(Indices, [&OperandEEWs](auto Idx1, auto Idx2) {
-      return OperandEEWs[Idx1] > OperandEEWs[Idx2];
+    sort(Indices, [&OperandRegsCounts](auto Idx1, auto Idx2) {
+      return OperandRegsCounts[Idx1] > OperandRegsCounts[Idx2];
     });
   }
 
@@ -5133,7 +5126,6 @@ public:
         ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
     auto &MBB = IGC.MBB;
     auto RCID = RC.getID();
-
     if (InstrDesc.getOperandConstraint(OpIndex, MCOI::TIED_TO) >= 0)
       return {};
     if (isSPRelative(Opcode))
@@ -5162,7 +5154,6 @@ public:
       return {};
 
     auto SEW = static_cast<unsigned>(TgtCtx.getSEW(MBB));
-    auto VLENB = TgtCtx.getVLENB();
     if (RCID == RISCV::VMV0RegClassID)
       return excludeForVMV0RegClass(OpIndex, InstrDesc, SEW,
                                     PregeneratedOperands, GetVReg);
@@ -5171,7 +5162,7 @@ public:
     if (!isNecessaryExcludeRegisters(IGC, InstrDesc))
       return Result;
 
-    // 1. Check source-source overlap constraint
+    // 1. Check operand-sources overlaps constraints
     copy(getExcludedForSources(InstrDesc, OpIndex, IGC, PregeneratedOperands),
          std::back_inserter(Result));
     if (InstrDesc.mayStore())
@@ -5179,7 +5170,7 @@ public:
     if (isRVVIndexedSegLoadStore(Opcode))
       return excludeForIndexedSegLoad(OpIndex, IGC, InstrDesc, Result, GetVReg);
 
-    // 2. Check destination-sources overlap constraints
+    // 2. Check operand-destination overlap constraint
     constexpr auto DestIdx = 0u;
     if (OpIndex == DestIdx)
       return excludeForDest(OpIndex, IGC, InstrDesc, Result, GetVReg);
@@ -5188,12 +5179,14 @@ public:
       return Result;
 
     // Here we separately process all three relations between DestEEW and EEW.
-    auto DestEEW = getOperandEEW(InstrDesc, DestIdx, SEW, VLENB);
-    auto EEW = getOperandEEW(InstrDesc, OpIndex, SEW, VLENB);
-    if (DestEEW < EEW) {
+    auto DestCount = TgtCtx.getOperandRegsCount(InstrDesc, DestIdx, MBB);
+    auto Count = TgtCtx.getOperandRegsCount(InstrDesc, OpIndex, MBB);
+    if (DestCount < Count) {
       // vd not yet preselected
       return Result;
     }
+    auto DestEEW = getOperandEEW(InstrDesc, DestIdx, SEW);
+    auto EEW = getOperandEEW(InstrDesc, OpIndex, SEW);
     if (DestEEW > EEW)
       return excludeIfDestEEWBiggerEEW(OpIndex, IGC, InstrDesc, Result,
                                        GetVReg);
@@ -6303,15 +6296,18 @@ SnippyRISCVTarget::getRegClass(const InstructionGenerationContext &IGC,
       (OperandRegClassID != RISCV::VRRegClassID))
     return RegInfo.getRegClass(OperandRegClassID);
 
-  auto RegsCount = TgtCtx.getOperandRegsCount(InstrDesc, OpIndex, MBB);
+  auto [RegNumMult, IsFractional] =
+      TgtCtx.getOperandEMUL(InstrDesc, OpIndex, MBB);
+  if (IsFractional)
+    RegNumMult = 1;
   // Special handling for Vector Load/Store Segment Instructions, because
   // this instructions moves subarrays.
   if ((isRVVUnitStrideSegLoadStore(Opcode) ||
        isRVVStridedSegLoadStore(Opcode) || isRVVIndexedSegLoadStore(Opcode)) &&
       OpIndex == 0 /* vector destination register group */)
-    return getRVVSegLoadStoreRegClassForVd(Opcode, RegsCount, RegInfo);
+    return getRVVSegLoadStoreRegClassForVd(Opcode, RegNumMult, RegInfo);
 
-  switch (RegsCount) {
+  switch (RegNumMult) {
   case 1:
     return RegInfo.getRegClass(OperandRegClassID);
   case 2:
