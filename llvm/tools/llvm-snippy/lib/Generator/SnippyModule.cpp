@@ -371,7 +371,7 @@ Expected<OpcGenHolder> DefaultPolicyConfig::createOpcodeGenerator(
                 [&](auto &&Entry) { return OpcMask(Entry.first); });
   OpcodeHistogram DFHCopy(DFHTopOpcodes);
   DFHCopy.copyPatterns(DataFlowHistogram);
-  if (DFHCopy.size() == 0)
+  if (DFHCopy.empty())
     return makeFailure(
         Errc::InvalidConfiguration,
         "We can not create any primary instruction in this "
@@ -379,7 +379,6 @@ Expected<OpcGenHolder> DefaultPolicyConfig::createOpcodeGenerator(
         "snippy can not find any instruction that could be created "
         "in current context.\nTry to increase instruction number by "
         "one or add more instructions to histogram.");
-
   auto &PluginManager = *Common->ProgramCfg.PluginManagerImpl;
   if (PluginManager.pluginHasBeenLoaded())
     return PluginManager.createPlugin(DFHCopy);
