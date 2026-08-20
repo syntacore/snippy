@@ -35,7 +35,7 @@ template <typename T> class GenResultT final : public GenResult {
 public:
   template <typename... Types>
   GenResultT(Types &&...Args)
-      : GenResult(getID()), Value{std::forward<Types>(Args)...} {};
+      : GenResult(getID()), Value{std::forward<Types>(Args)...} {}
   T Value;
 
 private:

@@ -53,6 +53,7 @@ auto accessMaskToStr(AccessMaskBit Mask) {
 
   switch (Mask) {
     LLVM_SNIPPY_ACCESS_MASKS_BASIC
+    LLVM_SNIPPY_ACCESS_MASK_DESC(None, 0b0000)
 #undef LLVM_SNIPPY_ACCESS_MASK_DESC
   }
 
