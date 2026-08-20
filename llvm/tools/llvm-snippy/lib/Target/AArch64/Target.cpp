@@ -478,9 +478,9 @@ public:
   void storeRegToAddrInReg(InstructionGenerationContext &IGC,
                            MCRegister AddrReg, MCRegister Reg,
                            unsigned BytesToWrite = 0) const {
-    assert(AArch64::GPR64RegClass.contains(AddrReg) ||
-           AArch64::GPR64spRegClass.contains(AddrReg) &&
-               "Expected address register be GPR64 or GPR64sp");
+    assert((AArch64::GPR64RegClass.contains(AddrReg) ||
+            AArch64::GPR64spRegClass.contains(AddrReg)) &&
+           "Expected address register be GPR64 or GPR64sp");
 
     auto &MBB = IGC.MBB;
     auto &Ins = IGC.Ins;

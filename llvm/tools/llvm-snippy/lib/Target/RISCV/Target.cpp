@@ -347,9 +347,9 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVPrimaryConfig &Cfg,
                             unsigned VLEN, const RISCVSubtarget *ST) {
   if (!isRVV(Opcode))
     return false;
-  auto SEW = static_cast<unsigned>(Cfg.SEW);
-  auto LMUL = Cfg.LMUL;
-  auto VL = Cfg.VL;
+
+  auto [SEWVal, LMUL, VL] = Cfg;
+  auto SEW = static_cast<unsigned>(SEWVal);
   auto ELEN = ST->getELen();
 
   if (!Cfg.isLegal(ELEN, VLEN)) {
@@ -2699,9 +2699,8 @@ public:
     assert(DestBB);
     auto Opcode = Branch.getOpcode();
     bool EqBranch = isEqBranch(Opcode);
-    assert(!EqBranch ||
-           ReservedRegs.size() == MaxNumOfReservedRegsForLoop &&
-               "Equal branches expected to have two reserved registers");
+    assert((!EqBranch || ReservedRegs.size() == MaxNumOfReservedRegsForLoop) &&
+           "Equal branches expected to have two reserved registers");
 
     auto FirstReg =
         EqBranch ? ReservedRegs[LimitRegIdx] : ReservedRegs[CounterRegIdx];
@@ -2862,9 +2861,9 @@ public:
                                        ArrayRef<Register> ReservedRegs,
                                        unsigned NIter) const override {
     assert(Branch.isBranch() && "Branch expected");
-    assert((ReservedRegs.size() != MaxNumOfReservedRegsForLoop) ||
-           (ReservedRegs[CounterRegIdx] != ReservedRegs[LimitRegIdx]) &&
-               "Counter and Limit registers expected to be different");
+    assert((ReservedRegs.size() != MaxNumOfReservedRegsForLoop ||
+            ReservedRegs[CounterRegIdx] != ReservedRegs[LimitRegIdx]) &&
+           "Counter and Limit registers expected to be different");
 
     auto CounterReg = ReservedRegs[CounterRegIdx];
     auto MaxCounterVal = getMaxGenValueForRegs(IGC, Branches, ReservedRegs);
@@ -2942,9 +2941,9 @@ public:
       RegToValueType &ExitingValues,
       const LoopCounterInitResult &CounterInitInfo) const override {
     assert(Branch.isBranch() && "Branch expected");
-    assert(ReservedRegs.size() != MaxNumOfReservedRegsForLoop ||
-           ReservedRegs[CounterRegIdx] != ReservedRegs[LimitRegIdx] &&
-               "Counter and limit registers expected to be different");
+    assert((ReservedRegs.size() != MaxNumOfReservedRegsForLoop ||
+            ReservedRegs[CounterRegIdx] != ReservedRegs[LimitRegIdx]) &&
+           "Counter and limit registers expected to be different");
     assert(NIter);
 
     auto Pos = IGC.Ins;
@@ -4045,7 +4044,7 @@ public:
                              const Function &Target, MDNode *MM,
                              std::optional<unsigned> OptOpcode,
                              MCRegister RA) const override {
-    auto Opcode = OptOpcode ? *OptOpcode : RISCV::JALR;
+    auto Opcode = OptOpcode.value_or(RISCV::JALR);
     assert(isCall(Opcode) && "Expected call here");
     switch (Opcode) {
     case RISCV::JAL:

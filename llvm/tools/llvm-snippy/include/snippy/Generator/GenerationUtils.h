@@ -87,7 +87,6 @@ void markMemAccessAsUsed(InstructionGenerationContext &IGC,
 
 void addMemAccessToDump(const MemAddresses &ChosenAddresses, MemAccessInfo &MAI,
                         size_t AccessSize);
-void dumpMemAccessesIfNeeded(const MemAccessInfo &MAI);
 
 void initializeBaseRegs(
     InstructionGenerationContext &InstrGenCtx,
@@ -98,11 +97,6 @@ std::pair<std::map<unsigned, APInt>, std::vector<AddressInfo>>
 mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
                  ArrayRef<unsigned> OpcodeIdxToBaseReg,
                  ArrayRef<unsigned> Opcodes);
-
-MachineBasicBlock::iterator processGeneratedInstructions(
-    MachineBasicBlock::iterator ItBegin,
-    planning::InstructionGenerationContext &InstrGenCtx,
-    const planning::RequestLimit &Limit);
 
 MachineBasicBlock *createMachineBasicBlock(MachineFunction &MF);
 
