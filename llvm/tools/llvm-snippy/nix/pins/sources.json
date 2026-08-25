@@ -7,6 +7,19 @@
       "url": "https://releases.nixos.org/nixpkgs/nixpkgs-26.11pre1052792.044bfe75bfe4/nixexprs.tar.xz",
       "hash": "sha256-Cwffw7dPM56d8spt4/queFQ1cKg69D9qrsp+wfwKvfo="
     },
+    "riscv-isa-sim": {
+      "type": "Git",
+      "repository": {
+        "type": "GitHub",
+        "owner": "LLVM-Snippy",
+        "repo": "riscv-isa-sim"
+      },
+      "branch": "main",
+      "submodules": false,
+      "revision": "2c86ee04c6f90af5cc5e6cce0161ab2d6e72f982",
+      "url": "https://github.com/LLVM-Snippy/riscv-isa-sim/archive/2c86ee04c6f90af5cc5e6cce0161ab2d6e72f982.tar.gz",
+      "hash": "sha256-D3TUVBiLC8d6oFEBLkn0Ym/AQMyQsLvq29loVpx9u0Y="
+    },
     "rvmi": {
       "type": "Git",
       "repository": {
