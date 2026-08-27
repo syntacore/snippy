@@ -1,4 +1,5 @@
-# RUN: not llvm-snippy %s --model-plugin None |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s |& FileCheck %s
 
 include:
   - ../Inputs/sections.yaml
@@ -17,4 +18,4 @@ fpu-config:
 histogram:
   - [FMUL_S, 1.0]
 
-# CHECK: float-nan-propagation-error-ranges-too-large.yaml:12:5: error: '0xffffffffffffffff' is too wide to fit in 32 bits
+# CHECK: float-nan-propagation-error-ranges-too-large.yaml:{{[0-9]+}}:{{[0-9]+}}: error: '0xffffffffffffffff' is too wide to fit in 32 bits

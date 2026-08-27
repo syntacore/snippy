@@ -1,5 +1,6 @@
-# RUN: not llvm-snippy %s -mtriple=riscv64 -model-plugin None |& FileCheck %s
-# RUN: not llvm-snippy %s -mtriple=riscv32 -model-plugin None |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s -mtriple=riscv64 |& FileCheck %s
+# RUN: not llvm-snippy %s -mtriple=riscv32 |& FileCheck %s
 
 # CHECK: error: Failed to get GP for jump table creation: ROM section is not configured
 

@@ -1,7 +1,8 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks that when calls can't be generated, they are removed
 #      from the histogram.
 
-# RUN: llvm-snippy %s -model-plugin None \
+# RUN: llvm-snippy %s \
 # RUN: |& FileCheck %s
 
 options:

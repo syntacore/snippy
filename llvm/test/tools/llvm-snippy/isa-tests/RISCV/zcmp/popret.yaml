@@ -1,6 +1,7 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks that popret instructions are generated.
-# RUN: llvm-snippy %s -mtriple=riscv64 -model-plugin None |& FileCheck %s
-# RUN: llvm-snippy %s -mtriple=riscv32 -model-plugin None |& FileCheck %s
+# RUN: llvm-snippy %s -mtriple=riscv64 |& FileCheck %s
+# RUN: llvm-snippy %s -mtriple=riscv32 |& FileCheck %s
 
 options:
   num-instrs: 1000

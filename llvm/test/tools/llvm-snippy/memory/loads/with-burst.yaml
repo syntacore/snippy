@@ -1,4 +1,5 @@
-# RUN: llvm-snippy %s -model-plugin=None -mtriple=riscv64 -mattr=-c \
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-c \
 # RUN:   -num-instrs=100 \
 # RUN:   -init-memory=loads -init-regs-in-elf
 

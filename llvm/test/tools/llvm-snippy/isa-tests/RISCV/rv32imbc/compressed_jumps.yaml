@@ -1,4 +1,5 @@
-# RUN: llvm-snippy --model-plugin=None %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s
 
 sections:
   - name:      text

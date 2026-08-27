@@ -1,6 +1,7 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: the test checks for bias-based RVV mode switches
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  -model-plugin=None -dump-mf --num-instrs=10000 -o %t \
+# RUN:  -dump-mf --num-instrs=10000 -o %t \
 # RUN:  -verify-gen-histogram  -histogram-must-succeed=true \
 # RUN:  |& FileCheck %s
 

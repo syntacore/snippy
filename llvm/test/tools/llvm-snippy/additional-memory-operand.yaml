@@ -1,3 +1,4 @@
+# REQUIRES: riscv-snippy-model-None
 #  This test checks that llvm-snippy will not corrupt reserved registers
 #  during postprocessMemoryOperands() of additional memory operands.
 #
@@ -11,7 +12,7 @@
 #
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:  -honor-target-abi \
-# RUN:  -model-plugin=None --num-instrs=3000 -o %t
+# RUN:  --num-instrs=3000 -o %t
 
 include:
 - codegen/Inputs/rvv-lmul1-sew32-vlany.yaml

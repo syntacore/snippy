@@ -1,7 +1,8 @@
-# RUN: not llvm-snippy %s -model-plugin=None %S/Inputs/invalid-weight-missing-close-bracket.yaml \
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s %S/Inputs/invalid-weight-missing-close-bracket.yaml \
 # RUN: |& FileCheck %s --check-prefix=MISSING_BRACKET
 
-# RUN: not llvm-snippy %s -model-plugin=None %S/Inputs/invalid-weight-for-opcode.yaml \
+# RUN: not llvm-snippy %s %S/Inputs/invalid-weight-for-opcode.yaml \
 # RUN: |& FileCheck %s --check-prefix=INVALID_DOUBLE
 
 options:

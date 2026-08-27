@@ -1,4 +1,5 @@
-# RUN: not llvm-snippy %s -mtriple=riscv64 -model-plugin None \
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s -mtriple=riscv64 \
 # RUN: |& FileCheck %s
 
 # CHECK: error: SMC mode currently isn't supported for histogram with vector instructions
