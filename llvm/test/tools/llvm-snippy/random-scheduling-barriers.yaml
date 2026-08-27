@@ -1,6 +1,7 @@
-# REQUIRES: asserts 
+# REQUIRES: asserts
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -model-plugin=None \
+# RUN:    -mtriple=riscv64 \
 # RUN:     -num-instrs=10000 -init-regs-in-elf -debug-only=snippy-riscv \
 # RUN:     -initial-regs=%S/initialization/Inputs/initial_state_rv64i.yaml \
 # RUN:     -random-scheduling \

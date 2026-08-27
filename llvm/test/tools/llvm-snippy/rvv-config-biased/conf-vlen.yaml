@@ -1,11 +1,10 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv64 -march=rv64gcv \
-# RUN:  --model-plugin None \
 # RUN:  --num-instrs=10 -o %t \
 # RUN:  -riscv-dump-rvv-config \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-DEFAULT
 
 # RUN: llvm-snippy %s -mtriple=riscv64 -march=rv64gcv_zvl512b \
-# RUN:  --model-plugin None \
 # RUN:  --num-instrs=10 -o %t \
 # RUN:  -riscv-dump-rvv-config \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-VLEN512

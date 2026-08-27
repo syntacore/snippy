@@ -1,6 +1,7 @@
-# RUN: llvm-snippy %s -march rv64if -model-plugin None -o %t
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s -march rv64if -o %t
 # RUN: llvm-objdump %t.elf -d |& FileCheck %s -dump-input fail
-# RUN: llvm-snippy %s -march rv64id -model-plugin None -o %t
+# RUN: llvm-snippy %s -march rv64id -o %t
 # RUN: llvm-objdump %t.elf -d |& FileCheck %s -dump-input fail
 include:
   - ../Inputs/sections.yaml

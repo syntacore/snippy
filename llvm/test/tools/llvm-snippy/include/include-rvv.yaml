@@ -1,7 +1,7 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: this is the test for checking the possibility to include rvv-config
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:  --num-instrs=10 -riscv-dump-rvv-config -o %t \
-# RUN:  -model-plugin=None \
 # RUN:  |& FileCheck %s
 
 include:

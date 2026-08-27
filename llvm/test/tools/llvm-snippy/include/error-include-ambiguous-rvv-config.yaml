@@ -1,7 +1,8 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: this is the test for catching error,
 # COM: when specifying rvv configuration through option and include
 # RUN: not llvm-snippy %s %S/Inputs/rvv-unit-all.yaml -mtriple=riscv64 -mattr=+v \
-# RUN:  -model-plugin=None --num-instrs=10 -o %t \
+# RUN:  --num-instrs=10 -o %t \
 # RUN:  |& FileCheck %s
 
 include:

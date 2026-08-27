@@ -1,10 +1,11 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+d \
 # RUN: -num-instrs=10 -init-regs-in-elf -riscv-init-fregs-from-memory \
-# RUN: -model-plugin=None --dump-mf |& FileCheck %s --check-prefix DINIT
+# RUN: --dump-mf |& FileCheck %s --check-prefix DINIT
 
 # RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+f \
 # RUN: -num-instrs=10 -init-regs-in-elf -riscv-init-fregs-from-memory \
-# RUN: -model-plugin=None --dump-mf |& FileCheck %s --check-prefix FINIT
+# RUN: --dump-mf |& FileCheck %s --check-prefix FINIT
 sections:
     - name:      0
       VMA:       0x70000000

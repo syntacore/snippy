@@ -1,5 +1,6 @@
 # No filecheck, only checking histogram
-# RUN: llvm-snippy %s -model-plugin None
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s
 
 options:
   mtriple: riscv64

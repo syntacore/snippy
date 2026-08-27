@@ -1,4 +1,5 @@
-# RUN: llvm-snippy %s -model-plugin=None |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s |& FileCheck %s
 
 # COM: Reserving all registers but x0 and x2 (sp). Option honor-target-abi
 # COM: makes it so x2 can't be used for address creation, so all memory

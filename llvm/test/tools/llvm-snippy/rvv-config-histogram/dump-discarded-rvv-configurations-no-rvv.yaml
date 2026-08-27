@@ -1,7 +1,8 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks that option -riscv-dump-discarded-rvv-configurations 
 #      returns None if RVV is not specified.
 
-# RUN: llvm-snippy %s -model-plugin None \ 
+# RUN: llvm-snippy %s \ 
 # RUN: |& FileCheck %s 
 
 options:

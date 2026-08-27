@@ -1,4 +1,5 @@
-# RUN: llvm-snippy %s --model-plugin None -o %t -verify-mi
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s -o %t -verify-mi
 # RUN: readelf -S %t.elf | FileCheck %s
 
 options:

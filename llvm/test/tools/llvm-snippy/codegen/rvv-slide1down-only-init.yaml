@@ -1,6 +1,7 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks that r-section is not required with --rvv-init-mode=slides
 
-# RUN: llvm-snippy %s --model-plugin None | FileCheck %s
+# RUN: llvm-snippy %s | FileCheck %s
 
 include:
 - Inputs/rvv-unit-all.yaml

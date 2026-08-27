@@ -1,6 +1,7 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: this test checks that option --rvv-init-mode=splats does not require r section
 
-# RUN: llvm-snippy %s --model-plugin None | FileCheck %s
+# RUN: llvm-snippy %s | FileCheck %s
 
 options:
   mtriple: riscv64

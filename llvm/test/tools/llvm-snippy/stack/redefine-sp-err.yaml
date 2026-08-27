@@ -1,11 +1,12 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+m \
-# RUN: -redefine-sp=reg::X0 --model-plugin=None -num-instrs=10 \
+# RUN: -redefine-sp=reg::X0 -num-instrs=10 \
 # RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=X0-CHECK
 # RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+m \
-# RUN: -redefine-sp=reg::X32 --model-plugin=None -num-instrs=10 \
+# RUN: -redefine-sp=reg::X32 -num-instrs=10 \
 # RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=ILL-CHECK
 # RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+m \
-# RUN: -redefine-sp=any-no-SP --model-plugin=None -num-instrs=10 \
+# RUN: -redefine-sp=any-no-SP -num-instrs=10 \
 # RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=NO-OPT-CHECK
 sections:
     - name:      1

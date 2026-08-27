@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: not llvm-snippy %s -mtriple=riscv64 \
-# RUN:   -enable-address-value-hazards -model-plugin=None -num-instrs=10 \
+# RUN:   -enable-address-value-hazards -num-instrs=10 \
 # RUN: |& FileCheck %s --dump-input fail
 
 sections:

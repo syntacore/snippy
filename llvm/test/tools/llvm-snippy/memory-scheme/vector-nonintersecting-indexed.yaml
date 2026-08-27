@@ -1,6 +1,7 @@
 # REQUIRES: asserts
 # REQUIRES: riscv-rvv
-# RUN: llvm-snippy %s -debug-only=snippy-riscv -model-plugin None |& grep -oP "IndexValue.*: \K.*" | sort | uniq | wc -l | FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s -debug-only=snippy-riscv |& grep -oP "IndexValue.*: \K.*" | sort | uniq | wc -l | FileCheck %s
 # COM: Check that 8 unique indices are generated
 # CHECK: 8
 options:

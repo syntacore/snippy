@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+v,+zvbc \
-# RUN:  -o %t --num-instrs=1000 -model-plugin=None \
+# RUN:  -o %t --num-instrs=1000 \
 # RUN:  --init-regs-in-elf --verify-mi |& FileCheck %s
 
 include:

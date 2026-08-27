@@ -1,8 +1,9 @@
-# RUN: llvm-snippy %s -model-plugin=None -o %t --object-type=reloc
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s -o %t --object-type=reloc
 # RUN: llvm-readelf -hl %t.elf | FileCheck %s --check-prefix=RELOC
-# RUN: llvm-snippy %s -model-plugin=None -o %t --object-type=exec
+# RUN: llvm-snippy %s -o %t --object-type=exec
 # RUN: llvm-readelf -hl %t.elf | FileCheck %s --check-prefix=EXEC
-# RUN: llvm-snippy %s -model-plugin=None -o %t --object-type=shared
+# RUN: llvm-snippy %s -o %t --object-type=shared
 # RUN: llvm-readelf -hl %t.elf | FileCheck %s --check-prefix=SHARED
 
 options:

@@ -1,5 +1,6 @@
-# RUN: llvm-snippy %s -model-plugin=None
-# RUN: not llvm-snippy %s -model-plugin=None --object-type=shared |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s
+# RUN: not llvm-snippy %s --object-type=shared |& FileCheck %s
 
 options:
   mtriple: "riscv64"

@@ -1,4 +1,5 @@
-# RUN: llvm-snippy %s --model-plugin None |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s |& FileCheck %s
 
 include:
   - ../Inputs/sections.yaml
