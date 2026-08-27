@@ -1,10 +1,12 @@
-# RUN: llvm-snippy %s -model-plugin=None \
+# REQUIRES: riscv-snippy-model-None
+
+# RUN: llvm-snippy %s \
 # RUN: -define-main-histogram=hist1 | FileCheck %s --check-prefix=HIST1
 
-# RUN: llvm-snippy %s -model-plugin=None \
+# RUN: llvm-snippy %s \
 # RUN: -define-main-histogram=hist2 | FileCheck %s --check-prefix=HIST2
 
-# RUN: llvm-snippy %s -model-plugin=None \
+# RUN: llvm-snippy %s \
 # RUN: -define-main-histogram=hist3 | FileCheck %s --check-prefix=HIST3
 
 options:

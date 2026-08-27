@@ -1,5 +1,5 @@
-# RUN: not llvm-snippy %s --model-plugin None |& \
-# RUN: FileCheck %s --ignore-case
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s |& FileCheck %s --ignore-case
 
 options:
   mtriple: riscv64

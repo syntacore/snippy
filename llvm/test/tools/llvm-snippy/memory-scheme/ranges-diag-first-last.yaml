@@ -1,6 +1,5 @@
-# RUN: not llvm-snippy %s %S/Inputs/loadstore-layout.yaml \
-# RUN:   -model-plugin=None \
-# RUN: |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s %S/Inputs/loadstore-layout.yaml |& FileCheck %s
 
 options:
   mtriple: riscv64

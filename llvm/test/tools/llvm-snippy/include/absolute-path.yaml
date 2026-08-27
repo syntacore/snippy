@@ -1,6 +1,7 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: sed -e "s|ROOT|%/S|" %/s > %t
 # RUN: llvm-snippy %t -mtriple=riscv64 \
-# RUN:   -model-plugin=None --dump-mf --num-instrs=150 |& FileCheck %s
+# RUN:   --dump-mf --num-instrs=150 |& FileCheck %s
 
 include:
   - ROOT/Inputs/full.yaml

@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv64 \
-# RUN:   -num-instrs=1 -init-memory=full -model-plugin=None \
+# RUN:   -num-instrs=1 -init-memory=full \
 # RUN:   -memory-seed=11 -o %t
 
 # RUN: llvm-readelf --hex-dump=.snippy.1.rw %t.elf \

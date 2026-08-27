@@ -1,5 +1,5 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s --riscv-preference-for-rvv-mode-change=vsetvli --dump-mf \
-# RUN:    -model-plugin=None \
 # RUN: |& FileCheck %s
 
 options:

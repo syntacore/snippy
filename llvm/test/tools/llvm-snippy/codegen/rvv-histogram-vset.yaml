@@ -1,7 +1,8 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:  -o %t --num-instrs=1000 \
 # RUN:  --init-regs-in-elf --verify-mi \
-# RUN:  -model-plugin=None --entry-point=start \
+# RUN:  --entry-point=start \
 # RUN:  -verify-gen-histogram  -histogram-must-succeed=true \
 # RUN:  -rvv-init-mode=loads \
 # RUN:  -histogram-must-succeed=false \

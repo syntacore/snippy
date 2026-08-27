@@ -1,8 +1,9 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks that option randomize-ra can be specified in cg-layout.
 
 # RUN: split-file %s %t
 # RUN: llvm-snippy %t/layout.yaml %t/cg-layout.yaml \
-# RUN:   %S/Inputs/sections-with-stack.yaml -model-plugin None &> %t.mf
+# RUN:   %S/Inputs/sections-with-stack.yaml &> %t.mf
 
 # COM: Here we check that if option -randomize-ra==true, then there are at
 #      least three different return addresses

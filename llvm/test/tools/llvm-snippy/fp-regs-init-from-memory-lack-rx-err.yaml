@@ -1,6 +1,7 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: not llvm-snippy %s -mtriple=riscv32 -mattr=+d,+f \
 # RUN: -num-instrs=10 -init-regs-in-elf -riscv-init-fregs-from-memory \
-# RUN: -model-plugin=None --dump-mf |& FileCheck %s 
+# RUN: --dump-mf |& FileCheck %s 
 
 sections:
     - name:      1

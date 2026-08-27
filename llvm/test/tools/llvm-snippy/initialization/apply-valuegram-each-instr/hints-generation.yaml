@@ -1,9 +1,9 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks the correctness of the hint insertion generation behavior 
 # COM: with the valuegram policy. Hints can only be inserted between sets of instructions 
 # COM: (target and support, for generating values ​​in registers).
 
 # RUN: llvm-snippy %s \
-# RUN:    -model-plugin=None \
 # RUN:    -generate-insertion-point-hints \
 # RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
 # RUN: |& FileCheck %s

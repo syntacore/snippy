@@ -1,10 +1,12 @@
-# RUN: llvm-snippy %s -model-plugin=None -verify-mi \
+# REQUIRES: riscv-snippy-model-None
+
+# RUN: llvm-snippy %s -verify-mi \
 # RUN: --define-main-histogram=LoadNTL | FileCheck %s --check-prefix=LOAD_NTL
 
-# RUN: llvm-snippy %s -model-plugin=None -verify-mi \
+# RUN: llvm-snippy %s -verify-mi \
 # RUN: --define-main-histogram=StoreNTL | FileCheck %s --check-prefix=STORE_NTL
 
-# RUN: llvm-snippy %s -model-plugin=None -verify-mi \
+# RUN: llvm-snippy %s -verify-mi \
 # RUN: --define-main-histogram=LoadStoreNTL | FileCheck %s --check-prefix=LOAD_STORE_NTL
 
 options:

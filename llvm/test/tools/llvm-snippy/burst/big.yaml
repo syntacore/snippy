@@ -1,1 +1,2 @@
-# RUN: timeout 30 llvm-snippy %S/Inputs/burst-big-layout.yaml %s -model-plugin=None
+# REQUIRES: riscv-snippy-model-None
+# RUN: timeout 30 llvm-snippy %S/Inputs/burst-big-layout.yaml %s

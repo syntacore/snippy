@@ -1,9 +1,10 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks that option -randomize-ra is working correctly.
 
 # COM: Here we check that if option -randomize-ra==true, then there are at
 #      least three different return addresses
 
-# RUN: llvm-snippy %s -randomize-ra=true -model-plugin None &> %t.rand.mf
+# RUN: llvm-snippy %s -randomize-ra=true &> %t.rand.mf
 # RUN: FileCheck %s --input-file %t.rand.mf
 # RUN: grep -E 'x[0-9]+ = PseudoJALCall' %t.rand.mf \
 # COM: Leave only names of the registers of the return address
@@ -18,7 +19,7 @@
 # COM: Here we check that if option -randomize-ra==false, there is only one
 #      unique return address
 
-# RUN: llvm-snippy %s -randomize-ra=false -model-plugin None &> %t.not-rand.mf
+# RUN: llvm-snippy %s -randomize-ra=false &> %t.not-rand.mf
 # RUN: grep -E 'x[0-9]+ = PseudoJALCall' %t.not-rand.mf \
 # COM: Leave only names of the registers of the return address
 # RUN: | sed -E 's/.*(x[0-9]+).*/\1/' \
@@ -31,7 +32,7 @@
 
 # COM: Here we check that -randomize-ra default is false.
 
-# RUN: llvm-snippy %s -randomize-ra=false -model-plugin None &> %t.default.mf
+# RUN: llvm-snippy %s -randomize-ra=false &> %t.default.mf
 # RUN: grep -E 'x[0-9]+ = PseudoJALCall' %t.default.mf \
 # RUN: | sed -E 's/.*(x[0-9]+).*/\1/' \
 # RUN: | awk '!seen[$0]++' \

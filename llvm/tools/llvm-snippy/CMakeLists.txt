@@ -74,6 +74,7 @@ set(LLVM_LINK_COMPONENTS
   )
 
 set(LLVMSnippyDeps intrinsics_gen)
+list(APPEND LLVMSnippyDeps llvm-snippy-plugins)
 add_llvm_tool(llvm-snippy
   DISABLE_LLVM_LINK_LLVM_DYLIB
   llvm-snippy.cpp
@@ -106,6 +107,8 @@ target_link_libraries(llvm-snippy PRIVATE
   LLVMSnippyOptionCategory
   )
 
+include(cmake/SnippyPlugins.cmake)
+add_dependencies(llvm-snippy llvm-snippy-plugins)
 
 set(LLVM_SNIPPY_TARGETS_LIST ${LLVM_SNIPPY_TARGETS})
 separate_arguments(LLVM_SNIPPY_TARGETS_LIST)

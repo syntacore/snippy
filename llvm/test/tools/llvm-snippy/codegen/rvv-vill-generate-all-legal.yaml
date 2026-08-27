@@ -1,15 +1,16 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test verifies that after installing
 # COM: the illegal rvv configuration in vtype,
 # COM: only legal instructions are generated (from RISCV-V spec 1.0 :
 # COM: vset{i}vl{i} and whole-register loads, stores, and moves). 
 
 # RUN: llvm-snippy %S/Inputs/rvv-vill-generate-all-legal.yaml \
-# RUN:  -model-plugin=None -mtriple=riscv64 -mattr=+v \
+# RUN:  -mtriple=riscv64 -mattr=+v \
 # RUN:  -dump-mf --num-instrs=1000 -o %t \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-ILLEGAL
 
 # RUN: llvm-snippy %S/Inputs/rvv-vill-generate-all-legal.yaml \
-# RUN:  -model-plugin=None -mtriple=riscv64 -mattr=+v \
+# RUN:  -mtriple=riscv64 -mattr=+v \
 # RUN:  -dump-mf --num-instrs=10000 -o %t \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-LEGAL
 

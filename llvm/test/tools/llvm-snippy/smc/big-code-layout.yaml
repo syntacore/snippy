@@ -1,4 +1,5 @@
-# RUN: llvm-snippy %s -model-plugin None \
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s \
 # RUN: |& FileCheck %s
 
 # CHECK: $[[TMP1:[a-z0-9]+]] = AUIPC target-flags(riscv-pcrel-hi) @__snippy_smc_memcpy, pre-instr-symbol <mcsymbol .[[TMP_SYM1:[a-zA-Z0-9_]+]]>

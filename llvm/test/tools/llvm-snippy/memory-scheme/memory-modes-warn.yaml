@@ -1,10 +1,11 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %S/Inputs/default-layout-2.yaml %s -mtriple=riscv64 \
 # RUN: -num-instrs=100 \
-# RUN: -model-plugin None -riscv-disable-misaligned-access \
+# RUN: -riscv-disable-misaligned-access \
 # RUN: |& FileCheck %s --dump-input fail
 # RUN: not llvm-snippy %S/Inputs/default-layout-2.yaml %s -mtriple=riscv64 \
 # RUN: -num-instrs=100 \
-# RUN: -model-plugin None -strict-memory-schemes -riscv-disable-misaligned-access \
+# RUN: -strict-memory-schemes -riscv-disable-misaligned-access \
 # RUN: |& FileCheck %s --dump-input fail --check-prefix=ERROR
 
 access-evictions:

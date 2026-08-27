@@ -1,4 +1,5 @@
-# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s |& FileCheck %s
 
 sections:
     - name:      1

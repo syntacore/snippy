@@ -1,8 +1,9 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks that option randomize-ra can be specified for specific
 #      functions in call-graph.
 
 # RUN: llvm-snippy %S/calls-randomize-ra.yaml %s -redefine-ra=reg::X7 \
-# RUN:   -model-plugin None &> %t.mf
+# RUN:   &> %t.mf
 
 
 # COM: Here we check that there are exactly two different return addresses (for

@@ -1,6 +1,7 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: not llvm-snippy %s -mtriple=riscv64  \
 # RUN: --init-regs-in-elf \
-# RUN:    -num-instrs=20 -model-plugin=None \
+# RUN:    -num-instrs=20 \
 # RUN:    |& FileCheck %s
 
 sections:

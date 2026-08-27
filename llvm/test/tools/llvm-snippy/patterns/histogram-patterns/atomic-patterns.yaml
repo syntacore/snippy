@@ -1,4 +1,5 @@
-# RUN: llvm-snippy %s -model-plugin=None -verify-mi |& FileCheck %s \
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s -verify-mi |& FileCheck %s \
 # RUN: --check-prefixes=ATOMIC_RELAXED,ATOMIC_REL,ATOMIC_AQ,CHECK
 
 options:

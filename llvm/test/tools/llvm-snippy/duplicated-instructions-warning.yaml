@@ -1,6 +1,7 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks that an error occurs if the options are incompatible
 
-# RUN: llvm-snippy %s --model-plugin=None -mtriple=riscv64 \
+# RUN: llvm-snippy %s -mtriple=riscv64 \
 # RUN: |& FileCheck %s
 
 include:

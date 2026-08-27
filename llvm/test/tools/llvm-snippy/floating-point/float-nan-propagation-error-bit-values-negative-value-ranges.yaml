@@ -1,4 +1,5 @@
-# RUN: not llvm-snippy %s --model-plugin None |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s |& FileCheck %s
 
 include:
   - ../Inputs/sections.yaml
@@ -17,4 +18,4 @@ fpu-config:
 histogram:
   - [FADD_D, 1.0]
 
-# CHECK: float-nan-propagation-error-bit-values-negative-value-ranges.yaml:14:11: error: Value can't be negative
+# CHECK: float-nan-propagation-error-bit-values-negative-value-ranges.yaml:{{[0-9]+}}:{{[0-9]+}}: error: Value can't be negative

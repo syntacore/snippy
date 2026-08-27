@@ -1,8 +1,9 @@
+# REQUIRES: riscv-snippy-model-None
 #COM: test checks that register reservations for loops depend on the branch instruction
 #COM: in case C_BNEZ only one register is expected to be reserved
 
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+c -num-instrs=1 \ 
-# RUN:     -verify-mi -dump-mf --model-plugin=None -o %t |& \
+# RUN:     -verify-mi -dump-mf -o %t |& \
 # RUN: FileCheck %s
 
 sections:

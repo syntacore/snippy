@@ -1,25 +1,26 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: sed -e s/OPCODE/MUL/g %s > %t.MUL.yaml
-# RUN: llvm-snippy %t.MUL.yaml -model-plugin=None \
+# RUN: llvm-snippy %t.MUL.yaml \
 # RUN: |& FileCheck %t.MUL.yaml --check-prefix=MUL
 
 # RUN: sed -e s/OPCODE/DIV/g %s > %t.DIV.yaml
-# RUN: llvm-snippy %t.DIV.yaml -model-plugin=None \
+# RUN: llvm-snippy %t.DIV.yaml \
 # RUN: |& FileCheck %t.DIV.yaml --check-prefix=DIV
 
 # RUN: sed -e s/OPCODE/MULH/g %s > %t.MULH.yaml
-# RUN: llvm-snippy %t.MULH.yaml -model-plugin=None \
+# RUN: llvm-snippy %t.MULH.yaml \
 # RUN: |& FileCheck %t.MULH.yaml --check-prefix=MULH
 
 # RUN: sed -e s/OPCODE/MULH/g %s > %t.MULH.yaml
-# RUN: llvm-snippy %t.MULH.yaml -model-plugin=None \
+# RUN: llvm-snippy %t.MULH.yaml \
 # RUN: |& FileCheck %t.MULH.yaml --check-prefix=MULH
 
 # RUN: sed -e s/OPCODE/DIVW/g %s > %t.DIVW.yaml
-# RUN: llvm-snippy %t.DIVW.yaml -model-plugin=None \
+# RUN: llvm-snippy %t.DIVW.yaml \
 # RUN: |& FileCheck %t.DIVW.yaml --check-prefix=DIVW
 
 # RUN: sed -e s/OPCODE/REM/g %s > %t.REM.yaml
-# RUN: llvm-snippy %t.REM.yaml -model-plugin=None \
+# RUN: llvm-snippy %t.REM.yaml \
 # RUN: |& FileCheck %t.REM.yaml --check-prefix=REM
 
 options:

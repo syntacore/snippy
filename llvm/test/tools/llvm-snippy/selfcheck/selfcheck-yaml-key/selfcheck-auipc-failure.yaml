@@ -1,13 +1,14 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: sed -e s/MODE/code/ %s >%t.code.yaml
-# RUN: not llvm-snippy %t.code.yaml -model-plugin=None \
+# RUN: not llvm-snippy %t.code.yaml \
 # RUN: |& FileCheck --dump-input always %s
 
 # RUN: sed -e s/MODE/memory/ %s >%t.memory.yaml
-# RUN: not llvm-snippy %t.memory.yaml -model-plugin=None \
+# RUN: not llvm-snippy %t.memory.yaml \
 # RUN: |& FileCheck --dump-input always %s
 
 # RUN: sed -e s/MODE/checksum/ %s >%t.checksum.yaml
-# RUN: not llvm-snippy %t.checksum.yaml -model-plugin=None \
+# RUN: not llvm-snippy %t.checksum.yaml \
 # RUN: |& FileCheck --dump-input always %s
 
 sections:

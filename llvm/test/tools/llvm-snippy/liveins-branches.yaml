@@ -1,4 +1,5 @@
-# RUN: llvm-snippy %s -model-plugin None -verify-mi -dump-mir=- \
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s -verify-mi -dump-mir=- \
 # RUN: | FileCheck %s
 
 # COM: Check that we tracks the liveness and 'verify-mi' finishes without errors.

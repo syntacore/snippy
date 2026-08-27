@@ -1,9 +1,11 @@
+# REQUIRES: riscv-snippy-model-None
+
 # COM: Check that using riscv-disallow-intersecting-mem-accesses requests number of elements > 1.
 # COM: This is done by specifying a VL larger than the scheme can accommodate. Without the option
 # COM: the generated indices are duplicated.
 #
-# RUN: llvm-snippy %s -model-plugin None
-# RUN: not llvm-snippy %s -riscv-disallow-intersecting-mem-accesses="VLUXEI8_V" -model-plugin None |& FileCheck %s
+# RUN: llvm-snippy %s
+# RUN: not llvm-snippy %s -riscv-disallow-intersecting-mem-accesses="VLUXEI8_V" |& FileCheck %s
 #
 # CHECK: Memory schemes are to restrictive to generate access (size: 1, alignment: 1, stride: 1, number of elements: 4)
 options:

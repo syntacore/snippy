@@ -1,13 +1,14 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks that possible to generate SP-based instructions with
 #      -redefine-sp=<stack_pointer> when static stack is enabled.
 
-# RUN: llvm-snippy %s -redefine-sp=reg::X2 -model-plugin None \
+# RUN: llvm-snippy %s -redefine-sp=reg::X2 \
 # RUN: |& FileCheck %s
 #
-# RUN: llvm-snippy %s -redefine-sp=SP -model-plugin None \
+# RUN: llvm-snippy %s -redefine-sp=SP \
 # RUN: |& FileCheck %s
 
-# RUN: llvm-snippy %s -redefine-sp=any -model-plugin None \
+# RUN: llvm-snippy %s -redefine-sp=any \
 # RUN: |& FileCheck %s
 
 options:

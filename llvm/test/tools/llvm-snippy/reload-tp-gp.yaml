@@ -1,4 +1,5 @@
-# RUN: llvm-snippy %s --model-plugin None | \
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s | \
 # RUN: FileCheck %s --ignore-case
 
 options:

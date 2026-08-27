@@ -1,14 +1,15 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s %S/Inputs/burst-store.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
 # RUN: -num-instrs=200 |& FileCheck %s -check-prefix=STORE
 
 # RUN: llvm-snippy %s %S/Inputs/burst-store.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
-# RUN: -num-instrs=200 -model-plugin=None |& FileCheck %s -check-prefix=STORE-ERR
+# RUN: -num-instrs=200 |& FileCheck %s -check-prefix=STORE-ERR
 
 # RUN: llvm-snippy %s %S/Inputs/burst-load.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
 # RUN: -num-instrs=200 |& FileCheck %s -check-prefix=LOAD
 
 # RUN: llvm-snippy %s %S/Inputs/burst-load.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
-# RUN: -num-instrs=200 -model-plugin=None |& FileCheck %s -check-prefix=LOAD-ERR
+# RUN: -num-instrs=200 |& FileCheck %s -check-prefix=LOAD-ERR
 
 # RUN: llvm-snippy %s %S/Inputs/burst-mixed.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
 # RUN: -num-instrs=200 |& FileCheck %s -check-prefix=MIXED
@@ -20,7 +21,7 @@
 # pattern wasn't met because it cannot be emitted. It's not the most robust test
 # case. Please, improve it if you have better ideas.
 # RUN: llvm-snippy %s %S/Inputs/burst-load-store.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
-# RUN: -num-instrs=1000 -model-plugin=None |& FileCheck %s -check-prefix=LOADSTORE-ERR
+# RUN: -num-instrs=1000 |& FileCheck %s -check-prefix=LOADSTORE-ERR
 
 # RUN: llvm-snippy %s %S/Inputs/burst-mixed-huge.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
 # RUN: -num-instrs=500 |& FileCheck %s -check-prefix=MIXED-HUGEGROUP

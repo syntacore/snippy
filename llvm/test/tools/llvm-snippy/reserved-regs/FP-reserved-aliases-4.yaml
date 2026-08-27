@@ -1,9 +1,10 @@
+# REQUIRES: riscv-snippy-model-None
+
 # COM: This test checks that if registers Fx_H, Fy_F, Fz_D are reserved, 
 # COM: then Fx_H, Fx_F, Fx_D, Fy_H, Fy_F, Fy_D, Fz_H, Fz_F and Fz_D
 # COM: are not found in the machine function dump.
 
-# RUN: llvm-snippy %s -model-plugin=None \
-# RUN:  |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
 
 options:
   mtriple: riscv64

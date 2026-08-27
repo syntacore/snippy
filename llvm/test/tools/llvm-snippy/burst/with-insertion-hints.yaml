@@ -1,4 +1,5 @@
-# RUN: llvm-snippy --model-plugin None %s %S/Inputs/load-burst.yaml | FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s %S/Inputs/load-burst.yaml | FileCheck %s
 
 options:
   mtriple: riscv64

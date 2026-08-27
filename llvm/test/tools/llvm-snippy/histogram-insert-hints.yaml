@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv64 -generate-insertion-point-hints \
-# RUN: -dump-mi -num-instrs=1000 -last-instr= -model-plugin=None \
+# RUN: -dump-mi -num-instrs=1000 -last-instr= \
 # RUN: | FileCheck %s
 
 sections:

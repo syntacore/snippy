@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: not llvm-snippy %s -mtriple=riscv64 \
-# RUN:   -model-plugin=None --dump-mf --num-instrs=150 |& FileCheck %s
+# RUN:   --dump-mf --num-instrs=150 |& FileCheck %s
 
 include:
   - Inputs/only-histogram.yaml

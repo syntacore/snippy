@@ -1,3 +1,5 @@
+# REQUIRES: riscv-snippy-model-None
+
 # COM: This test verifies that:
 # COM:    1. Field "weight" is optional and defaults equal 1
 # COM:    2. FinalWeight == IndividualWeight * GroupWeight
@@ -5,7 +7,7 @@
 # COM:    4. Zero weight is handled correctly
 
 # RUN: llvm-snippy %S/Inputs/default-layout.yaml %s -mtriple=riscv64 \
-# RUN:   -num-instrs=100 -dump-layout=true -model-plugin None \
+# RUN:   -num-instrs=100 -dump-layout=true \
 # RUN:   | FileCheck %s --dump-input always
 
 access-evictions:

@@ -1,8 +1,9 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -model-plugin=None -dump-mir=- \
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s -mtriple=riscv64 -dump-mir=- \
 # RUN:   |& FileCheck %s
 
 # RUN: llvm-snippy <(echo -e "options:\n  dump-mir: '-'") %s \
-# RUN:   -mtriple=riscv64 -model-plugin=None \
+# RUN:   -mtriple=riscv64 \
 # RUN:   |& FileCheck %s
 
 sections:
