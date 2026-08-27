@@ -1,4 +1,5 @@
-# RUN: llvm-snippy %s -seed=1 -model-plugin=None |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s -seed=1 |& FileCheck %s
 
 options:
     mtriple: riscv64

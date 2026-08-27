@@ -1,7 +1,9 @@
+# REQUIRES: riscv-snippy-model-None
+
 # COM: This test checks that the number of non-burst loads and burst stores
 #      are present at the beginning and end of function in enough count.
 
-# RUN: llvm-snippy %s -model-plugin=None &> %t.mf
+# RUN: llvm-snippy %s &> %t.mf
 
 # COM: We divide %t.mf into two equal parts %t.mf.part_0 and %t.mf.part_1 to
 #      make sure that each of them contains enough instructions.

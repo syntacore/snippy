@@ -1,27 +1,28 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks that an error occurs if the options are incompatible
 
 # RUN: sed -e s/INCORRECT_WEIGHT_VALUE/-1.0/ %s > %t.1.yaml
-# RUN: not llvm-snippy %t.1.yaml --model-plugin=None -mtriple=riscv64 \
+# RUN: not llvm-snippy %t.1.yaml -mtriple=riscv64 \
 # RUN: |& FileCheck %t.1.yaml
 
 # RUN: sed -e s/INCORRECT_WEIGHT_VALUE/-7.215/ %s > %t.2.yaml
-# RUN: not llvm-snippy %t.2.yaml --model-plugin=None -mtriple=riscv64 \
+# RUN: not llvm-snippy %t.2.yaml -mtriple=riscv64 \
 # RUN: |& FileCheck %t.2.yaml
 
 # RUN: sed -e s/INCORRECT_WEIGHT_VALUE/NaN/ %s > %t.3.yaml
-# RUN: not llvm-snippy %t.3.yaml --model-plugin=None -mtriple=riscv64 \
+# RUN: not llvm-snippy %t.3.yaml -mtriple=riscv64 \
 # RUN: |& FileCheck %t.3.yaml
 
 # RUN: sed -e s/INCORRECT_WEIGHT_VALUE/-NaN/ %s > %t.4.yaml
-# RUN: not llvm-snippy %t.4.yaml --model-plugin=None -mtriple=riscv64 \
+# RUN: not llvm-snippy %t.4.yaml -mtriple=riscv64 \
 # RUN: |& FileCheck %t.4.yaml
 
 # RUN: sed -e s/INCORRECT_WEIGHT_VALUE/inf/ %s > %t.5.yaml
-# RUN: not llvm-snippy %t.5.yaml --model-plugin=None -mtriple=riscv64 \
+# RUN: not llvm-snippy %t.5.yaml -mtriple=riscv64 \
 # RUN: |& FileCheck %t.5.yaml
 
 # RUN: sed -e s/INCORRECT_WEIGHT_VALUE/-inf/ %s > %t.6.yaml
-# RUN: not llvm-snippy %t.6.yaml --model-plugin=None -mtriple=riscv64 \
+# RUN: not llvm-snippy %t.6.yaml -mtriple=riscv64 \
 # RUN: |& FileCheck %t.6.yaml
 
 sections:

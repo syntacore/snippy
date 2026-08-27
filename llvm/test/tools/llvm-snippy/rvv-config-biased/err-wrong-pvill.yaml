@@ -1,11 +1,12 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks that install a pvil not from [0.0;1.0] - error.
 
 # RUN: not llvm-snippy %s %S/Inputs/rvv-unit-wrong-pvill-1.yaml -mtriple=riscv64 -mattr=+v \
-# RUN:  -model-plugin=None --num-instrs=1000 -o %t \
+# RUN:  --num-instrs=1000 -o %t \
 # RUN:  |& FileCheck %s
 
 # RUN: not llvm-snippy %s %S/Inputs/rvv-unit-wrong-pvill-2.yaml -mtriple=riscv64 -mattr=+v \
-# RUN:  -model-plugin=None --num-instrs=1000 -o %t \
+# RUN:  --num-instrs=1000 -o %t \
 # RUN:  |& FileCheck %s
 
 

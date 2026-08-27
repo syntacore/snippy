@@ -1,3 +1,4 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s %S/Inputs/store-burst.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \
 # RUN: -num-instrs=200 >& %t
 # RUN: FileCheck --input-file=%t %s -check-prefix=STORE
@@ -20,8 +21,7 @@
 # pattern wasn't met because it cannot be emitted. It's not the most robust test
 # case. Please, improve it if you have better ideas.
 # RUN: llvm-snippy %s %S/Inputs/load-store-burst.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \
-# RUN: -num-instrs=1000 \
-# RUN: -model-plugin=None |& FileCheck %s \
+# RUN: -num-instrs=1000 |& FileCheck %s \
 # RUN: -check-prefix=LOADSTORE-ERR
 
 # RUN: llvm-snippy %s %S/Inputs/mixed-burst.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \

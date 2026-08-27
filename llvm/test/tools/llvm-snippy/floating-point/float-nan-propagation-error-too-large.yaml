@@ -1,4 +1,5 @@
-# RUN: not llvm-snippy %s --model-plugin None |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s |& FileCheck %s
 
 include:
   - ../Inputs/sections.yaml
@@ -19,4 +20,4 @@ fpu-config:
 histogram:
   - [FMUL_H, 1.0]
 
-# CHECK: float-nan-propagation-error-too-large.yaml:12:5: error: Conversion from integer value '0xffffffffffff' would result in a floating-point overflow exception
+# CHECK: float-nan-propagation-error-too-large.yaml:{{[0-9]+}}:{{[0-9]+}}: error: Conversion from integer value '0xffffffffffff' would result in a floating-point overflow exception

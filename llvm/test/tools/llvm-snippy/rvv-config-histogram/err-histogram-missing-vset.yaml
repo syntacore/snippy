@@ -1,13 +1,12 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: test checks that if histogram does not have vset* instrictions
 # COM: and no bias is specified - and error is returned
 # RUN: not llvm-snippy %s %S/Inputs/rvv-unit-all.yaml -mtriple=riscv64 -mattr=+v \
-# RUN:  --model-plugin None \
 # RUN:  --num-instrs=10 -o %t \
 # RUN:  -riscv-dump-rvv-config \
 # RUN:  |& FileCheck %s
 
 # RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --model-plugin None \
 # RUN:  --num-instrs=10 -o %t \
 # RUN:  -riscv-dump-rvv-config \
 # RUN:  |& FileCheck %s

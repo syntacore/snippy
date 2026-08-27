@@ -1,6 +1,7 @@
+# REQUIRES: riscv-snippy-model-None
 # REQUIRES: riscv-rvv
 
-# RUN: llvm-snippy %s -model-plugin=None \
+# RUN: llvm-snippy %s \
 # RUN: |& FileCheck %s
 
 options:

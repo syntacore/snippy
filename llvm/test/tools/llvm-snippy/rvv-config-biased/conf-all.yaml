@@ -1,11 +1,12 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: this is the test for checking the amount of all valid combinations of listed parameters
 # RUN: llvm-snippy %s %S/Inputs/rvv-unit-all.yaml -mtriple=riscv64 -mattr=+v \
-# RUN:  -model-plugin=None --num-instrs=10 -o %t \
+# RUN:  --num-instrs=10 -o %t \
 # RUN:  -riscv-dump-rvv-config \
 # RUN:  |& FileCheck %s
 
 # RUN: llvm-snippy %S/Inputs/layout-cl-options-rvv.yaml \
-# RUN:  -model-plugin=None |& FileCheck %s
+# RUN:  |& FileCheck %s
 
 
 sections:

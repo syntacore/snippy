@@ -1,9 +1,10 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: not llvm-snippy %s \
-# RUN:   -redefine-sp=reg::X10 -model-plugin None \
+# RUN:   -redefine-sp=reg::X10 \
 # RUN: |& FileCheck %s --check-prefix SP
 
 # RUN: not llvm-snippy %s \
-# RUN:   -redefine-ra=reg::X11 -model-plugin None \
+# RUN:   -redefine-ra=reg::X11 \
 # RUN: |& FileCheck %s --check-prefix RA
 
 options:

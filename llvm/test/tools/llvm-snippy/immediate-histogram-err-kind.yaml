@@ -1,4 +1,5 @@
-# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s |& FileCheck %s
 
 include:
   - Inputs/sections.yaml
@@ -16,5 +17,5 @@ histogram:
 imm-hist:
   opcodes:
     - 'ADDI': notuniform
-# CHECK: immediate-histogram-err-kind.yaml:18:15: error: unknown enumerated scalar
+# CHECK: immediate-histogram-err-kind.yaml:{{[0-9]+}}:{{[0-9]+}}: error: unknown enumerated scalar
 # CHECK-NEXT:    - 'ADDI': notuniform

@@ -1,7 +1,9 @@
-# RUN: llvm-snippy %s -model-plugin=None -define-main-histogram=FPULoadSeq \
+# REQUIRES: riscv-snippy-model-None
+
+# RUN: llvm-snippy %s -define-main-histogram=FPULoadSeq \
 # RUN: |& FileCheck %s --check-prefixes=FPU_LOAD_SEQ
 
-# RUN: llvm-snippy %s -model-plugin=None -define-main-histogram=FPUStoreSeq \
+# RUN: llvm-snippy %s -define-main-histogram=FPUStoreSeq \
 # RUN: |& FileCheck %s --check-prefixes=FPU_STORE_SEQ
 
 options:

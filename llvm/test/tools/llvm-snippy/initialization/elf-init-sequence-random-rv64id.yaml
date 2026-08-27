@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+c,+f,+d \
-# RUN:    -dump-mi -num-instrs=10 -last-instr= -model-plugin=None \
+# RUN:    -dump-mi -num-instrs=10 -last-instr= \
 # RUN:    -init-regs-in-elf --verify-mi \
 # RUN:    | FileCheck %s --dump-input always
 

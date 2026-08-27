@@ -1,6 +1,7 @@
 # generated with isa-tests-gen.sh, to regenerate run:
 # isa-tests-gen.sh --march rv32if_zcf --mtriple riscv32 --extensions zcf\&c\ -\ zca
-# RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s | FileCheck %s -dump-input fail
 include:
   - "Inputs/sections.yaml"
 options:

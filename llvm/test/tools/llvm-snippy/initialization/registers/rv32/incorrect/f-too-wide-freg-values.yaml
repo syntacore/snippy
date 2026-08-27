@@ -1,6 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: not llvm-snippy %s \
 # RUN:    -initial-regs-yaml=%S/Inputs/f-too-wide-freg-values.yaml \
-# RUN:    -model-plugin=None \
 # RUN: |& FileCheck %s
 
 options:

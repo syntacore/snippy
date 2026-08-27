@@ -1,4 +1,5 @@
-# RUN: not llvm-snippy %s --model-plugin None \
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s \
 # RUN:   -Wdisable=no-model-exec,alien-invasions,no-coffee \
 # RUN:   |& FileCheck %s
 

@@ -1,8 +1,9 @@
-# RUN: llvm-snippy %s --model-plugin None |& FileCheck %s --check-prefix=WARN
-# RUN: llvm-snippy %s --model-plugin None \
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s |& FileCheck %s --check-prefix=WARN
+# RUN: llvm-snippy %s \
 # RUN:   -Wdisable=memory-access,unused-section,no-model-exec \
 # RUN:   |& FileCheck %s --check-prefix=NOWARN
-# RUN: llvm-snippy %s --model-plugin None \
+# RUN: llvm-snippy %s \
 # RUN:   -Wdisable=memory-access,unused-section \
 # RUN:   |& FileCheck %s --check-prefix=SOMEWARN
 

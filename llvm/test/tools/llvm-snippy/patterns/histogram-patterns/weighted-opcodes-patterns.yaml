@@ -1,4 +1,5 @@
-# RUN: llvm-snippy %s -model-plugin=None
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s
 
 # COM: This test checks that 'verify-gen-histogram' and 'histogram-must-succeed'
 # COM: succeed with weighted instructions

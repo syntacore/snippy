@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -num-instrs=100 -mtriple=riscv64 \
-# RUN:   --model-plugin=None --dump-cfg-before-all --cfg-basename=%t -o %t
+# RUN:   --dump-cfg-before-all --cfg-basename=%t -o %t
 # RUN: rm %t_SnippyFunction-cfg-dump-before-snippy-register-reserve.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-before-snippy-simulator-context-wrapper.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-before-snippy-simulator-context-preserver.dot \

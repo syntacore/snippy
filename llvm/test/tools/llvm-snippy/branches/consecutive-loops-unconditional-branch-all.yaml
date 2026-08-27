@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: not llvm-snippy %s -mtriple=riscv64 -num-instrs=100 \
-# RUN:     -mattr=+c -model-plugin None
+# RUN:     -mattr=+c
 
 branches:
   consecutive-loops: all

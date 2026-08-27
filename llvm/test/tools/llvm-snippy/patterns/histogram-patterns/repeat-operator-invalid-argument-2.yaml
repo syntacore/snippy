@@ -1,10 +1,12 @@
-# RUN: not llvm-snippy %s -model-plugin=None %S/Inputs/invalid-repeat-zero-argument.yaml \
+# REQUIRES: riscv-snippy-model-None
+
+# RUN: not llvm-snippy %s %S/Inputs/invalid-repeat-zero-argument.yaml \
 # RUN: |& FileCheck %s --check-prefix=ZERO_ARG
 
-# RUN: not llvm-snippy %s -model-plugin=None %S/Inputs/invalid-repeat-negative-argument.yaml \
+# RUN: not llvm-snippy %s %S/Inputs/invalid-repeat-negative-argument.yaml \
 # RUN: |& FileCheck %s --check-prefix=NEGATIVE_ARG
 
-# RUN: not llvm-snippy %s -model-plugin=None %S/Inputs/invalid-repeat-float-argument.yaml \
+# RUN: not llvm-snippy %s %S/Inputs/invalid-repeat-float-argument.yaml \
 # RUN: |& FileCheck %s --check-prefix=FLOAT_ARG
 
 include:

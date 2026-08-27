@@ -1,14 +1,15 @@
+# REQUIRES: riscv-snippy-model-None
 
-# RUN: llvm-snippy %s -model-plugin=None -define-main-histogram=LoadSeq \
+# RUN: llvm-snippy %s -define-main-histogram=LoadSeq \
 # RUN: |& FileCheck %s --check-prefixes=LOAD_SEQ
 
-# RUN: llvm-snippy %s -model-plugin=None -define-main-histogram=StoreSeq \
+# RUN: llvm-snippy %s -define-main-histogram=StoreSeq \
 # RUN: |& FileCheck %s --check-prefixes=STORE_SEQ
 
-# RUN: llvm-snippy %s -model-plugin=None -define-main-histogram=LoadStoreSeq \
+# RUN: llvm-snippy %s -define-main-histogram=LoadStoreSeq \
 # RUN: |& FileCheck %s --check-prefixes=LOAD_STORE_SEQ
 
-# RUN: llvm-snippy %s -model-plugin=None -define-main-histogram=LoadStoreWithOthers \
+# RUN: llvm-snippy %s -define-main-histogram=LoadStoreWithOthers \
 # RUN: |& FileCheck %s --check-prefixes=LOAD_STORE_WITH_OTHERS
 
 include:

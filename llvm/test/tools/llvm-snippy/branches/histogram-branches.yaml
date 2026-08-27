@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=800 \
-# RUN:   -verify-mi -mattr=+c -model-plugin None -histogram-max-deviation=2.1 \
+# RUN:   -verify-mi -mattr=+c -histogram-max-deviation=2.1 \
 # RUN:   -verify-gen-histogram -o %t 2>&1 | FileCheck %s
 
 sections:

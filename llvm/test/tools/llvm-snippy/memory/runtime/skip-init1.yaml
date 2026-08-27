@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -model-plugin=None \
+# RUN:    -mtriple=riscv64 \
 # RUN:     -num-instrs=100 -init-memory=runtime -init-regs-in-elf \
 # RUN:     -skip-memory-runtime-init -dump-mf \
 # RUN: |& FileCheck %s

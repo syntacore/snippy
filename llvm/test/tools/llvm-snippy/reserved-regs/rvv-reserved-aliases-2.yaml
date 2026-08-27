@@ -1,8 +1,7 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks that if register aliases are reserved,
 # COM: then all their sub-register are not found in the machine function dump.
-
-# RUN: llvm-snippy %s -model-plugin=None \
-# RUN:  |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
 
 options:
   mtriple: riscv64

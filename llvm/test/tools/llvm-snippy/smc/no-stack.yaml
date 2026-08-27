@@ -1,7 +1,8 @@
-# RUN: not llvm-snippy %s -model-plugin None \
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s \
 # RUN: |& FileCheck %s --check-prefix=NO-STACK
 
-# RUN: llvm-snippy %s -model-plugin None -external-stack \
+# RUN: llvm-snippy %s -external-stack \
 # RUN: |& FileCheck %s --check-prefix=EXT-STACK
 
 # NO-STACK: error: SMC mode expects stack section provided

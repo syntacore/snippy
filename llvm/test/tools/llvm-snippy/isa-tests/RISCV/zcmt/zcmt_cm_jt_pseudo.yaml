@@ -1,4 +1,5 @@
-# RUN: not llvm-snippy %s -mtriple=riscv64 -model-plugin None |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s -mtriple=riscv64 |& FileCheck %s
 
 # CHECK: error: PseudoSnippyCM_JT is not supported, use CM_JT instead
 
