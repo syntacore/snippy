@@ -1,4 +1,5 @@
-# RUN: llvm-snippy %s --model-plugin None -redefine-sp=reg::X5 |& \
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s -redefine-sp=reg::X5 |& \
 # RUN: FileCheck %s --ignore-case
 
 options:

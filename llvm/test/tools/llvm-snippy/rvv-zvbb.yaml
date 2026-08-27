@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v,+zvbb \
-# RUN:  -o %t --num-instrs=1000 -model-plugin=None \
+# RUN:  -o %t --num-instrs=1000 \
 # RUN:  --init-regs-in-elf --verify-mi -verify-gen-histogram
 
 include:

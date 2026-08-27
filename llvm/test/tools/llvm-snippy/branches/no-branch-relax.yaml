@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=800 \
-# RUN:   -mattr=+c -model-plugin None -no-branch-relax \
+# RUN:   -mattr=+c -no-branch-relax \
 # RUN:    -o %t 2>&1 | FileCheck %s
 
 sections:

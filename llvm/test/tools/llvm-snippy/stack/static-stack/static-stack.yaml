@@ -1,7 +1,8 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks that SP is not reserved, that is, it can be used as an
 #      operand of a regular instruction SUB.
 
-# RUN: llvm-snippy %s -model-plugin None \
+# RUN: llvm-snippy %s \
 # RUN: |& FileCheck %s
 
 options:

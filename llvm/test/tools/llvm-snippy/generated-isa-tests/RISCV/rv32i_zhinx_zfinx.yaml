@@ -1,6 +1,7 @@
 # generated with isa-tests-gen.sh, to regenerate run:
 # isa-tests-gen.sh --march rv32i_zhinx_zfinx --mtriple riscv32 --extensions zfinx\ +\ zhinx --ignore-opcode-regex \^FCVT_H_D_IN32X\$\|\^FCVT_D_H_IN32X\$ --include Inputs/no-fpu-overwrite.yaml
-# RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s | FileCheck %s -dump-input fail
 include:
   - "Inputs/sections.yaml"
   - "Inputs/no-fpu-overwrite.yaml"

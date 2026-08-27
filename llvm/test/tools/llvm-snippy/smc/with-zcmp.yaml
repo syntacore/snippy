@@ -1,7 +1,8 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -model-plugin None \
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s -mtriple=riscv64 \
 # RUN: |& FileCheck %s
 
-# RUN: llvm-snippy %s -mtriple=riscv32 -model-plugin None \
+# RUN: llvm-snippy %s -mtriple=riscv32 \
 # RUN: |& FileCheck %s
 
 options:

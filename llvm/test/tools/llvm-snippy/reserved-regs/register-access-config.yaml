@@ -1,4 +1,5 @@
-# RUN: llvm-snippy %s %S/Inputs/sections.yaml -model-plugin None --dump-layout \
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s %S/Inputs/sections.yaml --dump-layout \
 # RUN:   | FileCheck %s --check-prefix=MYCHECK
 
 options:

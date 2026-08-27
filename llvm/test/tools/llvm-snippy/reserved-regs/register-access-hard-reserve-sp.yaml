@@ -1,5 +1,5 @@
-# RUN: llvm-snippy %s %S/Inputs/sections.yaml -model-plugin=None \
-# RUN:   |& FileCheck %s --dump-input=fail
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s %S/Inputs/sections.yaml |& FileCheck %s --dump-input=fail
 
 options:
   mtriple: riscv64

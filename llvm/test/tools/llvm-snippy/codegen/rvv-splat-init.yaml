@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  -model-plugin=None --num-instrs=10000 -o %t \
+# RUN:  --num-instrs=10000 -o %t \
 # RUN:  -rvv-init-mode=splats \
 # RUN:  -verify-gen-histogram  -histogram-must-succeed=true \
 # RUN:  -dump-mf \

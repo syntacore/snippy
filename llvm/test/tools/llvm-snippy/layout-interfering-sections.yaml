@@ -1,4 +1,5 @@
-# RUN: not llvm-snippy %s -mtriple=riscv64 -model-plugin=None -mattr=-a -num-instrs=10 >& %t
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=-a -num-instrs=10 >& %t
 # RUN: FileCheck --input-file=%t --dump-input always %s
 
 sections:

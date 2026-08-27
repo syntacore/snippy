@@ -1,4 +1,5 @@
-# RUN: llvm-snippy %s -model-plugin None --dump-mir=- |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s --dump-mir=- |& FileCheck %s
 
 options:
   mtriple: riscv64

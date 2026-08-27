@@ -1,5 +1,6 @@
-# RUN: llvm-snippy %s %S/Inputs/immediate-histogram-concrete-first.yaml -model-plugin=None |& FileCheck %s
-# RUN: llvm-snippy %s %S/Inputs/immediate-histogram-generic-first.yaml -model-plugin=None |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s %S/Inputs/immediate-histogram-concrete-first.yaml |& FileCheck %s
+# RUN: llvm-snippy %s %S/Inputs/immediate-histogram-generic-first.yaml |& FileCheck %s
 
 include:
   - Inputs/sections.yaml

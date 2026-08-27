@@ -1,10 +1,12 @@
-# RUN: not llvm-snippy %s -model-plugin=None --define-main-histogram=MissingColong \ 
+# REQUIRES: riscv-snippy-model-None
+
+# RUN: not llvm-snippy %s --define-main-histogram=MissingColong \ 
 # RUN: %S/Inputs/invalid-repeat-range-missing-colon.yaml |& FileCheck %s --check-prefix=MISSING_COLON
 
-# RUN: not llvm-snippy %s -model-plugin=None --define-main-histogram=MissingColong \ 
+# RUN: not llvm-snippy %s --define-main-histogram=MissingColong \ 
 # RUN: %S/Inputs/invalid-repeat-range-missing-bracket.yaml |& FileCheck %s --check-prefix=MISSING_BRACKET
 
-# RUN: not llvm-snippy %s -model-plugin=None --define-main-histogram=MissingColong \ 
+# RUN: not llvm-snippy %s --define-main-histogram=MissingColong \ 
 # RUN: %S/Inputs/invalid-repeat-range-min-max-conflict.yaml |& FileCheck %s --check-prefix=MIN_MAX_CONFLICT
 
 include:

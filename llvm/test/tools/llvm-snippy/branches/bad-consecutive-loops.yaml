@@ -1,17 +1,18 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/CONS/-1/ > %t.0.yaml
 # RUN: not llvm-snippy %t.0.yaml -mtriple=riscv64 -num-instrs=20 \
 # RUN:     -verify-mi -mattr=-c -dump-mf --verify-consecutive-loops -o %t \
-# RUN:     --model-plugin=None |& FileCheck %s
+# RUN:     |& FileCheck %s
 
 # RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/CONS/dfa/ > %t.1.yaml
 # RUN: not llvm-snippy %t.1.yaml -mtriple=riscv64 -num-instrs=20 \
 # RUN:     -verify-mi -mattr=-c -dump-mf --verify-consecutive-loops -o %t \
-# RUN:     --model-plugin=None |& FileCheck %s
+# RUN:     |& FileCheck %s
 
 # RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/CONS/999999999999999/ > %t.2.yaml
 # RUN: not llvm-snippy %t.2.yaml -mtriple=riscv64 -num-instrs=20 \
 # RUN:     -verify-mi -mattr=-c -dump-mf --verify-consecutive-loops -o %t \
-# RUN:     --model-plugin=None |& FileCheck %s
+# RUN:     |& FileCheck %s
 
 # CHECK: error: invalid number
 

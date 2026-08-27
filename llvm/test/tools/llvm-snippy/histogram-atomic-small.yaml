@@ -1,11 +1,12 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: not llvm-snippy %s -mtriple=riscv64 -num-instrs=2 \
 # RUN:  -histogram-max-deviation=2.1 -verify-gen-histogram \
-# RUN:  -model-plugin None -mattr=+a \
+# RUN:  -mattr=+a \
 # RUN:  -dump-mf
 
 # RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=2 \
 # RUN:  -histogram-max-deviation=2.1 -histogram-must-succeed=false -verify-gen-histogram \
-# RUN:  -model-plugin None -mattr=+a \
+# RUN:  -mattr=+a \
 # RUN:  -dump-mf |& FileCheck %s --dump-input always
 
 # CHECK: Start Verification for function: SnippyFunction:

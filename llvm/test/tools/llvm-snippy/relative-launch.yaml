@@ -1,3 +1,4 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: cd %llvm_tools
 # RUN: ./llvm-snippy %s %S/Inputs/sections.yaml -o %t.elf
 

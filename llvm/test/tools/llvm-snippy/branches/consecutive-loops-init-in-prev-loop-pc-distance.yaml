@@ -1,6 +1,7 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=100 \
 # RUN:     -verify-mi -mattr=-c -dump-mf --verify-consecutive-loops -o %t \
-# RUN:     --model-plugin=None --init-cons-loop-in-prev-loop
+# RUN:     --init-cons-loop-in-prev-loop
 
 sections:
     - name:      1

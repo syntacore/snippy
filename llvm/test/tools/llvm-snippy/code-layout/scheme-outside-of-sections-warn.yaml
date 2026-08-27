@@ -1,4 +1,5 @@
-# RUN: llvm-snippy %s --model-plugin=None -o %t |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s -o %t |& FileCheck %s
 # RUN: llvm-objdump -D -j .snippy.1.rx %t.elf | FileCheck %s --check-prefix OBJ
 options:
   mtriple: riscv64

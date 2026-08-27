@@ -1,6 +1,7 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks that snippy correctly generates code consisting only of
 #      calls and branches.
-# RUN: llvm-snippy %s --model-plugin=None
+# RUN: llvm-snippy %s
 
 options:
   mtriple: riscv64

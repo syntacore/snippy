@@ -1,3 +1,4 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: llvm-snippy is not used directly, because substitutions here will
 # COM: mess up default options. layout file is also unspecified to skip actual
 # COM: generation.

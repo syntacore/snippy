@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %S/code-layout-many-instrs.yaml \
-# RUN:   --model-plugin None -o %t
+# RUN:   -o %t
 
 # RUN: ld.lld %t.elf -T %t.ld -o %t.final.elf
 

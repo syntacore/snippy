@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %S/Inputs/default-layout.yaml %s -mtriple=riscv64 \
-# RUN:   -num-instrs=100 -model-plugin None \
+# RUN:   -num-instrs=100 \
 # RUN:   -dump-layout=true -riscv-disable-misaligned-access \
 # RUN: | FileCheck %s --dump-input always
 
