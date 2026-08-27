@@ -1,5 +1,6 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -model-plugin None | FileCheck %s
-# RUN: llvm-snippy %s -mtriple=riscv32 -model-plugin None | FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s -mtriple=riscv64 | FileCheck %s
+# RUN: llvm-snippy %s -mtriple=riscv32 | FileCheck %s
 
 # CHECK-COUNT-9: CM_JALT
 

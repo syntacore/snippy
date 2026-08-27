@@ -1,38 +1,39 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks that an error occurs if the options are incompatible
 
 # RUN: sed -e s/SP_RELATIVE_INSTR/C_FLWSP/ %s > %t.1.yaml
-# RUN: not llvm-snippy %t.1.yaml -honor-target-abi --model-plugin=None \
+# RUN: not llvm-snippy %t.1.yaml -honor-target-abi \
 # RUN: |& FileCheck %s --check-prefix ABI
 
 # RUN: sed -e s/SP_RELATIVE_INSTR/C_FSWSP/ %s > %t.2.yaml
-# RUN: not llvm-snippy %t.2.yaml -honor-target-abi --model-plugin=None \
+# RUN: not llvm-snippy %t.2.yaml -honor-target-abi \
 # RUN: |& FileCheck %s --check-prefix ABI
 
 
 # RUN: sed -e s/SP_RELATIVE_INSTR/C_FLWSP/ %s > %t.1.yaml1
-# RUN: not llvm-snippy %t.1.yaml1 -redefine-sp=SP --model-plugin=None \
+# RUN: not llvm-snippy %t.1.yaml1 -redefine-sp=SP \
 # RUN: |& FileCheck %s --check-prefix SP
 
 # RUN: sed -e s/SP_RELATIVE_INSTR/C_FSWSP/ %s > %t.2.yaml1
-# RUN: not llvm-snippy %t.2.yaml1 -redefine-sp=SP --model-plugin=None \
+# RUN: not llvm-snippy %t.2.yaml1 -redefine-sp=SP \
 # RUN: |& FileCheck %s --check-prefix SP
 
 
 # RUN: sed -e s/SP_RELATIVE_INSTR/C_FLWSP/ %s > %t.1.yaml2
-# RUN: not llvm-snippy %t.1.yaml2 -redefine-sp=any --model-plugin=None \
+# RUN: not llvm-snippy %t.1.yaml2 -redefine-sp=any \
 # RUN: |& FileCheck %s --check-prefix ANY
 
 # RUN: sed -e s/SP_RELATIVE_INSTR/C_FSWSP/ %s > %t.2.yaml2
-# RUN: not llvm-snippy %t.2.yaml2 -redefine-sp=any --model-plugin=None \
+# RUN: not llvm-snippy %t.2.yaml2 -redefine-sp=any \
 # RUN: |& FileCheck %s --check-prefix ANY
 
 
 # RUN: sed -e s/SP_RELATIVE_INSTR/C_FLWSP/ %s > %t.1.yaml3
-# RUN: not llvm-snippy %t.1.yaml3 -redefine-sp=reg::X2 --model-plugin=None \
+# RUN: not llvm-snippy %t.1.yaml3 -redefine-sp=reg::X2 \
 # RUN: |& FileCheck %s --check-prefix X2
 
 # RUN: sed -e s/SP_RELATIVE_INSTR/C_FSWSP/ %s > %t.2.yaml3
-# RUN: not llvm-snippy %t.2.yaml3 -redefine-sp=reg::X2 --model-plugin=None \
+# RUN: not llvm-snippy %t.2.yaml3 -redefine-sp=reg::X2 \
 # RUN: |& FileCheck %s --check-prefix X2
 
 

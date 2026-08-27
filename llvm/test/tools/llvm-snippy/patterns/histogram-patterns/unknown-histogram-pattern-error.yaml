@@ -1,6 +1,7 @@
-# RUN: not llvm-snippy %s -model-plugin=None |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s |& FileCheck %s
 
-# RUN: not llvm-snippy %s -model-plugin=None -define-main-histogram=hist2 \
+# RUN: not llvm-snippy %s -define-main-histogram=hist2 \
 # RUN: |& FileCheck %s
 
 options:

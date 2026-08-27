@@ -1,5 +1,6 @@
-# RUN: llvm-snippy %s --dump-mf --model-plugin=None -o %t | FileCheck %s
-# RUN: llvm-snippy %s --dump-mf --model-plugin=None -init-regs-in-elf -o %t | \
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s --dump-mf -o %t | FileCheck %s
+# RUN: llvm-snippy %s --dump-mf -init-regs-in-elf -o %t | \
 # RUN: FileCheck %s
 
 options:

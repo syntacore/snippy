@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+m,+c \
-# RUN: --model-plugin=None -num-instrs=10000 -external-stack -redefine-sp=SP \
+# RUN: -num-instrs=10000 -external-stack -redefine-sp=SP \
 # RUN:  -spilled-regs-list=X1 -init-regs-in-elf -dump-mi -verify-mi |& FileCheck %s
 sections:
     - name:      1

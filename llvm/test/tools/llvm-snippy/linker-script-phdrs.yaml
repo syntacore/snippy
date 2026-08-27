@@ -1,7 +1,8 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -model-plugin=None -mattr=-a -num-instrs=10 -o %t
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a -num-instrs=10 -o %t
 # RUN: FileCheck %s --input-file=%t.ld --check-prefix=NODEF
 # RUN: FileCheck %s --input-file=%t.ld --check-prefix=BOTH
-# RUN: llvm-snippy %s -mtriple=riscv64 -model-plugin=None -mattr=-a -num-instrs=10 -o %t \
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a -num-instrs=10 -o %t \
 # RUN: -enable-phdrs-definition
 # RUN: FileCheck %s --input-file=%t.ld --check-prefix=WITHDEF
 # RUN: FileCheck %s --input-file=%t.ld --check-prefix=BOTH

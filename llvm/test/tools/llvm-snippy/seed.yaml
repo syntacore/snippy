@@ -1,3 +1,4 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv64 \
 # RUN:    -dump-mi -seed=0 -num-instrs=150  \
 # RUN:    -last-instr= \
@@ -14,26 +15,26 @@
 # RUN:    | FileCheck %s --dump-input always
 
 # RUN: llvm-snippy %s -mtriple=riscv64 \
-# RUN:   -model-plugin=None -verbose -seed=0 |& FileCheck %s --dump-input \
+# RUN:   -verbose -seed=0 |& FileCheck %s --dump-input \
 # RUN:   always --check-prefix=SEED-0
 # RUN: llvm-snippy %s -mtriple=riscv64 \
-# RUN:   -model-plugin=None -verbose -seed=300 |& FileCheck %s --dump-input \
+# RUN:   -verbose -seed=300 |& FileCheck %s --dump-input \
 # RUN:   always --check-prefix=SEED-300
 
 # RUN: llvm-snippy %s -mtriple=riscv64 \
-# RUN:   -model-plugin=None -seed=14u >& %t || true
+# RUN:   -seed=14u >& %t || true
 # RUN: FileCheck %s --input-file=%t --dump-input always --check-prefix=WRONG-SEED1
 
 # RUN: llvm-snippy %s -mtriple=riscv64 \
-# RUN:   -model-plugin=None -seed=1.4 >& %t || true
+# RUN:   -seed=1.4 >& %t || true
 # RUN: FileCheck %s --input-file=%t --dump-input always --check-prefix=WRONG-SEED2
 
 # RUN: llvm-snippy %s -mtriple=riscv64 \
-# RUN:   -model-plugin=None -seed=-1 >& %t || true
+# RUN:   -seed=-1 >& %t || true
 # RUN: FileCheck %s --input-file=%t --dump-input always --check-prefix=WRONG-SEED3
 
 # RUN: llvm-snippy %s -mtriple=riscv64 \
-# RUN:   -model-plugin=None -seed= |& FileCheck %s --dump-input always \
+# RUN:   -seed= |& FileCheck %s --dump-input always \
 # RUN:   --check-prefix=RAND-SEED
 
 sections:

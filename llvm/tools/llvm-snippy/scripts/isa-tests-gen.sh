@@ -122,7 +122,8 @@ for arg in "${args[@]}"; do
     printf " %q" "$arg"
 done
 printf "\n"
-echo "# RUN: llvm-snippy %s -model-plugin None | FileCheck %s -dump-input fail"
+echo "# REQUIRES: riscv-snippy-model-None"
+echo "# RUN: llvm-snippy %s | FileCheck %s -dump-input fail"
 echo "include:"
 for inc in "${includes[@]}"; do
     echo "  - \"$inc\""

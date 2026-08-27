@@ -1,3 +1,4 @@
+# REQUIRES: riscv-snippy-model-None
 # COM: This test checks that while the vill bit is set it is possible to change the V0 mask
 #
 # COM: Pattern to be found in the option -dump-mf output:
@@ -15,7 +16,7 @@
 # COM:               // 3. (([^V]|V[^S]|VS[^E]|VSE[^T])+)                -- check that ... not VSET<> ...
 # COM:               // 4. (v0 = VL1RE8_V)                               -- find load in v0
 
-# RUN:  llvm-snippy %s -model-plugin None\
+# RUN:  llvm-snippy %s\
 # RUN:  | tr -d '\n' \
 # RUN:  | grep -E '((VSETIVLI |VSETVLI )[^ ]+(, 128)(([^V]|V[^S]|VS[^E]|VSE[^T])+)(v0 = VL1RE8_V))'
 

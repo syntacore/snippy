@@ -1,4 +1,5 @@
-# RUN: not llvm-snippy %s --model-plugin None |& FileCheck %s
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s |& FileCheck %s
 
 include:
   - ../Inputs/sections.yaml
@@ -16,4 +17,4 @@ fpu-config:
 histogram:
   - [ADDI, 1.0]
 
-# CHECK: float-nan-propagation-error-integral-range-rounding-mode.yaml:15:22: error: unknown enumerated scalar
+# CHECK: float-nan-propagation-error-integral-range-rounding-mode.yaml:{{[0-9]+}}:{{[0-9]+}}: error: unknown enumerated scalar

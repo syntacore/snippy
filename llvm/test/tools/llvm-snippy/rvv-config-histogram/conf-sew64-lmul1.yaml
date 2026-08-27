@@ -1,5 +1,6 @@
+# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  -model-plugin=None --num-instrs=10 -o %t \
+# RUN:  --num-instrs=10 -o %t \
 # RUN:  -riscv-dump-rvv-config \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-SEW64
 
