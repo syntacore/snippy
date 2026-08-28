@@ -6,6 +6,7 @@
   ninja,
   mold,
   python3,
+  ruby,
   sphinx,
   lit,
   rvmi,
@@ -64,7 +65,7 @@ stdenv.mkDerivation (finalAttrs: {
     (lib.cmakeBool "LLVM_INCLUDE_EXAMPLES" false)
     (lib.cmakeBool "LLVM_INCLUDE_RUNTIMES" false)
     (lib.cmakeBool "LLVM_INCLUDE_DOCS" false)
-    (lib.cmakeFeature "SPIKE_MODEL_SRC" "${lib.getLib riscv-isa-sim}/lib")
+    (lib.cmakeFeature "RISCVModelSpike_DIR" "${lib.getLib riscv-isa-sim}/lib")
   ];
 
   buildPhase = ''
@@ -89,10 +90,13 @@ stdenv.mkDerivation (finalAttrs: {
 
   nativeCheckInputs = [
     lit
+    ruby
   ];
 
   checkPhase = ''
     export LIT_OPTS="-v --no-progress-bar"
+    cmake --build . --target check-llvm-tools-llvm-snippy
+    export LIT_OPTS="-v --no-progress-bar -Dsnippy-test-model=spike"
     cmake --build . --target check-llvm-tools-llvm-snippy
   '';
 

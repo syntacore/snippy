@@ -1,0 +1,8 @@
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+m,+c \
+# RUN: -num-instrs=10000 -external-stack -redefine-sp=SP \
+# RUN: %S/Inputs/layout3.yaml \
+# RUN: --spilled-regs-list=X1 |& FileCheck %s -check-prefix=EXTSTACKERROR
+
+# EXTSTACKERROR: error: Cannot run snippet on model: external stack was enabled.

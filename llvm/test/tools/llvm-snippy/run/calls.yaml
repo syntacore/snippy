@@ -1,0 +1,34 @@
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -function-number=20 -function-layers=5 -num-instrs=100 \
+# RUN: --dump-mf -num-instr-ancil=50 -verify-mi --redefine-ra=any-not-RA |& FileCheck %s
+
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      stack
+    VMA:       0x0
+    SIZE:      0x100000
+    LMA:       0x0
+    ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [JAL, 0.1]
+    - [JALR, 0.1]
+
+
+# CHECK: #===Simulation Start===
+# CHECK-DAG: jalr
+# CHECK-DAG: jal [[RA:[0-9a-z]+]], pc
+# CHECK: jr [[RA]]

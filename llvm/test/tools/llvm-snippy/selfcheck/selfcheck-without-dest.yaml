@@ -1,0 +1,14 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=-c \
+# RUN:     -num-instrs=2 -init-regs-in-elf -selfcheck -dump-mf -selfcheck-mem \
+# RUN: |& FileCheck %s
+
+include:
+- Inputs/sections.yaml
+
+histogram:
+    - [SW, 1.0]
+
+# CHECK-NOT: SD
+

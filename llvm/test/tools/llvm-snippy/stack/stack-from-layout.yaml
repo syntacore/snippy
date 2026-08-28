@@ -1,0 +1,35 @@
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+m,+c \
+# RUN:  -num-instrs=10000 -redefine-sp=SP -enable-static-stack=false \
+# RUN:  -spilled-regs-list=X1 -init-regs-in-elf -verify-mi |& FileCheck %s
+sections:
+    - name:      1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+    - name:      stack
+      # NOTE: Address chosen so that top of the stack materialization sequence doesn't have addi sp, -16.
+      VMA:       0xF00100
+      SIZE:      0x10000
+      LMA:       0xF00100
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+    - [ADD, 1.0]
+
+# CHECK: c.addi    sp, -{{[0-9]+}}
+# CHECK-NEXT: x2 0x[[RA_SLOT:[a-z0-9]+]]
+# CHECK-NEXT: c.sdsp  ra, 0(sp)
+# CHECK-NEXT: mem 0x[[RA_SLOT]] 0x[[RAVAL:[a-z0-9]+]]
+
+# CHECK: c.ldsp  ra, 0(sp)
+# CHECK-NEXT: x1  0x[[RAVAL]] mem 0x[[RA_SLOT]]
+# CHECK-NEXT: c.addi  sp, {{[0-9]+}}

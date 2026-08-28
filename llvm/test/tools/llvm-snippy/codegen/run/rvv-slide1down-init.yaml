@@ -1,0 +1,31 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-rvv
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  --num-instrs=10000 -o %t \
+# RUN:  -verify-gen-histogram  -histogram-must-succeed=true \
+# RUN:  -dump-mf \
+# RUN:  |& FileCheck %s
+
+include:
+- ../Inputs/rvv-unit-all.yaml
+
+sections:
+  - name:      0
+    VMA:       0x100000
+    SIZE:      0x400000
+    LMA:       0x100000
+    ACCESS:    r
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+    - [VADD_VV, 1.0]
+
+# CHECK: #===Simulation Start===

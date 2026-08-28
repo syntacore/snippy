@@ -1,0 +1,31 @@
+# REQUIRES: riscv-snippy-model-spike
+# COM: This test checks that if Zcmp instruction does not overwrite a return
+#      address, it can be generated with calls.
+# RUN: llvm-snippy %s -mtriple=riscv64 |& FileCheck %s
+# RUN: llvm-snippy %s -mtriple=riscv32 |& FileCheck %s
+
+options:
+  num-instrs: 1000
+  honor-target-abi: on
+  mattr: +zcmp
+  redefine-ra: RA
+  redefine-sp: any-not-SP
+
+include:
+  - ../../Inputs/sections-with-stack.yaml
+
+histogram:
+  - [CM_PUSH, 1.0]
+  - [CM_MVA01S, 1.0]
+  - [CM_MVSA01, 1.0]
+  - [JAL, 1.0]
+
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - fun1
+    - name: fun1
+
+# CHECK: ret

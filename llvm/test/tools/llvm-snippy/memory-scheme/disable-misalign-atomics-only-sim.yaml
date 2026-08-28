@@ -1,0 +1,54 @@
+
+# RUN: llvm-snippy %s -mtriple=riscv64 \
+# RUN: -mattr=+a --num-instrs=1000 \
+# RUN: --riscv-disable-misaligned-access=atomics-only
+
+include:
+- Inputs/memory-unaligned.yaml
+
+sections:
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+
+histogram:
+   - [LB, 1.0]
+   - [LBU, 1.0]
+   - [LH, 1.0]
+   - [LHU, 1.0]
+   - [LW, 1.0]
+   - [LWU, 1.0]
+   - [LD, 1.0]
+   - [SB, 1.0]
+   - [SH, 1.0]
+   - [SW, 1.0]
+   - [SD, 1.0]
+   - [LR_W, 1.0]
+   - [SC_W, 1.0]
+   - [LR_D, 1.0]
+   - [SC_D, 1.0]
+   - [AMOSWAP_W, 1.0]
+   - [AMOSWAP_D, 1.0]
+   - [AMOADD_W, 1.0]
+   - [AMOADD_D, 1.0]
+   - [AMOAND_W, 1.0]
+   - [AMOAND_D, 1.0]
+   - [AMOOR_W, 1.0]
+   - [AMOOR_D, 1.0]
+   - [AMOXOR_W, 1.0]
+   - [AMOXOR_D, 1.0]
+   - [AMOMAX_W, 1.0]
+   - [AMOMAX_D, 1.0]
+   - [AMOMAXU_W, 1.0]
+   - [AMOMAXU_D, 1.0]
+   - [AMOMIN_W, 1.0]
+   - [AMOMIN_D, 1.0]
+   - [AMOMINU_W, 1.0]
+   - [AMOMINU_D, 1.0]

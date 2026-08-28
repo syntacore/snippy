@@ -1,0 +1,23 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s -mtriple=riscv64  -dump-mf -backtrack -enable-address-value-hazards\
+# RUN: -num-instrs=1000 |& FileCheck %s --dump-input always
+
+sections:
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x800000
+      SIZE:      0x400000
+      LMA:       0x800000
+      ACCESS:    rw
+
+histogram:
+    - [LD, 1.0]
+
+# CHECK: [[REG:\$x[0-9]+]] = {{(ADD )|(SUB )}}
+# CHECK-SAME: [[REG]], $x{{[0-9]+}}
+# CHECK-NEXT: LD [[REG]]
+

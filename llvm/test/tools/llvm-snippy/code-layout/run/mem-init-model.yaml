@@ -1,0 +1,7 @@
+# RUN: llvm-snippy %S/../mem-init.yaml -o %t
+# RUN: llvm-readelf -s %t.elf | FileCheck %s
+
+# RUN: llvm-snippy %S/../code-layout-many-modules.yaml -o %t
+# RUN: llvm-readelf -s %t.elf | FileCheck %s
+
+# CHECK: __snippy_random

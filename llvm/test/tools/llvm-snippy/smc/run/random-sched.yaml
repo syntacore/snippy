@@ -1,0 +1,2 @@
+# RUN: llvm-snippy %S/../random-sched.yaml -mtriple=riscv64
+# RUN: llvm-snippy %S/../random-sched.yaml -mtriple=riscv32

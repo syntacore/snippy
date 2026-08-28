@@ -1,0 +1,34 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: not llvm-snippy %s \
+# RUN: -initial-regs-yaml=%S/Inputs/initial-regs-invalid-reg.yaml |& \
+# RUN: FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: "+f,+d,+c"
+  num-instrs: 10
+
+sections:
+  - name:      0
+    VMA:       0x8000
+    SIZE:      0x4000
+    LMA:       0x8000
+    ACCESS:    r
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+
+histogram:
+    - [C_NOP, 1.0]
+
+# CHECK: error
+# CHECK: Unknown registers detected in registogram: 
+# CHECK-SAME: List of unknown registers: [ UNKNOWN ]
+

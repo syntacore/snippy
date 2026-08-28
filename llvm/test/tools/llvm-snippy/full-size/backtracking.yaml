@@ -1,0 +1,25 @@
+# REQUIRES: riscv-snippy-model-callbacks
+# RUN: llvm-snippy %s -mtriple=riscv64  \
+# RUN: --init-regs-in-elf \
+# RUN: -num-instrs=all \
+# RUN: -backtrack \
+# RUN: --mattr=-c -dump-registers-yaml=%t
+# RUN: FileCheck %s --input-file=%t
+
+sections:
+    - name:      1
+      VMA:       0x80000
+      SIZE:      0x2000
+      LMA:       0x80000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+
+# CHECK: PC, 0x0000000000081FFC

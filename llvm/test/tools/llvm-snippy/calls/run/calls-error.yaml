@@ -1,0 +1,35 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: not llvm-snippy %s -mtriple=riscv64 -function-number=20 -function-layers=5 -num-instrs=100 \
+# RUN: --dump-mf -num-instr-ancil=50 -backtrack |& FileCheck %s --check-prefix=TRACK
+# RUN: not llvm-snippy %s -mtriple=riscv64 -function-number=20 -function-layers=5 -num-instrs=100 \
+# RUN: --dump-mf -num-instr-ancil=50 -selfcheck |& FileCheck %s --check-prefix=TRACK
+
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      stack
+    VMA:       0x310000
+    SIZE:      0x100000
+    LMA:       0x310000
+    ACCESS:    rw
+  - name:      selfcheck
+    VMA:       0x410000
+    SIZE:      0x100000
+    LMA:       0x410000
+    ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [JAL, 0.2]
+
+# TRACK: error: Cannot generate requested call instructions: backtrack and selfcheck do not work with calls yet.

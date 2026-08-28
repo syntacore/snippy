@@ -1,0 +1,1 @@
+# RUN: llvm-snippy %S/../ori_andi_xori.yaml

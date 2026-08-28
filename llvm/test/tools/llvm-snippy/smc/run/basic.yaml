@@ -1,0 +1,2 @@
+# RUN: llvm-snippy %S/../basic.yaml -mtriple=riscv64
+# RUN: llvm-snippy %S/../basic.yaml -mtriple=riscv32
