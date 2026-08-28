@@ -1,0 +1,89 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mcpu: generic-rv64
+  mattr: "+f,+d"
+  num-instrs: 10
+  init-regs-in-elf: off
+  honor-target-abi: on
+  redefine-sp: reg::X3
+sections:
+  - name:      stack
+    VMA:       0x200000
+    SIZE:      0x10000
+    LMA:       0x200000
+    ACCESS:    rw
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rw
+  - name:      utility
+    VMA:       0x400000
+    SIZE:      0x100000
+    LMA:       0x400000
+    ACCESS:    rw
+  - name:      2
+    VMA:       0x500000
+    SIZE:      0x100000
+    LMA:       0x500000
+    ACCESS:    rx
+
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - myfunc
+    - name: myfunc
+      external: true
+
+histogram:
+     - [FADD_D, 3.0]
+     - [FDIV_D, 3.0]
+     - [FLD, 3.0]
+     - [FSW, 3.0]
+     - [JAL, 10.0]
+     - [ADDIW, 1.0]
+     - [SUB, 4.0]
+
+# warning: When using --honor-target-abi and --redefine-sp=reg::X3 options together, target ABI may not be preserved in case of traps: use these options in combination only for valid code generation
+
+# spill global values
+# CHECK: sd gp
+# CHECK-NEXT: mem [[MEMGP:0x[0]{10}4[[:xdigit:]]{5}]] [[VALGP:0x[[:xdigit:]]{16}]]
+# CHECK: sd tp
+# CHECK-NEXT: mem [[MEMTP:0x[0]{10}4[[:xdigit:]]{5}]] [[VALTP:0x[[:xdigit:]]{16}]]
+
+# saving real sp
+# CHECK: sd gp
+
+# CHECK-NOT: mem [[MEMGP]]
+# CHECK-NOT: mem [[MEMTP]]
+
+# spill local values
+# CHECK: sd gp
+# CHECK-NEXT: mem [[LMEMGP:0x[0]{10}4[[:xdigit:]]{5}]] [[LVALGP:0x[[:xdigit:]]{16}]]
+# CHECK: sd tp
+# CHECK-NEXT: mem [[LMEMTP:0x[0]{10}4[[:xdigit:]]{5}]] [[LVALTP:0x[[:xdigit:]]{16}]]
+
+# reload global values
+# CHECK: ld gp
+# CHECK-NEXT: [[VALGP]] mem [[MEMGP]]
+# CHECK: ld tp
+# CHECK-NEXT: [[VALTP]] mem [[MEMTP]]
+
+# reload SP
+# CHECK-NEXT: add sp, gp, zero
+# CHECK-NEXT: x2
+
+# Call external function
+# CHECK-NEXT: jal
+
+# reload old local values
+# CHECK: ld gp
+# CHECK-NEXT: [[LVALGP]] mem [[LMEMGP]]
+# CHECK: ld tp
+# CHECK-NEXT: [[LVALTP]] mem [[LMEMTP]]

@@ -1,0 +1,77 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:     -num-instrs=10 -selfcheck -selfcheck-mem \
+# RUN:     -init-memory=runtime -init-regs-in-elf -memory-seed=11  \
+# RUN:     -dump-memory-section=2,3 -memory-section-file=%t11
+
+# COMM: Dump of sections 2,3
+# RUN: llvm-objcopy -O ihex -I binary %t11 %t1
+# RUN: cat %t1 |& FileCheck %s --dump-input fail
+
+
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:     -num-instrs=10 \
+# RUN:     -init-memory=runtime -init-regs-in-elf -memory-seed=11  \
+# RUN:     -dump-memory-section={rw} -memory-section-file=%t22
+
+# COMM: Dump of sections 2 and 3.
+# COMM: All RW sections include implicit ones such as selfchech and stack
+# COMM: (here they are disabled)
+# RUN: llvm-objcopy -O ihex -I binary %t22 %t2
+# RUN: cat %t2 |& FileCheck %s --dump-input always
+
+
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:     -num-instrs=10 \
+# RUN:     -init-memory=runtime -init-regs-in-elf -memory-seed=11  \
+# RUN:     -dump-memory-section={rw},2,2 -memory-section-file=%t33
+
+# COMM: Shows that sections may duplicate others in the input option,
+# COMM:   but final dump will contain each section only once.
+# RUN: llvm-objcopy -O ihex -I binary %t33 %t3
+# RUN: cat %t3 |& FileCheck %s --dump-input always
+
+# COMM: According to Ihex standart each satrts with number of bytes in the line.
+# COMM: This means that we will have 2 lines with 0x10 bytes. (10 bytes for each section)
+# COMM: :00 means the end of dump
+
+# COMM: This is splitmix32 for the memory-seed=11.
+# COMM: We expect to have 2 memory sections with the same initializaed memory
+# CHECK-COUNT-2: 330E1273299ED19A53102DED30FBF41C
+# CHECK-NEXT:    :00
+
+options:
+  trace-log: "/dev/null"
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x3000000
+      SIZE:      0x0000010
+      LMA:       0x3000000
+      ACCESS:    rw
+    - name:      3
+      VMA:       0x3002000
+      SIZE:      0x0000010
+      LMA:       0x3002000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+
+histogram:
+    - [LW, 2.0]

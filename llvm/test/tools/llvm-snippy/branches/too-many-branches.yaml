@@ -1,0 +1,20 @@
+# REQUIRES: snippy-long-tests
+# RUN: timeout 300 llvm-snippy %s -mtriple=riscv64 -num-instrs=5000 \
+# RUN:     -dump-mf -o %t
+
+sections:
+    - name:      1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+
+

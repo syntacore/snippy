@@ -1,0 +1,35 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s |& FileCheck %s
+
+include:
+  - ../../../Inputs/sections.yaml
+
+options:
+    mtriple: riscv64
+    mattr: +f
+    dump-mf: on
+    num-instrs: 100
+    init-regs-in-elf: true
+
+histogram:
+    - [FADD_S, 1.0]
+
+operands-reinitialization:
+    - type: valuegram
+      weight: 1.0
+      opcodes:
+        - "FADD_S":
+            - type: operands
+              values:
+                - - [0x123, 1.0] # Valuegram
+                - -inff          # Just a value
+            - type: operands
+              values: [0x123, -inff]
+
+# CHECK: fadd.s
+
+# IEEE754 single -inf representation
+# CHECK-10: 0xff800000
+
+# +inf representation
+# CHECK-NOT: 0x7f800000

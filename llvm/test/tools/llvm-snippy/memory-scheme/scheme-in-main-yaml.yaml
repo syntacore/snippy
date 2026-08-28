@@ -1,0 +1,38 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-None
+
+# RUN: llvm-snippy %s -mtriple=riscv64 \
+# RUN:   -num-instrs=100  -dump-layout=true \
+# RUN: | FileCheck %s --dump-input fail --check-prefix CONFIG
+
+# RUN: llvm-snippy %s -mtriple=riscv64 \
+# RUN:   -num-instrs=100 \
+# RUN:   -dump-layout=true \
+# RUN: |& FileCheck %s --dump-input fail
+sections:
+    - name:      1
+      VMA:       0x2000
+      SIZE:      0x100000
+      LMA:       0x2000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [LW, 10.0]
+    - [SW, 10.0]
+
+access-addresses:
+    - plain:
+          - addr: 0x80200F00
+
+# CONFIG: access-addresses:
+# CONFIG-NEXT:   - weight:          1
+# CONFIG-NEXT:     ordered:         false
+# CONFIG-NEXT:     plain:
+# CONFIG-NEXT:       - addr:            0x80200F00
+
+# CHECK-COUNT-100: 0x0000000080200{{f|F}}00

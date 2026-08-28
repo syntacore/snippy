@@ -1,0 +1,9 @@
+# COM: no eol
+include:
+  - sections.yaml
+
+options:
+    num-instrs: 500
+    verify-gen-histogram: True
+    histogram-must-succeed: True
+    dump-mf: true

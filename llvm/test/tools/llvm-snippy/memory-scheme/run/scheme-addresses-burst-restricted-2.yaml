@@ -1,0 +1,48 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: sed -e s/BURST_MODE/mixed/ %s >%t.mixed.yaml 
+# RUN: llvm-snippy %S/../Inputs/loadstore-layout.yaml %t.mixed.yaml -mtriple=riscv64 \
+# RUN:  -num-instrs=1000 \
+# RUN:  -dump-memory-accesses-restricted=%t-1.yaml \
+# RUN: |& FileCheck %s --check-prefix=EXEC
+
+# RUN: FileCheck --input-file=%t-1.yaml %s --check-prefix=ADDR
+
+# RUN: sed -e s/BURST_MODE/store/ %s >%t.store.yaml 
+# RUN: llvm-snippy %S/../Inputs/loadstore-layout.yaml %t.store.yaml -mtriple=riscv64 \
+# RUN:  -num-instrs=1000 \
+# RUN:  -dump-memory-accesses-restricted=%t-2.yaml \
+# RUN: |& FileCheck %s --check-prefix=EXEC
+
+# RUN: FileCheck --input-file=%t-2.yaml %s --check-prefix=ADDR
+
+# RUN: sed -e s/BURST_MODE/load/ %s >%t.load.yaml 
+# RUN: llvm-snippy %S/../Inputs/loadstore-layout.yaml %t.load.yaml -mtriple=riscv64 \
+# RUN:  -num-instrs=1000 \
+# RUN:  -dump-memory-accesses-restricted=%t-3.yaml \
+# RUN: |& FileCheck %s --check-prefix=EXEC
+
+# RUN: FileCheck --input-file=%t-3.yaml %s --check-prefix=ADDR
+
+access-ranges:
+    - start: 0x80002000
+      size: 4
+      stride: 1
+      first-offset: 0
+      last-offset: 0
+    - start: 0x80002010
+      size: 16
+      stride: 8
+      first-offset: 0
+      last-offset: 0
+    - start: 0x80002050
+      size: 10
+      stride: 4
+      first-offset: 0
+      last-offset: 0
+burst:
+  mode: BURST_MODE
+  min-size: 100
+  max-size: 100
+# EXEC: #===Simulation Start===
+
+# ADDR-COUNT-1000: - addr: 0x800020{{(00|01|02|03|10|18|50|54|58)}}

@@ -1,0 +1,23 @@
+# RUN: sed -e s/DO_PERM/off/ %s > %t.1.yaml
+# RUN: timeout 300 llvm-snippy %t.1.yaml -mtriple=riscv64 -num-instrs=1000 \
+# RUN:     -verify-mi
+# RUN: sed -e s/DO_PERM/on/ %s > %t.2.yaml
+# RUN: timeout 300 llvm-snippy %t.2.yaml -mtriple=riscv64 -num-instrs=1000 \
+# RUN:     -verify-mi
+sections:
+    - name:      1
+      VMA:       0x1000
+      SIZE:      0x10000
+      LMA:       0x1000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+
+branches:
+  permutation: DO_PERM

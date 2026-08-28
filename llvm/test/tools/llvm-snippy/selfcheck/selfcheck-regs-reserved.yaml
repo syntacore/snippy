@@ -1,0 +1,30 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -num-instrs=100 \
+# RUN:    -init-regs-in-elf -selfcheck -redefine-ra=RA \
+# RUN:    -reserved-regs-list=X0,X1,X2,X3,X4,X5,X6,X7,X8,X9,X11,X12,X13,X14,X15,X16,X17,X18,X19,X20,X21,X22,X23,X24,X25,X26,X27,X28,X29,X30,X31 \
+# RUN: |& FileCheck %s
+
+sections:
+  - name:      1
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x200000
+    SIZE:      0x100000
+    LMA:       0x200000
+    ACCESS:    rw
+  - name:      selfcheck
+    VMA:       0x300000
+    SIZE:      0x100000
+    LMA:       0x300000
+    ACCESS:    rw
+
+histogram:
+    - [XOR, 1.0]
+
+# CHECK: #===Simulation Start===
+# CHECK-COUNT-100: xor a0, a0, a0
+

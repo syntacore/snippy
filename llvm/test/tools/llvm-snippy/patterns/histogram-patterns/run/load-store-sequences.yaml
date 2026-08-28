@@ -1,0 +1,4 @@
+# RUN: llvm-snippy %S/../load-store-sequences.yaml -define-main-histogram=LoadSeq
+# RUN: llvm-snippy %S/../load-store-sequences.yaml -define-main-histogram=StoreSeq
+# RUN: llvm-snippy %S/../load-store-sequences.yaml -define-main-histogram=LoadStoreSeq
+# RUN: llvm-snippy %S/../load-store-sequences.yaml -define-main-histogram=LoadStoreWithOthers

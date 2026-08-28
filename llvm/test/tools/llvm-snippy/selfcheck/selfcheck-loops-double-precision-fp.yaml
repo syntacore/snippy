@@ -1,0 +1,53 @@
+# REQUIRES: riscv-snippy-model-callbacks
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=-c,+m,+f,+d \
+# RUN:    -num-instrs=1000 -init-regs-in-elf \
+# RUN:    --model-plugin=spike \
+# RUN: |& FileCheck %s
+sections:
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x410000
+      SIZE:      0x100000
+      LMA:       0x410000
+      ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+    - [BNE, 1.0]
+    - [BLT, 1.0]
+    - [BLTU, 1.0]
+    - [BGE, 1.0]
+    - [BGEU, 1.0]
+    - [XOR, 10.0]
+    - [ADD, 10.0]
+    - [MUL, 10.0]
+    - [DIV, 10.0]
+    - [FADD_D, 10.0]
+    - [FMUL_D, 10.0]
+    - [FSUB_D, 10.0]
+
+branches:
+  number-of-loop-iterations:
+    min: 1
+    max: 2
+  max-depth:
+    if: 3
+    loop: 3
+
+# CHECK: #===Simulation Start===
+

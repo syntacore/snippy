@@ -1,0 +1,51 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=-c \
+# RUN:    -num-instrs=50 -init-regs-in-elf -selfcheck=10 \
+# RUN: |& FileCheck %s --dump-input always 
+sections:
+  - name:      1
+    VMA:       0x310000
+    SIZE:      0x100000
+    LMA:       0x310000
+    ACCESS:    r
+  - name:      2
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      3
+    VMA:       0x500000
+    SIZE:      0x100000
+    LMA:       0x500000
+    ACCESS:    rw
+  - name:      selfcheck
+    VMA:       0x600000
+    SIZE:      0x100000
+    LMA:       0x600000
+    ACCESS:    rw
+
+histogram:
+    - [OR, 1.0]
+# CHECK-COUNT-10: or
+# CHECK: sd
+# CHECK-COUNT-10: or
+# CHECK: sd
+# CHECK-COUNT-10: or
+# CHECK: sd
+# CHECK-COUNT-10: or
+# CHECK: sd
+# CHECK-COUNT-10: or
+# CHECK: sd
+# CHECK: #===Simulation Start===
+# CHECK-COUNT-10: or
+# CHECK: sd
+# CHECK-COUNT-10: or
+# CHECK: sd
+# CHECK-COUNT-10: or
+# CHECK: sd
+# CHECK-COUNT-10: or
+# CHECK: sd
+# CHECK-COUNT-10: or
+# CHECK: sd
+

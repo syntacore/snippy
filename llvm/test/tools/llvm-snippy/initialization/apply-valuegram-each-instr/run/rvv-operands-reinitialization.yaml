@@ -1,0 +1,45 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-rvv
+
+# RUN: llvm-snippy %s -trace-SNTF %t.log.sntf
+# RUN: FileCheck --input-file=%t.log.sntf %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 200
+  rvv-init-mode: loads
+
+include:
+  - ../../../rvv-config-histogram/Inputs/sections.yaml
+
+histogram:
+       - [VSETVL, 1.0]
+       - [VADD_VV, 1.0]
+       - [VAADDU_VV, 1.0]
+       - [VAADD_VV, 1.0]
+       - [VADC_VIM, 1.0]
+       - [VAND_VV, 1.0]
+       - [VASUBU_VV, 1.0]
+       - [VASUB_VV, 1.0]
+       - [VCPOP_M, 1.0]
+       - [VDIVU_VV, 1.0]
+       - [VDIV_VV, 1.0]
+       - [VFADD_VV, 1.0]
+       - [VFCLASS_V, 1.0]
+       - [VFNMSAC_VV, 1.0]
+
+operands-reinitialization:
+  - type: valuegram
+    weight: 1.0
+    opcodes:
+      - "V.+_VV":
+        - type: operands
+          values: [0x1, 0x2]
+      - "V.+":
+        - type: operands
+          values: [0x3]
+
+# CHECK-COUNT-20: {{v[0-9]+}}=[1]:0000000000000000[0]:0000000000000003
+# CHECK-COUNT-45: {{v[0-9]+}}=[1]:0000000000000000[0]:0000000000000002
+# CHECK-COUNT-45: {{v[0-9]+}}=[1]:0000000000000000[0]:0000000000000001

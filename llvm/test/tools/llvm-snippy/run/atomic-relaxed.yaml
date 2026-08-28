@@ -1,0 +1,36 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=500 -mattr=+a |& FileCheck %s --dump-input always
+
+# CHECK: #===Simulation Start===
+
+sections:
+    - name:      1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [AMOADD_D, 1.0]
+    - [AMOADD_W, 1.0]
+    - [AMOAND_D, 1.0]
+    - [AMOAND_W, 1.0]
+    - [AMOMAXU_D, 1.0]
+    - [AMOMAXU_W, 1.0]
+    - [AMOMAX_D, 1.0]
+    - [AMOMAX_W, 1.0]
+    - [AMOMINU_D, 1.0]
+    - [AMOMINU_W, 1.0]
+    - [AMOMIN_D, 1.0]
+    - [AMOMIN_W, 1.0]
+    - [AMOOR_D, 1.0]
+    - [AMOOR_W, 1.0]
+    - [AMOSWAP_D, 1.0]
+    - [AMOSWAP_W, 1.0]
+    - [AMOXOR_D, 1.0]
+    - [AMOXOR_W, 1.0]

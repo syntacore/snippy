@@ -1,0 +1,46 @@
+# REQUIRES: riscv-snippy-model-callbacks
+
+# COM: This test checks that initialization before each instruction works with selfcheck.
+
+# RUN: llvm-snippy %s %S/../Inputs/double-floats.yaml \
+# RUN:     -valuegram-operands-regs=%S/../Inputs/histograms.yaml -o %t \
+# RUN: |& FileCheck %s --check-prefix=THREE_OPERANDS_ONE_X
+
+# RUN: FileCheck %s --check-prefix=SELFCHECK --input-file=%t.selfcheck.yaml
+
+options:
+  mtriple: "riscv64" 
+  mattr: "+zfh,+d"
+  num-instrs: 150
+  dump-mf: on
+  verify-mi: true
+  selfcheck: "10"
+  selfcheck-ref-value-storage: "memory"
+  valuegram-operands-regs-init-outputs: on
+
+sections:
+  - name:      0
+    VMA:       0x2000000
+    SIZE:      0x1000000
+    LMA:       0x2000000
+    ACCESS:    r
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80600000
+    SIZE:      0x0400000
+    LMA:       0x80600000
+    ACCESS:    rw
+  - name:      selfcheck
+    VMA:       0x90000000
+    SIZE:      0x00100000
+    LMA:       0x90000000
+    ACCESS:    rw
+
+# SELFCHECK-COUNT-15: address 
+#
+# Check initialization
+# THREE_OPERANDS_ONE_X-COUNT-10: = ADDI $x0, {{(0|1|255).*[[:space:]].*}} = ADDI {{.*}}, {{(83|170).*[[:space:]].*}}[[FREG1:\$f[0-9]+_d]] = FMV_D_X {{.*[[:space:]].*}} = ADDI {{.*(83|170).*[[:space:]].*}} = FMV_D_X {{.*[[:space:]].*}} = {{.*}}[[FREG1]], 

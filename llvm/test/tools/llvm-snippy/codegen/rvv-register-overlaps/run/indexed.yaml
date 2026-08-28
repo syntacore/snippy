@@ -1,0 +1,1 @@
+# RUN: llvm-snippy %S/../indexed.yaml
