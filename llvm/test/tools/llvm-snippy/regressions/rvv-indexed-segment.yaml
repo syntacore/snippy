@@ -1,0 +1,103 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: timeout 300 llvm-snippy %s
+
+options:
+  num-instrs: 10000
+  mtriple: riscv64
+  honor-target-abi: on
+  init-regs-in-elf: on
+  riscv-init-fregs-from-memory: on
+  enable-address-value-hazards: on
+  mattr: +v,+c
+
+sections:
+- name: snippet_0
+  PHDR: snippet_0
+  VMA: 0x41a2ea000
+  SIZE: 0xd865000
+  LMA: 0x41a2ea000
+  ACCESS: rx
+- name: stack
+  PHDR: stack
+  VMA: 0x47dcde000
+  SIZE: 0x1000
+  LMA: 0x47dcde000
+  ACCESS: rw
+- name: const
+  PHDR: const
+  VMA: 0x45a451000
+  SIZE: 0x10000
+  LMA: 0x45a451000
+  ACCESS: r
+- name: sect_rw_40ce5ea80
+  PHDR: sect_rw_40ce5ea80
+  VMA: 0x40ce5ea80
+  SIZE: 0x100
+  LMA: 0x40ce5ea80
+  ACCESS: rw
+
+histogram:
+- [LB, 111]
+- [LH, 111]
+- [LW, 111]
+- [LD, 111]
+- [C_LD, 111]
+- [SB, 166]
+- [SH, 166]
+- [SW, 166]
+- [SD, 166]
+- [C_SW, 166]
+- [C_SD, 166]
+- [FENCE, 100.0]
+- [VLOXEI8_V, 63]
+- [VLOXEI16_V, 63]
+- [VLOXEI32_V, 63]
+- [VLOXEI64_V, 63]
+- [VLOXSEG6EI64_V, 63]
+- [VLOXSEG7EI8_V, 63]
+- [VLOXSEG7EI16_V, 63]
+- [VLOXSEG8EI64_V, 63]
+- [FMV_W_X, 0.061]
+
+access-groups:
+- weight: 1.0
+  access-ranges:
+  - start: 0x40ce5eaa2
+    size: 0x2
+    stride: 2
+    first-offset: 0
+    last-offset: 1
+    max-past-last-offset: 0
+- weight: 1.0
+  access-ranges:
+  - start: 0x40ce5eaa8
+    size: 0x80
+    stride: 128
+    first-offset: 0
+    last-offset: 127
+    max-past-last-offset: 0
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: 0.1
+  mode-distribution:
+    VM:
+    - [all_ones, 1.0]
+    - [any_legal, 1.0]
+    VL:
+    - [max_encodable, 1.0]
+    - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+        sew_32: 1.0
+        sew_64: 1.0
+      LMUL:
+        m1: 1.0
+        m4: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0

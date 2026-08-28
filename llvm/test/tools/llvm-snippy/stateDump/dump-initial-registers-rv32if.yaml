@@ -1,0 +1,74 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=-a,+f \
+# RUN:    -num-instrs=10 -dump-initial-registers-yaml=%t.yaml \
+# RUN:     && FileCheck %s --dump-input always < %t.yaml
+
+# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=-a,+f \
+# RUN:    -num-instrs=10 -dump-initial-registers-yaml=%t.yaml \
+# RUN:    && FileCheck %s --dump-input always < %t.yaml
+
+sections:
+    - name:      1
+      VMA:       0x800000
+      SIZE:      0x4000
+      LMA:       0x800000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x806000
+      SIZE:      0x4000
+      LMA:       0x806000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [SRA, 1.0]
+    - [SRAI, 1.0]
+    - [SRL, 1.0]
+    - [SRLI, 1.0]
+    - [SLL, 1.0]
+    - [SLLI, 1.0]
+    - [AND, 1.0]
+    - [ANDI, 1.0]
+    - [OR, 1.0]
+    - [ORI, 1.0]
+    - [XOR, 1.0]
+    - [XORI, 1.0]
+    - [LW, 10.0]
+    - [SW, 10.0]
+
+# CHECK: registers:
+# CHECK:   X31
+# CHECK-NEXT:   - [ F0, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F1, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F2, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F3, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F4, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F5, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F6, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F7, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F8, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F9, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F10, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F11, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F12, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F13, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F14, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F15, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F16, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F17, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F18, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F19, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F20, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F21, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F22, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F23, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F24, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F25, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F26, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F27, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F28, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F29, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F30, 0x{{(0{8}[[:xdigit:]]{8})}} ]
+# CHECK-NEXT:   - [ F31, 0x{{(0{8}[[:xdigit:]]{8})}} ]

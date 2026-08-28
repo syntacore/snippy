@@ -1,0 +1,3 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: llvm-snippy %S/../with-zcmp.yaml -mtriple=riscv64
+# RUN: llvm-snippy %S/../with-zcmp.yaml -mtriple=riscv32

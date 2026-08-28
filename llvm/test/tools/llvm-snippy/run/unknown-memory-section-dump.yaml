@@ -1,0 +1,26 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: not llvm-snippy %s |& FileCheck %s
+options:
+  mtriple: riscv64
+  num-instrs: 10
+  init-regs-in-elf: true
+  trace-log: "/dev/null"
+  dump-memory-section: [1, 2, 3, "dfgdfg"]
+
+sections:
+- name: 1
+  VMA: 0x1000
+  LMA: 0x1000
+  SIZE: 0x1000
+  ACCESS: rx
+- name: 2
+  VMA: 0x2000
+  LMA: 0x2000
+  SIZE: 0x1000
+  ACCESS: rw
+
+histogram:
+  - [LW, 1.0]
+
+# CHECK: error: dump of unknown sections requested
+# CHECK-SAME: List of non-existent sections: "3", "dfgdfg"

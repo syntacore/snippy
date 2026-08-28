@@ -1,0 +1,26 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# COM: test checks that if we report error in case of incorrect registers
+
+# RUN: not llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=+c \
+# RUN:    -num-instrs=10 \
+# RUN:    -initial-regs-yaml=%S/Inputs/initial_state_rv64i-illegal-class.yaml \
+# RUN:    -dump-registers-yaml=%t.regs.yaml \
+# RUN: |& FileCheck %s
+
+sections:
+    - name:      1
+      VMA:       0x800000
+      SIZE:      0x4000
+      LMA:       0x800000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x806000
+      SIZE:      0x4000
+      LMA:       0x806000
+      ACCESS:    rw
+
+histogram:
+    - [C_NOP, 1.0]
+
+# CHECK: error: Illegal register class Y specified for initial register values. The following register classes are legal for the current target: X, F, V, PC.

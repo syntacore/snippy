@@ -1,0 +1,37 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:     -num-instrs=3 -selfcheck -selfcheck-mem \
+# RUN:     -init-memory=full -memory-seed=11 \
+# RUN:      -dump-memory-section=2 -memory-section-file=%t11
+
+# RUN: llvm-objcopy -O ihex -I binary %t11 %t1
+# RUN: cat %t1 |& FileCheck %s
+
+# COMM: This is the reference of splitmix32 generation for memory-seed=11
+# CHECK: 330E1273299ED19A53102DED30FBF41C40
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x300000
+      SIZE:      0x100000
+      LMA:       0x300000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x410000
+      SIZE:      0x100000
+      LMA:       0x410000
+      ACCESS:    rw
+
+histogram:
+    - [LB, 2.0]

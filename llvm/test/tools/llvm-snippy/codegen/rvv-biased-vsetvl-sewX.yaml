@@ -1,0 +1,52 @@
+# REQUIRES: riscv-rvv
+# REQUIRES: riscv-snippy-model-spike
+
+# COM: this test requires spike model because we match execution log
+# COM: the test checks for bias-based RVV mode switches
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 5000
+
+include:
+- Inputs/rvv-lmul1-sewX.yaml
+
+sections:
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+
+histogram:
+    - [VADD_VV, 1.0]
+
+# COM: Looking for sequences like:
+# COM:    vsetvl zero, a6, s7
+# COM:      ......
+# COM:    vmxnor.mm v0, v0, v0
+# COM:      ......
+# COM:    vadd.vv
+
+# CHECK-DAG: vsetvl {{zero, [a-z0-9]+, [a-z0-9]+[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetvl   {{a5, [a-z0-9]+, [a-z0-9]+[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetvl   {{s2, [a-z0-9]+, [a-z0-9]+[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetvl   {{t6, [a-z0-9]+, [a-z0-9]+[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+
+# CHECK-DAG: vsetvl {{[a-z0-9]+, ra, [a-z0-9]+[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetvl {{[a-z0-9]+, a5, [a-z0-9]+[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetvl {{[a-z0-9]+, s2, [a-z0-9]+[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetvl {{[a-z0-9]+, t6, [a-z0-9]+[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+
+# CHECK-DAG: vsetvl {{[a-z0-9]+, [a-z0-9]+, ra[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetvl {{[a-z0-9]+, [a-z0-9]+, a5[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetvl {{[a-z0-9]+, [a-z0-9]+, s2[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetvl {{[a-z0-9]+, [a-z0-9]+, t6[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv

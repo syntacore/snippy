@@ -1,0 +1,22 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s -mattr +f,-d -trace-log %t.f
+# RUN: FileCheck %s -input-file %t.f -dump-input fail
+# RUN: llvm-snippy %s -mattr +d -trace-log %t.fd
+# RUN: FileCheck %s -input-file %t.fd -dump-input fail
+include:
+  - ../../Inputs/sections.yaml
+options:
+  mtriple: riscv64
+  mcpu: generic-rv64
+  num-instrs: 1000
+histogram:
+  - [ReadFFLAGS, 1.0]
+  - [WriteFFLAGSImm, 1.0]
+  - [SwapFFLAGSImm, 1.0]
+imm-hist:
+  opcodes:
+    - "WriteFFLAGSImm|SwapFFLAGSImm":
+        - [0, 1.0] # Clear flags
+
+# CHECK-DAG: {{csrrs?}} {{[sat][[:digit:]]+}}, fflags
+# CHECK-DAG: {{csrr?wi}} {{(zero, )?}}fflags, 0

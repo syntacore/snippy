@@ -1,0 +1,21 @@
+sections:
+  - name: 1
+    VMA: 0x2000
+    SIZE: 0x1000000
+    LMA: 0x2000
+    ACCESS: rx
+  - name: 2
+    VMA: 0x40000000
+    SIZE: 0x2000
+    LMA: 0x40000000
+    ACCESS: rw
+  - name: stack
+    VMA: 0x40100000
+    SIZE: 0x1000
+    LMA: 0x40100000
+    ACCESS: rw
+  - name: selfcheck
+    VMA: 0x40200000
+    SIZE: 0x100000
+    LMA: 0x40200000
+    ACCESS: rw

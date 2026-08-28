@@ -1,0 +1,95 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-rvv
+
+# COM: This test checks that for instructions that, regardless of LMUL, write to
+#      one destination register, selfcheck also makes only one entry.
+
+# RUN: llvm-snippy %s \
+# COM:    -riscv-preference-for-rvv-mode-change=vsetvl \
+# RUN:    -initial-regs-yaml=%S/Inputs/reg-init.yaml -o %t
+# RUN: FileCheck %s --input-file=%t.selfcheck.yaml -check-prefix=ANNOTATION
+
+options:
+  mtriple: riscv64
+  mattr: +v,+f
+  num-instrs: 3000
+  rvv-init-mode: loads
+  init-regs-in-elf: on
+  verify-gen-histogram: on
+
+selfcheck:
+  mode: code
+  selfcheck-td-options:
+    enable-selfcheck-rvv: true
+
+include:
+- "../rvv-config-histogram/Inputs/rvv-unit-all.yaml"
+- Inputs/sections.yaml
+
+histogram:
+    - [VSETVL, 1.0]
+    - [VREDSUM_VS, 1.0]
+    - [VREDMAXU_VS, 1.0]
+    - [VREDMAX_VS, 1.0]
+    - [VREDMINU_VS, 1.0]
+    - [VREDMIN_VS, 1.0]
+    - [VREDAND_VS, 1.0]
+    - [VREDOR_VS, 1.0]
+    - [VREDXOR_VS, 1.0]
+    - [VFREDOSUM_VS, 1.0]
+    - [VFREDUSUM_VS, 1.0]
+    - [VFREDMAX_VS, 1.0]
+    - [VFREDMIN_VS, 1.0]
+    - [VWREDSUMU_VS, 1.0]
+    - [VWREDSUM_VS, 1.0]
+    - [VFWREDOSUM_VS, 1.0]
+    - [VFWREDUSUM_VS, 1.0]
+    - [VMSEQ_VV, 1.0]
+    - [VMSNE_VV, 1.0]
+    - [VMSLTU_VV, 1.0]
+    - [VMSLT_VV, 1.0]
+    - [VMSLEU_VV, 1.0]
+    - [VMSLE_VV, 1.0]
+    - [VMFEQ_VV, 1.0]
+    - [VMFNE_VV, 1.0]
+    - [VMFLT_VV, 1.0]
+    - [VMFLE_VV, 1.0]
+    - [VMSEQ_VX, 1.0]
+    - [VMSNE_VX, 1.0]
+    - [VMSLTU_VX, 1.0]
+    - [VMSLT_VX, 1.0]
+    - [VMSLEU_VX, 1.0]
+    - [VMSLE_VX, 1.0]
+    - [VMSGTU_VX, 1.0]
+    - [VMSGT_VX, 1.0]
+    - [VMFEQ_VF, 1.0]
+    - [VMFNE_VF, 1.0]
+    - [VMFLT_VF, 1.0]
+    - [VMFLE_VF, 1.0]
+    - [VMFGT_VF, 1.0]
+    - [VMFGE_VF, 1.0]
+    - [VMSEQ_VI, 1.0]
+    - [VMSNE_VI, 1.0]
+    - [VMSLEU_VI, 1.0]
+    - [VMSLE_VI, 1.0]
+    - [VMSGTU_VI, 1.0]
+    - [VMSGT_VI, 1.0]
+    - [VMADC_VVM, 1.0]
+    - [VMSBC_VVM, 1.0]
+    - [VMADC_VXM, 1.0]
+    - [VMSBC_VXM, 1.0]
+    - [VMADC_VIM, 1.0]
+    - [VMAND_MM, 1.0]
+    - [VMNAND_MM, 1.0]
+    - [VMANDN_MM, 1.0]
+    - [VMXOR_MM, 1.0]
+    - [VMOR_MM, 1.0]
+    - [VMNOR_MM, 1.0]
+    - [VMORN_MM, 1.0]
+    - [VMXNOR_MM, 1.0]
+    - [VMSBF_M, 1.0]
+    - [VMSOF_M, 1.0]
+    - [VMSIF_M, 1.0]
+
+# ANNOTATION-COUNT-3000: address
+# ANNOTATION-NOT: address

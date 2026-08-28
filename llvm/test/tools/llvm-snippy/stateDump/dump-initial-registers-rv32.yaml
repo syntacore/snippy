@@ -1,0 +1,75 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=-a \
+# RUN:    -num-instrs=10 -dump-initial-registers-yaml=%t.yaml \
+# RUN:    && FileCheck %s --dump-input always < %t.yaml
+
+# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=-a \
+# RUN:    -num-instrs=10 -dump-initial-registers-yaml=%t.yaml \
+# RUN:    && FileCheck %s --dump-input always < %t.yaml
+
+sections:
+    - name:      1
+      VMA:       0x800000
+      SIZE:      0x4000
+      LMA:       0x800000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x806000
+      SIZE:      0x4000
+      LMA:       0x806000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [SRA, 1.0]
+    - [SRAI, 1.0]
+    - [SRL, 1.0]
+    - [SRLI, 1.0]
+    - [SLL, 1.0]
+    - [SLLI, 1.0]
+    - [AND, 1.0]
+    - [ANDI, 1.0]
+    - [OR, 1.0]
+    - [ORI, 1.0]
+    - [XOR, 1.0]
+    - [XORI, 1.0]
+    - [LW, 10.0]
+    - [SW, 10.0]
+
+# CHECK: registers:
+# CHECK-NEXT:   - [ X0, 0x0000000000000000 ]
+# CHECK-NEXT:   - [ X1, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X2, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X3, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X4, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X5, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X6, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X7, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X8, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X9, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X10, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X11, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X12, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X13, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X14, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X15, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X16, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X17, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X18, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X19, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X20, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X21, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X22, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X23, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X24, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X25, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X26, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X27, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X28, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X29, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X30, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NEXT:   - [ X31, 0x{{([[:xdigit:]]{16})}} ]
+# CHECK-NOT: F0
+# CHECK-NOT: V0

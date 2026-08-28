@@ -1,0 +1,40 @@
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+c \
+# RUN:   -num-instrs=200 >& %t
+# RUN: FileCheck %s --input-file=%t --check-prefixes=SW
+# RUN: FileCheck %s --input-file=%t --check-prefixes=SD
+# RUN: FileCheck %s --input-file=%t --check-prefixes=LW
+# RUN: FileCheck %s --input-file=%t --check-prefixes=LD
+
+include:
+  - Inputs/memory-for-compressed-burst.yaml
+  - Inputs/mixed-burst.yaml
+
+sections:
+    - name: 1
+      VMA: 0x400400000
+      SIZE: 0x400000
+      LMA: 0x400400000
+      ACCESS: rx
+    - name: 2
+      VMA: 0x401000000
+      SIZE: 0x500000
+      LMA: 0x401000000
+      ACCESS: rw
+
+histogram:
+    - [C_LW, 1.0]
+    - [C_LD, 1.0]
+    - [C_SW, 1.0]
+    - [C_SD, 1.0]
+    - [LW, 1.0]
+    - [LD, 1.0]
+    - [SW, 1.0]
+    - [SD, 1.0]
+
+# Check that there are compressed instructions with non-zero offsets
+# SW-COUNT-5: c.sw {{[0-9a-z]+}}, {{[1-9][0-9]*}}(
+# SD-COUNT-5: c.sd {{[0-9a-z]+}}, {{[1-9][0-9]*}}(
+# LW-COUNT-5: c.lw {{[0-9a-z]+}}, {{[1-9][0-9]*}}(
+# LD-COUNT-5: c.ld {{[0-9a-z]+}}, {{[1-9][0-9]*}}(

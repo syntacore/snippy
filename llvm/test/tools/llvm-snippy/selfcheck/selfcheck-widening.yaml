@@ -1,0 +1,43 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-rvv
+
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=+v \
+# RUN:    -num-instrs=1000 -init-regs-in-elf -selfcheck --riscv-preference-for-rvv-mode-change=vsetvl \
+# RUN:    -enable-selfcheck-rvv -initial-regs-yaml=%S/Inputs/reg-init.yaml \
+# RUN:    -rvv-init-mode=loads -verify-gen-histogram -o %t
+# RUN: FileCheck %s --input-file=%t.selfcheck.yaml -check-prefix=ANNOTATION
+
+include:
+- "../rvv-config-histogram/Inputs/rvv-unit-sew_32-m1-max_encodable-bias.yaml"
+- Inputs/sections.yaml
+
+histogram:
+    - [VFWADD_VV, 1.0]
+    - [VFWADD_WF, 1.0]
+    - [VFWADD_WV, 1.0]
+    - [VFWADD_VF, 1.0]
+    - [VFWSUB_VF, 1.0]
+    - [VFWSUB_VV, 1.0]
+    - [VFWSUB_WF, 1.0]
+    - [VFWSUB_WV, 1.0]
+    - [VFWCVT_F_F_V, 1.0]
+    - [VFWCVT_F_XU_V, 1.0]
+    - [VFWCVT_F_X_V, 1.0]
+    - [VFWCVT_RTZ_XU_F_V, 1.0]
+    - [VFWCVT_RTZ_X_F_V, 1.0]
+    - [VFWCVT_XU_F_V, 1.0]
+    - [VFWCVT_X_F_V, 1.0]
+    - [VFWMACC_VF, 1.0]
+    - [VFWMACC_VV, 1.0]
+    - [VFWMSAC_VF, 1.0]
+    - [VFWMSAC_VV, 1.0]
+    - [VFWMUL_VF, 1.0]
+    - [VFWMUL_VV, 1.0]
+    - [VFWNMACC_VF, 1.0]
+    - [VFWNMACC_VV, 1.0]
+    - [VFWNMSAC_VF, 1.0]
+    - [VFWNMSAC_VV, 1.0]
+
+# ANNOTATION-COUNT-2000: address
+# ANNOTATION-NOT: address
