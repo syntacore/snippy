@@ -1,0 +1,28 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s | FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +zfa,+d
+  num-instrs: 1000
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+fpu-config:
+  overwrite:
+    mode: disabled
+sections:
+  - name: 1
+    VMA: 0x10000
+    LMA: 0x10000
+    SIZE: 0x10000
+    ACCESS: rx
+  - name: 2
+    VMA: 0x20000
+    LMA: 0x20000
+    SIZE: 0x10000
+    ACCESS: rw
+
+histogram:
+  - [FCVTMOD_W_D, 1.0]
+
+# CHECK-COUNT-1000: fcvtmod.w.d

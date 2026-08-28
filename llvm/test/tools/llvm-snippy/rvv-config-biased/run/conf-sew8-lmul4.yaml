@@ -1,0 +1,28 @@
+# REQUIRES: riscv-rvv
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  --num-instrs=10 -o %t \
+# RUN:  -riscv-dump-rvv-config
+
+include:
+- ../Inputs/rvv-unit-sew8-lmul4.yaml
+
+sections:
+  - name:      3
+    VMA:       0x7ffff000
+    SIZE:      0x1000
+    LMA:       0x7ffff000
+    ACCESS:    r
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VADD_VV, 1.0]

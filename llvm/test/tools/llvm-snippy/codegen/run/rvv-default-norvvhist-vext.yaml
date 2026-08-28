@@ -1,0 +1,21 @@
+# REQUIRES: riscv-rvv
+# COM: by default, we allow for generation even if no config and histogram
+# COM: are provided (probably, this needs to be changed)
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  --num-instrs=100 -o %t \
+# RUN:  -riscv-dump-rvv-config
+
+sections:
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [ADDI, 1.0]

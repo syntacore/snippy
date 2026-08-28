@@ -1,0 +1,91 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# COM: Check that specifying patterns in the register value histogram works
+
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=+m,+a,+f,+d,+c \
+# RUN:    -num-instrs=10 \
+# RUN:    -initial-regs-yaml=%S/Inputs/histogram_patterns_rv64g.yaml \
+# RUN:    -dump-registers-yaml=%t.regs.yaml
+# RUN: FileCheck %s --input-file %t.regs.yaml
+
+sections:
+    - name:      1
+      VMA:       0x800000
+      SIZE:      0x4000
+      LMA:       0x800000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x806000
+      SIZE:      0x4000
+      LMA:       0x806000
+      ACCESS:    rw
+
+histogram:
+    - [C_NOP, 1.0]
+
+# CHECK: registers:
+# CHECK-NEXT:  - [ X0, 0x0000000000000000 ]
+# CHECK-NEXT:  - [ X1
+# CHECK-NEXT:  - [ X2
+# CHECK-NEXT:  - [ X3
+# CHECK-NEXT:  - [ X4
+# CHECK-NEXT:  - [ X5
+# CHECK-NEXT:  - [ X6
+# CHECK-NEXT:  - [ X7
+# CHECK-NEXT:  - [ X8
+# CHECK-NEXT:  - [ X9
+# CHECK-NEXT:  - [ X10
+# CHECK-NEXT:  - [ X11
+# CHECK-NEXT:  - [ X12
+# CHECK-NEXT:  - [ X13
+# CHECK-NEXT:  - [ X14
+# CHECK-NEXT:  - [ X15
+# CHECK-NEXT:  - [ X16
+# CHECK-NEXT:  - [ X17
+# CHECK-NEXT:  - [ X18
+# CHECK-NEXT:  - [ X19
+# CHECK-NEXT:  - [ X20
+# CHECK-NEXT:  - [ X21
+# CHECK-NEXT:  - [ X22
+# CHECK-NEXT:  - [ X23
+# CHECK-NEXT:  - [ X24
+# CHECK-NEXT:  - [ X25
+# CHECK-NEXT:  - [ X26
+# CHECK-NEXT:  - [ X27
+# CHECK-NEXT:  - [ X28
+# CHECK-NEXT:  - [ X29
+# CHECK-NEXT:  - [ X30
+# CHECK-NEXT:  - [ X31
+# CHECK-NEXT:  - [ F0
+# CHECK-NEXT:  - [ F1
+# CHECK-NEXT:  - [ F2
+# CHECK-NEXT:  - [ F3
+# CHECK-NEXT:  - [ F4
+# CHECK-NEXT:  - [ F5
+# CHECK-NEXT:  - [ F6
+# CHECK-NEXT:  - [ F7
+# CHECK-NEXT:  - [ F8
+# CHECK-NEXT:  - [ F9
+# CHECK-NEXT:  - [ F10
+# CHECK-NEXT:  - [ F11
+# CHECK-NEXT:  - [ F12
+# CHECK-NEXT:  - [ F13
+# CHECK-NEXT:  - [ F14
+# CHECK-NEXT:  - [ F15
+# CHECK-NEXT:  - [ F16
+# CHECK-NEXT:  - [ F17
+# CHECK-NEXT:  - [ F18
+# CHECK-NEXT:  - [ F19
+# CHECK-NEXT:  - [ F20
+# CHECK-NEXT:  - [ F21
+# CHECK-NEXT:  - [ F22
+# CHECK-NEXT:  - [ F23
+# CHECK-NEXT:  - [ F24
+# CHECK-NEXT:  - [ F25
+# CHECK-NEXT:  - [ F26
+# CHECK-NEXT:  - [ F27
+# CHECK-NEXT:  - [ F28
+# CHECK-NEXT:  - [ F29
+# CHECK-NEXT:  - [ F30
+# CHECK-NEXT:  - [ F31
+# CHECK-NOT:   - [ V

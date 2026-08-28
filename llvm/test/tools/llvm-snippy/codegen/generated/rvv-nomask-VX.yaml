@@ -1,0 +1,107 @@
+# REQUIRES: riscv-rvv
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  -o %t --num-instrs=100000 \
+# RUN:  --init-regs-in-elf --verify-mi \
+# RUN:  --entry-point=start \
+# RUN:  -verify-gen-histogram -histogram-max-deviation=5 -histogram-must-succeed=true \
+# RUN:  -rvv-init-mode=loads \
+# RUN:  -riscv-nomask-mode-for-rvv=true \
+# RUN:  -histogram-must-succeed=false \
+# RUN:  |& FileCheck %s
+
+include:
+- "../../Inputs/memory-unaligned.yaml"
+- "../Inputs/rvv-unit-all.yaml"
+
+sections:
+  - name:      0
+    VMA:       0x2000000
+    SIZE:      0x1000000
+    LMA:       0x2000000
+    ACCESS:    r
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VAADDU_VX, 1.0]
+    - [VAADD_VX, 1.0]
+    # - [VADC_VXM, 1.0]
+    - [VADD_VX, 1.0]
+    - [VAND_VX, 1.0]
+    - [VASUBU_VX, 1.0]
+    - [VASUB_VX, 1.0]
+    - [VDIVU_VX, 1.0]
+    - [VDIV_VX, 1.0]
+    - [VMACC_VX, 1.0]
+    - [VMADC_VX, 1.0]
+    # - [VMADC_VXM, 1.0]
+    - [VMADD_VX, 1.0]
+    - [VMAXU_VX, 1.0]
+    - [VMAX_VX, 1.0]
+    # - [VMERGE_VXM, 1.0]
+    - [VMINU_VX, 1.0]
+    - [VMIN_VX, 1.0]
+    - [VMSBC_VX, 1.0]
+    # - [VMSBC_VXM, 1.0]
+    - [VMSEQ_VX, 1.0]
+    - [VMSGTU_VX, 1.0]
+    - [VMSGT_VX, 1.0]
+    - [VMSLEU_VX, 1.0]
+    - [VMSLE_VX, 1.0]
+    - [VMSLTU_VX, 1.0]
+    - [VMSLT_VX, 1.0]
+    - [VMSNE_VX, 1.0]
+    - [VMULHSU_VX, 1.0]
+    - [VMULHU_VX, 1.0]
+    - [VMULH_VX, 1.0]
+    - [VMUL_VX, 1.0]
+    - [VNMSAC_VX, 1.0]
+    - [VNMSUB_VX, 1.0]
+    - [VOR_VX, 1.0]
+    - [VREMU_VX, 1.0]
+    - [VREM_VX, 1.0]
+    - [VRGATHER_VX, 1.0]
+    - [VRSUB_VX, 1.0]
+    - [VSADDU_VX, 1.0]
+    - [VSADD_VX, 1.0]
+    # - [VSBC_VXM, 1.0]
+    - [VSLIDE1DOWN_VX, 1.0]
+    - [VSLIDE1UP_VX, 1.0]
+    - [VSLIDEDOWN_VX, 1.0]
+    - [VSLIDEUP_VX, 1.0]
+    - [VSLL_VX, 1.0]
+    - [VSMUL_VX, 1.0]
+    - [VSRA_VX, 1.0]
+    - [VSRL_VX, 1.0]
+    - [VSSRA_VX, 1.0]
+    - [VSSRL_VX, 1.0]
+    - [VSSUBU_VX, 1.0]
+    - [VSSUB_VX, 1.0]
+    - [VSUB_VX, 1.0]
+    - [VWADDU_VX, 1.0]
+    - [VWADD_VX, 1.0]
+    - [VWMACCSU_VX, 1.0]
+    - [VWMACCUS_VX, 1.0]
+    - [VWMACCU_VX, 1.0]
+    - [VWMACC_VX, 1.0]
+    - [VWMULSU_VX, 1.0]
+    - [VWMULU_VX, 1.0]
+    - [VWMUL_VX, 1.0]
+    - [VWSUBU_VX, 1.0]
+    - [VWSUB_VX, 1.0]
+    - [VXOR_VX, 1.0]
+# CHECK-NOT: Machine Verifier Pass report
+# CHECK: Start Verification for function: start:
+# CHECK: End Verification for function: start
+# CHECK-NOT: v0
+

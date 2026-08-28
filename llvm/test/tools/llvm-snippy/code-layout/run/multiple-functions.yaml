@@ -1,0 +1,5 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %S/../multiple-functions.yaml |& FileCheck %s
+
+# CHECK: Simulation Start
+# CHECK: jal

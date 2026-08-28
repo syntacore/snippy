@@ -1,0 +1,4 @@
+# REQUIRES: riscv-rvv
+
+# RUN: llvm-snippy %S/../Inputs/operands-reinitialization-rvv-mode-update.yaml
+

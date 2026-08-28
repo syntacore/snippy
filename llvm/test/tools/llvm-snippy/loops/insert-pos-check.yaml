@@ -1,0 +1,21 @@
+# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=3 \
+# RUN: --dump-mf |& FileCheck %s
+branches:
+  loop-ratio: 1
+sections:
+    - name:      1
+      VMA:       0x1000
+      SIZE:      0x10000
+      LMA:       0x1000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [BLT, 1.0]
+    - [SH, 1.0]
+
+# CHECK: [[REG:\$x[[:digit:]]+]] = ADDI [[REG]], {{[[:digit:]]+}}, pcsections <{{(0x)?[[:xdigit:]]+}}>{{[[:space:]].*}} BLT [[REG]], $x{{[[:digit:]]+}}

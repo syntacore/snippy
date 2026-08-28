@@ -1,0 +1,56 @@
+# REQUIRES: riscv-snippy-model-spike
+# COM: This test checks that all valid rlist and spimm values for push/pop are
+#      generated.
+# RUN: llvm-snippy %S/../push-pop.yaml -mtriple=riscv64 \
+# RUN: |& FileCheck %s --check-prefixes RV32,RV64
+# RUN: llvm-snippy %S/../push-pop.yaml -mtriple=riscv32 \
+# RUN: |& FileCheck %s --check-prefix RV32
+
+# RV32: cm.pop  {ra},
+# RV32: cm.pop  {ra, s0},
+# RV32: cm.pop  {ra, s0-s1},
+# RV32: cm.pop  {ra, s0-s2},
+# RV32: cm.pop  {ra, s0-s3},
+# RV32: cm.pop  {ra, s0-s4},
+# RV32: cm.pop  {ra, s0-s5},
+# RV32: cm.pop  {ra, s0-s6},
+# RV32: cm.pop  {ra, s0-s7},
+# RV32: cm.pop  {ra, s0-s8},
+# RV32: cm.pop  {ra, s0-s9},
+# RV32: cm.pop  {ra, s0-s11},
+
+# RV32: cm.push  {ra},
+# RV32: cm.push  {ra, s0},
+# RV32: cm.push  {ra, s0-s1},
+# RV32: cm.push  {ra, s0-s2},
+# RV32: cm.push  {ra, s0-s3},
+# RV32: cm.push  {ra, s0-s4},
+# RV32: cm.push  {ra, s0-s5},
+# RV32: cm.push  {ra, s0-s6},
+# RV32: cm.push  {ra, s0-s7},
+# RV32: cm.push  {ra, s0-s8},
+# RV32: cm.push  {ra, s0-s9},
+# RV32: cm.push  {ra, s0-s11},
+
+# RV32: cm.pop {{{.*}}}, 16
+# RV32: cm.pop {{{.*}}}, 32
+# RV32: cm.pop {{{.*}}}, 48
+# RV32: cm.pop {{{.*}}}, 64
+# RV32: cm.pop {{{.*}}}, 80
+# RV32: cm.pop {{{.*}}}, 96
+# RV32: cm.pop {{{.*}}}, 112
+# RV64: cm.pop {{{.*}}}, 128
+# RV64: cm.pop {{{.*}}}, 144
+# RV64: cm.pop {{{.*}}}, 160
+
+# RV32: cm.push {{{.*}}}, -16
+# RV32: cm.push {{{.*}}}, -32
+# RV32: cm.push {{{.*}}}, -48
+# RV32: cm.push {{{.*}}}, -64
+# RV32: cm.push {{{.*}}}, -80
+# RV32: cm.push {{{.*}}}, -96
+# RV32: cm.push {{{.*}}}, -112
+# RV64: cm.push {{{.*}}}, -128
+# RV64: cm.push {{{.*}}}, -144
+# RV64: cm.push {{{.*}}}, -160
+

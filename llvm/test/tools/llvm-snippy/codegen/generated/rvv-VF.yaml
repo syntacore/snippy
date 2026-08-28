@@ -1,0 +1,77 @@
+# REQUIRES: riscv-rvv
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  -o %t --num-instrs=100000 \
+# RUN:  --init-regs-in-elf --verify-mi \
+# RUN:  --entry-point=start \
+# RUN:  -verify-gen-histogram -histogram-max-deviation=5 -histogram-must-succeed=true \
+# RUN:  -rvv-init-mode=loads \
+# RUN:  -histogram-must-succeed=false \
+# RUN:  |& FileCheck %s
+
+include:
+- "../../Inputs/memory-unaligned.yaml"
+- "../Inputs/rvv-unit-float-available.yaml"
+
+sections:
+  - name:      0
+    VMA:       0x2000000
+    SIZE:      0x1000000
+    LMA:       0x2000000
+    ACCESS:    r
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VFADD_VF, 1.0]
+    - [VFDIV_VF, 1.0]
+    - [VFMACC_VF, 1.0]
+    - [VFMADD_VF, 1.0]
+    - [VFMAX_VF, 1.0]
+    - [VFMERGE_VFM, 1.0]
+    - [VFMIN_VF, 1.0]
+    - [VFMSAC_VF, 1.0]
+    - [VFMSUB_VF, 1.0]
+    - [VFMUL_VF, 1.0]
+    - [VFNMACC_VF, 1.0]
+    - [VFNMADD_VF, 1.0]
+    - [VFNMSAC_VF, 1.0]
+    - [VFNMSUB_VF, 1.0]
+    - [VFRDIV_VF, 1.0]
+    - [VFRSUB_VF, 1.0]
+    - [VFSGNJN_VF, 1.0]
+    - [VFSGNJX_VF, 1.0]
+    - [VFSGNJ_VF, 1.0]
+    - [VFSLIDE1DOWN_VF, 1.0]
+    - [VFSLIDE1UP_VF, 1.0]
+    - [VFSUB_VF, 1.0]
+    - [VFWADD_VF, 1.0]
+    - [VFWMACC_VF, 1.0]
+    - [VFWMSAC_VF, 1.0]
+    - [VFWMUL_VF, 1.0]
+    - [VFWNMACC_VF, 1.0]
+    - [VFWNMSAC_VF, 1.0]
+    - [VFWSUB_VF, 1.0]
+    - [VMFEQ_VF, 1.0]
+    - [VMFGE_VF, 1.0]
+    - [VMFGT_VF, 1.0]
+    - [VMFLE_VF, 1.0]
+    - [VMFLT_VF, 1.0]
+    - [VMFNE_VF, 1.0]
+    - [VSEXT_VF2, 1.0]
+    - [VSEXT_VF4, 1.0]
+    - [VSEXT_VF8, 1.0]
+    - [VZEXT_VF2, 1.0]
+    - [VZEXT_VF4, 1.0]
+    - [VZEXT_VF8, 1.0]
+# CHECK-NOT: Machine Verifier Pass report
+# CHECK: Start Verification for function: start:
+# CHECK: End Verification for function: start
+

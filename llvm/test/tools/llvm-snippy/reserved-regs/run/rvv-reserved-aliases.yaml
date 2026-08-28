@@ -1,0 +1,65 @@
+# COM: This test checks that even non-reserved registers will not be used, since they are included in aliases consisting of registers that are reserved.
+
+# RUN: not llvm-snippy %s \
+# RUN: |& FileCheck %s --dump-input always
+
+options:
+  mtriple: riscv64
+  mcpu: generic-rv64
+  mattr: +v
+  rvv-init-mode: loads
+  num-instrs: 100
+  init-regs-in-elf: on
+  reserved-regs-list: [V2,V5,V8,V11,V14,V17,V20,V23,V26,V29]
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: 0.5
+  mode-distribution:
+    VM:
+      - [all_ones, 2.0]
+      - [any_legal, 1.0]
+    VL:
+      - [max_encodable, 2.0]
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+      rne: 1.0
+      rdn: 1.0
+      ron: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+        sew_16: 1.0
+        sew_32: 1.0
+        sew_64: 1.0
+      LMUL:
+        m4: 1.0
+      VMA:
+        mu: 1.0
+        ma: 1.0
+      VTA:
+        tu: 1.0
+        ta: 1.0
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+
+histogram:
+    - [VADD_VV, 1.0]
+
+# CHECK: error: No available register VRM4: instruction generation

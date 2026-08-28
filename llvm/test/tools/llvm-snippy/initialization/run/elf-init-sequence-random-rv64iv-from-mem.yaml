@@ -1,0 +1,31 @@
+# REQUIRES: riscv-rvv
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v,+c,+f,+d \
+# RUN:    -num-instrs=100 -dump-mf -init-regs-in-elf -rvv-init-mode=loads --verify-mi \
+# RUN:    -verify-gen-histogram  -histogram-must-succeed=true --histogram-max-deviation=2.5 \
+# RUN:    |& FileCheck %s --dump-input always
+
+sections:
+    - name:      0
+      VMA:       0x200000
+      SIZE:      0x100000
+      LMA:       0x200000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x400000
+      SIZE:      0x100000
+      LMA:       0x400000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x600000
+      SIZE:      0x100000
+      LMA:       0x600000
+      ACCESS:    rw
+
+histogram:
+    - [C_NOP, 1.0]
+
+# CHECK: #===Simulation Start===
+# CHECK: vl1re8.v
+# CHECK-NEXT mem 0x0000000000200000

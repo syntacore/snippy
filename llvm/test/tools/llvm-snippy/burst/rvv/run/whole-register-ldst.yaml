@@ -1,0 +1,1 @@
+# RUN: llvm-snippy %S/../whole-register-ldst.yaml

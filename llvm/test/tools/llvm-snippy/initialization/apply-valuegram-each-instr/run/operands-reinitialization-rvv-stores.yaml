@@ -1,0 +1,31 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-rvv
+
+# RUN: llvm-snippy %s -trace-SNTF %t.log.sntf
+# RUN: FileCheck --input-file=%t.log.sntf %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 200
+  rvv-init-mode: loads
+
+include:
+  - ../../../rvv-config-histogram/Inputs/sections.yaml
+
+histogram:
+       - [VSETVL, 1.0]
+       - [VSSE8_V, 1.0]
+       - [VSSE16_V, 1.0]
+       - [VSSE32_V, 1.0]
+       - [VSSE64_V, 1.0]
+
+operands-reinitialization:
+  - type: valuegram
+    weight: 1.0
+    opcodes:
+      - "VSSE.+":
+        - type: operands
+          values: [0x42]
+
+# CHECK-COUNT-100: {{v[0-9]+}}=[1]:0000000000000000[0]:0000000000000042

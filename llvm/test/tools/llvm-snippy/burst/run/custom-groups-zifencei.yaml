@@ -1,0 +1,7 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %S/../custom-zifencei.yaml |& FileCheck %s
+
+# CHECK: ===Simulation Start===
+
+# CHECK: fence.i
+# CHECK: addi

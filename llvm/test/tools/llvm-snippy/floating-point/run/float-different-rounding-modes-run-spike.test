@@ -1,0 +1,4 @@
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %S/../float-different-rounding-modes.yaml
+# COM: Check that the binary is functional. Spike logs do not contain rounding modes.

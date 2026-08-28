@@ -1,0 +1,6 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: llvm-snippy %S/../non-memory.yaml -mtriple=riscv64 |& FileCheck %s
+# RUN: llvm-snippy %S/../non-memory.yaml -mtriple=riscv32 |& FileCheck %s
+
+# CHECK: cm.mvsa01
+# CHECK: cm.mva01s

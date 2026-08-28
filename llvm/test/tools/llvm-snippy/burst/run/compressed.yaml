@@ -1,0 +1,34 @@
+# RUN: llvm-snippy %s %S/../Inputs/burst-store.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
+# RUN: -num-instrs=200 
+
+# RUN: llvm-snippy %s %S/../Inputs/burst-load.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
+# RUN: -num-instrs=200
+
+# RUN: llvm-snippy %s %S/../Inputs/burst-mixed.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
+# RUN: -num-instrs=200
+
+# RUN: llvm-snippy %s %S/../Inputs/burst-load-store.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
+# RUN: -num-instrs=200
+
+# RUN: llvm-snippy %s %S/../Inputs/burst-mixed-huge.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
+# RUN: -num-instrs=500
+
+sections:
+    - name:      1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [C_LW, 1.0]
+    - [C_SW, 1.0]
+    - [C_SD, 1.0]
+    - [ADD, 1.0]
+    - [XOR, 1.0]
+    - [AND, 1.0]

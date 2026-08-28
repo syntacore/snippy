@@ -1,0 +1,40 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s | FileCheck %s -dump-input fail
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  selfcheck: ""
+  selfcheck-mem: true
+  init-memory: full-with-addresses
+sections:
+  - name: 0
+    VMA: 0x10000
+    SIZE: 0x80000
+    LMA: 0x10000
+    ACCESS: r
+  - name: 1
+    VMA: 0x100000
+    SIZE: 0x100000
+    LMA: 0x100000
+    ACCESS: rx
+  - name: 2
+    VMA: 0x210000
+    SIZE: 0x001000
+    LMA: 0x210000
+    ACCESS: rw
+  - name: selfcheck
+    VMA: 0x310000
+    SIZE: 0x100000
+    LMA: 0x310000
+    ACCESS: rw
+histogram:
+  - [LD, 2.0]
+  - [SD, 1.0]
+  - [ADD, 1.0]
+  - [XOR, 1.0]
+  - [AND, 1.0]
+  - [SUB, 1.0]
+
+# CHECK: #===Simulation Start===
+

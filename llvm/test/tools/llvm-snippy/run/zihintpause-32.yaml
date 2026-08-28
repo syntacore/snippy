@@ -1,0 +1,28 @@
+# RUN: llvm-snippy %s
+
+options:
+  mtriple: riscv32
+  mattr: +zihintpause
+  num-instrs: 10000
+  verify-mi: true
+  verify-gen-histogram: true
+
+sections:
+  - name: 1
+    VMA: 0x10000
+    LMA: 0x10000
+    SIZE: 0x10000
+    ACCESS: rx
+  - name: 2
+    VMA: 0x20000
+    LMA: 0x20000
+    SIZE: 0x10000
+    ACCESS: rw
+
+histogram:
+  - [ADD, 1.0]
+  - [SUB, 1.0]
+  - [OR, 1.0]
+  - [XOR, 1.0]
+  - [AND, 1.0]
+  - [PAUSE, 1.0]

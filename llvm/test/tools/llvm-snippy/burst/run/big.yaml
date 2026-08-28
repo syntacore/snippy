@@ -1,0 +1,5 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: timeout 30 llvm-snippy %S/../Inputs/burst-big-layout.yaml %s \
+# RUN:   -o %t | FileCheck %s
+
+# CHECK: ===Simulation Start===

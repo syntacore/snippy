@@ -1,0 +1,68 @@
+# REQUIRES: riscv-rvv
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  --num-instrs=1000 -o %t \
+# RUN:  --riscv-preference-for-rvv-mode-change=vsetvl \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-VSETVL
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  --num-instrs=1000 -o %t \
+# RUN:  --riscv-preference-for-rvv-mode-change=vsetvli \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-VSETVLI
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  --num-instrs=1000 -o %t \
+# RUN:  --riscv-preference-for-rvv-mode-change=vsetivli \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-VSETIVLI
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  --num-instrs=1000 -o %t \
+# RUN:  --riscv-preference-for-rvv-mode-change=any \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-ANY
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  --num-instrs=1000 -o %t \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-ANY
+
+include:
+- Inputs/rvv-lmul1-sewX.yaml
+
+sections:
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VADD_VV, 1.0]
+
+# CHECK-VSETVL: vadd.vv
+# CHECK-VSETVL: vsetvl
+# CHECK-VSETVL-NOT: vsetivli
+# CHECK-VSETVL-NOT: vsetvli
+
+# CHECK-VSETVLI: vadd.vv
+# CHECK-VSETVLI: vsetvli
+# CHECK-VSETVLI-NOT: vsetivli
+# CHECK-VSETVLI-NOT: vsetvl {{[^ ]+}}, {{[^ ]+}}, {{[^ ]+}}
+
+# CHECK-VSETIVLI: vadd.vv
+# CHECK-VSETIVLI: vsetivli
+# CHECK-VSETIVLI-NOT: vsetvl
+# CHECK-VSETIVLI-NOT: vsetvli
+
+# CHECK-ANY: vadd.vv
+# CHECK-ANY: vsetivli
+# CHECK-ANY: vsetvl
+# CHECK-ANY: vsetvli
+# CHECK-ANY: vadd.vv
+# CHECK-ANY: vsetivli
+# CHECK-ANY: vsetvl
+# CHECK-ANY: vsetvli

@@ -1,0 +1,48 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s -o %t
+
+# RUN: llvm-readelf --hex-dump=.snippy.2.rw %t.elf \
+# RUN:    |& FileCheck %s -dump-input fail
+
+options:
+  mtriple: riscv32
+  num-instrs: 100
+  selfcheck: ""
+  selfcheck-mem: true
+  init-memory: full-with-addresses
+  trace-log: /dev/null
+  riscv-disable-misaligned-access: true
+sections:
+  - name: 0
+    VMA: 0x10000
+    SIZE: 0x80000
+    LMA: 0x10000
+    ACCESS: r
+  - name: 1
+    VMA: 0x100000
+    SIZE: 0x100000
+    LMA: 0x100000
+    ACCESS: rx
+  - name: 2
+    VMA: 0x210000
+    SIZE: 0x000400
+    LMA: 0x210000
+    ACCESS: rw
+  - name: selfcheck
+    VMA: 0x400000
+    SIZE: 0x100000
+    LMA: 0x400000
+    ACCESS: rw
+histogram:
+  - [LW, 2.0]
+  - [SW, 1.0]
+  - [ADD, 1.0]
+  - [XOR, 1.0]
+  - [AND, 1.0]
+  - [SUB, 1.0]
+
+# COMM: Check that the values are valid addresses into the RW section
+# COMM: Value is stored as little endian
+
+# CHECK: '.snippy.2.rw':
+# CHECK-COUNT-256: {{[[:xdigit:]][048c]0[0123]2100}}

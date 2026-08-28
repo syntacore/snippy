@@ -1,0 +1,47 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:    -num-instrs=1000 -init-regs-in-elf -selfcheck \
+# RUN: |& FileCheck %s --check-prefixes=FULL,CHECK
+
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:    -num-instrs=1000 -init-regs-in-elf -selfcheck=600 \
+# RUN: |& FileCheck %s --check-prefixes=PART,CHECK
+
+sections:
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x600000
+      SIZE:      0x100000
+      LMA:       0x600000
+      ACCESS:    rw
+histogram:
+    - [LW, 1.0]
+burst:
+  mode: mixed
+  min-size: 1000
+  max-size: 1000
+# CHECK: #===Simulation Start===
+
+# According to burst algorithm, we'll use 15 regs as addresses and 17 as
+# destinations. Full selfcheck must verify all 17 registers.
+# FULL-COUNT-34: sd
+# FULL-NOT: sd
+
+# Partial selfcheck: we requested 1000 instructions to be generated and
+# selfcheck must verify each 600th instruction. So, selfcheck must be inserted
+# only for the one instruction.
+# PART-COUNT-2: sd
+# PART-NOT: sd
+
+

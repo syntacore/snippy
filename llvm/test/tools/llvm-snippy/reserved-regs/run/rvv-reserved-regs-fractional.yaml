@@ -1,0 +1,86 @@
+# REQUIRES: riscv-rvv
+# REQUIRES: riscv-snippy-model-spike
+
+# COM: This test checks that even with a very sparse space of legal registers 
+# COM: (no more than one in a row), with only fractional LMULs, it will be possible to select registers.
+
+# RUN: llvm-snippy %s \
+# RUN: |& FileCheck %s --dump-input always
+
+options:
+  mtriple: riscv64
+  mcpu: generic-rv64
+  mattr: +v
+  num-instrs: 10000
+  reserved-regs-list: [V2,V4,V5,V6,V8,V10,V12,V14,V16,V17,V19,V21,V23,V25,V26,V28,V29,V31]
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: 0.5
+  mode-distribution:
+    VM:
+      - [all_ones, 2.0]
+      - [any_legal, 1.0]
+    VL:
+      - [max_encodable, 2.0]
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+      rne: 1.0
+      rdn: 1.0
+      ron: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+        sew_16: 1.0
+        sew_32: 1.0
+        sew_64: 1.0
+      LMUL:
+        mf2: 1.0
+        mf4: 1.0
+        mf8: 1.0
+      VMA:
+        mu: 1.0
+        ma: 1.0
+      VTA:
+        tu: 1.0
+        ta: 1.0
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+
+histogram: 
+    - [VADD_VV, 1.0]
+
+# CHECK-NOT: {{v2 }}
+# CHECK-NOT: v4
+# CHECK-NOT: v5
+# CHECK-NOT: v6
+# CHECK-NOT: v8
+# CHECK-NOT: v10
+# CHECK-NOT: v12
+# CHECK-NOT: v14
+# CHECK-NOT: v16
+# CHECK-NOT: v17
+# CHECK-NOT: v19
+# CHECK-NOT: v21
+# CHECK-NOT: v23
+# CHECK-NOT: v25
+# CHECK-NOT: v26
+# CHECK-NOT: v28
+# CHECK-NOT: v29
+# CHECK-NOT: v31

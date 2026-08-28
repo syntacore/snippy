@@ -1,0 +1,45 @@
+# REQUIRES: riscv-snippy-model-spike
+# REQUIRES: riscv-snippy-model-callbacks
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-c \
+# RUN:   -num-instrs=100 \
+# RUN: |& FileCheck %s
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-c \
+# RUN:   -num-instrs=100 \
+# RUN:   -enable-address-value-hazards=true -backtrack --init-regs-in-elf \
+# RUN: |& FileCheck %s
+
+include:
+- Inputs/memory.yaml
+- Inputs/mixed-burst-big-group.yaml
+
+sections:
+    - name:      1
+      VMA:       0x70000000
+      SIZE:      0x400000
+      LMA:       0x70000000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+
+histogram:
+    - [LW, 1.0]
+    - [SD, 1.0]
+    - [ADD, 1.0]
+    - [XOR, 1.0]
+
+# CHECK: {{.*[[:space:]](lw)|(sd)[[:space:]].*}}
+# CHECK-NEXT: {{mem 0x[0-9a-f]+(1|2)( |$)}}
+# CHECK-NEXT: {{.*[[:space:]](lw)|(sd)[[:space:]].*}}
+# CHECK-NEXT: {{mem 0x[0-9a-f]+(1|2)( |$)}}
+# CHECK-NEXT: {{.*[[:space:]](lw)|(sd)[[:space:]].*}}
+# CHECK-NEXT: {{mem 0x[0-9a-f]+(1|2)( |$)}}
+# CHECK-NEXT: {{.*[[:space:]](lw)|(sd)[[:space:]].*}}
+# CHECK-NEXT: {{mem 0x[0-9a-f]+(1|2)( |$)}}
+# CHECK-NEXT: {{.*[[:space:]](lw)|(sd)[[:space:]].*}}
+# CHECK-NEXT: {{mem 0x[0-9a-f]+(1|2)( |$)}}
+

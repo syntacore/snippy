@@ -1,0 +1,52 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
+# RUN:  -num-instrs=1000 \
+# RUN:  -dump-memory-accesses=%t
+# RUN: FileCheck --input-file=%t %s
+
+# RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
+# RUN:  -num-instrs=1000 \
+# RUN:  --enable-address-value-hazards -backtrack \
+# RUN:  -dump-memory-accesses=%t
+# RUN: FileCheck --input-file=%t %s
+
+# RUN: llvm-snippy %S/Inputs/atomic-layout.yaml %s -mtriple=riscv64 -mattr=+a \
+# RUN:  -num-instrs=1000 \
+# RUN:  --enable-address-value-hazards -backtrack \
+# RUN:  -dump-memory-accesses=%t
+# RUN: FileCheck --input-file=%t %s
+
+# RUN: llvm-snippy %S/Inputs/lr-sc.yaml %s -mtriple=riscv64 -mattr=+a \
+# RUN:  -num-instrs=1000 \
+# RUN:  -dump-memory-accesses=%t
+# RUN: FileCheck --input-file=%t %s
+
+
+# RUN: sed -e s/BURST_SIZE/30/ %S/Inputs/burst-any.yaml | sed -e s/BURST_MODE/mixed/ >%t.30.mixed.yaml
+# RUN: llvm-snippy %S/Inputs/loadstore-layout.yaml %s %t.30.mixed.yaml -mtriple=riscv64 \
+# RUN:  -num-instrs=1000 \
+# RUN:  -dump-memory-accesses=%t \
+# RUN: -dump-burst-accesses-as-plain-addrs=true
+# RUN: FileCheck --input-file=%t %s
+
+# RUN: llvm-snippy %S/Inputs/loadstore-compressed-layout.yaml %s %t.30.mixed.yaml -mtriple=riscv64 -mattr=+c \
+# RUN:  -num-instrs=1000 \
+# RUN:  -dump-memory-accesses=%t \
+# RUN: -dump-burst-accesses-as-plain-addrs=true
+# RUN: FileCheck --input-file=%t %s
+
+# RUN: llvm-snippy %S/Inputs/atomic-layout.yaml %s %t.30.mixed.yaml -mtriple=riscv64 -mattr=+a\
+# RUN:  -num-instrs=1000 \
+# RUN:  -dump-memory-accesses=%t \
+# RUN: -dump-burst-accesses-as-plain-addrs=true
+# RUN: FileCheck --input-file=%t %s
+
+access-ranges:
+    - start: 0x80002000
+      size: 0x50
+      stride: 8
+      first-offset: 0
+      last-offset: 0
+
+# CHECK-COUNT-1000: {{0x800020(00|08|10|18|20|28|30|38|40|48)}}
+# CHECK-NOT: {{0x800020(00|08|10|18|20|28|30|38|40|48)}}

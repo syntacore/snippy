@@ -1,0 +1,42 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:     -num-instrs=10 -selfcheck -selfcheck-mem \
+# RUN:     -dump-memory-section=2,selfcheck -memory-section-file=%t11
+# RUN: llvm-objcopy -O ihex -I binary %t11 %t1 
+
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:     -num-instrs=10 -selfcheck -selfcheck-mem \
+# RUN:     -dump-memory-section={rw} -memory-section-file=%t22
+# RUN: llvm-objcopy -O ihex -I binary %t22 %t2 
+
+# RUN: diff %t1 %t2 |& FileCheck %s -allow-empty
+
+# Dumping all RW sections means that hiden sections will be dumped as well
+# CHECK-NOT: {{[[:xdigit:]]}} 
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x3000000
+      SIZE:      0x0000010
+      LMA:       0x3000000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+
+histogram:
+    - [LW, 2.0]

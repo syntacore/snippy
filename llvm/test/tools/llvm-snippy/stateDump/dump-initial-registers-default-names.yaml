@@ -1,0 +1,39 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: mkdir -p %t_dir1
+# RUN: cd %t_dir1
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a \
+# RUN:    --num-instrs=10 \
+# RUN:    --dump-initial-registers-yaml \
+# RUN:    && test -f initial_registers_state.yml \
+# RUN:    && not test -f registers_state.yml
+
+# RUN: mkdir -p %t_dir2
+# RUN: cd %t_dir2
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a \
+# RUN:    --num-instrs=10 \
+# RUN:    --dump-registers-yaml \
+# RUN:    && not test -f initial_registers_state.yml \
+# RUN:    && test -f registers_state.yml
+
+# RUN: mkdir -p %t_dir3
+# RUN: cd %t_dir3
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a \
+# RUN:    --num-instrs=10 \
+# RUN:    --dump-initial-registers-yaml --dump-registers-yaml \
+# RUN:    && test -f initial_registers_state.yml \
+# RUN:    && test -f registers_state.yml
+
+sections:
+    - name:      1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]

@@ -1,0 +1,22 @@
+sections:
+  - name: 1
+    VMA: 0x2000
+    SIZE: 0x1000000
+    LMA: 0x2000
+    ACCESS: rx
+  - name: 2
+    VMA: 0x40000000
+    SIZE: 0x2000
+    LMA: 0x40000000
+    ACCESS: rw
+  - name: stack
+    # NOTE: Address chosen so that top of the stack materialization sequence doesn't have addi sp, -16.
+    VMA: 0x40010100
+    SIZE: 0x1000
+    LMA: 0x40010100
+    ACCESS: rw
+  - name: selfcheck
+    VMA: 0x40020000
+    SIZE: 0x100000
+    LMA: 0x40020000
+    ACCESS: rw

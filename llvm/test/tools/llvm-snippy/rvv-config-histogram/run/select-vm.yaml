@@ -1,0 +1,44 @@
+# REQUIRES: riscv-rvv
+# REQUIRES: riscv-snippy-model-spike
+
+# COM: This test checks that if not all VMs are suitable for selected VL snippy 
+#      choose suitable one.
+
+# RUN: llvm-snippy %s -model-plugin spike \ 
+# RUN: |& FileCheck %s 
+
+options:
+  mtriple: riscv64
+  mcpu: generic-rv64
+  mattr: +v
+  num-instrs: 10000
+
+include:
+- "../Inputs/sections.yaml"
+
+riscv-vector-unit:
+  mode-distribution:
+    VM:
+      - [1, 1.0]       # suitable for VL = 3
+      - [15, 100500.0] # unsuitable for VL = 3
+    VL:
+      - [3, 1.0] 
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_32: 1.0
+      LMUL:
+        m8: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+ 
+histogram:
+       - [VSETIVLI, 1.0]
+       - [VADD_VV, 1.0]
+         
+# CHECK: vl1re8.v v0{{.*[[:space:]].*}}v0  0x00000000000000000000000000000001
+# CHECK-NOT: vl1re8.v v0{{.*[[:space:]].*}}v0  0x0000000000000000000000000000000f
+

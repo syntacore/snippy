@@ -1,0 +1,14 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s -mtriple=riscv64 \
+# RUN:   --layout-include-dir=%S/../Inputs \
+# RUN:   --num-instrs=150 |& FileCheck %s
+
+# RUN: llvm-snippy %s -mtriple=riscv64 \
+# RUN:   --layout-include-dir=/tmp/i-don-t-exist/Klaatu-barada-nikto \
+# RUN:   --layout-include-dir=%S/../Inputs \
+# RUN:   --num-instrs=150 |& FileCheck %s
+#
+include:
+  - full.yaml
+
+# CHECK: ===Simulation Start===

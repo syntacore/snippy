@@ -1,0 +1,27 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: not llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
+# RUN: --enable-address-value-hazards |& FileCheck %s --check-prefix=TRACK-ENABLE
+# RUN: not llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
+# RUN: |& FileCheck %s --check-prefix=TRACK-DISABLE
+
+sections:
+  - name:      0
+    VMA:       0x200000
+    SIZE:      0x50000
+    LMA:       0x200000
+    ACCESS:    r
+  - name:      1
+    VMA:       0x250000
+    SIZE:      0x500
+    LMA:       0x250000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x800000
+    SIZE:      0x100000
+    LMA:       0x800000
+    ACCESS:    rw
+histogram:
+    - [ADD, 1.0]
+
+# TRACK-ENABLE: error: Model execution failed: snippy emitted 4 byte instruction at address 0x250500 that is not fully covered by allocated sections. Probably rx section overflow. Try reducing number of instructions.
+# TRACK-DISABLE: error: RX section '1' (size 1280) failed to fit code mapped to it. Total code size: {{[0-9]+}}

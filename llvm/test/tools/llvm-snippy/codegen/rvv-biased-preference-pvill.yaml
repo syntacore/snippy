@@ -1,0 +1,62 @@
+# REQUIRES: riscv-rvv
+# COM: This test just checks that option
+# COM: "riscv-preference-for-rvv-mode-change" works with the pvill setting.
+# XFAIL: *
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  --model-plugin=spike --num-instrs=1000 -o %t \
+# RUN:  --riscv-preference-for-rvv-mode-change=vsetvl \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-VSETVL
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  --model-plugin=spike --num-instrs=1000 -o %t \
+# RUN:  --riscv-preference-for-rvv-mode-change=vsetvli \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-VSETVLI
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  --model-plugin=spike --num-instrs=1000 -o %t \
+# RUN:  --riscv-preference-for-rvv-mode-change=vsetivli \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-VSETIVLI
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  --model-plugin=spike --num-instrs=1000 -o %t \
+# RUN:  --riscv-preference-for-rvv-mode-change=any \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-ANY
+
+include:
+- "../rvv-config-biased/Inputs/rvv-unit-pvill-1.yaml"
+
+sections:
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VL1RE16_V, 1.0]
+
+# CHECK-VSETVL: vl1re16.v
+# CHECK-VSETVL: vsetvl
+# CHECK-VSETVL-NOT: vsetivli
+# CHECK-VSETVL-NOT: vsetvli
+
+# CHECK-VSETVLI: vl1re16.v
+# CHECK-VSETVLI: vsetvli
+# CHECK-VSETVLI-NOT: vsetivli
+# CHECK-VSETVLI-NOT: vsetvl {{[^ ]+}}, {{[^ ]+}}, {{[^ ]+}}
+
+# CHECK-VSETIVLI: vl1re16.v
+# CHECK-VSETIVLI: vsetivli
+# CHECK-VSETIVLI-NOT: vsetvl
+# CHECK-VSETIVLI-NOT: vsetvli
+
+# CHECK-ANY: vl1re16.v
+# CHECK-ANY: vsetivli
+# CHECK-ANY: vsetvl
+# CHECK-ANY: vsetvli

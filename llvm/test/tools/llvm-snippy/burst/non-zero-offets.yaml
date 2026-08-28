@@ -1,0 +1,66 @@
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %s >& %t
+# RUN: FileCheck %s --input-file %t --check-prefixes=SMALL
+# RUN: not FileCheck %s --input-file %t --check-prefixes=BIG
+
+options:
+  mtriple: riscv64
+  mattr: "+c,+a"
+  num-instrs: 1000
+  riscv-disable-misaligned-access: true
+  burst-addr-rand-threshold: 10
+
+sections:
+  - name: 1
+    VMA: 0x301000000
+    SIZE: 0x40000000
+    LMA: 0x301000000
+    ACCESS: rx
+  - name: 2
+    VMA: 0x401000000
+    SIZE:   0x500000
+    LMA: 0x401000000
+    ACCESS: rw
+
+histogram:
+  - [C_SW, 1]
+  - [AMOADD_W, 1]
+  - [AMOAND_W, 1]
+
+burst:
+  mode: mixed
+  min-size: 30
+  max-size: 30
+
+access-evictions:
+  - fixed: 0x401000000
+    mask: 0x0
+  - fixed: 0x401000008
+    mask: 0x0
+  - fixed: 0x401000004
+    mask: 0x0
+  - fixed: 0x401000010
+    mask: 0x0
+  - fixed: 0x401000014
+    mask: 0x0
+  - fixed: 0x401000018
+    mask: 0x0
+  - fixed: 0x401000020
+    mask: 0x0
+  - fixed: 0x401000024
+    mask: 0x0
+  - fixed: 0x401000028
+    mask: 0x0
+
+# SMALL: #===Simulation Start===
+# Check that there are a few c.sw with zero offset (atomics don't have imm offset).
+# SMALL-COUNT-10: c.sw {{.*}}, 0(
+
+# Snippy should generate ~300 c.sw instructions (1/3 of 1000). So, by default
+# there should be approx. 300 zero offsets. Since we've added additional
+# randomization to prevent zero offsets generation (see burst-addr-rand-threshold),
+# we shouldn't have so many zero offsets. My experiments show that only ~10% of
+# zero offsets left (they are mostly for 0x401000028, because imm offset in c.sw
+# doesn't support negative values).
+# BIG-COUNT-200: c.sw {{.*}}, 0(

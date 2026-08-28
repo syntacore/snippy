@@ -1,0 +1,17 @@
+# RUN: llvm-snippy %S/../../Inputs/jal-layout.yaml %s -mtriple=riscv64 -num-instrs=100 \
+# RUN: -num-instr-ancil=10 -verify-mi 
+
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - fun1
+        - fun2
+    - name: fun1
+      callees:
+        - fun2
+    - name: fun2
+      callees:
+        - fun3
+    - name: fun3

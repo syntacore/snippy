@@ -1,0 +1,44 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:     -num-instrs=100 -selfcheck -selfcheck-mem \
+# RUN:     -init-memory=full -memory-seed=11 -o %t
+
+# RUN: llvm-readelf --hex-dump=.snippy.2.rw %t.elf \
+# RUN: |& FileCheck %s --dump-input fail
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x010000
+      LMA:       0x210000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+
+histogram:
+    - [LB, 2.0]
+    - [SB, 1.0]
+    - [SW, 1.0]
+    - [ADD, 1.0]
+    - [XOR, 1.0]
+    - [AND, 1.0]
+    - [SUB, 1.0]
+
+# COMM: This is the reference of splitmix32 generation for memory-seed=11
+# CHECK:      '.snippy.2.rw':
+# CHECK-NEXT: 0x00000000
+# CHECK-SAME:            330e1273 299ed19a 53102ded 30fbf41c

@@ -1,0 +1,15 @@
+#REQUIRES: this-test-requires-no-more-than-just-a-fix
+
+# RUN: llvm-snippy %S/Inputs/rvv-vadd.yaml -mtriple=riscv64 --selfcheck -mattr=+v \
+# RUN: -num-instrs=1000 -model-plugin=spike \
+# RUN: --enable-selfcheck-rvv |& FileCheck %s
+
+# RUN: llvm-snippy %S/Inputs/rvv-many-opcodes.yaml -mtriple=riscv64 --selfcheck -mattr=+v \
+# RUN: -num-instrs=1000 -model-plugin=spike \
+# RUN: --enable-selfcheck-rvv |& FileCheck %s
+
+
+# CHECK-NOT: LLVM ERROR
+include:
+- Inputs/rvv-config.yaml
+

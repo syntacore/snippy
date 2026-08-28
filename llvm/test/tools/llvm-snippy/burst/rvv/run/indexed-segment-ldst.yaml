@@ -1,0 +1,2 @@
+# REQUIRES: riscv-rvv
+# RUN: llvm-snippy %S/../indexed-segment-ldst.yaml

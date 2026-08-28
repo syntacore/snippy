@@ -1,0 +1,52 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:     -num-instrs=10 \
+# RUN:     -dump-memory-section=2,3 -memory-section-file=%t11
+
+# COMM: Dump of sections 2,3
+# RUN: llvm-objcopy -O ihex -I binary %t11 %t1 
+# RUN: cat %t1 |& FileCheck %s --dump-input fail
+
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:     -num-instrs=10 \
+# RUN:     -dump-memory-section={rw},2,2 -memory-section-file=%t33
+
+# COMM: Shows that sections may duplicate others in the input option,
+# COMM:   but final dump will contain each section only once.
+# RUN: llvm-objcopy -O ihex -I binary %t33 %t3
+# RUN: cat %t3 |& FileCheck %s --dump-input always
+
+# According to Ihex standart each satrts with number of bytes in the line.
+# This means that we will have 2 lines with 0x10 bytes. (10 bytes for each section)
+# :00 means the end of dump
+
+# CHECK:      :1000000000000000000000000000000000000000F0
+# CHECK-NEXT: :1000100000000000000000000000000000000000E0
+# CHECK-NEXT: :00
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x3000000
+      SIZE:      0x0000010
+      LMA:       0x3000000
+      ACCESS:    rw
+    - name:      3
+      VMA:       0x3002000
+      SIZE:      0x0000010
+      LMA:       0x3002000
+      ACCESS:    rw
+
+histogram:
+    - [LW, 2.0]

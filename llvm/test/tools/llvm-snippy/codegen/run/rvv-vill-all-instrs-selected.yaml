@@ -1,0 +1,31 @@
+# REQUIRES: riscv-rvv
+# REQUIRES: riscv-snippy-model-spike
+
+# COM: This test checks that all opcodes from histogram have been selected
+
+# RUN: llvm-snippy %S/../Inputs/rvv-vill-all-instrs-selected.yaml \
+# RUN:  -mtriple=riscv64 -mattr=+v \
+# RUN:  --num-instrs=10000 -o %t \
+# RUN:  |& FileCheck %s
+
+# CHECK: #===Simulation Start===
+# CHECK: vl1re8.v
+# CHECK: vl1re16.v
+# CHECK: vl1re32.v
+# CHECK: vl1re64.v
+# CHECK: vl2re8.v
+# CHECK: vl2re16.v
+# CHECK: vl2re32.v
+# CHECK: vl2re64.v
+# CHECK: vl4re8.v
+# CHECK: vl4re16.v
+# CHECK: vl4re32.v
+# CHECK: vl4re64.v
+# CHECK: vl8re8.v
+# CHECK: vl8re16.v
+# CHECK: vl8re32.v
+# CHECK: vl8re64.v
+# CHECK: vs1r.v
+# CHECK: vs2r.v
+# CHECK: vs4r.v
+# CHECK: vs8r.v

@@ -1,0 +1,25 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: not llvm-snippy %s -mtriple=riscv64  \
+# RUN:    -num-instrs=10 \
+# RUN:    -initial-regs-yaml=%S/Inputs/jabberwocky.yaml \
+# RUN:    -dump-registers-yaml=%t.regs.yaml \
+# RUN: |& FileCheck %s
+
+sections:
+    - name:      1
+      VMA:       0x800000
+      SIZE:      0x4000
+      LMA:       0x800000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x806000
+      SIZE:      0x4000
+      LMA:       0x806000
+      ACCESS:    rw
+
+histogram:
+    - [ADDI, 1.0]
+
+# CHECK: jabberwocky.yaml:1:1:
+# CHECK-SAME: error: not a mapping
+# CHECK: error: Failed to parse file "{{.+}}"

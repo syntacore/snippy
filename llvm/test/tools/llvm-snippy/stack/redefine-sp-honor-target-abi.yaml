@@ -1,0 +1,25 @@
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+m -honor-target-abi \
+# RUN: -redefine-sp=reg::X4 -num-instrs=10 \
+# RUN: -init-regs-in-elf -verify-mi |& FileCheck %s
+sections:
+    - name:      1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x400000
+      SIZE:      0x100000
+      LMA:       0x400000
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+    - [ADD, 1.0]
+
+# CHECK: warning: (inconsistent-options) When using --honor-target-abi and --redefine-sp/ra=reg::X4 options together, target ABI may not be preserved in case of traps: use these options in combination only for valid code generation

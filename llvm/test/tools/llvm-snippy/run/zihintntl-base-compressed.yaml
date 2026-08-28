@@ -1,0 +1,39 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: llvm-snippy %s | FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  mattr: "+zihintntl,+c"
+
+sections:
+    - name:      1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [C_NTL_P1, 3.0]
+    - [C_NTL_PALL, 3.0]
+    - [C_NTL_S1, 3.0]
+    - [C_NTL_ALL, 3.0]
+    - [BEQ, 1.0]
+    - [BNE, 1.0]
+    - [SD, 1.0]
+    - [LD, 1.0]
+    - [ADDI, 1.0]
+
+# COM: check NTL_P1
+# CHECK-COUNT-5: c.add zero, sp
+# COM: check NTL_PALL
+# CHECK-COUNT-5: c.add zero, gp
+# COM: check NTL_S1
+# CHECK-COUNT-5: c.add zero, tp
+# COM: check NTL_ALL
+# CHECK-COUNT-5: c.add zero, t0

@@ -1,0 +1,28 @@
+# REQUIRES: riscv-snippy-model-spike
+# COM: This test checks that popret instructions are generated with float and
+#      vector extensions.
+# RUN: llvm-snippy %s -mtriple=riscv64 |& FileCheck %s
+# RUN: llvm-snippy %s -mtriple=riscv32 |& FileCheck %s
+
+options:
+  mattr: +v,+f,+zcmp
+  num-instrs: 500
+  honor-target-abi: on
+  function-number: 20
+  function-layers: 5
+  redefine-sp: SP
+
+include:
+  - ../../Inputs/sections-with-stack.yaml
+
+histogram:
+  - [CM_POPRET, 1.0]
+  - [CM_POPRETZ, 1.0]
+  - [JAL, 1.0]
+  - [ADD, 1.0]
+  - [FADD_D, 1.0]
+  - [VADD_VV, 1.0]
+  - [VSETVL, 1.0]
+
+# CHECK-DAG: cm.popret
+# CHECK-DAG: cm.popretz

@@ -1,0 +1,60 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# COM: test checks that rv64gv inputs can be read properly
+
+# REQUIRES: riscv-rvv
+
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=+m,+a,+f,+d,+c,+v \
+# RUN:    -num-instrs=10 \
+# RUN:    -initial-regs-yaml=%S/Inputs/initial_state_rv64gv_partial.yaml \
+# RUN:    -dump-registers-yaml=%t.regs.yaml
+# RUN: FileCheck %s --input-file %t.regs.yaml
+
+sections:
+    - name:      1
+      VMA:       0x800000
+      SIZE:      0x4000
+      LMA:       0x800000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x806000
+      SIZE:      0x4000
+      LMA:       0x806000
+      ACCESS:    rw
+
+histogram:
+    - [C_NOP, 1.0]
+
+# CHECK: registers:
+# CHECK-NEXT:  - [ X0, 0x0000000000000000 ]
+# CHECK-NEXT:  - [ X1, 0x0B00000000000010 ]
+# CHECK-NEXT:  - [ X2, 0x00C0000000000100 ]
+# CHECK-NEXT:  - [ X3, 0x000D000000001000 ]
+# CHECK-NEXT:  - [ X4, 0x0000E00000010000 ]
+# CHECK-NEXT:  - [ X5, 0x00000F0000100000 ]
+# CHECK-NEXT:  - [ X6, 0x000000A001000000 ]
+# CHECK-NEXT:  - [ X7, 0x0000000B10000000 ]
+# CHECK-NEXT:  - [ X8, 0x000000C001000000 ]
+# CHECK-NEXT:  - [ X9, 0x00000D0000100000 ]
+# CHECK-NEXT:  - [ X10, 0x0000E00000100000 ]
+# CHECK-NEXT:  - [ X11, 0x000F000000010000 ]
+# CHECK-NEXT:  - [ X12, 0x00A0000000001000 ]
+# CHECK-NEXT:  - [ X13, 0x0B00000000000100 ]
+# CHECK-NEXT:  - [ X14, 0xD000000000000010 ]
+# CHECK-NEXT:  - [ X15, 0x0E00000000000001 ]
+# CHECK-NEXT:  - [ X16, 0x00F0000000000000 ]
+# CHECK-NEXT:  - [ X17, 0x000A000000000010 ]
+# CHECK-NEXT:  - [ X18, 0x0000B00000000100 ]
+# CHECK-NEXT:  - [ X19, 0x00000C0000001000 ]
+# CHECK-NEXT:  - [ X20, 0x000000D000010000 ]
+# CHECK-NEXT:  - [ X21, 0x0000000E00100000 ]
+# CHECK-NEXT:  - [ X22, 0x000000A001000000 ]
+# CHECK-NEXT:  - [ X23, 0x00000B0010000000 ]
+# CHECK-NEXT:  - [ X24, 0x0000C00001000000 ]
+# CHECK-NEXT:  - [ X25, 0x000D000000100000 ]
+# CHECK-NEXT:  - [ X26, 0x00E0000000010000 ]
+# CHECK-NEXT:  - [ X27, 0x0A00000000001000 ]
+# CHECK-NEXT:  - [ X28, 0xB000000000000100 ]
+# CHECK-NEXT:  - [ X29, 0x0A00000000000010 ]
+# CHECK-NEXT:  - [ X30, 0x00B0000000000001 ]
+# CHECK-NEXT:  - [ X31, 0x100C000000000000 ]

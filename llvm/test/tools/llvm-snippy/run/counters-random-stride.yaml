@@ -1,0 +1,86 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: timeout 300 llvm-snippy %s | FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: "+c"
+  num-instrs: 1000
+  init-cons-loop-in-prev-loop: on
+
+include:
+  - ../loops/Inputs/sections.yaml
+
+histogram:
+  - [C_BNEZ, 1.0]
+  - [BNE, 1.0]
+  - [BLT, 1.0]
+  - [BLTU, 1.0]
+  - [BGE, 1.0]
+  - [BGEU, 1.0]
+  - [BEQ, 1.0]
+  - [C_BEQZ, 1.0]
+
+branches:
+  loop-ratio: 1.0
+  max-depth:
+    loop: 1
+  consecutive-loops: all
+  loop-counters:
+    random-init:
+      min: 10000
+      max: 100000
+    random-stride:
+      min: 10
+      # max immediate for C_ADDI
+      max: 31
+  number-of-loop-iterations:
+    min: 16
+    max: 16
+
+access-ranges:
+  - start: 0x400000000
+    size: 64
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+  - start: 0x400001000
+    size: 8
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+
+# Verify that each loop does required num iterations:
+
+# CHECK: [[BranchAddr:\([a-z0-9]+\)]] bne
+# CHECK-COUNT-15: [[BranchAddr]] bne
+# CHECK-NEXT: [[BranchAddr]]
+# CHECK-NEXT: j
+
+# CHECK: [[BranchAddr:[a-z0-9]+]] {{\([a-z0-9]+\)}} c.bnez
+# CHECK-COUNT-15: [[BranchAddr]] {{\([a-z0-9]+\)}} c.bnez
+# CHECK-NEXT: [[BranchAddr]]
+# CHECK-NEXT: j
+
+# CHECK: [[BranchAddr:\([a-z0-9]+\)]] blt
+# CHECK-COUNT-15: [[BranchAddr]] blt
+# CHECK-NEXT: [[BranchAddr]]
+# CHECK-NEXT: j
+
+# CHECK: [[BranchAddr:\([a-z0-9]+\)]] bltu
+# CHECK-COUNT-15: [[BranchAddr]] bltu
+# CHECK-NEXT: [[BranchAddr]]
+# CHECK-NEXT: j
+
+# CHECK: [[BranchAddr:\([a-z0-9]+\)]] bge
+# CHECK-COUNT-15: [[BranchAddr]] bge
+# CHECK-NEXT: [[BranchAddr]]
+# CHECK-NEXT: j
+
+# CHECK: [[BranchAddr:\([a-z0-9]+\)]] bgeu
+# CHECK-COUNT-15: [[BranchAddr]] bgeu
+# CHECK-NEXT: [[BranchAddr]]
+
+# CHECK: [[BranchAddr:[a-z0-9]+]] {{\([a-z0-9]+\)}} c.beqz
+# CHECK-COUNT-15: [[BranchAddr]] {{\([a-z0-9]+\)}} c.beqz
+# CHECK-NEXT: [[BranchAddr]]
+# CHECK-NEXT: j

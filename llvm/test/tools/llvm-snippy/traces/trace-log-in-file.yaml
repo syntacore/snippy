@@ -1,0 +1,29 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s -mtriple=riscv64 \
+# RUN:  --num-instrs=100 -o %t.elf --trace-log %t.trace.log
+
+# RUN: FileCheck --input-file=%t.trace.log %s
+
+sections:
+    - name:      1
+      VMA:       0x2000
+      SIZE:      0x1000
+      LMA:       0x2000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rw
+    - name:      3
+      VMA:       0x60000000
+      SIZE:      0x400000
+      LMA:       0x60000000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [SUB, 1.0]
+
+# CHECK: #===Simulation Start===
+

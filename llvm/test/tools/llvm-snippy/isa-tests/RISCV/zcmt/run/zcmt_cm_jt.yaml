@@ -1,0 +1,5 @@
+# REQUIRES: riscv-snippy-model-spike
+# COM: Check execution only.
+
+# RUN: llvm-snippy %S/../zcmt_cm_jt.yaml -mtriple=riscv64
+# RUN: llvm-snippy %S/../zcmt_cm_jt.yaml -mtriple=riscv32

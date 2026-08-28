@@ -1,0 +1,371 @@
+# REQUIRES: riscv-snippy-model-None
+# REQUIRES: snippy-long-tests
+# RUN: timeout 300 llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  mcpu: generic-rv64
+  num-instrs: 500000
+  init-memory: full
+  entry-point: test_1
+  external-stack: true
+  honor-target-abi: true
+  mangle-exported-names: true
+  init-regs-in-elf: true
+  riscv-init-fregs-from-memory: true
+  last-instr: RET
+  riscv-disable-misaligned-access: atomics-only
+  random-scheduling: true
+  enable-phdrs-definition: true
+  memory-seed: 1
+sections:
+  - name: sect_rx_40ca53000
+    PHDR: sect_rx_40ca53000
+    VMA: 0x40ca53000
+    SIZE: 0x2400000
+    LMA: 0x40ca53000
+    ACCESS: rx
+  - name: readonly
+    PHDR: readonly
+    VMA: 0x443311000
+    SIZE: 0x1000
+    LMA: 0x443311000
+    ACCESS: r
+  - name: selfcheck
+    PHDR: selfcheck
+    VMA: 0x4535d9000
+    SIZE: 0x1000000
+    LMA: 0x4535d9000
+    ACCESS: rw
+  - name: sect_rw_41eae4000
+    PHDR: sect_rw_41eae4000
+    VMA: 0x41eae4000
+    SIZE: 0x1000
+    LMA: 0x41eae4000
+    ACCESS: rw
+histogram:
+  - [LB, 5.0]
+  - [LBU, 5.0]
+access-groups:
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4a0a
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4a0c
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4a24
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4a46
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4a65
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4a67
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4a88
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4a95
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4ac0
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4ad7
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4af0
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4afb
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4b09
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4b21
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4b36
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4b5b
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4b70
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4b7b
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4b93
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4ba9
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4bd5
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4bdb
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4bf2
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4c15
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4c30
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4c43
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4c52
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4c6c
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4c86
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4ca3
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4ca7
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4cc7
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4cd4
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4cfd
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4d15
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4d2b
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4d3f
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4d47
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4d6c
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4d79
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4d8c
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4da5
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4dc3
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4de0
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4dfa
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0
+  - weight: 1.0
+    access-ranges:
+      - start: 0x41eae4dfb
+        size: 0x1
+        stride: 1
+        first-offset: 0
+        last-offset: 0

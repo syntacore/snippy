@@ -1,0 +1,31 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s -trace-SNTF %t
+# RUN: FileCheck %s --input-file=%t
+
+# This test checks that there are no CSRs in the SNTF trace by default.
+
+include:
+  - Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +f,+d
+  num-instrs: 2000
+
+histogram:
+  - [ADD, 1.0]
+  - [BNE, 4.5]
+  - [BEQ, 4.5]
+  - [ReadFCSR, 1.0]
+  - [WriteFCSRImm, 1.0]
+  - [SwapFCSRImm, 1.0]
+  - [ReadFRM, 1.0]
+  - [WriteFRMImm, 1.0]
+  - [SwapFRMImm, 1.0]
+  - [ReadFFLAGS, 1.0]
+  - [WriteFFLAGSImm, 1.0]
+  - [SwapFFLAGSImm, 1.0]
+
+# COM: Dump of CSRs is disabled by default
+# CHECK: # -csrs-changed
+# CHECK-NOT: csr{{[[:digit:]]}}
