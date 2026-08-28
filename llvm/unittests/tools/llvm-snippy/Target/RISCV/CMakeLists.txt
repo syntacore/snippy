@@ -5,9 +5,13 @@ set(snippy_sources
 
 set(snippy_link_libraries
   LLVMSnippy
-  LLVMSnippyRISCV
-  LLVMSnippyAArch64
   )
+foreach(t ${LLVM_SNIPPY_TARGETS_LIST})
+  set(tgt "LLVMSnippy${t}")
+  message(STATUS "Linknig Target unittests to ${tgt}")
+  list(APPEND snippy_link_libraries "${tgt}")
+endforeach()
+
 
 set(snippy_includes
   ${snippy_unittests_include}
