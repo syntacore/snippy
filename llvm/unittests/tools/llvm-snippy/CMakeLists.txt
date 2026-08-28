@@ -4,7 +4,19 @@ set(LLVM_LINK_COMPONENTS
 
 set(snippy_unittests_include ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set(snippy_init_gtest_env ${CMAKE_CURRENT_SOURCE_DIR}/src/InitSnippyGTestEnv.cpp)
-
+# FIXME: Here we redefine this variable because the one defined in
+# llvm/tools/llvm-snippy/lib/Target/CMakeLists.txt is not accessible
+# in unittests/ subdirectory
+set(LLVM_SNIPPY_TARGETS_LIST)
+if(LLVM_TARGETS_TO_BUILD MATCHES "RISCV" OR LLVM_EXPERIMENTAL_TARGETS_TO_BUILD MATCHES "RISCV")
+  list(APPEND LLVM_SNIPPY_TARGETS_LIST RISCV)
+endif()
+if(LLVM_TARGETS_TO_BUILD MATCHES "AArch64" OR LLVM_EXPERIMENTAL_TARGETS_TO_BUILD MATCHES "AArch64")
+  list(APPEND LLVM_SNIPPY_TARGETS_LIST AArch64)
+endif()
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND LLVM_TARGETS_TO_BUILD MATCHES "X86")
+  list(APPEND LLVM_SNIPPY_TARGETS_LIST X86)
+endif()
 add_subdirectory(RandomUtils)
 add_subdirectory(Target)
 
