@@ -1,0 +1,30 @@
+# REQUIRES: riscv-snippy-model-callbacks
+# RUN: not llvm-snippy %s -selfcheck |& FileCheck %s
+
+options:
+  mtriple: riscv32
+
+include:
+  - Inputs/sections.yaml
+
+histogram:
+  - [BLT, 1.0]
+
+branches:
+  loop-counters:
+    place-on-stack: off
+
+access-ranges:
+  - start: 0x40000000
+    size: 64
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+  - start: 0x40001000
+    size: 8
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+
+# CHECK: error: Wrong snippy configuration: loop counters: place-on-stack
+# CHECK-SAME: must be enabled when selfcheck and backtracking modes are used.

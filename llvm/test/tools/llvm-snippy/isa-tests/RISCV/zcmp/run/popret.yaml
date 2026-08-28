@@ -1,0 +1,8 @@
+# REQUIRES: riscv-snippy-model-spike
+# COM: This test checks that popret instructions are generated.
+# RUN: llvm-snippy %S/../popret.yaml -mtriple=riscv64 |& FileCheck %s
+# RUN: llvm-snippy %S/../popret.yaml -mtriple=riscv32 |& FileCheck %s
+
+# CHECK-COUNT-3: cm.popret
+# CHECK-COUNT-3: cm.popretz
+# CHECK-COUNT-3: ret

@@ -1,0 +1,35 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: not llvm-snippy %s
+
+options:
+  Wno-error: [non-reproducible-execution]
+  mtriple: "riscv64"
+  mcpu: "generic-rv64"
+  num-instrs: 1000
+
+sections:
+  # Spike adjusts this memory region from [0x400000-0x500010] to [0x400000-0x501000]
+  # Every access to [0x500010-0x501000] will be considered as a correct one, 
+  # even if we do not specify it as an available memory region
+  - name:      theProblem
+    VMA:       0x400000
+    SIZE:      0x100010
+    LMA:       0x400000
+    ACCESS:    rw
+  - name:      code
+    VMA:       0x600000
+    SIZE:      0x100000
+    LMA:       0x600000
+    ACCESS:    rx
+
+access-ranges:
+  - start: 0x500020
+    size:  0x000060
+    stride: 16
+    first-offset: 1
+    last-offset: 2
+
+histogram:
+  - [SW, 1.0]
+
+# CHECK: Memory call trying to access areas outside of the provided regions

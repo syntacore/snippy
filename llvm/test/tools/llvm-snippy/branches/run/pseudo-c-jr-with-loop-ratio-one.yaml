@@ -1,0 +1,35 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +c
+  num-instrs: 500
+  init-regs-in-elf: true
+
+sections:
+    - name:      text
+      VMA:       0x100000
+      SIZE:      0x200000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      data
+      VMA:       0x4000000
+      SIZE:      0x20000
+      LMA:       0x4000000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x5000000
+      SIZE:      0x20000
+      LMA:       0x5000000
+      ACCESS:    rw
+
+histogram:
+    - [PseudoC_JRB, 1.0]
+
+branches:
+  loop-ratio: 1.0
+
+# CHECK: auipc
+# CHECK: addi
+# CHECK: c.jr

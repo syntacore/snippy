@@ -1,0 +1,4 @@
+# RUN: llvm-snippy %S/../access-size.yaml --trace-log=/dev/null \
+# RUN:   |& FileCheck %s
+
+# CHECK-NOT:  0x150{{([[:xdigit:]]{3})}}

@@ -1,0 +1,78 @@
+# UNSUPPORTED: riscv-snippy-model-None
+
+# RUN: llvm-snippy %s -dump-mir=- --mattr=+zfh |& FileCheck %s
+# RUN: llvm-snippy %s -dump-mir=- --mattr=+f,+zfh |& FileCheck %s
+# RUN: llvm-snippy %s -dump-mir=- --mattr=+d,+zfh |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  init-regs-in-elf: true
+  num-instrs: 500
+  verify-mi: true
+  honor-target-abi: on
+
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      stack
+    VMA:       0x400000
+    SIZE:      0x100000
+    LMA:       0x400000
+    ACCESS:    rw
+
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - myfunc1
+        - myfunc2
+        - myfunc3
+        - myfunc4
+        - myfunc5
+    - name: myfunc1
+      external: true
+    - name: myfunc2
+      external: true
+    - name: myfunc3
+      external: true
+    - name: myfunc4
+      external: true
+    - name: myfunc5
+      external: true
+
+histogram:
+    - [ADD, 1.0]
+    - [SUB, 1.0]
+    - [FSW, 1.0]
+    - [FLW, 1.0]
+    - [FADD_H, 1.0]
+    - [FSUB_H, 1.0]
+    - [FMUL_H, 1.0]
+    - [FDIV_H, 1.0]
+    - [FADD_S, 1.0]
+    - [FSUB_S, 1.0]
+    - [FMUL_S, 1.0]
+    - [FDIV_S, 1.0]
+    - [JAL, 2]
+    - [JALR, 2]
+
+# COM: We check that SnippyFunction has tracksRegLiveness
+# CHECK: name: SnippyFunction
+# CHECK-NEXT: alignment:
+# CHECK-NEXT: exposesReturnsTwice:
+# CHECK-NEXT: legalized:
+# CHECK-NEXT: regBankSelected:
+# CHECK-NEXT: selected:
+# CHECK-NEXT: failedISel:
+# CHECK-NEXT: tracksRegLiveness: true
+# CHECK: Simulation Start
+# CHECK: remark: (relocatable-generated) Snippet generator generated relocatable image

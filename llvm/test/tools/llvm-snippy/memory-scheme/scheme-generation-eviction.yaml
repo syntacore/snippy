@@ -1,0 +1,30 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
+# RUN:  -num-instrs=1000 \
+# RUN:  -dump-memory-accesses=%t
+# RUN: FileCheck --input-file=%t %s
+
+# RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
+# RUN:  -num-instrs=1000 \
+# RUN:  -enable-address-value-hazards -backtrack \
+# RUN:  -dump-memory-accesses=%t
+# RUN: FileCheck --input-file=%t %s
+
+# RUN: llvm-snippy %S/Inputs/atomic-layout.yaml %s -mtriple=riscv64 -mattr=+a \
+# RUN:  -num-instrs=1000 \
+# RUN:  -enable-address-value-hazards -backtrack \
+# RUN:  -dump-memory-accesses=%t
+# RUN: FileCheck --input-file=%t %s
+
+# RUN: llvm-snippy %S/Inputs/lr-sc.yaml %s -mtriple=riscv64 -mattr=+a \
+# RUN:  -num-instrs=1000 \
+# RUN:  -dump-memory-accesses=%t
+# RUN: FileCheck --input-file=%t %s
+
+
+access-evictions:
+    - mask:  0x00000060
+      fixed: 0x80100010
+
+# CHECK-COUNT-1000: {{0x801000[1357]0}}
+# CHECK-NOT: {{0x801000[1357]0}}

@@ -1,0 +1,32 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s -verify-gen-plan \
+# RUN:    -mtriple=riscv64 -mattr=+m \
+# RUN:    -num-instrs=600 -selfcheck |& FileCheck %s
+
+sections:
+    - name:      1
+      VMA:       0x800000
+      SIZE:      0x4000
+      LMA:       0x800000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x806000
+      SIZE:      0x4000
+      LMA:       0x806000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x900000
+      SIZE:      0x100000
+      LMA:       0x900000
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+    - [XOR, 1.0]
+    - [BLT, 1.0]
+
+branches:
+    max-depth:
+        loop: 0
+
+# CHECK-NOT: warning: (gen-plan-verification) request for {{[a-zA-Z0-9]+}} contains limits not only on the number of generated instructions: number of instructions in some blocks can differ from plan

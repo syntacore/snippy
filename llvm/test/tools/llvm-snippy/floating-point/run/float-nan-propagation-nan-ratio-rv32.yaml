@@ -1,0 +1,29 @@
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %s -mattr=+zfh > %t.spike
+# RUN: %S/Inputs/NaN-overwrite-check.rb %t.spike 0.75 --mattrs +zfh\
+# RUN: --instructions fdiv.s,fmul.s,fdiv.h,fmul.h,fadd.h,fadd.s
+
+# RUN: llvm-snippy %s -mattr=+f,+zfh > %t.spike
+# RUN: %S/Inputs/NaN-overwrite-check.rb %t.spike 0.75 --mattrs +f,+zfh\
+# RUN: --instructions fdiv.s,fmul.s,fdiv.h,fmul.h,fadd.h,fadd.s
+
+include:
+  - ../../Inputs/sections.yaml
+options:
+  mtriple: riscv32
+  mcpu: generic-rv32
+  num-instrs: 500
+fpu-config:
+  overwrite:
+    mode: if-any-operand 
+    nan-rewrite-ratio: 0.75
+histogram:
+  - [FDIV_H, 1.0]
+  - [FMUL_H, 1.0]
+  - [FDIV_S, 1.0]
+  - [FMUL_S, 1.0]
+  - [FADD_H, 1.0]
+  - [FSUB_H, 1.0]
+  - [FADD_S, 1.0]
+  - [FSUB_S, 1.0]

@@ -1,0 +1,29 @@
+# REQUIRES: riscv-rvv
+
+# COM: this just ensures that we still have proper execution
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  --num-instrs=10 -o %t \
+# RUN:  -riscv-dump-rvv-config
+
+# COM: this just ensures that we still have proper execution
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  --num-instrs=10 -o %t \
+# RUN:  -riscv-dump-rvv-config=%t.rvv.config.info
+
+sections:
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VSETIVLI, 1.0]
+    - [VSETVLI, 1.0]
+    - [VSETVL, 1.0]
+    - [VADD_VV, 1.0]

@@ -1,0 +1,2 @@
+# RUN: llvm-snippy %S/../branches-and-calls-only.yaml -mtriple=riscv64
+# RUN: llvm-snippy %S/../branches-and-calls-only.yaml -mtriple=riscv32

@@ -1,0 +1,25 @@
+# RUN: llvm-snippy %s %S/../Inputs/custom-burst-mixed-memory-fence.yaml \
+# RUN:   -mtriple=riscv64 -mattr=+a,+f -num-instrs=200
+
+# RUN: llvm-snippy %s %S/../Inputs/custom-burst-mixed-memory-fence.yaml \
+# RUN:   -mtriple=riscv64 -mattr=+a,+f -num-instrs=200
+
+# RUN: llvm-snippy %s %S/../Inputs/fence-only-burst.yaml \
+# RUN:   -mtriple=riscv64 -mattr=+a,+f -num-instrs=200
+
+# RUN: not llvm-snippy %s %S/../Inputs/custom-burst-amoadd.yaml \
+# RUN:   -mtriple=riscv64 -mattr=+a,+f -num-instrs=200
+
+# RUN: llvm-snippy %s %S/../Inputs/custom-burst-fence-in-both-groups.yaml \
+# RUN:   -mtriple=riscv64 -mattr=+a,+f -num-instrs=500
+
+# RUN: llvm-snippy %S/../Inputs/options-in-layout-burst.yaml
+
+include:
+  - ../Inputs/sections.yaml
+
+histogram:
+    - [LW, 1.0]
+    - [SW, 1.0]
+    - [AMOSWAP_W, 1.0]
+    - [FENCE, 1.0]

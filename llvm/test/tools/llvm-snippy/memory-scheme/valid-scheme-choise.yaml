@@ -1,0 +1,26 @@
+# RUN: llvm-snippy %S/Inputs/lr-sc.yaml %s -mtriple=riscv64 -mattr=+a \
+# RUN:   -riscv-disable-misaligned-access \
+# RUN:   -num-instrs=1000
+
+access-addresses:
+    - plain:
+          - addr: 0x80201E01
+            access-size: 1
+    - plain:
+          - addr: 0x80200F00
+            access-size: 32
+    - plain:
+          - addr: 0x80201E01
+            access-size: 1
+    - plain:
+          - addr: 0x80201E02
+            access-size: 1
+    - plain:
+          - addr: 0x80201E03
+            access-size: 1
+    - plain:
+          - addr: 0x80201E04
+            access-size: 1
+    
+# COMM: Only one of these schemes is valid
+

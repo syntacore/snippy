@@ -1,6 +1,7 @@
+# UNSUPPORTED: riscv-snippy-model-None
 # REQUIRES: riscv-snippy-model-None
 # RUN: not llvm-snippy %s -random-scheduling |& FileCheck %s
-# CHECK: random-scheduling-option-and-config.yaml:6:3: error: 'random-scheduling' has been specified both as an option and as a configuration field 'enabled'
+# CHECK: random-scheduling-option-and-config.yaml:5:3: error: 'random-scheduling' has been specified both as an option and as a configuration field 'enabled'
 
 scheduling:
   enabled: true

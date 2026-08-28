@@ -1,0 +1,77 @@
+# REQUIRES: riscv-snippy-model-spikei
+
+# COM: This test checks that before each instruction, the registers it uses
+# COM: are initialized from memory and according to the histograms. 
+
+# RUN: llvm-snippy %s -mtriple=riscv64 \
+# RUN:    -riscv-init-fregs-from-memory -mattr=+f,+d \              
+# RUN:    -valuegram-operands-regs=%S/../Inputs/histograms.yaml \
+# RUN: |& FileCheck %s
+
+options:
+  num-instrs: 1000
+  dump-mf: on
+  valuegram-operands-regs-init-outputs: on
+
+sections:
+    - name:      0
+      VMA:       0x7000000
+      SIZE:      0x100000
+      LMA:       0x7000000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x8000000
+      SIZE:      0x400000
+      LMA:       0x8000000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x805FFFEF
+      SIZE:      0x11
+      LMA:       0x805FFFEF
+      ACCESS:    rw
+
+histogram:
+    - [FSQRT_S, 1.0]
+    - [FSQRT_D, 1.0]
+    - [FLD, 1.0]
+
+
+#          Valuegram values:
+#
+#                     X: 0, 1, 255.
+#                     F: 83 (0x53), 170 (0xaa).
+#                     We want to see them in initialization 
+#         
+#          An example of what we're matching:
+#              _
+#             |       $x18 = LUI 28672
+#             |       $x18 = ADDIW $x18, 448
+#       Addr <        $x18 = ADDI $x0, 1027, pcsections <0x562783b15a18>
+#             |       $x18 = SLLI $x18, 21, pcsections <0x562783b15a18>
+#             |_      $x18 = ADDI $x18, -17, pcsections <0x562783b15a18>
+#              _      $f19_d = FLD $x18, 0
+#             |       $x8 = LUI 28672
+#             |       $x8 = ADDIW $x8, 512
+#       Addr <        $x8 = ADDI $x0, 1027, pcsections <0x562783b15a18>
+#             |       $x8 = SLLI $x8, 21, pcsections <0x562783b15a18>
+#             |_      $x8 = ADDI $x8, -9, pcsections <0x562783b15a18>
+#                     $f10_d = FLD $x8, 0
+#                     $f19_d = FSQRT_D $f10_d, 0
+
+# 1. This checks to see if the initialization is in place
+
+# Double floats
+# CHECK-COUNT-100: [[FREG1:\$f[0-9]+_d]] = FLD{{.*[[:space:]].*[[:space:]].*[[:space:]].*[[:space:]].*[[:space:]].*[[:space:]].*}}[[FREG2:\$f[0-9]+_d]] = FLD{{.*[[:space:]].*}}[[FREG1]] = FSQRT_D [[FREG2]],{{.*}}
+
+
+# Single floats
+# CHECK-COUNT-100: [[FREG3:\$f[0-9]+_f]] = FLW{{.*[[:space:]].*[[:space:]].*[[:space:]].*[[:space:]].*[[:space:]].*[[:space:]].*}}[[FREG4:\$f[0-9]+_f]] = FLW{{.*[[:space:]].*}}[[FREG3]] = FSQRT_S [[FREG4]]
+
+# 2. This checks that the initialization values are taken from the histogram
+
+# Double floats
+# CHECK-COUNT-100: fld{{.*[[:space:]].*}}0x00000000000000{{53|aa}}
+
+# Single floats
+# CHECK-COUNT-100: flw{{.*[[:space:]].*}}0xffffffff000000{{53|aa}}
+

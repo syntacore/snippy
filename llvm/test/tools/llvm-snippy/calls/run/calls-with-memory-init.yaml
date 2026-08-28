@@ -1,0 +1,44 @@
+# RUN:  llvm-snippy %s -mtriple=riscv64 \
+# RUN:      -num-instrs=10 -num-instr-ancil=10 --dump-mf -verify-mi \
+# RUN:      -init-regs-in-elf -init-memory=runtime
+sections:
+  - name: 1
+    VMA: 0x210000
+    SIZE: 0x1000
+    LMA: 0x210000
+    ACCESS: rx
+  - name: 2
+    VMA: 0x100000
+    SIZE: 0x1000
+    LMA: 0x100000
+    ACCESS: rw
+  - name: stack
+    VMA: 0x0
+    SIZE: 0x5000
+    LMA: 0x0
+    ACCESS: rw
+  - name: utility
+    VMA: 0x310000
+    SIZE: 0x100
+    LMA: 0x310000
+    ACCESS: rw
+histogram:
+  - [ADD, 1.0]
+  - [ADDI, 1.0]
+  - [SUB, 1.0]
+  - [JAL, 0.2]
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - fun1
+        - fun2
+    - name: fun1
+      callees:
+        - fun2
+    - name: fun2
+      callees:
+        - fun3
+    - name: fun3
+      external: true
