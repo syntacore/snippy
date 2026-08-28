@@ -1,0 +1,6 @@
+histograms:
+  - reg-type: F
+    values:
+      - type: bitvalue
+        value: 0x00000000
+        weight: 1.0

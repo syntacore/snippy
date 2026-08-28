@@ -1,0 +1,30 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: llvm-snippy %s | FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +f,+zfh,+zfbfmin
+  num-instrs: 1000
+
+sections:
+  - name: 1
+    VMA: 0x10000
+    LMA: 0x10000
+    SIZE: 0x10000
+    ACCESS: rx
+  - name: 2
+    VMA: 0x20000
+    LMA: 0x20000
+    SIZE: 0x10000
+    ACCESS: rw
+
+histogram:
+  - [FCVT_BF16_S, 1.0]
+  - [FCVT_S_BF16, 1.0]
+  - [FMV_H_X, 1.0]
+  - [FMV_X_H, 1.0]
+
+# CHECK-DAG: fcvt.bf16.s
+# CHECK-DAG: fcvt.s.bf16
+# CHECK-DAG: fmv.h.x
+# CHECK-DAG: fmv.x.h

@@ -1,0 +1,221 @@
+# RUN: llvm-snippy %s -mtriple=riscv64 -mcpu=generic-rv64 \
+# RUN: | FileCheck %s --check-prefix=RV64-GPR-CHECK
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+zfh -mcpu=generic-rv64 \
+# RUN: | FileCheck %s --check-prefixes=RV64-GPR-CHECK,RV64-FPRF-CHECK
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+f -mcpu=generic-rv64 \
+# RUN: | FileCheck %s --check-prefixes=RV64-GPR-CHECK,RV64-FPRF-CHECK
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+d -mcpu=generic-rv64 \
+# RUN: | FileCheck %s --check-prefixes=RV64-GPR-CHECK,RV64-FPRD-CHECK
+
+# RUN: llvm-snippy %s -mtriple=riscv32 -mcpu=generic-rv32 \
+# RUN: | FileCheck %s --check-prefix=RV32-GPR-CHECK
+# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+zfh -mcpu=generic-rv32 \
+# RUN: | FileCheck %s --check-prefixes=RV32-GPR-CHECK,RV32-FPRF-CHECK
+# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+f -mcpu=generic-rv32 \
+# RUN: | FileCheck %s --check-prefixes=RV32-GPR-CHECK,RV32-FPRF-CHECK
+# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+d -mcpu=generic-rv32 \
+# RUN: | FileCheck %s --check-prefixes=RV32-GPR-CHECK,RV32-FPRD-CHECK
+
+options:
+  num-instrs: 10
+  honor-target-abi: on
+  verify-mi: on
+  dump-mf: on
+sections:
+  - name:      stack
+    VMA:       0x200000
+    SIZE:      0x10000
+    LMA:       0x200000
+    ACCESS:    rw
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rw
+  - name:      2
+    VMA:       0x500000
+    SIZE:      0x100000
+    LMA:       0x500000
+    ACCESS:    rx
+
+histogram:
+     - [XOR, 1.0]
+
+# COM: RV64
+# CHECK: Machine code for function SnippyFunction
+# COM: Spill callee saved registers to the stack
+# RV64-GPR-CHECK: SD $x1, $x2, 0
+# RV64-GPR-CHECK: SD $x3, $x2, 0
+# RV64-GPR-CHECK: SD $x4, $x2, 0
+# RV64-GPR-CHECK: SD $x8, $x2, 0
+# RV64-GPR-CHECK: SD $x9, $x2, 0
+# RV64-GPR-CHECK: SD $x18, $x2, 0
+# RV64-GPR-CHECK: SD $x19, $x2, 0
+# RV64-GPR-CHECK: SD $x20, $x2, 0
+# RV64-GPR-CHECK: SD $x21, $x2, 0
+# RV64-GPR-CHECK: SD $x22, $x2, 0
+# RV64-GPR-CHECK: SD $x23, $x2, 0
+# RV64-GPR-CHECK: SD $x24, $x2, 0
+# RV64-GPR-CHECK: SD $x25, $x2, 0
+# RV64-GPR-CHECK: SD $x26, $x2, 0
+# RV64-GPR-CHECK: SD $x27, $x2, 0
+
+# RV64-FPRD-CHECK: FSD $f8_d, $x2, 0
+# RV64-FPRD-CHECK: FSD $f9_d, $x2, 0
+# RV64-FPRD-CHECK: FSD $f18_d, $x2, 0
+# RV64-FPRD-CHECK: FSD $f19_d, $x2, 0
+# RV64-FPRD-CHECK: FSD $f20_d, $x2, 0
+# RV64-FPRD-CHECK: FSD $f21_d, $x2, 0
+# RV64-FPRD-CHECK: FSD $f22_d, $x2, 0
+# RV64-FPRD-CHECK: FSD $f23_d, $x2, 0
+# RV64-FPRD-CHECK: FSD $f24_d, $x2, 0
+# RV64-FPRD-CHECK: FSD $f25_d, $x2, 0
+# RV64-FPRD-CHECK: FSD $f26_d, $x2, 0
+# RV64-FPRD-CHECK: FSD $f27_d, $x2, 0
+
+# RV64-FPRF-CHECK: FSW $f8_f, $x2, 0
+# RV64-FPRF-CHECK: FSW $f9_f, $x2, 0
+# RV64-FPRF-CHECK: FSW $f18_f, $x2, 0
+# RV64-FPRF-CHECK: FSW $f19_f, $x2, 0
+# RV64-FPRF-CHECK: FSW $f20_f, $x2, 0
+# RV64-FPRF-CHECK: FSW $f21_f, $x2, 0
+# RV64-FPRF-CHECK: FSW $f22_f, $x2, 0
+# RV64-FPRF-CHECK: FSW $f23_f, $x2, 0
+# RV64-FPRF-CHECK: FSW $f24_f, $x2, 0
+# RV64-FPRF-CHECK: FSW $f25_f, $x2, 0
+# RV64-FPRF-CHECK: FSW $f26_f, $x2, 0
+# RV64-FPRF-CHECK: FSW $f27_f, $x2, 0
+
+# RV64-GPR-CHECK-COUNT-10: XOR
+
+# COM: Reload callee saved registers from the stack
+# RV64-FPRD-CHECK: $f27_d = FLD $x2, 0
+# RV64-FPRD-CHECK: $f26_d = FLD $x2, 0
+# RV64-FPRD-CHECK: $f25_d = FLD $x2, 0
+# RV64-FPRD-CHECK: $f24_d = FLD $x2, 0
+# RV64-FPRD-CHECK: $f23_d = FLD $x2, 0
+# RV64-FPRD-CHECK: $f22_d = FLD $x2, 0
+# RV64-FPRD-CHECK: $f21_d = FLD $x2, 0
+# RV64-FPRD-CHECK: $f20_d = FLD $x2, 0
+# RV64-FPRD-CHECK: $f19_d = FLD $x2, 0
+# RV64-FPRD-CHECK: $f18_d = FLD $x2, 0
+# RV64-FPRD-CHECK: $f9_d = FLD $x2, 0
+# RV64-FPRD-CHECK: $f8_d = FLD $x2, 0
+
+# RV64-FPRF-CHECK: $f27_f = FLW $x2, 0
+# RV64-FPRF-CHECK: $f26_f = FLW $x2, 0
+# RV64-FPRF-CHECK: $f25_f = FLW $x2, 0
+# RV64-FPRF-CHECK: $f24_f = FLW $x2, 0
+# RV64-FPRF-CHECK: $f23_f = FLW $x2, 0
+# RV64-FPRF-CHECK: $f22_f = FLW $x2, 0
+# RV64-FPRF-CHECK: $f21_f = FLW $x2, 0
+# RV64-FPRF-CHECK: $f20_f = FLW $x2, 0
+# RV64-FPRF-CHECK: $f19_f = FLW $x2, 0
+# RV64-FPRF-CHECK: $f18_f = FLW $x2, 0
+# RV64-FPRF-CHECK: $f9_f = FLW $x2, 0
+# RV64-FPRF-CHECK: $f8_f = FLW $x2, 0
+
+# RV64-GPR-CHECK: $x27 = LD $x2, 0
+# RV64-GPR-CHECK: $x26 = LD $x2, 0
+# RV64-GPR-CHECK: $x25 = LD $x2, 0
+# RV64-GPR-CHECK: $x24 = LD $x2, 0
+# RV64-GPR-CHECK: $x23 = LD $x2, 0
+# RV64-GPR-CHECK: $x22 = LD $x2, 0
+# RV64-GPR-CHECK: $x21 = LD $x2, 0
+# RV64-GPR-CHECK: $x20 = LD $x2, 0
+# RV64-GPR-CHECK: $x19 = LD $x2, 0
+# RV64-GPR-CHECK: $x18 = LD $x2, 0
+# RV64-GPR-CHECK: $x9 = LD $x2, 0
+# RV64-GPR-CHECK: $x8 = LD $x2, 0
+# RV64-GPR-CHECK: $x4 = LD $x2, 0
+# RV64-GPR-CHECK: $x3 = LD $x2, 0
+# RV64-GPR-CHECK: $x1 = LD $x2, 0
+
+# COM: RV32
+# COM: Spill callee saved registers to the stack
+# RV32-GPR-CHECK: SW $x1, $x2, 0
+# RV32-GPR-CHECK: SW $x3, $x2, 0
+# RV32-GPR-CHECK: SW $x4, $x2, 0
+# RV32-GPR-CHECK: SW $x8, $x2, 0
+# RV32-GPR-CHECK: SW $x9, $x2, 0
+# RV32-GPR-CHECK: SW $x18, $x2, 0
+# RV32-GPR-CHECK: SW $x19, $x2, 0
+# RV32-GPR-CHECK: SW $x20, $x2, 0
+# RV32-GPR-CHECK: SW $x21, $x2, 0
+# RV32-GPR-CHECK: SW $x22, $x2, 0
+# RV32-GPR-CHECK: SW $x23, $x2, 0
+# RV32-GPR-CHECK: SW $x24, $x2, 0
+# RV32-GPR-CHECK: SW $x25, $x2, 0
+# RV32-GPR-CHECK: SW $x26, $x2, 0
+# RV32-GPR-CHECK: SW $x27, $x2, 0
+
+# RV32-FPRD-CHECK: FSD $f8_d, $x2, 0
+# RV32-FPRD-CHECK: FSD $f9_d, $x2, 0
+# RV32-FPRD-CHECK: FSD $f18_d, $x2, 0
+# RV32-FPRD-CHECK: FSD $f19_d, $x2, 0
+# RV32-FPRD-CHECK: FSD $f20_d, $x2, 0
+# RV32-FPRD-CHECK: FSD $f21_d, $x2, 0
+# RV32-FPRD-CHECK: FSD $f22_d, $x2, 0
+# RV32-FPRD-CHECK: FSD $f23_d, $x2, 0
+# RV32-FPRD-CHECK: FSD $f24_d, $x2, 0
+# RV32-FPRD-CHECK: FSD $f25_d, $x2, 0
+# RV32-FPRD-CHECK: FSD $f26_d, $x2, 0
+# RV32-FPRD-CHECK: FSD $f27_d, $x2, 0
+
+# RV32-FPRF-CHECK: FSW $f8_f, $x2, 0
+# RV32-FPRF-CHECK: FSW $f9_f, $x2, 0
+# RV32-FPRF-CHECK: FSW $f18_f, $x2, 0
+# RV32-FPRF-CHECK: FSW $f19_f, $x2, 0
+# RV32-FPRF-CHECK: FSW $f20_f, $x2, 0
+# RV32-FPRF-CHECK: FSW $f21_f, $x2, 0
+# RV32-FPRF-CHECK: FSW $f22_f, $x2, 0
+# RV32-FPRF-CHECK: FSW $f23_f, $x2, 0
+# RV32-FPRF-CHECK: FSW $f24_f, $x2, 0
+# RV32-FPRF-CHECK: FSW $f25_f, $x2, 0
+# RV32-FPRF-CHECK: FSW $f26_f, $x2, 0
+# RV32-FPRF-CHECK: FSW $f27_f, $x2, 0
+
+# RV32-GPR-CHECK-COUNT-10: XOR
+
+# COM: Reload callee saved registers from the stack
+# RV32-FPRD-CHECK: $f27_d = FLD $x2, 0
+# RV32-FPRD-CHECK: $f26_d = FLD $x2, 0
+# RV32-FPRD-CHECK: $f25_d = FLD $x2, 0
+# RV32-FPRD-CHECK: $f24_d = FLD $x2, 0
+# RV32-FPRD-CHECK: $f23_d = FLD $x2, 0
+# RV32-FPRD-CHECK: $f22_d = FLD $x2, 0
+# RV32-FPRD-CHECK: $f21_d = FLD $x2, 0
+# RV32-FPRD-CHECK: $f20_d = FLD $x2, 0
+# RV32-FPRD-CHECK: $f19_d = FLD $x2, 0
+# RV32-FPRD-CHECK: $f18_d = FLD $x2, 0
+# RV32-FPRD-CHECK: $f9_d = FLD $x2, 0
+# RV32-FPRD-CHECK: $f8_d = FLD $x2, 0
+
+# RV32-FPRF-CHECK: $f27_f = FLW $x2, 0
+# RV32-FPRF-CHECK: $f26_f = FLW $x2, 0
+# RV32-FPRF-CHECK: $f25_f = FLW $x2, 0
+# RV32-FPRF-CHECK: $f24_f = FLW $x2, 0
+# RV32-FPRF-CHECK: $f23_f = FLW $x2, 0
+# RV32-FPRF-CHECK: $f22_f = FLW $x2, 0
+# RV32-FPRF-CHECK: $f21_f = FLW $x2, 0
+# RV32-FPRF-CHECK: $f20_f = FLW $x2, 0
+# RV32-FPRF-CHECK: $f19_f = FLW $x2, 0
+# RV32-FPRF-CHECK: $f18_f = FLW $x2, 0
+# RV32-FPRF-CHECK: $f9_f = FLW $x2, 0
+# RV32-FPRF-CHECK: $f8_f = FLW $x2, 0
+
+# RV32-GPR-CHECK: $x27 = LW $x2, 0
+# RV32-GPR-CHECK: $x26 = LW $x2, 0
+# RV32-GPR-CHECK: $x25 = LW $x2, 0
+# RV32-GPR-CHECK: $x24 = LW $x2, 0
+# RV32-GPR-CHECK: $x23 = LW $x2, 0
+# RV32-GPR-CHECK: $x22 = LW $x2, 0
+# RV32-GPR-CHECK: $x21 = LW $x2, 0
+# RV32-GPR-CHECK: $x20 = LW $x2, 0
+# RV32-GPR-CHECK: $x19 = LW $x2, 0
+# RV32-GPR-CHECK: $x18 = LW $x2, 0
+# RV32-GPR-CHECK: $x9 = LW $x2, 0
+# RV32-GPR-CHECK: $x8 = LW $x2, 0
+# RV32-GPR-CHECK: $x4 = LW $x2, 0
+# RV32-GPR-CHECK: $x3 = LW $x2, 0
+# RV32-GPR-CHECK: $x1 = LW $x2, 0

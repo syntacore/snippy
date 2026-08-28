@@ -1,0 +1,2 @@
+# RUN: llvm-snippy %S/../basic-invalid-code-layout.yaml -mtriple=riscv64
+# RUN: llvm-snippy %S/../basic-invalid-code-layout.yaml -mtriple=riscv32

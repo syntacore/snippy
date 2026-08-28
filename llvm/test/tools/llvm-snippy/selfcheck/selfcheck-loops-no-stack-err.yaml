@@ -1,0 +1,38 @@
+# REQUIRES: riscv-snippy-model-callbacks
+# RUN: not llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=-c,+m \
+# RUN:    -num-instrs=1000 -init-regs-in-elf -selfcheck -model-plugin=spike \
+# RUN: |& FileCheck %s
+sections:
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+    - [XOR, 10.0]
+    - [MUL, 10.0]
+    - [DIV, 10.0]
+
+branches:
+  number-of-loop-iterations:
+    min: 1
+    max: 2
+  max-depth:
+    if: 3
+    loop: 3
+
+
+# CHECK: error: Wrong snippy configuration: loops generation in selfcheck and backtracking modes requires stack.

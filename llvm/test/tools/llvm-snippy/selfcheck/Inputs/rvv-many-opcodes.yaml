@@ -1,0 +1,81 @@
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+    - name: selfcheck
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+    - name: stack
+      VMA:       0x410000
+      SIZE:      0x100000
+      LMA:       0x410000
+      ACCESS:    rw
+histogram:
+    - [VSEXT_VF2, 1.0]                                                                                           
+    - [VMAND_MM, 1.0]                                                                                            
+    - [VREDSUM_VS, 1.0]                                                                                          
+    - [VWREDSUM_VS, 1.0]                                                                                         
+    - [VADD_VV, 1.0]                                                                                             
+    - [VADD_VX, 1.0]                                                                                             
+    - [VADD_VI, 1.0]                                                                                             
+    - [VNSRA_WI, 1.0]                                                                                            
+    - [VWADD_VV, 1.0]                                                                                            
+    - [VWADD_VX, 1.0]                                                                                            
+    - [VWADD_WV, 1.0]                                                                                            
+    - [VWADD_WX, 1.0]                                                                                            
+    - [VMSEQ_VV, 1.0]                                                                                            
+    - [VMSEQ_VX, 1.0]                                                                                            
+    - [VADC_VIM, 1.0]                                                                                            
+    - [VADC_VVM, 1.0]                                                                                            
+    - [VADC_VXM, 1.0]                                                                                            
+    - [VMV_V_V, 1.0]                                                                                             
+    - [VMV1R_V, 1.0]                                                                                             
+    - [VMV2R_V, 1.0]                                                                                             
+    - [VMV4R_V, 1.0]                                                                                             
+    - [VMV8R_V, 1.0]                                                                                             
+    - [VMV_X_S, 1.0]                                                                                             
+    - [VMV_S_X, 1.0]                                                                                             
+    - [VSLIDEUP_VX, 1.0]                                                                                         
+    - [VSLIDEUP_VI, 1.0]                                                                                         
+    - [VSLIDE1UP_VX, 1.0]                                                                                        
+    - [VFSLIDE1UP_VF, 1.0]                                                                                       
+    - [VSLIDEDOWN_VX, 1.0]                                                                                       
+    - [VSLIDEDOWN_VI, 1.0]                                                                                       
+    - [VSLIDE1DOWN_VX, 1.0]                                                                                      
+    - [VFSLIDE1DOWN_VF, 1.0]                                                                                     
+    - [VRGATHER_VV, 1.0]                                                                                         
+    - [VRGATHER_VX, 1.0]                                                                                         
+    - [VRGATHER_VI, 1.0]                                                                                         
+    - [VRGATHEREI16_VV, 1.0]                                                                                     
+    - [VCOMPRESS_VM, 1.0]                                                                                        
+    - [VCPOP_M, 1.0]                                                                                             
+    - [VFIRST_M, 1.0]                                                                                            
+    - [VMSBF_M, 1.0]                                                                                             
+    - [VMSIF_M, 1.0]                                                                                             
+    - [VMSOF_M, 1.0]                                                                                             
+    - [VIOTA_M, 1.0]                                                                                             
+branches:
+  permutation: on
+  loop-ratio: 1.0
+  number-of-loop-iterations:
+    min: 3
+    max: 3
+  max-depth:
+    loop: 3
+    if: 0
+
+

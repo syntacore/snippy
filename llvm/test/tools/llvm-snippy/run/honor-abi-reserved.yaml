@@ -1,0 +1,64 @@
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+m,+c -redefine-sp=SP \
+# RUN: -num-instrs=1000 \
+# RUN: -honor-target-abi --reserved-regs-list=ra,s4 -init-regs-in-elf -verify-mi |& FileCheck %s
+sections:
+    - name:      1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x400000
+      SIZE:      0x100000
+      LMA:       0x400000
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+    - [ADD, 1.0]
+
+# CHECK: #===Simulation Start===
+# CHECK: c.addi sp, -{{[0-9]+}}
+
+# CHECK-DAG: c.sdsp  ra, 0(sp)
+# CHECK-DAG: c.sdsp  gp, 0(sp)
+# CHECK-DAG: c.sdsp  tp, 0(sp)
+# CHECK-DAG: c.sdsp  s0, 0(sp)
+# CHECK-DAG: c.sdsp  s1, 0(sp)
+# CHECK-DAG: c.sdsp  s2, 0(sp)
+# CHECK-DAG: c.sdsp  s3, 0(sp)
+# CHECK-DAG: c.sdsp  s4, 0(sp)
+# CHECK-DAG: c.sdsp  s5, 0(sp)
+# CHECK-DAG: c.sdsp  s6, 0(sp)
+# CHECK-DAG: c.sdsp  s7, 0(sp)
+# CHECK-DAG: c.sdsp  s8, 0(sp)
+# CHECK-DAG: c.sdsp  s9, 0(sp)
+# CHECK-DAG: c.sdsp  s10, 0(sp)
+# CHECK-DAG: c.sdsp  s11, 0(sp)
+
+# CHECK: div
+
+# CHECK-DAG: c.ldsp  ra, 0(sp)
+# CHECK-DAG: c.ldsp  gp, 0(sp)
+# CHECK-DAG: c.ldsp  tp, 0(sp)
+# CHECK-DAG: c.ldsp  s0, 0(sp)
+# CHECK-DAG: c.ldsp  s1, 0(sp)
+# CHECK-DAG: c.ldsp  s2, 0(sp)
+# CHECK-DAG: c.ldsp  s3, 0(sp)
+# CHECK-DAG: c.ldsp  s4, 0(sp)
+# CHECK-DAG: c.ldsp  s5, 0(sp)
+# CHECK-DAG: c.ldsp  s6, 0(sp)
+# CHECK-DAG: c.ldsp  s7, 0(sp)
+# CHECK-DAG: c.ldsp  s8, 0(sp)
+# CHECK-DAG: c.ldsp  s9, 0(sp)
+# CHECK-DAG: c.ldsp  s10, 0(sp)
+# CHECK-DAG: c.ldsp  s11, 0(sp)
+
+# CHECK: ld      sp, 0({{[a-z0-9]+}})

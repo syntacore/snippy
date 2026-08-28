@@ -1,0 +1,44 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:     -num-instrs=100 -selfcheck -selfcheck-mem \
+# RUN:     -init-memory=loads -redefine-ra=RA -init-regs-in-elf -external-mem-init-routine \
+# RUN:     -entry-point=Test -mangle-exported-names -o %t \
+# RUN:     |& FileCheck %s --check-prefix=EXEC 
+
+# RUN: llvm-objdump -D %t.elf |& FileCheck %s --dump-input=fail --check-prefix=DUMP
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100
+      LMA:       0x210000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+
+histogram:
+    - [LB, 2.0]
+    - [SB, 10.0]
+    - [SW, 10.0]
+    - [ADD, 1.0]
+
+# EXEC-NOT: jal
+
+# DUMP: <__Test_snippy_random>:
+# DUMP-NOT: sb {{ (zero) | (ra) | (sp) | (gp) | (tp) }} 
+# DUMP-NOT: sb {{(t[0-6])|(s[0-9])|(s10)|(s11)|(a5)|(a6)}}
+# DUMP: ret

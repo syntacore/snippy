@@ -1,0 +1,26 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s
+
+options:
+  mattr: +a
+  mtriple: riscv64
+  num-instrs: 1000
+  enable-address-value-hazards: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+
+sections:
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x800000
+      SIZE:      0x400000
+      LMA:       0x800000
+      ACCESS:    rw
+
+histogram:
+  - [SD, 1.0]
+  - [SC_D, 1.0]

@@ -1,0 +1,31 @@
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+m -honor-target-abi \
+# RUN: -num-instrs=10 \
+# RUN: -init-regs-in-elf -verify-mi |& FileCheck %s
+sections:
+    - name:      1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x400000
+      SIZE:      0x100000
+      LMA:       0x400000
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+    - [ADD, 1.0]
+
+# CHECK: sd      sp, 0({{[a-z0-9]+}})
+# CHECK-NEXT: mem 0x{{[a-z0-9]+}} 0x[[SPVAL:[a-z0-9]+]]
+
+# CHECK: ld      sp, 0({{[a-z0-9]+}})
+# CHECK-NEXT: x2  0x[[SPVAL]]

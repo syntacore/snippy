@@ -1,0 +1,25 @@
+# COM: basic checks to ensure that we track number of instructions for
+# COM: burst group
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -dump-mf \
+# RUN: -num-instrs=500 \
+# RUN: --histogram-must-succeed=false --verify-gen-histogram
+
+burst:
+  mode: mixed
+  min-size: 100
+  max-size: 100
+sections:
+    - name:      1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [LD, 1.0]

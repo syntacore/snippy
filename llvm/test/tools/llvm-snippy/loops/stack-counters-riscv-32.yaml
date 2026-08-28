@@ -1,0 +1,62 @@
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s | FileCheck %s
+
+options:
+  mtriple: riscv32
+  num-instrs: 100
+  dump-mf: on
+
+include:
+  - Inputs/sections-32.yaml
+
+histogram:
+  - [SUB, 1.0]
+  - [BLT, 1.0]
+
+branches:
+  loop-ratio: 1.0
+  loop-counters:
+    place-on-stack: on
+  number-of-loop-iterations:
+    min: 8
+    max: 8
+
+access-ranges:
+  - start: 0x40000000
+    size: 64
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+  - start: 0x40001000
+    size: 8
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+
+#COM: --Preheader block:
+#COM: Support instructions for SP register
+#CHECK: LUI
+#CHECK-NEXT: [[SP:\$x[[:digit:]]+]] = ADDI [[SP]], -16
+#
+#COM: CounterReg spilling
+#CHECK: [[SP]] = ADDI [[SP]], -16
+#CHECK-NEXT: SW $x{{[[:digit:]]+}}, [[SP]], 0
+#COM: LimitReg spilling
+#CHECK: [[SP]] = ADDI [[SP]], -16
+#CHECK-NEXT: SW $x{{[[:digit:]]+}}, [[SP]], 0
+#
+#COM: --Exiting block:
+#COM: LimitReg reloading
+#CHECK: [[LIMIT_REG:\$x[[:digit:]]+]] = LW [[SP]], 0
+#CHECK-NEXT: [[SP]] = ADDI [[SP]], 16
+#COM: CounterReg reloading
+#CHECK: [[COUNTER_REG:\$x[[:digit:]]+]] = LW [[SP]], 0
+#CHECK-NEXT: [[SP]] = ADDI [[SP]], 16
+#
+#COM: CounterReg spilling
+#CHECK: [[SP]] = ADDI [[SP]], -16
+#CHECK-NEXT: SW [[COUNTER_REG]], [[SP]], 0
+#COM: LimitReg spilling
+#CHECK: [[SP]] = ADDI [[SP]], -16
+#CHECK-NEXT: SW [[LIMIT_REG]], [[SP]], 0
+#CHECK-NEXT: BLT [[COUNTER_REG]], [[LIMIT_REG]]

@@ -1,0 +1,30 @@
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 10
+
+sections:
+   - name: 1
+     VMA: 0x2000
+     SIZE: 0x1000000
+     LMA: 0x2000
+     ACCESS: rx
+   - name: 2
+     VMA: 0x400000000
+     SIZE: 0x2000
+     LMA: 0x400000000
+     ACCESS: rw
+
+histogram:
+  - [BNE, 1.0]
+  - [BLT, 1.0]
+  - [BEQ, 1.0]
+
+branches:
+  loop-ratio: 0.5
+  loop-counters:
+    place-on-stack: on
+
+# CHECK: error: Cannot place loop counters on the stack: stack was not enabled.

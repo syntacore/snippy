@@ -1,0 +1,112 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a \
+# RUN:    -num-instrs=10 \
+# RUN:    -dump-registers-yaml=%t2.yaml -dump-initial-registers-yaml=%t1.yaml 
+
+# RUN: FileCheck %s --check-prefix=INITIAL < %t1.yaml
+# RUN: FileCheck %s --check-prefix=FINAL < %t2.yaml
+
+sections:
+    - name:      1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [SRA, 1.0]
+    - [SRAI, 1.0]
+    - [SRL, 1.0]
+    - [SRLI, 1.0]
+    - [SLL, 1.0]
+    - [SLLI, 1.0]
+    - [AND, 1.0]
+    - [ANDI, 1.0]
+    - [OR, 1.0]
+    - [ORI, 1.0]
+    - [XOR, 1.0]
+    - [XORI, 1.0]
+    - [LW, 10.0]
+    - [SW, 10.0]
+
+# INITIAL: registers:
+# INITIAL-NEXT:   - [ X0, 0x0000000000000000 ]
+# INITIAL-NEXT:   - [ X1, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X2, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X3, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X4, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X5, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X6, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X7, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X8, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X9, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X10, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X11, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X12, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X13, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X14, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X15, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X16, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X17, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X18, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X19, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X20, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X21, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X22, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X23, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X24, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X25, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X26, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X27, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X28, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X29, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X30, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ X31, 0x{{([[:xdigit:]]{16})}} ]
+# INITIAL-NEXT:   - [ PC, 0x0000000080000000 ]
+# INITIAL-NOT: F0
+# INITIAL-NOT: V0
+
+# FINAL: registers:
+# FINAL-NEXT:   - [ X0, 0x0000000000000000 ]
+# FINAL-NEXT:   - [ X1, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X2, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X3, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X4, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X5, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X6, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X7, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X8, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X9, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X10, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X11, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X12, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X13, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X14, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X15, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X16, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X17, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X18, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X19, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X20, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X21, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X22, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X23, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X24, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X25, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X26, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X27, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X28, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X29, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X30, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ X31, 0x{{([[:xdigit:]]{16})}} ]
+# FINAL-NEXT:   - [ PC, 0x000000008{{([[:xdigit:]]{7})}} ]
+# FINAL-NOT: F0
+# FINAL-NOT: V0

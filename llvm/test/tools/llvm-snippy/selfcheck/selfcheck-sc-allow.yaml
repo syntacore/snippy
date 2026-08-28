@@ -1,0 +1,42 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  mattr: +a
+  num-instrs: 1000
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+  selfcheck: ""
+  selfcheck-gv: true
+
+sections:
+  - name:      0
+    VMA:       0x200000
+    SIZE:      0x1000
+    LMA:       0x200000
+    ACCESS:    r
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80002000
+    SIZE:      0x100000
+    LMA:       0x80002000
+    ACCESS:    rw
+  - name:      selfcheck
+    VMA:       0x310000
+    SIZE:      0x1000000
+    LMA:       0x310000
+    ACCESS:    rw
+
+histogram:
+  - [SC_D, 1]
+  - [SC_D_AQ, 1]
+  - [SC_W, 1]
+  - [SC_W_AQ, 1]
+  - [LW, 1]
+  - [LWU, 1]
+  - [SD, 1]

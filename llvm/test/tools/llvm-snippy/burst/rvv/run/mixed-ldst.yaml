@@ -1,0 +1,1 @@
+# RUN: llvm-snippy %S/../mixed-ldst.yaml

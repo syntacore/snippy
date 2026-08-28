@@ -1,0 +1,45 @@
+# UNSUPPORTED: riscv-snippy-model-None
+
+# RUN: llvm-snippy %s -memory-section-file=%t1 -seed=1
+
+# RUN: llvm-objcopy -O ihex -I binary %t1 %t11
+# RUN: cat %t11 |& FileCheck %s
+
+# This is the dump for seed=1 and memory-seed=11.
+
+# CHECK:          :10000000330E1273299ED19A53102DED30FBF41C40
+# CHECK-NEXT:     :10001000330E1273299ED19A53102DED30FBF41C30
+# CHECK-NEXT:     :00000001FF
+
+options:
+  mtriple: "riscv64"
+  mcpu: "generic-rv64"
+  num-instrs: 1
+  init-memory: "full"
+  memory-seed: 11
+  dump-memory-section: ["{0x1000000-0x1000010}", "{0x1000100-0x1000110}"]
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x1000000
+      SIZE:      0x0000010
+      LMA:       0x1000000
+      ACCESS:    rw
+    - name:      3
+      VMA:       0x1000100
+      SIZE:      0x0000010
+      LMA:       0x1000100
+      ACCESS:    rw
+
+histogram:
+    - [LW, 2.0]

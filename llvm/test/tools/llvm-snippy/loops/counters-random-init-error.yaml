@@ -1,0 +1,51 @@
+# REQUIRES: riscv-snippy-model-None
+# RUN: timeout 300 not llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  init-cons-loop-in-prev-loop: true
+
+include:
+  - Inputs/sections.yaml
+
+histogram:
+  - [BLT, 1.0]
+  - [BGE, 1.0]
+  - [BGEU, 1.0]
+  - [BLTU, 1.0]
+  - [BNE, 1.0]
+  - [ADD, 1.0]
+  - [LD, 1.0]
+
+branches:
+  consecutive-loops: all
+  loop-counters:
+    random-init:
+      min: 1000000
+      max: 1000000
+  loop-ratio: 1
+  max-depth:
+    loop: 1
+  distance:
+    pc:
+      min: 12
+      max: 12
+
+access-ranges:
+  - start: 0x400000000
+    size: 64
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+  - start: 0x400001000
+    size: 8
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+
+# CHECK: error: Max PC distance requirement can't be met: Loop is already
+# CHECK-SAME: filled with 20 bytes, but max pc distance is 12. This can be
+# CHECK-SAME: caused by small PC distance with random loop counter initialization,
+# CHECK-SAME: you can try either relax PC distance requirements or reduce loop
+# CHECK-SAME: counter initialization to values close to 0.

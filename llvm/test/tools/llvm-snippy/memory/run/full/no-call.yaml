@@ -1,0 +1,37 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:     -num-instrs=1000 -selfcheck -selfcheck-mem \
+# RUN:     -init-memory=full -init-regs-in-elf \
+# RUN: |& FileCheck %s 
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100
+      LMA:       0x210000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+
+histogram:
+    - [LB, 2.0]
+    - [SB, 10.0]
+    - [SW, 10.0]
+    - [ADD, 1.0]
+
+# CHECK: #===Simulation Start===
+# CHECK-NOT: jal

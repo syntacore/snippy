@@ -1,0 +1,95 @@
+# REQUIRES: riscv-rvv
+# REQUIRES: riscv-snippy-model-spike
+# COM: This test checks that initialization takes place only according to the "registers" file.
+
+# RUN: llvm-snippy %s \
+# RUN:    -valuegram-operands-regs=%S/../Inputs/registers.yaml \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mcpu: generic-rv64
+  mattr: +v
+  dump-mf: true
+  num-instrs: 200
+  valuegram-operands-regs-init-outputs: on
+  rvv-init-mode: loads
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x80000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x1000000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x2100000
+      SIZE:      0x100000
+      LMA:       0x2100000
+      ACCESS:    rw
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: 0.1
+  mode-distribution:
+    VM:
+      - [all_ones, 2.0]
+      - [any_legal, 1.0]
+    VL:
+      - [max_encodable, 2.0]
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+      rne: 1.0
+      rdn: 1.0
+      ron: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+        sew_16: 1.0
+        sew_32: 1.0
+        sew_64: 1.0
+      LMUL:
+          m8: 1.0
+          m4: 1.0
+          m2: 1.0
+          m1: 1.0
+          mf2: 1.0
+          mf4: 1.0
+          mf8: 1.0
+      VMA:
+        mu: 1.0
+        ma: 1.0
+      VTA:
+        tu: 1.0
+        ta: 1.0
+
+histogram:
+       - [VADD_VV, 1.0]
+       - [VAADDU_VV, 1.0]
+       - [VAADD_VV, 1.0]
+       - [VADC_VIM, 1.0]
+       - [VAND_VV, 1.0]
+       - [VASUBU_VV, 1.0]
+       - [VASUB_VV, 1.0]
+       - [VCPOP_M, 1.0]
+       - [VDIVU_VV, 1.0]
+       - [VDIV_VV, 1.0]
+       - [VFADD_VV, 1.0]
+       - [VFCLASS_V, 1.0]
+       - [VFNMSAC_VV, 1.0]
+
+#          Register values:
+#                     V0-V10:  2
+#                     V11-V20: 4
+#                     V21-V31: 8
+#                     We want to see them in initialization
+
+# CHECK: ===Simulation Start===
+# CHECK-COUNT-50: v{{(0|1|2|3|4|5|6|7|8|9|10)}} 0x00000000000000000000000000000002
+# CHECK-COUNT-50: v{{(11|12|13|14|15|16|17|18|19|20)}} 0x00000000000000000000000000000004
+# CHECK-COUNT-50: v{{(21|22|23|24|25|26|27|28|29|30|31)}} 0x00000000000000000000000000000008

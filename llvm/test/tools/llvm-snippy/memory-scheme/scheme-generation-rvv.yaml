@@ -1,0 +1,17 @@
+# REQUIRES: riscv-rvv
+# RUN: llvm-snippy %S/Inputs/rvv-loadstore.yaml %s %S/Inputs/rvv-lmul1-sew64-max_encodable.yaml -mtriple=riscv64 -mattr=+v \
+# RUN:  -num-instrs=1000 \
+# RUN:  -dump-memory-accesses=%t
+# RUN: FileCheck --input-file=%t %s
+
+access-ranges:
+    - start: 0x80002000
+      size: 0x50
+      stride: 8
+      first-offset: 0
+      last-offset: 0
+
+# We request to generate 1000 vle64|vlse64|vloxei64, each of them will do two accesses as VL is
+# VLMAX.
+# CHECK-COUNT-2000: {{0x800020(00|08|10|18|20|28|30|38|40|48)}}
+# CHECK-NOT: {{0x800020(00|08|10|18|20|28|30|38|40|48)}}

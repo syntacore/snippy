@@ -1,0 +1,8 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %S/../custom-groups-integers-with-ld-st.yaml \
+# RUN: |& FileCheck %s
+
+# CHECK: {{(((.+)(SUB|LD)(.+)([[:space:]]+)){10})}}
+# CHECK: {{(((.+)(ADD|SD)(.+)([[:space:]]+)){10})}}
+
+# CHECK: ===Simulation Start===

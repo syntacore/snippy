@@ -1,0 +1,32 @@
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s -mtriple=riscv64 |& FileCheck %s
+include:
+  - Inputs/sections.yaml
+
+options:
+    num-instrs: 500
+    verify-gen-histogram: True
+    histogram-must-succeed: True
+    dump-mf: true
+    parse-mode: streamed
+
+histogram:
+  - [ADD, 1.0]
+  - [ADDI, 1.0]
+  - [SUB, 1.0]
+  - [AND, 1.0]
+  - [SRA, 1.0]
+  - [SRAI, 1.0]
+  - [SRL, 1.0]
+  - [SRLI, 1.0]
+  - [SLL, 1.0]
+  - [SLLI, 1.0]
+  - [ANDI, 1.0]
+  - [OR, 1.0]
+  - [ORI, 1.0]
+  - [XOR, 1.0]
+  - [XORI, 1.0]
+  - [LW, 1.0]
+  - [SW, 1.0]
+
+# CHECK: error: Unknown option "parse-mode" was specified in YAML

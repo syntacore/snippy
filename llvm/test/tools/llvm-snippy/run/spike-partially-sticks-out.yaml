@@ -1,0 +1,40 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: not llvm-snippy %s
+
+options:
+  Wno-error: [non-reproducible-execution]
+  mtriple: "riscv64"
+  mcpu: "generic-rv64"
+  num-instrs: 1000
+
+sections:
+  # Spike adjusts this memory region from [0x400000-0x500010] to [0x400000-0x501000]
+  # Every access to [0x500010-0x501000] will be considered as a correct one,
+  # even if we do not specify it as an available memory region
+  - name:      theProblem
+    VMA:       0x400000
+    SIZE:      0x100010
+    LMA:       0x400000
+    ACCESS:    rw
+  - name:      code
+    VMA:       0x600000
+    SIZE:      0x100000
+    LMA:       0x600000
+    ACCESS:    rx
+
+access-ranges:
+  # Test is supposed to check,
+  # if the error of partially sticking out memory region access will be found
+  # [0x500000 -- 0x500010] -- correct
+  # [0x500010 -- 0x500020] -- incorrect
+  - start: 0x500000
+    size:  0x000020
+    stride: 16
+    first-offset: 1
+    last-offset: 2
+
+histogram:
+  - [LW, 1.0]
+  - [SW, 1.0]
+
+# CHECK: error: Accessing invalid address

@@ -1,0 +1,56 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
+# RUN: |& FileCheck %s --check-prefix=DISABLED
+# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
+# RUN: --chained-rx-sections-fill |& FileCheck %s --check-prefix=ENABLED
+# RUN: not llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
+# RUN: --chained-rx-sections-fill --selfcheck |& FileCheck %s --check-prefix=ERROR
+# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
+# RUN: --chained-rx-sections-fill -model-plugin=spike --chained-rx-sorted |& FileCheck %s --check-prefix=SORTED
+
+sections:
+  - name:      3
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      1
+    VMA:       0x410000
+    SIZE:      0x100000
+    LMA:       0x410000
+    ACCESS:    rx
+  - name:      4
+    VMA:       0x610000
+    SIZE:      0x100000
+    LMA:       0x610000
+    ACCESS:    rx
+  - name:      selfcheck
+    VMA:       0x200000
+    SIZE:      0x10000
+    LMA:       0x200000
+    ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+
+# DISABLED-NOT: jalr zero
+#
+# ENABLED-COUNT-2: jalr zero
+# ENABLED-NOT: jalr zero
+#
+# SORTED: jalr zero
+# SORTED-NEXT: 0x00000000004
+# SORTED-NEXT: 0x00000000002
+# SORTED: jalr zero
+# SORTED-NEXT: 0x00000000002
+# SORTED-NEXT: 0x00000000006
+# SORTED-NOT: jalr zero
+#
+# ERROR: error: Cannot generate chained code routine: backtrack, selfcheck and address hazard mode do not work with it yet.

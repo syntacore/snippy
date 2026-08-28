@@ -1,0 +1,25 @@
+# RUN: not llvm-snippy %s -mtriple=riscv64 -num-instrs=1 \
+# RUN:  --selfcheck --selfcheck-ref-value-storage=memory  |& FileCheck %s
+
+# CHECK: error: Incorrect list of sections: section 2 and section selfcheck are interfering
+
+sections:
+    - name:      1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+    - name:      "selfcheck"
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [LW, 3.0]
+    - [SW, 3.0]

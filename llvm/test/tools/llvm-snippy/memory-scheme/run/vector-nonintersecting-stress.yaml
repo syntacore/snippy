@@ -1,0 +1,98 @@
+# COM: Here we are just checking that using all instructions that are supported
+# COM: by riscv-disallow-intersecting-mem-accesses access legal memory with various
+# COM: addressing corner cases (wide indices, small addresses e.t.c.) does not error
+# COM: out during execution.
+# REQUIRES: riscv-rvv
+# RUN: llvm-snippy %s
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 20000
+  verify-mi: true
+  riscv-disallow-intersecting-mem-accesses: ".*"
+  riscv-disable-misaligned-access: all
+  trace-log: /dev/null
+sections:
+  - name: 1
+    VMA: 0x80000000
+    SIZE: 0x04000000
+    LMA: 0x80000000
+    ACCESS: rx
+  - name: 2
+    VMA: 0x88000000
+    SIZE: 0x00400000
+    LMA: 0x88000000
+    ACCESS: r
+  - name: 3
+    VMA: 0x8100
+    SIZE: 0x128
+    LMA: 0x8100
+    ACCESS: rw
+  - name: 4
+    VMA: 0x81000000000000
+    SIZE: 50000
+    LMA: 0x81000000000000
+    ACCESS: rw
+  - name: 5
+    VMA: 0xffffffffffff0000
+    SIZE: 0xff
+    LMA: 0xffffffffffff0000
+    ACCESS: rw
+access-ranges:
+  - start: 0x8100
+    size: 0x128
+    stride: 1
+    first-offset: 0
+    last-offset: 0
+  - start: 0x8101
+    size: 0x127
+    stride: 1
+    first-offset: 0
+    last-offset: 0
+  - start: 0x81000000000000
+    size: 50000
+    stride: 2
+    first-offset: 0
+    last-offset: 0
+    max-past-last-offset: 0
+  - start: 0xffffffffffff0000
+    size: 0xff
+    stride: 1
+    first-offset: 0
+    last-offset: 0
+riscv-vector-unit:
+  mode-change-bias:
+    P: 0.2
+  mode-distribution:
+    VM:
+      - [all_ones, 1.0]
+    VL:
+      - [0, 1.0]
+      - [1, 1.0]
+      - [2, 1.0]
+      - [3, 1.0]
+      - [8, 1.0]
+      - [16, 1.0]
+    VXRM:
+      rnu: 1.0
+      rne: 1.0
+      rdn: 1.0
+      ron: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+        sew_16: 1.0
+        sew_32: 1.0
+        sew_64: 1.0
+      LMUL:
+        m1: 1.0
+      VMA:
+        mu: 1.0
+        ma: 1.0
+      VTA:
+        tu: 1.0
+        ta: 1.0
+histogram:
+  - ["V[LS][UO]XSEG[234567]EI(8|16|32|64)_V", 1.0]
+  - ["V[LS][OU]XEI(8|16|32|64)_V", 1.0]
+  - ["V[LS]SSEG[234567]E(8|16|32|64)_V", 1.0]

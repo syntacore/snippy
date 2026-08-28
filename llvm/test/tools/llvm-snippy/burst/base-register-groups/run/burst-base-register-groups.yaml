@@ -1,0 +1,1 @@
+# RUN: llvm-snippy %S/../Inputs/burst-base-register-groups.yaml

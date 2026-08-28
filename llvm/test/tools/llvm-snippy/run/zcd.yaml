@@ -1,0 +1,27 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: llvm-snippy %s |& FileCheck %s
+options:
+  mtriple: riscv32
+  num-instrs: 100
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+  mattr: -a,-m,-c,+f,+d,+zca,+zcd
+
+sections:
+- name: 1
+  VMA: 0x1000
+  LMA: 0x1000
+  SIZE: 0x1000
+  ACCESS: rx
+- name: 2
+  VMA: 0x2000
+  LMA: 0x2000
+  SIZE: 0x1000
+  ACCESS: rw
+
+histogram:
+  - [C_FLD, 1.0]
+  - [C_FSD, 1.0]
+
+# CHECK-DAG: c.fld
+# CHECK-DAG: c.fsd
