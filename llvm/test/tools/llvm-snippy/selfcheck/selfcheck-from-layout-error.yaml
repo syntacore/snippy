@@ -1,0 +1,25 @@
+# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+m,+c \
+# RUN: -num-instrs=10000 -model-plugin=NONEXISTENT \
+# RUN:  -init-regs-in-elf -verify-mi --selfcheck |& FileCheck %s
+sections:
+    - name:      1
+      VMA:       0x500000
+      SIZE:      0x100000
+      LMA:       0x500000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x600000
+      SIZE:      0x700000
+      LMA:       0x600000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0xF00000
+      SIZE:      0x100
+      LMA:       0xF00000
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+    - [ADD, 1.0]
+
+# CHECK: error: Cannot use "selfcheck" section from layout: it does not fit selfcheck data ({{[0-9]+}} bytes)

@@ -1,0 +1,54 @@
+# REQUIRES: riscv-rvv
+# REQUIRES: riscv-snippy-model-spike
+
+# COM: this test requires spike model because we match execution log
+# COM: the test checks for bias-based RVV mode switches
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  --num-instrs=100000 -o %t \
+# RUN:  -verify-gen-histogram  -histogram-must-succeed=true \
+# RUN:  |& FileCheck %s
+
+include:
+- Inputs/rvv-lmul1-sewX-nobias.yaml
+
+sections:
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+histogram:
+
+    - [VADD_VV, 1.0]
+    - [VSETIVLI, 1.0]
+    - [VSETVL, 1.0]
+    - [VSETVLI, 1.0]
+
+# CHECK: vsetivli zero, 2, e64, m1, tu, mu
+# CHECK: vsetivli zero, 4, e32, m1, tu, mu
+# CHECK: vsetivli zero, 16, e8, m1, tu, mu
+# CHECK: vsetivli zero, 8, e16, m1, tu, mu
+# CHECK: vsetivli a5, 2, e64, m1, tu, mu
+# CHECK: vsetivli a5, 4, e32, m1, tu, mu
+# CHECK: vsetivli a5, 16, e8, m1, tu, mu
+# CHECK: vsetivli a5, 8, e16, m1, tu, mu
+# CHECK: vsetivli s2, 2, e64, m1, tu, mu
+# CHECK: vsetivli s2, 4, e32, m1, tu, mu
+# CHECK: vsetivli s2, 16, e8, m1, tu, mu
+# CHECK: vsetivli s2, 8, e16, m1, tu, mu
+# CHECK: vsetivli t6, 2, e64, m1, tu, mu
+# CHECK: vsetivli t6, 4, e32, m1, tu, mu
+# CHECK: vsetivli t6, 16, e8, m1, tu, mu
+# CHECK: vsetivli t6, 8, e16, m1, tu, mu
+
+# CHECK: vadd
+# CHECK: vsetvl
+# CHECK: vadd
+# CHECK: vsetvli
+
+

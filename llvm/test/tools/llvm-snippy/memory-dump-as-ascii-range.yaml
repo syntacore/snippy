@@ -1,0 +1,41 @@
+# UNSUPPORTED: riscv-snippy-model-None
+
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mcpu=generic-rv64 \
+# RUN:     -num-instrs=10  \
+# RUN:     -init-memory=runtime -init-regs-in-elf -memory-seed=11  \
+# RUN:     -dump-memory-section={0x3000000-0x3000010},{0x3002000-0x3002010},{0x3000008-0x3000010} \
+# RUN:     -dump-memory-as-ascii -memory-section-file=%t1
+# RUN: cat %t1 |& FileCheck %s
+
+# CHECK:      Range {0x3000000-0x3000010}
+# CHECK-NEXT:   0x0: 33 0e 12 73 29 9e d1 9a 53 10 2d ed 30 fb f4 1c
+# CHECK-NEXT: Range {0x3000008-0x3000010}
+# CHECK-NEXT:   0x0: 53 10 2d ed 30 fb f4 1c
+# CHECK-NEXT: Range {0x3002000-0x3002010}
+# CHECK-NEXT:   0x0: 33 0e 12 73 29 9e d1 9a 53 10 2d ed 30 fb f4 1c
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x3000000
+      SIZE:      0x0000010
+      LMA:       0x3000000
+      ACCESS:    rw
+    - name:      3
+      VMA:       0x3002000
+      SIZE:      0x0000010
+      LMA:       0x3002000
+      ACCESS:    rw
+
+histogram:
+    - [LW, 2.0]

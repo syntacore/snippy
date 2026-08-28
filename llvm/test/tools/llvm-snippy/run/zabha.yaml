@@ -1,0 +1,46 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: llvm-snippy %s | FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +a,+zabha
+  num-instrs: 100
+
+sections:
+  - name: 1
+    VMA: 0x10000
+    LMA: 0x10000
+    SIZE: 0x10000
+    ACCESS: rx
+  - name: 2
+    VMA: 0x20000
+    LMA: 0x20000
+    SIZE: 0x10000
+    ACCESS: rw
+
+histogram:
+  - [AMOSWAP_H, 1.0]
+  - [AMOSWAP_B, 1.0]
+  - [AMOAND_H, 1.0]
+  - [AMOAND_B, 1.0]
+  - [AMOOR_H, 1.0]
+  - [AMOOR_B, 1.0]
+  - [AMOXOR_H, 1.0]
+  - [AMOXOR_B, 1.0]
+  - [AMOMAX_H, 1.0]
+  - [AMOMAX_B, 1.0]
+  - [AMOMIN_H, 1.0]
+  - [AMOMIN_B, 1.0]
+
+# CHECK-DAG: amoswap.h
+# CHECK-DAG: amoswap.b
+# CHECK-DAG: amoand.h
+# CHECK-DAG: amoand.b
+# CHECK-DAG: amoxor.h
+# CHECK-DAG: amoxor.b
+# CHECK-DAG: amoor.h
+# CHECK-DAG: amoor.b
+# CHECK-DAG: amomax.h
+# CHECK-DAG: amomax.b
+# CHECK-DAG: amomin.h
+# CHECK-DAG: amomin.b

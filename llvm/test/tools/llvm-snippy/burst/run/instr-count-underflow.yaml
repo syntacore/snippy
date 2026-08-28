@@ -1,0 +1,48 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s -mtriple=riscv64  \
+# RUN: -num-instrs=97 \
+# RUN: --histogram-must-succeed=false --verify-gen-histogram \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-TWO-OFF
+
+# RUN: llvm-snippy %s -mtriple=riscv64  \
+# RUN: -num-instrs=98 \
+# RUN: --histogram-must-succeed=false --verify-gen-histogram \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-ONE-OFF
+
+# RUN: llvm-snippy %s -mtriple=riscv64  \
+# RUN: -num-instrs=99 \
+# RUN: --histogram-must-succeed=false --verify-gen-histogram \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-MATCH
+
+# RUN: llvm-snippy %s -mtriple=riscv64  \
+# RUN: -num-instrs=100 \
+# RUN: --histogram-must-succeed=false --verify-gen-histogram \
+# RUN:  |& FileCheck %s --check-prefix=CHECK-ONE-PLUS
+
+burst:
+  mode: mixed
+  min-size: 100
+  max-size: 100
+sections:
+    - name:      1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [ADDI, 1.0]
+    - [LD, 1.0]
+
+# CHECK-TWO-OFF: #===Simulation Start===
+
+# CHECK-ONE-OFF: #===Simulation Start===
+
+# CHECK-MATCH: #===Simulation Start===
+
+# CHECK-ONE-PLUS: #===Simulation Start===

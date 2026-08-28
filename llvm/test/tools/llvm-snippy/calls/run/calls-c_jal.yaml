@@ -1,0 +1,43 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s |& FileCheck %s
+
+# CHECK:  C_JAL @fun{{[0-9]+}}, implicit-def $x1
+# CHECK: $[[TMP_REG:[a-z0-9]+]] = AUIPC target-flags(riscv-pcrel-hi) @fun{{[0-9]+}}, pre-instr-symbol <mcsymbol .[[TMP_SYM:[a-zA-Z0-9_]+]]>
+# CHECK: $[[TMP_REG]] = ADDI $[[TMP_REG]], target-flags(riscv-pcrel-lo) <mcsymbol .[[TMP_SYM]]>
+# CHECK: $[[TMP_REG]] = ADDI $[[TMP_REG]], {{[0-1]}}
+# CHECK-NOT: $[[TMP_REG]]
+# CHECK: C_JALR $[[TMP_REG]], implicit-def $x1
+# CHECK: #===Simulation Start===
+
+options:
+  function-number: 4
+  function-layers: 2
+  num-instrs: 1000
+  num-instr-ancil: 50
+  dump-mf: on
+  verify-mi: on
+  mtriple: riscv32
+  mattr: +c
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x100000
+    SIZE:      0x100000
+    LMA:       0x100000
+    ACCESS:    rw
+  - name:      stack
+    VMA:       0x310000
+    SIZE:      0x100000
+    LMA:       0x310000
+    ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [C_JAL, 0.1]
+    - [C_JALR, 0.1]

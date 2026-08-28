@@ -1,0 +1,2 @@
+intervals-to-verify:
+  - [0x40000, 0x414b0]

@@ -1,0 +1,16 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
+# RUN:   -num-instrs=10 -seed=2 \
+# RUN:   -riscv-disable-misaligned-access \
+# RUN: |& FileCheck %s --dump-input fail
+
+access-evictions:
+    - mask:  0x00000000
+      fixed: 0x80000100
+      weight: 0
+    - mask:  0x00000000
+      fixed: 0x80000010
+      weight: 0.01
+
+# CHECK-NOT: 80000100
+# CHECK-COUNT-10: 80000010

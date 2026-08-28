@@ -1,0 +1,22 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s --mtriple=riscv32 \
+# RUN:   --num-instrs=1000 --trace-log %t.log
+# RUN: FileCheck %s --input-file %t.log
+
+# COM: In RV32 mode, the simulation should end on "stop PC" just before EBREAK is executed.
+# CHECK-NOT: ebreak
+
+sections:
+  - name:      1
+    VMA:       0x80000000
+    LMA:       0x80000000
+    SIZE:      0x00020000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x10020000
+    LMA:       0x10020000
+    SIZE:      0x00010000
+    ACCESS:    rw
+
+histogram:
+- [ADD, 1.0]

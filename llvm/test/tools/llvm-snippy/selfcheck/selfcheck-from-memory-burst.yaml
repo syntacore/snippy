@@ -1,0 +1,48 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: sed -e s/BURST_SIZE/1/ %s >%t.1.yaml
+# RUN: llvm-snippy %t.1.yaml \
+# RUN:    -mtriple=riscv64 \
+# RUN:    -num-instrs=1000 -init-regs-in-elf -selfcheck --selfcheck-ref-value-storage=memory \
+# RUN: |& FileCheck %s
+
+# RUN: sed -e s/BURST_SIZE/10/ %s >%t.10.yaml
+# RUN: llvm-snippy %t.10.yaml \
+# RUN:    -mtriple=riscv64 \
+# RUN:    -num-instrs=1000 -init-regs-in-elf -selfcheck --selfcheck-ref-value-storage=memory \
+# RUN: |& FileCheck %s
+
+burst:
+  mode: mixed
+  min-size: BURST_SIZE
+  max-size: BURST_SIZE
+sections:
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+
+histogram:
+    - [LB, 1.0]
+    - [LBU, 1.0]
+    - [LH, 1.0]
+    - [LHU, 1.0]
+    - [LW, 1.0]
+    - [LWU, 1.0]
+    - [LD, 1.0]
+    - [SB, 1.0]
+    - [SH, 1.0]
+    - [SW, 1.0]
+    - [SD, 1.0]
+
+# CHECK: #===Simulation Start===

@@ -1,0 +1,26 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# COM: test checks that if we report error in case of incorrect registers
+
+# RUN: not llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=+c \
+# RUN:    -num-instrs=10 \
+# RUN:    -initial-regs-yaml=%S/Inputs/initial_state_rv64i-incorrect-gpr.yaml \
+# RUN:    -dump-registers-yaml=%t.regs.yaml \
+# RUN: |& FileCheck %s
+
+sections:
+    - name:      1
+      VMA:       0x800000
+      SIZE:      0x4000
+      LMA:       0x800000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x806000
+      SIZE:      0x4000
+      LMA:       0x806000
+      ACCESS:    rw
+
+histogram:
+    - [C_NOP, 1.0]
+
+# CHECK: initial_state_rv64i-incorrect-gpr.yaml:3:3: error: Could not derive register ordinal for XAD1

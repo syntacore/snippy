@@ -1,0 +1,30 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: timeout 10 llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +zicbop
+  num-instrs: 1000
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+
+sections:
+  - name: 1
+    VMA: 0x10000
+    LMA: 0x10000
+    SIZE: 0x10000
+    ACCESS: rx
+  - name: 2
+    VMA: 0x20000
+    LMA: 0x20000
+    SIZE: 0x10000
+    ACCESS: rw
+
+histogram:
+  - [PREFETCH_I, 1.0]
+  - [PREFETCH_R, 1.0]
+  - [PREFETCH_W, 1.0]
+
+# CHECK-DAG: prefetch.i
+# CHECK-DAG: prefetch.r
+# CHECK-DAG: prefetch.w

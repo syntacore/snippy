@@ -1,0 +1,36 @@
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 >& %t
+
+# RUN: FileCheck %s --input-file=%t --check-prefix=ADDR
+# RUN: FileCheck %s --input-file=%t --check-prefix=OFFSET
+
+include:
+- Inputs/memory-aligned-small.yaml
+burst:
+  mode: load
+  min-size: 100
+  max-size: 100
+sections:
+    - name:      1
+      VMA:       0x70000000
+      SIZE:      0x400000
+      LMA:       0x70000000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x8000bf00
+      SIZE:      0x100
+      LMA:       0x8000bf00
+      ACCESS:    rw
+
+histogram:
+    - [LW, 1.0]
+
+# Check that all memory accesses comply with memory scheme.
+# ADDR-COUNT-999: mem 0x000000008000bf{{[0-9a-f]}}0
+
+# Check offsets randomization. They must not be limited by memory scheme.
+# Without additional offsets randomization for burst mode maximum absolute
+# offset value is 0x100 (=size) = 256. So, check that there are offsets formed
+# by four digits.
+# OFFSET-COUNT-300: lw {{.*,}} {{-?[0-9]{4}\(}}

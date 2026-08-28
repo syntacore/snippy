@@ -1,0 +1,91 @@
+# UNSUPPORTED: riscv-snippy-model-None
+
+# RUN: llvm-snippy %s \
+# RUN:    -initial-regs-yaml=%S/Inputs/d.yaml -trace-SNTF %t.trace.dump
+# RUN: FileCheck %s --input-file %t.trace.dump
+
+options:
+  mtriple: riscv32
+  mattr: +d
+  num-instrs: 10
+  init-regs-in-elf: true
+
+sections:
+    - name:      1
+      VMA:       0x800000
+      SIZE:      0x4000
+      LMA:       0x800000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x806000
+      SIZE:      0x4000
+      LMA:       0x806000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+
+# CHECK: # SNTF
+# CHECK: f0=ffffffff00000002
+# CHECK: f1=ffffffff00000020
+# CHECK: f2=ffffffff00000200
+# CHECK: f3=ffffffff00002000
+# CHECK: f4=ffffffff00020000
+# CHECK: f5=ffffffff00200000
+# CHECK: f6=ffffffff02000000
+# CHECK: f7=ffffffff20000000
+# CHECK: f8=ffffffff02000000
+# CHECK: f9=ffffffff00200000
+# CHECK: f10=ffffffff00020000
+# CHECK: f11=ffffffff00002000
+# CHECK: f12=ffffffff00000200
+# CHECK: f13=ffffffff00000020
+# CHECK: f14=ffffffff00000002
+# CHECK: f15=ffffffff00000000
+# CHECK: f16=ffffffff00000020
+# CHECK: f17=ffffffff00000200
+# CHECK: f18=ffffffff00002000
+# CHECK: f19=ffffffff00020000
+# CHECK: f20=ffffffff00200000
+# CHECK: f21=ffffffff02000000
+# CHECK: f22=ffffffff20000000
+# CHECK: f23=ffffffff00000000
+# CHECK: f24=ffffffff20000000
+# CHECK: f25=ffffffff02000000
+# CHECK: f26=ffffffff00200000
+# CHECK: f27=ffffffff00020000
+# CHECK: f28=ffffffff00002000
+# CHECK: f29=ffffffff00000200
+# CHECK: f30=ffffffff00000020
+# CHECK: f31=ffffffff00000002
+# CHECK: x1=00000010
+# CHECK: x2=00000100
+# CHECK: x3=00001000
+# CHECK: x4=00010000
+# CHECK: x5=00100000
+# CHECK: x6=01000000
+# CHECK: x7=10000000
+# CHECK: x8=01000000
+# CHECK: x9=00100000
+# CHECK: x10=00100000
+# CHECK: x11=00010000
+# CHECK: x12=00001000
+# CHECK: x13=00000100
+# CHECK: x14=00000010
+# CHECK: x15=00000001
+# CHECK: x16=00000000
+# CHECK: x17=00000010
+# CHECK: x18=00000100
+# CHECK: x19=00001000
+# CHECK: x20=00010000
+# CHECK: x21=00100000
+# CHECK: x22=01000000
+# CHECK: x23=10000000
+# CHECK: x24=01000000
+# CHECK: x25=00100000
+# CHECK: x26=00010000
+# CHECK: x27=00001000
+# CHECK: x28=00000100
+# CHECK: x29=00000010
+# CHECK: x30=00000001
+# CHECK: x31=00000000

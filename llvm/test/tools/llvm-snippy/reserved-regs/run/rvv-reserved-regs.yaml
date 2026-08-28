@@ -1,0 +1,46 @@
+# REQUIRES: riscv-rvv
+# REQUIRES: riscv-snippy-model-spike
+
+# COM: This test checks that all reserved registers are not used
+
+# RUN: llvm-snippy %s \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mcpu: generic-rv64
+  mattr: +v
+  rvv-init-mode: loads
+  num-instrs: 10000
+  init-regs-in-elf: on
+  reserved-regs-list: [V5,V9,V13,V17,V21,V23]
+
+include:
+    - "../Inputs/rvv-unit-all.yaml"
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+
+histogram:
+    - [VADD_VV, 1.0]
+
+# CHECK-NOT: v5
+# CHECK-NOT: v9
+# CHECK-NOT: v13
+# CHECK-NOT: v17
+# CHECK-NOT: v21
+# CHECK-NOT: v23

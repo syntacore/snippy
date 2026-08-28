@@ -1,0 +1,13 @@
+garbage:
+  - weight: 1
+    filling-options:
+    - [uniform, 1.0]
+  - weight: 1
+    filling-options:
+    - [opcodes-histogram, 1.0]
+    - ["ANDI?", 2.0]
+    - [SLL, 1.0]
+    - ["LD?", 1.0]
+  - weight: 1
+    filling-options:
+    - [32'd12, 1.0]

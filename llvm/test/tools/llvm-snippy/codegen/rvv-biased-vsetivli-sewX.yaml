@@ -1,0 +1,57 @@
+# REQUIRES: riscv-rvv
+# REQUIRES: riscv-snippy-model-spike
+
+# COM: this test requires spike model because we match execution log
+# COM: the test checks for bias-based RVV mode switches
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 10000
+
+include:
+- Inputs/rvv-lmul1-sewX.yaml
+
+sections:
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x400000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80600000
+    SIZE:      0x400000
+    LMA:       0x80600000
+    ACCESS:    rw
+
+histogram:
+    - [VADD_VV, 1.0]
+
+# COM: Looking for sequences like:
+# COM:    vsetivli zero, 2, e64, m1, tu, mu
+# COM:      ......
+# COM:    vmxnor.mm v0, v0, v0
+# COM:      ......
+# COM:    vadd.vv
+
+# CHECK-DAG: vsetivli zero, 2, e64, m1, tu, mu{{[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetivli zero, 4, e32, m1, tu, mu{{[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetivli zero, 8, e16, m1, tu, mu{{[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetivli zero, 16, e8, m1, tu, mu{{[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+
+# CHECK-DAG: vsetivli a5, 2, e64, m1, tu, mu{{[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetivli a5, 4, e32, m1, tu, mu{{[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetivli a5, 8, e16, m1, tu, mu{{[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetivli a5, 16, e8, m1, tu, mu{{[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+
+# CHECK-DAG: vsetivli s2, 2, e64, m1, tu, mu{{[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetivli s2, 4, e32, m1, tu, mu{{[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetivli s2, 8, e16, m1, tu, mu{{[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetivli s2, 16, e8, m1, tu, mu{{[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+
+# CHECK-DAG: vsetivli t6, 2, e64, m1, tu, mu{{[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetivli t6, 4, e32, m1, tu, mu{{[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetivli t6, 8, e16, m1, tu, mu{{[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv
+# CHECK-DAG: vsetivli t6, 16, e8, m1, tu, mu{{[[:space:]].+[[:space:]].+}}vmxnor.mm v0, v0, v0{{[[:space:]].+[[:space:]].+}}vadd.vv

@@ -1,0 +1,245 @@
+# REQUIRES: riscv-rvv
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %s %S/Inputs/memory-aligned-small.yaml -mtriple=riscv64 -mattr=+v \
+# RUN:   -o %t --num-instrs=10000 \
+# RUN:   --init-regs-in-elf --verify-mi \
+# RUN:   -verify-gen-histogram  -histogram-must-succeed=true \
+# RUN:   -rvv-init-mode=loads \
+# RUN:   |& FileCheck %s --check-prefix=INBOUNDS
+
+# RUN: not llvm-snippy %s %S/Inputs/memory-aligned-small-outofbounds.yaml -mtriple=riscv64 -mattr=+v \
+# RUN:   -o %t --num-instrs=5000 \
+# RUN:   --init-regs-in-elf --verify-mi \
+# RUN:   -verify-gen-histogram  -histogram-must-succeed=true \
+# RUN:   -rvv-init-mode=loads |& \
+# RUN:   FileCheck %s --check-prefix=OUTOFBOUNDS
+
+# INBOUNDS-COUNT-31: vl1re8.v
+#   Check that all first addresses are aligned as expected. We count 998
+#   instructions as there are VSETVL in histogram which has an extremely low
+#   weight, but still can be inserted more than one time.
+# INBOUNDS-COUNT-998: core 0: {{.* mem}} 0x000000008000bf{{[0-9a-f]}}0
+
+# OUTOFBOUNDS: error: Primary interpreter step failed:
+# OUTOFBOUNDS-NEXT: MEPC:   0x{{[[:xdigit:]]+}}
+# OUTOFBOUNDS-NEXT: MCAUSE: 0x{{[[:xdigit:]]+}}
+# OUTOFBOUNDS-NEXT: MTVAL:  0x{{[[:xdigit:]]+}}
+# OUTOFBOUNDS-NEXT: ---
+# OUTOFBOUNDS-NEXT: registers:
+# OUTOFBOUNDS-NEXT:   - [ X0, 0x0000000000000000 ]
+# OUTOFBOUNDS-NEXT:   - [ X1, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X2, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X3, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X4, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X5, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X6, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X7, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X8, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X9, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X10, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X11, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X12, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X13, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X14, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X15, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X16, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X17, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X18, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X19, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X20, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X21, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X22, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X23, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X24, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X25, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X26, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X27, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X28, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X29, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X30, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ X31, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F0, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F1, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F2, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F3, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F4, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F5, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F6, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F7, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F8, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F9, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F10, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F11, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F12, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F13, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F14, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F15, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F16, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F17, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F18, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F19, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F20, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F21, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F22, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F23, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F24, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F25, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F26, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F27, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F28, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F29, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F30, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ F31, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V0, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V1, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V2, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V3, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V4, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V5, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V6, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V7, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V8, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V9, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V10, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V11, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V12, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V13, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V14, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V15, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V16, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V17, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V18, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V19, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V20, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V21, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V22, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V23, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V24, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V25, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V26, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V27, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V28, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V29, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V30, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ V31, 0x{{([[:xdigit:]]{32})}} ]
+# OUTOFBOUNDS-NEXT:   - [ PC, 0x{{([[:xdigit:]]{16})}} ]
+# OUTOFBOUNDS: ...
+
+
+sections:
+  - name:      0
+    VMA:       0x2000000
+    SIZE:      0x1000000
+    LMA:       0x2000000
+    ACCESS:    r
+  - name:      1
+    VMA:       0x3000000
+    SIZE:      0x1000000
+    LMA:       0x3000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x8000bf00
+    SIZE:      0x100
+    LMA:       0x8000bf00
+    ACCESS:    rw
+histogram:
+    - [VSETVL, 1.0]
+    - [VLE16FF_V, 1.0]
+    - [VLE16_V, 1.0]
+    - [VLE32FF_V, 1.0]
+    - [VLE32_V, 1.0]
+    - [VLE64FF_V, 1.0]
+    - [VLE64_V, 1.0]
+    - [VLE8FF_V, 1.0]
+    - [VLE8_V, 1.0]
+    - [VLM_V, 1.0]
+    - [VLSEG2E16FF_V, 1.0]
+    - [VLSEG2E16_V, 1.0]
+    - [VLSEG2E32FF_V, 1.0]
+    - [VLSEG2E32_V, 1.0]
+    - [VLSEG2E64FF_V, 1.0]
+    - [VLSEG2E64_V, 1.0]
+    - [VLSEG2E8FF_V, 1.0]
+    - [VLSEG2E8_V, 1.0]
+    - [VLSEG3E16FF_V, 1.0]
+    - [VLSEG3E16_V, 1.0]
+    - [VLSEG3E32FF_V, 1.0]
+    - [VLSEG3E32_V, 1.0]
+    - [VLSEG3E64FF_V, 1.0]
+    - [VLSEG3E64_V, 1.0]
+    - [VLSEG3E8FF_V, 1.0]
+    - [VLSEG3E8_V, 1.0]
+    - [VLSEG4E16FF_V, 1.0]
+    - [VLSEG4E16_V, 1.0]
+    - [VLSEG4E32FF_V, 1.0]
+    - [VLSEG4E32_V, 1.0]
+    - [VLSEG4E64FF_V, 1.0]
+    - [VLSEG4E64_V, 1.0]
+    - [VLSEG4E8FF_V, 1.0]
+    - [VLSEG4E8_V, 1.0]
+    - [VLSEG5E16FF_V, 1.0]
+    - [VLSEG5E16_V, 1.0]
+    - [VLSEG5E32FF_V, 1.0]
+    - [VLSEG5E32_V, 1.0]
+    - [VLSEG5E64FF_V, 1.0]
+    - [VLSEG5E64_V, 1.0]
+    - [VLSEG5E8FF_V, 1.0]
+    - [VLSEG5E8_V, 1.0]
+    - [VLSEG6E16FF_V, 1.0]
+    - [VLSEG6E16_V, 1.0]
+    - [VLSEG6E32FF_V, 1.0]
+    - [VLSEG6E32_V, 1.0]
+    - [VLSEG6E64FF_V, 1.0]
+    - [VLSEG6E64_V, 1.0]
+    - [VLSEG6E8FF_V, 1.0]
+    - [VLSEG6E8_V, 1.0]
+    - [VLSEG7E16FF_V, 1.0]
+    - [VLSEG7E16_V, 1.0]
+    - [VLSEG7E32FF_V, 1.0]
+    - [VLSEG7E32_V, 1.0]
+    - [VLSEG7E64FF_V, 1.0]
+    - [VLSEG7E64_V, 1.0]
+    - [VLSEG7E8FF_V, 1.0]
+    - [VLSEG7E8_V, 1.0]
+    - [VLSEG8E16FF_V, 1.0]
+    - [VLSEG8E16_V, 1.0]
+    - [VLSEG8E32FF_V, 1.0]
+    - [VLSEG8E32_V, 1.0]
+    - [VLSEG8E64FF_V, 1.0]
+    - [VLSEG8E64_V, 1.0]
+    - [VLSEG8E8FF_V, 1.0]
+    - [VLSEG8E8_V, 1.0]
+    - [VSE16_V, 1.0]
+    - [VSE32_V, 1.0]
+    - [VSE64_V, 1.0]
+    - [VSE8_V, 1.0]
+    - [VSM_V, 1.0]
+    - [VSSEG2E16_V, 1.0]
+    - [VSSEG2E32_V, 1.0]
+    - [VSSEG2E64_V, 1.0]
+    - [VSSEG2E8_V, 1.0]
+    - [VSSEG3E16_V, 1.0]
+    - [VSSEG3E32_V, 1.0]
+    - [VSSEG3E64_V, 1.0]
+    - [VSSEG3E8_V, 1.0]
+    - [VSSEG4E16_V, 1.0]
+    - [VSSEG4E32_V, 1.0]
+    - [VSSEG4E64_V, 1.0]
+    - [VSSEG4E8_V, 1.0]
+    - [VSSEG5E16_V, 1.0]
+    - [VSSEG5E32_V, 1.0]
+    - [VSSEG5E64_V, 1.0]
+    - [VSSEG5E8_V, 1.0]
+    - [VSSEG6E16_V, 1.0]
+    - [VSSEG6E32_V, 1.0]
+    - [VSSEG6E64_V, 1.0]
+    - [VSSEG6E8_V, 1.0]
+    - [VSSEG7E16_V, 1.0]
+    - [VSSEG7E32_V, 1.0]
+    - [VSSEG7E64_V, 1.0]
+    - [VSSEG7E8_V, 1.0]
+    - [VSSEG8E16_V, 1.0]
+    - [VSSEG8E32_V, 1.0]
+    - [VSSEG8E64_V, 1.0]
+    - [VSSEG8E8_V, 1.0]
