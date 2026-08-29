@@ -87,37 +87,6 @@ public:
   MCSymbol *emitCFILabel() override;
   void emitCFISections(bool EH, bool Debug, bool SFrame) override;
 
-  bool setEmitEHFrame(bool Val) { return std::exchange(EmitEHFrame, Val); }
-
-  MCFragment *getCurrentFragment() const;
-
-  void insert(MCFragment *F) {
-    flushPendingLabels(F);
-    MCSection *CurSection = getCurrentSectionOnly();
-    CurSection->getFragmentList().insert(CurInsertionPoint, F);
-    F->setParent(CurSection);
-  }
-
-  /// Get a data fragment to write into, creating a new one if the current
-  /// fragment is not a data fragment.
-  /// Optionally a \p STI can be passed in so that a new fragment is created
-  /// if the Subtarget differs from the current fragment.
-  MCDataFragment *getOrCreateDataFragment(const MCSubtargetInfo* STI = nullptr);
-
-protected:
-  bool changeSectionImpl(MCSection *Section, const MCExpr *Subsection);
-
-  /// Assign a label to the current Section and Subsection even though a
-  /// fragment is not yet present. Use flushPendingLabels(F) to associate
-  /// a fragment with this label.
-  void addPendingLabel(MCSymbol* label);
-
-  /// If any labels have been emitted but not assigned fragments in the current
-  /// Section and Subsection, ensure that they get assigned to fragment F.
-  /// Optionally, one can provide an offset \p FOffset as a symbol offset within
-  /// the fragment.
-  void flushPendingLabels(MCFragment *F, uint64_t FOffset = 0);
-
 public:
   void visitUsedSymbol(const MCSymbol &Sym) override;
 

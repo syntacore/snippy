@@ -244,12 +244,12 @@ public:
     const auto &State = ProgCtx.getLLVMState();
     const auto &RegInfo = State.getRegInfo();
     const auto &SnippyTgt = State.getSnippyTarget();
-    bool IsDst = Selected.getFlags() & RegState::Define;
+    bool IsDst = Selected.getFlags() & unsigned(RegState::Define);
     AccessMaskBit Mask = IsDst ? AccessMaskBit::W : AccessMaskBit::R;
     if (Selected.isTiedTo()) {
       return Operands[Selected.getTiedTo()].getReg();
     }
-    auto RegClass = RegInfo.getRegClass(OperandRegClassID);
+    const auto &RegClass = RegInfo.getRegClass(OperandRegClassID);
     auto ExpectedReg =
         RegGen.generate(RegClass, OperandRegClassID, RegInfo, RP, MBB,
                         SnippyTgt, /* Exclude */ {}, /* Include */ {}, Mask);
@@ -760,6 +760,11 @@ public:
   void
   addBTIHintOperands(llvm::ArrayRef<planning::PreselectedOpInfo> Preselected) {
     Operands.push_back(MachineOperand::CreateImm(getBTIHint()));
+  }
+
+  void addTIndexHintOperands(
+      llvm::ArrayRef<planning::PreselectedOpInfo> Preselected) {
+    SNIPPY_UNIMPLEMENTED();
   }
 
   void

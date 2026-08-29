@@ -123,6 +123,8 @@ public:
     return PassID;
   }
 
+  virtual void *getAdjustedAnalysisPointer(AnalysisID) { return this; }
+
   /// doInitialization - Virtual method overridden by subclasses to do
   /// any necessary initialization before any pass is run.
   virtual bool doInitialization(Module &)  { return false; }
