@@ -92,4 +92,3 @@ histogram:
     - [ZEXT_H_RV32, 1.0]
     - [CLMULR, 1.0]
     - ["C_[A-Za-z0-9_]+_HINT", 1.0]
-    - ["C_ADDI_HINT_IMM_ZERO", 1.0]

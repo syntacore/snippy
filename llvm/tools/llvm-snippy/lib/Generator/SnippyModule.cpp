@@ -65,7 +65,7 @@ SnippyProgramContext::createDefaultOpcodeGenerator(OpcodeHistogram &&OpcHist) {
 
 SnippyModule::SnippyModule(LLVMState &State, StringRef Name)
     : Module(Name, State.getCtx()), State(State), Context([&]() {
-        setTargetTriple(State.getSubtargetInfo().getTargetTriple().getTriple());
+        setTargetTriple(State.getSubtargetInfo().getTargetTriple());
         auto &LLVMTM = State.getTargetMachine();
         // Previously, AsmPrinter was created using Context from MMI
         // MMI is captured by PM, so in order to avoid potential invalid ref,
@@ -73,7 +73,7 @@ SnippyModule::SnippyModule(LLVMState &State, StringRef Name)
         auto Context = std::make_unique<MCContext>(
             LLVMTM.getTargetTriple(), LLVMTM.getMCAsmInfo(),
             LLVMTM.getMCRegisterInfo(), LLVMTM.getMCSubtargetInfo(), nullptr,
-            &LLVMTM.Options.MCOptions, false);
+            false);
         Context->setObjectFileInfo(LLVMTM.getObjFileLowering());
         return Context;
       }()),

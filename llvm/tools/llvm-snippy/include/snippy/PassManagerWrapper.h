@@ -15,7 +15,7 @@
 namespace llvm {
 
 class ImmutablePass;
-class LLVMTargetMachine;
+class TargetMachine;
 class MCContext;
 class raw_pwrite_stream;
 
@@ -30,7 +30,7 @@ public:
   void add(ActiveImmutablePassInterface *P);
   void add(Pass *P);
   void add(ImmutablePass *P);
-  bool addAsmPrinter(LLVMTargetMachine &LLVMTM, raw_pwrite_stream &Out,
+  bool addAsmPrinter(TargetMachine &LLVMTM, raw_pwrite_stream &Out,
                      raw_pwrite_stream *DwoOut, CodeGenFileType FileType,
                      MCContext &Context);
   bool run(Module &M) { return PM.run(M); };

@@ -79,10 +79,13 @@ public:
                                            unsigned SubReg = 0) {
     assert((Flags & 0x1) == 0 && "0x1 is not a RegState flag");
     return MachineOperand::CreateReg(
-        Reg, Flags & RegState::Define, Flags & RegState::Implicit,
-        Flags & RegState::Kill, Flags & RegState::Dead, Flags & RegState::Undef,
-        Flags & RegState::EarlyClobber, SubReg, Flags & RegState::Debug,
-        Flags & RegState::InternalRead, Flags & RegState::Renamable);
+        Reg, Flags & unsigned(RegState::Define),
+        Flags & unsigned(RegState::Implicit), Flags & unsigned(RegState::Kill),
+        Flags & unsigned(RegState::Dead), Flags & unsigned(RegState::Undef),
+        Flags & unsigned(RegState::EarlyClobber), SubReg,
+        Flags & unsigned(RegState::Debug),
+        Flags & unsigned(RegState::InternalRead),
+        Flags & unsigned(RegState::Renamable));
   }
 
   virtual ~SnippyOperandGenerator() = default;

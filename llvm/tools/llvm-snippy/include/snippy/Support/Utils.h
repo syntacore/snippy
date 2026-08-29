@@ -13,6 +13,7 @@
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SwapByteOrder.h"
 
 #include <array>
 #include <cmath>
@@ -372,8 +373,6 @@ auto transformOpt(const std::optional<T> &O, Func &&F)
     return std::invoke(std::forward<Func>(F), *O);
   return std::nullopt;
 }
-
-unsigned getAutoSenseRadix(StringRef &Str);
 
 void replaceAllSubstrs(std::string &Str, StringRef What, StringRef With);
 

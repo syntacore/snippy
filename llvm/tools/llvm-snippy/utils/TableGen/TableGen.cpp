@@ -48,7 +48,7 @@ static cl::opt<ActionType>
                       clEnumValN(GenRISCVOperands, "gen-riscv-operands",
                                  "Generate RISCV operands")));
 
-static bool snippyTableGenMain(raw_ostream &OS, RecordKeeper &Records) {
+static bool snippyTableGenMain(raw_ostream &OS, const RecordKeeper &Records) {
   switch (Action) {
   case PrintRecords:
     OS << Records; // No argument, dump all contents

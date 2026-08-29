@@ -52,7 +52,9 @@ getSupportedSysRegs(const RISCVSubtarget &ST);
 
 static inline unsigned getRegBitWidth(const RISCVSubtarget &ST, MCRegister Reg,
                                       unsigned VLEN = 0) {
-  if (RISCV::GPRRegClass.contains(Reg))
+  if (RISCV::GPRRegClass.contains(Reg) ||
+      (RISCV::X0_H <= Reg && Reg <= RISCV::X31_H) ||
+      (RISCV::X0_W <= Reg && Reg <= RISCV::X31_W))
     return ST.getXLen();
   if (RISCV::FPR16RegClass.contains(Reg))
     return Reg2Bytes * RISCV_CHAR_BIT;
@@ -64,21 +66,30 @@ static inline unsigned getRegBitWidth(const RISCVSubtarget &ST, MCRegister Reg,
   if (is_contained(getSupportedSysRegs(ST), RegID))
     return RISCVSimulatorSysRegs::getBitWidth(
         ST, static_cast<RISCVSimulatorSysRegs::RISCVSimulatorSysReg>(Reg.id()));
-  assert(RISCV::VRRegClass.contains(Reg) && "unknown register class");
+  if (!RISCV::VRRegClass.contains(Reg))
+    report_fatal_error(Twine("unknown RISC-V register class for register ") +
+                       Twine(Reg.id()));
   return VLEN;
 }
 
 static inline unsigned regToIndex(Register Reg) {
-  if (RISCV::X0 <= Reg && Reg <= RISCV::X31)
-    return Reg - RISCV::X0;
-  if (RISCV::F0_D <= Reg && Reg <= RISCV::F31_D)
-    return Reg - RISCV::F0_D;
-  if (RISCV::F0_F <= Reg && Reg <= RISCV::F31_F)
-    return Reg - RISCV::F0_F;
-  if (RISCV::F0_H <= Reg && Reg <= RISCV::F31_H)
-    return Reg - RISCV::F0_H;
-  assert(RISCV::V0 <= Reg && Reg <= RISCV::V31 && "unknown register");
-  return Reg - RISCV::V0;
+  const MCRegisterClass *RC = nullptr;
+  if (RISCV::X0_H <= Reg && Reg <= RISCV::X31_H)
+    return Reg - RISCV::X0_H;
+  if (RISCV::X0_W <= Reg && Reg <= RISCV::X31_W)
+    return Reg - RISCV::X0_W;
+  if (RISCV::GPRRegClass.contains(Reg))
+    RC = &RISCV::GPRRegClass;
+  else if (RISCV::FPR64RegClass.contains(Reg))
+    RC = &RISCV::FPR64RegClass;
+  else if (RISCV::FPR32RegClass.contains(Reg))
+    RC = &RISCV::FPR32RegClass;
+  else if (RISCV::FPR16RegClass.contains(Reg))
+    RC = &RISCV::FPR16RegClass;
+  else if (RISCV::VRRegClass.contains(Reg))
+    RC = &RISCV::VRRegClass;
+  assert(RC && "unknown register");
+  return llvm::find(*RC, Reg) - RC->begin();
 }
 
 using RISCVSimulatorSysRegs::RISCVSimulatorSysReg;

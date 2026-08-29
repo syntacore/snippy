@@ -19,13 +19,19 @@
 #include "llvm/Target/TargetMachine.h"
 
 namespace llvm {
+class AsmPrinter;
 class FunctionPass;
 class InstructionSelector;
+class MCInst;
+class MachineInstr;
 class ModulePass;
 class PassRegistry;
 class RISCVRegisterBankInfo;
 class RISCVSubtarget;
 class RISCVTargetMachine;
+
+void lowerRISCVMachineInstrToMCInst(AsmPrinter &AP, const MachineInstr *MI,
+                                    MCInst &OutMI);
 
 class RISCVCodeGenPreparePass
     : public OptionalPassInfoMixin<RISCVCodeGenPreparePass> {

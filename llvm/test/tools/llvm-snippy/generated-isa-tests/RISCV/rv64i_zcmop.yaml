@@ -12,20 +12,16 @@ options:
   verify-gen-histogram: true
   histogram-must-succeed: true
 histogram:
-  - [C_MOP1, 1.0]
-  - [C_MOP11, 1.0]
-  - [C_MOP13, 1.0]
-  - [C_MOP15, 1.0]
-  - [C_MOP3, 1.0]
-  - [C_MOP5, 1.0]
-  - [C_MOP7, 1.0]
-  - [C_MOP9, 1.0]
+  - [C_MOP_11, 1.0]
+  - [C_MOP_13, 1.0]
+  - [C_MOP_15, 1.0]
+  - [C_MOP_3, 1.0]
+  - [C_MOP_7, 1.0]
+  - [C_MOP_9, 1.0]
 
-# CHECK-DAG: C_MOP1
-# CHECK-DAG: C_MOP11
-# CHECK-DAG: C_MOP13
-# CHECK-DAG: C_MOP15
-# CHECK-DAG: C_MOP3
-# CHECK-DAG: C_MOP5
-# CHECK-DAG: C_MOP7
-# CHECK-DAG: C_MOP9
+# CHECK-DAG: C_MOP_11
+# CHECK-DAG: C_MOP_13
+# CHECK-DAG: C_MOP_15
+# CHECK-DAG: C_MOP_3
+# CHECK-DAG: C_MOP_7
+# CHECK-DAG: C_MOP_9

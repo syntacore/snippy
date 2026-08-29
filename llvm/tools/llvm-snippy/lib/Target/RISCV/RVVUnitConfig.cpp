@@ -1488,7 +1488,6 @@ std::unique_ptr<RVVConfigInterface> createRVVConfig() {
     // backend should be able to encode it.
     AllowReservedSEW = cl::BOU_TRUE;
 #endif
-  AllowReservedSEW = true;
   return std::make_unique<RVVConfig>();
 }
 

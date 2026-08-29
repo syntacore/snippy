@@ -35,9 +35,13 @@
 #include "llvm/MC/MCInstrDesc.h"
 #include "llvm/MC/MCRegister.h"
 #include "llvm/MC/MCStreamer.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/FormatVariadic.h"
 
 #include <vector>
+
+namespace llvm {
+namespace snippy {
 
 // FIX: experimental AArch64 support, remove after bringup
 #define SNIPPY_UNIMPLEMENTED()                                                 \
@@ -163,8 +167,6 @@ static bool expandMOVImm(APInt Value, MCRegister DstReg,
   }
   return true;
 }
-namespace llvm {
-namespace snippy {
 namespace {
 
 class SnippyAArch64Target : public SnippyTarget {
@@ -925,7 +927,7 @@ public:
 
   void addTargetLegalizationPasses(PassManagerWrapper &PM) const override {
     // Expand pseudo MOVi{64,32}imm
-    PM.add(createAArch64ExpandPseudoPass());
+    PM.add(createAArch64ExpandPseudoLegacyPass());
   }
 
   bool is64Bit(const TargetMachine &TM) const override {
@@ -1411,7 +1413,8 @@ public:
   std::unique_ptr<AsmPrinter>
   createAsmPrinter(TargetMachine &TM,
                    std::unique_ptr<MCStreamer> Streamer) const override {
-    return std::make_unique<AArch64AsmPrinter>(TM, std::move(Streamer));
+    return std::unique_ptr<AsmPrinter>(
+        TM.getTarget().createAsmPrinter(TM, std::move(Streamer)));
   }
 
   uint8_t getCodeAlignment(const TargetSubtargetInfo &STI) const override {
