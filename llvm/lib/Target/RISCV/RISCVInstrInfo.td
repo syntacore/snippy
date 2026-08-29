@@ -1896,9 +1896,9 @@ def PseudoJALCall : Pseudo<(outs GPR:$rd), (ins simm21_lsb0_jal:$imm20),
                            PseudoInstExpansion<(JAL GPR:$rd, simm21_lsb0_jal:$imm20)>,
                            Sched<[WriteJal]>;
 
-def PseudoJALRCall : Pseudo<(outs GPR:$rd), (ins GPR:$rs1, simm12:$imm12),
+def PseudoJALRCall : Pseudo<(outs GPR:$rd), (ins GPR:$rs1, simm12_lo_optional:$imm12),
                                   []>,
-                           PseudoInstExpansion<(JALR GPR:$rd, GPR:$rs1, simm12:$imm12)>,
+                           PseudoInstExpansion<(JALR GPR:$rd, GPR:$rs1, simm12_lo_optional:$imm12)>,
                            Sched<[WriteJalr, ReadJalr]>;
 
 }
@@ -1912,9 +1912,9 @@ def PseudoJALRRet : Pseudo<(outs), (ins GPR:$rs1),
                            PseudoInstExpansion<(JALR X0, GPR:$rs1, 0)>,
                            Sched<[ReadJalr]>;
 
-def PseudoJALRTail : Pseudo<(outs), (ins GPR:$rs1, simm12:$imm12),
+def PseudoJALRTail : Pseudo<(outs), (ins GPR:$rs1, simm12_lo_optional:$imm12),
                                   []>,
-                           PseudoInstExpansion<(JALR X0, GPR:$rs1, simm12:$imm12)>,
+                           PseudoInstExpansion<(JALR X0, GPR:$rs1, simm12_lo_optional:$imm12)>,
                            Sched<[ReadJalr]>;
 
 }
@@ -2260,9 +2260,7 @@ def WriteFFLAGS : WriteSysReg<SysRegFFLAGS, [FFLAGS]>;
 def WriteFFLAGSImm : WriteSysRegImm<SysRegFFLAGS, [FFLAGS]>;
 def SwapFFLAGSImm : SwapSysRegImm<SysRegFFLAGS, [FFLAGS]>;
 
-def WriteFCSR : WriteSysReg<SysRegFCSR, [FRM, FFLAGS]>;
-def ReadFCSR : ReadSysReg<SysRegFCSR, [FRM, FFLAGS]>;
-def WriteFCSRImm : WriteSysRegImm<SysRegFCSR, [FRM, FFLAGS]>;
+// Needed only for llvm-snippy.
 def SwapFCSRImm : SwapSysRegImm<SysRegFCSR, [FRM, FFLAGS]>;
 }
 

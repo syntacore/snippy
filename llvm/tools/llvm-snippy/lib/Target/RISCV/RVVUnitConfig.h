@@ -188,8 +188,16 @@ struct RVVConfiguration final {
   unsigned getVTYPE() const {
     bool IsTA = (TA == VTAMode::TA);
     bool IsMA = (MA == VMAMode::MA);
-    return RISCVVType::encodeVTYPE(
-        PrimaryCfg.LMUL, static_cast<unsigned>(PrimaryCfg.SEW), IsTA, IsMA);
+    unsigned SEW = static_cast<unsigned>(PrimaryCfg.SEW);
+    if (RISCVVType::isValidSEW(SEW))
+      return RISCVVType::encodeVTYPE(PrimaryCfg.LMUL, SEW, IsTA, IsMA);
+
+    // Reserved vsew encodings are intentionally generated to make hardware
+    // set vill.  Upstream's encoder now accepts only currently valid SEWs, so
+    // form the reserved immediate explicitly.
+    unsigned VType = ((Log2_32(SEW) - 3) << 3) |
+                     (static_cast<unsigned>(PrimaryCfg.LMUL) & 0x7);
+    return VType | (IsTA ? 0x40 : 0) | (IsMA ? 0x80 : 0);
   }
 
   static RVVConfiguration fromVTYPE(unsigned VL, unsigned VTYPE, VXRMMode XRM) {

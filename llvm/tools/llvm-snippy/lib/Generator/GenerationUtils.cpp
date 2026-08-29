@@ -281,7 +281,7 @@ void selectNonMemoryOperands(
     bool IsDst = Idx < InstrDesc.getNumDefs();
     const auto &OpInfo = Operands[Idx];
     auto OperandRegClassID = OpInfo.RegClass;
-    auto RegClass =
+    const auto &RegClass =
         Tgt.getRegClass(InstrGenCtx, OperandRegClassID, Idx, InstrDesc, RI);
     AccessMaskBit Mask =
         IsDst ? AccessMaskBit::PrimaryW : AccessMaskBit::PrimaryR;
@@ -417,6 +417,9 @@ void selectConcreteOffsets(
           auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
           auto Concrete = Tgt.generateTargetOperand(
               InstrDesc, Idx, Operand.getImm(), ProgCtx, Cfg);
+          if (Concrete.isReg())
+            return Register(Concrete.getReg());
+          assert(Concrete.isImm() && "Unexpected target operand kind");
           return StridedImmediate(Concrete.getImm(), Concrete.getImm(),
                                   Operand.getImm().getStride());
         }
@@ -727,7 +730,7 @@ generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
   // Randomly pick and reserve addr registers so as not to use them
   // destinations.
   auto AddrRegs = RP.getNAvailableRegisters(
-      "for memory access burst", RegInfo, *AddrRegClass.MC, MBB, NumAddrs,
+      "for memory access burst", RegInfo, AddrRegClass, MBB, NumAddrs,
       [&](Register R) {
         SmallVector<Register> Units;
         SnippyTgt.getPhysRegsFromUnit(R, RI, Units);

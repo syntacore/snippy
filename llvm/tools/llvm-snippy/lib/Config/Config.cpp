@@ -222,6 +222,12 @@ struct IncludeParsingWrapper final {
 static std::optional<unsigned> findRegisterByName(const SnippyTarget &SnippyTgt,
                                                   const MCRegisterInfo &RI,
                                                   StringRef Name) {
+  // Let the target resolve aliases first.  Some targets have multiple physical
+  // registers with the same printed name (for example RISC-V Zhinx
+  // subregisters), so the first matching register class is not necessarily the
+  // architectural register requested by a Snippy configuration.
+  if (auto Reg = SnippyTgt.findRegisterByName(Name))
+    return Reg;
   for (auto &RC : RI.regclasses()) {
     auto RegIdx = std::find_if(RC.begin(), RC.end(), [&Name, &RI](auto &Reg) {
       return Name == RI.getName(Reg);
@@ -229,7 +235,7 @@ static std::optional<unsigned> findRegisterByName(const SnippyTarget &SnippyTgt,
     if (RegIdx != RC.end())
       return *RegIdx;
   }
-  return SnippyTgt.findRegisterByName(Name);
+  return std::nullopt;
 }
 
 static std::unordered_set<unsigned>

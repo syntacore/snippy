@@ -1,7 +1,7 @@
 # REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -num-instrs=100 -mtriple=riscv64 \
 # RUN:   --dump-cfg-after-all --cfg-basename=%t -o %t
-# RUN: rm %t_SnippyFunction-cfg-dump-after-snippy-function-generator.dot \
+# RUN: rm -f %t_SnippyFunction-cfg-dump-after-snippy-function-generator.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-after-snippy-simulator-context-wrapper.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-after-snippy-simulator-context-preserver.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-after-snippy-register-reserve.dot \

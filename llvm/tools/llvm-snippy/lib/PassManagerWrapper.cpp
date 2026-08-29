@@ -64,7 +64,7 @@ void PassManagerWrapper::add(Pass *P) {
     PM.add(createCFGPrinterPassAfter(*PI, shouldViewCFGAfterPass(PA)));
 }
 
-bool PassManagerWrapper::addAsmPrinter(LLVMTargetMachine &LLVMTM,
+bool PassManagerWrapper::addAsmPrinter(TargetMachine &LLVMTM,
                                        raw_pwrite_stream &Out,
                                        raw_pwrite_stream *DwoOut,
                                        CodeGenFileType FileType,

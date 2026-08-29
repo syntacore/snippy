@@ -191,7 +191,8 @@ public:
                std::forward<Modes>(Ms)...) {
     this->setCallback(
         [Name, CB = std::move(this->Callback)](const DataType &SetVal) {
-          CB(SetVal);
+          if (CB)
+            CB(SetVal);
           auto &OptionBase = OptionsStorage::instance().get(Name);
           OptionBase.markAsSpecified();
         });
@@ -238,7 +239,8 @@ public:
                std::forward<Modes>(Ms)...) {
     this->setCallback(
         [Name, CB = std::move(this->Callback)](const DataType &SetVal) {
-          CB(SetVal);
+          if (CB)
+            CB(SetVal);
           auto &OptionBase = OptionsStorage::instance().get(Name);
           OptionBase.markAsSpecified();
         });

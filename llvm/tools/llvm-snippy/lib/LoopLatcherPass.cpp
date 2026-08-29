@@ -148,12 +148,9 @@ void processDomTree(
     DominatedBySelectedMBB.pop_back();
     if (CheckDomTree.dominates(&MBBToCheck, Last))
       Reserv = Last;
-    transform(make_filter_range(MainDomTree[Last]->children(),
-                                [&MBBToCheck](auto &&DomNode) {
-                                  return DomNode->getBlock() != &MBBToCheck;
-                                }),
-              std::back_inserter(DominatedBySelectedMBB),
-              [](auto &&DomNode) { return DomNode->getBlock(); });
+    for (const auto *DomNode : MainDomTree[Last]->children())
+      if (DomNode->getBlock() != &MBBToCheck)
+        DominatedBySelectedMBB.push_back(DomNode->getBlock());
   }
 }
 

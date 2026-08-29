@@ -33,5 +33,5 @@ histogram:
     - [BLT, 1.0]
 
 # CHECK: 000000000000{{([[:xdigit:]]{4})}} <.LBB0_{{[[:digit:]]+}}>
-# CHECK: ...
+# CHECK: nop
 # CHECK: 000000000001{{([[:xdigit:]]{4})}} <.LBB0_{{[[:digit:]]+}}>
