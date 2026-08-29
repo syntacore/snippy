@@ -29,6 +29,8 @@
 #include "snippy/Support/YAMLUtils.h"
 #include "snippy/Target/TargetConfigIface.h"
 
+#include "llvm/ADT/SmallSet.h"
+
 #include <unordered_map>
 namespace llvm {
 namespace snippy {

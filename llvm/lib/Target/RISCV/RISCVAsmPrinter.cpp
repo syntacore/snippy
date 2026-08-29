@@ -104,6 +104,11 @@ public:
 
   bool lowerPseudoInstExpansion(const MachineInstr *MI, MCInst &Inst);
 
+  void lowerMachineInstrToMCInst(const MachineInstr *MI, MCInst &Inst) {
+    if (!lowerPseudoInstExpansion(MI, Inst))
+      lowerToMCInst(MI, Inst);
+  }
+
   typedef std::tuple<unsigned, uint32_t> HwasanMemaccessTuple;
   std::map<HwasanMemaccessTuple, MCSymbol *> HwasanMemaccessSymbols;
   void LowerHWASAN_CHECK_MEMACCESS(const MachineInstr &MI);
@@ -141,6 +146,12 @@ private:
   getRequiredGlobalAlignmentGranule(const GlobalVariable &GV) override;
 };
 } // namespace
+
+void llvm::lowerRISCVMachineInstrToMCInst(AsmPrinter &AP,
+                                          const MachineInstr *MI,
+                                          MCInst &OutMI) {
+  static_cast<RISCVAsmPrinter &>(AP).lowerMachineInstrToMCInst(MI, OutMI);
+}
 
 void RISCVAsmPrinter::LowerSTACKMAP(MCStreamer &OutStreamer, StackMaps &SM,
                                     const MachineInstr &MI) {

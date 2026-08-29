@@ -19,28 +19,16 @@
 using namespace llvm;
 
 static std::vector<std::string> getEnabledFeatureOptions() {
-  StringMap<cl::Option *> &Options = cl::getRegisteredOptions();
-
-  using MapEntryRef =
-      std::reference_wrapper<StringMap<cl::Option *>::MapEntryTy>;
-  std::vector<MapEntryRef> EnabledFeatureOpts{};
-
-  llvm::copy_if(Options, std::back_inserter(EnabledFeatureOpts),
-                [](auto &&Entry) {
-                  cl::Option *Option = Entry.getValue();
-                  if (!llvm::is_contained(Option->Categories,
-                                          &opts::FeatureOptionsCategory))
-                    return false;
-                  cl::opt<bool> *Opt = static_cast<cl::opt<bool> *>(Option);
-                  return Opt->getValue();
-                });
-
   std::vector<std::string> OptNames{};
-  llvm::transform(EnabledFeatureOpts, std::back_inserter(OptNames),
-                  [](auto &&Entry) {
-                    cl::Option *Option = Entry.get().getValue();
-                    return Option->ArgStr.str();
-                  });
+  for (const auto &Entry : cl::getRegisteredOptions()) {
+    cl::Option *Option = Entry.second;
+    if (!llvm::is_contained(Option->Categories,
+                            &opts::FeatureOptionsCategory))
+      continue;
+    auto *Opt = static_cast<cl::opt<bool> *>(Option);
+    if (Opt->getValue())
+      OptNames.push_back(Option->ArgStr.str());
+  }
   return OptNames;
 }
 

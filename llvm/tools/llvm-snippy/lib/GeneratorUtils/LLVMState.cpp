@@ -32,7 +32,7 @@ namespace llvm {
 namespace snippy {
 
 LLVMState::LLVMState(const SnippyTarget *SnippyTarget,
-                     std::unique_ptr<LLVMTargetMachine> TargetMachine,
+                     std::unique_ptr<TargetMachine> TargetMachine,
                      std::unique_ptr<MCContext> Context,
                      std::unique_ptr<MCCodeEmitter> CodeEmitter,
                      std::unique_ptr<MCDisassembler> Disassembler)
@@ -156,9 +156,9 @@ Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
     TargetFeatures += ",";
   TargetFeatures += TargetInfo.Features;
   const TargetOptions Options;
-  auto TM = std::unique_ptr<LLVMTargetMachine>(static_cast<LLVMTargetMachine *>(
+  auto TM = std::unique_ptr<TargetMachine>(
       Tgt->createTargetMachine(TheTriple, TargetInfo.CPU, TargetFeatures,
-                               Options, Reloc::Model::Static)));
+                               Options, Reloc::Model::Static));
   if (!TM)
     return makeFailure(Errc::Failure, "Unable to create target machine");
 
@@ -170,9 +170,9 @@ Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
         llvm::formatv("No snippy target for {0}", TheTriple.normalize()));
 
   const Target &T = TM->getTarget();
-  const auto *STI = TM->getMCSubtargetInfo();
+  const auto &STI = TM->getMCSubtargetInfo();
 
-  if (auto &CPU = TargetInfo.CPU; !CPU.empty() && !STI->isCPUStringValid(CPU))
+  if (auto &CPU = TargetInfo.CPU; !CPU.empty() && !STI.isCPUStringValid(CPU))
     return makeFailure(
         Errc::InvalidConfiguration,
         llvm::formatv("cpu '{0}' is not valid for the specified subtarget",
@@ -185,7 +185,7 @@ Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
   auto CodeEmitter =
       std::unique_ptr<MCCodeEmitter>(T.createMCCodeEmitter(*MCII, *MCCtx));
   auto Disassembler =
-      std::unique_ptr<MCDisassembler>(T.createMCDisassembler(*STI, *MCCtx));
+      std::unique_ptr<MCDisassembler>(T.createMCDisassembler(STI, *MCCtx));
   TM->Options.UniqueBasicBlockSectionNames = 1;
 
   return LLVMState(SnippyTgt, std::move(TM), std::move(MCCtx),
@@ -222,7 +222,7 @@ MCInstPrinter &LLVMState::getInstPrinter() const {
   assert(TheTargetMachine);
   auto &TM = *TheTargetMachine;
   const Target &T = TM.getTarget();
-  auto &AsmInfo = *TM.getMCAsmInfo();
+  auto &AsmInfo = TM.getMCAsmInfo();
 
   TheInstPrinter.reset(
       T.createMCInstPrinter(TM.getTargetTriple(), AsmInfo.getAssemblerDialect(),
@@ -245,8 +245,8 @@ std::unique_ptr<MCStreamer> LLVMState::createObjStreamer(raw_pwrite_stream &OS,
   // it safely
   auto *ObjStreamer =
       static_cast<MCObjectStreamer *>(MCStreamerOrErr->release());
-  ObjStreamer->setEmitEHFrame(false);
-  ObjStreamer->setEmitDebugFrame(false);
+  ObjStreamer->emitCFISections(/*EH=*/false, /*Debug=*/false,
+                               /*SFrame=*/false);
   return std::unique_ptr<MCStreamer>(ObjStreamer);
 }
 
