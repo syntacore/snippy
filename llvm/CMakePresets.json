@@ -90,15 +90,12 @@
       "name": "snippy_basic",
       "displayName": "Basic preset for snippy build",
       "cacheVariables": {
-        "LLVM_ENABLE_LLD": "ON",
         "LLVM_ENABLE_PROJECTS": "lld",
         "LLVM_BUILD_TESTS": "ON",
         "LLVM_ENABLE_ASSERTIONS": "ON",
         "LLVM_OPTIMIZED_TABLEGEN": "ON",
-        "LLVM_CCACHE_BUILD": "ON",
         "LLVM_TARGETS_TO_BUILD": "RISCV;AArch64",
-        "LLVM_BUILD_SNIPPY": "ON",
-        "LLVM_ENABLE_SPHINX": "ON"
+        "LLVM_BUILD_SNIPPY": "ON"
       }
     }
   ]
