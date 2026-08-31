@@ -285,7 +285,8 @@ Following is an example of the configuration layout that contains:
        mtriple: "riscv64"
        mcpu: generic-rv64
        march: "rv64ifc_zifencei"
-       model-plugin: None
+       trace-log: trace.log
+       model-plugin: spike
 
 You may try layout-example.yaml from examples on github or from yml/ and
 share/examples/ folder in this release as follows and disassemble to see
@@ -344,6 +345,10 @@ options:
 -  ``None`` (default) |nbsp| -- |nbsp| Disables snippet execution on
    a model.
 
+-  ``spike``, ``<PATH>/riscv-spike-plugin.so``, or
+   ``riscv-spike-plugin.so`` (preferable).
+
+Where ``<PATH>`` is the parent directory of llvm-snippy executable
 
 **-num-instrs**
 
@@ -1758,6 +1763,146 @@ scheme.
    You can omit specifying the file name. In this case, the program uses
    the console output.
 
+.. _`_dumping_memory_sections`:
+
+Dumping Memory Sections
+~~~~~~~~~~~~~~~~~~~~~~~
+
+After executing the snippy code, you can dump multiple sections and/or
+their accesses using the ``-dump-memory-section`` option. Additionally,
+use the ``-memory-section-file=<path>`` option to specify the directory
+where you want to dump the section.
+
+You can use the ``-dump-memory-section`` option to:
+
+-  Dump a memory section after its interpretation. For example:
+
+   ::
+
+      ./llvm-snippy -mtriple=riscv64 ./yml/layout.yaml --dump-memory-section=
+
+   In this case, snippy dumps all ``rw`` sections including the
+   ancillary ones (for example, ``selfcheck`` and ``stack``).
+
+-  Dump specific sections with the ``rw`` access. For example:
+
+   ::
+
+      ./llvm-snippy -mtriple=riscv64 ./yml/layout.yaml --dump-memory-section=name,3,{rw}
+
+   In this case, snippy dumps only the ``3`` and/or ``name`` sections if
+   they are ``rw``.
+
+-  Dump a specific memory range. It creates a record in the output
+   memory section file for this range of the memory. The range records
+   from the state of the model after execution, so the content of the
+   sections memory output depends on the model implementation.
+
+   You specify the start and end of the required range in the format of
+   ``{start-end}``. For example:
+
+   ::
+
+      ./llvm-snippy -mtriple=riscv64 ./yml/layout.yaml --dump-memory-section={0x300F000-0x300f030}
+
+   .. note::
+
+      Currently, you cannot use this format with files used for
+      `initializing memory from results of another
+      snippet <#initializing-memory-from-results-of-another-snippet>`__.
+
+.. _`_dumping_memory_sections_as_ascii`:
+
+Dumping Memory Sections as ASCII
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+With the ``-dump-memory-section`` option described above, you can also
+use the ``-dump-memory-as-ascii`` option. This dumps the specified
+sections as ASCII symbols. For example:
+
+-  ::
+
+      Section {2}:
+      0x00000:  00 00 16 cb 00 2c 00 0b 58 2c 2d f6 00 60 01 0b
+      0x00010:  c0 62 cf 22 05 4c 00 1d dd ed 13 2d 46 1d 85 e0
+
+-  ::
+
+      Range {0x300F000-0x300f030}
+      0:  00 00 16 cb 00 2c 00 0b 58 2c 2d f6 00 60 01 0b
+      10: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+      20: 00 00 16 cb 00 2c 00 0b 58 2c 2d f6 00 60 01 0b
+
+.. _`_dumping_memory_access_scheme_for_burst_groups`:
+
+Dumping Memory Access Scheme for Burst Groups
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When generating addresses for burst groups, snippy operates not on
+single addresses, but rather on ranges of legal addresses. Snippy
+collects ranges used in burst groups and generates ranges-like schemes
+on the output.
+
+An example for collecting addresses:
+
+::
+
+   ./llvm-snippy -mtriple=riscv64 -mcpu=scr9 ./yml/layout.yaml \
+       ./yml/eviction.yaml -model-plugin=spike -num-instrs=100 -seed=0 \
+       --trace-log=log --dump-memory-accesses=acc.yaml \
+       -o layout.elf
+
+.. container:: formalpara-title
+
+   **acc.yaml**
+
+::
+
+   access-addresses:
+     - ordered: true
+       burst:
+           - addr: 0x80002000
+             size: 72
+             stride: 8
+             access-size: 8
+           - addr: 0x80004001
+             size: 26
+             stride: 2
+             access-size: 4
+
+You can then combine the generated ``access-addresses`` scheme for the
+burst mode as a usual `addresses enumeration
+scheme <#addresses-enumeration-scheme>`__:
+
+.. container:: formalpara-title
+
+   **acc.yaml**
+
+::
+
+   access-addresses:
+     - ordered: true
+       plain:
+         - addr: 0x80002001
+           access-size: 8
+         - addr: 0x80000000
+       burst:
+           - addr: 0x80002000
+             size: 72
+             stride: 8
+             access-size: 8
+           - addr: 0x80004001
+             size: 26
+             stride: 2
+             access-size: 4
+
+.. important::
+
+   If ``ordered`` is set to ``true``, snippy tries to use the provided
+   ranges for burst groups from the access-addresses scheme one by one,
+   and report a warning if it cannot use the current range of the
+   addresses for the burst group under generation. When multiple memory
+   schemes are passed, any appropriate scheme is selected.
 
 .. _`_burst_mode`:
 
@@ -2194,6 +2339,144 @@ of whether snippy will generate a loop when generating a branch.
 
    **RISC-V only:** C_JR is generated as an indirect branch instruction.
    **RISC-V only:** PseudoC_JRB is currently deprecated. Use C_JR instead.
+
+.. _`_consecutive_loops`:
+
+Consecutive Loops
+~~~~~~~~~~~~~~~~~
+
+Use the ``consecutive-loops`` field in ``branches`` to enable generation
+of consecutive loops.
+
+This field is optional. If you do not explicitly add it and specify its
+value, it defaults to ``0``, which means the feature is disabled.
+
+To enable consecutive loops in ``branches``:
+
+.. code:: yaml
+
+   branches:
+     consecutive-loops: <N>
+     loop-ratio: 1
+     max-depth:
+       loop: 1
+
+where:
+
+-  ``<N>`` is a value greater than zero. This sets up the generation of
+   a chain of up to N + 1 consecutive loops.
+
+   Alternatively, you can use the ``all`` value. In this case, snippy
+   generates all blocks as a chain of consecutive loops, except for the
+   pre-header with register initialization and the terminating block.
+
+-  ``loop-ratio`` and ``max-depth`` are ``1`` (mandatory).
+
+.. important::
+
+   You can only enable consecutive loops for single-block loops. This
+   way, you must either omit min/max block distance, or set it to ``0``.
+
+By default, a group of consecutive loops is initialized in the common
+pre-header. If you want only the counter for the first loop to be
+initialized in the pre-header, use the ``--init-cons-loop-in-prev-loop``
+setting. In this case, the counter for the second loop is initialized in
+the body of the first loop, and so on.
+
+.. note::
+   **RISC-V only:** If the `RISC-V C extension`_ is
+   enabled, then compressed instructions are used for the
+   instructions with loop counters.
+
+Following is an example of using the ``--init-cons-loop-in-prev-loop``
+setting:
+
+::
+
+   ./llvm-snippy -mtriple=riscv64 -mcpu=scr9 \
+   ./yml/layout-branches-chaining.yaml ./yml/memory-aligned.yaml \
+   -model-plugin=./riscv-sail-plugin.so -num-instrs=500 -seed=0 \
+   -init-memory=full-with-addresses --init-cons-loop-in-prev-loop \
+   --trace-log trace.log
+
+The result of such a configuration looks similar to the following:
+
+::
+
+   [731] [M]: 0x00000000002106EA (0xFE038BE3) beq t2, zero, 8182 // end of prev loop
+   [732] [M]: 0x00000000002106EE (0xA809) c.j 9 // go immediately to next loop, no pre-header
+   [733] [M]: 0x0000000000210700 (0x1BFD) c.addi s7, 63
+   [734] [M]: 0x0000000000210702 (0x4F0D) c.li t5, 3
+   [735] [M]: 0x0000000000210704 (0x4A85) c.li s5, 1
+   [736] [M]: 0x0000000000210706 (0xFF4BFDE3) bgeu s7, s4, 8186 // next loop latch
+
+If you do not use ``--init-cons-loop-in-prev-loop``, you might encounter
+issues with available registers. Without a pre-header, all IVs must be
+generated in the common pre-header, and all registers for all IVs must
+be reserved. Due to this, you might get an error as everything will be
+reserved.
+
+.. _`_random_values_for_initializing_loop_counters`:
+
+Random Values for Initializing Loop Counters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Use the ``random-init`` field in the ``loop-counters`` key in
+branchegrams to initialize the loop counter register with random values
+from a specified range or the default one.
+
+You need to explicitly enable ``random-init`` in your configuration. If
+you disable it or omit it in the configuration, the register values are
+considered ``0``.
+
+For example, you can provide the following configuration:
+
+.. code:: yaml
+
+   branches:
+     loop-counters:
+       random-init:
+         enabled: on
+         min: 10
+         max: 100
+
+where:
+
+-  ``enabled`` indicates whether initialization with random values is
+   enabled. To disable, either set ``enabled`` to ``off`` or omit this
+   key.
+
+-  ``min`` and ``max`` specify the range of random values. With
+   ``random-init`` enabled, you can provide:
+
+   -  Specific values for both ``min`` and ``max``.
+
+   -  None of them. In this case, ``min`` is set to ``0``, and ``max``
+      is the maximum possible value for this register.
+
+   -  Only ``min``. In this case, ``max`` is the maximum possible value
+      for this register.
+
+   -  Only ``max``. In this case, ``min`` is ``0``.
+
+.. _`_loops_with_counters_spilled_onto_stack`:
+
+Loops with Counters Spilled onto Stack
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Turn on the ``place-on-stack`` option in the ``loop-counters`` key to
+enable generation of loops with counters spilled onto stack. It
+guarantees using the stack for all loop registers |nbsp| -- |nbsp| 1 or 2, depending on
+the histogram. To turn the option on, explicitly add:
+
+.. code:: yaml
+
+   branches:
+     loop-counters:
+       place-on-stack: on
+
+The option is turned off by default. If the option is off, and you also
+have the tracking mode enabled, you will receive an error.
 
 
 .. _`_restricting_compressed_instructions_for_loop_counters`:
@@ -4800,13 +5083,13 @@ Co-simulation allows you to run a generated snippy ``.elf`` file on
 multiple models and perform a step-by-step state comparison of them.
 
 The generation process only uses one "primary" model plugin |nbsp| -- |nbsp| the one
-you specify in the ``plugin-model`` string. All the other plugins are
+you specify in the ``model-plugin`` string. All the other plugins are
 "secondary", or co-simulation, models, and you specify them in the
 ``cosim-model-plugins`` string.
 
 .. important::
 
-   Do not use the same plugin for both ``plugin-model`` and
+   Do not use the same plugin for both ``model-plugin`` and
    ``cosim-model-plugins``: it leads to an undefined result.
 
 To specify two and more models:
@@ -4815,7 +5098,7 @@ To specify two and more models:
 
    .. code:: yaml
 
-      plugin-model: <primary_model>
+      model-plugin: <primary_model>
       cosim-model-plugins: [<cosim_model1>, <cosim_model2>]
 
 
@@ -4823,7 +5106,7 @@ To specify two and more models:
 
    ::
 
-      -plugin-model=<primary_model> \
+      -model-plugin=<primary_model> \
       -cosim-model-plugins=<model_1>,<model_2>
 
 .. _`_state_comparison`:
@@ -4875,7 +5158,7 @@ before. This way, each model gets its own log file.
 
    ./llvm-snippy -mtriple=riscv64 -mcpu=<processor_model> \
        ./yml/layout.yaml -num-instrs=100 -seed=0 ./yml/memory.yaml \
-       -plugin-model=<model_plugin>.so -cosim-model-plugins=<co-sim_model>.so \
+       -model-plugin=<model_plugin>.so -cosim-model-plugins=<co-sim_model>.so \
        --init-regs-in-elf -trace-log=log -o layout.elf
 
 In this case you get two files: ``log`` and ``log.<co-sim_model>``.
