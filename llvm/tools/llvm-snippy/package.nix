@@ -11,6 +11,7 @@
   lit,
   rvmi,
   riscv-isa-sim,
+  whisper,
   versionCheckHook,
 }:
 
@@ -66,6 +67,7 @@ stdenv.mkDerivation (finalAttrs: {
     (lib.cmakeBool "LLVM_INCLUDE_RUNTIMES" false)
     (lib.cmakeBool "LLVM_INCLUDE_DOCS" false)
     (lib.cmakeFeature "RISCVModelSpike_DIR" "${lib.getLib riscv-isa-sim}/lib")
+    (lib.cmakeFeature "RISCVModelWhisper_DIR" "${lib.getLib whisper}/lib")
   ];
 
   buildPhase = ''
@@ -86,6 +88,7 @@ stdenv.mkDerivation (finalAttrs: {
   buildInputs = [
     rvmi
     riscv-isa-sim
+    whisper
   ];
 
   nativeCheckInputs = [
@@ -113,6 +116,7 @@ stdenv.mkDerivation (finalAttrs: {
     mkdir -p $doc
     cp -r ./tools/llvm-snippy/docs/{html,latex} $doc/
     ln -s ${lib.getLib riscv-isa-sim}/lib/libRISCVModel.so $out/bin/riscv-spike-plugin.so
+    ln -s ${lib.getLib whisper}/lib/libRISCVModel.so $out/bin/riscv-whisper-plugin.so
   '';
 
   doCheck = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
