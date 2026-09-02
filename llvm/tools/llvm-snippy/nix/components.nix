@@ -18,5 +18,6 @@ lib.mergeAttrsList (
     ./scope.nix
     (/. + (builtins.unsafeDiscardStringContext sources.rvmi) + "/nix/scope.nix")
     (/. + (builtins.unsafeDiscardStringContext sources.riscv-isa-sim) + "/nix/scope.nix")
+    (/. + (builtins.unsafeDiscardStringContext sources.whisper) + "/nix/scope.nix")
   ]
 )
