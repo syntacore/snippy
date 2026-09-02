@@ -32,6 +32,19 @@
       "revision": "d6f7741cddb3c48f5572d092974bc28ffde18baf",
       "url": "https://github.com/LLVM-Snippy/rvmi/archive/d6f7741cddb3c48f5572d092974bc28ffde18baf.tar.gz",
       "hash": "sha256-veXKxrNEvYwv0vtNL3tUYz4k/685UKNcJLsMPAEiyW0="
+    },
+    "whisper": {
+      "type": "Git",
+      "repository": {
+        "type": "GitHub",
+        "owner": "LLVM-Snippy",
+        "repo": "whisper"
+      },
+      "branch": "master",
+      "submodules": false,
+      "revision": "2b85e3f400355f378bbc160c71eb2a4e7e431183",
+      "url": "https://github.com/LLVM-Snippy/whisper/archive/2b85e3f400355f378bbc160c71eb2a4e7e431183.tar.gz",
+      "hash": "sha256-s9aT2CiS0EqHytJMhrM3h4QwWpoX7Za/Jm9Z7bx3Lng="
     }
   },
   "version": 8
