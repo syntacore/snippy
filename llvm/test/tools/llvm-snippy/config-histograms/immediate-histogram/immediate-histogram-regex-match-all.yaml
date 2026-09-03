@@ -1,0 +1,23 @@
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s |& FileCheck %s
+
+include:
+  - ../../Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  num-instrs: 20
+  dump-mf: on
+
+histogram: 
+  - [ADDI, 1.0]
+  - [XORI, 1.0]
+  - [ORI, 1.0]
+
+imm-hist:
+  opcodes:
+    - '.+': # Matches everything
+      - [1, 1.0]
+
+# Check that all 20 generated immediates are 1
+# CHECK-COUNT-20: $x{{[[:digit:]]+}}, 1

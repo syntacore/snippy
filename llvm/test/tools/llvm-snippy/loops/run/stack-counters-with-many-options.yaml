@@ -1,0 +1,54 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: timeout 300 llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 2000
+
+include:
+  - ../../loops/Inputs/sections.yaml
+
+histogram:
+  - [BLT, 1.0]
+  - [BGE, 1.0]
+  - [BGEU, 1.0]
+  - [BLTU, 1.0]
+  - [BNE, 1.0]
+  - [SUB, 1.0]
+  - [ADD, 1.0]
+  - [XOR, 1.0]
+
+branches:
+  loop-counters:
+    random-init:
+      min: 1000
+      max: 1000000
+    place-on-stack: on
+  loop-ratio: 0.5
+  max-depth:
+    if: 100
+    loop: 5
+  distance:
+    blocks:
+      min: 2
+      max: 2
+    pc:
+      min: 100
+      max: 120
+
+
+access-ranges:
+  - start: 0x400000000
+    size: 64
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+  - start: 0x400001000
+    size: 8
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+
+# CHECK: Simulation Start
+# CHECK: Snippet generator generated relocatable image: please, use
+# CHECK-SAME: linker with provided script to generate final image

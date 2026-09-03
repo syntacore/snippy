@@ -1,0 +1,23 @@
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+include:
+  - ../../Inputs/sections.yaml
+options:
+  mtriple: riscv64
+  mcpu: generic-rv64
+  mattr: "+zfh"
+  num-instrs: 100
+fpu-config:
+  overwrite:
+    ieee-half:
+      valuegram:
+        - [0xfefe, 1.0]
+    range:
+      min: 0xffffffffffff
+      max: 0xffffffffffff
+      rounding-mode: rmm
+histogram:
+  - [FMUL_H, 1.0]
+
+# CHECK: float-nan-propagation-error-too-large.yaml:{{[0-9]+}}:{{[0-9]+}}: error: Conversion from integer value '0xffffffffffff' would result in a floating-point overflow exception
