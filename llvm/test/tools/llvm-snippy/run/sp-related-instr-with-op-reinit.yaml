@@ -1,4 +1,0 @@
-# RUN: llvm-snippy %S/../sp-related-instr-with-op-reinit.yaml |& FileCheck %s
-
-
-# CHECK-NOT: C_SWSP $x2, $x2, {{[0-9]*}}

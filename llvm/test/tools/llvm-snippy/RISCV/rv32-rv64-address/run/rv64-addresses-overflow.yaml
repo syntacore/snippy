@@ -1,0 +1,7 @@
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy -init-regs-in-elf %S/../../../RISCV/rv32-rv64-address/rv64-addresses-overflow.yaml \
+# RUN: |& FileCheck %s
+
+# CHECK: x2 0xffffffffffff{{[0-9a-f]+}}
+# CHECK-NEXT: {{(sb|sh|sw|sd).*}}(sp)

@@ -1,0 +1,25 @@
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s |& FileCheck %s
+
+include:
+  - ../../Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  dump-mf: on
+  mattr: +Zicsr
+
+histogram:
+    - [CSRRWI, 1.0]
+
+imm-hist:
+  opcodes:
+    - 'CSRRWI':
+        operands:
+          - - [0x2, 1.0] # First operand  (CSR)
+          - uniform      # Second operand (Value to write)
+
+# NOTE: We expect that the second imm-operand will be 5-bit immediate
+# CHECK-COUNT-100: CSRRWI 2, {{[0-9]|[1-2][0-9]|3[0-1]}}
+

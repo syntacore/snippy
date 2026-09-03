@@ -1,0 +1,19 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-rvv
+
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=+v \
+# RUN:    -num-instrs=10 -init-regs-in-elf -selfcheck --riscv-preference-for-rvv-mode-change=vsetvl\
+# RUN:    -enable-selfcheck-rvv -initial-regs-yaml=%S/Inputs/reg-init.yaml \
+# RUN:    -rvv-init-mode=loads -o %t
+# RUN: FileCheck %s --input-file=%t.selfcheck.yaml -check-prefix=ANNOTATION
+
+include:
+- "../../RISCV/rvv/rvv-config-histogram/Inputs/rvv-unit-sew_16-m1-max_encodable-bias.yaml"
+- Inputs/sections.yaml
+
+histogram:
+    - [VLSE32_V, 10000.0]
+
+# ANNOTATION-COUNT-20: address
+# ANNOTATION-NOT: address

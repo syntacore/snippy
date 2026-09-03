@@ -1,0 +1,21 @@
+# REQUIRES: riscv-snippy-model-None
+# RUN: mkdir -p test-include-dir
+# RUN: cp %S/../Inputs/sections.yaml test-include-dir
+# RUN: llvm-snippy %s | FileCheck %s
+
+include:
+  - ../RISCV/Inputs/sections.yaml
+options:
+  mtriple: "riscv64"
+  mcpu: "generic-rv64"
+  mattr: "+a,+f"
+  num-instrs: 200
+  dump-options: "true"
+  layout-include-dir: ["./test-include-dir"]
+histogram:
+    - [LW, 1.0]
+
+# CHECK-DAG: num-instrs: '200'
+# CHECK-DAG: mtriple: riscv64
+# CHECK-DAG: mcpu: generic-rv64
+# CHECK-DAG: mattr: '+a,+f'

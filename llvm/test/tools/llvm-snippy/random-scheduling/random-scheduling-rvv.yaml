@@ -1,0 +1,61 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-rvv
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=+c,+v \
+# RUN:     -num-instrs=10000 -init-regs-in-elf  -rvv-init-mode=loads \
+# RUN:     -initial-regs=%S/../initialization/Inputs/initial_state_rv64gv.yaml \
+# RUN:     -dump-registers-yaml=%t_regs_1 -o %t_1
+
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=+c,+v \
+# RUN:     -num-instrs=10000 -init-regs-in-elf  -rvv-init-mode=loads \
+# RUN:     -initial-regs=%S/../initialization/Inputs/initial_state_rv64gv.yaml \
+# RUN:     -dump-registers-yaml=%t_regs_2 -o %t_2 -random-scheduling
+
+# RUN: diff %t_regs_1 %t_regs_2
+# RUN: not diff -q %t_1.elf %t_2.elf
+include:
+- ../RISCV/rvv/rvv-config-biased/Inputs/rvv-unit-all.yaml
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+
+histogram:
+  # branches
+  - [BEQ, 3.7]
+  - [BGE, 3.7]
+  - [BGEU, 3.7]
+  - [BLT, 3.7]
+  - [BLTU, 3.7]
+  - [BNE, 3.7]
+  - [C_BEQZ, 3.7]
+  - [C_BNEZ, 3.7]
+  - [C_J, 3.7]
+  - [VADD_VV, 10.0]
+  - [VXOR_VV, 10.0]
+  - [SW, 1.0]
+  - [ADD, 1.0]
+  - [XOR, 1.0]
+  - [AND, 1.0]
+  - [SUB, 1.0]
+branches:
+  number-of-loop-iterations:
+    min: 1
+    max: 2
+  max-depth:
+    if: 3
+    loop: 3

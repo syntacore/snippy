@@ -11,7 +11,7 @@ options:
   rvv-init-mode: loads
 
 include:
-  - ../../../rvv-config-histogram/Inputs/sections.yaml
+  - ../../../RISCV/rvv/rvv-config-histogram/Inputs/sections.yaml
 
 histogram:
        - [VSETVL, 1.0]

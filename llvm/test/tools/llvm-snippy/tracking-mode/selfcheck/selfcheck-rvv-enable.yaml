@@ -1,0 +1,47 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-rvv
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=+v \
+# RUN:     -num-instrs=2 -init-regs-in-elf -selfcheck -dump-mf -enable-selfcheck-rvv \
+# RUN:     -selfcheck-mem \
+# RUN: |& FileCheck %s
+
+include:
+- "../../RISCV/rvv/rvv-config-biased/Inputs/rvv-unit-non-zero-vl.yaml"
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x410000
+      SIZE:      0x100000
+      LMA:       0x410000
+      ACCESS:    rw
+
+histogram: 
+    - [VADD_VV, 1.0]
+
+# CHECK: [[REG:\$v[0-9]+]] = VADD_VV
+# CHECK: VS1R_V [[REG]]
+# CHECK: VS1R_V {{\$v[0-9]+}}
+# CHECK: EBREAK
+
+

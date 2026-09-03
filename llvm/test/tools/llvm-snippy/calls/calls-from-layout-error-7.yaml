@@ -1,8 +1,0 @@
-# RUN: not llvm-snippy %S/../Inputs/jal-layout.yaml %s -mtriple=riscv64 -num-instrs=100 \
-# RUN: -num-instr-ancil=10 --dump-mf -verify-mi |& FileCheck %s
-
-call-graph:
-  entry-point: SnippyFunction
-  function-list: 
-
-# CHECK: calls-from-layout-error-7.yaml:5:3: error: Read empty call graph

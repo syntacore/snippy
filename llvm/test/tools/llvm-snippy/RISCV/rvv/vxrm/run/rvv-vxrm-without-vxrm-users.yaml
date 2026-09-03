@@ -1,0 +1,17 @@
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: "riscv64"
+  mattr: "+v"
+  num-instrs: 1000
+
+include:
+- ../../../../RISCV/rvv/rvv-config-biased/Inputs/rvv-unit-all.yaml
+- ../../../../RISCV/rvv/rvv-config-histogram/Inputs/sections.yaml
+
+histogram:
+    - [VADD_VV, 1.0]
+
+# CHECK-NOT: csrwi   vxrm, {{[0-3]}}

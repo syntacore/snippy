@@ -1,0 +1,67 @@
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: not llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -num-instrs=1000  \
+# RUN:    -init-regs-in-elf -mattr=+a \
+# RUN: |& FileCheck %s --check-prefix=UNALIGNED
+include:
+- ../../Inputs/unaligned-guarantee.yaml
+
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x5000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x260000
+    SIZE:      0x1000
+    LMA:       0x260000
+    ACCESS:    r
+  - name:      3
+    VMA:       0x600000
+    SIZE:      0x100
+    LMA:       0x600000
+    ACCESS:    rw
+
+histogram:
+    - [AMOADD_D, 1.0]
+
+# UNALIGNED: error: Primary interpreter step failed:
+# UNALIGNED-NEXT: MEPC:   0x21{{([[:xdigit:]]{4})}}
+# UNALIGNED-NEXT: MCAUSE: 0x7
+# UNALIGNED-NEXT: MTVAL:  0x600001
+# UNALIGNED-NEXT: ---
+# UNALIGNED-NEXT: registers:
+# UNALIGNED-NEXT:   - [ X0, 0x0000000000000000 ]
+# UNALIGNED-NEXT:   - [ X1, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X2, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X3, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X4, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X5, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X6, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X7, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X8, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X9, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X10, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X11, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X12, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X13, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X14, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X15, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X16, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X17, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X18, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X19, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X20, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X21, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X22, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X23, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X24, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X25, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X26, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X27, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X28, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X29, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X30, 0x{{([[:xdigit:]]{16})}} ]
+# UNALIGNED-NEXT:   - [ X31, 0x{{([[:xdigit:]]{16})}} ]

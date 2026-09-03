@@ -4,7 +4,7 @@
 # RUN:   -reserved-regs-list=X1,X2,X8 -mattr=+c,+a,+m -last-instr=RET
 
 include:
-- "../Inputs/memory-aligned.yaml"
+- ../Inputs/memory-aligned.yaml
 
 sections:
   - name:      1

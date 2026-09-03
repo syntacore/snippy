@@ -1,0 +1,35 @@
+# REQUIRES: riscv-rvv
+# RUN: not llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=+v \
+# RUN:     -num-instrs=2 -init-regs-in-elf -selfcheck -enable-selfcheck-rvv  \
+# RUN: |& FileCheck %s 
+
+include:
+- ../../RISCV/rvv/rvv-config-biased/Inputs/rvv-unit-all.yaml
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x810001
+      SIZE:      0x50
+      LMA:       0x810001
+      ACCESS:    rx
+
+histogram: 
+    - [VADD_VV, 1.0]
+
+# CHECK: error: Wrong layout file: "selfcheck" section must be RW
