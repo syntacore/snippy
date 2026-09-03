@@ -8,7 +8,7 @@ options:
   dump-mf: true
 
 include:
-  - ./Inputs/sections.yaml
+  - Inputs/sections.yaml
 
 burst:
   mode: custom

@@ -1,0 +1,22 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: llvm-snippy %s | FileCheck %s
+
+include:
+  - ../../../Inputs/sections.yaml
+options:
+  mtriple: riscv32
+  mcpu: generic-rv32
+  mattr: "+f"
+  num-instrs: 50
+fpu-config:
+  overwrite:
+    ieee-single:
+      valuegram:
+        - [0x807fffff, 1.0] # neg_max_denorm
+    mode: if-any-operand
+histogram:
+  - [FMUL_S, 1.0]
+  - [FDIV_S, 1.0]
+
+# CHECK: fmv.w.x {{f[sat][[:digit:]]+}}
+# CHECK-NEXT: {{f[[:digit:]]+}} 0x807fffff

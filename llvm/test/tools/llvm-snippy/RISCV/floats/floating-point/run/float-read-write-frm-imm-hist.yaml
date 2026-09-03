@@ -1,0 +1,42 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: llvm-snippy %s -mattr +f,-d -trace-log %t.f
+# RUN: FileCheck %s -input-file %t.f -dump-input fail
+# RUN: llvm-snippy %s -mattr +d -trace-log %t.fd
+# RUN: FileCheck %s -input-file %t.fd -dump-input fail
+include:
+  - ../../../Inputs/sections.yaml
+options:
+  mtriple: riscv64
+  mcpu: generic-rv64
+  num-instrs: 2000
+histogram:
+  - [WriteFRMImm, 1.0]
+  - [SwapFRMImm, 1.0]
+  - [ReadFRM, 1.0]
+imm-hist:
+  opcodes:
+    - "WriteFRMImm|SwapFRMImm":
+        - [0, 1.0] # RNE
+        - [1, 1.0] # RTZ
+        - [2, 1.0] # RDN
+        - [3, 1.0] # RUP
+        - [4, 1.0] # RMM
+
+# CHECK-DAG: csrwi frm, 0
+# CHECK-DAG: csrwi frm, 1
+# CHECK-DAG: csrwi frm, 2
+# CHECK-DAG: csrwi frm, 3
+# CHECK-DAG: csrwi frm, 4
+# CHECK-DAG: csrr {{[sat][[:digit:]]+}}, frm
+# CHECK-DAG: csrrwi {{[sat][[:digit:]]+}}, frm, 0
+# CHECK-DAG: csrrwi {{[sat][[:digit:]]+}}, frm, 1
+# CHECK-DAG: csrrwi {{[sat][[:digit:]]+}}, frm, 2
+# CHECK-DAG: csrrwi {{[sat][[:digit:]]+}}, frm, 3
+# CHECK-DAG: csrrwi {{[sat][[:digit:]]+}}, frm, 4
+
+# CHECK-NOT: csrwi frm, 5
+# CHECK-NOT: csrwi frm, 6
+# CHECK-NOT: csrwi frm, 7
+# CHECK-NOT: csrrwi {{[sat][[:digit:]]+}}, frm, 5
+# CHECK-NOT: csrrwi {{[sat][[:digit:]]+}}, frm, 6
+# CHECK-NOT: csrrwi {{[sat][[:digit:]]+}}, frm, 7

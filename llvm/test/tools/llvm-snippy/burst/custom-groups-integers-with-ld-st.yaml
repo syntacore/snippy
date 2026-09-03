@@ -7,7 +7,7 @@ options:
     num-instrs: 100
 
 include:
-  - ./Inputs/sections.yaml
+  - Inputs/sections.yaml
 
 histogram:
     - [ADD, 1.0]

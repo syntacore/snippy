@@ -1,0 +1,44 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-rvv
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:  --num-instrs=10000 --init-regs-in-elf --verify-mi \
+# RUN:  |& FileCheck %s
+
+include:
+- ../Inputs/memory-unaligned.yaml
+
+sections:
+  - name:     1
+    VMA:      0x80000000
+    SIZE:     0x00400000
+    LMA:      0x80000000
+    ACCESS:   rx
+  - name:     2
+    VMA:      0x80600000
+    SIZE:     0x00400000
+    LMA:      0x80600000
+    ACCESS:   r
+  - name:     3
+    VMA:      0x81000000
+    SIZE:     0x00400000
+    LMA:      0x81000000
+    ACCESS:   rw
+
+# COM: Check that indexed loads and stores are properly executed
+histogram:
+   - ["VSETIVLI", 1.0]
+   - ["VSETVLI", 1.0]
+   - ["VSETVL", 1.0]
+   - ["VLUXEI(8|16|32|64)_V", 1.0]
+   - ["VLOXEI(8|16|32|64)_V", 1.0]
+   - ["VSUXEI(8|16|32|64)_V", 1.0]
+   - ["VSOXEI(8|16|32|64)_V", 1.0]
+   - ["VLUXSEG[1-8]EI(8|16|32|64)_V", 1.0]
+   - ["VLOXSEG[1-8]EI(8|16|32|64)_V", 1.0]
+   - ["VSUXSEG[1-8]EI(8|16|32|64)_V", 1.0]
+   - ["VSOXSEG[1-8]EI(8|16|32|64)_V", 1.0]
+
+# CHECK: ===Simulation Start===
+# CHECK-NOT: exception trap_
+
