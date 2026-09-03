@@ -1,0 +1,28 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# COM: test checks that rv64 inputs can be read properly (no FP, no RVV)
+
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:    -num-instrs=500 -dump-mf -backtrack -mattr=+m \
+# RUN:    -initial-regs-yaml=%S/../../initialization/Inputs/initial_state_zero.yaml \
+# RUN: |& FileCheck %s --dump-input always
+
+sections:
+    - name:      1
+      VMA:       0x800000
+      SIZE:      0x4000
+      LMA:       0x800000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x806000
+      SIZE:      0x4000
+      LMA:       0x806000
+      ACCESS:    rw
+
+histogram:
+    - [DIV, 1.0]
+    - [ADD, 1.0]
+
+# CHECK: bb.0:
+# CHECK-COUNT-500: ADD
+# CHECK-NEXT: EBREAK

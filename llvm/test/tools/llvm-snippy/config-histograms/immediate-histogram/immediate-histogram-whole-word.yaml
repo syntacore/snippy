@@ -1,0 +1,21 @@
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s %S/../../Inputs/sections.yaml \
+# RUN:   |& FileCheck %s
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  dump-mf: true
+
+histogram:
+  - [ADDI, 1.0]
+  - [ADD, 1.0]
+
+imm-hist:
+  opcodes:
+    - "ADD":
+      - [0, 1.0]
+    - ".+":
+      - [111, 1.0]
+# CHECK: $x{{[0-9]+}} = ADDI $x{{[0-9]+}}, 111
+# CHECK-NOT: $x{{[0-9]+}} = ADDI $x{{[0-9]+}}, 0
+# CHECK-NOT: Unused regex in immediate histogram
