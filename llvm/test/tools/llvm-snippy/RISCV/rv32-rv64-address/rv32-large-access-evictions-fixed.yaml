@@ -1,0 +1,18 @@
+# REQUIRES: riscv-snippy-model-None
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv32
+  num-instrs: 10
+
+include:
+  - ../Inputs/sections.yaml
+
+histogram:
+  - [LW, 1.0]
+
+access-evictions:
+    - mask:  0x40000000
+      fixed: 0x10000000f
+
+# CHECK: error: 'fixed' is too large. Selected target supports only 32 bit addresses

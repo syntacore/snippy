@@ -2,7 +2,7 @@
 # RUN: not llvm-snippy %s |& FileCheck %s
 
 include:
-  - ../../rvv-config-histogram/Inputs/sections.yaml
+  - ../../RISCV/rvv/rvv-config-histogram/Inputs/sections.yaml
 
 options:
     mtriple: riscv64

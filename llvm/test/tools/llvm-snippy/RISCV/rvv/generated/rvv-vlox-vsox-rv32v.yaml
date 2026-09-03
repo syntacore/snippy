@@ -1,0 +1,50 @@
+# REQUIRES: riscv-rvv
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+v \
+# RUN:  -o %t --num-instrs=1000 \
+# RUN:  --init-regs-in-elf --entry-point=start \
+# RUN:  -rvv-init-mode=loads \
+# RUN:  --riscv-init-fregs-from-memory |& \
+# RUN: FileCheck %s --check-prefix=OUT-MEM
+
+# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+v \
+# RUN:  -o %t --num-instrs=1000 \
+# RUN:  --init-regs-in-elf --entry-point=start \
+# RUN:  -rvv-init-mode=loads \
+# RUN:  --riscv-init-fregs-from-memory |& \
+# RUN: FileCheck %s --check-prefix=MEM
+
+include:
+- "../../../Inputs/memory-unaligned-small.yaml"
+- Inputs/rvv-unit-sew_16-m2.yaml
+
+sections:
+  - name:      0
+    VMA:       0x20000000
+    SIZE:      0x5000000
+    LMA:       0x20000000
+    ACCESS:    r
+  - name:      1
+    VMA:       0x25000000
+    SIZE:      0x500000
+    LMA:       0x25000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80000000
+    SIZE:      0x10
+    LMA:       0x80000000
+    ACCESS:    rw
+histogram:
+    - [VLOXEI32_V, 1.0]
+    - [VSOXEI32_V, 1.0]
+    - [VLOXEI16_V, 1.0]
+    - [VSOXEI16_V, 1.0]
+    - [VLOXEI8_V, 1.0]
+    - [VSOXEI8_V, 1.0]
+
+# OUT-MEM-NOT: mem 0x{{[0-1]([[:xdigit:]]{7})}}
+# OUT-MEM-NOT: mem 0x{{[3-7]([[:xdigit:]]{7})}}
+# OUT-MEM-NOT: mem 0x{{[9a-f]([[:xdigit:]]{7})}}
+# OUT-MEM-NOT: mem 0x{{8([[:xdigit:]]{5})[1-9a-f][0-9a-f]}}
+# MEM: mem 0x{{8000000[0-9a-f]}}

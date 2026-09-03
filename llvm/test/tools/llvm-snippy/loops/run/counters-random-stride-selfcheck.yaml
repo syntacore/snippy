@@ -1,0 +1,40 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: timeout 300 llvm-snippy %s -selfcheck |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 50
+
+include:
+  - ../../loops/Inputs/sections.yaml
+
+histogram:
+  - [BLT, 1.0]
+  - [BGE, 1.0]
+
+branches:
+  loop-ratio: 1.0
+  loop-counters:
+    random-stride:
+      enabled: on
+      # max immediate value for ADDI instruction
+      min: 2047
+      max: 2047
+
+access-ranges:
+  - start: 0x400000000
+    size: 64
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+  - start: 0x400001000
+    size: 8
+    stride: 8
+    first-offset: 0
+    last-offset: 0
+
+# CHECK-NOT: warning: (loop-stride-out-of-range)
+# CHECK: addi [[CounterReg:[a-z0-9]+]], [[CounterReg]], 2047
+# CHECK:  blt [[CounterReg]]
+# CHECK: addi [[CounterReg:[a-z0-9]+]], [[CounterReg]], -2047
+# CHECK:  bge

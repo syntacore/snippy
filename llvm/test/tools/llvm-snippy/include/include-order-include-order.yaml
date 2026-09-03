@@ -1,0 +1,9 @@
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %S/../Inputs/include-order-1.yaml \
+# RUN:   %S/../Inputs/include-order-3.yaml \
+# RUN:   -mtriple=riscv64 -num-instrs=10
+# RUN: llvm-snippy %S/../Inputs/include-order-3.yaml \
+# RUN:   %S/../Inputs/include-order-1.yaml \
+# RUN:   -mtriple=riscv64 -num-instrs=10
+# Check that include preprocessing does not depend on the order
+# of layout files passed on the command line.

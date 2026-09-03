@@ -1,0 +1,25 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: llvm-snippy %s | FileCheck %s
+
+include:
+  - ../../../../Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mcpu: generic-rv64
+  mattr: "+d"
+  num-instrs: 1000
+
+fpu-config:
+  overwrite:
+    range:
+      min: -1
+      max:  1
+    mode: if-all-operands
+
+histogram:
+  - [FDIV_D, 1.0]
+  - [FMUL_D, 1.0]
+
+# CHECK: {{(fdiv|fmul)}}.d [[REG:f[sat][[:digit:]]+]], {{(.+)([[:space:]]+)(.+)0x7ff8000000000000}}
+# CHECK: fmv.d.x [[REG]]
