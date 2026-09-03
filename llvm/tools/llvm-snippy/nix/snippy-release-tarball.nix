@@ -18,12 +18,22 @@ let
         ];
       }
       ''
+        shopt -s extglob
+
         mkdir $out
         cd $out
         mkdir {bin,lib}
 
-        cp -v ${llvm-snippy.out}/bin/* ./bin/
+        cp -v ${llvm-snippy.out}/bin/!(*.so) ./bin/
+        modelPlugins=( ${llvm-snippy.out}/bin/*-plugin.so )
         cp -v ${wrap-buddy}/lib/wrap-buddy/loader.bin ./lib/loader.bin
+
+        for modelPath in "''${modelPlugins[@]}"; do
+          model=$(basename $modelPath)
+          cp -v $modelPath ./lib/
+          chmod +x "./lib/$model"
+          ln -vsr "./lib/$model" "./bin/$model"
+        done
 
         ldd ./bin/* 2>/dev/null | awk '$1~/^\//{print $1} $3~/^\//{print $3}' | sort -u | while IFS= read -r lib; do
           [ -f "$lib" ] && cp -L --remove-destination -v "$lib" ./lib/
