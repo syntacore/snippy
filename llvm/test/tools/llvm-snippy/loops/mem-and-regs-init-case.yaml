@@ -60,4 +60,4 @@ histogram:
 # CHECK: $x30 = 
 # CHECK: $x31 = 
 # CHECK: bb.0:
-# CHECK: [[REG:\$x[[:digit:]]+]] = ADDI [[REG]], {{[[:digit:]]+}}, pcsections <{{(0x)?[[:xdigit:]]+}}>{{[[:space:]].*}} BLT [[REG]], $x{{[[:digit:]]+}}
+# CHECK: [[REG:\$x[[:digit:]]+]] = ADDI [[REG]], {{[[:digit:]]+}}, pcsections !{{[[:digit:]]+}}{{[[:space:]].*}} BLT [[REG]], $x{{[[:digit:]]+}}

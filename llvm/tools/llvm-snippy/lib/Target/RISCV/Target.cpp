@@ -5507,31 +5507,18 @@ private:
         RISCV::FPR16RegClassID, RISCV::FPR32RegClassID, RISCV::FPR64RegClassID};
 
     auto &ST = InstrGenCtx.getSubtarget<RISCVSubtarget>();
-    SmallVector<MCRegister, 2> SupRegs(RI.superregs(Reg));
-    // When any of the zfh, zfhmin, or f extensions are enabled, we can only
-    // unNaN FPR32 registers. UnNaN operations on FPR64 registers require
-    // instructions from the d extension, which is not present in these
-    // configurations. Also handle the case when we have 32-bit GPR registers
-    // and can only overwrite single precision FP registers.
-    llvm::erase_if(SupRegs, [&](auto SupReg) {
-      return RI.getRegClass(RISCV::FPR64RegClassID).contains(SupReg) &&
-             (!ST.hasStdExtD() || ST.getXLen() == 32);
-    });
-    if (SupRegs.empty())
-      return std::nullopt;
-    // When the +d extension is enabled, the FPR64 register must be obtained. It
-    // is a superregister of FPR32
-    if (SupRegs.size() == 2)
-      llvm::erase_if(SupRegs, [&](auto &&SupReg) {
-        return !RI.getRegClass(RISCV::FPR64RegClassID).contains(SupReg);
-      });
-    assert(SupRegs.size() == 1);
-    auto SuperReg = SupRegs.front();
-    auto ClassIDIter = llvm::find_if(FPRClassesID, [&](auto ID) {
-      return RI.getRegClass(ID).contains(SuperReg);
-    });
-    assert(ClassIDIter != FPRClassesID.end());
-    return std::make_pair(SuperReg, *ClassIDIter);
+    // Select the widest supported FP view explicitly: LLVM also exposes
+    // FPR128 superregisters, even when the Q extension is disabled.
+    for (auto ClassID : llvm::reverse(FPRClassesID)) {
+      if (ClassID == RISCV::FPR64RegClassID &&
+          (!ST.hasStdExtD() || ST.getXLen() == 32))
+        continue;
+      const auto &RC = RI.getRegClass(ClassID);
+      for (auto SuperReg : RI.superregs(Reg))
+        if (RC.contains(SuperReg))
+          return std::make_pair(SuperReg, ClassID);
+    }
+    return std::nullopt;
   }
 
   // Returns an optional pair of the most super-register for the provided `Reg`
