@@ -73,23 +73,21 @@ static inline unsigned getRegBitWidth(const RISCVSubtarget &ST, MCRegister Reg,
 }
 
 static inline unsigned regToIndex(Register Reg) {
-  const MCRegisterClass *RC = nullptr;
+  // Register classes use allocation order, which is not architectural order.
   if (RISCV::X0_H <= Reg && Reg <= RISCV::X31_H)
     return Reg - RISCV::X0_H;
   if (RISCV::X0_W <= Reg && Reg <= RISCV::X31_W)
     return Reg - RISCV::X0_W;
   if (RISCV::GPRRegClass.contains(Reg))
-    RC = &RISCV::GPRRegClass;
-  else if (RISCV::FPR64RegClass.contains(Reg))
-    RC = &RISCV::FPR64RegClass;
-  else if (RISCV::FPR32RegClass.contains(Reg))
-    RC = &RISCV::FPR32RegClass;
-  else if (RISCV::FPR16RegClass.contains(Reg))
-    RC = &RISCV::FPR16RegClass;
-  else if (RISCV::VRRegClass.contains(Reg))
-    RC = &RISCV::VRRegClass;
-  assert(RC && "unknown register");
-  return llvm::find(*RC, Reg) - RC->begin();
+    return Reg - RISCV::X0;
+  if (RISCV::FPR64RegClass.contains(Reg))
+    return Reg - RISCV::F0_D;
+  if (RISCV::FPR32RegClass.contains(Reg))
+    return Reg - RISCV::F0_F;
+  if (RISCV::FPR16RegClass.contains(Reg))
+    return Reg - RISCV::F0_H;
+  assert(RISCV::VRRegClass.contains(Reg) && "unknown register");
+  return Reg - RISCV::V0;
 }
 
 using RISCVSimulatorSysRegs::RISCVSimulatorSysReg;
