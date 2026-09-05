@@ -27,10 +27,10 @@ histogram:
 # There can be no more than 250 groups of size four. Groups of size four and
 # three have the same weight => 250 / 2 +- random => we expect to see each group
 # at least 100 times.
-# THREE-COUNT-100: {{((\$x([0-9]+) = ADDI(.+))([[:space:]]+)((\$x([0-9]+) = AMOADD_W \$x([0-9]+), \$x([0-9]+), pcsections <0x[0-9a-f]+>([[:space:]]+)){3})(\$x([0-9]+) = ADDI(.+)))}}
-# FOUR-COUNT-100: {{((\$x([0-9]+) = ADDI(.+))([[:space:]]+)((\$x([0-9]+) = AMOADD_W \$x([0-9]+), \$x([0-9]+), pcsections <0x[0-9a-f]+>([[:space:]]+)){4})(\$x([0-9]+) = ADDI(.+)))}}
+# THREE-COUNT-100: {{((\$x([0-9]+) = ADDI(.+))([[:space:]]+)((\$x([0-9]+) = AMOADD_W \$x([0-9]+), \$x([0-9]+), pcsections ![0-9]+([[:space:]]+)){3})(\$x([0-9]+) = ADDI(.+)))}}
+# FOUR-COUNT-100: {{((\$x([0-9]+) = ADDI(.+))([[:space:]]+)((\$x([0-9]+) = AMOADD_W \$x([0-9]+), \$x([0-9]+), pcsections ![0-9]+([[:space:]]+)){4})(\$x([0-9]+) = ADDI(.+)))}}
 # CHECK-NOT: {{((\$x([0-9]+) = AMOADD_W \$x([0-9]+), \$x([0-9]+)([[:space:]]+)){5})}}
 
 # There might be exactly one burst group of a smaller size.
-# ONE-COUNT-2: {{((\$x([0-9]+) = ADDI(.+))([[:space:]]+)((\$x([0-9]+) = AMOADD_W \$x([0-9]+), \$x([0-9]+), pcsections <0x[0-9a-f]+>([[:space:]]+)){2})(\$x([0-9]+) = ADDI(.+)))}}
-# TWO-COUNT-2: {{((\$x([0-9]+) = ADDI(.+))([[:space:]]+)((\$x([0-9]+) = AMOADD_W \$x([0-9]+), \$x([0-9]+), pcsections <0x[0-9a-f]+>([[:space:]]+)){1})(\$x([0-9]+) = ADDI(.+)))}}
+# ONE-COUNT-2: {{((\$x([0-9]+) = ADDI(.+))([[:space:]]+)((\$x([0-9]+) = AMOADD_W \$x([0-9]+), \$x([0-9]+), pcsections ![0-9]+([[:space:]]+)){2})(\$x([0-9]+) = ADDI(.+)))}}
+# TWO-COUNT-2: {{((\$x([0-9]+) = ADDI(.+))([[:space:]]+)((\$x([0-9]+) = AMOADD_W \$x([0-9]+), \$x([0-9]+), pcsections ![0-9]+([[:space:]]+)){1})(\$x([0-9]+) = ADDI(.+)))}}
