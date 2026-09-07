@@ -1,0 +1,127 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: asserts
+# RUN: sed -e s/MODE/code/ %s >%t.code.yaml
+# RUN: sed -e s/MODE/memory/ %s >%t.memory.yaml
+# RUN: sed -e s/MODE/checksum/ %s >%t.checksum.yaml
+
+# RUN: sed -e s/INSTR/FENCE/g %t.code.yaml >%t.code.FENCE.instr.yaml
+# RUN: llvm-snippy -debug-only=snippy-riscv %t.code.FENCE.instr.yaml \
+# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml -trace-log=%t \
+# RUN: |& FileCheck %t.code.FENCE.instr.yaml
+
+# RUN: sed -e s/INSTR/FENCE/g %t.memory.yaml >%t.memory.FENCE.instr.yaml
+# RUN: llvm-snippy -debug-only=snippy-riscv %t.memory.FENCE.instr.yaml \
+# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml -trace-log=%t \
+# RUN: |& FileCheck %t.memory.FENCE.instr.yaml
+
+# RUN: sed -e s/INSTR/FENCE/g %t.checksum.yaml >%t.checksum.FENCE.instr.yaml
+# RUN: llvm-snippy -debug-only=snippy-riscv %t.checksum.FENCE.instr.yaml \
+# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml -trace-log=%t \
+# RUN: |& FileCheck %t.checksum.FENCE.instr.yaml
+
+
+# RUN: sed -e s/INSTR/FENCE_I/g %t.code.yaml >%t.code.FENCE_I.instr.yaml
+# RUN: llvm-snippy -debug-only=snippy-riscv %t.code.FENCE_I.instr.yaml \
+# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml -trace-log=%t \
+# RUN: |& FileCheck %t.code.FENCE_I.instr.yaml
+
+# RUN: sed -e s/INSTR/FENCE_I/g %t.memory.yaml >%t.memory.FENCE_I.instr.yaml
+# RUN: llvm-snippy -debug-only=snippy-riscv %t.memory.FENCE_I.instr.yaml \
+# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml -trace-log=%t \
+# RUN: |& FileCheck %t.memory.FENCE_I.instr.yaml
+
+# RUN: sed -e s/INSTR/FENCE_I/g %t.checksum.yaml >%t.checksum.FENCE_I.instr.yaml
+# RUN: llvm-snippy -debug-only=snippy-riscv %t.checksum.FENCE_I.instr.yaml \
+# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml -trace-log=%t \
+# RUN: |& FileCheck %t.checksum.FENCE_I.instr.yaml
+
+
+# RUN: sed -e s/INSTR/FENCE_TSO/g %t.code.yaml >%t.code.FENCE_TSO.instr.yaml
+# RUN: llvm-snippy -debug-only=snippy-riscv %t.code.FENCE_TSO.instr.yaml \
+# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml -trace-log=%t \
+# RUN: |& FileCheck %t.code.FENCE_TSO.instr.yaml
+
+# RUN: sed -e s/INSTR/FENCE_TSO/g %t.memory.yaml >%t.memory.FENCE_TSO.instr.yaml
+# RUN: llvm-snippy -debug-only=snippy-riscv %t.memory.FENCE_TSO.instr.yaml \
+# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml -trace-log=%t \
+# RUN: |& FileCheck %t.memory.FENCE_TSO.instr.yaml
+
+# RUN: sed -e s/INSTR/FENCE_TSO/g %t.checksum.yaml >%t.checksum.FENCE_TSO.instr.yaml
+# RUN: llvm-snippy -debug-only=snippy-riscv %t.checksum.FENCE_TSO.instr.yaml \
+# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml -trace-log=%t \
+# RUN: |& FileCheck %t.checksum.FENCE_TSO.instr.yaml
+
+
+# RUN: sed -e s/INSTR/C_NOP/g %t.code.yaml >%t.code.C_NOP.instr.yaml
+# RUN: llvm-snippy -debug-only=snippy-riscv %t.code.C_NOP.instr.yaml \
+# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml -trace-log=%t \
+# RUN: |& FileCheck %t.code.C_NOP.instr.yaml
+
+# RUN: sed -e s/INSTR/C_NOP/g %t.memory.yaml >%t.memory.C_NOP.instr.yaml
+# RUN: llvm-snippy -debug-only=snippy-riscv %t.memory.C_NOP.instr.yaml \
+# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml -trace-log=%t \
+# RUN: |& FileCheck %t.memory.C_NOP.instr.yaml
+
+# RUN: sed -e s/INSTR/C_NOP/g %t.checksum.yaml >%t.checksum.C_NOP.instr.yaml
+# RUN: llvm-snippy -debug-only=snippy-riscv %t.checksum.C_NOP.instr.yaml \
+# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml -trace-log=%t \
+# RUN: |& FileCheck %t.checksum.C_NOP.instr.yaml
+
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80000000
+    SIZE:      0x10
+    LMA:       0x80000000
+    ACCESS:    rw
+  - name:      selfcheck
+    VMA:       0x80001000
+    SIZE:      0x1000
+    LMA:       0x80001000
+    ACCESS:    rw
+
+histogram:
+  - [INSTR, 1.0]
+
+options:
+  mattr: "+c,+zifencei"
+  num-instrs: 10
+  init-regs-in-elf: true
+  mtriple: riscv64
+
+selfcheck:
+  mode: MODE
+
+# CHECK: Selfcheck is disabled for this instruction
+# CHECK: INSTR 
+
+# CHECK: Selfcheck is disabled for this instruction
+# CHECK: INSTR 
+
+# CHECK: Selfcheck is disabled for this instruction
+# CHECK: INSTR 
+
+# CHECK: Selfcheck is disabled for this instruction
+# CHECK: INSTR 
+
+# CHECK: Selfcheck is disabled for this instruction
+# CHECK: INSTR 
+
+# CHECK: Selfcheck is disabled for this instruction
+# CHECK: INSTR 
+
+# CHECK: Selfcheck is disabled for this instruction
+# CHECK: INSTR 
+
+# CHECK: Selfcheck is disabled for this instruction
+# CHECK: INSTR 
+
+# CHECK: Selfcheck is disabled for this instruction
+# CHECK: INSTR 
+
+# CHECK: Selfcheck is disabled for this instruction
+# CHECK: INSTR 

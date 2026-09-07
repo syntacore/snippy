@@ -1,0 +1,68 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# UNSUPPORTED: riscv-snippy-model-whisper
+# RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
+# RUN:   -num-instrs=1000  \
+# RUN:   -riscv-disable-misaligned-access > %t
+
+# RUN: FileCheck %s --input-file %t --dump-input fail --check-prefix=RANGE1
+# RUN: not FileCheck %s --input-file %t --dump-input fail --check-prefix=RANGE1MAX
+# RUN: FileCheck %s --input-file %t --dump-input fail --check-prefix=RANGE4
+# RUN: FileCheck %s --input-file %t --dump-input fail --check-prefix=ADDR1
+# RUN: not FileCheck %s --input-file %t --dump-input fail --check-prefix=ADDR1MAX
+# RUN: FileCheck %s --input-file %t --dump-input fail --check-prefix=ADDR4
+# RUN: FileCheck %s --input-file %t --dump-input fail --check-prefix=EVIC1
+# RUN: not FileCheck %s --input-file %t --dump-input fail --check-prefix=EVIC1MAX
+# RUN: FileCheck %s --input-file %t --dump-input fail --check-prefix=EVIC4
+
+# We have total weight = 15, instruction count = 10000
+# Output waits for:
+#   At least: 
+#     400 checks for weight 1
+#     1600 checks for weight 4
+#   No more:
+#     1600 checks for weight 1
+
+
+access-ranges:
+    - start: 0x80001000
+      size: 0x1000
+      stride: 16
+      first-offset: 1
+      last-offset: 2
+      weight: 1
+    - start: 0x80002000
+      size: 0x1000
+      stride: 8
+      first-offset: 4
+      last-offset: 6
+      weight: 4
+
+# RANGE1-COUNT-40: {{mem((\[((R|W),){0,1})| )0x0000000080001([0-9a-fA-F]{3})}}
+# RANGE1MAX-COUNT-160: {{mem((\[((R|W),){0,1})| )0x0000000080001([0-9a-fA-F]{3})}}
+# RANGE4-COUNT-160: {{mem((\[((R|W),){0,1})| )0x0000000080002([0-9a-fA-F]{3})}}
+
+
+access-addresses:
+    - weight: 1
+      plain:
+          - addr: 0x80000010
+    - weight: 4
+      plain:
+          - addr: 0x80000020
+
+# ADDR1-COUNT-40: {{mem((\[((R|W),){0,1})| )0x0000000080000010}}
+# ADDR1MAX-COUNT-160: {{mem((\[((R|W),){0,1})| )0x0000000080000010}}
+# ADDR4-COUNT-160: {{mem((\[((R|W),){0,1})| )0x0000000080000020}}
+
+
+access-evictions:
+    - mask:  0x00000000
+      fixed: 0x80000001
+      weight: 1
+    - mask:  0x00000000
+      fixed: 0x80000002
+      weight: 4
+
+# EVIC1-COUNT-40: {{mem((\[((R|W),){0,1})| )0x0000000080000001}}
+# EVIC1MAX-COUNT-160: {{mem((\[((R|W),){0,1})| )0x0000000080000001}}
+# EVIC4-COUNT-160: {{mem((\[((R|W),){0,1})| )0x0000000080000002}}

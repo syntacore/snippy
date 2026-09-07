@@ -1,0 +1,30 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=-c \
+# RUN:    -num-instrs=20 -init-regs-in-elf \
+# RUN:    -reserved-regs-list=X0      \
+# RUN: |& FileCheck %s
+sections:
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+
+histogram:
+    - [SW, 1.0]
+
+selfcheck:
+  mode: checksum
+  period: 10
+
+# CHECK: #===Simulation Start===
+
+# CHECK-COUNT-2: beq
+# CHECK-NOT: beq
+

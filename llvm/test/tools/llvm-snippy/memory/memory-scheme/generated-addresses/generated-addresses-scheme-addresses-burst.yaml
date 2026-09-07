@@ -1,0 +1,32 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# UNSUPPORTED: riscv-snippy-model-whisper
+# RUN: llvm-snippy %S/../Inputs/loadstore-layout.yaml %S/../Inputs/burst-mixed-big.yaml \
+# RUN:  %s -mtriple=riscv64 \
+# RUN:  -num-instrs=1000 --trace-log=%t-big.log
+# RUN: FileCheck %s --input-file=%t-big.log
+
+# RUN: llvm-snippy %S/../Inputs/loadstore-layout-1b.yaml %S/../Inputs/burst-mixed-small.yaml \
+# RUN:  %s -mtriple=riscv64 \
+# RUN:  -num-instrs=1000 --trace-log=%t-small.log
+# RUN: FileCheck %s --input-file=%t-small.log
+
+access-addresses:
+  - ordered: true
+    burst:
+        - addr: 0x80002000
+          size: 4
+          stride: 1
+          access-size: 4
+        - addr: 0x80002010
+          size: 16
+          stride: 8
+          access-size: 8
+  - ordered: false
+    burst:
+        - addr: 0x80002050
+          size: 10
+          stride: 4
+          access-size: 1
+
+# CHECK-COUNT-1000: {{mem((\[((R|W),){0,1})| )0x00000000800020(00|01|02|03|10|18|50|54|58)}}
+

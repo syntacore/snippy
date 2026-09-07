@@ -1,0 +1,47 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: sed -e s/PERIOD/1/ %s >%t.1.period.yaml
+# RUN: llvm-snippy %t.1.period.yaml \
+# RUN:    -mtriple=riscv64 \
+# RUN:    -dump-mf -init-regs-in-elf \
+# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml \
+# RUN: |& FileCheck %s
+
+# RUN: sed -e s/PERIOD/10/ %s >%t.10.period.yaml
+# RUN: llvm-snippy %t.10.period.yaml \
+# RUN:    -mtriple=riscv64 \
+# RUN:    -dump-mf -init-regs-in-elf \
+# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml \
+# RUN: |& FileCheck %s
+
+# RUN: sed -e s/PERIOD/100/ %s >%t.100.period.yaml
+# RUN: llvm-snippy %t.100.period.yaml \
+# RUN:    -mtriple=riscv64 \
+# RUN:    -dump-mf -init-regs-in-elf \
+# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml \
+# RUN: |& FileCheck %s
+
+sections:
+  - name:      1
+    VMA:       0x210000
+    SIZE:      0x100000
+    LMA:       0x210000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80000000
+    SIZE:      0x10
+    LMA:       0x80000000
+    ACCESS:    rw
+
+histogram:
+  - [SD, 1.0]
+  - [LD, 1.0]
+
+options:
+  mattr: "+c"
+  num-instrs: 1000
+
+selfcheck:
+  mode: checksum
+  period: PERIOD
+
+# CHECK-NOT: BEQ $x0

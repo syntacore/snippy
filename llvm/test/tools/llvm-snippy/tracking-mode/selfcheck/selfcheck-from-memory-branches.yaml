@@ -1,0 +1,41 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# UNSUPPORTED: riscv-snippy-model-whisper
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=-c \
+# RUN:    -num-instrs=1000 -init-regs-in-elf -selfcheck \
+# RUN:    -reserved-regs-list=X0 --selfcheck-ref-value-storage=memory \
+# RUN: |& FileCheck %s
+sections:
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+
+histogram:
+    - [BEQ, 1.0]
+    - [XOR, 10.0]
+
+branches:
+    max-depth:
+        loop: 0
+
+# CHECK: #===Simulation Start===
+
+# CHECK: xor
+# CHECK-NEXT: [[XREG:x[0-9]+]] {{(<- )*}}0x[[VALUE:[0-9a-fA-F]+]]
+
+# CHECK: sd
+# CHECK-NEXT: 0x[[VALUE]]
+
+# CHECK: beq

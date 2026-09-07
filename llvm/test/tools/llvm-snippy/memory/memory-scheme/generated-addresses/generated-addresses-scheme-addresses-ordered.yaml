@@ -1,0 +1,32 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# UNSUPPORTED: riscv-snippy-model-whisper
+# RUN: llvm-snippy %S/../Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
+# RUN:   --riscv-disable-misaligned-access \
+# RUN:   -num-instrs=10 |& FileCheck %s \
+# RUN:   --check-prefix ORDER
+
+# RUN: llvm-snippy %S/../Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
+# RUN:   --riscv-disable-misaligned-access \
+# RUN:   -num-instrs=1000 |& FileCheck %s
+access-addresses:
+  - ordered: true
+    plain:
+      - addr: 0x80002001
+      - addr: 0x80000000
+      - addr: 0x80001234
+      - addr: 0x80000000
+      - addr: 0x80000300
+
+# ORDER: 0x0000000080002001
+# ORDER: 0x0000000080000000
+# ORDER: 0x0000000080001234
+# ORDER: 0x0000000080000000
+# ORDER: 0x0000000080000300
+# second round
+# ORDER: 0x0000000080002001
+# ORDER: 0x0000000080000000
+# ORDER: 0x0000000080001234
+# ORDER: 0x0000000080000000
+# ORDER: 0x0000000080000300
+
+# CHECK-COUNT-1000: {{0x000000008000(2001|0000|1234|0300)}}
