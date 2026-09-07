@@ -1,0 +1,18 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-rvv
+
+# RUN: llvm-snippy %s \
+# RUN:    %S/../selfcheck-indexed-segment-loads.yaml \
+# RUN:    -mtriple=riscv64 -mattr=+v \
+# RUN:    -num-instrs=10 -init-regs-in-elf --riscv-preference-for-rvv-mode-change=vsetvl \
+# RUN:    -initial-regs-yaml=%S/Inputs/reg-init.yaml \
+# RUN:    -rvv-init-mode=loads -o %t
+# RUN: FileCheck %s --input-file=%t.selfcheck.yaml -check-prefix=ANNOTATION
+
+selfcheck:
+  mode: code
+  selfcheck-td-options:
+    enable-selfcheck-rvv: true
+
+# ANNOTATION-COUNT-20: address
+# ANNOTATION-NOT: address

@@ -1,0 +1,24 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# UNSUPPORTED: riscv-snippy-model-whisper
+# RUN: llvm-snippy %S/../Inputs/loadstore-layout-4b.yaml %s -mtriple=riscv64 \
+# RUN:  -num-instrs=1000 \
+# RUN:  --riscv-disable-misaligned-access \
+# RUN:  -dump-memory-accesses=%t.accesses \
+# RUN:  -trace-log=%t.dump
+# RUN: FileCheck --input-file=%t.dump %s --check-prefix=CNT
+
+burst:
+  mode: mixed
+  min-size: 5
+  max-size: 5
+access-evictions:
+    - mask:  0x00000080
+      fixed: 0x80002000
+access-ranges:
+    - start: 0x80002010
+      size: 10
+      stride: 4
+      first-offset: 0
+      last-offset: 3
+
+# CNT-COUNT-1000: {{mem((\[((R|W),){0,1})| )0x00000000800020(00|80|10|14)}}

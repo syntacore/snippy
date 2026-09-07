@@ -1,0 +1,45 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: "riscv64"
+  num-instrs: 20
+  init-regs-in-elf: true
+  mattr: +f
+
+selfcheck:
+  mode: checksum
+
+sections:
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+
+histogram:
+    - [LW, 1.0]
+    - [SW, 1.0]
+    - [FLW, 1.0]
+    - [FSW, 1.0]
+
+burst:
+  mode: mixed
+  min-size: 20
+  max-size: 20
+# CHECK: #===Simulation Start===
+
+# CHECK: xor
+# CHECK: fmv.x.w
+# CHECK: beq

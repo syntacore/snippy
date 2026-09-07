@@ -1,0 +1,12 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# RUN: llvm-snippy %s \
+# RUN:    %S/../selfcheck-without-dest.yaml \
+# RUN:    -mtriple=riscv64 -mattr=-c \
+# RUN:     -num-instrs=2 -init-regs-in-elf -dump-mf -selfcheck-mem \
+# RUN: |& FileCheck %s
+
+selfcheck:
+  mode: code
+
+# CHECK-NOT: SD
+
