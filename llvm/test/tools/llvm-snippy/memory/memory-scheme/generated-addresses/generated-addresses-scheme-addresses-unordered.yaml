@@ -1,0 +1,17 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# UNSUPPORTED: riscv-snippy-model-whisper
+# RUN: llvm-snippy %S/../Inputs/loadstore-layout-4b.yaml %s -mtriple=riscv64 \
+# RUN:   --riscv-disable-misaligned-access \
+# RUN:   -num-instrs=1000 -trace-log %t
+
+# RUN: FileCheck %s -input-file %t
+
+access-addresses:
+  - ordered: false
+    plain:
+      - addr: 0x80000001
+      - addr: 0x80000002
+      - addr: 0x80000004
+      - addr: 0x80000008
+
+# CHECK-COUNT-1000: {{0x000000008000000(4|8)}}

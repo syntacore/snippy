@@ -1,0 +1,36 @@
+# REQUIRES: riscv-rvv
+# RUN: not llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=+v \
+# RUN:     -num-instrs=2 -init-regs-in-elf -dump-mf \
+# RUN:     -selfcheck-mem \
+# RUN: |& FileCheck %s
+
+include:
+- ../../../RISCV/rvv/rvv-config-biased/Inputs/rvv-unit-non-zero-vl.yaml
+
+sections:
+    - name:      0
+      VMA:       0x10000
+      SIZE:      0x40000
+      LMA:       0x10000
+      ACCESS:    r
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+
+histogram:
+    - [VADD_VV, 1.0]
+
+selfcheck:
+  mode: checksum
+  selfcheck-td-options:
+    enable-selfcheck-rvv: true
+
+# CHECK: error: selfcheck checksum mode is unsupported with RVV selfcheck enabled

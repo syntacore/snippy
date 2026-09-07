@@ -1,0 +1,32 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# UNSUPPORTED: riscv-snippy-model-whisper
+# RUN: llvm-snippy %S/../Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
+# RUN:   --riscv-disable-misaligned-access \
+# RUN:   -num-instrs=1000 |& FileCheck %s \
+# RUN:   --check-prefix ALL
+
+# RUN: llvm-snippy %S/../Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
+# RUN:   --riscv-disable-misaligned-access \
+# RUN:   -num-instrs=1000 |& FileCheck %s \
+# RUN:   --check-prefix CNT
+
+access-evictions:
+    - mask:  0x0000100c
+      fixed: 0x80100001
+burst:
+  mode: mixed
+  min-size: 30
+  max-size: 30
+
+# Check that we generated all possible addresses
+# ALL: {{mem((\[((R|W),){0,1})| )0x0000000080100001}}
+# ALL: {{mem((\[((R|W),){0,1})| )0x0000000080100005}}
+# ALL: {{mem((\[((R|W),){0,1})| )0x0000000080100009}}
+# ALL: {{mem((\[((R|W),){0,1})| )0x000000008010000[dD]}}
+# ALL: {{mem((\[((R|W),){0,1})| )0x0000000080101001}}
+# ALL: {{mem((\[((R|W),){0,1})| )0x0000000080101005}}
+# ALL: {{mem((\[((R|W),){0,1})| )0x0000000080101009}}
+# ALL: {{mem((\[((R|W),){0,1})| )0x000000008010100[dD]}}
+
+# Check that we generate addresses only from the scheme.
+# CNT-COUNT-998: {{mem((\[((R|W),){0,1})| )0x000000008010[01]00[159dD]}}

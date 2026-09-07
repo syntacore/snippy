@@ -1,0 +1,46 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# UNSUPPORTED: riscv-snippy-model-whisper
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=+f \
+# RUN:    -num-instrs=2 -init-regs-in-elf \
+# RUN: |& FileCheck %s
+
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 -mattr=+zfh \
+# RUN:     -num-instrs=2 -init-regs-in-elf -dump-mf -selfcheck-mem \
+# RUN: |& FileCheck %s --dump-input always
+
+sections:
+    - name:      1
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+
+histogram: 
+    - [FADD_S, 1.0]
+
+selfcheck:
+  mode: code 
+# CHECK: #===Simulation Start===
+
+# CHECK: fadd.s
+# CHECK: [[FPREG:f[0-9]+]] {{(<- )*}}0x{{(FFFFFFFF)*}}[[VALUE:[0-9a-fA-F]+]]
+
+# CHECK: fsw
+# CHECK: 0x[[VALUE]]
+
+# CHECK: sw
+# CHECK: 0x[[VALUE]]
+
+
