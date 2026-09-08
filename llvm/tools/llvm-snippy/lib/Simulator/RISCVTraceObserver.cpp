@@ -35,15 +35,6 @@ void RISCVTraceObserver::csrUpdateNotification(unsigned RegID,
   CSRLogs.emplace_back(RegisterLog{RegType::CSR, RegID, Value});
 }
 
-void RISCVTraceObserver::memUpdateNotification(MemoryAddressType Addr,
-                                               const char *Data, size_t Size) {
-  auto DataSize = Size * CHAR_BIT;
-  auto Value = APInt(
-      DataSize,
-      ArrayRef<uint64_t>(reinterpret_cast<const uint64_t *>(Data), DataSize));
-  MemLogs.emplace_back(MemoryLog{MemoryLog::AccessType::W, Addr, Value});
-}
-
 void RISCVTraceObserver::PCUpdateNotification(ProgramCounterType PC) {
   for_each(Converters, [&](auto &Converter) {
     Converter->acceptRecordsAndShiftPC(PC, RegLogs, CSRLogs, MemLogs);
@@ -53,13 +44,29 @@ void RISCVTraceObserver::PCUpdateNotification(ProgramCounterType PC) {
   MemLogs.clear();
 }
 
+void RISCVTraceObserver::handleMemReadOrUpdateNotification(
+    bool IsRead, MemoryAddressType Addr, const char *Data, size_t Size) {
+  auto BitWidth = Size * CHAR_BIT;
+  SmallVector<char, 64> Copy;
+  Copy.resize(alignTo(Size, sizeof(uint64_t)));
+  std::memcpy(Copy.data(), Data, Size);
+  auto Value =
+      APInt(BitWidth,
+            ArrayRef<uint64_t>(reinterpret_cast<const uint64_t *>(Copy.data()),
+                               Copy.size() / sizeof(uint64_t)));
+  MemLogs.emplace_back(
+      MemoryLog{IsRead ? MemoryLog::AccessType::R : MemoryLog::AccessType::W,
+                Addr, Value});
+}
+
+void RISCVTraceObserver::memUpdateNotification(MemoryAddressType Addr,
+                                               const char *Data, size_t Size) {
+  handleMemReadOrUpdateNotification(/*IsRead=*/false, Addr, Data, Size);
+}
+
 void RISCVTraceObserver::memReadNotification(MemoryAddressType Addr,
                                              const char *Data, size_t Size) {
-  auto DataSize = Size * CHAR_BIT;
-  auto Value = APInt(
-      DataSize,
-      ArrayRef<uint64_t>(reinterpret_cast<const uint64_t *>(Data), DataSize));
-  MemLogs.emplace_back(MemoryLog{MemoryLog::AccessType::R, Addr, Value});
+  handleMemReadOrUpdateNotification(/*IsRead=*/true, Addr, Data, Size);
 }
 
 } // namespace snippy

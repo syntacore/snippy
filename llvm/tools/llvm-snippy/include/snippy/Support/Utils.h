@@ -240,14 +240,11 @@ void convertNumberToBytesArrayWithEndianness(NumberT Num, size_t AddrLenInBytes,
 template <typename NumberT>
 APInt convertNumberToCorrectEndianness(NumberT Num, size_t AddrLenInBytes,
                                        bool TargetIsLittleEndian) {
-  SmallVector<unsigned char, 8> AddrBytes;
-  convertNumberToBytesArrayWithEndianness(
-      Num, AddrLenInBytes, TargetIsLittleEndian, std::back_inserter(AddrBytes));
-  APInt Res(AddrLenInBytes * CHAR_BIT, 0);
-  for (unsigned I = 0; I < AddrBytes.size(); ++I) {
-    Res |= (AddrBytes[I] << (I * CHAR_BIT));
-  }
-  return Res;
+  APInt Res(AddrLenInBytes * CHAR_BIT, Num);
+  return ((llvm::endianness::native == llvm::endianness::little) ==
+          TargetIsLittleEndian)
+             ? Res
+             : Res.byteSwap();
 }
 
 struct MIRComp {
