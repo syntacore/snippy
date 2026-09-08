@@ -26,6 +26,9 @@ private:
   SmallVector<RegisterLog> CSRLogs;
   SmallVector<MemoryLog> MemLogs;
 
+  void handleMemReadOrUpdateNotification(bool IsRead, MemoryAddressType Addr,
+                                         const char *Data, size_t Size);
+
 public:
   void xregUpdateNotification(unsigned RegID, RegisterType Value) override;
   void fregUpdateNotification(unsigned RegID, RegisterType Value) override;

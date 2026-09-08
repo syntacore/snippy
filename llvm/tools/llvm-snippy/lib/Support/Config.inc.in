@@ -1,0 +1,1 @@
+#cmakedefine01 LLVM_USE_SANITIZER
