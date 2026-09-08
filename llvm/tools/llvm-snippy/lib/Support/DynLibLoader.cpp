@@ -10,6 +10,8 @@
 #include "snippy/Support/DiagnosticInfo.h"
 #include "snippy/Support/Utils.h"
 
+#include "Config.inc"
+
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
@@ -46,7 +48,8 @@ void *getPermanentLibrary(const char *Filename, std::string *errMsg = nullptr) {
   auto Canonical = *CanonicalOrErr;
 
   void *Handle =
-      ::dlopen(Canonical.c_str(), RTLD_LAZY | RTLD_GLOBAL | RTLD_DEEPBIND);
+      ::dlopen(Canonical.c_str(), RTLD_LAZY | RTLD_GLOBAL |
+                                      (LLVM_USE_SANITIZER ? 0 : RTLD_DEEPBIND));
   if (!Handle) {
     if (errMsg)
       *errMsg = ::dlerror();
