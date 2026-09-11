@@ -338,15 +338,14 @@ Indicates which attributes to include (``+``) or exclude (``-``). For example:
 
 **-model-plugin**
 
-Hardware model plugin you want to use. Available
-options:
--  Path to the model plugin
+Hardware model plugin you want to use. Available values:
 
 -  ``None`` (default) |nbsp| -- |nbsp| Disables snippet execution on
    a model.
-
 -  ``spike``, ``<PATH>/riscv-spike-plugin.so``, or
    ``riscv-spike-plugin.so`` (preferable).
+-  ``whisper``, ``<PATH>/riscv-whisper-plugin.so``, or
+   ``riscv-whisper-plugin.so`` (preferable).
 
 Where ``<PATH>`` is the parent directory of llvm-snippy executable
 
@@ -668,17 +667,17 @@ The ``histogram-patterns`` allows you to define histograms from opcodes and othe
 histograms (defined within the same configuration) using various algebraic
 operations, such as:
 
--   `|` - Probabilistic OR (selection from either the left or right expression).
+-   ``|`` - Probabilistic OR (selection from either the left or right expression).
     Lets take two opcodes, DIV and MUL. The expression ``DIV | MUL`` then means
     choosing either ``DIV`` or ``MUL`` (by default, all opcodes within the patterns have equal probability).
 
--   `*` - Cartesian product.
+-   ``*`` - Cartesian product.
     For example, consider two opcode sequences: ``[ADD | SUB] * [LD | SD]``.
     Their Cartesian product yields all possible two-instruction sequences
     where an opcode from the first set is followed by an opcode from the second:
     ``ADD + LD; ADD + SD; SUB + LD; SUB + SD``.
 
--   `^` - Repetition of an opcode/pattern N times. You can specify either a possible range
+-   ``^`` - Repetition of an opcode/pattern N times. You can specify either a possible range
     in the format [min : max] or a specific number of repetitions for the pattern. E.g:
 
     -  For instance, ``ADD ^ 3`` would signify three consecutive ``ADD`` instructions.
@@ -1071,13 +1070,13 @@ Vector instructions work on a group of elements simultaneously.
 
 Snippy supports the following memory-related vector instructions:
 
--  `Strided load/store <#strided-loadstore>`__
+-  `Strided Load/Store <#strided-loadstore>`__
 
--  `Unit-stride load/store <#unit-stride-loadstore>`__
+-  `Unit-Stride Load/Store <#unit-stride-loadstore>`__
 
--  `Indexed load/store (ordered and unordered) <#indexed-loadstore>`__
+-  `Indexed Load/Store (ordered and unordered) <#indexed-loadstore>`__
 
--  Whole register load/store
+-  Whole Register Load/Store
 
 Unit-stride, strided, and indexed instructions also support `segment
 instructions <#segment-loadstore>`__.
@@ -1089,6 +1088,16 @@ Additionally,
 `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#72-vector-loadstore-addressing-modes>`__
 you can find a description of how addressing works for all types of
 instructions mentioned in this chapter.
+
+.. important::
+
+   RISC-V vector store instructions are able to perform several writes into
+   the same memory location.
+   When this happens, it leads to non-reproducible results in memory,
+   which is usually undesirable.
+   Snippy has a feature that prevents intersection of addresses
+   in such instructions, see the
+   `Avoiding Unordered Memory Accesses to the Same Addresses`_ section.
 
 .. _strided-loadstore:
 
@@ -1190,25 +1199,6 @@ In the basic process, snippy:
 2. Generates a strided instruction |nbsp| -- |nbsp| an instruction that can navigate
    through the selected memory scheme by the stride you specify. Such
    instructions simultaneously access not one address, but several.
-
-.. note::
-   The option ``riscv-disallow-intersecting-mem-accesses`` is specific to the
-   RISC-V RVV backend. It takes a **regex** that matches the desired strided
-   (or strided-segmented) **store** instructions **that appear in the
-   histogram** `Histogram <#histogram>`__. When the option is enabled,
-   Snippy emits those store instructions only if the generated element
-   addresses are guaranteed to be disjoint. If the memory scheme cannot
-   satisfy this non-intersecting requirement, Snippy fails.
-
-   This behavior applies to instructions described in the
-   `Strided Load/Store <#strided-loadstore>`__ section.
-
-   Currently the option works only with ``access-ranges`` memory schemes.
-   Other access types (e.g., ``access-evictions`` or address-enumeration
-   schemes) cannot guarantee the required disjoint addresses, so they are not
-   supported. Indexed unordered stores are also not supported at the moment.
-   For any other instruction that matches the regex the option simply has no
-   effect.
 
 Use ``memory.yaml`` for a reference on a memory scheme with strides:
 
@@ -2959,17 +2949,14 @@ comma-separated list of warning categories that you want to be affected:
    If you try to disable a category that does not exist, you will get an
    error.
 
--  ``-Werror`` |nbsp| -- |nbsp| To treat specific warnings as errors. Some warnings are
-   treated as errors by default, and you can override it by
-   ``-Wno-error``, as described further.
+-  ``-Werror`` |nbsp| -- |nbsp| To treat specific warnings as errors.
 
-   Several warnings are treated as errors by default. They are:
+   Some warnings are treated as errors by default:
+
    -  ``non-reproducible-execution``
 
-
-   Currently, the only warning that is treated as an error by default is
-   ``-Werror=non-reproducible-execution``. This way, this warning is
-   added by default to any other warning that you add via ``-Werror``.
+   You can convert these errors back to warnings by means of ``-Wno-error``,
+   as described below.
 
 -  ``-Wno-error`` |nbsp| -- |nbsp| To not treat specific warnings as errors (that is,
    to remove them from the list of warnings treated as errors).
@@ -3116,8 +3103,8 @@ The notation uses the following abbreviations for register classes:
 Also, when honor-target-abi is enabled, only live caller-saved registers are
 preserved around external function calls.
 
-Generated Function Naming
--------------------------
+Name of Generated Function
+--------------------------
 
 The default name of the function produced by llvm-snippy is "SnippyFunction".
 
@@ -3953,6 +3940,19 @@ two mutually exclusive modes:
 As a result, you have a random vector unit mode change on each ``VSET*``
 in the code.
 
+.. Warning::
+
+   If you do not specify a configuration, the only reachable RVV configuration is:
+
+   ::
+
+      { SEW=64, VL=2, TU, MU, VM=all_ones, LMUL=1, VXRM=rnu }
+
+   Generally, this default RVV config does not provide testing coverage that
+   is good enough for practical purposes.
+   That is why if RVV testing is needed, then some description of reachable
+   RVV configurations should be provided explicitly.
+
 .. _`_reachable_vector_configurations`:
 
 Reachable Vector Configurations
@@ -4070,12 +4070,12 @@ reachable RVV configurations for the snippet:
       probability, while the weights inside ``mode-list`` are normalized to
       ``1 - Pvill``.
 
-.. important::
+   .. important::
 
-   ``mode-list``, ``SEW``, ``LMUL`` are marked as *optional\** because
-   ``mode-list`` is specified **instead** of the ``SEW`` and ``LMUL`` keys of
-   ``VTYPE``: you provide either both ``SEW`` and ``LMUL`` or a ``mode-list``,
-   but never both at once.
+      ``mode-list``, ``SEW``, ``LMUL`` are marked as *optional\** because
+      ``mode-list`` is specified **instead** of the ``SEW`` and ``LMUL`` keys
+      of ``VTYPE``: you provide either both ``SEW`` and ``LMUL`` or a
+      ``mode-list``, but never both at once.
 
 -  ``VMA``, ``VTA`` |nbsp| -- |nbsp| Vector mask agnostic and vector tail agnostic
    modes. For the details, refer
@@ -4145,13 +4145,6 @@ reachable RVV configurations for the snippet:
          In this mode ``VL:max_encodable``, ``VL:vlmax``, and ``VL:any_legal`` have their
          ``VL`` limited to **global** ``VLMAX`` across all given ``SEW`` and ``LMUL``
          combinations.
-
-If you do not specify a configuration, the only reachable RVV
-configuration is:
-
-::
-
-   { SEW=64, VL=2, TU, MU, VM=unmasked, LMUL=1, VXRM=rnu }
 
 .. _`_example_of_vector_configuration`:
 
@@ -4363,6 +4356,74 @@ The resulting output looks similar to the following:
      - State Cardinality: 30 ~ {MASKS}
     --- RVV Configuration End  ---
 
+
+.. _Avoiding Unordered Memory Accesses to the Same Addresses:
+
+Avoiding Unordered Memory Accesses to the Same Addresses
+--------------------------------------------------------
+
+The memory accesses performed by a single instruction when the same memory
+location is accessed more than once are called *intersecting memory accesses*.
+Unordered intersecting memory access can lead to
+non-reproducible/unpredictable result of snippet execution,
+which is generally undesirable.
+
+RISC-V ISA has instructions that capable to perform unordered
+intersecting memory accesses. The ``riscv-disallow-intersecting-mem-accesses``
+option is intended to avoid such accesses by providing these instructions
+with non-intersecting memory addresses.
+
+The option accepts a *regex* that should match the opcodes
+for which intersecting memory accesses must be prevented.
+Then Snippy will produce only disjoint memory addresses for these opcodes.
+
+.. code:: yaml
+
+   # Prevent indexed-unordered vector instructions
+   # from intersecting memory stores.
+   options:
+      mtriple: riscv64
+      mattr: +v
+      riscv-disallow-intersecting-mem-accesses: "VSUXEI.*"
+
+.. important::
+   Currently this feature supports only
+   `indexed unordered <#indexed-loadstore>`__,
+   `strided and strided-segmented <#strided-loadstore>`__ RVV stores.
+   We believe this is sufficient to avoid unpredictable results of snippet
+   execution on RISC-V targets.
+   This may change in the future.
+
+   Other opcodes, when match the regex, are ignored.
+
+.. warning::
+   The functionality works only with
+   `Strided Memory Schemes <#memory-strides>`__ (``access-ranges``).
+   Other kinds of memory schemes (e.g.
+   `Memory Eviction <#memory-eviction>`__,
+   `Addresses Enumeration <#addresses-enumeration-scheme>`__,
+   `Negative Memory <#negative-memory-scheme>`__ schemes)
+   are unable to generate the disjoint addresses required for the feature
+   to function. That is why the instructions that are capable of producing
+   intersecting memory accesses but prohibited from doing so
+   (by this option) take addresses only from the ``access-range`` memory
+   schemes and ignore all others.
+   
+   The above means that
+   when different kinds of memory schemes are used in the snippet,
+   and ``riscv-disallow-intersecting-mem-accesses`` is engaged as well,
+   the memory accesses may be distributed unevenly.
+   **We do not recommend using memory schemes other than** ``access-ranges``
+   **in combination with this feature.**
+
+.. note::
+   RVV unordered store instructions that write only **one** element
+   cannot write to the same memory location more than once.
+   Therefore, snippets containing such instructions cannot
+   be impacted by the intersecting memory accesses problem.
+   Such instructions are not affected by the
+   ``riscv-disallow-intersecting-mem-accesses`` option and
+   are allowed to take addresses from all kinds of memory schemes.
 
 Support for Floating-Point Control and Status Registers
 =======================================================
