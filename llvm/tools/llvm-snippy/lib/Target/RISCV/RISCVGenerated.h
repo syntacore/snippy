@@ -2005,7 +2005,8 @@ inline unsigned getOperandEEW(const MCInstrDesc &InstrDesc, unsigned OpIndex,
   }
 
   if ((isRVVWidening(Opcode) && /* vd */ OpIndex == 0) ||
-      (isRVVDoubleWidthSource(Opcode) && /* vs2 */ OpIndex == 1))
+      (isRVVDoubleWidthSource(Opcode) && /* vs2 */ OpIndex == 1) ||
+      (isRVVWideningDestOverride(Opcode) && /* vd (addend) */ OpIndex == 1))
     return 2 * SEW;
 
   if (isRVVExt(Opcode) && /* vs2 */ OpIndex == 1)
