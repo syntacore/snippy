@@ -29,6 +29,7 @@ jobs:
             cmake
             libunwind
             lld
+            libc
             llvm
             third-party
       - name: Prepare ccache
