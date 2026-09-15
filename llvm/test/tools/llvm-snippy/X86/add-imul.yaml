@@ -1,0 +1,27 @@
+# REQUIRES: x86-registered-target
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s | FileCheck %s
+options:
+  mtriple: x86_64
+  num-instrs: 100
+  dump-mf: true
+
+sections:
+  - name: 1
+    VMA: 0x100000
+    LMA: 0x100000
+    SIZE: 0x100000
+    ACCESS: rx
+  - name: 2
+    VMA: 0x20000
+    LMA: 0x20000
+    SIZE: 0x10000
+    ACCESS: rw
+
+histogram:
+  - ["ADD64[r0-9]*", 1.0]
+  - ["IMUL64[r0-9]*", 1.0]
+
+# CHECK-DAG: ADD64rr
+# CHECK-DAG: IMUL64rr
+# CHECK-DAG: IMUL64r

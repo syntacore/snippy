@@ -15,10 +15,12 @@
 
 #include "MCTargetDesc/X86BaseInfo.h"
 #include "MCTargetDesc/X86MCTargetDesc.h"
+#include "X86AsmPrinter.h"
 #include "X86InstrInfo.h"
 #include "X86Subtarget.h"
 
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/MC/MCStreamer.h"
 
 #include <vector>
 
@@ -26,6 +28,12 @@ namespace llvm {
 namespace snippy {
 
 namespace {
+class X86Config : public TargetConfigInterface {
+  void mapConfig(yaml::IO &IO) override {}
+  bool hasConfig() const override { return false; }
+};
+
+class X86GeneratorContext : public TargetGenContextInterface {};
 
 class SnippyX86Target : public SnippyTarget {
 public:
@@ -53,36 +61,32 @@ public:
   createTargetContext(LLVMState &State, const Config &Cfg,
                       const TargetSubtargetInfo *STI,
                       const RegPoolWrapper &RP) const override {
-    reportUnimplementedError();
+    return std::make_unique<X86GeneratorContext>();
   }
 
   std::unique_ptr<TargetConfigInterface> createTargetConfig() const override {
-    reportUnimplementedError();
+    return std::make_unique<X86Config>();
   }
 
   void checkInstrTargetDependency(const OpcodeHistogram &H,
                                   const OpcodeCache &OpCC,
                                   const ProgramConfig &ProgramCfg,
-                                  const PassConfig &PassCfg) const override {
-    reportUnimplementedError();
-  }
+                                  const PassConfig &PassCfg) const override {}
 
-  bool isModeSwitchInstr(unsigned Opcode) const override {
-    reportUnimplementedError();
-  }
+  bool isModeSwitchInstr(unsigned Opcode) const override { return false; }
 
   bool modeSwitchIsSupport(const SnippyProgramContext &ProgCtx) const override {
-    reportUnimplementedError();
+    return true;
   }
 
   bool needToGenerateModeSwitches(
       const SnippyProgramContext &ProgCtx) const override {
-    reportUnimplementedError();
+    return false;
   }
 
   double
   getModeSwitchProbability(const SnippyProgramContext &ProgCtx) const override {
-    reportUnimplementedError();
+    return 0.0;
   }
 
   void checkTrackingRestrictions(const OpcodeHistogram &H) const override {
@@ -129,9 +133,7 @@ public:
     reportUnimplementedError();
   }
 
-  std::string getDefaultLastInstr() const override {
-    reportUnimplementedError();
-  }
+  std::string getDefaultLastInstr() const override { return "INT3"; }
 
   void generateRegsInit(InstructionGenerationContext &IGC,
                         const IRegisterState &R) const override {
@@ -139,16 +141,16 @@ public:
   }
 
   unsigned getFPRegsCount(const TargetSubtargetInfo &ST) const override {
-    reportUnimplementedError();
+    return 0;
   }
 
   bool requiresCustomGeneration(const MCInstrDesc &InstrDesc) const override {
-    reportUnimplementedError();
+    return false;
   }
 
   bool
   canBeGeneratedAsCommonInstr(const MCInstrDesc &InstrDesc) const override {
-    reportUnimplementedError();
+    return true;
   }
 
   void generateCustomInst(
@@ -161,7 +163,7 @@ public:
   std::unique_ptr<SnippyOperandGenerator>
   createOperandGenerator(planning::InstructionGenerationContext &IGC,
                          const MCInstrDesc &InstrDesc) const override {
-    reportUnimplementedError();
+    return nullptr;
   }
 
   bool needsLowering(const MCInstrDesc &InstrDesc) const override {
@@ -175,7 +177,7 @@ public:
 
   void instructionPostProcess(InstructionGenerationContext &IGC,
                               MachineInstr &MI) const override {
-    reportUnimplementedError();
+
   }
 
   void
@@ -223,17 +225,40 @@ public:
   }
 
   std::vector<std::string> getCallerSavedRegGroups() const override {
-    reportUnimplementedError();
+    return {};
   }
 
   std::vector<std::string> getCallerSavedLiveRegGroups() const override {
-    reportUnimplementedError();
+    return {};
   }
 
   std::vector<MCRegister>
   getCallerSavedRegs(const MachineFunction &MF,
                      ArrayRef<std::string> RegGroups) const override {
-    reportUnimplementedError();
+    if (RegGroups.empty())
+      return {};
+
+    std::vector<MCRegister> CallerRegs;
+
+    // x86_64 caller-saved (scratch) registers per System V ABI
+    // These are volatile across function calls
+    CallerRegs.insert(CallerRegs.end(),
+                      {
+                          // Argument registers (also scratch)
+                          X86::RDI, X86::RSI, X86::RDX, X86::RCX, X86::R8,
+                          X86::R9,
+
+                          // Return value and scratch registers
+                          X86::RAX,           // Return value
+                          X86::R10, X86::R11, // Scratch/temporary
+
+                          // TODO: add vector registers
+                      });
+
+    // Note: x86_64 has no dedicated frame pointer in the ABI,
+    // but RBP and RBX are callee-saved (so NOT included)
+    // RSP (stack pointer) is also callee-saved
+    return CallerRegs;
   }
 
   std::vector<MCRegister>
@@ -246,25 +271,25 @@ public:
               unsigned OperandRegClassID, unsigned OpIndex,
               const MCInstrDesc &InstrDesc,
               const MCRegisterInfo &RegInfo) const override {
-    reportUnimplementedError();
+    return RegInfo.getRegClass(OperandRegClassID);
   }
 
   std::vector<MCRegister> getRegsSuitableForSP() const override {
-    reportUnimplementedError();
+    return {X86::RSP};
   }
 
   std::vector<MCRegister>
   getRegsSuitableForRA(std::optional<unsigned> CallOpcode) const override {
-    reportUnimplementedError();
+    return {X86::R9};
   }
 
   void getImplicitDefRegs(unsigned Opcode,
                           SmallVectorImpl<MCRegister> &OutRegs) const override {
-    reportUnimplementedError();
+    return;
   }
 
-  MCRegister getStackPointer() const override { reportUnimplementedError(); }
-  MCRegister getReturnAddress() const override { reportUnimplementedError(); }
+  MCRegister getStackPointer() const override { return X86::RSP; }
+  MCRegister getReturnAddress() const override { return X86::R9; }
 
   bool isRegClassSupported(MCRegister Reg) const override {
     reportUnimplementedError();
@@ -393,29 +418,50 @@ public:
   }
 
   bool isMultipleReg(Register Reg, const MCRegisterInfo &RI) const override {
-    reportUnimplementedError();
+    if (Reg == X86::NoRegister)
+      return false;
+    // If there is only one subreg in subregs,
+    // then this register does not consist of smaller ones, which means it is
+    // physical
+    auto Subregs = RI.subregs_inclusive(Reg);
+    return std::distance(Subregs.begin(), Subregs.end()) != 1;
   }
 
   bool isPhysRegClass(unsigned RegClassID,
                       const MCRegisterInfo &RI) const override {
-    reportUnimplementedError();
+    const auto &RC = RI.getRegClass(RegClassID);
+    return std::all_of(RC.begin(), RC.end(), [this, &RI](unsigned Reg) {
+      return !isMultipleReg(Reg, RI);
+    });
   }
 
   Register getFirstPhysReg(Register Reg,
                            const MCRegisterInfo &RI) const override {
-    reportUnimplementedError();
+    auto Subregs = RI.subregs_inclusive(Reg);
+    return *std::min_element(Subregs.begin(), Subregs.end());
   }
 
   void
   getSubregsInclusive(Register Reg, const MCRegisterInfo &RI,
                       SmallVectorImpl<Register> &OutPhysRegs) const override {
-    reportUnimplementedError();
+    OutPhysRegs.clear();
+    llvm::append_range(OutPhysRegs, RI.subregs_inclusive(Reg));
   }
 
   void
   getPhysRegsFromUnit(Register RegUnit, const MCRegisterInfo &RI,
                       SmallVectorImpl<Register> &OutPhysRegs) const override {
-    reportUnimplementedError();
+    OutPhysRegs.clear();
+    if (RegUnit == X86::NoRegister)
+      return;
+    if (!isMultipleReg(RegUnit, RI)) {
+      OutPhysRegs.push_back(RegUnit);
+      return;
+    }
+
+    auto Subregs = RI.subregs_inclusive(RegUnit);
+    copy_if(Subregs, std::back_inserter(OutPhysRegs),
+            [this, &RI](auto &SubReg) { return !isMultipleReg(SubReg, RI); });
   }
 
   void getPhysRegsWithoutOverlaps(
@@ -470,11 +516,11 @@ public:
   }
 
   void addTargetSpecificPasses(PassManagerWrapper &PM) const override {
-    reportUnimplementedError();
+
   }
 
   void addTargetLegalizationPasses(PassManagerWrapper &PM) const override {
-    reportUnimplementedError();
+
   }
 
   bool is64Bit(const TargetMachine &TM) const override {
@@ -534,9 +580,77 @@ public:
 
   unsigned getLoopOverhead() const override { reportUnimplementedError(); }
 
+  // FIXME: for other targets we use <TGT>InstrInfo::getInstSizeInBytes but it
+  // is not implemented for X86 so we basically parse instruction type by-hand
   unsigned getInstrSize(const MachineInstr &Inst,
                         LLVMState &State) const override {
-    reportUnimplementedError();
+    const auto &X86STI =
+        State.getSubtarget<X86Subtarget>(*Inst.getParent()->getParent());
+    const auto *MCII = X86STI.getInstrInfo();
+    const MCInstrDesc &Desc = MCII->get(Inst.getOpcode());
+
+    // 1. Fixed-size instructions
+    unsigned FixedSize = Desc.getSize();
+    if (FixedSize > 0)
+      return FixedSize;
+
+    // 2. For variable-length instructions, compute size from operands
+    unsigned Size = 0;
+
+    // Opcode bytes: 1 for most, 2 if 0x0F prefix (we infer from opcode enum)
+    // We can check if the opcode belongs to the 0x0F group by looking at the
+    // instruction's TSFlags, but to keep it simple, we'll assume 1 byte.
+    Size += 1;
+
+    // REX prefix (64-bit mode) – present if any 64-bit GPR is used
+    bool HasREX = false;
+    for (const auto &MO : Inst.operands()) {
+      if (MO.isReg()) {
+        unsigned Reg = MO.getReg();
+        if (Reg >= X86::RAX && Reg <= X86::R15) {
+          HasREX = true;
+          break;
+        }
+      }
+    }
+    if (HasREX)
+      Size += 1;
+
+    // ModR/M byte – present for most instructions. We check if the instruction
+    // has any memory operand or if the operands include registers that need it.
+    // All GPR instructions (except some like PUSH/POP) have ModR/M.
+    // To be safe, we always add it; only a few implicit instructions lack it.
+    Size += 1;
+
+    // SIB byte – used for complex addressing. We'll skip detection for now.
+
+    // Displacement – check for memory operands via frame indices or
+    // addressing modes. For simplicity, we'll add 4 bytes if we see a
+    // frame index operand (common for stack references).
+    for (const auto &MO : Inst.operands()) {
+      if (MO.isFI()) {
+        Size += 4; // typical displacement size
+        break;
+      }
+    }
+
+    // Immediate – check for immediate operands
+    for (const auto &MO : Inst.operands()) {
+      if (MO.isImm()) {
+        int64_t Imm = MO.getImm();
+        if (Imm >= std::numeric_limits<int8_t>::min() &&
+            Imm <= std::numeric_limits<int8_t>::max())
+          Size += 1; // sign-extended byte
+        else
+          Size += 4; // 32-bit immediate (or 8 for 64-bit, but rare)
+      }
+    }
+
+    if (Size == 0)
+      snippy::fatal(Twine("Internal error at: ") + __PRETTY_FUNCTION__,
+                    "unknown instruction type");
+
+    return Size;
   }
 
   LoopType getLoopType(MachineInstr &Branch) const override {
@@ -559,13 +673,9 @@ public:
     reportUnimplementedError();
   }
 
-  virtual void initializeTargetPasses() const override {
-    reportUnimplementedError();
-  }
+  virtual void initializeTargetPasses() const override {}
 
-  unsigned countAddrsToGenerate(unsigned Opcode) const override {
-    reportUnimplementedError();
-  }
+  unsigned countAddrsToGenerate(unsigned Opcode) const override { return 0; }
 
   std::pair<AddressParts, MemAddresses>
   breakDownAddr(InstructionGenerationContext &IGC, AddressInfo AddrInfo,
@@ -670,7 +780,10 @@ public:
   getSelectionOperandsOrder(InstructionGenerationContext &IGC,
                             const MCInstrDesc &InstrDesc,
                             SmallVectorImpl<unsigned> &Indices) const override {
-    reportUnimplementedError();
+    auto NumOperands = InstrDesc.getNumOperands();
+    Indices.resize(NumOperands);
+    std::iota(Indices.begin(), Indices.end(), 0u);
+    return;
   }
 
   void excludeFromMemRegsForInstr(
@@ -686,12 +799,12 @@ public:
       const MCInstrDesc &InstrDesc, unsigned OpIndex,
       ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands)
       const override {
-    reportUnimplementedError();
+    return {};
   }
 
   std::vector<Register> includeRegs(unsigned Opcode,
                                     const MCRegisterClass &RC) const override {
-    reportUnimplementedError();
+    return {};
   }
 
   const TargetRegisterClass &getAddrRegClass() const override {
@@ -726,18 +839,14 @@ public:
     reportUnimplementedError();
   }
 
-  unsigned getInternalOpcode(unsigned Opc) const override {
-    reportUnimplementedError();
-  }
+  unsigned getInternalOpcode(unsigned Opc) const override { return Opc; }
 
   unsigned getOriginalOpcode(unsigned Opc) const override {
     reportUnimplementedError();
   }
 
-  bool isCall(unsigned Opcode) const override { reportUnimplementedError(); }
-  bool isSPRelative(unsigned Opcode) const override {
-    reportUnimplementedError();
-  }
+  bool isCall(unsigned Opcode) const override { return false; }
+  bool isSPRelative(unsigned Opcode) const override { return false; }
 
   void allocateMemoryInitializationRegs(
       InstructionGenerationContext &IGC,
@@ -771,18 +880,16 @@ public:
     reportUnimplementedError();
   }
 
-  bool isFloatingPoint(MCRegister Reg) const override {
-    reportUnimplementedError();
-  }
+  bool isFloatingPoint(MCRegister Reg) const override { return false; }
 
   bool isFloatingPoint(const MCInstrDesc &InstrDesc) const override {
-    reportUnimplementedError();
+    return false;
   }
 
   std::unique_ptr<AsmPrinter>
   createAsmPrinter(TargetMachine &TM,
                    std::unique_ptr<MCStreamer> Streamer) const override {
-    reportUnimplementedError();
+    return std::make_unique<X86AsmPrinter>(TM, std::move(Streamer));
   }
 
   uint8_t getCodeAlignment(const TargetSubtargetInfo &STI) const override {
