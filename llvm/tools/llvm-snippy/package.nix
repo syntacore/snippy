@@ -59,7 +59,7 @@ stdenv.mkDerivation (finalAttrs: {
     (lib.cmakeFeature "LLVM_ENABLE_PROJECTS" "lld")
     (lib.cmakeBool "LLVM_BUILD_TESTS" finalAttrs.finalPackage.doCheck)
     (lib.cmakeBool "LLVM_ENABLE_ASSERTIONS" true)
-    (lib.cmakeFeature "LLVM_TARGETS_TO_BUILD" "RISCV;AArch64")
+    (lib.cmakeFeature "LLVM_TARGETS_TO_BUILD" "RISCV;AArch64;X86")
     (lib.cmakeBool "LLVM_BUILD_SNIPPY" true)
     (lib.cmakeBool "LLVM_ENABLE_SPHINX" true)
     (lib.cmakeBool "LLVM_INCLUDE_BENCHMARKS" false)
