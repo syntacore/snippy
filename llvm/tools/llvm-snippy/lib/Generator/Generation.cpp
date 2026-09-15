@@ -801,7 +801,8 @@ static MachineOperand pregenerateOneOperand(
     return createRegAsOperand(Reg, Preselected.getFlags());
   }
 
-  if (OpType >= MCOI::OperandType::OPERAND_FIRST_TARGET) {
+  if (OpType >= MCOI::OperandType::OPERAND_FIRST_TARGET ||
+      OpType == MCOI::OperandType::OPERAND_IMMEDIATE) {
     if (Preselected.isReg())
       return createRegAsOperand(Preselected.getReg(), Preselected.getFlags());
     assert(Preselected.isUnset() || Preselected.isImm());
