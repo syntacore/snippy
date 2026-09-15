@@ -743,9 +743,10 @@ static MachineOperand pregenerateOneOperand(
   if (OpType == MCOI::OperandType::OPERAND_REGISTER) {
     assert(OperandRegClassID != -1);
     Register Reg;
-    if (Preselected.isTiedTo())
+    if (Preselected.isTiedTo()) {
+      assert(PregeneratedOperands[Preselected.getTiedTo()].isReg());
       Reg = PregeneratedOperands[Preselected.getTiedTo()].getReg();
-    else if (Preselected.isReg()) {
+    } else if (Preselected.isReg()) {
       Reg = Preselected.getReg();
       if (SnippyTgt.isPhysRegClass(OperandRegClassID, RegInfo))
         Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);

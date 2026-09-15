@@ -1538,13 +1538,6 @@ inline static bool isReservedValues(unsigned ELEN, unsigned SEW, VLMUL LMUL) {
 
 std::pair<unsigned, bool> computeDecodedEMUL(unsigned ELEN, unsigned SEW,
                                              unsigned EEW, VLMUL LMUL) {
-  if (isReservedValues(ELEN, SEW, LMUL) || !isLegalSEW(SEW) ||
-      !isLegalSEW(EEW)) {
-    // Calculating EMUL doesn't make sense for illegal values of SEW or LMUL, so
-    // just return {1, 0}
-    return {1, 0};
-  }
-
   auto [Multiplier, IsFractional] = RISCVVType::decodeVLMUL(LMUL);
   unsigned long long Dividend = EEW * (IsFractional ? 1u : Multiplier);
   unsigned long long Divisor = SEW * (IsFractional ? Multiplier : 1u);
