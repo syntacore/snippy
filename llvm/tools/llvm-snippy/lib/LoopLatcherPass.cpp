@@ -134,7 +134,7 @@ namespace llvm {
 namespace snippy {
 
 template <bool IsPostDom>
-void processDomTree(
+static void processDomTree(
     const MachineBasicBlock &MBBToProcess, const MachineBasicBlock &MBBToCheck,
     const DominatorTreeBase<MachineBasicBlock, IsPostDom> &MainDomTree,
     const DominatorTreeBase<MachineBasicBlock, !IsPostDom> &CheckDomTree,

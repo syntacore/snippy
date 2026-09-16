@@ -156,7 +156,8 @@ void SnippyDiagnosticInfo::print(llvm::DiagnosticPrinter &DP) const {
     ++WarningIt->second.EncounteredTotal;
 }
 
-void handleDiagnostic(LLVMContext &Ctx, const SnippyDiagnosticInfo &Diag) {
+static void handleDiagnostic(LLVMContext &Ctx,
+                             const SnippyDiagnosticInfo &Diag) {
   if (Diag.getSeverity() != DS_Error) {
     auto FoundIgnore = find(WDisable, getWarningNameStr(Diag.getName()));
     if (FoundIgnore != WDisable.end())
@@ -195,7 +196,7 @@ void handleDiagnostic(LLVMContext &Ctx, const SnippyDiagnosticInfo &Diag) {
   Ctx.setDiagnosticHandlerCallBack(OldHandlerCallback);
 }
 
-void handleDiagnostic(const SnippyDiagnosticInfo &Diag) {
+static void handleDiagnostic(const SnippyDiagnosticInfo &Diag) {
   LLVMContext Ctx;
   handleDiagnostic(Ctx, Diag);
 }

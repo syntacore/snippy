@@ -35,7 +35,7 @@ snippy::opt<bool> PermutationStatus("permutation-status",
                                     cl::cat(Options), cl::init(false),
                                     cl::Hidden);
 
-[[nodiscard, maybe_unused]] bool
+[[nodiscard, maybe_unused]] static bool
 checkBranchSettings(const Branchegram &Branches) {
   return !Branches.anyConsecutiveLoops() ||
          (Branches.LoopRatio == 1.0 && Branches.getMaxLoopDepth() == 1 &&
@@ -63,7 +63,7 @@ printRangesForAvailableSet(raw_ostream &OS, bool BackwardPossible,
   OS << '\n';
 }
 
-[[maybe_unused]] void
+[[maybe_unused]] static void
 printAvailableSet(raw_ostream &OS, unsigned BB,
                   const CFPermutationContext::BlockInfo::SetT &Available) {
   OS << "Initializing BlocksInfo for BB#" << BB << " with set: {";
@@ -188,10 +188,10 @@ llvm::snippy::CFPermutationContext::getBlockNumbered(unsigned N) const {
   return CurrMF.get().getBlockNumbered(N);
 }
 
-unsigned calcMaxBBDst(unsigned BB, unsigned NBlocks,
-                      unsigned RequestedInstrsNum, unsigned Opcode,
-                      bool DoAutoMaxBBDistance, const Branchegram &BS,
-                      GeneratorContext &GC) {
+static unsigned calcMaxBBDst(unsigned BB, unsigned NBlocks,
+                             unsigned RequestedInstrsNum, unsigned Opcode,
+                             bool DoAutoMaxBBDistance, const Branchegram &BS,
+                             GeneratorContext &GC) {
   LLVM_DEBUG(dbgs() << "Initializing BlocksInfo for " << NBlocks
                     << " blocks\n");
   LLVM_DEBUG(dbgs() << (DoAutoMaxBBDistance ? "" : "don't ")
