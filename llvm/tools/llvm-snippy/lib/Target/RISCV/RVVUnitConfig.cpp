@@ -633,14 +633,6 @@ static void printCombinedSewLmulProbs(raw_ostream &OS,
   OS << "\n";
 }
 
-[[maybe_unused]] static void printVLProbs(raw_ostream &OS,
-                                          const VLDistributionType &Dist) {
-  ProbableItems<size_t> VLProbs;
-  for (const auto &[VL, P] : enumerate(Dist))
-    VLProbs.push_back({VL, P});
-  VLProbs.print(OS);
-}
-
 // This doesn't account for VL. There might be a {SEW, LMUL} pair with
 // no legal VLs from config for it.
 static SewLmulDistribution

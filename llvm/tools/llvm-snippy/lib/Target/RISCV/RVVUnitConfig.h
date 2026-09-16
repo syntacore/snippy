@@ -106,12 +106,6 @@ std::pair<unsigned, bool> computeDecodedEMUL(unsigned ELEN, unsigned SEW,
                                              unsigned EEW, VLMUL LMUL);
 bool isValidEMUL(unsigned ELEN, unsigned SEW, unsigned EEW, VLMUL LMUL);
 
-inline static bool canBeEncoded(unsigned SEW) {
-  // This wrapper clarify the meaning of the function RISCVVType::isValidSEW.
-  // It returns true when we can encoded the SEW (reserved and not)
-  return RISCVVType::isValidSEW(SEW);
-}
-
 inline bool isLegalSEW(VSEW SEW) {
   switch (SEW) {
   default:
@@ -198,17 +192,6 @@ struct RVVConfiguration final {
     unsigned VType = ((Log2_32(SEW) - 3) << 3) |
                      (static_cast<unsigned>(PrimaryCfg.LMUL) & 0x7);
     return VType | (IsTA ? 0x40 : 0) | (IsMA ? 0x80 : 0);
-  }
-
-  static RVVConfiguration fromVTYPE(unsigned VL, unsigned VTYPE, VXRMMode XRM) {
-    VLMUL LMUL = RISCVVType::getVLMUL(VTYPE);
-    VSEW SEW = static_cast<VSEW>(RISCVVType::getSEW(VTYPE));
-    bool IsMA = RISCVVType::isMaskAgnostic(VTYPE);
-    bool IsTA = RISCVVType::isTailAgnostic(VTYPE);
-
-    return RVVConfiguration{RVVPrimaryConfig{SEW, LMUL, VL},
-                            IsMA ? VMAMode::MA : VMAMode::MU,
-                            IsTA ? VTAMode::TA : VTAMode::TU, XRM};
   }
 };
 
