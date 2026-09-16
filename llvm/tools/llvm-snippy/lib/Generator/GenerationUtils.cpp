@@ -186,8 +186,8 @@ std::map<unsigned, APInt> selectOperandsForConsecutiveInstrs(
 
 // NumDefs + NumAddrs might be more than a number of available regs. This
 // normalizes the number of regs to reserve for addrs.
-unsigned normalizeNumRegs(unsigned NumDefs, unsigned NumAddrs,
-                          unsigned NumRegs) {
+static unsigned normalizeNumRegs(unsigned NumDefs, unsigned NumAddrs,
+                                 unsigned NumRegs) {
   if (NumRegs == 0)
     snippy::fatal("No registers left to reserve for burst mode");
   auto Ratio = 1.0 * NumRegs / (NumAddrs + NumDefs);
@@ -200,10 +200,10 @@ unsigned normalizeNumRegs(unsigned NumDefs, unsigned NumAddrs,
 }
 
 // Count how many def regs of a register class RC the instruction has.
-unsigned countDefsHavingRC(ArrayRef<unsigned> Opcodes,
-                           const TargetRegisterInfo &RegInfo,
-                           const TargetRegisterClass &RC,
-                           const MCInstrInfo &InstrInfo) {
+static unsigned countDefsHavingRC(ArrayRef<unsigned> Opcodes,
+                                  const TargetRegisterInfo &RegInfo,
+                                  const TargetRegisterClass &RC,
+                                  const MCInstrInfo &InstrInfo) {
   auto CountDefsForOpcode = [&](unsigned Init, unsigned Opcode) {
     const auto &InstrDesc = InstrInfo.get(Opcode);
     auto NumDefs = InstrDesc.getNumDefs();

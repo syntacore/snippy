@@ -711,46 +711,49 @@ getSimulatorEntryPoint(llvm::snippy::DynamicLibrary &ModelLib) {
   return *VTable;
 }
 
-void MemUpdateCallback(RVMCallbackHandler *H, uint64_t Addr, const char *Data,
-                       size_t Size) {
+static void MemUpdateCallback(RVMCallbackHandler *H, uint64_t Addr,
+                              const char *Data, size_t Size) {
   assert(H);
   for (auto &&Observer : H->getObservers())
     Observer->memUpdateNotification(Addr, Data, Size);
 }
 
-void MemReadCallback(RVMCallbackHandler *H, uint64_t Addr, const char *Data,
-                     size_t Size) {
+static void MemReadCallback(RVMCallbackHandler *H, uint64_t Addr,
+                            const char *Data, size_t Size) {
   assert(H);
   for (auto &&Observer : H->getObservers())
     Observer->memReadNotification(Addr, Data, Size);
 }
 
-void XRegUpdateCallback(RVMCallbackHandler *H, RVMXReg Reg, RVMRegT Value) {
+static void XRegUpdateCallback(RVMCallbackHandler *H, RVMXReg Reg,
+                               RVMRegT Value) {
   assert(H);
   for (auto &&Observer : H->getObservers())
     Observer->xregUpdateNotification(Reg, Value);
 }
 
-void CSRUpdateCallback(RVMCallbackHandler *H, RVMCSR Reg, RVMRegT Value) {
+static void CSRUpdateCallback(RVMCallbackHandler *H, RVMCSR Reg,
+                              RVMRegT Value) {
   assert(H);
   for (auto &&Observer : H->getObservers())
     Observer->csrUpdateNotification(Reg, Value);
 }
 
-void FRegUpdateCallback(RVMCallbackHandler *H, RVMFReg Reg, RVMRegT Value) {
+static void FRegUpdateCallback(RVMCallbackHandler *H, RVMFReg Reg,
+                               RVMRegT Value) {
   assert(H);
   for (auto &&Observer : H->getObservers())
     Observer->fregUpdateNotification(Reg, Value);
 }
 
-void VRegUpdateCallback(RVMCallbackHandler *H, RVMVReg Reg, const char *Data,
-                        size_t Size) {
+static void VRegUpdateCallback(RVMCallbackHandler *H, RVMVReg Reg,
+                               const char *Data, size_t Size) {
   assert(H);
   for (auto &&Observer : H->getObservers())
     Observer->vregUpdateNotification(Reg, {Data, Size});
 }
 
-void PCUpdateCallback(RVMCallbackHandler *H, uint64_t PC) {
+static void PCUpdateCallback(RVMCallbackHandler *H, uint64_t PC) {
   assert(H);
   for (auto &&Observer : H->getObservers())
     Observer->PCUpdateNotification(PC);
