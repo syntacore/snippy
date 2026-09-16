@@ -2179,12 +2179,12 @@ static std::vector<std::string> getConfigIncludeFiles(StringRef Filename) {
   return IPW.Includes;
 }
 
-bool lineIsEmpty(StringRef Line) {
+static bool lineIsEmpty(StringRef Line) {
   auto Pos = Line.find_first_not_of(" \t\n");
   return Pos == StringRef::npos;
 }
 
-std::string commentIncludes(StringRef Text, unsigned IncludesN) {
+static std::string commentIncludes(StringRef Text, unsigned IncludesN) {
   if (IncludesN == 0)
     return Text.str();
   std::string Res;
@@ -2206,7 +2206,7 @@ std::string commentIncludes(StringRef Text, unsigned IncludesN) {
   return Res.substr(0, Res.size() - 1);
 }
 
-std::string endLineIfNeeded(StringRef Str) {
+static std::string endLineIfNeeded(StringRef Str) {
   if (Str.empty())
     return "";
   if (Str.back() == '\n')
