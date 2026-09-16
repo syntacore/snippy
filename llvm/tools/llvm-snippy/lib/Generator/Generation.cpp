@@ -107,8 +107,8 @@ enum class GenerationStatus {
   SizeFailed,
 };
 
-bool preInterpretBacktracking(const MachineInstr &MI, LLVMState &State,
-                              Backtrack &BT) {
+static bool preInterpretBacktracking(const MachineInstr &MI, LLVMState &State,
+                                     Backtrack &BT) {
   if (!BT.isInstrValid(MI, State.getSnippyTarget()))
     return false;
   // TODO: maybe there will be another one way for back-tracking?
@@ -157,7 +157,7 @@ std::vector<InstrIt> collectSelfcheckCandidates(
 }
 
 template <typename InstrIt>
-void reportGeneratorRollback(InstrIt ItBegin, InstrIt ItEnd) {
+static void reportGeneratorRollback(InstrIt ItBegin, InstrIt ItEnd) {
   LLVM_DEBUG(
       dbgs() << "Generated instructions: \n"; for (auto CurInstr = ItBegin;
                                                    CurInstr != ItEnd;
@@ -167,8 +167,8 @@ void reportGeneratorRollback(InstrIt ItBegin, InstrIt ItEnd) {
       } dbgs() << "are not valid. Regeneration...\n";);
 }
 
-void storeRefValue(InstructionGenerationContext &InstrGenCtx, MemAddr Addr,
-                   APInt Val) {
+static void storeRefValue(InstructionGenerationContext &InstrGenCtx,
+                          MemAddr Addr, APInt Val) {
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   // TODO: this should not be here
   if (InstrGenCtx.getCommonCfg().TrackCfg.Selfcheck->Mode ==
@@ -180,8 +180,8 @@ void storeRefValue(InstructionGenerationContext &InstrGenCtx, MemAddr Addr,
                                                             Val);
 }
 
-void selfcheckOverflowGuard(const SectionDesc &SelfcheckSection,
-                            unsigned long long SCAddress) {
+static void selfcheckOverflowGuard(const SectionDesc &SelfcheckSection,
+                                   unsigned long long SCAddress) {
   if (SCAddress >= SelfcheckSection.VMA + SelfcheckSection.Size)
     snippy::fatal("Selfcheck section overflow. Try to provide "
                   "\"selfcheck\" section description in layout file");
@@ -224,9 +224,10 @@ storeRefAndActualValueForSelfcheck(
   return {std::next(FirstInserted), FirstStoreInfo};
 }
 
-void generateCheckSumForDefReg(
-    Register SelfcheckReg, planning::InstructionGenerationContext &InstrGenCtx,
-    MCRegister AccReg, std::optional<MCRegister> TmpReg) {
+static void
+generateCheckSumForDefReg(Register SelfcheckReg,
+                          planning::InstructionGenerationContext &InstrGenCtx,
+                          MCRegister AccReg, std::optional<MCRegister> TmpReg) {
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   const auto &ST = ProgCtx.getLLVMState().getSnippyTarget();
 
@@ -234,7 +235,7 @@ void generateCheckSumForDefReg(
 }
 
 template <typename CheckRegsRangeT>
-void generateRegisterBasedSelfcheckRoutine(
+static void generateRegisterBasedSelfcheckRoutine(
     CheckRegsRangeT SelfcheckRegsRange,
     planning::InstructionGenerationContext &InstrGenCtx) {
   if (!range_size(SelfcheckRegsRange))
@@ -303,7 +304,7 @@ void generateRegisterBasedSelfcheckRoutine(
 }
 
 template <typename CheckRegsRangeT>
-void generateMemoryBasedSelfcheckRoutine(
+static void generateMemoryBasedSelfcheckRoutine(
     CheckRegsRangeT SelfcheckRegsRange,
     planning::InstructionGenerationContext &InstrGenCtx) {
   if (!range_size(SelfcheckRegsRange))
@@ -548,9 +549,9 @@ static bool shouldRewriteRegValue(
 }
 
 template <typename InstrIt>
-void controlNaNPropagation(
-    InstrIt Begin, InstrIt End,
-    planning::InstructionGenerationContext &InstrGenCtx) {
+static void
+controlNaNPropagation(InstrIt Begin, InstrIt End,
+                      planning::InstructionGenerationContext &InstrGenCtx) {
   if (Begin == End)
     return;
 
@@ -960,9 +961,9 @@ generateNopsToSizeLimit(const planning::RequestLimit &Limit,
   return handleGeneratedInstructions(ItBegin, InstrGenCtx, Limit);
 }
 
-bool sizeLimitIsExceeded(const planning::RequestLimit &Lim,
-                         const GenerationStatistics &CommitedStats,
-                         size_t NewGeneratedCodeSize) {
+static bool sizeLimitIsExceeded(const planning::RequestLimit &Lim,
+                                const GenerationStatistics &CommitedStats,
+                                size_t NewGeneratedCodeSize) {
   if (!Lim.isSizeLimit())
     return false;
   return NewGeneratedCodeSize > Lim.getSizeLeft(CommitedStats);
@@ -1023,8 +1024,8 @@ SmallVector<unsigned, 4> pickRecentDefs(MachineInstr &MI,
   return Picked;
 }
 
-unsigned chooseAddressRegister(InstructionGenerationContext &IGC,
-                               MachineInstr &MI, const AddressPart &AP) {
+static unsigned chooseAddressRegister(InstructionGenerationContext &IGC,
+                                      MachineInstr &MI, const AddressPart &AP) {
   auto &RP = IGC.getRegPool();
   auto &SimCtx = IGC.SimCtx;
   auto &ProgCtx = IGC.ProgCtx;
@@ -1281,8 +1282,8 @@ randomInstruction(const MCInstrDesc &InstrDesc,
   return MIB;
 }
 
-void spillPseudoInstImplicitReg(MachineInstr &MI, Register Reg,
-                                InstructionGenerationContext &IGC) {
+static void spillPseudoInstImplicitReg(MachineInstr &MI, Register Reg,
+                                       InstructionGenerationContext &IGC) {
   auto &ProgCtx = IGC.ProgCtx;
   auto &SnpTgt = ProgCtx.getLLVMState().getSnippyTarget();
   [[maybe_unused]] auto *MBBPtr = MI.getParent();
@@ -1302,7 +1303,7 @@ void spillPseudoInstImplicitReg(MachineInstr &MI, Register Reg,
   IGC.Ins = OldIns;
 }
 
-void spillPseudoInstImplicitRegs(
+static void spillPseudoInstImplicitRegs(
     MachineInstr &MI, planning::InstructionGenerationContext &InstrGenCtx) {
   auto &&ImplicitRegsOps = make_filter_range(
       MI.operands(), [](auto &&Op) { return Op.isReg() && Op.isImplicit(); });
@@ -1314,11 +1315,11 @@ void spillPseudoInstImplicitRegs(
   }
 }
 
-void generateRealInstruction(
-    const MCInstrDesc &InstrDesc,
-    planning::InstructionGenerationContext &InstrGenCtx,
-    SmallVector<planning::PreselectedOpInfo> Preselected,
-    MDNode *MetadataMark = nullptr) {
+static void
+generateRealInstruction(const MCInstrDesc &InstrDesc,
+                        planning::InstructionGenerationContext &InstrGenCtx,
+                        SmallVector<planning::PreselectedOpInfo> Preselected,
+                        MDNode *MetadataMark = nullptr) {
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
   auto Opc = InstrDesc.getOpcode();
@@ -1344,10 +1345,11 @@ void generateRealInstruction(
   spillPseudoInstImplicitRegs(*MI, InstrGenCtx);
 }
 
-void generateInstruction(const MCInstrDesc &InstrDesc,
-                         planning::InstructionGenerationContext &InstrGenCtx,
-                         SmallVector<planning::PreselectedOpInfo> Preselected,
-                         MDNode *MetadataMark) {
+static void
+generateInstruction(const MCInstrDesc &InstrDesc,
+                    planning::InstructionGenerationContext &InstrGenCtx,
+                    SmallVector<planning::PreselectedOpInfo> Preselected,
+                    MDNode *MetadataMark) {
 
   generateRealInstruction(InstrDesc, InstrGenCtx, std::move(Preselected),
                           MetadataMark);
@@ -1406,8 +1408,9 @@ findNextBlock(MachineBasicBlock *MBB,
 }
 
 template <typename RegsSnapshotTy>
-void writeRegsSnapshot(RegsSnapshotTy RegsSnapshot, MachineBasicBlock &MBB,
-                       RegStorageType Storage, GeneratorContext &GC) {
+static void writeRegsSnapshot(RegsSnapshotTy RegsSnapshot,
+                              MachineBasicBlock &MBB, RegStorageType Storage,
+                              GeneratorContext &GC) {
   auto &ProgCtx = GC.getProgramContext();
   const auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
   InstructionGenerationContext IGC(MBB, MBB.getFirstTerminator(), GC);
@@ -1422,8 +1425,9 @@ void writeRegsSnapshot(RegsSnapshotTy RegsSnapshot, MachineBasicBlock &MBB,
   }
 }
 
-void writeCSRsSnapshot(const TransactionStack::RegIdToValueType &RegsSnapshot,
-                       MachineBasicBlock &MBB, GeneratorContext &GC) {
+static void
+writeCSRsSnapshot(const TransactionStack::RegIdToValueType &RegsSnapshot,
+                  MachineBasicBlock &MBB, GeneratorContext &GC) {
   auto &ProgCtx = GC.getProgramContext();
   const auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
   InstructionGenerationContext IGC(MBB, MBB.getFirstTerminator(), GC);
@@ -1586,10 +1590,12 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
       0, State.getCodeBlockSize(MBB.begin(), MBB.getFirstTerminator()));
 }
 
-void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
-                      const GenerationStatistics &MFStats, GeneratorContext &GC,
-                      const SimulatorContext &SimCtx, const CallGraphState *CGS,
-                      MemAccessInfo *MAI) {
+static void finalizeFunction(MachineFunction &MF,
+                             planning::FunctionRequest &Request,
+                             const GenerationStatistics &MFStats,
+                             GeneratorContext &GC,
+                             const SimulatorContext &SimCtx,
+                             const CallGraphState *CGS, MemAccessInfo *MAI) {
   auto &ProgCtx = GC.getProgramContext();
   auto &State = ProgCtx.getLLVMState();
   auto &MBB = MF.back();
@@ -1643,10 +1649,10 @@ void finalizeFunction(MachineFunction &MF, planning::FunctionRequest &Request,
   MBB.back().setPreInstrSymbol(MF, ExitSym);
 }
 
-void processGenerationResult(
-    const planning::RequestLimit &Limit,
-    planning::InstructionGenerationContext &InstrGenCtx,
-    const GenerationResult &IntRes) {
+static void
+processGenerationResult(const planning::RequestLimit &Limit,
+                        planning::InstructionGenerationContext &InstrGenCtx,
+                        const GenerationResult &IntRes) {
   LLVM_DEBUG(printInterpretResult(dbgs(), "", IntRes); dbgs() << "\n\n");
   auto &SimCtx = InstrGenCtx.SimCtx;
   auto &BacktrackCount = InstrGenCtx.BacktrackCount;

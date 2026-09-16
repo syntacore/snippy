@@ -99,10 +99,6 @@ private:
   }
 
 public:
-  static bool isPattern(IValuegramEntry::EntryKind EntryKind) {
-    return getPatternKindOrNone(EntryKind).has_value();
-  }
-
   static Expected<ValuegramPattern>
   create(IValuegramEntry::EntryKind EntryKind) {
     if (auto Pattern = getPatternKindOrNone(EntryKind))
