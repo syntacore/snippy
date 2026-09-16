@@ -624,6 +624,10 @@ static void addZextBits(RVMExtDescriptor &Ext,
     ZextBits[RVM_ZEXT_VKB] = true;
   if (Subtarget.hasStdExtZvfbfmin())
     ZextBits[RVM_ZEXT_VFBFMIN] = true;
+  // Zvfbfa implies Zvfbfmin, and the model currently has no dedicated
+  // RVM_ZEXT_VFBFA bit, so signal Zvfbfa through RVM_ZEXT_VFBFMIN.
+  if (Subtarget.hasStdExtZvfbfa())
+    ZextBits[RVM_ZEXT_VFBFMIN] = true;
   if (Subtarget.hasStdExtZvfbfwma())
     ZextBits[RVM_ZEXT_VFBFWMA] = true;
   if (Subtarget.hasStdExtZvfh())

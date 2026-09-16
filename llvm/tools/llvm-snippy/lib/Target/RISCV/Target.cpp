@@ -419,8 +419,10 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVPrimaryConfig &Cfg,
     if (SEW < 16u &&
         !(mayBeZvfh8BitIntConversion(Opcode) && ST->hasStdExtZvfh()))
       return false;
-    if (SEW < 32u && !((isZvfh(Opcode) && ST->hasStdExtZvfh()) ||
-                       (isZvfhmin(Opcode) && ST->hasStdExtZvfhmin()))) {
+    if (SEW < 32u &&
+        !((isZvfh(Opcode) && ST->hasStdExtZvfh()) ||
+          (isZvfhmin(Opcode) && ST->hasStdExtZvfhmin()) ||
+          (isZvfbfa(Opcode) && ST->hasStdExtZvfbfa()))) {
       // If the EEW of a vector floating-point operand does not correspond to a
       // supported IEEE floating-point type, the instruction encoding is
       // reserved.
