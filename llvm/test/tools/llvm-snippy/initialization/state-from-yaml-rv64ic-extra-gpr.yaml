@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # COM: test checks that if extra GPR is specified we report an error
 
 # RUN: not llvm-snippy %s \

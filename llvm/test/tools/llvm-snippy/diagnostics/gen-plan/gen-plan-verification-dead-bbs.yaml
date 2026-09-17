@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: llvm-snippy %s -verify-gen-plan \
 # RUN:    -mtriple=riscv64 -mattr=+m \
 # RUN:    -num-instrs=600 -selfcheck |& FileCheck %s

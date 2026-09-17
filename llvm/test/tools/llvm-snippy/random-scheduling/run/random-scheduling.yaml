@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: llvm-snippy %s \
 # RUN:    -o %t_1 \
 # RUN:    -dump-registers-yaml=%t_regs_1 \ 

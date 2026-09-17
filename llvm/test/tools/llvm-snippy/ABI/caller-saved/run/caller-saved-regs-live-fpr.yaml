@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 
 # RUN: llvm-snippy %s -dump-mir=- --mattr=+zfh |& FileCheck %s
 # RUN: llvm-snippy %s -dump-mir=- --mattr=+f,+zfh |& FileCheck %s

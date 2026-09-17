@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: sed -e s/BURST_MODE/mixed/ %s >%t.mixed.yaml 
 # RUN: llvm-snippy %S/../Inputs/loadstore-layout.yaml %t.mixed.yaml -mtriple=riscv64 \
 # RUN:  -num-instrs=1000 \

@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: not llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
 # RUN: --enable-address-value-hazards |& FileCheck %s --check-prefix=TRACK-ENABLE
 # RUN: not llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \

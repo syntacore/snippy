@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # REQUIRES: riscv-rvv
 
 # COM: this is the test for checking possibility to put rvv-config in the body of main config
