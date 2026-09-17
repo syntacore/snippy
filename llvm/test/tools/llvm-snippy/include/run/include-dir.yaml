@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: llvm-snippy %s -mtriple=riscv64 \
 # RUN:   --layout-include-dir=%S/../Inputs \
 # RUN:   --num-instrs=150 |& FileCheck %s

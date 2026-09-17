@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
 # RUN:   -num-instrs=10 -seed=2 \
 # RUN:   -riscv-disable-misaligned-access \

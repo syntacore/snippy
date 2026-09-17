@@ -1,2 +1,2 @@
-# RUN: llvm-snippy -randomize-ra=false %S/../calls-randomize-ra.yaml
-# RUN: llvm-snippy -randomize-ra=true %S/../calls-randomize-ra.yaml
+# RUN: llvm-snippy -randomize-ra=false %S/../calls-randomize-ra.yaml --trace-log=/dev/null
+# RUN: llvm-snippy -randomize-ra=true %S/../calls-randomize-ra.yaml --trace-log=/dev/null

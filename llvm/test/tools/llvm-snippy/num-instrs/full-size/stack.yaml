@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: llvm-snippy %s -mtriple=riscv64  \
 # RUN: --init-regs-in-elf \
 # RUN: -spilled-regs-list=X1,X10 \

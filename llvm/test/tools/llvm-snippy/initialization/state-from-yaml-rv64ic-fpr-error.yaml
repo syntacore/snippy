@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # COM: test checks that we report an error if FPR registers specified when
 # no F or D extension enabled
 

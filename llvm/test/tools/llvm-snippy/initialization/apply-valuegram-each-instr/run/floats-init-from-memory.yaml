@@ -1,4 +1,4 @@
-# REQUIRES: riscv-snippy-model-spikei
+# REQUIRES: riscv-snippy-model-spike
 
 # COM: This test checks that before each instruction, the registers it uses
 # COM: are initialized from memory and according to the histograms. 

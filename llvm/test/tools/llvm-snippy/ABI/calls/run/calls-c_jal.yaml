@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: llvm-snippy %s |& FileCheck %s
 
 # CHECK:  C_JAL @fun{{[0-9]+}}, implicit-def $x1

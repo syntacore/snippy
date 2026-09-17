@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: llvm-snippy %s \
 # RUN:   --init-memory=ascii-file --init-memory-file=%S/Inputs/memory-map.yaml \
 # RUN:   --dump-memory-section=2,3,4  --memory-section-file=%t11 --dump-memory-as-ascii

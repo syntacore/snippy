@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # REQUIRES: asserts
 # RUN: sed -e s/MODE/code/ %s >%t.code.yaml
 # RUN: sed -e s/MODE/memory/ %s >%t.memory.yaml

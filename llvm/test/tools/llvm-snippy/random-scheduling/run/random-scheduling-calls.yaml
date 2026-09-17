@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # REQUIRES: asserts 
 # RUN: llvm-snippy %S/../../Inputs/jal-layout.yaml %s \
 # RUN:    -mtriple=riscv64 -enable-static-stack=false \
