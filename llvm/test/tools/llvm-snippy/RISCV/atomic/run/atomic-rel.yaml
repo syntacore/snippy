@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=500 -mattr=+a |& FileCheck %s --dump-input always
 
 # CHECK: #===Simulation Start===

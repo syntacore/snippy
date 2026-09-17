@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=100 \
 # RUN:     -verify-mi -mattr=+c |& FileCheck %s
 # RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=100 \

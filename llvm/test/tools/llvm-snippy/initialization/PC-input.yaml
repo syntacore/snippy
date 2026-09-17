@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a \
 # RUN:    -num-instrs=10 \
 # RUN:    --initial-regs-yaml=%S/Inputs/initial_state_PC.yaml  \

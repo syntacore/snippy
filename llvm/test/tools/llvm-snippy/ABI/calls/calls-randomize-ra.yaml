@@ -57,7 +57,7 @@ histogram:
     - [ADD, 1.0]
     - [ADDI, 1.0]
     - [SUB, 1.0]
-    - [JAL, 1.0]
+    - [JAL, 0.1]
 
 # CHECK: {{.*}} = PseudoJALCall
 # CHECK: {{.*}} = PseudoJALCall

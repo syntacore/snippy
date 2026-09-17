@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: sed -e s/PERIOD/1/ %s >%t.1.period.yaml
 # RUN: llvm-snippy %t.1.period.yaml \
 # RUN:    -mtriple=riscv64 \

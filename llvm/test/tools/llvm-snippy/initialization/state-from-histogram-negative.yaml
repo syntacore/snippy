@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # COM: Check that registers can contain also negative values that were specified in the histogram
 
 # REQUIRES: riscv-rvv

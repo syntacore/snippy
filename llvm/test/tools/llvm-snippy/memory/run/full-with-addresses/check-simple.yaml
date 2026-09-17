@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: llvm-snippy %s -o %t
 
 # RUN: llvm-readelf --hex-dump=.snippy.2.rw %t.elf \

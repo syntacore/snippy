@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: llvm-snippy %s \
 # RUN:    -mtriple=riscv32 -mattr=-c \
 # RUN:    -num-instrs=10000 -init-regs-in-elf -dump-registers-yaml=%t_regs
