@@ -101,10 +101,8 @@ stdenv.mkDerivation (finalAttrs: {
   '';
   checkPhase = ''
     runHook preCheck
-    for model in "None" "spike" "whisper"; do
-      export LIT_OPTS="-v --no-progress-bar -Dsnippy-test-model=$model"
-      cmake --build . --target check-llvm-tools-llvm-snippy
-    done
+    export LIT_OPTS="-v --no-progress-bar -Dsnippy-seeds-num-{None,spike,whisper}=1"
+    cmake --build . --target check-llvm-tools-llvm-snippy
     runHook postCheck
   '';
 

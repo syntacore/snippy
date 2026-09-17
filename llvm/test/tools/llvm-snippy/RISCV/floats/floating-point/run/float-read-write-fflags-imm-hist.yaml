@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: llvm-snippy %s -mattr +f,-d -trace-log %t.f
 # RUN: FileCheck %s -input-file %t.f -dump-input fail
 # RUN: llvm-snippy %s -mattr +d -trace-log %t.fd

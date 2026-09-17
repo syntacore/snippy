@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # UNSUPPORTED: riscv-snippy-model-whisper
 # RUN: llvm-snippy %s \
 # RUN:    -mtriple=riscv64 -mattr=+m \

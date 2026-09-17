@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: llvm-snippy %S/../custom-groups-integers-with-ld-st.yaml \
 # RUN: |& FileCheck %s
 

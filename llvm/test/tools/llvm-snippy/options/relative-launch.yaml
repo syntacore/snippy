@@ -1,4 +1,4 @@
-# REQUIRES: riscv-snippy-model-None
+# REQUIRES: skip-snippy-model-mixin
 # RUN: cd %llvm_tools
 # RUN: ./llvm-snippy %s %S/../Inputs/sections.yaml -o %t.elf
 

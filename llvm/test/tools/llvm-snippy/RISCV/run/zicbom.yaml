@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: timeout 10 llvm-snippy %s | FileCheck %s
 
 options:

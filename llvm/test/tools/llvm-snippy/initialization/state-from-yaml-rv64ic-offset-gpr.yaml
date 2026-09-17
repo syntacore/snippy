@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # COM: test checks that if we have 32 GPR, but they somehow use incorrect
 # COM: names (like [X2 - X33]) we still detect an error
 

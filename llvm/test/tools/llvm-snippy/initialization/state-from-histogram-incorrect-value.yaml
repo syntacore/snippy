@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # COM: Check that if there is a minus before the number in valuegram and radix is not equal to 10 - this is an error
 
 # RUN: not llvm-snippy %s \

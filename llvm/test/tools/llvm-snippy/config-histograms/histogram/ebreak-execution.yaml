@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: not llvm-snippy %s \
 # RUN:    -mtriple=riscv64 -num-instrs=10 \
 # RUN:    -init-regs-in-elf -mattr=+a \

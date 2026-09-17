@@ -1,4 +1,4 @@
-# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-snippy-model-any
 # RUN: llvm-snippy %S/../implicit-empty-group.yaml |& FileCheck %s
 
 # CHECK: ===Simulation Start===
