@@ -154,9 +154,6 @@ void RISCVConverterSNTF::printRegLog(raw_ostream &LogsBuff,
     break;
   }
   case RegType::CSR: {
-    [[maybe_unused]] auto *SysReg =
-        lookupSysReg(RISCVSimulatorSysReg(RegLog.RegID));
-    assert(SysReg && "couldn't deduce csr register");
     LogsBuff << llvm::formatv("csr{}", RegLog.RegID) << "="
              << toHexStringTruncate(std::get<RegisterType>(RegLog.NewValue),
                                     XLen);
