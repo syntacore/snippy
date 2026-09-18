@@ -18,6 +18,7 @@ in
 scope.llvm-snippy.overrideAttrs (
   finalAttrs: prevAttrs: {
     src = null; # So that we don't copy sources to store.
+    preCheck = ""; # Not needed for local development
     nativeBuildInputs =
       prevAttrs.nativeBuildInputs
       ++ (with pkgs; [
