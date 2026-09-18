@@ -35,48 +35,41 @@ nix-build llvm/tools/llvm-snippy -A llvm-snippy
 
 This command builds LLVM‑snippy together with all required dependencies (RVMI, riscv‑isa‑sim, etc.) and places the result in the Nix store. A symlink `result` will be created in the current directory pointing to the build output.
 
-### Build with CMake (manual)
+### Developer build with CMake (manual)
 
 If you need to develop LLVM‑snippy or build it outside of Nix, follow these steps.
 You will need to obtain RVMI and riscv‑isa‑sim. The easiest way is to build them using the Nix expressions included in this repository (see below).
 Alternatively, you can build them manually by cloning the repositories and following their own build instructions. In that case, you need to provide the correct paths to CMake:
 - For RVMI, set `PKG_CONFIG_LIBDIR` (or `PKG_CONFIG_PATH`) to the directory containing `rvmi.pc` (typically `<rvmi-install>/lib/pkgconfig`).
 - For riscv‑isa‑sim (Spike), pass `-DRISCVModelSpike_DIR=<path-to-spike-install>/lib` to CMake.
+- For whisper, pass `-DRISCVModelWhisper_DIR=<path-to-whisper-install>/lib` to CMake.
 
 #### 1. Prepare dependencies with Nix
 
-**Build RVMI**
-
+Enter nix shell with rvmi, riscv-isa-sim and whisper dependencies built:
 ```bash
-nix-build llvm/tools/llvm-snippy -A rvmi.dev
+nix-shell llvm/tools/llvm-snippy
 ```
-
-The command will print a path like `/nix/store/…-rvmi-…-dev` at the end.
-Append `lib/pkgconfig` to that path and export it as `PKG_CONFIG_LIBDIR` so CMake can locate RVMI via pkg‑config:
-
-```bash
-export PKG_CONFIG_LIBDIR=/nix/store/…-rvmi-…-dev/lib/pkgconfig
-```
-
-**Build riscv‑isa‑sim (Spike)**
-
-```bash
-nix-build llvm/tools/llvm-snippy -A riscv-isa-sim
-```
-
-The command will print a path like `/nix/store/…-riscv-isa-sim-…-dev` at the end.
-You will need this path (with `/lib` appended) for the CMake variable `RISCVModelSpike_DIR`.
 
 #### 2. Run CMake
 
-From the `${SNIPPY_PATH}` directory (the root of the LLVM‑snippy checkout) run:
+Enter `llvm/` directory and run cmake configure phase via nix to avoid passing dependencies by-hand:
+
+```
+cd llvm/
+runPhase configurePhase
+```
+
+**Or (if you really want to run cmake configure manually) use:**
 
 ```bash
+export PKG_CONFIG_LIBDIR=<rvmi install path>/lib/pkgconfig
 cmake -S llvm -B build --preset=snippy_basic \
       -DCMAKE_BUILD_TYPE=Release \
       -DLLVM_ENABLE_SPHINX=OFF \
       -DLLVM_CCACHE_BUILD=ON \
-      -DRISCVModelSpike_DIR=/nix/store/…-riscv-isa-sim-…-dev/lib
+      -DRISCVModelSpike_DIR=<spike install path>/lib
+      -DRISCVModelWhisper_DIR=<whisper install path>/lib
 ```
 
 Adjust the value of `RISCVModelSpike_DIR` to the actual path printed by the `nix-build` command for riscv‑isa‑sim (or to the location where you installed it manually).
@@ -84,8 +77,18 @@ Optionally, you can also pass `-DLLVM_ENABLE_SPHINX=ON` if you want to build doc
 
 #### 3. Build LLVM‑snippy
 
+Now you can actually build llvm-snippy
+
+Use either nix build (preferred):
+
 ```bash
-cmake --build build --target llvm-snippy llvm-ie
+runPhase buildPhase
+```
+
+Or simply cmake from now on:
+
+```bash
+cmake --build <build> --target llvm-snippy llvm-ie
 ```
 
 The generated binaries will be placed under `build/bin/`.
@@ -108,20 +111,23 @@ The test suite should be run twice: once without a model (default) and once with
 First, run the tests without a model:
 
 ```bash
-cmake --build build/ -t check-llvm-tools-llvm-snippy
+cmake --build <build> -t check-llvm-tools-llvm-snippy
 ```
 
 Then, run the tests with the Spike model enabled:
 
 ```bash
-LIT_OPTS=-Dsnippy-test-model=spike cmake --build build/ -t check-llvm-tools-llvm-snippy
+LIT_OPTS="-Dsnippy-seeds-num-None=2 -Dsnippy-seeds-num-spike=2 -Dsnippy-seeds-num-whisper=2" cmake --build <build> -t check-llvm-tools-llvm-snippy
 ```
 
 Alternatively, you can run `llvm-lit` directly (adjust the options similarly if you need to test with Spike):
 
 ```bash
-python3 build/bin/llvm-lit llvm/test/tools/llvm-snippy/
+python3 build/bin/llvm-lit -v llvm/test/tools/llvm-snippy/ -Dsnippy-seeds-num-None=2 -Dsnippy-seeds-num-spike=2 -Dsnippy-seeds-num-whisper=2
 ```
+
+> [!NOTE]
+> Snippy is a random generator so we prefer running tests for several different seeds. Number of seeds to run test on each model is specified via `-Dsnippy-seeds-num-<model>=N` lit option
 
 We expect that all tests pass with the `passed`, `unsupported`, or `xfail` statuses. If some tests fail for you, let us know by [creating an issue](#contributing-to-llvm-snippy).
 
