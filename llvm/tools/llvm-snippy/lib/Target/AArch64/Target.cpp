@@ -115,15 +115,15 @@ static bool expandMOVImm(APInt Value, MCRegister DstReg,
 
     case AArch64::ORRWri:
     case AArch64::ORRXri:
-      if (I->Op1 == 0) {
+      if (*I->Op1 == 0) {
         Insts.push_back(MCInstBuilder(I->Opcode)
                             .addReg(DstReg)
                             .addReg(BitSize == 32 ? AArch64::WZR : AArch64::XZR)
-                            .addImm(I->Op2));
+                            .addImm(*I->Op2));
       } else {
         Insts.push_back(
             MCInstBuilder(I->Opcode).addReg(DstReg).addReg(DstReg).addImm(
-                I->Op2));
+                *I->Op2));
       }
       break;
     case AArch64::ORRWrs:
@@ -132,19 +132,19 @@ static bool expandMOVImm(APInt Value, MCRegister DstReg,
                           .addReg(DstReg)
                           .addReg(DstReg)
                           .addReg(DstReg)
-                          .addImm(I->Op2));
+                          .addImm(*I->Op2));
     } break;
     case AArch64::ANDXri:
     case AArch64::EORXri:
-      if (I->Op1 == 0) {
+      if (*I->Op1 == 0) {
         Insts.push_back(MCInstBuilder(I->Opcode)
                             .addReg(DstReg)
                             .addReg(BitSize == 32 ? AArch64::WZR : AArch64::XZR)
-                            .addImm(I->Op2));
+                            .addImm(*I->Op2));
       } else {
         Insts.push_back(
             MCInstBuilder(I->Opcode).addReg(DstReg).addReg(DstReg).addImm(
-                I->Op2));
+                *I->Op2));
       }
       break;
     case AArch64::MOVNWi:
@@ -152,16 +152,16 @@ static bool expandMOVImm(APInt Value, MCRegister DstReg,
     case AArch64::MOVZWi:
     case AArch64::MOVZXi: {
       Insts.push_back(
-          MCInstBuilder(I->Opcode).addReg(DstReg).addImm(I->Op1).addImm(
-              I->Op2));
+          MCInstBuilder(I->Opcode).addReg(DstReg).addImm(*I->Op1).addImm(
+              *I->Op2));
     } break;
     case AArch64::MOVKWi:
     case AArch64::MOVKXi: {
       Insts.push_back(MCInstBuilder(I->Opcode)
                           .addReg(DstReg)
                           .addReg(DstReg)
-                          .addImm(I->Op1)
-                          .addImm(I->Op2));
+                          .addImm(*I->Op1)
+                          .addImm(*I->Op2));
     } break;
     }
   }

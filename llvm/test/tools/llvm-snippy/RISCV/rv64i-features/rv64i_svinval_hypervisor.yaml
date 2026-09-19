@@ -5,7 +5,7 @@
 include:
   - "../Inputs/sections.yaml"
 options:
-  march: rv64i_svinval
+  march: rv64i_svinval_h
   mtriple: riscv64
   num-instrs: 5000
   dump-mf: true
