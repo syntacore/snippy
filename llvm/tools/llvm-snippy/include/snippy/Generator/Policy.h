@@ -350,7 +350,8 @@ public:
   }
 
   void print(raw_ostream &OS) const {
-    OS << "Mode Changing Instruction Policy ";
+    assert(MCC);
+    MCC->print(OS);
   }
 };
 

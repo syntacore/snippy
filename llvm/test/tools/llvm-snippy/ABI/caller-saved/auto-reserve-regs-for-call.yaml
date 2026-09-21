@@ -27,14 +27,8 @@ sections:
     LMA:       0x400000
     ACCESS:    rw
 
-call-graph:
-  entry-point: SnippyFunction
-  function-list:
-    - name: SnippyFunction
-      callees:
-        - myfunc
-    - name: myfunc
-      external: true
+include:
+  - Inputs/call-graph-with-external-func.yaml
 
 histogram:
      - [FADD_D, 3.0]

@@ -21,22 +21,9 @@ options:
   honor-target-abi: on
   verify-mi: on
   dump-mf: on
-sections:
-  - name:      stack
-    VMA:       0x200000
-    SIZE:      0x10000
-    LMA:       0x200000
-    ACCESS:    rw
-  - name:      1
-    VMA:       0x210000
-    SIZE:      0x100000
-    LMA:       0x210000
-    ACCESS:    rw
-  - name:      2
-    VMA:       0x500000
-    SIZE:      0x100000
-    LMA:       0x500000
-    ACCESS:    rx
+
+include:
+  - ../Inputs/sections-with-stack.yaml
 
 histogram:
      - [XOR, 1.0]

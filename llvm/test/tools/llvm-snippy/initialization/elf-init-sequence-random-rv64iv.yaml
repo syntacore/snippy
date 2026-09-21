@@ -1,7 +1,7 @@
 # REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:    -num-instrs=10 -dump-mf -init-regs-in-elf --verify-mi \
-# RUN:    |& FileCheck %s --dump-input always
+# RUN: |& FileCheck %s
 
 sections:
     - name:      0
@@ -40,7 +40,7 @@ histogram:
     - [SW, 10.0]
 
 # CHECK: bb.1:
-# CHECK: $v0 = VMXNOR_MM undef $v0, undef $v0
+# CHECK: {{(\$v0 = .*$[[:space:]]+)+}}
 # CHECK: {{(\$v1 = .*$[[:space:]]+)+}}
 # CHECK: {{(\$v2 = .*$[[:space:]]+)+}}
 # CHECK: {{(\$v3 = .*$[[:space:]]+)+}}

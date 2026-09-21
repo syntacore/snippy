@@ -29,10 +29,8 @@ sections:
 histogram:
     - [VADD_VV, 1.0]
 
-# CHECK: $v0 = VMXNOR_MM
-# CHECK: $v{{[1-9]+}} = VMV_V_X
-# CHECK: $v0 = VMXNOR_MM
+# CHECK: $v{{[0-9]+}} = VMV_V_X
 # CHECK: VSLIDE1DOWN_VX
-# CHECK: $v0 = VMV_V_V
+# CHECK: $v0 = VSLIDE1DOWN_VX
 # CHECK: VADD
 # CHECK: EBREAK

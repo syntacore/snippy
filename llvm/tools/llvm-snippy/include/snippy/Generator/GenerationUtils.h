@@ -161,6 +161,9 @@ void reorder(ArrayT &Vec, MutableArrayRef<unsigned> Indices) {
   }
 }
 
+StringRef getName(const MCInstrDesc &InstrDesc,
+                  InstructionGenerationContext &IGC);
+
 } // namespace snippy
 } // namespace llvm
 #endif // LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_GENERATIONUTILS_H

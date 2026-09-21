@@ -39,6 +39,6 @@ histogram:
 
 # COM: Check that vs3 group can overlap with vs2 group (if EEW == SEW).
 #
-# CHECK: VSUXEI8_V $v28, $x{{[0-9]+}}, $v28
-# CHECK: VSUXEI16_V $v28, $x{{[0-9]+}}, $v28
-# CHECK: VSUXEI32_V $v28, $x{{[0-9]+}}, $v28
+# CHECK-DAG: VSUXEI8_V $v28, $x{{[0-9]+}}, $v28
+# CHECK-DAG: VSUXEI16_V $v28, $x{{[0-9]+}}, $v28
+# CHECK-DAG: VSUXEI32_V $v28, $x{{[0-9]+}}, $v28

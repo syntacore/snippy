@@ -40,9 +40,9 @@ histogram:
 # CHECK-NOT: $v24 = VRGATHEREI16_VV $v24
 # CHECK-NOT: $v28 = VRGATHEREI16_VV $v28
 # COM: Check that vs1 group can overlap with vs2 group (if EEW == SEW).
-# CHECK: VRGATHEREI16_VV $v24, $v24
+# CHECK-DAG: VRGATHEREI16_VV $v24, $v24
 # COM: Check that vs1 group cannot overlap with vs2 group (if EEW != SEW).
-# CHECK: VRGATHEREI16_VV $v20, $v30
-# CHECK: VRGATHEREI16_VV $v24, $v22
+# CHECK-DAG: VRGATHEREI16_VV $v20, $v30
+# CHECK-DAG: VRGATHEREI16_VV $v24, $v22
 # COM: Check that vs1 group can overlap with vs2 group.
-# CHECK: VRGATHER_VV $v24, $v24
+# CHECK-DAG: VRGATHER_VV $v24, $v24

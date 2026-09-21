@@ -1,0 +1,62 @@
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+d -mcpu=generic-rv64 \
+# RUN:   -preserve-caller-saved-regs=F \
+# RUN: | FileCheck %s
+
+
+# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+d -mcpu=generic-rv32 \
+# RUN:   -preserve-caller-saved-regs=F \
+# RUN: | FileCheck %s
+
+options:
+  num-instrs: 1000
+  redefine-sp: reg::X2
+  verify-mi: on
+  dump-mf: on
+
+include:
+  - ../Inputs/sections-with-stack.yaml
+  - ../Inputs/call-graph-with-external-func.yaml
+
+histogram:
+     - [JAL, 1.0]
+     - [ADD, 1.0]
+     - [FADD_S, 1.0]
+     - [FADD_D, 1.0]
+
+# COM: Spill caller saved registers to the stack
+
+# CHECK: FSD $f1_d, $x2, 0
+# CHECK: FSD $f5_d, $x2, 0
+# CHECK: FSD $f6_d, $x2, 0
+# CHECK: FSD $f7_d, $x2, 0
+# CHECK: FSD $f28_d, $x2, 0
+# CHECK: FSD $f29_d, $x2, 0
+# CHECK: FSD $f30_d, $x2, 0
+# CHECK: FSD $f31_d, $x2, 0
+# CHECK: FSD $f10_d, $x2, 0
+# CHECK: FSD $f11_d, $x2, 0
+# CHECK: FSD $f12_d, $x2, 0
+# CHECK: FSD $f13_d, $x2, 0
+# CHECK: FSD $f14_d, $x2, 0
+# CHECK: FSD $f15_d, $x2, 0
+# CHECK: FSD $f16_d, $x2, 0
+# CHECK: FSD $f17_d, $x2, 0
+
+# COM: Reload caller saved registers from the stack
+
+# CHECK: $f17_d = FLD $x2, 0
+# CHECK: $f16_d = FLD $x2, 0
+# CHECK: $f15_d = FLD $x2, 0
+# CHECK: $f14_d = FLD $x2, 0
+# CHECK: $f13_d = FLD $x2, 0
+# CHECK: $f12_d = FLD $x2, 0
+# CHECK: $f11_d = FLD $x2, 0
+# CHECK: $f10_d = FLD $x2, 0
+# CHECK: $f31_d = FLD $x2, 0
+# CHECK: $f30_d = FLD $x2, 0
+# CHECK: $f29_d = FLD $x2, 0
+# CHECK: $f28_d = FLD $x2, 0
+# CHECK: $f7_d = FLD $x2, 0
+# CHECK: $f6_d = FLD $x2, 0
+# CHECK: $f5_d = FLD $x2, 0
+# CHECK: $f1_d = FLD $x2, 0

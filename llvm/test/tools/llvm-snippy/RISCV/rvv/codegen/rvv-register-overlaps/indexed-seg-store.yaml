@@ -35,7 +35,7 @@ histogram:
   - [VLUXSEG2EI32_V, 1.0]
 
 # COM: Check that vs3 group can overlap with vs2 group (if EEW == SEW).
-# CHECK: VSUXSEG2EI32_V $v20, $x{{[0-9]+}}, $v20
+# CHECK-DAG: VSUXSEG2EI32_V $v20, $x{{[0-9]+}}, $v20
 # COM: For vector indexed segment loads, the destination vector register groups
 #      cannot overlap the source vector register group
 # CHECK-NOT: $v20 = VLUXSEG2EI32_V $x{{[0-9]+}}, $v20

@@ -1,7 +1,7 @@
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:    -num-instrs=10 -dump-mf -init-regs-in-elf \
 # RUN:    -rvv-init-mode=splats --verify-mi \
-# RUN:    |& FileCheck %s --dump-input always
+# RUN: |& FileCheck %s --dump-input always
 
 sections:
     - name:      1
@@ -35,7 +35,7 @@ histogram:
     - [SW, 10.0]
 
 # CHECK: bb.1:
-# CHECK: $v0 = VMXNOR_MM undef $v0, undef $v0
+# CHECK: $v0 = VMV_V_X $x0
 # CHECK: $v1 = VMV_V_X $x1
 # CHECK: $v2 = VMV_V_X $x2
 # CHECK: $v3 = VMV_V_X $x3

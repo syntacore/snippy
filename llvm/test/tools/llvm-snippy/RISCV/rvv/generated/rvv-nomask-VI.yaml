@@ -7,13 +7,12 @@
 # RUN:  --entry-point=start \
 # RUN:  -verify-gen-histogram -histogram-max-deviation=5 -histogram-must-succeed=true \
 # RUN:  -rvv-init-mode=loads \
-# RUN:  -riscv-nomask-mode-for-rvv=true \
 # RUN:  -histogram-must-succeed=false \
 # RUN:  |& FileCheck %s
 
 include:
 - "../../../Inputs/memory-unaligned.yaml"
-- "../codegen/Inputs/rvv-unit-all.yaml"
+- "../codegen/Inputs/rvv-unit-all-nomask.yaml"
 
 sections:
   - name:      0
@@ -33,12 +32,12 @@ sections:
     ACCESS:    rw
 histogram:
 
-    # - [VADC_VIM, 1.0]
+    - [VADC_VIM, 1.0]
     - [VADD_VI, 1.0]
     - [VAND_VI, 1.0]
     - [VMADC_VI, 1.0]
-    # - [VMADC_VIM, 1.0]
-    # - [VMERGE_VIM, 1.0]
+    - [VMADC_VIM, 1.0]
+    - [VMERGE_VIM, 1.0]
     - [VMSEQ_VI, 1.0]
     - [VMSGTU_VI, 1.0]
     - [VMSGT_VI, 1.0]
@@ -61,5 +60,5 @@ histogram:
 # CHECK-NOT: Machine Verifier Pass report
 # CHECK: Start Verification for function: start:
 # CHECK: End Verification for function: start
-# CHECK-NOT: v0
+# CHECK-NOT: v0.t
 

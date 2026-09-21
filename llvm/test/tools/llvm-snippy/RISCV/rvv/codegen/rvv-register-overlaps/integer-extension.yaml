@@ -37,7 +37,7 @@ histogram:
 #      register group when:
 #
 #      The destination EEW (=32, EMUL = 8) is greater than the source EEW (=8, EMUL = 2).
-# CHECK: $v24 = VZEXT_VF4 $v30
+# CHECK-DAG: $v24 = VZEXT_VF4 $v30
 # CHECK-NOT: $v24 = VZEXT_VF4 $v24
 # CHECK-NOT: $v24 = VZEXT_VF4 $v26
 # CHECK-NOT: $v24 = VZEXT_VF4 $v28
