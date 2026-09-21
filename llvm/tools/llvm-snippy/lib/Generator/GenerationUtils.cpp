@@ -288,12 +288,14 @@ void selectNonMemoryOperands(
     auto CustomMask = Tgt.getCustomAccessMaskForOperand(InstrDesc, Idx);
     if (CustomMask != AccessMaskBit::None)
       Mask = CustomMask;
-    auto ExcludedForOperand = Tgt.excludeRegsForOperand(
-        InstrGenCtx, RegClass, InstrDesc, Idx, Preselected);
+    SmallVector<Register> ExcludedForOperand;
+    SmallVector<Register> Include;
+    Tgt.excludeRegsForOperand(InstrGenCtx, RegClass, InstrDesc, Idx,
+                              Preselected, ExcludedForOperand);
     copy(Excluded, std::back_inserter(ExcludedForOperand));
     if (!IsDst)
       copy(Destinations, std::back_inserter(ExcludedForOperand));
-    auto Include = Tgt.includeRegs(Opcode, RegClass);
+    Tgt.includeRegs(Opcode, RegClass, Include);
     auto ExpectedReg = RegGen.generate(RegClass, OperandRegClassID, RI, *TmpRP,
                                        InstrGenCtx.MBB, Tgt, ExcludedForOperand,
                                        Include, Mask);
@@ -941,6 +943,13 @@ GlobalVariable *getGVForMBB(const MachineBasicBlock &MBB, GlobalsPool &GP,
                      /*Reason*/ "Relocation for BB address",
                      /* IsConst */ true);
   return GV;
+}
+
+StringRef getName(const MCInstrDesc &InstrDesc,
+                  InstructionGenerationContext &IGC) {
+  const auto &ProgCtx = IGC.ProgCtx;
+  const auto &State = ProgCtx.getLLVMState();
+  return State.getInstrInfo().getName(InstrDesc.getOpcode());
 }
 
 } // namespace snippy

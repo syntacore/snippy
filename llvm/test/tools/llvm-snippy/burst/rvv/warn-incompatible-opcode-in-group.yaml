@@ -42,8 +42,8 @@ riscv-vector-unit:
 
 burst:
   mode: custom
-  min-size: 10
-  max-size: 10
+  min-size: 4
+  max-size: 5
   groupings:
     - [VLE8_V, VADD_VX, VLSEG8E64_V, VL2RE8_V, VS2R_V]
 

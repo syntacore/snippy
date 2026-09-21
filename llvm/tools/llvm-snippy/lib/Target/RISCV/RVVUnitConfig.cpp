@@ -129,6 +129,10 @@ struct ModeChangeBias final {
   // instruction is selected. Illegal configuration occurs when the {SEW, LMUL}
   // pair violates the target's constraints based on VLEN and ELEN.
   double SetVillP = 0.0;
+
+  // Probability of switching into the unmasked (no V0 mask) mode during
+  // an RVV mode change.
+  double NoMaskP = 0.33;
 };
 
 struct RVVConfigurationSpace {
@@ -156,6 +160,8 @@ ModeChangeInfo deriveModeSwitchingProbability(const Config &Cfg,
   double TotalWeight = Hist.getTotalWeight();
   ModeChangeInfo Result;
   Result.ProbSetVill = Bias.SetVillP;
+  Result.ProbNoMaskMode =
+      Cfg.PassCfg.RegisterAccess.isWReserved(RISCV::V0) ? 1 : Bias.NoMaskP;
   Result.TotalHistWeight = TotalWeight;
 
   bool RVVPresentInHistogram = Hist.getOpcodesProbability([](unsigned Opcode) {
@@ -301,7 +307,9 @@ struct UnmaskedVMGenerator final : VMGeneratorInterface {
 
   unsigned getMinRequiredVL() const override { return 0; }
 
-  APInt generate(unsigned VL) const override { return APInt::getAllOnes(VL); }
+  APInt generateImpl(unsigned VL) const override {
+    return APInt::getAllOnes(VL);
+  }
 };
 
 struct LegalVMGenerator final : VMGeneratorInterface {
@@ -310,7 +318,7 @@ struct LegalVMGenerator final : VMGeneratorInterface {
 
   unsigned getMinRequiredVL() const override { return 0; }
 
-  APInt generate(unsigned VL) const override {
+  APInt generateImpl(unsigned VL) const override {
     auto MaxValue = APInt::getAllOnes(VL);
     return APInt(RandEngine::genInRangeInclusive(MaxValue));
   }
@@ -388,7 +396,7 @@ struct ImmVMGen : public VMGeneratorInterface {
 
   unsigned getMinRequiredVL() const override { return Value.getActiveBits(); }
 
-  APInt generate(unsigned VL) const override {
+  APInt generateImpl(unsigned VL) const override {
     assert((getMinRequiredVL() <= VL) &&
            "Generation request should be made only for valid VMs");
     return Value;
@@ -727,7 +735,7 @@ buildRawSewLmulDistribution(unsigned ELEN, unsigned VLEN,
   double TotalIllegalWeight =
       std::accumulate(IllegalRange.begin(), IllegalRange.end(), 0.0, AddProb);
 
-  if (isZero(TotalLegalWeight) && !isZero(1.0 - PVill))
+  if (isZero(TotalLegalWeight) && !isOne(PVill))
     fatal(
         "RVV Config: no legal configuration detected and Pvill != 1, aborting");
   // Should never happen as there're always reserved SEW and LMUL values
@@ -773,7 +781,7 @@ static void addToVLDistribution(unsigned MaxVL, double Weight,
 
   [[maybe_unused]] double TotalWeight =
       std::accumulate(VLDist.begin(), VLDist.end(), 0.0);
-  assert(isZero(TotalWeight) || isZero(TotalWeight - 1.0, /*Tolerance=*/1e-6));
+  assert(isZero(TotalWeight) || isOne(TotalWeight, /*Tolerance=*/1e-6));
 
   for (auto [ResW, W] : zip_equal(ResultingDistribution, VLDist))
     ResW += W * Weight;
@@ -1139,6 +1147,7 @@ template <> struct llvm::yaml::MappingTraits<ModeChangeBias> {
   static void mapping(IO &Io, ModeChangeBias &Guides) {
     Io.mapRequired("P", Guides.ModeChangeProb);
     Io.mapOptional("Pvill", Guides.SetVillP);
+    Io.mapOptional("Pnomask", Guides.NoMaskP);
   }
 
   static std::string validate(yaml::IO &IO, ModeChangeBias &Guides) {
@@ -1149,6 +1158,10 @@ template <> struct llvm::yaml::MappingTraits<ModeChangeBias> {
 
     if (!isCorrectProbability(Guides.SetVillP))
       return std::string(RVVConfigurationSpace::kUnitName) + ": Pvill " +
+             kProbBounds;
+
+    if (!isCorrectProbability(Guides.NoMaskP))
+      return std::string(RVVConfigurationSpace::kUnitName) + ": Pnomask " +
              kProbBounds;
     return {};
   }
@@ -1740,7 +1753,8 @@ static RVVConfigurationSpace createDefaultConfigurationSpace() {
 
 // MinVL = minimum bit width of all VM generators
 static unsigned getMinRequestedBitWidth(const VMSequence &VMSeq) {
-  assert(!VMSeq.empty());
+  if (VMSeq.empty())
+    return 0;
   unsigned MinVL = std::numeric_limits<unsigned>::max();
   for (const auto &[Name, Weight] : VMSeq) {
     auto VMGen = GeneratorFactory<VMGeneratorHolder>::create(Name.asStr());
@@ -1808,10 +1822,11 @@ getMinMaxPossibleVLOfGenerator(unsigned ELEN, unsigned VLEN,
 // VM2 must be discarded since there is no VL generator that can do 5 bits
 // VL1 must be discarded since there is no VM generator that can do 1 bit VM
 static VLVMInfo buildVLVMgenerators(unsigned ELEN, unsigned VLEN,
-                                    const VLSequence &OriginalVLSeq,
-                                    const VMSequence &OriginalVMSeq,
+                                    const RVVConfigurationSpace &CS,
                                     const SewLmulDistribution &SewLmulDist,
                                     bool IsOnlyVSETIVLI) {
+  const auto &OriginalVLSeq = CS.VUInfo.VL;
+  const auto &OriginalVMSeq = CS.VUInfo.VM;
   VLVMInfo Result;
 
   // We discard all VL generators for which there is no available VM
@@ -1859,12 +1874,14 @@ static VLVMInfo buildVLVMgenerators(unsigned ELEN, unsigned VLEN,
   if (Result.VLGens.empty())
     snippy::fatal(
         "riscv-vector-unit: Could not find any applicable VL generators");
-  if (Result.VMGens.empty())
-    snippy::fatal(
-        "riscv-vector-unit: Could not find any applicable VM generators");
+  if (!isOne(CS.Guides.NoMaskP)) {
+    if (Result.VMGens.empty())
+      snippy::fatal(
+          "riscv-vector-unit: Could not find any applicable VM generators");
+    Result.VMGens.normalizeProbs();
+  }
 
   Result.VLGens.normalizeProbs();
-  Result.VMGens.normalizeProbs();
 
   LLVM_DEBUG({
     dbgs() << "=== RVV VM Generators ===\n";
@@ -1958,7 +1975,7 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(const Config &Cfg,
   // there're no {SEW, LMUL} combinations or discarding VMgens, is UNNECESSARY
   // and is done only to get discarded names (backward compatibility).
   auto [VLGenerators, VMGenerators, DiscardedVLNames, DiscardedVMNames] =
-      buildVLVMgenerators(ELEN, VLEN, CS.VUInfo.VL, CS.VUInfo.VM, SewLmulDist,
+      buildVLVMgenerators(ELEN, VLEN, CS, SewLmulDist,
                           /*IsOnlyVSETIVLI*/ !IsPresentNonVSETIVLI);
 
   auto PrimaryDistBuilders =
@@ -1995,7 +2012,8 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(const Config &Cfg,
                                                std::move(SupportInfo))};
 }
 
-APInt RVVConfigurationInfo::selectVM(unsigned VL) const {
+std::optional<APInt>
+RVVConfigurationInfo::selectVM(unsigned VL, double NoMaskModeForRVV) const {
   assert(GenInfo && "There must be a generator. Probably VLEN is 0.");
   auto Filter = [VL](const VMGeneratorHolder &VMGen) {
     return VMGen->getMinRequiredVL() <= VL;
@@ -2004,7 +2022,7 @@ APInt RVVConfigurationInfo::selectVM(unsigned VL) const {
   // do not satisfy this condition. This can't be the case, since we have
   // already thrown out all VMs for which there is no available VL.
   const auto &ApplicableGen = cantFail(GenInfo->VMGen.generateIf(Filter));
-  return ApplicableGen->generate(VL);
+  return ApplicableGen->generate(VL, NoMaskModeForRVV);
 }
 
 RVVConfiguration

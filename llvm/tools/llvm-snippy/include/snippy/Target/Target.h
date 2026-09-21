@@ -74,6 +74,7 @@ enum class LoopType;
 
 struct ModeChangingContext {
   virtual ~ModeChangingContext() = default;
+  virtual void print(raw_ostream &OS) const = 0;
 };
 
 struct TargetGenContextInterface {
@@ -363,9 +364,6 @@ public:
   virtual bool
   canBeGeneratedAsCommonInstr(const MCInstrDesc &InstrDesc) const = 0;
 
-  virtual void instructionPostProcess(InstructionGenerationContext &IGC,
-                                      MachineInstr &MI) const = 0;
-
   virtual MCRegister
   getTmpRegisterForCheckSumSelfcheck(InstructionGenerationContext &IGC,
                                      const RegPoolWrapper &RP) const = 0;
@@ -640,13 +638,14 @@ public:
 
   // FIXME: basically, we should need only MCRegisterClass, but now
   // MCRegisterClass for RISCV does not fully express available regs.
-  virtual std::vector<Register> excludeRegsForOperand(
+  virtual void excludeRegsForOperand(
       InstructionGenerationContext &IGC, const MCRegisterClass &RC,
       const MCInstrDesc &InstrDesc, unsigned OpIndex,
-      ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands) const = 0;
+      ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands,
+      SmallVectorImpl<Register> &Result) const = 0;
 
-  virtual std::vector<Register>
-  includeRegs(unsigned Opcode, const MCRegisterClass &RC) const = 0;
+  virtual void includeRegs(unsigned Opcode, const MCRegisterClass &RC,
+                           SmallVectorImpl<Register> &Result) const = 0;
 
   virtual SmallVector<unsigned>
   getImmutableRegs(const MCRegisterClass &MCRegClass) const = 0;

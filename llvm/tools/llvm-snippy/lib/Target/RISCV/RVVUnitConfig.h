@@ -15,6 +15,7 @@
 #include "snippy/Support/RandUtil.h"
 
 #include <iterator>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -168,7 +169,7 @@ struct RVVConfiguration final {
   VXRMMode XRM = VXRMMode::RNU;
 
   std::string toStr() const;
-  void print(raw_ostream &OS) const { OS << toStr() << "\n"; };
+  void print(raw_ostream &OS) const { OS << toStr(); };
 
   bool isLegal(unsigned ELEN, unsigned VLEN) const {
     return PrimaryCfg.isLegal(ELEN, VLEN);
@@ -226,6 +227,7 @@ using VLGeneratorHolder = std::unique_ptr<VLGeneratorInterface>;
 
 struct VMGeneratorInterface {
   virtual std::string identify() const = 0;
+
   // We can apply a mask only if the number of active bits in it
   // does not exceed the total number of elements (VL).
   //
@@ -236,7 +238,13 @@ struct VMGeneratorInterface {
   //   APInt(/* numBits */ 11, /* val */ 158).getActiveBits() == 8
   //   If number of elements (VL) >= 8 this mask is applicable, otherwise not.
   virtual unsigned getMinRequiredVL() const = 0;
-  virtual APInt generate(unsigned VL) const = 0;
+  virtual std::optional<APInt> generate(unsigned VL,
+                                        double NoMaskModeForRVV) const {
+    if (RandEngine::genBoolWeighted(NoMaskModeForRVV))
+      return std::nullopt;
+    return this->generateImpl(VL);
+  };
+  virtual APInt generateImpl(unsigned VL) const = 0;
   virtual ~VMGeneratorInterface() {};
 };
 using VMGeneratorHolder = std::unique_ptr<VMGeneratorInterface>;
@@ -250,6 +258,10 @@ struct ModeChangeInfo {
   // Probability with which an illegal RVV configuration will be choosen during
   // RVV Mode Change
   double ProbSetVill = 0.0;
+
+  // If set, the probability of switching into the unmasked (no V0 mask) mode
+  // during an RVV mode change.
+  double ProbNoMaskMode = 0.33;
 
   // Weights are what our clients are expected to use. llvm-snippy uses
   // weight-based histograms for instruction selection. These weights are later
@@ -580,7 +592,7 @@ public:
     return RVVEnabled;
   }
 
-  APInt selectVM(unsigned VL) const;
+  std::optional<APInt> selectVM(unsigned VL, double NoMaskModeForRVV) const;
   RVVConfiguration selectConfiguration(bool MustUseReducedVL) const;
 
   bool isModeChangeArtificial() const { return ArtificialModeChange; }

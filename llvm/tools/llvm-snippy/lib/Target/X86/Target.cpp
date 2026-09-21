@@ -175,11 +175,6 @@ public:
     reportUnimplementedError();
   }
 
-  void instructionPostProcess(InstructionGenerationContext &IGC,
-                              MachineInstr &MI) const override {
-
-  }
-
   void
   generateCallToMemInitRoutine(InstructionGenerationContext &IGC,
                                size_t SectionStart, size_t SectionSize,
@@ -794,18 +789,14 @@ public:
     reportUnimplementedError();
   }
 
-  std::vector<Register> excludeRegsForOperand(
+  void excludeRegsForOperand(
       InstructionGenerationContext &IGC, const MCRegisterClass &RC,
       const MCInstrDesc &InstrDesc, unsigned OpIndex,
-      ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands)
-      const override {
-    return {};
-  }
+      ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands,
+      SmallVectorImpl<Register> &Result) const override {}
 
-  std::vector<Register> includeRegs(unsigned Opcode,
-                                    const MCRegisterClass &RC) const override {
-    return {};
-  }
+  void includeRegs(unsigned Opcode, const MCRegisterClass &RC,
+                   SmallVectorImpl<Register> &Result) const override {}
 
   const TargetRegisterClass &getAddrRegClass() const override {
     reportUnimplementedError();

@@ -28,6 +28,6 @@ sections:
 histogram:
     - [VADD_VV, 1.0]
 
-# CHECK: $v0 = VMV_V_V
+# CHECK: $v0 = VSLIDE1DOWN_VX
 # CHECK-NOT: VL1RE8_V $x
 

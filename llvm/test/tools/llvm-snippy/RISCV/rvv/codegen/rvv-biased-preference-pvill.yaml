@@ -1,26 +1,29 @@
 # REQUIRES: riscv-rvv
 # COM: This test just checks that option
 # COM: "riscv-preference-for-rvv-mode-change" works with the pvill setting.
-# XFAIL: *
 
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:  --model-plugin=spike --num-instrs=1000 -o %t \
 # RUN:  --riscv-preference-for-rvv-mode-change=vsetvl \
+# RUN:  --rvv-init-mode=slides \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-VSETVL
 
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:  --model-plugin=spike --num-instrs=1000 -o %t \
 # RUN:  --riscv-preference-for-rvv-mode-change=vsetvli \
+# RUN:  --rvv-init-mode=slides \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-VSETVLI
 
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:  --model-plugin=spike --num-instrs=1000 -o %t \
 # RUN:  --riscv-preference-for-rvv-mode-change=vsetivli \
+# RUN:  --rvv-init-mode=slides \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-VSETIVLI
 
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:  --model-plugin=spike --num-instrs=1000 -o %t \
 # RUN:  --riscv-preference-for-rvv-mode-change=any \
+# RUN:  --rvv-init-mode=slides \
 # RUN:  |& FileCheck %s --check-prefix=CHECK-ANY
 
 include:
@@ -37,8 +40,8 @@ sections:
     SIZE:      0x400000
     LMA:       0x80600000
     ACCESS:    rw
-histogram:
 
+histogram:
     - [VL1RE16_V, 1.0]
 
 # CHECK-VSETVL: vl1re16.v
