@@ -8,31 +8,9 @@ options:
   honor-target-abi: on
   verify-mi: on 
 
-sections:
-  - name:      1
-    VMA:       0x210000
-    SIZE:      0x100000
-    LMA:       0x210000
-    ACCESS:    rx
-  - name:      2
-    VMA:       0x100000
-    SIZE:      0x100000
-    LMA:       0x100000
-    ACCESS:    rw
-  - name:      stack
-    VMA:       0x400000
-    SIZE:      0x100000
-    LMA:       0x400000
-    ACCESS:    rw
-
-call-graph:
-  entry-point: SnippyFunction
-  function-list:
-    - name: SnippyFunction
-      callees:
-        - IamExternalFunc
-    - name: IamExternalFunc
-      external: true
+include:
+  - Inputs/sections-with-stack.yaml
+  - Inputs/call-graph-with-external-func.yaml
 
 histogram:
     - [ADD, 1.0]

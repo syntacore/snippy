@@ -87,6 +87,13 @@ struct RegisterAccessConfig final : private std::map<unsigned, AccessMaskBit> {
   using map::operator[];
   using map::insert;
   using map::try_emplace;
+
+  bool isWReserved(unsigned Reg) const {
+    auto It = find(Reg);
+    if (It == end())
+      return false;
+    return (It->second & AccessMaskBit::PrimaryW) == AccessMaskBit::PrimaryW;
+  };
 };
 
 } // namespace snippy

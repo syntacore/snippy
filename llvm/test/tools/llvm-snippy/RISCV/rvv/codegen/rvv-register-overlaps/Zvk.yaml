@@ -40,10 +40,10 @@ histogram:
   - [VAESDF_VS, 1.0]
 
 # COM: Check that vs1 group can overlap with vd group.
-# CHECK: $v24 = VSM3ME_VV $v28, $v24
-# CHECK: VAESDF_VV $v28(tied-def 0), $v28
+# CHECK-DAG: $v24 = VSM3ME_VV $v28, $v24
+# CHECK-DAG: VAESDF_VV $v28(tied-def 0), $v28
 # COM: Check that vs1 group can overlap with vs2 group.
-# CHECK: VSM3ME_VV $v28, $v28
-# CHECK: VSHA2CH_VV $v24(tied-def 0), $v28, $v28
-# CHECK: VSHA2CL_VV $v24(tied-def 0), $v28, $v28
-# CHECK: VSHA2MS_VV $v24(tied-def 0), $v28, $v28
+# CHECK-DAG: VSM3ME_VV $v28, $v28
+# CHECK-DAG: VSHA2CH_VV $v24(tied-def 0), $v28, $v28
+# CHECK-DAG: VSHA2CL_VV $v24(tied-def 0), $v28, $v28
+# CHECK-DAG: VSHA2MS_VV $v24(tied-def 0), $v28, $v28

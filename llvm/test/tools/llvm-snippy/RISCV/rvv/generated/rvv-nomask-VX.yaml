@@ -7,13 +7,12 @@
 # RUN:  --entry-point=start \
 # RUN:  -verify-gen-histogram -histogram-max-deviation=5 -histogram-must-succeed=true \
 # RUN:  -rvv-init-mode=loads \
-# RUN:  -riscv-nomask-mode-for-rvv=true \
 # RUN:  -histogram-must-succeed=false \
 # RUN:  |& FileCheck %s
 
 include:
 - "../../../Inputs/memory-unaligned.yaml"
-- "../codegen/Inputs/rvv-unit-all.yaml"
+- "../codegen/Inputs/rvv-unit-all-nomask.yaml"
 
 sections:
   - name:      0
@@ -35,7 +34,7 @@ histogram:
 
     - [VAADDU_VX, 1.0]
     - [VAADD_VX, 1.0]
-    # - [VADC_VXM, 1.0]
+    - [VADC_VXM, 1.0]
     - [VADD_VX, 1.0]
     - [VAND_VX, 1.0]
     - [VASUBU_VX, 1.0]
@@ -44,15 +43,15 @@ histogram:
     - [VDIV_VX, 1.0]
     - [VMACC_VX, 1.0]
     - [VMADC_VX, 1.0]
-    # - [VMADC_VXM, 1.0]
+    - [VMADC_VXM, 1.0]
     - [VMADD_VX, 1.0]
     - [VMAXU_VX, 1.0]
     - [VMAX_VX, 1.0]
-    # - [VMERGE_VXM, 1.0]
+    - [VMERGE_VXM, 1.0]
     - [VMINU_VX, 1.0]
     - [VMIN_VX, 1.0]
     - [VMSBC_VX, 1.0]
-    # - [VMSBC_VXM, 1.0]
+    - [VMSBC_VXM, 1.0]
     - [VMSEQ_VX, 1.0]
     - [VMSGTU_VX, 1.0]
     - [VMSGT_VX, 1.0]
@@ -74,7 +73,7 @@ histogram:
     - [VRSUB_VX, 1.0]
     - [VSADDU_VX, 1.0]
     - [VSADD_VX, 1.0]
-    # - [VSBC_VXM, 1.0]
+    - [VSBC_VXM, 1.0]
     - [VSLIDE1DOWN_VX, 1.0]
     - [VSLIDE1UP_VX, 1.0]
     - [VSLIDEDOWN_VX, 1.0]
@@ -103,5 +102,5 @@ histogram:
 # CHECK-NOT: Machine Verifier Pass report
 # CHECK: Start Verification for function: start:
 # CHECK: End Verification for function: start
-# CHECK-NOT: v0
+# CHECK-NOT: v0.t
 

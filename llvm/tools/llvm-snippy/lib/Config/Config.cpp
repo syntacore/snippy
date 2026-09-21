@@ -1468,7 +1468,7 @@ ProgramConfig::ProgramConfig(const SnippyTarget &Tgt, StringRef PluginFilename,
   PluginManagerImpl->loadPluginLib(PluginFilename.str());
 }
 
-Config::Config(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State,
+Config::Config(IncludePreprocessor &IPP, LLVMState &State,
                ProgramConfig &ProgCfg, const OpcodeCache &OpCC,
                bool ParseWithPlugin)
     : Includes([&IPP] {
@@ -1490,7 +1490,7 @@ Expected<Config> Config::create(IncludePreprocessor &IPP, RegPoolWrapper &RP,
                                 LLVMState &State, ProgramConfig &ProgCfg,
                                 const OpcodeCache &OpCC, bool ParseWithPlugin,
                                 std::optional<unsigned long long> Seed) {
-  Config Cfg(IPP, RP, State, ProgCfg, OpCC, ParseWithPlugin);
+  Config Cfg(IPP, State, ProgCfg, OpCC, ParseWithPlugin);
   ConfigIOContext CfgParsingCtx{
       Cfg.Histogram,
       OpCC,

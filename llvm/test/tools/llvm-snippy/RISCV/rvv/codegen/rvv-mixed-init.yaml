@@ -32,6 +32,9 @@ sections:
 histogram:
     - [VADD_VV, 1.0]
 
-# CHECK: $v0 = VL1RE8_V
+# COM: Use slide for v0 in nomask mode
+# CHECK: $v0 = VSLIDE1DOWN_VX
 # CHECK: VSLIDE1DOWN_VX
+# COM: Use load for v0 in mask mode
+# CHECK: $v0 = VL1RE8_V
 # CHECK: VADD

@@ -1,7 +1,7 @@
 # REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:  --num-instrs=10000 -o %t \
-# RUN:  -rvv-init-mode=splats \
+# RUN:  -rvv-init-mode=splats -init-regs-in-elf \
 # RUN:  -verify-gen-histogram  -histogram-must-succeed=true \
 # RUN:  -dump-mf \
 # RUN:  |& FileCheck %s
@@ -28,9 +28,10 @@ sections:
 histogram:
     - [VADD_VV, 1.0]
 
-# CHECK: VADD
-# CHECK: $v0 = VMXNOR_MM
-# CHECK: $v0 = VMV_V_V
+# COM: Initialization
+# CHECK: $v0 = VMV_V_X
+# COM: Set VM value
+# CHECK: $v0 = VSLIDE1DOWN_VX
 # CHECK: VADD
 # CHECK: EBREAK
 # CHECK: Start Verification for function:

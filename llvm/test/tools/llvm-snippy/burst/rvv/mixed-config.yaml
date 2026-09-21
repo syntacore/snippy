@@ -15,8 +15,8 @@ include:
 
 burst:
   mode: custom
-  min-size: 10
-  max-size: 10
+  min-size: 8
+  max-size: 8
   groupings:
     - [VLE8_V, VADD_VX,]
     - [VLE16_V, SW]
@@ -35,5 +35,5 @@ histogram:
   - [ADD, 1.0]
   - [ADDI, 1.0]
 
-# CHECK-DAG: {{(((VLE16_V|SW).*[[:space:]].*){10})}}
-# CHECK-DAG: {{(((VLE8_V|VADD_VX).*[[:space:]].*){10})}}
+# CHECK-DAG: {{(((VLE16_V|SW).*[[:space:]].*){8})}}
+# CHECK-DAG: {{(((VLE8_V|VADD_VX).*[[:space:]].*){8})}}

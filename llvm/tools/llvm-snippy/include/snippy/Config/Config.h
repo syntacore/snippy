@@ -324,8 +324,8 @@ public:
 
 private:
   // Constructor with YAML parsing
-  Config(IncludePreprocessor &IPP, RegPoolWrapper &RP, LLVMState &State,
-         ProgramConfig &ProgCfg, const OpcodeCache &OpCC, bool ParseWithPlugin);
+  Config(IncludePreprocessor &IPP, LLVMState &State, ProgramConfig &ProgCfg,
+         const OpcodeCache &OpCC, bool ParseWithPlugin);
 
 public:
   static Expected<Config>

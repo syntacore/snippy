@@ -724,7 +724,6 @@ static MachineOperand pregenerateOneOperand(
     const planning::PreselectedOpInfo &Preselected, unsigned OpIndex,
     ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands,
     std::optional<MemAddr> AccessAddress) {
-
   auto &RP = InstrGenCtx.getRegPool();
   auto &MBB = InstrGenCtx.MBB;
   auto &ProgCtx = InstrGenCtx.ProgCtx;
@@ -751,9 +750,11 @@ static MachineOperand pregenerateOneOperand(
     } else {
       auto RegClass = SnippyTgt.getRegClass(InstrGenCtx, OperandRegClassID,
                                             OpIndex, InstrDesc, RegInfo);
-      auto Exclude = SnippyTgt.excludeRegsForOperand(
-          InstrGenCtx, RegClass, InstrDesc, OpIndex, PregeneratedOperands);
-      auto Include = SnippyTgt.includeRegs(Opcode, RegClass);
+      SmallVector<Register> Exclude;
+      SmallVector<Register> Include;
+      SnippyTgt.excludeRegsForOperand(InstrGenCtx, RegClass, InstrDesc, OpIndex,
+                                      PregeneratedOperands, Exclude);
+      SnippyTgt.includeRegs(Opcode, RegClass, Include);
       bool IsDst = Preselected.getFlags() & RegState::Define;
       AccessMaskBit Mask = IsDst ? AccessMaskBit::W : AccessMaskBit::R;
 
@@ -1228,7 +1229,6 @@ randomInstruction(const MCInstrDesc &InstrDesc,
   auto MIB =
       getInstBuilder(MetadataMark, SnippyTgt, MBB, InstrGenCtx.Ins,
                      MBB.getParent()->getFunction().getContext(), InstrDesc);
-
   bool DoPostprocess =
       isPostprocessNeeded(InstrDesc, PreselectedIn, InstrGenCtx);
 
@@ -1268,12 +1268,6 @@ randomInstruction(const MCInstrDesc &InstrDesc,
 
   if (DoPostprocess)
     postprocessMemoryOperands(*MIB, InstrGenCtx, AddressesInfo);
-  // FIXME:
-  // We have a lot of problems with rollback and configurations
-  // After this, we can have additional instruction after main one!
-  [[maybe_unused]] auto PostProcessInstPos = std::next(MIB->getIterator());
-  assert(PostProcessInstPos == InstrGenCtx.Ins);
-  SnippyTgt.instructionPostProcess(InstrGenCtx, *MIB);
   return MIB;
 }
 

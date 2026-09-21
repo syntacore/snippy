@@ -264,8 +264,12 @@ public:
 
   void print(raw_ostream &OS, size_t Indent = 0) const {
     bool HasModeChange = ModeChangingPolicy.has_value();
-    OS.indent(Indent) << "SingleContextGroup <HasModeChange: " << HasModeChange;
-    OS << ", Limit: " << limit().getAsString() << ">\n";
+    OS.indent(Indent) << "SingleContextGroup <";
+    if (HasModeChange)
+      ModeChangingPolicy->print(OS);
+    else
+      OS << "No ModeChange";
+    OS << ", " << limit().getAsString() << ">\n";
     for_each(*this, [&](const auto &Req) {
       Req.print(OS, Indent + SubReqIndentSize);
     });

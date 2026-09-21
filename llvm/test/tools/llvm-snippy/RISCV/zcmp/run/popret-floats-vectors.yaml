@@ -19,7 +19,6 @@ histogram:
   - [CM_POPRET, 1.0]
   - [CM_POPRETZ, 1.0]
   - [JAL, 1.0]
-  - [ADD, 1.0]
   - [FADD_D, 1.0]
   - [VADD_VV, 1.0]
   - [VSETVL, 1.0]

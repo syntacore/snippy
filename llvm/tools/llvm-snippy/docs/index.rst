@@ -3274,7 +3274,7 @@ vector registers. The following modes are available:
    it to ``vreg`` using the ``VMV.V.X`` instruction. This mode does not
    require an ``r`` section.
 
--  ``loads`` |nbsp| -- |nbsp|  To use loads from the read-only section using the
+-  ``loads`` |nbsp| -- |nbsp| To use loads from the read-only section using the
    ``VL1RE8.V`` instruction.
 
 -  ``slides`` |nbsp| -- |nbsp| To use slides for ``v0-v31`` initialization. It writes
@@ -3282,8 +3282,9 @@ vector registers. The following modes are available:
    ``VSLIDE1DOWN.VX`` instruction. It repeats until ``vreg`` is filled.
    This mode does not require an ``r`` section.
 
--  ``mixed`` (default) |nbsp| -- |nbsp| To use slides for ``v1-v31`` initialization.
-   ``v0`` will be initialized using load.
+-  ``mixed`` (default) |nbsp| -- |nbsp| To use slides for ``v0-v31`` initialization in
+   `nomask mode <#nomask-mode>`__. And use loads for initialization ``v0`` as a mask for
+   mask mode and slides for ``v1-v31`` in mask mode.
 
 .. important::
 
@@ -4257,6 +4258,46 @@ RVV-configuration YAML file. Use this mode to set:
    After changing the configuration to a legal one, snippy continues to
    generate opcodes according to the whole histogram.
 
+-  ``Pnomask`` (optional) |nbsp| -- |nbsp| A probability that, after a change
+   of the vector configuration with a ``vset`` instruction, snippy switches
+   into the *nomask mode* for the subsequent vector instructions.
+   Defaults to ``0.33`` when omitted.
+
+   .. _`_nomask_mode`:
+
+   In the **nomask mode**, after a ``vset`` change of the vector
+   configuration, only *unmasked* vector instructions are generated, that
+   is, instructions that do not use a mask register. An instruction that
+   explicitly uses the ``v0`` register as a mask (``vadc``, ``vsbc``, and
+   ``vmerge``) in the nomask mode does **not** contain the value of ``VM``
+   configuration field. Since no mask is required, the ``v0`` register is
+   free and can be used by the generated code as an ordinary operand,
+   including as the destination or temporary register of an instruction.
+
+   In the **mask mode**, vector instructions can be generated both masked
+   and unmasked, but in this case the ``v0`` register always holds the
+   value specified by the ``VM`` field of the vector configuration. As a
+   result, ``v0`` cannot be overwritten by the result of an instruction and
+   cannot be used as the destination register.
+
+   .. note::
+
+      The default value ``0.33`` is chosen so that, on average, the number of
+      masked instructions is twice as small as the number of unmasked ones.
+
+   The numeric value of ``Pnomask`` means the following:
+
+   -  ``1``: Always use the nomask mode. Every RVV mode change switches
+      into the nomask mode, and a mask register is never generated.
+
+   -  ``0``: Never use the nomask mode. Every RVV mode change keeps using a
+      legitimately generated mask. In this case ``v0`` always holds mask value
+      and cannot be used as the destination or temporary register.
+
+   -  Greater than ``0`` but less than ``1``: On each RVV mode change
+      snippy switches into the nomask mode with the given probability. The
+      higher the value, the more often the nomask mode is selected.
+
 See an example below.
 
 .. important::
@@ -4275,6 +4316,7 @@ See an example below.
      mode-change-bias:
        P: 0.2
        Pvill: 1.0
+       Pnomask: 0.1
      mode-distribution:
        VM:
          - [all_ones, 2.0]

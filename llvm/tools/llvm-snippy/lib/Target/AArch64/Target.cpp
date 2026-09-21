@@ -318,11 +318,6 @@ public:
     return;
   }
 
-  void instructionPostProcess(InstructionGenerationContext &IGC,
-                              MachineInstr &MI) const override {
-    // TODO: no need to postprocess for now
-  }
-
   void
   generateCallToMemInitRoutine(InstructionGenerationContext &IGC,
                                size_t SectionStart, size_t SectionSize,
@@ -1288,18 +1283,14 @@ public:
     // No special register exclusions for AArch64 memory instructions.
   }
 
-  std::vector<Register> excludeRegsForOperand(
+  void excludeRegsForOperand(
       InstructionGenerationContext &IGC, const MCRegisterClass &RC,
       const MCInstrDesc &InstrDesc, unsigned OpIndex,
-      ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands)
-      const override {
-    return {};
-  }
+      ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands,
+      SmallVectorImpl<Register> &Result) const override {}
 
-  std::vector<Register> includeRegs(unsigned Opcode,
-                                    const MCRegisterClass &RC) const override {
-    return {};
-  }
+  void includeRegs(unsigned Opcode, const MCRegisterClass &RC,
+                   SmallVectorImpl<Register> &Result) const override {}
 
   const TargetRegisterClass &getAddrRegClass() const override {
     return AArch64::GPR64spRegClass;

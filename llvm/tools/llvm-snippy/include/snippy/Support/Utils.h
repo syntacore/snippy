@@ -273,6 +273,12 @@ inline bool isZero(T Value, T Tolerance = std::numeric_limits<T>::epsilon()) {
   return std::abs(Value) < Tolerance;
 }
 
+template <typename T>
+inline bool isOne(T Value, T Tolerance = std::numeric_limits<T>::epsilon()) {
+  static_assert(std::is_floating_point_v<T>, "Don't use this for integers");
+  return isZero(1.0 - Value, Tolerance);
+}
+
 inline unsigned getIdxLastNonZero(const std::vector<double> &Dist) {
   assert(!Dist.empty());
   auto It = std::find_if(Dist.rbegin(), Dist.rend(),

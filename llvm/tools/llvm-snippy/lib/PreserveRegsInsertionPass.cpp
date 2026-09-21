@@ -97,11 +97,10 @@ private:
     }
   }
 
-  auto getPreserveRegs(MachineFunction &MF,
-                       const SnippyProgramContext &ProgCtx) {
+  auto getPreserveRegs(MachineFunction &MF, const SnippyProgramContext &ProgCtx,
+                       ArrayRef<std::string> RegGroups) {
     auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
-    auto PreserveRegs =
-        SnippyTgt.getCallerSavedRegs(MF, SnippyTgt.getCallerSavedRegGroups());
+    auto PreserveRegs = SnippyTgt.getCallerSavedRegs(MF, RegGroups);
     auto MutatedRegs = getAllMutatedRegs(MF);
     // The remaining mutated registers were saved in the function's prologue.
     // Works only with sorted containers.
@@ -128,7 +127,8 @@ private:
     auto &ProgCtx = SGCtx.getProgramContext();
     auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
     auto &MF = *MBB.getParent();
-    auto PreserveRegs = getPreserveRegs(MF, ProgCtx);
+    auto PreserveRegs =
+        getPreserveRegs(MF, ProgCtx, SnippyTgt.getCallerSavedRegGroups());
 
     auto *TRI = MF.getSubtarget().getRegisterInfo();
     assert(TRI && "register information must be available");
@@ -222,15 +222,15 @@ private:
 
     auto &MF = *MBB.getParent();
     auto RequestedPreserveRegs =
-        SnippyTgt.getCallerSavedRegs(MF, RequestedCallerSavedGroups);
+        getPreserveRegs(MF, ProgCtx, RequestedCallerSavedGroups);
     auto ShouldPreserveCallerRegs =
         ProgCfg.FollowTargetABI || !RequestedPreserveRegs.empty();
 
     auto *TRI = MF.getSubtarget().getRegisterInfo();
     assert(TRI && "register information must be available");
 
-    auto AllCallerRegsToPreserve = SnippyTgt.getCallerSavedRegs(
-        MF, SnippyTgt.getCallerSavedLiveRegGroups());
+    auto AllCallerRegsToPreserve =
+        getPreserveRegs(MF, ProgCtx, SnippyTgt.getCallerSavedRegGroups());
     // Get only external call instrs.
     auto ExternalCalls = llvm::make_filter_range(MBB, [&](auto &&Instr) {
       return checkMetadata(Instr, SnippyMetadata::ExternalCall);

@@ -23,13 +23,31 @@ namespace snippy {
 
 struct RVVModeInfo final {
   unsigned VsetOpcode;
-  APInt VM;
+  // If VM == nullopt instructions can't use V0 as a mask, but can use V0 as
+  // destination operand, otherwise instructions can use V0 as a mask, but can't
+  // use it as destination operand.
+  std::optional<APInt> VM;
   RVVConfiguration Config;
   const MachineBasicBlock *MBBGuard = nullptr;
 
   bool operator==(const RVVModeInfo &Other) const {
+    if ((VM && !Other.VM) || (!VM && Other.VM))
+      return false;
     return VsetOpcode == Other.VsetOpcode && Config == Other.Config &&
-           APInt::isSameValue(VM, Other.VM) && MBBGuard == Other.MBBGuard;
+           ((!VM && !Other.VM) || APInt::isSameValue(*VM, *Other.VM)) &&
+           MBBGuard == Other.MBBGuard;
+  }
+
+  void print(raw_ostream &OS) const {
+    OS << "VsetOpcode: " << VsetOpcode << ", ";
+    if (VM) {
+      SmallString<16> VMStr;
+      VM->toString(VMStr, 16, /*Signed=*/false);
+      OS << "VM: 0x" << VMStr << ", ";
+    } else {
+      OS << "No VM, ";
+    }
+    Config.print(OS);
   }
 };
 
@@ -62,6 +80,7 @@ struct RISCVMemInitRegs final {
 struct RISCVModeChangingContext : public ModeChangingContext {
   RVVModeInfo RVVMI;
   RISCVModeChangingContext(const RVVModeInfo &RVVMI) : RVVMI(RVVMI) {}
+  void print(raw_ostream &OS) const override { RVVMI.print(OS); }
 };
 
 class RISCVGeneratorContext : public TargetGenContextInterface {
@@ -325,7 +344,7 @@ public:
   }
 
   void updateActiveRVVModeVM(const MachineBasicBlock *NewMBBGuard,
-                             const APInt &NewVM) {
+                             const std::optional<APInt> &NewVM) {
     CurrentRVVMode.MBBGuard = NewMBBGuard;
     CurrentRVVMode.VM = NewVM;
   }
