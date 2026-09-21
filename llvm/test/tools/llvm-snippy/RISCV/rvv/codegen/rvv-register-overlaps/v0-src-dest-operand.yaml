@@ -1,0 +1,23 @@
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  march: rv64imfdv
+  num-instrs: 1000
+  dump-mf: on
+  reserved-regs-list: ["V([2-9]|1[0-9]|2[0-9]|3[0-1])"]
+
+include:
+  - Inputs/sections.yaml
+  - Inputs/rvv-unit-lmul1.yaml
+
+histogram:
+  - [VADD_VV, 10.0]
+
+# COM: Check that vd group can overlap with source groups and v0 can used as
+#      source and destination operand.
+# CHECK-DAG: $v0 = VADD_VV $v1, $v1
+# CHECK-DAG: $v1 = VADD_VV $v0, $v1
+# CHECK-DAG: $v1 = VADD_VV $v1, $v0
+# CHECK-DAG: $v0 = VADD_VV $v0, $v0

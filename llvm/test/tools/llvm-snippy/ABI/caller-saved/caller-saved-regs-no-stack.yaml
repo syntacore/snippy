@@ -1,10 +1,11 @@
 # REQUIRES: riscv-snippy-model-None
 # RUN:  not llvm-snippy %s -mtriple=riscv64 -mcpu=generic-rv64 \
 # RUN:  |& FileCheck %s
- 
+
 options:
   preserve-caller-saved-regs: [X]
   num-instrs: 10
+
 sections:
   - name:      1
     VMA:       0x210000
@@ -17,14 +18,8 @@ sections:
     LMA:       0x500000
     ACCESS:    rx
 
-call-graph:
-  entry-point: SnippyFunction
-  function-list:
-    - name: SnippyFunction
-      callees:
-        - myfunc
-    - name: myfunc
-      external: true
+include:
+  - Inputs/call-graph-with-external-func.yaml
 
 histogram:
     - [ADD, 1.0]

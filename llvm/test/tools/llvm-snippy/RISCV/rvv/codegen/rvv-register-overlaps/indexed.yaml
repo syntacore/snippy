@@ -40,12 +40,12 @@ histogram:
 #      register group when:
 #
 #      The destination EEW (=32, EMUL = 4 or 8) equals the source EEW.
-# CHECK: $v24 = VLUXEI32_V $x{{[0-9]+}}, $v24
-# CHECK: $v28 = VLUXEI32_V $x{{[0-9]+}}, $v28
+# CHECK-DAG: $v24 = VLUXEI32_V $x{{[0-9]+}}, $v24
+# CHECK-DAG: $v28 = VLUXEI32_V $x{{[0-9]+}}, $v28
 
 #      The destination EEW (=32, EMUL = 4) is smaller than the source EEW.
-# CHECK: $v24 = VLUXEI64_V $x{{[0-9]+}}, $v24
+# CHECK-DAG: $v24 = VLUXEI64_V $x{{[0-9]+}}, $v24
 
 #      The destination EEW (=32, EMUL = 4 or 8) is greater than the source EEW.
-# CHECK: $v24 = VLUXEI16_V $x{{[0-9]+}}, $v26
-# CHECK: $v28 = VLUXEI16_V $x{{[0-9]+}}, $v30
+# CHECK-DAG: $v24 = VLUXEI16_V $x{{[0-9]+}}, $v26
+# CHECK-DAG: $v28 = VLUXEI16_V $x{{[0-9]+}}, $v30

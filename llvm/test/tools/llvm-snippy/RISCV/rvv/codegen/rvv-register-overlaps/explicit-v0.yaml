@@ -1,0 +1,39 @@
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  march: rv64imfdv
+  num-instrs: 1000
+  dump-mf: on
+  reserved-regs-list: ["V(1[6-9]|2[0-9]|3[0-1])"]
+
+include:
+  - Inputs/sections.yaml
+  - ../Inputs/rvv-unit-all.yaml
+
+histogram:
+  - [VADC_VIM, 1.0]
+  - [VADC_VVM, 1.0]
+  - [VADC_VXM, 1.0]
+  - [VFMERGE_VFM, 1.0]
+  - [VMADC_VIM, 1.0]
+  - [VMADC_VVM, 1.0]
+  - [VMADC_VXM, 1.0]
+  - [VMERGE_VIM, 1.0]
+  - [VMERGE_VVM, 1.0]
+  - [VMERGE_VXM, 1.0]
+  - [VMSBC_VVM, 1.0]
+  - [VMSBC_VXM, 1.0]
+  - [VSBC_VVM, 1.0]
+  - [VSBC_VXM, 1.0]
+  - [VADD_VV, 1.0]
+
+# COM: For vadc, vsbc and vmerge the instruction encoding is reserved if the
+#      destination vector register is v0.
+# CHECK-NOT: $v0 = VADC
+# CHECK-NOT: $v0 = VMADC
+# CHECK-NOT: $v0 = VSBC
+# CHECK-NOT: $v0 = VMSBC
+# CHECK-NOT: $v0 = VMERGE
+# CHECK-NOT: $v0 = VFMERGE

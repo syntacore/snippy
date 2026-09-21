@@ -1,6 +1,6 @@
 # REQUIRES: riscv-snippy-model-None
 # COM: This test checks that if register v0 is reserved, it is equivalent to
-#      using option --riscv-nomask-mode-for-rvv.
+#      setting `Pnomask`: 1
 # RUN: llvm-snippy %s |& FileCheck %s
 
 options:

@@ -200,6 +200,12 @@ public:
 
   static bool genBool() { return genInRangeInclusive(1); }
 
+  static bool genBoolWeighted(double TrueWeight) {
+    assert(TrueWeight >= 0 && TrueWeight <= 1.0);
+    std::discrete_distribution<bool> DD({1.0 - TrueWeight, TrueWeight});
+    return DD(pimpl->Engine);
+  }
+
   template <typename T> static T genInRangeExclusive(NumericRange<T> Range) {
     if (!Range.Min.has_value())
       Range.Min = 0;

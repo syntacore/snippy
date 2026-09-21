@@ -34,11 +34,13 @@ static Register pregenerateRegister(InstructionGenerationContext &InstrGenCtx,
   const auto &RegInfo = State.getRegInfo();
   const auto &Tgt = State.getSnippyTarget();
   auto OperandRegClassID = InstrDesc.operands()[OpIndex].RegClass;
-  const auto &RegClass = Tgt.getRegClass(
-      InstrGenCtx, OperandRegClassID, OpIndex, InstrDesc, RegInfo);
-  auto Exclude = Tgt.excludeRegsForOperand(InstrGenCtx, RegClass, InstrDesc,
-                                           OpIndex, Preselected);
-  auto Include = Tgt.includeRegs(InstrDesc.getOpcode(), RegClass);
+  const auto &RegClass = Tgt.getRegClass(InstrGenCtx, OperandRegClassID, OpIndex,
+                                  InstrDesc, RegInfo);
+  SmallVector<Register> Exclude;
+  SmallVector<Register> Include;
+  Tgt.excludeRegsForOperand(InstrGenCtx, RegClass, InstrDesc, OpIndex,
+                            Preselected, Exclude);
+  Tgt.includeRegs(InstrDesc.getOpcode(), RegClass, Include);
   AccessMaskBit Mask = AccessMaskBit::RW;
   auto CustomMask = Tgt.getCustomAccessMaskForOperand(InstrDesc, OpIndex);
   if (CustomMask != AccessMaskBit::None)

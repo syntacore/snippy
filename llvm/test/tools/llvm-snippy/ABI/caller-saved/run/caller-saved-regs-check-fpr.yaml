@@ -1,0 +1,69 @@
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+zfh -mcpu=generic-rv64 \
+# RUN:   -preserve-caller-saved-regs=F \
+# RUN: | FileCheck %s
+
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+f -mcpu=generic-rv64 \
+# RUN:   -preserve-caller-saved-regs=F \
+# RUN: | FileCheck %s
+
+
+# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+zfh -mcpu=generic-rv32 \
+# RUN:   -preserve-caller-saved-regs=F \
+# RUN: | FileCheck %s
+
+# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+f -mcpu=generic-rv32 \
+# RUN:   -preserve-caller-saved-regs=F \
+# RUN: | FileCheck %s
+
+options:
+  num-instrs: 1000
+  redefine-sp: reg::X2
+  verify-mi: on
+  dump-mf: on
+
+include:
+  - ../Inputs/sections-with-stack.yaml
+  - ../Inputs/call-graph-with-external-func.yaml
+
+histogram:
+     - [JAL, 1.0]
+     - [ADD, 1.0]
+     - [FADD_S, 1.0]
+
+# COM: Spill caller saved registers to the stack
+
+# CHECK: FSW $f1_f, $x2, 0
+# CHECK: FSW $f5_f, $x2, 0
+# CHECK: FSW $f6_f, $x2, 0
+# CHECK: FSW $f7_f, $x2, 0
+# CHECK: FSW $f28_f, $x2, 0
+# CHECK: FSW $f29_f, $x2, 0
+# CHECK: FSW $f30_f, $x2, 0
+# CHECK: FSW $f31_f, $x2, 0
+# CHECK: FSW $f10_f, $x2, 0
+# CHECK: FSW $f11_f, $x2, 0
+# CHECK: FSW $f12_f, $x2, 0
+# CHECK: FSW $f13_f, $x2, 0
+# CHECK: FSW $f14_f, $x2, 0
+# CHECK: FSW $f15_f, $x2, 0
+# CHECK: FSW $f16_f, $x2, 0
+# CHECK: FSW $f17_f, $x2, 0
+
+# COM: Reload caller saved registers from the stack
+
+# CHECK: $f17_f = FLW $x2, 0
+# CHECK: $f16_f = FLW $x2, 0
+# CHECK: $f15_f = FLW $x2, 0
+# CHECK: $f14_f = FLW $x2, 0
+# CHECK: $f13_f = FLW $x2, 0
+# CHECK: $f12_f = FLW $x2, 0
+# CHECK: $f11_f = FLW $x2, 0
+# CHECK: $f10_f = FLW $x2, 0
+# CHECK: $f31_f = FLW $x2, 0
+# CHECK: $f30_f = FLW $x2, 0
+# CHECK: $f29_f = FLW $x2, 0
+# CHECK: $f28_f = FLW $x2, 0
+# CHECK: $f7_f = FLW $x2, 0
+# CHECK: $f6_f = FLW $x2, 0
+# CHECK: $f5_f = FLW $x2, 0
+# CHECK: $f1_f = FLW $x2, 0

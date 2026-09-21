@@ -1239,18 +1239,6 @@ inline bool isRVVuseV0RegExplicitly(unsigned Opcode) {
   }
 }
 
-inline bool isRVVuseV0RegImplicitly(unsigned Opcode) {
-  switch (Opcode) {
-  default:
-    return false;
-  case RISCV::VFMV_V_F:
-  case RISCV::VMV_V_I:
-  case RISCV::VMV_V_X:
-  case RISCV::VMV_V_V:
-    return true;
-  }
-}
-
 inline bool isRVVWholeRegisterMove(unsigned Opcode) {
   switch (Opcode) {
   default:

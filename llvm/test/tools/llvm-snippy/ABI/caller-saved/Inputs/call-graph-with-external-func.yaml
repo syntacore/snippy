@@ -1,0 +1,8 @@
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - IamExternalFunc
+    - name: IamExternalFunc
+      external: true

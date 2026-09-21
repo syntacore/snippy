@@ -37,5 +37,5 @@ histogram:
 #      register group when:
 #
 #      The destination EEW (=32, EMUL = 1) is smaller than the source EEW (=64).
-# CHECK: $v30 = VNSRL_WI $v30
+# CHECK-DAG: $v30 = VNSRL_WI $v30
 # CHECK-NOT: $v31 = VNSRL_WI $v30
