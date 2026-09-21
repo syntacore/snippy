@@ -1,0 +1,5 @@
+# RUN: llvm-snippy %S/../../../../RISCV/floats/fp-precision/half-precision-fp-min-zfhmin.yaml \
+# RUN:    -mtriple=riscv64 -mattr=+zfhmin \
+# RUN:    -num-instrs=5000 \
+# RUN:    -init-regs-in-elf -verify-mi \
+# RUN:    -verify-gen-histogram -histogram-must-succeed=true
