@@ -100,6 +100,10 @@ The snippy output includes:
    file equals to the name of generated ELF file with ".elf" suffix
    replaced with ".ld". It is required, for example, for `global constants`_.
 
+-  An optional `selfcheck annotation file`_. 
+   The file name matches the name of the generated ELF file,
+   but with the suffix ".elf" replaced by ".selfcheck.yaml".
+
 -  Dump of the registers state after execution. To produce the register
    state use **--dump-registers-yaml** option. See
    `Final Registers State <#final-registers-state>`__.
@@ -4410,7 +4414,7 @@ Unordered intersecting memory access can lead to
 non-reproducible/unpredictable result of snippet execution,
 which is generally undesirable.
 
-RISC-V ISA has instructions that capable to perform unordered
+RISC-V ISA has instructions that are capable to perform unordered
 intersecting memory accesses. The ``riscv-disallow-intersecting-mem-accesses``
 option is intended to avoid such accesses by providing these instructions
 with non-intersecting memory addresses.
@@ -4558,138 +4562,95 @@ Self-check
 
 .. important::
 
-   This functionality is not supported without model plugin
+   Self-check features are not supported without model plugin.
 
-Self-check is a code generation mode that lets snippy verify the values
-its own instructions produce, using values obtained from the model
-plugin as a reference. Snippy supports two families of self-check
-modes:
+Self-check is a code generation mode that supports validation of the results
+of the primary instructions. The reference values are obtained from the
+model plugin. There are three families of self-check modes:
 
--  Memory-based modes (``code`` and ``memory``) |nbsp| -- |nbsp| the default. After
-   each (or each ``N``) main instruction(s), snippy stores a reference value
-   and the result of the instruction (a destination register) into the ``selfcheck`` section. You
-   then compare the two afterwards with something like an additional routine
-   embedded into your harness. See `Memory-based Self-check <#memory-based-self-check>`__.
+-  Memory-based ``code`` mode |nbsp| -- |nbsp| This is the default.
+   After each ``N`` primary instructions, snippy materializes
+   a reference value, and then inserts some ancillary code that stores
+   this reference value together with the actual result of the primary
+   instruction (its destination register) into the ``selfcheck`` section.
+   After execution completes, you can compare the reference vs. actual values
+   by means of an additional routine embedded into your harness.
+   See `Memory-based Self-check`_.
 
--  A register-based mode (``checksum``) |nbsp| -- |nbsp| snippy inserts code
+-  Memory-based ``memory`` mode |nbsp| -- |nbsp|
+   It is functionally the same as the ``code`` mode, but reference values
+   are placed into the ``selfcheck`` section at build time, so ancillary code
+   is not required. The result of the instruction (a destination
+   register) is still stored into ``selfcheck`` by ancillary code.
+
+-  Register-based ``checksum`` mode |nbsp| -- |nbsp| Snippy inserts code
    that computes and compares a running checksum on-the-fly and traps
    immediately if a mismatch is detected. This mode does not require a
-   ``selfcheck`` section. See `Register-based Self-check (Checksum Mode) <#register-based-self-check-checksum-mode>`__.
+   ``selfcheck`` section. See `Register-based Self-check (Checksum Mode)`_.
 
-You select the mode with the ``mode`` key of the top-level ``selfcheck``
-configuration key (see below), or with the ``-selfcheck-ref-value-storage``
-command-line option when using the legacy ``options: selfcheck: <N>`` way
-of enabling self-check.
+The Legacy Self-check Options
+-----------------------------
 
-.. _memory-based-self-check:
+The legacy method of enabling self-check and setting its mode is via options.
+The ``selfcheck=<N>`` option enables self-check, and
+the ``selfcheck-ref-value-storage=<mode>`` option selects its mode.
 
-Memory-based Self-check
-------------------------
+The options can be used in the CLI or placed under
+the ``options`` key in the configuration file.
 
-After each (or each ``N``) main
-instruction(s), snippy stores an etalon value and the result of the
-instruction to the ``selfcheck`` key. After execution, you have a
-section filled with pairs of values (``etalon1``-``real1``,
-``etalon2``-``real2``, etc). These values can be then compared to check
-if there are any differences.
+.. note::
 
-To use this feature:
+   The ``--selfcheck`` option has the default value ``<N>`` of ``1``,
+   so all the primary instructions are self-checked if this option is used
+   without parameters.
+   
+   If the ``selfcheck-ref-value-storage`` option is
+   not provided, then the ``code`` mode is selected by default.
 
-1. Enable the self-check setting via ``options``:
-
-   ::
-
-      selfcheck: <N>
-
-where ``<N>`` is each Nth instruction snippy will have self-checked. For
-example, if you want snippy to self-check each 100th instruction, use
-``100``. . To your layout, add the ``selfcheck`` key with the parameters
-of where you want to store the self-check values:
-
--  Name: ``selfcheck``
-
--  Access: ``rw``
-
-   For example:
-
-   .. code:: yaml
-
-      sections:
-      ...
-          - name: selfcheck
-            VMA:       0x310000
-            SIZE:      0x100000
-            LMA:       0x310000
-            ACCESS:    rw
-      ...
-
-   .. note::
-
-      In snippy, sections are ordered by their address (VMA) and **not**
-      by the order you specify them in the configuration.
-
-As a result, the section gets filled after each instruction with a
-register destination etalon and a real register value in the following
-format:
-
-::
-
-   REAL-1, ETA-1, REAL-2, ETA-2, REAL-3, ETA-3, ....
-
-where every value spans 128-bit.
-
-.. _selfcheck-configuration-key:
-
-The ``selfcheck`` Configuration Key
+The "selfcheck" Configuration Key
 ------------------------------------
 
-In addition to the legacy ``options: selfcheck: <N>`` way of enabling
-self-check (described above), you can use the top-level ``selfcheck``
-configuration key. It is required if you want to select a self-check mode
-other than the default (``code``), for example, the `register-based
-(checksum) mode <#register-based-self-check-checksum-mode>`__.
+In addition to the legacy way of enabling self-check
+via options (see above), you can use the top-level ``selfcheck``
+configuration key. Example:
 
 .. code:: yaml
 
    selfcheck:
-     mode: code       # code | memory | checksum
-     period: 1        # optional, defaults to 1 (self-check every instruction)
-     selfcheck-gv: false  # optional, same effect as --selfcheck-gv
+     mode: memory
+     period: 5
+     selfcheck-gv: true
+     selfcheck-td-options:
+       enable-selfcheck-rvv: true
 
 where:
 
 -  ``mode`` (required) |nbsp| -- |nbsp| Selects the self-check mode:
 
-   -  ``code`` (default) |nbsp| -- |nbsp| Memory-based. Reference values are
-      materialized during runtime and stored in the ``selfcheck`` section.
+   -  ``code`` |nbsp| -- |nbsp| Memory-based. Reference values are
+      materialized and stored in the ``selfcheck`` section at runtime.
 
-   -  ``memory`` |nbsp| -- |nbsp| Memory-based, behaves the same as ``code``,
-      but values are not materialized during runtime.
+   -  ``memory`` |nbsp| -- |nbsp| Memory-based. Reference values are
+      materialized and stored in the ``selfcheck`` section at build time.
 
-   -  ``checksum`` |nbsp| -- |nbsp| Register-based. See `Register-based
-      Self-check (Checksum Mode) <#register-based-self-check-checksum-mode>`__.
+   -  ``checksum`` |nbsp| -- |nbsp| Register-based.
+      See `Register-based Self-check (Checksum Mode)`_.
 
 -  ``period`` (optional) |nbsp| -- |nbsp| Same meaning as ``<N>`` in
-   ``options: selfcheck: <N>`` |nbsp| -- |nbsp| self-check every ``period`` th
+   ``options: selfcheck: <N>`` |nbsp| -- |nbsp| self-check occurs every ``period`` -th
    instruction. Defaults to ``1``.
 
 -  ``selfcheck-gv`` (optional) |nbsp| -- |nbsp| Same effect as the
-   ``--selfcheck-gv`` command-line option (see `Self-check Properties to
-   Global Variables <#self-check-properties-to-global-variables>`__).
+   ``--selfcheck-gv`` command-line option. Defaults to ``false``.
+   See `Exporting "selfcheck" Section Properties to Global Variables`_.
    Only applicable to memory-based modes.
 
 -  ``selfcheck-td-options`` (optional) |nbsp| -- |nbsp| Target-dependent
-   self-check options. For RISC-V, this currently supports
-   ``enable-selfcheck-rvv``, which is equivalent to the
-   ``--enable-selfcheck-rvv`` command-line option (see `Self-check for
-   RVV <#self-check-for-rvv>`__):
+   self-check options. For RISC-V, this currently supports:
 
-   .. code:: yaml
-
-      selfcheck:
-        mode: code
-        selfcheck-td-options:
-          enable-selfcheck-rvv: true
+   -  ``enable-selfcheck-rvv`` (optional) |nbsp| -- |nbsp| equivalent to the
+      ``--enable-selfcheck-rvv`` option. Defaults to ``false``.
+      See `Self-check for RVV`_.
 
 .. important::
 
@@ -4697,18 +4658,77 @@ where:
    ``enable-selfcheck-rvv``) both as a command-line option and inside the
    ``selfcheck`` configuration key at the same time.
 
-.. _register-based-self-check-checksum-mode:
+Memory-based Self-check
+-----------------------
+
+After each ``N`` primary instructions,
+snippy stores a reference value and the result of the
+instruction (actual value) in the ``selfcheck`` section.
+After snippet execution, the section is filled with actual and reference
+values, which can be compared to find out if there are any differences.
+To use this feature:
+
+#. Enable self-check and select the mode:
+
+   .. code:: yaml
+
+      options:
+         selfcheck: <N>
+         selfcheck-ref-value-storage: <mode> # the default is code
+
+   *  ``<N>`` defines self-check *period*, i.e. how many primary instructions
+      skipped between *checkpoints*. For example, if N=3, then the
+      1st instruction is self-checked, then the next two instructions
+      are skipped, then the 4th instruction is checked and so on,
+      i.e. each 3rd instruction is self-checked.
+
+   *  ``<mode>`` selects the self-check mode. For the Memory-based Self-check,
+      it should be one of: ``"code"``, ``"memory"``.
+
+#. Add the ``selfcheck`` section with ``rw`` access rights to the layout in
+   order to provide space in memory for holding actual/reference values.
+   Example:
+
+   .. code:: yaml
+
+      sections:
+      ...
+          - name:    selfcheck
+            ACCESS:  rw
+            VMA:     0x310000
+            SIZE:    0x100000
+            LMA:     0x310000
+      ...
+
+   After snippet execution, the section is filled with ``K``
+   "actual/reference" value pairs, where ``K`` is the number of *checkpoints*.
+   Each value occupies 128 bits (unused upper bits are zeroed).
+   There should be enough space in the section to hold all values,
+   i.e. the size of the section should be at least ``K*2*16 = N*32`` bytes.
+   Section format:
+
+   ::
+
+      ACTUAL-1, REF-1, ACTUAL-2, REF-2, ACTUAL-3, REF-3, ...
+
+#. In Memory-based modes, the address and size of the ``selfcheck`` section
+   together with some other parameters can be exported as global variables.
+   This allows accessing the section contents after snippet execution 
+   from the code linked to the snippet.
+   See more in `Exporting "selfcheck" Section Properties to Global Variables`_.
+   To enable this feature:
+
+   .. code:: yaml
+
+      options:
+         selfcheck-gv: true # the default is false.
 
 Register-based Self-check (Checksum Mode)
 ------------------------------------------
 
-.. important::
-
-   This functionality is not supported without model plugin
-
 Unlike the memory-based modes, the ``checksum`` self-check mode does not
-store reference/actual value pairs into a ``selfcheck`` section for later
-(offline or ``-selfcheck-mem``) comparison. Instead, snippy inserts
+store reference/actual value pairs in the ``selfcheck`` section for later
+comparison. Instead, snippy inserts
 inline instructions that:
 
 1. Accumulate a running checksum (bitwise XOR) of the selfchecked
@@ -4722,9 +4742,9 @@ inline instructions that:
    RISC-V) immediately if they differ.
 
 Because the check happens inline and traps as soon as a mismatch is
-detected, this mode does not require a ``selfcheck`` section, and you do
-not need any external tooling or the ``-selfcheck-mem`` option to detect
-a divergence -- the generated snippet checks itself while it runs.
+detected, this mode does not require neither the ``selfcheck`` section, nor
+the external tooling to detect a divergence.
+The generated snippet checks itself while it runs.
 
 To enable this mode, use the ``checksum`` value of the ``mode`` key:
 
@@ -4750,12 +4770,11 @@ To enable this mode, use the ``checksum`` value of the ``mode`` key:
        - [ADD, 1.0]
        - [SUB, 1.0]
 
-Alternatively, you can select this mode via the command line together
-with the legacy ``options: selfcheck: <N>`` way of enabling self-check:
+The legacy way of doing the same via CLI:
 
 ::
 
-   --selfcheck-ref-value-storage=checksum
+   --selfcheck 1 --selfcheck-ref-value-storage=checksum
 
 .. important::
 
@@ -4771,17 +4790,8 @@ with the legacy ``options: selfcheck: <N>`` way of enabling self-check:
    -  As with any self-check mode, ``AUIPC`` is not supported in the
       histogram.
 
-
-
 Self-check for RVV
 ------------------
-
-.. important::
-
-   Currently, this functionality does not supported without model plugin
-
-As the self-check feature is target-independent, it needs to be
-additionally enabled for RVV.
 
 Self-check for RVV is currently in the experimental state. To enable it:
 
@@ -4789,15 +4799,10 @@ Self-check for RVV is currently in the experimental state. To enable it:
 
    --enable-selfcheck-rvv
 
-
 .. _selfcheck-related global constants:
 
-Self-check Properties to Global Variables
------------------------------------------
-
-.. important::
-
-   This functionality is not supported without model plugin
+Exporting "selfcheck" Section Properties to Global Variables
+------------------------------------------------------------
 
 Self-check requires a certain amount of additional memory to be
 available. If you need to learn where the ``selfcheck`` key is after
@@ -4812,31 +4817,66 @@ explicitly indicate where the ``selfcheck`` key starts and ends.
 Following is an example of the external user code to work with snippy
 self-check global variables:
 
-::
+.. code:: c
 
+   // Exported variables:
    extern const unsigned long long *__snippy_selfcheck_section_address;
-
    extern unsigned long long __snippy_selfcheck_section_size;
-
    extern unsigned __snippy_selfcheck_data_byte_stride;
 
-   /* some code */
-
-   static void check_selfcheck_section() {
-     const char *ptr_pos = (const char *)__snippy_selfcheck_section_address;
-     unsigned distance_to_next_pair = 2 * __snippy_selfcheck_data_byte_stride;
-     start_analysis_report();
-
-     for (const char *end_pos = ptr_pos + __snippy_selfcheck_section_size;
-          ptr_pos != end_pos;
-          ptr_pos += distance_to_next_pair)
-       if (check_two_cells_identity(ptr_pos,
-              ptr_pos + __snippy_selfcheck_data_byte_stride,
-              __snippy_selfcheck_data_byte_stride))
-         return;
-
-     success_report();
+   // Usage example:
+   static const size_t SIZEOF_VALUES = (32/8); // Assume RV32.
+   const char * check_selfcheck_section() {
+     const char *p = (const char *)__snippy_selfcheck_section_address;
+     const char * const end = p + __snippy_selfcheck_section_size;
+     const size_t distance_to_next_pair = 2 * __snippy_selfcheck_data_byte_stride;
+     for (; p < end; p += distance_to_next_pair)
+       if (memcmp(p,
+             p + __snippy_selfcheck_data_byte_stride,
+             SIZEOF_VALUES))
+         return p; // Comparison failure, return ptr to mismatched values.
+     return NULL; // Success.
    }
+
+.. _selfcheck annotation file:
+
+Exporting Self-check Annotations to a File
+------------------------------------------
+
+This feature works in conjunction with Memory-based Self-check modes.
+It makes it easy to find PC of the primary instruction that
+produced an actual value that does not match the reference value.
+
+Self-check annotations are output to a YAML file whose name matches
+the name of the generated ELF file,
+but with the suffix ".elf" replaced with ".selfcheck.yaml".
+The file is generated automatically when
+any of the Memory-based Self-check modes is activated.
+
+Annotations reside under the top-level ``selfcheck-annotation`` YAML key
+and consist of ``K`` pairs of values:
+
+*  ``address`` - the address of the data tuple
+   (that contains actual and reference values)
+   in the selfcheck section,
+
+*  ``pc`` - the address of the primary instruction that yielded the values,
+
+where ``K`` is the number of *checkpoints* in the snippet.
+
+Example annotation file:
+
+.. code:: yaml
+
+   ---
+   selfcheck-annotation:
+   - address:         '0x310000'
+     pc:              '0x1003C4'
+   - address:         '0x310020'
+     pc:              '0x100408'
+   - address:         '0x310040'
+     pc:              '0x100454'
+   ...
 
 .. _global constants:
 
