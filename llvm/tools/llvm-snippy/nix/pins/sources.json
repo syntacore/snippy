@@ -42,9 +42,9 @@
       },
       "branch": "master",
       "submodules": false,
-      "revision": "6be683f24665a22977b7020acfee376448d8dbac",
-      "url": "https://github.com/LLVM-Snippy/whisper/archive/6be683f24665a22977b7020acfee376448d8dbac.tar.gz",
-      "hash": "sha256-ztgijnL1B8xUCCnGIkG0Ua4/LpnkVPIt79j6ULbsOw4="
+      "revision": "a1297abe0a30438984cacd6633de51e30dcd41e7",
+      "url": "https://github.com/LLVM-Snippy/whisper/archive/a1297abe0a30438984cacd6633de51e30dcd41e7.tar.gz",
+      "hash": "sha256-ZR7K1i0AkLK4itXghm3ENrt7FvlG3i9LPptSWjW51Tc="
     }
   },
   "version": 8
