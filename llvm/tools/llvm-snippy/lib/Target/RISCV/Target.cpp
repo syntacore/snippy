@@ -1213,6 +1213,13 @@ excludeForCmMvsa01(unsigned OpIndex,
 }
 
 using VRegGetterT = std::function<std::optional<Register>(unsigned Idx)>;
+// VRegGetter may return std::nullopt when the vector operand-register has not
+// been preselected yet.
+static void pushIfSelected(unsigned OpIndex, VRegGetterT VRegGetter,
+                           SmallVectorImpl<Register> &Result) {
+  if (auto VReg = VRegGetter(OpIndex))
+    Result.push_back(*VReg);
+}
 
 static void excludeForStridedLoadStore(
     unsigned OpIndex,
@@ -1294,9 +1301,10 @@ static void excludeForIndexedSegLoad(unsigned OpIndex,
   // by vs2), else the instruction encoding is reserved.
   auto AddConstraint = [&](unsigned Idx) {
     auto RegsCount = TgtCtx.getOperandRegsCount(InstrDesc, Idx, MBB);
-    auto BaseReg = *VRegGetter(Idx);
-    Result.resize(Result.size() + RegsCount);
-    std::iota(Result.end() - RegsCount, Result.end(), BaseReg);
+    if (auto BaseReg = VRegGetter(Idx)) {
+      Result.resize(Result.size() + RegsCount);
+      std::iota(Result.end() - RegsCount, Result.end(), *BaseReg);
+    }
   };
 
   constexpr auto Vs2Idx = 2u;
@@ -1338,12 +1346,11 @@ static void excludeForDest(unsigned OpIndex, InstructionGenerationContext &IGC,
   auto AddDestSrcConstraint = [&](unsigned VSrcIdx) {
     auto DestCount = TgtCtx.getOperandRegsCount(InstrDesc, OpIndex, MBB);
     auto VsCount = TgtCtx.getOperandRegsCount(InstrDesc, VSrcIdx, MBB);
-    // If VsCount < DestCount, vs not yet preselect.
-    if (VsCount > DestCount || (VsCount == DestCount && OpIndex > VSrcIdx)) {
-      auto BaseVsReg = *VRegGetter(VSrcIdx);
+    // If BaseVsReg == nullopt or VsCount < DestCount, vs not preselect.
+    if (auto BaseVsReg = VRegGetter(VSrcIdx);
+        BaseVsReg && (VsCount >= DestCount)) {
       if (!canSrcDestOperandsOverlap(Opcode))
-        Result.push_back(BaseVsReg);
-
+        Result.push_back(*BaseVsReg);
       // Check dest-source constraint
       //   * The destination EEW is smaller than the source EEW, and the
       //     lowest-numbered register in the
@@ -1351,10 +1358,9 @@ static void excludeForDest(unsigned OpIndex, InstructionGenerationContext &IGC,
       //     lowest-numbered register in the source vector register group.
       //     (For example, when LMUL=1, vnsrl.wi v0, v0, 3 is legal, but a
       //     destination of v1 is not).
-      assert(VsCount >= DestCount);
       auto RegsCount = VsCount - DestCount;
       Result.resize(Result.size() + RegsCount);
-      std::iota(Result.end() - RegsCount, Result.end(), BaseVsReg + DestCount);
+      std::iota(Result.end() - RegsCount, Result.end(), *BaseVsReg + DestCount);
     }
   };
   AddDestSrcConstraint(*VFirstSrc);
@@ -1389,14 +1395,16 @@ static void excludeIfDestEEWBiggerEEW(unsigned OpIndex,
   assert(DestCount >= VsMultiplier);
   auto RegsCount = DestCount - VsMultiplier;
   Result.resize(Result.size() + RegsCount);
-  std::iota(Result.end() - RegsCount, Result.end(), *VRegGetter(DestIdx));
+  if (auto DestReg = VRegGetter(DestIdx))
+    std::iota(Result.end() - RegsCount, Result.end(), *DestReg);
 }
 
 static void excludeIfDestEEWEqualEEW(unsigned Opcode, VRegGetterT VRegGetter,
                                      SmallVectorImpl<Register> &Result) {
   if (canSrcDestOperandsOverlap(Opcode))
     return;
-  Result.push_back(*VRegGetter(/* DestIdx */ 0));
+  constexpr auto DestIdx = 0u;
+  pushIfSelected(DestIdx, VRegGetter, Result);
 }
 
 static bool isNecessaryExcludeRegisters(InstructionGenerationContext &IGC,
@@ -1434,11 +1442,10 @@ static bool isNecessaryExcludeRegisters(InstructionGenerationContext &IGC,
          !canSrcDestOperandsOverlap(Opcode);
 }
 
-static void
-excludeForSources(const MCInstrDesc &InstrDesc, unsigned OpIndex,
-                  InstructionGenerationContext &IGC,
-                  ArrayRef<planning::PreselectedOpInfo> PregeneratedOperands,
-                  SmallVectorImpl<Register> &Result) {
+static void excludeForSources(const MCInstrDesc &InstrDesc, unsigned OpIndex,
+                              InstructionGenerationContext &IGC,
+                              VRegGetterT VRegGetter,
+                              SmallVectorImpl<Register> &Result) {
   if (isRVVuseV0RegExplicitly(InstrDesc.getOpcode())) {
     Result.push_back(RISCV::V0);
     return;
@@ -1459,7 +1466,6 @@ excludeForSources(const MCInstrDesc &InstrDesc, unsigned OpIndex,
     if (OpIndex == SrcIdx)
       SrcIdx = *VSecondSrc;
 
-    auto RegsCount = TgtCtx.getOperandRegsCount(InstrDesc, OpIndex, MBB);
     auto SrcRegsCount = TgtCtx.getOperandRegsCount(InstrDesc, SrcIdx, MBB);
     auto SrcEEW = getOperandEEW(InstrDesc, SrcIdx, SEW);
     // A vector register cannot be used to provide source operands with more
@@ -1468,12 +1474,10 @@ excludeForSources(const MCInstrDesc &InstrDesc, unsigned OpIndex,
     // result in the same vector register being read with two or more
     // different EEWs, including when the vector register appears at different
     // positions within two or more vector register groups, is reserved.
-    if (SrcEEW != EEW && (SrcRegsCount > RegsCount ||
-                          (SrcRegsCount == RegsCount && OpIndex > SrcIdx))) {
+    if (auto SrcReg = VRegGetter(SrcIdx); SrcReg && (SrcEEW != EEW)) {
       const auto &RegInfo = State.getRegInfo();
       const auto &Tgt = State.getSnippyTarget();
-      auto BaseReg =
-          Tgt.getFirstPhysReg(PregeneratedOperands[SrcIdx].getReg(), RegInfo);
+      auto BaseReg = Tgt.getFirstPhysReg(*SrcReg, RegInfo);
       [[maybe_unused]] const auto &VRegClass =
           RegInfo.getRegClass(RISCV::VRRegClassID);
       assert(VRegClass.contains(BaseReg));
@@ -5087,8 +5091,9 @@ public:
     // The following restrictions apply only to vector instructions.
     if (!isRVV(Opcode))
       return;
-
     auto Operands = InstrDesc.operands();
+    // GetVReg may return std::nullopt when the operand-register has not been
+    // preselected yet (or the operand is not a vector register).
     auto GetVReg = [&](unsigned Idx) -> std::optional<Register> {
       const auto &Op = PregeneratedOperands[Idx];
       if (!Op.isReg() || !isVectorRegClass(Operands[Idx].RegClass))
@@ -5128,13 +5133,13 @@ public:
 
     //   2. OpIdx == SrcIdx: We need to exclude the registers for the source
     //      operand. We need to take into account the possibly already selected:
-    //     1.1. Another source operands
-    excludeForSources(InstrDesc, OpIndex, IGC, PregeneratedOperands, Result);
+    //     2.1. Another source operands
+    excludeForSources(InstrDesc, OpIndex, IGC, GetVReg, Result);
     if (InstrDesc.mayStore())
       return;
     if (isRVVIndexedSegLoadStore(Opcode))
       return excludeForIndexedSegLoad(OpIndex, IGC, InstrDesc, GetVReg, Result);
-    //     1.2. Destination operand
+    //     2.2. Destination operand
     // Here we separately process all three relations between DestEEW and EEW.
     auto DestCount = TgtCtx.getOperandRegsCount(InstrDesc, DestIdx, MBB);
     auto Count = TgtCtx.getOperandRegsCount(InstrDesc, OpIndex, MBB);
