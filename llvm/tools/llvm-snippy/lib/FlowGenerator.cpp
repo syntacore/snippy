@@ -10,6 +10,7 @@
 #include "InitializePasses.h"
 
 #include "snippy/AddMetadataSectionPass.h"
+#include "snippy/Config/FunctionDescriptions.h"
 #include "snippy/Config/Selfcheck.h"
 #include "snippy/CreatePasses.h"
 #include "snippy/Generator/GeneratorContextPass.h"
@@ -265,11 +266,19 @@ static void dumpVerificationIntervalsIfNeeeded(SnippyModule &SM,
   auto &Meta = SM.hasGenResult<ObjectMetadata>()
                    ? SM.getGenResult<ObjectMetadata>()
                    : NullObjMeta;
+  SmallVector<std::string> ExternalFnNames;
+  if (auto *FuncDescs =
+          std::get_if<FunctionDescs>(&GenCtx.getConfig().PassCfg.CGLayout)) {
+    for (const auto &Desc : FuncDescs->Descs) {
+      if (Desc.External)
+        ExternalFnNames.push_back(Desc.Name);
+    }
+  }
   auto VerificationIntervals = IntervalsToVerify::createFromObject(
       State.getDisassembler(), Output,
       GenCtx.getProgramContext().getEntryPointName(),
       ProgCtx.getLinker().sections().getOutputSectionFor(".text").Desc.VMA,
-      Meta.EntryPrologueInstrCnt, Meta.EntryEpilogueInstrCnt);
+      Meta.EntryPrologueInstrCnt, Meta.EntryEpilogueInstrCnt, ExternalFnNames);
 
   if (!VerificationIntervals)
     snippy::fatal(Ctx, "Failed to extract pc intervals to verify",

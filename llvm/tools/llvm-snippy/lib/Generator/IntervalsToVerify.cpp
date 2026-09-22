@@ -81,7 +81,8 @@ public:
 
 private:
   IntervalsToVerifyFinder(MCDisassembler &D, size_t PrologueInstrCnt,
-                          size_t EpilogueInstrCnt, uint64_t SectionVMA);
+                          size_t EpilogueInstrCnt, uint64_t SectionVMA,
+                          ArrayRef<std::string> ExternalFnNames);
 
   Expected<uint64_t> getNthInstrAddress(size_t Num) const;
   Expected<uint64_t> getLastNthInstrAddress(size_t Num) const;
@@ -103,7 +104,8 @@ public:
   static Expected<IntervalsToVerifyFinder>
   createFromObject(MCDisassembler &D, StringRef ObjectBytes,
                    StringRef EntryPointName, uint64_t SectionVMA,
-                   size_t PrologueInstrCnt, size_t EpilogueInstrCnt);
+                   size_t PrologueInstrCnt, size_t EpilogueInstrCnt,
+                   ArrayRef<std::string> ExternalFnNames);
 
   std::vector<Interval> getIntervalsToVerify() const { return ToVerify; }
 
@@ -116,6 +118,7 @@ private:
   uint64_t SectionVMA;
   std::vector<Interval> ToVerify;
   std::vector<uint64_t> FunctionAddresses;
+  std::vector<std::string> ExternalFnNames;
 };
 
 } // namespace
@@ -125,9 +128,9 @@ namespace {
 Expected<IntervalsToVerifyFinder> IntervalsToVerifyFinder::createFromObject(
     MCDisassembler &D, StringRef ObjectBytes, StringRef EntryPointName,
     uint64_t MappedSectionAddr, size_t PrologueInstrCnt,
-    size_t EpilogueInstrCnt) {
+    size_t EpilogueInstrCnt, ArrayRef<std::string> ExternalFnNames) {
   IntervalsToVerifyFinder Finder(D, PrologueInstrCnt, EpilogueInstrCnt,
-                                 MappedSectionAddr);
+                                 MappedSectionAddr, ExternalFnNames);
   if (auto E = Finder.fillIntervals(ObjectBytes, EntryPointName))
     return std::move(E);
   return Finder;
@@ -144,6 +147,17 @@ Error IntervalsToVerifyFinder::fillStartAddressesOfFunctions() {
         !Type || *Type != object::SymbolRef::ST_Function)
       continue;
 
+    auto Name = F.getName();
+    if (!Name)
+      return Name.takeError();
+
+    // External functions are emitted with stub bodies solely so that the
+    // snippet can run on a model; they are overridden by user-provided code
+    // in the final image, so their addresses here do not match the memory
+    // being verified and must be skipped.
+    if (is_contained(ExternalFnNames, *Name))
+      continue;
+
     auto Addr = F.getAddress();
     if (!Addr)
       return Addr.takeError();
@@ -154,12 +168,12 @@ Error IntervalsToVerifyFinder::fillStartAddressesOfFunctions() {
   return Error::success();
 }
 
-IntervalsToVerifyFinder::IntervalsToVerifyFinder(MCDisassembler &D,
-                                                 size_t PrologueInstrCnt,
-                                                 size_t EpilogueInstrCnt,
-                                                 uint64_t MappedSectionAddr)
+IntervalsToVerifyFinder::IntervalsToVerifyFinder(
+    MCDisassembler &D, size_t PrologueInstrCnt, size_t EpilogueInstrCnt,
+    uint64_t MappedSectionAddr, ArrayRef<std::string> ExternalFnNames)
     : Disas(D), PrologueSZ(PrologueInstrCnt), EpilogueSZ(EpilogueInstrCnt),
-      SectionVMA(MappedSectionAddr) {}
+      SectionVMA(MappedSectionAddr),
+      ExternalFnNames(ExternalFnNames.begin(), ExternalFnNames.end()) {}
 
 Error IntervalsToVerifyFinder::writeInstructionAddresses(uint64_t StartAddr) {
   InstructionAddresses.clear();
@@ -305,10 +319,11 @@ namespace snippy {
 
 Expected<IntervalsToVerify> IntervalsToVerify::createFromObject(
     MCDisassembler &D, StringRef ObjectBytes, StringRef EntryPointName,
-    uint64_t SectionVMA, size_t PrologueInstrCnt, size_t EpilogueInstrCnt) {
+    uint64_t SectionVMA, size_t PrologueInstrCnt, size_t EpilogueInstrCnt,
+    ArrayRef<std::string> ExternalFnNames) {
   auto Finder = IntervalsToVerifyFinder::createFromObject(
       D, ObjectBytes, EntryPointName, SectionVMA, PrologueInstrCnt,
-      EpilogueInstrCnt);
+      EpilogueInstrCnt, ExternalFnNames);
 
   if (!Finder)
     return Finder.takeError();
