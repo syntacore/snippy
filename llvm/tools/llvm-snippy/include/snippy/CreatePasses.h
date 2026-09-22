@@ -94,9 +94,9 @@ ModulePass *createMemInitGeneratorPass(snippy::MemoryManager &MemManager,
                                        MachineModuleInfo &MMI,
                                        snippy::MemInitMode InitMode);
 
-ModulePass *createSMCInitPass(MachineModuleInfo &MMI);
-ModulePass *createSMCGeneratorPass(MachineModuleInfo &MMI);
-ModulePass *createSMCFillerPass(snippy::LLVMState &State);
+ModulePass *createSMCInitPass();
+ModulePass *createSMCGeneratorPass();
+ModulePass *createSMCFillerPass();
 ModulePass *createSMCSetSizeGlobalsPass();
 
 ModulePass *createSMCBBToNamePass();
