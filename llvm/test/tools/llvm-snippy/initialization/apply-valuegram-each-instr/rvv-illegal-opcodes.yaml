@@ -1,0 +1,37 @@
+# COM: This test checks that generation completes correctly when the layout
+#      contains incompatible opcodes and configurations: only compatible
+#      configurations are selected for all opcodes.
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+    mtriple: riscv64
+    mattr: +v
+    dump-mf: on
+    num-instrs: 100
+    rvv-init-mode: loads
+
+include:
+  - ../../RISCV/rvv/Inputs/rvv-sections.yaml
+  - Inputs/rvv-unit-sew-lmul-edges.yaml
+
+operands-reinitialization:
+    - type: valuegram
+      weight: 1.0
+      opcodes:
+        - "VWADD_VV":
+            - type: operands
+              values: [0x1, 0x2]
+        - "VFADD_VF":
+            - type: operands
+              values: [0x1, 0x2]
+
+histogram:
+    - [VADD_VV, 1.0]
+# Illegal when LMUL = 8
+    - [VWADD_VV, 1.0]
+# Illegal when SEW < 32
+    - [VFADD_VF, 1.0]
+
+# CHECK: VWADD_VV
+# CHECK: VFADD_VF
