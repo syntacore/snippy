@@ -1,0 +1,18 @@
+# COM: This test checks that generation completes correctly when the layout
+#      contains all rvv opcodes.
+
+# RUN: llvm-snippy %s -valuegram-operands-regs=%S/Inputs/histograms.yaml
+
+options:
+    mtriple: riscv64
+    mattr: +v
+    dump-mf: on
+    num-instrs: 10000
+    rvv-init-mode: loads
+
+include:
+  - ../../RISCV/rvv/Inputs/rvv-sections.yaml
+  - Inputs/rvv-unit-sew-lmul-edges.yaml
+
+histogram:
+    - [V.*_.*, 1.0]
