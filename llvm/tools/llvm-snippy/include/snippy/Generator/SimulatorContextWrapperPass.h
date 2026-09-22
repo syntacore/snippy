@@ -48,7 +48,7 @@ public:
   static char ID;
   SimulatorContextWrapper(bool DoInit)
       : ActiveImmutablePass<ModulePass, OwningSimulatorContext>(ID),
-        DoInit(DoInit){};
+        DoInit(DoInit) {}
 
   StringRef getPassName() const override;
 
@@ -63,7 +63,7 @@ private:
 class SimulatorContextPreserver : public ModulePass {
 public:
   static char ID;
-  SimulatorContextPreserver() : ModulePass(ID){};
+  SimulatorContextPreserver() : ModulePass(ID) {}
 
   StringRef getPassName() const override;
 

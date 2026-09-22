@@ -62,11 +62,11 @@ private:
 /// \template ActiveImmutablePass
 ///
 /// \brief implements generic "run-once" pass with arbitrary pack of
-///        produced analysises.
+///        produced analyses.
 ///
 /// \param Base - llvm pass type to inherit from. Supported types: ModulePass,
 ///                MachineFunctionPass.
-/// \pack  AnalysisTs - zero or more types of analysises producesd by this pass.
+/// \pack  AnalysisTs - zero or more types of analyses producesd by this pass.
 template <typename Base, typename... AnalysisTs>
 class ActiveImmutablePass : public Base, public ActiveImmutablePassInterface {
 public:
@@ -108,7 +108,7 @@ public:
   /// };
   ///
   ///  NOTE #1: This pass as analysis is never invalidated -  it is not
-  ///           nessesary to mark it as preserved by another passes.
+  ///           necessary to mark it as preserved by another passes.
   ///  NOTE #2: create<MyActiveImmutablePassName>() function must
   ///           return ActiveImmutablePassInterface*. The pointer of
   ///           same type must be passed to PassManagerWrapper::add()
@@ -124,7 +124,7 @@ public:
   ///           function can be retrieved by:
   ///                getAnalysis<SomeMFPass>().get<SomeMFAnalysis>(A);
   ///           where A - is either a Function& or MachineFunction&.
-  ActiveImmutablePass(char &ID) : Base(getUnique(ID)), RealID(&ID){};
+  ActiveImmutablePass(char &ID) : Base(getUnique(ID)), RealID(&ID) {}
 
   // Called by PassManagerWrapper.
   ImmutablePass *createStoragePass() override {
@@ -157,7 +157,7 @@ public:
   public:
     DecoyPass(Pass *RealPass, char &ID)
         : ImmutablePass(ID), RealPass(RealPass),
-          Name((Twine(RealPass->getPassName()) + " Storage").str()){};
+          Name((Twine(RealPass->getPassName()) + " Storage").str()) {}
     StringRef getPassName() const override { return Name; }
 
     // A hack to get a pointer to real path from decoy.
@@ -172,11 +172,11 @@ public:
 
   static constexpr auto IsFunctionAnalysis =
       std::is_base_of_v<FunctionPass, Base>;
-  // Based on the type of base pass, choose apropriate
+  // Based on the type of base pass, choose appropriate
   // storage container for analysis instance. If it is a ModulePass,
   // simple unique_ptr is enough. However, if it is a FunctionPass
   // or any of its derivatives, distinct instance of analysis for each
-  // function is required - use a hash table (Funtion <-> AnalysisInstance).
+  // function is required - use a hash table (Function <-> AnalysisInstance).
   template <typename AnalysisT>
   using AnalysisStorage = std::conditional_t<
       IsFunctionAnalysis,

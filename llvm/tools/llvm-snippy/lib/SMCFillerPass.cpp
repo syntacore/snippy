@@ -27,13 +27,10 @@ namespace snippy {
 namespace {
 
 class SMCFiller final : public ModulePass {
-  LLVMState *State = nullptr;
-
 public:
   static char ID;
 
   SMCFiller() : ModulePass(ID) {}
-  SMCFiller(LLVMState &State) : ModulePass(ID), State{&State} {}
 
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
@@ -62,9 +59,7 @@ INITIALIZE_PASS(SMCFiller, DEBUG_TYPE, PASS_DESC, false, false)
 
 namespace llvm {
 
-ModulePass *createSMCFillerPass(snippy::LLVMState &State) {
-  return new SMCFiller(State);
-}
+ModulePass *createSMCFillerPass() { return new SMCFiller(); }
 
 namespace snippy {
 
@@ -74,6 +69,7 @@ bool SMCFiller::runOnModule(Module &M) {
     return false;
   auto &MF = *SMCSrcMF;
   auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &State = GC.getProgramContext().getLLVMState();
   auto &SimCtx = getAnalysis<SimulatorContextWrapper>()
                      .get<OwningSimulatorContext>()
                      .get();
@@ -92,8 +88,7 @@ bool SMCFiller::runOnModule(Module &M) {
   auto &SMCManager = ProgCtx.getSMCManager();
   for (auto &&[MBB, TBB] :
        zip(drop_begin(MF), SMCManager.getTgtBlocksFromBlockPairs())) {
-    BlockSize =
-        State->getCodeBlockSize(TBB->begin(), TBB->getFirstTerminator());
+    BlockSize = State.getCodeBlockSize(TBB->begin(), TBB->getFirstTerminator());
     Limit = planning::RequestLimit::Size{BlockSize};
     Policy = planning::createGenPolicy(ProgCtx, GC.getConfig().DefFlowConfig);
     FunReq.addToBlock(
