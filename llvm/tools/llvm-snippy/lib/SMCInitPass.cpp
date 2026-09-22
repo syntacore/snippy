@@ -30,9 +30,7 @@ INITIALIZE_PASS(SMCInit, DEBUG_TYPE, PASS_DESC, false, false)
 
 namespace llvm {
 
-ModulePass *createSMCInitPass(MachineModuleInfo &MMI) {
-  return new SMCInit(MMI);
-}
+ModulePass *createSMCInitPass() { return new SMCInit(); }
 
 namespace snippy {
 
@@ -46,6 +44,7 @@ void SMCInit::getAnalysisUsage(AnalysisUsage &AU) const {
 }
 
 bool SMCInit::runOnModule(Module &M) {
+  auto &MMI = SnippyModule::fromModule(M).getMMI();
   auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
   auto &ProgCtx = GC.getProgramContext();
   const auto &State = ProgCtx.getLLVMState();
@@ -62,7 +61,7 @@ bool SMCInit::runOnModule(Module &M) {
   auto &F = State.createFunction(M, SMCManagerT::SMCSrcFuncName,
                                  /* SectionName */ "",
                                  Function::ExternalLinkage, M.getContext());
-  auto &MF = State.createMachineFunctionFor(F, *MMI, M.getContext(),
+  auto &MF = State.createMachineFunctionFor(F, MMI, M.getContext(),
                                             /* SetSection */ true);
 
   auto *EntryMBB = snippy::createMachineBasicBlock(MF);

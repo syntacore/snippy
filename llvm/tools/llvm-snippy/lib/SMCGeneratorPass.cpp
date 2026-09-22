@@ -25,13 +25,10 @@ namespace snippy {
 namespace {
 
 class SMCGenerator final : public ModulePass {
-  MachineModuleInfo *MMI = nullptr;
-
 public:
   static char ID;
 
   SMCGenerator() : ModulePass(ID) {}
-  SMCGenerator(MachineModuleInfo &MMI) : ModulePass(ID), MMI{&MMI} {}
 
   StringRef getPassName() const override { return PASS_DESC " Pass"; }
 
@@ -60,9 +57,7 @@ INITIALIZE_PASS(SMCGenerator, DEBUG_TYPE, PASS_DESC, false, false)
 
 namespace llvm {
 
-ModulePass *createSMCGeneratorPass(MachineModuleInfo &MMI) {
-  return new SMCGenerator(MMI);
-}
+ModulePass *createSMCGeneratorPass() { return new SMCGenerator(); }
 
 namespace snippy {
 
@@ -70,6 +65,7 @@ bool SMCGenerator::runOnModule(Module &M) {
   if (!getAnalysis<SMCInit>().getSMCSrcMF())
     return false;
   auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
+  auto &MMI = SnippyModule::fromModule(M).getMMI();
   auto &ProgCtx = GC.getProgramContext();
   auto &State = ProgCtx.getLLVMState();
 
@@ -77,7 +73,7 @@ bool SMCGenerator::runOnModule(Module &M) {
   auto &F = State.createFunction(M, SMCManagerT::SMCCopyFuncName,
                                  /* SectionName */ "",
                                  Function::ExternalLinkage, M.getContext());
-  auto &MF = State.createMachineFunctionFor(F, *MMI, M.getContext(),
+  auto &MF = State.createMachineFunctionFor(F, MMI, M.getContext(),
                                             /* SetSection */ true);
 
   SnpTgt.generateMemCpyForSMC(MF, ProgCtx);

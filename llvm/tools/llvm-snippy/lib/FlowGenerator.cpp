@@ -178,10 +178,10 @@ static auto createSMCInitRoutine(GeneratorContext &Ctx) {
         PM.add(createGeneratorContextWrapperPass(Ctx));
         PM.add(createRootRegPoolWrapperPass());
         PM.add(createSimulatorContextWrapperPass(/* DoInit */ false));
-        PM.add(createSMCInitPass(ExtModule->getMMI()));
+        PM.add(createSMCInitPass());
         PM.add(createSMCBBToNamePass());
-        PM.add(createSMCFillerPass(State));
-        PM.add(createSMCGeneratorPass(ExtModule->getMMI()));
+        PM.add(createSMCFillerPass());
+        PM.add(createSMCGeneratorPass());
         SnippyTgt.addTargetLegalizationPasses(PM);
         assert(Ctx.getConfig().PassCfg.CodeLayout);
         addCodeLayout(PM);

@@ -19,14 +19,12 @@ class MachineFunction;
 namespace snippy {
 
 class SMCInit final : public ModulePass {
-  MachineModuleInfo *MMI = nullptr;
   MachineFunction *SMCSrcMF = nullptr;
 
 public:
   static char ID;
 
   SMCInit() : ModulePass(ID) {}
-  SMCInit(MachineModuleInfo &MMI) : ModulePass(ID), MMI{&MMI} {}
 
   StringRef getPassName() const override;
 
