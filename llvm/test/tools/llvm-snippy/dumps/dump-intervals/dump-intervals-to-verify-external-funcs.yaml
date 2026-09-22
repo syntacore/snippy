@@ -1,0 +1,50 @@
+# RUN: llvm-snippy %s -mtriple=riscv64 \
+# RUN:    -num-instrs=100 -num-instr-ancil=50 -o %t.layout.elf \
+# RUN:    -dump-intervals-to-verify=%t.layout.elf.intervals-to-verify.yaml
+# RUN: FileCheck -input-file=%t.layout.elf.intervals-to-verify.yaml %s
+
+# External functions are emitted as weak symbols with stub bodies for running
+# the snippet on a model. They are overridden by user-provided code in the
+# real image, so they must not be included in the intervals to verify.
+
+# CHECK: intervals-to-verify:
+# CHECK-COUNT-3: [ {{0x[[:xdigit:]]+}}, {{0x[[:xdigit:]]+}} ]
+# CHECK-NOT: [ {{0x[[:xdigit:]]+}}, {{0x[[:xdigit:]]+}} ]
+
+call-graph:
+  entry-point: SnippyFunction
+  function-list:
+    - name: SnippyFunction
+      callees:
+        - fun1
+    - name: fun1
+      callees:
+        - fun2
+    - name: fun2
+      callees:
+        - fun3
+    - name: fun3
+      external: true
+
+sections:
+    - name:      1
+      VMA:       0x210000
+      SIZE:      0x100000
+      LMA:       0x210000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x100000
+      SIZE:      0x100000
+      LMA:       0x100000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [JAL, 0.2]
