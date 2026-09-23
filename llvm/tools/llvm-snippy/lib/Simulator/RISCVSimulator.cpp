@@ -624,6 +624,13 @@ static void addZextBits(RVMExtDescriptor &Ext,
     ZextBits[RVM_ZEXT_VKB] = true;
   if (Subtarget.hasStdExtZvfbfmin())
     ZextBits[RVM_ZEXT_VFBFMIN] = true;
+  // Zvfbfa implies Zvfbfmin. The model enables the bf16 semantics through the
+  // altfmt vtype bit and Zvfbfmin; Zvfbfa's arithmetic requires EXT_ZVFBFA,
+  // which is signalled here as well.
+  if (Subtarget.hasStdExtZvfbfa()) {
+    ZextBits[RVM_ZEXT_VFBFA] = true;
+    //ZextBits[RVM_ZEXT_VFBFMIN] = true;
+  }
   if (Subtarget.hasStdExtZvfbfwma())
     ZextBits[RVM_ZEXT_VFBFWMA] = true;
   if (Subtarget.hasStdExtZvfh())

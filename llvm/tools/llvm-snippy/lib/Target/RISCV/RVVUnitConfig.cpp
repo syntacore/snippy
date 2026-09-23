@@ -499,6 +499,8 @@ namespace llvm {
 namespace snippy {
 
 std::string toString(VSEW SEW) {
+  if (SEW == VSEW::SEW16Alt)
+    return "e16alt";
   switch (SEW) {
   case VSEW::SEWReserved1:
     return "eReserved1";
@@ -639,7 +641,7 @@ static SewLmulDistribution
 buildRawSewLmulDistribution(unsigned ELEN, unsigned VLEN,
                             const RVVUnitInfo &VUInfo, double PVill) {
   // All values, including the reserved ones
-  SEWInfo AllSewWeights = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+  SEWInfo AllSewWeights = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
   LMULInfo AllLMULWeights = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
 
   // Zero-out the reserved ones if required
@@ -949,6 +951,7 @@ template <> struct yaml::MappingTraits<SEWInfo> {
   static void mapping(yaml::IO &IO, SEWInfo &SEW) {
     IO.mapOptional("sew_8", SEW[VSEW::SEW8], 0.0);
     IO.mapOptional("sew_16", SEW[VSEW::SEW16], 0.0);
+    IO.mapOptional("sew_16alt", SEW[VSEW::SEW16Alt], 0.0);
     IO.mapOptional("sew_32", SEW[VSEW::SEW32], 0.0);
     IO.mapOptional("sew_64", SEW[VSEW::SEW64], 0.0);
   }
@@ -978,6 +981,7 @@ template <> struct yaml::ScalarEnumerationTraits<VSEW> {
   static void enumeration(IO &IO, VSEW &Value) {
     IO.enumCase(Value, "sew_8", VSEW::SEW8);
     IO.enumCase(Value, "sew_16", VSEW::SEW16);
+    IO.enumCase(Value, "sew_16alt", VSEW::SEW16Alt);
     IO.enumCase(Value, "sew_32", VSEW::SEW32);
     IO.enumCase(Value, "sew_64", VSEW::SEW64);
   }
@@ -1489,7 +1493,7 @@ bool isLegalSewLmul(unsigned ELEN, unsigned VLEN, VSEW SEW, VLMUL LMUL) {
   if (!isLegalSEW(SEW))
     return false;
 
-  unsigned SEWVal = static_cast<unsigned>(SEW);
+  unsigned SEWVal = getSEWWidth(SEW);
   if (SEWVal > ELEN)
     return false;
 
@@ -1511,7 +1515,7 @@ unsigned computeVLMax(unsigned ELEN, unsigned VLEN, VSEW VSEW, VLMUL LMUL) {
     return 0;
 
   auto [Multiplier, IsFractional] = RISCVVType::decodeVLMUL(LMUL);
-  unsigned SEW = static_cast<unsigned>(VSEW);
+  unsigned SEW = getSEWWidth(VSEW);
 
   unsigned Result =
       IsFractional ? (VLEN / SEW / Multiplier) : (VLEN / SEW * Multiplier);
@@ -1585,7 +1589,7 @@ static unsigned getNumReservedSEW(unsigned SEW) {
 static void printOldStyleConfig(raw_ostream &OS, VSEW SEW, VLMUL LMUL,
                                 VTAMode TA, VMAMode MA, VXRMMode XRM) {
   OS << "{ ";
-  unsigned SewVal = static_cast<unsigned>(SEW);
+  unsigned SewVal = getSEWWidth(SEW);
   OS << "e";
   if (!isLegalSEW(SEW))
     OS << "Reserved" << getNumReservedSEW(SewVal);

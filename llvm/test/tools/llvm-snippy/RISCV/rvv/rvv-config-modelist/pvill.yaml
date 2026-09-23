@@ -42,5 +42,5 @@ histogram:
 # CHECK: Set Vill Bit Probability: 0.5
 # CHECK-DAG: P: 0.25 Conf: { e8, m1, tu, mu, vxrm: rnu }
 # CHECK-DAG: P: 0.25 Conf: { e64, m8, tu, mu, vxrm: rnu }
-# CHECK: P: 0.5 Conf: {  Illegal Configurations:  42 points }
-# CHECK: - Configuration Bag Size: 44
+# CHECK: P: 0.5 Conf: {  Illegal Configurations:  44 points }
+# CHECK: - Configuration Bag Size: 46

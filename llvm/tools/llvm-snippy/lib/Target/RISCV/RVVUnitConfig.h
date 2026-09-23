@@ -63,6 +63,12 @@ std::string toString(VLMUL LMUL);
 enum class VSEW : unsigned {
   SEW8 = 8,
   SEW16 = 16,
+  // SEW 16 with the vtype "altfmt" bit (bit 8) set (Zvfbfa bfloat16 elements).
+  // This is a distinct enum identity from SEW16 and has a distinct numeric
+  // value (not a real SEW width) so that EnumMappingFunctions::toIdx (which
+  // compares with `==`) keeps the two entries separate. getSEWWidth() reports
+  // the real element width (16) for this mode.
+  SEW16Alt = 16384,
   SEW32 = 32,
   SEW64 = 64,
   SEWReserved1 = 128,
@@ -72,9 +78,10 @@ enum class VSEW : unsigned {
 };
 struct SEWEnumList final {
   static constexpr std::array Arr = {VSEW::SEW8,         VSEW::SEW16,
-                                     VSEW::SEW32,        VSEW::SEW64,
-                                     VSEW::SEWReserved1, VSEW::SEWReserved2,
-                                     VSEW::SEWReserved3, VSEW::SEWReserved4};
+                                     VSEW::SEW16Alt,     VSEW::SEW32,
+                                     VSEW::SEW64,        VSEW::SEWReserved1,
+                                     VSEW::SEWReserved2, VSEW::SEWReserved3,
+                                     VSEW::SEWReserved4};
 };
 
 std::string toString(VSEW SEW);
@@ -107,6 +114,11 @@ std::pair<unsigned, bool> computeDecodedEMUL(unsigned ELEN, unsigned SEW,
 bool isValidEMUL(unsigned ELEN, unsigned SEW, unsigned EEW, VLMUL LMUL);
 
 inline bool isLegalSEW(VSEW SEW) {
+  if (SEW == VSEW::SEW16Alt) {
+    // SEW16Alt is the Zvfbfa altfmt mode with element width 16; it is legal as
+    // a SEW=16 context.
+    return true;
+  }
   switch (SEW) {
   default:
     return false;
@@ -120,6 +132,21 @@ inline bool isLegalSEW(VSEW SEW) {
 
 inline bool isLegalSEW(unsigned SEW) {
   return isLegalSEW(static_cast<VSEW>(SEW));
+}
+
+// True when the SEW config selects the Zvfbfa altfmt (bfloat16) mode. Only
+// SEW 16 + altfmt is modeled; altfmt=1 is spec-reserved for SEW >= 32 and only
+// sew_8alt / sew_16alt are legal (sew_8alt covers just the 4 conversion ops).
+inline bool isAltFmtSEW(VSEW SEW) { return SEW == VSEW::SEW16Alt; }
+
+// The real element width in bits for a VSEW config. SEW16Alt is the Zvfbfa
+// altfmt mode whose element *width* is still 16 (only the format differs:
+// bf16 vs fp16). All width-based math (computeVLMax, EMUL, instruction
+// availability) must use this instead of the raw enum value.
+inline unsigned getSEWWidth(VSEW SEW) {
+  if (SEW == VSEW::SEW16Alt)
+    return static_cast<unsigned>(VSEW::SEW16);
+  return static_cast<unsigned>(SEW);
 }
 
 inline bool isLegalLMUL(VLMUL LMUL) { return LMUL != VLMUL::LMUL_RESERVED; }
@@ -182,16 +209,20 @@ struct RVVConfiguration final {
   unsigned getVTYPE() const {
     bool IsTA = (TA == VTAMode::TA);
     bool IsMA = (MA == VMAMode::MA);
-    unsigned SEW = static_cast<unsigned>(PrimaryCfg.SEW);
+    unsigned SEW = getSEWWidth(PrimaryCfg.SEW);
+    // altfmt (vtype bit 8) is derived from the SEW config: SEW16Alt selects the
+    // Zvfbfa bfloat16 mode.
+    bool AltFmt = isAltFmtSEW(PrimaryCfg.SEW);
     if (RISCVVType::isValidSEW(SEW))
-      return RISCVVType::encodeVTYPE(PrimaryCfg.LMUL, SEW, IsTA, IsMA);
+      return RISCVVType::encodeVTYPE(PrimaryCfg.LMUL, SEW, IsTA, IsMA, AltFmt);
 
     // Reserved vsew encodings are intentionally generated to make hardware
     // set vill.  Upstream's encoder now accepts only currently valid SEWs, so
     // form the reserved immediate explicitly.
     unsigned VType = ((Log2_32(SEW) - 3) << 3) |
                      (static_cast<unsigned>(PrimaryCfg.LMUL) & 0x7);
-    return VType | (IsTA ? 0x40 : 0) | (IsMA ? 0x80 : 0);
+    return VType | (IsTA ? 0x40 : 0) | (IsMA ? 0x80 : 0) |
+           (AltFmt ? 0x100 : 0);
   }
 };
 

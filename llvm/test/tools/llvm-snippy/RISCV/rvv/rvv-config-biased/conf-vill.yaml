@@ -88,8 +88,8 @@ histogram:
 # CHECK-BOTH-CONFIGS-NEXT:    P: 0.5 <any_legal>
 # CHECK-BOTH-CONFIGS:  - Configuration Bag Listing:
 # CHECK-BOTH-CONFIGS-COUNT-352:   /MaxVL
-# CHECK-BOTH-CONFIGS-NEXT:    P: 0.5 Conf: {  Illegal Configurations:  672 points }/MaxVL: 0
-# CHECK-BOTH-CONFIGS-NEXT:  - Configuration Bag Size: 1024
+# CHECK-BOTH-CONFIGS-NEXT:    P: 0.5 Conf: {  Illegal Configurations:  704 points }/MaxVL: 0
+# CHECK-BOTH-CONFIGS-NEXT:  - Configuration Bag Size: 1056
 # CHECK-BOTH-CONFIGS-NEXT:  - State Cardinality: 7552 ~ {MASKS}
 # CHECK-BOTH-CONFIGS-NEXT: --- RVV Configuration End  ---
 
@@ -105,8 +105,8 @@ histogram:
 # CHECK-ILLEGAL-ONLY-NEXT:    P: 0.5 <all_ones>
 # CHECK-ILLEGAL-ONLY-NEXT:    P: 0.5 <any_legal>
 # CHECK-ILLEGAL-ONLY:  - Configuration Bag Listing:
-# CHECK-ILLEGAL-ONLY-NEXT:    P: 1 Conf: {  Illegal Configurations:  672 points }/MaxVL: 0
-# CHECK-ILLEGAL-ONLY-NEXT:  - Configuration Bag Size: 672
+# CHECK-ILLEGAL-ONLY-NEXT:    P: 1 Conf: {  Illegal Configurations:  704 points }/MaxVL: 0
+# CHECK-ILLEGAL-ONLY-NEXT:  - Configuration Bag Size: 704
 # CHECK-ILLEGAL-ONLY-NEXT:  - State Cardinality: 0 ~ {MASKS}
 # CHECK-ILLEGAL-ONLY-NEXT: --- RVV Configuration End  ---
 

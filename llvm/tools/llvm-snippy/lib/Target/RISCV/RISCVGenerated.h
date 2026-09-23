@@ -1487,6 +1487,115 @@ inline bool isZvfh(unsigned Opcode) {
   }
 }
 
+inline bool isZvfbfa(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  // add/sub
+  case RISCV::VFADD_VV:
+  case RISCV::VFADD_VF:
+  case RISCV::VFSUB_VV:
+  case RISCV::VFSUB_VF:
+  case RISCV::VFRSUB_VF:
+
+  // widening add/sub
+  case RISCV::VFWADD_VV:
+  case RISCV::VFWADD_VF:
+  case RISCV::VFWADD_WV:
+  case RISCV::VFWADD_WF:
+  case RISCV::VFWSUB_VV:
+  case RISCV::VFWSUB_VF:
+  case RISCV::VFWSUB_WV:
+  case RISCV::VFWSUB_WF:
+
+  // multiply (incl. widening)
+  case RISCV::VFMUL_VV:
+  case RISCV::VFMUL_VF:
+  case RISCV::VFWMUL_VV:
+  case RISCV::VFWMUL_VF:
+
+  // fused multiply-add, same width
+  case RISCV::VFMACC_VV:
+  case RISCV::VFMACC_VF:
+  case RISCV::VFNMACC_VV:
+  case RISCV::VFNMACC_VF:
+  case RISCV::VFMSAC_VV:
+  case RISCV::VFMSAC_VF:
+  case RISCV::VFNMSAC_VV:
+  case RISCV::VFNMSAC_VF:
+  case RISCV::VFMADD_VV:
+  case RISCV::VFMADD_VF:
+  case RISCV::VFNMADD_VV:
+  case RISCV::VFNMADD_VF:
+  case RISCV::VFMSUB_VV:
+  case RISCV::VFMSUB_VF:
+  case RISCV::VFNMSUB_VV:
+  case RISCV::VFNMSUB_VF:
+
+  // widening fused multiply-add
+  case RISCV::VFWMACC_VV:
+  case RISCV::VFWMACC_VF:
+  case RISCV::VFWNMACC_VV:
+  case RISCV::VFWNMACC_VF:
+  case RISCV::VFWMSAC_VV:
+  case RISCV::VFWMSAC_VF:
+  case RISCV::VFWNMSAC_VV:
+  case RISCV::VFWNMSAC_VF:
+
+  // reciprocal/reciprocal-square-root
+  case RISCV::VFRSQRT7_V:
+  case RISCV::VFREC7_V:
+
+  // min/max and sign injection
+  case RISCV::VFMIN_VV:
+  case RISCV::VFMIN_VF:
+  case RISCV::VFMAX_VV:
+  case RISCV::VFMAX_VF:
+  case RISCV::VFSGNJ_VV:
+  case RISCV::VFSGNJ_VF:
+  case RISCV::VFSGNJN_VV:
+  case RISCV::VFSGNJN_VF:
+  case RISCV::VFSGNJX_VV:
+  case RISCV::VFSGNJX_VF:
+
+  // compare
+  case RISCV::VMFEQ_VV:
+  case RISCV::VMFEQ_VF:
+  case RISCV::VMFNE_VV:
+  case RISCV::VMFNE_VF:
+  case RISCV::VMFLT_VV:
+  case RISCV::VMFLT_VF:
+  case RISCV::VMFLE_VV:
+  case RISCV::VMFLE_VF:
+  case RISCV::VMFGT_VF:
+  case RISCV::VMFGE_VF:
+
+  case RISCV::VFCLASS_V:
+  case RISCV::VFMERGE_VFM:
+  case RISCV::VFMV_V_F:
+
+  // widening float conversions
+  case RISCV::VFWCVT_F_XU_V:
+  case RISCV::VFWCVT_F_X_V:
+  case RISCV::VFWCVT_F_F_V:
+
+  // narrowing float conversions
+  case RISCV::VFNCVT_XU_F_W:
+  case RISCV::VFNCVT_X_F_W:
+  case RISCV::VFNCVT_RTZ_XU_F_W:
+  case RISCV::VFNCVT_RTZ_X_F_W:
+  case RISCV::VFNCVT_F_F_W:
+  case RISCV::VFNCVT_ROD_F_F_W:
+
+  case RISCV::VFMV_F_S:
+  case RISCV::VFMV_S_F:
+
+  case RISCV::VFSLIDE1UP_VF:
+  case RISCV::VFSLIDE1DOWN_VF:
+    return true;
+  }
+}
+
 inline bool mayBeZvfh8BitIntConversion(unsigned Opcode) {
   switch (Opcode) {
   default:
