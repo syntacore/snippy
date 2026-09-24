@@ -4,6 +4,7 @@ set(LLVMSnippySimulatorSources
     RISCVSimulator.cpp
     X86Simulator.cpp
     Transactions.cpp
+    StepEffectsObserver.cpp
     RISCVTraceObserver.cpp
     RISCVConverterSNTF.cpp
     RISCVFeatureFlagsSNTF.cpp

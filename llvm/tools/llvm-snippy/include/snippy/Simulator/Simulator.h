@@ -74,11 +74,10 @@ public:
   virtual ProgramCounterType readPC() const = 0;
   virtual Error setPC(ProgramCounterType PC) = 0;
 
-  virtual Expected<RegisterType> readGPR(unsigned RegID) const = 0;
-
   virtual Expected<APInt> readReg(llvm::Register Reg) const = 0;
   virtual Error setReg(llvm::Register Reg, const APInt &NewValue) = 0;
 
+  virtual Expected<RegisterType> readGPR(unsigned RegID) const = 0;
   virtual Error setGPR(unsigned RegID, RegisterType NewValue) = 0;
 
   virtual Expected<RegisterType> readCSR(unsigned RegID) const = 0;

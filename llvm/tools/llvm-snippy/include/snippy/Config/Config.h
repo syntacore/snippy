@@ -189,6 +189,8 @@ struct ModelPluginOptions {
   std::string ModelLogPath;
   std::vector<std::string> ModelLibraries;
 
+  bool isCosimulation() const { return ModelLibraries.size() > 1; }
+
   bool runOnModel() const { return !ModelLibraries.empty(); }
 };
 

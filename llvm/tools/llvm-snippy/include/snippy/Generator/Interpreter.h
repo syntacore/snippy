@@ -21,6 +21,7 @@
 #include "snippy/Generator/ParsedElf.h"
 #include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/Simulator/Simulator.h"
+#include "snippy/Simulator/StepEffectsObserver.h"
 #include "snippy/Simulator/Transactions.h"
 
 #include <algorithm>
@@ -43,7 +44,7 @@ struct SimulationEnvironment {
   const TargetSubtargetInfo *ST;
   SimulationConfig SimCfg;
   const TargetGenContextInterface *TgtGenCtx = nullptr;
-  std::unique_ptr<RVMCallbackHandler> CallbackHandler;
+  bool NeedCallbackHandler = false;
   SectionDescVect Sections;
 };
 
@@ -86,12 +87,20 @@ public:
 };
 
 class Interpreter final {
+  std::unique_ptr<RVMCallbackHandler> CallbackHandler;
+  // Must be declared after CallbackHandler.
   std::unique_ptr<SimulatorInterface> Simulator;
   const SimulationEnvironment &Env;
   std::unique_ptr<RVMCallbackHandler::ObserverHandle<TransactionStack>>
       TransactionsObserverHandle;
+
   Error initTransactionMechanism();
+
+  bool compareRegisterStates(const Interpreter &Another) const;
+  bool compareMemory(const Interpreter &Another) const;
+
   void dumpOneRange(NamedMemoryRange Range, raw_fd_ostream &OS) const;
+
   bool coveredByMemoryRegion(MemAddr Start, MemAddr Size, AccMask Mode) const;
 
   static StringRef getStringNameOrUnknown(Expected<StringRef> Str) {
@@ -139,14 +148,23 @@ public:
       RVMCallbackHandler *CallbackHandler, std::string ModelLibrary);
 
   Interpreter(LLVMContext &Ctx, const SimulationEnvironment &Env,
-              std::unique_ptr<SimulatorInterface> Sim);
+              std::unique_ptr<SimulatorInterface> Sim,
+              std::unique_ptr<RVMCallbackHandler> CallbackHandler);
 
   Interpreter(LLVMContext &Ctx, const SimulationEnvironment &Env,
               std::unique_ptr<SimulatorInterface> Sim,
+              std::unique_ptr<RVMCallbackHandler> CallbackHandler,
               const IRegisterState &Regs);
 
   bool compareStates(const Interpreter &Another,
                      bool CheckMemory = false) const;
+
+  std::vector<EffectMismatch>
+  compareStepEffects(const StepEffects &Effects, const Interpreter &Another,
+                     const StepEffects &AnotherEffects) const {
+    return snippy::compareStepEffects(Effects, *Simulator, AnotherEffects,
+                                      *Another.Simulator);
+  }
 
   [[nodiscard]] ExecutionResult step() { return Simulator->executeInstr(); }
 
@@ -227,13 +245,15 @@ public:
   template <typename ObserverType, typename... CtorArgs>
   std::unique_ptr<RVMCallbackHandler::ObserverHandle<ObserverType>>
   setObserver(CtorArgs &&...Args) {
-    return Env.CallbackHandler->createAndSetObserver<ObserverType>(
+    assert(CallbackHandler && "Model has no callback handler");
+    return CallbackHandler->createAndSetObserver<ObserverType>(
         std::forward<CtorArgs>(Args)...);
   }
 
   template <typename ObserverHandleType>
   auto &getObserverByHandle(const ObserverHandleType &Handle) {
-    return Env.CallbackHandler->getObserverByHandle(Handle);
+    assert(CallbackHandler && "Model has no callback handler");
+    return CallbackHandler->getObserverByHandle(Handle);
   }
 
   void addInstr(const MachineInstr &MI, const LLVMState &State);
@@ -243,6 +263,10 @@ public:
   Error setPC(ProgramCounterType PC) { return Simulator->setPC(PC); }
 
   bool modelSupportCallbacks() const { return Simulator->supportsCallbacks(); }
+
+  SmallVector<unsigned> getSupportedCSRs() const {
+    return SmallVector<unsigned>(make_first_range(Simulator->getCSRValues()));
+  }
 
   Expected<APInt> readReg(llvm::Register Reg) const {
     return Simulator->readReg(Reg);

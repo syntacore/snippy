@@ -1,0 +1,22 @@
+# REQUIRES: skip-snippy-model-mixin
+#
+# COM: This test checks that the SNTF trace is the same whether we use
+# COM: single model or several (cosimulation).
+#
+# RUN: llvm-snippy %s -model-plugin=spike -trace-SNTF=%t.single.sntf
+# RUN: llvm-snippy %s -model-plugin=spike -cosim-model-plugins=whisper \
+# RUN:   -trace-SNTF=%t.cosim.sntf
+# RUN: diff %t.single.sntf %t.cosim.sntf
+
+include:
+  - ../Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  init-regs-in-elf: on
+
+histogram:
+  - [ADD, 1.0]
+  - [LD, 1.0]
+  - [SD, 1.0]

@@ -137,8 +137,12 @@ SimulationEnvironment Interpreter::createSimulationEnvironment(
     TargetGenContextInterface &TgtCtx) {
   auto &State = SPC.getLLVMState();
   const auto &SnippyTGT = State.getSnippyTarget();
+
+  bool SNTFTraceRequested = Cfg.PassCfg.TFOpts.TraceSNTFPath.has_value();
+  bool IsCosimulation = Cfg.PassCfg.ModelPluginConfig.isCosimulation();
+
   bool NeedCallbackHandler =
-      Cfg.hasTrackingMode() || Cfg.PassCfg.TFOpts.TraceSNTFPath.has_value();
+      Cfg.hasTrackingMode() || SNTFTraceRequested || IsCosimulation;
   auto &L = SPC.getLinker();
 
   SimulationEnvironment Env;
@@ -150,49 +154,82 @@ SimulationEnvironment Interpreter::createSimulationEnvironment(
   Env.SimCfg.TraceLogPath = Cfg.PassCfg.ModelPluginConfig.ModelLogPath;
   Env.TgtGenCtx = &TgtCtx;
 
-  if (NeedCallbackHandler)
-    Env.CallbackHandler = std::make_unique<RVMCallbackHandler>();
+  Env.NeedCallbackHandler = NeedCallbackHandler;
 
   return Env;
 }
 
 Interpreter::Interpreter(LLVMContext &Ctx, const SimulationEnvironment &SimEnv,
-                         std::unique_ptr<SimulatorInterface> Sim)
-    : Simulator(std::move(Sim)), Env(SimEnv) {
-  if (auto *Handler = Env.CallbackHandler.get())
+                         std::unique_ptr<SimulatorInterface> Sim,
+                         std::unique_ptr<RVMCallbackHandler> Handler)
+    : CallbackHandler(std::move(Handler)), Simulator(std::move(Sim)),
+      Env(SimEnv) {
+  if (CallbackHandler)
     TransactionsObserverHandle =
-        Handler->createAndSetObserver<TransactionStack>();
+        CallbackHandler->createAndSetObserver<TransactionStack>();
 }
 
 Interpreter::Interpreter(LLVMContext &Ctx, const SimulationEnvironment &Env,
                          std::unique_ptr<SimulatorInterface> Sim,
+                         std::unique_ptr<RVMCallbackHandler> Handler,
                          const IRegisterState &Regs)
-    : Interpreter(Ctx, Env, std::move(Sim)) {
+    : Interpreter(Ctx, Env, std::move(Sim), std::move(Handler)) {
   Simulator->setState(Regs);
 }
 
-bool Interpreter::compareStates(const Interpreter &Another,
-                                bool CheckMemory) const {
+static void readMemOrReport(const SimulatorInterface &Sim,
+                            MemoryAddressType Addr,
+                            MutableArrayRef<char> Data) {
+  auto Err = Sim.readMem(Addr, Data);
+  SNIPPY_CHECK_ERROR(Err, "failed to readMem");
+}
+
+static bool isEqualMemoryRange(const SimulatorInterface &Sim,
+                               const SimulatorInterface &Another,
+                               MemoryAddressType Start, uint64_t Size) {
+  // The range is read piece by piece, as reading it as a whole would mean two
+  // buffers as large as the whole model memory.
+  constexpr size_t ChunkSize = 64 * 1024;
+  std::vector<char> Chunk(ChunkSize);
+  std::vector<char> AnotherChunk(ChunkSize);
+
+  for (uint64_t Offset = 0; Offset < Size; Offset += ChunkSize) {
+    auto ChunkLen = std::min<size_t>(ChunkSize, Size - Offset);
+    readMemOrReport(Sim, Start + Offset,
+                    MutableArrayRef<char>(Chunk).take_front(ChunkLen));
+    readMemOrReport(Another, Start + Offset,
+                    MutableArrayRef<char>(AnotherChunk).take_front(ChunkLen));
+    if (!std::equal(Chunk.begin(), Chunk.begin() + ChunkLen,
+                    AnotherChunk.begin()))
+      return false;
+  }
+
+  return true;
+}
+
+bool Interpreter::compareMemory(const Interpreter &Another) const {
+  return all_of(Env.SimCfg.MemoryRegions, [&](auto &Region) {
+    return isEqualMemoryRange(*Simulator, *Another.Simulator, Region.Start,
+                              Region.Size);
+  });
+}
+
+bool Interpreter::compareRegisterStates(const Interpreter &Another) const {
   assert(Env.TgtGenCtx);
   auto RS1 = Env.SnippyTGT->createRegisterState(*Env.TgtGenCtx, *Env.ST);
   auto RS2 = Env.SnippyTGT->createRegisterState(*Env.TgtGenCtx, *Env.ST);
   Simulator->saveState(*RS1);
   Another.Simulator->saveState(*RS2);
-  if (*RS1 != *RS2)
-    return false;
-  if (!CheckMemory)
-    return true;
+  return *RS1 == *RS2;
+}
 
-  return llvm::all_of(Env.SimCfg.MemoryRegions, [&](auto &Region) {
-    std::vector<char> MI1, MI2;
-    MI1.resize(Region.Size);
-    MI2.resize(Region.Size);
-    auto Err = Simulator->readMem(Region.Start, MI1);
-    SNIPPY_CHECK_ERROR(Err, "failed to readMem");
-    Err = Another.Simulator->readMem(Region.Start, MI2);
-    SNIPPY_CHECK_ERROR(Err, "failed to readMem");
-    return MI1 == MI2;
-  });
+bool Interpreter::compareStates(const Interpreter &Another,
+                                bool CheckMemory) const {
+  if (!compareRegisterStates(Another))
+    return false;
+  if (CheckMemory)
+    return compareMemory(Another);
+  return true;
 }
 
 void Interpreter::resetMem() {
@@ -207,7 +244,7 @@ void Interpreter::resetMem() {
 
 void Interpreter::disableTransactionsTracking() {
   if (TransactionsObserverHandle)
-    Env.CallbackHandler->eraseByHandle(*TransactionsObserverHandle);
+    CallbackHandler->eraseByHandle(*TransactionsObserverHandle);
   TransactionsObserverHandle.reset();
 }
 
@@ -348,7 +385,7 @@ Error Interpreter::setReg(llvm::Register Reg, const APInt &NewValue) {
     return Error::success();
   auto RegIdx = Env.SnippyTGT->regToIndex(Reg);
   auto &Transactions =
-      Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
+      CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
   switch (Env.SnippyTGT->regToStorage(Reg)) {
   case RegStorageType::XReg:
     Transactions.xregUpdateNotification(RegIdx, NewValue.getZExtValue());
@@ -377,7 +414,7 @@ Error Interpreter::writeSection(const SectionData &Section) {
 
 Error Interpreter::initTransactionMechanism() {
   auto &Transactions =
-      Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
+      CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
   assert(Transactions.empty());
 
   for (auto [Start, Size, Name, _] : Env.SimCfg.MemoryRegions) {
@@ -421,7 +458,7 @@ Error Interpreter::initTransactionMechanism() {
 
 void Interpreter::openTransaction() {
   auto &Transactions =
-      Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
+      CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
 
   if (Transactions.empty()) {
     auto Err = initTransactionMechanism();
@@ -433,7 +470,7 @@ void Interpreter::openTransaction() {
 
 void Interpreter::commitTransaction() {
   auto &Transactions =
-      Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
+      CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
 
   assert(!Transactions.empty());
 
@@ -484,7 +521,7 @@ void Interpreter::commitTransaction() {
 
 void Interpreter::discardTransaction() {
   auto &Transactions =
-      Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
+      CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
 
   assert(!Transactions.empty());
 
@@ -517,7 +554,7 @@ void Interpreter::discardTransaction() {
 
 TransactionStack::AddrToDataType Interpreter::getMemBeforeTransaction() const {
   auto &Transactions =
-      Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
+      CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
 
   assert(!Transactions.empty());
   return Transactions.getMemBeforeTransaction();
@@ -526,7 +563,7 @@ TransactionStack::AddrToDataType Interpreter::getMemBeforeTransaction() const {
 TransactionStack::RegIdToValueType
 Interpreter::getXRegsBeforeTransaction() const {
   auto &Transactions =
-      Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
+      CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
 
   assert(!Transactions.empty());
   return Transactions.getXRegsBeforeTransaction();
@@ -535,7 +572,7 @@ Interpreter::getXRegsBeforeTransaction() const {
 TransactionStack::RegIdToValueType
 Interpreter::getCSRsBeforeTransaction() const {
   auto &Transactions =
-      Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
+      CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
 
   assert(!Transactions.empty());
   return Transactions.getCSRsBeforeTransaction();
@@ -544,7 +581,7 @@ Interpreter::getCSRsBeforeTransaction() const {
 TransactionStack::RegIdToValueType
 Interpreter::getFRegsBeforeTransaction() const {
   auto &Transactions =
-      Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
+      CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
 
   assert(!Transactions.empty());
   return Transactions.getFRegsBeforeTransaction();
@@ -553,7 +590,7 @@ Interpreter::getFRegsBeforeTransaction() const {
 TransactionStack::VRegIdToValueType
 Interpreter::getVRegsBeforeTransaction() const {
   auto &Transactions =
-      Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
+      CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
 
   assert(!Transactions.empty());
   return Transactions.getVRegsBeforeTransaction();
@@ -561,7 +598,7 @@ Interpreter::getVRegsBeforeTransaction() const {
 
 ProgramCounterType Interpreter::getPCBeforeTransaction() const {
   auto &Transactions =
-      Env.CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
+      CallbackHandler->getObserverByHandle(*TransactionsObserverHandle);
 
   assert(!Transactions.empty());
   return Transactions.getPCBeforeTransaction();
