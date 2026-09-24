@@ -5261,9 +5261,28 @@ At each step of the simulation, the program compares a state of each
 model against a "primary" one. If the program finds a difference, it
 issues an error and terminates further execution.
 
-.. note::
+The program compares what the models report as changed or accessed by
+the executed instruction:
 
-   For now, only the register file state is considered.
+-  the general-purpose, floating-point, and vector registers the
+   instruction writes;
+
+-  the bytes the instruction writes to memory;
+
+-  the bytes the instruction reads from memory, if both models report
+   the read;
+
+-  the program counter.
+
+If some model does not report its changes, the program compares the
+whole register file after each instruction and the whole memory before
+and after the run instead.
+
+.. warning::
+
+   If at least one of the models does not report its changes,
+   co-simulation becomes much slower. The cost of comparing the whole
+   memory grows with the total size of the memory sections.
 
 .. container:: formalpara-title
 
@@ -5272,6 +5291,10 @@ issues an error and terminates further execution.
 ::
 
    LLVM ERROR: Interpreters states differ
+
+The message lists the step, the address of the executed instruction, and
+each differing register or memory range with the values from both
+models.
 
 Preceding the error message, you can also see a combined log from all
 the simulator executions with messages from the respective simulators.
