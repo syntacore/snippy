@@ -51,9 +51,10 @@ TopLevelMemoryAccessSampler::chooseAccess(const AddressGenInfo &AddrGenInfo) {
   return reportSamplersError(Errs);
 }
 
-std::vector<AddressInfo> TopLevelMemoryAccessSampler::randomBurstGroupAddresses(
+std::vector<AddressInfo>
+TopLevelMemoryAccessSampler::randomConsecutiveGroupAddresses(
     ArrayRef<AddressRestriction> ARRange, const OpcodeCache &OpcC,
-    const SnippyTarget &SnpTgt) {
+    const SnippyTarget &SnpTgt, MemAccessKind Kind) {
   assert(!ARRange.empty());
 
   std::vector<AddressInfo> Addresses;
@@ -62,9 +63,11 @@ std::vector<AddressInfo> TopLevelMemoryAccessSampler::randomBurstGroupAddresses(
     AddressGenInfo AddrGenInfo{AR.AccessSize, AR.AccessAlignment,
                                AR.AllowMisalign, /*Burst=*/true};
     auto Access = sample(AddrGenInfo);
-    if (!Access)
-      snippy::fatal("Failed to sample memory access for burst group",
+    if (!Access) {
+      snippy::fatal(Twine("Failed to sample memory access for ") +
+                        getMemAccessKindName(Kind) + " group",
                     toString(Access.takeError()));
+    }
     Addresses.push_back(std::move(*Access));
   }
 

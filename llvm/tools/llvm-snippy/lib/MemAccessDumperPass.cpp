@@ -59,13 +59,13 @@ bool dumpPlainAccesses(raw_ostream &OS, const PlainAccessesType &Accesses,
   return true;
 }
 
-static void dumpBurstAccesses(raw_ostream &OS,
-                              const BurstGroupAccessesType &Accesses,
-                              StringRef Prefix) {
+static void dumpGroupedAccesses(raw_ostream &OS,
+                                const ConsecutiveGroupAccessesType &Accesses,
+                                StringRef Prefix, StringRef Label) {
   if (Accesses.empty())
     return;
 
-  OS << Prefix.data() << "burst:\n";
+  OS << Prefix.data() << Label.data() << ":\n";
 
   for (const auto &BurstDesc : Accesses) {
     assert(!BurstDesc.empty() && "At least one range is expected");
@@ -105,9 +105,12 @@ static void dumpBurstAccesses(raw_ostream &OS,
 }
 
 void dumpMemAccesses(StringRef Filename, const PlainAccessesType &Plain,
-                     const BurstGroupAccessesType &BurstRanges,
-                     const PlainAccessesType &BurstPlain, bool Restricted) {
-  if (Plain.empty() && BurstRanges.empty() && BurstPlain.empty()) {
+                     const ConsecutiveGroupAccessesType &BurstRanges,
+                     const PlainAccessesType &BurstPlain,
+                     const ConsecutiveGroupAccessesType &PatternRanges,
+                     const PlainAccessesType &PatternPlain, bool Restricted) {
+  if (Plain.empty() && BurstRanges.empty() && BurstPlain.empty() &&
+      PatternRanges.empty() && PatternPlain.empty()) {
     snippy::warn(WarningName::MemoryAccess, "Cannot dump memory accesses",
                  "No accesses were generated, file won't be created.");
     return;
@@ -128,10 +131,22 @@ void dumpMemAccesses(StringRef Filename, const PlainAccessesType &Plain,
   if (Added)
     Prefix = SameEntry;
 
-  if (!Restricted && !DumpBurstPlainAccesses)
-    dumpBurstAccesses(SS, BurstRanges, Prefix);
-  else
-    dumpPlainAccesses(SS, BurstPlain, Restricted, Prefix, /* Append */ Added);
+  // Dump grouped accesses (burst groups and patterns) through the same body.
+  // Both are sequences of memory instructions, so the dump logic is shared.
+  auto DumpGrouped = [&](const ConsecutiveGroupAccessesType &Ranges,
+                         const PlainAccessesType &PlainAccs, StringRef Label) {
+    if (!Restricted && !DumpBurstPlainAccesses)
+      dumpGroupedAccesses(SS, Ranges, Prefix, Label);
+    else
+      dumpPlainAccesses(SS, PlainAccs, Restricted, Prefix, /* Append */ Added);
+    if (!Ranges.empty() || !PlainAccs.empty())
+      Prefix = SameEntry;
+  };
+
+  DumpGrouped(BurstRanges, BurstPlain,
+              getMemAccessKindName(MemAccessKind::Burst));
+  DumpGrouped(PatternRanges, PatternPlain,
+              getMemAccessKindName(MemAccessKind::Pattern));
 
   if (Filename.empty())
     outs() << SS.str();
@@ -182,11 +197,15 @@ bool MemoryAccessDumper::runOnMachineFunction(MachineFunction &MF) {
   if (DumpMemAccesses.isSpecified())
     dumpMemAccesses(DumpMemAccesses.getValue(), MAI.getMemAccesses(),
                     MAI.getBurstRangeAccesses(), MAI.getBurstPlainAccesses(),
+                    MAI.getPatternRangeAccesses(),
+                    MAI.getPatternPlainAccesses(),
                     /* Restricted */ false);
 
   if (DumpMemAccessesRestricted.isSpecified())
     dumpMemAccesses(DumpMemAccessesRestricted.getValue(), MAI.getMemAccesses(),
                     MAI.getBurstRangeAccesses(), MAI.getBurstPlainAccesses(),
+                    MAI.getPatternRangeAccesses(),
+                    MAI.getPatternPlainAccesses(),
                     /* Restricted */ true);
 
   return false;
