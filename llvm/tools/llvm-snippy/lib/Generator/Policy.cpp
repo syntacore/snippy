@@ -209,8 +209,8 @@ void DefaultGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
       continue;
     }
     auto RP = InstrGenCtx.pushRegPool();
-    auto RegsToInit =
-        selectOperandsForConsecutiveInstrs(InstrGenCtx, Tgt, *RP, OpcSeqReq);
+    auto RegsToInit = selectOperandsForConsecutiveInstrs(
+        InstrGenCtx, Tgt, *RP, OpcSeqReq, MemAccessKind::Pattern);
     SmallVector<MCInst> InitInstrs;
     for (auto &[BaseReg, NewValue] : RegsToInit) {
       assert(RP->isReserved(BaseReg, AccessMaskBit::W));
@@ -250,8 +250,8 @@ void BurstGenPolicy::initialize(InstructionGenerationContext &InstrGenCtx,
   });
 
   auto RP = InstrGenCtx.pushRegPool();
-  auto RegsToInit =
-      selectOperandsForConsecutiveInstrs(InstrGenCtx, Tgt, *RP, Instructions);
+  auto RegsToInit = selectOperandsForConsecutiveInstrs(
+      InstrGenCtx, Tgt, *RP, Instructions, MemAccessKind::Burst);
   initializeBaseRegs(InstrGenCtx, RegsToInit);
   // Mark all support instrs with Bundle metadata
   auto RIter = MachineBasicBlock::reverse_iterator(std::prev(InstrGenCtx.Ins));

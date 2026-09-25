@@ -9,6 +9,7 @@
 #ifndef LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_TOPMEMACCSAMPLER_H
 #define LLVM_TOOLS_LLVM_SNIPPY_GENERATOR_TOPMEMACCSAMPLER_H
 
+#include "snippy/Generator/GenerationUtils.h"
 #include "snippy/Generator/MemAccessSampler.h"
 
 namespace llvm {
@@ -52,10 +53,9 @@ public:
   Expected<MemoryAccess &>
   chooseAccess(const AddressGenInfo &AddrGenInfo) override;
 
-  std::vector<AddressInfo>
-  randomBurstGroupAddresses(ArrayRef<AddressRestriction> ARRange,
-                            const OpcodeCache &OpcC,
-                            const SnippyTarget &SnpTgt);
+  std::vector<AddressInfo> randomConsecutiveGroupAddresses(
+      ArrayRef<AddressRestriction> ARRange, const OpcodeCache &OpcC,
+      const SnippyTarget &SnpTgt, MemAccessKind Kind);
 
   std::string getName() const override {
     return "top-level memory access sampler";
