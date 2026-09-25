@@ -37,7 +37,7 @@ static snippy::opt<unsigned> BurstAddressRandomizationThreshold(
 // For the given AddressInfo and AddressRestriction try to find another
 // AddressInfo such that:
 // 1. New AddressInfo will cover different set of addresses (for better
-// addresses and offsets randomization) in burst groups
+// addresses and offsets randomization) in consecutive groups
 // 2. Base address from the given AddressInfo may be reused for the new one. It
 // means that the provided AddressRestriction allows immediate offsets that are
 // necessary for the base address change.
@@ -48,10 +48,10 @@ static snippy::opt<unsigned> BurstAddressRandomizationThreshold(
 // min = -5, max = 5
 //
 // We are limited in the number of registers we can use for base addresses in
-// burst groups, but the given AddressInfo isn't really interesting: it doesn't
-// allow immediate offsets other than zero. So, we'd like to choose another
-// address info that provides wider range of immediate offsets and can use the
-// original base address under the given AddressRestrictions.
+// consecutive groups, but the given AddressInfo isn't really interesting:
+// it doesn't allow immediate offsets other than zero. So, we'd like to choose
+// another address info that provides wider range of immediate offsets and can
+// use the original base address under the given AddressRestrictions.
 //
 // Let's say we've choosen a new AddressInfo: base address = 15, min offset =
 // -10, max offset = 10 --> effective addresses are [5, 25] Replacement of the
@@ -59,10 +59,9 @@ static snippy::opt<unsigned> BurstAddressRandomizationThreshold(
 // effective addresses are still the same [5, 25] Then we need to apply
 // AddressRestrictions: base address = 10, min offset = -5 , max offset = 5 -->
 // effective addresses were shrinked to [5, 15]
-AddressInfo
-selectAddressForSingleInstrFromBurstGroup(InstructionGenerationContext &IGC,
-                                          AddressInfo OrigAI,
-                                          const AddressRestriction &OpcodeAR) {
+AddressInfo selectAddressForSingleConsecutiveInstr(
+    InstructionGenerationContext &IGC, AddressInfo OrigAI,
+    const AddressRestriction &OpcodeAR, MemAccessKind Kind) {
   if (OrigAI.MinOffset != 0 || OrigAI.MaxOffset != 0 ||
       (OpcodeAR.ImmOffsetRange.getMin() == 0 &&
        OpcodeAR.ImmOffsetRange.getMax() == 0)) {
@@ -81,10 +80,9 @@ selectAddressForSingleInstrFromBurstGroup(InstructionGenerationContext &IGC,
                                OpcodeAR.AllowMisalign, /*Burst=*/true};
     auto CandidateAccess = MS.sample(AddrGenInfo);
     if (!CandidateAccess) {
-      std::string PrefixErr;
-      raw_string_ostream OS(PrefixErr);
-      OS << "Cannot sample memory access for single instruction from burst "
-            "group";
+      Twine PrefixErr = Twine("Cannot sample memory access for single "
+                              "instruction from ") +
+                        getMemAccessKindName(Kind) + " group";
       snippy::fatal(PrefixErr, toString(CandidateAccess.takeError()));
     }
     auto &CandidateAI = *CandidateAccess;
@@ -144,8 +142,8 @@ selectAddressForSingleInstrFromBurstGroup(InstructionGenerationContext &IGC,
 
 std::map<unsigned, APInt> selectOperandsForConsecutiveInstrs(
     InstructionGenerationContext &InstrGenCtx, const SnippyTarget &Tgt,
-    RegPoolWrapper &RP,
-    std::vector<planning::InstructionRequest> &BurstInstrs) {
+    RegPoolWrapper &RP, std::vector<planning::InstructionRequest> &BurstInstrs,
+    MemAccessKind Kind) {
   auto &State = InstrGenCtx.ProgCtx.getLLVMState();
   auto IsMemUser = [&Tgt](auto Opc) -> bool {
     return Tgt.countAddrsToGenerate(Opc);
@@ -157,7 +155,7 @@ std::map<unsigned, APInt> selectOperandsForConsecutiveInstrs(
   std::vector<SmallVector<planning::PreselectedOpInfo, 8>>
       MemUserIdxToPreselectedOps(MemUsers.size());
   auto RegsToInit = selectOperandsForMemoryInstructions(
-      InstrGenCtx, MemUsers, RP, MemUserIdxToPreselectedOps);
+      InstrGenCtx, MemUsers, RP, MemUserIdxToPreselectedOps, Kind);
   // Here we collected all registers that should be initialized (we don't
   // initialize registers for non-memory instructions). Initialize them all in
   // one go.
@@ -349,7 +347,8 @@ std::map<unsigned, APInt> selectOperandsForMemoryInstructions(
     InstructionGenerationContext &InstrGenCtx, ArrayRef<unsigned> Opcodes,
     RegPoolWrapper &RP,
     std::vector<SmallVector<planning::PreselectedOpInfo, 8>>
-        &OpcodeIdxToPreselectedOps) {
+        &OpcodeIdxToPreselectedOps,
+    MemAccessKind Kind) {
   unsigned Count = Opcodes.size();
   const auto &ProgCtx = InstrGenCtx.ProgCtx;
   const auto &State = ProgCtx.getLLVMState();
@@ -360,7 +359,7 @@ std::map<unsigned, APInt> selectOperandsForMemoryInstructions(
   // used as destinations.
   auto OpcodeIdxToBaseReg = generateBaseRegs(InstrGenCtx, Opcodes);
   auto [RegsToInit, OpcodeIdxToAI] =
-      mapOpcodeIdxToAI(InstrGenCtx, OpcodeIdxToBaseReg, Opcodes);
+      mapOpcodeIdxToAI(InstrGenCtx, OpcodeIdxToBaseReg, Opcodes, Kind);
   // We already initialized base registers. Now to select other register
   // operands we must exclude base ones because they can't be modified again.
   auto Excluded = getExcludedRegsForOpcodes(Opcodes, State);
@@ -401,7 +400,7 @@ std::map<unsigned, APInt> selectOperandsForMemoryInstructions(
     AddressInfo ActualAI = AI;
     auto Offset = getOffsetImmediate(Preselected);
     ActualAI.Address += Offset.value_or(0);
-    markMemAccessAsUsed(InstrGenCtx, InstrDesc, ActualAI, MemAccessKind::BURST,
+    markMemAccessAsUsed(InstrGenCtx, InstrDesc, ActualAI, Kind,
                         InstrGenCtx.MAI);
   }
   return RegsToInit;
@@ -755,18 +754,20 @@ generateBaseRegs(InstructionGenerationContext &InstrGenCtx,
 // addresses "primary" because they'll be used as a defaults for the given base
 // registers (set of opcodes mapped to the base register). Snippy will try to
 // randomize addresses in a way that not only primary addresses are accessed
-// (see selectAddressForSingleInstrFromBurstGroup), but base register is always
+// (see selectAddressForSingleConsecutiveInstr), but base register is always
 // taken suitable for the primary address.
 static std::map<unsigned, AddressInfo> collectPrimaryAddresses(
     InstructionGenerationContext &IGC,
-    const std::map<unsigned, AddressRestriction> &BaseRegToStrongestAR) {
+    const std::map<unsigned, AddressRestriction> &BaseRegToStrongestAR,
+    MemAccessKind Kind) {
   auto &MS = IGC.getMemoryAccessSampler();
   auto &ProgCtx = IGC.ProgCtx;
   auto &SnpTgt = ProgCtx.getLLVMState().getSnippyTarget();
   auto ARRange = make_second_range(BaseRegToStrongestAR);
   std::vector<AddressRestriction> ARs(ARRange.begin(), ARRange.end());
   std::vector<AddressInfo> PrimaryAddresses =
-      MS.randomBurstGroupAddresses(ARs, ProgCtx.getOpcodeCache(), SnpTgt);
+      MS.randomConsecutiveGroupAddresses(ARs, ProgCtx.getOpcodeCache(), SnpTgt,
+                                         Kind);
   assert(PrimaryAddresses.size() == BaseRegToStrongestAR.size());
   std::map<unsigned, AddressInfo> BaseRegToPrimaryAddress;
   transform(
@@ -793,7 +794,7 @@ static std::map<unsigned, AddressInfo> collectPrimaryAddresses(
   return BaseRegToPrimaryAddress;
 }
 
-// Insert initialization of base addresses before the burst group.
+// Insert initialization of base addresses before the consecutive group.
 void initializeBaseRegs(InstructionGenerationContext &InstrGenCtx,
                         const std::map<unsigned, APInt> &BaseRegToValue) {
   auto &SimCtx = InstrGenCtx.SimCtx;
@@ -831,7 +832,7 @@ void markMemAccess(InstructionGenerationContext &IGC,
 std::pair<std::map<unsigned, APInt>, std::vector<AddressInfo>>
 mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
                  ArrayRef<unsigned> OpcodeIdxToBaseReg,
-                 ArrayRef<unsigned> Opcodes) {
+                 ArrayRef<unsigned> Opcodes, MemAccessKind Kind) {
   assert(OpcodeIdxToBaseReg.size() == Opcodes.size());
   auto &MBB = InstrGenCtx.MBB;
   auto *MAI = InstrGenCtx.MAI;
@@ -856,7 +857,7 @@ mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
   // For the selected strongest restrictions get addresses. Thus, we'll have a
   // mapping from base register to a legal address in memory to use.
   auto BaseRegToPrimaryAddress =
-      collectPrimaryAddresses(InstrGenCtx, BaseRegToStrongestAR);
+      collectPrimaryAddresses(InstrGenCtx, BaseRegToStrongestAR, Kind);
 
   // Try to find addresses for each opcode that allow better randomization of
   // offsets and effective addresses. If no address is found, we can always use
@@ -868,13 +869,23 @@ mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
     auto BaseReg = OpcodeIdxToBaseReg[OpcodeIdx];
     assert(BaseRegToPrimaryAddress.count(BaseReg));
     const auto &OrigAI = BaseRegToPrimaryAddress[BaseReg];
-    auto AI = selectAddressForSingleInstrFromBurstGroup(InstrGenCtx, OrigAI,
-                                                        OpcodeAR);
+    auto AI = selectAddressForSingleConsecutiveInstr(InstrGenCtx, OrigAI,
+                                                     OpcodeAR, Kind);
     OpcodeIdxToAI.push_back(AI);
   }
 
-  if (MAI)
-    MAI->addBurstRangeMemAccess(OpcodeIdxToAI);
+  if (MAI) {
+    switch (Kind) {
+    case MemAccessKind::Pattern:
+      MAI->addPatternRangeMemAccess(OpcodeIdxToAI);
+      break;
+    case MemAccessKind::Burst:
+      MAI->addBurstRangeMemAccess(OpcodeIdxToAI);
+      break;
+    default:
+      llvm_unreachable("Wrong MemAccessKind, expected Burst or Pattern");
+    }
+  }
   std::map<unsigned, APInt> BaseRegToAddr;
   transform(BaseRegToPrimaryAddress,
             std::inserter(BaseRegToAddr, BaseRegToAddr.end()),
@@ -895,10 +906,17 @@ void markMemAccessAsUsed(InstructionGenerationContext &IGC,
   auto AddrToAccess = MemAddresses{EffectiveAddr};
   markMemAccess(IGC, AddrToAccess, AccessSize, InstrDesc);
   if (MAI) {
-    if (Kind == MemAccessKind::BURST)
+    switch (Kind) {
+    case MemAccessKind::Burst:
       MAI->addBurstPlainMemAccess(EffectiveAddr, AccessSize);
-    else
+      break;
+    case MemAccessKind::Pattern:
+      MAI->addPatternPlainMemAccess(EffectiveAddr, AccessSize);
+      break;
+    case MemAccessKind::Regular:
       MAI->addMemAccess(EffectiveAddr, AccessSize);
+      break;
+    }
   }
 }
 

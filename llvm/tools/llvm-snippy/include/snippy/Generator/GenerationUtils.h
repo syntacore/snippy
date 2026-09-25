@@ -20,6 +20,24 @@ namespace snippy {
 namespace planning {
 struct InstructionRequest;
 } // namespace planning
+
+/// Kinds of memory accesses distinguished by the generator. Burst and pattern
+/// accesses are grouped sequences, regular accesses are independent
+/// instructions.
+enum class MemAccessKind { Burst, Pattern, Regular };
+
+constexpr inline StringLiteral getMemAccessKindName(MemAccessKind Kind) {
+  switch (Kind) {
+  case MemAccessKind::Burst:
+    return "burst";
+  case MemAccessKind::Pattern:
+    return "pattern";
+  case MemAccessKind::Regular:
+    return "regular";
+  }
+  llvm_unreachable("Unknown MemAccessKind");
+}
+
 // For the given InstrDesc fill the vector of selected operands to account them
 // in instruction generation procedure.
 void selectMemoryOperands(
@@ -38,7 +56,8 @@ std::map<unsigned, APInt> selectOperandsForMemoryInstructions(
     InstructionGenerationContext &InstrGenCtx, ArrayRef<unsigned> Opcodes,
     RegPoolWrapper &RP,
     std::vector<SmallVector<planning::PreselectedOpInfo, 8>>
-        &OpcodeIdxToPreselectedOps);
+        &OpcodeIdxToPreselectedOps,
+    MemAccessKind Kind);
 /// \brief Select non-memory operands for instruction. Take into account
 /// registers that are reserved as memory operands
 void selectNonMemoryOperands(
@@ -65,19 +84,18 @@ AddressInfo randomlyShiftAddressOffsetsInImmRange(AddressInfo AI,
 std::vector<unsigned> generateBaseRegs(InstructionGenerationContext &IGC,
                                        ArrayRef<unsigned> Opcodes);
 
-AddressInfo
-selectAddressForSingleInstrFromBurstGroup(InstructionGenerationContext &IGC,
-                                          AddressInfo OrigAI,
-                                          const AddressRestriction &OpcodeAR);
+AddressInfo selectAddressForSingleConsecutiveInstr(
+    InstructionGenerationContext &IGC, AddressInfo OrigAI,
+    const AddressRestriction &OpcodeAR, MemAccessKind Kind);
 
 // \brief Selects memory and non-memory operands for the consecutive instruction
 //  sequence.
 // \return a std::map mapping memory registers to their initial values.
 std::map<unsigned, APInt> selectOperandsForConsecutiveInstrs(
     InstructionGenerationContext &InstrGenCtx, const SnippyTarget &Tgt,
-    RegPoolWrapper &RP, std::vector<planning::InstructionRequest> &BurstInstrs);
+    RegPoolWrapper &RP, std::vector<planning::InstructionRequest> &BurstInstrs,
+    MemAccessKind Kind);
 
-enum class MemAccessKind { BURST, REGULAR };
 void markMemAccess(InstructionGenerationContext &IGC,
                    const MemAddresses &Addresses, size_t AccessSize,
                    const MCInstrDesc &InstrDesc);
@@ -96,7 +114,7 @@ void initializeBaseRegs(
 std::pair<std::map<unsigned, APInt>, std::vector<AddressInfo>>
 mapOpcodeIdxToAI(InstructionGenerationContext &InstrGenCtx,
                  ArrayRef<unsigned> OpcodeIdxToBaseReg,
-                 ArrayRef<unsigned> Opcodes);
+                 ArrayRef<unsigned> Opcodes, MemAccessKind Kind);
 
 MachineBasicBlock *createMachineBasicBlock(MachineFunction &MF);
 
