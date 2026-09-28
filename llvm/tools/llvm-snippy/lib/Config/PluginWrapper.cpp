@@ -8,21 +8,21 @@
 
 #include "snippy/Config/PluginWrapper.h"
 #include "snippy/Support/DynLibLoader.h"
+#include "snippy/Support/OpcodeCache.h"
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
+#include <dlfcn.h>
 
 #include <memory>
-
-#include "snippy/Support/OpcodeCache.h"
 
 namespace llvm {
 namespace snippy {
 
 void PluginManager::loadPluginDL(const std::string &PluginLibName) {
-  auto Lib = DynamicLibrary(PluginLibName);
+  auto Lib = DynamicLibrary(PluginLibName, RTLD_LAZY | RTLD_GLOBAL);
   const auto *VTable = reinterpret_cast<const PluginFunctionsTable *>(
       Lib.getAddressOfSymbol(PLUGIN_ENTRY_NAME));
   if (!VTable)

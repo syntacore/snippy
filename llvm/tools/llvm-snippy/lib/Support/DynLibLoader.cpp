@@ -25,7 +25,8 @@ namespace snippy {
 
 namespace {
 
-void *getPermanentLibrary(const char *Filename, std::string *errMsg = nullptr) {
+void *getPermanentLibrary(const char *Filename, int DLOpenFlags,
+                          std::string *ErrMsg = nullptr) {
   // Canonicalize path before loading the plugin. This has the effect of
   // resolving any symlinks, such that RUNPATH that refers to $ORIGIN is
   // relative to the shared object location and NOT relative to the location of
@@ -46,13 +47,13 @@ void *getPermanentLibrary(const char *Filename, std::string *errMsg = nullptr) {
   if (auto Err = CanonicalOrErr.takeError())
     snippy::fatal(toString(std::move(Err)));
   auto Canonical = *CanonicalOrErr;
-
-  void *Handle =
-      ::dlopen(Canonical.c_str(), RTLD_LAZY | RTLD_GLOBAL |
-                                      (LLVM_USE_SANITIZER ? 0 : RTLD_DEEPBIND));
+  // RTLD_DEEPBIND does not work with sanitizers
+  if (LLVM_USE_SANITIZER)
+    DLOpenFlags &= ~RTLD_DEEPBIND;
+  void *Handle = ::dlopen(Canonical.c_str(), DLOpenFlags);
   if (!Handle) {
-    if (errMsg)
-      *errMsg = ::dlerror();
+    if (ErrMsg)
+      *ErrMsg = ::dlerror();
   }
 
   return Handle;
@@ -115,13 +116,13 @@ std::string getDynLibPath(StringRef DynLib,
   snippy::fatal(formatv("could not find library for plugin: {0}", DynLib));
 }
 
-DynamicLibrary::DynamicLibrary(StringRef LibraryPath,
+DynamicLibrary::DynamicLibrary(StringRef LibraryPath, int DLOpenFlags,
                                std::optional<NameModifier> LibPathModif) {
   auto DynLibraryPath = getDynLibPath(LibraryPath, LibPathModif);
   DEBUG_WITH_TYPE("plugins", dbgs() << "Trying to load dynamic library at <"
                                     << DynLibraryPath << ">\n");
   std::string ErrMsg;
-  Handle = getPermanentLibrary(DynLibraryPath.c_str(), &ErrMsg);
+  Handle = getPermanentLibrary(DynLibraryPath.c_str(), DLOpenFlags, &ErrMsg);
   if (Handle)
     return;
 
@@ -163,6 +164,12 @@ std::string getCurrentLibExecutablePath() {
   }
 #endif
   return sys::fs::getMainExecutable(/* dummy argv */ nullptr, &Dummy);
+}
+
+int getModelLibraryDlopenFlags() {
+  // Using RTLD_LOCAL for model libraries as their symbols should be
+  // self-contained.
+  return RTLD_LAZY | RTLD_LOCAL;
 }
 
 } // namespace snippy

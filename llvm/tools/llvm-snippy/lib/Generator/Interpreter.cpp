@@ -83,7 +83,8 @@ std::unique_ptr<SimulatorInterface> Interpreter::createSimulatorForTarget(
     const SimulationConfig &SimCfg, const TargetGenContextInterface *TgtGenCtx,
     RVMCallbackHandler *CallbackHandler, std::string ModelLibrary) {
   auto Lib =
-      DynamicLibrary(std::move(ModelLibrary), makeModelNameFromPartialName);
+      DynamicLibrary(std::move(ModelLibrary), getModelLibraryDlopenFlags(),
+                     makeModelNameFromPartialName);
   auto Sim =
       TGT.createSimulator(Lib, SimCfg, TgtGenCtx, CallbackHandler, Subtarget);
   if (!Sim)

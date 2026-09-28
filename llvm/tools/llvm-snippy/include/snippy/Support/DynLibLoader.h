@@ -22,7 +22,7 @@ using NameModifier = std::function<std::string(StringRef)>;
 class DynamicLibrary {
 public:
   DynamicLibrary(
-      StringRef LibraryPath,
+      StringRef LibraryPath, int DLOpenFlags,
       std::optional<NameModifier> LibPathModif = std::optional<NameModifier>{});
   void *getAddressOfSymbol(const char *symbolName) const;
 
@@ -37,6 +37,7 @@ std::string getDynLibPath(
     std::optional<NameModifier> LibPathModif = std::optional<NameModifier>{});
 
 std::string getCurrentLibExecutablePath();
+int getModelLibraryDlopenFlags();
 } // namespace snippy
 
 } // namespace llvm
