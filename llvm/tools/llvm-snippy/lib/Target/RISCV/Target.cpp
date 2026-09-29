@@ -1593,17 +1593,6 @@ class SnippyRISCVTarget final : public SnippyTarget {
   }
 
 public:
-  SnippyRISCVTarget() {
-    // TODO: use model interface to fetch restricted sections
-
-    // htif
-    ReservedRanges.emplace_back("0", 0xFFF1001000, 8, 0xFFF1001000,
-                                Permissions::R | Permissions::W);
-    // clint
-    ReservedRanges.emplace_back("0", 0xFFF1000000, 8, 0xFFF1000000,
-                                Permissions::RWX);
-  }
-
   std::unique_ptr<TargetGenContextInterface>
   createTargetContext(LLVMState &State, const Config &Cfg,
                       const TargetSubtargetInfo *STI,
@@ -1633,16 +1622,6 @@ public:
     return Arch == Triple::riscv32 || Arch == Triple::riscv64;
   }
 
-  SectionDesc const *
-  touchesReservedRegion(SectionDesc const &desc) const override {
-    auto Touches =
-        std::find_if(ReservedRanges.begin(), ReservedRanges.end(),
-                     [&desc](auto &Range) { return Range.interfere(desc); });
-    if (Touches != ReservedRanges.end())
-      return &*Touches;
-    else
-      return nullptr;
-  }
   bool checkOpcodeSupported(int Opcode,
                             const MCSubtargetInfo &SI) const override {
     // FIXME: This check is required because currently basic
@@ -5366,8 +5345,6 @@ public:
   }
 
 private:
-  SmallVector<SectionDesc, 3> ReservedRanges;
-
   void rvvWriteValue(InstructionGenerationContext &IGC, APInt Value,
                      unsigned DstReg) const;
 
@@ -5560,6 +5537,10 @@ private:
       MI.setAsmPrinterFlag(RISCV::DoNotCompress);
   }
 };
+
+// Check that SnippyRISCVTarget contains only vtable pointer
+static_assert(sizeof(SnippyRISCVTarget) == sizeof(SnippyTarget),
+              "SnippyRISCVTarget must be stateless");
 
 [[noreturn]]
 static void reportInitializationFPRegError(LLVMContext &Ctx, const APInt &Value,

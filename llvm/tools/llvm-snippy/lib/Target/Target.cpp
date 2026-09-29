@@ -7,44 +7,32 @@
 //===----------------------------------------------------------------------===//
 #include "snippy/Target/Target.h"
 
-#include "llvm/ADT/Twine.h"
-#include "llvm/Support/Error.h"
-
 namespace llvm {
 namespace snippy {
 
 SnippyTarget::~SnippyTarget() {} // anchor.
 
-static SnippyTarget *FirstTarget = nullptr;
+static SmallVectorImpl<const SnippyTarget *> &getRegisteredTargets() {
+  // Not using global static to avoid initialization before main.
+  static SmallVector<const SnippyTarget *> Targets;
+  return Targets;
+}
 
 const SnippyTarget *SnippyTarget::lookup(Triple TT) {
-  for (const SnippyTarget *T = FirstTarget; T != nullptr; T = T->Next) {
-    if (T->matchesArch(TT.getArch()))
-      return T;
-  }
-  return nullptr;
+  auto &Targets = getRegisteredTargets();
+  auto It = find_if(Targets, [&TT](const SnippyTarget *T) {
+    return T->matchesArch(TT.getArch());
+  });
+  if (It == Targets.end())
+    return nullptr;
+  return *It;
 }
 
 void SnippyTarget::registerTarget(SnippyTarget *Target) {
-  if (FirstTarget == nullptr) {
-    FirstTarget = Target;
-    return;
-  }
-  if (Target->Next != nullptr)
-    return; // Already registered.
-  Target->Next = FirstTarget;
-  FirstTarget = Target;
+  auto &Targets = getRegisteredTargets();
+  if (!is_contained(Targets, Target))
+    Targets.push_back(Target);
 }
 
-void SnippyTarget::generateSpillToAddr(InstructionGenerationContext &IGC,
-                                       MCRegister Reg, MemAddr Addr) const {
-  storeRegToAddr(IGC, Addr, Reg,
-                 /* store the whole register */ 0);
-}
-void SnippyTarget::generateReloadFromAddr(InstructionGenerationContext &IGC,
-                                          MCRegister Reg, MemAddr Addr,
-                                          SnippyMetadata MetadataMark) const {
-  loadRegFromAddr(IGC, Addr, Reg, MetadataMark);
-}
 } // namespace snippy
 } // namespace llvm

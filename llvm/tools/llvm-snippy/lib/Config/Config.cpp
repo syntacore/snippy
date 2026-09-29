@@ -1576,22 +1576,6 @@ Expected<Config> Config::create(IncludePreprocessor &IPP, RegPoolWrapper &RP,
   return Cfg;
 }
 
-static void checkMemoryRegions(const SnippyTarget &SnippyTgt,
-                               const Config &Cfg) {
-  auto Sections = llvm::reverse(Cfg.ProgramCfg.Sections);
-  auto ReservedIt = llvm::find_if(Sections, [&SnippyTgt](auto &S) {
-    return SnippyTgt.touchesReservedRegion(S);
-  });
-  if (ReservedIt == Sections.end())
-    return;
-  auto *Reserved = SnippyTgt.touchesReservedRegion(*ReservedIt);
-  std::string ErrBuf;
-  llvm::raw_string_ostream SS{ErrBuf};
-  SS << "One of layout memory regions interferes with reserved region:\n";
-  outputYAMLToStream(*Reserved, SS);
-  snippy::fatal(ErrBuf.c_str());
-}
-
 static bool hasCallees(const FunctionDesc &FuncDesc) {
   return FuncDesc.Callees.size();
 }
@@ -1943,7 +1927,7 @@ void Config::validateAll(LLVMState &State, const OpcodeCache &OpCC,
                   "it is required to enable selfcheck");
   if (BurstConfig)
     checkBurstGram(Ctx, Histogram, OpCC, BurstConfig->Burst);
-  checkMemoryRegions(Tgt, *this);
+
   Tgt.checkInstrTargetDependency(Histogram, OpCC, ProgramCfg, PassCfg);
   if (hasTrackingMode())
     Tgt.checkTrackingRestrictions(Histogram);

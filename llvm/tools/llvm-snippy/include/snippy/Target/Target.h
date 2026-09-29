@@ -203,9 +203,6 @@ public:
   // Checks if the given register belongs to a supported register class.
   virtual bool isRegClassSupported(MCRegister Reg) const = 0;
 
-  void generateSpillToAddr(InstructionGenerationContext &IGC, MCRegister Reg,
-                           MemAddr Addr) const;
-
   virtual void generateSpillToStack(
       InstructionGenerationContext &IGC, MCRegister Reg, MCRegister SP,
       SnippyMetadata MetadataMark = SnippyMetadata::Support) const = 0;
@@ -213,10 +210,6 @@ public:
   virtual void generateReloadFromStack(
       InstructionGenerationContext &IGC, MCRegister Reg, MCRegister SP,
       SnippyMetadata MetadataMark = SnippyMetadata::Support) const = 0;
-
-  void generateReloadFromAddr(
-      InstructionGenerationContext &IGC, MCRegister Reg, MemAddr Addr,
-      SnippyMetadata MetadataMark = SnippyMetadata::Support) const;
 
   virtual void generatePopNoReload(InstructionGenerationContext &IGC,
                                    MCRegister Reg) const = 0;
@@ -282,13 +275,6 @@ public:
 
   // Registers a target. Not thread safe.
   static void registerTarget(SnippyTarget *T);
-
-  // Returns reserved memory region which Desc interfere with if any. Returns
-  // nullptr if none such regions exists.
-  virtual SectionDesc const *
-  touchesReservedRegion(SectionDesc const &Desc) const {
-    return nullptr;
-  }
 
   virtual void checkInstrTargetDependency(const OpcodeHistogram &H,
                                           const OpcodeCache &OpCC,
@@ -774,9 +760,11 @@ public:
 
 private:
   virtual bool matchesArch(Triple::ArchType Arch) const = 0;
-
-  const SnippyTarget *Next = nullptr;
 };
+
+// Check that SnippyTarget contains only vtable pointer
+static_assert(sizeof(SnippyTarget) == sizeof(void *),
+              "SnippyTarget must be stateless");
 
 inline const llvm::MachineOperand &getDividerOp(const MachineInstr &MI) {
   return MI.getOperand(2);

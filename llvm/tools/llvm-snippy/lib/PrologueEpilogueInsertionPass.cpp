@@ -226,8 +226,7 @@ static void setupStackPointer(InstructionGenerationContext &IGC,
   assert(Addr % SPSpillSize == 0u && "Stack section must be properly aligned");
 
   if (!ProgramCfg.isRegSpilledToMem(AuxReg) && ProgramCfg.FollowTargetABI)
-    SnippyTgt.storeRegToAddr(IGC, Addr, AuxReg,
-                             /* store the whole register */ 0);
+    SnippyTgt.storeRegToAddr(IGC, Addr, AuxReg);
   auto SPInitValue = Addr;
   SnippyTgt.writeValueToReg(
       IGC,
@@ -343,7 +342,7 @@ static void generateSpillToMem(InstructionGenerationContext &IGC,
   llvm::for_each(SpilledToMem, [&](auto Reg) {
     MBB.addLiveIn(Reg);
     auto Addr = SaveLocs.getSaveLocation(Reg).Global;
-    SnippyTgt.generateSpillToAddr(IGC, Reg, Addr);
+    SnippyTgt.storeRegToAddr(IGC, Addr, Reg);
   });
 }
 
@@ -467,8 +466,8 @@ bool PrologueEpilogueInsertion::insertEpilogue(
     auto &SaveLocs = ProgCtx.getProgramStateSaveSpace();
     llvm::for_each(SpilledToMem, [&](auto Reg) {
       auto Addr = SaveLocs.getSaveLocation(Reg).Global;
-      SnippyTgt.generateReloadFromAddr(InstrGenCtx, Reg, Addr,
-                                       SnippyMetadata::Epilogue);
+      SnippyTgt.loadRegFromAddr(InstrGenCtx, Addr, Reg,
+                                SnippyMetadata::Epilogue);
     });
   }
 
