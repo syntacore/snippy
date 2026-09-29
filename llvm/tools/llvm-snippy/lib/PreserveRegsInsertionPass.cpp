@@ -74,11 +74,11 @@ private:
     auto &SaveLocs = ProgCtx.getProgramStateSaveSpace();
     for (auto &Reg : SpilledToMem) {
       auto &Addr = SaveLocs.getSaveLocation(Reg);
-      Tgt.generateSpillToAddr(IGC, Reg, Addr.Local);
+      Tgt.storeRegToAddr(IGC, Addr.Local, Reg);
     }
     for (auto &Reg : SpilledToMem) {
       auto &Addr = SaveLocs.getSaveLocation(Reg);
-      Tgt.generateReloadFromAddr(IGC, Reg, Addr.Global);
+      Tgt.loadRegFromAddr(IGC, Addr.Global, Reg);
     }
   }
 
@@ -93,7 +93,7 @@ private:
     auto &SaveLocs = ProgCtx.getProgramStateSaveSpace();
     for (auto &Reg : SpilledToMem) {
       auto &Addr = SaveLocs.getSaveLocation(Reg);
-      Tgt.generateReloadFromAddr(IGC, Reg, Addr.Local);
+      Tgt.loadRegFromAddr(IGC, Addr.Local, Reg);
     }
   }
 

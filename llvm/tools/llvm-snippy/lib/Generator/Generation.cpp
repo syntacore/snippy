@@ -210,8 +210,7 @@ storeRefAndActualValueForSelfcheck(
   assert(InstrGenCtx.MBB.begin() != InsertPos);
   auto FirstInserted = std::prev(InsertPos);
 
-  ST.storeRegToAddr(InstrGenCtx, SCAddress, DestReg,
-                    /* store the whole register */ 0);
+  ST.storeRegToAddr(InstrGenCtx, SCAddress, DestReg);
   SelfcheckFirstStoreInfo<MachineBasicBlock::iterator> FirstStoreInfo{
       std::prev(InsertPos), SCAddress};
   SCAddress += ProgramConfig::getSCStride();
