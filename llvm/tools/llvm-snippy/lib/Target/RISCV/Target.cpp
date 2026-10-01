@@ -1624,6 +1624,11 @@ public:
               const MCInstrDesc &InstrDesc,
               const MCRegisterInfo &RegInfo) const override;
 
+  bool isRegisterOperand(const MCOperandInfo &Operand) const override {
+    return SnippyTarget::isRegisterOperand(Operand) ||
+           Operand.OperandType == RISCVOp::OPERAND_VMASK;
+  }
+
   bool matchesArch(Triple::ArchType Arch) const override {
     return Arch == Triple::riscv32 || Arch == Triple::riscv64;
   }
@@ -5105,8 +5110,7 @@ public:
       SmallVectorImpl<Register> &Result) const override {
     auto Opcode = InstrDesc.getOpcode();
     assert(PregeneratedOperands.size() == InstrDesc.getNumOperands());
-    assert(InstrDesc.operands()[OpIndex].OperandType ==
-           MCOI::OperandType::OPERAND_REGISTER);
+    assert(isRegisterOperand(InstrDesc.operands()[OpIndex]));
     auto &ProgCtx = IGC.ProgCtx;
     auto &State = ProgCtx.getLLVMState();
     const auto &TgtCtx =

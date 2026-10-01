@@ -38,6 +38,7 @@ class SMCManagerT final {
 
   std::vector<SMCPair> SMCBlockPairs;
   DenseMap<const MachineBasicBlock *, GlobalVariable *> SMCSrcMap;
+  DenseMap<const MachineBasicBlock *, size_t> OverwriteSizes;
   // TODO: use Register instead of unsigned or custom class
   std::vector<unsigned> SMCRegList;
   // smc target function name
@@ -73,6 +74,15 @@ public:
   }
 
   const std::vector<SMCPair> &getSMCBlockPairs() const { return SMCBlockPairs; }
+
+  void setOverwriteSize(const MachineBasicBlock *MBB, size_t Size) {
+    OverwriteSizes[MBB] = Size;
+  }
+
+  size_t getOverwriteSize(const MachineBasicBlock *MBB) const {
+    assert(OverwriteSizes.contains(MBB));
+    return OverwriteSizes.lookup(MBB);
+  }
 
   std::vector<unsigned> getSMCRegList() const { return SMCRegList; }
 

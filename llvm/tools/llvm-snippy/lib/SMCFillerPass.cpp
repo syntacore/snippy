@@ -69,7 +69,6 @@ bool SMCFiller::runOnModule(Module &M) {
     return false;
   auto &MF = *SMCSrcMF;
   auto &GC = getAnalysis<GeneratorContextWrapper>().getContext();
-  auto &State = GC.getProgramContext().getLLVMState();
   auto &SimCtx = getAnalysis<SimulatorContextWrapper>()
                      .get<OwningSimulatorContext>()
                      .get();
@@ -88,7 +87,9 @@ bool SMCFiller::runOnModule(Module &M) {
   auto &SMCManager = ProgCtx.getSMCManager();
   for (auto &&[MBB, TBB] :
        zip(drop_begin(MF), SMCManager.getTgtBlocksFromBlockPairs())) {
-    BlockSize = State.getCodeBlockSize(TBB->begin(), TBB->getFirstTerminator());
+    // The target's layout has already changed since its copy size was fixed.
+    // Generate exactly the number of bytes that the runtime memcpy will use.
+    BlockSize = SMCManager.getOverwriteSize(TBB);
     Limit = planning::RequestLimit::Size{BlockSize};
     Policy = planning::createGenPolicy(ProgCtx, GC.getConfig().DefFlowConfig);
     FunReq.addToBlock(

@@ -740,7 +740,7 @@ static MachineOperand pregenerateOneOperand(
   auto OpType = Operand.OperandType;
   auto OperandRegClassID = Operand.RegClass;
 
-  if (OpType == MCOI::OperandType::OPERAND_REGISTER) {
+  if (SnippyTgt.isRegisterOperand(Operand)) {
     assert(OperandRegClassID != -1);
     Register Reg;
     if (Preselected.isTiedTo()) {
