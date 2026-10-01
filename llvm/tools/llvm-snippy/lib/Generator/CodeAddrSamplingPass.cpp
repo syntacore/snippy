@@ -56,7 +56,8 @@ bool CodeAddrSampling::runOnMachineFunction(MachineFunction &MF) {
     auto &State = ProgCtx.getLLVMState();
     auto BlockSize = State.getCodeBlockSize(MBB.begin(), MBB.end());
     auto &STI = MBB.getParent()->getSubtarget();
-    AddressGenInfo Params{BlockSize, Tgt.getCodeAlignment(STI),
+    auto MBBASP = Tgt.getCLMBBAddrSelectParams(STI);
+    AddressGenInfo Params{BlockSize, MBBASP.MinAlignment.value(),
                           /* AllowMisalign */ false,
                           /* Burst */ false};
     auto AI = Sampler.randomAddress(Params);

@@ -150,6 +150,8 @@ bool LongJumpRelaxator::runOnMachineFunction(MachineFunction &MF) {
   auto &JumpMap = getAnalysis<JumpLengthener>().get<IndJumpInfoMap>(MF);
   for (auto &MBB : llvm::drop_begin(MF))
     Changed |= runOnMachineBasicBlock(MBB, JumpMap);
+  for (const auto &Jumps : JumpMap)
+    Jumps.second.MBB->setMachineBlockAddressTaken();
   return Changed;
 }
 

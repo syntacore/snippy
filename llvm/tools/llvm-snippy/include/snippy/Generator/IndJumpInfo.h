@@ -44,7 +44,9 @@ public:
     return DenseMap::count(&Jump);
   }
 
+  using DenseMap::begin;
   using DenseMap::empty;
+  using DenseMap::end;
   using DenseMap::size;
 };
 

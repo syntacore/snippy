@@ -238,7 +238,13 @@ public:
   virtual unsigned getSpillAlignmentInBytes(MCRegister Reg,
                                             const LLVMState &State) const = 0;
 
-  virtual uint8_t getCodeAlignment(const TargetSubtargetInfo &IGC) const = 0;
+  struct CLMBBAddrSelectParams {
+    Align MinAlignment;
+  };
+
+  /// Get basic block address selection params for use with code layout.
+  virtual CLMBBAddrSelectParams
+  getCLMBBAddrSelectParams(const TargetSubtargetInfo &IGC) const = 0;
 
   // Find register by name, std::nullopt if not found.
   virtual std::optional<unsigned>
@@ -528,11 +534,12 @@ public:
   virtual MachineInstr *
   generateMemoryBarrier(InstructionGenerationContext &IGC) const = 0;
 
-  virtual MachineInstr *generateCall(InstructionGenerationContext &IGC,
-                                     const Function &Target,
-                                     MDNode *MetadataMark,
-                                     std::optional<unsigned> Opcode,
-                                     MCRegister RA) const = 0;
+  /// \param NodeId CallGraphState::Node::getId() if the callee is part of
+  /// snippy's call graph or 0 otherwise.
+  virtual MachineInstr *
+  generateCall(InstructionGenerationContext &IGC, const Function &Target,
+               MDNode *MetadataMark, std::optional<unsigned> Opcode,
+               MCRegister RA, unsigned CalleeNodeId = 0) const = 0;
 
   virtual MachineInstr *generateTailCall(InstructionGenerationContext &IGC,
                                          const Function &Target) const = 0;

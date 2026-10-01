@@ -723,8 +723,8 @@ public:
 
   MachineInstr *generateCall(InstructionGenerationContext &IGC,
                              const Function &Target, MDNode *MM,
-                             std::optional<unsigned> OptOpcode,
-                             MCRegister RA) const override {
+                             std::optional<unsigned> OptOpcode, MCRegister RA,
+                             unsigned CalleeNodeId) const override {
     SNIPPY_UNIMPLEMENTED();
   }
 
@@ -1405,7 +1405,8 @@ public:
     return std::make_unique<AArch64AsmPrinter>(TM, std::move(Streamer));
   }
 
-  uint8_t getCodeAlignment(const TargetSubtargetInfo &STI) const override {
+  CLMBBAddrSelectParams
+  getCLMBBAddrSelectParams(const TargetSubtargetInfo &STI) const override {
     SNIPPY_UNIMPLEMENTED();
   }
 

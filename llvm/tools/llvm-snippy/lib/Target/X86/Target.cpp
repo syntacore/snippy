@@ -348,8 +348,8 @@ public:
 
   MachineInstr *generateCall(InstructionGenerationContext &IGC,
                              const Function &Target, MDNode *MetadataMark,
-                             std::optional<unsigned> Opcode,
-                             MCRegister RA) const override {
+                             std::optional<unsigned> Opcode, MCRegister RA,
+                             unsigned CalleeNodeId) const override {
     reportUnimplementedError();
   }
 
@@ -883,7 +883,8 @@ public:
     return std::make_unique<X86AsmPrinter>(TM, std::move(Streamer));
   }
 
-  uint8_t getCodeAlignment(const TargetSubtargetInfo &STI) const override {
+  CLMBBAddrSelectParams
+  getCLMBBAddrSelectParams(const TargetSubtargetInfo &STI) const override {
     reportUnimplementedError();
   }
 
