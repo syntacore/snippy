@@ -12,10 +12,10 @@ set(snippy_includes
   ${LLVM_BINARY_DIR}/lib/Target/RISCV
   )
 
-add_llvm_target_unittest(LLVMSnippyTestsRandom
+add_snippy_unittest(LLVMSnippyRandomTests
   ${snippy_sources}
   )
 
-target_link_libraries(LLVMSnippyTestsRandom PUBLIC ${snippy_link_libraries})
-target_include_directories(LLVMSnippyTestsRandom PUBLIC ${snippy_includes})
-set_property(TARGET LLVMSnippyTestsRandom PROPERTY FOLDER "Tests/UnitTests/ToolTests")
+target_link_libraries(LLVMSnippyRandomTests PUBLIC ${snippy_link_libraries})
+target_include_directories(LLVMSnippyRandomTests PUBLIC ${snippy_includes})
+set_property(TARGET LLVMSnippyRandomTests PROPERTY FOLDER "Tests/UnitTests/ToolTests")

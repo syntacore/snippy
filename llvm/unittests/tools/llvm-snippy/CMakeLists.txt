@@ -17,6 +17,18 @@ endif()
 if(LLVM_TARGETS_TO_BUILD MATCHES "X86" OR LLVM_EXPERIMENTAL_TARGETS_TO_BUILD MATCHES "X86")
   list(APPEND LLVM_SNIPPY_TARGETS_LIST X86)
 endif()
+
+# lit discovers unit test executables by the "Tests" suffix (llvm/test/Unit/lit.cfg.py).
+# A binary named otherwise is built but never run!
+function(add_snippy_unittest test_name)
+  if(NOT test_name MATCHES "Tests$")
+    message(FATAL_ERROR
+      "Unit test target '${test_name}' must end with 'Tests', "
+      "otherwise llvm-lit will not run it")
+  endif()
+  add_llvm_target_unittest(${test_name} ${ARGN})
+endfunction()
+
 add_subdirectory(RandomUtils)
 add_subdirectory(Target)
 
@@ -41,10 +53,10 @@ set(snippy_includes
   ${LLVM_BINARY_DIR}/lib/Target/RISCV
   )
 
-add_llvm_target_unittest(LLVMSnippyTestsCommon
+add_snippy_unittest(LLVMSnippyCommonTests
   ${snippy_sources}
   )
 
-target_link_libraries(LLVMSnippyTestsCommon PUBLIC ${snippy_link_libraries})
-target_include_directories(LLVMSnippyTestsCommon PUBLIC ${snippy_includes})
-set_property(TARGET LLVMSnippyTestsCommon PROPERTY FOLDER "Tests/UnitTests/ToolTests")
+target_link_libraries(LLVMSnippyCommonTests PUBLIC ${snippy_link_libraries})
+target_include_directories(LLVMSnippyCommonTests PUBLIC ${snippy_includes})
+set_property(TARGET LLVMSnippyCommonTests PROPERTY FOLDER "Tests/UnitTests/ToolTests")

@@ -35,8 +35,9 @@ struct SnippyTestsEnvironment : public testing::Environment {
 };
 } // namespace llvm::snippy
 
-int main() {
-  testing::InitGoogleTest();
+int main(int argc, char **argv) {
+  // check-llvm-unit uses cli args to interact with gtest
+  testing::InitGoogleTest(&argc, argv);
   testing::AddGlobalTestEnvironment(new llvm::snippy::SnippyTestsEnvironment);
   return RUN_ALL_TESTS();
 }
