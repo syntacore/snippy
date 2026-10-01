@@ -94,8 +94,9 @@ bool SMCSetSizeGlobals::runOnModule(Module &M) {
               ->getIterator();
       ++LastMainInstrIt;
     }
-    auto *Size = ConstantInt::get(
-        Type, State.getCodeBlockSize(TBB->begin(), LastMainInstrIt));
+    auto BlockSize = State.getCodeBlockSize(TBB->begin(), LastMainInstrIt);
+    SMCManager.setOverwriteSize(TBB, BlockSize);
+    auto *Size = ConstantInt::get(Type, BlockSize);
 
     auto *GVSize = GP.getGV(GVSizeName);
     GVSize->setInitializer(Size);

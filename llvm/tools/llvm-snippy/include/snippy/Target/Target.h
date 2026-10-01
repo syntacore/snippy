@@ -347,6 +347,11 @@ public:
 
   virtual bool requiresCustomGeneration(const MCInstrDesc &InstrDesc) const = 0;
 
+  // Targets can assign their own operand types to register operands.
+  virtual bool isRegisterOperand(const MCOperandInfo &Operand) const {
+    return Operand.OperandType == MCOI::OPERAND_REGISTER;
+  }
+
   // If non-null is returned, the generator is used by pregenerateOperands
   // instead of the default pregenerateOperandsImpl.
   // Return nullptr to use the previous generation path.

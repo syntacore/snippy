@@ -1,2 +1,3 @@
 # RUN: llvm-snippy %S/../compressed.yaml -mtriple=riscv64 %S/../Inputs/histogram-rvc64.yaml
 # RUN: llvm-snippy %S/../compressed.yaml -mtriple=riscv32 %S/../Inputs/histogram-rvc32.yaml
+# RUN: llvm-snippy %S/../compressed.yaml -mtriple=riscv64 %S/../Inputs/histogram-rvc64.yaml -seed=4
