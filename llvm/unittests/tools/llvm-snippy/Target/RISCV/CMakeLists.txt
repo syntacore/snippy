@@ -19,10 +19,10 @@ set(snippy_includes
   ${LLVM_BINARY_DIR}/lib/Target/RISCV
   )
 
-add_llvm_target_unittest(LLVMSnippyTestsTargetRISCV
+add_snippy_unittest(LLVMSnippyTargetRISCVTests
   ${snippy_sources}
   )
 
-target_link_libraries(LLVMSnippyTestsTargetRISCV PUBLIC ${snippy_link_libraries})
-target_include_directories(LLVMSnippyTestsTargetRISCV PUBLIC ${snippy_includes})
-set_property(TARGET LLVMSnippyTestsTargetRISCV PROPERTY FOLDER "Tests/UnitTests/ToolTests")
+target_link_libraries(LLVMSnippyTargetRISCVTests PUBLIC ${snippy_link_libraries})
+target_include_directories(LLVMSnippyTargetRISCVTests PUBLIC ${snippy_includes})
+set_property(TARGET LLVMSnippyTargetRISCVTests PROPERTY FOLDER "Tests/UnitTests/ToolTests")
