@@ -42,7 +42,7 @@ public:
     bool Committed;
 
     Edge(Node *Dest = nullptr, bool Committed = false)
-        : Dest(Dest), Committed(Committed){};
+        : Dest(Dest), Committed(Committed) {}
 
     // Needed by GraphTraits.
     operator Node *() const { return Dest; }
@@ -66,8 +66,9 @@ public:
      */
 
     explicit Node(const Function *Func,
-                  std::optional<MCRegister> RA = std::nullopt)
-        : Fs(1u, Func), RA(RA) {};
+                  std::optional<MCRegister> RA = std::nullopt,
+                  unsigned NodeId = 0)
+        : Fs(1u, Func), RA(RA), NodeId(NodeId) {}
 
     // Creates caller(this) <-> callee(N) relationship.
     void addCallee(Node *N);
@@ -104,11 +105,14 @@ public:
 
     std::optional<MCRegister> returnAddress() const { return RA; }
 
+    unsigned getId() const { return NodeId; }
+
   private:
     SmallVector<const Function *, 2> Fs;
     std::optional<MCRegister> RA{};
     ChildContainerT Callees;
     ChildContainerT Callers;
+    unsigned NodeId;
     bool External = false;
   };
 
@@ -119,6 +123,7 @@ private:
   NodeContainerT Nodes;
   NodeRefContainerT NodeRefs;
   DenseMap<const Function *, Node *> FunToNodeMap;
+  unsigned NextNodeId = 0;
 
 public:
   CallGraphState() = default;
@@ -127,7 +132,8 @@ public:
   auto *emplaceNode(const Function *F,
                     std::optional<MCRegister> RA = std::nullopt) {
     assert(!registered(F) && "Node for MF has been already registered");
-    auto *N = Nodes.emplace_back(std::make_unique<Node>(F, RA)).get();
+    auto *N =
+        Nodes.emplace_back(std::make_unique<Node>(F, RA, ++NextNodeId)).get();
     NodeRefs.emplace_back(N);
     FunToNodeMap.insert({F, N});
     return N;

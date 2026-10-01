@@ -2385,6 +2385,7 @@ public:
     switch (Opcode) {
     case RISCV::PseudoC_JRB:
       assert(BranchDesc.operands()[0].OperandType == MCOI::OPERAND_REGISTER);
+      TBB.setMachineBlockAddressTaken();
       return *getMainInstBuilder(*this, MBB, IGC.Ins,
                                  MBB.getParent()->getFunction().getContext(),
                                  InstrInfo.get(RISCV::PseudoSnippyC_JRB))
@@ -3001,8 +3002,8 @@ public:
     initRegsForRandFuncCall(IGC, SectionStart, SectionSize, Seed);
     auto *MM = getMetadataMark(IGC.ProgCtx.getLLVMState().getCtx(),
                                SnippyMetadata::Support);
-    generateCall(IGC, ExternalGenFunc, MM, /* Opcode */ std::nullopt,
-                 IGC.ProgCtx.getReturnAddress());
+    generateCall(IGC, ExternalGenFunc, MM, /*Opcode=*/std::nullopt,
+                 IGC.ProgCtx.getReturnAddress(), /*CalleeNodeId=*/0);
   }
 
   // This code should be equal to machine code in
@@ -3904,18 +3905,20 @@ public:
   }
 
   MachineInstr *generateCJALR(InstructionGenerationContext &IGC,
-                              const Function &Target,
-                              MDNode *MetadataMark) const {
+                              const Function &Target, MDNode *MetadataMark,
+                              unsigned CalleeNodeId) const {
     auto &ProgCtx = IGC.ProgCtx;
     const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
     auto &State = ProgCtx.getLLVMState();
     auto &Ctx = State.getCtx();
     const auto &RI = State.getRegInfo();
+
     auto RP = IGC.pushRegPool();
     auto Reg = getTmpRegForFuncAddr(
         MetadataMark, "scratch register for storing function address", RI, *RP,
         IGC.MBB);
     auto [_, AUIPCSymbol] = loadUpperPC(IGC, Reg, &Target);
+    const bool IsSupport = checkMetadata(MetadataMark, SnippyMetadata::Support);
 
     getFormAddrInstBuilder(*this, IGC.MBB, IGC.Ins, Ctx,
                            InstrInfo.get(RISCV::ADDI))
@@ -3923,7 +3926,6 @@ public:
         .addReg(Reg)
         .addSym(AUIPCSymbol, RISCVII::MO_PCREL_LO);
 
-    auto IsSupport = checkMetadata(MetadataMark, SnippyMetadata::Support);
     // According to the spec LSB is set to zero, so we can make RS value odd
     if (!IsSupport)
       getFormAddrInstBuilder(*this, IGC.MBB, IGC.Ins, Ctx,
@@ -3932,26 +3934,30 @@ public:
           .addReg(Reg)
           .addImm(RandEngine::genBool());
 
-    return getInstBuilder(MetadataMark, *this, IGC.MBB, IGC.Ins, Ctx,
-                          InstrInfo.get(RISCV::C_JALR))
-        .addReg(Reg);
+    auto CJalr = getInstBuilder(MetadataMark, *this, IGC.MBB, IGC.Ins, Ctx,
+                                InstrInfo.get(RISCV::C_JALR))
+                     .addReg(Reg);
+    return CJalr;
   }
 
   MachineInstr *generateJALR(InstructionGenerationContext &IGC,
                              const Function &Target, MCRegister RA,
-                             MDNode *MetadataMark, bool Tail = false) const {
+                             MDNode *MetadataMark, bool Tail = false,
+                             unsigned CalleeNodeId = 0) const {
     auto &ProgCtx = IGC.ProgCtx;
     const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
     auto &State = ProgCtx.getLLVMState();
     auto &Ctx = State.getCtx();
     const auto &RI = State.getRegInfo();
+
     auto RP = IGC.pushRegPool();
     auto Reg = getTmpRegForFuncAddr(
         MetadataMark, "scratch register for storing function address", RI, *RP,
         IGC.MBB);
     auto [_, AUIPCSymbol] = loadUpperPC(IGC, Reg, &Target);
 
-    auto IsSupport = checkMetadata(MetadataMark, SnippyMetadata::Support);
+    const bool IsSupport = checkMetadata(MetadataMark, SnippyMetadata::Support);
+
     if (IsSupport) {
       auto Jalr = getInstBuilder(
           MetadataMark, *this, IGC.MBB, IGC.Ins, Ctx,
@@ -4004,21 +4010,21 @@ public:
 
   MachineInstr *generateCall(InstructionGenerationContext &IGC,
                              const Function &Target, MDNode *MM,
-                             std::optional<unsigned> OptOpcode,
-                             MCRegister RA) const override {
+                             std::optional<unsigned> OptOpcode, MCRegister RA,
+                             unsigned CalleeNodeId) const override {
     auto Opcode = OptOpcode.value_or(RISCV::JALR);
     assert(isCall(Opcode) && "Expected call here");
     switch (Opcode) {
     case RISCV::JAL:
       return generateJAL(IGC, Target, RA, MM);
     case RISCV::JALR:
-      return generateJALR(IGC, Target, RA, MM);
+      return generateJALR(IGC, Target, RA, MM, /*Tail=*/false, CalleeNodeId);
     case RISCV::C_JAL:
       assert(RA == RISCV::X1);
       return generateCJAL(IGC, Target, MM);
     case RISCV::C_JALR:
       assert(RA == RISCV::X1);
-      return generateCJALR(IGC, Target, MM);
+      return generateCJALR(IGC, Target, MM, CalleeNodeId);
     case RISCV::CM_JALT:
       assert(RA == RISCV::X1);
       return generateCM_JALT(IGC, Target, MM);
@@ -5479,12 +5485,15 @@ private:
         TM.getTarget().createAsmPrinter(TM, std::move(Streamer)));
   }
 
-  uint8_t getCodeAlignment(const TargetSubtargetInfo &STI) const override {
+  CLMBBAddrSelectParams
+  getCLMBBAddrSelectParams(const TargetSubtargetInfo &STI) const override {
     const auto &ST = static_cast<const RISCVSubtarget &>(STI);
-    if (ST.hasStdExtC())
-      return 2;
-    return 4;
+    return {
+        // Code layout allows to create misaligned landing pads intentionally.
+        Align(ST.hasStdExtC() ? 2 : 4),
+    };
   }
+
   MachineBasicBlock::iterator
   insertJumpThroughRelocation(InstructionGenerationContext &IGC,
                               uint64_t Addr) const override {
@@ -5503,8 +5512,8 @@ private:
     IGC.Ins = MBB.getFirstTerminator();
     loadRegFromAddr(IGC, Addr, Reg);
     IGC.Ins = Ins;
-    return *getSupportInstBuilder(*this, MBB, Ins, State.getCtx(),
-                                  InstrInfo.get(RISCV::PseudoBRIND))
+    const auto &Opcode = InstrInfo.get(RISCV::PseudoBRIND);
+    return *getSupportInstBuilder(*this, MBB, Ins, State.getCtx(), Opcode)
                 .addReg(Reg)
                 .addImm(0)
                 .getInstr();

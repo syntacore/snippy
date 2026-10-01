@@ -1177,6 +1177,7 @@ MachineInstr *generateCall(unsigned OpCode,
     return nullptr;
   auto CalleeIdx = RandEngine::genInRangeExclusive(CalleeCount);
   auto *CalleeNode = std::next(Node->callees().begin(), CalleeIdx)->Dest;
+  assert(CalleeNode);
 
   auto &CallTarget = *RandEngine::selectFromContainer(CalleeNode->functions());
   assert(CallTarget.hasName());
@@ -1188,8 +1189,9 @@ MachineInstr *generateCall(unsigned OpCode,
   if (SpillRA)
     SnippyTgt.generateSpillToStack(InstrGenCtx, RA, RealStackPointer);
 
-  auto *Call =
-      SnippyTgt.generateCall(InstrGenCtx, CallTarget, MetadataMark, OpCode, RA);
+  auto *Call = SnippyTgt.generateCall(
+      InstrGenCtx, CallTarget, MetadataMark, OpCode, RA,
+      CalleeNode->isExternal() ? 0 : CalleeNode->getId());
   assert(Call);
   if (CalleeNode->isExternal())
     addSnippyMetadata(*Call, *MBB.getParent(), State.getCtx(),
