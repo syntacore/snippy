@@ -1270,6 +1270,12 @@ inline bool isRVVFloatingPoint(unsigned Opcode) {
     return (RISCV::VFADD_VF <= Opcode && Opcode <= RISCV::VFWSUB_WV) ||
            (RISCV::VMFEQ_VF <= Opcode && Opcode <= RISCV::VMFNE_VV);
   case RISCV::VFIRST_M:
+  // Zvfbfmin / Zvfbfwma sit inside the opcode range above, but they are BF16
+  // rather than IEEE half/single/double. Their SEW rule is handled separately.
+  case RISCV::VFNCVTBF16_F_F_W:
+  case RISCV::VFWCVTBF16_F_F_V:
+  case RISCV::VFWMACCBF16_VF:
+  case RISCV::VFWMACCBF16_VV:
     return false;
   }
 }
@@ -1488,6 +1494,32 @@ inline bool mayBeZvfh8BitIntConversion(unsigned Opcode) {
   }
 }
 
+// Zvfbfmin / Zvfbfwma are defined only for SEW=16 (BF16 elements). Widening
+// forms write EEW=32; the narrowing convert reads EEW=32.
+inline bool isZvfbfmin(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RISCV::VFWCVTBF16_F_F_V:
+  case RISCV::VFNCVTBF16_F_F_W:
+    return true;
+  }
+}
+
+inline bool isZvfbfwma(unsigned Opcode) {
+  switch (Opcode) {
+  default:
+    return false;
+  case RISCV::VFWMACCBF16_VV:
+  case RISCV::VFWMACCBF16_VF:
+    return true;
+  }
+}
+
+inline bool isZvfbf(unsigned Opcode) {
+  return isZvfbfmin(Opcode) || isZvfbfwma(Opcode);
+}
+
 inline bool isZvbc(unsigned Opcode) {
   switch (Opcode) {
   default:
@@ -1610,6 +1642,9 @@ inline bool isRVVFPWidening(unsigned Opcode) {
   case RISCV::VFWCVT_RTZ_X_F_V:
   case RISCV::VFWCVT_XU_F_V:
   case RISCV::VFWCVT_X_F_V:
+  case RISCV::VFWCVTBF16_F_F_V:
+  case RISCV::VFWMACCBF16_VV:
+  case RISCV::VFWMACCBF16_VF:
     return true;
   }
 }
@@ -1633,6 +1668,8 @@ inline bool isRVVWideningDestOverride(unsigned Opcode) {
   case RISCV::VFWNMACC_VF:
   case RISCV::VFWNMSAC_VV:
   case RISCV::VFWNMSAC_VF:
+  case RISCV::VFWMACCBF16_VV:
+  case RISCV::VFWMACCBF16_VF:
     return true;
   }
 }
@@ -1669,6 +1706,7 @@ inline bool isRVVFPNarrowing(unsigned Opcode) {
   case RISCV::VFNCVT_RTZ_X_F_W:
   case RISCV::VFNCVT_XU_F_W:
   case RISCV::VFNCVT_X_F_W:
+  case RISCV::VFNCVTBF16_F_F_W:
     return true;
   }
 }

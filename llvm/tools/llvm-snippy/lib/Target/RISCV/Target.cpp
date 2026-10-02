@@ -441,6 +441,11 @@ static bool isLegalRVVInstr(unsigned Opcode, const RVVPrimaryConfig &Cfg,
       return false;
     return isValidEMUL(ELEN, SEW, EEW, LMUL);
   }
+  // Zvfbfmin / Zvfbfwma are defined only for SEW = 16. A later widening check
+  // would otherwise accept SEW = 8/32/64, because EEW = SEW * 2 is still a
+  // legal element width.
+  if (isZvfbf(Opcode) && SEW != 16u)
+    return false;
   if (isRVVIntegerWidening(Opcode) || isRVVFPWidening(Opcode) ||
       isRVVIntegerNarrowing(Opcode) || isRVVFPNarrowing(Opcode)) {
     // Both widening and narrowing instructions use operands with EEW = SEW * 2.
