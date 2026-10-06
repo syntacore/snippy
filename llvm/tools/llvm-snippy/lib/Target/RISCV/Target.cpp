@@ -65,8 +65,8 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MathExtras.h"
 
+#include <algorithm>
 #include <cstdint>
-
 #include <functional>
 #include <limits>
 #include <numeric>
@@ -1788,7 +1788,10 @@ public:
                       ModeChangeInfo.WeightVSETVLI +
                       ModeChangeInfo.WeightVSETIVLI;
 
-    return VSETWeight / ModeChangeInfo.TotalHistWeight;
+    double VSETProbability = VSETWeight / ModeChangeInfo.TotalHistWeight;
+    // VSETWeight can be equal to TotalHistWeight, but FP division may round the
+    // ratio to slightly more than 1.0. Clamp to keep the result within [0, 1].
+    return std::clamp(VSETProbability, 0.0, 1.0);
   }
 
   std::pair<std::shared_ptr<const ModeChangingContext>, OpcodeFilterType>
