@@ -1,20 +1,19 @@
-# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s | FileCheck %s
 
 options:
   mtriple: riscv64
   mattr: +f,+d,+v,+zfh,+zvfbfmin
-  num-instrs: 100
+  num-instrs: 1000
   dump-mf: true
 
 include:
+  - ../rvv-config-biased/Inputs/rvv-unit-all.yaml
   - ../Inputs/rvv-sections.yaml
 
 histogram:
   - [VFNCVTBF16_F_F_W, 1.0]
   - [VFWCVTBF16_F_F_V, 1.0]
   - [VADD_VV, 1.0]
-  - [VSETVL, 1.0]
 
 # CHECK-DAG: VFNCVTBF16_F_F_W
 # CHECK-DAG: VFWCVTBF16_F_F_V
