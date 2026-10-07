@@ -1,0 +1,12 @@
+# COM: Default-RVV-config copy of popret-floats-vectors.yaml. The main test runs
+# COM: with -riscv-rvv-use-uniform-distribution (see lit.local.cfg) and XFAILs due to a
+# COM: known RVV mode handling bug; this copy forces -riscv-rvv-use-uniform-distribution
+# COM: =false to keep default-mode regression coverage until the bug is fixed.
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy -riscv-rvv-use-uniform-distribution=false \
+# RUN:   %S/popret-floats-vectors.yaml -mtriple=riscv64 \
+# RUN: |& FileCheck %S/popret-floats-vectors.yaml
+# RUN: llvm-snippy -riscv-rvv-use-uniform-distribution=false \
+# RUN:   %S/popret-floats-vectors.yaml -mtriple=riscv32 \
+# RUN: |& FileCheck %S/popret-floats-vectors.yaml

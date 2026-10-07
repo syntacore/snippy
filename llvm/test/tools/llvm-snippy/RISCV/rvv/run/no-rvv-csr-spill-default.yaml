@@ -1,0 +1,8 @@
+# COM: Default-RVV-config copy of no-rvv-csr-spill.yaml. The main test runs with
+# COM: -riscv-rvv-use-uniform-distribution (see lit.local.cfg) and XFAILs due to a known
+# COM: RVV mode handling bug; this copy forces -riscv-rvv-use-uniform-distribution
+# COM: =false to keep default-mode regression coverage until the bug is fixed.
+
+# REQUIRES: riscv-snippy-model-spike
+# RUN: llvm-snippy -riscv-rvv-use-uniform-distribution=false %S/no-rvv-csr-spill.yaml \
+# RUN: |& FileCheck %S/no-rvv-csr-spill.yaml

@@ -56,6 +56,13 @@ static snippy::opt<std::string> DumpDiscardedRVVConfigurations(
              "configuration generators"),
     cl::Hidden, cl::init(""), cl::ValueOptional, cl::cat(SnippyRISCVOptions));
 
+static snippy::opt<bool> UseRVVUniformDistribution(
+    "riscv-rvv-use-uniform-distribution",
+    cl::desc("Use a uniform default riscv-vector-unit configuration "
+             "(uniform distribution over legal SEW/LMUL/VMA/VTA/VL/VM/VXRM) "
+             "when no riscv-vector-unit is specified"),
+    cl::init(false), cl::cat(SnippyRISCVOptions));
+
 } // namespace snippy
 } // namespace llvm
 
@@ -1725,30 +1732,47 @@ static bool hasVXRMUsers(const OpcodeHistogram &Hist) {
                       [](auto Opcode) { return isRVVuseVXRM(Opcode); });
 }
 
-static RVVConfigurationSpace createDefaultConfigurationSpace() {
-  SEWInfo SEW;
-  LMULInfo LMUL;
-  VMAInfo VMA;
-  VTAInfo VTA;
-  VXRMInfo VXRM;
-
-  // Default vector unit info. Will always use the config that represents all
-  // bits of `vtype` field set to zero and LMUL=1, SEW=64.
-  SEW[VSEW::SEW64] = 1.0;
-  LMUL[VLMUL::LMUL_1] = 1.0;
-  VMA[VMAMode::MU] = 1.0;
-  VTA[VTAMode::TU] = 1.0;
-  VXRM[VXRMMode::RNU] = 1.0;
-  VMSequence VMSeq = {{UnmaskedVMGenerator::kID, 1.0}};
-  VLSequence VLSeq = {{MaxPossibleVLGen::kID, 1.0}};
-
+static RVVConfigurationSpace
+createConfigurationSpace(SEWInfo SEW, LMULInfo LMUL, VMAInfo VMA, VTAInfo VTA,
+                         VXRMInfo VXRM, VMSequence VMSeq, VLSequence VLSeq) {
   VTypeInfo VTYPE{SEW, LMUL, VMA, VTA};
   RVVUnitInfo VUInfo{
       VXRM, VTYPE, VMSeq, VLSeq, SewLmulDistribution{}, /*PrimaryBuilders=*/{}};
   RVVConfigurationSpace CS{
       /*no bias, deduce P from histogram*/ ModeChangeBias{}, VUInfo};
-
   return CS;
+}
+
+static RVVConfigurationSpace createDefaultConfigurationSpace() {
+  // Default vector unit info. Will always use the config that represents all
+  // bits of `vtype` field set to zero and LMUL=1, SEW=64
+  SEWInfo SEW = {VSEW::SEW64};
+  LMULInfo LMUL = {VLMUL::LMUL_1};
+  VMAInfo VMA = {VMAMode::MU};
+  VTAInfo VTA = {VTAMode::TU};
+  VXRMInfo VXRM = {VXRMMode::RNU};
+  VMSequence VMSeq = {{UnmaskedVMGenerator::kID, 1.0}};
+  VLSequence VLSeq = {{MaxPossibleVLGen::kID, 1.0}};
+  return createConfigurationSpace(SEW, LMUL, VMA, VTA, VXRM, VMSeq, VLSeq);
+}
+
+static RVVConfigurationSpace createUniformDefaultConfigurationSpace() {
+  // Uniform default: vary all elements of the RVV mode with a uniform
+  // distribution over every legal SEW/LMUL/VL/VM to exercise real vector-mode
+  // handling instead of always using SEW=64/LMUL=1/VL=max_encodable/
+  // VM=all_ones/VMA=mu/VTA=tu/VXRM=rnu.
+  SEWInfo SEW = {VSEW::SEW8, VSEW::SEW16, VSEW::SEW32, VSEW::SEW64};
+  LMULInfo LMUL = {VLMUL::LMUL_1,  VLMUL::LMUL_2,  VLMUL::LMUL_4, VLMUL::LMUL_8,
+                   VLMUL::LMUL_F8, VLMUL::LMUL_F4, VLMUL::LMUL_F2};
+  VMAInfo VMA = {VMAMode::MA, VMAMode::MU};
+  VTAInfo VTA = {VTAMode::TA, VTAMode::TU};
+  VXRMInfo VXRM = {VXRMMode::RNU, VXRMMode::RNE, VXRMMode::RDN, VXRMMode::RON};
+  // No explicit mode-change-bias is forced: VSET insertion probability is
+  // deduced from the histogram (like the default space), but the mode
+  // components themselves use a uniformly varied distribution.
+  VMSequence VMSeq = {{LegalVMGenerator::kID, 1.0}};
+  VLSequence VLSeq = {{LegalVLGenerator::kID, 1.0}};
+  return createConfigurationSpace(SEW, LMUL, VMA, VTA, VXRM, VMSeq, VLSeq);
 }
 
 // MinVL = minimum bit width of all VM generators
@@ -1949,7 +1973,10 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(const Config &Cfg,
   if (CSOpt && VLEN == 0)
     snippy::fatal("RVV configuration file should not be "
                   "specified for targets without RVV");
-  const auto &CS = CSOpt ? CSOpt.value() : createDefaultConfigurationSpace();
+  const auto &CS = CSOpt ? CSOpt.value()
+                         : (UseRVVUniformDistribution.getValue()
+                                ? createUniformDefaultConfigurationSpace()
+                                : createDefaultConfigurationSpace());
 
   auto SwitchInfo = deriveModeSwitchingProbability(Cfg, CS.Guides);
   bool IsArtificialModeChange = !CS.Guides.ModeChangeProb.isDeduced();

@@ -1,12 +1,11 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -seed=1 |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
 
 options:
     mtriple: riscv64
     mattr: +v
     dump-mf: on
     num-instrs: 100
-
 
 sections:
     - name:      1
@@ -26,11 +25,12 @@ sections:
       ACCESS:    r
 
 histogram:
-    - [VSETVL, 1.0]
-    - [VSETIVLI, 1.0]
     - [VLSE32_V, 1.0]
     - [VSSE32_V, 1.0]
-    - [VLSSEG6E8_V, 1.0]
+    - [VLSSEG2E8_V, 1.0]
+    - [VADD_VV, 1.0]
+    - [VSETVL, 1.0]
+    - [VSETIVLI, 1.0]
 
 burst:
     mode: custom
