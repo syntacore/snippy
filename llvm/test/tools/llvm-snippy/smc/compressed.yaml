@@ -12,7 +12,7 @@
 
 options:
   mattr: +m,+zifencei,+c
-  num-instrs: 500
+  num-instrs: 5000
   dump-mf: on
 
 include:
