@@ -81,23 +81,26 @@ bool SMCSetSizeGlobals::runOnModule(Module &M) {
 
     auto TermIt = TBB->getFirstTerminator();
     auto LastMainInstrIt = TermIt;
+    assert(LastMainInstrIt != TBB->end());
+
     if (TermIt != TBB->begin()) {
       // We can only overwrite those instructions that are not involved in
       // forming address for jump.
+      auto LastPrimaryInstrBeforeTerminatorSupport = llvm::find_if_not(
+          make_range((--TermIt)->getReverseIterator(), TBB->instr_rend()),
+          [](const auto &Instr) {
+            return checkMetadata(Instr, SnippyMetadata::Support);
+          });
+
       LastMainInstrIt =
-          llvm::find_if_not(make_range((--TermIt)->getReverseIterator(),
-                                       TBB->begin()->getReverseIterator()),
-                            [](const auto &Instr) {
-                              return checkMetadata(Instr,
-                                                   SnippyMetadata::Support);
-                            })
-              ->getIterator();
-      ++LastMainInstrIt;
+          LastPrimaryInstrBeforeTerminatorSupport == TBB->instr_rend()
+              ? TBB->begin()
+              : ++LastPrimaryInstrBeforeTerminatorSupport->getIterator();
     }
+
     auto BlockSize = State.getCodeBlockSize(TBB->begin(), LastMainInstrIt);
     SMCManager.setOverwriteSize(TBB, BlockSize);
     auto *Size = ConstantInt::get(Type, BlockSize);
-
     auto *GVSize = GP.getGV(GVSizeName);
     GVSize->setInitializer(Size);
   }

@@ -87,9 +87,15 @@ bool SMCFiller::runOnModule(Module &M) {
   auto &SMCManager = ProgCtx.getSMCManager();
   for (auto &&[MBB, TBB] :
        zip(drop_begin(MF), SMCManager.getTgtBlocksFromBlockPairs())) {
-    // The target's layout has already changed since its copy size was fixed.
-    // Generate exactly the number of bytes that the runtime memcpy will use.
+    // It's crucial that the overwrite source has exactly the same size as the
+    // target, because we must copy instructions wholesale. Cutting them in half
+    // will inevitably lead to decoding issues and mess up the target.
     BlockSize = SMCManager.getOverwriteSize(TBB);
+    // Not accounting for support instructions. When this pass is running we've
+    // already stripped support metadata.
+    // TODO: Stop using pcsections hack and preserve that information here.
+    assert(BlockSize <= GC.getProgramContext().getLLVMState().getCodeBlockSize(
+                            TBB->begin(), TBB->getFirstTerminator()));
     Limit = planning::RequestLimit::Size{BlockSize};
     Policy = planning::createGenPolicy(ProgCtx, GC.getConfig().DefFlowConfig);
     FunReq.addToBlock(
