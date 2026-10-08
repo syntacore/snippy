@@ -73,6 +73,8 @@ def c_lui_imm : RISCVOp,
                 ImmLeaf<XLenVT, [{return (Imm != 0) &&
                                  (isUInt<5>(Imm) ||
                                   (Imm >= 0xfffe0 && Imm <= 0xfffff));}]> {
+  let OperandType = "OPERAND_UIMM5_NONZERO";
+  let OperandNamespace = "RISCVOp";
   let ParserMatchClass = CLUIImmAsmOperand;
   let EncoderMethod = "getImmOpValue";
   let DecoderMethod = "decodeCLUIImmOperand";
@@ -701,8 +703,6 @@ def : InstAlias<".insn_cj $opcode, $funct3, $imm11",
 // Zca patterns are defined in the same order the compressed instructions appear
 // under the "RVC Instruction Set Listings" section of the ISA manual.
 
-// Zca Instructions
-
 let Predicates = [HasStdExtZihintntl], isPseudo = 1, mayLoad = 0, mayStore = 0,
     hasSideEffects = 1 in {
 def C_NTL_P1 : Pseudo<(outs), (ins), []>,
@@ -714,6 +714,8 @@ def C_NTL_S1 : Pseudo<(outs), (ins), []>,
 def C_NTL_ALL : Pseudo<(outs), (ins), []>,
                   PseudoInstExpansion<(C_ADD X0, X0, X5)>;
 } // Predicates = [HasStdExtZihintntl]
+
+// Zca Instructions
 
 // Quadrant 0
 let Predicates = [HasStdExtZca] in {

@@ -333,8 +333,7 @@ static RegStorageType regToStorage(Register Reg) {
       (RISCV::X0_W <= Reg && Reg <= RISCV::X31_W))
     return RegStorageType::XReg;
   if (RISCV::FPR16RegClass.contains(Reg) ||
-      RISCV::FPR32RegClass.contains(Reg) ||
-      RISCV::FPR64RegClass.contains(Reg))
+      RISCV::FPR32RegClass.contains(Reg) || RISCV::FPR64RegClass.contains(Reg))
     return RegStorageType::FReg;
   if (!RISCV::VRRegClass.contains(Reg))
     report_fatal_error(Twine("unknown RISC-V register storage for register ") +
@@ -2124,6 +2123,12 @@ public:
     if ((RISCV::F0_D <= RegUnit && RegUnit <= RISCV::F31_D) ||
         (RISCV::F0_F <= RegUnit && RegUnit <= RISCV::F31_F) ||
         (RISCV::F0_H <= RegUnit && RegUnit <= RISCV::F31_H)) {
+      OutPhysRegs.push_back(RegUnit);
+      return;
+    }
+    if ((RISCV::X0 <= RegUnit && RegUnit <= RISCV::X31) ||
+        (RISCV::X0_W <= RegUnit && RegUnit <= RISCV::X31_W) ||
+        (RISCV::X0_H <= RegUnit && RegUnit <= RISCV::X31_H)) {
       OutPhysRegs.push_back(RegUnit);
       return;
     }
@@ -4186,10 +4191,9 @@ public:
     auto Opcode = MIDesc.getOpcode();
     auto OperandType = MIDesc.operands()[OperandIdx].OperandType;
     if (OperandType == RISCVOp::OPERAND_VMASK)
-      return MachineOperand::CreateReg(isRVVuseV0RegExplicitly(Opcode)
-                                           ? RISCV::V0
-                                           : RISCV::NoRegister,
-                                       /*isDef=*/false);
+      return MachineOperand::CreateReg(
+          isRVVuseV0RegExplicitly(Opcode) ? RISCV::V0 : RISCV::NoRegister,
+          /*isDef=*/false);
     return MachineOperand::CreateImm(
         genImmOperandForOpcode(Opcode, IH, OperandType, StridedImm, State));
   }

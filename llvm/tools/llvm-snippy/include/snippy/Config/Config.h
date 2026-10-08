@@ -25,13 +25,15 @@
 #include "snippy/Config/RegisterAccess.h"
 #include "snippy/Config/SMCGram.h"
 #include "snippy/Config/Selfcheck.h"
-#include "snippy/Config/Scheduling.h"
 #include "snippy/Support/YAMLUtils.h"
 #include "snippy/Target/TargetConfigIface.h"
+
+#include "snippy/Config/Scheduling.h"
 
 #include "llvm/ADT/SmallSet.h"
 
 #include <unordered_map>
+
 namespace llvm {
 namespace snippy {
 #define GEN_SNIPPY_OPTIONS_STRUCT_DEF

@@ -360,7 +360,10 @@ def GPRNoX0 : GPRRegisterClass<(sub GPR, X0)> {
   let DiagnosticString = "register must be a GPR excluding zero (x0)";
 }
 
-def GPRNoX0X1 : GPRRegisterClass<(sub GPRNoX0, X1)>;
+def GPRNoX0X1 : GPRRegisterClass<(sub GPRNoX0, X1)>{
+  let DiagnosticType = "InvalidRegClassGPRNoX0X1";
+  let DiagnosticString = "register must be a GPR excluding zero (x0) and ra (x1)";
+}
 
 def GPRNoX2 : GPRRegisterClass<(sub GPR, X2)> {
   let DiagnosticType = "InvalidRegClassGPRNoX2";

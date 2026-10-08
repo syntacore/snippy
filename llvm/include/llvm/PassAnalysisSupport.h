@@ -214,11 +214,15 @@ AnalysisType *Pass::getAnalysisIfAvailable() const {
   assert(Resolver && "Pass not resident in a PassManager object!");
 
   const void *PI = &AnalysisType::ID;
+
   Pass *ResultPass = Resolver->getAnalysisIfAvailable(PI);
-  return ResultPass
-             ? static_cast<AnalysisType *>(
-                   ResultPass->getAdjustedAnalysisPointer(PI))
-             : nullptr;
+  if (!ResultPass) return nullptr;
+
+  // Because the AnalysisType may not be a subclass of pass (for
+  // AnalysisGroups), we use getAdjustedAnalysisPointer here to potentially
+  // adjust the return pointer (because the class may multiply inherit, once
+  // from pass, once from AnalysisType).
+  return (AnalysisType*)ResultPass->getAdjustedAnalysisPointer(PI);
 }
 
 /// getAnalysis<AnalysisType>() - This function is used by subclasses to get
@@ -241,8 +245,12 @@ AnalysisType &Pass::getAnalysisID(AnalysisID PI) const {
   assert(ResultPass &&
          "getAnalysis*() called on an analysis that was not "
          "'required' by pass!");
-  return *static_cast<AnalysisType *>(
-      ResultPass->getAdjustedAnalysisPointer(PI));
+
+  // Because the AnalysisType may not be a subclass of pass (for
+  // AnalysisGroups), we use getAdjustedAnalysisPointer here to potentially
+  // adjust the return pointer (because the class may multiply inherit, once
+  // from pass, once from AnalysisType).
+  return *(AnalysisType*)ResultPass->getAdjustedAnalysisPointer(PI);
 }
 
 /// getAnalysis<AnalysisType>() - This function is used by subclasses to get
@@ -274,8 +282,12 @@ AnalysisType &Pass::getAnalysisID(AnalysisID PI, Function &F, bool *Changed) {
   else
     assert(!LocalChanged &&
            "A pass trigged a code update but the update status is lost");
-  return *static_cast<AnalysisType *>(
-      ResultPass->getAdjustedAnalysisPointer(PI));
+
+  // Because the AnalysisType may not be a subclass of pass (for
+  // AnalysisGroups), we use getAdjustedAnalysisPointer here to potentially
+  // adjust the return pointer (because the class may multiply inherit, once
+  // from pass, once from AnalysisType).
+  return *(AnalysisType*)ResultPass->getAdjustedAnalysisPointer(PI);
 }
 
 } // end namespace llvm

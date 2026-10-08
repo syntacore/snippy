@@ -61,7 +61,7 @@ histogram:
     - [SC_D_RL, 1.0]
     - [SC_W, 1.0]
     - [SC_W_RL, 1.0]
-  
+
     - [LR_D, 5.0]
     - [LR_D_AQ, 5.0]
     - [LR_W, 5.0]
@@ -70,21 +70,21 @@ histogram:
 #          Valuegram values:
 #
 #                      X: 0, 1, 255.
-#                      We want to see them in initialization 
-#         
+#                      We want to see them in initialization
+#
 #          An example of what we're matching:
-# 
+#
 #          AMO and SC: $x7 = ADDI $x0, 255, pcsections <0x56275c6c3b28>
 #                      $x6 = ADDI $x0, 0, pcsections <0x56275c6c3b28>
 #                      $x29 = LUI 8574, pcsections <0x56275c6c3b28>
-#                      $x29 = ADDI{{W?}} $x29, -136, pcsections <0x56275c6c3b28>
+#                      $x29 = ADDI $x29, -136, pcsections <0x56275c6c3b28>
 #                      $x7 = AMOMAXU_W $x29, $x6
 
 #                  Lr: $x24 = ADDI $x0, 1, pcsections <0x55bafc168578>
 #                      $x1 = LUI 8617, pcsections <0x55bafc168578>
-#                      $x1 = ADDI{{W?}} $x1, -2032, pcsections <0x55bafc168578>
+#                      $x1 = ADDI $x1, -2032, pcsections <0x55bafc168578>
 #                      $x24 = LR_D $x1
 
 # AMO_SC-COUNT-100: [[REG0:\$x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}[[REG1:\$x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}[[REG2:\$x[0-9]+]] = LUI {{.*[[:space:]].*}}[[REG2]] = ADDI{{W?}} [[REG2]]{{.*[[:space:]].*}}[[REG0]] = {{AMO|SC}}{{.*}} [[REG1]], [[REG2]]
- 
+
 # LR-COUNT-100: [[REG3:\$x[0-9]+]] = ADDI $x0, {{(0|1|255).*[[:space:]].*}}[[REG4:\$x[0-9]+]] = LUI {{.*[[:space:]].*}}[[REG4]] = ADDI{{W?}} [[REG4]]{{.*[[:space:]].*}}[[REG3]] = LR_{{D|W}}{{.*}}[[REG4]]

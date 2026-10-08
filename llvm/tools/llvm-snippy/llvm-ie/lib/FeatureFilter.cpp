@@ -22,8 +22,7 @@ static std::vector<std::string> getEnabledFeatureOptions() {
   std::vector<std::string> OptNames{};
   for (const auto &Entry : cl::getRegisteredOptions()) {
     cl::Option *Option = Entry.second;
-    if (!llvm::is_contained(Option->Categories,
-                            &opts::FeatureOptionsCategory))
+    if (!llvm::is_contained(Option->Categories, &opts::FeatureOptionsCategory))
       continue;
     auto *Opt = static_cast<cl::opt<bool> *>(Option);
     if (Opt->getValue())

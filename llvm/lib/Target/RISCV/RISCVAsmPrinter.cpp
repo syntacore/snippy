@@ -145,9 +145,8 @@ private:
 };
 } // namespace
 
-void llvm::lowerRISCVMachineInstrToMCInst(AsmPrinter &AP,
-                                          const MachineInstr *MI,
-                                          MCInst &OutMI) {
+void llvm::lowerRISCVMachineInstrToMCInst(AsmPrinter &AP, const MachineInstr *MI,
+                                       MCInst &OutMI) {
   static_cast<RISCVAsmPrinter &>(AP).lowerMachineInstrToMCInst(MI, OutMI);
 }
 

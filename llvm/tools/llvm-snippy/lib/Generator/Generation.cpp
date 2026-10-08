@@ -750,8 +750,8 @@ static MachineOperand pregenerateOneOperand(
       if (SnippyTgt.isPhysRegClass(OperandRegClassID, RegInfo))
         Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
     } else {
-      const auto &RegClass = SnippyTgt.getRegClass(InstrGenCtx, OperandRegClassID,
-                                            OpIndex, InstrDesc, RegInfo);
+      const auto &RegClass = SnippyTgt.getRegClass(
+          InstrGenCtx, OperandRegClassID, OpIndex, InstrDesc, RegInfo);
       SmallVector<Register> Exclude;
       SmallVector<Register> Include;
       SnippyTgt.excludeRegsForOperand(InstrGenCtx, RegClass, InstrDesc, OpIndex,
@@ -1415,8 +1415,10 @@ static void writeRegsSnapshot(RegsSnapshotTy RegsSnapshot,
     // FIXME: we expect that writeValueToReg won't corrupt other registers of
     // the same class even if they were not reserved. Also we expect that
     // writing to FP/V register may use only non-reserved GPR registers.
-    SnippyTgt.writeValueToReg(
-        IGC, toAPInt(Value, SnippyTgt.getRegBitWidth(Reg, IGC)), Reg);
+    SnippyTgt.writeValueToReg(IGC,
+                              toAPInt(Value, SnippyTgt.getRegBitWidth(Reg, IGC),
+                                      /* ImplicitTrunc */ true),
+                              Reg);
   }
 }
 
@@ -1429,8 +1431,8 @@ writeCSRsSnapshot(const TransactionStack::RegIdToValueType &RegsSnapshot,
   auto RP = IGC.pushRegPool();
   for (auto &&[Reg, Value] : RegsSnapshot) {
     SnippyTgt.writeValueToCSR(IGC,
-                              toAPInt(Value,
-                                      SnippyTgt.getRegBitWidth(Reg, IGC)),
+                              toAPInt(Value, SnippyTgt.getRegBitWidth(Reg, IGC),
+                                      /* ImplicitTrunc */ true),
                               Reg);
   }
 }

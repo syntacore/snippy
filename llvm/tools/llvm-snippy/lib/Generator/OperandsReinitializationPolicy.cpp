@@ -34,8 +34,8 @@ static Register pregenerateRegister(InstructionGenerationContext &InstrGenCtx,
   const auto &RegInfo = State.getRegInfo();
   const auto &Tgt = State.getSnippyTarget();
   auto OperandRegClassID = InstrDesc.operands()[OpIndex].RegClass;
-  const auto &RegClass = Tgt.getRegClass(InstrGenCtx, OperandRegClassID, OpIndex,
-                                  InstrDesc, RegInfo);
+  const auto &RegClass = Tgt.getRegClass(InstrGenCtx, OperandRegClassID,
+                                         OpIndex, InstrDesc, RegInfo);
   SmallVector<Register> Exclude;
   SmallVector<Register> Include;
   Tgt.excludeRegsForOperand(InstrGenCtx, RegClass, InstrDesc, OpIndex,

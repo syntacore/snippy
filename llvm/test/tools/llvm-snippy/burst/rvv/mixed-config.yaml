@@ -9,6 +9,7 @@ options:
   verify-gen-histogram: true
   histogram-must-succeed: true
 
+# Eight-instruction bursts require enough disjoint vector register groups.
 include:
   - Inputs/sections.yaml
   - Inputs/rvv-unit-little-lmul.yaml

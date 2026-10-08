@@ -1,7 +1,7 @@
 # REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -num-instrs=100 -mtriple=riscv64 \
 # RUN:   --dump-cfg-after-all --cfg-basename=%t -o %t
-# RUN: rm -f %t_SnippyFunction-cfg-dump-after-snippy-function-generator.dot \
+# RUN: rm %t_SnippyFunction-cfg-dump-after-snippy-function-generator.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-after-snippy-simulator-context-wrapper.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-after-snippy-simulator-context-preserver.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-after-snippy-register-reserve.dot \
@@ -14,8 +14,9 @@
 # RUN:  %t_SnippyFunction-cfg-dump-after-snippy-flow-generator.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-after-snippy-prologue-epilogue-insertion.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-after-snippy-fill-external-functions-stubs.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-after-riscv-expand-pseudo.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-after-riscv-expand-atomic-pseudo.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-after-riscv-expand-pseudo-post-ra.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-after-riscv-expand-pseudo-pre-emit.dot \
+# RUN:  %t_SnippyFunction-cfg-dump-after-riscv-expand-pseudo-atomics.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-after-snippy-branch-lengthener.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-after-snippy-mem-access-dump.dot \
 # RUN:  %t_SnippyFunction-cfg-dump-after-snippy-post-verification.dot \

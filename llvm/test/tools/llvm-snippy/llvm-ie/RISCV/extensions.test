@@ -2,6 +2,7 @@
 ; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "d" | FileCheck -check-prefix=D_EXT %s
 ; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "all&a" | FileCheck -check-prefix=A_EXT %s
 ; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "a + c" | FileCheck -check-prefix=A_AND_C_EXT %s
+; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "d&c" | count 0
 ; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "d - c" | FileCheck -check-prefix=D_EXT_EXCLUDED_C %s
 ; RUN: llvm-ie -arch=riscv -disable-pseudo -riscv-ext "v - d - f" | FileCheck -check-prefix=V_EXT_EXCLUDED_D_F %s
 

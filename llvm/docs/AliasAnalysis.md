@@ -239,6 +239,20 @@ bool run(Module &M) {
 }
 ```
 
+### Required methods to override
+
+Subclasses that implement an analysis interface through multiple inheritance
+must override `getAdjustedAnalysisPointer` to adjust the pointer for that
+interface. For example:
+
+```cpp
+void *getAdjustedAnalysisPointer(const void *ID) override {
+  if (ID == &AliasAnalysis::ID)
+    return static_cast<AliasAnalysis *>(this);
+  return this;
+}
+```
+
 ### Interfaces which may be specified
 
 All of the [AliasAnalysis](https://llvm.org/doxygen/classllvm_1_1AliasAnalysis.html) virtual methods
