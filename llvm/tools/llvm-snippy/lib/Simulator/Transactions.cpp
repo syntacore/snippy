@@ -299,6 +299,11 @@ void TransactionStack::csrUpdateNotification(unsigned RegID,
                                              RegisterType Value) {
   if (empty())
     return;
+  // The model reports every CSR write, including registers this snapshot does
+  // not track (for example Spike's non-architectural mtype). Recording one of
+  // those makes getCSRPrevValue abort when self-check restores the transaction.
+  if (!InitialSnapshot.CSRs.count(RegID))
+    return;
   Transactions.back().CSRs[RegID] = Value;
   LLVM_DEBUG(dbgs() << "csr update notification: id " << RegID << ", data "
                     << Value << "\n");
