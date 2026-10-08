@@ -10,17 +10,9 @@
 # RUN:  --num-instrs=10 -o %t \
 # RUN:  -riscv-dump-rvv-config=%t.rvv.config.info
 
-sections:
-  - name:      1
-    VMA:       0x80000000
-    SIZE:      0x400000
-    LMA:       0x80000000
-    ACCESS:    rx
-  - name:      2
-    VMA:       0x80600000
-    SIZE:      0x400000
-    LMA:       0x80600000
-    ACCESS:    rw
+include:
+  - ../../Inputs/rvv-sections.yaml
+
 histogram:
 
     - [VSETIVLI, 1.0]

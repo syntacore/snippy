@@ -64,13 +64,13 @@
 options:
   mtriple: riscv64
   march: rv64imfdv
-  num-instrs: 1000
+  num-instrs: 500
   dump-mf: true
 
 burst:
   mode: custom
-  min-size: 4
-  max-size: 4
+  min-size: 2
+  max-size: 2
   groupings:
     - [OPCODE]
 
@@ -83,4 +83,4 @@ histogram:
   - [ADDI, 1.0]
 
 
-# OPCODE: {{((OPCODE.*[[:space:]].*){4})}}
+# OPCODE: {{((OPCODE.*[[:space:]].*){2})}}

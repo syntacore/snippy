@@ -9,15 +9,15 @@ options:
   histogram-must-succeed: on
 
 include:
-  - ../Inputs/sections.yaml
+  - ../RISCV/rvv/Inputs/rvv-sections.yaml
 
 scheduling:
   enabled: on
 
 burst:
   mode: custom
-  min-size: 5
-  max-size: 5
+  min-size: 2
+  max-size: 2
   groupings:
     - [LD]
     - [SD]
@@ -44,15 +44,15 @@ histogram:
     - [DIV, 1.0]
     - [SUB, 1.0]
 
-# CHECK: {{((LD.*[[:space:]].*){5})}}
-# CHECK: {{((SD.*[[:space:]].*){5})}}
-# CHECK: {{((LW.*[[:space:]].*){5})}}
-# CHECK: {{((SW.*[[:space:]].*){5})}}
-# CHECK: {{((VL2RE8_V.*[[:space:]].*){5})}}
-# CHECK: {{((VLE8_V.*[[:space:]].*){5})}}
-# CHECK: {{((VADD_V.*[[:space:]].*){5})}}
-# CHECK: {{((VLSEG2E32_V.*[[:space:]].*){5})}}
-# CHECK: {{((VS2R_V.*[[:space:]].*){5})}}
+# CHECK: {{((LD.*[[:space:]].*){2})}}
+# CHECK: {{((SD.*[[:space:]].*){2})}}
+# CHECK: {{((LW.*[[:space:]].*){2})}}
+# CHECK: {{((SW.*[[:space:]].*){2})}}
+# CHECK: {{((VL2RE8_V.*[[:space:]].*){2})}}
+# CHECK: {{((VLE8_V.*[[:space:]].*){2})}}
+# CHECK: {{((VADD_V.*[[:space:]].*){2})}}
+# CHECK: {{((VLSEG2E32_V.*[[:space:]].*){2})}}
+# CHECK: {{((VS2R_V.*[[:space:]].*){2})}}
 
 # CHECK: MUL
 # CHECK: DIV

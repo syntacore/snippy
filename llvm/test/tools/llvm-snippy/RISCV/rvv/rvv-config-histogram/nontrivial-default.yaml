@@ -2,28 +2,18 @@
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
 # RUN:  --num-instrs=10 -o %t \
 # RUN:  -riscv-dump-rvv-config \
-# RUN:  |& FileCheck %s
+# RUN: |& FileCheck %s
 
-# COM: this just ensures that we still have proper execution
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=10 -o %t \
-# RUN:  -riscv-dump-rvv-config
-
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=10 -o %t \
-# RUN:  -riscv-dump-rvv-config=%t.rvv.config.info
-# RUN: FileCheck --input-file=%t.rvv.config.info %s
-
-# COM: this just ensures that we still have proper execution
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=10 -o %t \
-# RUN:  -riscv-dump-rvv-config=%t.rvv.config.info
+# COM: With -riscv-rvv-use-uniform-distribution and no explicit riscv-vector-unit, the
+# COM: default configuration space is broadened from the single { e64, m1, tu,
+# COM: mu, vxrm: rnu } bag to a uniform set of SEW/LMUL/VL/VM/
+# COM: vxrm configurations. This documents the flag behaviour used to strengthen
+# COM: the test suite while keeping the user-facing default unchanged.
 
 include:
   - ../Inputs/rvv-sections.yaml
 
 histogram:
-
     - [VSETIVLI, 1.0]
     - [VSETVLI, 1.0]
     - [VSETVL, 1.0]

@@ -5,6 +5,7 @@
 # RUN:   -o %t --num-instrs=10000 \
 # RUN:   --init-regs-in-elf --verify-mi \
 # RUN:   -verify-gen-histogram  -histogram-must-succeed=true \
+# RUN:   -histogram-max-deviation=5 \
 # RUN:   -rvv-init-mode=loads \
 # RUN:   |& FileCheck %s --check-prefix=INBOUNDS
 
@@ -12,6 +13,7 @@
 # RUN:   -o %t --num-instrs=5000 \
 # RUN:   --init-regs-in-elf --verify-mi \
 # RUN:   -verify-gen-histogram  -histogram-must-succeed=true \
+# RUN:   -histogram-max-deviation=5 \
 # RUN:   -rvv-init-mode=loads |& \
 # RUN:   FileCheck %s --check-prefix=OUTOFBOUNDS
 

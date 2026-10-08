@@ -3970,6 +3970,13 @@ in the code.
    That is why if RVV testing is needed, then some description of reachable
    RVV configurations should be provided explicitly.
 
+   Alternatively, you can pass the ``--riscv-rvv-use-uniform-distribution``
+   command-line option to replace this default configuration with a
+   distribution that is uniform over every legal SEW, LMUL, VMA, VTA, VL,
+   VM and VXRM value. This way snippets exercise real vector-mode handling
+   (varying ``vtype``/``vl``/``vm``/``vxrm``) even when no explicit
+   ``riscv-vector-unit`` configuration is given.
+
 .. _`_reachable_vector_configurations`:
 
 Reachable Vector Configurations

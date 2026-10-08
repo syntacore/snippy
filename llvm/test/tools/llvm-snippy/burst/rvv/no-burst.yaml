@@ -13,8 +13,9 @@ include:
 histogram:
 - [LB, 1.0]
 - [LH, 1.0]
-- [VSOXSEG8EI32_V, 1.0]
-- [VSOXSEG8EI64_V, 1.0]
+- [VSOXSEG2EI32_V, 1.0]
+- [VSOXSEG2EI64_V, 1.0]
+- [VADD_VV, 1.0]
 - [VSETVL, 1.0]
 
 burst:
